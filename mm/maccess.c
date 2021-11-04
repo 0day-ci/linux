@@ -335,3 +335,267 @@ long strnlen_user_nofault(const void __user *unsafe_addr, long count)
 
 	return ret;
 }
+
+#ifdef ARCH_HAS_ATOMIC_UACCESS_HELPERS
+
+static int fix_pagefault(unsigned long uaddr, bool write_fault, int bytes)
+{
+	struct mm_struct *mm = current->mm;
+	int ret;
+
+	mmap_read_lock(mm);
+	ret = fixup_user_fault(mm, uaddr, write_fault ? FAULT_FLAG_WRITE : 0,
+			NULL);
+	mmap_read_unlock(mm);
+
+	return ret < 0 ? ret : 0;
+}
+
+int cmpxchg_user_32_nofault(u32 __user *uaddr, u32 *curr_val, u32 new_val)
+{
+	int ret = -EFAULT;
+	u32 __old = *curr_val;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	if (!user_access_begin(uaddr, sizeof(*uaddr))) {
+		pagefault_enable();
+		return -EFAULT;
+	}
+	ret = __try_cmpxchg_user_32(curr_val, uaddr, __old, new_val);
+	user_access_end();
+
+	if (!ret)
+		ret =  *curr_val == __old ? 0 : -EAGAIN;
+
+	pagefault_enable();
+	return ret;
+}
+
+int cmpxchg_user_64_nofault(u64 __user *uaddr, u64 *curr_val, u64 new_val)
+{
+	int ret = -EFAULT;
+	u64 __old = *curr_val;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	if (!user_access_begin(uaddr, sizeof(*uaddr))) {
+		pagefault_enable();
+		return -EFAULT;
+	}
+	ret = __try_cmpxchg_user_64(curr_val, uaddr, __old, new_val);
+	user_access_end();
+
+	if (!ret)
+		ret =  *curr_val == __old ? 0 : -EAGAIN;
+
+	pagefault_enable();
+
+	return ret;
+}
+
+int cmpxchg_user_32(u32 __user *uaddr, u32 *curr_val, u32 new_val)
+{
+	int ret = -EFAULT;
+	u32 __old = *curr_val;
+
+	/* Validate proper alignment. */
+	if (unlikely(((unsigned long)uaddr % sizeof(*uaddr)) ||
+			((unsigned long)curr_val % sizeof(*curr_val))))
+		return -EINVAL;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	while (true) {
+		ret = -EFAULT;
+		if (!user_access_begin(uaddr, sizeof(*uaddr)))
+			break;
+
+		ret = __try_cmpxchg_user_32(curr_val, uaddr, __old, new_val);
+		user_access_end();
+
+		if (!ret) {
+			ret =  *curr_val == __old ? 0 : -EAGAIN;
+			break;
+		}
+
+		if (fix_pagefault((unsigned long)uaddr, true, sizeof(*uaddr)) < 0)
+			break;
+	}
+
+	pagefault_enable();
+	return ret;
+}
+
+int cmpxchg_user_64(u64 __user *uaddr, u64 *curr_val, u64 new_val)
+{
+	int ret = -EFAULT;
+	u64 __old = *curr_val;
+
+	/* Validate proper alignment. */
+	if (unlikely(((unsigned long)uaddr % sizeof(*uaddr)) ||
+			((unsigned long)curr_val % sizeof(*curr_val))))
+		return -EINVAL;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	while (true) {
+		ret = -EFAULT;
+		if (!user_access_begin(uaddr, sizeof(*uaddr)))
+			break;
+
+		ret = __try_cmpxchg_user_64(curr_val, uaddr, __old, new_val);
+		user_access_end();
+
+		if (!ret) {
+			ret =  *curr_val == __old ? 0 : -EAGAIN;
+			break;
+		}
+
+		if (fix_pagefault((unsigned long)uaddr, true, sizeof(*uaddr)) < 0)
+			break;
+	}
+
+	pagefault_enable();
+	return ret;
+}
+
+/**
+ * xchg_user_[32|64][_nofault|]() - exchange 32/64-bit values
+ * @uaddr:   Destination address, in user space;
+ * @val:     Source address, in kernel space.
+ *
+ * This is the standard atomic xchg: exchange values pointed to by @uaddr and @val.
+ *
+ * The _nofault versions don't fault and can be used in
+ * atomic/preempt-disabled contexts.
+ *
+ * Return:
+ * 0      : OK/success;
+ * -EINVAL: @uaddr is not properly aligned ('may fault' versions only);
+ * -EFAULT: memory access error (including mis-aligned @uaddr in _nofault).
+ */
+int xchg_user_32_nofault(u32 __user *uaddr, u32 *val)
+{
+	int ret;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	if (!user_access_begin(uaddr, sizeof(*uaddr))) {
+		pagefault_enable();
+		return -EFAULT;
+	}
+
+	ret = __try_xchg_user_32(val, uaddr, *val);
+	user_access_end();
+
+	pagefault_enable();
+
+	return ret;
+}
+
+int xchg_user_64_nofault(u64 __user *uaddr, u64 *val)
+{
+	int ret;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	if (!user_access_begin(uaddr, sizeof(*uaddr))) {
+		pagefault_enable();
+		return -EFAULT;
+	}
+
+	ret = __try_xchg_user_64(val, uaddr, *val);
+	user_access_end();
+
+	pagefault_enable();
+
+	return ret;
+}
+
+int xchg_user_32(u32 __user *uaddr, u32 *val)
+{
+	int ret = -EFAULT;
+
+	/* Validate proper alignment. */
+	if (unlikely(((unsigned long)uaddr % sizeof(*uaddr)) ||
+			((unsigned long)val % sizeof(*val))))
+		return -EINVAL;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	while (true) {
+		ret = -EFAULT;
+		if (!user_access_begin(uaddr, sizeof(*uaddr)))
+			break;
+
+		ret = __try_xchg_user_32(val, uaddr, *val);
+		user_access_end();
+
+		if (!ret)
+			break;
+
+		if (fix_pagefault((unsigned long)uaddr, true, sizeof(*uaddr)) < 0)
+			break;
+	}
+
+	pagefault_enable();
+
+	return ret;
+}
+
+int xchg_user_64(u64 __user *uaddr, u64 *val)
+{
+	int ret = -EFAULT;
+
+	/* Validate proper alignment. */
+	if (unlikely(((unsigned long)uaddr % sizeof(*uaddr)) ||
+			((unsigned long)val % sizeof(*val))))
+		return -EINVAL;
+
+	if (unlikely(!access_ok(uaddr, sizeof(*uaddr))))
+		return -EFAULT;
+
+	pagefault_disable();
+
+	while (true) {
+		ret = -EFAULT;
+		if (!user_access_begin(uaddr, sizeof(*uaddr)))
+			break;
+
+		ret = __try_xchg_user_64(val, uaddr, *val);
+		user_access_end();
+
+		if (!ret)
+			break;
+
+		if (fix_pagefault((unsigned long)uaddr, true, sizeof(*uaddr)) < 0)
+			break;
+	}
+
+	pagefault_enable();
+
+	return ret;
+}
+#endif		/* ARCH_HAS_ATOMIC_UACCESS_HELPERS */
