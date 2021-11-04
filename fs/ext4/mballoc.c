@@ -3957,7 +3957,7 @@ void ext4_mb_mark_bb(struct super_block *sb, ext4_fsblk_t block,
 	if (err)
 		goto out_err;
 	sync_dirty_buffer(bitmap_bh);
-	err = ext4_handle_dirty_metadata(NULL, NULL, gdp_bh);
+	ext4_handle_dirty_metadata(NULL, NULL, gdp_bh);
 	sync_dirty_buffer(gdp_bh);
 
 out_err:
