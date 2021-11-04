@@ -1403,8 +1403,10 @@ static void i915_audio_component_cleanup(struct drm_i915_private *dev_priv)
  */
 void intel_audio_init(struct drm_i915_private *dev_priv)
 {
-	if (intel_lpe_audio_init(dev_priv) < 0)
-		i915_audio_component_init(dev_priv);
+	if (!intel_lpe_audio_init(dev_priv))
+		return;
+
+	i915_audio_component_init(dev_priv);
 }
 
 /**
@@ -1414,8 +1416,8 @@ void intel_audio_init(struct drm_i915_private *dev_priv)
  */
 void intel_audio_deinit(struct drm_i915_private *dev_priv)
 {
-	if ((dev_priv)->audio.lpe.platdev != NULL)
-		intel_lpe_audio_teardown(dev_priv);
-	else
-		i915_audio_component_cleanup(dev_priv);
+	if (!intel_lpe_audio_teardown(dev_priv))
+		return;
+
+	i915_audio_component_cleanup(dev_priv);
 }
