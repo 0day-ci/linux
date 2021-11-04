@@ -136,9 +136,9 @@ nfcmrvl_submit_bulk_urb(struct nfcmrvl_usb_drv_data *drv_data, gfp_t mem_flags)
 		if (err != -EPERM && err != -ENODEV)
 			nfc_err(&drv_data->udev->dev,
 				"urb %p submission failed (%d)\n", urb, -err);
-		usb_unanchor_urb(urb);
 	}
 
+	usb_unanchor_urb(urb);
 	usb_free_urb(urb);
 
 	return err;
