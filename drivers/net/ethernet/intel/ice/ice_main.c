@@ -6241,6 +6241,51 @@ static void ice_napi_disable_all(struct ice_vsi *vsi)
 }
 
 /**
+ * ice_get_eec_state - get state of SyncE DPLL
+ * @netdev: network interface device structure
+ * @state: state of SyncE DPLL
+ * @eec_flags: EEC state flags
+ * @extack: netlink extended ack
+ */
+static int
+ice_get_eec_state(struct net_device *netdev, enum if_eec_state *state,
+		  struct netlink_ext_ack *extack)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+
+	if (!ice_is_feature_supported(pf, ICE_F_CGU))
+		return -EOPNOTSUPP;
+
+	*state = pf->synce_dpll_state;
+
+	return 0;
+}
+
+/**
+ * ice_get_eec_src - get reference index of SyncE DPLL
+ * @netdev: network interface device structure
+ * @src: index of source reference of the SyncE DPLL
+ * @extack: netlink extended ack
+ */
+static int
+ice_get_eec_src(struct net_device *netdev, u32 *src,
+		struct netlink_ext_ack *extack)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+
+	if (!ice_is_feature_supported(pf, ICE_F_CGU))
+		return -EOPNOTSUPP;
+
+	*src = pf->synce_dpll_pin;
+
+	return 0;
+}
+
+/**
  * ice_down - Shutdown the connection
  * @vsi: The VSI being stopped
  */
@@ -8601,4 +8646,6 @@ static const struct net_device_ops ice_netdev_ops = {
 	.ndo_bpf = ice_xdp,
 	.ndo_xdp_xmit = ice_xdp_xmit,
 	.ndo_xsk_wakeup = ice_xsk_wakeup,
+	.ndo_get_eec_state = ice_get_eec_state,
+	.ndo_get_eec_src = ice_get_eec_src,
 };
