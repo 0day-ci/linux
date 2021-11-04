@@ -183,6 +183,10 @@ static int amba_probe(struct device *dev)
 	int ret;
 
 	do {
+		ret = of_amba_device_decode_irq(dev);
+		if (ret)
+			break;
+
 		ret = of_clk_set_defaults(dev->of_node, false);
 		if (ret < 0)
 			break;
@@ -395,10 +399,6 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
 	u32 size;
 	void __iomem *tmp;
 	int i, ret;
-
-	ret = of_amba_device_decode_irq(dev);
-	if (ret)
-		goto err_out;
 
 	ret = request_resource(parent, &dev->res);
 	if (ret)
