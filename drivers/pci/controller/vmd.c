@@ -10,7 +10,6 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/device.h>
 #include <linux/msi.h>
 #include <linux/pci.h>
 #include <linux/pci-acpi.h>
