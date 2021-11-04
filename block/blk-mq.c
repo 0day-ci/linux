@@ -2487,7 +2487,7 @@ static inline struct request *blk_get_plug_request(struct request_queue *q,
 	if (!plug)
 		return NULL;
 	rq = rq_list_peek(&plug->cached_rq);
-	if (!rq)
+	if (!rq || rq->q != q)
 		return NULL;
 	if (unlikely(!submit_bio_checks(bio)))
 		return ERR_PTR(-EIO);
