@@ -155,6 +155,7 @@ void *dma_direct_alloc(struct device *dev, size_t size,
 	struct page *page;
 	void *ret;
 	int err;
+	unsigned long kaddr;
 
 	size = PAGE_ALIGN(size);
 	if (attrs & DMA_ATTR_NO_WARN)
@@ -169,6 +170,11 @@ void *dma_direct_alloc(struct device *dev, size_t size,
 		if (!PageHighMem(page))
 			arch_dma_prep_coherent(page, size);
 		*dma_handle = phys_to_dma_direct(dev, page_to_phys(page));
+		if (IS_ENABLED(CONFIG_RODATA_FULL_DEFAULT_ENABLED)) {
+			kaddr = (unsigned long)phys_to_virt(dma_to_phys(dev, *dma_handle));
+			/* page remove kernel mapping for arm64 */
+			set_memory_valid(kaddr, size >> PAGE_SHIFT, 0);
+		}
 		/* return the page pointer as the opaque cookie */
 		return page;
 	}
@@ -275,9 +281,16 @@ void dma_direct_free(struct device *dev, size_t size,
 		void *cpu_addr, dma_addr_t dma_addr, unsigned long attrs)
 {
 	unsigned int page_order = get_order(size);
+	unsigned long kaddr;
 
 	if ((attrs & DMA_ATTR_NO_KERNEL_MAPPING) &&
 	    !force_dma_unencrypted(dev) && !is_swiotlb_for_alloc(dev)) {
+		if (IS_ENABLED(CONFIG_RODATA_FULL_DEFAULT_ENABLED)) {
+			size = PAGE_ALIGN(size);
+			kaddr = (unsigned long)phys_to_virt(dma_to_phys(dev, dma_addr));
+			/* page create kernel mapping for arm64 */
+			set_memory_valid(kaddr, size >> PAGE_SHIFT, 1);
+		}
 		/* cpu_addr is a struct page cookie, not a kernel address */
 		dma_free_contiguous(dev, cpu_addr, size);
 		return;
