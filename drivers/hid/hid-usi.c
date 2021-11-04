@@ -10,13 +10,17 @@
 
 #include <linux/module.h>
 #include <linux/sysfs.h>
+#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/hid.h>
+#include <linux/hid-usi.h>
 #include <linux/input.h>
 #include <linux/leds.h>
 #include <linux/workqueue.h>
 
 #include "hid-ids.h"
+
+#define USI_MAX_DEVICES		1
 
 #define USI_HAS_PENS		0
 #define USI_PENS_CONFIGURED	1
@@ -67,6 +71,12 @@ struct usi_drvdata {
 	bool need_flush;
 	struct delayed_work work;
 	u8 saved_data[USI_NUM_ATTRS];
+	bool user_pending;
+	struct completion user_work_done;
+	struct cdev cdev;
+	struct device *dev;
+	dev_t dev_id;
+	struct class *class;
 	spinlock_t lock; /* private data lock */
 };
 
@@ -237,9 +247,9 @@ static struct usi_pen *_usi_select_pen(struct usi_drvdata *usi, int index,
  *
  * Parses input event passed from input layer. This is used to detect
  * any writes to the USI driver from userspace and to program hardware
- * to the new value. No return value.
+ * to the new value. Returns 0 on success, or negative error value.
  */
-static void __usi_input_event(struct usi_drvdata *usi, unsigned int code,
+static int __usi_input_event(struct usi_drvdata *usi, unsigned int code,
 			      int value)
 {
 	struct usi_pen *pen = usi->current_pen;
@@ -251,13 +261,13 @@ static void __usi_input_event(struct usi_drvdata *usi, unsigned int code,
 		usi->update_pending);
 
 	if (code < MSC_PEN_SET_COLOR || code > MSC_PEN_SET_LINE_STYLE)
-		return;
+		return -EINVAL;
 
 	if (!pen)
-		return;
+		return -ENODEV;
 
 	if (test_bit(__msc_to_usi_id(code), &usi->update_pending))
-		return;
+		return -EBUSY;
 
 	/*
 	 * New value received, kick off the work for actually re-programming HW
@@ -276,6 +286,8 @@ static void __usi_input_event(struct usi_drvdata *usi, unsigned int code,
 
 		schedule_delayed_work(&usi->work, delay);
 	}
+
+	return 0;
 }
 
 static int _usi_input_event(struct input_dev *input, unsigned int type,
@@ -459,6 +471,11 @@ static int usi_raw_event(struct hid_device *hdev,
 				spin_lock_irqsave(&usi->lock, flags);
 				clear_bit(i, &usi->update_running);
 				spin_unlock_irqrestore(&usi->lock, flags);
+				if (usi->user_pending) {
+					complete(&usi->user_work_done);
+					usi->user_pending = false;
+				}
+
 				check_work = true;
 			}
 		}
@@ -516,6 +533,74 @@ static void _apply_quirks(struct usi_drvdata *usi, struct hid_device *hdev)
 	}
 }
 
+static long usi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	void __user *p = (void __user *)arg;
+	struct usi_pen_info info;
+	struct usi_pen *pen;
+	struct usi_drvdata *usi = file->private_data;
+	int ret;
+
+	if (cmd != USIIOCSET && cmd != USIIOCGET)
+		return -EINVAL;
+
+	if (copy_from_user(&info, p, sizeof(info)))
+		return -EFAULT;
+
+	pen = usi_find_pen(usi, info.index);
+	if (!pen)
+		return -ENODEV;
+
+	switch (cmd) {
+	case USIIOCSET:
+		if (info.code < MSC_PEN_SET_COLOR ||
+		    info.code > MSC_PEN_SET_LINE_STYLE)
+			return -EINVAL;
+
+		init_completion(&usi->user_work_done);
+
+		ret = __usi_input_event(usi, info.code, info.value);
+		if (ret)
+			return ret;
+
+		usi->user_pending = true;
+		ret = wait_for_completion_timeout(&usi->user_work_done,
+						  usi->timeout * 2);
+		if (!ret) {
+			usi->user_pending = false;
+			return -ETIMEDOUT;
+		}
+		return 0;
+
+	case USIIOCGET:
+		ret = __usi_pen_get_value(pen, info.code);
+		if (ret < 0)
+			return ret;
+
+		info.value = ret;
+
+		if (copy_to_user(p, &info, sizeof(info)))
+			return -EFAULT;
+
+		return sizeof(info);
+	}
+
+	return -EINVAL;
+}
+
+static int usi_open(struct inode *inode, struct file *file)
+{
+	struct usi_drvdata *usi = container_of(inode->i_cdev,
+					       struct usi_drvdata, cdev);
+	file->private_data = usi;
+	return 0;
+}
+
+static const struct file_operations usi_ops = {
+	.unlocked_ioctl = usi_ioctl,
+	.open = usi_open,
+};
+
 static int usi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 {
 	int ret;
@@ -529,28 +614,61 @@ static int usi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 
 	usi->hdev = hdev;
 
+	ret = alloc_chrdev_region(&usi->dev_id, 0, USI_MAX_DEVICES, "usi");
+	if (ret < 0)
+		return ret;
+
+	cdev_init(&usi->cdev, &usi_ops);
+	ret = cdev_add(&usi->cdev, usi->dev_id, USI_MAX_DEVICES);
+	if (ret < 0)
+		goto err;
+
+	usi->class = class_create(THIS_MODULE, "usi");
+	if (IS_ERR(usi->class)) {
+		ret = PTR_ERR(usi->class);
+		goto err;
+	}
+
+	usi->dev = device_create(usi->class, &hdev->dev, usi->dev_id, NULL,
+				 "usi");
+	if (IS_ERR(usi->dev)) {
+		ret = PTR_ERR(usi->dev);
+		goto err_class;
+	}
+
 	hid_set_drvdata(hdev, usi);
 
 	ret = hid_parse(hdev);
 	if (ret)
-		return ret;
+		goto err_dev;
 
 	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
 	if (ret)
-		goto err;
+		goto err_dev;
 
 	_apply_quirks(usi, hdev);
 
 	return 0;
 
+err_dev:
+	device_destroy(usi->class, usi->dev_id);
+
+err_class:
+	class_destroy(usi->class);
+
 err:
-	hid_hw_stop(hdev);
+	unregister_chrdev_region(usi->dev_id, USI_MAX_DEVICES);
 	return ret;
 }
 
 static void usi_remove(struct hid_device *hdev)
 {
+	struct usi_drvdata *usi = hid_get_drvdata(hdev);
+
 	hid_hw_stop(hdev);
+	device_destroy(usi->class, usi->dev_id);
+	class_destroy(usi->class);
+	unregister_chrdev_region(usi->dev_id, USI_MAX_DEVICES);
 }
 
 /**

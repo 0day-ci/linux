@@ -153,6 +153,7 @@ Code  Seq#    Include File                                           Comments
 'H'   C0-DF  net/bluetooth/cmtp/cmtp.h                               conflict!
 'H'   C0-DF  net/bluetooth/bnep/bnep.h                               conflict!
 'H'   F1     linux/hid-roccat.h                                      <mailto:erazor_de@users.sourceforge.net>
+'H'   F2-F3  linux/hid-usi.h
 'H'   F8-FA  sound/firewire.h
 'I'   all    linux/isdn.h                                            conflict!
 'I'   00-0F  drivers/isdn/divert/isdn_divert.h                       conflict!
