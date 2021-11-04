@@ -2797,7 +2797,9 @@ static int vmap_pfn_apply(pte_t *pte, unsigned long addr, void *private)
 
 	if (WARN_ON_ONCE(pfn_valid(data->pfns[data->idx])))
 		return -EINVAL;
-	*pte = pte_mkspecial(pfn_pte(data->pfns[data->idx++], data->prot));
+	*pte = pte_mkspecial(pfn_pte(data->pfns[data->idx], data->prot));
+	data->idx++;
+
 	return 0;
 }
 
