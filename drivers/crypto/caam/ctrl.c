@@ -805,12 +805,18 @@ static int caam_probe(struct platform_device *pdev)
 	for_each_available_child_of_node(nprop, np)
 		if (of_device_is_compatible(np, "fsl,sec-v4.0-job-ring") ||
 		    of_device_is_compatible(np, "fsl,sec4.0-job-ring")) {
-			ctrlpriv->jr[ring] = (struct caam_job_ring __iomem __force *)
-					     ((__force uint8_t *)ctrl +
-					     (ring + JR_BLOCK_NUMBER) *
-					      BLOCK_OFFSET
-					     );
-			ctrlpriv->total_jobrs++;
+			/* Check if the JR is not owned exclusively by TZ */
+			if (!((rd_reg32(&ctrl->jr_mid[ring].liodn_ms)) &
+				(MSTRID_LOCK_TZ_OWN | MSTRID_LOCK_PRIM_TZ))) {
+				ctrlpriv->jr[ring] = (struct caam_job_ring __iomem __force *)
+						     ((__force uint8_t *)ctrl +
+						     (ring + JR_BLOCK_NUMBER) *
+						      BLOCK_OFFSET
+						     );
+				/* Indicate that this JR is available for NS */
+				ctrlpriv->jobr_ns_flags |= BIT(ring);
+				ctrlpriv->total_jobrs++;
+			}
 			ring++;
 		}
 

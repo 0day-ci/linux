@@ -511,9 +511,26 @@ static int caam_jr_probe(struct platform_device *pdev)
 	struct device_node *nprop;
 	struct caam_job_ring __iomem *ctrl;
 	struct caam_drv_private_jr *jrpriv;
+	struct caam_drv_private *caamctrlpriv;
 	static int total_jobrs;
 	struct resource *r;
 	int error;
+
+	/* Before we proceed with the JR device probing, verify
+	 * that the job ring itself is available to Non-Secure world.
+	 * If the JR is owned exclusively by TZ - we should not even
+	 * process it further.
+	 */
+	caamctrlpriv = dev_get_drvdata(pdev->dev.parent);
+	if (!(caamctrlpriv->jobr_ns_flags & BIT(total_jobrs))) {
+		/* This job ring is marked to be exclusively used by TZ,
+		 * do not proceed with probing as the HW block is inaccessible.
+		 * Increment total seen JR devices since it is used as the index
+		 * into verification and fail probing for this node.
+		 */
+		total_jobrs++;
+		return -ENODEV;
+	}
 
 	jrdev = &pdev->dev;
 	jrpriv = devm_kzalloc(jrdev, sizeof(*jrpriv), GFP_KERNEL);

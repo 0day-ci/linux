@@ -91,6 +91,7 @@ struct caam_drv_private {
 	 * or from register-based version detection code
 	 */
 	u8 total_jobrs;		/* Total Job Rings in device */
+	u8 jobr_ns_flags;	/* Flags for each Job Ring if it is not owned by TZ*/
 	u8 qi_present;		/* Nonzero if QI present in device */
 	u8 mc_en;		/* Nonzero if MC f/w is active */
 	int secvio_irq;		/* Security violation interrupt number */

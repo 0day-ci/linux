@@ -445,10 +445,12 @@ struct caam_perfmon {
 };
 
 /* LIODN programming for DMA configuration */
-#define MSTRID_LOCK_LIODN	0x80000000
-#define MSTRID_LOCK_MAKETRUSTED	0x00010000	/* only for JR masterid */
+#define MSTRID_LOCK_LIODN		BIT(31)
+#define MSTRID_LOCK_MAKETRUSTED	BIT(16)	/* only for JR: masterid */
+#define MSTRID_LOCK_TZ_OWN		BIT(15)	/* only for JR: owned by TZ */
+#define MSTRID_LOCK_PRIM_TZ		BIT(4)	/* only for JR: Primary TZ */
 
-#define MSTRID_LIODN_MASK	0x0fff
+#define MSTRID_LIODN_MASK		GENMASK(11, 0)
 struct masterid {
 	u32 liodn_ms;	/* lock and make-trusted control bits */
 	u32 liodn_ls;	/* LIODN for non-sequence and seq access */
