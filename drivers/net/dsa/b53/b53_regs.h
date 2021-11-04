@@ -50,6 +50,12 @@
 /* Jumbo Frame Registers */
 #define B53_JUMBO_PAGE			0x40
 
+/* BroadSync HD Register Page */
+#define B53_BROADSYNC_PAGE		0x90
+
+/* Traffic Remarking Register Page */
+#define B53_TRAFFICREMARKING_PAGE	0x91
+
 /* EEE Control Registers Page */
 #define B53_EEE_PAGE			0x92
 
@@ -478,6 +484,38 @@
 #define B53_JUMBO_MAX_SIZE_63XX		0x08
 #define   JMS_MIN_SIZE			1518
 #define   JMS_MAX_SIZE			9724
+
+/*************************************************************************
+ * BroadSync HD Page Registers
+ *************************************************************************/
+
+#define B53_BROADSYNC_EN_CTRL1		0x00
+#define B53_BROADSYNC_EN_CTRL2		0x01
+#define B53_BROADSYNC_TS_REPORT_CTRL	0x02
+#define B53_BROADSYNC_PCP_CTRL		0x03
+#define B53_BROADSYNC_MAX_SDU		0x04
+#define B53_BROADSYNC_TIMEBASE1		0x10
+#define B53_BROADSYNC_TIMEBASE2		0x11
+#define B53_BROADSYNC_TIMEBASE3		0x12
+#define B53_BROADSYNC_TIMEBASE4		0x13
+#define B53_BROADSYNC_TIMEBASE_ADJ1	0x14
+#define B53_BROADSYNC_TIMEBASE_ADJ2	0x15
+#define B53_BROADSYNC_TIMEBASE_ADJ3	0x16
+#define B53_BROADSYNC_TIMEBASE_ADJ4	0x17
+#define B53_BROADSYNC_SLOT_CNT1		0x18
+#define B53_BROADSYNC_SLOT_CNT2		0x19
+#define B53_BROADSYNC_SLOT_CNT3		0x1a
+#define B53_BROADSYNC_SLOT_CNT4		0x1b
+#define B53_BROADSYNC_SLOT_ADJ1		0x1c
+#define B53_BROADSYNC_SLOT_ADJ2		0x1d
+#define B53_BROADSYNC_SLOT_ADJ3		0x1e
+#define B53_BROADSYNC_SLOT_ADJ4		0x1f
+#define B53_BROADSYNC_CLS5_BW_CTRL	0x30
+#define B53_BROADSYNC_CLS4_BW_CTRL	0x60
+#define B53_BROADSYNC_EGRESS_TS		0x90
+#define B53_BROADSYNC_EGRESS_TS_STS	0xd0
+#define B53_BROADSYNC_LINK_STS1		0xe0
+#define B53_BROADSYNC_LINK_STS2		0xe1
 
 /*************************************************************************
  * EEE Configuration Page Registers
