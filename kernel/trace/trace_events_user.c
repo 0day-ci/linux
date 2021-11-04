@@ -39,6 +39,10 @@
 #define MAX_EVENT_DESC 512
 #define EVENT_NAME(user_event) ((user_event)->tracepoint.name)
 
+#define MAX_BPF_COPY_SIZE PAGE_SIZE
+#define MAX_STACK_BPF_DATA 512
+#define copy_nofault copy_from_iter_nocache
+
 static char *register_page_data;
 
 static DEFINE_MUTEX(reg_mutex);
@@ -63,8 +67,7 @@ struct user_event_refs {
 	struct user_event *events[];
 };
 
-typedef void (*user_event_func_t) (struct user_event *user,
-				   void *data, u32 datalen,
+typedef void (*user_event_func_t) (struct user_event *user, struct iov_iter *i,
 				   void *tpdata);
 
 static int user_event_parse(char *name, char *args, char *flags,
@@ -491,7 +494,7 @@ static struct user_event *find_user_event(char *name, u32 *outkey)
 /*
  * Writes the user supplied payload out to a trace file.
  */
-static void user_event_ftrace(struct user_event *user, void *data, u32 datalen,
+static void user_event_ftrace(struct user_event *user, struct iov_iter *i,
 			      void *tpdata)
 {
 	struct trace_event_file *file;
@@ -506,41 +509,82 @@ static void user_event_ftrace(struct user_event *user, void *data, u32 datalen,
 		return;
 
 	entry = trace_event_buffer_reserve(&event_buffer, file,
-					   sizeof(*entry) + datalen);
+					   sizeof(*entry) + i->count);
 
 	if (unlikely(!entry))
 		return;
 
-	memcpy(entry + 1, data, datalen);
+	if (unlikely(!copy_nofault(entry + 1, i->count, i)))
+		return;
 
 	trace_event_buffer_commit(&event_buffer);
 }
 
 #ifdef CONFIG_PERF_EVENTS
+static void user_event_bpf(struct user_event *user, struct iov_iter *i)
+{
+	struct user_bpf_context context;
+	struct user_bpf_iter bpf_i;
+	char fast_data[MAX_STACK_BPF_DATA];
+	void *temp = NULL;
+
+	if ((user->flags & FLAG_BPF_ITER) && iter_is_iovec(i)) {
+		/* Raw iterator */
+		context.data_type = USER_BPF_DATA_ITER;
+		context.data_len = i->count;
+		context.iter = &bpf_i;
+
+		bpf_i.iov_offset = i->iov_offset;
+		bpf_i.iov = i->iov;
+		bpf_i.nr_segs = i->nr_segs;
+	} else if (i->nr_segs == 1 && iter_is_iovec(i)) {
+		/* Single buffer from user */
+		context.data_type = USER_BPF_DATA_USER;
+		context.data_len = i->count;
+		context.udata = i->iov->iov_base + i->iov_offset;
+	} else {
+		/* Multi buffer from user */
+		struct iov_iter copy = *i;
+		size_t copy_size = min(i->count, MAX_BPF_COPY_SIZE);
+
+		context.data_type = USER_BPF_DATA_KERNEL;
+		context.kdata = fast_data;
+
+		if (unlikely(copy_size > sizeof(fast_data))) {
+			temp = kmalloc(copy_size, GFP_NOWAIT);
+
+			if (temp)
+				context.kdata = temp;
+			else
+				copy_size = sizeof(fast_data);
+		}
+
+		context.data_len = copy_nofault(context.kdata,
+						copy_size, &copy);
+	}
+
+	trace_call_bpf(&user->call, &context);
+
+	kfree(temp);
+}
+
 /*
  * Writes the user supplied payload out to perf ring buffer or eBPF program.
  */
-static void user_event_perf(struct user_event *user, void *data, u32 datalen,
+static void user_event_perf(struct user_event *user, struct iov_iter *i,
 			    void *tpdata)
 {
 	struct hlist_head *perf_head;
 
-	if (bpf_prog_array_valid(&user->call)) {
-		struct user_bpf_context context = {0};
-
-		context.data_len = datalen;
-		context.data_type = USER_BPF_DATA_KERNEL;
-		context.kdata = data;
-
-		trace_call_bpf(&user->call, &context);
-	}
+	if (bpf_prog_array_valid(&user->call))
+		user_event_bpf(user, i);
 
 	perf_head = this_cpu_ptr(user->call.perf_events);
 
 	if (perf_head && !hlist_empty(perf_head)) {
 		struct trace_entry *perf_entry;
 		struct pt_regs *regs;
-		size_t size = sizeof(*perf_entry) + datalen;
+		size_t size = sizeof(*perf_entry) + i->count;
 		int context;
 
 		perf_entry = perf_trace_buf_alloc(ALIGN(size, 8),
@@ -551,7 +595,8 @@ static void user_event_perf(struct user_event *user, void *data, u32 datalen,
 
 		perf_fetch_caller_regs(regs);
 
-		memcpy(perf_entry + 1, data, datalen);
+		if (unlikely(!copy_nofault(perf_entry + 1, i->count, i)))
+			return;
 
 		perf_trace_buf_submit(perf_entry, size, context,
 				      user->call.event.type, 1, regs,
@@ -961,32 +1006,28 @@ static ssize_t user_events_write_core(struct file *file, struct iov_iter *i)
 	if (likely(atomic_read(&tp->key.enabled) > 0)) {
 		struct tracepoint_func *probe_func_ptr;
 		user_event_func_t probe_func;
+		struct iov_iter copy;
 		void *tpdata;
-		void *kdata;
-		u32 datalen;
 
-		kdata = kmalloc(i->count, GFP_KERNEL);
-
-		if (unlikely(!kdata))
-			return -ENOMEM;
-
-		datalen = copy_from_iter(kdata, i->count, i);
+		if (unlikely(iov_iter_fault_in_readable(i, i->count)))
+			return -EFAULT;
 
 		rcu_read_lock_sched();
+		pagefault_disable();
 
 		probe_func_ptr = rcu_dereference_sched(tp->funcs);
 
 		if (probe_func_ptr) {
 			do {
+				copy = *i;
 				probe_func = probe_func_ptr->func;
 				tpdata = probe_func_ptr->data;
-				probe_func(user, kdata, datalen, tpdata);
+				probe_func(user, &copy, tpdata);
 			} while ((++probe_func_ptr)->func);
 		}
 
+		pagefault_enable();
 		rcu_read_unlock_sched();
-
-		kfree(kdata);
 	}
 
 	return ret;
