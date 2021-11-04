@@ -1265,7 +1265,6 @@ static void fadump_release_reserved_area(u64 start, u64 end)
 static void sort_and_merge_mem_ranges(struct fadump_mrange_info *mrange_info)
 {
 	struct fadump_memory_range *mem_ranges;
-	struct fadump_memory_range tmp_range;
 	u64 base, size;
 	int i, j, idx;
 
@@ -1281,9 +1280,7 @@ static void sort_and_merge_mem_ranges(struct fadump_mrange_info *mrange_info)
 				idx = j;
 		}
 		if (idx != i) {
-			tmp_range = mem_ranges[idx];
-			mem_ranges[idx] = mem_ranges[i];
-			mem_ranges[i] = tmp_range;
+			swap(mem_ranges[idx], mem_ranges[i]);
 		}
 	}
 
