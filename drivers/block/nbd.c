@@ -2373,7 +2373,6 @@ static int nbd_genl_status(struct sk_buff *skb, struct genl_info *info)
 	reply_head = genlmsg_put_reply(reply, info, &nbd_genl_family, 0,
 				       NBD_CMD_STATUS);
 	if (!reply_head) {
-		nlmsg_free(reply);
 		goto out;
 	}
 
@@ -2381,7 +2380,6 @@ static int nbd_genl_status(struct sk_buff *skb, struct genl_info *info)
 	if (index == -1) {
 		ret = idr_for_each(&nbd_index_idr, &status_cb, reply);
 		if (ret) {
-			nlmsg_free(reply);
 			goto out;
 		}
 	} else {
@@ -2390,7 +2388,6 @@ static int nbd_genl_status(struct sk_buff *skb, struct genl_info *info)
 		if (nbd) {
 			ret = populate_nbd_status(nbd, reply);
 			if (ret) {
-				nlmsg_free(reply);
 				goto out;
 			}
 		}
@@ -2399,6 +2396,8 @@ static int nbd_genl_status(struct sk_buff *skb, struct genl_info *info)
 	genlmsg_end(reply, reply_head);
 	ret = genlmsg_reply(reply, info);
 out:
+	if (reply)
+		nlmsg_free(reply);
 	mutex_unlock(&nbd_index_mutex);
 	return ret;
 }
