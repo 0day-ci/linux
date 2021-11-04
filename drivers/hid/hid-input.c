@@ -1714,6 +1714,7 @@ static struct hid_input *hidinput_allocate(struct hid_device *hid,
 		case HID_GD_MOUSE:
 			suffix = "Mouse";
 			break;
+		case HID_DG_PEN:
 		case HID_DG_STYLUS:
 			suffix = "Pen";
 			break;
