@@ -242,16 +242,10 @@ static void wd_smp_clear_cpu_pending(int cpu)
 {
 	if (!cpumask_test_cpu(cpu, &wd_smp_cpus_pending)) {
 		if (unlikely(cpumask_test_cpu(cpu, &wd_smp_cpus_stuck))) {
-			struct pt_regs *regs = get_irq_regs();
 			unsigned long flags;
 
 			pr_emerg("CPU %d became unstuck TB:%lld\n",
 				 cpu, get_tb());
-			print_irqtrace_events(current);
-			if (regs)
-				show_regs(regs);
-			else
-				dump_stack();
 
 			wd_smp_lock(&flags);
 			cpumask_clear_cpu(cpu, &wd_smp_cpus_stuck);
