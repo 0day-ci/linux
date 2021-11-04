@@ -100,6 +100,10 @@ static int ite_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	if (ret)
 		return ret;
 
+	ret = hid_parse(hdev);
+	if (ret)
+		return ret;
+
 	return hid_hw_start(hdev, HID_CONNECT_DEFAULT);
 }
 
