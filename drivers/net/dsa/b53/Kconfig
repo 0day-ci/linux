@@ -45,3 +45,10 @@ config B53_SERDES
 	default ARCH_BCM_NSP
 	help
 	  Select to enable support for SerDes on e.g: Northstar Plus SoCs.
+
+config B53_PTP
+	bool "B53 PTP support"
+	depends on B53
+	depends on PTP_1588_CLOCK
+	help
+	  Select to enable support for PTP

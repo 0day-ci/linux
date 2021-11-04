@@ -31,6 +31,7 @@
 
 #include "b53_regs.h"
 #include "b53_priv.h"
+#include "b53_ptp.h"
 
 struct b53_mib_desc {
 	u8 size;
@@ -1131,12 +1132,24 @@ static int b53_setup(struct dsa_switch *ds)
 			b53_disable_port(ds, port);
 	}
 
+	if (dev->broadsync_hd) {
+		ret = b53_ptp_init(dev);
+		if (ret) {
+			dev_err(ds->dev, "failed to initialize PTP\n");
+			return ret;
+		}
+	}
+
 	return b53_setup_devlink_resources(ds);
 }
 
 static void b53_teardown(struct dsa_switch *ds)
 {
+	struct b53_device *dev = ds->priv;
+
 	dsa_devlink_resources_unregister(ds);
+	if (dev->broadsync_hd)
+		b53_ptp_exit(ds->priv);
 }
 
 static void b53_force_link(struct b53_device *dev, int port, int link)
@@ -2286,6 +2299,7 @@ static const struct dsa_switch_ops b53_switch_ops = {
 	.port_mdb_del		= b53_mdb_del,
 	.port_max_mtu		= b53_get_max_mtu,
 	.port_change_mtu	= b53_change_mtu,
+	.get_ts_info		= b53_get_ts_info,
 };
 
 struct b53_chip_data {
@@ -2301,6 +2315,7 @@ struct b53_chip_data {
 	u8 duplex_reg;
 	u8 jumbo_pm_reg;
 	u8 jumbo_size_reg;
+	bool broadsync_hd;
 };
 
 #define B53_VTA_REGS	\
@@ -2421,6 +2436,7 @@ static const struct b53_chip_data b53_switch_chips[] = {
 		.duplex_reg = B53_DUPLEX_STAT_GE,
 		.jumbo_pm_reg = B53_JUMBO_PORT_MASK,
 		.jumbo_size_reg = B53_JUMBO_MAX_SIZE,
+		.broadsync_hd = true,
 	},
 	{
 		.chip_id = BCM63XX_DEVICE_ID,
@@ -2589,6 +2605,7 @@ static int b53_switch_init(struct b53_device *dev)
 			dev->num_vlans = chip->vlans;
 			dev->num_arl_bins = chip->arl_bins;
 			dev->num_arl_buckets = chip->arl_buckets;
+			dev->broadsync_hd = chip->broadsync_hd;
 			break;
 		}
 	}

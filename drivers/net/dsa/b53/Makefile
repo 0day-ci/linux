@@ -6,3 +6,4 @@ obj-$(CONFIG_B53_MDIO_DRIVER)	+= b53_mdio.o
 obj-$(CONFIG_B53_MMAP_DRIVER)	+= b53_mmap.o
 obj-$(CONFIG_B53_SRAB_DRIVER)	+= b53_srab.o
 obj-$(CONFIG_B53_SERDES)	+= b53_serdes.o
+obj-$(CONFIG_B53_PTP)		+= b53_ptp.o
