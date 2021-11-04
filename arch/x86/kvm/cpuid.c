@@ -99,11 +99,46 @@ static int kvm_check_cpuid(struct kvm_cpuid_entry2 *entries, int nent)
 	return 0;
 }
 
+static void kvm_update_cpuid_base(struct kvm_vcpu *vcpu)
+{
+	u32 function;
+
+	for (function = 0x40000000; function < 0x40010000; function += 0x100) {
+		struct kvm_cpuid_entry2 *best = kvm_find_cpuid_entry(vcpu, function, 0);
+
+		if (best) {
+			char signature[12];
+
+			*(u32 *)&signature[0] = best->ebx;
+			*(u32 *)&signature[4] = best->ecx;
+			*(u32 *)&signature[8] = best->edx;
+
+			if (!memcmp(signature, "KVMKVMKVM\0\0\0", 12))
+				break;
+		}
+	}
+	vcpu->arch.kvm_cpuid_base = function;
+}
+
+static inline bool kvm_get_cpuid_base(struct kvm_vcpu *vcpu, u32 *function)
+{
+	if (vcpu->arch.kvm_cpuid_base < 0x40000000 ||
+	    vcpu->arch.kvm_cpuid_base >= 0x40010000)
+		return false;
+
+	*function = vcpu->arch.kvm_cpuid_base;
+	return true;
+}
+
 void kvm_update_pv_runtime(struct kvm_vcpu *vcpu)
 {
+	u32 base;
 	struct kvm_cpuid_entry2 *best;
 
-	best = kvm_find_cpuid_entry(vcpu, KVM_CPUID_FEATURES, 0);
+	if (!kvm_get_cpuid_base(vcpu, &base))
+		return;
+
+	best = kvm_find_cpuid_entry(vcpu, base + KVM_CPUID_FEATURES, 0);
 
 	/*
 	 * save the feature bitmap to avoid cpuid lookup for every PV
@@ -116,6 +151,7 @@ void kvm_update_pv_runtime(struct kvm_vcpu *vcpu)
 void kvm_update_cpuid_runtime(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
+	u32 base;
 
 	best = kvm_find_cpuid_entry(vcpu, 1, 0);
 	if (best) {
@@ -142,10 +178,14 @@ void kvm_update_cpuid_runtime(struct kvm_vcpu *vcpu)
 		     cpuid_entry_has(best, X86_FEATURE_XSAVEC)))
 		best->ebx = xstate_required_size(vcpu->arch.xcr0, true);
 
-	best = kvm_find_cpuid_entry(vcpu, KVM_CPUID_FEATURES, 0);
-	if (kvm_hlt_in_guest(vcpu->kvm) && best &&
-		(best->eax & (1 << KVM_FEATURE_PV_UNHALT)))
-		best->eax &= ~(1 << KVM_FEATURE_PV_UNHALT);
+	kvm_update_cpuid_base(vcpu);
+
+	if (kvm_get_cpuid_base(vcpu, &base)) {
+		best = kvm_find_cpuid_entry(vcpu, base + KVM_CPUID_FEATURES, 0);
+		if (kvm_hlt_in_guest(vcpu->kvm) && best &&
+		    (best->eax & (1 << KVM_FEATURE_PV_UNHALT)))
+			best->eax &= ~(1 << KVM_FEATURE_PV_UNHALT);
+	}
 
 	if (!kvm_check_has_quirk(vcpu->kvm, KVM_X86_QUIRK_MISC_ENABLE_NO_MWAIT)) {
 		best = kvm_find_cpuid_entry(vcpu, 0x1, 0);
