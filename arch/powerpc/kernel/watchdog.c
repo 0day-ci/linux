@@ -94,6 +94,10 @@ static u64 wd_smp_last_reset_tb;
  * Try to take the exclusive watchdog action / NMI IPI / printing lock.
  * wd_smp_lock must be held. If this fails, we should return and wait
  * for the watchdog to kick in again (or another CPU to trigger it).
+ *
+ * Importantly, if hardlockup_panic is set, wd_try_report failure should
+ * not delay the panic, because whichever other CPU is reporting will
+ * call panic.
  */
 static bool wd_try_report(void)
 {
@@ -153,7 +157,7 @@ static void wd_lockup_ipi(struct pt_regs *regs)
 	/* Do not panic from here because that can recurse into NMI IPI layer */
 }
 
-static bool set_cpu_stuck(int cpu, u64 tb)
+static bool set_cpu_stuck(int cpu)
 {
 	cpumask_set_cpu(cpu, &wd_smp_cpus_stuck);
 	cpumask_clear_cpu(cpu, &wd_smp_cpus_pending);
@@ -162,7 +166,7 @@ static bool set_cpu_stuck(int cpu, u64 tb)
 	 */
 	smp_mb();
 	if (cpumask_empty(&wd_smp_cpus_pending)) {
-		wd_smp_last_reset_tb = tb;
+		wd_smp_last_reset_tb = get_tb();
 		cpumask_andnot(&wd_smp_cpus_pending,
 				&wd_cpus_enabled,
 				&wd_smp_cpus_stuck);
@@ -171,14 +175,16 @@ static bool set_cpu_stuck(int cpu, u64 tb)
 	return false;
 }
 
-static void watchdog_smp_panic(int cpu, u64 tb)
+static void watchdog_smp_panic(int cpu)
 {
 	static cpumask_t wd_smp_cpus_ipi; // protected by reporting
 	unsigned long flags;
+	u64 tb;
 	int c;
 
 	wd_smp_lock(&flags);
 	/* Double check some things under lock */
+	tb = get_tb();
 	if ((s64)(tb - wd_smp_last_reset_tb) < (s64)wd_smp_panic_timeout_tb)
 		goto out;
 	if (cpumask_test_cpu(cpu, &wd_smp_cpus_pending))
@@ -192,7 +198,7 @@ static void watchdog_smp_panic(int cpu, u64 tb)
 			continue; // should not happen
 
 		__cpumask_set_cpu(c, &wd_smp_cpus_ipi);
-		if (set_cpu_stuck(c, tb))
+		if (set_cpu_stuck(c))
 			break;
 	}
 	if (cpumask_empty(&wd_smp_cpus_ipi)) {
@@ -232,7 +238,7 @@ out:
 	wd_smp_unlock(&flags);
 }
 
-static void wd_smp_clear_cpu_pending(int cpu, u64 tb)
+static void wd_smp_clear_cpu_pending(int cpu)
 {
 	if (!cpumask_test_cpu(cpu, &wd_smp_cpus_pending)) {
 		if (unlikely(cpumask_test_cpu(cpu, &wd_smp_cpus_stuck))) {
@@ -240,7 +246,7 @@ static void wd_smp_clear_cpu_pending(int cpu, u64 tb)
 			unsigned long flags;
 
 			pr_emerg("CPU %d became unstuck TB:%lld\n",
-				 cpu, tb);
+				 cpu, get_tb());
 			print_irqtrace_events(current);
 			if (regs)
 				show_regs(regs);
@@ -301,7 +307,7 @@ none_pending:
 		 */
 		wd_smp_lock(&flags);
 		if (cpumask_empty(&wd_smp_cpus_pending)) {
-			wd_smp_last_reset_tb = tb;
+			wd_smp_last_reset_tb = get_tb();
 			cpumask_andnot(&wd_smp_cpus_pending,
 					&wd_cpus_enabled,
 					&wd_smp_cpus_stuck);
@@ -316,10 +322,10 @@ static void watchdog_timer_interrupt(int cpu)
 
 	per_cpu(wd_timer_tb, cpu) = tb;
 
-	wd_smp_clear_cpu_pending(cpu, tb);
+	wd_smp_clear_cpu_pending(cpu);
 
 	if ((s64)(tb - wd_smp_last_reset_tb) >= (s64)wd_smp_panic_timeout_tb)
-		watchdog_smp_panic(cpu, tb);
+		watchdog_smp_panic(cpu);
 }
 
 DEFINE_INTERRUPT_HANDLER_NMI(soft_nmi_interrupt)
@@ -356,7 +362,7 @@ DEFINE_INTERRUPT_HANDLER_NMI(soft_nmi_interrupt)
 			return 0;
 		}
 
-		set_cpu_stuck(cpu, tb);
+		set_cpu_stuck(cpu);
 
 		wd_smp_unlock(&flags);
 
@@ -417,7 +423,7 @@ void arch_touch_nmi_watchdog(void)
 	tb = get_tb();
 	if (tb - per_cpu(wd_timer_tb, cpu) >= ticks) {
 		per_cpu(wd_timer_tb, cpu) = tb;
-		wd_smp_clear_cpu_pending(cpu, tb);
+		wd_smp_clear_cpu_pending(cpu);
 	}
 }
 EXPORT_SYMBOL(arch_touch_nmi_watchdog);
@@ -475,7 +481,7 @@ static void stop_watchdog(void *arg)
 	cpumask_clear_cpu(cpu, &wd_cpus_enabled);
 	wd_smp_unlock(&flags);
 
-	wd_smp_clear_cpu_pending(cpu, get_tb());
+	wd_smp_clear_cpu_pending(cpu);
 }
 
 static int stop_watchdog_on_cpu(unsigned int cpu)
