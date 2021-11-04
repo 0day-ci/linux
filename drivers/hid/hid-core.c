@@ -780,6 +780,9 @@ static void hid_scan_input_usage(struct hid_parser *parser, u32 usage)
 
 	if (usage == HID_DG_CONTACTID)
 		hid->group = HID_GROUP_MULTITOUCH;
+
+	if (usage == HID_DG_TRANSDUCER_INDEX)
+		hid->group = HID_GROUP_USI;
 }
 
 static void hid_scan_feature_usage(struct hid_parser *parser, u32 usage)

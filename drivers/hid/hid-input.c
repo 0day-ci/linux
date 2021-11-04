@@ -807,6 +807,10 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			}
 			break;
 
+		case 0x38: /* Transducer Index */
+			map_msc(MSC_PEN_ID);
+			break;
+
 		case 0x3b: /* Battery Strength */
 			hidinput_setup_battery(device, HID_INPUT_REPORT, field, false);
 			usage->type = EV_PWR;
@@ -851,6 +855,20 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 		case 0x5b: /* TransducerSerialNumber */
 			map_msc(MSC_SERIAL);
+			break;
+
+		case 0x5c: map_msc(MSC_PEN_COLOR);		break;
+		case 0x5e: map_msc(MSC_PEN_LINE_WIDTH);		break;
+
+		case 0x70:
+		case 0x71:
+		case 0x72:
+		case 0x73:
+		case 0x74:
+		case 0x75:
+		case 0x76:
+		case 0x77:
+			map_msc(MSC_PEN_LINE_STYLE);
 			break;
 
 		default:  goto unknown;
