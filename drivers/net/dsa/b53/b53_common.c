@@ -2300,6 +2300,7 @@ static const struct dsa_switch_ops b53_switch_ops = {
 	.port_max_mtu		= b53_get_max_mtu,
 	.port_change_mtu	= b53_change_mtu,
 	.get_ts_info		= b53_get_ts_info,
+	.port_rxtstamp		= b53_port_rxtstamp,
 };
 
 struct b53_chip_data {

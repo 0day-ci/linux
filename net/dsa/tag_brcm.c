@@ -9,6 +9,7 @@
 #include <linux/etherdevice.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/dsa/b53.h>
 
 #include "dsa_priv.h"
 
@@ -31,7 +32,10 @@
 /* 6th byte in the tag */
 #define BRCM_LEG_PORT_ID	(0xf)
 
-/* Newer Broadcom tag (4 bytes) */
+/* Newer Broadcom tag (4 bytes)
+ * For egress, when opcode = 0001, additional 4 bytes are used for
+ * the time stamp.
+ */
 #define BRCM_TAG_LEN	4
 
 /* Tag is constructed and desconstructed using byte by byte access
@@ -136,19 +140,26 @@ static struct sk_buff *brcm_tag_xmit_ll(struct sk_buff *skb,
  */
 static struct sk_buff *brcm_tag_rcv_ll(struct sk_buff *skb,
 				       struct net_device *dev,
-				       unsigned int offset)
+				       unsigned int offset,
+				       int *tag_len)
 {
 	int source_port;
 	u8 *brcm_tag;
+	u32 tstamp;
 
-	if (unlikely(!pskb_may_pull(skb, BRCM_TAG_LEN)))
+	*tag_len = 8;
+
+	if (unlikely(!pskb_may_pull(skb, *tag_len)))
 		return NULL;
 
 	brcm_tag = skb->data - offset;
 
-	/* The opcode should never be different than 0b000 */
-	if (unlikely((brcm_tag[0] >> BRCM_OPCODE_SHIFT) & BRCM_OPCODE_MASK))
-		return NULL;
+	if ((brcm_tag[0] >> BRCM_OPCODE_SHIFT) & BRCM_OPCODE_MASK) {
+		tstamp = brcm_tag[4] << 24 | brcm_tag[5] << 16 | brcm_tag[6] << 8 | brcm_tag[7];
+		BRCM_SKB_CB(skb)->meta_tstamp = tstamp;
+	} else {
+		*tag_len = BRCM_TAG_LEN;
+	}
 
 	/* We should never see a reserved reason code without knowing how to
 	 * handle it
@@ -164,7 +175,7 @@ static struct sk_buff *brcm_tag_rcv_ll(struct sk_buff *skb,
 		return NULL;
 
 	/* Remove Broadcom tag and update checksum */
-	skb_pull_rcsum(skb, BRCM_TAG_LEN);
+	skb_pull_rcsum(skb, *tag_len);
 
 	dsa_default_offload_fwd_mark(skb);
 
@@ -184,13 +195,14 @@ static struct sk_buff *brcm_tag_xmit(struct sk_buff *skb,
 static struct sk_buff *brcm_tag_rcv(struct sk_buff *skb, struct net_device *dev)
 {
 	struct sk_buff *nskb;
+	int tag_len;
 
 	/* skb->data points to the EtherType, the tag is right before it */
-	nskb = brcm_tag_rcv_ll(skb, dev, 2);
+	nskb = brcm_tag_rcv_ll(skb, dev, 2, &tag_len);
 	if (!nskb)
 		return nskb;
 
-	dsa_strip_etype_header(skb, BRCM_TAG_LEN);
+	dsa_strip_etype_header(skb, tag_len);
 
 	return nskb;
 }
@@ -295,8 +307,10 @@ static struct sk_buff *brcm_tag_xmit_prepend(struct sk_buff *skb,
 static struct sk_buff *brcm_tag_rcv_prepend(struct sk_buff *skb,
 					    struct net_device *dev)
 {
+	int tag_len;
+
 	/* tag is prepended to the packet */
-	return brcm_tag_rcv_ll(skb, dev, ETH_HLEN);
+	return brcm_tag_rcv_ll(skb, dev, ETH_HLEN, &tag_len);
 }
 
 static const struct dsa_device_ops brcm_prepend_netdev_ops = {

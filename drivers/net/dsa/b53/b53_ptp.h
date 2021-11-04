@@ -9,11 +9,15 @@
 
 #include "b53_priv.h"
 
+#define SKB_PTP_TYPE(__skb) (*(unsigned int *)((__skb)->cb))
+
 #ifdef CONFIG_B53_PTP
 int b53_ptp_init(struct b53_device *dev);
 void b53_ptp_exit(struct b53_device *dev);
 int b53_get_ts_info(struct dsa_switch *ds, int port,
 		    struct ethtool_ts_info *info);
+bool b53_port_rxtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb,
+		       unsigned int type);
 #else /* !CONFIG_B53_PTP */
 
 static inline int b53_ptp_init(struct b53_device *dev)
@@ -29,6 +33,12 @@ static inline int b53_get_ts_info(struct dsa_switch *ds, int port,
 				  struct ethtool_ts_info *info)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline bool b53_port_rxtstamp(struct dsa_switch *ds, int port,
+				     struct sk_buff *skb, unsigned int type)
+{
+	return false;
 }
 
 #endif
