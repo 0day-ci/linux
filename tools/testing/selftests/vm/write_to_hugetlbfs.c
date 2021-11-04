@@ -37,8 +37,8 @@ static int shmid;
 static void exit_usage(void)
 {
 	printf("Usage: %s -p <path to hugetlbfs file> -s <size to map> "
-	       "[-m <0=hugetlbfs | 1=mmap(MAP_HUGETLB)>] [-l] [-r] "
-	       "[-o] [-w] [-n]\n",
+	       "[-m <0=hugetlbfs | 1=mmap(MAP_HUGETLB)>] [-l(sleep)] [-r(private)] "
+	       "[-o(populate)] [-w(rite)] [-n(o-reserve)]\n",
 	       self);
 	exit(EXIT_FAILURE);
 }
@@ -160,6 +160,11 @@ int main(int argc, char **argv)
 		printf("NO_RESERVE mapping.\n");
 	else
 		printf("RESERVE mapping.\n");
+
+	if (want_sleep)
+		printf("Sleeping\n");
+	else
+		printf("Not sleeping\n");
 
 	switch (method) {
 	case HUGETLBFS:
