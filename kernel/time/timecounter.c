@@ -39,6 +39,9 @@ static u64 timecounter_read_delta(struct timecounter *tc)
 	/* calculate the delta since the last timecounter_read_delta(): */
 	cycle_delta = (cycle_now - tc->cycle_last) & tc->cc->mask;
 
+	if (tc->cc->overflow_point && (cycle_now - tc->cycle_last) > tc->cc->mask)
+		cycle_delta -= tc->cc->mask - tc->cc->overflow_point;
+
 	/* convert to nanoseconds: */
 	ns_offset = cyclecounter_cyc2ns(tc->cc, cycle_delta,
 					tc->mask, &tc->frac);

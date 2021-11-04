@@ -26,12 +26,15 @@
  *			see CYCLECOUNTER_MASK() helper macro
  * @mult:		cycle to nanosecond multiplier
  * @shift:		cycle to nanosecond divisor (power of two)
+ * @overflow_point:	non-power of two overflow point (optional),
+ *			smaller than mask
  */
 struct cyclecounter {
 	u64 (*read)(const struct cyclecounter *cc);
 	u64 mask;
 	u32 mult;
 	u32 shift;
+	u64 overflow_point;
 };
 
 /**
