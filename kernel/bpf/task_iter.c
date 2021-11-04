@@ -8,6 +8,7 @@
 #include <linux/fdtable.h>
 #include <linux/filter.h>
 #include <linux/btf_ids.h>
+#include "mmap_unlock_work.h"
 
 struct bpf_iter_seq_task_common {
 	struct pid_namespace *ns;
@@ -584,6 +585,54 @@ static struct bpf_iter_reg task_vma_reg_info = {
 		  PTR_TO_BTF_ID_OR_NULL },
 	},
 	.seq_info		= &task_vma_seq_info,
+};
+
+BPF_CALL_5(bpf_find_vma, struct task_struct *, task, u64, start,
+	   bpf_callback_t, callback_fn, void *, callback_ctx, u64, flags)
+{
+	struct mmap_unlock_irq_work *work = NULL;
+	struct vm_area_struct *vma;
+	bool irq_work_busy = false;
+	struct mm_struct *mm;
+	int ret = -ENOENT;
+
+	if (flags)
+		return -EINVAL;
+
+	if (!task)
+		return -ENOENT;
+
+	mm = task->mm;
+	if (!mm)
+		return -ENOENT;
+
+	irq_work_busy = bpf_mmap_unlock_get_irq_work(&work);
+
+	if (irq_work_busy || !mmap_read_trylock(mm))
+		return -EBUSY;
+
+	vma = find_vma(mm, start);
+
+	if (vma && vma->vm_start <= start && vma->vm_end > start) {
+		callback_fn((u64)(long)task, (u64)(long)vma,
+			    (u64)(long)callback_ctx, 0, 0);
+		ret = 0;
+	}
+	bpf_mmap_unlock_mm(work, mm);
+	return ret;
+}
+
+BTF_ID_LIST_SINGLE(btf_find_vma_ids, struct, task_struct)
+
+const struct bpf_func_proto bpf_find_vma_proto = {
+	.func		= bpf_find_vma,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id	= &btf_find_vma_ids[0],
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type	= ARG_PTR_TO_FUNC,
+	.arg4_type	= ARG_PTR_TO_STACK_OR_NULL,
+	.arg5_type	= ARG_ANYTHING,
 };
 
 static int __init task_iter_init(void)
