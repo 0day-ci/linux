@@ -6286,6 +6286,94 @@ ice_get_eec_src(struct net_device *netdev, u32 *src,
 }
 
 /**
+ * ice_get_rclk_range - get range of recovered clock indices
+ * @netdev: network interface device structure
+ * @min_idx: min rclk index
+ * @max_idx: max rclk index
+ * @extack: netlink extended ack
+ */
+static int
+ice_get_rclk_range(struct net_device *netdev, u32 *min_idx, u32 *max_idx,
+		   struct netlink_ext_ack *extack)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+
+	if (!ice_is_feature_supported(pf, ICE_F_CGU))
+		return -EOPNOTSUPP;
+
+	*min_idx = REF1P;
+	*max_idx = REF1N;
+
+	return 0;
+}
+
+/**
+ * ice_set_rclk_out - set recovered clock redirection to the output pin
+ * @netdev: network interface device structure
+ * @out_idx: output index
+ * @ena: true will enable redirection, false will disable it
+ * @extack: netlink extended ack
+ */
+static int
+ice_set_rclk_out(struct net_device *netdev, u32 out_idx, bool ena,
+		 struct netlink_ext_ack *extack)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+	enum ice_status ret;
+	u32 freq;
+
+	if (!ice_is_feature_supported(pf, ICE_F_CGU))
+		return -EOPNOTSUPP;
+
+	if (out_idx < REF1P || out_idx > REF1N)
+		return -EINVAL;
+
+	ret = ice_aq_set_phy_rec_clk_out(&pf->hw, out_idx - REF1P, ena, &freq);
+
+	return ice_status_to_errno(ret);
+}
+
+/**
+ * ice_get_rclk_state - Get state of recovered clock pin for a given netdev
+ * @netdev: network interface device structure
+ * @out_idx: output index
+ * @ena: returns true if the pin is enabled
+ * @extack: netlink extended ack
+ */
+static int
+ice_get_rclk_state(struct net_device *netdev, u32 out_idx, bool *ena,
+		   struct netlink_ext_ack *extack)
+{
+	u8 port_num = ICE_AQC_SET_PHY_REC_CLK_OUT_CURR_PORT;
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+	enum ice_status ret;
+	u32 freq;
+	u8 flags;
+
+	if (!ice_is_feature_supported(pf, ICE_F_CGU))
+		return -EOPNOTSUPP;
+
+	if (out_idx < REF1P || out_idx > REF1N)
+		return -EINVAL;
+
+	ret = ice_aq_get_phy_rec_clk_out(&pf->hw, out_idx - REF1P, &port_num,
+					 &flags, &freq);
+
+	if (!ret && (flags & ICE_AQC_GET_PHY_REC_CLK_OUT_OUT_EN))
+		*ena = true;
+	else
+		*ena = false;
+
+	return ice_status_to_errno(ret);
+}
+
+/**
  * ice_down - Shutdown the connection
  * @vsi: The VSI being stopped
  */
@@ -8648,4 +8736,7 @@ static const struct net_device_ops ice_netdev_ops = {
 	.ndo_xsk_wakeup = ice_xsk_wakeup,
 	.ndo_get_eec_state = ice_get_eec_state,
 	.ndo_get_eec_src = ice_get_eec_src,
+	.ndo_get_rclk_range = ice_get_rclk_range,
+	.ndo_set_rclk_out = ice_set_rclk_out,
+	.ndo_get_rclk_state = ice_get_rclk_state,
 };
