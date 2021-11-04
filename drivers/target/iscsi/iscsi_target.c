@@ -4223,34 +4223,17 @@ int iscsit_close_connection(
 
 	spin_unlock_bh(&sess->conn_lock);
 
-	/*
-	 * If connection reinstatement is being performed on this connection,
-	 * up the connection reinstatement semaphore that is being blocked on
-	 * in iscsit_cause_connection_reinstatement().
-	 */
 	spin_lock_bh(&conn->state_lock);
-	if (atomic_read(&conn->sleep_on_conn_wait_comp)) {
-		spin_unlock_bh(&conn->state_lock);
-		complete(&conn->conn_wait_comp);
-		wait_for_completion(&conn->conn_post_wait_comp);
-		spin_lock_bh(&conn->state_lock);
-	}
-
-	/*
-	 * If connection reinstatement is being performed on this connection
-	 * by receiving a REMOVECONNFORRECOVERY logout request, up the
-	 * connection wait rcfr semaphore that is being blocked on
-	 * an iscsit_connection_reinstatement_rcfr().
-	 */
-	if (atomic_read(&conn->connection_wait_rcfr)) {
-		spin_unlock_bh(&conn->state_lock);
-		complete(&conn->conn_wait_rcfr_comp);
-		wait_for_completion(&conn->conn_post_wait_comp);
-		spin_lock_bh(&conn->state_lock);
-	}
 	atomic_set(&conn->connection_reinstatement, 1);
 	spin_unlock_bh(&conn->state_lock);
 
+	/*
+	 * If connection reinstatement is being performed on this connection,
+	 * up the connection reinstatement semaphore that is being blocked on
+	 * in iscsit_cause_connection_reinstatement() or
+	 * in iscsit_connection_reinstatement_rcfr()
+	 */
+	complete_all(&conn->conn_wait_comp);
 	/*
 	 * If any other processes are accessing this connection pointer we
 	 * must wait until they have completed.

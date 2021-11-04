@@ -542,12 +542,8 @@ struct iscsi_conn {
 	atomic_t		connection_exit;
 	atomic_t		connection_recovery;
 	atomic_t		connection_reinstatement;
-	atomic_t		connection_wait_rcfr;
-	atomic_t		sleep_on_conn_wait_comp;
 	atomic_t		transport_failed;
-	struct completion	conn_post_wait_comp;
 	struct completion	conn_wait_comp;
-	struct completion	conn_wait_rcfr_comp;
 	struct completion	conn_waiting_on_uc_comp;
 	struct completion	conn_logout_comp;
 	struct completion	tx_half_close_comp;

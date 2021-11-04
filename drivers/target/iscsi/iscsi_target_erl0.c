@@ -839,8 +839,7 @@ void iscsit_connection_reinstatement_rcfr(struct iscsi_conn *conn)
 		send_sig(SIGINT, conn->rx_thread, 1);
 
 sleep:
-	wait_for_completion(&conn->conn_wait_rcfr_comp);
-	complete(&conn->conn_post_wait_comp);
+	wait_for_completion(&conn->conn_wait_comp);
 }
 
 void iscsit_cause_connection_reinstatement(struct iscsi_conn *conn, int sleep)
@@ -871,12 +870,9 @@ void iscsit_cause_connection_reinstatement(struct iscsi_conn *conn, int sleep)
 		spin_unlock_bh(&conn->state_lock);
 		return;
 	}
-
-	atomic_set(&conn->sleep_on_conn_wait_comp, 1);
 	spin_unlock_bh(&conn->state_lock);
 
 	wait_for_completion(&conn->conn_wait_comp);
-	complete(&conn->conn_post_wait_comp);
 }
 EXPORT_SYMBOL(iscsit_cause_connection_reinstatement);
 

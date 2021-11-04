@@ -824,9 +824,6 @@ struct iscsi_conn *iscsit_get_conn_from_cid_rcfr(struct iscsi_session *sess, u16
 	list_for_each_entry(conn, &sess->sess_conn_list, conn_list) {
 		if (conn->cid == cid) {
 			iscsit_inc_conn_usage_count(conn);
-			spin_lock(&conn->state_lock);
-			atomic_set(&conn->connection_wait_rcfr, 1);
-			spin_unlock(&conn->state_lock);
 			spin_unlock_bh(&sess->conn_lock);
 			return conn;
 		}
