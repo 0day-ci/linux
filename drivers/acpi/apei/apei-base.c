@@ -21,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/acpi.h>
 #include <linux/slab.h>
 #include <linux/io.h>
@@ -448,13 +449,34 @@ static int apei_get_nvs_resources(struct apei_resources *resources)
 	return acpi_nvs_for_each_region(apei_get_res_callback, resources);
 }
 
-int (*arch_apei_filter_addr)(int (*func)(__u64 start, __u64 size,
-				     void *data), void *data);
-static int apei_get_arch_resources(struct apei_resources *resources)
-
+#ifdef CONFIG_PCI
+extern struct list_head pci_mmcfg_list;
+static int apei_filter_mcfg_addr(struct apei_resources *res,
+			struct apei_resources *mcfg_res)
 {
-	return arch_apei_filter_addr(apei_get_res_callback, resources);
+	int rc = 0;
+	struct pci_mmcfg_region *cfg;
+
+	if (list_empty(&pci_mmcfg_list))
+		return 0;
+
+	apei_resources_init(mcfg_res);
+	list_for_each_entry(cfg, &pci_mmcfg_list, list) {
+		rc = apei_res_add(&mcfg_res->iomem, cfg->res.start, resource_size(&cfg->res));
+		if (rc)
+			return rc;
+	}
+
+	/* filter the mcfg resource from current APEI's */
+	return apei_resources_sub(res, mcfg_res);
 }
+#else
+static inline int apei_filter_mcfg_addr(struct apei_resources *res,
+			struct apei_resources *mcfg_res)
+{
+	return 0;
+}
+#endif
 
 /*
  * IO memory/port resource management mechanism is used to check
@@ -486,15 +508,9 @@ int apei_resources_request(struct apei_resources *resources,
 	if (rc)
 		goto nvs_res_fini;
 
-	if (arch_apei_filter_addr) {
-		apei_resources_init(&arch_res);
-		rc = apei_get_arch_resources(&arch_res);
-		if (rc)
-			goto arch_res_fini;
-		rc = apei_resources_sub(resources, &arch_res);
-		if (rc)
-			goto arch_res_fini;
-	}
+	rc = apei_filter_mcfg_addr(resources, &arch_res);
+	if (rc)
+		goto arch_res_fini;
 
 	rc = -EINVAL;
 	list_for_each_entry(res, &resources->iomem, list) {
@@ -544,8 +560,7 @@ err_unmap_iomem:
 		release_mem_region(res->start, res->end - res->start);
 	}
 arch_res_fini:
-	if (arch_apei_filter_addr)
-		apei_resources_fini(&arch_res);
+	apei_resources_fini(&arch_res);
 nvs_res_fini:
 	apei_resources_fini(&nvs_resources);
 	return rc;
