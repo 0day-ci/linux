@@ -1221,6 +1221,11 @@ config HID_MCP2221
 	To compile this driver as a module, choose M here: the module
 	will be called hid-mcp2221.ko.
 
+config HID_USI
+	tristate "USI (Universal Stylus Interface) support"
+	help
+	Provides USI support over I2C HID interface.
+
 endmenu
 
 endif # HID
