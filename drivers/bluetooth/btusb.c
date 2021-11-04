@@ -2883,7 +2883,7 @@ struct qca_version {
 	__le32	rom_version;
 	__le32	patch_version;
 	__le32	ram_version;
-	__le16	board_id;
+	__u8	board_id[2];
 	__le16	flag;
 	__u8	reserved[4];
 } __packed;
@@ -3072,7 +3072,7 @@ static void btusb_generate_qca_nvm_name(char *fwname, size_t max_size,
 	u16 flag = le16_to_cpu(ver->flag);
 
 	if (((flag >> 8) & 0xff) == QCA_FLAG_MULTI_NVM) {
-		u16 board_id = le16_to_cpu(ver->board_id);
+		u16 board_id = (ver->board_id[0] << 8) + ver->board_id[1];
 		const char *variant;
 
 		switch (le32_to_cpu(ver->ram_version)) {
