@@ -20,6 +20,15 @@
 typedef int (*cpu_stop_fn_t)(void *arg);
 
 #ifdef CONFIG_SMP
+/*
+ * Structure to determine completion condition and record errors.  May
+ * be shared by works on different cpus.
+ */
+struct cpu_stop_done {
+	atomic_t		nr_todo;	/* nr left to execute */
+	int			ret;		/* collected return value */
+	struct completion	completion;	/* fired if nr_todo reaches 0 */
+};
 
 struct cpu_stop_work {
 	struct list_head	list;		/* cpu_stopper->works */
@@ -28,6 +37,9 @@ struct cpu_stop_work {
 	void			*arg;
 	struct cpu_stop_done	*done;
 };
+
+void cpu_stop_init_done(struct cpu_stop_done *done, unsigned int nr_todo);
+void cpu_stop_signal_done(struct cpu_stop_done *done);
 
 int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg);
 int stop_two_cpus(unsigned int cpu1, unsigned int cpu2, cpu_stop_fn_t fn, void *arg);

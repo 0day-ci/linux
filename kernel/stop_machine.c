@@ -23,16 +23,6 @@
 #include <linux/nmi.h>
 #include <linux/sched/wake_q.h>
 
-/*
- * Structure to determine completion condition and record errors.  May
- * be shared by works on different cpus.
- */
-struct cpu_stop_done {
-	atomic_t		nr_todo;	/* nr left to execute */
-	int			ret;		/* collected return value */
-	struct completion	completion;	/* fired if nr_todo reaches 0 */
-};
-
 /* the actual stopper, one per every possible cpu, enabled on online cpus */
 struct cpu_stopper {
 	struct task_struct	*thread;
@@ -67,7 +57,7 @@ void print_stop_info(const char *log_lvl, struct task_struct *task)
 static DEFINE_MUTEX(stop_cpus_mutex);
 static bool stop_cpus_in_progress;
 
-static void cpu_stop_init_done(struct cpu_stop_done *done, unsigned int nr_todo)
+void cpu_stop_init_done(struct cpu_stop_done *done, unsigned int nr_todo)
 {
 	memset(done, 0, sizeof(*done));
 	atomic_set(&done->nr_todo, nr_todo);
@@ -75,7 +65,7 @@ static void cpu_stop_init_done(struct cpu_stop_done *done, unsigned int nr_todo)
 }
 
 /* signal completion unless @done is NULL */
-static void cpu_stop_signal_done(struct cpu_stop_done *done)
+void cpu_stop_signal_done(struct cpu_stop_done *done)
 {
 	if (atomic_dec_and_test(&done->nr_todo))
 		complete(&done->completion);
