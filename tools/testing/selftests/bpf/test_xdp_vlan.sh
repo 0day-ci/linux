@@ -131,9 +131,9 @@ fi
 set -e
 
 # Some shell-tools dependencies
-which ip > /dev/null
-which tc > /dev/null
-which ethtool > /dev/null
+command -v ip > /dev/null
+command -v tc > /dev/null
+command -v ethtool > /dev/null
 
 # Make rest of shell verbose, showing comments as doc/info
 if [ -n "$VERBOSE" ]; then

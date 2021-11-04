@@ -61,7 +61,7 @@ check_env()
 		exit 4
 	fi
 
-	which tcpdump &>/dev/null
+	command -v tcpdump &>/dev/null
 	if [ $? -ne 0 ];then
 		echo "selftests: [SKIP] Could not run test without tcpdump"
 		exit 4

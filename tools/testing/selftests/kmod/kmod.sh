@@ -110,12 +110,12 @@ function allow_user_defaults()
 
 test_reqs()
 {
-	if ! which modprobe 2> /dev/null > /dev/null; then
+	if ! command -v modprobe 2> /dev/null > /dev/null; then
 		echo "$0: You need modprobe installed" >&2
 		exit $ksft_skip
 	fi
 
-	if ! which kmod 2> /dev/null > /dev/null; then
+	if ! command -v kmod 2> /dev/null > /dev/null; then
 		echo "$0: You need kmod installed" >&2
 		exit $ksft_skip
 	fi

@@ -59,7 +59,7 @@ is_ima_sig_required()
 # Return 1 for PE signature found and 0 for not found.
 check_for_pesig()
 {
-	which pesign > /dev/null 2>&1 || log_skip "pesign not found"
+	command -v pesign > /dev/null 2>&1 || log_skip "pesign not found"
 
 	pesign -i $KERNEL_IMAGE --show-signature | grep -q "No signatures"
 	local ret=$?
@@ -77,7 +77,7 @@ check_for_imasig()
 {
 	local ret=0
 
-	which getfattr > /dev/null 2>&1
+	command -v getfattr > /dev/null 2>&1
 	if [ $?	-eq 1 ]; then
 		log_skip "getfattr not found"
 	fi

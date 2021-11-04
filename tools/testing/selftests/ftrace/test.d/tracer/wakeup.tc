@@ -3,7 +3,7 @@
 # description: Test wakeup tracer
 # requires: wakeup:tracer
 
-if ! which chrt ; then
+if ! command -v chrt ; then
   echo "chrt is not found. This test requires nice command."
   exit_unresolved
 fi

@@ -41,7 +41,7 @@ checktool (){
 
 checktool "iptables --version" "run test without iptables"
 checktool "ip -Version" "run test without ip tool"
-checktool "which nc" "run test without nc (netcat)"
+checktool "command -v nc" "run test without nc (netcat)"
 checktool "ip netns add ${r_a}" "create net namespace"
 
 for n in ${r_b} ${r_w} ${c_a} ${c_b};do

@@ -82,7 +82,7 @@ NSA_CMD="ip netns exec ${NSA}"
 NSB_CMD="ip netns exec ${NSB}"
 NSC_CMD="ip netns exec ${NSC}"
 
-which ping6 > /dev/null 2>&1 && ping6=$(which ping6) || ping6=$(which ping)
+command -v ping6 > /dev/null 2>&1 && ping6=$(command -v ping6) || ping6=$(command -v ping)
 
 ################################################################################
 # utilities
@@ -3974,7 +3974,7 @@ elif [ "$TESTS" = "ipv6" ]; then
 	TESTS="$TESTS_IPV6"
 fi
 
-which nettest >/dev/null
+command -v nettest >/dev/null
 if [ $? -ne 0 ]; then
 	echo "'nettest' command not found; skipping tests"
 	exit $ksft_skip

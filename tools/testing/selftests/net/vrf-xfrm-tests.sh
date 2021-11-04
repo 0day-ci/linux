@@ -31,7 +31,7 @@ ENC_2=0x3fb07ac2a91f0347dffeacf62fc46c20f8048be9725930ff
 SPI_1=0x02122b77
 SPI_2=0x2b770212
 
-which ping6 > /dev/null 2>&1 && ping6=$(which ping6) || ping6=$(which ping)
+command -v ping6 > /dev/null 2>&1 && ping6=$(command -v ping6) || ping6=$(command -v ping)
 
 ################################################################################
 #

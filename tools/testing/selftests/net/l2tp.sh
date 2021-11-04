@@ -16,7 +16,7 @@
 VERBOSE=0
 PAUSE_ON_FAIL=no
 
-which ping6 > /dev/null 2>&1 && ping6=$(which ping6) || ping6=$(which ping)
+command -v ping6 > /dev/null 2>&1 && ping6=$(command -v ping6) || ping6=$(command -v ping)
 
 ################################################################################
 #

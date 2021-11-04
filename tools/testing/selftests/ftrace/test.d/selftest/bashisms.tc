@@ -7,7 +7,7 @@ if [ ! -f $FTRACETEST_ROOT/ftracetest ]; then
   exit_unresolved
 fi
 
-if ! which checkbashisms > /dev/null 2>&1 ; then
+if ! command -v checkbashisms > /dev/null 2>&1 ; then
   echo "No checkbashisms found. skipped."
   exit_unresolved
 fi

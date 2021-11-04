@@ -9,7 +9,7 @@ if [ $uid -ne 0 ]; then
 	exit 1
 fi
 
-if ! which modprobe > /dev/null 2>&1; then
+if ! command -v modprobe > /dev/null 2>&1; then
 	echo "$0: You need modprobe installed"
         exit 4
 fi

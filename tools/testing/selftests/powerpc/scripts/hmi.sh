@@ -9,9 +9,9 @@
 if [ -x ./getscom ] && [ -x ./putscom ]; then
 	GETSCOM=./getscom
 	PUTSCOM=./putscom
-elif which getscom > /dev/null; then
-	GETSCOM=$(which getscom)
-	PUTSCOM=$(which putscom)
+elif command -v getscom > /dev/null; then
+	GETSCOM=$(command -v getscom)
+	PUTSCOM=$(command -v putscom)
 else
 	cat <<EOF
 Can't find getscom/putscom in . or \$PATH.

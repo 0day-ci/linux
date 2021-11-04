@@ -35,7 +35,7 @@ check_test_requirements()
 		exit $ksft_skip
 	fi
 
-	if ! which modprobe > /dev/null 2>&1; then
+	if ! command -v modprobe > /dev/null 2>&1; then
 		echo "$0: You need modprobe installed"
 		exit $ksft_skip
 	fi

@@ -35,7 +35,7 @@ checktool (){
 
 checktool "nft --version" "run test without nft tool"
 checktool "ip -Version" "run test without ip tool"
-checktool "which nc" "run test without nc (netcat)"
+checktool "command -v nc" "run test without nc (netcat)"
 checktool "ip netns add nsr1" "create net namespace"
 
 ip netns add ns1

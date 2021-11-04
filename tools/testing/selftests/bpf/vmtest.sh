@@ -97,7 +97,7 @@ download_rootfs()
 	local rootfsversion="$1"
 	local dir="$2"
 
-	if ! which zstd &> /dev/null; then
+	if ! command -v zstd &> /dev/null; then
 		echo 'Could not find "zstd" on the system, please install zstd'
 		exit 1
 	fi
@@ -212,7 +212,7 @@ run_vm()
 	local kernel_bzimage="$1"
 	local rootfs_img="${OUTPUT_DIR}/${ROOTFS_IMAGE}"
 
-	if ! which "${QEMU_BINARY}" &> /dev/null; then
+	if ! command -v "${QEMU_BINARY}" &> /dev/null; then
 		cat <<EOF
 Could not find ${QEMU_BINARY}
 Please install qemu or set the QEMU_BINARY environment variable.

@@ -37,7 +37,7 @@ if [ $? -ne 0 ];then
 	exit $ksft_skip
 fi
 
-which nc >/dev/null 2>&1
+command -v nc >/dev/null 2>&1
 if [ $? -ne 0 ];then
 	echo "SKIP: Could not run test without netcat tool"
 	exit $ksft_skip

@@ -19,7 +19,7 @@ fi
 # namespace.
 if [[ -z $(ip netns identify $$) ]]; then
 	err=0
-	if bpftool="$(which bpftool)"; then
+	if bpftool="$(command -v bpftool)"; then
 		echo "Testing global flow dissector..."
 
 		$bpftool prog loadall ./bpf_flow.o /sys/fs/bpf/flow \

@@ -197,7 +197,7 @@ VERBOSE=0
 TRACING=0
 
 # Some systems don't have a ping6 binary anymore
-which ping6 > /dev/null 2>&1 && ping6=$(which ping6) || ping6=$(which ping)
+command -v ping6 > /dev/null 2>&1 && ping6=$(command -v ping6) || ping6=$(command -v ping)
 
 #               Name                          Description                  re-run with nh
 tests="
@@ -661,7 +661,7 @@ setup_xfrm() {
 }
 
 setup_nettest_xfrm() {
-	which nettest >/dev/null
+	command -v nettest >/dev/null
 	if [ $? -ne 0 ]; then
 		echo "'nettest' command not found; skipping tests"
 	        return 1
@@ -1777,7 +1777,7 @@ test_pmtu_vti6_link_change_mtu() {
 check_command() {
 	cmd=${1}
 
-	if ! which ${cmd} > /dev/null 2>&1; then
+	if ! command -v ${cmd} > /dev/null 2>&1; then
 		err "  missing required command: '${cmd}'"
 		return 1
 	fi
@@ -2072,7 +2072,7 @@ do
 	case $o in
 	p) PAUSE_ON_FAIL=yes;;
 	v) VERBOSE=1;;
-	t) if which tcpdump > /dev/null 2>&1; then
+	t) if command -v tcpdump > /dev/null 2>&1; then
 		TRACING=1
 	   else
 		echo "=== tcpdump not available, tracing disabled"

@@ -97,15 +97,15 @@ test_reqs()
 		exit $ksft_skip
 	fi
 
-	if ! which perl 2> /dev/null > /dev/null; then
+	if ! command -v perl 2> /dev/null > /dev/null; then
 		echo "$0: You need perl installed"
 		exit $ksft_skip
 	fi
-	if ! which getconf 2> /dev/null > /dev/null; then
+	if ! command -v getconf 2> /dev/null > /dev/null; then
 		echo "$0: You need getconf installed"
 		exit $ksft_skip
 	fi
-	if ! which diff 2> /dev/null > /dev/null; then
+	if ! command -v diff 2> /dev/null > /dev/null; then
 		echo "$0: You need diff installed"
 		exit $ksft_skip
 	fi

@@ -199,7 +199,7 @@ zram_makefs()
 	local i=0
 	for fs in $zram_filesystems; do
 		# if requested fs not supported default it to ext2
-		which mkfs.$fs > /dev/null 2>&1 || fs=ext2
+		command -v mkfs.$fs > /dev/null 2>&1 || fs=ext2
 
 		echo "make $fs filesystem on /dev/zram$i"
 		mkfs.$fs /dev/zram$i > err.log 2>&1

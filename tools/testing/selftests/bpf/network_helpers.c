@@ -349,7 +349,7 @@ char *ping_command(int family)
 {
 	if (family == AF_INET6) {
 		/* On some systems 'ping' doesn't support IPv6, so use ping6 if it is present. */
-		if (!system("which ping6 >/dev/null 2>&1"))
+		if (!system("command -v ping6 >/dev/null 2>&1"))
 			return "ping6";
 		else
 			return "ping -6";

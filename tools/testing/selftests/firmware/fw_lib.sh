@@ -99,7 +99,7 @@ check_setup()
 	OLD_FWPATH="$(cat /sys/module/firmware_class/parameters/path)"
 
 	if [ "$HAS_FW_LOADER_COMPRESS" = "yes" ]; then
-		if ! which xz 2> /dev/null > /dev/null; then
+		if ! command -v xz 2> /dev/null > /dev/null; then
 			HAS_FW_LOADER_COMPRESS=""
 		fi
 	fi

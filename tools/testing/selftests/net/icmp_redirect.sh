@@ -488,7 +488,7 @@ EOF
 # main
 
 # Some systems don't have a ping6 binary anymore
-which ping6 > /dev/null 2>&1 && ping6=$(which ping6) || ping6=$(which ping)
+command -v ping6 > /dev/null 2>&1 && ping6=$(command -v ping6) || ping6=$(command -v ping)
 
 ret=0
 nsuccess=0
