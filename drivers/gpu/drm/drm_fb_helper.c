@@ -82,6 +82,8 @@ MODULE_PARM_DESC(drm_leak_fbdev_smem,
 static LIST_HEAD(kernel_fb_helper_list);
 static DEFINE_MUTEX(kernel_fb_helper_lock);
 
+static int __drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper, bool force);
+
 /**
  * DOC: fbdev helpers
  *
@@ -258,7 +260,7 @@ __drm_fb_helper_restore_fbdev_mode_unlocked(struct drm_fb_helper *fb_helper,
 	mutex_unlock(&fb_helper->lock);
 
 	if (do_delayed)
-		drm_fb_helper_hotplug_event(fb_helper);
+		__drm_fb_helper_hotplug_event(fb_helper, force);
 
 	return ret;
 }
@@ -1930,6 +1932,38 @@ int drm_fb_helper_initial_config(struct drm_fb_helper *fb_helper, int bpp_sel)
 }
 EXPORT_SYMBOL(drm_fb_helper_initial_config);
 
+static int __drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper, bool force)
+{
+	int err = 0;
+
+	if (!drm_fbdev_emulation || !fb_helper)
+		return 0;
+
+	mutex_lock(&fb_helper->lock);
+	if (fb_helper->deferred_setup) {
+		err = __drm_fb_helper_initial_config_and_unlock(fb_helper,
+				fb_helper->preferred_bpp);
+		return err;
+	}
+	if (!force) {
+		if (!fb_helper->fb || !drm_master_internal_acquire(fb_helper->dev)) {
+			fb_helper->delayed_hotplug = true;
+			mutex_unlock(&fb_helper->lock);
+			return err;
+		}
+		drm_master_internal_release(fb_helper->dev);
+	}
+	drm_dbg_kms(fb_helper->dev, "\n");
+
+	drm_client_modeset_probe(&fb_helper->client, fb_helper->fb->width, fb_helper->fb->height);
+	drm_setup_crtcs_fb(fb_helper);
+	mutex_unlock(&fb_helper->lock);
+
+	drm_fb_helper_set_par(fb_helper->fbdev);
+
+	return 0;
+}
+
 /**
  * drm_fb_helper_hotplug_event - respond to a hotplug notification by
  *                               probing all the outputs attached to the fb
@@ -1953,35 +1987,7 @@ EXPORT_SYMBOL(drm_fb_helper_initial_config);
  */
 int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
 {
-	int err = 0;
-
-	if (!drm_fbdev_emulation || !fb_helper)
-		return 0;
-
-	mutex_lock(&fb_helper->lock);
-	if (fb_helper->deferred_setup) {
-		err = __drm_fb_helper_initial_config_and_unlock(fb_helper,
-				fb_helper->preferred_bpp);
-		return err;
-	}
-
-	if (!fb_helper->fb || !drm_master_internal_acquire(fb_helper->dev)) {
-		fb_helper->delayed_hotplug = true;
-		mutex_unlock(&fb_helper->lock);
-		return err;
-	}
-
-	drm_master_internal_release(fb_helper->dev);
-
-	drm_dbg_kms(fb_helper->dev, "\n");
-
-	drm_client_modeset_probe(&fb_helper->client, fb_helper->fb->width, fb_helper->fb->height);
-	drm_setup_crtcs_fb(fb_helper);
-	mutex_unlock(&fb_helper->lock);
-
-	drm_fb_helper_set_par(fb_helper->fbdev);
-
-	return 0;
+	return __drm_fb_helper_hotplug_event(fb_helper, false);
 }
 EXPORT_SYMBOL(drm_fb_helper_hotplug_event);
 
