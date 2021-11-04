@@ -515,6 +515,11 @@ properties:
           - const: radxa,rockpi4
           - const: rockchip,rk3399
 
+      - description: Radxa ROCK Pi S
+	items:
+          - const: radxa,rockpis
+          - const: rockchip,rk3308
+
       - description: Radxa ROCK Pi E
         items:
           - const: radxa,rockpi-e
