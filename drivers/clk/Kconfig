@@ -334,6 +334,15 @@ config COMMON_CLK_VC5
 	  This driver supports the IDT VersaClock 5 and VersaClock 6
 	  programmable clock generators.
 
+config COMMON_CLK_SP7021
+	bool "Clock driver for Sunplus SP7021 SoC"
+	help
+	  This driver supports the Sunplus SP7021 SoC clocks.
+	  It implemented SP7021 PLLs/gate.
+	  Not all features of the PLL are currently supported
+	  by the driver.
+	  This driver is selected automatically by platform config.
+
 config COMMON_CLK_STM32MP157
 	def_bool COMMON_CLK && MACH_STM32MP157
 	help
