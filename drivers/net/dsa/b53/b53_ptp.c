@@ -263,10 +263,98 @@ int b53_get_ts_info(struct dsa_switch *ds, int port,
 	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
 				SOF_TIMESTAMPING_RX_HARDWARE |
 				SOF_TIMESTAMPING_RAW_HARDWARE;
-	info->tx_types = BIT(HWTSTAMP_TX_OFF);
-	info->rx_filters = BIT(HWTSTAMP_FILTER_NONE);
+	info->tx_types = BIT(HWTSTAMP_TX_ON);
+	info->rx_filters = BIT(HWTSTAMP_FILTER_PTP_V2_L2_EVENT);
 
 	return 0;
+}
+
+static int b53_set_hwtstamp_config(struct b53_device *dev, int port,
+				   struct hwtstamp_config *config)
+{
+	struct b53_port_hwtstamp *ps = &dev->ports[port].port_hwtstamp;
+	bool tstamp_enable = false;
+
+	clear_bit_unlock(B53_HWTSTAMP_ENABLED, &ps->state);
+
+	/* Reserved for future extensions */
+	if (config->flags)
+		return -EINVAL;
+
+	switch (config->tx_type) {
+	case HWTSTAMP_TX_ON:
+		tstamp_enable = true;
+		break;
+	case HWTSTAMP_TX_OFF:
+		tstamp_enable = false;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	switch (config->rx_filter) {
+	case HWTSTAMP_FILTER_NONE:
+		tstamp_enable = false;
+		break;
+	case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:
+	case HWTSTAMP_FILTER_ALL:
+		config->rx_filter = HWTSTAMP_FILTER_PTP_V2_L2_EVENT;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	if (ps->tx_skb) {
+		dev_kfree_skb_any(ps->tx_skb);
+		ps->tx_skb = NULL;
+	}
+	clear_bit(B53_HWTSTAMP_TX_IN_PROGRESS, &ps->state);
+
+	if (tstamp_enable)
+		set_bit(B53_HWTSTAMP_ENABLED, &ps->state);
+
+	return 0;
+}
+
+int b53_port_hwtstamp_set(struct dsa_switch *ds, int port, struct ifreq *ifr)
+{
+	struct b53_device *dev = ds->priv;
+	struct b53_port_hwtstamp *ps;
+	struct hwtstamp_config config;
+	int err;
+
+	ps = &dev->ports[port].port_hwtstamp;
+
+	if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))
+		return -EFAULT;
+
+	err = b53_set_hwtstamp_config(dev, port, &config);
+	if (err)
+		return err;
+
+	/* Save the chosen configuration to be returned later */
+	memcpy(&ps->tstamp_config, &config, sizeof(config));
+
+	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ? -EFAULT :
+								      0;
+}
+
+int b53_port_hwtstamp_get(struct dsa_switch *ds, int port, struct ifreq *ifr)
+{
+	struct b53_device *dev = ds->priv;
+	struct b53_port_hwtstamp *ps;
+	struct hwtstamp_config *config;
+
+	ps = &dev->ports[port].port_hwtstamp;
+	config = &ps->tstamp_config;
+
+	return copy_to_user(ifr->ifr_data, config, sizeof(*config)) ? -EFAULT :
+								      0;
 }
 
 void b53_ptp_exit(struct b53_device *dev)

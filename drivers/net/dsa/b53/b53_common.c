@@ -2302,6 +2302,8 @@ static const struct dsa_switch_ops b53_switch_ops = {
 	.get_ts_info		= b53_get_ts_info,
 	.port_rxtstamp		= b53_port_rxtstamp,
 	.port_txtstamp		= b53_port_txtstamp,
+	.port_hwtstamp_set	= b53_port_hwtstamp_set,
+	.port_hwtstamp_get	= b53_port_hwtstamp_get,
 };
 
 struct b53_chip_data {
