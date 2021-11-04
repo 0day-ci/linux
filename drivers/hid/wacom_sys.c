@@ -2489,6 +2489,9 @@ static void wacom_wireless_work(struct work_struct *work)
 
 		wacom_wac1->pid = wacom_wac->pid;
 		hid_hw_stop(hdev1);
+		error = hid_parse(wacom1->hdev);
+		if (error)
+			goto fail;
 		error = wacom_parse_and_register(wacom1, true);
 		if (error)
 			goto fail;
@@ -2501,6 +2504,9 @@ static void wacom_wireless_work(struct work_struct *work)
 				*((struct wacom_features *)id->driver_data);
 			wacom_wac2->pid = wacom_wac->pid;
 			hid_hw_stop(hdev2);
+			error = hid_parse(wacom2->hdev);
+			if (error)
+				goto fail;
 			error = wacom_parse_and_register(wacom2, true);
 			if (error)
 				goto fail;
@@ -2713,12 +2719,18 @@ static void wacom_mode_change_work(struct work_struct *work)
 	}
 
 	if (wacom1) {
+		error = hid_parse(wacom1->hdev);
+		if (error)
+			return;
 		error = wacom_parse_and_register(wacom1, false);
 		if (error)
 			return;
 	}
 
 	if (wacom2) {
+		error = hid_parse(wacom2->hdev);
+		if (error)
+			return;
 		error = wacom_parse_and_register(wacom2, false);
 		if (error)
 			return;
