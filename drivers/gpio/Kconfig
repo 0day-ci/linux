@@ -524,6 +524,7 @@ config GPIO_ROCKCHIP
 	tristate "Rockchip GPIO support"
 	depends on ARCH_ROCKCHIP || COMPILE_TEST
 	select GPIOLIB_IRQCHIP
+	select GENERIC_IRQ_CHIP
 	default ARCH_ROCKCHIP
 	help
 	  Say yes here to support GPIO on Rockchip SoCs.
