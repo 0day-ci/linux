@@ -487,6 +487,24 @@ config ARCH_S3C24XX
 	  (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or the
 	  Samsung SMDK2410 development board (and derivatives).
 
+config ARCH_SUNPLUS
+	bool "Sunplus SoCs"
+	select CLKSRC_OF
+	select COMMON_CLK
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_IRQ_CHIP
+	select GENERIC_IRQ_MULTI_HANDLER
+	select SERIAL_SUNPLUS
+	select SERIAL_SUNPLUS_CONSOLE
+	select USE_OF
+	select RTC_CLASS
+	select RESET_SUNPLUS
+	help
+	  Support for Sunplus SoC family: SP7021 and succeed SoCs based systems,
+	  such as the Banana Pi BPI-F2S development board ( and derivatives).
+	  (<http://www.sinovoip.com.cn/ecp_view.asp?id=586>)
+	  (<https://tibbo.com/store/plus1.html>)
+
 config ARCH_OMAP1
 	bool "TI OMAP1"
 	depends on MMU
@@ -688,6 +706,8 @@ source "arch/arm/mach-spear/Kconfig"
 source "arch/arm/mach-sti/Kconfig"
 
 source "arch/arm/mach-stm32/Kconfig"
+
+source "arch/arm/mach-sunplus/Kconfig"
 
 source "arch/arm/mach-sunxi/Kconfig"
 
