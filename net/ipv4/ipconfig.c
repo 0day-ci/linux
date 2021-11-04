@@ -1042,7 +1042,6 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 		goto drop;
 
 	b = (struct bootp_pkt *)skb_network_header(skb);
-	h = &b->iph;
 
 	/* One reply at a time, please. */
 	spin_lock(&ic_recv_lock);
