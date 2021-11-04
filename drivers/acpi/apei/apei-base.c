@@ -450,6 +450,23 @@ static int apei_get_nvs_resources(struct apei_resources *resources)
 }
 
 #ifdef CONFIG_PCI
+static int remove_quirk_mcfg_res(struct apei_resources *mcfg_res)
+{
+#ifdef CONFIG_PCI_QUIRKS
+	int rc = 0;
+	struct apei_resources quirk_res;
+
+	apei_resources_init(&quirk_res);
+	rc = apei_res_add(&quirk_res.iomem, pci_quirk_mcfg_res.start,
+		resource_size(&pci_quirk_mcfg_res));
+	if (rc)
+		return rc;
+
+	return apei_resources_sub(mcfg_res, &quirk_res);
+#else
+	return 0;
+#endif
+}
 extern struct list_head pci_mmcfg_list;
 static int apei_filter_mcfg_addr(struct apei_resources *res,
 			struct apei_resources *mcfg_res)
@@ -462,10 +479,16 @@ static int apei_filter_mcfg_addr(struct apei_resources *res,
 
 	apei_resources_init(mcfg_res);
 	list_for_each_entry(cfg, &pci_mmcfg_list, list) {
-		rc = apei_res_add(&mcfg_res->iomem, cfg->res.start, resource_size(&cfg->res));
+		rc = apei_res_add(&mcfg_res->iomem, cfg->res.start,
+				resource_size(&cfg->res));
 		if (rc)
 			return rc;
 	}
+
+	/* remove the pci quirk mcfg resource if any from the mcfg_res */
+	rc = remove_quirk_mcfg_res(mcfg_res);
+	if (rc)
+		return rc;
 
 	/* filter the mcfg resource from current APEI's */
 	return apei_resources_sub(res, mcfg_res);
