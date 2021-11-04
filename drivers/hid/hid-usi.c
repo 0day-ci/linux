@@ -37,7 +37,7 @@ enum {
 
 #define USI_MAX_PENS	10
 #define MSC_PEN_FIRST	MSC_PEN_ID
-#define MSC_PEN_LAST	MSC_PEN_LINE_STYLE
+#define MSC_PEN_LAST	MSC_PEN_SET_LINE_STYLE
 
 struct usi_pen {
 	int index;
@@ -63,6 +63,7 @@ struct usi_drvdata {
 	unsigned long query_pending;
 	unsigned long update_pending;
 	unsigned long query_running;
+	unsigned long update_running;
 	bool need_flush;
 	struct delayed_work work;
 	u8 saved_data[USI_NUM_ATTRS];
@@ -113,6 +114,9 @@ static inline int __usi_to_msc_id(int id)
 
 static inline int __msc_to_usi_id(unsigned int code)
 {
+	if (code >= MSC_PEN_SET_COLOR && code <= MSC_PEN_SET_LINE_STYLE)
+		return code - MSC_PEN_SET_COLOR + USI_PEN_COLOR;
+
 	if (code < MSC_PEN_ID || code > MSC_PEN_LINE_STYLE)
 		return -EINVAL;
 
@@ -169,6 +173,7 @@ static struct usi_pen *_usi_select_pen(struct usi_drvdata *usi, int index,
 	if (!in_range) {
 		usi->current_pen = NULL;
 		usi->update_pending = 0;
+		usi->update_running = 0;
 		usi->query_pending = 0;
 		usi->query_running = 0;
 		input_event(usi->idev, EV_MSC, MSC_PEN_ID, 0);
@@ -238,7 +243,6 @@ static void __usi_input_event(struct usi_drvdata *usi, unsigned int code,
 			      int value)
 {
 	struct usi_pen *pen = usi->current_pen;
-	int cached;
 	unsigned long flags;
 
 	hid_dbg(usi->hdev, "input-event: pen=%d, code=%x, value=%d, cached=%d, update-pending=%lx\n",
@@ -246,21 +250,13 @@ static void __usi_input_event(struct usi_drvdata *usi, unsigned int code,
 		pen ? __usi_pen_get_value(pen, code) : -1,
 		usi->update_pending);
 
-	if (code < MSC_PEN_COLOR || code > MSC_PEN_LINE_STYLE)
+	if (code < MSC_PEN_SET_COLOR || code > MSC_PEN_SET_LINE_STYLE)
 		return;
 
 	if (!pen)
 		return;
 
 	if (test_bit(__msc_to_usi_id(code), &usi->update_pending))
-		return;
-
-	/*
-	 * Check if we get a value that is different than what is in cache,
-	 * in this case userspace has written a new value.
-	 */
-	cached = __usi_pen_get_value(pen, code);
-	if (cached == value)
 		return;
 
 	/*
@@ -291,14 +287,9 @@ static int _usi_input_event(struct input_dev *input, unsigned int type,
 	if (value < 0)
 		return 0;
 
-	if (type == EV_MSC) {
-		switch (code) {
-		case MSC_PEN_COLOR:
-		case MSC_PEN_LINE_WIDTH:
-		case MSC_PEN_LINE_STYLE:
-			__usi_input_event(usi, code, value);
-			break;
-		}
+	if (type == EV_MSC && code >= MSC_PEN_SET_COLOR &&
+	    code <= MSC_PEN_SET_LINE_STYLE) {
+		__usi_input_event(usi, code, value);
 	}
 
 	return 0;
@@ -407,9 +398,9 @@ static int usi_raw_event(struct hid_device *hdev,
 	if (report->application != HID_DG_PEN)
 		return 0;
 
-	hid_dbg(usi->hdev, "%s: qp:%lx, qr:%lx, up:%lx, data=%*ph\n",
+	hid_dbg(usi->hdev, "%s: qp:%lx, qr:%lx, up:%lx, ur:%lx, data=%*ph\n",
 		__func__, usi->query_pending, usi->query_running,
-		usi->update_pending, size, data);
+		usi->update_pending, usi->update_running, size, data);
 
 	/* Get pen index */
 	index = data[usi->inputs[USI_PEN_ID]->report_offset / 8 + 1];
@@ -453,6 +444,23 @@ static int usi_raw_event(struct hid_device *hdev,
 			spin_lock_irqsave(&usi->lock, flags);
 			set_bit(i, &usi->query_running);
 			spin_unlock_irqrestore(&usi->lock, flags);
+		}
+
+		if (test_bit(i, &usi->update_running)) {
+			int new = __usi_pen_get_value(pen, __usi_to_msc_id(i) +
+						      MSC_PEN_SET_COLOR -
+						      MSC_PEN_COLOR);
+			if ((changed && *ptr == new) ||
+			    time_after(jiffies, usi->sync_point +
+				       usi->timeout)) {
+				__usi_pen_set_value(pen,
+						    __usi_to_msc_id(i), new);
+				cached = new;
+				spin_lock_irqsave(&usi->lock, flags);
+				clear_bit(i, &usi->update_running);
+				spin_unlock_irqrestore(&usi->lock, flags);
+				check_work = true;
+			}
 		}
 
 		if (test_bit(i, &usi->query_running)) {
@@ -681,11 +689,14 @@ static void usi_work(struct work_struct *work)
 	if (code < USI_NUM_ATTRS) {
 		usi_getset_feature(usi, code,
 				   __usi_pen_get_value(usi->current_pen,
-						       __usi_to_msc_id(code)),
+						       __usi_to_msc_id(code) +
+						       MSC_PEN_SET_COLOR -
+						       MSC_PEN_COLOR),
 				   true);
 		spin_lock_irqsave(&usi->lock, flags);
 		clear_bit(code, &usi->update_pending);
 		clear_bit(code, &usi->query_running);
+		set_bit(code, &usi->update_running);
 		spin_unlock_irqrestore(&usi->lock, flags);
 		running = true;
 	}
@@ -733,6 +744,10 @@ static int usi_allocate_pens(struct usi_drvdata *usi,
 	usi->idev->event = _usi_input_event;
 	usi->idev->open = _usi_input_open;
 	hid_dbg(usi->hdev, "allocated %zd pens\n", usi->npens);
+
+	input_set_capability(usi->idev, EV_MSC, MSC_PEN_SET_COLOR);
+	input_set_capability(usi->idev, EV_MSC, MSC_PEN_SET_LINE_WIDTH);
+	input_set_capability(usi->idev, EV_MSC, MSC_PEN_SET_LINE_STYLE);
 
 	return 0;
 }

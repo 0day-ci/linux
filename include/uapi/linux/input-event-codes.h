@@ -912,8 +912,11 @@
 #define MSC_PEN_COLOR			0x07
 #define MSC_PEN_LINE_WIDTH		0x08
 #define MSC_PEN_LINE_STYLE		0x09
+#define MSC_PEN_SET_COLOR		0x0a
+#define MSC_PEN_SET_LINE_WIDTH		0x0b
+#define MSC_PEN_SET_LINE_STYLE		0x0c
 /* TODO: Add USI diagnostic & battery events too */
-#define MSC_MAX				0x09
+#define MSC_MAX				0x0c
 #define MSC_CNT				(MSC_MAX + 1)
 
 /*
