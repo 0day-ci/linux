@@ -1093,6 +1093,33 @@ out:
 	return rc;
 }
 
+/*
+ * DIRECT_DEMOTION mode is for the system that multiple
+ * memory types are one to one correspondence, the node
+ * distance among the multiple memory types is tiered.
+ * For example, there are 3 memory types in one system:
+ * fast (node 0), medium (node 1) and slow (node 2). So
+ * the memory migration route should be:
+ * node 0 -> node 1 -> node 2 -> stop.
+ *
+ * MULTIPLE_DEMOTION mode is for the system that multiple
+ * memory types are not one to one correspondence, the node
+ * distance between fast memory node and slow memory nodes
+ * is equal. For example, there are 2 memory types in one
+ * system with 3 memory nodes: fast (node 0), slow (node 1),
+ * slow (node 2), and the distance between node 0 to node 1
+ * and node 0 to node 2 is equal. In this case, we should
+ * not migrate memory among slow memory nodes, instead we
+ * should treat node 1 and node 2 as a whole slow memory,
+ * so the memory migration route should be:
+ * node 0 -> node 1/2 -> stop.
+ */
+enum demotion_mode {
+	DIRECT_DEMOTION,
+	MULTIPLE_DEMOTION,
+};
+
+static enum demotion_mode numa_demotion_mode = DIRECT_DEMOTION;
 
 /*
  * node_demotion[] example:
@@ -1138,6 +1165,13 @@ out:
 static int node_demotion[MAX_NUMNODES] __read_mostly =
 	{[0 ...  MAX_NUMNODES - 1] = NUMA_NO_NODE};
 
+/*
+ * Used for one fast memory node to multiple slow memory nodes,
+ * to select the next target demotion node.
+ */
+static atomic_t next_demote_node[MAX_NUMNODES] =
+	{[0 ...  MAX_NUMNODES - 1] = ATOMIC_INIT(NUMA_NO_NODE)};
+
 /**
  * next_demotion_node() - Get the next node in the demotion path
  * @node: The starting node to lookup the next node
@@ -1149,7 +1183,8 @@ static int node_demotion[MAX_NUMNODES] __read_mostly =
  */
 int next_demotion_node(int node)
 {
-	int target;
+	nodemask_t target_nodes = NODE_MASK_NONE;
+	int target = NUMA_NO_NODE, src = node;
 
 	/*
 	 * node_demotion[] is updated without excluding this
@@ -1160,9 +1195,52 @@ int next_demotion_node(int node)
 	 * Make sure to use RCU over entire code blocks if
 	 * node_demotion[] reads need to be consistent.
 	 */
-	rcu_read_lock();
-	target = READ_ONCE(node_demotion[node]);
-	rcu_read_unlock();
+	switch (numa_demotion_mode) {
+	case DIRECT_DEMOTION:
+		rcu_read_lock();
+		target = READ_ONCE(node_demotion[node]);
+		rcu_read_unlock();
+		break;
+	case MULTIPLE_DEMOTION:
+		/*
+		 * Only fast memory can be demoted to multiple slow
+		 * memory nodes, and slow memory should not be demoted
+		 * among slow nemory nodes.
+		 */
+		if (!node_state(node, N_CPU))
+			return NUMA_NO_NODE;
+
+		rcu_read_lock();
+		do {
+			target = READ_ONCE(node_demotion[src]);
+			if (target == NUMA_NO_NODE)
+				break;
+
+			node_set(target, target_nodes);
+			src = target;
+		} while (1);
+		rcu_read_unlock();
+
+		if (!nodes_empty(target_nodes)) {
+			/*
+			 * When the fast memory can be demoted to multiple
+			 * slow memory nodes, here we choose round-robin
+			 * method to select one target demotion node.
+			 */
+			target = atomic_read(&next_demote_node[node]);
+			if (target == NUMA_NO_NODE)
+				target = first_node(target_nodes);
+			atomic_set(&next_demote_node[node],
+				   next_node_in(target, target_nodes));
+		} else {
+			target = NUMA_NO_NODE;
+		}
+
+		break;
+	default:
+		pr_warn("Invalid demotion mode\n");
+		break;
+	}
 
 	return target;
 }
@@ -3235,12 +3313,40 @@ static ssize_t numa_demotion_enabled_store(struct kobject *kobj,
 	return count;
 }
 
+
+static ssize_t numa_demotion_mode_show(struct kobject *kobj,
+				       struct kobj_attribute *attr, char *buf)
+{
+	return sysfs_emit(buf, "%s\n",
+			  numa_demotion_mode == DIRECT_DEMOTION ?
+			  "direct" : "multiple");
+}
+
+static ssize_t numa_demotion_mode_store(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					const char *buf, size_t count)
+{
+	if (!strncmp(buf, "direct", 6))
+		numa_demotion_mode = DIRECT_DEMOTION;
+	else if (!strncmp(buf, "multiple", 8))
+		numa_demotion_mode = MULTIPLE_DEMOTION;
+	else
+		return -EINVAL;
+
+	return count;
+}
+
 static struct kobj_attribute numa_demotion_enabled_attr =
 	__ATTR(demotion_enabled, 0644, numa_demotion_enabled_show,
 	       numa_demotion_enabled_store);
 
+static struct kobj_attribute numa_demotion_mode_attr =
+	__ATTR(demotion_mode, 0644, numa_demotion_mode_show,
+	       numa_demotion_mode_store);
+
 static struct attribute *numa_attrs[] = {
 	&numa_demotion_enabled_attr.attr,
+	&numa_demotion_mode_attr.attr,
 	NULL,
 };
 

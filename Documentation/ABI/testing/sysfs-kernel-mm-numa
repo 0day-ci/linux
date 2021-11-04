@@ -22,3 +22,19 @@ Description:	Enable/disable demoting pages during reclaim
 		the guarantees of cpusets.  This should not be enabled
 		on systems which need strict cpuset location
 		guarantees.
+
+What:		/sys/kernel/mm/numa/demotion_mode
+Date:		November 2021
+Contact:	Linux memory management mailing list <linux-mm@kvack.org>
+Description:	Set the demotion mode when enabling demoting pages during reclaim
+
+		Specify the demotion mode. "direct" is for the DIRECT_DEMOTION
+		mode if the system's multiple memory types are one to one
+		correspondence, the node distance among the multiple memory types
+		is tiered.
+
+		"multiple" is for the MULTIPLE_DEMOTION mode if the system's
+		multiple memory types are not one to one correspondence, the node
+		distance between fast memory node and slow memory nodes is equal,
+		which means one fast memory node can be demoted to multiple slow
+		memory nodes.
