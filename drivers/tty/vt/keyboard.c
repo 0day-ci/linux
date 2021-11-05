@@ -153,6 +153,7 @@ static int shift_state = 0;
 
 static unsigned int ledstate = -1U;			/* undefined */
 static unsigned char ledioctl;
+static bool vt_switch;
 
 /*
  * Notifier list for console keyboard events
@@ -412,8 +413,12 @@ static void do_compute_shiftstate(void)
 /* We still have to export this method to vt.c */
 void vt_set_leds_compute_shiftstate(void)
 {
+	struct kbd_struct *kb;
 	unsigned long flags;
 
+	kb = kbd_table + fg_console;
+	if (kb->kbdmode != VC_OFF)
+		vt_switch = true;
 	set_leds();
 
 	spin_lock_irqsave(&kbd_event_lock, flags);
@@ -1247,13 +1252,23 @@ void vt_kbd_con_stop(unsigned int console)
  */
 static void kbd_bh(struct tasklet_struct *unused)
 {
+	struct kbd_struct *kb;
 	unsigned int leds;
 	unsigned long flags;
+
+	kb = kbd_table + fg_console;
+	if (kb->kbdmode == VC_OFF)
+		return;
 
 	spin_lock_irqsave(&led_lock, flags);
 	leds = getleds();
 	leds |= (unsigned int)kbd->lockstate << 8;
 	spin_unlock_irqrestore(&led_lock, flags);
+
+	if (vt_switch) {
+		ledstate = ~leds;
+		vt_switch = false;
+	}
 
 	if (leds != ledstate) {
 		kbd_propagate_led_state(ledstate, leds);
@@ -1642,6 +1657,8 @@ int __init kbd_init(void)
 {
 	int i;
 	int error;
+
+	vt_switch = false;
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
 		kbd_table[i].ledflagstate = kbd_defleds();
