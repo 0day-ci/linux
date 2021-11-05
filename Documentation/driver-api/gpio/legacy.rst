@@ -382,34 +382,24 @@ GPIOs mapped to IRQs
 --------------------
 GPIO numbers are unsigned integers; so are IRQ numbers.  These make up
 two logically distinct namespaces (GPIO 0 need not use IRQ 0).  You can
-map between them using calls like::
+map between them using::
 
 	/* map GPIO numbers to IRQ numbers */
 	int gpio_to_irq(unsigned gpio);
 
-	/* map IRQ numbers to GPIO numbers (avoid using this) */
-	int irq_to_gpio(unsigned irq);
-
-Those return either the corresponding number in the other namespace, or
+This returns an irq number corresponding to the gpio number, or
 else a negative errno code if the mapping can't be done.  (For example,
 some GPIOs can't be used as IRQs.)  It is an unchecked error to use a GPIO
-number that wasn't set up as an input using gpio_direction_input(), or
-to use an IRQ number that didn't originally come from gpio_to_irq().
+number that wasn't set up as an input using gpio_direction_input().
 
-These two mapping calls are expected to cost on the order of a single
-addition or subtraction.  They're not allowed to sleep.
+The mapping call is expected to cost on the order of a single
+addition or subtraction.  It is not allowed to sleep.
 
 Non-error values returned from gpio_to_irq() can be passed to request_irq()
 or free_irq().  They will often be stored into IRQ resources for platform
 devices, by the board-specific initialization code.  Note that IRQ trigger
 options are part of the IRQ interface, e.g. IRQF_TRIGGER_FALLING, as are
 system wakeup capabilities.
-
-Non-error values returned from irq_to_gpio() would most commonly be used
-with gpio_get_value(), for example to initialize or update driver state
-when the IRQ is edge-triggered.  Note that some platforms don't support
-this reverse mapping, so you should avoid using it.
-
 
 Emulating Open Drain Signals
 ----------------------------
