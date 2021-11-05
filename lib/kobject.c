@@ -17,6 +17,12 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/module.h>
+#include <linux/delay.h>
+
+#ifdef CONFIG_DEBUG_KOBJECT_RELEASE
+static LIST_HEAD(kobj_cleanup_list);
+static DEFINE_SPINLOCK(kobj_cleanup_lock);
+#endif
 
 /**
  * kobject_namespace() - Return @kobj's namespace tag.
@@ -682,6 +688,13 @@ static void kobject_cleanup(struct kobject *kobj)
 	struct kobject *parent = kobj->parent;
 	struct kobj_type *t = get_ktype(kobj);
 	const char *name = kobj->name;
+#ifdef CONFIG_DEBUG_KOBJECT_RELEASE
+	unsigned long flags;
+
+	spin_lock_irqsave(&kobj_cleanup_lock, flags);
+	list_del(&kobj->node);
+	spin_unlock_irqrestore(&kobj_cleanup_lock, flags);
+#endif
 
 	pr_debug("kobject: '%s' (%p): %s, parent %p\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent);
@@ -716,10 +729,48 @@ static void kobject_cleanup(struct kobject *kobj)
 }
 
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
+/*
+ * Module notifier call back, flushing scheduled kobject cleanup work
+ * before freeing module
+ */
+static int kobj_module_callback(struct notifier_block *nb,
+				   unsigned long val, void *data)
+{
+	LIST_HEAD(pending);
+
+	if (val != MODULE_STATE_GOING)
+		return NOTIFY_DONE;
+
+	spin_lock_irq(&kobj_cleanup_lock);
+	list_splice_init(&kobj_cleanup_list, &pending);
+	spin_unlock_irq(&kobj_cleanup_lock);
+
+	while (!list_empty_careful(&pending))
+		msleep(jiffies_to_msecs(HZ / 10));
+
+	flush_scheduled_work();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block kobj_module_nb = {
+	.notifier_call = kobj_module_callback,
+};
+
 static void kobject_delayed_cleanup(struct work_struct *work)
 {
 	kobject_cleanup(container_of(to_delayed_work(work),
 				     struct kobject, release));
+}
+
+static int __init kobj_delayed_cleanup_init(void)
+{
+	WARN_ON(register_module_notifier(&kobj_module_nb));
+	return 0;
+}
+#else
+static int __init kobj_delayed_cleanup_init(void)
+{
+	return 0;
 }
 #endif
 
@@ -728,6 +779,7 @@ static void kobject_release(struct kref *kref)
 	struct kobject *kobj = container_of(kref, struct kobject, kref);
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
 	unsigned long delay = HZ + HZ * (get_random_int() & 0x3);
+	unsigned long flags;
 
 	if (kobj->ktype == &module_ktype)
 		delay = 0;
@@ -735,6 +787,10 @@ static void kobject_release(struct kref *kref)
 	pr_info("kobject: '%s' (%p): %s, parent %p (delayed %ld)\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent, delay);
 	INIT_DELAYED_WORK(&kobj->release, kobject_delayed_cleanup);
+
+	spin_lock_irqsave(&kobj_cleanup_lock, flags);
+	list_add(&kobj->node, &kobj_cleanup_list);
+	spin_unlock_irqrestore(&kobj_cleanup_lock, flags);
 
 	schedule_delayed_work(&kobj->release, delay);
 #else
@@ -1146,3 +1202,9 @@ void kobj_ns_drop(enum kobj_ns_type type, void *ns)
 	spin_unlock(&kobj_ns_type_lock);
 }
 EXPORT_SYMBOL_GPL(kobj_ns_drop);
+
+static int __init kobj_subsys_init(void)
+{
+	return kobj_delayed_cleanup_init();
+}
+core_initcall(kobj_subsys_init)
