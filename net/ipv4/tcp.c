@@ -4276,15 +4276,13 @@ static void __tcp_alloc_md5sig_pool(void)
 					       GFP_KERNEL,
 					       cpu_to_node(cpu));
 			if (!scratch)
-				return;
+				goto out_free;
 			per_cpu(tcp_md5sig_pool, cpu).scratch = scratch;
 		}
-		if (per_cpu(tcp_md5sig_pool, cpu).md5_req)
-			continue;
 
 		req = ahash_request_alloc(hash, GFP_KERNEL);
 		if (!req)
-			return;
+			goto out_free;
 
 		ahash_request_set_callback(req, 0, NULL, NULL);
 
@@ -4295,6 +4293,16 @@ static void __tcp_alloc_md5sig_pool(void)
 	 */
 	smp_wmb();
 	tcp_md5sig_pool_populated = true;
+	return;
+
+out_free:
+	for_each_possible_cpu(cpu) {
+		if (per_cpu(tcp_md5sig_pool, cpu).md5_req == NULL)
+			break;
+		ahash_request_free(per_cpu(tcp_md5sig_pool, cpu).md5_req);
+		per_cpu(tcp_md5sig_pool, cpu).md5_req = NULL;
+	}
+	crypto_free_ahash(hash);
 }
 
 bool tcp_alloc_md5sig_pool(void)
