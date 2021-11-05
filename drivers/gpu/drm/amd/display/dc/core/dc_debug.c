@@ -80,6 +80,14 @@ DEFINE_DYNAMIC_DEBUG_LOG_GROUPS(debug_dc, __debug_dc,
 				DC_DYNDBG_BITMAP_DESC(debug_dc),
 				amdgpu_bitmap);
 
+#if defined(CONFIG_TRACING)
+
+unsigned long __trace_dc;
+EXPORT_SYMBOL(__trace_dc);
+DEFINE_DYNAMIC_DEBUG_LOG_GROUPS(trace_dc, __trace_dc,
+				DC_DYNDBG_BITMAP_DESC(trace_dc),
+				amdgpu_bitmap);
+#endif
 #endif
 
 #define DC_LOGGER_INIT(logger)

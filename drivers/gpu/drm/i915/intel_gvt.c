@@ -195,8 +195,17 @@ static struct dyndbg_bitdesc i915_dyndbg_bitmap[] = {
 	help_(7, "gvt:render:")						\
 	help_(8, "gvt:sched:")
 
-DEFINE_DYNAMIC_DEBUG_BITGRPS(debug_gvt, __gvt_debug,
-			     I915_GVT_CATEGORIES(debug_gvt),
-			     i915_dyndbg_bitmap);
+DEFINE_DYNAMIC_DEBUG_LOG_GROUPS(debug_gvt, __gvt_debug,
+				I915_GVT_CATEGORIES(debug_gvt),
+				i915_dyndbg_bitmap);
 
+#if defined(CONFIG_TRACING)
+
+unsigned long __gvt_trace;
+EXPORT_SYMBOL(__gvt_trace);
+DEFINE_DYNAMIC_DEBUG_TRACE_GROUPS(trace_gvt, __gvt_trace,
+				  I915_GVT_CATEGORIES(trace_gvt),
+				  i915_dyndbg_bitmap);
+
+#endif
 #endif

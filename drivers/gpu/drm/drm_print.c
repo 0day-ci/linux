@@ -72,9 +72,16 @@ static struct dyndbg_bitdesc drm_dyndbg_bitmap[] = {
 	[8] = { DRM_DBG_CAT_DP },
 	[9] = { DRM_DBG_CAT_DRMRES }
 };
-DEFINE_DYNAMIC_DEBUG_BITGRPS(debug, __drm_debug, DRM_DEBUG_DESC,
-			     drm_dyndbg_bitmap);
+DEFINE_DYNAMIC_DEBUG_LOG_GROUPS(debug, __drm_debug, DRM_DEBUG_DESC,
+				drm_dyndbg_bitmap);
 
+#ifdef CONFIG_TRACING
+struct trace_array *trace_arr;
+unsigned long __drm_trace;
+EXPORT_SYMBOL(__drm_trace);
+DEFINE_DYNAMIC_DEBUG_TRACE_GROUPS(trace, __drm_trace, DRM_DEBUG_DESC,
+				  drm_dyndbg_bitmap);
+#endif
 #endif
 
 void __drm_puts_coredump(struct drm_printer *p, const char *str)
