@@ -1671,11 +1671,11 @@ tcp_md5_do_lookup(const struct sock *sk, int l3index,
 #define tcp_twsk_md5_key(twsk)	NULL
 #endif
 
-bool tcp_alloc_md5sig_pool(void);
+bool tcp_md5sig_pool_alloc(void);
 bool tcp_md5sig_pool_ready(void);
 
-struct tcp_md5sig_pool *tcp_get_md5sig_pool(void);
-static inline void tcp_put_md5sig_pool(void)
+struct tcp_md5sig_pool *tcp_md5sig_pool_get(void);
+static inline void tcp_md5sig_pool_put(void)
 {
 	local_bh_enable();
 }

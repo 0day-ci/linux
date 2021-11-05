@@ -4257,7 +4257,7 @@ static DEFINE_PER_CPU(struct tcp_md5sig_pool, tcp_md5sig_pool);
 static DEFINE_MUTEX(tcp_md5sig_mutex);
 static bool tcp_md5sig_pool_populated = false;
 
-static void __tcp_alloc_md5sig_pool(void)
+static void __tcp_md5sig_pool_alloc(void)
 {
 	struct crypto_ahash *hash;
 	int cpu;
@@ -4289,7 +4289,7 @@ static void __tcp_alloc_md5sig_pool(void)
 		per_cpu(tcp_md5sig_pool, cpu).md5_req = req;
 	}
 	/* before setting tcp_md5sig_pool_populated, we must commit all writes
-	 * to memory. See smp_rmb() in tcp_get_md5sig_pool()
+	 * to memory. See smp_rmb() in tcp_md5sig_pool_get()
 	 */
 	smp_wmb();
 	tcp_md5sig_pool_populated = true;
@@ -4305,13 +4305,13 @@ out_free:
 	crypto_free_ahash(hash);
 }
 
-bool tcp_alloc_md5sig_pool(void)
+bool tcp_md5sig_pool_alloc(void)
 {
 	if (unlikely(!tcp_md5sig_pool_populated)) {
 		mutex_lock(&tcp_md5sig_mutex);
 
 		if (!tcp_md5sig_pool_populated) {
-			__tcp_alloc_md5sig_pool();
+			__tcp_md5sig_pool_alloc();
 			if (tcp_md5sig_pool_populated)
 				static_branch_inc(&tcp_md5_needed);
 		}
@@ -4320,7 +4320,7 @@ bool tcp_alloc_md5sig_pool(void)
 	}
 	return tcp_md5sig_pool_populated;
 }
-EXPORT_SYMBOL(tcp_alloc_md5sig_pool);
+EXPORT_SYMBOL(tcp_md5sig_pool_alloc);
 
 bool tcp_md5sig_pool_ready(void)
 {
@@ -4329,25 +4329,25 @@ bool tcp_md5sig_pool_ready(void)
 EXPORT_SYMBOL(tcp_md5sig_pool_ready);
 
 /**
- *	tcp_get_md5sig_pool - get md5sig_pool for this user
+ *	tcp_md5sig_pool_get - get md5sig_pool for this user
  *
  *	We use percpu structure, so if we succeed, we exit with preemption
  *	and BH disabled, to make sure another thread or softirq handling
  *	wont try to get same context.
  */
-struct tcp_md5sig_pool *tcp_get_md5sig_pool(void)
+struct tcp_md5sig_pool *tcp_md5sig_pool_get(void)
 {
 	local_bh_disable();
 
 	if (tcp_md5sig_pool_populated) {
-		/* coupled with smp_wmb() in __tcp_alloc_md5sig_pool() */
+		/* coupled with smp_wmb() in __tcp_md5sig_pool_alloc() */
 		smp_rmb();
 		return this_cpu_ptr(&tcp_md5sig_pool);
 	}
 	local_bh_enable();
 	return NULL;
 }
-EXPORT_SYMBOL(tcp_get_md5sig_pool);
+EXPORT_SYMBOL(tcp_md5sig_pool_get);
 
 int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
 			  const struct sk_buff *skb, unsigned int header_len)
