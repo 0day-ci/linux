@@ -819,6 +819,8 @@ static inline int wait_on_page_locked_killable(struct page *page)
 	return folio_wait_locked_killable(page_folio(page));
 }
 
+void migration_entry_wait_on_locked(struct folio *folio, pte_t *ptep,
+				spinlock_t *ptl);
 int put_and_wait_on_page_locked(struct page *page, int state);
 void wait_on_page_writeback(struct page *page);
 void folio_wait_writeback(struct folio *folio);
