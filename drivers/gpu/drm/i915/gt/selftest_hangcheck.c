@@ -884,7 +884,7 @@ static int active_request_put(struct i915_request *rq)
 			  rq->engine->name,
 			  rq->fence.context,
 			  rq->fence.seqno);
-		GEM_TRACE_DUMP();
+		/*GEM_TRACE_DUMP();*/
 
 		intel_gt_set_wedged(rq->engine->gt);
 		err = -EIO;
@@ -1111,8 +1111,9 @@ static int __igt_reset_engines(struct intel_gt *gt,
 					       rq->fence.seqno, rq->context->guc_id.id);
 					i915_request_put(rq);
 
-					GEM_TRACE_DUMP();
+					/* GEM_TRACE_DUMP(); */
 					intel_gt_set_wedged(gt);
+
 					err = -EIO;
 					goto restore;
 				}
