@@ -4893,9 +4893,6 @@ static enum sctp_disposition sctp_sf_violation_chunk(
 {
 	static const char err_str[] = "The following chunk violates protocol:";
 
-	if (!asoc)
-		return sctp_sf_violation(net, ep, asoc, type, arg, commands);
-
 	return sctp_sf_abort_violation(net, ep, asoc, arg, commands, err_str,
 				       sizeof(err_str));
 }
