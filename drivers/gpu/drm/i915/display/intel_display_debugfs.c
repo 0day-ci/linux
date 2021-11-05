@@ -5,6 +5,7 @@
 
 #include <drm/drm_debugfs.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_hdcp.h>
 
 #include "i915_debugfs.h"
 #include "intel_de.h"
@@ -652,10 +653,11 @@ static void intel_hdcp_info(struct seq_file *m,
 		goto out;
 	}
 
-	ret = intel_hdcp_capable(intel_connector, &hdcp_cap);
+	ret = drm_hdcp_helper_hdcp1_capable(intel_connector->hdcp_helper_data,
+					    &hdcp_cap);
 	if (ret)
 		hdcp_cap = false;
-	ret = intel_hdcp2_capable(intel_connector, &hdcp2_cap);
+	ret = intel_hdcp2_capable(&intel_connector->base, &hdcp2_cap);
 	if (ret)
 		hdcp2_cap = false;
 

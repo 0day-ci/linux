@@ -26,6 +26,7 @@
  */
 
 #include <drm/drm_scdc_helper.h>
+#include <drm/drm_hdcp.h>
 
 #include "i915_drv.h"
 #include "intel_audio.h"
@@ -3062,6 +3063,9 @@ static void intel_enable_ddi(struct intel_atomic_state *state,
 			     const struct intel_crtc_state *crtc_state,
 			     const struct drm_connector_state *conn_state)
 {
+	struct intel_connector *connector = to_intel_connector(conn_state->connector);
+	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
+
 	drm_WARN_ON(state->base.dev, crtc_state->has_pch_encoder);
 
 	if (!crtc_state->bigjoiner_slave)
@@ -3078,12 +3082,10 @@ static void intel_enable_ddi(struct intel_atomic_state *state,
 	else
 		intel_enable_ddi_dp(state, encoder, crtc_state, conn_state);
 
-	/* Enable hdcp if it's desired */
-	if (conn_state->content_protection ==
-	    DRM_MODE_CONTENT_PROTECTION_DESIRED)
-		intel_hdcp_enable(to_intel_connector(conn_state->connector),
-				  crtc_state,
-				  (u8)conn_state->hdcp_content_type);
+	if (connector->hdcp_helper_data)
+		drm_hdcp_helper_atomic_commit(connector->hdcp_helper_data,
+					&state->base,
+					&dig_port->hdcp_mutex);
 }
 
 static void intel_disable_ddi_dp(struct intel_atomic_state *state,
@@ -3143,7 +3145,13 @@ static void intel_disable_ddi(struct intel_atomic_state *state,
 			      const struct intel_crtc_state *old_crtc_state,
 			      const struct drm_connector_state *old_conn_state)
 {
-	intel_hdcp_disable(to_intel_connector(old_conn_state->connector));
+	struct intel_connector *connector = to_intel_connector(old_conn_state->connector);
+	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
+
+	if (connector->hdcp_helper_data)
+		drm_hdcp_helper_atomic_commit(connector->hdcp_helper_data,
+					&state->base,
+					&dig_port->hdcp_mutex);
 
 	if (intel_crtc_has_type(old_crtc_state, INTEL_OUTPUT_HDMI))
 		intel_disable_ddi_hdmi(state, encoder, old_crtc_state,
@@ -3173,13 +3181,18 @@ void intel_ddi_update_pipe(struct intel_atomic_state *state,
 			   const struct intel_crtc_state *crtc_state,
 			   const struct drm_connector_state *conn_state)
 {
+	struct intel_connector *connector = to_intel_connector(conn_state->connector);
+	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
 
 	if (!intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI) &&
 	    !intel_encoder_is_mst(encoder))
 		intel_ddi_update_pipe_dp(state, encoder, crtc_state,
 					 conn_state);
 
-	intel_hdcp_update_pipe(state, encoder, crtc_state, conn_state);
+	if (connector->hdcp_helper_data)
+		drm_hdcp_helper_atomic_commit(connector->hdcp_helper_data,
+					      &state->base,
+					      &dig_port->hdcp_mutex);
 }
 
 static void

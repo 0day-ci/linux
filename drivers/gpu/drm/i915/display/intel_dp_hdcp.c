@@ -55,16 +55,23 @@ static void intel_dp_hdcp_wait_for_cp_irq(struct intel_hdcp *hdcp, int timeout)
 }
 
 static
-int intel_dp_hdcp_write_an_aksv(struct intel_digital_port *dig_port,
-				u8 *an)
+int intel_dp_hdcp1_send_an_aksv(struct drm_connector *drm_connector)
 {
+	struct intel_connector *connector = to_intel_connector(drm_connector);
+	struct intel_digital_port *dig_port = intel_attached_dig_port(connector);
 	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
+	struct drm_hdcp_an an;
 	u8 aksv[DRM_HDCP_KSV_LEN] = {};
 	ssize_t dpcd_ret;
+	int ret;
 
 	/* Output An first, that's easy */
+	ret = intel_hdcp1_read_an(drm_connector, &an);
+	if (ret)
+		return ret;
+
 	dpcd_ret = drm_dp_dpcd_write(&dig_port->dp.aux, DP_AUX_HDCP_AN,
-				     an, DRM_HDCP_AN_LEN);
+				     an.bytes, DRM_HDCP_AN_LEN);
 	if (dpcd_ret != DRM_HDCP_AN_LEN) {
 		drm_dbg_kms(&i915->drm,
 			    "Failed to write An over DP/AUX (%zd)\n",
@@ -90,198 +97,12 @@ int intel_dp_hdcp_write_an_aksv(struct intel_digital_port *dig_port,
 	return 0;
 }
 
-static int intel_dp_hdcp_read_bksv(struct intel_digital_port *dig_port,
-				   u8 *bksv)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux, DP_AUX_HDCP_BKSV, bksv,
-			       DRM_HDCP_KSV_LEN);
-	if (ret != DRM_HDCP_KSV_LEN) {
-		drm_dbg_kms(&i915->drm,
-			    "Read Bksv from DP/AUX failed (%zd)\n", ret);
-		return ret >= 0 ? -EIO : ret;
-	}
-	return 0;
-}
-
-static int intel_dp_hdcp_read_bstatus(struct intel_digital_port *dig_port,
-				      u8 *bstatus)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-
-	/*
-	 * For some reason the HDMI and DP HDCP specs call this register
-	 * definition by different names. In the HDMI spec, it's called BSTATUS,
-	 * but in DP it's called BINFO.
-	 */
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux, DP_AUX_HDCP_BINFO,
-			       bstatus, DRM_HDCP_BSTATUS_LEN);
-	if (ret != DRM_HDCP_BSTATUS_LEN) {
-		drm_dbg_kms(&i915->drm,
-			    "Read bstatus from DP/AUX failed (%zd)\n", ret);
-		return ret >= 0 ? -EIO : ret;
-	}
-	return 0;
-}
-
-static
-int intel_dp_hdcp_read_bcaps(struct intel_digital_port *dig_port,
-			     u8 *bcaps)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux, DP_AUX_HDCP_BCAPS,
-			       bcaps, 1);
-	if (ret != 1) {
-		drm_dbg_kms(&i915->drm,
-			    "Read bcaps from DP/AUX failed (%zd)\n", ret);
-		return ret >= 0 ? -EIO : ret;
-	}
-
-	return 0;
-}
-
-static
-int intel_dp_hdcp_repeater_present(struct intel_digital_port *dig_port,
-				   bool *repeater_present)
-{
-	ssize_t ret;
-	u8 bcaps;
-
-	ret = intel_dp_hdcp_read_bcaps(dig_port, &bcaps);
-	if (ret)
-		return ret;
-
-	*repeater_present = bcaps & DP_BCAPS_REPEATER_PRESENT;
-	return 0;
-}
-
-static
-int intel_dp_hdcp_read_ri_prime(struct intel_digital_port *dig_port,
-				u8 *ri_prime)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux, DP_AUX_HDCP_RI_PRIME,
-			       ri_prime, DRM_HDCP_RI_LEN);
-	if (ret != DRM_HDCP_RI_LEN) {
-		drm_dbg_kms(&i915->drm, "Read Ri' from DP/AUX failed (%zd)\n",
-			    ret);
-		return ret >= 0 ? -EIO : ret;
-	}
-	return 0;
-}
-
-static
-int intel_dp_hdcp_read_ksv_ready(struct intel_digital_port *dig_port,
-				 bool *ksv_ready)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-	u8 bstatus;
-
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux, DP_AUX_HDCP_BSTATUS,
-			       &bstatus, 1);
-	if (ret != 1) {
-		drm_dbg_kms(&i915->drm,
-			    "Read bstatus from DP/AUX failed (%zd)\n", ret);
-		return ret >= 0 ? -EIO : ret;
-	}
-	*ksv_ready = bstatus & DP_BSTATUS_READY;
-	return 0;
-}
-
-static
-int intel_dp_hdcp_read_ksv_fifo(struct intel_digital_port *dig_port,
-				int num_downstream, u8 *ksv_fifo)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-	int i;
-
-	/* KSV list is read via 15 byte window (3 entries @ 5 bytes each) */
-	for (i = 0; i < num_downstream; i += 3) {
-		size_t len = min(num_downstream - i, 3) * DRM_HDCP_KSV_LEN;
-		ret = drm_dp_dpcd_read(&dig_port->dp.aux,
-				       DP_AUX_HDCP_KSV_FIFO,
-				       ksv_fifo + i * DRM_HDCP_KSV_LEN,
-				       len);
-		if (ret != len) {
-			drm_dbg_kms(&i915->drm,
-				    "Read ksv[%d] from DP/AUX failed (%zd)\n",
-				    i, ret);
-			return ret >= 0 ? -EIO : ret;
-		}
-	}
-	return 0;
-}
-
-static
-int intel_dp_hdcp_read_v_prime_part(struct intel_digital_port *dig_port,
-				    int i, u32 *part)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-
-	if (i >= DRM_HDCP_V_PRIME_NUM_PARTS)
-		return -EINVAL;
-
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux,
-			       DP_AUX_HDCP_V_PRIME(i), part,
-			       DRM_HDCP_V_PRIME_PART_LEN);
-	if (ret != DRM_HDCP_V_PRIME_PART_LEN) {
-		drm_dbg_kms(&i915->drm,
-			    "Read v'[%d] from DP/AUX failed (%zd)\n", i, ret);
-		return ret >= 0 ? -EIO : ret;
-	}
-	return 0;
-}
-
 static
 int intel_dp_hdcp_toggle_signalling(struct intel_digital_port *dig_port,
 				    enum transcoder cpu_transcoder,
 				    bool enable)
 {
 	/* Not used for single stream DisplayPort setups */
-	return 0;
-}
-
-static
-bool intel_dp_hdcp_check_link(struct intel_digital_port *dig_port,
-			      struct intel_connector *connector)
-{
-	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
-	ssize_t ret;
-	u8 bstatus;
-
-	ret = drm_dp_dpcd_read(&dig_port->dp.aux, DP_AUX_HDCP_BSTATUS,
-			       &bstatus, 1);
-	if (ret != 1) {
-		drm_dbg_kms(&i915->drm,
-			    "Read bstatus from DP/AUX failed (%zd)\n", ret);
-		return false;
-	}
-
-	return !(bstatus & (DP_BSTATUS_LINK_FAILURE | DP_BSTATUS_REAUTH_REQ));
-}
-
-static
-int intel_dp_hdcp_capable(struct intel_digital_port *dig_port,
-			  bool *hdcp_capable)
-{
-	ssize_t ret;
-	u8 bcaps;
-
-	ret = intel_dp_hdcp_read_bcaps(dig_port, &bcaps);
-	if (ret)
-		return ret;
-
-	*hdcp_capable = bcaps & DP_BCAPS_HDCP_CAPABLE;
 	return 0;
 }
 
@@ -627,12 +448,16 @@ int intel_dp_hdcp2_check_link(struct intel_digital_port *dig_port,
 	return ret;
 }
 
-static
-int intel_dp_hdcp2_capable(struct intel_digital_port *dig_port,
-			   bool *capable)
+static int intel_dp_hdcp2_capable(struct drm_connector *drm_connector, bool *capable)
 {
+	struct intel_connector *connector = to_intel_connector(drm_connector);
+	struct intel_digital_port *dig_port = intel_attached_dig_port(connector);
 	u8 rx_caps[3];
 	int ret;
+
+	ret = intel_hdcp2_capable(drm_connector, capable);
+	if (ret || !capable)
+		return ret;
 
 	*capable = false;
 	ret = drm_dp_dpcd_read(&dig_port->dp.aux,
@@ -649,22 +474,11 @@ int intel_dp_hdcp2_capable(struct intel_digital_port *dig_port,
 }
 
 static const struct intel_hdcp_shim intel_dp_hdcp_shim = {
-	.write_an_aksv = intel_dp_hdcp_write_an_aksv,
-	.read_bksv = intel_dp_hdcp_read_bksv,
-	.read_bstatus = intel_dp_hdcp_read_bstatus,
-	.repeater_present = intel_dp_hdcp_repeater_present,
-	.read_ri_prime = intel_dp_hdcp_read_ri_prime,
-	.read_ksv_ready = intel_dp_hdcp_read_ksv_ready,
-	.read_ksv_fifo = intel_dp_hdcp_read_ksv_fifo,
-	.read_v_prime_part = intel_dp_hdcp_read_v_prime_part,
 	.toggle_signalling = intel_dp_hdcp_toggle_signalling,
-	.check_link = intel_dp_hdcp_check_link,
-	.hdcp_capable = intel_dp_hdcp_capable,
 	.write_2_2_msg = intel_dp_hdcp2_write_msg,
 	.read_2_2_msg = intel_dp_hdcp2_read_msg,
 	.config_stream_type = intel_dp_hdcp2_config_stream_type,
 	.check_2_2_link = intel_dp_hdcp2_check_link,
-	.hdcp_2_2_capable = intel_dp_hdcp2_capable,
 	.protocol = HDCP_PROTOCOL_DP,
 };
 
@@ -720,6 +534,43 @@ intel_dp_mst_hdcp_stream_encryption(struct intel_connector *connector,
 	return 0;
 }
 
+static int intel_dp_mst_hdcp1_post_encryption(struct drm_connector *drm_connector)
+{
+	struct intel_connector *connector = to_intel_connector(drm_connector);
+	int ret;
+
+	ret = intel_hdcp1_post_encryption(drm_connector);
+	if (ret)
+		return ret;
+
+	return intel_dp_mst_hdcp_stream_encryption(connector, true);
+}
+
+static int intel_dp_mst_hdcp1_disable(struct drm_connector *drm_connector)
+{
+	struct intel_connector *connector = to_intel_connector(drm_connector);
+	struct intel_digital_port *dig_port = intel_attached_dig_port(connector);
+	struct drm_i915_private *i915 = to_i915(connector->base.dev);
+	int ret;
+
+	ret = intel_dp_mst_hdcp_stream_encryption(connector, true);
+	if (ret) {
+		drm_err(&i915->drm, "[%s:%d] Failed to disable HDCP 1.4 stream enc\n",
+			connector->base.name, connector->base.base.id);
+		return ret;
+	}
+
+	/*
+	 * If there are other connectors on this port using HDCP,
+	 * don't disable it until it disabled HDCP encryption for
+	 * all connectors in MST topology.
+	*/
+	if (dig_port->num_hdcp_streams > 0)
+		return 0;
+
+	return intel_hdcp1_disable(drm_connector);
+}
+
 static int
 intel_dp_mst_hdcp2_stream_encryption(struct intel_connector *connector,
 				     bool enable)
@@ -757,7 +608,7 @@ intel_dp_mst_hdcp2_stream_encryption(struct intel_connector *connector,
 
 static
 int intel_dp_mst_hdcp2_check_link(struct intel_digital_port *dig_port,
-				  struct intel_connector *connector)
+			          struct intel_connector *connector)
 {
 	struct intel_hdcp *hdcp = &connector->hdcp;
 	int ret;
@@ -778,45 +629,87 @@ int intel_dp_mst_hdcp2_check_link(struct intel_digital_port *dig_port,
 }
 
 static const struct intel_hdcp_shim intel_dp_mst_hdcp_shim = {
-	.write_an_aksv = intel_dp_hdcp_write_an_aksv,
-	.read_bksv = intel_dp_hdcp_read_bksv,
-	.read_bstatus = intel_dp_hdcp_read_bstatus,
-	.repeater_present = intel_dp_hdcp_repeater_present,
-	.read_ri_prime = intel_dp_hdcp_read_ri_prime,
-	.read_ksv_ready = intel_dp_hdcp_read_ksv_ready,
-	.read_ksv_fifo = intel_dp_hdcp_read_ksv_fifo,
-	.read_v_prime_part = intel_dp_hdcp_read_v_prime_part,
 	.toggle_signalling = intel_dp_hdcp_toggle_signalling,
-	.stream_encryption = intel_dp_mst_hdcp_stream_encryption,
-	.check_link = intel_dp_hdcp_check_link,
-	.hdcp_capable = intel_dp_hdcp_capable,
 	.write_2_2_msg = intel_dp_hdcp2_write_msg,
 	.read_2_2_msg = intel_dp_hdcp2_read_msg,
 	.config_stream_type = intel_dp_hdcp2_config_stream_type,
 	.stream_2_2_encryption = intel_dp_mst_hdcp2_stream_encryption,
 	.check_2_2_link = intel_dp_mst_hdcp2_check_link,
-	.hdcp_2_2_capable = intel_dp_hdcp2_capable,
 	.protocol = HDCP_PROTOCOL_DP,
 };
 
+static const struct drm_hdcp_helper_funcs intel_dp_hdcp_helper_funcs = {
+	.setup = intel_hdcp_setup,
+	.load_keys = intel_hdcp_load_keys,
+	.hdcp2_capable = intel_dp_hdcp2_capable,
+	.hdcp2_enable = intel_hdcp2_enable,
+	.hdcp2_check_link = intel_hdcp2_check_link,
+	.hdcp2_disable = intel_hdcp2_disable,
+	.hdcp1_send_an_aksv = intel_dp_hdcp1_send_an_aksv,
+	.hdcp1_store_receiver_info = intel_hdcp1_store_receiver_info,
+	.hdcp1_enable_encryption = intel_hdcp1_enable_encryption,
+	.hdcp1_wait_for_r0 = intel_hdcp1_wait_for_r0,
+	.hdcp1_match_ri = intel_hdcp1_match_ri,
+	.hdcp1_post_encryption = intel_hdcp1_post_encryption,
+	.hdcp1_store_ksv_fifo = intel_hdcp1_store_ksv_fifo,
+	.hdcp1_disable = intel_hdcp1_disable,
+};
+
+static const struct drm_hdcp_helper_funcs intel_dp_mst_hdcp_helper_funcs = {
+	.setup = intel_hdcp_setup,
+	.load_keys = intel_hdcp_load_keys,
+	.hdcp2_capable = intel_dp_hdcp2_capable,
+	.hdcp2_enable = intel_hdcp2_enable,
+	.hdcp2_check_link = intel_hdcp2_check_link,
+	.hdcp2_disable = intel_hdcp2_disable,
+	.hdcp1_send_an_aksv = intel_dp_hdcp1_send_an_aksv,
+	.hdcp1_store_receiver_info = intel_hdcp1_store_receiver_info,
+	.hdcp1_enable_encryption = intel_hdcp1_enable_encryption,
+	.hdcp1_wait_for_r0 = intel_hdcp1_wait_for_r0,
+	.hdcp1_match_ri = intel_hdcp1_match_ri,
+	.hdcp1_post_encryption = intel_dp_mst_hdcp1_post_encryption,
+	.hdcp1_store_ksv_fifo = intel_hdcp1_store_ksv_fifo,
+	.hdcp1_disable = intel_dp_mst_hdcp1_disable,
+};
+
+
 int intel_dp_hdcp_init(struct intel_digital_port *dig_port,
-		       struct intel_connector *intel_connector)
+		       struct intel_connector *connector)
 {
-	struct drm_device *dev = intel_connector->base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_encoder *intel_encoder = &dig_port->base;
 	enum port port = intel_encoder->port;
 	struct intel_dp *intel_dp = &dig_port->dp;
+	struct drm_hdcp_helper_data *data;
+	const struct drm_hdcp_helper_funcs *helper_funcs;
+	const struct intel_hdcp_shim *intel_shim;
+	int ret;
 
-	if (!is_hdcp_supported(dev_priv, port))
+	if (!is_hdcp_supported(dev_priv, port) || intel_dp_is_edp(intel_dp))
 		return 0;
 
-	if (intel_connector->mst_port)
-		return intel_hdcp_init(intel_connector, dig_port,
-				       &intel_dp_mst_hdcp_shim);
-	else if (!intel_dp_is_edp(intel_dp))
-		return intel_hdcp_init(intel_connector, dig_port,
-				       &intel_dp_hdcp_shim);
+	if (connector->mst_port) {
+		helper_funcs = &intel_dp_mst_hdcp_helper_funcs;
+		intel_shim = &intel_dp_mst_hdcp_shim;
+	} else {
+		helper_funcs = &intel_dp_hdcp_helper_funcs;
+		intel_shim = &intel_dp_hdcp_shim;
+	}
 
+	data = drm_hdcp_helper_initialize_dp(&connector->base,
+					     &dig_port->dp.aux, helper_funcs,
+					     true);
+	if (IS_ERR(data)) {
+		drm_dbg_kms(&dev_priv->drm, "HDCP init failed, skipping.\n");
+		return PTR_ERR(data);
+	}
+
+	ret = intel_hdcp_init(connector, dig_port, intel_shim);
+	if (ret) {
+		drm_hdcp_helper_destroy(data);
+		return ret;
+	}
+
+	connector->hdcp_helper_data = data;
 	return 0;
 }
