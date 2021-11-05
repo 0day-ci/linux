@@ -227,7 +227,8 @@ of the characters::
 
 The flags are::
 
-  p    enables the pr_debug() callsite.
+  p    enables the pr_debug() callsite to syslog
+  T    enables the pr_debug() callsite to tracefs
   f    Include the function name in the printed message
   l    Include line number in the printed message
   m    Include module name in the printed message
@@ -240,8 +241,8 @@ have meaning, other flags ignored.
 For display, the flags are preceded by ``=``
 (mnemonic: what the flags are currently equal to).
 
-Note the regexp ``^[-+=][flmpt_]+$`` matches a flags specification.
-To clear all flags at once, use ``=_`` or ``-flmpt``.
+Note the regexp ``^[-+=][flmptT_]+$`` matches a flags specification.
+To clear all flags at once, use ``=_`` or ``-flmptT``.
 
 
 Debug messages during Boot Process
