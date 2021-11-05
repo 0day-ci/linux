@@ -73,9 +73,9 @@ static int ehci_brcm_hub_control(
 	 * of RESUME
 	 */
 	if ((typeReq == GetPortStatus) &&
-	    (wIndex && wIndex <= ports) &&
-	    ehci->reset_done[wIndex-1] &&
-	    time_after_eq(jiffies, ehci->reset_done[wIndex-1]) &&
+	    (temp < ports) &&
+	    ehci->reset_done[temp] &&
+	    time_after_eq(jiffies, ehci->reset_done[temp]) &&
 	    (ehci_readl(ehci, status_reg) & PORT_RESUME)) {
 
 		/*
