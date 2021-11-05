@@ -66,7 +66,6 @@ static int dp_parser_ctrl_res(struct dp_parser *parser)
 				DRM_ERROR("legacy memory region not large enough\n");
 				return -EINVAL;
 			}
-
 			dss->ahb.len = DP_DEFAULT_AHB_SIZE;
 			dss->aux.base = dss->ahb.base + DP_DEFAULT_AUX_OFFSET;
 			dss->aux.len = DP_DEFAULT_AUX_SIZE;
@@ -74,6 +73,10 @@ static int dp_parser_ctrl_res(struct dp_parser *parser)
 			dss->link.len = DP_DEFAULT_LINK_SIZE;
 			dss->p0.base = dss->ahb.base + DP_DEFAULT_P0_OFFSET;
 			dss->p0.len = DP_DEFAULT_P0_SIZE;
+			dss->hdcp_key.base = NULL;
+			dss->hdcp_key.len = 0;
+			dss->hdcp_tz.base = NULL;
+			dss->hdcp_tz.len = 0;
 		} else {
 			DRM_ERROR("unable to remap aux region: %pe\n", dss->aux.base);
 			return PTR_ERR(dss->aux.base);
@@ -89,6 +92,21 @@ static int dp_parser_ctrl_res(struct dp_parser *parser)
 		if (IS_ERR(dss->p0.base)) {
 			DRM_ERROR("unable to remap p0 region: %pe\n", dss->p0.base);
 			return PTR_ERR(dss->p0.base);
+		}
+
+		dss->hdcp_key.base = dp_ioremap(pdev, 5, &dss->hdcp_key.len);
+		if (!IS_ERR(dss->hdcp_key.base)) {
+			dss->hdcp_tz.base = dp_ioremap(pdev, 6, &dss->hdcp_tz.len);
+			if (IS_ERR(dss->hdcp_tz.base)) {
+				DRM_ERROR("unable to remap hdcp_tz region: %pe\n",
+					dss->hdcp_tz.base);
+				return PTR_ERR(dss->hdcp_tz.base);
+			}
+		} else {
+			dss->hdcp_key.base = NULL;
+			dss->hdcp_key.len = 0;
+			dss->hdcp_tz.base = NULL;
+			dss->hdcp_tz.len = 0;
 		}
 	}
 

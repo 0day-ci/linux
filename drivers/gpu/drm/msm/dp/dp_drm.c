@@ -6,17 +6,31 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_bridge.h>
+#include <drm/drm_connector.h>
 #include <drm/drm_crtc.h>
+#include <drm/drm_hdcp.h>
 
 #include "msm_drv.h"
 #include "msm_kms.h"
 #include "dp_drm.h"
+#include "dp_hdcp.h"
+
+struct dp_connector_state {
+	struct drm_connector_state base;
+	bool hdcp_transition;
+};
+#define to_dp_connector_state(x) container_of(x, struct dp_connector_state, base)
 
 struct dp_connector {
 	struct drm_connector base;
 	struct msm_dp *dp_display;
 };
 #define to_dp_connector(x) container_of(x, struct dp_connector, base)
+
+struct msm_dp *msm_dp_from_connector(struct drm_connector *connector)
+{
+	return to_dp_connector(connector)->dp_display;
+}
 
 /**
  * dp_connector_detect - callback to determine if connector is connected
@@ -115,19 +129,71 @@ static enum drm_mode_status dp_connector_mode_valid(
 	return dp_display_validate_mode(dp_disp, mode->clock);
 }
 
+static int dp_connector_atomic_check(struct drm_connector *connector,
+				     struct drm_atomic_state *state)
+{
+	struct drm_connector_state *conn_state;
+	struct dp_connector_state *dp_state;
+
+	conn_state = drm_atomic_get_new_connector_state(state, connector);
+	dp_state = to_dp_connector_state(conn_state);
+
+	dp_state->hdcp_transition = drm_hdcp_atomic_check(connector, state);
+
+	return 0;
+}
+
+static struct drm_connector_state *
+dp_connector_atomic_duplicate_state(struct drm_connector *connector)
+{
+	struct dp_connector_state *state;
+
+	state = kzalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return NULL;
+
+	state->hdcp_transition = false;
+
+	__drm_atomic_helper_connector_duplicate_state(connector, &state->base);
+	return &state->base;
+}
+
 static const struct drm_connector_funcs dp_connector_funcs = {
 	.detect = dp_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = drm_connector_cleanup,
 	.reset = drm_atomic_helper_connector_reset,
-	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_duplicate_state = dp_connector_atomic_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
 static const struct drm_connector_helper_funcs dp_connector_helper_funcs = {
 	.get_modes = dp_connector_get_modes,
 	.mode_valid = dp_connector_mode_valid,
+	.atomic_check = dp_connector_atomic_check,
 };
+
+bool dp_drm_is_connector_msm_dp(struct drm_connector *connector)
+{
+	return connector->funcs == &dp_connector_funcs;
+}
+
+void dp_drm_atomic_commit(struct drm_connector *connector,
+			  struct drm_connector_state *conn_state,
+			  struct drm_atomic_state *state)
+{
+	struct dp_connector_state *dp_state;
+	struct msm_dp *dp_disp;
+
+	dp_state = to_dp_connector_state(conn_state);
+
+	if (!dp_state->hdcp_transition)
+		return;
+
+	dp_disp = msm_dp_from_connector(connector);
+
+	dp_display_hdcp_commit(dp_disp, state);
+}
 
 /* connector initialization */
 struct drm_connector *dp_drm_connector_init(struct msm_dp *dp_display)
