@@ -229,6 +229,9 @@ static __init void pSeries_smp_probe(void)
 			return;
 	}
 
+	if (doorbell_disabled)
+		return;
+
 	/*
 	 * Under PowerVM, FSCR[MSGP] is enabled as guest vCPU siblings are
 	 * gang scheduled on the same physical core, so doorbells are always

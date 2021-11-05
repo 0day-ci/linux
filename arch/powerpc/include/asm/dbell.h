@@ -90,6 +90,7 @@ static inline void ppc_msgsync(void)
 #endif /* CONFIG_PPC_BOOK3S */
 
 extern void doorbell_exception(struct pt_regs *regs);
+extern bool doorbell_disabled;
 
 static inline void ppc_msgsnd(enum ppc_dbell type, u32 flags, u32 tag)
 {

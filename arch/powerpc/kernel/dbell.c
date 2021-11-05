@@ -38,6 +38,23 @@ DEFINE_INTERRUPT_HANDLER_ASYNC(doorbell_exception)
 
 	set_irq_regs(old_regs);
 }
+
+bool doorbell_disabled;
+
+static int __init doorbell_cmdline(char *arg)
+{
+	if (!arg)
+		return -EINVAL;
+
+	if (strncmp(arg, "off", 3) == 0) {
+		pr_info("Doorbell disabled on kernel command line\n");
+		doorbell_disabled = true;
+	}
+
+	return 0;
+}
+__setup("doorbell=", doorbell_cmdline);
+
 #else /* CONFIG_SMP */
 DEFINE_INTERRUPT_HANDLER_ASYNC(doorbell_exception)
 {

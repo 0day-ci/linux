@@ -1041,6 +1041,16 @@
 			The filter can be disabled or changed to another
 			driver later using sysfs.
 
+	doorbell=off	[PPC]
+			On processors with a XIVE interrupt controller
+			(POWER9 and above), the kernel can use either
+			doorbells or XIVE to generate CPU IPIs.	Sending
+			doorbell is generally preferred to using the XIVE
+			IC because it is faster. There are cases where
+			we want to avoid doorbells and use XIVE only,
+			for debug or performance. Only useful on
+			POWER9 and above.
+
 	driver_async_probe=  [KNL]
 			List of driver names to be probed asynchronously.
 			Format: <driver_name1>,<driver_name2>...

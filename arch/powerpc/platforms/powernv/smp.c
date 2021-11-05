@@ -338,10 +338,13 @@ static void __init pnv_smp_probe(void)
 		ic_cause_ipi = smp_ops->cause_ipi;
 		WARN_ON(!ic_cause_ipi);
 
-		if (cpu_has_feature(CPU_FTR_ARCH_300))
+		if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+			if (doorbell_disabled)
+				return;
 			smp_ops->cause_ipi = doorbell_global_ipi;
-		else
+		} else {
 			smp_ops->cause_ipi = pnv_cause_ipi;
+		}
 	}
 }
 
