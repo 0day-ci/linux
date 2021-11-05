@@ -293,11 +293,12 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 			tcptw->tw_md5_key = NULL;
 			if (static_branch_unlikely(&tcp_md5_needed)) {
 				struct tcp_md5sig_key *key;
+				bool err = WARN_ON(!tcp_md5sig_pool_ready());
 
 				key = tp->af_specific->md5_lookup(sk, sk);
-				if (key) {
+				if (key && !err) {
 					tcptw->tw_md5_key = kmemdup(key, sizeof(*key), GFP_ATOMIC);
-					BUG_ON(tcptw->tw_md5_key && !tcp_alloc_md5sig_pool());
+					WARN_ON_ONCE(tcptw->tw_md5_key == NULL);
 				}
 			}
 		} while (0);

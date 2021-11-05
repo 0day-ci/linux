@@ -1672,6 +1672,7 @@ tcp_md5_do_lookup(const struct sock *sk, int l3index,
 #endif
 
 bool tcp_alloc_md5sig_pool(void);
+bool tcp_md5sig_pool_ready(void);
 
 struct tcp_md5sig_pool *tcp_get_md5sig_pool(void);
 static inline void tcp_put_md5sig_pool(void)

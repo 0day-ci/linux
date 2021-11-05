@@ -4314,6 +4314,11 @@ bool tcp_alloc_md5sig_pool(void)
 }
 EXPORT_SYMBOL(tcp_alloc_md5sig_pool);
 
+bool tcp_md5sig_pool_ready(void)
+{
+	return tcp_md5sig_pool_populated;
+}
+EXPORT_SYMBOL(tcp_md5sig_pool_ready);
 
 /**
  *	tcp_get_md5sig_pool - get md5sig_pool for this user
