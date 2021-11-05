@@ -2857,6 +2857,7 @@ int kvm_lapic_enable_pv_eoi(struct kvm_vcpu *vcpu, u64 data, unsigned long len)
 	u64 addr = data & ~KVM_MSR_ENABLED;
 	struct gfn_to_hva_cache *ghc = &vcpu->arch.pv_eoi.data;
 	unsigned long new_len;
+	int ret;
 
 	if (!IS_ALIGNED(addr, 4))
 		return 1;
@@ -2870,7 +2871,13 @@ int kvm_lapic_enable_pv_eoi(struct kvm_vcpu *vcpu, u64 data, unsigned long len)
 	else
 		new_len = len;
 
-	return kvm_gfn_to_hva_cache_init(vcpu->kvm, ghc, addr, new_len);
+	ret = kvm_gfn_to_hva_cache_init(vcpu->kvm, ghc, addr, new_len);
+
+	if (ret && (vcpu->arch.pv_eoi.msr_val & KVM_MSR_ENABLED)) {
+		vcpu->arch.pv_eoi.msr_val &= ~KVM_MSR_ENABLED;
+		pr_warn_once("Disabled PV EOI during wrong address\n");
+	}
+	return ret;
 }
 
 int kvm_apic_accept_events(struct kvm_vcpu *vcpu)
