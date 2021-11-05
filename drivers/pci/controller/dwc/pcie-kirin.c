@@ -422,7 +422,8 @@ static int kirin_pcie_parse_port(struct kirin_pcie *pcie,
 			pcie->num_slots++;
 			if (pcie->num_slots > MAX_PCI_SLOTS) {
 				dev_err(dev, "Too many PCI slots!\n");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto put_node;
 			}
 
 			ret = of_pci_get_devfn(child);
@@ -446,6 +447,7 @@ static int kirin_pcie_parse_port(struct kirin_pcie *pcie,
 	return 0;
 
 put_node:
+	of_node_put(parent);
 	of_node_put(child);
 	return ret;
 }
