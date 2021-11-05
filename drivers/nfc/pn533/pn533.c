@@ -2285,8 +2285,10 @@ static int pn533_transceive(struct nfc_dev *nfc_dev,
 		/* jumbo frame ? */
 		if (skb->len > PN533_CMD_DATAEXCH_DATA_MAXLEN) {
 			rc = pn533_fill_fragment_skbs(dev, skb);
-			if (rc <= 0)
-				goto error;
+			if (rc <= 0) {
+				kfree(arg);
+				return rc;
+			}
 
 			skb = skb_dequeue(&dev->fragment_skb);
 			if (!skb) {
@@ -2353,8 +2355,11 @@ static int pn533_tm_send(struct nfc_dev *nfc_dev, struct sk_buff *skb)
 	/* let's split in multiple chunks if size's too big */
 	if (skb->len > PN533_CMD_DATAEXCH_DATA_MAXLEN) {
 		rc = pn533_fill_fragment_skbs(dev, skb);
-		if (rc <= 0)
-			goto error;
+		if (rc <= 0) {
+			if (rc < 0)
+				skb_queue_purge(&dev->fragment_skb);
+			return rc;
+		}
 
 		/* get the first skb */
 		skb = skb_dequeue(&dev->fragment_skb);
