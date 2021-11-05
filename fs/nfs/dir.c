@@ -1798,7 +1798,7 @@ no_entry:
 	}
 	nfs_set_verifier(dentry, dir_verifier);
 out:
-	trace_nfs_lookup_exit(dir, dentry, flags, error);
+	trace_nfs_lookup_exit(dir, dentry, flags, PTR_ERR_OR_ZERO(res));
 	nfs_free_fattr(fattr);
 	nfs_free_fhandle(fhandle);
 	return res;
