@@ -126,6 +126,7 @@ struct rs5c372 {
 	unsigned		smbus:1;
 	char			buf[17];
 	char			*regs;
+	int			voltage_low;
 };
 
 static int rs5c_get_regs(struct rs5c372 *rs5c)
@@ -216,20 +217,38 @@ static int rs5c372_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	if (status < 0)
 		return status;
 
+	/* check the warning bits */
 	switch (rs5c->type) {
 	case rtc_r2025sd:
 	case rtc_r2221tl:
 		if ((rs5c->type == rtc_r2025sd && !(ctrl2 & R2x2x_CTRL2_XSTP)) ||
 		    (rs5c->type == rtc_r2221tl &&  (ctrl2 & R2x2x_CTRL2_XSTP))) {
 			dev_warn(&client->dev, "rtc oscillator interruption detected. Please reset the rtc clock.\n");
+			/* keep it as indicator of low/dead battery */
+			rs5c->voltage_low = 1;
 			return -EINVAL;
 		}
 		break;
 	default:
 		if (ctrl2 & RS5C_CTRL2_XSTP) {
 			dev_warn(&client->dev, "rtc oscillator interruption detected. Please reset the rtc clock.\n");
+			/* keep it as indicator of low/dead battery */
+			rs5c->voltage_low = 1;
 			return -EINVAL;
 		}
+	}
+
+
+	switch (rs5c->type) {
+	case rtc_rs5c372a:
+	case rtc_rs5c372b:
+		break;
+	default:
+		if (ctrl2 & R2x2x_CTRL2_VDET) {
+			rs5c->voltage_low = 1;
+			dev_warn(&client->dev, "low voltage detected\n");
+		}
+		break;
 	}
 
 	tm->tm_sec = bcd2bin(rs5c->regs[RS5C372_REG_SECS] & 0x7f);
@@ -485,6 +504,32 @@ static int rs5c372_rtc_proc(struct device *dev, struct seq_file *seq)
 #define	rs5c372_rtc_proc	NULL
 #endif
 
+#ifdef CONFIG_RTC_INTF_DEV
+static int rs5c372_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
+{
+	struct rs5c372	*rs5c = i2c_get_clientdata(to_i2c_client(dev));
+
+	dev_dbg(dev, "%s: cmd=%x\n", __func__, cmd);
+
+	switch (cmd) {
+	case RTC_VL_READ:
+		if (rs5c->voltage_low)
+			dev_info(dev, "low voltage detected, date/time is not reliable.\n");
+
+		return put_user(rs5c->voltage_low, (unsigned int __user *)arg);
+	case RTC_VL_CLR:
+		/* Clear the cached value. */
+		rs5c->voltage_low = 0;
+		return 0;
+	default:
+		return -ENOIOCTLCMD;
+	}
+	return 0;
+}
+#else
+#define rs5c372_ioctl	NULL
+#endif
+
 static const struct rtc_class_ops rs5c372_rtc_ops = {
 	.proc		= rs5c372_rtc_proc,
 	.read_time	= rs5c372_rtc_read_time,
@@ -492,6 +537,7 @@ static const struct rtc_class_ops rs5c372_rtc_ops = {
 	.read_alarm	= rs5c_read_alarm,
 	.set_alarm	= rs5c_set_alarm,
 	.alarm_irq_enable = rs5c_rtc_alarm_irq_enable,
+	.ioctl		= rs5c372_ioctl,
 };
 
 #if IS_ENABLED(CONFIG_RTC_INTF_SYSFS)
