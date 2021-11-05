@@ -64,6 +64,13 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
 config NEED_PER_CPU_PAGE_FIRST_CHUNK
 	def_bool y if PPC64
 
+config MAXSMP
+	bool "Enable Maximum number of SMP Processors and NUMA Nodes"
+	depends on SMP && DEBUG_KERNEL && PPC_BOOK3S_64
+	help
+	  Enable maximum number of CPUS and NUMA Nodes for this architecture.
+	  If unsure, say N.
+
 config NR_IRQS
 	int "Number of virtual interrupt numbers"
 	range 32 1048576
@@ -668,6 +675,7 @@ config NUMA
 
 config NODES_SHIFT
 	int
+	default "10" if MAXSMP
 	default "8" if PPC64
 	default "4"
 	depends on NUMA
