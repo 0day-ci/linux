@@ -1932,7 +1932,7 @@ void qed_reset_vport_stats(struct qed_dev *cdev)
 						    : NULL;
 		u32 addr = 0, len = 0;
 
-		if (IS_PF(cdev) && !p_ptt) {
+		if (!p_ptt) {
 			DP_ERR(p_hwfn, "Failed to acquire ptt\n");
 			continue;
 		}
