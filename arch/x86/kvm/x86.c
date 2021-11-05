@@ -3505,6 +3505,9 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (data & KVM_STEAL_RESERVED_MASK)
 			return 1;
 
+		if (!kvm_vcpu_gfn_to_memslot(vcpu, data >> PAGE_SHIFT))
+			return 1;
+
 		vcpu->arch.st.msr_val = data;
 
 		if (!(data & KVM_MSR_ENABLED))
