@@ -201,4 +201,7 @@ config CORESIGHT_TRBE
 
 	  To compile this driver as a module, choose M here: the module will be
 	  called coresight-trbe.
+
+source "drivers/hwtracing/coresight/ultrasoc/Kconfig"
+
 endif

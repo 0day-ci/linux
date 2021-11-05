@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+#
+# ultrasoc configuration
+#
+config ULTRASOC_SMB
+	tristate "Ultrasoc system memory buffer drivers"
+        depends on ARM64 && CORESIGHT
+	help
+	  This enables support for the Ultrasoc system memory buffer
+	  driver that is responsible for receiving the trace data from
+	  Coresight ETM devices and storing them to a system buffer
+	  respectively.
