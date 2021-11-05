@@ -770,6 +770,8 @@ static int phy_poll_aneg_done(struct phy_device *phydev)
 int phy_ethtool_ksettings_set(struct phy_device *phydev,
 			      const struct ethtool_link_ksettings *cmd)
 {
+	int ret = 0;
+
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(advertising);
 	u8 autoneg = cmd->base.autoneg;
 	u8 duplex = cmd->base.duplex;
@@ -815,10 +817,10 @@ int phy_ethtool_ksettings_set(struct phy_device *phydev,
 	phydev->mdix_ctrl = cmd->base.eth_tp_mdix_ctrl;
 
 	/* Restart the PHY */
-	_phy_start_aneg(phydev);
+	ret = _phy_start_aneg(phydev);
 
 	mutex_unlock(&phydev->lock);
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(phy_ethtool_ksettings_set);
 
