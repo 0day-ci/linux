@@ -4253,32 +4253,79 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
 EXPORT_SYMBOL(tcp_getsockopt);
 
 #ifdef CONFIG_TCP_MD5SIG
-static DEFINE_PER_CPU(struct tcp_md5sig_pool, tcp_md5sig_pool);
-static DEFINE_MUTEX(tcp_md5sig_mutex);
-static bool tcp_md5sig_pool_populated = false;
+struct tcp_sig_crypto {
+	struct ahash_request * __percpu	*req;
+	const char			*alg;
+	bool				ready;
+};
 
-static void __tcp_md5sig_pool_alloc(void)
+#define TCP_SIG_POOL_MAX		8
+static struct tcp_sig_pool_priv_t {
+	struct tcp_sig_crypto		cryptos[TCP_SIG_POOL_MAX];
+	unsigned int			cryptos_nr;
+} tcp_sig_pool_priv = {
+	.cryptos_nr = 1,
+	.cryptos[TCP_MD5_SIG_ID].alg = "md5",
+};
+
+static DEFINE_PER_CPU(void *, tcp_sig_pool_scratch);
+static DEFINE_MUTEX(tcp_sig_pool_mutex);
+
+static int tcp_sig_pool_alloc_scrath(void)
 {
-	struct crypto_ahash *hash;
 	int cpu;
 
-	hash = crypto_alloc_ahash("md5", 0, CRYPTO_ALG_ASYNC);
-	if (IS_ERR(hash))
-		return;
+	for_each_possible_cpu(cpu) {
+		void *scratch = per_cpu(tcp_sig_pool_scratch, cpu);
+
+		if (scratch)
+			continue;
+
+		scratch = kmalloc_node(SCRATCH_SIZE, GFP_KERNEL,
+					cpu_to_node(cpu));
+		if (!scratch)
+			return -ENOMEM;
+		per_cpu(tcp_sig_pool_scratch, cpu) = scratch;
+	}
+	return 0;
+}
+
+bool tcp_sig_pool_ready(unsigned int id)
+{
+	return tcp_sig_pool_priv.cryptos[id].ready;
+}
+EXPORT_SYMBOL(tcp_sig_pool_ready);
+
+static int __tcp_sig_pool_alloc(struct tcp_sig_crypto *crypto, const char *alg)
+{
+	struct crypto_ahash *hash;
+	bool needs_key;
+	int cpu, ret = -ENOMEM;
+
+	crypto->alg = kstrdup(alg, GFP_KERNEL);
+	if (!crypto->alg)
+		return -ENOMEM;
+
+	crypto->req = alloc_percpu(struct ahash_request *);
+	if (!crypto->req)
+		goto out_free_alg;
+
+	hash = crypto_alloc_ahash(alg, 0, CRYPTO_ALG_ASYNC);
+	if (IS_ERR(hash)) {
+		ret = PTR_ERR(hash);
+		goto out_free_req;
+	}
+
+	/* If hash has .setkey(), allocate ahash per-cpu, not only request */
+	needs_key = crypto_ahash_get_flags(hash) & CRYPTO_TFM_NEED_KEY;
 
 	for_each_possible_cpu(cpu) {
-		void *scratch = per_cpu(tcp_md5sig_pool, cpu).scratch;
 		struct ahash_request *req;
 
-		if (!scratch) {
-			scratch = kmalloc_node(sizeof(union tcp_md5sum_block) +
-					       sizeof(struct tcphdr),
-					       GFP_KERNEL,
-					       cpu_to_node(cpu));
-			if (!scratch)
-				goto out_free;
-			per_cpu(tcp_md5sig_pool, cpu).scratch = scratch;
-		}
+		if (hash == NULL)
+			hash = crypto_alloc_ahash(alg, 0, CRYPTO_ALG_ASYNC);
+		if (IS_ERR(hash))
+			goto out_free;
 
 		req = ahash_request_alloc(hash, GFP_KERNEL);
 		if (!req)
@@ -4286,75 +4333,106 @@ static void __tcp_md5sig_pool_alloc(void)
 
 		ahash_request_set_callback(req, 0, NULL, NULL);
 
-		per_cpu(tcp_md5sig_pool, cpu).md5_req = req;
+		*per_cpu_ptr(crypto->req, cpu) = req;
+
+		if (needs_key)
+			hash = NULL;
 	}
-	/* before setting tcp_md5sig_pool_populated, we must commit all writes
-	 * to memory. See smp_rmb() in tcp_md5sig_pool_get()
+	/* before setting crypto->ready, we must commit all writes
+	 * to memory. See smp_rmb() in tcp_sig_pool_get()
 	 */
 	smp_wmb();
-	tcp_md5sig_pool_populated = true;
-	return;
+	crypto->ready = true;
+	return 0;
 
 out_free:
+	if (!IS_ERR_OR_NULL(hash) && needs_key)
+		crypto_free_ahash(hash);
+
 	for_each_possible_cpu(cpu) {
-		if (per_cpu(tcp_md5sig_pool, cpu).md5_req == NULL)
+		if (*per_cpu_ptr(crypto->req, cpu) == NULL)
 			break;
-		ahash_request_free(per_cpu(tcp_md5sig_pool, cpu).md5_req);
-		per_cpu(tcp_md5sig_pool, cpu).md5_req = NULL;
-	}
-	crypto_free_ahash(hash);
-}
-
-bool tcp_md5sig_pool_alloc(void)
-{
-	if (unlikely(!tcp_md5sig_pool_populated)) {
-		mutex_lock(&tcp_md5sig_mutex);
-
-		if (!tcp_md5sig_pool_populated) {
-			__tcp_md5sig_pool_alloc();
-			if (tcp_md5sig_pool_populated)
-				static_branch_inc(&tcp_md5_needed);
+		hash = crypto_ahash_reqtfm(*per_cpu_ptr(crypto->req, cpu));
+		ahash_request_free(*per_cpu_ptr(crypto->req, cpu));
+		if (needs_key) {
+			crypto_free_ahash(hash);
+			hash = NULL;
 		}
-
-		mutex_unlock(&tcp_md5sig_mutex);
 	}
-	return tcp_md5sig_pool_populated;
-}
-EXPORT_SYMBOL(tcp_md5sig_pool_alloc);
 
-bool tcp_md5sig_pool_ready(void)
-{
-	return tcp_md5sig_pool_populated;
+	if (hash)
+		crypto_free_ahash(hash);
+out_free_req:
+	free_percpu(crypto->req);
+out_free_alg:
+	kfree(crypto->alg);
+	return ret;
 }
-EXPORT_SYMBOL(tcp_md5sig_pool_ready);
+
+int tcp_sig_pool_alloc(const char *alg)
+{
+	unsigned int i, err;
+
+	/* slow-path: once per setsockopt() */
+	mutex_lock(&tcp_sig_pool_mutex);
+
+	err = tcp_sig_pool_alloc_scrath();
+	if (err)
+		goto out;
+
+	for (i = 0; i < tcp_sig_pool_priv.cryptos_nr; i++) {
+		if (!strcmp(tcp_sig_pool_priv.cryptos[i].alg, alg))
+			break;
+	}
+
+	if (i >= TCP_SIG_POOL_MAX) {
+		i = -ENOSPC;
+		goto out;
+	}
+
+	if (tcp_sig_pool_priv.cryptos[i].ready)
+		goto out;
+
+	err = __tcp_sig_pool_alloc(&tcp_sig_pool_priv.cryptos[i], alg);
+	if (!err && i == TCP_MD5_SIG_ID)
+		static_branch_inc(&tcp_md5_needed);
+
+out:
+	mutex_unlock(&tcp_sig_pool_mutex);
+	return err ?: i;
+}
+EXPORT_SYMBOL(tcp_sig_pool_alloc);
 
 /**
- *	tcp_md5sig_pool_get - get md5sig_pool for this user
+ *	tcp_sig_pool_get - get tcp_sig_pool for this user
  *
  *	We use percpu structure, so if we succeed, we exit with preemption
  *	and BH disabled, to make sure another thread or softirq handling
  *	wont try to get same context.
  */
-struct tcp_md5sig_pool *tcp_md5sig_pool_get(void)
+int tcp_sig_pool_get(unsigned int id, struct tcp_sig_pool *tsp)
 {
 	local_bh_disable();
 
-	if (tcp_md5sig_pool_populated) {
-		/* coupled with smp_wmb() in __tcp_md5sig_pool_alloc() */
-		smp_rmb();
-		return this_cpu_ptr(&tcp_md5sig_pool);
+	if (id > tcp_sig_pool_priv.cryptos_nr || !tcp_sig_pool_ready(id)) {
+		local_bh_enable();
+		return -EINVAL;
 	}
-	local_bh_enable();
-	return NULL;
-}
-EXPORT_SYMBOL(tcp_md5sig_pool_get);
 
-int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
+	/* coupled with smp_wmb() in __tcp_sig_pool_alloc() */
+	smp_rmb();
+	tsp->req = *this_cpu_ptr(tcp_sig_pool_priv.cryptos[id].req);
+	tsp->scratch = this_cpu_ptr(&tcp_sig_pool_scratch);
+	return 0;
+}
+EXPORT_SYMBOL(tcp_sig_pool_get);
+
+int tcp_md5_hash_skb_data(struct tcp_sig_pool *hp,
 			  const struct sk_buff *skb, unsigned int header_len)
 {
 	struct scatterlist sg;
 	const struct tcphdr *tp = tcp_hdr(skb);
-	struct ahash_request *req = hp->md5_req;
+	struct ahash_request *req = hp->req;
 	unsigned int i;
 	const unsigned int head_data_len = skb_headlen(skb) > header_len ?
 					   skb_headlen(skb) - header_len : 0;
@@ -4388,16 +4466,16 @@ int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
 }
 EXPORT_SYMBOL(tcp_md5_hash_skb_data);
 
-int tcp_md5_hash_key(struct tcp_md5sig_pool *hp, const struct tcp_md5sig_key *key)
+int tcp_md5_hash_key(struct tcp_sig_pool *hp, const struct tcp_md5sig_key *key)
 {
 	u8 keylen = READ_ONCE(key->keylen); /* paired with WRITE_ONCE() in tcp_md5_do_add */
 	struct scatterlist sg;
 
 	sg_init_one(&sg, key->key, keylen);
-	ahash_request_set_crypt(hp->md5_req, &sg, NULL, keylen);
+	ahash_request_set_crypt(hp->req, &sg, NULL, keylen);
 
 	/* We use data_race() because tcp_md5_do_add() might change key->key under us */
-	return data_race(crypto_ahash_update(hp->md5_req));
+	return data_race(crypto_ahash_update(hp->req));
 }
 EXPORT_SYMBOL(tcp_md5_hash_key);
 

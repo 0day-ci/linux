@@ -1628,10 +1628,10 @@ union tcp_md5sum_block {
 #endif
 };
 
-/* - pool: digest algorithm, hash description and scratch buffer */
-struct tcp_md5sig_pool {
-	struct ahash_request	*md5_req;
+struct tcp_sig_pool {
+	struct ahash_request	*req;
 	void			*scratch;
+#define SCRATCH_SIZE (sizeof(union tcp_md5sum_block) + sizeof(struct tcphdr))
 };
 
 /* - functions */
@@ -1671,18 +1671,24 @@ tcp_md5_do_lookup(const struct sock *sk, int l3index,
 #define tcp_twsk_md5_key(twsk)	NULL
 #endif
 
-bool tcp_md5sig_pool_alloc(void);
-bool tcp_md5sig_pool_ready(void);
 
-struct tcp_md5sig_pool *tcp_md5sig_pool_get(void);
-static inline void tcp_md5sig_pool_put(void)
+/* TCP MD5 supports only one hash function, set MD5 id in stone
+ * to avoid needless storing MD5 id in (struct tcp_md5sig_info).
+ */
+#define TCP_MD5_SIG_ID		0
+
+int tcp_sig_pool_alloc(const char *alg);
+bool tcp_sig_pool_ready(unsigned int id);
+
+int tcp_sig_pool_get(unsigned int id, struct tcp_sig_pool *tsp);
+static inline void tcp_sig_pool_put(void)
 {
 	local_bh_enable();
 }
 
-int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *, const struct sk_buff *,
+int tcp_md5_hash_skb_data(struct tcp_sig_pool *, const struct sk_buff *,
 			  unsigned int header_len);
-int tcp_md5_hash_key(struct tcp_md5sig_pool *hp,
+int tcp_md5_hash_key(struct tcp_sig_pool *hp,
 		     const struct tcp_md5sig_key *key);
 
 /* From tcp_fastopen.c */

@@ -603,6 +603,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 	int l3index = 0;
 	u8 prefixlen;
 	u8 flags;
+	int err;
 
 	if (optlen < sizeof(cmd))
 		return -EINVAL;
@@ -654,8 +655,9 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 	if (cmd.tcpm_keylen > TCP_MD5SIG_MAXKEYLEN)
 		return -EINVAL;
 
-	if (!tcp_md5sig_pool_alloc())
-		return -ENOMEM;
+	err = tcp_sig_pool_alloc("md5");
+	if (err < 0 || WARN_ON_ONCE(err != TCP_MD5_SIG_ID))
+		return err;
 
 	if (ipv6_addr_v4mapped(&sin6->sin6_addr))
 		return tcp_md5_do_add(sk, (union tcp_md5_addr *)&sin6->sin6_addr.s6_addr32[3],
@@ -668,7 +670,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 			      cmd.tcpm_key, cmd.tcpm_keylen, GFP_KERNEL);
 }
 
-static int tcp_v6_md5_hash_headers(struct tcp_md5sig_pool *hp,
+static int tcp_v6_md5_hash_headers(struct tcp_sig_pool *hp,
 				   const struct in6_addr *daddr,
 				   const struct in6_addr *saddr,
 				   const struct tcphdr *th, int nbytes)
@@ -689,38 +691,37 @@ static int tcp_v6_md5_hash_headers(struct tcp_md5sig_pool *hp,
 	_th->check = 0;
 
 	sg_init_one(&sg, bp, sizeof(*bp) + sizeof(*th));
-	ahash_request_set_crypt(hp->md5_req, &sg, NULL,
+	ahash_request_set_crypt(hp->req, &sg, NULL,
 				sizeof(*bp) + sizeof(*th));
-	return crypto_ahash_update(hp->md5_req);
+	return crypto_ahash_update(hp->req);
 }
 
 static int tcp_v6_md5_hash_hdr(char *md5_hash, const struct tcp_md5sig_key *key,
 			       const struct in6_addr *daddr, struct in6_addr *saddr,
 			       const struct tcphdr *th)
 {
-	struct tcp_md5sig_pool *hp;
+	struct tcp_sig_pool hp;
 	struct ahash_request *req;
 
-	hp = tcp_md5sig_pool_get();
-	if (!hp)
+	if (tcp_sig_pool_get(TCP_MD5_SIG_ID, &hp))
 		goto clear_hash_noput;
-	req = hp->md5_req;
+	req = hp.req;
 
 	if (crypto_ahash_init(req))
 		goto clear_hash;
-	if (tcp_v6_md5_hash_headers(hp, daddr, saddr, th, th->doff << 2))
+	if (tcp_v6_md5_hash_headers(&hp, daddr, saddr, th, th->doff << 2))
 		goto clear_hash;
-	if (tcp_md5_hash_key(hp, key))
+	if (tcp_md5_hash_key(&hp, key))
 		goto clear_hash;
 	ahash_request_set_crypt(req, NULL, md5_hash, 0);
 	if (crypto_ahash_final(req))
 		goto clear_hash;
 
-	tcp_md5sig_pool_put();
+	tcp_sig_pool_put();
 	return 0;
 
 clear_hash:
-	tcp_md5sig_pool_put();
+	tcp_sig_pool_put();
 clear_hash_noput:
 	memset(md5_hash, 0, 16);
 	return 1;
@@ -732,7 +733,7 @@ static int tcp_v6_md5_hash_skb(char *md5_hash,
 			       const struct sk_buff *skb)
 {
 	const struct in6_addr *saddr, *daddr;
-	struct tcp_md5sig_pool *hp;
+	struct tcp_sig_pool hp;
 	struct ahash_request *req;
 	const struct tcphdr *th = tcp_hdr(skb);
 
@@ -745,29 +746,28 @@ static int tcp_v6_md5_hash_skb(char *md5_hash,
 		daddr = &ip6h->daddr;
 	}
 
-	hp = tcp_md5sig_pool_get();
-	if (!hp)
+	if (tcp_sig_pool_get(TCP_MD5_SIG_ID, &hp))
 		goto clear_hash_noput;
-	req = hp->md5_req;
+	req = hp.req;
 
 	if (crypto_ahash_init(req))
 		goto clear_hash;
 
-	if (tcp_v6_md5_hash_headers(hp, daddr, saddr, th, skb->len))
+	if (tcp_v6_md5_hash_headers(&hp, daddr, saddr, th, skb->len))
 		goto clear_hash;
-	if (tcp_md5_hash_skb_data(hp, skb, th->doff << 2))
+	if (tcp_md5_hash_skb_data(&hp, skb, th->doff << 2))
 		goto clear_hash;
-	if (tcp_md5_hash_key(hp, key))
+	if (tcp_md5_hash_key(&hp, key))
 		goto clear_hash;
 	ahash_request_set_crypt(req, NULL, md5_hash, 0);
 	if (crypto_ahash_final(req))
 		goto clear_hash;
 
-	tcp_md5sig_pool_put();
+	tcp_sig_pool_put();
 	return 0;
 
 clear_hash:
-	tcp_md5sig_pool_put();
+	tcp_sig_pool_put();
 clear_hash_noput:
 	memset(md5_hash, 0, 16);
 	return 1;
