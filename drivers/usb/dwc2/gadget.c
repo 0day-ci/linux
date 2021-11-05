@@ -3356,6 +3356,7 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 	u32 val;
 	u32 usbcfg;
 	u32 dcfg = 0;
+	u8 speed;
 	int ep;
 
 	/* Kill any ep0 requests as controller will be reinitialized */
@@ -3397,7 +3398,22 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 
 	dcfg |= DCFG_EPMISCNT(1);
 
-	switch (hsotg->params.speed) {
+	speed = hsotg->params.speed;
+	if (hsotg->driver) {
+		switch (hsotg->driver->max_speed) {
+		case USB_SPEED_LOW:
+			speed = DWC2_SPEED_PARAM_LOW;
+			break;
+		case USB_SPEED_FULL:
+			if (speed != USB_SPEED_LOW)
+				speed = DWC2_SPEED_PARAM_FULL;
+			break;
+		default:
+			break;
+		}
+	}
+
+	switch (speed) {
 	case DWC2_SPEED_PARAM_LOW:
 		dcfg |= DCFG_DEVSPD_LS;
 		break;
