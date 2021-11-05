@@ -945,6 +945,8 @@ int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
 {
 	if (WARN_ON(intsize < 1))
 		return -EINVAL;
+	if (WARN_ON(intspec[0] > d->hwirq_max))
+		return -EINVAL;
 	*out_hwirq = intspec[0];
 	*out_type = IRQ_TYPE_NONE;
 	return 0;
@@ -987,6 +989,8 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d,
 {
 	if (WARN_ON(intsize < 1))
 		return -EINVAL;
+	if (WARN_ON(intspec[0] > d->hwirq_max))
+		return -EINVAL;
 	*out_hwirq = intspec[0];
 	if (intsize > 1)
 		*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
@@ -1012,6 +1016,8 @@ int irq_domain_translate_onecell(struct irq_domain *d,
 {
 	if (WARN_ON(fwspec->param_count < 1))
 		return -EINVAL;
+	if (WARN_ON(fwspec->param[0] > d->hwirq_max))
+		return -EINVAL;
 	*out_hwirq = fwspec->param[0];
 	*out_type = IRQ_TYPE_NONE;
 	return 0;
@@ -1032,6 +1038,8 @@ int irq_domain_translate_twocell(struct irq_domain *d,
 				 unsigned int *out_type)
 {
 	if (WARN_ON(fwspec->param_count < 2))
+		return -EINVAL;
+	if (WARN_ON(fwspec->param[0] > d->hwirq_max))
 		return -EINVAL;
 	*out_hwirq = fwspec->param[0];
 	*out_type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
