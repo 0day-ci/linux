@@ -228,6 +228,7 @@ static void metric__free(struct metric *m)
 	free(m->metric_refs);
 	expr__ctx_free(m->pctx);
 	free((char *)m->modifier);
+	evlist__delete(m->evlist);
 	free(m);
 }
 
@@ -1352,6 +1353,14 @@ static int parse_ids(struct perf_pmu *fake_pmu, struct expr_parse_ctx *ids,
 	*out_evlist = parsed_evlist;
 	parsed_evlist = NULL;
 err_out:
+	/*
+	 * Errors are generally cleaned up by printing, but parsing may succeed
+	 * with intermediate unused errors being recorded.
+	 */
+	free(parse_error.str);
+	free(parse_error.help);
+	free(parse_error.first_str);
+	free(parse_error.first_help);
 	evlist__delete(parsed_evlist);
 	strbuf_release(&events);
 	return ret;
@@ -1481,8 +1490,10 @@ static int parse_groups(struct evlist *perf_evlist, const char *str,
 	}
 
 
-	if (combined_evlist)
+	if (combined_evlist) {
 		evlist__splice_list_tail(perf_evlist, &combined_evlist->core.entries);
+		evlist__delete(combined_evlist);
+	}
 
 	list_for_each_entry(m, &metric_list, nd) {
 		if (m->evlist)
