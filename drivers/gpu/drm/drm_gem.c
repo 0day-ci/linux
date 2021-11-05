@@ -168,7 +168,8 @@ void drm_gem_private_object_init(struct drm_device *dev,
 EXPORT_SYMBOL(drm_gem_private_object_init);
 
 static void
-drm_gem_remove_prime_handles(struct drm_gem_object *obj, struct drm_file *filp)
+drm_gem_remove_prime_handle(struct drm_gem_object *obj, struct drm_file *filp,
+			    int handle)
 {
 	/*
 	 * Note: obj->dma_buf can't disappear as long as we still hold a
@@ -177,7 +178,7 @@ drm_gem_remove_prime_handles(struct drm_gem_object *obj, struct drm_file *filp)
 	mutex_lock(&filp->prime.lock);
 	if (obj->dma_buf) {
 		drm_prime_remove_buf_handle_locked(&filp->prime,
-						   obj->dma_buf);
+						   obj->dma_buf, handle);
 	}
 	mutex_unlock(&filp->prime.lock);
 }
@@ -252,7 +253,7 @@ drm_gem_object_release_handle(int id, void *ptr, void *data)
 	if (obj->funcs->close)
 		obj->funcs->close(obj, file_priv);
 
-	drm_gem_remove_prime_handles(obj, file_priv);
+	drm_gem_remove_prime_handle(obj, file_priv, id);
 	drm_vma_node_revoke(&obj->vma_node, file_priv);
 
 	drm_gem_object_handle_put_unlocked(obj);
