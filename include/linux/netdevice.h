@@ -1344,6 +1344,13 @@ struct netdev_net_notifier {
  *	The caller must be under RCU read context.
  * int (*ndo_fill_forward_path)(struct net_device_path_ctx *ctx, struct net_device_path *path);
  *     Get the forwarding path to reach the real device from the HW destination address
+ * int (*ndo_get_eec_state)(struct net_device *dev, enum if_eec_state *state,
+ *			    u32 *src_idx, struct netlink_ext_ack *extack);
+ *	Get state of physical layer frequency synchronization (SyncE)
+ * int (*ndo_get_eec_src)(struct net_device *dev, u32 *src,
+ *			  struct netlink_ext_ack *extack);
+ *	Get the index of the source signal that's currently used as EEC's
+ *	reference
  */
 struct net_device_ops {
 	int			(*ndo_init)(struct net_device *dev);
@@ -1563,6 +1570,12 @@ struct net_device_ops {
 	struct net_device *	(*ndo_get_peer_dev)(struct net_device *dev);
 	int                     (*ndo_fill_forward_path)(struct net_device_path_ctx *ctx,
                                                          struct net_device_path *path);
+	int			(*ndo_get_eec_state)(struct net_device *dev,
+						     enum if_eec_state *state,
+						     struct netlink_ext_ack *extack);
+	int			(*ndo_get_eec_src)(struct net_device *dev,
+						   u32 *src,
+						   struct netlink_ext_ack *extack);
 };
 
 /**

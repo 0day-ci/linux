@@ -1273,4 +1273,35 @@ enum {
 
 #define IFLA_MCTP_MAX (__IFLA_MCTP_MAX - 1)
 
+/* SyncE section */
+
+enum if_eec_state {
+	IF_EEC_STATE_INVALID = 0,	/* state is not valid */
+	IF_EEC_STATE_FREERUN,		/* clock is free-running */
+	IF_EEC_STATE_LOCKED,		/* clock is locked to the reference,
+					 * but the holdover memory is not valid
+					 */
+	IF_EEC_STATE_LOCKED_HO_ACQ,	/* clock is locked to the reference
+					 * and holdover memory is valid
+					 */
+	IF_EEC_STATE_HOLDOVER,		/* clock is in holdover mode */
+};
+
+#define EEC_SRC_PORT		(1 << 0) /* recovered clock from the port is
+					  * currently the source for the EEC
+					  */
+
+struct if_eec_state_msg {
+	__u32 ifindex;
+};
+
+enum {
+	IFLA_EEC_UNSPEC,
+	IFLA_EEC_STATE,
+	IFLA_EEC_SRC_IDX,
+	__IFLA_EEC_MAX,
+};
+
+#define IFLA_EEC_MAX (__IFLA_EEC_MAX - 1)
+
 #endif /* _UAPI_LINUX_IF_LINK_H */
