@@ -445,7 +445,7 @@ csio_ln_fdmi_dprt_cbfn(struct csio_hw *hw, struct csio_ioreq *fdmi_req)
 	/* Register one port per hba */
 	reg_pl = (struct fc_fdmi_rpl *)pld;
 	reg_pl->numport = htonl(1);
-	memcpy(&reg_pl->port[0].portname, csio_ln_wwpn(ln), 8);
+	memcpy(&reg_pl->port.portname, csio_ln_wwpn(ln), 8);
 	pld += sizeof(*reg_pl);
 
 	/* Start appending HBA attributes hba */

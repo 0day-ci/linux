@@ -232,7 +232,7 @@ static inline int fc_ct_ms_fill(struct fc_lport *lport,
 		put_unaligned_be32(1, &ct->payload.rhba.port.numport);
 		/* Port Name */
 		put_unaligned_be64(lport->wwpn,
-				   &ct->payload.rhba.port.port[0].portname);
+				   &ct->payload.rhba.port.port.portname);
 
 		/* HBA Attributes */
 		put_unaligned_be32(numattrs,
@@ -246,7 +246,7 @@ static inline int fc_ct_ms_fill(struct fc_lport *lport,
 				   &entry->type);
 		put_unaligned_be16(len, &entry->len);
 		put_unaligned_be64(lport->wwnn,
-				   (__be64 *)&entry->value[0]);
+				   (__be64 *)&entry->value);
 
 		/* Manufacturer */
 		entry = (struct fc_fdmi_attr_entry *)((char *)entry->value +
