@@ -160,6 +160,7 @@ struct bdaddr_list_with_flags {
 
 enum hci_conn_flags {
 	HCI_CONN_FLAG_REMOTE_WAKEUP,
+	HCI_CONN_FLAG_DEVICE_PRIVACY,
 	HCI_CONN_FLAG_MAX
 };
 
