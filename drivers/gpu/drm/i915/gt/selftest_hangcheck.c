@@ -887,7 +887,9 @@ static int active_request_put(struct i915_request *rq)
 			  rq->engine->name,
 			  rq->fence.context,
 			  rq->fence.seqno);
-		GEM_TRACE_DUMP();
+		/* Temporary workaround to allow CI to proceed */
+		if (!IS_DG1(rq->context->engine->i915))
+			GEM_TRACE_DUMP();
 
 		intel_gt_set_wedged(rq->engine->gt);
 		err = -EIO;
@@ -1115,7 +1117,12 @@ static int __igt_reset_engines(struct intel_gt *gt,
 					       rq->fence.seqno, rq->context->guc_id.id);
 					i915_request_put(rq);
 
-					GEM_TRACE_DUMP();
+					/*
+					 * Temporary workaround to allow CI
+					 * to proceed.
+					 */
+					if (!IS_DG1(gt->i915))
+						GEM_TRACE_DUMP();
 					intel_gt_set_wedged(gt);
 					err = -EIO;
 					goto restore;
