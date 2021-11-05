@@ -35,6 +35,16 @@
 
 /*
  * Memory regions for data placement.
+ *
+ * Due to the fact that TTM_PL_SYSTEM BO's can be accessed by the hardware
+ * and are not directly evictable they're handled slightly differently
+ * from other placements. The most important and driver visible side-effect
+ * of that is that TTM_PL_SYSTEM BO's are not allowed to be fenced and have
+ * to remain idle. For BO's which reside in system memory but for which
+ * the accelerator requires direct access (i.e. their usage needs to be
+ * synchronized between the CPU and accelerator via fences) a new, driver
+ * private placement should be introduced that can handle such scenarios.
+ *
  */
 
 #define TTM_PL_SYSTEM           0
