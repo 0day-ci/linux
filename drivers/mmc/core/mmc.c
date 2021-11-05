@@ -1624,6 +1624,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 */
 	if (host->ops->init_card)
 		host->ops->init_card(host, card);
+	mmc_fixup_device(card, sdio_card_init_methods);
 
 	/*
 	 * For native busses:  set card RCA and quit open drain mode.
