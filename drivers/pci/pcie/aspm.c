@@ -1282,7 +1282,7 @@ static ssize_t clkpm_store(struct device *dev,
 	down_read(&pci_bus_sem);
 	mutex_lock(&aspm_lock);
 
-	link->clkpm_disable = !state_enable;
+	link->clkpm_disable = !(state_enable && !pcie_aspm_sanity_check(pdev));
 	pcie_set_clkpm(link, policy_to_clkpm_state(link));
 
 	mutex_unlock(&aspm_lock);
