@@ -694,6 +694,9 @@ static inline bool pci_is_bridge(struct pci_dev *dev)
 
 static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 {
+	if (!dev)
+		return NULL;
+
 	dev = pci_physfn(dev);
 	if (pci_is_root_bus(dev->bus))
 		return NULL;
