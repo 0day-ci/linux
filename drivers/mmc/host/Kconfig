@@ -14,6 +14,15 @@ config MMC_DEBUG
 	  added host drivers please don't invent their private macro for
 	  debugging.
 
+config MMC_SUNPLUS
+	tristate "Sunplus SP7021 MMC Controller"
+	depends on ARCH_SUNPLUS || SOC_I143 || SOC_Q645
+	default y
+	help
+		If you say yes here, you will get support for eMMC host interface
+		on sunplus Socs.
+		If unsure, say N.
+		Sunplus  eMMC Host Controller v4.51 support"
 config MMC_ARMMMCI
 	tristate "ARM AMBA Multimedia Card Interface support"
 	depends on ARM_AMBA
