@@ -540,6 +540,30 @@ static void aspm_calc_l1ss_info(struct pcie_link_state *link,
 	}
 }
 
+static void aspm_calc_both_l1ss_caps(struct pcie_link_state *link,
+				    u32 *up_l1ss_cap, u32 *dwn_l1ss_cap)
+{
+	struct pci_dev *child = link->downstream, *parent = link->pdev;
+
+	pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CAP,
+			      up_l1ss_cap);
+	pci_read_config_dword(child, child->l1ss + PCI_L1SS_CAP,
+			      dwn_l1ss_cap);
+
+	if (!(*up_l1ss_cap & PCI_L1SS_CAP_L1_PM_SS))
+		*up_l1ss_cap = 0;
+	if (!(*dwn_l1ss_cap & PCI_L1SS_CAP_L1_PM_SS))
+		*dwn_l1ss_cap = 0;
+
+	/*
+	 * If we don't have LTR for the entire path from the Root Complex
+	 * to this device, we can't use ASPM L1.2 because it relies on the
+	 * LTR_L1.2_THRESHOLD.  See PCIe r4.0, secs 5.5.4, 6.18.
+	 */
+	if (!child->ltr_path)
+		*dwn_l1ss_cap &= ~PCI_L1SS_CAP_ASPM_L1_2;
+}
+
 static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 {
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
@@ -606,23 +630,7 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	link->latency_dw.l1 = calc_l1_latency(child_lnkcap);
 
 	/* Setup L1 substate */
-	pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CAP,
-			      &parent_l1ss_cap);
-	pci_read_config_dword(child, child->l1ss + PCI_L1SS_CAP,
-			      &child_l1ss_cap);
-
-	if (!(parent_l1ss_cap & PCI_L1SS_CAP_L1_PM_SS))
-		parent_l1ss_cap = 0;
-	if (!(child_l1ss_cap & PCI_L1SS_CAP_L1_PM_SS))
-		child_l1ss_cap = 0;
-
-	/*
-	 * If we don't have LTR for the entire path from the Root Complex
-	 * to this device, we can't use ASPM L1.2 because it relies on the
-	 * LTR_L1.2_THRESHOLD.  See PCIe r4.0, secs 5.5.4, 6.18.
-	 */
-	if (!child->ltr_path)
-		child_l1ss_cap &= ~PCI_L1SS_CAP_ASPM_L1_2;
+	aspm_calc_both_l1ss_caps(link, &parent_l1ss_cap, &child_l1ss_cap);
 
 	if (parent_l1ss_cap & child_l1ss_cap & PCI_L1SS_CAP_ASPM_L1_1)
 		link->aspm_support |= ASPM_STATE_L1_1;
