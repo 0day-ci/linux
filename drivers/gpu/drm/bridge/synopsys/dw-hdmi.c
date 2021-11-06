@@ -80,13 +80,25 @@ static const u16 csc_coeff_rgb_out_eitu709[3][4] = {
 	{ 0x2000, 0x0000, 0x3b61, 0x7e25 }
 };
 
-static const u16 csc_coeff_rgb_in_eitu601[3][4] = {
+static const u16 csc_coeff_rgb_full_in_eitu601[3][4] = {
+	{ 0x2044, 0x106f, 0x0644, 0x0040 },
+	{ 0xe677, 0x1c1c, 0xfd46, 0x0200 },
+	{ 0xed60, 0xf685, 0x1c1c, 0x0200 }
+};
+
+static const u16 csc_coeff_rgb_limited_in_eitu601[3][4] = {
 	{ 0x2591, 0x1322, 0x074b, 0x0000 },
 	{ 0x6535, 0x2000, 0x7acc, 0x0200 },
 	{ 0x6acd, 0x7534, 0x2000, 0x0200 }
 };
 
-static const u16 csc_coeff_rgb_in_eitu709[3][4] = {
+static const u16 csc_coeff_rgb_full_in_eitu709[3][4] = {
+	{ 0x2750, 0x0baf, 0x03f8, 0x0040 },
+	{ 0xe677, 0x1c1c, 0xfd6d, 0x0200 },
+	{ 0xea55, 0xf98f, 0x1c1c, 0x0200 }
+};
+
+static const u16 csc_coeff_rgb_limted_in_eitu709[3][4] = {
 	{ 0x2dc5, 0x0d9b, 0x049e, 0x0000 },
 	{ 0x62f0, 0x2000, 0x7d11, 0x0200 },
 	{ 0x6756, 0x78ab, 0x2000, 0x0200 }
@@ -1023,9 +1035,13 @@ static void dw_hdmi_update_csc_coeffs(struct dw_hdmi *hdmi)
 			csc_coeff = &csc_coeff_rgb_out_eitu709;
 	} else if (is_input_rgb && !is_output_rgb) {
 		if (hdmi->hdmi_data.enc_out_encoding == V4L2_YCBCR_ENC_601)
-			csc_coeff = &csc_coeff_rgb_in_eitu601;
+			csc_coeff = hdmi->hdmi_data.rgb_limited_range
+				? &csc_coeff_rgb_limited_in_eitu601
+				: &csc_coeff_rgb_full_in_eitu601;
 		else
-			csc_coeff = &csc_coeff_rgb_in_eitu709;
+			csc_coeff = hdmi->hdmi_data.rgb_limited_range
+				? &csc_coeff_rgb_limted_in_eitu709
+				: &csc_coeff_rgb_full_in_eitu709;
 		csc_scale = 0;
 	} else if (is_input_rgb && is_output_rgb &&
 		   hdmi->hdmi_data.rgb_limited_range) {
