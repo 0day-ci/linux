@@ -716,7 +716,8 @@ int stmmac_pltfr_remove(struct platform_device *pdev)
 	if (plat->exit)
 		plat->exit(pdev, plat->bsp_priv);
 
-	stmmac_remove_config_dt(pdev, plat);
+	of_node_put(plat->phy_node);
+	of_node_put(plat->mdio_node);
 
 	return ret;
 }
