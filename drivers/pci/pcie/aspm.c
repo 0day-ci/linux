@@ -1225,7 +1225,7 @@ static ssize_t aspm_attr_store_common(struct device *dev,
 	down_read(&pci_bus_sem);
 	mutex_lock(&aspm_lock);
 
-	if (state_enable) {
+	if (state_enable && !pcie_aspm_sanity_check(pdev)) {
 		link->aspm_disable &= ~state;
 		/* need to enable L1 for substates */
 		if (state & ASPM_STATE_L1SS)
