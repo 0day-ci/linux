@@ -2049,7 +2049,7 @@ int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm)
 {
 	unsigned char kb_func;
 	unsigned long flags;
-	char *kbs;
+	char *kbs = NULL;
 	int ret;
 
 	if (get_user(kb_func, &user_kdgkb->kb_func))
@@ -2092,7 +2092,8 @@ int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm)
 		break;
 	}
 
-	kfree(kbs);
+        if(kbs)
+            kfree(kbs);
 
 	return ret;
 }
