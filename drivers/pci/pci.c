@@ -801,6 +801,53 @@ struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res)
 EXPORT_SYMBOL(pci_find_resource);
 
 /**
+ * pci_resource_name - Return the name of the PCI resource.
+ * @dev: PCI device to query
+ * @i: index of the resource
+ *
+ * Returns the standard PCI resource(BAR) names according to their index.
+ */
+const char *pci_resource_name(struct pci_dev *dev, int i)
+{
+	if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) {
+		switch (i) {
+		case 0: return "BAR 0";
+		case 1: return "BAR 1";
+		case 2: return "BAR 2";
+		case 3: return "BAR 3";
+		case 4: return "BAR 4";
+		case 5: return "BAR 5";
+		case PCI_ROM_RESOURCE: return "ROM";
+		#ifdef CONFIG_PCI_IOV
+		case PCI_IOV_RESOURCES + 0: return "VF BAR 0";
+		case PCI_IOV_RESOURCES + 1: return "VF BAR 1";
+		case PCI_IOV_RESOURCES + 2: return "VF BAR 2";
+		case PCI_IOV_RESOURCES + 3: return "VF BAR 3";
+		case PCI_IOV_RESOURCES + 4: return "VF BAR 4";
+		case PCI_IOV_RESOURCES + 5: return "VF BAR 5";
+		#endif
+		}
+	} else if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
+		switch (i) {
+		case 0: return "BAR 0";
+		case 1: return "BAR 1";
+		case PCI_BRIDGE_IO_WINDOW: return "bridge I/O window";
+		case PCI_BRIDGE_MEM_WINDOW: return "bridge mem window";
+		case PCI_BRIDGE_PREF_MEM_WINDOW: return "bridge mem pref window";
+		}
+	} else if (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS) {
+		switch (i) {
+		case 0: return "BAR 0";
+		case PCI_CB_BRIDGE_IO_0_WINDOW: return "CardBus bridge I/O 0 window";
+		case PCI_CB_BRIDGE_IO_1_WINDOW: return "CardBus bridge I/O 1 window";
+		case PCI_CB_BRIDGE_MEM_0_WINDOW: return "CardBus bridge mem 0 window";
+		case PCI_CB_BRIDGE_MEM_1_WINDOW: return "CardBus bridge mem 1 window";
+		}
+	}
+	return "unknown";
+}
+
+/**
  * pci_wait_for_pending - wait for @mask bit(s) to clear in status word @pos
  * @dev: the PCI device to operate on
  * @pos: config space offset of status word
