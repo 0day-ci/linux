@@ -61,7 +61,6 @@ struct pcie_link_state {
 	u32 aspm_disable:7;		/* Disabled ASPM state */
 
 	/* Clock PM state */
-	u32 clkpm_enabled:1;		/* Current Clock PM state */
 	u32 clkpm_default:1;		/* Default Clock PM state by BIOS */
 	u32 clkpm_disable:1;		/* Clock PM disabled */
 
@@ -103,6 +102,21 @@ static const char *policy_str[] = {
 };
 
 #define LINK_RETRAIN_TIMEOUT HZ
+
+static int pcie_clkpm_enabled(struct pci_dev *pdev)
+{
+	struct pci_dev *child;
+	struct pci_bus *linkbus = pdev->subordinate;
+	u16 ctl;
+
+	/* CLKREQ_EN is only applicable for Upstream Ports */
+	list_for_each_entry(child, &linkbus->devices, bus_list) {
+		pcie_capability_read_word(child, PCI_EXP_LNKCTL, &ctl);
+		if (!(ctl & PCI_EXP_LNKCTL_CLKREQ_EN))
+			return 0;
+	}
+	return 1;
+}
 
 static int pcie_clkpm_capable(struct pci_dev *pdev)
 {
@@ -165,7 +179,7 @@ static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 	if (!pcie_clkpm_capable(link->pdev) || link->clkpm_disable)
 		enable = 0;
 	/* Need nothing if the specified equals to current state */
-	if (link->clkpm_enabled == enable)
+	if (pcie_clkpm_enabled(link->pdev) == enable)
 		return;
 
 	val = enable ? PCI_EXP_LNKCTL_CLKREQ_EN : 0;
@@ -173,31 +187,11 @@ static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 		pcie_capability_clear_and_set_word(child, PCI_EXP_LNKCTL,
 						   PCI_EXP_LNKCTL_CLKREQ_EN,
 						   val);
-
-	link->clkpm_enabled = !!enable;
 }
 
 static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 {
-	int enabled = 1;
-	u32 reg32;
-	u16 reg16;
-	struct pci_dev *child;
-	struct pci_bus *linkbus = link->pdev->subordinate;
-
-	/* All functions should have the same cap and state, take the worst */
-	list_for_each_entry(child, &linkbus->devices, bus_list) {
-		pcie_capability_read_dword(child, PCI_EXP_LNKCAP, &reg32);
-		if (!(reg32 & PCI_EXP_LNKCAP_CLKPM)) {
-			enabled = 0;
-			break;
-		}
-		pcie_capability_read_word(child, PCI_EXP_LNKCTL, &reg16);
-		if (!(reg16 & PCI_EXP_LNKCTL_CLKREQ_EN))
-			enabled = 0;
-	}
-	link->clkpm_enabled = enabled;
-	link->clkpm_default = enabled;
+	link->clkpm_default = pcie_clkpm_enabled(link->pdev);
 	link->clkpm_disable = blacklist ? 1 : 0;
 }
 
@@ -1272,9 +1266,8 @@ static ssize_t clkpm_show(struct device *dev,
 			  struct device_attribute *attr, char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct pcie_link_state *link = pcie_aspm_get_link(pdev);
 
-	return sysfs_emit(buf, "%d\n", link->clkpm_enabled);
+	return sysfs_emit(buf, "%d\n", pcie_clkpm_enabled(pdev));
 }
 
 static ssize_t clkpm_store(struct device *dev,
