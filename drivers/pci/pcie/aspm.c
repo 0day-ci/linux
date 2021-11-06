@@ -591,13 +591,47 @@ static u32 aspm_calc_init_linkcap(u32 up_lnkcap, u32 dwn_lnkcap,
 	return link_cap;
 }
 
+static u32 aspm_calc_enabled_states(struct pcie_link_state *link,
+				    u32 up_l1ss_cap, u32 dwn_l1ss_cap)
+{
+	struct pci_dev *child = link->downstream, *parent = link->pdev;
+	u16 parent_lnkctl, child_lnkctl;
+	u32 aspm_enabled = 0, parent_l1ss_ctl1 = 0, child_l1ss_ctl1 = 0;
+
+	pcie_capability_read_word(parent, PCI_EXP_LNKCTL, &parent_lnkctl);
+	pcie_capability_read_word(child, PCI_EXP_LNKCTL, &child_lnkctl);
+
+	if (child_lnkctl & PCI_EXP_LNKCTL_ASPM_L0S)
+		aspm_enabled |= ASPM_STATE_L0S_UP;
+	if (parent_lnkctl & PCI_EXP_LNKCTL_ASPM_L0S)
+		aspm_enabled |= ASPM_STATE_L0S_DW;
+	if (parent_lnkctl & child_lnkctl & PCI_EXP_LNKCTL_ASPM_L1)
+		aspm_enabled |= ASPM_STATE_L1;
+
+	if (up_l1ss_cap)
+		pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CTL1,
+				      &parent_l1ss_ctl1);
+	if (dwn_l1ss_cap)
+		pci_read_config_dword(child, child->l1ss + PCI_L1SS_CTL1,
+				      &child_l1ss_ctl1);
+
+	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_1)
+		aspm_enabled |= ASPM_STATE_L1_1;
+	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_2)
+		aspm_enabled |= ASPM_STATE_L1_2;
+	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_1)
+		aspm_enabled |= ASPM_STATE_L1_1_PCIPM;
+	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
+		aspm_enabled |= ASPM_STATE_L1_2_PCIPM;
+
+	return aspm_enabled;
+}
+
 static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 {
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
 	u32 parent_lnkcap, child_lnkcap;
-	u16 parent_lnkctl, child_lnkctl;
 	u32 parent_l1ss_cap, child_l1ss_cap;
-	u32 parent_l1ss_ctl1 = 0, child_l1ss_ctl1 = 0;
 	struct pci_bus *linkbus = parent->subordinate;
 
 	if (blacklist) {
@@ -627,41 +661,17 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	 */
 	pcie_capability_read_dword(parent, PCI_EXP_LNKCAP, &parent_lnkcap);
 	pcie_capability_read_dword(child, PCI_EXP_LNKCAP, &child_lnkcap);
-	pcie_capability_read_word(parent, PCI_EXP_LNKCTL, &parent_lnkctl);
-	pcie_capability_read_word(child, PCI_EXP_LNKCTL, &child_lnkctl);
 
-	/* Setup L0s state */
-	if (child_lnkctl & PCI_EXP_LNKCTL_ASPM_L0S)
-		link->aspm_enabled |= ASPM_STATE_L0S_UP;
-	if (parent_lnkctl & PCI_EXP_LNKCTL_ASPM_L0S)
-		link->aspm_enabled |= ASPM_STATE_L0S_DW;
 	link->latency_up.l0s = calc_l0s_latency(parent_lnkcap);
 	link->latency_dw.l0s = calc_l0s_latency(child_lnkcap);
-
-	/* Setup L1 state */
-	if (parent_lnkctl & child_lnkctl & PCI_EXP_LNKCTL_ASPM_L1)
-		link->aspm_enabled |= ASPM_STATE_L1;
 	link->latency_up.l1 = calc_l1_latency(parent_lnkcap);
 	link->latency_dw.l1 = calc_l1_latency(child_lnkcap);
 
 	/* Setup L1 substate */
 	aspm_calc_both_l1ss_caps(link, &parent_l1ss_cap, &child_l1ss_cap);
 
-	if (parent_l1ss_cap)
-		pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CTL1,
-				      &parent_l1ss_ctl1);
-	if (child_l1ss_cap)
-		pci_read_config_dword(child, child->l1ss + PCI_L1SS_CTL1,
-				      &child_l1ss_ctl1);
-
-	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_1)
-		link->aspm_enabled |= ASPM_STATE_L1_1;
-	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_2)
-		link->aspm_enabled |= ASPM_STATE_L1_2;
-	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_1)
-		link->aspm_enabled |= ASPM_STATE_L1_1_PCIPM;
-	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
-		link->aspm_enabled |= ASPM_STATE_L1_2_PCIPM;
+	link->aspm_enabled = aspm_calc_enabled_states(link, parent_l1ss_cap,
+						      child_l1ss_cap);
 
 	/* Save default state */
 	link->aspm_default = link->aspm_enabled;
