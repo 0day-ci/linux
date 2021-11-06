@@ -1775,6 +1775,7 @@ static void mt76_connac_mcu_parse_phy_cap(struct mt76_dev *dev,
 	dev->phy.chainmask = dev->phy.antenna_mask;
 	dev->phy.cap.has_2ghz = cap->hw_path & BIT(WF0_24G);
 	dev->phy.cap.has_5ghz = cap->hw_path & BIT(WF0_5G);
+	dev->phy.cap.has_bw160 = (cap->max_bw >= IEEE80211_STA_RX_BW_160);
 }
 
 int mt76_connac_mcu_get_nic_capability(struct mt76_phy *phy)
