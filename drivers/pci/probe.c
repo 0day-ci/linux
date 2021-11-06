@@ -181,6 +181,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	u64 l64, sz64, mask64;
 	u16 orig_cmd;
 	struct pci_bus_region region, inverted_region;
+	int idx = res - dev->resource;
+	const char *resource_name = pci_resource_name(dev, idx);
 
 	mask = type ? PCI_ROM_ADDRESS_MASK : ~0;
 
@@ -255,8 +257,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 
 	sz64 = pci_size(l64, sz64, mask64);
 	if (!sz64) {
-		pci_info(dev, FW_BUG "reg 0x%x: invalid BAR (can't size)\n",
-			 pos);
+		pci_info(dev, FW_BUG "%s: invalid BAR (can't size)\n",
+			 resource_name);
 		goto fail;
 	}
 
@@ -266,8 +268,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			res->flags |= IORESOURCE_UNSET | IORESOURCE_DISABLED;
 			res->start = 0;
 			res->end = 0;
-			pci_err(dev, "reg 0x%x: can't handle BAR larger than 4GB (size %#010llx)\n",
-				pos, (unsigned long long)sz64);
+			pci_err(dev, "%s: can't handle BAR larger than 4GB (size %#010llx)\n",
+				resource_name, (unsigned long long)sz64);
 			goto out;
 		}
 
@@ -276,8 +278,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			res->flags |= IORESOURCE_UNSET;
 			res->start = 0;
 			res->end = sz64 - 1;
-			pci_info(dev, "reg 0x%x: can't handle BAR above 4GB (bus address %#010llx)\n",
-				 pos, (unsigned long long)l64);
+			pci_info(dev, "%s: can't handle BAR above 4GB (bus address %#010llx)\n",
+				 resource_name, (unsigned long long)l64);
 			goto out;
 		}
 	}
@@ -303,8 +305,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		res->flags |= IORESOURCE_UNSET;
 		res->start = 0;
 		res->end = region.end - region.start;
-		pci_info(dev, "reg 0x%x: initial BAR value %#010llx invalid\n",
-			 pos, (unsigned long long)region.start);
+		pci_info(dev, "%s: initial BAR value %#010llx invalid\n",
+			 resource_name, (unsigned long long)region.start);
 	}
 
 	goto out;
@@ -314,7 +316,7 @@ fail:
 	res->flags = 0;
 out:
 	if (res->flags)
-		pci_info(dev, "reg 0x%x: %pR\n", pos, res);
+		pci_info(dev, "%s: %pR\n", resource_name, res);
 
 	return (res->flags & IORESOURCE_MEM_64) ? 1 : 0;
 }
