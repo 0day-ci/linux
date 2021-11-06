@@ -564,6 +564,33 @@ static void aspm_calc_both_l1ss_caps(struct pcie_link_state *link,
 		*dwn_l1ss_cap &= ~PCI_L1SS_CAP_ASPM_L1_2;
 }
 
+static u32 aspm_calc_init_linkcap(u32 up_lnkcap, u32 dwn_lnkcap,
+				  u32 up_l1ss_cap, u32 dwn_l1ss_cap)
+{
+	u32 link_cap = 0;
+
+	/*
+	 * Note that we must not enable L0s in either direction on a
+	 * given link unless components on both sides of the link each
+	 * support L0s.
+	 */
+	if (up_lnkcap & dwn_lnkcap & PCI_EXP_LNKCAP_ASPM_L0S)
+		link_cap |= ASPM_STATE_L0S;
+
+	if (up_lnkcap & dwn_lnkcap & PCI_EXP_LNKCAP_ASPM_L1)
+		link_cap |= ASPM_STATE_L1;
+	if (up_l1ss_cap & dwn_l1ss_cap & PCI_L1SS_CAP_ASPM_L1_1)
+		link_cap |= ASPM_STATE_L1_1;
+	if (up_l1ss_cap & dwn_l1ss_cap & PCI_L1SS_CAP_ASPM_L1_2)
+		link_cap |= ASPM_STATE_L1_2;
+	if (up_l1ss_cap & dwn_l1ss_cap & PCI_L1SS_CAP_PCIPM_L1_1)
+		link_cap |= ASPM_STATE_L1_1_PCIPM;
+	if (up_l1ss_cap & dwn_l1ss_cap & PCI_L1SS_CAP_PCIPM_L1_2)
+		link_cap |= ASPM_STATE_L1_2_PCIPM;
+
+	return link_cap;
+}
+
 static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 {
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
@@ -603,16 +630,7 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	pcie_capability_read_word(parent, PCI_EXP_LNKCTL, &parent_lnkctl);
 	pcie_capability_read_word(child, PCI_EXP_LNKCTL, &child_lnkctl);
 
-	/*
-	 * Setup L0s state
-	 *
-	 * Note that we must not enable L0s in either direction on a
-	 * given link unless components on both sides of the link each
-	 * support L0s.
-	 */
-	if (parent_lnkcap & child_lnkcap & PCI_EXP_LNKCAP_ASPM_L0S)
-		link->aspm_support |= ASPM_STATE_L0S;
-
+	/* Setup L0s state */
 	if (child_lnkctl & PCI_EXP_LNKCTL_ASPM_L0S)
 		link->aspm_enabled |= ASPM_STATE_L0S_UP;
 	if (parent_lnkctl & PCI_EXP_LNKCTL_ASPM_L0S)
@@ -621,9 +639,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	link->latency_dw.l0s = calc_l0s_latency(child_lnkcap);
 
 	/* Setup L1 state */
-	if (parent_lnkcap & child_lnkcap & PCI_EXP_LNKCAP_ASPM_L1)
-		link->aspm_support |= ASPM_STATE_L1;
-
 	if (parent_lnkctl & child_lnkctl & PCI_EXP_LNKCTL_ASPM_L1)
 		link->aspm_enabled |= ASPM_STATE_L1;
 	link->latency_up.l1 = calc_l1_latency(parent_lnkcap);
@@ -631,15 +646,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 
 	/* Setup L1 substate */
 	aspm_calc_both_l1ss_caps(link, &parent_l1ss_cap, &child_l1ss_cap);
-
-	if (parent_l1ss_cap & child_l1ss_cap & PCI_L1SS_CAP_ASPM_L1_1)
-		link->aspm_support |= ASPM_STATE_L1_1;
-	if (parent_l1ss_cap & child_l1ss_cap & PCI_L1SS_CAP_ASPM_L1_2)
-		link->aspm_support |= ASPM_STATE_L1_2;
-	if (parent_l1ss_cap & child_l1ss_cap & PCI_L1SS_CAP_PCIPM_L1_1)
-		link->aspm_support |= ASPM_STATE_L1_1_PCIPM;
-	if (parent_l1ss_cap & child_l1ss_cap & PCI_L1SS_CAP_PCIPM_L1_2)
-		link->aspm_support |= ASPM_STATE_L1_2_PCIPM;
 
 	if (parent_l1ss_cap)
 		pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CTL1,
@@ -657,11 +663,15 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	if (parent_l1ss_ctl1 & child_l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
 		link->aspm_enabled |= ASPM_STATE_L1_2_PCIPM;
 
-	if (link->aspm_support & ASPM_STATE_L1SS)
-		aspm_calc_l1ss_info(link, parent_l1ss_cap, child_l1ss_cap);
-
 	/* Save default state */
 	link->aspm_default = link->aspm_enabled;
+
+	link->aspm_support = aspm_calc_init_linkcap(parent_lnkcap,
+						    child_lnkcap,
+						    parent_l1ss_cap,
+						    child_l1ss_cap);
+	if (link->aspm_support & ASPM_STATE_L1SS)
+		aspm_calc_l1ss_info(link, parent_l1ss_cap, child_l1ss_cap);
 
 	/* Setup initial capable state. Will be updated later */
 	link->aspm_capable = link->aspm_support;
