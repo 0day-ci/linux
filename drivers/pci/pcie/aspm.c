@@ -447,6 +447,41 @@ static void pci_clear_and_set_dword(struct pci_dev *pdev, int pos,
 	pci_write_config_dword(pdev, pos, val);
 }
 
+static int pcie_aspm_sanity_check(struct pci_dev *pdev)
+{
+	struct pci_dev *child;
+	u32 reg32;
+
+	/*
+	 * Some functions in a slot might not all be PCIe functions,
+	 * very strange. Disable ASPM for the whole slot
+	 */
+	list_for_each_entry(child, &pdev->subordinate->devices, bus_list) {
+		if (!pci_is_pcie(child))
+			return -EINVAL;
+
+		/*
+		 * If ASPM is disabled then we're not going to change
+		 * the BIOS state. It's safe to continue even if it's a
+		 * pre-1.1 device
+		 */
+
+		if (aspm_disabled)
+			continue;
+
+		/*
+		 * Disable ASPM for pre-1.1 PCIe device, we follow MS to use
+		 * RBER bit to determine if a function is 1.1 version device
+		 */
+		pcie_capability_read_dword(child, PCI_EXP_DEVCAP, &reg32);
+		if (!(reg32 & PCI_EXP_DEVCAP_RBER) && !aspm_force) {
+			pci_info(child, "disabling ASPM on pre-1.1 PCIe device.  You can enable it with 'pcie_aspm=force'\n");
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
 /* Calculate L1.2 PM substate timing parameters */
 static void aspm_calc_l1ss_info(struct pcie_link_state *link,
 				u32 aspm_support, u32 parent_l1ss_cap,
@@ -844,41 +879,6 @@ static void free_link_state(struct pcie_link_state *link)
 {
 	link->pdev->link_state = NULL;
 	kfree(link);
-}
-
-static int pcie_aspm_sanity_check(struct pci_dev *pdev)
-{
-	struct pci_dev *child;
-	u32 reg32;
-
-	/*
-	 * Some functions in a slot might not all be PCIe functions,
-	 * very strange. Disable ASPM for the whole slot
-	 */
-	list_for_each_entry(child, &pdev->subordinate->devices, bus_list) {
-		if (!pci_is_pcie(child))
-			return -EINVAL;
-
-		/*
-		 * If ASPM is disabled then we're not going to change
-		 * the BIOS state. It's safe to continue even if it's a
-		 * pre-1.1 device
-		 */
-
-		if (aspm_disabled)
-			continue;
-
-		/*
-		 * Disable ASPM for pre-1.1 PCIe device, we follow MS to use
-		 * RBER bit to determine if a function is 1.1 version device
-		 */
-		pcie_capability_read_dword(child, PCI_EXP_DEVCAP, &reg32);
-		if (!(reg32 & PCI_EXP_DEVCAP_RBER) && !aspm_force) {
-			pci_info(child, "disabling ASPM on pre-1.1 PCIe device.  You can enable it with 'pcie_aspm=force'\n");
-			return -EINVAL;
-		}
-	}
-	return 0;
 }
 
 static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
