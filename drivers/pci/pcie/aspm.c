@@ -61,7 +61,6 @@ struct pcie_link_state {
 	u32 aspm_disable:7;		/* Disabled ASPM state */
 
 	/* Clock PM state */
-	u32 clkpm_capable:1;		/* Clock PM capable? */
 	u32 clkpm_enabled:1;		/* Current Clock PM state */
 	u32 clkpm_default:1;		/* Default Clock PM state by BIOS */
 	u32 clkpm_disable:1;		/* Clock PM disabled */
@@ -104,6 +103,20 @@ static const char *policy_str[] = {
 };
 
 #define LINK_RETRAIN_TIMEOUT HZ
+
+static int pcie_clkpm_capable(struct pci_dev *pdev)
+{
+	u32 cap;
+	struct pci_dev *child;
+	struct pci_bus *linkbus = pdev->subordinate;
+
+	list_for_each_entry(child, &linkbus->devices, bus_list) {
+		pcie_capability_read_dword(child, PCI_EXP_LNKCAP, &cap);
+		if (!(cap & PCI_EXP_LNKCAP_CLKPM))
+			return 0;
+	}
+	return 1;
+}
 
 static int policy_to_aspm_state(struct pcie_link_state *link)
 {
@@ -149,7 +162,7 @@ static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 	 * Don't enable Clock PM if the link is not Clock PM capable
 	 * or Clock PM is disabled
 	 */
-	if (!link->clkpm_capable || link->clkpm_disable)
+	if (!pcie_clkpm_capable(link->pdev) || link->clkpm_disable)
 		enable = 0;
 	/* Need nothing if the specified equals to current state */
 	if (link->clkpm_enabled == enable)
@@ -166,7 +179,7 @@ static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 
 static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 {
-	int capable = 1, enabled = 1;
+	int enabled = 1;
 	u32 reg32;
 	u16 reg16;
 	struct pci_dev *child;
@@ -176,7 +189,6 @@ static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 	list_for_each_entry(child, &linkbus->devices, bus_list) {
 		pcie_capability_read_dword(child, PCI_EXP_LNKCAP, &reg32);
 		if (!(reg32 & PCI_EXP_LNKCAP_CLKPM)) {
-			capable = 0;
 			enabled = 0;
 			break;
 		}
@@ -186,7 +198,6 @@ static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 	}
 	link->clkpm_enabled = enabled;
 	link->clkpm_default = enabled;
-	link->clkpm_capable = capable;
 	link->clkpm_disable = blacklist ? 1 : 0;
 }
 
@@ -1327,7 +1338,7 @@ static umode_t aspm_ctrl_attrs_are_visible(struct kobject *kobj,
 		return 0;
 
 	if (n == 0)
-		return link->clkpm_capable ? a->mode : 0;
+		return pcie_clkpm_capable(link->pdev) ? a->mode : 0;
 
 	return link->aspm_capable & aspm_state_map[n - 1] ? a->mode : 0;
 }
