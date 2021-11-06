@@ -2070,7 +2070,7 @@ int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm)
 		len = strlcpy(kbs, func_table[kb_func] ? : "", len);
 		spin_unlock_irqrestore(&func_buf_lock, flags);
 
-		ret = copy_to_user(user_kdgkb->kb_string, kbs, len + 1) ?
+		ret = copy_to_user(user_kdgkb->kb_string, kbs, len) ?
 			-EFAULT : 0;
 
 		break;
