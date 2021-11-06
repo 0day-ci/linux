@@ -54,7 +54,6 @@ struct pcie_link_state {
 	struct list_head sibling;	/* node in link_list */
 
 	/* ASPM state */
-	u32 aspm_enabled:7;		/* Enabled ASPM state */
 	u32 aspm_capable:7;		/* Capable ASPM state with latency */
 	u32 aspm_default:7;		/* Default ASPM state by BIOS */
 	u32 aspm_disable:7;		/* Disabled ASPM state */
@@ -676,6 +675,18 @@ static u32 aspm_calc_enabled_states(struct pcie_link_state *link,
 	return aspm_enabled;
 }
 
+static u32 aspm_get_enabled_states(struct pcie_link_state *link)
+{
+	u32 up_l1ss_cap, dwn_l1ss_cap;
+
+	if (pcie_aspm_sanity_check(link->pdev))
+		return ASPM_STATE_ALL;
+
+	aspm_calc_both_l1ss_caps(link, &up_l1ss_cap, &dwn_l1ss_cap);
+
+	return aspm_calc_enabled_states(link, up_l1ss_cap, dwn_l1ss_cap);
+}
+
 static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 {
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
@@ -684,8 +695,7 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	struct pci_bus *linkbus = parent->subordinate;
 
 	if (blacklist) {
-		/* Set enabled/disable so that we will disable ASPM later */
-		link->aspm_enabled = ASPM_STATE_ALL;
+		/* Set disable so that we will disable ASPM later */
 		link->aspm_disable = ASPM_STATE_ALL;
 		return;
 	}
@@ -719,11 +729,9 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	/* Setup L1 substate */
 	aspm_calc_both_l1ss_caps(link, &parent_l1ss_cap, &child_l1ss_cap);
 
-	link->aspm_enabled = aspm_calc_enabled_states(link, parent_l1ss_cap,
-						      child_l1ss_cap);
-
 	/* Save default state */
-	link->aspm_default = link->aspm_enabled;
+	link->aspm_default = aspm_calc_enabled_states(link, parent_l1ss_cap,
+						      child_l1ss_cap);
 
 	aspm_support = aspm_calc_init_linkcap(parent_lnkcap, child_lnkcap,
 					      parent_l1ss_cap, child_l1ss_cap);
@@ -762,7 +770,7 @@ static void pcie_config_aspm_l1ss(struct pcie_link_state *link, u32 state)
 	u32 val, enable_req;
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
 
-	enable_req = (link->aspm_enabled ^ state) & state;
+	enable_req = (aspm_get_enabled_states(link) ^ state) & state;
 
 	/*
 	 * Here are the rules specified in the PCIe spec for enabling L1SS:
@@ -821,6 +829,7 @@ static void pcie_config_aspm_link(struct pcie_link_state *link, u32 state)
 	u32 upstream = 0, dwstream = 0;
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
 	struct pci_bus *linkbus = parent->subordinate;
+	u32 aspm_enabled = aspm_get_enabled_states(link);
 
 	/* Enable only the states that were not explicitly disabled */
 	state &= (link->aspm_capable & ~link->aspm_disable);
@@ -832,11 +841,11 @@ static void pcie_config_aspm_link(struct pcie_link_state *link, u32 state)
 	/* Spec says both ports must be in D0 before enabling PCI PM substates*/
 	if (parent->current_state != PCI_D0 || child->current_state != PCI_D0) {
 		state &= ~ASPM_STATE_L1_SS_PCIPM;
-		state |= (link->aspm_enabled & ASPM_STATE_L1_SS_PCIPM);
+		state |= (aspm_enabled & ASPM_STATE_L1_SS_PCIPM);
 	}
 
 	/* Nothing to do if the link is already in the requested state */
-	if (link->aspm_enabled == state)
+	if (aspm_enabled == state)
 		return;
 	/* Convert ASPM state to upstream/downstream ASPM register state */
 	if (state & ASPM_STATE_L0S_UP)
@@ -863,8 +872,6 @@ static void pcie_config_aspm_link(struct pcie_link_state *link, u32 state)
 		pcie_config_aspm_dev(child, dwstream);
 	if (!(state & ASPM_STATE_L1))
 		pcie_config_aspm_dev(parent, upstream);
-
-	link->aspm_enabled = state;
 }
 
 static void pcie_config_aspm_path(struct pcie_link_state *link)
@@ -1238,7 +1245,7 @@ bool pcie_aspm_enabled(struct pci_dev *pdev)
 	if (!link)
 		return false;
 
-	return link->aspm_enabled;
+	return aspm_get_enabled_states(link);
 }
 EXPORT_SYMBOL_GPL(pcie_aspm_enabled);
 
@@ -1249,7 +1256,8 @@ static ssize_t aspm_attr_show_common(struct device *dev,
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct pcie_link_state *link = pcie_aspm_get_link(pdev);
 
-	return sysfs_emit(buf, "%d\n", (link->aspm_enabled & state) ? 1 : 0);
+	return sysfs_emit(buf, "%d\n",
+			  (aspm_get_enabled_states(link) & state) ? 1 : 0);
 }
 
 static ssize_t aspm_attr_store_common(struct device *dev,
