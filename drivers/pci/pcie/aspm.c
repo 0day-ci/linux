@@ -139,21 +139,12 @@ static int policy_to_clkpm_state(struct pcie_link_state *link)
 	return 0;
 }
 
-static void pcie_set_clkpm_nocheck(struct pcie_link_state *link, int enable)
-{
-	struct pci_dev *child;
-	struct pci_bus *linkbus = link->pdev->subordinate;
-	u32 val = enable ? PCI_EXP_LNKCTL_CLKREQ_EN : 0;
-
-	list_for_each_entry(child, &linkbus->devices, bus_list)
-		pcie_capability_clear_and_set_word(child, PCI_EXP_LNKCTL,
-						   PCI_EXP_LNKCTL_CLKREQ_EN,
-						   val);
-	link->clkpm_enabled = !!enable;
-}
-
 static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 {
+	u32 val;
+	struct pci_dev *child;
+	struct pci_bus *linkbus = link->pdev->subordinate;
+
 	/*
 	 * Don't enable Clock PM if the link is not Clock PM capable
 	 * or Clock PM is disabled
@@ -163,7 +154,14 @@ static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 	/* Need nothing if the specified equals to current state */
 	if (link->clkpm_enabled == enable)
 		return;
-	pcie_set_clkpm_nocheck(link, enable);
+
+	val = enable ? PCI_EXP_LNKCTL_CLKREQ_EN : 0;
+	list_for_each_entry(child, &linkbus->devices, bus_list)
+		pcie_capability_clear_and_set_word(child, PCI_EXP_LNKCTL,
+						   PCI_EXP_LNKCTL_CLKREQ_EN,
+						   val);
+
+	link->clkpm_enabled = !!enable;
 }
 
 static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
