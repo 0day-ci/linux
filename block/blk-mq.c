@@ -3595,7 +3595,7 @@ static struct blk_mq_hw_ctx *blk_mq_alloc_and_init_hctx(
 }
 
 static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
-						struct request_queue *q)
+				   struct request_queue *q)
 {
 	int i, j, end;
 	struct blk_mq_hw_ctx **hctxs = q->queue_hw_ctx;
@@ -3660,9 +3660,17 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 
 	for (; j < end; j++) {
 		struct blk_mq_hw_ctx *hctx = hctxs[j];
+		bool free_tags = !blk_mq_is_shared_tags(set->flags) &&
+			!q->nr_hw_queues && list_empty(&set->tag_list);
 
 		if (hctx) {
-			__blk_mq_free_map_and_rqs(set, j);
+			/*
+			 * tags should not be freed if other device is using the
+			 * tagset. q->nr_hw_queues is zero means current
+			 * function is called from queue initialization.
+			 */
+			if (free_tags)
+				__blk_mq_free_map_and_rqs(set, j);
 			blk_mq_exit_hctx(q, set, hctx, j);
 			hctxs[j] = NULL;
 		}
