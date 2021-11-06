@@ -2090,6 +2090,12 @@ int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm)
 
 		ret = 0;
 		break;
+	default: {
+		kbs = NULL;
+		ret = -ENOIOCTLCMD;
+
+		break;
+	}
 	}
 
 	kfree(kbs);
