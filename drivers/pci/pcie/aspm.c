@@ -54,7 +54,6 @@ struct pcie_link_state {
 	struct list_head sibling;	/* node in link_list */
 
 	/* ASPM state */
-	u32 aspm_support:7;		/* Supported ASPM state */
 	u32 aspm_enabled:7;		/* Enabled ASPM state */
 	u32 aspm_capable:7;		/* Capable ASPM state with latency */
 	u32 aspm_default:7;		/* Default ASPM state by BIOS */
@@ -450,7 +449,8 @@ static void pci_clear_and_set_dword(struct pci_dev *pdev, int pos,
 
 /* Calculate L1.2 PM substate timing parameters */
 static void aspm_calc_l1ss_info(struct pcie_link_state *link,
-				u32 parent_l1ss_cap, u32 child_l1ss_cap)
+				u32 aspm_support, u32 parent_l1ss_cap,
+				u32 child_l1ss_cap)
 {
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
 	u32 val1, val2, scale1, scale2;
@@ -459,7 +459,7 @@ static void aspm_calc_l1ss_info(struct pcie_link_state *link,
 	u32 pctl1, pctl2, cctl1, cctl2;
 	u32 pl1_2_enables, cl1_2_enables;
 
-	if (!(link->aspm_support & ASPM_STATE_L1_2_MASK))
+	if (!(aspm_support & ASPM_STATE_L1_2_MASK))
 		return;
 
 	/* Choose the greater of the two Port Common_Mode_Restore_Times */
@@ -591,6 +591,20 @@ static u32 aspm_calc_init_linkcap(u32 up_lnkcap, u32 dwn_lnkcap,
 	return link_cap;
 }
 
+static u32 aspm_get_init_cap(struct pcie_link_state *link)
+{
+	struct pci_dev *child = link->downstream, *parent = link->pdev;
+	u32 parent_lnkcap, child_lnkcap;
+	u32 parent_l1ss_cap, child_l1ss_cap;
+
+	pcie_capability_read_dword(parent, PCI_EXP_LNKCAP, &parent_lnkcap);
+	pcie_capability_read_dword(child, PCI_EXP_LNKCAP, &child_lnkcap);
+	aspm_calc_both_l1ss_caps(link, &parent_l1ss_cap, &child_l1ss_cap);
+
+	return aspm_calc_init_linkcap(parent_lnkcap, child_lnkcap,
+				      parent_l1ss_cap, child_l1ss_cap);
+}
+
 static u32 aspm_calc_enabled_states(struct pcie_link_state *link,
 				    u32 up_l1ss_cap, u32 dwn_l1ss_cap)
 {
@@ -630,7 +644,7 @@ static u32 aspm_calc_enabled_states(struct pcie_link_state *link,
 static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 {
 	struct pci_dev *child = link->downstream, *parent = link->pdev;
-	u32 parent_lnkcap, child_lnkcap;
+	u32 parent_lnkcap, child_lnkcap, aspm_support;
 	u32 parent_l1ss_cap, child_l1ss_cap;
 	struct pci_bus *linkbus = parent->subordinate;
 
@@ -676,15 +690,14 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	/* Save default state */
 	link->aspm_default = link->aspm_enabled;
 
-	link->aspm_support = aspm_calc_init_linkcap(parent_lnkcap,
-						    child_lnkcap,
-						    parent_l1ss_cap,
-						    child_l1ss_cap);
-	if (link->aspm_support & ASPM_STATE_L1SS)
-		aspm_calc_l1ss_info(link, parent_l1ss_cap, child_l1ss_cap);
+	aspm_support = aspm_calc_init_linkcap(parent_lnkcap, child_lnkcap,
+					      parent_l1ss_cap, child_l1ss_cap);
+	if (aspm_support & ASPM_STATE_L1SS)
+		aspm_calc_l1ss_info(link, aspm_support, parent_l1ss_cap,
+				    child_l1ss_cap);
 
 	/* Setup initial capable state. Will be updated later */
-	link->aspm_capable = link->aspm_support;
+	link->aspm_capable = aspm_support;
 
 	/* Get and check endpoint acceptable latencies */
 	list_for_each_entry(child, &linkbus->devices, bus_list) {
@@ -994,7 +1007,7 @@ static void pcie_update_aspm_capable(struct pcie_link_state *root)
 	list_for_each_entry(link, &link_list, sibling) {
 		if (link->root != root)
 			continue;
-		link->aspm_capable = link->aspm_support;
+		link->aspm_capable = aspm_get_init_cap(link);
 	}
 	list_for_each_entry(link, &link_list, sibling) {
 		struct pci_dev *child;
