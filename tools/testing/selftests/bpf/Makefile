@@ -26,6 +26,7 @@ CFLAGS += -g -O0 -rdynamic -Wall $(GENFLAGS) $(SAN_CFLAGS)		\
 	  -I$(TOOLSINCDIR) -I$(APIDIR) -I$(OUTPUT)			\
 	  -Dbpf_prog_load=bpf_prog_test_load				\
 	  -Dbpf_load_program=bpf_test_load_program
+LDFLAGS += $(SAN_CFLAGS)
 LDLIBS += -lcap -lelf -lz -lrt -lpthread
 
 # Silence some warnings when compiled with clang
