@@ -2306,48 +2306,55 @@ static int hns3_nic_do_ioctl(struct net_device *netdev,
 static int hns3_nic_set_features(struct net_device *netdev,
 				 netdev_features_t features)
 {
-	netdev_features_t changed = netdev->features ^ features;
+	netdev_features_t changed = netdev_active_features_xor(netdev,
+							       features);
 	struct hns3_nic_priv *priv = netdev_priv(netdev);
 	struct hnae3_handle *h = priv->ae_handle;
 	bool enable;
 	int ret;
 
-	if (changed & (NETIF_F_GRO_HW) && h->ae_algo->ops->set_gro_en) {
-		enable = !!(features & NETIF_F_GRO_HW);
+	if (netdev_features_test_bit(NETIF_F_GRO_HW_BIT, changed) &&
+	    h->ae_algo->ops->set_gro_en) {
+		enable = netdev_features_test_bit(NETIF_F_GRO_HW_BIT, features);
 		ret = h->ae_algo->ops->set_gro_en(h, enable);
 		if (ret)
 			return ret;
 	}
 
-	if ((changed & NETIF_F_HW_VLAN_CTAG_RX) &&
+	if (netdev_features_test_bit(NETIF_F_HW_VLAN_CTAG_RX_BIT, changed) &&
 	    h->ae_algo->ops->enable_hw_strip_rxvtag) {
-		enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
+		enable = netdev_features_test_bit(NETIF_F_HW_VLAN_CTAG_RX_BIT,
+						  features);
 		ret = h->ae_algo->ops->enable_hw_strip_rxvtag(h, enable);
 		if (ret)
 			return ret;
 	}
 
-	if ((changed & NETIF_F_NTUPLE) && h->ae_algo->ops->enable_fd) {
-		enable = !!(features & NETIF_F_NTUPLE);
+	if (netdev_features_test_bit(NETIF_F_NTUPLE_BIT, changed) &&
+	    h->ae_algo->ops->enable_fd) {
+		enable = netdev_features_test_bit(NETIF_F_NTUPLE_BIT, features);
 		h->ae_algo->ops->enable_fd(h, enable);
 	}
 
-	if ((netdev->features & NETIF_F_HW_TC) > (features & NETIF_F_HW_TC) &&
+	if ((netdev_active_features_test_bit(netdev, NETIF_F_HW_TC_BIT) >
+	    netdev_features_test_bit(NETIF_F_NTUPLE_BIT, features)) &&
 	    h->ae_algo->ops->cls_flower_active(h)) {
 		netdev_err(netdev,
 			   "there are offloaded TC filters active, cannot disable HW TC offload");
 		return -EINVAL;
 	}
 
-	if ((changed & NETIF_F_HW_VLAN_CTAG_FILTER) &&
+	if (netdev_features_test_bit(NETIF_F_HW_VLAN_CTAG_FILTER_BIT,
+				     changed) &&
 	    h->ae_algo->ops->enable_vlan_filter) {
-		enable = !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
+		enable = netdev_features_test_bit(NETIF_F_HW_VLAN_CTAG_FILTER_BIT,
+						  features);
 		ret = h->ae_algo->ops->enable_vlan_filter(h, enable);
 		if (ret)
 			return ret;
 	}
 
-	netdev->features = features;
+	netdev_set_active_features(netdev, features);
 	return 0;
 }
 
@@ -2376,8 +2383,10 @@ static netdev_features_t hns3_features_check(struct sk_buff *skb,
 	/* Hardware only supports checksum on the skb with a max header
 	 * len of 480 bytes.
 	 */
-	if (len > HNS3_MAX_HDR_LEN)
-		features &= ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
+	if (len > HNS3_MAX_HDR_LEN) {
+		features = netdev_features_andnot(features, NETIF_F_CSUM_MASK);
+		features = netdev_features_andnot(features, NETIF_F_GSO_MASK);
+	}
 
 	return features;
 }
@@ -3122,55 +3131,88 @@ static struct pci_driver hns3_driver = {
 	.err_handler    = &hns3_err_handler,
 };
 
+static const int hns3_default_features_array[] = {
+	NETIF_F_HW_VLAN_CTAG_FILTER_BIT,
+	NETIF_F_HW_VLAN_CTAG_RX_BIT,
+	NETIF_F_HW_VLAN_CTAG_TX_BIT,
+	NETIF_F_RXCSUM_BIT,
+	NETIF_F_SG_BIT,
+	NETIF_F_GSO_BIT,
+	NETIF_F_GRO_BIT,
+	NETIF_F_TSO_BIT,
+	NETIF_F_TSO6_BIT,
+	NETIF_F_GSO_GRE_BIT,
+	NETIF_F_GSO_GRE_CSUM_BIT,
+	NETIF_F_GSO_UDP_TUNNEL_BIT,
+	NETIF_F_SCTP_CRC_BIT,
+	NETIF_F_FRAGLIST,
+};
+
+static const int hns3_vlan_disable_features_array[] = {
+	NETIF_F_HW_VLAN_CTAG_FILTER_BIT,
+	NETIF_F_HW_VLAN_CTAG_RX_BIT,
+	NETIF_F_HW_VLAN_CTAG_TX_BIT,
+	NETIF_F_GRO_HW_BIT,
+	NETIF_F_NTUPLE_BIT,
+	NETIF_F_HW_TC_BIT,
+};
+
 /* set default feature to hns3 */
 static void hns3_set_default_feature(struct net_device *netdev)
 {
 	struct hnae3_handle *h = hns3_get_handle(netdev);
 	struct pci_dev *pdev = h->pdev;
 	struct hnae3_ae_dev *ae_dev = pci_get_drvdata(pdev);
+	netdev_features_t features, vlan_disable;
 
 	netdev->priv_flags |= IFF_UNICAST_FLT;
 
 	netdev->gso_partial_features |= NETIF_F_GSO_GRE_CSUM;
 
-	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER |
-		NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
-		NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
-		NETIF_F_GRO | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_GSO_GRE |
-		NETIF_F_GSO_GRE_CSUM | NETIF_F_GSO_UDP_TUNNEL |
-		NETIF_F_SCTP_CRC | NETIF_F_FRAGLIST;
+	netdev_features_zero(&features);
+	netdev_features_set_array(hns3_default_features_array,
+				  ARRAY_SIZE(hns3_default_features_array),
+				  &features);
+
+	netdev_features_zero(&vlan_disable);
+	netdev_features_set_array(hns3_vlan_disable_features_array,
+				  ARRAY_SIZE(hns3_vlan_disable_features_array),
+				  &vlan_disable);
 
 	if (ae_dev->dev_version >= HNAE3_DEVICE_VERSION_V2) {
-		netdev->features |= NETIF_F_GRO_HW;
+		netdev_features_set_bit(NETIF_F_GRO_HW_BIT, &features);
 
 		if (!(h->flags & HNAE3_SUPPORT_VF))
-			netdev->features |= NETIF_F_NTUPLE;
+			netdev_features_set_bit(NETIF_F_NTUPLE_BIT, &features);
 	}
 
 	if (test_bit(HNAE3_DEV_SUPPORT_UDP_GSO_B, ae_dev->caps))
-		netdev->features |= NETIF_F_GSO_UDP_L4;
+		netdev_features_set_bit(NETIF_F_GSO_UDP_L4_BIT, &features);
 
 	if (test_bit(HNAE3_DEV_SUPPORT_HW_TX_CSUM_B, ae_dev->caps))
-		netdev->features |= NETIF_F_HW_CSUM;
+		netdev_features_set_bit(NETIF_F_HW_CSUM_BIT, &features);
 	else
-		netdev->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		features = netdev_features_or(features, netdev_ip_csum_features);
 
 	if (test_bit(HNAE3_DEV_SUPPORT_UDP_TUNNEL_CSUM_B, ae_dev->caps))
-		netdev->features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+		netdev_features_set_bit(NETIF_F_GSO_UDP_TUNNEL_CSUM_BIT,
+					&features);
 
 	if (test_bit(HNAE3_DEV_SUPPORT_FD_FORWARD_TC_B, ae_dev->caps))
-		netdev->features |= NETIF_F_HW_TC;
+		netdev_features_set_bit(NETIF_F_HW_TC_BIT, &features);
 
-	netdev->hw_features |= netdev->features;
+	netdev_active_features_direct_or(netdev, features);
+
+	netdev_hw_features_direct_or(netdev, features);
 	if (!test_bit(HNAE3_DEV_SUPPORT_VLAN_FLTR_MDF_B, ae_dev->caps))
-		netdev->hw_features &= ~NETIF_F_HW_VLAN_CTAG_FILTER;
+		netdev_hw_features_clear_bit(netdev,
+					     NETIF_F_HW_VLAN_CTAG_FILTER_BIT);
 
-	netdev->vlan_features |= netdev->features &
-		~(NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_HW_VLAN_CTAG_TX |
-		  NETIF_F_HW_VLAN_CTAG_RX | NETIF_F_GRO_HW | NETIF_F_NTUPLE |
-		  NETIF_F_HW_TC);
+	features = netdev_features_andnot(features, vlan_disable);
+	netdev_vlan_features_direct_or(netdev, features);
 
-	netdev->hw_enc_features |= netdev->vlan_features | NETIF_F_TSO_MANGLEID;
+	netdev_hw_enc_features_direct_or(netdev, features);
+	netdev_hw_enc_features_set_bit(netdev, NETIF_F_TSO_MANGLEID_BIT);
 }
 
 static int hns3_alloc_buffer(struct hns3_enet_ring *ring,

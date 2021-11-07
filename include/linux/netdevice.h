@@ -1715,7 +1715,7 @@ enum netdev_ml_priv_type {
  *	@ptype_specific: Device-specific, protocol-specific packet handlers
  *
  *	@adj_list:	Directly linked devices, like slaves for bonding
- *	@features:	Currently active device features
+ *	@active_features:	Currently active device features
  *	@hw_features:	User-changeable features
  *
  *	@wanted_features:	User-requested features
@@ -1995,7 +1995,7 @@ struct net_device {
 	unsigned short		needed_headroom;
 	unsigned short		needed_tailroom;
 
-	netdev_features_t	features;
+	netdev_features_t	active_features;
 	netdev_features_t	hw_features;
 	netdev_features_t	wanted_features;
 	netdev_features_t	vlan_features;
@@ -2271,9 +2271,545 @@ struct net_device {
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
+#define netdev_active_features_zero(ndev) \
+		netdev_features_zero(&ndev->active_features)
+
+#define netdev_active_features_equal(ndev, features) \
+		netdev_features_equal(ndev->active_features, features)
+
+#define netdev_active_features_and(ndev, features) \
+		netdev_features_and(ndev->active_features, features)
+
+#define netdev_active_features_or(ndev, features) \
+		netdev_features_or(ndev->active_features, features)
+
+#define netdev_active_features_xor(ndev, features) \
+		netdev_features_xor(ndev->active_features, features)
+
+#define netdev_active_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->active_features, features)
+
+#define netdev_active_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->active_features)
+
+#define netdev_active_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->active_features)
+
+#define netdev_active_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->active_features)
+
+#define netdev_active_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->active_features)
+
+#define netdev_active_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, ndev->active_features)
+
+#define netdev_active_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->active_features, features)
+
+static inline void netdev_set_active_features(struct net_device *netdev,
+					      netdev_features_t src)
+{
+	netdev->active_features = src;
+}
+
+static inline netdev_features_t netdev_get_active_features(struct net_device *ndev)
+{
+	return ndev->active_features;
+}
+
+static inline void
+netdev_active_features_direct_and(struct net_device *ndev,
+				  netdev_features_t features)
+{
+	ndev->active_features = netdev_active_features_and(ndev, features);
+}
+
+static inline void
+netdev_active_features_direct_or(struct net_device *ndev,
+				 netdev_features_t features)
+{
+	ndev->active_features = netdev_active_features_or(ndev, features);
+}
+
+static inline void
+netdev_active_features_direct_xor(struct net_device *ndev,
+				  netdev_features_t features)
+{
+	ndev->active_features = netdev_active_features_xor(ndev, features);
+}
+
+static inline void
+netdev_active_features_direct_andnot(struct net_device *ndev,
+				     netdev_features_t features)
+{
+	ndev->active_features = netdev_active_features_andnot(ndev, features);
+}
+
+#define netdev_hw_features_zero(ndev) \
+		netdev_features_zero(&ndev->hw_features)
+
+#define netdev_hw_features_equal(ndev, features) \
+		netdev_features_equal(ndev->hw_features, features)
+
+#define netdev_hw_features_copy(features) \
+		netdev_features_copy(&ndev->hw_features)
+
+#define netdev_hw_features_and(ndev, features) \
+		netdev_features_and(ndev->hw_features, features)
+
+#define netdev_hw_features_or(ndev, features) \
+		netdev_features_or(ndev->hw_features, features)
+
+#define netdev_hw_features_xor(ndev, features) \
+		netdev_features_xor(ndev->hw_features, features)
+
+#define netdev_hw_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->hw_features, features)
+
+#define netdev_hw_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->hw_features)
+
+#define netdev_hw_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->hw_features)
+
+#define netdev_hw_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->hw_features)
+
+#define netdev_hw_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->hw_features)
+
+#define netdev_hw_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, &ndev->hw_features)
+
+#define netdev_hw_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->hw_features, features)
+
+static inline void netdev_set_hw_features(struct net_device *ndev,
+					  netdev_features_t src)
+{
+	ndev->hw_features = src;
+}
+
+static inline netdev_features_t netdev_get_hw_features(struct net_device *ndev)
+{
+	return ndev->hw_features;
+}
+
+static inline void
+netdev_hw_features_direct_and(struct net_device *ndev,
+			      netdev_features_t features)
+{
+	ndev->hw_features = netdev_hw_features_and(ndev, features);
+}
+
+static inline void
+netdev_hw_features_direct_or(struct net_device *ndev,
+			     netdev_features_t features)
+{
+	ndev->hw_features = netdev_hw_features_or(ndev, features);
+}
+
+static inline void
+netdev_hw_features_direct_xor(struct net_device *ndev,
+			      netdev_features_t features)
+{
+	ndev->hw_features = netdev_hw_features_xor(ndev, features);
+}
+
+static inline void
+netdev_hw_features_direct_andnot(struct net_device *ndev,
+				 netdev_features_t features)
+{
+	ndev->hw_features = netdev_hw_features_andnot(ndev, features);
+}
+
+#define netdev_wanted_features_zero(ndev) \
+		netdev_features_zero(&ndev->wanted_features)
+
+#define netdev_wanted_features_equal(ndev, features) \
+		netdev_features_equal(ndev->wanted_features, features)
+
+#define netdev_wanted_features_and(ndev, features) \
+		netdev_features_and(ndev->wanted_features, features)
+
+#define netdev_wanted_features_or(ndev, features) \
+		netdev_features_or(ndev->wanted_features, features)
+
+#define netdev_wanted_features_xor(ndev, features) \
+		netdev_features_xor(ndev->wanted_features, features)
+
+#define netdev_wanted_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->wanted_features, features)
+
+#define netdev_wanted_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->wanted_features)
+
+#define netdev_wanted_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->wanted_features)
+
+#define netdev_wanted_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->wanted_features)
+
+#define netdev_wanted_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->wanted_features)
+
+#define netdev_wanted_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, &ndev->wanted_features)
+
+#define netdev_wanted_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->wanted_features, features)
+
+static inline void netdev_set_wanted_features(struct net_device *ndev,
+					      netdev_features_t src)
+{
+	ndev->wanted_features = src;
+}
+
+static inline netdev_features_t
+netdev_get_wanted_features(struct net_device *ndev)
+{
+	return ndev->wanted_features;
+}
+
+static inline void
+netdev_wanted_features_direct_and(struct net_device *ndev,
+				  netdev_features_t features)
+{
+	ndev->wanted_features = netdev_wanted_features_and(ndev, features);
+}
+
+static inline void
+netdev_wanted_features_direct_or(struct net_device *ndev,
+				 netdev_features_t features)
+{
+	ndev->wanted_features = netdev_wanted_features_or(ndev, features);
+}
+
+static inline void
+netdev_wanted_features_direct_xor(struct net_device *ndev,
+				  netdev_features_t features)
+{
+	ndev->wanted_features = netdev_wanted_features_xor(ndev, features);
+}
+
+static inline void
+netdev_wanted_features_direct_andnot(struct net_device *ndev,
+				     netdev_features_t features)
+{
+	ndev->wanted_features = netdev_wanted_features_andnot(ndev, features);
+}
+
+#define netdev_vlan_features_zero(ndev) \
+		netdev_features_zero(&ndev->vlan_features)
+
+#define netdev_vlan_features_equal(ndev, features) \
+		netdev_features_equal(ndev->vlan_features, features)
+
+#define netdev_vlan_features_and(ndev, features) \
+		netdev_features_and(ndev->vlan_features, features)
+
+#define netdev_vlan_features_or(ndev, features) \
+		netdev_features_or(ndev->vlan_features, features)
+
+#define netdev_vlan_features_xor(ndev, features) \
+		netdev_features_xor(ndev->vlan_features, features)
+
+#define netdev_vlan_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->vlan_features, features)
+
+#define netdev_vlan_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->vlan_features)
+
+#define netdev_vlan_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->vlan_features)
+
+#define netdev_vlan_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->vlan_features)
+
+#define netdev_vlan_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->vlan_features)
+
+#define netdev_vlan_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, &ndev->vlan_features)
+
+#define netdev_vlan_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->vlan_features, features)
+
+static inline void netdev_set_vlan_features(struct net_device *ndev,
+					    netdev_features_t src)
+{
+	ndev->vlan_features = src;
+}
+
+static inline netdev_features_t
+netdev_get_vlan_features(struct net_device *ndev)
+{
+	return ndev->vlan_features;
+}
+
+static inline void
+netdev_vlan_features_direct_and(struct net_device *ndev,
+				netdev_features_t features)
+{
+	ndev->vlan_features = netdev_vlan_features_and(ndev, features);
+}
+
+static inline void
+netdev_vlan_features_direct_or(struct net_device *ndev,
+			       netdev_features_t features)
+{
+	ndev->vlan_features = netdev_vlan_features_or(ndev, features);
+}
+
+static inline void
+netdev_vlan_features_direct_xor(struct net_device *ndev,
+				netdev_features_t features)
+{
+	ndev->vlan_features = netdev_vlan_features_xor(ndev, features);
+}
+
+static inline void
+netdev_vlan_features_direct_andnot(struct net_device *ndev,
+				   netdev_features_t features)
+{
+	ndev->vlan_features = netdev_vlan_features_andnot(ndev, features);
+}
+
+#define netdev_hw_enc_features_zero(ndev) \
+		netdev_features_zero(&ndev->hw_enc_features)
+
+#define netdev_hw_enc_features_equal(ndev, features) \
+		netdev_features_equal(ndev->hw_enc_features, features)
+
+#define netdev_hw_enc_features_and(ndev, features) \
+		netdev_features_and(ndev->hw_enc_features, features)
+
+#define netdev_hw_enc_features_or(ndev, features) \
+		netdev_features_or(ndev->hw_enc_features, features)
+
+#define netdev_hw_enc_features_xor(ndev, features) \
+		netdev_features_xor(ndev->hw_enc_features, features)
+
+#define netdev_hw_enc_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->hw_enc_features, features)
+
+#define netdev_hw_enc_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->hw_enc_features)
+
+#define netdev_hw_enc_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->hw_enc_features)
+
+#define netdev_hw_enc_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->hw_enc_features)
+
+#define netdev_hw_enc_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->hw_enc_features)
+
+#define netdev_hw_enc_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, &ndev->hw_enc_features)
+
+#define netdev_hw_enc_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->hw_enc_features, features)
+
+static inline void netdev_set_hw_enc_features(struct net_device *ndev,
+					      netdev_features_t src)
+{
+	ndev->hw_enc_features = src;
+}
+
+static inline netdev_features_t
+netdev_get_hw_enc_features(struct net_device *ndev)
+{
+	return ndev->hw_enc_features;
+}
+
+static inline void
+netdev_hw_enc_features_direct_and(struct net_device *ndev,
+				  netdev_features_t features)
+{
+	ndev->hw_enc_features = netdev_hw_enc_features_and(ndev, features);
+}
+
+static inline void
+netdev_hw_enc_features_direct_or(struct net_device *ndev,
+				 netdev_features_t features)
+{
+	ndev->hw_enc_features = netdev_hw_enc_features_or(ndev, features);
+}
+
+static inline void
+netdev_hw_enc_features_direct_xor(struct net_device *ndev,
+				  netdev_features_t features)
+{
+	ndev->hw_enc_features = netdev_hw_enc_features_xor(ndev, features);
+}
+
+static inline void
+netdev_hw_enc_features_direct_andnot(struct net_device *ndev,
+				     netdev_features_t features)
+{
+	ndev->hw_enc_features = netdev_hw_enc_features_andnot(ndev, features);
+}
+
+#define netdev_mpls_features_zero(ndev) \
+		netdev_features_zero(&ndev->mpls_features)
+
+#define netdev_mpls_features_equal(ndev, features) \
+		netdev_features_equal(ndev->mpls_features, features)
+
+#define netdev_mpls_features_and(ndev, features) \
+		netdev_features_and(ndev->mpls_features, features)
+
+#define netdev_mpls_features_or(ndev, features) \
+		netdev_features_or(ndev->mpls_features, features)
+
+#define netdev_mpls_features_xor(ndev, features) \
+		netdev_features_xor(ndev->mpls_features, features)
+
+#define netdev_mpls_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->mpls_features, features)
+
+#define netdev_mpls_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->mpls_features)
+
+#define netdev_mpls_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->mpls_features)
+
+#define netdev_mpls_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->mpls_features)
+
+#define netdev_mpls_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->mpls_features)
+
+#define netdev_mpls_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, &ndev->mpls_features)
+
+#define netdev_mpls_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->mpls_features, features)
+
+static inline void netdev_set_mpls_features(struct net_device *ndev,
+					    netdev_features_t src)
+{
+	ndev->mpls_features = src;
+}
+
+static inline netdev_features_t
+netdev_get_mpls_features(struct net_device *ndev)
+{
+	return ndev->mpls_features;
+}
+
+static inline void
+netdev_mpls_features_direct_and(struct net_device *ndev,
+				netdev_features_t features)
+{
+	ndev->mpls_features = netdev_mpls_features_and(ndev, features);
+}
+
+static inline void
+netdev_mpls_features_direct_or(struct net_device *ndev,
+			       netdev_features_t features)
+{
+	ndev->mpls_features = netdev_mpls_features_or(ndev, features);
+}
+
+static inline void
+netdev_mpls_features_direct_xor(struct net_device *ndev,
+				netdev_features_t features)
+{
+	ndev->mpls_features = netdev_mpls_features_xor(ndev, features);
+}
+
+static inline void
+netdev_mpls_features_direct_andnot(struct net_device *ndev,
+				   netdev_features_t features)
+{
+	ndev->mpls_features = netdev_mpls_features_andnot(ndev, features);
+}
+
+#define netdev_gso_partial_features_zero(ndev) \
+		netdev_features_zero(&ndev->gso_partial_features)
+
+#define netdev_gso_partial_features_equal(ndev, features) \
+		netdev_features_equal(ndev->gso_partial_features, features)
+
+#define netdev_gso_partial_features_and(ndev, features) \
+		netdev_features_and(ndev->gso_partial_features, features)
+
+#define netdev_gso_partial_features_or(ndev, features) \
+		netdev_features_or(ndev->gso_partial_features, features)
+
+#define netdev_gso_partial_features_xor(ndev, features) \
+		netdev_features_xor(ndev->gso_partial_features, features)
+
+#define netdev_gso_partial_features_andnot(ndev, features) \
+		netdev_features_andnot(ndev->gso_partial_features, features)
+
+#define netdev_gso_partial_features_andnot_r(ndev, features) \
+		netdev_features_andnot(features, ndev->gso_partial_features)
+
+#define netdev_gso_partial_features_set_bit(ndev, nr) \
+		netdev_features_set_bit(nr, &ndev->gso_partial_features)
+
+#define netdev_gso_partial_features_set_array(ndev, array, array_size) \
+		netdev_features_set_array(array, array_size, &ndev->gso_partial_features)
+
+#define netdev_gso_partial_features_clear_bit(ndev, nr) \
+		netdev_features_clear_bit(nr, &ndev->gso_partial_features)
+
+#define netdev_gso_partial_features_test_bit(ndev, nr) \
+		netdev_features_test_bit(nr, &ndev->gso_partial_features)
+
+#define netdev_gso_partial_features_intersects(ndev, features) \
+		netdev_features_intersects(ndev->gso_partial_features, features)
+
+static inline void netdev_set_gso_partial_features(struct net_device *ndev,
+					    netdev_features_t src)
+{
+	ndev->gso_partial_features = src;
+}
+
+static inline netdev_features_t
+netdev_get_gso_partial_features(struct net_device *ndev)
+{
+	return ndev->gso_partial_features;
+}
+
+static inline void
+netdev_gso_partial_features_direct_and(struct net_device *ndev,
+				       netdev_features_t features)
+{
+	ndev->gso_partial_features = netdev_mpls_features_and(ndev, features);
+}
+
+static inline void
+netdev_gso_partial_features_direct_or(struct net_device *ndev,
+				      netdev_features_t features)
+{
+	ndev->gso_partial_features = netdev_mpls_features_or(ndev, features);
+}
+
+static inline void
+netdev_gso_partial_features_direct_xor(struct net_device *ndev,
+				       netdev_features_t features)
+{
+	ndev->gso_partial_features =
+			netdev_gso_partial_features_xor(ndev, features);
+}
+
+static inline void
+netdev_gso_partial_features_direct_andnot(struct net_device *ndev,
+					  netdev_features_t features)
+{
+	ndev->gso_partial_features =
+			netdev_gso_partial_features_andnot(ndev, features);
+}
+
 static inline bool netif_elide_gro(const struct net_device *dev)
 {
-	if (!(dev->features & NETIF_F_GRO) || dev->xdp_prog)
+	if (!netdev_active_features_test_bit(dev, NETIF_F_GRO_BIT) ||
+	    dev->xdp_prog)
 		return true;
 	return false;
 }
@@ -4517,7 +5053,7 @@ static inline void netif_tx_unlock_bh(struct net_device *dev)
 }
 
 #define HARD_TX_LOCK(dev, txq, cpu) {			\
-	if ((dev->features & NETIF_F_LLTX) == 0) {	\
+	if (!netdev_active_features_test_bit(dev, NETIF_F_LLTX_BIT)) {	\
 		__netif_tx_lock(txq, cpu);		\
 	} else {					\
 		__netif_tx_acquire(txq);		\
@@ -4525,12 +5061,12 @@ static inline void netif_tx_unlock_bh(struct net_device *dev)
 }
 
 #define HARD_TX_TRYLOCK(dev, txq)			\
-	(((dev->features & NETIF_F_LLTX) == 0) ?	\
+	((!netdev_active_features_test_bit(dev, NETIF_F_LLTX_BIT)) ?	\
 		__netif_tx_trylock(txq) :		\
 		__netif_tx_acquire(txq))
 
 #define HARD_TX_UNLOCK(dev, txq) {			\
-	if ((dev->features & NETIF_F_LLTX) == 0) {	\
+	if ((!netdev_active_features_test_bit(dev, NETIF_F_LLTX_BIT)) {	\
 		__netif_tx_unlock(txq);			\
 	} else {					\
 		__netif_tx_release(txq);		\
@@ -4942,20 +5478,20 @@ static inline bool can_checksum_protocol(netdev_features_t features,
 					 __be16 protocol)
 {
 	if (protocol == htons(ETH_P_FCOE))
-		return !!(features & NETIF_F_FCOE_CRC);
+		return netdev_features_test_bit(NETIF_F_FCOE_CRC_BIT, features);
 
 	/* Assume this is an IP checksum (not SCTP CRC) */
 
-	if (features & NETIF_F_HW_CSUM) {
+	if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, features)) {
 		/* Can checksum everything */
 		return true;
 	}
 
 	switch (protocol) {
 	case htons(ETH_P_IP):
-		return !!(features & NETIF_F_IP_CSUM);
+		return netdev_features_test_bit(NETIF_F_IP_CSUM_BIT, features);
 	case htons(ETH_P_IPV6):
-		return !!(features & NETIF_F_IPV6_CSUM);
+		return netdev_features_test_bit(NETIF_F_IPV6_CSUM_BIT, features);
 	default:
 		return false;
 	}
@@ -5019,20 +5555,25 @@ void linkwatch_run_queue(void);
 static inline netdev_features_t netdev_intersect_features(netdev_features_t f1,
 							  netdev_features_t f2)
 {
-	if ((f1 ^ f2) & NETIF_F_HW_CSUM) {
-		if (f1 & NETIF_F_HW_CSUM)
-			f1 |= (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM);
+	if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, f1) !=
+	    netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, f2)) {
+		if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, f1))
+			f1 = netdev_features_or(f1, netdev_ip_csum_features);
 		else
-			f2 |= (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM);
+			f2 = netdev_features_or(f2, netdev_ip_csum_features);
 	}
 
-	return f1 & f2;
+	return netdev_features_and(f1, f2);
 }
 
-static inline netdev_features_t netdev_get_wanted_features(
-	struct net_device *dev)
+static inline netdev_features_t
+netdev_get_full_wanted_features(struct net_device *dev)
 {
-	return (dev->features & ~dev->hw_features) | dev->wanted_features;
+	netdev_features_t features = netdev_get_active_features(dev);
+
+	features = netdev_hw_features_andnot_r(dev, features);
+
+	return netdev_wanted_features_or(dev, features);
 }
 netdev_features_t netdev_increment_features(netdev_features_t all,
 	netdev_features_t one, netdev_features_t mask);
@@ -5090,7 +5631,8 @@ static inline bool net_gso_ok(netdev_features_t features, int gso_type)
 static inline bool skb_gso_ok(struct sk_buff *skb, netdev_features_t features)
 {
 	return net_gso_ok(features, skb_shinfo(skb)->gso_type) &&
-	       (!skb_has_frag_list(skb) || (features & NETIF_F_FRAGLIST));
+	       (!skb_has_frag_list(skb) ||
+	       (netdev_features_test_bit(NETIF_F_FRAGLIST_BIT, features)));
 }
 
 static inline bool netif_needs_gso(struct sk_buff *skb,

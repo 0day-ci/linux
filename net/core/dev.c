@@ -1642,10 +1642,10 @@ void dev_disable_lro(struct net_device *dev)
 	struct net_device *lower_dev;
 	struct list_head *iter;
 
-	dev->wanted_features &= ~NETIF_F_LRO;
+	netdev_wanted_features_clear_bit(dev, NETIF_F_LRO_BIT);
 	netdev_update_features(dev);
 
-	if (unlikely(dev->features & NETIF_F_LRO))
+	if (unlikely(netdev_active_features_test_bit(dev, NETIF_F_LRO_BIT)))
 		netdev_WARN(dev, "failed to disable LRO!\n");
 
 	netdev_for_each_lower_dev(dev, lower_dev, iter)
@@ -1663,10 +1663,10 @@ EXPORT_SYMBOL(dev_disable_lro);
  */
 static void dev_disable_gro_hw(struct net_device *dev)
 {
-	dev->wanted_features &= ~NETIF_F_GRO_HW;
+	netdev_wanted_features_clear_bit(dev, NETIF_F_GRO_HW_BIT);
 	netdev_update_features(dev);
 
-	if (unlikely(dev->features & NETIF_F_GRO_HW))
+	if (unlikely(netdev_active_features_test_bit(dev, NETIF_F_GRO_HW_BIT)))
 		netdev_WARN(dev, "failed to disable GRO_HW!\n");
 }
 
@@ -3391,13 +3391,14 @@ struct sk_buff *__skb_gso_segment(struct sk_buff *skb,
 	 * support segmentation on this frame without needing additional
 	 * work.
 	 */
-	if (features & NETIF_F_GSO_PARTIAL) {
-		netdev_features_t partial_features = NETIF_F_GSO_ROBUST;
+	if (netdev_features_test_bit(NETIF_F_GSO_PARTIAL_BIT, features)) {
+		netdev_features_t partial_features = netdev_get_active_features(dev);
 		struct net_device *dev = skb->dev;
 
-		partial_features |= dev->features & dev->gso_partial_features;
-		if (!skb_gso_ok(skb, features | partial_features))
-			features &= ~NETIF_F_GSO_PARTIAL;
+		partial_features = netdev_gso_partial_features_and(dev, partial_features);
+		netdev_features_set_bit(NETIF_F_GSO_PARTIAL_BIT, &partial_features);
+		if (!skb_gso_ok(skb, netdev_features_or(features, partial_features)))
+			netdev_features_clear_bit(NETIF_F_GSO_PARTIAL_BIT, &features);
 	}
 
 	BUILD_BUG_ON(SKB_GSO_CB_OFFSET +
@@ -3440,7 +3441,7 @@ static int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 #ifdef CONFIG_HIGHMEM
 	int i;
 
-	if (!(dev->features & NETIF_F_HIGHDMA)) {
+	if (!netdev_active_features_test_bit(dev, NETIF_F_HIGHDMA_BIT)) {
 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
@@ -3461,7 +3462,7 @@ static netdev_features_t net_mpls_features(struct sk_buff *skb,
 					   __be16 type)
 {
 	if (eth_p_mpls(type))
-		features &= skb->dev->mpls_features;
+		features = netdev_mpls_features_and(skb->dev, features)
 
 	return features;
 }
@@ -3484,10 +3485,11 @@ static netdev_features_t harmonize_features(struct sk_buff *skb,
 
 	if (skb->ip_summed != CHECKSUM_NONE &&
 	    !can_checksum_protocol(features, type)) {
-		features &= ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
+		features = netdev_features_andnot(features, NETIF_F_CSUM_MASK);
+		features = netdev_features_andnot(features, NETIF_F_GSO_MASK);
 	}
 	if (illegal_highdma(skb->dev, skb))
-		features &= ~NETIF_F_SG;
+		netdev_features_clear_bit(NETIF_F_SG_BIT, &features);
 
 	return features;
 }
@@ -3514,11 +3516,11 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 	u16 gso_segs = skb_shinfo(skb)->gso_segs;
 
 	if (gso_segs > dev->gso_max_segs)
-		return features & ~NETIF_F_GSO_MASK;
+		return netdev_features_andnot(features, NETIF_F_GSO_MASK);
 
 	if (!skb_shinfo(skb)->gso_type) {
 		skb_warn_bad_offload(skb);
-		return features & ~NETIF_F_GSO_MASK;
+		return netdev_features_andnot(features, NETIF_F_GSO_MASK);
 	}
 
 	/* Support for GSO partial features requires software
@@ -3528,7 +3530,7 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 	 * segmented the frame.
 	 */
 	if (!(skb_shinfo(skb)->gso_type & SKB_GSO_PARTIAL))
-		features &= ~dev->gso_partial_features;
+		features = netdev_gso_partial_features_andnot_r(dev, features);
 
 	/* Make sure to clear the IPv4 ID mangling feature if the
 	 * IPv4 header has the potential to be fragmented.
@@ -3538,7 +3540,8 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 				    inner_ip_hdr(skb) : ip_hdr(skb);
 
 		if (!(iph->frag_off & htons(IP_DF)))
-			features &= ~NETIF_F_TSO_MANGLEID;
+			netdev_features_clear_bit(NETIF_F_TSO_MANGLEID_BIT,
+						  features);
 	}
 
 	return features;
@@ -3547,7 +3550,8 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 netdev_features_t netif_skb_features(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
-	netdev_features_t features = dev->features;
+	netdev_features_t features = netdev_get_active_features(dev);
+	netdev_features_t tmp;
 
 	if (skb_is_gso(skb))
 		features = gso_features_check(skb, dev, features);
@@ -3557,20 +3561,20 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
 	 * features for the netdev
 	 */
 	if (skb->encapsulation)
-		features &= dev->hw_enc_features;
+		features = netdev_hw_enc_features_and(dev, features);
 
-	if (skb_vlan_tagged(skb))
-		features = netdev_intersect_features(features,
-						     dev->vlan_features |
-						     NETIF_F_HW_VLAN_CTAG_TX |
-						     NETIF_F_HW_VLAN_STAG_TX);
+	if (skb_vlan_tagged(skb)) {
+		tmp = netdev_vlan_features_or(dev, netdev_tx_vlan_features);
+
+		features = netdev_intersect_features(features, tmp);
+	}
 
 	if (dev->netdev_ops->ndo_features_check)
-		features &= dev->netdev_ops->ndo_features_check(skb, dev,
-								features);
+		tmp = dev->netdev_ops->ndo_features_check(skb, dev, features);
 	else
-		features &= dflt_features_check(skb, dev, features);
+		tmp = dflt_features_check(skb, dev, features);
 
+	features = netdev_features_and(features, tmp);
 	return harmonize_features(skb, features);
 }
 EXPORT_SYMBOL(netif_skb_features);
@@ -3634,13 +3638,13 @@ int skb_csum_hwoffload_help(struct sk_buff *skb,
 			    const netdev_features_t features)
 {
 	if (unlikely(skb_csum_is_sctp(skb)))
-		return !!(features & NETIF_F_SCTP_CRC) ? 0 :
-			skb_crc32c_csum_help(skb);
+		return netdev_features_test_bit(NETIF_F_SCTP_CRC_BIT, features) ?
+			0 : skb_crc32c_csum_help(skb);
 
-	if (features & NETIF_F_HW_CSUM)
+	if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, features))
 		return 0;
 
-	if (features & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)) {
+	if (netdev_features_intersects(features, netdev_ip_csum_features)) {
 		switch (skb->csum_offset) {
 		case offsetof(struct tcphdr, check):
 		case offsetof(struct udphdr, check):
@@ -4382,7 +4386,7 @@ set_rps_cpu(struct net_device *dev, struct sk_buff *skb,
 
 		/* Should we steer this flow to a different hardware queue? */
 		if (!skb_rx_queue_recorded(skb) || !dev->rx_cpu_rmap ||
-		    !(dev->features & NETIF_F_NTUPLE))
+		    !netdev_active_features_test_bit(dev, NETIF_F_NTUPLE_BIT))
 			goto out;
 		rxq_index = cpu_rmap_lookup_index(dev->rx_cpu_rmap, next_cpu);
 		if (rxq_index == skb_get_rx_queue(skb))
@@ -9813,16 +9817,14 @@ static netdev_features_t netdev_sync_upper_features(struct net_device *lower,
 	struct net_device *upper, netdev_features_t features)
 {
 	netdev_features_t upper_disables = NETIF_F_UPPER_DISABLES;
-	netdev_features_t feature;
 	int feature_bit;
 
 	for_each_netdev_feature(upper_disables, feature_bit) {
-		feature = __NETIF_F_BIT(feature_bit);
-		if (!(upper->wanted_features & feature)
-		    && (features & feature)) {
-			netdev_dbg(lower, "Dropping feature %pNF, upper dev %s has it off.\n",
-				   &feature, upper->name);
-			features &= ~feature;
+		if (!netdev_wanted_features_test_bit(upper, feature_bit) &&
+		    netdev_features_test_bit(feature_bit, features)) {
+			netdev_dbg(lower, "Dropping feature bit %d, upper dev %s has it off.\n",
+				   feature_bit, upper->name);
+			netdev_features_clear_bit(feature_bit, &features);
 		}
 	}
 
@@ -9833,20 +9835,19 @@ static void netdev_sync_lower_features(struct net_device *upper,
 	struct net_device *lower, netdev_features_t features)
 {
 	netdev_features_t upper_disables = NETIF_F_UPPER_DISABLES;
-	netdev_features_t feature;
 	int feature_bit;
 
 	for_each_netdev_feature(upper_disables, feature_bit) {
-		feature = __NETIF_F_BIT(feature_bit);
-		if (!(features & feature) && (lower->features & feature)) {
-			netdev_dbg(upper, "Disabling feature %pNF on lower dev %s.\n",
-				   &feature, lower->name);
-			lower->wanted_features &= ~feature;
+		if (!netdev_features_test_bit(feature_bit, features) &&
+		    netdev_active_features_test_bit(lower, feature_bit)) {
+			netdev_dbg(upper, "Disabling feature bit %d on lower dev %s.\n",
+				   feature_bit, lower->name);
+			netdev_wanted_features_clear_bit(lower, feature_bit);
 			__netdev_update_features(lower);
 
-			if (unlikely(lower->features & feature))
-				netdev_WARN(upper, "failed to disable %pNF on %s!\n",
-					    &feature, lower->name);
+			if (unlikely(netdev_active_features_test_bit(lower, feature_bit))
+				netdev_WARN(upper, "failed to disable feature bit %d on %s!\n",
+					    feature_bit, lower->name);
 			else
 				netdev_features_change(lower);
 		}
@@ -9856,98 +9857,109 @@ static void netdev_sync_lower_features(struct net_device *upper,
 static netdev_features_t netdev_fix_features(struct net_device *dev,
 	netdev_features_t features)
 {
+	netdev_features_t tmp;
+
 	/* Fix illegal checksum combinations */
-	if ((features & NETIF_F_HW_CSUM) &&
-	    (features & (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM))) {
+	if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, features) &&
+	    netdev_features_intersects(features, netdev_ip_csum_features)) {
 		netdev_warn(dev, "mixed HW and IP checksum settings.\n");
-		features &= ~(NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM);
+		features = netdev_features_andnot(features,
+						  netdev_ip_csum_features);
 	}
 
 	/* TSO requires that SG is present as well. */
-	if ((features & NETIF_F_ALL_TSO) && !(features & NETIF_F_SG)) {
+	if (netdev_features_intersects(features, NETIF_F_ALL_TSO) &&
+	    !netdev_features_test_bit(NETIF_F_SG_BIT, features)) {
 		netdev_dbg(dev, "Dropping TSO features since no SG feature.\n");
-		features &= ~NETIF_F_ALL_TSO;
+		features = netdev_features_andnot(features, NETIF_F_ALL_TSO);
 	}
 
-	if ((features & NETIF_F_TSO) && !(features & NETIF_F_HW_CSUM) &&
-					!(features & NETIF_F_IP_CSUM)) {
+	if (netdev_features_test_bit(NETIF_F_TSO_BIT, features) &&
+	    !netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, features) &&
+	    !netdev_features_test_bit(NETIF_F_IP_CSUM_BIT, features)) {
 		netdev_dbg(dev, "Dropping TSO features since no CSUM feature.\n");
-		features &= ~NETIF_F_TSO;
-		features &= ~NETIF_F_TSO_ECN;
+		netdev_features_clear_bit(NETIF_F_TSO_BIT, &features);
+		netdev_features_clear_bit(NETIF_F_TSO_ECN_BIT, &features);
 	}
 
-	if ((features & NETIF_F_TSO6) && !(features & NETIF_F_HW_CSUM) &&
-					 !(features & NETIF_F_IPV6_CSUM)) {
+	if (netdev_features_test_bit(NETIF_F_TSO6_BIT, features) &&
+	    !netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, features) &&
+	    !!netdev_features_test_bit(NETIF_F_IPV6_CSUM_BIT, features)) {
 		netdev_dbg(dev, "Dropping TSO6 features since no CSUM feature.\n");
-		features &= ~NETIF_F_TSO6;
+		netdev_features_clear_bit(NETIF_F_TSO6_BIT, &features);
 	}
 
 	/* TSO with IPv4 ID mangling requires IPv4 TSO be enabled */
-	if ((features & NETIF_F_TSO_MANGLEID) && !(features & NETIF_F_TSO))
-		features &= ~NETIF_F_TSO_MANGLEID;
+	if (netdev_features_test_bit(NETIF_F_TSO_MANGLEID_BIT, features) &&
+	    !netdev_features_test_bit(NETIF_F_TSO_BIT, features))
+		netdev_features_clear_bit(NETIF_F_TSO_MANGLEID_BIT, &features);
 
 	/* TSO ECN requires that TSO is present as well. */
-	if ((features & NETIF_F_ALL_TSO) == NETIF_F_TSO_ECN)
-		features &= ~NETIF_F_TSO_ECN;
+	tmp = netdev_features_and(features, NETIF_F_ALL_TSO);
+	if (netdev_features_equal(tmp, netdev_tso_ecn_features)
+		features = netdev_features_andnot(features,
+						  netdev_tso_ecn_features);
 
 	/* Software GSO depends on SG. */
-	if ((features & NETIF_F_GSO) && !(features & NETIF_F_SG)) {
+	if (netdev_features_test_bit(NETIF_F_GSO_BIT, features) &&
+	    !netdev_features_test_bit(NETIF_F_SG_BIT, features)) {
 		netdev_dbg(dev, "Dropping NETIF_F_GSO since no SG feature.\n");
-		features &= ~NETIF_F_GSO;
+		netdev_features_clear_bit(NETIF_F_GSO_BIT, &features);
 	}
 
 	/* GSO partial features require GSO partial be set */
-	if ((features & dev->gso_partial_features) &&
-	    !(features & NETIF_F_GSO_PARTIAL)) {
+	if (netdev_gso_partial_features_intersects(dev, features) &&
+	    !netdev_features_test_bit(NETIF_F_GSO_PARTIAL_BIT, features)) {
 		netdev_dbg(dev,
 			   "Dropping partially supported GSO features since no GSO partial.\n");
-		features &= ~dev->gso_partial_features;
+		features = netdev_gso_partial_features_andnot_r(dev, features);
 	}
 
-	if (!(features & NETIF_F_RXCSUM)) {
+	if (!netdev_features_test_bit(NETIF_F_RXCSUM_BIT, features)) {
 		/* NETIF_F_GRO_HW implies doing RXCSUM since every packet
 		 * successfully merged by hardware must also have the
 		 * checksum verified by hardware.  If the user does not
 		 * want to enable RXCSUM, logically, we should disable GRO_HW.
 		 */
-		if (features & NETIF_F_GRO_HW) {
+		if (netdev_features_test_bit(NETIF_F_GRO_HW_BIT, features)) {
 			netdev_dbg(dev, "Dropping NETIF_F_GRO_HW since no RXCSUM feature.\n");
-			features &= ~NETIF_F_GRO_HW;
+			netdev_features_clear_bit(NETIF_F_GRO_HW_BIT, &features);
 		}
 	}
 
 	/* LRO/HW-GRO features cannot be combined with RX-FCS */
-	if (features & NETIF_F_RXFCS) {
-		if (features & NETIF_F_LRO) {
+	if (netdev_features_test_bit(NETIF_F_RXFCS_BIT, features)) {
+		if (netdev_features_test_bit(NETIF_F_LRO_BIT, features)) {
 			netdev_dbg(dev, "Dropping LRO feature since RX-FCS is requested.\n");
-			features &= ~NETIF_F_LRO;
+			netdev_features_clear_bit(NETIF_F_LRO_BIT, &features);
 		}
 
-		if (features & NETIF_F_GRO_HW) {
+		if (netdev_features_test_bit(NETIF_F_GRO_HW_BIT, features)) {
 			netdev_dbg(dev, "Dropping HW-GRO feature since RX-FCS is requested.\n");
-			features &= ~NETIF_F_GRO_HW;
+			netdev_features_clear_bit(NETIF_F_GRO_HW_BIT, &features);
 		}
 	}
 
-	if ((features & NETIF_F_GRO_HW) && (features & NETIF_F_LRO)) {
+	if (netdev_features_test_bit(NETIF_F_GRO_HW_BIT, features) &&
+	    netdev_features_test_bit(NETIF_F_LRO_BIT, features)) {
 		netdev_dbg(dev, "Dropping LRO feature since HW-GRO is requested.\n");
-		features &= ~NETIF_F_LRO;
+		netdev_features_clear_bit(NETIF_F_LRO_BIT, &features);
 	}
 
-	if (features & NETIF_F_HW_TLS_TX) {
-		bool ip_csum = (features & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)) ==
-			(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
-		bool hw_csum = features & NETIF_F_HW_CSUM;
+	if (netdev_features_test_bit(NETIF_F_HW_TLS_TX_BIT, features)) {
+		bool ip_csum = netdev_features_subset(features, netdev_ip_csum_features);
+		bool hw_csum = netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, features);
 
 		if (!ip_csum && !hw_csum) {
 			netdev_dbg(dev, "Dropping TLS TX HW offload feature since no CSUM feature.\n");
-			features &= ~NETIF_F_HW_TLS_TX;
+			netdev_features_clear_bit(NETIF_F_HW_TLS_TX_BIT, &features);
 		}
 	}
 
-	if ((features & NETIF_F_HW_TLS_RX) && !(features & NETIF_F_RXCSUM)) {
+	if (netdev_features_test_bit(NETIF_F_HW_TLS_RX_BIT, features) &&
+	    !netdev_features_test_bit(NETIF_F_RXCSUM_BIT, features)) {
 		netdev_dbg(dev, "Dropping TLS RX HW offload feature since no RXCSUM feature.\n");
-		features &= ~NETIF_F_HW_TLS_RX;
+		netdev_features_clear_bit(NETIF_F_HW_TLS_RX_BIT, &features);
 	}
 
 	return features;
@@ -9974,7 +9986,7 @@ int __netdev_update_features(struct net_device *dev)
 	netdev_for_each_upper_dev_rcu(dev, upper, iter)
 		features = netdev_sync_upper_features(dev, upper, features);
 
-	if (dev->features == features)
+	if (netdev_active_features_equal(dev, features))
 		goto sync_lower;
 
 	netdev_dbg(dev, "Features changed: %pNF -> %pNF\n",
@@ -10003,9 +10015,9 @@ sync_lower:
 		netdev_sync_lower_features(dev, lower, features);
 
 	if (!err) {
-		netdev_features_t diff = features ^ dev->features;
+		netdev_features_t diff = netdev_active_features_xor(dev, features);
 
-		if (diff & NETIF_F_RX_UDP_TUNNEL_PORT) {
+		if (netdev_features_test_bit(NETIF_F_RX_UDP_TUNNEL_PORT_BIT, diff)) {
 			/* udp_tunnel_{get,drop}_rx_info both need
 			 * NETIF_F_RX_UDP_TUNNEL_PORT enabled on the
 			 * device, or they won't do anything.
@@ -10013,33 +10025,36 @@ sync_lower:
 			 * *before* calling udp_tunnel_get_rx_info,
 			 * but *after* calling udp_tunnel_drop_rx_info.
 			 */
-			if (features & NETIF_F_RX_UDP_TUNNEL_PORT) {
-				dev->features = features;
+			if (netdev_features_test_bit(NETIF_F_RX_UDP_TUNNEL_PORT_BIT,
+						     features)) {
+				netdev_set_active_features(dev, features);
 				udp_tunnel_get_rx_info(dev);
 			} else {
 				udp_tunnel_drop_rx_info(dev);
 			}
 		}
 
-		if (diff & NETIF_F_HW_VLAN_CTAG_FILTER) {
-			if (features & NETIF_F_HW_VLAN_CTAG_FILTER) {
-				dev->features = features;
+		if (netdev_features_test_bit(NETIF_F_HW_VLAN_CTAG_FILTER_BIT, diff)) {
+			if (netdev_features_test_bit(NETIF_F_HW_VLAN_CTAG_FILTER_BIT,
+						     features)) {
+				netdev_set_active_features(dev, features);
 				err |= vlan_get_rx_ctag_filter_info(dev);
 			} else {
 				vlan_drop_rx_ctag_filter_info(dev);
 			}
 		}
 
-		if (diff & NETIF_F_HW_VLAN_STAG_FILTER) {
-			if (features & NETIF_F_HW_VLAN_STAG_FILTER) {
-				dev->features = features;
+		if (netdev_features_test_bit(NETIF_F_HW_VLAN_STAG_FILTER_BIT, diff)) {
+			if (netdev_features_test_bit(NETIF_F_HW_VLAN_STAG_FILTER_BIT,
+						     features)) {
+				netdev_set_active_features(dev, features);
 				err |= vlan_get_rx_stag_filter_info(dev);
 			} else {
 				vlan_drop_rx_stag_filter_info(dev);
 			}
 		}
 
-		dev->features = features;
+		netdev_set_active_features(dev, features);
 	}
 
 	return err < 0 ? 0 : 1;
@@ -10227,6 +10242,7 @@ int register_netdevice(struct net_device *dev)
 {
 	int ret;
 	struct net *net = dev_net(dev);
+	netdev_features_t features;
 
 	BUILD_BUG_ON(sizeof(netdev_features_t) * BITS_PER_BYTE <
 		     NETDEV_FEATURE_COUNT);
@@ -10265,8 +10281,8 @@ int register_netdevice(struct net_device *dev)
 		}
 	}
 
-	if (((dev->hw_features | dev->features) &
-	     NETIF_F_HW_VLAN_CTAG_FILTER) &&
+	if ((netdev_hw_features_test_bit(dev, NETIF_F_HW_VLAN_CTAG_FILTER_BIT) ||
+	     netdev_active_features_test_bit(dev, NETIF_F_HW_VLAN_CTAG_FILTER_BIT)) &&
 	    (!dev->netdev_ops->ndo_vlan_rx_add_vid ||
 	     !dev->netdev_ops->ndo_vlan_rx_kill_vid)) {
 		netdev_WARN(dev, "Buggy VLAN acceleration in driver!\n");
@@ -10283,44 +10299,48 @@ int register_netdevice(struct net_device *dev)
 	/* Transfer changeable features to wanted_features and enable
 	 * software offloads (GSO and GRO).
 	 */
-	dev->hw_features |= (NETIF_F_SOFT_FEATURES | NETIF_F_SOFT_FEATURES_OFF);
-	dev->features |= NETIF_F_SOFT_FEATURES;
+	netdev_hw_features_direct_or(dev, NETIF_F_SOFT_FEATURES);
+	netdev_hw_features_direct_or(dev, NETIF_F_SOFT_FEATURES_OFF);
+	netdev_active_features_direct_or(dev, NETIF_F_SOFT_FEATURES);
 
 	if (dev->udp_tunnel_nic_info) {
-		dev->features |= NETIF_F_RX_UDP_TUNNEL_PORT;
-		dev->hw_features |= NETIF_F_RX_UDP_TUNNEL_PORT;
+		netdev_active_features_set_bit(dev, NETIF_F_RX_UDP_TUNNEL_PORT_BIT);
+		netdev_hw_features_set_bit(dev, NETIF_F_RX_UDP_TUNNEL_PORT_BIT);
 	}
 
-	dev->wanted_features = dev->features & dev->hw_features;
+	features = netdev_get_active_features(dev);
+	features = netdev_hw_features_and(dev, features);
+	netdev_set_wanted_features(features);
 
 	if (!(dev->flags & IFF_LOOPBACK))
-		dev->hw_features |= NETIF_F_NOCACHE_COPY;
+		netdev_hw_features_clear_bit(dev, NETIF_F_NOCACHE_COPY_BIT);
 
 	/* If IPv4 TCP segmentation offload is supported we should also
 	 * allow the device to enable segmenting the frame with the option
 	 * of ignoring a static IP ID value.  This doesn't enable the
 	 * feature itself but allows the user to enable it later.
 	 */
-	if (dev->hw_features & NETIF_F_TSO)
-		dev->hw_features |= NETIF_F_TSO_MANGLEID;
-	if (dev->vlan_features & NETIF_F_TSO)
-		dev->vlan_features |= NETIF_F_TSO_MANGLEID;
-	if (dev->mpls_features & NETIF_F_TSO)
-		dev->mpls_features |= NETIF_F_TSO_MANGLEID;
-	if (dev->hw_enc_features & NETIF_F_TSO)
-		dev->hw_enc_features |= NETIF_F_TSO_MANGLEID;
+	if (netdev_hw_features_test_bit(dev, NETIF_F_TSO_BIT))
+		netdev_hw_features_set_bit(dev, NETIF_F_TSO_MANGLEID_BIT);
+	if (netdev_vlan_features_test_bit(dev, NETIF_F_TSO_BIT))
+		netdev_vlan_features_set_bit(dev, NETIF_F_TSO_MANGLEID_BIT);
+	if (netdev_mpls_features_test_bit(dev, NETIF_F_TSO_BIT))
+		netdev_mpls_features_set_bit(dev, NETIF_F_TSO_MANGLEID_BIT);
+	if (netdev_hw_enc_features_test_bit(dev, NETIF_F_TSO_BIT))
+		netdev_hw_enc_features_set_bit(dev, NETIF_F_TSO_MANGLEID_BIT);
 
 	/* Make NETIF_F_HIGHDMA inheritable to VLAN devices.
 	 */
-	dev->vlan_features |= NETIF_F_HIGHDMA;
+	netdev_vlan_features_set_bit(dev, NETIF_F_HIGHDMA_BIT);
 
 	/* Make NETIF_F_SG inheritable to tunnel devices.
 	 */
-	dev->hw_enc_features |= NETIF_F_SG | NETIF_F_GSO_PARTIAL;
+	netdev_hw_enc_features_set_bit(dev, NETIF_F_SG_BIT);
+	netdev_hw_enc_features_set_bit(dev, NETIF_F_GSO_PARTIAL_BIT);
 
 	/* Make NETIF_F_SG inheritable to MPLS.
 	 */
-	dev->mpls_features |= NETIF_F_SG;
+	netdev_mpls_features_set_bit(dev, NETIF_F_SG_BIT);
 
 	ret = call_netdevice_notifiers(NETDEV_POST_INIT, dev);
 	ret = notifier_to_errno(ret);
@@ -11161,7 +11181,7 @@ int __dev_change_net_namespace(struct net_device *dev, struct net *net,
 
 	/* Don't allow namespace local devices to be moved. */
 	err = -EINVAL;
-	if (dev->features & NETIF_F_NETNS_LOCAL)
+	if (netdev_active_features_test_bit(dev, NETIF_F_NETNS_LOCAL_BIT))
 		goto out;
 
 	/* Ensure the device has been registrered */
@@ -11357,16 +11377,29 @@ static int dev_cpu_dead(unsigned int oldcpu)
 netdev_features_t netdev_increment_features(netdev_features_t all,
 	netdev_features_t one, netdev_features_t mask)
 {
-	if (mask & NETIF_F_HW_CSUM)
-		mask |= NETIF_F_CSUM_MASK;
-	mask |= NETIF_F_VLAN_CHALLENGED;
+	netdev_features_t tmp;
 
-	all |= one & (NETIF_F_ONE_FOR_ALL | NETIF_F_CSUM_MASK) & mask;
-	all &= one | ~NETIF_F_ALL_FOR_ALL;
+	if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, mask))
+		mask = netdev_features_or(mask, NETIF_F_CSUM_MASK);
+	netdev_features_set_bit(NETIF_F_VLAN_CHALLENGED_BIT, &mask);
+
+	tmp = netdev_features_or(NETIF_F_ONE_FOR_ALL, NETIF_F_CSUM_MASK);
+	tmp = netdev_features_and(tmp, one);
+	tmp = netdev_features_and(tmp, mask);
+	all = netdev_features_or(tmp, all);
+
+	tmp = netdev_features_fill(&tmp);
+	tmp = netdev_features_andnot(tmp, NETIF_F_ALL_FOR_ALL);
+	tmp = netdev_features_or(tmp, one);
+	all = netdev_features_and(tmp, all);
 
 	/* If one device supports hw checksumming, set for all. */
-	if (all & NETIF_F_HW_CSUM)
-		all &= ~(NETIF_F_CSUM_MASK & ~NETIF_F_HW_CSUM);
+	if (netdev_features_test_bit(NETIF_F_HW_CSUM_BIT, all)) {
+		tmp = netdev_features_fill(&tmp);
+		netdev_features_clear_bit(NETIF_F_HW_CSUM_BIT, &tmp);
+		tmp = netdev_features_and(tmp, NETIF_F_CSUM_MASK);
+		all = netdev_features_andnot(all, tmp);
+	}
 
 	return all;
 }
@@ -11494,6 +11527,85 @@ define_netdev_printk_level(netdev_err, KERN_ERR);
 define_netdev_printk_level(netdev_warn, KERN_WARNING);
 define_netdev_printk_level(netdev_notice, KERN_NOTICE);
 define_netdev_printk_level(netdev_info, KERN_INFO);
+
+static void netdev_features_init(void)
+{
+	netdev_features_t features;
+
+	netdev_features_set_array(netif_f_never_change_array,
+				  ARRAY_SIZE(netif_f_never_change_array),
+				  &netdev_never_change_features);
+
+	netdev_features_set_array(netif_f_gso_mask_array,
+				  ARRAY_SIZE(netif_f_gso_mask_array),
+				  &netdev_gso_mask_features);
+
+	netdev_features_set_array(netif_f_ip_csum_array,
+				  ARRAY_SIZE(netif_f_ip_csum_array),
+				  &netdev_ip_csum_features);
+
+	netdev_features_set_array(netif_f_csum_mask_array,
+				  ARRAY_SIZE(netif_f_csum_mask_array),
+				  &netdev_csum_mask_features);
+
+	netdev_features_set_array(netif_f_all_tso_array,
+				  ARRAY_SIZE(netif_f_all_tso_array),
+				  &netdev_all_tso_features);
+
+	netdev_features_set_array(netif_f_tso_ecn_array,
+				  ARRAY_SIZE(netif_f_tso_ecn_array),
+				  &netdev_tso_ecn_features);
+
+	netdev_features_set_array(netif_f_all_fcoe_array,
+				  ARRAY_SIZE(netif_f_all_fcoe_array),
+				  &netdev_all_fcoe_features);
+
+	netdev_features_set_array(netif_f_gso_soft_array,
+				  ARRAY_SIZE(netif_f_gso_soft_array),
+				  &netdev_gso_software_features);
+
+	netdev_features_set_array(netif_f_one_for_all_array,
+				  ARRAY_SIZE(netif_f_one_for_all_array),
+				  &netdev_one_for_all_features);
+
+	netdev_features_set_array(netif_f_all_for_all_array,
+				  ARRAY_SIZE(netif_f_all_for_all_array),
+				  &netdev_all_for_all_features);
+
+	netdev_features_set_array(netif_f_upper_disables_array,
+				  ARRAY_SIZE(netif_f_upper_disables_array),
+				  &netdev_upper_disables_features);
+
+	netdev_features_set_array(netif_f_soft_array,
+				  ARRAY_SIZE(netif_f_soft_array),
+				  &netdev_soft_features);
+
+	netdev_features_set_array(netif_f_soft_off_array,
+				  ARRAY_SIZE(netif_f_soft_off_array),
+				  &netdev_soft_off_features);
+
+	netdev_features_set_array(netif_f_tx_vlan_array,
+				  ARRAY_SIZE(netif_f_tx_vlan_array),
+				  &netdev_tx_vlan_features);
+
+	netdev_features_set_array(netif_f_tx_vlan_array,
+				  ARRAY_SIZE(netif_f_tx_vlan_array),
+				  &netdev_vlan_features);
+	netdev_features_set_array(netif_f_rx_vlan_array,
+				  ARRAY_SIZE(netif_f_rx_vlan_array),
+				  &netdev_vlan_features);
+	netdev_features_set_array(netif_f_vlan_filter_array,
+				  ARRAY_SIZE(netif_f_vlan_filter_array),
+				  &netdev_vlan_features);
+
+	netdev_features_set_array(netif_f_gso_encap_array,
+				  ARRAY_SIZE(netif_f_gso_encap_array),
+				  &netdev_gso_encap_features);
+
+	netdev_features_fill(&features);
+	netdev_ethtool_features =
+		netdev_features_andnot(features, netdev_never_change_features);
+}
 
 static void __net_exit netdev_exit(struct net *net)
 {
@@ -11641,6 +11753,8 @@ static int __init net_dev_init(void)
 
 	if (register_pernet_subsys(&netdev_net_ops))
 		goto out;
+
+	netdev_features_init();
 
 	/*
 	 *	Initialise the packet receive queues.

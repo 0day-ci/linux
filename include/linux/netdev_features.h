@@ -9,8 +9,6 @@
 #include <linux/bitops.h>
 #include <asm/byteorder.h>
 
-typedef u64 netdev_features_t;
-
 enum {
 	NETIF_F_SG_BIT,			/* Scatter/gather IO. */
 	NETIF_F_IP_CSUM_BIT,		/* Can checksum TCP/UDP over IPv4. */
@@ -101,164 +99,189 @@ enum {
 	/**/NETDEV_FEATURE_COUNT
 };
 
-/* copy'n'paste compression ;) */
-#define __NETIF_F_BIT(bit)	((netdev_features_t)1 << (bit))
-#define __NETIF_F(name)		__NETIF_F_BIT(NETIF_F_##name##_BIT)
-
-#define NETIF_F_FCOE_CRC	__NETIF_F(FCOE_CRC)
-#define NETIF_F_FCOE_MTU	__NETIF_F(FCOE_MTU)
-#define NETIF_F_FRAGLIST	__NETIF_F(FRAGLIST)
-#define NETIF_F_FSO		__NETIF_F(FSO)
-#define NETIF_F_GRO		__NETIF_F(GRO)
-#define NETIF_F_GRO_HW		__NETIF_F(GRO_HW)
-#define NETIF_F_GSO		__NETIF_F(GSO)
-#define NETIF_F_GSO_ROBUST	__NETIF_F(GSO_ROBUST)
-#define NETIF_F_HIGHDMA		__NETIF_F(HIGHDMA)
-#define NETIF_F_HW_CSUM		__NETIF_F(HW_CSUM)
-#define NETIF_F_HW_VLAN_CTAG_FILTER __NETIF_F(HW_VLAN_CTAG_FILTER)
-#define NETIF_F_HW_VLAN_CTAG_RX	__NETIF_F(HW_VLAN_CTAG_RX)
-#define NETIF_F_HW_VLAN_CTAG_TX	__NETIF_F(HW_VLAN_CTAG_TX)
-#define NETIF_F_IP_CSUM		__NETIF_F(IP_CSUM)
-#define NETIF_F_IPV6_CSUM	__NETIF_F(IPV6_CSUM)
-#define NETIF_F_LLTX		__NETIF_F(LLTX)
-#define NETIF_F_LOOPBACK	__NETIF_F(LOOPBACK)
-#define NETIF_F_LRO		__NETIF_F(LRO)
-#define NETIF_F_NETNS_LOCAL	__NETIF_F(NETNS_LOCAL)
-#define NETIF_F_NOCACHE_COPY	__NETIF_F(NOCACHE_COPY)
-#define NETIF_F_NTUPLE		__NETIF_F(NTUPLE)
-#define NETIF_F_RXCSUM		__NETIF_F(RXCSUM)
-#define NETIF_F_RXHASH		__NETIF_F(RXHASH)
-#define NETIF_F_SCTP_CRC	__NETIF_F(SCTP_CRC)
-#define NETIF_F_SG		__NETIF_F(SG)
-#define NETIF_F_TSO6		__NETIF_F(TSO6)
-#define NETIF_F_TSO_ECN		__NETIF_F(TSO_ECN)
-#define NETIF_F_TSO		__NETIF_F(TSO)
-#define NETIF_F_VLAN_CHALLENGED	__NETIF_F(VLAN_CHALLENGED)
-#define NETIF_F_RXFCS		__NETIF_F(RXFCS)
-#define NETIF_F_RXALL		__NETIF_F(RXALL)
-#define NETIF_F_GSO_GRE		__NETIF_F(GSO_GRE)
-#define NETIF_F_GSO_GRE_CSUM	__NETIF_F(GSO_GRE_CSUM)
-#define NETIF_F_GSO_IPXIP4	__NETIF_F(GSO_IPXIP4)
-#define NETIF_F_GSO_IPXIP6	__NETIF_F(GSO_IPXIP6)
-#define NETIF_F_GSO_UDP_TUNNEL	__NETIF_F(GSO_UDP_TUNNEL)
-#define NETIF_F_GSO_UDP_TUNNEL_CSUM __NETIF_F(GSO_UDP_TUNNEL_CSUM)
-#define NETIF_F_TSO_MANGLEID	__NETIF_F(TSO_MANGLEID)
-#define NETIF_F_GSO_PARTIAL	 __NETIF_F(GSO_PARTIAL)
-#define NETIF_F_GSO_TUNNEL_REMCSUM __NETIF_F(GSO_TUNNEL_REMCSUM)
-#define NETIF_F_GSO_SCTP	__NETIF_F(GSO_SCTP)
-#define NETIF_F_GSO_ESP		__NETIF_F(GSO_ESP)
-#define NETIF_F_GSO_UDP		__NETIF_F(GSO_UDP)
-#define NETIF_F_HW_VLAN_STAG_FILTER __NETIF_F(HW_VLAN_STAG_FILTER)
-#define NETIF_F_HW_VLAN_STAG_RX	__NETIF_F(HW_VLAN_STAG_RX)
-#define NETIF_F_HW_VLAN_STAG_TX	__NETIF_F(HW_VLAN_STAG_TX)
-#define NETIF_F_HW_L2FW_DOFFLOAD	__NETIF_F(HW_L2FW_DOFFLOAD)
-#define NETIF_F_HW_TC		__NETIF_F(HW_TC)
-#define NETIF_F_HW_ESP		__NETIF_F(HW_ESP)
-#define NETIF_F_HW_ESP_TX_CSUM	__NETIF_F(HW_ESP_TX_CSUM)
-#define	NETIF_F_RX_UDP_TUNNEL_PORT  __NETIF_F(RX_UDP_TUNNEL_PORT)
-#define NETIF_F_HW_TLS_RECORD	__NETIF_F(HW_TLS_RECORD)
-#define NETIF_F_GSO_UDP_L4	__NETIF_F(GSO_UDP_L4)
-#define NETIF_F_HW_TLS_TX	__NETIF_F(HW_TLS_TX)
-#define NETIF_F_HW_TLS_RX	__NETIF_F(HW_TLS_RX)
-#define NETIF_F_GRO_FRAGLIST	__NETIF_F(GRO_FRAGLIST)
-#define NETIF_F_GSO_FRAGLIST	__NETIF_F(GSO_FRAGLIST)
-#define NETIF_F_HW_MACSEC	__NETIF_F(HW_MACSEC)
-#define NETIF_F_GRO_UDP_FWD	__NETIF_F(GRO_UDP_FWD)
-#define NETIF_F_HW_HSR_TAG_INS	__NETIF_F(HW_HSR_TAG_INS)
-#define NETIF_F_HW_HSR_TAG_RM	__NETIF_F(HW_HSR_TAG_RM)
-#define NETIF_F_HW_HSR_FWD	__NETIF_F(HW_HSR_FWD)
-#define NETIF_F_HW_HSR_DUP	__NETIF_F(HW_HSR_DUP)
-
-/* Finds the next feature with the highest number of the range of start till 0.
- */
-static inline int find_next_netdev_feature(u64 feature, unsigned long start)
-{
-	/* like BITMAP_LAST_WORD_MASK() for u64
-	 * this sets the most significant 64 - start to 0.
-	 */
-	feature &= ~0ULL >> (-start & ((sizeof(feature) * 8) - 1));
-
-	return fls64(feature) - 1;
-}
+typedef struct {
+	DECLARE_BITMAP(bits, NETDEV_FEATURE_COUNT);
+} netdev_features_t;
 
 /* This goes for the MSB to the LSB through the set feature bits,
  * mask_addr should be a u64 and bit an int
  */
 #define for_each_netdev_feature(mask_addr, bit)				\
-	for ((bit) = find_next_netdev_feature((mask_addr),		\
-					      NETDEV_FEATURE_COUNT);	\
-	     (bit) >= 0;						\
-	     (bit) = find_next_netdev_feature((mask_addr), (bit) - 1))
+	for_each_set_bit(bit, (unsigned long *)(mask_addr.bits), NETDEV_FEATURE_COUNT)
+
+extern netdev_features_t netdev_ethtool_features __ro_after_init;
+extern netdev_features_t netdev_never_change_features __ro_after_init;
+extern netdev_features_t netdev_gso_mask_features __ro_after_init;
+extern netdev_features_t netdev_ip_csum_features __ro_after_init;
+extern netdev_features_t netdev_csum_mask_features __ro_after_init;
+extern netdev_features_t netdev_all_tso_features __ro_after_init;
+extern netdev_features_t netdev_tso_ecn_features __ro_after_init;
+extern netdev_features_t netdev_all_fcoe_features __ro_after_init;
+extern netdev_features_t netdev_gso_software_features __ro_after_init;
+extern netdev_features_t netdev_one_for_all_features __ro_after_init;
+extern netdev_features_t netdev_all_for_all_features __ro_after_init;
+extern netdev_features_t netdev_upper_disable_features __ro_after_init;
+extern netdev_features_t netdev_soft_features __ro_after_init;
+extern netdev_features_t netdev_soft_off_features __ro_after_init;
+extern netdev_features_t netdev_vlan_features __ro_after_init;
+extern netdev_features_t netdev_tx_vlan_features __ro_after_init;
+extern netdev_features_t netdev_gso_encap_all_features __ro_after_init;
 
 /* Features valid for ethtool to change */
 /* = all defined minus driver/device-class-related */
-#define NETIF_F_NEVER_CHANGE	(NETIF_F_VLAN_CHALLENGED | \
-				 NETIF_F_LLTX | NETIF_F_NETNS_LOCAL)
+#define NETIF_F_NEVER_CHANGE	netdev_never_change_features
 
-/* remember that ((t)1 << t_BITS) is undefined in C99 */
-#define NETIF_F_ETHTOOL_BITS	((__NETIF_F_BIT(NETDEV_FEATURE_COUNT - 1) | \
-		(__NETIF_F_BIT(NETDEV_FEATURE_COUNT - 1) - 1)) & \
-		~NETIF_F_NEVER_CHANGE)
+#define NETIF_F_ETHTOOL_BITS	netdev_ethtool_features
 
 /* Segmentation offload feature mask */
-#define NETIF_F_GSO_MASK	(__NETIF_F_BIT(NETIF_F_GSO_LAST + 1) - \
-		__NETIF_F_BIT(NETIF_F_GSO_SHIFT))
+#define NETIF_F_GSO_MASK	netdev_gso_mask_features
 
 /* List of IP checksum features. Note that NETIF_F_HW_CSUM should not be
  * set in features when NETIF_F_IP_CSUM or NETIF_F_IPV6_CSUM are set--
  * this would be contradictory
  */
-#define NETIF_F_CSUM_MASK	(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | \
-				 NETIF_F_HW_CSUM)
+#define NETIF_F_CSUM_MASK	netdev_csum_mask_features
 
-#define NETIF_F_ALL_TSO 	(NETIF_F_TSO | NETIF_F_TSO6 | \
-				 NETIF_F_TSO_ECN | NETIF_F_TSO_MANGLEID)
+#define NETIF_F_ALL_TSO		netdev_all_tso_features
 
-#define NETIF_F_ALL_FCOE	(NETIF_F_FCOE_CRC | NETIF_F_FCOE_MTU | \
-				 NETIF_F_FSO)
+#define NETIF_F_ALL_FCOE	netdev_all_fcoe_features
 
 /* List of features with software fallbacks. */
-#define NETIF_F_GSO_SOFTWARE	(NETIF_F_ALL_TSO | NETIF_F_GSO_SCTP |	     \
-				 NETIF_F_GSO_UDP_L4 | NETIF_F_GSO_FRAGLIST)
+#define NETIF_F_GSO_SOFTWARE	netdev_gso_software_features
 
 /*
  * If one device supports one of these features, then enable them
  * for all in netdev_increment_features.
  */
-#define NETIF_F_ONE_FOR_ALL	(NETIF_F_GSO_SOFTWARE | NETIF_F_GSO_ROBUST | \
-				 NETIF_F_SG | NETIF_F_HIGHDMA |		\
-				 NETIF_F_FRAGLIST | NETIF_F_VLAN_CHALLENGED)
+#define NETIF_F_ONE_FOR_ALL	netdev_one_for_all_features
 
 /*
  * If one device doesn't support one of these features, then disable it
  * for all in netdev_increment_features.
  */
-#define NETIF_F_ALL_FOR_ALL	(NETIF_F_NOCACHE_COPY | NETIF_F_FSO)
+#define NETIF_F_ALL_FOR_ALL	netdev_all_for_all_features
 
 /*
  * If upper/master device has these features disabled, they must be disabled
  * on all lower/slave devices as well.
  */
-#define NETIF_F_UPPER_DISABLES	NETIF_F_LRO
+#define NETIF_F_UPPER_DISABLES	netdev_upper_disable_features
 
 /* changeable features with no special hardware requirements */
-#define NETIF_F_SOFT_FEATURES	(NETIF_F_GSO | NETIF_F_GRO)
+#define NETIF_F_SOFT_FEATURES	netdev_soft_features
 
 /* Changeable features with no special hardware requirements that defaults to off. */
-#define NETIF_F_SOFT_FEATURES_OFF	(NETIF_F_GRO_FRAGLIST | NETIF_F_GRO_UDP_FWD)
+#define NETIF_F_SOFT_FEATURES_OFF	netdev_soft_off_features
 
-#define NETIF_F_VLAN_FEATURES	(NETIF_F_HW_VLAN_CTAG_FILTER | \
-				 NETIF_F_HW_VLAN_CTAG_RX | \
-				 NETIF_F_HW_VLAN_CTAG_TX | \
-				 NETIF_F_HW_VLAN_STAG_FILTER | \
-				 NETIF_F_HW_VLAN_STAG_RX | \
-				 NETIF_F_HW_VLAN_STAG_TX)
+#define NETIF_F_VLAN_FEATURES	netdev_vlan_features
 
-#define NETIF_F_GSO_ENCAP_ALL	(NETIF_F_GSO_GRE |			\
-				 NETIF_F_GSO_GRE_CSUM |			\
-				 NETIF_F_GSO_IPXIP4 |			\
-				 NETIF_F_GSO_IPXIP6 |			\
-				 NETIF_F_GSO_UDP_TUNNEL |		\
-				 NETIF_F_GSO_UDP_TUNNEL_CSUM)
+#define NETIF_F_GSO_ENCAP_ALL	netdev_gso_encap_all_features
+
+static inline void netdev_features_zero(netdev_features_t *dst)
+{
+	bitmap_zero(dst->bits, NETDEV_FEATURE_COUNT);
+}
+
+static inline void netdev_features_fill(netdev_features_t *dst)
+{
+	bitmap_fill(dst->bits, NETDEV_FEATURE_COUNT);
+}
+
+static inline bool netdev_features_empty(netdev_features_t src)
+{
+	return bitmap_empty(src.bits, NETDEV_FEATURE_COUNT);
+}
+
+static inline bool netdev_features_equal(netdev_features_t src1,
+					 netdev_features_t src2)
+{
+	return bitmap_equal(src1.bits, src2.bits, NETDEV_FEATURE_COUNT);
+}
+
+static inline netdev_features_t
+netdev_features_and(netdev_features_t a, netdev_features_t b)
+{
+	netdev_features_t dst;
+
+	bitmap_and(dst.bits, a.bits, b.bits, NETDEV_FEATURE_COUNT);
+	return dst;
+}
+
+static inline netdev_features_t
+netdev_features_or(netdev_features_t a, netdev_features_t b)
+{
+	netdev_features_t dst;
+
+	bitmap_or(dst.bits, a.bits, b.bits, NETDEV_FEATURE_COUNT);
+	return dst;
+}
+
+static inline netdev_features_t
+netdev_features_xor(netdev_features_t a, netdev_features_t b)
+{
+	netdev_features_t dst;
+
+	bitmap_xor(dst.bits, a.bits, b.bits, NETDEV_FEATURE_COUNT);
+	return dst;
+}
+
+static inline netdev_features_t
+netdev_features_andnot(netdev_features_t a, netdev_features_t b)
+{
+	netdev_features_t dst;
+
+	bitmap_andnot(dst.bits, a.bits, b.bits, NETDEV_FEATURE_COUNT);
+	return dst;
+}
+
+static inline void netdev_features_set_bit(int nr, netdev_features_t *src)
+{
+	__set_bit(nr, src->bits);
+}
+
+static inline void netdev_features_clear_bit(int nr, netdev_features_t *src)
+{
+	__clear_bit(nr, src->bits);
+}
+
+static inline void netdev_features_mod_bit(int nr, netdev_features_t *src,
+					   int set)
+{
+	if (set)
+		netdev_features_set_bit(nr, src);
+	else
+		netdev_features_clear_bit(nr, src);
+}
+
+static inline void netdev_features_change_bit(int nr, netdev_features_t *src)
+{
+	__change_bit(nr, src->bits);
+}
+
+static inline bool netdev_features_test_bit(int nr, netdev_features_t src)
+{
+	return test_bit(nr, src.bits);
+}
+
+static inline void netdev_features_set_array(const int *array, int array_size,
+					     netdev_features_t *src)
+{
+	int i;
+
+	for (i = 0; i < array_size; i++)
+		netdev_features_set_bit(array[i], src);
+}
+
+static inline bool netdev_features_intersects(netdev_features_t src1,
+					      netdev_features_t src2)
+{
+	return bitmap_intersects(src1.bits, src2.bits, NETDEV_FEATURE_COUNT);
+}
+
+static inline bool netdev_features_subset(netdev_features_t src1,
+					  netdev_features_t src2)
+{
+	return bitmap_subset(src1.bits, src2.bits, NETDEV_FEATURE_COUNT);
+}
 
 #endif	/* _LINUX_NETDEV_FEATURES_H */
