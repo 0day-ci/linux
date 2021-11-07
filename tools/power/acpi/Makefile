@@ -9,18 +9,18 @@ include ../../scripts/Makefile.include
 
 .NOTPARALLEL:
 
-all: acpidbg acpidump ec
-clean: acpidbg_clean acpidump_clean ec_clean
-install: acpidbg_install acpidump_install ec_install
-uninstall: acpidbg_uninstall acpidump_uninstall ec_uninstall
+all: acpidbg acpidump ec pfru
+clean: acpidbg_clean acpidump_clean ec_clean pfru_clean
+install: acpidbg_install acpidump_install ec_install pfru_install
+uninstall: acpidbg_uninstall acpidump_uninstall ec_uninstall pfru_uninstall
 
-acpidbg acpidump ec: FORCE
+acpidbg acpidump ec pfru: FORCE
 	$(call descend,tools/$@,all)
-acpidbg_clean acpidump_clean ec_clean:
+acpidbg_clean acpidump_clean ec_clean pfru_clean:
 	$(call descend,tools/$(@:_clean=),clean)
-acpidbg_install acpidump_install ec_install:
+acpidbg_install acpidump_install ec_install pfru_install:
 	$(call descend,tools/$(@:_install=),install)
-acpidbg_uninstall acpidump_uninstall ec_uninstall:
+acpidbg_uninstall acpidump_uninstall ec_uninstall pfru_uninstall:
 	$(call descend,tools/$(@:_uninstall=),uninstall)
 
 .PHONY: FORCE
