@@ -266,8 +266,9 @@ struct brcm_msi {
 	struct mutex		lock; /* guards the alloc/free operations */
 	u64			target_addr;
 	int			irq;
-	/* used indicates which MSI interrupts have been alloc'd */
-	unsigned long		used;
+	/* Used indicates which MSI interrupts have been alloc'd. 'nr' bellow is
+	   the real size of the bitmap. It depends on the chip. */
+	DECLARE_BITMAP		(used, BRCM_INT_PCI_MSI_NR);
 	bool			legacy;
 	/* Some chips have MSIs in bits [31..24] of a shared register. */
 	int			legacy_shift;
@@ -534,7 +535,7 @@ static int brcm_msi_alloc(struct brcm_msi *msi)
 	int hwirq;
 
 	mutex_lock(&msi->lock);
-	hwirq = bitmap_find_free_region(&msi->used, msi->nr, 0);
+	hwirq = bitmap_find_free_region(msi->used, msi->nr, 0);
 	mutex_unlock(&msi->lock);
 
 	return hwirq;
@@ -543,7 +544,7 @@ static int brcm_msi_alloc(struct brcm_msi *msi)
 static void brcm_msi_free(struct brcm_msi *msi, unsigned long hwirq)
 {
 	mutex_lock(&msi->lock);
-	bitmap_release_region(&msi->used, hwirq, 0);
+	bitmap_release_region(msi->used, hwirq, 0);
 	mutex_unlock(&msi->lock);
 }
 
@@ -660,6 +661,12 @@ static int brcm_pcie_enable_msi(struct brcm_pcie *pcie)
 	msi->target_addr = pcie->msi_target_addr;
 	msi->irq = irq;
 	msi->legacy = pcie->hw_rev < BRCM_PCIE_HW_REV_33;
+
+	/*
+	 * Sanity check to make sure that the 'used' bitmap in struct brcm_msi
+	 * is large enough.
+	 */
+	BUILD_BUG_ON(BRCM_INT_PCI_MSI_LEGACY_NR > BRCM_INT_PCI_MSI_NR);
 
 	if (msi->legacy) {
 		msi->intr_base = msi->base + PCIE_INTR2_CPU_BASE;
