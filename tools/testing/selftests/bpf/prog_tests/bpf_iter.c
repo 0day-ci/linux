@@ -770,6 +770,7 @@ free_link:
 	bpf_link__destroy(link);
 out:
 	bpf_iter_bpf_percpu_hash_map__destroy(skel);
+	free(val);
 }
 
 static void test_bpf_array_map(void)
