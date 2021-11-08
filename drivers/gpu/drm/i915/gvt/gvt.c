@@ -63,23 +63,6 @@ static const struct intel_gvt_ops intel_gvt_ops = {
 	.emulate_hotplug = intel_vgpu_emulate_hotplug,
 };
 
-static void init_device_info(struct intel_gvt *gvt)
-{
-	struct intel_gvt_device_info *info = &gvt->device_info;
-	struct pci_dev *pdev = to_pci_dev(gvt->gt->i915->drm.dev);
-
-	info->max_support_vgpus = 8;
-	info->cfg_space_size = PCI_CFG_SPACE_EXP_SIZE;
-	info->mmio_size = 2 * 1024 * 1024;
-	info->mmio_bar = 0;
-	info->gtt_start_offset = 8 * 1024 * 1024;
-	info->gtt_entry_size = 8;
-	info->gtt_entry_size_shift = 3;
-	info->gmadr_bytes_in_cmd = 8;
-	info->max_surface_size = 36 * 1024 * 1024;
-	info->msi_cap_offset = pdev->msi_cap;
-}
-
 static void intel_gvt_test_and_emulate_vblank(struct intel_gvt *gvt)
 {
 	struct intel_vgpu *vgpu;
@@ -188,16 +171,12 @@ void intel_gvt_clean_device(struct drm_i915_private *i915)
  */
 int intel_gvt_init_device(struct drm_i915_private *i915)
 {
-	struct intel_gvt *gvt;
+	struct intel_gvt *gvt = i915->gvt;
 	struct intel_vgpu *vgpu;
 	int ret;
 
-	if (drm_WARN_ON(&i915->drm, i915->gvt))
+	if (drm_WARN_ON(&i915->drm, !i915->gvt))
 		return -EEXIST;
-
-	gvt = kzalloc(sizeof(struct intel_gvt), GFP_KERNEL);
-	if (!gvt)
-		return -ENOMEM;
 
 	gvt_dbg_core("init gvt device\n");
 
@@ -205,10 +184,6 @@ int intel_gvt_init_device(struct drm_i915_private *i915)
 	spin_lock_init(&gvt->scheduler.mmio_context_lock);
 	mutex_init(&gvt->lock);
 	mutex_init(&gvt->sched_lock);
-	gvt->gt = &i915->gt;
-	i915->gvt = gvt;
-
-	init_device_info(gvt);
 
 	ret = intel_gvt_setup_mmio_info(gvt);
 	if (ret)
@@ -281,8 +256,6 @@ out_clean_mmio_info:
 	intel_gvt_clean_mmio_info(gvt);
 out_clean_idr:
 	idr_destroy(&gvt->vgpu_idr);
-	kfree(gvt);
-	i915->gvt = NULL;
 	return ret;
 }
 

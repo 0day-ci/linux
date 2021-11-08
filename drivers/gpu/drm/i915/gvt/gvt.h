@@ -296,6 +296,11 @@ struct intel_vgpu_type {
 	enum intel_vgpu_edid resolution;
 };
 
+struct intel_gvt_hw_state {
+	void *cfg_space;
+	void *mmio;
+};
+
 struct intel_gvt {
 	/* GVT scope lock, protect GVT itself, and all resource currently
 	 * not yet protected by special locks(vgpu and scheduler lock).
@@ -311,6 +316,7 @@ struct intel_gvt {
 	struct intel_gvt_gm gm;
 	struct intel_gvt_fence fence;
 	struct intel_gvt_mmio mmio;
+	struct intel_gvt_hw_state hw_state;
 	struct intel_gvt_firmware firmware;
 	struct intel_gvt_irq irq;
 	struct intel_gvt_gtt gtt;

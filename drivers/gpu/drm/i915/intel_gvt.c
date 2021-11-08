@@ -87,8 +87,12 @@ bail:
 }
 
 #define GENERATE_MMIO_TABLE_IN_I915
-static int new_mmio_info(struct intel_gvt *gvt, u64 offset)
+static int new_mmio_info(struct intel_gvt *gvt, u32 offset)
 {
+	void *mmio = gvt->hw_state.mmio;
+
+	*(u32 *)(mmio + offset) = intel_uncore_read_notrace(gvt->gt->uncore,
+							    _MMIO(offset));
 	return 0;
 }
 
@@ -96,6 +100,22 @@ static int new_mmio_info(struct intel_gvt *gvt, u64 offset)
 #include "gvt/mmio_table.h"
 #undef GENERATE_MMIO_TABLE_IN_I915
 
+static void init_device_info(struct intel_gvt *gvt)
+{
+	struct intel_gvt_device_info *info = &gvt->device_info;
+	struct pci_dev *pdev = to_pci_dev(gvt->gt->i915->drm.dev);
+
+	info->max_support_vgpus = 8;
+	info->cfg_space_size = PCI_CFG_SPACE_EXP_SIZE;
+	info->mmio_size = 2 * 1024 * 1024;
+	info->mmio_bar = 0;
+	info->gtt_start_offset = 8 * 1024 * 1024;
+	info->gtt_entry_size = 8;
+	info->gtt_entry_size_shift = 3;
+	info->gmadr_bytes_in_cmd = 8;
+	info->max_surface_size = 36 * 1024 * 1024;
+	info->msi_cap_offset = pdev->msi_cap;
+}
 
 /**
  * intel_gvt_init - initialize GVT components
@@ -109,7 +129,13 @@ static int new_mmio_info(struct intel_gvt *gvt, u64 offset)
  */
 int intel_gvt_init(struct drm_i915_private *dev_priv)
 {
+	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
+	struct intel_gvt *gvt = NULL;
+	struct intel_gvt_hw_state *hw_state;
+	struct intel_gvt_device_info *info;
+	void *mem;
 	int ret;
+	int i;
 
 	if (i915_inject_probe_failure(dev_priv))
 		return -ENODEV;
@@ -123,17 +149,54 @@ int intel_gvt_init(struct drm_i915_private *dev_priv)
 	if (intel_uc_wants_guc_submission(&dev_priv->gt.uc)) {
 		drm_err(&dev_priv->drm,
 			"i915 GVT-g loading failed due to Graphics virtualization is not yet supported with GuC submission\n");
-		return -EIO;
+		goto bail;
 	}
+
+	gvt = kzalloc(sizeof(struct intel_gvt), GFP_KERNEL);
+	if (!gvt)
+		goto bail;
+
+	gvt->gt = &dev_priv->gt;
+	hw_state = &gvt->hw_state;
+	info = &gvt->device_info;
+
+	init_device_info(gvt);
+
+	mem = kmalloc(info->cfg_space_size, GFP_KERNEL);
+	if (!mem)
+		goto err_cfg_space;
+
+	hw_state->cfg_space = mem;
+
+	mem = vmalloc(info->mmio_size);
+	if (!mem)
+		goto err_mmio;
+
+	hw_state->mmio = mem;
+
+	for (i = 0; i < PCI_CFG_SPACE_EXP_SIZE; i += 4)
+		pci_read_config_dword(pdev, i, hw_state->cfg_space + i);
+
+	ret = intel_gvt_init_mmio_info(gvt);
+	if (ret)
+		goto err_mmio_info;
+
+	dev_priv->gvt = gvt;
 
 	ret = intel_gvt_init_device(dev_priv);
 	if (ret) {
 		drm_dbg(&dev_priv->drm, "Fail to init GVT device\n");
-		goto bail;
+		goto err_mmio_info;
 	}
 
 	return 0;
 
+err_mmio_info:
+	vfree(hw_state->mmio);
+err_mmio:
+	kfree(hw_state->cfg_space);
+err_cfg_space:
+	kfree(gvt);
 bail:
 	dev_priv->params.enable_gvt = 0;
 	return 0;
@@ -154,10 +217,16 @@ static inline bool intel_gvt_active(struct drm_i915_private *dev_priv)
  */
 void intel_gvt_driver_remove(struct drm_i915_private *dev_priv)
 {
+	struct intel_gvt *gvt = dev_priv->gvt;
+
 	if (!intel_gvt_active(dev_priv))
 		return;
 
+	kfree(gvt->hw_state.cfg_space);
+	vfree(gvt->hw_state.mmio);
 	intel_gvt_clean_device(dev_priv);
+	kfree(gvt);
+	dev_priv->gvt = NULL;
 }
 
 /**
