@@ -379,7 +379,7 @@ void intel_vgpu_init_cfg_space(struct intel_vgpu *vgpu,
 	u16 *gmch_ctl;
 	u8 next;
 
-	memcpy(vgpu_cfg_space(vgpu), gvt->firmware.cfg_space,
+	memcpy(vgpu_cfg_space(vgpu), gvt->hw_state.cfg_space,
 	       info->cfg_space_size);
 
 	if (!primary) {

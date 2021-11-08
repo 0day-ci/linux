@@ -280,8 +280,6 @@ struct intel_gvt_mmio {
 };
 
 struct intel_gvt_firmware {
-	void *cfg_space;
-	void *mmio;
 	bool firmware_loaded;
 };
 
