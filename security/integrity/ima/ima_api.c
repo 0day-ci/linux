@@ -9,13 +9,18 @@
  *	appraise_measurement, store_measurement and store_template.
  */
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/fs_struct.h>
 #include <linux/xattr.h>
 #include <linux/evm.h>
 #include <linux/iversion.h>
 
 #include "ima.h"
+
+static bool rawpath_enabled;
+module_param_named(rawpath, rawpath_enabled, bool, 0);
 
 /*
  * ima_free_template_entry - free an existing template entry
@@ -390,11 +395,22 @@ out:
  */
 const char *ima_d_path(const struct path *path, char **pathbuf, char *namebuf)
 {
+	struct dentry *dentry = NULL;
 	char *pathname = NULL;
 
 	*pathbuf = __getname();
 	if (*pathbuf) {
-		pathname = d_absolute_path(path, *pathbuf, PATH_MAX);
+		if (!rawpath_enabled) {
+			pathname = d_absolute_path(path, *pathbuf, PATH_MAX);
+		} else {
+			/* Use union/overlay full pathname */
+			if (unlikely(path->dentry->d_flags & DCACHE_OP_REAL))
+				dentry = d_real(path->dentry, NULL);
+			else
+				dentry = path->dentry;
+			pathname = dentry_path_raw(dentry, *pathbuf, PATH_MAX);
+		}
+
 		if (IS_ERR(pathname)) {
 			__putname(*pathbuf);
 			*pathbuf = NULL;
