@@ -333,6 +333,28 @@ static enum ieee1284_phase init_phase(int mode)
 	return IEEE1284_PH_FWD_IDLE;
 }
 
+/*
+ * Validate the mode and make sure the mode is power of two.
+ *
+ * IEEE1284_MODE_ECPRLE and IEEE1284_MODE_NIBBLE are exception
+ * to this so handle them accordingly.
+ */
+
+static int pp_validate_mode(int mode)
+{
+	if (mode == IEEE1284_MODE_ECPRLE || mode == IEEE1284_MODE_NIBBLE) {
+		return 1;
+	} else if (!(mode & (mode - 1)) &&
+		   (mode & (IEEE1284_MODE_BYTE | IEEE1284_MODE_COMPAT |
+			    IEEE1284_MODE_BECP | IEEE1284_MODE_ECP |
+			    IEEE1284_MODE_ECPSWE | IEEE1284_MODE_EPP |
+			    IEEE1284_MODE_EPPSL | IEEE1284_MODE_COMPAT |
+			    IEEE1284_MODE_EPPSWE))) {
+		return 1;
+	}
+	return 0;
+}
+
 static int pp_set_timeout(struct pardevice *pdev, long tv_sec, int tv_usec)
 {
 	long to_jiffies;
@@ -423,7 +445,11 @@ static int pp_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		if (copy_from_user(&mode, argp, sizeof(mode)))
 			return -EFAULT;
-		/* FIXME: validate mode */
+
+		/* Validate mode */
+		if (!pp_validate_mode(mode))
+			return -EINVAL;
+
 		pp->state.mode = mode;
 		pp->state.phase = init_phase(mode);
 
