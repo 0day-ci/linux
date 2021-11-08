@@ -2052,8 +2052,12 @@ static bool ata_identify_page_supported(struct ata_device *dev, u8 page)
 	struct ata_port *ap = dev->link->ap;
 	unsigned int err, i;
 
+	if (dev->horkage & ATA_HORKAGE_NO_ID_DEV_LOG)
+		return false;
+
 	if (!ata_log_supported(dev, ATA_LOG_IDENTIFY_DEVICE)) {
 		ata_dev_warn(dev, "ATA Identify Device Log not supported\n");
+		dev->horkage |= ATA_HORKAGE_NO_ID_DEV_LOG;
 		return false;
 	}
 
