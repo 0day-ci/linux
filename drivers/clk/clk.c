@@ -3849,6 +3849,31 @@ __clk_register(struct device *dev, struct device_node *np, struct clk_hw *hw)
 	core->max_rate = ULONG_MAX;
 	hw->core = core;
 
+	struct of_phandle_args clkspec;
+	u32 clksize, clktotal;
+	int i, index;
+
+	if (np && core->ops->match_clkspec && !of_property_read_u32(np, "#clock-cells", &clksize)) {
+		if (clksize == 0) {
+			if (of_property_read_bool(np, "critical-clocks"))
+				core->flags |= CLK_IS_CRITICAL;
+			clktotal = 0;
+		} else {
+			clkspec.np = np;
+			clktotal = of_property_count_u32_elems(np, "critical-clocks");
+			clktotal /= clksize;
+			for (index = 0; index < clktotal; index++) {
+				for (i = 0; i < clksize; i++) {
+					ret = of_property_read_u32_index(np, "critical-clocks",
+									 (index * clksize) + i,
+									 &(clkspec.args[i]));
+				}
+				if (!core->ops->match_clkspec(hw, &clkspec))
+					core->flags |= CLK_IS_CRITICAL;
+			}
+		}
+	}
+
 	ret = clk_core_populate_parent_map(core, init);
 	if (ret)
 		goto fail_parents;
