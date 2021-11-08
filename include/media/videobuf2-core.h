@@ -1155,8 +1155,10 @@ static inline void *vb2_get_drv_priv(struct vb2_queue *q)
 static inline void vb2_set_plane_payload(struct vb2_buffer *vb,
 				 unsigned int plane_no, unsigned long size)
 {
-	if (plane_no < vb->num_planes)
+	if (plane_no < vb->num_planes) {
+		WARN_ON(size > vb->planes[plane_no].length);
 		vb->planes[plane_no].bytesused = size;
+	}
 }
 
 /**
