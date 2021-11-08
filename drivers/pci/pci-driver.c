@@ -1299,7 +1299,7 @@ static int pci_pm_runtime_resume(struct device *dev)
 	 */
 	pci_restore_standard_config(pci_dev);
 
-	if (!to_pci_driver(dev->driver))
+	if (!device_is_bound(dev))
 		return 0;
 
 	pci_fixup_device(pci_fixup_resume_early, pci_dev);
