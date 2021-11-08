@@ -86,6 +86,17 @@ bail:
 	dev_priv->params.enable_gvt = 0;
 }
 
+#define GENERATE_MMIO_TABLE_IN_I915
+static int new_mmio_info(struct intel_gvt *gvt, u64 offset)
+{
+	return 0;
+}
+
+#include "gvt/reg.h"
+#include "gvt/mmio_table.h"
+#undef GENERATE_MMIO_TABLE_IN_I915
+
+
 /**
  * intel_gvt_init - initialize GVT components
  * @dev_priv: drm i915 private data
