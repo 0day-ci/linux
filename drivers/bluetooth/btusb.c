@@ -31,7 +31,7 @@
 static bool disable_scofix;
 static bool force_scofix;
 static bool enable_autosuspend = IS_ENABLED(CONFIG_BT_HCIBTUSB_AUTOSUSPEND);
-
+static bool enable_poll_sync;
 static bool reset = true;
 
 static struct usb_driver btusb_driver;
@@ -550,8 +550,12 @@ struct btusb_data {
 
 	unsigned long flags;
 
-	struct work_struct work;
-	struct work_struct waker;
+	int intr_interval;
+	struct work_struct  work;
+	struct work_struct  waker;
+	struct delayed_work rx_work;
+
+	struct sk_buff_head acl_q;
 
 	struct usb_anchor deferred;
 	struct usb_anchor tx_anchor;
@@ -588,8 +592,8 @@ struct btusb_data {
 	int isoc_altsetting;
 	int suspend_count;
 
-	int (*recv_event)(struct hci_dev *hdev, struct sk_buff *skb);
 	int (*recv_acl)(struct hci_dev *hdev, struct sk_buff *skb);
+	int (*recv_event)(struct btusb_data *data, struct sk_buff *skb);
 	int (*recv_bulk)(struct btusb_data *data, void *buffer, int count);
 
 	int (*setup_on_usb)(struct hci_dev *hdev);
@@ -761,7 +765,7 @@ static int btusb_recv_intr(struct btusb_data *data, void *buffer, int count)
 
 		if (!hci_skb_expect(skb)) {
 			/* Complete frame */
-			data->recv_event(data->hdev, skb);
+			data->recv_event(data, skb);
 			skb = NULL;
 		}
 	}
@@ -770,6 +774,18 @@ static int btusb_recv_intr(struct btusb_data *data, void *buffer, int count)
 	spin_unlock_irqrestore(&data->rxlock, flags);
 
 	return err;
+}
+
+static int btusb_recv_acl(struct btusb_data *data, struct sk_buff *skb)
+{
+	if (!enable_poll_sync)
+		return data->recv_acl(data->hdev, skb);
+
+	skb_queue_tail(&data->acl_q, skb);
+
+	schedule_delayed_work(&data->rx_work, data->intr_interval);
+
+	return 0;
 }
 
 static int btusb_recv_bulk(struct btusb_data *data, void *buffer, int count)
@@ -819,7 +835,7 @@ static int btusb_recv_bulk(struct btusb_data *data, void *buffer, int count)
 
 		if (!hci_skb_expect(skb)) {
 			/* Complete frame */
-			data->recv_acl(data->hdev, skb);
+			btusb_recv_acl(data, skb);
 			skb = NULL;
 		}
 	}
@@ -969,6 +985,19 @@ static int btusb_submit_intr_urb(struct hci_dev *hdev, gfp_t mem_flags)
 			bt_dev_err(hdev, "urb %p submission failed (%d)",
 				   urb, -err);
 		usb_unanchor_urb(urb);
+	}
+
+	/* The units are frames (milliseconds) for full and low speed devices,
+	 * and microframes (1/8 millisecond) for highspeed and SuperSpeed
+	 * devices.
+	 */
+	switch (urb->dev->speed) {
+	case USB_SPEED_SUPER_PLUS:
+	case USB_SPEED_SUPER:	/* units are 125us */
+		data->intr_interval = usecs_to_jiffies(urb->interval * 125);
+		break;
+	default:
+		data->intr_interval = msecs_to_jiffies(urb->interval);
 	}
 
 	usb_free_urb(urb);
@@ -1430,8 +1459,11 @@ static int btusb_close(struct hci_dev *hdev)
 
 	BT_DBG("%s", hdev->name);
 
+	cancel_delayed_work(&data->rx_work);
 	cancel_work_sync(&data->work);
 	cancel_work_sync(&data->waker);
+
+	skb_queue_purge(&data->acl_q);
 
 	clear_bit(BTUSB_ISOC_RUNNING, &data->flags);
 	clear_bit(BTUSB_BULK_RUNNING, &data->flags);
@@ -1463,6 +1495,10 @@ static int btusb_flush(struct hci_dev *hdev)
 	struct btusb_data *data = hci_get_drvdata(hdev);
 
 	BT_DBG("%s", hdev->name);
+
+	cancel_delayed_work(&data->rx_work);
+
+	skb_queue_purge(&data->acl_q);
 
 	usb_kill_anchored_urbs(&data->tx_anchor);
 	btusb_free_frags(data);
@@ -1827,6 +1863,17 @@ static void btusb_waker(struct work_struct *work)
 	usb_autopm_put_interface(data->intf);
 }
 
+static void btusb_rx_work(struct work_struct *work)
+{
+	struct btusb_data *data = container_of(work, struct btusb_data,
+					       rx_work.work);
+	struct sk_buff *skb;
+
+	/* Dequeue ACL data received during the interval */
+	while ((skb = skb_dequeue(&data->acl_q)))
+		data->recv_acl(data->hdev, skb);
+}
+
 static int btusb_setup_bcm92035(struct hci_dev *hdev)
 {
 	struct sk_buff *skb;
@@ -2028,9 +2075,9 @@ static int btusb_recv_bulk_intel(struct btusb_data *data, void *buffer,
 	return btusb_recv_bulk(data, buffer, count);
 }
 
-static int btusb_recv_event_intel(struct hci_dev *hdev, struct sk_buff *skb)
+static int btusb_recv_event_intel(struct btusb_data *data, struct sk_buff *skb)
 {
-	if (btintel_test_flag(hdev, INTEL_BOOTLOADER)) {
+	if (btintel_test_flag(data->hdev, INTEL_BOOTLOADER)) {
 		struct hci_event_hdr *hdr = (void *)skb->data;
 
 		if (skb->len > HCI_EVENT_HDR_SIZE && hdr->evt == 0xff &&
@@ -2044,7 +2091,7 @@ static int btusb_recv_event_intel(struct hci_dev *hdev, struct sk_buff *skb)
 				 * the device sends a vendor specific event
 				 * indicating that the bootup completed.
 				 */
-				btintel_bootup(hdev, ptr, len);
+				btintel_bootup(data->hdev, ptr, len);
 				break;
 			case 0x06:
 				/* When the firmware loading completes the
@@ -2052,13 +2099,14 @@ static int btusb_recv_event_intel(struct hci_dev *hdev, struct sk_buff *skb)
 				 * indicating the result of the firmware
 				 * loading.
 				 */
-				btintel_secure_send_result(hdev, ptr, len);
+				btintel_secure_send_result(data->hdev, ptr,
+							   len);
 				break;
 			}
 		}
 	}
 
-	return hci_recv_frame(hdev, skb);
+	return hci_recv_frame(data->hdev, skb);
 }
 
 static int btusb_send_frame_intel(struct hci_dev *hdev, struct sk_buff *skb)
@@ -3372,6 +3420,16 @@ static int btusb_shutdown_qca(struct hci_dev *hdev)
 	return 0;
 }
 
+static int btusb_recv_evt(struct btusb_data *data, struct sk_buff *skb)
+{
+	if (enable_poll_sync) {
+		/* Trigger dequeue immediatelly if an event is received */
+		schedule_delayed_work(&data->rx_work, 0);
+	}
+
+	return hci_recv_frame(data->hdev, skb);
+}
+
 static int btusb_probe(struct usb_interface *intf,
 		       const struct usb_device_id *id)
 {
@@ -3455,6 +3513,10 @@ static int btusb_probe(struct usb_interface *intf,
 
 	INIT_WORK(&data->work, btusb_work);
 	INIT_WORK(&data->waker, btusb_waker);
+	INIT_DELAYED_WORK(&data->rx_work, btusb_rx_work);
+
+	skb_queue_head_init(&data->acl_q);
+
 	init_usb_anchor(&data->deferred);
 	init_usb_anchor(&data->tx_anchor);
 	spin_lock_init(&data->txlock);
@@ -3468,7 +3530,7 @@ static int btusb_probe(struct usb_interface *intf,
 
 	priv_size = 0;
 
-	data->recv_event = hci_recv_frame;
+	data->recv_event = btusb_recv_evt;
 	data->recv_bulk = btusb_recv_bulk;
 
 	if (id->driver_info & BTUSB_INTEL_COMBINED) {
@@ -3941,6 +4003,9 @@ MODULE_PARM_DESC(force_scofix, "Force fixup of wrong SCO buffers size");
 
 module_param(enable_autosuspend, bool, 0644);
 MODULE_PARM_DESC(enable_autosuspend, "Enable USB autosuspend by default");
+
+module_param(enable_poll_sync, bool, 0644);
+MODULE_PARM_DESC(enable_poll_sync, "Enable URB polling interval synchronization");
 
 module_param(reset, bool, 0644);
 MODULE_PARM_DESC(reset, "Send HCI reset command on initialization");
