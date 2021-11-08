@@ -27,6 +27,7 @@ struct obj_cgroup;
 struct page;
 struct mm_struct;
 struct kmem_cache;
+struct super_block;
 
 /* Cgroup-specific page state, on top of universal node page state */
 enum memcg_stat_item {
@@ -689,7 +690,8 @@ static inline bool mem_cgroup_below_min(struct mem_cgroup *memcg)
 		page_counter_read(&memcg->memory);
 }
 
-int __mem_cgroup_charge(struct folio *folio, struct mm_struct *mm, gfp_t gfp);
+int __mem_cgroup_charge(struct folio *folio, struct mm_struct *mm, gfp_t gfp,
+			struct address_space *mapping);
 
 /**
  * mem_cgroup_charge - Charge a newly allocated folio to a cgroup.
@@ -710,7 +712,7 @@ static inline int mem_cgroup_charge(struct folio *folio, struct mm_struct *mm,
 {
 	if (mem_cgroup_disabled())
 		return 0;
-	return __mem_cgroup_charge(folio, mm, gfp);
+	return __mem_cgroup_charge(folio, mm, gfp, NULL);
 }
 
 int mem_cgroup_swapin_charge_page(struct page *page, struct mm_struct *mm,
@@ -922,6 +924,16 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 		return true;
 	return !!(memcg->css.flags & CSS_ONLINE);
 }
+
+bool is_remote_oom(struct mem_cgroup *memcg_under_oom);
+void mem_cgroup_set_charge_target(struct mem_cgroup **target,
+				  struct mem_cgroup *memcg);
+struct mem_cgroup *mem_cgroup_get_from_path(const char *path);
+/**
+ * User is responsible for providing a buffer @buf of length @len and freeing
+ * it.
+ */
+int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf, size_t len);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 		int zid, int nr_pages);
@@ -1217,8 +1229,15 @@ static inline bool mem_cgroup_below_min(struct mem_cgroup *memcg)
 	return false;
 }
 
-static inline int mem_cgroup_charge(struct folio *folio,
-		struct mm_struct *mm, gfp_t gfp)
+static inline int __mem_cgroup_charge(struct folio *folio, struct mm_struct *mm,
+				      gfp_t gfp_mask,
+				      struct address_space *mapping)
+{
+	return 0;
+}
+
+static inline int mem_cgroup_charge(struct folio *folio, struct mm_struct *mm,
+				    gfp_t gfp_mask)
 {
 	return 0;
 }
@@ -1324,6 +1343,25 @@ mem_cgroup_iter(struct mem_cgroup *root,
 static inline void mem_cgroup_iter_break(struct mem_cgroup *root,
 					 struct mem_cgroup *prev)
 {
+}
+
+static inline bool is_remote_oom(struct mem_cgroup *memcg_under_oom)
+{
+	return false;
+}
+
+static inline void mem_cgroup_set_charge_target(struct mem_cgroup **target,
+						struct mem_cgroup *memcg)
+{
+}
+
+static inline int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf,
+					      size_t len)
+{
+	if (len < 1)
+		return -EINVAL;
+	buf[0] = '\0';
+	return 0;
 }
 
 static inline int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,

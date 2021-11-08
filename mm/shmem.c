@@ -115,10 +115,14 @@ struct shmem_options {
 	bool full_inums;
 	int huge;
 	int seen;
+#if CONFIG_MEMCG
+	struct mem_cgroup *memcg;
+#endif
 #define SHMEM_SEEN_BLOCKS 1
 #define SHMEM_SEEN_INODES 2
 #define SHMEM_SEEN_HUGE 4
 #define SHMEM_SEEN_INUMS 8
+#define SHMEM_SEEN_MEMCG 16
 };
 
 #ifdef CONFIG_TMPFS
@@ -709,7 +713,8 @@ static int shmem_add_to_page_cache(struct page *page,
 	page->index = index;
 
 	if (!PageSwapCache(page)) {
-		error = mem_cgroup_charge(page_folio(page), charge_mm, gfp);
+		error = __mem_cgroup_charge(page_folio(page), charge_mm, gfp,
+					    mapping);
 		if (error) {
 			if (PageTransHuge(page)) {
 				count_vm_event(THP_FILE_FALLBACK);
@@ -3342,6 +3347,7 @@ static const struct export_operations shmem_export_ops = {
 enum shmem_param {
 	Opt_gid,
 	Opt_huge,
+	Opt_memcg,
 	Opt_mode,
 	Opt_mpol,
 	Opt_nr_blocks,
@@ -3363,6 +3369,7 @@ static const struct constant_table shmem_param_enums_huge[] = {
 const struct fs_parameter_spec shmem_fs_parameters[] = {
 	fsparam_u32   ("gid",		Opt_gid),
 	fsparam_enum  ("huge",		Opt_huge,  shmem_param_enums_huge),
+	fsparam_string("memcg",		Opt_memcg),
 	fsparam_u32oct("mode",		Opt_mode),
 	fsparam_string("mpol",		Opt_mpol),
 	fsparam_string("nr_blocks",	Opt_nr_blocks),
@@ -3379,6 +3386,7 @@ static int shmem_parse_one(struct fs_context *fc, struct fs_parameter *param)
 	struct shmem_options *ctx = fc->fs_private;
 	struct fs_parse_result result;
 	unsigned long long size;
+	struct mem_cgroup *memcg;
 	char *rest;
 	int opt;
 
@@ -3412,6 +3420,17 @@ static int shmem_parse_one(struct fs_context *fc, struct fs_parameter *param)
 			goto bad_value;
 		ctx->seen |= SHMEM_SEEN_INODES;
 		break;
+#ifdef CONFIG_MEMCG
+	case Opt_memcg:
+		if (ctx->memcg)
+			css_put(&ctx->memcg->css);
+		memcg = mem_cgroup_get_from_path(param->string);
+		if (IS_ERR(memcg))
+			goto bad_value;
+		ctx->memcg = memcg;
+		ctx->seen |= SHMEM_SEEN_MEMCG;
+		break;
+#endif
 	case Opt_mode:
 		ctx->mode = result.uint_32 & 07777;
 		break;
@@ -3573,6 +3592,14 @@ static int shmem_reconfigure(struct fs_context *fc)
 	}
 	raw_spin_unlock(&sbinfo->stat_lock);
 	mpol_put(mpol);
+#if CONFIG_MEMCG
+	if (ctx->seen & SHMEM_SEEN_MEMCG && ctx->memcg) {
+		mem_cgroup_set_charge_target(&fc->root->d_sb->s_memcg_to_charge,
+					     ctx->memcg);
+		css_put(&ctx->memcg->css);
+		ctx->memcg = NULL;
+	}
+#endif
 	return 0;
 out:
 	raw_spin_unlock(&sbinfo->stat_lock);
@@ -3582,6 +3609,11 @@ out:
 static int shmem_show_options(struct seq_file *seq, struct dentry *root)
 {
 	struct shmem_sb_info *sbinfo = SHMEM_SB(root->d_sb);
+	int err;
+	char *buf = __getname();
+
+	if (!buf)
+		return -ENOMEM;
 
 	if (sbinfo->max_blocks != shmem_default_max_blocks())
 		seq_printf(seq, ",size=%luk",
@@ -3625,7 +3657,13 @@ static int shmem_show_options(struct seq_file *seq, struct dentry *root)
 		seq_printf(seq, ",huge=%s", shmem_format_huge(sbinfo->huge));
 #endif
 	shmem_show_mpol(seq, sbinfo->mpol);
-	return 0;
+	/* Memory cgroup binding: memcg=cgroup_name */
+	err = mem_cgroup_get_name_from_sb(root->d_sb, buf, PATH_MAX);
+	if (!err && buf[0] != '\0')
+		seq_printf(seq, ",memcg=%s", buf);
+
+	__putname(buf);
+	return err;
 }
 
 #endif /* CONFIG_TMPFS */
@@ -3710,6 +3748,14 @@ static int shmem_fill_super(struct super_block *sb, struct fs_context *fc)
 	sb->s_flags |= SB_POSIXACL;
 #endif
 	uuid_gen(&sb->s_uuid);
+#if CONFIG_MEMCG
+	if (ctx->memcg) {
+		mem_cgroup_set_charge_target(&sb->s_memcg_to_charge,
+					     ctx->memcg);
+		css_put(&ctx->memcg->css);
+		ctx->memcg = NULL;
+	}
+#endif
 
 	inode = shmem_get_inode(sb, NULL, S_IFDIR | sbinfo->mode, 0, VM_NORESERVE);
 	if (!inode)
