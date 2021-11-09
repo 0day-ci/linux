@@ -50,6 +50,12 @@
 /* Jumbo Frame Registers */
 #define B53_JUMBO_PAGE			0x40
 
+/* BroadSync HD Register Page */
+#define B53_BROADSYNC_PAGE		0x90
+
+/* Traffic Remarking Register Page */
+#define B53_TRAFFICREMARKING_PAGE	0x91
+
 /* EEE Control Registers Page */
 #define B53_EEE_PAGE			0x92
 
@@ -259,6 +265,27 @@
 
 /* Broadcom header TX control (16 bit)	*/
 #define B53_BRCM_HDR_TX_DIS		0x62
+
+/*************************************************************************
+ * ARL Control Registers
+ *************************************************************************/
+
+/* Multiport Control Register (16 bit) */
+#define B53_MPORT_CTRL			0x0e
+#define   MPORT_CTRL_DIS_FORWARD	0
+#define   MPORT_CTRL_CMP_ETYPE		1
+#define   MPORT_CTRL_CMP_ADDR		2
+#define   MPORT_CTRL_CMP_ADDR_ETYPE	3
+#define   MPORT_CTRL_SHIFT(x)		((x) << 1)
+#define   MPORT_CTRL_MASK		0x2
+#define   MPORT0_TS_EN			BIT(15)
+
+/* Multiport Address N (N = 0–5) Register (64 bit) */
+#define B53_MPORT_ADDR(n)		(0x10 + ((n) << 4))
+#define   MPORT_ETYPE(x)		((u64)(x) << 48)
+
+/* Multiport Vector N (N = 0–5) Register (32 bit) */
+#define B53_MPORT_VCTR(n)		(0x18 + ((n) << 4))
 
 /*************************************************************************
  * ARL Access Page Registers
@@ -478,6 +505,50 @@
 #define B53_JUMBO_MAX_SIZE_63XX		0x08
 #define   JMS_MIN_SIZE			1518
 #define   JMS_MAX_SIZE			9724
+
+/*************************************************************************
+ * BroadSync HD Page Registers
+ *************************************************************************/
+
+/* BroadSync HD Enable Control Register (16 bit) */
+#define B53_BROADSYNC_EN_CTRL		0x00
+
+/* BroadSync HD Time Stamp Report Control Register */
+#define B53_BROADSYNC_TS_REPORT_CTRL	0x02
+#define   TSRPT_PKT_EN			BIT(0)
+
+/* BroadSync HD PCP Value Control Register */
+#define B53_BROADSYNC_PCP_CTRL		0x03
+
+/* BroadSync HD Max Packet Size Register */
+#define B53_BROADSYNC_MAX_SDU		0x04
+
+/* BroadSync HD Time Base Register (32 bit) */
+#define B53_BROADSYNC_TIMEBASE		0x10
+
+/* BroadSync HD Time Base Adjustment Register (32 bit) */
+#define B53_BROADSYNC_TIMEBASE_ADJ	0x14
+
+/* BroadSync HD Slot Number and Tick Counter Register (32 bit) */
+#define B53_BROADSYNC_SLOT_CNT		0x18
+
+/* BroadSync HD Slot Adjustment Register (32 bit) */
+#define B53_BROADSYNC_SLOT_ADJ		0x1c
+
+/* BroadSync HD Class 5 Bandwidth Control Register */
+#define B53_BROADSYNC_CLS5_BW_CTRL	0x30
+
+/* BroadSync HD Class 4 Bandwidth Control Register */
+#define B53_BROADSYNC_CLS4_BW_CTRL	0x60
+
+/* BroadSync HD Egress Time Stamp Register */
+#define B53_BROADSYNC_EGRESS_TS		0x90
+
+/* BroadSync HD Egress Time Stamp Status Register */
+#define B53_BROADSYNC_EGRESS_TS_STS	0xd0
+
+/* BroadSync HD Link Status Register (16 bit) */
+#define B53_BROADSYNC_LINK_STS		0xe0
 
 /*************************************************************************
  * EEE Configuration Page Registers
