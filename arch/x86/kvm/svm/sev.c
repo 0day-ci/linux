@@ -1737,9 +1737,9 @@ failed:
 
 int svm_vm_copy_asid_from(struct kvm *kvm, unsigned int source_fd)
 {
+	struct kvm_sev_info *mirror_sev, *source_sev;
 	struct file *source_kvm_file;
 	struct kvm *source_kvm;
-	struct kvm_sev_info source_sev, *mirror_sev;
 	int ret;
 
 	source_kvm_file = fget(source_fd);
@@ -1762,9 +1762,6 @@ int svm_vm_copy_asid_from(struct kvm *kvm, unsigned int source_fd)
 		goto e_source_unlock;
 	}
 
-	memcpy(&source_sev, &to_kvm_svm(source_kvm)->sev_info,
-	       sizeof(source_sev));
-
 	/*
 	 * The mirror kvm holds an enc_context_owner ref so its asid can't
 	 * disappear until we're done with it
@@ -1785,14 +1782,25 @@ int svm_vm_copy_asid_from(struct kvm *kvm, unsigned int source_fd)
 		goto e_mirror_unlock;
 	}
 
+	/*
+	 * Referencing the source's sev_info without holding the source's lock
+	 * is safe as SEV/SEV-ES activation is a one-way, "atomic" operation.
+	 * SEV state, e.g. the ASID, is modified under kvm->lock, and cannot be
+	 * changed after SEV is marked active (here or in normal activation).
+	 * That same atomicity also prevents TOC-TOU issues with respect to
+	 * related sanity checks on source_kvm.
+	 */
+	source_sev = &to_kvm_svm(source_kvm)->sev_info;
+
 	/* Set enc_context_owner and copy its encryption context over */
 	mirror_sev = &to_kvm_svm(kvm)->sev_info;
 	mirror_sev->enc_context_owner = source_kvm;
+	mirror_sev->asid = source_sev->asid;
 	mirror_sev->active = true;
-	mirror_sev->asid = source_sev.asid;
-	mirror_sev->fd = source_sev.fd;
-	mirror_sev->es_active = source_sev.es_active;
-	mirror_sev->handle = source_sev.handle;
+	mirror_sev->asid = source_sev->asid;
+	mirror_sev->fd = source_sev->fd;
+	mirror_sev->es_active = source_sev->es_active;
+	mirror_sev->handle = source_sev->handle;
 	/*
 	 * Do not copy ap_jump_table. Since the mirror does not share the same
 	 * KVM contexts as the original, and they may have different
