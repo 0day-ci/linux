@@ -1089,5 +1089,15 @@ config MMC_OWL
 	  This selects support for the SD/MMC Host Controller on
 	  Actions Semi Owl SoCs.
 
+config MMC_SP_SDV2
+	tristate "Sunplus SP7021 SD/SDIO Controller"
+	depends on SOC_SP7021
+	help
+		If you say yes here, you will get support for SD/SDIO host interface
+		on sunplus Socs.
+		If you have a controller with this interface, say Y or M here.
+		If unsure, say N.
+                Sunplus  SD/SDIO Host Controller support"
+
 config MMC_SDHCI_EXTERNAL_DMA
 	bool
