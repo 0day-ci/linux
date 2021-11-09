@@ -30,6 +30,24 @@
 
 static bool amp;
 
+/* This is the struct for extended device configuration.
+ * The opcode 0x03 is used for creating an extended device and followed by
+ * the configuration data below.
+ * dev_type is Primay or AMP.
+ * flag_len is the length of flag array
+ * flag array contains the flag to use/set while creating the device.
+ */
+struct vhci_ext_config {
+	__u8	dev_type;
+	__u8	flag_len;
+	__u8	flags[0];
+};
+
+#define VHCI_EXT_FLAG_ENABLE_AOSP		0x01
+#define VHCI_EXT_FLAG_QUIRK_RAW_DEVICE		0x02
+#define VHCI_EXT_FLAG_QUIARK_EXTERNAL_CONFIG	0x03
+#define VHCI_EXT_FLAG_QUIRK_INVALID_BDADDR	0x04
+
 struct vhci_data {
 	struct hci_dev *hdev;
 
@@ -278,63 +296,17 @@ static int vhci_setup(struct hci_dev *hdev)
 	return 0;
 }
 
-static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
+static int vhci_register_hdev(struct hci_dev *hdev, __u8 opcode)
 {
-	struct hci_dev *hdev;
+	struct vhci_data *data = hci_get_drvdata(hdev);
 	struct sk_buff *skb;
-	__u8 dev_type;
-
-	if (data->hdev)
-		return -EBADFD;
-
-	/* bits 0-1 are dev_type (Primary or AMP) */
-	dev_type = opcode & 0x03;
-
-	if (dev_type != HCI_PRIMARY && dev_type != HCI_AMP)
-		return -EINVAL;
-
-	/* bits 2-5 are reserved (must be zero) */
-	if (opcode & 0x3c)
-		return -EINVAL;
 
 	skb = bt_skb_alloc(4, GFP_KERNEL);
 	if (!skb)
 		return -ENOMEM;
 
-	hdev = hci_alloc_dev();
-	if (!hdev) {
-		kfree_skb(skb);
-		return -ENOMEM;
-	}
-
-	data->hdev = hdev;
-
-	hdev->bus = HCI_VIRTUAL;
-	hdev->dev_type = dev_type;
-	hci_set_drvdata(hdev, data);
-
-	hdev->open  = vhci_open_dev;
-	hdev->close = vhci_close_dev;
-	hdev->flush = vhci_flush;
-	hdev->send  = vhci_send_frame;
-	hdev->get_data_path_id = vhci_get_data_path_id;
-	hdev->get_codec_config_data = vhci_get_codec_config_data;
-	hdev->wakeup = vhci_wakeup;
-	hdev->setup = vhci_setup;
-	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
-
-	/* bit 6 is for external configuration */
-	if (opcode & 0x40)
-		set_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks);
-
-	/* bit 7 is for raw device */
-	if (opcode & 0x80)
-		set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
-
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
-		hci_free_dev(hdev);
-		data->hdev = NULL;
 		kfree_skb(skb);
 		return -EBUSY;
 	}
@@ -361,7 +333,65 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	skb_queue_tail(&data->readq, skb);
 
 	wake_up_interruptible(&data->read_wait);
+
 	return 0;
+}
+
+static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
+{
+	struct hci_dev *hdev;
+	__u8 dev_type;
+	int ret;
+
+	if (data->hdev)
+		return -EBADFD;
+
+	/* bits 0-1 are dev_type (Primary or AMP) */
+	dev_type = opcode & 0x03;
+
+	if (dev_type != HCI_PRIMARY && dev_type != HCI_AMP)
+		return -EINVAL;
+
+	/* bits 2-5 are reserved (must be zero) */
+	if (opcode & 0x3c)
+		return -EINVAL;
+
+	hdev = hci_alloc_dev();
+	if (!hdev)
+		return -ENOMEM;
+
+	data->hdev = hdev;
+
+	hdev->bus = HCI_VIRTUAL;
+	hdev->dev_type = dev_type;
+	hci_set_drvdata(hdev, data);
+
+	hdev->open  = vhci_open_dev;
+	hdev->close = vhci_close_dev;
+	hdev->flush = vhci_flush;
+	hdev->send  = vhci_send_frame;
+	hdev->get_data_path_id = vhci_get_data_path_id;
+	hdev->get_codec_config_data = vhci_get_codec_config_data;
+	hdev->wakeup = vhci_wakeup;
+	hdev->setup = vhci_setup;
+	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
+
+	/* bit 6 is for external configuration */
+	if (opcode & 0x40)
+		set_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks);
+
+	/* bit 7 is for raw device */
+	if (opcode & 0x80)
+		set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
+
+	/* Legacy method returns opcode instead of dev type */
+	ret = vhci_register_hdev(hdev, opcode);
+	if (ret < 0) {
+		hci_free_dev(hdev);
+		data->hdev = NULL;
+	}
+
+	return ret;
 }
 
 static int vhci_create_device(struct vhci_data *data, __u8 opcode)
@@ -370,6 +400,92 @@ static int vhci_create_device(struct vhci_data *data, __u8 opcode)
 
 	mutex_lock(&data->open_mutex);
 	err = __vhci_create_device(data, opcode);
+	mutex_unlock(&data->open_mutex);
+
+	return err;
+}
+
+static int __vhci_create_extended_device(struct vhci_data *data,
+							struct sk_buff *skb)
+{
+	struct hci_dev *hdev;
+	struct vhci_ext_config *config;
+	int i, ret;
+	__u8 flag;
+
+	if (data->hdev)
+		return -EBADFD;
+
+	/* Make sure the skb has a minimum valid length */
+	if (skb->len < sizeof(*config))
+		return -EINVAL;
+
+	config = (void *)(skb->data);
+	if (skb->len < sizeof(*config) + config->flag_len)
+		return -EINVAL;
+
+	if (config->dev_type != HCI_PRIMARY && config->dev_type != HCI_AMP)
+		return -EINVAL;
+
+	hdev = hci_alloc_dev();
+	if (!hdev)
+		return -ENOMEM;
+
+	data->hdev = hdev;
+
+	hdev->bus = HCI_VIRTUAL;
+	hdev->dev_type = config->dev_type;
+	hci_set_drvdata(hdev, data);
+
+	hdev->open  = vhci_open_dev;
+	hdev->close = vhci_close_dev;
+	hdev->flush = vhci_flush;
+	hdev->send  = vhci_send_frame;
+	hdev->get_data_path_id = vhci_get_data_path_id;
+	hdev->get_codec_config_data = vhci_get_codec_config_data;
+	hdev->wakeup = vhci_wakeup;
+	hdev->setup = vhci_setup;
+	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
+
+	for (i = 0; i < config->flag_len; i++) {
+		flag = config->flags[i];
+		switch (flag) {
+		case VHCI_EXT_FLAG_ENABLE_AOSP:
+			data->aosp_capable = 1;
+			break;
+		case VHCI_EXT_FLAG_QUIRK_RAW_DEVICE:
+			set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
+			break;
+		case VHCI_EXT_FLAG_QUIARK_EXTERNAL_CONFIG:
+			set_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks);
+			break;
+		case VHCI_EXT_FLAG_QUIRK_INVALID_BDADDR:
+			set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
+			break;
+		default:
+			BT_ERR("Invalid flag");
+			hci_free_dev(hdev);
+			data->hdev = NULL;
+			return -EINVAL;
+		}
+	}
+
+	/* Extended method returns the fixed extension opcode 0x03 */
+	ret = vhci_register_hdev(hdev, 0x03);
+	if (ret < 0) {
+		hci_free_dev(hdev);
+		data->hdev = NULL;
+	}
+
+	return ret;
+}
+
+static int vhci_create_extended_device(struct vhci_data *data,
+							struct sk_buff *skb)
+{
+	int err;
+	mutex_lock(&data->open_mutex);
+	err = __vhci_create_extended_device(data, skb);
 	mutex_unlock(&data->open_mutex);
 
 	return err;
@@ -419,14 +535,22 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 		opcode = *((__u8 *) skb->data);
 		skb_pull(skb, 1);
 
-		if (skb->len > 0) {
-			kfree_skb(skb);
-			return -EINVAL;
+		/* The dev_type 3 is used as an escape opcode for extension
+		 * handling. If dev_type is set to 3 all other bits must be
+		 * set to zero.
+		 */
+		if (opcode == 0x03) {
+			if (skb->len < 1)
+				ret = -EINVAL;
+			else
+				ret = vhci_create_extended_device(data, skb);
+		} else {
+			if (skb->len > 0)
+				ret = -EINVAL;
+			else
+				ret = vhci_create_device(data, opcode);
 		}
-
 		kfree_skb(skb);
-
-		ret = vhci_create_device(data, opcode);
 		break;
 
 	default:
