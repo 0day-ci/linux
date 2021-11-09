@@ -1084,7 +1084,8 @@ struct fwnode_handle *acpi_get_next_subnode(const struct fwnode_handle *fwnode,
  * Returns parent node of an ACPI device or data firmware node or %NULL if
  * not available.
  */
-struct fwnode_handle *acpi_node_get_parent(const struct fwnode_handle *fwnode)
+static struct fwnode_handle *
+acpi_node_get_parent(const struct fwnode_handle *fwnode)
 {
 	if (is_acpi_data_node(fwnode)) {
 		/* All data nodes have parent pointer so just return that */
@@ -1092,8 +1093,7 @@ struct fwnode_handle *acpi_node_get_parent(const struct fwnode_handle *fwnode)
 	}
 
 	if (is_acpi_device_node(fwnode)) {
-		struct device *dev =
-			to_acpi_device_node(fwnode)->dev.parent;
+		struct device *dev = to_acpi_device_node(fwnode)->dev.parent;
 
 		if (dev)
 			return acpi_fwnode_handle(to_acpi_device(dev));
