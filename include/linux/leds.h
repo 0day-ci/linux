@@ -73,6 +73,16 @@ enum led_blink_modes {
 	SOFTWARE_HARDWARE_CONTROLLED,
 };
 
+#ifdef CONFIG_LEDS_HARDWARE_CONTROL
+enum blink_mode_cmd {
+	BLINK_MODE_ENABLE, /* Enable the hardware blink mode */
+	BLINK_MODE_DISABLE, /* Disable the hardware blink mode */
+	BLINK_MODE_READ, /* Read the status of the hardware blink mode */
+	BLINK_MODE_SUPPORTED, /* Ask the driver if the hardware blink mode is supported */
+	BLINK_MODE_ZERO, /* Disable any hardware blink active */
+};
+#endif
+
 struct led_classdev {
 	const char		*name;
 	unsigned int brightness;
@@ -185,6 +195,17 @@ struct led_classdev {
 	 * the old status but that is not mandatory and also putting it off is accepted.
 	 */
 	int			(*hw_control_stop)(struct led_classdev *led_cdev);
+	/* This will be used to configure the various blink modes LED support in hardware
+	 * mode.
+	 * The LED driver require to support the active trigger and will elaborate the
+	 * unsigned long flag and do the operation based on the provided cmd.
+	 * Current operation are enable,disable,supported and status.
+	 * A trigger will use this to enable or disable the asked blink mode, check the
+	 * status of the blink mode or ask if the blink mode can run in hardware mode.
+	 */
+	int			(*hw_control_configure)(struct led_classdev *led_cdev,
+							unsigned long flag,
+							enum blink_mode_cmd cmd);
 #endif
 #endif
 
@@ -453,6 +474,24 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
 {
 	return led_cdev->trigger_data;
 }
+
+#ifdef CONFIG_LEDS_HARDWARE_CONTROL
+static inline bool led_trigger_blink_mode_is_supported(struct led_classdev *led_cdev,
+						       unsigned long flag)
+{
+	int ret;
+
+	/* Sanity check: make sure led support hw mode */
+	if (led_cdev->blink_mode == SOFTWARE_CONTROLLED)
+		return false;
+
+	ret = led_cdev->hw_control_configure(led_cdev, flag, BLINK_MODE_SUPPORTED);
+	if (ret > 0)
+		return true;
+
+	return false;
+}
+#endif
 
 /**
  * led_trigger_rename_static - rename a trigger

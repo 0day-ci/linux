@@ -198,6 +198,31 @@ With HARDWARE_CONTROLLED blink_mode hw_control_status/start/stop is optional
 and any software only trigger will reject activation as the LED supports only
 hardware mode.
 
+A trigger once he declared support for hardware controlled blinks, will use the function
+hw_control_configure() provided by the driver to check support for a particular blink mode.
+This function passes as the first argument (flag) a u32 flag.
+The second argument (cmd) of hw_control_configure() method can be used to do various
+operations for the specific blink mode. We currently support ENABLE, DISABLE, READ, ZERO
+and SUPPORTED to enable, disable, read the state of the blink mode, ask the LED
+driver if it does supports the specific blink mode and to reset any blink mode active.
+
+In ENABLE/DISABLE hw_control_configure() should configure the LED to enable/disable the
+requested blink mode (flag).
+In READ hw_control_configure() should return 0 or 1 based on the status of the requested
+blink mode (flag).
+In SUPPORTED hw_control_configure() should return 0 or 1 if the LED driver supports the
+requested blink mode (flags) or not.
+In ZERO hw_control_configure() should return 0 with success operation or error.
+
+The unsigned long flag is specific to the trigger and change across them. It's in the LED
+driver interest know how to elaborate this flag and to declare support for a
+particular trigger. For this exact reason explicit support for the specific
+trigger is mandatory or the driver returns -EOPNOTSUPP if asked to enter offload mode
+with a not supported trigger.
+If the driver returns -EOPNOTSUPP on hw_control_configure(), the trigger activation will
+fail as the driver doesn't support that specific offload trigger or doesn't know
+how to handle the provided flags.
+
 Known Issues
 ============
 
