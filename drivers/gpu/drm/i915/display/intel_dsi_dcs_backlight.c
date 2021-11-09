@@ -81,6 +81,7 @@ static void dcs_set_backlight(const struct drm_connector_state *conn_state, u32 
 
 	for_each_dsi_port(port, intel_dsi->dcs_backlight_ports) {
 		dsi_device = intel_dsi->dsi_hosts[port]->device;
+		dsi_device->mode_flags &= ~MIPI_DSI_MODE_LPM;
 		mipi_dsi_dcs_write(dsi_device, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				   &data, len);
 	}
