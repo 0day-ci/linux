@@ -47,7 +47,7 @@ struct static_call_site {
 	extern __weak struct static_call_key STATIC_CALL_KEY(name);	\
 	extern __weak struct static_call_key *STATIC_CALL_GETKEY(name)(void);\
 	extern __weak typeof(func) *STATIC_CALL_QUERY(name)(void);	\
-	extern typeof(func) STATIC_CALL_TRAMP(name)
+	extern struct static_call_tramp STATIC_CALL_TRAMP(name)
 
 #define __static_call_query(name)					\
 	((typeof(STATIC_CALL_QUERY(name)()))READ_ONCE(STATIC_CALL_KEY(name).func))
@@ -66,7 +66,7 @@ struct static_call_site {
 #define static_call(name)						\
 ({									\
 	__STATIC_CALL_ADDRESSABLE(name);				\
-	(&STATIC_CALL_TRAMP(name));					\
+	((typeof(STATIC_CALL_QUERY(name)()))&STATIC_CALL_TRAMP(name));	\
 })
 
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
@@ -107,7 +107,7 @@ struct static_call_key {
 };
 
 #define static_call(name)						\
-	((typeof(STATIC_CALL_TRAMP(name))*)(STATIC_CALL_KEY(name).func))
+	((typeof(STATIC_CALL_QUERY(name)()))(STATIC_CALL_KEY(name).func))
 
 #endif /* CONFIG_HAVE_STATIC_CALL */
 
