@@ -2943,6 +2943,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	if (err < 0) {
 		bt_dev_err(hdev, "sending frame failed (%d)", err);
 		kfree_skb(skb);
+
+		hci_tx_error(hdev, -err);
 	}
 }
 
