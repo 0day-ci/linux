@@ -652,21 +652,8 @@ static int create_static_call_sections(struct objtool_file *file)
 
 		key_sym = find_symbol_by_name(file->elf, tmp);
 		if (!key_sym) {
-			if (!module) {
-				WARN("static_call: can't find static_call_key symbol: %s", tmp);
-				return -1;
-			}
-
-			/*
-			 * For modules(), the key might not be exported, which
-			 * means the module can make static calls but isn't
-			 * allowed to change them.
-			 *
-			 * In that case we temporarily set the key to be the
-			 * trampoline address.  This is fixed up in
-			 * static_call_add_module().
-			 */
-			key_sym = insn->call_dest;
+			WARN("static_call: can't find static_call_key symbol: %s", tmp);
+			return -1;
 		}
 		free(key_name);
 
@@ -675,6 +662,20 @@ static int create_static_call_sections(struct objtool_file *file)
 				  idx * sizeof(struct static_call_site) + 4,
 				  R_X86_64_PC32, key_sym,
 				  is_sibling_call(insn) * STATIC_CALL_SITE_TAIL))
+			return -1;
+
+		/*
+		 * For modules(), the key might not be exported, which means
+		 * the module can make static calls but isn't allowed to change
+		 * them.
+		 *
+		 * For this case, we pass the trampoline in .static_call_sites
+		 * as well. This is used to lookup the key in
+		 * static_call_add_module().
+		 */
+		if (elf_add_reloc(file->elf, sec,
+				  idx * sizeof(struct static_call_site) + 8,
+				  R_X86_64_PC32, insn->call_dest, 0))
 			return -1;
 
 		idx++;

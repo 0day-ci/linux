@@ -366,18 +366,18 @@ static int static_call_add_module(struct module *mod)
 		 * means modules are allowed to call static_call_update() on
 		 * it.
 		 *
-		 * Otherwise, the key isn't exported, and 'addr' points to the
+		 * Otherwise, the key isn't exported, and 'tramp' points to the
 		 * trampoline so we need to lookup the key.
 		 *
 		 * We go through this dance to prevent crazy modules from
 		 * abusing sensitive static calls.
 		 */
-		if (!kernel_text_address(addr))
+		if (addr)
 			continue;
 
-		key = tramp_key_lookup(addr);
+		key = tramp_key_lookup((unsigned long)offset_to_ptr(&site->tramp));
 		if (!key) {
-			pr_warn("Failed to fixup __raw_static_call() usage at: %ps\n",
+			pr_warn("Failed to fixup static_call() usage at: %ps\n",
 				static_call_addr(site));
 			return -EINVAL;
 		}

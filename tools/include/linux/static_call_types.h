@@ -32,15 +32,20 @@
 struct static_call_site {
 	s32 addr;
 	s32 key;
+	s32 tramp;
 };
 
 #define DECLARE_STATIC_CALL(name, func)					\
-	extern struct static_call_key STATIC_CALL_KEY(name);		\
+	extern __weak struct static_call_key STATIC_CALL_KEY(name);	\
 	extern typeof(func) STATIC_CALL_TRAMP(name);
 
 #ifdef CONFIG_HAVE_STATIC_CALL
 
-#define __raw_static_call(name)	(&STATIC_CALL_TRAMP(name))
+#define static_call(name)						\
+({									\
+	__STATIC_CALL_ADDRESSABLE(name);				\
+	(&STATIC_CALL_TRAMP(name));					\
+})
 
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
 
@@ -51,12 +56,6 @@ struct static_call_site {
  */
 #define __STATIC_CALL_ADDRESSABLE(name) \
 	__ADDRESSABLE(STATIC_CALL_KEY(name))
-
-#define __static_call(name)						\
-({									\
-	__STATIC_CALL_ADDRESSABLE(name);				\
-	__raw_static_call(name);					\
-})
 
 struct static_call_key {
 	void *func;
@@ -71,23 +70,12 @@ struct static_call_key {
 #else /* !CONFIG_HAVE_STATIC_CALL_INLINE */
 
 #define __STATIC_CALL_ADDRESSABLE(name)
-#define __static_call(name)	__raw_static_call(name)
 
 struct static_call_key {
 	void *func;
 };
 
 #endif /* CONFIG_HAVE_STATIC_CALL_INLINE */
-
-#ifdef MODULE
-#define __STATIC_CALL_MOD_ADDRESSABLE(name)
-#define static_call_mod(name)	__raw_static_call(name)
-#else
-#define __STATIC_CALL_MOD_ADDRESSABLE(name) __STATIC_CALL_ADDRESSABLE(name)
-#define static_call_mod(name)	__static_call(name)
-#endif
-
-#define static_call(name)	__static_call(name)
 
 #else
 
