@@ -3290,7 +3290,9 @@ static int __f2fs_write_data_pages(struct address_space *mapping,
 	return ret;
 
 skip_write:
-	wbc->pages_skipped += get_dirty_pages(inode);
+	wbc->pages_skipped +=
+		mapping_tagged(inode->i_mapping, PAGECACHE_TAG_DIRTY) ?
+		get_dirty_pages(inode) : 0;
 	trace_f2fs_writepages(mapping->host, wbc, DATA);
 	return 0;
 }
