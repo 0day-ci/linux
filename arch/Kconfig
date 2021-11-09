@@ -1293,11 +1293,24 @@ config HAVE_STATIC_CALL_INLINE
 
 config HAVE_PREEMPT_DYNAMIC
 	bool
+
+config HAVE_PREEMPT_DYNAMIC_CALL
+	bool
 	depends on HAVE_STATIC_CALL
+	select HAVE_PREEMPT_DYNAMIC
 	help
 	   Select this if the architecture support boot time preempt setting
 	   on top of static calls. It is strongly advised to support inline
 	   static call to avoid any overhead.
+
+config HAVE_PREEMPT_DYNAMIC_KEY
+	bool
+	depends on JUMP_LABEL
+	select HAVE_PREEMPT_DYNAMIC
+	help
+	   Select this if the architecture support boot time preempt setting
+	   on top of static keys. This will likely have more overhead than
+	   using static calls.
 
 config ARCH_WANT_LD_ORPHAN_WARN
 	bool
