@@ -9,7 +9,7 @@
  *  Copyright:	MontaVista Software Inc.
  */
 #include <linux/clkdev.h>
-#include <linux/gpio.h>
+#include <linux/gpio/driver.h>
 #include <linux/gpio/gpio-reg.h>
 #include <linux/gpio/machine.h>
 #include <linux/module.h>

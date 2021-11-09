@@ -12,6 +12,7 @@
 #include <linux/errno.h>
 #include <linux/gpio/gpio-reg.h>
 #include <linux/gpio/machine.h>
+#include <linux/gpio/driver.h>
 #include <linux/gpio_keys.h>
 #include <linux/ioport.h>
 #include <linux/platform_data/sa11x0-serial.h>

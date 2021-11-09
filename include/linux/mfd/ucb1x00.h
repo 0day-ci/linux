@@ -9,6 +9,7 @@
 
 #include <linux/device.h>
 #include <linux/mfd/mcp.h>
+#include <linux/gpio/driver.h>
 #include <linux/gpio.h>
 #include <linux/mutex.h>
 

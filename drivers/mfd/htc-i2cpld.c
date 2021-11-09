@@ -20,6 +20,7 @@
 #include <linux/irq.h>
 #include <linux/spinlock.h>
 #include <linux/htcpld.h>
+#include <linux/gpio/driver.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
 

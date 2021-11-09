@@ -23,6 +23,7 @@
 #include <sound/ac97_codec.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
+#include <linux/gpio/driver.h>
 #include <linux/gpio.h>
 
 /*

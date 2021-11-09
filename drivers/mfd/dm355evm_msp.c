@@ -13,6 +13,7 @@
 #include <linux/err.h>
 #include <linux/gpio/consumer.h>
 #include <linux/gpio.h>
+#include <linux/gpio/driver.h>
 #include <linux/gpio/machine.h>
 #include <linux/leds.h>
 #include <linux/i2c.h>
