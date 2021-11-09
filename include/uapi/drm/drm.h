@@ -1096,6 +1096,22 @@ extern "C" {
 #define DRM_IOCTL_SYNCOBJ_TRANSFER	DRM_IOWR(0xCC, struct drm_syncobj_transfer)
 #define DRM_IOCTL_SYNCOBJ_TIMELINE_SIGNAL	DRM_IOWR(0xCD, struct drm_syncobj_timeline_array)
 
+/**
+ * DRM_IOCTL_MODE_GETFB2 - Get framebuffer metadata.
+ *
+ * This queries metadata about a framebuffer. User-space fills
+ * &drm_mode_fb_cmd2.fb_id as the input, and the kernels fills the rest of the
+ * struct as the output.
+ *
+ * If the client is not DRM master and doesn't have &CAP_SYS_ADMIN,
+ * &drm_mode_fb_cmd2.handles will be zeroed. Planes are valid until one has a
+ * zero &drm_mode_fb_cmd2.pitches -- this can be used to compute the number of
+ * planes.
+ *
+ * If the framebuffer has a format modifier, &DRM_MODE_FB_MODIFIERS will be set
+ * in &drm_mode_fb_cmd2.flags. Otherwise, &drm_mode_fb_cmd2.modifier has
+ * undefined contents.
+ */
 #define DRM_IOCTL_MODE_GETFB2		DRM_IOWR(0xCE, struct drm_mode_fb_cmd2)
 
 /*
