@@ -581,6 +581,7 @@ int ath11k_spectral_process_fft(struct ath11k *ar,
 	u16 length, freq;
 	u8 chan_width_mhz, bin_sz;
 	int ret;
+	u32 check_length;
 
 	lockdep_assert_held(&ar->spectral.lock);
 
@@ -613,6 +614,11 @@ int ath11k_spectral_process_fft(struct ath11k *ar,
 		ath11k_warn(ab, "Invalid num of bins %d\n", num_bins);
 		return -EINVAL;
 	}
+
+	check_length = sizeof(*fft_report) + (num_bins * ab->hw_params.spectral.fft_sz);
+	ret = ath11k_dbring_validate_buffer(ar, data, check_length);
+	if (ret)
+		return ret;
 
 	ret = ath11k_spectral_pull_search(ar, data, &search);
 	if (ret) {
@@ -746,6 +752,10 @@ static int ath11k_spectral_process_data(struct ath11k *ar,
 				ret = -EINVAL;
 				goto err;
 			}
+
+			ret = ath11k_dbring_validate_buffer(ar, data, tlv_len);
+			if (ret)
+				goto err;
 
 			summary = (struct spectral_summary_fft_report *)tlv;
 			ath11k_spectral_pull_summary(ar, &param->meta,
