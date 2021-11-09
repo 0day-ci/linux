@@ -75,7 +75,7 @@ static int udf_readdir(struct file *file, struct dir_context *ctx)
 	 * identifying beginning of dir entry (names are under user control),
 	 * we need to scan the directory from the beginning.
 	 */
-	if (ctx->pos != (loff_t)file->private_data) {
+	if (ctx->pos != (uintptr_t)file->private_data) {
 		emit_pos = nf_pos;
 		nf_pos = 0;
 	}
@@ -208,7 +208,7 @@ static int udf_readdir(struct file *file, struct dir_context *ctx)
 
 out:
 	/* Store position where we've ended */
-	file->private_data = (void *)ctx->pos;
+	file->private_data = (void *)(uintptr_t)ctx->pos;
 	if (fibh.sbh != fibh.ebh)
 		brelse(fibh.ebh);
 	brelse(fibh.sbh);
