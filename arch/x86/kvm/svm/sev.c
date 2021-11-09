@@ -2030,7 +2030,7 @@ void sev_free_vcpu(struct kvm_vcpu *vcpu)
 	__free_page(virt_to_page(svm->vmsa));
 
 	if (svm->ghcb_sa_free)
-		kfree(svm->ghcb_sa);
+		kvfree(svm->ghcb_sa);
 }
 
 static void dump_ghcb(struct vcpu_svm *svm)
@@ -2262,7 +2262,7 @@ void sev_es_unmap_ghcb(struct vcpu_svm *svm)
 			svm->ghcb_sa_sync = false;
 		}
 
-		kfree(svm->ghcb_sa);
+		kvfree(svm->ghcb_sa);
 		svm->ghcb_sa = NULL;
 		svm->ghcb_sa_free = false;
 	}
@@ -2350,7 +2350,7 @@ static int setup_vmgexit_scratch(struct vcpu_svm *svm, bool sync, u64 len)
 			       len, GHCB_SCRATCH_AREA_LIMIT);
 			return -EINVAL;
 		}
-		scratch_va = kzalloc(len, GFP_KERNEL_ACCOUNT);
+		scratch_va = kvzalloc(len, GFP_KERNEL_ACCOUNT);
 		if (!scratch_va)
 			return -ENOMEM;
 
@@ -2358,7 +2358,7 @@ static int setup_vmgexit_scratch(struct vcpu_svm *svm, bool sync, u64 len)
 			/* Unable to copy scratch area from guest */
 			pr_err("vmgexit: kvm_read_guest for scratch area failed\n");
 
-			kfree(scratch_va);
+			kvfree(scratch_va);
 			return -EFAULT;
 		}
 
