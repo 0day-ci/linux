@@ -505,6 +505,22 @@ bool ceph_quota_update_statfs(struct ceph_fs_client *fsc, struct kstatfs *buf)
 			buf->f_bfree = free;
 			buf->f_bavail = free;
 			is_updated = true;
+		} else if (ci->i_max_bytes) {
+			/* For quota size less than CEPH_BLOCK size, report
+			 * the total=used=CEPH_BLOCK,free=0 when quota is full and
+			 * total=free=CEPH_BLOCK, used=0 otherwise  */
+			total = ci->i_max_bytes;
+			used = ci->i_rbytes;
+
+			buf->f_blocks = 1;
+			if (total > used) {
+				buf->f_bfree = 1;
+				buf->f_bavail = 1;
+			} else {
+				buf->f_bfree = 0;
+				buf->f_bavail = 0;
+			}
+			is_updated = true;
 		}
 		iput(in);
 	}
