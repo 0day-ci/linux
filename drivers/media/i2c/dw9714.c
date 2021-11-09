@@ -251,7 +251,8 @@ static const struct of_device_id dw9714_of_table[] = {
 MODULE_DEVICE_TABLE(of, dw9714_of_table);
 
 static const struct dev_pm_ops dw9714_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(dw9714_vcm_suspend, dw9714_vcm_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+				pm_runtime_force_resume)
 	SET_RUNTIME_PM_OPS(dw9714_vcm_suspend, dw9714_vcm_resume, NULL)
 };
 
