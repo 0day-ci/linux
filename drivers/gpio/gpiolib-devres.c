@@ -385,13 +385,6 @@ static void devm_gpio_release(struct device *dev, void *res)
 	gpio_free(*gpio);
 }
 
-static int devm_gpio_match(struct device *dev, void *res, void *data)
-{
-	unsigned *this = res, *gpio = data;
-
-	return *this == *gpio;
-}
-
 /**
  *      devm_gpio_request - request a GPIO for a managed device
  *      @dev: device to request the GPIO for
@@ -458,24 +451,6 @@ int devm_gpio_request_one(struct device *dev, unsigned gpio,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(devm_gpio_request_one);
-
-/**
- *      devm_gpio_free - free a GPIO
- *      @dev: device to free GPIO for
- *      @gpio: GPIO to free
- *
- *      Except for the extra @dev argument, this function takes the
- *      same arguments and performs the same function as gpio_free().
- *      This function instead of gpio_free() should be used to manually
- *      free GPIOs allocated with devm_gpio_request().
- */
-void devm_gpio_free(struct device *dev, unsigned int gpio)
-{
-
-	WARN_ON(devres_release(dev, devm_gpio_release, devm_gpio_match,
-		&gpio));
-}
-EXPORT_SYMBOL_GPL(devm_gpio_free);
 
 static void devm_gpio_chip_release(void *data)
 {

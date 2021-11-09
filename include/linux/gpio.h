@@ -117,11 +117,6 @@ static inline int gpio_direction_output(unsigned gpio, int value)
 	return gpiod_direction_output_raw(gpio_to_desc(gpio), value);
 }
 
-static inline int gpio_set_debounce(unsigned gpio, unsigned debounce)
-{
-	return gpiod_set_debounce(gpio_to_desc(gpio), debounce);
-}
-
 static inline int gpio_get_value_cansleep(unsigned gpio)
 {
 	return gpiod_get_raw_value_cansleep(gpio_to_desc(gpio));
@@ -138,11 +133,6 @@ static inline int gpio_get_value(unsigned gpio)
 static inline void gpio_set_value(unsigned gpio, int value)
 {
 	return gpiod_set_raw_value(gpio_to_desc(gpio), value);
-}
-
-static inline int gpio_cansleep(unsigned gpio)
-{
-	return gpiod_cansleep(gpio_to_desc(gpio));
 }
 
 static inline int gpio_to_irq(unsigned gpio)
@@ -181,8 +171,6 @@ struct device;
 int devm_gpio_request(struct device *dev, unsigned gpio, const char *label);
 int devm_gpio_request_one(struct device *dev, unsigned gpio,
 			  unsigned long flags, const char *label);
-void devm_gpio_free(struct device *dev, unsigned int gpio);
-
 #else /* ! CONFIG_GPIOLIB */
 
 #include <linux/kernel.h>
@@ -239,11 +227,6 @@ static inline int gpio_direction_output(unsigned gpio, int value)
 	return -ENOSYS;
 }
 
-static inline int gpio_set_debounce(unsigned gpio, unsigned debounce)
-{
-	return -ENOSYS;
-}
-
 static inline int gpio_get_value(unsigned gpio)
 {
 	/* GPIO can never have been requested or set as {in,out}put */
@@ -255,13 +238,6 @@ static inline void gpio_set_value(unsigned gpio, int value)
 {
 	/* GPIO can never have been requested or set as output */
 	WARN_ON(1);
-}
-
-static inline int gpio_cansleep(unsigned gpio)
-{
-	/* GPIO can never have been requested or set as {in,out}put */
-	WARN_ON(1);
-	return 0;
 }
 
 static inline int gpio_get_value_cansleep(unsigned gpio)
@@ -317,11 +293,6 @@ static inline int devm_gpio_request_one(struct device *dev, unsigned gpio,
 {
 	WARN_ON(1);
 	return -EINVAL;
-}
-
-static inline void devm_gpio_free(struct device *dev, unsigned int gpio)
-{
-	WARN_ON(1);
 }
 
 #endif /* ! CONFIG_GPIOLIB */
