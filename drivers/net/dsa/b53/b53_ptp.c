@@ -6,6 +6,8 @@
  * Copyright (C) 2021 Linutronix GmbH
  */
 
+#include <linux/ptp_classify.h>
+
 #include "b53_priv.h"
 #include "b53_ptp.h"
 
@@ -105,6 +107,32 @@ static long b53_hwtstamp_work(struct ptp_clock_info *ptp)
 
 	return B53_PTP_OVERFLOW_PERIOD;
 }
+
+bool b53_port_rxtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb,
+		       unsigned int type)
+{
+	struct b53_device *dev = ds->priv;
+	struct b53_port_hwtstamp *ps = &dev->ports[port].port_hwtstamp;
+	struct skb_shared_hwtstamps *shwt;
+	u64 ns;
+
+	if (type != PTP_CLASS_V2_L2)
+		return false;
+
+	if (!test_bit(B53_HWTSTAMP_ENABLED, &ps->state))
+		return false;
+
+	mutex_lock(&dev->ptp_mutex);
+	ns = timecounter_cyc2time(&dev->tc, BRCM_SKB_CB(skb)->meta_tstamp);
+	mutex_unlock(&dev->ptp_mutex);
+
+	shwt = skb_hwtstamps(skb);
+	memset(shwt, 0, sizeof(*shwt));
+	shwt->hwtstamp = ns_to_ktime(ns);
+
+	return false;
+}
+EXPORT_SYMBOL(b53_port_rxtstamp);
 
 int b53_ptp_init(struct b53_device *dev)
 {

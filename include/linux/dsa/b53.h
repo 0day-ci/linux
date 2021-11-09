@@ -46,9 +46,32 @@ struct b53_io_ops {
 					struct phylink_link_state *state);
 };
 
+/* state flags for b53_port_hwtstamp::state */
+enum {
+	B53_HWTSTAMP_ENABLED,
+	B53_HWTSTAMP_TX_IN_PROGRESS,
+};
+
+struct b53_port_hwtstamp {
+	/* Port index */
+	int port_id;
+
+	/* Timestamping state */
+	unsigned long state;
+
+	/* Resources for transmit timestamping */
+	unsigned long tx_tstamp_start;
+	struct sk_buff *tx_skb;
+
+	/* Current timestamp configuration */
+	struct hwtstamp_config tstamp_config;
+};
+
 struct b53_port {
 	u16 vlan_ctl_mask;
 	struct ethtool_eee eee;
+	/* Per-port timestamping resources */
+	struct b53_port_hwtstamp port_hwtstamp;
 };
 
 struct b53_vlan {
@@ -112,3 +135,10 @@ struct b53_device {
 #define B53_PTP_OVERFLOW_PERIOD (HZ / 2)
 	struct delayed_work overflow_work;
 };
+
+struct brcm_skb_cb {
+	struct sk_buff *clone;
+	u32 meta_tstamp;
+};
+
+#define BRCM_SKB_CB(skb) ((struct brcm_skb_cb *)(skb)->cb)
