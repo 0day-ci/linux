@@ -18,6 +18,11 @@
 #define STATIC_CALL_TRAMP(name)		__PASTE(STATIC_CALL_TRAMP_PREFIX, name)
 #define STATIC_CALL_TRAMP_STR(name)	__stringify(STATIC_CALL_TRAMP(name))
 
+#define STATIC_CALL_GETKEY_PREFIX	__SCG__
+#define STATIC_CALL_GETKEY_PREFIX_STR	__stringify(STATIC_CALL_GETKEY_PREFIX)
+#define STATIC_CALL_GETKEY_PREFIX_LEN	(sizeof(STATIC_CALL_GETKEY_PREFIX_STR) - 1)
+#define STATIC_CALL_GETKEY(name)	__PASTE(STATIC_CALL_GETKEY_PREFIX, name)
+
 /*
  * Flags in the low bits of static_call_site::key.
  */
@@ -32,11 +37,12 @@
 struct static_call_site {
 	s32 addr;
 	s32 key;
-	s32 tramp;
+	s32 helper;
 };
 
 #define DECLARE_STATIC_CALL(name, func)					\
 	extern __weak struct static_call_key STATIC_CALL_KEY(name);	\
+	extern __weak struct static_call_key *STATIC_CALL_GETKEY(name)(void);\
 	extern typeof(func) STATIC_CALL_TRAMP(name);
 
 #ifdef CONFIG_HAVE_STATIC_CALL
@@ -55,6 +61,7 @@ struct static_call_site {
  * .static_call_sites section.
  */
 #define __STATIC_CALL_ADDRESSABLE(name) \
+	__ADDRESSABLE(STATIC_CALL_GETKEY(name)) \
 	__ADDRESSABLE(STATIC_CALL_KEY(name))
 
 struct static_call_key {

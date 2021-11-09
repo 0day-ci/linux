@@ -81,6 +81,7 @@ int notrace core_kernel_text(unsigned long addr)
 		return 1;
 	return 0;
 }
+EXPORT_SYMBOL_GPL(core_kernel_text);
 
 /**
  * core_kernel_data - tell if addr points to kernel data

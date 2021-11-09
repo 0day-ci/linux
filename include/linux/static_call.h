@@ -161,12 +161,6 @@ struct static_call_mod {
 	struct static_call_site *sites;
 };
 
-/* For finding the key associated with a trampoline */
-struct static_call_tramp_key {
-	s32 tramp;
-	s32 key;
-};
-
 extern void __static_call_update(struct static_call_key *key, void *tramp, void *func);
 extern int static_call_mod_init(struct module *mod);
 extern int static_call_text_reserved(void *start, void *end);
@@ -196,13 +190,21 @@ extern long __static_call_return0(void);
 	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name));			\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name))
 
+#define EXPORT_STATIC_CALL_GETKEY_HELPER(name)				\
+	struct static_call_key *STATIC_CALL_GETKEY(name)(void) {	\
+		BUG_ON(!core_kernel_text(				\
+			(unsigned long)__builtin_return_address(0)));	\
+		return &STATIC_CALL_KEY(name);				\
+	}								\
+	EXPORT_SYMBOL_GPL(STATIC_CALL_GETKEY(name))
+
 /* Leave the key unexported, so modules can't change static call targets: */
 #define EXPORT_STATIC_CALL_TRAMP(name)					\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name));				\
-	ARCH_ADD_TRAMP_KEY(name)
+	EXPORT_STATIC_CALL_GETKEY_HELPER(name)
 #define EXPORT_STATIC_CALL_TRAMP_GPL(name)				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name));			\
-	ARCH_ADD_TRAMP_KEY(name)
+	EXPORT_STATIC_CALL_GETKEY_HELPER(name)
 
 #elif defined(CONFIG_HAVE_STATIC_CALL)
 

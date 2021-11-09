@@ -600,7 +600,7 @@ static int create_static_call_sections(struct objtool_file *file)
 	struct section *sec;
 	struct static_call_site *site;
 	struct instruction *insn;
-	struct symbol *key_sym;
+	struct symbol *key_sym, *helper_sym;
 	char *key_name, *tmp;
 	int idx;
 
@@ -655,7 +655,6 @@ static int create_static_call_sections(struct objtool_file *file)
 			WARN("static_call: can't find static_call_key symbol: %s", tmp);
 			return -1;
 		}
-		free(key_name);
 
 		/* populate reloc for 'key' */
 		if (elf_add_reloc(file->elf, sec,
@@ -664,18 +663,27 @@ static int create_static_call_sections(struct objtool_file *file)
 				  is_sibling_call(insn) * STATIC_CALL_SITE_TAIL))
 			return -1;
 
+		memcpy(tmp, STATIC_CALL_GETKEY_PREFIX_STR, STATIC_CALL_GETKEY_PREFIX_LEN);
+
+		helper_sym = find_symbol_by_name(file->elf, tmp);
+		if (!helper_sym) {
+			WARN("static_call: can't find static_call_key symbol: %s", tmp);
+			return -1;
+		}
+		free(key_name);
+
 		/*
 		 * For modules(), the key might not be exported, which means
 		 * the module can make static calls but isn't allowed to change
 		 * them.
 		 *
-		 * For this case, we pass the trampoline in .static_call_sites
-		 * as well. This is used to lookup the key in
-		 * static_call_add_module().
+		 * For this case, we pass the special key helper routine in
+		 * .static_call_sites as well. This is used to lookup the key
+		 * in static_call_add_module().
 		 */
 		if (elf_add_reloc(file->elf, sec,
 				  idx * sizeof(struct static_call_site) + 8,
-				  R_X86_64_PC32, insn->call_dest, 0))
+				  R_X86_64_PC32, helper_sym, 0))
 			return -1;
 
 		idx++;
