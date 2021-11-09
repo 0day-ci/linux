@@ -92,23 +92,16 @@
  *
  *   where the argument evaludation also depends on the pointer value.
  *
- *   When calling a static_call that can be NULL, use:
- *
- *     static_call_cond(name)(arg1);
- *
- *   which will include the required value tests to avoid NULL-pointer
- *   dereferences.
- *
  *   To query which function is currently set to be called, use:
  *
  *   func = static_call_query(name);
  *
  *
- * DEFINE_STATIC_CALL_RET0 / __static_call_return0:
+ * DEFINE_STATIC_CALL_RET0:
  *
- *   Just like how DEFINE_STATIC_CALL_NULL() / static_call_cond() optimize the
- *   conditional void function call, DEFINE_STATIC_CALL_RET0 /
- *   __static_call_return0 optimize the do nothing return 0 function.
+ *   Just like how DEFINE_STATIC_CALL_NULL() optimizes the conditional void
+ *   function call, DEFINE_STATIC_CALL_RET0 optimizes the do nothing return 0
+ *   function.
  *
  *   This feature is strictly UB per the C standard (since it casts a function
  *   pointer to a different signature) and relies on the architecture ABI to
@@ -196,8 +189,6 @@ extern long __static_call_return0(void);
 	};								\
 	ARCH_DEFINE_STATIC_CALL_NULL_TRAMP(name)
 
-#define static_call_cond(name)	(void)__static_call(name)
-
 #define EXPORT_STATIC_CALL(name)					\
 	EXPORT_SYMBOL(STATIC_CALL_KEY(name));				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name))
@@ -231,8 +222,6 @@ static inline int static_call_init(void) { return 0; }
 	};								\
 	ARCH_DEFINE_STATIC_CALL_NULL_TRAMP(name)
 
-
-#define static_call_cond(name)	(void)__static_call(name)
 
 static inline
 void __static_call_update(struct static_call_key *key, void *tramp, void *func)
@@ -275,6 +264,8 @@ static inline long __static_call_return0(void)
 	return 0;
 }
 
+static inline void __static_call_nop(void) { }
+
 #define __DEFINE_STATIC_CALL(name, _func, _func_init)			\
 	DECLARE_STATIC_CALL(name, _func);				\
 	struct static_call_key STATIC_CALL_KEY(name) = {		\
@@ -284,37 +275,13 @@ static inline long __static_call_return0(void)
 #define DEFINE_STATIC_CALL_NULL(name, _func)				\
 	DECLARE_STATIC_CALL(name, _func);				\
 	struct static_call_key STATIC_CALL_KEY(name) = {		\
-		.func = NULL,						\
+		.func = (void *)__static_call_nop,			\
 	}
-
-static inline void __static_call_nop(void) { }
-
-/*
- * This horrific hack takes care of two things:
- *
- *  - it ensures the compiler will only load the function pointer ONCE,
- *    which avoids a reload race.
- *
- *  - it ensures the argument evaluation is unconditional, similar
- *    to the HAVE_STATIC_CALL variant.
- *
- * Sadly current GCC/Clang (10 for both) do not optimize this properly
- * and will emit an indirect call for the NULL case :-(
- */
-#define __static_call_cond(name)					\
-({									\
-	void *func = READ_ONCE(STATIC_CALL_KEY(name).func);		\
-	if (!func)							\
-		func = &__static_call_nop;				\
-	(typeof(STATIC_CALL_TRAMP(name))*)func;				\
-})
-
-#define static_call_cond(name)	(void)__static_call_cond(name)
 
 static inline
 void __static_call_update(struct static_call_key *key, void *tramp, void *func)
 {
-	WRITE_ONCE(key->func, func);
+	WRITE_ONCE(key->func, func ?: (void *)&__static_call_nop);
 }
 
 static inline int static_call_text_reserved(void *start, void *end)
