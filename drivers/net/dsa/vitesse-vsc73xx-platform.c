@@ -116,12 +116,7 @@ static int vsc73xx_platform_remove(struct platform_device *pdev)
 {
 	struct vsc73xx_platform *vsc_platform = platform_get_drvdata(pdev);
 
-	if (!vsc_platform)
-		return 0;
-
 	vsc73xx_remove(&vsc_platform->vsc);
-
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
