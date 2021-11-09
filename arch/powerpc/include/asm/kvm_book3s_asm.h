@@ -15,7 +15,11 @@
 #define XICS_IPI		2	/* interrupt source # for IPIs */
 
 /* LPIDs we support with this build -- runtime limit may be lower */
-#define KVMPPC_NR_LPIDS			(LPID_RSVD + 1)
+#define KVMPPC_NR_LPIDS		(1ul << 12)
+
+/* Reserved LPID for partn switching */
+#define   LPID_RSVD_POWER7	((1ul << 10) - 1)
+#define   LPID_RSVD		(KVMPPC_NR_LPIDS - 1)
 
 /* Maximum number of threads per physical core */
 #define MAX_SMT_THREADS		8
