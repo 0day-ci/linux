@@ -475,9 +475,14 @@ config SMP
 
 	  If you don't know what to do here, say N.
 
+# MAXSMP sets 8192 if COMPILE_TEST because that's what x86 has flushed out.
+# Exceeding that will cause a lot of compile errors. Have to deal with those
+# first.
 config NR_CPUS
-	int "Maximum number of CPUs (2-8192)" if SMP
-	range 2 8192 if SMP
+	int "Maximum number of CPUs (2-8192)" if SMP && !MAXSMP
+	range 2 16384 if SMP
+	default 16384 if MAXSMP && !COMPILE_TEST
+	default 8192 if MAXSMP && COMPILE_TEST
 	default "1" if !SMP
 	default "32" if PPC64
 	default "4"
