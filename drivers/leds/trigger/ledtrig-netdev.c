@@ -37,6 +37,7 @@
  */
 
 struct led_netdev_data {
+	bool hw_mode_supported;
 	spinlock_t lock;
 
 	struct delayed_work work;
@@ -61,8 +62,51 @@ enum netdev_led_attr {
 
 static void set_baseline_state(struct led_netdev_data *trigger_data)
 {
+	bool can_offload;
 	int current_brightness;
+	u32 hw_blink_mode_supported;
 	struct led_classdev *led_cdev = trigger_data->led_cdev;
+
+	if (trigger_data->hw_mode_supported) {
+		if (test_bit(TRIGGER_NETDEV_LINK, &trigger_data->mode) &&
+		    led_trigger_blink_mode_is_supported(led_cdev, TRIGGER_NETDEV_LINK))
+			hw_blink_mode_supported |= TRIGGER_NETDEV_LINK;
+		if (test_bit(TRIGGER_NETDEV_TX, &trigger_data->mode) &&
+		    led_trigger_blink_mode_is_supported(led_cdev, TRIGGER_NETDEV_TX))
+			hw_blink_mode_supported |= TRIGGER_NETDEV_TX;
+		if (test_bit(TRIGGER_NETDEV_RX, &trigger_data->mode) &&
+		    led_trigger_blink_mode_is_supported(led_cdev, TRIGGER_NETDEV_RX))
+			hw_blink_mode_supported |= TRIGGER_NETDEV_RX;
+
+		/* All the requested blink mode can be triggered by hardware.
+		 * Put it in hardware mode.
+		 */
+		if (hw_blink_mode_supported == trigger_data->mode)
+			can_offload = true;
+
+		if (can_offload) {
+			/* We are refreshing the blink modes. Reset them */
+			led_cdev->hw_control_configure(led_cdev, TRIGGER_NETDEV_LINK,
+						       BLINK_MODE_ZERO);
+
+			if (test_bit(TRIGGER_NETDEV_LINK, &trigger_data->mode))
+				led_cdev->hw_control_configure(led_cdev, TRIGGER_NETDEV_LINK,
+							       BLINK_MODE_ENABLE);
+			if (test_bit(TRIGGER_NETDEV_TX, &trigger_data->mode))
+				led_cdev->hw_control_configure(led_cdev, TRIGGER_NETDEV_TX,
+							       BLINK_MODE_ENABLE);
+			if (test_bit(TRIGGER_NETDEV_RX, &trigger_data->mode))
+				led_cdev->hw_control_configure(led_cdev, TRIGGER_NETDEV_RX,
+							       BLINK_MODE_ENABLE);
+			led_cdev->hw_control_start(led_cdev);
+
+			return;
+		}
+	}
+
+	/* If LED supports only hardware mode then skip any software handling */
+	if (led_cdev->blink_mode == HARDWARE_CONTROLLED)
+		return;
 
 	current_brightness = led_cdev->brightness;
 	if (current_brightness)
@@ -407,13 +451,27 @@ static int netdev_trig_activate(struct led_classdev *led_cdev)
 	trigger_data->mode = 0;
 	atomic_set(&trigger_data->interval, msecs_to_jiffies(50));
 	trigger_data->last_activity = 0;
+	if (led_cdev->blink_mode != SOFTWARE_CONTROLLED) {
+		trigger_data->hw_mode_supported = true;
+
+		/* With hw mode enabled reset any rule set by default */
+		if (led_cdev->hw_control_status(led_cdev)) {
+			rc = led_cdev->hw_control_configure(led_cdev, TRIGGER_NETDEV_LINK,
+							    BLINK_MODE_ZERO);
+			if (rc)
+				goto err;
+		}
+	}
 
 	led_set_trigger_data(led_cdev, trigger_data);
 
 	rc = register_netdevice_notifier(&trigger_data->notifier);
 	if (rc)
-		kfree(trigger_data);
+		goto err;
 
+	return 0;
+err:
+	kfree(trigger_data);
 	return rc;
 }
 
@@ -433,6 +491,7 @@ static void netdev_trig_deactivate(struct led_classdev *led_cdev)
 
 static struct led_trigger netdev_led_trigger = {
 	.name = "netdev",
+	.supported_blink_modes = SOFTWARE_HARDWARE,
 	.activate = netdev_trig_activate,
 	.deactivate = netdev_trig_deactivate,
 	.groups = netdev_trig_groups,
