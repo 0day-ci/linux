@@ -106,8 +106,7 @@ struct static_call_key {
 	void *func;
 };
 
-#define static_call(name)						\
-	((typeof(STATIC_CALL_QUERY(name)()))(STATIC_CALL_KEY(name).func))
+#define static_call(name)	static_call_query(name)
 
 #endif /* CONFIG_HAVE_STATIC_CALL */
 

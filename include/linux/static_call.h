@@ -302,8 +302,8 @@ static inline int static_call_text_reserved(void *start, void *end)
 	return 0;
 }
 
-#define EXPORT_STATIC_CALL(name)	EXPORT_SYMBOL(STATIC_CALL_KEY(name))
-#define EXPORT_STATIC_CALL_GPL(name)	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name))
+#define EXPORT_STATIC_CALL(name)	EXPORT_STATIC_CALL_QUERY(name,)
+#define EXPORT_STATIC_CALL_GPL(name)	EXPORT_STATIC_CALL_QUERY(name, _GPL)
 
 #define EXPORT_STATIC_CALL_FOR_UPDATE(name)	EXPORT_SYMBOL(STATIC_CALL_KEY(name))
 #define EXPORT_STATIC_CALL_FOR_UPDATE_GPL(name)	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name))
