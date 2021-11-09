@@ -184,6 +184,8 @@ static int clk_smd_rpm_handoff(struct clk_smd_rpm *r)
 	if (ret)
 		return ret;
 
+	r->enabled = true;
+
 	return 0;
 }
 
