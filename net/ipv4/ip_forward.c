@@ -95,9 +95,6 @@ int ip_forward(struct sk_buff *skb)
 	if (skb->pkt_type != PACKET_HOST)
 		goto drop;
 
-	if (unlikely(skb->sk))
-		goto drop;
-
 	if (skb_warn_if_lro(skb))
 		goto drop;
 
@@ -109,6 +106,9 @@ int ip_forward(struct sk_buff *skb)
 
 	skb_forward_csum(skb);
 	net = dev_net(skb->dev);
+
+	if (unlikely(!net->ipv4.sysctl_ip_fwd_accept_local && skb->sk))
+		goto drop;
 
 	/*
 	 *	According to the RFC, we must first decrease the TTL field. If
