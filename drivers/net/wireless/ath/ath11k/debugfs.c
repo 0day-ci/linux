@@ -50,6 +50,45 @@ static const char *htt_bp_lmac_ring[HTT_SW_LMAC_RING_IDX_MAX] = {
 	"MONITOR_DEST_RING",
 };
 
+void ath11k_dbring_add_debug_entry(struct ath11k *ar,
+				   enum wmi_direct_buffer_module id,
+				   enum ath11k_db_ring_dbg_event event,
+				   struct hal_srng *srng)
+{
+	struct ath11k_db_module_debug *db_module_debug;
+	struct ath11k_db_ring_debug *db_ring_debug;
+	struct ath11k_db_ring_debug_entry *entry;
+
+	if (id >= WMI_DIRECT_BUF_MAX || event >= DBR_RING_DEBUG_EVENT_MAX)
+		return;
+
+	db_module_debug = ar->debug.module_debug[id];
+	if (!db_module_debug)
+		return;
+
+	if (!db_module_debug->db_ring_debug_enabled)
+		return;
+
+	db_ring_debug = &db_module_debug->db_ring_debug;
+
+	spin_lock_bh(&db_ring_debug->lock);
+
+	if (db_ring_debug->entries) {
+		entry = &db_ring_debug->entries[db_ring_debug->db_ring_debug_idx];
+		entry->hp = srng->u.src_ring.hp;
+		entry->tp = *srng->u.src_ring.tp_addr;
+		entry->timestamp = jiffies;
+		entry->event = event;
+
+		db_ring_debug->db_ring_debug_idx++;
+		if (db_ring_debug->db_ring_debug_idx ==
+		    db_ring_debug->num_ring_debug_entries)
+			db_ring_debug->db_ring_debug_idx = 0;
+	}
+
+	spin_unlock_bh(&db_ring_debug->lock);
+}
+
 static void ath11k_fw_stats_pdevs_free(struct list_head *head)
 {
 	struct ath11k_fw_stats_pdev *i, *tmp;
@@ -1068,6 +1107,166 @@ static const struct file_operations fops_simulate_radar = {
 	.open = simple_open
 };
 
+static ssize_t ath11k_dbr_dump_debug_entries(struct file *file,
+					     char __user *user_buf,
+					     size_t count, loff_t *ppos)
+{
+	struct ath11k_db_ring_debug *db_ring_debug = file->private_data;
+	static const char * const event_id_to_string[] = {"empty", "Rx", "Replenish"};
+	int size = ATH11K_DBR_DEBUG_ENTRIES_MAX * 100;
+	char *buf;
+	int i, ret;
+	int len = 0;
+
+	buf = kzalloc(size, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	len += scnprintf(buf + len, size - len, "------------------------------------\n");
+	len += scnprintf(buf + len, size - len, "| idx | hp | tp | timestamp | event|\n");
+	len += scnprintf(buf + len, size - len, "------------------------------------\n");
+
+	spin_lock_bh(&db_ring_debug->lock);
+
+	for (i = 0; i < db_ring_debug->num_ring_debug_entries; i++) {
+		len += scnprintf(buf + len, size - len,
+				 "|%4u|%8u|%8u|%11llu|%8s|\n", i,
+				 db_ring_debug->entries[i].hp,
+				 db_ring_debug->entries[i].tp,
+				 db_ring_debug->entries[i].timestamp,
+				 event_id_to_string[db_ring_debug->entries[i].event]);
+	}
+
+	spin_unlock_bh(&db_ring_debug->lock);
+
+	ret = simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+
+	return ret;
+}
+
+static const struct file_operations fops_dump_dbr_debug_entries = {
+	.read = ath11k_dbr_dump_debug_entries,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+static void ath11k_db_module_debugfs_destroy(struct ath11k *ar, int module_id)
+{
+	struct ath11k_db_module_debug *module_debug;
+	struct ath11k_db_ring_debug *db_ring_debug;
+
+	if (!ar->debug.module_debug[module_id])
+		return;
+
+	module_debug = ar->debug.module_debug[module_id];
+	db_ring_debug = &module_debug->db_ring_debug;
+
+	debugfs_remove_recursive(module_debug->module_debugfs);
+	kfree(db_ring_debug->entries);
+	kfree(module_debug);
+	ar->debug.module_debug[module_id] = NULL;
+}
+
+static int ath11k_db_module_debugfs_init(struct ath11k *ar, int module_id)
+{
+	struct ath11k_db_module_debug *module_debug;
+	struct ath11k_db_ring_debug *db_ring_debug;
+	static const char * const module_id_to_str[] = {"spectral", "CFR"};
+
+	if (ar->debug.module_debug[module_id])
+		return 0;
+
+	ar->debug.module_debug[module_id] = kzalloc(sizeof(*module_debug),
+						    GFP_KERNEL);
+
+	if (!ar->debug.module_debug[module_id])
+		return -ENOMEM;
+
+	module_debug = ar->debug.module_debug[module_id];
+	db_ring_debug = &module_debug->db_ring_debug;
+
+	if (module_debug->module_debugfs)
+		return 0;
+
+	module_debug->module_debugfs = debugfs_create_dir(module_id_to_str[module_id],
+							  ar->debug.debugfs_pdev);
+	if (IS_ERR_OR_NULL(module_debug->module_debugfs)) {
+		if (IS_ERR(module_debug->module_debugfs))
+			return PTR_ERR(module_debug->module_debugfs);
+		return -ENOMEM;
+	}
+
+	module_debug->db_ring_debug_enabled = true;
+	db_ring_debug->num_ring_debug_entries = ATH11K_DBR_DEBUG_ENTRIES_MAX;
+	db_ring_debug->db_ring_debug_idx = 0;
+	db_ring_debug->entries = kcalloc(ATH11K_DBR_DEBUG_ENTRIES_MAX,
+					 sizeof(struct ath11k_db_ring_debug_entry),
+					 GFP_KERNEL);
+	if (!db_ring_debug->entries)
+		return -ENOMEM;
+
+	spin_lock_init(&db_ring_debug->lock);
+
+	debugfs_create_file("dump_db_ring_debug", 0444, module_debug->module_debugfs,
+			    db_ring_debug, &fops_dump_dbr_debug_entries);
+
+	return 0;
+}
+
+static ssize_t ath11k_write_enable_dbr_debug(struct file *file,
+					     const char __user *ubuf,
+					     size_t count, loff_t *ppos)
+{
+	struct ath11k *ar = file->private_data;
+	char buf[32] = {0};
+	u32 module_id, enable;
+	int ret;
+
+	mutex_lock(&ar->conf_mutex);
+
+	if (ar->state != ATH11K_STATE_ON) {
+		ret = -ENETDOWN;
+		goto out;
+	}
+
+	ret = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, ubuf, count);
+	if (ret < 0)
+		goto out;
+
+	buf[ret] = '\0';
+	ret = sscanf(buf, "%u %u", &module_id, &enable);
+	if (ret != 2 || module_id > 1 || enable > 1) {
+		ret = -EINVAL;
+		ath11k_warn(ar->ab, "usage: echo <module_id> <val> module_id:0-Spectral 1-CFR val:0-disable 1-enable\n");
+		goto out;
+	}
+
+	if (enable) {
+		ret = ath11k_db_module_debugfs_init(ar, module_id);
+		if (ret) {
+			ath11k_warn(ar->ab, "db ring module debugfs init failed: %d\n",
+				    ret);
+			goto out;
+		}
+	} else {
+		ath11k_db_module_debugfs_destroy(ar, module_id);
+	}
+
+	ret = count;
+out:
+	mutex_unlock(&ar->conf_mutex);
+	return ret;
+}
+
+static const struct file_operations fops_dbr_debug = {
+	.write = ath11k_write_enable_dbr_debug,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 int ath11k_debugfs_register(struct ath11k *ar)
 {
 	struct ath11k_base *ab = ar->ab;
@@ -1107,9 +1306,27 @@ int ath11k_debugfs_register(struct ath11k *ar)
 				    &ar->dfs_block_radar_events);
 	}
 
+	debugfs_create_file("enable_dbr_debug", 0200, ar->debug.debugfs_pdev,
+			    ar, &fops_dbr_debug);
+
 	return 0;
 }
 
 void ath11k_debugfs_unregister(struct ath11k *ar)
 {
+	struct ath11k_db_module_debug *module_debug;
+	struct ath11k_db_ring_debug *db_ring_debug;
+	int i;
+
+	for (i = 0; i < WMI_DIRECT_BUF_MAX; i++) {
+		module_debug = ar->debug.module_debug[i];
+		if (!module_debug)
+			continue;
+
+		db_ring_debug = &module_debug->db_ring_debug;
+		kfree(db_ring_debug->entries);
+		debugfs_remove_recursive(module_debug->module_debugfs);
+		kfree(module_debug);
+		ar->debug.module_debug[i] = NULL;
+	}
 }

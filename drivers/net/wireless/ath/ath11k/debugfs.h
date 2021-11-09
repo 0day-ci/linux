@@ -47,6 +47,36 @@ enum ath11k_dbg_htt_ext_stats_type {
 	ATH11K_DBG_HTT_NUM_EXT_STATS,
 };
 
+#define ATH11K_DBR_DEBUG_ENTRIES_MAX 512
+
+enum ath11k_db_ring_dbg_event {
+	DBR_RING_DEBUG_EVENT_INVALID,
+	DBR_RING_DEBUG_EVENT_RX,
+	DBR_RING_DEBUG_EVENT_REPLENISH,
+	DBR_RING_DEBUG_EVENT_MAX,
+};
+
+struct ath11k_db_ring_debug_entry {
+	u32 hp;
+	u32 tp;
+	u64 timestamp;
+	enum ath11k_db_ring_dbg_event event;
+};
+
+struct ath11k_db_ring_debug {
+	/* protects ath11k_db_ring_debug data */
+	spinlock_t lock;
+	struct ath11k_db_ring_debug_entry *entries;
+	u32 db_ring_debug_idx;
+	u32 num_ring_debug_entries;
+};
+
+struct ath11k_db_module_debug {
+	struct ath11k_db_ring_debug db_ring_debug;
+	struct dentry *module_debugfs;
+	bool db_ring_debug_enabled;
+};
+
 struct debug_htt_stats_req {
 	bool done;
 	u8 pdev_id;
@@ -149,6 +179,10 @@ static inline int ath11k_debugfs_rx_filter(struct ath11k *ar)
 	return ar->debug.rx_filter;
 }
 
+void ath11k_dbring_add_debug_entry(struct ath11k *ar,
+				   enum wmi_direct_buffer_module id,
+				   enum ath11k_db_ring_dbg_event event,
+				   struct hal_srng *srng);
 #else
 static inline int ath11k_debugfs_soc_create(struct ath11k_base *ab)
 {
@@ -216,6 +250,13 @@ static inline int ath11k_debugfs_rx_filter(struct ath11k *ar)
 	return 0;
 }
 
+static inline void
+ath11k_dbring_add_debug_entry(struct ath11k *ar,
+			      enum wmi_direct_buffer_module id,
+			      enum ath11k_db_ring_dbg_event event,
+			      struct hal_srng *srng)
+{
+}
 #endif /* CONFIG_MAC80211_DEBUGFS*/
 
 #endif /* _ATH11K_DEBUGFS_H_ */
