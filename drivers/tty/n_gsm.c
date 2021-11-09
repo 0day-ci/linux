@@ -2394,6 +2394,8 @@ static int gsmld_attach_gsm(struct tty_struct *tty, struct gsm_mux *gsm)
 				for (i--; i >= 1; i--)
 					tty_unregister_device(gsm_tty_driver,
 								base + i);
+
+				tty_kref_put(gsm->tty);
 				return PTR_ERR(dev);
 			}
 		}
