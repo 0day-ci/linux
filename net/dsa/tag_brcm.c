@@ -8,6 +8,7 @@
 #include <linux/dsa/brcm.h>
 #include <linux/etherdevice.h>
 #include <linux/list.h>
+#include <linux/ptp_classify.h>
 #include <linux/slab.h>
 #include <linux/dsa/b53.h>
 
@@ -76,6 +77,7 @@
 #define BRCM_EG_TC_SHIFT	5
 #define BRCM_EG_TC_MASK		0x7
 #define BRCM_EG_PID_MASK	0x1f
+#define BRCM_EG_T_R		0x20
 
 #if IS_ENABLED(CONFIG_NET_DSA_TAG_BRCM) || \
 	IS_ENABLED(CONFIG_NET_DSA_TAG_BRCM_PREPEND)
@@ -85,6 +87,8 @@ static struct sk_buff *brcm_tag_xmit_ll(struct sk_buff *skb,
 					unsigned int offset)
 {
 	struct dsa_port *dp = dsa_slave_to_port(dev);
+	unsigned int type = ptp_classify_raw(skb);
+	struct b53_port_hwtstamp *ps = dp->priv;
 	u16 queue = skb_get_queue_mapping(skb);
 	u8 *brcm_tag;
 
@@ -112,7 +116,13 @@ static struct sk_buff *brcm_tag_xmit_ll(struct sk_buff *skb,
 	 */
 	brcm_tag[0] = (1 << BRCM_OPCODE_SHIFT) |
 		       ((queue & BRCM_IG_TC_MASK) << BRCM_IG_TC_SHIFT);
+
 	brcm_tag[1] = 0;
+
+	if (type == PTP_CLASS_V2_L2 &&
+	    test_bit(B53_HWTSTAMP_TX_IN_PROGRESS, &ps->state))
+		brcm_tag[1] = 1 << BRCM_IG_TS_SHIFT;
+
 	brcm_tag[2] = 0;
 	if (dp->index == 8)
 		brcm_tag[2] = BRCM_IG_DSTMAP2_MASK;
@@ -124,6 +134,33 @@ static struct sk_buff *brcm_tag_xmit_ll(struct sk_buff *skb,
 	skb_set_queue_mapping(skb, BRCM_TAG_SET_PORT_QUEUE(dp->index, queue));
 
 	return skb;
+}
+
+static int set_txtstamp(struct dsa_port *dp,
+			int port,
+			u64 ns)
+{
+	struct b53_device *b53_dev = dp->ds->priv;
+	struct b53_port_hwtstamp *ps = dp->priv;
+	struct skb_shared_hwtstamps shhwtstamps;
+	struct sk_buff *tmp_skb;
+
+	if (!ps->tx_skb)
+		return 0;
+
+	mutex_lock(&b53_dev->ptp_mutex);
+	ns = timecounter_cyc2time(&b53_dev->tc, ns);
+	mutex_unlock(&b53_dev->ptp_mutex);
+
+	memset(&shhwtstamps, 0, sizeof(shhwtstamps));
+	shhwtstamps.hwtstamp = ns_to_ktime(ns);
+	tmp_skb = ps->tx_skb;
+	ps->tx_skb = NULL;
+
+	clear_bit_unlock(B53_HWTSTAMP_TX_IN_PROGRESS, &ps->state);
+	skb_complete_tx_timestamp(tmp_skb, &shhwtstamps);
+
+	return 0;
 }
 
 /* Frames with this tag have one of these two layouts:
@@ -143,6 +180,7 @@ static struct sk_buff *brcm_tag_rcv_ll(struct sk_buff *skb,
 				       unsigned int offset,
 				       int *tag_len)
 {
+	struct dsa_port *dp;
 	int source_port;
 	u8 *brcm_tag;
 	u32 tstamp;
@@ -176,6 +214,14 @@ static struct sk_buff *brcm_tag_rcv_ll(struct sk_buff *skb,
 	skb->dev = dsa_master_find_slave(dev, 0, source_port);
 	if (!skb->dev)
 		return NULL;
+
+	/* Check whether this is a status frame */
+	if (unlikely(*tag_len == 8 && brcm_tag[3] & BRCM_EG_T_R)) {
+		dp = dsa_slave_to_port(skb->dev);
+
+		set_txtstamp(dp, source_port, tstamp);
+		return NULL;
+	}
 
 	/* Remove Broadcom tag and update checksum */
 	skb_pull_rcsum(skb, *tag_len);
