@@ -1,10 +1,14 @@
 /* SPDX-License-Identifier: ISC */
 /*
  * Copyright (C) 2011-2013 Jonas Gorski <jogo@openwrt.org>
+ * Copyright (C) 2021 Linutronix GmbH
  *
  * Included by drivers/net/dsa/b53/b53_priv.h and net/dsa/tag_brcm.c
  */
 
+#include <linux/ptp_clock_kernel.h>
+#include <linux/timecounter.h>
+#include <linux/workqueue.h>
 #include <net/dsa.h>
 
 struct b53_device;
@@ -97,4 +101,14 @@ struct b53_device {
 	bool vlan_enabled;
 	unsigned int num_ports;
 	struct b53_port *ports;
+
+	/* PTP */
+	bool broadsync_hd;
+	struct ptp_clock *ptp_clock;
+	struct ptp_clock_info ptp_clock_info;
+	struct cyclecounter cc;
+	struct timecounter tc;
+	struct mutex ptp_mutex;
+#define B53_PTP_OVERFLOW_PERIOD (HZ / 2)
+	struct delayed_work overflow_work;
 };
