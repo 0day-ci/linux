@@ -1,0 +1,123 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/leds/leds-ktd20xx.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: LED driver for KTD20xx RGB LED from Kinetic.
+
+maintainers:
+  - Florian Eckert <fe@dev.tdt.de>
+
+description: |
+  The KTD20XX is multi-channel, I2C RGB LED Drivers that can group RGB LEDs into
+  a LED group or control them individually.
+
+  The difference in these RGB LED drivers is I2C address number the device is
+  listen on.
+
+properties:
+  compatible:
+    enum:
+      - kinetic,ktd20xx
+
+  reg:
+    maxItems: 1
+    description:
+      I2C slave address
+      ktd2061/58/59/60 0x68 0x69 0x6A 0x6B
+
+  '#address-cells':
+    const: 1
+
+  '#size-cells':
+    const: 0
+
+  'kinetic,color-current0':
+    description:
+      Specifies the current selection for the RGB color0.
+      Value 1 must be the current value for the color red.
+      Value 2 must be the current value for the color green.
+      Value 3 must be the current value for the color blue.
+      The current setting range is from 0mA to 24mA with 125uA steps.
+    $ref: /schemas/types.yaml#/definitions/uint8-array
+    items:
+      - minItems: 3
+      - maxItems: 3
+
+  'kinetic,color-current1':
+    description:
+      Specifies the current selection for the RGB color0.
+      Value 1 must be the current value for the color red.
+      Value 2 must be the current value for the color green.
+      Value 3 must be the current value for the color blue.
+      The current setting range is from 0mA to 24mA with 125uA steps.
+    $ref: /schemas/types.yaml#/definitions/uint8-array
+    items:
+      - minItems: 3
+      - maxItems: 3
+
+patternProperties:
+  '^multi-led@[0-9a-f]$':
+    type: object
+    allOf:
+      - $ref: leds-class-multicolor.yaml#
+    properties:
+      reg:
+        minItems: 1
+        maxItems: 12
+        description:
+          This property denotes the LED module number(s) that is used on the
+          for the child node.
+      'kinetic,color-selection':
+        description:
+          Specifies the color selection for this LED.
+          Value 1 selects the color register for color red.
+          Value 2 selects the color register for color green.
+          Value 3 selects the color register for color blue.
+          The value can be either 0 or 1. If 0, the current for the color
+          from color register 0 is used. If 1, the current for the color
+          from color register 1 is used.
+     $ref: /schemas/types.yaml#/definitions/uint8-array
+     items:
+       - minItems: 3
+       - maxItems: 3
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+   #include <dt-bindings/leds/common.h>
+
+   i2c {
+       #address-cells = <1>;
+       #size-cells = <0>;
+
+       led-controller@14 {
+           compatible = "ti,lp5009";
+           reg = <0x14>;
+           #address-cells = <1>;
+           #size-cells = <0>;
+           color-current0 = [ 00 00 00 ] // Current for RGB is 0mA
+           color-current1 = [ 28 28 28 ] // Current for RGB is 5mA
+
+           multi-led@0 {
+               reg = <0x0>;
+               color = <LED_COLOR_ID_RGB>;
+               function = LED_FUNCTION_CHARGING;
+                kinetic,color-selection = [ 00 01 00 ]; // Red=0mA Green=5mA Blue=0mA
+          };
+
+          multi-led@2 {
+            reg = <0x2>;
+            color = <LED_COLOR_ID_RGB>;
+            function = LED_FUNCTION_STANDBY;
+         };
+       };
+    };
+
+...
