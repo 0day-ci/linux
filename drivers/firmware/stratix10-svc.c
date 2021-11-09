@@ -365,8 +365,10 @@ static int svc_normal_to_secure_thread(void *data)
 						pdata, sizeof(*pdata),
 						&ctrl->svc_fifo_lock);
 
-		if (!ret_fifo)
+		if (!ret_fifo) {
+			schedule_timeout_interruptible(MAX_SCHEDULE_TIMEOUT);
 			continue;
+		}
 
 		pr_debug("get from FIFO pa=0x%016x, command=%u, size=%u\n",
 			 (unsigned int)pdata->paddr, pdata->command,
@@ -861,6 +863,7 @@ int stratix10_svc_send(struct stratix10_svc_chan *chan, void *msg)
 	ret = kfifo_in_spinlocked(&chan->ctrl->svc_fifo, p_data,
 				  sizeof(*p_data),
 				  &chan->ctrl->svc_fifo_lock);
+	wake_up_process(chan->ctrl->task);
 
 	kfree(p_data);
 
