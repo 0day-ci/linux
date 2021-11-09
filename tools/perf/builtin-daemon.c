@@ -531,7 +531,7 @@ static int daemon_session__control(struct daemon_session *session,
 		scnprintf(ack_path, sizeof(ack_path), "%s/%s",
 			  session->base, SESSION_ACK);
 
-		ack = open(ack_path, O_RDONLY, O_NONBLOCK);
+		ack = open(ack_path, O_RDONLY|O_NONBLOCK);
 		if (!ack) {
 			close(control);
 			return -1;
