@@ -6,6 +6,7 @@
 #ifndef _LINUX_MMIO_INSTRUMENTED_H
 #define _LINUX_MMIO_INSTRUMENTED_H
 
+#include <linux/dynamic_debug.h>
 #include <linux/tracepoint-defs.h>
 
 /*
@@ -25,7 +26,7 @@ void log_read_mmio(const char *width, const volatile void __iomem *addr);
 #define __raw_write(v, a, _l)	({				\
 	volatile void __iomem *_a = (a);			\
 	if (tracepoint_enabled(rwmmio_write))			\
-		log_write_mmio(__stringify(write##_l), v, _a);	\
+		dynamic_log_write_mmio(__stringify(write##_l), v, _a);\
 	arch_raw_write##_l((v), _a);				\
 	})
 
@@ -38,7 +39,7 @@ void log_read_mmio(const char *width, const volatile void __iomem *addr);
 	_t __a;							\
 	const volatile void __iomem *_a = (a);			\
 	if (tracepoint_enabled(rwmmio_read))			\
-		log_read_mmio(__stringify(read##_l), _a);	\
+		dynamic_log_read_mmio(__stringify(read##_l), _a);\
 	__a = arch_raw_read##_l(_a);				\
 	__a;							\
 	})
@@ -47,6 +48,26 @@ void log_read_mmio(const char *width, const volatile void __iomem *addr);
 #define __raw_readw(a)		__raw_read((a), w, u16)
 #define __raw_readl(a)		__raw_read((a), l, u32)
 #define __raw_readq(a)		__raw_read((a), q, u64)
+
+#if defined(CONFIG_DYNAMIC_DEBUG)
+#define dynamic_log_write_mmio(width, value, addr)		\
+do {								\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, width);	\
+	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_EVENT))	\
+		log_write_mmio(width, value, addr);		\
+} while (0)
+
+#define dynamic_log_read_mmio(width, addr)			\
+do {								\
+	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, width);	\
+	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_EVENT))	\
+		log_read_mmio(width, addr);			\
+} while (0)
+
+#else
+#define dynamic_log_write_mmio(width, val, addr)	log_write_mmio(width, val, addr)
+#define dynamic_log_read_mmio(width, addr)		log_read_mmio(width, addr)
+#endif /* CONFIG_DYNAMIC_DEBUG */
 
 #else
 
@@ -63,6 +84,10 @@ void log_read_mmio(const char *width, const volatile void __iomem *addr);
 static inline void log_write_mmio(const char *width, u64 val,
 				  volatile void __iomem *addr) {}
 static inline void log_read_mmio(const char *width,
+				 const volatile void __iomem *addr) {}
+static inline void dynamic_log_write_mmio(const char *width, u64 val,
+				  volatile void __iomem *addr) {}
+static inline void dynamic_log_read_mmio(const char *width,
 				 const volatile void __iomem *addr) {}
 
 #endif /* CONFIG_TRACE_MMIO_ACCESS */
