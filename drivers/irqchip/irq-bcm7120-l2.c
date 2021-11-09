@@ -325,7 +325,7 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
 	pr_info("registered %s intc (%pOF, parent IRQ(s): %d)\n",
 		intc_name, dn, data->num_parent_irqs);
 
-	return 0;
+	ret = 0;
 
 out_free_domain:
 	irq_domain_remove(data->domain);
@@ -336,6 +336,7 @@ out_unmap:
 		if (data->map_base[idx])
 			iounmap(data->map_base[idx]);
 	}
+	put_device(&pdev->dev);
 out_free_data:
 	kfree(data);
 	return ret;
