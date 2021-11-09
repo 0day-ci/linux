@@ -169,6 +169,34 @@ Setting the brightness to zero with brightness_set() callback function
 should completely turn off the LED and cancel the previously programmed
 hardware blinking function, if any.
 
+Hardware driven LEDs
+===================================
+
+Some LEDs can be driven by hardware (for example a LED connected to
+an ethernet PHY or an ethernet switch can be configured to blink on activity on
+the network, which in software is done by the netdev trigger).
+
+To do such offloading, LED driver must support this and a supported trigger must
+be used.
+
+LED driver should declare the correct blink_mode supported and should set the
+blink_mode parameter to one of HARDWARE_CONTROLLED or SOFTWARE_HARDWARE_CONTROLLED.
+The trigger will check this option and fail to activate if the blink_mode is not
+supported. By default if a LED driver doesn't declare blink_mode, SOFTWARE_CONTROLLED
+is assumed.
+
+The LED must implement 3 main API:
+- hw_control_status(): This asks the LED driver if hardware mode is enabled
+    or not. Triggers will check if the hardware mode is active and will try
+    to offload their triggers if supported by the driver.
+- hw_control_start(): This will simply enable the hardware mode for the LED.
+- hw_control_stop(): This will simply disable the hardware mode for the LED.
+    It's advised to the driver to put the LED in the old state but this is not
+    enforcerd and putting the LED off is also accepted.
+
+With HARDWARE_CONTROLLED blink_mode hw_control_status/start/stop is optional
+and any software only trigger will reject activation as the LED supports only
+hardware mode.
 
 Known Issues
 ============

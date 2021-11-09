@@ -164,6 +164,27 @@ static void led_remove_brightness_hw_changed(struct led_classdev *led_cdev)
 }
 #endif
 
+#ifdef CONFIG_LEDS_HARDWARE_CONTROL
+static int led_classdev_check_blink_mode_functions(struct led_classdev *led_cdev)
+{
+	int mode = led_cdev->blink_mode;
+
+	if (mode == SOFTWARE_HARDWARE_CONTROLLED &&
+	    (!led_cdev->hw_control_status ||
+	    !led_cdev->hw_control_start ||
+	    !led_cdev->hw_control_stop))
+		return -EINVAL;
+
+	if (mode == SOFTWARE_CONTROLLED &&
+	    (led_cdev->hw_control_status ||
+	    led_cdev->hw_control_start ||
+	    led_cdev->hw_control_stop))
+		return -EINVAL;
+
+	return 0;
+}
+#endif
+
 /**
  * led_classdev_suspend - suspend an led_classdev.
  * @led_cdev: the led_classdev to suspend.
@@ -366,6 +387,12 @@ int led_classdev_register_ext(struct device *parent,
 	ret = led_classdev_next_name(proposed_name, final_name, sizeof(final_name));
 	if (ret < 0)
 		return ret;
+
+#ifdef CONFIG_LEDS_HARDWARE_CONTROL
+	ret = led_classdev_check_blink_mode_functions(led_cdev);
+	if (ret < 0)
+		return ret;
+#endif
 
 	mutex_init(&led_cdev->led_access);
 	mutex_lock(&led_cdev->led_access);
