@@ -1426,9 +1426,9 @@ static int ov965x_configure_gpios_pdata(struct ov965x *ov965x,
 			return ret;
 		v4l2_dbg(1, debug, &ov965x->sd, "set gpio %d to 1\n", gpio);
 
-		gpio_set_value_cansleep(gpio, 1);
-		gpio_export(gpio, 0);
 		ov965x->gpios[i] = gpio_to_desc(gpio);
+		gpiod_set_value_cansleep(ov965x->gpios[i], 1);
+		gpiod_export(ov965x->gpios[i], 0);
 	}
 
 	return 0;

@@ -11,6 +11,7 @@
 #include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/err.h>
+#include <linux/gpio/consumer.h>
 #include <linux/gpio.h>
 #include <linux/gpio/machine.h>
 #include <linux/leds.h>
@@ -329,7 +330,7 @@ static int add_children(struct i2c_client *client)
 		gpio_request_one(gpio, GPIOF_IN, config_inputs[i].label);
 
 		/* make it easy for userspace to see these */
-		gpio_export(gpio, false);
+		gpiod_export(gpio_to_desc(gpio), false);
 	}
 
 	/* MMC/SD inputs -- right after the last config input */

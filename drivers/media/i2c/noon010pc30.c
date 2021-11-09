@@ -10,6 +10,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -755,7 +756,7 @@ static int noon010_probe(struct i2c_client *client,
 			goto np_err;
 		}
 		info->gpio_nreset = pdata->gpio_nreset;
-		gpio_export(info->gpio_nreset, 0);
+		gpiod_export(gpio_to_desc(info->gpio_nreset), 0);
 	}
 
 	if (gpio_is_valid(pdata->gpio_nstby)) {
@@ -767,7 +768,7 @@ static int noon010_probe(struct i2c_client *client,
 			goto np_err;
 		}
 		info->gpio_nstby = pdata->gpio_nstby;
-		gpio_export(info->gpio_nstby, 0);
+		gpiod_export(gpio_to_desc(info->gpio_nstby), 0);
 	}
 
 	for (i = 0; i < NOON010_NUM_SUPPLIES; i++)

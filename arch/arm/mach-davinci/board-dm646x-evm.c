@@ -19,7 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/leds.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/property.h>
@@ -249,7 +249,7 @@ static int evm_led_teardown(struct i2c_client *client, int gpio,
 	return 0;
 }
 
-static int evm_sw_gpio[4] = { -EINVAL, -EINVAL, -EINVAL, -EINVAL };
+static struct gpio_desc *evm_sw_gpio[4];
 
 static int evm_sw_setup(struct i2c_client *client, int gpio,
 			unsigned ngpio, void *c)
@@ -259,17 +259,19 @@ static int evm_sw_setup(struct i2c_client *client, int gpio,
 	char label[10];
 
 	for (i = 0; i < 4; ++i) {
+		struct gpio_desc *desc = gpio_to_desc(gpio + i);
+
 		snprintf(label, 10, "user_sw%d", i);
-		status = gpio_request(gpio, label);
+		status = gpio_request(gpio + i, label);
 		if (status)
 			goto out_free;
-		evm_sw_gpio[i] = gpio++;
+		evm_sw_gpio[i] = desc;
 
-		status = gpio_direction_input(evm_sw_gpio[i]);
+		status = gpiod_direction_input(desc);
 		if (status)
 			goto out_free;
 
-		status = gpio_export(evm_sw_gpio[i], 0);
+		status = gpiod_export(desc, 0);
 		if (status)
 			goto out_free;
 	}
@@ -277,9 +279,9 @@ static int evm_sw_setup(struct i2c_client *client, int gpio,
 
 out_free:
 	for (i = 0; i < 4; ++i) {
-		if (evm_sw_gpio[i] != -EINVAL) {
-			gpio_free(evm_sw_gpio[i]);
-			evm_sw_gpio[i] = -EINVAL;
+		if (evm_sw_gpio[i]) {
+			gpio_free(pin + i);
+			evm_sw_gpio[i] = NULL;
 		}
 	}
 	return status;
@@ -291,10 +293,10 @@ static int evm_sw_teardown(struct i2c_client *client, int gpio,
 	int i;
 
 	for (i = 0; i < 4; ++i) {
-		if (evm_sw_gpio[i] != -EINVAL) {
-			gpio_unexport(evm_sw_gpio[i]);
-			gpio_free(evm_sw_gpio[i]);
-			evm_sw_gpio[i] = -EINVAL;
+		if (evm_sw_gpio[i]) {
+			gpiod_unexport(evm_sw_gpio[i]);
+			gpio_free(gpio + i);
+			evm_sw_gpio[i] = NULL;
 		}
 	}
 	return 0;

@@ -15,6 +15,7 @@
 #include <linux/ctype.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
+#include <linux/gpio/consumer.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
@@ -852,7 +853,7 @@ static int s5k4ecgx_config_gpio(int nr, int val, const char *name)
 		return 0;
 	ret = gpio_request_one(nr, flags, name);
 	if (!ret)
-		gpio_export(nr, 0);
+		gpiod_export(gpio_to_desc(nr), 0);
 
 	return ret;
 }
