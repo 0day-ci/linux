@@ -23,10 +23,10 @@ static inline int __get_user_sigset(sigset_t *dst, const sigset_t __user *src)
 {
 	BUILD_BUG_ON(sizeof(sigset_t) != sizeof(u64));
 
-	return __get_user(dst->sig[0], (u64 __user *)&src->sig[0]);
+	return __get_user(*(u64 *)&dst->sig[0], (u64 __user *)&src->sig[0]);
 }
 #define unsafe_get_user_sigset(dst, src, label) \
-	unsafe_get_user((dst)->sig[0], (u64 __user *)&(src)->sig[0], label)
+	unsafe_get_user(*(u64 *)&(dst)->sig[0], (u64 __user *)&(src)->sig[0], label)
 
 #ifdef CONFIG_VSX
 extern unsigned long copy_vsx_to_user(void __user *to,
