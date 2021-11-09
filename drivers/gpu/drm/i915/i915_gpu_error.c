@@ -1866,10 +1866,14 @@ i915_gpu_coredump(struct intel_gt *gt, intel_engine_mask_t engine_mask)
 		}
 
 		gt_record_info(error->gt);
-		gt_record_engines(error->gt, engine_mask, compress);
 
-		if (INTEL_INFO(i915)->has_gt_uc)
-			error->gt->uc = gt_record_uc(error->gt, compress);
+		if (!intel_gt_has_unrecoverable_error(gt)) {
+			gt_record_engines(error->gt, engine_mask, compress);
+
+			if (INTEL_INFO(i915)->has_gt_uc)
+				error->gt->uc = gt_record_uc(error->gt,
+							     compress);
+		}
 
 		i915_vma_capture_finish(error->gt, compress);
 
