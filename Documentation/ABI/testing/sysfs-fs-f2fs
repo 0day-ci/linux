@@ -369,13 +369,15 @@ Contact:	"Jaegeuk Kim" <jaegeuk@kernel.org>
 Description:	Give a way to attach REQ_META|FUA to data writes
 		given temperature-based bits. Now the bits indicate:
 
-		+-------------------+-------------------+
-		|      REQ_META     |      REQ_FUA      |
-		+------+------+-----+------+------+-----+
-		|    5 |    4 |   3 |    2 |    1 |   0 |
-		+------+------+-----+------+------+-----+
-		| Cold | Warm | Hot | Cold | Warm | Hot |
-		+------+------+-----+------+------+-----+
+		+------------+-------------------+-------------------+
+		| HIPRI_DIO  |      REQ_META     |      REQ_FUA      |
+		+------------+------+------+-----+------+------+-----+
+		|          6 |    5 |    4 |   3 |    2 |    1 |   0 |
+		+------------+------+------+-----+------+------+-----+
+		|        All | Cold | Warm | Hot | Cold | Warm | Hot |
+		+------------+------+------+-----+------+------+-----+
+
+		Note that, HIPRI_DIO bit is only for direct IO path.
 
 What:		/sys/fs/f2fs/<disk>/node_io_flag
 Date:		June 2020
