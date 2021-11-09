@@ -154,4 +154,32 @@ config LEDS_TRIGGER_TTY
 
 	  When build as a module this driver will be called ledtrig-tty.
 
+config LEDS_TRIGGER_HARDWARE_PHY_ACTIVITY
+	tristate "LED Trigger for PHY Activity for Hardware Controlled LED"
+	depends on LEDS_HARDWARE_CONTROL
+	help
+	  This allows LEDs to be configured to run by hardware and offloaded
+	  based on some rules. The LED will blink or be on based on the PHY
+	  Activity for example on packet receive or based on the link speed.
+
+	  The current supported offload triggers are:
+	  - blink_tx: Blink LED on tx packet receive
+	  - blink_rx: Blink LED on rx packet receive
+	  - keep_link_10m: Keep LED on with 10m link speed
+	  - keep_link_100m: Keep LED on with 100m link speed
+	  - keep_link_1000m: Keep LED on with 1000m link speed
+	  - keep_half_duplex: Keep LED on with half duplex link
+	  - keep_full_duplex: Keep LED on with full duplex link
+	  - option_linkup_over: Blink rules are ignored with absent link
+	  - option_power_on_reset: Power ON Led on Switch/PHY reset
+	  - option_blink_2hz: Set blink speed at 2hz for every blink event
+	  - option_blink_4hz: Set blink speed at 4hz for every blink event
+	  - option_blink_8hz: Set blink speed at 8hz for every blink event
+
+	  These blink modes are present in the LED sysfs dir under
+	  hardware-phy-activity if supported by the LED driver.
+
+	  This trigger can be used only by LEDs that supports Hardware mode
+
+
 endif # LEDS_TRIGGERS
