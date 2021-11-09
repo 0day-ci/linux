@@ -96,12 +96,6 @@ static inline bool gpio_is_valid(int number)
 
 struct device;
 
-/* caller holds gpio_lock *OR* gpio is marked as requested */
-static inline struct gpio_chip *gpio_to_chip(unsigned gpio)
-{
-	return gpiod_to_chip(gpio_to_desc(gpio));
-}
-
 /* Always use the library code for GPIO management calls,
  * or when sleeping may be involved.
  */
@@ -158,7 +152,6 @@ int devm_gpio_request_one(struct device *dev, unsigned gpio,
 #include <linux/bug.h>
 
 struct device;
-struct gpio_chip;
 
 static inline bool gpio_is_valid(int number)
 {
