@@ -2812,6 +2812,13 @@ int hci_reset_dev(struct hci_dev *hdev)
 }
 EXPORT_SYMBOL(hci_reset_dev);
 
+/* Reset HCI device */
+void hci_tx_error(struct hci_dev *hdev, int err)
+{
+	hci_req_sync_cancel(hdev, err);
+}
+EXPORT_SYMBOL(hci_tx_error);
+
 /* Receive frame from HCI drivers */
 int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
 {
