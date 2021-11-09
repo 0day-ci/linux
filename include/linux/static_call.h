@@ -149,7 +149,10 @@ extern void arch_static_call_transform(void *site, void *tramp, void *func, bool
 			     STATIC_CALL_TRAMP_ADDR(name), __F);	\
 })
 
-#define static_call_query(name) (READ_ONCE(STATIC_CALL_KEY(name).func))
+#define EXPORT_STATIC_CALL_QUERY(name, sfx)				\
+	typeof(STATIC_CALL_QUERY(name)()) STATIC_CALL_QUERY(name)(void)	\
+		{ return STATIC_CALL_KEY(name).func; }			\
+	EXPORT_SYMBOL ## sfx (STATIC_CALL_QUERY(name))
 
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
 
@@ -200,9 +203,11 @@ extern long __static_call_return0(void);
 
 /* Leave the key unexported, so modules can't change static call targets: */
 #define EXPORT_STATIC_CALL_TRAMP(name)					\
+	EXPORT_STATIC_CALL_QUERY(name,);				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name));				\
 	EXPORT_STATIC_CALL_GETKEY_HELPER(name)
 #define EXPORT_STATIC_CALL_TRAMP_GPL(name)				\
+	EXPORT_STATIC_CALL_QUERY(name, _GPL);				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name));			\
 	EXPORT_STATIC_CALL_GETKEY_HELPER(name)
 
@@ -253,8 +258,10 @@ static inline long __static_call_return0(void)
 
 /* Leave the key unexported, so modules can't change static call targets: */
 #define EXPORT_STATIC_CALL_TRAMP(name)					\
+	EXPORT_STATIC_CALL_QUERY(name,);				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name))
 #define EXPORT_STATIC_CALL_TRAMP_GPL(name)				\
+	EXPORT_STATIC_CALL_QUERY(name, _GPL);				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name))
 
 #else /* Generic implementation */

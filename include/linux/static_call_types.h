@@ -23,6 +23,9 @@
 #define STATIC_CALL_GETKEY_PREFIX_LEN	(sizeof(STATIC_CALL_GETKEY_PREFIX_STR) - 1)
 #define STATIC_CALL_GETKEY(name)	__PASTE(STATIC_CALL_GETKEY_PREFIX, name)
 
+#define STATIC_CALL_QUERY_PREFIX	__SCQ__
+#define STATIC_CALL_QUERY(name)		__PASTE(STATIC_CALL_QUERY_PREFIX, name)
+
 /*
  * Flags in the low bits of static_call_site::key.
  */
@@ -43,7 +46,20 @@ struct static_call_site {
 #define DECLARE_STATIC_CALL(name, func)					\
 	extern __weak struct static_call_key STATIC_CALL_KEY(name);	\
 	extern __weak struct static_call_key *STATIC_CALL_GETKEY(name)(void);\
-	extern typeof(func) STATIC_CALL_TRAMP(name);
+	extern __weak typeof(func) *STATIC_CALL_QUERY(name)(void);	\
+	extern typeof(func) STATIC_CALL_TRAMP(name)
+
+#define __static_call_query(name)					\
+	((typeof(STATIC_CALL_QUERY(name)()))READ_ONCE(STATIC_CALL_KEY(name).func))
+
+#ifdef MODULE
+/* the key might not be exported */
+#define static_call_query(name)						\
+	(&STATIC_CALL_KEY(name) ? __static_call_query(name)		\
+				: STATIC_CALL_QUERY(name)())
+#else
+#define static_call_query(name)	__static_call_query(name)
+#endif
 
 #ifdef CONFIG_HAVE_STATIC_CALL
 
