@@ -22,6 +22,20 @@
 #include "record.h"
 #include "util/synthetic-events.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wredundant-decls"
+int btf__get_from_id(__u32 id, struct btf **btf);
+struct bpf_program *bpf_program__next(struct bpf_program *prog,
+				      const struct bpf_object *obj);
+struct bpf_map *bpf_map__next(const struct bpf_map *map, const struct bpf_object *obj);
+const void *btf__get_raw_data(const struct btf *btf, __u32 *size);
+#pragma GCC diagnostic pop
+
+int __weak btf__get_from_id(__u32 id __maybe_unused, struct btf **btf __maybe_unused)
+{
+	return -ENOTSUP;
+}
+
 struct btf * __weak btf__load_from_kernel_by_id(__u32 id)
 {
        struct btf *btf;
@@ -34,12 +48,25 @@ struct btf * __weak btf__load_from_kernel_by_id(__u32 id)
 }
 
 struct bpf_program * __weak
+bpf_program__next(struct bpf_program *prog __maybe_unused,
+		  const struct bpf_object *obj __maybe_unused)
+{
+	return NULL;
+}
+
+struct bpf_program * __weak
 bpf_object__next_program(const struct bpf_object *obj, struct bpf_program *prev)
 {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	return bpf_program__next(prev, obj);
 #pragma GCC diagnostic pop
+}
+
+struct bpf_map * __weak bpf_map__next(const struct bpf_map *map __maybe_unused,
+				      const struct bpf_object *obj __maybe_unused)
+{
+	return NULL;
 }
 
 struct bpf_map * __weak
@@ -49,6 +76,12 @@ bpf_object__next_map(const struct bpf_object *obj, const struct bpf_map *prev)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	return bpf_map__next(prev, obj);
 #pragma GCC diagnostic pop
+}
+
+const void * __weak btf__get_raw_data(const struct btf *btf __maybe_unused,
+				      __u32 *size __maybe_unused)
+{
+	return NULL;
 }
 
 const void * __weak
