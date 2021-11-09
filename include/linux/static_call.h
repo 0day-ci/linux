@@ -26,7 +26,7 @@
  *   static_call_update(name, func);
  *   static_call_query(name);
  *
- *   EXPORT_STATIC_CALL{,_TRAMP}{,_GPL}()
+ *   EXPORT_STATIC_CALL{,_FOR_UPDATE}{,_GPL}()
  *
  * Usage example:
  *
@@ -90,7 +90,7 @@
  *     if (my_func_ptr)
  *         my_func_ptr(arg1)
  *
- *   where the argument evaludation also depends on the pointer value.
+ *   where the argument evaluation also depends on the pointer value.
  *
  *   To query which function is currently set to be called, use:
  *
@@ -116,11 +116,15 @@
  *   Notably argument setup is unconditional.
  *
  *
- * EXPORT_STATIC_CALL() vs EXPORT_STATIC_CALL_TRAMP():
+ * EXPORT_STATIC_CALL() vs EXPORT_STATIC_CALL_FOR_UPDATE():
  *
- *   The difference is that the _TRAMP variant tries to only export the
- *   trampoline with the result that a module can use static_call{,_cond}() but
- *   not static_call_update().
+ *   EXPORT_STATIC_CALL() exports the minimal set of symbols that are needed
+ *   for a module to be able invoke the static call, with the result that it
+ *   can use static_call{,_cond}() but not static_call_update(). If the intent
+ *   is to permit modules to manipulate the targets of static calls associated
+ *   with a certain static call key occurring anywhere in the core kernel or
+ *   other modules than the one importing the static call, use
+ *   EXPORT_STATIC_CALL_FOR_UPDATE() instead.
  *
  */
 
@@ -186,10 +190,10 @@ extern long __static_call_return0(void);
 	};								\
 	ARCH_DEFINE_STATIC_CALL_NULL_TRAMP(name)
 
-#define EXPORT_STATIC_CALL(name)					\
+#define EXPORT_STATIC_CALL_FOR_UPDATE(name)				\
 	EXPORT_SYMBOL(STATIC_CALL_KEY(name));				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name))
-#define EXPORT_STATIC_CALL_GPL(name)					\
+#define EXPORT_STATIC_CALL_FOR_UPDATE_GPL(name)				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name));			\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name))
 
@@ -202,11 +206,11 @@ extern long __static_call_return0(void);
 	EXPORT_SYMBOL_GPL(STATIC_CALL_GETKEY(name))
 
 /* Leave the key unexported, so modules can't change static call targets: */
-#define EXPORT_STATIC_CALL_TRAMP(name)					\
+#define EXPORT_STATIC_CALL(name)					\
 	EXPORT_STATIC_CALL_QUERY(name,);				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name));				\
 	EXPORT_STATIC_CALL_GETKEY_HELPER(name)
-#define EXPORT_STATIC_CALL_TRAMP_GPL(name)				\
+#define EXPORT_STATIC_CALL_GPL(name)					\
 	EXPORT_STATIC_CALL_QUERY(name, _GPL);				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name));			\
 	EXPORT_STATIC_CALL_GETKEY_HELPER(name)
@@ -249,18 +253,18 @@ static inline long __static_call_return0(void)
 	return 0;
 }
 
-#define EXPORT_STATIC_CALL(name)					\
+#define EXPORT_STATIC_CALL_FOR_UPDATE(name)				\
 	EXPORT_SYMBOL(STATIC_CALL_KEY(name));				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name))
-#define EXPORT_STATIC_CALL_GPL(name)					\
+#define EXPORT_STATIC_CALL_FOR_UPDATE_GPL(name)				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name));			\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name))
 
 /* Leave the key unexported, so modules can't change static call targets: */
-#define EXPORT_STATIC_CALL_TRAMP(name)					\
+#define EXPORT_STATIC_CALL(name)					\
 	EXPORT_STATIC_CALL_QUERY(name,);				\
 	EXPORT_SYMBOL(STATIC_CALL_TRAMP(name))
-#define EXPORT_STATIC_CALL_TRAMP_GPL(name)				\
+#define EXPORT_STATIC_CALL_GPL(name)					\
 	EXPORT_STATIC_CALL_QUERY(name, _GPL);				\
 	EXPORT_SYMBOL_GPL(STATIC_CALL_TRAMP(name))
 
@@ -300,6 +304,9 @@ static inline int static_call_text_reserved(void *start, void *end)
 
 #define EXPORT_STATIC_CALL(name)	EXPORT_SYMBOL(STATIC_CALL_KEY(name))
 #define EXPORT_STATIC_CALL_GPL(name)	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name))
+
+#define EXPORT_STATIC_CALL_FOR_UPDATE(name)	EXPORT_SYMBOL(STATIC_CALL_KEY(name))
+#define EXPORT_STATIC_CALL_FOR_UPDATE_GPL(name)	EXPORT_SYMBOL_GPL(STATIC_CALL_KEY(name))
 
 #endif /* CONFIG_HAVE_STATIC_CALL */
 
