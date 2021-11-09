@@ -7,6 +7,7 @@
  */
 
 #include <linux/gpio/driver.h>
+#include <linux/gpio.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/clk.h>
@@ -22,8 +23,6 @@
 #include <linux/platform_data/gpio-davinci.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/spinlock.h>
-
-#include <asm-generic/gpio.h>
 
 #define MAX_REGS_BANKS 5
 #define MAX_INT_PER_BANK 32
