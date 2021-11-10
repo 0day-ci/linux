@@ -17,6 +17,9 @@
 #include <asm/code-patching.h>
 #include <asm/setup.h>
 #include <asm/inst.h>
+#include <asm/mmu_context.h>
+#include <asm/debug.h>
+#include <asm/tlb.h>
 
 static int __patch_instruction(u32 *exec_addr, struct ppc_inst instr, u32 *patch_addr)
 {
@@ -45,6 +48,32 @@ int raw_patch_instruction(u32 *addr, struct ppc_inst instr)
 }
 
 #ifdef CONFIG_STRICT_KERNEL_RWX
+
+struct temp_mm_state {
+	struct mm_struct *mm;
+};
+
+static inline struct temp_mm_state start_using_temp_mm(struct mm_struct *mm)
+{
+	struct temp_mm_state temp_state;
+
+	lockdep_assert_irqs_disabled();
+	temp_state.mm = current->active_mm;
+	switch_mm_irqs_off(current->active_mm, mm, current);
+
+	WARN_ON(!mm_is_thread_local(mm));
+
+	pause_breakpoints();
+	return temp_state;
+}
+
+static inline void stop_using_temp_mm(struct temp_mm_state prev_state)
+{
+	lockdep_assert_irqs_disabled();
+	switch_mm_irqs_off(current->active_mm, prev_state.mm, current);
+	unpause_breakpoints();
+}
+
 static DEFINE_PER_CPU(struct vm_struct *, text_poke_area);
 
 static int text_area_cpu_up(unsigned int cpu)
