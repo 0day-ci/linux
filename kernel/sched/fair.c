@@ -4638,7 +4638,7 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 #ifdef CONFIG_CFS_BANDWIDTH
 
 #ifdef CONFIG_JUMP_LABEL
-static struct static_key __cfs_bandwidth_used;
+static struct static_key __static_key __cfs_bandwidth_used;
 
 static inline bool cfs_bandwidth_used(void)
 {

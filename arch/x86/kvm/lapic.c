@@ -91,8 +91,8 @@ static inline int __apic_test_and_clear_vector(int vec, void *bitmap)
 	return __test_and_clear_bit(VEC_POS(vec), (bitmap) + REG_POS(vec));
 }
 
-__read_mostly DEFINE_STATIC_KEY_DEFERRED_FALSE(apic_hw_disabled, HZ);
-__read_mostly DEFINE_STATIC_KEY_DEFERRED_FALSE(apic_sw_disabled, HZ);
+DEFINE_STATIC_KEY_DEFERRED_FALSE(apic_hw_disabled, HZ);
+DEFINE_STATIC_KEY_DEFERRED_FALSE(apic_sw_disabled, HZ);
 
 static inline int apic_enabled(struct kvm_lapic *apic)
 {

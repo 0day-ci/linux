@@ -106,10 +106,19 @@ struct static_key {
 	};
 };
 
+/*
+ * With CONFIG_JUMP_LABEL, "struct static_key" are not used in fast path.
+ * We can put them in a separate section to increase data locality.
+ */
+#define __static_key __section(".data.unlikely")
+
 #else
 struct static_key {
 	atomic_t enabled;
 };
+
+#define __static_key __read_mostly
+
 #endif	/* CONFIG_JUMP_LABEL */
 #endif /* __ASSEMBLY__ */
 
@@ -367,7 +376,7 @@ struct static_key_false {
 #define STATIC_KEY_FALSE_INIT (struct static_key_false){ .key = STATIC_KEY_INIT_FALSE, }
 
 #define DEFINE_STATIC_KEY_TRUE(name)	\
-	struct static_key_true name = STATIC_KEY_TRUE_INIT
+	struct static_key_true __static_key name = STATIC_KEY_TRUE_INIT
 
 #define DEFINE_STATIC_KEY_TRUE_RO(name)	\
 	struct static_key_true name __ro_after_init = STATIC_KEY_TRUE_INIT
@@ -376,7 +385,7 @@ struct static_key_false {
 	extern struct static_key_true name
 
 #define DEFINE_STATIC_KEY_FALSE(name)	\
-	struct static_key_false name = STATIC_KEY_FALSE_INIT
+	struct static_key_false __static_key name = STATIC_KEY_FALSE_INIT
 
 #define DEFINE_STATIC_KEY_FALSE_RO(name)	\
 	struct static_key_false name __ro_after_init = STATIC_KEY_FALSE_INIT
@@ -384,14 +393,14 @@ struct static_key_false {
 #define DECLARE_STATIC_KEY_FALSE(name)	\
 	extern struct static_key_false name
 
-#define DEFINE_STATIC_KEY_ARRAY_TRUE(name, count)		\
-	struct static_key_true name[count] = {			\
-		[0 ... (count) - 1] = STATIC_KEY_TRUE_INIT,	\
+#define DEFINE_STATIC_KEY_ARRAY_TRUE(name, count)			\
+	struct static_key_true __static_key name[count] = {	\
+		[0 ... (count) - 1] = STATIC_KEY_TRUE_INIT,		\
 	}
 
-#define DEFINE_STATIC_KEY_ARRAY_FALSE(name, count)		\
-	struct static_key_false name[count] = {			\
-		[0 ... (count) - 1] = STATIC_KEY_FALSE_INIT,	\
+#define DEFINE_STATIC_KEY_ARRAY_FALSE(name, count)			\
+	struct static_key_false __static_key name[count] = {	\
+		[0 ... (count) - 1] = STATIC_KEY_FALSE_INIT,		\
 	}
 
 #define _DEFINE_STATIC_KEY_1(name)	DEFINE_STATIC_KEY_TRUE(name)

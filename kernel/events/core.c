@@ -9544,7 +9544,7 @@ fail:
 	return err;
 }
 
-struct static_key perf_swevent_enabled[PERF_COUNT_SW_MAX];
+struct static_key __static_key perf_swevent_enabled[PERF_COUNT_SW_MAX];
 
 static void sw_perf_event_destroy(struct perf_event *event)
 {
