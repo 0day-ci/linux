@@ -181,8 +181,8 @@ asmlinkage void aesni_gcm_finalize_avx_gen4(void *ctx,
 				   struct gcm_context_data *gdata,
 				   u8 *auth_tag, unsigned long auth_tag_len);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx);
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx2);
+static DEFINE_STATIC_KEY_FALSE_RO(gcm_use_avx);
+static DEFINE_STATIC_KEY_FALSE_RO(gcm_use_avx2);
 
 static inline struct
 aesni_rfc4106_gcm_ctx *aesni_rfc4106_gcm_ctx_get(struct crypto_aead *tfm)

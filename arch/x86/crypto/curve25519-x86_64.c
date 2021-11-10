@@ -1378,7 +1378,7 @@ static void curve25519_ever64_base(u8 *out, const u8 *priv)
 	memzero_explicit(tmp, sizeof(tmp));
 }
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(curve25519_use_bmi2_adx);
+static DEFINE_STATIC_KEY_FALSE_RO(curve25519_use_bmi2_adx);
 
 void curve25519_arch(u8 mypublic[CURVE25519_KEY_SIZE],
 		     const u8 secret[CURVE25519_KEY_SIZE],

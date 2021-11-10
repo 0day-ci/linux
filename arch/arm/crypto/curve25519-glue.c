@@ -23,7 +23,7 @@ asmlinkage void curve25519_neon(u8 mypublic[CURVE25519_KEY_SIZE],
 				const u8 secret[CURVE25519_KEY_SIZE],
 				const u8 basepoint[CURVE25519_KEY_SIZE]);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(have_neon);
+static DEFINE_STATIC_KEY_FALSE_RO(have_neon);
 
 void curve25519_arch(u8 out[CURVE25519_KEY_SIZE],
 		     const u8 scalar[CURVE25519_KEY_SIZE],

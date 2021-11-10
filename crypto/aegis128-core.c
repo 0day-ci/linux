@@ -36,7 +36,7 @@ struct aegis_ctx {
 	union aegis_block key;
 };
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(have_simd);
+static DEFINE_STATIC_KEY_FALSE_RO(have_simd);
 
 static const union aegis_block crypto_aegis_const[2] = {
 	{ .words64 = {

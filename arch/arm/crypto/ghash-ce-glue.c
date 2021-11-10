@@ -48,7 +48,7 @@ asmlinkage void pmull_ghash_update_p64(int blocks, u64 dg[], const char *src,
 asmlinkage void pmull_ghash_update_p8(int blocks, u64 dg[], const char *src,
 				      u64 const h[][2], const char *head);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(use_p64);
+static DEFINE_STATIC_KEY_FALSE_RO(use_p64);
 
 static int ghash_init(struct shash_desc *desc)
 {

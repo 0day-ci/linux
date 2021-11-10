@@ -35,9 +35,9 @@ asmlinkage void chacha_4block_xor_avx512vl(u32 *state, u8 *dst, const u8 *src,
 asmlinkage void chacha_8block_xor_avx512vl(u32 *state, u8 *dst, const u8 *src,
 					   unsigned int len, int nrounds);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(chacha_use_simd);
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(chacha_use_avx2);
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(chacha_use_avx512vl);
+static DEFINE_STATIC_KEY_FALSE_RO(chacha_use_simd);
+static DEFINE_STATIC_KEY_FALSE_RO(chacha_use_avx2);
+static DEFINE_STATIC_KEY_FALSE_RO(chacha_use_avx512vl);
 
 static unsigned int chacha_advance(unsigned int len, unsigned int maxblocks)
 {

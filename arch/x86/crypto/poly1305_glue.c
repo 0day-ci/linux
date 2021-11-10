@@ -30,9 +30,9 @@ asmlinkage void poly1305_blocks_avx2(void *ctx, const u8 *inp, const size_t len,
 asmlinkage void poly1305_blocks_avx512(void *ctx, const u8 *inp,
 				       const size_t len, const u32 padbit);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(poly1305_use_avx);
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(poly1305_use_avx2);
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(poly1305_use_avx512);
+static DEFINE_STATIC_KEY_FALSE_RO(poly1305_use_avx);
+static DEFINE_STATIC_KEY_FALSE_RO(poly1305_use_avx2);
+static DEFINE_STATIC_KEY_FALSE_RO(poly1305_use_avx512);
 
 struct poly1305_arch_internal {
 	union {

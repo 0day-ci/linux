@@ -40,7 +40,7 @@ static int __init parse_stress_slb(char *p)
 }
 early_param("stress_slb", parse_stress_slb);
 
-__ro_after_init DEFINE_STATIC_KEY_FALSE(stress_slb_key);
+DEFINE_STATIC_KEY_FALSE_RO(stress_slb_key);
 
 static void assert_slb_presence(bool present, unsigned long ea)
 {

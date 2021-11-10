@@ -30,7 +30,7 @@ asmlinkage void hchacha_block_neon(const u32 *state, u32 *out, int nrounds);
 asmlinkage void chacha_doarm(u8 *dst, const u8 *src, unsigned int bytes,
 			     const u32 *state, int nrounds);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(use_neon);
+static DEFINE_STATIC_KEY_FALSE_RO(use_neon);
 
 static inline bool neon_usable(void)
 {

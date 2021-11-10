@@ -25,8 +25,8 @@ asmlinkage void blake2s_compress_avx512(struct blake2s_state *state,
 					const u8 *block, const size_t nblocks,
 					const u32 inc);
 
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(blake2s_use_ssse3);
-static __ro_after_init DEFINE_STATIC_KEY_FALSE(blake2s_use_avx512);
+static DEFINE_STATIC_KEY_FALSE_RO(blake2s_use_ssse3);
+static DEFINE_STATIC_KEY_FALSE_RO(blake2s_use_avx512);
 
 void blake2s_compress_arch(struct blake2s_state *state,
 			   const u8 *block, size_t nblocks,
