@@ -85,6 +85,7 @@ config DRM_MSM_DSI
 config DRM_MSM_DSI_28NM_PHY
 	bool "Enable DSI 28nm PHY driver in MSM DRM"
 	depends on DRM_MSM_DSI
+	depends on COMMON_CLK
 	default y
 	help
 	  Choose this option if the 28nm DSI PHY is used on the platform.
@@ -92,6 +93,7 @@ config DRM_MSM_DSI_28NM_PHY
 config DRM_MSM_DSI_20NM_PHY
 	bool "Enable DSI 20nm PHY driver in MSM DRM"
 	depends on DRM_MSM_DSI
+	depends on COMMON_CLK
 	default y
 	help
 	  Choose this option if the 20nm DSI PHY is used on the platform.
@@ -99,6 +101,7 @@ config DRM_MSM_DSI_20NM_PHY
 config DRM_MSM_DSI_28NM_8960_PHY
 	bool "Enable DSI 28nm 8960 PHY driver in MSM DRM"
 	depends on DRM_MSM_DSI
+	depends on COMMON_CLK
 	default y
 	help
 	  Choose this option if the 28nm DSI PHY 8960 variant is used on the
@@ -107,6 +110,7 @@ config DRM_MSM_DSI_28NM_8960_PHY
 config DRM_MSM_DSI_14NM_PHY
 	bool "Enable DSI 14nm PHY driver in MSM DRM (used by MSM8996/APQ8096)"
 	depends on DRM_MSM_DSI
+	depends on COMMON_CLK
 	default y
 	help
 	  Choose this option if DSI PHY on 8996 is used on the platform.
@@ -114,6 +118,7 @@ config DRM_MSM_DSI_14NM_PHY
 config DRM_MSM_DSI_10NM_PHY
 	bool "Enable DSI 10nm PHY driver in MSM DRM (used by SDM845)"
 	depends on DRM_MSM_DSI
+	depends on COMMON_CLK
 	default y
 	help
 	  Choose this option if DSI PHY on SDM845 is used on the platform.
@@ -121,6 +126,7 @@ config DRM_MSM_DSI_10NM_PHY
 config DRM_MSM_DSI_7NM_PHY
 	bool "Enable DSI 7nm PHY driver in MSM DRM"
 	depends on DRM_MSM_DSI
+	depends on COMMON_CLK
 	default y
 	help
 	  Choose this option if DSI PHY on SM8150/SM8250/SC7280 is used on
