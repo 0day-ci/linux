@@ -1,17 +1,14 @@
-CC = $(CROSS_COMPILE)gcc
-CFLAGS = -g -Wall -O2 -D_FORTIFY_SOURCE=2
-SRCS=$(wildcard *.c)
-OBJS=$(SRCS:.c=.o)
+# SPDX-License-Identifier: GPL-2.0
+# Makefile for resctrl selftests
 
-all: resctrl_tests
+CFLAGS += -g -Wall -O2 -D_FORTIFY_SOURCE=2
+LDLIBS += -lnuma
 
-$(OBJS): $(SRCS)
-	$(CC) $(CFLAGS) -c $(SRCS)
+TEST_GEN_PROGS := resctrl_tests
+EXTRA_SOURCES := $(wildcard *.c)
 
-resctrl_tests: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+all: $(TEST_GEN_PROGS)
 
-.PHONY: clean
+$(TEST_GEN_PROGS): $(EXTRA_SOURCES)
 
-clean:
-	$(RM) $(OBJS) resctrl_tests
+include ../lib.mk
