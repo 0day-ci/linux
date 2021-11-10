@@ -2073,6 +2073,22 @@ static inline void cond_resched_rcu(void)
 #endif
 }
 
+#ifdef CONFIG_PREEMPT_DYNAMIC
+
+extern bool is_preempt_none(void);
+extern bool is_preempt_voluntary(void);
+extern bool is_preempt_full(void);
+
+#else
+
+#define is_preempt_none() IS_ENABLED(CONFIG_PREEMPT_NONE)
+#define is_preempt_voluntary() IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY)
+#define is_preempt_full() IS_ENABLED(CONFIG_PREEMPT)
+
+#endif
+
+#define is_preempt_rt() IS_ENABLED(CONFIG_PREEMPT_RT)
+
 /*
  * Does a critical section need to be broken due to another
  * task waiting?: (technically does not depend on CONFIG_PREEMPTION,

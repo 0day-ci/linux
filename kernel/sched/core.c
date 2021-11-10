@@ -6638,6 +6638,17 @@ static void __init preempt_dynamic_init(void)
 	}
 }
 
+#define PREEMPT_MODE_ACCESSOR(mode) \
+	bool is_preempt_##mode(void)						 \
+	{									 \
+		WARN_ON_ONCE(preempt_dynamic_mode == preempt_dynamic_undefined); \
+		return preempt_dynamic_mode == preempt_dynamic_##mode;		 \
+	}
+
+PREEMPT_MODE_ACCESSOR(none)
+PREEMPT_MODE_ACCESSOR(voluntary)
+PREEMPT_MODE_ACCESSOR(full)
+
 #else /* !CONFIG_PREEMPT_DYNAMIC */
 
 static inline void preempt_dynamic_init(void) { }
