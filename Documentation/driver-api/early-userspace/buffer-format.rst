@@ -14,10 +14,10 @@ is different.  The initramfs buffer contains an archive which is
 expanded into a ramfs filesystem; this document details the format of
 the initramfs buffer format.
 
-The initramfs buffer format is based around the "newc" or "crc" CPIO
-formats, and can be created with the cpio(1) utility.  The cpio
-archive can be compressed using gzip(1).  One valid version of an
-initramfs buffer is thus a single .cpio.gz file.
+The initramfs buffer format is based around the "newc" CPIO format, and
+can be created with the cpio(1) utility.  The cpio archive can be
+compressed using gzip(1).  One valid version of an initramfs buffer is
+thus a single .cpio.gz file.
 
 The full format of the initramfs buffer is defined by the following
 grammar, where::
@@ -40,9 +40,8 @@ grammar, where::
 
 
 In human terms, the initramfs buffer contains a collection of
-compressed and/or uncompressed cpio archives (in the "newc" or "crc"
-formats); arbitrary amounts zero bytes (for padding) can be added
-between members.
+compressed and/or uncompressed cpio archives (in the "newc" format),
+with arbitrary amount of zero-byte padding between members.
 
 The cpio "TRAILER!!!" entry (cpio end-of-archive) is optional, but is
 not ignored; see "handling of hard links" below.
@@ -55,7 +54,7 @@ by the ASCII string "000012ac"):
 ============= ================== ==============================================
 Field name    Field size	 Meaning
 ============= ================== ==============================================
-c_magic	      6 bytes		 The string "070701" or "070702"
+c_magic	      6 bytes		 The string "070701"
 c_ino	      8 bytes		 File inode number
 c_mode	      8 bytes		 File mode and permissions
 c_uid	      8 bytes		 File uid
@@ -68,8 +67,7 @@ c_min	      8 bytes		 Minor part of file device number
 c_rmaj	      8 bytes		 Major part of device node reference
 c_rmin	      8 bytes		 Minor part of device node reference
 c_namesize    8 bytes		 Length of filename, including final \0
-c_chksum      8 bytes		 Checksum of data field if c_magic is 070702;
-				 otherwise zero
+c_chksum      8 bytes		 Ignored; reserved for unsupported "crc" format
 ============= ================== ==============================================
 
 The c_mode field matches the contents of st_mode returned by stat(2)
@@ -77,12 +75,6 @@ on Linux, and encodes the file type and file permissions.
 
 The c_filesize should be zero for any file which is not a regular file
 or symlink.
-
-The c_chksum field contains a simple 32-bit unsigned sum of all the
-bytes in the data field.  cpio(1) refers to this as "crc", which is
-clearly incorrect (a cyclic redundancy check is a different and
-significantly stronger integrity check), however, this is the
-algorithm used.
 
 If the filename is "TRAILER!!!" this is actually an end-of-archive
 marker; the c_filesize for an end-of-archive marker must be zero.
