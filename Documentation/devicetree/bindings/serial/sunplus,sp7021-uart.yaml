@@ -1,0 +1,157 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/serial/sunplus,sp7021-uart.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Sunplus SoC SP7021 UART Controller Device Tree Bindings
+
+maintainers:
+  - Tony Huang <tony.huang@sunplus.com>
+  - Hammer Hsieh <hammer.hsieh@sunplus.com>
+  - Wells Lu <wells.lu@sunplus.com>
+
+allOf:
+  - $ref: serial.yaml#
+
+properties:
+  compatible:
+    const: sunplus,sp7021-uart
+
+  reg:
+    minItems: 1
+    maxItems: 2
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    minItems: 1
+    maxItems: 2
+
+  clock-names:
+    oneOf:
+      - items:
+          - const: UADMA
+          - pattern: '^PERI[0-1]$'
+      - items:
+          - const: HWUA
+          - pattern: '^PERI[0-1]$'
+
+  resets:
+    maxItems: 1
+
+  which-uart:
+    description:
+      UA1-4 support DMA mode, UA0 support PIO mode only.
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [ 1, 2, 3, 4]
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - resets
+
+if:
+  properties:
+    compatible:
+      contains:
+        enum:
+          - sunplus,sp7021-uart-rxdma
+          - sunplus,sp7021-uart-txdma
+then:
+  required:
+    - clock-names
+    - which-uart
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+    aliases {
+            serial0 = &uart0;
+            serial1 = &uart1;
+            serial2 = &uart2;
+            serial10 = &uartdmarx0;
+            serial20 = &uartdmatx0;
+            serial11 = &uartdmarx1;
+            serial21 = &uartdmatx1;
+    };
+
+    // UART0 PIO mode only
+    uart0: serial@9c000900 {
+        compatible = "sunplus,sp7021-uart";
+        reg = <0x9c000900 0x80>;
+        interrupt-parent = <&intc>;
+        interrupts = <53 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc 0x28>;
+        resets = <&rstc 0x18>;
+    };
+
+    // UART1 PIO mode
+    uart1: serial@9c000980 {
+        compatible = "sunplus,sp7021-uart";
+        reg = <0x9c000980 0x80>;
+        interrupt-parent = <&intc>;
+        interrupts = <54 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc 0x29>;
+        resets = <&rstc 0x19>;
+    };
+
+    // UART1 DMA mode for RX
+    uartdmarx0: serial@9c008980 {
+        compatible = "sunplus,sp7021-uart-rxdma";
+        reg = <0x9c008980 0x40>;
+        interrupt-parent = <&intc>;
+        interrupts = <138 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc 0x2f>, <&clkc 0x1b>;
+        clock-names = "UADMA", "PERI0";
+        resets = <&rstc 0x1f>;
+        which-uart = <1>;
+    };
+
+    // UART1 DMA mode for TX
+    uartdmatx0: serial@9c008a00 {
+        compatible = "sunplus,sp7021-uart-txdma";
+        reg = <0x9c008a00 0x40>, <0x9c008880 0x80>;
+        clocks = <&clkc 0x2d>, <&clkc 0x1b>;
+        clock-names = "HWUA", "PERI0";
+        resets = <&rstc 0x1d>;
+        which-uart = <1>;
+    };
+
+    // UART2 PIO mode
+    uart2: serial@9c000800 {
+        compatible = "sunplus,sp7021-uart";
+        reg = <0x9c000800 0x80>;
+        interrupt-parent = <&intc>;
+        interrupts = <55 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc 0x2a>;
+        resets = <&rstc 0x1a>;
+    };
+
+    // UART2 DMA mode for RX
+    uartdmarx1: serial@9c0089c0 {
+        compatible = "sunplus,sp7021-uart-rxdma";
+        reg = <0x9c0089c0 0x40>;
+        interrupt-parent = <&intc>;
+        interrupts = <139 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc 0x2f>,	<&clkc 0x1f>;
+        clock-names = "UADMA", "PERI1";
+        resets = <&rstc 0x1f>;
+        which-uart = <2>;
+    };
+
+    // UART2 DMA mode for TX
+    uartdmatx1: serial@9c008a40 {
+        compatible = "sunplus,sp7021-uart-txdma";
+        reg = <0x9c008a40 0x40>, <0x9c008900 0x80>;
+        clocks = <&clkc 0x2d>, <&clkc 0x1f>;
+        clock-names = "HWUA", "PERI1";
+        resets = <&rstc 0x1d>;
+        which-uart = <2>;
+    };
+...
