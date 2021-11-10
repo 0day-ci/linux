@@ -92,7 +92,8 @@ static bool kvm_is_mmio_pfn(kvm_pfn_t pfn)
 bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 	       struct kvm_memory_slot *slot, unsigned int pte_access,
 	       gfn_t gfn, kvm_pfn_t pfn, u64 old_spte, bool prefetch,
-	       bool can_unsync, bool host_writable, u64 *new_spte)
+	       bool can_unsync, bool host_writable, bool ad_need_write_protect,
+	       u64 *new_spte)
 {
 	int level = sp->role.level;
 	u64 spte = SPTE_MMU_PRESENT_MASK;
@@ -100,7 +101,7 @@ bool make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 
 	if (sp->role.ad_disabled)
 		spte |= SPTE_TDP_AD_DISABLED_MASK;
-	else if (kvm_vcpu_ad_need_write_protect(vcpu))
+	else if (ad_need_write_protect)
 		spte |= SPTE_TDP_AD_WRPROT_ONLY_MASK;
 
 	/*
@@ -195,8 +196,11 @@ bool vcpu_make_spte(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 		    gfn_t gfn, kvm_pfn_t pfn, u64 old_spte, bool prefetch,
 		    bool can_unsync, bool host_writable, u64 *new_spte)
 {
+	bool ad_need_write_protect = kvm_vcpu_ad_need_write_protect(vcpu);
+
 	return make_spte(vcpu, sp, slot, pte_access, gfn, pfn, old_spte,
-			 prefetch, can_unsync, host_writable, new_spte);
+			 prefetch, can_unsync, host_writable,
+			 ad_need_write_protect, new_spte);
 
 }
 
