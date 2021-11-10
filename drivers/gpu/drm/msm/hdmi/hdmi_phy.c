@@ -192,8 +192,10 @@ static const struct of_device_id msm_hdmi_phy_dt_match[] = {
 	  .data = &msm_hdmi_phy_8x74_cfg },
 	{ .compatible = "qcom,hdmi-phy-8084",
 	  .data = &msm_hdmi_phy_8x74_cfg },
+#ifdef CONFIG_COMMON_CLK
 	{ .compatible = "qcom,hdmi-phy-8996",
 	  .data = &msm_hdmi_phy_8996_cfg },
+#endif
 	{}
 };
 
