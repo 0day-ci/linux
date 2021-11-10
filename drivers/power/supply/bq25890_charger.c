@@ -388,6 +388,7 @@ static bool bq25890_is_adc_property(enum power_supply_property psp)
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
+	case POWER_SUPPLY_PROP_TEMP:
 		return true;
 
 	default:
