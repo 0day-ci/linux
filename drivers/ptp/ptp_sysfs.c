@@ -86,7 +86,7 @@ static ssize_t extts_fifo_show(struct device *dev,
 	if (!qcnt)
 		goto out;
 
-	cnt = snprintf(page, PAGE_SIZE, "%u %lld %u\n",
+	cnt = sysfs_emit(page, "%u %lld %u\n",
 		       event.index, event.t.sec, event.t.nsec);
 out:
 	mutex_unlock(&ptp->tsevq_mux);
@@ -387,7 +387,7 @@ static ssize_t ptp_pin_show(struct device *dev, struct device_attribute *attr,
 
 	mutex_unlock(&ptp->pincfg_mux);
 
-	return snprintf(page, PAGE_SIZE, "%u %u\n", func, chan);
+	return sysfs_emit(page, "%u %u\n", func, chan);
 }
 
 static ssize_t ptp_pin_store(struct device *dev, struct device_attribute *attr,
