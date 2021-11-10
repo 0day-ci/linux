@@ -297,6 +297,8 @@ static inline bool userfaultfd_must_wait(struct userfaultfd_ctx *ctx,
 	if (!pud_present(*pud))
 		goto out;
 	pmd = pmd_offset(pud, address);
+
+retry:
 	/*
 	 * READ_ONCE must function as a barrier with narrower scope
 	 * and it must be equivalent to:
@@ -323,7 +325,9 @@ static inline bool userfaultfd_must_wait(struct userfaultfd_ctx *ctx,
 	 * the pmd is stable (as in !pmd_trans_unstable) so we can re-read it
 	 * and use the standard pte_offset_map() instead of parsing _pmd.
 	 */
-	pte = pte_offset_map(pmd, address);
+	pte = pte_tryget_map(pmd, address);
+	if (!pte)
+		goto retry;
 	/*
 	 * Lockless access: we're in a wait_event so it's ok if it
 	 * changes under us.
@@ -333,7 +337,7 @@ static inline bool userfaultfd_must_wait(struct userfaultfd_ctx *ctx,
 	if (!pte_write(*pte) && (reason & VM_UFFD_WP))
 		ret = true;
 	pte_unmap(pte);
-
+	pte_put(mm, pmd, address);
 out:
 	return ret;
 }

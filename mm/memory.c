@@ -1165,7 +1165,8 @@ copy_pmd_range(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma,
 	src_pmd = pmd_offset(src_pud, addr);
 	do {
 		next = pmd_addr_end(addr, end);
-		if (is_huge_pmd(*src_pmd)) {
+retry:
+		if (is_huge_pmd(READ_ONCE(*src_pmd))) {
 			int err;
 			VM_BUG_ON_VMA(next-addr != HPAGE_PMD_SIZE, src_vma);
 			err = copy_huge_pmd(dst_mm, src_mm, dst_pmd, src_pmd,
@@ -1178,9 +1179,14 @@ copy_pmd_range(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma,
 		}
 		if (pmd_none_or_clear_bad(src_pmd))
 			continue;
+		if (pte_try_get(src_pmd))
+			goto retry;
 		if (copy_pte_range(dst_vma, src_vma, dst_pmd, src_pmd,
-				   addr, next))
+				   addr, next)) {
+			pte_put(src_mm, src_pmd, addr);
 			return -ENOMEM;
+		}
+		pte_put(src_mm, src_pmd, addr);
 	} while (dst_pmd++, src_pmd++, addr = next, addr != end);
 	return 0;
 }
@@ -1494,7 +1500,10 @@ static inline unsigned long zap_pmd_range(struct mmu_gather *tlb,
 		 */
 		if (pmd_none_or_trans_huge_or_clear_bad(pmd))
 			goto next;
+		if (pte_try_get(pmd))
+			goto next;
 		next = zap_pte_range(tlb, vma, pmd, addr, next, details);
+		pte_put(tlb->mm, pmd, addr);
 next:
 		cond_resched();
 	} while (pmd++, addr = next, addr != end);
@@ -2606,18 +2615,26 @@ static int apply_to_pmd_range(struct mm_struct *mm, pud_t *pud,
 		pmd = pmd_offset(pud, addr);
 	}
 	do {
+		pmd_t pmdval;
+
 		next = pmd_addr_end(addr, end);
-		if (pmd_none(*pmd) && !create)
+retry:
+		pmdval = READ_ONCE(*pmd);
+		if (pmd_none(pmdval) && !create)
 			continue;
-		if (WARN_ON_ONCE(pmd_leaf(*pmd)))
+		if (WARN_ON_ONCE(pmd_leaf(pmdval)))
 			return -EINVAL;
-		if (!pmd_none(*pmd) && WARN_ON_ONCE(pmd_bad(*pmd))) {
+		if (!pmd_none(pmdval) && WARN_ON_ONCE(pmd_bad(pmdval))) {
 			if (!create)
 				continue;
 			pmd_clear_bad(pmd);
 		}
+		if (!create && pte_try_get(pmd))
+			goto retry;
 		err = apply_to_pte_range(mm, pmd, addr, next,
 					 fn, data, create, mask);
+		if (!create)
+			pte_put(mm, pmd, addr);
 		if (err)
 			break;
 	} while (pmd++, addr = next, addr != end);
@@ -4343,26 +4360,31 @@ static vm_fault_t do_fault(struct vm_fault *vmf)
 		 * If we find a migration pmd entry or a none pmd entry, which
 		 * should never happen, return SIGBUS
 		 */
-		if (unlikely(!pmd_present(*vmf->pmd)))
+		if (unlikely(!pmd_present(*vmf->pmd))) {
 			ret = VM_FAULT_SIGBUS;
-		else {
-			vmf->pte = pte_offset_map_lock(vmf->vma->vm_mm,
+		} else {
+			vmf->pte = pte_tryget_map_lock(vmf->vma->vm_mm,
 						       vmf->pmd,
 						       vmf->address,
 						       &vmf->ptl);
-			/*
-			 * Make sure this is not a temporary clearing of pte
-			 * by holding ptl and checking again. A R/M/W update
-			 * of pte involves: take ptl, clearing the pte so that
-			 * we don't have concurrent modification by hardware
-			 * followed by an update.
-			 */
-			if (unlikely(pte_none(*vmf->pte)))
-				ret = VM_FAULT_SIGBUS;
-			else
-				ret = VM_FAULT_NOPAGE;
+			if (vmf->pte) {
+				/*
+				 * Make sure this is not a temporary clearing of pte
+				 * by holding ptl and checking again. A R/M/W update
+				 * of pte involves: take ptl, clearing the pte so that
+				 * we don't have concurrent modification by hardware
+				 * followed by an update.
+				 */
+				if (unlikely(pte_none(*vmf->pte)))
+					ret = VM_FAULT_SIGBUS;
+				else
+					ret = VM_FAULT_NOPAGE;
 
-			pte_unmap_unlock(vmf->pte, vmf->ptl);
+				pte_unmap_unlock(vmf->pte, vmf->ptl);
+				pte_put(vma->vm_mm, vmf->pmd, vmf->address);
+			} else {
+				ret = VM_FAULT_SIGBUS;
+			}
 		}
 	} else if (!(vmf->flags & FAULT_FLAG_WRITE))
 		ret = do_read_fault(vmf);
@@ -5016,13 +5038,22 @@ int follow_invalidate_pte(struct mm_struct *mm, unsigned long address,
 					(address & PAGE_MASK) + PAGE_SIZE);
 		mmu_notifier_invalidate_range_start(range);
 	}
-	ptep = pte_offset_map_lock(mm, pmd, address, ptlp);
+	ptep = pte_tryget_map_lock(mm, pmd, address, ptlp);
+	if (!ptep)
+		goto out;
 	if (!pte_present(*ptep))
 		goto unlock;
+	/*
+	 * when we reach here, it means that the refcount of the pte is at least
+	 * one and the contents of the PTE page table are stable until @ptlp is
+	 * released, so we can put pte safely.
+	 */
+	pte_put(mm, pmd, address);
 	*ptepp = ptep;
 	return 0;
 unlock:
 	pte_unmap_unlock(ptep, *ptlp);
+	pte_put(mm, pmd, address);
 	if (range)
 		mmu_notifier_invalidate_range_end(range);
 out:

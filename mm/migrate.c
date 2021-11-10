@@ -323,8 +323,12 @@ void migration_entry_wait(struct mm_struct *mm, pmd_t *pmd,
 				unsigned long address)
 {
 	spinlock_t *ptl = pte_lockptr(mm, pmd);
-	pte_t *ptep = pte_offset_map(pmd, address);
-	__migration_entry_wait(mm, ptep, ptl);
+	pte_t *ptep = pte_tryget_map(pmd, address);
+
+	if (ptep) {
+		__migration_entry_wait(mm, ptep, ptl);
+		pte_put(mm, pmd, address);
+	}
 }
 
 void migration_entry_wait_huge(struct vm_area_struct *vma,
@@ -2249,21 +2253,23 @@ static int migrate_vma_collect_pmd(pmd_t *pmdp,
 	unsigned long addr = start, unmapped = 0;
 	spinlock_t *ptl;
 	pte_t *ptep;
+	pmd_t pmdval;
 
 again:
-	if (pmd_none(*pmdp))
+	pmdval = READ_ONCE(*pmdp);
+	if (pmd_none(pmdvalp))
 		return migrate_vma_collect_hole(start, end, -1, walk);
 
-	if (pmd_trans_huge(*pmdp)) {
+	if (pmd_trans_huge(pmdval)) {
 		struct page *page;
 
 		ptl = pmd_lock(mm, pmdp);
-		if (unlikely(!pmd_trans_huge(*pmdp))) {
+		if (unlikely(!pmd_trans_huge(pmdval))) {
 			spin_unlock(ptl);
 			goto again;
 		}
 
-		page = pmd_page(*pmdp);
+		page = pmd_page(pmdval);
 		if (is_huge_zero_page(page)) {
 			spin_unlock(ptl);
 			split_huge_pmd(vma, pmdp, addr);
@@ -2284,16 +2290,18 @@ again:
 			if (ret)
 				return migrate_vma_collect_skip(start, end,
 								walk);
-			if (pmd_none(*pmdp))
+			if (pmd_none(pmdval))
 				return migrate_vma_collect_hole(start, end, -1,
 								walk);
 		}
 	}
 
-	if (unlikely(pmd_bad(*pmdp)))
+	if (unlikely(pmd_bad(pmdval)))
 		return migrate_vma_collect_skip(start, end, walk);
 
-	ptep = pte_offset_map_lock(mm, pmdp, addr, &ptl);
+	ptep = pte_tryget_map_lock(mm, pmdp, addr, &ptl);
+	if (!ptep)
+		goto again;
 	arch_enter_lazy_mmu_mode();
 
 	for (; addr < end; addr += PAGE_SIZE, ptep++) {
@@ -2416,6 +2424,7 @@ next:
 	}
 	arch_leave_lazy_mmu_mode();
 	pte_unmap_unlock(ptep - 1, ptl);
+	pte_put(mm, pmdp, start);
 
 	/* Only flush the TLB if we actually modified any entries */
 	if (unmapped)

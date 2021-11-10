@@ -331,10 +331,13 @@ static unsigned long dev_pagemap_mapping_shift(struct page *page,
 		return 0;
 	if (pmd_devmap(*pmd))
 		return PMD_SHIFT;
-	pte = pte_offset_map(pmd, address);
+	pte = pte_tryget_map(pmd, address);
+	if (!pte)
+		return 0;
 	if (pte_present(*pte) && pte_devmap(*pte))
 		ret = PAGE_SHIFT;
 	pte_unmap(pte);
+	pte_put(vma->vm_mm, pmd, address);
 	return ret;
 }
 
@@ -634,6 +637,7 @@ static int hwpoison_pte_range(pmd_t *pmdp, unsigned long addr,
 	int ret = 0;
 	pte_t *ptep, *mapped_pte;
 	spinlock_t *ptl;
+	unsigned long start = addr;
 
 	ptl = pmd_trans_huge_lock(pmdp, walk->vma);
 	if (ptl) {
@@ -645,8 +649,10 @@ static int hwpoison_pte_range(pmd_t *pmdp, unsigned long addr,
 	if (pmd_trans_unstable(pmdp))
 		goto out;
 
-	mapped_pte = ptep = pte_offset_map_lock(walk->vma->vm_mm, pmdp,
+	mapped_pte = ptep = pte_tryget_map_lock(walk->vma->vm_mm, pmdp,
 						addr, &ptl);
+	if (!ptep)
+		goto out;
 	for (; addr != end; ptep++, addr += PAGE_SIZE) {
 		ret = check_hwpoisoned_entry(*ptep, addr, PAGE_SHIFT,
 					     hwp->pfn, &hwp->tk);
@@ -654,6 +660,7 @@ static int hwpoison_pte_range(pmd_t *pmdp, unsigned long addr,
 			break;
 	}
 	pte_unmap_unlock(mapped_pte, ptl);
+	pte_put(walk->vma->vm_mm, pmdp, start);
 out:
 	cond_resched();
 	return ret;

@@ -1140,9 +1140,12 @@ static int replace_page(struct vm_area_struct *vma, struct page *page,
 				addr + PAGE_SIZE);
 	mmu_notifier_invalidate_range_start(&range);
 
-	ptep = pte_offset_map_lock(mm, pmd, addr, &ptl);
+	ptep = pte_tryget_map_lock(mm, pmd, addr, &ptl);
+	if (!ptep)
+		goto out_mn;
 	if (!pte_same(*ptep, orig_pte)) {
 		pte_unmap_unlock(ptep, ptl);
+		pte_put(mm, pmd, addr);
 		goto out_mn;
 	}
 
@@ -1182,6 +1185,7 @@ static int replace_page(struct vm_area_struct *vma, struct page *page,
 	put_page(page);
 
 	pte_unmap_unlock(ptep, ptl);
+	pte_put(mm, pmd, addr);
 	err = 0;
 out_mn:
 	mmu_notifier_invalidate_range_end(&range);

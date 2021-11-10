@@ -373,6 +373,7 @@ static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 	pte_t *pte;
 	spinlock_t *ptl;
 
+retry:
 	if (pmd_huge(*pmd)) {
 		ptl = pmd_lock(walk->mm, pmd);
 		if (pmd_huge(*pmd)) {
@@ -385,12 +386,15 @@ static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 
 	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
 		return 0;
-	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+	pte = pte_tryget_map_lock(walk->mm, pmd, addr, &ptl);
+	if (!pte)
+		goto retry;
 	if (!pte_present(*pte))
 		goto out;
 	damon_ptep_mkold(pte, walk->mm, addr);
 out:
 	pte_unmap_unlock(pte, ptl);
+	pte_put(walk->mm, pmd, addr);
 	return 0;
 }
 
@@ -446,6 +450,7 @@ static int damon_young_pmd_entry(pmd_t *pmd, unsigned long addr,
 	struct page *page;
 	struct damon_young_walk_private *priv = walk->private;
 
+retry:
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	if (pmd_huge(*pmd)) {
 		ptl = pmd_lock(walk->mm, pmd);
@@ -473,7 +478,9 @@ regular_page:
 
 	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
 		return -EINVAL;
-	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+	pte = pte_tryget_map_lock(walk->mm, pmd, addr, &ptl);
+	if (!pte)
+		goto retry;
 	if (!pte_present(*pte))
 		goto out;
 	page = damon_get_page(pte_pfn(*pte));
@@ -487,6 +494,7 @@ regular_page:
 	put_page(page);
 out:
 	pte_unmap_unlock(pte, ptl);
+	pte_put(walk->mm, pmd, addr);
 	return 0;
 }
 
