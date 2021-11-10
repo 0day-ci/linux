@@ -744,4 +744,6 @@ extern const struct attribute_group aspm_ctrl_attr_group;
 
 extern const struct attribute_group pci_dev_reset_method_attr_group;
 
+bool pcie_is_port_dev(struct pci_dev *dev);
+
 #endif /* DRIVERS_PCI_H */

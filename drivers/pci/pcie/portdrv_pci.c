@@ -90,6 +90,23 @@ static const struct dev_pm_ops pcie_portdrv_pm_ops = {
 #define PCIE_PORTDRV_PM_OPS	NULL
 #endif /* !PM */
 
+bool pcie_is_port_dev(struct pci_dev *dev)
+{
+	int type;
+
+	if (!dev)
+		return false;
+
+	type = pci_pcie_type(dev);
+
+	return pci_is_pcie(dev) &&
+		((type == PCI_EXP_TYPE_ROOT_PORT) ||
+		 (type == PCI_EXP_TYPE_UPSTREAM) ||
+		 (type == PCI_EXP_TYPE_DOWNSTREAM) ||
+		 (type == PCI_EXP_TYPE_RC_EC));
+}
+EXPORT_SYMBOL_GPL(pcie_is_port_dev);
+
 /*
  * pcie_portdrv_probe - Probe PCI-Express port devices
  * @dev: PCI-Express port device being probed
@@ -104,11 +121,7 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 	int type = pci_pcie_type(dev);
 	int status;
 
-	if (!pci_is_pcie(dev) ||
-	    ((type != PCI_EXP_TYPE_ROOT_PORT) &&
-	     (type != PCI_EXP_TYPE_UPSTREAM) &&
-	     (type != PCI_EXP_TYPE_DOWNSTREAM) &&
-	     (type != PCI_EXP_TYPE_RC_EC)))
+	if (!pcie_is_port_dev(dev))
 		return -ENODEV;
 
 	if (type == PCI_EXP_TYPE_RC_EC)
