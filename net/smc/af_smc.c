@@ -566,6 +566,20 @@ static void smc_switch_to_fallback(struct smc_sock *smc, int reason_code)
 	smc->fallback_rsn = reason_code;
 	smc_stat_fallback(smc);
 	trace_smc_switch_to_fallback(smc, reason_code);
+
+	/* We swapped sk->sk_wq of clcsocket and smc socket in smc_create()
+	 * to prevent mismatch of wait queue caused by fallback.
+	 *
+	 * If fallback really occurred, user application starts to use clcsocket.
+	 * Accordingly, clcsocket->sk->sk_wq should be reset to clcsocket->wq
+	 * in order that user application still uses the same wait queue as what
+	 * was used before fallback.
+	 *
+	 * After fallback, the relation between socket->wq and socket->sk->sk_wq is:
+	 * - clcsocket->sk->sk_wq  -->  clcsocket->wq
+	 * - smcsocket->sk->sk_wq  -->  clcsocket->wq
+	 */
+	rcu_assign_pointer(smc->clcsock->sk->sk_wq, &smc->clcsock->wq);
 	if (smc->sk.sk_socket && smc->sk.sk_socket->file) {
 		smc->clcsock->file = smc->sk.sk_socket->file;
 		smc->clcsock->file->private_data = smc->clcsock;
@@ -2174,6 +2188,12 @@ static int smc_accept(struct socket *sock, struct socket *new_sock,
 	if (rc)
 		goto out;
 
+	/* The new accepted smc sock sets sk->sk_wq to clcsocket->wq like what
+	 * smc_create() did when the fallback does not occur.
+	 */
+	if (!smc_sk(nsk)->use_fallback)
+		rcu_assign_pointer(nsk->sk_wq, &smc_sk(nsk)->clcsock->wq);
+
 	if (lsmc->sockopt_defer_accept && !(flags & O_NONBLOCK)) {
 		/* wait till data arrives on the socket */
 		timeo = msecs_to_jiffies(lsmc->sockopt_defer_accept *
@@ -2310,8 +2330,15 @@ static __poll_t smc_poll(struct file *file, struct socket *sock,
 		mask = smc->clcsock->ops->poll(file, smc->clcsock, wait);
 		sk->sk_err = smc->clcsock->sk->sk_err;
 	} else {
-		if (sk->sk_state != SMC_CLOSED)
-			sock_poll_wait(file, sock, wait);
+		if (sk->sk_state != SMC_CLOSED) {
+			/* SMC always uses clcsocket->wq for the call to
+			 * sock_poll_wait(), which is the same wait queue
+			 * as what smc socket->sk->sk_wq points to before
+			 * fallback or what clcsocket->sk->sk_wq points to
+			 * after fallback.
+			 */
+			sock_poll_wait(file, smc->clcsock, wait);
+		}
 		if (sk->sk_err)
 			mask |= EPOLLERR;
 		if ((sk->sk_shutdown == SHUTDOWN_MASK) ||
@@ -2706,6 +2733,31 @@ static int smc_create(struct net *net, struct socket *sock, int protocol,
 	}
 	smc->sk.sk_sndbuf = max(smc->clcsock->sk->sk_sndbuf, SMC_BUF_MIN_SIZE);
 	smc->sk.sk_rcvbuf = max(smc->clcsock->sk->sk_rcvbuf, SMC_BUF_MIN_SIZE);
+
+	/* To ensure that user applications consistently use the same wait queue
+	 * before and after fallback, we set smc socket->sk->sk_wq to clcsocket->wq
+	 * here and reset clcsocket->sk->sk_wq to clcsocket->wq in
+	 * smc_switch_to_fallback() if fallback occurrs, making clcsocket->wq the
+	 * constant wait queue which user applications use.
+	 *
+	 * here:
+	 * - Set smc socket->sk->sk_wq to clcsocket->wq
+	 *   So that the sk_data_ready()/sk_write_space.. will wake up clcsocket->wq
+	 *   and user applications will be notified of epoll events if they added
+	 *   eppoll_entry into clcsocket->wq through smc_poll().
+	 *
+	 * - Set clcsocket->sk->sk_wq to smc socket->wq
+	 *   Since clcsocket->wq is occupied by smcsocket->sk->sk_wq, clcsocket->
+	 *   sk->sk_wq have to use another wait queue (smc socket->wq) during TCP
+	 *   handshake or CLC messages transmission in rendezvous.
+	 *
+	 * So the relation between socket->wq and socket->sk->sk_wq before fallback is:
+	 *
+	 * - smc socket->sk->sk_wq --> clcsocket->wq
+	 * - clcsocket->sk->sk_wq  --> smc socket->wq
+	 */
+	rcu_assign_pointer(sk->sk_wq, &smc->clcsock->wq);
+	rcu_assign_pointer(smc->clcsock->sk->sk_wq, &smc->sk.sk_socket->wq);
 
 out:
 	return rc;
