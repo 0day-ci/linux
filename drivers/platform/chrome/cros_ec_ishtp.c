@@ -41,9 +41,9 @@ enum cros_ec_ish_channel {
 #define ISHTP_SEND_TIMEOUT			(3 * HZ)
 
 /* ISH Transport CrOS EC ISH client unique GUID */
-static const guid_t cros_ish_guid =
-	GUID_INIT(0x7b7154d0, 0x56f4, 0x4bdc,
-		  0xb0, 0xd8, 0x9e, 0x7c, 0xda,	0xe0, 0xd6, 0xa0);
+#define CROS_ISH_GUID GUID_INIT(0x7b7154d0, 0x56f4, 0x4bdc, \
+		  0xb0, 0xd8, 0x9e, 0x7c, 0xda,	0xe0, 0xd6, 0xa0)
+static const guid_t cros_ish_guid = CROS_ISH_GUID;
 
 struct header {
 	u8 channel;
@@ -775,7 +775,7 @@ static struct ishtp_cl_driver	cros_ec_ishtp_driver = {
 };
 
 static const struct ishtp_device_id cros_ec_ishtp_id_table[] = {
-	{ cros_ish_guid },
+	{ CROS_ISH_GUID },
 	{ }
 };
 MODULE_DEVICE_TABLE(ishtp, cros_ec_ishtp_id_table);
