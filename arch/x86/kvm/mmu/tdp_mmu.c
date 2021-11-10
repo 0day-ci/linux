@@ -220,7 +220,8 @@ out:
 
 static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				u64 old_spte, u64 new_spte, int level,
-				bool shared);
+				bool shared,
+				struct list_head *disconnected_sps);
 
 static void handle_changed_spte_acc_track(u64 old_spte, u64 new_spte, int level)
 {
@@ -302,6 +303,11 @@ static void tdp_mmu_unlink_page(struct kvm *kvm, struct kvm_mmu_page *sp,
  * @shared: This operation may not be running under the exclusive use
  *	    of the MMU lock and the operation must synchronize with other
  *	    threads that might be modifying SPTEs.
+ * @disconnected_sps: If null, the TLBs will be flushed and the disconnected
+ *		      TDP MMU page will be queued to be freed after an RCU
+ *		      callback. If non-null the page will be added to the list
+ *		      and flushing the TLBs and queueing an RCU callback to
+ *		      free the page will be the caller's responsibility.
  *
  * Given a page table that has been removed from the TDP paging structure,
  * iterates through the page table to clear SPTEs and free child page tables.
@@ -312,7 +318,8 @@ static void tdp_mmu_unlink_page(struct kvm *kvm, struct kvm_mmu_page *sp,
  * early rcu_dereferences in the function.
  */
 static void handle_removed_tdp_mmu_page(struct kvm *kvm, tdp_ptep_t pt,
-					bool shared)
+					bool shared,
+					struct list_head *disconnected_sps)
 {
 	struct kvm_mmu_page *sp = sptep_to_sp(rcu_dereference(pt));
 	int level = sp->role.level;
@@ -371,13 +378,16 @@ static void handle_removed_tdp_mmu_page(struct kvm *kvm, tdp_ptep_t pt,
 		}
 		handle_changed_spte(kvm, kvm_mmu_page_as_id(sp), gfn,
 				    old_child_spte, REMOVED_SPTE, level,
-				    shared);
+				    shared, disconnected_sps);
 	}
 
-	kvm_flush_remote_tlbs_with_address(kvm, base_gfn,
-					   KVM_PAGES_PER_HPAGE(level + 1));
-
-	call_rcu(&sp->rcu_head, tdp_mmu_free_sp_rcu_callback);
+	if (disconnected_sps) {
+		list_add_tail(&sp->link, disconnected_sps);
+	} else {
+		kvm_flush_remote_tlbs_with_address(kvm, base_gfn,
+						   KVM_PAGES_PER_HPAGE(level + 1));
+		call_rcu(&sp->rcu_head, tdp_mmu_free_sp_rcu_callback);
+	}
 }
 
 /**
@@ -391,13 +401,21 @@ static void handle_removed_tdp_mmu_page(struct kvm *kvm, tdp_ptep_t pt,
  * @shared: This operation may not be running under the exclusive use of
  *	    the MMU lock and the operation must synchronize with other
  *	    threads that might be modifying SPTEs.
+ * @disconnected_sps: Only used if a page of page table memory has been
+ *		      removed from the paging structure by this change.
+ *		      If null, the TLBs will be flushed and the disconnected
+ *		      TDP MMU page will be queued to be freed after an RCU
+ *		      callback. If non-null the page will be added to the list
+ *		      and flushing the TLBs and queueing an RCU callback to
+ *		      free the page will be the caller's responsibility.
  *
  * Handle bookkeeping that might result from the modification of a SPTE.
  * This function must be called for all TDP SPTE modifications.
  */
 static void __handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				  u64 old_spte, u64 new_spte, int level,
-				  bool shared)
+				  bool shared,
+				  struct list_head *disconnected_sps)
 {
 	bool was_present = is_shadow_present_pte(old_spte);
 	bool is_present = is_shadow_present_pte(new_spte);
@@ -475,22 +493,39 @@ static void __handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 	 */
 	if (was_present && !was_leaf && (pfn_changed || !is_present))
 		handle_removed_tdp_mmu_page(kvm,
-				spte_to_child_pt(old_spte, level), shared);
+				spte_to_child_pt(old_spte, level), shared,
+				disconnected_sps);
 }
 
 static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 				u64 old_spte, u64 new_spte, int level,
-				bool shared)
+				bool shared, struct list_head *disconnected_sps)
 {
 	__handle_changed_spte(kvm, as_id, gfn, old_spte, new_spte, level,
-			      shared);
+			      shared, disconnected_sps);
 	handle_changed_spte_acc_track(old_spte, new_spte, level);
 	handle_changed_spte_dirty_log(kvm, as_id, gfn, old_spte,
 				      new_spte, level);
 }
 
 /*
- * tdp_mmu_set_spte_atomic - Set a TDP MMU SPTE atomically
+ * The TLBs must be flushed between the pages linked from disconnected_sps
+ * being removed from the paging structure and this function being called.
+ */
+static void handle_disconnected_sps(struct kvm *kvm,
+				    struct list_head *disconnected_sps)
+{
+	struct kvm_mmu_page *sp;
+	struct kvm_mmu_page *next;
+
+	list_for_each_entry_safe(sp, next, disconnected_sps, link) {
+		list_del(&sp->link);
+		call_rcu(&sp->rcu_head, tdp_mmu_free_sp_rcu_callback);
+	}
+}
+
+/*
+ * __tdp_mmu_set_spte_atomic - Set a TDP MMU SPTE atomically
  * and handle the associated bookkeeping.  Do not mark the page dirty
  * in KVM's dirty bitmaps.
  *
@@ -500,9 +535,10 @@ static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
  * Returns: true if the SPTE was set, false if it was not. If false is returned,
  *	    this function will have no side-effects.
  */
-static inline bool tdp_mmu_set_spte_atomic(struct kvm *kvm,
-					   struct tdp_iter *iter,
-					   u64 new_spte)
+static inline bool __tdp_mmu_set_spte_atomic(struct kvm *kvm,
+					     struct tdp_iter *iter,
+					     u64 new_spte,
+					     struct list_head *disconnected_sps)
 {
 	lockdep_assert_held_read(&kvm->mmu_lock);
 
@@ -522,22 +558,32 @@ static inline bool tdp_mmu_set_spte_atomic(struct kvm *kvm,
 		return false;
 
 	__handle_changed_spte(kvm, iter->as_id, iter->gfn, iter->old_spte,
-			      new_spte, iter->level, true);
+			      new_spte, iter->level, true, disconnected_sps);
 	handle_changed_spte_acc_track(iter->old_spte, new_spte, iter->level);
 
 	return true;
 }
 
+static inline bool tdp_mmu_set_spte_atomic(struct kvm *kvm,
+					   struct tdp_iter *iter,
+					   u64 new_spte)
+{
+	return __tdp_mmu_set_spte_atomic(kvm, iter, new_spte, NULL);
+}
+
 static inline bool tdp_mmu_zap_spte_atomic(struct kvm *kvm,
 					   struct tdp_iter *iter)
 {
+	LIST_HEAD(disconnected_sps);
+
 	/*
 	 * Freeze the SPTE by setting it to a special,
 	 * non-present value. This will stop other threads from
 	 * immediately installing a present entry in its place
 	 * before the TLBs are flushed.
 	 */
-	if (!tdp_mmu_set_spte_atomic(kvm, iter, REMOVED_SPTE))
+	if (!__tdp_mmu_set_spte_atomic(kvm, iter, REMOVED_SPTE,
+				       &disconnected_sps))
 		return false;
 
 	kvm_flush_remote_tlbs_with_address(kvm, iter->gfn,
@@ -552,6 +598,8 @@ static inline bool tdp_mmu_zap_spte_atomic(struct kvm *kvm,
 	 * to non-present.
 	 */
 	WRITE_ONCE(*rcu_dereference(iter->sptep), 0);
+
+	handle_disconnected_sps(kvm, &disconnected_sps);
 
 	return true;
 }
@@ -577,6 +625,8 @@ static inline void __tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 				      u64 new_spte, bool record_acc_track,
 				      bool record_dirty_log)
 {
+	LIST_HEAD(disconnected_sps);
+
 	lockdep_assert_held_write(&kvm->mmu_lock);
 
 	/*
@@ -591,7 +641,7 @@ static inline void __tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 	WRITE_ONCE(*rcu_dereference(iter->sptep), new_spte);
 
 	__handle_changed_spte(kvm, iter->as_id, iter->gfn, iter->old_spte,
-			      new_spte, iter->level, false);
+			      new_spte, iter->level, false, &disconnected_sps);
 	if (record_acc_track)
 		handle_changed_spte_acc_track(iter->old_spte, new_spte,
 					      iter->level);
@@ -599,6 +649,8 @@ static inline void __tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 		handle_changed_spte_dirty_log(kvm, iter->as_id, iter->gfn,
 					      iter->old_spte, new_spte,
 					      iter->level);
+
+	handle_disconnected_sps(kvm, &disconnected_sps);
 }
 
 static inline void tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
