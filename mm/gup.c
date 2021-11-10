@@ -699,7 +699,7 @@ retry_locked:
 		} else {
 			spin_unlock(ptl);
 			split_huge_pmd(vma, pmd, address);
-			ret = pte_alloc(mm, pmd) ? -ENOMEM : 0;
+			ret = pte_alloc(mm, pmd) < 0 ? -ENOMEM : 0;
 		}
 
 		return ret ? ERR_PTR(ret) :

@@ -2306,13 +2306,27 @@ static inline void pgtable_pte_page_dtor(struct page *page)
 	dec_lruvec_page_state(page, NR_PAGETABLE);
 }
 
-#define pte_alloc(mm, pmd) (unlikely(pmd_none(*(pmd))) && __pte_alloc(mm, pmd))
+enum pmd_installed_type {
+	INSTALLED_PTE,
+	INSTALLED_HUGE_PMD,
+};
+
+static inline int pte_alloc(struct mm_struct *mm, pmd_t *pmd)
+{
+	if (unlikely(pmd_none(*(pmd))))
+		return __pte_alloc(mm, pmd);
+	if (unlikely(is_huge_pmd(*pmd)))
+		return INSTALLED_HUGE_PMD;
+
+	return INSTALLED_PTE;
+}
+#define pte_alloc pte_alloc
 
 #define pte_alloc_map(mm, pmd, address)			\
-	(pte_alloc(mm, pmd) ? NULL : pte_offset_map(pmd, address))
+	(pte_alloc(mm, pmd) < 0 ? NULL : pte_offset_map(pmd, address))
 
 #define pte_alloc_map_lock(mm, pmd, address, ptlp)	\
-	(pte_alloc(mm, pmd) ?			\
+	(pte_alloc(mm, pmd) < 0 ?			\
 		 NULL : pte_offset_map_lock(mm, pmd, address, ptlp))
 
 #define pte_alloc_kernel(pmd, address)			\

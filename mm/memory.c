@@ -437,8 +437,10 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 	}
 }
 
-void pmd_install(struct mm_struct *mm, pmd_t *pmd, pgtable_t *pte)
+enum pmd_installed_type pmd_install(struct mm_struct *mm, pmd_t *pmd,
+				    pgtable_t *pte)
 {
+	int ret = INSTALLED_PTE;
 	spinlock_t *ptl = pmd_lock(mm, pmd);
 
 	if (likely(pmd_none(*pmd))) {	/* Has another populated it ? */
@@ -459,20 +461,26 @@ void pmd_install(struct mm_struct *mm, pmd_t *pmd, pgtable_t *pte)
 		smp_wmb(); /* Could be smp_wmb__xxx(before|after)_spin_lock */
 		pmd_populate(mm, pmd, *pte);
 		*pte = NULL;
+	} else if (is_huge_pmd(*pmd)) {
+		/* See comment in handle_pte_fault() */
+		ret = INSTALLED_HUGE_PMD;
 	}
 	spin_unlock(ptl);
+
+	return ret;
 }
 
 int __pte_alloc(struct mm_struct *mm, pmd_t *pmd)
 {
+	enum pmd_installed_type ret;
 	pgtable_t new = pte_alloc_one(mm);
 	if (!new)
 		return -ENOMEM;
 
-	pmd_install(mm, pmd, &new);
+	ret = pmd_install(mm, pmd, &new);
 	if (new)
 		pte_free(mm, new);
-	return 0;
+	return ret;
 }
 
 int __pte_alloc_kernel(pmd_t *pmd)
@@ -1813,7 +1821,7 @@ more:
 
 	/* Allocate the PTE if necessary; takes PMD lock once only. */
 	ret = -ENOMEM;
-	if (pte_alloc(mm, pmd))
+	if (pte_alloc(mm, pmd) < 0)
 		goto out;
 
 	while (pages_to_write_in_pmd) {
@@ -3713,6 +3721,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	struct page *page;
 	vm_fault_t ret = 0;
 	pte_t entry;
+	int alloc_ret;
 
 	/* File mapping without ->vm_ops ? */
 	if (vma->vm_flags & VM_SHARED)
@@ -3728,11 +3737,11 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	 *
 	 * Here we only have mmap_read_lock(mm).
 	 */
-	if (pte_alloc(vma->vm_mm, vmf->pmd))
+	alloc_ret = pte_alloc(vma->vm_mm, vmf->pmd);
+	if (alloc_ret < 0)
 		return VM_FAULT_OOM;
-
 	/* See comment in handle_pte_fault() */
-	if (unlikely(pmd_trans_unstable(vmf->pmd)))
+	if (unlikely(alloc_ret == INSTALLED_HUGE_PMD))
 		return 0;
 
 	/* Use the zero-page for reads */
@@ -4023,6 +4032,8 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 	}
 
 	if (pmd_none(*vmf->pmd)) {
+		int alloc_ret;
+
 		if (PageTransCompound(page)) {
 			ret = do_set_pmd(vmf, page);
 			if (ret != VM_FAULT_FALLBACK)
@@ -4030,14 +4041,16 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 		}
 
 		if (vmf->prealloc_pte)
-			pmd_install(vma->vm_mm, vmf->pmd, &vmf->prealloc_pte);
-		else if (unlikely(pte_alloc(vma->vm_mm, vmf->pmd)))
-			return VM_FAULT_OOM;
-	}
+			alloc_ret = pmd_install(vma->vm_mm, vmf->pmd, &vmf->prealloc_pte);
+		else
+			alloc_ret = pte_alloc(vma->vm_mm, vmf->pmd);
 
-	/* See comment in handle_pte_fault() */
-	if (pmd_devmap_trans_unstable(vmf->pmd))
+		if (unlikely(alloc_ret != INSTALLED_PTE))
+			return alloc_ret < 0 ? VM_FAULT_OOM : 0;
+	} else if (pmd_devmap_trans_unstable(vmf->pmd)) {
+		/* See comment in handle_pte_fault() */
 		return 0;
+	}
 
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
 				      vmf->address, &vmf->ptl);

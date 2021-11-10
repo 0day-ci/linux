@@ -2731,21 +2731,8 @@ static void migrate_vma_insert_page(struct migrate_vma *migrate,
 	if (pmd_trans_huge(*pmdp) || pmd_devmap(*pmdp))
 		goto abort;
 
-	/*
-	 * Use pte_alloc() instead of pte_alloc_map().  We can't run
-	 * pte_offset_map() on pmds where a huge pmd might be created
-	 * from a different thread.
-	 *
-	 * pte_alloc_map() is safe to use under mmap_write_lock(mm) or when
-	 * parallel threads are excluded by other means.
-	 *
-	 * Here we only have mmap_read_lock(mm).
-	 */
-	if (pte_alloc(mm, pmdp))
-		goto abort;
-
-	/* See the comment in pte_alloc_one_map() */
-	if (unlikely(pmd_trans_unstable(pmdp)))
+	/* See the comment in do_anonymous_page() */
+	if (unlikely(pte_alloc(mm, pmdp) != INSTALLED_PTE))
 		goto abort;
 
 	if (unlikely(anon_vma_prepare(vma)))

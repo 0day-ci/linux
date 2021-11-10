@@ -592,15 +592,21 @@ retry:
 			err = -EEXIST;
 			break;
 		}
-		if (unlikely(pmd_none(dst_pmdval)) &&
-		    unlikely(__pte_alloc(dst_mm, dst_pmd))) {
-			err = -ENOMEM;
-			break;
-		}
-		/* If an huge pmd materialized from under us fail */
-		if (unlikely(pmd_trans_huge(*dst_pmd))) {
-			err = -EFAULT;
-			break;
+
+		if (unlikely(pmd_none(dst_pmdval))) {
+			int ret = __pte_alloc(dst_mm, dst_pmd);
+
+			/*
+			 * If there is not enough memory or an huge pmd
+			 * materialized from under us
+			 */
+			if (unlikely(ret < 0)) {
+				err = -ENOMEM;
+				break;
+			} else if (unlikely(ret == INSTALLED_HUGE_PMD)) {
+				err = -EFAULT;
+				break;
+			}
 		}
 
 		BUG_ON(pmd_none(*dst_pmd));
