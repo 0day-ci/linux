@@ -7,7 +7,10 @@
 
 #include <linux/pte_ref.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
+#include <asm/tlbflush.h>
 
+#ifdef CONFIG_FREE_USER_PTE
 /*
  * pte_get_unless_zero - Increment refcount for the PTE page table
  *			 unless it is zero.
@@ -15,7 +18,10 @@
  */
 bool pte_get_unless_zero(pmd_t *pmd)
 {
-	return true;
+	pgtable_t pte = pmd_pgtable(*pmd);
+
+	VM_BUG_ON(!PageTable(pte));
+	return atomic_inc_not_zero(&pte->pte_refcount);
 }
 
 /*
@@ -32,12 +38,20 @@ bool pte_get_unless_zero(pmd_t *pmd)
  */
 enum pte_tryget_type pte_try_get(pmd_t *pmd)
 {
-	if (unlikely(pmd_none(*pmd)))
-		return TRYGET_FAILED_NONE;
-	if (unlikely(is_huge_pmd(*pmd)))
-		return TRYGET_FAILED_HUGE_PMD;
+	int retval = TRYGET_SUCCESSED;
+	pmd_t pmdval;
 
-	return TRYGET_SUCCESSED;
+	rcu_read_lock();
+	pmdval = READ_ONCE(*pmd);
+	if (unlikely(pmd_none(pmdval)))
+		retval = TRYGET_FAILED_NONE;
+	else if (unlikely(is_huge_pmd(pmdval)))
+		retval = TRYGET_FAILED_HUGE_PMD;
+	else if (!pte_get_unless_zero(&pmdval))
+		retval = TRYGET_FAILED_ZERO;
+	rcu_read_unlock();
+
+	return retval;
 }
 
 /*
@@ -52,4 +66,69 @@ enum pte_tryget_type pte_try_get(pmd_t *pmd)
  */
 void pte_put_vmf(struct vm_fault *vmf)
 {
+	if (!(vmf->flags & FAULT_FLAG_PTE_GET))
+		return;
+	vmf->flags &= ~FAULT_FLAG_PTE_GET;
+
+	pte_put(vmf->vma->vm_mm, vmf->pmd, vmf->address);
+}
+#else
+bool pte_get_unless_zero(pmd_t *pmd)
+{
+	return true;
+}
+
+enum pte_tryget_type pte_try_get(pmd_t *pmd)
+{
+	if (unlikely(pmd_none(*pmd)))
+		return TRYGET_FAILED_NONE;
+
+	if (unlikely(is_huge_pmd(*pmd)))
+		return TRYGET_FAILED_HUGE_PMD;
+
+	return TRYGET_SUCCESSED;
+}
+
+void pte_put_vmf(struct vm_fault *vmf)
+{
+}
+#endif /* CONFIG_FREE_USER_PTE */
+
+#ifdef CONFIG_DEBUG_VM
+static void pte_free_debug(pmd_t pmd)
+{
+	pte_t *ptep = (pte_t *)pmd_page_vaddr(pmd);
+	int i = 0;
+
+	for (i = 0; i < PTRS_PER_PTE; i++)
+		BUG_ON(!pte_none(*ptep++));
+}
+#else
+static inline void pte_free_debug(pmd_t pmd)
+{
+}
+#endif
+
+static void pte_free_rcu(struct rcu_head *rcu)
+{
+	struct page *page = container_of(rcu, struct page, rcu_head);
+
+	pgtable_pte_page_dtor(page);
+	__free_page(page);
+}
+
+void free_user_pte_table(struct mm_struct *mm, pmd_t *pmd, unsigned long addr)
+{
+	struct vm_area_struct vma = TLB_FLUSH_VMA(mm, 0);
+	spinlock_t *ptl;
+	pmd_t pmdval;
+
+	ptl = pmd_lock(mm, pmd);
+	pmdval = pmdp_huge_get_and_clear(mm, addr, pmd);
+	flush_tlb_range(&vma, addr, addr + PMD_SIZE);
+	spin_unlock(ptl);
+
+	pte_free_debug(pmdval);
+	mm_dec_nr_ptes(mm);
+	call_rcu(&pmd_pgtable(pmdval)->rcu_head, pte_free_rcu);
 }
