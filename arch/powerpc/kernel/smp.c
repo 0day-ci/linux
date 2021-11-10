@@ -61,6 +61,7 @@
 #include <asm/cpu_has_feature.h>
 #include <asm/ftrace.h>
 #include <asm/kup.h>
+#include <asm/fadump.h>
 
 #ifdef DEBUG
 #include <asm/udbg.h>
@@ -626,7 +627,8 @@ static void nmi_stop_this_cpu(struct pt_regs *regs)
 	/*
 	 * IRQs are already hard disabled by the smp_handle_nmi_ipi.
 	 */
-	set_cpu_online(smp_processor_id(), false);
+	if (!(oops_in_progress && should_fadump_crash()))
+		set_cpu_online(smp_processor_id(), false);
 
 	spin_begin();
 	while (1)
@@ -650,7 +652,8 @@ static void stop_this_cpu(void *dummy)
 	 * to know other CPUs are offline before it breaks locks to flush
 	 * printk buffers, in case we panic()ed while holding the lock.
 	 */
-	set_cpu_online(smp_processor_id(), false);
+	if (!(oops_in_progress && should_fadump_crash()))
+		set_cpu_online(smp_processor_id(), false);
 
 	spin_begin();
 	while (1)
