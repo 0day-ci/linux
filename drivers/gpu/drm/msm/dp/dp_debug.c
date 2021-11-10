@@ -209,7 +209,6 @@ static const struct file_operations test_active_fops = {
 
 static int dp_debug_init(struct dp_debug *dp_debug, struct drm_minor *minor)
 {
-	int rc = 0;
 	struct dp_debug_private *debug = container_of(dp_debug,
 			struct dp_debug_private, dp_debug);
 
@@ -230,7 +229,7 @@ static int dp_debug_init(struct dp_debug *dp_debug, struct drm_minor *minor)
 
 	debug->root = minor->debugfs_root;
 
-	return rc;
+	return 0;
 }
 
 struct dp_debug *dp_debug_get(struct device *dev, struct dp_panel *panel,
