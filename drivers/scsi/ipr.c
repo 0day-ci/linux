@@ -9509,7 +9509,6 @@ static pci_ers_result_t ipr_pci_error_detected(struct pci_dev *pdev,
  **/
 static int ipr_probe_ioa_part2(struct ipr_ioa_cfg *ioa_cfg)
 {
-	int rc = 0;
 	unsigned long host_lock_flags = 0;
 
 	ENTER;
@@ -9525,7 +9524,7 @@ static int ipr_probe_ioa_part2(struct ipr_ioa_cfg *ioa_cfg)
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, host_lock_flags);
 
 	LEAVE;
-	return rc;
+	return 0;
 }
 
 /**
