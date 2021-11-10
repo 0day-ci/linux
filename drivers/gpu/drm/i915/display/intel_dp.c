@@ -127,7 +127,7 @@ static void intel_dp_set_default_sink_rates(struct intel_dp *intel_dp)
 }
 
 /* update sink rates from dpcd */
-static void intel_dp_set_sink_rates(struct intel_dp *intel_dp)
+static void intel_dp_set_dpcd_sink_rates(struct intel_dp *intel_dp)
 {
 	static const int dp_rates[] = {
 		162000, 270000, 540000, 810000
@@ -197,6 +197,54 @@ static void intel_dp_set_sink_rates(struct intel_dp *intel_dp)
 	intel_dp->num_sink_rates = i;
 }
 
+static void intel_dp_set_sink_rates(struct intel_dp *intel_dp)
+{
+	struct intel_connector *connector = intel_dp->attached_connector;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *encoder = &intel_dig_port->base;
+
+	intel_dp_set_dpcd_sink_rates(intel_dp);
+
+	if (intel_dp->num_sink_rates)
+		return;
+
+	drm_err(&dp_to_i915(intel_dp)->drm,
+		"[CONNECTOR:%d:%s][ENCODER:%d:%s] Invalid DPCD with no link rates, using defaults\n",
+		connector->base.base.id, connector->base.name,
+		encoder->base.base.id, encoder->base.name);
+
+	intel_dp_set_default_sink_rates(intel_dp);
+}
+
+static void intel_dp_set_default_max_sink_lane_count(struct intel_dp *intel_dp)
+{
+	intel_dp->max_sink_lane_count = 1;
+}
+
+static void intel_dp_set_max_sink_lane_count(struct intel_dp *intel_dp)
+{
+	struct intel_connector *connector = intel_dp->attached_connector;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *encoder = &intel_dig_port->base;
+
+	intel_dp->max_sink_lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
+
+	switch (intel_dp->max_sink_lane_count) {
+	case 1:
+	case 2:
+	case 4:
+		return;
+	}
+
+	drm_err(&dp_to_i915(intel_dp)->drm,
+		"[CONNECTOR:%d:%s][ENCODER:%d:%s] Invalid DPCD max lane count (%d), using default\n",
+		connector->base.base.id, connector->base.name,
+		encoder->base.base.id, encoder->base.name,
+		intel_dp->max_sink_lane_count);
+
+	intel_dp_set_default_max_sink_lane_count(intel_dp);
+}
+
 /* Get length of rates array potentially limited by max_rate. */
 static int intel_dp_rate_limit_len(const int *rates, int len, int max_rate)
 {
@@ -219,10 +267,19 @@ static int intel_dp_common_len_rate_limit(const struct intel_dp *intel_dp,
 				       intel_dp->num_common_rates, max_rate);
 }
 
+static int intel_dp_common_rate(struct intel_dp *intel_dp, int index)
+{
+	if (drm_WARN_ON(&dp_to_i915(intel_dp)->drm,
+			index < 0 || index >= intel_dp->num_common_rates))
+		return 162000;
+
+	return intel_dp->common_rates[index];
+}
+
 /* Theoretical max between source and sink */
 static int intel_dp_max_common_rate(struct intel_dp *intel_dp)
 {
-	return intel_dp->common_rates[intel_dp->num_common_rates - 1];
+	return intel_dp_common_rate(intel_dp, intel_dp->num_common_rates - 1);
 }
 
 /* Theoretical max between source and sink */
@@ -230,7 +287,7 @@ static int intel_dp_max_common_lane_count(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	int source_max = dig_port->max_lanes;
-	int sink_max = drm_dp_max_lane_count(intel_dp->dpcd);
+	int sink_max = intel_dp->max_sink_lane_count;
 	int fia_max = intel_tc_port_fia_max_lane_count(dig_port);
 	int lttpr_max = drm_dp_lttpr_max_lane_count(intel_dp->lttpr_common_caps);
 
@@ -242,7 +299,15 @@ static int intel_dp_max_common_lane_count(struct intel_dp *intel_dp)
 
 int intel_dp_max_lane_count(struct intel_dp *intel_dp)
 {
-	return intel_dp->max_link_lane_count;
+	switch (intel_dp->max_link_lane_count) {
+	case 1:
+	case 2:
+	case 4:
+		return intel_dp->max_link_lane_count;
+	default:
+		MISSING_CASE(intel_dp->max_link_lane_count);
+		return 1;
+	}
 }
 
 /*
@@ -554,13 +619,13 @@ int intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
 	if (index > 0) {
 		if (intel_dp_is_edp(intel_dp) &&
 		    !intel_dp_can_link_train_fallback_for_edp(intel_dp,
-							      intel_dp->common_rates[index - 1],
+							      intel_dp_common_rate(intel_dp, index - 1),
 							      lane_count)) {
 			drm_dbg_kms(&i915->drm,
 				    "Retrying Link training for eDP with same parameters\n");
 			return 0;
 		}
-		intel_dp->max_link_rate = intel_dp->common_rates[index - 1];
+		intel_dp->max_link_rate = intel_dp_common_rate(intel_dp, index - 1);
 		intel_dp->max_link_lane_count = lane_count;
 	} else if (lane_count > 1) {
 		if (intel_dp_is_edp(intel_dp) &&
@@ -1000,14 +1065,11 @@ static void intel_dp_print_rates(struct intel_dp *intel_dp)
 int
 intel_dp_max_link_rate(struct intel_dp *intel_dp)
 {
-	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
 	int len;
 
 	len = intel_dp_common_len_rate_limit(intel_dp, intel_dp->max_link_rate);
-	if (drm_WARN_ON(&i915->drm, len <= 0))
-		return 162000;
 
-	return intel_dp->common_rates[len - 1];
+	return intel_dp_common_rate(intel_dp, len - 1);
 }
 
 int intel_dp_rate_select(struct intel_dp *intel_dp, int rate)
@@ -1204,7 +1266,7 @@ intel_dp_compute_link_config_wide(struct intel_dp *intel_dp,
 						   output_bpp);
 
 		for (i = 0; i < intel_dp->num_common_rates; i++) {
-			link_rate = intel_dp->common_rates[i];
+			link_rate = intel_dp_common_rate(intel_dp, i);
 			if (link_rate < limits->min_rate ||
 			    link_rate > limits->max_rate)
 				continue;
@@ -1283,7 +1345,7 @@ static int intel_dp_dsc_compute_params(struct intel_encoder *encoder,
 	else
 		vdsc_cfg->slice_height = 2;
 
-	ret = intel_dsc_compute_params(encoder, crtc_state);
+	ret = intel_dsc_compute_params(crtc_state);
 	if (ret)
 		return ret;
 
@@ -1452,17 +1514,10 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 		&pipe_config->hw.adjusted_mode;
 	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 	struct link_config_limits limits;
-	int common_len;
 	int ret;
 
-	common_len = intel_dp_common_len_rate_limit(intel_dp,
-						    intel_dp->max_link_rate);
-
-	/* No common link rates between source and sink */
-	drm_WARN_ON(encoder->base.dev, common_len <= 0);
-
-	limits.min_rate = intel_dp->common_rates[0];
-	limits.max_rate = intel_dp->common_rates[common_len - 1];
+	limits.min_rate = intel_dp_common_rate(intel_dp, 0);
+	limits.max_rate = intel_dp_max_link_rate(intel_dp);
 
 	limits.min_lane_count = 1;
 	limits.max_lane_count = intel_dp_max_lane_count(intel_dp);
@@ -2603,6 +2658,7 @@ intel_edp_init_dpcd(struct intel_dp *intel_dp)
 		intel_dp->use_rate_select = true;
 	else
 		intel_dp_set_sink_rates(intel_dp);
+	intel_dp_set_max_sink_lane_count(intel_dp);
 
 	intel_dp_set_common_rates(intel_dp);
 	intel_dp_reset_max_link_params(intel_dp);
@@ -2648,6 +2704,7 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 				 drm_dp_is_branch(intel_dp->dpcd));
 
 		intel_dp_set_sink_rates(intel_dp);
+		intel_dp_set_max_sink_lane_count(intel_dp);
 		intel_dp_set_common_rates(intel_dp);
 	}
 
@@ -5014,6 +5071,7 @@ intel_dp_init_connector(struct intel_digital_port *dig_port,
 
 	intel_dp_set_source_rates(intel_dp);
 	intel_dp_set_default_sink_rates(intel_dp);
+	intel_dp_set_default_max_sink_lane_count(intel_dp);
 	intel_dp_set_common_rates(intel_dp);
 	intel_dp_reset_max_link_params(intel_dp);
 
