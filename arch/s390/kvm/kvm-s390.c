@@ -564,6 +564,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_S390_VCPU_RESETS:
 	case KVM_CAP_SET_GUEST_DEBUG:
 	case KVM_CAP_S390_DIAG318:
+	case KVM_CAP_S390_USER_SIGP_BUSY:
 		r = 1;
 		break;
 	case KVM_CAP_SET_GUEST_DEBUG2:
@@ -705,6 +706,15 @@ int kvm_vm_ioctl_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap)
 		VM_EVENT(kvm, 3, "%s", "ENABLE: CAP_S390_USER_SIGP");
 		kvm->arch.user_sigp = 1;
 		r = 0;
+		break;
+	case KVM_CAP_S390_USER_SIGP_BUSY:
+		r = -EINVAL;
+		if (kvm->arch.user_sigp) {
+			kvm->arch.user_sigp_busy = 1;
+			r = 0;
+		}
+		VM_EVENT(kvm, 3, "ENABLE: CAP_S390_USER_SIGP_BUSY %s",
+			 r ? "(not available)" : "(success)");
 		break;
 	case KVM_CAP_S390_VECTOR_REGISTERS:
 		mutex_lock(&kvm->lock);
@@ -4826,6 +4836,25 @@ long kvm_arch_vcpu_async_ioctl(struct file *filp,
 		if (s390int_to_s390irq(&s390int, &s390irq))
 			return -EINVAL;
 		return kvm_s390_inject_vcpu(vcpu, &s390irq);
+	}
+	case KVM_S390_VCPU_SET_SIGP_BUSY: {
+		int rc;
+
+		if (!vcpu->kvm->arch.user_sigp_busy)
+			return -EFAULT;
+
+		rc = kvm_s390_vcpu_set_sigp_busy(vcpu);
+		VCPU_EVENT(vcpu, 3, "SIGP: CPU %x set busy rc %x", vcpu->vcpu_id, rc);
+
+		return rc;
+	}
+	case KVM_S390_VCPU_RESET_SIGP_BUSY: {
+		if (!vcpu->kvm->arch.user_sigp_busy)
+			return -EFAULT;
+
+		VCPU_EVENT(vcpu, 3, "SIGP: CPU %x reset busy", vcpu->vcpu_id);
+		kvm_s390_vcpu_clear_sigp_busy(vcpu);
+		return 0;
 	}
 	}
 	return -ENOIOCTLCMD;

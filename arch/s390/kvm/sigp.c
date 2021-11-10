@@ -276,6 +276,10 @@ static int handle_sigp_dst(struct kvm_vcpu *vcpu, u8 order_code,
 	if (!dst_vcpu)
 		return SIGP_CC_NOT_OPERATIONAL;
 
+	if (kvm_s390_vcpu_is_sigp_busy(dst_vcpu)) {
+		return SIGP_CC_BUSY;
+	}
+
 	switch (order_code) {
 	case SIGP_SENSE:
 		vcpu->stat.instruction_sigp_sense++;
@@ -410,6 +414,12 @@ int kvm_s390_handle_sigp(struct kvm_vcpu *vcpu)
 	order_code = kvm_s390_get_base_disp_rs(vcpu, NULL);
 	if (handle_sigp_order_in_user_space(vcpu, order_code, cpu_addr))
 		return -EOPNOTSUPP;
+
+	/* Check the current vcpu, if it was a target from another vcpu */
+	if (kvm_s390_vcpu_is_sigp_busy(vcpu)) {
+		kvm_s390_set_psw_cc(vcpu, SIGP_CC_BUSY);
+		return 0;
+	}
 
 	if (r1 % 2)
 		parameter = vcpu->run->s.regs.gprs[r1];

@@ -82,6 +82,22 @@ static inline int is_vcpu_idle(struct kvm_vcpu *vcpu)
 	return test_bit(vcpu->vcpu_idx, vcpu->kvm->arch.idle_mask);
 }
 
+static inline bool kvm_s390_vcpu_is_sigp_busy(struct kvm_vcpu *vcpu)
+{
+	return (atomic_read(&vcpu->arch.sigp_busy) == 1);
+}
+
+static inline bool kvm_s390_vcpu_set_sigp_busy(struct kvm_vcpu *vcpu)
+{
+	/* Return zero for success, or -EBUSY if another vcpu won */
+	return (atomic_cmpxchg(&vcpu->arch.sigp_busy, 0, 1) == 0) ? 0 : -EBUSY;
+}
+
+static inline void kvm_s390_vcpu_clear_sigp_busy(struct kvm_vcpu *vcpu)
+{
+	atomic_set(&vcpu->arch.sigp_busy, 0);
+}
+
 static inline int kvm_is_ucontrol(struct kvm *kvm)
 {
 #ifdef CONFIG_KVM_S390_UCONTROL
