@@ -375,7 +375,7 @@ static int qcom_cpufreq_hw_lmh_init(struct cpufreq_policy *policy, int index)
 {
 	struct qcom_cpufreq_data *data = policy->driver_data;
 	struct platform_device *pdev = cpufreq_get_driver_data();
-	char irq_name[15];
+	char *irq_name;
 	int ret;
 
 	/*
@@ -392,9 +392,11 @@ static int qcom_cpufreq_hw_lmh_init(struct cpufreq_policy *policy, int index)
 	mutex_init(&data->throttle_lock);
 	INIT_DEFERRABLE_WORK(&data->throttle_work, qcom_lmh_dcvs_poll);
 
-	snprintf(irq_name, sizeof(irq_name), "dcvsh-irq-%u", policy->cpu);
-	ret = request_threaded_irq(data->throttle_irq, NULL, qcom_lmh_dcvs_handle_irq,
-				   IRQF_ONESHOT, irq_name, data);
+	irq_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "dcvsh-irq-%u",
+				  policy->cpu);
+	ret = devm_request_threaded_irq(&pdev->dev, data->throttle_irq, NULL,
+					qcom_lmh_dcvs_handle_irq, IRQF_ONESHOT,
+					irq_name, data);
 	if (ret) {
 		dev_err(&pdev->dev, "Error registering %s: %d\n", irq_name, ret);
 		return 0;
