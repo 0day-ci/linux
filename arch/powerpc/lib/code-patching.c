@@ -11,6 +11,7 @@
 #include <linux/cpuhotplug.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/random.h>
 
 #include <asm/tlbflush.h>
 #include <asm/page.h>
@@ -76,6 +77,7 @@ static inline void stop_using_temp_mm(struct temp_mm_state prev_state)
 
 static DEFINE_PER_CPU(struct vm_struct *, text_poke_area);
 static DEFINE_PER_CPU(unsigned long, cpu_patching_addr);
+static DEFINE_PER_CPU(struct mm_struct *, cpu_patching_mm);
 
 static int text_area_cpu_up(unsigned int cpu)
 {
@@ -99,8 +101,48 @@ static int text_area_cpu_down(unsigned int cpu)
 	return 0;
 }
 
+static __always_inline void __poking_init_temp_mm(void)
+{
+	int cpu;
+	spinlock_t *ptl;
+	pte_t *ptep;
+	struct mm_struct *patching_mm;
+	unsigned long patching_addr;
+
+	for_each_possible_cpu(cpu) {
+		patching_mm = copy_init_mm();
+		WARN_ON(!patching_mm);
+		per_cpu(cpu_patching_mm, cpu) = patching_mm;
+
+		/*
+		 * Choose a randomized, page-aligned address from the range:
+		 * [PAGE_SIZE, DEFAULT_MAP_WINDOW - PAGE_SIZE] The lower
+		 * address bound is PAGE_SIZE to avoid the zero-page.  The
+		 * upper address bound is DEFAULT_MAP_WINDOW - PAGE_SIZE to
+		 * stay under DEFAULT_MAP_WINDOW with the Book3s64 Hash MMU.
+		 */
+		patching_addr = PAGE_SIZE + ((get_random_long() & PAGE_MASK) %
+					     (DEFAULT_MAP_WINDOW - 2 * PAGE_SIZE));
+		per_cpu(cpu_patching_addr, cpu) = patching_addr;
+
+		/*
+		 * PTE allocation uses GFP_KERNEL which means we need to
+		 * pre-allocate the PTE here because we cannot do the
+		 * allocation during patching when IRQs are disabled.
+		 */
+		ptep = get_locked_pte(patching_mm, patching_addr, &ptl);
+		WARN_ON(!ptep);
+		pte_unmap_unlock(ptep, ptl);
+	}
+}
+
 void __init poking_init(void)
 {
+	if (radix_enabled()) {
+		__poking_init_temp_mm();
+		return;
+	}
+
 	WARN_ON(cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
 		"powerpc/text_poke:online", text_area_cpu_up,
 		text_area_cpu_down) < 0);
@@ -167,6 +209,57 @@ static inline int unmap_patch_area(unsigned long addr)
 	return 0;
 }
 
+/*
+ * This can be called for kernel text or a module.
+ */
+static int patch_instruction_mm(u32 *addr, struct ppc_inst instr)
+{
+	struct mm_struct *patching_mm = __this_cpu_read(cpu_patching_mm);
+	unsigned long text_poke_addr;
+	u32 *patch_addr = NULL;
+	struct temp_mm_state prev;
+	unsigned long flags;
+	struct page *page;
+	spinlock_t *ptl;
+	int rc;
+	pte_t *ptep;
+
+	text_poke_addr = __this_cpu_read(cpu_patching_addr);
+
+	local_irq_save(flags);
+
+	if (is_vmalloc_or_module_addr(addr))
+		page = vmalloc_to_page(addr);
+	else
+		page = virt_to_page(addr);
+
+	ptep = get_locked_pte(patching_mm, text_poke_addr, &ptl);
+	if (unlikely(!ptep)) {
+		pr_warn("map patch: failed to allocate pte for patching\n");
+		return -1;
+	}
+
+	set_pte_at(patching_mm, text_poke_addr, ptep, pte_mkdirty(mk_pte(page, PAGE_KERNEL)));
+	asm volatile("ptesync": : :"memory");
+
+	prev = start_using_temp_mm(patching_mm);
+
+	patch_addr = (u32 *)(text_poke_addr | offset_in_page(addr));
+	rc = __patch_instruction(addr, instr, patch_addr);
+
+	pte_clear(patching_mm, text_poke_addr, ptep);
+
+	local_flush_tlb_mm(patching_mm);
+
+	stop_using_temp_mm(prev);
+	pte_unmap_unlock(ptep, ptl);
+
+	local_irq_restore(flags);
+	WARN_ON(!ppc_inst_equal(ppc_inst_read(addr), instr));
+
+	return rc;
+}
+
 static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 {
 	int err, rc = 0;
@@ -175,16 +268,19 @@ static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 	unsigned long text_poke_addr;
 
 	/*
-	 * During early early boot patch_instruction is called
-	 * when text_poke_area is not ready, but we still need
-	 * to allow patching. We just do the plain old patching
+	 * During early boot patch_instruction is called when the
+	 * patching_mm/text_poke_area is not ready, but we still need to allow
+	 * patching. We just do the plain old patching.
 	 */
-	if (!this_cpu_read(text_poke_area))
+	text_poke_addr = __this_cpu_read(cpu_patching_addr);
+	if (!text_poke_addr)
 		return raw_patch_instruction(addr, instr);
+
+	if (radix_enabled())
+		return patch_instruction_mm(addr, instr);
 
 	local_irq_save(flags);
 
-	text_poke_addr = __this_cpu_read(cpu_patching_addr);
 	err = map_patch_area(addr, text_poke_addr);
 	if (err)
 		goto out;
