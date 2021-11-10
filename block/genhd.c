@@ -579,6 +579,12 @@ void del_gendisk(struct gendisk *disk)
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 
+	/*
+	 * New open() will be failed since disk becomes not alive, and old
+	 * open() has either grabbed the module refcnt or been failed in
+	 * case of deleting from module_exit(), so disk->fops->owner won't
+	 * be unloaded if the disk is opened.
+	 */
 	mutex_lock(&disk->open_mutex);
 	remove_inode_hash(disk->part0->bd_inode);
 	blk_drop_partitions(disk);
