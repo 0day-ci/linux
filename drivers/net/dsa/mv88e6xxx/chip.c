@@ -782,12 +782,17 @@ static void mv88e6xxx_mac_link_up(struct dsa_switch *ds, int port,
 	if ((!mv88e6xxx_phy_is_internal(ds, port) &&
 	     !mv88e6xxx_port_ppu_updates(chip, port)) ||
 	    mode == MLO_AN_FIXED) {
-		/* FIXME: for an automedia port, should we force the link
-		 * down here - what if the link comes up due to "other" media
-		 * while we're bringing the port up, how is the exclusivity
-		 * handled in the Marvell hardware? E.g. port 2 on 88E6390
-		 * shared between internal PHY and Serdes.
+		/* FIXME: we need to force the link down here, otherwise the
+		 * forcing of link speed and duplex by .port_set_speed_duplex()
+		 * doesn't work for some modes.
+		 * But what if the link comes up due to "other" media while
+		 * we're bringing the port up, how is the exclusivity handled in
+		 * the Marvell hardware? E.g. port 2 on 88E6390 shared between
+		 * internal PHY and Serdes.
 		 */
+		if (ops->port_sync_link)
+			err = ops->port_sync_link(chip, port, mode, false);
+
 		err = mv88e6xxx_serdes_pcs_link_up(chip, port, mode, speed,
 						   duplex);
 		if (err)
