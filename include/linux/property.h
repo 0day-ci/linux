@@ -391,6 +391,9 @@ const void *device_get_match_data(struct device *dev);
 int device_get_phy_mode(struct device *dev);
 
 int fwnode_get_phy_mode(struct fwnode_handle *fwnode);
+int fwnode_get_phy_modes(struct fwnode_handle *fwnode,
+			 unsigned long *interfaces);
+
 struct fwnode_handle *fwnode_graph_get_next_endpoint(
 	const struct fwnode_handle *fwnode, struct fwnode_handle *prev);
 struct fwnode_handle *
