@@ -2937,9 +2937,9 @@ static int kcompactd(void *p)
 			kcompactd_work_requested(pgdat), timeout) &&
 			!pgdat->proactive_compact_trigger) {
 
-			psi_memstall_enter(&pflags);
+			psi_memstall_enter(&pflags, TSK_COMPACTION);
 			kcompactd_do_work(pgdat);
-			psi_memstall_leave(&pflags);
+			psi_memstall_leave(&pflags, TSK_COMPACTION);
 			/*
 			 * Reset the timeout value. The defer timeout from
 			 * proactive compaction is lost here but that is fine

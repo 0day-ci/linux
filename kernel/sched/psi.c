@@ -225,22 +225,53 @@ void __init psi_init(void)
 
 static bool test_state(unsigned int *tasks, enum psi_states state)
 {
+	int memstall;
+
+	memstall = tasks[NR_BLK_CGROUP_THROTTLE] || tasks[NR_BIO] ||
+		   tasks[NR_COMPACTION] || tasks[NR_THRASHING] ||
+		   tasks[NR_CGROUP_RECLAIM_HIGH] || tasks[NR_CGROUP_RECLAIM_HIGH_SLEEP] ||
+		   tasks[NR_CGROUP_TRY_CHARGE] ||
+		   tasks[NR_DIRECT_COMPACTION] || tasks[NR_DIRECT_RECLAIM] ||
+		   tasks[NR_READ_SWAPPAGE] || tasks[NR_KSWAPD];
+
 	switch (state) {
 	case PSI_IO_SOME:
 		return unlikely(tasks[NR_IOWAIT]);
 	case PSI_IO_FULL:
 		return unlikely(tasks[NR_IOWAIT] && !tasks[NR_RUNNING]);
 	case PSI_MEM_SOME:
-		return unlikely(tasks[NR_MEMSTALL]);
+		return memstall;
 	case PSI_MEM_FULL:
-		return unlikely(tasks[NR_MEMSTALL] && !tasks[NR_RUNNING]);
+		return !tasks[NR_RUNNING] && memstall;
 	case PSI_CPU_SOME:
 		return unlikely(tasks[NR_RUNNING] > tasks[NR_ONCPU]);
 	case PSI_CPU_FULL:
 		return unlikely(tasks[NR_RUNNING] && !tasks[NR_ONCPU]);
 	case PSI_NONIDLE:
-		return tasks[NR_IOWAIT] || tasks[NR_MEMSTALL] ||
+		return tasks[NR_IOWAIT] || memstall ||
 			tasks[NR_RUNNING];
+	case PSI_BLK_CGROUP_THROTTLE:
+		return tasks[NR_BLK_CGROUP_THROTTLE];
+	case PSI_BIO:
+		return tasks[NR_BIO];
+	case PSI_COMPACTION:
+		return tasks[NR_COMPACTION];
+	case PSI_THRASHING:
+		return tasks[NR_THRASHING];
+	case PSI_CGROUP_RECLAIM_HIGH:
+		return tasks[NR_CGROUP_RECLAIM_HIGH];
+	case PSI_CGROUP_RECLAIM_HIGH_SLEEP:
+		return tasks[NR_CGROUP_RECLAIM_HIGH_SLEEP];
+	case PSI_CGROUP_TRY_CHARGE:
+		return tasks[NR_CGROUP_TRY_CHARGE];
+	case PSI_DIRECT_COMPACTION:
+		return tasks[NR_DIRECT_COMPACTION];
+	case PSI_DIRECT_RECLAIM:
+		return tasks[NR_DIRECT_RECLAIM];
+	case PSI_READ_SWAPPAGE:
+		return tasks[NR_READ_SWAPPAGE];
+	case PSI_KSWAPD:
+		return tasks[NR_KSWAPD];
 	default:
 		return false;
 	}
@@ -679,6 +710,39 @@ static void record_times(struct psi_group_cpu *groupc, u64 now)
 
 	if (groupc->state_mask & (1 << PSI_NONIDLE))
 		groupc->times[PSI_NONIDLE] += delta;
+
+	if (groupc->state_mask & (1 << PSI_BLK_CGROUP_THROTTLE))
+		groupc->times[PSI_BLK_CGROUP_THROTTLE] += delta;
+
+	if (groupc->state_mask & (1 << PSI_BIO))
+		groupc->times[PSI_BIO] += delta;
+
+	if (groupc->state_mask & (1 << PSI_COMPACTION))
+		groupc->times[PSI_COMPACTION] += delta;
+
+	if (groupc->state_mask & (1 << PSI_THRASHING))
+		groupc->times[PSI_THRASHING] += delta;
+
+	if (groupc->state_mask & (1 << PSI_CGROUP_RECLAIM_HIGH))
+		groupc->times[PSI_CGROUP_RECLAIM_HIGH] += delta;
+
+	if (groupc->state_mask & (1 << PSI_CGROUP_RECLAIM_HIGH_SLEEP))
+		groupc->times[PSI_CGROUP_RECLAIM_HIGH_SLEEP] += delta;
+
+	if (groupc->state_mask & (1 << PSI_CGROUP_TRY_CHARGE))
+		groupc->times[PSI_CGROUP_TRY_CHARGE] += delta;
+
+	if (groupc->state_mask & (1 << PSI_DIRECT_RECLAIM))
+		groupc->times[PSI_DIRECT_RECLAIM] += delta;
+
+	if (groupc->state_mask & (1 << PSI_DIRECT_COMPACTION))
+		groupc->times[PSI_DIRECT_COMPACTION] += delta;
+
+	if (groupc->state_mask & (1 << PSI_READ_SWAPPAGE))
+		groupc->times[PSI_READ_SWAPPAGE] += delta;
+
+	if (groupc->state_mask & (1 << PSI_KSWAPD))
+		groupc->times[PSI_KSWAPD] += delta;
 }
 
 static void psi_group_change(struct psi_group *group, int cpu,
@@ -889,7 +953,7 @@ void psi_task_switch(struct task_struct *prev, struct task_struct *next,
  * Marks the calling task as being stalled due to a lack of memory,
  * such as waiting for a refault or performing reclaim.
  */
-void psi_memstall_enter(unsigned long *flags)
+void psi_memstall_enter(unsigned long *flags, u32 set)
 {
 	struct rq_flags rf;
 	struct rq *rq;
@@ -908,7 +972,7 @@ void psi_memstall_enter(unsigned long *flags)
 	rq = this_rq_lock_irq(&rf);
 
 	current->in_memstall = 1;
-	psi_task_change(current, 0, TSK_MEMSTALL);
+	psi_task_change(current, 0, set);
 
 	rq_unlock_irq(rq, &rf);
 }
@@ -919,7 +983,7 @@ void psi_memstall_enter(unsigned long *flags)
  *
  * Marks the calling task as no longer stalled due to lack of memory.
  */
-void psi_memstall_leave(unsigned long *flags)
+void psi_memstall_leave(unsigned long *flags, u32 clear)
 {
 	struct rq_flags rf;
 	struct rq *rq;
@@ -937,7 +1001,7 @@ void psi_memstall_leave(unsigned long *flags)
 	rq = this_rq_lock_irq(&rf);
 
 	current->in_memstall = 0;
-	psi_task_change(current, TSK_MEMSTALL, 0);
+	psi_task_change(current, clear, 0);
 
 	rq_unlock_irq(rq, &rf);
 }
@@ -1021,6 +1085,17 @@ void cgroup_move_task(struct task_struct *task, struct css_set *to)
 	 */
 	task_flags = task->psi_flags;
 
+	if (task_on_rq_queued(task)) {
+		task_flags = TSK_RUNNING;
+		if (task_current(rq, task))
+			task_flags |= TSK_ONCPU;
+	} else if (task->in_iowait) {
+		task_flags = TSK_IOWAIT;
+	}
+
+	if (task->psi_flags & TSK_MEMSTALL_MASK)
+		task_flags |= task->psi_flags & TSK_MEMSTALL_MASK;
+
 	if (task_flags)
 		psi_task_change(task, task_flags, 0);
 
@@ -1053,19 +1128,56 @@ int psi_show(struct seq_file *m, struct psi_group *group, enum psi_res res)
 	for (full = 0; full < 2; full++) {
 		unsigned long avg[3];
 		u64 total;
+		u64 total_blk_cgroup_throttle;
+		u64 total_bio;
+		u64 total_compaction;
+		u64 total_thrashing;
+		u64 total_cgroup_reclaim_high;
+		u64 total_cgroup_reclaim_high_sleep;
+		u64 total_cgroup_try_charge;
+		u64 total_direct_compaction;
+		u64 total_direct_reclaim;
+		u64 total_read_swappage;
+		u64 total_kswapd;
 		int w;
 
 		for (w = 0; w < 3; w++)
 			avg[w] = group->avg[res * 2 + full][w];
 		total = div_u64(group->total[PSI_AVGS][res * 2 + full],
 				NSEC_PER_USEC);
+		total_blk_cgroup_throttle = div_u64(group->total[PSI_AVGS][PSI_BLK_CGROUP_THROTTLE],
+						    NSEC_PER_USEC);
+		total_bio = div_u64(group->total[PSI_AVGS][PSI_BIO],
+				    NSEC_PER_USEC);
+		total_compaction = div_u64(group->total[PSI_AVGS][PSI_COMPACTION],
+					   NSEC_PER_USEC);
+		total_thrashing = div_u64(group->total[PSI_AVGS][PSI_THRASHING],
+					  NSEC_PER_USEC);
+		total_cgroup_reclaim_high = div_u64(group->total[PSI_AVGS][PSI_CGROUP_RECLAIM_HIGH],
+						    NSEC_PER_USEC);
+		total_cgroup_reclaim_high_sleep = div_u64(group->total[PSI_AVGS][PSI_CGROUP_RECLAIM_HIGH_SLEEP],
+							  NSEC_PER_USEC);
+		total_cgroup_try_charge = div_u64(group->total[PSI_AVGS][PSI_CGROUP_TRY_CHARGE],
+						  NSEC_PER_USEC);
+		total_direct_compaction = div_u64(group->total[PSI_AVGS][PSI_DIRECT_COMPACTION],
+						  NSEC_PER_USEC);
+		total_direct_reclaim = div_u64(group->total[PSI_AVGS][PSI_DIRECT_RECLAIM],
+					       NSEC_PER_USEC);
+		total_read_swappage = div_u64(group->total[PSI_AVGS][PSI_READ_SWAPPAGE],
+					      NSEC_PER_USEC);
+		total_kswapd = div_u64(group->total[PSI_AVGS][PSI_KSWAPD],
+				       NSEC_PER_USEC);
 
-		seq_printf(m, "%s avg10=%lu.%02lu avg60=%lu.%02lu avg300=%lu.%02lu total=%llu\n",
+		seq_printf(m, "%s avg10=%lu.%02lu avg60=%lu.%02lu avg300=%lu.%02lu total=%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			   full ? "full" : "some",
 			   LOAD_INT(avg[0]), LOAD_FRAC(avg[0]),
 			   LOAD_INT(avg[1]), LOAD_FRAC(avg[1]),
 			   LOAD_INT(avg[2]), LOAD_FRAC(avg[2]),
-			   total);
+			   total, total_blk_cgroup_throttle, total_bio, total_compaction,
+			   total_thrashing, total_cgroup_reclaim_high,
+			   total_cgroup_reclaim_high_sleep, total_cgroup_try_charge,
+			   total_direct_compaction, total_direct_reclaim, total_read_swappage,
+			   total_kswapd);
 	}
 
 	return 0;

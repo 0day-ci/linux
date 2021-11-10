@@ -114,13 +114,15 @@ __schedstats_from_se(struct sched_entity *se)
 static inline void psi_enqueue(struct task_struct *p, bool wakeup)
 {
 	int clear = 0, set = TSK_RUNNING;
+	int v;
 
 	if (static_branch_likely(&psi_disabled))
 		return;
 
 	if (!wakeup || p->sched_psi_wake_requeue) {
-		if (p->in_memstall)
-			set |= TSK_MEMSTALL;
+		v = p->psi_flags & TSK_MEMSTALL_MASK;
+		if (v)
+			set |= v;
 		if (p->sched_psi_wake_requeue)
 			p->sched_psi_wake_requeue = 0;
 	} else {
@@ -134,6 +136,7 @@ static inline void psi_enqueue(struct task_struct *p, bool wakeup)
 static inline void psi_dequeue(struct task_struct *p, bool sleep)
 {
 	int clear = TSK_RUNNING;
+	int v;
 
 	if (static_branch_likely(&psi_disabled))
 		return;
@@ -147,8 +150,9 @@ static inline void psi_dequeue(struct task_struct *p, bool sleep)
 	if (sleep)
 		return;
 
-	if (p->in_memstall)
-		clear |= TSK_MEMSTALL;
+	v = p->psi_flags & TSK_MEMSTALL_MASK;
+	if (v)
+		clear |= v;
 
 	psi_task_change(p, clear, 0);
 }
@@ -166,11 +170,13 @@ static inline void psi_ttwu_dequeue(struct task_struct *p)
 		struct rq_flags rf;
 		struct rq *rq;
 		int clear = 0;
+		int v;
 
 		if (p->in_iowait)
 			clear |= TSK_IOWAIT;
-		if (p->in_memstall)
-			clear |= TSK_MEMSTALL;
+		v = p->psi_flags & TSK_MEMSTALL_MASK;
+		if (v)
+			clear |= v;
 
 		rq = __task_rq_lock(p, &rf);
 		psi_task_change(p, clear, 0);

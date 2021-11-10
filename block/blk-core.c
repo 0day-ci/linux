@@ -1050,9 +1050,9 @@ void submit_bio(struct bio *bio)
 	    bio_flagged(bio, BIO_WORKINGSET))) {
 		unsigned long pflags;
 
-		psi_memstall_enter(&pflags);
+		psi_memstall_enter(&pflags, TSK_BIO);
 		submit_bio_noacct(bio);
-		psi_memstall_leave(&pflags);
+		psi_memstall_leave(&pflags, TSK_BIO);
 		return;
 	}
 

@@ -1303,7 +1303,7 @@ static inline int folio_wait_bit_common(struct folio *folio, int bit_nr,
 			delayacct_thrashing_start();
 			delayacct = true;
 		}
-		psi_memstall_enter(&pflags);
+		psi_memstall_enter(&pflags, TSK_THRASHING);
 		thrashing = true;
 	}
 
@@ -1404,7 +1404,7 @@ repeat:
 	if (thrashing) {
 		if (delayacct)
 			delayacct_thrashing_end();
-		psi_memstall_leave(&pflags);
+		psi_memstall_leave(&pflags, TSK_THRASHING);
 	}
 
 	/*

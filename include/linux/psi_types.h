@@ -7,8 +7,6 @@
 #include <linux/kref.h>
 #include <linux/wait.h>
 
-#ifdef CONFIG_PSI
-
 /* Tracked task states */
 enum psi_task_count {
 	NR_IOWAIT,
@@ -21,7 +19,18 @@ enum psi_task_count {
 	 * don't have to special case any state tracking for it.
 	 */
 	NR_ONCPU,
-	NR_PSI_TASK_COUNTS = 4,
+	NR_BLK_CGROUP_THROTTLE,
+	NR_BIO,
+	NR_COMPACTION,
+	NR_THRASHING,
+	NR_CGROUP_RECLAIM_HIGH,
+	NR_CGROUP_RECLAIM_HIGH_SLEEP,
+	NR_CGROUP_TRY_CHARGE,
+	NR_DIRECT_COMPACTION,
+	NR_DIRECT_RECLAIM,
+	NR_READ_SWAPPAGE,
+	NR_KSWAPD,
+	NR_PSI_TASK_COUNTS = 16,
 };
 
 /* Task state bitmasks */
@@ -29,6 +38,26 @@ enum psi_task_count {
 #define TSK_MEMSTALL	(1 << NR_MEMSTALL)
 #define TSK_RUNNING	(1 << NR_RUNNING)
 #define TSK_ONCPU	(1 << NR_ONCPU)
+#define TSK_BLK_CGROUP_THROTTLE	(1 << NR_BLK_CGROUP_THROTTLE)
+#define TSK_BIO			(1 << NR_BIO)
+#define TSK_COMPACTION		(1 << NR_COMPACTION)
+#define TSK_THRASHING		(1 << NR_THRASHING)
+#define TSK_CGROUP_RECLAIM_HIGH	(1 << NR_CGROUP_RECLAIM_HIGH)
+#define TSK_CGROUP_RECLAIM_HIGH_SLEEP	(1 << NR_CGROUP_RECLAIM_HIGH_SLEEP)
+#define TSK_CGROUP_TRY_CHARGE	(1 << NR_CGROUP_TRY_CHARGE)
+#define TSK_DIRECT_COMPACTION	(1 << NR_DIRECT_COMPACTION)
+#define TSK_DIRECT_RECLAIM	(1 << NR_DIRECT_RECLAIM)
+#define TSK_READ_SWAPPAGE	(1 << NR_READ_SWAPPAGE)
+#define TSK_KSWAPD		(1 << NR_KSWAPD)
+#define TSK_MEMSTALL_MASK	(TSK_KSWAPD | TSK_READ_SWAPPAGE | \
+				TSK_DIRECT_RECLAIM | TSK_DIRECT_COMPACTION | \
+				TSK_CGROUP_TRY_CHARGE | \
+				TSK_CGROUP_RECLAIM_HIGH_SLEEP | \
+				TSK_CGROUP_RECLAIM_HIGH | TSK_THRASHING | \
+				TSK_COMPACTION | TSK_BIO | \
+				TSK_BLK_CGROUP_THROTTLE)
+
+#ifdef CONFIG_PSI
 
 /* Resources that workloads could be stalled on */
 enum psi_res {
@@ -51,9 +80,20 @@ enum psi_states {
 	PSI_MEM_FULL,
 	PSI_CPU_SOME,
 	PSI_CPU_FULL,
+	PSI_BLK_CGROUP_THROTTLE,
+	PSI_BIO,
+	PSI_COMPACTION,
+	PSI_THRASHING,
+	PSI_CGROUP_RECLAIM_HIGH,
+	PSI_CGROUP_RECLAIM_HIGH_SLEEP,
+	PSI_CGROUP_TRY_CHARGE,
+	PSI_DIRECT_COMPACTION,
+	PSI_DIRECT_RECLAIM,
+	PSI_READ_SWAPPAGE,
+	PSI_KSWAPD,
 	/* Only per-CPU, to weigh the CPU in the global average: */
 	PSI_NONIDLE,
-	NR_PSI_STATES = 7,
+	NR_PSI_STATES = 18,
 };
 
 enum psi_aggregators {

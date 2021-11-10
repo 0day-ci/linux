@@ -2342,10 +2342,10 @@ static unsigned long reclaim_high(struct mem_cgroup *memcg,
 
 		memcg_memory_event(memcg, MEMCG_HIGH);
 
-		psi_memstall_enter(&pflags);
+		psi_memstall_enter(&pflags, TSK_CGROUP_RECLAIM_HIGH);
 		nr_reclaimed += try_to_free_mem_cgroup_pages(memcg, nr_pages,
 							     gfp_mask, true);
-		psi_memstall_leave(&pflags);
+		psi_memstall_leave(&pflags, TSK_CGROUP_RECLAIM_HIGH);
 	} while ((memcg = parent_mem_cgroup(memcg)) &&
 		 !mem_cgroup_is_root(memcg));
 
@@ -2572,9 +2572,9 @@ retry_reclaim:
 	 * schedule_timeout_killable sets TASK_KILLABLE). This means we don't
 	 * need to account for any ill-begotten jiffies to pay them off later.
 	 */
-	psi_memstall_enter(&pflags);
+	psi_memstall_enter(&pflags, TSK_CGROUP_RECLAIM_HIGH_SLEEP);
 	schedule_timeout_killable(penalty_jiffies);
-	psi_memstall_leave(&pflags);
+	psi_memstall_leave(&pflags, TSK_CGROUP_RECLAIM_HIGH_SLEEP);
 
 out:
 	css_put(&memcg->css);
@@ -2641,10 +2641,10 @@ retry:
 
 	memcg_memory_event(mem_over_limit, MEMCG_MAX);
 
-	psi_memstall_enter(&pflags);
+	psi_memstall_enter(&pflags, TSK_CGROUP_TRY_CHARGE);
 	nr_reclaimed = try_to_free_mem_cgroup_pages(mem_over_limit, nr_pages,
 						    gfp_mask, may_swap);
-	psi_memstall_leave(&pflags);
+	psi_memstall_leave(&pflags, TSK_CGROUP_TRY_CHARGE);
 
 	if (mem_cgroup_margin(mem_over_limit) >= nr_pages)
 		goto retry;

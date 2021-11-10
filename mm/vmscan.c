@@ -4096,7 +4096,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int highest_zoneidx)
 	};
 
 	set_task_reclaim_state(current, &sc.reclaim_state);
-	psi_memstall_enter(&pflags);
+	psi_memstall_enter(&pflags, TSK_KSWAPD);
 	__fs_reclaim_acquire(_THIS_IP_);
 
 	count_vm_event(PAGEOUTRUN);
@@ -4278,7 +4278,7 @@ out:
 
 	snapshot_refaults(NULL, pgdat);
 	__fs_reclaim_release(_THIS_IP_);
-	psi_memstall_leave(&pflags);
+	psi_memstall_leave(&pflags, TSK_KSWAPD);
 	set_task_reclaim_state(current, NULL);
 
 	/*
@@ -4713,7 +4713,7 @@ static int __node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned in
 					   sc.gfp_mask);
 
 	cond_resched();
-	psi_memstall_enter(&pflags);
+	psi_memstall_enter(&pflags, TSK_KSWAPD);
 	fs_reclaim_acquire(sc.gfp_mask);
 	/*
 	 * We need to be able to allocate from the reserves for RECLAIM_UNMAP
@@ -4738,7 +4738,7 @@ static int __node_reclaim(struct pglist_data *pgdat, gfp_t gfp_mask, unsigned in
 	current->flags &= ~PF_SWAPWRITE;
 	memalloc_noreclaim_restore(noreclaim_flag);
 	fs_reclaim_release(sc.gfp_mask);
-	psi_memstall_leave(&pflags);
+	psi_memstall_leave(&pflags, TSK_KSWAPD);
 
 	trace_mm_vmscan_node_reclaim_end(sc.nr_reclaimed);
 

@@ -1678,7 +1678,7 @@ static void blkcg_maybe_throttle_blkg(struct blkcg_gq *blkg, bool use_memdelay)
 		delay_nsec = min_t(u64, delay_nsec, 250 * NSEC_PER_MSEC);
 
 	if (use_memdelay)
-		psi_memstall_enter(&pflags);
+		psi_memstall_enter(&pflags, TSK_BLK_CGROUP_THROTTLE);
 
 	exp = ktime_add_ns(now, delay_nsec);
 	tok = io_schedule_prepare();
@@ -1690,7 +1690,7 @@ static void blkcg_maybe_throttle_blkg(struct blkcg_gq *blkg, bool use_memdelay)
 	io_schedule_finish(tok);
 
 	if (use_memdelay)
-		psi_memstall_leave(&pflags);
+		psi_memstall_leave(&pflags, TSK_BLK_CGROUP_THROTTLE);
 }
 
 /**
