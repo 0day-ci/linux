@@ -1041,15 +1041,25 @@ static void mv88e6390_serdes_irq_link_sgmii(struct mv88e6xxx_chip *chip,
 	u16 bmsr;
 	int err;
 
-	/* If the link has dropped, we want to know about it. */
+	/* If the link has dropped, we want to know about it.
+	 * This register bit indicates when link was lost since the last read.
+	 * We need to read it twice to get the current value.
+	 */
 	err = mv88e6390_serdes_read(chip, lane, MDIO_MMD_PHYXS,
 				    MV88E6390_SGMII_BMSR, &bmsr);
-	if (err) {
-		dev_err(chip->dev, "can't read Serdes BMSR: %d\n", err);
-		return;
-	}
+	if (err)
+		goto err;
+
+	err = mv88e6390_serdes_read(chip, lane, MDIO_MMD_PHYXS,
+				    MV88E6390_SGMII_BMSR, &bmsr);
+	if (err)
+		goto err;
 
 	dsa_port_phylink_mac_change(chip->ds, port, !!(bmsr & BMSR_LSTATUS));
+
+	return;
+err:
+	dev_err(chip->dev, "can't read Serdes BMSR: %d\n", err);
 }
 
 static void mv88e6393x_serdes_irq_link_10g(struct mv88e6xxx_chip *chip,
