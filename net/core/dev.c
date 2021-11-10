@@ -6929,10 +6929,11 @@ void napi_disable(struct napi_struct *n)
 	set_bit(NAPI_STATE_DISABLE, &n->state);
 
 	do {
+retry:
 		val = READ_ONCE(n->state);
 		if (val & (NAPIF_STATE_SCHED | NAPIF_STATE_NPSVC)) {
 			usleep_range(20, 200);
-			continue;
+			goto retry;
 		}
 
 		new = val | NAPIF_STATE_SCHED | NAPIF_STATE_NPSVC;
