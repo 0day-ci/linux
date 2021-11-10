@@ -61,6 +61,10 @@ properties:
     type: boolean
     description: enable/disable internal i2c controller pullup resistors.
 
+  st,disable-shub:
+    type: boolean
+    description: enable/disable internal i2c controller.
+
   drive-open-drain:
     type: boolean
     description:
