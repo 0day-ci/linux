@@ -200,6 +200,8 @@ static int __replace_page(struct vm_area_struct *vma, unsigned long addr,
 	if (new_page)
 		set_pte_at_notify(mm, addr, pvmw.pte,
 				  mk_pte(new_page, vma->vm_page_prot));
+	else
+		pte_put(mm, pte_to_pmd(pvmw.pte), addr);
 
 	page_remove_rmap(old_page, false);
 	if (!page_mapped(old_page))
