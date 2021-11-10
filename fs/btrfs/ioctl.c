@@ -4019,6 +4019,9 @@ static long btrfs_ioctl_balance(struct file *file, void __user *arg)
 	bool need_unlock; /* for mut. excl. ops lock */
 	int ret;
 
+	if (!arg)
+		btrfs_warn(fs_info, "BTRFS_IOC_BALANCE ioctl is deprecated and will be removed in kernel 5.18");
+
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
