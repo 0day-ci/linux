@@ -1300,4 +1300,26 @@ enum {
 
 #define IFLA_EEC_MAX (__IFLA_EEC_MAX - 1)
 
+struct if_set_rclk_msg {
+	__u32 ifindex;
+	__u32 out_idx;
+	__u32 flags;
+};
+
+#define SET_RCLK_FLAGS_ENA	(1U << 0)
+
+enum {
+	IFLA_RCLK_STATE_UNSPEC,
+	IFLA_RCLK_STATE_OUT_STATE,
+	IFLA_RCLK_STATE_COUNT,
+	__IFLA_RCLK_STATE_MAX,
+};
+
+struct if_get_rclk_msg {
+	__u32 out_idx;
+	__u32 flags;
+};
+
+#define GET_RCLK_FLAGS_ENA	(1U << 0)
+
 #endif /* _UAPI_LINUX_IF_LINK_H */
