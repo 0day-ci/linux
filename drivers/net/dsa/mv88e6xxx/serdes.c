@@ -53,8 +53,11 @@ static int mv88e6xxx_serdes_pcs_get_state(struct mv88e6xxx_chip *chip,
 					  u16 status, u16 lpa,
 					  struct phylink_link_state *state)
 {
-	if (status & MV88E6390_SGMII_PHY_STATUS_SPD_DPL_VALID) {
-		state->link = !!(status & MV88E6390_SGMII_PHY_STATUS_LINK);
+	state->link = !!(status & MV88E6390_SGMII_PHY_STATUS_LINK);
+	state->an_complete = !!(status &
+				MV88E6390_SGMII_PHY_STATUS_SPD_DPL_VALID);
+
+	if (state->an_complete) {
 		state->duplex = status &
 				MV88E6390_SGMII_PHY_STATUS_DUPLEX_FULL ?
 			                         DUPLEX_FULL : DUPLEX_HALF;
@@ -81,8 +84,13 @@ static int mv88e6xxx_serdes_pcs_get_state(struct mv88e6xxx_chip *chip,
 			dev_err(chip->dev, "invalid PHY speed\n");
 			return -EINVAL;
 		}
-	} else {
-		state->link = false;
+	} else if (state->link &&
+		   state->interface != PHY_INTERFACE_MODE_SGMII) {
+		state->duplex = DUPLEX_FULL;
+		if (state->interface == PHY_INTERFACE_MODE_2500BASEX)
+			state->speed = SPEED_2500;
+		else
+			state->speed = SPEED_1000;
 	}
 
 	if (state->interface == PHY_INTERFACE_MODE_2500BASEX)
