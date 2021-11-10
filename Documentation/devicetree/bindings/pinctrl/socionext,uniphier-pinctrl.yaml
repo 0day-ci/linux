@@ -10,9 +10,6 @@ maintainers:
   - Masahiro Yamada <yamada.masahiro@socionext.com>
 
 properties:
-  $nodename:
-    pattern: "pinctrl"
-
   compatible:
     enum:
       - socionext,uniphier-ld4-pinctrl
@@ -25,6 +22,9 @@ properties:
       - socionext,uniphier-ld20-pinctrl
       - socionext,uniphier-pxs3-pinctrl
       - socionext,uniphier-nx1-pinctrl
+
+allOf:
+  - $ref: "pinctrl.yaml#"
 
 required:
   - compatible
