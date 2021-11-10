@@ -1281,6 +1281,31 @@ struct ice_aqc_set_mac_lb {
 	u8 reserved[15];
 };
 
+/* Set PHY recovered clock output (direct 0x0630) */
+struct ice_aqc_set_phy_rec_clk_out {
+	u8 phy_output;
+	u8 port_num;
+	u8 flags;
+#define ICE_AQC_SET_PHY_REC_CLK_OUT_OUT_EN	BIT(0)
+#define ICE_AQC_SET_PHY_REC_CLK_OUT_CURR_PORT	0xFF
+	u8 rsvd;
+	__le32 freq;
+	u8 rsvd2[6];
+	__le16 node_handle;
+};
+
+/* Get PHY recovered clock output (direct 0x0631) */
+struct ice_aqc_get_phy_rec_clk_out {
+	u8 phy_output;
+	u8 port_num;
+	u8 flags;
+#define ICE_AQC_GET_PHY_REC_CLK_OUT_OUT_EN	BIT(0)
+	u8 rsvd;
+	__le32 freq;
+	u8 rsvd2[6];
+	__le16 node_handle;
+};
+
 struct ice_aqc_link_topo_params {
 	u8 lport_num;
 	u8 lport_num_valid;
@@ -1838,6 +1863,28 @@ struct ice_aqc_get_cgu_dpll_status {
 	__le16 node_handle;
 };
 
+/* Read CGU register (direct 0x0C6E) */
+struct ice_aqc_read_cgu_reg {
+	__le16 offset;
+#define ICE_AQC_READ_CGU_REG_MAX_DATA_LEN	16
+	u8 data_len;
+	u8 rsvd[13];
+};
+
+/* Read CGU register response (direct 0x0C6E) */
+struct ice_aqc_read_cgu_reg_resp {
+	u8 data[ICE_AQC_READ_CGU_REG_MAX_DATA_LEN];
+};
+
+/* Write CGU register (direct 0x0C6F) */
+struct ice_aqc_write_cgu_reg {
+	__le16 offset;
+#define ICE_AQC_WRITE_CGU_REG_MAX_DATA_LEN	7
+	u8 data_len;
+	u8 data[ICE_AQC_WRITE_CGU_REG_MAX_DATA_LEN];
+	u8 rsvd[6];
+};
+
 /* Configure Firmware Logging Command (indirect 0xFF09)
  * Logging Information Read Response (indirect 0xFF10)
  * Note: The 0xFF10 command has no input parameters.
@@ -2033,6 +2080,8 @@ struct ice_aq_desc {
 		struct ice_aqc_get_phy_caps get_phy;
 		struct ice_aqc_set_phy_cfg set_phy;
 		struct ice_aqc_restart_an restart_an;
+		struct ice_aqc_set_phy_rec_clk_out set_phy_rec_clk_out;
+		struct ice_aqc_get_phy_rec_clk_out get_phy_rec_clk_out;
 		struct ice_aqc_gpio read_write_gpio;
 		struct ice_aqc_sff_eeprom read_write_sff_param;
 		struct ice_aqc_set_port_id_led set_port_id_led;
@@ -2188,6 +2237,8 @@ enum ice_adminq_opc {
 	ice_aqc_opc_get_link_status			= 0x0607,
 	ice_aqc_opc_set_event_mask			= 0x0613,
 	ice_aqc_opc_set_mac_lb				= 0x0620,
+	ice_aqc_opc_set_phy_rec_clk_out			= 0x0630,
+	ice_aqc_opc_get_phy_rec_clk_out			= 0x0631,
 	ice_aqc_opc_get_link_topo			= 0x06E0,
 	ice_aqc_opc_set_port_id_led			= 0x06E9,
 	ice_aqc_opc_set_gpio				= 0x06EC,
@@ -2238,6 +2289,8 @@ enum ice_adminq_opc {
 
 	/* 1588/SyncE commands/events */
 	ice_aqc_opc_get_cgu_dpll_status			= 0x0C66,
+	ice_aqc_opc_read_cgu_reg			= 0x0C6E,
+	ice_aqc_opc_write_cgu_reg			= 0x0C6F,
 
 	ice_aqc_opc_driver_shared_params		= 0x0C90,
 
