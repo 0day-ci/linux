@@ -4449,7 +4449,7 @@ static inline bool boot_cpu_is_amd(void)
  * the direct page table on host, use as much mmu features as
  * possible, however, kvm currently does not do execution-protection.
  */
-static void
+void
 build_tdp_shadow_zero_bits_mask(struct rsvd_bits_validate *shadow_zero_check,
 				int shadow_root_level)
 {
