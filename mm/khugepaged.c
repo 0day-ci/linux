@@ -1019,10 +1019,13 @@ static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 			.pmd = pmd,
 		};
 
-		vmf.pte = pte_offset_map(pmd, address);
+		vmf.pte = pte_tryget_map(pmd, address);
+		if (!vmf.pte)
+			continue;
 		vmf.orig_pte = *vmf.pte;
 		if (!is_swap_pte(vmf.orig_pte)) {
 			pte_unmap(vmf.pte);
+			pte_put_vmf(&vmf);
 			continue;
 		}
 		swapped_in++;
@@ -1041,7 +1044,10 @@ static bool __collapse_huge_page_swapin(struct mm_struct *mm,
 				trace_mm_collapse_huge_page_swapin(mm, swapped_in, referenced, 0);
 				return false;
 			}
+		} else {
+			pte_put_vmf(&vmf);
 		}
+
 		if (ret & VM_FAULT_ERROR) {
 			trace_mm_collapse_huge_page_swapin(mm, swapped_in, referenced, 0);
 			return false;
