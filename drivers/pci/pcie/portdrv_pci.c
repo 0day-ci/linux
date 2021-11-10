@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/aer.h>
 #include <linux/dmi.h>
+#include <linux/regulator/consumer.h>
 
 #include "../pci.h"
 #include "portdrv.h"
@@ -34,6 +35,9 @@ bool pcie_ports_native;
  * service even if the platform hasn't given us permission.
  */
 bool pcie_ports_dpc_native;
+
+/* forward declaration */
+static struct pci_driver pcie_portdriver;
 
 static int __init pcie_port_setup(char *str)
 {
@@ -107,6 +111,26 @@ bool pcie_is_port_dev(struct pci_dev *dev)
 }
 EXPORT_SYMBOL_GPL(pcie_is_port_dev);
 
+static int subdev_regulator_resume(struct pci_dev *dev)
+{
+	struct subdev_regulators *sr = dev->dev.driver_data;
+
+	if (sr)
+		return regulator_bulk_enable(sr->num_supplies, sr->supplies);
+
+	return 0;
+}
+
+static int subdev_regulator_suspend(struct pci_dev *dev, pm_message_t state)
+{
+	struct subdev_regulators *sr = dev->dev.driver_data;
+
+	if (sr)
+		return regulator_bulk_disable(sr->num_supplies, sr->supplies);
+
+	return 0;
+}
+
 /*
  * pcie_portdrv_probe - Probe PCI-Express port devices
  * @dev: PCI-Express port device being probed
@@ -130,6 +154,13 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 	status = pcie_port_device_register(dev);
 	if (status)
 		return status;
+
+	if (dev->bus->ops &&
+	    dev->bus->ops->add_bus &&
+	    dev->bus->dev.driver_data) {
+		pcie_portdriver.resume = subdev_regulator_resume;
+		pcie_portdriver.suspend = subdev_regulator_suspend;
+	}
 
 	pci_save_state(dev);
 
@@ -237,6 +268,7 @@ static struct pci_driver pcie_portdriver = {
 	.err_handler	= &pcie_portdrv_err_handler,
 
 	.driver.pm	= PCIE_PORTDRV_PM_OPS,
+	/* Note: suspend and resume may be set during probe */
 };
 
 static int __init dmi_pcie_pme_disable_msi(const struct dmi_system_id *d)

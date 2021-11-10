@@ -3,6 +3,7 @@
 #define DRIVERS_PCI_H
 
 #include <linux/pci.h>
+#include <linux/regulator/consumer.h>
 
 /* Number of possible devfns: 0.0 to 1f.7 inclusive */
 #define MAX_NR_DEVFNS 256
@@ -744,6 +745,13 @@ extern const struct attribute_group aspm_ctrl_attr_group;
 
 extern const struct attribute_group pci_dev_reset_method_attr_group;
 
+struct subdev_regulators {
+	unsigned int num_supplies;
+	struct regulator_bulk_data supplies[];
+};
+
 bool pcie_is_port_dev(struct pci_dev *dev);
+int pci_subdev_regulators_add_bus(struct pci_bus *bus);
+void pci_subdev_regulators_remove_bus(struct pci_bus *bus);
 
 #endif /* DRIVERS_PCI_H */

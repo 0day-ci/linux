@@ -419,3 +419,75 @@ void pci_bus_put(struct pci_bus *bus)
 	if (bus)
 		put_device(&bus->dev);
 }
+
+static void *alloc_subdev_regulators(struct device *dev)
+{
+	static const char * const supplies[] = {
+		"vpcie3v3",
+		"vpcie3v3aux",
+		"vpcie12v",
+	};
+	const size_t size = sizeof(struct subdev_regulators)
+		+ sizeof(struct regulator_bulk_data) * ARRAY_SIZE(supplies);
+	struct subdev_regulators *sr;
+	int i;
+
+	sr = devm_kzalloc(dev, size, GFP_KERNEL);
+
+	if (sr) {
+		sr->num_supplies = ARRAY_SIZE(supplies);
+		for (i = 0; i < ARRAY_SIZE(supplies); i++)
+			sr->supplies[i].supply = supplies[i];
+	}
+
+	return sr;
+}
+
+
+int pci_subdev_regulators_add_bus(struct pci_bus *bus)
+{
+	struct device *dev = &bus->dev;
+	struct subdev_regulators *sr;
+	int ret;
+
+	if (!pcie_is_port_dev(bus->self))
+		return 0;
+
+	if (WARN_ON(bus->dev.driver_data))
+		dev_err(dev, "multiple clients using dev.driver_data\n");
+
+	sr = alloc_subdev_regulators(&bus->dev);
+	if (!sr)
+		return -ENOMEM;
+
+	bus->dev.driver_data = sr;
+	ret = regulator_bulk_get(dev, sr->num_supplies, sr->supplies);
+	if (ret)
+		return ret;
+
+	ret = regulator_bulk_enable(sr->num_supplies, sr->supplies);
+	if (ret) {
+		dev_err(dev, "failed to enable regulators for downstream device\n");
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pci_subdev_regulators_add_bus);
+
+void pci_subdev_regulators_remove_bus(struct pci_bus *bus)
+{
+	struct device *dev = &bus->dev;
+	struct subdev_regulators *sr;
+
+	if (!pcie_is_port_dev(bus->self))
+		return;
+
+	sr = bus->dev.driver_data;
+	if (!sr)
+		return;
+
+	if (regulator_bulk_disable(sr->num_supplies, sr->supplies))
+		dev_err(dev, "failed to disable regulators for downstream device\n");
+}
+EXPORT_SYMBOL_GPL(pci_subdev_regulators_remove_bus);
