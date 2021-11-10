@@ -75,6 +75,7 @@ static inline void stop_using_temp_mm(struct temp_mm_state prev_state)
 }
 
 static DEFINE_PER_CPU(struct vm_struct *, text_poke_area);
+static DEFINE_PER_CPU(unsigned long, cpu_patching_addr);
 
 static int text_area_cpu_up(unsigned int cpu)
 {
@@ -87,6 +88,7 @@ static int text_area_cpu_up(unsigned int cpu)
 		return -1;
 	}
 	this_cpu_write(text_poke_area, area);
+	this_cpu_write(cpu_patching_addr, (unsigned long)area->addr);
 
 	return 0;
 }
@@ -172,11 +174,10 @@ static inline int unmap_patch_area(unsigned long addr)
 
 static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 {
-	int err;
+	int err, rc = 0;
 	u32 *patch_addr = NULL;
 	unsigned long flags;
 	unsigned long text_poke_addr;
-	unsigned long kaddr = (unsigned long)addr;
 
 	/*
 	 * During early early boot patch_instruction is called
@@ -188,15 +189,13 @@ static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 
 	local_irq_save(flags);
 
-	text_poke_addr = (unsigned long)__this_cpu_read(text_poke_area)->addr;
-	if (map_patch_area(addr, text_poke_addr)) {
-		err = -1;
+	text_poke_addr = __this_cpu_read(cpu_patching_addr);
+	err = map_patch_area(addr, text_poke_addr);
+	if (err)
 		goto out;
-	}
 
-	patch_addr = (u32 *)(text_poke_addr + (kaddr & ~PAGE_MASK));
-
-	__patch_instruction(addr, instr, patch_addr);
+	patch_addr = (u32 *)(text_poke_addr | offset_in_page(addr));
+	rc = __patch_instruction(addr, instr, patch_addr);
 
 	err = unmap_patch_area(text_poke_addr);
 	if (err)
@@ -204,8 +203,9 @@ static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 
 out:
 	local_irq_restore(flags);
+	WARN_ON(!ppc_inst_equal(ppc_inst_read(addr), instr));
 
-	return err;
+	return rc ? rc : err;
 }
 #else /* !CONFIG_STRICT_KERNEL_RWX */
 
