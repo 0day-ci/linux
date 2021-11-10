@@ -562,6 +562,10 @@ static void smc_stat_fallback(struct smc_sock *smc)
 
 static void smc_switch_to_fallback(struct smc_sock *smc, int reason_code)
 {
+	wait_queue_head_t *smc_wait = sk_sleep(&smc->sk);
+	wait_queue_head_t *clc_wait = sk_sleep(smc->clcsock->sk);
+	unsigned long flags;
+
 	smc->use_fallback = true;
 	smc->fallback_rsn = reason_code;
 	smc_stat_fallback(smc);
@@ -585,6 +589,16 @@ static void smc_switch_to_fallback(struct smc_sock *smc, int reason_code)
 		smc->clcsock->file->private_data = smc->clcsock;
 		smc->clcsock->wq.fasync_list =
 			smc->sk.sk_socket->wq.fasync_list;
+
+		/* There might be some wait queue entries remaining
+		 * in smc socket->wq, which should be removed to
+		 * clcsocket->wq during the fallback.
+		 */
+		spin_lock_irqsave(&smc_wait->lock, flags);
+		spin_lock_irqsave(&clc_wait->lock, flags);
+		list_splice_init(&smc_wait->head, &clc_wait->head);
+		spin_unlock_irqrestore(&clc_wait->lock, flags);
+		spin_unlock_irqrestore(&smc_wait->lock, flags);
 	}
 }
 
