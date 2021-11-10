@@ -12,9 +12,9 @@
 #include "ishtp-hid.h"
 
 /* ISH Transport protocol (ISHTP in short) GUID */
-static const guid_t hid_ishtp_guid =
-	GUID_INIT(0x33AECD58, 0xB679, 0x4E54,
-		  0x9B, 0xD9, 0xA0, 0x4D, 0x34, 0xF0, 0xC2, 0x26);
+#define HID_ISHTP_GUID	GUID_INIT(0x33AECD58, 0xB679, 0x4E54, \
+		  0x9B, 0xD9, 0xA0, 0x4D, 0x34, 0xF0, 0xC2, 0x26)
+static const guid_t hid_ishtp_guid = HID_ISHTP_GUID;
 
 /* Rx ring buffer pool size */
 #define HID_CL_RX_RING_SIZE	32
@@ -953,7 +953,7 @@ static struct ishtp_cl_driver	hid_ishtp_cl_driver = {
 };
 
 static const struct ishtp_device_id hid_ishtp_id_table[] = {
-	{ hid_ishtp_guid },
+	{ HID_ISHTP_GUID },
 	{ }
 };
 MODULE_DEVICE_TABLE(ishtp, hid_ishtp_id_table);
