@@ -5317,6 +5317,30 @@ the trailing ``'\0'``, is indicated by ``name_size`` in the header.
 The Stats Data block contains an array of 64-bit values in the same order
 as the descriptors in Descriptors block.
 
+4.134 KVM_S390_VCPU_RESET_SIGP_BUSY
+-----------------------------------
+
+:Capability: KVM_CAP_S390_USER_SIGP_BUSY
+:Architectures: s390
+:Type: vcpu ioctl
+:Parameters: none
+:Returns: 0
+
+This ioctl resets the VCPU's indicator that it is busy processing a SIGP
+order, and is thus available for additional SIGP orders.
+
+4.135 KVM_S390_VCPU_SET_SIGP_BUSY
+---------------------------------
+
+:Capability: KVM_CAP_S390_USER_SIGP_BUSY
+:Architectures: s390
+:Type: vcpu ioctl
+:Parameters: none
+:Returns: 0, or -EBUSY if VCPU is already busy
+
+This ioctl sets the VCPU's indicator that it is busy processing a SIGP
+order, and is thus unavailable for additional SIGP orders.
+
 5. The kvm_run structure
 ========================
 
@@ -6705,6 +6729,21 @@ MAP_SHARED mmap will result in an -EINVAL return.
 
 When enabled the VMM may make use of the ``KVM_ARM_MTE_COPY_TAGS`` ioctl to
 perform a bulk copy of tags to/from the guest.
+
+7.29 KVM_CAP_S390_USER_SIGP_BUSY
+--------------------------------
+
+:Architectures: s390
+:Parameters: none
+
+This capability indicates that KVM should indicate when a SIGP order has been
+sent to userspace for a particular vcpu, and return CC2 (BUSY) to any further
+SIGP order directed at the same vcpu even for those orders that are handled
+within the kernel.
+
+This capability is dependent on KVM_CAP_S390_USER_SIGP. If this capability
+is not enabled, SIGP orders handled by the kernel may not indicate whether a
+vcpu is currently processing another SIGP order.
 
 8. Other capabilities.
 ======================
