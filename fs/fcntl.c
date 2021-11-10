@@ -927,7 +927,7 @@ void fasync_free(struct fasync_struct *new)
  */
 struct fasync_struct *fasync_insert_entry(int fd, struct file *filp, struct fasync_struct **fapp, struct fasync_struct *new)
 {
-        struct fasync_struct *fa, **fp;
+	struct fasync_struct *fa, **fp;
 
 	spin_lock(&filp->f_lock);
 	spin_lock(&fasync_lock);
