@@ -93,9 +93,9 @@ struct ishtp_opregion_dev {
 };
 
 /* eclite ishtp client UUID: 6a19cc4b-d760-4de3-b14d-f25ebd0fbcd9 */
-static const guid_t ecl_ishtp_guid =
-	GUID_INIT(0x6a19cc4b, 0xd760, 0x4de3,
-		  0xb1, 0x4d, 0xf2, 0x5e, 0xbd, 0xf, 0xbc, 0xd9);
+#define ECL_ISHTP_GUID GUID_INIT(0x6a19cc4b, 0xd760, 0x4de3, \
+		  0xb1, 0x4d, 0xf2, 0x5e, 0xbd, 0xf, 0xbc, 0xd9)
+static const guid_t ecl_ishtp_guid = ECL_ISHTP_GUID;
 
 /* ACPI DSM UUID: 91d936a7-1f01-49c6-a6b4-72f00ad8d8a5 */
 static const guid_t ecl_acpi_guid =
@@ -682,7 +682,7 @@ static struct ishtp_cl_driver ecl_ishtp_cl_driver = {
 };
 
 static const struct ishtp_device_id ecl_ishtp_id_table[] = {
-	{ ecl_ishtp_guid },
+	{ ECL_ISHTP_GUID },
 	{ }
 };
 MODULE_DEVICE_TABLE(ishtp, ecl_ishtp_id_table);
