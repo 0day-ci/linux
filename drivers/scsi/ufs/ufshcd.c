@@ -7090,6 +7090,15 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 		goto release;
 	}
 
+	/*
+	 * ufshcd_try_to_abort_task() cleared the 'tag' bit in the doorbell
+	 * register. Clear the corresponding bit from outstanding_reqs to
+	 * prevent early completion.
+	 */
+	spin_lock_irqsave(&hba->outstanding_lock, flags);
+	__clear_bit(tag, &hba->outstanding_reqs);
+	spin_unlock_irqrestore(&hba->outstanding_lock, flags);
+
 	lrbp->cmd = NULL;
 	err = SUCCESS;
 
