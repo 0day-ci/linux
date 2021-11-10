@@ -148,7 +148,7 @@ struct mv3310_chip {
 };
 
 struct mv3310_priv {
-	DECLARE_BITMAP(supported_interfaces, PHY_INTERFACE_MODE_MAX);
+	DECLARE_PHY_INTERFACE_MASK(supported_interfaces);
 
 	u32 firmware_ver;
 	bool has_downshift;
