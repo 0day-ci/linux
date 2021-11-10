@@ -107,7 +107,7 @@ static u64 suspend_start;
  * This delay could be due to SMIs, NMIs, or to VCPU preemptions.  Used as
  * a lower bound for cs->uncertainty_margin values when registering clocks.
  */
-#define WATCHDOG_MAX_SKEW (50 * NSEC_PER_USEC)
+#define WATCHDOG_MAX_SKEW (100 * NSEC_PER_USEC)
 
 #ifdef CONFIG_CLOCKSOURCE_WATCHDOG
 static void clocksource_watchdog_work(struct work_struct *work);
@@ -205,11 +205,17 @@ EXPORT_SYMBOL_GPL(max_cswd_read_retries);
 static int verify_n_cpus = 8;
 module_param(verify_n_cpus, int, 0644);
 
-static bool cs_watchdog_read(struct clocksource *cs, u64 *csnow, u64 *wdnow)
+enum wd_read_status {
+	WD_READ_SUCCESS,
+	WD_READ_UNSTABLE,
+	WD_READ_SKIP
+};
+
+static enum wd_read_status cs_watchdog_read(struct clocksource *cs, u64 *csnow, u64 *wdnow)
 {
 	unsigned int nretries;
-	u64 wd_end, wd_delta;
-	int64_t wd_delay;
+	u64 wd_end, wd_end2, wd_delta;
+	int64_t wd_delay, wd_delay2;
 
 	for (nretries = 0; nretries <= max_cswd_read_retries; nretries++) {
 		local_irq_disable();
@@ -226,13 +232,30 @@ static bool cs_watchdog_read(struct clocksource *cs, u64 *csnow, u64 *wdnow)
 				pr_warn("timekeeping watchdog on CPU%d: %s retried %d times before success\n",
 					smp_processor_id(), watchdog->name, nretries);
 			}
-			return true;
+			return WD_READ_SUCCESS;
 		}
+	}
+
+	/*
+	 * Now compute delay in consecutive watchdog read to see if there is
+	 * too much external interferences that cause significant delay in
+	 * reading both clocksource and watchdog.
+	 *
+	 * If the consecutive watchdog read-back delay > WATCHDOG_MAX_SKEW/2,
+	 * report system busy and skip the current watchdog test.
+	 */
+	wd_end2 = watchdog->read(watchdog);
+	wd_delta = clocksource_delta(wd_end2, wd_end, watchdog->mask);
+	wd_delay2 = clocksource_cyc2ns(wd_delta, watchdog->mult, watchdog->shift);
+	if (wd_delay2 > WATCHDOG_MAX_SKEW/2) {
+		pr_warn("timekeeping watchdog on CPU%d: %s consecutive read-back delay of %lldns, system too busy\n",
+			smp_processor_id(), watchdog->name, wd_delay2);
+		return WD_READ_SKIP;
 	}
 
 	pr_warn("timekeeping watchdog on CPU%d: %s read-back delay of %lldns, attempt %d, marking unstable\n",
 		smp_processor_id(), watchdog->name, wd_delay, nretries);
-	return false;
+	return WD_READ_UNSTABLE;
 }
 
 static u64 csnow_mid;
@@ -356,6 +379,7 @@ static void clocksource_watchdog(struct timer_list *unused)
 	int next_cpu, reset_pending;
 	int64_t wd_nsec, cs_nsec;
 	struct clocksource *cs;
+	enum wd_read_status read_ret;
 	u32 md;
 
 	spin_lock(&watchdog_lock);
@@ -373,9 +397,12 @@ static void clocksource_watchdog(struct timer_list *unused)
 			continue;
 		}
 
-		if (!cs_watchdog_read(cs, &csnow, &wdnow)) {
-			/* Clock readout unreliable, so give it up. */
-			__clocksource_unstable(cs);
+		read_ret = cs_watchdog_read(cs, &csnow, &wdnow);
+
+		if (read_ret != WD_READ_SUCCESS) {
+			if (read_ret == WD_READ_UNSTABLE)
+				/* Clock readout unreliable, so give it up. */
+				__clocksource_unstable(cs);
 			continue;
 		}
 
@@ -1061,7 +1088,7 @@ void __clocksource_update_freq_scale(struct clocksource *cs, u32 scale, u32 freq
 	/*
 	 * If the uncertainty margin is not specified, calculate it.
 	 * If both scale and freq are non-zero, calculate the clock
-	 * period, but bound below at 2*WATCHDOG_MAX_SKEW.  However,
+	 * period, but bound below at WATCHDOG_MAX_SKEW.  However,
 	 * if either of scale or freq is zero, be very conservative and
 	 * take the tens-of-milliseconds WATCHDOG_THRESHOLD value for the
 	 * uncertainty margin.  Allow stupidly small uncertainty margins
@@ -1070,12 +1097,12 @@ void __clocksource_update_freq_scale(struct clocksource *cs, u32 scale, u32 freq
 	 */
 	if (scale && freq && !cs->uncertainty_margin) {
 		cs->uncertainty_margin = NSEC_PER_SEC / (scale * freq);
-		if (cs->uncertainty_margin < 2 * WATCHDOG_MAX_SKEW)
-			cs->uncertainty_margin = 2 * WATCHDOG_MAX_SKEW;
+		if (cs->uncertainty_margin < WATCHDOG_MAX_SKEW)
+			cs->uncertainty_margin = WATCHDOG_MAX_SKEW;
 	} else if (!cs->uncertainty_margin) {
 		cs->uncertainty_margin = WATCHDOG_THRESHOLD;
 	}
-	WARN_ON_ONCE(cs->uncertainty_margin < 2 * WATCHDOG_MAX_SKEW);
+	WARN_ON_ONCE(cs->uncertainty_margin < WATCHDOG_MAX_SKEW);
 
 	/*
 	 * Ensure clocksources that have large 'mult' values don't overflow
