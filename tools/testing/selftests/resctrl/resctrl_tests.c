@@ -8,12 +8,15 @@
  *    Sai Praneeth Prakhya <sai.praneeth.prakhya@intel.com>,
  *    Fenghua Yu <fenghua.yu@intel.com>
  */
+#include <numa.h>
+#include <string.h>
 #include "resctrl.h"
 
 #define BENCHMARK_ARGS		64
 #define BENCHMARK_ARG_SIZE	64
 
 bool is_amd;
+bool sub_numa_cluster_enable;
 
 void detect_amd(void)
 {
@@ -32,6 +35,35 @@ void detect_amd(void)
 		free(res);
 	}
 	fclose(inf);
+}
+
+void check_sub_numa_cluster(void)
+{
+	FILE *inf = fopen("/proc/cpuinfo", "r");
+	char *res, *s;
+	int socket_num = 0;
+	int numa_nodes = 0;
+
+	if (!inf)
+		return;
+
+	res = fgrep_last_match_line(inf, "physical id");
+
+	if (res) {
+		s = strpbrk(res, "1234567890");
+		socket_num = atoi(s) + 1;
+		free(res);
+	}
+	fclose(inf);
+
+	numa_nodes = numa_max_node() + 1;
+
+	/*
+	 * when the Sub-NUMA Clustering(SNC) feature is enabled,
+	 * the number of numa nodes is twice the number of sockets.
+	 */
+	if (numa_nodes == (2 * socket_num))
+		sub_numa_cluster_enable = true;
 }
 
 static void cmd_help(void)
@@ -61,6 +93,13 @@ static void run_mbm_test(bool has_ben, char **benchmark_cmd, int span,
 
 	ksft_print_msg("Starting MBM BW change ...\n");
 
+	/* when the Sub-NUMA Clustering(SNC) feature is enabled,
+	 * the CMT and MBM counters may not be accurate
+	 */
+	if (sub_numa_cluster_enable) {
+		ksft_test_result_skip("Sub-NUMA Clustering(SNC) feature is enabled, the MBM counters may not be accurate.\n");
+		return;
+	}
 	if (!validate_resctrl_feature_request(MBM_STR)) {
 		ksft_test_result_skip("Hardware does not support MBM or MBM is disabled\n");
 		return;
@@ -97,6 +136,14 @@ static void run_cmt_test(bool has_ben, char **benchmark_cmd, int cpu_no)
 	int res;
 
 	ksft_print_msg("Starting CMT test ...\n");
+
+	/* when the Sub-NUMA Clustering(SNC) feature is enabled,
+	 * the CMT and MBM counters may not be accurate
+	 */
+	if (sub_numa_cluster_enable) {
+		ksft_test_result_skip("Sub-NUMA Clustering(SNC) feature is enabled, the CMT counters may not be accurate.\n");
+		return;
+	}
 	if (!validate_resctrl_feature_request(CMT_STR)) {
 		ksft_test_result_skip("Hardware does not support CMT or CMT is disabled\n");
 		return;
@@ -209,6 +256,10 @@ int main(int argc, char **argv)
 
 	/* Detect AMD vendor */
 	detect_amd();
+
+	/* check whether sub numa clustering is enable or not */
+	if (!is_amd)
+		check_sub_numa_cluster();
 
 	if (has_ben) {
 		/* Extract benchmark command from command line. */

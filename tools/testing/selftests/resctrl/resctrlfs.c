@@ -606,6 +606,32 @@ char *fgrep(FILE *inf, const char *str)
 }
 
 /*
+ * Find the last matched line.
+ * Return a pointer to the string of the matched line,
+ * else retuen NULL if no matched line
+ */
+char *fgrep_last_match_line(FILE *inf, const char *str)
+{
+	char line[256];
+	char result_line[256];
+	int slen = strlen(str);
+
+	while (!feof(inf)) {
+		if (!fgets(line, 256, inf))
+			break;
+		if (strncmp(line, str, slen))
+			continue;
+
+		strcpy(result_line, line);
+	}
+
+	if (strlen(result_line) >= slen)
+		return strdup(result_line);
+
+	return NULL;
+}
+
+/*
  * validate_resctrl_feature_request - Check if requested feature is valid.
  * @resctrl_val:	Requested feature
  *
