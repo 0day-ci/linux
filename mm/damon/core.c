@@ -26,8 +26,7 @@
 /* Get a random number in [l, r) */
 #define damon_rand(l, r) (l + prandom_u32_max(r - l))
 
-static DEFINE_MUTEX(damon_lock);
-static int nr_running_ctxs;
+atomic_t nr_running_ctxs;
 
 /*
  * Construct a damon_region struct
@@ -356,20 +355,6 @@ int damon_set_schemes(struct damon_ctx *ctx, struct damos **schemes,
 	return 0;
 }
 
-/**
- * damon_nr_running_ctxs() - Return number of currently running contexts.
- */
-int damon_nr_running_ctxs(void)
-{
-	int nr_ctxs;
-
-	mutex_lock(&damon_lock);
-	nr_ctxs = nr_running_ctxs;
-	mutex_unlock(&damon_lock);
-
-	return nr_ctxs;
-}
-
 /* Returns the size upper limit for each monitoring region */
 static unsigned long damon_region_sz_limit(struct damon_ctx *ctx)
 {
@@ -408,7 +393,7 @@ static int __damon_start(struct damon_ctx *ctx)
 	if (!ctx->kdamond) {
 		err = 0;
 		ctx->kdamond = kthread_run(kdamond_fn, ctx, "kdamond.%d",
-				nr_running_ctxs);
+				atomic_read(&nr_running_ctxs));
 		if (IS_ERR(ctx->kdamond)) {
 			err = PTR_ERR(ctx->kdamond);
 			ctx->kdamond = NULL;
@@ -437,19 +422,15 @@ int damon_start(struct damon_ctx **ctxs, int nr_ctxs)
 	int i;
 	int err = 0;
 
-	mutex_lock(&damon_lock);
-	if (nr_running_ctxs) {
-		mutex_unlock(&damon_lock);
+	if (atomic_read(&nr_running_ctxs))
 		return -EBUSY;
-	}
 
 	for (i = 0; i < nr_ctxs; i++) {
 		err = __damon_start(ctxs[i]);
 		if (err)
 			break;
-		nr_running_ctxs++;
+		atomic_inc(&nr_running_ctxs);
 	}
-	mutex_unlock(&damon_lock);
 
 	return err;
 }
@@ -1078,9 +1059,7 @@ static int kdamond_fn(void *data)
 	ctx->kdamond = NULL;
 	mutex_unlock(&ctx->kdamond_lock);
 
-	mutex_lock(&damon_lock);
-	nr_running_ctxs--;
-	mutex_unlock(&damon_lock);
+	atomic_dec(&nr_running_ctxs);
 
 	return 0;
 }

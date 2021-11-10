@@ -20,6 +20,8 @@ static int dbgfs_nr_ctxs;
 static struct dentry **dbgfs_dirs;
 static DEFINE_MUTEX(damon_dbgfs_lock);
 
+extern atomic_t nr_running_ctxs;
+
 /*
  * Returns non-empty string on success, negative error code otherwise.
  */
@@ -689,7 +691,7 @@ static int dbgfs_mk_context(char *name)
 	struct dentry *root, **new_dirs, *new_dir;
 	struct damon_ctx **new_ctxs, *new_ctx;
 
-	if (damon_nr_running_ctxs())
+	if (atomic_read(&nr_running_ctxs))
 		return -EBUSY;
 
 	new_ctxs = krealloc(dbgfs_ctxs, sizeof(*dbgfs_ctxs) *
@@ -773,7 +775,7 @@ static int dbgfs_rm_context(char *name)
 	struct damon_ctx **new_ctxs;
 	int i, j;
 
-	if (damon_nr_running_ctxs())
+	if (atomic_read(&nr_running_ctxs))
 		return -EBUSY;
 
 	root = dbgfs_dirs[0];
@@ -854,7 +856,7 @@ static ssize_t dbgfs_monitor_on_read(struct file *file,
 		char __user *buf, size_t count, loff_t *ppos)
 {
 	char monitor_on_buf[5];
-	bool monitor_on = damon_nr_running_ctxs() != 0;
+	bool monitor_on = atomic_read(&nr_running_ctxs) != 0;
 	int len;
 
 	len = scnprintf(monitor_on_buf, 5, monitor_on ? "on\n" : "off\n");
