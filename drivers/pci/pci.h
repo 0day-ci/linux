@@ -746,6 +746,7 @@ extern const struct attribute_group aspm_ctrl_attr_group;
 extern const struct attribute_group pci_dev_reset_method_attr_group;
 
 struct subdev_regulators {
+	bool ep_wakeup_capable;
 	unsigned int num_supplies;
 	struct regulator_bulk_data supplies[];
 };

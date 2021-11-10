@@ -111,24 +111,55 @@ bool pcie_is_port_dev(struct pci_dev *dev)
 }
 EXPORT_SYMBOL_GPL(pcie_is_port_dev);
 
+static int pci_dev_may_wakeup(struct pci_dev *dev, void *data)
+{
+	bool *ret = data;
+
+	if (device_may_wakeup(&dev->dev)) {
+		*ret = true;
+		dev_dbg(&dev->dev, "disable cancelled for wake-up device\n");
+	}
+	return (int) *ret;
+}
+
 static int subdev_regulator_resume(struct pci_dev *dev)
 {
 	struct subdev_regulators *sr = dev->dev.driver_data;
 
-	if (sr)
-		return regulator_bulk_enable(sr->num_supplies, sr->supplies);
+	if (!sr)
+		return 0;
 
-	return 0;
+	if (sr->ep_wakeup_capable) {
+		/*
+		 * We are resuming from a suspend.  In the previous suspend
+		 * we did not disable the power supplies, so there is no
+		 * need to enable them (and falsely increase their usage
+		 * count).
+		 */
+		sr->ep_wakeup_capable = false;
+		return 0;
+	}
+
+	return regulator_bulk_enable(sr->num_supplies, sr->supplies);
 }
 
 static int subdev_regulator_suspend(struct pci_dev *dev, pm_message_t state)
 {
 	struct subdev_regulators *sr = dev->dev.driver_data;
 
-	if (sr)
-		return regulator_bulk_disable(sr->num_supplies, sr->supplies);
+	if (!sr)
+		return 0;
+	/*
+	 * If at least one device on this bus is enabled as a
+	 * wake-up source, do not turn off regulators.
+	 */
+	sr->ep_wakeup_capable = false;
+	pci_walk_bus(dev->bus, pci_dev_may_wakeup,
+		     &sr->ep_wakeup_capable);
+	if (sr->ep_wakeup_capable)
+		return 0;
 
-	return 0;
+	return regulator_bulk_disable(sr->num_supplies, sr->supplies);
 }
 
 /*
