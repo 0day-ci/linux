@@ -50,6 +50,7 @@
 #include <linux/ptrace.h>
 #include <linux/oom.h>
 #include <linux/memory.h>
+#include <linux/random.h>
 
 #include <asm/tlbflush.h>
 
@@ -1119,12 +1120,25 @@ out:
  *
  * This is represented in the node_demotion[] like this:
  *
- *	{  1, // Node 0 migrates to 1
- *	   2, // Node 1 migrates to 2
- *	  -1, // Node 2 does not migrate
- *	   4, // Node 3 migrates to 4
- *	   5, // Node 4 migrates to 5
- *	  -1} // Node 5 does not migrate
+ *	{  nr=1, nodes[0]=1 }, // Node 0 migrates to 1
+ *	{  nr=1, nodes[0]=2 }, // Node 1 migrates to 2
+ *	{  nr=0, nodes[0]=-1 }, // Node 2 does not migrate
+ *	{  nr=1, nodes[0]=4 }, // Node 3 migrates to 4
+ *	{  nr=1, nodes[0]=5 }, // Node 4 migrates to 5
+ *	{  nr=0, nodes[0]=-1} // Node 5 does not migrate
+ *
+ * Moreover some systems may have multiple same class memory
+ * types. Suppose a system has one socket with 3 memory nodes,
+ * node 0 is fast memory type, and node 1/2 both are slow memory
+ * type, and the distance between fast memory node and slow
+ * memory node is same. So the migration path should be:
+ *
+ *	0 -> 1/2 -> stop
+ *
+ * This is represented in the node_demotion[] like this:
+ *	{ nr=2, {nodes[0]=1, nodes[1]=2} }, // Node 0 migrates to node 1 and node 2
+ *	{ nr=0, nodes[0]=-1, }, // Node 1 dose not migrate
+ *	{ nr=0, nodes[0]=-1, }, // Node 2 does not migrate
  */
 
 /*
@@ -1135,8 +1149,13 @@ out:
  * must be held over all reads to ensure that no cycles are
  * observed.
  */
-static int node_demotion[MAX_NUMNODES] __read_mostly =
-	{[0 ...  MAX_NUMNODES - 1] = NUMA_NO_NODE};
+#define DEMOTION_TARGET_NODES 15
+struct demotion_nodes {
+	unsigned short nr;
+	short nodes[DEMOTION_TARGET_NODES];
+};
+
+static struct demotion_nodes node_demotion[MAX_NUMNODES] __read_mostly;
 
 /**
  * next_demotion_node() - Get the next node in the demotion path
@@ -1149,6 +1168,8 @@ static int node_demotion[MAX_NUMNODES] __read_mostly =
  */
 int next_demotion_node(int node)
 {
+	struct demotion_nodes *current_node_demotion = &node_demotion[node];
+	unsigned short target_nr, index;
 	int target;
 
 	/*
@@ -1161,9 +1182,25 @@ int next_demotion_node(int node)
 	 * node_demotion[] reads need to be consistent.
 	 */
 	rcu_read_lock();
-	target = READ_ONCE(node_demotion[node]);
-	rcu_read_unlock();
+	target_nr = READ_ONCE(current_node_demotion->nr);
 
+	if (target_nr == 0) {
+		target = NUMA_NO_NODE;
+		goto out;
+	} else if (target_nr == 1) {
+		index = 0;
+	} else {
+		/*
+		 * If there are multiple target nodes, just select one
+		 * target node randomly.
+		 */
+		index = get_random_int() % target_nr;
+	}
+
+	target = READ_ONCE(current_node_demotion->nodes[index]);
+
+out:
+	rcu_read_unlock();
 	return target;
 }
 
@@ -2974,10 +3011,13 @@ EXPORT_SYMBOL(migrate_vma_finalize);
 /* Disable reclaim-based migration. */
 static void __disable_all_migrate_targets(void)
 {
-	int node;
+	int node, i;
 
-	for_each_online_node(node)
-		node_demotion[node] = NUMA_NO_NODE;
+	for_each_online_node(node) {
+		node_demotion[node].nr = 0;
+		for (i = 0; i < DEMOTION_TARGET_NODES; i++)
+			node_demotion[node].nodes[i] = NUMA_NO_NODE;
+	}
 }
 
 static void disable_all_migrate_targets(void)
@@ -3004,26 +3044,35 @@ static void disable_all_migrate_targets(void)
  * Failing here is OK.  It might just indicate
  * being at the end of a chain.
  */
-static int establish_migrate_target(int node, nodemask_t *used)
+static int establish_migrate_target(int node, nodemask_t *used,
+				    int best_distance)
 {
-	int migration_target;
-
-	/*
-	 * Can not set a migration target on a
-	 * node with it already set.
-	 *
-	 * No need for READ_ONCE() here since this
-	 * in the write path for node_demotion[].
-	 * This should be the only thread writing.
-	 */
-	if (node_demotion[node] != NUMA_NO_NODE)
-		return NUMA_NO_NODE;
+	int migration_target, index, val;
+	struct demotion_nodes *current_node_demotion = &node_demotion[node];
 
 	migration_target = find_next_best_node(node, used);
 	if (migration_target == NUMA_NO_NODE)
 		return NUMA_NO_NODE;
 
-	node_demotion[node] = migration_target;
+	/*
+	 * If the node has been set a migration target node before,
+	 * which means it's the best distance between them. Still
+	 * check if this node can be demoted to other target nodes
+	 * if they have a same best distance.
+	 */
+	if (best_distance != -1) {
+		val = node_distance(node, migration_target);
+		if (val > best_distance)
+			return NUMA_NO_NODE;
+	}
+
+	index = current_node_demotion->nr;
+	if (WARN_ONCE(index >= DEMOTION_TARGET_NODES,
+		      "Exceeds maximum demotion target nodes\n"))
+		return NUMA_NO_NODE;
+
+	current_node_demotion->nodes[index] = migration_target;
+	current_node_demotion->nr++;
 
 	return migration_target;
 }
@@ -3039,7 +3088,9 @@ static int establish_migrate_target(int node, nodemask_t *used)
  *
  * The difference here is that cycles must be avoided.  If
  * node0 migrates to node1, then neither node1, nor anything
- * node1 migrates to can migrate to node0.
+ * node1 migrates to can migrate to node0. Also one node can
+ * be migrated to multiple nodes if the target nodes all have
+ * a same best-distance against the source node.
  *
  * This function can run simultaneously with readers of
  * node_demotion[].  However, it can not run simultaneously
@@ -3051,7 +3102,7 @@ static void __set_migration_target_nodes(void)
 	nodemask_t next_pass	= NODE_MASK_NONE;
 	nodemask_t this_pass	= NODE_MASK_NONE;
 	nodemask_t used_targets = NODE_MASK_NONE;
-	int node;
+	int node, best_distance;
 
 	/*
 	 * Avoid any oddities like cycles that could occur
@@ -3080,18 +3131,33 @@ again:
 	 * multiple source nodes to share a destination.
 	 */
 	nodes_or(used_targets, used_targets, this_pass);
-	for_each_node_mask(node, this_pass) {
-		int target_node = establish_migrate_target(node, &used_targets);
 
-		if (target_node == NUMA_NO_NODE)
-			continue;
+	for_each_node_mask(node, this_pass) {
+		best_distance = -1;
 
 		/*
-		 * Visit targets from this pass in the next pass.
-		 * Eventually, every node will have been part of
-		 * a pass, and will become set in 'used_targets'.
+		 * Try to set up the migration path for the node, and the target
+		 * migration nodes can be multiple, so doing a loop to find all
+		 * the target nodes if they all have a best node distance.
 		 */
-		node_set(target_node, next_pass);
+		do {
+			int target_node =
+				establish_migrate_target(node, &used_targets,
+							 best_distance);
+
+			if (target_node == NUMA_NO_NODE)
+				break;
+
+			if (best_distance == -1)
+				best_distance = node_distance(node, target_node);
+
+			/*
+			 * Visit targets from this pass in the next pass.
+			 * Eventually, every node will have been part of
+			 * a pass, and will become set in 'used_targets'.
+			 */
+			node_set(target_node, next_pass);
+		} while (1);
 	}
 	/*
 	 * 'next_pass' contains nodes which became migration
