@@ -26,6 +26,7 @@
 #include <linux/err.h>
 #include <linux/page-flags.h>
 #include <linux/page_ref.h>
+#include <linux/pte_ref.h>
 #include <linux/memremap.h>
 #include <linux/overflow.h>
 #include <linux/sizes.h>
@@ -2313,9 +2314,11 @@ enum pmd_installed_type {
 
 static inline int pte_alloc(struct mm_struct *mm, pmd_t *pmd)
 {
-	if (unlikely(pmd_none(*(pmd))))
+	enum pte_tryget_type ret = pte_try_get(pmd);
+
+	if (ret == TRYGET_FAILED_NONE || ret == TRYGET_FAILED_ZERO)
 		return __pte_alloc(mm, pmd);
-	if (unlikely(is_huge_pmd(*pmd)))
+	else if (ret == TRYGET_FAILED_HUGE_PMD)
 		return INSTALLED_HUGE_PMD;
 
 	return INSTALLED_PTE;

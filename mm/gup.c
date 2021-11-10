@@ -694,7 +694,7 @@ retry_locked:
 			spin_unlock(ptl);
 			ret = 0;
 			split_huge_pmd(vma, pmd, address);
-			if (pmd_trans_unstable(pmd))
+			if (pte_try_get(pmd) == TRYGET_FAILED_HUGE_PMD)
 				ret = -EBUSY;
 		} else {
 			spin_unlock(ptl);
@@ -702,8 +702,12 @@ retry_locked:
 			ret = pte_alloc(mm, pmd) < 0 ? -ENOMEM : 0;
 		}
 
-		return ret ? ERR_PTR(ret) :
-			follow_page_pte(vma, address, pmd, flags, &ctx->pgmap);
+		if (ret)
+			return ERR_PTR(ret);
+
+		page = follow_page_pte(vma, address, pmd, flags, &ctx->pgmap);
+		pte_put(mm, pmd, address);
+		return page;
 	}
 	page = follow_trans_huge_pmd(vma, address, pmd, flags);
 	spin_unlock(ptl);

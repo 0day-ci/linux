@@ -2736,9 +2736,9 @@ static void migrate_vma_insert_page(struct migrate_vma *migrate,
 		goto abort;
 
 	if (unlikely(anon_vma_prepare(vma)))
-		goto abort;
+		goto put;
 	if (mem_cgroup_charge(page_folio(page), vma->vm_mm, GFP_KERNEL))
-		goto abort;
+		goto put;
 
 	/*
 	 * The memory barrier inside __SetPageUptodate makes sure that
@@ -2764,7 +2764,7 @@ static void migrate_vma_insert_page(struct migrate_vma *migrate,
 			 * device memory.
 			 */
 			pr_warn_once("Unsupported ZONE_DEVICE page type.\n");
-			goto abort;
+			goto put;
 		}
 	} else {
 		entry = mk_pte(page, vma->vm_page_prot);
@@ -2811,11 +2811,14 @@ static void migrate_vma_insert_page(struct migrate_vma *migrate,
 	}
 
 	pte_unmap_unlock(ptep, ptl);
+	pte_put(mm, pmdp, addr);
 	*src = MIGRATE_PFN_MIGRATE;
 	return;
 
 unlock_abort:
 	pte_unmap_unlock(ptep, ptl);
+put:
+	pte_put(mm, pmdp, addr);
 abort:
 	*src &= ~MIGRATE_PFN_MIGRATE;
 }

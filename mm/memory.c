@@ -441,10 +441,13 @@ enum pmd_installed_type pmd_install(struct mm_struct *mm, pmd_t *pmd,
 				    pgtable_t *pte)
 {
 	int ret = INSTALLED_PTE;
-	spinlock_t *ptl = pmd_lock(mm, pmd);
+	spinlock_t *ptl;
 
+retry:
+	ptl = pmd_lock(mm, pmd);
 	if (likely(pmd_none(*pmd))) {	/* Has another populated it ? */
 		mm_inc_nr_ptes(mm);
+		pte_ref_init(*pte, pmd, 1);
 		/*
 		 * Ensure all pte setup (eg. pte page lock and page clearing) are
 		 * visible before the pte is made visible to other CPUs by being
@@ -464,6 +467,9 @@ enum pmd_installed_type pmd_install(struct mm_struct *mm, pmd_t *pmd,
 	} else if (is_huge_pmd(*pmd)) {
 		/* See comment in handle_pte_fault() */
 		ret = INSTALLED_HUGE_PMD;
+	} else if (!pte_get_unless_zero(pmd)) {
+		spin_unlock(ptl);
+		goto retry;
 	}
 	spin_unlock(ptl);
 
@@ -1028,6 +1034,7 @@ copy_pte_range(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma,
 	int rss[NR_MM_COUNTERS];
 	swp_entry_t entry = (swp_entry_t){0};
 	struct page *prealloc = NULL;
+	unsigned long start = addr;
 
 again:
 	progress = 0;
@@ -1108,6 +1115,7 @@ again:
 	pte_unmap(orig_src_pte);
 	add_mm_rss_vec(dst_mm, rss);
 	pte_unmap_unlock(orig_dst_pte, dst_ptl);
+	pte_put(dst_mm, dst_pmd, start);
 	cond_resched();
 
 	if (ret == -EIO) {
@@ -1778,6 +1786,7 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
 		goto out;
 	retval = insert_page_into_pte_locked(mm, pte, addr, page, prot);
 	pte_unmap_unlock(pte, ptl);
+	pte_put(mm, pte_to_pmd(pte), addr);
 out:
 	return retval;
 }
@@ -1810,6 +1819,7 @@ static int insert_pages(struct vm_area_struct *vma, unsigned long addr,
 	unsigned long remaining_pages_total = *num;
 	unsigned long pages_to_write_in_pmd;
 	int ret;
+	unsigned long start = addr;
 more:
 	ret = -EFAULT;
 	pmd = walk_to_pmd(mm, addr);
@@ -1836,7 +1846,7 @@ more:
 				pte_unmap_unlock(start_pte, pte_lock);
 				ret = err;
 				remaining_pages_total -= pte_idx;
-				goto out;
+				goto put;
 			}
 			addr += PAGE_SIZE;
 			++curr_page_idx;
@@ -1845,9 +1855,13 @@ more:
 		pages_to_write_in_pmd -= batch_size;
 		remaining_pages_total -= batch_size;
 	}
-	if (remaining_pages_total)
+	if (remaining_pages_total) {
+		pte_put(mm, pmd, start);
 		goto more;
+	}
 	ret = 0;
+put:
+	pte_put(mm, pmd, start);
 out:
 	*num = remaining_pages_total;
 	return ret;
@@ -2075,6 +2089,7 @@ static vm_fault_t insert_pfn(struct vm_area_struct *vma, unsigned long addr,
 
 out_unlock:
 	pte_unmap_unlock(pte, ptl);
+	pte_put(mm, pte_to_pmd(pte), addr);
 	return VM_FAULT_NOPAGE;
 }
 
@@ -2275,6 +2290,7 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 			unsigned long addr, unsigned long end,
 			unsigned long pfn, pgprot_t prot)
 {
+	unsigned long start = addr;
 	pte_t *pte, *mapped_pte;
 	spinlock_t *ptl;
 	int err = 0;
@@ -2294,6 +2310,7 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 	arch_leave_lazy_mmu_mode();
 	pte_unmap_unlock(mapped_pte, ptl);
+	pte_put(mm, pmd, start);
 	return err;
 }
 
@@ -2503,6 +2520,7 @@ static int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
 				     pte_fn_t fn, void *data, bool create,
 				     pgtbl_mod_mask *mask)
 {
+	unsigned long start = addr;
 	pte_t *pte, *mapped_pte;
 	int err = 0;
 	spinlock_t *ptl;
@@ -2536,8 +2554,11 @@ static int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
 
 	arch_leave_lazy_mmu_mode();
 
-	if (mm != &init_mm)
+	if (mm != &init_mm) {
 		pte_unmap_unlock(mapped_pte, ptl);
+		if (create)
+			pte_put(mm, pmd, start);
+	}
 	return err;
 }
 
@@ -3761,7 +3782,8 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 		/* Deliver the page fault to userland, check inside PT lock */
 		if (userfaultfd_missing(vma)) {
 			pte_unmap_unlock(vmf->pte, vmf->ptl);
-			return handle_userfault(vmf, VM_UFFD_MISSING);
+			ret = handle_userfault(vmf, VM_UFFD_MISSING);
+			goto put;
 		}
 		goto setpte;
 	}
@@ -3804,7 +3826,8 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	if (userfaultfd_missing(vma)) {
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
 		put_page(page);
-		return handle_userfault(vmf, VM_UFFD_MISSING);
+		ret = handle_userfault(vmf, VM_UFFD_MISSING);
+		goto put;
 	}
 
 	inc_mm_counter_fast(vma->vm_mm, MM_ANONPAGES);
@@ -3817,14 +3840,17 @@ setpte:
 	update_mmu_cache(vma, vmf->address, vmf->pte);
 unlock:
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
-	return ret;
+	goto put;
 release:
 	put_page(page);
 	goto unlock;
 oom_free_page:
 	put_page(page);
 oom:
-	return VM_FAULT_OOM;
+	ret = VM_FAULT_OOM;
+put:
+	pte_put(vma->vm_mm, vmf->pmd, vmf->address);
+	return ret;
 }
 
 /*
@@ -4031,7 +4057,9 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 			return ret;
 	}
 
-	if (pmd_none(*vmf->pmd)) {
+retry:
+	ret = pte_try_get(vmf->pmd);
+	if (ret == TRYGET_FAILED_NONE) {
 		int alloc_ret;
 
 		if (PageTransCompound(page)) {
@@ -4047,9 +4075,11 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 
 		if (unlikely(alloc_ret != INSTALLED_PTE))
 			return alloc_ret < 0 ? VM_FAULT_OOM : 0;
-	} else if (pmd_devmap_trans_unstable(vmf->pmd)) {
+	} else if (ret == TRYGET_FAILED_HUGE_PMD) {
 		/* See comment in handle_pte_fault() */
 		return 0;
+	} else if (ret == TRYGET_FAILED_ZERO) {
+		goto retry;
 	}
 
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
@@ -4063,6 +4093,7 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 
 	update_mmu_tlb(vma, vmf->address, vmf->pte);
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
+	pte_put(vma->vm_mm, vmf->pmd, vmf->address);
 	return ret;
 }
 

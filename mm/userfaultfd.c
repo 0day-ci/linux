@@ -574,6 +574,7 @@ retry:
 
 	while (src_addr < src_start + len) {
 		pmd_t dst_pmdval;
+		enum pte_tryget_type tryget_type;
 
 		BUG_ON(dst_addr >= dst_start + len);
 
@@ -583,6 +584,14 @@ retry:
 			break;
 		}
 
+again:
+		/*
+		 * After the management of the PTE page changes to the refcount
+		 * mode, the PTE page may be released by another thread(rcu mode),
+		 * so the rcu lock is held here to prevent the PTE page from
+		 * being released.
+		 */
+		rcu_read_lock();
 		dst_pmdval = pmd_read_atomic(dst_pmd);
 		/*
 		 * If the dst_pmd is mapped as THP don't
@@ -593,7 +602,9 @@ retry:
 			break;
 		}
 
-		if (unlikely(pmd_none(dst_pmdval))) {
+		tryget_type = pte_try_get(&dst_pmdval);
+		rcu_read_unlock();
+		if (unlikely(tryget_type == TRYGET_FAILED_NONE)) {
 			int ret = __pte_alloc(dst_mm, dst_pmd);
 
 			/*
@@ -607,6 +618,8 @@ retry:
 				err = -EFAULT;
 				break;
 			}
+		} else if (unlikely(tryget_type == TRYGET_FAILED_ZERO)) {
+			goto again;
 		}
 
 		BUG_ON(pmd_none(*dst_pmd));
@@ -614,6 +627,7 @@ retry:
 
 		err = mfill_atomic_pte(dst_mm, dst_pmd, dst_vma, dst_addr,
 				       src_addr, &page, mcopy_mode, wp_copy);
+		pte_put(dst_mm, dst_pmd, dst_addr);
 		cond_resched();
 
 		if (unlikely(err == -ENOENT)) {
