@@ -2364,6 +2364,7 @@ static void azx_remove(struct pci_dev *pci)
 		cancel_delayed_work_sync(&hda->probe_work);
 		device_lock(&pci->dev);
 
+		pci_set_drvdata(pci, NULL);
 		snd_card_free(card);
 	}
 }
