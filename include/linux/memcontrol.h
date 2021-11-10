@@ -937,6 +937,7 @@ struct mem_cgroup *mem_cgroup_get_from_path(const char *path);
  * it.
  */
 int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf, size_t len);
+bool is_remote_oom(struct mem_cgroup *memcg_under_oom);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 		int zid, int nr_pages);
@@ -1268,6 +1269,11 @@ static inline int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf,
 		return -EINVAL;
 	buf[0] = '\0';
 	return 0;
+}
+
+static inline bool is_remote_oom(struct mem_cgroup *memcg_under_oom)
+{
+	return false;
 }
 
 static inline int mem_cgroup_swapin_charge_page(struct page *page,
