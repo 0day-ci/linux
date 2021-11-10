@@ -623,10 +623,9 @@ static inline bool tdp_mmu_zap_spte_atomic(struct kvm *kvm,
  */
 static inline void __tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 				      u64 new_spte, bool record_acc_track,
-				      bool record_dirty_log)
+				      bool record_dirty_log,
+				      struct list_head *disconnected_sps)
 {
-	LIST_HEAD(disconnected_sps);
-
 	lockdep_assert_held_write(&kvm->mmu_lock);
 
 	/*
@@ -641,7 +640,7 @@ static inline void __tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 	WRITE_ONCE(*rcu_dereference(iter->sptep), new_spte);
 
 	__handle_changed_spte(kvm, iter->as_id, iter->gfn, iter->old_spte,
-			      new_spte, iter->level, false, &disconnected_sps);
+			      new_spte, iter->level, false, disconnected_sps);
 	if (record_acc_track)
 		handle_changed_spte_acc_track(iter->old_spte, new_spte,
 					      iter->level);
@@ -649,28 +648,32 @@ static inline void __tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 		handle_changed_spte_dirty_log(kvm, iter->as_id, iter->gfn,
 					      iter->old_spte, new_spte,
 					      iter->level);
+}
 
-	handle_disconnected_sps(kvm, &disconnected_sps);
+static inline void tdp_mmu_zap_spte(struct kvm *kvm, struct tdp_iter *iter,
+				    struct list_head *disconnected_sps)
+{
+	__tdp_mmu_set_spte(kvm, iter, 0, true, true, disconnected_sps);
 }
 
 static inline void tdp_mmu_set_spte(struct kvm *kvm, struct tdp_iter *iter,
 				    u64 new_spte)
 {
-	__tdp_mmu_set_spte(kvm, iter, new_spte, true, true);
+	__tdp_mmu_set_spte(kvm, iter, new_spte, true, true, NULL);
 }
 
 static inline void tdp_mmu_set_spte_no_acc_track(struct kvm *kvm,
 						 struct tdp_iter *iter,
 						 u64 new_spte)
 {
-	__tdp_mmu_set_spte(kvm, iter, new_spte, false, true);
+	__tdp_mmu_set_spte(kvm, iter, new_spte, false, true, NULL);
 }
 
 static inline void tdp_mmu_set_spte_no_dirty_log(struct kvm *kvm,
 						 struct tdp_iter *iter,
 						 u64 new_spte)
 {
-	__tdp_mmu_set_spte(kvm, iter, new_spte, true, false);
+	__tdp_mmu_set_spte(kvm, iter, new_spte, true, false, NULL);
 }
 
 #define tdp_root_for_each_pte(_iter, _root, _start, _end) \
@@ -757,6 +760,7 @@ static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
 	gfn_t max_gfn_host = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
 	bool zap_all = (start == 0 && end >= max_gfn_host);
 	struct tdp_iter iter;
+	LIST_HEAD(disconnected_sps);
 
 	/*
 	 * No need to try to step down in the iterator when zapping all SPTEs,
@@ -799,7 +803,7 @@ retry:
 			continue;
 
 		if (!shared) {
-			tdp_mmu_set_spte(kvm, &iter, 0);
+			tdp_mmu_zap_spte(kvm, &iter, &disconnected_sps);
 			flush = true;
 		} else if (!tdp_mmu_zap_spte_atomic(kvm, &iter)) {
 			/*
@@ -809,6 +813,12 @@ retry:
 			iter.old_spte = READ_ONCE(*rcu_dereference(iter.sptep));
 			goto retry;
 		}
+	}
+
+	if (!list_empty(&disconnected_sps)) {
+		kvm_flush_remote_tlbs(kvm);
+		handle_disconnected_sps(kvm, &disconnected_sps);
+		flush = false;
 	}
 
 	rcu_read_unlock();
