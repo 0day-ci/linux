@@ -134,23 +134,6 @@ static void __tlb_remove_table_free(struct mmu_table_batch *batch)
  *
  */
 
-static void tlb_remove_table_smp_sync(void *arg)
-{
-	/* Simply deliver the interrupt */
-}
-
-static void tlb_remove_table_sync_one(void)
-{
-	/*
-	 * This isn't an RCU grace period and hence the page-tables cannot be
-	 * assumed to be actually RCU-freed.
-	 *
-	 * It is however sufficient for software page-table walkers that rely on
-	 * IRQ disabling.
-	 */
-	smp_call_function(tlb_remove_table_smp_sync, NULL, 1);
-}
-
 static void tlb_remove_table_rcu(struct rcu_head *head)
 {
 	__tlb_remove_table_free(container_of(head, struct mmu_table_batch, rcu));
@@ -161,13 +144,30 @@ static void tlb_remove_table_free(struct mmu_table_batch *batch)
 	call_rcu(&batch->rcu, tlb_remove_table_rcu);
 }
 
-#else /* !CONFIG_MMU_GATHER_RCU_TABLE_FREE */
+static void tlb_remove_table_one_rcu(struct rcu_head *head)
+{
+	struct page *page = container_of(head, struct page, rcu_head);
 
-static void tlb_remove_table_sync_one(void) { }
+	__tlb_remove_table(page);
+}
+
+static void tlb_remove_table_one(void *table)
+{
+	pgtable_t page = (pgtable_t)table;
+
+	call_rcu(&page->rcu_head, tlb_remove_table_one_rcu);
+}
+
+#else /* !CONFIG_MMU_GATHER_RCU_TABLE_FREE */
 
 static void tlb_remove_table_free(struct mmu_table_batch *batch)
 {
 	__tlb_remove_table_free(batch);
+}
+
+static void tlb_remove_table_one(void *table)
+{
+	__tlb_remove_table(table);
 }
 
 #endif /* CONFIG_MMU_GATHER_RCU_TABLE_FREE */
@@ -185,12 +185,6 @@ static inline void tlb_table_invalidate(struct mmu_gather *tlb)
 		 */
 		tlb_flush_mmu_tlbonly(tlb);
 	}
-}
-
-static void tlb_remove_table_one(void *table)
-{
-	tlb_remove_table_sync_one();
-	__tlb_remove_table(table);
 }
 
 static void tlb_table_flush(struct mmu_gather *tlb)

@@ -477,7 +477,7 @@ regular_page:
 
 	arch_leave_lazy_mmu_mode();
 	pte_unmap_unlock(orig_pte, ptl);
-	pte_put(vma->vm_mm, pmd, start);
+	__pte_put(tlb, vma->vm_mm, pmd, start);
 	if (pageout)
 		reclaim_pages(&page_list);
 	cond_resched();
@@ -710,7 +710,7 @@ out:
 	arch_leave_lazy_mmu_mode();
 	pte_unmap_unlock(orig_pte, ptl);
 	if (nr_put)
-		pte_put_many(mm, pmd, start, nr_put);
+		__pte_put_many(tlb, mm, pmd, start, nr_put);
 	cond_resched();
 next:
 	return 0;

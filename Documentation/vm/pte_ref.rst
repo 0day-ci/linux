@@ -183,30 +183,34 @@ GUP as an example::
 4. Helpers
 ==========
 
-+---------------------+-------------------------------------------------+
-| pte_ref_init        | Initialize the pte_refcount and pmd             |
-+---------------------+-------------------------------------------------+
-| pte_to_pmd          | Get the corresponding pmd                       |
-+---------------------+-------------------------------------------------+
-| pte_update_pmd      | Update the corresponding pmd                    |
-+---------------------+-------------------------------------------------+
-| pte_get             | Increment a pte_refcount                        |
-+---------------------+-------------------------------------------------+
-| pte_get_many        | Add a value to a pte_refcount                   |
-+---------------------+-------------------------------------------------+
-| pte_get_unless_zero | Increment a pte_refcount unless it is 0         |
-+---------------------+-------------------------------------------------+
-| pte_try_get         | Try to increment a pte_refcount                 |
-+---------------------+-------------------------------------------------+
-| pte_tryget_map      | Try to increment a pte_refcount before          |
-|                     | pte_offset_map()                                |
-+---------------------+-------------------------------------------------+
-| pte_tryget_map_lock | Try to increment a pte_refcount before          |
-|                     | pte_offset_map_lock()                           |
-+---------------------+-------------------------------------------------+
-| pte_put             | Decrement a pte_refcount                        |
-+---------------------+-------------------------------------------------+
-| pte_put_many        | Sub a value to a pte_refcount                   |
-+---------------------+-------------------------------------------------+
-| pte_put_vmf         | Decrement a pte_refcount in the page fault path |
-+---------------------+-------------------------------------------------+
++---------------------+------------------------------------------------------+
+| pte_ref_init        | Initialize the pte_refcount and pmd                  |
++---------------------+------------------------------------------------------+
+| pte_to_pmd          | Get the corresponding pmd                            |
++---------------------+------------------------------------------------------+
+| pte_update_pmd      | Update the corresponding pmd                         |
++---------------------+------------------------------------------------------+
+| pte_get             | Increment a pte_refcount                             |
++---------------------+------------------------------------------------------+
+| pte_get_many        | Add a value to a pte_refcount                        |
++---------------------+------------------------------------------------------+
+| pte_get_unless_zero | Increment a pte_refcount unless it is 0              |
++---------------------+------------------------------------------------------+
+| pte_try_get         | Try to increment a pte_refcount                      |
++---------------------+------------------------------------------------------+
+| pte_tryget_map      | Try to increment a pte_refcount before               |
+|                     | pte_offset_map()                                     |
++---------------------+------------------------------------------------------+
+| pte_tryget_map_lock | Try to increment a pte_refcount before               |
+|                     | pte_offset_map_lock()                                |
++---------------------+------------------------------------------------------+
+| __pte_put           | Decrement a pte_refcount                             |
++---------------------+------------------------------------------------------+
+| __pte_put_many      | Sub a value to a pte_refcount                        |
++---------------------+------------------------------------------------------+
+| pte_put             | Decrement a pte_refcount(without tlb parameter)      |
++---------------------+------------------------------------------------------+
+| pte_put_many        | Sub a value to a pte_refcount(without tlb parameter) |
++---------------------+------------------------------------------------------+
+| pte_put_vmf         | Decrement a pte_refcount in the page fault path      |
++---------------------+------------------------------------------------------+

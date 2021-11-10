@@ -8,6 +8,8 @@
 #include <linux/pte_ref.h>
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
+#include <asm/pgalloc.h>
+#include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
 #ifdef CONFIG_FREE_USER_PTE
@@ -117,7 +119,8 @@ static void pte_free_rcu(struct rcu_head *rcu)
 	__free_page(page);
 }
 
-void free_user_pte_table(struct mm_struct *mm, pmd_t *pmd, unsigned long addr)
+void free_user_pte_table(struct mmu_gather *tlb, struct mm_struct *mm,
+			 pmd_t *pmd, unsigned long addr)
 {
 	struct vm_area_struct vma = TLB_FLUSH_VMA(mm, 0);
 	spinlock_t *ptl;
@@ -125,10 +128,14 @@ void free_user_pte_table(struct mm_struct *mm, pmd_t *pmd, unsigned long addr)
 
 	ptl = pmd_lock(mm, pmd);
 	pmdval = pmdp_huge_get_and_clear(mm, addr, pmd);
-	flush_tlb_range(&vma, addr, addr + PMD_SIZE);
+	if (!tlb)
+		flush_tlb_range(&vma, addr, addr + PMD_SIZE);
+	else
+		pte_free_tlb(tlb, pmd_pgtable(pmdval), addr);
 	spin_unlock(ptl);
 
 	pte_free_debug(pmdval);
 	mm_dec_nr_ptes(mm);
-	call_rcu(&pmd_pgtable(pmdval)->rcu_head, pte_free_rcu);
+	if (!tlb)
+		call_rcu(&pmd_pgtable(pmdval)->rcu_head, pte_free_rcu);
 }

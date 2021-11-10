@@ -22,7 +22,8 @@ enum pte_tryget_type pte_try_get(pmd_t *pmd);
 bool pte_get_unless_zero(pmd_t *pmd);
 
 #ifdef CONFIG_FREE_USER_PTE
-void free_user_pte_table(struct mm_struct *mm, pmd_t *pmdp, unsigned long addr);
+void free_user_pte_table(struct mmu_gather *tlb, struct mm_struct *mm,
+			 pmd_t *pmd, unsigned long addr);
 
 static inline void pte_ref_init(pgtable_t pte, pmd_t *pmd, int count)
 {
@@ -48,14 +49,21 @@ static inline void pte_get_many(pmd_t *pmd, unsigned int nr)
 	atomic_add(nr, &pte->pte_refcount);
 }
 
-static inline void pte_put_many(struct mm_struct *mm, pmd_t *pmd,
-				unsigned long addr, unsigned int nr)
+static inline void __pte_put_many(struct mmu_gather *tlb, struct mm_struct *mm,
+				  pmd_t *pmd, unsigned long addr,
+				  unsigned int nr)
 {
 	pgtable_t pte = pmd_pgtable(*pmd);
 
 	VM_BUG_ON(!PageTable(pte));
 	if (atomic_sub_and_test(nr, &pte->pte_refcount))
-		free_user_pte_table(mm, pmd, addr & PMD_MASK);
+		free_user_pte_table(tlb, mm, pmd, addr & PMD_MASK);
+}
+
+static inline void __pte_put(struct mmu_gather *tlb, struct mm_struct *mm,
+			     pmd_t *pmd, unsigned long addr)
+{
+	__pte_put_many(tlb, mm, pmd, addr, 1);
 }
 #else
 static inline void pte_ref_init(pgtable_t pte, pmd_t *pmd, int count)
@@ -75,8 +83,14 @@ static inline void pte_get_many(pmd_t *pmd, unsigned int nr)
 {
 }
 
-static inline void pte_put_many(struct mm_struct *mm, pmd_t *pmd,
-				unsigned long addr, unsigned int nr)
+static inline void __pte_put_many(struct mmu_gather *tlb, struct mm_struct *mm,
+				  pmd_t *pmd, unsigned long addr,
+				  unsigned int nr)
+{
+}
+
+static inline void __pte_put(struct mmu_gather *tlb, struct mm_struct *mm,
+			     pmd_t *pmd, unsigned long addr)
 {
 }
 #endif /* CONFIG_FREE_USER_PTE */
@@ -110,6 +124,12 @@ static inline pte_t *pte_tryget_map_lock(struct mm_struct *mm, pmd_t *pmd,
 	return pte_offset_map_lock(mm, pmd, address, ptlp);
 }
 
+static inline void pte_put_many(struct mm_struct *mm, pmd_t *pmd,
+				unsigned long addr, unsigned int nr)
+{
+	__pte_put_many(NULL, mm, pmd, addr, nr);
+}
+
 /*
  * pte_put - Decrement refcount for the PTE page table.
  * @mm: the mm_struct of the target address space.
@@ -120,7 +140,7 @@ static inline pte_t *pte_tryget_map_lock(struct mm_struct *mm, pmd_t *pmd,
  */
 static inline void pte_put(struct mm_struct *mm, pmd_t *pmd, unsigned long addr)
 {
-	pte_put_many(mm, pmd, addr, 1);
+	__pte_put(NULL, mm, pmd, addr);
 }
 
 #endif

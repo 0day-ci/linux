@@ -1469,7 +1469,7 @@ again:
 	}
 
 	if (nr_put)
-		pte_put_many(mm, pmd, start, nr_put);
+		__pte_put_many(tlb, mm, pmd, start, nr_put);
 
 	return addr;
 }
@@ -1515,7 +1515,7 @@ static inline unsigned long zap_pmd_range(struct mmu_gather *tlb,
 		if (pte_try_get(pmd))
 			goto next;
 		next = zap_pte_range(tlb, vma, pmd, addr, next, details);
-		pte_put(tlb->mm, pmd, addr);
+		__pte_put(tlb, tlb->mm, pmd, addr);
 next:
 		cond_resched();
 	} while (pmd++, addr = next, addr != end);
