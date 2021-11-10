@@ -76,9 +76,9 @@ enum ish_loader_commands {
 #define LOADER_XFER_MODE_ISHTP			BIT(1)
 
 /* ISH Transport Loader client unique GUID */
-static const guid_t loader_ishtp_guid =
-	GUID_INIT(0xc804d06a, 0x55bd, 0x4ea7,
-		  0xad, 0xed, 0x1e, 0x31, 0x22, 0x8c, 0x76, 0xdc);
+#define ISHTP_GUID GUID_INIT(0xc804d06a, 0x55bd, 0x4ea7, \
+		  0xad, 0xed, 0x1e, 0x31, 0x22, 0x8c, 0x76, 0xdc)
+static const guid_t loader_ishtp_guid = ISHTP_GUID;
 
 #define FILENAME_SIZE				256
 
@@ -1064,7 +1064,7 @@ static struct ishtp_cl_driver	loader_ishtp_cl_driver = {
 };
 
 static const struct ishtp_device_id loader_ishtp_id_table[] = {
-	{ loader_ishtp_guid },
+	{ ISHTP_GUID },
 	{ }
 };
 MODULE_DEVICE_TABLE(ishtp, loader_ishtp_id_table);
