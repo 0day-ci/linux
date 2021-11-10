@@ -513,7 +513,8 @@ static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
  * being removed from the paging structure and this function being called.
  */
 static void handle_disconnected_sps(struct kvm *kvm,
-				    struct list_head *disconnected_sps)
+				    struct list_head *disconnected_sps,
+				    bool can_yield, bool shared)
 {
 	struct kvm_mmu_page *sp;
 	struct kvm_mmu_page *next;
@@ -521,6 +522,16 @@ static void handle_disconnected_sps(struct kvm *kvm,
 	list_for_each_entry_safe(sp, next, disconnected_sps, link) {
 		list_del(&sp->link);
 		call_rcu(&sp->rcu_head, tdp_mmu_free_sp_rcu_callback);
+
+		if (can_yield &&
+		    (need_resched() || rwlock_needbreak(&kvm->mmu_lock))) {
+			rcu_read_unlock();
+			if (shared)
+				cond_resched_rwlock_read(&kvm->mmu_lock);
+			else
+				cond_resched_rwlock_write(&kvm->mmu_lock);
+			rcu_read_lock();
+		}
 	}
 }
 
@@ -599,7 +610,7 @@ static inline bool tdp_mmu_zap_spte_atomic(struct kvm *kvm,
 	 */
 	WRITE_ONCE(*rcu_dereference(iter->sptep), 0);
 
-	handle_disconnected_sps(kvm, &disconnected_sps);
+	handle_disconnected_sps(kvm, &disconnected_sps, false, true);
 
 	return true;
 }
@@ -817,7 +828,8 @@ retry:
 
 	if (!list_empty(&disconnected_sps)) {
 		kvm_flush_remote_tlbs(kvm);
-		handle_disconnected_sps(kvm, &disconnected_sps);
+		handle_disconnected_sps(kvm, &disconnected_sps,
+					can_yield, shared);
 		flush = false;
 	}
 
