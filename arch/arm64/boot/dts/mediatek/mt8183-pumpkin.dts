@@ -434,6 +434,18 @@
 				 <PINMUX_GPIO28__FUNC_GPIO28>;
 		};
 	};
+
+	usb_pins: usb-pins {
+		pins_usb {
+			pinmux = <PINMUX_GPIO42__FUNC_GPIO42>;
+			output-low;
+		};
+
+		pins_hub_rst {
+			pinmux = <PINMUX_GPIO9__FUNC_GPIO9>;
+			output-low;
+		};
+	};
 };
 
 &mfg {
@@ -495,4 +507,18 @@
 			remote-endpoint = <&it66121_in>;
 		};
 	};
+};
+
+&ssusb {
+	pinctrl-names = "default";
+	pinctrl-0 = <&usb_pins>;
+	maximum-speed = "high-speed";
+	dr_mode = "host";
+	vusb33-supply = <&mt6358_vusb_reg>;
+	status = "okay";
+};
+
+&usb_host {
+	vusb33-supply = <&mt6358_vusb_reg>;
+	status = "okay";
 };
