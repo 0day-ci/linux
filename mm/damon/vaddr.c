@@ -100,11 +100,7 @@ static unsigned long sz_range(struct damon_addr_range *r)
 static void swap_ranges(struct damon_addr_range *r1,
 			struct damon_addr_range *r2)
 {
-	struct damon_addr_range tmp;
-
-	tmp = *r1;
-	*r1 = *r2;
-	*r2 = tmp;
+	swap(*r1, *r2);
 }
 
 /*
