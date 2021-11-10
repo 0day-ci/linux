@@ -266,9 +266,9 @@ struct sdw_device_id {
  * Struct used for matching a device
  */
 struct of_device_id {
-	char	name[32];
-	char	type[32];
-	char	compatible[128];
+	char	name[24];
+	char	type[24];
+	char	compatible[48];
 	const void *data;
 };
 
