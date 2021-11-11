@@ -4222,7 +4222,7 @@ struct page *shmem_read_mapping_page_gfp(struct address_space *mapping,
 	else
 		unlock_page(page);
 
-	if (PageHWPoison(page))
+	if (!IS_ERR(page) && PageHWPoison(page))
 		page = ERR_PTR(-EIO);
 
 	return page;
