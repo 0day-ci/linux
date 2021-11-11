@@ -65,8 +65,10 @@
 #define SPI_SLVOE_OFFSET		10
 #define SPI_SRL_OFFSET			11
 #define SPI_CFS_OFFSET			12
+#define SPI_SSTE_OFFSET			24
 
 /* Bit fields in CTRLR0 based on DWC_ssi_databook.pdf v1.01a */
+#define DWC_SSI_CTRLR0_SSTE_OFFSET	14
 #define DWC_SSI_CTRLR0_SRL_OFFSET	13
 #define DWC_SSI_CTRLR0_TMOD_OFFSET	10
 #define DWC_SSI_CTRLR0_TMOD_MASK	GENMASK(11, 10)

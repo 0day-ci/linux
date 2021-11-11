@@ -27,6 +27,7 @@
 struct chip_data {
 	u32 cr0;
 	u32 rx_sample_dly;	/* RX sample delay */
+	bool sste;		/* Slave select Toggle flag */
 };
 
 #ifdef CONFIG_DEBUG_FS
@@ -269,6 +270,7 @@ static irqreturn_t dw_spi_irq(int irq, void *dev_id)
 
 static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 {
+	struct chip_data *chip = spi_get_ctldata(spi);
 	u32 cr0 = 0;
 
 	if (!(dws->caps & DW_SPI_CAP_DWC_SSI)) {
@@ -285,6 +287,9 @@ static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 
 		/* CTRLR0[11] Shift Register Loop */
 		cr0 |= ((spi->mode & SPI_LOOP) ? 1 : 0) << SPI_SRL_OFFSET;
+
+		/* CTRLR0[24] Slave Select Toggle Enable */
+		cr0 |= chip->sste << SPI_SSTE_OFFSET;
 	} else {
 		/* CTRLR0[ 7: 6] Frame Format */
 		cr0 |= SSI_MOTO_SPI << DWC_SSI_CTRLR0_FRF_OFFSET;
@@ -299,6 +304,9 @@ static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 
 		/* CTRLR0[13] Shift Register Loop */
 		cr0 |= ((spi->mode & SPI_LOOP) ? 1 : 0) << DWC_SSI_CTRLR0_SRL_OFFSET;
+
+		/* CTRLR0[14] Slave Select Toggle Enable */
+		cr0 |= chip->sste << DWC_SSI_CTRLR0_SSTE_OFFSET;
 
 		if (dws->caps & DW_SPI_CAP_KEEMBAY_MST)
 			cr0 |= DWC_SSI_CTRLR0_KEEMBAY_MST;
@@ -789,6 +797,9 @@ static int dw_spi_setup(struct spi_device *spi)
 		chip->rx_sample_dly = DIV_ROUND_CLOSEST(rx_sample_dly_ns,
 							NSEC_PER_SEC /
 							dws->max_freq);
+
+		/* Get slave select toggling feature requirement */
+		chip->sste = device_property_read_bool(&spi->dev, "snps,sste");
 	}
 
 	/*
