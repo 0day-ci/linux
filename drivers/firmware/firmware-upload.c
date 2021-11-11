@@ -22,6 +22,21 @@ static dev_t fw_upload_devt;
 
 #define to_fw_upload(d) container_of(d, struct fw_upload, dev)
 
+static void fw_upload_update_progress(struct fw_upload *fwl, u32 new_progress)
+{
+	mutex_lock(&fwl->lock);
+	fwl->progress = new_progress;
+	mutex_unlock(&fwl->lock);
+}
+
+static void fw_upload_set_error(struct fw_upload *fwl, u32 err_code)
+{
+	mutex_lock(&fwl->lock);
+	fwl->err_progress = fwl->progress;
+	fwl->err_code = err_code;
+	mutex_unlock(&fwl->lock);
+}
+
 static void fw_upload_prog_complete(struct fw_upload *fwl)
 {
 	mutex_lock(&fwl->lock);
@@ -38,24 +53,24 @@ static void fw_upload_do_load(struct work_struct *work)
 	fwl = container_of(work, struct fw_upload, work);
 
 	if (fwl->driver_unload) {
-		fwl->err_code = FW_UPLOAD_ERR_CANCELED;
+		fw_upload_set_error(fwl, FW_UPLOAD_ERR_CANCELED);
 		goto idle_exit;
 	}
 
 	get_device(&fwl->dev);
 	if (!try_module_get(fwl->dev.parent->driver->owner)) {
-		fwl->err_code = FW_UPLOAD_ERR_BUSY;
+		fw_upload_set_error(fwl, FW_UPLOAD_ERR_BUSY);
 		goto putdev_exit;
 	}
 
-	fwl->progress = FW_UPLOAD_PROG_PREPARING;
+	fw_upload_update_progress(fwl, FW_UPLOAD_PROG_PREPARING);
 	ret = fwl->ops->prepare(fwl, fwl->data, fwl->remaining_size);
 	if (ret) {
-		fwl->err_code = ret;
+		fw_upload_set_error(fwl, ret);
 		goto modput_exit;
 	}
 
-	fwl->progress = FW_UPLOAD_PROG_WRITING;
+	fw_upload_update_progress(fwl, FW_UPLOAD_PROG_WRITING);
 	while (fwl->remaining_size) {
 		ret = fwl->ops->write(fwl, fwl->data, offset,
 					fwl->remaining_size);
@@ -65,7 +80,7 @@ static void fw_upload_do_load(struct work_struct *work)
 					 "write-op wrote zero data\n");
 				ret = -FW_UPLOAD_ERR_RW_ERROR;
 			}
-			fwl->err_code = -ret;
+			fw_upload_set_error(fwl, -ret);
 			goto done;
 		}
 
@@ -73,10 +88,10 @@ static void fw_upload_do_load(struct work_struct *work)
 		offset += ret;
 	}
 
-	fwl->progress = FW_UPLOAD_PROG_PROGRAMMING;
+	fw_upload_update_progress(fwl, FW_UPLOAD_PROG_PROGRAMMING);
 	ret = fwl->ops->poll_complete(fwl);
 	if (ret)
-		fwl->err_code = ret;
+		fw_upload_set_error(fwl, ret);
 
 done:
 	if (fwl->ops->cleanup)
@@ -150,19 +165,40 @@ exit_free:
 	return ret;
 }
 
+static int fw_upload_ioctl_status(struct fw_upload *fwl, unsigned long arg)
+{
+	struct fw_upload_status status;
+
+	memset(&status, 0, sizeof(status));
+	status.progress = fwl->progress;
+	status.remaining_size = fwl->remaining_size;
+	status.err_progress = fwl->err_progress;
+	status.err_code = fwl->err_code;
+
+	if (copy_to_user((void __user *)arg, &status, sizeof(status)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static long fw_upload_ioctl(struct file *filp, unsigned int cmd,
 			    unsigned long arg)
 {
 	struct fw_upload *fwl = filp->private_data;
 	int ret = -ENOTTY;
 
+	mutex_lock(&fwl->lock);
+
 	switch (cmd) {
 	case FW_UPLOAD_WRITE:
-		mutex_lock(&fwl->lock);
 		ret = fw_upload_ioctl_write(fwl, arg);
-		mutex_unlock(&fwl->lock);
+		break;
+	case FW_UPLOAD_STATUS:
+		ret = fw_upload_ioctl_status(fwl, arg);
 		break;
 	}
+
+	mutex_unlock(&fwl->lock);
 
 	return ret;
 }

@@ -38,3 +38,9 @@ to a kernel worker thread. This is an exclusive operation; an attempt to
 start concurrent firmware uploads for the same device will fail with EBUSY.
 An eventfd file descriptor parameter is also passed to this IOCTL. It will
 be signalled at the completion of the firmware upload.
+
+FW_UPLOAD_STATUS:
+
+Collect status for an on-going firmware upload. The status returned includes
+how much data remains to be transferred, the progress of the upload, and
+error information in the case of a failure.

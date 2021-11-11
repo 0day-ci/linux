@@ -51,4 +51,21 @@ struct fw_upload_write {
 
 #define FW_UPLOAD_WRITE	_IOW(FW_UPLOAD_MAGIC, 0, struct fw_upload_write)
 
+/**
+ * FW_UPLOAD_STATUS - _IOR(FW_UPLOAD_MAGIC, 1, struct fw_upload_status)
+ *
+ * Request status information for an ongoing update.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+struct fw_upload_status {
+	/* Output */
+	__u32 remaining_size;	/* size remaining to transfer */
+	__u32 progress;		/* current progress of firmware upload */
+	__u32 err_progress;	/* progress at time of error */
+	__u32 err_code;		/* error code */
+};
+
+#define FW_UPLOAD_STATUS	_IOR(FW_UPLOAD_MAGIC, 1, struct fw_upload_status)
+
 #endif /* _UAPI_LINUX_FW_UPLOAD_H */
