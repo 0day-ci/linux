@@ -17,6 +17,9 @@
 #include <linux/spinlock.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
+#ifdef CONFIG_LEDS_TRIGGER_NETDEV
+#include <linux/netdevice.h>
+#endif
 
 struct device;
 struct led_pattern;

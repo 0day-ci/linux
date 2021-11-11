@@ -44,8 +44,30 @@ enum netdev_led_attr {
 
 static void set_baseline_state(struct led_netdev_data *trigger_data)
 {
-	int current_brightness;
+	int current_brightness, can_offload;
 	struct led_classdev *led_cdev = trigger_data->led_cdev;
+
+	if (LED_HARDWARE_CONTROLLED & led_cdev->flags) {
+		/* Check if blink mode can he set in hardware mode.
+		 * The LED driver will chose a interval based on the trigger_data
+		 * and its implementation.
+		 */
+		can_offload = led_cdev->blink_set(led_cdev, 0, 0);
+
+		/* If blink_set doesn't return error we can run in hardware mode
+		 * So actually activate it.
+		 */
+		if (!can_offload) {
+			led_cdev->hw_control_start(led_cdev);
+			return;
+		}
+	}
+
+	/* If LED supports only hardware mode and we reach this point,
+	 * then skip any software handling.
+	 */
+	if (!(LED_SOFTWARE_CONTROLLED & led_cdev->flags))
+		return;
 
 	current_brightness = led_cdev->brightness;
 	if (current_brightness)
@@ -395,8 +417,11 @@ static int netdev_trig_activate(struct led_classdev *led_cdev)
 
 	rc = register_netdevice_notifier(&trigger_data->notifier);
 	if (rc)
-		kfree(trigger_data);
+		goto err;
 
+	return 0;
+err:
+	kfree(trigger_data);
 	return rc;
 }
 
@@ -416,6 +441,7 @@ static void netdev_trig_deactivate(struct led_classdev *led_cdev)
 
 static struct led_trigger netdev_led_trigger = {
 	.name = "netdev",
+	.supported_blink_modes = SOFTWARE_HARDWARE,
 	.activate = netdev_trig_activate,
 	.deactivate = netdev_trig_deactivate,
 	.groups = netdev_trig_groups,
