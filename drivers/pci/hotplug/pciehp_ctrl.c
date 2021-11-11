@@ -15,11 +15,16 @@
 
 #define dev_fmt(fmt) "pciehp: " fmt
 
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/pm_runtime.h>
 #include <linux/pci.h>
 #include "pciehp.h"
+
+static bool fast_virtual_unplug = true;
+module_param(fast_virtual_unplug, bool, 0644);
+MODULE_PARM_DESC(fast_virtual_unplug, "Fast unplug (don't wait 5 seconds) for virtual machines.");
 
 /* The following routines constitute the bulk of the
    hotplug controller logic
@@ -176,7 +181,11 @@ void pciehp_handle_button_press(struct controller *ctrl)
 		/* blink power indicator and turn off attention */
 		pciehp_set_indicators(ctrl, PCI_EXP_SLTCTL_PWR_IND_BLINK,
 				      PCI_EXP_SLTCTL_ATTN_IND_OFF);
-		schedule_delayed_work(&ctrl->button_work, 5 * HZ);
+		if (ctrl->is_virtual && fast_virtual_unplug) {
+			schedule_delayed_work(&ctrl->button_work, 1);
+		} else {
+			schedule_delayed_work(&ctrl->button_work, 5 * HZ);
+		}
 		break;
 	case BLINKINGOFF_STATE:
 	case BLINKINGON_STATE:

@@ -79,6 +79,7 @@ extern int pciehp_poll_time;
  * @request_result: result of last user request submitted to the IRQ thread
  * @requester: wait queue to wake up on completion of user request,
  *	used for synchronous slot enable/disable request via sysfs
+ * @is_virtual: virtual machine pcie port.
  *
  * PCIe hotplug has a 1:1 relationship between controller and slot, hence
  * unlike other drivers, the two aren't represented by separate structures.
@@ -109,6 +110,8 @@ struct controller {
 	unsigned int ist_running;
 	int request_result;
 	wait_queue_head_t requester;
+
+	bool is_virtual;
 };
 
 /**

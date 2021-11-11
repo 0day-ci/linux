@@ -227,6 +227,11 @@ static int pciehp_probe(struct pcie_device *dev)
 		goto err_out_shutdown_notification;
 	}
 
+	if (dev->port->vendor == PCI_VENDOR_ID_REDHAT &&
+	    dev->port->device == 0x000c)
+		/* qemu pcie root port */
+		ctrl->is_virtual = true;
+
 	pciehp_check_presence(ctrl);
 
 	return 0;
