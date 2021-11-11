@@ -255,30 +255,52 @@ struct dyndbg_bitdesc {
 
 struct dyndbg_bitmap_param {
 	unsigned long *bits;		/* ref to shared state */
+	const char *flags;
 	unsigned int maplen;
 	struct dyndbg_bitdesc *map;	/* indexed by bitpos */
 };
 
 #if defined(CONFIG_DYNAMIC_DEBUG) || \
 	(defined(CONFIG_DYNAMIC_DEBUG_CORE) && defined(DYNAMIC_DEBUG_MODULE))
+
+#define DEFINE_DYNAMIC_DEBUG_BITGRPS_FLAGS(fsname, _var, _flags, desc, data) \
+	MODULE_PARM_DESC(fsname, desc);					\
+	static struct dyndbg_bitmap_param ddcats_##_var =		\
+	{ .bits = &(_var), .flags = (_flags),				\
+	  .map = data, .maplen = ARRAY_SIZE(data) };			\
+	module_param_cb(fsname, &param_ops_dyndbg, &ddcats_##_var, 0644)
+
+#define DEFINE_DYNAMIC_DEBUG_BITGRPS(fsname, _var, desc, data) \
+	DEFINE_DYNAMIC_DEBUG_BITGRPS_FLAGS(fsname, _var, "p", desc, data)
+
 /**
- * DEFINE_DYNAMIC_DEBUG_BITGRPS() - bitmap control of pr_debugs, by format match
+ * DEFINE_DYNAMIC_DEBUG_LOG_GROUPS() - bitmap control of grouped pr_debugs --> syslog
+ *
  * @fsname: parameter basename under /sys
  * @_var:   C-identifier holding bitmap
  * @desc:   string summarizing the controls provided
  * @bitmap: C array of struct dyndbg_bitdescs
  *
- * Intended for modules with a systematic use of pr_debug prefixes in
- * the format strings, this allows modules calling pr_debugs to
- * control them in groups by matching against their formats, and map
- * them to bits 0-N of a sysfs control point.
+ * Intended for modules having pr_debugs with prefixed/categorized
+ * formats; this lets you group them by substring match, map groups to
+ * bits, and enable per group to write to syslog, via @fsname.
  */
-#define DEFINE_DYNAMIC_DEBUG_BITGRPS(fsname, _var, desc, data)	\
-	MODULE_PARM_DESC(fsname, desc);					\
-	static struct dyndbg_bitmap_param ddcats_##_var =		\
-	{ .bits = &(_var), .map = data,					\
-	  .maplen = ARRAY_SIZE(data) };				\
-	module_param_cb(fsname, &param_ops_dyndbg, &ddcats_##_var, 0644)
+#define DEFINE_DYNAMIC_DEBUG_LOG_GROUPS(fsname, _var, desc, data)	\
+	DEFINE_DYNAMIC_DEBUG_BITGRPS_FLAGS(fsname, _var, "p", desc, data)
+
+/**
+ * DEFINE_DYNAMIC_DEBUG_TRACE_GROUPS() - bitmap control of pr_debugs --> tracefs
+ * @fsname: parameter basename under /sys
+ * @_var:   C-identifier holding bitmap
+ * @desc:   string summarizing the controls provided
+ * @bitmap: C array of struct dyndbg_bitdescs
+ *
+ * Intended for modules having pr_debugs with prefixed/categorized
+ * formats; this lets you group them by substring match, map groups to
+ * bits, and enable per group to write to tracebuf, via @fsname.
+ */
+#define DEFINE_DYNAMIC_DEBUG_TRACE_GROUPS(fsname, _var, desc, data)	\
+	DEFINE_DYNAMIC_DEBUG_BITGRPS_FLAGS(fsname, _var, "T", desc, data)
 
 extern const struct kernel_param_ops param_ops_dyndbg;
 
