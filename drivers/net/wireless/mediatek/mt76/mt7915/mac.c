@@ -2080,8 +2080,11 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
 			       IEEE80211_RC_BW_CHANGED))
 			mt7915_mcu_add_rate_ctrl(dev, vif, sta, true);
 
-		if (changed & IEEE80211_RC_SMPS_CHANGED)
+		if (changed & IEEE80211_RC_SMPS_CHANGED) {
 			mt7915_mcu_add_smps(dev, vif, sta);
+			mt7915_mcu_set_fixed_rate_ctrl(dev, vif, sta, NULL,
+						       RATE_PARAM_MMPS_UPDATE);
+		}
 
 		spin_lock_bh(&dev->sta_poll_lock);
 	}
