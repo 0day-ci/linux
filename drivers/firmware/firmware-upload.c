@@ -181,11 +181,20 @@ static int fw_upload_ioctl_status(struct fw_upload *fwl, unsigned long arg)
 	return 0;
 }
 
+static int fw_upload_ioctl_cancel(struct fw_upload *fwl, unsigned long arg)
+{
+	if (fwl->progress == FW_UPLOAD_PROG_IDLE)
+		return -ENODEV;
+
+	fwl->ops->cancel(fwl);
+	return 0;
+}
+
 static long fw_upload_ioctl(struct file *filp, unsigned int cmd,
 			    unsigned long arg)
 {
 	struct fw_upload *fwl = filp->private_data;
-	int ret = -ENOTTY;
+	int ret = 0;
 
 	mutex_lock(&fwl->lock);
 
@@ -195,6 +204,12 @@ static long fw_upload_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	case FW_UPLOAD_STATUS:
 		ret = fw_upload_ioctl_status(fwl, arg);
+		break;
+	case FW_UPLOAD_CANCEL:
+		ret = fw_upload_ioctl_cancel(fwl, arg);
+		break;
+	default:
+		ret = -ENOTTY;
 		break;
 	}
 
@@ -225,6 +240,8 @@ static int fw_upload_release(struct inode *inode, struct file *filp)
 		mutex_unlock(&fwl->lock);
 		goto close_exit;
 	}
+
+	fwl->ops->cancel(fwl);
 
 	mutex_unlock(&fwl->lock);
 	flush_work(&fwl->work);
@@ -260,7 +277,8 @@ fw_upload_register(struct device *parent, const struct fw_upload_ops *ops,
 	struct fw_upload *fwl;
 	int ret;
 
-	if (!ops || !ops->prepare || !ops->write || !ops->poll_complete) {
+	if (!ops || !ops->cancel || !ops->prepare ||
+	    !ops->write || !ops->poll_complete) {
 		dev_err(parent, "Attempt to register without all required ops\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -338,6 +356,8 @@ void fw_upload_unregister(struct fw_upload *fwl)
 		mutex_unlock(&fwl->lock);
 		goto unregister;
 	}
+
+	fwl->ops->cancel(fwl);
 
 	mutex_unlock(&fwl->lock);
 	flush_work(&fwl->work);

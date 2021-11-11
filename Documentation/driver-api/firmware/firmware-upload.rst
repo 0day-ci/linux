@@ -44,3 +44,11 @@ FW_UPLOAD_STATUS:
 Collect status for an on-going firmware upload. The status returned includes
 how much data remains to be transferred, the progress of the upload, and
 error information in the case of a failure.
+
+FW_UPLOAD_CANCEL:
+
+Request that an on-going firmware upload be cancelled. This IOCTL will
+return ENODEV if there is no upload in progress. Depending on the
+implementation of the lower-level driver, the cancellation may take affect
+immediately or it could block until a critical operation such as a FLASH
+is safely completed.

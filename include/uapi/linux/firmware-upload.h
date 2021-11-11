@@ -68,4 +68,6 @@ struct fw_upload_status {
 
 #define FW_UPLOAD_STATUS	_IOR(FW_UPLOAD_MAGIC, 1, struct fw_upload_status)
 
+#define FW_UPLOAD_CANCEL	_IO(FW_UPLOAD_MAGIC, 2)
+
 #endif /* _UAPI_LINUX_FW_UPLOAD_H */
