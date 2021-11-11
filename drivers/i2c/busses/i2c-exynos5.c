@@ -22,6 +22,8 @@
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/spinlock.h>
+#include <linux/mfd/syscon.h>
+#include <linux/regmap.h>
 
 /*
  * HSI2C controller from Samsung supports 2 modes of operation
@@ -166,9 +168,21 @@
 
 #define EXYNOS5_I2C_TIMEOUT (msecs_to_jiffies(100))
 
+/* USI(Universal Serial Interface) Register map */
+#define USI_CON					0xc4
+#define USI_OPTION				0xc8
+
+/* USI(Universal Serial Interface) Register bits */
+#define USI_CON_RESET				BIT(0)
+
+/* SYSREG Register bit */
+#define SYSREG_USI_SW_CONF_MASK			(0x7 << 0)
+#define SYSREG_I2C_SW_CONF			BIT(2)
+
 enum i2c_type_exynos {
 	I2C_TYPE_EXYNOS5,
 	I2C_TYPE_EXYNOS7,
+	I2C_TYPE_EXYNOSAUTOV9,
 };
 
 struct exynos5_i2c {
@@ -199,6 +213,10 @@ struct exynos5_i2c {
 
 	/* Version of HS-I2C Hardware */
 	const struct exynos_hsi2c_variant *variant;
+
+	/* USI sysreg info */
+	struct regmap		*usi_sysreg;
+	unsigned int		usi_offset;
 };
 
 /**
@@ -212,22 +230,32 @@ struct exynos5_i2c {
  */
 struct exynos_hsi2c_variant {
 	unsigned int		fifo_depth;
+	unsigned int		has_usi;
 	enum i2c_type_exynos	hw;
 };
 
 static const struct exynos_hsi2c_variant exynos5250_hsi2c_data = {
 	.fifo_depth	= 64,
+	.has_usi	= 0,
 	.hw		= I2C_TYPE_EXYNOS5,
 };
 
 static const struct exynos_hsi2c_variant exynos5260_hsi2c_data = {
 	.fifo_depth	= 16,
+	.has_usi	= 0,
 	.hw		= I2C_TYPE_EXYNOS5,
 };
 
 static const struct exynos_hsi2c_variant exynos7_hsi2c_data = {
 	.fifo_depth	= 16,
+	.has_usi	= 0,
 	.hw		= I2C_TYPE_EXYNOS7,
+};
+
+static const struct exynos_hsi2c_variant exynosautov9_hsi2c_data = {
+	.fifo_depth	= 64,
+	.has_usi	= 1,
+	.hw		= I2C_TYPE_EXYNOSAUTOV9,
 };
 
 static const struct of_device_id exynos5_i2c_match[] = {
@@ -243,6 +271,9 @@ static const struct of_device_id exynos5_i2c_match[] = {
 	}, {
 		.compatible = "samsung,exynos7-hsi2c",
 		.data = &exynos7_hsi2c_data
+	}, {
+		.compatible = "samsung,exynosautov9-hsi2c",
+		.data = &exynosautov9_hsi2c_data
 	}, {},
 };
 MODULE_DEVICE_TABLE(of, exynos5_i2c_match);
@@ -280,6 +311,31 @@ static int exynos5_i2c_set_timing(struct exynos5_i2c *i2c, bool hs_timings)
 		(i2c->op_clock >= I2C_MAX_FAST_MODE_PLUS_FREQ) ? I2C_MAX_STANDARD_MODE_FREQ :
 		i2c->op_clock;
 	int div, clk_cycle, temp;
+
+	/* In case of HSI2C controllers in EXYNOSAUTOV9
+	 * timing control formula changed.
+	 *
+	 * FSCL = IPCLK / ((CLK_DIV + 1) * 16)
+	 * T_SCL_LOW = IPCLK * (CLK_DIV + 1) * (N + M)
+	 *  [N : number of 0's in the TSCL_H_HS]
+	 *  [M : number of 0's in the TSCL_L_HS]
+	 * T_SCL_HIGH = IPCLK * (CLK_DIV + 1) * (N + M)
+	 *  [N : number of 1's in the TSCL_H_HS]
+	 *  [M : number of 1's in the TSCL_L_HS]
+	 *
+	 *  result of (N + M) is always 8.
+	 *  In general use case, we don't need to control timing_s1, timing_s2.
+	 */
+	if (i2c->variant->hw == I2C_TYPE_EXYNOSAUTOV9) {
+		div = ((clkin / (16 * i2c->op_clock)) - 1);
+		i2c_timing_s3 = div << 16;
+		if (hs_timings)
+			writel(i2c_timing_s3, i2c->regs + HSI2C_TIMING_HS3);
+		else
+			writel(i2c_timing_s3, i2c->regs + HSI2C_TIMING_FS3);
+
+		return 0;
+	}
 
 	/*
 	 * In case of HSI2C controller in Exynos5 series
@@ -355,6 +411,20 @@ static int exynos5_hsi2c_clock_setup(struct exynos5_i2c *i2c)
 	return exynos5_i2c_set_timing(i2c, true);
 }
 
+static void exynos_usi_reset(struct exynos5_i2c *i2c)
+{
+	u32 val;
+
+	val = readl(i2c->regs + USI_CON);
+	val |= USI_CON_RESET;
+	writel(val, i2c->regs + USI_CON);
+	udelay(1);
+
+	val = readl(i2c->regs + USI_CON);
+	val &= ~USI_CON_RESET;
+	writel(val, i2c->regs + USI_CON);
+}
+
 /*
  * exynos5_i2c_init: configures the controller for I2C functionality
  * Programs I2C controller for Master mode operation
@@ -384,6 +454,9 @@ static void exynos5_i2c_init(struct exynos5_i2c *i2c)
 static void exynos5_i2c_reset(struct exynos5_i2c *i2c)
 {
 	u32 i2c_ctl;
+
+	if (i2c->variant->hw == I2C_TYPE_EXYNOSAUTOV9)
+		exynos_usi_reset(i2c);
 
 	/* Set and clear the bit for reset */
 	i2c_ctl = readl(i2c->regs + HSI2C_CTL);
@@ -422,7 +495,8 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
 	writel(int_status, i2c->regs + HSI2C_INT_STATUS);
 
 	/* handle interrupt related to the transfer status */
-	if (i2c->variant->hw == I2C_TYPE_EXYNOS7) {
+	if (i2c->variant->hw == I2C_TYPE_EXYNOS7 ||
+			i2c->variant->hw == I2C_TYPE_EXYNOSAUTOV9) {
 		if (int_status & HSI2C_INT_TRANS_DONE) {
 			i2c->trans_done = 1;
 			i2c->state = 0;
@@ -569,13 +643,13 @@ static void exynos5_i2c_bus_check(struct exynos5_i2c *i2c)
 {
 	unsigned long timeout;
 
-	if (i2c->variant->hw != I2C_TYPE_EXYNOS7)
+	if (i2c->variant->hw == I2C_TYPE_EXYNOS5)
 		return;
 
 	/*
-	 * HSI2C_MASTER_ST_LOSE state in EXYNOS7 variant before transaction
-	 * indicates that bus is stuck (SDA is low). In such case bus recovery
-	 * can be performed.
+	 * HSI2C_MASTER_ST_LOSE state in EXYNOS7 or EXYNOSAUTOV9 variant before
+	 * transaction indicates that bus is stuck (SDA is low).
+	 * In such case bus recovery can be performed.
 	 */
 	timeout = jiffies + msecs_to_jiffies(100);
 	for (;;) {
@@ -611,10 +685,10 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
 	unsigned long flags;
 	unsigned short trig_lvl;
 
-	if (i2c->variant->hw == I2C_TYPE_EXYNOS7)
-		int_en |= HSI2C_INT_I2C_TRANS;
-	else
+	if (i2c->variant->hw == I2C_TYPE_EXYNOS5)
 		int_en |= HSI2C_INT_I2C;
+	else
+		int_en |= HSI2C_INT_I2C_TRANS;
 
 	i2c_ctl = readl(i2c->regs + HSI2C_CTL);
 	i2c_ctl &= ~(HSI2C_TXCHON | HSI2C_RXCHON);
@@ -738,6 +812,41 @@ static const struct i2c_algorithm exynos5_i2c_algorithm = {
 	.functionality		= exynos5_i2c_func,
 };
 
+static int exynos_usi_init(struct exynos5_i2c *i2c)
+{
+	struct device *dev = i2c->dev;
+	int ret;
+
+	if (!i2c->variant->has_usi)
+		return 0;
+
+	/* System Register has a field that can select the serial IP
+	 * provided by USI. We need to set it to I2C to use I2C.
+	 */
+	i2c->usi_sysreg = syscon_regmap_lookup_by_phandle(dev->of_node,
+							  "samsung,sysreg");
+	if (IS_ERR(i2c->usi_sysreg)) {
+		dev_err(dev, "Cannot find sysreg\n");
+		return PTR_ERR(i2c->usi_sysreg);
+	}
+
+	ret = of_property_read_u32_index(dev->of_node, "samsung,sysreg",
+					 1, &i2c->usi_offset);
+	if (ret) {
+		dev_err(dev, "sysreg offset is not specified\n");
+		return ret;
+	}
+
+	ret = regmap_update_bits(i2c->usi_sysreg, i2c->usi_offset,
+			SYSREG_USI_SW_CONF_MASK, SYSREG_I2C_SW_CONF);
+	if (ret < 0)
+		return ret;
+
+	exynos_usi_reset(i2c);
+
+	return 0;
+}
+
 static int exynos5_i2c_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -777,6 +886,12 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
 	i2c->adap.algo_data = i2c;
 	i2c->adap.dev.parent = &pdev->dev;
 
+	i2c->variant = of_device_get_match_data(&pdev->dev);
+
+	ret = exynos_usi_init(i2c);
+	if (ret)
+		return ret;
+
 	/* Clear pending interrupts from u-boot or misc causes */
 	exynos5_i2c_clr_pend_irq(i2c);
 
@@ -793,8 +908,6 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "cannot request HS-I2C IRQ %d\n", i2c->irq);
 		goto err_clk;
 	}
-
-	i2c->variant = of_device_get_match_data(&pdev->dev);
 
 	ret = exynos5_hsi2c_clock_setup(i2c);
 	if (ret)
