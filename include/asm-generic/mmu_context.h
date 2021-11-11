@@ -73,4 +73,8 @@ static inline void deactivate_mm(struct task_struct *tsk,
 }
 #endif
 
+#ifndef arch_exit_mm_mmput
+#define arch_exit_mm_mmput mmput
+#endif
+
 #endif /* __ASM_GENERIC_MMU_CONTEXT_H */
