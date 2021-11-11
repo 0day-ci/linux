@@ -7413,6 +7413,7 @@ S:	Maintained
 F:	Documentation/driver-api/firmware/firmware-upload.rst
 F:	drivers/firmware/firmware-upload.c
 F:	include/linux/firmware/firmware-upload.h
+F:	include/uapi/linux/firmware-upload.h
 
 FLASH ADAPTER DRIVER (IBM Flash Adapter 900GB Full Height PCI Flash Card)
 M:	Joshua Morris <josh.h.morris@us.ibm.com>
