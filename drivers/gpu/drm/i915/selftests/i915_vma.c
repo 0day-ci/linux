@@ -1005,7 +1005,7 @@ static int igt_vma_remapped_gtt(void *arg)
 
 			GEM_BUG_ON(vma->ggtt_view.type != *t);
 
-			map = i915_vma_pin_iomap(vma);
+			map = i915_vma_pin_iomap_unlocked(vma);
 			i915_vma_unpin(vma);
 			if (IS_ERR(map)) {
 				err = PTR_ERR(map);
@@ -1036,7 +1036,7 @@ static int igt_vma_remapped_gtt(void *arg)
 
 			GEM_BUG_ON(vma->ggtt_view.type != I915_GGTT_VIEW_NORMAL);
 
-			map = i915_vma_pin_iomap(vma);
+			map = i915_vma_pin_iomap_unlocked(vma);
 			i915_vma_unpin(vma);
 			if (IS_ERR(map)) {
 				err = PTR_ERR(map);
