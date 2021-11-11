@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/mailbox/xlnx,zynqmp-ipi-mailbox.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Xilinx IPI Mailbox controller bindings
+
+description:
+  The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to manage
+  messaging between two Xilinx Zynq UltraScale+ MPSoC IPI agents. Each IPI
+  agent owns registers used for notification and buffers for message.
+
+maintainers:
+  - Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+
+properties:
+  compatible:
+    const: xlnx,zynqmp-ipi-mailbox
+
+  reg:
+    maxItems: 4
+
+  interrupts:
+    maxItems: 1
+
+  "#mbox-cells":
+    const: 1
+
+  xlnx,ipi-id:
+    description: Xilinx IPI agent id
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+required:
+  - compatible
+  - reg
+  - xlnx,ipi-id
+  - "#mbox-cells"
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+     zynqmp_ipi {
+          compatible = "xlnx,zynqmp-ipi-mailbox";
+          interrupt-parent = <&gic>;
+          interrupts = <0 29 4>;
+          xlnx,ipi-id = <0>;
+          #address-cells = <1>;
+          #size-cells = <1>;
+          ranges;
+
+          /* APU<->RPU0 IPI mailbox controller */
+          ipi_mailbox_rpu0: mailbox@ff990400 {
+               reg = <0xff990400 0x20>,
+                     <0xff990420 0x20>,
+                     <0xff990080 0x20>,
+                     <0xff9900a0 0x20>;
+               reg-names = "local_request_region",
+                        "local_response_region",
+                        "remote_request_region",
+                        "remote_response_region";
+               #mbox-cells = <1>;
+               xlnx,ipi-id = <1>;
+          };
+          /* APU<->RPU1 IPI mailbox controller */
+          ipi_mailbox_rpu1: mailbox@ff990440 {
+               reg = <0xff990440 0x20>,
+                     <0xff990460 0x20>,
+                     <0xff990280 0x20>,
+                     <0xff9902a0 0x20>;
+               reg-names = "local_request_region",
+                        "local_response_region",
+                        "remote_request_region",
+                        "remote_response_region";
+               #mbox-cells = <1>;
+               xlnx,ipi-id = <2>;
+          };
+     };
+     rpu0 {
+          mboxes = <&ipi_mailbox_rpu0 0>,
+                <&ipi_mailbox_rpu0 1>;
+          mbox-names = "tx", "rx";
+     };
+     rpu1 {
+          mboxes = <&ipi_mailbox_rpu1 0>,
+                <&ipi_mailbox_rpu1 1>;
+          mbox-names = "tx", "rx";
+     };
+...
