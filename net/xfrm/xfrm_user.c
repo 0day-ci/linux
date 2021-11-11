@@ -1600,13 +1600,16 @@ static void copy_templates(struct xfrm_policy *xp, struct xfrm_user_tmpl *ut,
 	}
 }
 
-static int validate_tmpl(int nr, struct xfrm_user_tmpl *ut, u16 family)
+static int validate_tmpl(int nr, struct xfrm_user_tmpl *ut, u16 family,
+			 struct netlink_ext_ack *extack)
 {
 	u16 prev_family;
 	int i;
 
-	if (nr > XFRM_MAX_DEPTH)
+	if (nr > XFRM_MAX_DEPTH) {
+		NL_SET_ERR_MSG(extack, "Template count must be <= XFRM_MAX_DEPTH (" __stringify(XFRM_MAX_DEPTH) ")");
 		return -EINVAL;
+	}
 
 	prev_family = family;
 
@@ -1626,12 +1629,16 @@ static int validate_tmpl(int nr, struct xfrm_user_tmpl *ut, u16 family)
 		case XFRM_MODE_BEET:
 			break;
 		default:
-			if (ut[i].family != prev_family)
+			if (ut[i].family != prev_family) {
+				NL_SET_ERR_MSG(extack, "Mode in template doesn't support a family change");
 				return -EINVAL;
+			}
 			break;
 		}
-		if (ut[i].mode >= XFRM_MODE_MAX)
+		if (ut[i].mode >= XFRM_MODE_MAX) {
+			NL_SET_ERR_MSG(extack, "Mode in template must be < XFRM_MODE_MAX (" __stringify(XFRM_MODE_MAX) ")");
 			return -EINVAL;
+		}
 
 		prev_family = ut[i].family;
 
@@ -1643,17 +1650,21 @@ static int validate_tmpl(int nr, struct xfrm_user_tmpl *ut, u16 family)
 			break;
 #endif
 		default:
+			NL_SET_ERR_MSG(extack, "Invalid family in template");
 			return -EINVAL;
 		}
 
-		if (!xfrm_id_proto_valid(ut[i].id.proto))
+		if (!xfrm_id_proto_valid(ut[i].id.proto)) {
+			NL_SET_ERR_MSG(extack, "Invalid XFRM protocol in template");
 			return -EINVAL;
+		}
 	}
 
 	return 0;
 }
 
-static int copy_from_user_tmpl(struct xfrm_policy *pol, struct nlattr **attrs)
+static int copy_from_user_tmpl(struct xfrm_policy *pol, struct nlattr **attrs,
+			       struct netlink_ext_ack *extack)
 {
 	struct nlattr *rt = attrs[XFRMA_TMPL];
 
@@ -1664,7 +1675,7 @@ static int copy_from_user_tmpl(struct xfrm_policy *pol, struct nlattr **attrs)
 		int nr = nla_len(rt) / sizeof(*utmpl);
 		int err;
 
-		err = validate_tmpl(nr, utmpl, pol->family);
+		err = validate_tmpl(nr, utmpl, pol->family, extack);
 		if (err)
 			return err;
 
@@ -1736,7 +1747,7 @@ static struct xfrm_policy *xfrm_policy_construct(struct net *net, struct xfrm_us
 	if (err)
 		goto error;
 
-	if (!(err = copy_from_user_tmpl(xp, attrs)))
+	if (!(err = copy_from_user_tmpl(xp, attrs, extack)))
 		err = copy_from_user_sec_ctx(xp, attrs);
 	if (err)
 		goto error;
@@ -3242,7 +3253,7 @@ static struct xfrm_policy *xfrm_compile_policy(struct sock *sk, int opt,
 		return NULL;
 
 	nr = ((len - sizeof(*p)) / sizeof(*ut));
-	if (validate_tmpl(nr, ut, p->sel.family))
+	if (validate_tmpl(nr, ut, p->sel.family, NULL))
 		return NULL;
 
 	if (p->dir > XFRM_POLICY_OUT)
