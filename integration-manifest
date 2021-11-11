@@ -1,0 +1,32 @@
+drm drm-fixes 8bb7eca972ad531c9b149c0a51ab43a417385813
+	Linux 5.15
+drm-misc drm-misc-fixes 3cc1ae1fa70ab369e4645e38ce335a19438093ad
+	drm/nouveau: hdmigv100.c: fix corrupted HDMI Vendor InfoFrame
+drm-intel drm-intel-fixes 8bb7eca972ad531c9b149c0a51ab43a417385813
+	Linux 5.15
+drm drm-next 951bad0bd9de63b4c71bfd69f0dd5824b96a8ee9
+	Merge tag 'amd-drm-fixes-5.16-2021-11-10' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes bcae3af286f49bf4f6cda03f165fbe530f4a6bed
+	drm/locking: fix __stack_depot_* name conflict
+drm-intel drm-intel-next-fixes ade4a1fc5741a36b559dfbd4557dc3da1a4394af
+	drm/i915/adlp/fb: Prevent the mapping of redundant trailing padding NULL pages
+drm-misc drm-misc-next e9d9f9582c3d90bced286a63d1f718d4aae60a03
+	drm/bridge: parade-ps8640: Populate devices on aux-bus
+drm-intel drm-intel-next c582ffadbe6cf64be4544d9d168bcc520bd0c984
+	drm/i915/psr: Fix PSR2 handling of multiplanar format
+drm-intel drm-intel-gt-next 212e6562f33becbab1996261677a0b89c5ab8b54
+	drm/i915/dg2: Program recommended HW settings
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI b4dd0381f66d0bddc2c4bfc75e18a8a6b8a0d4b7
+	component: do not leave master devres group open after bind
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-intel topic/pxp e4e737bb5c170df6135a127739a9e6148ee3da82
+	Linux 5.15-rc2
+drm-intel topic/drm-dp-training-delay-helpers 02ed47aa6cc697fc34053c011fe72984a86273cb
+	drm/dp: reuse the 8b/10b link training delay helpers
