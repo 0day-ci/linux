@@ -1152,10 +1152,11 @@ out:
 #define DEFAULT_DEMOTION_TARGET_NODES 15
 struct demotion_nodes {
 	unsigned short nr;
-	short nodes[DEFAULT_DEMOTION_TARGET_NODES];
+	short nodes[];
 };
 
-static struct demotion_nodes node_demotion[MAX_NUMNODES] __read_mostly;
+static struct demotion_nodes *node_demotion[MAX_NUMNODES] __read_mostly;
+static unsigned short target_nodes_max;
 
 /**
  * next_demotion_node() - Get the next node in the demotion path
@@ -1168,9 +1169,12 @@ static struct demotion_nodes node_demotion[MAX_NUMNODES] __read_mostly;
  */
 int next_demotion_node(int node)
 {
-	struct demotion_nodes *nd = &node_demotion[node];
+	struct demotion_nodes *nd = node_demotion[node];
 	unsigned short target_nr, index;
 	int target;
+
+	if (!nd)
+		return NUMA_NO_NODE;
 
 	/*
 	 * node_demotion[] is updated without excluding this
@@ -3014,9 +3018,9 @@ static void __disable_all_migrate_targets(void)
 	int node, i;
 
 	for_each_online_node(node) {
-		node_demotion[node].nr = 0;
-		for (i = 0; i < DEFAULT_DEMOTION_TARGET_NODES; i++)
-			node_demotion[node].nodes[i] = NUMA_NO_NODE;
+		node_demotion[node]->nr = 0;
+		for (i = 0; i < target_nodes_max; i++)
+			node_demotion[node]->nodes[i] = NUMA_NO_NODE;
 	}
 }
 
@@ -3048,7 +3052,10 @@ static int establish_migrate_target(int node, nodemask_t *used,
 				    int best_distance)
 {
 	int migration_target, index, val;
-	struct demotion_nodes *nd = &node_demotion[node];
+	struct demotion_nodes *nd = node_demotion[node];
+
+	if (WARN_ONCE(!nd, "Can not set up migration path for node:%d\n", node))
+		return NUMA_NO_NODE;
 
 	migration_target = find_next_best_node(node, used);
 	if (migration_target == NUMA_NO_NODE)
@@ -3067,7 +3074,7 @@ static int establish_migrate_target(int node, nodemask_t *used,
 	}
 
 	index = nd->nr;
-	if (WARN_ONCE(index >= DEFAULT_DEMOTION_TARGET_NODES,
+	if (WARN_ONCE(index >= target_nodes_max,
 		      "Exceeds maximum demotion target nodes\n"))
 		return NUMA_NO_NODE;
 
@@ -3256,7 +3263,20 @@ static int migration_offline_cpu(unsigned int cpu)
 
 static int __init migrate_on_reclaim_init(void)
 {
-	int ret;
+	struct demotion_nodes *nd;
+	int ret, node;
+
+	/* Keep the maximum target demotion nodes are less than MAX_NUMNODES. */
+	target_nodes_max = min_t(unsigned short, DEFAULT_DEMOTION_TARGET_NODES,
+				 MAX_NUMNODES - 1);
+	for_each_node(node) {
+		nd = kmalloc(struct_size(nd, nodes, target_nodes_max),
+			     GFP_KERNEL);
+		if (!nd)
+			continue;
+
+		node_demotion[node] = nd;
+	}
 
 	ret = cpuhp_setup_state_nocalls(CPUHP_MM_DEMOTION_DEAD, "mm/demotion:offline",
 					NULL, migration_offline_cpu);
