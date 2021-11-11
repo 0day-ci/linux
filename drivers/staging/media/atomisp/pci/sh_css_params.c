@@ -2473,6 +2473,10 @@ sh_css_create_isp_params(struct ia_css_stream *stream,
 	succ &= (ddr_ptrs->macc_tbl != mmgr_NULL);
 
 	*isp_params_out = params;
+
+	if (!succ)
+		return -ENOMEM;
+
 	return err;
 }
 
