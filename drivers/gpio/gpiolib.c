@@ -594,11 +594,10 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 			       struct lock_class_key *request_key)
 {
 	struct fwnode_handle *fwnode = gc->parent ? dev_fwnode(gc->parent) : NULL;
-	unsigned long	flags;
-	int		ret = 0;
-	unsigned	i;
-	int		base = gc->base;
+	int ret = 0, base = gc->base;
 	struct gpio_device *gdev;
+	unsigned long flags;
+	unsigned int i;
 
 	/*
 	 * First: allocate and populate the internal stat container, and
