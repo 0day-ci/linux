@@ -149,6 +149,12 @@ patternProperties:
           is an optional feature of the designware controller, and the
           upper limit is also subject to controller configuration.
 
+      snps,sste:
+        description: Slave select line will toggle between consecutive
+          data frames, with the serial clock being held to its default
+          value while slave select line is high.
+        type: boolean
+
 unevaluatedProperties: false
 
 required:
