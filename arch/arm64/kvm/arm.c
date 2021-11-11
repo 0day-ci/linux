@@ -223,7 +223,12 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		r = 1;
 		break;
 	case KVM_CAP_NR_VCPUS:
-		r = num_online_cpus();
+		if (kvm)
+			r = min_t(unsigned int, num_online_cpus(),
+				  kvm->arch.max_vcpus);
+		else
+			r = min_t(unsigned int, num_online_cpus(),
+				  kvm_arm_default_max_vcpus());
 		break;
 	case KVM_CAP_MAX_VCPUS:
 	case KVM_CAP_MAX_VCPU_ID:
