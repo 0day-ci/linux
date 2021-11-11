@@ -1062,6 +1062,7 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 #endif
 	mm_init_uprobes_state(mm);
 	hugetlb_count_init(mm);
+	mm->mmput_async_task = NULL;
 
 	if (current->mm) {
 		mm->flags = current->mm->flags & MMF_INIT_MASK;
@@ -1130,7 +1131,12 @@ void mmput(struct mm_struct *mm)
 {
 	might_sleep();
 
-	if (atomic_dec_and_test(&mm->mm_users))
+	if (!atomic_dec_and_test(&mm->mm_users))
+		return;
+
+	if (READ_ONCE(mm->mmput_async_task))
+		wake_up_process(mm->mmput_async_task);
+	else
 		__mmput(mm);
 }
 EXPORT_SYMBOL_GPL(mmput);
@@ -1146,7 +1152,12 @@ static void mmput_async_fn(struct work_struct *work)
 
 void mmput_async(struct mm_struct *mm)
 {
-	if (atomic_dec_and_test(&mm->mm_users)) {
+	if (!atomic_dec_and_test(&mm->mm_users))
+		return;
+
+	if (READ_ONCE(mm->mmput_async_task)) {
+		wake_up_process(mm->mmput_async_task);
+	} else {
 		INIT_WORK(&mm->async_put_work, mmput_async_fn);
 		schedule_work(&mm->async_put_work);
 	}
@@ -3190,4 +3201,92 @@ int sysctl_max_threads(struct ctl_table *table, int write,
 	max_threads = threads;
 
 	return 0;
+}
+
+SYSCALL_DEFINE2(process_mmput_async, int, pidfd, unsigned int, flags)
+{
+#ifdef CONFIG_MMU
+	struct mm_struct *mm = NULL;
+	struct task_struct *task;
+	unsigned int tmp;
+	struct pid *pid;
+
+	if (flags)
+		return -EINVAL;
+
+	pid = pidfd_get_pid(pidfd, &tmp);
+	if (IS_ERR(pid))
+		return PTR_ERR(pid);
+
+	task = get_pid_task(pid, PIDTYPE_TGID);
+	/* The PID is not needed once we have the tast_struct */
+	put_pid(pid);
+	if (!task)
+		return -ESRCH;
+
+	/*
+	 * The struct_mm is guaranteed to be there as long as we are holding
+	 * a reference to the task_struct. This also guarantees that we
+	 * will not race with mmput, since we are now holding one additional
+	 * reference.
+	 */
+	if (mmget_not_zero(task->mm))
+		mm = task->mm;
+	/* The task_struct is not needed once we have the mm_struct */
+	put_task_struct(task);
+	/* If the target process no longer has an mm, there is nothing we can do. */
+	if (!mm)
+		return -ENXIO;
+
+	/* Use TASK_IDLE instead of TASK_UNINTERRUPTIBLE to avoid stall notifications. */
+	set_current_state(TASK_IDLE);
+	/*
+	 * Return an error if another task had already set itself as async
+	 * cleanup for the target mm.
+	 */
+	if (cmpxchg(&mm->mmput_async_task, NULL, current) != NULL) {
+		set_current_state(TASK_RUNNING);
+		return -EEXIST;
+	}
+
+	/*
+	 * The target mm now has an extra reference to current.
+	 * Is this useless?
+	 */
+	get_task_struct(current);
+	/*
+	 * We will now do mmput, and we no longer have a reference to the
+	 * task; we need mmgrab to be able to reference the mm_struct even
+	 * after its last user is gone.
+	 */
+	mmgrab(mm);
+	/*
+	 * If the target mm has been discarded after we got its reference,
+	 * then we are holding the last reference to it, and doing mmput
+	 * here will cause us to be schedulable again.
+	 */
+	mmput(mm);
+
+	/*
+	 * Go to sleep; we are set to TASK_IDLE, so nothing will wake us up
+	 * except an explicit wake_up_process from mmput.
+	 */
+	schedule();
+
+	/* Put the extra reference taken above */
+	put_task_struct(current);
+
+	/* Should this be a warning instead? */
+	if (atomic_read(&mm->mm_users))
+		panic("mm_users not 0 but trying to __mmput anyway!");
+
+	/* Do the actual work */
+	__mmput(mm);
+	/* And put the extra reference taken above */
+	mmdrop(mm);
+
+	return 0;
+#else
+	return -ENOSYS;
+#endif /* CONFIG_MMU */
 }
