@@ -1,0 +1,152 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/sunplus,sp7021-emac.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sunplus SP7021 Dual Ethernet MAC Device Tree Bindings
+
+maintainers:
+  - Wells Lu <wells.lu@sunplus.com>
+
+description: |
+  Sunplus SP7021 dual 10M/100M Ethernet MAC controller.
+  Device node of the controller has following properties.
+
+properties:
+  compatible:
+    const: sunplus,sp7021-emac
+
+  reg:
+    items:
+      - description: Base address and length of the EMAC registers.
+      - description: Base address and length of the MOON5 registers.
+
+  reg-names:
+    items:
+      - const: emac
+      - const: moon5
+
+  interrupts:
+    description: |
+      Contains number and type of interrupt. Number should be 66.
+      Type should be high-level trigger
+    maxItems: 1
+
+  clocks:
+    description: |
+      Clock controller selector for Ethernet MAC controller.
+    maxItems: 1
+
+  resets:
+    description: |
+      Reset controller selector for Ethernet MAC controller.
+    maxItems: 1
+
+  phy-handle1:
+    description: A handle to node of phy 1 in mdio node
+    maxItems: 1
+
+  phy-handle2:
+    description: A handle to node of phy 2 in mdio node
+    maxItems: 1
+
+  pinctrl-names:
+    description: |
+      Names corresponding to the numbered pinctrl states.
+      A pinctrl state named "default" must be defined.
+    const: default
+
+  pinctrl-0:
+    description: A handle to the 'default' state of pin configuration
+
+  nvmem-cells:
+    items:
+      - description: nvmem cell address of MAC address of MAC 1
+      - description: nvmem cell address of MAC address of MAC 2
+
+  nvmem-cell-names:
+    description: names corresponding to the nvmem cells of MAC address
+    items:
+      - const: mac_addr0
+      - const: mac_addr1
+
+  mdio:
+    type: object
+    description: Internal MDIO Bus
+
+    properties:
+      "#address-cells":
+        const: 1
+
+      "#size-cells":
+        const: 0
+
+    patternProperties:
+      "^ethernet-phy@[0-9]$":
+        type: object
+
+        description:
+          Integrated PHY node
+
+        properties:
+           reg:
+             maxItems: 1
+
+           phy-mode:
+             maxItems: 1
+
+        required:
+          - reg
+          - phy-mode
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - interrupts
+  - clocks
+  - resets
+  - phy-handle1
+  - phy-handle2
+  - pinctrl-0
+  - pinctrl-names
+  - nvmem-cells
+  - nvmem-cell-names
+  - mdio
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+    emac: emac@9c108000 {
+        compatible = "sunplus,sp7021-emac";
+        reg = <0x9c108000 0x400>, <0x9c000280 0x80>;
+        reg-names = "emac", "moon5";
+        interrupt-parent = <&intc>;
+        interrupts = <66 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc 0xa7>;
+        resets = <&rstc 0x97>;
+        phy-handle1 = <&eth_phy0>;
+        phy-handle2 = <&eth_phy1>;
+        pinctrl-0 = <&emac_demo_board_v3_pins>;
+        pinctrl-names = "default";
+        nvmem-cells = <&mac_addr0>, <&mac_addr1>;
+        nvmem-cell-names = "mac_addr0", "mac_addr1";
+
+        mdio {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            eth_phy0: ethernet-phy@0 {
+                reg = <0>;
+                phy-mode = "rmii";
+            };
+            eth_phy1: ethernet-phy@1 {
+                reg = <1>;
+                phy-mode = "rmii";
+            };
+        };
+    };
+...
