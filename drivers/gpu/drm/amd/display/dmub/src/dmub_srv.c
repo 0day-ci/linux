@@ -607,8 +607,8 @@ enum dmub_status dmub_srv_cmd_execute(struct dmub_srv *dmub)
 	 * read back stale, fully invalid or partially invalid data.
 	 */
 	dmub_rb_flush_pending(&dmub->inbox1_rb);
+	dmub->hw_funcs.set_inbox1_wptr(dmub, dmub->inbox1_rb.wrpt);
 
-		dmub->hw_funcs.set_inbox1_wptr(dmub, dmub->inbox1_rb.wrpt);
 	return DMUB_STATUS_OK;
 }
 
