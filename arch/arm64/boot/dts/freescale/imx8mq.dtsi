@@ -1305,6 +1305,7 @@
 			fsl,ddrc = <&ddrc>;
 			#interconnect-cells = <1>;
 			operating-points-v2 = <&noc_opp_table>;
+			status = "disabled";
 
 			noc_opp_table: opp-table {
 				compatible = "operating-points-v2";
