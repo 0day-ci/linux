@@ -850,6 +850,166 @@ static int ext4_ioctl_checkpoint(struct file *filp, unsigned long arg)
 	return err;
 }
 
+static int ext4_ioctl_getlabel(struct ext4_sb_info *sbi, char __user *user_label)
+{
+	char label[EXT4_LABEL_MAX + 1];
+
+	/*
+	 * EXT4_LABEL_MAX must always be smaller than FSLABEL_MAX because
+	 * FSLABEL_MAX must include terminating null byte, while s_volume_name
+	 * does not have to.
+	 */
+	BUILD_BUG_ON(EXT4_LABEL_MAX >= FSLABEL_MAX);
+
+	memset(label, 0, sizeof(label));
+	lock_buffer(sbi->s_sbh);
+	strncpy(label, sbi->s_es->s_volume_name, EXT4_LABEL_MAX);
+	unlock_buffer(sbi->s_sbh);
+
+	if (copy_to_user(user_label, label, sizeof(label)))
+		return -EFAULT;
+	return 0;
+}
+
+static int ext4_ioctl_setlabel(struct file *filp, const char __user *user_label)
+{
+	size_t len;
+	handle_t *handle;
+	ext4_group_t ngroups;
+	ext4_fsblk_t sb_block;
+	struct buffer_head *bh;
+	int ret = 0, ret2, grp;
+	unsigned long offset = 0;
+	char new_label[EXT4_LABEL_MAX + 1];
+	struct super_block *sb = file_inode(filp)->i_sb;
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
+	struct ext4_super_block *es = sbi->s_es;
+
+	/* Sanity check, this should never happen */
+	BUILD_BUG_ON(EXT4_LABEL_MAX > sizeof(es->s_volume_name));
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	/*
+	 * Copy the maximum length allowed for ext4 label with one more to
+	 * find the required terminating null byte in order to test the
+	 * label length. The on disk label doesn't need to be null terminated.
+	 */
+	if (copy_from_user(new_label, user_label, EXT4_LABEL_MAX + 1))
+		return -EFAULT;
+
+	len = strnlen(new_label, EXT4_LABEL_MAX + 1);
+	if (len > EXT4_LABEL_MAX)
+		return -EINVAL;
+
+	ret = mnt_want_write_file(filp);
+	if (ret)
+		return ret;
+
+	handle = ext4_journal_start_sb(sb, EXT4_HT_MISC, EXT4_MAX_TRANS_DATA);
+	if (IS_ERR(handle)) {
+		ret = PTR_ERR(handle);
+		goto err_out;
+	}
+	/* Update the primary superblock first */
+	ret = ext4_journal_get_write_access(handle, sb,
+					    sbi->s_sbh,
+					    EXT4_JTR_NONE);
+	if (ret)
+		goto err_journal;
+
+	lock_buffer(sbi->s_sbh);
+	memset(es->s_volume_name, 0, sizeof(es->s_volume_name));
+	memcpy(es->s_volume_name, new_label, len);
+	ext4_superblock_csum_set(sb);
+	unlock_buffer(sbi->s_sbh);
+
+	ret = ext4_handle_dirty_metadata(handle, NULL, sbi->s_sbh);
+	if (ret)
+		goto err_journal;
+	sync_dirty_buffer(sbi->s_sbh);
+
+	/* Update backup superblocks */
+	ngroups = ext4_get_groups_count(sb);
+	for (grp = 0; grp < ngroups; grp++) {
+
+		if (!ext4_bg_has_super(sb, grp))
+			continue;
+
+		/*
+		 * For the group 0 there is always 1k padding, so we have
+		 * either adjust offset, or sb_block depending on blocksize
+		 */
+		if (grp == 0) {
+			sb_block = 1 * EXT4_MIN_BLOCK_SIZE;
+			offset = do_div(sb_block, sb->s_blocksize);
+		} else {
+			sb_block = ext4_group_first_block_no(sb, grp);
+			offset = 0;
+		}
+
+		/*
+		 * Skip primary superblock, it's already done. Note that the
+		 * primary superblock is not always at group 0
+		 */
+		if (sbi->s_sbh->b_blocknr == sb_block)
+			continue;
+
+		ret = ext4_journal_ensure_credits_fn(handle, 1,
+						     EXT4_MAX_TRANS_DATA,
+						     0, 0);
+		if (ret < 0)
+			break;
+
+		bh = ext4_sb_bread(sb, sb_block, 0);
+		if (IS_ERR(bh)) {
+			ret = PTR_ERR(bh);
+			break;
+		}
+
+		ext4_debug("update backup superblock %llu\n", sb_block);
+		BUFFER_TRACE(bh, "get_write_access");
+		ret = ext4_journal_get_write_access(handle, sb,
+						    bh,
+						    EXT4_JTR_NONE);
+		if (ret) {
+			brelse(bh);
+			break;
+		}
+
+		es = (struct ext4_super_block *) (bh->b_data + offset);
+		lock_buffer(bh);
+		if (ext4_has_metadata_csum(sb) &&
+		    es->s_checksum != ext4_superblock_csum(sb, es)) {
+			ext4_msg(sb, KERN_ERR, "Invalid checksum for backup "
+				 "superblock %llu\n", sb_block);
+			unlock_buffer(bh);
+			brelse(bh);
+			ret = -EFSBADCRC;
+			break;
+		}
+		memset(es->s_volume_name, 0, sizeof(es->s_volume_name));
+		memcpy(es->s_volume_name, new_label, len);
+		if (ext4_has_metadata_csum(sb))
+			es->s_checksum = ext4_superblock_csum(sb, es);
+		unlock_buffer(bh);
+
+		ret = ext4_handle_dirty_metadata(handle, NULL, bh);
+		if (unlikely(ret))
+			ext4_std_error(sb, ret);
+		brelse(bh);
+	}
+
+err_journal:
+	ret2 = ext4_journal_stop(handle);
+	if (ret2 && !ret)
+		ret = ret2;
+err_out:
+	mnt_drop_write_file(filp);
+	ext4_std_error(sb, ret);
+	return ret;
+}
+
 static long __ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
@@ -1266,6 +1426,13 @@ resizefs_out:
 	case EXT4_IOC_CHECKPOINT:
 		return ext4_ioctl_checkpoint(filp, arg);
 
+	case FS_IOC_GETFSLABEL:
+		return ext4_ioctl_getlabel(EXT4_SB(sb), (void __user *)arg);
+
+	case FS_IOC_SETFSLABEL:
+		return ext4_ioctl_setlabel(filp,
+					   (const void __user *)arg);
+
 	default:
 		return -ENOTTY;
 	}
@@ -1347,6 +1514,8 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case EXT4_IOC_GETSTATE:
 	case EXT4_IOC_GET_ES_CACHE:
 	case EXT4_IOC_CHECKPOINT:
+	case FS_IOC_GETFSLABEL:
+	case FS_IOC_SETFSLABEL:
 		break;
 	default:
 		return -ENOIOCTLCMD;
