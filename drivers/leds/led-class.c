@@ -180,6 +180,13 @@ static int led_classdev_check_hw_control_functions(struct led_classdev *led_cdev
 	    led_cdev->hw_control_stop))
 		return -EINVAL;
 
+	/* blink_set is mandatory to configure the blink modes
+	 * in hardware control.
+	 */
+	if ((LED_HARDWARE_CONTROLLED & led_cdev->flags) &&
+	    !led_cdev->blink_set)
+		return -EINVAL;
+
 	return 0;
 }
 #endif

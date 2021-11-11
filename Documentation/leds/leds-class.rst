@@ -202,6 +202,23 @@ hardware mode and any software only trigger will reject activation.
 On init a LED driver that support a hardware mode should reset every blink mode
 set by default.
 
+Once a trigger has declared support for hardware-controller blinks, it will use
+blink_set() to try to offload his trigger on activation/configuration.
+blink_set() will return 0 if the requested modes set in trigger_data can be
+controlled by hardware or an error if both the mode bitmap is not supported by
+the hardware or there was a problem in the configuration.
+
+Following blink_set logic, setting brightness to LED_OFF with hardware control active
+will reset any active blink mode and disable hardware control setting the LED to off.
+
+It's in the LED driver's interest to know how to elaborate the trigger data and report support
+for a particular set of blink modes. For this exact reason explicit support for the specific
+trigger is mandatory or the driver returns -EOPNOTSUPP if asked to enter hardware mode
+with a not supported trigger.
+If the driver returns -EOPNOTSUPP on hw_control_configure(), the trigger activation will
+fail as the driver doesn't support that specific hardware blink modes or doesn't know
+how to handle the provided trigger data.
+
 Known Issues
 ============
 

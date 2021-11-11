@@ -76,6 +76,7 @@ struct led_classdev {
 	/* Lower 16 bits reflect status */
 #define LED_SUSPENDED		BIT(0)
 #define LED_UNREGISTERING	BIT(1)
+#define LED_HARDWARE_CONTROL	BIT(2)
 	/* Upper 16 bits reflect control information */
 #define LED_CORE_SUSPENDRESUME	BIT(16)
 #define LED_SYSFS_DISABLE	BIT(17)
@@ -123,6 +124,12 @@ struct led_classdev {
 	 * match the values specified exactly.
 	 * Deactivate blinking again when the brightness is set to LED_OFF
 	 * via the brightness_set() callback.
+	 * With LED_HARDWARE_CONTROL set in LED flags blink_set will also
+	 * configure blink modes requested by the current trigger if
+	 * supported by the LED driver.
+	 * Setting brightness to LED_OFF with hardware control active will
+	 * reset any active blink mode and disable hardware control setting
+	 * the LED off.
 	 */
 	int		(*blink_set)(struct led_classdev *led_cdev,
 				     unsigned long *delay_on,
@@ -166,6 +173,8 @@ struct led_classdev {
 	 */
 	bool			(*hw_control_status)(struct led_classdev *led_cdev);
 	/* Set LED in hardware mode and reset any blink mode active by default.
+	 * A trigger supporting hardware mode will have to use blink_set to configure
+	 * the modes.
 	 */
 	int			(*hw_control_start)(struct led_classdev *led_cdev);
 	/* Disable hardware mode for LED. It's advised to the LED driver to put it to
