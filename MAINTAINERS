@@ -7406,6 +7406,14 @@ F:	Documentation/firmware_class/
 F:	drivers/base/firmware_loader/
 F:	include/linux/firmware.h
 
+FIRMWARE UPLOADER
+M:	Russ Weight <russell.h.weight@intel.com>
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+F:	Documentation/driver-api/firmware/firmware-upload.rst
+F:	drivers/firmware/firmware-upload.c
+F:	include/linux/firmware/firmware-upload.h
+
 FLASH ADAPTER DRIVER (IBM Flash Adapter 900GB Full Height PCI Flash Card)
 M:	Joshua Morris <josh.h.morris@us.ibm.com>
 M:	Philip Kelleher <pjk1939@linux.ibm.com>
