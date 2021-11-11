@@ -662,6 +662,20 @@ static int __verify_userptr_ops(struct vb2_queue *q)
 	    !q->mem_ops->put_userptr)
 		return -EINVAL;
 
+#ifdef CONFIG_CMA
+	/*
+	 * If one or more pages of the user-allocated buffer memory were
+	 * allocated in CMA memory, then when the buffer is prepared any
+	 * attempt to pin such pages will fail since user-allocated pages
+	 * in CMA memory are supposed to be moveable, and pinning them in
+	 * place would defeat the purpose of CMA.
+	 *
+	 * CONFIG_CMA is typically only used with embedded systems, and
+	 * in that case the use of DMABUF is preferred.
+	 */
+	pr_warn_once("The USERPTR I/O streaming mode is unreliable if CMA is enabled.\n");
+	pr_warn_once("Use the DMABUF I/O streaming mode instead.\n");
+#endif
 	return 0;
 }
 
@@ -2398,6 +2412,10 @@ int vb2_core_queue_init(struct vb2_queue *q)
 	 */
 	if (WARN_ON(q->supports_requests && q->min_buffers_needed))
 		return -EINVAL;
+
+#ifdef CONFIG_VIDEOBUF2_DISABLE_USERPTR_AND_CMA
+	q->io_modes &= ~VB2_USERPTR;
+#endif
 
 	INIT_LIST_HEAD(&q->queued_list);
 	INIT_LIST_HEAD(&q->done_list);

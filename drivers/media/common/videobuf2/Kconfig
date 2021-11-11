@@ -7,6 +7,17 @@ config VIDEOBUF2_CORE
 config VIDEOBUF2_V4L2
 	tristate
 
+config VIDEOBUF2_DISABLE_USERPTR_AND_CMA
+	bool "Disable use of V4L2 USERPTR streaming if CMA is enabled"
+	depends on CMA
+	depends on VIDEOBUF2_V4L2
+	help
+	  Say Y here to disable V4L2 USERPTR streaming mode if CMA is enabled.
+	  If some of the pages of the buffer memory were allocated in CMA memory,
+	  then attempting to pin those pages in place will fail with an error.
+
+	  When in doubt, say N.
+
 config VIDEOBUF2_MEMOPS
 	tristate
 
