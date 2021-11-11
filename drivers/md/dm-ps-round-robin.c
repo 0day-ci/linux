@@ -88,7 +88,6 @@ static int rr_status(struct path_selector *ps, struct dm_path *path,
 		     status_type_t type, char *result, unsigned int maxlen)
 {
 	struct path_info *pi;
-	int sz = 0;
 
 	if (!path)
 		DMEMIT("0 ");
@@ -107,7 +106,7 @@ static int rr_status(struct path_selector *ps, struct dm_path *path,
 		}
 	}
 
-	return sz;
+	return 0;
 }
 
 /*
