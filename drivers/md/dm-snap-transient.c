@@ -88,7 +88,6 @@ static unsigned transient_status(struct dm_exception_store *store,
 				 status_type_t status, char *result,
 				 unsigned maxlen)
 {
-	unsigned sz = 0;
 
 	switch (status) {
 	case STATUSTYPE_INFO:
@@ -101,7 +100,7 @@ static unsigned transient_status(struct dm_exception_store *store,
 		break;
 	}
 
-	return sz;
+	return 0;
 }
 
 static struct dm_exception_store_type _transient_type = {
