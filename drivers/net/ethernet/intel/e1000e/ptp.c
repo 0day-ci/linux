@@ -238,7 +238,6 @@ static void e1000e_systim_overflow_work(struct work_struct *work)
 {
 	struct e1000_adapter *adapter = container_of(work, struct e1000_adapter,
 						     systim_overflow_work.work);
-	struct e1000_hw *hw = &adapter->hw;
 	struct timespec64 ts;
 	u64 ns;
 
