@@ -36,6 +36,7 @@
 #include <linux/sched.h>
 #include <linux/device.h>
 #include <linux/netdevice.h>
+#include <linux/trace.h>
 
 #include <rdma/ib_verbs.h>
 
@@ -74,6 +75,7 @@ module_param(verbose, int, 0644);
 MODULE_PARM_DESC(verbose, " dynamic_debug/control processing "
 		 "( 0 = off (default), 1 = module add/rm, 2 = >control summary, 3 = parsing, 4 = per-site changes)");
 
+
 /* Return the path relative to source root */
 static inline const char *trim_prefix(const char *path)
 {
@@ -87,6 +89,7 @@ static inline const char *trim_prefix(const char *path)
 
 static struct { unsigned flag:8; char opt_char; } opt_array[] = {
 	{ _DPRINTK_FLAGS_PRINT, 'p' },
+	{ _DPRINTK_FLAGS_TRACE, 'T' },
 	{ _DPRINTK_FLAGS_INCL_MODNAME, 'm' },
 	{ _DPRINTK_FLAGS_INCL_FUNCNAME, 'f' },
 	{ _DPRINTK_FLAGS_INCL_LINENO, 'l' },
@@ -209,11 +212,12 @@ static int ddebug_change(const struct ddebug_query *query,
 			newflags = (dp->flags & modifiers->mask) | modifiers->flags;
 			if (newflags == dp->flags)
 				continue;
+
 #ifdef CONFIG_JUMP_LABEL
-			if (dp->flags & _DPRINTK_FLAGS_PRINT) {
-				if (!(modifiers->flags & _DPRINTK_FLAGS_PRINT))
+			if (__dyndbg_site_is_enabled(dp)) {
+				if (!__dyndbg_site_is_enabled(modifiers))
 					static_branch_disable(&dp->key.dd_key_true);
-			} else if (modifiers->flags & _DPRINTK_FLAGS_PRINT)
+			} else if (__dyndbg_site_is_enabled(modifiers))
 				static_branch_enable(&dp->key.dd_key_true);
 #endif
 			dp->flags = newflags;
@@ -431,6 +435,16 @@ static int ddebug_parse_query(char *words[], int nwords,
 	return 0;
 }
 
+static int ddebug_validate_flags(struct flag_settings *modifiers)
+{
+#if !defined(CONFIG_TRACING)
+	if (__dyndbg_site_is_tracing(modifiers)) {
+		WARN_ONCE(1, "cannot enable T, CONFIG_TRACE=n\n");
+		return -EINVAL;
+	}
+#endif
+	return 0;
+}
 /*
  * Parse `str' as a flags specification, format [-+=][p]+.
  * Sets up *maskp and *flagsp to be used when changing the
@@ -483,7 +497,7 @@ static int ddebug_parse_flags(const char *str, struct flag_settings *modifiers)
 	}
 	v3pr_info("*flagsp=0x%x *maskp=0x%x\n", modifiers->flags, modifiers->mask);
 
-	return 0;
+	return ddebug_validate_flags(modifiers);
 }
 
 static int ddebug_exec_query(char *query_string, const char *modname)
@@ -699,10 +713,23 @@ static char *__dynamic_emit_prefix(const struct _ddebug *desc, char *buf)
 
 static inline char *dynamic_emit_prefix(struct _ddebug *desc, char *buf)
 {
-	if (unlikely(desc->flags & _DPRINTK_FLAGS_INCL_ANY))
+	if (unlikely(__dyndbg_site_is_enabled(desc) &&
+		     __dyndbg_site_is_decorated(desc)))
 		return __dynamic_emit_prefix(desc, buf);
 	return buf;
 }
+
+static struct trace_array *trace_arr;
+
+#if !defined(CONFIG_TRACING)
+/* private stub for 4 users below */
+static inline int __printf(3, 0)
+	trace_array_printk(struct trace_array *tr, unsigned long ip,
+			   const char *fmt, ...)
+{
+	return 0;
+}
+#endif
 
 void __dynamic_pr_debug(struct _ddebug *descriptor, const char *fmt, ...)
 {
@@ -718,7 +745,13 @@ void __dynamic_pr_debug(struct _ddebug *descriptor, const char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	printk(KERN_DEBUG "%s%pV", dynamic_emit_prefix(descriptor, buf), &vaf);
+	dynamic_emit_prefix(descriptor, buf);
+
+	if (__dyndbg_site_is_tracing(descriptor))
+		trace_array_printk(trace_arr, _THIS_IP_, "%s%pV", buf, &vaf);
+
+	if (__dyndbg_site_is_logging(descriptor))
+		printk(KERN_DEBUG "%s%pV", buf, &vaf);
 
 	va_end(args);
 }
@@ -729,6 +762,7 @@ void __dynamic_dev_dbg(struct _ddebug *descriptor,
 {
 	struct va_format vaf;
 	va_list args;
+	char buf[PREFIX_SIZE] = "";
 
 	BUG_ON(!descriptor);
 	BUG_ON(!fmt);
@@ -738,17 +772,21 @@ void __dynamic_dev_dbg(struct _ddebug *descriptor,
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
+	dynamic_emit_prefix(descriptor, buf);
+
+	if (__dyndbg_site_is_tracing(descriptor))
+		trace_array_printk(trace_arr, _THIS_IP_, "%s%pV", buf, &vaf);
+
+	if (!__dyndbg_site_is_logging(descriptor))
+		goto out;
+
 	if (!dev) {
 		printk(KERN_DEBUG "(NULL device *): %pV", &vaf);
 	} else {
-		char buf[PREFIX_SIZE] = "";
-
 		dev_printk_emit(LOGLEVEL_DEBUG, dev, "%s%s %s: %pV",
-				dynamic_emit_prefix(descriptor, buf),
-				dev_driver_string(dev), dev_name(dev),
-				&vaf);
+				buf, dev_driver_string(dev), dev_name(dev), &vaf);
 	}
-
+out:
 	va_end(args);
 }
 EXPORT_SYMBOL(__dynamic_dev_dbg);
@@ -760,6 +798,7 @@ void __dynamic_netdev_dbg(struct _ddebug *descriptor,
 {
 	struct va_format vaf;
 	va_list args;
+	char buf[PREFIX_SIZE] = "";
 
 	BUG_ON(!descriptor);
 	BUG_ON(!fmt);
@@ -769,12 +808,17 @@ void __dynamic_netdev_dbg(struct _ddebug *descriptor,
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	if (dev && dev->dev.parent) {
-		char buf[PREFIX_SIZE] = "";
+	dynamic_emit_prefix(descriptor, buf);
 
+	if (__dyndbg_site_is_tracing(descriptor))
+		trace_array_printk(trace_arr, _THIS_IP_, "%s%pV", buf, &vaf);
+
+	if (!__dyndbg_site_is_logging(descriptor))
+		goto out;
+
+	if (dev && dev->dev.parent) {
 		dev_printk_emit(LOGLEVEL_DEBUG, dev->dev.parent,
-				"%s%s %s %s%s: %pV",
-				dynamic_emit_prefix(descriptor, buf),
+				"%s%s %s %s%s: %pV", buf,
 				dev_driver_string(dev->dev.parent),
 				dev_name(dev->dev.parent),
 				netdev_name(dev), netdev_reg_state(dev),
@@ -785,7 +829,7 @@ void __dynamic_netdev_dbg(struct _ddebug *descriptor,
 	} else {
 		printk(KERN_DEBUG "(NULL net_device): %pV", &vaf);
 	}
-
+out:
 	va_end(args);
 }
 EXPORT_SYMBOL(__dynamic_netdev_dbg);
@@ -799,18 +843,24 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 {
 	struct va_format vaf;
 	va_list args;
+	char buf[PREFIX_SIZE] = "";
 
 	va_start(args, fmt);
 
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	if (ibdev && ibdev->dev.parent) {
-		char buf[PREFIX_SIZE] = "";
+	dynamic_emit_prefix(descriptor, buf);
 
+	if (__dyndbg_site_is_tracing(descriptor))
+		trace_array_printk(trace_arr, _THIS_IP_, "%s%pV", buf, &vaf);
+
+	if (!__dyndbg_site_is_logging(descriptor))
+		goto out;
+
+	if (ibdev && ibdev->dev.parent) {
 		dev_printk_emit(LOGLEVEL_DEBUG, ibdev->dev.parent,
-				"%s%s %s %s: %pV",
-				dynamic_emit_prefix(descriptor, buf),
+				"%s%s %s %s: %pV", buf,
 				dev_driver_string(ibdev->dev.parent),
 				dev_name(ibdev->dev.parent),
 				dev_name(&ibdev->dev),
@@ -820,7 +870,7 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 	} else {
 		printk(KERN_DEBUG "(NULL ib_device): %pV", &vaf);
 	}
-
+out:
 	va_end(args);
 }
 EXPORT_SYMBOL(__dynamic_ibdev_dbg);
@@ -1132,6 +1182,35 @@ static void ddebug_remove_all_tables(void)
 	mutex_unlock(&ddebug_lock);
 }
 
+#if defined(CONFIG_TRACING)
+
+static void ddebug_trace_cleanup(void)
+{
+	if (trace_arr) {
+		trace_array_put(trace_arr);
+		trace_array_destroy(trace_arr);
+		trace_arr = NULL;
+	}
+}
+
+static void ddebug_trace_init(void)
+{
+	int ret;
+
+	trace_arr = trace_array_get_by_name("dyndbg-tracefs");
+	if (!trace_arr)
+		return;
+
+	ret = trace_array_init_printk(trace_arr);
+	if (ret)
+		ddebug_trace_cleanup();
+}
+
+#else
+static inline void ddebug_trace_init(void) {}
+static inline void ddebug_trace_cleanup(void) {}
+#endif
+
 static __initdata int ddebug_init_success;
 
 static int __init dynamic_debug_init_control(void)
@@ -1174,6 +1253,9 @@ static int __init dynamic_debug_init(void)
 		ddebug_init_success = 1;
 		return 0;
 	}
+
+	ddebug_trace_init();
+
 	iter = __start___dyndbg;
 	modname = iter->modname;
 	iter_start = iter;
@@ -1215,6 +1297,7 @@ static int __init dynamic_debug_init(void)
 
 out_err:
 	ddebug_remove_all_tables();
+	ddebug_trace_cleanup();
 	return 0;
 }
 /* Allow early initialization for boot messages via boot param */
