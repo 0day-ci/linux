@@ -818,8 +818,7 @@ EXPORT_SYMBOL(__blk_mq_end_request);
 
 void blk_mq_end_request(struct request *rq, blk_status_t error)
 {
-	if (blk_update_request(rq, error, blk_rq_bytes(rq)))
-		BUG();
+	BUG_ON(blk_update_request(rq, error, blk_rq_bytes(rq)));
 	__blk_mq_end_request(rq, error);
 }
 EXPORT_SYMBOL(blk_mq_end_request);
