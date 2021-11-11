@@ -1301,11 +1301,6 @@ static struct attribute_group scsi_sdev_attr_group = {
 	.is_bin_visible = scsi_sdev_bin_attr_is_visible,
 };
 
-static const struct attribute_group *scsi_sdev_attr_groups[] = {
-	&scsi_sdev_attr_group,
-	NULL
-};
-
 static int scsi_target_add(struct scsi_target *starget)
 {
 	int error;
@@ -1575,7 +1570,6 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
 static struct device_type scsi_dev_type = {
 	.name =		"scsi_device",
 	.release =	scsi_device_dev_release,
-	.groups =	scsi_sdev_attr_groups,
 };
 
 void scsi_sysfs_device_initialize(struct scsi_device *sdev)
@@ -1601,6 +1595,7 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 		}
 	}
 	WARN_ON_ONCE(j >= ARRAY_SIZE(sdev->gendev_attr_groups));
+	sdev->sdev_gendev.groups = sdev->gendev_attr_groups;
 
 	device_initialize(&sdev->sdev_dev);
 	sdev->sdev_dev.parent = get_device(&sdev->sdev_gendev);
