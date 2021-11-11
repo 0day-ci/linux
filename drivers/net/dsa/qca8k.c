@@ -148,7 +148,7 @@ qca8k_set_page(struct mii_bus *bus, u16 page)
 	return 0;
 }
 
-static int
+int
 qca8k_read(struct qca8k_priv *priv, u32 reg, u32 *val)
 {
 	struct mii_bus *bus = priv->bus;
@@ -192,7 +192,7 @@ exit:
 	return ret;
 }
 
-static int
+int
 qca8k_rmw(struct qca8k_priv *priv, u32 reg, u32 mask, u32 write_val)
 {
 	struct mii_bus *bus = priv->bus;
@@ -1106,6 +1106,10 @@ qca8k_setup(struct dsa_switch *ds)
 		return ret;
 
 	ret = qca8k_setup_mac_pwr_sel(priv);
+	if (ret)
+		return ret;
+
+	ret = qca8k_setup_led_ctrl(priv);
 	if (ret)
 		return ret;
 
