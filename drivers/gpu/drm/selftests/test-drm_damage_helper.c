@@ -3,13 +3,10 @@
  * Test case for drm_damage_helper functions
  */
 
-#define pr_fmt(fmt) "drm_damage_helper: " fmt
-
+#include <kunit/test.h>
 #include <drm/drm_damage_helper.h>
 #include <drm/drm_plane.h>
 #include <drm/drm_drv.h>
-
-#include "test-drm_modeset_common.h"
 
 struct drm_driver mock_driver;
 static struct drm_device mock_device;
@@ -114,7 +111,7 @@ const struct drm_framebuffer fb = {
 	mock_setup(&old_state); \
 	mock_setup(&state);
 
-int igt_damage_iter_no_damage(void *ignored)
+static void igt_damage_iter_no_damage(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_rect clip;
@@ -129,13 +126,12 @@ int igt_damage_iter_no_damage(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 0, 0, 2048, 2048));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 0, 0, 2048, 2048));
 }
 
-int igt_damage_iter_no_damage_fractional_src(void *ignored)
+static void igt_damage_iter_no_damage_fractional_src(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_rect clip;
@@ -152,13 +148,12 @@ int igt_damage_iter_no_damage_fractional_src(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return rounded off plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 3, 3, 1028, 772));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 3, 3, 1028, 772));
 }
 
-int igt_damage_iter_no_damage_src_moved(void *ignored)
+static void igt_damage_iter_no_damage_src_moved(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_rect clip;
@@ -174,13 +169,12 @@ int igt_damage_iter_no_damage_src_moved(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 10, 10, 1034, 778));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 10, 10, 1034, 778));
 }
 
-int igt_damage_iter_no_damage_fractional_src_moved(void *ignored)
+static void igt_damage_iter_no_damage_fractional_src_moved(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_rect clip;
@@ -197,13 +191,11 @@ int igt_damage_iter_no_damage_fractional_src_moved(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 4, 4, 1029, 773));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test, check_damage_clip(&state, &clip, 4, 4, 1029, 773));
 }
 
-int igt_damage_iter_no_damage_not_visible(void *ignored)
+static void igt_damage_iter_no_damage_not_visible(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_rect clip;
@@ -221,12 +213,10 @@ int igt_damage_iter_no_damage_not_visible(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 0, "Should have no damage.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 0);
 }
 
-int igt_damage_iter_no_damage_no_crtc(void *ignored)
+static void igt_damage_iter_no_damage_no_crtc(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_rect clip;
@@ -242,12 +232,10 @@ int igt_damage_iter_no_damage_no_crtc(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 0, "Should have no damage.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 0);
 }
 
-int igt_damage_iter_no_damage_no_fb(void *ignored)
+static void igt_damage_iter_no_damage_no_fb(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_plane_state old_state;
@@ -267,12 +255,10 @@ int igt_damage_iter_no_damage_no_fb(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 0, "Should have no damage.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 0);
 }
 
-int igt_damage_iter_simple_damage(void *ignored)
+static void igt_damage_iter_simple_damage(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -292,13 +278,11 @@ int igt_damage_iter_simple_damage(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return damage when set.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 0, 0, 1024, 768));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test, check_damage_clip(&state, &clip, 0, 0, 1024, 768));
 }
 
-int igt_damage_iter_single_damage(void *ignored)
+static void igt_damage_iter_single_damage(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -317,13 +301,12 @@ int igt_damage_iter_single_damage(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return damage when set.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 256, 192, 768, 576));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 256, 192, 768, 576));
 }
 
-int igt_damage_iter_single_damage_intersect_src(void *ignored)
+static void igt_damage_iter_single_damage_intersect_src(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -343,13 +326,12 @@ int igt_damage_iter_single_damage_intersect_src(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return damage clipped to src.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 256, 192, 1024, 768));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 256, 192, 1024, 768));
 }
 
-int igt_damage_iter_single_damage_outside_src(void *ignored)
+static void igt_damage_iter_single_damage_outside_src(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -369,12 +351,10 @@ int igt_damage_iter_single_damage_outside_src(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 0, "Should have no damage.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 0);
 }
 
-int igt_damage_iter_single_damage_fractional_src(void *ignored)
+static void igt_damage_iter_single_damage_fractional_src(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -396,13 +376,13 @@ int igt_damage_iter_single_damage_fractional_src(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return damage when set.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 10, 10, 256, 330));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 10, 10, 256, 330));
 }
 
-int igt_damage_iter_single_damage_intersect_fractional_src(void *ignored)
+static void igt_damage_iter_single_damage_intersect_fractional_src(
+		struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -425,13 +405,13 @@ int igt_damage_iter_single_damage_intersect_fractional_src(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return damage clipped to rounded off src.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 10, 4, 1029, 330));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 10, 4, 1029, 330));
 }
 
-int igt_damage_iter_single_damage_outside_fractional_src(void *ignored)
+static void igt_damage_iter_single_damage_outside_fractional_src(
+		struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -454,12 +434,10 @@ int igt_damage_iter_single_damage_outside_fractional_src(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 0, "Should have no damage.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 0);
 }
 
-int igt_damage_iter_single_damage_src_moved(void *ignored)
+static void igt_damage_iter_single_damage_src_moved(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -480,13 +458,13 @@ int igt_damage_iter_single_damage_src_moved(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 10, 10, 1034, 778));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 10, 10, 1034, 778));
 }
 
-int igt_damage_iter_single_damage_fractional_src_moved(void *ignored)
+static void igt_damage_iter_single_damage_fractional_src_moved(
+		struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -509,13 +487,11 @@ int igt_damage_iter_single_damage_fractional_src_moved(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return rounded off plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 4, 4, 1029, 773));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test, check_damage_clip(&state, &clip, 4, 4, 1029, 773));
 }
 
-int igt_damage_iter_damage(void *ignored)
+static void igt_damage_iter_damage(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -535,18 +511,18 @@ int igt_damage_iter_damage(void *ignored)
 	drm_atomic_helper_damage_iter_init(&iter, &old_state, &state);
 	drm_atomic_for_each_plane_damage(&iter, &clip) {
 		if (num_hits == 0)
-			FAIL_ON(!check_damage_clip(&state, &clip, 20, 30, 200, 180));
+			KUNIT_EXPECT_TRUE(test,
+					check_damage_clip(&state, &clip, 20, 30, 200, 180));
 		if (num_hits == 1)
-			FAIL_ON(!check_damage_clip(&state, &clip, 240, 200, 280, 250));
+			KUNIT_EXPECT_TRUE(test,
+					check_damage_clip(&state, &clip, 240, 200, 280, 250));
 		num_hits++;
 	}
 
-	FAIL(num_hits != 2, "Should return damage when set.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 2);
 }
 
-int igt_damage_iter_damage_one_intersect(void *ignored)
+static void igt_damage_iter_damage_one_intersect(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -568,18 +544,18 @@ int igt_damage_iter_damage_one_intersect(void *ignored)
 	drm_atomic_helper_damage_iter_init(&iter, &old_state, &state);
 	drm_atomic_for_each_plane_damage(&iter, &clip) {
 		if (num_hits == 0)
-			FAIL_ON(!check_damage_clip(&state, &clip, 20, 30, 200, 180));
+			KUNIT_EXPECT_TRUE(test,
+					check_damage_clip(&state, &clip, 20, 30, 200, 180));
 		if (num_hits == 1)
-			FAIL_ON(!check_damage_clip(&state, &clip, 4, 4, 1029, 773));
+			KUNIT_EXPECT_TRUE(test,
+					check_damage_clip(&state, &clip, 4, 4, 1029, 773));
 		num_hits++;
 	}
 
-	FAIL(num_hits != 2, "Should return damage when set.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 2);
 }
 
-int igt_damage_iter_damage_one_outside(void *ignored)
+static void igt_damage_iter_damage_one_outside(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -600,13 +576,12 @@ int igt_damage_iter_damage_one_outside(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return damage when set.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 240, 200, 280, 250));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test,
+			check_damage_clip(&state, &clip, 240, 200, 280, 250));
 }
 
-int igt_damage_iter_damage_src_moved(void *ignored)
+static void igt_damage_iter_damage_src_moved(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -629,13 +604,11 @@ int igt_damage_iter_damage_src_moved(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 1, "Should return round off plane src as damage.");
-	FAIL_ON(!check_damage_clip(&state, &clip, 3, 3, 1028, 772));
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 1);
+	KUNIT_EXPECT_TRUE(test, check_damage_clip(&state, &clip, 3, 3, 1028, 772));
 }
 
-int igt_damage_iter_damage_not_visible(void *ignored)
+static void igt_damage_iter_damage_not_visible(struct kunit *test)
 {
 	struct drm_atomic_helper_damage_iter iter;
 	struct drm_property_blob damage_blob;
@@ -660,7 +633,39 @@ int igt_damage_iter_damage_not_visible(void *ignored)
 	drm_atomic_for_each_plane_damage(&iter, &clip)
 		num_hits++;
 
-	FAIL(num_hits != 0, "Should not return any damage.");
-
-	return 0;
+	KUNIT_EXPECT_EQ(test, num_hits, 0);
 }
+
+static struct kunit_case drm_damage_helper_tests[] = {
+	KUNIT_CASE(igt_damage_iter_no_damage),
+	KUNIT_CASE(igt_damage_iter_no_damage_fractional_src),
+	KUNIT_CASE(igt_damage_iter_no_damage_src_moved),
+	KUNIT_CASE(igt_damage_iter_no_damage_fractional_src_moved),
+	KUNIT_CASE(igt_damage_iter_no_damage_not_visible),
+	KUNIT_CASE(igt_damage_iter_no_damage_no_crtc),
+	KUNIT_CASE(igt_damage_iter_no_damage_no_fb),
+	KUNIT_CASE(igt_damage_iter_simple_damage),
+	KUNIT_CASE(igt_damage_iter_single_damage),
+	KUNIT_CASE(igt_damage_iter_single_damage_intersect_src),
+	KUNIT_CASE(igt_damage_iter_single_damage_outside_src),
+	KUNIT_CASE(igt_damage_iter_single_damage_fractional_src),
+	KUNIT_CASE(igt_damage_iter_single_damage_intersect_fractional_src),
+	KUNIT_CASE(igt_damage_iter_single_damage_outside_fractional_src),
+	KUNIT_CASE(igt_damage_iter_single_damage_src_moved),
+	KUNIT_CASE(igt_damage_iter_single_damage_fractional_src_moved),
+	KUNIT_CASE(igt_damage_iter_damage),
+	KUNIT_CASE(igt_damage_iter_damage_one_intersect),
+	KUNIT_CASE(igt_damage_iter_damage_one_outside),
+	KUNIT_CASE(igt_damage_iter_damage_src_moved),
+	KUNIT_CASE(igt_damage_iter_damage_not_visible),
+	{ }
+};
+
+static struct kunit_suite drm_damage_helper_test_suite = {
+	.name = "drm_damage_helper_tests",
+	.test_cases = drm_damage_helper_tests,
+};
+
+kunit_test_suite(drm_damage_helper_test_suite);
+
+MODULE_LICENSE("GPL");
