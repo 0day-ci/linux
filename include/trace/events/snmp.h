@@ -37,6 +37,11 @@ DEFINE_EVENT(snmp_template, snmp_##proto,			\
 	TP_ARGS(skb, field, val)				\
 )
 
+
+
+DEFINE_SNMP_EVENT(udp);
+DEFINE_SNMP_EVENT(udplite);
+
 #define TRACE_SNMP(skb, proto, field, val) \
 	trace_snmp_##proto(skb, field, val)
 
