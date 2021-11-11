@@ -119,6 +119,11 @@
 #define MAX_THREADS FUTEX_TID_MASK
 
 /*
+ * Priority for the OOM notifier used in process_mmput_async
+ */
+#define PROCESS_MMPUT_ASYNC_OOM_NOTIFY_PRIORITY 70
+
+/*
  * Protected counters by write_lock_irq(&tasklist_lock)
  */
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
@@ -3203,13 +3208,27 @@ int sysctl_max_threads(struct ctl_table *table, int write,
 	return 0;
 }
 
+/* Prevent the OOM from being triggered while we are cleaning up asynchronously */
+static int mmput_async_oom_notifier(struct notifier_block *nb, unsigned long dummy, void *parm)
+{
+	/*
+	 * We cannot know the speed at which pages are being freed, so we
+	 * fake it and say it's at least one. This is already enough to
+	 * stop the OOM killer.
+	 */
+	*(unsigned long *)parm += PAGE_SIZE;
+	return NOTIFY_OK;
+}
+
 SYSCALL_DEFINE2(process_mmput_async, int, pidfd, unsigned int, flags)
 {
 #ifdef CONFIG_MMU
+	struct notifier_block oom_nb;
 	struct mm_struct *mm = NULL;
 	struct task_struct *task;
 	unsigned int tmp;
 	struct pid *pid;
+	int r;
 
 	if (flags)
 		return -EINVAL;
@@ -3280,8 +3299,17 @@ SYSCALL_DEFINE2(process_mmput_async, int, pidfd, unsigned int, flags)
 	if (atomic_read(&mm->mm_users))
 		panic("mm_users not 0 but trying to __mmput anyway!");
 
+	/*
+	 * Register an OOM notifier, to stop the OOM while we are
+	 * asynchronously freeing the mm.
+	 */
+	oom_nb.priority = PROCESS_MMPUT_ASYNC_OOM_NOTIFY_PRIORITY;
+	oom_nb.notifier_call = mmput_async_oom_notifier;
+	r = register_oom_notifier(&oom_nb);
 	/* Do the actual work */
 	__mmput(mm);
+	if (!r)
+		unregister_oom_notifier(&oom_nb);
 	/* And put the extra reference taken above */
 	mmdrop(mm);
 
