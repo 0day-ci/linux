@@ -901,11 +901,12 @@ struct dfl_device_id {
 
 /**
  * struct ishtp_device_id - ISHTP device identifier
- * @guid_string: 36 char string of the form fa50ff2b-f2e8-45de-83fa-65417f2f49ba
- * @context: pointer to driver specific data
+ * @guid: 16-byte binary guid representation
+ * @driver_data: pointer to driver specific data
  */
 struct ishtp_device_id {
 	guid_t guid;
+	kernel_ulong_t driver_data;
 };
 
 #endif /* LINUX_MOD_DEVICETABLE_H */
