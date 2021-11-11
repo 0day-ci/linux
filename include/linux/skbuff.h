@@ -1933,9 +1933,10 @@ static inline void skb_queue_head_init_class(struct sk_buff_head *list,
  *	The "__skb_xxxx()" functions are the non-atomic ones that
  *	can only be called with interrupts disabled.
  */
-static inline void __skb_insert(struct sk_buff *newsk,
-				struct sk_buff *prev, struct sk_buff *next,
-				struct sk_buff_head *list)
+static inline void __no_sanitize_undefined
+__skb_insert(struct sk_buff *newsk,
+	     struct sk_buff *prev, struct sk_buff *next,
+	     struct sk_buff_head *list)
 {
 	/* See skb_queue_empty_lockless() and skb_peek_tail()
 	 * for the opposite READ_ONCE()
@@ -1966,8 +1967,9 @@ static inline void __skb_queue_splice(const struct sk_buff_head *list,
  *	@list: the new list to add
  *	@head: the place to add it in the first list
  */
-static inline void skb_queue_splice(const struct sk_buff_head *list,
-				    struct sk_buff_head *head)
+static inline void __no_sanitize_undefined
+skb_queue_splice(const struct sk_buff_head *list,
+		 struct sk_buff_head *head)
 {
 	if (!skb_queue_empty(list)) {
 		__skb_queue_splice(list, (struct sk_buff *) head, head->next);
@@ -1982,8 +1984,9 @@ static inline void skb_queue_splice(const struct sk_buff_head *list,
  *
  *	The list at @list is reinitialised
  */
-static inline void skb_queue_splice_init(struct sk_buff_head *list,
-					 struct sk_buff_head *head)
+static inline void __no_sanitize_undefined
+skb_queue_splice_init(struct sk_buff_head *list,
+		      struct sk_buff_head *head)
 {
 	if (!skb_queue_empty(list)) {
 		__skb_queue_splice(list, (struct sk_buff *) head, head->next);
@@ -1997,8 +2000,9 @@ static inline void skb_queue_splice_init(struct sk_buff_head *list,
  *	@list: the new list to add
  *	@head: the place to add it in the first list
  */
-static inline void skb_queue_splice_tail(const struct sk_buff_head *list,
-					 struct sk_buff_head *head)
+static inline void __no_sanitize_undefined
+skb_queue_splice_tail(const struct sk_buff_head *list,
+		      struct sk_buff_head *head)
 {
 	if (!skb_queue_empty(list)) {
 		__skb_queue_splice(list, head->prev, (struct sk_buff *) head);
@@ -2014,8 +2018,9 @@ static inline void skb_queue_splice_tail(const struct sk_buff_head *list,
  *	Each of the lists is a queue.
  *	The list at @list is reinitialised
  */
-static inline void skb_queue_splice_tail_init(struct sk_buff_head *list,
-					      struct sk_buff_head *head)
+static inline void __no_sanitize_undefined
+skb_queue_splice_tail_init(struct sk_buff_head *list,
+			   struct sk_buff_head *head)
 {
 	if (!skb_queue_empty(list)) {
 		__skb_queue_splice(list, head->prev, (struct sk_buff *) head);
@@ -2035,9 +2040,10 @@ static inline void skb_queue_splice_tail_init(struct sk_buff_head *list,
  *
  *	A buffer cannot be placed on two lists at the same time.
  */
-static inline void __skb_queue_after(struct sk_buff_head *list,
-				     struct sk_buff *prev,
-				     struct sk_buff *newsk)
+static inline void __no_sanitize_undefined
+__skb_queue_after(struct sk_buff_head *list,
+		  struct sk_buff *prev,
+		  struct sk_buff *newsk)
 {
 	__skb_insert(newsk, prev, prev->next, list);
 }
@@ -2045,9 +2051,10 @@ static inline void __skb_queue_after(struct sk_buff_head *list,
 void skb_append(struct sk_buff *old, struct sk_buff *newsk,
 		struct sk_buff_head *list);
 
-static inline void __skb_queue_before(struct sk_buff_head *list,
-				      struct sk_buff *next,
-				      struct sk_buff *newsk)
+static inline void __no_sanitize_undefined
+__skb_queue_before(struct sk_buff_head *list,
+		   struct sk_buff *next,
+		   struct sk_buff *newsk)
 {
 	__skb_insert(newsk, next->prev, next, list);
 }
@@ -2062,8 +2069,8 @@ static inline void __skb_queue_before(struct sk_buff_head *list,
  *
  *	A buffer cannot be placed on two lists at the same time.
  */
-static inline void __skb_queue_head(struct sk_buff_head *list,
-				    struct sk_buff *newsk)
+static inline void __no_sanitize_undefined
+__skb_queue_head(struct sk_buff_head *list, struct sk_buff *newsk)
 {
 	__skb_queue_after(list, (struct sk_buff *)list, newsk);
 }
@@ -2079,8 +2086,8 @@ void skb_queue_head(struct sk_buff_head *list, struct sk_buff *newsk);
  *
  *	A buffer cannot be placed on two lists at the same time.
  */
-static inline void __skb_queue_tail(struct sk_buff_head *list,
-				   struct sk_buff *newsk)
+static inline void __no_sanitize_undefined
+__skb_queue_tail(struct sk_buff_head *list, struct sk_buff *newsk)
 {
 	__skb_queue_before(list, (struct sk_buff *)list, newsk);
 }
