@@ -5531,8 +5531,11 @@ static int confirm_name(struct sock *sk, struct hci_dev *hdev, void *data,
 		goto failed;
 	}
 
-	if (cp->name_known) {
+	if (cp->name_state == MGMT_CONFIRM_NAME_KNOWN) {
 		e->name_state = NAME_KNOWN;
+		list_del(&e->list);
+	} else if (cp->name_state == MGMT_CONFIRM_NAME_DONT_CARE) {
+		e->name_state = NAME_DONT_CARE;
 		list_del(&e->list);
 	} else {
 		e->name_state = NAME_NEEDED;

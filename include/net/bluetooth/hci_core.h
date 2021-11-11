@@ -56,6 +56,7 @@ struct inquiry_entry {
 		NAME_NEEDED,
 		NAME_PENDING,
 		NAME_KNOWN,
+		NAME_DONT_CARE,		/* Don't know but don't want to know */
 	} name_state;
 	__u32			timestamp;
 	struct inquiry_data	data;
