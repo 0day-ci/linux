@@ -19,7 +19,7 @@ static void gen6_write_pde(const struct gen6_ppgtt *ppgtt,
 	dma_addr_t addr = pt ? px_dma(pt) : px_dma(ppgtt->base.vm.scratch[1]);
 
 	/* Caller needs to make sure the write completes if necessary */
-	iowrite32(GEN6_PDE_ADDR_ENCODE(addr) | GEN6_PDE_VALID,
+	iowrite32(GEN6_PDE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT,
 		  ppgtt->pd_addr + pde);
 }
 

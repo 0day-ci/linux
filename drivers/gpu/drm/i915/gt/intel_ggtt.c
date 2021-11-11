@@ -964,7 +964,7 @@ static u64 snb_pte_encode(dma_addr_t addr,
 			  enum i915_cache_level level,
 			  u32 flags)
 {
-	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | GEN6_PTE_VALID;
+	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT;
 
 	switch (level) {
 	case I915_CACHE_L3_LLC:
@@ -985,7 +985,7 @@ static u64 ivb_pte_encode(dma_addr_t addr,
 			  enum i915_cache_level level,
 			  u32 flags)
 {
-	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | GEN6_PTE_VALID;
+	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT;
 
 	switch (level) {
 	case I915_CACHE_L3_LLC:
@@ -1008,7 +1008,7 @@ static u64 byt_pte_encode(dma_addr_t addr,
 			  enum i915_cache_level level,
 			  u32 flags)
 {
-	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | GEN6_PTE_VALID;
+	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT;
 
 	if (!(flags & PTE_READ_ONLY))
 		pte |= BYT_PTE_WRITEABLE;
@@ -1023,7 +1023,7 @@ static u64 hsw_pte_encode(dma_addr_t addr,
 			  enum i915_cache_level level,
 			  u32 flags)
 {
-	gen6_pte_t pte = HSW_PTE_ADDR_ENCODE(addr) | GEN6_PTE_VALID;
+	gen6_pte_t pte = HSW_PTE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT;
 
 	if (level != I915_CACHE_NONE)
 		pte |= HSW_WB_LLC_AGE3;
@@ -1035,7 +1035,7 @@ static u64 iris_pte_encode(dma_addr_t addr,
 			   enum i915_cache_level level,
 			   u32 flags)
 {
-	gen6_pte_t pte = HSW_PTE_ADDR_ENCODE(addr) | GEN6_PTE_VALID;
+	gen6_pte_t pte = HSW_PTE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT;
 
 	switch (level) {
 	case I915_CACHE_NONE:

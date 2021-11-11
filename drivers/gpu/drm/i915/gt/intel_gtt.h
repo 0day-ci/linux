@@ -74,13 +74,11 @@ typedef u64 gen8_pte_t;
 #define GEN6_PDE_ADDR_ENCODE(addr)	GEN6_GTT_ADDR_ENCODE(addr)
 #define GEN6_PTE_CACHE_LLC		(2 << 1)
 #define GEN6_PTE_UNCACHED		(1 << 1)
-#define GEN6_PTE_VALID			REG_BIT(0)
 
 #define GEN6_PTES			I915_PTES(sizeof(gen6_pte_t))
 #define GEN6_PD_SIZE		        (I915_PDES * PAGE_SIZE)
 #define GEN6_PD_ALIGN			(PAGE_SIZE * 16)
 #define GEN6_PDE_SHIFT			22
-#define GEN6_PDE_VALID			REG_BIT(0)
 #define NUM_PTE(pde_shift)     (1 << (pde_shift - PAGE_SHIFT))
 
 #define GEN7_PTE_CACHE_L3_LLC		(3 << 1)
