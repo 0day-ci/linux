@@ -27,6 +27,7 @@ struct obj_cgroup;
 struct page;
 struct mm_struct;
 struct kmem_cache;
+struct super_block;
 
 /* Cgroup-specific page state, on top of universal node page state */
 enum memcg_stat_item {
@@ -713,6 +714,9 @@ static inline int mem_cgroup_charge(struct folio *folio, struct mm_struct *mm,
 	return __mem_cgroup_charge(folio, mm, gfp);
 }
 
+int mem_cgroup_charge_memcg(struct folio *folio, struct mem_cgroup *memcg,
+			    gfp_t gfp);
+
 int mem_cgroup_swapin_charge_page(struct page *page, struct mm_struct *mm,
 				  gfp_t gfp, swp_entry_t entry);
 void mem_cgroup_swapin_uncharge_swap(swp_entry_t entry);
@@ -922,6 +926,24 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 		return true;
 	return !!(memcg->css.flags & CSS_ONLINE);
 }
+
+struct mem_cgroup *
+mem_cgroup_mapping_get_charge_target(struct address_space *mapping);
+
+static inline void mem_cgroup_put_memcg(struct mem_cgroup *memcg)
+{
+	if (memcg)
+		css_put(&memcg->css);
+}
+
+void mem_cgroup_set_charge_target(struct mem_cgroup **target,
+				  struct mem_cgroup *memcg);
+struct mem_cgroup *mem_cgroup_get_from_path(const char *path);
+/**
+ * User is responsible for providing a buffer @buf of length @len and freeing
+ * it.
+ */
+int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf, size_t len);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 		int zid, int nr_pages);
@@ -1220,6 +1242,42 @@ static inline bool mem_cgroup_below_min(struct mem_cgroup *memcg)
 static inline int mem_cgroup_charge(struct folio *folio,
 		struct mm_struct *mm, gfp_t gfp)
 {
+	return 0;
+}
+
+static inline int mem_cgroup_charge_memcg(struct folio *folio,
+					  struct mem_cgroup *memcg,
+					  gfp_t gfp_mask)
+{
+	return 0;
+}
+
+static inline struct mem_cgroup *
+mem_cgroup_mapping_get_charge_target(struct address_space *mapping)
+{
+	return NULL;
+}
+
+static inline void mem_cgroup_put_memcg(struct mem_cgroup *memcg)
+{
+}
+
+static inline void mem_cgroup_set_charge_target(struct mem_cgroup **target,
+						struct mem_cgroup *memcg)
+{
+}
+
+static inline struct mem_cgroup *mem_cgroup_get_from_path(const char *path)
+{
+	return NULL;
+}
+
+static inline int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf,
+					      size_t len)
+{
+	if (len < 1)
+		return -EINVAL;
+	buf[0] = '\0';
 	return 0;
 }
 
