@@ -735,8 +735,14 @@ static int i2c_dw_irq_handler_master(struct dw_i2c_dev *dev)
 	if (stat & DW_IC_INTR_RX_FULL)
 		i2c_dw_read(dev);
 
-	if (stat & DW_IC_INTR_TX_EMPTY)
-		i2c_dw_xfer_msg(dev);
+	if (stat & DW_IC_INTR_TX_EMPTY) {
+		if (dev->msgs) {
+			i2c_dw_xfer_msg(dev);
+		} else { //null  pointer
+			i2c_dw_disable_int(dev);
+			return 0;
+		}
+	}
 
 	/*
 	 * No need to modify or disable the interrupt mask here.
