@@ -845,7 +845,6 @@ static ssize_t mon_bin_read(struct file *file, char __user *buf,
 			mutex_unlock(&rp->fetch_lock);
 			return -EFAULT;
 		}
-		nbytes -= step_len;
 		buf += step_len;
 		rp->b_read += step_len;
 		done += step_len;
