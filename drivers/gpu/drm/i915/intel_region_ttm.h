@@ -22,6 +22,8 @@ int intel_region_ttm_init(struct intel_memory_region *mem);
 
 void intel_region_ttm_fini(struct intel_memory_region *mem);
 
+void intel_region_ttm_disable(struct intel_memory_region *mem);
+
 struct i915_refct_sgt *
 intel_region_ttm_resource_to_rsgt(struct intel_memory_region *mem,
 				  struct ttm_resource *res);

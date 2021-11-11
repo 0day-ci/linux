@@ -1033,6 +1033,7 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 
 static const struct intel_memory_region_ops ttm_system_region_ops = {
 	.init_object = __i915_gem_ttm_object_init,
+	.disable = intel_region_ttm_disable,
 };
 
 struct intel_memory_region *

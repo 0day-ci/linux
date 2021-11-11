@@ -108,6 +108,7 @@ out_no_io:
 static const struct intel_memory_region_ops intel_region_lmem_ops = {
 	.init = region_lmem_init,
 	.release = region_lmem_release,
+	.disable = intel_region_ttm_disable,
 	.init_object = __i915_gem_ttm_object_init,
 };
 

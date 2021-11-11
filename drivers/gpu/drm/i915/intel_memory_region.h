@@ -52,6 +52,7 @@ struct intel_memory_region_ops {
 
 	int (*init)(struct intel_memory_region *mem);
 	void (*release)(struct intel_memory_region *mem);
+	void (*disable)(struct intel_memory_region *mem);
 
 	int (*init_object)(struct intel_memory_region *mem,
 			   struct drm_i915_gem_object *obj,

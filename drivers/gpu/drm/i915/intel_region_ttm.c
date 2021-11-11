@@ -115,6 +115,34 @@ void intel_region_ttm_fini(struct intel_memory_region *mem)
 }
 
 /**
+ * intel_region_ttm_disable - A TTM region disable callback helper
+ * @mem: The memory region.
+ *
+ * A helper that ensures that nothing any longer references a region at
+ * device takedown. Breaks refcounting loops and waits for objects in the
+ * region to be deleted.
+ */
+void intel_region_ttm_disable(struct intel_memory_region *mem)
+{
+	struct ttm_resource_manager *man = mem->region_private;
+
+	/*
+	 * Put the region's move fences. This releases requests that
+	 * may hold on to contexts and vms that may hold on to buffer
+	 * objects that may have a refcount on the region. :/
+	 */
+	if (man)
+		ttm_resource_manager_cleanup(man);
+
+	/* Flush objects that may just have been freed */
+	i915_gem_flush_free_objects(mem->i915);
+
+	/* Wait until the only region reference left is our own. */
+	while (kref_read(&mem->kref) > 1)
+		msleep(20);
+}
+
+/**
  * intel_region_ttm_resource_to_rsgt -
  * Convert an opaque TTM resource manager resource to a refcounted sg_table.
  * @mem: The memory region.
