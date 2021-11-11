@@ -1134,7 +1134,7 @@ int fuse_allow_current_process(struct fuse_conn *fc)
 	const struct cred *cred;
 
 	if (fc->allow_other)
-		return current_in_userns(fc->user_ns);
+		return current_in_userns(fc->user_ns) || capable(CAP_SYS_ADMIN);
 
 	cred = current_cred();
 	if (uid_eq(cred->euid, fc->user_id) &&
