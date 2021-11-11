@@ -122,4 +122,10 @@ struct ufs_dev_fix {
  */
 #define UFS_DEVICE_QUIRK_SWAP_L2P_ENTRY_FOR_HPB_READ (1 << 12)
 
+/*
+ * Some SAMSUNG UFS devices require keep on Write Booster for prevent
+ * performance drop. Enable this quirk to keep on Write Booster
+ */
+#define UFS_DEVICE_QUIRK_KEEP_ON_WB        (1 << 13)
+
 #endif /* UFS_QUIRKS_H_ */
