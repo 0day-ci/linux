@@ -1104,16 +1104,20 @@ static int __loop_clr_fd(struct loop_device *lo, bool release)
 	 */
 
 	mutex_lock(&lo->lo_mutex);
-	if (WARN_ON_ONCE(lo->lo_state != Lo_rundown)) {
-		err = -ENXIO;
-		goto out_unlock;
-	}
+	/*
+	 * Since this function is called upon "ioctl(LOOP_CLR_FD)" xor "close()
+	 * after ioctl(LOOP_CLR_FD)", it is a sign of something going wrong if
+	 * lo->lo_state has changed while waiting for lo->lo_mutex.
+	 */
+	BUG_ON(lo->lo_state != Lo_rundown);
 
+	/*
+	 * Since ioctl(LOOP_CLR_FD) depends on lo->lo_state == Lo_bound, it is
+	 * a sign of something going wrong if lo->lo_backing_file was not
+	 * assigned by ioctl(LOOP_SET_FD) or ioctl(LOOP_CONFIGURE).
+	 */
 	filp = lo->lo_backing_file;
-	if (filp == NULL) {
-		err = -EINVAL;
-		goto out_unlock;
-	}
+	BUG_ON(!filp);
 
 	if (test_bit(QUEUE_FLAG_WC, &lo->lo_queue->queue_flags))
 		blk_queue_write_cache(lo->lo_queue, false, false);
@@ -1121,7 +1125,20 @@ static int __loop_clr_fd(struct loop_device *lo, bool release)
 	/* freeze request queue during the transition */
 	blk_mq_freeze_queue(lo->lo_queue);
 
+	/*
+	 * To avoid circular locking dependency, call destroy_workqueue()
+	 * without holding lo->lo_mutex.
+	 */
+	mutex_unlock(&lo->lo_mutex);
 	destroy_workqueue(lo->workqueue);
+	mutex_lock(&lo->lo_mutex);
+
+	/*
+	 * As explained above, lo->lo_state cannot be changed while waiting for
+	 * lo->lo_mutex.
+	 */
+	BUG_ON(lo->lo_state != Lo_rundown);
+
 	spin_lock_irq(&lo->lo_work_lock);
 	list_for_each_entry_safe(worker, pos, &lo->idle_worker_list,
 				idle_list) {
@@ -1156,7 +1173,6 @@ static int __loop_clr_fd(struct loop_device *lo, bool release)
 	partscan = lo->lo_flags & LO_FLAGS_PARTSCAN;
 	lo_number = lo->lo_number;
 	disk_force_media_change(lo->lo_disk, DISK_EVENT_MEDIA_CHANGE);
-out_unlock:
 	mutex_unlock(&lo->lo_mutex);
 	if (partscan) {
 		/*
