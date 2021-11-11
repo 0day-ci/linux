@@ -417,6 +417,9 @@ struct rtnexthop {
 #define RTNH_COMPARE_MASK	(RTNH_F_DEAD | RTNH_F_LINKDOWN | \
 				 RTNH_F_OFFLOAD | RTNH_F_TRAP)
 
+/* these flags can't be set by the userspace */
+#define RTNH_F_REJECT_MASK	(RTNH_F_DEAD | RTNH_F_LINKDOWN)
+
 /* Macros to handle hexthops */
 
 #define RTNH_ALIGNTO	4

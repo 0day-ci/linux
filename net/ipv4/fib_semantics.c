@@ -683,7 +683,7 @@ static int fib_get_nhs(struct fib_info *fi, struct rtnexthop *rtnh,
 			return -EINVAL;
 		}
 
-		if (rtnh->rtnh_flags & (RTNH_F_DEAD | RTNH_F_LINKDOWN)) {
+		if (rtnh->rtnh_flags & RTNH_F_REJECT_MASK) {
 			NL_SET_ERR_MSG(extack,
 				       "Invalid flags for nexthop - can not contain DEAD or LINKDOWN");
 			return -EINVAL;
@@ -1361,7 +1361,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg,
 		goto err_inval;
 	}
 
-	if (cfg->fc_flags & (RTNH_F_DEAD | RTNH_F_LINKDOWN)) {
+	if (cfg->fc_flags & RTNH_F_REJECT_MASK) {
 		NL_SET_ERR_MSG(extack,
 			       "Invalid rtm_flags - can not contain DEAD or LINKDOWN");
 		goto err_inval;
