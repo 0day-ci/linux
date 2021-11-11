@@ -100,7 +100,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	int i;
 
 
-	if (ctrlpriv->virt_en == 1 ||
+	if ((ctrlpriv->caam_caps & CAAM_CAPS_VIRT_ENABLED) ||
 	    /*
 	     * Apparently on i.MX8M{Q,M,N,P} it doesn't matter if virt_en == 1
 	     * and the following steps should be performed regardless
@@ -169,7 +169,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	*status = rd_reg32(&deco->op_status_hi) &
 		  DECO_OP_STATUS_HI_ERR_MASK;
 
-	if (ctrlpriv->virt_en == 1)
+	if (ctrlpriv->caam_caps & CAAM_CAPS_VIRT_ENABLED)
 		clrsetbits_32(&ctrl->deco_rsr, DECORSR_JR0, 0);
 
 	/* Mark the DECO as free */
@@ -622,7 +622,6 @@ static int caam_probe(struct platform_device *pdev)
 	struct dentry *dfs_root;
 	u32 scfgr, comp_params;
 	u8 rng_vid;
-	int pg_size;
 	int BLOCK_OFFSET = 0;
 	bool pr_support = false;
 
@@ -666,11 +665,12 @@ static int caam_probe(struct platform_device *pdev)
 	else
 		caam_ptr_sz = sizeof(u32);
 	caam_dpaa2 = !!(comp_params & CTPR_MS_DPAA2);
-	ctrlpriv->qi_present = !!(comp_params & CTPR_MS_QI_MASK);
+	ctrlpriv->caam_caps |= (!!(comp_params & CTPR_MS_QI_MASK)) ?
+		CAAM_CAPS_QI_PRESENT : 0;
 
 #ifdef CONFIG_CAAM_QI
 	/* If (DPAA 1.x) QI present, check whether dependencies are available */
-	if (ctrlpriv->qi_present && !caam_dpaa2) {
+	if ((ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) && !caam_dpaa2) {
 		ret = qman_is_probed();
 		if (!ret) {
 			return -EPROBE_DEFER;
@@ -692,11 +692,14 @@ static int caam_probe(struct platform_device *pdev)
 	/* Allocating the BLOCK_OFFSET based on the supported page size on
 	 * the platform
 	 */
-	pg_size = (comp_params & CTPR_MS_PG_SZ_MASK) >> CTPR_MS_PG_SZ_SHIFT;
-	if (pg_size == 0)
-		BLOCK_OFFSET = PG_SIZE_4K;
+	ctrlpriv->caam_caps |=
+		(!!((comp_params & CTPR_MS_PG_SZ_MASK) >> CTPR_MS_PG_SZ_SHIFT)) ?
+		CAAM_CAPS_64K_PAGESIZE : 0;
+
+	if (ctrlpriv->caam_caps & CAAM_CAPS_64K_PAGESIZE)
+		BLOCK_OFFSET = SZ_64K;
 	else
-		BLOCK_OFFSET = PG_SIZE_64K;
+		BLOCK_OFFSET = SZ_4K;
 
 	ctrlpriv->ctrl = (struct caam_ctrl __iomem __force *)ctrl;
 	ctrlpriv->assure = (struct caam_assurance __iomem __force *)
@@ -711,11 +714,11 @@ static int caam_probe(struct platform_device *pdev)
 	/* Get the IRQ of the controller (for security violations only) */
 	ctrlpriv->secvio_irq = irq_of_parse_and_map(nprop, 0);
 	np = of_find_compatible_node(NULL, NULL, "fsl,qoriq-mc");
-	ctrlpriv->mc_en = !!np;
+	ctrlpriv->caam_caps |= (!!np) ? CAAM_CAPS_MC_ENABLED : 0;
 	of_node_put(np);
 
 #ifdef CONFIG_FSL_MC_BUS
-	if (ctrlpriv->mc_en) {
+	if (ctrlpriv->caam_caps & CAAM_CAPS_MC_ENABLED) {
 		struct fsl_mc_version *mc_version;
 
 		mc_version = fsl_mc_get_version();
@@ -732,7 +735,7 @@ static int caam_probe(struct platform_device *pdev)
 	 * In case of SoCs with Management Complex, MC f/w performs
 	 * the configuration.
 	 */
-	if (!ctrlpriv->mc_en)
+	if (!(ctrlpriv->caam_caps & CAAM_CAPS_MC_ENABLED))
 		clrsetbits_32(&ctrl->mcr, MCFGR_AWCACHE_MASK,
 			      MCFGR_AWCACHE_CACH | MCFGR_AWCACHE_BUFF |
 			      MCFGR_WDENABLE | MCFGR_LARGE_BURST);
@@ -745,7 +748,6 @@ static int caam_probe(struct platform_device *pdev)
 	 */
 	scfgr = rd_reg32(&ctrl->scfgr);
 
-	ctrlpriv->virt_en = 0;
 	if (comp_params & CTPR_MS_VIRT_EN_INCL) {
 		/* VIRT_EN_INCL = 1 & VIRT_EN_POR = 1 or
 		 * VIRT_EN_INCL = 1 & VIRT_EN_POR = 0 & SCFGR_VIRT_EN = 1
@@ -753,14 +755,14 @@ static int caam_probe(struct platform_device *pdev)
 		if ((comp_params & CTPR_MS_VIRT_EN_POR) ||
 		    (!(comp_params & CTPR_MS_VIRT_EN_POR) &&
 		       (scfgr & SCFGR_VIRT_EN)))
-				ctrlpriv->virt_en = 1;
+			ctrlpriv->caam_caps |= CAAM_CAPS_VIRT_ENABLED;
 	} else {
 		/* VIRT_EN_INCL = 0 && VIRT_EN_POR_VALUE = 1 */
 		if (comp_params & CTPR_MS_VIRT_EN_POR)
-				ctrlpriv->virt_en = 1;
+			ctrlpriv->caam_caps |= CAAM_CAPS_VIRT_ENABLED;
 	}
 
-	if (ctrlpriv->virt_en == 1)
+	if (ctrlpriv->caam_caps & CAAM_CAPS_VIRT_ENABLED)
 		clrsetbits_32(&ctrl->jrstart, 0, JRSTART_JR0_START |
 			      JRSTART_JR1_START | JRSTART_JR2_START |
 			      JRSTART_JR3_START);
@@ -785,7 +787,7 @@ static int caam_probe(struct platform_device *pdev)
 	caam_debugfs_init(ctrlpriv, dfs_root);
 
 	/* Check to see if (DPAA 1.x) QI present. If so, enable */
-	if (ctrlpriv->qi_present && !caam_dpaa2) {
+	if ((ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) && !caam_dpaa2) {
 		ctrlpriv->qi = (struct caam_queue_if __iomem __force *)
 			       ((__force uint8_t *)ctrl +
 				 BLOCK_OFFSET * QI_BLOCK_NUMBER
@@ -810,12 +812,13 @@ static int caam_probe(struct platform_device *pdev)
 					     (ring + JR_BLOCK_NUMBER) *
 					      BLOCK_OFFSET
 					     );
-			ctrlpriv->total_jobrs++;
 			ring++;
+			ctrlpriv->caam_caps |= BIT(ring);
 		}
 
 	/* If no QI and no rings specified, quit and go home */
-	if ((!ctrlpriv->qi_present) && (!ctrlpriv->total_jobrs)) {
+	if (!(ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) &&
+	    (hweight_long(ctrlpriv->caam_caps & CAAM_CAPS_JOBRS_MASK) == 0)) {
 		dev_err(dev, "no queues configured, terminating\n");
 		return -ENOMEM;
 	}
@@ -832,7 +835,8 @@ static int caam_probe(struct platform_device *pdev)
 	 * already instantiated, do RNG instantiation
 	 * In case of SoCs with Management Complex, RNG is managed by MC f/w.
 	 */
-	if (!(ctrlpriv->mc_en && pr_support) && rng_vid >= 4) {
+	if (!((ctrlpriv->caam_caps & CAAM_CAPS_MC_ENABLED) && pr_support) &&
+	    rng_vid >= 4) {
 		ctrlpriv->rng4_sh_init =
 			rd_reg32(&ctrl->r4tst[0].rdsta);
 		/*
@@ -900,8 +904,9 @@ static int caam_probe(struct platform_device *pdev)
 	/* Report "alive" for developer to see */
 	dev_info(dev, "device ID = 0x%016llx (Era %d)\n", caam_id,
 		 ctrlpriv->era);
-	dev_info(dev, "job rings = %d, qi = %d\n",
-		 ctrlpriv->total_jobrs, ctrlpriv->qi_present);
+	dev_info(dev, "job rings = %ld, qi = %s\n",
+		 hweight_long(ctrlpriv->caam_caps & CAAM_CAPS_JOBRS_MASK),
+		 (ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) ? "yes" : "no");
 
 	ret = devm_of_platform_populate(dev);
 	if (ret)

@@ -1023,6 +1023,4 @@ struct caam_deco {
 #define ASSURE_BLOCK_NUMBER	6
 #define QI_BLOCK_NUMBER		7
 #define DECO_BLOCK_NUMBER	8
-#define PG_SIZE_4K		0x1000
-#define PG_SIZE_64K		0x10000
 #endif /* REGS_H */

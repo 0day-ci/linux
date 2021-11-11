@@ -2610,7 +2610,7 @@ int caam_qi_algapi_init(struct device *ctrldev)
 	bool registered = false;
 
 	/* Make sure this runs only on (DPAA 1.x) QI */
-	if (!priv->qi_present || caam_dpaa2)
+	if (!(priv->caam_caps | CAAM_CAPS_QI_PRESENT) || caam_dpaa2)
 		return 0;
 
 	/*

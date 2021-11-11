@@ -86,15 +86,15 @@ struct caam_drv_private {
 
 	struct iommu_domain *domain;
 
-	/*
-	 * Detected geometry block. Filled in from device tree if powerpc,
-	 * or from register-based version detection code
-	 */
-	u8 total_jobrs;		/* Total Job Rings in device */
-	u8 qi_present;		/* Nonzero if QI present in device */
-	u8 mc_en;		/* Nonzero if MC f/w is active */
+	unsigned long caam_caps; /* CAAM Module capabilities */
+
+#define CAAM_CAPS_QI_PRESENT	BIT(0)	/* Queue Manager interface (QI) implemented */
+#define CAAM_CAPS_JOBRS_MASK	GENMASK(15, 1)	/* Job Ring is available in NS World */
+#define CAAM_CAPS_MC_ENABLED	BIT(16)	/* Management Complex is enabled (F/W is active) */
+#define CAAM_CAPS_VIRT_ENABLED	BIT(17)	/* Virtualization enabled */
+#define CAAM_CAPS_64K_PAGESIZE	BIT(18)	/* CAAM register page size (64KB if set, 4KB if unset) */
+
 	int secvio_irq;		/* Security violation interrupt number */
-	int virt_en;		/* Virtualization enabled in CAAM */
 	int era;		/* CAAM Era (internal HW revision) */
 
 #define	RNG4_MAX_HANDLES 2
