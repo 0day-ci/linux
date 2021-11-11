@@ -62,6 +62,32 @@ config DRM_DEBUG_MM
 
 	  If in doubt, say "N".
 
+config DRM_USE_DYNAMIC_DEBUG
+	bool "use dynamic debug to implement drm.debug"
+	default y
+	depends on DRM
+	depends on DYNAMIC_DEBUG || DYNAMIC_DEBUG_CORE
+	depends on JUMP_LABEL
+	help
+	  The "basic" drm.debug facility does a lot of unlikely
+	  bit-field tests at runtime; while cheap individually, the
+	  cost accumulates.  DYNAMIC_DEBUG can patch pr_debug()s into
+	  NOOP slots, in a running kernel, so avoids those bit-test
+	  overheads, and is therefore recommended by default.
+
+	  DRM_USE_DYNAMIC_DEBUG converts "basic" to "dyndbg", this
+	  creates many new dyndbg callsites (56 bytes each), which
+	  significantly increases drm* module .data, so is optional.
+	  On an x86-64 kernel, with a config derived from fedora, that
+	  price is:
+		       #prdbgs  KiB     #with DRM_USE_DYNAMIC_DEBUG=y
+	  kernel       3079	166k
+	  drm		  1	.06k     376	 21k
+	  drm_kms_helper		 207	 12k
+	  i915	        167	9.3k	1811	101k
+	  amdgpu       2339	130k	3917	220k
+	  nouveau      	  3	.17k	 105	~60k
+
 config DRM_DEBUG_SELFTEST
 	tristate "kselftests for DRM"
 	depends on DRM
