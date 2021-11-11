@@ -598,6 +598,7 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 	struct gpio_device *gdev;
 	unsigned long flags;
 	unsigned int i;
+	u32 ngpios;
 
 	/*
 	 * First: allocate and populate the internal stat container, and
@@ -646,9 +647,15 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 	}
 
 	if (gc->ngpio == 0) {
-		chip_err(gc, "tried to insert a GPIO chip with zero lines\n");
-		ret = -EINVAL;
-		goto err_free_descs;
+		ret = fwnode_property_read_u32(gdev->dev.fwnode, "ngpios",
+					       &ngpios);
+		if (ret == 0) {
+			gc->ngpio = ngpios;
+		} else {
+			chip_err(gc, "tried to insert a GPIO chip with zero lines\n");
+			ret = -EINVAL;
+			goto err_free_descs;
+		}
 	}
 
 	if (gc->ngpio > FASTPATH_NGPIO)
