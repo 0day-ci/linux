@@ -84,7 +84,6 @@ typedef u64 gen8_pte_t;
 #define GEN7_PTE_CACHE_L3_LLC		(3 << 1)
 
 #define BYT_PTE_SNOOPED_BY_CPU_CACHES	REG_BIT(2)
-#define BYT_PTE_WRITEABLE		REG_BIT(1)
 
 #define GEN12_PPGTT_PTE_LM	BIT_ULL(11)
 

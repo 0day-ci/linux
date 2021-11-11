@@ -1011,7 +1011,7 @@ static u64 byt_pte_encode(dma_addr_t addr,
 	gen6_pte_t pte = GEN6_PTE_ADDR_ENCODE(addr) | I915_PAGE_PRESENT;
 
 	if (!(flags & PTE_READ_ONLY))
-		pte |= BYT_PTE_WRITEABLE;
+		pte |= I915_PAGE_RW;
 
 	if (level != I915_CACHE_NONE)
 		pte |= BYT_PTE_SNOOPED_BY_CPU_CACHES;
