@@ -101,7 +101,7 @@ static int gtt_set(struct context *ctx, unsigned long offset, u32 v)
 
 	intel_gt_pm_get(vma->vm->gt);
 
-	map = i915_vma_pin_iomap(vma);
+	map = i915_vma_pin_iomap_unlocked(vma);
 	i915_vma_unpin(vma);
 	if (IS_ERR(map)) {
 		err = PTR_ERR(map);
@@ -134,7 +134,7 @@ static int gtt_get(struct context *ctx, unsigned long offset, u32 *v)
 
 	intel_gt_pm_get(vma->vm->gt);
 
-	map = i915_vma_pin_iomap(vma);
+	map = i915_vma_pin_iomap_unlocked(vma);
 	i915_vma_unpin(vma);
 	if (IS_ERR(map)) {
 		err = PTR_ERR(map);

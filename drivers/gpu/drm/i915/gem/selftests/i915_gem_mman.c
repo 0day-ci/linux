@@ -125,12 +125,13 @@ static int check_partial_mapping(struct drm_i915_gem_object *obj,
 	n = page - view.partial.offset;
 	GEM_BUG_ON(n >= view.partial.size);
 
-	io = i915_vma_pin_iomap(vma);
+	io = i915_vma_pin_iomap_unlocked(vma);
 	i915_vma_unpin(vma);
 	if (IS_ERR(io)) {
-		pr_err("Failed to iomap partial view: offset=%lu; err=%d\n",
-		       page, (int)PTR_ERR(io));
 		err = PTR_ERR(io);
+		if (err != -EINTR && err != -ERESTARTSYS)
+			pr_err("Failed to iomap partial view: offset=%lu; err=%d\n",
+			       page, err);
 		goto out;
 	}
 
@@ -219,12 +220,15 @@ static int check_partial_mappings(struct drm_i915_gem_object *obj,
 		n = page - view.partial.offset;
 		GEM_BUG_ON(n >= view.partial.size);
 
-		io = i915_vma_pin_iomap(vma);
+		io = i915_vma_pin_iomap_unlocked(vma);
 		i915_vma_unpin(vma);
 		if (IS_ERR(io)) {
-			pr_err("Failed to iomap partial view: offset=%lu; err=%d\n",
-			       page, (int)PTR_ERR(io));
-			return PTR_ERR(io);
+			int err = PTR_ERR(io);
+
+			if (err != -EINTR && err != -ERESTARTSYS)
+				pr_err("Failed to iomap partial view: offset=%lu; err=%d\n",
+				       page, err);
+			return err;
 		}
 
 		iowrite32(page, io + n * PAGE_SIZE / sizeof(*io));
@@ -773,7 +777,7 @@ static int gtt_set(struct drm_i915_gem_object *obj)
 		return PTR_ERR(vma);
 
 	intel_gt_pm_get(vma->vm->gt);
-	map = i915_vma_pin_iomap(vma);
+	map = i915_vma_pin_iomap_unlocked(vma);
 	i915_vma_unpin(vma);
 	if (IS_ERR(map)) {
 		err = PTR_ERR(map);
@@ -799,7 +803,7 @@ static int gtt_check(struct drm_i915_gem_object *obj)
 		return PTR_ERR(vma);
 
 	intel_gt_pm_get(vma->vm->gt);
-	map = i915_vma_pin_iomap(vma);
+	map = i915_vma_pin_iomap_unlocked(vma);
 	i915_vma_unpin(vma);
 	if (IS_ERR(map)) {
 		err = PTR_ERR(map);

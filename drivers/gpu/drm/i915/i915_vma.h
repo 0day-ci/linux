@@ -326,6 +326,9 @@ static inline bool i915_node_color_differs(const struct drm_mm_node *node,
  * Returns a valid iomapped pointer or ERR_PTR.
  */
 void __iomem *i915_vma_pin_iomap(struct i915_vma *vma);
+
+void __iomem *i915_vma_pin_iomap_unlocked(struct i915_vma *vma);
+
 #define IO_ERR_PTR(x) ((void __iomem *)ERR_PTR(x))
 
 /**

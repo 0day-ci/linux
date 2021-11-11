@@ -1357,7 +1357,7 @@ static int get_registers(struct intel_overlay *overlay, bool use_phys)
 		overlay->flip_addr = sg_dma_address(obj->mm.pages->sgl);
 	else
 		overlay->flip_addr = i915_ggtt_offset(vma);
-	overlay->regs = i915_vma_pin_iomap(vma);
+	overlay->regs = i915_vma_pin_iomap_unlocked(vma);
 	i915_vma_unpin(vma);
 
 	if (IS_ERR(overlay->regs)) {
