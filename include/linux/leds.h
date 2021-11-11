@@ -535,6 +535,30 @@ enum led_trigger_netdev_modes {
 };
 #endif
 
+#ifdef CONFIG_LEDS_TRIGGER_HARDWARE_PHY_ACTIVITY
+/* 3 main category for offload trigger:
+ * - blink: the led will blink on trigger
+ * - keep: the led will be kept on with condition
+ * - option: a configuration value internal to the led on how offload works
+ */
+enum hardware_phy_activity {
+	TRIGGER_PHY_ACTIVITY_BLINK_TX, /* Blink on TX traffic */
+	TRIGGER_PHY_ACTIVITY_BLINK_RX, /* Blink on RX traffic */
+	TRIGGER_PHY_ACTIVITY_LINK_10M, /* LED on with 10M link */
+	TRIGGER_PHY_ACTIVITY_LINK_100M, /* LED on with 100M link */
+	TRIGGER_PHY_ACTIVITY_LINK_1000M, /* LED on with 1000M link */
+	TRIGGER_PHY_ACTIVITY_HALF_DUPLEX, /* LED on with Half-Duplex link */
+	TRIGGER_PHY_ACTIVITY_FULL_DUPLEX, /* LED on with Full-Duplex link */
+	TRIGGER_PHY_ACTIVITY_OPTION_LINKUP_OVER, /* LED will be on with KEEP blink mode and blink on BLINK traffic */
+	TRIGGER_PHY_ACTIVITY_OPTION_POWER_ON_RESET, /* LED will be on Switch reset */
+};
+
+struct hardware_phy_activity_data {
+	unsigned long mode;
+	struct attribute_group *group;
+};
+#endif
+
 /* Trigger specific functions */
 #ifdef CONFIG_LEDS_TRIGGER_DISK
 void ledtrig_disk_activity(bool write);
