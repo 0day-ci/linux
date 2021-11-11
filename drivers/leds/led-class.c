@@ -164,6 +164,26 @@ static void led_remove_brightness_hw_changed(struct led_classdev *led_cdev)
 }
 #endif
 
+#ifdef CONFIG_LEDS_HARDWARE_CONTROL
+static int led_classdev_check_hw_control_functions(struct led_classdev *led_cdev)
+{
+	if ((LED_SOFTWARE_CONTROLLED & led_cdev->flags) &&
+	    (LED_HARDWARE_CONTROLLED & led_cdev->flags) &&
+	    (!led_cdev->hw_control_status ||
+	    !led_cdev->hw_control_start ||
+	    !led_cdev->hw_control_stop))
+		return -EINVAL;
+
+	if ((LED_SOFTWARE_CONTROLLED & led_cdev->flags) &&
+	    (led_cdev->hw_control_status ||
+	    led_cdev->hw_control_start ||
+	    led_cdev->hw_control_stop))
+		return -EINVAL;
+
+	return 0;
+}
+#endif
+
 /**
  * led_classdev_suspend - suspend an led_classdev.
  * @led_cdev: the led_classdev to suspend.
@@ -366,6 +386,19 @@ int led_classdev_register_ext(struct device *parent,
 	ret = led_classdev_next_name(proposed_name, final_name, sizeof(final_name));
 	if (ret < 0)
 		return ret;
+
+	/* Make sure a control mode is set.
+	 * With no control mode declared, set SOFTWARE_CONTROLLED by default.
+	 */
+	if (!(LED_SOFTWARE_CONTROLLED & led_cdev->flags) &&
+	    !(LED_HARDWARE_CONTROLLED & led_cdev->flags))
+		led_cdev->flags |= LED_SOFTWARE_CONTROLLED;
+
+#ifdef CONFIG_LEDS_HARDWARE_CONTROL
+	ret = led_classdev_check_hw_control_functions(led_cdev);
+	if (ret < 0)
+		return ret;
+#endif
 
 	mutex_init(&led_cdev->led_access);
 	mutex_lock(&led_cdev->led_access);
