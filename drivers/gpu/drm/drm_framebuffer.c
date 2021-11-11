@@ -601,7 +601,7 @@ int drm_mode_getfb2_ioctl(struct drm_device *dev,
 		r->handles[i] = 0;
 		r->pitches[i] = 0;
 		r->offsets[i] = 0;
-		r->modifier[i] = 0;
+		r->modifier[i] = DRM_FORMAT_MOD_INVALID;
 	}
 
 	for (i = 0; i < fb->format->num_planes; i++) {
