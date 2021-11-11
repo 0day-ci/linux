@@ -505,6 +505,33 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
 
 #endif /* CONFIG_LEDS_TRIGGERS */
 
+/* Trigger specific trigger_data used by netdev trigger */
+#ifdef CONFIG_LEDS_TRIGGER_NETDEV
+struct led_netdev_data {
+	spinlock_t lock;
+
+	struct delayed_work work;
+	struct notifier_block notifier;
+
+	struct led_classdev *led_cdev;
+	struct net_device *net_dev;
+
+	char device_name[IFNAMSIZ];
+	atomic_t interval;
+	unsigned int last_activity;
+
+	unsigned long mode;
+	bool carrier_link_up;
+};
+
+/* Trigger specific bitmap blink mode used by netdev trigger */
+enum led_trigger_netdev_modes {
+	TRIGGER_NETDEV_LINK,
+	TRIGGER_NETDEV_TX,
+	TRIGGER_NETDEV_RX,
+};
+#endif
+
 /* Trigger specific functions */
 #ifdef CONFIG_LEDS_TRIGGER_DISK
 void ledtrig_disk_activity(bool write);
