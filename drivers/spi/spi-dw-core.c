@@ -308,8 +308,8 @@ static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 		/* CTRLR0[14] Slave Select Toggle Enable */
 		cr0 |= chip->sste << DWC_SSI_CTRLR0_SSTE_OFFSET;
 
-		if (dws->caps & DW_SPI_CAP_KEEMBAY_MST)
-			cr0 |= DWC_SSI_CTRLR0_KEEMBAY_MST;
+		/* CTRLR0[31] MST */
+		cr0 |= DWC_SSI_CTRLR0_MST;
 	}
 
 	return cr0;

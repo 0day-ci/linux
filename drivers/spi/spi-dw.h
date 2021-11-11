@@ -78,11 +78,11 @@
 #define DWC_SSI_CTRLR0_DFS_OFFSET	0
 
 /*
- * For Keem Bay, CTRLR0[31] is used to select controller mode.
+ * CTRLR0[31] is used to select controller mode.
  * 0: SSI is slave
  * 1: SSI is master
  */
-#define DWC_SSI_CTRLR0_KEEMBAY_MST	BIT(31)
+#define DWC_SSI_CTRLR0_MST		BIT(31)
 
 /* Bit fields in CTRLR1 */
 #define SPI_NDF_MASK			GENMASK(15, 0)
