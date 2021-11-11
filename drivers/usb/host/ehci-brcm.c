@@ -63,6 +63,9 @@ static int ehci_brcm_hub_control(
 	unsigned long flags;
 	int retval, irq_disabled = 0;
 
+	if (!wIndex || wIndex > ports)
+		return -EPIPE;
+
 	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
 
 	/*
@@ -70,7 +73,6 @@ static int ehci_brcm_hub_control(
 	 * of RESUME
 	 */
 	if ((typeReq == GetPortStatus) &&
-	    (wIndex && wIndex <= ports) &&
 	    ehci->reset_done[wIndex-1] &&
 	    time_after_eq(jiffies, ehci->reset_done[wIndex-1]) &&
 	    (ehci_readl(ehci, status_reg) & PORT_RESUME)) {
