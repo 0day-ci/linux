@@ -90,7 +90,7 @@ static int caam_reset_hw_jr(struct device *dev)
 
 	if ((rd_reg32(&jrp->rregs->jrintstatus) & JRINT_ERR_HALT_MASK) !=
 	    JRINT_ERR_HALT_COMPLETE || timeout == 0) {
-		dev_err(dev, "failed to flush job ring %d\n", jrp->ridx);
+		dev_err(dev, "failed to flush job ring %x\n", jrp->ridx);
 		return -EIO;
 	}
 
@@ -101,7 +101,7 @@ static int caam_reset_hw_jr(struct device *dev)
 		cpu_relax();
 
 	if (timeout == 0) {
-		dev_err(dev, "failed to reset job ring %d\n", jrp->ridx);
+		dev_err(dev, "failed to reset job ring %x\n", jrp->ridx);
 		return -EIO;
 	}
 
@@ -489,7 +489,7 @@ static int caam_jr_init(struct device *dev)
 	error = devm_request_irq(dev, jrp->irq, caam_jr_interrupt, IRQF_SHARED,
 				 dev_name(dev), dev);
 	if (error) {
-		dev_err(dev, "can't connect JobR %d interrupt (%d)\n",
+		dev_err(dev, "can't connect JobR %x interrupt (%d)\n",
 			jrp->ridx, jrp->irq);
 		tasklet_kill(&jrp->irqtask);
 	}
@@ -511,9 +511,32 @@ static int caam_jr_probe(struct platform_device *pdev)
 	struct device_node *nprop;
 	struct caam_job_ring __iomem *ctrl;
 	struct caam_drv_private_jr *jrpriv;
-	static int total_jobrs;
+	u32 ring_addr;
 	struct resource *r;
 	int error;
+
+	/*
+	 * Get register page to see the start address of CB.
+	 * Job Rings have their respective input base addresses
+	 * defined in the register IRBAR_JRx. This address is
+	 * present in the DT node and is aligned to the page
+	 * size defined at CAAM compile time.
+	 */
+	if (of_property_read_u32(pdev->dev.of_node, "reg", &ring_addr)) {
+		dev_err(&pdev->dev, "failed to get register address for jobr\n");
+		return -ENOMEM;
+	}
+
+	if (caam_ctrl_check_jr_perm(pdev->dev.parent, ring_addr)) {
+		/*
+		 * This job ring is marked to be exclusively used by TZ,
+		 * do not proceed with probing as the HW block is inaccessible.
+		 * Defer this device probing for later, it might be released
+		 * into NS world.
+		 */
+		dev_info(&pdev->dev, "job ring is reserved in secure world\n");
+		return -ENODEV;
+	}
 
 	jrdev = &pdev->dev;
 	jrpriv = devm_kzalloc(jrdev, sizeof(*jrpriv), GFP_KERNEL);
@@ -523,7 +546,7 @@ static int caam_jr_probe(struct platform_device *pdev)
 	dev_set_drvdata(jrdev, jrpriv);
 
 	/* save ring identity relative to detection */
-	jrpriv->ridx = total_jobrs++;
+	jrpriv->ridx = ring_addr;
 
 	nprop = pdev->dev.of_node;
 	/* Get configuration properties from device tree */

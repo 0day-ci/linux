@@ -115,6 +115,8 @@ struct caam_drv_private {
 #endif
 };
 
+inline int caam_ctrl_check_jr_perm(struct device *ctrldev, u32 ring_addr);
+
 #ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_CRYPTO_API
 
 int caam_algapi_init(struct device *dev);

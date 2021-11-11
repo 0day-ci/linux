@@ -80,6 +80,42 @@ static void build_deinstantiation_desc(u32 *desc, int handle)
 }
 
 /*
+ * caam_ctrl_check_jr_perm - check if the job ring can be accessed
+ *				from Non-Secure World.
+ * @ctrldev - pointer to CAAM control device
+ * @ring_addr - input address of Job Ring, which access should be verified
+ *
+ * Return: - 0 if Job Ring is available in NS World
+ *	    - 1 if Job Ring is reserved in the Secure World
+ */
+inline int caam_ctrl_check_jr_perm(struct device *ctrldev, u32 ring_addr)
+{
+	struct caam_drv_private *ctrlpriv = dev_get_drvdata(ctrldev);
+	struct caam_ctrl __iomem *ctrl = ctrlpriv->ctrl;
+	u32 ring_id;
+
+	ring_id = ring_addr >>
+		((ctrlpriv->caam_caps & CAAM_CAPS_64K_PAGESIZE) ?
+		16 : 12);
+	/*
+	 * Check if the JR is not owned exclusively by TZ,
+	 * and update capabilities bitmap to indicate that
+	 * the Job Ring is available.
+	 * Note: Ring index is 0-based in the register map
+	 */
+	if (!((rd_reg32(&ctrl->jr_mid[ring_id - 1].liodn_ms)) &
+		MSTRID_LOCK_TZ_OWN)) {
+		ctrlpriv->caam_caps |= BIT(ring_id);
+		return 0;
+	}
+
+	/* Job Ring is reserved, clear bit if is was set before */
+	ctrlpriv->caam_caps &= ~BIT(ring_id);
+	return 1;
+}
+EXPORT_SYMBOL(caam_ctrl_check_jr_perm);
+
+/*
  * run_descriptor_deco0 - runs a descriptor on DECO0, under direct control of
  *			  the software (no JR/QI used).
  * @ctrldev - pointer to device
@@ -612,7 +648,7 @@ static bool check_version(struct fsl_mc_version *mc_version, u32 major,
 /* Probe routine for CAAM top (controller) level */
 static int caam_probe(struct platform_device *pdev)
 {
-	int ret, ring, gen_sk, ent_delay = RTSDCTL_ENT_DLY_MIN;
+	int ret, gen_sk, ent_delay = RTSDCTL_ENT_DLY_MIN;
 	u64 caam_id;
 	const struct soc_device_attribute *imx_soc_match;
 	struct device *dev;
@@ -803,20 +839,27 @@ static int caam_probe(struct platform_device *pdev)
 #endif
 	}
 
-	ring = 0;
 	for_each_available_child_of_node(nprop, np)
 		if (of_device_is_compatible(np, "fsl,sec-v4.0-job-ring") ||
 		    of_device_is_compatible(np, "fsl,sec4.0-job-ring")) {
-			ctrlpriv->jr[ring] = (struct caam_job_ring __iomem __force *)
-					     ((__force uint8_t *)ctrl +
-					     (ring + JR_BLOCK_NUMBER) *
-					      BLOCK_OFFSET
-					     );
-			ring++;
-			ctrlpriv->caam_caps |= BIT(ring);
+			u32 ring_id;
+			/*
+			 * Get register page to see the start address of CB
+			 * This is used to index into the bitmap of available
+			 * job rings and indicate if it is available in NS world.
+			 */
+			ret = of_property_read_u32(np, "reg", &ring_id);
+			if (ret) {
+				dev_err(dev, "failed to get register address for jobr\n");
+				continue;
+			}
+			caam_ctrl_check_jr_perm(dev, ring_id);
 		}
 
-	/* If no QI and no rings specified, quit and go home */
+	/*
+	 * If no QI, no rings specified or no rings available for NS -
+	 * quit and go home
+	 */
 	if (!(ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) &&
 	    (hweight_long(ctrlpriv->caam_caps & CAAM_CAPS_JOBRS_MASK) == 0)) {
 		dev_err(dev, "no queues configured, terminating\n");
