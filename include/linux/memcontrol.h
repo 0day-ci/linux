@@ -944,6 +944,7 @@ struct mem_cgroup *mem_cgroup_get_from_path(const char *path);
  * it.
  */
 int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf, size_t len);
+bool is_remote_oom(struct mem_cgroup *memcg_under_oom);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 		int zid, int nr_pages);
@@ -979,6 +980,11 @@ static inline void mem_cgroup_exit_user_fault(void)
 {
 	WARN_ON(!current->in_user_fault);
 	current->in_user_fault = 0;
+}
+
+static inline bool is_in_user_fault(void)
+{
+	return current->in_user_fault;
 }
 
 static inline bool task_in_memcg_oom(struct task_struct *p)
@@ -1281,6 +1287,11 @@ static inline int mem_cgroup_get_name_from_sb(struct super_block *sb, char *buf,
 	return 0;
 }
 
+static inline bool is_remote_oom(struct mem_cgroup *memcg_under_oom)
+{
+	return false;
+}
+
 static inline int mem_cgroup_swapin_charge_page(struct page *page,
 			struct mm_struct *mm, gfp_t gfp, swp_entry_t entry)
 {
@@ -1470,6 +1481,11 @@ static inline void mem_cgroup_enter_user_fault(void)
 
 static inline void mem_cgroup_exit_user_fault(void)
 {
+}
+
+static inline bool is_in_user_fault(void)
+{
+	return false;
 }
 
 static inline bool task_in_memcg_oom(struct task_struct *p)
