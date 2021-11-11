@@ -2585,6 +2585,20 @@ static inline int can_use_console(void)
 	return cpu_online(raw_smp_processor_id()) || have_callable_console();
 }
 
+extern int rcu_cpu_stall_suppress;
+
+static void rcu_console_stall_suppress(void)
+{
+	if (!rcu_cpu_stall_suppress)
+		rcu_cpu_stall_suppress = 4;
+}
+
+static void rcu_console_stall_unsuppress(void)
+{
+	if (rcu_cpu_stall_suppress == 4)
+		rcu_cpu_stall_suppress = 0;
+}
+
 /**
  * console_unlock - unlock the console system
  *
@@ -2631,6 +2645,9 @@ void console_unlock(void)
 	 * and cleared after the "again" goto label.
 	 */
 	do_cond_resched = console_may_schedule;
+
+	rcu_console_stall_suppress();
+
 again:
 	console_may_schedule = 0;
 
@@ -2642,6 +2659,7 @@ again:
 	if (!can_use_console()) {
 		console_locked = 0;
 		up_console_sem();
+		rcu_console_stall_unsuppress();
 		return;
 	}
 
@@ -2713,8 +2731,10 @@ skip:
 
 		handover = console_lock_spinning_disable_and_check();
 		printk_safe_exit_irqrestore(flags);
-		if (handover)
+		if (handover) {
+			rcu_console_stall_unsuppress();
 			return;
+		}
 
 		if (do_cond_resched)
 			cond_resched();
@@ -2735,6 +2755,8 @@ skip:
 	retry = prb_read_valid(prb, next_seq, NULL);
 	if (retry && console_trylock())
 		goto again;
+
+	rcu_console_stall_unsuppress();
 }
 EXPORT_SYMBOL(console_unlock);
 
