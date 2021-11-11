@@ -524,11 +524,17 @@ xfs_vn_get_link_inline(
 
 	/*
 	 * The VFS crashes on a NULL pointer, so return -EFSCORRUPTED if
-	 * if_data is junk.
+	 * if_data is junk. Also, if the path walk is in rcu-walk mode
+	 * and the inode link path has gone away due inode re-use we have
+	 * no choice but to tell the VFS to redo the lookup.
 	 */
-	link = ip->i_df.if_u1.if_data;
+	link = rcu_dereference(ip->i_df.if_u1.if_data);
+	if (!dentry && !link)
+		return ERR_PTR(-ECHILD);
+
 	if (XFS_IS_CORRUPT(ip->i_mount, !link))
 		return ERR_PTR(-EFSCORRUPTED);
+
 	return link;
 }
 

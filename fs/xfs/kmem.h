@@ -61,6 +61,10 @@ static inline void  kmem_free(const void *ptr)
 {
 	kvfree(ptr);
 }
+static inline void  kmem_free_rcu(const void *ptr)
+{
+	kvfree_rcu(ptr);
+}
 
 
 static inline void *
