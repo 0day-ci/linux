@@ -1,0 +1,150 @@
+QA output created by 542
+*** mkfs
+*** mount FS
+attr_set: Input/output error
+Could not set "attr_name" for SCRATCH_MNT/empty_file1
+touch: cannot touch 'SCRATCH_MNT/empty_file1': Input/output error
+db6747306e971b6e3fd474aae10159a1  -
+
+attr_remove: Input/output error
+Could not remove "attr_name" for SCRATCH_MNT/empty_file1
+touch: cannot touch 'SCRATCH_MNT/empty_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name" for /mnt/scratch/empty_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name" for SCRATCH_MNT/empty_file2
+touch: cannot touch 'SCRATCH_MNT/empty_file2': Input/output error
+d489897d7ba99c2815052ae7dca29097  -
+
+attr_remove: Input/output error
+Could not remove "attr_name" for SCRATCH_MNT/empty_file2
+touch: cannot touch 'SCRATCH_MNT/empty_file2': Input/output error
+attr_get: No data available
+Could not get "attr_name" for /mnt/scratch/empty_file2
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name" for SCRATCH_MNT/empty_file3
+touch: cannot touch 'SCRATCH_MNT/empty_file3': Input/output error
+0ba8b18d622a11b5ff89336761380857  -
+
+attr_remove: Input/output error
+Could not remove "attr_name" for SCRATCH_MNT/empty_file3
+touch: cannot touch 'SCRATCH_MNT/empty_file3': Input/output error
+attr_get: No data available
+Could not get "attr_name" for /mnt/scratch/empty_file3
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/inline_file1
+touch: cannot touch 'SCRATCH_MNT/inline_file1': Input/output error
+49f4f904e12102a3423d8ab3f845e6e8  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/inline_file1
+touch: cannot touch 'SCRATCH_MNT/inline_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/inline_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/inline_file2
+touch: cannot touch 'SCRATCH_MNT/inline_file2': Input/output error
+6a0bd8b5aaa619bcd51f2ead0208f1bb  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/inline_file2
+touch: cannot touch 'SCRATCH_MNT/inline_file2': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/inline_file2
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/inline_file3
+touch: cannot touch 'SCRATCH_MNT/inline_file3': Input/output error
+3276329baa72c32f0a4a5cb0dbf813df  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/inline_file3
+touch: cannot touch 'SCRATCH_MNT/inline_file3': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/inline_file3
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/extent_file1
+touch: cannot touch 'SCRATCH_MNT/extent_file1': Input/output error
+8c6a952b2dbecaa5a308a00d2022e599  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/extent_file1
+touch: cannot touch 'SCRATCH_MNT/extent_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/extent_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name4" for SCRATCH_MNT/extent_file2
+touch: cannot touch 'SCRATCH_MNT/extent_file2': Input/output error
+c5ae4d474e547819a8807cfde66daba2  -
+
+attr_set: Input/output error
+Could not set "attr_name4" for SCRATCH_MNT/extent_file3
+touch: cannot touch 'SCRATCH_MNT/extent_file3': Input/output error
+17bae95be35ce7a0e6d4327b67da932b  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/extent_file4
+touch: cannot touch 'SCRATCH_MNT/extent_file4': Input/output error
+d17d94c39a964409b8b8173a51f8e951  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/extent_file4
+touch: cannot touch 'SCRATCH_MNT/extent_file4': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/extent_file4
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/remote_file1
+touch: cannot touch 'SCRATCH_MNT/remote_file1': Input/output error
+4104e21da013632e636cdd044884ca94  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/remote_file1
+touch: cannot touch 'SCRATCH_MNT/remote_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/remote_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/remote_file2
+touch: cannot touch 'SCRATCH_MNT/remote_file2': Input/output error
+9ac16e37ecd6f6c24de3f724c49199a8  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/remote_file2
+touch: cannot touch 'SCRATCH_MNT/remote_file2': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for /mnt/scratch/remote_file2
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/sf_file
+touch: cannot touch 'SCRATCH_MNT/sf_file': Input/output error
+33bc798a506b093a7c2cdea122a738d7  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/leaf_file
+touch: cannot touch 'SCRATCH_MNT/leaf_file': Input/output error
+dec146c586813046f4b876bcecbaa713  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/node_file
+touch: cannot touch 'SCRATCH_MNT/node_file': Input/output error
+e97ce3d15f9f28607b51f76bf8b7296c  -
+
+*** done
+*** unmount
