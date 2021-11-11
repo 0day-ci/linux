@@ -76,9 +76,9 @@ enum ish_loader_commands {
 #define LOADER_XFER_MODE_ISHTP			BIT(1)
 
 /* ISH Transport Loader client unique GUID */
-static const guid_t loader_ishtp_guid =
-	GUID_INIT(0xc804d06a, 0x55bd, 0x4ea7,
-		  0xad, 0xed, 0x1e, 0x31, 0x22, 0x8c, 0x76, 0xdc);
+#define LOADER_ISHTP_GUID \
+	GUID_INIT(0xc804d06a, 0x55bd, 0x4ea7, \
+		  0xad, 0xed, 0x1e, 0x31, 0x22, 0x8c, 0x76, 0xdc)
 
 #define FILENAME_SIZE				256
 
@@ -880,7 +880,7 @@ static int loader_init(struct ishtp_cl *loader_ishtp_cl, int reset)
 
 	fw_client =
 		ishtp_fw_cl_get_client(ishtp_get_ishtp_device(loader_ishtp_cl),
-				       &loader_ishtp_guid);
+				       &LOADER_ISHTP_GUID);
 	if (!fw_client) {
 		dev_err(cl_data_to_dev(client_data),
 			"ISH client uuid not found\n");
@@ -1057,14 +1057,14 @@ static int loader_ishtp_cl_reset(struct ishtp_cl_device *cl_device)
 
 static struct ishtp_cl_driver	loader_ishtp_cl_driver = {
 	.name = "ish-loader",
-	.guid = &loader_ishtp_guid,
+	.guid = &LOADER_ISHTP_GUID,
 	.probe = loader_ishtp_cl_probe,
 	.remove = loader_ishtp_cl_remove,
 	.reset = loader_ishtp_cl_reset,
 };
 
 static const struct ishtp_device_id loader_ishtp_id_table[] = {
-	{ loader_ishtp_guid },
+	{ LOADER_ISHTP_GUID },
 	{ }
 };
 MODULE_DEVICE_TABLE(ishtp, loader_ishtp_id_table);
