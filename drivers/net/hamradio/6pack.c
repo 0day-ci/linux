@@ -677,8 +677,6 @@ static void sixpack_close(struct tty_struct *tty)
 	/* Free all 6pack frame buffers after unreg. */
 	kfree(sp->rbuff);
 	kfree(sp->xbuff);
-
-	free_netdev(sp->dev);
 }
 
 /* Perform I/O control on an active 6pack channel. */
