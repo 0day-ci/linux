@@ -398,6 +398,10 @@ static const struct usb_audio_device_name usb_audio_names[] = {
 	PROFILE_NAME(0x0bda, 0x4014, "Dell", "WD15 Dock", "Dell-WD15-Dock"),
 	/* Dell WD19 Dock */
 	PROFILE_NAME(0x0bda, 0x402e, "Dell", "WD19 Dock", "Dell-WD15-Dock"),
+	/* Dell Desktop - Front */
+	PROFILE_NAME(0x0bda, 0x4c54, "Dell", "Desktop", "Dell-Desktop-Front"),
+	/* Dell Desktop - Rear */
+	PROFILE_NAME(0x0bda, 0x4c55, "Dell", "Desktop", "Dell-Desktop-Rear"),
 
 	DEVICE_NAME(0x0ccd, 0x0028, "TerraTec", "Aureon5.1MkII"),
 
