@@ -876,6 +876,7 @@ struct regmap *__regmap_init(struct device *dev,
 	if (!bus) {
 		map->reg_read  = config->reg_read;
 		map->reg_write = config->reg_write;
+		map->reg_update_bits = config->reg_update_bits;
 
 		map->defer_caching = false;
 		goto skip_format_initialization;
@@ -3064,7 +3065,7 @@ static int _regmap_update_bits(struct regmap *map, unsigned int reg,
 	if (change)
 		*change = false;
 
-	if (regmap_volatile(map, reg) && map->reg_update_bits) {
+	if ((regmap_volatile(map, reg) || !map->bus) && map->reg_update_bits) {
 		ret = map->reg_update_bits(map->bus_context, reg, mask, val);
 		if (ret == 0 && change)
 			*change = true;
