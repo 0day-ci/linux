@@ -6461,7 +6461,8 @@ static irqreturn_t ufshcd_tmc_handler(struct ufs_hba *hba)
 		struct request *req = hba->tmf_rqs[tag];
 		struct completion *c = req->end_io_data;
 
-		complete(c);
+		if (c)
+			complete(c);
 		ret = IRQ_HANDLED;
 	}
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
@@ -6620,7 +6621,10 @@ static int __ufshcd_issue_tm_cmd(struct ufs_hba *hba,
 		 * Make sure that ufshcd_compl_tm() does not trigger a
 		 * use-after-free.
 		 */
+		spin_lock_irqsave(hba->host->host_lock, flags);
 		req->end_io_data = NULL;
+		spin_unlock_irqrestore(hba->host->host_lock, flags);
+
 		ufshcd_add_tm_upiu_trace(hba, task_tag, UFS_TM_ERR);
 		dev_err(hba->dev, "%s: task management cmd 0x%.2x timed-out\n",
 				__func__, tm_function);
