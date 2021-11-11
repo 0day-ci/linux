@@ -36,3 +36,5 @@ The FW_UPLOAD_WRITE IOCTL passes in the address of a data buffer and starts
 the firmware upload. This IOCTL returns immediately after assigning the work
 to a kernel worker thread. This is an exclusive operation; an attempt to
 start concurrent firmware uploads for the same device will fail with EBUSY.
+An eventfd file descriptor parameter is also passed to this IOCTL. It will
+be signalled at the completion of the firmware upload.

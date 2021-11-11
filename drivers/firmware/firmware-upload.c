@@ -26,6 +26,7 @@ static void fw_upload_prog_complete(struct fw_upload *fwl)
 {
 	mutex_lock(&fwl->lock);
 	fwl->progress = FW_UPLOAD_PROG_IDLE;
+	eventfd_signal(fwl->finished, 1);
 	mutex_unlock(&fwl->lock);
 }
 
@@ -96,12 +97,15 @@ idle_exit:
 	vfree(fwl->data);
 	fwl->data = NULL;
 	fw_upload_prog_complete(fwl);
+	eventfd_ctx_put(fwl->finished);
+	fwl->finished = NULL;
 }
 
 static int fw_upload_ioctl_write(struct fw_upload *fwl, unsigned long arg)
 {
 	struct fw_upload_write wb;
 	unsigned long minsz;
+	int ret;
 	u8 *buf;
 
 	if (fwl->driver_unload || fwl->progress != FW_UPLOAD_PROG_IDLE)
@@ -114,13 +118,23 @@ static int fw_upload_ioctl_write(struct fw_upload *fwl, unsigned long arg)
 	if (wb.flags)
 		return -EINVAL;
 
+	if (wb.evtfd < 0)
+		return -EINVAL;
+
 	buf = vzalloc(wb.size);
 	if (!buf)
 		return -ENOMEM;
 
 	if (copy_from_user(buf, u64_to_user_ptr(wb.buf), wb.size)) {
-		vfree(buf);
-		return -EFAULT;
+		ret = -EFAULT;
+		goto exit_free;
+	}
+
+	fwl->finished = eventfd_ctx_fdget(wb.evtfd);
+	if (IS_ERR(fwl->finished)) {
+		ret = PTR_ERR(fwl->finished);
+		fwl->finished = NULL;
+		goto exit_free;
 	}
 
 	fwl->data = buf;
@@ -130,6 +144,10 @@ static int fw_upload_ioctl_write(struct fw_upload *fwl, unsigned long arg)
 	queue_work(system_long_wq, &fwl->work);
 
 	return 0;
+
+exit_free:
+	vfree(buf);
+	return ret;
 }
 
 static long fw_upload_ioctl(struct file *filp, unsigned int cmd,

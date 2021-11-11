@@ -37,7 +37,7 @@
  *				struct fw_upload_write)
  *
  * Upload a data buffer to the target device. The user must provide the
- * data buffer and size.
+ * data buffer, size, and an eventfd file descriptor.
  *
  * Return: 0 on success, -errno on failure.
  */
@@ -45,6 +45,7 @@ struct fw_upload_write {
 	/* Input */
 	__u32 flags;		/* Zero for now */
 	__u32 size;		/* Data size (in bytes) to be written */
+	__s32 evtfd;		/* File descriptor for completion signal */
 	__u64 buf;		/* User space address of source data */
 };
 
