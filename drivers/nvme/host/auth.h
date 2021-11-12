@@ -16,6 +16,7 @@ int nvme_auth_dhgroup_id(const char *dhgroup_name);
 
 const char *nvme_auth_hmac_name(int hmac_id);
 const char *nvme_auth_digest_name(int hmac_id);
+int nvme_auth_hmac_hash_len(int hmac_id);
 int nvme_auth_hmac_id(const char *hmac_name);
 
 unsigned char *nvme_auth_extract_secret(unsigned char *secret,
