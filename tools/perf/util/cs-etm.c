@@ -410,17 +410,13 @@ struct cs_etm_packet_queue
 static void cs_etm__packet_swap(struct cs_etm_auxtrace *etm,
 				struct cs_etm_traceid_queue *tidq)
 {
-	struct cs_etm_packet *tmp;
-
 	if (etm->sample_branches || etm->synth_opts.last_branch ||
 	    etm->sample_instructions) {
 		/*
 		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
 		 * the next incoming packet.
 		 */
-		tmp = tidq->packet;
-		tidq->packet = tidq->prev_packet;
-		tidq->prev_packet = tmp;
+		swap(tidq->packet, tidq->prev_packet);
 	}
 }
 
