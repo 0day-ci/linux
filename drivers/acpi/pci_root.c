@@ -946,6 +946,8 @@ out_release_info:
 void __init acpi_pci_root_init(void)
 {
 	acpi_hest_init();
+	sdei_init();
+	ghes_init();
 	if (acpi_pci_disabled)
 		return;
 

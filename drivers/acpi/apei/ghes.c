@@ -1457,7 +1457,7 @@ static struct platform_driver ghes_platform_driver = {
 	.remove		= ghes_remove,
 };
 
-static int __init ghes_init(void)
+int __init ghes_init(void)
 {
 	int rc;
 
@@ -1499,4 +1499,3 @@ static int __init ghes_init(void)
 err:
 	return rc;
 }
-device_initcall(ghes_init);

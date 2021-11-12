@@ -33,6 +33,8 @@ extern bool ghes_disable;
 
 #ifdef CONFIG_ACPI_APEI
 void __init acpi_hest_init(void);
+int __init sdei_init(void);
+int __init ghes_init(void);
 #else
 static inline void acpi_hest_init(void) { return; }
 #endif
