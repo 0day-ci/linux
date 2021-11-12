@@ -2081,14 +2081,10 @@ process_op(struct tep_event *event, struct tep_print_arg *arg, char **tok)
 
 		if (right->type == TEP_PRINT_OP &&
 		    get_op_prio(arg->op.op) < get_op_prio(right->op.op)) {
-			struct tep_print_arg tmp;
-
 			/* rotate ops according to the priority */
 			arg->op.right = right->op.left;
 
-			tmp = *arg;
-			*arg = *right;
-			*right = tmp;
+			swap(*arg, *right);
 
 			arg->op.left = right;
 		} else {
