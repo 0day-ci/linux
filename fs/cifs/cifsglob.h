@@ -8,7 +8,7 @@
  */
 #ifndef _CIFS_GLOB_H
 #define _CIFS_GLOB_H
-
+#include <linux/refcount.h>
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <linux/inet.h>
@@ -1128,7 +1128,7 @@ struct tcon_link {
 #define TCON_LINK_PENDING	1
 #define TCON_LINK_IN_TREE	2
 	unsigned long		tl_time;
-	atomic_t		tl_count;
+	refcount_t		tl_count;
 	struct cifs_tcon	*tl_tcon;
 };
 
