@@ -13,6 +13,10 @@
 #include "hif.h"
 #include <linux/remoteproc.h>
 
+#define CORE_TOP_CSR_OFFSET		0x01900000
+#define CORE_TOP_CSR_SIZE		0x100000
+#define TCSR_SOC_HW_VERSION		0x4D000
+
 static const struct of_device_id ath11k_ahb_of_match[] = {
 	/* TODO: Should we change the compatible string to something similar
 	 * to one that ath10k uses?
@@ -650,6 +654,44 @@ static int ath11k_core_get_rproc(struct ath11k_base *ab)
 	return 0;
 }
 
+static int ath11k_check_hw_version(struct ath11k_base *ab)
+{
+	void __iomem *mem_core;
+	u32 soc_hw_version, soc_hw_version_major, soc_hw_version_minor;
+
+	switch (ab->hw_rev) {
+	case ATH11K_HW_IPQ8074:
+	case ATH11K_HW_IPQ6018_HW10:
+		/* CORE_TOP_CSR register is out of wcss */
+		mem_core = ioremap(CORE_TOP_CSR_OFFSET, CORE_TOP_CSR_SIZE);
+		if (IS_ERR(mem_core)) {
+			ath11k_err(ab, "core_top_csr ioremap error\n");
+			return -ENOMEM;
+		}
+		soc_hw_version = ioread32(mem_core + TCSR_SOC_HW_VERSION);
+		iounmap(mem_core);
+		soc_hw_version_major = FIELD_GET(TCSR_SOC_HW_VERSION_MAJOR_MASK,
+						 soc_hw_version);
+		soc_hw_version_minor = FIELD_GET(TCSR_SOC_HW_VERSION_MINOR_MASK,
+						 soc_hw_version);
+
+		ath11k_dbg(ab, ATH11K_DBG_AHB, "tcsr_soc_hw_version major %u minor %u\n",
+			   soc_hw_version_major,
+			   soc_hw_version_minor);
+
+		if (soc_hw_version_major != ath11k_hw_version[ab->hw_rev]) {
+			ath11k_err(ab, "Unsupported SOC hardware version: %u\n",
+				   soc_hw_version_major);
+			return -EOPNOTSUPP;
+		}
+		break;
+	default:
+		ath11k_err(ab, "Unknown hw_ver: %u\n", ab->hw_rev);
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
 static int ath11k_ahb_probe(struct platform_device *pdev)
 {
 	struct ath11k_base *ab;
@@ -690,6 +732,10 @@ static int ath11k_ahb_probe(struct platform_device *pdev)
 	ab->mem = mem;
 	ab->mem_len = resource_size(mem_res);
 	platform_set_drvdata(pdev, ab);
+
+	ret = ath11k_check_hw_version(ab);
+	if (ret)
+		goto err_core_free;
 
 	ret = ath11k_core_pre_init(ab);
 	if (ret)

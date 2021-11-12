@@ -916,6 +916,19 @@ struct ath11k_fw_stats_bcn {
 	u32 tx_bcn_outage_cnt;
 };
 
+#define TCSR_SOC_HW_VERSION_MAJOR_MASK	GENMASK(15, 8)
+#define TCSR_SOC_HW_VERSION_MINOR_MASK	GENMASK(7, 0)
+#define ATH11K_HW_VERSION_HW10		1
+#define ATH11K_HW_VERSION_HW20		2
+
+static const u32 ath11k_hw_version[] = {
+	[ATH11K_HW_IPQ8074] = ATH11K_HW_VERSION_HW20,
+	[ATH11K_HW_QCA6390_HW20] = ATH11K_HW_VERSION_HW20,
+	[ATH11K_HW_IPQ6018_HW10] = ATH11K_HW_VERSION_HW10,
+	[ATH11K_HW_QCN9074_HW10] = ATH11K_HW_VERSION_HW10,
+	[ATH11K_HW_WCN6855_HW20] = ATH11K_HW_VERSION_HW20,
+};
+
 extern const struct ce_pipe_config ath11k_target_ce_config_wlan_ipq8074[];
 extern const struct service_to_pipe ath11k_target_service_to_ce_map_wlan_ipq8074[];
 extern const struct service_to_pipe ath11k_target_service_to_ce_map_wlan_ipq6018[];

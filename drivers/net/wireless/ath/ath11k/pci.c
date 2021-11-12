@@ -25,8 +25,7 @@
 #define WINDOW_RANGE_MASK		GENMASK(18, 0)
 
 #define TCSR_SOC_HW_VERSION		0x0224
-#define TCSR_SOC_HW_VERSION_MAJOR_MASK	GENMASK(16, 8)
-#define TCSR_SOC_HW_VERSION_MINOR_MASK	GENMASK(7, 0)
+#define QCN9074_TCSR_SOC_HW_VERSION	0x1B00000
 
 /* BAR0 + 4k is always accessible, and no
  * need to force wakeup.
@@ -1206,11 +1205,12 @@ static const struct ath11k_hif_ops ath11k_pci_hif_ops = {
 	.get_ce_msi_idx = ath11k_pci_get_ce_msi_idx,
 };
 
-static void ath11k_pci_read_hw_version(struct ath11k_base *ab, u32 *major, u32 *minor)
+static void ath11k_pci_read_hw_version(struct ath11k_base *ab, u32 offset,
+				       u32 *major, u32 *minor)
 {
 	u32 soc_hw_version;
 
-	soc_hw_version = ath11k_pci_read32(ab, TCSR_SOC_HW_VERSION);
+	soc_hw_version = ath11k_pci_read32(ab, offset);
 	*major = FIELD_GET(TCSR_SOC_HW_VERSION_MAJOR_MASK,
 			   soc_hw_version);
 	*minor = FIELD_GET(TCSR_SOC_HW_VERSION_MINOR_MASK,
@@ -1253,10 +1253,11 @@ static int ath11k_pci_probe(struct pci_dev *pdev,
 
 	switch (pci_dev->device) {
 	case QCA6390_DEVICE_ID:
-		ath11k_pci_read_hw_version(ab, &soc_hw_version_major,
+		ath11k_pci_read_hw_version(ab, TCSR_SOC_HW_VERSION,
+					   &soc_hw_version_major,
 					   &soc_hw_version_minor);
 		switch (soc_hw_version_major) {
-		case 2:
+		case ATH11K_HW_VERSION_HW20:
 			ab->hw_rev = ATH11K_HW_QCA6390_HW20;
 			break;
 		default:
@@ -1268,15 +1269,28 @@ static int ath11k_pci_probe(struct pci_dev *pdev,
 		ab_pci->msi_config = &ath11k_msi_config[0];
 		break;
 	case QCN9074_DEVICE_ID:
-		ab_pci->msi_config = &ath11k_msi_config[1];
-		ab->bus_params.static_window_map = true;
-		ab->hw_rev = ATH11K_HW_QCN9074_HW10;
-		break;
-	case WCN6855_DEVICE_ID:
-		ath11k_pci_read_hw_version(ab, &soc_hw_version_major,
+		ath11k_pci_read_hw_version(ab, QCN9074_TCSR_SOC_HW_VERSION,
+					   &soc_hw_version_major,
 					   &soc_hw_version_minor);
 		switch (soc_hw_version_major) {
-		case 2:
+		case ATH11K_HW_VERSION_HW10:
+			ab->hw_rev = ATH11K_HW_QCN9074_HW10;
+			break;
+		default:
+			dev_err(&pdev->dev, "Unsupported QCN9074 SOC hardware version: %d %d\n",
+				soc_hw_version_major, soc_hw_version_minor);
+			ret = -EOPNOTSUPP;
+			goto err_pci_free_region;
+		}
+		ab_pci->msi_config = &ath11k_msi_config[1];
+		ab->bus_params.static_window_map = true;
+		break;
+	case WCN6855_DEVICE_ID:
+		ath11k_pci_read_hw_version(ab, TCSR_SOC_HW_VERSION,
+					   &soc_hw_version_major,
+					   &soc_hw_version_minor);
+		switch (soc_hw_version_major) {
+		case ATH11K_HW_VERSION_HW20:
 			ab->hw_rev = ATH11K_HW_WCN6855_HW20;
 			break;
 		default:
