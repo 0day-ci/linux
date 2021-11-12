@@ -68,17 +68,39 @@ static void global_ctrl_changed(struct kvm_pmu *pmu, u64 data)
 		reprogram_counter(pmu, bit);
 }
 
+/* UMask and Event Select Encodings for Intel CPUID Events */
+static inline bool is_intel_cpuid_event(u8 event_select, u8 unit_mask)
+{
+	if ((!unit_mask && event_select == 0x3C) ||
+	    (!unit_mask && event_select == 0xC0) ||
+	    (unit_mask == 0x01 && event_select == 0x3C) ||
+	    (unit_mask == 0x4F && event_select == 0x2E) ||
+	    (unit_mask == 0x41 && event_select == 0x2E) ||
+	    (!unit_mask && event_select == 0xC4) ||
+	    (!unit_mask && event_select == 0xC5))
+		return true;
+
+	/* the unimplemented topdown.slots event check is kipped. */
+	return false;
+}
+
 static unsigned intel_find_arch_event(struct kvm_pmu *pmu,
 				      u8 event_select,
 				      u8 unit_mask)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(intel_arch_events); i++)
-		if (intel_arch_events[i].eventsel == event_select &&
-		    intel_arch_events[i].unit_mask == unit_mask &&
-		    ((i > 6) || pmu->available_event_types & (1 << i)))
-			break;
+	for (i = 0; i < ARRAY_SIZE(intel_arch_events); i++) {
+		if (intel_arch_events[i].eventsel != event_select ||
+		    intel_arch_events[i].unit_mask != unit_mask)
+			continue;
+
+		if (is_intel_cpuid_event(event_select, unit_mask) &&
+		    !(pmu->available_event_types & BIT_ULL(i)))
+			return PERF_COUNT_HW_MAX + 1;
+
+		break;
+	}
 
 	if (i == ARRAY_SIZE(intel_arch_events))
 		return PERF_COUNT_HW_MAX;
@@ -90,12 +112,23 @@ static unsigned int intel_find_fixed_event(struct kvm_pmu *pmu, int idx)
 {
 	u32 event;
 	size_t size = ARRAY_SIZE(fixed_pmc_events);
+	u8 event_select, unit_mask;
+	unsigned int event_type;
 
 	if (idx >= size)
 		return PERF_COUNT_HW_MAX;
 
 	event = fixed_pmc_events[array_index_nospec(idx, size)];
-	return intel_arch_events[event].event_type;
+
+	event_select = intel_arch_events[event].eventsel;
+	unit_mask = intel_arch_events[event].unit_mask;
+	event_type = intel_arch_events[event].event_type;
+
+	if (is_intel_cpuid_event(event_select, unit_mask) &&
+	    !(pmu->available_event_types & BIT_ULL(event_type)))
+		return PERF_COUNT_HW_MAX + 1;
+
+	return event_type;
 }
 
 /* check if a PMC is enabled by comparing it with globl_ctrl bits. */

@@ -111,6 +111,14 @@ static void pmc_reprogram_counter(struct kvm_pmc *pmc, u32 type,
 		.config = config,
 	};
 
+	/*
+	 * The "config > PERF_COUNT_HW_MAX" only appears when
+	 * the kernel generic event is marked as unavailable
+	 * in the Intel guest architecture event CPUID leaf.
+	 */
+	if (type == PERF_TYPE_HARDWARE && config >= PERF_COUNT_HW_MAX)
+		return;
+
 	attr.sample_period = get_sample_period(pmc, pmc->counter);
 
 	if (in_tx)
