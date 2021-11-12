@@ -178,6 +178,7 @@ struct ath11k_hw_params {
 	u8 max_tx_ring;
 	const struct ath11k_hw_hal_params *hal_params;
 	bool supports_dynamic_smps_6ghz;
+	bool wakeup_mhi;
 };
 
 struct ath11k_hw_ops {
