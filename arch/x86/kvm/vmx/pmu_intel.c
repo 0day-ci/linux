@@ -96,7 +96,7 @@ static unsigned intel_find_arch_event(struct kvm_pmu *pmu,
 			continue;
 
 		if (is_intel_cpuid_event(event_select, unit_mask) &&
-		    !(pmu->available_event_types & BIT_ULL(i)))
+		    !test_bit(i, pmu->avail_cpuid_events))
 			return PERF_COUNT_HW_MAX + 1;
 
 		break;
@@ -125,7 +125,7 @@ static unsigned int intel_find_fixed_event(struct kvm_pmu *pmu, int idx)
 	event_type = intel_arch_events[event].event_type;
 
 	if (is_intel_cpuid_event(event_select, unit_mask) &&
-	    !(pmu->available_event_types & BIT_ULL(event_type)))
+	    !test_bit(event_type, pmu->avail_cpuid_events))
 		return PERF_COUNT_HW_MAX + 1;
 
 	return event_type;
@@ -497,6 +497,7 @@ static void intel_pmu_refresh(struct kvm_vcpu *vcpu)
 {
 	struct kvm_pmu *pmu = vcpu_to_pmu(vcpu);
 	struct lbr_desc *lbr_desc = vcpu_to_lbr_desc(vcpu);
+	unsigned long avail_cpuid_events;
 
 	struct x86_pmu_capability x86_pmu;
 	struct kvm_cpuid_entry2 *entry;
@@ -527,8 +528,10 @@ static void intel_pmu_refresh(struct kvm_vcpu *vcpu)
 	eax.split.bit_width = min_t(int, eax.split.bit_width, x86_pmu.bit_width_gp);
 	pmu->counter_bitmask[KVM_PMC_GP] = ((u64)1 << eax.split.bit_width) - 1;
 	eax.split.mask_length = min_t(int, eax.split.mask_length, x86_pmu.events_mask_len);
-	pmu->available_event_types = ~entry->ebx &
-					((1ull << eax.split.mask_length) - 1);
+	avail_cpuid_events = ~entry->ebx & ((1ull << eax.split.mask_length) - 1);
+	bitmap_copy(pmu->avail_cpuid_events,
+		    (unsigned long *)&avail_cpuid_events,
+		    eax.split.mask_length);
 
 	if (pmu->version == 1) {
 		pmu->nr_arch_fixed_counters = 0;
