@@ -40,9 +40,11 @@ static void measure_clocks(struct intel_engine_cs *engine,
 {
 	ktime_t dt[5];
 	u32 cycles[5];
+	unsigned long flags;
 	int i;
 
 	for (i = 0; i < 5; i++) {
+		local_irq_save(flags);
 		preempt_disable();
 		cycles[i] = -ENGINE_READ_FW(engine, RING_TIMESTAMP);
 		dt[i] = ktime_get();
@@ -52,6 +54,7 @@ static void measure_clocks(struct intel_engine_cs *engine,
 		dt[i] = ktime_sub(ktime_get(), dt[i]);
 		cycles[i] += ENGINE_READ_FW(engine, RING_TIMESTAMP);
 		preempt_enable();
+		local_irq_restore(flags);
 	}
 
 	/* Use the median of both cycle/dt; close enough */
