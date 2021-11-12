@@ -161,9 +161,10 @@ int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq)
 		 * if it is then we are done, unless there is an
 		 * interrupt-map which takes precedence.
 		 */
+		bool intc = of_property_read_bool(ipar, "interrupt-controller");
+
 		imap = of_get_property(ipar, "interrupt-map", &imaplen);
-		if (imap == NULL &&
-		    of_property_read_bool(ipar, "interrupt-controller")) {
+		if (imap == NULL && intc) {
 			pr_debug(" -> got it !\n");
 			return 0;
 		}
@@ -244,8 +245,14 @@ int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq)
 
 			pr_debug(" -> imaplen=%d\n", imaplen);
 		}
-		if (!match)
+		if (!match) {
+			if (intc) {
+				pr_debug("%pOF interrupt-map failed, using interrupt-controller\n", ipar);
+				return 0;
+			}
+
 			goto fail;
+		}
 
 		/*
 		 * Successfully parsed an interrrupt-map translation; copy new
