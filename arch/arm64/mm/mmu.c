@@ -253,6 +253,8 @@ static void init_pmd(pud_t *pudp, unsigned long addr, unsigned long end,
 	pmd_clear_fixmap();
 }
 
+static bool crash_mem_map __initdata;
+
 static void alloc_init_cont_pmd(pud_t *pudp, unsigned long addr,
 				unsigned long end, phys_addr_t phys,
 				pgprot_t prot,
@@ -260,7 +262,15 @@ static void alloc_init_cont_pmd(pud_t *pudp, unsigned long addr,
 {
 	unsigned long next;
 	pud_t pud = READ_ONCE(*pudp);
+	unsigned long len = end - addr;
+	phys_addr_t kernel_start = __pa_symbol(_stext);
+	phys_addr_t kernel_end = __pa_symbol(__init_begin);
 
+	if (debug_pagealloc_enabled() || crash_mem_map || IS_ENABLED(CONFIG_KFENCE))
+		;
+	else if (phys > kernel_end || phys + len < kernel_start) {
+		flags &= ~(NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS);
+	}
 	/*
 	 * Check for initial section mappings in the pgd/pud.
 	 */
@@ -484,7 +494,6 @@ void __init mark_linear_text_alias_ro(void)
 			    PAGE_KERNEL_RO);
 }
 
-static bool crash_mem_map __initdata;
 
 static int __init enable_crash_mem_map(char *arg)
 {
