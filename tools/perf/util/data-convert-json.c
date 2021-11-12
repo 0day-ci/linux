@@ -168,8 +168,8 @@ static int process_sample_event(struct perf_tool *tool,
 	output_json_key_format(out, true, 3, "pid", "%i", al.thread->pid_);
 	output_json_key_format(out, true, 3, "tid", "%i", al.thread->tid);
 
-	if (al.thread->cpu >= 0)
-		output_json_key_format(out, true, 3, "cpu", "%i", al.thread->cpu);
+	if (al.cpu >= 0)
+		output_json_key_format(out, true, 3, "cpu", "%i", al.cpu);
 
 	output_json_key_string(out, true, 3, "comm", thread__comm_str(al.thread));
 
