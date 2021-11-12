@@ -14,6 +14,8 @@ Required properties:
 				on Exynos5260 SoCs.
 	-> "samsung,exynos7-hsi2c", for i2c compatible with HSI2C available
 				on Exynos7 SoCs.
+	-> "samsung,exynosautov9-hsi2c", for i2c compatible with HSI2C available
+				on ExynosAutov9 SoCs.
 
   - reg: physical base address of the controller and length of memory mapped
     region.
@@ -31,6 +33,11 @@ Optional properties:
        at 100khz.
     -> If specified, the bus operates in high-speed mode only if the
        clock-frequency is >= 1Mhz.
+  - samsung,sysreg : system registers controller phandle to control USI.
+    -> If I2C integrated to USI(Universal Serial Interface), this property
+       is required. When using Exynos USI block, it needs to select which type
+       of Serial IPs(UART, SPI, I2C) to use with system register. So, it
+       requires samsung,sysreg phandle and offset value of system register.
 
 Example:
 
