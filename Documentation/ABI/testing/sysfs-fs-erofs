@@ -1,0 +1,7 @@
+What:		/sys/fs/erofs/features/
+Date:		November 2021
+Contact:	"Huang Jianan" <huangjianan@oppo.com>
+Description:	Shows all enabled kernel features.
+		Supported features:
+		lz4_0padding, compr_cfgs, big_pcluster, device_table,
+		sb_chksum.
