@@ -91,6 +91,7 @@ int remap_io_mapping(struct vm_area_struct *vma,
 		     unsigned long addr, unsigned long pfn, unsigned long size,
 		     struct io_mapping *iomap)
 {
+#if IS_ENABLED(CONFIG_X86)
 	struct remap_pfn r;
 	int err;
 
@@ -108,6 +109,7 @@ int remap_io_mapping(struct vm_area_struct *vma,
 		zap_vma_ptes(vma, addr, (r.pfn - pfn) << PAGE_SHIFT);
 		return err;
 	}
+#endif
 
 	return 0;
 }
