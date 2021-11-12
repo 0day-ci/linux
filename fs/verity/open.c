@@ -242,6 +242,17 @@ ssize_t fsverity_get_file_digest(struct fsverity_info *info, u8 *buf,
 	return hash_digest_size[*algo];
 }
 
+/*
+ * Provide the information of whether the fsverity built-in signature was
+ * validated.
+ *
+ * Return: true if the signature was validated, false if not
+ */
+bool fsverity_sig_validated(struct fsverity_info *info)
+{
+	return info->sig_validated;
+}
+
 static bool validate_fsverity_descriptor(struct inode *inode,
 					 const struct fsverity_descriptor *desc,
 					 size_t desc_size)
@@ -333,12 +344,18 @@ static int ensure_verity_info(struct inode *inode)
 	size_t desc_size;
 	int err;
 
-	if (vi)
+	if (vi && (!fsverity_require_signatures || vi->sig_validated))
 		return 0;
 
 	err = fsverity_get_descriptor(inode, &desc, &desc_size);
 	if (err)
 		return err;
+
+	if (vi) {
+		err = fsverity_verify_signature(vi, desc->signature,
+						le32_to_cpu(desc->sig_size));
+		goto out_free_desc;
+	}
 
 	vi = fsverity_create_info(inode, desc, desc_size);
 	if (IS_ERR(vi)) {

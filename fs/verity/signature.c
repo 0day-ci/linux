@@ -16,7 +16,7 @@
  * /proc/sys/fs/verity/require_signatures
  * If 1, all verity files must have a valid builtin signature.
  */
-static int fsverity_require_signatures;
+int fsverity_require_signatures;
 
 /*
  * Keyring that contains the trusted X.509 certificates.
@@ -37,7 +37,7 @@ static struct key *fsverity_keyring;
  *
  * Return: 0 on success (signature valid or not required); -errno on failure
  */
-int fsverity_verify_signature(const struct fsverity_info *vi,
+int fsverity_verify_signature(struct fsverity_info *vi,
 			      const u8 *signature, size_t sig_size)
 {
 	const struct inode *inode = vi->inode;
@@ -81,6 +81,8 @@ int fsverity_verify_signature(const struct fsverity_info *vi,
 				     err);
 		return err;
 	}
+
+	vi->sig_validated = true;
 
 	pr_debug("Valid signature for file digest %s:%*phN\n",
 		 hash_alg->name, hash_alg->digest_size, vi->file_digest);

@@ -140,6 +140,7 @@ int fsverity_prepare_setattr(struct dentry *dentry, struct iattr *attr);
 void fsverity_cleanup_inode(struct inode *inode);
 ssize_t fsverity_get_file_digest(struct fsverity_info *info, u8 *buf,
 				 size_t bufsize, enum hash_algo *algo);
+bool fsverity_sig_validated(struct fsverity_info *info);
 
 /* read_metadata.c */
 
@@ -195,6 +196,11 @@ static inline ssize_t fsverity_get_file_digest(struct fsverity_info *info,
 					       enum hash_algo *algo)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline bool fsverity_sig_validated(struct fsverity_info *info)
+{
+	return false;
 }
 
 /* read_metadata.c */
