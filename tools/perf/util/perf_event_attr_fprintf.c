@@ -94,7 +94,6 @@ int perf_event_attr__fprintf(FILE *fp, struct perf_event_attr *attr,
 			     attr__fprintf_f attr__fprintf, void *priv)
 {
 	char buf[BUF_SIZE];
-	int ret = 0;
 
 	PRINT_ATTRf(type, p_unsigned);
 	PRINT_ATTRf(size, p_unsigned);
@@ -155,5 +154,5 @@ int perf_event_attr__fprintf(FILE *fp, struct perf_event_attr *attr,
 	PRINT_ATTRf(aux_sample_size, p_unsigned);
 	PRINT_ATTRf(sig_data, p_unsigned);
 
-	return ret;
+	return 0;
 }
