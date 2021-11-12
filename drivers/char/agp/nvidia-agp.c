@@ -261,7 +261,7 @@ static int nvidia_remove_memory(struct agp_memory *mem, off_t pg_start, int type
 static void nvidia_tlbflush(struct agp_memory *mem)
 {
 	unsigned long end;
-	u32 wbc_reg, temp;
+	u32 wbc_reg;
 	int i;
 
 	/* flush chipset */
@@ -283,9 +283,9 @@ static void nvidia_tlbflush(struct agp_memory *mem)
 
 	/* flush TLB entries */
 	for (i = 0; i < 32 + 1; i++)
-		temp = readl(nvidia_private.aperture+(i * PAGE_SIZE / sizeof(u32)));
+		(void)readl(nvidia_private.aperture+(i * PAGE_SIZE / sizeof(u32)));
 	for (i = 0; i < 32 + 1; i++)
-		temp = readl(nvidia_private.aperture+(i * PAGE_SIZE / sizeof(u32)));
+		(void)readl(nvidia_private.aperture+(i * PAGE_SIZE / sizeof(u32)));
 }
 
 
