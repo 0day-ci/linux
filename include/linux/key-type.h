@@ -34,6 +34,8 @@ struct key_preparsed_payload {
 	union key_payload payload;	/* Proposed payload */
 	const void	*data;		/* Raw data */
 	size_t		datalen;	/* Raw datalen */
+	const void	*decoded;	/* PEM-decoded data */
+	size_t		decoded_len;	/* Length of PEM-decoded data */
 	size_t		quotalen;	/* Quota length for proposed payload */
 	time64_t	expiry;		/* Expiry time of key */
 } __randomize_layout;

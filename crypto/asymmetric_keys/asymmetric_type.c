@@ -12,10 +12,12 @@
 #include <linux/seq_file.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/ctype.h>
 #include <keys/system_keyring.h>
 #include <keys/user-type.h>
 #include "asymmetric_keys.h"
+#include "pem.h"
 
 MODULE_LICENSE("GPL");
 
@@ -378,6 +380,10 @@ static int asymmetric_key_preparse(struct key_preparsed_payload *prep)
 	if (prep->datalen == 0)
 		return -EINVAL;
 
+	ret = pem_decode(prep);
+	if (ret < 0)
+		return ret;
+
 	down_read(&asymmetric_key_parsers_sem);
 
 	ret = -EBADMSG;
@@ -428,6 +434,7 @@ static void asymmetric_key_free_preparse(struct key_preparsed_payload *prep)
 	}
 	asymmetric_key_free_kids(kids);
 	kfree(prep->description);
+	vfree(prep->decoded);
 }
 
 /*

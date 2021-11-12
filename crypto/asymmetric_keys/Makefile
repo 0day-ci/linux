@@ -8,7 +8,8 @@ obj-$(CONFIG_ASYMMETRIC_KEY_TYPE) += asymmetric_keys.o
 asymmetric_keys-y := \
 	asymmetric_type.o \
 	restrict.o \
-	signature.o
+	signature.o \
+	pem.o
 
 obj-$(CONFIG_ASYMMETRIC_PUBLIC_KEY_SUBTYPE) += public_key.o
 obj-$(CONFIG_ASYMMETRIC_TPM_KEY_SUBTYPE) += asym_tpm.o

@@ -167,7 +167,10 @@ static int x509_key_preparse(struct key_preparsed_payload *prep)
 	char *desc = NULL, *p;
 	int ret;
 
-	cert = x509_cert_parse(prep->data, prep->datalen);
+	if (prep->decoded)
+		cert = x509_cert_parse(prep->decoded, prep->decoded_len);
+	else
+		cert = x509_cert_parse(prep->data, prep->datalen);
 	if (IS_ERR(cert))
 		return PTR_ERR(cert);
 

@@ -137,7 +137,10 @@ static int pkcs8_key_preparse(struct key_preparsed_payload *prep)
 {
 	struct public_key *pub;
 
-	pub = pkcs8_parse(prep->data, prep->datalen);
+	if (prep->decoded)
+		pub = pkcs8_parse(prep->decoded, prep->decoded_len);
+	else
+		pub = pkcs8_parse(prep->data, prep->datalen);
 	if (IS_ERR(pub))
 		return PTR_ERR(pub);
 
