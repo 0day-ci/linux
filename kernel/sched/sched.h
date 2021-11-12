@@ -2951,7 +2951,7 @@ static inline unsigned long cpu_util_cfs(struct rq *rq)
 			     READ_ONCE(rq->cfs.avg.util_est.enqueued));
 	}
 
-	return util;
+	return min(util, capacity_orig_of(cpu_of(rq)));
 }
 
 static inline unsigned long cpu_util_rt(struct rq *rq)
