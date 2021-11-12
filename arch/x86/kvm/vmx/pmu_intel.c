@@ -86,7 +86,7 @@ static unsigned intel_find_arch_event(struct kvm_pmu *pmu,
 	return intel_arch_events[i].event_type;
 }
 
-static unsigned intel_find_fixed_event(int idx)
+static unsigned int intel_find_fixed_event(struct kvm_pmu *pmu, int idx)
 {
 	u32 event;
 	size_t size = ARRAY_SIZE(fixed_pmc_events);

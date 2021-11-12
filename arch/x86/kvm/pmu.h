@@ -26,7 +26,7 @@ struct kvm_event_hw_type_mapping {
 struct kvm_pmu_ops {
 	unsigned (*find_arch_event)(struct kvm_pmu *pmu, u8 event_select,
 				    u8 unit_mask);
-	unsigned (*find_fixed_event)(int idx);
+	unsigned int (*find_fixed_event)(struct kvm_pmu *pmu, int idx);
 	bool (*pmc_is_enabled)(struct kvm_pmc *pmc);
 	struct kvm_pmc *(*pmc_idx_to_pmc)(struct kvm_pmu *pmu, int pmc_idx);
 	struct kvm_pmc *(*rdpmc_ecx_to_pmc)(struct kvm_vcpu *vcpu,

@@ -152,7 +152,7 @@ static unsigned amd_find_arch_event(struct kvm_pmu *pmu,
 }
 
 /* return PERF_COUNT_HW_MAX as AMD doesn't have fixed events */
-static unsigned amd_find_fixed_event(int idx)
+static unsigned int amd_find_fixed_event(struct kvm_pmu *pmu, int idx)
 {
 	return PERF_COUNT_HW_MAX;
 }
