@@ -1368,6 +1368,9 @@ static int ax88179_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->needed_headroom = 8;
 	dev->net->max_mtu = 4088;
 
+	if (usb_device_no_sg_constraint(dev->udev))
+		dev->can_dma_sg = 1;
+
 	/* Initialize MII structure */
 	dev->mii.dev = dev->net;
 	dev->mii.mdio_read = ax88179_mdio_read;
@@ -1377,11 +1380,14 @@ static int ax88179_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->mii.phy_id = 0x03;
 	dev->mii.supports_gmii = 1;
 
-	dev->net->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-			      NETIF_F_RXCSUM;
+	dev->net->features |= NETIF_F_SG | NETIF_F_IP_CSUM |
+			      NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM | NETIF_F_TSO;
 
-	dev->net->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-				 NETIF_F_RXCSUM;
+	dev->net->hw_features |= NETIF_F_SG | NETIF_F_IP_CSUM |
+				 NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM |
+				 NETIF_F_TSO;
+
+	netif_set_gso_max_size(dev->net, 16384);
 
 	/* Enable checksum offload */
 	*tmp = AX_RXCOE_IP | AX_RXCOE_TCP | AX_RXCOE_UDP |
@@ -1536,6 +1542,10 @@ ax88179_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
 		tx_hdr2 |= 0x80008000;	/* Enable padding */
 
 	headroom = skb_headroom(skb) - 8;
+
+	if (!dev->can_dma_sg && (dev->net->features & NETIF_F_SG) &&
+	    skb_linearize(skb))
+		return NULL;
 
 	if ((skb_header_cloned(skb) || headroom < 0) &&
 	    pskb_expand_head(skb, headroom < 0 ? 8 : 0, 0, GFP_ATOMIC)) {
