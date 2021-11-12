@@ -19149,6 +19149,7 @@ L:	linux-mm@kvack.org
 S:	Maintained
 F:	include/linux/shmem_fs.h
 F:	mm/shmem.c
+F:	mm/shmem_verity.c
 
 TOMOYO SECURITY MODULE
 M:	Kentaro Takeda <takedakn@nttdata.co.jp>

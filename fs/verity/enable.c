@@ -13,6 +13,7 @@
 #include <linux/pagemap.h>
 #include <linux/sched/signal.h>
 #include <linux/uaccess.h>
+#include <linux/shmem_fs.h>
 
 /*
  * Read a file data page for Merkle tree construction.  Do aggressive readahead,
@@ -31,7 +32,10 @@ static struct page *read_file_data_page(struct file *filp, pgoff_t index,
 		else
 			page_cache_sync_readahead(filp->f_mapping, ra, filp,
 						  index, remaining_pages);
-		page = read_mapping_page(filp->f_mapping, index, NULL);
+		if (shmem_file(filp))
+			page = shmem_read_mapping_page(filp->f_mapping, index);
+		else
+			page = read_mapping_page(filp->f_mapping, index, NULL);
 		if (IS_ERR(page))
 			return page;
 	}

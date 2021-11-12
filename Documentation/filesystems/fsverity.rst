@@ -533,6 +533,24 @@ Currently, f2fs verity only supports a Merkle tree block size of 4096.
 Also, f2fs doesn't support enabling verity on files that currently
 have atomic or volatile writes pending.
 
+tmpfs
+-----
+
+tmpfs supports fsverity since Linux v5.17.
+
+Fsverity support for tmpfs can be enabled at build time through the kernel
+configuration option ``CONFIG_TMPFS_VERITY``. If enabled, it is also
+automatically enabled at mount time for every tmpfs filesystem
+instantiated.
+
+Like f2fs, tmpfs stores the verity metadata (Merkle tree and
+fsverity_descriptor) past the end of the file, starting at the first
+64K boundary beyond i_size. Also, like f2fs, it stores the fsverity
+descriptor location in an xattr.
+
+Currently, tmpfs verity only supports the case where the Merkle tree
+block size and page size are the same.
+
 Implementation details
 ======================
 

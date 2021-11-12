@@ -10,6 +10,9 @@
 #include <linux/xattr.h>
 #include <linux/fs_parser.h>
 
+#define SHMEM_VERITY_IN_PROGRESS 0x00000001
+#define SHMEM_XATTR_NAME_VERITY "v"
+
 /* inode in-kernel data */
 
 struct shmem_inode_info {
@@ -44,6 +47,7 @@ struct shmem_sb_info {
 	spinlock_t shrinklist_lock;   /* Protects shrinklist */
 	struct list_head shrinklist;  /* List of shinkable inodes */
 	unsigned long shrinklist_len; /* Length of shrinklist */
+	bool verity;		      /* Fsverity enabled or not */
 };
 
 static inline struct shmem_inode_info *SHMEM_I(struct inode *inode)
@@ -51,10 +55,33 @@ static inline struct shmem_inode_info *SHMEM_I(struct inode *inode)
 	return container_of(inode, struct shmem_inode_info, vfs_inode);
 }
 
+static inline bool shmem_verity_in_progress(struct inode *inode)
+{
+	struct shmem_inode_info *info = SHMEM_I(inode);
+
+	return IS_ENABLED(CONFIG_FS_VERITY) &&
+	       (info->flags & SHMEM_VERITY_IN_PROGRESS);
+}
+
+static inline void shmem_verity_set_in_progress(struct inode *inode)
+{
+	struct shmem_inode_info *info = SHMEM_I(inode);
+
+	info->flags |= SHMEM_VERITY_IN_PROGRESS;
+}
+
+static inline void shmem_verity_clear_in_progress(struct inode *inode)
+{
+	struct shmem_inode_info *info = SHMEM_I(inode);
+
+	info->flags &= ~SHMEM_VERITY_IN_PROGRESS;
+}
+
 /*
  * Functions in mm/shmem.c called directly from elsewhere:
  */
 extern const struct fs_parameter_spec shmem_fs_parameters[];
+extern const struct fsverity_operations shmem_verityops;
 extern int shmem_init(void);
 extern int shmem_init_fs_context(struct fs_context *fc);
 extern struct file *shmem_file_setup(const char *name,

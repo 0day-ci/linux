@@ -229,6 +229,13 @@ config TMPFS_INODE64
 
 	  If unsure, say N.
 
+config TMPFS_VERITY
+	bool "fsverity support for tmpfs (EXPERIMENTAL)"
+	depends on FS_VERITY && TMPFS && TMPFS_XATTR
+
+	help
+	  Enable fsverity protection for files in the tmpfs filesystem.
+
 config ARCH_SUPPORTS_HUGETLBFS
 	def_bool n
 

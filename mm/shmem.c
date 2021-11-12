@@ -78,6 +78,7 @@ static struct vfsmount *shm_mnt;
 #include <linux/userfaultfd_k.h>
 #include <linux/rmap.h>
 #include <linux/uuid.h>
+#include <linux/fsverity.h>
 
 #include <linux/uaccess.h>
 
@@ -1089,6 +1090,10 @@ static int shmem_setattr(struct user_namespace *mnt_userns,
 	if (error)
 		return error;
 
+	error = fsverity_prepare_setattr(dentry, attr);
+	if (error)
+		return error;
+
 	if (S_ISREG(inode->i_mode) && (attr->ia_valid & ATTR_SIZE)) {
 		loff_t oldsize = inode->i_size;
 		loff_t newsize = attr->ia_size;
@@ -1156,6 +1161,7 @@ static void shmem_evict_inode(struct inode *inode)
 		}
 	}
 
+	fsverity_cleanup_inode(inode);
 	simple_xattrs_free(&info->xattrs);
 	WARN_ON(inode->i_blocks);
 	shmem_free_inode(inode->i_sb);
@@ -1827,7 +1833,8 @@ static int shmem_getpage_gfp(struct inode *inode, pgoff_t index,
 		return -EFBIG;
 repeat:
 	if (sgp <= SGP_CACHE &&
-	    ((loff_t)index << PAGE_SHIFT) >= i_size_read(inode)) {
+	    ((loff_t)index << PAGE_SHIFT) >= i_size_read(inode) &&
+	    !fsverity_active(inode) && !shmem_verity_in_progress(inode)) {
 		return -EINVAL;
 	}
 
@@ -2485,7 +2492,7 @@ shmem_write_end(struct file *file, struct address_space *mapping,
 {
 	struct inode *inode = mapping->host;
 
-	if (pos + copied > inode->i_size)
+	if (pos + copied > inode->i_size && !shmem_verity_in_progress(inode))
 		i_size_write(inode, pos + copied);
 
 	if (!PageUptodate(page)) {
@@ -2804,6 +2811,56 @@ out:
 	inode_unlock(inode);
 	return error;
 }
+
+static bool shmem_sb_has_verity(struct inode *inode)
+{
+	return SHMEM_SB(inode->i_sb)->verity;
+}
+
+static int shmem_ioc_enable_verity(struct file *filp, unsigned long arg)
+{
+	if (!shmem_sb_has_verity(file_inode(filp)))
+		return -EOPNOTSUPP;
+
+	return fsverity_ioctl_enable(filp, (const void __user *)arg);
+}
+
+static int shmem_ioc_measure_verity(struct file *filp, unsigned long arg)
+{
+	if (!shmem_sb_has_verity(file_inode(filp)))
+		return -EOPNOTSUPP;
+
+	return fsverity_ioctl_measure(filp, (void __user *)arg);
+}
+
+static int shmem_ioc_read_verity_metadata(struct file *filp, unsigned long arg)
+{
+	if (!shmem_sb_has_verity(file_inode(filp)))
+		return -EOPNOTSUPP;
+
+	return fsverity_ioctl_read_metadata(filp, (const void __user *)arg);
+}
+
+static long shmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case FS_IOC_ENABLE_VERITY:
+		return shmem_ioc_enable_verity(filp, arg);
+	case FS_IOC_MEASURE_VERITY:
+		return shmem_ioc_measure_verity(filp, arg);
+	case FS_IOC_READ_VERITY_METADATA:
+		return shmem_ioc_read_verity_metadata(filp, arg);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+#ifdef CONFIG_TMPFS_VERITY
+static int shmem_file_open(struct inode *inode, struct file *filp)
+{
+	return fsverity_file_open(inode, filp);
+}
+#endif
 
 static int shmem_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
@@ -3673,6 +3730,10 @@ static int shmem_fill_super(struct super_block *sb, struct fs_context *fc)
 	}
 	sb->s_export_op = &shmem_export_ops;
 	sb->s_flags |= SB_NOSEC;
+#ifdef CONFIG_TMPFS_VERITY
+	sb->s_vop = &shmem_verityops;
+	sbinfo->verity = true;
+#endif
 #else
 	sb->s_flags |= SB_NOUSER;
 #endif
@@ -3825,6 +3886,10 @@ static const struct file_operations shmem_file_operations = {
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
 	.fallocate	= shmem_fallocate,
+	.unlocked_ioctl	= shmem_ioctl,
+#ifdef CONFIG_TMPFS_VERITY
+	.open		= shmem_file_open,
+#endif
 #endif
 };
 

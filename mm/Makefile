@@ -54,6 +54,8 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
 			   interval_tree.o list_lru.o workingset.o \
 			   debug.o gup.o mmap_lock.o $(mmu-y)
 
+obj-$(CONFIG_TMPFS_VERITY)	+= shmem_verity.o
+
 # Give 'page_alloc' its own module-parameter namespace
 page-alloc-y := page_alloc.o
 page-alloc-$(CONFIG_SHUFFLE_PAGE_ALLOCATOR) += shuffle.o
