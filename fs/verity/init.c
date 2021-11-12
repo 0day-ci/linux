@@ -58,4 +58,4 @@ err_exit_info_cache:
 	fsverity_exit_info_cache();
 	return err;
 }
-late_initcall(fsverity_init)
+core_initcall(fsverity_init)
