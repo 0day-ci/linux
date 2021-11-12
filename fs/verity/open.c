@@ -218,6 +218,30 @@ void fsverity_free_info(struct fsverity_info *vi)
 	kmem_cache_free(fsverity_info_cachep, vi);
 }
 
+/*
+ * Copy the file digest and associated algorithm taken from the passed
+ * fsverity_info structure to the locations supplied by the caller.
+ *
+ * Return: the digest size on success, a negative value on error
+ */
+ssize_t fsverity_get_file_digest(struct fsverity_info *info, u8 *buf,
+				 size_t bufsize, enum hash_algo *algo)
+{
+	enum hash_algo a;
+
+	a = match_string(hash_algo_name, HASH_ALGO__LAST,
+			 info->tree_params.hash_alg->name);
+	if (a < 0)
+		return a;
+
+	if (bufsize < hash_digest_size[a])
+		return -ERANGE;
+
+	*algo = a;
+	memcpy(buf, info->file_digest, hash_digest_size[*algo]);
+	return hash_digest_size[*algo];
+}
+
 static bool validate_fsverity_descriptor(struct inode *inode,
 					 const struct fsverity_descriptor *desc,
 					 size_t desc_size)

@@ -13,6 +13,7 @@
 
 #include <linux/fs.h>
 #include <uapi/linux/fsverity.h>
+#include <crypto/hash_info.h>
 
 /* Verity operations for filesystems */
 struct fsverity_operations {
@@ -137,6 +138,8 @@ int fsverity_ioctl_measure(struct file *filp, void __user *arg);
 int fsverity_file_open(struct inode *inode, struct file *filp);
 int fsverity_prepare_setattr(struct dentry *dentry, struct iattr *attr);
 void fsverity_cleanup_inode(struct inode *inode);
+ssize_t fsverity_get_file_digest(struct fsverity_info *info, u8 *buf,
+				 size_t bufsize, enum hash_algo *algo);
 
 /* read_metadata.c */
 
@@ -185,6 +188,13 @@ static inline int fsverity_prepare_setattr(struct dentry *dentry,
 
 static inline void fsverity_cleanup_inode(struct inode *inode)
 {
+}
+
+static inline ssize_t fsverity_get_file_digest(struct fsverity_info *info,
+					       u8 *buf, size_t bufsize,
+					       enum hash_algo *algo)
+{
+	return -EOPNOTSUPP;
 }
 
 /* read_metadata.c */
