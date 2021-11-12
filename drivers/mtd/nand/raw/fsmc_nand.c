@@ -540,12 +540,12 @@ unmap_dma:
  * @len:	number of bytes to write
  */
 static void fsmc_write_buf(struct fsmc_nand_data *host, const u8 *buf,
-			   int len)
+			   int len, bool force_8bit)
 {
 	int i;
 
 	if (IS_ALIGNED((uintptr_t)buf, sizeof(u32)) &&
-	    IS_ALIGNED(len, sizeof(u32))) {
+	    IS_ALIGNED(len, sizeof(u32)) && !force_8bit) {
 		u32 *p = (u32 *)buf;
 
 		len = len >> 2;
@@ -563,12 +563,13 @@ static void fsmc_write_buf(struct fsmc_nand_data *host, const u8 *buf,
  * @buf:	buffer to store date
  * @len:	number of bytes to read
  */
-static void fsmc_read_buf(struct fsmc_nand_data *host, u8 *buf, int len)
+static void fsmc_read_buf(struct fsmc_nand_data *host, u8 *buf, int len,
+			  bool force_8bit)
 {
 	int i;
 
 	if (IS_ALIGNED((uintptr_t)buf, sizeof(u32)) &&
-	    IS_ALIGNED(len, sizeof(u32))) {
+	    IS_ALIGNED(len, sizeof(u32)) && !force_8bit) {
 		u32 *p = (u32 *)buf;
 
 		len = len >> 2;
@@ -646,7 +647,8 @@ static int fsmc_exec_op(struct nand_chip *chip, const struct nand_operation *op,
 						  instr->ctx.data.len);
 			else
 				fsmc_read_buf(host, instr->ctx.data.buf.in,
-					      instr->ctx.data.len);
+					      instr->ctx.data.len,
+					      instr->ctx.data.force_8bit);
 			break;
 
 		case NAND_OP_DATA_OUT_INSTR:
@@ -656,7 +658,8 @@ static int fsmc_exec_op(struct nand_chip *chip, const struct nand_operation *op,
 						   instr->ctx.data.len);
 			else
 				fsmc_write_buf(host, instr->ctx.data.buf.out,
-					       instr->ctx.data.len);
+					       instr->ctx.data.len,
+					       instr->ctx.data.force_8bit);
 			break;
 
 		case NAND_OP_WAITRDY_INSTR:
