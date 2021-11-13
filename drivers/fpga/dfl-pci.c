@@ -136,19 +136,36 @@ static int *cci_pci_create_irq_table(struct pci_dev *pcidev, unsigned int nvec)
 	return table;
 }
 
-static int find_dfls_by_vsec(struct pci_dev *pcidev, struct dfl_fpga_enum_info *info)
+struct dfl_vsec {
+	u16 vendor;
+	u16 id;
+};
+
+static struct dfl_vsec vsecs[] = {
+	{ PCI_VENDOR_ID_INTEL, PCI_VSEC_ID_INTEL_DFLS },
+};
+
+static int find_dfls_by_vsec(struct pci_dev *pcidev,
+			     struct dfl_fpga_enum_info *info)
 {
 	u32 bir, offset, vndr_hdr, dfl_cnt, dfl_res;
 	int dfl_res_off, i, bars, voff = 0;
 	resource_size_t start, len;
 
-	while ((voff = pci_find_next_ext_capability(pcidev, voff, PCI_EXT_CAP_ID_VNDR))) {
-		vndr_hdr = 0;
-		pci_read_config_dword(pcidev, voff + PCI_VNDR_HEADER, &vndr_hdr);
+	for (i = 0; i < ARRAY_SIZE(vsecs); i++) {
+		if (pcidev->vendor != vsecs[i].vendor)
+			continue;
 
-		if (PCI_VNDR_HEADER_ID(vndr_hdr) == PCI_VSEC_ID_INTEL_DFLS &&
-		    pcidev->vendor == PCI_VENDOR_ID_INTEL)
-			break;
+		while ((voff =
+			pci_find_next_ext_capability(pcidev, voff,
+						     PCI_EXT_CAP_ID_VNDR))) {
+			vndr_hdr = 0;
+			pci_read_config_dword(pcidev, voff + PCI_VNDR_HEADER,
+					      &vndr_hdr);
+
+			if (PCI_VNDR_HEADER_ID(vndr_hdr) == vsecs[i].id)
+				break;
+		}
 	}
 
 	if (!voff) {
