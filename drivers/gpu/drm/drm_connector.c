@@ -161,20 +161,22 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
 		return;
 
 	if (mode->force) {
-		DRM_INFO("forcing %s connector %s\n", connector->name,
+		DRM_INFO("forcing [CONNECTOR:%d:%s]: %s\n",
+			 connector->base.id, connector->name,
 			 drm_get_connector_force_name(mode->force));
 		connector->force = mode->force;
 	}
 
 	if (mode->panel_orientation != DRM_MODE_PANEL_ORIENTATION_UNKNOWN) {
-		DRM_INFO("cmdline forces connector %s panel_orientation to %d\n",
-			 connector->name, mode->panel_orientation);
+		DRM_INFO("cmdline forces [CONNECTOR:%d:%s] panel_orientation to %d\n",
+			 connector->base.id, connector->name,
+			 mode->panel_orientation);
 		drm_connector_set_panel_orientation(connector,
 						    mode->panel_orientation);
 	}
 
-	DRM_DEBUG_KMS("cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
-		      connector->name, mode->name,
+	DRM_DEBUG_KMS("cmdline mode for [CONNECTOR:%d:%s] %s %dx%d@%dHz%s%s%s\n",
+		      connector->base.id, connector->name, mode->name,
 		      mode->xres, mode->yres,
 		      mode->refresh_specified ? mode->refresh : 60,
 		      mode->rb ? " reduced blanking" : "",
