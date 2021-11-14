@@ -326,6 +326,9 @@ static bool i915_ttm_eviction_valuable(struct ttm_buffer_object *bo,
 {
 	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
 
+	if (!obj)
+		return false;
+
 	/*
 	 * EXTERNAL objects should never be swapped out by TTM, instead we need
 	 * to handle that ourselves. TTM will already skip such objects for us,
@@ -448,6 +451,10 @@ static int i915_ttm_shrinker_release_pages(struct drm_i915_gem_object *obj,
 	if (bo->ttm->page_flags & TTM_TT_FLAG_SWAPPED)
 		return 0;
 
+	ret = ttm_bo_wait_ctx(bo, &ctx);
+	if (ret)
+		return ret;
+
 	bo->ttm->page_flags |= TTM_TT_FLAG_SWAPPED;
 	ret = ttm_bo_validate(bo, &place, &ctx);
 	if (ret) {
@@ -548,6 +555,9 @@ static void i915_ttm_swap_notify(struct ttm_buffer_object *bo)
 {
 	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
 	int ret = i915_ttm_move_notify(bo);
+
+	if (!obj)
+		return;
 
 	GEM_WARN_ON(ret);
 	GEM_WARN_ON(obj->ttm.cached_io_rsgt);
