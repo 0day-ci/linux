@@ -265,11 +265,12 @@ static int intelfb_create(struct drm_fb_helper *helper,
 		info->fix.smem_len = vma->node.size;
 	}
 
-	vaddr = i915_vma_pin_iomap(vma);
+	vaddr = i915_vma_pin_iomap_unlocked(vma);
 	if (IS_ERR(vaddr)) {
-		drm_err(&dev_priv->drm,
-			"Failed to remap framebuffer into virtual memory\n");
 		ret = PTR_ERR(vaddr);
+		if (ret != -EINTR && ret != -ERESTARTSYS)
+			drm_err(&dev_priv->drm,
+				"Failed to remap framebuffer into virtual memory\n");
 		goto out_unpin;
 	}
 	info->screen_base = vaddr;

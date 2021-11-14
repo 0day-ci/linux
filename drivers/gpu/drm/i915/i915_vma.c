@@ -431,6 +431,13 @@ int i915_vma_bind(struct i915_vma *vma,
 			work->pinned = i915_gem_object_get(vma->obj);
 		}
 	} else {
+		if (vma->obj) {
+			int ret;
+
+			ret = i915_gem_object_wait_moving_fence(vma->obj, true);
+			if (ret)
+				return ret;
+		}
 		vma->ops->bind_vma(vma->vm, NULL, vma, cache_level, bind_flags);
 	}
 
@@ -455,6 +462,10 @@ void __iomem *i915_vma_pin_iomap(struct i915_vma *vma)
 
 	ptr = READ_ONCE(vma->iomap);
 	if (ptr == NULL) {
+		err = i915_gem_object_wait_moving_fence(vma->obj, true);
+		if (err)
+			goto err;
+
 		/*
 		 * TODO: consider just using i915_gem_object_pin_map() for lmem
 		 * instead, which already supports mapping non-contiguous chunks
@@ -494,6 +505,25 @@ err_unpin:
 	__i915_vma_unpin(vma);
 err:
 	return IO_ERR_PTR(err);
+}
+
+void __iomem *i915_vma_pin_iomap_unlocked(struct i915_vma *vma)
+{
+	struct i915_gem_ww_ctx ww;
+	void __iomem *map;
+	int err;
+
+	for_i915_gem_ww(&ww, err, true) {
+		err = i915_gem_object_lock(vma->obj, &ww);
+		if (err)
+			continue;
+
+		map = i915_vma_pin_iomap(vma);
+	}
+	if (err)
+		map = IO_ERR_PTR(err);
+
+	return map;
 }
 
 void i915_vma_flush_writes(struct i915_vma *vma)
@@ -870,6 +900,7 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 		    u64 size, u64 alignment, u64 flags)
 {
 	struct i915_vma_work *work = NULL;
+	struct dma_fence *moving = NULL;
 	intel_wakeref_t wakeref = 0;
 	unsigned int bound;
 	int err;
@@ -895,7 +926,8 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 	if (flags & PIN_GLOBAL)
 		wakeref = intel_runtime_pm_get(&vma->vm->i915->runtime_pm);
 
-	if (flags & vma->vm->bind_async_flags) {
+	moving = vma->obj ? i915_gem_object_get_moving_fence(vma->obj) : NULL;
+	if (flags & vma->vm->bind_async_flags || moving) {
 		/* lock VM */
 		err = i915_vm_lock_objects(vma->vm, ww);
 		if (err)
@@ -908,6 +940,8 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 		}
 
 		work->vm = i915_vm_get(vma->vm);
+
+		dma_fence_work_chain(&work->base, moving);
 
 		/* Allocate enough page directories to used PTE */
 		if (vma->vm->allocate_va_range) {
@@ -1013,7 +1047,10 @@ err_fence:
 err_rpm:
 	if (wakeref)
 		intel_runtime_pm_put(&vma->vm->i915->runtime_pm, wakeref);
+	if (moving)
+		dma_fence_put(moving);
 	vma_put_pages(vma);
+
 	return err;
 }
 
