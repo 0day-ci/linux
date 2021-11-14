@@ -38,6 +38,7 @@
 
 #include <asm/kvm_host.h>
 #include <linux/kvm_dirty_ring.h>
+#include <linux/dirty_quota_migration.h>
 
 #ifndef KVM_MAX_VCPU_IDS
 #define KVM_MAX_VCPU_IDS KVM_MAX_VCPUS
@@ -360,6 +361,7 @@ struct kvm_vcpu {
 	 * it is a valid slot.
 	 */
 	int last_used_slot;
+	struct vCPUDirtyQuotaContext *vCPUdqctx;
 };
 
 /* must be called with irqs disabled */
@@ -618,6 +620,7 @@ struct kvm {
 	u32 dirty_ring_size;
 	bool vm_bugged;
 	bool vm_dead;
+	bool dirty_quota_migration_enabled;
 
 #ifdef CONFIG_HAVE_KVM_PM_NOTIFIER
 	struct notifier_block pm_notifier;
