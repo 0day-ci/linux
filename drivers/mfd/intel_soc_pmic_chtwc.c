@@ -10,6 +10,7 @@
 
 #include <linux/acpi.h>
 #include <linux/delay.h>
+#include <linux/dmi.h>
 #include <linux/err.h>
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
@@ -133,6 +134,51 @@ static const struct regmap_irq_chip cht_wc_regmap_irq_chip = {
 	.num_irqs = ARRAY_SIZE(cht_wc_regmap_irqs),
 	.num_regs = 1,
 };
+
+static const struct dmi_system_id cht_wc_model_dmi_ids[] = {
+	{	/* GPD win / GPD pocket mini laptops */
+		.driver_data = (void *)(long)INTEL_CHT_WC_GPD_WIN_POCKET,
+		/*
+		 * Note this may not seem like a very unique match, but in the
+		 * 24000+ DMI decode dumps from linux-hardware.org only 42 have
+		 * a board_vendor value of "AMI Corporation" and of those 42
+		 * only 1 (the GPD win/pocket entry) has a board_name of
+		 * "Default string". Also very few devices have both board_ and
+		 * product_name not set.
+		 */
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AMI Corporation"),
+			DMI_MATCH(DMI_BOARD_NAME, "Default string"),
+			DMI_MATCH(DMI_BOARD_SERIAL, "Default string"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Default string"),
+		},
+	}, {	/* Xiaomi Mi Pad 2 */
+		.driver_data = (void *)(long)INTEL_CHT_WC_XIAOMI_MIPAD2,
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Xiaomi Inc"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Mipad2"),
+		},
+	}, {	/* Lenovo Yoga Book X90F / X91F / X91L */
+		.driver_data = (void *)(long)INTEL_CHT_WC_LENOVO_YOGABOOK1,
+		.matches = {
+		  /* Non exact match to match all versions */
+		  DMI_MATCH(DMI_PRODUCT_NAME, "Lenovo YB1-X9"),
+		},
+	},
+	{ } /* Terminating empty */
+};
+
+enum intel_cht_wc_models intel_cht_wc_get_model(void)
+{
+	const struct dmi_system_id *id;
+
+	id = dmi_first_match(cht_wc_model_dmi_ids);
+	if (!id)
+		return INTEL_CHT_WC_UNKNOWN;
+
+	return (long)id->driver_data;
+}
+EXPORT_SYMBOL_GPL(intel_cht_wc_get_model);
 
 static int cht_wc_probe(struct i2c_client *client)
 {

@@ -41,7 +41,16 @@ struct intel_soc_pmic {
 	struct intel_scu_ipc_dev *scu;
 };
 
+enum intel_cht_wc_models {
+	INTEL_CHT_WC_UNKNOWN,
+	INTEL_CHT_WC_GPD_WIN_POCKET,
+	INTEL_CHT_WC_XIAOMI_MIPAD2,
+	INTEL_CHT_WC_LENOVO_YOGABOOK1,
+};
+
 int intel_soc_pmic_exec_mipi_pmic_seq_element(u16 i2c_address, u32 reg_address,
 					      u32 value, u32 mask);
+
+enum intel_cht_wc_models intel_cht_wc_get_model(void);
 
 #endif	/* __INTEL_SOC_PMIC_H__ */
