@@ -24,9 +24,17 @@ static inline int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPU
 	return 0;
 }
 
+static inline struct page *kvm_dirty_quota_context_get_page(
+		struct vCPUDirtyQuotaContext *vCPUdqctx, u32 offset)
+{
+	return NULL;
+}
+
 #else /* KVM_DIRTY_QUOTA_PAGE_OFFSET == 0 */
 
 int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPUdqctx);
+struct page *kvm_dirty_quota_context_get_page(
+		struct vCPUDirtyQuotaContext *vCPUdqctx, u32 offset);
 
 #endif /* KVM_DIRTY_QUOTA_PAGE_OFFSET == 0 */
 

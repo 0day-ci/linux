@@ -277,6 +277,10 @@ the VCPU file descriptor can be mmap-ed, including:
   KVM_DIRTY_LOG_PAGE_OFFSET * PAGE_SIZE.  For more information on
   KVM_CAP_DIRTY_LOG_RING, see section 8.3.
 
+- if KVM_CAP_DIRTY_QUOTA_MIGRATION is available, a number of pages at
+  KVM_DIRTY_QUOTA_PAGE_OFFSET * PAGE_SIZE.  For more information on
+  KVM_CAP_DIRTY_QUOTA_MIGRATION, see section 8.35.
+
 
 4.6 KVM_SET_MEMORY_REGION
 -------------------------
@@ -7484,3 +7488,38 @@ The argument to KVM_ENABLE_CAP is also a bitmask, and must be a subset
 of the result of KVM_CHECK_EXTENSION.  KVM will forward to userspace
 the hypercalls whose corresponding bit is in the argument, and return
 ENOSYS for the others.
+
+8.35 KVM_CAP_DIRTY_QUOTA_MIGRATION
+---------------------------
+
+:Architectures: x86
+:Parameters: args[0] - boolean value specifying whether to enable or
+disable dirty quota migration (true and false respectively)
+
+With dirty quota migration, memory dirtying is throttled by setting a
+limit on the number of pages a vCPU can dirty in given fixed microscopic
+size time intervals. This limit depends on the network throughput
+calculated over the last few intervals so as to throttle the vCPUs based
+on available network bandwidth. We are referring to this limit as the
+"dirty quota" of a vCPU and the fixed size intervals as the "dirty quota
+intervals".
+
+vCPUDirtyQuotaContext keeps the dirty quota context for each vCPU. It
+keeps the number of pages the vCPU has dirtied (dirty_counter) in the
+ongoing dirty quota interval and the maximum number of dirties allowed for
+the vCPU (dirty_quota) in the ongoing dirty quota interval.
+
+  struct vCPUDirtyQuotaContext {
+          u64 dirty_counter;
+          u64 dirty_quota;
+  };
+
+The flag dirty_quota_migration_enabled determines whether dirty quota-
+based throttling is enabled for an ongoing migration or not.
+
+When the guest tries to dirty a page, it leads to a vmexit as each page
+is write-protected. In the vmexit path, we increment the dirty_counter
+for the corresponding vCPU. Then, we check if the vCPU has exceeded its
+quota. If yes, we exit to userspace with a new exit reason
+KVM_EXIT_DIRTY_QUOTA_FULL. This "quota full" event is further handled on
+the userspace side.

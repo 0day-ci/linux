@@ -3519,6 +3519,9 @@ static vm_fault_t kvm_vcpu_fault(struct vm_fault *vmf)
 		page = kvm_dirty_ring_get_page(
 		    &vcpu->dirty_ring,
 		    vmf->pgoff - KVM_DIRTY_LOG_PAGE_OFFSET);
+	else if (vmf->pgoff == KVM_DIRTY_QUOTA_PAGE_OFFSET)
+		page = kvm_dirty_quota_context_get_page(vcpu->vCPUdqctx,
+				vmf->pgoff - KVM_DIRTY_QUOTA_PAGE_OFFSET);
 	else
 		return kvm_arch_vcpu_fault(vcpu, vmf);
 	get_page(page);
@@ -4207,6 +4210,12 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 #endif
 	case KVM_CAP_BINARY_STATS_FD:
 		return 1;
+	case KVM_CAP_DIRTY_QUOTA_MIGRATION:
+#if KVM_DIRTY_QUOTA_PAGE_OFFSET > 0
+		return 1;
+#else
+		return 0;
+#endif
 	default:
 		break;
 	}
@@ -4273,6 +4282,31 @@ static int kvm_vm_ioctl_reset_dirty_pages(struct kvm *kvm)
 	return cleared;
 }
 
+static int kvm_vm_ioctl_enable_dirty_quota_migration(struct kvm *kvm,
+		bool enabled)
+{
+	if (!KVM_DIRTY_LOG_PAGE_OFFSET)
+		return -EINVAL;
+
+	/*
+	 * For now, dirty quota migration works with dirty bitmap so don't
+	 * enable it if dirty ring interface is enabled. In future, dirty
+	 * quota migration may work with dirty ring interface was well.
+	 */
+	if (kvm->dirty_ring_size)
+		return -EINVAL;
+
+	/* Return if no change */
+	if (kvm->dirty_quota_migration_enabled == enabled)
+		return -EINVAL;
+
+	mutex_lock(&kvm->lock);
+	kvm->dirty_quota_migration_enabled = enabled;
+	mutex_unlock(&kvm->lock);
+
+	return 0;
+}
+
 int __attribute__((weak)) kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 						  struct kvm_enable_cap *cap)
 {
@@ -4305,6 +4339,9 @@ static int kvm_vm_ioctl_enable_cap_generic(struct kvm *kvm,
 	}
 	case KVM_CAP_DIRTY_LOG_RING:
 		return kvm_vm_ioctl_enable_dirty_log_ring(kvm, cap->args[0]);
+	case KVM_CAP_DIRTY_QUOTA_MIGRATION:
+		return kvm_vm_ioctl_enable_dirty_quota_migration(kvm,
+				cap->args[0]);
 	default:
 		return kvm_vm_ioctl_enable_cap(kvm, cap);
 	}
