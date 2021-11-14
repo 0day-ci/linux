@@ -81,10 +81,9 @@ void init_rt_rq(struct rt_rq *rt_rq)
 	int i;
 
 	array = &rt_rq->active;
-	for (i = 0; i < MAX_RT_PRIO; i++) {
+	for (i = 0; i < MAX_RT_PRIO; i++)
 		INIT_LIST_HEAD(array->queue + i);
-		__clear_bit(i, array->bitmap);
-	}
+	bitmap_clear(array->bitmap, 0, MAX_RT_PRIO);
 	/* delimiter for bitsearch: */
 	__set_bit(MAX_RT_PRIO, array->bitmap);
 
