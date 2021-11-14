@@ -233,8 +233,11 @@ void intel_memory_regions_driver_release(struct drm_i915_private *i915)
 		struct intel_memory_region *region =
 			fetch_and_zero(&i915->mm.regions[i]);
 
-		if (region)
+		if (region) {
+			if (region->ops->disable)
+				region->ops->disable(region);
 			intel_memory_region_put(region);
+		}
 	}
 }
 
