@@ -66,6 +66,7 @@
 #include <trace/events/kvm.h>
 
 #include <linux/kvm_dirty_ring.h>
+#include <linux/dirty_quota_migration.h>
 
 /* Worst case buffer size needed for holding an integer. */
 #define ITOA_MAX_LEN 12
@@ -1079,6 +1080,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	}
 
 	kvm->max_halt_poll_ns = halt_poll_ns;
+	kvm->dirty_quota_migration_enabled = false;
 
 	r = kvm_arch_init_vm(kvm, type);
 	if (r)
@@ -3634,6 +3636,12 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	if (kvm->dirty_ring_size) {
 		r = kvm_dirty_ring_alloc(&vcpu->dirty_ring,
 					 id, kvm->dirty_ring_size);
+		if (r)
+			goto arch_vcpu_destroy;
+	}
+
+	if (KVM_DIRTY_QUOTA_PAGE_OFFSET) {
+		r = kvm_vcpu_dirty_quota_alloc(&vcpu->vCPUdqctx);
 		if (r)
 			goto arch_vcpu_destroy;
 	}

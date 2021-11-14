@@ -14,4 +14,20 @@ struct vCPUDirtyQuotaContext {
 	u64 dirty_quota;
 };
 
+#if (KVM_DIRTY_QUOTA_PAGE_OFFSET == 0)
+/*
+ * If KVM_DIRTY_QUOTA_PAGE_OFFSET is not defined by the arch, exclude
+ * dirty_quota_migration.o by defining these nop functions for the arch.
+ */
+static inline int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPUdqctx)
+{
+	return 0;
+}
+
+#else /* KVM_DIRTY_QUOTA_PAGE_OFFSET == 0 */
+
+int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPUdqctx);
+
+#endif /* KVM_DIRTY_QUOTA_PAGE_OFFSET == 0 */
+
 #endif  /* DIRTY_QUOTA_MIGRATION_H */

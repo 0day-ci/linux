@@ -1906,6 +1906,15 @@ struct kvm_hyperv_eventfd {
 #define KVM_DIRTY_LOG_INITIALLY_SET            (1 << 1)
 
 /*
+ * KVM_DIRTY_QUOTA_PAGE_OFFSET will be defined, and set to the
+ * starting page offset of dirty quota context structure, by the
+ * arch implementing dirty quota migration.
+ */
+#ifndef KVM_DIRTY_QUOTA_PAGE_OFFSET
+#define KVM_DIRTY_QUOTA_PAGE_OFFSET 0
+#endif
+
+/*
  * Arch needs to define the macro after implementing the dirty ring
  * feature.  KVM_DIRTY_LOG_PAGE_OFFSET should be defined as the
  * starting page offset of the dirty ring structures.
