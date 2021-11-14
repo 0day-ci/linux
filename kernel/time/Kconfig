@@ -30,6 +30,10 @@ config GENERIC_TIME_VSYSCALL
 config GENERIC_CLOCKEVENTS
 	def_bool !LEGACY_TIMER_TICK
 
+# Architecture has its own cyc_to_ns() implementation
+config ARCH_HAS_CYC_TO_NS
+	bool
+
 # Architecture can handle broadcast in a driver-agnostic way
 config ARCH_HAS_TICK_BROADCAST
 	bool

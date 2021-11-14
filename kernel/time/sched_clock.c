@@ -63,10 +63,12 @@ static struct clock_data cd ____cacheline_aligned = {
 	.actual_read_sched_clock = jiffy_sched_clock_read,
 };
 
+#ifndef CONFIG_ARCH_HAS_CYC_TO_NS
 static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
 {
 	return (cyc * mult) >> shift;
 }
+#endif
 
 notrace struct clock_read_data *sched_clock_read_begin(unsigned int *seq)
 {
