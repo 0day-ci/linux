@@ -36,4 +36,7 @@ obj-$(CONFIG_PCI_ENDPOINT)	+= endpoint/
 obj-y				+= controller/
 obj-y				+= switch/
 
+# KUnit test files
+obj-$(CONFIG_PCI_READ_BASE_KUNIT_TEST) += pci-read-base-test.o
+
 subdir-ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
