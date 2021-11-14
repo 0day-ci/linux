@@ -98,6 +98,17 @@ config HTU21
 	  This driver can also be built as a module. If so, the module will
 	  be called htu21.
 
+config SHTC3
+	tristate "Sensirion SHTC3 humidity and temperature sensor"
+	depends on I2C
+	select CRC8
+	help
+	  Say yes here to build support for the Sensirion SHTC3
+	  humidity and temperature sensor.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called shtc3.
+
 config SI7005
 	tristate "SI7005 relative humidity and temperature sensor"
 	depends on I2C

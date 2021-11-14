@@ -16,6 +16,7 @@ obj-$(CONFIG_HTS221_I2C) += hts221_i2c.o
 obj-$(CONFIG_HTS221_SPI) += hts221_spi.o
 
 obj-$(CONFIG_HTU21) += htu21.o
+obj-$(CONFIG_SHTC3) += shtc3.o
 obj-$(CONFIG_SI7005) += si7005.o
 obj-$(CONFIG_SI7020) += si7020.o
 
