@@ -35,12 +35,17 @@ static inline bool is_dirty_quota_full(struct vCPUDirtyQuotaContext *vCPUdqctx)
 	return true;
 }
 
+static inline void kvm_vcpu_dirty_quota_free(struct vCPUDirtyQuotaContext **vCPUdqctx)
+{
+}
+
 #else /* KVM_DIRTY_QUOTA_PAGE_OFFSET == 0 */
 
 int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPUdqctx);
 struct page *kvm_dirty_quota_context_get_page(
 		struct vCPUDirtyQuotaContext *vCPUdqctx, u32 offset);
 bool is_dirty_quota_full(struct vCPUDirtyQuotaContext *vCPUdqctx);
+void kvm_vcpu_dirty_quota_free(struct vCPUDirtyQuotaContext **vCPUdqctx);
 
 #endif /* KVM_DIRTY_QUOTA_PAGE_OFFSET == 0 */
 
