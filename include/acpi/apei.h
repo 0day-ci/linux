@@ -33,8 +33,12 @@ extern bool ghes_disable;
 
 #ifdef CONFIG_ACPI_APEI
 void __init acpi_hest_init(void);
+int __init sdei_init(void);
+int __init ghes_init(void);
 #else
 static inline void acpi_hest_init(void) { return; }
+static inline void sdei_init(void) { return; }
+static inline void ghes_init(void) { return; }
 #endif
 
 int erst_write(const struct cper_record_header *record);
