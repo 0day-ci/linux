@@ -520,6 +520,9 @@ xfs_vn_get_link_inline(
 	struct xfs_inode	*ip = XFS_I(inode);
 	char			*link;
 
+	if (!dentry)
+		return ERR_PTR(-ECHILD);
+
 	ASSERT(ip->i_df.if_format == XFS_DINODE_FMT_LOCAL);
 
 	/*
