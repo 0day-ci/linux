@@ -8507,6 +8507,21 @@ int __init l2cap_init(void)
 	return 0;
 }
 
+void l2cap_avdtp_wakeup(struct l2cap_conn *conn, u16 cid, u8 status,
+			u16 handle)
+{
+	struct l2cap_chan *chan;
+
+	chan = l2cap_get_chan_by_dcid(conn, cid);
+
+	if (!chan)
+		return;
+
+	chan->ops->avdtp_wakeup(chan, status, handle);
+
+	l2cap_chan_unlock(chan);
+}
+
 void l2cap_exit(void)
 {
 	debugfs_remove(l2cap_debugfs);

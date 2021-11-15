@@ -1157,7 +1157,8 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 			break;
 		}
 
-		err = hci_configure_msft_avdtp_open(hdev, chan, optval, optlen);
+		err = hci_configure_msft_avdtp_open(hdev, chan, optval,
+						    optlen, sk);
 		hci_dev_put(hdev);
 		break;
 
@@ -1748,6 +1749,19 @@ static int l2cap_sock_filter(struct l2cap_chan *chan, struct sk_buff *skb)
 	return 0;
 }
 
+static void l2cap_sock_avdtp_wakeup(struct l2cap_chan *chan, u8 status,
+				    u16 handle)
+{
+	struct sock *sk = chan->data;
+
+	if (test_bit(BT_SK_AVDTP_PEND, &bt_sk(sk)->flags)) {
+		bt_sk(sk)->avdtp_handle = handle;
+		sk->sk_err = -bt_to_errno(status);
+		clear_bit(BT_SK_AVDTP_PEND, &bt_sk(sk)->flags);
+		sk->sk_state_change(sk);
+	}
+}
+
 static const struct l2cap_ops l2cap_chan_ops = {
 	.name			= "L2CAP Socket Interface",
 	.new_connection		= l2cap_sock_new_connection_cb,
@@ -1764,6 +1778,7 @@ static const struct l2cap_ops l2cap_chan_ops = {
 	.get_peer_pid		= l2cap_sock_get_peer_pid_cb,
 	.alloc_skb		= l2cap_sock_alloc_skb_cb,
 	.filter			= l2cap_sock_filter,
+	.avdtp_wakeup		= l2cap_sock_avdtp_wakeup,
 };
 
 static void l2cap_sock_destruct(struct sock *sk)

@@ -1450,6 +1450,7 @@ static void hci_cc_msft_avdtp_open(struct hci_dev *hdev, struct sk_buff *skb)
 	struct msft_rp_avdtp_open *rp;
 	struct msft_cp_avdtp_open *sent;
 	struct hci_conn *hconn;
+	struct l2cap_conn *conn;
 
 	if (skb->len < sizeof(*rp))
 		return;
@@ -1463,7 +1464,11 @@ static void hci_cc_msft_avdtp_open(struct hci_dev *hdev, struct sk_buff *skb)
 	if (!hconn)
 		return;
 
+	conn = hconn->l2cap_data;
+
 	/* wake up the task waiting on avdtp handle */
+	l2cap_avdtp_wakeup(conn, sent->dcid, rp->status,
+			   rp->status ? 0 : __le16_to_cpu(rp->avdtp_handle));
 }
 
 static void hci_cc_msft_avdtp_cmd(struct hci_dev *hdev, struct sk_buff *skb)

@@ -357,7 +357,7 @@ error:
 }
 
 int hci_configure_msft_avdtp_open(struct hci_dev *hdev, struct l2cap_chan *chan,
-				  sockptr_t optval, int optlen)
+				 sockptr_t optval, int optlen, struct sock *sk)
 {
 	struct msft_cp_avdtp_open *cmd = NULL;
 	struct hci_media_service_caps *caps;
@@ -392,7 +392,9 @@ int hci_configure_msft_avdtp_open(struct hci_dev *hdev, struct l2cap_chan *chan,
 
 	hci_send_cmd(hdev, HCI_MSFT_AVDTP_CMD, sizeof(*cmd) + optlen, cmd);
 
-	/* wait until we get avdtp handle or timeout */
+	set_bit(BT_SK_AVDTP_PEND, &bt_sk(sk)->flags);
+
+	err = bt_sock_wait_for_avdtp_hndl(sk, MSFT_AVDTP_TIMEOUT);
 
 fail:
 	kfree(cmd);

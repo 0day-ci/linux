@@ -669,6 +669,8 @@ struct l2cap_ops {
 					       unsigned long len, int nb);
 	int			(*filter) (struct l2cap_chan * chan,
 					   struct sk_buff *skb);
+	void			(*avdtp_wakeup) (struct l2cap_chan *chan,
+						 u8 status, u16 handle);
 };
 
 struct l2cap_conn {
@@ -1001,6 +1003,8 @@ void __l2cap_physical_cfm(struct l2cap_chan *chan, int result);
 
 struct l2cap_conn *l2cap_conn_get(struct l2cap_conn *conn);
 void l2cap_conn_put(struct l2cap_conn *conn);
+void l2cap_avdtp_wakeup(struct l2cap_conn *conn, u16 dcid, u8 status,
+			u16 handle);
 
 int l2cap_register_user(struct l2cap_conn *conn, struct l2cap_user *user);
 void l2cap_unregister_user(struct l2cap_conn *conn, struct l2cap_user *user);

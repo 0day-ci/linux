@@ -607,6 +607,42 @@ int bt_sock_wait_ready(struct sock *sk, unsigned long flags)
 }
 EXPORT_SYMBOL(bt_sock_wait_ready);
 
+/* This function expects the sk lock to be held when called */
+int bt_sock_wait_for_avdtp_hndl(struct sock *sk, unsigned long timeo)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	int err = 0;
+
+	BT_DBG("sk %p", sk);
+
+	add_wait_queue(sk_sleep(sk), &wait);
+	set_current_state(TASK_INTERRUPTIBLE);
+	while (test_bit(BT_SK_AVDTP_PEND, &bt_sk(sk)->flags)) {
+		if (!timeo) {
+			err = -EINPROGRESS;
+			break;
+		}
+
+		if (signal_pending(current)) {
+			err = sock_intr_errno(timeo);
+			break;
+		}
+
+		release_sock(sk);
+		timeo = schedule_timeout(timeo);
+		lock_sock(sk);
+		set_current_state(TASK_INTERRUPTIBLE);
+
+		err = sock_error(sk);
+		if (err)
+			break;
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(sk_sleep(sk), &wait);
+	return err;
+}
+EXPORT_SYMBOL(bt_sock_wait_for_avdtp_hndl);
+
 #ifdef CONFIG_PROC_FS
 static void *bt_seq_start(struct seq_file *seq, loff_t *pos)
 	__acquires(seq->private->l->lock)

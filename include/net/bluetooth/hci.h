@@ -347,6 +347,7 @@ enum {
 #define HCI_POWER_OFF_TIMEOUT	msecs_to_jiffies(5000)	/* 5 seconds */
 #define HCI_LE_CONN_TIMEOUT	msecs_to_jiffies(20000)	/* 20 seconds */
 #define HCI_LE_AUTOCONN_TIMEOUT	msecs_to_jiffies(4000)	/* 4 seconds */
+#define MSFT_AVDTP_TIMEOUT      msecs_to_jiffies(500) /* 0.5 seconds */
 
 /* HCI data types */
 #define HCI_COMMAND_PKT		0x01
