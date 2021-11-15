@@ -1129,9 +1129,9 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
 		spte = *sptep;
 		host_writable = spte & shadow_host_writable_mask;
 		slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
-		make_spte(vcpu, sp, slot, pte_access, gfn,
-			  spte_to_pfn(spte), spte, true, false,
-			  host_writable, &spte);
+		vcpu_make_spte(vcpu, sp, slot, pte_access, gfn,
+			       spte_to_pfn(spte), spte, true, false,
+			       host_writable, &spte);
 
 		flush |= mmu_spte_update(sptep, spte);
 	}
