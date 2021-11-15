@@ -2722,6 +2722,8 @@ static size_t trace__fprintf_tp_fields(struct trace *trace, struct evsel *evsel,
 				offset = format_field__intval(field, sample, evsel->needs_swap);
 				syscall_arg.len = offset >> 16;
 				offset &= 0xffff;
+				if (field->flags & TEP_FIELD_IS_REL_DYNAMIC)
+					offset += field->offset + field->size;
 			}
 
 			val = (uintptr_t)(sample->raw_data + offset);
