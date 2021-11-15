@@ -106,8 +106,11 @@ long vfs_truncate(const struct path *path, loff_t length)
 		goto put_write_and_out;
 
 	error = security_path_truncate(path);
-	if (!error)
-		error = do_truncate(mnt_userns, path->dentry, length, 0, NULL);
+	if (error)
+		goto put_write_and_out;
+
+	if (i_size_read(inode) != length)
+		error = do_truncate(mnt_userns, path->dentry, length, ATTR_MTIME | ATTR_CTIME, NULL);
 
 put_write_and_out:
 	put_write_access(inode);
