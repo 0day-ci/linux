@@ -1385,14 +1385,16 @@ static void hci_cc_le_set_ext_adv_enable(struct hci_dev *hdev,
 				if (adv->enabled)
 					goto unlock;
 			}
-		} else {
+
+			hci_dev_clear_flag(hdev, HCI_LE_ADV);
+		} else if (!cp->num_of_sets || !set->handle) {
 			/* All instances shall be considered disabled */
 			list_for_each_entry_safe(adv, n, &hdev->adv_instances,
 						 list)
 				adv->enabled = false;
-		}
 
-		hci_dev_clear_flag(hdev, HCI_LE_ADV);
+			hci_dev_clear_flag(hdev, HCI_LE_ADV);
+		}
 	}
 
 unlock:
