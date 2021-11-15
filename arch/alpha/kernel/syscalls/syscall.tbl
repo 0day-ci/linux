@@ -488,3 +488,5 @@
 556	common	landlock_restrict_self		sys_landlock_restrict_self
 # 557 reserved for memfd_secret
 558	common	process_mrelease		sys_process_mrelease
+# 559 reserved for futex_waitv
+560	common	trusted_for			sys_trusted_for
