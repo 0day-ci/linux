@@ -1804,7 +1804,7 @@ void md_bitmap_destroy(struct mddev *mddev)
 
 /*
  * initialize the bitmap structure
- * if this returns an error, bitmap_destroy must be called to do clean up
+ * if this returns an error, md_bitmap_destroy must be called to do clean up
  * once mddev->bitmap is set
  */
 struct bitmap *md_bitmap_create(struct mddev *mddev, int slot)
