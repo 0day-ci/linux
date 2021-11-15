@@ -152,7 +152,7 @@ no_mmap:
 }
 
 struct vfio_pci_group_info;
-static bool vfio_pci_dev_set_try_reset(struct vfio_device_set *dev_set);
+static void vfio_pci_dev_set_try_reset(struct vfio_device_set *dev_set);
 static int vfio_pci_dev_set_hot_reset(struct vfio_device_set *dev_set,
 				      struct vfio_pci_group_info *groups);
 
@@ -245,7 +245,8 @@ int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 	u16 cmd;
 	u8 msix_pos;
 
-	vfio_pci_set_power_state(vdev, PCI_D0);
+	if (!disable_idle_d3)
+		pm_runtime_get_sync(&pdev->dev);
 
 	/* Don't allow our initial saved state to include busmaster */
 	pci_clear_master(pdev);
@@ -405,8 +406,17 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 out:
 	pci_disable_device(pdev);
 
-	if (!vfio_pci_dev_set_try_reset(vdev->vdev.dev_set) && !disable_idle_d3)
-		vfio_pci_set_power_state(vdev, PCI_D3hot);
+	vfio_pci_dev_set_try_reset(vdev->vdev.dev_set);
+
+	/*
+	 * The device usage count always needs to decremented which was
+	 * incremented in vfio_pci_core_enable() with
+	 * pm_runtime_get_sync().
+	 */
+	if (!disable_idle_d3) {
+		pm_runtime_mark_last_busy(&pdev->dev);
+		pm_runtime_put_autosuspend(&pdev->dev);
+	}
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_disable);
 
@@ -1847,19 +1857,23 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 
 	vfio_pci_probe_power_state(vdev);
 
-	if (!disable_idle_d3) {
-		/*
-		 * pci-core sets the device power state to an unknown value at
-		 * bootup and after being removed from a driver.  The only
-		 * transition it allows from this unknown state is to D0, which
-		 * typically happens when a driver calls pci_enable_device().
-		 * We're not ready to enable the device yet, but we do want to
-		 * be able to get to D3.  Therefore first do a D0 transition
-		 * before going to D3.
-		 */
-		vfio_pci_set_power_state(vdev, PCI_D0);
-		vfio_pci_set_power_state(vdev, PCI_D3hot);
-	}
+	/*
+	 * pci-core sets the device power state to an unknown value at
+	 * bootup and after being removed from a driver.  The only
+	 * transition it allows from this unknown state is to D0, which
+	 * typically happens when a driver calls pci_enable_device().
+	 * We're not ready to enable the device yet, but we do want to
+	 * be able to get to D3.  Therefore first do a D0 transition
+	 * before enabling runtime PM.
+	 */
+	pci_set_power_state(pdev, PCI_D0);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_mark_last_busy(&pdev->dev);
+	pm_runtime_allow(&pdev->dev);
+
+	if (!disable_idle_d3)
+		pm_runtime_put_autosuspend(&pdev->dev);
 
 	ret = vfio_register_group_dev(&vdev->vdev);
 	if (ret)
@@ -1868,7 +1882,10 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 
 out_power:
 	if (!disable_idle_d3)
-		vfio_pci_set_power_state(vdev, PCI_D0);
+		pm_runtime_get_noresume(&pdev->dev);
+
+	pm_runtime_dont_use_autosuspend(&pdev->dev);
+	pm_runtime_forbid(&pdev->dev);
 out_vf:
 	vfio_pci_vf_uninit(vdev);
 	return ret;
@@ -1887,7 +1904,10 @@ void vfio_pci_core_unregister_device(struct vfio_pci_core_device *vdev)
 	vfio_pci_vga_uninit(vdev);
 
 	if (!disable_idle_d3)
-		vfio_pci_set_power_state(vdev, PCI_D0);
+		pm_runtime_get_noresume(&pdev->dev);
+
+	pm_runtime_dont_use_autosuspend(&pdev->dev);
+	pm_runtime_forbid(&pdev->dev);
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_unregister_device);
 
@@ -2093,32 +2113,62 @@ static bool vfio_pci_dev_set_needs_reset(struct vfio_device_set *dev_set)
  *  - At least one of the affected devices is marked dirty via
  *    needs_reset (such as by lack of FLR support)
  * Then attempt to perform that bus or slot reset.
- * Returns true if the dev_set was reset.
  */
-static bool vfio_pci_dev_set_try_reset(struct vfio_device_set *dev_set)
+static void vfio_pci_dev_set_try_reset(struct vfio_device_set *dev_set)
 {
 	struct vfio_pci_core_device *cur;
 	struct pci_dev *pdev;
 	int ret;
 
 	if (!vfio_pci_dev_set_needs_reset(dev_set))
-		return false;
+		return;
 
 	pdev = vfio_pci_dev_set_resettable(dev_set);
 	if (!pdev)
-		return false;
+		return;
 
 	ret = pci_reset_bus(pdev);
 	if (ret)
-		return false;
+		return;
 
 	list_for_each_entry(cur, &dev_set->device_list, vdev.dev_set_list) {
 		cur->needs_reset = false;
-		if (!disable_idle_d3)
-			vfio_pci_set_power_state(cur, PCI_D3hot);
+		if (!disable_idle_d3) {
+			/*
+			 * Inside pci_reset_bus(), all the devices in bus/slot
+			 * will be moved out of D0 state. This state change to
+			 * D0 can happen directly without going through the
+			 * runtime PM framework. pm_runtime_resume() will
+			 * help make the runtime state as active and then
+			 * pm_request_autosuspend() can be used which will
+			 * internally check for device usage count and will
+			 * move the device again into the low power state.
+			 */
+			pm_runtime_resume(&pdev->dev);
+			pm_runtime_mark_last_busy(&pdev->dev);
+			pm_request_autosuspend(&pdev->dev);
+		}
 	}
-	return true;
 }
+
+#ifdef CONFIG_PM
+static int vfio_pci_core_runtime_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int vfio_pci_core_runtime_resume(struct device *dev)
+{
+	return 0;
+}
+
+const struct dev_pm_ops vfio_pci_core_pm_ops = {
+	SET_RUNTIME_PM_OPS(vfio_pci_core_runtime_suspend,
+			   vfio_pci_core_runtime_resume,
+			   NULL)
+};
+EXPORT_SYMBOL_GPL(vfio_pci_core_pm_ops);
+#endif
 
 void vfio_pci_core_set_params(bool is_nointxmask, bool is_disable_vga,
 			      bool is_disable_idle_d3)

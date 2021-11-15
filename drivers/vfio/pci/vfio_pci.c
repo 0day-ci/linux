@@ -193,6 +193,9 @@ static struct pci_driver vfio_pci_driver = {
 	.remove			= vfio_pci_remove,
 	.sriov_configure	= vfio_pci_sriov_configure,
 	.err_handler		= &vfio_pci_core_err_handlers,
+#if defined(CONFIG_PM)
+	.driver.pm              = &vfio_pci_core_pm_ops,
+#endif
 };
 
 static void __init vfio_pci_fill_ids(void)
