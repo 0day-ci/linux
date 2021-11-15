@@ -132,6 +132,7 @@ struct vhost_net {
 	struct vhost_dev dev;
 	struct vhost_net_virtqueue vqs[VHOST_NET_VQ_MAX];
 	struct vhost_poll poll[VHOST_NET_VQ_MAX];
+	struct rcu_head rcu;
 	/* Number of TX recently submitted.
 	 * Protected by tx vq lock. */
 	unsigned tx_packets;
@@ -1389,6 +1390,18 @@ static void vhost_net_flush(struct vhost_net *n)
 	}
 }
 
+static void vhost_net_free(struct rcu_head *rcu_head)
+{
+	struct vhost_net *n = container_of(rcu_head, struct vhost_net, rcu);
+
+	kfree(n->vqs[VHOST_NET_VQ_RX].rxq.queue);
+	kfree(n->vqs[VHOST_NET_VQ_TX].xdp);
+	kfree(n->dev.vqs);
+	if (n->page_frag.page)
+		__page_frag_cache_drain(n->page_frag.page, n->refcnt_bias);
+	kvfree(n);
+}
+
 static int vhost_net_release(struct inode *inode, struct file *f)
 {
 	struct vhost_net *n = f->private_data;
@@ -1404,15 +1417,8 @@ static int vhost_net_release(struct inode *inode, struct file *f)
 		sockfd_put(tx_sock);
 	if (rx_sock)
 		sockfd_put(rx_sock);
-	/* Make sure no callbacks are outstanding */
-	synchronize_rcu();
 
-	kfree(n->vqs[VHOST_NET_VQ_RX].rxq.queue);
-	kfree(n->vqs[VHOST_NET_VQ_TX].xdp);
-	kfree(n->dev.vqs);
-	if (n->page_frag.page)
-		__page_frag_cache_drain(n->page_frag.page, n->refcnt_bias);
-	kvfree(n);
+	call_rcu(&n->rcu, vhost_net_free);
 	return 0;
 }
 
