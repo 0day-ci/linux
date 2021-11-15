@@ -1492,6 +1492,9 @@ static void hci_cc_msft_avdtp_cmd(struct hci_dev *hdev, struct sk_buff *skb)
 		hci_cc_msft_avdtp_open(hdev, skb);
 		break;
 
+	case HCI_MSFT_AVDTP_START:
+		break;
+
 	default:
 		bt_dev_err(hdev, "Invalid MSFT sub opcode 0x%2.2x",
 			   skb->data[1]);

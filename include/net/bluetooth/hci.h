@@ -2033,6 +2033,12 @@ struct msft_rp_avdtp_open {
 	__u8	audio_intf_param_cnt;
 } __packed;
 
+#define HCI_MSFT_AVDTP_START			0x09
+struct msft_cp_avdtp_start {
+	u8	sub_opcode;
+	__le16	avdtp_handle;
+} __packed;
+
 /* ---- HCI Events ---- */
 #define HCI_EV_INQUIRY_COMPLETE		0x01
 

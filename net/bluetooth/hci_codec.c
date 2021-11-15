@@ -400,3 +400,16 @@ fail:
 	kfree(cmd);
 	return err;
 }
+
+int hci_configure_msft_avdtp_start(struct hci_dev *hdev, struct sock *sk)
+{
+	struct msft_cp_avdtp_start cmd;
+
+	if (!bt_sk(sk)->avdtp_handle)
+		return -EBADFD;
+
+	cmd.sub_opcode = HCI_MSFT_AVDTP_START;
+	cmd.avdtp_handle = cpu_to_le16(bt_sk(sk)->avdtp_handle);
+
+	return hci_send_cmd(hdev, HCI_MSFT_AVDTP_CMD, sizeof(cmd), &cmd);
+}
