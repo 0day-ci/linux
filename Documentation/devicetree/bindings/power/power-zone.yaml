@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/power/power-zone.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Power zones description
+
+maintainers:
+  - Daniel Lezcano <daniel.lezcano@linaro.org>
+
+description: |+
+
+  A System on Chip contains a multitude of active components and each
+  of them is a source of heat. Even if a temperature sensor is not
+  present, a source of heat can be controlled by acting on the
+  consumed power via different techniques.
+
+  A powerzone describes a component or a group of components where we
+  can control the maximum power consumption. For instance, a group of
+  CPUs via the performance domain, a LCD screen via the brightness,
+  etc ...
+
+  Different components when they are used together can significantly
+  increase the overall temperature, so the description needs to
+  reflect this dependency in order to assign a power budget for a
+  group of powerzones.
+
+  This description is done via a hierarchy and the DT reflects it. It
+  does not represent the physical location or a topology, eg. on a
+  big.Little system, the little CPUs may not be represented as they do
+  not contribute significantly to the heat, however the GPU can be
+  tied with the big CPUs as they usually have a connection for
+  multimedia or game workloads.
+    
+properties:
+  $nodename:
+    const: powerzones
+    description:
+      A description
+
+  compatible:
+    const: powerzones
+
+  "#powerzone-cells":
+    description:
+      Number of cells in powerzone specifier. Typically 0 for nodes
+      representing but it can be any number in the future to describe
+      parameters of the powerzone.
+
+  powerzone:
+    description:
+      A phandle to a parent powerzone. If no powerzone attribute is set, the
+      described powerzone is the topmost in the hierarchy.
+
+required:
+  - compatible
+
+
+additionalProperties: true
+
+examples:
+  - |
+    POWERZONES: powerzones {
+      compatible = "powerzones";
+
+      SOC_PZ: soc {
+      };
+
+      PKG_PZ: pkg {
+        #powerzone-cells = <0>;
+        powerzone = <&SOC_PZ>;
+      };
+
+      BIG_PZ: big {
+        #powerzone-cells = <0>;
+        powerzone = <&PKG_PZ>;
+      };
+
+      GPU_PZ: gpu {
+        #powerzone-cells = <0>;
+        powerzone = <&PKG_PZ>;
+      };
+
+      MULTIMEDIA_PZ: multimedia {
+        #powerzone-cells = <0>;
+        powerzone = <&SOC_PZ>;
+      };
+    };
+
+  - |
+    A57_0: big@0 {
+      compatible = "arm,cortex-a57";
+      reg = <0x0 0x0>;
+      device_type = "cpu";
+      #powerzone-cells = <0>;
+      powerzone = <&BIG_PZ>;
+    };
+
+    A57_1: big@1 {
+      compatible = "arm,cortex-a57";
+      reg = <0x0 0x0>;
+      device_type = "cpu";
+      #powerzone-cells = <0>;
+      powerzone = <&BIG_PZ>;
+    };
+
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+
+    gpu@ffe40000 {
+      compatible = "amlogic,meson-g12a-mali", "arm,mali-bifrost";
+      reg = <0xffe40000 0x10000>;
+      interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+             <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
+             <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
+      interrupt-names = "job", "mmu", "gpu";
+      clocks = <&clk 1>;
+      #powerzone-cells = <0>;
+      powerzone = <&GPU_PZ>;
+    };
+...
