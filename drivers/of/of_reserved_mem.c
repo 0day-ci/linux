@@ -24,8 +24,7 @@
 
 #include "of_private.h"
 
-#define MAX_RESERVED_REGIONS	64
-static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
+static struct reserved_mem reserved_mem[CONFIG_OF_MAX_RESERVED_REGIONS];
 static int reserved_mem_count;
 
 static int __init early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
