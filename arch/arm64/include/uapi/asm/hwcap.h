@@ -76,5 +76,13 @@
 #define HWCAP2_BTI		(1 << 17)
 #define HWCAP2_MTE		(1 << 18)
 #define HWCAP2_ECV		(1 << 19)
+#define HWCAP2_SME		(1 << 20)
+#define HWCAP2_SME_I16I64	(1 << 21)
+#define HWCAP2_SME_F64F64	(1 << 22)
+#define HWCAP2_SME_I8I32	(1 << 23)
+#define HWCAP2_SME_F16F32	(1 << 24)
+#define HWCAP2_SME_B16F32	(1 << 25)
+#define HWCAP2_SME_F32F32	(1 << 26)
+#define HWCAP2_SME_FA64		(1 << 27)
 
 #endif /* _UAPI__ASM_HWCAP_H */
