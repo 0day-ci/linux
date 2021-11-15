@@ -523,7 +523,7 @@ void __ext4_fc_track_create(handle_t *handle, struct inode *inode,
 	args.op = EXT4_FC_TAG_CREAT;
 
 	ret = ext4_fc_track_template(handle, inode, __track_dentry_update,
-					(void *)&args, 0);
+					(void *)&args, 1);
 	trace_ext4_fc_track_create(inode, dentry, ret);
 }
 
