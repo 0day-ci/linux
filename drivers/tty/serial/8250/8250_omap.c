@@ -1593,12 +1593,16 @@ static int omap8250_runtime_suspend(struct device *dev)
 {
 	struct omap8250_priv *priv = dev_get_drvdata(dev);
 	struct uart_8250_port *up;
+	struct uart_port *port;
+	unsigned long flags;
 
 	/* In case runtime-pm tries this before we are setup */
 	if (!priv)
 		return 0;
 
 	up = serial8250_get_port(priv->line);
+	port = &up->port;
+
 	/*
 	 * When using 'no_console_suspend', the console UART must not be
 	 * suspended. Since driver suspend is managed by runtime suspend,
@@ -1609,6 +1613,10 @@ static int omap8250_runtime_suspend(struct device *dev)
 		if (uart_console(&up->port))
 			return -EBUSY;
 	}
+
+	spin_lock_irqsave(&port->lock, flags);
+	port->runtime_suspended = 1;
+	spin_unlock_irqrestore(&port->lock, flags);
 
 	if (priv->habit & UART_ERRATA_CLOCK_DISABLE) {
 		int ret;
@@ -1636,13 +1644,18 @@ static int omap8250_runtime_resume(struct device *dev)
 {
 	struct omap8250_priv *priv = dev_get_drvdata(dev);
 	struct uart_8250_port *up;
+	struct uart_port *port;
+	unsigned long flags;
 
 	/* In case runtime-pm tries this before we are setup */
 	if (!priv)
 		return 0;
 
 	up = serial8250_get_port(priv->line);
+	port = &up->port;
 
+	/* Restore state with interrupts disabled */
+	spin_lock_irqsave(&port->lock, flags);
 	if (omap8250_lost_context(up))
 		omap8250_restore_regs(up);
 
@@ -1651,6 +1664,12 @@ static int omap8250_runtime_resume(struct device *dev)
 
 	priv->latency = priv->calc_latency;
 	schedule_work(&priv->qos_work);
+
+	port->runtime_suspended = 0;
+	spin_unlock_irqrestore(&port->lock, flags);
+
+	uart_start_pending_tx(port);
+
 	return 0;
 }
 #endif
