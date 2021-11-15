@@ -2039,6 +2039,12 @@ struct msft_cp_avdtp_start {
 	__le16	avdtp_handle;
 } __packed;
 
+#define HCI_MSFT_AVDTP_SUSPEND			0x0A
+struct msft_cp_avdtp_suspend {
+	u8	sub_opcode;
+	__le16	avdtp_handle;
+} __packed;
+
 /* ---- HCI Events ---- */
 #define HCI_EV_INQUIRY_COMPLETE		0x01
 

@@ -179,6 +179,7 @@ struct bt_codecs {
 
 #define BT_MSFT_OPEN		20
 #define BT_MSFT_START		21
+#define BT_MSFT_SUSPEND		22
 
 __printf(1, 2)
 void bt_info(const char *fmt, ...);

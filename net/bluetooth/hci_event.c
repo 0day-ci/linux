@@ -1493,6 +1493,7 @@ static void hci_cc_msft_avdtp_cmd(struct hci_dev *hdev, struct sk_buff *skb)
 		break;
 
 	case HCI_MSFT_AVDTP_START:
+	case HCI_MSFT_AVDTP_SUSPEND:
 		break;
 
 	default:
