@@ -438,6 +438,8 @@ irqreturn_t cvm_mmc_interrupt(int irq, void *dev_id)
 	struct mmc_request *req;
 	u64 emm_int, rsp_sts;
 	bool host_done;
+	struct cvm_mmc_slot *slot;
+	int bus_id;
 
 	if (host->need_irq_handler_lock)
 		spin_lock(&host->irq_handler_lock);
@@ -455,7 +457,19 @@ irqreturn_t cvm_mmc_interrupt(int irq, void *dev_id)
 	if (!req)
 		goto out;
 
+	slot = mmc_priv(req->host);
+
+	/* Get response */
 	rsp_sts = readq(host->base + MIO_EMM_RSP_STS(host));
+	/* Map request to cvm_mmc_slot */
+	bus_id = FIELD_GET(MIO_EMM_RSP_STS_BUS_ID, rsp_sts);
+	if (bus_id != slot->bus_id) {
+		dev_err(mmc_classdev(slot->mmc),
+			"Remapping, request for slot %d, interrupt for %d!\n",
+			slot->bus_id, bus_id);
+		slot = host->slot[bus_id];
+	}
+
 	/*
 	 * dma_val set means DMA is still in progress. Don't touch
 	 * the request and wait for the interrupt indicating that
@@ -493,8 +507,9 @@ irqreturn_t cvm_mmc_interrupt(int irq, void *dev_id)
 	    (rsp_sts & MIO_EMM_RSP_STS_DMA_PEND))
 		cleanup_dma(host, rsp_sts);
 
+	if (mrq->done)
+		mrq->done(mrq);
 	host->current_req = NULL;
-	req->done(req);
 
 no_req_done:
 	if (host->dmar_fixup_done)
@@ -669,6 +684,7 @@ static void cvm_mmc_dma_request(struct mmc_host *mmc,
 		set_wdog(slot, data->timeout_ns);
 
 	WARN_ON(host->current_req);
+	mrq->host = mmc;
 	host->current_req = mrq;
 
 	emm_dma = prepare_ext_dma(mmc, mrq);
@@ -776,6 +792,7 @@ static void cvm_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	mods = cvm_mmc_get_cr_mods(cmd);
 
 	WARN_ON(host->current_req);
+	mrq->host = mmc;
 	host->current_req = mrq;
 
 	if (cmd->data) {
