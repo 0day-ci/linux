@@ -54,8 +54,10 @@ virtual address size configured by the kernel. For example, with a
 virtual address size of 48, the PAC is 7 bits wide.
 
 Recent versions of GCC can compile code with APIAKey-based return
-address protection when passed the -msign-return-address option. This
-uses instructions in the HINT space (unless -march=armv8.3-a or higher
+address protection when passed compiler option as following.
+Pass -msign-return-address when we use GCC 7, 8.
+Pass -mbranch-protection when we use GCC 9 or later.
+This uses instructions in the HINT space (unless -march=armv8.3-a or higher
 is also passed), and such code can run on systems without the pointer
 authentication extension.
 
