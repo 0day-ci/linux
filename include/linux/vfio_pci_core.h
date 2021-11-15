@@ -123,9 +123,8 @@ struct vfio_pci_core_device {
 	bool			has_vga;
 	bool			needs_reset;
 	bool			nointx;
-	bool			needs_pm_restore;
+	bool                    pm_runtime_suspended;
 	struct pci_saved_state	*pci_saved_state;
-	struct pci_saved_state	*pm_save;
 	int			ioeventfds_nr;
 	struct eventfd_ctx	*err_trigger;
 	struct eventfd_ctx	*req_trigger;

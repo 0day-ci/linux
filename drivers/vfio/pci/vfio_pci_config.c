@@ -25,6 +25,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/vfio_pci_core.h>
 
@@ -119,11 +120,50 @@ struct perm_bits {
 #define	NO_WRITE	0
 #define	ALL_WRITE	0xFFFFFFFFU
 
-static int vfio_user_config_read(struct pci_dev *pdev, int offset,
+static void vfio_pci_config_pm_runtime_get(struct pci_dev *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct device *parent = dev->parent;
+
+	if (parent)
+		pm_runtime_get_sync(parent);
+
+	pm_runtime_get_noresume(dev);
+	/*
+	 * pdev->current_state is set to PCI_D3cold during suspending,
+	 * so wait until suspending completes
+	 */
+	pm_runtime_barrier(dev);
+	/*
+	 * Only need to resume devices in D3cold, because config
+	 * registers are still accessible for devices suspended but
+	 * not in D3cold.
+	 */
+	if (pdev->current_state == PCI_D3cold)
+		pm_runtime_resume(dev);
+}
+
+static void vfio_pci_config_pm_runtime_put(struct pci_dev *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct device *parent = dev->parent;
+
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_noidle(dev);
+
+	if (parent)
+		pm_runtime_put_noidle(parent);
+}
+
+static int vfio_user_config_read(struct vfio_pci_core_device *vdev, int offset,
 				 __le32 *val, int count)
 {
+	struct pci_dev *pdev = vdev->pdev;
 	int ret = -EINVAL;
 	u32 tmp_val = 0;
+
+	if (vdev->pm_runtime_suspended)
+		vfio_pci_config_pm_runtime_get(pdev);
 
 	switch (count) {
 	case 1:
@@ -147,14 +187,21 @@ static int vfio_user_config_read(struct pci_dev *pdev, int offset,
 
 	*val = cpu_to_le32(tmp_val);
 
+	if (vdev->pm_runtime_suspended)
+		vfio_pci_config_pm_runtime_put(pdev);
+
 	return ret;
 }
 
-static int vfio_user_config_write(struct pci_dev *pdev, int offset,
+static int vfio_user_config_write(struct vfio_pci_core_device *vdev, int offset,
 				  __le32 val, int count)
 {
+	struct pci_dev *pdev = vdev->pdev;
 	int ret = -EINVAL;
 	u32 tmp_val = le32_to_cpu(val);
+
+	if (vdev->pm_runtime_suspended)
+		vfio_pci_config_pm_runtime_get(pdev);
 
 	switch (count) {
 	case 1:
@@ -167,6 +214,9 @@ static int vfio_user_config_write(struct pci_dev *pdev, int offset,
 		ret = pci_user_write_config_dword(pdev, offset, tmp_val);
 		break;
 	}
+
+	if (vdev->pm_runtime_suspended)
+		vfio_pci_config_pm_runtime_put(pdev);
 
 	return ret;
 }
@@ -183,11 +233,10 @@ static int vfio_default_config_read(struct vfio_pci_core_device *vdev, int pos,
 
 	/* Any non-virtualized bits? */
 	if (cpu_to_le32(~0U >> (32 - (count * 8))) != virt) {
-		struct pci_dev *pdev = vdev->pdev;
 		__le32 phys_val = 0;
 		int ret;
 
-		ret = vfio_user_config_read(pdev, pos, &phys_val, count);
+		ret = vfio_user_config_read(vdev, pos, &phys_val, count);
 		if (ret)
 			return ret;
 
@@ -224,18 +273,17 @@ static int vfio_default_config_write(struct vfio_pci_core_device *vdev, int pos,
 
 	/* Non-virtualzed and writable bits go to hardware */
 	if (write & ~virt) {
-		struct pci_dev *pdev = vdev->pdev;
 		__le32 phys_val = 0;
 		int ret;
 
-		ret = vfio_user_config_read(pdev, pos, &phys_val, count);
+		ret = vfio_user_config_read(vdev, pos, &phys_val, count);
 		if (ret)
 			return ret;
 
 		phys_val &= ~(write & ~virt);
 		phys_val |= (val & (write & ~virt));
 
-		ret = vfio_user_config_write(pdev, pos, phys_val, count);
+		ret = vfio_user_config_write(vdev, pos, phys_val, count);
 		if (ret)
 			return ret;
 	}
@@ -250,7 +298,7 @@ static int vfio_direct_config_read(struct vfio_pci_core_device *vdev, int pos,
 {
 	int ret;
 
-	ret = vfio_user_config_read(vdev->pdev, pos, val, count);
+	ret = vfio_user_config_read(vdev, pos, val, count);
 	if (ret)
 		return ret;
 
@@ -275,7 +323,7 @@ static int vfio_raw_config_write(struct vfio_pci_core_device *vdev, int pos,
 {
 	int ret;
 
-	ret = vfio_user_config_write(vdev->pdev, pos, val, count);
+	ret = vfio_user_config_write(vdev, pos, val, count);
 	if (ret)
 		return ret;
 
@@ -288,7 +336,7 @@ static int vfio_raw_config_read(struct vfio_pci_core_device *vdev, int pos,
 {
 	int ret;
 
-	ret = vfio_user_config_read(vdev->pdev, pos, val, count);
+	ret = vfio_user_config_read(vdev, pos, val, count);
 	if (ret)
 		return ret;
 
@@ -692,13 +740,86 @@ static int __init init_pci_cap_basic_perm(struct perm_bits *perm)
 	return 0;
 }
 
+static int vfio_perform_runtime_pm(struct vfio_pci_core_device *vdev, int pos,
+				   int count, struct perm_bits *perm,
+				   int offset, __le32 val, pci_power_t state)
+{
+	/*
+	 * If runtime PM is enabled, then instead of directly writing
+	 * PCI_PM_CTRL register, decrement the device usage counter whenever
+	 * the power state is non-D0. The kernel runtime PM framework will
+	 * itself put the PCI device in the low power state when device usage
+	 * counter will become zero. The guest OS will read the PCI_PM_CTRL
+	 * register back to confirm the current power state so virtual
+	 * register bits can be used. For this, read the actual PCI_PM_CTRL
+	 * register, update the power state related bits and then update the
+	 * vconfig bits corresponding to PCI_PM_CTRL offset. If the
+	 * pm_runtime_suspended status is set, then return the virtual
+	 * register value for PCI_PM_CTRL register read. All the bits
+	 * in PCI_PM_CTRL are being returned from virtual config, so that
+	 * this register read will not wake up the PCI device from suspended
+	 * state.
+	 *
+	 * Once power state will be changed back to D0, then clear the power
+	 * state related bits in vconfig. After this, increment the device
+	 * usage counter which will internally wake up the PCI device from
+	 * suspended state.
+	 */
+	if (state != PCI_D0 && !vdev->pm_runtime_suspended) {
+		__le32 virt_val = 0;
+
+		count = vfio_default_config_write(vdev, pos, count, perm,
+						  offset, val);
+		if (count < 0)
+			return count;
+
+		vfio_default_config_read(vdev, pos, 4, perm, offset, &virt_val);
+		virt_val &= ~cpu_to_le32(PCI_PM_CTRL_STATE_MASK);
+		virt_val |= (val & cpu_to_le32(PCI_PM_CTRL_STATE_MASK));
+		memcpy(vdev->vconfig + pos, &virt_val, 4);
+		vdev->pm_runtime_suspended = true;
+		pm_runtime_mark_last_busy(&vdev->pdev->dev);
+		pm_runtime_put_autosuspend(&vdev->pdev->dev);
+		return count;
+	}
+
+	if (vdev->pm_runtime_suspended && state == PCI_D0) {
+		vdev->pm_runtime_suspended = false;
+		*(__le16 *)&vdev->vconfig[pos] &=
+			~cpu_to_le16(PCI_PM_CTRL_STATE_MASK);
+		pm_runtime_get_sync(&vdev->pdev->dev);
+	}
+
+	return vfio_default_config_write(vdev, pos, count, perm, offset, val);
+}
+
+static int vfio_pm_config_read(struct vfio_pci_core_device *vdev, int pos,
+			       int count, struct perm_bits *perm,
+			       int offset, __le32 *val)
+{
+	/*
+	 * If pm_runtime_suspended status is set, then return the virtual
+	 * register value for PCI_PM_CTRL register read.
+	 */
+	if (vdev->pm_runtime_suspended &&
+	    offset >= PCI_PM_CTRL && offset < (PCI_PM_CTRL + 4)) {
+		memcpy(val, vdev->vconfig + pos, count);
+		return count;
+	}
+
+	return vfio_default_config_read(vdev, pos, count, perm, offset, val);
+}
+
 static int vfio_pm_config_write(struct vfio_pci_core_device *vdev, int pos,
 				int count, struct perm_bits *perm,
 				int offset, __le32 val)
 {
-	count = vfio_default_config_write(vdev, pos, count, perm, offset, val);
-	if (count < 0)
-		return count;
+	if (offset != PCI_PM_CTRL) {
+		count = vfio_default_config_write(vdev, pos, count, perm,
+						  offset, val);
+		if (count < 0)
+			return count;
+	}
 
 	if (offset == PCI_PM_CTRL) {
 		pci_power_t state;
@@ -718,7 +839,8 @@ static int vfio_pm_config_write(struct vfio_pci_core_device *vdev, int pos,
 			break;
 		}
 
-		vfio_pci_set_power_state(vdev, state);
+		count = vfio_perform_runtime_pm(vdev, pos, count, perm,
+						offset, val, state);
 	}
 
 	return count;
@@ -731,6 +853,7 @@ static int __init init_pci_cap_pm_perm(struct perm_bits *perm)
 		return -ENOMEM;
 
 	perm->writefn = vfio_pm_config_write;
+	perm->readfn = vfio_pm_config_read;
 
 	/*
 	 * We always virtualize the next field so we can remove
@@ -1921,13 +2044,31 @@ ssize_t vfio_pci_config_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 	size_t done = 0;
 	int ret = 0;
 	loff_t pos = *ppos;
+	bool runtime_put_required = false;
 
 	pos &= VFIO_PCI_OFFSET_MASK;
 
+	/*
+	 * For virtualized bits read/write, the device should not be resumed.
+	 * Increment the device usage count alone so that the device won't be
+	 * runtime suspended during config read/write.
+	 */
+	if (vdev->pm_runtime_suspended) {
+		pm_runtime_get_noresume(&vdev->pdev->dev);
+		runtime_put_required = true;
+	}
+
 	while (count) {
 		ret = vfio_config_do_rw(vdev, buf, count, &pos, iswrite);
-		if (ret < 0)
+		if (ret < 0) {
+			/*
+			 * Decrement the device usage counter corresponding to
+			 * previous pm_runtime_get_noresume().
+			 */
+			if (runtime_put_required)
+				pm_runtime_put_autosuspend(&vdev->pdev->dev);
 			return ret;
+		}
 
 		count -= ret;
 		done += ret;
@@ -1936,6 +2077,13 @@ ssize_t vfio_pci_config_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 	}
 
 	*ppos += done;
+
+	/*
+	 * Decrement the device usage counter corresponding to previous
+	 * pm_runtime_get_noresume().
+	 */
+	if (runtime_put_required)
+		pm_runtime_put_autosuspend(&vdev->pdev->dev);
 
 	return done;
 }

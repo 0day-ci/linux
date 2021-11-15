@@ -187,57 +187,6 @@ static bool vfio_pci_nointx(struct pci_dev *pdev)
 	return false;
 }
 
-static void vfio_pci_probe_power_state(struct vfio_pci_core_device *vdev)
-{
-	struct pci_dev *pdev = vdev->pdev;
-	u16 pmcsr;
-
-	if (!pdev->pm_cap)
-		return;
-
-	pci_read_config_word(pdev, pdev->pm_cap + PCI_PM_CTRL, &pmcsr);
-
-	vdev->needs_pm_restore = !(pmcsr & PCI_PM_CTRL_NO_SOFT_RESET);
-}
-
-/*
- * pci_set_power_state() wrapper handling devices which perform a soft reset on
- * D3->D0 transition.  Save state prior to D0/1/2->D3, stash it on the vdev,
- * restore when returned to D0.  Saved separately from pci_saved_state for use
- * by PM capability emulation and separately from pci_dev internal saved state
- * to avoid it being overwritten and consumed around other resets.
- */
-int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t state)
-{
-	struct pci_dev *pdev = vdev->pdev;
-	bool needs_restore = false, needs_save = false;
-	int ret;
-
-	if (vdev->needs_pm_restore) {
-		if (pdev->current_state < PCI_D3hot && state >= PCI_D3hot) {
-			pci_save_state(pdev);
-			needs_save = true;
-		}
-
-		if (pdev->current_state >= PCI_D3hot && state <= PCI_D0)
-			needs_restore = true;
-	}
-
-	ret = pci_set_power_state(pdev, state);
-
-	if (!ret) {
-		/* D3 might be unsupported via quirk, skip unless in D3 */
-		if (needs_save && pdev->current_state >= PCI_D3hot) {
-			vdev->pm_save = pci_store_saved_state(pdev);
-		} else if (needs_restore) {
-			pci_load_and_free_saved_state(pdev, &vdev->pm_save);
-			pci_restore_state(pdev);
-		}
-	}
-
-	return ret;
-}
-
 int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 {
 	struct pci_dev *pdev = vdev->pdev;
@@ -322,6 +271,16 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 
 	/* For needs_reset */
 	lockdep_assert_held(&vdev->vdev.dev_set->lock);
+
+	/*
+	 * The vfio device user can close the device after putting the device
+	 * into runtime suspended state so wake up the device first in
+	 * this case.
+	 */
+	if (vdev->pm_runtime_suspended) {
+		vdev->pm_runtime_suspended = false;
+		pm_runtime_get_sync(&pdev->dev);
+	}
 
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
@@ -1809,7 +1768,6 @@ void vfio_pci_core_uninit_device(struct vfio_pci_core_device *vdev)
 	mutex_destroy(&vdev->vma_lock);
 	vfio_uninit_group_dev(&vdev->vdev);
 	kfree(vdev->region);
-	kfree(vdev->pm_save);
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_uninit_device);
 
@@ -1854,8 +1812,6 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 	ret = vfio_pci_vga_init(vdev);
 	if (ret)
 		goto out_vf;
-
-	vfio_pci_probe_power_state(vdev);
 
 	/*
 	 * pci-core sets the device power state to an unknown value at
