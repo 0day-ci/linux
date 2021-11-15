@@ -426,3 +426,18 @@ int hci_configure_msft_avdtp_suspend(struct hci_dev *hdev, struct sock *sk)
 
 	return hci_send_cmd(hdev, HCI_MSFT_AVDTP_CMD, sizeof(cmd), &cmd);
 }
+
+int hci_configure_msft_avdtp_close(struct hci_dev *hdev, struct sock *sk)
+{
+	struct msft_cp_avdtp_close cmd;
+
+	if (!bt_sk(sk)->avdtp_handle)
+		return -EBADFD;
+
+	cmd.sub_opcode = HCI_MSFT_AVDTP_CLOSE;
+	cmd.avdtp_handle = cpu_to_le16(bt_sk(sk)->avdtp_handle);
+
+	bt_sk(sk)->avdtp_handle = 0;
+
+	return hci_send_cmd(hdev, HCI_MSFT_AVDTP_CMD, sizeof(cmd), &cmd);
+}

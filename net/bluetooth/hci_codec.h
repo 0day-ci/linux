@@ -13,3 +13,4 @@ int hci_configure_msft_avdtp_open(struct hci_dev *hdev, struct l2cap_chan *chan,
 				  sockptr_t optval, int optlen, struct sock *sk);
 int hci_configure_msft_avdtp_start(struct hci_dev *hdev, struct sock *sk);
 int hci_configure_msft_avdtp_suspend(struct hci_dev *hdev, struct sock *sk);
+int hci_configure_msft_avdtp_close(struct hci_dev *hdev, struct sock *sk);
