@@ -4530,7 +4530,7 @@ static void hci_sync_conn_complete_evt(struct hci_dev *hdev,
 {
 	struct hci_ev_sync_conn_complete *ev = (void *) skb->data;
 	struct hci_conn *conn;
-	unsigned int notify_evt;
+	unsigned int notify_evt = 0;
 
 	BT_DBG("%s status 0x%2.2x", hdev->name, ev->status);
 
