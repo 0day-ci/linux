@@ -314,6 +314,43 @@ static inline u32 i2c_dw_acpi_round_bus_speed(struct device *device) { return 0;
 
 #endif	/* CONFIG_ACPI */
 
+struct dw_scl_cfg {
+	u16 ss_hcnt;
+	u16 ss_lcnt;
+	u16 fs_hcnt;
+	u16 fs_lcnt;
+	u16 fp_hcnt;
+	u16 fp_lcnt;
+	u16 hs_hcnt;
+	u16 hs_lcnt;
+};
+
+/*
+ * The HCNT/LCNT information calculated based on the input clock are not always
+ * accurate for some given platform. In some systems get it more higher SCL speed.
+ * On such systems we better get results from dts config.
+ */
+void i2c_dw_scl_timing_configure(struct dw_i2c_dev *dev)
+{
+	int ret;
+	struct dw_scl_cfg i2c_scl_timing;
+
+	ret = device_property_read_u16_array(dev->dev, "dw-i2c-scl-timing",
+					(u16 *)&i2c_scl_timing, sizeof(i2c_scl_timing)/sizeof(u16));
+	if (ret)
+		return;
+
+	dev->ss_hcnt = i2c_scl_timing.ss_hcnt;
+	dev->ss_lcnt = i2c_scl_timing.ss_lcnt;
+	dev->fs_hcnt = i2c_scl_timing.fs_hcnt;
+	dev->fs_lcnt = i2c_scl_timing.fs_lcnt;
+	dev->fp_hcnt = i2c_scl_timing.fp_hcnt;
+	dev->fp_lcnt = i2c_scl_timing.fp_lcnt;
+	dev->hs_hcnt = i2c_scl_timing.hs_hcnt;
+	dev->hs_lcnt = i2c_scl_timing.hs_lcnt;
+}
+EXPORT_SYMBOL_GPL(i2c_dw_scl_timing_configure);
+
 void i2c_dw_adjust_bus_speed(struct dw_i2c_dev *dev)
 {
 	u32 acpi_speed = i2c_dw_acpi_round_bus_speed(dev->dev);

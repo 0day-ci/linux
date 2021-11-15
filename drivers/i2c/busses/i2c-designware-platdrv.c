@@ -237,6 +237,9 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	t = &dev->timings;
 	i2c_parse_fw_timings(&pdev->dev, t, false);
 
+	// Try to get HCNT/LCNT from dts
+	i2c_dw_scl_timing_configure(dev);
+
 	i2c_dw_adjust_bus_speed(dev);
 
 	if (pdev->dev.of_node)
