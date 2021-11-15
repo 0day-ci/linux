@@ -63,6 +63,13 @@ struct i40evf_channel {
 	u64 max_tx_rate; /* bandwidth rate allocation for VSIs */
 };
 
+/* used for VLAN list 'vm_vlan_list' by VM for trusted and untrusted VF */
+struct i40e_vm_vlan {
+	struct list_head list;
+	s16 vlan;
+	u16 vsi_id;
+};
+
 /* VF information structure */
 struct i40e_vf {
 	struct i40e_pf *pf;
@@ -104,6 +111,9 @@ struct i40e_vf {
 	bool link_up;		/* only valid if VF link is forced */
 	bool spoofchk;
 	u16 num_vlan;
+
+	/* VLAN list created by VM for trusted and untrusted VF */
+	struct list_head vm_vlan_list;
 
 	/* ADq related variables */
 	bool adq_enabled; /* flag to enable adq */
