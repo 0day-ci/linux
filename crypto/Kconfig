@@ -1845,6 +1845,13 @@ config CRYPTO_JITTERENTROPY
 	  random numbers. This Jitterentropy RNG registers with
 	  the kernel crypto API and can be used by any caller.
 
+config CRYPTO_KDF800108_CTR
+	tristate "Counter KDF (SP800-108)"
+	select CRYPTO_HASH
+	help
+	  Enable the key derivation function in counter mode compliant to
+	  SP800-108.
+
 config CRYPTO_USER_API
 	tristate
 
