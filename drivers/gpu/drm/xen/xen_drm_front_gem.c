@@ -222,15 +222,19 @@ xen_drm_front_gem_import_sg_table(struct drm_device *dev,
 
 	ret = drm_prime_sg_to_page_array(sgt, xen_obj->pages,
 					 xen_obj->num_pages);
-	if (ret < 0)
+	if (ret < 0) {
+		gem_free_pages_array(xen_obj);
 		return ERR_PTR(ret);
+	}
 
 	ret = xen_drm_front_dbuf_create(drm_info->front_info,
 					xen_drm_front_dbuf_to_cookie(&xen_obj->base),
 					0, 0, 0, size, sgt->sgl->offset,
 					xen_obj->pages);
-	if (ret < 0)
+	if (ret < 0) {
+		gem_free_pages_array(xen_obj);
 		return ERR_PTR(ret);
+	}
 
 	DRM_DEBUG("Imported buffer of size %zu with nents %u\n",
 		  size, sgt->orig_nents);
