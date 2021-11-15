@@ -506,6 +506,34 @@ DEFINE_EVENT_PRINT(foo_template, foo_with_template_print,
 	TP_ARGS(foo, bar),
 	TP_printk("bar %s %d", __get_str(foo), __entry->bar));
 
+/*
+ * There are yet another __rel_loc dynamic data attribute. If you
+ * use __rel_dynamic_array() and __rel_string() etc. macros, you
+ * can use this attribute. There is no difference from the viewpoint
+ * of functionality with/without 'rel' but the encoding is a bit
+ * different. This is expected to be used with user-space event,
+ * there is no reason that the kernel event use this, but only for
+ * testing.
+ */
+
+TRACE_EVENT(foo_rel_loc,
+
+	TP_PROTO(const char *foo, int bar),
+
+	TP_ARGS(foo, bar),
+
+	TP_STRUCT__entry(
+		__rel_string(	foo,	foo	)
+		__field(	int,	bar	)
+	),
+
+	TP_fast_assign(
+		__assign_rel_str(foo, foo);
+		__entry->bar = bar;
+	),
+
+	TP_printk("foo_rel_loc %s, %d", __get_rel_str(foo), __entry->bar)
+);
 #endif
 
 /***** NOTICE! The #if protection ends here. *****/

@@ -43,6 +43,8 @@ static void simple_thread_func(int cnt)
 	trace_foo_with_template_cond("prints other times", cnt);
 
 	trace_foo_with_template_print("I have to be different", cnt);
+
+	trace_foo_rel_loc("Hello __rel_loc", cnt);
 }
 
 static int simple_thread(void *arg)
