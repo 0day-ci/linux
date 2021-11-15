@@ -909,6 +909,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 	struct l2cap_conn *conn;
 	int len, err = 0;
 	u32 opt;
+	struct hci_dev *hdev;
 
 	BT_DBG("sk %p", sk);
 
@@ -1135,6 +1136,29 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 
 		BT_DBG("mode 0x%2.2x", chan->mode);
 
+		break;
+
+	case BT_MSFT_OPEN:
+		if (sk->sk_state != BT_CONNECTED) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		hdev = hci_get_route(BDADDR_ANY, &chan->src, BDADDR_BREDR);
+		if (!hdev) {
+			err = -EBADFD;
+			break;
+		}
+
+		if (!hci_dev_test_flag(hdev, HCI_OFFLOAD_CODECS_ENABLED) ||
+		    !hdev->get_data_path_id) {
+			err = -EOPNOTSUPP;
+			hci_dev_put(hdev);
+			break;
+		}
+
+		err = hci_configure_msft_avdtp_open(hdev, chan, optval, optlen);
+		hci_dev_put(hdev);
 		break;
 
 	default:

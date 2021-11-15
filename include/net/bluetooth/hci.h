@@ -2009,6 +2009,22 @@ struct hci_cp_le_reject_cis {
 	__u8    reason;
 } __packed;
 
+#define HCI_MSFT_AVDTP_CMD			0xfc1e
+
+#define HCI_MSFT_AVDTP_OPEN			0x08
+struct hci_media_service_caps {
+	__u8	category;
+	__u8	len;
+	__u8	data[0];
+} __packed;
+
+struct msft_cp_avdtp_open {
+	__u8	sub_opcode;
+	__le16	handle;
+	__le16	dcid;
+	__le16	omtu;
+} __packed;
+
 /* ---- HCI Events ---- */
 #define HCI_EV_INQUIRY_COMPLETE		0x01
 

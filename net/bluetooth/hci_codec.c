@@ -355,3 +355,46 @@ int hci_get_supported_codecs(struct hci_dev *hdev, u8 type, char __user *optval,
 error:
 	return err;
 }
+
+int hci_configure_msft_avdtp_open(struct hci_dev *hdev, struct l2cap_chan *chan,
+				  sockptr_t optval, int optlen)
+{
+	struct msft_cp_avdtp_open *cmd = NULL;
+	struct hci_media_service_caps *caps;
+	int err;
+
+	if (!optlen || optlen < sizeof(*caps)) {
+		err = -EINVAL;
+		goto fail;
+	}
+
+	cmd = kzalloc(sizeof(*cmd) + optlen, GFP_KERNEL);
+	if (!cmd) {
+		err = -ENOMEM;
+		goto fail;
+	}
+
+	cmd->sub_opcode = HCI_MSFT_AVDTP_OPEN;
+	cmd->handle = __cpu_to_le16(chan->conn->hcon->handle);
+	cmd->dcid = cpu_to_le16(chan->dcid);
+	cmd->omtu = cpu_to_le16(chan->omtu);
+	caps = (void *)(cmd + 1);
+
+	if (copy_from_sockptr(caps, optval, optlen)) {
+		err = -EFAULT;
+		goto fail;
+	}
+
+	if (caps->category != 0x07) {
+		err = -EINVAL;
+		goto fail;
+	}
+
+	hci_send_cmd(hdev, HCI_MSFT_AVDTP_CMD, sizeof(*cmd) + optlen, cmd);
+
+	/* wait until we get avdtp handle or timeout */
+
+fail:
+	kfree(cmd);
+	return err;
+}
