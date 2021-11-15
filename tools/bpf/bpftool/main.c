@@ -93,6 +93,7 @@ static int do_version(int argc, char **argv)
 		jsonw_name(json_wtr, "features");
 		jsonw_start_object(json_wtr);	/* features */
 		jsonw_bool_field(json_wtr, "libbfd", has_libbfd);
+		jsonw_bool_field(json_wtr, "libbpf_strict", !legacy_libbpf);
 		jsonw_bool_field(json_wtr, "skeletons", has_skeletons);
 		jsonw_end_object(json_wtr);	/* features */
 
@@ -104,6 +105,10 @@ static int do_version(int argc, char **argv)
 		printf("features:");
 		if (has_libbfd) {
 			printf(" libbfd");
+			nb_features++;
+		}
+		if (!legacy_libbpf) {
+			printf("%s libbpf_strict", nb_features++ ? "," : "");
 			nb_features++;
 		}
 		if (has_skeletons)
@@ -414,9 +419,11 @@ int main(int argc, char **argv)
 				  options, NULL)) >= 0) {
 		switch (opt) {
 		case 'V':
-			return do_version(argc, argv);
+			last_do_help = do_version;
+			break;
 		case 'h':
-			return do_help(argc, argv);
+			last_do_help = do_help;
+			break;
 		case 'p':
 			pretty_output = true;
 			/* fall through */
@@ -476,7 +483,7 @@ int main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	if (argc < 0)
+	if (argc < 1)
 		usage();
 
 	ret = cmd_select(cmds, argc, argv, do_help);
