@@ -15,6 +15,7 @@
 #include <linux/vhost_iotlb.h>
 #include <linux/irqbypass.h>
 
+struct vhost_dev;
 struct vhost_work;
 typedef void (*vhost_work_fn_t)(struct vhost_work *work);
 
