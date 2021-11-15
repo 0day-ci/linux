@@ -2636,7 +2636,8 @@ static void config_data_path_complete(struct hci_dev *hdev, u8 status,
 	bt_dev_dbg(hdev, "status %u", status);
 }
 
-int hci_req_configure_datapath(struct hci_dev *hdev, struct bt_codec *codec)
+int hci_req_configure_datapath(struct hci_dev *hdev, u8 transport,
+			       struct bt_codec *codec)
 {
 	struct hci_request req;
 	int err;
@@ -2656,7 +2657,7 @@ int hci_req_configure_datapath(struct hci_dev *hdev, struct bt_codec *codec)
 		goto error;
 	}
 
-	err = hdev->get_data_path_id(hdev, &cmd->data_path_id);
+	err = hdev->get_data_path_id(hdev, transport, &cmd->data_path_id);
 	if (err < 0)
 		goto error;
 

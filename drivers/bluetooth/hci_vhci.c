@@ -80,8 +80,12 @@ static int vhci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	return 0;
 }
 
-static int vhci_get_data_path_id(struct hci_dev *hdev, u8 *data_path_id)
+static int vhci_get_data_path_id(struct hci_dev *hdev, u8 transport,
+				 u8 *data_path_id)
 {
+	if (transport != HCI_TRANSPORT_SCO_ESCO)
+		return -EINVAL;
+
 	*data_path_id = 0;
 	return 0;
 }
