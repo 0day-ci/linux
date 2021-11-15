@@ -1961,6 +1961,7 @@ struct bitmap *get_bitmap_from_slot(struct mddev *mddev, int slot)
 	bitmap = md_bitmap_create(mddev, slot);
 	if (IS_ERR(bitmap)) {
 		rv = PTR_ERR(bitmap);
+		md_bitmap_destroy(mddev)
 		return ERR_PTR(rv);
 	}
 
