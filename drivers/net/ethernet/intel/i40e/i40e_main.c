@@ -282,6 +282,38 @@ static int i40e_put_lump(struct i40e_lump_tracking *pile, u16 index, u16 id)
 }
 
 /**
+ * i40e_max_lump_qp - find a biggest size of lump available in qp_pile
+ * @pf: pointer to private device data structure
+ *
+ * Returns the max size of lump in a qp_pile, or negative for error
+ */
+int i40e_max_lump_qp(struct i40e_pf *pf)
+{
+	struct i40e_lump_tracking *pile = pf->qp_pile;
+	int pool_size, max_size;
+	unsigned int i;
+
+	if (!pile) {
+		dev_info(&pf->pdev->dev,
+			 "param err: pile=%s\n",
+			 pile ? "<valid>" : "<null>");
+		return -EINVAL;
+	}
+
+	pool_size = 0;
+	max_size = 0;
+	for (i = 0; i < pile->num_entries; i++) {
+		if (pile->list[i] & I40E_PILE_VALID_BIT) {
+			pool_size = 0;
+			continue;
+		}
+		max_size = max(max_size, ++pool_size);
+	}
+
+	return max_size;
+}
+
+/**
  * i40e_find_vsi_from_id - searches for the vsi with the given id
  * @pf: the pf structure to search for the vsi
  * @id: id of the vsi it is searching for
