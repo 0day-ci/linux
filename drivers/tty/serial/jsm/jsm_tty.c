@@ -746,10 +746,10 @@ static void jsm_carrier(struct jsm_channel *ch)
 void jsm_check_queue_flow_control(struct jsm_channel *ch)
 {
 	struct board_ops *bd_ops = ch->ch_bd->bd_ops;
-	int qleft;
+	int qleft = ch->ch_r_tail - ch->ch_r_head - 1;
 
 	/* Store how much space we have left in the queue */
-	if ((qleft = ch->ch_r_tail - ch->ch_r_head - 1) < 0)
+	if (qleft < 0)
 		qleft += RQUEUEMASK + 1;
 
 	/*
