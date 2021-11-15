@@ -14920,6 +14920,13 @@ L:	platform-driver-x86@vger.kernel.org
 S:	Maintained
 F:	drivers/platform/x86/peaq-wmi.c
 
+PECI HARDWARE MONITORING DRIVERS
+M:	Iwona Winiarska <iwona.winiarska@intel.com>
+R:	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+L:	linux-hwmon@vger.kernel.org
+S:	Supported
+F:	drivers/hwmon/peci/
+
 PECI SUBSYSTEM
 M:	Iwona Winiarska <iwona.winiarska@intel.com>
 R:	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
