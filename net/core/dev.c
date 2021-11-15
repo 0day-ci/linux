@@ -3661,6 +3661,10 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 	if (unlikely(!skb))
 		goto out_null;
 
+	if (unlikely(skb_shared(skb)) &&
+	    !(dev->priv_flags & IFF_TX_SKB_SHARING))
+		goto out_kfree_skb;
+
 	skb = sk_validate_xmit_skb(skb, dev);
 	if (unlikely(!skb))
 		goto out_null;
