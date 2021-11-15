@@ -487,6 +487,20 @@ static void coredump_finish(struct mm_struct *mm, bool core_dumped)
 {
 	struct core_thread *curr, *next;
 	struct task_struct *task;
+	int signr;
+	struct ksignal ksig;
+
+	current->mm->core_state->core_dumped = true;
+
+	/*
+	 * Check if there is a SIGSTOP pending, and if so, re-trigger its delivery
+	 * allowing the coredump umh process to do a ptrace on this one.
+	 */
+	spin_lock_irq(&current->sighand->siglock);
+	signr = next_signal(&current->pending, &current->blocked);
+	spin_unlock_irq(&current->sighand->siglock);
+	if (signr == SIGSTOP)
+		get_signal(&ksig);
 
 	spin_lock_irq(&current->sighand->siglock);
 	if (core_dumped && !__fatal_signal_pending(current))
@@ -601,7 +615,7 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		 */
 		.mm_flags = mm->flags,
 	};
-
+	core_state.core_dumped = false;
 	audit_core_dumps(siginfo->si_signo);
 
 	binfmt = mm->binfmt;
@@ -695,7 +709,7 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		if (sub_info)
 			retval = call_usermodehelper_exec(sub_info,
 							  UMH_WAIT_EXEC);
-
+		core_state.umh_pid = sub_info->pid;
 		kfree(helper_argv);
 		if (retval) {
 			printk(KERN_INFO "Core dump to |%s pipe failed\n",

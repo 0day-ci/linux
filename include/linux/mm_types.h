@@ -396,6 +396,8 @@ struct core_state {
 	atomic_t nr_threads;
 	struct core_thread dumper;
 	struct completion startup;
+	bool core_dumped;
+	pid_t umh_pid;
 };
 
 struct kioctx_table;

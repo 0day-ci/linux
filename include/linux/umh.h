@@ -24,6 +24,7 @@ struct subprocess_info {
 	char **envp;
 	int wait;
 	int retval;
+	pid_t pid;
 	int (*init)(struct subprocess_info *info, struct cred *new);
 	void (*cleanup)(struct subprocess_info *info);
 	void *data;

@@ -904,8 +904,22 @@ static bool prepare_signal(int sig, struct task_struct *p, bool force)
 	sigset_t flush;
 
 	if (signal->flags & (SIGNAL_GROUP_EXIT | SIGNAL_GROUP_COREDUMP)) {
-		if (!(signal->flags & SIGNAL_GROUP_EXIT))
-			return sig == SIGKILL;
+		if (!(signal->flags & SIGNAL_GROUP_EXIT)) {
+			/*
+			 * If the signal is for the process being core-dumped
+			 * and the signal is SIGSTOP sent by the coredump umh process
+			 * let it through (in addition to SIGKILL)
+			 * allowing the coredump umh process to ptrace the dying process.
+			 */
+			bool sig_from_umh = false;
+
+			if (unlikely(p->mm && p->mm->core_state &&
+				p->mm->core_state->umh_pid == current->tgid)) {
+				sig_from_umh = true;
+			}
+			return sig == SIGKILL || (sig == SIGSTOP && sig_from_umh);
+		}
+
 		/*
 		 * The process is in the middle of dying, nothing to do.
 		 */
@@ -975,8 +989,18 @@ static inline bool wants_signal(int sig, struct task_struct *p)
 	if (sigismember(&p->blocked, sig))
 		return false;
 
-	if (p->flags & PF_EXITING)
+	if (p->flags & PF_EXITING) {
+		/*
+		 * Ignore the fact the process is exiting,
+		 * if it's being core-dumped, and the signal is SIGSTOP
+		 * allowing the coredump umh process to ptrace the dying process.
+		 * See prepare_signal().
+		 */
+		if (unlikely(p->mm && p->mm->core_state && sig == SIGSTOP))
+			return true;
+
 		return false;
+	}
 
 	if (sig == SIGKILL)
 		return true;
@@ -1053,6 +1077,22 @@ static void complete_signal(int sig, struct task_struct *p, enum pid_type type)
 			} while_each_thread(p, t);
 			return;
 		}
+	}
+
+	/*
+	 * If the signal is completed for a process being core-dumped,
+	 * and the signal is SIGSTOP, there is no point in waking up its tasks,
+	 * as they are either dumping the core, or in uninterruptible state,
+	 * so skip the wake up if core-dump is not yet completed.
+	 * Instead, if the core-dump has been completed, see coredump_finish()
+	 * set the task state directly to TASK_TRACED,
+	 * allowing the coredump umh process to ptrace the dying process.
+	 */
+	if (unlikely(t->mm && t->mm->core_state) && sig == SIGSTOP) {
+		if (t->mm->core_state->core_dumped)
+			t->state = TASK_TRACED;
+
+		return;
 	}
 
 	/*
@@ -2623,6 +2663,7 @@ bool get_signal(struct ksignal *ksig)
 	struct sighand_struct *sighand = current->sighand;
 	struct signal_struct *signal = current->signal;
 	int signr;
+	bool sigstop_pending = false;
 
 	if (unlikely(current->task_works))
 		task_work_run();
@@ -2688,8 +2729,23 @@ relock:
 		goto relock;
 	}
 
+
+	/*
+	 * If this task is being core-dumped,
+	 * and the next signal is SIGSTOP, allow its delivery
+	 * to enable the coredump umh process to ptrace the dying one.
+	 */
+	if (unlikely(current->mm && current->mm->core_state)) {
+		int nextsig = 0;
+
+		nextsig = next_signal(&current->pending, &current->blocked);
+		if (nextsig == SIGSTOP) {
+			sigstop_pending = true;
+		}
+	}
+
 	/* Has this task already been marked for death? */
-	if (signal_group_exit(signal)) {
+	if (signal_group_exit(signal) && !sigstop_pending) {
 		ksig->info.si_signo = signr = SIGKILL;
 		sigdelset(&current->pending.signal, SIGKILL);
 		trace_signal_deliver(SIGKILL, SEND_SIG_NOINFO,
