@@ -6,6 +6,17 @@
 
 menu "Amplifiers"
 
+config AD7293
+	tristate "Analog Devices AD7293 Power Amplifier Current Controller"
+	depends on SPI
+	help
+	  Say yes here to build support for Analog Devices AD7293
+	  Power Amplifier Current Controller with
+	  ADC, DACs, and Temperature and Current Sensors
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ad7293.
+
 config AD8366
 	tristate "Analog Devices AD8366 and similar Gain Amplifiers"
 	depends on SPI
