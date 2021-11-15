@@ -122,6 +122,17 @@ config LEDS_BCM6358
 	  This option enables support for LEDs connected to the BCM6358
 	  LED HW controller accessed via MMIO registers.
 
+config LEDS_BCM63XXX
+	tristate "LED Support for Broadcom BCM63xxx SoCs"
+	depends on LEDS_CLASS
+	depends on ARCH_BCM4908 || BCM63XX || COMPILE_TEST
+	depends on HAS_IOMEM
+	depends on OF
+	default ARCH_BCM4908
+	help
+	  This option enables support for LED controller that is part of
+	  BCM63xxx family SoCs.
+
 config LEDS_CPCAP
 	tristate "LED Support for Motorola CPCAP"
 	depends on LEDS_CLASS
