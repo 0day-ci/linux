@@ -166,7 +166,7 @@ static __poll_t virtio_gpu_poll(struct file *filp,
 	struct drm_pending_event *e = NULL;
 	__poll_t mask = 0;
 
-	if (!vfpriv->ring_idx_mask)
+	if (!vfpriv || !vfpriv->ring_idx_mask)
 		return drm_poll(filp, wait);
 
 	poll_wait(filp, &drm_file->event_wait, wait);
