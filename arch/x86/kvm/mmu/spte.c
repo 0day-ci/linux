@@ -90,7 +90,7 @@ static bool kvm_is_mmio_pfn(kvm_pfn_t pfn)
 }
 
 bool make_spte(struct kvm *kvm, struct kvm_mmu_page *sp,
-	       struct kvm_memory_slot *slot, unsigned int pte_access,
+	       const struct kvm_memory_slot *slot, unsigned int pte_access,
 	       gfn_t gfn, kvm_pfn_t pfn, u64 old_spte, bool prefetch,
 	       bool can_unsync, bool host_writable, bool ad_need_write_protect,
 	       u64 mt_mask, struct rsvd_bits_validate *shadow_zero_check,
