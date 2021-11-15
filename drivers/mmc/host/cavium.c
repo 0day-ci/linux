@@ -493,8 +493,8 @@ irqreturn_t cvm_mmc_interrupt(int irq, void *dev_id)
 	    (rsp_sts & MIO_EMM_RSP_STS_DMA_PEND))
 		cleanup_dma(host, rsp_sts);
 
+	mmc_request_done(slot->mmc, req);
 	host->current_req = NULL;
-	req->done(req);
 
 no_req_done:
 	if (host->dmar_fixup_done)
@@ -699,8 +699,7 @@ static void cvm_mmc_dma_request(struct mmc_host *mmc,
 
 error:
 	mrq->cmd->error = -EINVAL;
-	if (mrq->done)
-		mrq->done(mrq);
+	mmc_request_done(mmc, mrq);
 	host->release_bus(host);
 }
 
