@@ -77,6 +77,16 @@ config OF_NET
 config OF_RESERVED_MEM
 	def_bool OF_EARLY_FLATTREE
 
+config OF_MAX_RESERVED_REGIONS
+    int "Maximum count of reserved regions"
+    depends on OF_RESERVED_MEM
+    default 64
+    help
+        Reserved regions in /reserved-memory node includes static
+        reservations with fixed location and dynamic ones for device
+        cma regions. This parameter sets the maximum number of reserved
+        regions in the system.
+
 config OF_RESOLVE
 	bool
 
