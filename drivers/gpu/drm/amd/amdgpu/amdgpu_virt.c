@@ -286,12 +286,14 @@ static int amdgpu_virt_init_ras_err_handler_data(struct amdgpu_device *adev)
 		return -ENOMEM;
 
 	bps = kmalloc_array(align_space, sizeof((*data)->bps), GFP_KERNEL);
-	bps_bo = kmalloc_array(align_space, sizeof((*data)->bps_bo), GFP_KERNEL);
-
-	if (!bps || !bps_bo) {
-		kfree(bps);
-		kfree(bps_bo);
+	if (!bps) {
 		kfree(*data);
+		return -ENOMEM;
+	}
+	bps_bo = kmalloc_array(align_space, sizeof((*data)->bps_bo), GFP_KERNEL);
+	if (!bps_bo) {
+		kfree(*data);
+		kfree(bps);
 		return -ENOMEM;
 	}
 
