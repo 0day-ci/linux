@@ -2994,6 +2994,16 @@ void rpc_clnt_xprt_switch_add_xprt(struct rpc_clnt *clnt, struct rpc_xprt *xprt)
 }
 EXPORT_SYMBOL_GPL(rpc_clnt_xprt_switch_add_xprt);
 
+unsigned int rpc_clnt_xprt_switch_num_xprts(struct rpc_clnt *clnt)
+{
+	unsigned int num;
+	rcu_read_lock();
+	num = rcu_dereference(clnt->cl_xpi.xpi_xpswitch)->xps_nxprts;
+	rcu_read_unlock();
+	return num;
+}
+EXPORT_SYMBOL_GPL(rpc_clnt_xprt_switch_num_xprts);
+
 bool rpc_clnt_xprt_switch_has_addr(struct rpc_clnt *clnt,
 				   const struct sockaddr *sap)
 {
