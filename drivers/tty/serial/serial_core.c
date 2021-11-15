@@ -107,10 +107,33 @@ static int serial_pm_resume_and_get(struct device *dev)
 	return pm_runtime_resume_and_get(dev);
 }
 
+/* Only increments the runtime PM usage count */
+static void serial_pm_get_noresume(struct device *dev)
+{
+	pm_runtime_get_noresume(dev);
+}
+
 static void serial_pm_autosuspend(struct device *dev)
 {
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
+}
+
+/*
+ * This routine can be used before register access to wake up a serial
+ * port that has been runtime PM suspended by the serial port driver.
+ * Note that the runtime_suspended flag is managed by the serial port
+ * device driver runtime PM.
+ */
+static int __uart_port_wakeup(struct uart_port *port)
+{
+	if (!port->runtime_suspended)
+		return 0;
+
+	if (port->ops->wakeup)
+		return port->ops->wakeup(port);
+
+	return 0;
 }
 
 /*
@@ -145,8 +168,15 @@ static void __uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 
-	if (port && !uart_tx_stopped(port))
-		port->ops->start_tx(port);
+	if (!port || uart_tx_stopped(port))
+		return;
+
+	if (__uart_port_wakeup(port) < 0)
+		return;
+
+	serial_pm_get_noresume(port->dev);
+	port->ops->start_tx(port);
+	serial_pm_autosuspend(port->dev);
 }
 
 static void uart_start(struct tty_struct *tty)
@@ -159,6 +189,21 @@ static void uart_start(struct tty_struct *tty)
 	__uart_start(tty);
 	uart_port_unlock(port, flags);
 }
+
+/*
+ * This routine can be called from the serial driver runtime PM resume function
+ * to transmit buffered data if the serial port was not active on uart_write().
+ */
+void uart_start_pending_tx(struct uart_port *port)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->lock, flags);
+	if (!uart_tx_stopped(port) && uart_circ_chars_pending(&port->state->xmit))
+		port->ops->start_tx(port);
+	spin_unlock_irqrestore(&port->lock, flags);
+}
+EXPORT_SYMBOL(uart_start_pending_tx);
 
 static void
 uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
