@@ -478,7 +478,7 @@ static void nfs_show_mount_options(struct seq_file *m, struct nfs_server *nfss,
 		   rpc_peeraddr2str(nfss->client, RPC_DISPLAY_NETID));
 	rcu_read_unlock();
 	if (clp->cl_nconnect > 0)
-		seq_printf(m, ",nconnect=%u", clp->cl_nconnect);
+		seq_printf(m, ",nconnect=%u", rpc_clnt_xprt_switch_num_xprts(clp->cl_rpcclient));
 	if (version == 4) {
 		if (clp->cl_max_connect > 1)
 			seq_printf(m, ",max_connect=%u", clp->cl_max_connect);
