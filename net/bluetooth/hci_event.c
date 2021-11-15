@@ -1445,6 +1445,55 @@ static void hci_cc_le_set_ext_scan_param(struct hci_dev *hdev,
 	hci_dev_unlock(hdev);
 }
 
+static void hci_cc_msft_avdtp_open(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	struct msft_rp_avdtp_open *rp;
+	struct msft_cp_avdtp_open *sent;
+	struct hci_conn *hconn;
+
+	if (skb->len < sizeof(*rp))
+		return;
+
+	rp = (void *)skb->data;
+
+	sent = hci_sent_cmd_data(hdev, HCI_MSFT_AVDTP_CMD);
+
+	hconn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(sent->handle));
+
+	if (!hconn)
+		return;
+
+	/* wake up the task waiting on avdtp handle */
+}
+
+static void hci_cc_msft_avdtp_cmd(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	void *sent;
+	__u8 status;
+
+	if (skb->len < 2)
+		return;
+
+	status = skb->data[0];
+
+	bt_dev_dbg(hdev, "status 0x%2.2x", status);
+
+	sent = hci_sent_cmd_data(hdev, HCI_MSFT_AVDTP_CMD);
+	if (!sent)
+		return;
+
+	switch (skb->data[1]) {
+	case HCI_MSFT_AVDTP_OPEN:
+		hci_cc_msft_avdtp_open(hdev, skb);
+		break;
+
+	default:
+		bt_dev_err(hdev, "Invalid MSFT sub opcode 0x%2.2x",
+			   skb->data[1]);
+		break;
+	}
+}
+
 static bool has_pending_adv_report(struct hci_dev *hdev)
 {
 	struct discovery_state *d = &hdev->discovery;
@@ -3810,6 +3859,10 @@ static void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *skb,
 
 	case HCI_OP_LE_READ_TRANSMIT_POWER:
 		hci_cc_le_read_transmit_power(hdev, skb);
+		break;
+
+	case HCI_MSFT_AVDTP_CMD:
+		hci_cc_msft_avdtp_cmd(hdev, skb);
 		break;
 
 	default:

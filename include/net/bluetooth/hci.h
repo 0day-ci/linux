@@ -2025,6 +2025,13 @@ struct msft_cp_avdtp_open {
 	__le16	omtu;
 } __packed;
 
+struct msft_rp_avdtp_open {
+	__u8	status;
+	__u8	sub_opcode;
+	__le16	avdtp_handle;
+	__u8	audio_intf_param_cnt;
+} __packed;
+
 /* ---- HCI Events ---- */
 #define HCI_EV_INQUIRY_COMPLETE		0x01
 
