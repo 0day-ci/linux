@@ -1315,6 +1315,20 @@ has_cpuid_feature(const struct arm64_cpu_capabilities *entry, int scope)
 	return feature_matches(val, entry);
 }
 
+static bool
+has_feature_flag(const struct arm64_cpu_capabilities *entry, int scope)
+{
+	u64 val;
+
+	WARN_ON(scope == SCOPE_LOCAL_CPU && preemptible());
+	if (scope == SCOPE_SYSTEM)
+		val = read_sanitised_ftr_reg(entry->sys_reg);
+	else
+		val = __read_sysreg_by_encoding(entry->sys_reg);
+
+	return val & ((u64)1 << entry->field_pos);
+}
+
 const struct cpumask *system_32bit_el0_cpumask(void)
 {
 	if (!system_supports_32bit_el0())
@@ -2389,6 +2403,18 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 	{									\
 		__HWCAP_CAP(#cap, cap_type, cap)				\
 		.matches = match,						\
+	}
+
+
+#define HWCAP_CPUID_FLAG_MATCH(reg, field)				\
+		.matches = has_feature_flag,					\
+		.sys_reg = reg,							\
+		.field_pos = field,
+
+#define HWCAP_CAP_FLAG(reg, field, cap_type, cap)			\
+	{									\
+		__HWCAP_CAP(#cap, cap_type, cap)				\
+		HWCAP_CPUID_FLAG_MATCH(reg, field)	\
 	}
 
 #ifdef CONFIG_ARM64_PTR_AUTH
