@@ -2702,14 +2702,19 @@ static int ieee80211_set_tx_power(struct wiphy *wiphy,
 	enum nl80211_tx_power_setting txp_type = type;
 	bool update_txp_type = false;
 	bool has_monitor = false;
+	int ret = 0;
+
+	rtnl_lock();
 
 	if (wdev) {
 		sdata = IEEE80211_WDEV_TO_SUB_IF(wdev);
 
 		if (sdata->vif.type == NL80211_IFTYPE_MONITOR) {
 			sdata = rtnl_dereference(local->monitor_sdata);
-			if (!sdata)
-				return -EOPNOTSUPP;
+			if (!sdata) {
+				ret = -EOPNOTSUPP;
+				goto out;
+			}
 		}
 
 		switch (type) {
@@ -2719,8 +2724,10 @@ static int ieee80211_set_tx_power(struct wiphy *wiphy,
 			break;
 		case NL80211_TX_POWER_LIMITED:
 		case NL80211_TX_POWER_FIXED:
-			if (mbm < 0 || (mbm % 100))
-				return -EOPNOTSUPP;
+			if (mbm < 0 || (mbm % 100)) {
+				ret = -EOPNOTSUPP;
+				goto out;
+			}
 			sdata->user_power_level = MBM_TO_DBM(mbm);
 			break;
 		}
@@ -2732,7 +2739,7 @@ static int ieee80211_set_tx_power(struct wiphy *wiphy,
 
 		ieee80211_recalc_txpower(sdata, update_txp_type);
 
-		return 0;
+		goto out;
 	}
 
 	switch (type) {
@@ -2742,8 +2749,10 @@ static int ieee80211_set_tx_power(struct wiphy *wiphy,
 		break;
 	case NL80211_TX_POWER_LIMITED:
 	case NL80211_TX_POWER_FIXED:
-		if (mbm < 0 || (mbm % 100))
-			return -EOPNOTSUPP;
+		if (mbm < 0 || (mbm % 100)) {
+			ret = -EOPNOTSUPP;
+			goto out;
+		}
 		local->user_power_level = MBM_TO_DBM(mbm);
 		break;
 	}
@@ -2778,7 +2787,9 @@ static int ieee80211_set_tx_power(struct wiphy *wiphy,
 		}
 	}
 
-	return 0;
+out:
+	rtnl_unlock();
+	return ret;
 }
 
 static int ieee80211_get_tx_power(struct wiphy *wiphy,
