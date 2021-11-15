@@ -1361,6 +1361,66 @@ void kvm_tdp_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 		clear_dirty_pt_masked(kvm, root, gfn, mask, wrprot);
 }
 
+static void try_promote_lpage(struct kvm *kvm,
+			      const struct kvm_memory_slot *slot,
+			      struct tdp_iter *iter)
+{
+	struct kvm_mmu_page *sp = sptep_to_sp(iter->sptep);
+	struct rsvd_bits_validate shadow_zero_check;
+	/*
+	 * Since the TDP  MMU doesn't manage nested PTs, there's no need to
+	 * write protect for a nested VM when PML is in use.
+	 */
+	bool ad_need_write_protect = false;
+	bool map_writable;
+	kvm_pfn_t pfn;
+	u64 new_spte;
+	u64 mt_mask;
+
+	/*
+	 * If addresses are being invalidated, don't do in-place promotion to
+	 * avoid accidentally mapping an invalidated address.
+	 */
+	if (unlikely(kvm->mmu_notifier_count))
+		return;
+
+	pfn = __gfn_to_pfn_memslot(slot, iter->gfn, true, NULL, true,
+				   &map_writable, NULL);
+
+	/*
+	 * Can't reconstitute an lpage if the consituent pages can't be
+	 * mapped higher.
+	 */
+	if (iter->level > kvm_mmu_max_mapping_level(kvm, slot, iter->gfn,
+						    pfn, PG_LEVEL_NUM))
+		return;
+
+	build_tdp_shadow_zero_bits_mask(&shadow_zero_check, iter->root_level);
+
+	/*
+	 * In some cases, a vCPU pointer is required to get the MT mask,
+	 * however in most cases it can be generated without one. If a
+	 * vCPU pointer is needed kvm_x86_try_get_mt_mask will fail.
+	 * In that case, bail on in-place promotion.
+	 */
+	if (unlikely(!static_call(kvm_x86_try_get_mt_mask)(kvm, iter->gfn,
+							   kvm_is_mmio_pfn(pfn),
+							   &mt_mask)))
+		return;
+
+	make_spte(kvm, sp, slot, ACC_ALL, iter->gfn, pfn, 0, false, true,
+		  map_writable, ad_need_write_protect, mt_mask,
+		  &shadow_zero_check, &new_spte);
+
+	tdp_mmu_set_spte_atomic(kvm, iter, new_spte);
+
+	/*
+	 * Re-read the SPTE to avoid recursing into one of the removed child
+	 * page tables.
+	 */
+	iter->old_spte = READ_ONCE(*rcu_dereference(iter->sptep));
+}
+
 /*
  * Clear leaf entries which could be replaced by large mappings, for
  * GFNs within the slot.
@@ -1381,9 +1441,14 @@ retry:
 		if (tdp_mmu_iter_cond_resched(kvm, &iter, false, true))
 			continue;
 
-		if (!is_shadow_present_pte(iter.old_spte) ||
-		    !is_last_spte(iter.old_spte, iter.level))
+		if (!is_shadow_present_pte(iter.old_spte))
 			continue;
+
+		/* Try to promote the constitutent pages to an lpage. */
+		if (!is_last_spte(iter.old_spte, iter.level)) {
+			try_promote_lpage(kvm, slot, &iter);
+			continue;
+		}
 
 		pfn = spte_to_pfn(iter.old_spte);
 		if (kvm_is_reserved_pfn(pfn) ||
