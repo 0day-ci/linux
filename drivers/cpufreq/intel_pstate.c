@@ -936,10 +936,16 @@ static void intel_pstate_hwp_set(unsigned int cpu)
 	max = cpu_data->max_perf_ratio;
 	min = cpu_data->min_perf_ratio;
 
-	if (cpu_data->policy == CPUFREQ_POLICY_PERFORMANCE)
-		min = max;
-
 	rdmsrl_on_cpu(cpu, MSR_HWP_REQUEST, &value);
+
+	if (cpu_data->policy == CPUFREQ_POLICY_PERFORMANCE) {
+		min = max;
+		epp = 0;
+		if (boot_cpu_has(X86_FEATURE_HWP_EPP))
+			epp = (value >> 24) & 0xff;
+		if (epp)
+			cpu_data->epp_policy = 0;
+	}
 
 	value &= ~HWP_MIN_PERF(~0L);
 	value |= HWP_MIN_PERF(min);
