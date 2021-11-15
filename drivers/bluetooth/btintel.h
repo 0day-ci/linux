@@ -158,6 +158,7 @@ enum {
 
 struct btintel_data {
 	DECLARE_BITMAP(flags, __INTEL_NUM_FLAGS);
+	struct intel_offload_use_cases use_cases;
 };
 
 #define btintel_set_flag(hdev, nr)					\
