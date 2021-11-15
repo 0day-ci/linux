@@ -255,11 +255,8 @@ struct sk_buff *build_skb(void *data, unsigned int frag_size)
 {
 	struct sk_buff *skb = __build_skb(data, frag_size);
 
-	if (skb && frag_size) {
-		skb->head_frag = 1;
-		if (page_is_pfmemalloc(virt_to_head_page(data)))
-			skb->pfmemalloc = 1;
-	}
+	skb_set_head_frag_pfmemalloc(skb, data, frag_size);
+
 	return skb;
 }
 EXPORT_SYMBOL(build_skb);
@@ -278,11 +275,8 @@ struct sk_buff *build_skb_around(struct sk_buff *skb,
 
 	__build_skb_around(skb, data, frag_size);
 
-	if (frag_size) {
-		skb->head_frag = 1;
-		if (page_is_pfmemalloc(virt_to_head_page(data)))
-			skb->pfmemalloc = 1;
-	}
+	skb_set_head_frag_pfmemalloc(skb, data, frag_size);
+
 	return skb;
 }
 EXPORT_SYMBOL(build_skb_around);
@@ -325,10 +319,7 @@ struct sk_buff *napi_build_skb(void *data, unsigned int frag_size)
 {
 	struct sk_buff *skb = __napi_build_skb(data, frag_size);
 
-	if (likely(skb) && frag_size) {
-		skb->head_frag = 1;
-		skb_propagate_pfmemalloc(virt_to_head_page(data), skb);
-	}
+	skb_set_head_frag_pfmemalloc(skb, data, frag_size);
 
 	return skb;
 }

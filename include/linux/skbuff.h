@@ -3040,15 +3040,20 @@ static inline bool dev_page_is_reusable(const struct page *page)
 }
 
 /**
- *	skb_propagate_pfmemalloc - Propagate pfmemalloc if skb is allocated after RX page
- *	@page: The page that was allocated from skb_alloc_page
- *	@skb: The skb that may need pfmemalloc set
+ *	skb_set_head_frag_pfmemalloc - Set head_frag and pfmemalloc
+ *	@skb: The skb that may need head_frag and pfmemalloc set
+ *      @data: data buffer provided by caller
+ *      @frag_size: size of data, or 0 if head was kmalloced
  */
-static inline void skb_propagate_pfmemalloc(const struct page *page,
-					    struct sk_buff *skb)
+static inline void skb_set_head_frag_pfmemalloc(struct sk_buff *skb, void *data,
+						unsigned int frag_size)
 {
-	if (page_is_pfmemalloc(page))
-		skb->pfmemalloc = true;
+
+	if (likely(skb) && frag_size) {
+		skb->head_frag = 1;
+		if (page_is_pfmemalloc(virt_to_head_page(data)))
+			skb->pfmemalloc = 1;
+	}
 }
 
 /**
