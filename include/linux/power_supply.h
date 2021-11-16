@@ -410,11 +410,16 @@ extern void power_supply_put_battery_info(struct power_supply *psy,
 					  struct power_supply_battery_info *info);
 extern int power_supply_ocv2cap_simple(struct power_supply_battery_ocv_table *table,
 				       int table_len, int ocv);
+int power_supply_dcap2ocv_simple(struct power_supply_battery_ocv_table *table,
+				int table_len, int dcap);
+
 extern struct power_supply_battery_ocv_table *
 power_supply_find_ocv2cap_table(struct power_supply_battery_info *info,
 				int temp, int *table_len);
 extern int power_supply_batinfo_ocv2cap(struct power_supply_battery_info *info,
 					int ocv, int temp);
+int power_supply_batinfo_dcap2ocv(struct power_supply_battery_info *info,
+				 int dcap, int temp);
 extern int
 power_supply_temp2resist_simple(struct power_supply_resistance_temp_table *table,
 				int table_len, int temp);

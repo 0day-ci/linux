@@ -807,6 +807,48 @@ int power_supply_temp2resist_simple(struct power_supply_resistance_temp_table *t
 EXPORT_SYMBOL_GPL(power_supply_temp2resist_simple);
 
 /**
+ * power_supply_dcap2ocv_simple() - find the battery OCV by capacity
+ * @table: Pointer to battery OCV/CAP lookup table
+ * @table_len: OCV/CAP table length
+ * @cap: Current cap value in units of 0.1%
+ *
+ * OCV (Open Circuit Voltage) is often used to estimate the battery SOC (State
+ * Of Charge). Usually conversion tables are used to store the corresponding
+ * OCV and SOC. Systems which use so called "Zero Adjust" where at the near
+ * end-of-battery condition the SOC from coulomb counter is used to retrieve
+ * the OCV - and OCV and VSYS difference is used to re-estimate the battery
+ * capacity. This helper function can be used to look up battery OCV according
+ * to current capacity value from one OCV table, and the OCV table must be
+ * ordered descending.
+ *
+ * Return: the battery OCV in uV.
+ */
+int power_supply_dcap2ocv_simple(struct power_supply_battery_ocv_table *table,
+				int table_len, int dcap)
+{
+	int i, ocv, tmp;
+
+	for (i = 0; i < table_len; i++)
+		if (dcap > table[i].capacity * 10)
+			break;
+
+	if (i > 0 && i < table_len) {
+		tmp = (table[i - 1].ocv - table[i].ocv) *
+		      (dcap - table[i].capacity * 10);
+
+		tmp /= (table[i - 1].capacity - table[i].capacity) * 10;
+		ocv = tmp + table[i].ocv;
+	} else if (i == 0) {
+		ocv = table[0].ocv;
+	} else {
+		ocv = table[table_len - 1].ocv;
+	}
+
+	return ocv;
+}
+EXPORT_SYMBOL_GPL(power_supply_dcap2ocv_simple);
+
+/**
  * power_supply_ocv2cap_simple() - find the battery capacity
  * @table: Pointer to battery OCV lookup table
  * @table_len: OCV table length
@@ -865,6 +907,33 @@ power_supply_find_ocv2cap_table(struct power_supply_battery_info *info,
 	return info->ocv_table[best_index];
 }
 EXPORT_SYMBOL_GPL(power_supply_find_ocv2cap_table);
+
+/**
+ * power_supply_batinfo_dcap2ocv() - Compute OCV based on SOC
+ * @info: Pointer to battery information.
+ * @dcao: Battery capacity in units of 0.1%
+ * @temp: Temperatur in Celsius
+ *
+ * Compute the open circuit voltage at given temperature matching given
+ * capacity for a battery described by given battery info. Computation is
+ * done based on tables of known capacity - open circuit voltage value pairs.
+ * Requires the OCV tables being populated in the battery info.
+ *
+ * Return: The battery OCV in uV or -EINVAL if OCV table is not available.
+ */
+int power_supply_batinfo_dcap2ocv(struct power_supply_battery_info *info,
+				 int dcap, int temp)
+{
+	struct power_supply_battery_ocv_table *table;
+	int table_len;
+
+	table = power_supply_find_ocv2cap_table(info, temp, &table_len);
+	if (!table)
+		return -EINVAL;
+
+	return power_supply_dcap2ocv_simple(table, table_len, dcap);
+}
+EXPORT_SYMBOL_GPL(power_supply_batinfo_dcap2ocv);
 
 int power_supply_batinfo_ocv2cap(struct power_supply_battery_info *info,
 				 int ocv, int temp)
