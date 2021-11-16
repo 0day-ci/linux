@@ -105,6 +105,21 @@ struct idmac_desc {
 /* Each descriptor can transfer up to 4KB of data in chained mode */
 #define DW_MCI_DESC_DATA_LENGTH	0x1000
 
+int dw_mci_of_alias_get_id(struct dw_mci *host)
+{
+	int ctrl_id;
+
+	if (WARN_ON(!host->dev->of_node))
+		return 0;
+
+	ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
+
+	if (ctrl_id < 0)
+		ctrl_id = 0;
+
+	return ctrl_id;
+}
+
 #if defined(CONFIG_DEBUG_FS)
 static int dw_mci_req_show(struct seq_file *s, void *v)
 {
@@ -2828,13 +2843,10 @@ static int dw_mci_init_slot_caps(struct dw_mci_slot *slot)
 	if (host->pdata->pm_caps)
 		mmc->pm_caps = host->pdata->pm_caps;
 
-	if (host->dev->of_node) {
-		ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
-		if (ctrl_id < 0)
-			ctrl_id = 0;
-	} else {
+	if (host->dev->of_node)
+		ctrl_id = dw_mci_of_alias_get_id(host);
+	else
 		ctrl_id = to_platform_device(host->dev)->id;
-	}
 
 	if (drv_data && drv_data->caps) {
 		if (ctrl_id >= drv_data->num_caps) {

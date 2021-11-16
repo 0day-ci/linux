@@ -508,6 +508,8 @@ extern int dw_mci_runtime_suspend(struct device *device);
 extern int dw_mci_runtime_resume(struct device *device);
 #endif
 
+extern int dw_mci_of_alias_get_id(struct dw_mci *host);
+
 /**
  * struct dw_mci_slot - MMC slot state
  * @mmc: The mmc_host representing this slot.

@@ -127,9 +127,7 @@ static int dw_mci_hi6220_parse_dt(struct dw_mci *host)
 	if (IS_ERR(priv->reg))
 		priv->reg = NULL;
 
-	priv->ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
-	if (priv->ctrl_id < 0)
-		priv->ctrl_id = 0;
+	priv->ctrl_id = dw_mci_of_alias_get_id(host);
 
 	if (priv->ctrl_id >= TIMING_MODE)
 		return -EINVAL;
