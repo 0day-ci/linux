@@ -205,6 +205,7 @@ static int kexec_file_add_ipl_report(struct kimage *image,
 		return ret;
 	buf.bufsz = data->report->size;
 	buf.memsz = buf.bufsz;
+	image->arch.ipl_buf = buf.buffer;
 
 	data->memsz += buf.memsz;
 
@@ -324,4 +325,12 @@ int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
 		arch_kexec_do_relocs(r_type, loc, val, addr);
 	}
 	return 0;
+}
+
+int arch_kimage_file_post_load_cleanup(struct kimage *image)
+{
+	kvfree(image->arch.ipl_buf);
+	image->arch.ipl_buf = NULL;
+
+	return kexec_image_post_load_cleanup_default(image);
 }
