@@ -124,6 +124,21 @@ static const struct vendor_data vendor_sbsa = {
 	.fixed_options		= true,
 };
 
+static const struct vendor_data vendor_xlnx = {
+	.reg_offset             = pl011_std_offsets,
+	.ifls                   = UART011_IFLS_RX4_8 | UART011_IFLS_TX4_8,
+	.fr_busy                = UART01x_FR_BUSY,
+	.fr_dsr                 = UART01x_FR_DSR,
+	.fr_cts                 = UART01x_FR_CTS,
+	.fr_ri                  = UART011_FR_RI,
+	.access_32b             = true,
+	.oversampling           = false,
+	.dma_threshold          = false,
+	.cts_event_workaround   = false,
+	.always_enabled         = true,
+	.fixed_options          = false,
+};
+
 #ifdef CONFIG_ACPI_SPCR_TABLE
 static const struct vendor_data vendor_qdt_qdf2400_e44 = {
 	.reg_offset		= pl011_std_offsets,
@@ -2628,6 +2643,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
 }
 OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
 OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
+OF_EARLYCON_DECLARE(pl011, "arm,xlnx-uart", pl011_early_console_setup);
 
 /*
  * On Qualcomm Datacenter Technologies QDF2400 SOCs affected by
@@ -2872,6 +2888,7 @@ static int sbsa_uart_probe(struct platform_device *pdev)
 {
 	struct uart_amba_port *uap;
 	struct resource *r;
+	int xlnx_uart = 0;
 	int portnr, ret;
 	int baudrate;
 
@@ -2882,6 +2899,7 @@ static int sbsa_uart_probe(struct platform_device *pdev)
 	if (pdev->dev.of_node) {
 		struct device_node *np = pdev->dev.of_node;
 
+		xlnx_uart = of_device_is_compatible(np, "arm,xlnx-uart");
 		ret = of_property_read_u32(np, "current-speed", &baudrate);
 		if (ret)
 			return ret;
@@ -2911,13 +2929,23 @@ static int sbsa_uart_probe(struct platform_device *pdev)
 #endif
 		uap->vendor = &vendor_sbsa;
 
+	uap->port.ops   = &sbsa_uart_pops;
+
+	if (xlnx_uart) {
+		uap->vendor = &vendor_xlnx;
+		uap->clk = devm_clk_get(&pdev->dev, NULL);
+		if (IS_ERR(uap->clk))
+			return PTR_ERR(uap->clk);
+
+		uap->port.ops = &amba_pl011_pops;
+	}
+
 	uap->reg_offset	= uap->vendor->reg_offset;
 	uap->fifosize	= 32;
 	uap->port.iotype = uap->vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
-	uap->port.ops	= &sbsa_uart_pops;
 	uap->fixed_baud = baudrate;
 
-	snprintf(uap->type, sizeof(uap->type), "SBSA");
+	snprintf(uap->type, sizeof(uap->type), "%s\n", (xlnx_uart ? "xlnx_uart" : "SBSA"));
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
@@ -2941,6 +2969,7 @@ static int sbsa_uart_remove(struct platform_device *pdev)
 
 static const struct of_device_id sbsa_uart_of_match[] = {
 	{ .compatible = "arm,sbsa-uart", },
+	{ .compatible = "arm,xlnx-uart", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
