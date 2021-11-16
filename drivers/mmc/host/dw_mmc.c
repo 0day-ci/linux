@@ -112,7 +112,11 @@ int dw_mci_of_alias_get_id(struct dw_mci *host)
 	if (WARN_ON(!host->dev->of_node))
 		return 0;
 
-	ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
+	ctrl_id = of_alias_get_id(host->dev->of_node, "mmc");
+
+	/* Compatibility fallback for old device trees. */
+	if (ctrl_id < 0)
+		ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
 
 	if (ctrl_id < 0)
 		ctrl_id = 0;
