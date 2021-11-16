@@ -960,10 +960,21 @@ int f2fs_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 		down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
 		filemap_invalidate_lock(inode->i_mapping);
 
+		/*
+		 * Truncate stale preallocated blocks used by the previous DIO.
+		 */
+		if (file_should_truncate(inode)) {
+			err = f2fs_truncate(inode);
+			if (err)
+				goto out_unlock;
+			file_dont_truncate(inode);
+		}
+
 		truncate_setsize(inode, attr->ia_size);
 
 		if (attr->ia_size <= old_size)
 			err = f2fs_truncate(inode);
+out_unlock:
 		/*
 		 * do not trim all blocks after i_size if target size is
 		 * larger than i_size.
@@ -4257,6 +4268,13 @@ static int f2fs_preallocate_blocks(struct kiocb *iocb, struct iov_iter *iter)
 	/* If it will be an out-of-place direct write, don't bother. */
 	if (dio && f2fs_lfs_mode(sbi))
 		return 0;
+	/*
+	 * Don't preallocate holes aligned to DIO_SKIP_HOLES which turns into
+	 * buffered IO, if DIO meets any holes.
+	 */
+	if (dio && i_size_read(inode) &&
+		(F2FS_BYTES_TO_BLK(pos) < F2FS_BLK_ALIGN(i_size_read(inode))))
+		return 0;
 
 	/* No-wait I/O can't allocate blocks. */
 	if (iocb->ki_flags & IOCB_NOWAIT)
@@ -4366,10 +4384,14 @@ static ssize_t f2fs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		if (preallocated > 0 && i_size_read(inode) < target_size) {
 			down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
 			filemap_invalidate_lock(inode->i_mapping);
-			f2fs_truncate(inode);
+			if (!f2fs_truncate(inode))
+				file_dont_truncate(inode);
 			filemap_invalidate_unlock(inode->i_mapping);
 			up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
+		} else {
+			file_dont_truncate(inode);
 		}
+
 		clear_inode_flag(inode, FI_PREALLOCATED_ALL);
 
 		if (ret > 0)
