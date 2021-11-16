@@ -444,6 +444,10 @@ extern int power_supply_ocv2cap_simple(struct power_supply_battery_ocv_table *ta
 				       int table_len, int ocv);
 int power_supply_dcap2ocv_simple(struct power_supply_battery_ocv_table *table,
 				int table_len, int dcap);
+int power_supply_ocv2dcap_simple(struct power_supply_battery_ocv_table *table,
+				 int table_len, int ocv);
+int power_supply_batinfo_ocv2dcap(struct power_supply_battery_info *info,
+				  int ocv, int temp);
 
 extern struct power_supply_battery_ocv_table *
 power_supply_find_ocv2cap_table(struct power_supply_battery_info *info,
