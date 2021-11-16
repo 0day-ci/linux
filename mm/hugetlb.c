@@ -5741,6 +5741,14 @@ int hugetlb_mcopy_atomic_pte(struct mm_struct *dst_mm,
 		page = find_lock_page(mapping, idx);
 		if (!page)
 			goto out;
+		/*
+		 * Set new_pagecache_page to true, as we've added a page to the
+		 * pagecache, but userfaultfd hasn't set up a mapping for this
+		 * page yet. If we bail out before setting up the mapping, we
+		 * want to indicate to restore_reserve_on_error() that we've
+		 * added the page to the page cache.
+		 */
+		new_pagecache_page = true;
 	} else if (!*pagep) {
 		/* If a page already exists, then it's UFFDIO_COPY for
 		 * a non-missing case. Return -EEXIST.
