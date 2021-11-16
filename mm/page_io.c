@@ -282,6 +282,14 @@ static void bio_associate_blkg_from_page(struct bio *bio, struct page *page)
 #define bio_associate_blkg_from_page(bio, page)		do { } while (0)
 #endif /* CONFIG_MEMCG && CONFIG_BLK_CGROUP */
 
+struct swap_iocb {
+	struct blk_plug_cb	cb;	/* Must be first */
+	struct kiocb		iocb;
+	struct bio_vec		bvec[SWAP_CLUSTER_MAX];
+	struct work_struct	work;
+	int			pages;
+};
+
 int __swap_writepage(struct page *page, struct writeback_control *wbc,
 		bio_end_io_t end_write_func)
 {
@@ -353,6 +361,59 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 	return 0;
 }
 
+static void sio_read_complete(struct kiocb *iocb, long ret)
+{
+	struct swap_iocb *sio = container_of(iocb, struct swap_iocb, iocb);
+	int p;
+
+	for (p = 0; p < sio->pages; p++) {
+		struct page *page = sio->bvec[p].bv_page;
+
+		if (ret != PAGE_SIZE * sio->pages) {
+			SetPageError(page);
+			ClearPageUptodate(page);
+			pr_alert_ratelimited("Read-error on swap-device\n");
+		} else {
+			SetPageUptodate(page);
+			count_vm_event(PSWPIN);
+		}
+		unlock_page(page);
+	}
+	kfree(sio);
+}
+
+static void sio_read_unplug(struct blk_plug_cb *cb, bool from_schedule);
+
+static void sio_read_unplug_worker(struct work_struct *work)
+{
+	struct swap_iocb *sio = container_of(work, struct swap_iocb, work);
+	sio_read_unplug(&sio->cb, 0);
+}
+
+static void sio_read_unplug(struct blk_plug_cb *cb, bool from_schedule)
+{
+	struct swap_iocb *sio = container_of(cb, struct swap_iocb, cb);
+	struct address_space *mapping = sio->iocb.ki_filp->f_mapping;
+	struct iov_iter from;
+	unsigned int nofs_flag;
+	int ret;
+
+	if (from_schedule) {
+		INIT_WORK(&sio->work, sio_read_unplug_worker);
+		schedule_work(&sio->work);
+		return;
+	}
+
+	iov_iter_bvec(&from, READ, sio->bvec,
+		      sio->pages, PAGE_SIZE * sio->pages);
+	/* nofs needs as ->direct_IO may take the same mutex it takes for write */
+	nofs_flag = memalloc_nofs_save();
+	ret = mapping->a_ops->direct_IO(&sio->iocb, &from);
+	memalloc_nofs_restore(nofs_flag);
+	if (ret != -EIOCBQUEUED)
+		sio_read_complete(&sio->iocb, ret);
+}
+
 int swap_readpage(struct page *page, bool synchronous)
 {
 	struct bio *bio;
@@ -380,10 +441,48 @@ int swap_readpage(struct page *page, bool synchronous)
 	if (data_race(sis->flags & SWP_FS_OPS)) {
 		struct file *swap_file = sis->swap_file;
 		struct address_space *mapping = swap_file->f_mapping;
+		struct blk_plug_cb *cb;
+		struct swap_iocb *sio;
+		loff_t pos = page_file_offset(page);
+		struct blk_plug plug;
+		int p;
 
-		ret = mapping->a_ops->readpage(swap_file, page);
-		if (!ret)
-			count_vm_event(PSWPIN);
+		/* We are sometimes called without a plug active.
+		 * By calling blk_start_plug() here, we ensure blk_check_plugged
+		 * only fails if memory allocation fails.
+		 */
+		blk_start_plug(&plug);
+		cb = blk_check_plugged(sio_read_unplug, swap_file, sizeof(*sio));
+		sio = container_of(cb, struct swap_iocb, cb);
+		if (cb && sio->pages &&
+		    sio->iocb.ki_pos + sio->pages * PAGE_SIZE != pos) {
+			/* Not contiguous - hide this sio from lookup */
+			cb->data = NULL;
+			cb = blk_check_plugged(sio_read_unplug, swap_file,
+					       sizeof(*sio));
+			sio = container_of(cb, struct swap_iocb, cb);
+		}
+		if (!cb) {
+			blk_finish_plug(&plug);
+			ret = mapping->a_ops->readpage(swap_file, page);
+			if (!ret)
+				count_vm_event(PSWPIN);
+			goto out;
+		}
+		if (sio->pages == 0) {
+			init_sync_kiocb(&sio->iocb, swap_file);
+			sio->iocb.ki_pos = pos;
+			sio->iocb.ki_complete = sio_read_complete;
+		}
+		p = sio->pages;
+		sio->bvec[p].bv_page = page;
+		sio->bvec[p].bv_len = PAGE_SIZE;
+		sio->bvec[p].bv_offset = 0;
+		p += 1;
+		sio->pages = p;
+		if (p == ARRAY_SIZE(sio->bvec))
+			cb->data = NULL;
+		blk_finish_plug(&plug);
 		goto out;
 	}
 
