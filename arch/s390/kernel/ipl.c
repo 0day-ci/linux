@@ -2144,7 +2144,7 @@ struct ipl_report *ipl_report_init(struct ipl_parameter_block *ipib)
 	return report;
 }
 
-void *ipl_report_finish(struct ipl_report *report)
+int ipl_report_finish(struct ipl_report *report, void **ipl_buf)
 {
 	struct ipl_report_certificate *cert;
 	struct ipl_report_component *comp;
@@ -2195,7 +2195,9 @@ void *ipl_report_finish(struct ipl_report *report)
 	}
 
 	BUG_ON(ptr > buf + report->size);
-	return buf;
+	*ipl_buf = buf;
+
+	return 0;
 }
 
 int ipl_report_free(struct ipl_report *report)

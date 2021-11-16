@@ -122,7 +122,7 @@ struct ipl_report_certificate {
 
 struct kexec_buf;
 struct ipl_report *ipl_report_init(struct ipl_parameter_block *ipib);
-void *ipl_report_finish(struct ipl_report *report);
+int ipl_report_finish(struct ipl_report *report, void **ipl_buf);
 int ipl_report_free(struct ipl_report *report);
 int ipl_report_add_component(struct ipl_report *report, struct kexec_buf *kbuf,
 			     unsigned char flags, unsigned short cert);

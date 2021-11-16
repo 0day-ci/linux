@@ -170,6 +170,7 @@ static int kexec_file_add_ipl_report(struct kimage *image,
 	struct kexec_buf buf;
 	unsigned long addr;
 	void *ptr, *end;
+	int ret;
 
 	buf.image = image;
 
@@ -199,7 +200,9 @@ static int kexec_file_add_ipl_report(struct kimage *image,
 		ptr += len;
 	}
 
-	buf.buffer = ipl_report_finish(data->report);
+	ret = ipl_report_finish(data->report, &buf.buffer);
+	if (ret)
+		return ret;
 	buf.bufsz = data->report->size;
 	buf.memsz = buf.bufsz;
 
