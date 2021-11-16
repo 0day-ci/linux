@@ -3,6 +3,7 @@
 
 #include <linux/msi.h>
 #include <linux/pci.h>
+#include <linux/of.h>
 
 #include "core.h"
 #include "debug.h"
@@ -316,7 +317,11 @@ int ath11k_mhi_register(struct ath11k_pci *ab_pci)
 	struct ath11k_base *ab = ab_pci->ab;
 	struct mhi_controller *mhi_ctrl;
 	struct mhi_controller_config *ath11k_mhi_config;
-	int ret;
+	struct device_node *np;
+	int ret, len, sw, aw;
+	u32 *reg, *reg_end;
+	unsigned long start, size;
+	bool no_dt_entry = 0;
 
 	mhi_ctrl = mhi_alloc_controller();
 	if (!mhi_ctrl)
@@ -339,8 +344,39 @@ int ath11k_mhi_register(struct ath11k_pci *ab_pci)
 		return ret;
 	}
 
-	mhi_ctrl->iova_start = 0;
-	mhi_ctrl->iova_stop = 0xffffffff;
+	np = of_find_node_by_type(NULL, "memory");
+	if (!np) {
+		no_dt_entry = 1;
+		goto no_dt_entry;
+	}
+
+	aw = of_n_addr_cells(np);
+	sw = of_n_size_cells(np);
+
+	reg = (unsigned int *)of_get_property(np, "reg", &len);
+	if (!reg) {
+		no_dt_entry = 1;
+		goto no_dt_entry;
+	}
+
+	reg_end = reg + len / (aw * sw);
+
+	do {
+		start = of_read_number(reg, aw);
+		reg += aw;
+		size = of_read_number(reg, sw);
+		reg += sw;
+	} while (reg < reg_end);
+
+no_dt_entry:
+	if (no_dt_entry) {
+		mhi_ctrl->iova_start = 0;
+		mhi_ctrl->iova_stop = 0xFFFFFFFF;
+	} else {
+		mhi_ctrl->iova_start = (dma_addr_t)(start + 0x1000000);
+		mhi_ctrl->iova_stop = (dma_addr_t)(start + size);
+	}
+
 	mhi_ctrl->sbl_size = SZ_512K;
 	mhi_ctrl->seg_len = SZ_512K;
 	mhi_ctrl->fbc_download = true;
