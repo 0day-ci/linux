@@ -213,7 +213,7 @@ void msm_gem_put_pages(struct drm_gem_object *obj)
 static pgprot_t msm_gem_pgprot(struct msm_gem_object *msm_obj, pgprot_t prot)
 {
 	if (msm_obj->flags & (MSM_BO_WC|MSM_BO_UNCACHED))
-		return pgprot_writecombine(prot);
+		return pgprot_syscached(prot);
 	return prot;
 }
 
