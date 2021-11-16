@@ -17,6 +17,8 @@
 #include "felix.h"
 
 #define VSC9959_TAS_GCL_ENTRY_MAX	63
+#define VSC9959_SWITCH_PCI_BAR		4
+#define VSC9959_IMDIO_PCI_BAR		0
 
 static const u32 vsc9959_ana_regmap[] = {
 	REG(ANA_ADVLEARN,			0x0089a0),
@@ -1365,6 +1367,7 @@ static const struct felix_info felix_info_vsc9959 = {
 	.prevalidate_phy_mode	= vsc9959_prevalidate_phy_mode,
 	.port_setup_tc		= vsc9959_port_setup_tc,
 	.port_sched_speed_set	= vsc9959_sched_speed_set,
+	.init_regmap		= ocelot_regmap_init,
 };
 
 static irqreturn_t felix_irq_handler(int irq, void *data)
@@ -1383,9 +1386,6 @@ static irqreturn_t felix_irq_handler(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
-
-#define VSC9959_SWITCH_PCI_BAR 4
-#define VSC9959_IMDIO_PCI_BAR 0
 
 static int felix_pci_probe(struct pci_dev *pdev,
 			   const struct pci_device_id *id)
