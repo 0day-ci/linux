@@ -1393,6 +1393,18 @@ static inline int folio_nid(const struct folio *folio)
 }
 
 #ifdef CONFIG_NUMA_BALANCING
+/* page access time bits needs to hold at least 4 seconds */
+#define PAGE_ACCESS_TIME_MIN_BITS	12
+#if LAST_CPUPID_SHIFT < PAGE_ACCESS_TIME_MIN_BITS
+#define PAGE_ACCESS_TIME_BUCKETS				\
+	(PAGE_ACCESS_TIME_MIN_BITS - LAST_CPUPID_SHIFT)
+#else
+#define PAGE_ACCESS_TIME_BUCKETS	0
+#endif
+
+#define PAGE_ACCESS_TIME_MASK				\
+	(LAST_CPUPID_MASK << PAGE_ACCESS_TIME_BUCKETS)
+
 static inline int cpu_pid_to_cpupid(int cpu, int pid)
 {
 	return ((cpu & LAST__CPU_MASK) << LAST__PID_SHIFT) | (pid & LAST__PID_MASK);
@@ -1435,6 +1447,16 @@ static inline int page_cpupid_xchg_last(struct page *page, int cpupid)
 	return xchg(&page->_last_cpupid, cpupid & LAST_CPUPID_MASK);
 }
 
+static inline unsigned int xchg_page_access_time(struct page *page,
+						 unsigned int time)
+{
+	unsigned int last_time;
+
+	last_time = xchg(&page->_last_cpupid,
+			 (time >> PAGE_ACCESS_TIME_BUCKETS) & LAST_CPUPID_MASK);
+	return last_time << PAGE_ACCESS_TIME_BUCKETS;
+}
+
 static inline int page_cpupid_last(struct page *page)
 {
 	return page->_last_cpupid;
@@ -1450,6 +1472,7 @@ static inline int page_cpupid_last(struct page *page)
 }
 
 extern int page_cpupid_xchg_last(struct page *page, int cpupid);
+extern unsigned int xchg_page_access_time(struct page *page, unsigned int time);
 
 static inline void page_cpupid_reset_last(struct page *page)
 {
@@ -1460,6 +1483,12 @@ static inline void page_cpupid_reset_last(struct page *page)
 static inline int page_cpupid_xchg_last(struct page *page, int cpupid)
 {
 	return page_to_nid(page); /* XXX */
+}
+
+static inline unsigned int xchg_page_access_time(struct page *page,
+						 unsigned int time)
+{
+	return 0;
 }
 
 static inline int page_cpupid_last(struct page *page)
