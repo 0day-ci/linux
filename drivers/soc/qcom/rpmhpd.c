@@ -108,7 +108,6 @@ static struct rpmhpd cx_ao;
 static struct rpmhpd cx = {
 	.pd = { .name = "cx", },
 	.peer = &cx_ao,
-	.parent = &mx.pd,
 	.res_name = "cx.lvl",
 };
 
@@ -116,7 +115,6 @@ static struct rpmhpd cx_ao = {
 	.pd = { .name = "cx_ao", },
 	.active_only = true,
 	.peer = &cx,
-	.parent = &mx_ao.pd,
 	.res_name = "cx.lvl",
 };
 
@@ -149,12 +147,28 @@ static struct rpmhpd mxc_ao = {
 };
 
 /* SDM845 RPMH powerdomains */
+static struct rpmhpd sdm845_cx_ao;
+static struct rpmhpd sdm845_cx = {
+	.pd = { .name = "cx", },
+	.peer = &sdm845_cx_ao,
+	.parent = &mx.pd,
+	.res_name = "cx.lvl",
+};
+
+static struct rpmhpd sdm845_cx_ao = {
+	.pd = { .name = "cx_ao", },
+	.active_only = true,
+	.peer = &sdm845_cx,
+	.parent = &mx_ao.pd,
+	.res_name = "cx.lvl",
+};
+
 static struct rpmhpd *sdm845_rpmhpds[] = {
 	[SDM845_EBI] = &ebi,
 	[SDM845_MX] = &mx,
 	[SDM845_MX_AO] = &mx_ao,
-	[SDM845_CX] = &cx,
-	[SDM845_CX_AO] = &cx_ao,
+	[SDM845_CX] = &sdm845_cx,
+	[SDM845_CX_AO] = &sdm845_cx_ao,
 	[SDM845_LMX] = &lmx,
 	[SDM845_LCX] = &lcx,
 	[SDM845_GFX] = &gfx,
