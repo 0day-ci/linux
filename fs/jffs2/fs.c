@@ -114,8 +114,18 @@ int jffs2_do_setattr (struct inode *inode, struct iattr *iattr)
 
 	ri->isize = cpu_to_je32((ivalid & ATTR_SIZE)?iattr->ia_size:inode->i_size);
 	ri->atime = cpu_to_je32(I_SEC((ivalid & ATTR_ATIME)?iattr->ia_atime:inode->i_atime));
-	ri->mtime = cpu_to_je32(I_SEC((ivalid & ATTR_MTIME)?iattr->ia_mtime:inode->i_mtime));
-	ri->ctime = cpu_to_je32(I_SEC((ivalid & ATTR_CTIME)?iattr->ia_ctime:inode->i_ctime));
+	/*
+	 * Special case for truncate() where we should update the times despite not having
+	 * ATTR_CTIME and ATTR_MTIME set.
+	 */
+	if ((ivalid & ATTR_SIZE) && (iattr->ia_size != inode->i_size) &&
+			!(ivalid & (ATTR_CTIME | ATTR_MTIME))) {
+		ri->mtime = cpu_to_je32(I_SEC(iattr->ia_mtime));
+		ri->ctime = cpu_to_je32(I_SEC(iattr->ia_ctime));
+	} else {
+		ri->mtime = cpu_to_je32(I_SEC((ivalid & ATTR_MTIME)?iattr->ia_mtime:inode->i_mtime));
+		ri->ctime = cpu_to_je32(I_SEC((ivalid & ATTR_CTIME)?iattr->ia_ctime:inode->i_ctime));
+	}
 
 	ri->offset = cpu_to_je32(0);
 	ri->csize = ri->dsize = cpu_to_je32(mdatalen);
