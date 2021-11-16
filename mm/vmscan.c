@@ -1513,8 +1513,14 @@ retry:
 		if (!sc->may_unmap && page_mapped(page))
 			goto keep_locked;
 
+		/* ->flags can be updated non-atomicially (scan_swap_map_slots),
+		 * but that will never affect SWP_FS_OPS, so the data_race
+		 * is safe.
+		 */
 		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
-			(PageSwapCache(page) && (sc->gfp_mask & __GFP_IO));
+			(PageSwapCache(page) &&
+			 !data_race(page_swap_info(page)->flags & SWP_FS_OPS) &&
+			 (sc->gfp_mask & __GFP_IO));
 
 		/*
 		 * The number of dirty pages determines if a node is marked
@@ -1682,7 +1688,9 @@ retry:
 						goto activate_locked_split;
 				}
 
-				may_enter_fs = true;
+				if ((sc->gfp_mask & __GFP_FS) ||
+				    !data_race(page_swap_info(page)->flags & SWP_FS_OPS))
+					may_enter_fs = true;
 
 				/* Adding to swap updated mapping */
 				mapping = page_mapping(page);
