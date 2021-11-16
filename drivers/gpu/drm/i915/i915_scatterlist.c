@@ -85,6 +85,11 @@ struct sg_table *i915_sg_from_mm_node(const struct drm_mm_node *node,
 			if (st->nents)
 				sg = __sg_next(sg);
 
+			if (!sg) {
+				sg_free_table(st);
+				i915_refct_sgt_put(rsgt);
+				return ERR_PTR(-EFAULT);
+			}
 			sg_dma_address(sg) = region_start + offset;
 			sg_dma_len(sg) = 0;
 			sg->length = 0;
@@ -161,6 +166,11 @@ struct sg_table *i915_sg_from_buddy_resource(struct ttm_resource *res,
 				if (st->nents)
 					sg = __sg_next(sg);
 
+				if (!sg) {
+					sg_free_table(st);
+					i915_refct_sgt_put(rsgt);
+					return ERR_PTR(-EFAULT);
+				}
 				sg_dma_address(sg) = region_start + offset;
 				sg_dma_len(sg) = 0;
 				sg->length = 0;
