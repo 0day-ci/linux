@@ -292,7 +292,8 @@ static void nfs42_copy_dest_done(struct inode *inode, loff_t pos, loff_t len)
 	spin_lock(&inode->i_lock);
 	if (newsize > i_size_read(inode))
 		i_size_write(inode, newsize);
-	nfs_set_cache_invalid(inode, NFS_INO_INVALID_CHANGE |
+	nfs_set_cache_invalid(inode, NFS_INO_REVAL_PAGECACHE |
+					     NFS_INO_INVALID_CHANGE |
 					     NFS_INO_INVALID_CTIME |
 					     NFS_INO_INVALID_MTIME |
 					     NFS_INO_INVALID_BLOCKS);
