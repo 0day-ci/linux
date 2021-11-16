@@ -52,6 +52,90 @@ static int __init cpu_idle_nopoll_setup(char *__unused)
 __setup("hlt", cpu_idle_nopoll_setup);
 #endif
 
+#ifdef CONFIG_SMT_IDLE_POLL
+DEFINE_STATIC_KEY_FALSE(__smt_idle_poll_enabled);
+
+void smt_idle_poll_switch(struct rq *rq)
+{
+	struct rq *smt_rq;
+	struct task_group *tg;
+	int smt, cpu;
+
+	if (!static_branch_unlikely(&__smt_idle_poll_enabled))
+		return;
+
+	if (rq->idle == current) {
+		rq->need_smt_idle_poll = false;
+		return;
+	}
+
+	rcu_read_lock();
+	tg = container_of(task_css_check(current, cpu_cgrp_id, true),
+		struct task_group, css);
+	rq->need_smt_idle_poll = tg->need_smt_idle_poll;
+	rcu_read_unlock();
+
+	if (!rq->need_smt_idle_poll)
+		return;
+
+	cpu = rq->cpu;
+	for_each_cpu(smt, cpu_smt_mask(cpu)) {
+		if (cpu == smt || !cpu_online(smt))
+			continue;
+		smt_rq = cpu_rq(smt);
+		if (smt_rq->idle == smt_rq->curr && !smt_rq->in_smt_idle_poll)
+			smp_send_reschedule(smt);
+	}
+}
+
+/**
+ * need_smt_idle_poll - Decide whether to continue SMT idle polling.
+ */
+static bool need_smt_idle_poll(void)
+{
+	int cpu, ht;
+	struct rq *rq;
+
+	if (!static_branch_unlikely(&__smt_idle_poll_enabled))
+		return false;
+
+	if (tif_need_resched())
+		return false;
+
+	cpu = smp_processor_id();
+	for_each_cpu(ht, cpu_smt_mask(cpu)) {
+		if (cpu == ht || !cpu_online(ht))
+			continue;
+
+		rq = cpu_rq(ht);
+		if (rq->need_smt_idle_poll)
+			return true;
+	}
+
+	return false;
+}
+
+static noinline int __cpuidle smt_idle_poll(void)
+{
+	trace_cpu_idle(0, smp_processor_id());
+	stop_critical_timings();
+	rcu_idle_enter();
+	local_irq_enable();
+
+	this_rq()->in_smt_idle_poll = true;
+	while (need_smt_idle_poll())
+		;
+	this_rq()->in_smt_idle_poll = false;
+
+	rcu_idle_exit();
+	start_critical_timings();
+	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+
+	return 1;
+}
+
+#endif
+
 static noinline int __cpuidle cpu_idle_poll(void)
 {
 	trace_cpu_idle(0, smp_processor_id());
@@ -292,6 +376,13 @@ static void do_idle(void)
 
 		arch_cpu_idle_enter();
 		rcu_nocb_flush_deferred_wakeup();
+
+#ifdef CONFIG_SMT_IDLE_POLL
+		if (need_smt_idle_poll()) {
+			tick_nohz_idle_restart_tick();
+			smt_idle_poll();
+		}
+#endif
 
 		/*
 		 * In poll mode we reenable interrupts and spin. Also if we

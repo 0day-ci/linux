@@ -402,6 +402,10 @@ struct task_group {
 	/* A positive value indicates that this is a SCHED_IDLE group. */
 	int			idle;
 
+#ifdef CONFIG_SMT_IDLE_POLL
+	bool			need_smt_idle_poll;
+#endif
+
 #ifdef	CONFIG_SMP
 	/*
 	 * load_avg can be heavily contended at clock tick time, so put
@@ -1114,6 +1118,11 @@ struct rq {
 	unsigned char		core_forceidle;
 	unsigned int		core_forceidle_seq;
 #endif
+
+#ifdef CONFIG_SMT_IDLE_POLL
+	bool			need_smt_idle_poll;
+	bool			in_smt_idle_poll;
+#endif
 };
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -1301,6 +1310,15 @@ static inline bool sched_group_cookie_match(struct rq *rq,
 	return true;
 }
 #endif /* CONFIG_SCHED_CORE */
+
+#ifdef CONFIG_SMT_IDLE_POLL
+DECLARE_STATIC_KEY_FALSE(__smt_idle_poll_enabled);
+extern void smt_idle_poll_switch(struct rq *rq);
+#else
+static inline void smt_idle_poll_switch(struct rq *rq)
+{
+}
+#endif
 
 static inline void lockdep_assert_rq_held(struct rq *rq)
 {

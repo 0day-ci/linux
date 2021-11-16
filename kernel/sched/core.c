@@ -4842,6 +4842,7 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	prev_state = READ_ONCE(prev->__state);
 	vtime_task_switch(prev);
 	perf_event_task_sched_in(prev, current);
+	smt_idle_poll_switch(rq);
 	finish_task(prev);
 	tick_nohz_task_switch();
 	finish_lock_switch(rq);
@@ -10139,6 +10140,30 @@ static u64 cpu_shares_read_u64(struct cgroup_subsys_state *css,
 	return (u64) scale_load_down(tg->shares);
 }
 
+#ifdef CONFIG_SMT_IDLE_POLL
+static atomic_t smt_idle_poll_count;
+static int smt_idle_poll_write_u64(struct cgroup_subsys_state *css,
+				struct cftype *cftype, u64 smt_idle_poll)
+{
+	if (smt_idle_poll == 1) {
+		if (atomic_inc_return(&smt_idle_poll_count) == 1)
+			static_branch_enable(&__smt_idle_poll_enabled);
+	} else if (smt_idle_poll == 0) {
+		if (atomic_dec_return(&smt_idle_poll_count) == 0)
+			static_branch_disable(&__smt_idle_poll_enabled);
+	} else
+		return -EINVAL;
+	css_tg(css)->need_smt_idle_poll = smt_idle_poll;
+	return 0;
+}
+
+static u64 smt_idle_poll_read_u64(struct cgroup_subsys_state *css,
+			       struct cftype *cft)
+{
+	return (u64)css_tg(css)->need_smt_idle_poll;
+}
+#endif
+
 #ifdef CONFIG_CFS_BANDWIDTH
 static DEFINE_MUTEX(cfs_constraints_mutex);
 
@@ -10515,6 +10540,13 @@ static struct cftype cpu_legacy_files[] = {
 		.read_s64 = cpu_idle_read_s64,
 		.write_s64 = cpu_idle_write_s64,
 	},
+#ifdef CONFIG_SMT_IDLE_POLL
+	{
+		.name = "smt_idle_poll",
+		.read_u64 = smt_idle_poll_read_u64,
+		.write_u64 = smt_idle_poll_write_u64,
+	},
+#endif
 #endif
 #ifdef CONFIG_CFS_BANDWIDTH
 	{
@@ -10732,6 +10764,13 @@ static struct cftype cpu_files[] = {
 		.read_s64 = cpu_idle_read_s64,
 		.write_s64 = cpu_idle_write_s64,
 	},
+#ifdef CONFIG_SMT_IDLE_POLL
+	{
+		.name = "smt_idle_poll",
+		.read_u64 = smt_idle_poll_read_u64,
+		.write_u64 = smt_idle_poll_write_u64,
+	},
+#endif
 #endif
 #ifdef CONFIG_CFS_BANDWIDTH
 	{

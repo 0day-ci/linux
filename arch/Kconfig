@@ -225,6 +225,16 @@ config GENERIC_SMP_IDLE_THREAD
 config GENERIC_IDLE_POLL_SETUP
 	bool
 
+config SMT_IDLE_POLL
+	bool "SMT idle poll"
+	depends on SCHED_SMT
+	help
+	  When hardware SMT is enabled, the switching between idle or busy
+	  state of one cpu will cause performance fluctuation of other
+	  cpus on the same core. This provides a way to support consistent
+	  SMT noise.
+	  If in doubt, say "N".
+
 config ARCH_HAS_FORTIFY_SOURCE
 	bool
 	help
