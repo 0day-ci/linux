@@ -791,6 +791,17 @@ config CHARGER_UCS1002
 	  Say Y to enable support for Microchip UCS1002 Programmable
 	  USB Port Power Controller with Charger Emulation.
 
+config CHARGER_BD71828
+	tristate "Power-supply driver for ROHM BD71828 and BD71815 PMIC"
+	depends on MFD_ROHM_BD71828
+	select POWER_SIMPLE_GAUGE
+	help
+	  Say Y here to enable support for charger, battery and fuel gauge
+	  in ROHM BD71815, BD71817, BD71827, ROHM BD71828 power management
+	  ICs. This driver gets various bits of information about battery
+	  and charger states and also implements fuel gauge based on
+	  coulomb counters on PMIC.
+
 config CHARGER_BD99954
 	tristate "ROHM bd99954 charger driver"
 	depends on I2C
