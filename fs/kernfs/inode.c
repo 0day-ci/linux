@@ -195,7 +195,7 @@ int kernfs_iop_getattr(struct user_namespace *mnt_userns,
 	return 0;
 }
 
-static void kernfs_init_inode(struct kernfs_node *kn, struct inode *inode)
+void kernfs_init_inode(struct kernfs_node *kn, struct inode *inode)
 {
 	kernfs_get(kn);
 	inode->i_private = kn;

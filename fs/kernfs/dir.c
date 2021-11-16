@@ -1119,9 +1119,17 @@ static struct dentry *kernfs_iop_lookup(struct inode *dir,
 			up_read(&kernfs_rwsem);
 			return NULL;
 		}
-		inode = kernfs_get_inode(dir->i_sb, kn);
-		if (!inode)
-			inode = ERR_PTR(-ENOMEM);
+		kernfs_get(kn);
+		up_read(&kernfs_rwsem);
+		inode = iget_locked(dir->i_sb, kernfs_ino(kn));
+		if (!inode) {
+			kernfs_put(kn);
+			return ERR_PTR(-ENOMEM);
+		}
+		down_read(&kernfs_rwsem);
+		if (inode->i_state & I_NEW)
+			kernfs_init_inode(kn, inode);
+		kernfs_put(kn);
 	}
 	/*
 	 * Needed for negative dentry validation.

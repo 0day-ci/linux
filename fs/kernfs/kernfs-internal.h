@@ -118,6 +118,7 @@ int kernfs_iop_getattr(struct user_namespace *mnt_userns,
 		       u32 request_mask, unsigned int query_flags);
 ssize_t kernfs_iop_listxattr(struct dentry *dentry, char *buf, size_t size);
 int __kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr);
+void kernfs_init_inode(struct kernfs_node *kn, struct inode *inode);
 
 /*
  * dir.c
