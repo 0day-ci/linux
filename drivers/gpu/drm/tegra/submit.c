@@ -608,12 +608,10 @@ free_job_data:
 	if (job_data && job_data->used_mappings) {
 		for (i = 0; i < job_data->num_used_mappings; i++)
 			tegra_drm_mapping_put(job_data->used_mappings[i].mapping);
-
-		kfree(job_data->used_mappings);
 	}
 
-	if (job_data)
-		kfree(job_data);
+	kfree(job_data->used_mappings);
+	kfree(job_data);
 put_bo:
 	gather_bo_put(&bo->base);
 unlock:
