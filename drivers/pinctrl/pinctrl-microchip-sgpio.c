@@ -835,22 +835,15 @@ static struct sgpio_properties
 	return NULL;
 }
 
-static int microchip_sgpio_probe(struct platform_device *pdev)
+int microchip_sgpio_core_probe(struct device *dev, struct device_node *node,
+			       struct regmap *regmap, u32 offset)
 {
 	int div_clock = 0, ret, port, i, nbanks;
-	struct device *dev = &pdev->dev;
-	struct device_node *node = dev_of_node(dev);
 	struct fwnode_handle *child, *fwnode;
 	struct reset_control *reset;
 	struct sgpio_priv *priv;
 	struct clk *clk;
-	u32 __iomem *regs;
 	u32 val;
-	struct regmap_config regmap_config = {
-		.reg_bits = 32,
-		.val_bits = 32,
-		.reg_stride = 4,
-	};
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -878,17 +871,13 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	regs = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(regs))
-		return PTR_ERR(regs);
-
-	priv->regs = devm_regmap_init_mmio(dev, regs, &regmap_config);
-	if (IS_ERR(priv->regs))
-		return PTR_ERR(priv->regs);
-
+	priv->regs = regmap;
 	priv->regs_offset = 0;
 	priv->properties = microchip_sgpio_match_from_node(node);
 	priv->in.is_input = true;
+
+	if (!priv->properties)
+		return dev_err_probe(dev, -EINVAL, "No property match found\n");
 
 	/* Get rest of device properties */
 	ret = microchip_sgpio_get_ports(priv);
@@ -925,6 +914,29 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 	sgpio_writel(priv, priv->ports, REG_PORT_ENABLE, 0);
 
 	return 0;
+}
+EXPORT_SYMBOL(microchip_sgpio_core_probe);
+
+static int microchip_sgpio_probe(struct platform_device *pdev)
+{
+	struct regmap_config regmap_config = {0};
+	struct device *dev = &pdev->dev;
+	struct regmap *regmap;
+	u32 __iomem *regs;
+
+	regmap_config.reg_bits = 32;
+	regmap_config.val_bits = 32;
+	regmap_config.reg_stride = 4;
+
+	regs = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(regs))
+		return PTR_ERR(regs);
+
+	regmap = devm_regmap_init_mmio(dev, regs, &regmap_config);
+	if (IS_ERR(regmap))
+		return PTR_ERR(regmap);
+
+	return microchip_sgpio_core_probe(dev, dev->of_node, regmap, 0);
 }
 
 static struct platform_driver microchip_sgpio_pinctrl_driver = {

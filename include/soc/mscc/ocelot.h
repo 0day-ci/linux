@@ -930,4 +930,15 @@ int ocelot_pinctrl_core_probe(struct device *dev,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_PINCTRL_MICROCHIP_SGPIO)
+int microchip_sgpio_core_probe(struct device *dev, struct device_node *node,
+			       struct regmap *regmap, u32 offset);
+#else
+int microchip_sgpio_core_probe(struct device *dev, struct device_node *node,
+			       struct regmap *regmap, u32 offset)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+
 #endif
