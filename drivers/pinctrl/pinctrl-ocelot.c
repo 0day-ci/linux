@@ -25,15 +25,15 @@
 #include "pinconf.h"
 #include "pinmux.h"
 
-#define ocelot_clrsetbits(addr, clear, set) \
-	writel((readl(addr) & ~(clear)) | (set), (addr))
-
 /* PINCONFIG bits (sparx5 only) */
 enum {
 	PINCONF_BIAS,
 	PINCONF_SCHMITT,
 	PINCONF_DRIVE_STRENGTH,
 };
+
+#define ocelot_pinctrl_determine_stride(desc) \
+	(1 + (desc->npins - 1) / 32)
 
 #define BIAS_PD_BIT BIT(4)
 #define BIAS_PU_BIT BIT(3)
@@ -149,10 +149,13 @@ struct ocelot_pin_caps {
 
 struct ocelot_pinctrl {
 	struct device *dev;
+	struct device_node *node;
 	struct pinctrl_dev *pctl;
 	struct gpio_chip gpio_chip;
 	struct regmap *map;
+	u32 regmap_offset;
 	struct regmap *pincfg;
+	u32 pincfg_offset;
 	struct pinctrl_desc *desc;
 	struct ocelot_pmx_func func[FUNC_MAX];
 	u8 stride;
@@ -714,7 +717,8 @@ static int ocelot_pin_function_idx(struct ocelot_pinctrl *info,
 	return -1;
 }
 
-#define REG_ALT(msb, info, p) (OCELOT_GPIO_ALT0 * (info)->stride + 4 * ((msb) + ((info)->stride * ((p) / 32))))
+#define REG_ALT(msb, info, p) (OCELOT_GPIO_ALT0 * (info)->stride + 4 * ((msb) + \
+			((info)->stride * ((p) / 32))) + (info)->regmap_offset)
 
 static int ocelot_pinmux_set_mux(struct pinctrl_dev *pctldev,
 				 unsigned int selector, unsigned int group)
@@ -744,7 +748,8 @@ static int ocelot_pinmux_set_mux(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
-#define REG(r, info, p) ((r) * (info)->stride + (4 * ((p) / 32)))
+#define REG(r, info, p) (((r) * (info)->stride + (4 * ((p) / 32))) + \
+		(info)->regmap_offset)
 
 static int ocelot_gpio_set_direction(struct pinctrl_dev *pctldev,
 				     struct pinctrl_gpio_range *range,
@@ -766,10 +771,8 @@ static int ocelot_gpio_request_enable(struct pinctrl_dev *pctldev,
 	struct ocelot_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 	unsigned int p = offset % 32;
 
-	regmap_update_bits(info->map, REG_ALT(0, info, offset),
-			   BIT(p), 0);
-	regmap_update_bits(info->map, REG_ALT(1, info, offset),
-			   BIT(p), 0);
+	regmap_update_bits(info->map, REG_ALT(0, info, offset), BIT(p), 0);
+	regmap_update_bits(info->map, REG_ALT(1, info, offset), BIT(p), 0);
 
 	return 0;
 }
@@ -821,11 +824,11 @@ static int ocelot_hw_get_value(struct ocelot_pinctrl *info,
 	if (info->pincfg) {
 		u32 regcfg;
 
-		ret = regmap_read(info->pincfg, pin, &regcfg);
+		ret = regmap_read(info->pincfg, pin + info->pincfg_offset,
+				  &regcfg);
 		if (ret)
 			return ret;
 
-		ret = 0;
 		switch (reg) {
 		case PINCONF_BIAS:
 			*val = regcfg & BIAS_BITS;
@@ -853,14 +856,14 @@ static int ocelot_pincfg_clrsetbits(struct ocelot_pinctrl *info, u32 regaddr,
 	u32 val;
 	int ret;
 
-	ret = regmap_read(info->pincfg, regaddr, &val);
+	ret = regmap_read(info->pincfg, regaddr + info->pincfg_offset, &val);
 	if (ret)
 		return ret;
 
 	val &= ~clrbits;
 	val |= setbits;
 
-	ret = regmap_write(info->pincfg, regaddr, val);
+	ret = regmap_write(info->pincfg, regaddr + info->pincfg_offset, val);
 
 	return ret;
 }
@@ -873,7 +876,6 @@ static int ocelot_hw_set_value(struct ocelot_pinctrl *info,
 	int ret = -EOPNOTSUPP;
 
 	if (info->pincfg) {
-
 		ret = 0;
 		switch (reg) {
 		case PINCONF_BIAS:
@@ -1019,15 +1021,16 @@ static int ocelot_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 			if (arg)
 				regmap_write(info->map,
 					     REG(OCELOT_GPIO_OUT_SET, info,
-						 pin),
+						 pin) + info->regmap_offset,
 					     BIT(p));
 			else
 				regmap_write(info->map,
 					     REG(OCELOT_GPIO_OUT_CLR, info,
-						 pin),
+						 pin) + info->regmap_offset,
 					     BIT(p));
 			regmap_update_bits(info->map,
-					   REG(OCELOT_GPIO_OE, info, pin),
+					   REG(OCELOT_GPIO_OE, info, pin) +
+					       info->regmap_offset,
 					   BIT(p),
 					   param == PIN_CONFIG_INPUT_ENABLE ?
 					   0 : BIT(p));
@@ -1138,20 +1141,20 @@ static int ocelot_create_group_func_map(struct device *dev,
 	return 0;
 }
 
-static int ocelot_pinctrl_register(struct platform_device *pdev,
+static int ocelot_pinctrl_register(struct device *dev,
 				   struct ocelot_pinctrl *info)
 {
 	int ret;
 
-	ret = ocelot_create_group_func_map(&pdev->dev, info);
+	ret = ocelot_create_group_func_map(dev, info);
 	if (ret) {
-		dev_err(&pdev->dev, "Unable to create group func map.\n");
+		dev_err(dev, "Unable to create group func map.\n");
 		return ret;
 	}
 
-	info->pctl = devm_pinctrl_register(&pdev->dev, info->desc, info);
+	info->pctl = devm_pinctrl_register(dev, info->desc, info);
 	if (IS_ERR(info->pctl)) {
-		dev_err(&pdev->dev, "Failed to register pinctrl\n");
+		dev_err(dev, "Failed to register pinctrl\n");
 		return PTR_ERR(info->pctl);
 	}
 
@@ -1320,7 +1323,7 @@ static void ocelot_irq_handler(struct irq_desc *desc)
 	}
 }
 
-static int ocelot_gpiochip_register(struct platform_device *pdev,
+static int ocelot_gpiochip_register(struct device *dev,
 				    struct ocelot_pinctrl *info)
 {
 	struct gpio_chip *gc;
@@ -1331,7 +1334,7 @@ static int ocelot_gpiochip_register(struct platform_device *pdev,
 
 	gc = &info->gpio_chip;
 	gc->ngpio = info->desc->npins;
-	gc->parent = &pdev->dev;
+	gc->parent = dev;
 	gc->base = -1;
 	gc->of_node = info->dev->of_node;
 	gc->label = "ocelot-gpio";
@@ -1342,8 +1345,7 @@ static int ocelot_gpiochip_register(struct platform_device *pdev,
 		girq->chip = &ocelot_irqchip;
 		girq->parent_handler = ocelot_irq_handler;
 		girq->num_parents = 1;
-		girq->parents = devm_kcalloc(&pdev->dev, 1,
-					     sizeof(*girq->parents),
+		girq->parents = devm_kcalloc(dev, 1, sizeof(*girq->parents),
 					     GFP_KERNEL);
 		if (!girq->parents)
 			return -ENOMEM;
@@ -1352,7 +1354,7 @@ static int ocelot_gpiochip_register(struct platform_device *pdev,
 		girq->handler = handle_edge_irq;
 	}
 
-	return devm_gpiochip_add_data(&pdev->dev, gc, info);
+	return devm_gpiochip_add_data(dev, gc, info);
 }
 
 static const struct of_device_id ocelot_pinctrl_of_match[] = {
@@ -1384,56 +1386,104 @@ static struct regmap *ocelot_pinctrl_create_pincfg(struct platform_device *pdev)
 	return devm_regmap_init_mmio(&pdev->dev, base, &regmap_config);
 }
 
+static struct pinctrl_desc
+*ocelot_pinctrl_match_from_node(struct device_node *device_node)
+{
+	const struct of_device_id *match;
+
+	match = of_match_node(of_match_ptr(ocelot_pinctrl_of_match),
+			      device_node);
+
+	if (match)
+		return (struct pinctrl_desc *)match->data;
+
+	return NULL;
+}
+
+int ocelot_pinctrl_core_probe(struct device *dev,
+			      struct pinctrl_desc *pinctrl_desc,
+			      struct regmap *regmap_base, u32 regmap_offset,
+			      struct regmap *pincfg_base, u32 pincfg_offset,
+			      struct device_node *device_node)
+{
+	struct ocelot_pinctrl *info;
+	int ret;
+
+	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
+
+	if (!pinctrl_desc)
+		pinctrl_desc = ocelot_pinctrl_match_from_node(device_node);
+	if (!pinctrl_desc) {
+		dev_err(dev, "Failed to find device match\n");
+		return -ENODEV;
+	}
+
+	info->desc = pinctrl_desc;
+	info->stride = ocelot_pinctrl_determine_stride(info->desc);
+	info->dev = dev;
+	info->node = device_node;
+	info->map = regmap_base;
+	info->pincfg = pincfg_base;
+	info->regmap_offset = regmap_offset;
+	info->pincfg_offset = pincfg_offset;
+
+	ret = ocelot_pinctrl_register(dev, info);
+	if (ret)
+		return ret;
+
+	ret = ocelot_gpiochip_register(dev, info);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+EXPORT_SYMBOL(ocelot_pinctrl_core_probe);
+
 static int ocelot_pinctrl_probe(struct platform_device *pdev)
 {
+	struct pinctrl_desc *pinctrl_desc;
 	struct device *dev = &pdev->dev;
-	struct ocelot_pinctrl *info;
+	struct regmap *regmap;
 	struct regmap *pincfg;
 	void __iomem *base;
-	int ret;
+	int ret, stride;
 	struct regmap_config regmap_config = {
 		.reg_bits = 32,
 		.val_bits = 32,
 		.reg_stride = 4,
 	};
 
-	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
-	if (!info)
-		return -ENOMEM;
-
-	info->desc = (struct pinctrl_desc *)device_get_match_data(dev);
+	pinctrl_desc = (struct pinctrl_desc *)device_get_match_data(dev);
 
 	base = devm_ioremap_resource(dev,
 			platform_get_resource(pdev, IORESOURCE_MEM, 0));
 	if (IS_ERR(base))
 		return PTR_ERR(base);
 
-	info->stride = 1 + (info->desc->npins - 1) / 32;
+	stride = ocelot_pinctrl_determine_stride(pinctrl_desc);
 
-	regmap_config.max_register = OCELOT_GPIO_SD_MAP * info->stride + 15 * 4;
+	regmap_config.max_register = OCELOT_GPIO_SD_MAP * stride + 15 * 4;
 
-	info->map = devm_regmap_init_mmio(dev, base, &regmap_config);
-	if (IS_ERR(info->map)) {
+	regmap = devm_regmap_init_mmio(dev, base, &regmap_config);
+	if (IS_ERR(regmap)) {
 		dev_err(dev, "Failed to create regmap\n");
-		return PTR_ERR(info->map);
+		return PTR_ERR(regmap);
 	}
-	dev_set_drvdata(dev, info->map);
-	info->dev = dev;
+	dev_set_drvdata(dev, regmap);
 
 	/* Pinconf registers */
-	if (info->desc->confops) {
+	if (pinctrl_desc->confops) {
 		pincfg = ocelot_pinctrl_create_pincfg(pdev);
-		if (IS_ERR(pincfg))
+		if (IS_ERR(pincfg)) {
 			dev_dbg(dev, "Failed to create pincfg regmap\n");
-		else
-			info->pincfg = pincfg;
+			pincfg = NULL;
+		}
 	}
 
-	ret = ocelot_pinctrl_register(pdev, info);
-	if (ret)
-		return ret;
-
-	ret = ocelot_gpiochip_register(pdev, info);
+	ret = ocelot_pinctrl_core_probe(dev, pinctrl_desc, regmap, 0, pincfg, 0,
+					dev->of_node);
 	if (ret)
 		return ret;
 

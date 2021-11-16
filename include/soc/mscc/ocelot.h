@@ -6,6 +6,7 @@
 #define _SOC_MSCC_OCELOT_H
 
 #include <linux/ptp_clock_kernel.h>
+#include <linux/pinctrl/pinctrl.h>
 #include <linux/net_tstamp.h>
 #include <linux/if_vlan.h>
 #include <linux/regmap.h>
@@ -907,6 +908,23 @@ ocelot_mrp_add_ring_role(struct ocelot *ocelot, int port,
 static inline int
 ocelot_mrp_del_ring_role(struct ocelot *ocelot, int port,
 			 const struct switchdev_obj_ring_role_mrp *mrp)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+
+#if IS_ENABLED(CONFIG_PINCTRL_OCELOT)
+int ocelot_pinctrl_core_probe(struct device *dev,
+			      struct pinctrl_desc *pinctrl_desc,
+			      struct regmap *regmap_base, u32 regmap_offset,
+			      struct regmap *pincfg_base, u32 pincfg_offset,
+			      struct device_node *device_node);
+#else
+int ocelot_pinctrl_core_probe(struct device *dev,
+			      struct pinctrl_desc *pinctrl_desc,
+			      struct regmap *regmap_base, u32 regmap_offset,
+			      struct regmap *pincfg_base, u32 pincfg_offset,
+			      struct device_node *device_node)
 {
 	return -EOPNOTSUPP;
 }
