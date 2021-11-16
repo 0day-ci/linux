@@ -47,6 +47,7 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/msi.h>
+#include <linux/of.h>
 #include <linux/perf_event.h>
 #include <linux/platform_device.h>
 #include <linux/smp.h>
@@ -750,8 +751,15 @@ static void smmu_pmu_get_acpi_options(struct smmu_pmu *smmu_pmu)
 		smmu_pmu->options |= SMMU_PMCG_EVCNTR_RDONLY;
 		break;
 	}
+}
 
-	dev_notice(smmu_pmu->dev, "option mask 0x%x\n", smmu_pmu->options);
+static void smmu_pmu_get_of_options(struct smmu_pmu *smmu_pmu)
+{
+	struct device_node *node = smmu_pmu->dev->of_node;
+
+	if (of_device_is_compatible(node, "hisilicon,smmu-v3-pmcg-hip08"))
+		/* HiSilicon Erratum 162001800 */
+		smmu_pmu->options |= SMMU_PMCG_EVCNTR_RDONLY;
 }
 
 static int smmu_pmu_probe(struct platform_device *pdev)
@@ -834,7 +842,13 @@ static int smmu_pmu_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	smmu_pmu_get_acpi_options(smmu_pmu);
+	if (dev->of_node)
+		smmu_pmu_get_of_options(smmu_pmu);
+	else
+		smmu_pmu_get_acpi_options(smmu_pmu);
+
+	if (smmu_pmu->options)
+		dev_notice(dev, "option mask 0x%x\n", smmu_pmu->options);
 
 	/* Pick one CPU to be the preferred one to use */
 	smmu_pmu->on_cpu = raw_smp_processor_id();
@@ -884,10 +898,17 @@ static void smmu_pmu_shutdown(struct platform_device *pdev)
 	smmu_pmu_disable(&smmu_pmu->pmu);
 }
 
+static const struct of_device_id arm_smmu_pmu_match[] = {
+	{ .compatible = "arm,smmu-v3-pmcg" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, arm_smmu_pmu_match);
+
 static struct platform_driver smmu_pmu_driver = {
 	.driver = {
 		.name = "arm-smmu-v3-pmcg",
 		.suppress_bind_attrs = true,
+		.of_match_table = of_match_ptr(arm_smmu_pmu_match),
 	},
 	.probe = smmu_pmu_probe,
 	.remove = smmu_pmu_remove,
