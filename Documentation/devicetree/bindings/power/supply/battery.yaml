@@ -114,6 +114,25 @@ properties:
       - description: alert when battery temperature is lower than this value
       - description: alert when battery temperature is higher than this value
 
+  temp-degrade-table:
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    description: |
+      An array of value triplets. First value is "capacity change per degree C"
+      when temperature differs from 'set point'. Second value is "capacity
+      degradation at given 'set point' temperature" and third value is "the
+      'set-point' temperature" where given degradation is correct.
+      Up to 100 value triplets can be provided to specify different degradation
+      for different temperature ranges. When capacity change caused by
+      temperatures is computed the range which 'set point' is closest to the
+      current temperature is used. Capacity change should be in units of
+      micro Ah. Temperature is in units of 0.1 C degree.
+    maxItems: 100
+    items:
+      items:
+        - description: capacity drop per degree C in micro Ah
+        - description: capacity drop at 'set point' temperature in micro Ah
+        - description: 'set point' temperature for this range in 0.1 degree C
+
 required:
   - compatible
 
