@@ -1491,7 +1491,7 @@ static void top_off_fp (struct fs_dev *dev, struct freepool *fp,
 			    skb, ne, skb->data, skb->head);
 		n++;
 		ne->flags = FP_FLAGS_EPI | fp->bufsize;
-		ne->next  = virt_to_bus (NULL);
+		ne->next  = (u32)virt_to_bus (NULL);
 		ne->bsa   = virt_to_bus (skb->data);
 		ne->aal_bufsize = fp->bufsize;
 		ne->skb = skb;
