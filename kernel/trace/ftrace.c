@@ -6406,8 +6406,9 @@ static int ftrace_process_locs(struct module *mod,
 	if (!count)
 		return 0;
 
-	sort(start, count, sizeof(*start),
-	     ftrace_cmp_ips, NULL);
+	if (mod)
+		sort(start, count, sizeof(*start),
+		     ftrace_cmp_ips, NULL);
 
 	start_pg = ftrace_allocate_pages(count);
 	if (!start_pg)
