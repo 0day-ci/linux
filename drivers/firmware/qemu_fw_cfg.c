@@ -608,6 +608,7 @@ static int fw_cfg_register_file(const struct fw_cfg_file *f)
 				   fw_cfg_sel_ko, "%d", entry->select);
 	if (err) {
 		kobject_put(&entry->kobj);
+		kfree(entry);
 		return err;
 	}
 
