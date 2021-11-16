@@ -109,6 +109,7 @@ struct sgpio_bank {
 
 struct sgpio_priv {
 	struct device *dev;
+	struct device_node *dev_node;
 	struct sgpio_bank in;
 	struct sgpio_bank out;
 	u32 bitcount;
@@ -524,12 +525,16 @@ static int microchip_sgpio_of_xlate(struct gpio_chip *gc,
 static int microchip_sgpio_get_ports(struct sgpio_priv *priv)
 {
 	const char *range_property_name = "microchip,sgpio-port-ranges";
+	struct device_node *dev_node = priv->dev_node;
+	const struct fwnode_handle *fwnode_handle;
 	struct device *dev = priv->dev;
 	u32 range_params[64];
 	int i, nranges, ret;
 
+	fwnode_handle = of_fwnode_handle(dev_node);
+
 	/* Calculate port mask */
-	nranges = device_property_count_u32(dev, range_property_name);
+	nranges = fwnode_property_count_u32(fwnode_handle, range_property_name);
 	if (nranges < 2 || nranges % 2 || nranges > ARRAY_SIZE(range_params)) {
 		dev_err(dev, "%s port range: '%s' property\n",
 			nranges == -EINVAL ? "Missing" : "Invalid",
@@ -537,7 +542,7 @@ static int microchip_sgpio_get_ports(struct sgpio_priv *priv)
 		return -EINVAL;
 	}
 
-	ret = device_property_read_u32_array(dev, range_property_name,
+	ret = fwnode_property_read_u32_array(fwnode_handle, range_property_name,
 					     range_params, nranges);
 	if (ret) {
 		dev_err(dev, "failed to parse '%s' property: %d\n",
@@ -804,11 +809,38 @@ static int microchip_sgpio_register_bank(struct device *dev,
 	return ret;
 }
 
+static const struct of_device_id microchip_sgpio_gpio_of_match[] = {
+	{
+		.compatible = "microchip,sparx5-sgpio",
+		.data = &properties_sparx5,
+	}, {
+		.compatible = "mscc,luton-sgpio",
+		.data = &properties_luton,
+	}, {
+		.compatible = "mscc,ocelot-sgpio",
+		.data = &properties_ocelot,
+	}, {
+		/* sentinel */
+	}
+};
+
+static struct sgpio_properties
+*microchip_sgpio_match_from_node(struct device_node *node)
+{
+	const struct of_device_id *match;
+
+	match = of_match_node(of_match_ptr(microchip_sgpio_gpio_of_match), node);
+	if (match)
+		return (struct sgpio_properties *)match->data;
+	return NULL;
+}
+
 static int microchip_sgpio_probe(struct platform_device *pdev)
 {
 	int div_clock = 0, ret, port, i, nbanks;
 	struct device *dev = &pdev->dev;
-	struct fwnode_handle *fwnode;
+	struct device_node *node = dev_of_node(dev);
+	struct fwnode_handle *child, *fwnode;
 	struct reset_control *reset;
 	struct sgpio_priv *priv;
 	struct clk *clk;
@@ -825,18 +857,21 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	priv->dev = dev;
+	priv->dev_node = node;
 
-	reset = devm_reset_control_get_optional_shared(&pdev->dev, "switch");
+	fwnode = of_fwnode_handle(node);
+
+	reset = devm_reset_control_get_optional_shared(dev, "switch");
 	if (IS_ERR(reset))
 		return dev_err_probe(dev, PTR_ERR(reset), "Failed to get reset\n");
 	reset_control_reset(reset);
 
-	clk = devm_clk_get(dev, NULL);
+	clk = devm_get_clk_from_child(dev, node, NULL);
 	if (IS_ERR(clk))
 		return dev_err_probe(dev, PTR_ERR(clk), "Failed to get clock\n");
 
 	div_clock = clk_get_rate(clk);
-	if (device_property_read_u32(dev, "bus-frequency", &priv->clock))
+	if (fwnode_property_read_u32(fwnode, "bus-frequency", &priv->clock))
 		priv->clock = 12500000;
 	if (priv->clock == 0 || priv->clock > (div_clock / 2)) {
 		dev_err(dev, "Invalid frequency %d\n", priv->clock);
@@ -852,7 +887,7 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 		return PTR_ERR(priv->regs);
 
 	priv->regs_offset = 0;
-	priv->properties = device_get_match_data(dev);
+	priv->properties = microchip_sgpio_match_from_node(node);
 	priv->in.is_input = true;
 
 	/* Get rest of device properties */
@@ -860,17 +895,17 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	nbanks = device_get_child_node_count(dev);
+	nbanks = fwnode_get_child_node_count(fwnode);
 	if (nbanks != 2) {
 		dev_err(dev, "Must have 2 banks (have %d)\n", nbanks);
 		return -EINVAL;
 	}
 
 	i = 0;
-	device_for_each_child_node(dev, fwnode) {
-		ret = microchip_sgpio_register_bank(dev, priv, fwnode, i++);
+	fwnode_for_each_child_node(fwnode, child) {
+		ret = microchip_sgpio_register_bank(dev, priv, child, i++);
 		if (ret) {
-			fwnode_handle_put(fwnode);
+			fwnode_handle_put(child);
 			return ret;
 		}
 	}
@@ -891,21 +926,6 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 
 	return 0;
 }
-
-static const struct of_device_id microchip_sgpio_gpio_of_match[] = {
-	{
-		.compatible = "microchip,sparx5-sgpio",
-		.data = &properties_sparx5,
-	}, {
-		.compatible = "mscc,luton-sgpio",
-		.data = &properties_luton,
-	}, {
-		.compatible = "mscc,ocelot-sgpio",
-		.data = &properties_ocelot,
-	}, {
-		/* sentinel */
-	}
-};
 
 static struct platform_driver microchip_sgpio_pinctrl_driver = {
 	.driver = {
