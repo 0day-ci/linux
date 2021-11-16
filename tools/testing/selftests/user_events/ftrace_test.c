@@ -21,6 +21,11 @@ const char *status_file = "/sys/kernel/debug/tracing/user_events_status";
 const char *enable_file = "/sys/kernel/debug/tracing/events/user_events/__test_event/enable";
 const char *trace_file = "/sys/kernel/debug/tracing/trace";
 
+struct rel_loc {
+	__u16 offset;
+	__u16 size;
+} __packed;
+
 static int trace_bytes(void)
 {
 	int fd = open(trace_file, O_RDONLY);
@@ -47,6 +52,22 @@ static int trace_bytes(void)
 	return bytes;
 }
 
+static int clear(void)
+{
+	int fd = open(data_file, O_RDWR);
+
+	if (fd == -1)
+		return -1;
+
+	if (ioctl(fd, DIAG_IOCSDEL, "__test_event") == -1)
+		if (errno != ENOENT)
+			return -1;
+
+	close(fd);
+
+	return 0;
+}
+
 FIXTURE(user) {
 	int status_fd;
 	int data_fd;
@@ -71,6 +92,8 @@ FIXTURE_TEARDOWN(user) {
 		write(self->enable_fd, "0", sizeof("0"));
 		close(self->enable_fd);
 	}
+
+	ASSERT_EQ(0, clear());
 }
 
 TEST_F(user, register_events) {
@@ -197,6 +220,58 @@ TEST_F(user, write_fault) {
 	ASSERT_EQ(0, madvise(anon, l, MADV_DONTNEED));
 	ASSERT_NE(-1, writev(self->data_fd, (const struct iovec *)io, 2));
 	ASSERT_EQ(0, munmap(anon, l));
+}
+
+TEST_F(user, write_validator) {
+	struct user_reg reg = {0};
+	struct iovec io[3];
+	struct rel_loc loc;
+	char data[8];
+	int before = 0, after = 0;
+
+	reg.size = sizeof(reg);
+	reg.name_args = (__u64)"__test_event __rel_loc char[] data";
+
+	/* Register should work */
+	ASSERT_EQ(0, ioctl(self->data_fd, DIAG_IOCSREG, &reg));
+	ASSERT_EQ(0, reg.write_index);
+	ASSERT_NE(0, reg.status_index);
+
+	io[0].iov_base = &reg.write_index;
+	io[0].iov_len = sizeof(reg.write_index);
+	io[1].iov_base = &loc;
+	io[1].iov_len = sizeof(loc);
+	io[2].iov_base = data;
+	io[2].iov_len = sizeof(data);
+
+	loc.offset = 0;
+	loc.size = snprintf(data, sizeof(data), "Test") + 1;
+	io[2].iov_len = loc.size;
+
+	/* Undersized write should fail */
+	ASSERT_EQ(-1, writev(self->data_fd, (const struct iovec *)io, 1));
+	ASSERT_EQ(EINVAL, errno);
+
+	/* Enable event */
+	self->enable_fd = open(enable_file, O_RDWR);
+	ASSERT_NE(-1, write(self->enable_fd, "1", sizeof("1")))
+
+	/* Full write should work */
+	before = trace_bytes();
+	ASSERT_NE(-1, writev(self->data_fd, (const struct iovec *)io, 3));
+	after = trace_bytes();
+	ASSERT_GT(after, before);
+
+	/* Out of bounds write should fault */
+	loc.offset = 1024;
+	ASSERT_EQ(-1, writev(self->data_fd, (const struct iovec *)io, 3));
+	ASSERT_EQ(EFAULT, errno);
+
+	/* Non-Null should fault */
+	loc.offset = 0;
+	memset(data, 'A', sizeof(data));
+	ASSERT_EQ(-1, writev(self->data_fd, (const struct iovec *)io, 3));
+	ASSERT_EQ(EFAULT, errno);
 }
 
 int main(int argc, char **argv)
