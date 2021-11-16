@@ -68,12 +68,28 @@ static void global_ctrl_changed(struct kvm_pmu *pmu, u64 data)
 		reprogram_counter(pmu, bit);
 }
 
+static inline unsigned int intel_find_fixed_event(int idx)
+{
+	u32 event;
+	size_t size = ARRAY_SIZE(fixed_pmc_events);
+
+	if (idx >= size)
+		return PERF_COUNT_HW_MAX;
+
+	event = fixed_pmc_events[array_index_nospec(idx, size)];
+	return intel_arch_events[event].event_type;
+}
+
+
 static unsigned int intel_find_perf_hw_id(struct kvm_pmc *pmc)
 {
 	struct kvm_pmu *pmu = pmc_to_pmu(pmc);
 	u8 event_select = pmc->eventsel & ARCH_PERFMON_EVENTSEL_EVENT;
 	u8 unit_mask = (pmc->eventsel & ARCH_PERFMON_EVENTSEL_UMASK) >> 8;
 	int i;
+
+	if (pmc_is_fixed(pmc))
+		return intel_find_fixed_event(pmc->idx - INTEL_PMC_IDX_FIXED);
 
 	for (i = 0; i < ARRAY_SIZE(intel_arch_events); i++)
 		if (intel_arch_events[i].eventsel == event_select
@@ -85,18 +101,6 @@ static unsigned int intel_find_perf_hw_id(struct kvm_pmc *pmc)
 		return PERF_COUNT_HW_MAX;
 
 	return intel_arch_events[i].event_type;
-}
-
-static unsigned intel_find_fixed_event(int idx)
-{
-	u32 event;
-	size_t size = ARRAY_SIZE(fixed_pmc_events);
-
-	if (idx >= size)
-		return PERF_COUNT_HW_MAX;
-
-	event = fixed_pmc_events[array_index_nospec(idx, size)];
-	return intel_arch_events[event].event_type;
 }
 
 /* check if a PMC is enabled by comparing it with globl_ctrl bits. */
@@ -722,7 +726,6 @@ static void intel_pmu_cleanup(struct kvm_vcpu *vcpu)
 
 struct kvm_pmu_ops intel_pmu_ops = {
 	.find_perf_hw_id = intel_find_perf_hw_id,
-	.find_fixed_event = intel_find_fixed_event,
 	.pmc_is_enabled = intel_pmc_is_enabled,
 	.pmc_idx_to_pmc = intel_pmc_idx_to_pmc,
 	.rdpmc_ecx_to_pmc = intel_rdpmc_ecx_to_pmc,
