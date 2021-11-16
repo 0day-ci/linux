@@ -4,7 +4,7 @@
 $id: http://devicetree.org/schemas/display/panel/lvds.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: LVDS Display Panel
+title: LVDS Display Common Properties
 
 maintainers:
   - Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
@@ -26,18 +26,7 @@ description: |+
   Device compatible with those specifications have been marketed under the
   FPD-Link and FlatLink brands.
 
-allOf:
-  - $ref: panel-common.yaml#
-
 properties:
-  compatible:
-    contains:
-      const: panel-lvds
-    description:
-      Shall contain "panel-lvds" in addition to a mandatory panel-specific
-      compatible string defined in individual panel bindings. The "panel-lvds"
-      value shall never be used on its own.
-
   data-mapping:
     enum:
       - jeida-18
@@ -95,22 +84,6 @@ properties:
     description:
       If set, reverse the bit order described in the data mappings below on all
       data lanes, transmitting bits for slots 6 to 0 instead of 0 to 6.
-
-  port: true
-  ports: true
-
-required:
-  - compatible
-  - data-mapping
-  - width-mm
-  - height-mm
-  - panel-timing
-
-oneOf:
-  - required:
-      - port
-  - required:
-      - ports
 
 additionalProperties: true
 
