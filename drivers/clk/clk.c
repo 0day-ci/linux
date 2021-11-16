@@ -21,6 +21,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/sched.h>
 #include <linux/clkdev.h>
+#include <linux/workqueue.h>
 
 #include "clk.h"
 
@@ -1206,7 +1207,7 @@ static void clk_core_disable_unprepare(struct clk_core *core)
 	clk_core_unprepare_lock(core);
 }
 
-static void __init clk_unprepare_unused_subtree(struct clk_core *core)
+static void clk_unprepare_unused_subtree(struct clk_core *core)
 {
 	struct clk_core *child;
 
@@ -1236,7 +1237,7 @@ static void __init clk_unprepare_unused_subtree(struct clk_core *core)
 	clk_pm_runtime_put(core);
 }
 
-static void __init clk_disable_unused_subtree(struct clk_core *core)
+static void clk_disable_unused_subtree(struct clk_core *core)
 {
 	struct clk_core *child;
 	unsigned long flags;
@@ -1290,14 +1291,9 @@ static int __init clk_ignore_unused_setup(char *__unused)
 }
 __setup("clk_ignore_unused", clk_ignore_unused_setup);
 
-static int __init clk_disable_unused(void)
+static void __clk_disable_unused(struct work_struct *w)
 {
 	struct clk_core *core;
-
-	if (clk_ignore_unused) {
-		pr_warn("clk: Not disabling unused clocks\n");
-		return 0;
-	}
 
 	clk_prepare_lock();
 
@@ -1314,6 +1310,23 @@ static int __init clk_disable_unused(void)
 		clk_unprepare_unused_subtree(core);
 
 	clk_prepare_unlock();
+}
+DECLARE_DELAYED_WORK(disable_unused, __clk_disable_unused);
+
+static int __init clk_disable_unused(void)
+{
+	if (clk_ignore_unused) {
+		pr_warn("clk: Not disabling unused clocks\n");
+		return 0;
+	}
+
+	/*
+	 * We punt completion for an arbitrary amount of time since
+	 * systems with enable clocks during module load are initialized
+	 * after late_initcall_sync(), as module drivers will be probed
+	 * and initialized afterwards.
+	 */
+	schedule_delayed_work(&disable_unused, msecs_to_jiffies(15000));
 
 	return 0;
 }
