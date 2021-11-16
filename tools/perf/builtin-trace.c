@@ -2959,7 +2959,6 @@ static int trace__process_sample(struct perf_tool *tool,
 {
 	struct trace *trace = container_of(tool, struct trace, tool);
 	struct thread *thread;
-	int err = 0;
 
 	tracepoint_handler handler = evsel->handler;
 
@@ -2975,7 +2974,7 @@ static int trace__process_sample(struct perf_tool *tool,
 	}
 out:
 	thread__put(thread);
-	return err;
+	return 0;
 }
 
 static int trace__record(struct trace *trace, int argc, const char **argv)
