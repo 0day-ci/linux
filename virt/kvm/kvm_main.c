@@ -4910,7 +4910,6 @@ int kvm_io_bus_write(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 {
 	struct kvm_io_bus *bus;
 	struct kvm_io_range range;
-	int r;
 
 	range = (struct kvm_io_range) {
 		.addr = addr,
@@ -4920,8 +4919,8 @@ int kvm_io_bus_write(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 	bus = srcu_dereference(vcpu->kvm->buses[bus_idx], &vcpu->kvm->srcu);
 	if (!bus)
 		return -ENOMEM;
-	r = __kvm_io_bus_write(vcpu, bus, &range, val);
-	return r < 0 ? r : 0;
+
+	return min(__kvm_io_bus_write(vcpu, bus, &range, val), 0);
 }
 EXPORT_SYMBOL_GPL(kvm_io_bus_write);
 
@@ -4981,7 +4980,6 @@ int kvm_io_bus_read(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 {
 	struct kvm_io_bus *bus;
 	struct kvm_io_range range;
-	int r;
 
 	range = (struct kvm_io_range) {
 		.addr = addr,
@@ -4991,8 +4989,8 @@ int kvm_io_bus_read(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 	bus = srcu_dereference(vcpu->kvm->buses[bus_idx], &vcpu->kvm->srcu);
 	if (!bus)
 		return -ENOMEM;
-	r = __kvm_io_bus_read(vcpu, bus, &range, val);
-	return r < 0 ? r : 0;
+
+	return min(__kvm_io_bus_read(vcpu, bus, &range, val), 0);
 }
 
 /* Caller must hold slots_lock. */
