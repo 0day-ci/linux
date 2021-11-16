@@ -8,6 +8,8 @@
 #include <linux/prefetch.h>
 #include "mount.h"
 
+#include "internal.h"
+
 struct prepend_buffer {
 	char *buf;
 	int len;
