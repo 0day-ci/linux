@@ -421,6 +421,16 @@ arp_all_targets
 		consider the slave up only when all of the arp_ip_targets
 		are reachable
 
+missed_max
+
+        Maximum number of arp_interval monitor cycle for missed ARP replies.
+        If this number is exceeded, link is reported as down.
+
+        Normally 2 monitor cycles are needed. One cycle for missed ARP request
+        and one cycle for waiting ARP reply.
+
+        default 2
+
 downdelay
 
 	Specifies the time, in milliseconds, to wait before disabling
