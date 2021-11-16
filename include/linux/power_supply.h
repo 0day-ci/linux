@@ -430,6 +430,11 @@ devm_power_supply_get_by_phandle(struct device *dev, const char *property)
 { return NULL; }
 #endif /* CONFIG_OF */
 
+void power_supply_dev_put_battery_info(struct device *dev,
+				       struct power_supply_battery_info *info);
+int power_supply_dev_get_battery_info(struct device *dev,
+				      struct fwnode_handle *node,
+				      struct power_supply_battery_info *info);
 extern int power_supply_get_battery_info(struct power_supply *psy,
 					 struct power_supply_battery_info *info);
 extern void power_supply_put_battery_info(struct power_supply *psy,
