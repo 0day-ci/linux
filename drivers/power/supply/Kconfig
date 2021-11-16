@@ -9,6 +9,9 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
+config POWER_SIMPLE_GAUGE
+	tristate
+
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"
 	help
