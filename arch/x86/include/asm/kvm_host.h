@@ -292,9 +292,9 @@ struct kvm_kernel_irq_routing_entry;
  * the number of unique SPs that can theoretically be created is 2^n, where n
  * is the number of bits that are used to compute the role.
  *
- * But, even though there are 18 bits in the mask below, not all combinations
+ * But, even though there are 20 bits in the mask below, not all combinations
  * of modes and flags are possible.  The maximum number of possible upper-level
- * shadow pages for a single gfn is in the neighborhood of 2^13.
+ * shadow pages for a single gfn is in the neighborhood of 2^15.
  *
  *   - invalid shadow pages are not accounted.
  *   - level is effectively limited to four combinations, not 16 as the number
