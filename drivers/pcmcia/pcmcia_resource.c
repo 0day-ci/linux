@@ -393,7 +393,6 @@ int pcmcia_release_configuration(struct pcmcia_device *p_dev)
 static int pcmcia_release_io(struct pcmcia_device *p_dev)
 {
 	struct pcmcia_socket *s = p_dev->socket;
-	int ret = -EINVAL;
 	config_t *c;
 
 	mutex_lock(&s->ops_mutex);
@@ -413,7 +412,7 @@ static int pcmcia_release_io(struct pcmcia_device *p_dev)
 out:
 	mutex_unlock(&s->ops_mutex);
 
-	return ret;
+	return -EINVAL;
 } /* pcmcia_release_io */
 
 
