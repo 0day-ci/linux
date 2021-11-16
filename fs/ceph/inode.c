@@ -651,10 +651,11 @@ int ceph_fill_file_size(struct inode *inode, int issued,
 			 * don't hold those caps, then we need to check whether
 			 * the file is either opened or mmaped
 			 */
-			if ((issued & (CEPH_CAP_FILE_CACHE|
+			if (ci->i_truncate_size != truncate_size &&
+			    ((issued & (CEPH_CAP_FILE_CACHE|
 				       CEPH_CAP_FILE_BUFFER)) ||
 			    mapping_mapped(inode->i_mapping) ||
-			    __ceph_is_file_opened(ci)) {
+			    __ceph_is_file_opened(ci))) {
 				ci->i_truncate_pending++;
 				queue_trunc = 1;
 			}
