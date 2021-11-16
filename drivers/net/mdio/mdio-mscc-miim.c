@@ -10,6 +10,7 @@
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
+#include <linux/mdio/mdio-mscc-miim.h>
 #include <linux/module.h>
 #include <linux/of_mdio.h>
 #include <linux/phy.h>
@@ -37,7 +38,9 @@
 
 struct mscc_miim_dev {
 	struct regmap *regs;
+	int mii_status_offset;
 	struct regmap *phy_regs;
+	int phy_reset_offset;
 };
 
 /* When high resolution timers aren't built-in: we can't use usleep_range() as
@@ -56,7 +59,8 @@ static int mscc_miim_status(struct mii_bus *bus)
 	struct mscc_miim_dev *miim = bus->priv;
 	int val, err;
 
-	err = regmap_read(miim->regs, MSCC_MIIM_REG_STATUS, &val);
+	err = regmap_read(miim->regs,
+			  MSCC_MIIM_REG_STATUS + miim->mii_status_offset, &val);
 	if (err < 0)
 		WARN_ONCE(1, "mscc miim status read error %d\n", err);
 
@@ -91,7 +95,9 @@ static int mscc_miim_read(struct mii_bus *bus, int mii_id, int regnum)
 	if (ret)
 		goto out;
 
-	err = regmap_write(miim->regs, MSCC_MIIM_REG_CMD, MSCC_MIIM_CMD_VLD |
+	err = regmap_write(miim->regs,
+			   MSCC_MIIM_REG_CMD + miim->mii_status_offset,
+			   MSCC_MIIM_CMD_VLD |
 			   (mii_id << MSCC_MIIM_CMD_PHYAD_SHIFT) |
 			   (regnum << MSCC_MIIM_CMD_REGAD_SHIFT) |
 			   MSCC_MIIM_CMD_OPR_READ);
@@ -103,7 +109,8 @@ static int mscc_miim_read(struct mii_bus *bus, int mii_id, int regnum)
 	if (ret)
 		goto out;
 
-	err = regmap_read(miim->regs, MSCC_MIIM_REG_DATA, &val);
+	err = regmap_read(miim->regs,
+			  MSCC_MIIM_REG_DATA + miim->mii_status_offset, &val);
 
 	if (err < 0)
 		WARN_ONCE(1, "mscc miim read data reg error %d\n", err);
@@ -128,7 +135,9 @@ static int mscc_miim_write(struct mii_bus *bus, int mii_id,
 	if (ret < 0)
 		goto out;
 
-	err = regmap_write(miim->regs, MSCC_MIIM_REG_CMD, MSCC_MIIM_CMD_VLD |
+	err = regmap_write(miim->regs,
+			   MSCC_MIIM_REG_CMD + miim->mii_status_offset,
+			   MSCC_MIIM_CMD_VLD |
 			   (mii_id << MSCC_MIIM_CMD_PHYAD_SHIFT) |
 			   (regnum << MSCC_MIIM_CMD_REGAD_SHIFT) |
 			   (value << MSCC_MIIM_CMD_WRDATA_SHIFT) |
@@ -143,14 +152,17 @@ out:
 static int mscc_miim_reset(struct mii_bus *bus)
 {
 	struct mscc_miim_dev *miim = bus->priv;
+	int offset = miim->phy_reset_offset;
 	int err;
 
 	if (miim->phy_regs) {
-		err = regmap_write(miim->phy_regs, MSCC_PHY_REG_PHY_CFG, 0);
+		err = regmap_write(miim->phy_regs,
+				   MSCC_PHY_REG_PHY_CFG + offset, 0);
 		if (err < 0)
 			WARN_ONCE(1, "mscc reset set error %d\n", err);
 
-		err = regmap_write(miim->phy_regs, MSCC_PHY_REG_PHY_CFG, 0x1ff);
+		err = regmap_write(miim->phy_regs,
+				   MSCC_PHY_REG_PHY_CFG + offset, 0x1ff);
 		if (err < 0)
 			WARN_ONCE(1, "mscc reset clear error %d\n", err);
 
@@ -166,12 +178,12 @@ static const struct regmap_config mscc_miim_regmap_config = {
 	.reg_stride	= 4,
 };
 
-static int mscc_miim_setup(struct device *dev, struct mii_bus *bus,
-			   struct regmap *mii_regmap, struct regmap *phy_regmap)
+int mscc_miim_setup(struct device *dev, struct mii_bus **pbus,
+		    struct regmap *mii_regmap, int status_offset,
+		    struct regmap *phy_regmap, int reset_offset)
 {
 	struct mscc_miim_dev *miim;
 	struct mii_bus *bus;
-	int ret;
 
 	bus = devm_mdiobus_alloc_size(dev, sizeof(*miim));
 	if (!bus)
@@ -187,10 +199,15 @@ static int mscc_miim_setup(struct device *dev, struct mii_bus *bus,
 	miim = bus->priv;
 
 	miim->regs = mii_regmap;
+	miim->mii_status_offset = status_offset;
 	miim->phy_regs = phy_regmap;
+	miim->phy_reset_offset = reset_offset;
+
+	*pbus = bus;
 
 	return 0;
 }
+EXPORT_SYMBOL(mscc_miim_setup);
 
 static int mscc_miim_probe(struct platform_device *pdev)
 {
@@ -227,7 +244,7 @@ static int mscc_miim_probe(struct platform_device *pdev)
 		return PTR_ERR(dev->phy_regs);
 	}
 
-	mscc_miim_setup(&pdev->dev, bus, mii_regmap, phy_regmap);
+	mscc_miim_setup(&pdev->dev, &bus, mii_regmap, 0, phy_regmap, 0);
 
 	ret = of_mdiobus_register(bus, pdev->dev.of_node);
 	if (ret < 0) {
