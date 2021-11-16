@@ -25,6 +25,7 @@
 #include <linux/psi.h>
 #include <linux/uio.h>
 #include <linux/sched/task.h>
+#include "internal.h"
 
 void end_swap_bio_write(struct bio *bio)
 {
@@ -288,7 +289,69 @@ struct swap_iocb {
 	struct bio_vec		bvec[SWAP_CLUSTER_MAX];
 	struct work_struct	work;
 	int			pages;
+	bool			on_stack;
 };
+
+static void sio_aio_complete(struct kiocb *iocb, long ret)
+{
+	struct swap_iocb *sio = container_of(iocb, struct swap_iocb, iocb);
+	int p;
+
+	if (ret != PAGE_SIZE * sio->pages) {
+		/*
+		 * In the case of swap-over-nfs, this can be a
+		 * temporary failure if the system has limited
+		 * memory for allocating transmit buffers.
+		 * Mark the page dirty and avoid
+		 * rotate_reclaimable_page but rate-limit the
+		 * messages but do not flag PageError like
+		 * the normal direct-to-bio case as it could
+		 * be temporary.
+		 */
+		pr_err_ratelimited("Write error on dio swapfile (%llu - %d pages)\n",
+				   page_file_offset(sio->bvec[0].bv_page),
+				   sio->pages);
+		for (p = 0; p < sio->pages; p++) {
+			set_page_dirty(sio->bvec[p].bv_page);
+			ClearPageReclaim(sio->bvec[p].bv_page);
+		}
+	}
+	for (p = 0; p < sio->pages; p++)
+		end_page_writeback(sio->bvec[p].bv_page);
+	if (!sio->on_stack)
+		kfree(sio);
+}
+
+static void sio_aio_unplug(struct blk_plug_cb *cb, bool from_schedule);
+
+static void sio_write_unplug_worker(struct work_struct *work)
+{
+	struct swap_iocb *sio = container_of(work, struct swap_iocb, work);
+	sio_aio_unplug(&sio->cb, 0);
+}
+
+static void sio_aio_unplug(struct blk_plug_cb *cb, bool from_schedule)
+{
+	struct swap_iocb *sio = container_of(cb, struct swap_iocb, cb);
+	struct address_space *mapping = sio->iocb.ki_filp->f_mapping;
+	struct iov_iter from;
+	int ret;
+	unsigned int noreclaim_flag;
+
+	if (from_schedule) {
+		INIT_WORK(&sio->work, sio_write_unplug_worker);
+		queue_work(mm_percpu_wq, &sio->work);
+		return;
+	}
+
+	noreclaim_flag = memalloc_noreclaim_save();
+	iov_iter_bvec(&from, WRITE, sio->bvec,
+		      sio->pages, PAGE_SIZE * sio->pages);
+	ret = mapping->a_ops->direct_IO(&sio->iocb, &from);
+	memalloc_noreclaim_restore(noreclaim_flag);
+	if (ret != -EIOCBQUEUED)
+		sio_aio_complete(&sio->iocb, ret);
+}
 
 int __swap_writepage(struct page *page, struct writeback_control *wbc,
 		bio_end_io_t end_write_func)
@@ -299,44 +362,51 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 
 	VM_BUG_ON_PAGE(!PageSwapCache(page), page);
 	if (data_race(sis->flags & SWP_FS_OPS)) {
-		struct kiocb kiocb;
+		struct swap_iocb *sio, sio_on_stack;
+		struct blk_plug_cb *cb;
 		struct file *swap_file = sis->swap_file;
-		struct address_space *mapping = swap_file->f_mapping;
-		struct bio_vec bv = {
-			.bv_page = page,
-			.bv_len  = PAGE_SIZE,
-			.bv_offset = 0
-		};
-		struct iov_iter from;
-
-		iov_iter_bvec(&from, WRITE, &bv, 1, PAGE_SIZE);
-		init_sync_kiocb(&kiocb, swap_file);
-		kiocb.ki_pos = page_file_offset(page);
+		loff_t pos = page_file_offset(page);
+		int p;
 
 		set_page_writeback(page);
 		unlock_page(page);
-		ret = mapping->a_ops->direct_IO(&kiocb, &from);
-		if (ret == PAGE_SIZE) {
-			count_vm_event(PSWPOUT);
-			ret = 0;
-		} else {
-			/*
-			 * In the case of swap-over-nfs, this can be a
-			 * temporary failure if the system has limited
-			 * memory for allocating transmit buffers.
-			 * Mark the page dirty and avoid
-			 * folio_rotate_reclaimable but rate-limit the
-			 * messages but do not flag PageError like
-			 * the normal direct-to-bio case as it could
-			 * be temporary.
-			 */
-			set_page_dirty(page);
-			ClearPageReclaim(page);
-			pr_err_ratelimited("Write error on dio swapfile (%llu)\n",
-					   page_file_offset(page));
+		cb = blk_check_plugged(sio_aio_unplug, swap_file, sizeof(*sio));
+		sio = container_of(cb, struct swap_iocb, cb);
+		if (cb && sio->pages &&
+		    sio->iocb.ki_pos + sio->pages * PAGE_SIZE != pos) {
+			/* Not contiguous - hide this sio from lookup */
+			cb->data = NULL;
+			cb = blk_check_plugged(sio_aio_unplug, swap_file,
+					       sizeof(*sio));
+			sio = container_of(cb, struct swap_iocb, cb);
 		}
-		end_page_writeback(page);
-		return ret;
+		if (!cb) {
+			sio = &sio_on_stack;
+			sio->pages = 0;
+			sio->on_stack = true;
+		}
+
+		if (sio->pages == 0) {
+			init_sync_kiocb(&sio->iocb, swap_file);
+			sio->iocb.ki_pos = pos;
+			if (sio != &sio_on_stack)
+				sio->iocb.ki_complete = sio_aio_complete;
+		}
+		p = sio->pages;
+		sio->bvec[p].bv_page = page;
+		sio->bvec[p].bv_len = PAGE_SIZE;
+		sio->bvec[p].bv_offset = 0;
+		p += 1;
+		sio->pages = p;
+		if (!cb)
+			sio_aio_unplug(&sio->cb, 0);
+		else if (p >= ARRAY_SIZE(sio->bvec))
+			/* Don't try to add to this */
+			cb->data = NULL;
+
+		count_vm_event(PSWPOUT);
+
+		return 0;
 	}
 
 	ret = bdev_write_page(sis->bdev, swap_page_sector(page), page, wbc);
