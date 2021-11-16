@@ -5504,7 +5504,10 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 				 int max_lane_count, int max_link_rate,
 				 int conn_base_id)
 {
-	struct drm_dp_mst_topology_state *mst_state;
+	struct drm_dp_mst_topology_state *mst_state = NULL;
+
+	mgr->payloads = NULL;
+	mgr->proposed_vcpis = NULL;
 
 	mutex_init(&mgr->lock);
 	mutex_init(&mgr->qlock);
@@ -5526,7 +5529,7 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 	 */
 	mgr->delayed_destroy_wq = alloc_ordered_workqueue("drm_dp_mst_wq", 0);
 	if (mgr->delayed_destroy_wq == NULL)
-		return -ENOMEM;
+		goto out;
 
 	INIT_WORK(&mgr->work, drm_dp_mst_link_probe_work);
 	INIT_WORK(&mgr->tx_work, drm_dp_tx_work);
@@ -5542,18 +5545,18 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 	mgr->conn_base_id = conn_base_id;
 	if (max_payloads + 1 > sizeof(mgr->payload_mask) * 8 ||
 	    max_payloads + 1 > sizeof(mgr->vcpi_mask) * 8)
-		return -EINVAL;
+		goto failed;
 	mgr->payloads = kcalloc(max_payloads, sizeof(struct drm_dp_payload), GFP_KERNEL);
 	if (!mgr->payloads)
-		return -ENOMEM;
+		goto failed;
 	mgr->proposed_vcpis = kcalloc(max_payloads, sizeof(struct drm_dp_vcpi *), GFP_KERNEL);
 	if (!mgr->proposed_vcpis)
-		return -ENOMEM;
+		goto failed;
 	set_bit(0, &mgr->payload_mask);
 
 	mst_state = kzalloc(sizeof(*mst_state), GFP_KERNEL);
 	if (mst_state == NULL)
-		return -ENOMEM;
+		goto failed;
 
 	mst_state->total_avail_slots = 63;
 	mst_state->start_slot = 1;
@@ -5566,6 +5569,13 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 				    &drm_dp_mst_topology_state_funcs);
 
 	return 0;
+
+failed:
+	kfree(mgr->proposed_vcpis);
+	kfree(mgr->payloads);
+	destroy_workqueue(mgr->delayed_destroy_wq);
+out:
+	return -ENOMEM;
 }
 EXPORT_SYMBOL(drm_dp_mst_topology_mgr_init);
 
