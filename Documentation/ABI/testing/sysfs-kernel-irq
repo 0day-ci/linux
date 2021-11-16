@@ -58,3 +58,10 @@ KernelVersion:	4.17
 Contact:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 Description:	The wakeup state of the interrupt. Either the string
 		'enabled' or 'disabled'.
+
+What:		/sys/kernel/irq/<irq>/state
+Date:		November 2021
+KernelVersion:	5.16
+Contact:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Description:	The state of the interrupt. Either the string
+		'enabled' or 'disabled'.

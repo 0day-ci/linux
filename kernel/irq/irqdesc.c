@@ -265,6 +265,21 @@ static ssize_t actions_show(struct kobject *kobj,
 }
 IRQ_ATTR_RO(actions);
 
+static ssize_t state_show(struct kobject *kobj,
+			  struct kobj_attribute *attr, char *buf)
+{
+	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
+	ssize_t ret;
+
+	raw_spin_lock_irq(&desc->lock);
+	ret = sprintf(buf, "%s\n",
+		      irqd_irq_disabled(&desc->irq_data) ? "disabled" : "enabled");
+	raw_spin_unlock_irq(&desc->lock);
+
+	return ret;
+}
+IRQ_ATTR_RO(state);
+
 static struct attribute *irq_attrs[] = {
 	&per_cpu_count_attr.attr,
 	&chip_name_attr.attr,
@@ -273,6 +288,7 @@ static struct attribute *irq_attrs[] = {
 	&wakeup_attr.attr,
 	&name_attr.attr,
 	&actions_attr.attr,
+	&state_attr.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(irq);
