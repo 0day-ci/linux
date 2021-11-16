@@ -1368,6 +1368,7 @@ static const struct felix_info felix_info_vsc9959 = {
 	.port_setup_tc		= vsc9959_port_setup_tc,
 	.port_sched_speed_set	= vsc9959_sched_speed_set,
 	.init_regmap		= ocelot_regmap_init,
+	.get_quirk_for_port	= felix_quirks_have_rate_adaptation,
 };
 
 static irqreturn_t felix_irq_handler(int irq, void *data)

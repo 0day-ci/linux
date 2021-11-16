@@ -48,6 +48,7 @@ struct felix_info {
 					u32 speed);
 	struct regmap *(*init_regmap)(struct ocelot *ocelot,
 				      struct resource *res);
+	unsigned long (*get_quirk_for_port)(struct ocelot *ocelot, int port);
 };
 
 extern const struct dsa_switch_ops felix_switch_ops;
@@ -67,5 +68,8 @@ struct felix {
 
 struct net_device *felix_port_to_netdev(struct ocelot *ocelot, int port);
 int felix_netdev_to_port(struct net_device *dev);
+
+unsigned long felix_quirks_have_rate_adaptation(struct ocelot *ocelot,
+						int port);
 
 #endif

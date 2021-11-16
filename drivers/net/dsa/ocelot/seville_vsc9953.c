@@ -1088,6 +1088,7 @@ static const struct felix_info seville_info_vsc9953 = {
 	.phylink_validate	= vsc9953_phylink_validate,
 	.prevalidate_phy_mode	= vsc9953_prevalidate_phy_mode,
 	.init_regmap		= ocelot_regmap_init,
+	.get_quirk_for_port	= felix_quirks_have_rate_adaptation,
 };
 
 static int seville_probe(struct platform_device *pdev)

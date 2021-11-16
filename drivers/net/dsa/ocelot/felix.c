@@ -824,14 +824,25 @@ static void felix_phylink_mac_config(struct dsa_switch *ds, int port,
 		phylink_set_pcs(dp->pl, &felix->pcs[port]->pcs);
 }
 
+unsigned long felix_quirks_have_rate_adaptation(struct ocelot *ocelot,
+						int port)
+{
+	return FELIX_MAC_QUIRKS;
+}
+EXPORT_SYMBOL(felix_quirks_have_rate_adaptation);
+
 static void felix_phylink_mac_link_down(struct dsa_switch *ds, int port,
 					unsigned int link_an_mode,
 					phy_interface_t interface)
 {
 	struct ocelot *ocelot = ds->priv;
+	unsigned long quirks;
+	struct felix *felix;
 
+	felix = ocelot_to_felix(ocelot);
+	quirks = felix->info->get_quirk_for_port(ocelot, port);
 	ocelot_phylink_mac_link_down(ocelot, port, link_an_mode, interface,
-				     FELIX_MAC_QUIRKS);
+				     quirks);
 }
 
 static void felix_phylink_mac_link_up(struct dsa_switch *ds, int port,
@@ -842,11 +853,14 @@ static void felix_phylink_mac_link_up(struct dsa_switch *ds, int port,
 				      bool tx_pause, bool rx_pause)
 {
 	struct ocelot *ocelot = ds->priv;
-	struct felix *felix = ocelot_to_felix(ocelot);
+	unsigned long quirks;
+	struct felix *felix;
 
+	felix = ocelot_to_felix(ocelot);
+	quirks = felix->info->get_quirk_for_port(ocelot, port);
 	ocelot_phylink_mac_link_up(ocelot, port, phydev, link_an_mode,
 				   interface, speed, duplex, tx_pause, rx_pause,
-				   FELIX_MAC_QUIRKS);
+				   quirks);
 
 	if (felix->info->port_sched_speed_set)
 		felix->info->port_sched_speed_set(ocelot, port, speed);
