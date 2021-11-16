@@ -1220,7 +1220,7 @@ static int msi2500_probe(struct usb_interface *intf,
 	}
 
 	/* SPI master adapter */
-	master = spi_alloc_master(dev->dev, 0);
+	master = devm_spi_alloc_master(dev->dev, 0);
 	if (master == NULL) {
 		ret = -ENOMEM;
 		goto err_unregister_v4l2_dev;
@@ -1233,7 +1233,6 @@ static int msi2500_probe(struct usb_interface *intf,
 	spi_master_set_devdata(master, dev);
 	ret = spi_register_master(master);
 	if (ret) {
-		spi_master_put(master);
 		goto err_unregister_v4l2_dev;
 	}
 
