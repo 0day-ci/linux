@@ -176,6 +176,12 @@
 			#clock-cells = <1>;
 		};
 
+		pmctrl: pmctrl@fff31000 {
+			compatible = "hisilicon,hi3670-pmctrl", "syscon";
+			reg = <0x0 0xfff31000 0x0 0x1000>;
+			#clock-cells = <1>;
+		};
+
 		iomcu: iomcu@ffd7e000 {
 			compatible = "hisilicon,hi3670-iomcu", "syscon";
 			reg = <0x0 0xffd7e000 0x0 0x1000>;
@@ -657,6 +663,107 @@
 			#interrupt-cells = <2>;
 			clocks = <&sctrl HI3670_PCLK_AO_GPIO6>;
 			clock-names = "apb_pclk";
+		};
+
+		pcie_phy: pcie-phy@fc000000 {
+			compatible = "hisilicon,hi970-pcie-phy";
+			reg = <0x0 0xfc000000 0x0 0x80000>;
+
+			phy-supply = <&ldo33>;
+
+			clocks = <&crg_ctrl HI3670_CLK_GATE_PCIEPHY_REF>,
+				 <&crg_ctrl HI3670_CLK_GATE_PCIEAUX>,
+				 <&crg_ctrl HI3670_PCLK_GATE_PCIE_PHY>,
+				 <&crg_ctrl HI3670_PCLK_GATE_PCIE_SYS>,
+				 <&crg_ctrl HI3670_ACLK_GATE_PCIE>;
+			clock-names = "phy_ref", "aux",
+				      "apb_phy", "apb_sys",
+				      "aclk";
+
+			/* vboost iboost pre post main */
+			hisilicon,eye-diagram-param = <0xffffffff 0xffffffff
+						       0xffffffff 0xffffffff
+						       0xffffffff>;
+
+			#phy-cells = <0>;
+		};
+
+		pcie@f4000000 {
+			compatible = "hisilicon,kirin970-pcie";
+			reg = <0x0 0xf4000000 0x0 0x1000000>,
+			      <0x0 0xfc180000 0x0 0x1000>,
+			      <0x0 0xf5000000 0x0 0x2000>;
+			reg-names = "dbi", "apb", "config";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			device_type = "pci";
+			phys = <&pcie_phy>;
+			ranges = <0x02000000 0x0 0x00000000
+				  0x0 0xf6000000
+				  0x0 0x02000000>;
+			num-lanes = <1>;
+			#interrupt-cells = <1>;
+			interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "msi";
+			interrupt-map-mask = <0 0 0 7>;
+			interrupt-map = <0x0 0 0 1
+					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+					<0x0 0 0 2
+					 &gic GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
+					<0x0 0 0 3
+					 &gic GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
+					<0x0 0 0 4
+					 &gic GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
+			reset-gpios = <&gpio7 0 0>;
+			hisilicon,clken-gpios = <&gpio27 3 0>, <&gpio17 0 0>,
+						<&gpio20 6 0>;
+			pcie@0,0 { // Lane 0: PCIe switch: Bus 1, Device 0
+				reg = <0 0 0 0 0>;
+				compatible = "pciclass,0604";
+				device_type = "pci";
+				#address-cells = <3>;
+				#size-cells = <2>;
+				ranges;
+
+				pcie@0,0 { // Lane 0: upstream
+					reg = <0 0 0 0 0>;
+					compatible = "pciclass,0604";
+					device_type = "pci";
+					#address-cells = <3>;
+					#size-cells = <2>;
+					ranges;
+
+					pcie@1,0 { // Lane 4: M.2
+						reg = <0x0800 0 0 0 0>;
+						compatible = "pciclass,0604";
+						device_type = "pci";
+						reset-gpios = <&gpio3 1 0>;
+						#address-cells = <3>;
+						#size-cells = <2>;
+						ranges;
+					};
+
+					pcie@5,0 { // Lane 5: Mini PCIe
+						reg = <0x2800 0 0 0 0>;
+						compatible = "pciclass,0604";
+						device_type = "pci";
+						reset-gpios = <&gpio27 4 0 >;
+						#address-cells = <3>;
+						#size-cells = <2>;
+						ranges;
+					};
+
+					pcie@7,0 { // Lane 6: Ethernet
+						reg = <0x3800 0 0 0 0>;
+						compatible = "pciclass,0604";
+						device_type = "pci";
+						reset-gpios = <&gpio25 2 0 >;
+						#address-cells = <3>;
+						#size-cells = <2>;
+						ranges;
+					};
+				};
+			};
 		};
 
 		/* UFS */
