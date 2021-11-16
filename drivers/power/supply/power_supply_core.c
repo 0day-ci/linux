@@ -639,6 +639,7 @@ int power_supply_dev_get_battery_info(struct device *dev,
 	info->resist_table = NULL;
 	info->temp_dgrd_values = 0;
 	info->temp_dgrd = NULL;
+	info->degrade_cycle_uah = 0;
 
 	for (index = 0; index < POWER_SUPPLY_OCV_TEMP_MAX; index++) {
 		info->ocv_table[index]       = NULL;
@@ -689,6 +690,8 @@ int power_supply_dev_get_battery_info(struct device *dev,
 			dev_warn(dev, "%s unknown battery type\n", value);
 	}
 
+	fwnode_property_read_u32(battery_node, "degrade-cycle-microamp-hours",
+			     &info->degrade_cycle_uah);
 	fwnode_property_read_u32(battery_node, "energy-full-design-microwatt-hours",
 			     &info->energy_full_design_uwh);
 	fwnode_property_read_u32(battery_node, "charge-full-design-microamp-hours",

@@ -403,6 +403,7 @@ struct power_supply_battery_info {
 	int resist_table_size;
 	int temp_dgrd_values;
 	struct power_supply_temp_degr *temp_dgrd;
+	int degrade_cycle_uah;
 };
 
 extern struct atomic_notifier_head power_supply_notifier;
