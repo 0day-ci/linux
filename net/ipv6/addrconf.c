@@ -392,7 +392,8 @@ static struct inet6_dev *ipv6_add_dev(struct net_device *dev)
 	timer_setup(&ndev->rs_timer, addrconf_rs_timer, 0);
 	memcpy(&ndev->cnf, dev_net(dev)->ipv6.devconf_dflt, sizeof(ndev->cnf));
 
-	if (ndev->cnf.stable_secret.initialized)
+	if (ndev->cnf.stable_secret.initialized &&
+	    ndev->cnf.addr_gen_mode != IN6_ADDR_GEN_MODE_STABLE_PRIVACY_NO_LLA)
 		ndev->cnf.addr_gen_mode = IN6_ADDR_GEN_MODE_STABLE_PRIVACY;
 
 	ndev->cnf.mtu6 = dev->mtu;
@@ -2578,7 +2579,8 @@ static void manage_tempaddrs(struct inet6_dev *idev,
 static bool is_addr_mode_generate_stable(struct inet6_dev *idev)
 {
 	return idev->cnf.addr_gen_mode == IN6_ADDR_GEN_MODE_STABLE_PRIVACY ||
-	       idev->cnf.addr_gen_mode == IN6_ADDR_GEN_MODE_RANDOM;
+	       idev->cnf.addr_gen_mode == IN6_ADDR_GEN_MODE_RANDOM ||
+	       idev->cnf.addr_gen_mode == IN6_ADDR_GEN_MODE_STABLE_PRIVACY_NO_LLA;
 }
 
 int addrconf_prefix_rcv_add_addr(struct net *net, struct net_device *dev,
@@ -3331,6 +3333,8 @@ static void addrconf_addr_gen(struct inet6_dev *idev, bool prefix_route)
 					      0, 0, GFP_KERNEL);
 		break;
 	case IN6_ADDR_GEN_MODE_NONE:
+	case IN6_ADDR_GEN_MODE_RANDOM_NO_LLA:
+	case IN6_ADDR_GEN_MODE_STABLE_PRIVACY_NO_LLA:
 	default:
 		/* will not add any link local address */
 		break;
@@ -5798,7 +5802,9 @@ static int check_addr_gen_mode(int mode)
 	if (mode != IN6_ADDR_GEN_MODE_EUI64 &&
 	    mode != IN6_ADDR_GEN_MODE_NONE &&
 	    mode != IN6_ADDR_GEN_MODE_STABLE_PRIVACY &&
-	    mode != IN6_ADDR_GEN_MODE_RANDOM)
+	    mode != IN6_ADDR_GEN_MODE_RANDOM &&
+	    mode != IN6_ADDR_GEN_MODE_STABLE_PRIVACY_NO_LLA &&
+	    mode != IN6_ADDR_GEN_MODE_RANDOM_NO_LLA)
 		return -EINVAL;
 	return 1;
 }
@@ -6428,15 +6434,19 @@ static int addrconf_sysctl_stable_secret(struct ctl_table *ctl, int write,
 		for_each_netdev(net, dev) {
 			struct inet6_dev *idev = __in6_dev_get(dev);
 
-			if (idev) {
+			if (idev && idev->cnf.addr_gen_mode !=
+			    IN6_ADDR_GEN_MODE_STABLE_PRIVACY_NO_LLA) {
 				idev->cnf.addr_gen_mode =
 					IN6_ADDR_GEN_MODE_STABLE_PRIVACY;
 			}
 		}
 	} else {
 		struct inet6_dev *idev = ctl->extra1;
-
-		idev->cnf.addr_gen_mode = IN6_ADDR_GEN_MODE_STABLE_PRIVACY;
+		if (idev->cnf.addr_gen_mode !=
+		    IN6_ADDR_GEN_MODE_STABLE_PRIVACY_NO_LLA) {
+			idev->cnf.addr_gen_mode =
+				IN6_ADDR_GEN_MODE_STABLE_PRIVACY;
+		}
 	}
 
 out:
