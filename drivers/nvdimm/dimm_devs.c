@@ -430,7 +430,7 @@ static struct attribute *nvdimm_attributes[] = {
 
 static umode_t nvdimm_visible(struct kobject *kobj, struct attribute *a, int n)
 {
-	struct device *dev = container_of(kobj, typeof(*dev), kobj);
+	struct device *dev = kobj_to_dev(kobj);
 	struct nvdimm *nvdimm = to_nvdimm(dev);
 
 	if (a != &dev_attr_security.attr && a != &dev_attr_frozen.attr)
@@ -546,7 +546,7 @@ static struct attribute *nvdimm_firmware_attributes[] = {
 
 static umode_t nvdimm_firmware_visible(struct kobject *kobj, struct attribute *a, int n)
 {
-	struct device *dev = container_of(kobj, typeof(*dev), kobj);
+	struct device *dev = kobj_to_dev(kobj);
 	struct nvdimm_bus *nvdimm_bus = walk_to_nvdimm_bus(dev);
 	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
 	struct nvdimm *nvdimm = to_nvdimm(dev);
