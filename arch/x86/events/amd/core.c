@@ -587,6 +587,8 @@ static void amd_pmu_cpu_dead(int cpu)
 
 static void amd_pmu_wait_on_overflow(int idx)
 {
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	struct hw_perf_event *hwc = &cpuc->events[idx]->hw;
 	unsigned int i;
 	u64 counter;
 
@@ -596,7 +598,7 @@ static void amd_pmu_wait_on_overflow(int idx)
 	 * forever...
 	 */
 	for (i = 0; i < OVERFLOW_WAIT_COUNT; i++) {
-		rdmsrl(x86_pmu_event_addr(idx), counter);
+		rdpmcl(hwc->event_base_rdpmc, counter);
 		if (counter & (1ULL << (x86_pmu.cntval_bits - 1)))
 			break;
 
