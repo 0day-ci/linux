@@ -630,7 +630,7 @@ ssize_t nfs_file_write(struct kiocb *iocb, struct iov_iter *from)
 		result = generic_write_checks(iocb, from);
 		if (result <= 0)
 			return result;
-		return nfs_file_direct_write(iocb, from);
+		return nfs_file_direct_write(iocb, from, FLUSH_COND_STABLE);
 	}
 
 	dprintk("NFS: write(%pD2, %zu@%Ld)\n",

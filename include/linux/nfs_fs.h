@@ -509,7 +509,8 @@ extern ssize_t nfs_direct_IO(struct kiocb *, struct iov_iter *);
 extern ssize_t nfs_file_direct_read(struct kiocb *iocb,
 			struct iov_iter *iter);
 extern ssize_t nfs_file_direct_write(struct kiocb *iocb,
-			struct iov_iter *iter);
+				     struct iov_iter *iter,
+				     int ioflags);
 
 /*
  * linux/fs/nfs/dir.c
