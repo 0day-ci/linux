@@ -845,18 +845,30 @@ bool fwnode_device_is_available(const struct fwnode_handle *fwnode)
 EXPORT_SYMBOL_GPL(fwnode_device_is_available);
 
 /**
- * device_get_child_node_count - return the number of child nodes for device
- * @dev: Device to cound the child nodes for
+ * fwnode_get_child_node_count - return the number of child nodes for the fwnode
+ * @fwnode: Node to count the childe nodes for
  */
-unsigned int device_get_child_node_count(struct device *dev)
+unsigned int fwnode_get_child_node_count(struct fwnode_handle *fwnode)
 {
 	struct fwnode_handle *child;
 	unsigned int count = 0;
 
-	device_for_each_child_node(dev, child)
+	fwnode_for_each_child_node(fwnode, child)
 		count++;
 
 	return count;
+}
+EXPORT_SYMBOL_GPL(fwnode_get_child_node_count);
+
+/**
+ * device_get_child_node_count - return the number of child nodes for device
+ * @dev: Device to count the child nodes for
+ */
+unsigned int device_get_child_node_count(struct device *dev)
+{
+	struct fwnode_handle *fwnode = dev_fwnode(dev);
+
+	return fwnode_get_child_node_count(fwnode);
 }
 EXPORT_SYMBOL_GPL(device_get_child_node_count);
 
