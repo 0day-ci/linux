@@ -39,6 +39,7 @@
 #include <linux/frontswap.h>
 #include <linux/fs_parser.h>
 #include <linux/swapfile.h>
+#include <linux/fsnotify.h>
 
 static struct vfsmount *shm_mnt;
 
@@ -1823,6 +1824,7 @@ static int shmem_getpage_gfp(struct inode *inode, pgoff_t index,
 	int error;
 	int once = 0;
 	int alloced = 0;
+	bool max_blocks_reached = false;
 
 	if (index > (MAX_LFS_FILESIZE >> PAGE_SHIFT))
 		return -EFBIG;
@@ -1908,9 +1910,11 @@ alloc_nohuge:
 
 		error = PTR_ERR(page);
 		page = NULL;
-		if (error == -EPERM)
+		if (error == -ENOSPC)
+			max_blocks_reached = true;
+		else if (error == -EPERM)
 			error = -ENOSPC;
-		else if (error != -ENOSPC)
+		else
 			goto unlock;
 		/*
 		 * Try to reclaim some space by splitting a huge page
@@ -2024,11 +2028,16 @@ unlock:
 		unlock_page(page);
 		put_page(page);
 	}
-	if (error == -ENOSPC && !once++) {
-		spin_lock_irq(&info->lock);
-		shmem_recalc_inode(inode);
-		spin_unlock_irq(&info->lock);
-		goto repeat;
+	if (error == -ENOSPC) {
+		if (!once++) {
+			spin_lock_irq(&info->lock);
+			shmem_recalc_inode(inode);
+			spin_unlock_irq(&info->lock);
+			goto repeat;
+		}
+
+		if (max_blocks_reached)
+			fsnotify_sb_error(inode->i_sb, inode, ENOSPC);
 	}
 	if (error == -EEXIST)
 		goto repeat;
@@ -2716,6 +2725,7 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 	end = (offset + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	/* Try to avoid a swapstorm if len is impossible to satisfy */
 	if (sbinfo->max_blocks && end - start > sbinfo->max_blocks) {
+		fsnotify_sb_error(inode->i_sb, inode, ENOSPC);
 		error = -ENOSPC;
 		goto out;
 	}
