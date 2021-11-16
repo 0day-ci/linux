@@ -419,7 +419,8 @@ static void reset_cancel(struct intel_engine_cs *engine)
 
 	/* Mark all submitted requests as skipped. */
 	list_for_each_entry(request, &engine->sched_engine->requests, sched.link)
-		i915_request_put(i915_request_mark_eio(request));
+		if (i915_request_mark_eio(request))
+			i915_request_put(request);
 	intel_engine_signal_breadcrumbs(engine);
 
 	/* Remaining _unready_ requests will be nop'ed when submitted */

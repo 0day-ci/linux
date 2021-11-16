@@ -3073,7 +3073,8 @@ static void execlists_reset_cancel(struct intel_engine_cs *engine)
 
 	/* Mark all executing requests as skipped. */
 	list_for_each_entry(rq, &engine->sched_engine->requests, sched.link)
-		i915_request_put(i915_request_mark_eio(rq));
+		if (i915_request_mark_eio(rq))
+			i915_request_put(rq);
 	intel_engine_signal_breadcrumbs(engine);
 
 	/* Flush the queued requests to the timeline list (for retiring). */
@@ -3093,7 +3094,8 @@ static void execlists_reset_cancel(struct intel_engine_cs *engine)
 
 	/* On-hold requests will be flushed to timeline upon their release */
 	list_for_each_entry(rq, &sched_engine->hold, sched.link)
-		i915_request_put(i915_request_mark_eio(rq));
+		if (i915_request_mark_eio(rq))
+			i915_request_put(rq);
 
 	/* Cancel all attached virtual engines */
 	while ((rb = rb_first_cached(&execlists->virtual))) {

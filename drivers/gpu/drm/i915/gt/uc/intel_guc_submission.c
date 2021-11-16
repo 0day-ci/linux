@@ -640,7 +640,8 @@ static int __guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 	 * request resubmitted after the context was banned.
 	 */
 	if (unlikely(intel_context_is_banned(ce))) {
-		i915_request_put(i915_request_mark_eio(rq));
+		if (i915_request_mark_eio(rq))
+			i915_request_put(rq);
 		intel_engine_signal_breadcrumbs(ce->engine);
 		return 0;
 	}
@@ -1369,7 +1370,8 @@ static void guc_cancel_context_requests(struct intel_context *ce)
 	spin_lock_irqsave(&sched_engine->lock, flags);
 	spin_lock(&ce->guc_state.lock);
 	list_for_each_entry(rq, &ce->guc_state.requests, sched.link)
-		i915_request_put(i915_request_mark_eio(rq));
+		if (i915_request_mark_eio(rq))
+			i915_request_put(rq);
 	spin_unlock(&ce->guc_state.lock);
 	spin_unlock_irqrestore(&sched_engine->lock, flags);
 }
@@ -1410,7 +1412,8 @@ guc_cancel_sched_engine_requests(struct i915_sched_engine *sched_engine)
 
 			__i915_request_submit(rq);
 
-			i915_request_put(i915_request_mark_eio(rq));
+			if (i915_request_mark_eio(rq))
+				i915_request_put(rq);
 		}
 
 		rb_erase_cached(&p->node, &sched_engine->queue);

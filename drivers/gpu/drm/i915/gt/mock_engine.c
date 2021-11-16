@@ -285,7 +285,8 @@ static void mock_reset_cancel(struct intel_engine_cs *engine)
 
 	/* Mark all submitted requests as skipped. */
 	list_for_each_entry(rq, &engine->sched_engine->requests, sched.link)
-		i915_request_put(i915_request_mark_eio(rq));
+		if (i915_request_mark_eio(rq))
+			i915_request_put(rq);
 	intel_engine_signal_breadcrumbs(engine);
 
 	/* Cancel and submit all pending requests. */
