@@ -150,6 +150,12 @@ properties:
       string to uniquely identify variant of the calibration data in the
       board-2.bin for designs with colliding bus and device specific ids
 
+  memory-region:
+    maxItems: 1
+    description:
+      phandle to a node describing reserved memory (System RAM memory)
+      used by ath11k firmware (see bindings/reserved-memory/reserved-memory.txt)
+
 required:
   - compatible
   - reg
@@ -279,3 +285,45 @@ examples:
                           "tcl2host-status-ring";
         qcom,rproc = <&q6v5_wcss>;
     };
+
+    memory {
+        device_type = "memory";
+        reg = <0x0 0x40000000 0x0 0x20000000>;
+    };
+
+    reserved-memory {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        qcn9074_pcie0: qcn9074_pcie0@51100000 {
+            no-map;
+            reg = <0x0 0x51100000 0x0 0x03500000>;
+        };
+
+        qcn9074_pcie1: qcn9074_pcie1@54600000 {
+            no-map;
+            reg = <0x0 0x54600000 0x0 0x03500000>;
+        };
+    };
+
+    pcie0_rp: pcie0_rp {
+        reg = <0 0 0 0 0>;
+
+        status = "ok";
+        ath11k_0: ath11k@0 {
+            reg = <0 0 0 0 0 >;
+            memory-region = <&qcn9074_pcie0>;
+        };
+    };
+
+    pcie1_rp: pcie1_rp {
+        reg = <0 0 0 0 0>;
+
+        status = "ok";
+        ath11k_1: ath11k@1 {
+            reg = <0 0 0 0 0 >;
+            memory-region = <&qcn9074_pcie1>;
+        };
+    };
+
