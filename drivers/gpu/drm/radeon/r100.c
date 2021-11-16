@@ -2809,10 +2809,7 @@ void r100_vram_init_sizes(struct radeon_device *rdev)
 		if (rdev->mc.aper_size > config_aper_size)
 			config_aper_size = rdev->mc.aper_size;
 
-		if (config_aper_size > rdev->mc.real_vram_size)
-			rdev->mc.mc_vram_size = config_aper_size;
-		else
-			rdev->mc.mc_vram_size = rdev->mc.real_vram_size;
+		rdev->mc.mc_vram_size = max(config_aper_size, rdev->mc.real_vram_size);
 	}
 }
 
@@ -3447,10 +3444,7 @@ void r100_bandwidth_update(struct radeon_device *rdev)
 	mc_latency_mclk.full += disp_latency_overhead.full + cur_latency_mclk.full;
 	mc_latency_sclk.full += disp_latency_overhead.full + cur_latency_sclk.full;
 
-	if (mc_latency_mclk.full > mc_latency_sclk.full)
-		disp_latency.full = mc_latency_mclk.full;
-	else
-		disp_latency.full = mc_latency_sclk.full;
+	disp_latency.full = max(mc_latency_mclk.full, mc_latency_sclk.full);
 
 	/* setup Max GRPH_STOP_REQ default value */
 	if (ASIC_IS_RV100(rdev))
