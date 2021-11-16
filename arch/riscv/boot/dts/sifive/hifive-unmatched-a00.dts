@@ -51,6 +51,11 @@
 &i2c0 {
 	status = "okay";
 
+	tps544b20@1e {
+		compatible = "tps544b20";
+		reg = <0x1e>;
+	};
+
 	temperature-sensor@4c {
 		compatible = "ti,tmp451";
 		reg = <0x4c>;
