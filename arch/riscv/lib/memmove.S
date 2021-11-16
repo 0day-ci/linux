@@ -5,60 +5,55 @@
 
 ENTRY(__memmove)
 WEAK(memmove)
-        move    t0, a0
-        move    t1, a1
+        bltu    a0, a1, __memcpy
+
+        add     t1, a1, a2
+        bleu    t1, a0, __memcpy
 
         beq     a0, a1, exit_memcpy
         beqz    a2, exit_memcpy
-        srli    t2, a2, 0x2
 
-        slt     t3, a0, a1
-        beqz    t3, do_reverse
+        /* reverse src and dst */
+        add     t0, a0, a2
+        /* check low-order bits match */
+        andi    a3, t0, SZREG-1
+        andi    a4, t1, SZREG-1
+        bne     a3, a4, copy_tail_loop
+        beqz    a4, copy_body
 
-        andi    a2, a2, 0x3
-        li      t4, 1
-        beqz    t2, byte_copy
+copy_head:
+        /* head misalignment */
+        addi    t1, t1, -1
+        lb      t3, 0(t1)
+        addi    t0, t0, -1
+        addi    a4, a4, -1
+        sb      t3, 0(t0)
+        bnez    a4, copy_head
+        sub     a2, a2, a3
 
-word_copy:
-        lw      t3, 0(a1)
-        addi    t2, t2, -1
-        addi    a1, a1, 4
-        sw      t3, 0(a0)
-        addi    a0, a0, 4
-        bnez    t2, word_copy
+copy_body:
+        andi    a4, a2, ~(SZREG-1)
+        andi    a2, a2, (SZREG-1)
+        beqz    a4, copy_tail
+copy_body_loop:
+        addi    t1, t1, -SZREG
+        REG_L   t3, 0(t1)
+        addi    t0, t0, -SZREG
+        addi    a4, a4, -SZREG
+        REG_S   t3, 0(t0)
+        bnez    a4, copy_body_loop
+
+copy_tail:
+        /* tail misalignment */
         beqz    a2, exit_memcpy
-        j       byte_copy
-
-do_reverse:
-        add     a0, a0, a2
-        add     a1, a1, a2
-        andi    a2, a2, 0x3
-        li      t4, -1
-        beqz    t2, reverse_byte_copy
-
-reverse_word_copy:
-        addi    a1, a1, -4
-        addi    t2, t2, -1
-        lw      t3, 0(a1)
-        addi    a0, a0, -4
-        sw      t3, 0(a0)
-        bnez    t2, reverse_word_copy
-        beqz    a2, exit_memcpy
-
-reverse_byte_copy:
-        addi    a0, a0, -1
-        addi    a1, a1, -1
-
-byte_copy:
-        lb      t3, 0(a1)
+copy_tail_loop:
+        addi    t1, t1, -1
+        lb      t3, 0(t1)
+        addi    t0, t0, -1
         addi    a2, a2, -1
-        sb      t3, 0(a0)
-        add     a1, a1, t4
-        add     a0, a0, t4
-        bnez    a2, byte_copy
+        sb      t3, 0(t0)
+        bnez    a2, copy_tail_loop
 
 exit_memcpy:
-        move a0, t0
-        move a1, t1
         ret
 END(__memmove)
