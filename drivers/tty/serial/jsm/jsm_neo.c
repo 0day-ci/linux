@@ -668,8 +668,7 @@ static void neo_flush_uart_read(struct jsm_channel *ch)
 			jsm_dbg(IOCTL, &ch->ch_bd->pci_dev,
 				"Still flushing RX UART... i: %d\n", i);
 			udelay(10);
-		}
-		else
+		} else
 			break;
 	}
 }
