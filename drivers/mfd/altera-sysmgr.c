@@ -83,6 +83,7 @@ static struct regmap_config altr_sysmgr_regmap_cfg = {
 	.fast_io = true,
 	.use_single_read = true,
 	.use_single_write = true,
+	.use_raw_spinlock = true,
 };
 
 /**
