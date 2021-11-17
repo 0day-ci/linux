@@ -656,6 +656,7 @@ struct sdhci_ops {
 	void	(*request_done)(struct sdhci_host *host,
 				struct mmc_request *mrq);
 	void    (*dump_vendor_regs)(struct sdhci_host *host);
+	void	(*err_stats)(struct sdhci_host *host, u32 intmask);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

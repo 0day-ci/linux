@@ -3147,6 +3147,13 @@ static void sdhci_timeout_timer(struct timer_list *t)
 	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->cmd && !sdhci_data_line_cmd(host->cmd)) {
+		if (host->ops->err_stats) {
+			u32 intmask;
+
+			host->mmc->timer = true;
+			intmask = sdhci_readl(host, SDHCI_INT_STATUS);
+			host->ops->err_stats(host, intmask);
+		}
 		pr_err("%s: Timeout waiting for hardware cmd interrupt.\n",
 		       mmc_hostname(host->mmc));
 		sdhci_dumpregs(host);
@@ -3169,6 +3176,13 @@ static void sdhci_timeout_data_timer(struct timer_list *t)
 
 	if (host->data || host->data_cmd ||
 	    (host->cmd && sdhci_data_line_cmd(host->cmd))) {
+		if (host->ops->err_stats) {
+			u32 intmask;
+
+			host->mmc->timer = true;
+			intmask = sdhci_readl(host, SDHCI_INT_STATUS);
+			host->ops->err_stats(host, intmask);
+		}
 		pr_err("%s: Timeout waiting for hardware interrupt.\n",
 		       mmc_hostname(host->mmc));
 		sdhci_dumpregs(host);
@@ -3454,6 +3468,9 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 	}
 
 	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
+	if (host->ops->err_stats)
+		host->ops->err_stats(host, intmask);
+
 	if (!intmask || intmask == 0xffffffff) {
 		result = IRQ_NONE;
 		goto out;

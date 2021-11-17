@@ -242,6 +242,23 @@ struct sdhci_msm_variant_ops {
 			u32 offset);
 };
 
+enum {
+	MMC_ERR_CMD_TIMEOUT,
+	MMC_ERR_CMD_CRC,
+	MMC_ERR_DAT_TIMEOUT,
+	MMC_ERR_DAT_CRC,
+	MMC_ERR_AUTO_CMD,
+	MMC_ERR_ADMA,
+	MMC_ERR_TUNING,
+	MMC_ERR_CMDQ_RED,
+	MMC_ERR_CMDQ_GCE,
+	MMC_ERR_CMDQ_ICCE,
+	MMC_ERR_REQ_TIMEOUT,
+	MMC_ERR_CMDQ_REQ_TIMEOUT,
+	MMC_ERR_ICE_CFG,
+	MMC_ERR_MAX,
+};
+
 /*
  * From V5, register spaces have changed. Wrap this info in a structure
  * and choose the data_structure based on version info mentioned in DT.
@@ -285,6 +302,8 @@ struct sdhci_msm_host {
 	u32 dll_config;
 	u32 ddr_config;
 	bool vqmmc_enabled;
+	bool err_occurred;
+	u32  err_stats[MMC_ERR_MAX];
 };
 
 static const struct sdhci_msm_offset *sdhci_priv_msm_offset(struct sdhci_host *host)
@@ -2106,9 +2125,20 @@ static void sdhci_msm_set_timeout(struct sdhci_host *host, struct mmc_command *c
 		host->data_timeout = 22LL * NSEC_PER_SEC;
 }
 
+void sdhci_msm_cqe_err_stats(struct mmc_host *mmc, unsigned long flags)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+
+	if (flags & BIT(0))
+		msm_host->err_stats[MMC_ERR_CMDQ_REQ_TIMEOUT]++;
+}
+
 static const struct cqhci_host_ops sdhci_msm_cqhci_ops = {
 	.enable		= sdhci_msm_cqe_enable,
 	.disable	= sdhci_msm_cqe_disable,
+	.err_stats	= sdhci_msm_cqe_err_stats,
 #ifdef CONFIG_MMC_CRYPTO
 	.program_key	= sdhci_msm_program_key,
 #endif
@@ -2403,6 +2433,46 @@ static void sdhci_msm_dump_vendor_regs(struct sdhci_host *host)
 		readl_relaxed(host->ioaddr +
 			msm_offset->core_vendor_spec_func2),
 		readl_relaxed(host->ioaddr + msm_offset->core_vendor_spec3));
+	msm_host->err_occurred = true;
+}
+
+void sdhci_msm_err_stats(struct sdhci_host *host, u32 intmask)
+{
+	int command;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+
+	if (!msm_host->err_occurred)
+		msm_host->err_stats[MMC_ERR_CMD_TIMEOUT] = 0;
+
+	if (host && host->mmc && host->mmc->timer) {
+		msm_host->err_stats[MMC_ERR_REQ_TIMEOUT]++;
+		host->mmc->timer = false;
+	}
+
+	if (intmask & SDHCI_INT_CRC) {
+		command = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
+		if (command != MMC_SEND_TUNING_BLOCK ||
+		    command != MMC_SEND_TUNING_BLOCK_HS200)
+			msm_host->err_stats[MMC_ERR_CMD_CRC]++;
+	} else if ((intmask & SDHCI_INT_TIMEOUT) ||
+		(intmask & SDHCI_INT_DATA_TIMEOUT))
+		msm_host->err_stats[MMC_ERR_CMD_TIMEOUT]++;
+	else if (intmask & SDHCI_INT_DATA_CRC) {
+		command = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
+		if (command != MMC_SEND_TUNING_BLOCK ||
+		    command != MMC_SEND_TUNING_BLOCK_HS200)
+			msm_host->err_stats[MMC_ERR_DAT_CRC]++;
+	} else if (intmask & SDHCI_INT_DATA_TIMEOUT)
+		msm_host->err_stats[MMC_ERR_DAT_TIMEOUT]++;
+	else if (intmask & CQHCI_IS_RED)
+		msm_host->err_stats[MMC_ERR_CMDQ_RED]++;
+	else if (intmask & CQHCI_IS_GCE)
+		msm_host->err_stats[MMC_ERR_CMDQ_GCE]++;
+	else if (intmask & CQHCI_IS_ICCE)
+		msm_host->err_stats[MMC_ERR_CMDQ_ICCE]++;
+	else if (intmask & SDHCI_INT_ADMA_ERROR)
+		msm_host->err_stats[MMC_ERR_ADMA]++;
 }
 
 static const struct sdhci_msm_variant_ops mci_var_ops = {
@@ -2456,6 +2526,7 @@ static const struct sdhci_ops sdhci_msm_ops = {
 	.dump_vendor_regs = sdhci_msm_dump_vendor_regs,
 	.set_power = sdhci_set_power_noreg,
 	.set_timeout = sdhci_msm_set_timeout,
+	.err_stats = sdhci_msm_err_stats,
 };
 
 static const struct sdhci_pltfm_data sdhci_msm_pdata = {
@@ -2482,6 +2553,125 @@ static inline void sdhci_msm_get_of_property(struct platform_device *pdev,
 	of_property_read_u32(node, "qcom,dll-config", &msm_host->dll_config);
 }
 
+static ssize_t err_state_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+
+	if (!host || !host->mmc)
+		return -EINVAL;
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", !!msm_host->err_occurred);
+}
+
+static ssize_t err_state_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+	unsigned int val;
+
+	if (kstrtouint(buf, 0, &val))
+		return -EINVAL;
+	if (!host || !host->mmc)
+		return -EINVAL;
+
+	msm_host->err_occurred = !!val;
+	if (!val)
+		memset(msm_host->err_stats, 0, sizeof(msm_host->err_stats));
+
+	return count;
+}
+static DEVICE_ATTR_RW(err_state);
+
+static ssize_t err_stats_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+	char tmp[100];
+
+	if (!host || !host->mmc)
+		return -EINVAL;
+
+	scnprintf(tmp, sizeof(tmp), "# Command Timeout Error: %d\n",
+		msm_host->err_stats[MMC_ERR_CMD_TIMEOUT]);
+	strlcpy(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# Command CRC Error: %d\n",
+		msm_host->err_stats[MMC_ERR_CMD_CRC]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# Data Timeout Error: %d\n",
+		msm_host->err_stats[MMC_ERR_DAT_TIMEOUT]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# Data CRC Error: %d\n",
+		msm_host->err_stats[MMC_ERR_DAT_CRC]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# Auto-Cmd Error: %d\n",
+		msm_host->err_stats[MMC_ERR_ADMA]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# ADMA Error: %d\n",
+		msm_host->err_stats[MMC_ERR_ADMA]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# Tuning Error: %d\n",
+		msm_host->err_stats[MMC_ERR_TUNING]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# CMDQ RED Errors: %d\n",
+		msm_host->err_stats[MMC_ERR_CMDQ_RED]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# CMDQ GCE Errors: %d\n",
+		msm_host->err_stats[MMC_ERR_CMDQ_GCE]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# CMDQ ICCE Errors: %d\n",
+		msm_host->err_stats[MMC_ERR_CMDQ_ICCE]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# CMDQ Request Timedout: %d\n",
+		msm_host->err_stats[MMC_ERR_CMDQ_REQ_TIMEOUT]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	scnprintf(tmp, sizeof(tmp), "# Request Timedout Error: %d\n",
+		msm_host->err_stats[MMC_ERR_REQ_TIMEOUT]);
+	strlcat(buf, tmp, PAGE_SIZE);
+
+	return strlen(buf);
+}
+static DEVICE_ATTR_RO(err_stats);
+
+static struct attribute *sdhci_msm_sysfs_attrs[] = {
+	&dev_attr_err_state.attr,
+	&dev_attr_err_stats.attr,
+	NULL
+};
+
+static const struct attribute_group sdhci_msm_sysfs_group = {
+	.name = "qcom",
+	.attrs = sdhci_msm_sysfs_attrs,
+};
+
+static int sdhci_msm_init_sysfs(struct platform_device *pdev)
+{
+	int ret;
+
+	ret = sysfs_create_group(&pdev->dev.kobj, &sdhci_msm_sysfs_group);
+	if (ret)
+		dev_err(&pdev->dev, "%s: Failed sdhci_msm sysfs group err=%d\n",
+			__func__, ret);
+	return ret;
+}
 
 static int sdhci_msm_probe(struct platform_device *pdev)
 {
@@ -2733,6 +2923,8 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		ret = sdhci_add_host(host);
 	if (ret)
 		goto pm_runtime_disable;
+
+	sdhci_msm_init_sysfs(pdev);
 
 	pm_runtime_mark_last_busy(&pdev->dev);
 	pm_runtime_put_autosuspend(&pdev->dev);
