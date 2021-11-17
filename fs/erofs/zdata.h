@@ -25,8 +25,8 @@
 struct z_erofs_collection {
 	struct mutex lock;
 
-	/* I: page offset of start position of decompression */
-	unsigned short pageofs;
+	/* I: page offset of start position of (de)compression */
+	unsigned short pageofs_in, pageofs_out;
 
 	/* L: maximum relative page index in pagevec[] */
 	unsigned short nr_pages;
@@ -61,6 +61,9 @@ struct z_erofs_pcluster {
 
 	/* A: lower limit of decompressed length and if full length or not */
 	unsigned int length;
+
+	/* I: tail-packing physical cluster length */
+	unsigned short pclusterlen;
 
 	/* I: physical cluster size in pages */
 	unsigned short pclusterpages;

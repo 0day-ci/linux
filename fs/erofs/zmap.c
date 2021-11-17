@@ -7,6 +7,10 @@
 #include <asm/unaligned.h>
 #include <trace/events/erofs.h>
 
+static int z_erofs_do_map_blocks(struct inode *inode,
+				 struct erofs_map_blocks *map,
+				 int flags);
+
 int z_erofs_fill_inode(struct inode *inode)
 {
 	struct erofs_inode *const vi = EROFS_I(inode);
@@ -18,10 +22,72 @@ int z_erofs_fill_inode(struct inode *inode)
 		vi->z_algorithmtype[0] = 0;
 		vi->z_algorithmtype[1] = 0;
 		vi->z_logical_clusterbits = LOG_BLOCK_SIZE;
+		vi->z_idata_size = 0;
 		set_bit(EROFS_I_Z_INITED_BIT, &vi->flags);
+
+		DBG_BUGON(erofs_sb_has_tail_packing(sbi));
 	}
 	inode->i_mapping->a_ops = &z_erofs_aops;
 	return 0;
+}
+
+static erofs_off_t compacted_inline_data_addr(struct erofs_inode *vi,
+					      erofs_off_t i_off,
+					      unsigned int totalidx)
+{
+	const erofs_off_t ebase = ALIGN(i_off + vi->inode_isize +
+					vi->xattr_isize, 8) +
+				  sizeof(struct z_erofs_map_header);
+	unsigned int compacted_4b_initial, compacted_4b_end;
+	unsigned int compacted_2b;
+	erofs_off_t addr;
+
+	compacted_4b_initial = (32 - ebase % 32) / 4;
+	if (compacted_4b_initial == 32 / 4)
+		compacted_4b_initial = 0;
+
+	if (compacted_4b_initial > totalidx) {
+		compacted_4b_initial = 0;
+		compacted_2b = 0;
+	} else if (vi->z_advise & Z_EROFS_ADVISE_COMPACTED_2B) {
+		compacted_2b = rounddown(totalidx - compacted_4b_initial, 16);
+	} else
+		compacted_2b = 0;
+
+	compacted_4b_end = totalidx - compacted_4b_initial - compacted_2b;
+
+	addr = ebase + compacted_4b_initial * 4 + compacted_2b * 2;
+	if (compacted_4b_end > 1)
+		addr += (compacted_4b_end / 2) * 8;
+	if (compacted_4b_end % 2)
+		addr += 8;
+
+	return addr;
+}
+
+static erofs_off_t legacy_inline_data_addr(struct erofs_inode *vi,
+					   erofs_off_t i_off,
+					   unsigned int totalidx)
+{
+	return Z_EROFS_VLE_LEGACY_INDEX_ALIGN(i_off + vi->inode_isize +
+					      vi->xattr_isize) +
+		totalidx * sizeof(struct z_erofs_vle_decompressed_index);
+}
+
+static erofs_off_t z_erofs_inline_data_addr(struct inode *inode)
+{
+	struct erofs_inode *const vi = EROFS_I(inode);
+	const unsigned int datamode = vi->datalayout;
+	const unsigned int totalidx = DIV_ROUND_UP(inode->i_size, EROFS_BLKSIZ);
+	const erofs_off_t ibase = iloc(EROFS_I_SB(inode), vi->nid);
+
+	if (datamode == EROFS_INODE_FLAT_COMPRESSION)
+		return compacted_inline_data_addr(vi, ibase, totalidx);
+
+	if (datamode == EROFS_INODE_FLAT_COMPRESSION_LEGACY)
+		return legacy_inline_data_addr(vi, ibase, totalidx);
+
+	return -EINVAL;
 }
 
 static int z_erofs_fill_inode_lazy(struct inode *inode)
@@ -65,6 +131,7 @@ static int z_erofs_fill_inode_lazy(struct inode *inode)
 
 	h = kaddr + erofs_blkoff(pos);
 	vi->z_advise = le16_to_cpu(h->h_advise);
+	vi->z_idata_size = le16_to_cpu(h->h_idata_size);
 	vi->z_algorithmtype[0] = h->h_algorithmtype & 15;
 	vi->z_algorithmtype[1] = h->h_algorithmtype >> 4;
 
@@ -94,13 +161,29 @@ static int z_erofs_fill_inode_lazy(struct inode *inode)
 		err = -EFSCORRUPTED;
 		goto unmap_done;
 	}
-	/* paired with smp_mb() at the beginning of the function */
-	smp_mb();
-	set_bit(EROFS_I_Z_INITED_BIT, &vi->flags);
 unmap_done:
 	kunmap_atomic(kaddr);
 	unlock_page(page);
 	put_page(page);
+	if (err)
+		goto out_unlock;
+
+	/* record HEAD lcn for tail-packing pcluster */
+	if (vi->z_idata_size) {
+		struct erofs_map_blocks map = { .m_la = inode->i_size - 1 };
+
+		err = z_erofs_do_map_blocks(inode, &map, 0);
+		if (map.mpage)
+			put_page(map.mpage);
+		if (err < 0)
+			goto out_unlock;
+
+		vi->z_idata_headlcn = map.m_la >> vi->z_logical_clusterbits;
+	}
+
+	/* paired with smp_mb() at the beginning of the function */
+	smp_mb();
+	set_bit(EROFS_I_Z_INITED_BIT, &vi->flags);
 out_unlock:
 	clear_and_wake_up_bit(EROFS_I_BL_Z_BIT, &vi->flags);
 	return err;
@@ -305,7 +388,7 @@ static int unpack_compacted_index(struct z_erofs_maprecorder *m,
 	}
 	m->clusterofs = lo;
 	m->delta[0] = 0;
-	/* figout out blkaddr (pblk) for HEAD lclusters */
+	/* figure out blkaddr (pblk) for HEAD lclusters */
 	if (!big_pcluster) {
 		nblk = 1;
 		while (i > 0) {
@@ -466,7 +549,8 @@ static int z_erofs_extent_lookback(struct z_erofs_maprecorder *m,
 }
 
 static int z_erofs_get_extent_compressedlen(struct z_erofs_maprecorder *m,
-					    unsigned int initial_lcn)
+					    unsigned int initial_lcn,
+					    bool idatamap)
 {
 	struct erofs_inode *const vi = EROFS_I(m->inode);
 	struct erofs_map_blocks *const map = m->map;
@@ -478,6 +562,11 @@ static int z_erofs_get_extent_compressedlen(struct z_erofs_maprecorder *m,
 		  m->type != Z_EROFS_VLE_CLUSTER_TYPE_HEAD1 &&
 		  m->type != Z_EROFS_VLE_CLUSTER_TYPE_HEAD2);
 	DBG_BUGON(m->type != m->headtype);
+
+	if (idatamap) {
+		map->m_plen = vi->z_idata_size;
+		return 0;
+	}
 
 	if (m->headtype == Z_EROFS_VLE_CLUSTER_TYPE_PLAIN ||
 	    ((m->headtype == Z_EROFS_VLE_CLUSTER_TYPE_HEAD1) &&
@@ -583,9 +672,9 @@ static int z_erofs_get_extent_decompressedlen(struct z_erofs_maprecorder *m)
 	return 0;
 }
 
-int z_erofs_map_blocks_iter(struct inode *inode,
-			    struct erofs_map_blocks *map,
-			    int flags)
+static int z_erofs_do_map_blocks(struct inode *inode,
+				 struct erofs_map_blocks *map,
+				 int flags)
 {
 	struct erofs_inode *const vi = EROFS_I(inode);
 	struct z_erofs_maprecorder m = {
@@ -596,20 +685,7 @@ int z_erofs_map_blocks_iter(struct inode *inode,
 	unsigned int lclusterbits, endoff;
 	unsigned long initial_lcn;
 	unsigned long long ofs, end;
-
-	trace_z_erofs_map_blocks_iter_enter(inode, map, flags);
-
-	/* when trying to read beyond EOF, leave it unmapped */
-	if (map->m_la >= inode->i_size) {
-		map->m_llen = map->m_la + 1 - inode->i_size;
-		map->m_la = inode->i_size;
-		map->m_flags = 0;
-		goto out;
-	}
-
-	err = z_erofs_fill_inode_lazy(inode);
-	if (err)
-		goto out;
+	bool idatamap;
 
 	lclusterbits = vi->z_logical_clusterbits;
 	ofs = map->m_la;
@@ -658,10 +734,23 @@ int z_erofs_map_blocks_iter(struct inode *inode,
 		goto unmap_out;
 	}
 
-	map->m_llen = end - map->m_la;
-	map->m_pa = blknr_to_addr(m.pblk);
+	/* check if mapping tail-packing data */
+	idatamap = vi->z_idata_size && (ofs == inode->i_size - 1 ||
+		   m.lcn == vi->z_idata_headlcn);
 
-	err = z_erofs_get_extent_compressedlen(&m, initial_lcn);
+	/* need to trim tail-packing data if beyond file size */
+	map->m_llen = end - map->m_la;
+	if (idatamap && end > inode->i_size)
+		map->m_llen -= end - inode->i_size;
+
+	if (idatamap && (vi->z_advise & Z_EROFS_ADVISE_INLINE_DATA)) {
+		map->m_pa = z_erofs_inline_data_addr(inode);
+		map->m_flags |= EROFS_MAP_META;
+	} else {
+		map->m_pa = blknr_to_addr(m.pblk);
+	}
+
+	err = z_erofs_get_extent_compressedlen(&m, initial_lcn, idatamap);
 	if (err)
 		goto out;
 
@@ -689,9 +778,34 @@ out:
 		  __func__, map->m_la, map->m_pa,
 		  map->m_llen, map->m_plen, map->m_flags);
 
+	return err;
+}
+
+int z_erofs_map_blocks_iter(struct inode *inode,
+			    struct erofs_map_blocks *map,
+			    int flags)
+{
+	int err = 0;
+
+	trace_z_erofs_map_blocks_iter_enter(inode, map, flags);
+
+	/* when trying to read beyond EOF, leave it unmapped */
+	if (map->m_la >= inode->i_size) {
+		map->m_llen = map->m_la + 1 - inode->i_size;
+		map->m_la = inode->i_size;
+		map->m_flags = 0;
+		goto out;
+	}
+
+	err = z_erofs_fill_inode_lazy(inode);
+	if (err)
+		goto out;
+
+	err = z_erofs_do_map_blocks(inode, map, flags);
+out:
 	trace_z_erofs_map_blocks_iter_exit(inode, map, flags, err);
 
-	/* aggressively BUG_ON iff CONFIG_EROFS_FS_DEBUG is on */
+	/* aggressively BUG_ON if CONFIG_EROFS_FS_DEBUG is on */
 	DBG_BUGON(err < 0 && err != -ENOMEM);
 	return err;
 }
