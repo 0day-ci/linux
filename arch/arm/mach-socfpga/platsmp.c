@@ -5,6 +5,9 @@
  * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
  * Copyright (C) 2012 Altera Corporation
  */
+
+#define __NO_FORTIFY /* need to avoid the crash with memcpy() calls */
+
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/smp.h>
