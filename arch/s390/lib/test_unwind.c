@@ -176,7 +176,7 @@ static noinline int unwindme_func4(struct unwindme *u)
 		 * trigger specification exception
 		 */
 		asm volatile(
-			"	mvcl	%%r1,%%r1\n"
+			"	.insn e,0x0e11\n"	/* mvcl	%%r1,%%r1" */
 			"0:	nopr	%%r7\n"
 			EX_TABLE(0b, 0b)
 			:);
