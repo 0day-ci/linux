@@ -111,7 +111,7 @@ static int rcar_pwm_set_counter(struct rcar_pwm_chip *rp, int div, int duty_ns,
 	u32 cyc, ph;
 
 	one_cycle = (unsigned long long)NSEC_PER_SEC * 100ULL * (1 << div);
-	do_div(one_cycle, clk_rate);
+	div64_ul(one_cycle, clk_rate);
 
 	tmp = period_ns * 100ULL;
 	do_div(tmp, one_cycle);
