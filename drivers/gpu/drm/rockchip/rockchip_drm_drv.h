@@ -18,11 +18,25 @@
 
 #define ROCKCHIP_MAX_FB_BUFFER	3
 #define ROCKCHIP_MAX_CONNECTOR	2
-#define ROCKCHIP_MAX_CRTC	2
+#define ROCKCHIP_MAX_CRTC	4
 
 struct drm_device;
 struct drm_connector;
 struct iommu_domain;
+
+#define VOP_OUTPUT_IF_RGB       BIT(0)
+#define VOP_OUTPUT_IF_BT1120    BIT(1)
+#define VOP_OUTPUT_IF_BT656     BIT(2)
+#define VOP_OUTPUT_IF_LVDS0     BIT(3)
+#define VOP_OUTPUT_IF_LVDS1     BIT(4)
+#define VOP_OUTPUT_IF_MIPI0     BIT(5)
+#define VOP_OUTPUT_IF_MIPI1     BIT(6)
+#define VOP_OUTPUT_IF_eDP0      BIT(7)
+#define VOP_OUTPUT_IF_eDP1      BIT(8)
+#define VOP_OUTPUT_IF_DP0       BIT(9)
+#define VOP_OUTPUT_IF_DP1       BIT(10)
+#define VOP_OUTPUT_IF_HDMI0     BIT(11)
+#define VOP_OUTPUT_IF_HDMI1     BIT(12)
 
 struct rockchip_crtc_state {
 	struct drm_crtc_state base;
@@ -31,6 +45,10 @@ struct rockchip_crtc_state {
 	int output_bpc;
 	int output_flags;
 	bool enable_afbc;
+	uint32_t bus_format;
+	uint32_t output_if;
+	u32 bus_flags;
+	int color_space;
 };
 #define to_rockchip_crtc_state(s) \
 		container_of(s, struct rockchip_crtc_state, base)
@@ -67,4 +85,6 @@ extern struct platform_driver rockchip_dp_driver;
 extern struct platform_driver rockchip_lvds_driver;
 extern struct platform_driver vop_platform_driver;
 extern struct platform_driver rk3066_hdmi_driver;
+extern struct platform_driver vop2_platform_driver;
+
 #endif /* _ROCKCHIP_DRM_DRV_H_ */
