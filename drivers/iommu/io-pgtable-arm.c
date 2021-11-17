@@ -10,6 +10,7 @@
 #define pr_fmt(fmt)	"arm-lpae io-pgtable: " fmt
 
 #include <linux/atomic.h>
+#include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/io-pgtable.h>
 #include <linux/kernel.h>
@@ -132,6 +133,9 @@
 
 #define APPLE_DART_PTE_PROT_NO_WRITE (1<<7)
 #define APPLE_DART_PTE_PROT_NO_READ (1<<8)
+
+#define APPLE_DART_PTE_SUBPAGE_START	GENMASK_ULL(63, 52)
+#define APPLE_DART_PTE_SUBPAGE_END	GENMASK_ULL(51, 40)
 
 /* IOPTE accessors */
 #define iopte_deref(pte,d) __va(iopte_to_paddr(pte, d))
@@ -272,6 +276,12 @@ static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
 		pte |= ARM_LPAE_PTE_TYPE_PAGE;
 	else
 		pte |= ARM_LPAE_PTE_TYPE_BLOCK;
+
+	if (data->iop.fmt == APPLE_DART) {
+		/* subpage protection: always allow access to the entire page */
+		pte |= FIELD_PREP(APPLE_DART_PTE_SUBPAGE_START, 0);
+		pte |= FIELD_PREP(APPLE_DART_PTE_SUBPAGE_END, 0xfff);
+	}
 
 	for (i = 0; i < num_entries; i++)
 		ptep[i] = pte | paddr_to_iopte(paddr + i * sz, data);
