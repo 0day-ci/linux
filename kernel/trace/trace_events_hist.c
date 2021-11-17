@@ -2669,7 +2669,7 @@ static struct hist_field *parse_expr(struct hist_trigger_data *hist_data,
 		if (!divisor) {
 			hist_err(file->tr, HIST_ERR_DIVISION_BY_ZERO, errpos(str));
 			ret = -EDOM;
-			goto free;
+			goto free_expr;
 		}
 
 		/*
@@ -2709,7 +2709,7 @@ static struct hist_field *parse_expr(struct hist_trigger_data *hist_data,
 		expr->type = kstrdup_const(operand1->type, GFP_KERNEL);
 		if (!expr->type) {
 			ret = -ENOMEM;
-			goto free;
+			goto free_expr;
 		}
 
 		expr->name = expr_str(expr, 0);
@@ -2719,6 +2719,7 @@ static struct hist_field *parse_expr(struct hist_trigger_data *hist_data,
 free:
 	destroy_hist_field(operand1, 0);
 	destroy_hist_field(operand2, 0);
+free_expr:
 	destroy_hist_field(expr, 0);
 
 	return ERR_PTR(ret);
