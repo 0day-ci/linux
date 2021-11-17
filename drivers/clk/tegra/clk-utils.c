@@ -26,7 +26,7 @@ int div_frac_get(unsigned long rate, unsigned parent_rate, u8 width,
 	if (flags & TEGRA_DIVIDER_ROUND_UP)
 		divider_ux1 += rate - 1;
 
-	do_div(divider_ux1, rate);
+	div64_ul(divider_ux1, rate);
 
 	if (flags & TEGRA_DIVIDER_INT)
 		divider_ux1 *= mul;
