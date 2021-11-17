@@ -141,9 +141,15 @@ EXPORT_SYMBOL_GPL(trace_seq_bitmask);
 void trace_seq_vprintf(struct trace_seq *s, const char *fmt, va_list args)
 {
 	unsigned int save_len = s->seq.len;
+	char buf[1];
 
-	if (s->full)
+	if (s->full) {
+		/* Consume args from va_list before returning, some callers
+		 * expect that.
+		 */
+		vsnprintf(buf, sizeof(buf), fmt, args);
 		return;
+	}
 
 	__trace_seq_init(s);
 
