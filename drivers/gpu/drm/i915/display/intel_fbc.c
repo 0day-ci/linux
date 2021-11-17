@@ -898,6 +898,8 @@ static bool tiling_is_valid(struct drm_i915_private *i915,
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Yf_TILED:
 		return DISPLAY_VER(i915) >= 9;
+	case I915_FORMAT_MOD_4_TILED:
+		return HAS_4TILE(i915);
 	case I915_FORMAT_MOD_X_TILED:
 		return true;
 	default:
