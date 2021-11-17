@@ -84,6 +84,14 @@ properties:
       source) by the master device (data sink). In the master mode the data
       source device is also the source of the synchronization signals.
 
+  status:
+    enum:
+      - ok
+      - okay
+      - disabled
+    description:
+      Enables or disables the link. Disabled links are ignored.
+
   bus-type:
     $ref: /schemas/types.yaml#/definitions/uint32
     enum:
