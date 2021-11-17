@@ -3630,3 +3630,7 @@ void kvm_sys_reg_table_init(void)
 
 	id_reg_info_init_all();
 }
+
+#if IS_ENABLED(CONFIG_KVM_KUNIT_TEST)
+#include "sys_regs_test.c"
+#endif
