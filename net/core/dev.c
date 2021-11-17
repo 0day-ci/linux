@@ -150,6 +150,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/prandom.h>
 #include <linux/once_lite.h>
+#include <linux/netdev_refs.h>
 
 #include "net-sysfs.h"
 
@@ -157,6 +158,13 @@
 static DEFINE_SPINLOCK(ptype_lock);
 struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
 struct list_head ptype_all __read_mostly;	/* Taps */
+
+const struct debug_obj_descr netdev_ref_debug_descr = {
+	.name		= "netdev_ref",
+};
+#ifdef CONFIG_DEBUG_OBJECTS_NETDEV_REFS
+EXPORT_SYMBOL(netdev_ref_debug_descr);
+#endif
 
 static int netif_rx_internal(struct sk_buff *skb);
 static int call_netdevice_notifiers_info(unsigned long val,
