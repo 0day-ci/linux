@@ -2161,7 +2161,7 @@ static bool fib_good_nh(const struct fib_nh *nh)
 
 		if (likely(nh->fib_nh_gw_family == AF_INET))
 			n = __ipv4_neigh_lookup_noref(nh->fib_nh_dev,
-						   (__force u32)nh->fib_nh_gw4);
+						      &nh->fib_nh_gw4);
 		else if (nh->fib_nh_gw_family == AF_INET6)
 			n = __ipv6_neigh_lookup_noref_stub(nh->fib_nh_dev,
 							   &nh->fib_nh_gw6);

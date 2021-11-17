@@ -407,35 +407,13 @@ static inline struct neighbour *__ipv6_neigh_lookup(struct net_device *dev, cons
 static inline void __ipv6_confirm_neigh(struct net_device *dev,
 					const void *pkey)
 {
-	struct neighbour *n;
-
-	rcu_read_lock_bh();
-	n = __ipv6_neigh_lookup_noref(dev, pkey);
-	if (n) {
-		unsigned long now = jiffies;
-
-		/* avoid dirtying neighbour */
-		if (READ_ONCE(n->confirmed) != now)
-			WRITE_ONCE(n->confirmed, now);
-	}
-	rcu_read_unlock_bh();
+	__neigh_confirm(dev, pkey, __ipv6_neigh_lookup_noref);
 }
 
 static inline void __ipv6_confirm_neigh_stub(struct net_device *dev,
 					     const void *pkey)
 {
-	struct neighbour *n;
-
-	rcu_read_lock_bh();
-	n = __ipv6_neigh_lookup_noref_stub(dev, pkey);
-	if (n) {
-		unsigned long now = jiffies;
-
-		/* avoid dirtying neighbour */
-		if (READ_ONCE(n->confirmed) != now)
-			WRITE_ONCE(n->confirmed, now);
-	}
-	rcu_read_unlock_bh();
+	__neigh_confirm(dev, pkey, __ipv6_neigh_lookup_noref_stub);
 }
 
 /* uses ipv6_stub and is meant for use outside of IPv6 core */

@@ -3091,9 +3091,7 @@ int neigh_xmit(int index, struct net_device *dev,
 			goto out;
 		rcu_read_lock_bh();
 		if (index == NEIGH_ARP_TABLE) {
-			u32 key = *((u32 *)addr);
-
-			neigh = __ipv4_neigh_lookup_noref(dev, key);
+			neigh = __ipv4_neigh_lookup_noref(dev, addr);
 		} else {
 			neigh = __neigh_lookup_noref(tbl, addr, dev);
 		}

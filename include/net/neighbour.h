@@ -335,6 +335,25 @@ static inline struct neighbour *neigh_create(struct neigh_table *tbl,
 {
 	return __neigh_create(tbl, pkey, dev, true);
 }
+
+static inline void __neigh_confirm(struct net_device *dev, const void *pkey,
+				   struct neighbour *(*neigh_lookup_noref)(
+				   struct net_device *, const void *))
+{
+	struct neighbour *n;
+
+	rcu_read_lock_bh();
+	n = neigh_lookup_noref(dev, pkey);
+	if (n) {
+		unsigned long now = jiffies;
+
+		/* avoid dirtying neighbour */
+		if (READ_ONCE(n->confirmed) != now)
+			WRITE_ONCE(n->confirmed, now);
+	}
+	rcu_read_unlock_bh();
+}
+
 void neigh_destroy(struct neighbour *neigh);
 int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb);
 int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new, u32 flags,

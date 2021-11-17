@@ -1141,8 +1141,7 @@ static bool ipv4_good_nh(const struct fib_nh *nh)
 
 	rcu_read_lock_bh();
 
-	n = __ipv4_neigh_lookup_noref(nh->fib_nh_dev,
-				      (__force u32)nh->fib_nh_gw4);
+	n = __ipv4_neigh_lookup_noref(nh->fib_nh_dev, &nh->fib_nh_gw4);
 	if (n)
 		state = n->nud_state;
 

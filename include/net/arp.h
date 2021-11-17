@@ -19,8 +19,10 @@ static inline u32 arp_hashfn(const void *pkey, const struct net_device *dev, u32
 }
 
 #ifdef CONFIG_INET
-static inline struct neighbour *__ipv4_neigh_lookup_noref(struct net_device *dev, u32 key)
+static inline struct neighbour *__ipv4_neigh_lookup_noref(struct net_device *dev, const void *pkey)
 {
+	u32 key = *(const u32 *)pkey;
+
 	if (dev->flags & (IFF_LOOPBACK | IFF_POINTOPOINT))
 		key = INADDR_ANY;
 
@@ -28,7 +30,7 @@ static inline struct neighbour *__ipv4_neigh_lookup_noref(struct net_device *dev
 }
 #else
 static inline
-struct neighbour *__ipv4_neigh_lookup_noref(struct net_device *dev, u32 key)
+struct neighbour *__ipv4_neigh_lookup_noref(struct net_device *dev, const void *pkey)
 {
 	return NULL;
 }
@@ -39,7 +41,7 @@ static inline struct neighbour *__ipv4_neigh_lookup(struct net_device *dev, u32 
 	struct neighbour *n;
 
 	rcu_read_lock_bh();
-	n = __ipv4_neigh_lookup_noref(dev, key);
+	n = __ipv4_neigh_lookup_noref(dev, &key);
 	if (n && !refcount_inc_not_zero(&n->refcnt))
 		n = NULL;
 	rcu_read_unlock_bh();
@@ -49,18 +51,7 @@ static inline struct neighbour *__ipv4_neigh_lookup(struct net_device *dev, u32 
 
 static inline void __ipv4_confirm_neigh(struct net_device *dev, u32 key)
 {
-	struct neighbour *n;
-
-	rcu_read_lock_bh();
-	n = __ipv4_neigh_lookup_noref(dev, key);
-	if (n) {
-		unsigned long now = jiffies;
-
-		/* avoid dirtying neighbour */
-		if (READ_ONCE(n->confirmed) != now)
-			WRITE_ONCE(n->confirmed, now);
-	}
-	rcu_read_unlock_bh();
+	__neigh_confirm(dev, &key, __ipv4_neigh_lookup_noref);
 }
 
 void arp_init(void);
