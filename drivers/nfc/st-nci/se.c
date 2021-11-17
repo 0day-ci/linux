@@ -335,6 +335,12 @@ static int st_nci_hci_connectivity_event_received(struct nci_dev *ndev,
 			return -ENOMEM;
 
 		transaction->aid_len = skb->data[1];
+
+		// Checking if the length of the AID is valid
+		if (transaction->aid_len > sizeof(transaction->aid))
+			return -EINVAL;
+
+
 		memcpy(transaction->aid, &skb->data[2], transaction->aid_len);
 
 		/* Check next byte is PARAMETERS tag (82) */
@@ -343,6 +349,15 @@ static int st_nci_hci_connectivity_event_received(struct nci_dev *ndev,
 			return -EPROTO;
 
 		transaction->params_len = skb->data[transaction->aid_len + 3];
+
+		// check if the length of the parameters is valid
+		// we can't use sizeof(transaction->params) because it's
+		// a flexible array member so we have to check if params_len
+		// is bigger than the space allocated for the array
+		if (transaction->params_len > ((skb->len - 2) - sizeof(struct nfc_evt_transaction)))
+			return -EINVAL;
+
+
 		memcpy(transaction->params, skb->data +
 		       transaction->aid_len + 4, transaction->params_len);
 
