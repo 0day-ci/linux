@@ -79,9 +79,15 @@ config DRM_DEBUG_SELFTEST
 
 	  If in doubt, say "N".
 
+config DRM_INPUT_HELPER
+	def_bool y
+	depends on DRM_KMS_HELPER
+	depends on INPUT
+
 config DRM_KMS_HELPER
 	tristate
 	depends on DRM
+	select DRM_INPUT_HELPER if INPUT
 	help
 	  CRTC helpers for KMS drivers.
 
