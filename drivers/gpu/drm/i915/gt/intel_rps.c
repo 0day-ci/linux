@@ -7,6 +7,7 @@
 
 #include "i915_drv.h"
 #include "intel_breadcrumbs.h"
+#include "intel_engine_pm.h"
 #include "intel_gt.h"
 #include "intel_gt_clock_utils.h"
 #include "intel_gt_irq.h"
@@ -65,26 +66,45 @@ static void set(struct intel_uncore *uncore, i915_reg_t reg, u32 val)
 static void rps_timer(struct timer_list *t)
 {
 	struct intel_rps *rps = from_timer(rps, t, timer);
-	struct intel_engine_cs *engine;
-	ktime_t dt, last, timestamp;
-	enum intel_engine_id id;
+	struct intel_gt *gt = rps_to_gt(rps);
+	ktime_t dt, last, timestamp = 0;
 	s64 max_busy[3] = {};
+	int i, j;
 
-	timestamp = 0;
-	for_each_engine(engine, rps_to_gt(rps), id) {
-		s64 busy;
-		int i;
+	/* Compare average occupancy over each engine group */
+	for (i = 0; i < ARRAY_SIZE(gt->engine_class); i++) {
+		s64 busy = 0;
+		int count = 0;
 
-		dt = intel_engine_get_busy_time(engine, &timestamp);
-		last = engine->stats.rps;
-		engine->stats.rps = dt;
+		for (j = 0; j < ARRAY_SIZE(gt->engine_class[i]); j++) {
+			struct intel_engine_cs *engine;
 
-		busy = ktime_to_ns(ktime_sub(dt, last));
-		for (i = 0; i < ARRAY_SIZE(max_busy); i++) {
-			if (busy > max_busy[i])
-				swap(busy, max_busy[i]);
+			engine = gt->engine_class[i][j];
+			if (!engine)
+				continue;
+
+			dt = intel_engine_get_busy_time(engine, &timestamp);
+			last = engine->stats.rps;
+			engine->stats.rps = dt;
+
+			if (!intel_engine_pm_is_awake(engine))
+				continue;
+
+			busy += ktime_to_ns(ktime_sub(dt, last));
+			count++;
+		}
+
+		if (count > 1)
+			busy = div_u64(busy, count);
+		if (busy <= max_busy[ARRAY_SIZE(max_busy) - 1])
+			continue;
+
+		for (j = 0; j < ARRAY_SIZE(max_busy); j++) {
+			if (busy > max_busy[j])
+				swap(busy, max_busy[j]);
 		}
 	}
+
 	last = rps->pm_timestamp;
 	rps->pm_timestamp = timestamp;
 
