@@ -14,7 +14,7 @@ mlx5e_devlink_get_port_parent_id(struct mlx5_core_dev *dev, struct netdev_phys_i
 	memcpy(ppid->id, &parent_id, sizeof(parent_id));
 }
 
-int mlx5e_devlink_port_register(struct mlx5e_priv *priv)
+void mlx5e_devlink_port_register(struct mlx5e_priv *priv)
 {
 	struct devlink *devlink = priv_to_devlink(priv->mdev);
 	struct devlink_port_attrs attrs = {};
@@ -40,8 +40,7 @@ int mlx5e_devlink_port_register(struct mlx5e_priv *priv)
 	dl_port = mlx5e_devlink_get_dl_port(priv);
 	memset(dl_port, 0, sizeof(*dl_port));
 	devlink_port_attrs_set(dl_port, &attrs);
-
-	return devlink_port_register(devlink, dl_port, dl_port_index);
+	devlink_port_register(devlink, dl_port, dl_port_index);
 }
 
 void mlx5e_devlink_port_type_eth_set(struct mlx5e_priv *priv)

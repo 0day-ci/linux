@@ -2453,24 +2453,12 @@ static int am65_cpsw_nuss_register_devlink(struct am65_cpsw_common *common)
 		memcpy(attrs.switch_id.id, common->switch_id, attrs.switch_id.id_len);
 		devlink_port_attrs_set(dl_port, &attrs);
 
-		ret = devlink_port_register(common->devlink, dl_port, port->port_id);
-		if (ret) {
-			dev_err(dev, "devlink_port reg fail for port %d, ret:%d\n",
-				port->port_id, ret);
-			goto dl_port_unreg;
-		}
+		devlink_port_register(common->devlink, dl_port, port->port_id);
 		devlink_port_type_eth_set(dl_port, port->ndev);
 	}
 	devlink_register(common->devlink);
 	return ret;
 
-dl_port_unreg:
-	for (i = i - 1; i >= 1; i--) {
-		port = am65_common_get_port(common, i);
-		dl_port = &port->devlink_port;
-
-		devlink_port_unregister(dl_port);
-	}
 dl_unreg:
 	devlink_free(common->devlink);
 	return ret;

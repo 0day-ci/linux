@@ -172,8 +172,8 @@ int ocelot_port_devlink_init(struct ocelot *ocelot, int port,
 	attrs.flavour = flavour;
 
 	devlink_port_attrs_set(dlp, &attrs);
-
-	return devlink_port_register(dl, dlp, port);
+	devlink_port_register(dl, dlp, port);
+	return 0;
 }
 
 void ocelot_port_devlink_teardown(struct ocelot *ocelot, int port)

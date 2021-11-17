@@ -5461,11 +5461,7 @@ static int mlx5e_probe(struct auxiliary_device *adev,
 	priv->profile = profile;
 	priv->ppriv = NULL;
 
-	err = mlx5e_devlink_port_register(priv);
-	if (err) {
-		mlx5_core_err(mdev, "mlx5e_devlink_port_register failed, %d\n", err);
-		goto err_destroy_netdev;
-	}
+	mlx5e_devlink_port_register(priv);
 
 	err = profile->init(mdev, netdev);
 	if (err) {
@@ -5497,7 +5493,6 @@ err_profile_cleanup:
 	profile->cleanup(priv);
 err_devlink_cleanup:
 	mlx5e_devlink_port_unregister(priv);
-err_destroy_netdev:
 	mlx5e_destroy_netdev(priv);
 	return err;
 }

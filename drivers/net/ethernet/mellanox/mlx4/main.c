@@ -3033,9 +3033,7 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 	struct mlx4_port_info *info = &mlx4_priv(dev)->port[port];
 	int err;
 
-	err = devlink_port_register(devlink, &info->devlink_port, port);
-	if (err)
-		return err;
+	devlink_port_register(devlink, &info->devlink_port, port);
 
 	/* Ethernet and IB drivers will normally set the port type,
 	 * but if they are not built set the type now to prevent

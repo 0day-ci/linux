@@ -422,7 +422,6 @@ int prestera_devlink_port_register(struct prestera_port *port)
 	struct prestera_switch *sw = port->sw;
 	struct devlink *dl = priv_to_devlink(sw);
 	struct devlink_port_attrs attrs = {};
-	int err;
 
 	attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
 	attrs.phys.port_number = port->fp_id;
@@ -431,12 +430,7 @@ int prestera_devlink_port_register(struct prestera_port *port)
 
 	devlink_port_attrs_set(&port->dl_port, &attrs);
 
-	err = devlink_port_register(dl, &port->dl_port, port->fp_id);
-	if (err) {
-		dev_err(prestera_dev(sw), "devlink_port_register failed: %d\n", err);
-		return err;
-	}
-
+	devlink_port_register(dl, &port->dl_port, port->fp_id);
 	return 0;
 }
 

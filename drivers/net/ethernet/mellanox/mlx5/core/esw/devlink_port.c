@@ -87,9 +87,7 @@ int mlx5_esw_offloads_devlink_port_register(struct mlx5_eswitch *esw, u16 vport_
 
 	devlink = priv_to_devlink(dev);
 	dl_port_index = mlx5_esw_vport_to_devlink_port_index(dev, vport_num);
-	err = devlink_port_register(devlink, dl_port, dl_port_index);
-	if (err)
-		goto reg_err;
+	devlink_port_register(devlink, dl_port, dl_port_index);
 
 	err = devlink_rate_leaf_create(dl_port, vport);
 	if (err)
@@ -100,7 +98,6 @@ int mlx5_esw_offloads_devlink_port_register(struct mlx5_eswitch *esw, u16 vport_
 
 rate_err:
 	devlink_port_unregister(dl_port);
-reg_err:
 	mlx5_esw_dl_port_free(dl_port);
 	return err;
 }
@@ -156,9 +153,7 @@ int mlx5_esw_devlink_sf_port_register(struct mlx5_eswitch *esw, struct devlink_p
 	devlink_port_attrs_pci_sf_set(dl_port, controller, pfnum, sfnum, !!controller);
 	devlink = priv_to_devlink(dev);
 	dl_port_index = mlx5_esw_vport_to_devlink_port_index(dev, vport_num);
-	err = devlink_port_register(devlink, dl_port, dl_port_index);
-	if (err)
-		return err;
+	devlink_port_register(devlink, dl_port, dl_port_index);
 
 	err = devlink_rate_leaf_create(dl_port, vport);
 	if (err)

@@ -498,10 +498,6 @@ int ice_devlink_create_pf_port(struct ice_pf *pf)
 	struct devlink_port *devlink_port;
 	struct devlink *devlink;
 	struct ice_vsi *vsi;
-	struct device *dev;
-	int err;
-
-	dev = ice_pf_to_dev(pf);
 
 	devlink_port = &pf->devlink_port;
 
@@ -514,13 +510,7 @@ int ice_devlink_create_pf_port(struct ice_pf *pf)
 	devlink_port_attrs_set(devlink_port, &attrs);
 	devlink = priv_to_devlink(pf);
 
-	err = devlink_port_register(devlink, devlink_port, vsi->idx);
-	if (err) {
-		dev_err(dev, "Failed to create devlink port for PF %d, error %d\n",
-			pf->hw.pf_id, err);
-		return err;
-	}
-
+	devlink_port_register(devlink, devlink_port, vsi->idx);
 	return 0;
 }
 
@@ -554,12 +544,9 @@ int ice_devlink_create_vf_port(struct ice_vf *vf)
 	struct devlink_port *devlink_port;
 	struct devlink *devlink;
 	struct ice_vsi *vsi;
-	struct device *dev;
 	struct ice_pf *pf;
-	int err;
 
 	pf = vf->pf;
-	dev = ice_pf_to_dev(pf);
 	vsi = ice_get_vf_vsi(vf);
 	devlink_port = &vf->devlink_port;
 
@@ -570,13 +557,7 @@ int ice_devlink_create_vf_port(struct ice_vf *vf)
 	devlink_port_attrs_set(devlink_port, &attrs);
 	devlink = priv_to_devlink(pf);
 
-	err = devlink_port_register(devlink, devlink_port, vsi->idx);
-	if (err) {
-		dev_err(dev, "Failed to create devlink port for VF %d, error %d\n",
-			vf->vf_id, err);
-		return err;
-	}
-
+	devlink_port_register(devlink, devlink_port, vsi->idx);
 	return 0;
 }
 

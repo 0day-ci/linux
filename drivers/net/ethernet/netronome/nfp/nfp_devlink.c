@@ -374,8 +374,8 @@ int nfp_devlink_port_register(struct nfp_app *app, struct nfp_port *port)
 	devlink_port_attrs_set(&port->dl_port, &attrs);
 
 	devlink = priv_to_devlink(app->pf);
-
-	return devlink_port_register(devlink, &port->dl_port, port->eth_id);
+	devlink_port_register(devlink, &port->dl_port, port->eth_id);
+	return 0;
 }
 
 void nfp_devlink_port_unregister(struct nfp_port *port)

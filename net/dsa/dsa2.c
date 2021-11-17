@@ -504,7 +504,6 @@ static int dsa_port_devlink_setup(struct dsa_port *dp)
 	struct devlink *dl = dp->ds->devlink;
 	const unsigned char *id;
 	unsigned char len;
-	int err;
 
 	id = (const unsigned char *)&dst->index;
 	len = sizeof(dst->index);
@@ -530,12 +529,10 @@ static int dsa_port_devlink_setup(struct dsa_port *dp)
 	}
 
 	devlink_port_attrs_set(dlp, &attrs);
-	err = devlink_port_register(dl, dlp, dp->index);
+	devlink_port_register(dl, dlp, dp->index);
+	dp->devlink_port_setup = true;
 
-	if (!err)
-		dp->devlink_port_setup = true;
-
-	return err;
+	return 0;
 }
 
 static void dsa_port_teardown(struct dsa_port *dp)

@@ -1380,10 +1380,8 @@ static int __nsim_dev_port_add(struct nsim_dev *nsim_dev, enum nsim_dev_port_typ
 	memcpy(attrs.switch_id.id, nsim_dev->switch_id.id, nsim_dev->switch_id.id_len);
 	attrs.switch_id.id_len = nsim_dev->switch_id.id_len;
 	devlink_port_attrs_set(devlink_port, &attrs);
-	err = devlink_port_register(priv_to_devlink(nsim_dev), devlink_port,
-				    nsim_dev_port->port_index);
-	if (err)
-		goto err_port_free;
+	devlink_port_register(priv_to_devlink(nsim_dev), devlink_port,
+			      nsim_dev_port->port_index);
 
 	err = nsim_dev_port_debugfs_init(nsim_dev, nsim_dev_port);
 	if (err)
@@ -1413,7 +1411,6 @@ err_port_debugfs_exit:
 	nsim_dev_port_debugfs_exit(nsim_dev_port);
 err_dl_port_unregister:
 	devlink_port_unregister(devlink_port);
-err_port_free:
 	kfree(nsim_dev_port);
 	return err;
 }

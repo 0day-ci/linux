@@ -1209,11 +1209,7 @@ int bnxt_dl_register(struct bnxt *bp)
 	memcpy(attrs.switch_id.id, bp->dsn, sizeof(bp->dsn));
 	attrs.switch_id.id_len = sizeof(bp->dsn);
 	devlink_port_attrs_set(&bp->dl_port, &attrs);
-	rc = devlink_port_register(dl, &bp->dl_port, bp->pf.port_id);
-	if (rc) {
-		netdev_err(bp->dev, "devlink_port_register failed\n");
-		goto err_dl_free;
-	}
+	devlink_port_register(dl, &bp->dl_port, bp->pf.port_id);
 
 	rc = bnxt_dl_params_register(bp);
 	if (rc)
@@ -1225,7 +1221,6 @@ out:
 
 err_dl_port_unreg:
 	devlink_port_unregister(&bp->dl_port);
-err_dl_free:
 	devlink_free(dl);
 	return rc;
 }
