@@ -361,12 +361,6 @@ static struct devlink_sb *devlink_sb_get_by_index(struct devlink *devlink,
 	return NULL;
 }
 
-static bool devlink_sb_index_exists(struct devlink *devlink,
-				    unsigned int sb_index)
-{
-	return devlink_sb_get_by_index(devlink, sb_index);
-}
-
 static struct devlink_sb *devlink_sb_get_from_attrs(struct devlink *devlink,
 						    struct nlattr **attrs)
 {
@@ -382,16 +376,11 @@ static struct devlink_sb *devlink_sb_get_from_attrs(struct devlink *devlink,
 	return ERR_PTR(-EINVAL);
 }
 
-static struct devlink_sb *devlink_sb_get_from_info(struct devlink *devlink,
-						   struct genl_info *info)
+static int devlink_sb_pool_index_get_from_info(struct devlink_sb *devlink_sb,
+					       struct genl_info *info,
+					       u16 *p_pool_index)
 {
-	return devlink_sb_get_from_attrs(devlink, info->attrs);
-}
-
-static int devlink_sb_pool_index_get_from_attrs(struct devlink_sb *devlink_sb,
-						struct nlattr **attrs,
-						u16 *p_pool_index)
-{
+	struct nlattr **attrs = info->attrs;
 	u16 val;
 
 	if (!attrs[DEVLINK_ATTR_SB_POOL_INDEX])
@@ -404,18 +393,11 @@ static int devlink_sb_pool_index_get_from_attrs(struct devlink_sb *devlink_sb,
 	return 0;
 }
 
-static int devlink_sb_pool_index_get_from_info(struct devlink_sb *devlink_sb,
-					       struct genl_info *info,
-					       u16 *p_pool_index)
-{
-	return devlink_sb_pool_index_get_from_attrs(devlink_sb, info->attrs,
-						    p_pool_index);
-}
-
 static int
-devlink_sb_pool_type_get_from_attrs(struct nlattr **attrs,
-				    enum devlink_sb_pool_type *p_pool_type)
+devlink_sb_pool_type_get_from_info(struct genl_info *info,
+				   enum devlink_sb_pool_type *p_pool_type)
 {
+	struct nlattr **attrs = info->attrs;
 	u8 val;
 
 	if (!attrs[DEVLINK_ATTR_SB_POOL_TYPE])
@@ -430,16 +412,10 @@ devlink_sb_pool_type_get_from_attrs(struct nlattr **attrs,
 }
 
 static int
-devlink_sb_pool_type_get_from_info(struct genl_info *info,
-				   enum devlink_sb_pool_type *p_pool_type)
+devlink_sb_th_type_get_from_info(struct genl_info *info,
+				 enum devlink_sb_threshold_type *p_th_type)
 {
-	return devlink_sb_pool_type_get_from_attrs(info->attrs, p_pool_type);
-}
-
-static int
-devlink_sb_th_type_get_from_attrs(struct nlattr **attrs,
-				  enum devlink_sb_threshold_type *p_th_type)
-{
+	struct nlattr **attrs = info->attrs;
 	u8 val;
 
 	if (!attrs[DEVLINK_ATTR_SB_POOL_THRESHOLD_TYPE])
@@ -454,18 +430,12 @@ devlink_sb_th_type_get_from_attrs(struct nlattr **attrs,
 }
 
 static int
-devlink_sb_th_type_get_from_info(struct genl_info *info,
-				 enum devlink_sb_threshold_type *p_th_type)
+devlink_sb_tc_index_get_from_info(struct devlink_sb *devlink_sb,
+				  struct genl_info *info,
+				  enum devlink_sb_pool_type pool_type,
+				  u16 *p_tc_index)
 {
-	return devlink_sb_th_type_get_from_attrs(info->attrs, p_th_type);
-}
-
-static int
-devlink_sb_tc_index_get_from_attrs(struct devlink_sb *devlink_sb,
-				   struct nlattr **attrs,
-				   enum devlink_sb_pool_type pool_type,
-				   u16 *p_tc_index)
-{
+	struct nlattr **attrs = info->attrs;
 	u16 val;
 
 	if (!attrs[DEVLINK_ATTR_SB_TC_INDEX])
@@ -480,16 +450,6 @@ devlink_sb_tc_index_get_from_attrs(struct devlink_sb *devlink_sb,
 		return -EINVAL;
 	*p_tc_index = val;
 	return 0;
-}
-
-static int
-devlink_sb_tc_index_get_from_info(struct devlink_sb *devlink_sb,
-				  struct genl_info *info,
-				  enum devlink_sb_pool_type pool_type,
-				  u16 *p_tc_index)
-{
-	return devlink_sb_tc_index_get_from_attrs(devlink_sb, info->attrs,
-						  pool_type, p_tc_index);
 }
 
 struct devlink_region {
@@ -1972,7 +1932,7 @@ static int devlink_nl_cmd_sb_get_doit(struct sk_buff *skb,
 	struct sk_buff *msg;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2090,7 +2050,7 @@ static int devlink_nl_cmd_sb_pool_get_doit(struct sk_buff *skb,
 	u16 pool_index;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2214,7 +2174,7 @@ static int devlink_nl_cmd_sb_pool_set_doit(struct sk_buff *skb,
 	u32 size;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2305,7 +2265,7 @@ static int devlink_nl_cmd_sb_port_pool_get_doit(struct sk_buff *skb,
 	u16 pool_index;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2435,7 +2395,7 @@ static int devlink_nl_cmd_sb_port_pool_set_doit(struct sk_buff *skb,
 	u32 threshold;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2528,7 +2488,7 @@ static int devlink_nl_cmd_sb_tc_pool_bind_get_doit(struct sk_buff *skb,
 	u16 tc_index;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2689,7 +2649,7 @@ static int devlink_nl_cmd_sb_tc_pool_bind_set_doit(struct sk_buff *skb,
 	u32 threshold;
 	int err;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2723,7 +2683,7 @@ static int devlink_nl_cmd_sb_occ_snapshot_doit(struct sk_buff *skb,
 	const struct devlink_ops *ops = devlink->ops;
 	struct devlink_sb *devlink_sb;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -2739,7 +2699,7 @@ static int devlink_nl_cmd_sb_occ_max_clear_doit(struct sk_buff *skb,
 	const struct devlink_ops *ops = devlink->ops;
 	struct devlink_sb *devlink_sb;
 
-	devlink_sb = devlink_sb_get_from_info(devlink, info);
+	devlink_sb = devlink_sb_get_from_attrs(devlink, info->attrs);
 	if (IS_ERR(devlink_sb))
 		return PTR_ERR(devlink_sb);
 
@@ -9636,29 +9596,24 @@ int devlink_sb_register(struct devlink *devlink, unsigned int sb_index,
 			u16 egress_tc_count)
 {
 	struct devlink_sb *devlink_sb;
-	int err = 0;
 
-	mutex_lock(&devlink->lock);
-	if (devlink_sb_index_exists(devlink, sb_index)) {
-		err = -EEXIST;
-		goto unlock;
-	}
+	WARN_ON(devlink_sb_get_by_index(devlink, sb_index));
 
 	devlink_sb = kzalloc(sizeof(*devlink_sb), GFP_KERNEL);
-	if (!devlink_sb) {
-		err = -ENOMEM;
-		goto unlock;
-	}
+	if (!devlink_sb)
+		return -ENOMEM;
+
 	devlink_sb->index = sb_index;
 	devlink_sb->size = size;
 	devlink_sb->ingress_pools_count = ingress_pools_count;
 	devlink_sb->egress_pools_count = egress_pools_count;
 	devlink_sb->ingress_tc_count = ingress_tc_count;
 	devlink_sb->egress_tc_count = egress_tc_count;
+
+	mutex_lock(&devlink->lock);
 	list_add_tail(&devlink_sb->list, &devlink->sb_list);
-unlock:
 	mutex_unlock(&devlink->lock);
-	return err;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(devlink_sb_register);
 
@@ -9666,9 +9621,10 @@ void devlink_sb_unregister(struct devlink *devlink, unsigned int sb_index)
 {
 	struct devlink_sb *devlink_sb;
 
-	mutex_lock(&devlink->lock);
 	devlink_sb = devlink_sb_get_by_index(devlink, sb_index);
 	WARN_ON(!devlink_sb);
+
+	mutex_lock(&devlink->lock);
 	list_del(&devlink_sb->list);
 	mutex_unlock(&devlink->lock);
 	kfree(devlink_sb);
