@@ -435,8 +435,8 @@ __svc_create(struct svc_program *prog, unsigned int bufsize, int npools,
 		return NULL;
 	serv->sv_name      = prog->pg_name;
 	serv->sv_program   = prog;
-	serv->sv_nrthreads = 1;
 	serv->sv_stats     = prog->pg_stats;
+	kref_init(&serv->sv_refcnt);
 	if (bufsize > RPCSVC_MAXPAYLOAD)
 		bufsize = RPCSVC_MAXPAYLOAD;
 	serv->sv_max_payload = bufsize? bufsize : 4096;
@@ -526,19 +526,12 @@ EXPORT_SYMBOL_GPL(svc_shutdown_net);
  * protect the sv_nrthreads, sv_permsocks and sv_tempsocks.
  */
 void
-svc_destroy(struct svc_serv *serv)
+svc_destroy(struct kref *ref)
 {
-	dprintk("svc: svc_destroy(%s, %d)\n",
-				serv->sv_program->pg_name,
-				serv->sv_nrthreads);
+	struct svc_serv *serv = container_of(ref, struct svc_serv, sv_refcnt);
 
-	if (serv->sv_nrthreads) {
-		if (--(serv->sv_nrthreads) != 0) {
-			svc_sock_update_bufs(serv);
-			return;
-		}
-	} else
-		printk("svc_destroy: no threads for serv=%p!\n", serv);
+	dprintk("svc: svc_destroy(%s)\n",
+		serv->sv_program->pg_name);
 
 	del_timer_sync(&serv->sv_temptimer);
 
@@ -647,6 +640,7 @@ svc_prepare_thread(struct svc_serv *serv, struct svc_pool *pool, int node)
 	if (!rqstp)
 		return ERR_PTR(-ENOMEM);
 
+	svc_get(serv);
 	serv->sv_nrthreads++;
 	spin_lock_bh(&pool->sp_lock);
 	pool->sp_nrthreads++;
@@ -786,8 +780,7 @@ int
 svc_set_num_threads(struct svc_serv *serv, struct svc_pool *pool, int nrservs)
 {
 	if (pool == NULL) {
-		/* The -1 assumes caller has done a svc_get() */
-		nrservs -= (serv->sv_nrthreads-1);
+		nrservs -= serv->sv_nrthreads;
 	} else {
 		spin_lock_bh(&pool->sp_lock);
 		nrservs -= pool->sp_nrthreads;
@@ -824,8 +817,7 @@ int
 svc_set_num_threads_sync(struct svc_serv *serv, struct svc_pool *pool, int nrservs)
 {
 	if (pool == NULL) {
-		/* The -1 assumes caller has done a svc_get() */
-		nrservs -= (serv->sv_nrthreads-1);
+		nrservs -= serv->sv_nrthreads;
 	} else {
 		spin_lock_bh(&pool->sp_lock);
 		nrservs -= pool->sp_nrthreads;
@@ -890,11 +882,12 @@ svc_exit_thread(struct svc_rqst *rqstp)
 		list_del_rcu(&rqstp->rq_all);
 	spin_unlock_bh(&pool->sp_lock);
 
+	serv->sv_nrthreads -= 1;
+	svc_sock_update_bufs(serv);
+
 	svc_rqst_free(rqstp);
 
-	/* Release the server */
-	if (serv)
-		svc_destroy(serv);
+	svc_put(serv);
 }
 EXPORT_SYMBOL_GPL(svc_exit_thread);
 
