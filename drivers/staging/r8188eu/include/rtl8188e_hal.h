@@ -112,21 +112,6 @@ enum usb_rx_agg_mode {
 #include "HalVerDef.h"
 #include "hal_com.h"
 
-/* 	Channel Plan */
-enum ChannelPlan {
-	CHPL_FCC	= 0,
-	CHPL_IC		= 1,
-	CHPL_ETSI	= 2,
-	CHPL_SPA	= 3,
-	CHPL_FRANCE	= 4,
-	CHPL_MKK	= 5,
-	CHPL_MKK1	= 6,
-	CHPL_ISRAEL	= 7,
-	CHPL_TELEC	= 8,
-	CHPL_GLOBAL	= 9,
-	CHPL_WORLD	= 10,
-};
-
 struct txpowerinfo24g {
 	u8 IndexCCK_Base[RF_PATH_MAX][MAX_CHNL_GROUP_24G];
 	u8 IndexBW40_Base[RF_PATH_MAX][MAX_CHNL_GROUP_24G];
@@ -206,18 +191,7 @@ struct hal_data_8188e {
 	u8	PwrGroupHT20[RF_PATH_MAX][CHANNEL_MAX_NUMBER];
 	u8	PwrGroupHT40[RF_PATH_MAX][CHANNEL_MAX_NUMBER];
 
-	u8	LegacyHTTxPowerDiff;/*  Legacy to HT rate power diff */
-	/*  The current Tx Power Level */
-	u8	CurrentCckTxPwrIdx;
-	u8	CurrentOfdm24GTxPwrIdx;
-	u8	CurrentBW2024GTxPwrIdx;
-	u8	CurrentBW4024GTxPwrIdx;
-
 	/*  Read/write are allow for following hardware information variables */
-	u8	framesync;
-	u32	framesyncC34;
-	u8	framesyncMonitor;
-	u8	DefaultInitialGain[4];
 	u8	pwrGroupCnt;
 	u32	MCSTxPowerLevelOriginalOffset[MAX_PG_GROUP][16];
 	u32	CCKTxPowerLevelOriginalOffset;
@@ -236,9 +210,6 @@ struct hal_data_8188e {
 	struct bb_reg_def PHYRegDef[4];	/* Radio A/B/C/D */
 
 	u32	RfRegChnlVal[2];
-
-	/* RDG enable */
-	bool	 bRDGEnable;
 
 	/* for host message to fw */
 	u8	LastHMEBoxNum;
@@ -260,22 +231,11 @@ struct hal_data_8188e {
 	u8	FwRsvdPageStartOffset; /* Reserve page start offset except
 					*  beacon in TxQ. */
 
-	/*  2010/08/09 MH Add CU power down mode. */
-	bool		pwrdown;
-
-	/*  Add for dual MAC  0--Mac0 1--Mac1 */
-	u32	interfaceIndex;
-
 	u8	OutEpQueueSel;
 	u8	OutEpNumber;
 
 	/*  Add for USB aggreation mode dynamic shceme. */
 	bool		UsbRxHighSpeedMode;
-
-	/*  2010/11/22 MH Add for slim combo debug mode selective. */
-	/*  This is used for fix the drawback of CU TSMC-A/UMC-A cut.
-	 * HW auto suspend ability. Close BT clock. */
-	bool		SlimComboDbg;
 
 	u16	EfuseUsedBytes;
 

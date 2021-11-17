@@ -70,8 +70,6 @@ void rtl8188eu_interface_configure(struct adapter *adapt)
 	else
 		haldata->UsbBulkOutSize = USB_FULL_SPEED_BULK_SIZE;/* 64 bytes */
 
-	haldata->interfaceIndex = pdvobjpriv->InterfaceNumber;
-
 	haldata->UsbTxAggMode		= 1;
 	haldata->UsbTxAggDescNum	= 0x6;	/*  only 4 bits */
 
@@ -398,13 +396,6 @@ static void _InitEDCA(struct adapter *Adapter)
 	rtw_write32(Adapter, REG_EDCA_BK_PARAM, 0x0000A44F);
 	rtw_write32(Adapter, REG_EDCA_VI_PARAM, 0x005EA324);
 	rtw_write32(Adapter, REG_EDCA_VO_PARAM, 0x002FA226);
-}
-
-static void _InitRDGSetting(struct adapter *Adapter)
-{
-	rtw_write8(Adapter, REG_RD_CTRL, 0xFF);
-	rtw_write16(Adapter, REG_RD_NAV_NXT, 0x200);
-	rtw_write8(Adapter, REG_RD_RESP_PKT_TH, 0x05);
 }
 
 static void _InitRetryFunction(struct adapter *Adapter)
@@ -742,9 +733,6 @@ u32 rtl8188eu_hal_init(struct adapter *Adapter)
 	value16 = rtw_read16(Adapter, REG_CR);
 	value16 |= (MACTXEN | MACRXEN);
 	rtw_write8(Adapter, REG_CR, value16);
-
-	if (haldata->bRDGEnable)
-		_InitRDGSetting(Adapter);
 
 	/* Enable TX Report */
 	/* Enable Tx Report Timer */
