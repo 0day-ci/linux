@@ -73,7 +73,7 @@ enum itrace_period_type {
  * @ptwrites: whether to synthesize events for ptwrites
  * @pwr_events: whether to synthesize power events
  * @other_events: whether to synthesize other events recorded due to the use of
- *                aux_output
+ *                aux_output (all events for Arm SPE)
  * @errors: whether to synthesize decoder error events
  * @dont_decode: whether to skip decoding entirely
  * @log: write a decoding log
