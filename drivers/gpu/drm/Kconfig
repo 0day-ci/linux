@@ -84,6 +84,22 @@ config DRM_INPUT_HELPER
 	depends on DRM_KMS_HELPER
 	depends on INPUT
 
+config DRM_SELF_REFRESH_INPUT_BOOST_DEFAULT
+	bool "Preemptively exit panel self-refresh on input device activity" if EXPERT
+	default y
+	depends on DRM_INPUT_HELPER
+	help
+	  Allows the generic DRM panel self-refresh helpers to factor in user
+	  input activity to preemptively exit panel self-refresh, in order to
+	  reduce potentially-visible latency when displaying new display
+	  content. This is an optimization which often will do the right thing,
+	  but can be disabled for experimentation or similar.
+
+	  Saying Y enables the feature by default; this can also be configured
+	  by module parameter, drm_kms_helper.self_refresh_input_boost.
+
+	  If in doubt, say "Y".
+
 config DRM_KMS_HELPER
 	tristate
 	depends on DRM
