@@ -1903,7 +1903,7 @@ static void throtl_downgrade_check(struct throtl_grp *tg)
 
 	if (tg->bps[READ][LIMIT_LOW]) {
 		bps = tg->last_bytes_disp[READ] * HZ;
-		do_div(bps, elapsed_time);
+		div64_ul(bps, elapsed_time);
 		if (bps >= tg->bps[READ][LIMIT_LOW])
 			tg->last_low_overflow_time[READ] = now;
 	}
