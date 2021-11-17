@@ -2448,6 +2448,9 @@ EXPORT_SYMBOL_GPL(nf_ct_iterate_destroy);
 
 static int kill_all(struct nf_conn *i, void *data)
 {
+	if (!data)
+		return !check_net(nf_ct_net(i));
+
 	return net_eq(nf_ct_net(i), data);
 }
 
@@ -2494,10 +2497,18 @@ static void __nf_conntrack_cleanup_net_list(struct list_head *net_exit_list)
  */
 void nf_conntrack_cleanup_net(struct net *net)
 {
+	struct nf_conntrack_net *cnet = nf_ct_pernet(net);
 	LIST_HEAD(single);
 
+	synchronize_net();
+
+	while (atomic_read(&cnet->count) != 0) {
+		nf_ct_iterate_cleanup(kill_all, net, 0, 0);
+		schedule();
+	}
+
 	list_add(&net->exit_list, &single);
-	nf_conntrack_cleanup_net_list(&single);
+	__nf_conntrack_cleanup_net_list(&single);
 }
 
 void nf_conntrack_cleanup_net_list(struct list_head *net_exit_list)
@@ -2516,9 +2527,11 @@ i_see_dead_people:
 	list_for_each_entry(net, net_exit_list, exit_list) {
 		struct nf_conntrack_net *cnet = nf_ct_pernet(net);
 
-		nf_ct_iterate_cleanup(kill_all, net, 0, 0);
-		if (atomic_read(&cnet->count) != 0)
-			busy = 1;
+		if (atomic_read(&cnet->count) != 0) {
+			nf_ct_iterate_cleanup(kill_all, NULL, 0, 0);
+			if (atomic_read(&cnet->count) != 0)
+				busy = 1;
+		}
 	}
 	if (busy) {
 		schedule();
