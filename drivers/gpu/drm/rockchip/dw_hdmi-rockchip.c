@@ -9,6 +9,7 @@
 #include <linux/platform_device.h>
 #include <linux/phy/phy.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 
 #include <drm/bridge/dw_hdmi.h>
 #include <drm/drm_edid.h>
@@ -83,6 +84,8 @@ struct rockchip_hdmi {
 	struct clk *vpll_clk;
 	struct clk *grf_clk;
 	struct dw_hdmi *hdmi;
+	struct regulator *avdd_0v9;
+	struct regulator *avdd_1v8;
 	struct phy *phy;
 };
 
@@ -221,6 +224,22 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
 
 	hdmi->vpll_clk = hdmi->clks[RK_HDMI_CLK_VPLL].clk;
 	hdmi->grf_clk = hdmi->clks[RK_HDMI_CLK_GRF].clk;
+
+	hdmi->avdd_0v9 = devm_regulator_get_optional(hdmi->dev, "avdd-0v9");
+	if (IS_ERR(hdmi->avdd_0v9)) {
+		if (PTR_ERR(hdmi->avdd_0v9) != -ENODEV)
+			return PTR_ERR(hdmi->avdd_0v9);
+
+		hdmi->avdd_0v9 = NULL;
+	}
+
+	hdmi->avdd_1v8 = devm_regulator_get_optional(hdmi->dev, "avdd-1v8");
+	if (IS_ERR(hdmi->avdd_1v8)) {
+		if (PTR_ERR(hdmi->avdd_1v8) != -ENODEV)
+			return PTR_ERR(hdmi->avdd_1v8);
+
+		hdmi->avdd_1v8 = NULL;
+	}
 
 	return 0;
 }
@@ -559,11 +578,27 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
 		return ret;
 	}
 
+	if (hdmi->avdd_0v9) {
+		ret = regulator_enable(hdmi->avdd_0v9);
+		if (ret) {
+			DRM_DEV_ERROR(hdmi->dev, "failed to enable avdd0v9: %d\n", ret);
+			goto err_avdd_0v9;
+		}
+	}
+
+	if (hdmi->avdd_1v8) {
+		ret = regulator_enable(hdmi->avdd_1v8);
+		if (ret) {
+			DRM_DEV_ERROR(hdmi->dev, "failed to enable avdd1v8: %d\n", ret);
+			goto err_avdd_1v8;
+		}
+	}
+
 	ret = clk_bulk_prepare_enable(RK_HDMI_NCLOCKS_HDMI, hdmi->clks);
 	if (ret) {
 		DRM_DEV_ERROR(hdmi->dev, "Failed to enable HDMI vpll: %d\n",
 			      ret);
-		return ret;
+		goto err_clk;
 	}
 
 	if (hdmi->chip_data == &rk3568_chip_data) {
@@ -587,10 +622,21 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
 	 */
 	if (IS_ERR(hdmi->hdmi)) {
 		ret = PTR_ERR(hdmi->hdmi);
-		drm_encoder_cleanup(encoder);
-		clk_bulk_disable_unprepare(RK_HDMI_NCLOCKS_HDMI, hdmi->clks);
+		goto err_bind;
 	}
 
+	return 0;
+
+err_bind:
+	clk_bulk_disable_unprepare(RK_HDMI_NCLOCKS_HDMI, hdmi->clks);
+	drm_encoder_cleanup(encoder);
+err_clk:
+	if (hdmi->avdd_1v8)
+		regulator_disable(hdmi->avdd_1v8);
+err_avdd_1v8:
+	if (hdmi->avdd_0v9)
+		regulator_disable(hdmi->avdd_0v9);
+err_avdd_0v9:
 	return ret;
 }
 
@@ -601,6 +647,12 @@ static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
 
 	dw_hdmi_unbind(hdmi->hdmi);
 	clk_bulk_disable_unprepare(RK_HDMI_NCLOCKS_HDMI, hdmi->clks);
+
+	if (hdmi->avdd_1v8)
+		regulator_disable(hdmi->avdd_1v8);
+
+	if (hdmi->avdd_0v9)
+		regulator_disable(hdmi->avdd_0v9);
 }
 
 static const struct component_ops dw_hdmi_rockchip_ops = {

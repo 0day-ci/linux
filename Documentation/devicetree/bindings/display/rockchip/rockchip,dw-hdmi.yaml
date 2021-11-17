@@ -28,6 +28,12 @@ properties:
   reg-io-width:
     const: 4
 
+  avdd-0v9-supply:
+    description: A 0.9V supply that powers up the SoC internal circuitry.
+
+  avdd-1v8-supply:
+    description: A 0.9V supply that powers up the SoC internal circuitry.
+
   clocks:
     minItems: 2
     items:
