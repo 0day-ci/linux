@@ -127,6 +127,11 @@ static inline int svc_put(struct svc_serv *serv)
 	return kref_put(&serv->sv_refcnt, svc_destroy);
 }
 
+static inline int svc_put_not_last(struct svc_serv *serv)
+{
+	return refcount_dec_not_one(&serv->sv_refcnt.refcount);
+}
+
 /*
  * Maximum payload size supported by a kernel RPC server.
  * This is use to determine the max number of pages nfsd is
