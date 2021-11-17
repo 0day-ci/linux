@@ -21,7 +21,9 @@
 #include <linux/of.h>
 
 #ifdef CONFIG_PCI_DRIVERS_GENERIC
+#ifndef CONFIG_MACH_LOONGSON64
 #define pci_remap_iospace pci_remap_iospace
+#endif
 #endif
 
 #ifdef CONFIG_PCI_DRIVERS_LEGACY
