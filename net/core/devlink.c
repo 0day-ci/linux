@@ -9833,17 +9833,9 @@ int devlink_resource_register(struct devlink *devlink,
 {
 	struct devlink_resource *resource;
 	struct list_head *resource_list;
-	bool top_hierarchy;
 	int err = 0;
 
-	top_hierarchy = parent_resource_id == DEVLINK_RESOURCE_ID_PARENT_TOP;
-
-	mutex_lock(&devlink->lock);
-	resource = devlink_resource_find(devlink, NULL, resource_id);
-	if (resource) {
-		err = -EINVAL;
-		goto out;
-	}
+	WARN_ON(devlink_resource_find(devlink, NULL, resource_id));
 
 	resource = kzalloc(sizeof(*resource), GFP_KERNEL);
 	if (!resource) {
@@ -9851,7 +9843,17 @@ int devlink_resource_register(struct devlink *devlink,
 		goto out;
 	}
 
-	if (top_hierarchy) {
+	resource->name = resource_name;
+	resource->size = resource_size;
+	resource->size_new = resource_size;
+	resource->id = resource_id;
+	resource->size_valid = true;
+	memcpy(&resource->size_params, size_params,
+	       sizeof(resource->size_params));
+	INIT_LIST_HEAD(&resource->resource_list);
+
+	mutex_lock(&devlink->lock);
+	if (parent_resource_id == DEVLINK_RESOURCE_ID_PARENT_TOP) {
 		resource_list = &devlink->resource_list;
 	} else {
 		struct devlink_resource *parent_resource;
@@ -9868,14 +9870,6 @@ int devlink_resource_register(struct devlink *devlink,
 		}
 	}
 
-	resource->name = resource_name;
-	resource->size = resource_size;
-	resource->size_new = resource_size;
-	resource->id = resource_id;
-	resource->size_valid = true;
-	memcpy(&resource->size_params, size_params,
-	       sizeof(resource->size_params));
-	INIT_LIST_HEAD(&resource->resource_list);
 	list_add_tail(&resource->list, resource_list);
 out:
 	mutex_unlock(&devlink->lock);
