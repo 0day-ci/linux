@@ -543,6 +543,9 @@ static int apple_pcie_setup_port(struct apple_pcie *pcie,
 	if (ret < 0)
 		return ret;
 
+	/* Hold #PERST for 100ms as per the spec */
+	gpiod_set_value(reset, 0);
+	msleep(100);
 	rmw_set(PORT_PERST_OFF, port->base + PORT_PERST);
 	gpiod_set_value(reset, 1);
 
