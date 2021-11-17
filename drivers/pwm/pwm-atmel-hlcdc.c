@@ -60,7 +60,7 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *c, struct pwm_device *pwm,
 				return -EINVAL;
 
 			clk_period_ns = (u64)NSEC_PER_SEC * 256;
-			do_div(clk_period_ns, clk_freq);
+			div64_ul(clk_period_ns, clk_freq);
 		}
 
 		/* Errata: cannot use slow clk on some IP revisions */
@@ -72,7 +72,7 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *c, struct pwm_device *pwm,
 				return -EINVAL;
 
 			clk_period_ns = (u64)NSEC_PER_SEC * 256;
-			do_div(clk_period_ns, clk_freq);
+			div64_ul(clk_period_ns, clk_freq);
 		}
 
 		for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++) {
