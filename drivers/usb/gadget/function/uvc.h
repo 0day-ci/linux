@@ -13,6 +13,8 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/usb/composite.h>
+#include <linux/usb/g_uvc.h>
+#include <linux/usb/video.h>
 #include <linux/videodev2.h>
 
 #include <media/v4l2-device.h>
@@ -93,6 +95,12 @@ struct uvc_video {
 	unsigned int cur_ival;
 
 	struct mutex mutex;	/* protects frame parameters */
+	spinlock_t frame_lock;
+
+	struct uvc_streaming_control probe;
+	struct uvc_streaming_control commit;
+
+	int control;
 
 	unsigned int uvc_num_requests;
 
@@ -128,6 +136,8 @@ struct uvc_device {
 	struct usb_function func;
 	struct uvc_video video;
 	bool func_connected;
+	bool setup_subscribed;
+	bool data_subscribed;
 
 	struct uvcg_streaming_header *header;
 
@@ -181,5 +191,11 @@ extern struct uvcg_format *find_format_by_index(struct uvc_device *uvc,
 extern struct uvcg_frame *find_frame_by_index(struct uvc_device *uvc,
 					      struct uvcg_format *uformat,
 					      int index);
+extern void uvc_fill_streaming_control(struct uvc_device *uvc,
+				       struct uvc_streaming_control *ctrl,
+				       int iframe, int iformat,
+				       unsigned int ival);
+extern int uvc_send_response(struct uvc_device *uvc,
+			     struct uvc_request_data *data);
 
 #endif /* _UVC_GADGET_H_ */

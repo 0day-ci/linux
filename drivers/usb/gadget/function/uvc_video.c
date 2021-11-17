@@ -523,6 +523,7 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 
 	INIT_LIST_HEAD(&video->req_free);
 	spin_lock_init(&video->req_lock);
+	spin_lock_init(&video->frame_lock);
 	INIT_WORK(&video->pump, uvcg_video_pump);
 
 	if (list_empty(&uvc->header->formats))
@@ -545,6 +546,11 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 		return -EINVAL;
 
 	video->cur_ival = uvc_default_frame_interval(video);
+
+	uvc_fill_streaming_control(uvc, &video->probe, framedef, 1,
+				   video->cur_ival);
+	uvc_fill_streaming_control(uvc, &video->commit, framedef, 1,
+				   video->cur_ival);
 
 	/* Initialize the video buffers queue. */
 	uvcg_queue_init(&video->queue, uvc->v4l2_dev.dev->parent,
