@@ -596,7 +596,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 			goto out;
 		}
 
-		if (dev->power.irq_safe) {
+		if (dev->power.irq_safe && !IS_ENABLED(CONFIG_PREEMPT_RT)) {
 			spin_unlock(&dev->power.lock);
 
 			cpu_relax();
@@ -614,7 +614,12 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 
 			spin_unlock_irq(&dev->power.lock);
 
-			schedule();
+#ifdef CONFIG_PREEMPT_RT
+			if (dev->power.irq_safe)
+				schedule_rtlock();
+			else
+#endif
+				schedule();
 
 			spin_lock_irq(&dev->power.lock);
 		}
@@ -779,7 +784,7 @@ static int rpm_resume(struct device *dev, int rpmflags)
 			goto out;
 		}
 
-		if (dev->power.irq_safe) {
+		if (dev->power.irq_safe && !IS_ENABLED(CONFIG_PREEMPT_RT)) {
 			spin_unlock(&dev->power.lock);
 
 			cpu_relax();
@@ -798,7 +803,12 @@ static int rpm_resume(struct device *dev, int rpmflags)
 
 			spin_unlock_irq(&dev->power.lock);
 
-			schedule();
+#ifdef CONFIG_PREEMPT_RT
+			if (dev->power.irq_safe)
+				schedule_rtlock();
+			else
+#endif
+				schedule();
 
 			spin_lock_irq(&dev->power.lock);
 		}
