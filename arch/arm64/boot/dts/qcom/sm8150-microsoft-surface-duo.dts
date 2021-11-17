@@ -270,6 +270,8 @@
 		vdda_hv_ebi2:
 		vdda_hv_ebi3:
 		vdda_hv_refgen0:
+		vdda_mipi_dsi0_1p2:
+		vdda_mipi_dsi1_1p2:
 		vdda_qlink_hv_ck:
 		vreg_l3c_1p2: ldo3 {
 			regulator-min-microvolt = <1200000>;
@@ -359,6 +361,26 @@
 	};
 };
 
+&mdss_dsi0 {
+	status = "okay";
+	vdda-supply = <&vdda_mipi_dsi0_1p2>;
+};
+
+&mdss_dsi0_phy {
+	status = "okay";
+	vdds-supply = <&vdda_dsi_0_pll_0p9>;
+};
+
+&mdss_dsi1 {
+	status = "okay";
+	vdda-supply = <&vdda_mipi_dsi1_1p2>;
+};
+
+&mdss_dsi1_phy {
+	status = "okay";
+	vdds-supply = <&vdda_dsi_1_pll_0p9>;
+};
+
 &i2c1 {
 	status = "okay";
 	clock-frequency = <400000>;
@@ -428,6 +450,10 @@
 	/* MAX34417 @ 0x12 */
 	/* MAX34417 @ 0x1a */
 	/* MAX34417 @ 0x1e */
+};
+
+&mdss {
+	status = "okay";
 };
 
 &pon {
