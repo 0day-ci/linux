@@ -844,6 +844,241 @@ static void validate_mvfr1_el1_test(struct kunit *test)
 	test_kvm_vcpu_fini(test, vcpu);
 }
 
+static void feature_trap_activate_test(struct kunit *test)
+{
+	struct kvm_vcpu *vcpu;
+	struct feature_config_ctrl config_data, *config = &config_data;
+	u64 cfg_mask, cfg_val;
+
+	vcpu = test_kvm_vcpu_init(test);
+	KUNIT_EXPECT_TRUE(test, vcpu);
+	if (!vcpu)
+		return;
+
+	vcpu->arch.hcr_el2 = 0;
+	config->ftr_reg = SYS_ID_AA64MMFR1_EL1;
+	config->ftr_shift = 4;
+	config->ftr_min = 2;
+	config->ftr_signed = FTR_UNSIGNED;
+
+	/* Test for hcr_el2 */
+	config->cfg_reg = VCPU_HCR_EL2;
+	cfg_mask = 0x30000800000;
+	cfg_val = 0x30000800000;
+	config->cfg_mask = cfg_mask;
+	config->cfg_val = cfg_val;
+
+	vcpu->arch.hcr_el2 = 0;
+	feature_trap_activate(vcpu, config);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2 & cfg_mask, cfg_val);
+
+	cfg_mask = 0x30000800000;
+	cfg_val = 0;
+	config->cfg_mask = cfg_mask;
+	config->cfg_val = cfg_val;
+
+	vcpu->arch.hcr_el2 = 0;
+	feature_trap_activate(vcpu, config);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2 & cfg_mask, cfg_val);
+
+	/* Test for mdcr_el2 */
+	config->cfg_reg = VCPU_MDCR_EL2;
+	cfg_mask = 0x30000800000;
+	cfg_val = 0x30000800000;
+	config->cfg_mask = cfg_mask;
+	config->cfg_val = cfg_val;
+
+	vcpu->arch.mdcr_el2 = 0;
+	feature_trap_activate(vcpu, config);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.mdcr_el2 & cfg_mask, cfg_val);
+
+	cfg_mask = 0x30000800000;
+	cfg_val = 0x0;
+	config->cfg_mask = cfg_mask;
+	config->cfg_val = cfg_val;
+
+	vcpu->arch.mdcr_el2 = 0;
+	feature_trap_activate(vcpu, config);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.mdcr_el2 & cfg_mask, cfg_val);
+
+	/* Test for cptr_el2 */
+	config->cfg_reg = VCPU_CPTR_EL2;
+	cfg_mask = 0x30000800000;
+	cfg_val = 0x30000800000;
+	config->cfg_mask = cfg_mask;
+	config->cfg_val = cfg_val;
+
+	vcpu->arch.cptr_el2 = 0;
+	feature_trap_activate(vcpu, config);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.cptr_el2 & cfg_mask, cfg_val);
+
+	cfg_mask = 0x30000800000;
+	cfg_val = 0x0;
+	config->cfg_mask = cfg_mask;
+	config->cfg_val = cfg_val;
+
+	vcpu->arch.cptr_el2 = 0;
+	feature_trap_activate(vcpu, config);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.cptr_el2 & cfg_mask, cfg_val);
+
+	test_kvm_vcpu_fini(test, vcpu);
+}
+
+static bool test_need_trap_aa64dfr0(struct kvm_vcpu *vcpu)
+{
+	u64 val;
+
+	val = __vcpu_sys_reg(vcpu, IDREG_SYS_IDX(SYS_ID_AA64DFR0_EL1));
+	return ((val & 0xf) == 0);
+}
+
+static void id_reg_features_trap_activate_test(struct kunit *test)
+{
+	struct kvm_vcpu *vcpu;
+	u32 id;
+	u64 cfg_mask0, cfg_val0, cfg_mask1, cfg_val1, cfg_mask2, cfg_val2;
+	u64 cfg_mask, cfg_val, id_reg_sys_val;
+	struct id_reg_info id_reg_data;
+	struct feature_config_ctrl *config, config0, config1, config2;
+	struct feature_config_ctrl *trap_features[] = {
+		&config0, &config1, &config2, NULL,
+	};
+
+	vcpu = test_kvm_vcpu_init(test);
+	KUNIT_EXPECT_TRUE(test, vcpu);
+	if (!vcpu)
+		return;
+
+	id_reg_sys_val = 0x7777777777777777;
+	id = SYS_ID_AA64DFR0_EL1;
+	id_reg_data.sys_reg = id;
+	id_reg_data.sys_val = id_reg_sys_val;
+	id_reg_data.vcpu_limit_val  = (u64)-1;
+	id_reg_data.trap_features =
+			(const struct feature_config_ctrl *(*)[])trap_features;
+
+	cfg_mask0 = 0x3;
+	cfg_val0 = 0x3;
+	config = &config0;
+	memset(config, 0, sizeof(*config));
+	config->ftr_reg = id;
+	config->ftr_shift = 60;
+	config->ftr_min = 2;
+	config->ftr_signed = FTR_UNSIGNED;
+	config->cfg_reg = VCPU_HCR_EL2;
+	config->cfg_mask = cfg_mask0;
+	config->cfg_val = cfg_val0;
+
+	cfg_mask1 = 0x70000040;
+	cfg_val1 = 0x30000040;
+	config = &config1;
+	memset(config, 0, sizeof(*config));
+	config->ftr_reg = id;
+	config->ftr_need_trap = test_need_trap_aa64dfr0;
+	config->ftr_signed = FTR_UNSIGNED;
+	config->cfg_reg = VCPU_HCR_EL2;
+	config->cfg_mask = cfg_mask1;
+	config->cfg_val = cfg_val1;
+
+	/* Feature with signed ID register field */
+	cfg_mask2 = 0x70000000800;
+	cfg_val2 = 0x30000000800;
+	config = &config2;
+	memset(config, 0, sizeof(*config));
+	config->ftr_reg = id;
+	config->ftr_shift = 4;
+	config->ftr_min = 0;
+	config->ftr_signed = FTR_SIGNED;
+	config->cfg_reg = VCPU_HCR_EL2;
+	config->cfg_mask = cfg_mask2;
+	config->cfg_val = cfg_val2;
+
+	/* Enable features for config0, 1 and 2 */
+	__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = id_reg_sys_val;
+
+	vcpu->arch.hcr_el2 = 0;
+	id_reg_features_trap_activate(vcpu, &id_reg_data);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2, 0);
+
+	/* Disable features for config0 only */
+	__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x1;
+	cfg_mask = cfg_mask0;
+	cfg_val = cfg_val0;
+
+	vcpu->arch.hcr_el2 = 0;
+	id_reg_features_trap_activate(vcpu, &id_reg_data);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2 & cfg_mask, cfg_val);
+
+	/* Disable features for config0 and config1 */
+	__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x0;
+	cfg_mask = (cfg_mask0 | cfg_mask1);
+	cfg_val = (cfg_val0 | cfg_val1);
+
+	vcpu->arch.hcr_el2 = 0;
+	id_reg_features_trap_activate(vcpu, &id_reg_data);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2 & cfg_mask, cfg_val);
+
+	/* Disable features for config0, 1, and 2 */
+	__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0xf0;
+	cfg_mask = (cfg_mask0 | cfg_mask1 | cfg_mask2);
+	cfg_val = (cfg_val0 | cfg_val1 | cfg_val2);
+
+	vcpu->arch.hcr_el2 = 0;
+	id_reg_features_trap_activate(vcpu, &id_reg_data);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2 & cfg_mask, cfg_val);
+
+	/* Test with id_reg_info == NULL */
+	vcpu->arch.hcr_el2 = 0;
+	id_reg_features_trap_activate(vcpu, NULL);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2, 0);
+
+	/* Test with id_reg_data.trap_features = NULL */
+	id_reg_data.trap_features = NULL;
+	__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0xf0;
+
+	vcpu->arch.hcr_el2 = 0;
+	id_reg_features_trap_activate(vcpu, &id_reg_data);
+	KUNIT_EXPECT_EQ(test, vcpu->arch.hcr_el2, 0);
+
+	test_kvm_vcpu_fini(test, vcpu);
+}
+
+static void vcpu_need_trap_ptrauth_test(struct kunit *test)
+{
+	struct kvm_vcpu *vcpu;
+	u32 id = SYS_ID_AA64ISAR1_EL1;
+
+	vcpu = test_kvm_vcpu_init(test);
+	KUNIT_EXPECT_TRUE(test, vcpu);
+	if (!vcpu)
+		return;
+
+	if (system_has_full_ptr_auth()) {
+		__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x0;
+		KUNIT_EXPECT_TRUE(test, vcpu_need_trap_ptrauth(vcpu));
+
+		/* GPI = 1, API = 1 */
+		__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x10000100;
+		KUNIT_EXPECT_FALSE(test, vcpu_need_trap_ptrauth(vcpu));
+
+		/* GPI = 1, APA = 1 */
+		__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x10000010;
+		KUNIT_EXPECT_FALSE(test, vcpu_need_trap_ptrauth(vcpu));
+
+		/* GPA = 1, API = 1 */
+		__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x01000100;
+		KUNIT_EXPECT_FALSE(test, vcpu_need_trap_ptrauth(vcpu));
+
+		/* GPA = 1, APA = 1 */
+		__vcpu_sys_reg(vcpu, IDREG_SYS_IDX(id)) = 0x01000010;
+		KUNIT_EXPECT_FALSE(test, vcpu_need_trap_ptrauth(vcpu));
+	} else {
+		KUNIT_EXPECT_FALSE(test, vcpu_need_trap_ptrauth(vcpu));
+	}
+
+	test_kvm_vcpu_fini(test, vcpu);
+}
+
 static struct kunit_case kvm_sys_regs_test_cases[] = {
 	KUNIT_CASE_PARAM(arm64_check_feature_one_test, feature_one_gen_params),
 	KUNIT_CASE_PARAM(arm64_check_features_test, features_gen_params),
@@ -859,6 +1094,9 @@ static struct kunit_case kvm_sys_regs_test_cases[] = {
 	KUNIT_CASE(validate_id_aa64dfr0_el1_test),
 	KUNIT_CASE(validate_id_dfr0_el1_test),
 	KUNIT_CASE(validate_mvfr1_el1_test),
+	KUNIT_CASE(vcpu_need_trap_ptrauth_test),
+	KUNIT_CASE(feature_trap_activate_test),
+	KUNIT_CASE(id_reg_features_trap_activate_test),
 	{}
 };
 
