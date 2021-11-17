@@ -106,6 +106,12 @@
 	status = "okay";
 };
 
+&hdmi {
+	status = "okay";
+	avdd-0v9-supply = <&vdda0v9_image>;
+	avdd-1v8-supply = <&vcca1v8_image>;
+};
+
 &i2c0 {
 	status = "okay";
 
@@ -388,5 +394,23 @@
 };
 
 &uart2 {
+	status = "okay";
+};
+
+&vop {
+	status = "okay";
+	assigned-clocks = <&cru DCLK_VOP0>, <&cru DCLK_VOP1>;
+	assigned-clock-parents = <&pmucru PLL_HPLL>, <&cru PLL_VPLL>;
+};
+
+&vop_mmu {
+	status = "okay";
+};
+
+&hdmi_in_vp0 {
+	status = "okay";
+};
+
+&vp0_out_hdmi {
 	status = "okay";
 };
