@@ -2289,7 +2289,7 @@ static int eb_submit(struct i915_execbuffer *eb)
 
 static int num_vcs_engines(const struct drm_i915_private *i915)
 {
-	return hweight_long(VDBOX_MASK(&i915->gt));
+	return hweight_long(VDBOX_MASK(&i915->gt0));
 }
 
 /*

@@ -529,7 +529,7 @@ i915_gem_userptr_ioctl(struct drm_device *dev,
 		 * On almost all of the older hw, we cannot tell the GPU that
 		 * a page is readonly.
 		 */
-		if (!dev_priv->gt.vm->has_read_only)
+		if (!dev_priv->gt0.vm->has_read_only)
 			return -ENODEV;
 	}
 

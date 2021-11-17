@@ -73,7 +73,7 @@ static int i915_gem_object_get_pages_phys(struct drm_i915_gem_object *obj)
 		dst += PAGE_SIZE;
 	}
 
-	intel_gt_chipset_flush(&to_i915(obj->base.dev)->gt);
+	intel_gt_chipset_flush(&to_i915(obj->base.dev)->gt0);
 
 	/* We're no longer struct page backed */
 	obj->mem_flags &= ~I915_BO_FLAG_STRUCT_PAGE;
@@ -159,7 +159,7 @@ int i915_gem_object_pwrite_phys(struct drm_i915_gem_object *obj,
 		return -EFAULT;
 
 	drm_clflush_virt_range(vaddr, args->size);
-	intel_gt_chipset_flush(&to_i915(obj->base.dev)->gt);
+	intel_gt_chipset_flush(&to_i915(obj->base.dev)->gt0);
 
 	i915_gem_object_flush_frontbuffer(obj, ORIGIN_CPU);
 	return 0;

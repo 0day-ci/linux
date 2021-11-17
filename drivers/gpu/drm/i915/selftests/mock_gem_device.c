@@ -45,7 +45,7 @@
 
 void mock_device_flush(struct drm_i915_private *i915)
 {
-	struct intel_gt *gt = &i915->gt;
+	struct intel_gt *gt = &i915->gt0;
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
 
@@ -64,7 +64,7 @@ static void mock_device_release(struct drm_device *dev)
 		goto out;
 
 	mock_device_flush(i915);
-	intel_gt_driver_remove(&i915->gt);
+	intel_gt_driver_remove(&i915->gt0);
 
 	i915_gem_drain_workqueue(i915);
 	i915_gem_drain_freed_objects(i915);
@@ -73,7 +73,7 @@ static void mock_device_release(struct drm_device *dev)
 	destroy_workqueue(i915->wq);
 
 	intel_region_ttm_device_fini(i915);
-	intel_gt_driver_late_release(&i915->gt);
+	intel_gt_driver_late_release(&i915->gt0);
 	intel_memory_regions_driver_release(i915);
 
 	drm_mode_config_cleanup(&i915->drm);
@@ -178,10 +178,10 @@ struct drm_i915_private *mock_gem_device(void)
 	spin_lock_init(&i915->gpu_error.lock);
 
 	i915_gem_init__mm(i915);
-	intel_gt_init_early(&i915->gt, i915);
+	intel_gt_init_early(&i915->gt0, i915);
 	mock_uncore_init(&i915->uncore, i915);
-	atomic_inc(&i915->gt.wakeref.count); /* disable; no hw support */
-	i915->gt.awake = -ENODEV;
+	atomic_inc(&i915->gt0.wakeref.count); /* disable; no hw support */
+	i915->gt0.awake = -ENODEV;
 
 	ret = intel_region_ttm_device_init(i915);
 	if (ret)
@@ -194,19 +194,19 @@ struct drm_i915_private *mock_gem_device(void)
 	mock_init_contexts(i915);
 
 	mock_init_ggtt(i915, &i915->ggtt);
-	i915->gt.vm = i915_vm_get(&i915->ggtt.vm);
+	i915->gt0.vm = i915_vm_get(&i915->ggtt.vm);
 
 	mkwrite_device_info(i915)->platform_engine_mask = BIT(0);
-	i915->gt.info.engine_mask = BIT(0);
+	i915->gt0.info.engine_mask = BIT(0);
 
-	i915->gt.engine[RCS0] = mock_engine(i915, "mock", RCS0);
-	if (!i915->gt.engine[RCS0])
+	i915->gt0.engine[RCS0] = mock_engine(i915, "mock", RCS0);
+	if (!i915->gt0.engine[RCS0])
 		goto err_unlock;
 
-	if (mock_engine_init(i915->gt.engine[RCS0]))
+	if (mock_engine_init(i915->gt0.engine[RCS0]))
 		goto err_context;
 
-	__clear_bit(I915_WEDGED, &i915->gt.reset.flags);
+	__clear_bit(I915_WEDGED, &i915->gt0.reset.flags);
 	intel_engines_driver_register(i915);
 
 	i915->do_release = true;
@@ -215,13 +215,13 @@ struct drm_i915_private *mock_gem_device(void)
 	return i915;
 
 err_context:
-	intel_gt_driver_remove(&i915->gt);
+	intel_gt_driver_remove(&i915->gt0);
 err_unlock:
 	destroy_workqueue(i915->wq);
 err_drv:
 	intel_region_ttm_device_fini(i915);
 err_ttm:
-	intel_gt_driver_late_release(&i915->gt);
+	intel_gt_driver_late_release(&i915->gt0);
 	intel_memory_regions_driver_release(i915);
 	drm_mode_config_cleanup(&i915->drm);
 	mock_destroy_device(i915);

@@ -616,14 +616,14 @@ static bool assert_mmap_offset(struct drm_i915_private *i915,
 static void disable_retire_worker(struct drm_i915_private *i915)
 {
 	i915_gem_driver_unregister__shrinker(i915);
-	intel_gt_pm_get(&i915->gt);
-	cancel_delayed_work_sync(&i915->gt.requests.retire_work);
+	intel_gt_pm_get(&i915->gt0);
+	cancel_delayed_work_sync(&i915->gt0.requests.retire_work);
 }
 
 static void restore_retire_worker(struct drm_i915_private *i915)
 {
 	igt_flush_test(i915);
-	intel_gt_pm_put(&i915->gt);
+	intel_gt_pm_put(&i915->gt0);
 	i915_gem_driver_register__shrinker(i915);
 }
 
@@ -651,8 +651,8 @@ static int igt_mmap_offset_exhaustion(void *arg)
 
 	/* Disable background reaper */
 	disable_retire_worker(i915);
-	GEM_BUG_ON(!i915->gt.awake);
-	intel_gt_retire_requests(&i915->gt);
+	GEM_BUG_ON(!i915->gt0.awake);
+	intel_gt_retire_requests(&i915->gt0);
 	i915_gem_drain_freed_objects(i915);
 
 	/* Trim the device mmap space to only a page */
@@ -728,7 +728,7 @@ static int igt_mmap_offset_exhaustion(void *arg)
 
 	/* Now fill with busy dead objects that we expect to reap */
 	for (loop = 0; loop < 3; loop++) {
-		if (intel_gt_is_wedged(&i915->gt))
+		if (intel_gt_is_wedged(&i915->gt0))
 			break;
 
 		obj = i915_gem_object_create_internal(i915, PAGE_SIZE);
@@ -942,7 +942,7 @@ static int __igt_mmap(struct drm_i915_private *i915,
 	}
 
 	if (type == I915_MMAP_TYPE_GTT)
-		intel_gt_flush_ggtt_writes(&i915->gt);
+		intel_gt_flush_ggtt_writes(&i915->gt0);
 
 	err = wc_check(obj);
 	if (err == -ENXIO)
@@ -1049,7 +1049,7 @@ static int __igt_mmap_access(struct drm_i915_private *i915,
 		goto out_unmap;
 	}
 
-	intel_gt_flush_ggtt_writes(&i915->gt);
+	intel_gt_flush_ggtt_writes(&i915->gt0);
 
 	err = access_process_vm(current, addr, &x, sizeof(x), 0);
 	if (err != sizeof(x)) {
@@ -1065,7 +1065,7 @@ static int __igt_mmap_access(struct drm_i915_private *i915,
 		goto out_unmap;
 	}
 
-	intel_gt_flush_ggtt_writes(&i915->gt);
+	intel_gt_flush_ggtt_writes(&i915->gt0);
 
 	err = __get_user(y, ptr);
 	if (err) {
@@ -1165,7 +1165,7 @@ static int __igt_mmap_gpu(struct drm_i915_private *i915,
 	}
 
 	if (type == I915_MMAP_TYPE_GTT)
-		intel_gt_flush_ggtt_writes(&i915->gt);
+		intel_gt_flush_ggtt_writes(&i915->gt0);
 
 	for_each_uabi_engine(engine, i915) {
 		struct i915_request *rq;
