@@ -142,7 +142,7 @@ u32 iwl_new_rate_from_v1(u32 rate_v1)
 		}
 	/* if legacy format */
 	} else {
-		u32 legacy_rate = iwl_legacy_rate_to_fw_idx(rate_v1);
+		int legacy_rate = iwl_legacy_rate_to_fw_idx(rate_v1);
 
 		WARN_ON(legacy_rate < 0);
 		rate_v2 |= legacy_rate;
@@ -172,7 +172,7 @@ u32 iwl_new_rate_from_v1(u32 rate_v1)
 }
 IWL_EXPORT_SYMBOL(iwl_new_rate_from_v1);
 
-u32 iwl_legacy_rate_to_fw_idx(u32 rate_n_flags)
+int iwl_legacy_rate_to_fw_idx(u32 rate_n_flags)
 {
 	int rate = rate_n_flags & RATE_LEGACY_RATE_MSK_V1;
 	int idx;
