@@ -262,6 +262,9 @@ struct vdec_pic_info {
  * @decoded_frame_cnt: number of decoded frames
  * @lock: protect variables accessed by V4L2 threads and worker thread such as
  *	  mtk_video_dec_buf.
+ * @stream_started: this flag is turned on when both queues (cap and out) starts streaming
+ *	  and it is turned off once both queues stop streaming. It is used for a correct
+ *	  setup and set-down of the hardware when starting and stopping streaming.
  */
 struct mtk_vcodec_ctx {
 	enum mtk_instance_type type;
@@ -304,6 +307,7 @@ struct mtk_vcodec_ctx {
 
 	int decoded_frame_cnt;
 	struct mutex lock;
+	bool stream_started;
 
 };
 

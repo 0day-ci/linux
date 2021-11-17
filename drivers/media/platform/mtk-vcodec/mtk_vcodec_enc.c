@@ -891,6 +891,9 @@ static int vb2ops_venc_start_streaming(struct vb2_queue *q, unsigned int count)
 		goto err_start_stream;
 	}
 
+	if (ctx->stream_started)
+		return 0;
+
 	/* Do the initialization when both start_streaming have been called */
 	if (V4L2_TYPE_IS_OUTPUT(q->type)) {
 		if (!vb2_start_streaming_called(&ctx->m2m_ctx->cap_q_ctx.q))
@@ -929,6 +932,7 @@ static int vb2ops_venc_start_streaming(struct vb2_queue *q, unsigned int count)
 		ctx->state = MTK_STATE_HEADER;
 	}
 
+	ctx->stream_started = true;
 	return 0;
 
 err_set_param:
@@ -1003,6 +1007,9 @@ static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
 		}
 	}
 
+	if (!ctx->stream_started)
+		return;
+
 	if ((q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
 	     vb2_is_streaming(&ctx->m2m_ctx->out_q_ctx.q)) ||
 	    (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE &&
@@ -1024,6 +1031,7 @@ static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
 		mtk_v4l2_err("pm_runtime_put fail %d", ret);
 
 	ctx->state = MTK_STATE_FREE;
+	ctx->stream_started = false;
 }
 
 static int vb2ops_venc_buf_out_validate(struct vb2_buffer *vb)
