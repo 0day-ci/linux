@@ -2476,6 +2476,18 @@ void nf_conntrack_cleanup_end(void)
 	kmem_cache_destroy(nf_conntrack_cachep);
 }
 
+static void __nf_conntrack_cleanup_net_list(struct list_head *net_exit_list)
+{
+	struct net *net;
+
+	list_for_each_entry(net, net_exit_list, exit_list) {
+		nf_conntrack_ecache_pernet_fini(net);
+		nf_conntrack_expect_pernet_fini(net);
+		free_percpu(net->ct.stat);
+		free_percpu(net->ct.pcpu_lists);
+	}
+}
+
 /*
  * Mishearing the voices in his head, our hero wonders how he's
  * supposed to kill the mall.
@@ -2513,12 +2525,7 @@ i_see_dead_people:
 		goto i_see_dead_people;
 	}
 
-	list_for_each_entry(net, net_exit_list, exit_list) {
-		nf_conntrack_ecache_pernet_fini(net);
-		nf_conntrack_expect_pernet_fini(net);
-		free_percpu(net->ct.stat);
-		free_percpu(net->ct.pcpu_lists);
-	}
+	__nf_conntrack_cleanup_net_list(net_exit_list);
 }
 
 void *nf_ct_alloc_hashtable(unsigned int *sizep, int nulls)
