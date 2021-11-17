@@ -63,6 +63,22 @@ static void set(struct intel_uncore *uncore, i915_reg_t reg, u32 val)
 	intel_uncore_write_fw(uncore, reg, val);
 }
 
+static bool race_to_idle(struct intel_rps *rps, u64 busy, u64 dt)
+{
+	unsigned int this = rps->cur_freq;
+	unsigned int next = rps->cur_freq + 1;
+	u64 next_dt = next * max(busy, dt);
+
+	/*
+	 * Compare estimated time spent in rc6 at the next power bin. If
+	 * we expect to sleep longer than the estimated increased power
+	 * cost of running at a higher frequency, it will be reduced power
+	 * consumption overall.
+	 */
+	return (((next_dt - this * busy) >> 10) * this * this >
+		((next_dt - next * busy) >> 10) * next * next);
+}
+
 static void rps_timer(struct timer_list *t)
 {
 	struct intel_rps *rps = from_timer(rps, t, timer);
@@ -133,7 +149,7 @@ static void rps_timer(struct timer_list *t)
 			if (!max_busy[i])
 				break;
 
-			busy += div_u64(max_busy[i], 1 << i);
+			busy += max_busy[i] >> i;
 		}
 		GT_TRACE(rps_to_gt(rps),
 			 "busy:%lld [%d%%], max:[%lld, %lld, %lld], interval:%d\n",
@@ -141,13 +157,18 @@ static void rps_timer(struct timer_list *t)
 			 max_busy[0], max_busy[1], max_busy[2],
 			 rps->pm_interval);
 
-		if (100 * busy > rps->power.up_threshold * dt &&
-		    rps->cur_freq < rps->max_freq_softlimit) {
+		if (rps->cur_freq < rps->max_freq_softlimit &&
+		    race_to_idle(rps, max_busy[0], dt)) {
 			rps->pm_iir |= GEN6_PM_RP_UP_THRESHOLD;
 			rps->pm_interval = 1;
 			schedule_work(&rps->work);
-		} else if (100 * busy < rps->power.down_threshold * dt &&
-			   rps->cur_freq > rps->min_freq_softlimit) {
+		} else if (rps->cur_freq < rps->max_freq_softlimit &&
+			   100 * busy > rps->power.up_threshold * dt) {
+			rps->pm_iir |= GEN6_PM_RP_UP_THRESHOLD;
+			rps->pm_interval = 1;
+			schedule_work(&rps->work);
+		} else if (rps->cur_freq > rps->min_freq_softlimit &&
+			   100 * busy < rps->power.down_threshold * dt) {
 			rps->pm_iir |= GEN6_PM_RP_DOWN_THRESHOLD;
 			rps->pm_interval = 1;
 			schedule_work(&rps->work);
