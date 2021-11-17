@@ -4708,7 +4708,8 @@ type3_infoblock(struct net_device *dev, u_char count, u_char *p)
     if (lp->state == INITIALISED) {
         lp->ibn = 3;
         lp->active = *p++;
-	if (MOTO_SROM_BUG) lp->active = 0;
+	/* The DE4X5_MAX_PHY is length of lp->phy, and its value is 8 */
+	if (MOTO_SROM_BUG || lp->active == DE4X5_MAX_PHY) lp->active = 0;
 	lp->phy[lp->active].gep = (*p ? p : NULL); p += (2 * (*p) + 1);
 	lp->phy[lp->active].rst = (*p ? p : NULL); p += (2 * (*p) + 1);
 	lp->phy[lp->active].mc  = get_unaligned_le16(p); p += 2;
