@@ -56,6 +56,7 @@ struct cvm_mmc_host {
 	struct device *dev;
 	void __iomem *base;
 	void __iomem *dma_base;
+
 	int reg_off;
 	int reg_off_dma;
 	u64 emm_cfg;
@@ -70,6 +71,7 @@ struct cvm_mmc_host {
 	bool use_sg;
 
 	bool has_ciu3;
+	bool use_vqmmc;  /* Force disable slot over switch */
 	bool big_dma_addr;
 	bool need_irq_handler_lock;
 	spinlock_t irq_handler_lock;
@@ -206,10 +208,14 @@ struct cvm_mmc_cr_mods {
 #define MIO_EMM_SWITCH_CLK_HI		GENMASK_ULL(31, 16)
 #define MIO_EMM_SWITCH_CLK_LO		GENMASK_ULL(15, 0)
 
+/* Additional defines */
+#define MODE_SWITCH_RETRIES	100
+
 /* Protoypes */
 irqreturn_t cvm_mmc_interrupt(int irq, void *dev_id);
 int cvm_mmc_of_slot_probe(struct device *dev, struct cvm_mmc_host *host);
 int cvm_mmc_of_slot_remove(struct cvm_mmc_slot *slot);
 extern const char *cvm_mmc_irq_names[];
 
-#endif
+#endif /* _CAVIUM_MMC_H_ */
+

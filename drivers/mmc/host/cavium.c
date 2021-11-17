@@ -193,36 +193,166 @@ static int get_bus_id(u64 reg)
 	return FIELD_GET(GENMASK_ULL(61, 60), reg);
 }
 
-/*
- * We never set the switch_exe bit since that would interfere
- * with the commands send by the MMC core.
+/**
+ * pre_switch - Switch voltage regulators
+ * @prev: Current slot, can be NULL
+ * @next: Next slot
+ *
+ * Switch between regulators used by slots. This call has to be done
+ * after call to pre_switch().
  */
-static void do_switch(struct cvm_mmc_host *host, u64 emm_switch)
+static void switch_vqmmc(struct cvm_mmc_slot *prev, struct cvm_mmc_slot *next)
 {
-	int retries = 100;
+	bool same_vqmmc = false;
+	struct regulator *next_vqmmc;
+	struct regulator *prev_vqmmc;
+
+	next_vqmmc = next->mmc->supply.vqmmc;
+	if (prev) {
+		prev_vqmmc = prev->mmc->supply.vqmmc;
+		/* Prev slot and next slot share vqmmc? */
+		same_vqmmc = prev_vqmmc == next_vqmmc;
+		/* Disable old regulator, if not the same */
+		if (!same_vqmmc && !IS_ERR_OR_NULL(prev_vqmmc))
+			regulator_disable(prev_vqmmc);
+	}
+
+	/* Enable regulator for next slot */
+	if (!same_vqmmc && !IS_ERR_OR_NULL(next_vqmmc)) {
+		int ret;
+
+		ret = regulator_enable(next_vqmmc);
+		if (ret)
+			dev_err(mmc_classdev(next->mmc),
+				"Can't enable vqmmc, error (%d)!\n", ret);
+	}
+}
+
+/**
+ * pre_switch - Start switch operation between slots
+ * @prev: Current slot, can be NULL
+ * @next: Next slot
+ *
+ * MMC block for octeontx2 shares data lines among the three card slots.
+ * To avoid transient states on DAT[0..7] and CLK lines set
+ * CMDn to tri-state when VQMMC is switched.
+ */
+static void pre_switch(struct cvm_mmc_slot *prev, struct cvm_mmc_slot *next)
+{
+	struct cvm_mmc_host *host; /* Common block for all slots */
+
+	host = next->host;
+	if (host->use_vqmmc)
+		/* Disable clock and data lines on all slots */
+		writeq(1ull << 3, host->base + MIO_EMM_CFG(host));
+
+	if (prev) {
+		/* Store current slot settings */
+		prev->cached_switch = readq(host->base + MIO_EMM_SWITCH(host));
+		prev->cached_rca = readq(host->base + MIO_EMM_RCA(host));
+	}
+}
+
+/**
+ * post_switch - Finish switch operation
+ * @prev: Current slot
+ * @next: Next slot
+ *
+ * Function finishes switch operation by enabling selcted slot
+ * and recovering its settigs.
+ */
+static void post_switch(struct cvm_mmc_slot *prev, struct cvm_mmc_slot *next)
+{
+	struct cvm_mmc_host *host; /* Common block for all slots */
+
+	host = next->host;
+	if (host->use_vqmmc)
+		/* Enable clock and data lines for current slot */
+		writeq(1ull << next->bus_id, host->base + MIO_EMM_CFG(host));
+
+	/* Read back values set during switch */
+	next->cached_switch = readq(host->base + MIO_EMM_SWITCH(host));
+	/* Set RCA value */
+	writeq(next->cached_rca, host->base + MIO_EMM_RCA(host));
+}
+
+/**
+ * mode_switch - Performs low level switch operation
+ * @host: Common hardware block for all slots
+ * @emm_switch: register value to use for the operation
+ *
+ * Function finishes switch operation by enabling selcted slot
+ * and recovering its settigs.
+ */
+static inline void mode_switch(struct cvm_mmc_host *host, u64 emm_switch)
+{
+	unsigned int retries = MODE_SWITCH_RETRIES;
 	u64 rsp_sts;
-	int bus_id;
 
-	/*
-	 * Modes setting only taken from slot 0. Work around that hardware
-	 * issue by first switching to slot 0.
-	 */
-	bus_id = get_bus_id(emm_switch);
-	clear_bus_id(&emm_switch);
 	writeq(emm_switch, host->base + MIO_EMM_SWITCH(host));
-
-	set_bus_id(&emm_switch, bus_id);
-	writeq(emm_switch, host->base + MIO_EMM_SWITCH(host));
-
-	/* wait for the switch to finish */
+	/* Wait for switch completion */
 	do {
 		rsp_sts = readq(host->base + MIO_EMM_RSP_STS(host));
 		if (!(rsp_sts & MIO_EMM_RSP_STS_SWITCH_VAL))
 			break;
 		udelay(10);
 	} while (--retries);
+}
 
+/**
+ * do_switch - Performs switch operation
+ * @host: Common hardware block for all slots
+ * @emm_switch: register value to use for the operation
+ *
+ * Function performs switch operation between slost on hardware level.
+ * It is also called when the same slot changes mode, class or bus width.
+ * Switch requires sometimes to change current slot, store some of the slot
+ * information. Additionally, the volatge regulator for a card has to be
+ * switched too. Function uses use_vqmmc quirk for hardware.
+ * The quirk is related to errata that requires to go over slot 0
+ * for all switch operations, otherwise no parameters are accepted.
+ */
+static void do_switch(struct cvm_mmc_host *host, u64 emm_switch)
+{
+	struct cvm_mmc_slot *next, *prev;
+	int bus_id;
+	bool slot_changed;
+
+	/* Initially previous slot is not set */
+	prev = NULL;
+	/* Read back bus id and get slot. Check does bus_id != last_slot */
+	bus_id = FIELD_GET(MIO_EMM_SWITCH_BUS_ID, emm_switch);
+	next = host->slot[bus_id];
+	slot_changed = host->last_slot != bus_id;
+	if (host->last_slot != -1)
+		prev = host->slot[host->last_slot];
+
+	/* Prepare to slot switch, switch voltage regulators */
+	if (slot_changed) {
+		pre_switch(prev, next);
+		switch_vqmmc(prev, next);
+	}
+
+	/*
+	 * Modes setting only taken from slot 0. Work around that hardware
+	 * issue by first switching to slot 0.
+	 */
+	if (bus_id) {
+		u64 emm_switch0;
+		/* Clear bus_id and switch through bus_id 0 */
+		emm_switch0 = emm_switch & (~MIO_EMM_SWITCH_BUS_ID);
+		mode_switch(host, emm_switch0);
+	}
+
+	/* Switch with target bus_id */
+	mode_switch(host, emm_switch);
 	check_switch_errors(host);
+
+	if (slot_changed)
+		post_switch(prev, next);
+
+	/* Set current slot id */
+	host->last_slot = bus_id;
 }
 
 static bool switch_val_changed(struct cvm_mmc_slot *slot, u64 new_val)
@@ -972,7 +1102,7 @@ static int cvm_mmc_of_parse(struct device *dev, struct cvm_mmc_slot *slot)
 	 * Legacy Octeon firmware has no regulator entry, fall-back to
 	 * a hard-coded voltage to get a sane OCR.
 	 */
-	if (IS_ERR(mmc->supply.vmmc))
+	if (IS_ERR_OR_NULL(mmc->supply.vmmc))
 		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
 
 	/* Common MMC bindings */
@@ -1058,6 +1188,8 @@ int cvm_mmc_of_slot_probe(struct device *dev, struct cvm_mmc_host *host)
 
 	host->acquire_bus(host);
 	host->slot[id] = slot;
+	host->use_vqmmc = host->use_vqmmc ||
+			  !IS_ERR_OR_NULL(slot->mmc->supply.vqmmc);
 	cvm_mmc_switch_to(slot);
 	cvm_mmc_init_lowlevel(slot);
 	host->release_bus(host);
