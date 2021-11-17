@@ -1,0 +1,28 @@
+drm drm-fixes fa55b7dcdc43c1aa1ba12bca9d2dd4318c2a0dbf
+	Linux 5.16-rc1
+drm-misc drm-misc-fixes fb561bf9abde49f7e00fdbf9ed2ccf2d86cac8ee
+	fbdev: Prevent probing generic drivers if a FB is already registered
+drm-intel drm-intel-fixes 8b2abf777d8ea8d8db15af553454e0e976804225
+	drm/i915/guc: fix NULL vs IS_ERR() checking
+drm drm-next fa55b7dcdc43c1aa1ba12bca9d2dd4318c2a0dbf
+	Linux 5.16-rc1
+drm-misc drm-misc-next-fixes bcae3af286f49bf4f6cda03f165fbe530f4a6bed
+	drm/locking: fix __stack_depot_* name conflict
+drm-intel drm-intel-next-fixes fa55b7dcdc43c1aa1ba12bca9d2dd4318c2a0dbf
+	Linux 5.16-rc1
+drm-misc drm-misc-next 37fe0cf5fb803d98efd7feb64b408c9b029c1085
+	drm/i915: Clarify probing order in intel_dp_aux_init_backlight_funcs()
+drm-intel drm-intel-next a59308a5fb231aca72b9b070a6577fa49ec2d72a
+	drm/i915: Fix fastsets on TypeC ports following a non-blocking modeset
+drm-intel drm-intel-gt-next fc12b70d12d07598cde27cc17dbfafc2a2a33ff8
+	drm/i915/guc: fix NULL vs IS_ERR() checking
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
