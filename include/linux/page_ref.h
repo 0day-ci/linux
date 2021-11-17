@@ -8,8 +8,6 @@
 #include <linux/tracepoint-defs.h>
 
 DECLARE_TRACEPOINT(page_ref_init);
-DECLARE_TRACEPOINT(page_ref_mod);
-DECLARE_TRACEPOINT(page_ref_mod_and_test);
 DECLARE_TRACEPOINT(page_ref_mod_and_return);
 DECLARE_TRACEPOINT(page_ref_add_unless);
 DECLARE_TRACEPOINT(page_ref_freeze);
@@ -27,8 +25,6 @@ DECLARE_TRACEPOINT(page_ref_unfreeze);
 #define page_ref_tracepoint_active(t) tracepoint_enabled(t)
 
 extern void __page_ref_init(struct page *page);
-extern void __page_ref_mod(struct page *page, int v);
-extern void __page_ref_mod_and_test(struct page *page, int v, int ret);
 extern void __page_ref_mod_and_return(struct page *page, int v, int ret);
 extern void __page_ref_add_unless(struct page *page, int v, int u, int ret);
 extern void __page_ref_freeze(struct page *page, int v, int ret);
@@ -39,12 +35,6 @@ extern void __page_ref_unfreeze(struct page *page, int v);
 #define page_ref_tracepoint_active(t) false
 
 static inline void __page_ref_init(struct page *page)
-{
-}
-static inline void __page_ref_mod(struct page *page, int v)
-{
-}
-static inline void __page_ref_mod_and_test(struct page *page, int v, int ret)
 {
 }
 static inline void __page_ref_mod_and_return(struct page *page, int v, int ret)
@@ -127,32 +117,12 @@ static inline int page_ref_add_return(struct page *page, int nr)
 
 static inline void page_ref_add(struct page *page, int nr)
 {
-	int old_val = atomic_fetch_add(nr, &page->_refcount);
-	int new_val = old_val + nr;
-
-	VM_BUG_ON_PAGE((unsigned int)new_val < (unsigned int)old_val, page);
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, nr);
+	page_ref_add_return(page, nr);
 }
 
 static inline void folio_ref_add(struct folio *folio, int nr)
 {
 	page_ref_add(&folio->page, nr);
-}
-
-static inline void page_ref_sub(struct page *page, int nr)
-{
-	int old_val = atomic_fetch_sub(nr, &page->_refcount);
-	int new_val = old_val - nr;
-
-	VM_BUG_ON_PAGE((unsigned int)new_val > (unsigned int)old_val, page);
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, -nr);
-}
-
-static inline void folio_ref_sub(struct folio *folio, int nr)
-{
-	page_ref_sub(&folio->page, nr);
 }
 
 static inline int page_ref_sub_return(struct page *page, int nr)
@@ -166,56 +136,19 @@ static inline int page_ref_sub_return(struct page *page, int nr)
 	return new_val;
 }
 
+static inline void page_ref_sub(struct page *page, int nr)
+{
+	page_ref_sub_return(page, nr);
+}
+
+static inline void folio_ref_sub(struct folio *folio, int nr)
+{
+	page_ref_sub(&folio->page, nr);
+}
+
 static inline int folio_ref_sub_return(struct folio *folio, int nr)
 {
 	return page_ref_sub_return(&folio->page, nr);
-}
-
-static inline void page_ref_inc(struct page *page)
-{
-	int old_val = atomic_fetch_inc(&page->_refcount);
-	int new_val = old_val + 1;
-
-	VM_BUG_ON_PAGE((unsigned int)new_val < (unsigned int)old_val, page);
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, 1);
-}
-
-static inline void folio_ref_inc(struct folio *folio)
-{
-	page_ref_inc(&folio->page);
-}
-
-static inline void page_ref_dec(struct page *page)
-{
-	int old_val = atomic_fetch_dec(&page->_refcount);
-	int new_val = old_val - 1;
-
-	VM_BUG_ON_PAGE((unsigned int)new_val > (unsigned int)old_val, page);
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, -1);
-}
-
-static inline void folio_ref_dec(struct folio *folio)
-{
-	page_ref_dec(&folio->page);
-}
-
-static inline int page_ref_sub_and_test(struct page *page, int nr)
-{
-	int old_val = atomic_fetch_sub(nr, &page->_refcount);
-	int new_val = old_val - nr;
-	int ret = new_val == 0;
-
-	VM_BUG_ON_PAGE((unsigned int)new_val > (unsigned int)old_val, page);
-	if (page_ref_tracepoint_active(page_ref_mod_and_test))
-		__page_ref_mod_and_test(page, -nr, ret);
-	return ret;
-}
-
-static inline int folio_ref_sub_and_test(struct folio *folio, int nr)
-{
-	return page_ref_sub_and_test(&folio->page, nr);
 }
 
 static inline int page_ref_inc_return(struct page *page)
@@ -229,26 +162,14 @@ static inline int page_ref_inc_return(struct page *page)
 	return new_val;
 }
 
-static inline int folio_ref_inc_return(struct folio *folio)
+static inline void page_ref_inc(struct page *page)
 {
-	return page_ref_inc_return(&folio->page);
+	page_ref_inc_return(page);
 }
 
-static inline int page_ref_dec_and_test(struct page *page)
+static inline void folio_ref_inc(struct folio *folio)
 {
-	int old_val = atomic_fetch_dec(&page->_refcount);
-	int new_val = old_val - 1;
-	int ret = new_val == 0;
-
-	VM_BUG_ON_PAGE((unsigned int)new_val > (unsigned int)old_val, page);
-	if (page_ref_tracepoint_active(page_ref_mod_and_test))
-		__page_ref_mod_and_test(page, -1, ret);
-	return ret;
-}
-
-static inline int folio_ref_dec_and_test(struct folio *folio)
-{
-	return page_ref_dec_and_test(&folio->page);
+	page_ref_inc(&folio->page);
 }
 
 static inline int page_ref_dec_return(struct page *page)
@@ -260,6 +181,41 @@ static inline int page_ref_dec_return(struct page *page)
 	if (page_ref_tracepoint_active(page_ref_mod_and_return))
 		__page_ref_mod_and_return(page, -1, new_val);
 	return new_val;
+}
+
+static inline void page_ref_dec(struct page *page)
+{
+	page_ref_dec_return(page);
+}
+
+static inline void folio_ref_dec(struct folio *folio)
+{
+	page_ref_dec(&folio->page);
+}
+
+static inline int page_ref_sub_and_test(struct page *page, int nr)
+{
+	return page_ref_sub_return(page, nr) == 0;
+}
+
+static inline int folio_ref_sub_and_test(struct folio *folio, int nr)
+{
+	return page_ref_sub_and_test(&folio->page, nr);
+}
+
+static inline int folio_ref_inc_return(struct folio *folio)
+{
+	return page_ref_inc_return(&folio->page);
+}
+
+static inline int page_ref_dec_and_test(struct page *page)
+{
+	return page_ref_dec_return(page) == 0;
+}
+
+static inline int folio_ref_dec_and_test(struct folio *folio)
+{
+	return page_ref_dec_and_test(&folio->page);
 }
 
 static inline int folio_ref_dec_return(struct folio *folio)
