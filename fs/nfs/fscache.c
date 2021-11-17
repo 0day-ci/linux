@@ -382,9 +382,7 @@ static void nfs_fscache_read_page_complete(struct page *page,
 					       void *context,
 					       int error)
 {
-	dfprintk(FSCACHE,
-		 "NFS: fscache_read_page_complete (0x%p/0x%p/%d)\n",
-		 page, context, error);
+	trace_nfs_fscache_read_page_complete(page->mapping->host, page, 1, error);
 
 	/*
 	 * If the read completes with an error, mark the page with PG_checked,
@@ -405,13 +403,11 @@ int __nfs_fscache_read_page(struct nfs_open_context *ctx,
 {
 	int ret;
 
-	dfprintk(FSCACHE,
-		 "NFS: readpage_from_fscache(fsc:%p/p:%p(i:%lx f:%lx)/0x%p)\n",
-		 nfs_i_fscache(inode), page, page->index, page->flags, inode);
-
+	trace_nfs_fscache_read_pages(inode, page, 1);
 	if (PageChecked(page)) {
 		ClearPageChecked(page);
-		return 1;
+		ret = 1;
+		goto out;
 	}
 
 	ret = fscache_read_or_alloc_page(nfs_i_fscache(inode),
@@ -422,22 +418,21 @@ int __nfs_fscache_read_page(struct nfs_open_context *ctx,
 
 	switch (ret) {
 	case 0: /* read BIO submitted (page in fscache) */
-		dfprintk(FSCACHE,
-			 "NFS:    fscache_read_page: BIO submitted\n");
 		nfs_inc_fscache_stats(inode, NFSIOS_FSCACHE_PAGES_READ_OK);
-		return ret;
+		break;
 
 	case -ENOBUFS: /* inode not in cache */
 	case -ENODATA: /* page not in cache */
 		nfs_inc_fscache_stats(inode, NFSIOS_FSCACHE_PAGES_READ_FAIL);
-		dfprintk(FSCACHE,
-			 "NFS:    fscache_read_page %d\n", ret);
-		return 1;
+		ret = 1;
+		break;
 
 	default:
-		dfprintk(FSCACHE, "NFS:    fscache_read_page %d\n", ret);
 		nfs_inc_fscache_stats(inode, NFSIOS_FSCACHE_PAGES_READ_FAIL);
 	}
+
+out:
+	trace_nfs_fscache_read_pages_exit(inode, page, 1, ret);
 	return ret;
 }
 
@@ -453,8 +448,7 @@ int __nfs_fscache_read_pages(struct nfs_open_context *ctx,
 	unsigned npages = *nr_pages;
 	int ret;
 
-	dfprintk(FSCACHE, "NFS: fscache_read_pages (0x%p/%u/0x%p)\n",
-		 nfs_i_fscache(inode), npages, inode);
+	trace_nfs_fscache_read_pages(inode, lru_to_page(pages), *nr_pages);
 
 	ret = fscache_read_or_alloc_pages(nfs_i_fscache(inode),
 					  mapping, pages, nr_pages,
@@ -472,22 +466,18 @@ int __nfs_fscache_read_pages(struct nfs_open_context *ctx,
 	case 0: /* read submitted to the cache for all pages */
 		BUG_ON(!list_empty(pages));
 		BUG_ON(*nr_pages != 0);
-		dfprintk(FSCACHE,
-			 "NFS: fscache_read_pages: submitted\n");
-
-		return ret;
+		break;
 
 	case -ENOBUFS: /* some pages aren't cached and can't be */
 	case -ENODATA: /* some pages aren't cached */
-		dfprintk(FSCACHE,
-			 "NFS: fscache_read_pages: no page: %d\n", ret);
-		return 1;
+		ret = 1;
+		break;
 
 	default:
-		dfprintk(FSCACHE,
-			 "NFS: fscache_read_pages: ret  %d\n", ret);
+		;
 	}
 
+	trace_nfs_fscache_read_pages_exit(inode, lru_to_page(pages), *nr_pages, ret);
 	return ret;
 }
 
@@ -499,16 +489,10 @@ void __nfs_fscache_write_page(struct inode *inode, struct page *page, int sync)
 {
 	int ret;
 
-	dfprintk(FSCACHE,
-		 "NFS: fscache_write_page(fsc:%p/p:%p(i:%lx f:%lx)/%d)\n",
-		 nfs_i_fscache(inode), page, page->index, page->flags, sync);
+	trace_nfs_fscache_write_page(inode, page, 1);
 
 	ret = fscache_write_page(nfs_i_fscache(inode), page,
 				 inode->i_size, GFP_KERNEL);
-	dfprintk(FSCACHE,
-		 "NFS:     nfs_fscache_write_page: p:%p(i:%lu f:%lx) ret %d\n",
-		 page, page->index, page->flags, ret);
-
 	if (ret != 0) {
 		fscache_uncache_page(nfs_i_fscache(inode), page);
 		nfs_inc_fscache_stats(inode,
@@ -518,4 +502,5 @@ void __nfs_fscache_write_page(struct inode *inode, struct page *page, int sync)
 		nfs_inc_fscache_stats(inode,
 				      NFSIOS_FSCACHE_PAGES_WRITTEN_OK);
 	}
+	trace_nfs_fscache_write_page_exit(inode, page, 1, ret);
 }
