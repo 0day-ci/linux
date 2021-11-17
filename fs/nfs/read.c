@@ -123,7 +123,7 @@ static void nfs_readpage_release(struct nfs_page *req, int error)
 		struct address_space *mapping = page_file_mapping(page);
 
 		if (PageUptodate(page))
-			nfs_readpage_to_fscache(inode, page, 0);
+			nfs_fscache_write_page(inode, page, 0);
 		else if (!PageError(page) && !PagePrivate(page))
 			generic_error_remove_page(mapping, page);
 		unlock_page(page);
@@ -367,7 +367,7 @@ int nfs_readpage(struct file *file, struct page *page)
 
 	xchg(&desc.ctx->error, 0);
 	if (!IS_SYNC(inode)) {
-		ret = nfs_readpage_from_fscache(desc.ctx, inode, page);
+		ret = nfs_fscache_read_page(desc.ctx, inode, page);
 		if (ret == 0)
 			goto out_wait;
 	}
@@ -422,7 +422,7 @@ int nfs_readpages(struct file *file, struct address_space *mapping,
 	/* attempt to read as many of the pages as possible from the cache
 	 * - this returns -ENOBUFS immediately if the cookie is negative
 	 */
-	ret = nfs_readpages_from_fscache(desc.ctx, inode, mapping,
+	ret = nfs_fscache_read_pages(desc.ctx, inode, mapping,
 					 pages, &nr_pages);
 	if (ret == 0)
 		goto read_complete; /* all pages were read */
