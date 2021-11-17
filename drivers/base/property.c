@@ -922,6 +922,40 @@ int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
 EXPORT_SYMBOL_GPL(fwnode_get_phy_mode);
 
 /**
+ * fwnode_get_phy_modes - Fill in phy modes bitmap for given firmware node
+ * @fwnode:	Pointer to the given node
+ * @interfaces:	Phy modes bitmask, as declared by DECLARE_PHY_INTERFACE_MASK()
+ *
+ * Reads the strings from property 'phy-mode' or 'phy-connection-type' and fills
+ * interfaces bitmask. Returns 0 on success, or errno on error.
+ */
+int fwnode_get_phy_modes(struct fwnode_handle *fwnode,
+			 unsigned long *interfaces)
+{
+	const char *modes[PHY_INTERFACE_MODE_MAX];
+	int len, i, j;
+
+	len = fwnode_property_read_string_array(fwnode, "phy-mode", modes,
+						ARRAY_SIZE(modes));
+	if (len < 0)
+		len = fwnode_property_read_string_array(fwnode,
+							"phy-connection-type",
+							modes,
+							ARRAY_SIZE(modes));
+	if (len < 0)
+		return len;
+
+	phy_interface_zero(interfaces);
+	for (i = 0; i < len; ++i)
+		for (j = 0; j < PHY_INTERFACE_MODE_MAX; j++)
+			if (!strcasecmp(modes[i], phy_modes(j)))
+				__set_bit(j, interfaces);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(fwnode_get_phy_modes);
+
+/**
  * device_get_phy_mode - Get first phy mode for given device
  * @dev:	Pointer to the given device
  *
