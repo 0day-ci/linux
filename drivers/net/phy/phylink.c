@@ -1430,6 +1430,10 @@ int phylink_connect_phy(struct phylink *pl, struct phy_device *phy)
 {
 	int ret;
 
+	/* Set the PHY's host supported interfaces */
+	phy_interface_copy(phy->host_interfaces,
+			   pl->config->supported_interfaces);
+
 	/* Use PHY device/driver interface */
 	if (pl->link_interface == PHY_INTERFACE_MODE_NA) {
 		pl->link_interface = phy->interface;
@@ -1504,6 +1508,10 @@ int phylink_fwnode_phy_connect(struct phylink *pl,
 	fwnode_handle_put(phy_fwnode);
 	if (!phy_dev)
 		return -ENODEV;
+
+	/* Set the PHY's host supported interfaces */
+	phy_interface_copy(phy_dev->host_interfaces,
+			   pl->config->supported_interfaces);
 
 	ret = phy_attach_direct(pl->netdev, phy_dev, flags,
 				pl->link_interface);
@@ -2689,6 +2697,8 @@ static bool phylink_phy_no_inband(struct phy_device *phy)
 		(phy->c45_ids.device_ids[1] & 0xfffffff0) == 0xae025150;
 }
 
+static DECLARE_PHY_INTERFACE_MASK(phylink_sfp_interfaces);
+
 static int phylink_sfp_connect_phy(void *upstream, struct phy_device *phy)
 {
 	struct phylink *pl = upstream;
@@ -2709,6 +2719,10 @@ static int phylink_sfp_connect_phy(void *upstream, struct phy_device *phy)
 		mode = MLO_AN_PHY;
 	else
 		mode = MLO_AN_INBAND;
+
+	/* Set the PHY's host supported interfaces */
+	phy_interface_and(phy->host_interfaces, phylink_sfp_interfaces,
+			  pl->config->supported_interfaces);
 
 	/* Do the initial configuration */
 	ret = phylink_sfp_config(pl, mode, phy->supported, phy->advertising);
@@ -3070,5 +3084,19 @@ void phylink_mii_c45_pcs_get_state(struct mdio_device *pcs,
 	}
 }
 EXPORT_SYMBOL_GPL(phylink_mii_c45_pcs_get_state);
+
+static int __init phylink_init(void)
+{
+	__set_bit(PHY_INTERFACE_MODE_USXGMII, phylink_sfp_interfaces);
+	__set_bit(PHY_INTERFACE_MODE_10GBASER, phylink_sfp_interfaces);
+	__set_bit(PHY_INTERFACE_MODE_10GKR, phylink_sfp_interfaces);
+	__set_bit(PHY_INTERFACE_MODE_5GBASER, phylink_sfp_interfaces);
+	__set_bit(PHY_INTERFACE_MODE_2500BASEX, phylink_sfp_interfaces);
+	__set_bit(PHY_INTERFACE_MODE_SGMII, phylink_sfp_interfaces);
+	__set_bit(PHY_INTERFACE_MODE_1000BASEX, phylink_sfp_interfaces);
+
+	return 0;
+}
+module_init(phylink_init);
 
 MODULE_LICENSE("GPL v2");
