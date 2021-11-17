@@ -81,6 +81,20 @@ struct uvcg_format *find_format_by_index(struct uvc_device *uvc, int index)
 	return uformat;
 }
 
+int find_format_index(struct uvc_device *uvc, struct uvcg_format *uformat)
+{
+	struct uvcg_format_ptr *format;
+	int i = 1;
+
+	list_for_each_entry(format, &uvc->header->formats, entry) {
+		if (uformat == format->fmt)
+			return i;
+		i++;
+	}
+
+	return 0;
+}
+
 struct uvcg_frame *find_frame_by_index(struct uvc_device *uvc,
 				       struct uvcg_format *uformat,
 				       int index)
@@ -169,8 +183,7 @@ static struct uvcg_frame *find_closest_frame_by_size(struct uvc_device *uvc,
  * Requests handling
  */
 
-static int
-uvc_send_response(struct uvc_device *uvc, struct uvc_request_data *data)
+int uvc_send_response(struct uvc_device *uvc, struct uvc_request_data *data)
 {
 	struct usb_composite_dev *cdev = uvc->func.config->cdev;
 	struct usb_request *req = uvc->control_req;
@@ -229,12 +242,14 @@ uvc_v4l2_get_format(struct file *file, void *fh, struct v4l2_format *fmt)
 }
 
 static int _uvc_v4l2_try_fmt(struct uvc_video *video, struct v4l2_format *fmt,
+			     struct uvc_streaming_control *probe,
 			     struct uvcg_format **uvc_format,
 			     struct uvcg_frame **uvc_frame)
 {
 	struct uvc_device *uvc = video->uvc;
 	struct uvcg_format *uformat;
 	struct uvcg_frame *uframe;
+	int iformat;
 	u8 *fcc;
 
 	if (fmt->type != video->queue.queue.type)
@@ -248,6 +263,10 @@ static int _uvc_v4l2_try_fmt(struct uvc_video *video, struct v4l2_format *fmt,
 
 	uformat = find_format_by_pix(uvc, fmt->fmt.pix.pixelformat);
 	if (!uformat)
+		return -EINVAL;
+
+	iformat = find_format_index(uvc, uformat);
+	if (!iformat)
 		return -EINVAL;
 
 	uframe = find_closest_frame_by_size(uvc, uformat,
@@ -268,6 +287,10 @@ static int _uvc_v4l2_try_fmt(struct uvc_video *video, struct v4l2_format *fmt,
 		*uvc_format = uformat;
 	if (uvc_frame)
 		*uvc_frame = uframe;
+	if (probe)
+		uvc_fill_streaming_control(uvc, probe, iformat,
+					   uframe->frame.b_frame_index,
+					   video->cur_ival);
 
 	return 0;
 }
@@ -279,7 +302,7 @@ uvc_v4l2_try_fmt(struct file *file, void *fh, struct v4l2_format *fmt)
 	struct uvc_device *uvc = video_get_drvdata(vdev);
 	struct uvc_video *video = &uvc->video;
 
-	return _uvc_v4l2_try_fmt(video, fmt, NULL, NULL);
+	return _uvc_v4l2_try_fmt(video, fmt, NULL, NULL, NULL);
 }
 
 static int
@@ -288,16 +311,22 @@ uvc_v4l2_set_format(struct file *file, void *fh, struct v4l2_format *fmt)
 	struct video_device *vdev = video_devdata(file);
 	struct uvc_device *uvc = video_get_drvdata(vdev);
 	struct uvc_video *video = &uvc->video;
+	struct uvc_streaming_control probe;
 	struct uvcg_format *uformat;
 	struct uvcg_frame *uframe;
 	int ret;
 
-	ret = _uvc_v4l2_try_fmt(video, fmt, &uformat, &uframe);
+	ret = _uvc_v4l2_try_fmt(video, fmt, &probe, &uformat, &uframe);
 	if (ret)
 		return ret;
 
+	spin_lock(&video->frame_lock);
+
+	video->commit = probe;
 	video->cur_format = uformat;
 	video->cur_frame = uframe;
+
+	spin_unlock(&video->frame_lock);
 
 	return ret;
 }
@@ -496,14 +525,20 @@ uvc_v4l2_subscribe_event(struct v4l2_fh *fh,
 	if (sub->type < UVC_EVENT_FIRST || sub->type > UVC_EVENT_LAST)
 		return -EINVAL;
 
-	if (sub->type == UVC_EVENT_SETUP && uvc->func_connected)
+	if (sub->type == UVC_EVENT_STREAMON && uvc->func_connected)
 		return -EBUSY;
 
 	ret = v4l2_event_subscribe(fh, sub, 2, NULL);
 	if (ret < 0)
 		return ret;
 
-	if (sub->type == UVC_EVENT_SETUP) {
+	if (sub->type == UVC_EVENT_SETUP)
+		uvc->setup_subscribed = true;
+
+	if (sub->type == UVC_EVENT_DATA)
+		uvc->data_subscribed = true;
+
+	if (sub->type == UVC_EVENT_STREAMON) {
 		uvc->func_connected = true;
 		handle->is_uvc_app_handle = true;
 		uvc_function_connect(uvc);
@@ -532,7 +567,10 @@ uvc_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 	if (ret < 0)
 		return ret;
 
-	if (sub->type == UVC_EVENT_SETUP && handle->is_uvc_app_handle) {
+	if (sub->type == UVC_EVENT_SETUP)
+		uvc->setup_subscribed = false;
+
+	if (sub->type == UVC_EVENT_STREAMON && handle->is_uvc_app_handle) {
 		uvc_v4l2_disable(uvc);
 		handle->is_uvc_app_handle = false;
 	}
