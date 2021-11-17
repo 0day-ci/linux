@@ -1303,7 +1303,7 @@ static ssize_t omapfb_show_panel_name(struct device *dev,
 {
 	struct omapfb_device *fbdev = dev_get_drvdata(dev);
 
-	return snprintf(buf, PAGE_SIZE, "%s\n", fbdev->panel->name);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", fbdev->panel->name);
 }
 
 static ssize_t omapfb_show_bklight_level(struct device *dev,
@@ -1314,7 +1314,7 @@ static ssize_t omapfb_show_bklight_level(struct device *dev,
 	int r;
 
 	if (fbdev->panel->get_bklight_level) {
-		r = snprintf(buf, PAGE_SIZE, "%d\n",
+		r = scnprintf(buf, PAGE_SIZE, "%d\n",
 			     fbdev->panel->get_bklight_level(fbdev->panel));
 	} else
 		r = -ENODEV;
@@ -1348,7 +1348,7 @@ static ssize_t omapfb_show_bklight_max(struct device *dev,
 	int r;
 
 	if (fbdev->panel->get_bklight_level) {
-		r = snprintf(buf, PAGE_SIZE, "%d\n",
+		r = scnprintf(buf, PAGE_SIZE, "%d\n",
 			     fbdev->panel->get_bklight_max(fbdev->panel));
 	} else
 		r = -ENODEV;
@@ -1379,7 +1379,7 @@ static ssize_t omapfb_show_ctrl_name(struct device *dev,
 {
 	struct omapfb_device *fbdev = dev_get_drvdata(dev);
 
-	return snprintf(buf, PAGE_SIZE, "%s\n", fbdev->ctrl->name);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", fbdev->ctrl->name);
 }
 
 static struct device_attribute dev_attr_ctrl_name =
