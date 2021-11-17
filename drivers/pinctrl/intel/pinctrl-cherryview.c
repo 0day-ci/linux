@@ -1686,6 +1686,10 @@ static int chv_pinctrl_probe(struct platform_device *pdev)
 	acpi_status status;
 	int i, ret, irq;
 
+	/* Cherry Trail DSDTs have an extra INT33FF device with UID 5, ignore */
+	if (!strcmp(adev->pnp.unique_id, "5"))
+		return -ENODEV;
+
 	soc_data = intel_pinctrl_get_soc_data(pdev);
 	if (IS_ERR(soc_data))
 		return PTR_ERR(soc_data);
