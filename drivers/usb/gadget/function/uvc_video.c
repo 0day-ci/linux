@@ -19,6 +19,7 @@
 #include "uvc.h"
 #include "uvc_queue.h"
 #include "uvc_video.h"
+#include "uvc_configfs.h"
 
 /* --------------------------------------------------------------------------
  * Video codecs
@@ -474,21 +475,71 @@ int uvcg_video_enable(struct uvc_video *video, int enable)
 	return ret;
 }
 
+static int uvc_frame_default(struct uvcg_format *uformat)
+{
+	struct uvcg_uncompressed *u;
+	struct uvcg_mjpeg *m;
+
+	switch (uformat->type) {
+	case UVCG_UNCOMPRESSED:
+		u = to_uvcg_uncompressed(&uformat->group.cg_item);
+		if (u)
+			return u->desc.bDefaultFrameIndex;
+		break;
+	case UVCG_MJPEG:
+		m = to_uvcg_mjpeg(&uformat->group.cg_item);
+		if (m)
+			return m->desc.bDefaultFrameIndex;
+		break;
+	}
+
+	return 0;
+}
+
+static int uvc_default_frame_interval(struct uvc_video *video)
+{
+	int i;
+
+	for (i = 0; i < video->cur_frame->frame.b_frame_interval_type; i++) {
+		if (video->cur_frame->frame.dw_default_frame_interval ==
+			video->cur_frame->dw_frame_interval[i]) {
+			video->cur_ival = i + 1;
+			return i + 1;
+		}
+	}
+
+	/* fallback */
+	return 1;
+}
+
 /*
  * Initialize the UVC video stream.
  */
 int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 {
+	int iframe;
+
 	INIT_LIST_HEAD(&video->req_free);
 	spin_lock_init(&video->req_lock);
 	INIT_WORK(&video->pump, uvcg_video_pump);
 
+	if (list_empty(&uvc->header->formats))
+		return -EINVAL;
+
 	video->uvc = uvc;
-	video->fcc = V4L2_PIX_FMT_YUYV;
-	video->bpp = 16;
-	video->width = 320;
-	video->height = 240;
-	video->imagesize = 320 * 240 * 2;
+	video->cur_format = find_format_by_index(uvc, 1);
+	if (!video->cur_format)
+		return -EINVAL;
+
+	iframe = uvc_frame_default(video->cur_format);
+	if (!iframe)
+		return -EINVAL;
+
+	video->cur_frame = find_frame_by_index(uvc, video->cur_format, iframe);
+	if (!video->cur_frame)
+		return -EINVAL;
+
+	video->cur_ival = uvc_default_frame_interval(video);
 
 	/* Initialize the video buffers queue. */
 	uvcg_queue_init(&video->queue, uvc->v4l2_dev.dev->parent,
