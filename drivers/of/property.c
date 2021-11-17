@@ -730,6 +730,9 @@ EXPORT_SYMBOL(of_graph_get_endpoint_by_regs);
  */
 struct device_node *of_graph_get_remote_endpoint(const struct device_node *node)
 {
+	if (!of_device_is_available(node))
+		return NULL;
+
 	/* Get remote endpoint node. */
 	return of_parse_phandle(node, "remote-endpoint", 0);
 }

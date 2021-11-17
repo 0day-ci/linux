@@ -67,10 +67,8 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
 
 	for_each_endpoint_of_node(port, ep) {
 		remote_port = of_graph_get_remote_port(ep);
-		if (!remote_port) {
-			of_node_put(ep);
-			return 0;
-		}
+		if (!remote_port)
+			continue;
 
 		possible_crtcs |= drm_of_crtc_port_mask(dev, remote_port);
 
