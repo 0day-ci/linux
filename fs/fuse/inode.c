@@ -1133,7 +1133,7 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
 			if (arg->flags & FUSE_DONT_MASK)
 				fc->dont_mask = 1;
 			if (arg->flags & FUSE_AUTO_INVAL_DATA)
-				fc->auto_inval_data = 1;
+				fc->auto_inval_data = sb_rdonly(fm->sb) ? 0 : 1;
 			else if (arg->flags & FUSE_EXPLICIT_INVAL_DATA)
 				fc->explicit_inval_data = 1;
 			if (arg->flags & FUSE_DO_READDIRPLUS) {
@@ -1146,7 +1146,7 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
 			if (arg->flags & FUSE_WRITEBACK_CACHE)
 				fc->writeback_cache = 1;
 			if (arg->flags & FUSE_PARALLEL_DIROPS)
-				fc->parallel_dirops = 1;
+				fc->parallel_dirops = sb_rdonly(fm->sb) ? 0 : 1;
 			if (arg->flags & FUSE_HANDLE_KILLPRIV)
 				fc->handle_killpriv = 1;
 			if (arg->time_gran && arg->time_gran <= 1000000000)
