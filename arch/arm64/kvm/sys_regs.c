@@ -841,9 +841,6 @@ static struct id_reg_info id_aa64pfr0_el1_info = {
 
 static struct id_reg_info id_aa64pfr1_el1_info = {
 	.sys_reg = SYS_ID_AA64PFR1_EL1,
-	.ftr_check_types = U_FCT(ID_AA64PFR1_RASFRAC_SHIFT, FCT_IGNORE) |
-			   U_FCT(ID_AA64PFR1_MPAMFRAC_SHIFT, FCT_IGNORE) |
-			   U_FCT(ID_AA64PFR1_CSV2FRAC_SHIFT, FCT_IGNORE),
 	.init = init_id_aa64pfr1_el1_info,
 	.validate = validate_id_aa64pfr1_el1,
 	.get_reset_val = get_reset_id_aa64pfr1_el1,
@@ -3460,10 +3457,106 @@ int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
 	return write_demux_regids(uindices);
 }
 
+/* ID register's fractional field information with its feature field. */
+struct feature_frac {
+	u32	id;
+	u32	shift;
+	u32	frac_id;
+	u32	frac_shift;
+	u8	frac_ftr_check;
+};
+
+static struct feature_frac feature_frac_table[] = {
+	{
+		.frac_id = SYS_ID_AA64PFR1_EL1,
+		.frac_shift = ID_AA64PFR1_RASFRAC_SHIFT,
+		.id = SYS_ID_AA64PFR0_EL1,
+		.shift = ID_AA64PFR0_RAS_SHIFT,
+	},
+	{
+		.frac_id = SYS_ID_AA64PFR1_EL1,
+		.frac_shift = ID_AA64PFR1_MPAMFRAC_SHIFT,
+		.id = SYS_ID_AA64PFR0_EL1,
+		.shift = ID_AA64PFR0_MPAM_SHIFT,
+	},
+	{
+		.frac_id = SYS_ID_AA64PFR1_EL1,
+		.frac_shift = ID_AA64PFR1_CSV2FRAC_SHIFT,
+		.id = SYS_ID_AA64PFR0_EL1,
+		.shift = ID_AA64PFR0_CSV2_SHIFT,
+	},
+};
+
+/*
+ * Return non-zero if the feature/fractional fields pair are not
+ * supported. Return zero otherwise.
+ * This function only checks fractional feature field and assumes
+ * the feature field is valid.
+ */
+static int vcpu_id_reg_feature_frac_check(const struct kvm_vcpu *vcpu,
+					  const struct feature_frac *ftr_frac)
+{
+	u32 id;
+	int fval, flim, ret;
+	u64 val, lim, mask;
+	const struct id_reg_info *id_reg;
+	bool sign = FCT_SIGN(ftr_frac->frac_ftr_check);
+	enum feature_check_type type = FCT_TYPE(ftr_frac->frac_ftr_check);
+
+	/* Check if the feature field value is same as the limit */
+	id = ftr_frac->id;
+	id_reg = GET_ID_REG_INFO(id);
+
+	val = __read_id_reg(vcpu, id);
+	lim = id_reg ? id_reg->vcpu_limit_val : read_sanitised_ftr_reg(id);
+
+	mask = (u64)ARM64_FEATURE_FIELD_MASK << ftr_frac->shift;
+	if ((val & mask) != (lim & mask))
+		/*
+		 * The feature level is smaller than the limit.
+		 * Any fractional version should be fine.
+		 */
+		return 0;
+
+	/* Check the fractional feature field */
+	id = ftr_frac->frac_id;
+	id_reg = GET_ID_REG_INFO(id);
+
+	val = __read_id_reg(vcpu, id);
+	fval = cpuid_feature_extract_field(val, ftr_frac->frac_shift, sign);
+
+	lim = id_reg ? id_reg->vcpu_limit_val : read_sanitised_ftr_reg(id);
+	flim = cpuid_feature_extract_field(lim, ftr_frac->frac_shift, sign);
+
+	ret = arm64_check_feature_one(type, fval, flim);
+	return ret ? -E2BIG : 0;
+}
+
+int kvm_id_regs_consistency_check(const struct kvm_vcpu *vcpu)
+{
+	int i, err;
+	const struct feature_frac *frac;
+
+	/*
+	 * Check ID registers' fractional fields, which aren't checked
+	 * at KVM_SET_ONE_REG.
+	 */
+	for (i = 0; i < ARRAY_SIZE(feature_frac_table); i++) {
+		frac = &feature_frac_table[i];
+		err = vcpu_id_reg_feature_frac_check(vcpu, frac);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
 static void id_reg_info_init_all(void)
 {
 	int i;
 	struct id_reg_info *id_reg;
+	struct feature_frac *frac;
+	u64 mask = ARM64_FEATURE_FIELD_MASK;
+	u64 org;
 
 	for (i = 0; i < ARRAY_SIZE(id_reg_info_table); i++) {
 		id_reg = (struct id_reg_info *)id_reg_info_table[i];
@@ -3471,6 +3564,32 @@ static void id_reg_info_init_all(void)
 			continue;
 
 		id_reg_info_init(id_reg);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(feature_frac_table); i++) {
+		frac = &feature_frac_table[i];
+		id_reg = GET_ID_REG_INFO(frac->frac_id);
+
+		/*
+		 * An ID register that has fractional fields is expected
+		 * to have its own id_reg_info.
+		 */
+		if (WARN_ON_ONCE(!id_reg))
+			continue;
+
+		/*
+		 * Update the id_reg's ftr_check_types for the fractional
+		 * field with FCT_IGNORE so that the field won't be validated
+		 * when the ID register is set by userspace, which could
+		 * temporarily cause an inconsistency if its (main) feature
+		 * field is not set yet.  Save the original ftr_check_types
+		 * for the fractional field to validate the field later.
+		 */
+		org = (id_reg->ftr_check_types >> frac->frac_shift) & mask;
+		id_reg->ftr_check_types &= ~(mask << frac->frac_shift);
+		id_reg->ftr_check_types |=
+			MAKE_FCT(frac->frac_shift, FCT_IGNORE, FCT_SIGN(org));
+		frac->frac_ftr_check = org;
 	}
 }
 
