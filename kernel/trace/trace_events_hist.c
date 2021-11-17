@@ -2717,8 +2717,10 @@ static struct hist_field *parse_expr(struct hist_trigger_data *hist_data,
 
 	return expr;
 free:
-	destroy_hist_field(operand1, 0);
-	destroy_hist_field(operand2, 0);
+	if (!expr || expr->operands[0] != operand1)
+		destroy_hist_field(operand1, 0);
+	if (!expr || expr->operands[1] != operand2)
+		destroy_hist_field(operand2, 0);
 	destroy_hist_field(expr, 0);
 
 	return ERR_PTR(ret);
