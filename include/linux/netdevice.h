@@ -48,6 +48,7 @@
 #include <uapi/linux/pkt_cls.h>
 #include <linux/hashtable.h>
 #include <linux/rbtree.h>
+#include <linux/ref_tracker.h>
 
 struct netpoll_info;
 struct device;
@@ -2181,6 +2182,7 @@ struct net_device {
 #else
 	refcount_t		dev_refcnt;
 #endif
+	struct ref_tracker_dir	refcnt_tracker;
 
 	struct list_head	link_watch_list;
 
@@ -3807,6 +3809,7 @@ void netdev_run_todo(void);
  *	@dev: network device
  *
  * Release reference to device to allow it to be freed.
+ * Try using dev_put_track() instead.
  */
 static inline void dev_put(struct net_device *dev)
 {
@@ -3824,6 +3827,7 @@ static inline void dev_put(struct net_device *dev)
  *	@dev: network device
  *
  * Hold reference to device to keep it from being freed.
+ * Try using dev_hold_track() instead.
  */
 static inline void dev_hold(struct net_device *dev)
 {
@@ -3833,6 +3837,25 @@ static inline void dev_hold(struct net_device *dev)
 #else
 		refcount_inc(&dev->dev_refcnt);
 #endif
+	}
+}
+
+static inline void dev_hold_track(struct net_device *dev,
+				  struct ref_tracker **tracker,
+				  gfp_t gfp)
+{
+	if (dev) {
+		dev_hold(dev);
+		ref_tracker_alloc(&dev->refcnt_tracker, tracker, gfp);
+	}
+}
+
+static inline void dev_put_track(struct net_device *dev,
+				 struct ref_tracker **tracker)
+{
+	if (dev) {
+		ref_tracker_free(&dev->refcnt_tracker, tracker);
+		dev_put(dev);
 	}
 }
 
