@@ -14,14 +14,15 @@
 #include <linux/nvmem-consumer.h>
 
 /**
- * of_get_phy_mode - Get phy mode for given device_node
+ * of_get_phy_mode - Get first phy mode for given device_node
  * @np:	Pointer to the given device_node
  * @interface: Pointer to the result
  *
  * The function gets phy interface string from property 'phy-mode' or
- * 'phy-connection-type'. The index in phy_modes table is set in
- * interface and 0 returned. In case of error interface is set to
- * PHY_INTERFACE_MODE_NA and an errno is returned, e.g. -ENODEV.
+ * 'phy-connection-type'. If there are more string in the property, the first
+ * one is used. The index in phy_modes table is set in interface and 0 returned.
+ * In case of error interface is set to PHY_INTERFACE_MODE_NA and an errno is
+ * returned, e.g. -ENODEV.
  */
 int of_get_phy_mode(struct device_node *np, phy_interface_t *interface)
 {

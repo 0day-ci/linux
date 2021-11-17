@@ -893,12 +893,13 @@ enum dev_dma_attr device_get_dma_attr(struct device *dev)
 EXPORT_SYMBOL_GPL(device_get_dma_attr);
 
 /**
- * fwnode_get_phy_mode - Get phy mode for given firmware node
+ * fwnode_get_phy_mode - Get first phy mode for given firmware node
  * @fwnode:	Pointer to the given node
  *
  * The function gets phy interface string from property 'phy-mode' or
- * 'phy-connection-type', and return its index in phy_modes table, or errno in
- * error case.
+ * 'phy-connection-type', and returns its index in phy_modes table, or errno in
+ * error case. If there are multiple strings in the property, the first one is
+ * used.
  */
 int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
 {
@@ -921,12 +922,13 @@ int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
 EXPORT_SYMBOL_GPL(fwnode_get_phy_mode);
 
 /**
- * device_get_phy_mode - Get phy mode for given device
+ * device_get_phy_mode - Get first phy mode for given device
  * @dev:	Pointer to the given device
  *
  * The function gets phy interface string from property 'phy-mode' or
- * 'phy-connection-type', and return its index in phy_modes table, or errno in
- * error case.
+ * 'phy-connection-type', and returns its index in phy_modes table, or errno in
+ * error case. If there are multiple strings in the property, the first one is
+ * used.
  */
 int device_get_phy_mode(struct device *dev)
 {
