@@ -166,7 +166,7 @@ static int vlan_newlink(struct net *src_net, struct net_device *dev,
 
 	vlan->vlan_proto = proto;
 	vlan->vlan_id	 = nla_get_u16(data[IFLA_VLAN_ID]);
-	vlan->real_dev	 = real_dev;
+	__netdev_ref_store(&vlan->real_dev, real_dev);
 	dev->priv_flags |= (real_dev->priv_flags & IFF_XMIT_DST_RELEASE);
 	vlan->flags	 = VLAN_FLAG_REORDER_HDR;
 
@@ -274,7 +274,7 @@ nla_put_failure:
 
 static struct net *vlan_get_link_net(const struct net_device *dev)
 {
-	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+	struct net_device *real_dev = __vlan_dev_real_dev(dev);
 
 	return dev_net(real_dev);
 }

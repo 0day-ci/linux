@@ -1250,9 +1250,10 @@ static int bnxt_tc_resolve_tunnel_hdrs(struct bnxt *bp,
 	dst_dev = rt->dst.dev;
 	if (is_vlan_dev(dst_dev)) {
 #if IS_ENABLED(CONFIG_VLAN_8021Q)
+		struct net_device *real_dev = __vlan_dev_real_dev(dst_dev);
 		struct vlan_dev_priv *vlan = vlan_dev_priv(dst_dev);
 
-		if (vlan->real_dev != real_dst_dev) {
+		if (real_dev != real_dst_dev) {
 			netdev_info(bp->dev,
 				    "dst_dev(%s) doesn't use PF-if(%s)\n",
 				    netdev_name(dst_dev),

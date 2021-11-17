@@ -231,9 +231,10 @@ static int vlan_seq_show(struct seq_file *seq, void *v)
 	} else {
 		const struct net_device *vlandev = v;
 		const struct vlan_dev_priv *vlan = vlan_dev_priv(vlandev);
+		struct net_device *real_dev = netdev_ref_ptr(&vlan->real_dev);
 
 		seq_printf(seq, "%-15s| %d  | %s\n",  vlandev->name,
-			   vlan->vlan_id,    vlan->real_dev->name);
+			   vlan->vlan_id,    real_dev->name);
 	}
 	return 0;
 }
@@ -242,6 +243,7 @@ static int vlandev_seq_show(struct seq_file *seq, void *offset)
 {
 	struct net_device *vlandev = (struct net_device *) seq->private;
 	const struct vlan_dev_priv *vlan = vlan_dev_priv(vlandev);
+	struct net_device *real_dev = netdev_ref_ptr(&vlan->real_dev);
 	struct rtnl_link_stats64 temp;
 	const struct rtnl_link_stats64 *stats;
 	static const char fmt64[] = "%30s %12llu\n";
@@ -262,7 +264,7 @@ static int vlandev_seq_show(struct seq_file *seq, void *offset)
 	seq_puts(seq, "\n");
 	seq_printf(seq, fmt64, "total frames transmitted", stats->tx_packets);
 	seq_printf(seq, fmt64, "total bytes transmitted", stats->tx_bytes);
-	seq_printf(seq, "Device: %s", vlan->real_dev->name);
+	seq_printf(seq, "Device: %s", real_dev->name);
 	/* now show all PRIORITY mappings relating to this VLAN */
 	seq_printf(seq, "\nINGRESS priority mappings: "
 			"0:%u  1:%u  2:%u  3:%u  4:%u  5:%u  6:%u 7:%u\n",

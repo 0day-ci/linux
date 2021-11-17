@@ -89,7 +89,7 @@ static void vlan_stacked_transfer_operstate(const struct net_device *rootdev,
 void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 {
 	struct vlan_dev_priv *vlan = vlan_dev_priv(dev);
-	struct net_device *real_dev = vlan->real_dev;
+	struct net_device *real_dev = netdev_ref_ptr(&vlan->real_dev);
 	struct vlan_info *vlan_info;
 	struct vlan_group *grp;
 	u16 vlan_id = vlan->vlan_id;
@@ -148,7 +148,7 @@ int vlan_check_real_dev(struct net_device *real_dev,
 int register_vlan_dev(struct net_device *dev, struct netlink_ext_ack *extack)
 {
 	struct vlan_dev_priv *vlan = vlan_dev_priv(dev);
-	struct net_device *real_dev = vlan->real_dev;
+	struct net_device *real_dev = __netdev_ref_ptr(&vlan->real_dev);
 	u16 vlan_id = vlan->vlan_id;
 	struct vlan_info *vlan_info;
 	struct vlan_group *grp;
@@ -185,7 +185,7 @@ int register_vlan_dev(struct net_device *dev, struct netlink_ext_ack *extack)
 		goto out_unregister_netdev;
 
 	/* Account for reference in struct vlan_dev_priv */
-	dev_hold(real_dev);
+	__netdev_hold_stored(&vlan->real_dev);
 
 	vlan_stacked_transfer_operstate(real_dev, dev, vlan);
 	linkwatch_fire_event(dev); /* _MUST_ call rfc2863_policy() */
@@ -272,7 +272,7 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	vlan = vlan_dev_priv(new_dev);
 	vlan->vlan_proto = htons(ETH_P_8021Q);
 	vlan->vlan_id = vlan_id;
-	vlan->real_dev = real_dev;
+	__netdev_ref_store(&vlan->real_dev, real_dev);
 	vlan->dent = NULL;
 	vlan->flags = VLAN_FLAG_REORDER_HDR;
 
@@ -321,6 +321,7 @@ static void vlan_transfer_features(struct net_device *dev,
 				   struct net_device *vlandev)
 {
 	struct vlan_dev_priv *vlan = vlan_dev_priv(vlandev);
+	struct net_device *real_dev = netdev_ref_ptr(&vlan->real_dev);
 
 	vlandev->gso_max_size = dev->gso_max_size;
 	vlandev->gso_max_segs = dev->gso_max_segs;
@@ -335,8 +336,8 @@ static void vlan_transfer_features(struct net_device *dev,
 #endif
 
 	vlandev->priv_flags &= ~IFF_XMIT_DST_RELEASE;
-	vlandev->priv_flags |= (vlan->real_dev->priv_flags & IFF_XMIT_DST_RELEASE);
-	vlandev->hw_enc_features = vlan_tnl_features(vlan->real_dev);
+	vlandev->priv_flags |= (real_dev->priv_flags & IFF_XMIT_DST_RELEASE);
+	vlandev->hw_enc_features = vlan_tnl_features(real_dev);
 
 	netdev_update_features(vlandev);
 }

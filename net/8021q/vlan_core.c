@@ -101,10 +101,10 @@ EXPORT_SYMBOL(__vlan_find_dev_deep_rcu);
 
 struct net_device *vlan_dev_real_dev(const struct net_device *dev)
 {
-	struct net_device *ret = vlan_dev_priv(dev)->real_dev;
+	struct net_device *ret = __vlan_dev_real_dev(dev);
 
 	while (is_vlan_dev(ret))
-		ret = vlan_dev_priv(ret)->real_dev;
+		ret = __vlan_dev_real_dev(ret);
 
 	return ret;
 }

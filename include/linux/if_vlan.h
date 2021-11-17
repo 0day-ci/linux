@@ -8,6 +8,7 @@
 #define _LINUX_IF_VLAN_H_
 
 #include <linux/netdevice.h>
+#include <linux/netdev_refs.h>
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/bug.h>
@@ -176,7 +177,7 @@ struct vlan_dev_priv {
 	u16					vlan_id;
 	u16					flags;
 
-	struct net_device			*real_dev;
+	struct netdev_ref			real_dev;
 	unsigned char				real_dev_addr[ETH_ALEN];
 
 	struct proc_dir_entry			*dent;
@@ -189,6 +190,14 @@ struct vlan_dev_priv {
 static inline struct vlan_dev_priv *vlan_dev_priv(const struct net_device *dev)
 {
 	return netdev_priv(dev);
+}
+
+static inline struct net_device *
+__vlan_dev_real_dev(const struct net_device *dev)
+{
+	struct vlan_dev_priv *vlan = vlan_dev_priv(dev);
+
+	return netdev_ref_ptr(&vlan->real_dev);
 }
 
 static inline u16
