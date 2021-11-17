@@ -190,6 +190,10 @@ module_param(vgif, int, 0444);
 static int lbrv = true;
 module_param(lbrv, int, 0444);
 
+/* enable/disable PMU virtualization */
+bool pmuv = true;
+module_param(pmuv, bool, 0444);
+
 static int tsc_scaling = true;
 module_param(tsc_scaling, int, 0444);
 
@@ -952,6 +956,10 @@ static __init void svm_set_cpu_caps(void)
 	    boot_cpu_has(X86_FEATURE_AMD_SSBD))
 		kvm_cpu_cap_set(X86_FEATURE_VIRT_SSBD);
 
+	/* AMD PMU PERFCTR_CORE CPUID */
+	if (pmuv && boot_cpu_has(X86_FEATURE_PERFCTR_CORE))
+		kvm_cpu_cap_set(X86_FEATURE_PERFCTR_CORE);
+
 	/* CPUID 0x8000001F (SME/SEV features) */
 	sev_set_cpu_caps();
 }
@@ -1084,6 +1092,9 @@ static __init int svm_hardware_setup(void)
 		else
 			pr_info("LBR virtualization supported\n");
 	}
+
+	if (!pmuv)
+		pr_info("PMU virtualization is disabled\n");
 
 	svm_set_cpu_caps();
 
