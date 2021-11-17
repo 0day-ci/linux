@@ -539,6 +539,41 @@ static void execlists_schedule_in(struct i915_request *rq, int idx)
 	GEM_BUG_ON(intel_context_inflight(ce) != rq->engine);
 }
 
+static void virtual_xfer_context(struct virtual_engine *ve,
+				 struct intel_engine_cs *engine)
+{
+	unsigned int n;
+
+	if (likely(engine == ve->siblings[0]))
+		return;
+
+	if (!intel_engine_has_relative_mmio(engine))
+		lrc_update_offsets(&ve->context, engine);
+
+	/*
+	 * Move the bound engine to the top of the list for
+	 * future execution. We then kick this tasklet first
+	 * before checking others, so that we preferentially
+	 * reuse this set of bound registers.
+	 */
+	for (n = 1; n < ve->num_siblings; n++) {
+		if (ve->siblings[n] == engine) {
+			swap(ve->siblings[n], ve->siblings[0]);
+			break;
+		}
+	}
+}
+
+static int ve_random_sibling(struct virtual_engine *ve)
+{
+	return prandom_u32_max(ve->num_siblings);
+}
+
+static int ve_random_other_sibling(struct virtual_engine *ve)
+{
+	return 1 + prandom_u32_max(ve->num_siblings - 1);
+}
+
 static void
 resubmit_virtual_request(struct i915_request *rq, struct virtual_engine *ve)
 {
@@ -578,8 +613,23 @@ static void kick_siblings(struct i915_request *rq, struct intel_context *ce)
 	    rq->execution_mask != engine->mask)
 		resubmit_virtual_request(rq, ve);
 
-	if (READ_ONCE(ve->request))
+	/*
+	 * Reschedule with a new "preferred" sibling.
+	 *
+	 * The tasklets are executed in the order of ve->siblings[], so
+	 * siblings[0] receives preferrential treatment of greedily checking
+	 * for execution of the virtual engine. At this point, the virtual
+	 * engine is no longer in the current GPU cache due to idleness or
+	 * contention, so it can be executed on any without penalty. We
+	 * re-randomise at this point in order to spread light loads across
+	 * the system, heavy overlapping loads will continue to be greedily
+	 * executed by the first available engine.
+	 */
+	if (READ_ONCE(ve->request)) {
+		virtual_xfer_context(ve,
+				     ve->siblings[ve_random_other_sibling(ve)]);
 		tasklet_hi_schedule(&ve->base.sched_engine->tasklet);
+	}
 }
 
 static void __execlists_schedule_out(struct i915_request * const rq,
@@ -1028,32 +1078,6 @@ first_virtual_engine(struct intel_engine_cs *engine)
 	}
 
 	return NULL;
-}
-
-static void virtual_xfer_context(struct virtual_engine *ve,
-				 struct intel_engine_cs *engine)
-{
-	unsigned int n;
-
-	if (likely(engine == ve->siblings[0]))
-		return;
-
-	GEM_BUG_ON(READ_ONCE(ve->context.inflight));
-	if (!intel_engine_has_relative_mmio(engine))
-		lrc_update_offsets(&ve->context, engine);
-
-	/*
-	 * Move the bound engine to the top of the list for
-	 * future execution. We then kick this tasklet first
-	 * before checking others, so that we preferentially
-	 * reuse this set of bound registers.
-	 */
-	for (n = 1; n < ve->num_siblings; n++) {
-		if (ve->siblings[n] == engine) {
-			swap(ve->siblings[n], ve->siblings[0]);
-			break;
-		}
-	}
 }
 
 static void defer_request(struct i915_request *rq, struct list_head * const pl)
@@ -3556,7 +3580,7 @@ static void virtual_engine_initial_hint(struct virtual_engine *ve)
 	 * NB This does not force us to execute on this engine, it will just
 	 * typically be the first we inspect for submission.
 	 */
-	swp = prandom_u32_max(ve->num_siblings);
+	swp = ve_random_sibling(ve);
 	if (swp)
 		swap(ve->siblings[swp], ve->siblings[0]);
 }
