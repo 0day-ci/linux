@@ -5223,8 +5223,6 @@ static int __devlink_snapshot_id_increment(struct devlink *devlink, u32 id)
 	unsigned long count;
 	void *p;
 
-	lockdep_assert_held(&devlink->lock);
-
 	p = xa_load(&devlink->snapshot_ids, id);
 	if (WARN_ON(!p))
 		return -EINVAL;
@@ -5258,8 +5256,6 @@ static void __devlink_snapshot_id_decrement(struct devlink *devlink, u32 id)
 {
 	unsigned long count;
 	void *p;
-
-	lockdep_assert_held(&devlink->lock);
 
 	p = xa_load(&devlink->snapshot_ids, id);
 	if (WARN_ON(!p))
@@ -5298,8 +5294,6 @@ static void __devlink_snapshot_id_decrement(struct devlink *devlink, u32 id)
  */
 static int __devlink_snapshot_id_insert(struct devlink *devlink, u32 id)
 {
-	lockdep_assert_held(&devlink->lock);
-
 	if (xa_load(&devlink->snapshot_ids, id))
 		return -EEXIST;
 
@@ -5325,8 +5319,6 @@ static int __devlink_snapshot_id_insert(struct devlink *devlink, u32 id)
  */
 static int __devlink_region_snapshot_id_get(struct devlink *devlink, u32 *id)
 {
-	lockdep_assert_held(&devlink->lock);
-
 	return xa_alloc(&devlink->snapshot_ids, id, xa_mk_value(1),
 			xa_limit_32b, GFP_KERNEL);
 }
@@ -5352,8 +5344,6 @@ __devlink_region_snapshot_create(struct devlink_region *region,
 	struct devlink *devlink = region->devlink;
 	struct devlink_snapshot *snapshot;
 	int err;
-
-	lockdep_assert_held(&devlink->lock);
 
 	/* check if region can hold one more snapshot */
 	if (region->cur_snapshots == region->max_snapshots)
@@ -5390,8 +5380,6 @@ static void devlink_region_snapshot_del(struct devlink_region *region,
 					struct devlink_snapshot *snapshot)
 {
 	struct devlink *devlink = region->devlink;
-
-	lockdep_assert_held(&devlink->lock);
 
 	devlink_nl_region_notify(region, snapshot, DEVLINK_CMD_REGION_DEL);
 	region->cur_snapshots--;
