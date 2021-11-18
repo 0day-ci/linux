@@ -67,11 +67,9 @@ static int lp87565_probe(struct i2c_client *client,
 
 	lp87565->reset_gpio = devm_gpiod_get_optional(lp87565->dev, "reset",
 						      GPIOD_OUT_LOW);
-	if (IS_ERR(lp87565->reset_gpio)) {
-		ret = PTR_ERR(lp87565->reset_gpio);
-		if (ret == -EPROBE_DEFER)
-			return ret;
-	}
+	if (IS_ERR(lp87565->reset_gpio))
+		return dev_err_probe(lp87565->dev, PTR_ERR(lp87565->reset_gpio),
+				     "Failed getting reset GPIO");
 
 	if (lp87565->reset_gpio) {
 		gpiod_set_value_cansleep(lp87565->reset_gpio, 1);
