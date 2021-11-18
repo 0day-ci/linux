@@ -215,6 +215,17 @@ static struct damos **str_to_schemes(const char *str, ssize_t len,
 			goto fail;
 		}
 
+		if (min_sz > max_sz || min_nr_a > max_nr_a || min_age > max_age) {
+			pr_err("mininum > maxinum\n");
+			goto fail;
+		}
+
+		if (wmarks.high < wmarks.mid || wmarks.high < wmarks.low ||
+		    wmarks.mid <  wmarks.low) {
+			pr_err("wrong wmarks\n");
+			goto fail;
+		}
+
 		pos += parsed;
 		scheme = damon_new_scheme(min_sz, max_sz, min_nr_a, max_nr_a,
 				min_age, max_age, action, &quota, &wmarks);
