@@ -153,6 +153,42 @@ reschedule:
 				 msecs_to_jiffies(tmo));
 }
 
+static bool single_bit_set(int val, int bits_to_check)
+{
+	int bit;
+	const unsigned long bits = val;
+
+	bit = find_first_bit(&bits, bits_to_check);
+	if (bit == bits_to_check)
+		return false;
+
+	bit = find_next_bit(&bits, bits_to_check, bit + 1);
+
+	return (bit == bits_to_check);
+}
+
+static int map_event_simple(int irq, struct regulator_irq_data *rid,
+			    unsigned long *dev_mask)
+{
+	int err = rid->states[0].possible_errs;
+
+	*dev_mask = 1;
+	/*
+	 * This helper should only be used in a situation where the IRQ
+	 * can indicate only one type of problem for one specific rdev.
+	 * Something fishy is going on if we are having multiple rdevs or ERROR
+	 * flags here.
+	 */
+	if (WARN_ON(rid->num_states != 1 ||
+	    !single_bit_set(err, sizeof(err) * 8)))
+		return 0;
+
+	rid->states[0].errors = err;
+	rid->states[0].notifs = regulator_err2notif(err);
+
+	return 0;
+}
+
 static irqreturn_t regulator_notifier_isr(int irq, void *data)
 {
 	struct regulator_irq *h = data;
@@ -320,7 +356,10 @@ static void init_rdev_errors(struct regulator_irq *h)
  *			IRQF_ONESHOT when requesting the (threaded) irq.
  * @common_errs:	Errors which can be flagged by this IRQ for all rdevs.
  *			When IRQ is re-enabled these errors will be cleared
- *			from all associated regulators
+ *			from all associated regulators. Use this instead of the
+ *			per_rdev_errs if you have a simple device where the
+ *			IRQ can indicate only one type of error for one specific
+ *			regulator (and you omitted the map_event).
  * @per_rdev_errs:	Optional error flag array describing errors specific
  *			for only some of the regulators. These errors will be
  *			or'ed with common errors. If this is given the array
@@ -341,7 +380,7 @@ void *regulator_irq_helper(struct device *dev,
 	struct regulator_irq *h;
 	int ret;
 
-	if (!rdev_amount || !d || !d->map_event || !d->name)
+	if (!rdev_amount || !d || !d->name)
 		return ERR_PTR(-EINVAL);
 
 	h = devm_kzalloc(dev, sizeof(*h), GFP_KERNEL);
@@ -350,6 +389,15 @@ void *regulator_irq_helper(struct device *dev,
 
 	h->irq = irq;
 	h->desc = *d;
+
+	if (!h->desc.map_event) {
+		if (rdev_amount != 1 ||
+		    !single_bit_set(common_errs, sizeof(common_errs) * 8) ||
+		    per_rdev_errs)
+			return ERR_PTR(-EINVAL);
+
+		h->desc.map_event = map_event_simple;
+	}
 
 	ret = init_rdev_state(dev, h, rdev, common_errs, per_rdev_errs,
 			      rdev_amount);
