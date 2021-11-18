@@ -682,6 +682,8 @@ void ocelot_phylink_mac_link_down(struct ocelot *ocelot, int port,
 				 DEV_CLOCK_CFG_MAC_TX_RST |
 				 DEV_CLOCK_CFG_MAC_RX_RST,
 				 DEV_CLOCK_CFG);
+
+	ocelot_port->speed = SPEED_UNKNOWN;
 }
 EXPORT_SYMBOL_GPL(ocelot_phylink_mac_link_down);
 
@@ -696,6 +698,8 @@ void ocelot_phylink_mac_link_up(struct ocelot *ocelot, int port,
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 	int mac_speed, mode = 0;
 	u32 mac_fc_cfg;
+
+	ocelot_port->speed = speed;
 
 	/* The MAC might be integrated in systems where the MAC speed is fixed
 	 * and it's the PCS who is performing the rate adaptation, so we have
@@ -772,6 +776,9 @@ void ocelot_phylink_mac_link_up(struct ocelot *ocelot, int port,
 	/* Core: Enable port for frame transfer */
 	ocelot_fields_write(ocelot, port,
 			    QSYS_SWITCH_PORT_MODE_PORT_ENA, 1);
+
+	if (ocelot->ops->cut_through_fwd)
+		ocelot->ops->cut_through_fwd(ocelot);
 }
 EXPORT_SYMBOL_GPL(ocelot_phylink_mac_link_up);
 
@@ -1637,6 +1644,9 @@ void ocelot_apply_bridge_fwd_mask(struct ocelot *ocelot)
 
 		ocelot_write_rix(ocelot, mask, ANA_PGID_PGID, PGID_SRC + port);
 	}
+
+	if (ocelot->ops->cut_through_fwd)
+		ocelot->ops->cut_through_fwd(ocelot);
 }
 EXPORT_SYMBOL(ocelot_apply_bridge_fwd_mask);
 
