@@ -175,9 +175,8 @@ static void vc4_hdmi_cec_update_clk_div(struct vc4_hdmi *vc4_hdmi)
 static void vc4_hdmi_cec_update_clk_div(struct vc4_hdmi *vc4_hdmi) {}
 #endif
 
-static void vc4_hdmi_enable_scrambling(struct drm_encoder *encoder);
-
 static void vc4_hdmi_handle_hotplug(struct vc4_hdmi *vc4_hdmi,
+				    struct drm_modeset_acquire_ctx *ctx,
 				    enum drm_connector_status status)
 {
 	struct drm_connector *connector = &vc4_hdmi->connector;
@@ -189,6 +188,10 @@ static void vc4_hdmi_handle_hotplug(struct vc4_hdmi *vc4_hdmi,
 	 * issues since cec_s_phys_addr_from_edid might call
 	 * .adap_enable, which leads to that funtion being called with
 	 * our mutex held.
+	 *
+	 * A similar situation occurs with
+	 * drm_atomic_helper_connector_hdmi_reset_link() that will call
+	 * into our KMS hooks if the scrambling was enabled.
 	 *
 	 * Concurrency isn't an issue at the moment since we don't share
 	 * any state with any of the other frameworks so we can ignore
@@ -210,7 +213,7 @@ static void vc4_hdmi_handle_hotplug(struct vc4_hdmi *vc4_hdmi,
 	cec_s_phys_addr_from_edid(vc4_hdmi->cec_adap, edid);
 	kfree(edid);
 
-	vc4_hdmi_enable_scrambling(&vc4_hdmi->encoder.base.base);
+	drm_atomic_helper_connector_hdmi_reset_link(connector, ctx);
 }
 
 static int vc4_hdmi_connector_detect_ctx(struct drm_connector *connector,
@@ -248,7 +251,7 @@ static int vc4_hdmi_connector_detect_ctx(struct drm_connector *connector,
 			status = connector_status_connected;
 	}
 
-	vc4_hdmi_handle_hotplug(vc4_hdmi, status);
+	vc4_hdmi_handle_hotplug(vc4_hdmi, ctx, status);
 	pm_runtime_put(&vc4_hdmi->pdev->dev);
 
 	return status;
