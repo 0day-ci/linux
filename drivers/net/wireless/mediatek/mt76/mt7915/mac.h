@@ -300,7 +300,7 @@ struct mt7915_tx_free {
 	__le16 ctrl;
 	u8 txd_cnt;
 	u8 rsv[3];
-	__le32 info[];
+	__le32 info[]; /* DW3+ */
 } __packed __aligned(4);
 
 #define MT_TX_FREE_MSDU_CNT		GENMASK(9, 0)
@@ -312,6 +312,8 @@ struct mt7915_tx_free {
 /* when configured for txcount mode.  See MT_PLE_HOST_RPT0_TX_LATENCY. */
 #define MT_TX_FREE_TXCNT		GENMASK(12, 0)
 #define MT_TX_FREE_STATUS		GENMASK(14, 13)
+/* 0:  not MPDU, 1:  MSDU is head pkt of TXD page (MPDU) */
+#define MT_TX_FREE_HEAD_OF_PAGE		BIT(15)
 #define MT_TX_FREE_MSDU_ID		GENMASK(30, 16)
 #define MT_TX_FREE_PAIR			BIT(31)
 
