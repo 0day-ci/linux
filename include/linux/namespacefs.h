@@ -21,6 +21,8 @@ namespacefs_create_dir(const char *name, struct dentry *parent,
 void namespacefs_remove_dir(struct dentry *dentry);
 int namespacefs_create_pid_ns_dir(struct pid_namespace *ns);
 void namespacefs_remove_pid_ns_dir(struct pid_namespace *ns);
+int namespacefs_create_uts_ns_dir(struct uts_namespace *ns);
+void namespacefs_remove_uts_ns_dir(struct uts_namespace *ns);
 
 #else
 
@@ -52,6 +54,17 @@ namespacefs_create_pid_ns_dir(struct pid_namespace *ns)
 
 static inline void
 namespacefs_remove_pid_ns_dir(struct pid_namespace *ns)
+{
+}
+
+static inline int
+namespacefs_create_uts_ns_dir(struct uts_namespace *ns)
+{
+	return 0;
+}
+
+static inline void
+namespacefs_remove_uts_ns_dir(struct uts_namespace *ns)
 {
 }
 

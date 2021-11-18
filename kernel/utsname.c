@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/cred.h>
 #include <linux/user_namespace.h>
+#include <linux/namespacefs.h>
 #include <linux/proc_ns.h>
 #include <linux/sched/task.h>
 
@@ -70,8 +71,15 @@ static struct uts_namespace *clone_uts_ns(struct user_namespace *user_ns,
 	memcpy(&ns->name, &old_ns->name, sizeof(ns->name));
 	ns->user_ns = get_user_ns(user_ns);
 	up_read(&uts_sem);
+
+	err = namespacefs_create_uts_ns_dir(ns);
+	if (err)
+		goto fail_free_inum;
+
 	return ns;
 
+fail_free_inum:
+	ns_free_inum(&ns->ns);
 fail_free:
 	kmem_cache_free(uts_ns_cache, ns);
 fail_dec:
@@ -105,6 +113,7 @@ struct uts_namespace *copy_utsname(unsigned long flags,
 
 void free_uts_ns(struct uts_namespace *ns)
 {
+	namespacefs_remove_uts_ns_dir(ns);
 	dec_uts_namespaces(ns->ucounts);
 	put_user_ns(ns->user_ns);
 	ns_free_inum(&ns->ns);
