@@ -665,8 +665,7 @@ struct mlx5_ib_mr {
 	/* User MR data */
 	struct mlx5_cache_ent *cache_ent;
 	struct ib_umem *umem;
-
-	/* This is zero'd when the MR is allocated */
+	/* Everything after umem is zero'd when the MR is allocated */
 	union {
 		/* Used only while the MR is in the cache */
 		struct {
@@ -718,7 +717,7 @@ struct mlx5_ib_mr {
 /* Zero the fields in the mr that are variant depending on usage */
 static inline void mlx5_clear_mr(struct mlx5_ib_mr *mr)
 {
-	memset(mr->out, 0, sizeof(*mr) - offsetof(struct mlx5_ib_mr, out));
+	memset_after(mr, 0, umem);
 }
 
 static inline bool is_odp_mr(struct mlx5_ib_mr *mr)
