@@ -3,6 +3,7 @@
 
 #include <linux/msi.h>
 #include <linux/pci.h>
+#include <linux/of.h>
 
 #include "core.h"
 #include "debug.h"
@@ -311,6 +312,26 @@ static void ath11k_mhi_op_write_reg(struct mhi_controller *mhi_cntrl,
 	writel(val, addr);
 }
 
+static bool ath11k_mhi_read_addr_from_dt(struct mhi_controller *mhi_ctrl)
+{
+	struct device_node *np;
+	u32 reg[4];
+	dma_addr_t start;
+
+	np = of_find_node_by_type(NULL, "memory");
+	if (!np)
+		return false;
+
+	if (of_property_read_u32_array(np, "reg", reg, 4))
+		return false;
+
+	start = reg[0] + reg[1];
+	mhi_ctrl->iova_start = start + 0x1000000;
+	mhi_ctrl->iova_stop = start + reg[2] + reg[3];
+
+	return true;
+}
+
 int ath11k_mhi_register(struct ath11k_pci *ab_pci)
 {
 	struct ath11k_base *ab = ab_pci->ab;
@@ -339,8 +360,14 @@ int ath11k_mhi_register(struct ath11k_pci *ab_pci)
 		return ret;
 	}
 
-	mhi_ctrl->iova_start = 0;
-	mhi_ctrl->iova_stop = 0xffffffff;
+	if ((test_bit(ATH11K_FLAG_FIXED_MEM_RGN, &ab->dev_flags))) {
+		if (!ath11k_mhi_read_addr_from_dt(mhi_ctrl))
+			return -ENODATA;
+	} else {
+		mhi_ctrl->iova_start = 0;
+		mhi_ctrl->iova_stop = 0xFFFFFFFF;
+	}
+
 	mhi_ctrl->sbl_size = SZ_512K;
 	mhi_ctrl->seg_len = SZ_512K;
 	mhi_ctrl->fbc_download = true;
