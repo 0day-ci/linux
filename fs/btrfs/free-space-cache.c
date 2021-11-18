@@ -1581,6 +1581,68 @@ static int tree_insert_offset(struct rb_root *root, u64 offset,
 }
 
 /*
+ * This is a little subtle.  We *only* have ->max_extent_size set if we actually
+ * searched through the bitmap and figured out the largest ->max_extent_size,
+ * otherwise it's 0.  In the case that it's 0 we don't want to tell the
+ * allocator the wrong thing, we want to use the actual real max_extent_size
+ * we've found already if it's larger, or we want to use ->bytes.
+ *
+ * This matters because find_free_space() will skip entries who's ->bytes is
+ * less than the required bytes.  So if we didn't search down this bitmap, we
+ * may pick some previous entry that has a smaller ->max_extent_size than we
+ * have.  For example, assume we have two entries, one that has
+ * ->max_extent_size set to 4k and ->bytes set to 1M.  A second entry hasn't set
+ * ->max_extent_size yet, has ->bytes set to 8k and it's contiguous.  We will
+ *  call into find_free_space(), and return with max_extent_size == 4k, because
+ *  that first bitmap entry had ->max_extent_size set, but the second one did
+ *  not.  If instead we returned 8k we'd come in searching for 8k, and find the
+ *  8k contiguous range.
+ *
+ *  Consider the other case, we have 2 8k chunks in that second entry and still
+ *  don't have ->max_extent_size set.  We'll return 16k, and the next time the
+ *  allocator comes in it'll fully search our second bitmap, and this time it'll
+ *  get an uptodate value of 8k as the maximum chunk size.  Then we'll get the
+ *  right allocation the next loop through.
+ */
+static inline u64 get_max_extent_size(struct btrfs_free_space *entry)
+{
+	if (entry->bitmap && entry->max_extent_size)
+		return entry->max_extent_size;
+	return entry->bytes;
+}
+
+/*
+ * This is indexed in reverse of what we generally do for rb-tree's, the largest
+ * chunks are left most and the smallest are rightmost.  This is so that we can
+ * take advantage of the cached property of the cached rb-tree and simply get
+ * the largest free space chunk right away.
+ */
+static void tree_insert_bytes(struct btrfs_free_space_ctl *ctl,
+			      struct btrfs_free_space *info)
+{
+	struct rb_root_cached *root = &ctl->free_space_bytes;
+	struct rb_node **p = &root->rb_root.rb_node;
+	struct rb_node *parent_node = NULL;
+	struct btrfs_free_space *tmp;
+	bool leftmost = true;
+
+	while (*p) {
+		parent_node = *p;
+		tmp = rb_entry(parent_node, struct btrfs_free_space,
+			       bytes_index);
+		if (get_max_extent_size(info) < get_max_extent_size(tmp)) {
+			p = &(*p)->rb_right;
+			leftmost = false;
+		} else {
+			p = &(*p)->rb_left;
+		}
+	}
+
+	rb_link_node(&info->bytes_index, parent_node, p);
+	rb_insert_color_cached(&info->bytes_index, root, leftmost);
+}
+
+/*
  * searches the tree for the given offset.
  *
  * fuzzy - If this is set, then we are trying to make an allocation, and we just
@@ -1708,6 +1770,7 @@ __unlink_free_space(struct btrfs_free_space_ctl *ctl,
 		    struct btrfs_free_space *info)
 {
 	rb_erase(&info->offset_index, &ctl->free_space_offset);
+	rb_erase_cached(&info->bytes_index, &ctl->free_space_bytes);
 	ctl->free_extents--;
 
 	if (!info->bitmap && !btrfs_free_space_trimmed(info)) {
@@ -1734,6 +1797,8 @@ static int link_free_space(struct btrfs_free_space_ctl *ctl,
 	if (ret)
 		return ret;
 
+	tree_insert_bytes(ctl, info);
+
 	if (!info->bitmap && !btrfs_free_space_trimmed(info)) {
 		ctl->discardable_extents[BTRFS_STAT_CURR]++;
 		ctl->discardable_bytes[BTRFS_STAT_CURR] += info->bytes;
@@ -1742,6 +1807,22 @@ static int link_free_space(struct btrfs_free_space_ctl *ctl,
 	ctl->free_space += info->bytes;
 	ctl->free_extents++;
 	return ret;
+}
+
+static void relink_bitmap_entry(struct btrfs_free_space_ctl *ctl,
+				struct btrfs_free_space *info)
+{
+	ASSERT(info->bitmap);
+
+	/*
+	 * If our entry is empty it's because we're on a cluster and we don't
+	 * want to re-link it into our ctl bytes index.
+	 */
+	if (RB_EMPTY_NODE(&info->bytes_index))
+		return;
+
+	rb_erase_cached(&info->bytes_index, &ctl->free_space_bytes);
+	tree_insert_bytes(ctl, info);
 }
 
 static inline void __bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
@@ -1761,6 +1842,8 @@ static inline void __bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
 	info->bytes -= bytes;
 	if (info->max_extent_size > ctl->unit)
 		info->max_extent_size = 0;
+
+	relink_bitmap_entry(ctl, info);
 
 	if (start && test_bit(start - 1, info->bitmap))
 		extent_delta++;
@@ -1797,8 +1880,15 @@ static void bitmap_set_bits(struct btrfs_free_space_ctl *ctl,
 
 	bitmap_set(info->bitmap, start, count);
 
+	/*
+	 * We set some bytes, we have no idea what the max extent size is
+	 * anymore.
+	 */
+	info->max_extent_size = 0;
 	info->bytes += bytes;
 	ctl->free_space += bytes;
+
+	relink_bitmap_entry(ctl, info);
 
 	if (start && test_bit(start - 1, info->bitmap))
 		extent_delta--;
@@ -1867,44 +1957,14 @@ static int search_bitmap(struct btrfs_free_space_ctl *ctl,
 
 	*bytes = (u64)(max_bits) * ctl->unit;
 	bitmap_info->max_extent_size = *bytes;
+	relink_bitmap_entry(ctl, bitmap_info);
 	return -1;
-}
-
-/*
- * This is a little subtle.  We *only* have ->max_extent_size set if we actually
- * searched through the bitmap and figured out the largest ->max_extent_size,
- * otherwise it's 0.  In the case that it's 0 we don't want to tell the
- * allocator the wrong thing, we want to use the actual real max_extent_size
- * we've found already if it's larger, or we want to use ->bytes.
- *
- * This matters because find_free_space() will skip entries who's ->bytes is
- * less than the required bytes.  So if we didn't search down this bitmap, we
- * may pick some previous entry that has a smaller ->max_extent_size than we
- * have.  For example, assume we have two entries, one that has
- * ->max_extent_size set to 4k and ->bytes set to 1M.  A second entry hasn't set
- * ->max_extent_size yet, has ->bytes set to 8k and it's contiguous.  We will
- *  call into find_free_space(), and return with max_extent_size == 4k, because
- *  that first bitmap entry had ->max_extent_size set, but the second one did
- *  not.  If instead we returned 8k we'd come in searching for 8k, and find the
- *  8k contiguous range.
- *
- *  Consider the other case, we have 2 8k chunks in that second entry and still
- *  don't have ->max_extent_size set.  We'll return 16k, and the next time the
- *  allocator comes in it'll fully search our second bitmap, and this time it'll
- *  get an uptodate value of 8k as the maximum chunk size.  Then we'll get the
- *  right allocation the next loop through.
- */
-static inline u64 get_max_extent_size(struct btrfs_free_space *entry)
-{
-	if (entry->bitmap && entry->max_extent_size)
-		return entry->max_extent_size;
-	return entry->bytes;
 }
 
 /* Cache the size of the max extent in bytes */
 static struct btrfs_free_space *
 find_free_space(struct btrfs_free_space_ctl *ctl, u64 *offset, u64 *bytes,
-		unsigned long align, u64 *max_extent_size)
+		unsigned long align, u64 *max_extent_size, bool use_bytes_index)
 {
 	struct btrfs_free_space *entry;
 	struct rb_node *node;
@@ -1914,16 +1974,38 @@ find_free_space(struct btrfs_free_space_ctl *ctl, u64 *offset, u64 *bytes,
 
 	if (!ctl->free_space_offset.rb_node)
 		goto out;
+again:
+	if (use_bytes_index) {
+		node = rb_first_cached(&ctl->free_space_bytes);
+	} else {
+		entry = tree_search_offset(ctl, offset_to_bitmap(ctl, *offset),
+					   0, 1);
+		if (!entry)
+			goto out;
+		node = &entry->offset_index;
+	}
 
-	entry = tree_search_offset(ctl, offset_to_bitmap(ctl, *offset), 0, 1);
-	if (!entry)
-		goto out;
+	for (; node; node = rb_next(node)) {
+		if (use_bytes_index)
+			entry = rb_entry(node, struct btrfs_free_space,
+					 bytes_index);
+		else
+			entry = rb_entry(node, struct btrfs_free_space,
+					 offset_index);
 
-	for (node = &entry->offset_index; node; node = rb_next(node)) {
-		entry = rb_entry(node, struct btrfs_free_space, offset_index);
+		/*
+		 * If we are using the bytes index then all subsequent entries
+		 * in this tree are going to be < bytes, so simply set the max
+		 * extent size and exit the loop.
+		 *
+		 * If we're using the offset index then we need to keep going
+		 * through the rest of the tree.
+		 */
 		if (entry->bytes < *bytes) {
 			*max_extent_size = max(get_max_extent_size(entry),
 					       *max_extent_size);
+			if (use_bytes_index)
+				break;
 			continue;
 		}
 
@@ -1940,6 +2022,13 @@ find_free_space(struct btrfs_free_space_ctl *ctl, u64 *offset, u64 *bytes,
 			tmp = entry->offset;
 		}
 
+		/*
+		 * We don't break here if we're using the bytes index because we
+		 * may have another entry that has the correct alignment that is
+		 * the right size, so we don't want to miss that possibility.
+		 * At worst this adds another loop through the logic, but if we
+		 * broke here we could prematurely ENOSPC.
+		 */
 		if (entry->bytes < *bytes + align_off) {
 			*max_extent_size = max(get_max_extent_size(entry),
 					       *max_extent_size);
@@ -1947,6 +2036,7 @@ find_free_space(struct btrfs_free_space_ctl *ctl, u64 *offset, u64 *bytes,
 		}
 
 		if (entry->bitmap) {
+			struct rb_node *old_next = rb_next(node);
 			u64 size = *bytes;
 
 			ret = search_bitmap(ctl, entry, &tmp, &size, true);
@@ -1959,6 +2049,15 @@ find_free_space(struct btrfs_free_space_ctl *ctl, u64 *offset, u64 *bytes,
 					max(get_max_extent_size(entry),
 					    *max_extent_size);
 			}
+
+			/*
+			 * The bitmap may have gotten re-arranged in the space
+			 * index here because the max_extent_size may have been
+			 * updated.  Start from the beginning again if this
+			 * happened.
+			 */
+			if (use_bytes_index && old_next != rb_next(node))
+				goto again;
 			continue;
 		}
 
@@ -2106,12 +2205,6 @@ static u64 add_bytes_to_bitmap(struct btrfs_free_space_ctl *ctl,
 	bytes_to_set = min(end - offset, bytes);
 
 	bitmap_set_bits(ctl, info, offset, bytes_to_set);
-
-	/*
-	 * We set some bytes, we have no idea what the max extent size is
-	 * anymore.
-	 */
-	info->max_extent_size = 0;
 
 	return bytes_to_set;
 
@@ -2510,6 +2603,7 @@ int __btrfs_add_free_space(struct btrfs_fs_info *fs_info,
 	info->bytes = bytes;
 	info->trim_state = trim_state;
 	RB_CLEAR_NODE(&info->offset_index);
+	RB_CLEAR_NODE(&info->bytes_index);
 
 	spin_lock(&ctl->tree_lock);
 
@@ -2823,6 +2917,7 @@ void btrfs_init_free_space_ctl(struct btrfs_block_group *block_group,
 	ctl->start = block_group->start;
 	ctl->private = block_group;
 	ctl->op = &free_space_op;
+	ctl->free_space_bytes = RB_ROOT_CACHED;
 	INIT_LIST_HEAD(&ctl->trimming_ranges);
 	mutex_init(&ctl->cache_writeout_mutex);
 
@@ -2888,6 +2983,7 @@ static void __btrfs_return_cluster_to_free_space(
 		}
 		tree_insert_offset(&ctl->free_space_offset,
 				   entry->offset, &entry->offset_index, bitmap);
+		tree_insert_bytes(ctl, entry);
 	}
 	cluster->root = RB_ROOT;
 	spin_unlock(&cluster->lock);
@@ -2989,12 +3085,14 @@ u64 btrfs_find_space_for_alloc(struct btrfs_block_group *block_group,
 	u64 align_gap = 0;
 	u64 align_gap_len = 0;
 	enum btrfs_trim_state align_gap_trim_state = BTRFS_TRIM_STATE_UNTRIMMED;
+	bool use_bytes_index = (offset == block_group->start);
 
 	ASSERT(!btrfs_is_zoned(block_group->fs_info));
 
 	spin_lock(&ctl->tree_lock);
 	entry = find_free_space(ctl, &offset, &bytes_search,
-				block_group->full_stripe_len, max_extent_size);
+				block_group->full_stripe_len, max_extent_size,
+				use_bytes_index);
 	if (!entry)
 		goto out;
 
@@ -3278,6 +3376,17 @@ again:
 
 	cluster->window_start = start * ctl->unit + entry->offset;
 	rb_erase(&entry->offset_index, &ctl->free_space_offset);
+	rb_erase_cached(&entry->bytes_index, &ctl->free_space_bytes);
+
+	/*
+	 * We need to know if we're currently on the normal space index when we
+	 * manipulate the bitmap so that we know we need to remove and re-insert
+	 * it into the space_index tree.  Clear the bytes_index node here so the
+	 * bitmap manipulation helpers know not to mess with the space_index
+	 * until this bitmap entry is added back into the normal cache.
+	 */
+	RB_CLEAR_NODE(&entry->bytes_index);
+
 	ret = tree_insert_offset(&cluster->root, entry->offset,
 				 &entry->offset_index, 1);
 	ASSERT(!ret); /* -EEXIST; Logic error */
@@ -3368,6 +3477,7 @@ setup_cluster_no_bitmap(struct btrfs_block_group *block_group,
 			continue;
 
 		rb_erase(&entry->offset_index, &ctl->free_space_offset);
+		rb_erase_cached(&entry->bytes_index, &ctl->free_space_bytes);
 		ret = tree_insert_offset(&cluster->root, entry->offset,
 					 &entry->offset_index, 0);
 		total_size += entry->bytes;
