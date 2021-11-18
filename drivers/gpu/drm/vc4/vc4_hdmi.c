@@ -99,11 +99,6 @@
 
 #define HDMI_14_MAX_TMDS_CLK   (340 * 1000 * 1000)
 
-static bool vc4_hdmi_mode_needs_scrambling(const struct drm_display_mode *mode)
-{
-	return (mode->clock * 1000) > HDMI_14_MAX_TMDS_CLK;
-}
-
 static int vc4_hdmi_debugfs_regs(struct seq_file *m, void *unused)
 {
 	struct drm_info_node *node = (struct drm_info_node *)m->private;
@@ -296,7 +291,7 @@ static int vc4_hdmi_connector_get_modes(struct drm_connector *connector)
 		const struct drm_display_mode *mode;
 
 		list_for_each_entry(mode, &connector->probed_modes, head) {
-			if (vc4_hdmi_mode_needs_scrambling(mode)) {
+			if (drm_mode_hdmi_requires_scrambling(mode, 8)) {
 				drm_warn_once(drm, "The core clock cannot reach frequencies high enough to support 4k @ 60Hz.");
 				drm_warn_once(drm, "Please change your config.txt file to add hdmi_enable_4kp60.");
 			}
@@ -314,6 +309,14 @@ static int vc4_hdmi_connector_atomic_check(struct drm_connector *connector,
 	struct drm_connector_state *new_state =
 		drm_atomic_get_new_connector_state(state, connector);
 	struct drm_crtc *crtc = new_state->crtc;
+	int ret;
+
+	ret = drm_atomic_helper_connector_hdmi_check(connector, state);
+	if (ret)
+		return ret;
+
+	if (new_state->hdmi_needs_scrambling != new_state->hdmi_needs_high_tmds_ratio)
+		return -EINVAL;
 
 	if (!crtc)
 		return 0;
@@ -603,37 +606,16 @@ static void vc4_hdmi_set_infoframes(struct drm_encoder *encoder)
 	vc4_hdmi_set_hdr_infoframe(encoder);
 }
 
-static bool vc4_hdmi_supports_scrambling(struct drm_encoder *encoder)
-{
-	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
-	struct drm_display_info *display = &vc4_hdmi->connector.display_info;
-
-	lockdep_assert_held(&vc4_hdmi->mutex);
-
-	if (!display->is_hdmi)
-		return false;
-
-	if (!display->hdmi.scdc.supported ||
-	    !display->hdmi.scdc.scrambling.supported)
-		return false;
-
-	return true;
-}
-
 #define SCRAMBLING_POLLING_DELAY_MS	1000
 
 static void vc4_hdmi_enable_scrambling(struct drm_encoder *encoder)
 {
 	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
-	const struct drm_display_mode *mode = &vc4_hdmi->saved_adjusted_mode;
 	unsigned long flags;
 
 	lockdep_assert_held(&vc4_hdmi->mutex);
 
-	if (!vc4_hdmi_supports_scrambling(encoder))
-		return;
-
-	if (!vc4_hdmi_mode_needs_scrambling(mode))
+	if (!vc4_hdmi->scdc_needed)
 		return;
 
 	drm_scdc_set_high_tmds_clock_ratio(vc4_hdmi->ddc, true);
@@ -1245,6 +1227,7 @@ static void vc4_hdmi_encoder_atomic_mode_set(struct drm_encoder *encoder,
 	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
 
 	mutex_lock(&vc4_hdmi->mutex);
+	vc4_hdmi->scdc_needed = conn_state->hdmi_needs_scrambling;
 	memcpy(&vc4_hdmi->saved_adjusted_mode,
 	       &crtc_state->adjusted_mode,
 	       sizeof(vc4_hdmi->saved_adjusted_mode));
@@ -1275,7 +1258,7 @@ static int vc4_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
 	 * bandwidth). Slightly lower the frequency to bring it out of
 	 * the WiFi range.
 	 */
-	tmds_rate = pixel_rate * 10;
+	tmds_rate = pixel_rate * (conn_state->hdmi_needs_high_tmds_ratio ? 40 : 10);
 	if (vc4_hdmi->disable_wifi_frequencies &&
 	    (tmds_rate >= WIFI_2_4GHz_CH1_MIN_FREQ &&
 	     tmds_rate <= WIFI_2_4GHz_CH1_MAX_FREQ)) {
@@ -1297,7 +1280,7 @@ static int vc4_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
 	if (pixel_rate > vc4_hdmi->variant->max_pixel_clock)
 		return -EINVAL;
 
-	if (vc4_hdmi->disable_4kp60 && (pixel_rate > HDMI_14_MAX_TMDS_CLK))
+	if (vc4_hdmi->disable_4kp60 && conn_state->hdmi_needs_scrambling)
 		return -EINVAL;
 
 	vc4_state->pixel_rate = pixel_rate;
@@ -1319,7 +1302,8 @@ vc4_hdmi_encoder_mode_valid(struct drm_encoder *encoder,
 	if ((mode->clock * 1000) > vc4_hdmi->variant->max_pixel_clock)
 		return MODE_CLOCK_HIGH;
 
-	if (vc4_hdmi->disable_4kp60 && vc4_hdmi_mode_needs_scrambling(mode))
+	if (vc4_hdmi->disable_4kp60 &&
+	    drm_mode_hdmi_requires_scrambling(mode, 8))
 		return MODE_CLOCK_HIGH;
 
 	return MODE_OK;

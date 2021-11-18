@@ -206,6 +206,12 @@ struct vc4_hdmi {
 	 * the scrambler on? Protected by @mutex.
 	 */
 	bool scdc_enabled;
+
+	/**
+	 * @scdc_needed: Is the HDMI controller needs to have the
+	 * scrambling on? Protected by @mutex.
+	 */
+	bool scdc_needed;
 };
 
 static inline struct vc4_hdmi *
