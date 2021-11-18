@@ -250,15 +250,12 @@ static inline void blk_integrity_del(struct gendisk *disk)
 
 unsigned long blk_rq_timeout(unsigned long timeout);
 void blk_add_timer(struct request *req);
-void blk_print_req_error(struct request *req, blk_status_t status);
+const char *blk_status_to_str(blk_status_t status);
 
 bool blk_attempt_plug_merge(struct request_queue *q, struct bio *bio,
 		unsigned int nr_segs, bool *same_queue_rq);
 bool blk_bio_list_merge(struct request_queue *q, struct list_head *list,
 			struct bio *bio, unsigned int nr_segs);
-
-void __blk_account_io_start(struct request *req);
-void __blk_account_io_done(struct request *req, u64 now);
 
 /*
  * Plug flush limits
@@ -350,23 +347,7 @@ static inline bool blk_do_io_stat(struct request *rq)
 	return (rq->rq_flags & RQF_IO_STAT) && rq->rq_disk;
 }
 
-static inline void blk_account_io_done(struct request *req, u64 now)
-{
-	/*
-	 * Account IO completion.  flush_rq isn't accounted as a
-	 * normal IO on queueing nor completion.  Accounting the
-	 * containing request is enough.
-	 */
-	if (blk_do_io_stat(req) && req->part &&
-	    !(req->rq_flags & RQF_FLUSH_SEQ))
-		__blk_account_io_done(req, now);
-}
-
-static inline void blk_account_io_start(struct request *req)
-{
-	if (blk_do_io_stat(req))
-		__blk_account_io_start(req);
-}
+void update_io_ticks(struct block_device *part, unsigned long now, bool end);
 
 static inline void req_set_nomerge(struct request_queue *q, struct request *req)
 {
@@ -492,5 +473,15 @@ extern const struct address_space_operations def_blk_aops;
 int disk_register_independent_access_ranges(struct gendisk *disk,
 				struct blk_independent_access_ranges *new_iars);
 void disk_unregister_independent_access_ranges(struct gendisk *disk);
+
+#ifdef CONFIG_FAIL_MAKE_REQUEST
+bool should_fail_request(struct block_device *part, unsigned int bytes);
+#else /* CONFIG_FAIL_MAKE_REQUEST */
+static inline bool should_fail_request(struct block_device *part,
+					unsigned int bytes)
+{
+	return false;
+}
+#endif /* CONFIG_FAIL_MAKE_REQUEST */
 
 #endif /* BLK_INTERNAL_H */
