@@ -941,6 +941,18 @@ static int perf_cgroup_ensure_storage(struct perf_event *event,
 	return ret;
 }
 
+struct perf_cgroup *cgroup_tryget_perf_cgroup(struct cgroup *cgrp)
+{
+	struct cgroup_subsys_state *css;
+
+	css = cgroup_tryget_css(cgrp, &perf_event_cgrp_subsys);
+
+	if (!css)
+		return NULL;
+
+	return container_of(css, struct perf_cgroup, css);
+}
+
 static inline int perf_cgroup_connect(int fd, struct perf_event *event,
 				      struct perf_event_attr *attr,
 				      struct perf_event *group_leader)
@@ -1078,6 +1090,11 @@ static inline void perf_cgroup_sched_out(struct task_struct *task,
 static inline void perf_cgroup_sched_in(struct task_struct *prev,
 					struct task_struct *task)
 {
+}
+
+struct perf_cgroup *cgroup_tryget_perf_cgroup(struct cgroup *cgrp)
+{
+	return NULL;
 }
 
 static inline int perf_cgroup_connect(pid_t pid, struct perf_event *event,

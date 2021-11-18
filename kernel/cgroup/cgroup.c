@@ -495,8 +495,8 @@ static struct cgroup_subsys_state *cgroup_css(struct cgroup *cgrp,
  * Find and get @cgrp's css associated with @ss.  If the css doesn't exist
  * or is offline, %NULL is returned.
  */
-static struct cgroup_subsys_state *cgroup_tryget_css(struct cgroup *cgrp,
-						     struct cgroup_subsys *ss)
+struct cgroup_subsys_state *cgroup_tryget_css(struct cgroup *cgrp,
+					      struct cgroup_subsys *ss)
 {
 	struct cgroup_subsys_state *css;
 

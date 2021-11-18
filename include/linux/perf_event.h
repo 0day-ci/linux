@@ -927,6 +927,8 @@ struct perf_cgroup {
 	struct perf_cgroup_info	__percpu *info;
 };
 
+extern struct perf_cgroup *cgroup_tryget_perf_cgroup(struct cgroup *cgrp);
+
 /*
  * Must ensure cgroup is pinned (css_get) before calling
  * this function. In other words, we cannot call this function
