@@ -725,6 +725,8 @@ trace_trigger_soft_disabled(struct trace_event_file *file)
 
 #ifdef CONFIG_BPF_EVENTS
 unsigned int trace_call_bpf(struct trace_event_call *call, void *ctx);
+int perf_event_attach_bpf_prog_array(struct perf_event *event,
+				     struct bpf_prog_array *new_array);
 int perf_event_attach_bpf_prog(struct perf_event *event, struct bpf_prog *prog, u64 bpf_cookie);
 void perf_event_detach_bpf_prog(struct perf_event *event);
 int perf_event_query_prog_array(struct perf_event *event, void __user *info);
@@ -739,6 +741,13 @@ int bpf_get_perf_event_info(const struct perf_event *event, u32 *prog_id,
 static inline unsigned int trace_call_bpf(struct trace_event_call *call, void *ctx)
 {
 	return 1;
+}
+
+static inline int
+int perf_event_attach_bpf_prog_array(struct perf_event *event,
+				     struct bpf_prog_array *new_array)
+{
+	return -EOPNOTSUPP;
 }
 
 static inline int

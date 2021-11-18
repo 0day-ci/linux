@@ -1724,6 +1724,34 @@ static DEFINE_MUTEX(bpf_event_mutex);
 
 #define BPF_TRACE_MAX_PROGS 64
 
+int perf_event_attach_bpf_prog_array(struct perf_event *event,
+				     struct bpf_prog_array *new_array)
+{
+	struct bpf_prog_array_item *item;
+	struct bpf_prog_array *old_array;
+
+	if (!new_array)
+		return -EINVAL;
+
+	if (bpf_prog_array_length(new_array) >= BPF_TRACE_MAX_PROGS)
+		return -E2BIG;
+
+	if (!trace_kprobe_on_func_entry(event->tp_event) ||
+	     !trace_kprobe_error_injectable(event->tp_event))
+		for (item = new_array->items; item->prog; item++)
+			if (item->prog->kprobe_override)
+				return -EINVAL;
+
+	mutex_lock(&bpf_event_mutex);
+
+	old_array = bpf_event_rcu_dereference(event->tp_event->prog_array);
+	rcu_assign_pointer(event->tp_event->prog_array, new_array);
+	bpf_prog_array_free(old_array);
+
+	mutex_unlock(&bpf_event_mutex);
+	return 0;
+}
+
 int perf_event_attach_bpf_prog(struct perf_event *event,
 			       struct bpf_prog *prog,
 			       u64 bpf_cookie)
