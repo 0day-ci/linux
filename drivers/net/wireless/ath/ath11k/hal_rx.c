@@ -1080,6 +1080,9 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		break;
 	}
 	case HAL_PHYRX_RSSI_LEGACY: {
+		int i;
+		bool db2dbm = test_bit(WMI_TLV_SERVICE_HW_DB2DBM_CONVERSION_SUPPORT,
+				       ab->wmi_ab.svc_map);
 		struct hal_rx_phyrx_rssi_legacy_info *rssi =
 			(struct hal_rx_phyrx_rssi_legacy_info *)tlv_data;
 
@@ -1090,6 +1093,16 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		ppdu_info->rssi_comb =
 			FIELD_GET(HAL_RX_PHYRX_RSSI_LEGACY_INFO_INFO1_RSSI_COMB,
 				  __le32_to_cpu(rssi->info0));
+
+		if (db2dbm) {
+			for (i = 0; i < ARRAY_SIZE(rssi->preamble); i++) {
+				u32 rssi2040 = __le32_to_cpu(rssi->preamble[i].rssi_2040);
+
+				ppdu_info->rssi_chain_pri20[i] =
+					FIELD_GET(HAL_RX_PHYRX_RSSI_PREAMBLE_PRI20,
+						  rssi2040);
+			}
+		}
 		break;
 	}
 	case HAL_RX_MPDU_START: {

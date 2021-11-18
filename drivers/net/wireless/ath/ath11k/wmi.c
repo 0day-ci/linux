@@ -130,6 +130,8 @@ static const struct wmi_tlv_policy wmi_tlv_policies[] = {
 		.min_len = sizeof(struct wmi_vdev_delete_resp_event) },
 	[WMI_TAG_OBSS_COLOR_COLLISION_EVT] = {
 		.min_len = sizeof(struct wmi_obss_color_collision_event) },
+	[WMI_TAG_PER_CHAIN_RSSI_STATS] = {
+		.min_len = sizeof(struct wmi_per_chain_rssi_stats) },
 };
 
 #define PRIMAP(_hw_mode_) \
@@ -5432,10 +5434,17 @@ ath11k_wmi_pull_bcn_stats(const struct wmi_bcn_stats *src,
 int ath11k_wmi_pull_fw_stats(struct ath11k_base *ab, struct sk_buff *skb,
 			     struct ath11k_fw_stats *stats)
 {
+	struct ath11k *ar;
 	const void **tb;
 	const struct wmi_stats_event *ev;
+	const struct wmi_per_chain_rssi_stats *rssi;
+	const struct wmi_rssi_stats *stats_rssi;
+	struct ieee80211_sta *sta;
+	struct ath11k_sta *arsta;
 	const void *data;
-	int i, ret;
+	const struct wmi_tlv *tlv;
+	u16 tlv_tag, tlv_len;
+	int i, ret, rssi_num = 0;
 	u32 len = skb->len;
 
 	tb = ath11k_wmi_tlv_parse_alloc(ab, skb->data, len, GFP_ATOMIC);
@@ -5447,11 +5456,17 @@ int ath11k_wmi_pull_fw_stats(struct ath11k_base *ab, struct sk_buff *skb,
 
 	ev = tb[WMI_TAG_STATS_EVENT];
 	data = tb[WMI_TAG_ARRAY_BYTE];
+	rssi = tb[WMI_TAG_PER_CHAIN_RSSI_STATS];
 	if (!ev || !data) {
 		ath11k_warn(ab, "failed to fetch update stats ev");
 		kfree(tb);
 		return -EPROTO;
 	}
+
+	if (rssi && (ev->stats_id & WMI_REQUEST_RSSI_PER_CHAIN_STAT))
+		rssi_num = rssi->num_per_chain_rssi_stats;
+
+	ar = ath11k_mac_get_ar_by_pdev_id(ab, ev->pdev_id);
 
 	ath11k_dbg(ab, ATH11K_DBG_WMI,
 		   "wmi stats update ev pdev_id %d pdev %i vdev %i bcn %i\n",
@@ -5533,6 +5548,96 @@ int ath11k_wmi_pull_fw_stats(struct ath11k_base *ab, struct sk_buff *skb,
 		list_add_tail(&dst->list, &stats->bcn);
 	}
 
+	ath11k_dbg(ab, ATH11K_DBG_WMI,
+		   "wmi stats id 0x%x num chain %d\n",
+		   ev->stats_id,
+		   rssi_num);
+
+	if (rssi_num) {
+		/* This TLV of WMI_TAG_PER_CHAIN_RSSI_STATS is followed by
+		 * another TLV of array of structs
+		 * wmi_rssi_stats rssi_stats[num_per_chain_rssi_stats].
+		 * So add check integrity for the TLVs.
+		 * rssi is behind the TLV of WMI_TAG_PER_CHAIN_RSSI_STATS.
+		 */
+		tlv = (struct wmi_tlv *)((u8 *)rssi - sizeof(*tlv));
+		tlv_len = FIELD_GET(WMI_TLV_LEN, tlv->header);
+
+		/* Skip wmi_per_chain_rssi_stats to get the TLV of array structs */
+		tlv = (struct wmi_tlv *)((u8 *)rssi + tlv_len);
+		if (((u8 *)tlv - skb->data) >= skb->len)
+			goto fin;
+
+		tlv_tag = FIELD_GET(WMI_TLV_TAG, tlv->header);
+		if (tlv_tag != WMI_TAG_ARRAY_STRUCT)
+			rssi_num = 0;
+
+		/* Skip array struct TLV to get the array of structs */
+		tlv++;
+		if (((u8 *)tlv - skb->data) >= skb->len)
+			goto fin;
+
+		tlv_len = FIELD_GET(WMI_TLV_LEN, tlv->header);
+	}
+
+	for (i = 0; i < rssi_num; i++) {
+		struct ath11k_vif *arvif;
+		int j;
+
+		stats_rssi = (struct wmi_rssi_stats *)((u8 *)tlv + i *
+			(sizeof(*tlv) + tlv_len));
+		if (((u8 *)stats_rssi - skb->data) >= skb->len)
+			goto fin;
+
+		tlv_tag = FIELD_GET(WMI_TLV_TAG, stats_rssi->tlv_header);
+		if (tlv_tag != WMI_TAG_RSSI_STATS) {
+			ath11k_warn(ab, "invalid rssi stats TLV data\n");
+			break;
+		}
+
+		stats->stats_id = WMI_REQUEST_RSSI_PER_CHAIN_STAT;
+
+		ath11k_dbg(ab, ATH11K_DBG_WMI,
+			   "wmi stats vdev id %d mac %pM\n",
+			   stats_rssi->vdev_id, stats_rssi->peer_macaddr.addr);
+
+		arvif = ath11k_mac_get_arvif(ar, stats_rssi->vdev_id);
+		if (!arvif) {
+			ath11k_warn(ab, "not found vif for vdev id %d\n",
+				    stats_rssi->vdev_id);
+			continue;
+		}
+
+		ath11k_dbg(ab, ATH11K_DBG_WMI,
+			   "wmi stats bssid %pM vif %pK\n",
+			   arvif->bssid, arvif->vif);
+
+		sta = ieee80211_find_sta_by_ifaddr(ar->hw,
+						   arvif->bssid,
+						   NULL);
+		if (!sta) {
+			ath11k_warn(ab, "not found station for bssid %pM\n",
+				    arvif->bssid);
+			continue;
+		}
+
+		arsta = (struct ath11k_sta *)sta->drv_priv;
+
+		BUILD_BUG_ON(ARRAY_SIZE(arsta->chain_signal) >
+			     ARRAY_SIZE(stats_rssi->rssi_avg_beacon));
+
+		for (j = 0; j < ARRAY_SIZE(arsta->chain_signal); j++) {
+			arsta->chain_signal[j] = stats_rssi->rssi_avg_beacon[j];
+			ath11k_dbg(ab, ATH11K_DBG_WMI,
+				   "wmi stats beacon rssi[%d] %d data rssi[%d] %d\n",
+				   j,
+				   stats_rssi->rssi_avg_beacon[j],
+				   j,
+				   stats_rssi->rssi_avg_data[j]);
+		}
+	}
+
+fin:
 	kfree(tb);
 	return 0;
 }

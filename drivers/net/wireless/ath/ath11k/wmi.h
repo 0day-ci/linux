@@ -4394,6 +4394,20 @@ struct wmi_stats_event {
 	u32 num_peer_extd2_stats;
 } __packed;
 
+#define WMI_MAX_CHAINS 8
+
+struct wmi_rssi_stats {
+	u32 tlv_header;
+	u32 vdev_id;
+	u32 rssi_avg_beacon[WMI_MAX_CHAINS];
+	u32 rssi_avg_data[WMI_MAX_CHAINS];
+	struct wmi_mac_addr peer_macaddr;
+} __packed;
+
+struct wmi_per_chain_rssi_stats {
+	u32 num_per_chain_rssi_stats;
+} __packed;
+
 struct wmi_pdev_ctl_failsafe_chk_event {
 	u32 pdev_id;
 	u32 ctl_failsafe_status;
