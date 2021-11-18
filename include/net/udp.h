@@ -28,6 +28,7 @@
 #include <linux/seq_file.h>
 #include <linux/poll.h>
 #include <linux/indirect_call_wrapper.h>
+#include <trace/events/snmp.h>
 
 /**
  *	struct udp_skb_cb  -  UDP(-Lite) private variables
@@ -384,12 +385,24 @@ static inline int copy_linear_skb(struct sk_buff *skb, int len, int off,
 /*
  * 	SNMP statistics for UDP and UDP-Lite
  */
-#define UDP_INC_STATS(net, field, is_udplite)		      do { \
-	if (is_udplite) SNMP_INC_STATS((net)->mib.udplite_statistics, field);       \
-	else		SNMP_INC_STATS((net)->mib.udp_statistics, field);  }  while(0)
-#define __UDP_INC_STATS(net, field, is_udplite) 	      do { \
-	if (is_udplite) __SNMP_INC_STATS((net)->mib.udplite_statistics, field);         \
-	else		__SNMP_INC_STATS((net)->mib.udp_statistics, field);    }  while(0)
+#define UDP_INC_STATS(net, field, is_udplite)			do {	\
+	if (is_udplite) {						\
+		SNMP_INC_STATS((net)->mib.udplite_statistics, field);	\
+		trace_snmp(skb, TRACE_MIB_UDPLITE, field, 1);				\
+	} else {							\
+		SNMP_INC_STATS((net)->mib.udp_statistics, field);	\
+		trace_snmp(skb, TRACE_MIB_UDP, field, 1);			\
+	}								\
+} while (0)
+#define __UDP_INC_STATS(net, skb, field, is_udplite)		do {	\
+	if (is_udplite) {						\
+		__SNMP_INC_STATS((net)->mib.udplite_statistics, field);	\
+		trace_snmp(skb, TRACE_MIB_UDPLITE, field, 1);				\
+	} else {							\
+		__SNMP_INC_STATS((net)->mib.udp_statistics, field);	\
+		trace_snmp(skb, TRACE_MIB_UDP, field, 1);			\
+	}								\
+}  while (0)
 
 #define __UDP6_INC_STATS(net, field, is_udplite)	    do { \
 	if (is_udplite) __SNMP_INC_STATS((net)->mib.udplite_stats_in6, field);\

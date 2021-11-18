@@ -1648,9 +1648,11 @@ static struct sk_buff *__first_packet_length(struct sock *sk,
 
 	while ((skb = skb_peek(rcvq)) != NULL) {
 		if (udp_lib_checksum_complete(skb)) {
-			__UDP_INC_STATS(sock_net(sk), UDP_MIB_CSUMERRORS,
+			__UDP_INC_STATS(sock_net(sk), skb,
+					UDP_MIB_CSUMERRORS,
 					IS_UDPLITE(sk));
-			__UDP_INC_STATS(sock_net(sk), UDP_MIB_INERRORS,
+			__UDP_INC_STATS(sock_net(sk), skb,
+					UDP_MIB_INERRORS,
 					IS_UDPLITE(sk));
 			atomic_inc(&sk->sk_drops);
 			__skb_unlink(skb, rcvq);
@@ -2143,7 +2145,7 @@ static int udp_queue_rcv_one_skb(struct sock *sk, struct sk_buff *skb)
 
 			ret = encap_rcv(sk, skb);
 			if (ret <= 0) {
-				__UDP_INC_STATS(sock_net(sk),
+				__UDP_INC_STATS(sock_net(sk), skb,
 						UDP_MIB_INDATAGRAMS,
 						is_udplite);
 				return -ret;
@@ -2201,9 +2203,10 @@ static int udp_queue_rcv_one_skb(struct sock *sk, struct sk_buff *skb)
 	return __udp_queue_rcv_skb(sk, skb);
 
 csum_error:
-	__UDP_INC_STATS(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);
+	__UDP_INC_STATS(sock_net(sk), skb, UDP_MIB_CSUMERRORS,
+			is_udplite);
 drop:
-	__UDP_INC_STATS(sock_net(sk), UDP_MIB_INERRORS, is_udplite);
+	__UDP_INC_STATS(sock_net(sk), skb, UDP_MIB_INERRORS, is_udplite);
 	atomic_inc(&sk->sk_drops);
 	kfree_skb(skb);
 	return -1;
@@ -2290,9 +2293,9 @@ start_lookup:
 
 		if (unlikely(!nskb)) {
 			atomic_inc(&sk->sk_drops);
-			__UDP_INC_STATS(net, UDP_MIB_RCVBUFERRORS,
+			__UDP_INC_STATS(net, skb, UDP_MIB_RCVBUFERRORS,
 					IS_UDPLITE(sk));
-			__UDP_INC_STATS(net, UDP_MIB_INERRORS,
+			__UDP_INC_STATS(net, skb, UDP_MIB_INERRORS,
 					IS_UDPLITE(sk));
 			continue;
 		}
@@ -2311,7 +2314,7 @@ start_lookup:
 			consume_skb(skb);
 	} else {
 		kfree_skb(skb);
-		__UDP_INC_STATS(net, UDP_MIB_IGNOREDMULTI,
+		__UDP_INC_STATS(net, skb, UDP_MIB_IGNOREDMULTI,
 				proto == IPPROTO_UDPLITE);
 	}
 	return 0;
@@ -2454,7 +2457,8 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	if (udp_lib_checksum_complete(skb))
 		goto csum_error;
 
-	__UDP_INC_STATS(net, UDP_MIB_NOPORTS, proto == IPPROTO_UDPLITE);
+	__UDP_INC_STATS(net, skb, UDP_MIB_NOPORTS,
+			proto == IPPROTO_UDPLITE);
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
 
 	/*
@@ -2481,9 +2485,11 @@ csum_error:
 			    proto == IPPROTO_UDPLITE ? "Lite" : "",
 			    &saddr, ntohs(uh->source), &daddr, ntohs(uh->dest),
 			    ulen);
-	__UDP_INC_STATS(net, UDP_MIB_CSUMERRORS, proto == IPPROTO_UDPLITE);
+	__UDP_INC_STATS(net, skb, UDP_MIB_CSUMERRORS,
+			proto == IPPROTO_UDPLITE);
 drop:
-	__UDP_INC_STATS(net, UDP_MIB_INERRORS, proto == IPPROTO_UDPLITE);
+	__UDP_INC_STATS(net, skb, UDP_MIB_INERRORS,
+			proto == IPPROTO_UDPLITE);
 	kfree_skb(skb);
 	return 0;
 }
