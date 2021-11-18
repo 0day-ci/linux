@@ -11,6 +11,10 @@ struct ns_common {
 	const struct proc_ns_operations *ops;
 	unsigned int inum;
 	refcount_t count;
+
+#ifdef CONFIG_NAMESPACE_FS
+	struct dentry *dentry;
+#endif /* CONFIG_NAMESPACE_FS */
 };
 
 #endif
