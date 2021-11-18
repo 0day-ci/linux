@@ -629,6 +629,7 @@ static void proc_watchdog_update(void)
 {
 	/* Remove impossible cpus to keep sysctl output clean. */
 	cpumask_and(&watchdog_cpumask, &watchdog_cpumask, cpu_possible_mask);
+	WARN_ONCE(!cpumask_subset(&watchdog_cpumask, housekeeping_cpumask(HK_FLAG_TIMER)), "Enabling watchdog on nohz_full cores\n");
 	lockup_detector_reconfigure();
 }
 
