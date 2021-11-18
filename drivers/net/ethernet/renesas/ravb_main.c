@@ -2489,7 +2489,7 @@ static int ravb_set_gti(struct net_device *ndev)
 		return -EINVAL;
 
 	inc = 1000000000ULL << 20;
-	do_div(inc, rate);
+	inc = div64_ul(inc, rate);
 
 	if (inc < GTI_TIV_MIN || inc > GTI_TIV_MAX) {
 		dev_err(dev, "gti.tiv increment 0x%llx is outside the range 0x%x - 0x%x\n",
