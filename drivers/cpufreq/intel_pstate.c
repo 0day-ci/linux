@@ -3369,7 +3369,7 @@ static int __init intel_pstate_init(void)
 			if (!default_driver)
 				default_driver = &intel_pstate;
 
-			if (boot_cpu_has(X86_FEATURE_HYBRID_CPU))
+			if (boot_cpu_has(X86_FEATURE_HYBRID_CPU) && acpi_cpc_valid())
 				intel_pstate_cppc_set_cpu_scaling();
 
 			goto hwp_cpu_matched;
