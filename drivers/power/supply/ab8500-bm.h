@@ -460,10 +460,7 @@ struct ab8500_bm_charger_parameters {
 
 /**
  * struct ab8500_bm_data - ab8500 battery management data
- * @temp_under		under this temp, charging is stopped
- * @temp_low		between this temp and temp_under charging is reduced
- * @temp_high		between this temp and temp_over charging is reduced
- * @temp_over		over this temp, charging is stopped
+ * @bi			battery info from device tree
  * @temp_now		present battery temperature
  * @temp_interval_chg	temperature measurement interval in s when charging
  * @temp_interval_nochg	temperature measurement interval in s when not charging
@@ -491,10 +488,7 @@ struct ab8500_bm_charger_parameters {
  * @fg_params		fuel gauge parameters
  */
 struct ab8500_bm_data {
-	int temp_under;
-	int temp_low;
-	int temp_high;
-	int temp_over;
+	struct power_supply_battery_info bi;
 	int temp_now;
 	int temp_interval_chg;
 	int temp_interval_nochg;
