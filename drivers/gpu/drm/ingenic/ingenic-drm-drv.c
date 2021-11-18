@@ -757,7 +757,7 @@ ingenic_drm_gem_create_object(struct drm_device *drm, size_t size)
 
 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj)
-		return ERR_PTR(-ENOMEM);
+		return NULL;
 
 	obj->map_noncoherent = priv->soc_info->map_noncoherent;
 
