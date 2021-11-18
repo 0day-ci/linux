@@ -424,6 +424,26 @@ static inline bool drm_mode_is_stereo(const struct drm_display_mode *mode)
 	return mode->flags & DRM_MODE_FLAG_3D_MASK;
 }
 
+/**
+ * drm_mode_hdmi_requires_scrambling - Checks if a mode requires HDMI Scrambling
+ * @mode: DRM display mode
+ * @bpc: Pixels bit depth
+ *
+ * Checks if a given display mode requires the scrambling to be enabled.
+ *
+ * Returns:
+ * A boolean stating whether it's required or not.
+ */
+static inline bool
+drm_mode_hdmi_requires_scrambling(const struct drm_display_mode *mode,
+				  unsigned char bpc)
+{
+	unsigned long long clock = mode->crtc_clock * bpc;
+	do_div(clock, 8);
+
+	return mode->clock > 340000;
+}
+
 struct drm_connector;
 struct drm_cmdline_mode;
 
