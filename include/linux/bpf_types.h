@@ -57,6 +57,10 @@ BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_SYSCTL, cg_sysctl,
 BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_SOCKOPT, cg_sockopt,
 	      struct bpf_sockopt, struct bpf_sockopt_kern)
 #endif
+#if defined (CONFIG_BPF_EVENTS) && defined (CONFIG_CGROUP_BPF)
+BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_TRACEPOINT, cg_tracepoint,
+	      __u64, u64)
+#endif
 #ifdef CONFIG_BPF_LIRC_MODE2
 BPF_PROG_TYPE(BPF_PROG_TYPE_LIRC_MODE2, lirc_mode2,
 	      __u32, u32)

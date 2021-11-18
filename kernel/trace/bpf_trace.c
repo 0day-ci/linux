@@ -1720,6 +1720,14 @@ const struct bpf_verifier_ops perf_event_verifier_ops = {
 const struct bpf_prog_ops perf_event_prog_ops = {
 };
 
+const struct bpf_verifier_ops cg_tracepoint_verifier_ops = {
+	.get_func_proto  = tp_prog_func_proto,
+	.is_valid_access = tp_prog_is_valid_access,
+};
+
+const struct bpf_prog_ops cg_tracepoint_prog_ops = {
+};
+
 static DEFINE_MUTEX(bpf_event_mutex);
 
 #define BPF_TRACE_MAX_PROGS 64

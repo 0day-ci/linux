@@ -2152,6 +2152,7 @@ static bool is_perfmon_prog_type(enum bpf_prog_type prog_type)
 	case BPF_PROG_TYPE_LSM:
 	case BPF_PROG_TYPE_STRUCT_OPS: /* has access to struct sock */
 	case BPF_PROG_TYPE_EXT: /* extends any prog */
+	case BPF_PROG_TYPE_CGROUP_TRACEPOINT:
 		return true;
 	default:
 		return false;
@@ -3140,6 +3141,8 @@ attach_type_to_prog_type(enum bpf_attach_type attach_type)
 		return BPF_PROG_TYPE_SK_LOOKUP;
 	case BPF_XDP:
 		return BPF_PROG_TYPE_XDP;
+	case BPF_CGROUP_TRACEPOINT:
+		return BPF_PROG_TYPE_CGROUP_TRACEPOINT;
 	default:
 		return BPF_PROG_TYPE_UNSPEC;
 	}
@@ -3192,6 +3195,7 @@ static int bpf_prog_attach(const union bpf_attr *attr)
 	case BPF_PROG_TYPE_CGROUP_SOCK_ADDR:
 	case BPF_PROG_TYPE_CGROUP_SOCKOPT:
 	case BPF_PROG_TYPE_CGROUP_SYSCTL:
+	case BPF_PROG_TYPE_CGROUP_TRACEPOINT:
 	case BPF_PROG_TYPE_SOCK_OPS:
 		ret = cgroup_bpf_prog_attach(attr, ptype, prog);
 		break;
