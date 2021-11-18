@@ -190,6 +190,228 @@ mt7915_fw_util_wa_show(struct seq_file *file, void *data)
 
 DEFINE_SHOW_ATTRIBUTE(mt7915_fw_util_wa);
 
+struct mt7915_txo_worker_info {
+	char* buf;
+	int sofar;
+	int size;
+};
+
+static void mt7915_txo_worker(void *wi_data, struct ieee80211_sta *sta)
+{
+	struct mt7915_txo_worker_info *wi = wi_data;
+	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+	struct mt76_testmode_data *td = &msta->test;
+	struct ieee80211_vif *vif;
+	struct wireless_dev *wdev;
+
+	if (wi->sofar >= wi->size)
+		return; /* buffer is full */
+
+	vif = container_of((void *)msta->vif, struct ieee80211_vif, drv_priv);
+	wdev = ieee80211_vif_to_wdev(vif);
+
+	wi->sofar += scnprintf(wi->buf + wi->sofar, wi->size - wi->sofar,
+			       "vdev (%s) active=%d tpc=%d sgi=%d mcs=%d nss=%d"
+			       " pream=%d retries=%d dynbw=%d bw=%d\n",
+			       wdev->netdev->name,
+			       td->txo_active, td->tx_power[0],
+			       td->tx_rate_sgi, td->tx_rate_idx,
+			       td->tx_rate_nss, td->tx_rate_mode,
+			       td->tx_xmit_count, td->tx_dynbw,
+			       td->txbw);
+}
+
+static ssize_t mt7915_read_set_rate_override(struct file *file,
+					     char __user *user_buf,
+					     size_t count, loff_t *ppos)
+{
+	struct mt7915_dev *dev = file->private_data;
+        struct ieee80211_hw *hw = dev->mphy.hw;
+	char *buf2;
+	int size = 8000;
+	int rv, sofar;
+	struct mt7915_txo_worker_info wi;
+	const char buf[] =
+		"This allows specify specif tx rate parameters for all DATA"
+		" frames on a vdev\n"
+		"To set a value, you specify the dev-name and key-value pairs:\n"
+		"tpc=10 sgi=1 mcs=x nss=x pream=x retries=x dynbw=0|1 bw=x enable=0|1\n"
+		"pream: 0=cck, 1=ofdm, 2=HT, 3=VHT, 4=HE_SU\n"
+		"cck-mcs: 0=1Mbps, 1=2Mbps, 3=5.5Mbps, 3=11Mbps\n"
+		"ofdm-mcs: 0=6Mbps, 1=9Mbps, 2=12Mbps, 3=18Mbps, 4=24Mbps, 5=36Mbps,"
+		" 6=48Mbps, 7=54Mbps\n"
+		"tpc is not implemented currently, bw is 0-3 for 20-160\n"
+		" For example, wlan0:\n"
+		"echo \"wlan0 tpc=255 sgi=1 mcs=0 nss=1 pream=3 retries=1 dynbw=0 bw=0"
+		" active=1\" > ...mt76/set_rate_override\n";
+
+	buf2 = kzalloc(size, GFP_KERNEL);
+	if (!buf2)
+		return -ENOMEM;
+	strcpy(buf2, buf);
+	sofar = strlen(buf2);
+
+	wi.sofar = sofar;
+	wi.buf = buf2;
+	wi.size = size;
+
+	ieee80211_iterate_stations_atomic(hw, mt7915_txo_worker, &wi);
+
+	rv = simple_read_from_buffer(user_buf, count, ppos, buf2, wi.sofar);
+	kfree(buf2);
+	return rv;
+}
+
+/* Set the rates for specific types of traffic.
+ */
+static ssize_t mt7915_write_set_rate_override(struct file *file,
+					      const char __user *user_buf,
+					      size_t count, loff_t *ppos)
+{
+	struct mt7915_dev *dev = file->private_data;
+	struct mt7915_sta *msta;
+	struct ieee80211_vif *vif;
+	struct mt76_testmode_data *td = NULL;
+	struct wireless_dev *wdev;
+	struct mt76_wcid *wcid;
+	struct mt76_phy *mphy = &dev->mt76.phy;
+	char buf[180];
+	char tmp[20];
+	char *tok;
+	int ret, i, j;
+	unsigned int vdev_id = 0xFFFF;
+	char *bufptr = buf;
+	long rc;
+	char dev_name_match[IFNAMSIZ + 2];
+
+	memset(buf, 0, sizeof(buf));
+
+	simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, user_buf, count);
+
+	/* make sure that buf is null terminated */
+	buf[sizeof(buf) - 1] = 0;
+
+	/* drop the possible '\n' from the end */
+	if (buf[count - 1] == '\n')
+		buf[count - 1] = 0;
+
+	mutex_lock(&mphy->dev->mutex);
+
+	/* Ignore empty lines, 'echo' appends them sometimes at least. */
+	if (buf[0] == 0) {
+		ret = count;
+		goto exit;
+	}
+
+	/* String starts with vdev name, ie 'wlan0'  Find the proper vif that
+	 * matches the name.
+	 */
+	for (i = 0; i < ARRAY_SIZE(dev->mt76.wcid_mask); i++) {
+		u32 mask = dev->mt76.wcid_mask[i];
+		u32 phy_mask = dev->mt76.wcid_phy_mask[i];
+
+		if (!mask)
+			continue;
+
+		for (j = i * 32; mask; j++, mask >>= 1, phy_mask >>= 1) {
+			if (!(mask & 1))
+				continue;
+
+			wcid = rcu_dereference(dev->mt76.wcid[j]);
+			if (!wcid)
+				continue;
+
+			msta = container_of(wcid, struct mt7915_sta, wcid);
+
+			vif = container_of((void *)msta->vif, struct ieee80211_vif, drv_priv);
+
+			wdev = ieee80211_vif_to_wdev(vif);
+
+			if (!wdev)
+				continue;
+
+			snprintf(dev_name_match, sizeof(dev_name_match) - 1, "%s ",
+				 wdev->netdev->name);
+
+			if (strncmp(dev_name_match, buf, strlen(dev_name_match)) == 0) {
+				vdev_id = j;
+				td = &msta->test;
+				bufptr = buf + strlen(dev_name_match) - 1;
+				break;
+			}
+		}
+	}
+
+	if (vdev_id == 0xFFFF) {
+		if (strstr(buf, "active=0")) {
+			/* Ignore, we are disabling it anyway */
+			ret = count;
+			goto exit;
+		} else {
+			dev_info(dev->mt76.dev,
+				 "mt7915: set-rate-override, unknown netdev name: %s\n", buf);
+		}
+		ret = -EINVAL;
+		goto exit;
+	}
+
+#define MT7915_PARSE_LTOK(a, b)					\
+	do {								\
+		tok = strstr(bufptr, " " #a "=");			\
+		if (tok) {						\
+			char *tspace;					\
+			tok += 1; /* move past initial space */		\
+			strncpy(tmp, tok + strlen(#a "="), sizeof(tmp) - 1); \
+			tmp[sizeof(tmp) - 1] = 0;			\
+			tspace = strstr(tmp, " ");			\
+			if (tspace)					\
+				*tspace = 0;				\
+			if (kstrtol(tmp, 0, &rc) != 0)			\
+				dev_info(dev->mt76.dev,			\
+					 "mt7915: set-rate-override: " #a \
+					 "= could not be parsed, tmp: %s\n", \
+					 tmp);				\
+			else						\
+				td->b = rc;				\
+		}							\
+	} while (0)
+
+	/* TODO:  Allow configuring LTF? */
+	td->tx_ltf = 1; /* 0: HTLTF 3.2us, 1: HELTF, 6.4us, 2 HELTF 12,8us */
+
+	MT7915_PARSE_LTOK(tpc, tx_power[0]);
+	MT7915_PARSE_LTOK(sgi, tx_rate_sgi);
+	MT7915_PARSE_LTOK(mcs, tx_rate_idx);
+	MT7915_PARSE_LTOK(nss, tx_rate_nss);
+	MT7915_PARSE_LTOK(pream, tx_rate_mode);
+	MT7915_PARSE_LTOK(retries, tx_xmit_count);
+	MT7915_PARSE_LTOK(dynbw, tx_dynbw);
+	MT7915_PARSE_LTOK(bw, txbw);
+	MT7915_PARSE_LTOK(active, txo_active);
+
+	dev_info(dev->mt76.dev,
+		 "mt7915: set-rate-overrides, vdev %i(%s) active=%d tpc=%d sgi=%d mcs=%d"
+		 " nss=%d pream=%d retries=%d dynbw=%d bw=%d\n",
+		 vdev_id, dev_name_match,
+		 td->txo_active, td->tx_power[0], td->tx_rate_sgi, td->tx_rate_idx,
+		 td->tx_rate_nss, td->tx_rate_mode, td->tx_xmit_count, td->tx_dynbw,
+		 td->txbw);
+
+	ret = count;
+
+exit:
+	mutex_unlock(&mphy->dev->mutex);
+	return ret;
+}
+
+static const struct file_operations fops_set_rate_override = {
+	.read = mt7915_read_set_rate_override,
+	.write = mt7915_write_set_rate_override,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 static int
 mt7915_txs_for_no_skb_set(void *data, u64 val)
 {
@@ -577,6 +799,8 @@ int mt7915_init_debugfs(struct mt7915_phy *phy)
 		debugfs_create_file("radar_trigger", 0200, dir, dev,
 				    &fops_radar_trigger);
 	}
+	debugfs_create_file("set_rate_override", 0600, dir,
+			    dev, &fops_set_rate_override);
 
 	return 0;
 }

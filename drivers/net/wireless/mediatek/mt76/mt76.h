@@ -577,6 +577,7 @@ struct mt76_testmode_ops {
 
 struct mt76_testmode_data {
 	enum mt76_testmode_state state;
+	u8 txo_active; /* tx overrides are active */
 
 	u32 param_set[DIV_ROUND_UP(NUM_MT76_TM_ATTRS, 32)];
 	struct sk_buff *tx_skb;
@@ -591,6 +592,9 @@ struct mt76_testmode_data {
 	u8 tx_rate_ldpc;
 	u8 tx_rate_stbc;
 	u8 tx_ltf;
+	u8 txbw; /* specify TX bandwidth: 0 20Mhz, 1 40Mhz, 2 80Mhz, 3 160Mhz */
+	u8 tx_xmit_count; /* 0 means no-ack, 1 means one transmit, etc */
+	u8 tx_dynbw; /* 0:  dynamic bw disabled, 1: dynamic bw enabled */
 
 	u8 tx_antenna_mask;
 	u8 tx_spe_idx;
