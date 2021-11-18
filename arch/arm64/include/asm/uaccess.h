@@ -362,10 +362,11 @@ do {									\
 #define __put_user_error(x, ptr, err)					\
 do {									\
 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+	__typeof__(*(__p)) __val = (x);					\
 	might_fault();							\
 	if (access_ok(__p, sizeof(*__p))) {				\
 		__p = uaccess_mask_ptr(__p);				\
-		__raw_put_user((x), __p, (err));			\
+		__raw_put_user(__val, __p, (err));			\
 	} else	{							\
 		(err) = -EFAULT;					\
 	}								\
