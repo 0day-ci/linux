@@ -171,21 +171,34 @@ void copy_user_highpage(struct page *to, struct page *from,
 {
 	void *vfrom, *vto;
 
-	vto = kmap_atomic(to);
-	if (cpu_has_dc_aliases &&
-	    page_mapcount(from) && !Page_dcache_dirty(from)) {
-		vfrom = kmap_coherent(from, vaddr);
+	if (IS_ENABLED(CONFIG_64BIT) && !cpu_has_dc_aliases) {
+		vfrom = page_address(from);
+		vto   = page_address(to);
 		copy_page(vto, vfrom);
-		kunmap_coherent();
+		/*
+		 * even without cache alias, still need to maintain
+		 * coherence between icache and dcache
+		 */
+		if (!cpu_has_ic_fills_f_dc)
+			flush_data_cache_page((unsigned long)vto);
+
 	} else {
-		vfrom = kmap_atomic(from);
-		copy_page(vto, vfrom);
-		kunmap_atomic(vfrom);
+		vto = kmap_atomic(to);
+		if (cpu_has_dc_aliases &&
+		    page_mapcount(from) && !Page_dcache_dirty(from)) {
+			vfrom = kmap_coherent(from, vaddr);
+			copy_page(vto, vfrom);
+			kunmap_coherent();
+		} else {
+			vfrom = kmap_atomic(from);
+			copy_page(vto, vfrom);
+			kunmap_atomic(vfrom);
+		}
+		if ((!cpu_has_ic_fills_f_dc) ||
+		      pages_do_alias((unsigned long)vto, vaddr & PAGE_MASK))
+			flush_data_cache_page((unsigned long)vto);
+		kunmap_atomic(vto);
 	}
-	if ((!cpu_has_ic_fills_f_dc) ||
-	    pages_do_alias((unsigned long)vto, vaddr & PAGE_MASK))
-		flush_data_cache_page((unsigned long)vto);
-	kunmap_atomic(vto);
 	/* Make sure this page is cleared on other CPU's too before using it */
 	smp_wmb();
 }
