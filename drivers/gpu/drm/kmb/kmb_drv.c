@@ -514,8 +514,10 @@ static int kmb_probe(struct platform_device *pdev)
 	ret = kmb_dsi_host_bridge_init(get_device(&dsi_pdev->dev));
 
 	if (ret == -EPROBE_DEFER) {
+		of_dev_put(dsi_pdev);
 		return -EPROBE_DEFER;
 	} else if (ret) {
+		of_dev_put(dsi_pdev);
 		DRM_ERROR("probe failed to initialize DSI host bridge\n");
 		return ret;
 	}
@@ -523,8 +525,10 @@ static int kmb_probe(struct platform_device *pdev)
 	/* Create DRM device */
 	kmb = devm_drm_dev_alloc(dev, &kmb_driver,
 				 struct kmb_drm_private, drm);
-	if (IS_ERR(kmb))
+	if (IS_ERR(kmb)) {
+		of_dev_put(dsi_pdev);
 		return PTR_ERR(kmb);
+	}
 
 	dev_set_drvdata(dev, &kmb->drm);
 
@@ -571,6 +575,8 @@ static int kmb_probe(struct platform_device *pdev)
  err_free1:
 	dev_set_drvdata(dev, NULL);
 	kmb_dsi_host_unregister(kmb->kmb_dsi);
+
+	of_dev_put(dsi_pdev);
 
 	return ret;
 }
