@@ -299,6 +299,8 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev);
 struct pci_vpd {
 	struct mutex	lock;
 	unsigned int	len;
+	u32		cached_val;
+	int		cached_offset;
 	u8		cap;
 };
 

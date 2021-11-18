@@ -189,6 +189,11 @@ static ssize_t pci_vpd_read(struct pci_dev *dev, loff_t pos, size_t count,
 			break;
 		}
 
+		if (vpd->cached_offset == (pos & ~3)) {
+			val = vpd->cached_val;
+			goto process;
+		}
+
 		ret = pci_user_write_config_word(dev, vpd->cap + PCI_VPD_ADDR,
 						 pos & ~3);
 		if (ret < 0)
@@ -201,6 +206,9 @@ static ssize_t pci_vpd_read(struct pci_dev *dev, loff_t pos, size_t count,
 		if (ret < 0)
 			break;
 
+		vpd->cached_val = val;
+		vpd->cached_offset = pos & ~3;
+process:
 		skip = pos & 3;
 		for (i = 0;  i < sizeof(u32); i++) {
 			if (i >= skip) {
@@ -240,6 +248,10 @@ static ssize_t pci_vpd_write(struct pci_dev *dev, loff_t pos, size_t count,
 		return -EINTR;
 
 	while (pos < end) {
+		/* invalidate read cache */
+		if (vpd->cached_offset == pos)
+			vpd->cached_offset = -1;
+
 		ret = pci_user_write_config_dword(dev, vpd->cap + PCI_VPD_DATA,
 						  get_unaligned_le32(buf));
 		if (ret < 0)
@@ -268,6 +280,7 @@ void pci_vpd_init(struct pci_dev *dev)
 
 	dev->vpd.cap = pci_find_capability(dev, PCI_CAP_ID_VPD);
 	mutex_init(&dev->vpd.lock);
+	dev->vpd.cached_offset = -1;
 }
 
 static ssize_t vpd_read(struct file *filp, struct kobject *kobj,
