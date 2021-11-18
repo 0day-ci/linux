@@ -11,7 +11,9 @@
 #include <linux/fsnotify.h>
 #include <linux/magic.h>
 #include <linux/idr.h>
+#include <linux/proc_ns.h>
 #include <linux/seq_file.h>
+#include <linux/pid_namespace.h>
 
 static struct vfsmount *namespacefs_mount;
 static int namespacefs_mount_count;
@@ -307,6 +309,19 @@ void namespacefs_remove_pid_ns_dir(struct pid_namespace *ns)
 	namespacefs_remove_dir(ns->ns.dentry);
 }
 
+static int add_ns_dentry(struct ns_common *ns)
+{
+	struct dentry *dentry =
+		namespacefs_create_dir(ns->ops->name, NULL, &init_user_ns);
+
+	if (IS_ERR(dentry))
+		return PTR_ERR(dentry);
+
+	ns->dentry = dentry;
+
+	return 0;
+}
+
 #define _NS_MOUNT_DIR	"namespaces"
 
 static int __init namespacefs_init(void)
@@ -321,8 +336,14 @@ static int __init namespacefs_init(void)
 	if (err)
 		goto rm_mount;
 
+	err = add_ns_dentry(&init_pid_ns.ns);
+	if (err)
+		goto unreg;
+
 	return 0;
 
+ unreg:
+	unregister_filesystem(&namespacefs_fs_type);
  rm_mount:
 	sysfs_remove_mount_point(fs_kobj, _NS_MOUNT_DIR);
  fail:

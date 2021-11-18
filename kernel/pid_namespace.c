@@ -12,6 +12,7 @@
 #include <linux/pid.h>
 #include <linux/pid_namespace.h>
 #include <linux/user_namespace.h>
+#include <linux/namespacefs.h>
 #include <linux/syscalls.h>
 #include <linux/cred.h>
 #include <linux/err.h>
@@ -101,6 +102,7 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	err = ns_alloc_inum(&ns->ns);
 	if (err)
 		goto out_free_idr;
+
 	ns->ns.ops = &pidns_operations;
 
 	refcount_set(&ns->ns.count, 1);
@@ -110,8 +112,14 @@ static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns
 	ns->ucounts = ucounts;
 	ns->pid_allocated = PIDNS_ADDING;
 
+	err = namespacefs_create_pid_ns_dir(ns);
+	if (err)
+		goto out_free_inum;
+
 	return ns;
 
+out_free_inum:
+	ns_free_inum(&ns->ns);
 out_free_idr:
 	idr_destroy(&ns->idr);
 	kmem_cache_free(pid_ns_cachep, ns);
@@ -133,6 +141,7 @@ static void delayed_free_pidns(struct rcu_head *p)
 
 static void destroy_pid_namespace(struct pid_namespace *ns)
 {
+	namespacefs_remove_pid_ns_dir(ns);
 	ns_free_inum(&ns->ns);
 
 	idr_destroy(&ns->idr);
