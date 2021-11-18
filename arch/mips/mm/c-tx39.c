@@ -170,6 +170,7 @@ static void tx39_flush_cache_page(struct vm_area_struct *vma, unsigned long page
 	struct mm_struct *mm = vma->vm_mm;
 	pmd_t *pmdp;
 	pte_t *ptep;
+	unsigned long vaddr = phys_to_virt(pfn_to_phys(pfn));
 
 	/*
 	 * If ownes no valid ASID yet, cannot possibly have gotten
@@ -207,11 +208,14 @@ static void tx39_flush_cache_page(struct vm_area_struct *vma, unsigned long page
 	/*
 	 * Do indexed flush, too much work to get the (possible) TLB refills
 	 * to work correctly.
+	 *
+	 * Assuming that tx39 family do not support high memory, nor has
+	 * dcache alias, vaddr can index dcache directly and correctly
 	 */
 	if (cpu_has_dc_aliases || exec)
-		tx39_blast_dcache_page_indexed(page);
+		tx39_blast_dcache_page_indexed(vaddr);
 	if (exec)
-		tx39_blast_icache_page_indexed(page);
+		tx39_blast_icache_page_indexed(vaddr);
 }
 
 static void local_tx39_flush_data_cache_page(void * addr)
