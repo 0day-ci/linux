@@ -93,7 +93,7 @@ static int st_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	spin_unlock_irqrestore(&rtc->lock, flags);
 
 	lpt = ((unsigned long long)lpt_msb << 32) | lpt_lsb;
-	do_div(lpt, rtc->clkrate);
+	lpt = div64_ul(lpt, rtc->clkrate);
 	rtc_time64_to_tm(lpt, tm);
 
 	return 0;
@@ -248,7 +248,8 @@ static int st_rtc_probe(struct platform_device *pdev)
 
 	rtc->rtc_dev->ops = &st_rtc_ops;
 	rtc->rtc_dev->range_max = U64_MAX;
-	do_div(rtc->rtc_dev->range_max, rtc->clkrate);
+	rtc->rtc_dev->range_max = div64_ul(rtc->rtc_dev->range_max,
+					rtc->clkrate);
 
 	ret = devm_rtc_register_device(rtc->rtc_dev);
 	if (ret) {
