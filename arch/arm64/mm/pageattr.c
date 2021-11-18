@@ -61,8 +61,13 @@ static int change_memory_common(unsigned long addr, int numpages,
 	unsigned long start = addr;
 	unsigned long size = PAGE_SIZE * numpages;
 	unsigned long end = start + size;
+	unsigned long cont_pte_start = 0;
+	unsigned long cont_pte_end = 0;
+	unsigned long cont_pmd_start = 0;
+	unsigned long cont_pmd_end = 0;
+	pgprot_t orig_set_mask = set_mask;
 	struct vm_struct *area;
-	int i;
+	int i = 0;
 
 	if (!PAGE_ALIGNED(addr)) {
 		start &= PAGE_MASK;
@@ -98,9 +103,58 @@ static int change_memory_common(unsigned long addr, int numpages,
 	 */
 	if (rodata_full && (pgprot_val(set_mask) == PTE_RDONLY ||
 			    pgprot_val(clear_mask) == PTE_RDONLY)) {
-		for (i = 0; i < area->nr_pages; i++) {
-			__change_memory_common((u64)page_address(area->pages[i]),
-					       PAGE_SIZE, set_mask, clear_mask);
+		cont_pmd_start = (start + ~CONT_PMD_MASK + 1) & CONT_PMD_MASK;
+		cont_pmd_end = cont_pmd_start + ~CONT_PMD_MASK + 1;
+		cont_pte_start = (start + ~CONT_PTE_MASK + 1) & CONT_PTE_MASK;
+		cont_pte_end = cont_pte_start + ~CONT_PTE_MASK + 1;
+
+		if (addr <= cont_pmd_start && end > cont_pmd_end) {
+			do {
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+				i++;
+				addr++;
+			} while(addr < cont_pmd_start);
+			do {
+				set_mask = __pgprot(pgprot_val(set_mask) | PTE_CONT);
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+				i++;
+				addr++;
+			} while(addr < cont_pmd_end);
+			set_mask = orig_set_mask;
+			do {
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+				i++;
+				addr++;
+			} while(addr <= end);
+		} else if (addr <= cont_pte_start && end > cont_pte_end) {
+			do {
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+				i++;
+				addr++;
+			} while(addr < cont_pte_start);
+			do {
+				set_mask = __pgprot(pgprot_val(set_mask) | PTE_CONT);
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+				i++;
+				addr++;
+			} while(addr < cont_pte_end);
+			set_mask = orig_set_mask;
+			do {
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+				i++;
+				addr++;
+			} while(addr <= end);
+		} else {
+			for (i = 0; i < area->nr_pages; i++) {
+				__change_memory_common((u64)page_address(area->pages[i]),
+						PAGE_SIZE, set_mask, clear_mask);
+			}
 		}
 	}
 
