@@ -24,6 +24,7 @@
 const efi_system_table_t *efi_system_table;
 extern u32 image_offset;
 static efi_loaded_image_t *image = NULL;
+static u64 efi_coco_secret_phys_addr = U64_MAX;
 
 static efi_status_t
 preserve_pci_rom_image(efi_pci_io_protocol_t *pci, struct pci_setup_rom **__rom)
@@ -443,6 +444,21 @@ static void add_e820ext(struct boot_params *params,
 		params->hdr.setup_data = (unsigned long)e820ext;
 }
 
+#ifdef CONFIG_EFI_COCO_SECRET
+static void efi_set_coco_secret_phys_addr(void)
+{
+	struct linux_efi_coco_secret_area *secret_area =
+		get_efi_config_table(LINUX_EFI_COCO_SECRET_AREA_GUID);
+
+	if (!secret_area || secret_area->size == 0 || secret_area->size >= SZ_4G)
+		return;
+
+	efi_coco_secret_phys_addr = secret_area->base_pa;
+}
+#else
+static void efi_set_coco_secret_phys_addr(void) {}
+#endif
+
 static efi_status_t
 setup_e820(struct boot_params *params, struct setup_data *e820ext, u32 e820ext_size)
 {
@@ -494,6 +510,16 @@ setup_e820(struct boot_params *params, struct setup_data *e820ext, u32 e820ext_s
 				e820_type = E820_TYPE_SOFT_RESERVED;
 			else
 				e820_type = E820_TYPE_RAM;
+#ifdef CONFIG_EFI_COCO_SECRET
+			if (d->phys_addr == efi_coco_secret_phys_addr)
+				/*
+				 * Fix a quirk in firmwares which don't mark
+				 * the EFI confidential computing area as
+				 * EFI_RESERVED_TYPE, but instead as
+				 * EFI_BOOT_SERVICES_DATA.
+				 */
+				e820_type = E820_TYPE_RESERVED;
+#endif
 			break;
 
 		case EFI_ACPI_MEMORY_NVS:
@@ -792,6 +818,8 @@ unsigned long efi_main(efi_handle_t handle,
 	efi_random_get_seed();
 
 	efi_retrieve_tpm2_eventlog();
+
+	efi_set_coco_secret_phys_addr();
 
 	setup_graphics(boot_params);
 
