@@ -291,19 +291,27 @@ struct kvm_kernel_irq_routing_entry;
  * the number of unique SPs that can theoretically be created is 2^n, where n
  * is the number of bits that are used to compute the role.
  *
- * But, even though there are 18 bits in the mask below, not all combinations
- * of modes and flags are possible.  The maximum number of possible upper-level
- * shadow pages for a single gfn is in the neighborhood of 2^13.
+ * There are 19 bits in the mask below, and the page tracking code only uses
+ * 16 bits per gfn in kvm_arch_memory_slot to count whether a page is tracked.
+ * However, not all combinations of modes and flags are possible.  First
+ * of all, invalid shadow pages pages are not accounted, and "smm" is constant
+ * in a given memslot (because memslots are per address space, and SMM uses
+ * a separate address space).  Of the remaining 2^17 possibilities:
  *
- *   - invalid shadow pages are not accounted.
- *   - level is effectively limited to four combinations, not 16 as the number
- *     bits would imply, as 4k SPs are not tracked (allowed to go unsync).
- *   - level is effectively unused for non-PAE paging because there is exactly
- *     one upper level (see 4k SP exception above).
- *   - quadrant is used only for non-PAE paging and is exclusive with
- *     gpte_is_8_bytes.
- *   - execonly and ad_disabled are used only for nested EPT, which makes it
- *     exclusive with quadrant.
+ *   - quadrant will only be used if gpte_is_8_bytes=0 (non-PAE paging);
+ *     execonly and ad_disabled are only used for nested EPT which has
+ *     gpte_is_8_bytes=1.  Therefore, 2 bits are always unused.
+ *
+ *   - the 4 bits of level are effectively limited to the values 2/3/4/5,
+ *     as 4k SPs are not tracked (allowed to go unsync).  In addition non-PAE
+ *     paging has exactly one upper level, making level completely redundant
+ *     when gpte_is_8_bytes=0.
+ *
+ *   - on top of this, smep_andnot_wp and smap_andnot_wp are only set if
+ *     cr0_wp=0, therefore these three bits only give rise to 5 possibilities.
+ *
+ * Therefore, the maximum number of possible upper-level shadow pages for a
+ * given (as_id, gfn) pair is a bit less than 2^12.
  */
 union kvm_mmu_page_role {
 	u32 word;
