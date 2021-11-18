@@ -2739,7 +2739,7 @@ static u32 mvpp2_cycles_to_usec(u32 cycles, unsigned long clk_hz)
 {
 	u64 tmp = (u64)cycles * USEC_PER_SEC;
 
-	do_div(tmp, clk_hz);
+	tmp = div64_ul(tmp, clk_hz);
 
 	return tmp > U32_MAX ? U32_MAX : tmp;
 }
