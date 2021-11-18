@@ -252,6 +252,10 @@ config PCIE_BUS_PEER2PEER
 
 endchoice
 
+config PCI_READ_BASE_KUNIT_TEST
+	tristate "KUnit tests for __pci_read_base() in probe.c"
+	depends on PCI && KUNIT=y
+
 source "drivers/pci/hotplug/Kconfig"
 source "drivers/pci/controller/Kconfig"
 source "drivers/pci/endpoint/Kconfig"
