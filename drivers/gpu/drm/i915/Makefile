@@ -62,12 +62,12 @@ i915-y += i915_driver.o \
 i915-y += \
 	dma_resv_utils.o \
 	i915_memcpy.o \
-	i915_mm.o \
 	i915_sw_fence.o \
 	i915_sw_fence_work.o \
 	i915_syncmap.o \
 	i915_user_extensions.o
 
+i915-$(CONFIG_X86) += i915_mm.o
 i915-$(CONFIG_COMPAT)   += i915_ioc32.o
 i915-$(CONFIG_DEBUG_FS) += \
 	i915_debugfs.o \
