@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config NAMESPACE_FS
+	bool "NameSpace Filesystem support"
+	help
+	  This option enables support for namespacefs - a pseudo filesystem
+	  that allows to examine the hierarchy of namespaces.
