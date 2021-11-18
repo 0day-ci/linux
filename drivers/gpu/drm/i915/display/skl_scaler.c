@@ -87,6 +87,7 @@ static u16 skl_scaler_calc_phase(int sub, int scale, bool chroma_cosited)
 #define ICL_MAX_DST_H 4096
 #define SKL_MIN_YUV_420_SRC_W 16
 #define SKL_MIN_YUV_420_SRC_H 16
+#define MAX_CUSCTL_W 4096
 
 static int
 skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
@@ -221,6 +222,14 @@ int skl_update_scaler_plane(struct intel_crtc_state *crtc_state,
 	int ret;
 	bool force_detach = !fb || !plane_state->uapi.visible;
 	bool need_scaler = false;
+
+	/* PLANE_CUS_CTL size max 4096 */
+	if (icl_is_hdr_plane(dev_priv, intel_plane->id) &&
+	    fb && intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier) &&
+	    (drm_rect_width(&plane_state->uapi.src) >> 16) > MAX_CUSCTL_W) {
+		DRM_ERROR("HDR chroma upsampler size exceeds limits\n");
+		return -EINVAL;
+	}
 
 	/* Pre-gen11 and SDR planes always need a scaler for planar formats. */
 	if (!icl_is_hdr_plane(dev_priv, intel_plane->id) &&
