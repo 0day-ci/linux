@@ -108,6 +108,7 @@ struct clocksource {
 	const char		*name;
 	struct list_head	list;
 	int			rating;
+	int			clock_skew_skipcnt;
 	enum clocksource_ids	id;
 	enum vdso_clock_mode	vdso_clock_mode;
 	unsigned long		flags;
