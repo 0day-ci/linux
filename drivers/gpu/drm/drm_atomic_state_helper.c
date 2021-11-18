@@ -455,6 +455,64 @@ void drm_atomic_helper_connector_tv_reset(struct drm_connector *connector)
 EXPORT_SYMBOL(drm_atomic_helper_connector_tv_reset);
 
 /**
+ * drm_atomic_helper_connector_hdmi_check - Checks the state of an HDMI connector
+ * @connector: DRM connector
+ * @state: DRM atomic state to check
+ *
+ * Checks that an HDMI connector state is sane, and sets the various
+ * HDMI-specific flags in drm_connector_state related to HDMI support.
+ *
+ * Returns:
+ * 0 on success, a negative error code otherwise.
+ */
+int drm_atomic_helper_connector_hdmi_check(struct drm_connector *connector,
+					   struct drm_atomic_state *state)
+{
+	struct drm_connector_state *conn_state = drm_atomic_get_new_connector_state(state,
+										    connector);
+	struct drm_display_info *info = &connector->display_info;
+	const struct drm_display_mode *mode;
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	bool required;
+
+	if (!conn_state)
+		return -EINVAL;
+
+	crtc = conn_state->crtc;
+	if (!crtc)
+		return -EINVAL;
+
+	crtc_state = drm_atomic_get_crtc_state(state, crtc);
+	if (IS_ERR(crtc_state))
+		return PTR_ERR(crtc_state);
+
+	mode = &crtc_state->mode;
+	crtc_state->connectors_changed = true;
+	conn_state->hdmi_needs_scrambling = false;
+	conn_state->hdmi_needs_high_tmds_ratio = false;
+
+	if (!info->is_hdmi)
+		return 0;
+
+	if (!info->hdmi.scdc.supported)
+		return 0;
+
+	required = drm_mode_hdmi_requires_scrambling(mode, conn_state->max_bpc);
+	if (required && !info->hdmi.scdc.scrambling.supported)
+		return -EINVAL;
+
+	if (info->hdmi.scdc.scrambling.low_rates || required)
+		conn_state->hdmi_needs_scrambling = true;
+
+	if (required)
+		conn_state->hdmi_needs_high_tmds_ratio = true;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_atomic_helper_connector_hdmi_check);
+
+/**
  * __drm_atomic_helper_connector_duplicate_state - copy atomic connector state
  * @connector: connector object
  * @state: atomic connector state

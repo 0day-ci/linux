@@ -830,6 +830,31 @@ struct drm_connector_state {
 	 * DRM blob property for HDR output metadata
 	 */
 	struct drm_property_blob *hdr_output_metadata;
+
+	/**
+	 * @hdmi_needs_scrambling:
+	 *
+	 * Only relevant for HDMI sink. Tracks whether the scrambling
+	 * should be turned on for the current sink and mode.
+	 *
+	 * Drivers needing this should use
+	 * drm_atomic_helper_connector_hdmi_check() and use the value
+	 * set here to enable or disable their scrambler.
+	 */
+	bool hdmi_needs_scrambling;
+
+	/**
+	 * @hdmi_needs_high_tmds_ratio:
+	 *
+	 * Only relevant for HDMI sink. Tracks whether the TMDS clock
+	 * ratio should be 1/10 of the pixel clock (false), or 1/40
+	 * (true).
+	 *
+	 * Drivers needing this should use
+	 * drm_atomic_helper_connector_hdmi_check() and use the value
+	 * set here to enable or disable their scrambler.
+	 */
+	bool hdmi_needs_high_tmds_ratio;
 };
 
 /**
