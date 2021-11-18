@@ -1448,6 +1448,9 @@ static int fuse_dir_fsync(struct file *file, loff_t start, loff_t end,
 	if (fc->no_fsyncdir)
 		return 0;
 
+        if (sb_rdonly(inode->i_sb))
+                return 0;
+
 	inode_lock(inode);
 	err = fuse_fsync_common(file, start, end, datasync, FUSE_FSYNCDIR);
 	if (err == -ENOSYS) {
