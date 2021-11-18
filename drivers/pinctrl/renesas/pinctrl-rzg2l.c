@@ -92,6 +92,7 @@
 #define PWPR			(0x3014)
 #define SD_CH(n)		(0x3000 + (n) * 4)
 #define QSPI			(0x3008)
+#define ETHER_MODE		(0x3018)
 
 #define PVDD_1800		1	/* I/O domain voltage <= 1.8V */
 #define PVDD_3300		0	/* I/O domain voltage >= 3.3V */
@@ -104,6 +105,10 @@
 #define PFC_MASK		0x07
 #define IEN_MASK		0x01
 #define IOLH_MASK		0x03
+#define ETHER_MODE_ETH0_MASK	BIT(0)
+#define ETHER_MODE_ETH1_MASK	BIT(1)
+#define ETHER_MODE_ETH0_ADDR	0x11c20000
+#define ETHER_MODE_ETH1_ADDR	0x11c30000
 
 #define PM_INPUT		0x1
 #define PM_OUTPUT		0x2
@@ -1197,6 +1202,69 @@ static void rzg2l_pinctrl_clk_disable(void *data)
 	clk_disable_unprepare(data);
 }
 
+static bool rzg2l_pinctrl_is_rgmii_mode(struct rzg2l_pinctrl *pctrl,
+					struct device_node *node)
+{
+	const char *mode = of_get_property(node, "phy-mode", NULL);
+	bool ret = false;
+
+	if (!mode) {
+		dev_err(pctrl->dev, "phy-mode missing, setting to mii mode");
+		return ret;
+	}
+
+	if ((!strcmp("rgmii", mode)) || (!strcmp("rgmii-id", mode)) ||
+	    (!strcmp("rgmii-rxid", mode)) || (!strcmp("rgmii-txid", mode)))
+		ret = true;
+
+	return ret;
+}
+
+static void rzg2l_pinctrl_set_eth_mode(struct rzg2l_pinctrl *pctrl,
+				       struct device_node *np)
+{
+	u8 reg = readb(pctrl->base + ETHER_MODE);
+	u8 mask = ETHER_MODE_ETH0_MASK;
+	const __be32 *prop;
+	u64 addr;
+
+	prop = of_get_property(np, "reg", NULL);
+	if (!prop)
+		return;
+
+	addr = of_read_number(prop, of_n_addr_cells(np));
+	if (addr == ETHER_MODE_ETH1_ADDR)
+		mask = ETHER_MODE_ETH1_MASK;
+
+	if (rzg2l_pinctrl_is_rgmii_mode(pctrl, np))
+		reg &= ~mask;
+	else
+		reg |= mask;
+
+	writeb(reg, pctrl->base + ETHER_MODE);
+}
+
+static void rzg2l_pinctrl_set_ether_modes(struct rzg2l_pinctrl *pctrl)
+{
+	struct device_node *np, *np1 = NULL;
+
+	np = of_find_compatible_node(NULL, NULL, "renesas,rzg2l-gbeth");
+	if (np) {
+		np1 = of_find_compatible_node(np, NULL, "renesas,rzg2l-gbeth");
+		if (of_device_is_available(np))
+			rzg2l_pinctrl_set_eth_mode(pctrl, np);
+
+		of_node_put(np);
+	}
+
+	if (np1) {
+		if (of_device_is_available(np1))
+			rzg2l_pinctrl_set_eth_mode(pctrl, np1);
+
+		of_node_put(np1);
+	}
+}
+
 static int rzg2l_pinctrl_probe(struct platform_device *pdev)
 {
 	struct rzg2l_pinctrl *pctrl;
@@ -1245,6 +1313,8 @@ static int rzg2l_pinctrl_probe(struct platform_device *pdev)
 	ret = rzg2l_pinctrl_register(pctrl);
 	if (ret)
 		return ret;
+
+	rzg2l_pinctrl_set_ether_modes(pctrl);
 
 	dev_info(pctrl->dev, "%s support registered\n", DRV_NAME);
 	return 0;
