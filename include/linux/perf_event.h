@@ -777,6 +777,7 @@ struct perf_event {
 
 #ifdef CONFIG_CGROUP_PERF
 	struct perf_cgroup		*cgrp; /* cgroup event is attach to */
+	struct list_head		bpf_cg_list;
 #endif
 
 #ifdef CONFIG_SECURITY
@@ -983,6 +984,9 @@ extern void perf_pmu_resched(struct pmu *pmu);
 extern int perf_event_refresh(struct perf_event *event, int refresh);
 extern void perf_event_update_userpage(struct perf_event *event);
 extern int perf_event_release_kernel(struct perf_event *event);
+extern int perf_event_create_for_all_cpus(struct perf_event_attr *attr,
+				struct cgroup *cgroup,
+				struct list_head *entries);
 extern struct perf_event *
 perf_event_create_kernel_counter(struct perf_event_attr *attr,
 				int cpu,

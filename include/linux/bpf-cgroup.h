@@ -154,6 +154,11 @@ struct cgroup_bpf {
 
 	/* cgroup_bpf is released using a work queue */
 	struct work_struct release_work;
+
+        /* list of perf events (per child cgroups) for tracepoint/kprobe/uprobe bpf attachment to cgroup */
+        /* TODO: array of tp type with array of events for each cgroup
+         * currently only one tp type supported at a time */
+        struct list_head per_cg_events;
 };
 
 int cgroup_bpf_inherit(struct cgroup *cgrp);
@@ -161,21 +166,21 @@ void cgroup_bpf_offline(struct cgroup *cgrp);
 
 int __cgroup_bpf_attach(struct cgroup *cgrp,
 			struct bpf_prog *prog, struct bpf_prog *replace_prog,
-			struct bpf_cgroup_link *link,
+			struct bpf_cgroup_link *link, int bpf_attach_subtype,
 			enum bpf_attach_type type, u32 flags);
 int __cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
 			struct bpf_cgroup_link *link,
-			enum bpf_attach_type type);
+			enum bpf_attach_type type, int bpf_attach_subtype);
 int __cgroup_bpf_query(struct cgroup *cgrp, const union bpf_attr *attr,
 		       union bpf_attr __user *uattr);
 
 /* Wrapper for __cgroup_bpf_*() protected by cgroup_mutex */
 int cgroup_bpf_attach(struct cgroup *cgrp,
 		      struct bpf_prog *prog, struct bpf_prog *replace_prog,
-		      struct bpf_cgroup_link *link, enum bpf_attach_type type,
-		      u32 flags);
+		      struct bpf_cgroup_link *link, int bpf_attach_subtype,
+		      enum bpf_attach_type type, u32 flags);
 int cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
-		      enum bpf_attach_type type);
+		      enum bpf_attach_type type, int bpf_attach_subtype);
 int cgroup_bpf_query(struct cgroup *cgrp, const union bpf_attr *attr,
 		     union bpf_attr __user *uattr);
 

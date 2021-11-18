@@ -14,6 +14,8 @@
 #include <linux/string.h>
 #include <linux/bpf.h>
 #include <linux/bpf-cgroup.h>
+#include <linux/perf_event.h>
+#include <linux/trace_events.h>
 #include <net/sock.h>
 #include <net/bpf_sk_storage.h>
 
@@ -112,6 +114,8 @@ static void cgroup_bpf_release(struct work_struct *work)
 	struct bpf_prog_array *old_array;
 	struct list_head *storages = &cgrp->bpf.storages;
 	struct bpf_cgroup_storage *storage, *stmp;
+	struct list_head *events = &cgrp->bpf.per_cg_events;
+	struct perf_event *event, *etmp;
 
 	unsigned int atype;
 
@@ -139,6 +143,10 @@ static void cgroup_bpf_release(struct work_struct *work)
 	list_for_each_entry_safe(storage, stmp, storages, list_cg) {
 		bpf_cgroup_storage_unlink(storage);
 		bpf_cgroup_storage_free(storage);
+	}
+
+	list_for_each_entry_safe(event, etmp, events, bpf_cg_list) {
+		perf_event_release_kernel(event);
 	}
 
 	mutex_unlock(&cgroup_mutex);
@@ -226,13 +234,16 @@ static bool hierarchy_allows_attach(struct cgroup *cgrp,
  */
 static int compute_effective_progs(struct cgroup *cgrp,
 				   enum cgroup_bpf_attach_type atype,
+				   int bpf_attach_subtype,
 				   struct bpf_prog_array **array)
 {
 	struct bpf_prog_array_item *item;
 	struct bpf_prog_array *progs;
 	struct bpf_prog_list *pl;
 	struct cgroup *p = cgrp;
-	int cnt = 0;
+	struct perf_event *event, *etmp;
+	struct perf_event_attr attr = {};
+	int rc, cnt = 0;
 
 	/* count number of effective programs by walking parents */
 	do {
@@ -244,6 +255,21 @@ static int compute_effective_progs(struct cgroup *cgrp,
 	progs = bpf_prog_array_alloc(cnt, GFP_KERNEL);
 	if (!progs)
 		return -ENOMEM;
+
+	if (atype == CGROUP_TRACEPOINT) {
+		/* TODO: only create event for cgroup that can have process */
+
+		attr.config = bpf_attach_subtype;
+		attr.type = PERF_TYPE_TRACEPOINT;
+		attr.sample_type = PERF_SAMPLE_RAW;
+		attr.sample_period = 1;
+		attr.wakeup_events = 1;
+
+		rc = perf_event_create_for_all_cpus(&attr, cgrp,
+				&cgrp->bpf.per_cg_events);
+		if (rc)
+			goto err;
+	}
 
 	/* populate the array with effective progs */
 	cnt = 0;
@@ -264,20 +290,41 @@ static int compute_effective_progs(struct cgroup *cgrp,
 		}
 	} while ((p = cgroup_parent(p)));
 
+	if (atype == CGROUP_TRACEPOINT) {
+		list_for_each_entry_safe(event, etmp, &cgrp->bpf.per_cg_events, bpf_cg_list) {
+			rc = perf_event_attach_bpf_prog_array(event, progs);
+			if (rc)
+				goto err_attach;
+		}
+	}
+
 	*array = progs;
 	return 0;
+err_attach:
+	list_for_each_entry_safe(event, etmp, &cgrp->bpf.per_cg_events, bpf_cg_list)
+		perf_event_release_kernel(event);
+err:
+	bpf_prog_array_free(progs);
+	return rc;
 }
 
 static void activate_effective_progs(struct cgroup *cgrp,
 				     enum cgroup_bpf_attach_type atype,
 				     struct bpf_prog_array *old_array)
 {
-	old_array = rcu_replace_pointer(cgrp->bpf.effective[atype], old_array,
-					lockdep_is_held(&cgroup_mutex));
-	/* free prog array after grace period, since __cgroup_bpf_run_*()
-	 * might be still walking the array
-	 */
-	bpf_prog_array_free(old_array);
+	struct perf_event *event, *etmp;
+
+	if (atype == CGROUP_TRACEPOINT)
+		list_for_each_entry_safe(event, etmp, &cgrp->bpf.per_cg_events, bpf_cg_list)
+			perf_event_enable(event);
+	else {
+		old_array = rcu_replace_pointer(cgrp->bpf.effective[atype], old_array,
+						lockdep_is_held(&cgroup_mutex));
+		/* free prog array after grace period, since __cgroup_bpf_run_*()
+		 * might be still walking the array
+		 */
+		bpf_prog_array_free(old_array);
+	}
 }
 
 /**
@@ -306,9 +353,10 @@ int cgroup_bpf_inherit(struct cgroup *cgrp)
 		INIT_LIST_HEAD(&cgrp->bpf.progs[i]);
 
 	INIT_LIST_HEAD(&cgrp->bpf.storages);
+	INIT_LIST_HEAD(&cgrp->bpf.per_cg_events);
 
 	for (i = 0; i < NR; i++)
-		if (compute_effective_progs(cgrp, i, &arrays[i]))
+		if (compute_effective_progs(cgrp, i, -1, &arrays[i]))
 			goto cleanup;
 
 	for (i = 0; i < NR; i++)
@@ -328,7 +376,8 @@ cleanup:
 }
 
 static int update_effective_progs(struct cgroup *cgrp,
-				  enum cgroup_bpf_attach_type atype)
+				  enum cgroup_bpf_attach_type atype,
+                                  int bpf_attach_subtype)
 {
 	struct cgroup_subsys_state *css;
 	int err;
@@ -340,7 +389,8 @@ static int update_effective_progs(struct cgroup *cgrp,
 		if (percpu_ref_is_zero(&desc->bpf.refcnt))
 			continue;
 
-		err = compute_effective_progs(desc, atype, &desc->bpf.inactive);
+		err = compute_effective_progs(desc, atype, bpf_attach_subtype,
+				&desc->bpf.inactive);
 		if (err)
 			goto cleanup;
 	}
@@ -424,6 +474,7 @@ static struct bpf_prog_list *find_attach_entry(struct list_head *progs,
  * @prog: A program to attach
  * @link: A link to attach
  * @replace_prog: Previously attached program to replace if BPF_F_REPLACE is set
+ * @bpf_attach_subtype: Type ID of perf tracing event for tracepoint/kprobe/uprobe
  * @type: Type of attach operation
  * @flags: Option flags
  *
@@ -432,7 +483,7 @@ static struct bpf_prog_list *find_attach_entry(struct list_head *progs,
  */
 int __cgroup_bpf_attach(struct cgroup *cgrp,
 			struct bpf_prog *prog, struct bpf_prog *replace_prog,
-			struct bpf_cgroup_link *link,
+			struct bpf_cgroup_link *link, int bpf_attach_subtype,
 			enum bpf_attach_type type, u32 flags)
 {
 	u32 saved_flags = (flags & (BPF_F_ALLOW_OVERRIDE | BPF_F_ALLOW_MULTI));
@@ -454,6 +505,14 @@ int __cgroup_bpf_attach(struct cgroup *cgrp,
 	if (!!replace_prog != !!(flags & BPF_F_REPLACE))
 		/* replace_prog implies BPF_F_REPLACE, and vice versa */
 		return -EINVAL;
+        if ((type == BPF_CGROUP_TRACEPOINT) &&
+	    ((flags & BPF_F_REPLACE) || (bpf_attach_subtype < 0) || !(flags & BPF_F_ALLOW_MULTI)))
+		/* replace fd is used to pass the subtype */
+		/* subtype is required for BPF_CGROUP_TRACEPOINT */
+		/* not allow multi BPF progs for the attach type for now */
+                return -EINVAL;
+
+	/* TODO check bpf_attach_subtype is valid */
 
 	atype = to_cgroup_bpf_attach_type(type);
 	if (atype < 0)
@@ -499,7 +558,7 @@ int __cgroup_bpf_attach(struct cgroup *cgrp,
 	bpf_cgroup_storages_assign(pl->storage, storage);
 	cgrp->bpf.flags[atype] = saved_flags;
 
-	err = update_effective_progs(cgrp, atype);
+	err = update_effective_progs(cgrp, atype, bpf_attach_subtype);
 	if (err)
 		goto cleanup;
 
@@ -679,7 +738,8 @@ static struct bpf_prog_list *find_detach_entry(struct list_head *progs,
  * Must be called with cgroup_mutex held.
  */
 int __cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
-			struct bpf_cgroup_link *link, enum bpf_attach_type type)
+			struct bpf_cgroup_link *link, enum bpf_attach_type type,
+			int bpf_attach_subtype)
 {
 	enum cgroup_bpf_attach_type atype;
 	struct bpf_prog *old_prog;
@@ -708,7 +768,7 @@ int __cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
 	pl->prog = NULL;
 	pl->link = NULL;
 
-	err = update_effective_progs(cgrp, atype);
+	err = update_effective_progs(cgrp, atype, bpf_attach_subtype);
 	if (err)
 		goto cleanup;
 
@@ -809,7 +869,7 @@ int cgroup_bpf_prog_attach(const union bpf_attr *attr,
 		}
 	}
 
-	ret = cgroup_bpf_attach(cgrp, prog, replace_prog, NULL,
+	ret = cgroup_bpf_attach(cgrp, prog, replace_prog, NULL, attr->replace_bpf_fd,
 				attr->attach_type, attr->attach_flags);
 
 	if (replace_prog)
@@ -832,7 +892,7 @@ int cgroup_bpf_prog_detach(const union bpf_attr *attr, enum bpf_prog_type ptype)
 	if (IS_ERR(prog))
 		prog = NULL;
 
-	ret = cgroup_bpf_detach(cgrp, prog, attr->attach_type);
+	ret = cgroup_bpf_detach(cgrp, prog, attr->attach_type, attr->replace_bpf_fd);
 	if (prog)
 		bpf_prog_put(prog);
 
@@ -861,7 +921,7 @@ static void bpf_cgroup_link_release(struct bpf_link *link)
 	}
 
 	WARN_ON(__cgroup_bpf_detach(cg_link->cgroup, NULL, cg_link,
-				    cg_link->type));
+				    cg_link->type, -1));
 
 	cg = cg_link->cgroup;
 	cg_link->cgroup = NULL;
@@ -961,7 +1021,7 @@ int cgroup_bpf_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 		goto out_put_cgroup;
 	}
 
-	err = cgroup_bpf_attach(cgrp, NULL, NULL, link,
+	err = cgroup_bpf_attach(cgrp, NULL, NULL, link, -1,
 				link->type, BPF_F_ALLOW_MULTI);
 	if (err) {
 		bpf_link_cleanup(&link_primer);

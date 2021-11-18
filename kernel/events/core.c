@@ -12537,6 +12537,51 @@ err:
 }
 EXPORT_SYMBOL_GPL(perf_event_create_kernel_counter);
 
+int perf_event_create_for_all_cpus(struct perf_event_attr *attr,
+				struct cgroup *cgroup,
+				struct list_head *entries)
+{
+	struct perf_event **events;
+        struct perf_cgroup *perf_cgrp;
+	int cpu, i = 0;
+
+	events = kzalloc(sizeof(struct perf_event *) * num_possible_cpus(),
+			GFP_KERNEL);
+
+	if (!events)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		/* allocate first, connect the cgroup later */
+		events[i] = perf_event_create_kernel_counter(attr, cpu, NULL, NULL, NULL);
+
+		if (IS_ERR(events[i]))
+			goto err;
+
+		i++;
+	}
+
+	perf_cgrp = cgroup_tryget_perf_cgroup(cgroup);
+	if (!perf_cgrp)
+		goto err;
+
+	for (i--; i >= 0; i--) {
+                events[i]->cgrp = perf_cgrp;
+
+                list_add(&events[i]->bpf_cg_list, entries);
+	}
+
+	kfree(events);
+	return 0;
+
+err:
+	for (i--; i >= 0; i--)
+		free_event(events[i]);
+
+	kfree(events);
+	return -ENOMEM;
+}
+
 void perf_pmu_migrate_context(struct pmu *pmu, int src_cpu, int dst_cpu)
 {
 	struct perf_event_context *src_ctx;
