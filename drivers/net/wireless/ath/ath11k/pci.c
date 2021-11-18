@@ -1383,6 +1383,7 @@ static void ath11k_pci_remove(struct pci_dev *pdev)
 
 	set_bit(ATH11K_FLAG_UNREGISTERING, &ab->dev_flags);
 
+	cancel_work_sync(&ab->update_11d_work);
 	ath11k_core_deinit(ab);
 
 qmi_fail:
