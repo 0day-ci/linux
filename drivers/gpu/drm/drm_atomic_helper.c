@@ -38,6 +38,7 @@
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_print.h>
+#include <drm/drm_scdc_helper.h>
 #include <drm/drm_self_refresh_helper.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_writeback.h>
@@ -3524,3 +3525,111 @@ drm_atomic_helper_bridge_propagate_bus_fmt(struct drm_bridge *bridge,
 	return input_fmts;
 }
 EXPORT_SYMBOL(drm_atomic_helper_bridge_propagate_bus_fmt);
+
+static int modeset_pipe(struct drm_crtc *crtc,
+			struct drm_modeset_acquire_ctx *ctx)
+{
+	struct drm_atomic_state *state;
+	struct drm_crtc_state *crtc_state;
+	int ret;
+
+	state = drm_atomic_state_alloc(crtc->dev);
+	if (!state)
+		return -ENOMEM;
+
+	state->acquire_ctx = ctx;
+
+	crtc_state = drm_atomic_get_crtc_state(state, crtc);
+	if (IS_ERR(crtc_state)) {
+		ret = PTR_ERR(crtc_state);
+		goto out;
+	}
+
+	crtc_state->connectors_changed = true;
+
+	ret = drm_atomic_commit(state);
+out:
+	drm_atomic_state_put(state);
+
+	return ret;
+}
+
+/**
+ * drm_atomic_helper_connector_hdmi_reset_link() - Resets an HDMI link
+ * @connector: DRM connector we want to reset
+ * @ctx: Lock acquisition context
+ *
+ * This helper is here to restore the HDMI link state after the
+ * connector status has changed, typically when a TV has come out of
+ * suspend or when the HDMI cable has been disconnected and then
+ * reconnected.
+ *
+ * Returns:
+ * 0 on success, a negative error code otherwise.
+ */
+int drm_atomic_helper_connector_hdmi_reset_link(struct drm_connector *connector,
+						struct drm_modeset_acquire_ctx *ctx)
+{
+	struct drm_device *drm = connector->dev;
+	struct drm_connector_state *conn_state;
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	u8 config;
+	int ret;
+
+	if (!connector)
+		return 0;
+
+	drm_WARN_ON(drm,
+		    (connector->connector_type != DRM_MODE_CONNECTOR_HDMIA) &&
+		    (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB));
+
+	ret = drm_modeset_lock(&drm->mode_config.connection_mutex, ctx);
+	if (ret)
+		return ret;
+
+	conn_state = connector->state;
+	crtc = conn_state->crtc;
+	if (!crtc)
+		return 0;
+
+	ret = drm_modeset_lock(&crtc->mutex, ctx);
+	if (ret)
+		return ret;
+
+	crtc_state = crtc->state;
+	if (!crtc_state->active)
+		return 0;
+
+	if (!conn_state->hdmi_needs_high_tmds_ratio &&
+	    !conn_state->hdmi_needs_scrambling)
+		return 0;
+
+	if (conn_state->commit &&
+	    !try_wait_for_completion(&conn_state->commit->hw_done))
+		return 0;
+
+	ret = drm_scdc_readb(connector->ddc, SCDC_TMDS_CONFIG, &config);
+	if (ret < 0) {
+		drm_err(drm, "Failed to read TMDS config: %d\n", ret);
+		return 0;
+	}
+
+	if (!!(config & SCDC_TMDS_BIT_CLOCK_RATIO_BY_40) ==
+	    conn_state->hdmi_needs_high_tmds_ratio &&
+	    !!(config & SCDC_SCRAMBLING_ENABLE) ==
+	    conn_state->hdmi_needs_scrambling)
+		return 0;
+
+	/*
+	 * HDMI 2.0 says that one should not send scrambled data
+	 * prior to configuring the sink scrambling, and that
+	 * TMDS clock/data transmission should be suspended when
+	 * changing the TMDS clock rate in the sink. So let's
+	 * just do a full modeset here, even though some sinks
+	 * would be perfectly happy if were to just reconfigure
+	 * the SCDC settings on the fly.
+	 */
+	return modeset_pipe(crtc, ctx);
+}
+EXPORT_SYMBOL(drm_atomic_helper_connector_hdmi_reset_link);

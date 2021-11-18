@@ -231,4 +231,7 @@ drm_atomic_helper_bridge_propagate_bus_fmt(struct drm_bridge *bridge,
 					u32 output_fmt,
 					unsigned int *num_input_fmts);
 
+int drm_atomic_helper_connector_hdmi_reset_link(struct drm_connector *connector,
+						struct drm_modeset_acquire_ctx *ctx);
+
 #endif /* DRM_ATOMIC_HELPER_H_ */
