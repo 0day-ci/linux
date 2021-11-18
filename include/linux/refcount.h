@@ -147,6 +147,11 @@ static inline unsigned int refcount_read(const refcount_t *r)
 	return atomic_read(&r->refs);
 }
 
+static inline bool refcount_is_one(const refcount_t *r)
+{
+	return refcount_read(r) == 1;
+}
+
 static inline __must_check bool __refcount_add_not_zero(int i, refcount_t *r, int *oldp)
 {
 	int old = refcount_read(r);
