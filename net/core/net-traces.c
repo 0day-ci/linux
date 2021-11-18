@@ -35,6 +35,7 @@
 #include <trace/events/tcp.h>
 #include <trace/events/fib.h>
 #include <trace/events/qdisc.h>
+#include <trace/events/snmp.h>
 #if IS_ENABLED(CONFIG_BRIDGE)
 #include <trace/events/bridge.h>
 EXPORT_TRACEPOINT_SYMBOL_GPL(br_fdb_add);
@@ -61,3 +62,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(napi_poll);
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(tcp_send_reset);
 EXPORT_TRACEPOINT_SYMBOL_GPL(tcp_bad_csum);
+
+EXPORT_TRACEPOINT_SYMBOL_GPL(snmp);
