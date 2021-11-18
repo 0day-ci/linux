@@ -217,6 +217,7 @@ struct stm32_adc_cfg {
 
 /**
  * struct stm32_adc - private data of each ADC IIO instance
+ * dev:			parent device
  * @common:		reference to ADC block common data
  * @offset:		ADC instance register offset in ADC block
  * @cfg:		compatible configuration data
@@ -243,6 +244,7 @@ struct stm32_adc_cfg {
  * @int_ch:		internal channel indexes array
  */
 struct stm32_adc {
+	struct device		*dev;
 	struct stm32_adc_common	*common;
 	u32			offset;
 	const struct stm32_adc_cfg	*cfg;
@@ -1986,8 +1988,7 @@ static int stm32_adc_populate_int_ch(struct iio_dev *indio_dev, const char *ch_n
 			/* Get calibration data for vrefint channel */
 			ret = nvmem_cell_read_u16(&indio_dev->dev, "vrefint", &vrefint);
 			if (ret && ret != -ENOENT) {
-				return dev_err_probe(&indio_dev->dev, ret,
-						     "nvmem access error\n");
+				return dev_err_probe(adc->dev, ret, "nvmem access error\n");
 			}
 			if (ret == -ENOENT)
 				dev_dbg(&indio_dev->dev, "vrefint calibration not found\n");
@@ -2220,6 +2221,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
 	init_completion(&adc->completion);
 	adc->cfg = (const struct stm32_adc_cfg *)
 		of_match_device(dev->driver->of_match_table, dev)->data;
+	adc->dev = &pdev->dev;
 
 	indio_dev->name = dev_name(&pdev->dev);
 	indio_dev->dev.of_node = pdev->dev.of_node;
