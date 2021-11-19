@@ -191,6 +191,52 @@ out:
 	return wrprot;
 }
 
+static u64 mark_spte_executable(u64 spte)
+{
+	bool is_access_track = is_access_track_spte(spte);
+
+	if (is_access_track)
+		spte = restore_acc_track_spte(spte);
+
+	spte &= ~shadow_nx_mask;
+	spte |= shadow_x_mask;
+
+	if (is_access_track)
+		spte = mark_spte_for_access_track(spte);
+
+	return spte;
+}
+
+/*
+ * Construct an SPTE that maps a sub-page of the given large SPTE. This is
+ * used during large page splitting, to build the SPTEs that make up the new
+ * page table.
+ */
+u64 make_large_page_split_spte(u64 large_spte, int level, int index, unsigned int access)
+{
+	u64 child_spte;
+	int child_level;
+
+	BUG_ON(is_mmio_spte(large_spte));
+	BUG_ON(!is_large_present_pte(large_spte));
+
+	child_spte = large_spte;
+	child_level = level - 1;
+
+	child_spte += (index * KVM_PAGES_PER_HPAGE(child_level)) << PAGE_SHIFT;
+
+	if (child_level == PG_LEVEL_4K) {
+		child_spte &= ~PT_PAGE_SIZE_MASK;
+
+		/* Allow execution for 4K pages if it was disabled for NX HugePages. */
+		if (is_nx_huge_page_enabled() && access & ACC_EXEC_MASK)
+			child_spte = mark_spte_executable(child_spte);
+	}
+
+	return child_spte;
+}
+
+
 u64 make_nonleaf_spte(u64 *child_pt, bool ad_disabled)
 {
 	u64 spte = SPTE_MMU_PRESENT_MASK;

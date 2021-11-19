@@ -738,6 +738,66 @@ static int mmu_topup_memory_caches(struct kvm_vcpu *vcpu, bool maybe_indirect)
 					  PT64_ROOT_MAX_LEVEL);
 }
 
+static inline void assert_split_caches_invariants(struct kvm *kvm)
+{
+	/*
+	 * The split caches must only be modified while holding the slots_lock,
+	 * since it is only used during memslot VM-ioctls.
+	 */
+	lockdep_assert_held(&kvm->slots_lock);
+
+	/*
+	 * Only the TDP MMU supports large page splitting using
+	 * kvm->arch.split_caches, which is why we only have to allocate
+	 * page_header_cache and shadow_page_cache. Assert that the TDP
+	 * MMU is at least enabled when the split cache is allocated.
+	 */
+	BUG_ON(!is_tdp_mmu_enabled(kvm));
+}
+
+int mmu_topup_split_caches(struct kvm *kvm)
+{
+	struct kvm_mmu_memory_caches *split_caches = &kvm->arch.split_caches;
+	int r;
+
+	assert_split_caches_invariants(kvm);
+
+	r = kvm_mmu_topup_memory_cache(&split_caches->page_header_cache, 1);
+	if (r)
+		goto out;
+
+	r = kvm_mmu_topup_memory_cache(&split_caches->shadow_page_cache, 1);
+	if (r)
+		goto out;
+
+	return 0;
+
+out:
+	pr_warn("Failed to top-up split caches. Will not split large pages.\n");
+	return r;
+}
+
+static void mmu_free_split_caches(struct kvm *kvm)
+{
+	assert_split_caches_invariants(kvm);
+
+	kvm_mmu_free_memory_cache(&kvm->arch.split_caches.pte_list_desc_cache);
+	kvm_mmu_free_memory_cache(&kvm->arch.split_caches.shadow_page_cache);
+}
+
+bool mmu_split_caches_need_topup(struct kvm *kvm)
+{
+	assert_split_caches_invariants(kvm);
+
+	if (kvm->arch.split_caches.page_header_cache.nobjs == 0)
+		return true;
+
+	if (kvm->arch.split_caches.shadow_page_cache.nobjs == 0)
+		return true;
+
+	return false;
+}
+
 static void mmu_free_memory_caches(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu_memory_caches *mmu_caches;
@@ -5696,6 +5756,7 @@ void kvm_mmu_init_vm(struct kvm *kvm)
 
 	spin_lock_init(&kvm->arch.mmu_unsync_pages_lock);
 
+	mmu_init_memory_caches(&kvm->arch.split_caches);
 	kvm_mmu_init_tdp_mmu(kvm);
 
 	node->track_write = kvm_mmu_pte_write;
@@ -5817,6 +5878,28 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 	 */
 	if (flush)
 		kvm_arch_flush_remote_tlbs_memslot(kvm, memslot);
+}
+
+void kvm_mmu_slot_try_split_large_pages(struct kvm *kvm,
+					const struct kvm_memory_slot *memslot,
+					int target_level)
+{
+	u64 start, end;
+
+	if (!is_tdp_mmu_enabled(kvm))
+		return;
+
+	if (mmu_topup_split_caches(kvm))
+		return;
+
+	start = memslot->base_gfn;
+	end = start + memslot->npages;
+
+	read_lock(&kvm->mmu_lock);
+	kvm_tdp_mmu_try_split_large_pages(kvm, memslot, start, end, target_level);
+	read_unlock(&kvm->mmu_lock);
+
+	mmu_free_split_caches(kvm);
 }
 
 static bool kvm_mmu_zap_collapsible_spte(struct kvm *kvm,

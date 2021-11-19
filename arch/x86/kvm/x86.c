@@ -11735,6 +11735,12 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 		if (kvm_dirty_log_manual_protect_and_init_set(kvm))
 			return;
 
+		/*
+		 * Attempt to split all large pages into 4K pages so that vCPUs
+		 * do not have to take write-protection faults.
+		 */
+		kvm_mmu_slot_try_split_large_pages(kvm, new, PG_LEVEL_4K);
+
 		if (kvm_x86_ops.cpu_dirty_log_size) {
 			kvm_mmu_slot_leaf_clear_dirty(kvm, new);
 			kvm_mmu_slot_remove_write_access(kvm, new, PG_LEVEL_2M);

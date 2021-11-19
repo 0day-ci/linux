@@ -695,6 +695,39 @@ static inline bool tdp_mmu_iter_cond_resched(struct kvm *kvm,
 	return false;
 }
 
+static inline bool
+tdp_mmu_need_split_caches_topup_or_resched(struct kvm *kvm, struct tdp_iter *iter)
+{
+	if (mmu_split_caches_need_topup(kvm))
+		return true;
+
+	return tdp_mmu_iter_need_resched(kvm, iter);
+}
+
+static inline int
+tdp_mmu_topup_split_caches_resched(struct kvm *kvm, struct tdp_iter *iter, bool flush)
+{
+	int r;
+
+	rcu_read_unlock();
+
+	if (flush)
+		kvm_flush_remote_tlbs(kvm);
+
+	read_unlock(&kvm->mmu_lock);
+
+	cond_resched();
+	r = mmu_topup_split_caches(kvm);
+
+	read_lock(&kvm->mmu_lock);
+
+	rcu_read_lock();
+	WARN_ON(iter->gfn > iter->next_last_level_gfn);
+	tdp_iter_restart(iter);
+
+	return r;
+}
+
 /*
  * Tears down the mappings for the range of gfns, [start, end), and frees the
  * non-root pages mapping GFNs strictly within that range. Returns true if
@@ -1239,6 +1272,96 @@ bool kvm_tdp_mmu_wrprot_slot(struct kvm *kvm,
 			     slot->base_gfn + slot->npages, min_level);
 
 	return spte_set;
+}
+
+static bool tdp_mmu_split_large_page_atomic(struct kvm *kvm, struct tdp_iter *iter)
+{
+	const u64 large_spte = iter->old_spte;
+	const int level = iter->level;
+	struct kvm_mmu_page *child_sp;
+	u64 child_spte;
+	int i;
+
+	BUG_ON(mmu_split_caches_need_topup(kvm));
+
+	child_sp = alloc_child_tdp_mmu_page(&kvm->arch.split_caches, iter);
+
+	for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
+		child_spte = make_large_page_split_spte(large_spte, level, i, ACC_ALL);
+
+		/*
+		 * No need for atomics since child_sp has not been installed
+		 * in the table yet and thus is not reachable by any other
+		 * thread.
+		 */
+		child_sp->spt[i] = child_spte;
+	}
+
+	return tdp_mmu_install_sp_atomic(kvm, iter, child_sp, false);
+}
+
+static void tdp_mmu_split_large_pages_root(struct kvm *kvm, struct kvm_mmu_page *root,
+					   gfn_t start, gfn_t end, int target_level)
+{
+	struct tdp_iter iter;
+	bool flush = false;
+	int r;
+
+	rcu_read_lock();
+
+	/*
+	 * Traverse the page table splitting all large pages above the target
+	 * level into one lower level. For example, if we encounter a 1GB page
+	 * we split it into 512 2MB pages.
+	 *
+	 * Since the TDP iterator uses a pre-order traversal, we are guaranteed
+	 * to visit an SPTE before ever visiting its children, which means we
+	 * will correctly recursively split large pages that are more than one
+	 * level above the target level (e.g. splitting 1GB to 2MB to 4KB).
+	 */
+	for_each_tdp_pte_min_level(iter, root, target_level + 1, start, end) {
+retry:
+		if (tdp_mmu_need_split_caches_topup_or_resched(kvm, &iter)) {
+			r = tdp_mmu_topup_split_caches_resched(kvm, &iter, flush);
+			flush = false;
+
+			/*
+			 * If topping up the split caches failed, we can't split
+			 * any more pages. Bail out of the loop.
+			 */
+			if (r)
+				break;
+
+			continue;
+		}
+
+		if (!is_large_present_pte(iter.old_spte))
+			continue;
+
+		if (!tdp_mmu_split_large_page_atomic(kvm, &iter))
+			goto retry;
+
+		flush = true;
+	}
+
+	rcu_read_unlock();
+
+	if (flush)
+		kvm_flush_remote_tlbs(kvm);
+}
+
+void kvm_tdp_mmu_try_split_large_pages(struct kvm *kvm,
+				       const struct kvm_memory_slot *slot,
+				       gfn_t start, gfn_t end,
+				       int target_level)
+{
+	struct kvm_mmu_page *root;
+
+	lockdep_assert_held_read(&kvm->mmu_lock);
+
+	for_each_tdp_mmu_root_yield_safe(kvm, root, slot->as_id, true)
+		tdp_mmu_split_large_pages_root(kvm, root, start, end, target_level);
+
 }
 
 /*

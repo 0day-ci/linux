@@ -161,4 +161,7 @@ void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc);
 void account_huge_nx_page(struct kvm *kvm, struct kvm_mmu_page *sp);
 void unaccount_huge_nx_page(struct kvm *kvm, struct kvm_mmu_page *sp);
 
+int mmu_topup_split_caches(struct kvm *kvm);
+bool mmu_split_caches_need_topup(struct kvm *kvm);
+
 #endif /* __KVM_X86_MMU_INTERNAL_H */

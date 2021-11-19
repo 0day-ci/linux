@@ -1232,6 +1232,9 @@ struct kvm_arch {
 	hpa_t	hv_root_tdp;
 	spinlock_t hv_root_tdp_lock;
 #endif
+
+	/* MMU caches used when splitting large pages during VM-ioctls. */
+	struct kvm_mmu_memory_caches split_caches;
 };
 
 struct kvm_vm_stat {
@@ -1588,6 +1591,9 @@ void kvm_mmu_reset_context(struct kvm_vcpu *vcpu);
 void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 				      const struct kvm_memory_slot *memslot,
 				      int start_level);
+void kvm_mmu_slot_try_split_large_pages(struct kvm *kvm,
+					const struct kvm_memory_slot *memslot,
+					int target_level);
 void kvm_mmu_zap_collapsible_sptes(struct kvm *kvm,
 				   const struct kvm_memory_slot *memslot);
 void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
