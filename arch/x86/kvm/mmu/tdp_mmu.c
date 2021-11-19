@@ -1299,7 +1299,12 @@ static bool tdp_mmu_split_large_page_atomic(struct kvm *kvm, struct tdp_iter *it
 		child_sp->spt[i] = child_spte;
 	}
 
-	return tdp_mmu_install_sp_atomic(kvm, iter, child_sp, false);
+	if (!tdp_mmu_install_sp_atomic(kvm, iter, child_sp, false))
+		return false;
+
+	kvm_update_page_stats(kvm, level - 1, PT64_ENT_PER_PAGE);
+
+	return true;
 }
 
 static void tdp_mmu_split_large_pages_root(struct kvm *kvm, struct kvm_mmu_page *root,
