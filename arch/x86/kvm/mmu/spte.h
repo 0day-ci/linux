@@ -257,6 +257,11 @@ static inline bool is_large_pte(u64 pte)
 	return pte & PT_PAGE_SIZE_MASK;
 }
 
+static inline bool is_large_present_pte(u64 pte)
+{
+	return is_shadow_present_pte(pte) && is_large_pte(pte);
+}
+
 static inline bool is_last_spte(u64 pte, int level)
 {
 	return (level == PG_LEVEL_4K) || is_large_pte(pte);
