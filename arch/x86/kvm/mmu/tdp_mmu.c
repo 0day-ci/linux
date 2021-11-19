@@ -157,13 +157,10 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 		if (kvm_mmu_page_as_id(_root) != _as_id) {		\
 		} else
 
-static struct kvm_mmu_page *alloc_tdp_mmu_page(struct kvm_vcpu *vcpu, gfn_t gfn,
-					       union kvm_mmu_page_role role)
+static struct kvm_mmu_page *alloc_tdp_mmu_page(struct kvm_mmu_memory_caches *mmu_caches,
+					       gfn_t gfn, union kvm_mmu_page_role role)
 {
-	struct kvm_mmu_memory_caches *mmu_caches;
 	struct kvm_mmu_page *sp;
-
-	mmu_caches = &vcpu->arch.mmu_caches;
 
 	sp = kvm_mmu_memory_cache_alloc(&mmu_caches->page_header_cache);
 	sp->spt = kvm_mmu_memory_cache_alloc(&mmu_caches->shadow_page_cache);
@@ -178,7 +175,8 @@ static struct kvm_mmu_page *alloc_tdp_mmu_page(struct kvm_vcpu *vcpu, gfn_t gfn,
 	return sp;
 }
 
-static struct kvm_mmu_page *alloc_child_tdp_mmu_page(struct kvm_vcpu *vcpu, struct tdp_iter *iter)
+static struct kvm_mmu_page *alloc_child_tdp_mmu_page(struct kvm_mmu_memory_caches *mmu_caches,
+						     struct tdp_iter *iter)
 {
 	struct kvm_mmu_page *parent_sp;
 	union kvm_mmu_page_role role;
@@ -188,7 +186,7 @@ static struct kvm_mmu_page *alloc_child_tdp_mmu_page(struct kvm_vcpu *vcpu, stru
 	role = parent_sp->role;
 	role.level--;
 
-	return alloc_tdp_mmu_page(vcpu, iter->gfn, role);
+	return alloc_tdp_mmu_page(mmu_caches, iter->gfn, role);
 }
 
 hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu)
@@ -213,7 +211,7 @@ hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu)
 			goto out;
 	}
 
-	root = alloc_tdp_mmu_page(vcpu, 0, role);
+	root = alloc_tdp_mmu_page(&vcpu->arch.mmu_caches, 0, role);
 	refcount_set(&root->tdp_mmu_root_count, 1);
 
 	spin_lock(&kvm->arch.tdp_mmu_pages_lock);
@@ -1031,7 +1029,7 @@ int kvm_tdp_mmu_map(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault)
 			if (is_removed_spte(iter.old_spte))
 				break;
 
-			sp = alloc_child_tdp_mmu_page(vcpu, &iter);
+			sp = alloc_child_tdp_mmu_page(&vcpu->arch.mmu_caches, &iter);
 			if (!tdp_mmu_install_sp_atomic(vcpu->kvm, &iter, sp, account_nx))
 				break;
 		}
