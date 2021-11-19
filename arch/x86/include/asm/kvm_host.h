@@ -612,6 +612,13 @@ struct kvm_vcpu_xen {
 	u64 runstate_times[4];
 };
 
+struct kvm_mmu_memory_caches {
+	struct kvm_mmu_memory_cache pte_list_desc_cache;
+	struct kvm_mmu_memory_cache shadow_page_cache;
+	struct kvm_mmu_memory_cache gfn_array_cache;
+	struct kvm_mmu_memory_cache page_header_cache;
+};
+
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -681,10 +688,7 @@ struct kvm_vcpu_arch {
 	 */
 	struct kvm_mmu *walk_mmu;
 
-	struct kvm_mmu_memory_cache mmu_pte_list_desc_cache;
-	struct kvm_mmu_memory_cache mmu_shadow_page_cache;
-	struct kvm_mmu_memory_cache mmu_gfn_array_cache;
-	struct kvm_mmu_memory_cache mmu_page_header_cache;
+	struct kvm_mmu_memory_caches mmu_caches;
 
 	/*
 	 * QEMU userspace and the guest each have their own FPU state.

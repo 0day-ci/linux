@@ -175,10 +175,13 @@ static union kvm_mmu_page_role page_role_for_level(struct kvm_vcpu *vcpu,
 static struct kvm_mmu_page *alloc_tdp_mmu_page(struct kvm_vcpu *vcpu, gfn_t gfn,
 					       int level)
 {
+	struct kvm_mmu_memory_caches *mmu_caches;
 	struct kvm_mmu_page *sp;
 
-	sp = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_page_header_cache);
-	sp->spt = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_shadow_page_cache);
+	mmu_caches = &vcpu->arch.mmu_caches;
+
+	sp = kvm_mmu_memory_cache_alloc(&mmu_caches->page_header_cache);
+	sp->spt = kvm_mmu_memory_cache_alloc(&mmu_caches->shadow_page_cache);
 	set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
 
 	sp->role.word = page_role_for_level(vcpu, level).word;

@@ -732,38 +732,60 @@ static void walk_shadow_page_lockless_end(struct kvm_vcpu *vcpu)
 
 static int mmu_topup_memory_caches(struct kvm_vcpu *vcpu, bool maybe_indirect)
 {
+	struct kvm_mmu_memory_caches *mmu_caches;
 	int r;
 
+	mmu_caches = &vcpu->arch.mmu_caches;
+
 	/* 1 rmap, 1 parent PTE per level, and the prefetched rmaps. */
-	r = kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_pte_list_desc_cache,
+	r = kvm_mmu_topup_memory_cache(&mmu_caches->pte_list_desc_cache,
 				       1 + PT64_ROOT_MAX_LEVEL + PTE_PREFETCH_NUM);
 	if (r)
 		return r;
-	r = kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_shadow_page_cache,
+	r = kvm_mmu_topup_memory_cache(&mmu_caches->shadow_page_cache,
 				       PT64_ROOT_MAX_LEVEL);
 	if (r)
 		return r;
 	if (maybe_indirect) {
-		r = kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_gfn_array_cache,
+		r = kvm_mmu_topup_memory_cache(&mmu_caches->gfn_array_cache,
 					       PT64_ROOT_MAX_LEVEL);
 		if (r)
 			return r;
 	}
-	return kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_page_header_cache,
+	return kvm_mmu_topup_memory_cache(&mmu_caches->page_header_cache,
 					  PT64_ROOT_MAX_LEVEL);
 }
 
 static void mmu_free_memory_caches(struct kvm_vcpu *vcpu)
 {
-	kvm_mmu_free_memory_cache(&vcpu->arch.mmu_pte_list_desc_cache);
-	kvm_mmu_free_memory_cache(&vcpu->arch.mmu_shadow_page_cache);
-	kvm_mmu_free_memory_cache(&vcpu->arch.mmu_gfn_array_cache);
-	kvm_mmu_free_memory_cache(&vcpu->arch.mmu_page_header_cache);
+	struct kvm_mmu_memory_caches *mmu_caches;
+
+	mmu_caches = &vcpu->arch.mmu_caches;
+
+	kvm_mmu_free_memory_cache(&mmu_caches->pte_list_desc_cache);
+	kvm_mmu_free_memory_cache(&mmu_caches->shadow_page_cache);
+	kvm_mmu_free_memory_cache(&mmu_caches->gfn_array_cache);
+	kvm_mmu_free_memory_cache(&mmu_caches->page_header_cache);
+}
+
+static void mmu_init_memory_caches(struct kvm_mmu_memory_caches *caches)
+{
+	caches->pte_list_desc_cache.kmem_cache = pte_list_desc_cache;
+	caches->pte_list_desc_cache.gfp_zero = __GFP_ZERO;
+
+	caches->page_header_cache.kmem_cache = mmu_page_header_cache;
+	caches->page_header_cache.gfp_zero = __GFP_ZERO;
+
+	caches->shadow_page_cache.gfp_zero = __GFP_ZERO;
 }
 
 static struct pte_list_desc *mmu_alloc_pte_list_desc(struct kvm_vcpu *vcpu)
 {
-	return kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_pte_list_desc_cache);
+	struct kvm_mmu_memory_caches *mmu_caches;
+
+	mmu_caches = &vcpu->arch.mmu_caches;
+
+	return kvm_mmu_memory_cache_alloc(&mmu_caches->pte_list_desc_cache);
 }
 
 static void mmu_free_pte_list_desc(struct pte_list_desc *pte_list_desc)
@@ -1071,7 +1093,7 @@ static bool rmap_can_add(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu_memory_cache *mc;
 
-	mc = &vcpu->arch.mmu_pte_list_desc_cache;
+	mc = &vcpu->arch.mmu_caches.pte_list_desc_cache;
 	return kvm_mmu_memory_cache_nr_free_objects(mc);
 }
 
@@ -1742,12 +1764,15 @@ static void drop_parent_pte(struct kvm_mmu_page *sp,
 
 static struct kvm_mmu_page *kvm_mmu_alloc_page(struct kvm_vcpu *vcpu, int direct)
 {
+	struct kvm_mmu_memory_caches *mmu_caches;
 	struct kvm_mmu_page *sp;
 
-	sp = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_page_header_cache);
-	sp->spt = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_shadow_page_cache);
+	mmu_caches = &vcpu->arch.mmu_caches;
+
+	sp = kvm_mmu_memory_cache_alloc(&mmu_caches->page_header_cache);
+	sp->spt = kvm_mmu_memory_cache_alloc(&mmu_caches->shadow_page_cache);
 	if (!direct)
-		sp->gfns = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_gfn_array_cache);
+		sp->gfns = kvm_mmu_memory_cache_alloc(&mmu_caches->gfn_array_cache);
 	set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
 
 	/*
@@ -5544,13 +5569,7 @@ int kvm_mmu_create(struct kvm_vcpu *vcpu)
 {
 	int ret;
 
-	vcpu->arch.mmu_pte_list_desc_cache.kmem_cache = pte_list_desc_cache;
-	vcpu->arch.mmu_pte_list_desc_cache.gfp_zero = __GFP_ZERO;
-
-	vcpu->arch.mmu_page_header_cache.kmem_cache = mmu_page_header_cache;
-	vcpu->arch.mmu_page_header_cache.gfp_zero = __GFP_ZERO;
-
-	vcpu->arch.mmu_shadow_page_cache.gfp_zero = __GFP_ZERO;
+	mmu_init_memory_caches(&vcpu->arch.mmu_caches);
 
 	vcpu->arch.mmu = &vcpu->arch.root_mmu;
 	vcpu->arch.walk_mmu = &vcpu->arch.root_mmu;
