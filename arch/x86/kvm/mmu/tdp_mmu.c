@@ -1284,6 +1284,8 @@ static bool tdp_mmu_split_large_page_atomic(struct kvm *kvm, struct tdp_iter *it
 
 	BUG_ON(mmu_split_caches_need_topup(kvm));
 
+	trace_kvm_mmu_split_large_page(iter->gfn, large_spte, level);
+
 	child_sp = alloc_child_tdp_mmu_page(&kvm->arch.split_caches, iter);
 
 	for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
