@@ -645,6 +645,15 @@ static inline void tdp_mmu_set_spte_no_dirty_log(struct kvm *kvm,
 	for_each_tdp_pte(_iter, __va(_mmu->root_hpa),		\
 			 _mmu->shadow_root_level, _start, _end)
 
+static inline bool tdp_mmu_iter_need_resched(struct kvm *kvm, struct tdp_iter *iter)
+{
+	/* Ensure forward progress has been made before yielding. */
+	if (iter->next_last_level_gfn == iter->yielded_gfn)
+		return false;
+
+	return need_resched() || rwlock_needbreak(&kvm->mmu_lock);
+}
+
 /*
  * Yield if the MMU lock is contended or this thread needs to return control
  * to the scheduler.
@@ -664,11 +673,7 @@ static inline bool tdp_mmu_iter_cond_resched(struct kvm *kvm,
 					     struct tdp_iter *iter, bool flush,
 					     bool shared)
 {
-	/* Ensure forward progress has been made before yielding. */
-	if (iter->next_last_level_gfn == iter->yielded_gfn)
-		return false;
-
-	if (need_resched() || rwlock_needbreak(&kvm->mmu_lock)) {
+	if (tdp_mmu_iter_need_resched(kvm, iter)) {
 		rcu_read_unlock();
 
 		if (flush)
