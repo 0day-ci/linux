@@ -101,7 +101,7 @@ static void test_weak_syms(void)
 	usleep(1);
 
 	data = skel->data;
-	ASSERT_EQ(data->out__existing_typed, 0, "existing typed ksym");
+	ASSERT_GE(data->out__existing_typed, 0, "existing typed ksym");
 	ASSERT_NEQ(data->out__existing_typeless, -1, "existing typeless ksym");
 	ASSERT_EQ(data->out__non_existent_typeless, 0, "nonexistent typeless ksym");
 	ASSERT_EQ(data->out__non_existent_typed, 0, "nonexistent typed ksym");
@@ -128,7 +128,7 @@ static void test_weak_syms_lskel(void)
 	usleep(1);
 
 	data = skel->data;
-	ASSERT_EQ(data->out__existing_typed, 0, "existing typed ksym");
+	ASSERT_GE(data->out__existing_typed, 0, "existing typed ksym");
 	ASSERT_NEQ(data->out__existing_typeless, -1, "existing typeless ksym");
 	ASSERT_EQ(data->out__non_existent_typeless, 0, "nonexistent typeless ksym");
 	ASSERT_EQ(data->out__non_existent_typed, 0, "nonexistent typed ksym");
