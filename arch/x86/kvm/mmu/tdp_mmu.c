@@ -140,16 +140,21 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 	lockdep_assert_held(&kvm->mmu_lock);
 
 	/*
-	 * Restart the walk if the previous root was invalidated, which can
-	 * happen if the caller drops mmu_lock when yielding.  Restarting the
-	 * walke is necessary because invalidating a root also removes it from
-	 * tdp_mmu_roots.  Restarting is safe and correct because invalidating
-	 * a root is done if and only if _all_ roots are invalidated, i.e. any
-	 * root on tdp_mmu_roots was added _after_ the invalidation event.
+	 * Terminate the walk if the previous root was invalidated, which can
+	 * happen if the caller yielded and dropped mmu_lock.  Because invalid
+	 * roots are removed from tdp_mmu_roots with mmu_lock held for write,
+	 * if the previous root was invalidated, then the invalidation occurred
+	 * after this walk started.  And because _all_ roots are invalidated
+	 * during an invalidation event, any root on tdp_mmu_roots was created
+	 * after the invalidation.  Lastly, any state change being made by the
+	 * caller must be effected before updating SPTEs, otherwise vCPUs could
+	 * simply create new SPTEs with the old state.  Thus, if the previous
+	 * root was invalidated, all valid roots are guaranteed to have been
+	 * created after the desired state change and don't need to be updated.
 	 */
 	if (prev_root && prev_root->role.invalid) {
 		kvm_tdp_mmu_put_root(kvm, prev_root, shared);
-		prev_root = NULL;
+		return NULL;
 	}
 
 	/*
