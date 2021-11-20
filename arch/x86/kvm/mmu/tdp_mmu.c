@@ -79,6 +79,11 @@ static void tdp_mmu_free_sp_rcu_callback(struct rcu_head *head)
 	tdp_mmu_free_sp(sp);
 }
 
+/*
+ * Note, putting a root might sleep, i.e. the caller must have IRQs enabled and
+ * must not explicitly disable preemption (it will be disabled by virtue of
+ * holding mmu_lock, hence the lack of a might_sleep()).
+ */
 void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 			  bool shared)
 {
@@ -101,7 +106,7 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 	 * intermediate paging structures, that may be zapped, as such entries
 	 * are associated with the ASID on both VMX and SVM.
 	 */
-	(void)zap_gfn_range(kvm, root, 0, -1ull, false, false, shared);
+	(void)zap_gfn_range(kvm, root, 0, -1ull, true, false, shared);
 
 	call_rcu(&root->rcu_head, tdp_mmu_free_sp_rcu_callback);
 }
