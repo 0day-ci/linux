@@ -8,6 +8,7 @@
 #include <linux/idr.h>
 #include <cxlmem.h>
 #include <cxl.h>
+#include <pci.h>
 #include "core.h"
 
 /**
@@ -436,7 +437,7 @@ static int devm_cxl_link_uport(struct device *host, struct cxl_port *port)
 
 static struct cxl_port *cxl_port_alloc(struct device *uport,
 				       resource_size_t component_reg_phys,
-				       struct cxl_port *parent_port)
+				       struct cxl_port *parent_port, void *data)
 {
 	struct cxl_port *port;
 	struct device *dev;
@@ -465,6 +466,7 @@ static struct cxl_port *cxl_port_alloc(struct device *uport,
 
 	port->uport = uport;
 	port->component_reg_phys = component_reg_phys;
+	port->data = data;
 	ida_init(&port->decoder_ida);
 	INIT_LIST_HEAD(&port->dports);
 
@@ -485,16 +487,17 @@ err:
  * @uport: "physical" device implementing this upstream port
  * @component_reg_phys: (optional) for configurable cxl_port instances
  * @parent_port: next hop up in the CXL memory decode hierarchy
+ * @data: opaque data to be used by the port driver
  */
 struct cxl_port *devm_cxl_add_port(struct device *uport,
 				   resource_size_t component_reg_phys,
-				   struct cxl_port *parent_port)
+				   struct cxl_port *parent_port, void *data)
 {
 	struct device *dev, *host;
 	struct cxl_port *port;
 	int rc;
 
-	port = cxl_port_alloc(uport, component_reg_phys, parent_port);
+	port = cxl_port_alloc(uport, component_reg_phys, parent_port, data);
 	if (IS_ERR(port))
 		return port;
 
@@ -530,6 +533,113 @@ err:
 	return ERR_PTR(rc);
 }
 EXPORT_SYMBOL_NS_GPL(devm_cxl_add_port, CXL);
+
+static int add_upstream_port(struct device *host, struct pci_dev *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct cxl_port *parent_port;
+	struct cxl_register_map map;
+	struct cxl_port *port;
+	int rc;
+
+	/* A port is useless if there are no component registers */
+	rc = cxl_find_regblock(pdev, CXL_REGLOC_RBI_COMPONENT, &map);
+	if (rc)
+		return rc;
+
+	parent_port = find_parent_cxl_port(pdev);
+	if (!parent_port)
+		return -ENODEV;
+
+	if (!parent_port->dev.driver) {
+		dev_dbg(dev, "Upstream port has no driver\n");
+		put_device(&parent_port->dev);
+		return -ENODEV;
+	}
+
+	port = devm_cxl_add_port(dev, cxl_reg_block(pdev, &map), parent_port,
+				 NULL);
+	put_device(&parent_port->dev);
+	if (IS_ERR(port))
+		dev_err(dev, "Failed to add upstream port %ld\n",
+			PTR_ERR(port));
+	else
+		dev_dbg(dev, "Added CXL port\n");
+
+	return rc;
+}
+
+static int add_downstream_port(struct pci_dev *pdev)
+{
+	resource_size_t creg = CXL_RESOURCE_NONE;
+	struct device *dev = &pdev->dev;
+	struct cxl_port *parent_port;
+	struct cxl_register_map map;
+	u32 lnkcap, port_num;
+	int rc;
+
+	/*
+	 * Ports are to be scanned from top down. Therefore, the upstream port
+	 * must already exist.
+	 */
+	parent_port = find_parent_cxl_port(pdev);
+	if (!parent_port)
+		return -ENODEV;
+
+	if (!parent_port->dev.driver) {
+		dev_dbg(dev, "Host port to dport has no driver\n");
+		put_device(&parent_port->dev);
+		return -ENODEV;
+	}
+
+	rc = cxl_find_regblock(pdev, CXL_REGLOC_RBI_COMPONENT, &map);
+	if (rc)
+		creg = CXL_RESOURCE_NONE;
+	else
+		creg = cxl_reg_block(pdev, &map);
+
+	if (pci_read_config_dword(pdev, pci_pcie_cap(pdev) + PCI_EXP_LNKCAP,
+				  &lnkcap) != PCIBIOS_SUCCESSFUL)
+		return 1;
+	port_num = FIELD_GET(PCI_EXP_LNKCAP_PN, lnkcap);
+
+	rc = cxl_add_dport(parent_port, dev, port_num, creg, false);
+	put_device(&parent_port->dev);
+	if (rc)
+		dev_err(dev, "Failed to add downstream port to %s\n",
+			dev_name(&parent_port->dev));
+	else
+		dev_dbg(dev, "Added downstream port to %s\n",
+			dev_name(&parent_port->dev));
+
+	return rc;
+}
+
+static int match_add_ports(struct pci_dev *pdev, void *data)
+{
+	struct device *dev = &pdev->dev;
+	struct device *host = data;
+
+	if (is_cxl_switch_usp((dev)))
+		return add_upstream_port(host, pdev);
+	else if (is_cxl_switch_dsp((dev)))
+		return add_downstream_port(pdev);
+	else
+		return 0;
+}
+
+/**
+ * cxl_scan_ports() - Adds all ports for the subtree beginning with @dport
+ * @dport: Beginning node of the CXL topology
+ */
+void cxl_scan_ports(struct cxl_dport *dport)
+{
+	struct device *d = dport->dport;
+	struct pci_dev *pdev = to_pci_dev(d);
+
+	pci_walk_bus(pdev->bus, match_add_ports, &dport->port->dev);
+}
+EXPORT_SYMBOL_NS_GPL(cxl_scan_ports, CXL);
 
 static struct cxl_dport *find_dport(struct cxl_port *port, int id)
 {
@@ -613,6 +723,23 @@ err:
 	return rc;
 }
 EXPORT_SYMBOL_NS_GPL(cxl_add_dport, CXL);
+
+struct cxl_dport *cxl_find_dport_by_dev(struct cxl_port *port,
+					struct device *dev)
+{
+	struct cxl_dport *dport;
+
+	device_lock(&port->dev);
+	list_for_each_entry(dport, &port->dports, list)
+		if (dport->dport == dev) {
+			device_unlock(&port->dev);
+			return dport;
+		}
+
+	device_unlock(&port->dev);
+	return NULL;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_find_dport_by_dev, CXL);
 
 static int decoder_populate_targets(struct cxl_decoder *cxld,
 				    struct cxl_port *port, int *target_map)
@@ -858,6 +985,8 @@ static int cxl_device_id(struct device *dev)
 		return CXL_DEVICE_NVDIMM;
 	if (dev->type == &cxl_port_type)
 		return CXL_DEVICE_PORT;
+	if (dev->type == &cxl_memdev_type)
+		return CXL_DEVICE_MEMORY_EXPANDER;
 	return 0;
 }
 

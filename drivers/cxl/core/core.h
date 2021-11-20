@@ -6,6 +6,7 @@
 
 extern const struct device_type cxl_nvdimm_bridge_type;
 extern const struct device_type cxl_nvdimm_type;
+extern const struct device_type cxl_memdev_type;
 
 extern struct attribute_group cxl_base_attribute_group;
 
@@ -19,5 +20,7 @@ int cxl_memdev_init(void);
 void cxl_memdev_exit(void);
 void cxl_mbox_init(void);
 void cxl_mbox_exit(void);
+
+struct cxl_port *find_parent_cxl_port(struct pci_dev *pdev);
 
 #endif /* __CXL_CORE_H__ */

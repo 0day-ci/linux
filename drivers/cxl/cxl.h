@@ -296,6 +296,7 @@ struct cxl_port {
  * @port: reference to cxl_port that contains this downstream port
  * @list: node for a cxl_port's list of cxl_dport instances
  * @root_port_link: node for global list of root ports
+ * @data: Opaque data passed by other drivers, used by port driver
  */
 struct cxl_dport {
 	struct device *dport;
@@ -304,16 +305,20 @@ struct cxl_dport {
 	struct cxl_port *port;
 	struct list_head list;
 	struct list_head root_port_link;
+	void *data;
 };
 
 struct cxl_port *to_cxl_port(struct device *dev);
 struct cxl_port *devm_cxl_add_port(struct device *uport,
 				   resource_size_t component_reg_phys,
-				   struct cxl_port *parent_port);
+				   struct cxl_port *parent_port, void *data);
+void cxl_scan_ports(struct cxl_dport *root_port);
 
 int cxl_add_dport(struct cxl_port *port, struct device *dport, int port_id,
 		  resource_size_t component_reg_phys, bool root_port);
 struct cxl_dport *cxl_get_root_dport(struct device *dev);
+struct cxl_dport *cxl_find_dport_by_dev(struct cxl_port *port,
+					struct device *dev);
 
 struct cxl_decoder *to_cxl_decoder(struct device *dev);
 bool is_root_decoder(struct device *dev);
@@ -349,6 +354,7 @@ void cxl_driver_unregister(struct cxl_driver *cxl_drv);
 #define CXL_DEVICE_NVDIMM_BRIDGE	1
 #define CXL_DEVICE_NVDIMM		2
 #define CXL_DEVICE_PORT			3
+#define CXL_DEVICE_MEMORY_EXPANDER	4
 
 #define MODULE_ALIAS_CXL(type) MODULE_ALIAS("cxl:t" __stringify(type) "*")
 #define CXL_MODALIAS_FMT "cxl:t%d"

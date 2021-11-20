@@ -108,8 +108,16 @@ static u64 get_decoder_size(void __iomem *hdm_decoder, int n)
 
 static bool is_endpoint_port(struct cxl_port *port)
 {
-	/* Endpoints can't be ports... yet! */
-	return false;
+	/*
+	 * It's tempting to just check list_empty(port->dports) here, but this
+	 * might get called before dports are setup for a port.
+	 */
+
+	if (!port->uport->driver)
+		return false;
+
+	return to_cxl_drv(port->uport->driver)->id ==
+	       CXL_DEVICE_MEMORY_EXPANDER;
 }
 
 static void rescan_ports(struct work_struct *work)

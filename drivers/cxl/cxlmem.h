@@ -35,12 +35,15 @@
  * @cdev: char dev core object for ioctl operations
  * @cxlds: The device state backing this device
  * @id: id number of this memdev instance.
+ * @component_reg_phys: register base of component registers
+ * @root_port: Hostbridge's root port connected to this endpoint
  */
 struct cxl_memdev {
 	struct device dev;
 	struct cdev cdev;
 	struct cxl_dev_state *cxlds;
 	int id;
+	struct cxl_dport *root_port;
 };
 
 static inline struct cxl_memdev *to_cxl_memdev(struct device *dev)

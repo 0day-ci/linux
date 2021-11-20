@@ -15,6 +15,7 @@
 
 /* CXL 2.0 8.1.3: PCIe DVSEC for CXL Device */
 #define CXL_DVSEC_PCIE_DEVICE					0
+
 #define   CXL_DVSEC_PCIE_DEVICE_CAP_OFFSET			0xA
 #define     CXL_DVSEC_PCIE_DEVICE_MEM_CAPABLE			BIT(2)
 #define     CXL_DVSEC_PCIE_DEVICE_HDM_COUNT_MASK		GENMASK(5, 4)
@@ -63,5 +64,8 @@ enum cxl_regloc_type {
 #define cxl_reg_block(pdev, map)                                               \
 	((resource_size_t)(pci_resource_start(pdev, (map)->barno) +            \
 			   (map)->block_offset))
+
+bool is_cxl_switch_usp(struct device *dev);
+bool is_cxl_switch_dsp(struct device *dev);
 
 #endif /* __CXL_PCI_H__ */
