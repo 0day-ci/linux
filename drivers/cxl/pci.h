@@ -47,4 +47,8 @@ enum cxl_regloc_type {
 	CXL_REGLOC_RBI_TYPES
 };
 
+#define cxl_reg_block(pdev, map)                                               \
+	((resource_size_t)(pci_resource_start(pdev, (map)->barno) +            \
+			   (map)->block_offset))
+
 #endif /* __CXL_PCI_H__ */
