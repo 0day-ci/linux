@@ -2,7 +2,11 @@
 #ifndef _LINUX_STDDEF_H
 #define _LINUX_STDDEF_H
 
+
 #include <uapi/linux/stddef.h>
+
+#include <linux/offsetof.h>
+
 
 #undef NULL
 #define NULL ((void *)0)
@@ -11,13 +15,6 @@ enum {
 	false	= 0,
 	true	= 1
 };
-
-#undef offsetof
-#ifdef __compiler_offsetof
-#define offsetof(TYPE, MEMBER)	__compiler_offsetof(TYPE, MEMBER)
-#else
-#define offsetof(TYPE, MEMBER)	((size_t)&((TYPE *)0)->MEMBER)
-#endif
 
 /**
  * sizeof_field() - Report the size of a struct field in bytes
