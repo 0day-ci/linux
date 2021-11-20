@@ -25,6 +25,53 @@
  */
 
 static DEFINE_IDA(cxl_port_ida);
+static DECLARE_RWSEM(topology_host_sem);
+
+static struct device *cxl_topology_host;
+
+int cxl_register_topology_host(struct device *host)
+{
+	down_write(&topology_host_sem);
+	if (cxl_topology_host) {
+		up_write(&topology_host_sem);
+		pr_warn("%s host currently in use. Please try unloading %s",
+			dev_name(cxl_topology_host), host->driver->name);
+		return -EBUSY;
+	}
+
+	cxl_topology_host = host;
+	up_write(&topology_host_sem);
+
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_register_topology_host, CXL);
+
+void cxl_unregister_topology_host(struct device *host)
+{
+	down_write(&topology_host_sem);
+	if (cxl_topology_host == host)
+		cxl_topology_host = NULL;
+	else
+		pr_warn("topology host in use by %s\n",
+			cxl_topology_host->driver->name);
+	up_write(&topology_host_sem);
+}
+EXPORT_SYMBOL_NS_GPL(cxl_unregister_topology_host, CXL);
+
+static struct device *get_cxl_topology_host(void)
+{
+	down_read(&topology_host_sem);
+	if (cxl_topology_host)
+		return cxl_topology_host;
+	up_read(&topology_host_sem);
+	return NULL;
+}
+
+static void put_cxl_topology_host(struct device *dev)
+{
+	WARN_ON(dev != cxl_topology_host);
+	up_read(&topology_host_sem);
+}
 
 static ssize_t devtype_show(struct device *dev, struct device_attribute *attr,
 			    char *buf)
@@ -362,17 +409,16 @@ err:
 
 /**
  * devm_cxl_add_port - register a cxl_port in CXL memory decode hierarchy
- * @host: host device for devm operations
  * @uport: "physical" device implementing this upstream port
  * @component_reg_phys: (optional) for configurable cxl_port instances
  * @parent_port: next hop up in the CXL memory decode hierarchy
  */
-struct cxl_port *devm_cxl_add_port(struct device *host, struct device *uport,
+struct cxl_port *devm_cxl_add_port(struct device *uport,
 				   resource_size_t component_reg_phys,
 				   struct cxl_port *parent_port)
 {
+	struct device *dev, *host;
 	struct cxl_port *port;
-	struct device *dev;
 	int rc;
 
 	port = cxl_port_alloc(uport, component_reg_phys, parent_port);
@@ -391,7 +437,12 @@ struct cxl_port *devm_cxl_add_port(struct device *host, struct device *uport,
 	if (rc)
 		goto err;
 
+	host = get_cxl_topology_host();
+	if (!host)
+		return ERR_PTR(-ENODEV);
+
 	rc = devm_add_action_or_reset(host, unregister_port, port);
+	put_cxl_topology_host(host);
 	if (rc)
 		return ERR_PTR(rc);
 

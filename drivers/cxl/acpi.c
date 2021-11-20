@@ -224,8 +224,7 @@ static int add_host_bridge_uport(struct device *match, void *arg)
 		return 0;
 	}
 
-	port = devm_cxl_add_port(host, match, dport->component_reg_phys,
-				 root_port);
+	port = devm_cxl_add_port(match, dport->component_reg_phys, root_port);
 	if (IS_ERR(port))
 		return PTR_ERR(port);
 	dev_dbg(host, "%s: add: %s\n", dev_name(match), dev_name(&port->dev));
@@ -376,6 +375,11 @@ static int add_root_nvdimm_bridge(struct device *match, void *data)
 	return 1;
 }
 
+static void clear_topology_host(void *data)
+{
+	cxl_unregister_topology_host(data);
+}
+
 static int cxl_acpi_probe(struct platform_device *pdev)
 {
 	int rc;
@@ -384,7 +388,15 @@ static int cxl_acpi_probe(struct platform_device *pdev)
 	struct acpi_device *adev = ACPI_COMPANION(host);
 	struct cxl_cfmws_context ctx;
 
-	root_port = devm_cxl_add_port(host, host, CXL_RESOURCE_NONE, NULL);
+	rc = cxl_register_topology_host(host);
+	if (rc)
+		return rc;
+
+	rc = devm_add_action_or_reset(host, clear_topology_host, host);
+	if (rc)
+		return rc;
+
+	root_port = devm_cxl_add_port(host, CXL_RESOURCE_NONE, root_port);
 	if (IS_ERR(root_port))
 		return PTR_ERR(root_port);
 	dev_dbg(host, "add: %s\n", dev_name(&root_port->dev));
