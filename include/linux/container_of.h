@@ -2,10 +2,11 @@
 #ifndef _LINUX_CONTAINER_OF_H
 #define _LINUX_CONTAINER_OF_H
 
+
 #include <linux/build_bug.h>
 #include <linux/err.h>
+#include <linux/typeof_member.h>
 
-#define typeof_member(T, m)	typeof(((T*)0)->m)
 
 /**
  * container_of - cast a member of a structure out to the containing structure
