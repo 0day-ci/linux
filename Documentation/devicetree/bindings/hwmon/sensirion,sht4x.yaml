@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/hwmon/sensirion,sht4x.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sensirion SHT4x Humidity and Temperature Sensor IC
+
+maintainers:
+  - Navin Sankar Velliangiri navin@linumiz.com
+
+description: |
+  The SHT4x is a high-accuracy digital humidity and temperature sensor
+  designed especially for battery-driven high-volume consumer
+  electronics applications.  For further information refere to
+  Documentation/hwmon/sht4x.rst
+
+  This binding document describes the binding for the hardware monitor
+  portion of the driver.
+
+properties:
+  compatible:
+    enum:
+      - sensirion,sht4x
+
+  reg:
+    const: 0x44
+    description:
+      The I2c base address of the SHT4x.  0x44 for all chip versions
+      except for SHT41-BD1B, where it is 0x45.
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+      clock-frequency = <400000>;
+
+      sht4x@44 {
+        compatible = "sensirion,sht4x";
+        reg = <0x44>;
+      };
+    };
+...
