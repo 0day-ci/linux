@@ -33,10 +33,7 @@ struct efx_sw_stat_desc {
 				get_stat_function) {			\
 	.name = #stat_name,						\
 	.source = EFX_ETHTOOL_STAT_SOURCE_##source_name,		\
-	.offset = ((((field_type *) 0) ==				\
-		      &((struct efx_##source_name *)0)->field) ?	\
-		    offsetof(struct efx_##source_name, field) :		\
-		    offsetof(struct efx_##source_name, field)),		\
+	.offset = offsetof(struct efx_##source_name, field),		\
 	.get_stat = get_stat_function,					\
 }
 
