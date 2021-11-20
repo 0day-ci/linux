@@ -725,11 +725,9 @@ int cachefiles_has_space(struct cachefiles_cache *cache,
 	    stats.f_bavail < cache->bcull)
 		goto begin_cull;
 
-	if (test_bit(CACHEFILES_CULLING, &cache->flags) &&
-	    stats.f_ffree >= cache->frun &&
+	if (stats.f_ffree >= cache->frun &&
 	    stats.f_bavail >= cache->brun &&
-	    test_and_clear_bit(CACHEFILES_CULLING, &cache->flags)
-	    ) {
+	    test_and_clear_bit(CACHEFILES_CULLING, &cache->flags)) {
 		_debug("cease culling");
 		cachefiles_state_changed(cache);
 	}
