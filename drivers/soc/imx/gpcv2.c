@@ -204,6 +204,7 @@ struct imx_pgc_domain {
 	const int voltage;
 	const bool keep_clocks;
 	struct device *dev;
+	bool blkctrl_bus_enabled;
 };
 
 struct imx_pgc_domain_data {
@@ -282,17 +283,14 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 				   domain->bits.hskreq, domain->bits.hskreq);
 
 		/*
-		 * ret = regmap_read_poll_timeout(domain->regmap, GPC_PU_PWRHSK, reg_val,
-		 *				  (reg_val & domain->bits.hskack), 0,
-		 *				  USEC_PER_MSEC);
-		 * Technically we need the commented code to wait handshake. But that needs
-		 * the BLK-CTL module BUS clk-en bit being set.
-		 *
-		 * There is a separate BLK-CTL module and we will have such a driver for it,
-		 * that driver will set the BUS clk-en bit and handshake will be triggered
-		 * automatically there. Just add a delay and suppose the handshake finish
-		 * after that.
+		 * blkctrl_bus_enabled implies that the GPC is being invoked from a blk-ctrl
+		 * and not from a peripheral or other GPC power domain.  The blk-ctrl is required
+		 * to support the handshake.
 		 */
+		if (domain->blkctrl_bus_enabled)
+			ret = regmap_read_poll_timeout(domain->regmap, GPC_PU_PWRHSK, reg_val,
+							(reg_val & domain->bits.hskack), 0,
+							USEC_PER_MSEC);
 	}
 
 	/* Disable reset clocks for all devices in the domain */
@@ -701,6 +699,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 		},
 		.pgc   = BIT(IMX8MM_PGC_VPUMIX),
 		.keep_clocks = true,
+		.blkctrl_bus_enabled = true,
 	},
 
 	[IMX8MM_POWER_DOMAIN_VPUG1] = {
@@ -748,6 +747,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 		},
 		.pgc   = BIT(IMX8MM_PGC_DISPMIX),
 		.keep_clocks = true,
+		.blkctrl_bus_enabled = true,
 	},
 
 	[IMX8MM_POWER_DOMAIN_MIPI] = {
