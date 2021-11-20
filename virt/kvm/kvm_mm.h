@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
-#ifndef KVM_MMU_LOCK_H
-#define KVM_MMU_LOCK_H 1
+#ifndef __KVM_MM_H__
+#define __KVM_MM_H__ 1
 
 /*
  * Architectures can choose whether to use an rwlock or spinlock
@@ -20,4 +20,21 @@
 #define KVM_MMU_UNLOCK(kvm)    spin_unlock(&(kvm)->mmu_lock)
 #endif /* KVM_HAVE_MMU_RWLOCK */
 
-#endif
+kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
+		     bool write_fault, bool *writable);
+
+#ifdef CONFIG_HAVE_KVM_PFNCACHE
+void gfn_to_pfn_cache_invalidate_start(struct kvm *kvm,
+				       unsigned long start,
+				       unsigned long end,
+				       bool may_block);
+#else
+static inline void gfn_to_pfn_cache_invalidate_start(struct kvm *kvm,
+						     unsigned long start,
+						     unsigned long end,
+						     bool may_block)
+{
+}
+#endif /* HAVE_KVM_PFNCACHE */
+
+#endif /* __KVM_MM_H__ */
