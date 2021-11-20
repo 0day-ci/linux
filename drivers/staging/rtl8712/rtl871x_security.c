@@ -269,7 +269,7 @@ static void secmicclear(struct mic_data *pmicdata)
 /* Reset the state to the empty message. */
 	pmicdata->L = pmicdata->K0;
 	pmicdata->R = pmicdata->K1;
-	pmicdata->nBytesInM = 0;
+	pmicdata->nbytes_in_m = 0;
 	pmicdata->M = 0;
 }
 
@@ -285,10 +285,10 @@ void r8712_secmicsetkey(struct mic_data *pmicdata, u8 *key)
 static void secmicappendbyte(struct mic_data *pmicdata, u8 b)
 {
 	/* Append the byte to our word-sized buffer */
-	pmicdata->M |= ((u32)b) << (8 * pmicdata->nBytesInM);
-	pmicdata->nBytesInM++;
+	pmicdata->M |= ((u32)b) << (8 * pmicdata->n_bytes_in_m);
+	pmicdata->nbytes_in_m++;
 	/* Process the word if it is full. */
-	if (pmicdata->nBytesInM >= 4) {
+	if (pmicdata->nbytes_in_m >= 4) {
 		pmicdata->L ^= pmicdata->M;
 		pmicdata->R ^= ROL32(pmicdata->L, 17);
 		pmicdata->L += pmicdata->R;
@@ -301,7 +301,7 @@ static void secmicappendbyte(struct mic_data *pmicdata, u8 b)
 		pmicdata->L += pmicdata->R;
 		/* Clear the buffer */
 		pmicdata->M = 0;
-		pmicdata->nBytesInM = 0;
+		pmicdata->nbytes_in_m = 0;
 	}
 }
 
@@ -323,7 +323,7 @@ void r8712_secgetmic(struct mic_data *pmicdata, u8 *dst)
 	secmicappendbyte(pmicdata, 0);
 	secmicappendbyte(pmicdata, 0);
 	/* and then zeroes until the length is a multiple of 4 */
-	while (pmicdata->nBytesInM != 0)
+	while (pmicdata->nbytes_in_m != 0)
 		secmicappendbyte(pmicdata, 0);
 	/* The appendByte function has already computed the result. */
 	secmicputuint32(dst, pmicdata->L);

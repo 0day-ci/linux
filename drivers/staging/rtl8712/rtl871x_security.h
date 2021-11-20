@@ -192,7 +192,7 @@ struct mic_data {
 	u32  K0, K1;         /* Key */
 	u32  L, R;           /* Current state */
 	u32  M;              /* Message accumulator (single word) */
-	u32  nBytesInM;      /* # bytes in M */
+	u32  nbytes_in_m;      /* # bytes in M */
 };
 
 void seccalctkipmic(
@@ -200,11 +200,11 @@ void seccalctkipmic(
 	u8  *header,
 	u8  *data,
 	u32  data_len,
-	u8  *Miccode,
+	u8  *miccode,
 	u8   priority);
 
 void r8712_secmicsetkey(struct mic_data *pmicdata, u8 *key);
-void r8712_secmicappend(struct mic_data *pmicdata, u8 *src, u32 nBytes);
+void r8712_secmicappend(struct mic_data *pmicdata, u8 *src, u32 nbytes);
 void r8712_secgetmic(struct mic_data *pmicdata, u8 *dst);
 u32 r8712_aes_encrypt(struct _adapter *padapter, u8 *pxmitframe);
 u32 r8712_tkip_encrypt(struct _adapter *padapter, u8 *pxmitframe);
