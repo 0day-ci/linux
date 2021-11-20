@@ -31,6 +31,8 @@ static DECLARE_RWSEM(root_port_sem);
 
 static struct device *cxl_topology_host;
 
+static bool is_cxl_decoder(struct device *dev);
+
 int cxl_register_topology_host(struct device *host)
 {
 	down_write(&topology_host_sem);
@@ -73,6 +75,45 @@ static void put_cxl_topology_host(struct device *dev)
 {
 	WARN_ON(dev != cxl_topology_host);
 	up_read(&topology_host_sem);
+}
+
+static int decoder_match(struct device *dev, void *data)
+{
+	struct resource *theirs = (struct resource *)data;
+	struct cxl_decoder *cxld;
+
+	if (!is_cxl_decoder(dev))
+		return 0;
+
+	cxld = to_cxl_decoder(dev);
+	if (theirs->start <= cxld->decoder_range.start &&
+	    theirs->end >= cxld->decoder_range.end)
+		return 1;
+
+	return 0;
+}
+
+static struct cxl_decoder *cxl_find_root_decoder(resource_size_t base,
+						 resource_size_t size)
+{
+	struct cxl_decoder *cxld = NULL;
+	struct device *cxldd;
+	struct device *host;
+	struct resource res = (struct resource){
+		.start = base,
+		.end = base + size - 1,
+	};
+
+	host = get_cxl_topology_host();
+	if (!host)
+		return NULL;
+
+	cxldd = device_find_child(host, &res, decoder_match);
+	if (cxldd)
+		cxld = to_cxl_decoder(cxldd);
+
+	put_cxl_topology_host(host);
+	return cxld;
 }
 
 static ssize_t devtype_show(struct device *dev, struct device_attribute *attr,
@@ -280,6 +321,11 @@ bool is_root_decoder(struct device *dev)
 }
 EXPORT_SYMBOL_NS_GPL(is_root_decoder, CXL);
 
+static bool is_cxl_decoder(struct device *dev)
+{
+	return dev->type->release == cxl_decoder_release;
+}
+
 struct cxl_decoder *to_cxl_decoder(struct device *dev)
 {
 	if (dev_WARN_ONCE(dev, dev->type->release != cxl_decoder_release,
@@ -327,6 +373,7 @@ struct cxl_port *to_cxl_port(struct device *dev)
 		return NULL;
 	return container_of(dev, struct cxl_port, dev);
 }
+EXPORT_SYMBOL_NS_GPL(to_cxl_port, CXL);
 
 struct cxl_dport *cxl_get_root_dport(struct device *dev)
 {
@@ -735,6 +782,24 @@ EXPORT_SYMBOL_NS_GPL(cxl_decoder_add, CXL);
 
 static void cxld_unregister(void *dev)
 {
+	struct cxl_decoder *plat_decoder, *cxld = to_cxl_decoder(dev);
+	resource_size_t base, size;
+
+	if (is_root_decoder(dev)) {
+		device_unregister(dev);
+		return;
+	}
+
+	base = cxld->decoder_range.start;
+	size = range_len(&cxld->decoder_range);
+
+	if (size) {
+		plat_decoder = cxl_find_root_decoder(base, size);
+		if (plat_decoder)
+			__release_region(&plat_decoder->platform_res, base,
+					 size);
+	}
+
 	device_unregister(dev);
 }
 
@@ -789,6 +854,8 @@ static int cxl_device_id(struct device *dev)
 		return CXL_DEVICE_NVDIMM_BRIDGE;
 	if (dev->type == &cxl_nvdimm_type)
 		return CXL_DEVICE_NVDIMM;
+	if (dev->type == &cxl_port_type)
+		return CXL_DEVICE_PORT;
 	return 0;
 }
 
