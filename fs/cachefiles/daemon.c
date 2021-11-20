@@ -688,8 +688,6 @@ int cachefiles_has_space(struct cachefiles_cache *cache,
 	//       fnr, bnr);
 
 	/* find out how many pages of blockdev are available */
-	memset(&stats, 0, sizeof(stats));
-
 	ret = vfs_statfs(&path, &stats);
 	if (ret < 0) {
 		if (ret == -EIO)
