@@ -5,12 +5,14 @@
 
 #include <uapi/linux/stddef.h>
 
+#include <linux/memberof.h>
+
 
 #undef offsetof
 #ifdef __compiler_offsetof
 #define offsetof(T, m)	__compiler_offsetof(T, m)
 #else
-#define offsetof(T, m)	((size_t)&((T *)0)->m)
+#define offsetof(T, m)	((size_t)&memberof(T, m))
 #endif
 
 

@@ -3,7 +3,10 @@
 #define _LINUX_TYPEOF_MEMBER_H
 
 
-#define typeof_member(T, m)  typeof(((T *)0)->m)
+#include <linux/memberof.h>
+
+
+#define typeof_member(T, m)  typeof(memberof(T, m))
 
 
 #endif	/* _LINUX_TYPEOF_MEMBER_H */
