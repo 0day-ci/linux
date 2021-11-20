@@ -2754,6 +2754,7 @@ void free_transhuge_page(struct page *page)
 void deferred_split_huge_page(struct page *page)
 {
 	struct deferred_split *ds_queue = get_deferred_split_queue(page);
+	struct list_head *list = current->deferred_split_list;
 #ifdef CONFIG_MEMCG
 	struct mem_cgroup *memcg = page_memcg(compound_head(page));
 #endif
@@ -2774,7 +2775,14 @@ void deferred_split_huge_page(struct page *page)
 	if (PageSwapCache(page))
 		return;
 
+	if (list && list_empty(page_deferred_list(page))) {
+		/* corresponding put in split_local_deferred_list. */
+		get_page(page);
+		list_add(page_deferred_list(page), list);
+	}
+
 	spin_lock_irqsave(&ds_queue->split_queue_lock, flags);
+
 	if (list_empty(page_deferred_list(page))) {
 		count_vm_event(THP_DEFERRED_SPLIT_PAGE);
 		list_add_tail(page_deferred_list(page), &ds_queue->split_queue);
@@ -2799,6 +2807,48 @@ static unsigned long deferred_split_count(struct shrinker *shrink,
 		ds_queue = &sc->memcg->deferred_split_queue;
 #endif
 	return READ_ONCE(ds_queue->split_queue_len);
+}
+
+void split_local_deferred_list(struct list_head *defer_list)
+{
+	struct list_head *pos, *next;
+	struct page *page;
+
+	/* First iteration for split. */
+	list_for_each_safe(pos, next, defer_list) {
+		page = list_entry((void *)pos, struct page, deferred_list);
+		page = compound_head(page);
+
+		if (!trylock_page(page))
+			continue;
+
+		if (split_huge_page(page)) {
+			unlock_page(page);
+			continue;
+		}
+		/* split_huge_page() removes page from list on success */
+		unlock_page(page);
+
+		/* corresponding get in deferred_split_huge_page. */
+		put_page(page);
+	}
+
+	/* Second iteration to putback failed pages. */
+	list_for_each_safe(pos, next, defer_list) {
+		struct deferred_split *ds_queue;
+		unsigned long flags;
+
+		page = list_entry((void *)pos, struct page, deferred_list);
+		page = compound_head(page);
+		ds_queue = get_deferred_split_queue(page);
+
+		spin_lock_irqsave(&ds_queue->split_queue_lock, flags);
+		list_move(page_deferred_list(page), &ds_queue->split_queue);
+		spin_unlock_irqrestore(&ds_queue->split_queue_lock, flags);
+
+		/* corresponding get in deferred_split_huge_page. */
+		put_page(page);
+	}
 }
 
 static unsigned long deferred_split_scan(struct shrinker *shrink,

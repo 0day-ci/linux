@@ -1412,6 +1412,10 @@ struct task_struct {
 	struct mem_cgroup		*active_memcg;
 #endif
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	struct list_head		*deferred_split_list;
+#endif
+
 #ifdef CONFIG_BLK_CGROUP
 	struct request_queue		*throttle_queue;
 #endif

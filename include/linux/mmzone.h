@@ -795,6 +795,11 @@ struct deferred_split {
 	struct list_head split_queue;
 	unsigned long split_queue_len;
 };
+void split_local_deferred_list(struct list_head *defer_list);
+#else
+static inline void split_local_deferred_list(struct list_head *defer_list)
+{
+}
 #endif
 
 /*

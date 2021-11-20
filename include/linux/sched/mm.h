@@ -374,6 +374,17 @@ set_active_memcg(struct mem_cgroup *memcg)
 }
 #endif
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+static inline void set_local_deferred_list(struct list_head *list)
+{
+	current->deferred_split_list = list;
+}
+#else
+static inline void set_local_deferred_list(struct list_head *list)
+{
+}
+#endif
+
 #ifdef CONFIG_MEMBARRIER
 enum {
 	MEMBARRIER_STATE_PRIVATE_EXPEDITED_READY		= (1U << 0),

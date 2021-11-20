@@ -762,7 +762,15 @@ static int madvise_free_single_vma(struct vm_area_struct *vma,
 static long madvise_dontneed_single_vma(struct vm_area_struct *vma,
 					unsigned long start, unsigned long end)
 {
+	LIST_HEAD(list);
+
+	set_local_deferred_list(&list);
+
 	zap_page_range(vma, start, end - start);
+
+	set_local_deferred_list(NULL);
+	split_local_deferred_list(&list);
+
 	return 0;
 }
 
