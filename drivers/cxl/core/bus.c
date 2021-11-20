@@ -187,6 +187,12 @@ static const struct attribute_group *cxl_decoder_switch_attribute_groups[] = {
 	NULL,
 };
 
+static const struct attribute_group *cxl_decoder_endpoint_attribute_groups[] = {
+	&cxl_decoder_base_attribute_group,
+	&cxl_base_attribute_group,
+	NULL,
+};
+
 static void cxl_decoder_release(struct device *dev)
 {
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);
@@ -195,6 +201,12 @@ static void cxl_decoder_release(struct device *dev)
 	ida_free(&port->decoder_ida, cxld->id);
 	kfree(cxld);
 }
+
+static const struct device_type cxl_decoder_endpoint_type = {
+	.name = "cxl_decoder_endpoint",
+	.release = cxl_decoder_release,
+	.groups = cxl_decoder_endpoint_attribute_groups,
+};
 
 static const struct device_type cxl_decoder_switch_type = {
 	.name = "cxl_decoder_switch",
@@ -207,6 +219,11 @@ static const struct device_type cxl_decoder_root_type = {
 	.release = cxl_decoder_release,
 	.groups = cxl_decoder_root_attribute_groups,
 };
+
+static bool is_endpoint_decoder(struct device *dev)
+{
+	return dev->type == &cxl_decoder_endpoint_type;
+}
 
 bool is_root_decoder(struct device *dev)
 {
@@ -499,7 +516,9 @@ out_unlock:
  * cxl_decoder_alloc - Allocate a new CXL decoder
  * @port: owning port of this decoder
  * @nr_targets: downstream targets accessible by this decoder. All upstream
- *		ports and root ports must have at least 1 target.
+ *		ports and root ports must have at least 1 target. Endpoint
+ *		devices will have 0 targets. Callers wishing to register an
+ *		endpoint device should specify 0.
  *
  * A port should contain one or more decoders. Each of those decoders enable
  * some address space for CXL.mem utilization. A decoder is expected to be
@@ -516,7 +535,7 @@ struct cxl_decoder *cxl_decoder_alloc(struct cxl_port *port,
 	struct device *dev;
 	int rc = 0;
 
-	if (nr_targets > CXL_DECODER_MAX_INTERLEAVE || nr_targets == 0)
+	if (nr_targets > CXL_DECODER_MAX_INTERLEAVE)
 		return ERR_PTR(-EINVAL);
 
 	cxld = kzalloc(struct_size(cxld, target, nr_targets), GFP_KERNEL);
@@ -535,8 +554,11 @@ struct cxl_decoder *cxl_decoder_alloc(struct cxl_port *port,
 	dev->parent = &port->dev;
 	dev->bus = &cxl_bus_type;
 
+	/* Endpoints don't have a target list */
+	if (nr_targets == 0)
+		dev->type = &cxl_decoder_endpoint_type;
 	/* root ports do not have a cxl_port_type parent */
-	if (port->dev.parent->type == &cxl_port_type)
+	else if (port->dev.parent->type == &cxl_port_type)
 		dev->type = &cxl_decoder_switch_type;
 	else
 		dev->type = &cxl_decoder_root_type;
@@ -579,12 +601,15 @@ int cxl_decoder_add(struct cxl_decoder *cxld, int *target_map)
 	if (cxld->interleave_ways < 1)
 		return -EINVAL;
 
-	port = to_cxl_port(cxld->dev.parent);
-	rc = decoder_populate_targets(cxld, port, target_map);
-	if (rc)
-		return rc;
-
 	dev = &cxld->dev;
+
+	port = to_cxl_port(cxld->dev.parent);
+	if (!is_endpoint_decoder(dev)) {
+		rc = decoder_populate_targets(cxld, port, target_map);
+		if (rc)
+			return rc;
+	}
+
 	rc = dev_set_name(dev, "decoder%d.%d", port->id, cxld->id);
 	if (rc)
 		return rc;
