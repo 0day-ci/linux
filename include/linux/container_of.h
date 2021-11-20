@@ -17,7 +17,7 @@
  *
  */
 #define container_of(ptr, type, member) ({				\
-	void *__mptr = (void *)(ptr);					\
+	const void *__mptr = (ptr);					\
 	static_assert(__same_type(*(ptr), memberof(type, member)) ||	\
 		      __same_type(*(ptr), void),			\
 		      "pointer type mismatch in container_of()");	\
