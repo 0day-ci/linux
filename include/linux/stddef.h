@@ -6,6 +6,7 @@
 #include <uapi/linux/stddef.h>
 
 #include <linux/offsetof.h>
+#include <linux/sizeof_field.h>
 
 
 #undef NULL
@@ -15,14 +16,6 @@ enum {
 	false	= 0,
 	true	= 1
 };
-
-/**
- * sizeof_field() - Report the size of a struct field in bytes
- *
- * @TYPE: The structure containing the field of interest
- * @MEMBER: The field to return the size of
- */
-#define sizeof_field(TYPE, MEMBER) sizeof((((TYPE *)0)->MEMBER))
 
 /**
  * offsetofend() - Report the offset of a struct field within the struct
