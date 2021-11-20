@@ -137,6 +137,34 @@ mount options.  It can be added later, when the tmpfs is already mounted
 on MountPoint, by 'mount -o remount,mpol=Policy:NodeList MountPoint'.
 
 
+If CONFIG_MEMCG is enabled, filesystems (including tmpfs) has a mount option to
+specify the memory cgroup to be charged for page allocations.
+
+memcg=/sys/fs/cgroup/unified/test/: data page allocations are charged to
+cgroup /sys/fs/cgroup/unified/test/.
+
+Only processes that have write access to
+/sys/fs/cgroup/unified/test/cgroup.procs can mount a tmpfs with
+memcg=/sys/fs/cgroup/unified/test. Thus, a process is able to charge memory to a
+cgroup only if it itself is able to enter that cgroup and allocate memory
+there. This is to prevent random processes from mounting filesystems in user
+namespaces and intentionally DoSing random cgroups running on the system.
+
+Once a mount point is created with memcg=, any process that has write access to
+this mount point is able to use this mount point and direct charges to the
+cgroup provided. Thus, it is important to limit write access to the mount point
+to the intended users if untrusted code is running on the machine. This is
+generally required regardless of whether the mount is done with memcg= or not.
+
+When charging memory to the remote memcg (memcg specified with memcg=) and
+hitting that memcg's limit, the oom-killer will be invoked (if enabled) and will
+attempt to kill a process in the remote memcg. If no killable processes are
+found, the remote charging process gets an ENOSPC error. If the remote charging
+process is in the pagefault path, it gets a SIGBUS signal. It's recommended
+that processes executing remote charges are able to handle a SIGBUS signal or
+ENOSPC error that may arise during executing the remote charges.
+
+
 To specify the initial root directory you can use the following mount
 options:
 
