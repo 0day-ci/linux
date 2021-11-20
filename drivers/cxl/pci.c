@@ -230,7 +230,7 @@ static int cxl_pci_mbox_get(struct cxl_dev_state *cxlds)
 	 * but it's possible early devices implemented this before the ECN.
 	 */
 	md_status = readq(cxlds->regs.memdev + CXLMDEV_STATUS_OFFSET);
-	if (!(md_status & CXLMDEV_MBOX_IF_READY && CXLMDEV_READY(md_status))) {
+	if (!(md_status & CXLMDEV_MBOX_IF_READY)) {
 		dev_err(dev, "mbox: reported doorbell ready, but not mbox ready\n");
 		rc = -EBUSY;
 		goto out;
