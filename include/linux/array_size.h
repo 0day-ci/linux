@@ -7,7 +7,9 @@
 
 
 /* &a[0] degrades to a pointer: a different type from an array */
-#define __must_be_array(a)  __must_be(!__same_type((a), &(a)[0]))
+#define __is_array(a)  (!__same_type((a), &(a)[0]))
+
+#define __must_be_array(a)  __must_be(__is_array(a))
 
 /**
  * ARRAY_SIZE - get the number of elements in array @a
