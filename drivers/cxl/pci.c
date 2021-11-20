@@ -182,6 +182,27 @@ static int __cxl_pci_mbox_send_cmd(struct cxl_dev_state *cxlds,
 	return 0;
 }
 
+/*
+ * Implements roughly the bottom half of Figure 42 of the CXL Type 3 Memory
+ * Device Software Guide
+ */
+static int check_device_status(struct cxl_dev_state *cxlds)
+{
+	const u64 md_status = readq(cxlds->regs.memdev + CXLMDEV_STATUS_OFFSET);
+
+	if (md_status & CXLMDEV_DEV_FATAL) {
+		dev_err(cxlds->dev, "Fatal: replace device\n");
+		return -EIO;
+	}
+
+	if (md_status & CXLMDEV_FW_HALT) {
+		dev_err(cxlds->dev, "FWHalt: reset or replace device\n");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 /**
  * cxl_pci_mbox_get() - Acquire exclusive access to the mailbox.
  * @cxlds: The device state to gain access to.
@@ -231,17 +252,13 @@ static int cxl_pci_mbox_get(struct cxl_dev_state *cxlds)
 	 * Hardware shouldn't allow a ready status but also have failure bits
 	 * set. Spit out an error, this should be a bug report
 	 */
-	rc = -EFAULT;
-	if (md_status & CXLMDEV_DEV_FATAL) {
-		dev_err(dev, "mbox: reported ready, but fatal\n");
+	rc = check_device_status(cxlds);
+	if (rc)
 		goto out;
-	}
-	if (md_status & CXLMDEV_FW_HALT) {
-		dev_err(dev, "mbox: reported ready, but halted\n");
-		goto out;
-	}
+
 	if (CXLMDEV_RESET_NEEDED(md_status)) {
 		dev_err(dev, "mbox: reported ready, but reset needed\n");
+		rc = -EFAULT;
 		goto out;
 	}
 
