@@ -9,7 +9,13 @@ hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu);
 
 __must_check static inline bool kvm_tdp_mmu_get_root(struct kvm_mmu_page *root)
 {
-	if (root->role.invalid)
+	/*
+	 * Acquiring a reference on an invalid root is a KVM bug.  Invalid roots
+	 * are supposed to be reachable only by references that were acquired
+	 * before the invalidation, and taking an additional reference to an
+	 * invalid root is not allowed.
+	 */
+	if (WARN_ON_ONCE(root->role.invalid))
 		return false;
 
 	return refcount_inc_not_zero(&root->tdp_mmu_root_count);
@@ -44,8 +50,10 @@ static inline bool kvm_tdp_mmu_zap_sp(struct kvm *kvm, struct kvm_mmu_page *sp)
 }
 
 void kvm_tdp_mmu_zap_all(struct kvm *kvm);
-void kvm_tdp_mmu_invalidate_all_roots(struct kvm *kvm);
-void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm);
+void kvm_tdp_mmu_invalidate_all_roots(struct kvm *kvm,
+				      struct list_head *invalidated_roots);
+void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm,
+				       struct list_head *invalidated_roots);
 
 int kvm_tdp_mmu_map(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault);
 
