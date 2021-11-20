@@ -1493,8 +1493,9 @@ static int sata_fsl_probe(struct platform_device *ofdev)
 	host_priv->ssr_base = ssr_base;
 	host_priv->csr_base = csr_base;
 
-	irq = irq_of_parse_and_map(ofdev->dev.of_node, 0);
-	if (!irq) {
+	irq = platform_get_irq(ofdev, 0);
+	if (irq < 0) {
+		retval = irq;
 		dev_err(&ofdev->dev, "invalid irq from platform\n");
 		goto error_exit_with_cleanup;
 	}
@@ -1569,8 +1570,6 @@ static int sata_fsl_remove(struct platform_device *ofdev)
 	device_remove_file(&ofdev->dev, &host_priv->rx_watermark);
 
 	ata_host_detach(host);
-
-	irq_dispose_mapping(host_priv->irq);
 
 	return 0;
 }
