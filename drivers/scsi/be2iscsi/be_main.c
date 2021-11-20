@@ -3947,7 +3947,8 @@ static int beiscsi_init_sgl_handle(struct beiscsi_hba *phba)
 	for (ulp_num = 0; ulp_num < BEISCSI_ULP_COUNT; ulp_num++)
 		if (test_bit(ulp_num, &phba->fw_config.ulp_supported))
 			break;
-
+	if (ulp_num >= BEISCSI_ULP_COUNT)
+		return -ENOMEM;
 	ulp_icd_start = phba->fw_config.iscsi_icd_start[ulp_num];
 
 	arr_index = 0;
