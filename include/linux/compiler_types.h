@@ -2,6 +2,10 @@
 #ifndef __LINUX_COMPILER_TYPES_H
 #define __LINUX_COMPILER_TYPES_H
 
+
+#include <linux/same_type.h>
+
+
 #ifndef __ASSEMBLY__
 
 #ifdef __CHECKER__
@@ -271,9 +275,6 @@ struct ftrace_likely_data {
 #else
 #define asm_inline asm
 #endif
-
-/* Are two types/vars the same type (ignoring qualifiers)? */
-#define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
 
 /*
  * __unqual_scalar_typeof(x) - Declare an unqualified scalar type, leaving
