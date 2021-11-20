@@ -16,12 +16,16 @@
  * @member:	the name of the member within the struct.
  *
  */
-#define container_of(ptr, type, member) ({				\
+#define container_of(ptr, type, member)  (				\
+{									\
 	const void *__mptr = (ptr);					\
+									\
 	static_assert(__same_type(*(ptr), memberof(type, member)) ||	\
 		      __same_type(*(ptr), void),			\
 		      "pointer type mismatch in container_of()");	\
-	((type *)(__mptr - offsetof(type, member))); })
+	((type *)(__mptr - offsetof(type, member)));			\
+}									\
+)
 
 /**
  * container_of_safe - cast a member of a structure out to the containing structure
