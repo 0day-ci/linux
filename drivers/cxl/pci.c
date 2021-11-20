@@ -496,6 +496,60 @@ static int wait_for_valid(struct cxl_dev_state *cxlds)
 	return valid ? 0 : -ETIMEDOUT;
 }
 
+/*
+ * Implements Figure 43 of the CXL Type 3 Memory Device Software Guide. Waits a
+ * full 256s no matter what the device reports.
+ */
+static int wait_for_media_ready(struct cxl_dev_state *cxlds)
+{
+	const unsigned long timeout = jiffies + (256 * HZ);
+	struct pci_dev *pdev = to_pci_dev(cxlds->dev);
+	u64 md_status;
+	bool active;
+	int rc;
+
+	rc = wait_for_valid(cxlds);
+	if (rc)
+		return rc;
+
+	do {
+		u64 size;
+		u32 temp;
+		int rc;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, 0, SIZE, HIGH),
+					   &temp);
+		if (rc)
+			return -ENXIO;
+		size = (u64)temp << 32;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, 0, SIZE, LOW),
+					   &temp);
+		if (rc)
+			return -ENXIO;
+		size |= temp & CXL_DVSEC_PCIE_DEVICE_MEM_SIZE_LOW_MASK;
+
+		active = FIELD_GET(CXL_DVSEC_PCIE_DEVICE_MEM_ACTIVE, temp);
+		if (active)
+			break;
+		cpu_relax();
+		mdelay(100);
+	} while (!time_after(jiffies, timeout));
+
+	if (!active)
+		return -ETIMEDOUT;
+
+	rc = check_device_status(cxlds);
+	if (rc)
+		return rc;
+
+	md_status = readq(cxlds->regs.memdev + CXLMDEV_STATUS_OFFSET);
+	if (!CXLMDEV_READY(md_status))
+		return -EIO;
+
+	return 0;
+}
+
 static struct cxl_endpoint_dvsec_info *dvsec_ranges(struct cxl_dev_state *cxlds)
 {
 	struct pci_dev *pdev = to_pci_dev(cxlds->dev);
@@ -598,6 +652,8 @@ static int cxl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!cxlds->device_dvsec)
 		dev_warn(&pdev->dev,
 			 "Device DVSEC not present. Expect limited functionality.\n");
+	else
+		cxlds->wait_media_ready = wait_for_media_ready;
 
 	rc = cxl_setup_regs(pdev, CXL_REGLOC_RBI_MEMDEV, &map);
 	if (rc)

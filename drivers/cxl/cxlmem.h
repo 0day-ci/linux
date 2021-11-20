@@ -167,6 +167,7 @@ struct cxl_dev_state {
 	struct cxl_endpoint_dvsec_info *info;
 
 	int (*mbox_send)(struct cxl_dev_state *cxlds, struct cxl_mbox_cmd *cmd);
+	int (*wait_media_ready)(struct cxl_dev_state *cxlds);
 };
 
 enum cxl_opcode {
