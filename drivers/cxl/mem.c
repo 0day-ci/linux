@@ -155,6 +155,11 @@ static int cxl_mem_probe(struct device *dev)
 		goto out;
 	}
 
+	/* FIXME: Add true switch support */
+	dev_err(dev, "Devices behind switches are currently unsupported\n");
+	rc = -ENODEV;
+	goto err_out;
+
 	/* Walk down from the root port and add all switches */
 	cxl_scan_ports(ctx.root_port);
 
