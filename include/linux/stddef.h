@@ -5,13 +5,11 @@
 
 #include <uapi/linux/stddef.h>
 
+#include <linux/NULL.h>
 #include <linux/offsetof.h>
 #include <linux/offsetofend.h>
 #include <linux/sizeof_field.h>
 
-
-#undef NULL
-#define NULL ((void *)0)
 
 enum {
 	false	= 0,
