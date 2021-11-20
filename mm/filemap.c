@@ -903,7 +903,7 @@ noinline int __filemap_add_folio(struct address_space *mapping,
 	folio->index = index;
 
 	if (!huge) {
-		error = mem_cgroup_charge(folio, NULL, gfp);
+		error = mem_cgroup_charge_mapping(folio, NULL, gfp, mapping);
 		VM_BUG_ON_FOLIO(index & (folio_nr_pages(folio) - 1), folio);
 		if (error)
 			goto error;

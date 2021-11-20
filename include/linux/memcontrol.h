@@ -27,6 +27,7 @@ struct obj_cgroup;
 struct page;
 struct mm_struct;
 struct kmem_cache;
+struct super_block;
 
 /* Cgroup-specific page state, on top of universal node page state */
 enum memcg_stat_item {
@@ -923,6 +924,15 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 	return !!(memcg->css.flags & CSS_ONLINE);
 }
 
+void mem_cgroup_set_charge_target(struct super_block *sb,
+				  struct mem_cgroup *memcg);
+
+int mem_cgroup_charge_mapping(struct folio *folio, struct mm_struct *mm,
+			      gfp_t gfp, struct address_space *mapping);
+
+struct mem_cgroup *mem_cgroup_get_from_path(const char *path);
+void mem_cgroup_put_name_in_seq(struct seq_file *seq, struct super_block *sb);
+
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 		int zid, int nr_pages);
 
@@ -1221,6 +1231,28 @@ static inline int mem_cgroup_charge(struct folio *folio,
 		struct mm_struct *mm, gfp_t gfp)
 {
 	return 0;
+}
+
+static inline void mem_cgroup_set_charge_target(struct super_block *sb,
+						struct mem_cgroup *memcg)
+{
+}
+
+static inline int mem_cgroup_charge_mapping(struct folio *folio,
+					    struct mm_struct *mm, gfp_t gfp,
+					    struct address_space *mapping)
+{
+	return 0;
+}
+
+static inline struct mem_cgroup *mem_cgroup_get_from_path(const char *path)
+{
+	return NULL;
+}
+
+static inline void mem_cgroup_put_name_in_seq(struct seq_file *seq,
+					      struct super_block *sb)
+{
 }
 
 static inline int mem_cgroup_swapin_charge_page(struct page *page,

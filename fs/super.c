@@ -24,6 +24,7 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
+#include <linux/memcontrol.h>
 #include <linux/mount.h>
 #include <linux/security.h>
 #include <linux/writeback.h>		/* for the emergency remount stuff */
@@ -180,6 +181,7 @@ static void destroy_unused_super(struct super_block *s)
 	up_write(&s->s_umount);
 	list_lru_destroy(&s->s_dentry_lru);
 	list_lru_destroy(&s->s_inode_lru);
+	mem_cgroup_set_charge_target(s, NULL);
 	security_sb_free(s);
 	put_user_ns(s->s_user_ns);
 	kfree(s->s_subtype);
@@ -292,6 +294,7 @@ static void __put_super(struct super_block *s)
 		WARN_ON(s->s_dentry_lru.node);
 		WARN_ON(s->s_inode_lru.node);
 		WARN_ON(!list_empty(&s->s_mounts));
+		mem_cgroup_set_charge_target(s, NULL);
 		security_sb_free(s);
 		fscrypt_sb_free(s);
 		put_user_ns(s->s_user_ns);
@@ -903,6 +906,9 @@ int reconfigure_super(struct fs_context *fc)
 				return retval;
 		}
 	}
+
+	if (fc->memcg)
+		mem_cgroup_set_charge_target(sb, fc->memcg);
 
 	if (fc->ops->reconfigure) {
 		retval = fc->ops->reconfigure(fc);
@@ -1527,6 +1533,9 @@ int vfs_get_tree(struct fs_context *fc)
 		fc_drop_locked(fc);
 		return error;
 	}
+
+	if (fc->memcg)
+		mem_cgroup_set_charge_target(sb, fc->memcg);
 
 	/*
 	 * filesystems should never set s_maxbytes larger than MAX_LFS_FILESIZE

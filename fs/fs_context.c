@@ -23,6 +23,7 @@
 #include <asm/sections.h>
 #include "mount.h"
 #include "internal.h"
+#include <linux/memcontrol.h>
 
 enum legacy_fs_param {
 	LEGACY_FS_UNSET_PARAMS,
@@ -108,6 +109,28 @@ int vfs_parse_fs_param_source(struct fs_context *fc, struct fs_parameter *param)
 }
 EXPORT_SYMBOL(vfs_parse_fs_param_source);
 
+static int parse_param_memcg(struct fs_context *fc, struct fs_parameter *param)
+{
+	struct mem_cgroup *memcg;
+
+	if (strcmp(param->key, "memcg") != 0)
+		return -ENOPARAM;
+
+	if (param->type != fs_value_is_string)
+		return invalf(fc, "Non-string source");
+
+	if (fc->memcg)
+		return invalf(fc, "Multiple memcgs specified");
+
+	memcg = mem_cgroup_get_from_path(param->string);
+	if (IS_ERR(memcg))
+		return invalf(fc, "Bad value for memcg");
+
+	fc->memcg = memcg;
+	param->string = NULL;
+	return 0;
+}
+
 /**
  * vfs_parse_fs_param - Add a single parameter to a superblock config
  * @fc: The filesystem context to modify
@@ -147,6 +170,10 @@ int vfs_parse_fs_param(struct fs_context *fc, struct fs_parameter *param)
 		if (ret != -ENOPARAM)
 			return ret;
 	}
+
+	ret = parse_param_memcg(fc, param);
+	if (ret != -ENOPARAM)
+		return ret;
 
 	/* If the filesystem doesn't take any arguments, give it the
 	 * default handling of source.

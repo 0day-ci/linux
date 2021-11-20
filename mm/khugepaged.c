@@ -1661,7 +1661,8 @@ static void collapse_file(struct mm_struct *mm,
 		goto out;
 	}
 
-	if (unlikely(mem_cgroup_charge(page_folio(new_page), mm, gfp))) {
+	if (unlikely(mem_cgroup_charge_mapping(page_folio(new_page), mm, gfp,
+					       mapping))) {
 		result = SCAN_CGROUP_CHARGE_FAIL;
 		goto out;
 	}
