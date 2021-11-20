@@ -1430,12 +1430,25 @@ static struct ata_port_operations sata_fsl_ops = {
 	.pmp_detach = sata_fsl_pmp_detach,
 };
 
+static void sata_fsl_host_stop(struct ata_host *host)
+{
+	struct sata_fsl_host_priv *host_priv = host->private_data;
+
+	iounmap(host_priv->hcr_base);
+	kfree(host_priv);
+}
+
+static struct ata_port_operations sata_fsl_platform_ops = {
+	.inherits       = &sata_fsl_ops,
+	.host_stop      = sata_fsl_host_stop,
+};
+
 static const struct ata_port_info sata_fsl_port_info[] = {
 	{
 	 .flags = SATA_FSL_HOST_FLAGS,
 	 .pio_mask = ATA_PIO4,
 	 .udma_mask = ATA_UDMA6,
-	 .port_ops = &sata_fsl_ops,
+	 .port_ops = &sata_fsl_platform_ops,
 	 },
 };
 
@@ -1558,8 +1571,6 @@ static int sata_fsl_remove(struct platform_device *ofdev)
 	ata_host_detach(host);
 
 	irq_dispose_mapping(host_priv->irq);
-	iounmap(host_priv->hcr_base);
-	kfree(host_priv);
 
 	return 0;
 }
