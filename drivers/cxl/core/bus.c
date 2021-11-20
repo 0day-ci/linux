@@ -26,6 +26,8 @@
 
 static DEFINE_IDA(cxl_port_ida);
 static DECLARE_RWSEM(topology_host_sem);
+static LIST_HEAD(cxl_root_ports);
+static DECLARE_RWSEM(root_port_sem);
 
 static struct device *cxl_topology_host;
 
@@ -326,12 +328,31 @@ struct cxl_port *to_cxl_port(struct device *dev)
 	return container_of(dev, struct cxl_port, dev);
 }
 
+struct cxl_dport *cxl_get_root_dport(struct device *dev)
+{
+	struct cxl_dport *ret = NULL;
+	struct cxl_dport *dport;
+
+	down_read(&root_port_sem);
+	list_for_each_entry(dport, &cxl_root_ports, root_port_link) {
+		if (dport->dport == dev) {
+			ret = dport;
+			break;
+		}
+	}
+
+	up_read(&root_port_sem);
+	return ret;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_get_root_dport, CXL);
+
 static void unregister_port(void *_port)
 {
 	struct cxl_port *port = _port;
 	struct cxl_dport *dport;
 
 	device_lock(&port->dev);
+	down_read(&root_port_sem);
 	list_for_each_entry(dport, &port->dports, list) {
 		char link_name[CXL_TARGET_STRLEN];
 
@@ -339,7 +360,10 @@ static void unregister_port(void *_port)
 			     dport->port_id) >= CXL_TARGET_STRLEN)
 			continue;
 		sysfs_remove_link(&port->dev.kobj, link_name);
+
+		list_del_init(&dport->root_port_link);
 	}
+	up_read(&root_port_sem);
 	device_unlock(&port->dev);
 	device_unregister(&port->dev);
 }
@@ -493,12 +517,13 @@ static int add_dport(struct cxl_port *port, struct cxl_dport *new)
  * @dport_dev: firmware or PCI device representing the dport
  * @port_id: identifier for this dport in a decoder's target list
  * @component_reg_phys: optional location of CXL component registers
+ * @root_port: is this a root port (hostbridge downstream)
  *
  * Note that all allocations and links are undone by cxl_port deletion
  * and release.
  */
 int cxl_add_dport(struct cxl_port *port, struct device *dport_dev, int port_id,
-		  resource_size_t component_reg_phys)
+		  resource_size_t component_reg_phys, bool root_port)
 {
 	char link_name[CXL_TARGET_STRLEN];
 	struct cxl_dport *dport;
@@ -513,6 +538,7 @@ int cxl_add_dport(struct cxl_port *port, struct device *dport_dev, int port_id,
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&dport->list);
+	INIT_LIST_HEAD(&dport->root_port_link);
 	dport->dport = get_device(dport_dev);
 	dport->port_id = port_id;
 	dport->component_reg_phys = component_reg_phys;
@@ -525,6 +551,12 @@ int cxl_add_dport(struct cxl_port *port, struct device *dport_dev, int port_id,
 	rc = sysfs_create_link(&port->dev.kobj, &dport_dev->kobj, link_name);
 	if (rc)
 		goto err;
+
+	if (root_port) {
+		down_write(&root_port_sem);
+		list_add_tail(&dport->root_port_link, &cxl_root_ports);
+		up_write(&root_port_sem);
+	}
 
 	return 0;
 err:

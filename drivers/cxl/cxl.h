@@ -272,6 +272,7 @@ struct cxl_port {
  * @component_reg_phys: downstream port component registers
  * @port: reference to cxl_port that contains this downstream port
  * @list: node for a cxl_port's list of cxl_dport instances
+ * @root_port_link: node for global list of root ports
  */
 struct cxl_dport {
 	struct device *dport;
@@ -279,6 +280,7 @@ struct cxl_dport {
 	resource_size_t component_reg_phys;
 	struct cxl_port *port;
 	struct list_head list;
+	struct list_head root_port_link;
 };
 
 struct cxl_port *to_cxl_port(struct device *dev);
@@ -287,7 +289,8 @@ struct cxl_port *devm_cxl_add_port(struct device *uport,
 				   struct cxl_port *parent_port);
 
 int cxl_add_dport(struct cxl_port *port, struct device *dport, int port_id,
-		  resource_size_t component_reg_phys);
+		  resource_size_t component_reg_phys, bool root_port);
+struct cxl_dport *cxl_get_root_dport(struct device *dev);
 
 struct cxl_decoder *to_cxl_decoder(struct device *dev);
 bool is_root_decoder(struct device *dev);

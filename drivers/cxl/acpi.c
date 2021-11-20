@@ -159,7 +159,7 @@ __mock int match_add_root_ports(struct pci_dev *pdev, void *data)
 		creg = cxl_reg_block(pdev, &map);
 
 	port_num = FIELD_GET(PCI_EXP_LNKCAP_PN, lnkcap);
-	rc = cxl_add_dport(port, &pdev->dev, port_num, creg);
+	rc = cxl_add_dport(port, &pdev->dev, port_num, creg, true);
 	if (rc) {
 		ctx->error = rc;
 		return rc;
@@ -341,7 +341,7 @@ static int add_host_bridge_dport(struct device *match, void *arg)
 		return 0;
 	}
 
-	rc = cxl_add_dport(root_port, match, uid, ctx.chbcr);
+	rc = cxl_add_dport(root_port, match, uid, ctx.chbcr, false);
 	if (rc) {
 		dev_err(host, "failed to add downstream port: %s\n",
 			dev_name(match));
