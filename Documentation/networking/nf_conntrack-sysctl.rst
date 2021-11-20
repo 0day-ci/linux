@@ -207,3 +207,7 @@ nf_flowtable_udp_timeout - INTEGER (seconds)
         Control offload timeout for udp connections.
         UDP connections may be offloaded from nf conntrack to nf flow table.
         Once aged, the connection is returned to nf conntrack with udp pickup timeout.
+
+nf_conntrack_gc_scan_intervaL - INTEGER (seconds)
+	default 120
+	minimum 1
