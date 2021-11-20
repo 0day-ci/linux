@@ -151,22 +151,21 @@ struct bdaddr_list_with_irk {
 	u8 local_irk[16];
 };
 
+enum hci_conn_flags {
+	HCI_CONN_FLAG_REMOTE_WAKEUP,
+
+	__HCI_CONN_NUM_FLAGS,
+};
+
+/* Make sure number of flags doesn't exceed sizeof(current_flags) */
+static_assert(__HCI_CONN_NUM_FLAGS < 32);
+
 struct bdaddr_list_with_flags {
 	struct list_head list;
 	bdaddr_t bdaddr;
 	u8 bdaddr_type;
-	u32 current_flags;
+	DECLARE_BITMAP(flags, __HCI_CONN_NUM_FLAGS);
 };
-
-enum hci_conn_flags {
-	HCI_CONN_FLAG_REMOTE_WAKEUP,
-	HCI_CONN_FLAG_MAX
-};
-
-#define hci_conn_test_flag(nr, flags) ((flags) & (1U << nr))
-
-/* Make sure number of flags doesn't exceed sizeof(current_flags) */
-static_assert(HCI_CONN_FLAG_MAX < 32);
 
 struct bt_uuid {
 	struct list_head list;
@@ -559,6 +558,7 @@ struct hci_dev {
 	struct rfkill		*rfkill;
 
 	DECLARE_BITMAP(dev_flags, __HCI_NUM_FLAGS);
+	DECLARE_BITMAP(conn_flags, __HCI_CONN_NUM_FLAGS);
 
 	__s8			adv_tx_power;
 	__u8			adv_data[HCI_MAX_EXT_AD_LENGTH];
@@ -754,7 +754,7 @@ struct hci_conn_params {
 
 	struct hci_conn *conn;
 	bool explicit_connect;
-	u32 current_flags;
+	DECLARE_BITMAP(flags, __HCI_CONN_NUM_FLAGS);
 };
 
 extern struct list_head hci_dev_list;
@@ -762,13 +762,20 @@ extern struct list_head hci_cb_list;
 extern rwlock_t hci_dev_list_lock;
 extern struct mutex hci_cb_list_lock;
 
-#define hci_dev_set_flag(hdev, nr)             set_bit((nr), (hdev)->dev_flags)
-#define hci_dev_clear_flag(hdev, nr)           clear_bit((nr), (hdev)->dev_flags)
-#define hci_dev_change_flag(hdev, nr)          change_bit((nr), (hdev)->dev_flags)
-#define hci_dev_test_flag(hdev, nr)            test_bit((nr), (hdev)->dev_flags)
-#define hci_dev_test_and_set_flag(hdev, nr)    test_and_set_bit((nr), (hdev)->dev_flags)
-#define hci_dev_test_and_clear_flag(hdev, nr)  test_and_clear_bit((nr), (hdev)->dev_flags)
-#define hci_dev_test_and_change_flag(hdev, nr) test_and_change_bit((nr), (hdev)->dev_flags)
+#define hci_dev_set_flag(hdev, nr) \
+	set_bit((nr), (hdev)->dev_flags)
+#define hci_dev_clear_flag(hdev, nr) \
+	clear_bit((nr), (hdev)->dev_flags)
+#define hci_dev_change_flag(hdev, nr) \
+	change_bit((nr), (hdev)->dev_flags)
+#define hci_dev_test_flag(hdev, nr) \
+	test_bit((nr), (hdev)->dev_flags)
+#define hci_dev_test_and_set_flag(hdev, nr) \
+	test_and_set_bit((nr), (hdev)->dev_flags)
+#define hci_dev_test_and_clear_flag(hdev, nr) \
+	test_and_clear_bit((nr), (hdev)->dev_flags)
+#define hci_dev_test_and_change_flag(hdev, nr) \
+	test_and_change_bit((nr), (hdev)->dev_flags)
 
 #define hci_dev_clear_volatile_flags(hdev)			\
 	do {							\
@@ -1464,6 +1471,9 @@ void hci_conn_del_sysfs(struct hci_conn *conn);
 /* Use LL Privacy based address resolution if supported */
 #define use_ll_privacy(dev) (ll_privacy_capable(dev) && \
 			     hci_dev_test_flag(dev, HCI_ENABLE_LL_PRIVACY))
+
+#define privacy_mode_capable(dev) (use_ll_privacy(dev) && \
+				   (hdev->commands[39] & 0x04))
 
 /* Use enhanced synchronous connection if command is supported */
 #define enhanced_sco_capable(dev) ((dev)->commands[29] & 0x08)
