@@ -79,11 +79,18 @@ static void tdp_mmu_free_sp_rcu_callback(struct rcu_head *head)
 	tdp_mmu_free_sp(sp);
 }
 
+static bool tdp_mmu_zap_root(struct kvm *kvm, struct kvm_mmu_page *root,
+			     bool shared)
+{
+	return zap_gfn_range(kvm, root, 0, -1ull, true, false, shared);
+}
+
 /*
  * Note, putting a root might sleep, i.e. the caller must have IRQs enabled and
  * must not explicitly disable preemption (it will be disabled by virtue of
  * holding mmu_lock, hence the lack of a might_sleep()).
  */
+
 void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 			  bool shared)
 {
@@ -118,7 +125,7 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 	 * should have been zapped by kvm_tdp_mmu_zap_invalidated_roots(), and
 	 * inserting new SPTEs under an invalid root is a KVM bug.
 	 */
-	if (zap_gfn_range(kvm, root, 0, -1ull, true, false, shared))
+	if (tdp_mmu_zap_root(kvm, root, shared))
 		WARN_ON_ONCE(root->role.invalid);
 
 	call_rcu(&root->rcu_head, tdp_mmu_free_sp_rcu_callback);
@@ -923,7 +930,7 @@ void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm,
 		 * will still flush on yield, but that's a minor performance
 		 * blip and not a functional issue.
 		 */
-		(void)zap_gfn_range(kvm, root, 0, -1ull, true, false, true);
+		(void)tdp_mmu_zap_root(kvm, root, true);
 		kvm_tdp_mmu_put_root(kvm, root, true);
 	}
 }
