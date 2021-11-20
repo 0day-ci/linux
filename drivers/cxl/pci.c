@@ -2,6 +2,7 @@
 /* Copyright(c) 2020 Intel Corporation. All rights reserved. */
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/sizes.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
@@ -298,6 +299,34 @@ static int cxl_pci_mbox_send(struct cxl_dev_state *cxlds, struct cxl_mbox_cmd *c
 static int cxl_pci_setup_mailbox(struct cxl_dev_state *cxlds)
 {
 	const int cap = readl(cxlds->regs.mbox + CXLDEV_MBOX_CAPS_OFFSET);
+	unsigned long timeout;
+	u64 md_status;
+	int rc;
+
+	/*
+	 * CXL 2.0 ECN "Add Mailbox Ready Time" defines a capability field to
+	 * dictate how long to wait for the mailbox to become ready. For
+	 * simplicity, and to handle devices that might have been implemented
+	 * prior to the ECN, wait the max amount of time no matter what the
+	 * device says.
+	 */
+	timeout = jiffies + 256 * HZ;
+
+	rc = check_device_status(cxlds);
+	if (rc)
+		return rc;
+
+	do {
+		md_status = readq(cxlds->regs.memdev + CXLMDEV_STATUS_OFFSET);
+		if (md_status & CXLMDEV_MBOX_IF_READY)
+			break;
+		if (msleep_interruptible(100))
+			break;
+	} while (!time_after(jiffies, timeout));
+
+	/* It's assumed that once the interface is ready, it will remain ready. */
+	if (!(md_status & CXLMDEV_MBOX_IF_READY))
+		return -EIO;
 
 	cxlds->mbox_send = cxl_pci_mbox_send;
 	cxlds->payload_size =
