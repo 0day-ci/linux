@@ -452,8 +452,126 @@ static int cxl_setup_regs(struct pci_dev *pdev, enum cxl_regloc_type type,
 	return rc;
 }
 
+#define CDPD(cxlds, which)                                                     \
+	cxlds->device_dvsec + CXL_DVSEC_PCIE_DEVICE_##which##_OFFSET
+
+#define CDPDR(cxlds, which, sorb, lohi)                                        \
+	cxlds->device_dvsec +                                                  \
+		CXL_DVSEC_PCIE_DEVICE_RANGE_##sorb##_##lohi##_OFFSET(which)
+
+static int wait_for_valid(struct cxl_dev_state *cxlds)
+{
+	struct pci_dev *pdev = to_pci_dev(cxlds->dev);
+	const unsigned long timeout = jiffies + HZ;
+	bool valid;
+
+	do {
+		u64 size;
+		u32 temp;
+		int rc;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, 0, SIZE, HIGH),
+					   &temp);
+		if (rc)
+			return -ENXIO;
+		size = (u64)temp << 32;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, 0, SIZE, LOW),
+					   &temp);
+		if (rc)
+			return -ENXIO;
+		size |= temp & CXL_DVSEC_PCIE_DEVICE_MEM_SIZE_LOW_MASK;
+
+		/*
+		 * Memory_Info_Valid: When set, indicates that the CXL Range 1
+		 * Size high and Size Low registers are valid. Must be set
+		 * within 1 second of deassertion of reset to CXL device.
+		 */
+		valid = FIELD_GET(CXL_DVSEC_PCIE_DEVICE_MEM_INFO_VALID, temp);
+		if (valid)
+			break;
+		cpu_relax();
+	} while (!time_after(jiffies, timeout));
+
+	return valid ? 0 : -ETIMEDOUT;
+}
+
+static struct cxl_endpoint_dvsec_info *dvsec_ranges(struct cxl_dev_state *cxlds)
+{
+	struct pci_dev *pdev = to_pci_dev(cxlds->dev);
+	struct cxl_endpoint_dvsec_info *info;
+	int hdm_count, rc, i;
+	u16 cap, ctrl;
+
+	rc = pci_read_config_word(pdev, CDPD(cxlds, CAP), &cap);
+	if (rc)
+		return ERR_PTR(-ENXIO);
+	rc = pci_read_config_word(pdev, CDPD(cxlds, CTRL), &ctrl);
+	if (rc)
+		return ERR_PTR(-ENXIO);
+
+	if (!(cap & CXL_DVSEC_PCIE_DEVICE_MEM_CAPABLE))
+		return ERR_PTR(-ENODEV);
+
+	/*
+	 * It is not allowed by spec for MEM.capable to be set and have 0 HDM
+	 * decoders. Therefore, the device is not considered CXL.mem capable.
+	 */
+	hdm_count = FIELD_GET(CXL_DVSEC_PCIE_DEVICE_HDM_COUNT_MASK, cap);
+	if (!hdm_count || hdm_count > 2)
+		return ERR_PTR(-EINVAL);
+
+	rc = wait_for_valid(cxlds);
+	if (rc)
+		return ERR_PTR(rc);
+
+	info = devm_kzalloc(cxlds->dev, sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return ERR_PTR(-ENOMEM);
+
+	info->mem_enabled = FIELD_GET(CXL_DVSEC_PCIE_DEVICE_MEM_ENABLE, ctrl);
+
+	for (i = 0; i < hdm_count; i++) {
+		u64 base, size;
+		u32 temp;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, i, SIZE, HIGH),
+					   &temp);
+		if (rc)
+			continue;
+		size = (u64)temp << 32;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, i, SIZE, LOW),
+					   &temp);
+		if (rc)
+			continue;
+		size |= temp & CXL_DVSEC_PCIE_DEVICE_MEM_SIZE_LOW_MASK;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, i, BASE, HIGH),
+					   &temp);
+		if (rc)
+			continue;
+		base = (u64)temp << 32;
+
+		rc = pci_read_config_dword(pdev, CDPDR(cxlds, i, BASE, LOW),
+					   &temp);
+		if (rc)
+			continue;
+		base |= temp & CXL_DVSEC_PCIE_DEVICE_MEM_BASE_LOW_MASK;
+
+		info->range[i].base = base;
+		info->range[i].size = size;
+		info->ranges++;
+	}
+
+	return info;
+}
+
+#undef CDPDR
+
 static int cxl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
+	struct cxl_endpoint_dvsec_info *info;
 	struct cxl_register_map map;
 	struct cxl_memdev *cxlmd;
 	struct cxl_dev_state *cxlds;
@@ -504,6 +622,14 @@ static int cxl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	rc = cxl_mem_create_range_info(cxlds);
 	if (rc)
 		return rc;
+
+	info = dvsec_ranges(cxlds);
+	if (IS_ERR(info))
+		dev_err(&pdev->dev,
+			"Failed to get DVSEC range information (%ld)\n",
+			PTR_ERR(info));
+	else
+		cxlds->info = info;
 
 	cxlmd = devm_cxl_add_memdev(cxlds);
 	if (IS_ERR(cxlmd))
