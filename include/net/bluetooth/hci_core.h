@@ -153,6 +153,7 @@ struct bdaddr_list_with_irk {
 
 enum hci_conn_flags {
 	HCI_CONN_FLAG_REMOTE_WAKEUP,
+	HCI_CONN_FLAG_DEVICE_PRIVACY,
 
 	__HCI_CONN_NUM_FLAGS,
 };
