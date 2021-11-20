@@ -433,9 +433,6 @@ static void handle_removed_tdp_mmu_page(struct kvm *kvm, tdp_ptep_t pt,
 				    shared);
 	}
 
-	kvm_flush_remote_tlbs_with_address(kvm, base_gfn,
-					   KVM_PAGES_PER_HPAGE(level + 1));
-
 	call_rcu(&sp->rcu_head, tdp_mmu_free_sp_rcu_callback);
 }
 
@@ -815,20 +812,13 @@ retry:
 
 bool kvm_tdp_mmu_zap_sp(struct kvm *kvm, struct kvm_mmu_page *sp)
 {
-	u64 old_spte;
+	u64 old_spte = kvm_tdp_mmu_read_spte(sp->ptep);
 
-	rcu_read_lock();
-
-	old_spte = kvm_tdp_mmu_read_spte(sp->ptep);
-	if (WARN_ON_ONCE(!is_shadow_present_pte(old_spte))) {
-		rcu_read_unlock();
+	if (WARN_ON_ONCE(!is_shadow_present_pte(old_spte)))
 		return false;
-	}
 
 	__tdp_mmu_set_spte(kvm, kvm_mmu_page_as_id(sp), sp->ptep, old_spte, 0,
 			   sp->gfn, sp->role.level + 1, true, true);
-
-	rcu_read_unlock();
 
 	return true;
 }
@@ -871,6 +861,11 @@ static bool tdp_mmu_zap_leafs(struct kvm *kvm, struct kvm_mmu_page *root,
 	}
 
 	rcu_read_unlock();
+
+	/*
+	 * Because this flows zaps _only_ leaf SPTEs, the caller doesn't need
+	 * to provide RCU protection as no 'struct kvm_mmu_page' will be freed.
+	 */
 	return flush;
 }
 
@@ -1011,6 +1006,10 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 		ret = RET_PF_SPURIOUS;
 	else if (!tdp_mmu_set_spte_atomic(vcpu->kvm, iter, new_spte))
 		return RET_PF_RETRY;
+	else if (is_shadow_present_pte(iter->old_spte) &&
+		 !is_last_spte(iter->old_spte, iter->level))
+		kvm_flush_remote_tlbs_with_address(vcpu->kvm, sp->gfn,
+						   KVM_PAGES_PER_HPAGE(iter->level + 1));
 
 	/*
 	 * If the page fault was caused by a write but the page is write
