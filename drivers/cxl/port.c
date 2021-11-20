@@ -233,12 +233,64 @@ static int enumerate_hdm_decoders(struct cxl_port *port,
 	return 0;
 }
 
+/*
+ * Per the CXL specification (8.2.5.12 CXL HDM Decoder Capability Structure)
+ * single ported host-bridges need not publish a decoder capability when a
+ * passthrough decode can be assumed, i.e. all transactions that the uport sees
+ * are claimed and passed to the single dport. Disable the range until the first
+ * CXL region is enumerated / activated.
+ */
+static int add_passthrough_decoder(struct cxl_port *port)
+{
+	int single_port_map[1], rc;
+	struct cxl_decoder *cxld;
+	struct cxl_dport *dport;
+
+	device_lock_assert(&port->dev);
+
+	cxld = cxl_decoder_alloc(port, 1);
+	if (IS_ERR(cxld))
+		return PTR_ERR(cxld);
+
+	cxld->interleave_ways = 1;
+	cxld->interleave_granularity = PAGE_SIZE;
+	cxld->target_type = CXL_DECODER_EXPANDER;
+	cxld->platform_res = (struct resource)DEFINE_RES_MEM(0, 0);
+
+	dport = list_first_entry(&port->dports, typeof(*dport), list);
+	single_port_map[0] = dport->port_id;
+
+	rc = cxl_decoder_add_locked(cxld, single_port_map);
+	if (rc)
+		put_device(&cxld->dev);
+	else
+		rc = cxl_decoder_autoremove(&port->dev, cxld);
+
+	if (rc == 0)
+		dev_dbg(&port->dev, "add: %s\n", dev_name(&cxld->dev));
+
+	return rc;
+}
+
 static int cxl_port_probe(struct device *dev)
 {
 	struct cxl_port *port = to_cxl_port(dev);
 	struct cxl_port_data *portdata;
 	void __iomem *crb;
-	int rc;
+	int rc = 0;
+
+	if (list_is_singular(&port->dports)) {
+		struct device *host_dev = get_cxl_topology_host();
+
+		/*
+		 * Root ports (single host bridge downstream) are handled by
+		 * platform driver
+		 */
+		if (port->uport != host_dev)
+			rc = add_passthrough_decoder(port);
+		put_cxl_topology_host(host_dev);
+		return rc;
+	}
 
 	if (port->component_reg_phys == CXL_RESOURCE_NONE)
 		return 0;

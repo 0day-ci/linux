@@ -170,6 +170,8 @@ void __iomem *devm_cxl_iomap_block(struct device *dev, resource_size_t addr,
 
 int cxl_register_topology_host(struct device *host);
 void cxl_unregister_topology_host(struct device *host);
+struct device *get_cxl_topology_host(void);
+void put_cxl_topology_host(struct device *dev);
 
 /*
  * cxl_decoder flags that define the type of memory / devices this

@@ -210,8 +210,6 @@ static int add_host_bridge_uport(struct device *match, void *arg)
 	struct acpi_device *bridge = to_cxl_host_bridge(host, match);
 	struct acpi_pci_root *pci_root;
 	struct cxl_walk_context ctx;
-	int single_port_map[1], rc;
-	struct cxl_decoder *cxld;
 	struct cxl_dport *dport;
 	struct cxl_port *port;
 
@@ -245,43 +243,9 @@ static int add_host_bridge_uport(struct device *match, void *arg)
 		return -ENODEV;
 	if (ctx.error)
 		return ctx.error;
-	if (ctx.count > 1)
-		return 0;
 
-	/* TODO: Scan CHBCR for HDM Decoder resources */
-
-	/*
-	 * Per the CXL specification (8.2.5.12 CXL HDM Decoder Capability
-	 * Structure) single ported host-bridges need not publish a decoder
-	 * capability when a passthrough decode can be assumed, i.e. all
-	 * transactions that the uport sees are claimed and passed to the single
-	 * dport. Disable the range until the first CXL region is enumerated /
-	 * activated.
-	 */
-	cxld = cxl_decoder_alloc(port, 1);
-	if (IS_ERR(cxld))
-		return PTR_ERR(cxld);
-
-	cxld->interleave_ways = 1;
-	cxld->interleave_granularity = PAGE_SIZE;
-	cxld->target_type = CXL_DECODER_EXPANDER;
-	cxld->platform_res = (struct resource)DEFINE_RES_MEM(0, 0);
-
-	device_lock(&port->dev);
-	dport = list_first_entry(&port->dports, typeof(*dport), list);
-	device_unlock(&port->dev);
-
-	single_port_map[0] = dport->port_id;
-
-	rc = cxl_decoder_add(cxld, single_port_map);
-	if (rc)
-		put_device(&cxld->dev);
-	else
-		rc = cxl_decoder_autoremove(host, cxld);
-
-	if (rc == 0)
-		dev_dbg(host, "add: %s\n", dev_name(&cxld->dev));
-	return rc;
+	/* Host bridge ports are enumerated by the port driver. */
+	return 0;
 }
 
 struct cxl_chbs_context {
@@ -448,3 +412,4 @@ module_platform_driver(cxl_acpi_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_IMPORT_NS(CXL);
 MODULE_IMPORT_NS(ACPI);
+MODULE_SOFTDEP("pre: cxl_port");

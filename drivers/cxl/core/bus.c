@@ -62,7 +62,7 @@ void cxl_unregister_topology_host(struct device *host)
 }
 EXPORT_SYMBOL_NS_GPL(cxl_unregister_topology_host, CXL);
 
-static struct device *get_cxl_topology_host(void)
+struct device *get_cxl_topology_host(void)
 {
 	down_read(&topology_host_sem);
 	if (cxl_topology_host)
@@ -70,12 +70,14 @@ static struct device *get_cxl_topology_host(void)
 	up_read(&topology_host_sem);
 	return NULL;
 }
+EXPORT_SYMBOL_NS_GPL(get_cxl_topology_host, CXL);
 
-static void put_cxl_topology_host(struct device *dev)
+void put_cxl_topology_host(struct device *dev)
 {
 	WARN_ON(dev != cxl_topology_host);
 	up_read(&topology_host_sem);
 }
+EXPORT_SYMBOL_NS_GPL(put_cxl_topology_host, CXL);
 
 static int decoder_match(struct device *dev, void *data)
 {
