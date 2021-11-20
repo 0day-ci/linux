@@ -30,11 +30,15 @@
 #include <linux/time64.h>
 
 #define DATASIZE 100
+#define GROUPS_NUM 10
+#define FD_NUM 20
 
 static bool use_pipes = false;
 static unsigned int nr_loops = 100;
 static bool thread_mode = false;
-static unsigned int num_groups = 10;
+static unsigned int num_groups = GROUPS_NUM;
+static unsigned int num_fds = FD_NUM;
+static unsigned int total_counter; /* num_groups * num_fds */
 
 struct sender_context {
 	unsigned int num_fds;
@@ -49,6 +53,9 @@ struct receiver_context {
 	int ready_out;
 	int wakefd;
 };
+
+struct receiver_context *ctx_arr[FD_NUM*GROUPS_NUM];
+struct sender_context *snd_ctx_arr[FD_NUM*GROUPS_NUM];
 
 static void fdpair(int fds[2])
 {
@@ -190,29 +197,30 @@ static void reap_worker(pthread_t id)
 
 /* One group of senders and receivers */
 static unsigned int group(pthread_t *pth,
-		unsigned int num_fds,
+		unsigned int num_fd,
 		int ready_out,
 		int wakefd)
 {
 	unsigned int i;
 	struct sender_context *snd_ctx = malloc(sizeof(struct sender_context)
-			+ num_fds * sizeof(int));
+			+ num_fd * sizeof(int));
 
 	if (!snd_ctx)
 		err(EXIT_FAILURE, "malloc()");
 
-	for (i = 0; i < num_fds; i++) {
+	for (i = 0; i < num_fd; i++) {
 		int fds[2];
 		struct receiver_context *ctx = malloc(sizeof(*ctx));
 
 		if (!ctx)
 			err(EXIT_FAILURE, "malloc()");
 
+		total_counter++;
 
 		/* Create the pipe between client and server */
 		fdpair(fds);
 
-		ctx->num_packets = num_fds * nr_loops;
+		ctx->num_packets = num_fd * nr_loops;
 		ctx->in_fds[0] = fds[0];
 		ctx->in_fds[1] = fds[1];
 		ctx->ready_out = ready_out;
@@ -223,24 +231,28 @@ static unsigned int group(pthread_t *pth,
 		snd_ctx->out_fds[i] = fds[1];
 		if (!thread_mode)
 			close(fds[0]);
+
+		ctx_arr[total_counter] = ctx;
 	}
 
 	/* Now we have all the fds, fork the senders */
-	for (i = 0; i < num_fds; i++) {
+	for (i = 0; i < num_fd; i++) {
 		snd_ctx->ready_out = ready_out;
 		snd_ctx->wakefd = wakefd;
-		snd_ctx->num_fds = num_fds;
+		snd_ctx->num_fds = num_fd;
 
-		pth[num_fds+i] = create_worker(snd_ctx, (void *)sender);
+		pth[num_fd+i] = create_worker(snd_ctx, (void *)sender);
 	}
 
 	/* Close the fds we have left */
 	if (!thread_mode)
-		for (i = 0; i < num_fds; i++)
+		for (i = 0; i < num_fd; i++)
 			close(snd_ctx->out_fds[i]);
 
+	snd_ctx_arr[total_counter] = snd_ctx;
+
 	/* Return number of children to reap */
-	return num_fds * 2;
+	return num_fd * 2;
 }
 
 static const struct option options[] = {
@@ -262,7 +274,6 @@ int bench_sched_messaging(int argc, const char **argv)
 {
 	unsigned int i, total_children;
 	struct timeval start, stop, diff;
-	unsigned int num_fds = 20;
 	int readyfds[2], wakefds[2];
 	char dummy;
 	pthread_t *pth_tab;
@@ -286,6 +297,7 @@ int bench_sched_messaging(int argc, const char **argv)
 	for (i = 0; i < total_children; i++)
 		if (read(readyfds[0], &dummy, 1) != 1)
 			err(EXIT_FAILURE, "Reading for readyfds");
+
 
 	gettimeofday(&start, NULL);
 
@@ -323,6 +335,11 @@ int bench_sched_messaging(int argc, const char **argv)
 		break;
 	}
 
+	/* Free malloc's */
+	for (i = 0; i < FD_NUM * GROUPS_NUM; i++) {
+		free(ctx_arr[i]);
+		free(snd_ctx_arr[i]);
+	}
 	free(pth_tab);
 
 	return 0;
