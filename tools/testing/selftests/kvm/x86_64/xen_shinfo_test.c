@@ -14,6 +14,9 @@
 #include <stdint.h>
 #include <time.h>
 #include <sched.h>
+#include <signal.h>
+
+#include <sys/eventfd.h>
 
 #define VCPU_ID		5
 
@@ -22,10 +25,12 @@
 #define SHINFO_REGION_SLOT	10
 #define PAGE_SIZE		4096
 
+#define SHINFO_ADDR	(SHINFO_REGION_GPA)
 #define PVTIME_ADDR	(SHINFO_REGION_GPA + PAGE_SIZE)
 #define RUNSTATE_ADDR	(SHINFO_REGION_GPA + PAGE_SIZE + 0x20)
 #define VCPU_INFO_ADDR	(SHINFO_REGION_GPA + 0x40)
 
+#define SHINFO_VADDR	(SHINFO_REGION_GVA)
 #define RUNSTATE_VADDR	(SHINFO_REGION_GVA + PAGE_SIZE + 0x20)
 #define VCPU_INFO_VADDR	(SHINFO_REGION_GVA + 0x40)
 
@@ -73,15 +78,30 @@ struct vcpu_info {
         struct pvclock_vcpu_time_info time;
 }; /* 64 bytes (x86) */
 
+struct shared_info {
+	struct vcpu_info vcpu_info[32];
+	unsigned long evtchn_pending[64];
+	unsigned long evtchn_mask[64];
+	struct pvclock_wall_clock wc;
+	uint32_t wc_sec_hi;
+	/* arch_shared_info here */
+};
+
 #define RUNSTATE_running  0
 #define RUNSTATE_runnable 1
 #define RUNSTATE_blocked  2
 #define RUNSTATE_offline  3
 
+struct {
+	struct kvm_irq_routing info;
+	struct kvm_irq_routing_entry entries[2];
+} irq_routes;
+
 static void evtchn_handler(struct ex_regs *regs)
 {
 	struct vcpu_info *vi = (void *)VCPU_INFO_VADDR;
 	vi->evtchn_upcall_pending = 0;
+	vi->evtchn_pending_sel = 0;
 
 	GUEST_SYNC(0x20);
 }
@@ -127,7 +147,19 @@ static void guest_code(void)
 	GUEST_SYNC(6);
 	GUEST_ASSERT(rs->time[RUNSTATE_runnable] >= MIN_STEAL_TIME);
 
-	GUEST_DONE();
+	/* Attempt to deliver a *masked* interrupt */
+	GUEST_SYNC(7);
+
+	/* Wait until we see the bit set */
+	struct shared_info *si = (void *)SHINFO_VADDR;
+	while (!si->evtchn_pending[0])
+		__asm__ __volatile__ ("rep nop" : : : "memory");
+
+	/* Now deliver an *unmasked* interrupt */
+	GUEST_SYNC(8);
+
+	for (;;)
+		__asm__ __volatile__ ("rep nop" : : : "memory");
 }
 
 static int cmp_timespec(struct timespec *a, struct timespec *b)
@@ -144,6 +176,11 @@ static int cmp_timespec(struct timespec *a, struct timespec *b)
 		return 0;
 }
 
+static void handle_alrm(int sig)
+{
+	TEST_FAIL("IRQ delivery timed out");
+}
+
 int main(int argc, char *argv[])
 {
 	struct timespec min_ts, max_ts, vm_ts;
@@ -155,6 +192,7 @@ int main(int argc, char *argv[])
 	}
 
 	bool do_runstate_tests = !!(xen_caps & KVM_XEN_HVM_CONFIG_RUNSTATE);
+	bool do_eventfd_tests = !!(xen_caps & KVM_XEN_HVM_CONFIG_EVTCHN_2LEVEL);
 
 	clock_gettime(CLOCK_REALTIME, &min_ts);
 
@@ -165,6 +203,11 @@ int main(int argc, char *argv[])
 	vm_userspace_mem_region_add(vm, VM_MEM_SRC_ANONYMOUS,
 				    SHINFO_REGION_GPA, SHINFO_REGION_SLOT, 2, 0);
 	virt_map(vm, SHINFO_REGION_GVA, SHINFO_REGION_GPA, 2);
+
+	struct shared_info *shinfo = addr_gpa2hva(vm, SHINFO_VADDR);
+
+	int zero_fd = open("/dev/zero", O_RDONLY);
+	TEST_ASSERT(zero_fd != -1, "Failed to open /dev/zero");
 
 	struct kvm_xen_hvm_config hvmc = {
 		.flags = KVM_XEN_HVM_CONFIG_INTERCEPT_HCALL,
@@ -183,6 +226,16 @@ int main(int argc, char *argv[])
 		.u.shared_info.gfn = SHINFO_REGION_GPA / PAGE_SIZE,
 	};
 	vm_ioctl(vm, KVM_XEN_HVM_SET_ATTR, &ha);
+
+	/*
+	 * Test what happens when the HVA of the shinfo page is remapped after
+	 * the kernel has a reference to it. But make sure we copy the clock
+	 * info over since that's only set at setup time, and we test it later.
+	 */
+	struct pvclock_wall_clock wc_copy = shinfo->wc;
+	void *m = mmap(shinfo, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE, zero_fd, 0);
+	TEST_ASSERT(m == shinfo, "Failed to map /dev/zero over shared info");
+	shinfo->wc = wc_copy;
 
 	struct kvm_xen_vcpu_attr vi = {
 		.type = KVM_XEN_VCPU_ATTR_TYPE_VCPU_INFO,
@@ -212,6 +265,49 @@ int main(int argc, char *argv[])
 			.u.gpa = RUNSTATE_ADDR,
 		};
 		vcpu_ioctl(vm, VCPU_ID, KVM_XEN_VCPU_SET_ATTR, &st);
+	}
+
+	int irq_fd[2] = { -1, -1 };
+
+	if (do_eventfd_tests) {
+		irq_fd[0] = eventfd(0, 0);
+		irq_fd[1] = eventfd(0, 0);
+
+		/* Unexpected, but not a KVM failure */
+		if (irq_fd[0] == -1 || irq_fd[1] == -1)
+			do_eventfd_tests = false;
+	}
+
+	if (do_eventfd_tests) {
+		irq_routes.info.nr = 2;
+
+		irq_routes.entries[0].gsi = 32;
+		irq_routes.entries[0].type = KVM_IRQ_ROUTING_XEN_EVTCHN;
+		irq_routes.entries[0].u.xen_evtchn.port = 15;
+		irq_routes.entries[0].u.xen_evtchn.vcpu = VCPU_ID;
+		irq_routes.entries[0].u.xen_evtchn.priority = KVM_IRQ_ROUTING_XEN_EVTCHN_PRIO_2LEVEL;
+
+		irq_routes.entries[1].gsi = 33;
+		irq_routes.entries[1].type = KVM_IRQ_ROUTING_XEN_EVTCHN;
+		irq_routes.entries[1].u.xen_evtchn.port = 66;
+		irq_routes.entries[1].u.xen_evtchn.vcpu = VCPU_ID;
+		irq_routes.entries[1].u.xen_evtchn.priority = KVM_IRQ_ROUTING_XEN_EVTCHN_PRIO_2LEVEL;
+
+		vm_ioctl(vm, KVM_SET_GSI_ROUTING, &irq_routes);
+
+		struct kvm_irqfd ifd = { };
+
+		ifd.fd = irq_fd[0];
+		ifd.gsi = 32;
+		vm_ioctl(vm, KVM_IRQFD, &ifd);
+
+		ifd.fd = irq_fd[1];
+		ifd.gsi = 33;
+		vm_ioctl(vm, KVM_IRQFD, &ifd);
+
+		struct sigaction sa = { };
+		sa.sa_handler = handle_alrm;
+		sigaction(SIGALRM, &sa, NULL);
 	}
 
 	struct vcpu_info *vinfo = addr_gpa2hva(vm, VCPU_INFO_VADDR);
@@ -289,9 +385,23 @@ int main(int argc, char *argv[])
 					sched_yield();
 				} while (get_run_delay() < rundelay);
 				break;
+			case 7:
+				if (!do_eventfd_tests)
+					goto done;
+				shinfo->evtchn_mask[0] = 0x8000;
+				eventfd_write(irq_fd[0], 1UL);
+				alarm(1);
+				break;
+			case 8:
+				eventfd_write(irq_fd[1], 1UL);
+				evtchn_irq_expected = true;
+				break;
+
 			case 0x20:
 				TEST_ASSERT(evtchn_irq_expected, "Unexpected event channel IRQ");
 				evtchn_irq_expected = false;
+				if (shinfo->evtchn_pending[1])
+					goto done;
 				break;
 			}
 			break;
