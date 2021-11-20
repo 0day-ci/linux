@@ -932,6 +932,7 @@ int mem_cgroup_charge_mapping(struct folio *folio, struct mm_struct *mm,
 
 struct mem_cgroup *mem_cgroup_get_from_path(const char *path);
 void mem_cgroup_put_name_in_seq(struct seq_file *seq, struct super_block *sb);
+bool is_remote_oom(struct mem_cgroup *memcg_under_oom);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 		int zid, int nr_pages);
@@ -1253,6 +1254,11 @@ static inline struct mem_cgroup *mem_cgroup_get_from_path(const char *path)
 static inline void mem_cgroup_put_name_in_seq(struct seq_file *seq,
 					      struct super_block *sb)
 {
+}
+
+static inline bool is_remote_oom(struct mem_cgroup *memcg_under_oom)
+{
+	return false;
 }
 
 static inline int mem_cgroup_swapin_charge_page(struct page *page,

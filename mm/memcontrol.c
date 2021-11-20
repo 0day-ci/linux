@@ -2669,6 +2669,35 @@ void mem_cgroup_put_name_in_seq(struct seq_file *m, struct super_block *sb)
 }
 
 /*
+ * Returns true if current's mm is a descendant of the memcg_under_oom (or
+ * equal to it). False otherwise. This is used by the oom-killer to detect
+ * ooms due to remote charging.
+ */
+bool is_remote_oom(struct mem_cgroup *memcg_under_oom)
+{
+	struct mem_cgroup *current_memcg;
+	bool is_remote_oom;
+
+	if (!memcg_under_oom)
+		return false;
+
+	rcu_read_lock();
+	current_memcg = mem_cgroup_from_task(current);
+	if (current_memcg && !css_tryget_online(&current_memcg->css))
+		current_memcg = NULL;
+	rcu_read_unlock();
+
+	if (!current_memcg)
+		return false;
+
+	is_remote_oom =
+		!mem_cgroup_is_descendant(current_memcg, memcg_under_oom);
+	css_put(&current_memcg->css);
+
+	return is_remote_oom;
+}
+
+/*
  * Set or clear (if @memcg is NULL) charge association from file system to
  * memcg.  If @memcg != NULL, then a css reference must be held by the caller to
  * ensure that the cgroup is not deleted during this operation, this reference
@@ -6814,7 +6843,7 @@ int mem_cgroup_charge_mapping(struct folio *folio, struct mm_struct *mm,
 	if (mapping_memcg) {
 		ret = charge_memcg(folio, mapping_memcg, gfp);
 		css_put(&mapping_memcg->css);
-		return ret;
+		return ret == -ENOMEM ? -ENOSPC : ret;
 	}
 
 	return mem_cgroup_charge(folio, mm, gfp);
