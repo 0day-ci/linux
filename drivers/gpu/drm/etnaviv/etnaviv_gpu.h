@@ -182,4 +182,10 @@ void etnaviv_gpu_start_fe(struct etnaviv_gpu *gpu, u32 address, u16 prefetch);
 
 extern struct platform_driver etnaviv_gpu_driver;
 
+int etnaviv_gpu_bind(struct device *dev, struct device *master, void *data);
+void etnaviv_gpu_unbind(struct device *dev, struct device *master, void *data);
+
+int etnaviv_gpu_register_irq(struct etnaviv_gpu *gpu, int irq);
+void etnaviv_gpu_get_clock(struct etnaviv_gpu *gpu, struct device *dev);
+
 #endif /* __ETNAVIV_GPU_H__ */
