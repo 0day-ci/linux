@@ -2,8 +2,12 @@
 #ifndef _LINUX_ARRAY_SIZE_H
 #define _LINUX_ARRAY_SIZE_H
 
-#include <linux/compiler.h>
+#include <linux/must_be.h>
+#include <linux/same_type.h>
 
+
+/* &a[0] degrades to a pointer: a different type from an array */
+#define __must_be_array(a)  __must_be(!__same_type((a), &(a)[0]))
 
 /**
  * ARRAY_SIZE - get the number of elements in array @a

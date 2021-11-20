@@ -12,6 +12,8 @@
 #ifndef __ES58X_COMMON_H__
 #define __ES58X_COMMON_H__
 
+
+#include <linux/array_size.h>
 #include <linux/types.h>
 #include <linux/usb.h>
 #include <linux/netdevice.h>
@@ -20,6 +22,7 @@
 
 #include "es581_4.h"
 #include "es58x_fd.h"
+
 
 /* Driver constants */
 #define ES58X_RX_URBS_MAX 5	/* Empirical value */

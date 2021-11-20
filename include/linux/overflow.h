@@ -2,8 +2,11 @@
 #ifndef __LINUX_OVERFLOW_H
 #define __LINUX_OVERFLOW_H
 
+
+#include <linux/array_size.h>
 #include <linux/compiler.h>
 #include <linux/limits.h>
+
 
 /*
  * We need to compute the minimum and maximum values representable in a given
