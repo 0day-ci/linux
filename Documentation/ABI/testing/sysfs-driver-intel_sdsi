@@ -1,0 +1,75 @@
+What:		/sys/bus/auxiliary/devices/intel_extended_cap.sdsi.X
+Date:		Nov 2021
+KernelVersion:	5.17
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		This folder contains interface files for accessing Intel
+		Software Defined Silicon (SDSi) features on a CPU. X
+		represent the socket instance (though not the socket id).
+
+		Some files communicate with SDSi hardware through a mailbox.
+		Should the operation fail, one of the following error codes
+		may be returned:
+
+		Error Code	Cause
+	        ----------	-----
+	        EIO		General mailbox failure. Log may indicate cause.
+	        EBUSY		Mailbox is owned by another agent.
+	        EPERM		SDSI capability is not enabled in hardware.
+	        EPROTO		Failure in mailbox protocol detected by driver.
+				See log for details.
+	        EOVERFLOW	For provision commands, the size of the data
+				exceeds what may be written.
+	        ESPIPE		Seeking is not allowed.
+	        ETIMEDOUT	Failure to complete mailbox transaction in time.
+
+What:		/sys/bus/auxiliary/devices/intel_extended_cap.sdsi.X/guid
+Date:		Nov 2021
+KernelVersion:	5.17
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(RO) The GUID for the registers file. The GUID identifies
+		the register layout of the registers file in this folder.
+		Information about the register layouts for a particular GUID
+		is available at http://github.com/intel/intel-sdsi
+
+What:		/sys/bus/auxiliary/devices/intel_extended_cap.sdsi.X/registers
+Date:		Nov 2021
+KernelVersion:	5.17
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(RO) Contains information needed by applications to provision
+		a CPU and monitor status information. The layout of this file
+		is determined by the GUID in this folder. Information about the
+		layout for a particular GUID is available at
+		http://github.com/intel/intel-sdsi
+
+What:		/sys/bus/auxiliary/devices/intel_extended_cap.sdsi.X/provision_akc
+Date:		Nov 2021
+KernelVersion:	5.17
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(WO) Used to write an Authentication Key Certificate (AKC) to
+		the SDSi NVRAM for the CPU. The AKC is used to authentication a
+		Capability Activation Payload. Mailbox command.
+
+What:		/sys/bus/auxiliary/devices/intel_extended_cap.sdsi.X/provision_cap
+Date:		Nov 2021
+KernelVersion:	5.17
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(WO) Used to write a Capability Activation Payload (CAP) to the
+		SDSi NVRAM for the CPU. CAP files are used to activate a given
+		CPU feature. The CAP file is validated by SDSi hardware using a
+		previously provision AKC file. Upon successful authentication, the
+		CPU configuration is updated. A cold reboot is required to fully
+		activate the feature. Mailbox command.
+
+What:		/sys/bus/auxiliary/devices/intel_extended_cap.sdsi.X/read_state_cert
+Date:		Nov 2021
+KernelVersion:	5.17
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(RO) Used to read back the current State Certificate for the CPU
+		from SDSi hardware. The State Certificate contains information
+		about the current licenses on the CPU. Mailbox command.
