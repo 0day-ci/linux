@@ -195,7 +195,7 @@ struct nested_vmx {
 	 * pointers, so we must keep them pinned while L2 runs.
 	 */
 	struct page *apic_access_page;
-	struct kvm_host_map virtual_apic_map;
+	struct gfn_to_pfn_cache virtual_apic_cache;
 	struct kvm_host_map pi_desc_map;
 
 	struct kvm_host_map msr_bitmap_map;
