@@ -6004,6 +6004,7 @@ DRM DRIVER FOR LG.PHILIPS SW43101 PANEL
 M:	Yassine Oudjana <y.oudjana@protonmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/display/panel/lgphilips,sw43101.yaml
+F:	drivers/gpu/drm/panel/panel-lgphilips-sw43101.c
 
 DRM DRIVER FOR LVDS PANELS
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
