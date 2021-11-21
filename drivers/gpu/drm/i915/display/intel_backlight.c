@@ -268,18 +268,6 @@ static void ext_pwm_set_backlight(const struct drm_connector_state *conn_state, 
 	pwm_apply_state(panel->backlight.pwm, &panel->backlight.pwm_state);
 }
 
-static void
-intel_panel_actually_set_backlight(const struct drm_connector_state *conn_state, u32 level)
-{
-	struct intel_connector *connector = to_intel_connector(conn_state->connector);
-	struct drm_i915_private *i915 = to_i915(connector->base.dev);
-	struct intel_panel *panel = &connector->panel;
-
-	drm_dbg_kms(&i915->drm, "set backlight level = %d\n", level);
-
-	panel->backlight.funcs->set(conn_state, level);
-}
-
 /* set backlight brightness to level in range [0..max], assuming hw min is
  * respected.
  */
@@ -314,7 +302,7 @@ void intel_backlight_set_acpi(const struct drm_connector_state *conn_state,
 					 panel->backlight.device->props.max_brightness);
 
 	if (panel->backlight.enabled)
-		intel_panel_actually_set_backlight(conn_state, hw_level);
+		intel_backlight_set_pwm_level(conn_state, hw_level);
 
 	mutex_unlock(&dev_priv->backlight_lock);
 }
@@ -863,7 +851,7 @@ static void intel_panel_set_backlight(const struct drm_connector_state *conn_sta
 	panel->backlight.level = hw_level;
 
 	if (panel->backlight.enabled)
-		intel_panel_actually_set_backlight(conn_state, hw_level);
+		intel_backlight_set_pwm_level(conn_state, hw_level);
 
 	mutex_unlock(&dev_priv->backlight_lock);
 }
