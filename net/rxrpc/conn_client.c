@@ -328,6 +328,7 @@ static struct rxrpc_bundle *rxrpc_look_up_bundle(struct rxrpc_conn_parameters *c
 	return candidate;
 
 found_bundle_free:
+	rxrpc_put_peer(candidate->params.peer);
 	kfree(candidate);
 found_bundle:
 	rxrpc_get_bundle(bundle);
