@@ -90,6 +90,10 @@ extern void exit_itimers(struct signal_struct *);
 
 extern pid_t kernel_clone(struct kernel_clone_args *kargs);
 struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node);
+struct task_struct *kernel_worker(int (*fn)(void *), void *arg, int node,
+				  unsigned long clone_flags, u32 worker_flags);
+__printf(2, 3)
+void kernel_worker_start(struct task_struct *tsk, const char namefmt[], ...);
 struct task_struct *fork_idle(int);
 struct mm_struct *copy_init_mm(void);
 extern pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);

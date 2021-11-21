@@ -2543,6 +2543,77 @@ struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node)
 	return copy_process(NULL, 0, node, &args);
 }
 
+static bool kernel_worker_flags_valid(struct kernel_clone_args *kargs)
+{
+	/* Verify that no unknown flags are passed along. */
+	if (kargs->worker_flags & ~(KERN_WORKER_IO | KERN_WORKER_USER |
+				    KERN_WORKER_NO_FILES | KERN_WORKER_SIG_IGN))
+		return false;
+
+	/*
+	 * If we're ignoring all signals don't allow sharing struct sighand and
+	 * don't bother clearing signal handlers.
+	 */
+	if ((kargs->flags & (CLONE_SIGHAND | CLONE_CLEAR_SIGHAND)) &&
+	    (kargs->worker_flags & KERN_WORKER_SIG_IGN))
+		return false;
+
+	return true;
+}
+
+/**
+ * kernel_worker - create a copy of a process to be used by the kernel
+ * @fn: thread stack
+ * @arg: data to be passed to fn
+ * @node: numa node to allocate task from
+ * @clone_flags: CLONE flags
+ * @worker_flags: KERN_WORKER flags
+ *
+ * This returns a created task, or an error pointer. The returned task is
+ * inactive, and the caller must fire it up through kernel_worker_start(). If
+ * this is an PF_IO_WORKER all singals but KILL and STOP are blocked.
+ */
+struct task_struct *kernel_worker(int (*fn)(void *), void *arg, int node,
+				  unsigned long clone_flags, u32 worker_flags)
+{
+	struct kernel_clone_args args = {
+		.flags		= ((lower_32_bits(clone_flags) | CLONE_VM |
+				   CLONE_UNTRACED) & ~CSIGNAL),
+		.exit_signal	= (lower_32_bits(clone_flags) & CSIGNAL),
+		.stack		= (unsigned long)fn,
+		.stack_size	= (unsigned long)arg,
+		.worker_flags	= KERN_WORKER_USER | worker_flags,
+	};
+
+	if (!kernel_worker_flags_valid(&args))
+		return ERR_PTR(-EINVAL);
+
+	return copy_process(NULL, 0, node, &args);
+}
+EXPORT_SYMBOL_GPL(kernel_worker);
+
+/**
+ * kernel_worker_start - Start a task created with kernel_worker
+ * @tsk: task to wake up
+ * @namefmt: printf-style format string for the thread name
+ * @arg: arguments for @namefmt
+ */
+void kernel_worker_start(struct task_struct *tsk, const char namefmt[], ...)
+{
+	char name[TASK_COMM_LEN];
+	va_list args;
+
+	WARN_ON(!(tsk->flags & PF_USER_WORKER));
+
+	va_start(args, namefmt);
+	vsnprintf(name, sizeof(name), namefmt, args);
+	set_task_comm(tsk, name);
+	va_end(args);
+
+	wake_up_new_task(tsk);
+}
+EXPORT_SYMBOL_GPL(kernel_worker_start);
+
 /*
  *  Ok, this is the main fork-routine.
  *
