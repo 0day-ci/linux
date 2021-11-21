@@ -2084,7 +2084,6 @@ void i915_request_show(struct drm_printer *m,
 {
 	const char *name = rq->fence.ops->get_timeline_name((struct dma_fence *)&rq->fence);
 	char buf[80] = "";
-	int x = 0;
 
 	/*
 	 * The prefix is used to show the queue status, for which we use
@@ -2115,8 +2114,6 @@ void i915_request_show(struct drm_printer *m,
 	 *      status may not be updated until it is retired and removed
 	 *      from the lists
 	 */
-
-	x = print_sched_attr(&rq->sched.attr, buf, x, sizeof(buf));
 
 	drm_printf(m, "%s%.*s%c %llx:%lld%s%s %s @ %dms: %s\n",
 		   prefix, indent, "                ",
