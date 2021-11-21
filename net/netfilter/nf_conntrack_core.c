@@ -83,6 +83,8 @@ static DEFINE_MUTEX(nf_conntrack_mutex);
 #define MIN_CHAINLEN	8u
 #define MAX_CHAINLEN	(32u - MIN_CHAINLEN)
 
+__read_mostly unsigned int nf_conntrack_gc_scan_interval = GC_SCAN_INTERVAL;
+EXPORT_SYMBOL_GPL(nf_conntrack_gc_scan_interval);
 static struct conntrack_gc_work conntrack_gc_work;
 
 void nf_conntrack_lock(spinlock_t *lock) __acquires(lock)
@@ -1422,7 +1424,9 @@ static void gc_worker(struct work_struct *work)
 {
 	unsigned long end_time = jiffies + GC_SCAN_MAX_DURATION;
 	unsigned int i, hashsz, nf_conntrack_max95 = 0;
-	unsigned long next_run = GC_SCAN_INTERVAL;
+	unsigned long next_run = max_t(unsigned int,
+				       nf_conntrack_gc_scan_interval,
+				       HZ);
 	struct conntrack_gc_work *gc_work;
 	gc_work = container_of(work, struct conntrack_gc_work, dwork.work);
 
