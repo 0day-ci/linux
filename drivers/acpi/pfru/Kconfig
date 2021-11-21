@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0
+config ACPI_PFRU
+	tristate "ACPI Platform Firmware Runtime Update (PFRU)"
+	depends on 64BIT
+	help
+	  In order to reduce the system reboot times and update the platform firmware
+	  in time, Platform Firmware Runtime Update is leveraged to patch the system
+	  without reboot. This driver supports Platform Firmware Runtime Update,
+	  which is composed of two parts: code injection and driver update. It also
+	  allows telemetry data to be retrieved from the platform firmware.
+
+	  To compile this driver as module, choose M here:
+	  the modules will be called pfru_update and pfru_telemetry.
