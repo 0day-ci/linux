@@ -169,9 +169,10 @@ static inline void rtrs_clt_update_rdma_stats(struct rtrs_clt_stats *stats,
 {
 	struct rtrs_clt_stats_pcpu *s;
 
-	s = this_cpu_ptr(stats->pcpu_stats);
+	s = get_cpu_ptr(stats->pcpu_stats);
 	s->rdma.dir[d].cnt++;
 	s->rdma.dir[d].size_total += size;
+	put_cpu_ptr(stats->pcpu_stats);
 }
 
 void rtrs_clt_update_all_stats(struct rtrs_clt_io_req *req, int dir)
