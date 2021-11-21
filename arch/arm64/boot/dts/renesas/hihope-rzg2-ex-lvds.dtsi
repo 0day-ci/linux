@@ -12,6 +12,17 @@
 
 		brightness-levels = <0 2 8 16 32 64 128 255>;
 		default-brightness-level = <6>;
+		power-supply = <&reg_12v>;
+		enable-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+	};
+
+	reg_12v: regulator2 {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-12V";
+		regulator-min-microvolt = <12000000>;
+		regulator-max-microvolt = <12000000>;
+		regulator-boot-on;
+		regulator-always-on;
 	};
 };
 
