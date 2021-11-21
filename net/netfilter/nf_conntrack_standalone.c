@@ -554,6 +554,8 @@ enum nf_ct_sysctl_index {
 	NF_SYSCTL_CT_MAX,
 	NF_SYSCTL_CT_COUNT,
 	NF_SYSCTL_CT_BUCKETS,
+	NF_SYSCTL_CT_GC_BUCKETS,
+	NF_SYSCTL_CT_GC_INTERVAL,
 	NF_SYSCTL_CT_CHECKSUM,
 	NF_SYSCTL_CT_LOG_INVALID,
 	NF_SYSCTL_CT_EXPECT_MAX,
@@ -624,6 +626,9 @@ enum nf_ct_sysctl_index {
 
 #define NF_SYSCTL_CT_LAST_SYSCTL (__NF_SYSCTL_CT_LAST_SYSCTL + 1)
 
+static const unsigned long max_scan_interval = 1 * 24 * 60 * 60 * HZ;
+static const unsigned long min_scan_interval = 1;
+
 static struct ctl_table nf_ct_sysctl_table[] = {
 	[NF_SYSCTL_CT_MAX] = {
 		.procname	= "nf_conntrack_max",
@@ -644,6 +649,23 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.maxlen         = sizeof(unsigned int),
 		.mode           = 0644,
 		.proc_handler   = nf_conntrack_hash_sysctl,
+	},
+	[NF_SYSCTL_CT_GC_BUCKETS] = {
+		.procname       = "nf_conntrack_gc_buckets",
+		.data           = &nf_conntrack_gc_buckets,
+		.maxlen         = sizeof(unsigned int),
+		.mode           = 0644,
+		.proc_handler	= proc_douintvec_minmax,
+		.extra1		= SYSCTL_ONE,
+	},
+	[NF_SYSCTL_CT_GC_INTERVAL] = {
+		.procname       = "nf_conntrack_gc_interval",
+		.data           = &nf_conntrack_gc_interval,
+		.maxlen         = sizeof(unsigned long),
+		.mode           = 0644,
+		.proc_handler	= proc_doulongvec_ms_jiffies_minmax,
+		.extra1		= (void *)&min_scan_interval,
+		.extra2		= (void *)&max_scan_interval,
 	},
 	[NF_SYSCTL_CT_CHECKSUM] = {
 		.procname	= "nf_conntrack_checksum",
@@ -1123,6 +1145,8 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 		table[NF_SYSCTL_CT_MAX].mode = 0444;
 		table[NF_SYSCTL_CT_EXPECT_MAX].mode = 0444;
 		table[NF_SYSCTL_CT_BUCKETS].mode = 0444;
+		table[NF_SYSCTL_CT_GC_BUCKETS].mode = 0444;
+		table[NF_SYSCTL_CT_GC_INTERVAL].mode = 0444;
 	}
 
 	cnet->sysctl_header = register_net_sysctl(net, "net/netfilter", table);

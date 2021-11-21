@@ -61,6 +61,19 @@ nf_conntrack_frag6_timeout - INTEGER (seconds)
 
 	Time to keep an IPv6 fragment in memory.
 
+nf_conntrack_gc_buckets - INTEGER
+        default 4294967295
+
+	Number of buckets to scan during one gc cycle.
+        If the value is less than nf_conntrack_buckets, gc will return
+        early and next cycle resumes at the next unscanned bucket.
+        Default is to scan entire table per cycle.
+
+nf_conntrack_gc_interval - INTEGER (milliseconds)
+        default 120000 (2 minutes)
+
+        Garbage collector Interval (in milliseconds).
+
 nf_conntrack_generic_timeout - INTEGER (seconds)
 	default 600
 

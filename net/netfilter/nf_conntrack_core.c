@@ -66,6 +66,7 @@ EXPORT_SYMBOL_GPL(nf_conntrack_hash);
 struct conntrack_gc_work {
 	struct delayed_work	dwork;
 	u32			next_bucket;
+	u32			buckets;
 	bool			exiting;
 	bool			early_drop;
 };
@@ -82,6 +83,9 @@ static DEFINE_MUTEX(nf_conntrack_mutex);
 
 #define MIN_CHAINLEN	8u
 #define MAX_CHAINLEN	(32u - MIN_CHAINLEN)
+
+unsigned long __read_mostly nf_conntrack_gc_interval = GC_SCAN_INTERVAL;
+unsigned int __read_mostly nf_conntrack_gc_buckets = UINT_MAX;
 
 static struct conntrack_gc_work conntrack_gc_work;
 
@@ -1421,12 +1425,17 @@ static bool gc_worker_can_early_drop(const struct nf_conn *ct)
 static void gc_worker(struct work_struct *work)
 {
 	unsigned long end_time = jiffies + GC_SCAN_MAX_DURATION;
+	unsigned long next_run = nf_conntrack_gc_interval;
 	unsigned int i, hashsz, nf_conntrack_max95 = 0;
-	unsigned long next_run = GC_SCAN_INTERVAL;
 	struct conntrack_gc_work *gc_work;
+	unsigned int buckets;
 	gc_work = container_of(work, struct conntrack_gc_work, dwork.work);
 
+	buckets = gc_work->buckets;
+	gc_work->buckets = 0;
+
 	i = gc_work->next_bucket;
+	gc_work->next_bucket = 0;
 	if (gc_work->early_drop)
 		nf_conntrack_max95 = nf_conntrack_max / 100u * 95u;
 
@@ -1491,7 +1500,12 @@ static void gc_worker(struct work_struct *work)
 		cond_resched();
 		i++;
 
+		if (++buckets >= nf_conntrack_gc_buckets) {
+			gc_work->next_bucket = i;
+			break;
+		}
 		if (time_after(jiffies, end_time) && i < hashsz) {
+			gc_work->buckets = buckets;
 			gc_work->next_bucket = i;
 			next_run = 0;
 			break;
@@ -1508,16 +1522,15 @@ static void gc_worker(struct work_struct *work)
 	 * This worker is only here to reap expired entries when system went
 	 * idle after a busy period.
 	 */
-	if (next_run) {
+	if (next_run)
 		gc_work->early_drop = false;
-		gc_work->next_bucket = 0;
-	}
+
 	queue_delayed_work(system_power_efficient_wq, &gc_work->dwork, next_run);
 }
 
 static void conntrack_gc_work_init(struct conntrack_gc_work *gc_work)
 {
-	INIT_DEFERRABLE_WORK(&gc_work->dwork, gc_worker);
+	INIT_DELAYED_WORK(&gc_work->dwork, gc_worker);
 	gc_work->exiting = false;
 }
 
@@ -2743,7 +2756,7 @@ int nf_conntrack_init_start(void)
 		goto err_proto;
 
 	conntrack_gc_work_init(&conntrack_gc_work);
-	queue_delayed_work(system_power_efficient_wq, &conntrack_gc_work.dwork, HZ);
+	queue_delayed_work(system_power_efficient_wq, &conntrack_gc_work.dwork, 10 * HZ);
 
 	return 0;
 
