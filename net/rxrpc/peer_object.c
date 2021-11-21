@@ -364,10 +364,12 @@ struct rxrpc_peer *rxrpc_lookup_peer(struct rxrpc_sock *rx,
 
 		spin_unlock_bh(&rxnet->peer_hash_lock);
 
-		if (peer)
+		if (peer) {
+			rxrpc_put_local(candidate->local);
 			kfree(candidate);
-		else
+		} else {
 			peer = candidate;
+		}
 	}
 
 	_net("PEER %d {%pISp}", peer->debug_id, &peer->srx.transport);
