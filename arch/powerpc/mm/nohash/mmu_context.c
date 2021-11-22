@@ -320,8 +320,6 @@ int init_new_context(struct task_struct *t, struct mm_struct *mm)
 	 * have id == 0) and don't alter context slice inherited via fork (which
 	 * will have id != 0).
 	 */
-	if (mm->context.id == 0)
-		slice_init_new_context_exec(mm);
 	mm->context.id = MMU_NO_CONTEXT;
 	mm->context.active = 0;
 	pte_frag_set(&mm->context, NULL);
