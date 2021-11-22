@@ -185,8 +185,10 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		seq_puts(m, " tx39_cache");
 	if (cpu_has_octeon_cache)
 		seq_puts(m, " octeon_cache");
+	preempt_disable();
 	if (cpu_has_fpu)
 		seq_puts(m, " fpu");
+	preempt_enable();
 	if (cpu_has_32fpr)
 		seq_puts(m, " 32fpr");
 	if (cpu_has_cache_cdex_p)
