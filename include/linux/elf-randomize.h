@@ -4,7 +4,8 @@
 
 struct mm_struct;
 
-#ifndef CONFIG_ARCH_HAS_ELF_RANDOMIZE
+#if !defined(CONFIG_ARCH_HAS_ELF_RANDOMIZE) && \
+	!defined(CONFIG_ARCH_WANT_DEFAULT_TOPDOWN_MMAP_LAYOUT)
 static inline unsigned long arch_mmap_rnd(void) { return 0; }
 # if defined(arch_randomize_brk) && defined(CONFIG_COMPAT_BRK)
 #  define compat_brk_randomized

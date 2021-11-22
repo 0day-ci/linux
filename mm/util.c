@@ -344,6 +344,7 @@ unsigned long randomize_stack_top(unsigned long stack_top)
 }
 
 #ifdef CONFIG_ARCH_WANT_DEFAULT_TOPDOWN_MMAP_LAYOUT
+#ifndef CONFIG_ARCH_HAS_ELF_RANDOMIZE
 unsigned long arch_randomize_brk(struct mm_struct *mm)
 {
 	/* Is the current task 32bit ? */
@@ -352,6 +353,7 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
 
 	return randomize_page(mm->brk, SZ_1G);
 }
+#endif
 
 unsigned long arch_mmap_rnd(void)
 {
