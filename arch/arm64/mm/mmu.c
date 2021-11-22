@@ -125,15 +125,21 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
 	 * The following mapping attributes may be updated in live
 	 * kernel mappings without the need for break-before-make.
 	 */
+#ifndef CONFIG_RODATA_FULL_USE_PTE_CONT
 	pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE | PTE_NG;
+#else
+	pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE | PTE_NG | PTE_CONT;
+#endif
 
 	/* creating or taking down mappings is always safe */
 	if (old == 0 || new == 0)
 		return true;
 
 	/* live contiguous mappings may not be manipulated at all */
-	if ((old | new) & PTE_CONT)
+#ifndef CONFIG_RODATA_FULL_USE_PTE_CONT
+	if (old | new) & PTE_CONT)
 		return false;
+#endif
 
 	/* Transitioning from Non-Global to Global is unsafe */
 	if (old & ~new & PTE_NG)
@@ -207,7 +213,7 @@ static void alloc_init_cont_pte(pmd_t *pmdp, unsigned long addr,
 
 		/* use a contiguous mapping if the range is suitably aligned */
 		if ((((addr | next | phys) & ~CONT_PTE_MASK) == 0) &&
-		    (flags & NO_CONT_MAPPINGS) == 0)
+		    (IS_ENABLED(CONFIG_RODATA_FULL_USE_PTE_CONT) || (flags & NO_CONT_MAPPINGS) == 0))
 			__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
 
 		init_pte(pmdp, addr, next, phys, __prot);

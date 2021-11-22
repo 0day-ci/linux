@@ -99,6 +99,15 @@ static int change_memory_common(unsigned long addr, int numpages,
 	if (rodata_full && (pgprot_val(set_mask) == PTE_RDONLY ||
 			    pgprot_val(clear_mask) == PTE_RDONLY)) {
 		for (i = 0; i < area->nr_pages; i++) {
+#ifdef CONFIG_RODATA_FULL_USE_PTE_CONT
+			unsigned long cont_pte_low_bound;
+			unsigned long addr;
+
+			addr = (u64)page_address(area->pages[i]);
+			cont_pte_low_bound = addr & CONT_PTE_MASK;
+			__change_memory_common(cont_pte_low_bound,
+					       (~CONT_PTE_MASK + 1), __pgprot(0) , __pgprot(PTE_CONT));
+#endif
 			__change_memory_common((u64)page_address(area->pages[i]),
 					       PAGE_SIZE, set_mask, clear_mask);
 		}

@@ -1313,6 +1313,15 @@ config RODATA_FULL_DEFAULT_ENABLED
 	  This requires the linear region to be mapped down to pages,
 	  which may adversely affect performance in some cases.
 
+config RODATA_FULL_USE_PTE_CONT
+       bool "Apply PTE_CONT when RODATA_FULL_DEFAULT_ENABLED enabled"
+       depends on RODATA_FULL_DEFAULT_ENABLED
+       default y
+       help
+         Apply PTE_CONT on linear mapping as much as we can when
+         RODATA_FULL_DEFAULT_ENABLED enabled which could decrease the
+         impaction on performance by small pte granularity.
+
 config ARM64_SW_TTBR0_PAN
 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
 	help
