@@ -791,6 +791,7 @@ void ovl_inode_init(struct inode *inode, struct ovl_inode_params *oip,
 	ovl_copyattr(realinode, inode);
 	ovl_copyflags(realinode, inode);
 	ovl_map_ino(inode, ino, fsid);
+	d_mark_dontcache(inode);
 }
 
 static void ovl_fill_inode(struct inode *inode, umode_t mode, dev_t rdev)
