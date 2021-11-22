@@ -15,6 +15,7 @@
 #include <linux/seq_file.h>
 #include <linux/posix_acl_xattr.h>
 #include <linux/exportfs.h>
+#include <linux/writeback.h>
 #include "overlayfs.h"
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
@@ -406,12 +407,32 @@ static int ovl_remount(struct super_block *sb, int *flags, char *data)
 	return ret;
 }
 
+static int ovl_write_inode(struct inode *inode,
+			   struct writeback_control *wbc)
+{
+	struct ovl_fs *ofs = inode->i_sb->s_fs_info;
+	struct inode *upper_inode = ovl_inode_upper(inode);
+	int ret = 0;
+
+	if (!upper_inode)
+		return 0;
+
+	if (!ovl_should_sync(ofs))
+		return 0;
+
+	ret = write_inode_now(upper_inode, wbc->sync_mode == WB_SYNC_ALL);
+	mark_inode_dirty(inode);
+
+	return ret;
+}
+
 static const struct super_operations ovl_super_operations = {
 	.alloc_inode	= ovl_alloc_inode,
 	.free_inode	= ovl_free_inode,
 	.destroy_inode	= ovl_destroy_inode,
 	.drop_inode	= generic_delete_inode,
 	.put_super	= ovl_put_super,
+	.write_inode	= ovl_write_inode,
 	.sync_fs	= ovl_sync_fs,
 	.statfs		= ovl_statfs,
 	.show_options	= ovl_show_options,
