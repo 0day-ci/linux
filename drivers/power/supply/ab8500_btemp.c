@@ -408,42 +408,6 @@ static int ab8500_btemp_get_batctrl_res(struct ab8500_btemp *di)
 }
 
 /**
- * ab8500_btemp_res_to_temp() - resistance to temperature
- * @di:		pointer to the ab8500_btemp structure
- * @tbl:	pointer to the resiatance to temperature table
- * @tbl_size:	size of the resistance to temperature table
- * @res:	resistance to calculate the temperature from
- *
- * This function returns the battery temperature in degrees Celsius
- * based on the NTC resistance.
- */
-static int ab8500_btemp_res_to_temp(struct ab8500_btemp *di,
-	const struct ab8500_res_to_temp *tbl, int tbl_size, int res)
-{
-	int i;
-	/*
-	 * Calculate the formula for the straight line
-	 * Simple interpolation if we are within
-	 * the resistance table limits, extrapolate
-	 * if resistance is outside the limits.
-	 */
-	if (res > tbl[0].resist)
-		i = 0;
-	else if (res <= tbl[tbl_size - 1].resist)
-		i = tbl_size - 2;
-	else {
-		i = 0;
-		while (!(res <= tbl[i].resist &&
-			res > tbl[i + 1].resist))
-			i++;
-	}
-
-	return fixp_linear_interpolate(tbl[i].resist, tbl[i].temp,
-				       tbl[i + 1].resist, tbl[i + 1].temp,
-				       res);
-}
-
-/**
  * ab8500_btemp_measure_temp() - measure battery temperature
  * @di:		pointer to the ab8500_btemp structure
  *
@@ -451,6 +415,7 @@ static int ab8500_btemp_res_to_temp(struct ab8500_btemp *di,
  */
 static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 {
+	struct power_supply_battery_info *bi = &di->bm->bi;
 	int temp, ret;
 	static int prev;
 	int rbat, rntc, vntc;
@@ -469,9 +434,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 			return BTEMP_THERMAL_LOW_LIMIT;
 		}
 
-		temp = ab8500_btemp_res_to_temp(di,
-			di->bm->bat_type->r_to_t_tbl,
-			di->bm->bat_type->n_temp_tbl_elements, rbat);
+		temp = power_supply_ntc_resist2temp_simple(bi, rbat);
 	} else {
 		ret = iio_read_channel_processed(di->btemp_ball, &vntc);
 		if (ret < 0) {
@@ -486,9 +449,7 @@ static int ab8500_btemp_measure_temp(struct ab8500_btemp *di)
 		 */
 		rntc = 230000 * vntc / (VTVOUT_V - vntc);
 
-		temp = ab8500_btemp_res_to_temp(di,
-			di->bm->bat_type->r_to_t_tbl,
-			di->bm->bat_type->n_temp_tbl_elements, rntc);
+		temp = power_supply_ntc_resist2temp_simple(bi, rntc);
 		prev = temp;
 	}
 	dev_dbg(di->dev, "Battery temperature is %d\n", temp);

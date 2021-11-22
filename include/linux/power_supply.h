@@ -336,9 +336,27 @@ struct power_supply_battery_ocv_table {
 	int capacity;	/* percent */
 };
 
+/**
+ * struct power_supply_resistance_temp_table - correlate temperature to resistance
+ * @temp: the internal temperature of the battery in degrees Celsius
+ * @resistance: the percentage of the factory internal resistance at this
+ *   temperature, usually nomimal factory resistance is 100 percent at 25
+ *   degrees Celsius, lower at higher temperature and higher at lower
+ *   temperature.
+ */
 struct power_supply_resistance_temp_table {
 	int temp;	/* celsius */
 	int resistance;	/* internal resistance percent */
+};
+
+/**
+ * struct power_supply_ntc_resistance_temp_table - correlate NTC to temp
+ * @resistance: the NTC resistance in ohm
+ * @temp: the corresponding temperature in degrees Celsius
+ */
+struct power_supply_ntc_resistance_temp_table {
+	int resistance_ohm;
+	int temp;
 };
 
 #define POWER_SUPPLY_OCV_TEMP_MAX 20
@@ -427,6 +445,18 @@ struct power_supply_resistance_temp_table {
  *   by temperature: highest temperature with lowest resistance first, lowest
  *   temperature with highest resistance last.
  * @resist_table_size: the number of items in the resist_table.
+ * @ntc_resist_table: this is a table that correlates a resistance of a negative
+ *   temperature coefficient (NTC) resistor to an internal temperature of a
+ *   battery. This can be achieved by a separate thermistor to
+ *   supply voltage on a third terminal on a battery which is the most
+ *   reliable. An external thermistor can also be used sometimes. Knowing the
+ *   temperature of the battery is usually necessary to perform a lookup in the
+ *   resist_table to determine the internal resistance of the battery, and
+ *   to find the right ocv_table to determine the capacity of the battery.
+ *   The NTC resistance table must be ordered descending by resistance:
+ *   largest resistance with lowest temperature first, lowest resistance with
+ *   highest temperature last.
+ * @ntc_resist_table_size: the number of items in the ntc_resist_table.
  *
  * This is the recommended struct to manage static battery parameters,
  * populated by power_supply_get_battery_info(). Most platform drivers should
@@ -547,6 +577,8 @@ struct power_supply_battery_info {
 	int ocv_table_size[POWER_SUPPLY_OCV_TEMP_MAX];
 	struct power_supply_resistance_temp_table *resist_table;
 	int resist_table_size;
+	struct power_supply_ntc_resistance_temp_table *ntc_resist_table;
+	int ntc_resist_table_size;
 };
 
 extern struct atomic_notifier_head power_supply_notifier;
@@ -588,6 +620,8 @@ extern int power_supply_batinfo_ocv2cap(struct power_supply_battery_info *info,
 extern int
 power_supply_temp2resist_simple(struct power_supply_resistance_temp_table *table,
 				int table_len, int temp);
+extern int power_supply_ntc_resist2temp_simple(struct power_supply_battery_info *info,
+					       int resistance_ohm);
 extern void power_supply_changed(struct power_supply *psy);
 extern int power_supply_am_i_supplied(struct power_supply *psy);
 extern int power_supply_set_input_current_limit_from_supplier(

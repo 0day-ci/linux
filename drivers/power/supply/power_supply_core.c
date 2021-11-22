@@ -589,6 +589,7 @@ int power_supply_get_battery_info(struct power_supply *psy,
 	info->temp_max                       = INT_MAX;
 	info->factory_internal_resistance_uohm  = -EINVAL;
 	info->resist_table = NULL;
+	info->ntc_resist_table = NULL;
 
 	for (index = 0; index < POWER_SUPPLY_OCV_TEMP_MAX; index++) {
 		info->ocv_table[index]       = NULL;
@@ -805,6 +806,57 @@ int power_supply_temp2resist_simple(struct power_supply_resistance_temp_table *t
 				       temp);
 }
 EXPORT_SYMBOL_GPL(power_supply_temp2resist_simple);
+
+/**
+ * power_supply_ntc_resist2temp_simple() - find the battery temperature
+ * @info: battery information
+ * @resistance_ohm: Current NTC resistance value in microohm
+ *
+ * This helper function is used to look up battery internal temperature
+ * according to current NTC resistance value from one NTC resistance table.
+ * The NTC resistance table must be ordered descending by resistance:
+ * largest resistance with lowest temperature first, lowest resistance with
+ * highest temperature last. The function will interpolate to find the
+ * corresponding temperature.
+ *
+ * Return: the battery temperature.
+ */
+int power_supply_ntc_resist2temp_simple(struct power_supply_battery_info *info,
+					int resistance_ohm)
+{
+	struct power_supply_ntc_resistance_temp_table *table;
+	int i, high, low;
+	int table_len;
+
+	table = info->ntc_resist_table;
+	table_len = info->ntc_resist_table_size;
+
+	if (!table || !table_len) {
+		pr_err("Empty battery NTC resistance table, assume 25 degrees\n");
+		return 25;
+	}
+	if (!resistance_ohm)
+		pr_info("Battery NTC resistance 0, this is unlikely\n");
+
+	/* Break loop at table_len - 1 because that is the highest index */
+	for (i = 0; i < table_len - 1; i++)
+		if (resistance_ohm > table[i].resistance_ohm)
+			break;
+
+	/* The library function will deal with high == low */
+	if ((i == 0) || (i == (table_len - 1)))
+		high = i;
+	else
+		high = i - 1;
+	low = i;
+
+	return fixp_linear_interpolate(table[low].resistance_ohm,
+				       table[low].temp,
+				       table[high].resistance_ohm,
+				       table[high].temp,
+				       resistance_ohm);
+}
+EXPORT_SYMBOL_GPL(power_supply_ntc_resist2temp_simple);
 
 /**
  * power_supply_ocv2cap_simple() - find the battery capacity

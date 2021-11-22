@@ -44,25 +44,25 @@ static struct power_supply_battery_ocv_table ocv_cap_tbl[] = {
 };
 
 /*
- * Note that the res_to_temp table must be strictly sorted by falling
+ * Note that the ntc_res_to_temp_tbl table must be strictly sorted by falling
  * resistance values to work.
  */
-static const struct ab8500_res_to_temp temp_tbl[] = {
-	{-5, 214834},
-	{ 0, 162943},
-	{ 5, 124820},
-	{10,  96520},
-	{15,  75306},
-	{20,  59254},
-	{25,  47000},
-	{30,  37566},
-	{35,  30245},
-	{40,  24520},
-	{45,  20010},
-	{50,  16432},
-	{55,  13576},
-	{60,  11280},
-	{65,   9425},
+static struct power_supply_ntc_resistance_temp_table ntc_res_to_temp_tbl[] = {
+	{ .resistance_ohm = 214834, .temp = -5},
+	{ .resistance_ohm = 162943, .temp = 0},
+	{ .resistance_ohm = 124820, .temp = 5},
+	{ .resistance_ohm = 96520, .temp = 10},
+	{ .resistance_ohm = 75306, .temp = 15},
+	{ .resistance_ohm = 59254, .temp = 20},
+	{ .resistance_ohm = 47000, .temp = 25},
+	{ .resistance_ohm = 37566, .temp = 30},
+	{ .resistance_ohm = 30245, .temp = 35},
+	{ .resistance_ohm = 24520, .temp = 40},
+	{ .resistance_ohm = 20010, .temp = 45},
+	{ .resistance_ohm = 16432, .temp = 50},
+	{ .resistance_ohm = 13576, .temp = 55},
+	{ .resistance_ohm = 11280, .temp = 60},
+	{ .resistance_ohm = 9425, .temp = 65},
 };
 
 /*
@@ -92,8 +92,6 @@ static struct ab8500_battery_type bat_type_thermistor_unknown = {
 	.maint_b_chg_timer_h = 200,
 	.low_high_cur_lvl = 300,
 	.low_high_vol_lvl = 4000,
-	.n_temp_tbl_elements = ARRAY_SIZE(temp_tbl),
-	.r_to_t_tbl = temp_tbl,
 };
 
 static const struct ab8500_bm_capacity_levels cap_levels = {
@@ -215,6 +213,11 @@ int ab8500_bm_of_probe(struct power_supply *psy,
 		bi->factory_internal_resistance_uohm = 300000;
 		bi->resist_table = temp_to_batres_tbl_thermistor;
 		bi->resist_table_size = ARRAY_SIZE(temp_to_batres_tbl_thermistor);
+	}
+
+	if (!bi->ntc_resist_table) {
+		bi->ntc_resist_table = ntc_res_to_temp_tbl;
+		bi->ntc_resist_table_size = ARRAY_SIZE(ntc_res_to_temp_tbl);
 	}
 
 	if (!bi->ocv_table[0]) {
