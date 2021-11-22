@@ -212,7 +212,7 @@ static int ast_detect_chip(struct drm_device *dev, bool *need_post)
 		}
 		break;
 	}
-
+	ast->support_wide_screen = true;
 	/* Check 3rd Tx option (digital output afaik) */
 	ast->tx_chip_type = AST_TX_NONE;
 
@@ -230,7 +230,7 @@ static int ast_detect_chip(struct drm_device *dev, bool *need_post)
 			ast->tx_chip_type = AST_TX_SIL164;
 	}
 
-	if ((ast->chip == AST2300) || (ast->chip == AST2400)) {
+	if ((ast->chip == AST2300) || (ast->chip == AST2400) || (ast->chip == AST2500)) {
 		/*
 		 * On AST2300 and 2400, look the configuration set by the SoC in
 		 * the SOC scratch register #1 bits 11:8 (interestingly marked
@@ -254,7 +254,8 @@ static int ast_detect_chip(struct drm_device *dev, bool *need_post)
 		case 0x0c:
 			ast->tx_chip_type = AST_TX_DP501;
 		}
-	}
+	} else if (ast->chip == AST2600)
+		ast_dp_launch(&ast->base, 0);
 
 	/* Print stuff for diagnostic purposes */
 	switch(ast->tx_chip_type) {
