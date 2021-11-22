@@ -78,6 +78,7 @@ int intel_guc_capture_list_count(struct intel_guc *guc, u32 owner, u32 type, u32
 				 u16 *num_entries);
 int intel_guc_capture_list_init(struct intel_guc *guc, u32 owner, u32 type, u32 class,
 				struct guc_mmio_reg *ptr, u16 num_entries);
+int intel_guc_capture_output_min_size_est(struct intel_guc *guc);
 void intel_guc_capture_destroy(struct intel_guc *guc);
 int intel_guc_capture_init(struct intel_guc *guc);
 

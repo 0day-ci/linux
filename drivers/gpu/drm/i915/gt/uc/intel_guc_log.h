@@ -42,9 +42,17 @@ struct intel_guc;
 #define GUC_VERBOSITY_TO_LOG_LEVEL(x)	((x) + 2)
 #define GUC_LOG_LEVEL_MAX GUC_VERBOSITY_TO_LOG_LEVEL(GUC_LOG_VERBOSITY_MAX)
 
+struct intel_guc_log_stats {
+	struct mutex lock; /* protects below and guc_log_buffer_state's read-ptr */
+	u32 sampled_overflow;
+	u32 overflow;
+	u32 flush;
+};
+
 struct intel_guc_log {
 	u32 level;
 	struct i915_vma *vma;
+	void *buf_addr;
 	struct {
 		void *buf_addr;
 		bool started;
@@ -53,12 +61,6 @@ struct intel_guc_log {
 		struct mutex lock;
 		u32 full_count;
 	} relay;
-	/* logging related stats */
-	struct {
-		u32 sampled_overflow;
-		u32 overflow;
-		u32 flush;
-	} stats[GUC_MAX_LOG_BUFFER];
 };
 
 void intel_guc_log_init_early(struct intel_guc_log *log);
