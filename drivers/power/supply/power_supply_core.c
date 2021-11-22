@@ -581,6 +581,7 @@ int power_supply_get_battery_info(struct power_supply *psy,
 	info->charge_term_current_ua         = -EINVAL;
 	info->constant_charge_current_max_ua = -EINVAL;
 	info->constant_charge_voltage_max_uv = -EINVAL;
+	info->maintenance_charge             = NULL;
 	info->temp_ambient_alert_min         = INT_MIN;
 	info->temp_ambient_alert_max         = INT_MAX;
 	info->temp_alert_min                 = INT_MIN;
@@ -857,6 +858,16 @@ int power_supply_ntc_resist2temp_simple(struct power_supply_battery_info *info,
 				       resistance_ohm);
 }
 EXPORT_SYMBOL_GPL(power_supply_ntc_resist2temp_simple);
+
+struct power_supply_maintenance_charge_table *
+power_supply_get_maintenance_charging_setting(struct power_supply_battery_info *info,
+					      int index)
+{
+	if (index >= info->maintenance_charge_size)
+		return NULL;
+	return &info->maintenance_charge[index];
+}
+EXPORT_SYMBOL_GPL(power_supply_get_maintenance_charging_setting);
 
 /**
  * power_supply_ocv2cap_simple() - find the battery capacity
