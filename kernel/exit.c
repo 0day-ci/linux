@@ -472,6 +472,13 @@ static void exit_mm(void)
 				break;
 			freezable_schedule();
 		}
+		/*
+		 * Re-trigger PTRACE_EVENT_EXIT for a process being core-dumped,
+		 * after the coredump finished (see above).
+		 * This enables the coredump user mode helper to receive PTRACE_EVENT_EXIT
+		 * for each thread of the dying process.
+		 */
+		ptrace_event(PTRACE_EVENT_EXIT, current->exit_code);
 		__set_current_state(TASK_RUNNING);
 		mmap_read_lock(mm);
 	}
