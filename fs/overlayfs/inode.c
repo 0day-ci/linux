@@ -778,8 +778,10 @@ void ovl_inode_init(struct inode *inode, struct ovl_inode_params *oip,
 {
 	struct inode *realinode;
 
-	if (oip->upperdentry)
+	if (oip->upperdentry) {
 		OVL_I(inode)->__upperdentry = oip->upperdentry;
+		mark_inode_dirty(inode);
+	}
 	if (oip->lowerpath && oip->lowerpath->dentry)
 		OVL_I(inode)->lower = igrab(d_inode(oip->lowerpath->dentry));
 	if (oip->lowerdata)
