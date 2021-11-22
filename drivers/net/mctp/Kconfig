@@ -3,6 +3,17 @@ if MCTP
 
 menu "MCTP Device Drivers"
 
+config MCTP_SERIAL
+	tristate "MCTP serial transport"
+	depends on TTY
+	select CRC_CCITT
+	help
+	  This driver provides an MCTP-over-serial interface, through a
+	  serial line-discipline. By attaching the ldisc to a serial device,
+	  we get a new net device to transport MCTP packets.
+
+	  Say y here if you need to connect to MCTP devices over serial.
+
 endmenu
 
 endif
