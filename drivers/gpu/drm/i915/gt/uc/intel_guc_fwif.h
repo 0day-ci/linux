@@ -267,6 +267,8 @@ struct guc_mmio_reg {
 	u32 value;
 	u32 flags;
 #define GUC_REGSET_MASKED		(1 << 0)
+#define GUC_REGSET_STEERING_GROUP       GENMASK(15, 12)
+#define GUC_REGSET_STEERING_INSTANCE    GENMASK(23, 20)
 	u32 mask;
 } __packed;
 
