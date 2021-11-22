@@ -883,8 +883,13 @@ __SYSCALL(__NR_process_mrelease, sys_process_mrelease)
 #define __NR_futex_waitv 449
 __SYSCALL(__NR_futex_waitv, sys_futex_waitv)
 
+#define __NR_umcg_ctl 450
+__SYSCALL(__NR_umcg_ctl, sys_umcg_ctl)
+#define __NR_umcg_wait 451
+__SYSCALL(__NR_umcg_wait, sys_umcg_wait)
 #undef __NR_syscalls
-#define __NR_syscalls 450
+
+#define __NR_syscalls 452
 
 /*
  * 32 bit systems traditionally used different
