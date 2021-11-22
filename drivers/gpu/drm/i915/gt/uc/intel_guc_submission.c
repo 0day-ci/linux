@@ -24,6 +24,7 @@
 
 #include "intel_guc_ads.h"
 #include "intel_guc_submission.h"
+#include "gt/uc/intel_guc_capture.h"
 
 #include "i915_drv.h"
 #include "i915_trace.h"
@@ -1425,6 +1426,8 @@ void intel_guc_submission_reset_prepare(struct intel_guc *guc)
 	}
 
 	scrub_guc_desc_for_outstanding_g2h(guc);
+
+	intel_guc_capture_store_snapshot_immediate(guc);
 }
 
 static struct intel_engine_cs *
@@ -4007,10 +4010,11 @@ int intel_guc_error_capture_process_msg(struct intel_guc *guc,
 		return -EPROTO;
 	}
 
-	status = msg[0];
-	drm_info(&guc_to_gt(guc)->i915->drm, "Got error capture: status = %d", status);
+	status = msg[0] & INTEL_GUC_STATE_CAPTURE_EVENT_STATUS_MASK;
+	if (status == INTEL_GUC_STATE_CAPTURE_EVENT_STATUS_NOSPACE)
+		drm_warn(&guc_to_gt(guc)->i915->drm, "G2H-Error capture no space\n");
 
-	/* Add extraction of error capture dump */
+	intel_guc_capture_store_snapshot(guc);
 
 	return 0;
 }

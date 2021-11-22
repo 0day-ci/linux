@@ -64,8 +64,13 @@ struct intel_guc_log {
 };
 
 void intel_guc_log_init_early(struct intel_guc_log *log);
+unsigned int guc_get_log_buffer_size(enum guc_log_buffer_type type);
+size_t guc_get_log_buffer_offset(enum guc_log_buffer_type type);
 int intel_guc_log_create(struct intel_guc_log *log);
 void intel_guc_log_destroy(struct intel_guc_log *log);
+ 
+bool guc_check_log_buf_overflow(struct intel_guc *guc, struct intel_guc_log_stats *state,
+				unsigned int full_cnt);
 
 int intel_guc_log_set_level(struct intel_guc_log *log, u32 level);
 bool intel_guc_log_relay_created(const struct intel_guc_log *log);

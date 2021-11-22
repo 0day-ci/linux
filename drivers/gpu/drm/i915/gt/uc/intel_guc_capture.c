@@ -11,8 +11,11 @@
 #include "gt/intel_gt.h"
 #include "gt/intel_lrc_reg.h"
 
+#include <linux/circ_buf.h>
+
 #include "intel_guc_fwif.h"
 #include "intel_guc_capture.h"
+#include "i915_gpu_error.h"
 
 /*
  * Define all device tables of GuC error capture register lists
@@ -390,15 +393,218 @@ int intel_guc_capture_output_min_size_est(struct intel_guc *guc)
 	return (worst_min_size * 3);
 }
 
+/*
+ * KMD Init time flows:
+ * --------------------
+ *     --> alloc A: GuC input capture regs lists (registered via ADS)
+ *                  List acquired via intel_guc_capture_list_count + intel_guc_capture_list_init
+ *                  Size = global-reg-list + (class-reg-list) + (num-instances x instance-reg-list)
+ *                  Device tables carry: 1x global, 1x per-class, 1x per-instance)
+ *                  Caller needs to call per-class and per-instance multiplie times
+ *
+ *     --> alloc B: GuC output capture buf (registered via guc_init_params(log_param))
+ *                  Size = #define CAPTURE_BUFFER_SIZE (warns if on too-small)
+ *                  Note2: 'x 3' to hold multiple capture groups
+ *
+ *     --> alloc C: GuC capture interim circular buffer storage in system mem
+ *                  Size = 'power_of_two(sizeof(B))' as per kernel circular buffer helper
+ *
+ * GUC Runtime notify capture:
+ * --------------------------
+ *     --> G2H STATE_CAPTURE_NOTIFICATION
+ *                   L--> intel_guc_capture_store_snapshot
+ *                        L--> queue(__guc_capture_store_snapshot_work)
+ *                             Copies from B (head->tail) into C
+ */
+
+static void guc_capture_store_insert(struct intel_guc *guc, struct guc_capture_out_store *store,
+				     unsigned char *new_data, size_t bytes)
+{
+	struct drm_i915_private *dev_priv = (guc_to_gt(guc))->i915;
+	unsigned char *dst_data = store->addr;
+	unsigned long h, t;
+	size_t tmp;
+
+	h = store->head;
+	t = store->tail;
+	if (CIRC_SPACE(h, t, store->size) >= bytes) {
+		while (bytes) {
+			tmp = CIRC_SPACE_TO_END(h, t, store->size);
+			if (tmp) {
+				tmp = tmp < bytes ? tmp : bytes;
+				i915_unaligned_memcpy_from_wc(&dst_data[h], new_data, tmp);
+				bytes -= tmp;
+				new_data += tmp;
+				h = (h + tmp) & (store->size - 1);
+			} else {
+				drm_err(&dev_priv->drm, "circbuf copy-to ptr-corruption!\n");
+				break;
+			}
+		}
+		store->head = h;
+	} else {
+		drm_err(&dev_priv->drm, "GuC capture interim-store insufficient space!\n");
+	}
+}
+
+static void __guc_capture_store_snapshot_work(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = (guc_to_gt(guc))->i915;
+	unsigned int buffer_size, read_offset, write_offset, bytes_to_copy, full_count;
+	struct guc_log_buffer_state *log_buf_state;
+	struct guc_log_buffer_state log_buf_state_local;
+	void *src_data, *dst_data = NULL;
+	bool new_overflow;
+
+	/* Lock to get the pointer to GuC capture-log-buffer-state */
+	mutex_lock(&guc->log_state[GUC_CAPTURE_LOG_BUFFER].lock);
+	log_buf_state = guc->log.buf_addr +
+			(sizeof(struct guc_log_buffer_state) * GUC_CAPTURE_LOG_BUFFER);
+	src_data = guc->log.buf_addr + guc_get_log_buffer_offset(GUC_CAPTURE_LOG_BUFFER);
+
+	/*
+	 * Make a copy of the state structure, inside GuC log buffer
+	 * (which is uncached mapped), on the stack to avoid reading
+	 * from it multiple times.
+	 */
+	memcpy(&log_buf_state_local, log_buf_state, sizeof(struct guc_log_buffer_state));
+	buffer_size = guc_get_log_buffer_size(GUC_CAPTURE_LOG_BUFFER);
+	read_offset = log_buf_state_local.read_ptr;
+	write_offset = log_buf_state_local.sampled_write_ptr;
+	full_count = log_buf_state_local.buffer_full_cnt;
+
+	/* Bookkeeping stuff */
+	guc->log_state[GUC_CAPTURE_LOG_BUFFER].flush += log_buf_state_local.flush_to_file;
+	new_overflow = guc_check_log_buf_overflow(guc, &guc->log_state[GUC_CAPTURE_LOG_BUFFER],
+						  full_count);
+
+	/* Update the state of shared log buffer */
+	log_buf_state->read_ptr = write_offset;
+	log_buf_state->flush_to_file = 0;
+
+	mutex_unlock(&guc->log_state[GUC_CAPTURE_LOG_BUFFER].lock);
+
+	dst_data = guc->capture.out_store.addr;
+	if (dst_data) {
+		mutex_lock(&guc->capture.out_store.lock);
+
+		/* Now copy the actual logs. */
+		if (unlikely(new_overflow)) {
+			/* copy the whole buffer in case of overflow */
+			read_offset = 0;
+			write_offset = buffer_size;
+		} else if (unlikely((read_offset > buffer_size) ||
+					(write_offset > buffer_size))) {
+			drm_err(&dev_priv->drm, "invalid GuC log capture buffer state!\n");
+			/* copy whole buffer as offsets are unreliable */
+			read_offset = 0;
+			write_offset = buffer_size;
+		}
+
+		/* first copy from the tail end of the GuC log capture buffer */
+		if (read_offset > write_offset) {
+			guc_capture_store_insert(guc, &guc->capture.out_store, src_data,
+						 write_offset);
+			bytes_to_copy = buffer_size - read_offset;
+		} else {
+			bytes_to_copy = write_offset - read_offset;
+		}
+		guc_capture_store_insert(guc, &guc->capture.out_store, src_data + read_offset,
+					 bytes_to_copy);
+
+		mutex_unlock(&guc->capture.out_store.lock);
+	}
+}
+
+static void guc_capture_store_snapshot_work(struct work_struct *work)
+{
+	struct intel_guc_state_capture *capture =
+		container_of(work, struct intel_guc_state_capture, store_work);
+	struct intel_guc *guc =
+		container_of(capture, struct intel_guc, capture);
+
+	__guc_capture_store_snapshot_work(guc);
+}
+
+void  intel_guc_capture_store_snapshot(struct intel_guc *guc)
+{
+	if (guc->capture.enabled)
+		queue_work(system_highpri_wq, &guc->capture.store_work);
+}
+
+void intel_guc_capture_store_snapshot_immediate(struct intel_guc *guc)
+{
+	if (guc->capture.enabled)
+		__guc_capture_store_snapshot_work(guc);
+}
+
+static void guc_capture_store_destroy(struct intel_guc *guc)
+{
+	mutex_destroy(&guc->capture.out_store.lock);
+	mutex_destroy(&guc->capture.out_store.lock);
+	guc->capture.out_store.size = 0;
+	kfree(guc->capture.out_store.addr);
+	guc->capture.out_store.addr = NULL;
+}
+
+static int guc_capture_store_create(struct intel_guc *guc)
+{
+	/*
+	 * Make this interim buffer 3x the GuC capture output buffer so that we can absorb
+	 * a little delay when processing the raw capture dumps into text friendly logs
+	 * for the i915_gpu_coredump output
+	 */
+	size_t max_dump_size;
+	struct drm_i915_private *dev_priv = (guc_to_gt(guc))->i915;
+
+	GEM_BUG_ON(guc->capture.out_store.addr);
+
+	max_dump_size = PAGE_ALIGN(intel_guc_capture_output_min_size_est(guc));
+	max_dump_size = roundup_pow_of_two(max_dump_size);
+
+	guc->capture.out_store.addr = kzalloc(max_dump_size, GFP_KERNEL);
+	if (!guc->capture.out_store.addr) {
+		drm_warn(&dev_priv->drm, "GuC-capture interim-store populated at init!\n");
+		return -ENOMEM;
+	}
+	guc->capture.out_store.size = max_dump_size;
+	mutex_init(&guc->capture.out_store.lock);
+	mutex_init(&guc->capture.out_store.lock);
+
+	return 0;
+}
+
 void intel_guc_capture_destroy(struct intel_guc *guc)
 {
+	if (!guc->capture.enabled)
+		return;
+
+	guc->capture.enabled = false;
+
+	intel_synchronize_irq(guc_to_gt(guc)->i915);
+	flush_work(&guc->capture.store_work);
+	guc_capture_store_destroy(guc);
 	guc_capture_clear_ext_regs(guc->capture.reglists);
 }
 
 int intel_guc_capture_init(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = (guc_to_gt(guc))->i915;
+	int ret;
 
 	guc->capture.reglists = guc_capture_get_device_reglist(dev_priv);
+	/*
+	 * allocate interim store at init time so we dont require memory
+	 * allocation whilst in the midst of the reset + capture
+	 */
+	ret = guc_capture_store_create(guc);
+	if (ret) {
+		guc_capture_clear_ext_regs(guc->capture.reglists);
+		return ret;
+	}
+
+	INIT_WORK(&guc->capture.store_work, guc_capture_store_snapshot_work);
+	guc->capture.enabled = true;
+
 	return 0;
 }

@@ -194,7 +194,7 @@ bool guc_check_log_buf_overflow(struct intel_guc *guc,
 	return overflow;
 }
 
-static unsigned int guc_get_log_buffer_size(enum guc_log_buffer_type type)
+unsigned int guc_get_log_buffer_size(enum guc_log_buffer_type type)
 {
 	switch (type) {
 	case GUC_DEBUG_LOG_BUFFER:
@@ -208,6 +208,20 @@ static unsigned int guc_get_log_buffer_size(enum guc_log_buffer_type type)
 	}
 
 	return 0;
+}
+
+size_t guc_get_log_buffer_offset(enum guc_log_buffer_type type)
+{
+	enum guc_log_buffer_type i;
+	size_t offset = PAGE_SIZE;/* for the log_buffer_states */
+
+	for (i = GUC_DEBUG_LOG_BUFFER; i < GUC_MAX_LOG_BUFFER; i++) {
+		if (i == type)
+			break;
+		offset += guc_get_log_buffer_size(i);
+	}
+
+	return offset;
 }
 
 static void _guc_log_copy_debuglogs_for_relay(struct intel_guc_log *log)

@@ -64,7 +64,19 @@ struct intel_guc_capture_out_group {
 	struct intel_guc_capture_out_data group_lists[0];
 };
 
+struct guc_capture_out_store {
+	/* An interim storage to copy the GuC error-capture-output before
+	 * parsing and reporting via proper reporting flows with formatting.
+	 */
+	unsigned char *addr;
+	size_t size;
+	unsigned long head; /* inject new output capture data */
+	unsigned long tail; /* remove output capture data when reporting */
+	struct mutex lock; /*lock head or tail when copying capture in or extracting out*/
+};
+
 struct intel_guc_state_capture {
+	bool enabled;
 	struct __guc_mmio_reg_descr_group *reglists;
 	u16 num_instance_regs[GUC_CAPTURE_LIST_INDEX_MAX][GUC_MAX_ENGINE_CLASSES];
 	u16 num_class_regs[GUC_CAPTURE_LIST_INDEX_MAX][GUC_MAX_ENGINE_CLASSES];
@@ -72,14 +84,18 @@ struct intel_guc_state_capture {
 	int instance_list_size;
 	int class_list_size;
 	int global_list_size;
+	struct guc_capture_out_store out_store;
+	struct work_struct store_work;
 };
 
+void intel_guc_capture_store_snapshot(struct intel_guc *guc);
 int intel_guc_capture_list_count(struct intel_guc *guc, u32 owner, u32 type, u32 class,
 				 u16 *num_entries);
 int intel_guc_capture_list_init(struct intel_guc *guc, u32 owner, u32 type, u32 class,
 				struct guc_mmio_reg *ptr, u16 num_entries);
 int intel_guc_capture_output_min_size_est(struct intel_guc *guc);
 void intel_guc_capture_destroy(struct intel_guc *guc);
+void intel_guc_capture_store_snapshot_immediate(struct intel_guc *guc);
 int intel_guc_capture_init(struct intel_guc *guc);
 
 #endif /* _INTEL_GUC_CAPTURE_H */
