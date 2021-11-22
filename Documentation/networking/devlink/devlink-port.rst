@@ -122,6 +122,10 @@ A user may set the hardware address of the function using
 'devlink port function set hw_addr' command. For Ethernet port function
 this means a MAC address.
 
+A user can set a function as trusted so that a function has the additional
+privileges. One example is to allow trusted function to query and operate
+the steering database similar to the switchdev device.
+
 Subfunction
 ============
 

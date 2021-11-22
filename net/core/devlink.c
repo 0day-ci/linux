@@ -147,6 +147,7 @@ static const struct nla_policy devlink_function_nl_policy[DEVLINK_PORT_FUNCTION_
 	[DEVLINK_PORT_FN_ATTR_STATE] =
 		NLA_POLICY_RANGE(NLA_U8, DEVLINK_PORT_FN_STATE_INACTIVE,
 				 DEVLINK_PORT_FN_STATE_ACTIVE),
+	[DEVLINK_PORT_FN_ATTR_TRUSTED] = { .type = NLA_U8 },
 };
 
 static DEFINE_XARRAY_FLAGS(devlinks, XA_FLAGS_ALLOC);
@@ -986,6 +987,31 @@ devlink_port_fn_opstate_valid(enum devlink_port_fn_opstate opstate)
 	       opstate == DEVLINK_PORT_FN_OPSTATE_ATTACHED;
 }
 
+static int devlink_port_fn_trusted_fill(const struct devlink_ops *ops,
+					struct devlink_port *port,
+					struct sk_buff *msg,
+					struct netlink_ext_ack *extack,
+					bool *msg_updated)
+{
+	bool trusted;
+	int err;
+
+	if (!ops->port_fn_trusted_get)
+		return 0;
+
+	err = ops->port_fn_trusted_get(port, &trusted, extack);
+	if (err) {
+		if (err == -EOPNOTSUPP)
+			return 0;
+		return err;
+	}
+
+	if (nla_put_u8(msg, DEVLINK_PORT_FN_ATTR_TRUSTED, trusted))
+		return -EMSGSIZE;
+	*msg_updated = true;
+	return 0;
+}
+
 static int devlink_port_fn_state_fill(const struct devlink_ops *ops,
 				      struct devlink_port *port,
 				      struct sk_buff *msg,
@@ -1042,6 +1068,9 @@ devlink_nl_port_function_attrs_put(struct sk_buff *msg, struct devlink_port *por
 	if (err)
 		goto out;
 	err = devlink_port_fn_state_fill(ops, port, msg, extack, &msg_updated);
+	if (err)
+		goto out;
+	err = devlink_port_fn_trusted_fill(ops, port, msg, extack, &msg_updated);
 out:
 	if (err || !msg_updated)
 		nla_nest_cancel(msg, function_attr);
@@ -1434,6 +1463,25 @@ static int devlink_port_function_hw_addr_set(struct devlink_port *port,
 					      extack);
 }
 
+static int devlink_port_fn_trusted_set(struct devlink_port *port,
+				       const struct nlattr *attr,
+				       struct netlink_ext_ack *extack)
+{
+	const struct devlink_ops *ops;
+	bool trusted;
+
+	if (nla_get_u8(attr) > 1)
+		return -EINVAL;
+
+	trusted = nla_get_u8(attr);
+	ops = port->devlink->ops;
+	if (!ops->port_fn_trusted_set) {
+		NL_SET_ERR_MSG_MOD(extack, "Function does not support trust setting");
+		return -EOPNOTSUPP;
+	}
+	return ops->port_fn_trusted_set(port, trusted, extack);
+}
+
 static int devlink_port_fn_state_set(struct devlink_port *port,
 				     const struct nlattr *attr,
 				     struct netlink_ext_ack *extack)
@@ -1468,6 +1516,13 @@ static int devlink_port_function_set(struct devlink_port *port,
 	attr = tb[DEVLINK_PORT_FUNCTION_ATTR_HW_ADDR];
 	if (attr) {
 		err = devlink_port_function_hw_addr_set(port, attr, extack);
+		if (err)
+			return err;
+	}
+
+	attr = tb[DEVLINK_PORT_FN_ATTR_TRUSTED];
+	if (attr) {
+		err = devlink_port_fn_trusted_set(port, attr, extack);
 		if (err)
 			return err;
 	}

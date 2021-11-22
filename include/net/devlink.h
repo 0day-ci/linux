@@ -1462,6 +1462,28 @@ struct devlink_ops {
 				 struct netlink_ext_ack *extack);
 
 	/**
+	 * port_fn_trusted_get() - Get the trusted state of port function
+	 * @port: The devlink port
+	 * @trusted: Query privilege state
+	 * @extack: extack for reporting error messages
+	 *
+	 * Return: 0 on success, negative value otherwise.
+	 */
+	int (*port_fn_trusted_get)(struct devlink_port *port,
+				   bool *trusted,
+				   struct netlink_ext_ack *extack);
+	/**
+	 * port_fn_trusted_set() - Set the trusted state of port function
+	 * @port: The devlink port
+	 * @trusted: Set privilege state
+	 * @extack: extack for reporting error messages
+	 *
+	 * Return: 0 on success, negative value otherwise.
+	 */
+	int (*port_fn_trusted_set)(struct devlink_port *port,
+				   bool trusted,
+				   struct netlink_ext_ack *extack);
+	/**
 	 * Rate control callbacks.
 	 */
 	int (*rate_leaf_tx_share_set)(struct devlink_rate *devlink_rate, void *priv,
