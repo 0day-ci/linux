@@ -210,28 +210,30 @@ static int ems_pcmcia_add_card(struct pcmcia_device *pdev, unsigned long base)
 			(i * EMS_PCMCIA_CAN_CTRL_SIZE);
 
 		/* Check if channel is present */
-		if (ems_pcmcia_check_chan(priv)) {
-			priv->read_reg  = ems_pcmcia_read_reg;
-			priv->write_reg = ems_pcmcia_write_reg;
-			priv->can.clock.freq = EMS_PCMCIA_CAN_CLOCK;
-			priv->ocr = EMS_PCMCIA_OCR;
-			priv->cdr = EMS_PCMCIA_CDR;
-			priv->flags |= SJA1000_CUSTOM_IRQ_HANDLER;
-
-			/* Register SJA1000 device */
-			err = register_sja1000dev(dev);
-			if (err) {
-				free_sja1000dev(dev);
-				goto failure_cleanup;
-			}
-
-			card->channels++;
-
-			printk(KERN_INFO "%s: registered %s on channel "
-			       "#%d at 0x%p, irq %d\n", DRV_NAME, dev->name,
-			       i, priv->reg_base, dev->irq);
-		} else
+		if (!ems_pcmcia_check_chan(priv)) {
+			err = -EINVAL;
 			free_sja1000dev(dev);
+			goto failure_cleanup;
+		}
+		priv->read_reg  = ems_pcmcia_read_reg;
+		priv->write_reg = ems_pcmcia_write_reg;
+		priv->can.clock.freq = EMS_PCMCIA_CAN_CLOCK;
+		priv->ocr = EMS_PCMCIA_OCR;
+		priv->cdr = EMS_PCMCIA_CDR;
+		priv->flags |= SJA1000_CUSTOM_IRQ_HANDLER;
+
+		/* Register SJA1000 device */
+		err = register_sja1000dev(dev);
+		if (err) {
+			free_sja1000dev(dev);
+			goto failure_cleanup;
+		}
+
+		card->channels++;
+
+		printk(KERN_INFO "%s: registered %s on channel "
+		       "#%d at 0x%p, irq %d\n", DRV_NAME, dev->name,
+		       i, priv->reg_base, dev->irq);
 	}
 
 	err = request_irq(dev->irq, &ems_pcmcia_interrupt, IRQF_SHARED,
