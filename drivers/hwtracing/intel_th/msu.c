@@ -7,6 +7,7 @@
 
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
+#include <linux/bitfield.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -789,8 +790,8 @@ static int msc_configure(struct msc *msc)
 	reg &= ~(MSC_MODE | MSC_WRAPEN | MSC_EN | MSC_RD_HDR_OVRD);
 
 	reg |= MSC_EN;
-	reg |= msc->mode << __ffs(MSC_MODE);
-	reg |= msc->burst_len << __ffs(MSC_LEN);
+	reg |= FIELD_PREP(MSC_MODE, msc->mode);
+	reg |= FIELD_PREP(MSC_LEN, msc->burst_len);
 
 	if (msc->wrap)
 		reg |= MSC_WRAPEN;
@@ -1691,8 +1692,7 @@ static int intel_th_msc_init(struct msc *msc)
 	INIT_LIST_HEAD(&msc->iter_list);
 
 	msc->burst_len =
-		(ioread32(msc->reg_base + REG_MSU_MSC0CTL) & MSC_LEN) >>
-		__ffs(MSC_LEN);
+		FIELD_GET(MSC_LEN, ioread32(msc->reg_base + REG_MSU_MSC0CTL));
 
 	return 0;
 }

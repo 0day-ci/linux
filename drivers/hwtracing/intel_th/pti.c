@@ -7,6 +7,7 @@
 
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
+#include <linux/bitfield.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -152,12 +153,12 @@ static int intel_th_pti_activate(struct intel_th_device *thdev)
 	u32 ctl = PTI_EN;
 
 	if (pti->patgen)
-		ctl |= pti->patgen << __ffs(PTI_PATGENMODE);
+		ctl |= FIELD_PREP(PTI_PATGENMODE, pti->patgen);
 	if (pti->freeclk)
 		ctl |= PTI_FCEN;
-	ctl |= pti->mode << __ffs(PTI_MODE);
-	ctl |= pti->clkdiv << __ffs(PTI_CLKDIV);
-	ctl |= pti->lpp_dest << __ffs(LPP_DEST);
+	ctl |= FIELD_PREP(PTI_MODE, pti->mode);
+	ctl |= FIELD_PREP(PTI_CLKDIV, pti->clkdiv);
+	ctl |= FIELD_PREP(LPP_DEST, pti->lpp_dest);
 
 	iowrite32(ctl, pti->base + REG_PTI_CTL);
 
@@ -179,8 +180,8 @@ static void read_hw_config(struct pti_device *pti)
 {
 	u32 ctl = ioread32(pti->base + REG_PTI_CTL);
 
-	pti->mode	= (ctl & PTI_MODE) >> __ffs(PTI_MODE);
-	pti->clkdiv	= (ctl & PTI_CLKDIV) >> __ffs(PTI_CLKDIV);
+	pti->mode	= FIELD_GET(PTI_MODE, ctl);
+	pti->clkdiv	= FIELD_GET(PTI_CLKDIV, ctl);
 	pti->freeclk	= !!(ctl & PTI_FCEN);
 
 	if (!pti_mode[pti->mode])
