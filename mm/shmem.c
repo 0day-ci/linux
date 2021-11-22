@@ -559,7 +559,7 @@ static unsigned long shmem_unused_huge_shrink(struct shmem_sb_info *sbinfo,
 	if (list_empty(&sbinfo->shrinklist))
 		return SHRINK_STOP;
 
-	spin_lock(&sbinfo->shrinklist_lock);
+	mutex_lock(&sbinfo->shrinklist_mutex);
 	list_for_each_safe(pos, next, &sbinfo->shrinklist) {
 		info = list_entry(pos, struct shmem_inode_info, shrinklist);
 
@@ -586,7 +586,6 @@ next:
 		if (!--batch)
 			break;
 	}
-	spin_unlock(&sbinfo->shrinklist_lock);
 
 	list_for_each_safe(pos, next, &to_remove) {
 		info = list_entry(pos, struct shmem_inode_info, shrinklist);
@@ -643,10 +642,9 @@ leave:
 		iput(inode);
 	}
 
-	spin_lock(&sbinfo->shrinklist_lock);
 	list_splice_tail(&list, &sbinfo->shrinklist);
 	sbinfo->shrinklist_len -= removed;
-	spin_unlock(&sbinfo->shrinklist_lock);
+	mutex_unlock(&sbinfo->shrinklist_mutex);
 
 	return split;
 }
@@ -1137,12 +1135,12 @@ static void shmem_evict_inode(struct inode *inode)
 		inode->i_size = 0;
 		shmem_truncate_range(inode, 0, (loff_t)-1);
 		if (!list_empty(&info->shrinklist)) {
-			spin_lock(&sbinfo->shrinklist_lock);
+		    mutex_lock(&sbinfo->shrinklist_mutex);
 			if (!list_empty(&info->shrinklist)) {
 				list_del_init(&info->shrinklist);
 				sbinfo->shrinklist_len--;
 			}
-			spin_unlock(&sbinfo->shrinklist_lock);
+		    mutex_unlock(&sbinfo->shrinklist_mutex);
 		}
 		while (!list_empty(&info->swaplist)) {
 			/* Wait while shmem_unuse() is scanning this inode... */
@@ -1954,7 +1952,7 @@ alloc_nohuge:
 		 * Part of the huge page is beyond i_size: subject
 		 * to shrink under memory pressure.
 		 */
-		spin_lock(&sbinfo->shrinklist_lock);
+		mutex_lock(&sbinfo->shrinklist_mutex);
 		/*
 		 * _careful to defend against unlocked access to
 		 * ->shrink_list in shmem_unused_huge_shrink()
@@ -1964,7 +1962,7 @@ alloc_nohuge:
 				      &sbinfo->shrinklist);
 			sbinfo->shrinklist_len++;
 		}
-		spin_unlock(&sbinfo->shrinklist_lock);
+		mutex_unlock(&sbinfo->shrinklist_mutex);
 	}
 
 	/*
@@ -3694,7 +3692,7 @@ static int shmem_fill_super(struct super_block *sb, struct fs_context *fc)
 	raw_spin_lock_init(&sbinfo->stat_lock);
 	if (percpu_counter_init(&sbinfo->used_blocks, 0, GFP_KERNEL))
 		goto failed;
-	spin_lock_init(&sbinfo->shrinklist_lock);
+	mutex_init(&sbinfo->shrinklist_mutex);
 	INIT_LIST_HEAD(&sbinfo->shrinklist);
 
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
