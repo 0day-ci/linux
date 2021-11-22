@@ -1706,6 +1706,12 @@ netdev_queue_update_kobjects(struct net_device *dev, int old_num, int new_num)
 	int i;
 	int error = 0;
 
+	/* When unregistering a net device we can't register new kobjects, as
+	 * this would result in an UaF of the device's kobj.
+	 */
+	if (dev->reg_state == NETREG_UNREGISTERING && new_num > old_num)
+		return -EINVAL;
+
 	for (i = old_num; i < new_num; i++) {
 		error = netdev_queue_add_kobject(dev, i);
 		if (error) {
@@ -1725,6 +1731,7 @@ netdev_queue_update_kobjects(struct net_device *dev, int old_num, int new_num)
 		kobject_put(&queue->kobj);
 	}
 
+	dev->real_num_tx_queues = new_num;
 	return error;
 #else
 	return 0;
