@@ -292,18 +292,14 @@ static int ovl_sync_fs(struct super_block *sb, int wait)
 	/*
 	 * Not called for sync(2) call or an emergency sync (SB_I_SKIP_SYNC).
 	 * All the super blocks will be iterated, including upper_sb.
-	 *
-	 * If this is a syncfs(2) call, then we do need to call
-	 * sync_filesystem() on upper_sb, but enough if we do it when being
-	 * called with wait == 1.
 	 */
-	if (!wait)
-		return 0;
-
 	upper_sb = ovl_upper_mnt(ofs)->mnt_sb;
-
 	down_read(&upper_sb->s_umount);
-	ret = sync_filesystem(upper_sb);
+	if (wait)
+		wait_sb_inodes(upper_sb);
+	if (upper_sb->s_op->sync_fs)
+		upper_sb->s_op->sync_fs(upper_sb, wait);
+	ret = ovl_sync_upper_blockdev(upper_sb, wait);
 	up_read(&upper_sb->s_umount);
 
 	return ret;
