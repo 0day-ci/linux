@@ -198,6 +198,7 @@ void wakeup_flusher_threads_bdi(struct backing_dev_info *bdi,
 				enum wb_reason reason);
 void inode_wait_for_writeback(struct inode *inode);
 void inode_io_list_del(struct inode *inode);
+void wait_sb_inodes(struct super_block *sb);
 
 /* writeback.h requires fs.h; it, too, is not included from here. */
 static inline void wait_on_inode(struct inode *inode)

@@ -2505,7 +2505,7 @@ EXPORT_SYMBOL(__mark_inode_dirty);
  * completed by the time we have gained the lock and waited for all IO that is
  * in progress regardless of the order callers are granted the lock.
  */
-static void wait_sb_inodes(struct super_block *sb)
+void wait_sb_inodes(struct super_block *sb)
 {
 	LIST_HEAD(sync_list);
 
@@ -2589,6 +2589,7 @@ static void wait_sb_inodes(struct super_block *sb)
 	rcu_read_unlock();
 	mutex_unlock(&sb->s_sync_lock);
 }
+EXPORT_SYMBOL(wait_sb_inodes);
 
 static void __writeback_inodes_sb_nr(struct super_block *sb, unsigned long nr,
 				     enum wb_reason reason, bool skip_if_busy)
