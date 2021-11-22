@@ -2027,10 +2027,10 @@ intel_wait_for_vblank(struct drm_i915_private *dev_priv, enum pipe pipe)
 static inline void
 intel_wait_for_vblank_if_active(struct drm_i915_private *dev_priv, enum pipe pipe)
 {
-	const struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
+	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 
 	if (crtc->active)
-		intel_wait_for_vblank(dev_priv, pipe);
+		drm_crtc_wait_one_vblank(&crtc->base);
 }
 
 static inline bool intel_modifier_uses_dpt(struct drm_i915_private *i915, u64 modifier)
