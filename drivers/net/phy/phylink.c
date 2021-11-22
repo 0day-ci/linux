@@ -741,6 +741,12 @@ static void phylink_resolve(struct work_struct *w)
 		case MLO_AN_INBAND:
 			phylink_mac_pcs_get_state(pl, &link_state);
 
+			/* The PCS may have a latching link-fail indicator.
+			 * If the PCS link goes down, retrigger a resolve.
+			 */
+			if (!link_state.link && cur_link_state)
+				retrigger = true;
+
 			/* If we have a phy, the "up" state is the union of
 			 * both the PHY and the MAC
 			 */
