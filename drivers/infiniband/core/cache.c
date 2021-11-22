@@ -963,9 +963,13 @@ int rdma_query_gid(struct ib_device *device, u32 port_num,
 	table = rdma_gid_table(device, port_num);
 	read_lock_irqsave(&table->rwlock, flags);
 
-	if (index < 0 || index >= table->sz ||
-	    !is_gid_entry_valid(table->data_vec[index]))
+	if (index < 0 || index >= table->sz)
 		goto done;
+
+	if (!is_gid_entry_valid(table->data_vec[index])) {
+		res = -ENOENT;
+		goto done;
+	}
 
 	memcpy(gid, &table->data_vec[index]->attr.gid, sizeof(*gid));
 	res = 0;
