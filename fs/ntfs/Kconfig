@@ -49,8 +49,13 @@ config NTFS_DEBUG
 	  When reporting bugs, please try to have available a full dump of
 	  debugging messages while the misbehaviour was occurring.
 
+config DISABLE_NTFS_RW
+	bool
+	default y if PPC
+
 config NTFS_RW
 	bool "NTFS write support"
+	depends on !DISABLE_NTFS_RW
 	depends on NTFS_FS
 	help
 	  This enables the partial, but safe, write support in the NTFS driver.
