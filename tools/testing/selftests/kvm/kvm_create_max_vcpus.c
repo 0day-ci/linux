@@ -12,12 +12,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 
 #include "test_util.h"
 
 #include "kvm_util.h"
 #include "asm/kvm.h"
 #include "linux/kvm.h"
+
+/* 'Safe' number of open file descriptors in addition to vCPU fds needed */
+#define NOFD 16
 
 void test_vcpu_creation(int first_vcpu_id, int num_vcpus)
 {
@@ -40,9 +44,27 @@ int main(int argc, char *argv[])
 {
 	int kvm_max_vcpu_id = kvm_check_cap(KVM_CAP_MAX_VCPU_ID);
 	int kvm_max_vcpus = kvm_check_cap(KVM_CAP_MAX_VCPUS);
+	struct rlimit rl;
 
 	pr_info("KVM_CAP_MAX_VCPU_ID: %d\n", kvm_max_vcpu_id);
 	pr_info("KVM_CAP_MAX_VCPUS: %d\n", kvm_max_vcpus);
+
+	/*
+	 * Creating KVM_CAP_MAX_VCPUS vCPUs require KVM_CAP_MAX_VCPUS open
+	 * file decriptors.
+	 */
+	TEST_ASSERT(!getrlimit(RLIMIT_NOFILE, &rl),
+		    "getrlimit() failed (errno: %d)", errno);
+
+	if (kvm_max_vcpus > rl.rlim_cur - NOFD) {
+		rl.rlim_cur = kvm_max_vcpus + NOFD;
+
+		if (kvm_max_vcpus > rl.rlim_max - NOFD)
+			rl.rlim_max = kvm_max_vcpus + NOFD;
+
+		TEST_ASSERT(!setrlimit(RLIMIT_NOFILE, &rl),
+			    "setrlimit() failed (errno: %d)", errno);
+	}
 
 	/*
 	 * Upstream KVM prior to 4.8 does not support KVM_CAP_MAX_VCPU_ID.
