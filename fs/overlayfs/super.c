@@ -258,6 +258,16 @@ static void ovl_put_super(struct super_block *sb)
 	ovl_free_fs(ofs);
 }
 
+static int ovl_sync_upper_blockdev(struct super_block *sb, int wait)
+{
+	if (!sb->s_bdev)
+		return 0;
+
+	if (!wait)
+		return filemap_flush(sb->s_bdev->bd_inode->i_mapping);
+	return filemap_write_and_wait_range(sb->s_bdev->bd_inode->i_mapping, 0, LLONG_MAX);
+}
+
 /* Sync real dirty inodes in upper filesystem (if it exists) */
 static int ovl_sync_fs(struct super_block *sb, int wait)
 {
