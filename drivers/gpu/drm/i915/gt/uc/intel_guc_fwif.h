@@ -86,11 +86,14 @@
 #define GUC_CTL_LOG_PARAMS		0
 #define   GUC_LOG_VALID			(1 << 0)
 #define   GUC_LOG_NOTIFY_ON_HALF_FULL	(1 << 1)
-#define   GUC_LOG_ALLOC_IN_MEGABYTE	(1 << 3)
+#define   GUC_LOG_CAPTURE_ALLOC_UNITS	(1 << 2)
+#define   GUC_LOG_LOG_ALLOC_UNITS	(1 << 3)
 #define   GUC_LOG_CRASH_SHIFT		4
 #define   GUC_LOG_CRASH_MASK		(0x3 << GUC_LOG_CRASH_SHIFT)
 #define   GUC_LOG_DEBUG_SHIFT		6
 #define   GUC_LOG_DEBUG_MASK	        (0xF << GUC_LOG_DEBUG_SHIFT)
+#define   GUC_LOG_CAPTURE_SHIFT		10
+#define   GUC_LOG_CAPTURE_MASK	        (0x3 << GUC_LOG_CAPTURE_SHIFT)
 #define   GUC_LOG_BUF_ADDR_SHIFT	12
 
 #define GUC_CTL_WA			1
@@ -264,6 +267,7 @@ struct guc_mmio_reg {
 	u32 value;
 	u32 flags;
 #define GUC_REGSET_MASKED		(1 << 0)
+	u32 mask;
 } __packed;
 
 /* GuC register sets */
@@ -280,6 +284,14 @@ struct guc_gt_system_info {
 	u32 generic_gt_sysinfo[GUC_GENERIC_GT_SYSINFO_MAX];
 } __packed;
 
+/* Capture-types of GuC capture register lists */
+enum
+{
+	GUC_CAPTURE_LIST_INDEX_PF = 0,
+	GUC_CAPTURE_LIST_INDEX_VF = 1,
+	GUC_CAPTURE_LIST_INDEX_MAX = 2,
+};
+
 /* GuC Additional Data Struct */
 struct guc_ads {
 	struct guc_mmio_reg_set reg_state_list[GUC_MAX_ENGINE_CLASSES][GUC_MAX_INSTANCES_PER_CLASS];
@@ -291,7 +303,11 @@ struct guc_ads {
 	u32 golden_context_lrca[GUC_MAX_ENGINE_CLASSES];
 	u32 eng_state_size[GUC_MAX_ENGINE_CLASSES];
 	u32 private_data;
-	u32 reserved[15];
+	u32 reserved2;
+	u32 capture_instance[GUC_CAPTURE_LIST_INDEX_MAX][GUC_MAX_ENGINE_CLASSES];
+	u32 capture_class[GUC_CAPTURE_LIST_INDEX_MAX][GUC_MAX_ENGINE_CLASSES];
+	u32 capture_global[GUC_CAPTURE_LIST_INDEX_MAX];
+	u32 reserved[4];
 } __packed;
 
 /* Engine usage stats */
@@ -312,6 +328,7 @@ struct guc_engine_usage {
 enum guc_log_buffer_type {
 	GUC_DEBUG_LOG_BUFFER,
 	GUC_CRASH_DUMP_LOG_BUFFER,
+	GUC_CAPTURE_LOG_BUFFER,
 	GUC_MAX_LOG_BUFFER
 };
 
