@@ -66,6 +66,26 @@ extern unsigned long __sw_hweight64(__u64 w);
 	     (start) < (size); \
 	     (start) = find_next_clump8(&(clump), (bits), (size), (start) + 8))
 
+/**
+ * single_bit_set - check if only one bit is set in value
+ * @bits:		value to check
+ * @bits_to_check:	how many bits we should scan
+ *
+ * Return: true if only one of the checked bits is set, othervice return false.
+ */
+static inline bool single_bit_set(const unsigned long bits, int bits_to_check)
+{
+	int bit;
+
+	bit = find_first_bit(&bits, bits_to_check);
+	if (bit == bits_to_check)
+		return false;
+
+	bit = find_next_bit(&bits, bits_to_check, bit + 1);
+
+	return (bit == bits_to_check);
+}
+
 static inline int get_bitmask_order(unsigned int count)
 {
 	int order;
