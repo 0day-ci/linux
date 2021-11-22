@@ -215,6 +215,16 @@ config USB_ISIGHTFW
 	  driver beforehand. Tools for doing so are available at
 	  http://bersace03.free.fr
 
+config USB_USB2244
+	tristate "Microchip USB2244 Ultra Fast USB 2.0 SD driver"
+	depends on GPIOLIB
+	help
+	  Say Y or M here if you want to reset Microchip USB2244 Ultra Fast
+	  USB 2.0 SD controller.
+	  This option enables support for Microchip USB2244 Ultra Fast USB 2.0
+	  SD controller. This driver reset the gpio pin makes controller out of
+	  reset.
+
 config USB_YUREX
 	tristate "USB YUREX driver support"
 	help
