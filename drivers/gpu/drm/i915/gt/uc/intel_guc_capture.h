@@ -88,6 +88,11 @@ struct intel_guc_state_capture {
 	struct work_struct store_work;
 };
 
+struct drm_i915_error_state_buf;
+struct intel_gt_coredump;
+
+int intel_guc_capture_out_print_next_group(struct drm_i915_error_state_buf *m,
+					   struct intel_gt_coredump *gt);
 void intel_guc_capture_store_snapshot(struct intel_guc *guc);
 int intel_guc_capture_list_count(struct intel_guc *guc, u32 owner, u32 type, u32 class,
 				 u16 *num_entries);
@@ -96,6 +101,7 @@ int intel_guc_capture_list_init(struct intel_guc *guc, u32 owner, u32 type, u32 
 int intel_guc_capture_output_min_size_est(struct intel_guc *guc);
 void intel_guc_capture_destroy(struct intel_guc *guc);
 void intel_guc_capture_store_snapshot_immediate(struct intel_guc *guc);
+struct intel_guc_state_capture *intel_guc_capture_store_ptr(struct intel_guc *guc);
 int intel_guc_capture_init(struct intel_guc *guc);
 
 #endif /* _INTEL_GUC_CAPTURE_H */

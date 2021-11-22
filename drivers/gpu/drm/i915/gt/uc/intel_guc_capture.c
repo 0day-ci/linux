@@ -415,7 +415,388 @@ int intel_guc_capture_output_min_size_est(struct intel_guc *guc)
  *                   L--> intel_guc_capture_store_snapshot
  *                        L--> queue(__guc_capture_store_snapshot_work)
  *                             Copies from B (head->tail) into C
+ *
+ * GUC --> notify context reset:
+ * -----------------------------
+ *     --> G2H CONTEXT RESET
+ *                   L--> guc_handle_context_reset --> i915_capture_error_state
+ *                    --> i915_gpu_coredump --> intel_guc_capture_store_ptr
+ *                        L--> keep a ptr to capture_store in
+ *                             i915_gpu_coredump struct.
+ *
+ * User Sysfs / Debugfs
+ * --------------------
+ *      --> i915_gpu_coredump_copy_to_buffer->
+ *                   L--> err_print_to_sgl --> err_print_gt
+ *                        L--> error_print_guc_captures
+ *                             L--> loop: intel_guc_capture_out_print_next_group
+ *
  */
+
+#if IS_ENABLED(CONFIG_DRM_I915_CAPTURE_ERROR)
+
+static char *
+guc_capture_register_string(const struct intel_guc *guc, u32 owner, u32 type,
+			    u32 class, u32 id, u32 offset)
+{
+	struct __guc_mmio_reg_descr_group *reglists = guc->capture.reglists;
+	struct __guc_mmio_reg_descr_group *match;
+	int num_regs, j = 0;
+
+	if (!reglists)
+		return NULL;
+
+	match = guc_capture_get_one_list(reglists, owner, type, id);
+	if (match) {
+		num_regs = match->num_regs;
+		while (num_regs--) {
+			if (offset == match->list[j].reg.reg)
+				return match->list[j].regname;
+			++j;
+		}
+	}
+
+	return NULL;
+}
+
+static inline int
+guc_capture_store_remove_dw(struct guc_capture_out_store *store, u32 *bytesleft,
+			    u32 *dw)
+{
+	int tries = 2;
+	int avail = 0;
+	u32 *src_data;
+
+	if (!*bytesleft)
+		return 0;
+
+	while (tries--) {
+		avail = CIRC_CNT_TO_END(store->head, store->tail, store->size);
+		if (avail >= sizeof(u32)) {
+			src_data = (u32 *)(store->addr + store->tail);
+			*dw = *src_data;
+			store->tail = (store->tail + 4) & (store->size - 1);
+			*bytesleft -= 4;
+			return 4;
+		}
+		if (store->tail == (store->size - 1) && store->head > 0)
+			store->tail = 0;
+	}
+
+	return 0;
+}
+
+static int
+capture_store_get_group_hdr(const struct intel_guc *guc,
+			    struct guc_capture_out_store *store, u32 *bytesleft,
+			    struct intel_guc_capture_out_group_header *group)
+{
+	int read = 0;
+	int fullsize = sizeof(struct intel_guc_capture_out_group_header);
+
+	if (fullsize > *bytesleft)
+		return -1;
+
+	if (CIRC_CNT_TO_END(store->head, store->tail, store->size) >= fullsize) {
+		    memcpy(group, (store->addr + store->tail), fullsize);
+			store->tail = (store->tail + fullsize) & (store->size - 1);
+			*bytesleft -= fullsize;
+		return 0;
+	}
+
+	read += guc_capture_store_remove_dw(store, bytesleft, &group->reserved1);
+	read += guc_capture_store_remove_dw(store, bytesleft, &group->info);
+	if (read != sizeof(*group))
+		return -1;
+
+	return 0;
+}
+
+static int
+capture_store_get_data_hdr(const struct intel_guc *guc,
+			   struct guc_capture_out_store *store, u32 *bytesleft,
+			   struct intel_guc_capture_out_data_header *data)
+{
+	int read = 0;
+	int fullsize = sizeof(struct intel_guc_capture_out_data_header);
+
+	if (fullsize > *bytesleft)
+		return -1;
+
+	if (CIRC_CNT_TO_END(store->head, store->tail, store->size) >= fullsize) {
+		    memcpy(data, (store->addr + store->tail), fullsize);
+			store->tail = (store->tail + fullsize) & (store->size - 1);
+			*bytesleft -= fullsize;
+		return 0;
+	}
+
+	read += guc_capture_store_remove_dw(store, bytesleft, &data->reserved1);
+	read += guc_capture_store_remove_dw(store, bytesleft, &data->info);
+	read += guc_capture_store_remove_dw(store, bytesleft, &data->lrca);
+	read += guc_capture_store_remove_dw(store, bytesleft, &data->guc_ctx_id);
+	read += guc_capture_store_remove_dw(store, bytesleft, &data->num_mmios);
+	if (read != sizeof(*data))
+		return -1;
+
+	return 0;
+}
+
+static int
+capture_store_get_register(const struct intel_guc *guc,
+			   struct guc_capture_out_store *store, u32 *bytesleft,
+			   struct guc_mmio_reg *reg)
+{
+	int read = 0;
+	int fullsize = sizeof(struct guc_mmio_reg);
+
+	if (fullsize > *bytesleft)
+		return -1;
+
+	if (CIRC_CNT_TO_END(store->head, store->tail, store->size) >= fullsize) {
+		    memcpy(reg, (store->addr + store->tail), fullsize);
+			store->tail = (store->tail + fullsize) & (store->size - 1);
+			*bytesleft -= fullsize;
+		return 0;
+	}
+
+	read += guc_capture_store_remove_dw(store, bytesleft, &reg->offset);
+	read += guc_capture_store_remove_dw(store, bytesleft, &reg->value);
+	read += guc_capture_store_remove_dw(store, bytesleft, &reg->flags);
+	read += guc_capture_store_remove_dw(store, bytesleft, &reg->mask);
+	if (read != sizeof(*reg))
+		return -1;
+
+	return 0;
+}
+
+static void guc_capture_store_drop_data(struct guc_capture_out_store *store,
+					unsigned long sampled_head)
+{
+	if (sampled_head == 0)
+		store->tail = store->size - 1;
+	else
+		store->tail = sampled_head - 1;
+}
+
+#ifdef CONFIG_DRM_I915_DEBUG_GUC
+#define guc_capt_err_print(a, b, ...) \
+	do { \
+		drm_warn(a, __VA_ARGS__); \
+		if (b) \
+			i915_error_printf(b, __VA_ARGS__); \
+	} while (0)
+#else
+#define guc_capt_err_print(a, b, ...) \
+	do { \
+		if (b) \
+			i915_error_printf(b, __VA_ARGS__); \
+	} while (0)
+#endif
+
+static struct intel_engine_cs *
+guc_lookup_engine(struct intel_guc *guc, u8 guc_class, u8 instance)
+{
+	struct intel_gt *gt = guc_to_gt(guc);
+	u8 engine_class = guc_class_to_engine_class(guc_class);
+
+	/* Class index is checked in class converter */
+	GEM_BUG_ON(instance > MAX_ENGINE_INSTANCE);
+
+	return gt->engine_class[engine_class][instance];
+}
+
+static inline struct intel_context *
+guc_context_lookup(struct intel_guc *guc, u32 guc_ctx_id)
+{
+	struct intel_context *ce;
+
+	if (unlikely(guc_ctx_id >= GUC_MAX_LRC_DESCRIPTORS)) {
+		drm_dbg(&guc_to_gt(guc)->i915->drm, "Invalid guc_ctx_id 0x%X, max 0x%X",
+			guc_ctx_id, GUC_MAX_LRC_DESCRIPTORS);
+		return NULL;
+	}
+
+	ce = xa_load(&guc->context_lookup, guc_ctx_id);
+	if (unlikely(!ce)) {
+		drm_dbg(&guc_to_gt(guc)->i915->drm, "Context is NULL, guc_ctx_id 0x%X",
+			guc_ctx_id);
+		return NULL;
+	}
+
+	return ce;
+}
+
+
+#define PRINT guc_capt_err_print
+#define REGSTR guc_capture_register_string
+
+#define GCAP_PRINT_INTEL_ENG_INFO(i915, ebuf, eng) \
+	PRINT(&(i915->drm), (ebuf), "    i915-Eng-Name: %s\n", (eng)->name); \
+	PRINT(&(i915->drm), (ebuf), "    i915-Eng-Class: 0x%02x\n", (eng)->class); \
+	PRINT(&(i915->drm), (ebuf), "    i915-Eng-Inst: 0x%02x\n", (eng)->instance); \
+	PRINT(&(i915->drm), (ebuf), "    i915-Eng-LogicalMask: 0x%08x\n", (eng)->logical_mask)
+
+#define GCAP_PRINT_GUC_INST_INFO(i915, ebuf, data) \
+	PRINT(&(i915->drm), (ebuf), "    LRCA: 0x%08x\n", (data).lrca); \
+	PRINT(&(i915->drm), (ebuf), "    GuC-ContextID: 0x%08x\n", (data).guc_ctx_id); \
+	PRINT(&(i915->drm), (ebuf), "    GuC-Engine-Instance: 0x%08x\n", \
+	      (uint32_t) FIELD_GET(GUC_CAPTURE_DATAHDR_SRC_INSTANCE, (data).info));
+
+#define GCAP_PRINT_INTEL_CTX_INFO(i915, ebuf, ce) \
+	PRINT(&(i915->drm), (ebuf), "    i915-Ctx-Flags: 0x%016lx\n", (ce)->flags); \
+	PRINT(&(i915->drm), (ebuf), "    i915-Ctx-GuC-ID: 0x%016x\n", (ce)->guc_id.id);
+
+int intel_guc_capture_out_print_next_group(struct drm_i915_error_state_buf *ebuf,
+					   struct intel_gt_coredump *gt)
+{
+	/* constant qualifier for data-pointers we shouldn't change mid of error dump printing */
+	struct intel_guc_state_capture *cap = gt->uc->capture;
+	struct intel_guc *guc = container_of(cap, struct intel_guc, capture);
+	struct drm_i915_private *i915 = (container_of(guc, struct intel_gt,
+						   uc.guc))->i915;
+	struct guc_capture_out_store *store = &cap->out_store;
+	struct guc_capture_out_store tmpstore;
+	struct intel_guc_capture_out_group_header group;
+	struct intel_guc_capture_out_data_header data;
+	struct guc_mmio_reg reg;
+	const char *grptypestr[GUC_STATE_CAPTURE_GROUP_TYPE_MAX] = {"full-capture",
+								    "partial-capture"};
+	const char *datatypestr[GUC_CAPTURE_LIST_TYPE_MAX] = {"Global", "Engine-Class",
+							      "Engine-Instance"};
+	enum guc_capture_group_types grptype;
+	enum guc_capture_type datatype;
+	int numgrps, numregs;
+	char *str, noname[16];
+	u32 numbytes, engineclass, eng_inst, ret = 0;
+	struct intel_engine_cs *eng;
+	struct intel_context *ce;
+
+	if (!cap->enabled)
+		return -ENODEV;
+
+	mutex_lock(&store->lock);
+	smp_mb(); /* sync to get the latest head for the moment */
+	/* NOTE1: make a copy of store so we dont have to deal with a changing lower bound of
+	 *        occupied-space in this circular buffer.
+	 * NOTE2: Higher up the stack from here, we keep calling this function in a loop to
+	 *        reading more capture groups as they appear (as the lower bound of occupied-space
+	 *        changes) until this circ-buf is empty.
+	 */
+	memcpy(&tmpstore, store, sizeof(tmpstore));
+
+	PRINT(&i915->drm, ebuf, "global --- GuC Error Capture\n");
+
+	numbytes = CIRC_CNT(tmpstore.head, tmpstore.tail, tmpstore.size);
+	if (!numbytes) {
+		PRINT(&i915->drm, ebuf, "GuC capture stream empty!\n");
+		ret = -ENODATA;
+		goto unlock;
+	}
+	/* everything in GuC output structures are dword aligned */
+	if (numbytes & 0x3) {
+		PRINT(&i915->drm, ebuf, "GuC capture stream unaligned!\n");
+		ret = -EIO;
+		goto unlock;
+	}
+
+	if (capture_store_get_group_hdr(guc, &tmpstore, &numbytes, &group)) {
+		PRINT(&i915->drm, ebuf, "GuC capture error getting next group-header!\n");
+		ret = -EIO;
+		goto unlock;
+	}
+
+	PRINT(&i915->drm, ebuf, "NumCaptures:  0x%08x\n", (uint32_t)
+	      FIELD_GET(GUC_CAPTURE_GRPHDR_SRC_NUMCAPTURES, group.info));
+	grptype = FIELD_GET(GUC_CAPTURE_GRPHDR_SRC_CAPTURE_TYPE, group.info);
+	PRINT(&i915->drm, ebuf, "Coverage:  0x%08x = %s\n", grptype,
+	      grptypestr[grptype % GUC_STATE_CAPTURE_GROUP_TYPE_MAX]);
+
+	numgrps = FIELD_GET(GUC_CAPTURE_GRPHDR_SRC_NUMCAPTURES, group.info);
+	while (numgrps--) {
+		eng = NULL;
+		ce = NULL;
+
+		if (capture_store_get_data_hdr(guc, &tmpstore, &numbytes, &data)) {
+			PRINT(&i915->drm, ebuf, "GuC capture error on next data-header!\n");
+			ret = -EIO;
+			goto unlock;
+		}
+		datatype = FIELD_GET(GUC_CAPTURE_DATAHDR_SRC_TYPE, data.info);
+		PRINT(&i915->drm, ebuf, "  RegListType: %s\n",
+		      datatypestr[datatype % GUC_CAPTURE_LIST_TYPE_MAX]);
+
+		engineclass = FIELD_GET(GUC_CAPTURE_DATAHDR_SRC_CLASS, data.info);
+		if (datatype != GUC_CAPTURE_LIST_TYPE_GLOBAL) {
+			PRINT(&i915->drm, ebuf, "    GuC-Engine-Class: %d\n",
+			      engineclass);
+			if (engineclass <= GUC_LAST_ENGINE_CLASS)
+				PRINT(&i915->drm, ebuf, "    i915-Eng-Class: %d\n",
+				      guc_class_to_engine_class(engineclass));
+
+			if (datatype == GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE) {
+				GCAP_PRINT_GUC_INST_INFO(i915, ebuf, data);
+				eng_inst = FIELD_GET(GUC_CAPTURE_DATAHDR_SRC_INSTANCE, data.info);
+				eng = guc_lookup_engine(guc, engineclass, eng_inst);
+				if (eng) {
+					GCAP_PRINT_INTEL_ENG_INFO(i915, ebuf, eng);
+				} else {
+					PRINT(&i915->drm, ebuf, "    i915-Eng-Lookup Fail!\n");
+				}
+				ce = guc_context_lookup(guc, data.guc_ctx_id);
+				if (ce) {
+					GCAP_PRINT_INTEL_CTX_INFO(i915, ebuf, ce);
+				} else {
+					PRINT(&i915->drm, ebuf, "    i915-Ctx-Lookup Fail!\n");
+				}
+			}
+		}
+		numregs = FIELD_GET(GUC_CAPTURE_DATAHDR_NUM_MMIOS, data.num_mmios);
+		PRINT(&i915->drm, ebuf, "     NumRegs: 0x%08x\n", numregs);
+
+		while (numregs--) {
+			if (capture_store_get_register(guc, &tmpstore, &numbytes, &reg)) {
+				PRINT(&i915->drm, ebuf, "Error getting next register!\n");
+				ret = -EIO;
+				goto unlock;
+			}
+			str = REGSTR(guc, GUC_CAPTURE_LIST_INDEX_PF, datatype,
+				     engineclass, 0, reg.offset);
+			if (!str) {
+				snprintf(noname, sizeof(noname), "REG-0x%08x", reg.offset);
+				str = noname;
+			}
+			PRINT(&i915->drm, ebuf, "      %s:  0x%08x\n", str, reg.value);
+
+		}
+		if (eng) {
+			const struct intel_engine_coredump *ee;
+			for (ee = gt->engine; ee; ee = ee->next) {
+				const struct i915_vma_coredump *vma;
+				if (ee->engine == eng) {
+					for (vma = ee->vma; vma; vma = vma->next)
+						i915_print_error_vma(ebuf, ee->engine, vma);
+				}
+			}
+		}
+	}
+
+	store->tail = tmpstore.tail;
+unlock:
+	/* if we have a stream error, just drop everything */
+	if (ret == -EIO) {
+		drm_warn(&i915->drm, "Skip GuC capture data print due to stream error\n");
+		guc_capture_store_drop_data(store, tmpstore.head);
+	}
+
+	mutex_unlock(&store->lock);
+
+	return ret;
+}
+
+#undef REGSTR
+#undef PRINT
+
+#endif //CONFIG_DRM_I915_DEBUG_GUC
 
 static void guc_capture_store_insert(struct intel_guc *guc, struct guc_capture_out_store *store,
 				     unsigned char *new_data, size_t bytes)
@@ -585,6 +966,14 @@ void intel_guc_capture_destroy(struct intel_guc *guc)
 	flush_work(&guc->capture.store_work);
 	guc_capture_store_destroy(guc);
 	guc_capture_clear_ext_regs(guc->capture.reglists);
+}
+
+struct intel_guc_state_capture *
+intel_guc_capture_store_ptr(struct intel_guc *guc)
+{
+	if (!guc->capture.enabled)
+		return NULL;
+	return &guc->capture;
 }
 
 int intel_guc_capture_init(struct intel_guc *guc)

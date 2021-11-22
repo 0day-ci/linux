@@ -600,6 +600,16 @@ static void error_print_engine(struct drm_i915_error_state_buf *m,
 	error_print_context(m, "  Active context: ", &ee->context);
 }
 
+static void error_print_guc_captures(struct drm_i915_error_state_buf *m,
+				     struct intel_gt_coredump *gt)
+{
+	int ret;
+
+	do {
+		ret = intel_guc_capture_out_print_next_group(m, gt);
+	} while (!ret);
+}
+
 void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
 {
 	va_list args;
@@ -609,9 +619,9 @@ void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
 	va_end(args);
 }
 
-static void print_error_vma(struct drm_i915_error_state_buf *m,
-			    const struct intel_engine_cs *engine,
-			    const struct i915_vma_coredump *vma)
+void i915_print_error_vma(struct drm_i915_error_state_buf *m,
+			  const struct intel_engine_cs *engine,
+			  const struct i915_vma_coredump *vma)
 {
 	char out[ASCII85_BUFSZ];
 	int page;
@@ -679,7 +689,7 @@ static void err_print_uc(struct drm_i915_error_state_buf *m,
 
 	intel_uc_fw_dump(&error_uc->guc_fw, &p);
 	intel_uc_fw_dump(&error_uc->huc_fw, &p);
-	print_error_vma(m, NULL, error_uc->guc_log);
+	i915_print_error_vma(m, NULL, error_uc->guc_log);
 }
 
 static void err_free_sgl(struct scatterlist *sgl)
@@ -764,12 +774,16 @@ static void err_print_gt(struct drm_i915_error_state_buf *m,
 		err_printf(m, "  GAM_DONE: 0x%08x\n", gt->gam_done);
 	}
 
-	for (ee = gt->engine; ee; ee = ee->next) {
-		const struct i915_vma_coredump *vma;
+	if (gt->uc->capture) /* error capture was via GuC */
+		error_print_guc_captures(m, gt);
+	else {
+		for (ee = gt->engine; ee; ee = ee->next) {
+			const struct i915_vma_coredump *vma;
 
-		error_print_engine(m, ee);
-		for (vma = ee->vma; vma; vma = vma->next)
-			print_error_vma(m, ee->engine, vma);
+			error_print_engine(m, ee);
+			for (vma = ee->vma; vma; vma = vma->next)
+				i915_print_error_vma(m, ee->engine, vma);
+		}
 	}
 
 	if (gt->uc)
@@ -1140,7 +1154,7 @@ static void gt_record_fences(struct intel_gt_coredump *gt)
 	gt->nfence = i;
 }
 
-static void engine_record_registers(struct intel_engine_coredump *ee)
+static void engine_record_registers_execlist(struct intel_engine_coredump *ee)
 {
 	const struct intel_engine_cs *engine = ee->engine;
 	struct drm_i915_private *i915 = engine->i915;
@@ -1384,8 +1398,10 @@ intel_engine_coredump_alloc(struct intel_engine_cs *engine, gfp_t gfp)
 
 	ee->engine = engine;
 
-	engine_record_registers(ee);
-	engine_record_execlists(ee);
+	if (!intel_uc_uses_guc_submission(&engine->gt->uc)) {
+		engine_record_registers_execlist(ee);
+		engine_record_execlists(ee);
+	}
 
 	return ee;
 }
@@ -1558,8 +1574,8 @@ gt_record_uc(struct intel_gt_coredump *gt,
 	return error_uc;
 }
 
-/* Capture all registers which don't fit into another category. */
-static void gt_record_regs(struct intel_gt_coredump *gt)
+/* Capture all global registers which don't fit into another category. */
+static void gt_record_registers_execlist(struct intel_gt_coredump *gt)
 {
 	struct intel_uncore *uncore = gt->_gt->uncore;
 	struct drm_i915_private *i915 = uncore->i915;
@@ -1806,7 +1822,9 @@ intel_gt_coredump_alloc(struct intel_gt *gt, gfp_t gfp)
 	gc->_gt = gt;
 	gc->awake = intel_gt_pm_is_awake(gt);
 
-	gt_record_regs(gc);
+	if (!intel_uc_uses_guc_submission(&gt->uc))
+		gt_record_registers_execlist(gc);
+
 	gt_record_fences(gc);
 
 	return gc;
@@ -1870,6 +1888,11 @@ i915_gpu_coredump(struct intel_gt *gt, intel_engine_mask_t engine_mask)
 
 		if (INTEL_INFO(i915)->has_gt_uc)
 			error->gt->uc = gt_record_uc(error->gt, compress);
+
+		if (intel_uc_uses_guc_submission(&gt->uc))
+			error->gt->uc->capture = intel_guc_capture_store_ptr(&gt->uc.guc);
+		else
+			error->gt->uc->capture = NULL;
 
 		i915_vma_capture_finish(error->gt, compress);
 

@@ -17,6 +17,7 @@
 #include "gt/intel_engine.h"
 #include "gt/intel_gt_types.h"
 #include "gt/uc/intel_uc_fw.h"
+#include "gt/uc/intel_guc_capture.h"
 
 #include "intel_device_info.h"
 
@@ -151,6 +152,7 @@ struct intel_gt_coredump {
 		struct intel_uc_fw guc_fw;
 		struct intel_uc_fw huc_fw;
 		struct i915_vma_coredump *guc_log;
+		struct intel_guc_state_capture *capture;
 	} *uc;
 
 	struct intel_gt_coredump *next;
@@ -216,6 +218,9 @@ struct drm_i915_error_state_buf {
 
 __printf(2, 3)
 void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...);
+void i915_print_error_vma(struct drm_i915_error_state_buf *m,
+			  const struct intel_engine_cs *engine,
+			  const struct i915_vma_coredump *vma);
 
 struct i915_gpu_coredump *i915_gpu_coredump(struct intel_gt *gt,
 					    intel_engine_mask_t engine_mask);
