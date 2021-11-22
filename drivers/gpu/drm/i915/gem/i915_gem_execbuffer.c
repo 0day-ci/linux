@@ -505,12 +505,23 @@ static bool platform_has_relocs_enabled(const struct i915_execbuffer *eb)
 	return false;
 }
 
+static bool platform_allows_pass_alignment(const struct i915_execbuffer *eb)
+{
+	if (GRAPHICS_VER(eb->i915) < 4)
+		return true;
+
+	return false;
+}
+
 static int
 eb_validate_vma(struct i915_execbuffer *eb,
 		struct drm_i915_gem_exec_object2 *entry,
 		struct i915_vma *vma)
 {
 	if (entry->relocation_count && !platform_has_relocs_enabled(eb))
+		return -EINVAL;
+
+	if (entry->alignment && !platform_allows_pass_alignment(eb))
 		return -EINVAL;
 
 	if (unlikely(entry->flags & eb->invalid_flags))
