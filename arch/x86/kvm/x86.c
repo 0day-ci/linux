@@ -5124,6 +5124,25 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		struct kvm_cpuid cpuid;
 
 		r = -EFAULT;
+
+		/*
+		 * KVM does not correctly handle changing guest CPUID after KVM_RUN, as
+		 * MAXPHYADDR, GBPAGES support, AMD reserved bit behavior, etc.. aren't
+		 * tracked in kvm_mmu_page_role.  As a result, KVM may miss guest page
+		 * faults due to reusing SPs/SPTEs.  Alert userspace, but otherwise
+		 * sweep the problem under the rug.
+		 *
+		 * KVM's horrific CPUID ABI makes the problem all but impossible to
+		 * solve, as correctly handling multiple vCPU models (with respect to
+		 * paging and physical address properties) in a single VM would require
+		 * tracking all relevant CPUID information in kvm_mmu_page_role.  That
+		 * is very undesirable as it would double the memory requirements for
+		 * gfn_track (see struct kvm_mmu_page_role comments), and in practice
+		 * no sane VMM mucks with the core vCPU model on the fly.
+		 */
+		if (vcpu->arch.last_vmentry_cpu != -1)
+			goto out;
+
 		if (copy_from_user(&cpuid, cpuid_arg, sizeof(cpuid)))
 			goto out;
 		r = kvm_vcpu_ioctl_set_cpuid(vcpu, &cpuid, cpuid_arg->entries);
@@ -5134,6 +5153,14 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		struct kvm_cpuid2 cpuid;
 
 		r = -EFAULT;
+
+		/*
+		 * KVM_SET_CPUID{,2} after KVM_RUN is forbidded, see the comment in
+		 * KVM_SET_CPUID case above.
+		 */
+		if (vcpu->arch.last_vmentry_cpu != -1)
+			goto out;
+
 		if (copy_from_user(&cpuid, cpuid_arg, sizeof(cpuid)))
 			goto out;
 		r = kvm_vcpu_ioctl_set_cpuid2(vcpu, &cpuid,
