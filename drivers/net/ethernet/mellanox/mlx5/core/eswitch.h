@@ -150,6 +150,7 @@ struct mlx5_vport_info {
 	u8                      qos;
 	u8                      spoofchk: 1;
 	u8                      trusted: 1;
+	u8                      offloads_trusted: 1;
 };
 
 /* Vport context events */
@@ -510,7 +511,15 @@ int mlx5_devlink_port_function_hw_addr_get(struct devlink_port *port,
 int mlx5_devlink_port_function_hw_addr_set(struct devlink_port *port,
 					   const u8 *hw_addr, int hw_addr_len,
 					   struct netlink_ext_ack *extack);
-
+int mlx5_devlink_port_function_trusted_get(struct devlink_port *port,
+					   bool *trusted,
+					   struct netlink_ext_ack *extack);
+int mlx5_devlink_port_function_trusted_set(struct devlink_port *port,
+					   bool trusted,
+					   struct netlink_ext_ack *extack);
+int mlx5_esw_get_hca_trusted(struct mlx5_eswitch *esw,
+			     u16 vport_num,
+			     bool *trusted);
 void *mlx5_eswitch_get_uplink_priv(struct mlx5_eswitch *esw, u8 rep_type);
 
 int mlx5_eswitch_add_vlan_action(struct mlx5_eswitch *esw,

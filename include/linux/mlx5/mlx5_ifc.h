@@ -1401,7 +1401,8 @@ struct mlx5_ifc_cmd_hca_cap_bits {
 
 	u8         reserved_at_120[0xa];
 	u8         log_max_ra_req_dc[0x6];
-	u8         reserved_at_130[0xa];
+	u8         vhca_trust_level_reg[0x1];
+	u8         reserved_at_131[0x9];
 	u8         log_max_ra_res_dc[0x6];
 
 	u8         reserved_at_140[0x6];
@@ -11483,6 +11484,13 @@ struct mlx5_ifc_tls_progress_params_bits {
 	u8         auth_state[0x2];
 	u8         reserved_at_44[0x4];
 	u8         hw_offset_record_number[0x18];
+};
+
+struct mlx5_ifc_vhca_trust_level_bits {
+	u8        all_vhca[0x1];
+	u8        reserved_0[0xf];
+	u8        vhca_id[0x10];
+	u8        trust_level[0x20];
 };
 
 enum {

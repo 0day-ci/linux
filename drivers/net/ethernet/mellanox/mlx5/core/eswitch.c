@@ -820,6 +820,24 @@ static void esw_vport_cleanup(struct mlx5_eswitch *esw, struct mlx5_vport *vport
 	esw_vport_cleanup_acl(esw, vport);
 }
 
+static int mlx5_esw_query_hca_trusted(struct mlx5_eswitch *esw,
+				      struct mlx5_vport *vport)
+{
+	bool trusted;
+	int err;
+
+	err = mlx5_esw_get_hca_trusted(esw, vport->vport, &trusted);
+	if (err == -EOPNOTSUPP)
+		return 0;
+
+	if (err)
+		return err;
+
+	vport->info.offloads_trusted = trusted;
+
+	return 0;
+}
+
 int mlx5_esw_vport_enable(struct mlx5_eswitch *esw, u16 vport_num,
 			  enum mlx5_eswitch_vport_event enabled_events)
 {
@@ -853,6 +871,12 @@ int mlx5_esw_vport_enable(struct mlx5_eswitch *esw, u16 vport_num,
 	if (!mlx5_esw_is_manager_vport(esw, vport->vport) &&
 	    MLX5_CAP_GEN(esw->dev, vhca_resource_manager)) {
 		ret = mlx5_esw_vport_vhca_id_set(esw, vport_num);
+		if (ret)
+			goto err_vhca_mapping;
+	}
+
+	if (!mlx5_esw_is_manager_vport(esw, vport_num)) {
+		ret = mlx5_esw_query_hca_trusted(esw, vport);
 		if (ret)
 			goto err_vhca_mapping;
 	}

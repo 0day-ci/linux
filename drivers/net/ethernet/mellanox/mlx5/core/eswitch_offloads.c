@@ -3864,6 +3864,122 @@ is_port_function_supported(struct mlx5_eswitch *esw, u16 vport_num)
 	       mlx5_esw_is_sf_vport(esw, vport_num);
 }
 
+static struct mlx5_vport *
+mlx5_dlport_to_vport_get(struct devlink_port *port, struct mlx5_eswitch *esw,
+			 struct netlink_ext_ack *extack)
+{
+	u16 vport_num;
+
+	vport_num = mlx5_esw_devlink_port_index_to_vport_num(port->index);
+	if (!is_port_function_supported(esw, vport_num))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	return mlx5_eswitch_get_vport(esw, vport_num);
+}
+
+static int mlx5_esw_set_hca_trusted(struct mlx5_eswitch *esw, u16 vport_num, bool trusted)
+{
+	u32 out[MLX5_ST_SZ_DW(vhca_trust_level)] = {};
+	u32 in[MLX5_ST_SZ_DW(vhca_trust_level)] = {};
+	int sz = MLX5_ST_SZ_BYTES(vhca_trust_level);
+	u16 vhca_id;
+	int err;
+
+	if (!MLX5_CAP_GEN(esw->dev, vhca_trust_level_reg))
+		return -EOPNOTSUPP;
+
+	err = mlx5_esw_query_vport_vhca_id(esw, vport_num, &vhca_id);
+	if (err) {
+		esw_warn(esw->dev, "Getting vhca_id for vport=%u failed err=%d\n",
+			 vport_num, err);
+		return err;
+	}
+
+	MLX5_SET(vhca_trust_level, in, vhca_id, vhca_id);
+	MLX5_SET(vhca_trust_level, in, trust_level, trusted);
+
+	return mlx5_core_access_reg(esw->dev, in, sz, out, sz, MLX5_REG_TRUST_LEVEL, 0, 1);
+}
+
+int mlx5_devlink_port_function_trusted_set(struct devlink_port *port,
+					   bool trusted,
+					   struct netlink_ext_ack *extack)
+{
+	struct mlx5_eswitch *esw;
+	struct mlx5_vport *vport;
+	int err;
+
+	esw = mlx5_devlink_eswitch_get(port->devlink);
+	if (IS_ERR(esw))
+		return PTR_ERR(esw);
+
+	vport = mlx5_dlport_to_vport_get(port, esw, extack);
+	if (IS_ERR(vport)) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Failed to get vport");
+		return PTR_ERR(vport);
+	}
+
+	err = mlx5_esw_set_hca_trusted(esw, vport->vport, trusted);
+	if (!err)
+		vport->info.offloads_trusted = trusted;
+
+	return err;
+}
+
+int mlx5_esw_get_hca_trusted(struct mlx5_eswitch *esw, u16 vport_num, bool *trusted)
+{
+	u32 out[MLX5_ST_SZ_DW(vhca_trust_level)] = {};
+	u32 in[MLX5_ST_SZ_DW(vhca_trust_level)] = {};
+	int sz = MLX5_ST_SZ_BYTES(vhca_trust_level);
+	u32 trust_level;
+	u16 vhca_id;
+	int err;
+
+	if (!MLX5_CAP_GEN(esw->dev, vhca_trust_level_reg))
+		return -EOPNOTSUPP;
+
+	err = mlx5_esw_query_vport_vhca_id(esw, vport_num, &vhca_id);
+	if (err) {
+		esw_warn(esw->dev, "Query of vhca_id for vport %d failed, err %d\n",
+			 vport_num, err);
+		return err;
+	}
+
+	MLX5_SET(vhca_trust_level, in, vhca_id, vhca_id);
+	mlx5_core_access_reg(esw->dev, in, sz, out, sz, MLX5_REG_TRUST_LEVEL, 0, 0);
+	trust_level = MLX5_GET(vhca_trust_level, out, trust_level);
+	*trusted = trust_level & 0x1;
+
+	return 0;
+}
+
+int mlx5_devlink_port_function_trusted_get(struct devlink_port *port,
+					   bool *trusted,
+					   struct netlink_ext_ack *extack)
+{
+	struct mlx5_eswitch *esw;
+	struct mlx5_vport *vport;
+
+	esw = mlx5_devlink_eswitch_get(port->devlink);
+	if (IS_ERR(esw))
+		return PTR_ERR(esw);
+
+	if (!MLX5_CAP_GEN(esw->dev, vhca_trust_level_reg))
+		return -EOPNOTSUPP;
+
+	vport = mlx5_dlport_to_vport_get(port, esw, extack);
+	if (IS_ERR(vport)) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Failed to get vport");
+		return PTR_ERR(vport);
+	}
+
+	*trusted = vport->info.offloads_trusted;
+
+	return 0;
+}
+
 int mlx5_devlink_port_function_hw_addr_get(struct devlink_port *port,
 					   u8 *hw_addr, int *hw_addr_len,
 					   struct netlink_ext_ack *extack)
