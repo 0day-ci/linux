@@ -452,9 +452,7 @@ static inline int neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 	
 	if (READ_ONCE(neigh->used) != now)
 		WRITE_ONCE(neigh->used, now);
-	if (!(neigh->nud_state&(NUD_CONNECTED|NUD_DELAY|NUD_PROBE)))
-		return __neigh_event_send(neigh, skb);
-	return 0;
+	return __neigh_event_send(neigh, skb);
 }
 
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
