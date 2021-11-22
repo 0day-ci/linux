@@ -321,7 +321,7 @@ static int proc_tgid_net_readdir(struct file *file, struct dir_context *ctx)
 	ret = -EINVAL;
 	net = get_proc_task_net(file_inode(file));
 	if (net != NULL) {
-		ret = proc_readdir_de(file, ctx, net->proc_net);
+		ret = proc_readdir_de(file, ctx, net->proc_net, NULL);
 		put_net(net);
 	}
 	return ret;

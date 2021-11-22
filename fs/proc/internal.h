@@ -190,7 +190,7 @@ struct proc_dir_entry *proc_register(struct proc_dir_entry *dir,
 extern struct dentry *proc_lookup(struct inode *, struct dentry *, unsigned int);
 struct dentry *proc_lookup_de(struct inode *, struct dentry *, struct proc_dir_entry *);
 extern int proc_readdir(struct file *, struct dir_context *);
-int proc_readdir_de(struct file *, struct dir_context *, struct proc_dir_entry *);
+int proc_readdir_de(struct file *, struct dir_context *, struct proc_dir_entry *, const struct proc_lookup_list *);
 
 static inline void pde_get(struct proc_dir_entry *pde)
 {
@@ -318,3 +318,24 @@ static inline void pde_force_lookup(struct proc_dir_entry *pde)
 	/* /proc/net/ entries can be changed under us by setns(CLONE_NEWNET) */
 	pde->proc_dops = &proc_net_dentry_ops;
 }
+
+/*
+ * "cpuinfo", "uptime" is represented as
+ *
+ *	(u8[]){
+ *		7, 'c', 'p', 'u', 'i', 'n', 'f', 'o',
+ *		6, 'u', 'p', 't', 'i', 'm', 'e',
+ *		0
+ *	}
+ */
+struct proc_lookup_list {
+	u8 len;
+	char str[];
+};
+
+static inline struct proc_lookup_list *lookup_list_next(const struct proc_lookup_list *ll)
+{
+	return (struct proc_lookup_list *)((void *)ll + 1 + ll->len);
+}
+
+bool in_lookup_list(const struct proc_lookup_list *ll, const char *str, unsigned int len);

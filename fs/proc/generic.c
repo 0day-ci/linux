@@ -282,7 +282,7 @@ struct dentry *proc_lookup(struct inode *dir, struct dentry *dentry,
  * for success..
  */
 int proc_readdir_de(struct file *file, struct dir_context *ctx,
-		    struct proc_dir_entry *de)
+		    struct proc_dir_entry *de, const struct proc_lookup_list *ll)
 {
 	int i;
 
@@ -305,14 +305,18 @@ int proc_readdir_de(struct file *file, struct dir_context *ctx,
 
 	do {
 		struct proc_dir_entry *next;
+
 		pde_get(de);
 		read_unlock(&proc_subdir_lock);
-		if (!dir_emit(ctx, de->name, de->namelen,
-			    de->low_ino, de->mode >> 12)) {
-			pde_put(de);
-			return 0;
+
+		if (ll ? in_lookup_list(ll, de->name, de->namelen) : true) {
+			if (!dir_emit(ctx, de->name, de->namelen, de->low_ino, de->mode >> 12)) {
+				pde_put(de);
+				return 0;
+			}
+			ctx->pos++;
 		}
-		ctx->pos++;
+
 		read_lock(&proc_subdir_lock);
 		next = pde_subdir_next(de);
 		pde_put(de);
@@ -330,7 +334,8 @@ int proc_readdir(struct file *file, struct dir_context *ctx)
 	if (fs_info->pidonly == PROC_PIDONLY_ON)
 		return 1;
 
-	return proc_readdir_de(file, ctx, PDE(inode));
+	return proc_readdir_de(file, ctx, PDE(inode),
+				PDE(inode) == &proc_root ? fs_info->lookup_list : NULL);
 }
 
 /*
