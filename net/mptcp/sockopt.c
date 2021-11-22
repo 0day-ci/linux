@@ -1066,6 +1066,24 @@ static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
 	return 0;
 }
 
+static int mptcp_put_int8_option(struct mptcp_sock *msk, char __user *optval,
+				 int __user *optlen, u8 val)
+{
+	int len;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+
+	if (len) {
+		if (put_user(1, optlen))
+			return -EFAULT;
+		if (copy_to_user(optval, &val, 1))
+			return -EFAULT;
+	}
+
+	return 0;
+}
+
 static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 				    char __user *optval, int __user *optlen)
 {
@@ -1079,6 +1097,19 @@ static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 	case TCP_INQ:
 		return mptcp_put_int_option(msk, optval, optlen, msk->recvmsg_inq);
 	}
+	return -EOPNOTSUPP;
+}
+
+static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
+			       char __user *optval, int __user *optlen)
+{
+	struct sock *sk = (void *)msk;
+
+	switch (optname) {
+	case IP_TOS:
+		return mptcp_put_int8_option(msk, optval, optlen, inet_sk(sk)->tos);
+	}
+
 	return -EOPNOTSUPP;
 }
 
@@ -1117,6 +1148,8 @@ int mptcp_getsockopt(struct sock *sk, int level, int optname,
 	if (ssk)
 		return tcp_getsockopt(ssk, level, optname, optval, option);
 
+	if (level == SOL_IP)
+		return mptcp_getsockopt_v4(msk, optname, optval, option);
 	if (level == SOL_TCP)
 		return mptcp_getsockopt_sol_tcp(msk, optname, optval, option);
 	if (level == SOL_MPTCP)
