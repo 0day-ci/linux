@@ -10,6 +10,7 @@
 #include "gt/shmem_utils.h"
 #include "intel_guc_ads.h"
 #include "intel_guc_fwif.h"
+#include "intel_guc_capture.h"
 #include "intel_uc.h"
 #include "i915_drv.h"
 
@@ -71,8 +72,7 @@ static u32 guc_ads_golden_ctxt_size(struct intel_guc *guc)
 
 static u32 guc_ads_capture_size(struct intel_guc *guc)
 {
-	/* Basic support to init ADS without a proper GuC error capture list */
-	return PAGE_ALIGN(PAGE_SIZE);
+	return PAGE_ALIGN(guc->ads_capture_size);
 }
 
 static u32 guc_ads_private_data_size(struct intel_guc *guc)
@@ -519,24 +519,170 @@ static void guc_init_golden_context(struct intel_guc *guc)
 	GEM_BUG_ON(guc->ads_golden_ctxt_size != total_size);
 }
 
-static void guc_capture_prep_lists(struct intel_guc *guc, struct __guc_ads_blob *blob)
+static int
+guc_fill_reglist(struct intel_guc *guc, struct __guc_ads_blob *blob, int vf, bool enabled,
+		 int classid, int type, char *typename, u16 *p_numregs, int newnum, u8 **p_virt_ptr,
+		 u32 *p_blobptr_to_ggtt, u32 *p_ggtt, u32 null_ggtt)
 {
-	int i, j;
-	u32 addr_ggtt, offset;
+	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
+	struct guc_debug_capture_list *listnode;
+	int size = 0;
 
-	offset = guc_ads_capture_offset(guc);
-	addr_ggtt = intel_guc_ggtt_offset(guc, guc->ads_vma) + offset;
+	if (blob && *p_numregs != newnum) {
+		if (type == GUC_CAPTURE_LIST_TYPE_GLOBAL)
+			drm_warn(&i915->drm, "Guc-Cap VF%d-%s num-reg mismatch was=%d now=%d!\n",
+				 vf, typename, *p_numregs, newnum);
+		else
+			drm_warn(&i915->drm, "Guc-Cap VF%d-Class-%d-%s num-reg mismatch was=%d now=%d!\n",
+				 vf, classid, typename, *p_numregs, newnum);
+	}
+	/*
+	 * For enabled capture lists, we not only need to call capture module to help
+	 * populate the list-descriptor into the correct ads capture structures, but
+	 * we also need to increment the virtual pointers and ggtt offsets so that
+	 * caller has the subsequent gfx memory location.
+	 */
+	*p_numregs = newnum;
+	size = PAGE_ALIGN((sizeof(struct guc_debug_capture_list)) +
+			  (newnum * sizeof(struct guc_mmio_reg)));
+	/* if caller hasn't allocated ADS blob, return size and counts, we're done */
+	if (!blob)
+		return size;
+	if (blob) {
+		/* if caller allocated ADS blob, populate the capture register descriptors */
+		if (!newnum) {
+			*p_blobptr_to_ggtt = null_ggtt;
+		} else {
+			/* get ptr and populate header info: */
+			*p_blobptr_to_ggtt = *p_ggtt;
+			listnode = (struct guc_debug_capture_list *)*p_virt_ptr;
+			*p_ggtt += sizeof(struct guc_debug_capture_list);
+			*p_virt_ptr += sizeof(struct guc_debug_capture_list);
+			listnode->header.info = FIELD_PREP(GUC_CAPTURELISTHDR_NUMDESCR, *p_numregs);
 
-	/* FIXME: Populate a proper capture list */
+			/* get ptr and populate register descriptor list: */
+			intel_guc_capture_list_init(guc, vf, type, classid,
+						    (struct guc_mmio_reg *)*p_virt_ptr,
+						    *p_numregs);
+
+			/* increment ptrs for that header: */
+			*p_ggtt += size - sizeof(struct guc_debug_capture_list);
+			*p_virt_ptr += size - sizeof(struct guc_debug_capture_list);
+		}
+	}
+
+	return size;
+}
+
+static int guc_capture_prep_lists(struct intel_guc *guc, struct __guc_ads_blob *blob)
+{
+	struct intel_gt *gt = guc_to_gt(guc);
+	int i, j, size;
+	u32 ggtt, null_ggtt, offset, alloc_size = 0;
+	struct guc_gt_system_info *info, local_info;
+	struct guc_debug_capture_list *listnode;
+	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
+	struct intel_guc_state_capture *gc = &guc->capture;
+	u16 tmp = 0;
+	u8 *ptr = NULL;
+
+	if (blob) {
+		offset = guc_ads_capture_offset(guc);
+		ggtt = intel_guc_ggtt_offset(guc, guc->ads_vma) + offset;
+		ptr = ((u8 *)blob) + offset;
+		info = &blob->system_info;
+	} else {
+		memset(&local_info, 0, sizeof(local_info));
+		info = &local_info;
+		fill_engine_enable_masks(gt, info);
+	}
+
+	/* first, set aside the first page for a capture_list with zero descriptors */
+	alloc_size = PAGE_SIZE;
+	if (blob) {
+		listnode = (struct guc_debug_capture_list *)ptr;
+		listnode->header.info = FIELD_PREP(GUC_CAPTURELISTHDR_NUMDESCR, 0);
+		null_ggtt = ggtt;
+		ggtt += PAGE_SIZE;
+		ptr +=  PAGE_SIZE;
+	}
+
+#define COUNT_REGS intel_guc_capture_list_count
+#define FILL_REGS guc_fill_reglist
+#define TYPE_CLASS GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS
+#define TYPE_INSTANCE GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE
 
 	for (i = 0; i < GUC_CAPTURE_LIST_INDEX_MAX; i++) {
 		for (j = 0; j < GUC_MAX_ENGINE_CLASSES; j++) {
-			blob->ads.capture_instance[i][j] = addr_ggtt;
-			blob->ads.capture_class[i][j] = addr_ggtt;
+			if (!info->engine_enabled_masks[j]) {
+				if (gc->num_class_regs[i][j])
+					drm_warn(&i915->drm, "GuC-Cap VF%d-class-%d "
+						 "class regs valid mismatch was=%d now=%d!\n",
+						 i, j, gc->num_class_regs[i][j], tmp);
+				if (gc->num_instance_regs[i][j])
+					drm_warn(&i915->drm, "GuC-Cap VF%d-class-%d "
+						 "inst regs valid mismatch was=%d now=%d!\n",
+						 i, j, gc->num_instance_regs[i][j], tmp);
+				gc->num_class_regs[i][j] = 0;
+				gc->num_instance_regs[i][j] = 0;
+				if (blob) {
+					blob->ads.capture_class[i][j] = null_ggtt;
+					blob->ads.capture_instance[i][j] = null_ggtt;
+				}
+			} else {
+				if (!COUNT_REGS(guc, i, TYPE_CLASS,
+						guc_class_to_engine_class(j), &tmp)) {
+					size = FILL_REGS(guc, blob, i, true, j, TYPE_CLASS,
+							 "class", &gc->num_class_regs[i][j],
+							 tmp, &ptr,
+							 &blob->ads.capture_class[i][j],
+							 &ggtt, null_ggtt);
+					gc->class_list_size += size;
+					alloc_size += size;
+				} else {
+					gc->num_class_regs[i][j] = 0;
+					if (blob)
+						blob->ads.capture_class[i][j] = null_ggtt;
+				}
+				if (!COUNT_REGS(guc, i, TYPE_INSTANCE,
+						guc_class_to_engine_class(j), &tmp)) {
+					size = FILL_REGS(guc, blob, i, true, j, TYPE_INSTANCE,
+							 "instance", &gc->num_instance_regs[i][j],
+							 tmp, &ptr,
+							 &blob->ads.capture_instance[i][j],
+							 &ggtt, null_ggtt);
+					gc->instance_list_size += size;
+					alloc_size += size;
+				} else {
+					gc->num_instance_regs[i][j] = 0;
+					if (blob)
+						blob->ads.capture_instance[i][j] = null_ggtt;
+				}
+			}
 		}
-
-		blob->ads.capture_global[i] = addr_ggtt;
+		if (!COUNT_REGS(guc, i, GUC_CAPTURE_LIST_TYPE_GLOBAL, 0, &tmp)) {
+			size = FILL_REGS(guc, blob, i, true, 0, GUC_CAPTURE_LIST_TYPE_GLOBAL,
+					 "global", &gc->num_global_regs[i], tmp, &ptr,
+					 &blob->ads.capture_global[i], &ggtt, null_ggtt);
+			gc->global_list_size += size;
+			alloc_size += size;
+		} else {
+			gc->num_global_regs[i] = 0;
+			if (blob)
+				blob->ads.capture_global[i] = null_ggtt;
+		}
 	}
+
+#undef COUNT_REGS
+#undef FILL_REGS
+#undef TYPE_CLASS
+#undef TYPE_INSTANCE
+
+	if (guc->ads_capture_size && guc->ads_capture_size != PAGE_ALIGN(alloc_size))
+		drm_warn(&i915->drm, "GuC->ADS->Capture alloc size changed from %d to %d\n",
+			 guc->ads_capture_size, PAGE_ALIGN(alloc_size));
+
+	return PAGE_ALIGN(alloc_size);
 }
 
 static void __guc_ads_init(struct intel_guc *guc)
@@ -613,6 +759,12 @@ int intel_guc_ads_create(struct intel_guc *guc)
 	if (ret < 0)
 		return ret;
 	guc->ads_golden_ctxt_size = ret;
+
+	/* Likewise the capture lists: */
+	ret = guc_capture_prep_lists(guc, NULL);
+	if (ret < 0)
+		return ret;
+	guc->ads_capture_size = ret;
 
 	/* Now the total size can be determined: */
 	size = guc_ads_blob_size(guc);
