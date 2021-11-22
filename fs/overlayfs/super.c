@@ -1984,6 +1984,10 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	if (!ofs)
 		goto out;
 
+	err = super_setup_bdi(sb);
+	if (err)
+		goto out_err;
+
 	err = -ENOMEM;
 	ofs->creator_cred = cred = prepare_creds();
 	if (!cred)
