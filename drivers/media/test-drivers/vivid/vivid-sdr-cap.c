@@ -101,7 +101,7 @@ static void vivid_thread_sdr_cap_tick(struct vivid_dev *dev)
 	spin_unlock(&dev->slock);
 
 	if (sdr_cap_buf) {
-		sdr_cap_buf->vb.sequence = dev->sdr_cap_seq_count;
+		sdr_cap_buf->vb.sequence = dev->sdr_cap_with_seq_wrap_count;
 		v4l2_ctrl_request_setup(sdr_cap_buf->vb.vb2_buf.req_obj.req,
 					&dev->ctrl_hdl_sdr_cap);
 		v4l2_ctrl_request_complete(sdr_cap_buf->vb.vb2_buf.req_obj.req,
@@ -124,6 +124,7 @@ static int vivid_thread_sdr_cap(void *data)
 	unsigned long jiffies_since_start;
 	unsigned long cur_jiffies;
 	unsigned wait_jiffies;
+	u64 rem;
 
 	dprintk(dev, 1, "SDR Capture Thread Start\n");
 
@@ -131,10 +132,13 @@ static int vivid_thread_sdr_cap(void *data)
 
 	/* Resets frame counters */
 	dev->sdr_cap_seq_offset = 0;
-	if (dev->seq_wrap)
-		dev->sdr_cap_seq_offset = 0xffffff80U;
+	dev->sdr_cap_seq_count = 0;
 	dev->jiffies_sdr_cap = jiffies;
 	dev->sdr_cap_seq_resync = false;
+	if (dev->time_wrap) {
+		div64_u64_rem(ktime_get_ns(), dev->time_wrap, &rem);
+		dev->time_wrap_offset = dev->time_wrap - rem;
+	}
 
 	for (;;) {
 		try_to_freeze();
@@ -174,6 +178,7 @@ static int vivid_thread_sdr_cap(void *data)
 		}
 		dev->sdr_cap_seq_count =
 			buffers_since_start + dev->sdr_cap_seq_offset;
+		dev->sdr_cap_with_seq_wrap_count = dev->sdr_cap_seq_count - dev->sdr_cap_seq_start;
 
 		vivid_thread_sdr_cap_tick(dev);
 		mutex_unlock(&dev->mutex);
@@ -263,7 +268,10 @@ static int sdr_cap_start_streaming(struct vb2_queue *vq, unsigned count)
 	int err = 0;
 
 	dprintk(dev, 1, "%s\n", __func__);
-	dev->sdr_cap_seq_count = 0;
+
+	dev->sdr_cap_seq_start = dev->seq_wrap * 128;
+	dev->time_wrap_offset = 0;
+
 	if (dev->start_streaming_error) {
 		dev->start_streaming_error = false;
 		err = -EINVAL;

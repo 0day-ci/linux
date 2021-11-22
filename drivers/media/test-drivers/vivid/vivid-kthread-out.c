@@ -147,6 +147,7 @@ static int vivid_thread_vid_out(void *data)
 	unsigned wait_jiffies;
 	unsigned numerator;
 	unsigned denominator;
+	u64 rem;
 
 	dprintk(dev, 1, "Video Output Thread Start\n");
 
@@ -154,12 +155,13 @@ static int vivid_thread_vid_out(void *data)
 
 	/* Resets frame counters */
 	dev->out_seq_offset = 0;
-	if (dev->seq_wrap)
-		dev->out_seq_count = 0xffffff80U;
+	dev->out_seq_count = 0;
 	dev->jiffies_vid_out = jiffies;
-	dev->vid_out_seq_start = dev->vbi_out_seq_start = 0;
-	dev->meta_out_seq_start = 0;
 	dev->out_seq_resync = false;
+	if (dev->time_wrap) {
+		div64_u64_rem(ktime_get_ns(), dev->time_wrap, &rem);
+		dev->time_wrap_offset = dev->time_wrap - rem;
+	}
 
 	for (;;) {
 		try_to_freeze();
@@ -272,6 +274,7 @@ int vivid_start_generating_vid_out(struct vivid_dev *dev, bool *pstreaming)
 	dev->vid_out_seq_start = dev->seq_wrap * 128;
 	dev->vbi_out_seq_start = dev->seq_wrap * 128;
 	dev->meta_out_seq_start = dev->seq_wrap * 128;
+	dev->time_wrap_offset = 0;
 
 	dev->kthread_vid_out = kthread_run(vivid_thread_vid_out, dev,
 			"%s-vid-out", dev->v4l2_dev.name);

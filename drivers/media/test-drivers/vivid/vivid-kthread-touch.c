@@ -52,6 +52,7 @@ static int vivid_thread_touch_cap(void *data)
 	unsigned int numerator;
 	unsigned int denominator;
 	int dropped_bufs;
+	u64 rem;
 
 	dprintk(dev, 1, "Touch Capture Thread Start\n");
 
@@ -62,6 +63,10 @@ static int vivid_thread_touch_cap(void *data)
 	dev->touch_cap_seq_count = 0;
 	dev->touch_cap_seq_resync = false;
 	dev->jiffies_touch_cap = jiffies;
+	if (dev->time_wrap) {
+		div64_u64_rem(ktime_get_ns(), dev->time_wrap, &rem);
+		dev->time_wrap_offset = dev->time_wrap - rem;
+	}
 
 	for (;;) {
 		try_to_freeze();
@@ -102,6 +107,8 @@ static int vivid_thread_touch_cap(void *data)
 		}
 		dropped_bufs = buffers_since_start + dev->touch_cap_seq_offset - dev->touch_cap_seq_count;
 		dev->touch_cap_seq_count = buffers_since_start + dev->touch_cap_seq_offset;
+		dev->touch_cap_with_seq_wrap_count =
+			dev->touch_cap_seq_count - dev->touch_cap_seq_start;
 
 		vivid_thread_tch_cap_tick(dev, dropped_bufs);
 
@@ -142,6 +149,9 @@ int vivid_start_generating_touch_cap(struct vivid_dev *dev)
 		dev->touch_cap_streaming = true;
 		return 0;
 	}
+
+	dev->touch_cap_seq_start = dev->seq_wrap * 128;
+	dev->time_wrap_offset = 0;
 
 	dev->kthread_touch_cap = kthread_run(vivid_thread_touch_cap, dev,
 					     "%s-tch-cap", dev->v4l2_dev.name);

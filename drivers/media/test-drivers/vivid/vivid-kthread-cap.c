@@ -719,8 +719,7 @@ static noinline_for_stack void vivid_thread_vid_cap_tick(struct vivid_dev *dev,
 	if (!vid_cap_buf && !vbi_cap_buf && !meta_cap_buf)
 		goto update_mv;
 
-	f_time = dev->cap_frame_period * dev->vid_cap_seq_count +
-		 dev->cap_stream_start + dev->time_wrap_offset;
+	f_time = ktime_get_ns() + dev->time_wrap_offset;
 
 	if (vid_cap_buf) {
 		v4l2_ctrl_request_setup(vid_cap_buf->vb.vb2_buf.req_obj.req,
@@ -802,6 +801,7 @@ static int vivid_thread_vid_cap(void *data)
 	unsigned numerator;
 	unsigned denominator;
 	int dropped_bufs;
+	u64 rem;
 
 	dprintk(dev, 1, "Video Capture Thread Start\n");
 
@@ -812,6 +812,10 @@ static int vivid_thread_vid_cap(void *data)
 	dev->cap_seq_count = 0;
 	dev->cap_seq_resync = false;
 	dev->jiffies_vid_cap = jiffies;
+	if (dev->time_wrap) {
+		div64_u64_rem(ktime_get_ns(), dev->time_wrap, &rem);
+		dev->time_wrap_offset = dev->time_wrap - rem;
+	}
 	dev->cap_stream_start = ktime_get_ns();
 	vivid_cap_update_frame_period(dev);
 
@@ -928,6 +932,7 @@ int vivid_start_generating_vid_cap(struct vivid_dev *dev, bool *pstreaming)
 	dev->vid_cap_seq_start = dev->seq_wrap * 128;
 	dev->vbi_cap_seq_start = dev->seq_wrap * 128;
 	dev->meta_cap_seq_start = dev->seq_wrap * 128;
+	dev->time_wrap_offset = 0;
 
 	dev->kthread_vid_cap = kthread_run(vivid_thread_vid_cap, dev,
 			"%s-vid-cap", dev->v4l2_dev.name);
