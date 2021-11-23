@@ -802,6 +802,59 @@ mvneta_get_stats64(struct net_device *dev,
 	stats->tx_dropped	= dev->stats.tx_dropped;
 }
 
+static int mvneta_get_xdp_stats(const struct net_device *dev, u32 attr_id,
+				void *attr_data)
+{
+	const struct mvneta_port *pp = netdev_priv(dev);
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	u32 cpu;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for_each_possible_cpu(cpu) {
+		const struct mvneta_pcpu_stats *stats;
+		const struct mvneta_stats *ps;
+		u64 xdp_xmit_err;
+		u64 xdp_redirect;
+		u64 xdp_tx_err;
+		u64 xdp_pass;
+		u64 xdp_drop;
+		u64 xdp_xmit;
+		u64 xdp_tx;
+		u32 start;
+
+		stats = per_cpu_ptr(pp->stats, cpu);
+		ps = &stats->es.ps;
+
+		do {
+			start = u64_stats_fetch_begin_irq(&stats->syncp);
+
+			xdp_drop = ps->xdp_drop;
+			xdp_pass = ps->xdp_pass;
+			xdp_redirect = ps->xdp_redirect;
+			xdp_tx = ps->xdp_tx;
+			xdp_tx_err = ps->xdp_tx_err;
+			xdp_xmit = ps->xdp_xmit;
+			xdp_xmit_err = ps->xdp_xmit_err;
+		} while (u64_stats_fetch_retry_irq(&stats->syncp, start));
+
+		xdp_stats->drop += xdp_drop;
+		xdp_stats->pass += xdp_pass;
+		xdp_stats->redirect += xdp_redirect;
+		xdp_stats->tx += xdp_tx;
+		xdp_stats->tx_errors += xdp_tx_err;
+		xdp_stats->xmit_packets += xdp_xmit;
+		xdp_stats->xmit_errors += xdp_xmit_err;
+	}
+
+	return 0;
+}
+
 /* Rx descriptors helper methods */
 
 /* Checks whether the RX descriptor having this status is both the first
@@ -4957,6 +5010,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
 	.ndo_change_mtu		= mvneta_change_mtu,
 	.ndo_fix_features	= mvneta_fix_features,
 	.ndo_get_stats64	= mvneta_get_stats64,
+	.ndo_get_xdp_stats	= mvneta_get_xdp_stats,
 	.ndo_eth_ioctl		= mvneta_ioctl,
 	.ndo_bpf		= mvneta_xdp,
 	.ndo_xdp_xmit		= mvneta_xdp_xmit,
