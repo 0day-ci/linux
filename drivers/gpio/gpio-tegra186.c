@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/hte.h>
 
 #include <dt-bindings/gpio/tegra186-gpio.h>
 #include <dt-bindings/gpio/tegra194-gpio.h>
@@ -34,6 +35,7 @@
 #define  TEGRA186_GPIO_ENABLE_CONFIG_TRIGGER_LEVEL BIT(4)
 #define  TEGRA186_GPIO_ENABLE_CONFIG_DEBOUNCE BIT(5)
 #define  TEGRA186_GPIO_ENABLE_CONFIG_INTERRUPT BIT(6)
+#define  TEGRA186_GPIO_ENABLE_CONFIG_TIMESTAMP_FUNC BIT(7)
 
 #define TEGRA186_GPIO_DEBOUNCE_CONTROL 0x04
 #define  TEGRA186_GPIO_DEBOUNCE_CONTROL_THRESHOLD(x) ((x) & 0xff)
@@ -81,6 +83,7 @@ struct tegra_gpio {
 	struct irq_chip intc;
 	unsigned int num_irq;
 	unsigned int *irq;
+	struct device *dev;
 
 	const struct tegra_gpio_soc *soc;
 	unsigned int num_irqs_per_bank;
@@ -187,6 +190,86 @@ static int tegra186_gpio_direction_output(struct gpio_chip *chip,
 	value = readl(base + TEGRA186_GPIO_ENABLE_CONFIG);
 	value |= TEGRA186_GPIO_ENABLE_CONFIG_ENABLE;
 	value |= TEGRA186_GPIO_ENABLE_CONFIG_OUT;
+	writel(value, base + TEGRA186_GPIO_ENABLE_CONFIG);
+
+	return 0;
+}
+
+static int tegra186_gpio_req_hw_ts(struct gpio_chip *chip, unsigned int offset,
+				   hte_ts_cb_t cb, hte_ts_threaded_cb_t tcb,
+				   struct hte_ts_desc *hdesc, void *data)
+{
+	struct tegra_gpio *gpio;
+	void __iomem *base;
+	int value, ret;
+
+	if (!chip || !hdesc)
+		return -EINVAL;
+
+	gpio = gpiochip_get_data(chip);
+	if (!gpio)
+		return -ENODEV;
+
+	base = tegra186_gpio_get_base(gpio, offset);
+	if (WARN_ON(base == NULL))
+		return -EINVAL;
+
+	/*
+	 * HTE provider of this gpio controller does not support below gpio
+	 * configs:
+	 * 1. gpio as output
+	 * 2. gpio as input
+	 *
+	 * HTE provider supports below gpio config:
+	 * a. gpio as input with irq enabled
+	 */
+
+	if (tegra186_gpio_get_direction(chip, offset) ==
+	    GPIO_LINE_DIRECTION_OUT)
+		return -ENOTSUPP;
+
+	if (!gpiochip_line_is_irq(chip, offset))
+		return -ENOTSUPP;
+
+	hdesc->con_id = offset;
+
+	ret = hte_req_ts_by_hte_name(gpio->dev, "hardware-timestamp-engine",
+				     hdesc, cb, tcb, data);
+	if (ret)
+		return ret;
+
+	value = readl(base + TEGRA186_GPIO_ENABLE_CONFIG);
+	value |= TEGRA186_GPIO_ENABLE_CONFIG_TIMESTAMP_FUNC;
+	writel(value, base + TEGRA186_GPIO_ENABLE_CONFIG);
+
+	return 0;
+}
+
+static int tegra186_gpio_rel_hw_ts(struct gpio_chip *chip,
+				   unsigned int offset,
+				   struct hte_ts_desc *hdesc)
+{
+	struct tegra_gpio *gpio;
+	void __iomem *base;
+	int value, ret;
+
+	if (!hdesc || !chip)
+		return -EINVAL;
+
+	gpio = gpiochip_get_data(chip);
+	if (!gpio)
+		return -ENODEV;
+
+	base = tegra186_gpio_get_base(gpio, offset);
+	if (WARN_ON(base == NULL))
+		return -EINVAL;
+
+	ret = hte_release_ts(hdesc);
+	if (ret)
+		return ret;
+
+	value = readl(base + TEGRA186_GPIO_ENABLE_CONFIG);
+	value &= ~TEGRA186_GPIO_ENABLE_CONFIG_TIMESTAMP_FUNC;
 	writel(value, base + TEGRA186_GPIO_ENABLE_CONFIG);
 
 	return 0;
@@ -819,6 +902,12 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 			irq->map[offset + j] = irq->parents[port->bank];
 
 		offset += port->pins;
+	}
+
+	gpio->dev = &pdev->dev;
+	if (device_property_present(gpio->dev, "hardware-timestamp-engine")) {
+		gpio->gpio.req_hw_timestamp = tegra186_gpio_req_hw_ts;
+		gpio->gpio.rel_hw_timestamp = tegra186_gpio_rel_hw_ts;
 	}
 
 	return devm_gpiochip_add_data(&pdev->dev, &gpio->gpio, gpio);
