@@ -29,6 +29,7 @@
 #include <linux/prefetch.h>
 #include <linux/blk-crypto.h>
 #include <linux/sched/sysctl.h>
+#include <linux/part_stat.h>
 
 #include <trace/events/block.h>
 
