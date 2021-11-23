@@ -977,7 +977,7 @@ xfs_create(
 	struct xfs_trans_res	*tres;
 	uint			resblks;
 	xfs_ino_t		ino;
-	struct user_namespace	*fs_userns = &init_user_ns;
+	struct user_namespace	*fs_userns = i_user_ns(VFS_I(dp));
 
 	trace_xfs_create(dp, name);
 
@@ -1134,7 +1134,7 @@ xfs_create_tmpfile(
 	struct xfs_trans_res	*tres;
 	uint			resblks;
 	xfs_ino_t		ino;
-	struct user_namespace	*fs_userns = &init_user_ns;
+	struct user_namespace	*fs_userns = i_user_ns(VFS_I(dp));
 
 	if (xfs_is_shutdown(mp))
 		return -EIO;

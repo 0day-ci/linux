@@ -163,7 +163,7 @@ xfs_symlink(
 	struct xfs_dquot	*pdqp = NULL;
 	uint			resblks;
 	xfs_ino_t		ino;
-	struct user_namespace	*fs_userns = &init_user_ns;
+	struct user_namespace	*fs_userns = i_user_ns(VFS_I(dp));
 
 	*ipp = NULL;
 
