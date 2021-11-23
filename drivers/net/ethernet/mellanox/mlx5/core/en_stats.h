@@ -158,6 +158,7 @@ struct mlx5e_sw_stats {
 	u64 rx_csum_complete_tail;
 	u64 rx_csum_complete_tail_slow;
 	u64 rx_csum_unnecessary_inner;
+	u64 rx_xdp_errors;
 	u64 rx_xdp_drop;
 	u64 rx_xdp_redirect;
 	u64 rx_xdp_tx_xmit;
@@ -237,6 +238,7 @@ struct mlx5e_sw_stats {
 	u64 rx_xsk_csum_none;
 	u64 rx_xsk_ecn_mark;
 	u64 rx_xsk_removed_vlan_packets;
+	u64 rx_xsk_xdp_errors;
 	u64 rx_xsk_xdp_drop;
 	u64 rx_xsk_xdp_redirect;
 	u64 rx_xsk_wqe_err;
@@ -335,6 +337,7 @@ struct mlx5e_rq_stats {
 	u64 mcast_packets;
 	u64 ecn_mark;
 	u64 removed_vlan_packets;
+	u64 xdp_errors;
 	u64 xdp_drop;
 	u64 xdp_redirect;
 	u64 wqe_err;

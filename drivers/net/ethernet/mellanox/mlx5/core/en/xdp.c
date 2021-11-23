@@ -156,7 +156,8 @@ bool mlx5e_xdp_handle(struct mlx5e_rq *rq, struct mlx5e_dma_info *di,
 	case XDP_ABORTED:
 xdp_abort:
 		trace_xdp_exception(rq->netdev, prog, act);
-		fallthrough;
+		rq->stats->xdp_errors++;
+		return true;
 	case XDP_DROP:
 		rq->stats->xdp_drop++;
 		return true;
