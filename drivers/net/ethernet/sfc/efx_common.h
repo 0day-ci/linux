@@ -32,6 +32,9 @@ void efx_start_all(struct efx_nic *efx);
 void efx_stop_all(struct efx_nic *efx);
 
 void efx_net_stats(struct net_device *net_dev, struct rtnl_link_stats64 *stats);
+int efx_get_xdp_stats_nch(const struct net_device *net_dev, u32 attr_id);
+int efx_get_xdp_stats(const struct net_device *net_dev, u32 attr_id,
+		      void *attr_data);
 
 int efx_create_reset_workqueue(void);
 void efx_queue_reset_work(struct efx_nic *efx);

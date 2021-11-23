@@ -606,6 +606,48 @@ void efx_net_stats(struct net_device *net_dev, struct rtnl_link_stats64 *stats)
 	spin_unlock_bh(&efx->stats_lock);
 }
 
+int efx_get_xdp_stats_nch(const struct net_device *net_dev, u32 attr_id)
+{
+	const struct efx_nic *efx = netdev_priv(net_dev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return efx->n_channels;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+int efx_get_xdp_stats(const struct net_device *net_dev, u32 attr_id,
+		      void *attr_data)
+{
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	struct efx_nic *efx = netdev_priv(net_dev);
+	const struct efx_channel *channel;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	spin_lock_bh(&efx->stats_lock);
+
+	efx_for_each_channel(channel, efx) {
+		xdp_stats->drop = channel->n_rx_xdp_drops;
+		xdp_stats->errors = channel->n_rx_xdp_bad_drops;
+		xdp_stats->redirect = channel->n_rx_xdp_redirect;
+		xdp_stats->tx = channel->n_rx_xdp_tx;
+
+		xdp_stats++;
+	}
+
+	spin_unlock_bh(&efx->stats_lock);
+
+	return 0;
+}
+
 /* Push loopback/power/transmit disable settings to the PHY, and reconfigure
  * the MAC appropriately. All other PHY configuration changes are pushed
  * through phy_op->set_settings(), and pushed asynchronously to the MAC
