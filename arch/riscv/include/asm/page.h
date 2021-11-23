@@ -16,6 +16,14 @@
 #define PAGE_SIZE	(_AC(1, UL) << PAGE_SHIFT)
 #define PAGE_MASK	(~(PAGE_SIZE - 1))
 
+#if __riscv_xlen == 64
+/* Image load offset(2MB) from start of RAM */
+#define LOAD_OFFSET	0x200000
+#else
+/* Image load offset(4MB) from start of RAM */
+#define LOAD_OFFSET	0x400000
+#endif
+
 #ifdef CONFIG_64BIT
 #define HUGE_MAX_HSTATE		2
 #else

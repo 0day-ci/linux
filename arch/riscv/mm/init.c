@@ -221,6 +221,11 @@ static void __init setup_bootmem(void)
 	if (!IS_ENABLED(CONFIG_BUILTIN_DTB))
 		memblock_reserve(dtb_early_pa, fdt_totalsize(dtb_early_va));
 
+	/*
+	 * Reserve OpenSBI region and depends on PMP to deny accesses.
+	 */
+	memblock_reserve(__pa(PAGE_OFFSET), LOAD_OFFSET);
+
 	early_init_fdt_scan_reserved_mem();
 	dma_contiguous_reserve(dma32_phys_limit);
 	if (IS_ENABLED(CONFIG_64BIT))
@@ -604,7 +609,7 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 
 	kernel_map.va_kernel_xip_pa_offset = kernel_map.virt_addr - kernel_map.xiprom;
 #else
-	kernel_map.phys_addr = (uintptr_t)(&_start);
+	kernel_map.phys_addr = (uintptr_t)(&_start) - LOAD_OFFSET;
 	kernel_map.size = (uintptr_t)(&_end) - kernel_map.phys_addr;
 #endif
 	kernel_map.va_pa_offset = PAGE_OFFSET - kernel_map.phys_addr;
@@ -645,8 +650,8 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 	create_pmd_mapping(trampoline_pmd, kernel_map.virt_addr,
 			   kernel_map.xiprom, PMD_SIZE, PAGE_KERNEL_EXEC);
 #else
-	create_pmd_mapping(trampoline_pmd, kernel_map.virt_addr,
-			   kernel_map.phys_addr, PMD_SIZE, PAGE_KERNEL_EXEC);
+	create_pmd_mapping(trampoline_pmd, kernel_map.virt_addr + LOAD_OFFSET,
+			   kernel_map.phys_addr + LOAD_OFFSET, PMD_SIZE, PAGE_KERNEL_EXEC);
 #endif
 #else
 	/* Setup trampoline PGD */

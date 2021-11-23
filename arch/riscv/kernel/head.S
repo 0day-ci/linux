@@ -61,13 +61,7 @@ ENTRY(_start)
 	/* Image load offset (0MB) from start of RAM for M-mode */
 	.dword 0
 #else
-#if __riscv_xlen == 64
-	/* Image load offset(2MB) from start of RAM */
-	.dword 0x200000
-#else
-	/* Image load offset(4MB) from start of RAM */
-	.dword 0x400000
-#endif
+	.dword LOAD_OFFSET
 #endif
 	/* Effective size of kernel image */
 	.dword _end - _start
@@ -94,6 +88,8 @@ relocate:
 	la a1, kernel_map
 	XIP_FIXUP_OFFSET a1
 	REG_L a1, KERNEL_MAP_VIRT_ADDR(a1)
+	li a2, LOAD_OFFSET
+	add a1, a1, a2
 	la a2, _start
 	sub a1, a1, a2
 	add ra, ra, a1
