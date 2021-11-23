@@ -45,7 +45,7 @@ static void free_bitmap(struct btrfs_free_space_ctl *ctl,
 			struct btrfs_free_space *bitmap_info);
 static void bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
 			      struct btrfs_free_space *info, u64 offset,
-			      u64 bytes);
+			      u64 bytes, bool update_stats);
 
 static struct inode *__lookup_free_space_inode(struct btrfs_root *root,
 					       struct btrfs_path *path,
@@ -886,7 +886,7 @@ static int copy_free_space_cache(struct btrfs_block_group *block_group,
 							   bytes);
 				if (ret)
 					break;
-				bitmap_clear_bits(ctl, info, offset, bytes);
+				bitmap_clear_bits(ctl, info, offset, bytes, true);
 				offset = info->offset;
 				bytes = ctl->unit;
 			}
@@ -1744,9 +1744,9 @@ static int link_free_space(struct btrfs_free_space_ctl *ctl,
 	return ret;
 }
 
-static inline void __bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
-				       struct btrfs_free_space *info,
-				       u64 offset, u64 bytes)
+static inline void bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
+				     struct btrfs_free_space *info,
+				     u64 offset, u64 bytes, bool update_stat)
 {
 	unsigned long start, count, end;
 	int extent_delta = -1;
@@ -1773,14 +1773,9 @@ static inline void __bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
 		ctl->discardable_extents[BTRFS_STAT_CURR] += extent_delta;
 		ctl->discardable_bytes[BTRFS_STAT_CURR] -= bytes;
 	}
-}
 
-static void bitmap_clear_bits(struct btrfs_free_space_ctl *ctl,
-			      struct btrfs_free_space *info, u64 offset,
-			      u64 bytes)
-{
-	__bitmap_clear_bits(ctl, info, offset, bytes);
-	ctl->free_space -= bytes;
+	if (update_stat)
+		ctl->free_space -= bytes;
 }
 
 static void bitmap_set_bits(struct btrfs_free_space_ctl *ctl,
@@ -2011,7 +2006,7 @@ again:
 	/* Cannot clear past the end of the bitmap */
 	search_bytes = min(search_bytes, end - search_start + 1);
 
-	bitmap_clear_bits(ctl, bitmap_info, search_start, search_bytes);
+	bitmap_clear_bits(ctl, bitmap_info, search_start, search_bytes, true);
 	*offset += search_bytes;
 	*bytes -= search_bytes;
 
@@ -2362,10 +2357,7 @@ static bool steal_from_bitmap_to_end(struct btrfs_free_space_ctl *ctl,
 	if (!btrfs_free_space_trimmed(bitmap))
 		info->trim_state = BTRFS_TRIM_STATE_UNTRIMMED;
 
-	if (update_stat)
-		bitmap_clear_bits(ctl, bitmap, end, bytes);
-	else
-		__bitmap_clear_bits(ctl, bitmap, end, bytes);
+	bitmap_clear_bits(ctl, bitmap, end, bytes, update_stat);
 
 	if (!bitmap->bytes)
 		free_bitmap(ctl, bitmap);
@@ -2419,10 +2411,7 @@ static bool steal_from_bitmap_to_front(struct btrfs_free_space_ctl *ctl,
 	if (!btrfs_free_space_trimmed(bitmap))
 		info->trim_state = BTRFS_TRIM_STATE_UNTRIMMED;
 
-	if (update_stat)
-		bitmap_clear_bits(ctl, bitmap, info->offset, bytes);
-	else
-		__bitmap_clear_bits(ctl, bitmap, info->offset, bytes);
+	bitmap_clear_bits(ctl, bitmap, info->offset, bytes, update_stat);
 
 	if (!bitmap->bytes)
 		free_bitmap(ctl, bitmap);
@@ -2976,7 +2965,7 @@ u64 btrfs_find_space_for_alloc(struct btrfs_block_group *block_group,
 
 	ret = offset;
 	if (entry->bitmap) {
-		bitmap_clear_bits(ctl, entry, offset, bytes);
+		bitmap_clear_bits(ctl, entry, offset, bytes, true);
 
 		if (!btrfs_free_space_trimmed(entry))
 			atomic64_add(bytes, &discard_ctl->discard_bytes_saved);
@@ -3078,7 +3067,7 @@ static u64 btrfs_alloc_from_bitmap(struct btrfs_block_group *block_group,
 	}
 
 	ret = search_start;
-	__bitmap_clear_bits(ctl, entry, ret, bytes);
+	bitmap_clear_bits(ctl, entry, ret, bytes, false);
 
 	return ret;
 }
@@ -3828,7 +3817,7 @@ static int trim_bitmaps(struct btrfs_block_group *block_group,
 		    bytes > (max_discard_size + minlen))
 			bytes = max_discard_size;
 
-		bitmap_clear_bits(ctl, entry, start, bytes);
+		bitmap_clear_bits(ctl, entry, start, bytes, true);
 		if (entry->bytes == 0)
 			free_bitmap(ctl, entry);
 
