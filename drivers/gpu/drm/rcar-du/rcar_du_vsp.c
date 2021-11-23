@@ -88,8 +88,6 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
 	 * Ensure that the plane source configuration takes effect by requesting
 	 * a restart of the group. See rcar_du_plane_atomic_update() for a more
 	 * detailed explanation.
-	 *
-	 * TODO: Check whether this is still needed on Gen3.
 	 */
 	crtc->group->need_restart = true;
 

@@ -248,7 +248,7 @@ void rcar_du_group_start_stop(struct rcar_du_group *rgrp, bool start)
 	 * when the display controller will have to be restarted.
 	 */
 	if (start) {
-		if (rgrp->used_crtcs++ != 0)
+		if (rgrp->used_crtcs++ != 0 && rgrp->dev->info->gen != 3)
 			__rcar_du_group_start_stop(rgrp, false);
 		__rcar_du_group_start_stop(rgrp, true);
 	} else {
@@ -260,6 +260,9 @@ void rcar_du_group_start_stop(struct rcar_du_group *rgrp, bool start)
 void rcar_du_group_restart(struct rcar_du_group *rgrp)
 {
 	rgrp->need_restart = false;
+
+	if (rgrp->dev->info->gen == 3)
+		return;
 
 	__rcar_du_group_start_stop(rgrp, false);
 	__rcar_du_group_start_stop(rgrp, true);
