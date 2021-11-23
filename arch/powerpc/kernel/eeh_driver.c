@@ -851,26 +851,6 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 		return;
 	}
 
-	/*
-	 * When devices are hot-removed we might get an EEH due to
-	 * a driver attempting to touch the MMIO space of a removed
-	 * device. In this case we don't have a device to recover
-	 * so suppress the event if we can't find any present devices.
-	 *
-	 * The hotplug driver should take care of tearing down the
-	 * device itself.
-	 */
-	eeh_for_each_pe(pe, tmp_pe)
-		eeh_pe_for_each_dev(tmp_pe, edev, tmp)
-			if (eeh_slot_presence_check(edev->pdev))
-				devices++;
-
-	if (!devices) {
-		pr_debug("EEH: Frozen PHB#%x-PE#%x is empty!\n",
-			pe->phb->global_number, pe->addr);
-		goto out; /* nothing to recover */
-	}
-
 	/* Log the event */
 	if (pe->type & EEH_PE_PHB) {
 		pr_err("EEH: Recovering PHB#%x, location: %s\n",
@@ -940,6 +920,28 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 		    result != PCI_ERS_RESULT_NONE &&
 		    result != PCI_ERS_RESULT_NEED_RESET)
 			result = PCI_ERS_RESULT_NEED_RESET;
+	}
+
+	/*
+	 * When devices are hot-removed we might get an EEH due to
+	 * a driver attempting to touch the MMIO space of a removed
+	 * device. In this case we don't have a device to recover
+	 * bail out early as there is nothing to recover.
+	 *
+	 * The hotplug driver should take care of tearing down the
+	 * device itself.
+	 */
+	eeh_for_each_pe(pe, tmp_pe)
+		eeh_pe_for_each_dev(tmp_pe, edev, tmp)
+			if (eeh_slot_presence_check(edev->pdev))
+				devices++;
+
+	if (!devices) {
+		pr_info("EEH: Frozen PHB#%x-PE#%x is empty!\n",
+			pe->phb->global_number, pe->addr);
+		pr_info("EEH: Surprise hotplug remove. nothing to recover.\n");
+		eeh_set_channel_state(pe, pci_channel_io_perm_failure);
+		goto out; /* nothing to recover */
 	}
 
 	/* Get the current PCI slot state. This can take a long time,
