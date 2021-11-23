@@ -31,6 +31,8 @@ static irqreturn_t interrupt_cnt_isr(int irq, void *dev_id)
 
 	atomic_inc(&priv->count);
 
+	counter_push_event(&priv->counter, COUNTER_EVENT_OVERFLOW, 0);
+
 	return IRQ_HANDLED;
 }
 
