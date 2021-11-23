@@ -2225,6 +2225,7 @@ struct net_device {
 		struct pcpu_lstats __percpu		*lstats;
 		struct pcpu_sw_netstats __percpu	*tstats;
 		struct pcpu_dstats __percpu		*dstats;
+		struct xdp_drv_stats /* per-channel */	*xstats;
 	};
 
 #if IS_ENABLED(CONFIG_GARP)

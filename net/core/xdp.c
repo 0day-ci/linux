@@ -611,3 +611,127 @@ struct xdp_frame *xdpf_clone(struct xdp_frame *xdpf)
 
 	return nxdpf;
 }
+
+/**
+ * xdp_fetch_rx_drv_stats - helper for implementing .ndo_get_xdp_stats()
+ * @if_stats: target container passed from rtnetlink core
+ * @rstats: driver container if it uses generic xdp_rx_drv_stats
+ *
+ * Fetches Rx path XDP statistics from a suggested driver structure to
+ * the one used by rtnetlink, respecting atomic/seqcount synchronization.
+ */
+void xdp_fetch_rx_drv_stats(struct ifla_xdp_stats *if_stats,
+			    const struct xdp_rx_drv_stats *rstats)
+{
+	u32 start;
+
+	do {
+		start = u64_stats_fetch_begin_irq(&rstats->syncp);
+
+		if_stats->packets = u64_stats_read(&rstats->packets);
+		if_stats->bytes = u64_stats_read(&rstats->bytes);
+		if_stats->pass = u64_stats_read(&rstats->pass);
+		if_stats->drop = u64_stats_read(&rstats->drop);
+		if_stats->tx = u64_stats_read(&rstats->tx);
+		if_stats->tx_errors = u64_stats_read(&rstats->tx_errors);
+		if_stats->redirect = u64_stats_read(&rstats->redirect);
+		if_stats->redirect_errors =
+			u64_stats_read(&rstats->redirect_errors);
+		if_stats->aborted = u64_stats_read(&rstats->aborted);
+		if_stats->invalid = u64_stats_read(&rstats->invalid);
+	} while (u64_stats_fetch_retry_irq(&rstats->syncp, start));
+}
+EXPORT_SYMBOL_GPL(xdp_fetch_rx_drv_stats);
+
+/**
+ * xdp_fetch_tx_drv_stats - helper for implementing .ndo_get_xdp_stats()
+ * @if_stats: target container passed from rtnetlink core
+ * @tstats: driver container if it uses generic xdp_tx_drv_stats
+ *
+ * Fetches Tx path XDP statistics from a suggested driver structure to
+ * the one used by rtnetlink, respecting atomic/seqcount synchronization.
+ */
+void xdp_fetch_tx_drv_stats(struct ifla_xdp_stats *if_stats,
+			    const struct xdp_tx_drv_stats *tstats)
+{
+	u32 start;
+
+	do {
+		start = u64_stats_fetch_begin_irq(&tstats->syncp);
+
+		if_stats->xmit_packets = u64_stats_read(&tstats->packets);
+		if_stats->xmit_bytes = u64_stats_read(&tstats->bytes);
+		if_stats->xmit_errors = u64_stats_read(&tstats->errors);
+		if_stats->xmit_full = u64_stats_read(&tstats->full);
+	} while (u64_stats_fetch_retry_irq(&tstats->syncp, start));
+}
+EXPORT_SYMBOL_GPL(xdp_fetch_tx_drv_stats);
+
+/**
+ * xdp_get_drv_stats_generic - generic implementation of .ndo_get_xdp_stats()
+ * @dev: network interface device structure
+ * @attr_id: type of statistics (XDP, XSK, ...)
+ * @attr_data: target stats container
+ *
+ * Returns 0 on success, -%EOPNOTSUPP if either driver or this function doesn't
+ * support this attr_id, -%ENODATA if the driver supports attr_id, but can't
+ * provide anything right now, and -%EINVAL if driver configuration is invalid.
+ */
+int xdp_get_drv_stats_generic(const struct net_device *dev, u32 attr_id,
+			      void *attr_data)
+{
+	const bool xsk = attr_id == IFLA_XDP_XSTATS_TYPE_XSK;
+	const struct xdp_drv_stats *drv_iter = dev->xstats;
+	const struct net_device_ops *ops = dev->netdev_ops;
+	struct ifla_xdp_stats *iter = attr_data;
+	int nch;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		if (unlikely(!ops->ndo_bpf))
+			return -EINVAL;
+
+		break;
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		if (!ops->ndo_xsk_wakeup)
+			return -EOPNOTSUPP;
+
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	if (unlikely(!drv_iter || !ops->ndo_get_xdp_stats_nch))
+		return -EINVAL;
+
+	nch = ops->ndo_get_xdp_stats_nch(dev, attr_id);
+	switch (nch) {
+	case 0:
+		/* Stats are shared across the netdev */
+		nch = 1;
+		break;
+	case 1 ... INT_MAX:
+		/* Stats are per-channel */
+		break;
+	default:
+		return nch;
+	}
+
+	for (i = 0; i < nch; i++) {
+		const struct xdp_rx_drv_stats *rstats;
+		const struct xdp_tx_drv_stats *tstats;
+
+		rstats = xsk ? &drv_iter->xsk_rx : &drv_iter->xdp_rx;
+		xdp_fetch_rx_drv_stats(iter, rstats);
+
+		tstats = xsk ? &drv_iter->xsk_tx : &drv_iter->xdp_tx;
+		xdp_fetch_tx_drv_stats(iter, tstats);
+
+		drv_iter++;
+		iter++;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(xdp_get_drv_stats_generic);

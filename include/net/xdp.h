@@ -7,6 +7,7 @@
 #define __LINUX_NET_XDP_H__
 
 #include <linux/skbuff.h> /* skb_shared_info */
+#include <linux/u64_stats_sync.h> /* u64_stats_* */
 
 /**
  * DOC: XDP RX-queue information
@@ -291,5 +292,166 @@ void xdp_attachment_setup(struct xdp_attachment_info *info,
 			  struct netdev_bpf *bpf);
 
 #define DEV_MAP_BULK_SIZE XDP_BULK_QUEUE_SIZE
+
+/* Suggested XDP/XSK driver stats, mirror &ifla_xdp_stats except
+ * for generic errors, refer to its documentation for the details.
+ * The intended usage is to either have them as a standalone array
+ * of xdp_drv_stats, or embed &xdp_{rx,tx}_drv_stats into a ring
+ * structure. Having separate XDP and XSK counters is recommended.
+ */
+
+struct ifla_xdp_stats;
+
+struct xdp_rx_drv_stats {
+	struct u64_stats_sync syncp;
+	u64_stats_t packets;
+	u64_stats_t bytes;
+	u64_stats_t pass;
+	u64_stats_t drop;
+	u64_stats_t redirect;
+	u64_stats_t tx;
+	u64_stats_t redirect_errors;
+	u64_stats_t tx_errors;
+	u64_stats_t aborted;
+	u64_stats_t invalid;
+};
+
+struct xdp_tx_drv_stats {
+	struct u64_stats_sync syncp;
+	u64_stats_t packets;
+	u64_stats_t bytes;
+	u64_stats_t errors;
+	u64_stats_t full;
+};
+
+struct xdp_drv_stats {
+	struct xdp_rx_drv_stats xdp_rx;
+	struct xdp_tx_drv_stats xdp_tx;
+	struct xdp_rx_drv_stats xsk_rx ____cacheline_aligned;
+	struct xdp_tx_drv_stats xsk_tx;
+} ____cacheline_aligned;
+
+/* Shortened copy of Rx stats to put on stack */
+struct xdp_rx_drv_stats_local {
+	u32 bytes;
+	u32 packets;
+	u32 pass;
+	u32 drop;
+	u32 tx;
+	u32 tx_errors;
+	u32 redirect;
+	u32 redirect_errors;
+	u32 aborted;
+	u32 invalid;
+};
+
+#define xdp_init_rx_drv_stats(rstats) u64_stats_init(&(rstats)->syncp)
+#define xdp_init_tx_drv_stats(tstats) u64_stats_init(&(tstats)->syncp)
+
+/**
+ * xdp_init_drv_stats - initialize driver XDP stats
+ * @xdp_stats: driver container if it uses generic xdp_drv_stats
+ *
+ * Initializes atomic/seqcount sync points inside the containers.
+ */
+static inline void xdp_init_drv_stats(struct xdp_drv_stats *xdp_stats)
+{
+	xdp_init_rx_drv_stats(&xdp_stats->xdp_rx);
+	xdp_init_tx_drv_stats(&xdp_stats->xdp_tx);
+	xdp_init_rx_drv_stats(&xdp_stats->xsk_rx);
+	xdp_init_tx_drv_stats(&xdp_stats->xsk_tx);
+}
+
+/**
+ * xdp_update_rx_drv_stats - update driver XDP stats
+ * @rstats: target driver container
+ * @lrstats: filled onstack structure
+ *
+ * Fetches Rx path XDP statistics from the onstack structure to the
+ * driver container, respecting atomic/seqcount synchronization.
+ * Typical usage is to call it at the end of Rx NAPI polling.
+ */
+static inline void
+xdp_update_rx_drv_stats(struct xdp_rx_drv_stats *rstats,
+			const struct xdp_rx_drv_stats_local *lrstats)
+{
+	if (!lrstats->packets)
+		return;
+
+	u64_stats_update_begin(&rstats->syncp);
+	u64_stats_add(&rstats->packets, lrstats->packets);
+	u64_stats_add(&rstats->bytes, lrstats->bytes);
+	u64_stats_add(&rstats->pass, lrstats->pass);
+	u64_stats_add(&rstats->drop, lrstats->drop);
+	u64_stats_add(&rstats->redirect, lrstats->redirect);
+	u64_stats_add(&rstats->tx, lrstats->tx);
+	u64_stats_add(&rstats->redirect_errors, lrstats->redirect_errors);
+	u64_stats_add(&rstats->tx_errors, lrstats->tx_errors);
+	u64_stats_add(&rstats->aborted, lrstats->aborted);
+	u64_stats_add(&rstats->invalid, lrstats->invalid);
+	u64_stats_update_end(&rstats->syncp);
+}
+
+/**
+ * xdp_update_tx_drv_stats - update driver XDP stats
+ * @tstats: target driver container
+ * @packets: onstack packet counter
+ * @bytes: onstack octete counter
+ *
+ * Adds onstack packet/byte Tx XDP counter values from the current session
+ * to the driver container. Typical usage is to call it on completion path /
+ * Tx NAPI polling.
+ */
+static inline void xdp_update_tx_drv_stats(struct xdp_tx_drv_stats *tstats,
+					   u32 packets, u32 bytes)
+{
+	if (!packets)
+		return;
+
+	u64_stats_update_begin(&tstats->syncp);
+	u64_stats_add(&tstats->packets, packets);
+	u64_stats_add(&tstats->bytes, bytes);
+	u64_stats_update_end(&tstats->syncp);
+}
+
+/**
+ * xdp_update_tx_drv_err - update driver Tx XDP errors counter
+ * @tstats: target driver container
+ * @num: onstack error counter / number of non-xmitted frames
+ *
+ * Adds onstack error Tx XDP counter value from the current session
+ * to the driver container. Typical usage is to call it at on error
+ * path of .ndo_xdp_xmit() / XSK zerocopy xmit.
+ */
+static inline void xdp_update_tx_drv_err(struct xdp_tx_drv_stats *tstats,
+					 u32 num)
+{
+	u64_stats_update_begin(&tstats->syncp);
+	u64_stats_add(&tstats->errors, num);
+	u64_stats_update_end(&tstats->syncp);
+}
+
+/**
+ * xdp_update_tx_drv_full - update driver Tx XDP ring full counter
+ * @tstats: target driver container
+ *
+ * Adds onstack error Tx XDP counter value from the current session
+ * to the driver container. Typical usage is to call it at in case
+ * of no free descs available on a ring in .ndo_xdp_xmit() / XSK
+ * zerocopy xmit.
+ */
+static inline void xdp_update_tx_drv_full(struct xdp_tx_drv_stats *tstats)
+{
+	u64_stats_update_begin(&tstats->syncp);
+	u64_stats_inc(&tstats->full);
+	u64_stats_update_end(&tstats->syncp);
+}
+
+void xdp_fetch_rx_drv_stats(struct ifla_xdp_stats *if_stats,
+			    const struct xdp_rx_drv_stats *rstats);
+void xdp_fetch_tx_drv_stats(struct ifla_xdp_stats *if_stats,
+			    const struct xdp_tx_drv_stats *tstats);
+int xdp_get_drv_stats_generic(const struct net_device *dev, u32 attr_id,
+			      void *attr_data);
 
 #endif /* __LINUX_NET_XDP_H__ */
