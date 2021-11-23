@@ -437,6 +437,71 @@ static void veth_get_stats64(struct net_device *dev,
 	rcu_read_unlock();
 }
 
+static int veth_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id)
+{
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return max(dev->real_num_rx_queues, dev->real_num_tx_queues);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int veth_get_xdp_stats(const struct net_device *dev, u32 attr_id,
+			      void *attr_data)
+{
+	const struct veth_priv *priv = netdev_priv(dev);
+	const struct net_device *peer = rtnl_dereference(priv->peer);
+	struct ifla_xdp_stats *xdp_iter, *xdp_stats = attr_data;
+	const struct veth_rq_stats *rq_stats;
+	u64 xmit_packets, xmit_errors;
+	u32 i, start;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < dev->real_num_rx_queues; i++) {
+		rq_stats = &priv->rq[i].stats;
+		xdp_iter = xdp_stats + i;
+
+		do {
+			start = u64_stats_fetch_begin_irq(&rq_stats->syncp);
+
+			xdp_iter->errors = rq_stats->vs.xdp_errors;
+			xdp_iter->redirect = rq_stats->vs.xdp_redirect;
+			xdp_iter->drop = rq_stats->vs.xdp_drops;
+			xdp_iter->tx = rq_stats->vs.xdp_tx;
+			xdp_iter->tx_errors = rq_stats->vs.xdp_tx_err;
+		} while (u64_stats_fetch_retry_irq(&rq_stats->syncp, start));
+	}
+
+	if (!peer)
+		return 0;
+
+	priv = netdev_priv(peer);
+
+	for (i = 0; i < peer->real_num_rx_queues; i++) {
+		rq_stats = &priv->rq[i].stats;
+		xdp_iter = xdp_stats + (i % dev->real_num_tx_queues);
+
+		do {
+			start = u64_stats_fetch_begin_irq(&rq_stats->syncp);
+
+			xmit_packets = rq_stats->vs.peer_tq_xdp_xmit;
+			xmit_errors = rq_stats->vs.peer_tq_xdp_xmit_err;
+		} while (u64_stats_fetch_retry_irq(&rq_stats->syncp, start));
+
+		xdp_iter->xmit_packets += xmit_packets;
+		xdp_iter->xmit_errors += xmit_errors;
+	}
+
+	return 0;
+}
+
 /* fake multicast ability */
 static void veth_set_multicast_list(struct net_device *dev)
 {
@@ -1537,6 +1602,8 @@ static const struct net_device_ops veth_netdev_ops = {
 	.ndo_stop		= veth_close,
 	.ndo_start_xmit		= veth_xmit,
 	.ndo_get_stats64	= veth_get_stats64,
+	.ndo_get_xdp_stats_nch	= veth_get_xdp_stats_nch,
+	.ndo_get_xdp_stats	= veth_get_xdp_stats,
 	.ndo_set_rx_mode	= veth_set_multicast_list,
 	.ndo_set_mac_address	= eth_mac_addr,
 #ifdef CONFIG_NET_POLL_CONTROLLER
