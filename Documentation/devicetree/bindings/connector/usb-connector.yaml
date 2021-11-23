@@ -30,6 +30,10 @@ properties:
           - const: samsung,usb-connector-11pin
           - const: usb-b-connector
 
+      - items:
+          - const: qcom,usb-connector-eud
+          - const: usb-c-connector
+
   label:
     description: Symbolic name for the connector.
 
