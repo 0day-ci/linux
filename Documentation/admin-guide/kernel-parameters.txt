@@ -4964,6 +4964,9 @@
 			[KNL] Disable ring 3 MONITOR/MWAIT feature on supported
 			CPUs.
 
+	riscv.fwsz=nn[KMG]
+			[RISC-V] Determine firmware size to save memory
+
 	ro		[KNL] Mount root device read-only on boot
 
 	rodata=		[KNL]
