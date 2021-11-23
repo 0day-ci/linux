@@ -2809,7 +2809,7 @@ static unsigned long deferred_split_scan(struct shrinker *shrink,
 	unsigned long flags;
 	LIST_HEAD(list), *pos, *next;
 	struct page *page;
-	int split = 0;
+	unsigned long split = 0;
 
 #ifdef CONFIG_MEMCG
 	if (sc->memcg)
@@ -2847,6 +2847,7 @@ next:
 
 	spin_lock_irqsave(&ds_queue->split_queue_lock, flags);
 	list_splice_tail(&list, &ds_queue->split_queue);
+	ds_queue->split_queue_len -= split;
 	spin_unlock_irqrestore(&ds_queue->split_queue_lock, flags);
 
 	/*
