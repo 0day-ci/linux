@@ -1532,13 +1532,13 @@ static int veth_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 }
 
 static const struct net_device_ops veth_netdev_ops = {
-	.ndo_init            = veth_dev_init,
-	.ndo_open            = veth_open,
-	.ndo_stop            = veth_close,
-	.ndo_start_xmit      = veth_xmit,
-	.ndo_get_stats64     = veth_get_stats64,
-	.ndo_set_rx_mode     = veth_set_multicast_list,
-	.ndo_set_mac_address = eth_mac_addr,
+	.ndo_init		= veth_dev_init,
+	.ndo_open		= veth_open,
+	.ndo_stop		= veth_close,
+	.ndo_start_xmit		= veth_xmit,
+	.ndo_get_stats64	= veth_get_stats64,
+	.ndo_set_rx_mode	= veth_set_multicast_list,
+	.ndo_set_mac_address	= eth_mac_addr,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= veth_poll_controller,
 #endif
