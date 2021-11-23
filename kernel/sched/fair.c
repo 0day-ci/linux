@@ -6271,9 +6271,9 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 
 		span_avg = sd->span_weight * avg_idle;
 		if (span_avg > 4*avg_cost)
-			nr = div_u64(span_avg, avg_cost);
+			nr = div_u64(span_avg, avg_cost) - 1;
 		else
-			nr = 4;
+			nr = 3;
 
 		time = cpu_clock(this);
 	}
@@ -6285,11 +6285,11 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 				return i;
 
 		} else {
-			if (!--nr)
-				return -1;
 			idle_cpu = __select_idle_cpu(cpu, p);
 			if ((unsigned int)idle_cpu < nr_cpumask_bits)
 				break;
+			if (!--nr)
+				return -1;
 		}
 	}
 
