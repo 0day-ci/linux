@@ -239,3 +239,48 @@ bool kernel_page_present(struct page *page)
 	ptep = pte_offset_kernel(pmdp, addr);
 	return pte_valid(READ_ONCE(*ptep));
 }
+
+void arch_alloc_page(struct page *page, int order)
+{
+	unsigned long addr;
+	unsigned long cont_pte_low_bound;
+
+	if (!rodata_full)
+		return;
+
+	addr = (u64)page_address(page);
+	if ((order >= 4) && (addr & ~CONT_PTE_MASK) == 0) {
+		order -= 4;
+		do {
+			cont_pte_low_bound = addr & CONT_PTE_MASK;
+			__change_memory_common(cont_pte_low_bound,
+					(~CONT_PTE_MASK + 1), __pgprot(PTE_CONT), __pgprot(0));
+			addr = (u64)page_address(page);
+			page += 4;
+			order--;
+		}while (order >= 0);
+	}
+}
+
+void arch_free_page(struct page *page, int order)
+{
+	unsigned long addr;
+	unsigned long cont_pte_low_bound;
+
+	if (!rodata_full)
+		return;
+
+	addr = (u64)page_address(page);
+	if ((order >= 4) && (addr & ~CONT_PTE_MASK) == 0) {
+		order -= 4;
+		do {
+			cont_pte_low_bound = addr & CONT_PTE_MASK;
+			__change_memory_common(cont_pte_low_bound,
+					(~CONT_PTE_MASK + 1), __pgprot(0), __pgprot(PTE_CONT));
+			addr = (u64)page_address(page);
+			page += 4;
+			order--;
+		}while (order >= 0);
+	}
+}
+

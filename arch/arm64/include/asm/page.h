@@ -45,6 +45,11 @@ int pfn_is_map_memory(unsigned long pfn);
 
 #include <asm/memory.h>
 
+#define HAVE_ARCH_ALLOC_PAGE
+#define HAVE_ARCH_FREE_PAGE
+
+extern void arch_alloc_page(struct page *page, int order);
+extern void arch_free_page(struct page *page, int order);
 #endif /* !__ASSEMBLY__ */
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_DATA_FLAGS_TSK_EXEC | VM_MTE_ALLOWED)
