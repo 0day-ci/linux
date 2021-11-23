@@ -1266,6 +1266,7 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 
 		u64_stats_init(&ring->tx_syncp);
 		u64_stats_init(&ring->tx_syncp2);
+		ring->xdp_stats = adapter->xdp_stats + txr_idx;
 
 		/* assign ring to adapter */
 		adapter->tx_ring[txr_idx] = ring;
@@ -1300,6 +1301,7 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 		ring->queue_index = rxr_idx;
 
 		u64_stats_init(&ring->rx_syncp);
+		ring->xdp_stats = adapter->xdp_stats + rxr_idx;
 
 		/* assign ring to adapter */
 		adapter->rx_ring[rxr_idx] = ring;
@@ -2973,12 +2975,51 @@ static int igb_xdp_xmit(struct net_device *dev, int n,
 		nxmit++;
 	}
 
+	if (unlikely(nxmit < n))
+		xdp_update_tx_drv_err(&tx_ring->xdp_stats->tx, n - nxmit);
+
 	__netif_tx_unlock(nq);
 
 	if (unlikely(flags & XDP_XMIT_FLUSH))
 		igb_xdp_ring_update_tail(tx_ring);
 
 	return nxmit;
+}
+
+static int igb_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id)
+{
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return IGB_MAX_ALLOC_QUEUES;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int igb_get_xdp_stats(const struct net_device *dev, u32 attr_id,
+			     void *attr_data)
+{
+	const struct igb_adapter *adapter = netdev_priv(dev);
+	const struct igb_xdp_stats *drv_iter = adapter->xdp_stats;
+	struct ifla_xdp_stats *iter = attr_data;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < IGB_MAX_ALLOC_QUEUES; i++) {
+		xdp_fetch_rx_drv_stats(iter, &drv_iter->rx);
+		xdp_fetch_tx_drv_stats(iter, &drv_iter->tx);
+
+		drv_iter++;
+		iter++;
+	}
+
+	return 0;
 }
 
 static const struct net_device_ops igb_netdev_ops = {
@@ -3007,6 +3048,8 @@ static const struct net_device_ops igb_netdev_ops = {
 	.ndo_setup_tc		= igb_setup_tc,
 	.ndo_bpf		= igb_xdp,
 	.ndo_xdp_xmit		= igb_xdp_xmit,
+	.ndo_get_xdp_stats_nch	= igb_get_xdp_stats_nch,
+	.ndo_get_xdp_stats	= igb_get_xdp_stats,
 };
 
 /**
@@ -3620,6 +3663,7 @@ err_eeprom:
 	if (hw->flash_address)
 		iounmap(hw->flash_address);
 err_sw_init:
+	kfree(adapter->xdp_stats);
 	kfree(adapter->mac_table);
 	kfree(adapter->shadow_vfta);
 	igb_clear_interrupt_scheme(adapter);
@@ -3833,6 +3877,7 @@ static void igb_remove(struct pci_dev *pdev)
 		iounmap(hw->flash_address);
 	pci_release_mem_regions(pdev);
 
+	kfree(adapter->xdp_stats);
 	kfree(adapter->mac_table);
 	kfree(adapter->shadow_vfta);
 	free_netdev(netdev);
@@ -3962,6 +4007,7 @@ static int igb_sw_init(struct igb_adapter *adapter)
 	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
+	u32 i;
 
 	pci_read_config_word(pdev, PCI_COMMAND, &hw->bus.pci_cmd_word);
 
@@ -4018,6 +4064,19 @@ static int igb_sw_init(struct igb_adapter *adapter)
 				       GFP_KERNEL);
 	if (!adapter->shadow_vfta)
 		return -ENOMEM;
+
+	adapter->xdp_stats = kcalloc(IGB_MAX_ALLOC_QUEUES,
+				     sizeof(*adapter->xdp_stats),
+				     GFP_KERNEL);
+	if (!adapter->xdp_stats)
+		return -ENOMEM;
+
+	for (i = 0; i < IGB_MAX_ALLOC_QUEUES; i++) {
+		struct igb_xdp_stats *xdp_stats = adapter->xdp_stats + i;
+
+		xdp_init_rx_drv_stats(&xdp_stats->rx);
+		xdp_init_tx_drv_stats(&xdp_stats->tx);
+	}
 
 	/* This call may decrease the number of queues */
 	if (igb_init_interrupt_scheme(adapter, true)) {
@@ -6264,8 +6323,10 @@ int igb_xmit_xdp_ring(struct igb_adapter *adapter,
 
 	len = xdpf->len;
 
-	if (unlikely(!igb_desc_unused(tx_ring)))
+	if (unlikely(!igb_desc_unused(tx_ring))) {
+		xdp_update_tx_drv_full(&tx_ring->xdp_stats->tx);
 		return IGB_XDP_CONSUMED;
+	}
 
 	dma = dma_map_single(tx_ring->dev, xdpf->data, len, DMA_TO_DEVICE);
 	if (dma_mapping_error(tx_ring->dev, dma))
@@ -8045,6 +8106,7 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int napi_budget)
 	unsigned int total_bytes = 0, total_packets = 0;
 	unsigned int budget = q_vector->tx.work_limit;
 	unsigned int i = tx_ring->next_to_clean;
+	u32 xdp_packets = 0, xdp_bytes = 0;
 
 	if (test_bit(__IGB_DOWN, &adapter->state))
 		return true;
@@ -8075,10 +8137,13 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int napi_budget)
 		total_packets += tx_buffer->gso_segs;
 
 		/* free the skb */
-		if (tx_buffer->type == IGB_TYPE_SKB)
+		if (tx_buffer->type == IGB_TYPE_SKB) {
 			napi_consume_skb(tx_buffer->skb, napi_budget);
-		else
+		} else {
 			xdp_return_frame(tx_buffer->xdpf);
+			xdp_bytes += tx_buffer->bytecount;
+			xdp_packets++;
+		}
 
 		/* unmap skb header data */
 		dma_unmap_single(tx_ring->dev,
@@ -8135,6 +8200,8 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int napi_budget)
 	tx_ring->tx_stats.bytes += total_bytes;
 	tx_ring->tx_stats.packets += total_packets;
 	u64_stats_update_end(&tx_ring->tx_syncp);
+	xdp_update_tx_drv_stats(&tx_ring->xdp_stats->tx, xdp_packets,
+				xdp_bytes);
 	q_vector->tx.total_bytes += total_bytes;
 	q_vector->tx.total_packets += total_packets;
 
@@ -8393,7 +8460,8 @@ static struct sk_buff *igb_build_skb(struct igb_ring *rx_ring,
 
 static struct sk_buff *igb_run_xdp(struct igb_adapter *adapter,
 				   struct igb_ring *rx_ring,
-				   struct xdp_buff *xdp)
+				   struct xdp_buff *xdp,
+				   struct xdp_rx_drv_stats_local *lrstats)
 {
 	int err, result = IGB_XDP_PASS;
 	struct bpf_prog *xdp_prog;
@@ -8404,32 +8472,46 @@ static struct sk_buff *igb_run_xdp(struct igb_adapter *adapter,
 	if (!xdp_prog)
 		goto xdp_out;
 
+	lrstats->bytes += xdp->data_end - xdp->data;
+	lrstats->packets++;
+
 	prefetchw(xdp->data_hard_start); /* xdp_frame write */
 
 	act = bpf_prog_run_xdp(xdp_prog, xdp);
 	switch (act) {
 	case XDP_PASS:
+		lrstats->pass++;
 		break;
 	case XDP_TX:
 		result = igb_xdp_xmit_back(adapter, xdp);
-		if (result == IGB_XDP_CONSUMED)
+		if (result == IGB_XDP_CONSUMED) {
+			lrstats->tx_errors++;
 			goto out_failure;
+		}
+		lrstats->tx++;
 		break;
 	case XDP_REDIRECT:
 		err = xdp_do_redirect(adapter->netdev, xdp, xdp_prog);
-		if (err)
+		if (err) {
+			lrstats->redirect_errors++;
 			goto out_failure;
+		}
 		result = IGB_XDP_REDIR;
+		lrstats->redirect++;
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(act);
-		fallthrough;
+		lrstats->invalid++;
+		goto out_failure;
 	case XDP_ABORTED:
+		lrstats->aborted++;
 out_failure:
 		trace_xdp_exception(rx_ring->netdev, xdp_prog, act);
-		fallthrough;
+		result = IGB_XDP_CONSUMED;
+		break;
 	case XDP_DROP:
 		result = IGB_XDP_CONSUMED;
+		lrstats->drop++;
 		break;
 	}
 xdp_out:
@@ -8677,6 +8759,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 {
 	struct igb_adapter *adapter = q_vector->adapter;
 	struct igb_ring *rx_ring = q_vector->rx.ring;
+	struct xdp_rx_drv_stats_local lrstats = { };
 	struct sk_buff *skb = rx_ring->skb;
 	unsigned int total_bytes = 0, total_packets = 0;
 	u16 cleaned_count = igb_desc_unused(rx_ring);
@@ -8740,7 +8823,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 			/* At larger PAGE_SIZE, frame_sz depend on len size */
 			xdp.frame_sz = igb_rx_frame_truesize(rx_ring, size);
 #endif
-			skb = igb_run_xdp(adapter, rx_ring, &xdp);
+			skb = igb_run_xdp(adapter, rx_ring, &xdp, &lrstats);
 		}
 
 		if (IS_ERR(skb)) {
@@ -8814,6 +8897,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 	rx_ring->rx_stats.packets += total_packets;
 	rx_ring->rx_stats.bytes += total_bytes;
 	u64_stats_update_end(&rx_ring->rx_syncp);
+	xdp_update_rx_drv_stats(&rx_ring->xdp_stats->rx, &lrstats);
 	q_vector->rx.total_packets += total_packets;
 	q_vector->rx.total_bytes += total_bytes;
 

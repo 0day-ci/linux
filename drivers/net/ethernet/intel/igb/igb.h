@@ -303,6 +303,11 @@ struct igb_rx_queue_stats {
 	u64 alloc_failed;
 };
 
+struct igb_xdp_stats {
+	struct xdp_rx_drv_stats rx;
+	struct xdp_tx_drv_stats tx;
+} ____cacheline_aligned;
+
 struct igb_ring_container {
 	struct igb_ring *ring;		/* pointer to linked list of rings */
 	unsigned int total_bytes;	/* total bytes processed this int */
@@ -356,6 +361,7 @@ struct igb_ring {
 			struct u64_stats_sync rx_syncp;
 		};
 	};
+	struct igb_xdp_stats *xdp_stats;
 	struct xdp_rxq_info xdp_rxq;
 } ____cacheline_internodealigned_in_smp;
 
@@ -531,6 +537,8 @@ struct igb_mac_addr {
 #define IGB_MAC_STATE_SRC_ADDR	0x4
 #define IGB_MAC_STATE_QUEUE_STEERING 0x8
 
+#define IGB_MAX_ALLOC_QUEUES	16
+
 /* board specific private data structure */
 struct igb_adapter {
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
@@ -554,11 +562,11 @@ struct igb_adapter {
 	u16 tx_work_limit;
 	u32 tx_timeout_count;
 	int num_tx_queues;
-	struct igb_ring *tx_ring[16];
+	struct igb_ring *tx_ring[IGB_MAX_ALLOC_QUEUES];
 
 	/* RX */
 	int num_rx_queues;
-	struct igb_ring *rx_ring[16];
+	struct igb_ring *rx_ring[IGB_MAX_ALLOC_QUEUES];
 
 	u32 max_frame_size;
 	u32 min_frame_size;
@@ -664,6 +672,8 @@ struct igb_adapter {
 	struct igb_mac_addr *mac_table;
 	struct vf_mac_filter vf_macs;
 	struct vf_mac_filter *vf_mac_list;
+
+	struct igb_xdp_stats *xdp_stats;
 };
 
 /* flags controlling PTP/1588 function */
