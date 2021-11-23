@@ -28,9 +28,14 @@ struct blk_flush_queue;
 struct kiocb;
 struct pr_ops;
 struct rq_qos;
-struct blk_queue_stats;
 struct blk_stat_callback;
 struct blk_crypto_profile;
+
+struct blk_queue_stats {
+	struct list_head callbacks;
+	spinlock_t lock;
+	bool enable_accounting;
+};
 
 /* Must be consistent with blk_mq_poll_stats_bkt() */
 #define BLK_MQ_POLL_STATS_BKTS 16
@@ -267,7 +272,7 @@ struct request_queue {
 	int			poll_nsec;
 
 	struct blk_stat_callback	*poll_cb;
-	struct blk_rq_stat	poll_stat[BLK_MQ_POLL_STATS_BKTS];
+	struct blk_rq_stat	*poll_stat;
 
 	struct timer_list	timeout;
 	struct work_struct	timeout_work;
@@ -397,7 +402,6 @@ struct request_queue {
 #define QUEUE_FLAG_FUA		18	/* device supports FUA writes */
 #define QUEUE_FLAG_DAX		19	/* device supports DAX */
 #define QUEUE_FLAG_STATS	20	/* track IO start and completion times */
-#define QUEUE_FLAG_POLL_STATS	21	/* collecting stats for hybrid polling */
 #define QUEUE_FLAG_REGISTERED	22	/* queue has been registered to a disk */
 #define QUEUE_FLAG_QUIESCED	24	/* queue has been quiesced */
 #define QUEUE_FLAG_PCI_P2PDMA	25	/* device supports PCI p2p requests */

@@ -4629,9 +4629,25 @@ EXPORT_SYMBOL_GPL(blk_mq_update_nr_hw_queues);
 /* Enable polling stats and return whether they were already enabled. */
 static bool blk_poll_stats_enable(struct request_queue *q)
 {
-	if (test_bit(QUEUE_FLAG_POLL_STATS, &q->queue_flags) ||
-	    blk_queue_flag_test_and_set(QUEUE_FLAG_POLL_STATS, q))
+	struct blk_rq_stat *poll_stat;
+
+	if (q->poll_stat)
 		return true;
+
+	poll_stat = kcalloc(BLK_MQ_POLL_STATS_BKTS, sizeof(*poll_stat),
+				GFP_ATOMIC);
+	if (!poll_stat)
+		return false;
+
+	spin_lock_irq(&q->stats->lock);
+	if (q->poll_stat) {
+		spin_unlock_irq(&q->stats->lock);
+		kfree(poll_stat);
+		return true;
+	}
+	q->poll_stat = poll_stat;
+	spin_unlock_irq(&q->stats->lock);
+
 	blk_stat_add_callback(q, q->poll_cb);
 	return false;
 }
@@ -4642,8 +4658,7 @@ static void blk_mq_poll_stats_start(struct request_queue *q)
 	 * We don't arm the callback if polling stats are not enabled or the
 	 * callback is already active.
 	 */
-	if (!test_bit(QUEUE_FLAG_POLL_STATS, &q->queue_flags) ||
-	    blk_stat_is_active(q->poll_cb))
+	if (!q->poll_stat || blk_stat_is_active(q->poll_cb))
 		return;
 
 	blk_stat_activate_msecs(q->poll_cb, 100);
