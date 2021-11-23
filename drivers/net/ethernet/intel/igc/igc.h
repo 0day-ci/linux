@@ -21,6 +21,8 @@ void igc_ethtool_set_ops(struct net_device *);
 /* Transmit and receive queues */
 #define IGC_MAX_RX_QUEUES		4
 #define IGC_MAX_TX_QUEUES		4
+#define IGC_MAX_QUEUES			max(IGC_MAX_RX_QUEUES, \
+					    IGC_MAX_TX_QUEUES)
 
 #define MAX_Q_VECTORS			8
 #define MAX_STD_JUMBO_FRAME_SIZE	9216
@@ -125,6 +127,7 @@ struct igc_ring {
 			struct sk_buff *skb;
 		};
 	};
+	struct xdp_drv_stats *xdp_stats;
 
 	struct xdp_rxq_info xdp_rxq;
 	struct xsk_buff_pool *xsk_pool;
