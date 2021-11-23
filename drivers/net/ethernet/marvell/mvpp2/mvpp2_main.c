@@ -5131,6 +5131,56 @@ mvpp2_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 	stats->tx_dropped	= dev->stats.tx_dropped;
 }
 
+static int mvpp2_get_xdp_stats_ndo(const struct net_device *dev, u32 attr_id,
+				   void *attr_data)
+{
+	const struct mvpp2_port *port = netdev_priv(dev);
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	u32 cpu, start;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for_each_possible_cpu(cpu) {
+		const struct mvpp2_pcpu_stats *ps;
+		u64 xdp_xmit_err;
+		u64 xdp_redirect;
+		u64 xdp_tx_err;
+		u64 xdp_pass;
+		u64 xdp_drop;
+		u64 xdp_xmit;
+		u64 xdp_tx;
+
+		ps = per_cpu_ptr(port->stats, cpu);
+
+		do {
+			start = u64_stats_fetch_begin_irq(&ps->syncp);
+
+			xdp_redirect = ps->xdp_redirect;
+			xdp_pass = ps->xdp_pass;
+			xdp_drop = ps->xdp_drop;
+			xdp_xmit = ps->xdp_xmit;
+			xdp_xmit_err = ps->xdp_xmit_err;
+			xdp_tx = ps->xdp_tx;
+			xdp_tx_err = ps->xdp_tx_err;
+		} while (u64_stats_fetch_retry_irq(&ps->syncp, start));
+
+		xdp_stats->redirect += xdp_redirect;
+		xdp_stats->pass += xdp_pass;
+		xdp_stats->drop += xdp_drop;
+		xdp_stats->xmit_packets += xdp_xmit;
+		xdp_stats->xmit_errors += xdp_xmit_err;
+		xdp_stats->tx += xdp_tx;
+		xdp_stats->tx_errors  += xdp_tx_err;
+	}
+
+	return 0;
+}
+
 static int mvpp2_set_ts_config(struct mvpp2_port *port, struct ifreq *ifr)
 {
 	struct hwtstamp_config config;
@@ -5719,6 +5769,7 @@ static const struct net_device_ops mvpp2_netdev_ops = {
 	.ndo_set_mac_address	= mvpp2_set_mac_address,
 	.ndo_change_mtu		= mvpp2_change_mtu,
 	.ndo_get_stats64	= mvpp2_get_stats64,
+	.ndo_get_xdp_stats	= mvpp2_get_xdp_stats_ndo,
 	.ndo_eth_ioctl		= mvpp2_ioctl,
 	.ndo_vlan_rx_add_vid	= mvpp2_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= mvpp2_vlan_rx_kill_vid,
