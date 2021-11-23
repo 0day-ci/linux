@@ -15,6 +15,8 @@
 
 #define GPU_PAS_ID 13
 
+extern bool force_gpu_coredump;
+
 static inline bool _a6xx_check_idle(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
@@ -1367,39 +1369,53 @@ static void a6xx_fault_detect_irq(struct msm_gpu *gpu)
 		gpu_read(gpu, REG_A6XX_CP_IB1_REM_SIZE),
 		gpu_read64(gpu, REG_A6XX_CP_IB2_BASE, REG_A6XX_CP_IB2_BASE_HI),
 		gpu_read(gpu, REG_A6XX_CP_IB2_REM_SIZE));
-
-	/* Turn off the hangcheck timer to keep it from bothering us */
-	del_timer(&gpu->hangcheck_timer);
-
-	kthread_queue_work(gpu->worker, &gpu->recover_work);
 }
 
 static irqreturn_t a6xx_irq(struct msm_gpu *gpu)
 {
 	u32 status = gpu_read(gpu, REG_A6XX_RBBM_INT_0_STATUS);
+	bool coredump = false;
 
 	gpu_write(gpu, REG_A6XX_RBBM_INT_CLEAR_CMD, status);
 
-	if (status & A6XX_RBBM_INT_0_MASK_RBBM_HANG_DETECT)
+	if (status & A6XX_RBBM_INT_0_MASK_RBBM_HANG_DETECT) {
 		a6xx_fault_detect_irq(gpu);
+		coredump = true;
+	}
 
-	if (status & A6XX_RBBM_INT_0_MASK_CP_AHB_ERROR)
+	if (status & A6XX_RBBM_INT_0_MASK_CP_AHB_ERROR) {
 		dev_err_ratelimited(&gpu->pdev->dev, "CP | AHB bus error\n");
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A6XX_RBBM_INT_0_MASK_CP_HW_ERROR)
+	if (status & A6XX_RBBM_INT_0_MASK_CP_HW_ERROR) {
 		a6xx_cp_hw_err_irq(gpu);
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A6XX_RBBM_INT_0_MASK_RBBM_ATB_ASYNCFIFO_OVERFLOW)
+	if (status & A6XX_RBBM_INT_0_MASK_RBBM_ATB_ASYNCFIFO_OVERFLOW) {
 		dev_err_ratelimited(&gpu->pdev->dev, "RBBM | ATB ASYNC overflow\n");
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A6XX_RBBM_INT_0_MASK_RBBM_ATB_BUS_OVERFLOW)
+	if (status & A6XX_RBBM_INT_0_MASK_RBBM_ATB_BUS_OVERFLOW) {
 		dev_err_ratelimited(&gpu->pdev->dev, "RBBM | ATB bus overflow\n");
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A6XX_RBBM_INT_0_MASK_UCHE_OOB_ACCESS)
+	if (status & A6XX_RBBM_INT_0_MASK_UCHE_OOB_ACCESS) {
 		dev_err_ratelimited(&gpu->pdev->dev, "UCHE | Out of bounds access\n");
+		coredump |= force_gpu_coredump;
+	}
 
 	if (status & A6XX_RBBM_INT_0_MASK_CP_CACHE_FLUSH_TS)
 		msm_gpu_retire(gpu);
+
+	if (coredump) {
+		/* Turn off the hangcheck timer to keep it from bothering us */
+		del_timer(&gpu->hangcheck_timer);
+		kthread_queue_work(gpu->worker, &gpu->recover_work);
+	}
 
 	return IRQ_HANDLED;
 }

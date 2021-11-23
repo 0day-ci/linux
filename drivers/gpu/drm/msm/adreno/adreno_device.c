@@ -20,6 +20,10 @@ bool allow_vram_carveout = false;
 MODULE_PARM_DESC(allow_vram_carveout, "Allow using VRAM Carveout, in place of IOMMU");
 module_param_named(allow_vram_carveout, allow_vram_carveout, bool, 0600);
 
+bool force_gpu_coredump = false;
+MODULE_PARM_DESC(snapshot_debugbus, "Force gpu coredump on hw errors which are usually harmless");
+module_param_named(force_gpu_coredump, force_gpu_coredump, bool, 0600);
+
 static const struct adreno_info gpulist[] = {
 	{
 		.rev   = ADRENO_REV(2, 0, 0, 0),

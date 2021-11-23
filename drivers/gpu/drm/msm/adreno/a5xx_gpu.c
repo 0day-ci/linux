@@ -14,6 +14,7 @@
 #include "a5xx_gpu.h"
 
 extern bool hang_debug;
+extern bool force_gpu_coredump;
 static void a5xx_dump(struct msm_gpu *gpu);
 
 #define GPU_PAS_ID 13
@@ -1237,11 +1238,6 @@ static void a5xx_fault_detect_irq(struct msm_gpu *gpu)
 		gpu_read(gpu, REG_A5XX_CP_IB1_BUFSZ),
 		gpu_read64(gpu, REG_A5XX_CP_IB2_BASE, REG_A5XX_CP_IB2_BASE_HI),
 		gpu_read(gpu, REG_A5XX_CP_IB2_BUFSZ));
-
-	/* Turn off the hangcheck timer to keep it from bothering us */
-	del_timer(&gpu->hangcheck_timer);
-
-	kthread_queue_work(gpu->worker, &gpu->recover_work);
 }
 
 #define RBBM_ERROR_MASK \
@@ -1255,6 +1251,7 @@ static void a5xx_fault_detect_irq(struct msm_gpu *gpu)
 static irqreturn_t a5xx_irq(struct msm_gpu *gpu)
 {
 	u32 status = gpu_read(gpu, REG_A5XX_RBBM_INT_0_STATUS);
+	bool coredump = false;
 
 	/*
 	 * Clear all the interrupts except RBBM_AHB_ERROR - if we clear it
@@ -1264,20 +1261,30 @@ static irqreturn_t a5xx_irq(struct msm_gpu *gpu)
 		status & ~A5XX_RBBM_INT_0_MASK_RBBM_AHB_ERROR);
 
 	/* Pass status to a5xx_rbbm_err_irq because we've already cleared it */
-	if (status & RBBM_ERROR_MASK)
+	if (status & RBBM_ERROR_MASK) {
 		a5xx_rbbm_err_irq(gpu, status);
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A5XX_RBBM_INT_0_MASK_CP_HW_ERROR)
+	if (status & A5XX_RBBM_INT_0_MASK_CP_HW_ERROR) {
 		a5xx_cp_err_irq(gpu);
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A5XX_RBBM_INT_0_MASK_MISC_HANG_DETECT)
+	if (status & A5XX_RBBM_INT_0_MASK_MISC_HANG_DETECT) {
 		a5xx_fault_detect_irq(gpu);
+		coredump = true;
+	}
 
-	if (status & A5XX_RBBM_INT_0_MASK_UCHE_OOB_ACCESS)
+	if (status & A5XX_RBBM_INT_0_MASK_UCHE_OOB_ACCESS) {
 		a5xx_uche_err_irq(gpu);
+		coredump |= force_gpu_coredump;
+	}
 
-	if (status & A5XX_RBBM_INT_0_MASK_GPMU_VOLTAGE_DROOP)
+	if (status & A5XX_RBBM_INT_0_MASK_GPMU_VOLTAGE_DROOP) {
 		a5xx_gpmu_err_irq(gpu);
+		coredump |= force_gpu_coredump;
+	}
 
 	if (status & A5XX_RBBM_INT_0_MASK_CP_CACHE_FLUSH_TS) {
 		a5xx_preempt_trigger(gpu);
@@ -1286,6 +1293,12 @@ static irqreturn_t a5xx_irq(struct msm_gpu *gpu)
 
 	if (status & A5XX_RBBM_INT_0_MASK_CP_SW)
 		a5xx_preempt_irq(gpu);
+
+	if (coredump) {
+		/* Turn off the hangcheck timer to keep it from bothering us */
+		del_timer(&gpu->hangcheck_timer);
+		kthread_queue_work(gpu->worker, &gpu->recover_work);
+	}
 
 	return IRQ_HANDLED;
 }
