@@ -539,12 +539,22 @@ static int apple_pcie_setup_port(struct apple_pcie *pcie,
 
 	rmw_set(PORT_APPCLK_EN, port->base + PORT_APPCLK);
 
+	/* Engage #PERST before setting up the clock */
+	gpiod_set_value(reset, 0);
+
 	ret = apple_pcie_setup_refclk(pcie, port);
 	if (ret < 0)
 		return ret;
 
+	/* The minimal Tperst-clk value is 100us (PCIe CMS r2.0, 2.6.2) */
+	usleep_range(100, 200);
+
+	/* Deassert #PERST */
 	rmw_set(PORT_PERST_OFF, port->base + PORT_PERST);
 	gpiod_set_value(reset, 1);
+
+	/* Wait for 100ms after #PERST deassertion (PCIe r2.0, 6.6.1) */
+	msleep(100);
 
 	ret = readl_relaxed_poll_timeout(port->base + PORT_STATUS, stat,
 					 stat & PORT_STATUS_READY, 100, 250000);
