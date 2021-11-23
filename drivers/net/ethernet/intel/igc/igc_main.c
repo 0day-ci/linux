@@ -2604,6 +2604,8 @@ static void igc_xdp_xmit_zc(struct igc_ring *ring)
 	__netif_tx_lock(nq, cpu);
 
 	budget = igc_desc_unused(ring);
+	if (unlikely(!budget))
+		goto out_unlock;
 
 	while (xsk_tx_peek_desc(pool, &xdp_desc) && budget--) {
 		u32 cmd_type, olinfo_status;
@@ -2644,6 +2646,7 @@ static void igc_xdp_xmit_zc(struct igc_ring *ring)
 		xsk_tx_release(pool);
 	}
 
+out_unlock:
 	__netif_tx_unlock(nq);
 }
 
