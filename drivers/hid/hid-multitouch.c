@@ -1286,8 +1286,11 @@ static int mt_touch_input_configured(struct hid_device *hdev,
 	    (app->buttons_count == 1))
 		td->is_buttonpad = true;
 
-	if (td->is_buttonpad)
+	if (td->is_buttonpad) {
 		__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+		__clear_bit(BTN_RIGHT, dev->keybit);
+		__clear_bit(BTN_MIDDLE, dev->keybit);
+	}
 
 	app->pending_palm_slots = devm_kcalloc(&hi->input->dev,
 					       BITS_TO_LONGS(td->maxcontacts),
