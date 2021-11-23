@@ -1267,6 +1267,9 @@ static int cs35l41_handle_pdata(struct device *dev,
 }
 
 static const struct reg_sequence cs35l41_reva0_errata_patch[] = {
+	{ CS35L41_DSP1_CCM_CORE_CTRL,	 0x00000000 },
+	{ CS35L41_PWR_CTRL2,		 0x00000000 },
+	{ CS35L41_AMP_GAIN_CTRL,	 0x00000000 },
 	{ 0x00000040,			 0x00005555 },
 	{ 0x00000040,			 0x0000AAAA },
 	{ 0x00003854,			 0x05180240 },
@@ -1286,6 +1289,9 @@ static const struct reg_sequence cs35l41_reva0_errata_patch[] = {
 };
 
 static const struct reg_sequence cs35l41_revb0_errata_patch[] = {
+	{ CS35L41_DSP1_CCM_CORE_CTRL,	 0x00000000 },
+	{ CS35L41_PWR_CTRL2,		 0x00000000 },
+	{ CS35L41_AMP_GAIN_CTRL,	 0x00000000 },
 	{ 0x00000040,			 0x00005555 },
 	{ 0x00000040,			 0x0000AAAA },
 	{ CS35L41_VIMON_SPKMON_RESYNC,	 0x00000000 },
@@ -1299,6 +1305,9 @@ static const struct reg_sequence cs35l41_revb0_errata_patch[] = {
 };
 
 static const struct reg_sequence cs35l41_revb2_errata_patch[] = {
+	{ CS35L41_DSP1_CCM_CORE_CTRL,	 0x00000000 },
+	{ CS35L41_PWR_CTRL2,		 0x00000000 },
+	{ CS35L41_AMP_GAIN_CTRL,	 0x00000000 },
 	{ 0x00000040,			 0x00005555 },
 	{ 0x00000040,			 0x0000AAAA },
 	{ CS35L41_VIMON_SPKMON_RESYNC,	 0x00000000 },
@@ -1530,26 +1539,6 @@ int cs35l41_probe(struct cs35l41_private *cs35l41,
 	ret = cs35l41_otp_unpack(cs35l41->dev, cs35l41->regmap);
 	if (ret < 0) {
 		dev_err(cs35l41->dev, "OTP Unpack failed: %d\n", ret);
-		goto err;
-	}
-
-	ret = regmap_write(cs35l41->regmap, CS35L41_DSP1_CCM_CORE_CTRL, 0);
-	if (ret < 0) {
-		dev_err(cs35l41->dev, "Write CCM_CORE_CTRL failed: %d\n", ret);
-		goto err;
-	}
-
-	ret = regmap_update_bits(cs35l41->regmap, CS35L41_PWR_CTRL2,
-				 CS35L41_AMP_EN_MASK, 0);
-	if (ret < 0) {
-		dev_err(cs35l41->dev, "Write CS35L41_PWR_CTRL2 failed: %d\n", ret);
-		goto err;
-	}
-
-	ret = regmap_update_bits(cs35l41->regmap, CS35L41_AMP_GAIN_CTRL,
-				 CS35L41_AMP_GAIN_PCM_MASK, 0);
-	if (ret < 0) {
-		dev_err(cs35l41->dev, "Write CS35L41_AMP_GAIN_CTRL failed: %d\n", ret);
 		goto err;
 	}
 
