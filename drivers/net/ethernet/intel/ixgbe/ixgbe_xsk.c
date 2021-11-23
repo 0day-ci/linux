@@ -96,7 +96,8 @@ int ixgbe_xsk_pool_setup(struct ixgbe_adapter *adapter,
 
 static int ixgbe_run_xdp_zc(struct ixgbe_adapter *adapter,
 			    struct ixgbe_ring *rx_ring,
-			    struct xdp_buff *xdp)
+			    struct xdp_buff *xdp,
+			    struct xdp_rx_drv_stats_local *lrstats)
 {
 	int err, result = IXGBE_XDP_PASS;
 	struct bpf_prog *xdp_prog;
@@ -104,41 +105,58 @@ static int ixgbe_run_xdp_zc(struct ixgbe_adapter *adapter,
 	struct xdp_frame *xdpf;
 	u32 act;
 
+	lrstats->bytes += xdp->data_end - xdp->data;
+	lrstats->packets++;
+
 	xdp_prog = READ_ONCE(rx_ring->xdp_prog);
 	act = bpf_prog_run_xdp(xdp_prog, xdp);
 
 	if (likely(act == XDP_REDIRECT)) {
 		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
-		if (err)
+		if (err) {
+			lrstats->redirect_errors++;
 			goto out_failure;
+		}
+		lrstats->redirect++;
 		return IXGBE_XDP_REDIR;
 	}
 
 	switch (act) {
 	case XDP_PASS:
+		lrstats->pass++;
 		break;
 	case XDP_TX:
 		xdpf = xdp_convert_buff_to_frame(xdp);
-		if (unlikely(!xdpf))
+		if (unlikely(!xdpf)) {
+			lrstats->tx_errors++;
 			goto out_failure;
+		}
 		ring = ixgbe_determine_xdp_ring(adapter);
 		if (static_branch_unlikely(&ixgbe_xdp_locking_key))
 			spin_lock(&ring->tx_lock);
 		result = ixgbe_xmit_xdp_ring(ring, xdpf);
 		if (static_branch_unlikely(&ixgbe_xdp_locking_key))
 			spin_unlock(&ring->tx_lock);
-		if (result == IXGBE_XDP_CONSUMED)
+		if (result == IXGBE_XDP_CONSUMED) {
+			lrstats->tx_errors++;
 			goto out_failure;
+		}
+		lrstats->tx++;
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(act);
-		fallthrough;
+		lrstats->invalid++;
+		goto out_failure;
 	case XDP_ABORTED:
+		lrstats->aborted++;
 out_failure:
 		trace_xdp_exception(rx_ring->netdev, xdp_prog, act);
-		fallthrough; /* handle aborts by dropping packet */
+		/* handle aborts by dropping packet */
+		result = IXGBE_XDP_CONSUMED;
+		break;
 	case XDP_DROP:
 		result = IXGBE_XDP_CONSUMED;
+		lrstats->drop++;
 		break;
 	}
 	return result;
@@ -246,6 +264,7 @@ int ixgbe_clean_rx_irq_zc(struct ixgbe_q_vector *q_vector,
 	unsigned int total_rx_bytes = 0, total_rx_packets = 0;
 	struct ixgbe_adapter *adapter = q_vector->adapter;
 	u16 cleaned_count = ixgbe_desc_unused(rx_ring);
+	struct xdp_rx_drv_stats_local lrstats = { };
 	unsigned int xdp_res, xdp_xmit = 0;
 	bool failure = false;
 	struct sk_buff *skb;
@@ -299,7 +318,8 @@ int ixgbe_clean_rx_irq_zc(struct ixgbe_q_vector *q_vector,
 
 		bi->xdp->data_end = bi->xdp->data + size;
 		xsk_buff_dma_sync_for_cpu(bi->xdp, rx_ring->xsk_pool);
-		xdp_res = ixgbe_run_xdp_zc(adapter, rx_ring, bi->xdp);
+		xdp_res = ixgbe_run_xdp_zc(adapter, rx_ring, bi->xdp,
+					   &lrstats);
 
 		if (xdp_res) {
 			if (xdp_res & (IXGBE_XDP_TX | IXGBE_XDP_REDIR))
@@ -349,6 +369,7 @@ int ixgbe_clean_rx_irq_zc(struct ixgbe_q_vector *q_vector,
 	rx_ring->stats.packets += total_rx_packets;
 	rx_ring->stats.bytes += total_rx_bytes;
 	u64_stats_update_end(&rx_ring->syncp);
+	xdp_update_rx_drv_stats(&rx_ring->xdp_stats->xsk_rx, &lrstats);
 	q_vector->rx.total_packets += total_rx_packets;
 	q_vector->rx.total_bytes += total_rx_bytes;
 
@@ -392,6 +413,7 @@ static bool ixgbe_xmit_zc(struct ixgbe_ring *xdp_ring, unsigned int budget)
 	while (budget-- > 0) {
 		if (unlikely(!ixgbe_desc_unused(xdp_ring)) ||
 		    !netif_carrier_ok(xdp_ring->netdev)) {
+			xdp_update_tx_drv_full(&xdp_ring->xdp_stats->xsk_tx);
 			work_done = false;
 			break;
 		}
@@ -448,9 +470,10 @@ bool ixgbe_clean_xdp_tx_irq(struct ixgbe_q_vector *q_vector,
 	u16 ntc = tx_ring->next_to_clean, ntu = tx_ring->next_to_use;
 	unsigned int total_packets = 0, total_bytes = 0;
 	struct xsk_buff_pool *pool = tx_ring->xsk_pool;
+	u32 xdp_frames = 0, xdp_bytes = 0;
+	u32 xsk_frames = 0, xsk_bytes = 0;
 	union ixgbe_adv_tx_desc *tx_desc;
 	struct ixgbe_tx_buffer *tx_bi;
-	u32 xsk_frames = 0;
 
 	tx_bi = &tx_ring->tx_buffer_info[ntc];
 	tx_desc = IXGBE_TX_DESC(tx_ring, ntc);
@@ -459,13 +482,14 @@ bool ixgbe_clean_xdp_tx_irq(struct ixgbe_q_vector *q_vector,
 		if (!(tx_desc->wb.status & cpu_to_le32(IXGBE_TXD_STAT_DD)))
 			break;
 
-		total_bytes += tx_bi->bytecount;
-		total_packets += tx_bi->gso_segs;
-
-		if (tx_bi->xdpf)
+		if (tx_bi->xdpf) {
 			ixgbe_clean_xdp_tx_buffer(tx_ring, tx_bi);
-		else
+			xdp_bytes += tx_bi->bytecount;
+			xdp_frames++;
+		} else {
+			xsk_bytes += tx_bi->bytecount;
 			xsk_frames++;
+		}
 
 		tx_bi->xdpf = NULL;
 
@@ -483,11 +507,17 @@ bool ixgbe_clean_xdp_tx_irq(struct ixgbe_q_vector *q_vector,
 	}
 
 	tx_ring->next_to_clean = ntc;
+	total_bytes = xdp_bytes + xsk_bytes;
+	total_packets = xdp_frames + xsk_frames;
 
 	u64_stats_update_begin(&tx_ring->syncp);
 	tx_ring->stats.bytes += total_bytes;
 	tx_ring->stats.packets += total_packets;
 	u64_stats_update_end(&tx_ring->syncp);
+	xdp_update_tx_drv_stats(&tx_ring->xdp_stats->xdp_tx, xdp_frames,
+				xdp_bytes);
+	xdp_update_tx_drv_stats(&tx_ring->xdp_stats->xsk_tx, xsk_frames,
+				xsk_bytes);
 	q_vector->tx.total_bytes += total_bytes;
 	q_vector->tx.total_packets += total_packets;
 

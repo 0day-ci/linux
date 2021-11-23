@@ -951,6 +951,7 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 		ring->queue_index = xdp_idx;
 		set_ring_xdp(ring);
 		spin_lock_init(&ring->tx_lock);
+		ring->xdp_stats = adapter->netdev->xstats + xdp_idx;
 
 		/* assign ring to adapter */
 		WRITE_ONCE(adapter->xdp_ring[xdp_idx], ring);
@@ -994,6 +995,7 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 		/* apply Rx specific ring traits */
 		ring->count = adapter->rx_ring_count;
 		ring->queue_index = rxr_idx;
+		ring->xdp_stats = adapter->netdev->xstats + rxr_idx;
 
 		/* assign ring to adapter */
 		WRITE_ONCE(adapter->rx_ring[rxr_idx], ring);
@@ -1303,4 +1305,3 @@ void ixgbe_tx_ctxtdesc(struct ixgbe_ring *tx_ring, u32 vlan_macip_lens,
 	context_desc->type_tucmd_mlhl	= cpu_to_le32(type_tucmd);
 	context_desc->mss_l4len_idx	= cpu_to_le32(mss_l4len_idx);
 }
-

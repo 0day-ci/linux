@@ -349,6 +349,7 @@ struct ixgbe_ring {
 		struct ixgbe_tx_queue_stats tx_stats;
 		struct ixgbe_rx_queue_stats rx_stats;
 	};
+	struct xdp_drv_stats *xdp_stats;
 	u16 rx_offset;
 	struct xdp_rxq_info xdp_rxq;
 	spinlock_t tx_lock;	/* used in XDP mode */
