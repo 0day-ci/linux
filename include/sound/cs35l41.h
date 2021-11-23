@@ -764,5 +764,6 @@ extern struct regmap_config cs35l41_regmap_i2c;
 extern struct regmap_config cs35l41_regmap_spi;
 
 int cs35l41_init_supplies(struct device *dev, struct regulator_bulk_data *supplies);
+int cs35l41_otp_unpack(struct device *dev, struct regmap *regmap);
 
 #endif /* __CS35L41_H */
