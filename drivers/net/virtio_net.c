@@ -1919,6 +1919,60 @@ static void virtnet_stats(struct net_device *dev,
 	tot->rx_frame_errors = dev->stats.rx_frame_errors;
 }
 
+static int virtnet_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id)
+{
+	const struct virtnet_info *vi = netdev_priv(dev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return vi->curr_queue_pairs;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int virtnet_get_xdp_stats(const struct net_device *dev, u32 attr_id,
+				 void *attr_data)
+{
+	const struct virtnet_info *vi = netdev_priv(dev);
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < vi->curr_queue_pairs; i++) {
+		const struct virtnet_rq_stats *rqs = &vi->rq[i].stats;
+		const struct virtnet_sq_stats *sqs = &vi->sq[i].stats;
+		u32 start;
+
+		do {
+			start = u64_stats_fetch_begin_irq(&rqs->syncp);
+
+			xdp_stats->packets = rqs->xdp_packets;
+			xdp_stats->tx = rqs->xdp_tx;
+			xdp_stats->redirect = rqs->xdp_redirects;
+			xdp_stats->drop = rqs->xdp_drops;
+			xdp_stats->errors = rqs->xdp_errors;
+		} while (u64_stats_fetch_retry_irq(&rqs->syncp, start));
+
+		do {
+			start = u64_stats_fetch_begin_irq(&sqs->syncp);
+
+			xdp_stats->xmit_packets = sqs->xdp_xmit;
+			xdp_stats->xmit_errors = sqs->xdp_xmit_errors;
+		} while (u64_stats_fetch_retry_irq(&sqs->syncp, start));
+
+		xdp_stats++;
+	}
+
+	return 0;
+}
+
 static void virtnet_ack_link_announce(struct virtnet_info *vi)
 {
 	rtnl_lock();
@@ -2717,6 +2771,8 @@ static const struct net_device_ops virtnet_netdev = {
 	.ndo_set_mac_address	= virtnet_set_mac_address,
 	.ndo_set_rx_mode	= virtnet_set_rx_mode,
 	.ndo_get_stats64	= virtnet_stats,
+	.ndo_get_xdp_stats_nch	= virtnet_get_xdp_stats_nch,
+	.ndo_get_xdp_stats	= virtnet_get_xdp_stats,
 	.ndo_vlan_rx_add_vid	= virtnet_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= virtnet_vlan_rx_kill_vid,
 	.ndo_bpf		= virtnet_xdp,
