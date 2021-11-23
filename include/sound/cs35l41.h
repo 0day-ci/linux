@@ -10,6 +10,8 @@
 #ifndef __CS35L41_H
 #define __CS35L41_H
 
+#include <linux/regmap.h>
+
 #define CS35L41_FIRSTREG		0x00000000
 #define CS35L41_LASTREG			0x03804FE8
 #define CS35L41_DEVID			0x00000000
@@ -529,7 +531,6 @@
 #define CS35L41_OTP_TRIM_35		0x0000400C
 #define CS35L41_OTP_TRIM_36		0x00002030
 
-#define CS35L41_MAX_CACHE_REG		36
 #define CS35L41_OTP_SIZE_WORDS		32
 #define CS35L41_NUM_OTP_ELEM		100
 #define CS35L41_NUM_OTP_MAPS		5
@@ -757,5 +758,8 @@ struct cs35l41_otp_map_element_t {
 	u32 bit_offset;
 	u32 word_offset;
 };
+
+extern struct regmap_config cs35l41_regmap_i2c;
+extern struct regmap_config cs35l41_regmap_spi;
 
 #endif /* __CS35L41_H */
