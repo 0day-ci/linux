@@ -561,6 +561,7 @@ struct ocelot_ops {
 	int (*psfp_filter_del)(struct ocelot *ocelot, struct flow_cls_offload *f);
 	int (*psfp_stats_get)(struct ocelot *ocelot, struct flow_cls_offload *f,
 			      struct flow_stats *stats);
+	void (*cut_through_fwd)(struct ocelot *ocelot);
 };
 
 struct ocelot_vcap_policer {
@@ -655,6 +656,8 @@ struct ocelot_port {
 
 	struct net_device		*bridge;
 	u8				stp_state;
+
+	int				speed;
 };
 
 struct ocelot {
