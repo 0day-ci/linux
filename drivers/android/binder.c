@@ -1933,7 +1933,7 @@ static void binder_transaction_buffer_release(struct binder_proc *proc,
 		case BINDER_TYPE_FD: {
 			/*
 			 * No need to close the file here since user-space
-			 * closes it for for successfully delivered
+			 * closes it for successfully delivered
 			 * transactions. For transactions that weren't
 			 * delivered, the new fd was never allocated so
 			 * there is no need to close and the fput on the
@@ -4424,10 +4424,12 @@ static int binder_thread_release(struct binder_proc *proc,
 	/*
 	 * If this thread used poll, make sure we remove the waitqueue
 	 * from any epoll data structures holding it with POLLFREE.
-	 * waitqueue_active() is safe to use here because we're holding
-	 * the inner lock.
 	 */
 	if ((thread->looper & BINDER_LOOPER_STATE_POLL) &&
+	    /*
+	     * waitqueue_active() is safe to use here because we're holding
+	     * the inner lock.
+	     */
 	    waitqueue_active(&thread->wait)) {
 		wake_up_poll(&thread->wait, EPOLLHUP | POLLFREE);
 	}
@@ -4436,7 +4438,7 @@ static int binder_thread_release(struct binder_proc *proc,
 
 	/*
 	 * This is needed to avoid races between wake_up_poll() above and
-	 * and ep_remove_waitqueue() called for other reasons (eg the epoll file
+	 * ep_remove_waitqueue() called for other reasons (eg the epoll file
 	 * descriptor being closed); ep_remove_waitqueue() holds an RCU read
 	 * lock, so we can be sure it's done after calling synchronize_rcu().
 	 */
@@ -4752,8 +4754,9 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	unsigned int size = _IOC_SIZE(cmd);
 	void __user *ubuf = (void __user *)arg;
 
-	/*pr_info("binder_ioctl: %d:%d %x %lx\n",
-			proc->pid, current->pid, cmd, arg);*/
+	/* pr_info("binder_ioctl: %d:%d %x %lx\n",
+	 *		proc->pid, current->pid, cmd, arg);
+	 */
 
 	binder_selftest_alloc(&proc->alloc);
 
@@ -5982,8 +5985,8 @@ static int __init binder_init(void)
 	if (!IS_ENABLED(CONFIG_ANDROID_BINDERFS) &&
 	    strcmp(binder_devices_param, "") != 0) {
 		/*
-		* Copy the module_parameter string, because we don't want to
-		* tokenize it in-place.
+		 * Copy the module_parameter string, because we don't want to
+		 * tokenize it in-place.
 		 */
 		device_names = kstrdup(binder_devices_param, GFP_KERNEL);
 		if (!device_names) {
