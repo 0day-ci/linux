@@ -654,6 +654,23 @@
 			power-domains = <&zynqmp_firmware PD_QSPI>;
 		};
 
+		r5fss: r5fss@ff9a0000 {
+			compatible = "xlnx,zynqmp-r5fss";
+			xlnx,cluster-mode = <1>;
+
+                        reg = <0x0 0Xff9a0000 0x0 0x228>;
+
+			r5f_core0: r5f-0 {
+				compatible = "xlnx,zynqmp-r5f";
+				power-domains = <&zynqmp_firmware PD_RPU_0>;
+			};
+
+			r5f_core1: r5f-1 {
+				compatible = "xlnx,zynqmp-r5f";
+				power-domains = <&zynqmp_firmware PD_RPU_1>;
+			};
+		};
+
 		psgtr: phy@fd400000 {
 			compatible = "xlnx,zynqmp-psgtr-v1.1";
 			status = "disabled";
