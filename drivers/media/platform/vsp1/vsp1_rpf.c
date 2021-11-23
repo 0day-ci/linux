@@ -249,6 +249,7 @@ static void rpf_configure_partition(struct vsp1_entity *entity,
 	const struct vsp1_format_info *fmtinfo = rpf->fmtinfo;
 	const struct v4l2_pix_format_mplane *format = &rpf->format;
 	struct v4l2_rect crop;
+	unsigned int i;
 
 	/*
 	 * Source size and crop offsets.
@@ -287,17 +288,13 @@ static void rpf_configure_partition(struct vsp1_entity *entity,
 		       (crop.width << VI6_RPF_SRC_ESIZE_EHSIZE_SHIFT) |
 		       (crop.height << VI6_RPF_SRC_ESIZE_EVSIZE_SHIFT));
 
-	mem.addr[0] += crop.top * format->plane_fmt[0].bytesperline
-		     + crop.left * fmtinfo->bpp[0] / 8;
-
-	if (format->num_planes > 1) {
+	for (i = 0; i < format->num_planes; ++i) {
 		unsigned int offset;
 
-		offset = crop.top * format->plane_fmt[1].bytesperline
-		       + crop.left / fmtinfo->hsub
-		       * fmtinfo->bpp[1] / 8;
-		mem.addr[1] += offset;
-		mem.addr[2] += offset;
+		offset = crop.top * format->plane_fmt[i].bytesperline / (i ? fmtinfo->vsub : 1)
+		       + crop.left / (i ? fmtinfo->hsub : 1)
+		       * fmtinfo->bpp[i] / 8;
+		mem.addr[i] += offset;
 	}
 
 	/*
