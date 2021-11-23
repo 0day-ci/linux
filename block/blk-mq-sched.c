@@ -43,6 +43,7 @@ void blk_mq_sched_assign_ioc(struct request *rq)
 	get_io_context(icq->ioc);
 	rq->elv.icq = icq;
 }
+EXPORT_SYMBOL_GPL(blk_mq_sched_assign_ioc);
 
 /*
  * Mark a hardware queue as needing a restart. For shared queues, maintain
