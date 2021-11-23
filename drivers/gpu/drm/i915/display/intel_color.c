@@ -815,6 +815,12 @@ static void glk_load_degamma_lut(const struct intel_crtc_state *crtc_state)
 	enum pipe pipe = crtc->pipe;
 	int i, lut_size = INTEL_INFO(dev_priv)->color.degamma_lut_size;
 	const struct drm_color_lut *lut = crtc_state->hw.degamma_lut->data;
+	u32 extended_lut_size;
+
+	if (DISPLAY_VER(dev_priv) >= 13)
+		extended_lut_size = 131;
+	else
+		extended_lut_size = 35;
 
 	/*
 	 * When setting the auto-increment bit, the hardware seems to
@@ -827,8 +833,8 @@ static void glk_load_degamma_lut(const struct intel_crtc_state *crtc_state)
 
 	for (i = 0; i < lut_size; i++) {
 		/*
-		 * First 33 entries represent range from 0 to 1.0
-		 * 34th and 35th entry will represent extended range
+		 * First lut_size entries represent range from 0 to 1.0
+		 * 3 additional lut entries will represent extended range
 		 * inputs 3.0 and 7.0 respectively, currently clamped
 		 * at 1.0. Since the precision is 16bit, the user
 		 * value can be directly filled to register.
@@ -844,7 +850,7 @@ static void glk_load_degamma_lut(const struct intel_crtc_state *crtc_state)
 	}
 
 	/* Clamp values > 1.0. */
-	while (i++ < 35)
+	while (i++ < extended_lut_size)
 		intel_de_write_fw(dev_priv, PRE_CSC_GAMC_DATA(pipe), 1 << 16);
 
 	intel_de_write_fw(dev_priv, PRE_CSC_GAMC_INDEX(pipe), 0);
