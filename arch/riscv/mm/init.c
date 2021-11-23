@@ -159,6 +159,15 @@ static int __init early_mem(char *p)
 }
 early_param("mem", early_mem);
 
+static phys_addr_t firmware_size __initdata;
+static int __init early_get_firmware_size(char *arg)
+{
+	firmware_size = memparse(arg, &arg);
+
+	return 0;
+}
+early_param("riscv.fwsz", early_get_firmware_size);
+
 static void __init setup_bootmem(void)
 {
 	phys_addr_t vmlinux_end = __pa_symbol(&_end);
@@ -224,7 +233,10 @@ static void __init setup_bootmem(void)
 	/*
 	 * Reserve OpenSBI region and depends on PMP to deny accesses.
 	 */
-	memblock_reserve(__pa(PAGE_OFFSET), LOAD_OFFSET);
+	if (firmware_size > PAGE_SIZE)
+		memblock_reserve(__pa(PAGE_OFFSET), firmware_size);
+	else
+		memblock_reserve(__pa(PAGE_OFFSET), LOAD_OFFSET);
 
 	early_init_fdt_scan_reserved_mem();
 	dma_contiguous_reserve(dma32_phys_limit);
