@@ -4949,18 +4949,18 @@ static int mvneta_setup_tc(struct net_device *dev, enum tc_setup_type type,
 }
 
 static const struct net_device_ops mvneta_netdev_ops = {
-	.ndo_open            = mvneta_open,
-	.ndo_stop            = mvneta_stop,
-	.ndo_start_xmit      = mvneta_tx,
-	.ndo_set_rx_mode     = mvneta_set_rx_mode,
-	.ndo_set_mac_address = mvneta_set_mac_addr,
-	.ndo_change_mtu      = mvneta_change_mtu,
-	.ndo_fix_features    = mvneta_fix_features,
-	.ndo_get_stats64     = mvneta_get_stats64,
-	.ndo_eth_ioctl        = mvneta_ioctl,
-	.ndo_bpf	     = mvneta_xdp,
-	.ndo_xdp_xmit        = mvneta_xdp_xmit,
-	.ndo_setup_tc	     = mvneta_setup_tc,
+	.ndo_open		= mvneta_open,
+	.ndo_stop		= mvneta_stop,
+	.ndo_start_xmit		= mvneta_tx,
+	.ndo_set_rx_mode	= mvneta_set_rx_mode,
+	.ndo_set_mac_address	= mvneta_set_mac_addr,
+	.ndo_change_mtu		= mvneta_change_mtu,
+	.ndo_fix_features	= mvneta_fix_features,
+	.ndo_get_stats64	= mvneta_get_stats64,
+	.ndo_eth_ioctl		= mvneta_ioctl,
+	.ndo_bpf		= mvneta_xdp,
+	.ndo_xdp_xmit		= mvneta_xdp_xmit,
+	.ndo_setup_tc		= mvneta_setup_tc,
 };
 
 static const struct ethtool_ops mvneta_eth_tool_ops = {
