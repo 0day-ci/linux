@@ -20,6 +20,7 @@
 #include <linux/tracehook.h>
 #include <linux/ratelimit.h>
 #include <linux/syscalls.h>
+#include <linux/uaccess-buffer.h>
 
 #include <asm/daifflags.h>
 #include <asm/debug-monitors.h>
@@ -919,6 +920,8 @@ static void do_signal(struct pt_regs *regs)
 
 void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags)
 {
+	bool uaccess_buffer_pending = uaccess_buffer_pre_exit_loop();
+
 	do {
 		if (thread_flags & _TIF_NEED_RESCHED) {
 			/* Unmask Debug and SError for the next task */
@@ -950,6 +953,8 @@ void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags)
 		local_daif_mask();
 		thread_flags = READ_ONCE(current_thread_info()->flags);
 	} while (thread_flags & _TIF_WORK_MASK);
+
+	uaccess_buffer_post_exit_loop(uaccess_buffer_pending);
 }
 
 unsigned long __ro_after_init signal_minsigstksz;

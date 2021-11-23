@@ -7,6 +7,7 @@
 #include <linux/ptrace.h>
 #include <linux/randomize_kstack.h>
 #include <linux/syscalls.h>
+#include <linux/uaccess-buffer.h>
 
 #include <asm/daifflags.h>
 #include <asm/debug-monitors.h>
@@ -139,7 +140,9 @@ static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
 			goto trace_exit;
 	}
 
+	uaccess_buffer_syscall_entry();
 	invoke_syscall(regs, scno, sc_nr, syscall_table);
+	uaccess_buffer_syscall_exit();
 
 	/*
 	 * The tracing status may have changed under our feet, so we have to
