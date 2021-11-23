@@ -12,12 +12,6 @@
 #include "blk-mq.h"
 #include "blk.h"
 
-struct blk_queue_stats {
-	struct list_head callbacks;
-	spinlock_t lock;
-	bool enable_accounting;
-};
-
 void blk_rq_stat_init(struct blk_rq_stat *stat)
 {
 	stat->min = -1ULL;

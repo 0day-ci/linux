@@ -4629,9 +4629,25 @@ EXPORT_SYMBOL_GPL(blk_mq_update_nr_hw_queues);
 /* Enable polling stats and return whether they were already enabled. */
 static bool blk_poll_stats_enable(struct request_queue *q)
 {
-	if (test_bit(QUEUE_FLAG_POLL_STATS, &q->queue_flags) ||
-	    blk_queue_flag_test_and_set(QUEUE_FLAG_POLL_STATS, q))
+	struct blk_rq_stat *poll_stat;
+
+	if (test_bit(QUEUE_FLAG_POLL_STATS, &q->queue_flags))
 		return true;
+
+	poll_stat = kzalloc(BLK_MQ_POLL_STATS_BKTS * sizeof(*poll_stat),
+				GFP_ATOMIC);
+	if (!poll_stat)
+		return false;
+
+	spin_lock_irq(&q->stats->lock);
+	if (blk_queue_flag_test_and_set(QUEUE_FLAG_POLL_STATS, q)) {
+		spin_unlock_irq(&q->stats->lock);
+		kfree(poll_stat);
+		return true;
+	}
+	q->poll_stat = poll_stat;
+	spin_unlock_irq(&q->stats->lock);
+
 	blk_stat_add_callback(q, q->poll_cb);
 	return false;
 }

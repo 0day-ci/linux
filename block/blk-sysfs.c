@@ -790,6 +790,7 @@ static void blk_release_queue(struct kobject *kobj)
 	blk_stat_free_callback(q->poll_cb);
 
 	blk_free_queue_stats(q->stats);
+	kfree(q->poll_stat);
 
 	blk_exit_queue(q);
 
