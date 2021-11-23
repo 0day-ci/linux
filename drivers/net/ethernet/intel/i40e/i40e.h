@@ -942,6 +942,7 @@ struct i40e_vsi {
 	irqreturn_t (*irq_handler)(int irq, void *data);
 
 	unsigned long *af_xdp_zc_qps; /* tracks AF_XDP ZC enabled qps */
+	struct xdp_drv_stats *xdp_stats; /* XDP/XSK stats array */
 } ____cacheline_internodealigned_in_smp;
 
 struct i40e_netdev_priv {

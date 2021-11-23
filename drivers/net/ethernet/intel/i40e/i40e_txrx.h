@@ -368,6 +368,7 @@ struct i40e_ring {
 		struct i40e_tx_queue_stats tx_stats;
 		struct i40e_rx_queue_stats rx_stats;
 	};
+	struct xdp_drv_stats *xdp_stats;
 
 	unsigned int size;		/* length of descriptor ring in bytes */
 	dma_addr_t dma;			/* physical address of ring */

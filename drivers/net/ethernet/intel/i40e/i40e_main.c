@@ -11087,7 +11087,7 @@ static int i40e_set_num_rings_in_vsi(struct i40e_vsi *vsi)
 static int i40e_vsi_alloc_arrays(struct i40e_vsi *vsi, bool alloc_qvectors)
 {
 	struct i40e_ring **next_rings;
-	int size;
+	int size, i;
 	int ret = 0;
 
 	/* allocate memory for both Tx, XDP Tx and Rx ring pointers */
@@ -11103,6 +11103,15 @@ static int i40e_vsi_alloc_arrays(struct i40e_vsi *vsi, bool alloc_qvectors)
 	}
 	vsi->rx_rings = next_rings;
 
+	vsi->xdp_stats = kcalloc(vsi->alloc_queue_pairs,
+				 sizeof(*vsi->xdp_stats),
+				 GFP_KERNEL);
+	if (!vsi->xdp_stats)
+		goto err_xdp_stats;
+
+	for (i = 0; i < vsi->alloc_queue_pairs; i++)
+		xdp_init_drv_stats(vsi->xdp_stats + i);
+
 	if (alloc_qvectors) {
 		/* allocate memory for q_vector pointers */
 		size = sizeof(struct i40e_q_vector *) * vsi->num_q_vectors;
@@ -11115,6 +11124,10 @@ static int i40e_vsi_alloc_arrays(struct i40e_vsi *vsi, bool alloc_qvectors)
 	return ret;
 
 err_vectors:
+	kfree(vsi->xdp_stats);
+	vsi->xdp_stats = NULL;
+
+err_xdp_stats:
 	kfree(vsi->tx_rings);
 	return ret;
 }
@@ -11225,6 +11238,10 @@ static void i40e_vsi_free_arrays(struct i40e_vsi *vsi, bool free_qvectors)
 		kfree(vsi->q_vectors);
 		vsi->q_vectors = NULL;
 	}
+
+	kfree(vsi->xdp_stats);
+	vsi->xdp_stats = NULL;
+
 	kfree(vsi->tx_rings);
 	vsi->tx_rings = NULL;
 	vsi->rx_rings = NULL;
@@ -11347,6 +11364,7 @@ static int i40e_alloc_rings(struct i40e_vsi *vsi)
 		if (vsi->back->hw_features & I40E_HW_WB_ON_ITR_CAPABLE)
 			ring->flags = I40E_TXR_FLAGS_WB_ON_ITR;
 		ring->itr_setting = pf->tx_itr_default;
+		ring->xdp_stats = vsi->xdp_stats + i;
 		WRITE_ONCE(vsi->tx_rings[i], ring++);
 
 		if (!i40e_enabled_xdp_vsi(vsi))
@@ -11365,6 +11383,7 @@ static int i40e_alloc_rings(struct i40e_vsi *vsi)
 			ring->flags = I40E_TXR_FLAGS_WB_ON_ITR;
 		set_ring_xdp(ring);
 		ring->itr_setting = pf->tx_itr_default;
+		ring->xdp_stats = vsi->xdp_stats + i;
 		WRITE_ONCE(vsi->xdp_rings[i], ring++);
 
 setup_rx:
@@ -11378,6 +11397,7 @@ setup_rx:
 		ring->size = 0;
 		ring->dcb_tc = 0;
 		ring->itr_setting = pf->rx_itr_default;
+		ring->xdp_stats = vsi->xdp_stats + i;
 		WRITE_ONCE(vsi->rx_rings[i], ring);
 	}
 
@@ -13308,6 +13328,19 @@ static int i40e_xdp(struct net_device *dev,
 	}
 }
 
+static int i40e_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id)
+{
+	const struct i40e_netdev_priv *np = netdev_priv(dev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		return np->vsi->alloc_queue_pairs;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_open		= i40e_open,
 	.ndo_stop		= i40e_close,
@@ -13343,6 +13376,8 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_bpf		= i40e_xdp,
 	.ndo_xdp_xmit		= i40e_xdp_xmit,
 	.ndo_xsk_wakeup	        = i40e_xsk_wakeup,
+	.ndo_get_xdp_stats_nch	= i40e_get_xdp_stats_nch,
+	.ndo_get_xdp_stats	= xdp_get_drv_stats_generic,
 	.ndo_dfwd_add_station	= i40e_fwd_add,
 	.ndo_dfwd_del_station	= i40e_fwd_del,
 };
@@ -13487,6 +13522,7 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 	netdev->netdev_ops = &i40e_netdev_ops;
 	netdev->watchdog_timeo = 5 * HZ;
 	i40e_set_ethtool_ops(netdev);
+	netdev->xstats = vsi->xdp_stats;
 
 	/* MTU range: 68 - 9706 */
 	netdev->min_mtu = ETH_MIN_MTU;
