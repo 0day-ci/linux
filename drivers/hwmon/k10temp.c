@@ -85,6 +85,7 @@ struct k10temp_data {
 	u32 show_temp;
 	bool is_zen;
 	u32 ccd_offset;
+	u32 ccd_limit;
 };
 
 #define TCTL_BIT	0
@@ -357,12 +358,12 @@ static const struct hwmon_chip_info k10temp_chip_info = {
 };
 
 static void k10temp_get_ccd_support(struct pci_dev *pdev,
-				    struct k10temp_data *data, int limit)
+				    struct k10temp_data *data)
 {
 	u32 regval;
 	int i;
 
-	for (i = 0; i < limit; i++) {
+	for (i = 0; i < data->ccd_limit; i++) {
 		amd_smn_read(amd_pci_dev_to_node_id(pdev),
 			     ZEN_CCD_TEMP(data->ccd_offset, i), &regval);
 		if (regval & ZEN_CCD_TEMP_VALID)
@@ -411,14 +412,16 @@ static int k10temp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		case 0x11:	/* Zen APU */
 		case 0x18:	/* Zen+ APU */
 			data->ccd_offset = 0x154;
-			k10temp_get_ccd_support(pdev, data, 4);
+			data->ccd_limit = 4;
+			k10temp_get_ccd_support(pdev, data);
 			break;
 		case 0x31:	/* Zen2 Threadripper */
 		case 0x60:	/* Renoir */
 		case 0x68:	/* Lucienne */
 		case 0x71:	/* Zen2 */
 			data->ccd_offset = 0x154;
-			k10temp_get_ccd_support(pdev, data, 8);
+			data->ccd_limit = 8;
+			k10temp_get_ccd_support(pdev, data);
 			break;
 		}
 	} else if (boot_cpu_data.x86 == 0x19) {
@@ -431,13 +434,15 @@ static int k10temp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		case 0x21:		/* Zen3 Ryzen Desktop */
 		case 0x50 ... 0x5f:	/* Green Sardine */
 			data->ccd_offset = 0x154;
-			k10temp_get_ccd_support(pdev, data, 8);
+			data->ccd_limit = 8;
+			k10temp_get_ccd_support(pdev, data);
 			break;
 		case 0x10 ... 0x1f:
 		case 0x40 ... 0x4f:	/* Yellow Carp */
 		case 0xa0 ... 0xaf:
 			data->ccd_offset = 0x300;
-			k10temp_get_ccd_support(pdev, data, 8);
+			data->ccd_limit = 8;
+			k10temp_get_ccd_support(pdev, data);
 			break;
 		}
 	} else {
