@@ -1729,7 +1729,7 @@ static struct sk_buff *igc_build_skb(struct igc_ring *rx_ring,
 	net_prefetch(va);
 
 	/* build an skb around the page buffer */
-	skb = build_skb(va - IGC_SKB_PAD, truesize);
+	skb = napi_build_skb(va - IGC_SKB_PAD, truesize);
 	if (unlikely(!skb))
 		return NULL;
 
