@@ -10,6 +10,7 @@
 #include <linux/lockdep.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinconf-generic.h>
+#include <linux/hte.h> /* For hardware timestamping */
 
 struct gpio_desc;
 struct of_phandle_args;
@@ -319,6 +320,10 @@ struct gpio_irq_chip {
  * @add_pin_ranges: optional routine to initialize pin ranges, to be used when
  *	requires special mapping of the pins that provides GPIO functionality.
  *	It is called after adding GPIO chip and before adding IRQ chip.
+ * @req_hw_timestamp: Dependent on GPIO chip, an optional routine to
+ *	enable hardware assisted timestamp.
+ * @rel_hw_timestamp: Dependent on GPIO chip, an optional routine to
+ *	disable/release hardware assisted timestamp.
  * @base: identifies the first GPIO number handled by this chip;
  *	or, if negative during registration, requests dynamic ID allocation.
  *	DEPRECATION: providing anything non-negative and nailing the base
@@ -414,6 +419,15 @@ struct gpio_chip {
 
 	int			(*add_pin_ranges)(struct gpio_chip *gc);
 
+	int			(*req_hw_timestamp)(struct gpio_chip *gc,
+						    unsigned int offset,
+						    hte_ts_cb_t cb,
+						    hte_ts_threaded_cb_t tcb,
+						    struct hte_ts_desc *hdesc,
+						    void *data);
+	int			(*rel_hw_timestamp)(struct gpio_chip *chip,
+						    unsigned int offset,
+						    struct hte_ts_desc *hdesc);
 	int			base;
 	u16			ngpio;
 	u16			offset;

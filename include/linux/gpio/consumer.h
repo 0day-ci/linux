@@ -6,6 +6,7 @@
 #include <linux/bug.h>
 #include <linux/compiler_types.h>
 #include <linux/err.h>
+#include <linux/hte.h>
 
 struct device;
 
@@ -112,6 +113,9 @@ int gpiod_get_direction(struct gpio_desc *desc);
 int gpiod_direction_input(struct gpio_desc *desc);
 int gpiod_direction_output(struct gpio_desc *desc, int value);
 int gpiod_direction_output_raw(struct gpio_desc *desc, int value);
+int gpiod_req_hw_timestamp_ns(struct gpio_desc *desc, hte_ts_cb_t cb,
+			      hte_ts_threaded_cb_t tcb, void *data);
+int gpiod_rel_hw_timestamp_ns(struct gpio_desc *desc);
 
 /* Value get/set from non-sleeping context */
 int gpiod_get_value(const struct gpio_desc *desc);
@@ -353,8 +357,19 @@ static inline int gpiod_direction_output_raw(struct gpio_desc *desc, int value)
 	WARN_ON(desc);
 	return -ENOSYS;
 }
-
-
+static inline int gpiod_req_hw_timestamp_ns(struct gpio_desc *desc,
+					    hte_ts_cb_t cb,
+					    hte_ts_threaded_cb_t tcb,
+					    void *data)
+{
+	WARN_ON(desc);
+	return -ENOSYS;
+}
+static inline int gpiod_rel_hw_timestamp_ns(struct gpio_desc *desc)
+{
+	WARN_ON(desc);
+	return -ENOSYS;
+}
 static inline int gpiod_get_value(const struct gpio_desc *desc)
 {
 	/* GPIO can never have been requested */
