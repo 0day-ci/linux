@@ -2292,3 +2292,72 @@ unsigned int mlx5e_nic_stats_grps_num(struct mlx5e_priv *priv)
 {
 	return ARRAY_SIZE(mlx5e_nic_stats_grps);
 }
+
+int mlx5e_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id)
+{
+	const struct mlx5e_priv *priv = netdev_priv(dev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return priv->max_nch;
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		return priv->xsk.ever_used ? priv->max_nch : -ENODATA;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+int mlx5e_get_xdp_stats(const struct net_device *dev, u32 attr_id,
+			void *attr_data)
+{
+	const struct mlx5e_priv *priv = netdev_priv(dev);
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		if (!priv->xsk.ever_used)
+			return -ENODATA;
+
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < priv->max_nch; i++) {
+		const struct mlx5e_channel_stats *cs = priv->channel_stats + i;
+
+		switch (attr_id) {
+		case IFLA_XDP_XSTATS_TYPE_XDP:
+			/* mlx5e_rq_stats rq */
+			xdp_stats->errors = cs->rq.xdp_errors;
+			xdp_stats->drop = cs->rq.xdp_drop;
+			xdp_stats->redirect = cs->rq.xdp_redirect;
+			/* mlx5e_xdpsq_stats rq_xdpsq */
+			xdp_stats->tx = cs->rq_xdpsq.xmit;
+			xdp_stats->tx_errors = cs->rq_xdpsq.err +
+					       cs->rq_xdpsq.full;
+			/* mlx5e_xdpsq_stats xdpsq */
+			xdp_stats->xmit_packets = cs->xdpsq.xmit;
+			xdp_stats->xmit_errors = cs->xdpsq.err;
+			xdp_stats->xmit_full = cs->xdpsq.full;
+			break;
+		case IFLA_XDP_XSTATS_TYPE_XSK:
+			/* mlx5e_rq_stats xskrq */
+			xdp_stats->errors = cs->xskrq.xdp_errors;
+			xdp_stats->drop = cs->xskrq.xdp_drop;
+			xdp_stats->redirect = cs->xskrq.xdp_redirect;
+			/* mlx5e_xdpsq_stats xsksq */
+			xdp_stats->xmit_packets = cs->xsksq.xmit;
+			xdp_stats->xmit_errors = cs->xsksq.err;
+			xdp_stats->xmit_full = cs->xsksq.full;
+			break;
+		}
+
+		xdp_stats++;
+	}
+
+	return 0;
+}

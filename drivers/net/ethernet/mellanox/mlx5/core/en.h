@@ -1212,4 +1212,9 @@ int mlx5e_set_vf_rate(struct net_device *dev, int vf, int min_tx_rate, int max_t
 int mlx5e_get_vf_config(struct net_device *dev, int vf, struct ifla_vf_info *ivi);
 int mlx5e_get_vf_stats(struct net_device *dev, int vf, struct ifla_vf_stats *vf_stats);
 #endif
+
+int mlx5e_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id);
+int mlx5e_get_xdp_stats(const struct net_device *dev, u32 attr_id,
+			void *attr_data);
+
 #endif /* __MLX5_EN_H__ */
