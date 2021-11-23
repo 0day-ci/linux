@@ -44,6 +44,10 @@
 #define RAVB_RXTSTAMP_TYPE_ALL	0x00000006
 #define RAVB_RXTSTAMP_ENABLED	0x00000010	/* Enable RX timestamping */
 
+/* GbEthernet TOE hardware checksum values */
+#define TOE_RX_CSUM_OK		0x0000
+#define TOE_RX_CSUM_UNSUPPORTED	0xFFFF
+
 enum ravb_reg {
 	/* AVB-DMAC registers */
 	CCC	= 0x0000,
