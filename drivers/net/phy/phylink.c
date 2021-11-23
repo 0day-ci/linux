@@ -564,6 +564,74 @@ static int phylink_parse_fixedlink(struct phylink *pl,
 	return 0;
 }
 
+static void phylink_update_phy_modes(struct phylink *pl,
+				     struct fwnode_handle *fwnode)
+{
+	unsigned long *supported = pl->config->supported_interfaces;
+	DECLARE_PHY_INTERFACE_MASK(modes);
+
+	/* FIXME: If supported is empty, leave it as it is. This happens for
+	 * unconverted drivers that don't fill up supported_interfaces. Once all
+	 * such drivers are converted, we can drop this.
+	 */
+	if (phy_interface_empty(supported))
+		return;
+
+	if (fwnode_get_phy_modes(fwnode, modes) < 0)
+		return;
+
+	/* If no modes are defined in fwnode, interpret it as all modes
+	 * supported by the MAC are supported by the board.
+	 */
+	if (phy_interface_empty(modes))
+		return;
+
+	/* We want the intersection of given supported modes with those defined
+	 * in DT.
+	 *
+	 * Some older device-trees mention only one of `sgmii`, `1000base-x` or
+	 * `2500base-x`, while supporting all three. Other mention `10gbase-r`
+	 * or `usxgmii`, while supporting both, and also `sgmii`, `1000base-x`,
+	 * `2500base-x` and `5gbase-r`.
+	 * For backwards compatibility with these older DTs, make it so that if
+	 * one of these modes is mentioned in DT and MAC supports more of them,
+	 * keep all that are supported according to the logic above.
+	 *
+	 * Nonetheless it is possible that a device may support only one mode,
+	 * for example 1000base-x, due to strapping pins or some other reasons.
+	 * If a specific device supports only the mode mentioned in DT, the
+	 * exception should be made here with of_machine_is_compatible().
+	 */
+	if (bitmap_weight(modes, PHY_INTERFACE_MODE_MAX) == 1) {
+		DECLARE_PHY_INTERFACE_MASK(mask);
+		bool lower = false;
+
+		if (test_bit(PHY_INTERFACE_MODE_10GBASER, modes) ||
+		    test_bit(PHY_INTERFACE_MODE_USXGMII, modes)) {
+			phy_interface_zero(mask);
+			__set_bit(PHY_INTERFACE_MODE_5GBASER, mask);
+			__set_bit(PHY_INTERFACE_MODE_10GBASER, mask);
+			__set_bit(PHY_INTERFACE_MODE_USXGMII, mask);
+			phy_interface_and(mask, supported, mask);
+			phy_interface_or(modes, modes, mask);
+			lower = true;
+		}
+
+		if (lower || (test_bit(PHY_INTERFACE_MODE_SGMII, modes) ||
+			      test_bit(PHY_INTERFACE_MODE_1000BASEX, modes) ||
+			      test_bit(PHY_INTERFACE_MODE_2500BASEX, modes))) {
+			phy_interface_zero(mask);
+			__set_bit(PHY_INTERFACE_MODE_SGMII, mask);
+			__set_bit(PHY_INTERFACE_MODE_1000BASEX, mask);
+			__set_bit(PHY_INTERFACE_MODE_2500BASEX, mask);
+			phy_interface_and(mask, supported, mask);
+			phy_interface_or(modes, modes, mask);
+		}
+	}
+
+	phy_interface_and(supported, supported, modes);
+}
+
 static int phylink_parse_mode(struct phylink *pl, struct fwnode_handle *fwnode)
 {
 	struct fwnode_handle *dn;
@@ -1156,6 +1224,8 @@ struct phylink *phylink_create(struct phylink_config *config,
 	pl->mac_ops = mac_ops;
 	__set_bit(PHYLINK_DISABLE_STOPPED, &pl->phylink_disable_state);
 	timer_setup(&pl->link_poll, phylink_fixed_poll, 0);
+
+	phylink_update_phy_modes(pl, fwnode);
 
 	bitmap_fill(pl->supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
 	linkmode_copy(pl->link_config.advertising, pl->supported);
