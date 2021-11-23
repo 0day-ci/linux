@@ -13,25 +13,27 @@ snd-hda-codec-$(CONFIG_SND_HDA_INPUT_BEEP) += hda_beep.o
 CFLAGS_hda_controller.o := -I$(src)
 CFLAGS_hda_intel.o := -I$(src)
 
-snd-hda-codec-generic-objs :=	hda_generic.o
-snd-hda-codec-realtek-objs :=	patch_realtek.o
-snd-hda-codec-cmedia-objs :=	patch_cmedia.o
-snd-hda-codec-analog-objs :=	patch_analog.o
-snd-hda-codec-idt-objs :=	patch_sigmatel.o
-snd-hda-codec-si3054-objs :=	patch_si3054.o
-snd-hda-codec-cirrus-objs :=	patch_cirrus.o
-snd-hda-codec-cs8409-objs :=	patch_cs8409.o patch_cs8409-tables.o
-snd-hda-codec-ca0110-objs :=	patch_ca0110.o
-snd-hda-codec-ca0132-objs :=	patch_ca0132.o
-snd-hda-codec-conexant-objs :=	patch_conexant.o
-snd-hda-codec-via-objs :=	patch_via.o
-snd-hda-codec-hdmi-objs :=	patch_hdmi.o hda_eld.o
+snd-hda-codec-generic-objs :=		hda_generic.o
+snd-hda-codec-cs35l41-i2c-objs :=	cs35l41_hda_i2c.o cs35l41_hda.o ../../soc/codecs/cs35l41-lib.o
+snd-hda-codec-realtek-objs :=		patch_realtek.o
+snd-hda-codec-cmedia-objs :=		patch_cmedia.o
+snd-hda-codec-analog-objs :=		patch_analog.o
+snd-hda-codec-idt-objs :=		patch_sigmatel.o
+snd-hda-codec-si3054-objs :=		patch_si3054.o
+snd-hda-codec-cirrus-objs :=		patch_cirrus.o
+snd-hda-codec-cs8409-objs :=		patch_cs8409.o patch_cs8409-tables.o
+snd-hda-codec-ca0110-objs :=		patch_ca0110.o
+snd-hda-codec-ca0132-objs :=		patch_ca0132.o
+snd-hda-codec-conexant-objs :=		patch_conexant.o
+snd-hda-codec-via-objs :=		patch_via.o
+snd-hda-codec-hdmi-objs :=		patch_hdmi.o hda_eld.o
 
 # common driver
 obj-$(CONFIG_SND_HDA) := snd-hda-codec.o
 
 # codec drivers
 obj-$(CONFIG_SND_HDA_GENERIC) += snd-hda-codec-generic.o
+obj-$(CONFIG_SND_HDA_CODEC_CS35L41_I2C) += snd-hda-codec-cs35l41-i2c.o
 obj-$(CONFIG_SND_HDA_CODEC_REALTEK) += snd-hda-codec-realtek.o
 obj-$(CONFIG_SND_HDA_CODEC_CMEDIA) += snd-hda-codec-cmedia.o
 obj-$(CONFIG_SND_HDA_CODEC_ANALOG) += snd-hda-codec-analog.o
