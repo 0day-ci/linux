@@ -41,6 +41,29 @@ If `-s` is specified once the detailed errors won't be shown.
 
 `ip` supports JSON formatting via the `-j` option.
 
+For some interfaces, standard XDP statistics are available.
+It can be accessed the same ways, e.g. `ip`::
+
+  $ ip link xdpstats dev enp178s0
+  16: enp178s0:
+  xdp-channel0-rx_xdp_packets: 0
+  xdp-channel0-rx_xdp_bytes: 1
+  xdp-channel0-rx_xdp_errors: 2
+  xdp-channel0-rx_xdp_aborted: 3
+  xdp-channel0-rx_xdp_drop: 4
+  xdp-channel0-rx_xdp_invalid: 5
+  xdp-channel0-rx_xdp_pass: 6
+  xdp-channel0-rx_xdp_redirect: 7
+  xdp-channel0-rx_xdp_redirect_errors: 8
+  xdp-channel0-rx_xdp_tx: 9
+  xdp-channel0-rx_xdp_tx_errors: 10
+  xdp-channel0-tx_xdp_xmit_packets: 11
+  xdp-channel0-tx_xdp_xmit_bytes: 12
+  xdp-channel0-tx_xdp_xmit_errors: 13
+  xdp-channel0-tx_xdp_xmit_full: 14
+
+Those are usually per-channel. JSON is also supported via the `-j` opt.
+
 Protocol-specific statistics
 ----------------------------
 
@@ -147,6 +170,8 @@ Statistics are reported both in the responses to link information
 requests (`RTM_GETLINK`) and statistic requests (`RTM_GETSTATS`,
 when `IFLA_STATS_LINK_64` bit is set in the `.filter_mask` of the request).
 
+`IFLA_STATS_LINK_XDP_XSTATS` bit is used to retrieve standard XDP statstics.
+
 ethtool
 -------
 
@@ -205,6 +230,14 @@ allows setting the frequency of refreshing statistics, if needed.
 Retrieving ethtool statistics is a multi-syscall process, drivers are advised
 to keep the number of statistics constant to avoid race conditions with
 user space trying to read them.
+
+It is up to the developers whether to implement XDP statistics or not due to
+possible performance hits. If so, it is encouraged to export it using generic
+XDP statistics infrastructure, not driver-defined Ethtool stats.
+It can be achieve by implementing `.ndo_get_xdp_stats` and, optionally but
+preferred, `.ndo_get_xdp_stats_nch`. There are several common helper structures
+and functions in `include/net/xdp.h` to make this simpler and keep the code
+compact.
 
 Statistics must persist across routine operations like bringing the interface
 down and up.
