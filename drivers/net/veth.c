@@ -43,6 +43,7 @@ struct veth_stats {
 	u64	xdp_packets;
 	u64	xdp_bytes;
 	u64	xdp_redirect;
+	u64	xdp_errors;
 	u64	xdp_drops;
 	u64	xdp_tx;
 	u64	xdp_tx_err;
@@ -96,6 +97,7 @@ static const struct veth_q_stat_desc veth_rq_stats_desc[] = {
 	{ "xdp_bytes",		VETH_RQ_STAT(xdp_bytes) },
 	{ "drops",		VETH_RQ_STAT(rx_drops) },
 	{ "xdp_redirect",	VETH_RQ_STAT(xdp_redirect) },
+	{ "xdp_errors",		VETH_RQ_STAT(xdp_errors) },
 	{ "xdp_drops",		VETH_RQ_STAT(xdp_drops) },
 	{ "xdp_tx",		VETH_RQ_STAT(xdp_tx) },
 	{ "xdp_tx_errors",	VETH_RQ_STAT(xdp_tx_err) },
@@ -655,16 +657,18 @@ static struct xdp_frame *veth_xdp_rcv_one(struct veth_rq *rq,
 			fallthrough;
 		case XDP_ABORTED:
 			trace_xdp_exception(rq->dev, xdp_prog, act);
-			fallthrough;
+			goto err_xdp;
 		case XDP_DROP:
 			stats->xdp_drops++;
-			goto err_xdp;
+			goto xdp_drop;
 		}
 	}
 	rcu_read_unlock();
 
 	return frame;
 err_xdp:
+	stats->xdp_errors++;
+xdp_drop:
 	rcu_read_unlock();
 	xdp_return_frame(frame);
 xdp_xmit:
@@ -805,7 +809,8 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq,
 		fallthrough;
 	case XDP_ABORTED:
 		trace_xdp_exception(rq->dev, xdp_prog, act);
-		fallthrough;
+		stats->xdp_errors++;
+		goto xdp_drop;
 	case XDP_DROP:
 		stats->xdp_drops++;
 		goto xdp_drop;
