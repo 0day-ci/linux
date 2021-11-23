@@ -13,11 +13,21 @@ struct a6xx_gpu_state_obj {
 	u32 *data;
 };
 
+struct a6xx_gmu_state {
+	struct a6xx_gpu_state_obj *registers;
+	int nr_registers;
+
+	struct msm_gpu_state_bo *log_bo;
+
+	struct msm_gpu_state_bo *hfi_bo;
+
+	struct msm_gpu_state_bo *debug_bo;
+
+	struct msm_gpu_state_bo *mem_bin_bo[2];
+};
+
 struct a6xx_gpu_state {
 	struct msm_gpu_state base;
-
-	struct a6xx_gpu_state_obj *gmu_registers;
-	int nr_gmu_registers;
 
 	struct a6xx_gpu_state_obj *registers;
 	int nr_registers;
@@ -42,7 +52,7 @@ struct a6xx_gpu_state {
 	struct a6xx_gpu_state_obj *cx_debugbus;
 	int nr_cx_debugbus;
 
-	struct msm_gpu_state_bo *gmu_log;
+	struct a6xx_gmu_state gmu_state;
 
 	struct list_head objs;
 };
@@ -777,20 +787,21 @@ static void a6xx_get_gmu_registers(struct msm_gpu *gpu,
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 	struct a6xx_gpu *a6xx_gpu = to_a6xx_gpu(adreno_gpu);
+	struct a6xx_gmu_state *gmu_state = &a6xx_state->gmu_state;
 
-	a6xx_state->gmu_registers = state_kcalloc(a6xx_state,
-		2, sizeof(*a6xx_state->gmu_registers));
+	gmu_state->registers = state_kcalloc(a6xx_state,
+		2, sizeof(*gmu_state->registers));
 
-	if (!a6xx_state->gmu_registers)
+	if (!gmu_state->registers)
 		return;
 
-	a6xx_state->nr_gmu_registers = 2;
+	gmu_state->nr_registers = 2;
 
 	/* Get the CX GMU registers from AHB */
 	_a6xx_get_gmu_registers(gpu, a6xx_state, &a6xx_gmu_reglist[0],
-		&a6xx_state->gmu_registers[0], false);
+		&gmu_state->registers[0], false);
 	_a6xx_get_gmu_registers(gpu, a6xx_state, &a6xx_gmu_reglist[1],
-		&a6xx_state->gmu_registers[1], true);
+		&gmu_state->registers[1], true);
 
 	if (!a6xx_gmu_gx_is_on(&a6xx_gpu->gmu))
 		return;
@@ -799,31 +810,46 @@ static void a6xx_get_gmu_registers(struct msm_gpu *gpu,
 	gpu_write(gpu, REG_A6XX_GMU_AO_AHB_FENCE_CTRL, 0);
 
 	_a6xx_get_gmu_registers(gpu, a6xx_state, &a6xx_gmu_reglist[2],
-		&a6xx_state->gmu_registers[2], false);
+		&gmu_state->registers[2], false);
+
+	gmu_state->nr_registers = 3;
 }
 
-static void a6xx_get_gmu_log(struct msm_gpu *gpu,
+static void a6xx_get_gmu_bo(struct a6xx_gpu_state *a6xx_state,
+		struct a6xx_gmu_bo *gmu_bo, struct msm_gpu_state_bo **dest_bo)
+{
+	struct msm_gpu_state_bo *bo;
+
+	bo = state_kcalloc(a6xx_state, 1, sizeof(**dest_bo));
+	if (!bo)
+		return;
+
+	bo->iova = gmu_bo->iova;
+	bo->size = gmu_bo->size;
+	bo->data = kvzalloc(bo->size, GFP_KERNEL);
+	if (!bo->data)
+		return;
+
+	memcpy(bo->data, gmu_bo->virt, gmu_bo->size);
+
+	*dest_bo = bo;
+}
+
+static void a6xx_get_gmu_state(struct msm_gpu *gpu,
 		struct a6xx_gpu_state *a6xx_state)
 {
+	struct a6xx_gmu_state *gmu_state = &a6xx_state->gmu_state;
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 	struct a6xx_gpu *a6xx_gpu = to_a6xx_gpu(adreno_gpu);
 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
-	struct msm_gpu_state_bo *gmu_log;
 
-	gmu_log = state_kcalloc(a6xx_state,
-		1, sizeof(*a6xx_state->gmu_log));
-	if (!gmu_log)
-		return;
+	a6xx_get_gmu_registers(gpu, a6xx_state);
 
-	gmu_log->iova = gmu->log.iova;
-	gmu_log->size = gmu->log.size;
-	gmu_log->data = kvzalloc(gmu_log->size, GFP_KERNEL);
-	if (!gmu_log->data)
-		return;
+	a6xx_get_gmu_bo(a6xx_state, &gmu->log, &gmu_state->log_bo);
 
-	memcpy(gmu_log->data, gmu->log.virt, gmu->log.size);
+	a6xx_get_gmu_bo(a6xx_state, &gmu->hfi, &gmu_state->hfi_bo);
 
-	a6xx_state->gmu_log = gmu_log;
+	a6xx_get_gmu_bo(a6xx_state, &gmu->debug, &gmu_state->debug_bo);
 }
 
 #define A6XX_GBIF_REGLIST_SIZE   1
@@ -961,9 +987,7 @@ struct msm_gpu_state *a6xx_gpu_state_get(struct msm_gpu *gpu)
 	/* Get the generic state from the adreno core */
 	adreno_gpu_state_get(gpu, &a6xx_state->base);
 
-	a6xx_get_gmu_registers(gpu, a6xx_state);
-
-	a6xx_get_gmu_log(gpu, a6xx_state);
+	a6xx_get_gmu_state(gpu, a6xx_state);
 
 	/* If GX isn't on the rest of the data isn't going to be accessible */
 	if (!a6xx_gmu_gx_is_on(&a6xx_gpu->gmu))
@@ -1005,9 +1029,16 @@ static void a6xx_gpu_state_destroy(struct kref *kref)
 			struct msm_gpu_state, ref);
 	struct a6xx_gpu_state *a6xx_state = container_of(state,
 			struct a6xx_gpu_state, base);
+	struct a6xx_gmu_state *gmu_state = &a6xx_state->gmu_state;
 
-	if (a6xx_state->gmu_log && a6xx_state->gmu_log->data)
-		kvfree(a6xx_state->gmu_log->data);
+	if (gmu_state->log_bo && gmu_state->log_bo->data)
+		kvfree(gmu_state->log_bo->data);
+
+	if (gmu_state->hfi_bo && gmu_state->hfi_bo->data)
+		kvfree(gmu_state->hfi_bo->data);
+
+	if (gmu_state->debug_bo && gmu_state->debug_bo->data)
+		kvfree(gmu_state->debug_bo->data);
 
 	list_for_each_entry_safe(obj, tmp, &a6xx_state->objs, node)
 		kfree(obj);
@@ -1210,6 +1241,53 @@ static void a6xx_show_debugbus(struct a6xx_gpu_state *a6xx_state,
 	}
 }
 
+void a6xx_gmu_show(struct a6xx_gmu_state *gmu_state, struct drm_printer *p)
+{
+	int i;
+
+	drm_puts(p, "gmu-log:\n");
+	if (gmu_state->log_bo) {
+		struct msm_gpu_state_bo *log_bo = gmu_state->log_bo;
+
+		drm_printf(p, "    iova: 0x%016llx\n", log_bo->iova);
+		drm_printf(p, "    size: %zu\n", log_bo->size);
+		adreno_show_object(p, &log_bo->data, log_bo->size,
+				&log_bo->encoded);
+	}
+
+	drm_puts(p, "gmu-hfi:\n");
+	if (gmu_state->hfi_bo) {
+		struct msm_gpu_state_bo *hfi_bo = gmu_state->hfi_bo;
+
+		drm_printf(p, "    iova: 0x%016llx\n", hfi_bo->iova);
+		drm_printf(p, "    size: %zu\n", hfi_bo->size);
+		adreno_show_object(p, &hfi_bo->data, hfi_bo->size,
+				&hfi_bo->encoded);
+	}
+
+	drm_puts(p, "gmu-debug:\n");
+	if (gmu_state->debug_bo) {
+		struct msm_gpu_state_bo *debug_bo = gmu_state->debug_bo;
+
+		drm_printf(p, "    iova: 0x%016llx\n", debug_bo->iova);
+		drm_printf(p, "    size: %zu\n", debug_bo->size);
+		adreno_show_object(p, &debug_bo->data, debug_bo->size,
+				&debug_bo->encoded);
+	}
+
+	drm_puts(p, "registers-gmu:\n");
+	for (i = 0; i < gmu_state->nr_registers; i++) {
+		struct a6xx_gpu_state_obj *obj = &gmu_state->registers[i];
+		const struct a6xx_registers *regs = obj->handle;
+
+		if (!obj->handle)
+			continue;
+
+		a6xx_show_registers(regs->registers, obj->data, regs->count, p);
+	}
+}
+
+
 void a6xx_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 		struct drm_printer *p)
 {
@@ -1222,30 +1300,11 @@ void a6xx_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 
 	adreno_show(gpu, state, p);
 
-	drm_puts(p, "gmu-log:\n");
-	if (a6xx_state->gmu_log) {
-		struct msm_gpu_state_bo *gmu_log = a6xx_state->gmu_log;
-
-		drm_printf(p, "    iova: 0x%016llx\n", gmu_log->iova);
-		drm_printf(p, "    size: %zu\n", gmu_log->size);
-		adreno_show_object(p, &gmu_log->data, gmu_log->size,
-				&gmu_log->encoded);
-	}
+	a6xx_gmu_show(&a6xx_state->gmu_state, p);
 
 	drm_puts(p, "registers:\n");
 	for (i = 0; i < a6xx_state->nr_registers; i++) {
 		struct a6xx_gpu_state_obj *obj = &a6xx_state->registers[i];
-		const struct a6xx_registers *regs = obj->handle;
-
-		if (!obj->handle)
-			continue;
-
-		a6xx_show_registers(regs->registers, obj->data, regs->count, p);
-	}
-
-	drm_puts(p, "registers-gmu:\n");
-	for (i = 0; i < a6xx_state->nr_gmu_registers; i++) {
-		struct a6xx_gpu_state_obj *obj = &a6xx_state->gmu_registers[i];
 		const struct a6xx_registers *regs = obj->handle;
 
 		if (!obj->handle)
