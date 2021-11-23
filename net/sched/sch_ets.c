@@ -476,10 +476,15 @@ static struct sk_buff *ets_qdisc_dequeue(struct Qdisc *sch)
 				return ets_qdisc_dequeue_skb(sch, skb);
 		}
 
+drr_dequeue:
 		if (list_empty(&q->active))
 			goto out;
 
 		cl = list_first_entry(&q->active, struct ets_class, alist);
+		if (!cl->qdisc) {
+			list_del(&cl->alist);
+			goto drr_dequeue;
+		}
 		skb = cl->qdisc->ops->peek(cl->qdisc);
 		if (!skb) {
 			qdisc_warn_nonwc(__func__, cl->qdisc);
