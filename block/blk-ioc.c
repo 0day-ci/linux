@@ -286,6 +286,7 @@ int create_task_io_context(struct task_struct *task, gfp_t gfp_flags, int node)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(create_task_io_context);
 
 /**
  * get_task_io_context - get io_context of a task
