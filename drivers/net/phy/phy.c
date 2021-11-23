@@ -58,13 +58,31 @@ static const char *phy_state_to_str(enum phy_state st)
 
 static void phy_link_up(struct phy_device *phydev)
 {
+	bool must_relock = false;
+
+	if (mutex_is_locked(&phydev->lock)) {
+		must_relock = true;
+		mutex_unlock(&phydev->lock);
+	}
 	phydev->phy_link_change(phydev, true);
+	if (must_relock)
+		mutex_lock(&phydev->lock);
+
 	phy_led_trigger_change_speed(phydev);
 }
 
 static void phy_link_down(struct phy_device *phydev)
 {
+	bool must_relock = false;
+
+	if (mutex_is_locked(&phydev->lock)) {
+		must_relock = true;
+		mutex_unlock(&phydev->lock);
+	}
 	phydev->phy_link_change(phydev, false);
+	if (must_relock)
+		mutex_lock(&phydev->lock);
+
 	phy_led_trigger_change_speed(phydev);
 }
 
