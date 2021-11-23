@@ -144,14 +144,10 @@ int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
 		return -EINVAL;
 
 	rcu_read_lock();
-	if (pid == 0) {
-		task = current;
-	} else {
-		task = find_task_by_vpid(pid);
-		if (!task) {
-			rcu_read_unlock();
-			return -ESRCH;
-		}
+	task = task_by_pid(pid);
+	if (!task) {
+		rcu_read_unlock();
+		return -ESRCH;
 	}
 	get_task_struct(task);
 	rcu_read_unlock();

@@ -223,10 +223,7 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 	read_lock(&tasklist_lock);
 	switch (which) {
 	case PRIO_PROCESS:
-		if (who)
-			p = find_task_by_vpid(who);
-		else
-			p = current;
+		p = task_by_pid(who);
 		if (p)
 			error = set_one_prio(p, niceval, error);
 		break;
@@ -286,10 +283,7 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 	read_lock(&tasklist_lock);
 	switch (which) {
 	case PRIO_PROCESS:
-		if (who)
-			p = find_task_by_vpid(who);
-		else
-			p = current;
+		p = task_by_pid(who);
 		if (p) {
 			niceval = nice_to_rlimit(task_nice(p));
 			if (niceval > retval)
@@ -1659,7 +1653,7 @@ SYSCALL_DEFINE4(prlimit64, pid_t, pid, unsigned int, resource,
 	}
 
 	rcu_read_lock();
-	tsk = pid ? find_task_by_vpid(pid) : current;
+	tsk = task_by_pid(pid);
 	if (!tsk) {
 		rcu_read_unlock();
 		return -ESRCH;

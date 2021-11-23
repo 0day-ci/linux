@@ -34,16 +34,6 @@ unsigned long mt_fpemul_threshold;
  */
 
 /*
- * find_process_by_pid - find a process with a matching PID value.
- * used in sys_sched_set/getaffinity() in kernel/sched/core.c, so
- * cloned here.
- */
-static inline struct task_struct *find_process_by_pid(pid_t pid)
-{
-	return pid ? find_task_by_vpid(pid) : current;
-}
-
-/*
  * check the target process has a UID that matches the current process's
  */
 static bool check_same_owner(struct task_struct *p)
@@ -79,7 +69,7 @@ asmlinkage long mipsmt_sys_sched_setaffinity(pid_t pid, unsigned int len,
 	cpus_read_lock();
 	rcu_read_lock();
 
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (!p) {
 		rcu_read_unlock();
 		cpus_read_unlock();
@@ -170,7 +160,7 @@ asmlinkage long mipsmt_sys_sched_getaffinity(pid_t pid, unsigned int len,
 	rcu_read_lock();
 
 	retval = -ESRCH;
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (!p)
 		goto out_unlock;
 	retval = security_task_getscheduler(p);

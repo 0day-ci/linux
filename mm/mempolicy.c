@@ -1538,7 +1538,7 @@ static int kernel_migrate_pages(pid_t pid, unsigned long maxnode,
 
 	/* Find the mm_struct */
 	rcu_read_lock();
-	task = pid ? find_task_by_vpid(pid) : current;
+	task = task_by_pid(pid);
 	if (!task) {
 		rcu_read_unlock();
 		err = -ESRCH;

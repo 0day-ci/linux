@@ -1900,6 +1900,13 @@ extern unsigned long init_stack[THREAD_SIZE / sizeof(unsigned long)];
  */
 
 extern struct task_struct *find_task_by_vpid(pid_t nr);
+/**
+ * task_by_pid - find a process with a matching PID value.
+ * @pid: the pid in question.
+ *
+ * The task of @pid, if found. %NULL otherwise.
+ */
+extern struct task_struct *task_by_pid(pid_t nr);
 extern struct task_struct *find_task_by_pid_ns(pid_t nr, struct pid_namespace *ns);
 
 /*

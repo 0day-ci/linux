@@ -2838,14 +2838,10 @@ struct task_struct *cgroup_procs_write_start(char *buf, bool threadgroup,
 	}
 
 	rcu_read_lock();
-	if (pid) {
-		tsk = find_task_by_vpid(pid);
-		if (!tsk) {
-			tsk = ERR_PTR(-ESRCH);
-			goto out_unlock_threadgroup;
-		}
-	} else {
-		tsk = current;
+	tsk = task_by_pid(pid);
+	if (!tsk) {
+		tsk = ERR_PTR(-ESRCH);
+		goto out_unlock_threadgroup;
 	}
 
 	if (threadgroup)

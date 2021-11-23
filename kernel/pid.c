@@ -422,6 +422,11 @@ struct task_struct *find_task_by_vpid(pid_t vnr)
 	return find_task_by_pid_ns(vnr, task_active_pid_ns(current));
 }
 
+struct task_struct *task_by_pid(pid_t nr)
+{
+	return nr ? find_task_by_vpid(nr) : current;
+}
+
 struct task_struct *find_get_task_by_vpid(pid_t nr)
 {
 	struct task_struct *task;

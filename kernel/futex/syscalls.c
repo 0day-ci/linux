@@ -62,13 +62,9 @@ SYSCALL_DEFINE3(get_robust_list, int, pid,
 	rcu_read_lock();
 
 	ret = -ESRCH;
-	if (!pid)
-		p = current;
-	else {
-		p = find_task_by_vpid(pid);
-		if (!p)
-			goto err_unlock;
-	}
+	p = task_by_pid(pid);
+	if (!p)
+		goto err_unlock;
 
 	ret = -EPERM;
 	if (!ptrace_may_access(p, PTRACE_MODE_READ_REALCREDS))
@@ -348,13 +344,9 @@ COMPAT_SYSCALL_DEFINE3(get_robust_list, int, pid,
 	rcu_read_lock();
 
 	ret = -ESRCH;
-	if (!pid)
-		p = current;
-	else {
-		p = find_task_by_vpid(pid);
-		if (!p)
-			goto err_unlock;
-	}
+	p = task_by_pid(pid);
+	if (!p)
+		goto err_unlock;
 
 	ret = -EPERM;
 	if (!ptrace_may_access(p, PTRACE_MODE_READ_REALCREDS))
