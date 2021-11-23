@@ -6264,7 +6264,7 @@ static int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 	int max_irr;
 	bool max_irr_updated;
 
-	if (KVM_BUG_ON(!vcpu->arch.apicv_active, vcpu->kvm))
+	if (KVM_BUG_ON(!enable_apicv, vcpu->kvm))
 		return -EIO;
 
 	if (pi_test_on(&vmx->pi_desc)) {
@@ -6276,20 +6276,31 @@ static int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 		smp_mb__after_atomic();
 		max_irr_updated =
 			kvm_apic_update_irr(vcpu, vmx->pi_desc.pir, &max_irr);
-
-		/*
-		 * If we are running L2 and L1 has a new pending interrupt
-		 * which can be injected, this may cause a vmexit or it may
-		 * be injected into L2.  Either way, this interrupt will be
-		 * processed via KVM_REQ_EVENT, not RVI, because we do not use
-		 * virtual interrupt delivery to inject L1 interrupts into L2.
-		 */
-		if (is_guest_mode(vcpu) && max_irr_updated)
-			kvm_make_request(KVM_REQ_EVENT, vcpu);
 	} else {
 		max_irr = kvm_lapic_find_highest_irr(vcpu);
+		max_irr_updated = false;
 	}
-	vmx_hwapic_irr_update(vcpu, max_irr);
+
+	/*
+	 * If virtual interrupt delivery is not in use, the interrupt
+	 * will be processed via KVM_REQ_EVENT, not RVI.  This can happen
+	 * in two cases:
+	 *
+	 * 1) If we are running L2 and L1 has a new pending interrupt
+	 * which can be injected, this may cause a vmexit or it may
+	 * be injected into L2.  We do not use virtual interrupt
+	 * delivery to inject L1 interrupts into L2.
+	 *
+	 * 2) If APICv is disabled for this vCPU, assigned devices may
+	 * still attempt to post interrupts.  The posted interrupt
+	 * vector will cause a vmexit and the subsequent entry will
+	 * call sync_pir_to_irr.
+	 */
+	if (!is_guest_mode(vcpu) && vcpu->arch.apicv_active)
+		vmx_set_rvi(max_irr);
+	else if (max_irr_updated)
+		kvm_make_request(KVM_REQ_EVENT, vcpu);
+
 	return max_irr;
 }
 
