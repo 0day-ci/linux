@@ -2809,7 +2809,7 @@ static unsigned long deferred_split_scan(struct shrinker *shrink,
 	unsigned long flags;
 	LIST_HEAD(list), *pos, *next;
 	struct page *page;
-	int split = 0;
+	unsigned long split = 0, num = 0;
 
 #ifdef CONFIG_MEMCG
 	if (sc->memcg)
@@ -2823,6 +2823,7 @@ static unsigned long deferred_split_scan(struct shrinker *shrink,
 		page = compound_head(page);
 		if (get_page_unless_zero(page)) {
 			list_move(page_deferred_list(page), &list);
+			num++;
 		} else {
 			/* We lost race with put_compound_page() */
 			list_del_init(page_deferred_list(page));
@@ -2847,6 +2848,7 @@ next:
 
 	spin_lock_irqsave(&ds_queue->split_queue_lock, flags);
 	list_splice_tail(&list, &ds_queue->split_queue);
+	ds_queue->split_queue_len += (num - split);
 	spin_unlock_irqrestore(&ds_queue->split_queue_lock, flags);
 
 	/*
