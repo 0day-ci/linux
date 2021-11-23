@@ -24,6 +24,7 @@ obj-y += common/
 obj-y += dac/
 obj-y += dummy/
 obj-y += gyro/
+obj-y += filter/
 obj-y += frequency/
 obj-y += health/
 obj-y += humidity/
