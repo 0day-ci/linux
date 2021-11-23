@@ -187,8 +187,9 @@ static void *edid_load(struct drm_connector *connector, const char *name,
 
 		pdev = platform_device_register_simple(connector_name, -1, NULL, 0);
 		if (IS_ERR(pdev)) {
-			DRM_ERROR("Failed to register EDID firmware platform device "
-				  "for connector \"%s\"\n", connector_name);
+			drm_err(connector->dev,
+				"[CONNECTOR:%d:%s]: failed to register EDID firmware platform device\n",
+				connector->base.id, connector_name);
 			return ERR_CAST(pdev);
 		}
 
@@ -242,9 +243,10 @@ static void *edid_load(struct drm_connector *connector, const char *name,
 		u8 *new_edid;
 
 		edid[EDID_LENGTH-1] += edid[0x7e] - valid_extensions;
-		DRM_INFO("Found %d valid extensions instead of %d in EDID data "
-		    "\"%s\" for connector \"%s\"\n", valid_extensions,
-		    edid[0x7e], name, connector_name);
+		drm_info(connector->dev,
+			 "[CONNECTOR:%d:%s]: found %d valid extensions instead of %d in EDID data \"%s\"\n",
+			 connector->base.id, connector_name,
+			 valid_extensions, edid[0x7e], name);
 		edid[0x7e] = valid_extensions;
 
 		new_edid = krealloc(edid, (valid_extensions + 1) * EDID_LENGTH,
@@ -253,10 +255,11 @@ static void *edid_load(struct drm_connector *connector, const char *name,
 			edid = new_edid;
 	}
 
-	DRM_INFO("Got %s EDID base block and %d extension%s from "
-	    "\"%s\" for connector \"%s\"\n", (builtin >= 0) ? "built-in" :
-	    "external", valid_extensions, valid_extensions == 1 ? "" : "s",
-	    name, connector_name);
+	drm_info(connector->dev,
+		 "[CONNECTOR:%d:%s]: got %s EDID base block and %d extension%s from \"%s\"\n",
+		 connector->base.id, connector_name,
+		 (builtin >= 0) ? "built-in" : "external", valid_extensions,
+		 valid_extensions == 1 ? "" : "s", name);
 
 out:
 	release_firmware(fw);

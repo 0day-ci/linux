@@ -504,7 +504,8 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 	if (WARN_ON(!list_empty(&dev->mode_config.connector_list))) {
 		drm_connector_list_iter_begin(dev, &conn_iter);
 		drm_for_each_connector_iter(connector, &conn_iter)
-			DRM_ERROR("connector %s leaked!\n", connector->name);
+			drm_err(connector->dev, "[CONNECTOR:%d:%s] leaked!\n",
+				connector->base.id, connector->name);
 		drm_connector_list_iter_end(&conn_iter);
 	}
 
