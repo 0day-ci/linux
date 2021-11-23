@@ -229,6 +229,7 @@ int main(int argc, char *argv[])
 	int pidx;
 	int pid;
 	int opt;
+	int i;
 
 	while ((opt = getopt(argc, argv, ":hkT:P:d:")) != -1) {
 		switch (opt) {
@@ -324,6 +325,28 @@ int main(int argc, char *argv[])
 	validate(get_cs_cookie(0) == get_cs_cookie(pid));
 	validate(get_cs_cookie(pid) != 0);
 	validate(get_cs_cookie(pid) == get_cs_cookie(procs[pidx].thr_tids[0]));
+
+	printf("\n## Set a new cookie on a single thread/PR_SCHED_CORE_SCOPE_THREAD [%d]\n", pid);
+	if (_prctl(PR_SCHED_CORE, PR_SCHED_CORE_CREATE, pid, PR_SCHED_CORE_SCOPE_THREAD, 0) < 0)
+		handle_error("core_sched create failed -- PR_SCHED_CORE_SCOPE_THREAD");
+	disp_processes(num_processes, procs);
+
+	validate(get_cs_cookie(pid) != get_cs_cookie(procs[pidx].thr_tids[0]));
+
+	printf("\n## Copy cookie from a thread [%d] to [%d] as PR_SCHED_CORE_SCOPE_THREAD\n", pid, procs[pidx].thr_tids[0]);
+	if (_prctl(PR_SCHED_CORE, PR_SCHED_CORE_SHARE, procs[pidx].thr_tids[0], PR_SCHED_CORE_SCOPE_THREAD, pid) < 0)
+		handle_error("core_sched share cookie from and to thread failed -- PR_SCHED_CORE_SCOPE_THREAD");
+	disp_processes(num_processes, procs);
+
+	validate(get_cs_cookie(pid) == get_cs_cookie(procs[pidx].thr_tids[0]));
+
+	printf("\n## Copy cookie from a thread [%d] to [%d] as PR_SCHED_CORE_SCOPE_THREAD_GROUP\n", pid, pid);
+	if (_prctl(PR_SCHED_CORE, PR_SCHED_CORE_SHARE, pid, PR_SCHED_CORE_SCOPE_THREAD_GROUP, pid) < 0)
+		handle_error("core_sched share cookie from and to thread-group failed -- PR_SCHED_CORE_SCOPE_THREAD_GROUP");
+	disp_processes(num_processes, procs);
+
+	for (i = 0; i < procs[pidx].num_threads; ++i)
+		validate(get_cs_cookie(pid) == get_cs_cookie(procs[pidx].thr_tids[i]));
 
 	if (errors) {
 		printf("TESTS FAILED. errors: %d\n", errors);
