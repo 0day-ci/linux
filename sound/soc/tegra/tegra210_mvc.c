@@ -156,7 +156,7 @@ static int tegra210_mvc_put_mute(struct snd_kcontrol *kcontrol,
 	if (err < 0)
 		goto end;
 
-	return 1;
+	err = 1;
 
 end:
 	pm_runtime_put(cmpnt->dev);
@@ -222,7 +222,7 @@ static int tegra210_mvc_put_vol(struct snd_kcontrol *kcontrol,
 			   TEGRA210_MVC_VOLUME_SWITCH_MASK,
 			   TEGRA210_MVC_VOLUME_SWITCH_TRIGGER);
 
-	return 1;
+	err = 1;
 
 end:
 	pm_runtime_put(cmpnt->dev);
