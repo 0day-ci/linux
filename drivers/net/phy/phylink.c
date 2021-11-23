@@ -1196,15 +1196,25 @@ EXPORT_SYMBOL_GPL(phylink_create);
  * in mac_prepare() or mac_config() methods if it is desired to dynamically
  * change the PCS.
  *
- * Please note that there are behavioural changes with the mac_config()
- * callback if a PCS is present (denoting a newer setup) so removing a PCS
- * is not supported, and if a PCS is going to be used, it must be registered
- * by calling phylink_set_pcs() at the latest in the first mac_config() call.
+ * Please note that for legacy phylink users, there are behavioural changes
+ * with the mac_config() callback if a PCS is present (denoting a newer setup)
+ * so removing a PCS is not supported. If a PCS is going to be used, it must
+ * be registered by calling phylink_set_pcs() at the latest in the first
+ * mac_config() call.
+ *
+ * For modern drivers, this may be called with a NULL pcs argument to
+ * disconnect the PCS from phylink.
  */
 void phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs)
 {
+	if (pl->config->legacy_pre_march2020 && pl->pcs && !pcs) {
+		phylink_warn(pl,
+			     "Removing PCS is not supported in a legacy driver");
+		return;
+	}
+
 	pl->pcs = pcs;
-	pl->pcs_ops = pcs->ops;
+	pl->pcs_ops = pcs ? pcs->ops : NULL;
 }
 EXPORT_SYMBOL_GPL(phylink_set_pcs);
 
