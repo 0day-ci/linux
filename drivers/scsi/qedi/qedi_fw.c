@@ -813,10 +813,11 @@ unlock:
 
 check_cleanup_reqs:
 	if (qedi_conn->cmd_cleanup_req > 0) {
-		QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_TID,
-			  "Freeing tid=0x%x for cid=0x%x\n",
-			  cqe->itid, qedi_conn->iscsi_conn_id);
-		qedi_conn->cmd_cleanup_cmpl++;
+		++qedi_conn->cmd_cleanup_cmpl;
+		QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_SCSI_TM,
+			  "Freeing tid=0x%x for cid=0x%x cleanup count=%d\n",
+			  cqe->itid, qedi_conn->iscsi_conn_id,
+			  qedi_conn->cmd_cleanup_cmpl);
 		wake_up(&qedi_conn->wait_queue);
 	} else {
 		QEDI_ERR(&qedi->dbg_ctx,
