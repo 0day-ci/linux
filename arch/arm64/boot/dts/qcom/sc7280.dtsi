@@ -1315,6 +1315,18 @@
 				phys = <&usb_2_hsphy>;
 				phy-names = "usb2-phy";
 				maximum-speed = "high-speed";
+				usb-role-switch;
+				usb_con: eud_usb_connector {
+					compatible = "qcom,usb-connector-eud",
+						     "usb-c-connector";
+					ports {
+						port@0 {
+							usb2_role_switch: endpoint {
+								remote-endpoint = <&eud_ep>;
+							};
+						};
+					};
+				};
 			};
 		};
 
@@ -1337,6 +1349,19 @@
 			reg = <0 0x09200000 0 0xd0000>, <0 0x09600000 0 0x50000>;
 			reg-names = "llcc_base", "llcc_broadcast_base";
 			interrupts = <GIC_SPI 582 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		eud:  eud@88e0000 {
+			compatible = "qcom,sc7280-eud","qcom,eud";
+			reg = <0 0x88e0000 0 0x2000>,
+			      <0 0x88e2000 0 0x1000>;
+			interrupt-parent = <&pdc>;
+			interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
+			port {
+				eud_ep: endpoint {
+					remote-endpoint = <&usb2_role_switch>;
+				};
+			};
 		};
 
 		nsp_noc: interconnect@a0c0000 {
