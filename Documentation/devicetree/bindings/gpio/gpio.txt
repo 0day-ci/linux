@@ -167,6 +167,13 @@ left to right from the passed array. An incomplete array (where the number
 of passed named are less than ngpios) will still be used up until the last
 provided valid line index.
 
+Optionally, a GPIO controller may have a "hardware-timestamp-engine" property.
+This specifies the timestamp engine node. The property is only useful if the
+hardware timestamp engine (HTE) serves as a back-end to support hardware
+timestamp GPIO lines in a real time and GPIO controller has dependency on the
+engine. It will be up to GPIO controller and HTE provider drivers to figure out
+the mapping between GPIO controller and HTE namespaces of a given GPIO line.
+
 Example:
 
 gpio-controller@00000000 {
@@ -180,6 +187,7 @@ gpio-controller@00000000 {
 		"LED G", "LED B", "Col A", "Col B", "Col C", "Col D",
 		"Row A", "Row B", "Row C", "Row D", "NMI button",
 		"poweroff", "reset";
+	hardware-timestamp-engine = <&hadrware_ts_engine_node>;
 }
 
 The GPIO chip may contain GPIO hog definitions. GPIO hogging is a mechanism
