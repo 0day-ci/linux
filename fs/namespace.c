@@ -3197,7 +3197,12 @@ static void *copy_mount_options(const void __user * data)
 	if (!copy)
 		return ERR_PTR(-ENOMEM);
 
-	left = copy_from_user(copy, data, PAGE_SIZE);
+	/*
+	 * Use raw_copy_from_user to avoid reporting overly large accesses in
+	 * the uaccess buffer, as this can lead to false positive reports in
+	 * downstream consumers.
+	 */
+	left = raw_copy_from_user(copy, data, PAGE_SIZE);
 
 	/*
 	 * Not all architectures have an exact copy_from_user(). Resort to
