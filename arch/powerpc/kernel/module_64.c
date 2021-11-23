@@ -422,11 +422,16 @@ static inline int create_stub(const Elf64_Shdr *sechdrs,
 			      const char *name)
 {
 	long reladdr;
+	func_desc_t desc;
+	int i;
 
 	if (is_mprofile_ftrace_call(name))
 		return create_ftrace_stub(entry, addr, me);
 
-	memcpy(entry->jump, ppc64_stub_insns, sizeof(ppc64_stub_insns));
+	for (i = 0; i < sizeof(ppc64_stub_insns) / sizeof(u32); i++) {
+		patch_instruction(&entry->jump[i],
+				  ppc_inst(ppc64_stub_insns[i]));
+	}
 
 	/* Stub uses address relative to r2. */
 	reladdr = (unsigned long)entry - my_r2(sechdrs, me);
@@ -437,10 +442,19 @@ static inline int create_stub(const Elf64_Shdr *sechdrs,
 	}
 	pr_debug("Stub %p get data from reladdr %li\n", entry, reladdr);
 
-	entry->jump[0] |= PPC_HA(reladdr);
-	entry->jump[1] |= PPC_LO(reladdr);
-	entry->funcdata = func_desc(addr);
-	entry->magic = STUB_MAGIC;
+	patch_instruction(&entry->jump[0],
+			  ppc_inst(entry->jump[0] | PPC_HA(reladdr)));
+	patch_instruction(&entry->jump[1],
+			  ppc_inst(entry->jump[1] | PPC_LO(reladdr)));
+
+	// func_desc_t is 8 bytes if ABIv2, else 16 bytes
+	desc = func_desc(addr);
+	for (i = 0; i < sizeof(func_desc_t) / sizeof(u32); i++) {
+		patch_instruction(((u32 *)&entry->funcdata) + i,
+				  ppc_inst(((u32 *)(&desc))[i]));
+	}
+
+	patch_instruction(&entry->magic, ppc_inst(STUB_MAGIC));
 
 	return 1;
 }
@@ -496,7 +510,7 @@ static int restore_r2(const char *name, u32 *instruction, struct module *me)
 		return 0;
 	}
 	/* ld r2,R2_STACK_OFFSET(r1) */
-	*instruction = PPC_INST_LD_TOC;
+	patch_instruction(instruction, ppc_inst(PPC_INST_LD_TOC));
 	return 1;
 }
 
@@ -636,9 +650,9 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			}
 
 			/* Only replace bits 2 through 26 */
-			*(uint32_t *)location
-				= (*(uint32_t *)location & ~0x03fffffc)
+			value = (*(uint32_t *)location & ~0x03fffffc)
 				| (value & 0x03fffffc);
+			patch_instruction((u32 *)location, ppc_inst(value));
 			break;
 
 		case R_PPC64_REL64:
