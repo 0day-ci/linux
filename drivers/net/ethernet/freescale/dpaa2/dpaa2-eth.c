@@ -1973,6 +1973,49 @@ static void dpaa2_eth_get_stats(struct net_device *net_dev,
 	}
 }
 
+static int dpaa2_eth_get_xdp_stats_nch(const struct net_device *net_dev,
+				       u32 attr_id)
+{
+	const struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return priv->num_channels;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int dpaa2_eth_get_xdp_stats(const struct net_device *net_dev,
+				   u32 attr_id, void *attr_data)
+{
+	const struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < priv->num_channels; i++) {
+		const struct dpaa2_eth_ch_stats *ch_stats;
+
+		ch_stats = &priv->channel[i]->stats;
+
+		xdp_stats->drop = ch_stats->xdp_drop;
+		xdp_stats->redirect = ch_stats->xdp_redirect;
+		xdp_stats->tx = ch_stats->xdp_tx;
+		xdp_stats->tx_errors = ch_stats->xdp_tx_err;
+
+		xdp_stats++;
+	}
+
+	return 0;
+}
+
 /* Copy mac unicast addresses from @net_dev to @priv.
  * Its sole purpose is to make dpaa2_eth_set_rx_mode() more readable.
  */
@@ -2601,6 +2644,8 @@ static const struct net_device_ops dpaa2_eth_ops = {
 	.ndo_stop = dpaa2_eth_stop,
 	.ndo_set_mac_address = dpaa2_eth_set_addr,
 	.ndo_get_stats64 = dpaa2_eth_get_stats,
+	.ndo_get_xdp_stats_nch = dpaa2_eth_get_xdp_stats_nch,
+	.ndo_get_xdp_stats = dpaa2_eth_get_xdp_stats,
 	.ndo_set_rx_mode = dpaa2_eth_set_rx_mode,
 	.ndo_set_features = dpaa2_eth_set_features,
 	.ndo_eth_ioctl = dpaa2_eth_ioctl,
