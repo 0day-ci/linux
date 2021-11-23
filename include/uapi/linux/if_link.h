@@ -1147,6 +1147,7 @@ enum {
 	IFLA_STATS_LINK_XSTATS_SLAVE,
 	IFLA_STATS_LINK_OFFLOAD_XSTATS,
 	IFLA_STATS_AF_SPEC,
+	IFLA_STATS_LINK_XDP_XSTATS,
 	__IFLA_STATS_MAX,
 };
 
@@ -1174,6 +1175,72 @@ enum {
 	__IFLA_OFFLOAD_XSTATS_MAX
 };
 #define IFLA_OFFLOAD_XSTATS_MAX (__IFLA_OFFLOAD_XSTATS_MAX - 1)
+
+/* These are embedded into IFLA_STATS_LINK_XDP_XSTATS */
+enum {
+	IFLA_XDP_XSTATS_TYPE_UNSPEC,
+	/* Stats collected on a "regular" channel(s) */
+	IFLA_XDP_XSTATS_TYPE_XDP,
+	/* Stats collected on an XSK channel(s) */
+	IFLA_XDP_XSTATS_TYPE_XSK,
+
+	__IFLA_XDP_XSTATS_TYPE_CNT,
+};
+
+#define IFLA_XDP_XSTATS_TYPE_START	(IFLA_XDP_XSTATS_TYPE_UNSPEC + 1)
+#define IFLA_XDP_XSTATS_TYPE_MAX	(__IFLA_XDP_XSTATS_TYPE_CNT - 1)
+
+/* Embedded into IFLA_XDP_XSTATS_TYPE_XDP or IFLA_XDP_XSTATS_TYPE_XSK */
+enum {
+	IFLA_XDP_XSTATS_SCOPE_UNSPEC,
+	/* netdev-wide stats */
+	IFLA_XDP_XSTATS_SCOPE_SHARED,
+	/* Per-channel stats */
+	IFLA_XDP_XSTATS_SCOPE_CHANNEL,
+
+	__IFLA_XDP_XSTATS_SCOPE_CNT,
+};
+
+/* Embedded into IFLA_XDP_XSTATS_SCOPE_SHARED/IFLA_XDP_XSTATS_SCOPE_CHANNEL */
+enum {
+	/* Padding for 64-bit alignment */
+	IFLA_XDP_XSTATS_UNSPEC,
+	/* Number of frames passed to bpf_prog_run_xdp() */
+	IFLA_XDP_XSTATS_PACKETS,
+	/* Number of bytes went through bpf_prog_run_xdp() */
+	IFLA_XDP_XSTATS_BYTES,
+	/* Number of general XDP errors if driver counts them together */
+	IFLA_XDP_XSTATS_ERRORS,
+	/* Number of %XDP_ABORTED returns */
+	IFLA_XDP_XSTATS_ABORTED,
+	/* Number of %XDP_DROP returns */
+	IFLA_XDP_XSTATS_DROP,
+	/* Number of returns of unallowed values (i.e. not XDP_*) */
+	IFLA_XDP_XSTATS_INVALID,
+	/* Number of %XDP_PASS returns */
+	IFLA_XDP_XSTATS_PASS,
+	/* Number of successfully performed %XDP_REDIRECT requests */
+	IFLA_XDP_XSTATS_REDIRECT,
+	/* Number of failed %XDP_REDIRECT requests */
+	IFLA_XDP_XSTATS_REDIRECT_ERRORS,
+	/* Number of successfully performed %XDP_TX requests */
+	IFLA_XDP_XSTATS_TX,
+	/* Number of failed %XDP_TX requests */
+	IFLA_XDP_XSTATS_TX_ERRORS,
+	/* Number of successfully transmitted XDP/XSK frames */
+	IFLA_XDP_XSTATS_XMIT_PACKETS,
+	/* Number of successfully transmitted XDP/XSK bytes */
+	IFLA_XDP_XSTATS_XMIT_BYTES,
+	/* Number of XDP/XSK frames failed to transmit */
+	IFLA_XDP_XSTATS_XMIT_ERRORS,
+	/* Number of XDP/XSK queue being full at the moment of transmission */
+	IFLA_XDP_XSTATS_XMIT_FULL,
+
+	__IFLA_XDP_XSTATS_CNT,
+};
+
+#define IFLA_XDP_XSTATS_START		(IFLA_XDP_XSTATS_UNSPEC + 1)
+#define IFLA_XDP_XSTATS_MAX		(__IFLA_XDP_XSTATS_CNT - 1)
 
 /* XDP section */
 

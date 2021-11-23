@@ -1327,6 +1327,13 @@ struct netdev_net_notifier {
  *	queue id bound to an AF_XDP socket. The flags field specifies if
  *	only RX, only Tx, or both should be woken up using the flags
  *	XDP_WAKEUP_RX and XDP_WAKEUP_TX.
+ * int (*ndo_get_xdp_stats_nch)(const struct net_device *dev, u32 attr_id);
+ *	Get the number of channels which ndo_get_xdp_stats will return
+ *	statistics for.
+ *
+ * int (*ndo_get_xdp_stats)(const struct net_device *dev, u32 attr_id,
+ *			    void *attr_data);
+ *	Get attr_id XDP statistics into the attr_data pointer.
  * struct devlink_port *(*ndo_get_devlink_port)(struct net_device *dev);
  *	Get devlink port instance associated with a given netdev.
  *	Called with a reference on the netdevice and devlink locks only,
@@ -1550,6 +1557,11 @@ struct net_device_ops {
 							  struct xdp_buff *xdp);
 	int			(*ndo_xsk_wakeup)(struct net_device *dev,
 						  u32 queue_id, u32 flags);
+	int			(*ndo_get_xdp_stats_nch)(const struct net_device *dev,
+							 u32 attr_id);
+	int			(*ndo_get_xdp_stats)(const struct net_device *dev,
+						     u32 attr_id,
+						     void *attr_data);
 	struct devlink_port *	(*ndo_get_devlink_port)(struct net_device *dev);
 	int			(*ndo_tunnel_ctl)(struct net_device *dev,
 						  struct ip_tunnel_parm *p, int cmd);

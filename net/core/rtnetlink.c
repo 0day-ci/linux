@@ -5107,6 +5107,262 @@ static int rtnl_get_offload_stats_size(const struct net_device *dev)
 	return nla_size;
 }
 
+#define IFLA_XDP_XSTATS_NUM		(__IFLA_XDP_XSTATS_CNT - \
+					 IFLA_XDP_XSTATS_START)
+
+static_assert(sizeof(struct ifla_xdp_stats) / sizeof(__u64) ==
+	      IFLA_XDP_XSTATS_NUM);
+
+static u32 rtnl_get_xdp_stats_num(u32 attr_id)
+{
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		return IFLA_XDP_XSTATS_NUM;
+	default:
+		return 0;
+	}
+}
+
+static bool rtnl_get_xdp_stats_xdpxsk(struct sk_buff *skb, u32 ch,
+				      const void *attr_data)
+{
+	const struct ifla_xdp_stats *xstats = attr_data;
+
+	xstats += ch;
+
+	if (nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_PACKETS, xstats->packets,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_BYTES, xstats->bytes,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_ERRORS, xstats->errors,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_ABORTED, xstats->aborted,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_DROP, xstats->drop,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_INVALID, xstats->invalid,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_PASS, xstats->pass,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_REDIRECT, xstats->redirect,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_REDIRECT_ERRORS,
+			      xstats->redirect_errors,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_TX, xstats->tx,
+			      IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_TX_ERRORS,
+			      xstats->tx_errors, IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_XMIT_PACKETS,
+			      xstats->xmit_packets, IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_XMIT_BYTES,
+			      xstats->xmit_bytes, IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_XMIT_ERRORS,
+			      xstats->xmit_errors, IFLA_XDP_XSTATS_UNSPEC) ||
+	    nla_put_u64_64bit(skb, IFLA_XDP_XSTATS_XMIT_FULL,
+			      xstats->xmit_full, IFLA_XDP_XSTATS_UNSPEC))
+		return false;
+
+	return true;
+}
+
+static bool rtnl_get_xdp_stats_one(struct sk_buff *skb, u32 attr_id,
+				   u32 scope_id, u32 ch, const void *attr_data)
+{
+	struct nlattr *scope;
+
+	scope = nla_nest_start_noflag(skb, scope_id);
+	if (!scope)
+		return false;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		if (!rtnl_get_xdp_stats_xdpxsk(skb, ch, attr_data))
+			goto fail;
+
+		break;
+	default:
+fail:
+		nla_nest_cancel(skb, scope);
+
+		return false;
+	}
+
+	nla_nest_end(skb, scope);
+
+	return true;
+}
+
+static bool rtnl_get_xdp_stats(struct sk_buff *skb,
+			       const struct net_device *dev,
+			       int *idxattr, int *prividx)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+	struct nlattr *xstats, *type = NULL;
+	u32 saved_ch = *prividx & U16_MAX;
+	u32 saved_attr = *prividx >> 16;
+	bool nuke_xstats = true;
+	u32 attr_id, ch = 0;
+	int ret;
+
+	if (!ops || !ops->ndo_get_xdp_stats)
+		goto nodata;
+
+	*idxattr = IFLA_STATS_LINK_XDP_XSTATS;
+
+	xstats = nla_nest_start_noflag(skb, IFLA_STATS_LINK_XDP_XSTATS);
+	if (!xstats)
+		return false;
+
+	for (attr_id = IFLA_XDP_XSTATS_TYPE_START;
+	     attr_id < __IFLA_XDP_XSTATS_TYPE_CNT;
+	     attr_id++) {
+		u32 nstat, scope_id, nch;
+		bool nuke_type = true;
+		void *attr_data;
+		size_t size;
+
+		if (attr_id > saved_attr)
+			saved_ch = 0;
+		if (attr_id < saved_attr)
+			continue;
+
+		nstat = rtnl_get_xdp_stats_num(attr_id);
+		if (!nstat)
+			continue;
+
+		scope_id = IFLA_XDP_XSTATS_SCOPE_SHARED;
+		nch = 1;
+
+		if (!ops->ndo_get_xdp_stats_nch)
+			goto shared;
+
+		ret = ops->ndo_get_xdp_stats_nch(dev, attr_id);
+		if (ret == -EOPNOTSUPP || ret == -ENODATA)
+			continue;
+		if (ret < 0)
+			goto out;
+		if (!ret)
+			goto shared;
+
+		scope_id = IFLA_XDP_XSTATS_SCOPE_CHANNEL;
+		nch = ret;
+
+shared:
+		size = array3_size(nch, nstat, sizeof(__u64));
+		if (unlikely(size == SIZE_MAX)) {
+			ret = -EOVERFLOW;
+			goto out;
+		}
+
+		attr_data = kzalloc(size, GFP_KERNEL);
+		if (!attr_data) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		ret = ops->ndo_get_xdp_stats(dev, attr_id, attr_data);
+		if (ret == -EOPNOTSUPP || ret == -ENODATA)
+			goto kfree_cont;
+		if (ret) {
+kfree_out:
+			kfree(attr_data);
+			goto out;
+		}
+
+		ret = -EMSGSIZE;
+
+		type = nla_nest_start_noflag(skb, attr_id);
+		if (!type)
+			goto kfree_out;
+
+		for (ch = saved_ch; ch < nch; ch++)
+			if (!rtnl_get_xdp_stats_one(skb, attr_id, scope_id,
+						    ch, attr_data)) {
+				if (nuke_type)
+					nla_nest_cancel(skb, type);
+				else
+					nla_nest_end(skb, type);
+
+				goto kfree_out;
+			} else {
+				nuke_xstats = false;
+				nuke_type = false;
+			}
+
+		nla_nest_end(skb, type);
+kfree_cont:
+		kfree(attr_data);
+	}
+
+	ret = 0;
+
+out:
+	if (nuke_xstats)
+		nla_nest_cancel(skb, xstats);
+	else
+		nla_nest_end(skb, xstats);
+
+	if (ret && ret != -EOPNOTSUPP && ret != -ENODATA) {
+		/* If the driver has 60+ queues, we can run out of skb
+		 * tailroom even when putting stats for one type. Save
+		 * channel number in prividx to resume from it next time
+		 * rather than restaring the whole type and running into
+		 * the same problem again.
+		 */
+		*prividx = (attr_id << 16) | ch;
+		return false;
+	}
+
+	*prividx = 0;
+nodata:
+	*idxattr = 0;
+
+	return true;
+}
+
+static size_t rtnl_get_xdp_stats_size(const struct net_device *dev)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+	size_t size = 0;
+	u32 attr_id;
+
+	if (!ops || !ops->ndo_get_xdp_stats)
+		return 0;
+
+	for (attr_id = IFLA_XDP_XSTATS_TYPE_START;
+	     attr_id < __IFLA_XDP_XSTATS_TYPE_CNT;
+	     attr_id++) {
+		u32 nstat = rtnl_get_xdp_stats_num(attr_id);
+		u32 nch = 1;
+		int ret;
+
+		if (!nstat)
+			continue;
+
+		if (!ops->ndo_get_xdp_stats_nch)
+			goto shared;
+
+		ret = ops->ndo_get_xdp_stats_nch(dev, attr_id);
+		if (ret < 0)
+			continue;
+		if (ret > 0)
+			nch = ret;
+
+shared:
+		size += nla_total_size(0) +	/* IFLA_XDP_XSTATS_TYPE_* */
+			(nla_total_size(0) +	/* IFLA_XDP_XSTATS_SCOPE_* */
+			 nla_total_size_64bit(sizeof(__u64)) * nstat) * nch;
+	}
+
+	if (size)
+		size += nla_total_size(0);	/* IFLA_STATS_LINK_XDP_XSTATS */
+
+	return size;
+}
+
 static int rtnl_fill_statsinfo(struct sk_buff *skb, struct net_device *dev,
 			       int type, u32 pid, u32 seq, u32 change,
 			       unsigned int flags, unsigned int filter_mask,
@@ -5243,6 +5499,11 @@ static int rtnl_fill_statsinfo(struct sk_buff *skb, struct net_device *dev,
 		*idxattr = 0;
 	}
 
+	if (stats_attr_valid(filter_mask, IFLA_STATS_LINK_XDP_XSTATS,
+			     *idxattr) &&
+	    !rtnl_get_xdp_stats(skb, dev, idxattr, prividx))
+		goto nla_put_failure;
+
 	nlmsg_end(skb, nlh);
 
 	return 0;
@@ -5317,6 +5578,9 @@ static size_t if_nlmsg_stats_size(const struct net_device *dev,
 		}
 		rcu_read_unlock();
 	}
+
+	if (stats_attr_valid(filter_mask, IFLA_STATS_LINK_XDP_XSTATS, 0))
+		size += rtnl_get_xdp_stats_size(dev);
 
 	return size;
 }
