@@ -536,7 +536,6 @@
 #define CS35L41_NUM_OTP_MAPS		5
 
 #define CS35L41_VALID_PDATA		0x80000000
-#define CS35L41_NUM_SUPPLIES            2
 
 #define CS35L41_SCLK_MSTR_MASK		0x10
 #define CS35L41_SCLK_MSTR_SHIFT		4
@@ -724,6 +723,8 @@
 #define CS35L41_SPI_MAX_FREQ		4000000
 #define CS35L41_REGSTRIDE		4
 
+#define CS35L41_NUM_SUPPLIES		2
+
 enum cs35l41_clk_ids {
 	CS35L41_CLKID_SCLK = 0,
 	CS35L41_CLKID_LRCLK = 1,
@@ -761,5 +762,7 @@ struct cs35l41_otp_map_element_t {
 
 extern struct regmap_config cs35l41_regmap_i2c;
 extern struct regmap_config cs35l41_regmap_spi;
+
+int cs35l41_init_supplies(struct device *dev, struct regulator_bulk_data *supplies);
 
 #endif /* __CS35L41_H */

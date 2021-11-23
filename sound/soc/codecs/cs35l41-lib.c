@@ -7,6 +7,7 @@
 // Author: David Rhodes <david.rhodes@cirrus.com>
 // Author: Lucas Tanure <lucas.tanure@cirrus.com>
 
+#include <linux/regulator/consumer.h>
 #include <sound/cs35l41.h>
 
 const struct reg_default cs35l41_reg[] = {
@@ -690,6 +691,11 @@ const struct cs35l41_otp_map_element_t cs35l41_otp_map_map[CS35L41_NUM_OTP_MAPS]
 	},
 };
 
+static const char * const cs35l41_supplies[CS35L41_NUM_SUPPLIES] = {
+	"VA",
+	"VP",
+};
+
 struct regmap_config cs35l41_regmap_i2c = {
 	.reg_bits = 32,
 	.val_bits = 32,
@@ -720,3 +726,26 @@ struct regmap_config cs35l41_regmap_spi = {
 	.precious_reg = cs35l41_precious_reg,
 	.cache_type = REGCACHE_RBTREE,
 };
+
+int cs35l41_init_supplies(struct device *dev, struct regulator_bulk_data *supplies)
+{
+	int i, ret;
+
+	for (i = 0; i < CS35L41_NUM_SUPPLIES; i++)
+		supplies[i].supply = cs35l41_supplies[i];
+
+	ret = devm_regulator_bulk_get(dev, CS35L41_NUM_SUPPLIES, supplies);
+	if (ret != 0) {
+		dev_err(dev, "Failed to request core supplies: %d\n", ret);
+		return ret;
+	}
+
+	ret = regulator_bulk_enable(CS35L41_NUM_SUPPLIES, supplies);
+	if (ret != 0) {
+		dev_err(dev, "Failed to enable core supplies: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+

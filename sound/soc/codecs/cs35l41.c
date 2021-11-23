@@ -24,11 +24,6 @@
 
 #include "cs35l41.h"
 
-static const char * const cs35l41_supplies[CS35L41_NUM_SUPPLIES] = {
-	"VA",
-	"VP",
-};
-
 struct cs35l41_pll_sysclk_config {
 	int freq;
 	int clk_cfg;
@@ -1526,7 +1521,7 @@ err_dsp:
 int cs35l41_probe(struct cs35l41_private *cs35l41,
 		  struct cs35l41_platform_data *pdata)
 {
-	u32 regid, reg_revid, i, mtl_revid, int_status, chipid_match;
+	u32 regid, reg_revid, mtl_revid, int_status, chipid_match;
 	int irq_pol = 0;
 	int ret;
 
@@ -1538,21 +1533,9 @@ int cs35l41_probe(struct cs35l41_private *cs35l41,
 			return ret;
 	}
 
-	for (i = 0; i < CS35L41_NUM_SUPPLIES; i++)
-		cs35l41->supplies[i].supply = cs35l41_supplies[i];
-
-	ret = devm_regulator_bulk_get(cs35l41->dev, CS35L41_NUM_SUPPLIES,
-				      cs35l41->supplies);
-	if (ret != 0) {
-		dev_err(cs35l41->dev, "Failed to request core supplies: %d\n", ret);
+	ret = cs35l41_init_supplies(cs35l41->dev, cs35l41->supplies);
+	if (ret)
 		return ret;
-	}
-
-	ret = regulator_bulk_enable(CS35L41_NUM_SUPPLIES, cs35l41->supplies);
-	if (ret != 0) {
-		dev_err(cs35l41->dev, "Failed to enable core supplies: %d\n", ret);
-		return ret;
-	}
 
 	/* returning NULL can be an option if in stereo mode */
 	cs35l41->reset_gpio = devm_gpiod_get_optional(cs35l41->dev, "reset",
