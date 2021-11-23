@@ -6,6 +6,7 @@
 #include <linux/livepatch.h>
 #include <linux/audit.h>
 #include <linux/tick.h>
+#include <linux/uaccess-buffer.h>
 
 #include "common.h"
 
@@ -88,6 +89,8 @@ __syscall_enter_from_user_work(struct pt_regs *regs, long syscall)
 
 	if (work & SYSCALL_WORK_ENTER)
 		syscall = syscall_trace_enter(regs, syscall, work);
+
+	uaccess_buffer_syscall_entry();
 
 	return syscall;
 }
@@ -197,14 +200,17 @@ static unsigned long exit_to_user_mode_loop(struct pt_regs *regs,
 static void exit_to_user_mode_prepare(struct pt_regs *regs)
 {
 	unsigned long ti_work = READ_ONCE(current_thread_info()->flags);
+	bool uaccess_buffer_pending;
 
 	lockdep_assert_irqs_disabled();
 
 	/* Flush pending rcuog wakeup before the last need_resched() check */
 	tick_nohz_user_enter_prepare();
 
+	uaccess_buffer_pending = uaccess_buffer_pre_exit_loop();
 	if (unlikely(ti_work & EXIT_TO_USER_MODE_WORK))
 		ti_work = exit_to_user_mode_loop(regs, ti_work);
+	uaccess_buffer_post_exit_loop(uaccess_buffer_pending);
 
 	arch_exit_to_user_mode_prepare(regs, ti_work);
 
@@ -271,6 +277,7 @@ static void syscall_exit_to_user_mode_prepare(struct pt_regs *regs)
 			local_irq_enable();
 	}
 
+	uaccess_buffer_syscall_exit();
 	rseq_syscall(regs);
 
 	/*

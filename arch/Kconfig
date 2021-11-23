@@ -31,6 +31,7 @@ config HOTPLUG_SMT
 	bool
 
 config GENERIC_ENTRY
+       select HAVE_ARCH_UACCESS_BUFFER
        bool
 
 config KPROBES
