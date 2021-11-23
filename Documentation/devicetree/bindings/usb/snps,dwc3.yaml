@@ -318,6 +318,12 @@ properties:
     items:
       enum: [1, 4, 8, 16, 32, 64, 128, 256]
 
+  connector:
+    type: object
+    $ref: /connector/usb-connector.yaml#
+    description:
+      Connector for dual role switch, especially for "eud-usb-c-connector"
+
 unevaluatedProperties: false
 
 required:
