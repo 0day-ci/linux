@@ -125,9 +125,10 @@ static void __sched_core_set(struct task_struct *p, unsigned long cookie)
 
 /* Called from prctl interface: PR_SCHED_CORE */
 int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
-			 unsigned long uaddr)
+			 unsigned long arg)
 {
-	unsigned long cookie = 0, id = 0;
+	unsigned long cookie = 0, id = 0, uaddr = 0;
+	pid_t pid_share = -1;
 	struct task_struct *task, *p;
 	struct pid *grp;
 	int err = 0;
@@ -140,8 +141,19 @@ int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
 	BUILD_BUG_ON(PR_SCHED_CORE_SCOPE_PROCESS_GROUP != PIDTYPE_PGID);
 
 	if (type > PIDTYPE_PGID || cmd >= PR_SCHED_CORE_MAX || pid < 0 ||
-	    (cmd != PR_SCHED_CORE_GET && uaddr))
+	    (cmd != PR_SCHED_CORE_GET && cmd != PR_SCHED_CORE_SHARE && arg))
 		return -EINVAL;
+
+	switch (cmd) {
+	case PR_SCHED_CORE_GET:
+		uaddr = arg;
+		break;
+	case PR_SCHED_CORE_SHARE:
+		pid_share = arg;
+		if (pid_share < 0)
+			return -EINVAL;
+		break;
+	}
 
 	rcu_read_lock();
 	task = task_by_pid(pid);
@@ -195,6 +207,20 @@ int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
 		cookie = sched_core_clone_cookie(task);
 		__sched_core_set(current, cookie);
 		goto out;
+
+	case PR_SCHED_CORE_SHARE:
+		rcu_read_lock();
+		p = task_by_pid(pid_share);
+		if (!p)
+			err = -ESRCH;
+		else if (!ptrace_may_access(p, PTRACE_MODE_READ_REALCREDS))
+			err = -EPERM;
+		if (!err)
+			cookie = sched_core_clone_cookie(p);
+		rcu_read_unlock();
+		if (err)
+			goto out;
+		break;
 
 	default:
 		err = -EINVAL;
