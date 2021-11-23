@@ -2481,6 +2481,7 @@ static int ice_xdp_alloc_setup_rings(struct ice_vsi *vsi)
 		xdp_ring->next_rs = ICE_TX_THRESH - 1;
 		xdp_ring->dev = dev;
 		xdp_ring->count = vsi->num_tx_desc;
+		xdp_ring->xdp_stats = vsi->xdp_stats + i;
 		WRITE_ONCE(vsi->xdp_rings[i], xdp_ring);
 		if (ice_setup_tx_ring(xdp_ring))
 			goto free_xdp_rings;
@@ -2834,6 +2835,19 @@ static int ice_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 					  xdp->xsk.queue_id);
 	default:
 		return -EINVAL;
+	}
+}
+
+static int ice_get_xdp_stats_nch(const struct net_device *dev, u32 attr_id)
+{
+	const struct ice_netdev_priv *np = netdev_priv(dev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+	case IFLA_XDP_XSTATS_TYPE_XSK:
+		return np->vsi->alloc_xdp_stats;
+	default:
+		return -EOPNOTSUPP;
 	}
 }
 
@@ -3280,6 +3294,7 @@ static int ice_cfg_netdev(struct ice_vsi *vsi)
 	ice_set_netdev_features(netdev);
 
 	ice_set_ops(netdev);
+	netdev->xstats = vsi->xdp_stats;
 
 	if (vsi->type == ICE_VSI_PF) {
 		SET_NETDEV_DEV(netdev, ice_pf_to_dev(vsi->back));
@@ -8608,4 +8623,6 @@ static const struct net_device_ops ice_netdev_ops = {
 	.ndo_bpf = ice_xdp,
 	.ndo_xdp_xmit = ice_xdp_xmit,
 	.ndo_xsk_wakeup = ice_xsk_wakeup,
+	.ndo_get_xdp_stats_nch = ice_get_xdp_stats_nch,
+	.ndo_get_xdp_stats = xdp_get_drv_stats_generic,
 };

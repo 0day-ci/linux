@@ -532,19 +532,25 @@ ice_rx_frame_truesize(struct ice_rx_ring *rx_ring, unsigned int __maybe_unused s
  * @xdp: xdp_buff used as input to the XDP program
  * @xdp_prog: XDP program to run
  * @xdp_ring: ring to be used for XDP_TX action
+ * @lrstats: onstack Rx XDP stats
  *
  * Returns any of ICE_XDP_{PASS, CONSUMED, TX, REDIR}
  */
 static int
 ice_run_xdp(struct ice_rx_ring *rx_ring, struct xdp_buff *xdp,
-	    struct bpf_prog *xdp_prog, struct ice_tx_ring *xdp_ring)
+	    struct bpf_prog *xdp_prog, struct ice_tx_ring *xdp_ring,
+	    struct xdp_rx_drv_stats_local *lrstats)
 {
 	int err;
 	u32 act;
 
+	lrstats->bytes += xdp->data_end - xdp->data;
+	lrstats->packets++;
+
 	act = bpf_prog_run_xdp(xdp_prog, xdp);
 	switch (act) {
 	case XDP_PASS:
+		lrstats->pass++;
 		return ICE_XDP_PASS;
 	case XDP_TX:
 		if (static_branch_unlikely(&ice_xdp_locking_key))
@@ -552,22 +558,31 @@ ice_run_xdp(struct ice_rx_ring *rx_ring, struct xdp_buff *xdp,
 		err = ice_xmit_xdp_ring(xdp->data, xdp->data_end - xdp->data, xdp_ring);
 		if (static_branch_unlikely(&ice_xdp_locking_key))
 			spin_unlock(&xdp_ring->tx_lock);
-		if (err == ICE_XDP_CONSUMED)
+		if (err == ICE_XDP_CONSUMED) {
+			lrstats->tx_errors++;
 			goto out_failure;
+		}
+		lrstats->tx++;
 		return err;
 	case XDP_REDIRECT:
 		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
-		if (err)
+		if (err) {
+			lrstats->redirect_errors++;
 			goto out_failure;
+		}
+		lrstats->redirect++;
 		return ICE_XDP_REDIR;
 	default:
 		bpf_warn_invalid_xdp_action(act);
-		fallthrough;
+		lrstats->invalid++;
+		goto out_failure;
 	case XDP_ABORTED:
+		lrstats->aborted++;
 out_failure:
 		trace_xdp_exception(rx_ring->netdev, xdp_prog, act);
-		fallthrough;
+		return ICE_XDP_CONSUMED;
 	case XDP_DROP:
+		lrstats->drop++;
 		return ICE_XDP_CONSUMED;
 	}
 }
@@ -626,6 +641,9 @@ ice_xdp_xmit(struct net_device *dev, int n, struct xdp_frame **frames,
 
 	if (static_branch_unlikely(&ice_xdp_locking_key))
 		spin_unlock(&xdp_ring->tx_lock);
+
+	if (unlikely(nxmit < n))
+		xdp_update_tx_drv_err(&xdp_ring->xdp_stats->xdp_tx, n - nxmit);
 
 	return nxmit;
 }
@@ -1089,6 +1107,7 @@ int ice_clean_rx_irq(struct ice_rx_ring *rx_ring, int budget)
 {
 	unsigned int total_rx_bytes = 0, total_rx_pkts = 0, frame_sz = 0;
 	u16 cleaned_count = ICE_DESC_UNUSED(rx_ring);
+	struct xdp_rx_drv_stats_local lrstats = { };
 	unsigned int offset = rx_ring->rx_offset;
 	struct ice_tx_ring *xdp_ring = NULL;
 	unsigned int xdp_res, xdp_xmit = 0;
@@ -1173,7 +1192,8 @@ int ice_clean_rx_irq(struct ice_rx_ring *rx_ring, int budget)
 		if (!xdp_prog)
 			goto construct_skb;
 
-		xdp_res = ice_run_xdp(rx_ring, &xdp, xdp_prog, xdp_ring);
+		xdp_res = ice_run_xdp(rx_ring, &xdp, xdp_prog, xdp_ring,
+				      &lrstats);
 		if (!xdp_res)
 			goto construct_skb;
 		if (xdp_res & (ICE_XDP_TX | ICE_XDP_REDIR)) {
@@ -1254,6 +1274,7 @@ construct_skb:
 	rx_ring->skb = skb;
 
 	ice_update_rx_ring_stats(rx_ring, total_rx_pkts, total_rx_bytes);
+	xdp_update_rx_drv_stats(&rx_ring->xdp_stats->xdp_rx, &lrstats);
 
 	/* guarantee a trip back through this routine if there was a failure */
 	return failure ? budget : (int)total_rx_pkts;

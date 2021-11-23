@@ -258,6 +258,8 @@ static void ice_clean_xdp_irq(struct ice_tx_ring *xdp_ring)
 		xdp_ring->next_dd = ICE_TX_THRESH - 1;
 	xdp_ring->next_to_clean = ntc;
 	ice_update_tx_ring_stats(xdp_ring, total_pkts, total_bytes);
+	xdp_update_tx_drv_stats(&xdp_ring->xdp_stats->xdp_tx, total_pkts,
+				total_bytes);
 }
 
 /**
@@ -277,6 +279,7 @@ int ice_xmit_xdp_ring(void *data, u16 size, struct ice_tx_ring *xdp_ring)
 		ice_clean_xdp_irq(xdp_ring);
 
 	if (!unlikely(ICE_DESC_UNUSED(xdp_ring))) {
+		xdp_update_tx_drv_full(&xdp_ring->xdp_stats->xdp_tx);
 		xdp_ring->tx_stats.tx_busy++;
 		return ICE_XDP_CONSUMED;
 	}

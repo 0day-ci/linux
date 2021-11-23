@@ -284,9 +284,9 @@ struct ice_rx_ring {
 	struct ice_rxq_stats rx_stats;
 	struct ice_q_stats	stats;
 	struct u64_stats_sync syncp;
+	struct xdp_drv_stats *xdp_stats;
 
-	struct rcu_head rcu;		/* to avoid race on free */
-	/* CL4 - 3rd cacheline starts here */
+	/* CL4 - 4rd cacheline starts here */
 	struct ice_channel *ch;
 	struct bpf_prog *xdp_prog;
 	struct ice_tx_ring *xdp_ring;
@@ -298,6 +298,9 @@ struct ice_rx_ring {
 	u8 dcb_tc;			/* Traffic class of ring */
 	u8 ptp_rx;
 	u8 flags;
+
+	/* CL5 - 5th cacheline starts here */
+	struct rcu_head rcu;		/* to avoid race on free */
 } ____cacheline_internodealigned_in_smp;
 
 struct ice_tx_ring {
@@ -324,13 +327,16 @@ struct ice_tx_ring {
 	/* stats structs */
 	struct ice_q_stats	stats;
 	struct u64_stats_sync syncp;
-	struct ice_txq_stats tx_stats;
+	struct xdp_drv_stats *xdp_stats;
 
 	/* CL3 - 3rd cacheline starts here */
+	struct ice_txq_stats tx_stats;
 	struct rcu_head rcu;		/* to avoid race on free */
 	DECLARE_BITMAP(xps_state, ICE_TX_NBITS);	/* XPS Config State */
 	struct ice_channel *ch;
 	struct ice_ptp_tx *tx_tstamps;
+
+	/* CL4 - 4th cacheline starts here */
 	spinlock_t tx_lock;
 	u32 txq_teid;			/* Added Tx queue TEID */
 #define ICE_TX_FLAGS_RING_XDP		BIT(0)

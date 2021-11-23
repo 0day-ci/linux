@@ -454,42 +454,58 @@ ice_construct_skb_zc(struct ice_rx_ring *rx_ring, struct xdp_buff **xdp_arr)
  * @xdp: xdp_buff used as input to the XDP program
  * @xdp_prog: XDP program to run
  * @xdp_ring: ring to be used for XDP_TX action
+ * @lrstats: onstack Rx XDP stats
  *
  * Returns any of ICE_XDP_{PASS, CONSUMED, TX, REDIR}
  */
 static int
 ice_run_xdp_zc(struct ice_rx_ring *rx_ring, struct xdp_buff *xdp,
-	       struct bpf_prog *xdp_prog, struct ice_tx_ring *xdp_ring)
+	       struct bpf_prog *xdp_prog, struct ice_tx_ring *xdp_ring,
+	       struct xdp_rx_drv_stats_local *lrstats)
 {
 	int err, result = ICE_XDP_PASS;
 	u32 act;
+
+	lrstats->bytes += xdp->data_end - xdp->data;
+	lrstats->packets++;
 
 	act = bpf_prog_run_xdp(xdp_prog, xdp);
 
 	if (likely(act == XDP_REDIRECT)) {
 		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
-		if (err)
+		if (err) {
+			lrstats->redirect_errors++;
 			goto out_failure;
+		}
+		lrstats->redirect++;
 		return ICE_XDP_REDIR;
 	}
 
 	switch (act) {
 	case XDP_PASS:
+		lrstats->pass++;
 		break;
 	case XDP_TX:
 		result = ice_xmit_xdp_buff(xdp, xdp_ring);
-		if (result == ICE_XDP_CONSUMED)
+		if (result == ICE_XDP_CONSUMED) {
+			lrstats->tx_errors++;
 			goto out_failure;
+		}
+		lrstats->tx++;
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(act);
-		fallthrough;
+		lrstats->invalid++;
+		goto out_failure;
 	case XDP_ABORTED:
+		lrstats->aborted++;
 out_failure:
 		trace_xdp_exception(rx_ring->netdev, xdp_prog, act);
-		fallthrough;
+		result = ICE_XDP_CONSUMED;
+		break;
 	case XDP_DROP:
 		result = ICE_XDP_CONSUMED;
+		lrstats->drop++;
 		break;
 	}
 
@@ -507,6 +523,7 @@ int ice_clean_rx_irq_zc(struct ice_rx_ring *rx_ring, int budget)
 {
 	unsigned int total_rx_bytes = 0, total_rx_packets = 0;
 	u16 cleaned_count = ICE_DESC_UNUSED(rx_ring);
+	struct xdp_rx_drv_stats_local lrstats = { };
 	struct ice_tx_ring *xdp_ring;
 	unsigned int xdp_xmit = 0;
 	struct bpf_prog *xdp_prog;
@@ -548,7 +565,8 @@ int ice_clean_rx_irq_zc(struct ice_rx_ring *rx_ring, int budget)
 		xsk_buff_set_size(*xdp, size);
 		xsk_buff_dma_sync_for_cpu(*xdp, rx_ring->xsk_pool);
 
-		xdp_res = ice_run_xdp_zc(rx_ring, *xdp, xdp_prog, xdp_ring);
+		xdp_res = ice_run_xdp_zc(rx_ring, *xdp, xdp_prog, xdp_ring,
+					 &lrstats);
 		if (xdp_res) {
 			if (xdp_res & (ICE_XDP_TX | ICE_XDP_REDIR))
 				xdp_xmit |= xdp_res;
@@ -598,6 +616,7 @@ int ice_clean_rx_irq_zc(struct ice_rx_ring *rx_ring, int budget)
 
 	ice_finalize_xdp_rx(xdp_ring, xdp_xmit);
 	ice_update_rx_ring_stats(rx_ring, total_rx_packets, total_rx_bytes);
+	xdp_update_rx_drv_stats(&rx_ring->xdp_stats->xsk_rx, &lrstats);
 
 	if (xsk_uses_need_wakeup(rx_ring->xsk_pool)) {
 		if (failure || rx_ring->next_to_clean == rx_ring->next_to_use)
@@ -629,6 +648,7 @@ static bool ice_xmit_zc(struct ice_tx_ring *xdp_ring, int budget)
 		struct ice_tx_buf *tx_buf;
 
 		if (unlikely(!ICE_DESC_UNUSED(xdp_ring))) {
+			xdp_update_tx_drv_full(&xdp_ring->xdp_stats->xsk_tx);
 			xdp_ring->tx_stats.tx_busy++;
 			work_done = false;
 			break;
@@ -686,11 +706,11 @@ ice_clean_xdp_tx_buf(struct ice_tx_ring *xdp_ring, struct ice_tx_buf *tx_buf)
  */
 bool ice_clean_tx_irq_zc(struct ice_tx_ring *xdp_ring, int budget)
 {
-	int total_packets = 0, total_bytes = 0;
 	s16 ntc = xdp_ring->next_to_clean;
+	u32 xdp_frames = 0, xdp_bytes = 0;
+	u32 xsk_frames = 0, xsk_bytes = 0;
 	struct ice_tx_desc *tx_desc;
 	struct ice_tx_buf *tx_buf;
-	u32 xsk_frames = 0;
 	bool xmit_done;
 
 	tx_desc = ICE_TX_DESC(xdp_ring, ntc);
@@ -702,13 +722,14 @@ bool ice_clean_tx_irq_zc(struct ice_tx_ring *xdp_ring, int budget)
 		      cpu_to_le64(ICE_TX_DESC_DTYPE_DESC_DONE)))
 			break;
 
-		total_bytes += tx_buf->bytecount;
-		total_packets++;
-
 		if (tx_buf->raw_buf) {
 			ice_clean_xdp_tx_buf(xdp_ring, tx_buf);
 			tx_buf->raw_buf = NULL;
+
+			xdp_bytes += tx_buf->bytecount;
+			xdp_frames++;
 		} else {
+			xsk_bytes += tx_buf->bytecount;
 			xsk_frames++;
 		}
 
@@ -736,7 +757,13 @@ bool ice_clean_tx_irq_zc(struct ice_tx_ring *xdp_ring, int budget)
 	if (xsk_uses_need_wakeup(xdp_ring->xsk_pool))
 		xsk_set_tx_need_wakeup(xdp_ring->xsk_pool);
 
-	ice_update_tx_ring_stats(xdp_ring, total_packets, total_bytes);
+	ice_update_tx_ring_stats(xdp_ring, xdp_frames + xsk_frames,
+				 xdp_bytes + xsk_bytes);
+	xdp_update_tx_drv_stats(&xdp_ring->xdp_stats->xdp_tx, xdp_frames,
+				xdp_bytes);
+	xdp_update_tx_drv_stats(&xdp_ring->xdp_stats->xsk_tx, xsk_frames,
+				xsk_bytes);
+
 	xmit_done = ice_xmit_zc(xdp_ring, ICE_DFLT_IRQ_WORK);
 
 	return budget > 0 && xmit_done;

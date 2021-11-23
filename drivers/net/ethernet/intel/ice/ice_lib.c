@@ -73,6 +73,7 @@ static int ice_vsi_alloc_arrays(struct ice_vsi *vsi)
 {
 	struct ice_pf *pf = vsi->back;
 	struct device *dev;
+	u32 i;
 
 	dev = ice_pf_to_dev(pf);
 	if (vsi->type == ICE_VSI_CHNL)
@@ -115,8 +116,23 @@ static int ice_vsi_alloc_arrays(struct ice_vsi *vsi)
 	if (!vsi->af_xdp_zc_qps)
 		goto err_zc_qps;
 
+	vsi->alloc_xdp_stats = max_t(u16, vsi->alloc_rxq, num_possible_cpus());
+
+	vsi->xdp_stats = kcalloc(vsi->alloc_xdp_stats, sizeof(*vsi->xdp_stats),
+				 GFP_KERNEL);
+	if (!vsi->xdp_stats)
+		goto err_xdp_stats;
+
+	for (i = 0; i < vsi->alloc_xdp_stats; i++)
+		xdp_init_drv_stats(vsi->xdp_stats + i);
+
 	return 0;
 
+err_xdp_stats:
+	vsi->alloc_xdp_stats = 0;
+
+	bitmap_free(vsi->af_xdp_zc_qps);
+	vsi->af_xdp_zc_qps = NULL;
 err_zc_qps:
 	devm_kfree(dev, vsi->q_vectors);
 err_vectors:
@@ -316,6 +332,10 @@ static void ice_vsi_free_arrays(struct ice_vsi *vsi)
 	struct device *dev;
 
 	dev = ice_pf_to_dev(pf);
+
+	kfree(vsi->xdp_stats);
+	vsi->xdp_stats = NULL;
+	vsi->alloc_xdp_stats = 0;
 
 	if (vsi->af_xdp_zc_qps) {
 		bitmap_free(vsi->af_xdp_zc_qps);
@@ -1422,6 +1442,7 @@ static int ice_vsi_alloc_rings(struct ice_vsi *vsi)
 		ring->netdev = vsi->netdev;
 		ring->dev = dev;
 		ring->count = vsi->num_rx_desc;
+		ring->xdp_stats = vsi->xdp_stats + i;
 		WRITE_ONCE(vsi->rx_rings[i], ring);
 	}
 
