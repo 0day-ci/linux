@@ -26,10 +26,33 @@ properties:
   "#size-cells":
     const: 1
 
+  '#nvmem-cell-cells':
+    enum: [0, 1]
+    description:
+      Must be 1 if the transformations has multiple output values.
+      The argument is then the index into the list of output values.
+      For example, if the nvmem cell only specify a base ethernet
+      address the transformation can then create different individual
+      ethernet addresses.
+
   read-only:
     $ref: /schemas/types.yaml#/definitions/flag
     description:
       Mark the provider as read only.
+
+  transformation:
+    description:
+      Transform the content of a NVMEM cell. Sometimes it is necessary
+      to preprocess the content of a cell so it is usable by the NVMEM
+      consumer. There are also cases where one NVMEM cell value can
+      generate a list of values.
+
+      Use one of the NVMEM_T_* prefixed definitions from the header
+      include/dt-bindings/nvmem/nvmem.h.
+
+      Some transformations might have additional arguments.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
 
   wp-gpios:
     description:
@@ -97,6 +120,12 @@ examples:
           speed_bin: speed-bin@c{
               reg = <0xc 0x1>;
               bits = <2 3>;
+          };
+
+          ethernet_base_mac: base-mac-address@100 {
+              #nvmem-cell-cells = <1>;
+              reg = <0x100 0x6>;
+              transformation = <NVMEM_T_ETH_OFFSET 0 1 2 7>;
           };
       };
 
