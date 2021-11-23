@@ -637,7 +637,11 @@ const struct bpf_func_proto bpf_event_output_data_proto =  {
 BPF_CALL_3(bpf_copy_from_user, void *, dst, u32, size,
 	   const void __user *, user_ptr)
 {
-	int ret = copy_from_user(dst, user_ptr, size);
+	/*
+	 * Avoid copy_from_user() here as it may leak information about the BPF
+	 * program to userspace via the uaccess buffer.
+	 */
+	int ret = raw_copy_from_user(dst, user_ptr, size);
 
 	if (unlikely(ret)) {
 		memset(dst, 0, size);

@@ -96,6 +96,7 @@
 #include <linux/scs.h>
 #include <linux/io_uring.h>
 #include <linux/bpf.h>
+#include <linux/uaccess-buffer.h>
 
 #include <asm/pgalloc.h>
 #include <linux/uaccess.h>
@@ -889,6 +890,8 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 
 	if (memcg_charge_kernel_stack(tsk))
 		goto free_stack;
+
+	uaccess_buffer_cancel_log(tsk);
 
 	stack_vm_area = task_stack_vm_area(tsk);
 

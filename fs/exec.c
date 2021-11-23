@@ -65,6 +65,7 @@
 #include <linux/vmalloc.h>
 #include <linux/io_uring.h>
 #include <linux/syscall_user_dispatch.h>
+#include <linux/uaccess-buffer.h>
 
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1313,6 +1314,7 @@ int begin_new_exec(struct linux_binprm * bprm)
 	me->personality &= ~bprm->per_clear;
 
 	clear_syscall_work_syscall_user_dispatch(me);
+	uaccess_buffer_set_descriptor_addr_addr(0);
 
 	/*
 	 * We have to apply CLOEXEC before we change whether the process is
