@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 //
-// cs35l41-tables.c -- CS35L41 ALSA SoC audio driver
+// cs35l41-lib.c -- CS35L41 Common functions for HDA and ASoC Audio drivers
 //
 // Copyright 2017-2021 Cirrus Logic, Inc.
 //
 // Author: David Rhodes <david.rhodes@cirrus.com>
+// Author: Lucas Tanure <lucas.tanure@cirrus.com>
 
-#include "cs35l41.h"
+#include <linux/regmap.h>
+#include <sound/cs35l41.h>
 
 const struct reg_default cs35l41_reg[CS35L41_MAX_CACHE_REG] = {
 	{ CS35L41_PWR_CTRL1,			0x00000000 },
