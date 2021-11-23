@@ -3313,12 +3313,65 @@ static void ena_get_stats64(struct net_device *netdev,
 	stats->tx_errors = 0;
 }
 
+static int ena_get_xdp_stats_nch(const struct net_device *netdev, u32 attr_id)
+{
+	const struct ena_adapter *adapter = netdev_priv(netdev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return adapter->num_io_queues;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int ena_get_xdp_stats(const struct net_device *netdev, u32 attr_id,
+			     void *attr_data)
+{
+	const struct ena_adapter *adapter = netdev_priv(netdev);
+	struct ifla_xdp_stats *xdp_stats = attr_data;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < adapter->num_io_queues; i++) {
+		const struct u64_stats_sync *syncp;
+		const struct ena_stats_rx *stats;
+		u32 start;
+
+		stats = &adapter->rx_ring[i].rx_stats;
+		syncp = &adapter->rx_ring[i].syncp;
+
+		do {
+			start = u64_stats_fetch_begin_irq(syncp);
+
+			xdp_stats->drop = stats->xdp_drop;
+			xdp_stats->pass = stats->xdp_pass;
+			xdp_stats->tx = stats->xdp_tx;
+			xdp_stats->redirect = stats->xdp_redirect;
+			xdp_stats->aborted = stats->xdp_aborted;
+			xdp_stats->invalid = stats->xdp_invalid;
+		} while (u64_stats_fetch_retry_irq(syncp, start));
+
+		xdp_stats++;
+	}
+
+	return 0;
+}
+
 static const struct net_device_ops ena_netdev_ops = {
 	.ndo_open		= ena_open,
 	.ndo_stop		= ena_close,
 	.ndo_start_xmit		= ena_start_xmit,
 	.ndo_select_queue	= ena_select_queue,
 	.ndo_get_stats64	= ena_get_stats64,
+	.ndo_get_xdp_stats_nch	= ena_get_xdp_stats_nch,
+	.ndo_get_xdp_stats	= ena_get_xdp_stats,
 	.ndo_tx_timeout		= ena_tx_timeout,
 	.ndo_change_mtu		= ena_change_mtu,
 	.ndo_set_mac_address	= NULL,
