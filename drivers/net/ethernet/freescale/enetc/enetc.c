@@ -2575,6 +2575,54 @@ struct net_device_stats *enetc_get_stats(struct net_device *ndev)
 	return stats;
 }
 
+int enetc_get_xdp_stats_nch(const struct net_device *ndev, u32 attr_id)
+{
+	const struct enetc_ndev_priv *priv = netdev_priv(ndev);
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		return max(priv->num_rx_rings, priv->num_tx_rings);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+int enetc_get_xdp_stats(const struct net_device *ndev, u32 attr_id,
+			void *attr_data)
+{
+	struct ifla_xdp_stats *xdp_iter, *xdp_stats = attr_data;
+	const struct enetc_ndev_priv *priv = netdev_priv(ndev);
+	const struct enetc_ring_stats *stats;
+	u32 i;
+
+	switch (attr_id) {
+	case IFLA_XDP_XSTATS_TYPE_XDP:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < priv->num_tx_rings; i++) {
+		stats = &priv->tx_ring[i]->stats;
+		xdp_iter = xdp_stats + i;
+
+		xdp_iter->tx = stats->xdp_tx;
+		xdp_iter->tx_errors = stats->xdp_tx_drops;
+	}
+
+	for (i = 0; i < priv->num_rx_rings; i++) {
+		stats = &priv->rx_ring[i]->stats;
+		xdp_iter = xdp_stats + i;
+
+		xdp_iter->drop = stats->xdp_drops;
+		xdp_iter->redirect = stats->xdp_redirect;
+		xdp_iter->redirect_errors = stats->xdp_redirect_failures;
+		xdp_iter->redirect_errors += stats->xdp_redirect_sg;
+	}
+
+	return 0;
+}
+
 static int enetc_set_rss(struct net_device *ndev, int en)
 {
 	struct enetc_ndev_priv *priv = netdev_priv(ndev);

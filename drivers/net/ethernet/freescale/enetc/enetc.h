@@ -389,6 +389,9 @@ void enetc_start(struct net_device *ndev);
 void enetc_stop(struct net_device *ndev);
 netdev_tx_t enetc_xmit(struct sk_buff *skb, struct net_device *ndev);
 struct net_device_stats *enetc_get_stats(struct net_device *ndev);
+int enetc_get_xdp_stats_nch(const struct net_device *ndev, u32 attr_id);
+int enetc_get_xdp_stats(const struct net_device *ndev, u32 attr_id,
+			void *attr_data);
 int enetc_set_features(struct net_device *ndev,
 		       netdev_features_t features);
 int enetc_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd);
