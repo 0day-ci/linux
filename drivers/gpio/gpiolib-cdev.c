@@ -464,6 +464,12 @@ struct line {
 	 * stale value.
 	 */
 	unsigned int level;
+	/*
+	 * dir will be touched in HTE callbacks hte_ts_cb_t and
+	 * hte_ts_threaded_cb_t and they are mutually exclusive. This will be
+	 * unused when HTE is not supported/disabled.
+	 */
+	enum hte_dir dir;
 };
 
 /**
@@ -518,6 +524,7 @@ struct linereq {
 	 GPIO_V2_LINE_DRIVE_FLAGS | \
 	 GPIO_V2_LINE_EDGE_FLAGS | \
 	 GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME | \
+	 GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE | \
 	 GPIO_V2_LINE_BIAS_FLAGS)
 
 static void linereq_put_event(struct linereq *lr,
@@ -546,12 +553,104 @@ static u64 line_event_timestamp(struct line *line)
 	return ktime_get_ns();
 }
 
+static hte_return_t process_hw_ts_thread(void *p)
+{
+	struct line *line = p;
+	struct linereq *lr = line->req;
+	struct gpio_v2_line_event le;
+	u64 eflags;
+
+	memset(&le, 0, sizeof(le));
+
+	le.timestamp_ns = line->timestamp_ns;
+	line->timestamp_ns = 0;
+
+	if (line->dir >= HTE_DIR_NOSUPP) {
+		eflags = READ_ONCE(line->eflags);
+		if (eflags == GPIO_V2_LINE_FLAG_EDGE_BOTH) {
+			int level = gpiod_get_value_cansleep(line->desc);
+
+			if (level)
+				/* Emit low-to-high event */
+				le.id = GPIO_V2_LINE_EVENT_RISING_EDGE;
+			else
+				/* Emit high-to-low event */
+				le.id = GPIO_V2_LINE_EVENT_FALLING_EDGE;
+		} else if (eflags == GPIO_V2_LINE_FLAG_EDGE_RISING) {
+			/* Emit low-to-high event */
+			le.id = GPIO_V2_LINE_EVENT_RISING_EDGE;
+		} else if (eflags == GPIO_V2_LINE_FLAG_EDGE_FALLING) {
+			/* Emit high-to-low event */
+			le.id = GPIO_V2_LINE_EVENT_FALLING_EDGE;
+		} else {
+			return HTE_CB_ERROR;
+		}
+	} else {
+		if (line->dir == HTE_RISING_EDGE_TS)
+			le.id = GPIO_V2_LINE_EVENT_RISING_EDGE;
+		else
+			le.id = GPIO_V2_LINE_EVENT_FALLING_EDGE;
+	}
+
+	le.line_seqno = line->line_seqno;
+	le.seqno = (lr->num_lines == 1) ? le.line_seqno : line->req_seqno;
+	le.offset = gpio_chip_hwgpio(line->desc);
+
+	linereq_put_event(lr, &le);
+
+	return HTE_CB_HANDLED;
+}
+
+static hte_return_t process_hw_ts(struct hte_ts_data *ts, void *p)
+{
+	struct line *line = p;
+	struct linereq *lr = line->req;
+
+	if (!ts)
+		return HTE_CB_ERROR;
+
+	line->timestamp_ns = ts->tsc;
+	line->dir = ts->dir;
+
+	/*
+	 * It is possible that HTE engine detects spurious edges for the
+	 * lines where software debounce is enabled. This primary callback
+	 * will be called multiple times in that case. It will be better to
+	 * let debounce_work_func handle instead of process_hw_ts_thread.
+	 * The timestamp_ns will be overwritten here which is fine as we are
+	 * interested in the last value anyway. The debounce_work_func will
+	 * then just read whatever last line->timestamp_ns is stored. Because
+	 * this callback can be called multiple times, we are not really
+	 * interested in ts->seq.
+	 */
+	if (!READ_ONCE(line->sw_debounced)) {
+		line->line_seqno = ts->seq;
+
+		/*
+		 * Increment in this callback incase all the lines in linereq
+		 * are enabled for hw timestamping. This will work even if
+		 * subset of lines are enabled for hw timestamping as
+		 * edge_irq_* callbacks will proceed as usual for them.
+		 */
+		if (lr->num_lines != 1)
+			line->req_seqno = atomic_inc_return(&lr->seqno);
+
+		return HTE_RUN_THREADED_CB;
+	}
+
+	return HTE_CB_HANDLED;
+}
+
 static irqreturn_t edge_irq_thread(int irq, void *p)
 {
 	struct line *line = p;
 	struct linereq *lr = line->req;
 	struct gpio_v2_line_event le;
 	u64 eflags;
+
+	/* Let process_hw_ts_thread handle */
+	if (test_bit(FLAG_EVENT_CLOCK_HARDWARE, &line->desc->flags))
+		return IRQ_HANDLED;
 
 	/* Do not leak kernel stack to userspace */
 	memset(&le, 0, sizeof(le));
@@ -603,6 +702,10 @@ static irqreturn_t edge_irq_handler(int irq, void *p)
 {
 	struct line *line = p;
 	struct linereq *lr = line->req;
+
+	/* Let HTE supplied callbacks handle */
+	if (test_bit(FLAG_EVENT_CLOCK_HARDWARE, &line->desc->flags))
+		return IRQ_HANDLED;
 
 	/*
 	 * Just store the timestamp in hardirq context so we get it as
@@ -682,20 +785,29 @@ static void debounce_work_func(struct work_struct *work)
 	/* Do not leak kernel stack to userspace */
 	memset(&le, 0, sizeof(le));
 
-	lr = line->req;
-	le.timestamp_ns = line_event_timestamp(line);
-	le.offset = gpio_chip_hwgpio(line->desc);
-	line->line_seqno++;
-	le.line_seqno = line->line_seqno;
-	le.seqno = (lr->num_lines == 1) ?
-		le.line_seqno : atomic_inc_return(&lr->seqno);
-
 	if (level)
 		/* Emit low-to-high event */
 		le.id = GPIO_V2_LINE_EVENT_RISING_EDGE;
 	else
 		/* Emit high-to-low event */
 		le.id = GPIO_V2_LINE_EVENT_FALLING_EDGE;
+
+	if (test_bit(FLAG_EVENT_CLOCK_HARDWARE, &line->desc->flags)) {
+		le.timestamp_ns = line->timestamp_ns;
+		if (line->dir < HTE_DIR_NOSUPP)
+			le.id = (line->dir == HTE_RISING_EDGE_TS) ?
+				 GPIO_V2_LINE_EVENT_RISING_EDGE :
+				 GPIO_V2_LINE_EVENT_FALLING_EDGE;
+	} else {
+		le.timestamp_ns = line_event_timestamp(line);
+	}
+
+	lr = line->req;
+	le.offset = gpio_chip_hwgpio(line->desc);
+	line->line_seqno++;
+	le.line_seqno = line->line_seqno;
+	le.seqno = (lr->num_lines == 1) ?
+		le.line_seqno : atomic_inc_return(&lr->seqno);
 
 	linereq_put_event(lr, &le);
 }
@@ -891,13 +1003,17 @@ static int gpio_v2_line_flags_validate(u64 flags)
 	/* Return an error if an unknown flag is set */
 	if (flags & ~GPIO_V2_LINE_VALID_FLAGS)
 		return -EINVAL;
-
 	/*
 	 * Do not allow both INPUT and OUTPUT flags to be set as they are
 	 * contradictory.
 	 */
 	if ((flags & GPIO_V2_LINE_FLAG_INPUT) &&
 	    (flags & GPIO_V2_LINE_FLAG_OUTPUT))
+		return -EINVAL;
+
+	/* Only allow one event clock source */
+	if ((flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME) &&
+	    (flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE))
 		return -EINVAL;
 
 	/* Edge detection requires explicit input. */
@@ -992,6 +1108,8 @@ static void gpio_v2_line_config_flags_to_desc_flags(u64 flags,
 
 	assign_bit(FLAG_EVENT_CLOCK_REALTIME, flagsp,
 		   flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME);
+	assign_bit(FLAG_EVENT_CLOCK_HARDWARE, flagsp,
+		   flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE);
 }
 
 static long linereq_get_values(struct linereq *lr, void __user *ip)
@@ -1152,6 +1270,21 @@ static long linereq_set_config_unlocked(struct linereq *lr,
 					polarity_change);
 			if (ret)
 				return ret;
+		}
+
+		/* Check if new config sets hardware assisted clock */
+		if (flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE) {
+			ret = gpiod_req_hw_timestamp_ns(desc, process_hw_ts,
+							process_hw_ts_thread,
+							&lr->lines[i]);
+			if (ret)
+				return ret;
+		} else {
+			/*
+			 * HTE subsys will do nothing if there is nothing to
+			 * release.
+			 */
+			gpiod_rel_hw_timestamp_ns(desc);
 		}
 
 		blocking_notifier_call_chain(&desc->gdev->notifier,
@@ -1409,6 +1542,14 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 					flags & GPIO_V2_LINE_EDGE_FLAGS);
 			if (ret)
 				goto out_free_linereq;
+
+			if (flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE) {
+				ret = gpiod_req_hw_timestamp_ns(desc, process_hw_ts,
+							process_hw_ts_thread,
+							&lr->lines[i]);
+				if (ret)
+					goto out_free_linereq;
+			}
 		}
 
 		blocking_notifier_call_chain(&desc->gdev->notifier,
@@ -1959,6 +2100,8 @@ static void gpio_desc_to_lineinfo(struct gpio_desc *desc,
 
 	if (test_bit(FLAG_EVENT_CLOCK_REALTIME, &desc->flags))
 		info->flags |= GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME;
+	else if (test_bit(FLAG_EVENT_CLOCK_HARDWARE, &desc->flags))
+		info->flags |= GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE;
 
 	debounce_period_us = READ_ONCE(desc->debounce_period_us);
 	if (debounce_period_us) {
