@@ -161,6 +161,7 @@ static const struct regmap_range da9063_ad_volatile_ranges[] = {
 	regmap_reg_range(DA9063_REG_ADC_RES_L, DA9063_AD_REG_SECOND_D),
 	regmap_reg_range(DA9063_REG_SEQ, DA9063_REG_SEQ),
 	regmap_reg_range(DA9063_REG_EN_32K, DA9063_REG_EN_32K),
+	regmap_reg_range(DA9063_REG_VBCORE2_A, DA9063_REG_VBCORE2_A),
 	regmap_reg_range(DA9063_AD_REG_MON_REG_5, DA9063_AD_REG_MON_REG_6),
 };
 
@@ -206,6 +207,7 @@ static const struct regmap_range da9063_bb_da_volatile_ranges[] = {
 	regmap_reg_range(DA9063_REG_ADC_RES_L, DA9063_BB_REG_SECOND_D),
 	regmap_reg_range(DA9063_REG_SEQ, DA9063_REG_SEQ),
 	regmap_reg_range(DA9063_REG_EN_32K, DA9063_REG_EN_32K),
+	regmap_reg_range(DA9063_REG_VBCORE2_A, DA9063_REG_VBCORE2_A),
 	regmap_reg_range(DA9063_BB_REG_MON_REG_5, DA9063_BB_REG_MON_REG_6),
 };
 
