@@ -29,7 +29,9 @@ ASUS mainboards publish hardware monitoring information via WMI interface.
 
 ASUS WMI interface provides a methods to get list of sensors and values of
 such, which is utilized by this driver to publish those sensor readings to the
-HWMON system. The driver is aware of and reads the following sensors:
+HWMON system.
+
+The driver is aware of and reads the following sensors:
  * CPU Core Voltage,
  * CPU SOC Voltage,
  * DRAM Voltage,
@@ -64,7 +66,7 @@ HWMON system. The driver is aware of and reads the following sensors:
  * CPU VRM Output Current.
 
 Known Issues:
-* The WMI implementation in some of Asus' BIOSes is buggy. This can result in
+ * The WMI implementation in some of Asus' BIOSes is buggy. This can result in
    fans stopping, fans getting stuck at max speed, or temperature readouts
    getting stuck. This is not an issue with the driver, but the BIOS. The Prime
    X470 Pro seems particularly bad for this. The more frequently the WMI
@@ -73,4 +75,4 @@ Known Issues:
    sensors frequently, don't leave you computer unattended. Upgrading to new
    BIOS version with method version greater than or equal to two should
    rectify the issue.
-* A few boards report 12v voltages to be ~10v.
+ * A few boards report 12v voltages to be ~10v.
