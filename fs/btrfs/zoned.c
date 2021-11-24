@@ -2296,3 +2296,22 @@ void btrfs_sync_replace_for_zoned(struct scrub_ctx *sctx)
 
 	wait_event(sctx->list_wait, atomic_read(&sctx->bios_in_flight) == 0);
 }
+
+int btrfs_finish_extent_writes_for_zoned(struct btrfs_root *root,
+					 struct btrfs_block_group *cache)
+{
+	struct btrfs_fs_info *fs_info = cache->fs_info;
+	struct btrfs_trans_handle *trans;
+
+	if (!btrfs_is_zoned(fs_info))
+		return 0;
+
+	btrfs_wait_block_group_reservations(cache);
+	btrfs_wait_nocow_writers(cache);
+	btrfs_wait_ordered_roots(fs_info, U64_MAX, cache->start, cache->length);
+
+	trans = btrfs_join_transaction(root);
+	if (IS_ERR(trans))
+		return PTR_ERR(trans);
+	return btrfs_commit_transaction(trans);
+}

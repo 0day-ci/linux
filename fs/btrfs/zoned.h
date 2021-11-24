@@ -89,6 +89,8 @@ int btrfs_fill_writer_pointer_gap(struct scrub_ctx *sctx, u64 physical);
 int btrfs_sync_write_pointer_for_zoned(struct scrub_ctx *sctx, u64 logical,
 				       u64 physical, u64 physical_end);
 void btrfs_sync_replace_for_zoned(struct scrub_ctx *sctx);
+int btrfs_finish_extent_writes_for_zoned(struct btrfs_root *root,
+					 struct btrfs_block_group *cache);
 #else /* CONFIG_BLK_DEV_ZONED */
 static inline int btrfs_get_dev_zone(struct btrfs_device *device, u64 pos,
 				     struct blk_zone *zone)
@@ -280,6 +282,12 @@ static inline int btrfs_sync_write_pointer_for_zoned(struct scrub_ctx *sctx,
 }
 
 static inline void btrfs_sync_replace_for_zoned(struct scrub_ctx *sctx) { }
+
+static inline int btrfs_finish_extent_writes_for_zoned(struct btrfs_root *root,
+					       struct btrfs_block_group *cache)
+{
+	return 0;
+}
 #endif
 
 static inline bool btrfs_dev_is_sequential(struct btrfs_device *device, u64 pos)
