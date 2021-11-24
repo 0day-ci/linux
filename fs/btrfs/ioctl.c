@@ -49,6 +49,7 @@
 #include "delalloc-space.h"
 #include "block-group.h"
 #include "subpage.h"
+#include "zoned.h"
 
 #ifdef CONFIG_64BIT
 /* If we have a 32-bit userspace and 64-bit kernel, then the UAPI
@@ -192,15 +193,6 @@ static int check_fsflags(unsigned int old_flags, unsigned int flags)
 	return 0;
 }
 
-static int check_fsflags_compatible(struct btrfs_fs_info *fs_info,
-				    unsigned int flags)
-{
-	if (btrfs_is_zoned(fs_info) && (flags & FS_NOCOW_FL))
-		return -EPERM;
-
-	return 0;
-}
-
 /*
  * Set flags/xflags from the internal inode flags. The remaining items of
  * fsxattr are zeroed.
@@ -238,7 +230,7 @@ int btrfs_fileattr_set(struct user_namespace *mnt_userns,
 	if (ret)
 		return ret;
 
-	ret = check_fsflags_compatible(fs_info, fsflags);
+	ret = btrfs_zoned_check_fsflags_compatible(fs_info, fsflags);
 	if (ret)
 		return ret;
 

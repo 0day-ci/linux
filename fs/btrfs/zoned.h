@@ -371,4 +371,13 @@ static inline void btrfs_zoned_data_reloc_unlock(struct inode *inode)
 		btrfs_inode_unlock(inode, 0);
 }
 
+static inline int btrfs_zoned_check_fsflags_compatible(
+					       struct btrfs_fs_info *fs_info,
+					       unsigned int flags)
+{
+	if (btrfs_is_zoned(fs_info) && (flags & FS_NOCOW_FL))
+		return -EPERM;
+
+	return 0;
+}
 #endif
