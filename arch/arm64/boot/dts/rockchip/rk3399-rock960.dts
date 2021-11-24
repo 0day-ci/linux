@@ -61,6 +61,51 @@
 		};
 	};
 
+	powerzones {
+
+		PKG_PZ: pkg {
+			#powerzone-cells = <0>;
+                        powerzone = <&SOC_PZ>;
+		};
+
+		SOC_PZ: soc {
+		};
+	};
+};
+
+&cpu_b0 {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
+};
+
+&cpu_b1 {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
+};
+
+&cpu_l0 {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
+};
+
+&cpu_l1 {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
+};
+
+&cpu_l2 {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
+};
+
+&cpu_l3 {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
+};
+
+&gpu {
+	#powerzone-cells = <0>;
+	powerzone = <&PKG_PZ>;
 };
 
 &cpu_alert0 {
