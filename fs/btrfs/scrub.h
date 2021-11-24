@@ -53,4 +53,5 @@ void btrfs_scrub_wr_submit(struct scrub_ctx *sctx);
 int btrfs_scrub_dev(struct btrfs_fs_info *fs_info, u64 devid, u64 start,
 		    u64 end, struct btrfs_scrub_progress *progress,
 		    int readonly, int is_dev_replace);
+void btrfs_scrub_pause(struct btrfs_fs_info *fs_info);
 #endif /* BTRFS_SCRUB_H */

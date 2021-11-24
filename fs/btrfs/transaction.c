@@ -22,6 +22,7 @@
 #include "block-group.h"
 #include "space-info.h"
 #include "zoned.h"
+#include "scrub.h"
 
 #define BTRFS_ROOT_TRANS_TAG 0
 
