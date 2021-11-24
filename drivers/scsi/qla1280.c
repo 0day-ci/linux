@@ -3716,7 +3716,7 @@ qla1280_error_entry(struct scsi_qla_host *ha, struct response *pkt,
 		ha->outstanding_cmds[handle] = NULL;
 
 		/* Bad payload or header */
-		if (pkt->entry_status & (BIT_3 + BIT_2)) {
+		if (pkt->entry_status & (BIT_3 | BIT_2)) {
 			/* Bad payload or header, set error status. */
 			/* CMD_RESULT(sp->cmd) = CS_BAD_PAYLOAD; */
 			CMD_RESULT(sp->cmd) = DID_ERROR << 16;
