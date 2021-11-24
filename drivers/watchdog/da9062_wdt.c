@@ -87,6 +87,20 @@ static int da9062_wdt_start(struct watchdog_device *wdd)
 	unsigned int selector;
 	int ret;
 
+	/*
+	 * Use da9062's SHUTDOWN mode instead of POWERDOWN for watchdog reset.
+	 * On timeout the PMIC should reset the system, not powering it
+	 * off.
+	 */
+	ret = regmap_update_bits(wdt->hw->regmap,
+				 DA9062AA_CONFIG_I,
+				 DA9062AA_WATCHDOG_SD_MASK,
+				 DA9062AA_WATCHDOG_SD_MASK);
+	if (ret)
+		dev_err(wdt->hw->dev,
+			"failed to set wdt reset mode. Expect poweroff on watchdog reset: %d\n",
+			ret);
+
 	selector = da9062_wdt_timeout_to_sel(wdt->wdtdev.timeout);
 	ret = da9062_wdt_update_timeout_register(wdt, selector);
 	if (ret)
