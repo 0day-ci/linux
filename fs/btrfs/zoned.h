@@ -84,6 +84,7 @@ int btrfs_mark_block_group_to_copy(struct btrfs_fs_info *fs_info,
 bool btrfs_finish_block_group_to_copy(struct btrfs_device *srcdev,
 				      struct btrfs_block_group *cache,
 				      u64 physical);
+bool btrfs_is_block_group_to_copy(struct btrfs_fs_info *fs_info, u64 logical);
 #else /* CONFIG_BLK_DEV_ZONED */
 static inline int btrfs_get_dev_zone(struct btrfs_device *device, u64 pos,
 				     struct blk_zone *zone)
@@ -254,6 +255,12 @@ static inline bool btrfs_finish_block_group_to_copy(struct btrfs_device *srcdev,
 					    u64 physical)
 {
 	return true;
+}
+
+static bool btrfs_is_block_group_to_copy(struct btrfs_fs_info *fs_info,
+					 u64 logical)
+{
+	return false;
 }
 #endif
 

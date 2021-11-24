@@ -6177,25 +6177,6 @@ static int get_extra_mirror_from_replace(struct btrfs_fs_info *fs_info,
 	return ret;
 }
 
-static bool is_block_group_to_copy(struct btrfs_fs_info *fs_info, u64 logical)
-{
-	struct btrfs_block_group *cache;
-	bool ret;
-
-	/* Non zoned filesystem does not use "to_copy" flag */
-	if (!btrfs_is_zoned(fs_info))
-		return false;
-
-	cache = btrfs_lookup_block_group(fs_info, logical);
-
-	spin_lock(&cache->lock);
-	ret = cache->to_copy;
-	spin_unlock(&cache->lock);
-
-	btrfs_put_block_group(cache);
-	return ret;
-}
-
 static void handle_ops_on_dev_replace(enum btrfs_map_op op,
 				      struct btrfs_io_context **bioc_ret,
 				      struct btrfs_dev_replace *dev_replace,
@@ -6216,7 +6197,8 @@ static void handle_ops_on_dev_replace(enum btrfs_map_op op,
 		 * A block group which have "to_copy" set will eventually
 		 * copied by dev-replace process. We can avoid cloning IO here.
 		 */
-		if (is_block_group_to_copy(dev_replace->srcdev->fs_info, logical))
+		if (btrfs_is_block_group_to_copy(dev_replace->srcdev->fs_info,
+						 logical))
 			return;
 
 		/*
