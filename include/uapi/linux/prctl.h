@@ -272,4 +272,11 @@ struct prctl_mm_map {
 # define PR_SCHED_CORE_SCOPE_THREAD_GROUP	1
 # define PR_SCHED_CORE_SCOPE_PROCESS_GROUP	2
 
+/* Set/get enabled per-process numa_balancing */
+#define PR_NUMA_BALANCING		63
+# define PR_SET_NUMAB_DISABLED		NUMAB_DISABLED
+# define PR_SET_NUMAB_ENABLED		NUMAB_ENABLED
+# define PR_SET_NUMAB_DEFAULT		NUMAB_DEFAULT
+# define PR_GET_NUMAB				3
+
 #endif /* _LINUX_PRCTL_H */
