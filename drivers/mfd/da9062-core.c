@@ -571,6 +571,8 @@ static const struct regmap_range da9062_aa_volatile_ranges[] = {
 	regmap_reg_range(DA9062AA_COUNT_S, DA9062AA_SECOND_D),
 	regmap_reg_range(DA9062AA_SEQ, DA9062AA_SEQ),
 	regmap_reg_range(DA9062AA_EN_32K, DA9062AA_EN_32K),
+	regmap_reg_range(DA9062AA_VBUCK2_A, DA9062AA_VBUCK2_A),
+	regmap_reg_range(DA9062AA_VBUCK3_A, DA9062AA_VBUCK3_A),
 };
 
 static const struct regmap_access_table da9062_aa_readable_table = {
