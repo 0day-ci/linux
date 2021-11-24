@@ -1,0 +1,13 @@
+TODO:
+* there are some clean up works, fixing code style, refactorring.
+  - remove "static struct zynpu_priv" in zynpu_sysfs
+  - use kernel coding style
+  - checkpatch.pl fixes
+  - sparse fixes
+  - integrate with drivers/misc
+
+* this driver only works with closed source usermode driver,
+  so need to reverse the lib, and impelement it, then open source UMD. 
+
+Please send any patches to Greg Kroah-Hartman <greg@kroah.com>
+and Cai Huoqing <caihuoqing@baidu.com>.

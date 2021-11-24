@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-2.0+
+#
+# ARM (China) ZHOUYI AI accelerator drivers configuration.
+#
+
+config ZYNPU
+	tristate "ARM (China) ZHOUYI AI accelerator support"
+	depends on OF && HAS_IOMEM
+	select CMA
+	select DMA_CMA
+	help
+	  Say yes here to build support for ZHOUYI AI accelerator.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called zhouyi_npu.
+
+choice
+	prompt "ZHOUYI NPU version"
+	depends on ZYNPU
+	default ZHOUYI_V1
+	help
+	  Select the chip version of ZHOUYI NPU.
+
+	config ZHOUYI_V1
+		bool "ZHOUYI V1"
+		help
+		  select ZHOUYI Z1 support
+
+	config ZHOUYI_V2
+		bool "ZHOUYI V2"
+		help
+		  select ZHOUYI Z2 support
+
+endchoice
