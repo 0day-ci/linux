@@ -2391,8 +2391,7 @@ static void tipc_crypto_work_rx(struct work_struct *work)
 			resched = true;
 			break;
 		default:
-			synchronize_rcu();
-			kfree(rx->skey);
+			kvfree_rcu(rx->skey);
 			rx->skey = NULL;
 			break;
 		}
