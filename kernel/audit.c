@@ -197,6 +197,9 @@ static struct audit_ctl_mutex {
 struct audit_context_entry {
 	struct list_head	list;
 	int			type;	/* Audit record type */
+	union {
+		struct lsmblob	mac_task_context;
+	};
 };
 
 /* The audit_buffer is used when formatting an audit record.  The caller
@@ -2139,6 +2142,21 @@ void audit_log_key(struct audit_buffer *ab, char *key)
 		audit_log_format(ab, "(null)");
 }
 
+static int audit_add_aux_task(struct audit_buffer *ab, struct lsmblob *blob)
+{
+	struct audit_context_entry *ace;
+
+	ace = kzalloc(sizeof(*ace), GFP_KERNEL);
+	if (!ace)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&ace->list);
+	ace->type = AUDIT_MAC_TASK_CONTEXTS;
+	ace->mac_task_context = *blob;
+	list_add(&ace->list, &ab->aux_records);
+	return 0;
+}
+
 int audit_log_task_context(struct audit_buffer *ab)
 {
 	int error;
@@ -2149,16 +2167,22 @@ int audit_log_task_context(struct audit_buffer *ab)
 	if (!lsmblob_is_set(&blob))
 		return 0;
 
-	error = security_secid_to_secctx(&blob, &context, LSMBLOB_FIRST);
-	if (error) {
-		if (error != -EINVAL)
-			goto error_path;
+	if (!lsm_multiple_contexts()) {
+		error = security_secid_to_secctx(&blob, &context,
+						 LSMBLOB_FIRST);
+		if (error) {
+			if (error != -EINVAL)
+				goto error_path;
+			return 0;
+		}
+		audit_log_format(ab, " subj=%s", context.context);
+		security_release_secctx(&context);
 		return 0;
 	}
-
-	audit_log_format(ab, " subj=%s", context.context);
-	security_release_secctx(&context);
-	return 0;
+	audit_log_format(ab, " subj=?");
+	error = audit_add_aux_task(ab, &blob);
+	if (!error)
+		return 0;
 
 error_path:
 	audit_panic("error in audit_log_task_context");
@@ -2419,9 +2443,12 @@ void audit_log_end(struct audit_buffer *ab)
 	struct audit_context_entry *entry;
 	struct audit_context mcontext;
 	struct audit_context *mctx;
+	struct lsmcontext lcontext;
 	struct audit_buffer *mab;
 	struct list_head *l;
 	struct list_head *n;
+	int rc;
+	int i;
 
 	if (!ab)
 		return;
@@ -2448,7 +2475,28 @@ void audit_log_end(struct audit_buffer *ab)
 			continue;
 		}
 		switch (entry->type) {
-		/* Don't know of any quite yet. */
+		case AUDIT_MAC_TASK_CONTEXTS:
+			for (i = 0; i < LSMBLOB_ENTRIES; i++) {
+				if (entry->mac_task_context.secid[i] == 0)
+					continue;
+				rc = security_secid_to_secctx(
+						&entry->mac_task_context,
+						&lcontext, i);
+				if (rc) {
+					if (rc != -EINVAL)
+						audit_panic("error in audit_log_end");
+					audit_log_format(mab, "%ssubj_%s=\"?\"",
+							 i ? " " : "",
+							 lsm_slot_to_name(i));
+				} else {
+					audit_log_format(mab, "%ssubj_%s=\"%s\"",
+							 i ? " " : "",
+							 lsm_slot_to_name(i),
+							 lcontext.context);
+					security_release_secctx(&lcontext);
+				}
+			}
+			break;
 		default:
 			audit_panic("Unknown type in audit_log_end");
 			break;
