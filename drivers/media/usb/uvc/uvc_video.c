@@ -1055,7 +1055,10 @@ static int uvc_video_decode_start(struct uvc_streaming *stream,
 	 * that discontinuous sequence numbers always indicate lost frames.
 	 */
 	if (stream->last_fid != fid) {
-		stream->sequence++;
+		if (stream->last_fid > UVC_STREAM_FID)
+			stream->last_fid = fid;
+		else
+			stream->sequence++;
 		if (stream->sequence)
 			uvc_video_stats_update(stream);
 	}
@@ -1080,7 +1083,7 @@ static int uvc_video_decode_start(struct uvc_streaming *stream,
 
 	/* Synchronize to the input stream by waiting for the FID bit to be
 	 * toggled when the the buffer state is not UVC_BUF_STATE_ACTIVE.
-	 * stream->last_fid is initialized to -1, so the first isochronous
+	 * stream->last_fid is initialized to 0xff, so the first isochronous
 	 * frame will always be in sync.
 	 *
 	 * If the device doesn't toggle the FID bit, invert stream->last_fid
@@ -1111,7 +1114,7 @@ static int uvc_video_decode_start(struct uvc_streaming *stream,
 	 * last payload can be lost anyway). We thus must check if the FID has
 	 * been toggled.
 	 *
-	 * stream->last_fid is initialized to -1, so the first isochronous
+	 * stream->last_fid is initialized to 0xff, so the first isochronous
 	 * frame will never trigger an end of frame detection.
 	 *
 	 * Empty buffers (bytesused == 0) don't trigger end of frame detection
@@ -1895,7 +1898,7 @@ static int uvc_video_start_transfer(struct uvc_streaming *stream,
 	int ret;
 
 	stream->sequence = -1;
-	stream->last_fid = -1;
+	stream->last_fid = 0xff;
 	stream->bulk.header_size = 0;
 	stream->bulk.skip_payload = 0;
 	stream->bulk.payload_size = 0;
