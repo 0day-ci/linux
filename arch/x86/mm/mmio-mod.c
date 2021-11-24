@@ -307,10 +307,8 @@ static void iounmap_trace_core(volatile void __iomem *addr)
 
 not_enabled:
 	spin_unlock_irq(&trace_lock);
-	if (found_trace) {
-		synchronize_rcu(); /* unregister_kmmio_probe() requirement */
-		kfree(found_trace);
-	}
+	if (found_trace)
+		kvfree_rcu(found_trace); /* unregister_kmmio_probe() requirement */
 }
 
 void mmiotrace_iounmap(volatile void __iomem *addr)
