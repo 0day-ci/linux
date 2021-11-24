@@ -2212,8 +2212,7 @@ void __remove_memory(u64 start, u64 size)
 	 * trigger BUG() if some memory is not offlined prior to calling this
 	 * function
 	 */
-	if (try_remove_memory(start, size))
-		BUG();
+	BUG_ON(try_remove_memory(start, size));
 }
 
 /*
