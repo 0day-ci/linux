@@ -199,6 +199,7 @@ struct audit_context_entry {
 	int			type;	/* Audit record type */
 	union {
 		struct lsmblob	mac_task_context;
+		struct lsmblob	mac_obj_context;
 	};
 };
 
@@ -2190,6 +2191,44 @@ error_path:
 }
 EXPORT_SYMBOL(audit_log_task_context);
 
+void audit_log_object_context(struct audit_buffer *ab, struct lsmblob *blob)
+{
+	struct audit_context_entry *ace;
+	struct lsmcontext context;
+	int error;
+
+	if (!lsm_multiple_contexts()) {
+		error = security_secid_to_secctx(blob, &context, LSMBLOB_FIRST);
+		if (error) {
+			if (error != -EINVAL)
+				goto error_path;
+			return;
+		}
+		audit_log_format(ab, " obj=%s", context.context);
+		security_release_secctx(&context);
+		return;
+	}
+	/*
+	 * If there is more than one security module that has a
+	 * object "context" it's necessary to put the object data
+	 * into a separate record to maintain compatibility.
+	 */
+	audit_log_format(ab, " obj=?");
+	ace = kzalloc(sizeof(*ace), GFP_KERNEL);
+	if (ace) {
+		INIT_LIST_HEAD(&ace->list);
+		ace->type = AUDIT_MAC_OBJ_CONTEXTS;
+		ace->mac_obj_context = *blob;
+		list_add(&ace->list, &ab->aux_records);
+		return;
+	}
+	error = -ENOMEM;
+
+error_path:
+	audit_panic("error in audit_log_object_context");
+}
+EXPORT_SYMBOL(audit_log_object_context);
+
 void audit_log_d_path_exe(struct audit_buffer *ab,
 			  struct mm_struct *mm)
 {
@@ -2490,6 +2529,28 @@ void audit_log_end(struct audit_buffer *ab)
 							 lsm_slot_to_name(i));
 				} else {
 					audit_log_format(mab, "%ssubj_%s=\"%s\"",
+							 i ? " " : "",
+							 lsm_slot_to_name(i),
+							 lcontext.context);
+					security_release_secctx(&lcontext);
+				}
+			}
+			break;
+		case AUDIT_MAC_OBJ_CONTEXTS:
+			for (i = 0; i < LSMBLOB_ENTRIES; i++) {
+				if (entry->mac_obj_context.secid[i] == 0)
+					continue;
+				rc = security_secid_to_secctx(
+							&entry->mac_obj_context,
+							&lcontext, i);
+				if (rc) {
+					if (rc != -EINVAL)
+						audit_panic("error in audit_log_end");
+					audit_log_format(mab, "%sobj_%s=\"?\"",
+							 i ? " " : "",
+							 lsm_slot_to_name(i));
+				} else {
+					audit_log_format(mab, "%sobj_%s=\"%s\"",
 							 i ? " " : "",
 							 lsm_slot_to_name(i),
 							 lcontext.context);
