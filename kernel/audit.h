@@ -112,6 +112,7 @@ struct audit_context {
 		AUDIT_CTX_UNUSED,	/* audit_context is currently unused */
 		AUDIT_CTX_SYSCALL,	/* in use by syscall */
 		AUDIT_CTX_URING,	/* in use by io_uring */
+		AUDIT_CTX_AUXRECORD,	/* in use for auxiliary records */
 	} context;
 	enum audit_state    state, current_state;
 	struct audit_stamp  stamp;	/* event identifier */

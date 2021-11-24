@@ -1681,6 +1681,8 @@ static void audit_log_exit(void)
 	case AUDIT_CTX_URING:
 		audit_log_uring(context);
 		break;
+	case AUDIT_CTX_AUXRECORD:
+		break;
 	default:
 		BUG();
 		break;
