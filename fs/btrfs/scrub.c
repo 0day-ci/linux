@@ -204,7 +204,6 @@ static void scrub_remap_extent(struct btrfs_fs_info *fs_info,
 			       int *extent_mirror_num);
 static int scrub_add_page_to_wr_bio(struct scrub_ctx *sctx,
 				    struct scrub_page *spage);
-static void scrub_wr_submit(struct scrub_ctx *sctx);
 static void scrub_wr_bio_end_io(struct bio *bio);
 static void scrub_wr_bio_end_io_worker(struct btrfs_work *work);
 static void scrub_put_ctx(struct scrub_ctx *sctx);
@@ -1626,7 +1625,7 @@ again:
 		   spage->physical_for_dev_replace ||
 		   sbio->logical + sbio->page_count * sectorsize !=
 		   spage->logical) {
-		scrub_wr_submit(sctx);
+		btrfs_scrub_wr_submit(sctx);
 		goto again;
 	}
 
@@ -1638,7 +1637,7 @@ again:
 			mutex_unlock(&sctx->wr_lock);
 			return -EIO;
 		}
-		scrub_wr_submit(sctx);
+		btrfs_scrub_wr_submit(sctx);
 		goto again;
 	}
 
@@ -1646,13 +1645,13 @@ again:
 	scrub_page_get(spage);
 	sbio->page_count++;
 	if (sbio->page_count == sctx->pages_per_wr_bio)
-		scrub_wr_submit(sctx);
+		btrfs_scrub_wr_submit(sctx);
 	mutex_unlock(&sctx->wr_lock);
 
 	return 0;
 }
 
-static void scrub_wr_submit(struct scrub_ctx *sctx)
+void btrfs_scrub_wr_submit(struct scrub_ctx *sctx)
 {
 	struct scrub_bio *sbio;
 
@@ -1989,7 +1988,7 @@ static void scrub_throttle(struct scrub_ctx *sctx)
 	sctx->throttle_deadline = 0;
 }
 
-static void scrub_submit(struct scrub_ctx *sctx)
+void btrfs_scrub_submit(struct scrub_ctx *sctx)
 {
 	struct scrub_bio *sbio;
 
@@ -2053,7 +2052,7 @@ again:
 		   sbio->logical + sbio->page_count * sectorsize !=
 		   spage->logical ||
 		   sbio->dev != spage->dev) {
-		scrub_submit(sctx);
+		btrfs_scrub_submit(sctx);
 		goto again;
 	}
 
@@ -2065,7 +2064,7 @@ again:
 			sbio->bio = NULL;
 			return -EIO;
 		}
-		scrub_submit(sctx);
+		btrfs_scrub_submit(sctx);
 		goto again;
 	}
 
@@ -2073,7 +2072,7 @@ again:
 	atomic_inc(&sblock->outstanding_pages);
 	sbio->page_count++;
 	if (sbio->page_count == sctx->pages_per_rd_bio)
-		scrub_submit(sctx);
+		btrfs_scrub_submit(sctx);
 
 	return 0;
 }
@@ -2125,7 +2124,7 @@ static void scrub_missing_raid56_worker(struct btrfs_work *work)
 
 	if (sctx->is_dev_replace && sctx->flush_all_writes) {
 		mutex_lock(&sctx->wr_lock);
-		scrub_wr_submit(sctx);
+		btrfs_scrub_wr_submit(sctx);
 		mutex_unlock(&sctx->wr_lock);
 	}
 
@@ -2281,7 +2280,7 @@ leave_nomem:
 		}
 
 		if (flags & BTRFS_EXTENT_FLAG_SUPER)
-			scrub_submit(sctx);
+			btrfs_scrub_submit(sctx);
 	}
 
 	/* last one frees, either here or in bio completion for last page */
@@ -2335,7 +2334,7 @@ static void scrub_bio_end_io_worker(struct btrfs_work *work)
 
 	if (sctx->is_dev_replace && sctx->flush_all_writes) {
 		mutex_lock(&sctx->wr_lock);
-		scrub_wr_submit(sctx);
+		btrfs_scrub_wr_submit(sctx);
 		mutex_unlock(&sctx->wr_lock);
 	}
 
@@ -3048,9 +3047,9 @@ out:
 						logic_end - logic_start);
 	}
 	scrub_parity_put(sparity);
-	scrub_submit(sctx);
+	btrfs_scrub_submit(sctx);
 	mutex_lock(&sctx->wr_lock);
-	scrub_wr_submit(sctx);
+	btrfs_scrub_wr_submit(sctx);
 	mutex_unlock(&sctx->wr_lock);
 
 	btrfs_release_path(path);
@@ -3063,9 +3062,9 @@ static void sync_replace_for_zoned(struct scrub_ctx *sctx)
 		return;
 
 	sctx->flush_all_writes = true;
-	scrub_submit(sctx);
+	btrfs_scrub_submit(sctx);
 	mutex_lock(&sctx->wr_lock);
-	scrub_wr_submit(sctx);
+	btrfs_scrub_wr_submit(sctx);
 	mutex_unlock(&sctx->wr_lock);
 
 	wait_event(sctx->list_wait, atomic_read(&sctx->bios_in_flight) == 0);
@@ -3233,9 +3232,9 @@ static noinline_for_stack int scrub_stripe(struct scrub_ctx *sctx,
 		if (atomic_read(&fs_info->scrub_pause_req)) {
 			/* push queued extents */
 			sctx->flush_all_writes = true;
-			scrub_submit(sctx);
+			btrfs_scrub_submit(sctx);
 			mutex_lock(&sctx->wr_lock);
-			scrub_wr_submit(sctx);
+			btrfs_scrub_wr_submit(sctx);
 			mutex_unlock(&sctx->wr_lock);
 			wait_event(sctx->list_wait,
 				   atomic_read(&sctx->bios_in_flight) == 0);
@@ -3464,9 +3463,9 @@ skip:
 	}
 out:
 	/* push queued extents */
-	scrub_submit(sctx);
+	btrfs_scrub_submit(sctx);
 	mutex_lock(&sctx->wr_lock);
-	scrub_wr_submit(sctx);
+	btrfs_scrub_wr_submit(sctx);
 	mutex_unlock(&sctx->wr_lock);
 
 	blk_finish_plug(&plug);
@@ -3778,9 +3777,9 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 		 * changes to 0.
 		 */
 		sctx->flush_all_writes = true;
-		scrub_submit(sctx);
+		btrfs_scrub_submit(sctx);
 		mutex_lock(&sctx->wr_lock);
-		scrub_wr_submit(sctx);
+		btrfs_scrub_wr_submit(sctx);
 		mutex_unlock(&sctx->wr_lock);
 
 		wait_event(sctx->list_wait,

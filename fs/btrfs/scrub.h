@@ -48,4 +48,6 @@ struct scrub_ctx {
 	refcount_t              refs;
 };
 
+void btrfs_scrub_submit(struct scrub_ctx *sctx);
+void btrfs_scrub_wr_submit(struct scrub_ctx *sctx);
 #endif /* BTRFS_SCRUB_H */
