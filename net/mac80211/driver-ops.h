@@ -1241,7 +1241,7 @@ static inline int drv_can_aggregate_in_amsdu(struct ieee80211_local *local,
 					     struct sk_buff *skb)
 {
 	if (!local->ops->can_aggregate_in_amsdu)
-		return true;
+		return -EOPNOTSUPP;
 
 	return local->ops->can_aggregate_in_amsdu(&local->hw, head, skb);
 }
@@ -1303,7 +1303,8 @@ static inline int drv_start_nan(struct ieee80211_local *local,
 	int ret;
 
 	might_sleep();
-	check_sdata_in_driver(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return -EIO;
 
 	trace_drv_start_nan(local, sdata, conf);
 	ret = local->ops->start_nan(&local->hw, &sdata->vif, conf);
@@ -1315,7 +1316,8 @@ static inline void drv_stop_nan(struct ieee80211_local *local,
 				struct ieee80211_sub_if_data *sdata)
 {
 	might_sleep();
-	check_sdata_in_driver(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return;
 
 	trace_drv_stop_nan(local, sdata);
 	local->ops->stop_nan(&local->hw, &sdata->vif);
@@ -1330,7 +1332,8 @@ static inline int drv_nan_change_conf(struct ieee80211_local *local,
 	int ret;
 
 	might_sleep();
-	check_sdata_in_driver(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return -EIO;
 
 	if (!local->ops->nan_change_conf)
 		return -EOPNOTSUPP;
@@ -1350,7 +1353,8 @@ static inline int drv_add_nan_func(struct ieee80211_local *local,
 	int ret;
 
 	might_sleep();
-	check_sdata_in_driver(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return -EIO;
 
 	if (!local->ops->add_nan_func)
 		return -EOPNOTSUPP;
@@ -1367,7 +1371,8 @@ static inline void drv_del_nan_func(struct ieee80211_local *local,
 				   u8 instance_id)
 {
 	might_sleep();
-	check_sdata_in_driver(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return;
 
 	trace_drv_del_nan_func(local, sdata, instance_id);
 	if (local->ops->del_nan_func)
@@ -1407,7 +1412,8 @@ static inline void drv_update_vif_offload(struct ieee80211_local *local,
 					  struct ieee80211_sub_if_data *sdata)
 {
 	might_sleep();
-	check_sdata_in_driver(sdata);
+	if (!check_sdata_in_driver(sdata))
+		return;
 
 	if (!local->ops->update_vif_offload)
 		return;
