@@ -20,6 +20,10 @@ properties:
   compatible:
     oneOf:
       - description:
+          Sitronix ST7735R 262K Color Single-Chip TFT Controller/Driver
+        items:
+          - const: sitronix,st7735r
+      - description:
           Adafruit 1.8" 160x128 Color TFT LCD (Product ID 358 or 618)
         items:
           - enum:
@@ -32,20 +36,99 @@ properties:
               - okaya,rh128128t
           - const: sitronix,st7715r
 
+  width:
+    description:
+      Width of display panel in pixels
+
+  height:
+    description:
+      Height of display panel in pixels
+
+  frmctr1:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Frame Rate Control (In normal mode/Full colors) (B1h)
+    minItems: 3
+    maxItems: 3
+
+  invctr:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Display Inversion Control (B4h)
+    minItems: 1
+    maxItems: 1
+
+  pwctr1:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Power Control 1 (C0h)
+    minItems: 3
+    maxItems: 3
+
+  pwctr2:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Power Control 2 (C1h)
+    minItems: 1
+    maxItems: 1
+
+  pwctr3:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Power Control 3 (in Normal mode/Full colors) (C2h)
+    minItems: 2
+    maxItems: 2
+
+  vmctr1:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      VCOM Control 1 (C5h)
+    minItems: 1
+    maxItems: 1
+
+  madctl:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Memory Data Access Control (36h)
+    minItems: 1
+    maxItems: 1
+
+  gamctrp1:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Gamma Positive Polarity Correction Characteristics Setting (E0h)
+    minItems: 16
+    maxItems: 16
+
+  gamctrn1:
+    $ref: /schemas/types.yaml#definitions/uint8-array
+    description:
+      Gamma Negative Polarity Correction Characteristics Setting (E1h)
+    minItems: 16
+    maxItems: 16
+
+  write-only:
+    type: boolean
+    description:
+      Controller is not readable (ie. MISO is not wired up).
+
   dc-gpios:
     maxItems: 1
-    description: Display data/command selection (D/CX)
+    description: |
+      Controller data/command selection (D/CX) in 4-line SPI mode.
+      If not set, the controller is in 3-line SPI mode.
 
   backlight: true
   reg: true
   spi-max-frequency: true
   reset-gpios: true
   rotation: true
+  width-mm: true
+  height-mm: true
 
 required:
   - compatible
   - reg
-  - dc-gpios
 
 additionalProperties: false
 
@@ -72,5 +155,36 @@ examples:
                     backlight = <&backlight>;
             };
     };
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    spi {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            sainsmart18@0{
+                    compatible = "sitronix,st7735r";
+                    reg = <0>;
+                    spi-max-frequency = <40000000>;
+
+                    width = <160>;
+                    height = <128>;
+
+                    frmctr1 = [ 01 2C 2D ];
+                    invctr = [ 07 ];
+                    pwctr1 = [ A2 02 84 ];
+                    pwctr2 = [ C5 ];
+                    pwctr3 = [ 0A 00 ];
+                    vmctr1 = [ 0E ];
+                    madctl = [ 60 ];
+                    gamctrp1 = [ 0F 1A 0F 18 2F 28 20 22 1F 1B 23 37 00 07 02 10 ];
+                    gamctrn1 = [ 0F 1B 0F 17 33 2C 29 2E 30 30 39 3F 00 07 03 10 ];
+
+                    dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+                    reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+                    write-only;
+            };
+    };
+
 
 ...
