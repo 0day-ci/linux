@@ -101,6 +101,9 @@ static __init struct key_restriction *get_secondary_restriction(void)
 void __init set_machine_trusted_keys(struct key *keyring)
 {
 	machine_trusted_keys = keyring;
+
+	if (key_link(secondary_trusted_keys, machine_trusted_keys) < 0)
+		panic("Can't link (machine) trusted keyrings\n");
 }
 
 /**
