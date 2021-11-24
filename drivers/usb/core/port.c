@@ -9,6 +9,7 @@
 
 #include <linux/slab.h>
 #include <linux/pm_qos.h>
+#include <linux/usb/typec.h>
 
 #include "hub.h"
 
@@ -528,6 +529,14 @@ static void find_and_link_peer(struct usb_hub *hub, int port1)
 		link_peers_report(port_dev, peer);
 }
 
+static int usb_port_link_typec_port(struct notifier_block *nb, unsigned long event, void *ptr)
+{
+	struct usb_port *port_dev = container_of(nb, struct usb_port, typec_nb);
+
+	typec_link_port(&port_dev->dev);
+	return NOTIFY_OK;
+}
+
 int usb_hub_create_port_device(struct usb_hub *hub, int port1)
 {
 	struct usb_port *port_dev;
@@ -578,6 +587,14 @@ int usb_hub_create_port_device(struct usb_hub *hub, int port1)
 	find_and_link_peer(hub, port1);
 
 	/*
+	 * In some cases, the Type C port gets registered later, so
+	 * register a Type C notifier so that we can link the ports
+	 * later too.
+	 */
+	port_dev->typec_nb.notifier_call = usb_port_link_typec_port;
+	typec_port_registration_register_notify(&port_dev->typec_nb);
+
+	/*
 	 * Enable runtime pm and hold a refernce that hub_configure()
 	 * will drop once the PM_QOS_NO_POWER_OFF flag state has been set
 	 * and the hub has been fully registered (hdev->maxchild set).
@@ -616,6 +633,7 @@ void usb_hub_remove_port_device(struct usb_hub *hub, int port1)
 	struct usb_port *port_dev = hub->ports[port1 - 1];
 	struct usb_port *peer;
 
+	typec_port_registration_unregister_notify(&port_dev->typec_nb);
 	peer = port_dev->peer;
 	if (peer)
 		unlink_peers(port_dev, peer);

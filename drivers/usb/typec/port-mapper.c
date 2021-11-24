@@ -7,7 +7,6 @@
  */
 
 #include <linux/acpi.h>
-#include <linux/usb.h>
 #include <linux/usb/typec.h>
 
 #include "class.h"
@@ -219,46 +218,6 @@ void typec_unlink_port(struct device *port)
 	class_for_each_device(&typec_class, NULL, port, port_match_and_unlink);
 }
 EXPORT_SYMBOL_GPL(typec_unlink_port);
-
-static int each_port(struct device *port, void *connector)
-{
-	struct port_node *node;
-	int ret;
-
-	node = create_port_node(port);
-	if (IS_ERR(node))
-		return PTR_ERR(node);
-
-	if (!connector_match(connector, node)) {
-		remove_port_node(node);
-		return 0;
-	}
-
-	ret = link_port(to_typec_port(connector), node);
-	if (ret) {
-		remove_port_node(node->pld);
-		return ret;
-	}
-
-	get_device(connector);
-
-	return 0;
-}
-
-int typec_link_ports(struct typec_port *con)
-{
-	int ret = 0;
-
-	con->pld = get_pld(&con->dev);
-	if (!con->pld)
-		return 0;
-
-	ret = usb_for_each_port(&con->dev, each_port);
-	if (ret)
-		typec_unlink_ports(con);
-
-	return ret;
-}
 
 void typec_unlink_ports(struct typec_port *con)
 {

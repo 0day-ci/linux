@@ -11,6 +11,7 @@
  *  move struct usb_hub to this file.
  */
 
+#include <linux/notifier.h>
 #include <linux/usb.h>
 #include <linux/usb/ch11.h>
 #include <linux/usb/hcd.h>
@@ -89,6 +90,7 @@ struct usb_hub {
  * @is_superspeed cache super-speed status
  * @usb3_lpm_u1_permit: whether USB3 U1 LPM is permitted.
  * @usb3_lpm_u2_permit: whether USB3 U2 LPM is permitted.
+ * @typec_nb: notifier called when a Type C port is registered.
  */
 struct usb_port {
 	struct usb_device *child;
@@ -105,6 +107,7 @@ struct usb_port {
 	unsigned int is_superspeed:1;
 	unsigned int usb3_lpm_u1_permit:1;
 	unsigned int usb3_lpm_u2_permit:1;
+	struct notifier_block typec_nb;
 };
 
 #define to_usb_port(_dev) \

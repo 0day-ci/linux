@@ -2110,10 +2110,7 @@ struct typec_port *typec_register_port(struct device *parent,
 		return ERR_PTR(ret);
 	}
 
-	ret = typec_link_ports(port);
-	if (ret)
-		dev_warn(&port->dev, "failed to create symlinks (%d)\n", ret);
-
+	/* Used to allow USB ports to register to this Type C port */
 	blocking_notifier_call_chain(&typec_port_registration_notifier, 0, port);
 
 	return port;
