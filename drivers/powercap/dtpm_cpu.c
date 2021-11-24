@@ -189,16 +189,22 @@ static int cpuhp_dtpm_cpu_online(unsigned int cpu)
 		return 0;
 
 	pd = em_cpu_get(cpu);
-	if (!pd)
+	if (!pd) {
+		cpufreq_cpu_put(policy);
 		return -EINVAL;
+	}
 
 	dtpm = per_cpu(dtpm_per_cpu, cpu);
-	if (dtpm)
+	if (dtpm) {
+		cpufreq_cpu_put(policy);
 		return power_add(dtpm, pd);
+	}
 
 	dtpm = dtpm_alloc(&dtpm_ops);
-	if (!dtpm)
+	if (!dtpm) {
+		cpufreq_cpu_put(policy);
 		return -EINVAL;
+	}
 
 	dtpm_cpu = kzalloc(sizeof(*dtpm_cpu), GFP_KERNEL);
 	if (!dtpm_cpu)
@@ -226,6 +232,7 @@ static int cpuhp_dtpm_cpu_online(unsigned int cpu)
 	if (ret)
 		goto out_power_sub;
 
+	cpufreq_cpu_put(policy);
 	return 0;
 
 out_power_sub:
@@ -243,6 +250,7 @@ out_kfree_dtpm_cpu:
 
 out_kfree_dtpm:
 	kfree(dtpm);
+	cpufreq_cpu_put(policy);
 	return ret;
 }
 
