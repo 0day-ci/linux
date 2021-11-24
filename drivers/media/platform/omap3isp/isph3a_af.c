@@ -170,13 +170,13 @@ static int h3a_af_validate_params(struct ispstat *af, void *new_conf)
 			     OMAP3ISP_AF_PAXEL_VERTICAL_COUNT_MAX))
 		return -EINVAL;
 
-	if (IS_OUT_OF_BOUNDS(paxel_cfg->height, OMAP3ISP_AF_PAXEL_HEIGHT_MIN,
+	if (IS_OUT_OF_BOUNDS((u32)paxel_cfg->height, OMAP3ISP_AF_PAXEL_HEIGHT_MIN,
 			     OMAP3ISP_AF_PAXEL_HEIGHT_MAX) ||
 	    paxel_cfg->height % 2)
 		return -EINVAL;
 
 	/* Check width */
-	if (IS_OUT_OF_BOUNDS(paxel_cfg->width, OMAP3ISP_AF_PAXEL_WIDTH_MIN,
+	if (IS_OUT_OF_BOUNDS((u32)paxel_cfg->width, OMAP3ISP_AF_PAXEL_WIDTH_MIN,
 			     OMAP3ISP_AF_PAXEL_WIDTH_MAX) ||
 	    paxel_cfg->width % 2)
 		return -EINVAL;
