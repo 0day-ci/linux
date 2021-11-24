@@ -1576,27 +1576,6 @@ static int scrub_write_page_to_dev_replace(struct scrub_block *sblock,
 	return scrub_add_page_to_wr_bio(sblock->sctx, spage);
 }
 
-static int fill_writer_pointer_gap(struct scrub_ctx *sctx, u64 physical)
-{
-	int ret = 0;
-	u64 length;
-
-	if (!btrfs_is_zoned(sctx->fs_info))
-		return 0;
-
-	if (!btrfs_dev_is_sequential(sctx->wr_tgtdev, physical))
-		return 0;
-
-	if (sctx->write_pointer < physical) {
-		length = physical - sctx->write_pointer;
-
-		ret = btrfs_zoned_issue_zeroout(sctx->wr_tgtdev,
-						sctx->write_pointer, length);
-		if (!ret)
-			sctx->write_pointer = physical;
-	}
-	return ret;
-}
 
 static int scrub_add_page_to_wr_bio(struct scrub_ctx *sctx,
 				    struct scrub_page *spage)
@@ -1621,7 +1600,7 @@ again:
 	if (sbio->page_count == 0) {
 		struct bio *bio;
 
-		ret = fill_writer_pointer_gap(sctx,
+		ret = btrfs_fill_writer_pointer_gap(sctx,
 					      spage->physical_for_dev_replace);
 		if (ret) {
 			mutex_unlock(&sctx->wr_lock);
