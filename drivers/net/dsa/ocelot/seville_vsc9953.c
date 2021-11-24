@@ -994,36 +994,16 @@ static int vsc9953_reset(struct ocelot *ocelot)
 	return 0;
 }
 
-static void vsc9953_phylink_validate(struct ocelot *ocelot, int port,
-				     unsigned long *supported,
-				     struct phylink_link_state *state)
+static void vsc9953_phylink_get_caps(struct ocelot *ocelot, int port,
+				     struct phylink_config *config)
 {
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
-	if (state->interface != PHY_INTERFACE_MODE_NA &&
-	    state->interface != ocelot_port->phy_mode) {
-		linkmode_zero(supported);
-		return;
-	}
+	__set_bit(ocelot_port->phy_mode,
+		  config->supported_interfaces);
 
-	phylink_set_port_modes(mask);
-	phylink_set(mask, Autoneg);
-	phylink_set(mask, Pause);
-	phylink_set(mask, Asym_Pause);
-	phylink_set(mask, 10baseT_Full);
-	phylink_set(mask, 10baseT_Half);
-	phylink_set(mask, 100baseT_Full);
-	phylink_set(mask, 100baseT_Half);
-	phylink_set(mask, 1000baseT_Full);
-
-	if (state->interface == PHY_INTERFACE_MODE_INTERNAL) {
-		phylink_set(mask, 2500baseT_Full);
-		phylink_set(mask, 2500baseX_Full);
-	}
-
-	linkmode_and(supported, supported, mask);
-	linkmode_and(state->advertising, state->advertising, mask);
+	config->mac_capabilities = MAC_ASYM_PAUSE | MAC_SYM_PAUSE |
+		MAC_10 | MAC_100 | MAC_1000FD | MAC_2500FD;
 }
 
 static int vsc9953_prevalidate_phy_mode(struct ocelot *ocelot, int port,
@@ -1185,7 +1165,7 @@ static const struct felix_info seville_info_vsc9953 = {
 	.num_tx_queues		= OCELOT_NUM_TC,
 	.mdio_bus_alloc		= vsc9953_mdio_bus_alloc,
 	.mdio_bus_free		= vsc9953_mdio_bus_free,
-	.phylink_validate	= vsc9953_phylink_validate,
+	.phylink_get_caps	= vsc9953_phylink_get_caps,
 	.prevalidate_phy_mode	= vsc9953_prevalidate_phy_mode,
 };
 
