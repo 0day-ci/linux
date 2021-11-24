@@ -32,6 +32,7 @@
 #include <linux/psi.h>
 #include "blk.h"
 #include "blk-ioprio.h"
+#include "blk-rq-qos.h"
 #include "blk-throttle.h"
 
 /*
@@ -1200,16 +1201,18 @@ int blkcg_init_queue(struct request_queue *q)
 
 	ret = blk_throtl_init(q);
 	if (ret)
-		goto err_destroy_all;
+		goto err_qos_exit;
 
 	ret = blk_iolatency_init(q);
 	if (ret) {
 		blk_throtl_exit(q);
-		goto err_destroy_all;
+		goto err_qos_exit;
 	}
 
 	return 0;
 
+err_qos_exit:
+	rq_qos_exit(q);
 err_destroy_all:
 	blkg_destroy_all(q);
 	return ret;
@@ -1229,6 +1232,7 @@ err_unlock:
  */
 void blkcg_exit_queue(struct request_queue *q)
 {
+	rq_qos_exit(q);
 	blkg_destroy_all(q);
 	blk_throtl_exit(q);
 }
