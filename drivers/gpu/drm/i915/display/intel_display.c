@@ -8037,7 +8037,6 @@ static int intel_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-	intel_fbc_choose_crtc(dev_priv, state);
 	ret = intel_compute_global_watermarks(state);
 	if (ret)
 		goto fail;
@@ -8066,6 +8065,10 @@ static int intel_atomic_check(struct drm_device *dev,
 	}
 
 	ret = intel_atomic_check_crtcs(state);
+	if (ret)
+		goto fail;
+
+	ret = intel_fbc_atomic_check(state);
 	if (ret)
 		goto fail;
 
