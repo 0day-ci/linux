@@ -3,6 +3,7 @@
 #ifndef __LINUX_USB_TYPEC_H
 #define __LINUX_USB_TYPEC_H
 
+#include <linux/notifier.h>
 #include <linux/types.h>
 
 /* USB Type-C Specification releases */
@@ -308,6 +309,8 @@ int typec_get_negotiated_svdm_version(struct typec_port *port);
 #if IS_REACHABLE(CONFIG_TYPEC)
 int typec_link_port(struct device *port);
 void typec_unlink_port(struct device *port);
+int typec_port_registration_register_notify(struct notifier_block *nb);
+int typec_port_registration_unregister_notify(struct notifier_block *nb);
 #else
 static inline int typec_link_port(struct device *port)
 {
@@ -315,6 +318,16 @@ static inline int typec_link_port(struct device *port)
 }
 
 static inline void typec_unlink_port(struct device *port) { }
+
+int typec_port_registration_register_notify(struct notifier_block *nb)
+{
+	return 0;
+}
+
+int typec_port_registration_unregister_notify(struct notifier_block *nb)
+{
+	return 0;
+}
 #endif
 
 #endif /* __LINUX_USB_TYPEC_H */

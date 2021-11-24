@@ -16,6 +16,8 @@
 #include "bus.h"
 #include "class.h"
 
+static BLOCKING_NOTIFIER_HEAD(typec_port_registration_notifier);
+
 static DEFINE_IDA(typec_index_ida);
 
 struct class typec_class = {
@@ -1980,6 +1982,32 @@ void typec_port_register_altmodes(struct typec_port *port,
 EXPORT_SYMBOL_GPL(typec_port_register_altmodes);
 
 /**
+ *  typec_port_registration_register_notify - Register a notifier for Type C port registration.
+ *  @nb: notifier block to signal
+ *
+ *  This function allows callers to get a notification when a Type C port is registered with
+ *  the connector class.
+ */
+int typec_port_registration_register_notify(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&typec_port_registration_notifier, nb);
+}
+EXPORT_SYMBOL_GPL(typec_port_registration_register_notify);
+
+/**
+ *  typec_port_registration_unregister_notify - Unregister a notifier for Type C port registration.
+ *  @nb: notifier block to unregister
+ *
+ *  This function allows callers to unregister notifiers which were previously registered using
+ *  typec_port_registration_register_notify().
+ */
+int typec_port_registration_unregister_notify(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&typec_port_registration_notifier, nb);
+}
+EXPORT_SYMBOL_GPL(typec_port_registration_unregister_notify);
+
+/**
  * typec_register_port - Register a USB Type-C Port
  * @parent: Parent device
  * @cap: Description of the port
@@ -2085,6 +2113,8 @@ struct typec_port *typec_register_port(struct device *parent,
 	ret = typec_link_ports(port);
 	if (ret)
 		dev_warn(&port->dev, "failed to create symlinks (%d)\n", ret);
+
+	blocking_notifier_call_chain(&typec_port_registration_notifier, 0, port);
 
 	return port;
 }
