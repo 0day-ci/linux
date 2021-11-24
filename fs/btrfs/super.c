@@ -49,6 +49,7 @@
 #include "block-group.h"
 #include "discard.h"
 #include "qgroup.h"
+#include "scrub.h"
 #define CREATE_TRACE_POINTS
 #include <trace/events/btrfs.h>
 
