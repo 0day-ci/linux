@@ -634,6 +634,30 @@ static void cs42l42_run_jack_detect(struct sub_codec *cs42l42)
 	cs8409_i2c_write(cs42l42, 0x1120, 0xc0);
 }
 
+static void cs42l42_run_jack_detect_all(struct hda_codec *codec)
+{
+	struct cs8409_spec *spec = codec->spec;
+	struct sub_codec *cs42l42;
+	int i;
+
+	for (i = 0; i < spec->num_scodecs; i++) {
+		cs42l42 = spec->scodecs[i];
+		cs42l42_enable_jack_detect(cs42l42);
+		if (!cs42l42->hp_jack_in)
+			cs42l42_run_jack_detect(cs42l42);
+	}
+}
+
+/*
+ * cs42l42_jack_detect_worker - Worker that retries jack detect
+ */
+static void cs42l42_jack_detect_worker(struct work_struct *work)
+{
+	struct cs8409_spec *spec = container_of(work, struct cs8409_spec, jack_detect_work.work);
+
+	cs42l42_run_jack_detect_all(spec->codec);
+}
+
 static int cs42l42_handle_tip_sense(struct sub_codec *cs42l42, unsigned int reg_ts_status)
 {
 	int status_changed = 0;
@@ -749,8 +773,6 @@ static void cs42l42_resume(struct sub_codec *cs42l42)
 
 	if (cs42l42->full_scale_vol)
 		cs8409_i2c_write(cs42l42, 0x2001, 0x01);
-
-	cs42l42_enable_jack_detect(cs42l42);
 }
 
 #ifdef CONFIG_PM
@@ -800,6 +822,7 @@ static void cs8409_free(struct hda_codec *codec)
 
 	/* Cancel i2c clock disable timer, and disable clock if left enabled */
 	cancel_delayed_work_sync(&spec->i2c_clk_work);
+	cancel_delayed_work_sync(&spec->jack_detect_work);
 	cs8409_disable_i2c_clock(codec);
 
 	snd_hda_gen_free(codec);
@@ -863,6 +886,7 @@ static int cs8409_cs42l42_suspend(struct hda_codec *codec)
 
 	/* Cancel i2c clock disable timer, and disable clock if left enabled */
 	cancel_delayed_work_sync(&spec->i2c_clk_work);
+	cancel_delayed_work_sync(&spec->jack_detect_work);
 	cs8409_disable_i2c_clock(codec);
 
 	snd_hda_shutup_pins(codec);
@@ -970,6 +994,8 @@ void cs8409_cs42l42_fixups(struct hda_codec *codec, const struct hda_fixup *fix,
 		spec->scodecs[CS8409_CODEC0]->codec = codec;
 		codec->patch_ops = cs8409_cs42l42_patch_ops;
 
+		INIT_DELAYED_WORK(&spec->jack_detect_work, cs42l42_jack_detect_worker);
+
 		spec->gen.suppress_auto_mute = 1;
 		spec->gen.no_primary_hp = 1;
 		spec->gen.suppress_vmaster = 1;
@@ -1029,9 +1055,16 @@ void cs8409_cs42l42_fixups(struct hda_codec *codec, const struct hda_fixup *fix,
 	case HDA_FIXUP_ACT_INIT:
 		cs8409_cs42l42_hw_init(codec);
 		spec->init_done = 1;
-		if (spec->init_done && spec->build_ctrl_done
-			&& !spec->scodecs[CS8409_CODEC0]->hp_jack_in)
-			cs42l42_run_jack_detect(spec->scodecs[CS8409_CODEC0]);
+		if (spec->init_done && spec->build_ctrl_done) {
+			/* No point in running jack detect until we have fully resumed */
+			if (codec->core.dev.power.power_state.event != PM_EVENT_ON) {
+				codec_warn(codec, "Not ready to detect jack, deferring...\n");
+				schedule_delayed_work(&spec->jack_detect_work, msecs_to_jiffies(25));
+				return;
+			} else {
+				cs42l42_run_jack_detect_all(codec);
+			}
+		}
 		break;
 	case HDA_FIXUP_ACT_BUILD:
 		spec->build_ctrl_done = 1;
@@ -1040,9 +1073,16 @@ void cs8409_cs42l42_fixups(struct hda_codec *codec, const struct hda_fixup *fix,
 		 * been already plugged in.
 		 * Run immediately after init.
 		 */
-		if (spec->init_done && spec->build_ctrl_done
-			&& !spec->scodecs[CS8409_CODEC0]->hp_jack_in)
-			cs42l42_run_jack_detect(spec->scodecs[CS8409_CODEC0]);
+		if (spec->init_done && spec->build_ctrl_done) {
+			/* No point in running jack detect until we have fully resumed */
+			if (codec->core.dev.power.power_state.event != PM_EVENT_ON) {
+				codec_warn(codec, "Not ready to detect jack, deferring...\n");
+				schedule_delayed_work(&spec->jack_detect_work, msecs_to_jiffies(25));
+				return;
+			} else {
+				cs42l42_run_jack_detect_all(codec);
+			}
+		}
 		break;
 	default:
 		break;
@@ -1178,7 +1218,6 @@ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int ac
 {
 	struct cs8409_spec *spec = codec->spec;
 	struct snd_kcontrol_new *kctrl;
-	int i;
 
 	switch (action) {
 	case HDA_FIXUP_ACT_PRE_PROBE:
@@ -1192,6 +1231,8 @@ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int ac
 		spec->scodecs[CS8409_CODEC1] = &dolphin_cs42l42_1;
 		spec->scodecs[CS8409_CODEC1]->codec = codec;
 		spec->num_scodecs = 2;
+
+		INIT_DELAYED_WORK(&spec->jack_detect_work, cs42l42_jack_detect_worker);
 
 		codec->patch_ops = cs8409_dolphin_patch_ops;
 
@@ -1237,9 +1278,13 @@ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int ac
 		dolphin_hw_init(codec);
 		spec->init_done = 1;
 		if (spec->init_done && spec->build_ctrl_done) {
-			for (i = 0; i < spec->num_scodecs; i++) {
-				if (!spec->scodecs[i]->hp_jack_in)
-					cs42l42_run_jack_detect(spec->scodecs[i]);
+			/* No point in running jack detect until we have fully resumed */
+			if (codec->core.dev.power.power_state.event != PM_EVENT_ON) {
+				codec_warn(codec, "Not ready to detect jack, deferring...\n");
+				schedule_delayed_work(&spec->jack_detect_work, msecs_to_jiffies(25));
+				return;
+			} else {
+				cs42l42_run_jack_detect_all(codec);
 			}
 		}
 		break;
@@ -1251,9 +1296,13 @@ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int ac
 		 * Run immediately after init.
 		 */
 		if (spec->init_done && spec->build_ctrl_done) {
-			for (i = 0; i < spec->num_scodecs; i++) {
-				if (!spec->scodecs[i]->hp_jack_in)
-					cs42l42_run_jack_detect(spec->scodecs[i]);
+			/* No point in running jack detect until we have fully resumed */
+			if (codec->core.dev.power.power_state.event != PM_EVENT_ON) {
+				codec_warn(codec, "Not ready to detect jack, deferring...\n");
+				schedule_delayed_work(&spec->jack_detect_work, msecs_to_jiffies(25));
+				return;
+			} else {
+				cs42l42_run_jack_detect_all(codec);
 			}
 		}
 		break;
