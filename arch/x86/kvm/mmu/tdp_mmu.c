@@ -695,23 +695,15 @@ static inline bool tdp_mmu_iter_cond_resched(struct kvm *kvm,
  * account for the possibility that other threads are modifying the paging
  * structures concurrently. If shared is false, this thread should hold the
  * MMU lock in write mode.
+ *
+ * If zap_all is true, eliminate all the paging structures that contains the
+ * SPTEs.
  */
-static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
-			  gfn_t start, gfn_t end, bool can_yield, bool flush,
-			  bool shared)
+static bool __zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
+			    gfn_t start, gfn_t end, bool can_yield, bool flush,
+			    bool shared, bool zap_all)
 {
-	gfn_t max_gfn_host = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
-	bool zap_all = (start == 0 && end >= max_gfn_host);
 	struct tdp_iter iter;
-
-	/*
-	 * Bound the walk at host.MAXPHYADDR, guest accesses beyond that will
-	 * hit a #PF(RSVD) and never get to an EPT Violation/Misconfig / #NPF,
-	 * and so KVM will never install a SPTE for such addresses.
-	 */
-	end = min(end, max_gfn_host);
-
-	kvm_lockdep_assert_mmu_lock_held(kvm, shared);
 
 	rcu_read_lock();
 
@@ -723,17 +715,24 @@ retry:
 			continue;
 		}
 
-		if (!is_shadow_present_pte(iter.old_spte))
+		/*
+		 * In zap_all case, ignore the checking of present since we have
+		 * to zap everything.
+		 */
+		if (!zap_all && !is_shadow_present_pte(iter.old_spte))
 			continue;
 
 		/*
 		 * If this is a non-last-level SPTE that covers a larger range
 		 * than should be zapped, continue, and zap the mappings at a
-		 * lower level, except when zapping all SPTEs.
+		 * lower level. Actual zapping started at proper granularity
+		 * that is not so large as to cause a soft lockup when handling
+		 * the changed pte (which does not yield).
 		 */
 		if (!zap_all &&
 		    (iter.gfn < start ||
-		     iter.gfn + KVM_PAGES_PER_HPAGE(iter.level) > end) &&
+		     iter.gfn + KVM_PAGES_PER_HPAGE(iter.level) > end ||
+		     iter.level > PG_LEVEL_1G) &&
 		    !is_last_spte(iter.old_spte, iter.level))
 			continue;
 
@@ -751,6 +750,30 @@ retry:
 	}
 
 	rcu_read_unlock();
+	return flush;
+}
+
+static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
+			  gfn_t start, gfn_t end, bool can_yield, bool flush,
+			  bool shared)
+{
+	gfn_t max_gfn_host = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
+	bool zap_all = (start == 0 && end >= max_gfn_host);
+
+	/*
+	 * Bound the walk at host.MAXPHYADDR, guest accesses beyond that will
+	 * hit a #PF(RSVD) and never get to an EPT Violation/Misconfig / #NPF,
+	 * and so KVM will never install a SPTE for such addresses.
+	 */
+	end = min(end, max_gfn_host);
+
+	kvm_lockdep_assert_mmu_lock_held(kvm, shared);
+
+	flush = __zap_gfn_range(kvm, root, start, end, can_yield, flush, shared,
+				false);
+	if (zap_all)
+		flush = __zap_gfn_range(kvm, root, start, end, can_yield, flush,
+					shared, true);
 	return flush;
 }
 
