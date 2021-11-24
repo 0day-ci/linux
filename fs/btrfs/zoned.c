@@ -2282,3 +2282,17 @@ int btrfs_sync_write_pointer_for_zoned(struct scrub_ctx *sctx, u64 logical,
 
 	return ret;
 }
+
+void btrfs_sync_replace_for_zoned(struct scrub_ctx *sctx)
+{
+	if (!btrfs_is_zoned(sctx->fs_info))
+		return;
+
+	sctx->flush_all_writes = true;
+	btrfs_scrub_submit(sctx);
+	mutex_lock(&sctx->wr_lock);
+	btrfs_scrub_wr_submit(sctx);
+	mutex_unlock(&sctx->wr_lock);
+
+	wait_event(sctx->list_wait, atomic_read(&sctx->bios_in_flight) == 0);
+}

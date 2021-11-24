@@ -3056,20 +3056,6 @@ out:
 	return ret < 0 ? ret : 0;
 }
 
-static void sync_replace_for_zoned(struct scrub_ctx *sctx)
-{
-	if (!btrfs_is_zoned(sctx->fs_info))
-		return;
-
-	sctx->flush_all_writes = true;
-	btrfs_scrub_submit(sctx);
-	mutex_lock(&sctx->wr_lock);
-	btrfs_scrub_wr_submit(sctx);
-	mutex_unlock(&sctx->wr_lock);
-
-	wait_event(sctx->list_wait, atomic_read(&sctx->bios_in_flight) == 0);
-}
-
 static noinline_for_stack int scrub_stripe(struct scrub_ctx *sctx,
 					   struct map_lookup *map,
 					   struct btrfs_device *scrub_dev,
@@ -3402,7 +3388,7 @@ again:
 				goto out;
 
 			if (sctx->is_dev_replace)
-				sync_replace_for_zoned(sctx);
+				btrfs_sync_replace_for_zoned(sctx);
 
 			if (extent_logical + extent_len <
 			    key.objectid + bytes) {
