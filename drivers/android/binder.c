@@ -4424,10 +4424,12 @@ static int binder_thread_release(struct binder_proc *proc,
 	/*
 	 * If this thread used poll, make sure we remove the waitqueue
 	 * from any epoll data structures holding it with POLLFREE.
-	 * waitqueue_active() is safe to use here because we're holding
-	 * the inner lock.
 	 */
 	if ((thread->looper & BINDER_LOOPER_STATE_POLL) &&
+	    /*
+	     * waitqueue_active() is safe to use here because we're holding
+	     * the inner lock.
+	     */
 	    waitqueue_active(&thread->wait)) {
 		wake_up_poll(&thread->wait, EPOLLHUP | POLLFREE);
 	}
