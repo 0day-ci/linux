@@ -1144,6 +1144,10 @@ struct task_struct {
 	int				softirq_disable_cnt;
 #endif
 
+#ifdef CONFIG_PRINTK
+	u8				printk_loglevel;
+#endif
+
 #ifdef CONFIG_LOCKDEP
 # define MAX_LOCK_DEPTH			48UL
 	u64				curr_chain_key;

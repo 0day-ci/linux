@@ -2021,6 +2021,62 @@ static inline u32 printk_caller_id(void)
 		0x80000000 + raw_smp_processor_id();
 }
 
+/* Support to use the loglevel of the last message for continuous lines. */
+#ifdef CONFIG_HAVE_NMI
+#define PRINTK_IRQ_CTX_NUM	3
+#else
+#define PRINTK_IRQ_CTX_NUM	2
+#endif
+
+static DEFINE_PER_CPU(u8, printk_loglevel_irq_ctx[PRINTK_IRQ_CTX_NUM]);
+static u8 printk_loglevel_irq_ctx_early[PRINTK_IRQ_CTX_NUM];
+
+/* Return pointer where the loglevel is stored for the current context. */
+static u8 *printk_loglevel_ctx_var(void)
+{
+	unsigned char irq_ctx_level = interrupt_context_level();
+
+	/* normal process context */
+	if (irq_ctx_level == 0)
+		return &current->printk_loglevel;
+
+	/* IRQ context */
+	if (WARN_ON_ONCE(irq_ctx_level > PRINTK_IRQ_CTX_NUM))
+		return NULL;
+
+	if (printk_percpu_data_ready())
+		return this_cpu_ptr(&printk_loglevel_irq_ctx[irq_ctx_level - 1]);
+	else
+		return &printk_loglevel_irq_ctx_early[irq_ctx_level - 1];
+}
+
+static void printk_write_loglevel_ctx(int loglevel)
+{
+	u8 *loglevel_var = printk_loglevel_ctx_var();
+
+	if (!loglevel_var)
+		return;
+
+	/*
+	 * Remember only the really used loglevels that can be stored
+	 * within 3 bytes in struct printk_info.
+	 */
+	if (WARN_ON_ONCE(loglevel != LOG_LEVEL(loglevel)))
+		return;
+
+	*loglevel_var = loglevel;
+}
+
+static u8 printk_read_loglevel_ctx(void)
+{
+	u8 *loglevel_var = printk_loglevel_ctx_var();
+
+	if (!loglevel_var)
+		return LOGLEVEL_DEFAULT;
+
+	return *loglevel_var;
+}
+
 /**
  * printk_parse_prefix - Parse level and control flags.
  *
@@ -2064,6 +2120,21 @@ u16 printk_parse_prefix(const char *text, int *level,
 	}
 
 	return prefix_len;
+}
+
+static int printk_sanitize_loglevel(int loglevel, enum printk_info_flags flags)
+{
+	/* For continuous lines, fallback to the previously used loglevel. */
+	if (flags & LOG_CONT && loglevel == LOGLEVEL_DEFAULT)
+		loglevel = printk_read_loglevel_ctx();
+
+	if (loglevel == LOGLEVEL_DEFAULT)
+		loglevel = default_message_loglevel;
+
+	/* Remember the really used loglevel for this context. */
+	printk_write_loglevel_ctx(loglevel);
+
+	return loglevel;
 }
 
 __printf(5, 0)
@@ -2142,8 +2213,7 @@ int vprintk_store(int facility, int level,
 	if (facility == 0)
 		printk_parse_prefix(&prefix_buf[0], &level, &flags);
 
-	if (level == LOGLEVEL_DEFAULT)
-		level = default_message_loglevel;
+	level = printk_sanitize_loglevel(level, flags);
 
 	if (dev_info)
 		flags |= LOG_NEWLINE;
