@@ -7,6 +7,7 @@ VERBOSE="${VERBOSE:-1}"
 IKCONFIG="/tmp/config-`uname -r`"
 KERNEL_IMAGE="/boot/vmlinuz-`uname -r`"
 SECURITYFS=$(grep "securityfs" /proc/mounts | awk '{print $2}')
+BLACKLIST_BIN_HASH=""
 
 log_info()
 {
@@ -243,4 +244,74 @@ check_ima_policy()
 	# invert "grep -q" result, returning 1 for found.
 	[ $? -eq 0 ] && ret=1
 	return $ret
+}
+
+# Look for check_blacklist in IMA Policy
+# Return 1 for found and 0 for not found.
+check_for_ima_policy_blacklist()
+{
+	local ret=0
+
+	check_ima_policy "appraise" "func=KEXEC_KERNEL_CHECK" \
+			"appraise_flag=check_blacklist"
+	ret=$?
+	[ $ret -eq 1 ] && log_info "Found IMA blacklist policy rule"
+
+	return $ret
+}
+
+# Look for blacklist_binary from blacklist keyring
+# Return 1 for found and 0 for not found.
+check_for_dbx_bin()
+{
+	local ret=0
+
+	which keyctl > /dev/null 2>&1 || log_skip "keyctl not found"
+	cmd=$(keyctl show %keyring:.blacklist | grep "blacklist: bin" | wc -l)
+	if [ $cmd -ge 1 ]; then
+		BLACKLIST_BIN_HASH=$(keyctl show %keyring:.blacklist | grep \
+					"blacklist: bin" | cut -d":" -f3)
+		log_info "Found DBX blacklist binary from keyring"
+		ret=1
+	fi
+	return $ret
+}
+
+common_steps_for_dbx()
+{
+	ima_policy=0
+        dbx=0
+	secureboot=0
+
+	# kexec requires root privileges
+	require_root_privileges
+
+	# get the kernel config
+	get_kconfig
+
+	kconfig_enabled "CONFIG_KEXEC_FILE=y" "kexec_file_load is enabled"
+	if [ $? -eq 0 ]; then
+		log_skip "kexec_file_load is not enabled"
+	fi
+
+	kconfig_enabled "CONFIG_SYSTEM_BLACKLIST_KEYRING=y" \
+			"Kernel config blacklist_keyring is enabled"
+	if [ $? -eq 0 ]; then
+		log_skip "Kernel config blacklist_keyring is not enabled"
+	fi
+
+	check_for_ima_policy_blacklist
+	ima_policy=$?
+	if [ $ima_policy -eq 0 ];then
+		log_skip "Not found IMA blacklist policy rule"
+	fi
+
+	check_for_dbx_bin
+	dbx=$?
+	if [ $dbx -eq 0 ]; then
+		log_skip "Not found blacklisted kernel"
+	fi
+
+	get_secureboot_mode
+	secureboot=$?
 }
