@@ -12,6 +12,8 @@
 #include <linux/kthread.h>
 #include <linux/mm.h>
 #include <linux/random.h>
+#include <linux/sched.h>
+#include <linux/sched/debug.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 
@@ -978,12 +980,25 @@ static unsigned long damos_wmark_wait_us(struct damos *scheme)
 	return 0;
 }
 
+/* sleep for @usecs in idle mode */
+static void __sched damon_usleep_idle(unsigned long usecs)
+{
+	ktime_t exp = ktime_add_us(ktime_get(), usecs);
+	u64 delta = usecs * NSEC_PER_USEC / 100;	/* allow 1% error */
+
+	for (;;) {
+		__set_current_state(TASK_IDLE);
+		if (!schedule_hrtimeout_range(&exp, delta, HRTIMER_MODE_ABS))
+			break;
+	}
+}
+
 static void kdamond_usleep(unsigned long usecs)
 {
 	if (usecs > 100 * 1000)
-		schedule_timeout_interruptible(usecs_to_jiffies(usecs));
+		schedule_timeout_idle(usecs_to_jiffies(usecs));
 	else
-		usleep_range(usecs, usecs + 1);
+		damon_usleep_idle(usecs);
 }
 
 /* Returns negative error code if it's not activated but should return */
@@ -1038,7 +1053,7 @@ static int kdamond_fn(void *data)
 				ctx->callback.after_sampling(ctx))
 			done = true;
 
-		usleep_range(ctx->sample_interval, ctx->sample_interval + 1);
+		kdamond_usleep(ctx->sample_interval);
 
 		if (ctx->primitive.check_accesses)
 			max_nr_accesses = ctx->primitive.check_accesses(ctx);
