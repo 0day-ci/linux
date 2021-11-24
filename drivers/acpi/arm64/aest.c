@@ -14,6 +14,8 @@
 
 #include <asm/ras.h>
 
+#include <ras/ras_event.h>
+
 #undef pr_fmt
 #define pr_fmt(fmt) "ACPI AEST: " fmt
 
@@ -125,6 +127,9 @@ static void aest_proc(struct aest_node_data *data)
 		}
 
 		aest_print(data, regs, i, misc23_present);
+
+		trace_arm_ras_ext_event(data->node_type, data->data.vendor.acpi_hid,
+					data->data.vendor.acpi_uid, i, &regs);
 
 		if (regs.err_status & ERR_STATUS_UE)
 			fatal = true;

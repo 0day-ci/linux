@@ -6,6 +6,8 @@
 #include <asm/cpufeature.h>
 #include <asm/ras.h>
 
+#include <ras/ras_event.h>
+
 static bool ras_extn_v1p1(void)
 {
 	unsigned long fld, reg = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
@@ -94,6 +96,8 @@ void arch_arm_ras_report_error(u64 implemented, bool clear_misc)
 		}
 
 		arch_arm_ras_print_error(&regs, i, misc23_present);
+
+		trace_arm_ras_ext_event(0, cpu_num, 0, i, &regs);
 
 		/*
 		 * In the future, we will treat UER conditions as potentially
