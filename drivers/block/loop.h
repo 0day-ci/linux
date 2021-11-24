@@ -19,6 +19,7 @@
 /* Possible states of device */
 enum {
 	Lo_unbound,
+	Lo_binding,
 	Lo_bound,
 	Lo_rundown,
 	Lo_deleting,
