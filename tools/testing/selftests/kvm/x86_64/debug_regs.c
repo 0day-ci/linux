@@ -168,7 +168,7 @@ int main(void)
 	target_rip = CAST_TO_RIP(ss_start);
 	target_dr6 = 0xffff4ff0ULL;
 	vcpu_regs_get(vm, VCPU_ID, &regs);
-	for (i = 0; i < (sizeof(ss_size) / sizeof(ss_size[0])); i++) {
+	for (i = 0; i < ARRAY_SIZE(ss_size); i++) {
 		target_rip += ss_size[i];
 		CLEAR_DEBUG();
 		debug.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP |
