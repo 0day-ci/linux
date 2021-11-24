@@ -86,7 +86,7 @@ __setup("kasan_multi_shot", kasan_set_multi_shot);
 
 static void print_error_description(struct kasan_access_info *info)
 {
-	pr_err("BUG: KASAN: %s in %pS\n",
+	pr_err("KASAN: BUG: %s in %pS\n",
 		kasan_get_bug_type(info), (void *)info->ip);
 	if (info->access_size)
 		pr_err("%s of size %zu at addr %px by task %s/%d\n",
@@ -366,7 +366,7 @@ void kasan_report_invalid_free(void *object, unsigned long ip)
 #endif /* IS_ENABLED(CONFIG_KUNIT) */
 
 	start_report(&flags);
-	pr_err("BUG: KASAN: double-free or invalid-free in %pS\n", (void *)ip);
+	pr_err("KASAN: BUG: double-free or invalid-free in %pS\n", (void *)ip);
 	kasan_print_tags(tag, object);
 	pr_err("\n");
 	print_address_description(object, tag);
@@ -386,7 +386,7 @@ void kasan_report_async(void)
 #endif /* IS_ENABLED(CONFIG_KUNIT) */
 
 	start_report(&flags);
-	pr_err("BUG: KASAN: invalid-access\n");
+	pr_err("KASAN: BUG: invalid-access\n");
 	pr_err("Asynchronous mode enabled: no access details available\n");
 	pr_err("\n");
 	dump_stack_lvl(KERN_ERR);
