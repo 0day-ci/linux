@@ -317,6 +317,10 @@ int intel_vgpu_emulate_cfg_write(struct intel_vgpu *vgpu, unsigned int offset,
 		return -EINVAL;
 
 	if (drm_WARN_ON(&i915->drm,
+			offset > vgpu->gvt->device_info.cfg_space_size))
+		return -EINVAL;
+
+	if (drm_WARN_ON(&i915->drm,
 			offset + bytes > vgpu->gvt->device_info.cfg_space_size))
 		return -EINVAL;
 
