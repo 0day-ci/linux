@@ -156,21 +156,26 @@ static int cpuhp_dtpm_cpu_offline(unsigned int cpu)
 		return 0;
 
 	pd = em_cpu_get(cpu);
-	if (!pd)
+	if (!pd) {
+		cpufreq_cpu_put(policy);
 		return -EINVAL;
+	}
 
 	dtpm = per_cpu(dtpm_per_cpu, cpu);
 
 	power_sub(dtpm, pd);
 
-	if (cpumask_weight(policy->cpus) != 1)
+	if (cpumask_weight(policy->cpus) != 1) {
+		cpufreq_cpu_put(policy);
 		return 0;
+	}
 
 	for_each_cpu(cpu, policy->related_cpus)
 		per_cpu(dtpm_per_cpu, cpu) = NULL;
 
 	dtpm_unregister(dtpm);
 
+	cpufreq_cpu_put(policy);
 	return 0;
 }
 
