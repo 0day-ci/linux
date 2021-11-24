@@ -1339,4 +1339,24 @@ int qed_mcp_nvm_get_cfg(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
 int qed_mcp_nvm_set_cfg(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
 			u16 option_id, u8 entity_id, u16 flags, u8 *p_buf,
 			u32 len);
+
+/**
+ * qed_mcp_is_esl_supported(): Return whether management firmware support ESL or not.
+ *
+ * @p_hwfn: hw function pointer
+ *
+ * Return: bool
+ */
+bool qed_mcp_is_esl_supported(struct qed_hwfn *p_hwfn);
+
+/**
+ * qed_mcp_get_esl_status(): Get enhanced system lockdown status
+ *
+ * @p_hwfn: hw function pointer
+ * @p_ptt: ptt resource pointer
+ * @active: ESL active status data pointer
+ *
+ * Return: Int
+ */
+int qed_mcp_get_esl_status(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt, bool *active);
 #endif
