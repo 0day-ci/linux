@@ -782,8 +782,7 @@ static void rdac_bus_detach( struct scsi_device *sdev )
 	}
 	spin_unlock(&list_lock);
 	sdev->handler_data = NULL;
-	synchronize_rcu();
-	kfree(h);
+	kvfree_rcu(h);
 }
 
 static struct scsi_device_handler rdac_dh = {

@@ -180,8 +180,7 @@ static int tpci200_free_irq(struct ipack_device *dev)
 	slot_irq = tpci200->slots[dev->slot].irq;
 	/* uninstall handler */
 	RCU_INIT_POINTER(tpci200->slots[dev->slot].irq, NULL);
-	synchronize_rcu();
-	kfree(slot_irq);
+	kvfree_rcu(slot_irq);
 	mutex_unlock(&tpci200->mutex);
 	return 0;
 }

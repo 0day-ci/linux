@@ -1061,8 +1061,7 @@ static int nx842_probe(struct vio_dev *viodev,
 
 	rcu_assign_pointer(devdata, new_devdata);
 	spin_unlock_irqrestore(&devdata_mutex, flags);
-	synchronize_rcu();
-	kfree(old_devdata);
+	kvfree_rcu(old_devdata);
 
 	of_reconfig_notifier_register(&nx842_of_nb);
 

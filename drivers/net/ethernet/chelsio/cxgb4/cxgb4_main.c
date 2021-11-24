@@ -7190,8 +7190,7 @@ static void remove_one(struct pci_dev *pdev)
 	}
 	pci_release_regions(pdev);
 	kfree(adapter->mbox_log);
-	synchronize_rcu();
-	kfree(adapter);
+	kvfree_rcu(adapter);
 }
 
 /* "Shutdown" quiesces the device, stopping Ingress Packet and Interrupt

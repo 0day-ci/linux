@@ -179,10 +179,8 @@ void dln2_unregister_event_cb(struct platform_device *pdev, u16 id)
 
 	spin_unlock_irqrestore(&dln2->event_cb_lock, flags);
 
-	if (found) {
-		synchronize_rcu();
-		kfree(i);
-	}
+	if (found)
+		kvfree_rcu(i);
 }
 EXPORT_SYMBOL(dln2_unregister_event_cb);
 

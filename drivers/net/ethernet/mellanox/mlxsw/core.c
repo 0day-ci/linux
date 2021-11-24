@@ -2190,8 +2190,7 @@ void mlxsw_core_rx_listener_unregister(struct mlxsw_core *mlxsw_core,
 	if (!rxl_item)
 		return;
 	list_del_rcu(&rxl_item->list);
-	synchronize_rcu();
-	kfree(rxl_item);
+	kvfree_rcu(rxl_item);
 }
 EXPORT_SYMBOL(mlxsw_core_rx_listener_unregister);
 

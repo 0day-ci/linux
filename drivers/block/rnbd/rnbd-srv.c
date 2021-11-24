@@ -808,8 +808,7 @@ fill_response:
 
 free_srv_sess_dev:
 	xa_erase(&srv_sess->index_idr, srv_sess_dev->device_id);
-	synchronize_rcu();
-	kfree(srv_sess_dev);
+	kvfree_rcu(srv_sess_dev);
 srv_dev_put:
 	if (open_msg->access_mode != RNBD_ACCESS_RO) {
 		mutex_lock(&srv_dev->lock);

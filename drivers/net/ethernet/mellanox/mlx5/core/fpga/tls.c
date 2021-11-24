@@ -253,7 +253,7 @@ static void mlx5_fpga_tls_send_teardown_cmd(struct mlx5_core_dev *mdev,
 	MLX5_SET(tls_cmd, cmd, swid, swid);
 
 	mlx5_fpga_tls_flow_to_cmd(flow, cmd);
-	kfree(flow);
+	kvfree_rcu(flow);
 
 	buf->sg[0].data = cmd;
 	buf->sg[0].size = MLX5_TLS_COMMAND_SIZE;
@@ -283,7 +283,6 @@ void mlx5_fpga_tls_del_flow(struct mlx5_core_dev *mdev, u32 swid,
 		return;
 	}
 
-	synchronize_rcu(); /* before kfree(flow) */
 	mlx5_fpga_tls_send_teardown_cmd(mdev, flow, swid, flags);
 }
 

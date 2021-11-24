@@ -388,8 +388,7 @@ err_free:
 		sqs = rcu_replace_pointer(chs->c[i]->qos_sqs, NULL,
 					  lockdep_is_held(&priv->state_lock));
 
-		synchronize_rcu(); /* Sync with NAPI. */
-		kvfree(sqs);
+		kvfree_rcu(sqs); /* Sync with NAPI. */
 	}
 	return -ENOMEM;
 }
