@@ -992,6 +992,19 @@ config GPIO_ADNP
 	  enough to represent all pins, but the driver will assume a
 	  register layout for 64 pins (8 registers).
 
+config GPIO_CYPRESS_CY8C95X0
+	tristate "Cypress CY8C95X0 I2C GPIO expander"
+	depends on OF_GPIO
+	select GPIOLIB_IRQCHIP
+	select GPIO_REGMAP
+	select REGMAP_I2C
+	select REGMAP
+	help
+	  Support for 20/40/60 pin Cypress Cy8C95x0 GPIO I2C expander.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called gpio-cy8c95x0.
+
 config GPIO_GW_PLD
 	tristate "Gateworks PLD GPIO Expander"
 	depends on OF_GPIO
