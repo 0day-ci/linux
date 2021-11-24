@@ -3803,9 +3803,6 @@ struct btrfs_root *find_reloc_root(struct btrfs_fs_info *fs_info,
 				   u64 bytenr);
 int btrfs_should_ignore_reloc_root(struct btrfs_root *root);
 
-/* scrub.c */
-int btrfs_scrub_progress(struct btrfs_fs_info *fs_info, u64 devid,
-			 struct btrfs_scrub_progress *progress);
 static inline void btrfs_init_full_stripe_locks_tree(
 			struct btrfs_full_stripe_locks_tree *locks_root)
 {
