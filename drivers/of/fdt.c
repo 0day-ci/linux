@@ -638,7 +638,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
 		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);
 		if (!size)
 			break;
-		early_init_dt_reserve_memory_arch(base, size, false);
+		early_init_dt_reserve_memory_arch(base, size, true);
 	}
 
 	fdt_scan_reserved_mem();
