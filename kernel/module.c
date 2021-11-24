@@ -4150,8 +4150,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
  ddebug_cleanup:
 	ftrace_release_mod(mod);
 	dynamic_debug_remove(mod, info->debug);
-	synchronize_rcu();
-	kfree(mod->args);
+	kvfree_rcu(mod->args);
  free_arch_cleanup:
 	cfi_cleanup(mod);
 	module_arch_cleanup(mod);
