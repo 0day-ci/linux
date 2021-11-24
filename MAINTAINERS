@@ -6200,6 +6200,7 @@ M:	Jagan Teki <jagan@amarulasolutions.com>
 M:	Christopher Vollo <chris@renewoutreach.org>
 S:	Maintained
 F:	Documentation/devicetree/bindings/display/bridge/ti,dlpc3433.yaml
+F:	drivers/gpu/drm/bridge/ti-dlpc3433.c
 
 DRM DRIVER FOR TPO TPG110 PANELS
 M:	Linus Walleij <linus.walleij@linaro.org>
