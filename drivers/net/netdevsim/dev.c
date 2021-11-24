@@ -1371,7 +1371,7 @@ static int __nsim_dev_port_add(struct nsim_dev *nsim_dev, enum nsim_dev_port_typ
 	devlink_port = &nsim_dev_port->devlink_port;
 	if (nsim_dev_port_is_pf(nsim_dev_port)) {
 		attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
-		attrs.phys.port_number = port_index + 1;
+		attrs.phys.port_number = port_index;
 	} else {
 		attrs.flavour = DEVLINK_PORT_FLAVOUR_PCI_VF;
 		attrs.pci_vf.pf = 0;
