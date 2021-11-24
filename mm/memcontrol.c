@@ -1261,6 +1261,18 @@ struct lruvec *folio_lruvec_lock_irqsave(struct folio *folio,
 	return lruvec;
 }
 
+struct lruvec *folio_lruvec_trylock_irqsave(struct folio *folio,
+		unsigned long *flags)
+{
+	struct lruvec *lruvec = folio_lruvec(folio);
+
+	if (spin_trylock_irqsave(&lruvec->lru_lock, *flags)) {
+		lruvec_memcg_debug(lruvec, folio);
+		return lruvec;
+	}
+
+	return NULL;
+}
 /**
  * mem_cgroup_update_lru_size - account for adding or removing an lru page
  * @lruvec: mem_cgroup per zone lru vector

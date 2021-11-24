@@ -959,8 +959,14 @@ void release_pages(struct page **pages, int nr)
 		if (PageLRU(page)) {
 			struct lruvec *prev_lruvec = lruvec;
 
-			lruvec = folio_lruvec_relock_irqsave(folio, lruvec,
+retry:
+			lruvec = folio_lruvec_tryrelock_irqsave(folio, lruvec,
 									&flags);
+			if (!lruvec) {
+				cond_resched();
+				goto retry;
+			}
+
 			if (prev_lruvec != lruvec)
 				lock_batch = 0;
 

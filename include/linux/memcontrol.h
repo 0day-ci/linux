@@ -800,6 +800,8 @@ struct lruvec *folio_lruvec_lock(struct folio *folio);
 struct lruvec *folio_lruvec_lock_irq(struct folio *folio);
 struct lruvec *folio_lruvec_lock_irqsave(struct folio *folio,
 						unsigned long *flags);
+struct lruvec *folio_lruvec_trylock_irqsave(struct folio *folio,
+						unsigned long *flags);
 
 #ifdef CONFIG_DEBUG_VM
 void lruvec_memcg_debug(struct lruvec *lruvec, struct folio *folio);
@@ -1313,6 +1315,17 @@ static inline struct lruvec *folio_lruvec_lock_irqsave(struct folio *folio,
 	return &pgdat->__lruvec;
 }
 
+static inline struct lruvec *folio_lruvec_trylock_irqsave(struct folio *folio,
+		unsigned long *flagsp)
+{
+	struct pglist_data *pgdat = folio_pgdat(folio);
+
+	if (spin_trylock_irqsave(&pgdat->__lruvec.lru_lock, *flagsp))
+		return &pgdat->__lruvec;
+	else
+		return NULL;
+}
+
 static inline struct mem_cgroup *
 mem_cgroup_iter(struct mem_cgroup *root,
 		struct mem_cgroup *prev,
@@ -1596,6 +1609,19 @@ static inline struct lruvec *folio_lruvec_relock_irqsave(struct folio *folio,
 	}
 
 	return folio_lruvec_lock_irqsave(folio, flags);
+}
+
+static inline struct lruvec *folio_lruvec_tryrelock_irqsave(struct folio *folio,
+		struct lruvec *locked_lruvec, unsigned long *flags)
+{
+	if (locked_lruvec) {
+		if (folio_matches_lruvec(folio, locked_lruvec))
+			return locked_lruvec;
+
+		unlock_page_lruvec_irqrestore(locked_lruvec, *flags);
+	}
+
+	return folio_lruvec_trylock_irqsave(folio, flags);
 }
 
 #ifdef CONFIG_CGROUP_WRITEBACK
