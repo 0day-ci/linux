@@ -120,8 +120,6 @@ static inline void *pde_data(const struct inode *inode)
 	return inode->i_private;
 }
 
-#define PDE_DATA(i)	pde_data(i)
-
 extern void *proc_get_parent_data(const struct inode *);
 extern void proc_remove(struct proc_dir_entry *);
 extern void remove_proc_entry(const char *, struct proc_dir_entry *);
@@ -194,7 +192,7 @@ static inline struct proc_dir_entry *proc_mkdir_mode(const char *name,
 
 static inline void proc_set_size(struct proc_dir_entry *de, loff_t size) {}
 static inline void proc_set_user(struct proc_dir_entry *de, kuid_t uid, kgid_t gid) {}
-static inline void *PDE_DATA(const struct inode *inode) {BUG(); return NULL;}
+static inline void *pde_data(const struct inode *inode) {BUG(); return NULL;}
 static inline void *proc_get_parent_data(const struct inode *inode) { BUG(); return NULL; }
 
 static inline void proc_remove(struct proc_dir_entry *de) {}
