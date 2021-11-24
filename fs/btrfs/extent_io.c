@@ -3282,8 +3282,7 @@ static int calc_bio_boundaries(struct btrfs_bio_ctrl *bio_ctrl,
 	else
 		bio_ctrl->len_to_stripe_boundary = (u32)geom.len;
 
-	if (!btrfs_is_zoned(fs_info) ||
-	    bio_op(bio_ctrl->bio) != REQ_OP_ZONE_APPEND) {
+	if (bio_op(bio_ctrl->bio) != REQ_OP_ZONE_APPEND) {
 		bio_ctrl->len_to_oe_boundary = U32_MAX;
 		return 0;
 	}
@@ -3338,7 +3337,7 @@ static int alloc_new_bio(struct btrfs_inode *inode,
 		bio_set_dev(bio, bdev);
 		wbc_init_bio(wbc, bio);
 	}
-	if (btrfs_is_zoned(fs_info) && bio_op(bio) == REQ_OP_ZONE_APPEND) {
+	if (bio_op(bio) == REQ_OP_ZONE_APPEND) {
 		struct btrfs_device *device;
 
 		device = btrfs_zoned_get_device(fs_info, disk_bytenr,
