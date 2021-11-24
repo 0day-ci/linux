@@ -3343,7 +3343,7 @@ const char *simple_get_link(struct dentry *, struct inode *,
 			    struct delayed_call *);
 extern const struct inode_operations simple_symlink_inode_operations;
 
-extern int iterate_dir(struct file *, struct dir_context *);
+extern int iterate_dir(struct file *file, struct dir_context *ctx, bool use_fpos);
 
 int vfs_fstatat(int dfd, const char __user *filename, struct kstat *stat,
 		int flags);

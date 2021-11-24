@@ -21,6 +21,7 @@
 #include <linux/unistd.h>
 #include <linux/compat.h>
 #include <linux/uaccess.h>
+#include "internal.h"
 
 #include <asm/unaligned.h>
 
@@ -36,8 +37,14 @@
 	unsafe_copy_to_user(dst, src, len, label);		\
 } while (0)
 
-
-int iterate_dir(struct file *file, struct dir_context *ctx)
+/**
+ * iterate_dir - iterate over directory
+ * @file    : pointer to file struct of directory
+ * @ctx     : pointer to directory ctx structure
+ * @use_fpos: true : use file offset
+ *            false: use pos in ctx structure
+ */
+int iterate_dir(struct file *file, struct dir_context *ctx, bool use_fpos)
 {
 	struct inode *inode = file_inode(file);
 	bool shared = false;
@@ -60,12 +67,17 @@ int iterate_dir(struct file *file, struct dir_context *ctx)
 
 	res = -ENOENT;
 	if (!IS_DEADDIR(inode)) {
-		ctx->pos = file->f_pos;
+		if (use_fpos)
+			ctx->pos = file->f_pos;
+
 		if (shared)
 			res = file->f_op->iterate_shared(file, ctx);
 		else
 			res = file->f_op->iterate(file, ctx);
-		file->f_pos = ctx->pos;
+
+		if (use_fpos)
+			file->f_pos = ctx->pos;
+
 		fsnotify_access(file);
 		file_accessed(file);
 	}
@@ -190,7 +202,7 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	error = iterate_dir(f.file, &buf.ctx);
+	error = iterate_dir(f.file, &buf.ctx, true);
 	if (buf.result)
 		error = buf.result;
 
@@ -283,7 +295,7 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	error = iterate_dir(f.file, &buf.ctx);
+	error = iterate_dir(f.file, &buf.ctx, true);
 	if (error >= 0)
 		error = buf.error;
 	if (buf.prev_reclen) {
@@ -448,7 +460,7 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	error = iterate_dir(f.file, &buf.ctx);
+	error = iterate_dir(f.file, &buf.ctx, true);
 	if (buf.result)
 		error = buf.result;
 
@@ -534,7 +546,7 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
-	error = iterate_dir(f.file, &buf.ctx);
+	error = iterate_dir(f.file, &buf.ctx, true);
 	if (error >= 0)
 		error = buf.error;
 	if (buf.prev_reclen) {
