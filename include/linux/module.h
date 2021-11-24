@@ -677,6 +677,11 @@ static inline bool is_livepatch_module(struct module *mod)
 bool is_module_sig_enforced(void);
 void set_module_sig_enforced(void);
 
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+
+extern int tainted_list_max_count; /* for sysctl */
+
+#endif
 #else /* !CONFIG_MODULES... */
 
 static inline struct module *__module_address(unsigned long addr)

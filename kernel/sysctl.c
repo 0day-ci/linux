@@ -2119,6 +2119,16 @@ static struct ctl_table kern_table[] = {
 		.extra1		= SYSCTL_ONE,
 		.extra2		= SYSCTL_ONE,
 	},
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+	{
+		.procname	= "tainted_list_max_count",
+		.data		= &tainted_list_max_count,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &neg_one,
+	},
+#endif
 #endif
 #ifdef CONFIG_UEVENT_HELPER
 	{

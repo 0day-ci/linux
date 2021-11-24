@@ -90,6 +90,17 @@
  */
 static DEFINE_MUTEX(module_mutex);
 static LIST_HEAD(modules);
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+static LIST_HEAD(unloaded_tainted_modules);
+static int tainted_list_count;
+int __read_mostly tainted_list_max_count = 20;
+
+struct mod_unloaded_taint {
+	struct list_head list;
+	char name[MODULE_NAME_LEN];
+	unsigned long taints;
+};
+#endif
 
 /* Work queue for freeing init sections in success case */
 static void do_free_init(struct work_struct *w);
@@ -309,6 +320,47 @@ int unregister_module_notifier(struct notifier_block *nb)
 	return blocking_notifier_chain_unregister(&module_notify_list, nb);
 }
 EXPORT_SYMBOL(unregister_module_notifier);
+
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+
+static int try_add_tainted_module(struct module *mod)
+{
+	struct mod_unload_taint *mod_taint;
+
+	module_assert_mutex_or_preempt();
+
+	if (tainted_list_max_count >= 0 && mod->taints) {
+		if (!tainted_list_max_count &&
+			tainted_list_count >= tainted_list_max_count) {
+			pr_warn_once("%s: limit reached on the unloaded tainted modules list (count: %d).\n",
+				     mod->name, tainted_list_count);
+			goto out;
+		}
+
+		mod_taint = kmalloc(sizeof(*mod_taint), GFP_KERNEL);
+		if (unlikely(!mod_taint))
+			return -ENOMEM;
+		else {
+			strlcpy(mod_taint->name, mod->name,
+				MODULE_NAME_LEN);
+			mod_taint->taints = mod->taints;
+			list_add_rcu(&mod_taint->list,
+				&unloaded_tainted_modules);
+			tainted_list_count++;
+		}
+out:
+	}
+	return 0;
+}
+
+#else /* MODULE_UNLOAD_TAINT_TRACKING */
+
+static int try_add_tainted_module(struct module *mod)
+{
+	return 0;
+}
+
+#endif /* MODULE_UNLOAD_TAINT_TRACKING */
 
 /*
  * We require a truly strong try_module_get(): 0 means success.
@@ -579,6 +631,23 @@ struct module *find_module(const char *name)
 {
 	return find_module_all(name, strlen(name), false);
 }
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+struct mod_unload_taint *find_mod_unload_taint(const char *name, size_t len,
+					    unsigned long taints)
+{
+	struct mod_unload_taint *mod_taint;
+
+	module_assert_mutex_or_preempt();
+
+	list_for_each_entry_rcu(mod_taint, &unloaded_tainted_modules, list,
+				lockdep_is_held(&module_mutex)) {
+		if (strlen(mod_taint->name) == len && !memcmp(mod_taint->name,
+			name, len) && mod_taint->taints & taints) {
+			return mod_taint;
+		}
+	}
+	return NULL;
+#endif
 
 #ifdef CONFIG_SMP
 
@@ -1121,13 +1190,13 @@ static inline int module_unload_init(struct module *mod)
 }
 #endif /* CONFIG_MODULE_UNLOAD */
 
-static size_t module_flags_taint(struct module *mod, char *buf)
+static size_t module_flags_taint(unsigned long taints, char *buf)
 {
 	size_t l = 0;
 	int i;
 
 	for (i = 0; i < TAINT_FLAGS_COUNT; i++) {
-		if (taint_flags[i].module && test_bit(i, &mod->taints))
+		if (taint_flags[i].module && test_bit(i, &taints))
 			buf[l++] = taint_flags[i].c_true;
 	}
 
@@ -1194,7 +1263,7 @@ static ssize_t show_taint(struct module_attribute *mattr,
 {
 	size_t l;
 
-	l = module_flags_taint(mk->mod, buffer);
+	l = module_flags_taint(mk->mod->taints, buffer);
 	buffer[l++] = '\n';
 	return l;
 }
@@ -2193,6 +2262,9 @@ static void free_module(struct module *mod)
 	module_bug_cleanup(mod);
 	/* Wait for RCU-sched synchronizing before releasing mod->list and buglist. */
 	synchronize_rcu();
+	if (try_add_tainted_module(mod))
+		pr_error("%s: adding tainted module to the unloaded tainted modules list failed.\n",
+			 mod->name);
 	mutex_unlock(&module_mutex);
 
 	/* Clean up CFI for the module. */
@@ -3714,6 +3786,9 @@ static noinline int do_init_module(struct module *mod)
 {
 	int ret = 0;
 	struct mod_initfree *freeinit;
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+	struct mod_unload_taint *old;
+#endif
 
 	freeinit = kmalloc(sizeof(*freeinit), GFP_KERNEL);
 	if (!freeinit) {
@@ -3747,6 +3822,16 @@ static noinline int do_init_module(struct module *mod)
 	mod->state = MODULE_STATE_LIVE;
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_LIVE, mod);
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+	mutex_lock(&module_mutex);
+	old = find_mod_unload_taint(mod->name, strlen(mod->name),
+				mod->taints);
+	if (old) {
+		list_del_rcu(&old->list);
+		synchronize_rcu();
+	}
+	mutex_unlock(&module_mutex);
+#endif
 
 	/* Delay uevent until module has finished its init routine */
 	kobject_uevent(&mod->mkobj.kobj, KOBJ_ADD);
@@ -4555,7 +4640,7 @@ static char *module_flags(struct module *mod, char *buf)
 	    mod->state == MODULE_STATE_GOING ||
 	    mod->state == MODULE_STATE_COMING) {
 		buf[bx++] = '(';
-		bx += module_flags_taint(mod, buf + bx);
+		bx += module_flags_taint(mod->taints, buf + bx);
 		/* Show a - for module-is-being-unloaded */
 		if (mod->state == MODULE_STATE_GOING)
 			buf[bx++] = '-';
@@ -4779,6 +4864,10 @@ void print_modules(void)
 {
 	struct module *mod;
 	char buf[MODULE_FLAGS_BUF_SIZE];
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+	struct mod_unload_taint *mod_taint;
+	size_t l;
+#endif
 
 	printk(KERN_DEFAULT "Modules linked in:");
 	/* Most callers should already have preempt disabled, but make sure */
@@ -4788,6 +4877,15 @@ void print_modules(void)
 			continue;
 		pr_cont(" %s%s", mod->name, module_flags(mod, buf));
 	}
+#ifdef CONFIG_MODULE_UNLOAD_TAINT_TRACKING
+	printk(KERN_DEFAULT "\nUnloaded tainted modules:");
+	list_for_each_entry_rcu(mod_taint, &unloaded_tainted_modules,
+				list) {
+		l = module_flags_taint(mod_taint->taints, buf);
+		buf[l++] = '\0';
+		pr_cont(" %s(%s)", mod_taint->name, buf);
+	}
+#endif
 	preempt_enable();
 	if (last_unloaded_module[0])
 		pr_cont(" [last unloaded: %s]", last_unloaded_module);

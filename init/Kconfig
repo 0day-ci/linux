@@ -2116,6 +2116,15 @@ config MODULE_FORCE_UNLOAD
 	  rmmod).  This is mainly for kernel developers and desperate users.
 	  If unsure, say N.
 
+config MODULE_UNLOAD_TAINT_TRACKING
+	bool "Tainted module unload tracking"
+	default n
+	help
+          This option allows you to maintain a record of each unloaded
+          module that taints the kernel. Now in addition to displaying a
+          list of linked modules e.g. in the event of an Oops, the
+          aforementioned details are also displayed. If unsure, say N.
+
 config MODVERSIONS
 	bool "Module versioning support"
 	help
