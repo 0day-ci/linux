@@ -2,3 +2,4 @@
 obj-$(CONFIG_ACPI_IORT) 	+= iort.o
 obj-$(CONFIG_ACPI_GTDT) 	+= gtdt.o
 obj-y				+= dma.o
+obj-$(CONFIG_ACPI_AEST) 	+= aest.o

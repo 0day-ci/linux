@@ -8,3 +8,6 @@ config ACPI_IORT
 
 config ACPI_GTDT
 	bool
+
+config ACPI_AEST
+	bool "ARM Error Source Table Support"
