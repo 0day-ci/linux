@@ -17,33 +17,6 @@
 
 #include "ext4_jbd2.h"
 
-struct ext4_rcu_ptr {
-	struct rcu_head rcu;
-	void *ptr;
-};
-
-static void ext4_rcu_ptr_callback(struct rcu_head *head)
-{
-	struct ext4_rcu_ptr *ptr;
-
-	ptr = container_of(head, struct ext4_rcu_ptr, rcu);
-	kvfree(ptr->ptr);
-	kfree(ptr);
-}
-
-void ext4_kvfree_array_rcu(void *to_free)
-{
-	struct ext4_rcu_ptr *ptr = kzalloc(sizeof(*ptr), GFP_KERNEL);
-
-	if (ptr) {
-		ptr->ptr = to_free;
-		call_rcu(&ptr->rcu, ext4_rcu_ptr_callback);
-		return;
-	}
-	synchronize_rcu();
-	kvfree(to_free);
-}
-
 int ext4_resize_begin(struct super_block *sb)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
@@ -906,7 +879,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	n_group_desc[gdb_num] = gdb_bh;
 	rcu_assign_pointer(EXT4_SB(sb)->s_group_desc, n_group_desc);
 	EXT4_SB(sb)->s_gdb_count++;
-	ext4_kvfree_array_rcu(o_group_desc);
+	kvfree_rcu(o_group_desc);
 
 	lock_buffer(EXT4_SB(sb)->s_sbh);
 	le16_add_cpu(&es->s_reserved_gdt_blocks, -1);
@@ -969,7 +942,7 @@ static int add_new_gdb_meta_bg(struct super_block *sb,
 
 	rcu_assign_pointer(EXT4_SB(sb)->s_group_desc, n_group_desc);
 	EXT4_SB(sb)->s_gdb_count++;
-	ext4_kvfree_array_rcu(o_group_desc);
+	kvfree_rcu(o_group_desc);
 	return err;
 }
 
