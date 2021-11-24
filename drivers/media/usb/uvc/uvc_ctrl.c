@@ -2143,6 +2143,40 @@ int uvc_ctrl_restore_values(struct uvc_device *dev)
 }
 
 /* --------------------------------------------------------------------------
+ * Quirks
+ */
+
+static s32 uvc_ctrl_get_abs_exposure_exponential(
+	struct uvc_control_mapping *mapping, u8 query, const u8 *data)
+{
+	s32 i;
+	s32 value = uvc_get_le_value(mapping, query, data);
+
+	switch (query) {
+	case UVC_GET_CUR:
+	case UVC_GET_MIN:
+	case UVC_GET_MAX:
+	case UVC_GET_DEF:
+		for (i = 0; i < 14; ++i) {
+			if (10000 >> i <= value)
+				break;
+		}
+		return 14 - i;
+	case UVC_GET_RES:
+		return 1;
+	default:
+		return value;
+	}
+}
+
+static void uvc_ctrl_set_abs_exposure_exponential(
+	struct uvc_control_mapping *mapping, s32 value, u8 *data)
+{
+	value = 10000 >> (14 - value);
+	uvc_set_le_value(mapping, value, data);
+}
+
+/* --------------------------------------------------------------------------
  * Control and mapping handling
  */
 
@@ -2208,6 +2242,13 @@ static int __uvc_ctrl_add_mapping(struct uvc_video_chain *chain,
 			chain->ctrl_class_bitmap |= BIT(i);
 			break;
 		}
+	}
+
+	if ((chain->dev->quirks & UVC_QUIRK_EXPONENTIAL_EXPOSURE) &&
+	    ctrl->info.selector == UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL) {
+		uvc_dbg(chain->dev, CONTROL, "Applying exponential exposure quirk\n");
+		map->get = uvc_ctrl_get_abs_exposure_exponential;
+		map->set = uvc_ctrl_set_abs_exposure_exponential;
 	}
 
 	list_add_tail(&map->list, &ctrl->info.mappings);
