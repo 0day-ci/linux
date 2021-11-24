@@ -50,6 +50,7 @@
 #include "block-group.h"
 #include "subpage.h"
 #include "zoned.h"
+#include "scrub.h"
 
 #ifdef CONFIG_64BIT
 /* If we have a 32-bit userspace and 64-bit kernel, then the UAPI
