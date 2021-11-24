@@ -14,6 +14,12 @@
 #  define __NR_bpf 349
 # elif defined(__s390__)
 #  define __NR_bpf 351
+# elif defined(__mips__) && defined(_ABIO32)
+#  define __NR_bpf (__NR_Linux + 355)
+# elif defined(__mips__) && defined(_ABIN32)
+#  define __NR_bpf (__NR_Linux + 319)
+# elif defined(__mips__) && defined(_ABI64)
+#  define __NR_bpf (__NR_Linux + 315)
 # else
 #  error __NR_bpf not defined. libbpf does not support your arch.
 # endif
