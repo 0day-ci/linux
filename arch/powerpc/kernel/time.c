@@ -594,6 +594,8 @@ DEFINE_INTERRUPT_HANDLER_ASYNC(timer_interrupt)
 
 	if (test_irq_work_pending()) {
 		clear_irq_work_pending();
+		if (IS_ENABLED(CONFIG_PPC_BOOK3S_64))
+			mce_run_late_handlers();
 		irq_work_run();
 	}
 

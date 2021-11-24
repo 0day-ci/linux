@@ -28,18 +28,8 @@
 
 #include "setup.h"
 
-static void machine_check_process_queued_event(struct irq_work *work);
-static void machine_check_ue_irq_work(struct irq_work *work);
 static void machine_check_ue_event(struct machine_check_event *evt);
 static void machine_process_ue_event(struct work_struct *work);
-
-static struct irq_work mce_event_process_work = {
-        .func = machine_check_process_queued_event,
-};
-
-static struct irq_work mce_ue_event_irq_work = {
-	.func = machine_check_ue_irq_work,
-};
 
 static DECLARE_WORK(mce_ue_event_work, machine_process_ue_event);
 
@@ -89,6 +79,12 @@ static void mce_set_error_info(struct machine_check_event *mce,
 	}
 }
 
+/* Raise decrementer interrupt */
+void machine_check_raise_dec_intr(void)
+{
+	arch_irq_work_raise();
+}
+
 /*
  * Decode and save high level MCE information into per cpu buffer which
  * is an array of machine_check_event structure.
@@ -134,6 +130,8 @@ void save_mce_event(struct pt_regs *regs, long handled,
 	mce_set_error_info(mce, mce_err);
 	if (mce->error_type == MCE_ERROR_TYPE_UE)
 		mce->u.ue_error.ignore_event = mce_err->ignore_event;
+
+	local_paca->mces_to_process++;
 
 	if (!addr)
 		return;
@@ -217,7 +215,7 @@ void release_mce_event(void)
 	get_mce_event(NULL, true);
 }
 
-static void machine_check_ue_irq_work(struct irq_work *work)
+static void machine_check_ue_work(void)
 {
 	schedule_work(&mce_ue_event_work);
 }
@@ -239,7 +237,7 @@ static void machine_check_ue_event(struct machine_check_event *evt)
 	       evt, sizeof(*evt));
 
 	/* Queue work to process this event later. */
-	irq_work_queue(&mce_ue_event_irq_work);
+	machine_check_raise_dec_intr();
 }
 
 /*
@@ -249,7 +247,6 @@ void machine_check_queue_event(void)
 {
 	int index;
 	struct machine_check_event evt;
-	unsigned long msr;
 
 	if (!get_mce_event(&evt, MCE_EVENT_RELEASE))
 		return;
@@ -263,20 +260,7 @@ void machine_check_queue_event(void)
 	memcpy(&local_paca->mce_info->mce_event_queue[index],
 	       &evt, sizeof(evt));
 
-	/*
-	 * Queue irq work to process this event later. Before
-	 * queuing the work enable translation for non radix LPAR,
-	 * as irq_work_queue may try to access memory outside RMO
-	 * region.
-	 */
-	if (!radix_enabled() && firmware_has_feature(FW_FEATURE_LPAR)) {
-		msr = mfmsr();
-		mtmsr(msr | MSR_IR | MSR_DR);
-		irq_work_queue(&mce_event_process_work);
-		mtmsr(msr);
-	} else {
-		irq_work_queue(&mce_event_process_work);
-	}
+	machine_check_raise_dec_intr();
 }
 
 void mce_common_process_ue(struct pt_regs *regs,
@@ -338,7 +322,7 @@ static void machine_process_ue_event(struct work_struct *work)
  * process pending MCE event from the mce event queue. This function will be
  * called during syscall exit.
  */
-static void machine_check_process_queued_event(struct irq_work *work)
+static void machine_check_process_queued_event(void)
 {
 	int index;
 	struct machine_check_event *evt;
@@ -360,6 +344,17 @@ static void machine_check_process_queued_event(struct irq_work *work)
 		}
 		machine_check_print_event_info(evt, false, false);
 		local_paca->mce_info->mce_queue_count--;
+	}
+}
+
+void mce_run_late_handlers(void)
+{
+	if (unlikely(local_paca->mces_to_process)) {
+		if (ppc_md.machine_check_log_err)
+			ppc_md.machine_check_log_err();
+		machine_check_process_queued_event();
+		machine_check_ue_work();
+		local_paca->mces_to_process--;
 	}
 }
 
