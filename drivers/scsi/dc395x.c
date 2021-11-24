@@ -1126,7 +1126,7 @@ static void reset_dev_param(struct AdapterCtlBlk *acb)
 	list_for_each_entry(dcb, &acb->dcb_list, list) {
 		u8 period_index;
 
-		dcb->sync_mode &= ~(SYNC_NEGO_DONE + WIDE_NEGO_DONE);
+		dcb->sync_mode &= ~(SYNC_NEGO_DONE | WIDE_NEGO_DONE);
 		dcb->sync_period = 0;
 		dcb->sync_offset = 0;
 
