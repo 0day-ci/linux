@@ -44,6 +44,8 @@
 #define MT7915_MAX_TWT_AGRT		16
 #define MT7915_MAX_STA_TWT_AGRT		8
 
+#define MT7915_FIRMWARE_V1		0
+
 struct mt7915_vif;
 struct mt7915_sta;
 struct mt7915_dfs_pulse;
@@ -225,6 +227,8 @@ struct mt7915_phy {
 	struct mib_stats mib;
 	struct mt76_channel_state state_ts;
 
+	u8 stats_work_count;
+
 #ifdef CONFIG_NL80211_TESTMODE
 	struct {
 		u32 *reg_backup;
@@ -273,6 +277,7 @@ struct mt7915_dev {
 	bool ibf;
 	u8 fw_debug_wm;
 	u8 fw_debug_wa;
+	u8 fw_ver;
 
 	void *cal;
 
@@ -453,6 +458,7 @@ int mt7915_mcu_rdd_cmd(struct mt7915_dev *dev, enum mt7915_rdd_cmd cmd,
 int mt7915_mcu_wa_cmd(struct mt7915_dev *dev, int cmd, u32 a1, u32 a2, u32 a3);
 int mt7915_mcu_fw_log_2_host(struct mt7915_dev *dev, u8 type, u8 ctrl);
 int mt7915_mcu_fw_dbg_ctrl(struct mt7915_dev *dev, u32 module, u8 level);
+int mt7915_mcu_get_all_sta_stats(struct mt7915_dev *dev, u8 event);
 void mt7915_mcu_rx_event(struct mt7915_dev *dev, struct sk_buff *skb);
 void mt7915_mcu_exit(struct mt7915_dev *dev);
 
@@ -480,6 +486,11 @@ static inline void mt7915_irq_disable(struct mt7915_dev *dev, u32 mask)
 		mt7915_dual_hif_set_irq_mask(dev, true, mask, 0);
 	else
 		mt76_set_irq_mask(&dev->mt76, MT_INT_MASK_CSR, mask, 0);
+}
+
+static inline bool mt7915_firmware_offload(struct mt7915_dev *dev)
+{
+	return dev->fw_ver == MT7915_FIRMWARE_V1;
 }
 
 u32 mt7915_mac_wtbl_lmac_addr(struct mt7915_dev *dev, u16 wcid, u8 dw);

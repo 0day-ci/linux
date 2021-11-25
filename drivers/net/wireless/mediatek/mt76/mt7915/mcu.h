@@ -44,6 +44,7 @@ enum {
 	MCU_EXT_EVENT_RDD_REPORT = 0x3a,
 	MCU_EXT_EVENT_CSA_NOTIFY = 0x4f,
 	MCU_EXT_EVENT_BCC_NOTIFY = 0x75,
+	MCU_EXT_EVENT_GET_ALL_STA_STATS = 0xb5,
 };
 
 enum {
@@ -51,6 +52,14 @@ enum {
 	MCU_ATE_SET_FREQ_OFFSET = 0xa,
 	MCU_ATE_SET_SLOT_TIME = 0x13,
 	MCU_ATE_CLEAN_TXQUEUE = 0x1c,
+};
+
+enum {
+	MCU_EXT_EVENT_ALL_TX_RX_RATE = 0x1,
+	MCU_EXT_EVENT_TX_STAT_PER_WCID = 0x2,
+	MCU_EXT_EVENT_RX_STAT = 0x03,
+	MCU_EXT_EVENT_TXRX_AIR_TIME = 0x05,
+	MCU_EXT_EVENT_PHY_GI_MODE = 0x07,
 };
 
 struct mt7915_mcu_rxd {
@@ -206,6 +215,24 @@ struct mt7915_mcu_tx {
 	struct edca edca[IEEE80211_NUM_ACS];
 } __packed;
 
+struct mt7915_mcu_sta_stat {
+	u8 event_id;
+	u8 more_event;
+	__le16 sta_num;
+	union {
+		struct {
+			__le16 wlan_id;
+			__le32 tx_time[4];
+			__le32 rx_time[4];
+		} airtime[0];
+		struct {
+			__le16 wlan_id;
+			u8 gimode;
+			u8 rsv;
+		} gi[0];
+	}
+};
+
 #define WMM_AIFS_SET		BIT(0)
 #define WMM_CW_MIN_SET		BIT(1)
 #define WMM_CW_MAX_SET		BIT(2)
@@ -291,6 +318,7 @@ enum {
 	MCU_EXT_CMD_GROUP_PRE_CAL_INFO = 0xab,
 	MCU_EXT_CMD_DPD_PRE_CAL_INFO = 0xac,
 	MCU_EXT_CMD_PHY_STAT_INFO = 0xad,
+	MCU_EXT_CMD_GET_ALL_STA_STATS = 0xb5,
 };
 
 enum {

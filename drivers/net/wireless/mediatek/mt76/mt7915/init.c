@@ -957,6 +957,8 @@ int mt7915_register_device(struct mt7915_dev *dev)
 	if (ret)
 		return ret;
 
+	dev->fw_ver = mt76_rr(dev, MT_SWDEF(0x7c));
+
 	return mt7915_init_debugfs(&dev->phy);
 }
 

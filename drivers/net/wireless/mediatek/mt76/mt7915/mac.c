@@ -1330,7 +1330,8 @@ mt7915_mac_tx_free(struct mt7915_dev *dev, struct sk_buff *skb)
 		mt7915_txwi_free(dev, txwi, sta, &free_list);
 	}
 
-	mt7915_mac_sta_poll(dev);
+	if (!mt7915_firmware_offload(dev))
+		mt7915_mac_sta_poll(dev);
 
 	if (wake)
 		mt76_set_tx_blocked(&dev->mt76, false);
@@ -2092,27 +2093,41 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
 void mt7915_mac_work(struct work_struct *work)
 {
 	struct mt7915_phy *phy;
+	struct mt7915_dev *dev;
 	struct mt76_phy *mphy;
 
 	mphy = (struct mt76_phy *)container_of(work, struct mt76_phy,
 					       mac_work.work);
 	phy = mphy->priv;
+	dev = phy->dev;
 
-	mutex_lock(&mphy->dev->mutex);
+	if (++phy->stats_work_count == 10) {
+		phy->stats_work_count = 0;
+		mutex_lock(&mphy->dev->mutex);
 
-	mt76_update_survey(mphy);
-	if (++mphy->mac_work_count == 5) {
-		mphy->mac_work_count = 0;
+		mt76_update_survey(mphy);
+		if (++mphy->mac_work_count == 5) {
+			mphy->mac_work_count = 0;
 
-		mt7915_mac_update_stats(phy);
+			mt7915_mac_update_stats(phy);
+		}
+
+		mutex_unlock(&mphy->dev->mutex);
+
+		mt76_tx_status_check(mphy->dev, false);
 	}
 
-	mutex_unlock(&mphy->dev->mutex);
-
-	mt76_tx_status_check(mphy->dev, false);
+	if (mt7915_firmware_offload(dev)) {
+		mutex_lock(&mphy->dev->mutex);
+		mt7915_mcu_get_all_sta_stats(phy->dev,
+					     MCU_EXT_EVENT_TXRX_AIR_TIME);
+		mt7915_mcu_get_all_sta_stats(phy->dev,
+					     MCU_EXT_EVENT_PHY_GI_MODE);
+		mutex_unlock(&mphy->dev->mutex);
+	}
 
 	ieee80211_queue_delayed_work(mphy->hw, &mphy->mac_work,
-				     MT7915_WATCHDOG_TIME);
+				     MT7915_WATCHDOG_TIME/10);
 }
 
 static void mt7915_dfs_stop_radar_detector(struct mt7915_phy *phy)

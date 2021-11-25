@@ -511,6 +511,126 @@ mt7915_mcu_rx_log_message(struct mt7915_dev *dev, struct sk_buff *skb)
 }
 
 static void
+mt7915_mcu_get_sta_airtime(struct mt7915_dev *dev, struct sk_buff *skb)
+{
+	struct mt7915_mcu_sta_stat *at = (struct mt7915_mcu_sta_stat *)skb->data;
+	int idx;
+
+	for (idx = 0; idx < le16_to_cpu(at->sta_num); idx++) {
+		static const u8 ac_to_tid[] = {
+			[IEEE80211_AC_BE] = 0,
+			[IEEE80211_AC_BK] = 1,
+			[IEEE80211_AC_VI] = 4,
+			[IEEE80211_AC_VO] = 6
+		};
+		struct ieee80211_sta *sta;
+		struct mt7915_sta *msta;
+		struct mt76_wcid *wcid;
+		int i;
+		bool clear = false;
+		u16 w_idx;
+		u32 tx_time[IEEE80211_NUM_ACS], rx_time[IEEE80211_NUM_ACS];
+
+		w_idx = le16_to_cpu(at->airtime[idx].wlan_id);
+		wcid = rcu_dereference(dev->mt76.wcid[w_idx]);
+		sta = wcid_to_sta(wcid);
+		if (!sta)
+			continue;
+
+		msta = container_of(wcid, struct mt7915_sta, wcid);
+
+		for (i = 0; i < IEEE80211_NUM_ACS; i++) {
+			u32 tx_last = msta->airtime_ac[i];
+			u32 rx_last = msta->airtime_ac[i + 4];
+
+			msta->airtime_ac[i] =
+				le32_to_cpu(at->airtime[idx].tx_time[i]);
+			msta->airtime_ac[i + 4] =
+				le32_to_cpu(at->airtime[idx].rx_time[i]);
+
+			tx_time[i] = msta->airtime_ac[i] - tx_last;
+			rx_time[i] = msta->airtime_ac[i + 4] - rx_last;
+
+			if ((tx_last | rx_last) & BIT(30))
+				clear = true;
+		}
+
+		if (clear)
+			memset(msta->airtime_ac, 0, sizeof(msta->airtime_ac));
+
+		for (i = 0; i < IEEE80211_NUM_ACS; i++) {
+			u8 q = mt7915_lmac_mapping(dev, i);
+			u32 tx_cur = tx_time[q];
+			u32 rx_cur = rx_time[q];
+			u8 tid = ac_to_tid[i];
+
+			if (!tx_cur && !rx_cur)
+				continue;
+
+			ieee80211_sta_register_airtime(sta, tid, tx_cur,
+				rx_cur);
+		}
+	}
+}
+
+static void
+mt7915_mcu_get_sta_gi(struct mt7915_dev *dev, struct sk_buff *skb)
+{
+	struct mt7915_mcu_sta_stat *mgi = (struct mt7915_mcu_sta_stat *)skb->data;
+	int idx;
+
+	for (idx = 0; idx < le16_to_cpu(mgi->sta_num); idx++) {
+		struct ieee80211_sta *sta;
+		struct mt7915_sta *msta;
+		struct mt76_wcid *wcid;
+		struct rate_info *rate;
+		u8 val;
+		u16 w_idx;
+
+		w_idx = le16_to_cpu(mgi->gi[idx].wlan_id);
+		wcid = rcu_dereference(dev->mt76.wcid[w_idx]);
+		sta = wcid_to_sta(wcid);
+
+		if (!sta)
+			continue;
+
+		msta = container_of(wcid, struct mt7915_sta, wcid);
+		rate = &msta->wcid.rate;
+		val = mgi->gi[idx].gimode;
+
+		if (rate->flags & RATE_INFO_FLAGS_HE_MCS)
+			rate->he_gi = val;
+		else if (rate->flags &
+			(RATE_INFO_FLAGS_VHT_MCS | RATE_INFO_FLAGS_MCS)) {
+			if (val)
+				rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
+			else
+				rate->flags &= ~RATE_INFO_FLAGS_SHORT_GI;
+		}
+	}
+}
+
+static void
+mt7915_mcu_rx_sta_stats(struct mt7915_dev *dev, struct sk_buff *skb)
+{
+	u8 type;
+
+	skb_pull(skb, sizeof(struct mt7915_mcu_rxd));
+	type = *(skb->data);
+
+	switch (type) {
+	case MCU_EXT_EVENT_TXRX_AIR_TIME:
+		mt7915_mcu_get_sta_airtime(dev, skb);
+		break;
+	case MCU_EXT_EVENT_PHY_GI_MODE:
+		mt7915_mcu_get_sta_gi(dev, skb);
+		break;
+	default:
+		break;
+	}
+}
+
+static void
 mt7915_mcu_cca_finish(void *priv, u8 *mac, struct ieee80211_vif *vif)
 {
 	if (!vif->color_change_active)
@@ -542,6 +662,9 @@ mt7915_mcu_rx_ext_event(struct mt7915_dev *dev, struct sk_buff *skb)
 				IEEE80211_IFACE_ITER_RESUME_ALL,
 				mt7915_mcu_cca_finish, dev);
 		break;
+	case MCU_EXT_EVENT_GET_ALL_STA_STATS:
+		mt7915_mcu_rx_sta_stats(dev, skb);
+		break;
 	default:
 		break;
 	}
@@ -571,6 +694,7 @@ void mt7915_mcu_rx_event(struct mt7915_dev *dev, struct sk_buff *skb)
 	    rxd->ext_eid == MCU_EXT_EVENT_ASSERT_DUMP ||
 	    rxd->ext_eid == MCU_EXT_EVENT_PS_SYNC ||
 	    rxd->ext_eid == MCU_EXT_EVENT_BCC_NOTIFY ||
+	    rxd->ext_eid == MCU_EXT_EVENT_GET_ALL_STA_STATS ||
 	    !rxd->seq)
 		mt7915_mcu_rx_unsolicited_event(dev, skb);
 	else
@@ -3012,6 +3136,20 @@ int mt7915_mcu_fw_dbg_ctrl(struct mt7915_dev *dev, u32 module, u8 level)
 
 	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(FW_DBG_CTRL), &data,
 				 sizeof(data), false);
+}
+
+int mt7915_mcu_get_all_sta_stats(struct mt7915_dev *dev, u8 event)
+{
+
+	struct {
+		u8 event_type;
+		u8 res[3];
+	} req = {
+		.event_type = event
+	};
+
+	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(GET_ALL_STA_STATS),
+		&req, sizeof(req), false);
 }
 
 static int mt7915_mcu_set_mwds(struct mt7915_dev *dev, bool enabled)
