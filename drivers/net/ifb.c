@@ -26,6 +26,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/ethtool.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/init.h>
@@ -35,7 +36,10 @@
 #include <net/pkt_sched.h>
 #include <net/net_namespace.h>
 
-#define TX_Q_LIMIT    32
+#define DRV_NAME	"ifb"
+#define DRV_VERSION	"1.0"
+#define TX_Q_LIMIT	32
+
 struct ifb_q_private {
 	struct net_device	*dev;
 	struct tasklet_struct   ifb_tasklet;
@@ -181,6 +185,12 @@ static int ifb_dev_init(struct net_device *dev)
 	return 0;
 }
 
+static void ifb_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+}
+
 static const struct net_device_ops ifb_netdev_ops = {
 	.ndo_open	= ifb_open,
 	.ndo_stop	= ifb_close,
@@ -188,6 +198,10 @@ static const struct net_device_ops ifb_netdev_ops = {
 	.ndo_start_xmit	= ifb_xmit,
 	.ndo_validate_addr = eth_validate_addr,
 	.ndo_init	= ifb_dev_init,
+};
+
+static const struct ethtool_ops ifb_ethtool_ops = {
+	.get_drvinfo = ifb_get_drvinfo,
 };
 
 #define IFB_FEATURES (NETIF_F_HW_CSUM | NETIF_F_SG  | NETIF_F_FRAGLIST	| \
@@ -223,6 +237,8 @@ static void ifb_setup(struct net_device *dev)
 	dev->hw_enc_features |= dev->features;
 	dev->vlan_features |= IFB_FEATURES & ~(NETIF_F_HW_VLAN_CTAG_TX |
 					       NETIF_F_HW_VLAN_STAG_TX);
+
+	dev->ethtool_ops = &ifb_ethtool_ops;
 
 	dev->flags |= IFF_NOARP;
 	dev->flags &= ~IFF_MULTICAST;
@@ -289,7 +305,7 @@ static int ifb_validate(struct nlattr *tb[], struct nlattr *data[],
 }
 
 static struct rtnl_link_ops ifb_link_ops __read_mostly = {
-	.kind		= "ifb",
+	.kind		= DRV_NAME,
 	.priv_size	= sizeof(struct ifb_dev_private),
 	.setup		= ifb_setup,
 	.validate	= ifb_validate,
@@ -359,4 +375,4 @@ module_init(ifb_init_module);
 module_exit(ifb_cleanup_module);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jamal Hadi Salim");
-MODULE_ALIAS_RTNL_LINK("ifb");
+MODULE_ALIAS_RTNL_LINK(DRV_NAME);
