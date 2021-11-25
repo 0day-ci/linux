@@ -73,7 +73,7 @@ required:
   - dmas
   - dma-names
 
-additionalProperties: false
+additionalProperties: true
 
 examples:
   - |
