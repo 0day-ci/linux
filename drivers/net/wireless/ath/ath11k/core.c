@@ -408,12 +408,12 @@ int ath11k_core_check_dt(struct ath11k_base *ab)
 }
 
 static int ath11k_core_create_board_name(struct ath11k_base *ab, char *name,
-					 size_t name_len)
+					 size_t name_len, bool with_variant)
 {
 	/* strlen(',variant=') + strlen(ab->qmi.target.bdf_ext) */
 	char variant[9 + ATH11K_QMI_BDF_EXT_STR_LENGTH] = { 0 };
 
-	if (ab->qmi.target.bdf_ext[0] != '\0')
+	if (with_variant && ab->qmi.target.bdf_ext[0] != '\0')
 		scnprintf(variant, sizeof(variant), ",variant=%s",
 			  ab->qmi.target.bdf_ext);
 
@@ -676,17 +676,28 @@ static int ath11k_core_fetch_board_data_api_1(struct ath11k_base *ab,
 #define BOARD_NAME_SIZE 200
 int ath11k_core_fetch_bdf(struct ath11k_base *ab, struct ath11k_board_data *bd)
 {
-	char boardname[BOARD_NAME_SIZE];
+	char boardname[BOARD_NAME_SIZE], fallback_boardname[BOARD_NAME_SIZE];
 	int ret;
 
-	ret = ath11k_core_create_board_name(ab, boardname, BOARD_NAME_SIZE);
+	ret = ath11k_core_create_board_name(ab, boardname, BOARD_NAME_SIZE, true);
 	if (ret) {
 		ath11k_err(ab, "failed to create board name: %d", ret);
 		return ret;
 	}
 
+	ret = ath11k_core_create_board_name(ab, fallback_boardname,
+					    BOARD_NAME_SIZE, false);
+	if (ret) {
+		ath11k_err(ab, "failed to create fallback board name: %d", ret);
+		return ret;
+	}
+
 	ab->bd_api = 2;
 	ret = ath11k_core_fetch_board_data_api_n(ab, bd, boardname);
+	if (!ret)
+		goto success;
+
+	ret = ath11k_core_fetch_board_data_api_n(ab, bd, fallback_boardname);
 	if (!ret)
 		goto success;
 
