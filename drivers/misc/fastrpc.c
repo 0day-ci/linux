@@ -216,6 +216,7 @@ struct fastrpc_channel_ctx {
 	struct miscdevice miscdev;
 	struct miscdevice securedev;
 	struct kref refcount;
+	bool secure;
 };
 
 struct fastrpc_user {
@@ -1650,6 +1651,7 @@ static int fastrpc_rpmsg_probe(struct rpmsg_device *rpdev)
 	if (!data)
 		return -ENOMEM;
 
+	data->secure = !(of_property_read_bool(rdev->of_node, "qcom,non-secure-domain"));
 	data->miscdev.minor = MISC_DYNAMIC_MINOR;
 	data->miscdev.name = devm_kasprintf(rdev, GFP_KERNEL, "fastrpc-%s",
 					    domains[domain_id]);
