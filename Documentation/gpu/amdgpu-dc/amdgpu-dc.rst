@@ -26,4 +26,4 @@ table of content:
    amdgpu-dcn-overview.rst
    amdgpu-dm.rst
    amdgpu-dc-debug.rst
-
+   dc-glossary.rst
