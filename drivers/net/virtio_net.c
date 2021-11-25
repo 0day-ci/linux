@@ -3238,10 +3238,11 @@ static int virtnet_probe(struct virtio_device *vdev)
 		dev->mtu = mtu;
 		dev->max_mtu = mtu;
 
-		/* TODO: size buffers correctly in this case. */
-		if (dev->mtu > ETH_DATA_LEN)
-			vi->big_packets = true;
 	}
+
+	/* TODO: size buffers correctly in this case. */
+	if (dev->max_mtu > ETH_DATA_LEN)
+		vi->big_packets = true;
 
 	if (vi->any_header_sg)
 		dev->needed_headroom = vi->hdr_len;
