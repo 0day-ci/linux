@@ -33,12 +33,14 @@
 
 /* List of supported CPU ids for fixed clk */
 #define AMD_CPU_ID_RV			0x15D0
+#define AMD_CPU_ID_RN			0x1630
 
 static const char * const clk_oscout1_parents[] = { "clk48MHz", "clk25MHz" };
 static struct clk_hw *hws[ST_MAX_CLKS];
 
 static const struct pci_device_id fch_pci_ids[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, AMD_CPU_ID_RV) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, AMD_CPU_ID_RN) },
 	{ }
 };
 
