@@ -305,6 +305,8 @@ struct tb_regs_port_header {
 /* TMU adapter registers */
 #define TMU_ADP_CS_3				0x03
 #define TMU_ADP_CS_3_UDM			BIT(29)
+#define TMU_ADP_CS_6				0x06
+#define TMU_ADP_CS_6_DTS			BIT(1)
 
 /* Lane adapter registers */
 #define LANE_ADP_CS_0				0x00
