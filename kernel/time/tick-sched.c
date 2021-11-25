@@ -573,6 +573,8 @@ void __init tick_nohz_init(void)
  * NO HZ enabled ?
  */
 bool tick_nohz_enabled __read_mostly  = true;
+EXPORT_SYMBOL(tick_nohz_enabled);
+
 unsigned long tick_nohz_active  __read_mostly;
 /*
  * Enable / Disable tickless mode
@@ -590,6 +592,7 @@ bool tick_nohz_tick_stopped(void)
 
 	return ts->tick_stopped;
 }
+EXPORT_SYMBOL(tick_nohz_tick_stopped);
 
 bool tick_nohz_tick_stopped_cpu(int cpu)
 {
@@ -1147,6 +1150,7 @@ bool tick_nohz_idle_got_tick(void)
 	}
 	return false;
 }
+EXPORT_SYMBOL(tick_nohz_idle_got_tick);
 
 /**
  * tick_nohz_get_next_hrtimer - return the next expiration time for the hrtimer
@@ -1202,6 +1206,7 @@ ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
 
 	return ktime_sub(next_event, now);
 }
+EXPORT_SYMBOL(tick_nohz_get_sleep_length);
 
 /**
  * tick_nohz_get_idle_calls_cpu - return the current idle calls counter value
