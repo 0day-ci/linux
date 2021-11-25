@@ -79,6 +79,7 @@
 #define SENSORS_PD	(2)
 
 #define miscdev_to_cctx(d) container_of(d, struct fastrpc_channel_ctx, miscdev)
+#define securedev_to_cctx(d) container_of(d, struct fastrpc_channel_ctx, securedev)
 
 static const char *domains[FASTRPC_DEV_MAX] = { "adsp", "mdsp",
 						"sdsp", "cdsp"};
@@ -213,6 +214,7 @@ struct fastrpc_channel_ctx {
 	struct idr ctx_idr;
 	struct list_head users;
 	struct miscdevice miscdev;
+	struct miscdevice securedev;
 	struct kref refcount;
 };
 
@@ -1218,9 +1220,22 @@ static int fastrpc_device_release(struct inode *inode, struct file *file)
 
 static int fastrpc_device_open(struct inode *inode, struct file *filp)
 {
-	struct fastrpc_channel_ctx *cctx = miscdev_to_cctx(filp->private_data);
+	struct fastrpc_channel_ctx *cctx = NULL;
 	struct fastrpc_user *fl = NULL;
+	struct miscdevice *currdev = NULL;
 	unsigned long flags;
+
+	if (!filp)
+		return -EFAULT;
+
+	currdev = (struct miscdevice *)(filp->private_data);
+	if (!currdev)
+		return -EFAULT;
+
+	if (strstr(currdev->name, "secure") != NULL)
+		cctx = securedev_to_cctx(filp->private_data);
+	else
+		cctx = miscdev_to_cctx(filp->private_data);
 
 	fl = kzalloc(sizeof(*fl), GFP_KERNEL);
 	if (!fl)
@@ -1644,6 +1659,15 @@ static int fastrpc_rpmsg_probe(struct rpmsg_device *rpdev)
 		kfree(data);
 		return err;
 	}
+	data->securedev.minor = MISC_DYNAMIC_MINOR;
+	data->securedev.name = devm_kasprintf(rdev, GFP_KERNEL,
+				"fastrpc-%s-secure", domains[domain_id]);
+	data->securedev.fops = &fastrpc_fops;
+	err = misc_register(&data->securedev);
+	if (err) {
+		kfree(data);
+		return err;
+	}
 
 	kref_init(&data->refcount);
 
@@ -1655,7 +1679,11 @@ static int fastrpc_rpmsg_probe(struct rpmsg_device *rpdev)
 	data->domain_id = domain_id;
 	data->rpdev = rpdev;
 
-	return of_platform_populate(rdev->of_node, NULL, NULL, rdev);
+	err = of_platform_populate(rdev->of_node, NULL, NULL, rdev);
+	dev_info(rdev, "%s done for %s with nodes non-secure(%d), secure(%d) return: %d\n",
+		__func__, domains[domain_id],
+		data->miscdev.minor, data->securedev.minor, err);
+	return err;
 }
 
 static void fastrpc_notify_users(struct fastrpc_user *user)
@@ -1680,6 +1708,7 @@ static void fastrpc_rpmsg_remove(struct rpmsg_device *rpdev)
 	spin_unlock_irqrestore(&cctx->lock, flags);
 
 	misc_deregister(&cctx->miscdev);
+	misc_deregister(&cctx->securedev);
 	of_platform_depopulate(&rpdev->dev);
 
 	cctx->rpdev = NULL;
