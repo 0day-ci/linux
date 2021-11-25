@@ -2373,6 +2373,7 @@ static int smc_shutdown(struct socket *sock, int how)
 	struct smc_sock *smc;
 	int rc = -EINVAL;
 	int rc1 = 0;
+	int old_state;
 
 	smc = smc_sk(sk);
 
@@ -2398,7 +2399,12 @@ static int smc_shutdown(struct socket *sock, int how)
 	}
 	switch (how) {
 	case SHUT_RDWR:		/* shutdown in both directions */
+		old_state = sk->sk_state;
 		rc = smc_close_active(smc);
+		if (old_state == SMC_ACTIVE &&
+		    sk->sk_state == SMC_PEERCLOSEWAIT1)
+			goto out_no_shutdown;
+
 		break;
 	case SHUT_WR:
 		rc = smc_close_shutdown_write(smc);
@@ -2410,6 +2416,8 @@ static int smc_shutdown(struct socket *sock, int how)
 	}
 	if (smc->clcsock)
 		rc1 = kernel_sock_shutdown(smc->clcsock, how);
+
+out_no_shutdown:
 	/* map sock_shutdown_cmd constants to sk_shutdown value range */
 	sk->sk_shutdown |= how + 1;
 
