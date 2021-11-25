@@ -90,6 +90,7 @@ struct virtio_mmio_device {
 	/* a list of queues so we can dispatch IRQs */
 	spinlock_t lock;
 	struct list_head virtqueues;
+	bool intr_soft_enabled;
 };
 
 struct virtio_mmio_vq_info {
@@ -100,7 +101,37 @@ struct virtio_mmio_vq_info {
 	struct list_head node;
 };
 
+/* disable irq handlers */
+void vm_disable_cbs(struct virtio_device *vdev)
+{
+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
+	int irq = platform_get_irq(vm_dev->pdev, 0);
 
+	/*
+	 * The below synchronize() guarantees that any
+	 * interrupt for this line arriving after
+	 * synchronize_irq() has completed is guaranteed to see
+	 * intx_soft_enabled == false.
+	 */
+	WRITE_ONCE(vm_dev->intr_soft_enabled, false);
+	synchronize_irq(irq);
+}
+
+/* enable irq handlers */
+void vm_enable_cbs(struct virtio_device *vdev)
+{
+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
+	int irq = platform_get_irq(vm_dev->pdev, 0);
+
+	disable_irq(irq);
+	/*
+	 * The above disable_irq() provides TSO ordering and
+	 * as such promotes the below store to store-release.
+	 */
+	WRITE_ONCE(vm_dev->intr_soft_enabled, true);
+	enable_irq(irq);
+	return;
+}
 
 /* Configuration interface */
 
@@ -262,6 +293,8 @@ static void vm_reset(struct virtio_device *vdev)
 
 	/* 0 status means a reset. */
 	writel(0, vm_dev->base + VIRTIO_MMIO_STATUS);
+	/* Disable VQ/configuration callbacks. */
+	vm_disable_cbs(vdev);
 }
 
 
@@ -287,6 +320,9 @@ static irqreturn_t vm_interrupt(int irq, void *opaque)
 	unsigned long status;
 	unsigned long flags;
 	irqreturn_t ret = IRQ_NONE;
+
+	if (!READ_ONCE(vm_dev->intr_soft_enabled))
+		return IRQ_NONE;
 
 	/* Read and acknowledge interrupts */
 	status = readl(vm_dev->base + VIRTIO_MMIO_INTERRUPT_STATUS);
@@ -529,6 +565,7 @@ static bool vm_get_shm_region(struct virtio_device *vdev,
 }
 
 static const struct virtio_config_ops virtio_mmio_config_ops = {
+	.enable_cbs     = vm_enable_cbs,
 	.get		= vm_get,
 	.set		= vm_set,
 	.generation	= vm_generation,
