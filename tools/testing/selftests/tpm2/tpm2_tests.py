@@ -104,6 +104,7 @@ class SmokeTest(unittest.TestCase):
             policy_dig = self.client.get_policy_digest(handle)
         finally:
             self.client.flush_context(handle)
+            self.client.reset_da_lock()
 
         blob = self.client.seal(self.root_key, data, auth, policy_dig)
 
