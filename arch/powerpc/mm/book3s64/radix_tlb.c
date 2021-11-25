@@ -1170,16 +1170,14 @@ static inline void __radix__flush_tlb_range(struct mm_struct *mm,
 				_tlbiel_pid_multicast(mm, pid, RIC_FLUSH_ALL);
 			}
 		}
-	} else {
+	} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
 		bool hflush = false;
 		unsigned long hstart, hend;
 
-		if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
-			hstart = (start + PMD_SIZE - 1) & PMD_MASK;
-			hend = end & PMD_MASK;
-			if (hstart < hend)
-				hflush = true;
-		}
+		hstart = (start + PMD_SIZE - 1) & PMD_MASK;
+		hend = end & PMD_MASK;
+		if (hstart < hend)
+			hflush = true;
 
 		if (type == FLUSH_TYPE_LOCAL) {
 			asm volatile("ptesync": : :"memory");
@@ -1206,6 +1204,25 @@ static inline void __radix__flush_tlb_range(struct mm_struct *mm,
 			if (hflush)
 				_tlbiel_va_range_multicast(mm,
 					hstart, hend, pid, PMD_SIZE, MMU_PAGE_2M, flush_pwc);
+		}
+	} else {
+
+		if (type == FLUSH_TYPE_LOCAL) {
+			asm volatile("ptesync" : : : "memory");
+			if (flush_pwc)
+				/* For PWC, only one flush is needed */
+				__tlbiel_pid(pid, 0, RIC_FLUSH_PWC);
+			__tlbiel_va_range(start, end, pid, page_size, mmu_virtual_psize);
+			ppc_after_tlbiel_barrier();
+		} else if (cputlb_use_tlbie()) {
+			asm volatile("ptesync" : : : "memory");
+			if (flush_pwc)
+				__tlbie_pid(pid, RIC_FLUSH_PWC);
+			__tlbie_va_range(start, end, pid, page_size, mmu_virtual_psize);
+			asm volatile("eieio; tlbsync; ptesync" : : : "memory");
+		} else {
+			_tlbiel_va_range_multicast(mm,
+					start, end, pid, page_size, mmu_virtual_psize, flush_pwc);
 		}
 	}
 out:
