@@ -235,6 +235,7 @@ struct fastrpc_user {
 	spinlock_t lock;
 	/* lock for allocations */
 	struct mutex mutex;
+	int dev_minor;
 };
 
 static void fastrpc_free_map(struct kref *ref)
@@ -1017,6 +1018,15 @@ bail:
 	return err;
 }
 
+static int is_session_rejected(struct fastrpc_user *fl) {
+	/* Check if the device node is non-secure and channel is secure*/
+	if ((fl->dev_minor == fl->cctx->miscdev.minor) && fl->cctx->secure) {
+		dev_err(&fl->cctx->rpdev->dev, "Cannot access secure channel\n");
+		return -EACCES;
+	}
+	return 0;
+}
+
 static int fastrpc_init_create_process(struct fastrpc_user *fl,
 					char __user *argp)
 {
@@ -1036,6 +1046,10 @@ static int fastrpc_init_create_process(struct fastrpc_user *fl,
 		u32 siglen;
 	} inbuf;
 	u32 sc;
+
+	err = is_session_rejected(fl);
+	if (err)
+		return err;
 
 	args = kcalloc(FASTRPC_CREATE_PROCESS_NARGS, sizeof(*args), GFP_KERNEL);
 	if (!args)
@@ -1225,6 +1239,7 @@ static int fastrpc_device_open(struct inode *inode, struct file *filp)
 	struct fastrpc_user *fl = NULL;
 	struct miscdevice *currdev = NULL;
 	unsigned long flags;
+	int dev_minor = MINOR(inode->i_rdev);
 
 	if (!filp)
 		return -EFAULT;
@@ -1254,6 +1269,7 @@ static int fastrpc_device_open(struct inode *inode, struct file *filp)
 	INIT_LIST_HEAD(&fl->user);
 	fl->tgid = current->tgid;
 	fl->cctx = cctx;
+	fl->dev_minor = dev_minor;
 
 	fl->sctx = fastrpc_session_alloc(cctx);
 	if (!fl->sctx) {
