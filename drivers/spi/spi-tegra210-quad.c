@@ -21,6 +21,8 @@
 #include <linux/of_device.h>
 #include <linux/reset.h>
 #include <linux/spi/spi.h>
+#include <linux/acpi.h>
+#include <linux/property.h>
 
 #define QSPI_COMMAND1				0x000
 #define QSPI_BIT_LENGTH(x)			(((x) & 0x1f) << 0)
@@ -767,7 +769,7 @@ static u32 tegra_qspi_setup_transfer_one(struct spi_device *spi, struct spi_tran
 	u32 tx_tap = 0, rx_tap = 0;
 	int req_mode;
 
-	if (speed != tqspi->cur_speed) {
+	if (!has_acpi_companion(tqspi->dev) && speed != tqspi->cur_speed) {
 		clk_set_rate(tqspi->clk, speed);
 		tqspi->cur_speed = speed;
 	}
@@ -875,16 +877,15 @@ static int tegra_qspi_start_transfer_one(struct spi_device *spi,
 static struct tegra_qspi_client_data *tegra_qspi_parse_cdata_dt(struct spi_device *spi)
 {
 	struct tegra_qspi_client_data *cdata;
-	struct device_node *slave_np = spi->dev.of_node;
 
 	cdata = devm_kzalloc(&spi->dev, sizeof(*cdata), GFP_KERNEL);
 	if (!cdata)
 		return NULL;
 
-	of_property_read_u32(slave_np, "nvidia,tx-clk-tap-delay",
-			     &cdata->tx_clk_tap_delay);
-	of_property_read_u32(slave_np, "nvidia,rx-clk-tap-delay",
-			     &cdata->rx_clk_tap_delay);
+	device_property_read_u32(&spi->dev, "nvidia,tx-clk-tap-delay",
+				 &cdata->tx_clk_tap_delay);
+	device_property_read_u32(&spi->dev, "nvidia,rx-clk-tap-delay",
+				 &cdata->rx_clk_tap_delay);
 	return cdata;
 }
 
@@ -943,14 +944,27 @@ static void tegra_qspi_dump_regs(struct tegra_qspi *tqspi)
 		tegra_qspi_readl(tqspi, QSPI_FIFO_STATUS));
 }
 
+static void tegra_qspi_reset(struct tegra_qspi *tqspi)
+{
+	if (tqspi->rst) {
+		reset_control_assert(tqspi->rst);
+		udelay(2);
+		reset_control_deassert(tqspi->rst);
+		return;
+	}
+#ifdef CONFIG_ACPI
+	if (ACPI_FAILURE(acpi_evaluate_object(ACPI_HANDLE(tqspi->dev),
+					      "_RST", NULL, NULL)))
+		dev_err(tqspi->dev, "failed to reset device\n");
+#endif
+}
+
 static void tegra_qspi_handle_error(struct tegra_qspi *tqspi)
 {
 	dev_err(tqspi->dev, "error in transfer, fifo status 0x%08x\n", tqspi->status_reg);
 	tegra_qspi_dump_regs(tqspi);
 	tegra_qspi_flush_fifos(tqspi, true);
-	reset_control_assert(tqspi->rst);
-	udelay(2);
-	reset_control_deassert(tqspi->rst);
+	tegra_qspi_reset(tqspi);
 }
 
 static void tegra_qspi_transfer_end(struct spi_device *spi)
@@ -1202,6 +1216,14 @@ static const struct of_device_id tegra_qspi_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, tegra_qspi_of_match);
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id tegra_qspi_acpi_match[] = {
+	{ .id = "NVDA14E2", },
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, tegra_qspi_acpi_match);
+#endif
+
 static int tegra_qspi_probe(struct platform_device *pdev)
 {
 	struct spi_master	*master;
@@ -1242,18 +1264,20 @@ static int tegra_qspi_probe(struct platform_device *pdev)
 	qspi_irq = platform_get_irq(pdev, 0);
 	tqspi->irq = qspi_irq;
 
-	tqspi->clk = devm_clk_get(&pdev->dev, "qspi");
-	if (IS_ERR(tqspi->clk)) {
-		ret = PTR_ERR(tqspi->clk);
-		dev_err(&pdev->dev, "failed to get clock: %d\n", ret);
-		return ret;
-	}
+	if (!has_acpi_companion(tqspi->dev)) {
+		tqspi->clk = devm_clk_get(&pdev->dev, "qspi");
+		if (IS_ERR(tqspi->clk)) {
+			ret = PTR_ERR(tqspi->clk);
+			dev_err(&pdev->dev, "failed to get clock: %d\n", ret);
+			return ret;
+		}
 
-	tqspi->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
-	if (IS_ERR(tqspi->rst)) {
-		ret = PTR_ERR(tqspi->rst);
-		dev_err(&pdev->dev, "failed to get reset control: %d\n", ret);
-		return ret;
+		tqspi->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+		if (IS_ERR(tqspi->rst)) {
+			dev_err(&pdev->dev, "failed to get reset control: %d\n", ret);
+			ret = PTR_ERR(tqspi->rst);
+			return ret;
+		}
 	}
 
 	tqspi->max_buf_size = QSPI_FIFO_DEPTH << 2;
@@ -1277,9 +1301,7 @@ static int tegra_qspi_probe(struct platform_device *pdev)
 		goto exit_pm_disable;
 	}
 
-	reset_control_assert(tqspi->rst);
-	udelay(2);
-	reset_control_deassert(tqspi->rst);
+	tegra_qspi_reset(tqspi);
 
 	tqspi->def_command1_reg = QSPI_M_S | QSPI_CS_SW_HW |  QSPI_CS_SW_VAL;
 	tegra_qspi_writel(tqspi, tqspi->def_command1_reg, QSPI_COMMAND1);
@@ -1353,6 +1375,10 @@ static int __maybe_unused tegra_qspi_resume(struct device *dev)
 	return spi_master_resume(master);
 }
 
+#ifdef CONFIG_ACPI
+static int __maybe_unused tegra_qspi_runtime_suspend(struct device *dev) { return 0; }
+static int __maybe_unused tegra_qspi_runtime_resume(struct device *dev) { return 0; }
+#else
 static int __maybe_unused tegra_qspi_runtime_suspend(struct device *dev)
 {
 	struct spi_master *master = dev_get_drvdata(dev);
@@ -1378,6 +1404,7 @@ static int __maybe_unused tegra_qspi_runtime_resume(struct device *dev)
 
 	return ret;
 }
+#endif
 
 static const struct dev_pm_ops tegra_qspi_pm_ops = {
 	SET_RUNTIME_PM_OPS(tegra_qspi_runtime_suspend, tegra_qspi_runtime_resume, NULL)
@@ -1389,6 +1416,7 @@ static struct platform_driver tegra_qspi_driver = {
 		.name		= "tegra-qspi",
 		.pm		= &tegra_qspi_pm_ops,
 		.of_match_table	= tegra_qspi_of_match,
+		.acpi_match_table = ACPI_PTR(tegra_qspi_acpi_match),
 	},
 	.probe =	tegra_qspi_probe,
 	.remove =	tegra_qspi_remove,
