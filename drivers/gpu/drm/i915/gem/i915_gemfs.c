@@ -31,7 +31,7 @@ int i915_gemfs_init(struct drm_i915_private *i915)
 	 */
 
 	opts = NULL;
-	if (intel_vtd_active()) {
+	if (intel_vtd_active(i915)) {
 		if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
 			static char huge_opt[] = "huge=within_size"; /* r/w */
 
