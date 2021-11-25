@@ -5032,6 +5032,7 @@ unsigned int nr_iowait_cpu(int cpu)
 {
 	return atomic_read(&cpu_rq(cpu)->nr_iowait);
 }
+EXPORT_SYMBOL(nr_iowait_cpu);
 
 /*
  * IO-wait accounting, and how it's mostly bollocks (on SMP).
