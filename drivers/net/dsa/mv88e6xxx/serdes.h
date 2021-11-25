@@ -111,6 +111,10 @@ int mv88e6390_serdes_pcs_config(struct mv88e6xxx_chip *chip, int port,
 				int lane, unsigned int mode,
 				phy_interface_t interface,
 				const unsigned long *advertise);
+int mv88e6393x_serdes_pcs_config(struct mv88e6xxx_chip *chip, int port,
+				 int lane, unsigned int mode,
+				 phy_interface_t interface,
+				 const unsigned long *advertise);
 int mv88e6185_serdes_pcs_get_state(struct mv88e6xxx_chip *chip, int port,
 				   int lane, struct phylink_link_state *state);
 int mv88e6352_serdes_pcs_get_state(struct mv88e6xxx_chip *chip, int port,

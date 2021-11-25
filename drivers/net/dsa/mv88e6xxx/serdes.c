@@ -880,6 +880,18 @@ int mv88e6390_serdes_pcs_config(struct mv88e6xxx_chip *chip, int port,
 				      MV88E6390_SGMII_BMCR, bmcr);
 }
 
+int mv88e6393x_serdes_pcs_config(struct mv88e6xxx_chip *chip, int port,
+				 int lane, unsigned int mode,
+				 phy_interface_t interface,
+				 const unsigned long *advertise)
+{
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		return 0;
+
+	return mv88e6390_serdes_pcs_config(chip, port, lane, mode, interface,
+					   advertise);
+}
+
 static int mv88e6390_serdes_pcs_get_state_sgmii(struct mv88e6xxx_chip *chip,
 	int port, int lane, struct phylink_link_state *state)
 {
