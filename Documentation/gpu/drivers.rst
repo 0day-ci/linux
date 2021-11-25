@@ -5,7 +5,7 @@ GPU Driver Documentation
 .. toctree::
 
    amdgpu
-   amdgpu-dc
+   amdgpu-dc/amdgpu-dc
    i915
    mcde
    meson
