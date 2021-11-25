@@ -1298,9 +1298,6 @@ void virtio_transport_recv_pkt(struct virtio_transport *t,
 
 	space_available = virtio_transport_space_update(sk, pkt);
 
-	/* Update CID in case it has changed after a transport reset event */
-	vsk->local_addr.svm_cid = dst.svm_cid;
-
 	if (space_available)
 		sk->sk_write_space(sk);
 
