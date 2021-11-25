@@ -1603,15 +1603,19 @@ static int qca_regulator_init(struct hci_uart *hu)
 	 */
 	qcadev = serdev_device_get_drvdata(hu->serdev);
 	if (!qcadev->bt_power->vregs_on) {
-		serdev_device_close(hu->serdev);
+		if (qca_is_wcn399x(soc_type))
+			serdev_device_close(hu->serdev);
+
 		ret = qca_regulator_enable(qcadev);
 		if (ret)
 			return ret;
 
-		ret = serdev_device_open(hu->serdev);
-		if (ret) {
-			bt_dev_err(hu->hdev, "failed to open port");
-			return ret;
+		if (qca_is_wcn399x(soc_type)) {
+			ret = serdev_device_open(hu->serdev);
+			if (ret) {
+				bt_dev_err(hu->hdev, "failed to open port");
+				return ret;
+			}
 		}
 	}
 
@@ -1635,9 +1639,8 @@ static int qca_regulator_init(struct hci_uart *hu)
 		}
 	}
 
-	qca_set_speed(hu, QCA_INIT_SPEED);
-
 	if (qca_is_wcn399x(soc_type)) {
+		qca_set_speed(hu, QCA_INIT_SPEED);
 		ret = qca_send_power_pulse(hu, true);
 		if (ret)
 			return ret;
@@ -1648,6 +1651,7 @@ static int qca_regulator_init(struct hci_uart *hu)
 	 * Without this, we will have RTS and CTS synchronization
 	 * issues.
 	 */
+
 	serdev_device_close(hu->serdev);
 	ret = serdev_device_open(hu->serdev);
 	if (ret) {
