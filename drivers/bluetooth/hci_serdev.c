@@ -157,6 +157,9 @@ static int hci_uart_close(struct hci_dev *hdev)
 		serdev_device_close(hu->serdev);
 	}
 
+	if (hu->proto->poweroff)
+		hu->proto->poweroff(hu);
+
 	return 0;
 }
 

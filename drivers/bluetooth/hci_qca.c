@@ -231,6 +231,7 @@ static int qca_regulator_enable(struct qca_serdev *qcadev);
 static void qca_regulator_disable(struct qca_serdev *qcadev);
 static void qca_power_shutdown(struct hci_uart *hu);
 static int qca_power_off(struct hci_dev *hdev);
+static int qca_power_off_reg(struct hci_uart *hu);
 static void qca_controller_memdump(struct work_struct *work);
 
 static enum qca_btsoc_type qca_soc_type(struct hci_uart *hu)
@@ -553,7 +554,6 @@ static void qca_controller_memdump_timeout(struct work_struct *work)
 
 	mutex_unlock(&qca->hci_memdump_lock);
 }
-
 
 /* Initialize protocol */
 static int qca_open(struct hci_uart *hu)
@@ -1815,6 +1815,7 @@ static const struct hci_uart_proto qca_proto = {
 	.flush		= qca_flush,
 	.setup		= qca_setup,
 	.recv		= qca_recv,
+	.poweroff	= qca_power_off_reg,
 	.enqueue	= qca_enqueue,
 	.dequeue	= qca_dequeue,
 };
@@ -1881,7 +1882,6 @@ static void qca_power_shutdown(struct hci_uart *hu)
 	struct qca_data *qca = hu->priv;
 	unsigned long flags;
 	enum qca_btsoc_type soc_type = qca_soc_type(hu);
-	bool sw_ctrl_state;
 
 	/* From this point we go into power off state. But serial port is
 	 * still open, stop queueing the IBS data and flush all the buffered
@@ -1904,7 +1904,22 @@ static void qca_power_shutdown(struct hci_uart *hu)
 		host_set_baudrate(hu, 2400);
 		qca_send_power_pulse(hu, false);
 		qca_regulator_disable(qcadev);
-	} else if (soc_type == QCA_WCN6750) {
+	} else if (qcadev->bt_en) {
+		gpiod_set_value_cansleep(qcadev->bt_en, 0);
+	}
+
+	set_bit(QCA_BT_OFF, &qca->flags);
+}
+
+static int qca_power_off_reg(struct hci_uart *hu)
+{
+	struct qca_serdev *qcadev;
+	enum qca_btsoc_type soc_type = qca_soc_type(hu);
+	bool sw_ctrl_state;
+
+	qcadev = serdev_device_get_drvdata(hu->serdev);
+
+	if (soc_type == QCA_WCN6750) {
 		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 		msleep(100);
 		qca_regulator_disable(qcadev);
@@ -1912,11 +1927,8 @@ static void qca_power_shutdown(struct hci_uart *hu)
 			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
 			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
 		}
-	} else if (qcadev->bt_en) {
-		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 	}
-
-	set_bit(QCA_BT_OFF, &qca->flags);
+	return 0;
 }
 
 static int qca_power_off(struct hci_dev *hdev)

@@ -59,6 +59,7 @@ struct hci_uart_proto {
 	int (*recv)(struct hci_uart *hu, const void *data, int len);
 	int (*enqueue)(struct hci_uart *hu, struct sk_buff *skb);
 	struct sk_buff *(*dequeue)(struct hci_uart *hu);
+	int (*poweroff)(struct hci_uart *hu);
 };
 
 struct hci_uart {
