@@ -429,6 +429,8 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 				else
 					goto err_clk;
 			}
+		} else {
+			goto err_clk;
 		}
 	}
 
