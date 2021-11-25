@@ -1880,6 +1880,7 @@ static const struct nla_policy ifla_policy[IFLA_MAX+1] = {
 	[IFLA_PROTO_DOWN_REASON] = { .type = NLA_NESTED },
 	[IFLA_NEW_IFINDEX]	= NLA_POLICY_MIN(NLA_S32, 1),
 	[IFLA_PARENT_DEV_NAME]	= { .type = NLA_NUL_STRING },
+	[IFLA_IFINDEX_LIST]	= { .type = NLA_BINARY },
 };
 
 static const struct nla_policy ifla_info_policy[IFLA_INFO_MAX+1] = {
@@ -3049,6 +3050,55 @@ static int rtnl_group_dellink(const struct net *net, int group)
 	return 0;
 }
 
+static int rtnl_list_dellink(struct net *net, void *ifindex_list, int size)
+{
+	const int num_devices = size / sizeof(int);
+	struct net_device **dev_list;
+	LIST_HEAD(list_kill);
+	int i, ret;
+
+	if (size < 0 || size % sizeof(int))
+		return -EINVAL;
+
+	dev_list = kmalloc_array(num_devices, sizeof(*dev_list), GFP_KERNEL);
+	if (!dev_list)
+		return -ENOMEM;
+
+	for (i = 0; i < num_devices; i++) {
+		const struct rtnl_link_ops *ops;
+		struct net_device *dev;
+
+		ret = -ENODEV;
+		dev = __dev_get_by_index(net, ((int *)ifindex_list)[i]);
+		if (!dev)
+			goto out_free;
+
+		ret = -EOPNOTSUPP;
+		ops = dev->rtnl_link_ops;
+		if (!ops || !ops->dellink)
+			goto out_free;
+
+		dev_list[i] = dev;
+	}
+
+	for (i = 0; i < num_devices; i++) {
+		const struct rtnl_link_ops *ops;
+		struct net_device *dev;
+
+		dev = dev_list[i];
+		ops = dev->rtnl_link_ops;
+		ops->dellink(dev, &list_kill);
+	}
+
+	unregister_netdevice_many(&list_kill);
+
+	ret = 0;
+
+out_free:
+	kfree(dev_list);
+	return ret;
+}
+
 int rtnl_delete_link(struct net_device *dev)
 {
 	const struct rtnl_link_ops *ops;
@@ -3101,6 +3151,9 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh,
 				   tb[IFLA_ALT_IFNAME], NULL);
 	else if (tb[IFLA_GROUP])
 		err = rtnl_group_dellink(tgt_net, nla_get_u32(tb[IFLA_GROUP]));
+	else if (tb[IFLA_IFINDEX_LIST])
+		err = rtnl_list_dellink(tgt_net, nla_data(tb[IFLA_IFINDEX_LIST]),
+					nla_len(tb[IFLA_IFINDEX_LIST]));
 	else
 		goto out;
 
