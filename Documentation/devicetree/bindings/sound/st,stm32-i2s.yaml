@@ -79,7 +79,7 @@ examples:
   - |
     #include <dt-bindings/interrupt-controller/arm-gic.h>
     #include <dt-bindings/clock/stm32mp1-clks.h>
-    i2s2: audio-controller@4000b000 {
+    spi2s2: spi@4000b000 {
         compatible = "st,stm32h7-i2s";
         #sound-dai-cells = <0>;
         reg = <0x4000b000 0x400>;
