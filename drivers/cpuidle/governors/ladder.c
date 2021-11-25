@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/cpuidle.h>
 #include <linux/jiffies.h>
+#include <linux/module.h>
 #include <linux/tick.h>
 
 #include <asm/io.h>
@@ -195,3 +196,6 @@ static int __init init_ladder(void)
 }
 
 postcore_initcall(init_ladder);
+
+MODULE_DESCRIPTION("CPUidle Ladder governor (for periodic timer tick)");
+MODULE_LICENSE("GPL v2");

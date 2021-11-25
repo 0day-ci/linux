@@ -19,13 +19,13 @@ config CPU_IDLE_MULTIPLE_DRIVERS
 	bool
 
 config CPU_IDLE_GOV_LADDER
-	bool "Ladder governor (for periodic timer tick)"
+	tristate "Ladder governor (for periodic timer tick)"
 
 config CPU_IDLE_GOV_MENU
-	bool "Menu governor (for tickless system)"
+	tristate "Menu governor (for tickless system)"
 
 config CPU_IDLE_GOV_TEO
-	bool "Timer events oriented (TEO) governor (for tickless systems)"
+	tristate "Timer events oriented (TEO) governor (for tickless systems)"
 	help
 	  This governor implements a simplified idle state selection method
 	  focused on timer events and does not do any interactivity boosting.

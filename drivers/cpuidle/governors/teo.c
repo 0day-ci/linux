@@ -104,6 +104,7 @@
 #include <linux/cpuidle.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched/clock.h>
 #include <linux/tick.h>
 
@@ -532,3 +533,6 @@ static int __init teo_governor_init(void)
 }
 
 postcore_initcall(teo_governor_init);
+
+MODULE_DESCRIPTION("CPUidle Timer events oriented (TEO) governor (for tickless systems)");
+MODULE_LICENSE("GPL v2");

@@ -13,6 +13,7 @@
 #include <linux/time.h>
 #include <linux/ktime.h>
 #include <linux/hrtimer.h>
+#include <linux/module.h>
 #include <linux/tick.h>
 #include <linux/sched.h>
 #include <linux/sched/loadavg.h>
@@ -577,3 +578,6 @@ static int __init init_menu(void)
 }
 
 postcore_initcall(init_menu);
+
+MODULE_DESCRIPTION("CPUidle Menu governor (for tickless system)");
+MODULE_LICENSE("GPL v2");
