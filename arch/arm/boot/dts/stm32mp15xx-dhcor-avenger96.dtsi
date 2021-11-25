@@ -362,7 +362,7 @@
 	};
 };
 
-&spi2 {
+&spi2s2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi2_pins_a>;
 	cs-gpios = <&gpioi 0 0>;

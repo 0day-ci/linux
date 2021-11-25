@@ -114,7 +114,7 @@
 	disable-wp;
 };
 
-&spi1 {
+&spi2s1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_pins_a>;
 	cs-gpios = <&gpioz 3 0>;

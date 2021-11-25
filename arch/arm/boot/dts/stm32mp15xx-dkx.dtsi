@@ -427,7 +427,9 @@
 	status = "disabled";
 };
 
-&i2s2 {
+&spi2s2 {
+	compatible = "st,stm32h7-i2s";
+	#sound-dai-cells = <0>;
 	clocks = <&rcc SPI2>, <&rcc SPI2_K>, <&rcc PLL3_Q>, <&rcc PLL3_R>;
 	clock-names = "pclk", "i2sclk", "x8k", "x11k";
 	pinctrl-names = "default", "sleep";
@@ -435,7 +437,8 @@
 	pinctrl-1 = <&i2s2_sleep_pins_a>;
 	status = "okay";
 
-	i2s2_port: port {
+	i2s2_port: port@0 {
+		reg = <0>;
 		i2s2_endpoint: endpoint {
 			remote-endpoint = <&sii9022_tx_endpoint>;
 			format = "i2s";
