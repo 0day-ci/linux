@@ -29,7 +29,8 @@ class SmokeTest(unittest.TestCase):
 
     def determine_bank_alg(self):
         # Probe for available PCR bank
-        for bank_alg in [tpm2.TPM2_ALG_SHA1, tpm2.TPM2_ALG_SHA256]:
+        for bank_alg in [tpm2.TPM2_ALG_SHA1, tpm2.TPM2_ALG_SHA256,
+                         tpm2.TPM2_ALG_SHA384, tpm2.TPM2_ALG_SHA512]:
             try:
                 handle = self.client.start_auth_session(tpm2.TPM2_SE_TRIAL)
                 self.client.policy_pcr(handle, [17], bank_alg=bank_alg)
