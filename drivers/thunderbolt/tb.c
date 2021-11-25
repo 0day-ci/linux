@@ -1081,6 +1081,13 @@ static int tb_tunnel_pci(struct tb *tb, struct tb_switch *sw)
 		return -EIO;
 	}
 
+	/*
+	 * In case of Titan Ridge CLx shall be enabled, enable PCIe L1 here,
+	 * after PCIe tunnelling was enabled.
+	 */
+	if (tb_switch_titan_ridge_pcie_l1_enable(sw))
+		tb_sw_warn(sw, "failed to enable PCIe L1 for Titan Ridge\n");
+
 	list_add_tail(&tunnel->list, &tcm->tunnel_list);
 	return 0;
 }

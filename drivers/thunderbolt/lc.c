@@ -508,3 +508,30 @@ int tb_lc_force_power(struct tb_switch *sw)
 
 	return tb_sw_write(sw, &in, TB_CFG_SWITCH, TB_LC_POWER, 1);
 }
+
+/**
+ * tb_lc_clx_supported() - Check whether CLx is supported by the link
+ * @sw: Port to check
+ *
+ * TB_LC_LINK_ATTR_CPS bit reflects if the link supports CLx including
+ * active cables (if connected on the link).
+ */
+bool tb_lc_clx_supported(struct tb_port *port)
+{
+	struct tb_switch *sw = port->sw;
+	int cap, ret;
+	u32 val;
+
+	if (!tb_switch_is_titan_ridge(sw))
+		return false;
+
+	cap = find_port_lc_cap(port);
+	if (cap < 0)
+		return false;
+
+	ret = tb_sw_read(sw, &val, TB_CFG_SWITCH, cap + TB_LC_LINK_ATTR, 1);
+	if (ret)
+		return false;
+
+	return !!(val & TB_LC_LINK_ATTR_CPS);
+}

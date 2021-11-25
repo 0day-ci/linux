@@ -140,6 +140,7 @@ enum tb_clx {
  * @cap_plug_events: Offset to the plug events capability (%0 if not found)
  * @cap_vsec_tmu: Offset to the TMU vendor specific capability (%0 if not found)
  * @cap_lc: Offset to the link controller capability (%0 if not found)
+ * @cap_lp: Offset to the low power (CLx for TBT) capability (%0 if not found)
  * @is_unplugged: The switch is going away
  * @drom: DROM of the switch (%NULL if not found)
  * @nvm: Pointer to the NVM if the switch has one (%NULL otherwise)
@@ -192,6 +193,7 @@ struct tb_switch {
 	int cap_plug_events;
 	int cap_vsec_tmu;
 	int cap_lc;
+	int cap_lp;
 	bool is_unplugged;
 	u8 *drom;
 	struct tb_nvm *nvm;
@@ -931,6 +933,10 @@ void tb_switch_tmu_configure(struct tb_switch *sw,
 int tb_switch_enable_clx(struct tb_switch *sw, enum tb_clx clx);
 int tb_switch_disable_clx(struct tb_switch *sw, enum tb_clx clx);
 bool tb_switch_is_clx_enabled(struct tb_switch *sw);
+bool tb_switch_is_cl0s_enabled(struct tb_switch *sw);
+bool tb_switch_clx_supported(struct tb_switch *sw);
+int tb_switch_titan_ridge_pcie_l1_enable(struct tb_switch *sw);
+int tb_port_titan_ridge_clx_objection_mask(struct tb_switch *sw);
 
 int tb_wait_for_port(struct tb_port *port, bool wait_if_unplugged);
 int tb_port_add_nfc_credits(struct tb_port *port, int credits);
@@ -1031,6 +1037,7 @@ bool tb_lc_dp_sink_query(struct tb_switch *sw, struct tb_port *in);
 int tb_lc_dp_sink_alloc(struct tb_switch *sw, struct tb_port *in);
 int tb_lc_dp_sink_dealloc(struct tb_switch *sw, struct tb_port *in);
 int tb_lc_force_power(struct tb_switch *sw);
+bool tb_lc_clx_supported(struct tb_port *port);
 
 static inline int tb_route_length(u64 route)
 {
