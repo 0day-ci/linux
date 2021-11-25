@@ -621,6 +621,18 @@ void try_to_unmap_flush_dirty(void)
 		try_to_unmap_flush();
 }
 
+/* The upper 15 bit of mm->tlb_flush_batched records pending flushes */
+#define TLB_FLUSH_BATCH_PENDING_SHIFT	16
+#define TLB_FLUSH_BATCH_COUNT_MASK	0x7f
+#define TLB_FLUSH_BATCH_PENDING_ONE	(1 << TLB_FLUSH_BATCH_PENDING_SHIFT)
+
+#define TLB_FLUSH_BATCH_PENDING(cnt)					\
+	(((cnt) >> TLB_FLUSH_BATCH_PENDING_SHIFT) & TLB_FLUSH_BATCH_COUNT_MASK)
+#define TLB_FLUSH_BATCH_FLUSHED(cnt)					\
+	((cnt) & TLB_FLUSH_BATCH_COUNT_MASK)
+#define TLB_FLUSH_BATCH_PACK(pending, flushed)				\
+	(((pending) << TLB_FLUSH_BATCH_PENDING_SHIFT) | (flushed))
+
 static void set_tlb_ubc_flush_pending(struct mm_struct *mm, bool writable)
 {
 	struct tlbflush_unmap_batch *tlb_ubc = &current->tlb_ubc;
@@ -633,7 +645,7 @@ static void set_tlb_ubc_flush_pending(struct mm_struct *mm, bool writable)
 	 * before the PTE is cleared.
 	 */
 	barrier();
-	mm->tlb_flush_batched = true;
+	atomic_add(TLB_FLUSH_BATCH_PENDING_ONE, &mm->tlb_flush_batched);
 
 	/*
 	 * If the PTE was dirty then it's best to assume it's writable. The
@@ -680,15 +692,19 @@ static bool should_defer_flush(struct mm_struct *mm, enum ttu_flags flags)
  */
 void flush_tlb_batched_pending(struct mm_struct *mm)
 {
-	if (data_race(mm->tlb_flush_batched)) {
-		flush_tlb_mm(mm);
+	int batched = atomic_read(&mm->tlb_flush_batched);
+	int pending = TLB_FLUSH_BATCH_PENDING(batched);
+	int flushed = TLB_FLUSH_BATCH_FLUSHED(batched);
 
+	if (pending != flushed) {
+		flush_tlb_mm(mm);
 		/*
-		 * Do not allow the compiler to re-order the clearing of
-		 * tlb_flush_batched before the tlb is flushed.
+		 * If the new TLB flushing is pended during flushing,
+		 * leave mm->tlb_flush_batched as is, to avoid to lose
+		 * flushing.
 		 */
-		barrier();
-		mm->tlb_flush_batched = false;
+		atomic_cmpxchg(&mm->tlb_flush_batched, batched,
+			       TLB_FLUSH_BATCH_PACK(pending, pending));
 	}
 }
 #else
