@@ -64,7 +64,7 @@ struct tc358762 {
 	struct drm_connector connector;
 	struct regulator *regulator;
 	struct drm_bridge *panel_bridge;
-	bool pre_enabled;
+	bool enabled;
 	int error;
 };
 
@@ -125,26 +125,26 @@ static int tc358762_init(struct tc358762 *ctx)
 	return tc358762_clear_error(ctx);
 }
 
-static void tc358762_post_disable(struct drm_bridge *bridge)
+static void tc358762_disable(struct drm_bridge *bridge)
 {
 	struct tc358762 *ctx = bridge_to_tc358762(bridge);
 	int ret;
 
 	/*
-	 * The post_disable hook might be called multiple times.
+	 * The disable hook might be called multiple times.
 	 * We want to avoid regulator imbalance below.
 	 */
-	if (!ctx->pre_enabled)
+	if (!ctx->enabled)
 		return;
 
-	ctx->pre_enabled = false;
+	ctx->enabled = false;
 
 	ret = regulator_disable(ctx->regulator);
 	if (ret < 0)
 		dev_err(ctx->dev, "error disabling regulators (%d)\n", ret);
 }
 
-static void tc358762_pre_enable(struct drm_bridge *bridge)
+static void tc358762_enable(struct drm_bridge *bridge)
 {
 	struct tc358762 *ctx = bridge_to_tc358762(bridge);
 	int ret;
@@ -157,7 +157,7 @@ static void tc358762_pre_enable(struct drm_bridge *bridge)
 	if (ret < 0)
 		dev_err(ctx->dev, "error initializing bridge (%d)\n", ret);
 
-	ctx->pre_enabled = true;
+	ctx->enabled = true;
 }
 
 static int tc358762_attach(struct drm_bridge *bridge,
@@ -170,8 +170,8 @@ static int tc358762_attach(struct drm_bridge *bridge,
 }
 
 static const struct drm_bridge_funcs tc358762_bridge_funcs = {
-	.post_disable = tc358762_post_disable,
-	.pre_enable = tc358762_pre_enable,
+	.disable = tc358762_disable,
+	.enable = tc358762_enable,
 	.attach = tc358762_attach,
 };
 
@@ -218,7 +218,7 @@ static int tc358762_probe(struct mipi_dsi_device *dsi)
 	mipi_dsi_set_drvdata(dsi, ctx);
 
 	ctx->dev = dev;
-	ctx->pre_enabled = false;
+	ctx->enabled = false;
 
 	/* TODO: Find out how to get dual-lane mode working */
 	dsi->lanes = 1;
