@@ -86,6 +86,23 @@ bail:
 	dev_priv->params.enable_gvt = 0;
 }
 
+static void init_device_info(struct intel_gvt *gvt)
+{
+	struct intel_gvt_device_info *info = &gvt->device_info;
+	struct pci_dev *pdev = to_pci_dev(gvt->gt->i915->drm.dev);
+
+	info->max_support_vgpus = 8;
+	info->cfg_space_size = PCI_CFG_SPACE_EXP_SIZE;
+	info->mmio_size = 2 * 1024 * 1024;
+	info->mmio_bar = 0;
+	info->gtt_start_offset = 8 * 1024 * 1024;
+	info->gtt_entry_size = 8;
+	info->gtt_entry_size_shift = 3;
+	info->gmadr_bytes_in_cmd = 8;
+	info->max_surface_size = 36 * 1024 * 1024;
+	info->msi_cap_offset = pdev->msi_cap;
+}
+
 /**
  * intel_gvt_init - initialize GVT components
  * @dev_priv: drm i915 private data
@@ -98,6 +115,7 @@ bail:
  */
 int intel_gvt_init(struct drm_i915_private *dev_priv)
 {
+	struct intel_gvt *gvt = NULL;
 	int ret;
 
 	if (i915_inject_probe_failure(dev_priv))
@@ -115,15 +133,32 @@ int intel_gvt_init(struct drm_i915_private *dev_priv)
 		return -EIO;
 	}
 
+	gvt = kzalloc(sizeof(struct intel_gvt), GFP_KERNEL);
+	if (!gvt)
+		return -ENOMEM;
+
+	gvt->gt = &dev_priv->gt;
+
+	init_device_info(gvt);
+
+	ret = intel_gvt_setup_mmio_info(gvt);
+	if (ret)
+		goto err_setup_mmio_info;
+
+	dev_priv->gvt = gvt;
+
 	ret = intel_gvt_init_device(dev_priv);
 	if (ret) {
 		drm_dbg(&dev_priv->drm, "Fail to init GVT device\n");
-		goto bail;
+		goto err_init_device;
 	}
 
 	return 0;
 
-bail:
+err_init_device:
+	intel_gvt_clean_mmio_info(gvt);
+err_setup_mmio_info:
+	kfree(gvt);
 	dev_priv->params.enable_gvt = 0;
 	return 0;
 }
@@ -147,6 +182,9 @@ void intel_gvt_driver_remove(struct drm_i915_private *dev_priv)
 		return;
 
 	intel_gvt_clean_device(dev_priv);
+	intel_gvt_clean_mmio_info(dev_priv->gvt);
+	kfree(dev_priv->gvt);
+	dev_priv->gvt = NULL;
 }
 
 /**
