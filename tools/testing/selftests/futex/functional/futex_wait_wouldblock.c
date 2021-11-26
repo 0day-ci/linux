@@ -17,12 +17,12 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <linux/futex_syscall.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "futextest.h"
-#include "futex2test.h"
 #include "logging.h"
 
 #define TEST_NAME "futex-wait-wouldblock"
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 	}
 
 	info("Calling futex_waitv on f1: %u @ %p with val=%u\n", f1, &f1, f1+1);
-	res = futex_waitv(&waitv, 1, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(&waitv, 1, 0, &to, CLOCK_MONOTONIC);
 	if (!res || errno != EWOULDBLOCK) {
 		ksft_test_result_pass("futex_waitv returned: %d %s\n",
 				      res ? errno : res,

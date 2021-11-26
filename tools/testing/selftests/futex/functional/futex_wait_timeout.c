@@ -15,9 +15,9 @@
  *
  *****************************************************************************/
 
+#include <linux/futex_syscall.h>
 #include <pthread.h>
 #include "futextest.h"
-#include "futex2test.h"
 #include "logging.h"
 
 #define TEST_NAME "futex-wait-timeout"
@@ -185,13 +185,13 @@ int main(int argc, char *argv[])
 	/* futex_waitv with CLOCK_MONOTONIC */
 	if (futex_get_abs_timeout(CLOCK_MONOTONIC, &to, timeout_ns))
 		return RET_FAIL;
-	res = futex_waitv(&waitv, 1, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(&waitv, 1, 0, &to, CLOCK_MONOTONIC);
 	test_timeout(res, &ret, "futex_waitv monotonic", ETIMEDOUT);
 
 	/* futex_waitv with CLOCK_REALTIME */
 	if (futex_get_abs_timeout(CLOCK_REALTIME, &to, timeout_ns))
 		return RET_FAIL;
-	res = futex_waitv(&waitv, 1, 0, &to, CLOCK_REALTIME);
+	res = __kernel_futex_syscall_waitv(&waitv, 1, 0, &to, CLOCK_REALTIME);
 	test_timeout(res, &ret, "futex_waitv realtime", ETIMEDOUT);
 
 	ksft_print_cnts();

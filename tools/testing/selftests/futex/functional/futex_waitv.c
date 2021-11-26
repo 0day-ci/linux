@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <error.h>
 #include <getopt.h>
+#include <linux/futex_syscall.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +17,6 @@
 #include <stdint.h>
 #include <sys/shm.h>
 #include "futextest.h"
-#include "futex2test.h"
 #include "logging.h"
 
 #define TEST_NAME "futex-wait"
@@ -24,6 +24,8 @@
 #define NR_FUTEXES 30
 static struct futex_waitv waitv[NR_FUTEXES];
 u_int32_t futexes[NR_FUTEXES] = {0};
+
+#define u64_to_ptr(x) ((void *)(uintptr_t)(x))
 
 void usage(char *prog)
 {
@@ -45,7 +47,7 @@ void *waiterfn(void *arg)
 
 	to.tv_sec++;
 
-	res = futex_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
 	if (res < 0) {
 		ksft_test_result_fail("futex_waitv returned: %d %s\n",
 				      errno, strerror(errno));
@@ -153,7 +155,7 @@ int main(int argc, char *argv[])
 
 	to.tv_sec++;
 
-	res = futex_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
 	if (res == EINVAL) {
 		ksft_test_result_fail("futex_waitv private returned: %d %s\n",
 				      res ? errno : res,
@@ -172,7 +174,7 @@ int main(int argc, char *argv[])
 
 	to.tv_sec++;
 
-	res = futex_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
 	if (res == EINVAL) {
 		ksft_test_result_fail("futex_wake private returned: %d %s\n",
 				      res ? errno : res,
@@ -190,7 +192,7 @@ int main(int argc, char *argv[])
 
 	to.tv_sec++;
 
-	res = futex_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(waitv, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
 	if (res == EINVAL) {
 		ksft_test_result_fail("futex_waitv private returned: %d %s\n",
 				      res ? errno : res,
@@ -206,7 +208,7 @@ int main(int argc, char *argv[])
 
 	to.tv_sec++;
 
-	res = futex_waitv(NULL, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
+	res = __kernel_futex_syscall_waitv(NULL, NR_FUTEXES, 0, &to, CLOCK_MONOTONIC);
 	if (res == EINVAL) {
 		ksft_test_result_fail("futex_waitv private returned: %d %s\n",
 				      res ? errno : res,
@@ -222,7 +224,7 @@ int main(int argc, char *argv[])
 
 	to.tv_sec++;
 
-	res = futex_waitv(NULL, NR_FUTEXES, 0, &to, CLOCK_TAI);
+	res = __kernel_futex_syscall_waitv(NULL, NR_FUTEXES, 0, &to, CLOCK_TAI);
 	if (res == EINVAL) {
 		ksft_test_result_fail("futex_waitv private returned: %d %s\n",
 				      res ? errno : res,
