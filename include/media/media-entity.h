@@ -119,12 +119,16 @@ struct media_pipeline {
  *		a pad. In that case, it represents the source pad.
  * @intf:	Part of a union. Used only if the first object (gobj0) is
  *		an interface.
+ * @primary:	Part of a union. Used only if the first object (gobj0) is
+ *		an entity and the link type is MEDIA_LNK_FL_ANCILLARY_LINK.
  * @gobj1:	Part of a union. Used to get the pointer for the second
  *		graph_object of the link.
  * @sink:	Part of a union. Used only if the second object (gobj1) is
  *		a pad. In that case, it represents the sink pad.
  * @entity:	Part of a union. Used only if the second object (gobj1) is
  *		an entity.
+ * @ancillary:	Part of a union. Used only if the second object (gobj1) is
+ *		an entity and the link type is MEDIA_LNK_FL_ANCILLARY_LINK.
  * @reverse:	Pointer to the link for the reverse direction of a pad to pad
  *		link.
  * @flags:	Link flags, as defined in uapi/media.h (MEDIA_LNK_FL_*)
@@ -137,11 +141,13 @@ struct media_link {
 		struct media_gobj *gobj0;
 		struct media_pad *source;
 		struct media_interface *intf;
+		struct media_entity *primary;
 	};
 	union {
 		struct media_gobj *gobj1;
 		struct media_pad *sink;
 		struct media_entity *entity;
+		struct media_entity *ancillary;
 	};
 	struct media_link *reverse;
 	unsigned long flags;
@@ -1103,6 +1109,30 @@ void media_remove_intf_links(struct media_interface *intf);
  * This helper function will check if @operation is not %NULL. On such case,
  * it will issue a call to @operation\(@entity, @args\).
  */
+
+/**
+ * media_create_ancillary_link() - creates a link between two entities
+ *
+ * @primary:	pointer to the primary %media_entity
+ * @ancillary:	pointer to the ancillary %media_entity
+ * @flags:	Link flags, as defined in
+ *		:ref:`include/uapi/linux/media.h <media_header>`
+ *		( seek for ``MEDIA_LNK_FL_*``)
+ *
+ *
+ * Valid values for flags:
+ *
+ * %MEDIA_LNK_FL_ENABLED
+ *   Indicates that the two entities are connected pieces of hardware that form
+ *   a single logical unit.
+ *
+ *   A typical example is a camera lens being linked to the sensor that it is
+ *   supporting.
+ */
+struct media_link *
+media_create_ancillary_link(struct media_entity *primary,
+			    struct media_entity *ancillary,
+			    u32 flags);
 
 #define media_entity_call(entity, operation, args...)			\
 	(((entity)->ops && (entity)->ops->operation) ?			\
