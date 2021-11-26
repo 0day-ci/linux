@@ -161,6 +161,7 @@ static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 
 	text_poke_addr = (unsigned long)__this_cpu_read(text_poke_area)->addr;
 	if (map_patch_area(addr, text_poke_addr)) {
+		WARN_ON_ONCE(1);
 		err = -1;
 		goto out;
 	}
@@ -192,8 +193,10 @@ static bool skip_addr_verif = false;
 int patch_instruction(u32 *addr, struct ppc_inst instr)
 {
 	/* Make sure we aren't patching a freed init section */
-	if (!skip_addr_verif && !kernel_text_address((unsigned long)addr))
+	if (!skip_addr_verif && !kernel_text_address((unsigned long)addr)) {
+		WARN_ON_ONCE(1);
 		return 0;
+	}
 
 	return do_patch_instruction(addr, instr);
 }
