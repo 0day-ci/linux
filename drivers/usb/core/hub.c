@@ -5530,6 +5530,7 @@ static void port_event(struct usb_hub *hub, int port1)
 		__must_hold(&port_dev->status_lock)
 {
 	int connect_change;
+	bool disconnect = false;
 	struct usb_port *port_dev = hub->ports[port1 - 1];
 	struct usb_device *udev = port_dev->child;
 	struct usb_device *hdev = hub->hdev;
@@ -5545,6 +5546,9 @@ static void port_event(struct usb_hub *hub, int port1)
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
 		usb_clear_port_feature(hdev, port1, USB_PORT_FEAT_C_CONNECTION);
 		connect_change = 1;
+		if (!(portstatus & USB_PORT_STAT_CONNECTION) &&
+		    !(portstatus & USB_PORT_STAT_ENABLE))
+			disconnect = true;
 	}
 
 	if (portchange & USB_PORT_STAT_C_ENABLE) {
@@ -5613,7 +5617,7 @@ static void port_event(struct usb_hub *hub, int port1)
 	 * Warm reset a USB3 protocol port if it's in
 	 * SS.Inactive state.
 	 */
-	if (hub_port_warm_reset_required(hub, port1, portstatus)) {
+	if (hub_port_warm_reset_required(hub, port1, portstatus) && !disconnect) {
 		dev_dbg(&port_dev->dev, "do warm reset\n");
 		if (!udev || !(portstatus & USB_PORT_STAT_CONNECTION)
 				|| udev->state == USB_STATE_NOTATTACHED) {
