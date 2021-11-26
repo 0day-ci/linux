@@ -1457,27 +1457,26 @@ static struct platform_driver ghes_platform_driver = {
 	.remove		= ghes_remove,
 };
 
-static int __init ghes_init(void)
+void __init ghes_init(void)
 {
 	int rc;
 
 	if (acpi_disabled)
-		return -ENODEV;
+		return;
 
 	switch (hest_disable) {
 	case HEST_NOT_FOUND:
-		return -ENODEV;
+		pr_info(GHES_PFX "HEST is not found!\n");
+		return;
 	case HEST_DISABLED:
 		pr_info(GHES_PFX "HEST is not enabled!\n");
-		return -EINVAL;
+		return;
 	default:
 		break;
 	}
 
-	if (ghes_disable) {
+	if (ghes_disable)
 		pr_info(GHES_PFX "GHES is not enabled!\n");
-		return -EINVAL;
-	}
 
 	ghes_nmi_init_cxt();
 
@@ -1495,8 +1494,7 @@ static int __init ghes_init(void)
 	else
 		pr_info(GHES_PFX "Failed to enable APEI firmware first mode.\n");
 
-	return 0;
+	return;
 err:
-	return rc;
+	ghes_disable = 1;
 }
-device_initcall(ghes_init);
