@@ -887,6 +887,7 @@ static int btmtksdio_setup(struct hci_dev *hdev)
 	if (enable_autosuspend)
 		pm_runtime_allow(bdev->dev);
 
+	hci_set_msft_opcode(hdev, 0xFD30);
 	bt_dev_info(hdev, "Device setup in %llu usecs", duration);
 
 	return 0;
