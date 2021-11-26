@@ -190,8 +190,12 @@ static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 int patch_instruction(u32 *addr, struct ppc_inst instr)
 {
 	/* Make sure we aren't patching a freed init section */
-	if (!kernel_text_address((unsigned long)addr))
+	if (system_state >= SYSTEM_FREEING_INITMEM && init_section_contains(addr, 4))
 		return 0;
+
+	if (!kernel_text_address((unsigned long)addr))
+		pr_warn_once("%s() called on invalid text address 0x%p from %pS\n",
+			     __func__, addr, __builtin_return_address(0));
 
 	return do_patch_instruction(addr, instr);
 }
