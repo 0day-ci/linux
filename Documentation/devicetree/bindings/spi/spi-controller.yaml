@@ -162,6 +162,27 @@ patternProperties:
         description:
           Delay, in microseconds, after a write transfer.
 
+      stacked-memories:
+        type: boolean
+        description: Several SPI memories can be wired in stacked mode.
+          This basically means that either a device features several chip
+          selects, or that different devices must be seen as a single
+          bigger chip. This basically doubles (or more) the total address
+          space with only a single additional wire, while still needing
+          to repeat the commands when crossing a chip boundary. XIP is
+          usually not supported in this mode.
+
+      parallel-memories:
+        type: boolean
+        description: Several SPI memories can be wired in parallel mode.
+          The devices are physically on a different buses but will always
+          act synchronously as each data word is spread across the
+          different memories (eg. even bits are stored in one memory, odd
+          bits in the other). This basically doubles the address space and
+          the throughput while greatly complexifying the wiring because as
+          many busses as devices must be wired. XIP is usually not
+          supported in this mode.
+
     required:
       - compatible
       - reg
