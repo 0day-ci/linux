@@ -20152,7 +20152,7 @@ L:	linux-fsdevel@vger.kernel.org
 S:	Supported
 W:	https://virtio-fs.gitlab.io/
 F:	Documentation/filesystems/virtiofs.rst
-F:	fs/fuse/virtio_fs.c
+F:	fs/fuse/virtiofs.c
 F:	include/uapi/linux/virtio_fs.h
 
 VIRTIO GPIO DRIVER
