@@ -5715,23 +5715,22 @@ static bool __kvm_zap_rmaps(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 {
 	const struct kvm_memory_slot *memslot;
 	struct kvm_memslots *slots;
-	struct rb_node *node;
+	struct kvm_memslot_iter iter;
 	bool flush = false;
 	gfn_t start, end;
-	int i, idx;
+	int i;
 
 	if (!kvm_memslots_have_rmaps(kvm))
 		return flush;
 
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
 		slots = __kvm_memslots(kvm, i);
-		idx = slots->node_idx;
 
-		kvm_for_each_memslot_in_gfn_range(node, slots, gfn_start, gfn_end) {
-			memslot = container_of(node, struct kvm_memory_slot, gfn_node[idx]);
+		kvm_for_each_memslot_in_gfn_range(&iter, slots, gfn_start, gfn_end) {
+			memslot = kvm_memslot_iter_slot(&iter);
 			start = max(gfn_start, memslot->base_gfn);
 			end = min(gfn_end, memslot->base_gfn + memslot->npages);
-			if (start >= end)
+			if (WARN_ON_ONCE(start >= end))
 				continue;
 
 			flush = slot_handle_level_range(kvm, memslot, kvm_zap_rmapp,

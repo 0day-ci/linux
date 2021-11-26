@@ -1797,22 +1797,11 @@ static int kvm_set_memslot(struct kvm *kvm,
 static bool kvm_check_memslot_overlap(struct kvm_memslots *slots, int id,
 				      gfn_t start, gfn_t end)
 {
-	int idx = slots->node_idx;
-	struct rb_node *node;
+	struct kvm_memslot_iter iter;
 
-	kvm_for_each_memslot_in_gfn_range(node, slots, start, end) {
-		struct kvm_memory_slot *cslot;
-		gfn_t cend;
-
-		cslot = container_of(node, struct kvm_memory_slot, gfn_node[idx]);
-		cend = cslot->base_gfn + cslot->npages;
-		if (cslot->id == id)
-			continue;
-
-		/* kvm_for_each_in_gfn_no_more() guarantees that cslot->base_gfn < nend */
-		if (cend > start)
+	kvm_for_each_memslot_in_gfn_range(&iter, slots, start, end)
+		if (kvm_memslot_iter_slot(&iter)->id != id)
 			return true;
-	}
 
 	return false;
 }
