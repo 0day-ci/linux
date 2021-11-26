@@ -9,12 +9,15 @@
 #ifndef _UAPI_LINUX_FUTEX_SYSCALL_H
 #define _UAPI_LINUX_FUTEX_SYSCALL_H
 
-#include <asm/unistd.h>
+#include <unistd.h>
 #include <errno.h>
+#include <linux/futex.h>
 #include <linux/types.h>
 #include <linux/time_types.h>
 #include <stdint.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
+#include <time.h>
 
 /**
  * futex_syscall_timeout() - __NR_futex/__NR_futex_time64 syscall wrapper
@@ -84,6 +87,33 @@ __kernel_futex_syscall_nr_requeue(volatile uint32_t *uaddr, int op, uint32_t val
 
 	errno = ENOSYS;
 	return -1;
+}
+
+/**
+ * futex_waitv - Wait at multiple futexes, wake on any
+ * @waiters:    Array of waiters
+ * @nr_waiters: Length of waiters array
+ * @flags: Operation flags
+ * @timo:  Optional timeout for operation
+ */
+static inline int
+__kernel_futex_syscall_waitv(volatile struct futex_waitv *waiters, unsigned long nr_waiters,
+			      unsigned long flags, struct timespec *timo, clockid_t clockid)
+{
+	/* futex_waitv expects a 64-bit time_t */
+	if (sizeof(*timo) == sizeof(struct __kernel_timespec))
+		return syscall(__NR_futex_waitv, waiters, nr_waiters, flags, timo, clockid);
+
+	/* If the caller supplied a 32-bit time_t, convert it to 64-bit */
+	if (timo) {
+		struct __kernel_timespec ts_new;
+
+		ts_new.tv_sec = timo->tv_sec;
+		ts_new.tv_nsec = timo->tv_nsec;
+
+		return syscall(__NR_futex_waitv, waiters, nr_waiters, flags, &ts_new, clockid);
+	} else
+		return syscall(__NR_futex_waitv, waiters, nr_waiters, flags, NULL, clockid);
 }
 
 #endif /* _UAPI_LINUX_FUTEX_SYSCALL_H */
