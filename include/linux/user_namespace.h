@@ -62,6 +62,7 @@ enum ucount_type {
 };
 
 #define MAX_PER_NAMESPACE_UCOUNTS UCOUNT_RLIMIT_NPROC
+#define RLIMIT_COUNTS UCOUNT_COUNTS - MAX_PER_NAMESPACE_UCOUNTS + 1
 
 struct user_namespace {
 	struct uid_gid_map	uid_map;
@@ -98,7 +99,8 @@ struct user_namespace {
 	struct ctl_table_header *sysctls;
 #endif
 	struct ucounts		*ucounts;
-	long ucount_max[UCOUNT_COUNTS];
+	long ucount_max[MAX_PER_NAMESPACE_UCOUNTS];
+	long rlimit_max[RLIMIT_COUNTS];
 } __randomize_layout;
 
 struct ucounts {
@@ -131,10 +133,15 @@ long inc_rlimit_get_ucounts(struct ucounts *ucounts, enum ucount_type type);
 void dec_rlimit_put_ucounts(struct ucounts *ucounts, enum ucount_type type);
 bool is_ucounts_overlimit(struct ucounts *ucounts, enum ucount_type type, unsigned long max);
 
-static inline void set_rlimit_ucount_max(struct user_namespace *ns,
+static inline long get_userns_rlimit_max(struct user_namespace *ns, enum ucount_type type)
+{
+	return READ_ONCE(ns->rlimit_max[type - MAX_PER_NAMESPACE_UCOUNTS]);
+}
+
+static inline void set_userns_rlimit_max(struct user_namespace *ns,
 		enum ucount_type type, unsigned long max)
 {
-	ns->ucount_max[type] = max <= LONG_MAX ? max : LONG_MAX;
+	ns->rlimit_max[type - MAX_PER_NAMESPACE_UCOUNTS] = max <= LONG_MAX ? max : LONG_MAX;
 }
 
 #ifdef CONFIG_USER_NS
