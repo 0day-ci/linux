@@ -24,6 +24,36 @@ or host-managed, chunk_sectors indicates the size in 512B sectors of the zones
 of the device, with the eventual exception of the last zone of the device which
 may be smaller.
 
+crypto
+------
+This subdirectory is present if the device supports inline encryption.
+(See :ref:`Documentation/block/inline-encryption.rst <inline_encryption>`.)
+This subdirectory contains the following files and subdirectories which describe
+the inline encryption capabilities of the device:
+
+max_dun_bits (RO)
+~~~~~~~~~~~~~~~~~
+The maximum length, in bits, of data unit numbers (DUNs) accepted by the device.
+
+modes
+~~~~~
+This subdirectory contains one file (RO) per crypto mode the device supports.
+Each such file contains a hexadecimal number that is a bitmask of the supported
+data unit sizes, in bytes, for the crypto mode.
+
+The crypto modes that may be supported are:
+
+* AES-256-XTS
+* AES-128-CBC-ESSIV
+* Adiantum
+
+For example, if a device supports AES-256-XTS with data unit sizes of 512 and
+4096 bytes, the file "AES-256-XTS" will be present and will contain "0x1200".
+
+num_keyslots (RO)
+~~~~~~~~~~~~~~~~~
+The number of crypto keyslots the device has.
+
 dax (RO)
 --------
 This file indicates whether the device supports Direct Access (DAX),
