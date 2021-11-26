@@ -187,10 +187,12 @@ static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 
 #endif /* CONFIG_STRICT_KERNEL_RWX */
 
+static bool skip_addr_verif = false;
+
 int patch_instruction(u32 *addr, struct ppc_inst instr)
 {
 	/* Make sure we aren't patching a freed init section */
-	if (!kernel_text_address((unsigned long)addr))
+	if (!skip_addr_verif && !kernel_text_address((unsigned long)addr))
 		return 0;
 
 	return do_patch_instruction(addr, instr);
@@ -738,11 +740,13 @@ static int __init test_code_patching(void)
 {
 	printk(KERN_DEBUG "Running code patching self-tests ...\n");
 
+	skip_addr_verif = true;
 	test_branch_iform();
 	test_branch_bform();
 	test_create_function_call();
 	test_translate_branch();
 	test_prefixed_patching();
+	skip_addr_verif = false;
 
 	return 0;
 }
