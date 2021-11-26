@@ -741,6 +741,12 @@ static void _dpu_kms_hw_destroy(struct dpu_kms *dpu_kms)
 			if ((vbif_idx < VBIF_MAX) && dpu_kms->hw_vbif[vbif_idx])
 				dpu_hw_vbif_destroy(dpu_kms->hw_vbif[vbif_idx]);
 		}
+		for (i = 0; i < dpu_kms->catalog->intf_count; i++) {
+			u32 intf_idx = dpu_kms->catalog->intf[i].id;
+
+			if ((intf_idx < INTF_MAX) && dpu_kms->hw_intf[intf_idx])
+				dpu_hw_intf_destroy(dpu_kms->hw_intf[intf_idx]);
+		}
 	}
 
 	if (dpu_kms->rm_init)
@@ -1065,6 +1071,24 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 				rc = -EINVAL;
 			DPU_ERROR("failed to init vbif %d: %d\n", vbif_idx, rc);
 			dpu_kms->hw_vbif[vbif_idx] = NULL;
+			goto power_error;
+		}
+	}
+
+	for (i = 0; i < dpu_kms->catalog->intf_count; i++) {
+		u32 intf_idx = dpu_kms->catalog->intf[i].id;
+
+		if (dpu_kms->catalog->intf[i].type == INTF_NONE)
+			continue;
+
+		dpu_kms->hw_intf[intf_idx] = dpu_hw_intf_init(intf_idx,
+				dpu_kms->mmio, dpu_kms->catalog);
+		if (IS_ERR_OR_NULL(dpu_kms->hw_intf[intf_idx])) {
+			rc = PTR_ERR(dpu_kms->hw_intf[intf_idx]);
+			if (!dpu_kms->hw_intf[intf_idx])
+				rc = -EINVAL;
+			DPU_ERROR("failed to init intf %d: %d\n", intf_idx, rc);
+			dpu_kms->hw_intf[intf_idx] = NULL;
 			goto power_error;
 		}
 	}
