@@ -1304,6 +1304,7 @@ new_segment:
 			bool merge = true;
 			int i = skb_shinfo(skb)->nr_frags;
 			struct page_frag *pfrag = sk_page_frag(sk);
+			unsigned int offset;
 
 			if (!sk_page_frag_refill(sk, pfrag))
 				goto wait_for_space;
@@ -1331,14 +1332,11 @@ new_segment:
 			if (!sk_wmem_schedule(sk, copy))
 				goto wait_for_space;
 
-			err = skb_copy_to_page_nocache(sk, &msg->msg_iter, skb,
-						       pfrag->page,
-						       pfrag->offset,
-						       copy);
-			if (err)
-				goto do_error;
-
-			/* Update the skb. */
+			/* Update the skb before accessing the user space buffer
+			 * so that we leave the task frag in a consistent state.
+			 * Just in case the page_fault handler need to use it
+			 */
+			offset = pfrag->offset;
 			if (merge) {
 				skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], copy);
 			} else {
@@ -1347,6 +1345,12 @@ new_segment:
 				page_ref_inc(pfrag->page);
 			}
 			pfrag->offset += copy;
+
+			err = skb_copy_to_page_nocache(sk, &msg->msg_iter, skb,
+						       pfrag->page,
+						       offset, copy);
+			if (err)
+				goto do_error;
 		} else {
 			/* First append to a fragless skb builds initial
 			 * pure zerocopy skb
