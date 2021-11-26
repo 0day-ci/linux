@@ -1378,8 +1378,12 @@ static void kvm_replace_memslot(struct kvm *kvm,
 		hash_del(&old->id_node[idx]);
 		interval_tree_remove(&old->hva_node[idx], &slots->hva_tree);
 
-		if ((long)old == atomic_long_read(&slots->last_used_slot))
-			atomic_long_set(&slots->last_used_slot, (long)new);
+		/*
+		 * The atomicity isn't strictly required here since we are
+		 * operating on an inactive memslots set anyway.
+		 */
+		atomic_long_cmpxchg(&slots->last_used_slot,
+				    (unsigned long)old, (unsigned long)new);
 
 		if (!new) {
 			kvm_erase_gfn_node(slots, old);
