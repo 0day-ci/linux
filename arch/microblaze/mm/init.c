@@ -144,7 +144,7 @@ int page_is_ram(unsigned long pfn)
  */
 static void mm_cmdline_setup(void)
 {
-	unsigned long maxmem = 0;
+	unsigned long maxmem;
 	char *p = cmd_line;
 
 	/* Look for mem= option on command line */
