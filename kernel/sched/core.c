@@ -9753,28 +9753,12 @@ static inline void alloc_uclamp_sched_group(struct task_group *tg,
 #endif
 }
 
-static void sched_free_group(struct task_group *tg)
+void sched_free_group(struct task_group *tg)
 {
 	free_fair_sched_group(tg);
 	free_rt_sched_group(tg);
 	autogroup_free(tg);
 	kmem_cache_free(task_group_cache, tg);
-}
-
-static void sched_free_group_rcu(struct rcu_head *rcu)
-{
-	sched_free_group(container_of(rcu, struct task_group, rcu));
-}
-
-static void sched_unregister_group(struct task_group *tg)
-{
-	unregister_fair_sched_group(tg);
-	unregister_rt_sched_group(tg);
-	/*
-	 * We have to wait for yet another RCU grace period to expire, as
-	 * print_cfs_stats() might run concurrently.
-	 */
-	call_rcu(&tg->rcu, sched_free_group_rcu);
 }
 
 /* allocate runqueue etc for a new task group */
@@ -9819,40 +9803,23 @@ void sched_online_group(struct task_group *tg, struct task_group *parent)
 	online_fair_sched_group(tg);
 }
 
-/* rcu callback to free various structures associated with a task group */
-static void sched_unregister_group_rcu(struct rcu_head *rhp)
-{
-	/* Now it should be safe to free those cfs_rqs: */
-	sched_unregister_group(container_of(rhp, struct task_group, rcu));
-}
-
-void sched_destroy_group(struct task_group *tg)
-{
-	/* Wait for possible concurrent references to cfs_rqs complete: */
-	call_rcu(&tg->rcu, sched_unregister_group_rcu);
-}
-
-void sched_release_group(struct task_group *tg)
+void sched_released_group(struct task_group *tg)
 {
 	unsigned long flags;
 
 	/*
-	 * Unlink first, to avoid walk_tg_tree_from() from finding us (via
-	 * sched_cfs_period_timer()).
-	 *
-	 * For this to be effective, we have to wait for all pending users of
-	 * this task group to leave their RCU critical section to ensure no new
-	 * user will see our dying task group any more. Specifically ensure
-	 * that tg_unthrottle_up() won't add decayed cfs_rq's to it.
-	 *
-	 * We therefore defer calling unregister_fair_sched_group() to
-	 * sched_unregister_group() which is guarantied to get called only after the
-	 * current RCU grace period has expired.
+	 * We get here only after all CPUs see tg as dying and an RCU grace
+	 * period. Despite that there may still be concurrent RCU readers
+	 * (walk_tg_tree_from() or task_group list) in their RCU sections.
+	 * Their references to tg stay valid only inside the RCU read section.
 	 */
 	spin_lock_irqsave(&task_group_lock, flags);
 	list_del_rcu(&tg->list);
 	list_del_rcu(&tg->siblings);
 	spin_unlock_irqrestore(&task_group_lock, flags);
+
+	unregister_fair_sched_group(tg);
+	unregister_rt_sched_group(tg);
 }
 
 static void sched_change_group(struct task_struct *tsk, int type)
@@ -9967,7 +9934,7 @@ static void cpu_cgroup_css_released(struct cgroup_subsys_state *css)
 {
 	struct task_group *tg = css_tg(css);
 
-	sched_release_group(tg);
+	sched_released_group(tg);
 }
 
 static void cpu_cgroup_css_free(struct cgroup_subsys_state *css)
@@ -9977,7 +9944,7 @@ static void cpu_cgroup_css_free(struct cgroup_subsys_state *css)
 	/*
 	 * Relies on the RCU grace period between css_released() and this.
 	 */
-	sched_unregister_group(tg);
+	sched_free_group(tg);
 }
 
 /*

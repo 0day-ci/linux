@@ -4762,6 +4762,12 @@ static int tg_unthrottle_up(struct task_group *tg, void *data)
 		cfs_rq->throttled_clock_task_time += rq_clock_task(rq) -
 					     cfs_rq->throttled_clock_task;
 
+		/*
+		 * Last tg_unthrottle_up() may happen in a task_group being removed,
+		 * it is only RCU protected so don't store it into leaf list.
+		 */
+		if (css_is_dying(&tg->css))
+			return 0;
 		/* Add cfs_rq with load or one or more already running entities to the list */
 		if (!cfs_rq_is_decayed(cfs_rq) || cfs_rq->nr_running)
 			list_add_leaf_cfs_rq(cfs_rq);

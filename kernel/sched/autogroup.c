@@ -22,6 +22,11 @@ void autogroup_free(struct task_group *tg)
 	kfree(tg->autogroup);
 }
 
+static void sched_free_group_rcu(struct rcu_head *rcu)
+{
+	sched_free_group(container_of(rcu, struct task_group, rcu));
+}
+
 static inline void autogroup_destroy(struct kref *kref)
 {
 	struct autogroup *ag = container_of(kref, struct autogroup, kref);
@@ -31,8 +36,9 @@ static inline void autogroup_destroy(struct kref *kref)
 	ag->tg->rt_se = NULL;
 	ag->tg->rt_rq = NULL;
 #endif
-	sched_release_group(ag->tg);
-	sched_destroy_group(ag->tg);
+	sched_released_group(ag->tg);
+	/* Wait for possible concurrent references to cfs_rqs complete: */
+	call_rcu(&ag->tg->rcu, sched_free_group_rcu);
 }
 
 static inline void autogroup_kref_put(struct autogroup *ag)

@@ -503,8 +503,8 @@ extern int sched_rt_can_attach(struct task_group *tg, struct task_struct *tsk);
 extern struct task_group *sched_create_group(struct task_group *parent);
 extern void sched_online_group(struct task_group *tg,
 			       struct task_group *parent);
-extern void sched_destroy_group(struct task_group *tg);
-extern void sched_release_group(struct task_group *tg);
+extern void sched_released_group(struct task_group *tg);
+extern void sched_free_group(struct task_group *tg);
 
 extern void sched_move_task(struct task_struct *tsk);
 
