@@ -11753,8 +11753,7 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 	    (change == KVM_MR_CREATE || change == KVM_MR_DELETE)) {
 		unsigned long nr_mmu_pages;
 
-		nr_mmu_pages = kvm->nr_memslot_pages * KVM_PERMILLE_MMU_PAGES;
-		nr_mmu_pages /= 1000;
+		nr_mmu_pages = kvm->nr_memslot_pages / KVM_MEMSLOT_PAGES_TO_MMU_PAGES_RATIO;
 		nr_mmu_pages = max(nr_mmu_pages, KVM_MIN_ALLOC_MMU_PAGES);
 		kvm_mmu_change_mmu_pages(kvm, nr_mmu_pages);
 	}
