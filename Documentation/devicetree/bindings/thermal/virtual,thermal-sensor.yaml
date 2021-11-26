@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright 2021 BayLibre
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/thermal/virtual,thermal-sensor.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Virtual thermal sensor binding
+
+maintainers:
+  - Alexandre Bailon <abailon@baylibre.com>
+
+description: |
+  The virtual thermal sensor device provides a way to aggregate the temperature
+  from multiple thermal zones. Basically, this could be used to get the
+  maximum, minimum or average temperature.
+
+allOf:
+  - $ref: thermal-sensor.yaml#
+
+properties:
+  compatible:
+    const: virtual,thermal-sensor
+
+  aggregation-function:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Used to select the operations to perform on the sensors to get the virtual
+      sensor temperature.
+    enum:
+      - VIRTUAL_THERMAL_SENSOR_MIN_VAL
+      - VIRTUAL_THERMAL_SENSOR_MAX_VAL
+      - VIRTUAL_THERMAL_SENSOR_AVG_VAL
+
+  thermal-sensors:
+    $ref: /schemas/types.yaml#/definitions/string-array
+    description:
+      The names of the thermal zone to aggregate.
+
+required:
+  - aggregation-function
+  - thermal-sensors
+
+additionalProperties: true
+
+examples:
+  - |
+    #include <dt-bindings/thermal/thermal.h>
+    #include <dt-bindings/thermal/virtual-sensor.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/clock/mt8192-clk.h>
+
+    lvts: lvts@1100b000 {
+        compatible = "mediatek,mt6873-lvts";
+        reg = <0x1100b000 0x1000>;
+        clocks = <&infracfg CLK_INFRA_THERM>;
+        clock-names = "lvts_clk";
+        #thermal-sensor-cells = <1>;
+        interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+    };
+
+    cpu_max_sensor: cpu_max_sensor {
+      compatible = "virtual,thermal-sensor";
+      #thermal-sensor-cells = <1>;
+      aggregation-function = <VIRTUAL_THERMAL_SENSOR_MAX_VAL>;
+      thermal-sensors = "cpu1", "cpu2";
+    };
+
+    thermal_zones: thermal-zones {
+      cpu1 {
+        polling-delay = <0>; /* milliseconds */
+        polling-delay-passive = <0>; /* milliseconds */
+        thermal-sensors = <&lvts 0>;
+      };
+      cpu2 {
+        polling-delay = <0>; /* milliseconds */
+        polling-delay-passive = <0>; /* milliseconds */
+        thermal-sensors = <&lvts 1>;
+      };
+      cpu_max {
+        polling-delay = <0>; /* milliseconds */
+        polling-delay-passive = <0>; /* milliseconds */
+        thermal-sensors = <&cpu_max_sensor 0>;
+      };
+    };
+...
