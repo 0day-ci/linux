@@ -156,8 +156,7 @@ static int riscv_map_cache_decode(u64 config, unsigned int *type,
 static int riscv_map_cache_event(u64 config)
 {
 	unsigned int type, op, result;
-	int err = -ENOENT;
-		int code;
+	int err, code;
 
 	err = riscv_map_cache_decode(config, &type, &op, &result);
 	if (!riscv_pmu->cache_events || err)
