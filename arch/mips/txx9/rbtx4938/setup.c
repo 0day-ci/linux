@@ -283,9 +283,9 @@ static int __init rbtx4938_spi_init(void)
 		.mode = SPI_MODE_1 | SPI_CS_HIGH,
 	};
 	spi_register_board_info(&srtc_info, 1);
-	spi_eeprom_register(SPI_BUSNO, SEEPROM1_CS, 128);
-	spi_eeprom_register(SPI_BUSNO, 16 + SEEPROM2_CS, 128);
-	spi_eeprom_register(SPI_BUSNO, 16 + SEEPROM3_CS, 128);
+	spi_eeprom_register(SPI_BUSNO,  0 + SEEPROM1_CS);
+	spi_eeprom_register(SPI_BUSNO, 16 + SEEPROM2_CS);
+	spi_eeprom_register(SPI_BUSNO, 16 + SEEPROM3_CS);
 	gpio_request(16 + SRTC_CS, "rtc-rs5c348");
 	gpio_direction_output(16 + SRTC_CS, 0);
 	gpio_request(SEEPROM1_CS, "seeprom1");

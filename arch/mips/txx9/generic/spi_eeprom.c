@@ -9,18 +9,32 @@
  *
  * Support for TX4938 in 2.6 - Manish Lachwani (mlachwani@mvista.com)
  */
-#include <linux/init.h>
-#include <linux/slab.h>
-#include <linux/export.h>
 #include <linux/device.h>
+#include <linux/export.h>
+#include <linux/init.h>
+#include <linux/property.h>
+#include <linux/slab.h>
+
 #include <linux/spi/spi.h>
-#include <linux/spi/eeprom.h>
+
 #include <asm/txx9/spi.h>
 
+#define AT250X0_SIZE		128
 #define AT250X0_PAGE_SIZE	8
 
+static const struct property_entry spi_eeprom_properties[] = {
+	PROPERTY_ENTRY_U32("size", AT250X0_SIZE),
+	PROPERTY_ENTRY_U32("pagesize", AT250X0_PAGE_SIZE),
+	PROPERTY_ENTRY_U32("address-width", 8),
+	{ }
+};
+
+static const struct software_node spi_eeprom_node = {
+	.properties = spi_eeprom_properties,
+};
+
 /* register board information for at25 driver */
-int __init spi_eeprom_register(int busid, int chipid, int size)
+int __init spi_eeprom_register(int busid, int chipid)
 {
 	struct spi_board_info info = {
 		.modalias = "at25",
@@ -28,16 +42,8 @@ int __init spi_eeprom_register(int busid, int chipid, int size)
 		.bus_num = busid,
 		.chip_select = chipid,
 		/* Mode 0: High-Active, Sample-Then-Shift */
+		.swnode = &spi_eeprom_node,
 	};
-	struct spi_eeprom *eeprom;
-	eeprom = kzalloc(sizeof(*eeprom), GFP_KERNEL);
-	if (!eeprom)
-		return -ENOMEM;
-	strcpy(eeprom->name, "at250x0");
-	eeprom->byte_len = size;
-	eeprom->page_size = AT250X0_PAGE_SIZE;
-	eeprom->flags = EE_ADDR1;
-	info.platform_data = eeprom;
 	return spi_register_board_info(&info, 1);
 }
 
