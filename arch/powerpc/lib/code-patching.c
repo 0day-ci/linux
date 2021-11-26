@@ -422,9 +422,11 @@ static void __init test_branch_iform(void)
 {
 	int err;
 	struct ppc_inst instr;
-	u32 tmp[2];
-	u32 *iptr = tmp;
-	unsigned long addr = (unsigned long)tmp;
+	u32 *iptr;
+	unsigned long addr;
+
+	iptr = (u32 *)ppc_function_entry(test_trampoline);
+	addr = (unsigned long)iptr;
 
 	/* The simplest case, branch to self, no flags */
 	check(instr_is_branch_iform(ppc_inst(0x48000000)));
@@ -516,12 +518,12 @@ static void __init test_create_function_call(void)
 static void __init test_branch_bform(void)
 {
 	int err;
-	unsigned long addr;
 	struct ppc_inst instr;
-	u32 tmp[2];
-	u32 *iptr = tmp;
+	u32 *iptr;
+	unsigned long addr;
 	unsigned int flags;
 
+	iptr = (u32 *)ppc_function_entry(test_trampoline);
 	addr = (unsigned long)iptr;
 
 	/* The simplest case, branch to self, no flags */
@@ -602,6 +604,12 @@ static void __init test_translate_branch(void)
 	check(buf);
 	if (!buf)
 		return;
+
+	/*
+	 * Have to disable the address bounds check for patch_instruction
+	 * because we are patching vmalloc space here.
+	 */
+	skip_addr_verif = true;
 
 	/* Simple case, branch to self moved a little */
 	p = buf;
@@ -715,6 +723,8 @@ static void __init test_translate_branch(void)
 	check(instr_is_branch_to_addr(p, addr));
 	check(instr_is_branch_to_addr(q, addr));
 
+	skip_addr_verif = false;
+
 	/* Free the buffer we were using */
 	vfree(buf);
 }
@@ -743,13 +753,11 @@ static int __init test_code_patching(void)
 {
 	printk(KERN_DEBUG "Running code patching self-tests ...\n");
 
-	skip_addr_verif = true;
 	test_branch_iform();
 	test_branch_bform();
 	test_create_function_call();
 	test_translate_branch();
 	test_prefixed_patching();
-	skip_addr_verif = false;
 
 	return 0;
 }
