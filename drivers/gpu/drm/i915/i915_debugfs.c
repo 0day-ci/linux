@@ -565,7 +565,9 @@ static int i915_wedged_set(void *data, u64 val)
 {
 	struct drm_i915_private *i915 = data;
 
-	return intel_gt_debugfs_reset_store(&i915->gt, val);
+	intel_gt_debugfs_reset_store(&i915->gt, val);
+
+	return 0;
 }
 
 DEFINE_SIMPLE_ATTRIBUTE(i915_wedged_fops,
@@ -711,14 +713,18 @@ static int i915_forcewake_open(struct inode *inode, struct file *file)
 {
 	struct drm_i915_private *i915 = inode->i_private;
 
-	return intel_gt_pm_debugfs_forcewake_user_open(&i915->gt);
+	intel_gt_pm_debugfs_forcewake_user_open(&i915->gt);
+
+	return 0;
 }
 
 static int i915_forcewake_release(struct inode *inode, struct file *file)
 {
 	struct drm_i915_private *i915 = inode->i_private;
 
-	return intel_gt_pm_debugfs_forcewake_user_release(&i915->gt);
+	intel_gt_pm_debugfs_forcewake_user_release(&i915->gt);
+
+	return 0;
 }
 
 static const struct file_operations i915_forcewake_fops = {
