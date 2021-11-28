@@ -140,6 +140,7 @@ struct nct6775_sio_data {
 	int ld;
 	enum kinds kind;
 	enum sensor_access access;
+	acpi_handle acpi_wmi_mutex;
 
 	/* superio_() callbacks  */
 	void (*sio_outb)(struct nct6775_sio_data *sio_data, int reg, int val);
@@ -155,6 +156,8 @@ struct nct6775_sio_data {
 #define ASUSWMI_METHODID_RHWM		0x5248574D
 #define ASUSWMI_METHODID_WHWM		0x5748574D
 #define ASUSWMI_UNSUPPORTED_METHOD	0xFFFFFFFE
+/* Wait for up to 0.5 s to acquire the lock */
+#define ASUSWMI_LOCK_TIMEOUT_MS		500
 
 static int nct6775_asuswmi_evaluate_method(u32 method_id, u8 bank, u8 reg, u8 val, u32 *retval)
 {
@@ -1243,7 +1246,11 @@ struct nct6775_data {
 	unsigned int (*fan_from_reg)(u16 reg, unsigned int divreg);
 	unsigned int (*fan_from_reg_min)(u16 reg, unsigned int divreg);
 
-	struct mutex update_lock;
+	union {
+		struct mutex update_lock;	/* non ACPI lock */
+		acpi_handle acpi_wmi_mutex;	/* ACPI lock */
+	} mlock;
+
 	bool valid;		/* true if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
 
@@ -1561,6 +1568,26 @@ static int nct6775_wmi_write_value(struct nct6775_data *data, u16 reg, u16 value
 	}
 
 	return res;
+}
+
+static int nct6775_wmi_lock(struct nct6775_data *data)
+{
+	acpi_status status;
+
+	status = acpi_acquire_mutex(data->mlock.acpi_wmi_mutex, NULL, ASUSWMI_LOCK_TIMEOUT_MS);
+	if (ACPI_FAILURE(status))
+		return -EIO;
+
+	return 0;
+}
+
+static void nct6775_wmi_unlock(struct nct6775_data *data, struct device *dev)
+{
+	acpi_status status;
+
+	status = acpi_release_mutex(data->mlock.acpi_wmi_mutex, NULL);
+	if (ACPI_FAILURE(status))
+		dev_err(dev, "Failed to release mutex.");
 }
 
 /*
@@ -1922,14 +1949,14 @@ static void nct6775_update_pwm_limits(struct device *dev)
 
 static int nct6775_lock(struct nct6775_data *data)
 {
-	mutex_lock(&data->update_lock);
+	mutex_lock(&data->mlock.update_lock);
 
 	return 0;
 }
 
 static void nct6775_unlock(struct nct6775_data *data, struct device *dev)
 {
-	mutex_unlock(&data->update_lock);
+	mutex_unlock(&data->mlock.update_lock);
 }
 
 static struct nct6775_data *nct6775_update_device(struct device *dev)
@@ -4061,9 +4088,15 @@ static int nct6775_probe(struct platform_device *pdev)
 		data->write_value = nct6775_wmi_write_value;
 	}
 
-	mutex_init(&data->update_lock);
-	data->lock = nct6775_lock;
-	data->unlock = nct6775_unlock;
+	if (sio_data->acpi_wmi_mutex) {
+		data->mlock.acpi_wmi_mutex = sio_data->acpi_wmi_mutex;
+		data->lock = nct6775_wmi_lock;
+		data->unlock = nct6775_wmi_unlock;
+	} else {
+		mutex_init(&data->mlock.update_lock);
+		data->lock = nct6775_lock;
+		data->unlock = nct6775_unlock;
+	}
 
 	data->name = nct6775_device_names[data->kind];
 	data->bank = 0xff;		/* Force initial bank selection */
@@ -5114,6 +5147,7 @@ static int __init sensors_nct6775_init(void)
 	int sioaddr[2] = { 0x2e, 0x4e };
 	enum sensor_access access = access_direct;
 	const char *board_vendor, *board_name;
+	acpi_handle acpi_wmi_mutex = NULL;
 	u8 tmp;
 
 	err = platform_driver_register(&nct6775_driver);
@@ -5159,6 +5193,7 @@ static int __init sensors_nct6775_init(void)
 		found = true;
 
 		sio_data.access = access;
+		sio_data.acpi_wmi_mutex = acpi_wmi_mutex;
 
 		if (access == access_asuswmi) {
 			sio_data.sio_outb = superio_wmi_outb;
@@ -5186,11 +5221,13 @@ static int __init sensors_nct6775_init(void)
 			res.end = address + IOREGION_OFFSET + IOREGION_LENGTH - 1;
 			res.flags = IORESOURCE_IO;
 
-			err = acpi_check_resource_conflict(&res);
-			if (err) {
-				platform_device_put(pdev[i]);
-				pdev[i] = NULL;
-				continue;
+			if (!acpi_wmi_mutex) {
+				err = acpi_check_resource_conflict(&res);
+				if (err) {
+					platform_device_put(pdev[i]);
+					pdev[i] = NULL;
+					continue;
+				}
 			}
 
 			err = platform_device_add_resources(pdev[i], &res, 1);
