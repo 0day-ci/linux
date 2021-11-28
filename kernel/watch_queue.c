@@ -372,6 +372,7 @@ static void __put_watch_queue(struct kref *kref)
 	wfilter = rcu_access_pointer(wqueue->filter);
 	if (wfilter)
 		kfree_rcu(wfilter, rcu);
+	bitmap_free(wqueue->notes_bitmap);
 	kfree_rcu(wqueue, rcu);
 }
 
