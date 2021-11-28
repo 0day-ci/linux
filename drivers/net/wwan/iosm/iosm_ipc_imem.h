@@ -380,6 +380,7 @@ struct iosm_imem {
 	   ev_mux_net_transmit_pending:1,
 	   reset_det_n:1,
 	   pcie_wake_n:1;
+	struct dentry *debugfs_dir;
 };
 
 /**
