@@ -382,6 +382,20 @@ int i915_ttm_move_notify(struct ttm_buffer_object *bo)
 	return 0;
 }
 
+static struct intel_context
+*i915_to_migrate_context(struct drm_i915_private *i915)
+{
+	struct intel_gt *gt = to_root_gt(i915);
+
+	return gt->migrate.context;
+}
+
+static struct intel_engine_cs
+*i915_to_migrate_engine(struct drm_i915_private *i915)
+{
+	return i915_to_migrate_context(i915)->engine;
+}
+
 static struct dma_fence *i915_ttm_accel_move(struct ttm_buffer_object *bo,
 					     bool clear,
 					     struct ttm_resource *dst_mem,
@@ -397,7 +411,8 @@ static struct dma_fence *i915_ttm_accel_move(struct ttm_buffer_object *bo,
 	enum i915_cache_level src_level, dst_level;
 	int ret;
 
-	if (!i915->gt.migrate.context || intel_gt_is_wedged(&i915->gt))
+	if (!i915_to_migrate_context(i915) ||
+	    intel_gt_is_wedged(to_root_gt(i915)))
 		return ERR_PTR(-EINVAL);
 
 	/* With fail_gpu_migration, we always perform a GPU clear. */
@@ -410,9 +425,9 @@ static struct dma_fence *i915_ttm_accel_move(struct ttm_buffer_object *bo,
 		    !I915_SELFTEST_ONLY(fail_gpu_migration))
 			return ERR_PTR(-EINVAL);
 
-		intel_engine_pm_get(i915->gt.migrate.context->engine);
-		ret = intel_context_migrate_clear(i915->gt.migrate.context, dep,
-						  dst_st->sgl, dst_level,
+		intel_engine_pm_get(i915_to_migrate_engine(i915));
+		ret = intel_context_migrate_clear(i915_to_migrate_context(i915),
+						  dep, dst_st->sgl, dst_level,
 						  i915_ttm_gtt_binds_lmem(dst_mem),
 						  0, &rq);
 	} else {
@@ -423,8 +438,8 @@ static struct dma_fence *i915_ttm_accel_move(struct ttm_buffer_object *bo,
 			return ERR_CAST(src_rsgt);
 
 		src_level = i915_ttm_cache_level(i915, bo->resource, src_ttm);
-		intel_engine_pm_get(i915->gt.migrate.context->engine);
-		ret = intel_context_migrate_copy(i915->gt.migrate.context,
+		intel_engine_pm_get(i915_to_migrate_engine(i915));
+		ret = intel_context_migrate_copy(i915_to_migrate_context(i915),
 						 dep, src_rsgt->table.sgl,
 						 src_level,
 						 i915_ttm_gtt_binds_lmem(bo->resource),
@@ -435,7 +450,7 @@ static struct dma_fence *i915_ttm_accel_move(struct ttm_buffer_object *bo,
 		i915_refct_sgt_put(src_rsgt);
 	}
 
-	intel_engine_pm_put(i915->gt.migrate.context->engine);
+	intel_engine_pm_put(i915_to_migrate_engine(i915));
 
 	if (ret && rq) {
 		i915_request_wait(rq, 0, MAX_SCHEDULE_TIMEOUT);
