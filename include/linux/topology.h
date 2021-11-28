@@ -189,6 +189,7 @@ static inline int cpu_to_mem(int cpu)
 #endif
 #ifndef topology_cluster_id
 #define topology_cluster_id(cpu)		((void)(cpu), -1)
+#define topology_cluster_no_sysfs		1
 #endif
 #ifndef topology_core_id
 #define topology_core_id(cpu)			((void)(cpu), 0)
@@ -201,6 +202,7 @@ static inline int cpu_to_mem(int cpu)
 #endif
 #ifndef topology_cluster_cpumask
 #define topology_cluster_cpumask(cpu)		cpumask_of(cpu)
+#define topology_cluster_no_sysfs		1
 #endif
 #ifndef topology_die_cpumask
 #define topology_die_cpumask(cpu)		cpumask_of(cpu)
