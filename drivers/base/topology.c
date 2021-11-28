@@ -45,8 +45,10 @@ static ssize_t name##_list_read(struct file *file, struct kobject *kobj,	\
 define_id_show_func(physical_package_id);
 static DEVICE_ATTR_RO(physical_package_id);
 
+#ifndef topology_die_no_sysfs
 define_id_show_func(die_id);
 static DEVICE_ATTR_RO(die_id);
+#endif
 
 define_id_show_func(cluster_id);
 static DEVICE_ATTR_RO(cluster_id);
@@ -70,9 +72,11 @@ define_siblings_read_func(cluster_cpus, cluster_cpumask);
 static BIN_ATTR_RO(cluster_cpus, 0);
 static BIN_ATTR_RO(cluster_cpus_list, 0);
 
+#ifndef topology_die_no_sysfs
 define_siblings_read_func(die_cpus, die_cpumask);
 static BIN_ATTR_RO(die_cpus, 0);
 static BIN_ATTR_RO(die_cpus_list, 0);
+#endif
 
 define_siblings_read_func(package_cpus, core_cpumask);
 static BIN_ATTR_RO(package_cpus, 0);
@@ -103,8 +107,10 @@ static struct bin_attribute *bin_attrs[] = {
 	&bin_attr_core_siblings_list,
 	&bin_attr_cluster_cpus,
 	&bin_attr_cluster_cpus_list,
+#ifndef topology_die_no_sysfs
 	&bin_attr_die_cpus,
 	&bin_attr_die_cpus_list,
+#endif
 	&bin_attr_package_cpus,
 	&bin_attr_package_cpus_list,
 #ifdef CONFIG_SCHED_BOOK
@@ -120,7 +126,9 @@ static struct bin_attribute *bin_attrs[] = {
 
 static struct attribute *default_attrs[] = {
 	&dev_attr_physical_package_id.attr,
+#ifndef topology_die_no_sysfs
 	&dev_attr_die_id.attr,
+#endif
 	&dev_attr_cluster_id.attr,
 	&dev_attr_core_id.attr,
 #ifdef CONFIG_SCHED_BOOK
