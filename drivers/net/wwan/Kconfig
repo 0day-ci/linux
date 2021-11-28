@@ -80,6 +80,14 @@ config IOSM
 
 	  If unsure, say N.
 
+config IOSM_DEBUGFS
+	bool "IOSM Debugfs support"
+	depends on IOSM && DEBUG_FS
+	help
+	  Enables debugfs driver interface for traces collection.
+
+	  If unsure, say N.
+
 endif # WWAN
 
 endmenu
