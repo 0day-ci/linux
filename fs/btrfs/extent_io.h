@@ -109,7 +109,6 @@ struct extent_buffer {
 struct btrfs_bio_ctrl {
 	struct bio *bio;
 	unsigned long bio_flags;
-	u32 len_to_stripe_boundary;
 	u32 len_to_oe_boundary;
 };
 
