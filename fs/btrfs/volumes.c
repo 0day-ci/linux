@@ -6772,6 +6772,17 @@ static int submit_stripe_bio(struct btrfs_io_context *bioc, struct bio *bio,
 		dev->devid, bio->bi_iter.bi_size);
 	bio_set_dev(bio, dev->bdev);
 
+	/*
+	 * At endio time, bi_iter is no longer reliable, thus we have to save
+	 * current bi_iter into btrfs_bio so that even for split bio we can
+	 * iterate only the split part.
+	 *
+	 * For bio create by btrfs_bio_slit() or btrfs_bio_clone*(), it's
+	 * already set, but we can still have original bio which has its
+	 * iter not initialized.
+	 */
+	btrfs_bio_save_iter(btrfs_bio(bio));
+
 	/* Do the final endio remap if needed */
 	ret = btrfs_bio_final_endio_remap(fs_info, bio);
 	if (ret < 0)

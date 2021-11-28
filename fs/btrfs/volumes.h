@@ -378,6 +378,13 @@ struct btrfs_bio {
 			bio_end_io_t *orig_endio;
 		};
 	};
+
+	/*
+	 * Saved bio::bi_iter before submission.
+	 *
+	 * This allows us to interate the cloned/split bio properly, as at
+	 * endio time bio::bi_iter is no longer reliable.
+	 */
 	struct bvec_iter iter;
 
 	/*
@@ -398,6 +405,18 @@ static inline void btrfs_bio_free_csum(struct btrfs_bio *bbio)
 		kfree(bbio->csum);
 		bbio->csum = NULL;
 	}
+}
+
+/*
+ * To save bbio::bio->bi_iter into bbio::iter so for callers who need the
+ * original bi_iter can access the original part of the bio.
+ * This is especially important for the incoming split btrfs_bio, which needs
+ * to call its endio for and only for the split range.
+ */
+static inline void btrfs_bio_save_iter(struct btrfs_bio *bbio)
+{
+	if (!bbio->iter.bi_size)
+		bbio->iter = bbio->bio.bi_iter;
 }
 
 struct btrfs_io_stripe {
