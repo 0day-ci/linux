@@ -5109,33 +5109,58 @@ static int __init nct6775_find(int sioaddr, struct nct6775_sio_data *sio_data)
  */
 static struct platform_device *pdev[2];
 
-static const char * const asus_wmi_boards[] = {
-	"ProArt X570-CREATOR WIFI",
-	"Pro WS X570-ACE",
-	"PRIME B360-PLUS",
-	"PRIME B460-PLUS",
-	"PRIME X570-PRO",
-	"ROG CROSSHAIR VIII DARK HERO",
-	"ROG CROSSHAIR VIII FORMULA",
-	"ROG CROSSHAIR VIII HERO",
-	"ROG CROSSHAIR VIII IMPACT",
-	"ROG STRIX B550-E GAMING",
-	"ROG STRIX B550-F GAMING",
-	"ROG STRIX B550-F GAMING (WI-FI)",
-	"ROG STRIX B550-I GAMING",
-	"ROG STRIX X570-F GAMING",
-	"ROG STRIX Z390-E GAMING",
-	"ROG STRIX Z490-I GAMING",
-	"TUF GAMING B550M-PLUS",
-	"TUF GAMING B550M-PLUS (WI-FI)",
-	"TUF GAMING B550-PLUS",
-	"TUF GAMING B550-PRO",
-	"TUF GAMING X570-PLUS",
-	"TUF GAMING X570-PLUS (WI-FI)",
-	"TUF GAMING X570-PRO (WI-FI)",
-	"TUF GAMING Z490-PLUS",
-	"TUF GAMING Z490-PLUS (WI-FI)",
+struct acpi_board_info {
+	char *acpi_mutex_path;
 };
+
+#define DMI_ASUS_BOARD_INFO(name, mutex_path)			\
+static struct acpi_board_info name = {				\
+	.acpi_mutex_path = mutex_path,				\
+}
+
+DMI_ASUS_BOARD_INFO(acpi_board_MAXIMUS_VII_HERO, "\\_SB_.PCI0.LPCB.SIO1.MUT0");
+DMI_ASUS_BOARD_INFO(acpi_board_ROG_STRIX_B550_E_GAMING, "\\_SB.PCI0.SBRG.SIO1.MUT0");
+
+#define DMI_EXACT_MATCH_ASUS_BOARD_NAME(name, info) {			\
+	.matches = {								\
+		DMI_EXACT_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),	\
+		DMI_EXACT_MATCH(DMI_BOARD_NAME, name),				\
+	},									\
+	.driver_data = info,							\
+}
+
+static const struct dmi_system_id asus_wmi_info_table[] = {
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("MAXIMUS VII HERO", &acpi_board_MAXIMUS_VII_HERO),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("PRIME B360-PLUS", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("PRIME B460-PLUS", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("PRIME B550M-A (WI-FI)", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("PRIME X570-PRO", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("Pro WS X570-ACE", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ProArt X570-CREATOR WIFI", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG CROSSHAIR VIII DARK HERO", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG CROSSHAIR VIII FORMULA", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG CROSSHAIR VIII HERO", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG CROSSHAIR VIII IMPACT", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX B550-E GAMING",
+					&acpi_board_ROG_STRIX_B550_E_GAMING),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX B550-F GAMING", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX B550-F GAMING (WI-FI)", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX B550-I GAMING", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX X570-F GAMING", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX Z390-E GAMING", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("ROG STRIX Z490-I GAMING", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING B550-PLUS", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING B550-PRO", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING B550M-PLUS", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING B550M-PLUS (WI-FI)", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING X570-PLUS", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING X570-PLUS (WI-FI)", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING X570-PRO (WI-FI)", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING Z490-PLUS", NULL),
+	DMI_EXACT_MATCH_ASUS_BOARD_NAME("TUF GAMING Z490-PLUS (WI-FI)", NULL),
+	{}
+};
+MODULE_DEVICE_TABLE(dmi, asus_wmi_info_table);
 
 static int __init sensors_nct6775_init(void)
 {
@@ -5146,28 +5171,37 @@ static int __init sensors_nct6775_init(void)
 	struct nct6775_sio_data sio_data;
 	int sioaddr[2] = { 0x2e, 0x4e };
 	enum sensor_access access = access_direct;
-	const char *board_vendor, *board_name;
+	const struct dmi_system_id *dmi_id;
+	struct acpi_board_info *board_info;
 	acpi_handle acpi_wmi_mutex = NULL;
-	u8 tmp;
+	acpi_status status;
+	u8 tmp = 0;
 
 	err = platform_driver_register(&nct6775_driver);
 	if (err)
 		return err;
 
-	board_vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
-	board_name = dmi_get_system_info(DMI_BOARD_NAME);
+	dmi_id = dmi_first_match(asus_wmi_info_table);
+	if (dmi_id) {
+		/* if reading chip ID via WMI succeeds, use WMI */
+		if (!nct6775_asuswmi_read(0, NCT6775_PORT_CHIPID, &tmp) &&
+		    tmp) {
+			pr_info("Using Asus WMI to access %#x chip.\n", tmp);
+			access = access_asuswmi;
+		} else {
+			pr_err("Can't read chip ID by Asus WMI.\n");
+		}
 
-	if (board_name && board_vendor &&
-	    !strcmp(board_vendor, "ASUSTeK COMPUTER INC.")) {
-		err = match_string(asus_wmi_boards, ARRAY_SIZE(asus_wmi_boards),
-				   board_name);
-		if (err >= 0) {
-			/* if reading chip id via WMI succeeds, use WMI */
-			if (!nct6775_asuswmi_read(0, NCT6775_PORT_CHIPID, &tmp)) {
-				pr_info("Using Asus WMI to access %#x chip.\n", tmp);
-				access = access_asuswmi;
-			} else {
-				pr_err("Can't read ChipID by Asus WMI.\n");
+		if (dmi_id->driver_data) {
+			board_info = dmi_id->driver_data;
+			if (board_info->acpi_mutex_path) {
+				status = acpi_get_handle(NULL, board_info->acpi_mutex_path,
+							 &acpi_wmi_mutex);
+				if (!ACPI_FAILURE(status)) {
+					pr_info("Using Asus WMI mutex: %s\n",
+						board_info->acpi_mutex_path);
+					access = access_direct;
+				}
 			}
 		}
 	}
