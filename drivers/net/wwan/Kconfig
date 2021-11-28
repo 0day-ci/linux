@@ -16,6 +16,14 @@ config WWAN
 
 if WWAN
 
+config WWAN_DEBUGFS
+	bool "WWAN subsystem common debugfs interface"
+	depends on DEBUG_FS
+	help
+	  Enables common debugfs infrastructure for WWAN devices.
+
+	  If unsure, say N.
+
 config WWAN_HWSIM
 	tristate "Simulated WWAN device"
 	help
@@ -83,6 +91,7 @@ config IOSM
 config IOSM_DEBUGFS
 	bool "IOSM Debugfs support"
 	depends on IOSM && DEBUG_FS
+	select WWAN_DEBUGFS
 	help
 	  Enables debugfs driver interface for traces collection.
 
