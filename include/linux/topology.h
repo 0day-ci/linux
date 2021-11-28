@@ -194,6 +194,14 @@ static inline int cpu_to_mem(int cpu)
 #ifndef topology_core_id
 #define topology_core_id(cpu)			((void)(cpu), 0)
 #endif
+#ifndef topology_book_id
+#define topology_book_id(cpu)			((void)(cpu), -1)
+#define topology_book_no_sysfs			1
+#endif
+#ifndef topology_drawer_id
+#define topology_drawer_id(cpu)			((void)(cpu), -1)
+#define topology_drawer_no_sysfs		1
+#endif
 #ifndef topology_sibling_cpumask
 #define topology_sibling_cpumask(cpu)		cpumask_of(cpu)
 #endif
@@ -207,6 +215,14 @@ static inline int cpu_to_mem(int cpu)
 #ifndef topology_die_cpumask
 #define topology_die_cpumask(cpu)		cpumask_of(cpu)
 #define topology_die_no_sysfs			1
+#endif
+#ifndef topology_book_cpumask
+#define topology_book_cpumask(cpu)		cpumask_of(cpu)
+#define topology_book_no_sysfs			1
+#endif
+#ifndef topology_drawer_cpumask
+#define topology_drawer_cpumask(cpu)		cpumask_of(cpu)
+#define topology_drawer_no_sysfs		1
 #endif
 
 #if defined(CONFIG_SCHED_SMT) && !defined(cpu_smt_mask)
