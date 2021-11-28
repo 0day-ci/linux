@@ -1498,6 +1498,7 @@ static struct platform_driver rcar_csi2_pdrv = {
 	.probe	= rcsi2_probe,
 	.driver	= {
 		.name	= "rcar-csi2",
+		.suppress_bind_attrs = true,
 		.of_match_table	= rcar_csi2_of_table,
 	},
 };
