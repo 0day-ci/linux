@@ -245,10 +245,6 @@ enum rtl_registers {
 	FuncEvent	= 0xf0,
 	FuncEventMask	= 0xf4,
 	FuncPresetState	= 0xf8,
-	IBCR0           = 0xf8,
-	IBCR2           = 0xf9,
-	IBIMR0          = 0xfa,
-	IBISR0          = 0xfb,
 	FuncForceEvent	= 0xfc,
 };
 
@@ -1127,65 +1123,16 @@ DECLARE_RTL_COND(rtl_dp_ocp_read_cond)
 	return r8168dp_ocp_read(tp, reg) & 0x00000800;
 }
 
-DECLARE_RTL_COND(rtl_ep_ocp_read_cond)
-{
-	return r8168ep_ocp_read(tp, 0x124) & 0x00000001;
-}
-
-DECLARE_RTL_COND(rtl_ocp_tx_cond)
-{
-	return RTL_R8(tp, IBISR0) & 0x20;
-}
-
-static void rtl8168ep_stop_cmac(struct rtl8169_private *tp)
-{
-	RTL_W8(tp, IBCR2, RTL_R8(tp, IBCR2) & ~0x01);
-	rtl_loop_wait_high(tp, &rtl_ocp_tx_cond, 50000, 2000);
-	RTL_W8(tp, IBISR0, RTL_R8(tp, IBISR0) | 0x20);
-	RTL_W8(tp, IBCR0, RTL_R8(tp, IBCR0) & ~0x01);
-}
-
 static void rtl8168dp_driver_start(struct rtl8169_private *tp)
 {
 	r8168dp_oob_notify(tp, OOB_CMD_DRIVER_START);
 	rtl_loop_wait_high(tp, &rtl_dp_ocp_read_cond, 10000, 10);
 }
 
-static void rtl8168ep_driver_start(struct rtl8169_private *tp)
-{
-	r8168ep_ocp_write(tp, 0x01, 0x180, OOB_CMD_DRIVER_START);
-	r8168ep_ocp_write(tp, 0x01, 0x30, r8168ep_ocp_read(tp, 0x30) | 0x01);
-	rtl_loop_wait_high(tp, &rtl_ep_ocp_read_cond, 10000, 10);
-}
-
-static void rtl8168_driver_start(struct rtl8169_private *tp)
-{
-	if (tp->dash_type == RTL_DASH_DP)
-		rtl8168dp_driver_start(tp);
-	else
-		rtl8168ep_driver_start(tp);
-}
-
 static void rtl8168dp_driver_stop(struct rtl8169_private *tp)
 {
 	r8168dp_oob_notify(tp, OOB_CMD_DRIVER_STOP);
 	rtl_loop_wait_low(tp, &rtl_dp_ocp_read_cond, 10000, 10);
-}
-
-static void rtl8168ep_driver_stop(struct rtl8169_private *tp)
-{
-	rtl8168ep_stop_cmac(tp);
-	r8168ep_ocp_write(tp, 0x01, 0x180, OOB_CMD_DRIVER_STOP);
-	r8168ep_ocp_write(tp, 0x01, 0x30, r8168ep_ocp_read(tp, 0x30) | 0x01);
-	rtl_loop_wait_low(tp, &rtl_ep_ocp_read_cond, 10000, 10);
-}
-
-static void rtl8168_driver_stop(struct rtl8169_private *tp)
-{
-	if (tp->dash_type == RTL_DASH_DP)
-		rtl8168dp_driver_stop(tp);
-	else
-		rtl8168ep_driver_stop(tp);
 }
 
 static bool r8168dp_check_dash(struct rtl8169_private *tp)
@@ -3213,8 +3160,6 @@ static void rtl_hw_start_8168h_1(struct rtl8169_private *tp)
 
 static void rtl_hw_start_8168ep(struct rtl8169_private *tp)
 {
-	rtl8168ep_stop_cmac(tp);
-
 	rtl_set_fifo_size(tp, 0x08, 0x10, 0x02, 0x06);
 	rtl8168g_set_pause_thresholds(tp, 0x2f, 0x5f);
 
@@ -3309,8 +3254,6 @@ static void rtl_hw_start_8117(struct rtl8169_private *tp)
 		{ 0x59, 0x0040,	0x1100 },
 	};
 	int rg_saw_cnt;
-
-	rtl8168ep_stop_cmac(tp);
 
 	/* disable aspm and clock request before access ephy */
 	rtl_hw_aspm_clkreq_enable(tp, false);
@@ -4954,8 +4897,8 @@ static void rtl_remove_one(struct pci_dev *pdev)
 
 	unregister_netdev(tp->dev);
 
-	if (tp->dash_type != RTL_DASH_NONE)
-		rtl8168_driver_stop(tp);
+	if (tp->dash_type == RTL_DASH_DP)
+		rtl8168dp_driver_stop(tp);
 
 	rtl_release_firmware(tp);
 
@@ -5147,10 +5090,7 @@ static void rtl_hw_init_8125(struct rtl8169_private *tp)
 static void rtl_hw_initialize(struct rtl8169_private *tp)
 {
 	switch (tp->mac_version) {
-	case RTL_GIGA_MAC_VER_49 ... RTL_GIGA_MAC_VER_53:
-		rtl8168ep_stop_cmac(tp);
-		fallthrough;
-	case RTL_GIGA_MAC_VER_40 ... RTL_GIGA_MAC_VER_48:
+	case RTL_GIGA_MAC_VER_40 ... RTL_GIGA_MAC_VER_53:
 		rtl_hw_init_8168g(tp);
 		break;
 	case RTL_GIGA_MAC_VER_60 ... RTL_GIGA_MAC_VER_63:
@@ -5424,9 +5364,9 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 			    jumbo_max, tp->mac_version <= RTL_GIGA_MAC_VER_06 ?
 			    "ok" : "ko");
 
-	if (tp->dash_type != RTL_DASH_NONE) {
+	if (tp->dash_type == RTL_DASH_DP) {
 		netdev_info(dev, "DASH enabled\n");
-		rtl8168_driver_start(tp);
+		rtl8168dp_driver_start(tp);
 	}
 
 	if (pci_dev_run_wake(pdev))
