@@ -284,7 +284,6 @@ static inline unsigned int mmu_psize_to_shift(unsigned int mmu_psize)
 #error Unsupported page size
 #endif
 
-extern int mmu_linear_psize;
 extern int mmu_vmemmap_psize;
 
 struct tlb_core_data {
