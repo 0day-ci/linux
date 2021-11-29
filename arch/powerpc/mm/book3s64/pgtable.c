@@ -534,7 +534,7 @@ static int __init pgtable_debugfs_setup(void)
 }
 arch_initcall(pgtable_debugfs_setup);
 
-#ifdef CONFIG_ZONE_DEVICE
+#if defined(CONFIG_ZONE_DEVICE) && defined(ARCH_HAS_MEMREMAP_COMPAT_ALIGN)
 /*
  * Override the generic version in mm/memremap.c.
  *
