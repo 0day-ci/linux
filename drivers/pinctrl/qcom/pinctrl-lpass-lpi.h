@@ -131,6 +131,7 @@ static const unsigned int gpio10_pins[] = { 10 };
 static const unsigned int gpio11_pins[] = { 11 };
 static const unsigned int gpio12_pins[] = { 12 };
 static const unsigned int gpio13_pins[] = { 13 };
+static const unsigned int gpio14_pins[] = { 14 };
 
 int lpi_pinctrl_probe(struct platform_device *pdev);
 int lpi_pinctrl_remove(struct platform_device *pdev);
