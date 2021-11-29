@@ -477,6 +477,7 @@ struct kvm_vcpu_arch {
 #define KVM_ARM64_EXCEPT_AA64_ELx_SERR	(3 << 9)
 #define KVM_ARM64_EXCEPT_AA64_EL1	(0 << 11)
 #define KVM_ARM64_EXCEPT_AA64_EL2	(1 << 11)
+#define KVM_ARM64_EXCEPT_AA64_EL_MASK	(1 << 11)
 
 /*
  * Overlaps with KVM_ARM64_EXCEPT_MASK on purpose so that it can't be
