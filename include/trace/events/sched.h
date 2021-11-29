@@ -261,6 +261,7 @@ TRACE_EVENT(sched_switch,
 				{ EXIT_DEAD, "X" },
 				{ EXIT_ZOMBIE, "Z" },
 				{ TASK_PARKED, "P" },
+				{ TASK_RTLOCK_WAIT, "L" },
 				{ TASK_DEAD, "I" }) :
 		  "R",
 

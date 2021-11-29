@@ -91,13 +91,14 @@ struct task_group;
 #define EXIT_TRACE			(EXIT_ZOMBIE | EXIT_DEAD)
 /* Used in tsk->state again: */
 #define TASK_PARKED			0x0040
-#define TASK_DEAD			0x0080
-#define TASK_WAKEKILL			0x0100
-#define TASK_WAKING			0x0200
-#define TASK_NOLOAD			0x0400
-#define TASK_NEW			0x0800
 /* RT specific auxilliary flag to mark RT lock waiters */
-#define TASK_RTLOCK_WAIT		0x1000
+#define TASK_RTLOCK_WAIT		0x0080
+
+#define TASK_DEAD			0x0100
+#define TASK_WAKEKILL			0x0200
+#define TASK_WAKING			0x0400
+#define TASK_NOLOAD			0x0800
+#define TASK_NEW			0x1000
 #define TASK_STATE_MAX			0x2000
 
 /* Convenience macros for the sake of set_current_state: */
@@ -114,7 +115,7 @@ struct task_group;
 #define TASK_REPORT			(TASK_RUNNING | TASK_INTERRUPTIBLE | \
 					 TASK_UNINTERRUPTIBLE | __TASK_STOPPED | \
 					 __TASK_TRACED | EXIT_DEAD | EXIT_ZOMBIE | \
-					 TASK_PARKED)
+					 TASK_PARKED | TASK_RTLOCK_WAIT)
 
 #define task_is_running(task)		(READ_ONCE((task)->__state) == TASK_RUNNING)
 
@@ -1632,7 +1633,7 @@ static inline unsigned int task_state_index(struct task_struct *tsk)
 
 static inline char task_index_to_char(unsigned int state)
 {
-	static const char state_char[] = "RSDTtXZPI";
+	static const char state_char[] = "RSDTtXZPLI";
 
 	BUILD_BUG_ON(1 + ilog2(TASK_REPORT_MAX) != sizeof(state_char) - 1);
 
