@@ -262,7 +262,8 @@ int ima_get_action(struct user_namespace *mnt_userns, struct inode *inode,
 int ima_must_measure(struct inode *inode, int mask, enum ima_hooks func);
 int ima_collect_measurement(struct integrity_iint_cache *iint,
 			    struct file *file, void *buf, loff_t size,
-			    enum hash_algo algo, struct modsig *modsig);
+			    enum hash_algo algo, struct modsig *modsig,
+			    bool veritysig);
 void ima_store_measurement(struct integrity_iint_cache *iint, struct file *file,
 			   const unsigned char *filename,
 			   struct evm_ima_xattr_data *xattr_value,
