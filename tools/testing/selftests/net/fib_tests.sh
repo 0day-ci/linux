@@ -453,15 +453,19 @@ fib_rp_filter_test()
 	$NS_EXEC sysctl -qw net.ipv4.conf.all.accept_local=1
 	$NS_EXEC sysctl -qw net.ipv4.conf.all.route_localnet=1
 
+	$NS_EXEC tc qd add dev dummy0 parent root handle 1: fq_codel
+	$NS_EXEC tc filter add dev dummy0 parent 1: protocol arp basic action mirred egress redirect dev dummy1
+	$NS_EXEC tc filter add dev dummy0 parent 1: protocol ip basic action mirred egress redirect dev dummy1
+
 	$NS_EXEC tc qd add dev dummy1 parent root handle 1: fq_codel
 	$NS_EXEC tc filter add dev dummy1 parent 1: protocol arp basic action mirred egress redirect dev lo
 	$NS_EXEC tc filter add dev dummy1 parent 1: protocol ip basic action mirred egress redirect dev lo
 	set +e
 
-	run_cmd "ip netns exec ns1 ping -I dummy1 -w1 -c1 198.51.100.1"
+	run_cmd "ip netns exec ns1 ping -I dummy0 -w1 -c1 198.51.100.1"
 	log_test $? 0 "rp_filter passes local packets"
 
-	run_cmd "ip netns exec ns1 ping -I dummy1 -w1 -c1 127.0.0.1"
+	run_cmd "ip netns exec ns1 ping -I dummy0 -w1 -c1 127.0.0.1"
 	log_test $? 0 "rp_filter passes loopback packets"
 
 	cleanup
