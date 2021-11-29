@@ -16,6 +16,7 @@
 #include <linux/stat.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/module.h>
 
 /**
  * kobject_namespace() - Return @kobj's namespace tag.
@@ -727,6 +728,19 @@ static void kobject_release(struct kref *kref)
 	struct kobject *kobj = container_of(kref, struct kobject, kref);
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
 	unsigned long delay = HZ + HZ * (get_random_int() & 0x3);
+
+	/*
+	 * Don't delay to release module kobject so that we can detect late
+	 * kobject release more effectively because module unloading waits
+	 * for completion of module kobject release, see mod_kobject_put.
+	 *
+	 * Meantime mod_kobject_put() always waits for completion of module
+	 * kobject's release, CONFIG_DEBUG_KOBJECT_RELEASE is basically
+	 * useless for debugging module kobject's release.
+	 */
+	if (kobj->ktype == &module_ktype)
+		delay = 0;
+
 	pr_info("kobject: '%s' (%p): %s, parent %p (delayed %ld)\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent, delay);
 	INIT_DELAYED_WORK(&kobj->release, kobject_delayed_cleanup);
