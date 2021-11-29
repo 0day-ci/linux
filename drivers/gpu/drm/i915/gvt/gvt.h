@@ -40,6 +40,7 @@
 #include "debug.h"
 #include "hypercall.h"
 #include "mmio.h"
+#include "mmio_info_table.h"
 #include "reg.h"
 #include "interrupt.h"
 #include "gtt.h"
