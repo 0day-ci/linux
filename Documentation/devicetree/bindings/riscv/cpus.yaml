@@ -63,6 +63,16 @@ properties:
       - riscv,sv48
       - riscv,none
 
+  mmu:
+    description:
+      Describes the CPU's MMU Standard Extensions support.
+      These values originate from the RISC-V Privileged
+      Specification document, available from
+      https://riscv.org/specifications/
+    $ref: '/schemas/types.yaml#/definitions/string'
+    enum:
+      - riscv,svpmbt
+
   riscv,isa:
     description:
       Identifies the specific RISC-V instruction set architecture
