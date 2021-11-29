@@ -23,7 +23,7 @@ int rpaphp_get_sensor_state(struct slot *slot, int *state)
 	int rc;
 	int setlevel;
 
-	rc = rtas_get_sensor(DR_ENTITY_SENSE, slot->index, state);
+	rc = rtas_get_sensor_nonblocking(DR_ENTITY_SENSE, slot->index, state);
 
 	if (rc < 0) {
 		if (rc == -EFAULT || rc == -EEXIST) {
@@ -38,10 +38,10 @@ int rpaphp_get_sensor_state(struct slot *slot, int *state)
 			if (rc < 0) {
 				dbg("%s: power on slot[%s] failed rc=%d.\n",
 				    __func__, slot->name, rc);
-			} else {
-				rc = rtas_get_sensor(DR_ENTITY_SENSE,
-						     slot->index, state);
+				return rc;
 			}
+			rc = rtas_get_sensor_nonblocking(DR_ENTITY_SENSE,
+							 slot->index, state);
 		} else if (rc == -ENODEV)
 			info("%s: slot is unusable\n", __func__);
 		else

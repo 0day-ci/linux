@@ -686,7 +686,8 @@ int rtas_get_sensor(int sensor, int index, int *state)
 }
 EXPORT_SYMBOL(rtas_get_sensor);
 
-int rtas_get_sensor_fast(int sensor, int index, int *state)
+static int
+__rtas_get_sensor(int sensor, int index, int *state, bool warn_on)
 {
 	int token = rtas_token("get-sensor-state");
 	int rc;
@@ -695,13 +696,25 @@ int rtas_get_sensor_fast(int sensor, int index, int *state)
 		return -ENOENT;
 
 	rc = rtas_call(token, 2, 2, state, sensor, index);
-	WARN_ON(rc == RTAS_BUSY || (rc >= RTAS_EXTENDED_DELAY_MIN &&
-				    rc <= RTAS_EXTENDED_DELAY_MAX));
+	WARN_ON(warn_on &&
+		(rc == RTAS_BUSY || (rc >= RTAS_EXTENDED_DELAY_MIN &&
+				    rc <= RTAS_EXTENDED_DELAY_MAX)));
 
 	if (rc < 0)
 		return rtas_error_rc(rc);
 	return rc;
 }
+
+int rtas_get_sensor_fast(int sensor, int index, int *state)
+{
+	return __rtas_get_sensor(sensor, index, state, true);
+}
+
+int rtas_get_sensor_nonblocking(int sensor, int index, int *state)
+{
+	return __rtas_get_sensor(sensor, index, state, false);
+}
+EXPORT_SYMBOL(rtas_get_sensor_nonblocking);
 
 bool rtas_indicator_present(int token, int *maxindex)
 {
