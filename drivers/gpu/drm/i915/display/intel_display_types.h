@@ -1485,6 +1485,7 @@ struct intel_pps {
 	bool want_panel_vdd;
 	unsigned long last_power_on;
 	unsigned long last_backlight_off;
+	unsigned long last_oui_write;
 	ktime_t panel_power_off_time;
 	intel_wakeref_t vdd_wakeref;
 
@@ -1653,6 +1654,9 @@ struct intel_dp {
 	struct intel_dp_pcon_frl frl;
 
 	struct intel_psr psr;
+
+	/* When we last wrote the OUI for eDP */
+	unsigned long last_oui_write;
 };
 
 enum lspcon_vendor {
