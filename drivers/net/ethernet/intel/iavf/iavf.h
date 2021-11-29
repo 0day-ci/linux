@@ -287,7 +287,7 @@ struct iavf_adapter {
 /* duplicates for common code */
 #define IAVF_FLAG_DCB_ENABLED			0
 	/* flags for admin queue service task */
-	u32 aq_required;
+	u64 aq_required;
 #define IAVF_FLAG_AQ_ENABLE_QUEUES		BIT(0)
 #define IAVF_FLAG_AQ_DISABLE_QUEUES		BIT(1)
 #define IAVF_FLAG_AQ_ADD_MAC_FILTER		BIT(2)
@@ -320,6 +320,14 @@ struct iavf_adapter {
 #define IAVF_FLAG_AQ_DEL_ADV_RSS_CFG		BIT(28)
 #define IAVF_FLAG_AQ_REQUEST_STATS		BIT(29)
 #define IAVF_FLAG_AQ_GET_OFFLOAD_VLAN_V2_CAPS	BIT(30)
+#define IAVF_FLAG_AQ_ENABLE_CTAG_VLAN_STRIPPING		BIT(31)
+#define IAVF_FLAG_AQ_DISABLE_CTAG_VLAN_STRIPPING	BIT(32)
+#define IAVF_FLAG_AQ_ENABLE_STAG_VLAN_STRIPPING		BIT(33)
+#define IAVF_FLAG_AQ_DISABLE_STAG_VLAN_STRIPPING	BIT(34)
+#define IAVF_FLAG_AQ_ENABLE_CTAG_VLAN_INSERTION		BIT(35)
+#define IAVF_FLAG_AQ_DISABLE_CTAG_VLAN_INSERTION	BIT(36)
+#define IAVF_FLAG_AQ_ENABLE_STAG_VLAN_INSERTION		BIT(37)
+#define IAVF_FLAG_AQ_DISABLE_STAG_VLAN_INSERTION	BIT(38)
 
 	/* OS defined structs */
 	struct net_device *netdev;
@@ -524,6 +532,14 @@ void iavf_enable_channels(struct iavf_adapter *adapter);
 void iavf_disable_channels(struct iavf_adapter *adapter);
 void iavf_add_cloud_filter(struct iavf_adapter *adapter);
 void iavf_del_cloud_filter(struct iavf_adapter *adapter);
+void iavf_enable_vlan_stripping_v2(struct iavf_adapter *adapter, u16 tpid);
+void iavf_disable_vlan_stripping_v2(struct iavf_adapter *adapter, u16 tpid);
+void iavf_enable_vlan_insertion_v2(struct iavf_adapter *adapter, u16 tpid);
+void iavf_disable_vlan_insertion_v2(struct iavf_adapter *adapter, u16 tpid);
+void
+iavf_set_vlan_offload_features(struct iavf_adapter *adapter,
+			       netdev_features_t prev_features,
+			       netdev_features_t features);
 void iavf_add_fdir_filter(struct iavf_adapter *adapter);
 void iavf_del_fdir_filter(struct iavf_adapter *adapter);
 void iavf_add_adv_rss_cfg(struct iavf_adapter *adapter);
