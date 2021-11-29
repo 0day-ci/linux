@@ -29,7 +29,7 @@ static bool CheckCondition(const u32  Condition, const u32  Hex)
 *                           RadioA_1T.TXT
 ******************************************************************************/
 
-static u32 Array_RadioA_1T_8188E[] = {
+static u32 array_RadioA_1T_8188E[] = {
 		0x000, 0x00030000,
 		0x008, 0x00084000,
 		0x018, 0x00000407,
@@ -134,13 +134,13 @@ static u32 Array_RadioA_1T_8188E[] = {
 enum HAL_STATUS ODM_ReadAndConfig_RadioA_1T_8188E(struct odm_dm_struct *pDM_Odm)
 {
 	#define READ_NEXT_PAIR(v1, v2, i) do	\
-		 { i += 2; v1 = Array[i];	\
-		 v2 = Array[i + 1]; } while (0)
+		 { i += 2; v1 = array[i];	\
+		 v2 = array[i + 1]; } while (0)
 
 	u32     hex         = 0;
 	u32     i           = 0;
-	u32     ArrayLen    = sizeof(Array_RadioA_1T_8188E) / sizeof(u32);
-	u32    *Array       = Array_RadioA_1T_8188E;
+	u32     array_len    = ARRAY_SIZE(array_RadioA_1T_8188E);
+	u32    *array       = array_RadioA_1T_8188E;
 	bool		biol = false;
 	struct adapter *Adapter =  pDM_Odm->Adapter;
 	struct xmit_frame *pxmit_frame = NULL;
@@ -160,9 +160,9 @@ enum HAL_STATUS ODM_ReadAndConfig_RadioA_1T_8188E(struct odm_dm_struct *pDM_Odm)
 		}
 	}
 
-	for (i = 0; i < ArrayLen; i += 2) {
-		u32 v1 = Array[i];
-		u32 v2 = Array[i + 1];
+	for (i = 0; i < array_len; i += 2) {
+		u32 v1 = array[i];
+		u32 v2 = array[i + 1];
 
 		/*  This (offset, data) pair meets the condition. */
 		if (v1 < 0xCDCDCDCD) {
@@ -189,19 +189,19 @@ enum HAL_STATUS ODM_ReadAndConfig_RadioA_1T_8188E(struct odm_dm_struct *pDM_Odm)
 			}
 			continue;
 		} else { /*  This line is the start line of branch. */
-			if (!CheckCondition(Array[i], hex)) {
+			if (!CheckCondition(array[i], hex)) {
 				/*  Discard the following (offset, data) pairs. */
 				READ_NEXT_PAIR(v1, v2, i);
 				while (v2 != 0xDEAD &&
 				       v2 != 0xCDEF &&
-				       v2 != 0xCDCD && i < ArrayLen - 2)
+				       v2 != 0xCDCD && i < array_len - 2)
 					READ_NEXT_PAIR(v1, v2, i);
 				i -= 2; /*  prevent from for-loop += 2 */
 			} else { /*  Configure matched pairs and skip to end of if-else. */
 			READ_NEXT_PAIR(v1, v2, i);
 				while (v2 != 0xDEAD &&
 				       v2 != 0xCDEF &&
-				       v2 != 0xCDCD && i < ArrayLen - 2) {
+				       v2 != 0xCDCD && i < array_len - 2) {
 					if (biol) {
 						if (rtw_IOL_cmd_boundary_handle(pxmit_frame))
 							bndy_cnt++;
@@ -226,7 +226,7 @@ enum HAL_STATUS ODM_ReadAndConfig_RadioA_1T_8188E(struct odm_dm_struct *pDM_Odm)
 					READ_NEXT_PAIR(v1, v2, i);
 				}
 
-				while (v2 != 0xDEAD && i < ArrayLen - 2)
+				while (v2 != 0xDEAD && i < array_len - 2)
 					READ_NEXT_PAIR(v1, v2, i);
 			}
 		}
