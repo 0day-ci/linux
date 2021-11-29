@@ -209,7 +209,7 @@ static void iwl_mei_free_shared_mem(struct mei_cl_device *cldev)
 	struct iwl_mei *mei = mei_cldev_get_drvdata(cldev);
 
 	if (mei_cldev_dma_unmap(cldev))
-		dev_err(&cldev->dev, "Coudln't unmap the shared mem properly\n");
+		dev_err(&cldev->dev, "Couldn't unmap the shared mem properly\n");
 	memset(&mei->shared_mem, 0, sizeof(mei->shared_mem));
 }
 
@@ -1754,7 +1754,7 @@ static void iwl_mei_dbgfs_register(struct iwl_mei *mei)
 			     mei->dbgfs_dir, &iwl_mei_status);
 	debugfs_create_file("send_start_message", S_IWUSR, mei->dbgfs_dir,
 			    mei, &iwl_mei_dbgfs_send_start_message_ops);
-	debugfs_create_file("req_ownserhip", S_IWUSR, mei->dbgfs_dir,
+	debugfs_create_file("req_ownership", S_IWUSR, mei->dbgfs_dir,
 			    mei, &iwl_mei_dbgfs_req_ownership_ops);
 }
 
