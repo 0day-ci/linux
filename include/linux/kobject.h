@@ -70,6 +70,7 @@ struct kobject {
 	struct kernfs_node	*sd; /* sysfs directory entry */
 	struct kref		kref;
 #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
+	struct list_head	node;
 	struct delayed_work	release;
 #endif
 	unsigned int state_initialized:1;
