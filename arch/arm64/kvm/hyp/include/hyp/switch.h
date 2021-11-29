@@ -184,8 +184,12 @@ static bool kvm_hyp_handle_fpsimd(struct kvm_vcpu *vcpu, u64 *exit_code)
 
 	esr_ec = kvm_vcpu_trap_get_class(vcpu);
 
-	/* Don't handle SVE traps for non-SVE vcpus here: */
-	if (!sve_guest && esr_ec != ESR_ELx_EC_FP_ASIMD)
+	/*
+	 * Don't handle SVE traps for non-SVE vcpus here. This
+	 * includes NV guests for the time being.
+	 */
+	if (!sve_guest && (esr_ec != ESR_ELx_EC_FP_ASIMD ||
+			   guest_hyp_fpsimd_traps_enabled(vcpu)))
 		return false;
 
 	/* Valid trap.  Switch the context: */
