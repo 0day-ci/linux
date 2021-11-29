@@ -754,3 +754,134 @@ void rtl_dash_interrupt(struct rtl_dash *dash)
 	tasklet_schedule(&dash->tl);
 }
 
+int rtl_dash_to_fw(struct rtl_dash *dash, u8 *src, int size)
+{
+	int ret;
+	long t;
+
+	if (dash->cmac_state != CMAC_STATE_RUNNING)
+		return -ENETDOWN;
+
+	spin_lock_bh(&dash->cmac_lock);
+	ret = dash_rx_data(dash, NULL, 0);
+	spin_unlock_bh(&dash->cmac_lock);
+	if (ret < 0)
+		return -EUCLEAN;
+
+	reinit_completion(&dash->cmac_tx);
+	reinit_completion(&dash->fw_ack);
+
+	spin_lock_bh(&dash->cmac_lock);
+	ret = cmac_start_xmit(dash, src, size, false);
+	spin_unlock_bh(&dash->cmac_lock);
+
+	if (ret < 0)
+		goto err;
+
+	t = wait_for_completion_interruptible_timeout(&dash->cmac_tx,
+						      CMAC_TIMEOUT);
+	if (!t) {
+		ret = -ETIMEDOUT;
+		dev_err(&dash->pdev_cmac->dev, "CMAC tx timeout\n");
+		goto err;
+	} else if (t < 0) {
+		ret = t;
+		dev_err(&dash->pdev_cmac->dev, "CMAC tx fail %ld\n", t);
+		goto err;
+	}
+
+	t = wait_for_completion_interruptible_timeout(&dash->fw_ack,
+						      CMAC_TIMEOUT);
+	if (!t) {
+		ret = -ETIMEDOUT;
+		dev_err(&dash->pdev_cmac->dev, "FW ACK timeout\n");
+	} else if (t < 0) {
+		ret = t;
+		dev_err(&dash->pdev_cmac->dev, "FW ACK fail %ld\n", t);
+	}
+
+err:
+	return ret;
+}
+
+int rtl_dash_from_fw(struct rtl_dash *dash, u8 *src, int size)
+{
+	int ret;
+	long t;
+
+	if (dash->cmac_state != CMAC_STATE_RUNNING)
+		return -ENETDOWN;
+
+	reinit_completion(&dash->cmac_rx);
+
+	spin_lock_bh(&dash->cmac_lock);
+	ret = dash_rx_data(dash, src, size);
+	spin_unlock_bh(&dash->cmac_lock);
+
+	if (ret)
+		goto out;
+
+	t = wait_for_completion_interruptible_timeout(&dash->cmac_rx,
+						      CMAC_TIMEOUT);
+	if (!t) {
+		dev_warn(&dash->pdev_cmac->dev, "CMAC data timeout\n");
+	} else if (t < 0) {
+		ret = t;
+		dev_err(&dash->pdev_cmac->dev, "Wait CMAC data fail %ld\n", t);
+		goto out;
+	}
+
+	spin_lock_bh(&dash->cmac_lock);
+	ret = dash_rx_data(dash, src, size);
+	spin_unlock_bh(&dash->cmac_lock);
+
+out:
+	return ret;
+}
+
+void rtl_dash_set_ap_ready(struct rtl_dash *dash, bool enable)
+{
+	struct rtl8169_private *tp = dash->tp;
+	u32 data;
+
+	data = r8168ep_ocp_read(tp, 0x124);
+	if (enable)
+		data |= BIT(1);
+	else
+		data &= ~BIT(1);
+	r8168ep_ocp_write(tp, 0x1, 0x124, data);
+}
+
+bool rtl_dash_get_ap_ready(struct rtl_dash *dash)
+{
+	struct rtl8169_private *tp = dash->tp;
+
+	if (r8168ep_ocp_read(tp, 0x124) & BIT(1))
+		return true;
+	else
+		return false;
+}
+
+ssize_t rtl_dash_info(struct rtl_dash *dash, char *buf)
+{
+	struct rtl8169_private *tp = dash->tp;
+	char *dest = buf;
+	int size;
+	u32 data;
+
+	data = r8168ep_ocp_read(tp, 0x120);
+	size = sprintf(dest, "FW_VERSION=0x%08X\n", data);
+	if (size > 0)
+		dest += size;
+	else
+		return size;
+
+	data = r8168ep_ocp_read(tp, 0x174);
+	size = sprintf(dest, "FW_BUILD=0x%08X\n", data);
+	if (size > 0)
+		dest += size;
+	else
+		return size;
+
+	return strlen(buf) + 1;
+}

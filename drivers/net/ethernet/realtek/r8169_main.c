@@ -4640,6 +4640,184 @@ static int r8169_phy_connect(struct rtl8169_private *tp)
 	return 0;
 }
 
+static ssize_t
+information_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+	ssize_t ret;
+
+	if (rtnl_lock_killable())
+		return -EINTR;
+
+	ret = rtl_dash_info(tp->rtl_dash, buf);
+
+	rtnl_unlock();
+
+	return ret;
+}
+
+static DEVICE_ATTR_RO(information);
+
+static ssize_t
+ap_ready_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+	bool enable;
+
+	if (rtnl_lock_killable())
+		return -EINTR;
+
+	enable = rtl_dash_get_ap_ready(tp->rtl_dash);
+
+	rtnl_unlock();
+
+	if (enable)
+		strcat(buf, "enable\n");
+	else
+		strcat(buf, "disable\n");
+
+	return (strlen(buf) + 1);
+}
+
+static ssize_t ap_ready_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+	ssize_t len = strlen(buf);
+	bool enable;
+
+	if (buf[len - 1] <= ' ')
+		len--;
+
+	/* strlen("enable") = 6, and strlen("disable") = 7 */
+	if (len != 6 && len != 7)
+		return -EINVAL;
+
+	if (len == 6 && !strncmp(buf, "enable", 6))
+		enable = true;
+	else if (len == 7 && !strncmp(buf, "disable", 7))
+		enable = false;
+	else
+		return -EINVAL;
+
+	if (rtnl_lock_killable())
+		return -EINTR;
+
+	rtl_dash_set_ap_ready(tp->rtl_dash, enable);
+
+	rtnl_unlock();
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(ap_ready);
+
+static struct attribute *rtl_dash_attrs[] = {
+	&dev_attr_ap_ready.attr,
+	&dev_attr_information.attr,
+	NULL
+};
+
+static ssize_t cmac_data_write(struct file *fp, struct kobject *kobj,
+			       struct bin_attribute *attr, char *buf,
+			       loff_t offset, size_t size)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+	int ret;
+
+	if (IS_ERR_OR_NULL(tp->rtl_dash))
+		return -ENODEV;
+
+	if (size > CMAC_BUF_SIZE)
+		return -EFBIG;
+
+	if (offset)
+		return -EINVAL;
+
+	if (rtnl_lock_killable())
+		return -EINTR;
+
+	ret = rtl_dash_to_fw(tp->rtl_dash, buf, size);
+
+	rtnl_unlock();
+
+	return ret;
+}
+
+static ssize_t cmac_data_read(struct file *fp, struct kobject *kobj,
+			      struct bin_attribute *attr, char *buf,
+			      loff_t offset, size_t size)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+	int ret;
+
+	if (IS_ERR_OR_NULL(tp->rtl_dash))
+		return -ENODEV;
+
+	if (offset)
+		return -EINVAL;
+
+	if (rtnl_lock_killable())
+		return -EINTR;
+
+	ret = rtl_dash_from_fw(tp->rtl_dash, buf, size);
+
+	rtnl_unlock();
+
+	return ret;
+}
+
+static BIN_ATTR_RW(cmac_data, CMAC_BUF_SIZE);
+
+static struct bin_attribute *rtl_dash_bin_attrs[] = {
+	&bin_attr_cmac_data,
+	NULL
+};
+
+static umode_t is_dash_visible(struct kobject *kobj, struct attribute *attr,
+			       int n)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+
+	if (IS_ERR_OR_NULL(tp->rtl_dash))
+		return 0;
+
+	if (attr == &dev_attr_information.attr)
+		return 0440;
+
+	return 0660;
+}
+
+static umode_t is_dash_bin_visible(struct kobject *kobj,
+				   struct bin_attribute *attr, int n)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct net_device *net = to_net_dev(dev);
+	struct rtl8169_private *tp = netdev_priv(net);
+
+	if (IS_ERR_OR_NULL(tp->rtl_dash))
+		return 0;
+
+	return 0660;
+}
+
+static struct attribute_group rtl_dash_grp = {
+	.name = "dash",
+	.is_visible	= is_dash_visible,
+	.attrs		= rtl_dash_attrs,
+	.is_bin_visible = is_dash_bin_visible,
+	.bin_attrs = rtl_dash_bin_attrs,
+};
+
 static void rtl8169_dash_release(struct rtl8169_private *tp)
 {
 	if (tp->dash_type > RTL_DASH_DP) {
@@ -4703,6 +4881,8 @@ static int rtl8169_close(struct net_device *dev)
 
 	phy_disconnect(tp->phydev);
 
+	sysfs_remove_group(&dev->dev.kobj, &rtl_dash_grp);
+
 	dma_free_coherent(&pdev->dev, R8169_RX_RING_BYTES, tp->RxDescArray,
 			  tp->RxPhyAddr);
 	dma_free_coherent(&pdev->dev, R8169_TX_RING_BYTES, tp->TxDescArray,
@@ -4761,6 +4941,10 @@ static int rtl_open(struct net_device *dev)
 		if (retval)
 			goto err_release_fw_2;
 
+		retval = sysfs_create_group(&dev->dev.kobj, &rtl_dash_grp);
+		if (retval < 0)
+			goto err_release_dash;
+
 		tp->irq_mask |= DashCMAC | DashIntr;
 	}
 
@@ -4768,7 +4952,7 @@ static int rtl_open(struct net_device *dev)
 	retval = request_irq(pci_irq_vector(pdev, 0), rtl8169_interrupt,
 			     irqflags, dev->name, tp);
 	if (retval < 0)
-		goto err_release_dash;
+		goto err_remove_group;
 
 	retval = r8169_phy_connect(tp);
 	if (retval)
@@ -4784,6 +4968,8 @@ out:
 
 err_free_irq:
 	free_irq(pci_irq_vector(pdev, 0), tp);
+err_remove_group:
+	sysfs_remove_group(&dev->dev.kobj, &rtl_dash_grp);
 err_release_dash:
 	rtl8169_dash_release(tp);
 err_release_fw_2:
