@@ -78,5 +78,7 @@ u8 rtl8168d_efuse_read(struct rtl8169_private *tp, int reg_addr);
 void r8169_hw_phy_config(struct rtl8169_private *tp, struct phy_device *phydev,
 			 enum mac_version ver);
 
+u32 r8168ep_ocp_read(struct rtl8169_private *tp, u16 reg);
 u32 r8168_type2_read(struct rtl8169_private *tp, u32 addr);
+void r8168ep_ocp_write(struct rtl8169_private *tp, u8 mask, u16 reg, u32 data);
 void r8168_type2_write(struct rtl8169_private *tp, u8 mask, u32 addr, u32 val);

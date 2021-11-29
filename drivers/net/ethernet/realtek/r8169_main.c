@@ -33,6 +33,7 @@
 
 #include "r8169.h"
 #include "r8169_firmware.h"
+#include "r8169_dash.h"
 
 #define FIRMWARE_8168D_1	"rtl_nic/rtl8168d-1.fw"
 #define FIRMWARE_8168D_2	"rtl_nic/rtl8168d-2.fw"
@@ -348,8 +349,10 @@ enum rtl8125_registers {
 
 enum rtl_register_content {
 	/* InterruptStatusBits */
+	DashCMAC	= 0x8000,
 	SYSErr		= 0x8000,
 	PCSTimeout	= 0x4000,
+	DashIntr	= 0x1000,
 	SWInt		= 0x0100,
 	TxDescUnavail	= 0x0080,
 	RxFIFOOver	= 0x0040,
@@ -586,12 +589,6 @@ enum rtl_flag {
 	RTL_FLAG_MAX
 };
 
-enum rtl_dash_type {
-	RTL_DASH_NONE,
-	RTL_DASH_DP,
-	RTL_DASH_EP,
-};
-
 struct rtl8169_private {
 	void __iomem *mmio_addr;	/* memory map physical address */
 	struct pci_dev *pci_dev;
@@ -628,6 +625,7 @@ struct rtl8169_private {
 
 	const char *fw_name;
 	struct rtl_fw *rtl_fw;
+	struct rtl_dash *rtl_dash;
 
 	u32 ocp_base;
 };
@@ -1117,7 +1115,7 @@ static u32 r8168dp_ocp_read(struct rtl8169_private *tp, u16 reg)
 		RTL_R32(tp, OCPDR) : ~0;
 }
 
-static u32 r8168ep_ocp_read(struct rtl8169_private *tp, u16 reg)
+u32 r8168ep_ocp_read(struct rtl8169_private *tp, u16 reg)
 {
 	return _rtl_eri_read(tp, reg, ERIAR_OOB);
 }
@@ -1130,8 +1128,7 @@ static void r8168dp_ocp_write(struct rtl8169_private *tp, u8 mask, u16 reg,
 	rtl_loop_wait_low(tp, &rtl_ocpar_cond, 100, 20);
 }
 
-static void r8168ep_ocp_write(struct rtl8169_private *tp, u8 mask, u16 reg,
-			      u32 data)
+void r8168ep_ocp_write(struct rtl8169_private *tp, u8 mask, u16 reg, u32 data)
 {
 	_rtl_eri_write(tp, reg, ((u32)mask & 0x0f) << ERIAR_MASK_SHIFT,
 		       data, ERIAR_OOB);
@@ -4541,7 +4538,13 @@ static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance)
 	if ((status & 0xffff) == 0xffff || !(status & tp->irq_mask))
 		return IRQ_NONE;
 
-	if (unlikely(status & SYSErr)) {
+	if (tp->rtl_dash) {
+		if (status & DashCMAC)
+			rtl_dash_cmac_reset_indicate(tp->rtl_dash);
+
+		if (status & DashIntr)
+			rtl_dash_interrupt(tp->rtl_dash);
+	} else if (unlikely(status & SYSErr)) {
 		rtl8169_pcierr_interrupt(tp->dev);
 		goto out;
 	}
@@ -4637,6 +4640,15 @@ static int r8169_phy_connect(struct rtl8169_private *tp)
 	return 0;
 }
 
+static void rtl8169_dash_release(struct rtl8169_private *tp)
+{
+	if (tp->dash_type > RTL_DASH_DP) {
+		tp->irq_mask &= ~(DashCMAC | DashIntr);
+		rtl_release_dash(tp->rtl_dash);
+		tp->rtl_dash = NULL;
+	}
+}
+
 static void rtl8169_down(struct rtl8169_private *tp)
 {
 	/* Clear all task flags */
@@ -4651,6 +4663,9 @@ static void rtl8169_down(struct rtl8169_private *tp)
 
 	rtl8169_cleanup(tp, true);
 
+	if (tp->rtl_dash)
+		rtl_dash_down(tp->rtl_dash);
+
 	rtl_prepare_power_down(tp);
 }
 
@@ -4663,6 +4678,9 @@ static void rtl8169_up(struct rtl8169_private *tp)
 	napi_enable(&tp->napi);
 	set_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags);
 	rtl_reset_work(tp);
+
+	if (tp->rtl_dash)
+		rtl_dash_up(tp->rtl_dash);
 
 	phy_start(tp->phydev);
 }
@@ -4679,6 +4697,7 @@ static int rtl8169_close(struct net_device *dev)
 	rtl8169_rx_clear(tp);
 
 	cancel_work_sync(&tp->wk.work);
+	rtl8169_dash_release(tp);
 
 	free_irq(pci_irq_vector(pdev, 0), tp);
 
@@ -4734,11 +4753,22 @@ static int rtl_open(struct net_device *dev)
 
 	rtl_request_firmware(tp);
 
+	if (tp->dash_type > RTL_DASH_DP) {
+		netdev_info(dev, "DASH enabled\n");
+		tp->rtl_dash = rtl_request_dash(tp, pdev, tp->mac_version,
+						tp->mmio_addr);
+		retval = PTR_ERR_OR_ZERO(tp->rtl_dash);
+		if (retval)
+			goto err_release_fw_2;
+
+		tp->irq_mask |= DashCMAC | DashIntr;
+	}
+
 	irqflags = pci_dev_msi_enabled(pdev) ? IRQF_NO_THREAD : IRQF_SHARED;
 	retval = request_irq(pci_irq_vector(pdev, 0), rtl8169_interrupt,
 			     irqflags, dev->name, tp);
 	if (retval < 0)
-		goto err_release_fw_2;
+		goto err_release_dash;
 
 	retval = r8169_phy_connect(tp);
 	if (retval)
@@ -4754,6 +4784,8 @@ out:
 
 err_free_irq:
 	free_irq(pci_irq_vector(pdev, 0), tp);
+err_release_dash:
+	rtl8169_dash_release(tp);
 err_release_fw_2:
 	rtl_release_firmware(tp);
 	rtl8169_rx_clear(tp);
