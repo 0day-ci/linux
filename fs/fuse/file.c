@@ -550,6 +550,8 @@ static int fuse_fsync(struct file *file, loff_t start, loff_t end,
 
 	if (fuse_is_bad(inode))
 		return -EIO;
+	if (sb_rdonly(inode->i_sb))
+		return 0;
 
 	inode_lock(inode);
 
