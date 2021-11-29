@@ -3635,7 +3635,9 @@ out:
 		in6_dev_put(idev);
 
 	if (err) {
-		lwtstate_put(fib6_nh->fib_nh_lws);
+		/* check if we failed after fib_nh_common_init() was called */
+		if (fib6_nh->nh_common.nhc_pcpu_rth_output)
+			fib_nh_common_release(&fib6_nh->nh_common);
 		fib6_nh->fib_nh_lws = NULL;
 		dev_put(dev);
 	}
@@ -3822,7 +3824,7 @@ static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 	} else {
 		err = fib6_nh_init(net, rt->fib6_nh, cfg, gfp_flags, extack);
 		if (err)
-			goto out;
+			goto out_free;
 
 		fib6_nh = rt->fib6_nh;
 
@@ -3841,7 +3843,7 @@ static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 		if (!ipv6_chk_addr(net, &cfg->fc_prefsrc, dev, 0)) {
 			NL_SET_ERR_MSG(extack, "Invalid source address");
 			err = -EINVAL;
-			goto out;
+			goto out_free;
 		}
 		rt->fib6_prefsrc.addr = cfg->fc_prefsrc;
 		rt->fib6_prefsrc.plen = 128;
@@ -3849,12 +3851,13 @@ static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 		rt->fib6_prefsrc.plen = 0;
 
 	return rt;
-out:
-	fib6_info_release(rt);
-	return ERR_PTR(err);
+
 out_free:
 	ip_fib_metrics_put(rt->fib6_metrics);
+	if (rt->nh)
+		nexthop_put(rt->nh);
 	kfree(rt);
+out:
 	return ERR_PTR(err);
 }
 
