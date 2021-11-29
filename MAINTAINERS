@@ -9486,6 +9486,12 @@ L:	linux-kernel@vger.kernel.org
 S:	Supported
 F:	arch/x86/include/asm/intel-family.h
 
+INTEL KEEM BAY DDR SUBSYSTEM, NETWORK ON CHIP INTERCONNECT DRIVER
+M:	Pandith N <pandith.n@intel.com>
+S:	Supported
+F:	drivers/interconnect/intel/
+F:	include/uapi/linux/noc_uapi.h
+
 INTEL DRM DRIVERS (excluding Poulsbo, Moorestown and derivative chipsets)
 M:	Jani Nikula <jani.nikula@linux.intel.com>
 M:	Joonas Lahtinen <joonas.lahtinen@linux.intel.com>
