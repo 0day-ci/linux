@@ -575,11 +575,6 @@ static int ixgbe_ipsec_add_sa(struct xfrm_state *xs)
 		return -EINVAL;
 	}
 
-	if (xs->props.mode != XFRM_MODE_TRANSPORT) {
-		netdev_err(dev, "Unsupported mode for ipsec offload\n");
-		return -EINVAL;
-	}
-
 	if (ixgbe_ipsec_check_mgmt_ip(xs)) {
 		netdev_err(dev, "IPsec IP addr clash with mgmt filters\n");
 		return -EINVAL;
@@ -587,6 +582,11 @@ static int ixgbe_ipsec_add_sa(struct xfrm_state *xs)
 
 	if (xs->xso.flags & XFRM_OFFLOAD_INBOUND) {
 		struct rx_sa rsa;
+
+		if (xs->props.mode != XFRM_MODE_TRANSPORT) {
+			netdev_err(dev, "IPsec inbound offload supported only for transport mode\n");
+			return -EINVAL;
+		}
 
 		if (xs->calg) {
 			netdev_err(dev, "Compression offload not supported\n");
@@ -698,6 +698,11 @@ static int ixgbe_ipsec_add_sa(struct xfrm_state *xs)
 			     (__force u32)rsa.xs->id.spi);
 	} else {
 		struct tx_sa tsa;
+
+		if (xs->props.mode != XFRM_MODE_TRANSPORT && (dev->features & NETIF_F_TSO)) {
+			netdev_err(dev, "Cannot support tunnel mode IPsec offload and TSO simultaneously\n");
+			return -EINVAL;
+		}
 
 		if (adapter->num_vfs &&
 		    adapter->bridge_mode != BRIDGE_MODE_VEPA)

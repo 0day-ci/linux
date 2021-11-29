@@ -275,13 +275,13 @@ static int ixgbevf_ipsec_add_sa(struct xfrm_state *xs)
 		return -EINVAL;
 	}
 
-	if (xs->props.mode != XFRM_MODE_TRANSPORT) {
-		netdev_err(dev, "Unsupported mode for ipsec offload\n");
-		return -EINVAL;
-	}
-
 	if (xs->xso.flags & XFRM_OFFLOAD_INBOUND) {
 		struct rx_sa rsa;
+
+		if (xs->props.mode != XFRM_MODE_TRANSPORT) {
+			netdev_err(dev, "IPsec inbound offload supported only for transport mode\n");
+			return -EINVAL;
+		}
 
 		if (xs->calg) {
 			netdev_err(dev, "Compression offload not supported\n");
@@ -341,6 +341,11 @@ static int ixgbevf_ipsec_add_sa(struct xfrm_state *xs)
 			     (__force u32)rsa.xs->id.spi);
 	} else {
 		struct tx_sa tsa;
+
+		if (xs->props.mode != XFRM_MODE_TRANSPORT && (dev->features & NETIF_F_TSO)) {
+			netdev_err(dev, "Cannot support tunnel mode IPsec offload and TSO simultaneously\n");
+			return -EINVAL;
+		}
 
 		/* find the first unused index */
 		ret = ixgbevf_ipsec_find_empty_idx(ipsec, false);
