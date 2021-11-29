@@ -1798,7 +1798,33 @@ int cfg80211_get_ies_channel_number(const u8 *ie, size_t ielen,
 	const u8 *tmp;
 	int channel_number = -1;
 
-	if (band == NL80211_BAND_S1GHZ) {
+	if (channel->band == NL80211_BAND_6GHZ) {
+		const struct element *elem;
+
+		elem = cfg80211_find_ext_elem(WLAN_EID_EXT_HE_OPERATION, ie,
+					      ielen);
+		if (elem && elem->datalen >= ieee80211_he_oper_size(&elem->data[1])) {
+			struct ieee80211_he_operation *he_oper =
+				(void *)(&elem->data[1]);
+			const struct ieee80211_he_6ghz_oper *he_6ghz_oper;
+
+			he_6ghz_oper = ieee80211_he_6ghz_oper(he_oper);
+			if (!he_6ghz_oper)
+				return channel;
+
+			freq = ieee80211_channel_to_frequency(he_6ghz_oper->primary,
+							      NL80211_BAND_6GHZ);
+
+			/* duplicated beacon indication is relevant for beacons
+			 * only
+			 */
+			if (freq != channel->center_freq &&
+			    abs(freq - channel->center_freq) <= 80 &&
+			    (ftype != CFG80211_BSS_FTYPE_BEACON ||
+			     he_6ghz_oper->control & IEEE80211_HE_6GHZ_OPER_CTRL_DUP_BEACON))
+				channel_number = he_6ghz_oper->primary;
+		}
+	} else if (band == NL80211_BAND_S1GHZ) {
 		tmp = cfg80211_find_ie(WLAN_EID_S1G_OPERATION, ie, ielen);
 		if (tmp && tmp[1] >= sizeof(struct ieee80211_s1g_oper_ie)) {
 			struct ieee80211_s1g_oper_ie *s1gop = (void *)(tmp + 2);
@@ -1829,12 +1855,13 @@ EXPORT_SYMBOL(cfg80211_get_ies_channel_number);
  * from neighboring channels and the Beacon frames use the DSSS Parameter Set
  * element to indicate the current (transmitting) channel, but this might also
  * be needed on other bands if RX frequency does not match with the actual
- * operating channel of a BSS.
+ * operating channel of a BSS, or if the AP reports a different primary channel.
  */
 static struct ieee80211_channel *
 cfg80211_get_bss_channel(struct wiphy *wiphy, const u8 *ie, size_t ielen,
 			 struct ieee80211_channel *channel,
-			 enum nl80211_bss_scan_width scan_width)
+			 enum nl80211_bss_scan_width scan_width,
+			 enum cfg80211_bss_frame_type ftype)
 {
 	u32 freq;
 	int channel_number;
@@ -1909,7 +1936,7 @@ cfg80211_inform_single_bss_data(struct wiphy *wiphy,
 		return NULL;
 
 	channel = cfg80211_get_bss_channel(wiphy, ie, ielen, data->chan,
-					   data->scan_width);
+					   data->scan_width, ftype);
 	if (!channel)
 		return NULL;
 
@@ -2332,6 +2359,7 @@ cfg80211_inform_single_bss_frame_data(struct wiphy *wiphy,
 	size_t ielen, min_hdr_len = offsetof(struct ieee80211_mgmt,
 					     u.probe_resp.variable);
 	int bss_type;
+	enum cfg80211_bss_frame_type ftype;
 
 	BUILD_BUG_ON(offsetof(struct ieee80211_mgmt, u.probe_resp.variable) !=
 			offsetof(struct ieee80211_mgmt, u.beacon.variable));
@@ -2368,8 +2396,16 @@ cfg80211_inform_single_bss_frame_data(struct wiphy *wiphy,
 			variable = ext->u.s1g_beacon.variable;
 	}
 
+	if (ieee80211_is_beacon(mgmt->frame_control))
+		ftype = CFG80211_BSS_FTYPE_BEACON;
+	else if (ieee80211_is_probe_resp(mgmt->frame_control))
+		ftype = CFG80211_BSS_FTYPE_PRESP;
+	else
+		ftype = CFG80211_BSS_FTYPE_UNKNOWN;
+
 	channel = cfg80211_get_bss_channel(wiphy, variable,
-					   ielen, data->chan, data->scan_width);
+					   ielen, data->chan, data->scan_width,
+					   ftype);
 	if (!channel)
 		return NULL;
 
