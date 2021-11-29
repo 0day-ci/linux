@@ -722,6 +722,8 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
 		if (kvm_check_request(KVM_REQ_RELOAD_PMU, vcpu))
 			kvm_pmu_handle_pmcr(vcpu,
 					    __vcpu_sys_reg(vcpu, PMCR_EL0));
+
+		check_nested_vcpu_requests(vcpu);
 	}
 }
 
@@ -820,9 +822,16 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		if (!ret)
 			ret = 1;
 
-		update_vmid(&vcpu->arch.hw_mmu->vmid);
-
+		/*
+		 * A nested exeption triggered by a vcpu request (such
+		 * as an interrupt injected in a guest hypervisor) can
+		 * change the currently used VMID (by switching to a
+		 * different translation regime. It is thus necesary
+		 * to update the VMID *after* all requests have been
+		 * processed.
+		 */
 		check_vcpu_requests(vcpu);
+		update_vmid(&vcpu->arch.hw_mmu->vmid);
 
 		/*
 		 * Preparing the interrupts to be injected also
