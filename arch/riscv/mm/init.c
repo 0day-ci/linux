@@ -854,3 +854,8 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node,
 	return vmemmap_populate_basepages(start, end, node, NULL);
 }
 #endif
+
+#if defined(CONFIG_64BIT)
+struct __svpbmt_struct __svpbmt __ro_after_init;
+EXPORT_SYMBOL(__svpbmt);
+#endif

@@ -59,14 +59,29 @@ static inline void pud_clear(pud_t *pudp)
 	set_pud(pudp, __pud(0));
 }
 
+static inline unsigned long _chg_of_pmd(pmd_t pmd)
+{
+	return (pmd_val(pmd) & _PAGE_CHG_MASK);
+}
+
+static inline unsigned long _chg_of_pud(pud_t pud)
+{
+	return (pud_val(pud) & _PAGE_CHG_MASK);
+}
+
+static inline unsigned long _chg_of_pte(pte_t pte)
+{
+	return (pte_val(pte) & _PAGE_CHG_MASK);
+}
+
 static inline pmd_t *pud_pgtable(pud_t pud)
 {
-	return (pmd_t *)pfn_to_virt(pud_val(pud) >> _PAGE_PFN_SHIFT);
+	return (pmd_t *)pfn_to_virt(_chg_of_pud(pud) >> _PAGE_PFN_SHIFT);
 }
 
 static inline struct page *pud_page(pud_t pud)
 {
-	return pfn_to_page(pud_val(pud) >> _PAGE_PFN_SHIFT);
+	return pfn_to_page(_chg_of_pud(pud) >> _PAGE_PFN_SHIFT);
 }
 
 static inline pmd_t pfn_pmd(unsigned long pfn, pgprot_t prot)
@@ -76,7 +91,7 @@ static inline pmd_t pfn_pmd(unsigned long pfn, pgprot_t prot)
 
 static inline unsigned long _pmd_pfn(pmd_t pmd)
 {
-	return pmd_val(pmd) >> _PAGE_PFN_SHIFT;
+	return _chg_of_pmd(pmd) >> _PAGE_PFN_SHIFT;
 }
 
 #define mk_pmd(page, prot)    pfn_pmd(page_to_pfn(page), prot)
