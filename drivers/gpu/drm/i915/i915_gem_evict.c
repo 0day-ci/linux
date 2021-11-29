@@ -51,6 +51,7 @@ static int ggtt_flush(struct intel_gt *gt)
 
 static bool
 mark_free(struct drm_mm_scan *scan,
+	  struct i915_gem_ww_ctx *ww,
 	  struct i915_vma *vma,
 	  unsigned int flags,
 	  struct list_head *unwind)
@@ -58,7 +59,7 @@ mark_free(struct drm_mm_scan *scan,
 	if (i915_vma_is_pinned(vma))
 		return false;
 
-	if (!i915_gem_object_trylock(vma->obj))
+	if (!i915_gem_object_trylock(vma->obj, ww))
 		return false;
 
 	list_add(&vma->evict_link, unwind);
@@ -101,6 +102,7 @@ static bool defer_evict(struct i915_vma *vma)
  */
 int
 i915_gem_evict_something(struct i915_address_space *vm,
+			 struct i915_gem_ww_ctx *ww,
 			 u64 min_size, u64 alignment,
 			 unsigned long color,
 			 u64 start, u64 end,
@@ -173,7 +175,7 @@ search_again:
 			continue;
 		}
 
-		if (mark_free(&scan, vma, flags, &eviction_list))
+		if (mark_free(&scan, ww, vma, flags, &eviction_list))
 			goto found;
 	}
 
@@ -250,7 +252,7 @@ found:
 
 		/* If we find any non-objects (!vma), we cannot evict them */
 		if (vma->node.color != I915_COLOR_UNEVICTABLE &&
-		    i915_gem_object_trylock(vma->obj)) {
+		    i915_gem_object_trylock(vma->obj, ww)) {
 			ret = __i915_vma_unbind(vma);
 			i915_gem_object_unlock(vma->obj);
 		} else {
@@ -273,6 +275,7 @@ found:
  * memory in e.g. the shrinker.
  */
 int i915_gem_evict_for_node(struct i915_address_space *vm,
+			    struct i915_gem_ww_ctx *ww,
 			    struct drm_mm_node *target,
 			    unsigned int flags)
 {
@@ -345,7 +348,7 @@ int i915_gem_evict_for_node(struct i915_address_space *vm,
 			break;
 		}
 
-		if (!i915_gem_object_trylock(vma->obj)) {
+		if (!i915_gem_object_trylock(vma->obj, ww)) {
 			ret = -ENOSPC;
 			break;
 		}
@@ -386,7 +389,7 @@ int i915_gem_evict_for_node(struct i915_address_space *vm,
  * To clarify: This is for freeing up virtual address space, not for freeing
  * memory in e.g. the shrinker.
  */
-int i915_gem_evict_vm(struct i915_address_space *vm)
+int i915_gem_evict_vm(struct i915_address_space *vm, struct i915_gem_ww_ctx *ww)
 {
 	int ret = 0;
 
@@ -412,7 +415,7 @@ int i915_gem_evict_vm(struct i915_address_space *vm)
 			if (i915_vma_is_pinned(vma))
 				continue;
 
-			if (!i915_gem_object_trylock(vma->obj))
+			if (!i915_gem_object_trylock(vma->obj, ww))
 				continue;
 
 			__i915_vma_pin(vma);
