@@ -666,19 +666,12 @@ SYSCALL_DEFINE5(fsetxattr, int, fd, const char __user *, name,
 /*
  * Extended attribute GET operations
  */
-static ssize_t
-getxattr(struct user_namespace *mnt_userns, struct dentry *d,
-	 const char __user *name, void __user *value, size_t size)
+ssize_t
+do_getxattr(struct user_namespace *mnt_userns, struct dentry *d,
+	 const char *name, void __user *value, size_t size)
 {
-	ssize_t error;
 	void *kvalue = NULL;
-	char kname[XATTR_NAME_MAX + 1];
-
-	error = strncpy_from_user(kname, name, sizeof(kname));
-	if (error == 0 || error == sizeof(kname))
-		error = -ERANGE;
-	if (error < 0)
-		return error;
+	size_t error;
 
 	if (size) {
 		if (size > XATTR_SIZE_MAX)
@@ -688,10 +681,10 @@ getxattr(struct user_namespace *mnt_userns, struct dentry *d,
 			return -ENOMEM;
 	}
 
-	error = vfs_getxattr(mnt_userns, d, kname, kvalue, size);
+	error = vfs_getxattr(mnt_userns, d, name, kvalue, size);
 	if (error > 0) {
-		if ((strcmp(kname, XATTR_NAME_POSIX_ACL_ACCESS) == 0) ||
-		    (strcmp(kname, XATTR_NAME_POSIX_ACL_DEFAULT) == 0))
+		if ((strcmp(name, XATTR_NAME_POSIX_ACL_ACCESS) == 0) ||
+		    (strcmp(name, XATTR_NAME_POSIX_ACL_DEFAULT) == 0))
 			posix_acl_fix_xattr_to_user(mnt_userns, kvalue, error);
 		if (size && copy_to_user(value, kvalue, error))
 			error = -EFAULT;
@@ -704,6 +697,22 @@ getxattr(struct user_namespace *mnt_userns, struct dentry *d,
 	kvfree(kvalue);
 
 	return error;
+}
+
+static ssize_t
+getxattr(struct user_namespace *mnt_userns, struct dentry *d,
+	 const char __user *name, void __user *value, size_t size)
+{
+	ssize_t error;
+	char kname[XATTR_NAME_MAX + 1];
+
+	error = strncpy_from_user(kname, name, sizeof(kname));
+	if (error == 0 || error == sizeof(kname))
+		error = -ERANGE;
+	if (error < 0)
+		return error;
+
+	return do_getxattr(mnt_userns, d, kname, value, size);
 }
 
 static ssize_t path_getxattr(const char __user *pathname,
