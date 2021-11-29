@@ -125,6 +125,8 @@
 					 SDHCI_TRNS_BLK_CNT_EN | \
 					 SDHCI_TRNS_DMA)
 
+static void tegra_sdhci_set_clock(struct sdhci_host *host, unsigned int clock);
+
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
 	u64 dma_mask;
@@ -370,6 +372,16 @@ static void tegra_sdhci_hs400_enhanced_strobe(struct mmc_host *mmc,
 		val &= ~SDHCI_TEGRA_SYS_SW_CTRL_ENHANCED_STROBE;
 
 	sdhci_writel(host, val, SDHCI_TEGRA_VENDOR_SYS_SW_CTRL);
+
+	/*
+	 * When CMD13 is sent after switching to HS400 mode, the bus
+	 * is operating at either MMC_HIGH_26_MAX_DTR or
+	 * MMC_HIGH_52_MAX_DTR.
+	 * To meet Tegra SDHCI requirement at HS400 mode, force SDHCI
+	 * interface clock to MMC_HS200_MAX_DTR (200 MHz) so that host
+	 * controller CAR clock and the interface clock are rate matched.
+	 */
+	tegra_sdhci_set_clock(host, MMC_HS200_MAX_DTR);
 
 }
 
