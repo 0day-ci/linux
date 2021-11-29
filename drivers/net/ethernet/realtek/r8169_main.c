@@ -1071,6 +1071,45 @@ static u16 rtl_ephy_read(struct rtl8169_private *tp, int reg_addr)
 		RTL_R32(tp, EPHYAR) & EPHYAR_DATA_MASK : ~0;
 }
 
+static u32 r8168_dash_adjust_addr(struct rtl8169_private *tp, u32 addr)
+{
+	switch (tp->mac_version) {
+	case RTL_GIGA_MAC_VER_49 ... RTL_GIGA_MAC_VER_51:
+		return ((addr & 0xf000) << 8) | (addr & 0xfff);
+	case RTL_GIGA_MAC_VER_52 ... RTL_GIGA_MAC_VER_53:
+		return ((addr & 0xfff000) << 6) | (addr & 0xfff);
+	default:
+		WARN_ON_ONCE(1);
+		return (addr & 0xfff);
+	}
+}
+
+u32 r8168_type2_read(struct rtl8169_private *tp, u32 addr)
+{
+	u32 cmd = ERIAR_READ_CMD | ERIAR_OOB | ERIAR_MASK_1111;
+
+	cmd |= r8168_dash_adjust_addr(tp, addr);
+	RTL_W32(tp, ERIAR, cmd);
+
+	return rtl_loop_wait_high(tp, &rtl_eriar_cond, 100, 100) ?
+		RTL_R32(tp, ERIDR) : ~0;
+}
+
+void r8168_type2_write(struct rtl8169_private *tp, u8 mask, u32 addr, u32 val)
+{
+	u32 cmd = ERIAR_WRITE_CMD | ERIAR_OOB |
+		  ((u32)mask & 0x0f) << ERIAR_MASK_SHIFT;
+
+	if (WARN(addr & 3 || !mask, "addr: 0x%x, mask: 0x%08x\n", addr, mask))
+		return;
+
+	RTL_W32(tp, ERIDR, val);
+	cmd |= r8168_dash_adjust_addr(tp, addr);
+	RTL_W32(tp, ERIAR, cmd);
+
+	rtl_loop_wait_low(tp, &rtl_eriar_cond, 100, 100);
+}
+
 static u32 r8168dp_ocp_read(struct rtl8169_private *tp, u16 reg)
 {
 	RTL_W32(tp, OCPAR, 0x0fu << 12 | (reg & 0x0fff));
