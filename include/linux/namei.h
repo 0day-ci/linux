@@ -49,12 +49,12 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT};
 
 extern int path_pts(struct path *path);
 
-extern int user_path_at_empty(int, const char __user *, unsigned, struct path *, int *empty);
+extern int user_path_at_empty(int, struct filename *, unsigned, struct path *);
 
 static inline int user_path_at(int dfd, const char __user *name, unsigned flags,
 		 struct path *path)
 {
-	return user_path_at_empty(dfd, name, flags, path, NULL);
+	return user_path_at_empty(dfd, getname_flags(name, flags, NULL), flags, path);
 }
 
 extern int kern_path(const char *, unsigned, struct path *);

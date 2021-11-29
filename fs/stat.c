@@ -435,12 +435,17 @@ static int do_readlinkat(int dfd, const char __user *pathname,
 	int error;
 	int empty = 0;
 	unsigned int lookup_flags = LOOKUP_EMPTY;
+	struct filename *filename;
 
 	if (bufsiz <= 0)
 		return -EINVAL;
 
 retry:
-	error = user_path_at_empty(dfd, pathname, lookup_flags, &path, &empty);
+	filename = getname_flags(pathname, lookup_flags, &empty);
+	if (IS_ERR(filename))
+		return PTR_ERR(filename);
+
+	error = user_path_at_empty(dfd, filename, lookup_flags, &path);
 	if (!error) {
 		struct inode *inode = d_backing_inode(path.dentry);
 

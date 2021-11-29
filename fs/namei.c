@@ -2794,10 +2794,9 @@ int path_pts(struct path *path)
 }
 #endif
 
-int user_path_at_empty(int dfd, const char __user *name, unsigned flags,
-		 struct path *path, int *empty)
+int user_path_at_empty(int dfd, struct filename *filename, unsigned flags,
+		       struct path *path)
 {
-	struct filename *filename = getname_flags(name, flags, empty);
 	int ret = filename_lookup(dfd, filename, flags, path, NULL);
 
 	putname(filename);
