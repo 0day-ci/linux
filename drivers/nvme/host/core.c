@@ -2564,6 +2564,9 @@ static struct nvme_subsystem *__nvme_find_get_subsystem(const char *subsysnqn)
 
 	lockdep_assert_held(&nvme_subsystems_lock);
 
+	if (strncmp(subsysnqn, "nqn.", 4))
+		return NULL;
+
 	/*
 	 * Fail matches for discovery subsystems. This results
 	 * in each discovery controller bound to a unique subsystem.
