@@ -2891,6 +2891,9 @@ void kvm_mmu_hugepage_adjust(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault
 	if (unlikely(fault->max_level == PG_LEVEL_4K))
 		return;
 
+	if (!fault->page)
+		return;
+
 	if (is_error_noslot_pfn(fault->pfn) || kvm_is_reserved_pfn(fault->pfn))
 		return;
 
@@ -3950,9 +3953,9 @@ static bool kvm_faultin_pfn(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault,
 	}
 
 	async = false;
-	fault->pfn = __gfn_to_pfn_memslot(slot, fault->gfn, false, &async,
-					  fault->write, &fault->map_writable,
-					  &fault->hva);
+	fault->pfn = __gfn_to_pfn_page_memslot(slot, fault->gfn, false, &async,
+					       fault->write, &fault->map_writable,
+					       &fault->hva, &fault->page);
 	if (!async)
 		return false; /* *pfn has correct page already */
 
@@ -3966,9 +3969,9 @@ static bool kvm_faultin_pfn(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault,
 			goto out_retry;
 	}
 
-	fault->pfn = __gfn_to_pfn_memslot(slot, fault->gfn, false, NULL,
-					  fault->write, &fault->map_writable,
-					  &fault->hva);
+	fault->pfn = __gfn_to_pfn_page_memslot(slot, fault->gfn, false, NULL,
+					       fault->write, &fault->map_writable,
+					       &fault->hva, &fault->page);
 	return false;
 
 out_retry:
@@ -4029,7 +4032,8 @@ out_unlock:
 		read_unlock(&vcpu->kvm->mmu_lock);
 	else
 		write_unlock(&vcpu->kvm->mmu_lock);
-	kvm_release_pfn_clean(fault->pfn);
+	if (fault->page)
+		put_page(fault->page);
 	return r;
 }
 
