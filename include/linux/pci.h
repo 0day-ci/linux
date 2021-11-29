@@ -700,6 +700,26 @@ static inline bool pci_is_bridge(struct pci_dev *dev)
 		dev->hdr_type == PCI_HEADER_TYPE_CARDBUS;
 }
 
+/**
+ * pci_dev_depth - Return the depth of a device in the PCI hierarchy
+ * @dev: PCI device
+ *
+ * Return the depth (number of parent busses above) the device in
+ * the PCI hierarchy.
+ */
+static inline int pci_dev_depth(struct pci_dev *dev)
+{
+	struct pci_bus *bus = dev->bus;
+	int depth = 0;
+
+	while (bus->parent) {
+		depth++;
+		bus = bus->parent;
+	}
+
+	return depth;
+}
+
 #define for_each_pci_bridge(dev, bus)				\
 	list_for_each_entry(dev, &bus->devices, bus_list)	\
 		if (!pci_is_bridge(dev)) {} else
