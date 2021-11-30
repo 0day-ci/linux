@@ -174,6 +174,10 @@
 				compatible = "xlnx,zynqmp-aes";
 			};
 
+			xlnx_sha3_384: sha384 {
+				compatible = "xlnx,zynqmp-sha3-384";
+			};
+
 			zynqmp_reset: reset-controller {
 				compatible = "xlnx,zynqmp-reset";
 				#reset-cells = <1>;
