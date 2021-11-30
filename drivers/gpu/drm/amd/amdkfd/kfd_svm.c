@@ -2913,6 +2913,9 @@ svm_range_add(struct kfd_process *p, uint64_t start, uint64_t size,
 
 	if (left) {
 		prange = svm_range_new(svms, last - left + 1, last);
+		if (!prange)
+			return -ENOMEM;
+
 		list_add(&prange->insert_list, insert_list);
 		list_add(&prange->update_list, update_list);
 	}
