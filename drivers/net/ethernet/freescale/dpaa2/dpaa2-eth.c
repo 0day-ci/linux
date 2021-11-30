@@ -4442,7 +4442,7 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
 
 	err = dpaa2_eth_dl_alloc(priv);
 	if (err)
-		goto err_dl_register;
+		goto err_dl_alloc;
 
 	err = dpaa2_eth_dl_traps_register(priv);
 	if (err)
@@ -4462,17 +4462,26 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
 	dpaa2_dbg_add(priv);
 #endif
 
-	dpaa2_eth_dl_register(priv);
+	err = dpaa2_eth_dl_register(priv);
+	if (err < 0) {
+		dev_err(dev, "dpaa2_eth_dl_register failed\n");
+		goto err_dl_register;
+	}
 	dev_info(dev, "Probed interface %s\n", net_dev->name);
 	return 0;
 
+err_dl_register:
+#ifdef CONFIG_DEBUG_FS
+	dpaa2_dbg_remove(priv);
+#endif
+	unregister_netdev(net_dev);
 err_netdev_reg:
 	dpaa2_eth_dl_port_del(priv);
 err_dl_port_add:
 	dpaa2_eth_dl_traps_unregister(priv);
 err_dl_trap_register:
 	dpaa2_eth_dl_free(priv);
-err_dl_register:
+err_dl_alloc:
 	dpaa2_eth_disconnect_mac(priv);
 err_connect_mac:
 	if (priv->do_link_poll)
