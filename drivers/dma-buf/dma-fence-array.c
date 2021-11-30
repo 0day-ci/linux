@@ -174,8 +174,18 @@ struct dma_fence_array *dma_fence_array_create(int num_fences,
 
 	fence->error = PENDING_ERROR;
 
-	if (signal_on_any)
+	set_bit(DMA_FENCE_FLAG_LOCK_RECURSIVE_BIT, &fence->flags);
+
+	if (signal_on_any) {
 		dma_fence_enable_sw_signaling(fence);
+	} else {
+		int i;
+
+		for (i = 0; i < num_fences; i++, fences++)
+			if (test_bit(DMA_FENCE_FLAG_LOCK_RECURSIVE_BIT,
+				     &(*fences)->flags))
+				dma_fence_enable_sw_signaling(*fences);
+	}
 
 	return array;
 }

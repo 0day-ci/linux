@@ -255,5 +255,14 @@ void dma_fence_chain_init(struct dma_fence_chain *chain,
 
 	dma_fence_init(&chain->base, &dma_fence_chain_ops,
 		       &chain->lock, context, seqno);
+
+	set_bit(DMA_FENCE_FLAG_LOCK_RECURSIVE_BIT, &chain->base.flags);
+	if (test_bit(DMA_FENCE_FLAG_LOCK_RECURSIVE_BIT, &fence->flags)) {
+		/*
+		 * Disable further calls into @fence's enable_signaling
+		 * To prohibit further recursive locking
+		 */
+		dma_fence_enable_sw_signaling(fence);
+	}
 }
 EXPORT_SYMBOL(dma_fence_chain_init);
