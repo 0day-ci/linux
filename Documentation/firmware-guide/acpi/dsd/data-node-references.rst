@@ -33,7 +33,7 @@ extension key.
 Example
 =======
 
-In the ASL snippet below, the "reference" _DSD property [2] contains a
+In the ASL snippet below, the "reference" _DSD property contains a
 device object reference to DEV0 and under that device object, a
 hierarchical data extension key "node@1" referring to the NOD1 object
 and lastly, a hierarchical data extension key "anothernode" referring to
@@ -89,10 +89,5 @@ Documentation/firmware-guide/acpi/dsd/graph.rst.
 References
 ==========
 
-[1] Hierarchical Data Extension UUID For _DSD.
-<https://www.uefi.org/sites/default/files/resources/_DSD-hierarchical-data-extension-UUID-v1.1.pdf>,
-referenced 2018-07-17.
-
-[2] Device Properties UUID For _DSD.
-<https://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf>,
-referenced 2016-10-04.
+[1] DSD Guide. https://github.com/UEFI/DSD-Guide/blob/main/dsd-guide.adoc,
+    referenced 2021-11-30.

@@ -11,10 +11,10 @@ Later, for connecting these PHYs to their respective MACs, the PHYs registered
 on the MDIO bus have to be referenced.
 
 This document introduces two _DSD properties that are to be used
-for connecting PHYs on the MDIO bus [3] to the MAC layer.
+for connecting PHYs on the MDIO bus [2] to the MAC layer.
 
 These properties are defined in accordance with the "Device
-Properties UUID For _DSD" [2] document and the
+Properties UUID For _DSD" [4] document and the
 daffd814-6eba-4d8c-8a91-bc9bbf4aa301 UUID must be used in the Device
 Data Descriptors containing them.
 
@@ -48,22 +48,22 @@ as device object references (e.g. \_SB.MDI0.PHY1).
 phy-mode
 --------
 The "phy-mode" _DSD property is used to describe the connection to
-the PHY. The valid values for "phy-mode" are defined in [4].
+the PHY. The valid values for "phy-mode" are defined in [3].
 
 managed
 -------
 Optional property, which specifies the PHY management type.
-The valid values for "managed" are defined in [4].
+The valid values for "managed" are defined in [3].
 
 fixed-link
 ----------
 The "fixed-link" is described by a data-only subnode of the
 MAC port, which is linked in the _DSD package via
 hierarchical data extension (UUID dbb8e3e6-5886-4ba6-8795-1319f52a966b
-in accordance with [5] "_DSD Implementation Guide" document).
+in accordance with [4] "_DSD Implementation Guide" document).
 The subnode should comprise a required property ("speed") and
 possibly the optional ones - complete list of parameters and
-their values are specified in [4].
+their values are specified in [3].
 
 The following ASL example illustrates the usage of these properties.
 
@@ -190,10 +190,9 @@ References
 
 [1] Documentation/networking/phy.rst
 
-[2] https://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf
+[2] Documentation/firmware-guide/acpi/DSD-properties-rules.rst
 
-[3] Documentation/firmware-guide/acpi/DSD-properties-rules.rst
+[3] Documentation/devicetree/bindings/net/ethernet-controller.yaml
 
-[4] Documentation/devicetree/bindings/net/ethernet-controller.yaml
-
-[5] https://github.com/UEFI/DSD-Guide/blob/main/dsd-guide.pdf
+[4] DSD Guide. https://github.com/UEFI/DSD-Guide/blob/main/dsd-guide.adoc,
+    referenced 2021-11-30.

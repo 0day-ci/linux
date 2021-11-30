@@ -5,7 +5,7 @@
 Describing and referring to LEDs in ACPI
 ========================================
 
-Individual LEDs are described by hierarchical data extension [6] nodes under the
+Individual LEDs are described by hierarchical data extension [5] nodes under the
 device node, the LED driver chip. The "reg" property in the LED specific nodes
 tells the numerical ID of each individual LED output to which the LEDs are
 connected. [3] The hierarchical data nodes are named "led@X", where X is the
@@ -17,7 +17,7 @@ documentation. In short, LEDs are directly referred to by using phandles.
 While Device tree allows referring to any node in the tree[1], in ACPI
 references are limited to device nodes only [2]. For this reason using the same
 mechanism on ACPI is not possible. A mechanism to refer to non-device ACPI nodes
-is documented in [7].
+is documented in [6].
 
 ACPI allows (as does DT) using integer arguments after the reference. A
 combination of the LED driver device reference and an integer argument,
@@ -90,22 +90,16 @@ where
 References
 ==========
 
-[1] Device tree. https://www.devicetree.org, referenced 2019-02-21.
+[1] Devicetree. https://www.devicetree.org, referenced 2019-02-21.
 
 [2] Advanced Configuration and Power Interface Specification.
-    https://uefi.org/sites/default/files/resources/ACPI_6_3_final_Jan30.pdf,
-    referenced 2019-02-21.
+    https://uefi.org/specifications/ACPI/6.4/, referenced 2021-11-30.
 
-[3] Documentation/devicetree/bindings/leds/common.txt
+[3] Documentation/devicetree/bindings/leds/common.yaml
 
-[4] Documentation/devicetree/bindings/media/video-interfaces.txt
+[4] Documentation/devicetree/bindings/media/video-interfaces.yaml
 
-[5] Device Properties UUID For _DSD.
-    https://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf,
-    referenced 2019-02-21.
+[5] DSD Guide. https://github.com/UEFI/DSD-Guide/blob/main/dsd-guide.adoc,
+    referenced 2021-11-30.
 
-[6] Hierarchical Data Extension UUID For _DSD.
-    https://www.uefi.org/sites/default/files/resources/_DSD-hierarchical-data-extension-UUID-v1.1.pdf,
-    referenced 2019-02-21.
-
-[7] Documentation/firmware-guide/acpi/dsd/data-node-references.rst
+[6] Documentation/firmware-guide/acpi/dsd/data-node-references.rst
