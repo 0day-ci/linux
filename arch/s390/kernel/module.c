@@ -44,7 +44,7 @@ void *module_alloc(unsigned long size)
 	p = __vmalloc_node_range(size, MODULE_ALIGN, MODULES_VADDR, MODULES_END,
 				 GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
 				 __builtin_return_address(0));
-	if (p && (kasan_module_alloc(p, size) < 0)) {
+	if (p && (kasan_alloc_module_shadow(p, size) < 0)) {
 		vfree(p);
 		return NULL;
 	}
