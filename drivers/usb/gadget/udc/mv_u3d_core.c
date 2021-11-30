@@ -417,6 +417,12 @@ static int mv_u3d_req_to_trb(struct mv_u3d_req *req)
 	 */
 	if (length <= (unsigned)MV_U3D_EP_MAX_LENGTH_TRANSFER) {
 		trb = mv_u3d_build_trb_one(req, &count, &dma);
+		if (!trb) {
+			dev_err(u3d->dev, "%s, mv_u3d_build_trb_one fail\n",
+				__func__);
+			return -ENOMEM;
+		}
+
 		list_add_tail(&trb->trb_list, &req->trb_list);
 		req->trb_head = trb;
 		req->trb_count = 1;
