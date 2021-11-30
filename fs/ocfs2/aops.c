@@ -1813,6 +1813,7 @@ try_again:
 	if (ret == -EAGAIN) {
 		BUG_ON(wc->w_target_page);
 		ret = 0;
+		*fsdata = wc;
 		goto out_quota;
 	}
 
