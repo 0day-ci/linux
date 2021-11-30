@@ -219,15 +219,15 @@ static void oops_end(unsigned long flags, struct pt_regs *regs,
 	raw_local_irq_restore(flags);
 
 	/*
-	 * system_reset_excption handles debugger, crash dump, panic, for 0x100
+	 * When system_reset_exception sets signr==0, it does not want crash
+	 * dump code to be called (it has already handled it).
 	 */
-	if (TRAP(regs) == INTERRUPT_SYSTEM_RESET)
-		return;
+	if (!(TRAP(regs) == INTERRUPT_SYSTEM_RESET && signr == 0)) {
+		crash_fadump(regs, "die oops");
 
-	crash_fadump(regs, "die oops");
-
-	if (kexec_should_crash(current))
-		crash_kexec(regs);
+		if (kexec_should_crash(current))
+			crash_kexec(regs);
+	}
 
 	if (!signr)
 		return;
@@ -287,7 +287,8 @@ void die(const char *str, struct pt_regs *regs, long err)
 	unsigned long flags;
 
 	/*
-	 * system_reset_excption handles debugger, crash dump, panic, for 0x100
+	 * When system_reset_exception calls die, it does not want the
+	 * debugger to be invoked (it has already handled it).
 	 */
 	if (TRAP(regs) != INTERRUPT_SYSTEM_RESET) {
 		if (debugger(regs))
@@ -462,8 +463,19 @@ DEFINE_INTERRUPT_HANDLER_NMI(system_reset_exception)
 
 	/* See if any machine dependent calls */
 	if (ppc_md.system_reset_exception) {
-		if (ppc_md.system_reset_exception(regs))
-			goto out;
+		if (ppc_md.system_reset_exception(regs)) {
+			/*
+			 * If this is unrecoverable, it will miss calling
+			 * the debugger due to the TRAP=0x100 logic in die(),
+			 * do it here.
+			 */
+			if (regs_is_unrecoverable(regs)) {
+				if (debugger(regs))
+					goto out;
+			} else {
+				goto out;
+			}
+		}
 	}
 
 	if (debugger(regs))
@@ -488,9 +500,10 @@ DEFINE_INTERRUPT_HANDLER_NMI(system_reset_exception)
 
 	/*
 	 * No debugger or crash dump registered, print logs then
-	 * panic.
+	 * panic. Pass 0 in the err argument to prevent the debugger
+	 * being invoked again, and to prevent die() from crashing.
 	 */
-	die("System Reset", regs, SIGABRT);
+	die("System Reset", regs, 0);
 
 	mdelay(2*MSEC_PER_SEC); /* Wait a little while for others to print */
 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
