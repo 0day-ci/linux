@@ -1375,6 +1375,20 @@ static int msm_pdev_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
+	switch (get_mdp_ver(pdev)) {
+	case KMS_MDP5:
+		ret = mdp5_mdss_early_init(&pdev->dev, priv);
+		break;
+	case KMS_DPU:
+		ret = dpu_mdss_early_init(&pdev->dev, priv);
+		break;
+	default:
+		ret = 0;
+		break;
+	}
+	if (ret)
+		return ret;
+
 	platform_set_drvdata(pdev, priv);
 
 	if (get_mdp_ver(pdev)) {
@@ -1407,6 +1421,12 @@ fail:
 
 static int msm_pdev_remove(struct platform_device *pdev)
 {
+	struct msm_drm_private *priv = platform_get_drvdata(pdev);
+
+	if (priv->mdss && priv->mdss->funcs)
+		priv->mdss->funcs->remove(priv->mdss);
+
+	priv->mdss = NULL;
 	component_master_del(&pdev->dev, &msm_drm_ops);
 	of_platform_depopulate(&pdev->dev);
 
@@ -1418,7 +1438,7 @@ static void msm_pdev_shutdown(struct platform_device *pdev)
 	struct msm_drm_private *priv = platform_get_drvdata(pdev);
 	struct drm_device *drm = priv ? priv->dev : NULL;
 
-	if (!priv || !priv->kms)
+	if (!priv || !priv->kms || !drm->mode_config.funcs)
 		return;
 
 	drm_atomic_helper_shutdown(drm);
