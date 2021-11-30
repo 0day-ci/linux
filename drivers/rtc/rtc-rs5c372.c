@@ -30,6 +30,8 @@
 #define RS5C372_REG_TRIM	7
 #	define RS5C372_TRIM_XSL		0x80
 #	define RS5C372_TRIM_MASK	0x7F
+#	define RS5C372_TRIM_DEV		(1 << 7)
+#	define RS5C372_TRIM_DECR	(1 << 6)
 
 #define RS5C_REG_ALARM_A_MIN	8			/* or ALARM_W */
 #define RS5C_REG_ALARM_A_HOURS	9
@@ -485,6 +487,82 @@ static int rs5c372_rtc_proc(struct device *dev, struct seq_file *seq)
 #define	rs5c372_rtc_proc	NULL
 #endif
 
+static int rs5c372_read_offset(struct device *dev, long *offset)
+{
+	struct rs5c372 *rs5c = i2c_get_clientdata(to_i2c_client(dev));
+	int addr = RS5C_ADDR(RS5C372_REG_TRIM);
+	unsigned char val = i2c_smbus_read_byte_data(rs5c->client, addr);
+	long ppb_per_step = (val & RS5C372_TRIM_DEV) ? 1017 : 3052;
+	unsigned char decr = val & RS5C372_TRIM_DECR;
+
+	/* Only bits[0:5] repsents the time counts */
+	val &= 0x3F;
+
+	/* If bits[1:5] are all 0, it means no increment or decrement */
+	if (!(val & 0x3E)) {
+		*offset = 0;
+	} else {
+		if (decr)
+			*offset = -(((~val) & 0x3F) + 1) * ppb_per_step;
+		else
+			*offset = (val - 1) * ppb_per_step;
+	}
+
+	return 0;
+}
+
+static int rs5c372_set_offset(struct device *dev, long offset)
+{
+	struct rs5c372 *rs5c = i2c_get_clientdata(to_i2c_client(dev));
+	int addr = RS5C_ADDR(RS5C372_REG_TRIM);
+	unsigned char val = RS5C372_TRIM_DEV;
+	long steps = 0;
+
+	/*
+	 * Check if it is possible to use high resolution mode (DEV=1). In this
+	 * mode, the minimum resolution is 2 / (32768 * 20 * 3), which is about
+	 * 1017 ppb
+	 */
+	steps = DIV_ROUND_CLOSEST(offset, 1017);
+	if (steps > 0x3E || steps < -0x3E) {
+		/*
+		 * offset is out of the range of high resolution mode. Try to
+		 * use low resolution mode (DEV=0). In this mode, the minimum
+		 * resolution is 2 / (32768 * 20), which is about 3052 ppb.
+		 */
+		val &= ~RS5C372_TRIM_DEV;
+		steps = DIV_ROUND_CLOSEST(offset, 3052);
+
+		if (steps > 0x3E || steps < -0x3E)
+			return -ERANGE;
+	}
+
+	if (steps > 0) {
+		val |= steps + 1;
+	} else {
+		val |= RS5C372_TRIM_DECR;
+		val |= (~(-steps - 1)) & 0x3F;
+	}
+
+	if (!steps || !(val & 0x3E)) {
+		/*
+		 * if offset is too small, set oscillation adjustment register
+		 * with the default values, which means no increment or
+		 * decrement.
+		 */
+		val = 0;
+	}
+
+	dev_dbg(&rs5c->client->dev, "write 0x%x for offset %ld\n", val, offset);
+
+	if (i2c_smbus_write_byte_data(rs5c->client, addr, val) < 0) {
+		dev_err(&rs5c->client->dev, "failed to write 0x%x to reg %d\n", val, addr);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 static const struct rtc_class_ops rs5c372_rtc_ops = {
 	.proc		= rs5c372_rtc_proc,
 	.read_time	= rs5c372_rtc_read_time,
@@ -492,6 +570,8 @@ static const struct rtc_class_ops rs5c372_rtc_ops = {
 	.read_alarm	= rs5c_read_alarm,
 	.set_alarm	= rs5c_set_alarm,
 	.alarm_irq_enable = rs5c_rtc_alarm_irq_enable,
+	.read_offset    = rs5c372_read_offset,
+	.set_offset     = rs5c372_set_offset,
 };
 
 #if IS_ENABLED(CONFIG_RTC_INTF_SYSFS)
