@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/crypto/xlnx,zynqmp-sha3.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Xilinx ZynqMP SHA3 Hardware Accelerator Device Tree Bindings
+
+maintainers:
+  - Harsha Harsha<harsha.harsha@xilinx.com>
+
+description: |
+  The ZynqMP SHA3 hardened cryptographic accelerator is used to
+  calculate the SHA3 hash for the given user data.
+
+properties:
+  compatible:
+    const: xlnx,zynqmp-sha3-384
+
+required:
+  - compatible
+
+additionalProperties: false
+
+examples:
+  - |
+    xlnx_sha3_384: sha3-384 {
+      compatible = "xlnx,zynqmp-sha3-384";
+    };
+...
