@@ -787,6 +787,19 @@ static inline bool blk_mq_add_to_batch(struct request *req,
 	return true;
 }
 
+/*
+ * If the queue has allocated & used srcu to quiesce queue, quiesce wait is
+ * done via the synchronize_srcu(q->rcu), otherwise it can be done via
+ * shared synchronize_rcu() from other request queues in same host wide.
+ *
+ * This helper can help us to support quiescing queue in parallel, so just
+ * one quiesce wait is enough if shared quiesce wait is allowed.
+ */
+static inline bool blk_mq_shared_quiesce_wait(struct request_queue *q)
+{
+	return !blk_queue_has_srcu(q);
+}
+
 void blk_mq_requeue_request(struct request *rq, bool kick_requeue_list);
 void blk_mq_kick_requeue_list(struct request_queue *q);
 void blk_mq_delay_kick_requeue_list(struct request_queue *q, unsigned long msecs);
