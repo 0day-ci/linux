@@ -14,11 +14,14 @@
 #define FASTRPC_IOCTL_MUNMAP		_IOWR('R', 7, struct fastrpc_req_munmap)
 #define FASTRPC_IOCTL_INIT_ATTACH_SNS	_IO('R', 8)
 
+/* Fastrpc attribute for memory protection of buffers */
+#define FASTRPC_SECUREMAP (1)
+
 struct fastrpc_invoke_args {
 	__u64 ptr;
 	__u64 length;
 	__s32 fd;
-	__u32 reserved;
+	__u32 attr;
 };
 
 struct fastrpc_invoke {
