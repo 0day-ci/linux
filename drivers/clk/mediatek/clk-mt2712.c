@@ -1266,6 +1266,8 @@ static int clk_mt2712_apmixed_probe(struct platform_device *pdev)
 	clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
 
 	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
+	if (!clk_data)
+		return -ENOMEM;
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 
