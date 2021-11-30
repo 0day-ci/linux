@@ -475,8 +475,14 @@ void kasan_release_vmalloc(unsigned long start, unsigned long end,
 	}
 }
 
-void *__kasan_unpoison_vmalloc(const void *start, unsigned long size)
+void *__kasan_unpoison_vmalloc(const void *start, unsigned long size,
+				bool vm_alloc)
 {
+	/*
+	 * As software tag-based KASAN tags both VM_ALLOC and non-VM_ALLOC
+	 * mappings, the vm_alloc argument is ignored.
+	 */
+
 	if (!is_vmalloc_or_module_addr(start))
 		return (void *)start;
 
