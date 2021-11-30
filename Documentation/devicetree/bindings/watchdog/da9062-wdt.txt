@@ -10,6 +10,9 @@ Optional properties:
 - dlg,use-sw-pm: Add this property to disable the watchdog during suspend.
 	Only use this option if you can't use the watchdog automatic suspend
 	function during a suspend (see register CONTROL_B).
+- dlg,wdt-sd: Set what happens on watchdog timeout. If this bit is set the
+	watchdog timeout triggers SHUTDOWN, if cleared the watchdog triggers
+	POWERDOWN. Can be 0 or 1.
 
 Example: DA9062
 
