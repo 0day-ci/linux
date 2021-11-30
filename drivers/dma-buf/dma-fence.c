@@ -609,6 +609,37 @@ void dma_fence_enable_sw_signaling(struct dma_fence *fence)
 }
 EXPORT_SYMBOL(dma_fence_enable_sw_signaling);
 
+static int __dma_fence_add_callback(struct dma_fence *fence,
+				    struct dma_fence_cb *cb,
+				    dma_fence_func_t func,
+				    int nest_level)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	if (WARN_ON(!fence || !func))
+		return -EINVAL;
+
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		INIT_LIST_HEAD(&cb->node);
+		return -ENOENT;
+	}
+
+	spin_lock_irqsave_nested(fence->lock, flags, 0);
+
+	if (__dma_fence_enable_signaling(fence)) {
+		cb->func = func;
+		list_add_tail(&cb->node, &fence->cb_list);
+	} else {
+		INIT_LIST_HEAD(&cb->node);
+		ret = -ENOENT;
+	}
+
+	spin_unlock_irqrestore(fence->lock, flags);
+
+	return ret;
+}
+
 /**
  * dma_fence_add_callback - add a callback to be called when the fence
  * is signaled
@@ -637,32 +668,32 @@ EXPORT_SYMBOL(dma_fence_enable_sw_signaling);
 int dma_fence_add_callback(struct dma_fence *fence, struct dma_fence_cb *cb,
 			   dma_fence_func_t func)
 {
-	unsigned long flags;
-	int ret = 0;
-
-	if (WARN_ON(!fence || !func))
-		return -EINVAL;
-
-	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-		INIT_LIST_HEAD(&cb->node);
-		return -ENOENT;
-	}
-
-	spin_lock_irqsave(fence->lock, flags);
-
-	if (__dma_fence_enable_signaling(fence)) {
-		cb->func = func;
-		list_add_tail(&cb->node, &fence->cb_list);
-	} else {
-		INIT_LIST_HEAD(&cb->node);
-		ret = -ENOENT;
-	}
-
-	spin_unlock_irqrestore(fence->lock, flags);
-
-	return ret;
+	return __dma_fence_add_callback(fence, cb, func, 0);
 }
 EXPORT_SYMBOL(dma_fence_add_callback);
+
+/**
+ * dma_fence_add_callback_nested - add a callback from within a fence locked
+ * section to be called when the fence is signaled
+ * @fence: the fence to wait on
+ * @cb: the callback to register
+ * @func: the function to call
+ *
+ * This function is identical to dma_fence_add_callback() except it is
+ * intended to be used from within a section where the fence lock of
+ * another fence might be locked, and where it is guaranteed that
+ * other fence will signal _after_ @fence.
+ *
+ * Returns 0 in case of success, -ENOENT if the fence is already signaled
+ * and -EINVAL in case of error.
+ */
+int dma_fence_add_callback_nested(struct dma_fence *fence,
+				  struct dma_fence_cb *cb,
+				  dma_fence_func_t func)
+{
+	return __dma_fence_add_callback(fence, cb, func, SINGLE_DEPTH_NESTING);
+}
+EXPORT_SYMBOL(dma_fence_add_callback_nested);
 
 /**
  * dma_fence_get_status - returns the status upon completion

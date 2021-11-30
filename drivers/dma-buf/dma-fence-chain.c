@@ -152,7 +152,8 @@ static bool dma_fence_chain_enable_signaling(struct dma_fence *fence)
 		struct dma_fence *f = chain ? chain->fence : fence;
 
 		dma_fence_get(f);
-		if (!dma_fence_add_callback(f, &head->cb, dma_fence_chain_cb)) {
+		if (!dma_fence_add_callback_nested(f, &head->cb,
+						   dma_fence_chain_cb)) {
 			dma_fence_put(fence);
 			return true;
 		}

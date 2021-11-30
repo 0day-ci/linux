@@ -84,8 +84,8 @@ static bool dma_fence_array_enable_signaling(struct dma_fence *fence)
 		 * insufficient).
 		 */
 		dma_fence_get(&array->base);
-		if (dma_fence_add_callback(array->fences[i], &cb[i].cb,
-					   dma_fence_array_cb_func)) {
+		if (dma_fence_add_callback_nested(array->fences[i], &cb[i].cb,
+						  dma_fence_array_cb_func)) {
 			int error = array->fences[i]->error;
 
 			dma_fence_array_set_pending_error(array, error);
@@ -154,6 +154,7 @@ struct dma_fence_array *dma_fence_array_create(int num_fences,
 {
 	struct dma_fence_array *array;
 	size_t size = sizeof(*array);
+	struct dma_fence *fence;
 
 	/* Allocate the callback structures behind the array. */
 	size += num_fences * sizeof(struct dma_fence_array_cb);
@@ -161,8 +162,9 @@ struct dma_fence_array *dma_fence_array_create(int num_fences,
 	if (!array)
 		return NULL;
 
+	fence = &array->base;
 	spin_lock_init(&array->lock);
-	dma_fence_init(&array->base, &dma_fence_array_ops, &array->lock,
+	dma_fence_init(fence, &dma_fence_array_ops, &array->lock,
 		       context, seqno);
 	init_irq_work(&array->work, irq_dma_fence_array_work);
 
@@ -170,7 +172,10 @@ struct dma_fence_array *dma_fence_array_create(int num_fences,
 	atomic_set(&array->num_pending, signal_on_any ? 1 : num_fences);
 	array->fences = fences;
 
-	array->base.error = PENDING_ERROR;
+	fence->error = PENDING_ERROR;
+
+	if (signal_on_any)
+		dma_fence_enable_sw_signaling(fence);
 
 	return array;
 }
