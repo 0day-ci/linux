@@ -1238,9 +1238,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 #endif
 	opipe = get_pipe_info(out.file, true);
 	if (!opipe) {
-		retval = rw_verify_area(WRITE, out.file, &out_pos, count);
-		if (retval < 0)
-			goto fput_out;
 		file_start_write(out.file);
 		retval = do_splice_direct(in.file, &pos, out.file, &out_pos,
 					  count, fl);
