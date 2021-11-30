@@ -116,7 +116,7 @@ __unsafe_restore_general_regs(struct pt_regs *regs, struct mcontext __user *sr)
 	int i;
 
 	for (i = 0; i <= PT_RESULT; i++) {
-		if ((i == PT_MSR) || (i == PT_SOFTE))
+		if ((i == PT_NIP) || (i == PT_MSR) || (i == PT_SOFTE))
 			continue;
 		unsafe_get_user(gregs[i], &sr->mc_gregs[i], failed);
 	}
@@ -156,7 +156,7 @@ static __always_inline
 int __unsafe_restore_general_regs(struct pt_regs *regs, struct mcontext __user *sr)
 {
 	/* copy up to but not including MSR */
-	unsafe_copy_from_user(regs, &sr->mc_gregs, PT_MSR * sizeof(elf_greg_t), failed);
+	unsafe_copy_from_user(regs, &sr->mc_gregs, PT_NIP * sizeof(elf_greg_t), failed);
 
 	/* copy from orig_r3 (the word after the MSR) up to the end */
 	unsafe_copy_from_user(&regs->orig_gpr3, &sr->mc_gregs[PT_ORIG_R3],
@@ -458,7 +458,7 @@ static long restore_user_regs(struct pt_regs *regs,
 			      struct mcontext __user *sr, int sig)
 {
 	unsigned int save_r2 = 0;
-	unsigned long msr;
+	unsigned long nip, msr;
 #ifdef CONFIG_VSX
 	int i;
 #endif
@@ -473,6 +473,9 @@ static long restore_user_regs(struct pt_regs *regs,
 		save_r2 = (unsigned int)regs->gpr[2];
 	unsafe_restore_general_regs(regs, sr, failed);
 	set_trap_norestart(regs);
+	unsafe_get_user(nip, &sr->mc_gregs[PT_NIP], failed);
+	nip &= ~3UL;
+	regs_set_return_ip(regs, nip);
 	unsafe_get_user(msr, &sr->mc_gregs[PT_MSR], failed);
 	if (!sig)
 		regs->gpr[2] = (unsigned long) save_r2;
@@ -560,7 +563,7 @@ static long restore_tm_user_regs(struct pt_regs *regs,
 				 struct mcontext __user *sr,
 				 struct mcontext __user *tm_sr)
 {
-	unsigned long msr, msr_hi;
+	unsigned long nip, msr, msr_hi;
 	int i;
 
 	if (tm_suspend_disabled)
@@ -576,7 +579,9 @@ static long restore_tm_user_regs(struct pt_regs *regs,
 		return 1;
 
 	unsafe_restore_general_regs(&current->thread.ckpt_regs, sr, failed);
-	unsafe_get_user(current->thread.tm_tfhar, &sr->mc_gregs[PT_NIP], failed);
+	unsafe_get_user(nip, &sr->mc_gregs[PT_NIP], failed);
+	nip &= ~3UL;
+	current->thread.tm_tfhar = nip;
 	unsafe_get_user(msr, &sr->mc_gregs[PT_MSR], failed);
 
 	/* Restore the previous little-endian mode */
@@ -645,6 +650,10 @@ static long restore_tm_user_regs(struct pt_regs *regs,
 		unsafe_copy_vsx_from_user(current, &tm_sr->mc_vsregs, failed);
 		current->thread.used_vsr = true;
 	}
+
+	unsafe_get_user(nip, &tm_sr->mc_gregs[PT_NIP], failed);
+	nip &= ~3UL;
+	regs_set_return_ip(regs, nip);
 
 	/* Get the top half of the MSR from the user context */
 	unsafe_get_user(msr_hi, &tm_sr->mc_gregs[PT_MSR], failed);
@@ -801,7 +810,7 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 	regs->gpr[4] = (unsigned long)&frame->info;
 	regs->gpr[5] = (unsigned long)&frame->uc;
 	regs->gpr[6] = (unsigned long)frame;
-	regs_set_return_ip(regs, (unsigned long) ksig->ka.sa.sa_handler);
+	regs_set_return_ip(regs, (unsigned long) ksig->ka.sa.sa_handler & ~3UL);
 	/* enter the signal handler in native-endian mode */
 	regs_set_return_msr(regs, (regs->msr & ~MSR_LE) | (MSR_KERNEL & MSR_LE));
 
@@ -889,7 +898,7 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset,
 	regs->gpr[1] = newsp;
 	regs->gpr[3] = ksig->sig;
 	regs->gpr[4] = (unsigned long) sc;
-	regs_set_return_ip(regs, (unsigned long) ksig->ka.sa.sa_handler);
+	regs_set_return_ip(regs, (unsigned long) ksig->ka.sa.sa_handler & ~3UL);
 	/* enter the signal handler in native-endian mode */
 	regs_set_return_msr(regs, (regs->msr & ~MSR_LE) | (MSR_KERNEL & MSR_LE));
 

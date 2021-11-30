@@ -336,7 +336,7 @@ static long notrace __unsafe_restore_sigcontext(struct task_struct *tsk, sigset_
 	elf_vrreg_t __user *v_regs;
 #endif
 	unsigned long save_r13 = 0;
-	unsigned long msr;
+	unsigned long nip, msr;
 	struct pt_regs *regs = tsk->thread.regs;
 #ifdef CONFIG_VSX
 	int i;
@@ -350,7 +350,9 @@ static long notrace __unsafe_restore_sigcontext(struct task_struct *tsk, sigset_
 
 	/* copy the GPRs */
 	unsafe_copy_from_user(regs->gpr, sc->gp_regs, sizeof(regs->gpr), efault_out);
-	unsafe_get_user(regs->nip, &sc->gp_regs[PT_NIP], efault_out);
+	unsafe_get_user(nip, &sc->gp_regs[PT_NIP], efault_out);
+	nip &= ~3UL;
+	regs_set_return_ip(regs, nip);
 	/* get MSR separately, transfer the LE bit if doing signal return */
 	unsafe_get_user(msr, &sc->gp_regs[PT_MSR], efault_out);
 	if (sig)
@@ -434,7 +436,7 @@ static long restore_tm_sigcontexts(struct task_struct *tsk,
 	elf_vrreg_t __user *v_regs, *tm_v_regs;
 #endif
 	unsigned long err = 0;
-	unsigned long msr;
+	unsigned long nip, msr;
 	struct pt_regs *regs = tsk->thread.regs;
 #ifdef CONFIG_VSX
 	int i;
@@ -458,8 +460,13 @@ static long restore_tm_sigcontexts(struct task_struct *tsk,
 	 * For the case of getting a signal and simply returning from it,
 	 * we don't need to re-copy them here.
 	 */
-	err |= __get_user(regs->nip, &tm_sc->gp_regs[PT_NIP]);
-	err |= __get_user(tsk->thread.tm_tfhar, &sc->gp_regs[PT_NIP]);
+	err |= __get_user(nip, &tm_sc->gp_regs[PT_NIP]);
+	nip &= ~3UL;
+	regs_set_return_ip(regs, nip);
+
+	err |= __get_user(nip, &sc->gp_regs[PT_NIP]);
+	nip &= ~3UL;
+	tsk->thread.tm_tfhar = nip;
 
 	/* get MSR separately, transfer the LE bit if doing signal return */
 	err |= __get_user(msr, &sc->gp_regs[PT_MSR]);
