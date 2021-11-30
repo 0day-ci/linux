@@ -36,6 +36,8 @@ device drivers and their description must be added to the following table:
      - Description
    * - ``physical_ports``
      - A limited capacity of physical ports that the switch ASIC can support
+   * - ``io_eq_size``
+     - Control the size of I/O completion EQs
 
 example usage
 -------------
