@@ -2953,15 +2953,15 @@ scsi_host_block(struct Scsi_Host *shost)
 		}
 	}
 
-	/*
-	 * SCSI never enables blk-mq's BLK_MQ_F_BLOCKING flag so
-	 * calling synchronize_rcu() once is enough.
-	 */
-	WARN_ON_ONCE(shost->tag_set.flags & BLK_MQ_F_BLOCKING);
+	if (!ret) {
+		shost_for_each_device(sdev, shost) {
+			struct request_queue *q = sdev->request_queue;
 
-	if (!ret)
-		synchronize_rcu();
-
+			blk_mq_wait_quiesce_done(q);
+			if (blk_mq_shared_quiesce_wait(q))
+				break;
+		}
+	}
 	return ret;
 }
 EXPORT_SYMBOL_GPL(scsi_host_block);
