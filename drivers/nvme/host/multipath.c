@@ -862,6 +862,7 @@ int nvme_mpath_init_identify(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 			"ANA log page size (%zd) larger than MDTS (%zd).\n",
 			ana_log_size, max_transfer_size);
 		dev_err(ctrl->device, "disabling ANA support.\n");
+		error = -EINVAL;
 		goto out_uninit;
 	}
 	if (ana_log_size > ctrl->ana_log_size) {
