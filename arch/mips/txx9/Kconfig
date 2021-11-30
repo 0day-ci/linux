@@ -66,14 +66,6 @@ config SOC_TX4938
 	select GPIO_TXX9
 	imply HAS_TXX9_ACLC
 
-config SOC_TX4939
-	bool
-	select CEVT_TXX9
-	imply HAS_TXX9_SERIAL
-	select HAVE_PCI
-	select PCI_TX4927
-	imply HAS_TXX9_ACLC
-
 config TOSHIBA_FPCIB0
 	bool "FPCIB0 Backplane Support"
 	depends on PCI && MACH_TXX9
