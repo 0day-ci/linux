@@ -653,6 +653,8 @@ static int mtk_infrasys_init(struct platform_device *pdev)
 
 	mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
 			       clk_data);
+	if (!clk_data)
+		return -ENOMEM;
 
 	mtk_clk_register_cpumuxes(node, infra_muxes, ARRAY_SIZE(infra_muxes),
 				  clk_data);
