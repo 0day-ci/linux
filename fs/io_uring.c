@@ -5041,7 +5041,7 @@ static int io_send(struct io_kiocb *req, unsigned int issue_flags)
 	return 0;
 }
 
-#define IO_SENDZC_VALID_FLAGS IORING_SENDZC_FLUSH
+#define IO_SENDZC_VALID_FLAGS (IORING_SENDZC_FLUSH | IORING_SENDZC_FIXED_BUF)
 
 static int io_sendzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
@@ -5071,6 +5071,15 @@ static int io_sendzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	if (req->msgzc.zc_flags & ~IO_SENDZC_VALID_FLAGS)
 		return -EINVAL;
 
+	if (req->msgzc.zc_flags & IORING_SENDZC_FIXED_BUF) {
+		idx = READ_ONCE(sqe->buf_index);
+		if (unlikely(idx >= ctx->nr_user_bufs))
+			return -EFAULT;
+		idx = array_index_nospec(idx, ctx->nr_user_bufs);
+		req->imu = READ_ONCE(ctx->user_bufs[idx]);
+		io_req_set_rsrc_node(req, ctx);
+	}
+
 #ifdef CONFIG_COMPAT
 	if (req->ctx->compat)
 		sr->msg_flags |= MSG_CMSG_COMPAT;
@@ -5094,7 +5103,13 @@ static int io_sendzc(struct io_kiocb *req, unsigned int issue_flags)
 	if (unlikely(!sock))
 		return -ENOTSOCK;
 
-	ret = import_single_range(WRITE, sr->buf, sr->len, &iov, &msg.msg_iter);
+	if (req->msgzc.zc_flags & IORING_SENDZC_FIXED_BUF) {
+		ret = __io_import_fixed(WRITE, &msg.msg_iter, req->imu,
+					(u64)sr->buf, sr->len);
+	} else {
+		ret = import_single_range(WRITE, sr->buf, sr->len, &iov,
+					  &msg.msg_iter);
+	}
 	if (unlikely(ret))
 		return ret;
 
