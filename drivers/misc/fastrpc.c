@@ -353,7 +353,7 @@ static void fastrpc_context_free(struct kref *ref)
 	ctx = container_of(ref, struct fastrpc_invoke_ctx, refcount);
 	cctx = ctx->cctx;
 
-	for (i = 0; i < ctx->nscalars; i++)
+	for (i = 0; i < ctx->nbufs; i++)
 		fastrpc_map_put(ctx->maps[i]);
 
 	if (ctx->buf)
@@ -785,6 +785,7 @@ static int fastrpc_get_args(u32 kernel, struct fastrpc_invoke_ctx *ctx)
 	err = fastrpc_buf_alloc(ctx->fl, dev, pkt_size, &ctx->buf);
 	if (err)
 		return err;
+	memset(ctx->buf->virt, 0, pkt_size);
 
 	rpra = ctx->buf->virt;
 	list = ctx->buf->virt + ctx->nscalars * sizeof(*rpra);
@@ -887,9 +888,19 @@ static int fastrpc_put_args(struct fastrpc_invoke_ctx *ctx,
 			    u32 kernel)
 {
 	struct fastrpc_remote_arg *rpra = ctx->rpra;
-	int i, inbufs;
+	struct fastrpc_map *mmap = NULL;
+	struct fastrpc_invoke_buf *list;
+	struct fastrpc_phy_page *pages;
+	u64 *fdlist;
+	int i, inbufs, outbufs, handles;
 
 	inbufs = REMOTE_SCALARS_INBUFS(ctx->sc);
+	outbufs = REMOTE_SCALARS_OUTBUFS(ctx->sc);
+	handles = REMOTE_SCALARS_INHANDLES(ctx->sc) + REMOTE_SCALARS_OUTHANDLES(ctx->sc);
+	list = ctx->buf->virt + ctx->nscalars * sizeof(*rpra);
+	pages = ctx->buf->virt + ctx->nscalars * (sizeof(*list) +
+		sizeof(*rpra));
+	fdlist = (uint64_t *)(pages + inbufs + outbufs + handles);
 
 	for (i = inbufs; i < ctx->nbufs; ++i) {
 		if (!ctx->maps[i]) {
@@ -904,6 +915,13 @@ static int fastrpc_put_args(struct fastrpc_invoke_ctx *ctx,
 				memcpy(dst, src, len);
 			}
 		}
+	}
+
+	for (i = 0; i < FASTRPC_MAX_FDLIST; i++) {
+		if (!fdlist[i])
+			break;
+		if (!fastrpc_map_find(fl, (int)fdlist[i], &mmap))
+			fastrpc_map_put(mmap);
 	}
 
 	return 0;
