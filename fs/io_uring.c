@@ -608,6 +608,7 @@ struct io_sendzc {
 	int				msg_flags;
 	int				addr_len;
 	void __user			*addr;
+	unsigned int			zc_flags;
 };
 
 struct io_open {
@@ -1982,6 +1983,12 @@ static void io_uring_tx_zerocopy_callback(struct sk_buff *skb,
 	} else {
 		io_zc_tx_work_callback(&notifier->commit_work);
 	}
+}
+
+static void io_tx_kill_notification(struct io_tx_ctx *tx_ctx)
+{
+	io_uring_tx_zerocopy_callback(NULL, &tx_ctx->notifier->uarg, true);
+	tx_ctx->notifier = NULL;
 }
 
 static struct io_tx_notifier *io_alloc_tx_notifier(struct io_ring_ctx *ctx,
@@ -5034,6 +5041,8 @@ static int io_send(struct io_kiocb *req, unsigned int issue_flags)
 	return 0;
 }
 
+#define IO_SENDZC_VALID_FLAGS IORING_SENDZC_FLUSH
+
 static int io_sendzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_ring_ctx *ctx = req->ctx;
@@ -5041,8 +5050,6 @@ static int io_sendzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	unsigned int idx;
 
 	if (unlikely(req->ctx->flags & IORING_SETUP_IOPOLL))
-		return -EINVAL;
-	if (READ_ONCE(sqe->ioprio))
 		return -EINVAL;
 
 	sr->buf = u64_to_user_ptr(READ_ONCE(sqe->addr));
@@ -5059,6 +5066,10 @@ static int io_sendzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 
 	sr->addr = u64_to_user_ptr(READ_ONCE(sqe->addr2));
 	sr->addr_len = READ_ONCE(sqe->__pad2[0]);
+
+	req->msgzc.zc_flags = READ_ONCE(sqe->ioprio);
+	if (req->msgzc.zc_flags & ~IO_SENDZC_VALID_FLAGS)
+		return -EINVAL;
 
 #ifdef CONFIG_COMPAT
 	if (req->ctx->compat)
@@ -5082,6 +5093,7 @@ static int io_sendzc(struct io_kiocb *req, unsigned int issue_flags)
 	sock = sock_from_file(req->file);
 	if (unlikely(!sock))
 		return -ENOTSOCK;
+
 	ret = import_single_range(WRITE, sr->buf, sr->len, &iov, &msg.msg_iter);
 	if (unlikely(ret))
 		return ret;
@@ -5121,6 +5133,8 @@ static int io_sendzc(struct io_kiocb *req, unsigned int issue_flags)
 		if (ret == -ERESTARTSYS)
 			ret = -EINTR;
 		req_set_fail(req);
+	} else if (req->msgzc.zc_flags & IORING_SENDZC_FLUSH) {
+		io_tx_kill_notification(req->msgzc.tx_ctx);
 	}
 	io_ring_submit_unlock(ctx, issue_flags & IO_URING_F_UNLOCKED);
 	__io_req_complete(req, issue_flags, ret, 0);
@@ -9418,11 +9432,9 @@ static void io_sqe_tx_ctx_kill_ubufs(struct io_ring_ctx *ctx)
 
 	for (i = 0; i < ctx->nr_tx_ctxs; i++) {
 		tx_ctx = &ctx->tx_ctxs[i];
-		if (!tx_ctx->notifier)
-			continue;
-		io_uring_tx_zerocopy_callback(NULL, &tx_ctx->notifier->uarg,
-					      true);
-		tx_ctx->notifier = NULL;
+
+		if (tx_ctx->notifier)
+			io_tx_kill_notification(tx_ctx);
 	}
 }
 

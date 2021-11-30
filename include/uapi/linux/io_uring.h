@@ -187,6 +187,10 @@ enum {
 #define IORING_POLL_UPDATE_EVENTS	(1U << 1)
 #define IORING_POLL_UPDATE_USER_DATA	(1U << 2)
 
+enum {
+	IORING_SENDZC_FLUSH		= (1U << 0),
+};
+
 /*
  * IO completion data structure (Completion Queue Entry)
  */
