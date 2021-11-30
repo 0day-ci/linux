@@ -4540,9 +4540,7 @@ static void nvme_start_ns_queue(struct nvme_ns *ns)
 static void nvme_stop_ns_queue(struct nvme_ns *ns)
 {
 	if (!test_and_set_bit(NVME_NS_STOPPED, &ns->flags))
-		blk_mq_quiesce_queue(ns->queue);
-	else
-		blk_mq_wait_quiesce_done(ns->queue);
+		blk_mq_quiesce_queue_nowait(ns->queue);
 }
 
 /*
@@ -4643,6 +4641,11 @@ void nvme_stop_queues(struct nvme_ctrl *ctrl)
 	down_read(&ctrl->namespaces_rwsem);
 	list_for_each_entry(ns, &ctrl->namespaces, list)
 		nvme_stop_ns_queue(ns);
+	list_for_each_entry(ns, &ctrl->namespaces, list) {
+		blk_mq_wait_quiesce_done(ns->queue);
+		if (blk_mq_shared_quiesce_wait(ns->queue))
+			break;
+	}
 	up_read(&ctrl->namespaces_rwsem);
 }
 EXPORT_SYMBOL_GPL(nvme_stop_queues);
