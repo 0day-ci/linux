@@ -33,6 +33,7 @@ ignore define LIRC_CAN_SET_REC_DUTY_CYCLE
 # Obsolete ioctls
 
 ignore ioctl LIRC_GET_LENGTH
+ignore ioctl LIRC_SET_REC_TIMEOUT_REPORTS
 
 # rc protocols
 
