@@ -428,9 +428,8 @@ config THP_SWAP
 # UP and nommu archs use km based percpu allocator
 #
 config NEED_PER_CPU_KM
-	depends on !SMP
 	bool
-	default y
+	default !SMP || !MMU
 
 config CLEANCACHE
 	bool "Enable cleancache driver to cache clean pages if tmem is present"
