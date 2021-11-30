@@ -688,6 +688,13 @@ int radeon_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 			 * virtual address space */
 			vm->ib_bo_va = radeon_vm_bo_add(rdev, vm,
 							rdev->ring_tmp_bo.bo);
+			if (!vm->ib_bo_va) {
+				r = -ENOMEM;
+				radeon_vm_fini(rdev, vm);
+				kfree(fpriv);
+				goto out_suspend;
+			}
+
 			r = radeon_vm_bo_set_addr(rdev, vm->ib_bo_va,
 						  RADEON_VA_IB_OFFSET,
 						  RADEON_VM_PAGE_READABLE |
