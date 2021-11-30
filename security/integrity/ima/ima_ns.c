@@ -16,6 +16,7 @@
 #include <linux/mount.h>
 #include <linux/proc_ns.h>
 #include <linux/lsm_hooks.h>
+#include <linux/user_namespace.h>
 
 #include "ima.h"
 
@@ -63,6 +64,11 @@ struct ima_namespace *copy_ima_ns(struct ima_namespace *old_ns,
 {
 	return create_ima_ns(user_ns);
 }
+
+void ima_ns_userns_early_teardown(struct ima_namespace *ns)
+{
+}
+EXPORT_SYMBOL(ima_ns_userns_early_teardown);
 
 static void destroy_ima_ns(struct ima_namespace *ns)
 {
