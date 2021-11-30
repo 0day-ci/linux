@@ -139,6 +139,8 @@ struct ns_status {
 /* Internal IMA function definitions */
 int ima_init(void);
 int ima_fs_init(void);
+int ima_fs_ns_init(struct ima_namespace *ns);
+void ima_fs_ns_free(struct ima_namespace *ns);
 int ima_add_template_entry(struct ima_namespace *ns,
 			   struct ima_template_entry *entry, int violation,
 			   const char *op, struct inode *inode,

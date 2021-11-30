@@ -20,6 +20,8 @@
 
 int ima_init_namespace(struct ima_namespace *ns)
 {
+	int rc = 0;
+
 	ns->ns_status_tree = RB_ROOT;
 	rwlock_init(&ns->ns_status_lock);
 	ns->ns_status_cache = KMEM_CACHE(ns_status, SLAB_PANIC);
@@ -52,8 +54,10 @@ int ima_init_namespace(struct ima_namespace *ns)
 	mutex_init(&ns->ima_write_mutex);
 	ns->valid_policy = 1;
 	ns->ima_fs_flags = 0;
+	if (ns != &init_ima_ns)
+		rc = ima_fs_ns_init(ns);
 
-	return 0;
+	return rc;
 }
 
 int __init ima_ns_init(void)

@@ -22,6 +22,7 @@
 #include <linux/parser.h>
 #include <linux/vmalloc.h>
 #include <linux/ima.h>
+#include <linux/namei.h>
 
 #include "ima.h"
 
@@ -436,8 +437,13 @@ static int ima_release_policy(struct inode *inode, struct file *file)
 
 	ima_update_policy(ns);
 #if !defined(CONFIG_IMA_WRITE_POLICY) && !defined(CONFIG_IMA_READ_POLICY)
-	securityfs_remove(ima_policy);
-	ima_policy = NULL;
+	if (ns == &init_ima_ns) {
+		securityfs_remove(ima_policy);
+		ima_policy = NULL;
+	} else {
+		securityfs_ns_remove(ns->dentry[IMAFS_DENTRY_POLICY]);
+		ns->dentry[IMAFS_DENTRY_POLICY] = NULL;
+	}
 #elif defined(CONFIG_IMA_WRITE_POLICY)
 	clear_bit(IMA_FS_BUSY, &ns->ima_fs_flags);
 #elif defined(CONFIG_IMA_READ_POLICY)
@@ -508,4 +514,172 @@ out:
 	securityfs_remove(ima_dir);
 	securityfs_remove(ima_policy);
 	return -1;
+}
+
+/*
+ * Fix the ownership (uid/gid) of the dentry's that couldn't be set at the
+ * time of their creation because the user namespace wasn't configured, yet.
+ */
+static void ima_fs_ns_fixup_uid_gid(struct ima_namespace *ns)
+{
+	struct inode *inode;
+	size_t i;
+
+	if (ns->file_ownership_fixes_done ||
+	    ns->user_ns->uid_map.nr_extents == 0)
+		return;
+
+	ns->file_ownership_fixes_done = true;
+	for (i = 0; i < IMAFS_DENTRY_LAST; i++) {
+		if (!ns->dentry[i])
+			continue;
+		inode = ns->dentry[i]->d_inode;
+		inode->i_uid = make_kuid(ns->user_ns, 0);
+		inode->i_gid = make_kgid(ns->user_ns, 0);
+	}
+}
+
+/* Fix the permissions when a file is opened */
+int ima_fs_ns_permission(struct user_namespace *mnt_userns, struct inode *inode,
+			 int mask)
+{
+	ima_fs_ns_fixup_uid_gid(get_current_ns());
+	return generic_permission(mnt_userns, inode, mask);
+}
+
+const struct inode_operations ima_fs_ns_inode_operations = {
+	.lookup		= simple_lookup,
+	.permission	= ima_fs_ns_permission,
+};
+
+int ima_fs_ns_init(struct ima_namespace *ns)
+{
+	struct dentry *parent;
+
+	ns->mount = securityfs_ns_create_mount(ns->user_ns);
+	if (IS_ERR(ns->mount)) {
+		ns->mount = NULL;
+		return -1;
+	}
+	ns->mount_count += 1;
+
+	ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR] =
+	    securityfs_ns_create_dir("integrity", NULL,
+				     &ima_fs_ns_inode_operations,
+				     &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR])) {
+		ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR] = NULL;
+		goto out;
+	}
+
+	ns->dentry[IMAFS_DENTRY_DIR] =
+	    securityfs_ns_create_dir("ima", ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR],
+				     &ima_fs_ns_inode_operations,
+				     &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_DIR])) {
+		ns->dentry[IMAFS_DENTRY_DIR] = NULL;
+		goto out;
+	}
+
+	ns->dentry[IMAFS_DENTRY_SYMLINK] =
+	    securityfs_ns_create_symlink("ima", NULL, "integrity/ima", NULL,
+				     &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_SYMLINK])) {
+		ns->dentry[IMAFS_DENTRY_SYMLINK] = NULL;
+		goto out;
+	}
+
+	parent = ns->dentry[IMAFS_DENTRY_DIR];
+	ns->dentry[IMAFS_DENTRY_BINARY_RUNTIME_MEASUREMENTS] =
+	    securityfs_ns_create_file("binary_runtime_measurements",
+				   S_IRUSR | S_IRGRP, parent, NULL,
+				   &ima_measurements_ops,
+				   &ima_fs_ns_inode_operations,
+				   &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_BINARY_RUNTIME_MEASUREMENTS])) {
+		ns->dentry[IMAFS_DENTRY_BINARY_RUNTIME_MEASUREMENTS] = NULL;
+		goto out;
+	}
+
+	ns->dentry[IMAFS_DENTRY_ASCII_RUNTIME_MEASUREMENTS] =
+	    securityfs_ns_create_file("ascii_runtime_measurements",
+				   S_IRUSR | S_IRGRP, parent, NULL,
+				   &ima_ascii_measurements_ops,
+				   &ima_fs_ns_inode_operations,
+				   &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_ASCII_RUNTIME_MEASUREMENTS])) {
+		ns->dentry[IMAFS_DENTRY_ASCII_RUNTIME_MEASUREMENTS] = NULL;
+		goto out;
+	}
+
+	ns->dentry[IMAFS_DENTRY_RUNTIME_MEASUREMENTS_COUNT] =
+	    securityfs_ns_create_file("runtime_measurements_count",
+				   S_IRUSR | S_IRGRP, parent, NULL,
+				   &ima_measurements_count_ops,
+				   &ima_fs_ns_inode_operations,
+				   &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_RUNTIME_MEASUREMENTS_COUNT])) {
+		ns->dentry[IMAFS_DENTRY_RUNTIME_MEASUREMENTS_COUNT] = NULL;
+		goto out;
+	}
+
+	ns->dentry[IMAFS_DENTRY_VIOLATIONS] =
+	    securityfs_ns_create_file("violations", S_IRUSR | S_IRGRP,
+				   parent, NULL, &ima_htable_violations_ops,
+				   &ima_fs_ns_inode_operations,
+				   &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_VIOLATIONS])) {
+		ns->dentry[IMAFS_DENTRY_VIOLATIONS] = NULL;
+		goto out;
+	}
+
+	ns->dentry[IMAFS_DENTRY_IMA_POLICY] =
+	    securityfs_ns_create_file("policy", POLICY_FILE_FLAGS,
+				   parent, NULL,
+				   &ima_measure_policy_ops,
+				   &ima_fs_ns_inode_operations,
+				   &ns->mount, &ns->mount_count);
+	if (IS_ERR(ns->dentry[IMAFS_DENTRY_IMA_POLICY])) {
+		ns->dentry[IMAFS_DENTRY_IMA_POLICY] = NULL;
+		goto out;
+	}
+
+	/* Adjust the trigger for user namespace's early teardown of dependent
+	 * namespaces. Due to the filesystem there's an additional reference
+	 * to the user namespace.
+	 */
+	ns->user_ns->refcount_teardown += 1;
+
+	return 0;
+
+out:
+	ima_fs_ns_free(ns);
+
+	return -1;
+}
+
+void ima_fs_ns_free(struct ima_namespace *ns)
+{
+	size_t i;
+
+	for (i = 0; i < IMAFS_DENTRY_LAST; i++) {
+		switch (i) {
+		case IMAFS_DENTRY_DIR:
+		case IMAFS_DENTRY_INTEGRITY_DIR:
+			/* files first */
+			continue;
+		}
+		securityfs_ns_remove(ns->dentry[i], &ns->mount, &ns->mount_count);
+		ns->dentry[i] = NULL;
+	}
+	securityfs_ns_remove(ns->dentry[IMAFS_DENTRY_DIR], &ns->mount, &ns->mount_count);
+	ns->dentry[IMAFS_DENTRY_DIR] = NULL;
+	securityfs_ns_remove(ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR], &ns->mount, &ns->mount_count);
+	ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR] = NULL;
+
+	if (ns->mount) {
+		mntput(ns->mount);
+		ns->mount_count -= 1;
+	}
+	ns->mount = NULL;
 }
