@@ -5314,8 +5314,10 @@ static void le_conn_update_addr(struct hci_conn *conn, bdaddr_t *bdaddr,
 			conn->init_addr_type = ADDR_LE_DEV_RANDOM;
 			bacpy(&conn->init_addr, local_rpa);
 		} else if (hci_dev_test_flag(conn->hdev, HCI_PRIVACY)) {
-			conn->init_addr_type = ADDR_LE_DEV_RANDOM;
-			bacpy(&conn->init_addr, &conn->hdev->rpa);
+			if (!use_ll_privacy(conn->hdev)) {
+				conn->init_addr_type = ADDR_LE_DEV_RANDOM;
+				bacpy(&conn->init_addr, &conn->hdev->rpa);
+			}
 		} else {
 			hci_copy_identity_address(conn->hdev, &conn->init_addr,
 						  &conn->init_addr_type);
