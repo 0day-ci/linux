@@ -99,7 +99,7 @@ early_param("cma", early_cma);
 #ifdef CONFIG_DMA_PERNUMA_CMA
 
 static struct cma *dma_contiguous_pernuma_area[MAX_NUMNODES];
-static phys_addr_t pernuma_size_bytes __initdata;
+static phys_addr_t pernuma_size_bytes __initdata = size_bytes;
 
 static int __init early_cma_pernuma(char *p)
 {
