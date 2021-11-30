@@ -300,6 +300,8 @@ struct host1x_device;
  * @driver: core driver
  * @subdevs: table of OF device IDs matching subdevices for this driver
  * @list: list node for the driver
+ * @init: called when the host1x logical driver is registered
+ * @deinit: called when the host1x logical driver is unregistered
  * @probe: called when the host1x logical device is probed
  * @remove: called when the host1x logical device is removed
  * @shutdown: called when the host1x logical device is shut down
@@ -310,6 +312,8 @@ struct host1x_driver {
 	const struct of_device_id *subdevs;
 	struct list_head list;
 
+	int (*init)(struct host1x_device *device);
+	void (*deinit)(struct host1x_device *device);
 	int (*probe)(struct host1x_device *device);
 	int (*remove)(struct host1x_device *device);
 	void (*shutdown)(struct host1x_device *device);
