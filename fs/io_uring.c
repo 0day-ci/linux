@@ -94,6 +94,8 @@
 #define IORING_MAX_CQ_ENTRIES	(2 * IORING_MAX_ENTRIES)
 #define IORING_SQPOLL_CAP_ENTRIES_VALUE 8
 
+#define IORING_MAX_TX_NOTIFIERS	(1U << 10)
+
 /* only define max */
 #define IORING_MAX_FIXED_FILES	(1U << 15)
 #define IORING_MAX_RESTRICTIONS	(IORING_RESTRICTION_LAST + \
@@ -326,6 +328,15 @@ struct io_submit_state {
 	struct blk_plug		plug;
 };
 
+struct io_tx_notifier {
+};
+
+struct io_tx_ctx {
+	struct io_tx_notifier	*notifier;
+	u64			tag;
+	u32			seq;
+};
+
 struct io_ring_ctx {
 	/* const or read-mostly hot data */
 	struct {
@@ -373,6 +384,8 @@ struct io_ring_ctx {
 		unsigned		nr_user_files;
 		unsigned		nr_user_bufs;
 		struct io_mapped_ubuf	**user_bufs;
+		struct io_tx_ctx	*tx_ctxs;
+		unsigned		nr_tx_ctxs;
 
 		struct io_submit_state	submit_state;
 		struct list_head	timeout_list;
@@ -9200,6 +9213,55 @@ static int io_buffer_validate(struct iovec *iov)
 	return 0;
 }
 
+static int io_sqe_tx_ctx_unregister(struct io_ring_ctx *ctx)
+{
+	if (!ctx->nr_tx_ctxs)
+		return -ENXIO;
+
+	kvfree(ctx->tx_ctxs);
+	ctx->tx_ctxs = NULL;
+	ctx->nr_tx_ctxs = 0;
+	return 0;
+}
+
+static int io_sqe_tx_ctx_register(struct io_ring_ctx *ctx,
+				  void __user *arg, unsigned int nr_args)
+{
+	struct io_uring_tx_ctx_register __user *tx_args = arg;
+	struct io_uring_tx_ctx_register tx_arg;
+	unsigned i;
+	int ret;
+
+	if (ctx->nr_tx_ctxs)
+		return -EBUSY;
+	if (!nr_args)
+		return -EINVAL;
+	if (nr_args > IORING_MAX_TX_NOTIFIERS)
+		return -EMFILE;
+
+	ctx->tx_ctxs = kvcalloc(nr_args, sizeof(ctx->tx_ctxs[0]),
+				GFP_KERNEL_ACCOUNT);
+	if (!ctx->tx_ctxs)
+		return -ENOMEM;
+
+	for (i = 0; i < nr_args; i++, ctx->nr_tx_ctxs++) {
+		struct io_tx_ctx *tx_ctx = &ctx->tx_ctxs[i];
+
+		if (copy_from_user(&tx_arg, &tx_args[i], sizeof(tx_arg))) {
+			ret = -EFAULT;
+			goto out_fput;
+		}
+		tx_ctx->tag = tx_arg.tag;
+	}
+	return 0;
+
+out_fput:
+	kvfree(ctx->tx_ctxs);
+	ctx->tx_ctxs = NULL;
+	ctx->nr_tx_ctxs = 0;
+	return ret;
+}
+
 static int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 				   unsigned int nr_args, u64 __user *tags)
 {
@@ -9428,6 +9490,7 @@ static __cold void io_ring_ctx_free(struct io_ring_ctx *ctx)
 #endif
 	WARN_ON_ONCE(!list_empty(&ctx->ltimeout_list));
 
+	io_sqe_tx_ctx_unregister(ctx);
 	io_mem_free(ctx->rings);
 	io_mem_free(ctx->sq_sqes);
 
@@ -11102,6 +11165,15 @@ static int __io_uring_register(struct io_ring_ctx *ctx, unsigned opcode,
 		if (!arg || nr_args != 2)
 			break;
 		ret = io_register_iowq_max_workers(ctx, arg);
+		break;
+	case IORING_REGISTER_TX_CTX:
+		ret = io_sqe_tx_ctx_register(ctx, arg, nr_args);
+		break;
+	case IORING_UNREGISTER_TX_CTX:
+		ret = -EINVAL;
+		if (arg || nr_args)
+			break;
+		ret = io_sqe_tx_ctx_unregister(ctx);
 		break;
 	default:
 		ret = -EINVAL;

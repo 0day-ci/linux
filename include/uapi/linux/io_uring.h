@@ -325,6 +325,9 @@ enum {
 	/* set/get max number of io-wq workers */
 	IORING_REGISTER_IOWQ_MAX_WORKERS	= 19,
 
+	IORING_REGISTER_TX_CTX			= 20,
+	IORING_UNREGISTER_TX_CTX		= 21,
+
 	/* this goes last */
 	IORING_REGISTER_LAST
 };
@@ -363,6 +366,10 @@ struct io_uring_rsrc_update2 {
 	__aligned_u64 tags;
 	__u32 nr;
 	__u32 resv2;
+};
+
+struct io_uring_tx_ctx_register {
+	__u64 tag;
 };
 
 /* Skip updating fd indexes set to this value in the fd table */
