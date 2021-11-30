@@ -318,6 +318,10 @@ vidtv_channel_pmt_match_sections(struct vidtv_channel *channels,
 	struct vidtv_psi_table_pmt_stream *s = NULL;
 	struct vidtv_channel *cur_chnl = channels;
 	struct vidtv_psi_desc *desc = NULL;
+	struct vidtv_mux *m = container_of(&channels,
+					struct vidtv_mux,
+					channels);
+
 	u16 e_pid; /* elementary stream pid */
 	u16 curr_id;
 	u32 j;
@@ -341,6 +345,13 @@ vidtv_channel_pmt_match_sections(struct vidtv_channel *channels,
 					tail = vidtv_psi_pmt_stream_init(tail,
 									 s->type,
 									 e_pid);
+
+					if (!tail) {
+						vidtv_psi_pmt_stream_destroy(head);
+						dev_warn_ratelimited(m->dev,
+							"No enough memory for vidtv_psi_pmt_stream_init");
+						return;
+					}
 
 					if (!head)
 						head = tail;
