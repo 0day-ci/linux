@@ -334,6 +334,7 @@ struct io_tx_notifier {
 	struct percpu_ref	*fixed_rsrc_refs;
 	u64			tag;
 	u32			seq;
+	struct list_head	cache_node;
 };
 
 struct io_tx_ctx {
@@ -393,6 +394,9 @@ struct io_ring_ctx {
 		unsigned		nr_tx_ctxs;
 
 		struct io_submit_state	submit_state;
+		struct list_head	ubuf_list;
+		struct list_head	ubuf_list_locked;
+		int			ubuf_locked_nr;
 		struct list_head	timeout_list;
 		struct list_head	ltimeout_list;
 		struct list_head	cq_overflow_list;
@@ -1491,6 +1495,8 @@ static __cold struct io_ring_ctx *io_ring_ctx_alloc(struct io_uring_params *p)
 	INIT_WQ_LIST(&ctx->locked_free_list);
 	INIT_DELAYED_WORK(&ctx->fallback_work, io_fallback_req_func);
 	INIT_WQ_LIST(&ctx->submit_state.compl_reqs);
+	INIT_LIST_HEAD(&ctx->ubuf_list);
+	INIT_LIST_HEAD(&ctx->ubuf_list_locked);
 	return ctx;
 err:
 	kfree(ctx->dummy_ubuf);
@@ -1955,16 +1961,20 @@ static void io_zc_tx_work_callback(struct work_struct *work)
 	struct io_tx_notifier *notifier = container_of(work, struct io_tx_notifier,
 						       commit_work);
 	struct io_ring_ctx *ctx = notifier->uarg.ctx;
+	struct percpu_ref *rsrc_refs = notifier->fixed_rsrc_refs;
 
 	spin_lock(&ctx->completion_lock);
 	io_fill_cqe_aux(ctx, notifier->tag, notifier->seq, 0);
+
+	list_add(&notifier->cache_node, &ctx->ubuf_list_locked);
+	ctx->ubuf_locked_nr++;
+
 	io_commit_cqring(ctx);
 	spin_unlock(&ctx->completion_lock);
 	io_cqring_ev_posted(ctx);
 
-	percpu_ref_put(notifier->fixed_rsrc_refs);
+	percpu_ref_put(rsrc_refs);
 	percpu_ref_put(&ctx->refs);
-	kfree(notifier);
 }
 
 static void io_uring_tx_zerocopy_callback(struct sk_buff *skb,
@@ -1991,26 +2001,69 @@ static void io_tx_kill_notification(struct io_tx_ctx *tx_ctx)
 	tx_ctx->notifier = NULL;
 }
 
+static void io_notifier_splice(struct io_ring_ctx *ctx)
+{
+	spin_lock(&ctx->completion_lock);
+	list_splice_init(&ctx->ubuf_list_locked, &ctx->ubuf_list);
+	ctx->ubuf_locked_nr = 0;
+	spin_unlock(&ctx->completion_lock);
+}
+
+static void io_notifier_free_cached(struct io_ring_ctx *ctx)
+{
+	struct io_tx_notifier *notifier;
+
+	io_notifier_splice(ctx);
+
+	while (!list_empty(&ctx->ubuf_list)) {
+		notifier = list_first_entry(&ctx->ubuf_list,
+					    struct io_tx_notifier, cache_node);
+		list_del(&notifier->cache_node);
+		kfree(notifier);
+	}
+}
+
+static inline bool io_notifier_has_cached(struct io_ring_ctx *ctx)
+{
+	if (likely(!list_empty(&ctx->ubuf_list)))
+		return true;
+	if (READ_ONCE(ctx->ubuf_locked_nr) <= IO_REQ_ALLOC_BATCH)
+		return false;
+	io_notifier_splice(ctx);
+	return !list_empty(&ctx->ubuf_list);
+}
+
 static struct io_tx_notifier *io_alloc_tx_notifier(struct io_ring_ctx *ctx,
 						   struct io_tx_ctx *tx_ctx)
 {
 	struct io_tx_notifier *notifier;
 	struct ubuf_info *uarg;
 
-	notifier = kmalloc(sizeof(*notifier), GFP_ATOMIC);
-	if (!notifier)
-		return NULL;
+	if (likely(io_notifier_has_cached(ctx))) {
+		if (WARN_ON_ONCE(list_empty(&ctx->ubuf_list)))
+			return NULL;
+
+		notifier = list_first_entry(&ctx->ubuf_list,
+					    struct io_tx_notifier, cache_node);
+		list_del(&notifier->cache_node);
+	} else {
+		gfp_t gfp_flags = GFP_ATOMIC|GFP_KERNEL_ACCOUNT;
+
+		notifier = kmalloc(sizeof(*notifier), gfp_flags);
+		if (!notifier)
+			return NULL;
+		uarg = &notifier->uarg;
+		uarg->ctx = ctx;
+		uarg->flags = SKBFL_ZEROCOPY_FRAG | SKBFL_DONT_ORPHAN;
+		uarg->callback = io_uring_tx_zerocopy_callback;
+	}
 
 	WARN_ON_ONCE(!current->io_uring);
 	notifier->seq = tx_ctx->seq++;
 	notifier->tag = tx_ctx->tag;
 	io_set_rsrc_node(&notifier->fixed_rsrc_refs, ctx);
 
-	uarg = &notifier->uarg;
-	uarg->ctx = ctx;
-	uarg->flags = SKBFL_ZEROCOPY_FRAG | SKBFL_DONT_ORPHAN;
-	uarg->callback = io_uring_tx_zerocopy_callback;
-	refcount_set(&uarg->refcnt, 1);
+	refcount_set(&notifier->uarg.refcnt, 1);
 	percpu_ref_get(&ctx->refs);
 	return notifier;
 }
@@ -9731,6 +9784,7 @@ static __cold void io_ring_ctx_free(struct io_ring_ctx *ctx)
 #endif
 	WARN_ON_ONCE(!list_empty(&ctx->ltimeout_list));
 
+	io_notifier_free_cached(ctx);
 	io_sqe_tx_ctx_unregister(ctx);
 	io_mem_free(ctx->rings);
 	io_mem_free(ctx->sq_sqes);
