@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0
-
 #include <linux/context_tracking.h>
 #include <linux/entry-common.h>
 #include <linux/highmem.h>
