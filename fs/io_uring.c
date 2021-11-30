@@ -600,6 +600,16 @@ struct io_sr_msg {
 	size_t				len;
 };
 
+struct io_sendzc {
+	struct file			*file;
+	void __user			*buf;
+	size_t				len;
+	struct io_tx_ctx 		*tx_ctx;
+	int				msg_flags;
+	int				addr_len;
+	void __user			*addr;
+};
+
 struct io_open {
 	struct file			*file;
 	int				dfd;
@@ -874,6 +884,7 @@ struct io_kiocb {
 		struct io_mkdir		mkdir;
 		struct io_symlink	symlink;
 		struct io_hardlink	hardlink;
+		struct io_sendzc	msgzc;
 	};
 
 	u8				opcode;
@@ -1123,6 +1134,12 @@ static const struct io_op_def io_op_defs[] = {
 	[IORING_OP_MKDIRAT] = {},
 	[IORING_OP_SYMLINKAT] = {},
 	[IORING_OP_LINKAT] = {},
+	[IORING_OP_SENDZC] = {
+		.needs_file		= 1,
+		.unbound_nonreg_file	= 1,
+		.pollout		= 1,
+		.audit_skip		= 1,
+	},
 };
 
 /* requests with any of those set should undergo io_disarm_next() */
@@ -1991,7 +2008,6 @@ static struct io_tx_notifier *io_alloc_tx_notifier(struct io_ring_ctx *ctx,
 	return notifier;
 }
 
-__attribute__((unused))
 static inline struct io_tx_notifier *io_get_tx_notifier(struct io_ring_ctx *ctx,
 							struct io_tx_ctx *tx_ctx)
 {
@@ -5018,6 +5034,102 @@ static int io_send(struct io_kiocb *req, unsigned int issue_flags)
 	return 0;
 }
 
+static int io_sendzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
+{
+	struct io_ring_ctx *ctx = req->ctx;
+	struct io_sendzc *sr = &req->msgzc;
+	unsigned int idx;
+
+	if (unlikely(req->ctx->flags & IORING_SETUP_IOPOLL))
+		return -EINVAL;
+	if (READ_ONCE(sqe->ioprio))
+		return -EINVAL;
+
+	sr->buf = u64_to_user_ptr(READ_ONCE(sqe->addr));
+	sr->len = READ_ONCE(sqe->len);
+	sr->msg_flags = READ_ONCE(sqe->msg_flags) | MSG_NOSIGNAL;
+	if (sr->msg_flags & MSG_DONTWAIT)
+		req->flags |= REQ_F_NOWAIT;
+
+	idx = READ_ONCE(sqe->tx_ctx_idx);
+	if (idx > ctx->nr_tx_ctxs)
+		return -EINVAL;
+	idx = array_index_nospec(idx, ctx->nr_tx_ctxs);
+	req->msgzc.tx_ctx = &ctx->tx_ctxs[idx];
+
+	sr->addr = u64_to_user_ptr(READ_ONCE(sqe->addr2));
+	sr->addr_len = READ_ONCE(sqe->__pad2[0]);
+
+#ifdef CONFIG_COMPAT
+	if (req->ctx->compat)
+		sr->msg_flags |= MSG_CMSG_COMPAT;
+#endif
+	return 0;
+}
+
+static int io_sendzc(struct io_kiocb *req, unsigned int issue_flags)
+{
+	struct sockaddr_storage address;
+	struct io_ring_ctx *ctx = req->ctx;
+	struct io_tx_notifier *notifier;
+	struct io_sendzc *sr = &req->msgzc;
+	struct msghdr msg;
+	struct iovec iov;
+	struct socket *sock;
+	unsigned flags;
+	int ret, min_ret = 0;
+
+	sock = sock_from_file(req->file);
+	if (unlikely(!sock))
+		return -ENOTSOCK;
+	ret = import_single_range(WRITE, sr->buf, sr->len, &iov, &msg.msg_iter);
+	if (unlikely(ret))
+		return ret;
+
+	msg.msg_name = NULL;
+	msg.msg_control = NULL;
+	msg.msg_controllen = 0;
+	msg.msg_namelen = 0;
+	if (sr->addr) {
+		ret = move_addr_to_kernel(sr->addr, sr->addr_len, &address);
+		if (ret < 0)
+			return ret;
+		msg.msg_name = (struct sockaddr *)&address;
+		msg.msg_namelen = sr->addr_len;
+	}
+
+	io_ring_submit_lock(ctx, issue_flags & IO_URING_F_UNLOCKED);
+	notifier = io_get_tx_notifier(ctx, req->msgzc.tx_ctx);
+	if (!notifier) {
+		req_set_fail(req);
+		ret = -ENOMEM;
+		goto out;
+	}
+	msg.msg_ubuf = &notifier->uarg;
+
+	flags = sr->msg_flags;
+	if (issue_flags & IO_URING_F_NONBLOCK)
+		flags |= MSG_DONTWAIT;
+	if (flags & MSG_WAITALL)
+		min_ret = iov_iter_count(&msg.msg_iter);
+	msg.msg_flags = flags;
+	ret = sock_sendmsg(sock, &msg);
+
+	if (ret < min_ret) {
+		if (ret == -EAGAIN && (issue_flags & IO_URING_F_NONBLOCK))
+			goto out;
+		if (ret == -ERESTARTSYS)
+			ret = -EINTR;
+		req_set_fail(req);
+	}
+	io_ring_submit_unlock(ctx, issue_flags & IO_URING_F_UNLOCKED);
+	__io_req_complete(req, issue_flags, ret, 0);
+	return 0;
+out:
+	io_ring_submit_unlock(ctx, issue_flags & IO_URING_F_UNLOCKED);
+	return ret;
+}
+
 static int __io_recvmsg_copy_hdr(struct io_kiocb *req,
 				 struct io_async_msghdr *iomsg)
 {
@@ -5421,6 +5533,7 @@ IO_NETOP_PREP_ASYNC(sendmsg);
 IO_NETOP_PREP_ASYNC(recvmsg);
 IO_NETOP_PREP_ASYNC(connect);
 IO_NETOP_PREP(accept);
+IO_NETOP_PREP(sendzc);
 IO_NETOP_FN(send);
 IO_NETOP_FN(recv);
 #endif /* CONFIG_NET */
@@ -6573,6 +6686,8 @@ static int io_req_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	case IORING_OP_SENDMSG:
 	case IORING_OP_SEND:
 		return io_sendmsg_prep(req, sqe);
+	case IORING_OP_SENDZC:
+		return io_sendzc_prep(req, sqe);
 	case IORING_OP_RECVMSG:
 	case IORING_OP_RECV:
 		return io_recvmsg_prep(req, sqe);
@@ -6832,6 +6947,9 @@ static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
 		break;
 	case IORING_OP_SEND:
 		ret = io_send(req, issue_flags);
+		break;
+	case IORING_OP_SENDZC:
+		ret = io_sendzc(req, issue_flags);
 		break;
 	case IORING_OP_RECVMSG:
 		ret = io_recvmsg(req, issue_flags);
