@@ -30,6 +30,7 @@ static void get_io_context(struct io_context *ioc)
 	atomic_long_inc(&ioc->refcount);
 }
 
+#ifdef CONFIG_BLK_ICQ
 static void icq_free_icq_rcu(struct rcu_head *head)
 {
 	struct io_cq *icq = container_of(head, struct io_cq, __rcu_head);
@@ -162,6 +163,40 @@ static bool ioc_delay_free(struct io_context *ioc)
 }
 
 /**
+ * ioc_clear_queue - break any ioc association with the specified queue
+ * @q: request_queue being cleared
+ *
+ * Walk @q->icq_list and exit all io_cq's.
+ */
+void ioc_clear_queue(struct request_queue *q)
+{
+	LIST_HEAD(icq_list);
+
+	spin_lock_irq(&q->queue_lock);
+	list_splice_init(&q->icq_list, &icq_list);
+	spin_unlock_irq(&q->queue_lock);
+
+	while (!list_empty(&icq_list)) {
+		struct io_cq *icq =
+			list_entry(icq_list.next, struct io_cq, q_node);
+
+		spin_lock_irq(&icq->ioc->lock);
+		if (!(icq->flags & ICQ_DESTROYED))
+			ioc_destroy_icq(icq);
+		spin_unlock_irq(&icq->ioc->lock);
+	}
+}
+#else /* CONFIG_BLK_ICQ */
+static inline void ioc_exit_icqs(struct io_context *ioc)
+{
+}
+static inline bool ioc_delay_free(struct io_context *ioc)
+{
+	return false;
+}
+#endif /* CONFIG_BLK_ICQ */
+
+/**
  * put_io_context - put a reference of io_context
  * @ioc: io_context to put
  *
@@ -192,31 +227,6 @@ void exit_io_context(struct task_struct *task)
 	}
 }
 
-/**
- * ioc_clear_queue - break any ioc association with the specified queue
- * @q: request_queue being cleared
- *
- * Walk @q->icq_list and exit all io_cq's.
- */
-void ioc_clear_queue(struct request_queue *q)
-{
-	LIST_HEAD(icq_list);
-
-	spin_lock_irq(&q->queue_lock);
-	list_splice_init(&q->icq_list, &icq_list);
-	spin_unlock_irq(&q->queue_lock);
-
-	while (!list_empty(&icq_list)) {
-		struct io_cq *icq =
-			list_entry(icq_list.next, struct io_cq, q_node);
-
-		spin_lock_irq(&icq->ioc->lock);
-		if (!(icq->flags & ICQ_DESTROYED))
-			ioc_destroy_icq(icq);
-		spin_unlock_irq(&icq->ioc->lock);
-	}
-}
-
 static struct io_context *alloc_io_context(gfp_t gfp_flags, int node)
 {
 	struct io_context *ioc;
@@ -228,10 +238,12 @@ static struct io_context *alloc_io_context(gfp_t gfp_flags, int node)
 
 	atomic_long_set(&ioc->refcount, 1);
 	atomic_set(&ioc->active_ref, 1);
+#ifdef CONFIG_BLK_ICQ
 	spin_lock_init(&ioc->lock);
 	INIT_RADIX_TREE(&ioc->icq_tree, GFP_ATOMIC);
 	INIT_HLIST_HEAD(&ioc->icq_list);
 	INIT_WORK(&ioc->release_work, ioc_release_fn);
+#endif
 	return ioc;
 }
 
@@ -316,6 +328,7 @@ int __copy_io(unsigned long clone_flags, struct task_struct *tsk)
 	return 0;
 }
 
+#ifdef CONFIG_BLK_ICQ
 /**
  * ioc_lookup_icq - lookup io_cq from ioc
  * @q: the associated request_queue
@@ -441,3 +454,4 @@ static int __init blk_ioc_init(void)
 	return 0;
 }
 subsys_initcall(blk_ioc_init);
+#endif /* CONFIG_BLK_ICQ */
