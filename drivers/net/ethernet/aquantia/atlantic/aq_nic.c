@@ -316,18 +316,25 @@ int aq_nic_ndev_register(struct aq_nic_s *self)
 	aq_macsec_init(self);
 #endif
 
-	mutex_lock(&self->fwreq_mutex);
-	err = self->aq_fw_ops->get_mac_permanent(self->aq_hw, addr);
-	mutex_unlock(&self->fwreq_mutex);
-	if (err)
-		goto err_exit;
+	if (eth_platform_get_mac_address(&self->pdev->dev, addr) == 0) {
+		// DT supplied a valid MAC address
+		eth_hw_addr_set(self->ndev, addr);
+	} else {
+		// If DT has none or an invalid one, ask device for MAC address
+		mutex_lock(&self->fwreq_mutex);
+		err = self->aq_fw_ops->get_mac_permanent(self->aq_hw, addr);
+		mutex_unlock(&self->fwreq_mutex);
 
-	eth_hw_addr_set(self->ndev, addr);
+		if (err)
+			goto err_exit;
 
-	if (!is_valid_ether_addr(self->ndev->dev_addr) ||
-	    !aq_nic_is_valid_ether_addr(self->ndev->dev_addr)) {
-		netdev_warn(self->ndev, "MAC is invalid, will use random.");
-		eth_hw_addr_random(self->ndev);
+		if (is_valid_ether_addr(addr) &&
+		    aq_nic_is_valid_ether_addr(addr)) {
+			eth_hw_addr_set(self->ndev, addr);
+		} else {
+			netdev_warn(self->ndev, "MAC is invalid, will use random.");
+			eth_hw_addr_random(self->ndev);
+		}
 	}
 
 #if defined(AQ_CFG_MAC_ADDR_PERMANENT)
