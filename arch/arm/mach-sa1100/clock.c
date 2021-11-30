@@ -127,6 +127,9 @@ int __init sa11xx_clk_init(void)
 				 ARRAY_SIZE(clk_tucr_parents), 0,
 				 (void __iomem *)&TUCR, FShft(TUCR_TSEL),
 				 FAlnMsk(TUCR_TSEL), 0, &tucr_lock);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
+
 	clk_set_rate(hw->clk, 3686400);
 
 	hw = kzalloc(sizeof(*hw), GFP_KERNEL);
