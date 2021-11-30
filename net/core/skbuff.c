@@ -666,10 +666,14 @@ static void skb_release_data(struct sk_buff *skb)
 			      &shinfo->dataref))
 		goto exit;
 
-	skb_zcopy_clear(skb, true);
+	if (!(shinfo->flags & SKBFL_MANAGED_FRAGS)) {
+		for (i = 0; i < shinfo->nr_frags; i++)
+			__skb_frag_unref(&shinfo->frags[i], skb->pp_recycle);
+	} else {
+		shinfo->flags &= ~SKBFL_MANAGED_FRAGS;
+	}
 
-	for (i = 0; i < shinfo->nr_frags; i++)
-		__skb_frag_unref(&shinfo->frags[i], skb->pp_recycle);
+	skb_zcopy_clear(skb, true);
 
 	if (shinfo->frag_list)
 		kfree_skb_list(shinfo->frag_list);
@@ -1467,6 +1471,7 @@ int skb_copy_ubufs(struct sk_buff *skb, gfp_t gfp_mask)
 	/* skb frags release userspace buffers */
 	for (i = 0; i < num_frags; i++)
 		skb_frag_unref(skb, i);
+	skb_shinfo(skb)->flags &= ~SKBFL_MANAGED_FRAGS;
 
 	/* skb frags point to kernel buffers */
 	for (i = 0; i < new_frags - 1; i++) {
@@ -1593,6 +1598,7 @@ struct sk_buff *skb_copy(const struct sk_buff *skb, gfp_t gfp_mask)
 	BUG_ON(skb_copy_bits(skb, -headerlen, n->head, headerlen + skb->len));
 
 	skb_copy_header(n, skb);
+	skb_shinfo(n)->flags &= ~SKBFL_MANAGED_FRAGS;
 	return n;
 }
 EXPORT_SYMBOL(skb_copy);
@@ -1649,6 +1655,7 @@ struct sk_buff *__pskb_copy_fclone(struct sk_buff *skb, int headroom,
 			skb_frag_ref(skb, i);
 		}
 		skb_shinfo(n)->nr_frags = i;
+		skb_shinfo(n)->flags &= ~SKBFL_MANAGED_FRAGS;
 	}
 
 	if (skb_has_frag_list(skb)) {
@@ -1721,6 +1728,7 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 			refcount_inc(&skb_uarg(skb)->refcnt);
 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
 			skb_frag_ref(skb, i);
+		skb_shinfo(skb)->flags &= ~SKBFL_MANAGED_FRAGS;
 
 		if (skb_has_frag_list(skb))
 			skb_clone_fraglist(skb);
@@ -3784,6 +3792,8 @@ int skb_append_pagefrags(struct sk_buff *skb, struct page *page,
 	if (skb_can_coalesce(skb, i, page, offset)) {
 		skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], size);
 	} else if (i < MAX_SKB_FRAGS) {
+		if (skb_shinfo(skb)->flags & SKBFL_MANAGED_FRAGS)
+			return -EMSGSIZE;
 		get_page(page);
 		skb_fill_page_desc(skb, i, page, offset, size);
 	} else {

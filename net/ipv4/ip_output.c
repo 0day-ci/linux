@@ -1193,6 +1193,10 @@ alloc_new_skb:
 			err = -ENOMEM;
 			if (!sk_page_frag_refill(sk, pfrag))
 				goto error;
+			if (skb_shinfo(skb)->flags & SKBFL_MANAGED_FRAGS) {
+				err = -EMSGSIZE;
+				goto error;
+			}
 
 			if (!skb_can_coalesce(skb, i, pfrag->page,
 					      pfrag->offset)) {
