@@ -68,6 +68,10 @@ static int snd_pcm_plugin_alloc(struct snd_pcm_plugin *plugin, snd_pcm_uframes_t
 	size /= 8;
 	if (plugin->buf_frames < frames) {
 		kvfree(plugin->buf);
+
+		if (size > INT_MAX)
+			return -ENOMEM;
+
 		plugin->buf = kvzalloc(size, GFP_KERNEL);
 		plugin->buf_frames = frames;
 	}
