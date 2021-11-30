@@ -26,19 +26,18 @@ properties:
   interrupts:
     minItems: 2
 
+  clocks:
+    items:
+      - description: rtc_clk is the operating frequency of crystal.
+
+  clock-names:
+    items:
+      - const: "rtc_clk"
+
   interrupt-names:
     items:
       - const: alarm
       - const: sec
-
-  calibration:
-    description: |
-      calibration value for 1 sec period which will
-      be programmed directly to calibration register.
-    $ref: /schemas/types.yaml#/definitions/uint32
-    minimum: 0x1
-    maximum: 0x1FFFFF
-    default: 0x198233
 
 required:
   - compatible
@@ -60,6 +59,7 @@ examples:
         interrupt-parent = <&gic>;
         interrupts = <0 26 4>, <0 27 4>;
         interrupt-names = "alarm", "sec";
-        calibration = <0x198233>;
+        clock-names = "rtc_clk";
+        clocks = <&rtc_clk>;
       };
     };
