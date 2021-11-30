@@ -492,6 +492,7 @@ static int pmc_setup_dev(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dev_warn(&pdev->dev, "platform clocks register failed: %d\n",
 			 ret);
 
+	iounmap(pmc->regmap);
 	pmc->init = true;
 	return ret;
 }
