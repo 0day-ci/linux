@@ -51,6 +51,8 @@ static int fch_clk_probe(struct platform_device *pdev)
 			clk_oscout1_parents, ARRAY_SIZE(clk_oscout1_parents),
 			0, fch_data->base + CLKDRVSTR2, OSCOUT1CLK25MHZ, 3, 0,
 			NULL);
+		if (IS_ERR(hws[ST_CLK_MUX]))
+			return PTR_ERR(hws[ST_CLK_MUX]);
 
 		clk_set_parent(hws[ST_CLK_MUX]->clk, hws[ST_CLK_48M]->clk);
 
