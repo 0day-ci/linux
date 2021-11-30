@@ -378,6 +378,8 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 	if (mem_err->validation_bits & CPER_MEM_VALID_BANK_ADDRESS)
 		p += sprintf(p, "bank_address:%d ",
 			     mem_err->bank & CPER_MEM_BANK_ADDRESS_MASK);
+	if (mem_err->validation_bits & CPER_MEM_VALID_DEVICE)
+		p += sprintf(p, "device:%d ", mem_err->device);
 	if (mem_err->validation_bits & (CPER_MEM_VALID_ROW | CPER_MEM_VALID_ROW_EXT)) {
 		u32 row = mem_err->row;
 
