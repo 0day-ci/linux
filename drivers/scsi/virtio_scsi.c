@@ -337,7 +337,11 @@ static void virtscsi_rescan_hotunplug(struct virtio_scsi *vscsi)
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int result, inquiry_len, inq_result_len = 256;
 	char *inq_result = kmalloc(inq_result_len, GFP_KERNEL);
-
+	if (!inq_result) {
+		pr_err("%s:no enough memory for inq_result\n",
+			__func__);
+		return;
+	}
 	shost_for_each_device(sdev, shost) {
 		inquiry_len = sdev->inquiry_len ? sdev->inquiry_len : 36;
 
