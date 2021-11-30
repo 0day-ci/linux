@@ -392,6 +392,7 @@ struct devlink_resource {
 
 #define DEVLINK_RESOURCE_GENERIC_NAME_PORTS "physical_ports"
 #define DEVLINK_RESOURCE_GENERIC_NAME_IO_EQ "io_eq_size"
+#define DEVLINK_RESOURCE_GENERIC_NAME_EVENT_EQ "event_eq_size"
 
 #define __DEVLINK_PARAM_MAX_STRING_VALUE 32
 enum devlink_param_type {

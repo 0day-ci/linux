@@ -38,6 +38,8 @@ device drivers and their description must be added to the following table:
      - A limited capacity of physical ports that the switch ASIC can support
    * - ``io_eq_size``
      - Control the size of I/O completion EQs
+   * - ``event_eq_size``
+     - Control the size of the asynchronous control events EQ
 
 example usage
 -------------
