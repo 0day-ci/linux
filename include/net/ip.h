@@ -232,7 +232,8 @@ struct sk_buff *ip_make_skb(struct sock *sk, struct flowi4 *fl4,
 					int len, int odd, struct sk_buff *skb),
 			    void *from, int length, int transhdrlen,
 			    struct ipcm_cookie *ipc, struct rtable **rtp,
-			    struct inet_cork *cork, unsigned int flags);
+			    struct inet_cork *cork, unsigned int flags,
+			    struct ubuf_info *uarg);
 
 int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl);
 

@@ -947,10 +947,10 @@ static int __ip_append_data(struct sock *sk,
 			    int getfrag(void *from, char *to, int offset,
 					int len, int odd, struct sk_buff *skb),
 			    void *from, int length, int transhdrlen,
-			    unsigned int flags)
+			    unsigned int flags,
+			    struct ubuf_info *uarg)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	struct ubuf_info *uarg = NULL;
 	struct sk_buff *skb;
 
 	struct ip_options *opt = cork->opt;
@@ -966,6 +966,7 @@ static int __ip_append_data(struct sock *sk,
 	unsigned int wmem_alloc_delta = 0;
 	bool paged, extra_uref = false;
 	u32 tskey = 0;
+	bool zc = false;
 
 	skb = skb_peek_tail(queue);
 
@@ -1000,7 +1001,21 @@ static int __ip_append_data(struct sock *sk,
 	    (!exthdrlen || (rt->dst.dev->features & NETIF_F_HW_ESP_TX_CSUM)))
 		csummode = CHECKSUM_PARTIAL;
 
-	if (flags & MSG_ZEROCOPY && length && sock_flag(sk, SOCK_ZEROCOPY)) {
+	if (uarg) {
+		if (skb_zcopy(skb) && uarg != skb_zcopy(skb))
+			return -EINVAL;
+
+		/* If it's not zerocopy, just drop uarg, the caller should
+		 * be able to handle it.
+		 */
+		if (rt->dst.dev->features & NETIF_F_SG &&
+		    csummode == CHECKSUM_PARTIAL) {
+			paged = true;
+			zc = true;
+		} else {
+			uarg = NULL;
+		}
+	} else if (flags & MSG_ZEROCOPY && length && sock_flag(sk, SOCK_ZEROCOPY)) {
 		uarg = msg_zerocopy_realloc(sk, length, skb_zcopy(skb));
 		if (!uarg)
 			return -ENOBUFS;
@@ -1008,6 +1023,7 @@ static int __ip_append_data(struct sock *sk,
 		if (rt->dst.dev->features & NETIF_F_SG &&
 		    csummode == CHECKSUM_PARTIAL) {
 			paged = true;
+			zc = true;
 		} else {
 			uarg->zerocopy = 0;
 			skb_zcopy_set(skb, uarg, &extra_uref);
@@ -1171,7 +1187,7 @@ alloc_new_skb:
 				err = -EFAULT;
 				goto error;
 			}
-		} else if (!uarg || !uarg->zerocopy) {
+		} else if (!zc) {
 			int i = skb_shinfo(skb)->nr_frags;
 
 			err = -ENOMEM;
@@ -1308,7 +1324,7 @@ int ip_append_data(struct sock *sk, struct flowi4 *fl4,
 
 	return __ip_append_data(sk, fl4, &sk->sk_write_queue, &inet->cork.base,
 				sk_page_frag(sk), getfrag,
-				from, length, transhdrlen, flags);
+				from, length, transhdrlen, flags, NULL);
 }
 
 ssize_t	ip_append_page(struct sock *sk, struct flowi4 *fl4, struct page *page,
@@ -1600,7 +1616,8 @@ struct sk_buff *ip_make_skb(struct sock *sk,
 					int len, int odd, struct sk_buff *skb),
 			    void *from, int length, int transhdrlen,
 			    struct ipcm_cookie *ipc, struct rtable **rtp,
-			    struct inet_cork *cork, unsigned int flags)
+			    struct inet_cork *cork, unsigned int flags,
+			    struct ubuf_info *uarg)
 {
 	struct sk_buff_head queue;
 	int err;
@@ -1619,7 +1636,7 @@ struct sk_buff *ip_make_skb(struct sock *sk,
 
 	err = __ip_append_data(sk, fl4, &queue, cork,
 			       &current->task_frag, getfrag,
-			       from, length, transhdrlen, flags);
+			       from, length, transhdrlen, flags, uarg);
 	if (err) {
 		__ip_flush_pending_frames(sk, &queue, cork);
 		return ERR_PTR(err);
