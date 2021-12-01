@@ -2223,7 +2223,7 @@ static noinline int search_ioctl(struct inode *inode,
 
 	while (1) {
 		ret = -EFAULT;
-		if (fault_in_writeable(ubuf + sk_offset, *buf_size - sk_offset))
+		if (fault_in_writeable(ubuf + sk_offset, *buf_size - sk_offset, 0))
 			break;
 
 		ret = btrfs_search_forward(root, &key, path, sk->min_transid);

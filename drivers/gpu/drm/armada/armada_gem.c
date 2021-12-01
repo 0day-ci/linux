@@ -351,7 +351,7 @@ int armada_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	if (!access_ok(ptr, args->size))
 		return -EFAULT;
 
-	if (fault_in_readable(ptr, args->size))
+	if (fault_in_readable(ptr, args->size, 0))
 		return -EFAULT;
 
 	dobj = armada_gem_object_lookup(file, args->handle);

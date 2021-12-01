@@ -191,7 +191,7 @@ static size_t copy_page_to_iter_iovec(struct page *page, size_t offset, size_t b
 	buf = iov->iov_base + skip;
 	copy = min(bytes, iov->iov_len - skip);
 
-	if (IS_ENABLED(CONFIG_HIGHMEM) && !fault_in_writeable(buf, copy)) {
+	if (IS_ENABLED(CONFIG_HIGHMEM) && !fault_in_writeable(buf, copy, 0)) {
 		kaddr = kmap_atomic(page);
 		from = kaddr + offset;
 
@@ -275,7 +275,7 @@ static size_t copy_page_from_iter_iovec(struct page *page, size_t offset, size_t
 	buf = iov->iov_base + skip;
 	copy = min(bytes, iov->iov_len - skip);
 
-	if (IS_ENABLED(CONFIG_HIGHMEM) && !fault_in_readable(buf, copy)) {
+	if (IS_ENABLED(CONFIG_HIGHMEM) && !fault_in_readable(buf, copy, 0)) {
 		kaddr = kmap_atomic(page);
 		to = kaddr + offset;
 
@@ -433,6 +433,7 @@ out:
  * fault_in_iov_iter_readable - fault in iov iterator for reading
  * @i: iterator
  * @size: maximum length
+ * @min_size: minimum size to be faulted in
  *
  * Fault in one or more iovecs of the given iov_iter, to a maximum length of
  * @size.  For each iovec, fault in each page that constitutes the iovec.
@@ -442,25 +443,32 @@ out:
  *
  * Always returns 0 for non-userspace iterators.
  */
-size_t fault_in_iov_iter_readable(const struct iov_iter *i, size_t size)
+size_t fault_in_iov_iter_readable(const struct iov_iter *i, size_t size,
+				  size_t min_size)
 {
 	if (iter_is_iovec(i)) {
 		size_t count = min(size, iov_iter_count(i));
 		const struct iovec *p;
 		size_t skip;
+		size_t orig_size = size;
 
 		size -= count;
 		for (p = i->iov, skip = i->iov_offset; count; p++, skip = 0) {
 			size_t len = min(count, p->iov_len - skip);
+			size_t min_len = min(len, min_size);
 			size_t ret;
 
 			if (unlikely(!len))
 				continue;
-			ret = fault_in_readable(p->iov_base + skip, len);
+			ret = fault_in_readable(p->iov_base + skip, len,
+						min_len);
 			count -= len - ret;
+			min_size -= min(min_size, len - ret);
 			if (ret)
 				break;
 		}
+		if (min_size)
+			return orig_size;
 		return count + size;
 	}
 	return 0;
@@ -471,6 +479,7 @@ EXPORT_SYMBOL(fault_in_iov_iter_readable);
  * fault_in_iov_iter_writeable - fault in iov iterator for writing
  * @i: iterator
  * @size: maximum length
+ * @min_size: minimum size to be faulted in
  *
  * Faults in the iterator using get_user_pages(), i.e., without triggering
  * hardware page faults.  This is primarily useful when we already know that
@@ -481,25 +490,32 @@ EXPORT_SYMBOL(fault_in_iov_iter_readable);
  *
  * Always returns 0 for non-user-space iterators.
  */
-size_t fault_in_iov_iter_writeable(const struct iov_iter *i, size_t size)
+size_t fault_in_iov_iter_writeable(const struct iov_iter *i, size_t size,
+				   size_t min_size)
 {
 	if (iter_is_iovec(i)) {
 		size_t count = min(size, iov_iter_count(i));
 		const struct iovec *p;
 		size_t skip;
+		size_t orig_size = size;
 
 		size -= count;
 		for (p = i->iov, skip = i->iov_offset; count; p++, skip = 0) {
 			size_t len = min(count, p->iov_len - skip);
+			size_t min_len = min(len, min_size);
 			size_t ret;
 
 			if (unlikely(!len))
 				continue;
-			ret = fault_in_safe_writeable(p->iov_base + skip, len);
+			ret = fault_in_safe_writeable(p->iov_base + skip, len,
+						      min_len);
 			count -= len - ret;
+			min_size -= min(min_size, len - ret);
 			if (ret)
 				break;
 		}
+		if (min_size)
+			return orig_size;
 		return count + size;
 	}
 	return 0;

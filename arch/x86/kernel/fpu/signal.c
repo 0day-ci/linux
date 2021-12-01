@@ -309,7 +309,7 @@ retry:
 		if (ret != X86_TRAP_PF)
 			return false;
 
-		if (!fault_in_readable(buf, size))
+		if (!fault_in_readable(buf, size, 0))
 			goto retry;
 		return false;
 	}

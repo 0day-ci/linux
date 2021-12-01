@@ -1662,13 +1662,15 @@ finish_or_fault:
  * fault_in_writeable - fault in userspace address range for writing
  * @uaddr: start of address range
  * @size: size of address range
+ * @min_size: minimum size to be faulted in
  *
  * Returns the number of bytes not faulted in (like copy_to_user() and
  * copy_from_user()).
  */
-size_t fault_in_writeable(char __user *uaddr, size_t size)
+size_t fault_in_writeable(char __user *uaddr, size_t size, size_t min_size)
 {
 	char __user *start = uaddr, *end;
+	size_t faulted_in = size;
 
 	if (unlikely(size == 0))
 		return 0;
@@ -1688,8 +1690,10 @@ size_t fault_in_writeable(char __user *uaddr, size_t size)
 
 out:
 	if (size > uaddr - start)
-		return size - (uaddr - start);
-	return 0;
+		faulted_in = uaddr - start;
+	if (faulted_in < min_size)
+		return size;
+	return size - faulted_in;
 }
 EXPORT_SYMBOL(fault_in_writeable);
 
@@ -1697,6 +1701,7 @@ EXPORT_SYMBOL(fault_in_writeable);
  * fault_in_safe_writeable - fault in an address range for writing
  * @uaddr: start of address range
  * @size: length of address range
+ * @min_size: minimum size to be faulted in
  *
  * Faults in an address range using get_user_pages, i.e., without triggering
  * hardware page faults.  This is primarily useful when we already know that
@@ -1711,13 +1716,15 @@ EXPORT_SYMBOL(fault_in_writeable);
  * Returns the number of bytes not faulted in, like copy_to_user() and
  * copy_from_user().
  */
-size_t fault_in_safe_writeable(const char __user *uaddr, size_t size)
+size_t fault_in_safe_writeable(const char __user *uaddr, size_t size,
+			       size_t min_size)
 {
 	unsigned long start = (unsigned long)untagged_addr(uaddr);
 	unsigned long end, nstart, nend;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = NULL;
 	int locked = 0;
+	size_t faulted_in = size;
 
 	nstart = start & PAGE_MASK;
 	end = PAGE_ALIGN(start + size);
@@ -1750,9 +1757,11 @@ size_t fault_in_safe_writeable(const char __user *uaddr, size_t size)
 	}
 	if (locked)
 		mmap_read_unlock(mm);
-	if (nstart == end)
-		return 0;
-	return size - min_t(size_t, nstart - start, size);
+	if (nstart != end)
+		faulted_in = min_t(size_t, nstart - start, size);
+	if (faulted_in < min_size)
+		return size;
+	return size - faulted_in;
 }
 EXPORT_SYMBOL(fault_in_safe_writeable);
 
@@ -1760,14 +1769,17 @@ EXPORT_SYMBOL(fault_in_safe_writeable);
  * fault_in_readable - fault in userspace address range for reading
  * @uaddr: start of user address range
  * @size: size of user address range
+ * @min_size: minimum size to be faulted in
  *
  * Returns the number of bytes not faulted in (like copy_to_user() and
  * copy_from_user()).
  */
-size_t fault_in_readable(const char __user *uaddr, size_t size)
+size_t fault_in_readable(const char __user *uaddr, size_t size,
+			 size_t min_size)
 {
 	const char __user *start = uaddr, *end;
 	volatile char c;
+	size_t faulted_in = size;
 
 	if (unlikely(size == 0))
 		return 0;
@@ -1788,8 +1800,10 @@ size_t fault_in_readable(const char __user *uaddr, size_t size)
 out:
 	(void)c;
 	if (size > uaddr - start)
-		return size - (uaddr - start);
-	return 0;
+		faulted_in = uaddr - start;
+	if (faulted_in < min_size)
+		return size;
+	return size - faulted_in;
 }
 EXPORT_SYMBOL(fault_in_readable);
 

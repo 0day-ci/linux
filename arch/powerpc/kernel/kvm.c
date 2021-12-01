@@ -670,7 +670,7 @@ static void __init kvm_use_magic_page(void)
 
 	/* Quick self-test to see if the mapping works */
 	if (fault_in_readable((const char __user *)KVM_MAGIC_PAGE,
-			      sizeof(u32))) {
+			      sizeof(u32), 0)) {
 		kvm_patching_worked = false;
 		return;
 	}

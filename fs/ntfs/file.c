@@ -1830,7 +1830,7 @@ again:
 		 * pages being swapped out between us bringing them into memory
 		 * and doing the actual copying.
 		 */
-		if (unlikely(fault_in_iov_iter_readable(i, bytes))) {
+		if (unlikely(fault_in_iov_iter_readable(i, bytes, 0))) {
 			status = -EFAULT;
 			break;
 		}
