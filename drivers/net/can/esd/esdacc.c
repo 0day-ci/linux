@@ -483,15 +483,16 @@ static void handle_core_msg_rxtxdone(struct acc_core *core,
 		can_frame_set_cc_len(cf, msg->dlc.rx.len & ACC_CAN_DLC_MASK,
 				     priv->can.ctrlmode);
 
-		if (msg->dlc.rx.len & ACC_CAN_RTR_FLAG)
+		if (msg->dlc.rx.len & ACC_CAN_RTR_FLAG) {
 			cf->can_id |= CAN_RTR_FLAG;
-		else
+		} else {
 			memcpy(cf->data, msg->data, cf->len);
+			stats->rx_bytes += cf->len;
+		}
+		stats->rx_packets++;
 
 		skb_hwtstamps(skb)->hwtstamp = acc_ts2ktime(priv->ov, msg->ts);
 
-		stats->rx_packets++;
-		stats->rx_bytes += cf->len;
 		netif_rx(skb);
 	}
 }
