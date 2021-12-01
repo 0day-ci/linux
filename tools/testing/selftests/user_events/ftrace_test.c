@@ -20,6 +20,7 @@ const char *data_file = "/sys/kernel/debug/tracing/user_events_data";
 const char *status_file = "/sys/kernel/debug/tracing/user_events_status";
 const char *enable_file = "/sys/kernel/debug/tracing/events/user_events/__test_event/enable";
 const char *trace_file = "/sys/kernel/debug/tracing/trace";
+const char *fmt_file = "/sys/kernel/debug/tracing/events/user_events/__test_event/format";
 
 static int trace_bytes(void)
 {
@@ -47,6 +48,61 @@ static int trace_bytes(void)
 	return bytes;
 }
 
+static int get_print_fmt(char *buffer, int len)
+{
+	FILE *fp = fopen(fmt_file, "r");
+	int c, index = 0, last = 0;
+
+	if (!fp)
+		return -1;
+
+	/* Read until empty line (Skip Common) */
+	while (true) {
+		c = getc(fp);
+
+		if (c == EOF)
+			break;
+
+		if (last == '\n' && c == '\n')
+			break;
+
+		last = c;
+	}
+
+	last = 0;
+
+	/* Read until empty line (Skip Properties) */
+	while (true) {
+		c = getc(fp);
+
+		if (c == EOF)
+			break;
+
+		if (last == '\n' && c == '\n')
+			break;
+
+		last = c;
+	}
+
+	/* Read in print_fmt: */
+	while (len > 1) {
+		c = getc(fp);
+
+		if (c == EOF || c == '\n')
+			break;
+
+		buffer[index++] = c;
+
+		len--;
+	}
+
+	buffer[index] = 0;
+
+	fclose(fp);
+
+	return 0;
+}
+
 static int clear(void)
 {
 	int fd = open(data_file, O_RDWR);
@@ -61,6 +117,44 @@ static int clear(void)
 	close(fd);
 
 	return 0;
+}
+
+static int check_print_fmt(const char *event, const char *expected)
+{
+	struct user_reg reg = {0};
+	char print_fmt[256];
+	int ret;
+	int fd;
+
+	/* Ensure cleared */
+	ret = clear();
+
+	if (ret != 0)
+		return ret;
+
+	fd = open(data_file, O_RDWR);
+
+	if (fd == -1)
+		return fd;
+
+	reg.size = sizeof(reg);
+	reg.name_args = (__u64)event;
+
+	/* Register should work */
+	ret = ioctl(fd, DIAG_IOCSREG, &reg);
+
+	close(fd);
+
+	if (ret != 0)
+		return ret;
+
+	/* Ensure correct print_fmt */
+	ret = get_print_fmt(print_fmt, sizeof(print_fmt));
+
+	if (ret != 0)
+		return ret;
+
+	return strcmp(print_fmt, expected);
 }
 
 FIXTURE(user) {
@@ -280,6 +374,78 @@ TEST_F(user, write_validator) {
 	loc = DYN_LOC(0, bytes);
 	ASSERT_EQ(-1, writev(self->data_fd, (const struct iovec *)io, 3));
 	ASSERT_EQ(EFAULT, errno);
+}
+
+TEST_F(user, print_fmt) {
+	int ret;
+
+	ret = check_print_fmt("__test_event __rel_loc char[] data",
+			      "print fmt: \"data=%s\", __get_rel_str(data)");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event __data_loc char[] data",
+			      "print fmt: \"data=%s\", __get_str(data)");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event s64 data",
+			      "print fmt: \"data=%lld\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event u64 data",
+			      "print fmt: \"data=%llu\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event s32 data",
+			      "print fmt: \"data=%d\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event u32 data",
+			      "print fmt: \"data=%u\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event int data",
+			      "print fmt: \"data=%d\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event unsigned int data",
+			      "print fmt: \"data=%u\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event s16 data",
+			      "print fmt: \"data=%d\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event u16 data",
+			      "print fmt: \"data=%u\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event short data",
+			      "print fmt: \"data=%d\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event unsigned short data",
+			      "print fmt: \"data=%u\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event s8 data",
+			      "print fmt: \"data=%d\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event u8 data",
+			      "print fmt: \"data=%u\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event char data",
+			      "print fmt: \"data=%d\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event unsigned char data",
+			      "print fmt: \"data=%u\", REC->data");
+	ASSERT_EQ(0, ret);
+
+	ret = check_print_fmt("__test_event char[4] data",
+			      "print fmt: \"data=%s\", REC->data");
+	ASSERT_EQ(0, ret);
 }
 
 int main(int argc, char **argv)

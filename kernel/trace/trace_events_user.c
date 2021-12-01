@@ -257,7 +257,7 @@ static int user_event_add_field(struct user_event *user, const char *type,
 	goto add_field;
 
 add_validator:
-	if (strstr(type, "char[") != 0)
+	if (strstr(type, "char") != 0)
 		validator_flags |= VALIDATOR_ENSURE_NULL;
 
 	validator = kmalloc(sizeof(*validator), GFP_KERNEL);
@@ -456,14 +456,21 @@ static const char *user_field_format(const char *type)
 	return "%llu";
 }
 
-static bool user_field_is_dyn_string(const char *type)
+static bool user_field_is_dyn_string(const char *type, const char **str_func)
 {
-	if (str_has_prefix(type, "__data_loc ") ||
-	    str_has_prefix(type, "__rel_loc "))
-		if (strstr(type, "char[") != 0)
-			return true;
+	if (str_has_prefix(type, "__data_loc ")) {
+		*str_func = "__get_str";
+		goto check;
+	}
+
+	if (str_has_prefix(type, "__rel_loc ")) {
+		*str_func = "__get_rel_str";
+		goto check;
+	}
 
 	return false;
+check:
+	return strstr(type, "char") != 0;
 }
 
 #define LEN_OR_ZERO (len ? len - pos : 0)
@@ -472,6 +479,7 @@ static int user_event_set_print_fmt(struct user_event *user, char *buf, int len)
 	struct ftrace_event_field *field, *next;
 	struct list_head *head = &user->fields;
 	int pos = 0, depth = 0;
+	const char *str_func;
 
 	pos += snprintf(buf + pos, LEN_OR_ZERO, "\"");
 
@@ -488,9 +496,9 @@ static int user_event_set_print_fmt(struct user_event *user, char *buf, int len)
 	pos += snprintf(buf + pos, LEN_OR_ZERO, "\"");
 
 	list_for_each_entry_safe_reverse(field, next, head, link) {
-		if (user_field_is_dyn_string(field->type))
+		if (user_field_is_dyn_string(field->type, &str_func))
 			pos += snprintf(buf + pos, LEN_OR_ZERO,
-					", __get_str(%s)", field->name);
+					", %s(%s)", str_func, field->name);
 		else
 			pos += snprintf(buf + pos, LEN_OR_ZERO,
 					", REC->%s", field->name);
