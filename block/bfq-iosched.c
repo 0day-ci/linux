@@ -5283,6 +5283,7 @@ void bfq_put_queue(struct bfq_queue *bfqq)
 	if (bfqq->bfqd && bfqq->bfqd->last_completed_rq_bfqq == bfqq)
 		bfqq->bfqd->last_completed_rq_bfqq = NULL;
 
+	hlist_del(&bfqq->children_node);
 	kmem_cache_free(bfq_pool, bfqq);
 	bfqg_and_blkg_put(bfqg);
 }
@@ -5457,8 +5458,9 @@ static void bfq_check_ioprio_change(struct bfq_io_cq *bic, struct bio *bio)
 		bfq_set_next_ioprio_data(bfqq, bic);
 }
 
-static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
-			  struct bfq_io_cq *bic, pid_t pid, int is_sync)
+static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_group *bfqg,
+			  struct bfq_queue *bfqq, struct bfq_io_cq *bic,
+			  pid_t pid, int is_sync)
 {
 	u64 now_ns = ktime_get_ns();
 
@@ -5467,6 +5469,7 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	INIT_HLIST_NODE(&bfqq->burst_list_node);
 	INIT_HLIST_NODE(&bfqq->woken_list_node);
 	INIT_HLIST_HEAD(&bfqq->woken_list);
+	hlist_add_head(&bfqq->children_node, &bfqg->children);
 
 	bfqq->ref = 0;
 	bfqq->bfqd = bfqd;
@@ -5720,8 +5723,7 @@ static struct bfq_queue *bfq_get_queue(struct bfq_data *bfqd,
 				     bfqd->queue->node);
 
 	if (bfqq) {
-		bfq_init_bfqq(bfqd, bfqq, bic, current->pid,
-			      is_sync);
+		bfq_init_bfqq(bfqd, bfqg, bfqq, bic, current->pid, is_sync);
 		bfq_init_entity(&bfqq->entity, bfqg);
 		bfq_log_bfqq(bfqd, bfqq, "allocated");
 	} else {
@@ -7006,6 +7008,7 @@ static void bfq_exit_queue(struct elevator_queue *e)
 
 	hrtimer_cancel(&bfqd->idle_slice_timer);
 
+	hlist_del(&bfqd->oom_bfqq.children_node);
 	/* release oom-queue reference to root group */
 	bfqg_and_blkg_put(bfqd->root_group);
 
@@ -7056,28 +7059,6 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	spin_lock_irq(&q->queue_lock);
 	q->elevator = eq;
 	spin_unlock_irq(&q->queue_lock);
-
-	/*
-	 * Our fallback bfqq if bfq_find_alloc_queue() runs into OOM issues.
-	 * Grab a permanent reference to it, so that the normal code flow
-	 * will not attempt to free it.
-	 */
-	bfq_init_bfqq(bfqd, &bfqd->oom_bfqq, NULL, 1, 0);
-	bfqd->oom_bfqq.ref++;
-	bfqd->oom_bfqq.new_ioprio = BFQ_DEFAULT_QUEUE_IOPRIO;
-	bfqd->oom_bfqq.new_ioprio_class = IOPRIO_CLASS_BE;
-	bfqd->oom_bfqq.entity.new_weight =
-		bfq_ioprio_to_weight(bfqd->oom_bfqq.new_ioprio);
-
-	/* oom_bfqq does not participate to bursts */
-	bfq_clear_bfqq_just_created(&bfqd->oom_bfqq);
-
-	/*
-	 * Trigger weight initialization, according to ioprio, at the
-	 * oom_bfqq's first activation. The oom_bfqq's ioprio and ioprio
-	 * class won't be changed any more.
-	 */
-	bfqd->oom_bfqq.entity.prio_changed = 1;
 
 	bfqd->queue = q;
 
@@ -7157,6 +7138,27 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 		goto out_free;
 	bfq_init_root_group(bfqd->root_group, bfqd);
 	bfq_init_entity(&bfqd->oom_bfqq.entity, bfqd->root_group);
+	/*
+	 * Our fallback bfqq if bfq_find_alloc_queue() runs into OOM issues.
+	 * Grab a permanent reference to it, so that the normal code flow
+	 * will not attempt to free it.
+	 */
+	bfq_init_bfqq(bfqd, bfqd->root_group, &bfqd->oom_bfqq, NULL, 1, 0);
+	bfqd->oom_bfqq.ref++;
+	bfqd->oom_bfqq.new_ioprio = BFQ_DEFAULT_QUEUE_IOPRIO;
+	bfqd->oom_bfqq.new_ioprio_class = IOPRIO_CLASS_BE;
+	bfqd->oom_bfqq.entity.new_weight =
+		bfq_ioprio_to_weight(bfqd->oom_bfqq.new_ioprio);
+
+	/* oom_bfqq does not participate to bursts */
+	bfq_clear_bfqq_just_created(&bfqd->oom_bfqq);
+
+	/*
+	 * Trigger weight initialization, according to ioprio, at the
+	 * oom_bfqq's first activation. The oom_bfqq's ioprio and ioprio
+	 * class won't be changed any more.
+	 */
+	bfqd->oom_bfqq.entity.prio_changed = 1;
 
 	wbt_disable_default(q);
 	return 0;
