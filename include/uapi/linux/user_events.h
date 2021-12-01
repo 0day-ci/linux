@@ -29,6 +29,9 @@
 #define EVENT_STATUS_PERF (1 << EVENT_BIT_PERF)
 #define EVENT_STATUS_OTHER (1 << EVENT_BIT_OTHER)
 
+/* Create dynamic location entry within a 32-bit value */
+#define DYN_LOC(offset, size) ((size) << 16 | (offset))
+
 /* Use raw iterator for attached BPF program(s), no affect on ftrace/perf */
 #define FLAG_BPF_ITER (1 << 0)
 
