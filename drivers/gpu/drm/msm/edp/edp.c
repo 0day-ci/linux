@@ -66,8 +66,7 @@ fail:
 
 static int edp_bind(struct device *dev, struct device *master, void *data)
 {
-	struct drm_device *drm = dev_get_drvdata(master);
-	struct msm_drm_private *priv = drm->dev_private;
+	struct msm_drm_private *priv = dev_get_drvdata(master);
 	struct msm_edp *edp;
 
 	DBG("");
@@ -81,8 +80,7 @@ static int edp_bind(struct device *dev, struct device *master, void *data)
 
 static void edp_unbind(struct device *dev, struct device *master, void *data)
 {
-	struct drm_device *drm = dev_get_drvdata(master);
-	struct msm_drm_private *priv = drm->dev_private;
+	struct msm_drm_private *priv = dev_get_drvdata(master);
 
 	DBG("");
 	if (priv->edp) {
