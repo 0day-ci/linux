@@ -787,6 +787,8 @@ static int mt79xx_setup(struct hci_dev *hdev, const char *fwname)
 		return err;
 	}
 
+	hci_set_aosp_capable(hdev);
+
 	return err;
 }
 
