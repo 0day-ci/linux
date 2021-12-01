@@ -670,7 +670,8 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	LIST_HEAD(resources);
 	resource_size_t offset[2] = {0};
 	resource_size_t membar2_offset = 0x2000;
-	struct pci_bus *child;
+	struct pci_bus *child, *bus;
+	struct pci_host_bridge *root_bridge, *vmd_bridge;
 	int ret;
 
 	/*
@@ -797,6 +798,21 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 		vmd_remove_irq_domain(vmd);
 		return -ENODEV;
 	}
+
+	vmd_bridge = to_pci_host_bridge(vmd->bus->bridge);
+
+	bus = vmd->dev->bus;
+	while (bus->parent)
+		bus = bus->parent;
+
+	root_bridge = to_pci_host_bridge(bus->bridge);
+
+	vmd_bridge->native_pcie_hotplug = root_bridge->native_pcie_hotplug;
+	vmd_bridge->native_shpc_hotplug = root_bridge->native_shpc_hotplug;
+	vmd_bridge->native_aer = root_bridge->native_aer;
+	vmd_bridge->native_pme = root_bridge->native_pme;
+	vmd_bridge->native_ltr = root_bridge->native_ltr;
+	vmd_bridge->native_dpc = root_bridge->native_dpc;
 
 	vmd_attach_resources(vmd);
 	if (vmd->irq_domain)
