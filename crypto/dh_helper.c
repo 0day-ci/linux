@@ -7,6 +7,7 @@
 #include <linux/export.h>
 #include <linux/err.h>
 #include <linux/string.h>
+#include <linux/fips.h>
 #include <crypto/dh.h>
 #include <crypto/kpp.h>
 #include <crypto/rng.h>
@@ -622,6 +623,9 @@ int crypto_dh_decode_key(const char *buf, unsigned int len, struct dh *params)
 	    params->g_size > params->p_size)
 		return -EINVAL;
 
+	/* Only safe-prime groups are allowed in FIPS mode. */
+	if (fips_enabled && params->group_id == dh_group_id_unknown)
+		return -EINVAL;
 
 	return 0;
 }
