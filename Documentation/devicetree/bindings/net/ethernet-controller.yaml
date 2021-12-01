@@ -178,7 +178,7 @@ properties:
                   Duplex configuration. 0 for half duplex or 1 for
                   full duplex
 
-              - enum: [10, 100, 1000]
+              - enum: [10, 100, 1000, 2500]
                 description:
                   Link speed in Mbits/sec.
 
