@@ -29,6 +29,13 @@ enum dh_group_id {
 	dh_group_id_rfc7919_ffdhe6144,
 	dh_group_id_rfc7919_ffdhe8192,
 #endif
+#ifdef CONFIG_CRYPTO_DH_GROUPS_RFC3526
+	dh_group_id_rfc3526_modp2048 = 6, /* Constant used by test vector. */
+	dh_group_id_rfc3526_modp3072,
+	dh_group_id_rfc3526_modp4096,
+	dh_group_id_rfc3526_modp6144,
+	dh_group_id_rfc3526_modp8192,
+#endif
 };
 
 /**
