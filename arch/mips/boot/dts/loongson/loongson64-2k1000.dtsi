@@ -193,6 +193,17 @@
 				interrupt-parent = <&liointc0>;
 			};
 
+			gpu@5,0 {
+				compatible = "pci0014,7a05.0",
+						   "pci0014,7a05",
+						   "pciclass030200",
+						   "pciclass0302";
+
+				reg = <0x2800 0x0 0x0 0x0 0x0>;
+				interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
+				interrupt-parent = <&liointc0>;
+			};
+
 			pci_bridge@9,0 {
 				compatible = "pci0014,7a19.0",
 						   "pci0014,7a19",
