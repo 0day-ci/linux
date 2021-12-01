@@ -21,6 +21,7 @@
 #include "ice_trace.h"
 #include "ice_eswitch.h"
 #include "ice_tc_lib.h"
+#include "ice_vsi_vlan_ops.h"
 
 #define DRV_SUMMARY	"Intel(R) Ethernet Connection E800 Series Linux Driver"
 static const char ice_driver_string[] = DRV_SUMMARY;
@@ -249,7 +250,7 @@ static int ice_set_promisc(struct ice_vsi *vsi, u8 promisc_m)
 	if (vsi->type != ICE_VSI_PF)
 		return 0;
 
-	if (vsi->num_vlan > 1)
+	if (ice_vsi_has_non_zero_vlans(vsi))
 		status = ice_fltr_set_vlan_vsi_promisc(&vsi->back->hw, vsi, promisc_m);
 	else
 		status = ice_fltr_set_vsi_promisc(&vsi->back->hw, vsi->idx, promisc_m, 0);
@@ -270,7 +271,7 @@ static int ice_clear_promisc(struct ice_vsi *vsi, u8 promisc_m)
 	if (vsi->type != ICE_VSI_PF)
 		return 0;
 
-	if (vsi->num_vlan > 1)
+	if (ice_vsi_has_non_zero_vlans(vsi))
 		status = ice_fltr_clear_vlan_vsi_promisc(&vsi->back->hw, vsi, promisc_m);
 	else
 		status = ice_fltr_clear_vsi_promisc(&vsi->back->hw, vsi->idx, promisc_m, 0);
@@ -286,6 +287,7 @@ static int ice_clear_promisc(struct ice_vsi *vsi, u8 promisc_m)
  */
 static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 {
+	struct ice_vsi_vlan_ops *vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
 	struct device *dev = ice_pf_to_dev(vsi->back);
 	struct net_device *netdev = vsi->netdev;
 	bool promisc_forced_on = false;
@@ -358,7 +360,7 @@ static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 	/* check for changes in promiscuous modes */
 	if (changed_flags & IFF_ALLMULTI) {
 		if (vsi->current_netdev_flags & IFF_ALLMULTI) {
-			if (vsi->num_vlan > 1)
+			if (ice_vsi_has_non_zero_vlans(vsi))
 				promisc_m = ICE_MCAST_VLAN_PROMISC_BITS;
 			else
 				promisc_m = ICE_MCAST_PROMISC_BITS;
@@ -372,7 +374,7 @@ static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 			}
 		} else {
 			/* !(vsi->current_netdev_flags & IFF_ALLMULTI) */
-			if (vsi->num_vlan > 1)
+			if (ice_vsi_has_non_zero_vlans(vsi))
 				promisc_m = ICE_MCAST_VLAN_PROMISC_BITS;
 			else
 				promisc_m = ICE_MCAST_PROMISC_BITS;
@@ -401,7 +403,7 @@ static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 						~IFF_PROMISC;
 					goto out_promisc;
 				}
-				vsi->vlan_ops.dis_rx_filtering(vsi);
+				vlan_ops->dis_rx_filtering(vsi);
 			}
 		} else {
 			/* Clear Rx filter to remove traffic from wire */
@@ -415,7 +417,7 @@ static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 					goto out_promisc;
 				}
 				if (vsi->num_vlan > 1)
-					vsi->vlan_ops.ena_rx_filtering(vsi);
+					vlan_ops->ena_rx_filtering(vsi);
 			}
 		}
 	}
@@ -3419,6 +3421,7 @@ static int
 ice_vlan_rx_add_vid(struct net_device *netdev, __be16 proto, u16 vid)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi_vlan_ops *vlan_ops;
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_vlan vlan;
 	int ret;
@@ -3427,9 +3430,11 @@ ice_vlan_rx_add_vid(struct net_device *netdev, __be16 proto, u16 vid)
 	if (!vid)
 		return 0;
 
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+
 	/* Enable VLAN pruning when a VLAN other than 0 is added */
 	if (!ice_vsi_is_vlan_pruning_ena(vsi)) {
-		ret = vsi->vlan_ops.ena_rx_filtering(vsi);
+		ret = vlan_ops->ena_rx_filtering(vsi);
 		if (ret)
 			return ret;
 	}
@@ -3438,7 +3443,7 @@ ice_vlan_rx_add_vid(struct net_device *netdev, __be16 proto, u16 vid)
 	 * packets aren't pruned by the device's internal switch on Rx
 	 */
 	vlan = ICE_VLAN(be16_to_cpu(proto), vid, 0);
-	ret = vsi->vlan_ops.add_vlan(vsi, &vlan);
+	ret = vlan_ops->add_vlan(vsi, &vlan);
 	if (!ret)
 		set_bit(ICE_VSI_VLAN_FLTR_CHANGED, vsi->state);
 
@@ -3457,6 +3462,7 @@ static int
 ice_vlan_rx_kill_vid(struct net_device *netdev, __be16 proto, u16 vid)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi_vlan_ops *vlan_ops;
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_vlan vlan;
 	int ret;
@@ -3465,17 +3471,19 @@ ice_vlan_rx_kill_vid(struct net_device *netdev, __be16 proto, u16 vid)
 	if (!vid)
 		return 0;
 
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+
 	/* Make sure VLAN delete is successful before updating VLAN
 	 * information
 	 */
 	vlan = ICE_VLAN(be16_to_cpu(proto), vid, 0);
-	ret = vsi->vlan_ops.del_vlan(vsi, &vlan);
+	ret = vlan_ops->del_vlan(vsi, &vlan);
 	if (ret)
 		return ret;
 
 	/* Disable pruning when VLAN 0 is the only VLAN rule */
 	if (vsi->num_vlan == 1 && ice_vsi_is_vlan_pruning_ena(vsi))
-		vsi->vlan_ops.dis_rx_filtering(vsi);
+		vlan_ops->dis_rx_filtering(vsi);
 
 	set_bit(ICE_VSI_VLAN_FLTR_CHANGED, vsi->state);
 	return ret;
@@ -5592,6 +5600,7 @@ static int
 ice_set_features(struct net_device *netdev, netdev_features_t features)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi_vlan_ops *vlan_ops;
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_pf *pf = vsi->back;
 	int ret = 0;
@@ -5608,6 +5617,8 @@ ice_set_features(struct net_device *netdev, netdev_features_t features)
 		return -EBUSY;
 	}
 
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+
 	/* Multiple features can be changed in one call so keep features in
 	 * separate if/else statements to guarantee each feature is checked
 	 */
@@ -5619,24 +5630,24 @@ ice_set_features(struct net_device *netdev, netdev_features_t features)
 
 	if ((features & NETIF_F_HW_VLAN_CTAG_RX) &&
 	    !(netdev->features & NETIF_F_HW_VLAN_CTAG_RX))
-		ret = vsi->vlan_ops.ena_stripping(vsi, ETH_P_8021Q);
+		ret = vlan_ops->ena_stripping(vsi, ETH_P_8021Q);
 	else if (!(features & NETIF_F_HW_VLAN_CTAG_RX) &&
 		 (netdev->features & NETIF_F_HW_VLAN_CTAG_RX))
-		ret = vsi->vlan_ops.dis_stripping(vsi);
+		ret = vlan_ops->dis_stripping(vsi);
 
 	if ((features & NETIF_F_HW_VLAN_CTAG_TX) &&
 	    !(netdev->features & NETIF_F_HW_VLAN_CTAG_TX))
-		ret = vsi->vlan_ops.ena_insertion(vsi, ETH_P_8021Q);
+		ret = vlan_ops->ena_insertion(vsi, ETH_P_8021Q);
 	else if (!(features & NETIF_F_HW_VLAN_CTAG_TX) &&
 		 (netdev->features & NETIF_F_HW_VLAN_CTAG_TX))
-		ret = vsi->vlan_ops.dis_insertion(vsi);
+		ret = vlan_ops->dis_insertion(vsi);
 
 	if ((features & NETIF_F_HW_VLAN_CTAG_FILTER) &&
 	    !(netdev->features & NETIF_F_HW_VLAN_CTAG_FILTER))
-		ret = vsi->vlan_ops.ena_rx_filtering(vsi);
+		ret = vlan_ops->ena_rx_filtering(vsi);
 	else if (!(features & NETIF_F_HW_VLAN_CTAG_FILTER) &&
 		 (netdev->features & NETIF_F_HW_VLAN_CTAG_FILTER))
-		ret = vsi->vlan_ops.dis_rx_filtering(vsi);
+		ret = vlan_ops->dis_rx_filtering(vsi);
 
 	if ((features & NETIF_F_NTUPLE) &&
 	    !(netdev->features & NETIF_F_NTUPLE)) {
@@ -5664,19 +5675,21 @@ ice_set_features(struct net_device *netdev, netdev_features_t features)
 }
 
 /**
- * ice_vsi_vlan_setup - Setup VLAN offload properties on a VSI
+ * ice_vsi_vlan_setup - Setup VLAN offload properties on a PF VSI
  * @vsi: VSI to setup VLAN properties for
  */
 static int ice_vsi_vlan_setup(struct ice_vsi *vsi)
 {
-	int ret = 0;
+	struct ice_vsi_vlan_ops *vlan_ops;
+
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
 
 	if (vsi->netdev->features & NETIF_F_HW_VLAN_CTAG_RX)
-		ret = vsi->vlan_ops.ena_stripping(vsi, ETH_P_8021Q);
+		vlan_ops->ena_stripping(vsi, ETH_P_8021Q);
 	if (vsi->netdev->features & NETIF_F_HW_VLAN_CTAG_TX)
-		ret = vsi->vlan_ops.ena_insertion(vsi, ETH_P_8021Q);
+		vlan_ops->ena_insertion(vsi, ETH_P_8021Q);
 
-	return ret;
+	return ice_vsi_add_vlan_zero(vsi);
 }
 
 /**
@@ -6277,11 +6290,12 @@ static void ice_napi_disable_all(struct ice_vsi *vsi)
  */
 int ice_down(struct ice_vsi *vsi)
 {
-	int i, tx_err, rx_err, link_err = 0;
+	int i, tx_err, rx_err, link_err = 0, vlan_err = 0;
 
 	WARN_ON(!test_bit(ICE_VSI_DOWN, vsi->state));
 
 	if (vsi->netdev && vsi->type == ICE_VSI_PF) {
+		vlan_err = ice_vsi_del_vlan_zero(vsi);
 		if (!ice_is_e810(&vsi->back->hw))
 			ice_ptp_link_change(vsi->back, vsi->back->hw.pf_id, false);
 		netif_carrier_off(vsi->netdev);
@@ -6323,7 +6337,7 @@ int ice_down(struct ice_vsi *vsi)
 	ice_for_each_rxq(vsi, i)
 		ice_clean_rx_ring(vsi->rx_rings[i]);
 
-	if (tx_err || rx_err || link_err) {
+	if (tx_err || rx_err || link_err || vlan_err) {
 		netdev_err(vsi->netdev, "Failed to close VSI 0x%04X on switch 0x%04X\n",
 			   vsi->vsi_num, vsi->vsw->sw_id);
 		return -EIO;
