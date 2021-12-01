@@ -271,6 +271,59 @@ static inline bool pagefault_disabled(void)
  */
 #define faulthandler_disabled() (pagefault_disabled() || in_atomic())
 
+#ifndef CONFIG_ARCH_HAS_SUBPAGE_FAULTS
+
+/**
+ * probe_subpage_writeable: probe the user range for write faults at sub-page
+ *			    granularity (e.g. arm64 MTE)
+ * @uaddr: start of address range
+ * @size: size of address range
+ *
+ * Returns 0 on success, the number of bytes not probed on fault.
+ *
+ * It is expected that the caller checked for the write permission of each
+ * page in the range either by put_user() or GUP. The architecture port can
+ * implement a more efficient get_user() probing if the same sub-page faults
+ * are triggered by either a read or a write.
+ */
+static inline size_t probe_subpage_writeable(void __user *uaddr, size_t size)
+{
+	return 0;
+}
+
+/**
+ * probe_subpage_safe_writeable: probe the user range for write faults at
+ *				 sub-page granularity without corrupting the
+ *				 existing data
+ * @uaddr: start of address range
+ * @size: size of address range
+ *
+ * Returns 0 on success, the number of bytes not probed on fault.
+ *
+ * It is expected that the caller checked for the write permission of each
+ * page in the range either by put_user() or GUP.
+ */
+static inline size_t probe_subpage_safe_writeable(void __user *uaddr,
+						  size_t size)
+{
+	return 0;
+}
+
+/**
+ * probe_subpage_readable: probe the user range for read faults at sub-page
+ *			   granularity
+ * @uaddr: start of address range
+ * @size: size of address range
+ *
+ * Returns 0 on success, the number of bytes not probed on fault.
+ */
+static inline size_t probe_subpage_readable(void __user *uaddr, size_t size)
+{
+	return 0;
+}
+
+#endif
+
 #ifndef ARCH_HAS_NOCACHE_UACCESS
 
 static inline __must_check unsigned long

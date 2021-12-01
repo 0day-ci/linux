@@ -1691,7 +1691,8 @@ size_t fault_in_writeable(char __user *uaddr, size_t size, size_t min_size)
 out:
 	if (size > uaddr - start)
 		faulted_in = uaddr - start;
-	if (faulted_in < min_size)
+	if (faulted_in < min_size ||
+	    (min_size && probe_subpage_writeable(start, min_size)))
 		return size;
 	return size - faulted_in;
 }
@@ -1759,7 +1760,8 @@ size_t fault_in_safe_writeable(const char __user *uaddr, size_t size,
 		mmap_read_unlock(mm);
 	if (nstart != end)
 		faulted_in = min_t(size_t, nstart - start, size);
-	if (faulted_in < min_size)
+	if (faulted_in < min_size ||
+	    (min_size && probe_subpage_safe_writeable(uaddr, min_size)))
 		return size;
 	return size - faulted_in;
 }
@@ -1801,7 +1803,8 @@ out:
 	(void)c;
 	if (size > uaddr - start)
 		faulted_in = uaddr - start;
-	if (faulted_in < min_size)
+	if (faulted_in < min_size ||
+	    (min_size && probe_subpage_readable(start, min_size)))
 		return size;
 	return size - faulted_in;
 }
