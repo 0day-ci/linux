@@ -81,7 +81,8 @@ struct scripting_ops {
 			       struct perf_sample *sample,
 			       struct evsel *evsel,
 			       struct addr_location *al,
-			       struct addr_location *addr_al);
+			       struct addr_location *addr_al,
+			       struct machine *machine);
 	void (*process_switch)(union perf_event *event,
 			       struct perf_sample *sample,
 			       struct machine *machine);

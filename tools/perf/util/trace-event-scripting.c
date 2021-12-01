@@ -51,7 +51,8 @@ static void process_event_unsupported(union perf_event *event __maybe_unused,
 				      struct perf_sample *sample __maybe_unused,
 				      struct evsel *evsel __maybe_unused,
 				      struct addr_location *al __maybe_unused,
-				      struct addr_location *addr_al __maybe_unused)
+				      struct addr_location *addr_al __maybe_unused,
+				      struct machine *machine __maybe_unused)
 {
 }
 

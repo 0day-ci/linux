@@ -454,7 +454,8 @@ static void perl_process_event(union perf_event *event,
 			       struct perf_sample *sample,
 			       struct evsel *evsel,
 			       struct addr_location *al,
-			       struct addr_location *addr_al)
+			       struct addr_location *addr_al,
+			       struct machine *machine __maybe_unused)
 {
 	scripting_context__update(scripting_context, event, sample, evsel, al, addr_al);
 	perl_process_tracepoint(sample, evsel, al);

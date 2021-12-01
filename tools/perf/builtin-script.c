@@ -2256,7 +2256,7 @@ static int process_sample_event(struct perf_tool *tool,
 				thread__resolve(al.thread, &addr_al, sample);
 			addr_al_ptr = &addr_al;
 		}
-		scripting_ops->process_event(event, sample, evsel, &al, addr_al_ptr);
+		scripting_ops->process_event(event, sample, evsel, &al, addr_al_ptr, machine);
 	} else {
 		process_event(scr, sample, evsel, &al, &addr_al, machine);
 	}

@@ -708,7 +708,8 @@ static void regs_map(struct regs_dump *regs, uint64_t mask, char *bf, int size)
 
 static void set_regs_in_dict(PyObject *dict,
 			     struct perf_sample *sample,
-			     struct evsel *evsel)
+			     struct evsel *evsel,
+			     struct machine *machine __maybe_unused)
 {
 	struct perf_event_attr *attr = &evsel->core.attr;
 
@@ -776,6 +777,7 @@ static PyObject *get_perf_sample_dict(struct perf_sample *sample,
 					 struct evsel *evsel,
 					 struct addr_location *al,
 					 struct addr_location *addr_al,
+					 struct machine *machine,
 					 PyObject *callchain)
 {
 	PyObject *dict, *dict_sample, *brstack, *brstacksym;
@@ -849,7 +851,7 @@ static PyObject *get_perf_sample_dict(struct perf_sample *sample,
 			PyLong_FromUnsignedLongLong(sample->cyc_cnt));
 	}
 
-	set_regs_in_dict(dict, sample, evsel);
+	set_regs_in_dict(dict, sample, evsel, machine);
 
 	return dict;
 }
@@ -857,7 +859,8 @@ static PyObject *get_perf_sample_dict(struct perf_sample *sample,
 static void python_process_tracepoint(struct perf_sample *sample,
 				      struct evsel *evsel,
 				      struct addr_location *al,
-				      struct addr_location *addr_al)
+				      struct addr_location *addr_al,
+				      struct machine *machine)
 {
 	struct tep_event *event = evsel->tp_format;
 	PyObject *handler, *context, *t, *obj = NULL, *callchain;
@@ -964,7 +967,7 @@ static void python_process_tracepoint(struct perf_sample *sample,
 		PyTuple_SetItem(t, n++, dict);
 
 	if (get_argument_count(handler) == (int) n + 1) {
-		all_entries_dict = get_perf_sample_dict(sample, evsel, al, addr_al,
+		all_entries_dict = get_perf_sample_dict(sample, evsel, al, addr_al, machine,
 			callchain);
 		PyTuple_SetItem(t, n++,	all_entries_dict);
 	} else {
@@ -1366,7 +1369,8 @@ static int python_process_call_return(struct call_return *cr, u64 *parent_db_id,
 static void python_process_general_event(struct perf_sample *sample,
 					 struct evsel *evsel,
 					 struct addr_location *al,
-					 struct addr_location *addr_al)
+					 struct addr_location *addr_al,
+					 struct machine *machine)
 {
 	PyObject *handler, *t, *dict, *callchain;
 	static char handler_name[64];
@@ -1388,7 +1392,7 @@ static void python_process_general_event(struct perf_sample *sample,
 
 	/* ip unwinding */
 	callchain = python_process_callchain(sample, evsel, al);
-	dict = get_perf_sample_dict(sample, evsel, al, addr_al, callchain);
+	dict = get_perf_sample_dict(sample, evsel, al, addr_al, machine, callchain);
 
 	PyTuple_SetItem(t, n++, dict);
 	if (_PyTuple_Resize(&t, n) == -1)
@@ -1403,7 +1407,8 @@ static void python_process_event(union perf_event *event,
 				 struct perf_sample *sample,
 				 struct evsel *evsel,
 				 struct addr_location *al,
-				 struct addr_location *addr_al)
+				 struct addr_location *addr_al,
+				 struct machine *machine)
 {
 	struct tables *tables = &tables_global;
 
@@ -1411,14 +1416,14 @@ static void python_process_event(union perf_event *event,
 
 	switch (evsel->core.attr.type) {
 	case PERF_TYPE_TRACEPOINT:
-		python_process_tracepoint(sample, evsel, al, addr_al);
+		python_process_tracepoint(sample, evsel, al, addr_al, machine);
 		break;
 	/* Reserve for future process_hw/sw/raw APIs */
 	default:
 		if (tables->db_export_mode)
 			db_export__sample(&tables->dbe, event, sample, evsel, al, addr_al);
 		else
-			python_process_general_event(sample, evsel, al, addr_al);
+			python_process_general_event(sample, evsel, al, addr_al, machine);
 	}
 }
 
