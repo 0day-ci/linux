@@ -434,7 +434,8 @@ err_undo:
 static int __alloc_range(struct drm_buddy_mm *mm,
 			 struct list_head *dfs,
 			 u64 start, u64 size,
-			 struct list_head *blocks)
+			 struct list_head *blocks,
+			 bool trim_path)
 {
 	struct drm_buddy_block *block;
 	struct drm_buddy_block *buddy;
@@ -480,8 +481,20 @@ static int __alloc_range(struct drm_buddy_mm *mm,
 
 		if (!drm_buddy_block_is_split(block)) {
 			err = split_block(mm, block);
-			if (unlikely(err))
+			if (unlikely(err)) {
+				if (trim_path)
+					/*
+					 * Here in case of trim, we return and dont goto
+					 * split failure path as it removes from the
+					 * original list and potentially also freeing
+					 * the block. so we could leave as it is,
+					 * worse case we get some internal fragmentation
+					 * and leave the decision to the user
+					 */
+					return err;
+
 				goto err_undo;
+			}
 		}
 
 		list_add(&block->right->tmp_link, dfs);
@@ -535,8 +548,61 @@ static int __drm_buddy_alloc_range(struct drm_buddy_mm *mm,
 	for (i = 0; i < mm->n_roots; ++i)
 		list_add_tail(&mm->roots[i]->tmp_link, &dfs);
 
-	return __alloc_range(mm, &dfs, start, size, blocks);
+	return __alloc_range(mm, &dfs, start, size, blocks, 0);
 }
+
+/**
+ * drm_buddy_block_trim - free unused pages
+ *
+ * @mm: DRM buddy manager
+ * @new_size: original size requested
+ * @blocks: output list head to add allocated blocks
+ *
+ * For contiguous allocation, we round up the size to the nearest
+ * power of two value, drivers consume *actual* size, so remaining
+ * portions are unused and it can be freed.
+ *
+ * Returns:
+ * 0 on success, error code on failure.
+ */
+int drm_buddy_block_trim(struct drm_buddy_mm *mm,
+			 u64 new_size,
+			 struct list_head *blocks)
+{
+	struct drm_buddy_block *block;
+	u64 new_start;
+	LIST_HEAD(dfs);
+
+	if (!list_is_singular(blocks))
+		return -EINVAL;
+
+	block = list_first_entry(blocks,
+				 struct drm_buddy_block,
+				 link);
+
+	if (!drm_buddy_block_is_allocated(block))
+		return -EINVAL;
+
+	if (new_size > drm_buddy_block_size(mm, block))
+		return -EINVAL;
+
+	if (!new_size && !IS_ALIGNED(new_size, mm->chunk_size))
+		return -EINVAL;
+
+	if (new_size == drm_buddy_block_size(mm, block))
+		return 0;
+
+	list_del(&block->link);
+
+	new_start = drm_buddy_block_offset(block);
+
+	mark_free(mm, block);
+
+	list_add(&block->tmp_link, &dfs);
+
+	return __alloc_range(mm, &dfs, new_start, new_size, blocks, 1);
+}
+EXPORT_SYMBOL(drm_buddy_block_trim);
 
 /**
  * drm_buddy_alloc - allocate power-of-two blocks
