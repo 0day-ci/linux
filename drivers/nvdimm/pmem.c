@@ -416,8 +416,10 @@ static int pmem_attach_disk(struct device *dev,
 	if (is_nd_pfn(dev)) {
 		nd_pfn = to_nd_pfn(dev);
 		rc = nvdimm_setup_pfn(nd_pfn, &pmem->pgmap);
-		if (rc)
+		if (rc) {
+			devm_namespace_disable(dev, ndns);
 			return rc;
+		}
 	}
 
 	/* we're attaching a block device, disable raw namespace access */
@@ -564,17 +566,15 @@ static int nd_pmem_probe(struct device *dev)
 	ret = nd_pfn_probe(dev, ndns);
 	if (ret == 0)
 		return -ENXIO;
-	else if (ret == -EOPNOTSUPP)
-		return ret;
-
-	ret = nd_dax_probe(dev, ndns);
-	if (ret == 0)
-		return -ENXIO;
-	else if (ret == -EOPNOTSUPP)
-		return ret;
-
+	else if (ret != -EOPNOTSUPP) {
+		ret = nd_dax_probe(dev, ndns);
+		if (ret == 0)
+			return -ENXIO;
+	}
 	/* probe complete, attach handles namespace enabling */
 	devm_namespace_disable(dev, ndns);
+	if (ret == -EOPNOTSUPP)
+		return ret;
 
 	return pmem_attach_disk(dev, ndns);
 }
