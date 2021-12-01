@@ -1331,8 +1331,7 @@ static const struct kpp_testvec dh_tv_template[] = {
 	.expected_a_public_size = 256,
 	.expected_ss_size = 256,
 	},
-#endif /* IS_ENABLED(CONFIG_CRYPTO_DH_GROUPS_RFC7919) */
-#if IS_ENABLED(CONFIG_CRYPTO_DH_GROUPS_RFC3526)
+#elif IS_ENABLED(CONFIG_CRYPTO_DH_GROUPS_RFC3526)
 	{
 	.secret =
 #ifdef __LITTLE_ENDIAN
@@ -1423,7 +1422,7 @@ static const struct kpp_testvec dh_tv_template[] = {
 	.expected_a_public_size = 256,
 	.expected_ss_size = 256,
 	},
-#endif /* IS_ENABLED(CONFIG_CRYPTO_DH_GROUPS_RFC3526) */
+#else
 	{
 	.secret =
 #ifdef __LITTLE_ENDIAN
@@ -1642,6 +1641,7 @@ static const struct kpp_testvec dh_tv_template[] = {
 	.expected_a_public_size = 256,
 	.expected_ss_size = 256,
 	},
+#endif
 };
 
 static const struct kpp_testvec curve25519_tv_template[] = {
