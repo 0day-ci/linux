@@ -177,6 +177,8 @@ struct aic_irq_chip {
 	void __iomem *base;
 	struct irq_domain *hw_domain;
 	struct irq_domain *ipi_domain;
+	struct cpumask ecore_mask;
+	struct cpumask pcore_mask;
 	int nr_hw;
 	int ipi_hwirq;
 };
@@ -198,6 +200,11 @@ static u32 aic_ic_read(struct aic_irq_chip *ic, u32 reg)
 static void aic_ic_write(struct aic_irq_chip *ic, u32 reg, u32 val)
 {
 	writel_relaxed(val, ic->base + reg);
+}
+
+static bool __is_pcore(u64 mpidr)
+{
+	return MPIDR_AFFINITY_LEVEL(mpidr, 2) == 1;
 }
 
 /*
@@ -831,6 +838,13 @@ static int __init aic_of_ic_init(struct device_node *node, struct device_node *p
 		iounmap(irqc->base);
 		kfree(irqc);
 		return -ENODEV;
+	}
+
+	for_each_possible_cpu(i) {
+		if (__is_pcore(cpu_logical_map(i)))
+			cpumask_set_cpu(i, &irqc->pcore_mask);
+		else
+			cpumask_set_cpu(i, &irqc->ecore_mask);
 	}
 
 	set_handle_irq(aic_handle_irq);
