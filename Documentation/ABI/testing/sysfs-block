@@ -515,6 +515,16 @@ Description:
 		scheduler module, if it isn't already present in the system.
 
 
+What:		/sys/block/<disk>/queue/stable_writes
+Date:		September 2020
+Contact:	linux-block@vger.kernel.org
+Description:
+		[RW] If the device requires that memory must not be modified
+		while it is being written out to disk, this file will contain
+		'1'.  Otherwise it will contain '0'.  This file is writable for
+		testing purposes.
+
+
 What:		/sys/block/<disk>/queue/throttle_sample_time
 Date:		March 2017
 Contact:	linux-block@vger.kernel.org
