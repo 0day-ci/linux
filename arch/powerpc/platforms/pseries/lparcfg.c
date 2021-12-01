@@ -311,6 +311,58 @@ static void parse_mpp_x_data(struct seq_file *m)
 		seq_printf(m, "coalesce_pool_spurr=%ld\n", mpp_x_data.pool_spurr_cycles);
 }
 
+/*
+ * PAPR defines no maximum for the LPAR name, and defines that the maximum
+ * length of the get-system-parameter's output buffer is 4000 plus 2 bytes for
+ * the length. Limit LPAR's name size to 1024
+ */
+#define SPLPAR_LPAR_NAME_MAXLEN	1026
+#define SPLPAR_LPAR_NAME_TOKEN	55
+static void parse_lpar_name(struct seq_file *m)
+{
+	int rc, len, token;
+	unsigned char *local_buffer;
+
+	token = rtas_token("ibm,get-system-parameter");
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return;
+
+	local_buffer = kmalloc(SPLPAR_LPAR_NAME_MAXLEN, GFP_KERNEL);
+	if (!local_buffer)
+		return;
+
+	do {
+		spin_lock(&rtas_data_buf_lock);
+
+		memset(rtas_data_buf, 0, RTAS_DATA_BUF_SIZE);
+		rc = rtas_call(token, 3, 1, NULL, SPLPAR_LPAR_NAME_TOKEN,
+			       __pa(rtas_data_buf), RTAS_DATA_BUF_SIZE);
+		memcpy(local_buffer, rtas_data_buf, SPLPAR_LPAR_NAME_MAXLEN);
+
+		spin_unlock(&rtas_data_buf_lock);
+	} while (rtas_busy_delay(rc));
+
+	if (rc != 0) {
+		pr_err_once(
+			"%s %s Error calling get-system-parameter (0x%x)\n",
+			__FILE__, __func__, rc);
+	} else {
+		local_buffer[SPLPAR_LPAR_NAME_MAXLEN - 1] = '\0';
+		len = local_buffer[0] * 256 + local_buffer[1];
+
+		/*
+		 * Forces an empty string in the weird case fw reports no data.
+		 */
+		if (!len)
+			local_buffer[2] = '\0';
+
+		seq_printf(m, "partition_name=%s\n", local_buffer + 2);
+	}
+
+	kfree(local_buffer);
+}
+
+
 #define SPLPAR_CHARACTERISTICS_TOKEN 20
 #define SPLPAR_MAXLENGTH 1026*(sizeof(char))
 
@@ -496,6 +548,7 @@ static int pseries_lparcfg_data(struct seq_file *m, void *v)
 
 	if (firmware_has_feature(FW_FEATURE_SPLPAR)) {
 		/* this call handles the ibm,get-system-parameter contents */
+		parse_lpar_name(m);
 		parse_system_parameter_string(m);
 		parse_ppp_data(m);
 		parse_mpp_data(m);
