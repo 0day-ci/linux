@@ -5763,6 +5763,17 @@ out_autopm:
 out_hdev_lock:
 	usb_unlock_device(hdev);
 
+	/*
+	 * Rogue usb sticks can cause endless device connection
+	 * events due to unstable electric connection. This
+	 * can cause very short time gap between unlock/lock
+	 * of hub device mutex thus causing mutex starvation
+	 * for some other lower priority thread. Thus sleep
+	 * would give fair chance to all other threads to
+	 * acquire the usb hub mutex.
+	 */
+	msleep(25);
+
 	/* Balance the stuff in kick_hub_wq() and allow autosuspend */
 	usb_autopm_put_interface(intf);
 	kref_put(&hub->kref, hub_release);
