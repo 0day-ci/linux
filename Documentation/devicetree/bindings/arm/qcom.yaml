@@ -201,10 +201,12 @@ properties:
 
       - items:
           - enum:
-              - qcom,sc7280-idp
-              - qcom,sc7280-idp2
+              - google,hoglin
               - google,piglin
               - google,senor
+              - qcom,sc7280-crd
+              - qcom,sc7280-idp
+              - qcom,sc7280-idp2
           - const: qcom,sc7280
 
       - items:
