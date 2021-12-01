@@ -12,6 +12,18 @@ enum ice_ptp_tmr_cmd {
 	READ_TIME
 };
 
+enum ice_eec_state {
+	ICE_EEC_STATE_INVALID = 0,       /* state is not valid */
+	ICE_EEC_STATE_FREERUN,           /* clock is free-running */
+	ICE_EEC_STATE_LOCKED,            /* clock is locked to the reference,
+					  * but the holdover memory is not valid
+					  */
+	ICE_EEC_STATE_LOCKED_HO_ACQ,     /* clock is locked to the reference
+					  * and holdover memory is valid
+					  */
+	ICE_EEC_STATE_HOLDOVER,          /* clock is in holdover mode */
+};
+
 /* Increment value to generate nanoseconds in the GLTSYN_TIME_L register for
  * the E810 devices. Based off of a PLL with an 812.5 MHz frequency.
  */
@@ -33,6 +45,8 @@ int ice_ptp_init_phy_e810(struct ice_hw *hw);
 int ice_read_sma_ctrl_e810t(struct ice_hw *hw, u8 *data);
 int ice_write_sma_ctrl_e810t(struct ice_hw *hw, u8 data);
 bool ice_is_pca9575_present(struct ice_hw *hw);
+enum ice_eec_state
+ice_get_zl_dpll_state(struct ice_hw *hw, u8 dpll_idx, u8 *pin);
 
 #define PFTSYN_SEM_BYTES	4
 
@@ -97,5 +111,25 @@ bool ice_is_pca9575_present(struct ice_hw *hw);
 #define ICE_SMA_MIN_BIT_E810T	3
 #define ICE_SMA_MAX_BIT_E810T	7
 #define ICE_PCA9575_P1_OFFSET	8
+
+enum ice_e810t_cgu_dpll {
+	ICE_CGU_DPLL_SYNCE,
+	ICE_CGU_DPLL_PTP,
+	ICE_CGU_DPLL_MAX
+};
+
+enum ice_e810t_cgu_pins {
+	REF0P,
+	REF0N,
+	REF1P,
+	REF1N,
+	REF2P,
+	REF2N,
+	REF3P,
+	REF3N,
+	REF4P,
+	REF4N,
+	NUM_E810T_CGU_PINS
+};
 
 #endif /* _ICE_PTP_HW_H_ */
