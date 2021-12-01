@@ -337,8 +337,10 @@ static int do_update_property(char *buf, size_t bufsize)
 	if (!newprop)
 		return -ENOMEM;
 
+#ifdef CONFIG_PPC_64S_HASH_MMU
 	if (!strcmp(name, "slb-size") || !strcmp(name, "ibm,slb-size"))
 		slb_set_size(*(int *)value);
+#endif
 
 	return of_update_property(np, newprop);
 }

@@ -306,10 +306,14 @@ int add_initrd_mem_range(struct crash_mem **mem_ranges)
  */
 int add_htab_mem_range(struct crash_mem **mem_ranges)
 {
+#ifdef CONFIG_PPC_64S_HASH_MMU
 	if (!htab_address)
 		return 0;
 
 	return add_mem_range(mem_ranges, __pa(htab_address), htab_size_bytes);
+#else
+	return 0;
+#endif
 }
 #endif
 
