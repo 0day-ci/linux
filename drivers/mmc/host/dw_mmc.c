@@ -1289,6 +1289,7 @@ static void dw_mci_set_data_timeout(struct dw_mci *host,
 {
 	u32 clk_div, tmout;
 	u64 tmp;
+	unsigned int tmp2;
 
 	clk_div = (mci_readl(host, CLKDIV) & 0xFF) * 2;
 	if (clk_div == 0)
@@ -1301,10 +1302,28 @@ static void dw_mci_set_data_timeout(struct dw_mci *host,
 	tmout = 0xFF; /* Set maximum */
 
 	/* TMOUT[31:8] (DATA_TIMEOUT) */
-	if (!tmp || tmp > 0xFFFFFF)
-		tmout |= (0xFFFFFF << 8);
-	else
-		tmout |= (tmp & 0xFFFFFF) << 8;
+	if (host->quirks & DW_MMC_QUIRK_EXTENDED_TMOUT) {
+		/*
+		 * Extended HW timer (max = 0x6FFFFF2):
+		 * ((TMOUT[10:8] - 1) * 0xFFFFFF + TMOUT[31:11] * 8)
+		 */
+		if (!tmp || tmp > 0x6FFFFF2)
+			tmout |= (0xFFFFFF << 8);
+		else {
+			/* TMOUT[10:8] */
+			tmp2 = (((unsigned int)tmp / 0xFFFFFF) + 1) & 0x7;
+			tmout |= tmp2 << 8;
+
+			/* TMOUT[31:11] */
+			tmp = tmp - ((tmp2 - 1) * 0xFFFFFF);
+			tmout |= (tmp & 0xFFFFF8) << 8;
+		}
+	} else {
+		if (!tmp || tmp > 0xFFFFFF)
+			tmout |= (0xFFFFFF << 8);
+		else
+			tmout |= (tmp & 0xFFFFFF) << 8;
+	}
 
 	mci_writel(host, TMOUT, tmout);
 	dev_dbg(host->dev, "timeout_ns: %u => TMOUT[31:8]: 0x%#08x",
@@ -2005,8 +2024,14 @@ static void dw_mci_set_drto(struct dw_mci *host)
 	if (drto_div == 0)
 		drto_div = 1;
 
+	if (host->quirks & DW_MMC_QUIRK_EXTENDED_TMOUT)
+		drto_clks = (((drto_clks & 0x7) - 1) * 0xFFFFFF) +
+			((drto_clks & 0xFFFFF8));
+
 	drto_ms = DIV_ROUND_UP_ULL((u64)MSEC_PER_SEC * drto_clks * drto_div,
 				   host->bus_hz);
+
+	dev_dbg(host->dev, "drto_ms: %u\n", drto_ms);
 
 	/* add a bit spare time */
 	drto_ms += 10;
