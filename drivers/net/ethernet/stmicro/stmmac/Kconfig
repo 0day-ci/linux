@@ -271,4 +271,16 @@ config STMMAC_PCI
 	  If you have a controller with this interface, say Y or M here.
 
 	  If unsure, say N.
+
+config STMMAC_TX_TIMEOUT
+	bool "STMMAC TX timeout support"
+	default STMMAC_ETH
+	depends on STMMAC_ETH
+	help
+	  Support for TX timeout enable on stmmac.
+
+	  This selects the TX watchdog timeout support for stmmac driver. The
+	  feature is enabled by default when STMMAC_ETH is selected. If you
+	  want to disable the TX watchdog timeout feature, say N here.
+
 endif

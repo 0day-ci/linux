@@ -5421,6 +5421,7 @@ static int stmmac_napi_poll_rxtx(struct napi_struct *napi, int budget)
 	return min(rxtx_done, budget - 1);
 }
 
+#ifdef CONFIG_STMMAC_TX_TIMEOUT
 /**
  *  stmmac_tx_timeout
  *  @dev : Pointer to net device structure
@@ -5436,6 +5437,7 @@ static void stmmac_tx_timeout(struct net_device *dev, unsigned int txqueue)
 
 	stmmac_global_err(priv);
 }
+#endif
 
 /**
  *  stmmac_set_rx_mode - entry point for multicast addressing
@@ -6632,7 +6634,9 @@ static const struct net_device_ops stmmac_netdev_ops = {
 	.ndo_fix_features = stmmac_fix_features,
 	.ndo_set_features = stmmac_set_features,
 	.ndo_set_rx_mode = stmmac_set_rx_mode,
+#ifdef CONFIG_STMMAC_TX_TIMEOUT
 	.ndo_tx_timeout = stmmac_tx_timeout,
+#endif
 	.ndo_eth_ioctl = stmmac_ioctl,
 	.ndo_setup_tc = stmmac_setup_tc,
 	.ndo_select_queue = stmmac_select_queue,
