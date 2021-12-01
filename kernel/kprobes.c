@@ -2063,7 +2063,7 @@ int kprobe_on_func_entry(kprobe_opcode_t *addr, const char *sym, unsigned long o
 int register_kretprobe(struct kretprobe *rp)
 {
 	int ret;
-	struct kretprobe_instance *inst;
+	struct kretprobe_instance *inst = NULL;
 	int i;
 	void *addr;
 
@@ -2104,7 +2104,8 @@ int register_kretprobe(struct kretprobe *rp)
 
 	rp->rph->rp = rp;
 	for (i = 0; i < rp->maxactive; i++) {
-		inst = kzalloc(sizeof(struct kretprobe_instance) +
+		if (rp->data_size >= 0)
+			inst = kzalloc(sizeof(struct kretprobe_instance) +
 			       rp->data_size, GFP_KERNEL);
 		if (inst == NULL) {
 			refcount_set(&rp->rph->ref, i);
