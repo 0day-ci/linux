@@ -106,12 +106,9 @@ static const struct irq_domain_ops dpu_mdss_irqdomain_ops = {
 	.xlate = irq_domain_xlate_onecell,
 };
 
-static int _dpu_mdss_irq_domain_add(struct dpu_mdss *dpu_mdss)
+static int _dpu_mdss_irq_domain_add(struct device *dev, struct dpu_mdss *dpu_mdss)
 {
-	struct device *dev;
 	struct irq_domain *domain;
-
-	dev = dpu_mdss->base.dev->dev;
 
 	domain = irq_domain_add_linear(dev->of_node, 32,
 			&dpu_mdss_irqdomain_ops, dpu_mdss);
@@ -194,7 +191,6 @@ static void dpu_mdss_destroy(struct drm_device *dev)
 
 	pm_runtime_suspend(dev->dev);
 	pm_runtime_disable(dev->dev);
-	_dpu_mdss_irq_domain_fini(dpu_mdss);
 	irq = platform_get_irq(pdev, 0);
 	irq_set_chained_handler_and_data(irq, NULL, NULL);
 	msm_dss_put_clk(mp->clk_config, mp->num_clk);
@@ -203,14 +199,42 @@ static void dpu_mdss_destroy(struct drm_device *dev)
 	if (dpu_mdss->mmio)
 		devm_iounmap(&pdev->dev, dpu_mdss->mmio);
 	dpu_mdss->mmio = NULL;
-	priv->mdss = NULL;
+}
+
+static void dpu_mdss_remove(struct msm_mdss *mdss)
+{
+	_dpu_mdss_irq_domain_fini(to_dpu_mdss(mdss));
 }
 
 static const struct msm_mdss_funcs mdss_funcs = {
 	.enable	= dpu_mdss_enable,
 	.disable = dpu_mdss_disable,
 	.destroy = dpu_mdss_destroy,
+	.remove = dpu_mdss_remove,
 };
+
+int dpu_mdss_early_init(struct device *dev, struct msm_drm_private *priv)
+{
+	struct dpu_mdss *dpu_mdss;
+	int ret;
+
+	dpu_mdss = devm_kzalloc(dev, sizeof(*dpu_mdss), GFP_KERNEL);
+	if (!dpu_mdss)
+		return -ENOMEM;
+
+	ret = _dpu_mdss_irq_domain_add(dev, dpu_mdss);
+	if (ret)
+		return ret;
+
+	/*
+	 * Here we have no drm_device yet, but still do the assignment
+	 * so that we can retrieve our struct dpu_mdss from the main
+	 * init function, since we allocate it here.
+	 */
+	priv->mdss = &dpu_mdss->base;
+
+	return 0;
+}
 
 int dpu_mdss_init(struct drm_device *dev)
 {
@@ -221,9 +245,9 @@ int dpu_mdss_init(struct drm_device *dev)
 	int ret;
 	int irq;
 
-	dpu_mdss = devm_kzalloc(dev->dev, sizeof(*dpu_mdss), GFP_KERNEL);
+	dpu_mdss = to_dpu_mdss(priv->mdss);
 	if (!dpu_mdss)
-		return -ENOMEM;
+		return -ENODATA;
 
 	dpu_mdss->mmio = msm_ioremap(pdev, "mdss", "mdss");
 	if (IS_ERR(dpu_mdss->mmio))
@@ -241,10 +265,6 @@ int dpu_mdss_init(struct drm_device *dev)
 	dpu_mdss->base.dev = dev;
 	dpu_mdss->base.funcs = &mdss_funcs;
 
-	ret = _dpu_mdss_irq_domain_add(dpu_mdss);
-	if (ret)
-		goto irq_domain_error;
-
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
 		ret = irq;
@@ -253,16 +273,10 @@ int dpu_mdss_init(struct drm_device *dev)
 
 	irq_set_chained_handler_and_data(irq, dpu_mdss_irq,
 					 dpu_mdss);
-
-	priv->mdss = &dpu_mdss->base;
-
 	pm_runtime_enable(dev->dev);
-
 	return 0;
 
 irq_error:
-	_dpu_mdss_irq_domain_fini(dpu_mdss);
-irq_domain_error:
 	msm_dss_put_clk(mp->clk_config, mp->num_clk);
 clk_parse_err:
 	devm_kfree(&pdev->dev, mp->clk_config);

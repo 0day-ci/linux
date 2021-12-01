@@ -112,9 +112,8 @@ static const struct irq_domain_ops mdss_hw_irqdomain_ops = {
 };
 
 
-static int mdss_irq_domain_init(struct mdp5_mdss *mdp5_mdss)
+static int mdss_irq_domain_init(struct device *dev, struct mdp5_mdss *mdp5_mdss)
 {
-	struct device *dev = mdp5_mdss->base.dev->dev;
 	struct irq_domain *d;
 
 	d = irq_domain_add_linear(dev->of_node, 32, &mdss_hw_irqdomain_ops,
@@ -182,19 +181,51 @@ static void mdp5_mdss_destroy(struct drm_device *dev)
 	if (!mdp5_mdss)
 		return;
 
-	irq_domain_remove(mdp5_mdss->irqcontroller.domain);
-	mdp5_mdss->irqcontroller.domain = NULL;
-
 	regulator_disable(mdp5_mdss->vdd);
 
 	pm_runtime_disable(dev->dev);
+}
+
+static void mdp5_mdss_remove(struct msm_mdss *mdss)
+{
+	struct mdp5_mdss *mdp5_mdss = to_mdp5_mdss(mdss);
+
+	irq_domain_remove(mdp5_mdss->irqcontroller.domain);
+	mdp5_mdss->irqcontroller.domain = NULL;
 }
 
 static const struct msm_mdss_funcs mdss_funcs = {
 	.enable	= mdp5_mdss_enable,
 	.disable = mdp5_mdss_disable,
 	.destroy = mdp5_mdss_destroy,
+	.remove = mdp5_mdss_remove,
 };
+
+int mdp5_mdss_early_init(struct device *dev, struct msm_drm_private *priv)
+{
+	struct mdp5_mdss *mdp5_mdss;
+	int ret;
+
+	if (!of_device_is_compatible(dev->of_node, "qcom,mdss"))
+		return 0;
+
+	mdp5_mdss = devm_kzalloc(dev, sizeof(*mdp5_mdss), GFP_KERNEL);
+	if (!mdp5_mdss)
+		return -ENOMEM;
+
+	ret = mdss_irq_domain_init(dev, mdp5_mdss);
+	if (ret)
+		return ret;
+
+	/*
+	 * Here we have no drm_device yet, but still do the assignment
+	 * so that we can retrieve our struct mdp5_mdss from the main
+	 * init function, since we allocate it here.
+	 */
+	priv->mdss = &mdp5_mdss->base;
+
+	return 0;
+}
 
 int mdp5_mdss_init(struct drm_device *dev)
 {
@@ -208,11 +239,9 @@ int mdp5_mdss_init(struct drm_device *dev)
 	if (!of_device_is_compatible(dev->dev->of_node, "qcom,mdss"))
 		return 0;
 
-	mdp5_mdss = devm_kzalloc(dev->dev, sizeof(*mdp5_mdss), GFP_KERNEL);
-	if (!mdp5_mdss) {
-		ret = -ENOMEM;
-		goto fail;
-	}
+	mdp5_mdss = to_mdp5_mdss(priv->mdss);
+	if (!mdp5_mdss)
+		return -ENODATA;
 
 	mdp5_mdss->base.dev = dev;
 
@@ -255,17 +284,8 @@ int mdp5_mdss_init(struct drm_device *dev)
 		goto fail_irq;
 	}
 
-	ret = mdss_irq_domain_init(mdp5_mdss);
-	if (ret) {
-		DRM_DEV_ERROR(dev->dev, "failed to init sub-block irqs: %d\n", ret);
-		goto fail_irq;
-	}
-
 	mdp5_mdss->base.funcs = &mdss_funcs;
-	priv->mdss = &mdp5_mdss->base;
-
 	pm_runtime_enable(dev->dev);
-
 	return 0;
 fail_irq:
 	regulator_disable(mdp5_mdss->vdd);

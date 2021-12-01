@@ -202,6 +202,7 @@ struct msm_mdss_funcs {
 	int (*enable)(struct msm_mdss *mdss);
 	int (*disable)(struct msm_mdss *mdss);
 	void (*destroy)(struct drm_device *dev);
+	void (*remove)(struct msm_mdss *mdss);
 };
 
 struct msm_mdss {
@@ -209,7 +210,9 @@ struct msm_mdss {
 	const struct msm_mdss_funcs *funcs;
 };
 
+int mdp5_mdss_early_init(struct device *dev, struct msm_drm_private *priv);
 int mdp5_mdss_init(struct drm_device *dev);
+int dpu_mdss_early_init(struct device *dev, struct msm_drm_private *priv);
 int dpu_mdss_init(struct drm_device *dev);
 
 #define for_each_crtc_mask(dev, crtc, crtc_mask) \
