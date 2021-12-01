@@ -4,6 +4,7 @@
 #include "util/counts.h"
 #include "util/debug.h"
 #include "util/dso.h"
+#include "util/env.h"
 #include <subcmd/exec-cmd.h>
 #include "util/header.h"
 #include <subcmd/parse-options.h>
@@ -649,7 +650,7 @@ out:
 }
 
 static int perf_sample__fprintf_regs(struct regs_dump *regs, uint64_t mask,
-				     FILE *fp)
+				     const char *arch, FILE *fp)
 {
 	unsigned i = 0, r;
 	int printed = 0;
@@ -661,7 +662,7 @@ static int perf_sample__fprintf_regs(struct regs_dump *regs, uint64_t mask,
 
 	for_each_set_bit(r, (unsigned long *) &mask, sizeof(mask) * 8) {
 		u64 val = regs->regs[i++];
-		printed += fprintf(fp, "%5s:0x%"PRIx64" ", perf_reg_name(r), val);
+		printed += fprintf(fp, "%5s:0x%"PRIx64" ", perf_reg_name(r, arch), val);
 	}
 
 	return printed;
@@ -717,18 +718,16 @@ tod_scnprintf(struct perf_script *script, char *buf, int buflen,
 	return buf;
 }
 
-static int perf_sample__fprintf_iregs(struct perf_sample *sample,
-				      struct perf_event_attr *attr, FILE *fp)
+static int perf_sample__fprintf_iregs(struct perf_sample *sample, struct perf_event_attr *attr,
+				      const char *arch, FILE *fp)
 {
-	return perf_sample__fprintf_regs(&sample->intr_regs,
-					 attr->sample_regs_intr, fp);
+	return perf_sample__fprintf_regs(&sample->intr_regs, attr->sample_regs_intr, arch, fp);
 }
 
-static int perf_sample__fprintf_uregs(struct perf_sample *sample,
-				      struct perf_event_attr *attr, FILE *fp)
+static int perf_sample__fprintf_uregs(struct perf_sample *sample, struct perf_event_attr *attr,
+				      const char *arch, FILE *fp)
 {
-	return perf_sample__fprintf_regs(&sample->user_regs,
-					 attr->sample_regs_user, fp);
+	return perf_sample__fprintf_regs(&sample->user_regs, attr->sample_regs_user, arch, fp);
 }
 
 static int perf_sample__fprintf_start(struct perf_script *script,
@@ -2000,6 +1999,7 @@ static void process_event(struct perf_script *script,
 	struct evsel_script *es = evsel->priv;
 	FILE *fp = es->fp;
 	char str[PAGE_SIZE_NAME_LEN];
+	const char *arch = perf_env__arch(machine->env);
 
 	if (output[type].fields == 0)
 		return;
@@ -2066,10 +2066,10 @@ static void process_event(struct perf_script *script,
 	}
 
 	if (PRINT_FIELD(IREGS))
-		perf_sample__fprintf_iregs(sample, attr, fp);
+		perf_sample__fprintf_iregs(sample, attr, arch, fp);
 
 	if (PRINT_FIELD(UREGS))
-		perf_sample__fprintf_uregs(sample, attr, fp);
+		perf_sample__fprintf_uregs(sample, attr, arch, fp);
 
 	if (PRINT_FIELD(BRSTACK))
 		perf_sample__fprintf_brstack(sample, thread, attr, fp);

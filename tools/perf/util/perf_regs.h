@@ -27,15 +27,42 @@ uint64_t arch__user_reg_mask(void);
 #ifdef HAVE_PERF_REGS_SUPPORT
 extern const struct sample_reg sample_reg_masks[];
 
+#include <string.h>
 #include <perf_regs.h>
 
 #define DWARF_MINIMAL_REGS ((1ULL << PERF_REG_IP) | (1ULL << PERF_REG_SP))
 
 int perf_reg_value(u64 *valp, struct regs_dump *regs, int id);
 
-static inline const char *perf_reg_name(int id)
+#include "perf_regs_csky.h"
+#include "perf_regs_mips.h"
+#include "perf_regs_powerpc.h"
+#include "perf_regs_riscv.h"
+#include "perf_regs_s390.h"
+#include "perf_regs_x86.h"
+#include "perf_regs_arm.h"
+#include "perf_regs_arm64.h"
+
+static inline const char *perf_reg_name(int id, const char *arch)
 {
-	const char *reg_name = __perf_reg_name(id);
+	const char *reg_name = NULL;
+
+	if (!strcmp(arch, "csky"))
+		reg_name = __perf_reg_name_csky(id);
+	else if (!strcmp(arch, "mips"))
+		reg_name = __perf_reg_name_mips(id);
+	else if (!strcmp(arch, "powerpc"))
+		reg_name = __perf_reg_name_powerpc(id);
+	else if (!strcmp(arch, "riscv"))
+		reg_name = __perf_reg_name_riscv(id);
+	else if (!strcmp(arch, "s390"))
+		reg_name = __perf_reg_name_s390(id);
+	else if (!strcmp(arch, "x86"))
+		reg_name = __perf_reg_name_x86(id);
+	else if (!strcmp(arch, "arm"))
+		reg_name = __perf_reg_name_arm(id);
+	else if (!strcmp(arch, "arm64"))
+		reg_name = __perf_reg_name_arm64(id);
 
 	return reg_name ?: "unknown";
 }
@@ -46,7 +73,7 @@ static inline const char *perf_reg_name(int id)
 
 #define DWARF_MINIMAL_REGS PERF_REGS_MASK
 
-static inline const char *perf_reg_name(int id __maybe_unused)
+static inline const char *perf_reg_name(int id __maybe_unused, const char *arch __maybe_unused)
 {
 	return "unknown";
 }
