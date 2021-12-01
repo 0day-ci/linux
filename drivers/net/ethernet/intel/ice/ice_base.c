@@ -5,6 +5,7 @@
 #include "ice_base.h"
 #include "ice_lib.h"
 #include "ice_dcb_lib.h"
+#include "ice_virtchnl_pf.h"
 
 /**
  * __ice_vsi_get_qs_contig - Assign a contiguous chunk of queues to VSI
