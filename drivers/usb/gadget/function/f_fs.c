@@ -957,10 +957,12 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
-		ret = wait_event_interruptible(
-				epfile->ffs->wait, (ep = epfile->ep));
+		ret = wait_event_interruptible(epfile->ffs->wait,
+				(ep = epfile->ep) || !epfile->ffs->func);
 		if (ret)
 			return -EINTR;
+		if (!epfile->ffs->func)
+			return -ENODEV;
 	}
 
 	/* Do we halt? */
@@ -3292,6 +3294,7 @@ static int ffs_func_set_alt(struct usb_function *f,
 	if (alt == (unsigned)-1) {
 		ffs->func = NULL;
 		ffs_event_add(ffs, FUNCTIONFS_DISABLE);
+		wake_up_interruptible(&ffs->wait);
 		return 0;
 	}
 
