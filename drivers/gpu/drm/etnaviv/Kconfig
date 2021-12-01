@@ -15,6 +15,18 @@ config DRM_ETNAVIV
 	help
 	  DRM driver for Vivante GPUs.
 
+config DRM_ETNAVIV_PCI_DRIVER
+	bool "Enable PCI device driver support"
+	depends on DRM_ETNAVIV
+	depends on PCI
+	depends on MACH_LOONGSON64
+	default y
+	help
+	  DRM PCI driver for the Vivante GPU in LS7A1000 north bridge
+	  and LS2K1000 SoC. The GC1000 in LS2K1000 and LS7A1000 is a
+	  PCI device.
+	  If in doubt, say "n".
+
 config DRM_ETNAVIV_THERMAL
 	bool "enable ETNAVIV thermal throttling"
 	depends on DRM_ETNAVIV

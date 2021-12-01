@@ -90,13 +90,14 @@ struct drm_etnaviv_param {
  * GEM buffers:
  */
 
-#define ETNA_BO_CACHE_MASK   0x000f0000
+#define ETNA_BO_CACHE_MASK       0x000f0000
 /* cache modes */
-#define ETNA_BO_CACHED       0x00010000
-#define ETNA_BO_WC           0x00020000
-#define ETNA_BO_UNCACHED     0x00040000
+#define ETNA_BO_CACHED           0x00010000
+#define ETNA_BO_WC               0x00020000
+#define ETNA_BO_UNCACHED         0x00040000
+#define ETNA_BO_CACHED_COHERENT  0x00080000
 /* map flags */
-#define ETNA_BO_FORCE_MMU    0x00100000
+#define ETNA_BO_FORCE_MMU        0x00100000
 
 struct drm_etnaviv_gem_new {
 	__u64 size;           /* in */
