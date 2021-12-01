@@ -3758,7 +3758,7 @@ struct btrfs_super_block *btrfs_read_dev_one_super(struct block_device *bdev,
 	super = page_address(page);
 	if (btrfs_super_magic(super) != BTRFS_MAGIC) {
 		btrfs_release_disk_super(super);
-		return ERR_PTR(-ENODATA);
+		return ERR_PTR(-EINVAL);
 	}
 
 	if (btrfs_super_bytenr(super) != bytenr_orig) {

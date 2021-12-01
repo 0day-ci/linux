@@ -1219,7 +1219,7 @@ static int open_fs_devices(struct btrfs_fs_devices *fs_devices,
 		if (ret == 0 &&
 		    (!latest_dev || device->generation > latest_dev->generation)) {
 			latest_dev = device;
-		} else if (ret == -ENODATA) {
+		} else if (ret) {
 			fs_devices->num_devices--;
 			list_del(&device->dev_list);
 			btrfs_free_device(device);
