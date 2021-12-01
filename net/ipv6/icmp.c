@@ -57,6 +57,7 @@
 #include <net/protocol.h>
 #include <net/raw.h>
 #include <net/rawv6.h>
+#include <net/seg6.h>
 #include <net/transp_v6.h>
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
@@ -818,9 +819,40 @@ out_bh_enable:
 	local_bh_enable();
 }
 
+/* Determine if the invoking packet contains a segment routing header.
+ * If it does, extract the true destination address, which is the
+ * first segment address
+ */
+static void icmpv6_notify_srh(struct sk_buff *skb, struct inet6_skb_parm *opt)
+{
+	struct sk_buff *skb_orig;
+	struct ipv6_sr_hdr *srh;
+
+	skb_orig = skb_clone(skb, GFP_ATOMIC);
+	if (!skb_orig)
+		return;
+
+	skb_dst_drop(skb_orig);
+	skb_reset_network_header(skb_orig);
+
+	srh = seg6_get_srh(skb_orig, 0);
+	if (!srh)
+		goto out;
+
+	if (srh->type != IPV6_SRCRT_TYPE_4)
+		goto out;
+
+	opt->flags |= IP6SKB_SEG6;
+	opt->srhoff = (unsigned char *)srh - skb->data;
+
+out:
+	kfree_skb(skb_orig);
+}
+
 void icmpv6_notify(struct sk_buff *skb, u8 type, u8 code, __be32 info)
 {
 	const struct inet6_protocol *ipprot;
+	struct inet6_skb_parm *opt = IP6CB(skb);
 	int inner_offset;
 	__be16 frag_off;
 	u8 nexthdr;
@@ -828,6 +860,8 @@ void icmpv6_notify(struct sk_buff *skb, u8 type, u8 code, __be32 info)
 
 	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr)))
 		goto out;
+
+	icmpv6_notify_srh(skb, opt);
 
 	nexthdr = ((struct ipv6hdr *)skb->data)->nexthdr;
 	if (ipv6_ext_hdr(nexthdr)) {
@@ -853,7 +887,7 @@ void icmpv6_notify(struct sk_buff *skb, u8 type, u8 code, __be32 info)
 
 	ipprot = rcu_dereference(inet6_protos[nexthdr]);
 	if (ipprot && ipprot->err_handler)
-		ipprot->err_handler(skb, NULL, type, code, inner_offset, info);
+		ipprot->err_handler(skb, opt, type, code, inner_offset, info);
 
 	raw6_icmp_error(skb, nexthdr, type, code, inner_offset, info);
 	return;
