@@ -155,6 +155,10 @@ properties:
   power-domains:
     maxItems: 1
 
+  nvidia,memory-controller:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: phandle of the memory controller node
+
 required:
   - compatible
   - reg
