@@ -216,6 +216,14 @@ try:
     import sphinx_rtd_theme
     html_theme = 'sphinx_rtd_theme'
     html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+    # If dark mode is available, use it
+    try:
+        extensions.append('sphinx_rtd_dark_mode')
+        html_theme = 'sphinx_rtd_dark_mode'
+    except:
+        pass
+
 except ImportError:
     sys.stderr.write('Warning: The Sphinx \'sphinx_rtd_theme\' HTML theme was not found. Make sure you have the theme installed to produce pretty HTML output. Falling back to the default theme.\n')
 
