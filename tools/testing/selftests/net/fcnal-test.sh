@@ -3993,6 +3993,7 @@ usage: ${0##*/} OPTS
 	-4          IPv4 tests only
 	-6          IPv6 tests only
 	-t <test>   Test name/set to run
+	-l          List all avaible tests
 	-p          Pause on fail
 	-P          Pause after each test
 	-v          Be verbose
@@ -4006,10 +4007,15 @@ TESTS_IPV4="ipv4_ping ipv4_tcp ipv4_udp ipv4_bind ipv4_runtime ipv4_netfilter"
 TESTS_IPV6="ipv6_ping ipv6_tcp ipv6_udp ipv6_bind ipv6_runtime ipv6_netfilter"
 TESTS_OTHER="use_cases"
 
+list()
+{
+	echo "Test names: $TESTS_IPV4 $TESTS_IPV6 $TESTS_OTHER"
+}
+
 PAUSE_ON_FAIL=no
 PAUSE=no
 
-while getopts :46t:pPvh o
+while getopts :46lt:pPvh o
 do
 	case $o in
 		4) TESTS=ipv4;;
@@ -4018,6 +4024,7 @@ do
 		p) PAUSE_ON_FAIL=yes;;
 		P) PAUSE=yes;;
 		v) VERBOSE=1;;
+		l) list; exit 0;;
 		h) usage; exit 0;;
 		*) usage; exit 1;;
 	esac
