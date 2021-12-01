@@ -99,7 +99,7 @@ static int rzg2l_thermal_get_temp(void *devdata, int *temp)
 
 	/* The temperature Tj is calculated by the formula
 	 * Tj = (dsensor − calib1) * 165/ (calib0 − calib1) − 40
-	 * where calib0 and calib1 are the caliberation values.
+	 * where calib0 and calib1 are the calibration values.
 	 */
 	val = ((dsensor - priv->calib1) * (MCELSIUS(165) /
 		(priv->calib0 - priv->calib1))) - MCELSIUS(40);
@@ -209,7 +209,7 @@ static int rzg2l_thermal_probe(struct platform_device *pdev)
 	if (ret)
 		goto err;
 
-	dev_dbg(dev, "TSU probed with %s caliberation values",
+	dev_dbg(dev, "TSU probed with %s calibration values",
 		rzg2l_thermal_read(priv, OTPTSUTRIM_REG(0)) ?  "hw" : "sw");
 
 	return 0;
