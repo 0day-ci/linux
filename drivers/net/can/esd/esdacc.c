@@ -555,8 +555,6 @@ static void handle_core_msg_overrun(struct acc_core *core,
 
 	skb_hwtstamps(skb)->hwtstamp = acc_ts2ktime(priv->ov, msg->ts);
 
-	stats->rx_packets++;
-	stats->rx_bytes += cf->len;
 	netif_rx(skb);
 }
 
@@ -613,8 +611,6 @@ static void handle_core_msg_buserr(struct acc_core *core,
 
 	skb_hwtstamps(skb)->hwtstamp = acc_ts2ktime(priv->ov, msg->ts);
 
-	stats->rx_packets++;
-	stats->rx_bytes += cf->len;
 	netif_rx(skb);
 }
 
@@ -668,8 +664,6 @@ handle_core_msg_errstatechange(struct acc_core *core,
 
 		skb_hwtstamps(skb)->hwtstamp = acc_ts2ktime(priv->ov, msg->ts);
 
-		stats->rx_packets++;
-		stats->rx_bytes += cf->len;
 		netif_rx(skb);
 	} else {
 		stats->rx_dropped++;
