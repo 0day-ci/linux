@@ -614,6 +614,9 @@ struct ethtool_module_power_mode_params {
  *	plugged-in.
  * @set_module_power_mode: Set the power mode policy for the plug-in module
  *	used by the network device.
+ * @get_rclk_range: Get range of valid Reference Clock input pins for the port.
+ * @get_rclk_state: Get state of Reference Clock input signal pin.
+ * @set_rclk_out: Enable/disable Reference Clock input signal pin.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -750,6 +753,12 @@ struct ethtool_ops {
 	int	(*set_module_power_mode)(struct net_device *dev,
 					 const struct ethtool_module_power_mode_params *params,
 					 struct netlink_ext_ack *extack);
+	int	(*get_rclk_range)(struct net_device *dev, u32 *min_idx,
+				  u32 *max_idx, struct netlink_ext_ack *extack);
+	int	(*get_rclk_state)(struct net_device *dev, u32 out_idx,
+				  bool *ena, struct netlink_ext_ack *extack);
+	int	(*set_rclk_out)(struct net_device *dev, u32 out_idx, bool ena,
+				struct netlink_ext_ack *extack);
 };
 
 int ethtool_check_ops(const struct ethtool_ops *ops);

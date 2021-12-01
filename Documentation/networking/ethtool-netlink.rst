@@ -220,6 +220,8 @@ Userspace to kernel:
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET``       get PHC virtual clocks info
   ``ETHTOOL_MSG_MODULE_SET``            set transceiver module parameters
   ``ETHTOOL_MSG_MODULE_GET``            get transceiver module parameters
+  ``ETHTOOL_RCLK_GET``                  get recovered clock parameters
+  ``ETHTOOL_RCLK_SET``                  set recovered clock parameters
   ===================================== =================================
 
 Kernel to userspace:
@@ -260,6 +262,8 @@ Kernel to userspace:
   ``ETHTOOL_MSG_STATS_GET_REPLY``          standard statistics
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET_REPLY``    PHC virtual clocks info
   ``ETHTOOL_MSG_MODULE_GET_REPLY``         transceiver module parameters
+  ``ETHTOOL_MSG_RCLK_GET_REPLY``           reference recovered clock config
+  ``ETHTOOL_MSG_RCLK_NTF``                 reference recovered clock config
   ======================================== =================================
 
 ``GET`` requests are sent by userspace applications to retrieve device
@@ -1598,6 +1602,67 @@ For SFF-8636 modules, low power mode is forced by the host according to table
 For CMIS modules, low power mode is forced by the host according to table 6-12
 in revision 5.0 of the specification.
 
+RCLK_GET
+========
+
+Get status of an output pin for PHY recovered frequency clock.
+
+Request contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_RCLK_HEADER``               nested  request header
+  ``ETHTOOL_A_RCLK_OUT_PIN_IDX``          u32     index of a pin
+  ======================================  ======  ==========================
+
+Kernel response contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_RCLK_OUT_PIN_IDX``          u32     index of a pin
+  ``ETHTOOL_A_RCLK_PIN_FLAGS``            u32     state of a pin
+  ``ETHTOOL_A_RCLK_RANGE_MIN_PIN``        u32     min index of RCLK pins
+  ``ETHTOOL_A_RCLK_RANGE_MAX_PIN``        u32     max index of RCLK pins
+  ======================================  ======  ==========================
+
+Supported device can have mulitple reference recover clock pins available
+to be used as source of frequency for a DPLL.
+Once a pin on given port is enabled. The PHY recovered frequency is being
+fed onto that pin, and can be used by DPLL to synchonize with its signal.
+Pins don't have to start with index equal 0 - device can also have different
+external sources pins.
+
+The ``ETHTOOL_A_RCLK_OUT_PIN_IDX`` is optional parameter. If present in
+the RCLK_GET request, the ``ETHTOOL_A_RCLK_PIN_ENABLED`` is provided in a
+response, it contatins state of the pin pointed by the index. Values are:
+
+.. kernel-doc:: include/uapi/linux/ethtool.h
+    :identifiers: ethtool_rclk_pin_state
+
+If ``ETHTOOL_A_RCLK_OUT_PIN_IDX`` is not present in the RCLK_GET request,
+the range of available pins is returned:
+``ETHTOOL_A_RCLK_RANGE_MIN_PIN`` is lowest possible index of a pin available
+for recovering frequency from PHY.
+``ETHTOOL_A_RCLK_RANGE_MAX_PIN`` is highest possible index of a pin available
+for recovering frequency from PHY.
+
+RCLK_SET
+==========
+
+Set status of an output pin for PHY recovered frequency clock.
+
+Request contents:
+
+  ======================================  ======  ========================
+  ``ETHTOOL_A_RCLK_HEADER``               nested  request header
+  ``ETHTOOL_A_RCLK_OUT_PIN_IDX``          u32     index of a pin
+  ``ETHTOOL_A_RCLK_PIN_FLAGS``            u32      requested state
+  ======================================  ======  ========================
+
+``ETHTOOL_A_RCLK_OUT_PIN_IDX`` is a index of a pin for which the change of
+state is requested. Values of ``ETHTOOL_A_RCLK_PIN_ENABLED`` are:
+
+.. kernel-doc:: include/uapi/linux/ethtool.h
+    :identifiers: ethtool_rclk_pin_state
+
 Request translation
 ===================
 
@@ -1699,4 +1764,6 @@ are netlink only.
   n/a                                 ``ETHTOOL_MSG_PHC_VCLOCKS_GET``
   n/a                                 ``ETHTOOL_MSG_MODULE_GET``
   n/a                                 ``ETHTOOL_MSG_MODULE_SET``
+  n/a                                 ``ETHTOOL_MSG_RCLK_GET``
+  n/a                                 ``ETHTOOL_MSG_RCLK_SET``
   =================================== =====================================
