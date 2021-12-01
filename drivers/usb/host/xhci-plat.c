@@ -327,6 +327,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 					 &xhci->imod_interval);
 	}
 
+	if (of_device_is_compatible(pdev->dev.parent->of_node, "snps,dwc3"))
+		xhci->quirks |= XHCI_SKIP_PHY_INIT;
+
 	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
 	if (IS_ERR(hcd->usb_phy)) {
 		ret = PTR_ERR(hcd->usb_phy);
