@@ -341,17 +341,19 @@ out_free_data:
 	return ret;
 }
 
-static int __init bcm7120_l2_intc_probe_7120(struct device_node *dn,
+static int __init bcm7120_l2_intc_probe_7120(struct platform_device *pdev,
 					     struct device_node *parent)
 {
-	return bcm7120_l2_intc_probe(dn, parent, bcm7120_l2_intc_iomap_7120,
+	return bcm7120_l2_intc_probe(pdev->dev.of_node, parent,
+				     bcm7120_l2_intc_iomap_7120,
 				     "BCM7120 L2");
 }
 
-static int __init bcm7120_l2_intc_probe_3380(struct device_node *dn,
+static int __init bcm7120_l2_intc_probe_3380(struct platform_device *pdev,
 					     struct device_node *parent)
 {
-	return bcm7120_l2_intc_probe(dn, parent, bcm7120_l2_intc_iomap_3380,
+	return bcm7120_l2_intc_probe(pdev->dev.of_node, parent,
+				     bcm7120_l2_intc_iomap_3380,
 				     "BCM3380 L2");
 }
 

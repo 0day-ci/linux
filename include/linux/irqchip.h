@@ -36,13 +36,19 @@ extern of_irq_init_cb_t typecheck_irq_init_cb;
 #define IRQCHIP_DECLARE(name, compat, fn)	\
 	OF_DECLARE_2(irqchip, name, compat, typecheck_irq_init_cb(fn))
 
+typedef int (*irqchip_init_cb_t)(struct platform_device *,
+				 struct device_node *);
+extern irqchip_init_cb_t typecheck_irqchip_init_cb;
+#define typecheck_irqchip_init_cb(fn) \
+	(__typecheck(typecheck_irqchip_init_cb, &fn) ? fn : fn)
+
 extern int platform_irqchip_probe(struct platform_device *pdev);
 
 #define IRQCHIP_PLATFORM_DRIVER_BEGIN(drv_name) \
 static const struct of_device_id drv_name##_irqchip_match_table[] = {
 
 #define IRQCHIP_MATCH(compat, fn) { .compatible = compat,		\
-				    .data = typecheck_irq_init_cb(fn), },
+				    .data = typecheck_irqchip_init_cb(fn), },
 
 #define IRQCHIP_PLATFORM_DRIVER_END(drv_name)				\
 	{},								\

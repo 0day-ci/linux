@@ -270,16 +270,18 @@ out_free:
 	return ret;
 }
 
-static int __init brcmstb_l2_edge_intc_of_init(struct device_node *np,
+static int __init brcmstb_l2_edge_intc_of_init(struct platform_device *pdev,
 	struct device_node *parent)
 {
-	return brcmstb_l2_intc_of_init(np, parent, &l2_edge_intc_init);
+	return brcmstb_l2_intc_of_init(pdev->dev.of_node, parent,
+				       &l2_edge_intc_init);
 }
 
-static int __init brcmstb_l2_lvl_intc_of_init(struct device_node *np,
+static int __init brcmstb_l2_lvl_intc_of_init(struct platform_device *pdev,
 	struct device_node *parent)
 {
-	return brcmstb_l2_intc_of_init(np, parent, &l2_lvl_intc_init);
+	return brcmstb_l2_intc_of_init(pdev->dev.of_node, parent,
+				       &l2_lvl_intc_init);
 }
 
 IRQCHIP_PLATFORM_DRIVER_BEGIN(brcmstb_l2)
