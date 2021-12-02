@@ -295,14 +295,19 @@ static void blkdev_bio_end_io_async(struct bio *bio)
 		ret = blk_status_to_errno(bio->bi_status);
 	}
 
-	iocb->ki_complete(iocb, ret);
-
 	if (dio->flags & DIO_SHOULD_DIRTY) {
 		bio_check_pages_dirty(bio);
 	} else {
 		bio_release_pages(bio, false);
-		bio_put(bio);
+		if (iocb->ki_flags & IOCB_BIO_PASSBACK) {
+			iocb->ki_flags |= IOCB_PRIV_IS_BIO;
+			iocb->private = bio;
+		} else {
+			bio_put(bio);
+		}
 	}
+
+	iocb->ki_complete(iocb, ret);
 }
 
 static ssize_t __blkdev_direct_IO_async(struct kiocb *iocb,
