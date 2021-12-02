@@ -213,12 +213,6 @@ struct kasan_free_meta *kasan_get_free_meta(struct kmem_cache *cache,
 
 #if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
 
-static inline const void *kasan_shadow_to_mem(const void *shadow_addr)
-{
-	return (void *)(((unsigned long)shadow_addr - KASAN_SHADOW_OFFSET)
-		<< KASAN_SHADOW_SCALE_SHIFT);
-}
-
 static inline bool addr_has_metadata(const void *addr)
 {
 	return (addr >= kasan_shadow_to_mem((void *)KASAN_SHADOW_START));
