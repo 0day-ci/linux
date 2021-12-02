@@ -1,0 +1,28 @@
+drm drm-fixes 52e81b6954321a577aeb99486fd6e980e9eafa6a
+	Merge tag 'amd-drm-fixes-5.16-2021-12-01' of https://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes 679d94cd7d900871e5bc9cf780bd5b73af35ab42
+	dma-buf: system_heap: Use 'for_each_sgtable_sg' in pages free flow
+drm-intel drm-intel-fixes 61e29a0956bdb09eac8aca7d9add9f902baff08b
+	drm/i915: Add support for panels with VESA backlights with PWM enable/disable
+drm drm-next c305ae99dfd4d0fe70c7fdf13ef5f7650a804ea7
+	Merge tag 'drm-intel-next-2021-11-30' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes bcae3af286f49bf4f6cda03f165fbe530f4a6bed
+	drm/locking: fix __stack_depot_* name conflict
+drm-intel drm-intel-next-fixes fa55b7dcdc43c1aa1ba12bca9d2dd4318c2a0dbf
+	Linux 5.16-rc1
+drm-misc drm-misc-next 4ff22f487f8c26b99cbe1678344595734c001a39
+	drm: Return error codes from struct drm_driver.gem_create_object
+drm-intel drm-intel-next 0e959b4e993b095641f405972bc56d8aa72eadb6
+	drm/i915: Add PLANE_CUS_CTL restriction in max_width
+drm-intel drm-intel-gt-next 96b1c450b386b34479c0d6c5e24ebee84261433a
+	drm/i915: Add workaround numbers to GEN7_COMMON_SLICE_CHICKEN1 whitelisting
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
