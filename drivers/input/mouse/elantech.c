@@ -1122,10 +1122,8 @@ static void elantech_set_buttonpad_prop(struct psmouse *psmouse)
 	struct input_dev *dev = psmouse->dev;
 	struct elantech_data *etd = psmouse->private;
 
-	if (elantech_is_buttonpad(&etd->info)) {
-		__set_bit(INPUT_PROP_BUTTONPAD, dev->propbit);
-		__clear_bit(BTN_RIGHT, dev->keybit);
-	}
+	if (elantech_is_buttonpad(&etd->info))
+		input_set_property(dev, INPUT_PROP_BUTTONPAD);
 }
 
 /*

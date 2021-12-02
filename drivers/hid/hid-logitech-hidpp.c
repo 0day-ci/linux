@@ -2637,7 +2637,7 @@ static void wtp_populate_input(struct hidpp_device *hidpp,
 	if (hidpp->quirks & HIDPP_QUIRK_WTP_PHYSICAL_BUTTONS)
 		input_set_capability(input_dev, EV_KEY, BTN_RIGHT);
 	else
-		__set_bit(INPUT_PROP_BUTTONPAD, input_dev->propbit);
+		input_set_property(input_dev, INPUT_PROP_BUTTONPAD);
 
 	input_mt_init_slots(input_dev, wd->maxcontacts, INPUT_MT_POINTER |
 		INPUT_MT_DROP_UNUSED);

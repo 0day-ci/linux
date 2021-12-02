@@ -265,7 +265,7 @@ static int rmi_f30_map_gpios(struct rmi_function *fn,
 	 * mapped buttons.
 	 */
 	if (pdata->gpio_data.buttonpad || (button - BTN_LEFT == 1))
-		__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+		input_set_property(input, INPUT_PROP_BUTTONPAD);
 
 	return 0;
 }

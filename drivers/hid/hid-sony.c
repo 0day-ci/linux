@@ -1521,9 +1521,7 @@ static int sony_register_touchpad(struct sony_sc *sc, int touch_count,
 	sc->touchpad->name = name;
 
 	/* We map the button underneath the touchpad to BTN_LEFT. */
-	__set_bit(EV_KEY, sc->touchpad->evbit);
-	__set_bit(BTN_LEFT, sc->touchpad->keybit);
-	__set_bit(INPUT_PROP_BUTTONPAD, sc->touchpad->propbit);
+	input_set_property(sc->touchpad, INPUT_PROP_BUTTONPAD);
 
 	input_set_abs_params(sc->touchpad, ABS_MT_POSITION_X, 0, w, 0, 0);
 	input_set_abs_params(sc->touchpad, ABS_MT_POSITION_Y, 0, h, 0, 0);

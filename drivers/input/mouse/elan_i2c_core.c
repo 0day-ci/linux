@@ -1176,7 +1176,7 @@ static int elan_setup_input_device(struct elan_tp_data *data)
 	__set_bit(EV_ABS, input->evbit);
 	__set_bit(INPUT_PROP_POINTER, input->propbit);
 	if (data->clickpad) {
-		__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+		input_set_property(input, INPUT_PROP_BUTTONPAD);
 	} else {
 		__set_bit(BTN_RIGHT, input->keybit);
 		if (data->middle_button)

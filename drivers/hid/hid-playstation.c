@@ -573,8 +573,7 @@ static struct input_dev *ps_touchpad_create(struct hid_device *hdev, int width, 
 		return ERR_CAST(touchpad);
 
 	/* Map button underneath touchpad to BTN_LEFT. */
-	input_set_capability(touchpad, EV_KEY, BTN_LEFT);
-	__set_bit(INPUT_PROP_BUTTONPAD, touchpad->propbit);
+	input_set_property(touchpad, INPUT_PROP_BUTTONPAD);
 
 	input_set_abs_params(touchpad, ABS_MT_POSITION_X, 0, width - 1, 0, 0);
 	input_set_abs_params(touchpad, ABS_MT_POSITION_Y, 0, height - 1, 0, 0);

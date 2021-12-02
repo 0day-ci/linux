@@ -501,7 +501,7 @@ static int cyapa_create_input_dev(struct cyapa *cyapa)
 		__set_bit(BTN_RIGHT, input->keybit);
 
 	if (cyapa->btn_capability == CAPABILITY_LEFT_BTN_MASK)
-		__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+		input_set_property(input, INPUT_PROP_BUTTONPAD);
 
 	/* Handle pointer emulation and unused slots in core */
 	error = input_mt_init_slots(input, CYAPA_MAX_MT_SLOTS,

@@ -3082,8 +3082,7 @@ int alps_init(struct psmouse *psmouse)
 		dev1->keybit[BIT_WORD(BTN_2)] |= BIT_MASK(BTN_2);
 		dev1->keybit[BIT_WORD(BTN_3)] |= BIT_MASK(BTN_3);
 	} else if (priv->flags & ALPS_BUTTONPAD) {
-		set_bit(INPUT_PROP_BUTTONPAD, dev1->propbit);
-		clear_bit(BTN_RIGHT, dev1->keybit);
+		input_set_property(dev1, INPUT_PROP_BUTTONPAD);
 	} else {
 		dev1->keybit[BIT_WORD(BTN_MIDDLE)] |= BIT_MASK(BTN_MIDDLE);
 	}

@@ -2028,7 +2028,7 @@ static void mxt_set_up_as_touchpad(struct input_dev *input_dev,
 
 	input_dev->name = "Atmel maXTouch Touchpad";
 
-	__set_bit(INPUT_PROP_BUTTONPAD, input_dev->propbit);
+	input_set_property(input_dev, INPUT_PROP_BUTTONPAD);
 
 	input_abs_set_res(input_dev, ABS_X, MXT_PIXELS_PER_MM);
 	input_abs_set_res(input_dev, ABS_Y, MXT_PIXELS_PER_MM);

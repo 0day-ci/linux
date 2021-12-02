@@ -182,8 +182,7 @@ static int elan_input_configured(struct hid_device *hdev, struct hid_input *hi)
 	input_set_abs_params(input, ABS_MT_PRESSURE, 0, ELAN_MAX_PRESSURE,
 			     0, 0);
 
-	__set_bit(BTN_LEFT, input->keybit);
-	__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+	input_set_property(input, INPUT_PROP_BUTTONPAD);
 
 	ret = input_mt_init_slots(input, ELAN_MAX_FINGERS, INPUT_MT_POINTER);
 	if (ret) {

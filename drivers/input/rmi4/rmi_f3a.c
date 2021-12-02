@@ -159,7 +159,7 @@ static int rmi_f3a_map_gpios(struct rmi_function *fn, struct f3a_data *f3a,
 	input->keycodemax = f3a->gpio_count;
 
 	if (pdata->gpio_data.buttonpad || (button - BTN_LEFT == 1))
-		__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+		input_set_property(input, INPUT_PROP_BUTTONPAD);
 
 	return 0;
 }

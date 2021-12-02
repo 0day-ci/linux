@@ -330,8 +330,6 @@ static void focaltech_set_input_params(struct psmouse *psmouse)
 	__clear_bit(EV_REL, dev->evbit);
 	__clear_bit(REL_X, dev->relbit);
 	__clear_bit(REL_Y, dev->relbit);
-	__clear_bit(BTN_RIGHT, dev->keybit);
-	__clear_bit(BTN_MIDDLE, dev->keybit);
 
 	/*
 	 * Now set up our capabilities.
@@ -341,7 +339,7 @@ static void focaltech_set_input_params(struct psmouse *psmouse)
 	input_set_abs_params(dev, ABS_MT_POSITION_Y, 0, priv->y_max, 0, 0);
 	input_set_abs_params(dev, ABS_TOOL_WIDTH, 0, 15, 0, 0);
 	input_mt_init_slots(dev, 5, INPUT_MT_POINTER);
-	__set_bit(INPUT_PROP_BUTTONPAD, dev->propbit);
+	input_set_property(dev, INPUT_PROP_BUTTONPAD);
 }
 
 static int focaltech_read_register(struct ps2dev *ps2dev, int reg,

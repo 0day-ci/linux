@@ -1289,7 +1289,7 @@ applespi_register_touchpad_device(struct applespi_data *applespi,
 	input_set_capability(touchpad_input_dev, EV_REL, REL_Y);
 
 	__set_bit(INPUT_PROP_POINTER, touchpad_input_dev->propbit);
-	__set_bit(INPUT_PROP_BUTTONPAD, touchpad_input_dev->propbit);
+	input_set_property(touchpad_input_dev, INPUT_PROP_BUTTONPAD);
 
 	/* finger touch area */
 	input_set_abs_params(touchpad_input_dev, ABS_MT_TOUCH_MAJOR,

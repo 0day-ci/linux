@@ -722,7 +722,7 @@ static int alps_input_configured(struct hid_device *hdev, struct hid_input *hi)
 	__set_bit(EV_KEY, input->evbit);
 
 	if (data->btn_cnt == 1)
-		__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
+		input_set_property(input, INPUT_PROP_BUTTONPAD);
 
 	for (i = 0; i < data->btn_cnt; i++)
 		__set_bit(BTN_LEFT + i, input->keybit);
