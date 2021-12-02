@@ -4808,6 +4808,13 @@ static int _bpf_setsockopt(struct sock *sk, int level, int optname,
 		case SO_REUSEPORT:
 			sk->sk_reuseport = valbool;
 			break;
+		case SO_TXREHASH:
+			if (val < -1 || val > 1) {
+				ret = -EINVAL;
+				break;
+			}
+			sk->sk_txrehash = val;
+			break;
 		default:
 			ret = -EINVAL;
 		}
@@ -4979,6 +4986,9 @@ static int _bpf_getsockopt(struct sock *sk, int level, int optname,
 			break;
 		case SO_REUSEPORT:
 			*((int *)optval) = sk->sk_reuseport;
+			break;
+		case SO_TXREHASH:
+			*((int *)optval) = sk->sk_txrehash;
 			break;
 		default:
 			goto err_clear;
