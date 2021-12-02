@@ -855,7 +855,7 @@ int stmmac_init_tstamp_counter(struct stmmac_priv *priv, u32 systime_flags)
 	stmmac_config_sub_second_increment(priv, priv->ptpaddr,
 					   priv->plat->clk_ptp_rate,
 					   xmac, &sec_inc);
-	temp = div_u64(1000000000ULL, sec_inc);
+	temp = div_u64(1000000000ULL, (sec_inc > 0) ? sec_inc : 1);
 
 	/* Store sub second increment for later use */
 	priv->sub_second_inc = sec_inc;
