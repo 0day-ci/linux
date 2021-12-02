@@ -19,7 +19,7 @@
  * @no_reboot_use_pmc: Use PMC BXT API to set and clear NO_REBOOT bit
  */
 struct itco_wdt_platform_data {
-	char name[32];
+	const char *name;
 	unsigned int version;
 	bool no_reboot_use_pmc;
 };

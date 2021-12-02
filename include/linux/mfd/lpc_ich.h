@@ -27,7 +27,7 @@ enum {
 };
 
 struct lpc_ich_info {
-	char name[32];
+	const char *name;
 	unsigned int iTCO_version;
 	unsigned int gpio_version;
 	enum intel_spi_type spi_type;

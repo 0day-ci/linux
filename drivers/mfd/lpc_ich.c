@@ -889,7 +889,7 @@ static int lpc_ich_finalize_wdt_cell(struct pci_dev *dev)
 	info = &lpc_chipset_info[priv->chipset];
 
 	pdata->version = info->iTCO_version;
-	strlcpy(pdata->name, info->name, sizeof(pdata->name));
+	pdata->name = info->name;
 
 	cell->platform_data = pdata;
 	cell->pdata_size = sizeof(*pdata);
