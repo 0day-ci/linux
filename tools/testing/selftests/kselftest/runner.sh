@@ -49,6 +49,15 @@ run_one()
 
 	# Reset any "settings"-file variables.
 	export kselftest_timeout="$kselftest_default_timeout"
+
+	# Optional arguments for any command, possibly defined in settings
+	# as args="<options>"
+	kselftest_args=""
+
+	# Optional arguments for this command, possibly defined in settings
+	# as <$BASENAME_TEST>_args="<options>"
+	kselftest_cmd_args_ref="kselftest_${BASENAME_TEST}_args"
+
 	# Load per-test-directory kselftest "settings" file.
 	settings="$BASE_DIR/$DIR/settings"
 	if [ -r "$settings" ] ; then
@@ -69,7 +78,8 @@ run_one()
 		echo "# Warning: file $TEST is missing!"
 		echo "not ok $test_num $TEST_HDR_MSG"
 	else
-		cmd="./$BASENAME_TEST"
+		eval kselftest_cmd_args="\$$kselftest_cmd_args_ref"
+		cmd="./$BASENAME_TEST $kselftest_cmd_args $kselftest_args"
 		if [ ! -x "$TEST" ]; then
 			echo "# Warning: file $TEST is not executable"
 
