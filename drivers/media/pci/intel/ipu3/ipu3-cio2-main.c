@@ -1691,16 +1691,15 @@ static int cio2_check_fwnode_graph(struct fwnode_handle *fwnode)
 {
 	struct fwnode_handle *endpoint;
 
-	if (IS_ERR_OR_NULL(fwnode))
-		return -EINVAL;
-
-	endpoint = fwnode_graph_get_next_endpoint(fwnode, NULL);
-	if (endpoint) {
-		fwnode_handle_put(endpoint);
-		return 0;
+	while (!IS_ERR_OR_NULL(fwnode)) {
+		endpoint = fwnode_graph_get_next_endpoint(fwnode, NULL);
+		if (endpoint) {
+			fwnode_handle_put(endpoint);
+			return 0;
+		}
+		fwnode = fwnode->secondary;
 	}
-
-	return cio2_check_fwnode_graph(fwnode->secondary);
+	return -EINVAL;
 }
 
 /**************** PCI interface ****************/
