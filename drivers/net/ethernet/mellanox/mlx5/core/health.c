@@ -335,7 +335,7 @@ static int mlx5_health_try_recover(struct mlx5_core_dev *dev)
 {
 	mlx5_core_warn(dev, "handling bad device here\n");
 	mlx5_handle_bad_state(dev);
-	if (mlx5_health_wait_pci_up(dev)) {
+	if (dev->timeouts && mlx5_health_wait_pci_up(dev)) {
 		mlx5_core_err(dev, "health recovery flow aborted, PCI reads still not working\n");
 		return -EIO;
 	}
