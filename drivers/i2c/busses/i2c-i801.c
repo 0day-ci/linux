@@ -440,9 +440,6 @@ static int i801_check_post(struct i801_priv *priv, int status)
 		dev_dbg(&priv->pci_dev->dev, "Lost arbitration\n");
 	}
 
-	/* Clear status flags except BYTE_DONE, to be cleared by caller */
-	outb_p(status, SMBHSTSTS(priv));
-
 	return result;
 }
 
@@ -457,8 +454,10 @@ static int i801_wait_intr(struct i801_priv *priv)
 		status = inb_p(SMBHSTSTS(priv));
 		busy = status & SMBHSTSTS_HOST_BUSY;
 		status &= STATUS_ERROR_FLAGS | SMBHSTSTS_INTR;
-		if (!busy && status)
+		if (!busy && status) {
+			outb_p(status, SMBHSTSTS(priv));
 			return status;
+		}
 	} while (time_is_after_eq_jiffies(timeout));
 
 	return -ETIMEDOUT;
