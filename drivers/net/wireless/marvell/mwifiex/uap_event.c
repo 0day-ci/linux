@@ -282,7 +282,7 @@ int mwifiex_process_uap_event(struct mwifiex_private *priv)
 					 MWIFIEX_TxPD_POWER_MGMT_LAST_PACKET))
 						adapter->ps_state =
 							PS_STATE_SLEEP;
-					return 0;
+				return 0;
 			}
 		}
 		adapter->ps_state = PS_STATE_AWAKE;
