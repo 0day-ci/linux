@@ -32,6 +32,15 @@ properties:
   clock-names:
     const: rtc
 
+  enable-gpios:
+    maxItems: 1
+    description: A GPIO line connected to the ENABLE line.  If this
+      is specified, then reset-gpios also must be specified.
+
+  reset-gpios:
+    maxItems: 1
+    description: A GPIO line connected to the RESET line.
+
 required:
   - compatible
   - interrupts
@@ -51,6 +60,8 @@ examples:
         interrupts = <27 0>;
         clocks = <&pck1>;
         clock-names = "rtc";
+        enable-gpios = <&pioA 5 0>;
+        reset-gpios = <&pioA 6 0>;
       };
     };
 
