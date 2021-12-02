@@ -313,6 +313,10 @@ err_clk:
 
 static void sdhci_brcmstb_shutdown(struct platform_device *pdev)
 {
+	struct sdhci_host *host = platform_get_drvdata(pdev);
+
+	/* Cancel possible rescan worker thread */
+	cancel_delayed_work_sync(&host->mmc->detect);
 	sdhci_pltfm_suspend(&pdev->dev);
 }
 
