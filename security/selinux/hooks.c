@@ -970,6 +970,7 @@ out:
 static int selinux_add_opt(int token, const char *s, void **mnt_opts)
 {
 	struct selinux_mnt_opts *opts = *mnt_opts;
+	bool is_alloc_opts = false;
 
 	if (token == Opt_seclabel)	/* eaten and completely ignored */
 		return 0;
@@ -979,9 +980,13 @@ static int selinux_add_opt(int token, const char *s, void **mnt_opts)
 		if (!opts)
 			return -ENOMEM;
 		*mnt_opts = opts;
+		is_alloc_opts = true;
 	}
-	if (!s)
+	if (!s) {
+		if (is_alloc_opts)
+			kfree(opts);
 		return -ENOMEM;
+	}
 	switch (token) {
 	case Opt_context:
 		if (opts->context || opts->defcontext)
@@ -1007,6 +1012,8 @@ static int selinux_add_opt(int token, const char *s, void **mnt_opts)
 	return 0;
 Einval:
 	pr_warn(SEL_MOUNT_FAIL_MSG);
+	if (is_alloc_opts)
+		kfree(opts);
 	return -EINVAL;
 }
 
