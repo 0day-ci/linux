@@ -1914,6 +1914,7 @@ int btrfs_zone_finish(struct btrfs_block_group *block_group)
 	block_group->alloc_offset = block_group->zone_capacity;
 	block_group->free_space_ctl->free_space = 0;
 	btrfs_clear_treelog_bg(block_group);
+	btrfs_clear_data_reloc_bg(block_group);
 	spin_unlock(&block_group->lock);
 
 	ret = blkdev_zone_mgmt(device->bdev, REQ_OP_ZONE_FINISH,
@@ -1996,6 +1997,7 @@ void btrfs_zone_finish_endio(struct btrfs_fs_info *fs_info, u64 logical, u64 len
 	ASSERT(block_group->alloc_offset == block_group->zone_capacity);
 	ASSERT(block_group->free_space_ctl->free_space == 0);
 	btrfs_clear_treelog_bg(block_group);
+	btrfs_clear_data_reloc_bg(block_group);
 	spin_unlock(&block_group->lock);
 
 	map = block_group->physical_map;
