@@ -216,6 +216,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	bool violation_check;
 	enum hash_algo hash_algo;
 	unsigned int allowed_algos = 0;
+	int veritysig = false;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
 		return 0;
@@ -333,8 +334,12 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	}
 
 	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
+	if (xattr_value && xattr_value->type == IMA_VERITY_DIGSIG &&
+	    strcmp(template_desc->name, "ima-sig") == 0)
+		veritysig = true;
 
-	rc = ima_collect_measurement(iint, file, buf, size, hash_algo, modsig);
+	rc = ima_collect_measurement(iint, file, buf, size, hash_algo,
+				     modsig, veritysig);
 	if (rc != 0 && rc != -EBADF && rc != -EINVAL)
 		goto out_locked;
 

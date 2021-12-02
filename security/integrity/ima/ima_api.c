@@ -212,7 +212,8 @@ int ima_get_action(struct user_namespace *mnt_userns, struct inode *inode,
  */
 int ima_collect_measurement(struct integrity_iint_cache *iint,
 			    struct file *file, void *buf, loff_t size,
-			    enum hash_algo algo, struct modsig *modsig)
+			    enum hash_algo algo, struct modsig *modsig,
+			    bool veritysig)
 {
 	const char *audit_cause = "failed";
 	struct inode *inode = file_inode(file);
