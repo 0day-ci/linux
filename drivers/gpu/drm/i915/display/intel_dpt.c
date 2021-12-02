@@ -64,7 +64,7 @@ static void dpt_insert_entries(struct i915_address_space *vm,
 	 * not to allow the user to override access to a read only page.
 	 */
 
-	i = vma->node.start / I915_GTT_PAGE_SIZE;
+	i = i915_vma_offset(vma) / I915_GTT_PAGE_SIZE;
 	for_each_sgt_daddr(addr, sgt_iter, vma->pages)
 		gen8_set_pte(&base[i++], pte_encode | addr);
 }
@@ -104,7 +104,7 @@ static void dpt_bind_vma(struct i915_address_space *vm,
 
 static void dpt_unbind_vma(struct i915_address_space *vm, struct i915_vma *vma)
 {
-	vm->clear_range(vm, vma->node.start, vma->size);
+	vm->clear_range(vm, i915_vma_offset(vma), vma->size);
 }
 
 static void dpt_cleanup(struct i915_address_space *vm)

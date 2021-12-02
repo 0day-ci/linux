@@ -110,7 +110,7 @@ static void gen6_ppgtt_insert_entries(struct i915_address_space *vm,
 {
 	struct i915_ppgtt *ppgtt = i915_vm_to_ppgtt(vm);
 	struct i915_page_directory * const pd = ppgtt->pd;
-	unsigned int first_entry = vma->node.start / I915_GTT_PAGE_SIZE;
+	unsigned int first_entry = i915_vma_offset(vma) / I915_GTT_PAGE_SIZE;
 	unsigned int act_pt = first_entry / GEN6_PTES;
 	unsigned int act_pte = first_entry % GEN6_PTES;
 	const u32 pte_encode = vm->pte_encode(0, cache_level, flags);

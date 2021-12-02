@@ -460,7 +460,7 @@ static void gen8_ppgtt_insert_huge(struct i915_vma *vma,
 {
 	const gen8_pte_t pte_encode = gen8_pte_encode(0, cache_level, flags);
 	unsigned int rem = sg_dma_len(iter->sg);
-	u64 start = vma->node.start;
+	u64 start = i915_vma_offset(vma);
 
 	GEM_BUG_ON(!i915_vm_is_4lvl(vma->vm));
 
@@ -542,8 +542,8 @@ static void gen8_ppgtt_insert_huge(struct i915_vma *vma,
 		if (maybe_64K != -1 &&
 		    (index == I915_PDES ||
 		     (i915_vm_has_scratch_64K(vma->vm) &&
-		      !iter->sg && IS_ALIGNED(vma->node.start +
-					      vma->node.size,
+		      !iter->sg && IS_ALIGNED(i915_vma_offset(vma) +
+					      i915_vma_size(vma),
 					      I915_GTT_PAGE_SIZE_2M)))) {
 			vaddr = px_vaddr(pd);
 			vaddr[maybe_64K] |= GEN8_PDE_IPS_64K;
@@ -587,7 +587,7 @@ static void gen8_ppgtt_insert(struct i915_address_space *vm,
 	if (vma->page_sizes.sg > I915_GTT_PAGE_SIZE) {
 		gen8_ppgtt_insert_huge(vma, &iter, cache_level, flags);
 	} else  {
-		u64 idx = vma->node.start >> GEN8_PTE_SHIFT;
+		u64 idx = i915_vma_offset(vma) >> GEN8_PTE_SHIFT;
 
 		do {
 			struct i915_page_directory * const pdp =
