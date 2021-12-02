@@ -17,7 +17,7 @@ struct dtpm {
 	struct dtpm *parent;
 	struct list_head sibling;
 	struct list_head children;
-	struct dtpm_ops *ops;
+	const struct dtpm_ops *ops;
 	unsigned long flags;
 	u64 power_limit;
 	u64 power_max;
@@ -64,7 +64,7 @@ int dtpm_update_power(struct dtpm *dtpm);
 
 int dtpm_release_zone(struct powercap_zone *pcz);
 
-void dtpm_init(struct dtpm *dtpm, struct dtpm_ops *ops);
+void dtpm_init(struct dtpm *dtpm, const struct dtpm_ops *ops);
 
 void dtpm_unregister(struct dtpm *dtpm);
 

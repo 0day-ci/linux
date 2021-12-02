@@ -157,7 +157,7 @@ static void pd_release(struct dtpm *dtpm)
 	kfree(dtpm_cpu);
 }
 
-static struct dtpm_ops dtpm_ops = {
+static const struct dtpm_ops dtpm_ops = {
 	.set_power_uw	 = set_pd_power_limit,
 	.get_power_uw	 = get_pd_power_uw,
 	.update_power_uw = update_pd_power_uw,

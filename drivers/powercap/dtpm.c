@@ -361,7 +361,7 @@ static const struct powercap_zone_ops zone_ops = {
  * @dtpm: The dtpm struct pointer to be initialized
  * @ops: The dtpm device specific ops, NULL for a virtual node
  */
-void dtpm_init(struct dtpm *dtpm, struct dtpm_ops *ops)
+void dtpm_init(struct dtpm *dtpm, const struct dtpm_ops *ops)
 {
 	if (dtpm) {
 		INIT_LIST_HEAD(&dtpm->children);
