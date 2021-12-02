@@ -8,13 +8,11 @@ config PCI_MVEBU
 	depends on ARCH_MVEBU || ARCH_DOVE || COMPILE_TEST
 	depends on MVEBU_MBUS
 	depends on ARM
-	depends on OF
 	select PCI_BRIDGE_EMUL
 
 config PCI_AARDVARK
 	tristate "Aardvark PCIe controller"
 	depends on (ARCH_MVEBU && ARM64) || COMPILE_TEST
-	depends on OF
 	depends on PCI_MSI_IRQ_DOMAIN
 	select PCI_BRIDGE_EMUL
 	help
@@ -34,12 +32,11 @@ config PCIE_XILINX_NWL
 
 config PCI_FTPCI100
 	bool "Faraday Technology FTPCI100 PCI controller"
-	depends on OF
 	default ARCH_GEMINI
 
 config PCI_IXP4XX
 	bool "Intel IXP4xx PCI controller"
-	depends on ARM && OF
+	depends on ARM
 	depends on ARCH_IXP4XX || COMPILE_TEST
 	default ARCH_IXP4XX
 	help
@@ -85,7 +82,6 @@ config PCI_HOST_COMMON
 
 config PCI_HOST_GENERIC
 	tristate "Generic PCI host controller"
-	depends on OF
 	select PCI_HOST_COMMON
 	select IRQ_DOMAIN
 	help
@@ -94,7 +90,7 @@ config PCI_HOST_GENERIC
 
 config PCIE_XILINX
 	bool "Xilinx AXI PCIe host bridge support"
-	depends on OF || COMPILE_TEST
+	depends on COMPILE_TEST
 	depends on PCI_MSI_IRQ_DOMAIN
 	help
 	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
@@ -111,7 +107,7 @@ config PCIE_XILINX_CPM
 config PCI_XGENE
 	bool "X-Gene PCIe controller"
 	depends on ARM64 || COMPILE_TEST
-	depends on OF || (ACPI && PCI_QUIRKS)
+	depends on ACPI && PCI_QUIRKS
 	help
 	  Say Y here if you want internal PCI support on APM X-Gene SoC.
 	  There are 5 internal PCIe ports available. Each port is GEN3 capable
@@ -128,7 +124,6 @@ config PCI_XGENE_MSI
 
 config PCI_V3_SEMI
 	bool "V3 Semiconductor PCI controller"
-	depends on OF
 	depends on ARM || COMPILE_TEST
 	default ARCH_INTEGRATOR_AP
 
@@ -146,7 +141,6 @@ config PCIE_IPROC
 config PCIE_IPROC_PLATFORM
 	tristate "Broadcom iProc PCIe platform bus driver"
 	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
-	depends on OF
 	select PCIE_IPROC
 	default ARCH_BCM_IPROC
 	help
@@ -190,7 +184,7 @@ config PCIE_ALTERA_MSI
 config PCI_HOST_THUNDER_PEM
 	bool "Cavium Thunder PCIe controller to off-chip devices"
 	depends on ARM64 || COMPILE_TEST
-	depends on OF || (ACPI && PCI_QUIRKS)
+	depends on ACPI && PCI_QUIRKS
 	select PCI_HOST_COMMON
 	help
 	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
@@ -198,7 +192,7 @@ config PCI_HOST_THUNDER_PEM
 config PCI_HOST_THUNDER_ECAM
 	bool "Cavium Thunder ECAM controller to on-chip devices on pass-1.x silicon"
 	depends on ARM64 || COMPILE_TEST
-	depends on OF || (ACPI && PCI_QUIRKS)
+	depends on ACPI && PCI_QUIRKS
 	select PCI_HOST_COMMON
 	help
 	  Say Y here if you want ECAM support for CN88XX-Pass-1.x Cavium Thunder SoCs.
@@ -210,7 +204,6 @@ config PCIE_ROCKCHIP
 config PCIE_ROCKCHIP_HOST
 	tristate "Rockchip PCIe host controller"
 	depends on ARCH_ROCKCHIP || COMPILE_TEST
-	depends on OF
 	depends on PCI_MSI_IRQ_DOMAIN
 	select MFD_SYSCON
 	select PCIE_ROCKCHIP
@@ -222,7 +215,6 @@ config PCIE_ROCKCHIP_HOST
 config PCIE_ROCKCHIP_EP
 	bool "Rockchip PCIe endpoint controller"
 	depends on ARCH_ROCKCHIP || COMPILE_TEST
-	depends on OF
 	depends on PCI_ENDPOINT
 	select MFD_SYSCON
 	select PCIE_ROCKCHIP
@@ -234,7 +226,6 @@ config PCIE_ROCKCHIP_EP
 config PCIE_MEDIATEK
 	tristate "MediaTek PCIe controller"
 	depends on ARCH_MEDIATEK || COMPILE_TEST
-	depends on OF
 	depends on PCI_MSI_IRQ_DOMAIN
 	help
 	  Say Y here if you want to enable PCIe controller support on
@@ -272,7 +263,6 @@ config PCIE_BRCMSTB
 	tristate "Broadcom Brcmstb PCIe host controller"
 	depends on ARCH_BRCMSTB || ARCH_BCM2835 || ARCH_BCM4908 || \
 		   BMIPS_GENERIC || COMPILE_TEST
-	depends on OF
 	depends on PCI_MSI_IRQ_DOMAIN
 	default ARCH_BRCMSTB
 	help
@@ -289,7 +279,6 @@ config PCI_HYPERV_INTERFACE
 config PCI_LOONGSON
 	bool "LOONGSON PCI Controller"
 	depends on MACH_LOONGSON64 || COMPILE_TEST
-	depends on OF
 	depends on PCI_QUIRKS
 	default MACH_LOONGSON64
 	help
@@ -298,7 +287,7 @@ config PCI_LOONGSON
 
 config PCIE_MICROCHIP_HOST
 	bool "Microchip AXI PCIe host bridge support"
-	depends on PCI_MSI && OF
+	depends on PCI_MSI
 	select PCI_MSI_IRQ_DOMAIN
 	select GENERIC_MSI_IRQ_DOMAIN
 	select PCI_HOST_COMMON
@@ -321,7 +310,6 @@ config PCIE_APPLE_MSI_DOORBELL_ADDR
 config PCIE_APPLE
 	tristate "Apple PCIe controller"
 	depends on ARCH_APPLE || COMPILE_TEST
-	depends on OF
 	depends on PCI_MSI_IRQ_DOMAIN
 	select PCI_HOST_COMMON
 	help
