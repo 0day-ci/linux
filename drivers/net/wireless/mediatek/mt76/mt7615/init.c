@@ -378,6 +378,7 @@ mt7615_init_wiphy(struct ieee80211_hw *hw)
 	if (is_mt7663(&phy->dev->mt76)) {
 		wiphy->iface_combinations = if_comb;
 		wiphy->n_iface_combinations = ARRAY_SIZE(if_comb);
+		wiphy->flags &= ~WIPHY_FLAG_4ADDR_STATION;
 	} else {
 		wiphy->iface_combinations = if_comb_radar;
 		wiphy->n_iface_combinations = ARRAY_SIZE(if_comb_radar);
