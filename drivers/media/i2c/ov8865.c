@@ -2319,56 +2319,57 @@ static int ov8865_sensor_init(struct ov8865_sensor *sensor)
 
 static int ov8865_sensor_power(struct ov8865_sensor *sensor, bool on)
 {
-	/* Keep initialized to zero for disable label. */
-	int ret = 0;
+	int ret;
 
-	if (on) {
-		gpiod_set_value_cansleep(sensor->reset, 1);
-		gpiod_set_value_cansleep(sensor->powerdown, 1);
-
-		ret = regulator_enable(sensor->dovdd);
-		if (ret) {
-			dev_err(sensor->dev,
-				"failed to enable DOVDD regulator\n");
-			goto disable;
-		}
-
-		ret = regulator_enable(sensor->avdd);
-		if (ret) {
-			dev_err(sensor->dev,
-				"failed to enable AVDD regulator\n");
-			goto disable;
-		}
-
-		ret = regulator_enable(sensor->dvdd);
-		if (ret) {
-			dev_err(sensor->dev,
-				"failed to enable DVDD regulator\n");
-			goto disable;
-		}
-
-		ret = clk_prepare_enable(sensor->extclk);
-		if (ret) {
-			dev_err(sensor->dev, "failed to enable EXTCLK clock\n");
-			goto disable;
-		}
-
-		gpiod_set_value_cansleep(sensor->reset, 0);
-		gpiod_set_value_cansleep(sensor->powerdown, 0);
-
-		/* Time to enter streaming mode according to power timings. */
-		usleep_range(10000, 12000);
-	} else {
-disable:
-		gpiod_set_value_cansleep(sensor->powerdown, 1);
-		gpiod_set_value_cansleep(sensor->reset, 1);
-
-		clk_disable_unprepare(sensor->extclk);
-
-		regulator_disable(sensor->dvdd);
-		regulator_disable(sensor->avdd);
-		regulator_disable(sensor->dovdd);
+	if (!on) {
+		ret = 0;
+		goto disable;
 	}
+
+	gpiod_set_value_cansleep(sensor->reset, 1);
+	gpiod_set_value_cansleep(sensor->powerdown, 1);
+
+	ret = regulator_enable(sensor->dovdd);
+	if (ret) {
+		dev_err(sensor->dev, "failed to enable DOVDD regulator\n");
+		goto disable;
+	}
+
+	ret = regulator_enable(sensor->avdd);
+	if (ret) {
+		dev_err(sensor->dev, "failed to enable AVDD regulator\n");
+		goto disable;
+	}
+
+	ret = regulator_enable(sensor->dvdd);
+	if (ret) {
+		dev_err(sensor->dev, "failed to enable DVDD regulator\n");
+		goto disable;
+	}
+
+	ret = clk_prepare_enable(sensor->extclk);
+	if (ret) {
+		dev_err(sensor->dev, "failed to enable EXTCLK clock\n");
+		goto disable;
+	}
+
+	gpiod_set_value_cansleep(sensor->reset, 0);
+	gpiod_set_value_cansleep(sensor->powerdown, 0);
+
+	/* Time to enter streaming mode according to power timings. */
+	usleep_range(10000, 12000);
+
+	return 0;
+
+disable:
+	gpiod_set_value_cansleep(sensor->powerdown, 1);
+	gpiod_set_value_cansleep(sensor->reset, 1);
+
+	clk_disable_unprepare(sensor->extclk);
+
+	regulator_disable(sensor->dvdd);
+	regulator_disable(sensor->avdd);
+	regulator_disable(sensor->dovdd);
 
 	return ret;
 }
