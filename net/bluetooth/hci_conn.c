@@ -638,7 +638,7 @@ static void hci_conn_auto_accept(struct work_struct *work)
 
 static void le_disable_advertising(struct hci_dev *hdev)
 {
-	if (ext_adv_capable(hdev)) {
+	if (use_ext_adv(hdev)) {
 		struct hci_cp_le_set_ext_adv_enable cp;
 
 		cp.enable = 0x00;
@@ -1063,7 +1063,7 @@ static void hci_req_directed_advertising(struct hci_request *req,
 	u8 own_addr_type;
 	u8 enable;
 
-	if (ext_adv_capable(hdev)) {
+	if (use_ext_adv(hdev)) {
 		struct hci_cp_le_set_ext_adv_params cp;
 		bdaddr_t random_addr;
 

@@ -129,6 +129,8 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_ADD_EXT_ADV_PARAMS,
 	MGMT_OP_ADD_EXT_ADV_DATA,
 	MGMT_OP_ADD_ADV_PATTERNS_MONITOR_RSSI,
+	MGMT_OP_SET_MESH,
+	MGMT_OP_MESH_SEND,
 };
 
 static const u16 mgmt_events[] = {
@@ -994,7 +996,7 @@ static int rpa_expired_sync(struct hci_dev *hdev, void *data)
 	 * controller happens in the hci_req_enable_advertising()
 	 * function.
 	 */
-	if (ext_adv_capable(hdev))
+	if (use_ext_adv(hdev))
 		return hci_start_ext_adv_sync(hdev, hdev->cur_adv_instance);
 	else
 		return hci_enable_advertising_sync(hdev);
@@ -1015,13 +1017,43 @@ static void rpa_expired(struct work_struct *work)
 	hci_cmd_sync_queue(hdev, rpa_expired_sync, NULL, NULL);
 }
 
+static int send_settings_rsp(struct sock *sk, u16 opcode, struct hci_dev *hdev);
+static int mesh_send_done_sync(struct hci_dev *hdev, void *data)
+{
+	struct mgmt_pending_cmd *cmd = data;
+
+	bt_dev_dbg(hdev, "Send Mesh Packet Done");
+	hci_disable_advertising_sync(hdev);
+	hci_dev_clear_flag(hdev, HCI_MESH_SENDING);
+	send_settings_rsp(cmd->sk, MGMT_OP_SET_MESH, hdev);
+	mgmt_pending_remove(cmd);
+
+	return 0;
+}
+
+static void mesh_send_done(struct work_struct *work)
+{
+	struct mgmt_pending_cmd *cmd;
+	struct hci_dev *hdev = container_of(work, struct hci_dev,
+					    mesh_send_done.work);
+
+	if (!hci_dev_test_flag(hdev, HCI_MESH_SENDING))
+		return;
+
+	cmd = pending_find(MGMT_OP_MESH_SEND, hdev);
+	hci_cmd_sync_queue(hdev, mesh_send_done_sync, cmd, NULL);
+}
+
 static void mgmt_init_hdev(struct sock *sk, struct hci_dev *hdev)
 {
 	if (hci_dev_test_and_set_flag(hdev, HCI_MGMT))
 		return;
 
+	BT_INFO("MGMT ver %d.%d", MGMT_VERSION, MGMT_REVISION);
+
 	INIT_DELAYED_WORK(&hdev->service_cache, service_cache_off);
 	INIT_DELAYED_WORK(&hdev->rpa_expired, rpa_expired);
+	INIT_DELAYED_WORK(&hdev->mesh_send_done, mesh_send_done);
 
 	/* Non-mgmt controlled devices get this bit set
 	 * implicitly so that pairing works for them, however
@@ -1992,6 +2024,9 @@ static int set_le_sync(struct hci_dev *hdev, void *data)
 	u8 val = !!cp->val;
 	int err;
 
+	hci_dev_clear_flag(hdev, HCI_MESH);
+	hci_dev_clear_flag(hdev, HCI_MESH_ACTIVE);
+
 	if (!val) {
 		if (hci_dev_test_flag(hdev, HCI_LE_ADV))
 			hci_disable_advertising_sync(hdev);
@@ -2010,7 +2045,7 @@ static int set_le_sync(struct hci_dev *hdev, void *data)
 	 * update in powered_update_hci will take care of it.
 	 */
 	if (!err && hci_dev_test_flag(hdev, HCI_LE_ENABLED)) {
-		if (ext_adv_capable(hdev)) {
+		if (use_ext_adv(hdev)) {
 			int status;
 
 			status = hci_setup_ext_adv_instance_sync(hdev, 0x00);
@@ -2024,6 +2059,159 @@ static int set_le_sync(struct hci_dev *hdev, void *data)
 		hci_update_passive_scan(hdev);
 	}
 
+	return err;
+}
+
+static void set_mesh_complete(struct hci_dev *hdev, void *data, int err)
+{
+	struct mgmt_pending_cmd *cmd = data;
+	u8 status = mgmt_status(err);
+	struct sock *sk = cmd->sk;
+
+	if (status) {
+		mgmt_pending_foreach(MGMT_OP_SET_MESH, hdev, cmd_status_rsp,
+							&status);
+		return;
+	}
+
+	send_settings_rsp(sk, MGMT_OP_SET_MESH, hdev);
+}
+
+static int set_mesh_sync(struct hci_dev *hdev, void *data)
+{
+	struct mgmt_pending_cmd *cmd = data;
+	struct mgmt_cp_set_mesh *cp = cmd->param;
+	size_t len = cmd->param_len;
+
+	memset(hdev->mesh_ad_types, 0, sizeof(hdev->mesh_ad_types));
+	hci_dev_clear_flag(hdev, HCI_MESH_ACTIVE);
+
+	if (cp->enable) {
+		hci_dev_set_flag(hdev, HCI_MESH);
+
+		if (cp->active)
+			hci_dev_set_flag(hdev, HCI_MESH_ACTIVE);
+
+	} else
+		hci_dev_clear_flag(hdev, HCI_MESH);
+
+	/* Truncate the passed ad_type list if too long */
+	if (len - sizeof(*cp) <= sizeof(hdev->mesh_ad_types))
+		memcpy(hdev->mesh_ad_types, cp->ad_types, len - sizeof(*cp));
+	else
+		memcpy(hdev->mesh_ad_types, cp->ad_types,
+						sizeof(hdev->mesh_ad_types));
+
+	hci_update_passive_scan_sync(hdev);
+	return 0;
+}
+
+static int set_mesh(struct sock *sk, struct hci_dev *hdev, void *data, u16 len)
+{
+	struct mgmt_cp_set_mesh *cp = data;
+	struct mgmt_pending_cmd *cmd;
+	int err = 0;
+
+	bt_dev_dbg(hdev, "sock %p", sk);
+
+	if (!lmp_le_capable(hdev))
+		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_MESH,
+				       MGMT_STATUS_NOT_SUPPORTED);
+
+	if ((cp->enable != 0x00 && cp->enable != 0x01) ||
+				(cp->active != 0x00 && cp->active != 0x01))
+		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_MESH,
+				       MGMT_STATUS_INVALID_PARAMS);
+
+	hci_dev_lock(hdev);
+
+	cmd = mgmt_pending_add(sk, MGMT_OP_SET_MESH, hdev, data, len);
+	if (!cmd)
+		err = -ENOMEM;
+	else
+		err = hci_cmd_sync_queue(hdev, set_mesh_sync, cmd,
+						set_mesh_complete);
+
+
+	send_settings_rsp(sk, MGMT_OP_SET_MESH, hdev);
+	hci_dev_unlock(hdev);
+	return err;
+}
+
+static void mesh_send_complete(struct hci_dev *hdev, void *data, int err)
+{
+	struct mgmt_pending_cmd *cmd = data;
+	struct mgmt_cp_mesh_send *cp = cmd->param;
+	unsigned long mesh_send_interval;
+	u8 mgmt_err = mgmt_status(err);
+
+	/* Report any errors here, but don't report completion */
+
+	if (mgmt_err) {
+		hci_dev_clear_flag(hdev, HCI_MESH_SENDING);
+		mgmt_cmd_status(cmd->sk, hdev->id, MGMT_OP_MESH_SEND, mgmt_err);
+		mgmt_pending_remove(cmd);
+		return;
+	}
+
+	mesh_send_interval = msecs_to_jiffies((cp->cnt) * 25);
+	queue_delayed_work(hdev->req_workqueue, &hdev->mesh_send_done,
+			   mesh_send_interval);
+}
+
+static int mesh_send_sync(struct hci_dev *hdev, void *data)
+{
+	struct mgmt_pending_cmd *cmd = data;
+
+	if (hci_dev_test_flag(hdev, HCI_LE_ADV))
+		return MGMT_STATUS_BUSY;
+
+	return hci_mesh_send_sync(hdev, cmd->param, cmd->param_len);
+}
+
+static int mesh_send(struct sock *sk, struct hci_dev *hdev, void *data, u16 len)
+{
+	struct mgmt_pending_cmd *cmd;
+	struct mgmt_cp_mesh_send *send = data;
+	int err = 0;
+
+	bt_dev_dbg(hdev, "Send Mesh Packet Start...");
+
+	if (!hci_dev_test_flag(hdev, HCI_MESH) || len <= MGMT_MESH_SEND_SIZE ||
+					len > (MGMT_MESH_SEND_SIZE + 29))
+		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_MESH_SEND,
+				       MGMT_STATUS_REJECTED);
+
+	hci_dev_lock(hdev);
+	if (hci_dev_test_flag(hdev, HCI_MESH_SENDING) ||
+				hci_dev_test_flag(hdev, HCI_LE_ADV)) {
+		err = mgmt_cmd_status(sk, hdev->id, MGMT_OP_MESH_SEND,
+							MGMT_STATUS_BUSY);
+		goto done;
+	}
+
+
+	hci_dev_set_flag(hdev, HCI_MESH_SENDING);
+
+	cmd = mgmt_pending_add(sk, MGMT_OP_MESH_SEND, hdev, send->data,
+				len - sizeof(struct mgmt_cp_mesh_send));
+
+	if (!cmd)
+		err = -ENOMEM;
+	else
+		err = hci_cmd_sync_queue(hdev, mesh_send_sync, cmd,
+						mesh_send_complete);
+
+	if (err < 0) {
+		err = mgmt_cmd_status(sk, hdev->id, MGMT_OP_MESH_SEND,
+						MGMT_STATUS_FAILED);
+
+		if (cmd)
+			mgmt_pending_remove(cmd);
+	}
+
+done:
+	hci_dev_unlock(hdev);
 	return err;
 }
 
@@ -5731,7 +5919,7 @@ static int set_adv_sync(struct hci_dev *hdev, void *data)
 		 */
 		hdev->cur_adv_instance = 0x00;
 
-		if (ext_adv_capable(hdev)) {
+		if (use_ext_adv(hdev)) {
 			hci_start_ext_adv_sync(hdev, 0x00);
 		} else {
 			hci_update_adv_data_sync(hdev, 0x00);
@@ -5780,6 +5968,7 @@ static int set_advertising(struct sock *sk, struct hci_dev *hdev, void *data,
 	if (!hdev_is_powered(hdev) ||
 	    (val == hci_dev_test_flag(hdev, HCI_ADVERTISING) &&
 	     (cp->val == 0x02) == hci_dev_test_flag(hdev, HCI_ADVERTISING_CONNECTABLE)) ||
+	    hci_dev_test_flag(hdev, HCI_MESH) ||
 	    hci_conn_num(hdev, LE_LINK) > 0 ||
 	    (hci_dev_test_flag(hdev, HCI_LE_SCAN) &&
 	     hdev->le_scan_type == LE_SCAN_ACTIVE)) {
@@ -7730,11 +7919,10 @@ static u32 get_supported_adv_flags(struct hci_dev *hdev)
 	/* In extended adv TX_POWER returned from Set Adv Param
 	 * will be always valid.
 	 */
-	if ((hdev->adv_tx_power != HCI_TX_POWER_INVALID) ||
-	    ext_adv_capable(hdev))
+	if ((hdev->adv_tx_power != HCI_TX_POWER_INVALID) || use_ext_adv(hdev))
 		flags |= MGMT_ADV_FLAG_TX_POWER;
 
-	if (ext_adv_capable(hdev)) {
+	if (use_ext_adv(hdev)) {
 		flags |= MGMT_ADV_FLAG_SEC_1M;
 		flags |= MGMT_ADV_FLAG_HW_OFFLOAD;
 		flags |= MGMT_ADV_FLAG_CAN_SET_TX_POWER;
@@ -8703,7 +8891,10 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ add_ext_adv_data,        MGMT_ADD_EXT_ADV_DATA_SIZE,
 						HCI_MGMT_VAR_LEN },
 	{ add_adv_patterns_monitor_rssi,
-				   MGMT_ADD_ADV_PATTERNS_MONITOR_RSSI_SIZE,
+				   MGMT_ADD_ADV_PATTERNS_MONITOR_RSSI_SIZE },
+	{ set_mesh,                MGMT_SET_MESH_SIZE,
+						HCI_MGMT_VAR_LEN },
+	{ mesh_send,               MGMT_MESH_SEND_SIZE,
 						HCI_MGMT_VAR_LEN },
 };
 
@@ -9526,7 +9717,8 @@ static bool is_filter_match(struct hci_dev *hdev, s8 rssi, u8 *eir,
 
 void mgmt_device_found(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 link_type,
 		       u8 addr_type, u8 *dev_class, s8 rssi, u32 flags,
-		       u8 *eir, u16 eir_len, u8 *scan_rsp, u8 scan_rsp_len)
+		       u8 *eir, u16 eir_len, u8 *scan_rsp, u8 scan_rsp_len,
+		       u32 instant)
 {
 	char buf[512];
 	struct mgmt_ev_device_found *ev = (void *)buf;
