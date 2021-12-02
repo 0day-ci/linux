@@ -374,7 +374,6 @@ static int xlp_gpio_probe(struct platform_device *pdev)
 	gc->base = 0;
 	gc->parent = &pdev->dev;
 	gc->ngpio = ngpio;
-	gc->of_node = pdev->dev.of_node;
 	gc->direction_output = xlp_gpio_dir_output;
 	gc->direction_input = xlp_gpio_dir_input;
 	gc->set = xlp_gpio_set;

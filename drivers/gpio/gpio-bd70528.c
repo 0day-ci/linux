@@ -201,9 +201,7 @@ static int bd70528_probe(struct platform_device *pdev)
 	bdgpio->gpio.set = bd70528_gpio_set;
 	bdgpio->gpio.ngpio = 4;
 	bdgpio->gpio.base = -1;
-#ifdef CONFIG_OF_GPIO
-	bdgpio->gpio.of_node = dev->parent->of_node;
-#endif
+
 	bdgpio->regmap = dev_get_regmap(dev->parent, NULL);
 	if (!bdgpio->regmap)
 		return -ENODEV;
