@@ -186,7 +186,8 @@ void ppgtt_bind_vma(struct i915_address_space *vm,
 	u32 pte_flags;
 
 	if (!test_bit(I915_VMA_ALLOC_BIT, __i915_vma_flags(vma))) {
-		vm->allocate_va_range(vm, stash, vma->node.start, vma->size);
+		GEM_BUG_ON(vma->size > i915_vma_size(vma));
+		vm->allocate_va_range(vm, stash, i915_vma_offset(vma), vma->size);
 		set_bit(I915_VMA_ALLOC_BIT, __i915_vma_flags(vma));
 	}
 
@@ -204,7 +205,7 @@ void ppgtt_bind_vma(struct i915_address_space *vm,
 void ppgtt_unbind_vma(struct i915_address_space *vm, struct i915_vma *vma)
 {
 	if (test_and_clear_bit(I915_VMA_ALLOC_BIT, __i915_vma_flags(vma)))
-		vm->clear_range(vm, vma->node.start, vma->size);
+		vm->clear_range(vm, i915_vma_offset(vma), vma->size);
 }
 
 static unsigned long pd_count(u64 size, int shift)

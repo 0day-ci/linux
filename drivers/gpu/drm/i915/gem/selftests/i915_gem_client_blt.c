@@ -94,14 +94,14 @@ static int prepare_blit(const struct tiled_blits *t,
 	*cs++ = BLT_DEPTH_32 | BLT_ROP_SRC_COPY | dst_pitch;
 	*cs++ = 0;
 	*cs++ = t->height << 16 | t->width;
-	*cs++ = lower_32_bits(dst->vma->node.start);
+	*cs++ = lower_32_bits(i915_vma_offset(dst->vma));
 	if (use_64b_reloc)
-		*cs++ = upper_32_bits(dst->vma->node.start);
+		*cs++ = upper_32_bits(i915_vma_offset(dst->vma));
 	*cs++ = 0;
 	*cs++ = src_pitch;
-	*cs++ = lower_32_bits(src->vma->node.start);
+	*cs++ = lower_32_bits(i915_vma_offset(src->vma));
 	if (use_64b_reloc)
-		*cs++ = upper_32_bits(src->vma->node.start);
+		*cs++ = upper_32_bits(i915_vma_offset(src->vma));
 
 	*cs++ = MI_BATCH_BUFFER_END;
 
@@ -317,7 +317,7 @@ static int pin_buffer(struct i915_vma *vma, u64 addr)
 {
 	int err;
 
-	if (drm_mm_node_allocated(&vma->node) && vma->node.start != addr) {
+	if (drm_mm_node_allocated(&vma->node) && i915_vma_offset(vma) != addr) {
 		err = i915_vma_unbind(vma);
 		if (err)
 			return err;
@@ -327,6 +327,7 @@ static int pin_buffer(struct i915_vma *vma, u64 addr)
 	if (err)
 		return err;
 
+	GEM_BUG_ON(i915_vma_offset(vma) != addr);
 	return 0;
 }
 
@@ -373,8 +374,8 @@ tiled_blit(struct tiled_blits *t,
 		err = move_to_active(dst->vma, rq, 0);
 	if (!err)
 		err = rq->engine->emit_bb_start(rq,
-						t->batch->node.start,
-						t->batch->node.size,
+						i915_vma_offset(t->batch),
+						i915_vma_size(t->batch),
 						0);
 	i915_request_get(rq);
 	i915_request_add(rq);

@@ -458,7 +458,8 @@ static void i915_ggtt_insert_entries(struct i915_address_space *vm,
 	unsigned int flags = (cache_level == I915_CACHE_NONE) ?
 		AGP_USER_MEMORY : AGP_USER_CACHED_MEMORY;
 
-	intel_gtt_insert_sg_entries(vma->pages, vma->node.start >> PAGE_SHIFT,
+	intel_gtt_insert_sg_entries(vma->pages,
+				    i915_ggtt_offset(vma) >> PAGE_SHIFT,
 				    flags);
 }
 
@@ -649,7 +650,7 @@ static void aliasing_gtt_unbind_vma(struct i915_address_space *vm,
 				    struct i915_vma *vma)
 {
 	if (i915_vma_is_bound(vma, I915_VMA_GLOBAL_BIND))
-		vm->clear_range(vm, vma->node.start, vma->size);
+		vm->clear_range(vm, i915_ggtt_offset(vma), vma->size);
 
 	if (i915_vma_is_bound(vma, I915_VMA_LOCAL_BIND))
 		ppgtt_unbind_vma(&i915_vm_to_ggtt(vm)->alias->vm, vma);
