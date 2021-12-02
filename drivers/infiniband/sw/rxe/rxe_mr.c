@@ -695,6 +695,8 @@ int rxe_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 	rxe_drop_ref(mr_pd(mr));
 	rxe_drop_ref(mr);
 
+	rxe_fini(mr);
+
 	return 0;
 }
 

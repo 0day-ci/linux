@@ -12,7 +12,8 @@ int rxe_alloc_mw(struct ib_mw *ibmw, struct ib_udata *udata)
 	struct rxe_dev *rxe = to_rdev(ibmw->device);
 	int ret;
 
-	rxe_add_ref(pd);
+	if (!rxe_add_ref(pd))
+		return -EINVAL;
 
 	ret = rxe_add_to_pool(&rxe->mw_pool, mw);
 	if (ret) {
@@ -60,8 +61,9 @@ int rxe_dealloc_mw(struct ib_mw *ibmw)
 	rxe_do_dealloc_mw(mw);
 	spin_unlock_bh(&mw->lock);
 
-	rxe_drop_ref(mw);
 	rxe_drop_ref(pd);
+	rxe_drop_ref(mw);
+	rxe_fini(mw);
 
 	return 0;
 }
@@ -178,11 +180,11 @@ static void rxe_do_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 	if (mw->length) {
 		mw->mr = mr;
 		atomic_inc(&mr->num_mw);
-		rxe_add_ref(mr);
+		rxe_add_ref(mr);	/* safe */
 	}
 
 	if (mw->ibmw.type == IB_MW_TYPE_2) {
-		rxe_add_ref(qp);
+		rxe_add_ref(qp);	/* safe */
 		mw->qp = qp;
 	}
 }
@@ -199,7 +201,7 @@ int rxe_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 	mw = rxe_pool_get_index(&rxe->mw_pool, mw_rkey >> 8);
 	if (unlikely(!mw)) {
 		ret = -EINVAL;
-		goto err;
+		goto err_out;
 	}
 
 	if (unlikely(mw->rkey != mw_rkey)) {
@@ -236,7 +238,7 @@ err_drop_mr:
 		rxe_drop_ref(mr);
 err_drop_mw:
 	rxe_drop_ref(mw);
-err:
+err_out:
 	return ret;
 }
 

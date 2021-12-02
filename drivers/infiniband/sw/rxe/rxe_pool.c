@@ -150,6 +150,7 @@ static void *__rxe_alloc(struct rxe_pool *pool, gfp_t flags)
 	elem->pool = pool;
 	elem->obj = obj;
 	kref_init(&elem->ref_cnt);
+	init_completion(&elem->complete);
 
 	if (pool->init) {
 		err = pool->init(elem);
@@ -189,6 +190,7 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
 	elem->pool = pool;
 	elem->obj = (u8 *)elem - pool->elem_offset;
 	kref_init(&elem->ref_cnt);
+	init_completion(&elem->complete);
 
 	if (pool->init) {
 		err = pool->init(elem);
@@ -372,8 +374,26 @@ void rxe_elem_release(struct kref *kref)
 	if (pool->cleanup)
 		pool->cleanup(elem);
 
-	if (pool->flags & RXE_POOL_ALLOC)
-		kfree(elem->obj);
+	complete_all(&elem->complete);
 
 	atomic_dec(&pool->num_elem);
+}
+
+/**
+ * rxe_elem_free() - free memory holding pool element
+ * @elem: the pool elem
+ */
+void __rxe_fini(struct rxe_pool_elem *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	int ret;
+
+	ret = wait_for_completion_timeout(&elem->complete, 10);
+
+	if (!ret)
+		pr_info("Timed out waiting for %s#%d\n", pool->name,
+				elem->index);
+
+	if (elem->pool->flags & RXE_POOL_ALLOC)
+		kfree(elem->obj);
 }

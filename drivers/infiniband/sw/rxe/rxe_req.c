@@ -614,9 +614,10 @@ int rxe_requester(void *arg)
 	struct rxe_ah *ah;
 	struct rxe_av *av;
 
-	rxe_add_ref(qp);
+	/* check qp pointer still valid */
+	if (!rxe_add_ref(qp))
+		return -EAGAIN;
 
-next_wqe:
 	if (unlikely(!qp->valid || qp->req.state == QP_STATE_ERROR))
 		goto exit;
 
@@ -644,7 +645,7 @@ next_wqe:
 		if (unlikely(ret))
 			goto err;
 		else
-			goto next_wqe;
+			goto done;
 	}
 
 	if (unlikely(qp_type(qp) == IB_QPT_RC &&
@@ -760,7 +761,9 @@ next_wqe:
 
 	update_state(qp, wqe, &pkt, payload);
 
-	goto next_wqe;
+done:
+	rxe_drop_ref(qp);
+	return 0;
 
 err_drop_ah:
 	if (ah)

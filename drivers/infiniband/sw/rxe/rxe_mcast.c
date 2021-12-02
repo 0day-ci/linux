@@ -122,6 +122,8 @@ int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 
 out_drop_ref:
 	rxe_drop_ref(grp);			/* ref from get_key */
+	if (grp->elem.complete.done)
+		rxe_fini(grp);
 err1:
 	return ret;
 }
@@ -149,6 +151,8 @@ void rxe_drop_all_mcast_groups(struct rxe_qp *qp)
 		spin_unlock_bh(&grp->mcg_lock);
 		rxe_drop_ref(qp);
 		rxe_drop_ref(grp);
+		if (grp->elem.complete.done)
+			rxe_fini(grp);
 		kfree(elem);
 	}
 }

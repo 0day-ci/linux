@@ -116,6 +116,7 @@ static void rxe_dealloc_ucontext(struct ib_ucontext *ibuc)
 	struct rxe_ucontext *uc = to_ruc(ibuc);
 
 	rxe_drop_ref(uc);
+	rxe_fini(uc);
 }
 
 static int rxe_port_immutable(struct ib_device *dev, u32 port_num,
@@ -150,6 +151,7 @@ static int rxe_dealloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 	struct rxe_pd *pd = to_rpd(ibpd);
 
 	rxe_drop_ref(pd);
+	rxe_fini(pd);
 	return 0;
 }
 
@@ -189,6 +191,7 @@ static int rxe_create_ah(struct ib_ah *ibah,
 					 sizeof(uresp->ah_num));
 		if (err) {
 			rxe_drop_ref(ah);
+			rxe_fini(ah);
 			return -EFAULT;
 		}
 	} else if (ah->is_user) {
@@ -229,6 +232,7 @@ static int rxe_destroy_ah(struct ib_ah *ibah, u32 flags)
 	struct rxe_ah *ah = to_rah(ibah);
 
 	rxe_drop_ref(ah);
+	rxe_fini(ah);
 	return 0;
 }
 
@@ -297,25 +301,29 @@ static int rxe_create_srq(struct ib_srq *ibsrq, struct ib_srq_init_attr *init,
 
 	err = rxe_srq_chk_attr(rxe, NULL, &init->attr, IB_SRQ_INIT_MASK);
 	if (err)
-		goto err1;
+		goto err_out;
 
 	err = rxe_add_to_pool(&rxe->srq_pool, srq);
 	if (err)
-		goto err1;
+		goto err_out;
 
-	rxe_add_ref(pd);
+	if (!rxe_add_ref(pd))
+		goto err_drop_srq;
+
 	srq->pd = pd;
 
 	err = rxe_srq_from_init(rxe, srq, init, udata, uresp);
 	if (err)
-		goto err2;
+		goto err_drop_pd;
 
 	return 0;
 
-err2:
+err_drop_pd:
 	rxe_drop_ref(pd);
+err_drop_srq:
 	rxe_drop_ref(srq);
-err1:
+	rxe_fini(srq);
+err_out:
 	return err;
 }
 
@@ -373,6 +381,7 @@ static int rxe_destroy_srq(struct ib_srq *ibsrq, struct ib_udata *udata)
 
 	rxe_drop_ref(srq->pd);
 	rxe_drop_ref(srq);
+	rxe_fini(srq);
 	return 0;
 }
 
@@ -442,6 +451,7 @@ static int rxe_create_qp(struct ib_qp *ibqp, struct ib_qp_init_attr *init,
 
 qp_init:
 	rxe_drop_ref(qp);
+	rxe_fini(qp);
 	return err;
 }
 
@@ -486,6 +496,7 @@ static int rxe_destroy_qp(struct ib_qp *ibqp, struct ib_udata *udata)
 
 	rxe_qp_destroy(qp);
 	rxe_drop_ref(qp);
+	rxe_fini(qp);
 	return 0;
 }
 
@@ -797,6 +808,7 @@ static int rxe_destroy_cq(struct ib_cq *ibcq, struct ib_udata *udata)
 	rxe_cq_disable(cq);
 
 	rxe_drop_ref(cq);
+	rxe_fini(cq);
 	return 0;
 }
 
@@ -882,15 +894,28 @@ static struct ib_mr *rxe_get_dma_mr(struct ib_pd *ibpd, int access)
 	struct rxe_dev *rxe = to_rdev(ibpd->device);
 	struct rxe_pd *pd = to_rpd(ibpd);
 	struct rxe_mr *mr;
+	int err;
 
 	mr = rxe_alloc(&rxe->mr_pool);
-	if (!mr)
-		return ERR_PTR(-ENOMEM);
+	if (!mr) {
+		err = -ENOMEM;
+		goto err_out;
+	}
 
-	rxe_add_ref(pd);
+	if (!rxe_add_ref(pd)) {
+		err = -EINVAL;
+		goto err_drop_mr;
+	}
+
 	rxe_mr_init_dma(pd, access, mr);
 
 	return &mr->ibmr;
+
+err_drop_mr:
+	rxe_drop_ref(mr);
+	rxe_fini(mr);
+err_out:
+	return ERR_PTR(err);
 }
 
 static struct ib_mr *rxe_reg_user_mr(struct ib_pd *ibpd,
@@ -899,30 +924,35 @@ static struct ib_mr *rxe_reg_user_mr(struct ib_pd *ibpd,
 				     u64 iova,
 				     int access, struct ib_udata *udata)
 {
-	int err;
 	struct rxe_dev *rxe = to_rdev(ibpd->device);
 	struct rxe_pd *pd = to_rpd(ibpd);
 	struct rxe_mr *mr;
+	int err;
 
 	mr = rxe_alloc(&rxe->mr_pool);
 	if (!mr) {
 		err = -ENOMEM;
-		goto err2;
+		goto err_out;
 	}
 
 
-	rxe_add_ref(pd);
+	if (!rxe_add_ref(pd)) {
+		err = -EINVAL;
+		goto err_drop_mr;
+	}
 
 	err = rxe_mr_init_user(pd, start, length, iova, access, mr);
 	if (err)
-		goto err3;
+		goto err_drop_pd;
 
 	return &mr->ibmr;
 
-err3:
+err_drop_pd:
 	rxe_drop_ref(pd);
+err_drop_mr:
 	rxe_drop_ref(mr);
-err2:
+	rxe_fini(mr);
+err_out:
 	return ERR_PTR(err);
 }
 
@@ -934,27 +964,34 @@ static struct ib_mr *rxe_alloc_mr(struct ib_pd *ibpd, enum ib_mr_type mr_type,
 	struct rxe_mr *mr;
 	int err;
 
-	if (mr_type != IB_MR_TYPE_MEM_REG)
-		return ERR_PTR(-EINVAL);
+	if (mr_type != IB_MR_TYPE_MEM_REG) {
+		err = -EINVAL;
+		goto err_out;
+	}
 
 	mr = rxe_alloc(&rxe->mr_pool);
 	if (!mr) {
 		err = -ENOMEM;
-		goto err1;
+		goto err_out;
 	}
 
-	rxe_add_ref(pd);
+	if (!rxe_add_ref(pd)) {
+		err = -EINVAL;
+		goto err_drop_mr;
+	}
 
 	err = rxe_mr_init_fast(pd, max_num_sg, mr);
 	if (err)
-		goto err2;
+		goto err_drop_pd;
 
 	return &mr->ibmr;
 
-err2:
+err_drop_pd:
 	rxe_drop_ref(pd);
+err_drop_mr:
 	rxe_drop_ref(mr);
-err1:
+	rxe_fini(mr);
+err_out:
 	return ERR_PTR(err);
 }
 
@@ -994,8 +1031,10 @@ static int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 	if (err)
 		return err;
 
+	/* adds a ref on grp if successful */
 	err = rxe_mcast_add_grp_elem(rxe, qp, grp);
 
+	/* drops the ref from ..get_grp() */
 	rxe_drop_ref(grp);
 	return err;
 }
@@ -1005,6 +1044,7 @@ static int rxe_detach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 	struct rxe_dev *rxe = to_rdev(ibqp->device);
 	struct rxe_qp *qp = to_rqp(ibqp);
 
+	/* drops a ref on grp if successful */
 	return rxe_mcast_drop_grp_elem(rxe, qp, mgid);
 }
 

@@ -288,11 +288,11 @@ static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 
 			cpkt = SKB_TO_PKT(cskb);
 			cpkt->qp = qp;
-			rxe_add_ref(qp);
+			rxe_add_ref(qp);	/* safe */
 			rxe_rcv_pkt(cpkt, cskb);
 		} else {
 			pkt->qp = qp;
-			rxe_add_ref(qp);
+			rxe_add_ref(qp);	/* safe */
 			rxe_rcv_pkt(pkt, skb);
 			skb = NULL;	/* mark consumed */
 		}

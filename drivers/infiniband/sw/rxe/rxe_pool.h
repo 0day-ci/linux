@@ -30,6 +30,7 @@ struct rxe_pool_elem {
 	struct rxe_pool		*pool;
 	void			*obj;
 	struct kref		ref_cnt;
+	struct completion	complete;
 	struct list_head	list;
 
 	/* only used if keyed */
@@ -104,5 +105,8 @@ static inline bool __rxe_drop_ref(struct rxe_pool_elem *elem)
 	return ret;
 }
 #define rxe_drop_ref(obj) __rxe_drop_ref(&(obj)->elem)
+
+void __rxe_fini(struct rxe_pool_elem *elem);
+#define rxe_fini(obj) __rxe_fini(&(obj)->elem)
 
 #endif /* RXE_POOL_H */
