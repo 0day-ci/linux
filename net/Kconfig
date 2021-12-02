@@ -253,6 +253,14 @@ config PCPU_DEV_REFCNT
 	  network device refcount are using per cpu variables if this option is set.
 	  This can be forced to N to detect underflows (with a performance drop).
 
+config NET_DEV_REFCNT_TRACKER
+	bool "Enable tracking in dev_put_track() and dev_hold_track()"
+	select REF_TRACKER
+	default n
+	help
+	  Enable debugging feature to track leaked device references.
+	  This adds memory and cpu costs.
+
 config RPS
 	bool
 	depends on SMP && SYSFS
