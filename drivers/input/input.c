@@ -2125,6 +2125,41 @@ void input_set_capability(struct input_dev *dev, unsigned int type, unsigned int
 }
 EXPORT_SYMBOL(input_set_capability);
 
+/**
+ * input_set_property - add a property to the device
+ * @dev: device to add the property to
+ * @property: type of the property (INPUT_PROP_POINTER, INPUT_PROP_DIRECT...)
+ *
+ * In addition to setting up corresponding bit in dev->propbit the function
+ * might add or remove related capabilities.
+ */
+void input_set_property(struct input_dev *dev, unsigned int property)
+{
+	switch (property) {
+	case INPUT_PROP_POINTER:
+	case INPUT_PROP_DIRECT:
+	case INPUT_PROP_SEMI_MT:
+	case INPUT_PROP_TOPBUTTONPAD:
+	case INPUT_PROP_POINTING_STICK:
+	case INPUT_PROP_ACCELEROMETER:
+		break;
+
+	case INPUT_PROP_BUTTONPAD:
+		input_set_capability(dev, EV_KEY, BTN_LEFT);
+		__clear_bit(BTN_RIGHT, dev->keybit);
+		__clear_bit(BTN_MIDDLE, dev->keybit);
+		break;
+
+	default:
+		pr_err("%s: unknown property %u\n", __func__, property);
+		dump_stack();
+		return;
+	}
+
+	__set_bit(property, dev->propbit);
+}
+EXPORT_SYMBOL(input_set_property);
+
 static unsigned int input_estimate_events_per_packet(struct input_dev *dev)
 {
 	int mt_slots;

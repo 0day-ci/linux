@@ -456,6 +456,7 @@ static inline void input_mt_sync(struct input_dev *dev)
 }
 
 void input_set_capability(struct input_dev *dev, unsigned int type, unsigned int code);
+void input_set_property(struct input_dev *dev, unsigned int property);
 
 /**
  * input_set_events_per_packet - tell handlers about the driver event rate
