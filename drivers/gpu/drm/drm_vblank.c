@@ -1911,7 +1911,7 @@ static void drm_handle_vblank_events(struct drm_device *dev, unsigned int pipe)
 
 		list_del(&e->base.link);
 		drm_vblank_put(dev, pipe);
-		send_vblank_event(dev, e, seq, now);
+		send_vblank_event(dev, e, e->sequence, now);
 	}
 
 	if (crtc && crtc->funcs->get_vblank_timestamp)
