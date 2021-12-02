@@ -297,6 +297,12 @@ static void die_kernel_fault(const char *msg, unsigned long addr,
 	pr_alert("Unable to handle kernel %s at virtual address %016lx\n", msg,
 		 addr);
 
+#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
+	pr_alert("Possible KASAN shadow access for range [%016lx..%016lx]\n",
+		 (unsigned long)kasan_shadow_to_mem((void *)addr),
+		 (unsigned long)kasan_shadow_to_mem((void *)addr + 1) - 1);
+#endif
+
 	mem_abort_decode(esr);
 
 	show_pte(addr);
