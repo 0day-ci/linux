@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/platform/microsoft/surface-xbl.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Surface Extensible Bootloader for Microsoft Surface Duo
+
+maintainers:
+  - Jarrett Schultz <jaschultz@microsoft.com>
+
+description: |
+  Defined to expose information that is used during production when
+  device is in manufacturing mode. Some of the information included
+  in this imem section is -
+    * board_id
+    * battery_present
+    * hw_init_retries
+    * is_customer_mode
+    * is_act_mode
+    * pmic_reset_reason
+    * touch_fw_version
+    * ocp_error_location
+  See sysfs documentation for more information.
+
+properties:
+  compatible:
+    const: simple-mfd
+
+  reg:
+    maxItems: 1
+
+  properties:
+    compatible:
+      const: microsoft,sm8150-surface-duo-xbl
+
+#    reg:
+#      maxItems: 1
+
+#  additionalProperties: false
+
+#  required:
+#    - compatible
+#    - reg
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - ranges
+  - "#address-cells"
+  - "#size-cells"
+
+examples:
+  - |
+    imem@146bf000 {
+      compatible = "simple-mfd";
+      reg = <0x146bf000 0x1000>;
+      ranges = <0x0 0x146bf000 0x1000>;
+
+      #address-cells = <1>;
+      #size-cells = <1>;
+
+      xbl@a94 {
+        compatible = "microsoft,sm8150-surface-duo-xbl";
+        reg = <0xa94 0x100>;
+      };
+    };
