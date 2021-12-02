@@ -2843,24 +2843,38 @@ static int selinux_fs_context_dup(struct fs_context *fc,
 	if (src->fscontext) {
 		opts->fscontext = kstrdup(src->fscontext, GFP_KERNEL);
 		if (!opts->fscontext)
-			return -ENOMEM;
+			goto err_fscontext;
 	}
 	if (src->context) {
 		opts->context = kstrdup(src->context, GFP_KERNEL);
 		if (!opts->context)
-			return -ENOMEM;
+			goto err_context;
 	}
 	if (src->rootcontext) {
 		opts->rootcontext = kstrdup(src->rootcontext, GFP_KERNEL);
 		if (!opts->rootcontext)
-			return -ENOMEM;
+			goto err_rootcontext;
 	}
 	if (src->defcontext) {
 		opts->defcontext = kstrdup(src->defcontext, GFP_KERNEL);
 		if (!opts->defcontext)
-			return -ENOMEM;
+			goto err_defcontext;
 	}
 	return 0;
+
+err_defcontext:
+	if (src->rootcontext)
+		kfree(opts->rootcontext);
+err_rootcontext:
+	if (src->context)
+		kfree(opts->context);
+err_context:
+	if (src->fscontext)
+		kfree(opts->fscontext);
+err_fscontext:
+	kfree(fc->security);
+
+	return -ENOMEM;
 }
 
 static const struct fs_parameter_spec selinux_fs_parameters[] = {
