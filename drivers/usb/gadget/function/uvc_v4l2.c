@@ -169,8 +169,12 @@ uvc_v4l2_qbuf(struct file *file, void *fh, struct v4l2_buffer *b)
 	if (ret < 0)
 		return ret;
 
-	if (uvc->state == UVC_STATE_STREAMING)
-		schedule_work(&video->pump);
+	if (uvc->state == UVC_STATE_STREAMING) {
+		if (!video->queue.use_sg)
+			schedule_work(&video->pump);
+		else
+			uvcg_video_pump(video);
+	}
 
 	return ret;
 }
