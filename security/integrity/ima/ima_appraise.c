@@ -240,6 +240,11 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 			struct evm_ima_xattr_data *xattr_value, int xattr_len,
 			enum integrity_status *status, const char **cause)
 {
+	u8 verity_digest[IMA_MAX_DIGEST_SIZE + 1];
+	struct {
+		struct ima_digest_data hdr;
+		char digest[IMA_MAX_DIGEST_SIZE];
+	} hash;
 	int rc = -EINVAL, hash_start = 0;
 
 	switch (xattr_value->type) {
@@ -277,7 +282,45 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 		*status = INTEGRITY_PASS;
 		break;
 	case IMA_VERITY_DIGSIG:
-		fallthrough;
+		set_bit(IMA_DIGSIG, &iint->atomic_flags);
+
+		/*
+		 * The IMA signature is based on a hash of IMA_VERITY_DIGSIG
+		 * and the fs-verity file digest, not directly on the
+		 * fs-verity file digest.  Both digests should probably be
+		 * included in the IMA measurement list, but for now this
+		 * digest is only used for verifying the IMA signature.
+		 */
+		verity_digest[0] = IMA_VERITY_DIGSIG;
+		memcpy(verity_digest + 1, iint->ima_hash->digest,
+		       iint->ima_hash->length);
+
+		hash.hdr.algo = iint->ima_hash->algo;
+		hash.hdr.length = iint->ima_hash->length;
+
+		rc = ima_calc_buffer_hash(verity_digest,
+					  iint->ima_hash->length + 1,
+					  &hash.hdr);
+		if (rc) {
+			*cause = "verity-hashing-error";
+			*status = INTEGRITY_FAIL;
+			break;
+		}
+
+		rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
+					     (const char *)xattr_value,
+					      xattr_len,
+					      hash.hdr.digest,
+					      hash.hdr.length);
+
+		if (rc) {
+			*cause = "invalid-verity-signature";
+			*status = INTEGRITY_FAIL;
+		} else {
+			*status = INTEGRITY_PASS;
+		}
+
+		break;
 	case EVM_IMA_XATTR_DIGSIG:
 		set_bit(IMA_DIGSIG, &iint->atomic_flags);
 		rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
