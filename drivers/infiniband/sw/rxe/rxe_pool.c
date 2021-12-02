@@ -97,37 +97,13 @@ static const struct rxe_type_info {
 	},
 };
 
-static int rxe_pool_init_index(struct rxe_pool *pool, u32 max, u32 min)
-{
-	int err = 0;
-
-	if ((max - min + 1) < pool->max_elem) {
-		pr_warn("not enough indices for max_elem\n");
-		err = -EINVAL;
-		goto out;
-	}
-
-	pool->index.max_index = max;
-	pool->index.min_index = min;
-
-	pool->index.table = bitmap_zalloc(max - min + 1, GFP_KERNEL);
-	if (!pool->index.table) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-out:
-	return err;
-}
-
-int rxe_pool_init(
+void rxe_pool_init(
 	struct rxe_dev		*rxe,
 	struct rxe_pool		*pool,
 	enum rxe_elem_type	type,
 	unsigned int		max_elem)
 {
 	const struct rxe_type_info *info = &rxe_type_info[type];
-	int			err = 0;
 
 	memset(pool, 0, sizeof(*pool));
 
@@ -142,14 +118,13 @@ int rxe_pool_init(
 
 	atomic_set(&pool->num_elem, 0);
 
-	rwlock_init(&pool->pool_lock);
-
 	if (pool->flags & RXE_POOL_INDEX) {
-		pool->index.tree = RB_ROOT;
-		err = rxe_pool_init_index(pool, info->max_index,
-					  info->min_index);
-		if (err)
-			goto out;
+		xa_init_flags(&pool->xarray.xa, XA_FLAGS_ALLOC);
+		pool->xarray.limit.max = info->max_index;
+		pool->xarray.limit.min = info->min_index;
+	} else {
+		/* if pool not indexed just use xa spin_lock */
+		spin_lock_init(&pool->xarray.xa.xa_lock);
 	}
 
 	if (pool->flags & RXE_POOL_KEY) {
@@ -157,9 +132,6 @@ int rxe_pool_init(
 		pool->key.key_offset = info->key_offset;
 		pool->key.key_size = info->key_size;
 	}
-
-out:
-	return err;
 }
 
 void rxe_pool_cleanup(struct rxe_pool *pool)
@@ -167,51 +139,6 @@ void rxe_pool_cleanup(struct rxe_pool *pool)
 	if (atomic_read(&pool->num_elem) > 0)
 		pr_warn("%s pool destroyed with unfree'd elem\n",
 			pool->name);
-
-	if (pool->flags & RXE_POOL_INDEX)
-		bitmap_free(pool->index.table);
-}
-
-static u32 alloc_index(struct rxe_pool *pool)
-{
-	u32 index;
-	u32 range = pool->index.max_index - pool->index.min_index + 1;
-
-	index = find_next_zero_bit(pool->index.table, range, pool->index.last);
-	if (index >= range)
-		index = find_first_zero_bit(pool->index.table, range);
-
-	WARN_ON_ONCE(index >= range);
-	set_bit(index, pool->index.table);
-	pool->index.last = index;
-	return index + pool->index.min_index;
-}
-
-static int rxe_insert_index(struct rxe_pool *pool, struct rxe_pool_elem *new)
-{
-	struct rb_node **link = &pool->index.tree.rb_node;
-	struct rb_node *parent = NULL;
-	struct rxe_pool_elem *elem;
-
-	while (*link) {
-		parent = *link;
-		elem = rb_entry(parent, struct rxe_pool_elem, index_node);
-
-		if (elem->index == new->index) {
-			pr_warn("element already exists!\n");
-			return -EINVAL;
-		}
-
-		if (elem->index > new->index)
-			link = &(*link)->rb_left;
-		else
-			link = &(*link)->rb_right;
-	}
-
-	rb_link_node(&new->index_node, parent, link);
-	rb_insert_color(&new->index_node, &pool->index.tree);
-
-	return 0;
 }
 
 static int rxe_insert_key(struct rxe_pool *pool, struct rxe_pool_elem *new)
@@ -262,9 +189,9 @@ int __rxe_add_key(struct rxe_pool_elem *elem, void *key)
 	struct rxe_pool *pool = elem->pool;
 	int err;
 
-	write_lock_bh(&pool->pool_lock);
+	rxe_pool_lock_bh(pool);
 	err = __rxe_add_key_locked(elem, key);
-	write_unlock_bh(&pool->pool_lock);
+	rxe_pool_unlock_bh(pool);
 
 	return err;
 }
@@ -280,55 +207,16 @@ void __rxe_drop_key(struct rxe_pool_elem *elem)
 {
 	struct rxe_pool *pool = elem->pool;
 
-	write_lock_bh(&pool->pool_lock);
+	rxe_pool_lock_bh(pool);
 	__rxe_drop_key_locked(elem);
-	write_unlock_bh(&pool->pool_lock);
-}
-
-int __rxe_add_index_locked(struct rxe_pool_elem *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-	int err;
-
-	elem->index = alloc_index(pool);
-	err = rxe_insert_index(pool, elem);
-
-	return err;
-}
-
-int __rxe_add_index(struct rxe_pool_elem *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-	int err;
-
-	write_lock_bh(&pool->pool_lock);
-	err = __rxe_add_index_locked(elem);
-	write_unlock_bh(&pool->pool_lock);
-
-	return err;
-}
-
-void __rxe_drop_index_locked(struct rxe_pool_elem *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-
-	clear_bit(elem->index - pool->index.min_index, pool->index.table);
-	rb_erase(&elem->index_node, &pool->index.tree);
-}
-
-void __rxe_drop_index(struct rxe_pool_elem *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-
-	write_lock_bh(&pool->pool_lock);
-	__rxe_drop_index_locked(elem);
-	write_unlock_bh(&pool->pool_lock);
+	rxe_pool_unlock_bh(pool);
 }
 
 void *rxe_alloc_locked(struct rxe_pool *pool)
 {
 	struct rxe_pool_elem *elem;
 	void *obj;
+	int err;
 
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
@@ -343,8 +231,18 @@ void *rxe_alloc_locked(struct rxe_pool *pool)
 	elem->obj = obj;
 	kref_init(&elem->ref_cnt);
 
+	if (pool->flags & RXE_POOL_INDEX) {
+		err = xa_alloc_cyclic_bh(&pool->xarray.xa, &elem->index, elem,
+					 pool->xarray.limit,
+					 &pool->xarray.next, GFP_ATOMIC);
+		if (err)
+			goto out_free;
+	}
+
 	return obj;
 
+out_free:
+	kfree(obj);
 out_cnt:
 	atomic_dec(&pool->num_elem);
 	return NULL;
@@ -354,6 +252,7 @@ void *rxe_alloc(struct rxe_pool *pool)
 {
 	struct rxe_pool_elem *elem;
 	void *obj;
+	int err;
 
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
@@ -368,8 +267,18 @@ void *rxe_alloc(struct rxe_pool *pool)
 	elem->obj = obj;
 	kref_init(&elem->ref_cnt);
 
+	if (pool->flags & RXE_POOL_INDEX) {
+		err = xa_alloc_cyclic_bh(&pool->xarray.xa, &elem->index, elem,
+					 pool->xarray.limit,
+					 &pool->xarray.next, GFP_KERNEL);
+		if (err)
+			goto out_free;
+	}
+
 	return obj;
 
+out_free:
+	kfree(obj);
 out_cnt:
 	atomic_dec(&pool->num_elem);
 	return NULL;
@@ -377,6 +286,8 @@ out_cnt:
 
 int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
 {
+	int err = -EINVAL;
+
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
 
@@ -384,11 +295,19 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
 	elem->obj = (u8 *)elem - pool->elem_offset;
 	kref_init(&elem->ref_cnt);
 
+	if (pool->flags & RXE_POOL_INDEX) {
+		err = xa_alloc_cyclic_bh(&pool->xarray.xa, &elem->index, elem,
+					 pool->xarray.limit,
+					 &pool->xarray.next, GFP_KERNEL);
+		if (err)
+			goto out_cnt;
+	}
+
 	return 0;
 
 out_cnt:
 	atomic_dec(&pool->num_elem);
-	return -EINVAL;
+	return err;
 }
 
 void rxe_elem_release(struct kref *kref)
@@ -397,6 +316,9 @@ void rxe_elem_release(struct kref *kref)
 		container_of(kref, struct rxe_pool_elem, ref_cnt);
 	struct rxe_pool *pool = elem->pool;
 	void *obj;
+
+	if (pool->flags & RXE_POOL_INDEX)
+		__xa_erase(&pool->xarray.xa, elem->index);
 
 	if (pool->cleanup)
 		pool->cleanup(elem);
@@ -409,42 +331,26 @@ void rxe_elem_release(struct kref *kref)
 	atomic_dec(&pool->num_elem);
 }
 
-void *rxe_pool_get_index_locked(struct rxe_pool *pool, u32 index)
+/**
+ * rxe_pool_get_index - lookup object from index
+ * @pool: the object pool
+ * @index: the index of the obkect
+ *
+ * Returns: the object if the index exists in the pool
+ * and the reference count on the object is positive
+ */
+void *rxe_pool_get_index(struct rxe_pool *pool, u32 index)
 {
-	struct rb_node *node;
 	struct rxe_pool_elem *elem;
 	void *obj;
 
-	node = pool->index.tree.rb_node;
-
-	while (node) {
-		elem = rb_entry(node, struct rxe_pool_elem, index_node);
-
-		if (elem->index > index)
-			node = node->rb_left;
-		else if (elem->index < index)
-			node = node->rb_right;
-		else
-			break;
-	}
-
-	if (node) {
-		kref_get(&elem->ref_cnt);
+	rxe_pool_lock_bh(pool);
+	elem = xa_load(&pool->xarray.xa, index);
+	if (elem && kref_get_unless_zero(&elem->ref_cnt))
 		obj = elem->obj;
-	} else {
+	else
 		obj = NULL;
-	}
-
-	return obj;
-}
-
-void *rxe_pool_get_index(struct rxe_pool *pool, u32 index)
-{
-	void *obj;
-
-	read_lock_bh(&pool->pool_lock);
-	obj = rxe_pool_get_index_locked(pool, index);
-	read_unlock_bh(&pool->pool_lock);
+	rxe_pool_unlock_bh(pool);
 
 	return obj;
 }
@@ -486,9 +392,9 @@ void *rxe_pool_get_key(struct rxe_pool *pool, void *key)
 {
 	void *obj;
 
-	read_lock_bh(&pool->pool_lock);
+	rxe_pool_lock_bh(pool);
 	obj = rxe_pool_get_key_locked(pool, key);
-	read_unlock_bh(&pool->pool_lock);
+	rxe_pool_unlock_bh(pool);
 
 	return obj;
 }

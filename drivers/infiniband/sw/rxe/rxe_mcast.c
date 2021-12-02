@@ -44,7 +44,7 @@ int rxe_mcast_get_grp(struct rxe_dev *rxe, union ib_gid *mgid,
 	if (rxe->attr.max_mcast_qp_attach == 0)
 		return -EINVAL;
 
-	write_lock_bh(&pool->pool_lock);
+	rxe_pool_lock_bh(pool);
 
 	grp = rxe_pool_get_key_locked(pool, mgid);
 	if (grp)
@@ -52,13 +52,13 @@ int rxe_mcast_get_grp(struct rxe_dev *rxe, union ib_gid *mgid,
 
 	grp = create_grp(rxe, pool, mgid);
 	if (IS_ERR(grp)) {
-		write_unlock_bh(&pool->pool_lock);
+		rxe_pool_unlock_bh(pool);
 		err = PTR_ERR(grp);
 		return err;
 	}
 
 done:
-	write_unlock_bh(&pool->pool_lock);
+	rxe_pool_unlock_bh(pool);
 	*grp_p = grp;
 	return 0;
 }
