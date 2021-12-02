@@ -188,7 +188,9 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+	if (ret)
+		return ret;
 
 	priv->uioinfo = uioinfo;
 	spin_lock_init(&priv->lock);
