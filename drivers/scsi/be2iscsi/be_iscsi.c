@@ -1224,15 +1224,17 @@ static void beiscsi_flush_cq(struct beiscsi_hba *phba)
 	struct be_eq_obj *pbe_eq;
 	struct hwi_controller *phwi_ctrlr;
 	struct hwi_context_memory *phwi_context;
+	struct pci_dev *pcidev;
 
 	phwi_ctrlr = phba->phwi_ctrlr;
 	phwi_context = phwi_ctrlr->phwi_ctxt;
+	pcidev = phba->pcidev;
 
 	for (i = 0; i < phba->num_cpus; i++) {
 		pbe_eq = &phwi_context->be_eq[i];
-		irq_poll_disable(&pbe_eq->iopoll);
-		beiscsi_process_cq(pbe_eq, BE2_MAX_NUM_CQ_PROC);
-		irq_poll_enable(&pbe_eq->iopoll);
+		disable_irq(pci_irq_vector(pcidev, i));
+		beiscsi_process_cq(pbe_eq);
+		enable_irq(pci_irq_vector(pcidev, i));
 	}
 }
 
