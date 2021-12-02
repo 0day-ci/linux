@@ -329,7 +329,7 @@ config ARCH_MULTIPLATFORM
 	select USE_OF
 
 config ARM_SINGLE_ARMV7M
-	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
+	bool "ARMv7-M based platforms (Cortex-M0/M3/M4/M7)"
 	depends on !MMU
 	select ARM_NVIC
 	select AUTO_ZRELADDR
