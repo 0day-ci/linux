@@ -57,3 +57,52 @@ int fsverity_ioctl_measure(struct file *filp, void __user *_uarg)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(fsverity_ioctl_measure);
+
+/**
+ * fsverity_collect_digest() - get a verity file's digest
+ * @inode: inode to get digest of
+ * @digest: (out) pointer to the digest
+ * @alg: (out) pointer to the hash algorithm enumeration
+ *
+ * Return the file hash algorithm and digest of an fsverity protected file.
+ *
+ * Return: 0 on success, -errno on failure
+ */
+int fsverity_collect_digest(struct inode *inode,
+			    u8 digest[FS_VERITY_MAX_DIGEST_SIZE],
+			    enum hash_algo *alg)
+{
+	const struct fsverity_info *vi;
+	const struct fsverity_hash_alg *hash_alg;
+	int i;
+
+	vi = fsverity_get_info(inode);
+	if (!vi)
+		return -ENODATA; /* not a verity file */
+
+	hash_alg = vi->tree_params.hash_alg;
+	memset(digest, 0, FS_VERITY_MAX_DIGEST_SIZE);
+	*alg = HASH_ALGO__LAST;
+
+	/* convert hash algorithm to hash_algo_name */
+	for (i = 0; i < HASH_ALGO__LAST; i++) {
+		pr_debug("name %s hash_algo_name[%d] %s\n",
+			  hash_alg->name, i, hash_algo_name[i]);
+
+		if (!strcmp(hash_alg->name, hash_algo_name[i])) {
+			*alg = i;
+			break;
+		}
+	}
+
+	/* Shouldn't happen */
+	if (*alg == HASH_ALGO__LAST)
+		return -EINVAL;
+
+	memcpy(digest, vi->file_digest, hash_alg->digest_size);
+
+	pr_debug("file digest:%s %*phN\n", hash_algo_name[*alg],
+		  hash_digest_size[*alg], digest);
+
+	return 0;
+}
