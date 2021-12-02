@@ -25,7 +25,8 @@ properties:
     pattern: "^spmi@.*"
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 5
 
   "#address-cells":
     const: 2
