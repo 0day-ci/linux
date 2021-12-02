@@ -12,7 +12,8 @@ static const struct rxe_type_info {
 	const char *name;
 	size_t size;
 	size_t elem_offset;
-	void (*cleanup)(struct rxe_pool_elem *obj);
+	int (*init)(struct rxe_pool_elem *elem);
+	void (*cleanup)(struct rxe_pool_elem *elem);
 	enum rxe_pool_flags flags;
 	u32 min_index;
 	u32 max_index;
@@ -82,6 +83,7 @@ static const struct rxe_type_info {
 		.name		= "rxe-mc_grp",
 		.size		= sizeof(struct rxe_mc_grp),
 		.elem_offset	= offsetof(struct rxe_mc_grp, elem),
+		.init		= rxe_init_grp,
 		.cleanup	= rxe_mc_cleanup,
 		.flags		= RXE_POOL_KEY | RXE_POOL_ALLOC,
 		.key_offset	= offsetof(struct rxe_mc_grp, mgid),
@@ -112,6 +114,7 @@ void rxe_pool_init(
 	pool->elem_size		= ALIGN(info->size, RXE_POOL_ALIGN);
 	pool->elem_offset	= info->elem_offset;
 	pool->flags		= info->flags;
+	pool->init		= info->init;
 	pool->cleanup		= info->cleanup;
 
 	atomic_set(&pool->num_elem, 0);
@@ -139,78 +142,7 @@ void rxe_pool_cleanup(struct rxe_pool *pool)
 			pool->name);
 }
 
-static int rxe_insert_key(struct rxe_pool *pool, struct rxe_pool_elem *new)
-{
-	struct rb_node **link = &pool->key.tree.rb_node;
-	struct rb_node *parent = NULL;
-	struct rxe_pool_elem *elem;
-	int cmp;
-
-	while (*link) {
-		parent = *link;
-		elem = rb_entry(parent, struct rxe_pool_elem, key_node);
-
-		cmp = memcmp((u8 *)elem + pool->key.key_offset,
-			     (u8 *)new + pool->key.key_offset,
-			     pool->key.key_size);
-
-		if (cmp == 0) {
-			pr_warn("key already exists!\n");
-			return -EINVAL;
-		}
-
-		if (cmp > 0)
-			link = &(*link)->rb_left;
-		else
-			link = &(*link)->rb_right;
-	}
-
-	rb_link_node(&new->key_node, parent, link);
-	rb_insert_color(&new->key_node, &pool->key.tree);
-
-	return 0;
-}
-
-int __rxe_add_key_locked(struct rxe_pool_elem *elem, void *key)
-{
-	struct rxe_pool *pool = elem->pool;
-	int err;
-
-	memcpy((u8 *)elem + pool->key.key_offset, key, pool->key.key_size);
-	err = rxe_insert_key(pool, elem);
-
-	return err;
-}
-
-int __rxe_add_key(struct rxe_pool_elem *elem, void *key)
-{
-	struct rxe_pool *pool = elem->pool;
-	int err;
-
-	rxe_pool_lock_bh(pool);
-	err = __rxe_add_key_locked(elem, key);
-	rxe_pool_unlock_bh(pool);
-
-	return err;
-}
-
-void __rxe_drop_key_locked(struct rxe_pool_elem *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-
-	rb_erase(&elem->key_node, &pool->key.tree);
-}
-
-void __rxe_drop_key(struct rxe_pool_elem *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-
-	rxe_pool_lock_bh(pool);
-	__rxe_drop_key_locked(elem);
-	rxe_pool_unlock_bh(pool);
-}
-
-void *rxe_alloc_locked(struct rxe_pool *pool)
+static void *__rxe_alloc(struct rxe_pool *pool, gfp_t flags)
 {
 	struct rxe_pool_elem *elem;
 	void *obj;
@@ -219,7 +151,7 @@ void *rxe_alloc_locked(struct rxe_pool *pool)
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
 
-	obj = kzalloc(pool->elem_size, GFP_ATOMIC);
+	obj = kzalloc(pool->elem_size, flags);
 	if (!obj)
 		goto out_cnt;
 
@@ -228,6 +160,12 @@ void *rxe_alloc_locked(struct rxe_pool *pool)
 	elem->pool = pool;
 	elem->obj = obj;
 	kref_init(&elem->ref_cnt);
+
+	if (pool->init) {
+		err = pool->init(elem);
+		if (err)
+			goto out_free;
+	}
 
 	if (pool->flags & RXE_POOL_INDEX) {
 		err = xa_alloc_cyclic_bh(&pool->xarray.xa, &elem->index, elem,
@@ -248,38 +186,7 @@ out_cnt:
 
 void *rxe_alloc(struct rxe_pool *pool)
 {
-	struct rxe_pool_elem *elem;
-	void *obj;
-	int err;
-
-	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
-		goto out_cnt;
-
-	obj = kzalloc(pool->elem_size, GFP_KERNEL);
-	if (!obj)
-		goto out_cnt;
-
-	elem = (struct rxe_pool_elem *)((u8 *)obj + pool->elem_offset);
-
-	elem->pool = pool;
-	elem->obj = obj;
-	kref_init(&elem->ref_cnt);
-
-	if (pool->flags & RXE_POOL_INDEX) {
-		err = xa_alloc_cyclic_bh(&pool->xarray.xa, &elem->index, elem,
-					 pool->xarray.limit,
-					 &pool->xarray.next, GFP_KERNEL);
-		if (err)
-			goto out_free;
-	}
-
-	return obj;
-
-out_free:
-	kfree(obj);
-out_cnt:
-	atomic_dec(&pool->num_elem);
-	return NULL;
+	return __rxe_alloc(pool, GFP_KERNEL);
 }
 
 int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
@@ -292,6 +199,12 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
 	elem->pool = pool;
 	elem->obj = (u8 *)elem - pool->elem_offset;
 	kref_init(&elem->ref_cnt);
+
+	if (pool->init) {
+		err = pool->init(elem);
+		if (err)
+			goto out_cnt;
+	}
 
 	if (pool->flags & RXE_POOL_INDEX) {
 		err = xa_alloc_cyclic_bh(&pool->xarray.xa, &elem->index, elem,
@@ -306,27 +219,6 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
 out_cnt:
 	atomic_dec(&pool->num_elem);
 	return err;
-}
-
-void rxe_elem_release(struct kref *kref)
-{
-	struct rxe_pool_elem *elem =
-		container_of(kref, struct rxe_pool_elem, ref_cnt);
-	struct rxe_pool *pool = elem->pool;
-	void *obj;
-
-	if (pool->flags & RXE_POOL_INDEX)
-		__xa_erase(&pool->xarray.xa, elem->index);
-
-	if (pool->cleanup)
-		pool->cleanup(elem);
-
-	if (pool->flags & RXE_POOL_ALLOC) {
-		obj = elem->obj;
-		kfree(obj);
-	}
-
-	atomic_dec(&pool->num_elem);
 }
 
 /**
@@ -353,7 +245,8 @@ void *rxe_pool_get_index(struct rxe_pool *pool, u32 index)
 	return obj;
 }
 
-void *rxe_pool_get_key_locked(struct rxe_pool *pool, void *key)
+/* lookup key in pool. Caller must hold pool lock */
+static void *__rxe_get_key(struct rxe_pool *pool, void *key)
 {
 	struct rb_node *node;
 	struct rxe_pool_elem *elem;
@@ -386,13 +279,111 @@ void *rxe_pool_get_key_locked(struct rxe_pool *pool, void *key)
 	return obj;
 }
 
+/* add key to pool. Caller must hold pool lock */
+static int __rxe_add_key(struct rxe_pool_elem *new, void *key)
+{
+	struct rxe_pool *pool = new->pool;
+	struct rb_node **link = &pool->key.tree.rb_node;
+	struct rb_node *parent = NULL;
+	struct rxe_pool_elem *elem;
+	int cmp;
+
+	while (*link) {
+		parent = *link;
+		elem = rb_entry(parent, struct rxe_pool_elem, key_node);
+
+		cmp = memcmp(key, (u8 *)elem + pool->key.key_offset,
+			     pool->key.key_size);
+		if (cmp == 0) {
+			pr_warn("key already exists!\n");
+			return -EINVAL;
+		}
+
+		if (cmp > 0)
+			link = &(*link)->rb_left;
+		else
+			link = &(*link)->rb_right;
+	}
+
+	rb_link_node(&new->key_node, parent, link);
+	rb_insert_color(&new->key_node, &pool->key.tree);
+
+	memcpy((u8 *)new + pool->key.key_offset, key, pool->key.key_size);
+
+	return 0;
+}
+
+/**
+ * rxe_pool_get_key() - lookup key in pool and return object
+ * @pool: the object pool
+ * @key: the key
+ *
+ * Returns: the address of the object if present else NULL
+ */
 void *rxe_pool_get_key(struct rxe_pool *pool, void *key)
 {
 	void *obj;
 
 	rxe_pool_lock_bh(pool);
-	obj = rxe_pool_get_key_locked(pool, key);
+	obj = __rxe_get_key(pool, key);
 	rxe_pool_unlock_bh(pool);
 
 	return obj;
+}
+
+/**
+ * rxe_pool_add_key() - lookup or add object with key in pool
+ * @pool: the object pool
+ * @key: the key
+ *
+ * Returns: If object matching key is present in pool return
+ *	    its address and take a reference else allocate a
+ *	    new object to pool with key and return its address
+ *	    with one reference.
+ */
+void *rxe_pool_add_key(struct rxe_pool *pool, void *key)
+{
+	void *obj;
+
+	rxe_pool_lock_bh(pool);
+	obj = __rxe_get_key(pool, key);
+	if (obj)
+		goto done;
+
+	obj = __rxe_alloc(pool, GFP_ATOMIC);
+	if (!obj)
+		goto done;
+
+	__rxe_add_key(obj, key);
+done:
+	rxe_pool_unlock_bh(pool);
+
+	return obj;
+}
+
+/**
+ * rxe_elem_release() - cleanup pool element when last reference dropped
+ * @kref: address of the kref contained in pool element
+ *
+ * Caller should hold pool lock
+ */
+void rxe_elem_release(struct kref *kref)
+{
+	struct rxe_pool_elem *elem =
+		container_of(kref, struct rxe_pool_elem, ref_cnt);
+	struct rxe_pool *pool = elem->pool;
+
+	if (pool->flags & RXE_POOL_INDEX)
+		__xa_erase(&pool->xarray.xa, elem->index);
+
+	if (pool->flags & RXE_POOL_KEY)
+		rb_erase(&elem->key_node, &pool->key.tree);
+
+	if (pool->cleanup)
+		pool->cleanup(elem);
+
+	if (pool->flags & RXE_POOL_ALLOC)
+		kfree(elem->obj);
+
+	atomic_dec(&pool->num_elem);
 }
