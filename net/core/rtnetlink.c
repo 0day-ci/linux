@@ -1880,6 +1880,7 @@ static const struct nla_policy ifla_policy[IFLA_MAX+1] = {
 	[IFLA_PROTO_DOWN_REASON] = { .type = NLA_NESTED },
 	[IFLA_NEW_IFINDEX]	= NLA_POLICY_MIN(NLA_S32, 1),
 	[IFLA_PARENT_DEV_NAME]	= { .type = NLA_NUL_STRING },
+	[IFLA_IFINDEX]		= { .type = NLA_S32 },
 };
 
 static const struct nla_policy ifla_info_policy[IFLA_INFO_MAX+1] = {
@@ -3049,6 +3050,65 @@ static int rtnl_group_dellink(const struct net *net, int group)
 	return 0;
 }
 
+static int rtnl_ifindex_dellink(struct net *net, struct nlattr *head, int len,
+				struct netlink_ext_ack *extack)
+{
+	int i = 0, num_devices = 0, rem;
+	struct net_device **dev_list;
+	const struct nlattr *nla;
+	LIST_HEAD(list_kill);
+	int ret;
+
+	nla_for_each_attr(nla, head, len, rem) {
+		if (nla_type(nla) == IFLA_IFINDEX)
+			num_devices++;
+	}
+
+	dev_list = kmalloc_array(num_devices, sizeof(*dev_list), GFP_KERNEL);
+	if (!dev_list)
+		return -ENOMEM;
+
+	nla_for_each_attr(nla, head, len, rem) {
+		const struct rtnl_link_ops *ops;
+		struct net_device *dev;
+		int ifindex;
+
+		if (nla_type(nla) != IFLA_IFINDEX)
+			continue;
+
+		ifindex = nla_get_s32(nla);
+		ret = -ENODEV;
+		dev = __dev_get_by_index(net, ifindex);
+		if (!dev) {
+			NL_SET_ERR_MSG_ATTR(extack, nla, "Unknown ifindex");
+			goto out_free;
+		}
+
+		ret = -EOPNOTSUPP;
+		ops = dev->rtnl_link_ops;
+		if (!ops || !ops->dellink) {
+			NL_SET_ERR_MSG_ATTR(extack, nla, "Device cannot be deleted");
+			goto out_free;
+		}
+
+		dev_list[i++] = dev;
+	}
+
+	for (i = 0; i < num_devices; i++) {
+		struct net_device *dev = dev_list[i];
+
+		dev->rtnl_link_ops->dellink(dev, &list_kill);
+	}
+
+	unregister_netdevice_many(&list_kill);
+
+	ret = 0;
+
+out_free:
+	kfree(dev_list);
+	return ret;
+}
+
 int rtnl_delete_link(struct net_device *dev)
 {
 	const struct rtnl_link_ops *ops;
@@ -3092,6 +3152,11 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh,
 			return PTR_ERR(tgt_net);
 	}
 
+	if (tb[IFLA_GROUP] && tb[IFLA_IFINDEX]) {
+		NL_SET_ERR_MSG(extack, "Can't pass both IFLA_GROUP and IFLA_IFINDEX");
+		return -EOPNOTSUPP;
+	}
+
 	err = -EINVAL;
 	ifm = nlmsg_data(nlh);
 	if (ifm->ifi_index > 0)
@@ -3101,6 +3166,9 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh,
 				   tb[IFLA_ALT_IFNAME], NULL);
 	else if (tb[IFLA_GROUP])
 		err = rtnl_group_dellink(tgt_net, nla_get_u32(tb[IFLA_GROUP]));
+	else if (tb[IFLA_IFINDEX])
+		err = rtnl_ifindex_dellink(tgt_net, nlmsg_attrdata(nlh, sizeof(*ifm)),
+					   nlmsg_attrlen(nlh, sizeof(*ifm)), extack);
 	else
 		goto out;
 
