@@ -63,14 +63,15 @@ int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 		goto out;
 	}
 
-	elem = rxe_alloc(&rxe->mc_elem_pool);
+	elem = kzalloc(sizeof(*elem), GFP_KERNEL);
 	if (!elem) {
 		err = -ENOMEM;
 		goto out;
 	}
 
-	/* each qp holds a ref on the grp */
+	/* each elem holds a ref on the grp and the qp */
 	rxe_add_ref(grp);
+	rxe_add_ref(qp);
 
 	grp->num_qp++;
 	elem->qp = qp;
@@ -91,6 +92,7 @@ int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 {
 	struct rxe_mc_grp *grp;
 	struct rxe_mc_elem *elem, *tmp;
+	int ret = -EINVAL;
 
 	grp = rxe_pool_get_key(&rxe->mc_grp_pool, mgid);
 	if (!grp)
@@ -107,18 +109,21 @@ int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 
 			spin_unlock_bh(&grp->mcg_lock);
 			spin_unlock_bh(&qp->grp_lock);
-			rxe_drop_ref(elem);
-			rxe_drop_ref(grp);	/* ref held by QP */
-			rxe_drop_ref(grp);	/* ref from get_key */
-			return 0;
+			kfree(elem);
+			rxe_drop_ref(qp);	/* ref held by elem */
+			rxe_drop_ref(grp);	/* ref held by elem */
+			ret = 0;
+			goto out_drop_ref;
 		}
 	}
 
 	spin_unlock_bh(&grp->mcg_lock);
 	spin_unlock_bh(&qp->grp_lock);
+
+out_drop_ref:
 	rxe_drop_ref(grp);			/* ref from get_key */
 err1:
-	return -EINVAL;
+	return ret;
 }
 
 void rxe_drop_all_mcast_groups(struct rxe_qp *qp)
@@ -142,8 +147,9 @@ void rxe_drop_all_mcast_groups(struct rxe_qp *qp)
 		list_del(&elem->qp_list);
 		grp->num_qp--;
 		spin_unlock_bh(&grp->mcg_lock);
+		rxe_drop_ref(qp);
 		rxe_drop_ref(grp);
-		rxe_drop_ref(elem);
+		kfree(elem);
 	}
 }
 
