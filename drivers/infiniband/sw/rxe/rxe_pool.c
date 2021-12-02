@@ -97,11 +97,8 @@ static const struct rxe_type_info {
 	},
 };
 
-void rxe_pool_init(
-	struct rxe_dev		*rxe,
-	struct rxe_pool		*pool,
-	enum rxe_elem_type	type,
-	unsigned int		max_elem)
+void rxe_pool_init(struct rxe_dev *rxe, struct rxe_pool *pool,
+		   enum rxe_elem_type type, unsigned int max_elem)
 {
 	const struct rxe_type_info *info = &rxe_type_info[type];
 
@@ -109,7 +106,6 @@ void rxe_pool_init(
 
 	pool->rxe		= rxe;
 	pool->name		= info->name;
-	pool->type		= type;
 	pool->max_elem		= max_elem;
 	pool->elem_size		= ALIGN(info->size, RXE_POOL_ALIGN);
 	pool->elem_offset	= info->elem_offset;
@@ -222,7 +218,7 @@ out_cnt:
 }
 
 /**
- * rxe_pool_get_index - lookup object from index
+ * rxe_pool_get_index() - lookup object from index
  * @pool: the object pool
  * @index: the index of the obkect
  *

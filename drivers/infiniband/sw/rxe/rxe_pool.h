@@ -46,7 +46,6 @@ struct rxe_pool {
 	int			(*init)(struct rxe_pool_elem *elem);
 	void			(*cleanup)(struct rxe_pool_elem *elem);
 	enum rxe_pool_flags	flags;
-	enum rxe_elem_type	type;
 
 	unsigned int		max_elem;
 	atomic_t		num_elem;
