@@ -1760,6 +1760,10 @@ struct v4l2_ext_control {
 		struct v4l2_ctrl_mpeg2_sequence __user *p_mpeg2_sequence;
 		struct v4l2_ctrl_mpeg2_picture __user *p_mpeg2_picture;
 		struct v4l2_ctrl_mpeg2_quantisation __user *p_mpeg2_quantisation;
+		struct v4l2_ctrl_mpeg2_sequence_v2 __user *p_mpeg2_sequence_v2;
+		struct v4l2_ctrl_mpeg2_picture_v2 __user *p_mpeg2_picture_v2;
+		struct v4l2_ctrl_mpeg2_quantisation_v2 __user *p_mpeg2_quantisation_v2;
+		struct v4l2_ctrl_mpeg2_uapi_version __user *p_mpeg2_uapi_version;
 		struct v4l2_ctrl_vp9_compressed_hdr __user *p_vp9_compressed_hdr_probs;
 		struct v4l2_ctrl_vp9_frame __user *p_vp9_frame;
 		void __user *ptr;
@@ -1826,6 +1830,9 @@ enum v4l2_ctrl_type {
 	V4L2_CTRL_TYPE_MPEG2_QUANTISATION   = 0x0250,
 	V4L2_CTRL_TYPE_MPEG2_SEQUENCE       = 0x0251,
 	V4L2_CTRL_TYPE_MPEG2_PICTURE        = 0x0252,
+	V4L2_CTRL_TYPE_MPEG2_QUANTISATION_V2   = 0x0253,
+	V4L2_CTRL_TYPE_MPEG2_SEQUENCE_V2       = 0x0254,
+	V4L2_CTRL_TYPE_MPEG2_PICTURE_V2        = 0x0255,
 
 	V4L2_CTRL_TYPE_VP9_COMPRESSED_HDR	= 0x0260,
 	V4L2_CTRL_TYPE_VP9_FRAME		= 0x0261,

@@ -269,6 +269,11 @@ static int hantro_try_ctrl(struct v4l2_ctrl *ctrl)
 		/* We only support profile 0 */
 		if (dec_params->profile != 0)
 			return -EINVAL;
+	} else if (ctrl->id == V4L2_CID_STATELESS_MPEG2_UAPI_VERSION) {
+		/*
+		 * optionally restrict the uAPI version that this driver supports if
+		 * the standard min/max validation for menu controls is not enough
+		 */
 	}
 	return 0;
 }
@@ -339,6 +344,14 @@ static const struct hantro_ctrl controls[] = {
 	}, {
 		.codec = HANTRO_MPEG2_DECODER,
 		.cfg = {
+			.id = V4L2_CID_STATELESS_MPEG2_UAPI_VERSION,
+			.def = V4L2_STATELESS_MPEG2_UAPI_V1,
+			.min = V4L2_STATELESS_MPEG2_UAPI_V1,
+			.max = V4L2_STATELESS_MPEG2_UAPI_V2,
+		},
+	}, {
+		.codec = HANTRO_MPEG2_DECODER,
+		.cfg = {
 			.id = V4L2_CID_STATELESS_MPEG2_SEQUENCE,
 		},
 	}, {
@@ -350,6 +363,21 @@ static const struct hantro_ctrl controls[] = {
 		.codec = HANTRO_MPEG2_DECODER,
 		.cfg = {
 			.id = V4L2_CID_STATELESS_MPEG2_QUANTISATION,
+		},
+	}, {
+		.codec = HANTRO_MPEG2_DECODER,
+		.cfg = {
+			.id = V4L2_CID_STATELESS_MPEG2_SEQUENCE_V2,
+		},
+	}, {
+		.codec = HANTRO_MPEG2_DECODER,
+		.cfg = {
+			.id = V4L2_CID_STATELESS_MPEG2_PICTURE_V2,
+		},
+	}, {
+		.codec = HANTRO_MPEG2_DECODER,
+		.cfg = {
+			.id = V4L2_CID_STATELESS_MPEG2_QUANTISATION_V2,
 		},
 	}, {
 		.codec = HANTRO_VP8_DECODER,

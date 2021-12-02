@@ -573,6 +573,11 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		NULL,
 	};
 
+	static const char * const mpeg2_stateless_uapi_version[] = {
+		"V1",
+		"V2",
+	};
+
 	switch (id) {
 	case V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ:
 		return mpeg_audio_sampling_freq;
@@ -705,6 +710,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return hevc_start_code;
 	case V4L2_CID_CAMERA_ORIENTATION:
 		return camera_orientation;
+	case V4L2_CID_STATELESS_MPEG2_UAPI_VERSION:
+		return mpeg2_stateless_uapi_version;
 	default:
 		return NULL;
 	}
@@ -1178,6 +1185,10 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_STATELESS_MPEG2_SEQUENCE:			return "MPEG-2 Sequence Header";
 	case V4L2_CID_STATELESS_MPEG2_PICTURE:			return "MPEG-2 Picture Header";
 	case V4L2_CID_STATELESS_MPEG2_QUANTISATION:		return "MPEG-2 Quantisation Matrices";
+	case V4L2_CID_STATELESS_MPEG2_SEQUENCE_V2:		return "MPEG-2 Sequence Header V2";
+	case V4L2_CID_STATELESS_MPEG2_PICTURE_V2:		return "MPEG-2 Picture Header V2";
+	case V4L2_CID_STATELESS_MPEG2_QUANTISATION_V2:		return "MPEG-2 Quantisation Matrices V2";
+	case V4L2_CID_STATELESS_MPEG2_UAPI_VERSION:		return "MPEG-2 uAPI Version";
 	case V4L2_CID_STATELESS_VP9_COMPRESSED_HDR:	return "VP9 Probabilities Updates";
 	case V4L2_CID_STATELESS_VP9_FRAME:			return "VP9 Frame Decode Parameters";
 
@@ -1360,6 +1371,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_STATELESS_H264_DECODE_MODE:
 	case V4L2_CID_STATELESS_H264_START_CODE:
 	case V4L2_CID_CAMERA_ORIENTATION:
+	case V4L2_CID_STATELESS_MPEG2_UAPI_VERSION:
 		*type = V4L2_CTRL_TYPE_MENU;
 		break;
 	case V4L2_CID_LINK_FREQ:
@@ -1468,6 +1480,15 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		break;
 	case V4L2_CID_STATELESS_MPEG2_QUANTISATION:
 		*type = V4L2_CTRL_TYPE_MPEG2_QUANTISATION;
+		break;
+	case V4L2_CID_STATELESS_MPEG2_SEQUENCE_V2:
+		*type = V4L2_CTRL_TYPE_MPEG2_SEQUENCE_V2;
+		break;
+	case V4L2_CID_STATELESS_MPEG2_PICTURE_V2:
+		*type = V4L2_CTRL_TYPE_MPEG2_PICTURE_V2;
+		break;
+	case V4L2_CID_STATELESS_MPEG2_QUANTISATION_V2:
+		*type = V4L2_CTRL_TYPE_MPEG2_QUANTISATION_V2;
 		break;
 	case V4L2_CID_STATELESS_FWHT_PARAMS:
 		*type = V4L2_CTRL_TYPE_FWHT_PARAMS;

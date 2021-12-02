@@ -1984,6 +1984,44 @@ struct v4l2_ctrl_mpeg2_quantisation {
 	__u8	chroma_non_intra_quantiser_matrix[64];
 };
 
+#define V4L2_CID_STATELESS_MPEG2_UAPI_VERSION  (V4L2_CID_CODEC_STATELESS_BASE+223)
+
+enum v4l2_stateless_mpeg2_uapi_version {
+	V4L2_STATELESS_MPEG2_UAPI_V1, /* assume V1 by default */
+	V4L2_STATELESS_MPEG2_UAPI_V2,
+};
+
+#define V4L2_CID_STATELESS_MPEG2_QUANTISATION_V2  (V4L2_CID_CODEC_STATELESS_BASE+224)
+#define V4L2_CID_STATELESS_MPEG2_PICTURE_V2  (V4L2_CID_CODEC_STATELESS_BASE+225)
+#define V4L2_CID_STATELESS_MPEG2_SEQUENCE_V2  (V4L2_CID_CODEC_STATELESS_BASE+226)
+
+struct v4l2_ctrl_mpeg2_quantisation_v2 {
+	__u8	intra_quantiser_matrix[64];
+	__u8	non_intra_quantiser_matrix[64];
+	__u8	chroma_intra_quantiser_matrix[64];
+	__u8	chroma_non_intra_quantiser_matrix[64];
+};
+
+struct v4l2_ctrl_mpeg2_picture_v2 {
+	__u64	backward_ref_ts;
+	__u64	forward_ref_ts;
+	__u32	flags;
+	__u8	f_code[2][2];
+	__u8	picture_coding_type;
+	__u8	picture_structure;
+	__u8	intra_dc_precision;
+	__u8	reserved[5];
+};
+
+struct v4l2_ctrl_mpeg2_sequence_v2 {
+	__u16	horizontal_size;
+	__u16	vertical_size;
+	__u32	vbv_buffer_size;
+	__u16	profile_and_level_indication;
+	__u8	chroma_format;
+	__u8	flags;
+};
+
 #define V4L2_CID_COLORIMETRY_CLASS_BASE	(V4L2_CTRL_CLASS_COLORIMETRY | 0x900)
 #define V4L2_CID_COLORIMETRY_CLASS	(V4L2_CTRL_CLASS_COLORIMETRY | 1)
 

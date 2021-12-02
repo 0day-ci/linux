@@ -145,7 +145,7 @@ hantro_g1_mpeg2_dec_set_buffers(struct hantro_dev *vpu, struct hantro_ctx *ctx,
 	vdpu_write_relaxed(vpu, backward_addr, G1_REG_REFER3_BASE);
 }
 
-int hantro_g1_mpeg2_dec_run(struct hantro_ctx *ctx)
+static void hantro_g1_mpeg2_dec_run_v1(struct hantro_ctx *ctx)
 {
 	struct hantro_dev *vpu = ctx->dev;
 	struct vb2_v4l2_buffer *src_buf, *dst_buf;
@@ -155,9 +155,6 @@ int hantro_g1_mpeg2_dec_run(struct hantro_ctx *ctx)
 
 	src_buf = hantro_get_src_buf(ctx);
 	dst_buf = hantro_get_dst_buf(ctx);
-
-	/* Apply request controls if any */
-	hantro_start_prepare_run(ctx);
 
 	seq = hantro_get_ctrl(ctx,
 			      V4L2_CID_STATELESS_MPEG2_SEQUENCE);
@@ -231,6 +228,48 @@ int hantro_g1_mpeg2_dec_run(struct hantro_ctx *ctx)
 	hantro_g1_mpeg2_dec_set_buffers(vpu, ctx, &src_buf->vb2_buf,
 					&dst_buf->vb2_buf,
 					seq, pic);
+}
+
+static void hantro_g1_mpeg2_dec_run_v2(struct hantro_ctx *ctx)
+{
+	const struct v4l2_ctrl_mpeg2_sequence_v2 *seq;
+	const struct v4l2_ctrl_mpeg2_picture_v2 *pic;
+	const struct v4l2_ctrl_mpeg2_quantisation_v2 *quant;
+
+	seq = hantro_get_ctrl(ctx,
+			      V4L2_CID_STATELESS_MPEG2_SEQUENCE_V2);
+	pic = hantro_get_ctrl(ctx,
+			      V4L2_CID_STATELESS_MPEG2_PICTURE_V2);
+	quant = hantro_get_ctrl(ctx,
+				V4L2_CID_STATELESS_MPEG2_QUANTISATION_V2);
+
+	WARN_ON_ONCE(!seq || !pic || !quant);
+
+	/* actually implement v2 ... */
+
+	/* pretend this happened so as to keep userspace going */
+	hantro_irq_done(ctx->dev, VB2_BUF_STATE_DONE);
+}
+
+int hantro_g1_mpeg2_dec_run(struct hantro_ctx *ctx)
+{
+	struct hantro_dev *vpu = ctx->dev;
+	enum v4l2_stateless_mpeg2_uapi_version version;
+
+	/* Apply request controls if any */
+	hantro_start_prepare_run(ctx);
+
+	version = v4l2_ctrl_find(&ctx->ctrl_handler,
+				 V4L2_CID_STATELESS_MPEG2_UAPI_VERSION)->cur.val;
+
+	switch (version) {
+	case V4L2_STATELESS_MPEG2_UAPI_V1:
+		hantro_g1_mpeg2_dec_run_v1(ctx);
+		break;
+	case V4L2_STATELESS_MPEG2_UAPI_V2:
+		hantro_g1_mpeg2_dec_run_v2(ctx);
+		break;
+	}
 
 	hantro_end_prepare_run(ctx);
 

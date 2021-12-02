@@ -283,6 +283,15 @@ static void std_log(const struct v4l2_ctrl *ctrl)
 	case V4L2_CTRL_TYPE_MPEG2_PICTURE:
 		pr_cont("MPEG2_PICTURE");
 		break;
+	case V4L2_CTRL_TYPE_MPEG2_QUANTISATION_V2:
+		pr_cont("MPEG2_QUANTISATION_V2");
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQUENCE_V2:
+		pr_cont("MPEG2_SEQUENCE_V2");
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_PICTURE_V2:
+		pr_cont("MPEG2_PICTURE_V2");
+		break;
 	case V4L2_CTRL_TYPE_VP9_COMPRESSED_HDR:
 		pr_cont("VP9_COMPRESSED_HDR");
 		break;
@@ -559,6 +568,55 @@ static int std_validate_compound(const struct v4l2_ctrl *ctrl, u32 idx,
 
 	case V4L2_CTRL_TYPE_MPEG2_QUANTISATION:
 		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQUENCE_V2:
+		p_mpeg2_sequence = p;
+
+		switch (p_mpeg2_sequence->chroma_format) {
+		case 1: /* 4:2:0 */
+		case 2: /* 4:2:2 */
+		case 3: /* 4:4:4 */
+			break;
+		default:
+			return -EINVAL;
+		}
+		break;
+
+	case V4L2_CTRL_TYPE_MPEG2_PICTURE_V2:
+		p_mpeg2_picture = p;
+
+		switch (p_mpeg2_picture->intra_dc_precision) {
+		case 0: /* 8 bits */
+		case 1: /* 9 bits */
+		case 2: /* 10 bits */
+		case 3: /* 11 bits */
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		switch (p_mpeg2_picture->picture_structure) {
+		case V4L2_MPEG2_PIC_TOP_FIELD:
+		case V4L2_MPEG2_PIC_BOTTOM_FIELD:
+		case V4L2_MPEG2_PIC_FRAME:
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		switch (p_mpeg2_picture->picture_coding_type) {
+		case V4L2_MPEG2_PIC_CODING_TYPE_I:
+		case V4L2_MPEG2_PIC_CODING_TYPE_P:
+		case V4L2_MPEG2_PIC_CODING_TYPE_B:
+			break;
+		default:
+			return -EINVAL;
+		}
+		zero_reserved(*p_mpeg2_picture);
+		break;
+
+	case V4L2_CTRL_TYPE_MPEG2_QUANTISATION_V2:
+		break;
+
 
 	case V4L2_CTRL_TYPE_FWHT_PARAMS:
 		p_fwht_params = p;
@@ -1383,6 +1441,15 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		break;
 	case V4L2_CTRL_TYPE_MPEG2_QUANTISATION:
 		elem_size = sizeof(struct v4l2_ctrl_mpeg2_quantisation);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQUENCE_V2:
+		elem_size = sizeof(struct v4l2_ctrl_mpeg2_sequence_v2);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_PICTURE_V2:
+		elem_size = sizeof(struct v4l2_ctrl_mpeg2_picture_v2);
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_QUANTISATION_V2:
+		elem_size = sizeof(struct v4l2_ctrl_mpeg2_quantisation_v2);
 		break;
 	case V4L2_CTRL_TYPE_FWHT_PARAMS:
 		elem_size = sizeof(struct v4l2_ctrl_fwht_params);

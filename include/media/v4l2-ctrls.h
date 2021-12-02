@@ -71,6 +71,9 @@ union v4l2_ctrl_ptr {
 	struct v4l2_ctrl_mpeg2_sequence *p_mpeg2_sequence;
 	struct v4l2_ctrl_mpeg2_picture *p_mpeg2_picture;
 	struct v4l2_ctrl_mpeg2_quantisation *p_mpeg2_quantisation;
+	struct v4l2_ctrl_mpeg2_sequence_v2 *p_mpeg2_sequence_v2;
+	struct v4l2_ctrl_mpeg2_picture_v2 *p_mpeg2_picture_v2;
+	struct v4l2_ctrl_mpeg2_quantisation_v2 *p_mpeg2_quantisation_v2;
 	struct v4l2_ctrl_fwht_params *p_fwht_params;
 	struct v4l2_ctrl_h264_sps *p_h264_sps;
 	struct v4l2_ctrl_h264_pps *p_h264_pps;
