@@ -3132,6 +3132,7 @@ xfs_alloc_vextent_prepare_ag(
 	if (need_pag)
 		args->pag = xfs_perag_get(args->mp, args->agno);
 
+	args->agbp = NULL;
 	error = xfs_alloc_fix_freelist(args, 0);
 	if (error) {
 		trace_xfs_alloc_vextent_nofix(args);
@@ -3253,6 +3254,10 @@ xfs_alloc_vextent_this_ag(
  * transaction. This will result in an out-of-order locking of AGFs and hence
  * can cause deadlocks.
  *
+ * On return, args->pag may be left referenced if we finish before the "all
+ * failed" return point. The allocation finish still needs the perag, and
+ * so the caller will release it once they've finished the allocation.
+ *
  * XXX(dgc): when wrapping in potential deadlock scenarios, we could use
  * try-locks on the AGFs below the critical AG rather than skip them entirely.
  * We won't deadlock in that case, we'll just skip the AGFs we can't lock.
@@ -3265,67 +3270,65 @@ xfs_alloc_vextent_iterate_ags(
 	uint32_t		flags)
 {
 	struct xfs_mount	*mp = args->mp;
+	xfs_agnumber_t		restart_agno = 0;
+	xfs_agnumber_t		agno;
 	int			error = 0;
 
 	/*
-	 * Loop over allocation groups twice; first time with
-	 * trylock set, second time without.
+	 * If we already have allocated a block in this transaction, we don't
+	 * want to lock AGs whose number is below the start AG. This results in
+	 * out-of-order locking of AGF and deadlocks will result.
 	 */
-	args->agno = start_agno;
-	for (;;) {
+	if (args->tp->t_firstblock != NULLFSBLOCK)
+		restart_agno = start_agno;
+
+restart:
+	for_each_perag_wrap_range(mp, start_agno, restart_agno,
+			mp->m_sb.sb_agcount, agno, args->pag) {
+		args->agno = agno;
 		args->agbno = target_agbno;
-		args->pag = xfs_perag_get(args->mp, args->agno);
+		trace_printk("sag %u rag %u agno %u pag %u, agbno %u, agcnt %u",
+			start_agno, restart_agno, agno, args->pag->pag_agno,
+			target_agbno, mp->m_sb.sb_agcount);
+
 		error = xfs_alloc_vextent_prepare_ag(args);
 		if (error)
 			break;
-
-		if (args->agbp) {
-			/*
-			 * Allocation is supposed to succeed now, so break out
-			 * of the loop regardless of whether we succeed or not.
-			 */
-			if (args->agno == start_agno && target_agbno)
-				error = xfs_alloc_ag_vextent_near(args);
-			else
-				error = xfs_alloc_ag_vextent_size(args);
-			break;
+		if (!args->agbp) {
+			trace_xfs_alloc_vextent_loopfailed(args);
+			continue;
 		}
 
-		trace_xfs_alloc_vextent_loopfailed(args);
-
 		/*
-		* For the first allocation, we can try any AG to get
-		* space.  However, if we already have allocated a
-		* block, we don't want to try AGs whose number is below
-		* sagno. Otherwise, we may end up with out-of-order
-		* locking of AGF, which might cause deadlock.
-		*/
-		if (++(args->agno) == mp->m_sb.sb_agcount) {
-			if (args->tp->t_firstblock != NULLFSBLOCK)
-				args->agno = start_agno;
-			else
-				args->agno = 0;
-		}
-		/*
-		 * Reached the starting a.g., must either be done
-		 * or switch to non-trylock mode.
+		 * Allocation is supposed to succeed now, so break out of the
+		 * loop regardless of whether we succeed or not.
 		 */
-		if (args->agno == start_agno) {
-			if (flags == 0) {
-				args->agbno = NULLAGBLOCK;
-				trace_xfs_alloc_vextent_allfailed(args);
-				break;
-			}
-			flags = 0;
-		}
-		xfs_perag_put(args->pag);
-		args->pag = NULL;
+		if (args->agno == start_agno && target_agbno)
+			error = xfs_alloc_ag_vextent_near(args);
+		else
+			error = xfs_alloc_ag_vextent_size(args);
+		break;
 	}
+	if (error) {
+		xfs_perag_rele(args->pag);
+		args->pag = NULL;
+		return error;
+	}
+	if (args->agbp)
+		return 0;
+
 	/*
-	 * On success, perag is left referenced in args for the caller to clean
-	 * up after they've finished the allocation.
+	 * We didn't find an AG we can alloation from. If we were given
+	 * constraining flags by the caller, drop them and retry the allocation
+	 * without any constraints being set.
 	 */
-	return error;
+	if (flags) {
+		flags = 0;
+		goto restart;
+	}
+
+	trace_xfs_alloc_vextent_allfailed(args);
+	return 0;
 }
 
 /*
@@ -3367,7 +3370,7 @@ xfs_alloc_vextent_start_ag(
 	if (!error)
 		error = xfs_alloc_vextent_finish(args);
 	if (args->pag) {
-		xfs_perag_put(args->pag);
+		xfs_perag_rele(args->pag);
 		args->pag = NULL;
 	}
 
@@ -3408,7 +3411,7 @@ xfs_alloc_vextent_first_ag(
 	if (!error)
 		error = xfs_alloc_vextent_finish(args);
 	if (args->pag) {
-		xfs_perag_put(args->pag);
+		xfs_perag_rele(args->pag);
 		args->pag = NULL;
 	}
 	return error;
