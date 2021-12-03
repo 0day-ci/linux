@@ -19,6 +19,7 @@
 #include <linux/rculist.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
+#include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/net_tstamp.h>
 #include <linux/ethtool.h>
@@ -268,6 +269,7 @@ static void macvlan_broadcast(struct sk_buff *skb,
 	unsigned int i;
 	int err;
 	unsigned int hash;
+	struct in_device *in_dev;
 
 	if (skb->protocol == htons(ETH_P_PAUSE))
 		return;
@@ -279,6 +281,18 @@ static void macvlan_broadcast(struct sk_buff *skb,
 		hash = mc_hash(vlan, eth->h_dest);
 		if (!test_bit(hash, vlan->mc_filter))
 			continue;
+
+		rcu_read_lock();
+		if (src && net_eq(dev_net(vlan->dev), dev_net(src))) {
+			in_dev = __in_dev_get_rcu(src);
+			if (!IN_DEV_ACCEPT_LOCAL(in_dev)) {
+				in_dev_put(in_dev);
+				rcu_read_unlock();
+				continue;
+			}
+			in_dev_put(in_dev);
+		}
+		rcu_read_unlock();
 
 		err = NET_RX_DROP;
 		nskb = skb_clone(skb, GFP_ATOMIC);
