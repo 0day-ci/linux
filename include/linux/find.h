@@ -17,6 +17,41 @@ extern unsigned long _find_first_and_bit(const unsigned long *addr1,
 extern unsigned long _find_first_zero_bit(const unsigned long *addr, unsigned long size);
 extern unsigned long _find_last_bit(const unsigned long *addr, unsigned long size);
 
+static __always_inline
+unsigned long __find_bits_deref(const void *addr, unsigned long size)
+{
+	unsigned long val;
+
+	BUILD_BUG_ON(!small_const_nbits(size));
+	/*
+	 * This part of the routine will be evaluated at
+	 * compile-time (due to small_const_nbits()), and only
+	 * for values of "size" <= sizeof(unsigned long). As
+	 * such, the compiler can see when the dereference of
+	 * "addr" may be reading past the end of the variable
+	 * (when it is smaller than unsigned long). While the
+	 * GENMASK will clobber those bits for no exposure, it
+	 * is still technically an OOB read. Instead, pick a
+	 * better dereference width to avoid it entirely.
+	 */
+	switch (size) {
+	case 0 ... 8:
+		val = *(const unsigned char *)addr;
+		break;
+	case 9 ... 16:
+		val = *(const unsigned short *)addr;
+		break;
+	case 17 ... 32:
+		val = *(const unsigned int *)addr;
+		break;
+	default:
+		val = *(const unsigned long *)addr;
+		break;
+	}
+
+	return val;
+}
+
 #ifndef find_next_bit
 /**
  * find_next_bit - find the next set bit in a memory region
@@ -37,7 +72,8 @@ unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 		if (unlikely(offset >= size))
 			return size;
 
-		val = *addr & GENMASK(size - 1, offset);
+		val =  __find_bits_deref(addr, size);
+		val &= GENMASK(size - 1, offset);
 		return val ? __ffs(val) : size;
 	}
 
@@ -67,7 +103,9 @@ unsigned long find_next_and_bit(const unsigned long *addr1,
 		if (unlikely(offset >= size))
 			return size;
 
-		val = *addr1 & *addr2 & GENMASK(size - 1, offset);
+		val =  __find_bits_deref(addr1, size);
+		val &= __find_bits_deref(addr2, size);
+		val &= GENMASK(size - 1, offset);
 		return val ? __ffs(val) : size;
 	}
 
@@ -95,7 +133,8 @@ unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
 		if (unlikely(offset >= size))
 			return size;
 
-		val = *addr | ~GENMASK(size - 1, offset);
+		val =  __find_bits_deref(addr, size);
+		val |= ~GENMASK(size - 1, offset);
 		return val == ~0UL ? size : ffz(val);
 	}
 
@@ -116,8 +155,10 @@ static inline
 unsigned long find_first_bit(const unsigned long *addr, unsigned long size)
 {
 	if (small_const_nbits(size)) {
-		unsigned long val = *addr & GENMASK(size - 1, 0);
+		unsigned long val;
 
+		val =  __find_bits_deref(addr, size);
+		val &= GENMASK(size - 1, 0);
 		return val ? __ffs(val) : size;
 	}
 
@@ -141,8 +182,11 @@ unsigned long find_first_and_bit(const unsigned long *addr1,
 				 unsigned long size)
 {
 	if (small_const_nbits(size)) {
-		unsigned long val = *addr1 & *addr2 & GENMASK(size - 1, 0);
+		unsigned long val;
 
+		val =  __find_bits_deref(addr1, size);
+		val &= __find_bits_deref(addr2, size);
+		val &= GENMASK(size - 1, 0);
 		return val ? __ffs(val) : size;
 	}
 
@@ -163,8 +207,10 @@ static inline
 unsigned long find_first_zero_bit(const unsigned long *addr, unsigned long size)
 {
 	if (small_const_nbits(size)) {
-		unsigned long val = *addr | ~GENMASK(size - 1, 0);
+		unsigned long val;
 
+		val =  __find_bits_deref(addr, size);
+		val |= ~GENMASK(size - 1, 0);
 		return val == ~0UL ? size : ffz(val);
 	}
 
@@ -184,8 +230,10 @@ static inline
 unsigned long find_last_bit(const unsigned long *addr, unsigned long size)
 {
 	if (small_const_nbits(size)) {
-		unsigned long val = *addr & GENMASK(size - 1, 0);
+		unsigned long val;
 
+		val =  __find_bits_deref(addr, size);
+		val &= GENMASK(size - 1, 0);
 		return val ? __fls(val) : size;
 	}
 
