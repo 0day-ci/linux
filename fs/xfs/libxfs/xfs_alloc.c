@@ -2709,7 +2709,6 @@ xfs_alloc_fix_freelist(
 	targs.agbp = agbp;
 	targs.agno = args->agno;
 	targs.alignment = targs.minlen = targs.prod = 1;
-	targs.type = XFS_ALLOCTYPE_THIS_AG;
 	targs.pag = pag;
 	error = xfs_alloc_read_agfl(pag, tp, &agflbp);
 	if (error)
@@ -3233,7 +3232,7 @@ xfs_alloc_vextent_set_fsbno(
 /*
  * Allocate within a single AG only.
  */
-static int
+int
 xfs_alloc_vextent_this_ag(
 	struct xfs_alloc_arg	*args)
 {
@@ -3248,9 +3247,7 @@ xfs_alloc_vextent_this_ag(
 	}
 
 	args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
-	args->pag = xfs_perag_get(mp, args->agno);
 	error = xfs_alloc_ag_vextent(args);
-	xfs_perag_put(args->pag);
 	if (error)
 		return error;
 
@@ -3429,11 +3426,15 @@ int
 xfs_alloc_vextent(
 	struct xfs_alloc_arg	*args)
 {
+	int			error;
+
 	switch (args->type) {
-	case XFS_ALLOCTYPE_THIS_AG:
 	case XFS_ALLOCTYPE_NEAR_BNO:
-	case XFS_ALLOCTYPE_THIS_BNO:
-		return xfs_alloc_vextent_this_ag(args);
+		args->pag = xfs_perag_get(args->mp,
+				XFS_FSB_TO_AGNO(args->mp, args->fsbno));
+		error = xfs_alloc_vextent_this_ag(args);
+		xfs_perag_put(args->pag);
+		return error;
 	case XFS_ALLOCTYPE_START_BNO:
 		return xfs_alloc_vextent_start_ag(args);
 	case XFS_ALLOCTYPE_FIRST_AG:
