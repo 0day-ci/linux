@@ -621,7 +621,7 @@ xchk_bmap_check_rmaps(
 			break;
 	}
 	if (pag)
-		xfs_perag_put(pag);
+		xfs_perag_rele(pag);
 	return error;
 }
 

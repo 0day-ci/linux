@@ -95,6 +95,68 @@ xfs_perag_put(
 }
 
 /*
+ * Active references for perag structures. This is for short term access to the
+ * per ag structures for walking trees or accessing state. If an AG is being
+ * shrunk or is offline, then this will fail to find that AG and return NULL
+ * instead.
+ */
+struct xfs_perag *
+xfs_perag_grab(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno)
+{
+	struct xfs_perag	*pag;
+
+	rcu_read_lock();
+	pag = radix_tree_lookup(&mp->m_perag_tree, agno);
+	if (pag) {
+		trace_xfs_perag_grab(mp, pag->pag_agno,
+				atomic_read(&pag->pag_active_ref), _RET_IP_);
+		if (!atomic_inc_not_zero(&pag->pag_active_ref))
+			pag = NULL;
+	}
+	rcu_read_unlock();
+	return pag;
+}
+
+/*
+ * search from @first to find the next perag with the given tag set.
+ */
+struct xfs_perag *
+xfs_perag_grab_tag(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		first,
+	int			tag)
+{
+	struct xfs_perag	*pag;
+	int			found;
+
+	rcu_read_lock();
+	found = radix_tree_gang_lookup_tag(&mp->m_perag_tree,
+					(void **)&pag, first, 1, tag);
+	if (found <= 0) {
+		rcu_read_unlock();
+		return NULL;
+	}
+	trace_xfs_perag_grab_tag(mp, pag->pag_agno,
+			atomic_read(&pag->pag_active_ref), _RET_IP_);
+	if (!atomic_inc_not_zero(&pag->pag_active_ref))
+		pag = NULL;
+	rcu_read_unlock();
+	return pag;
+}
+
+void
+xfs_perag_rele(
+	struct xfs_perag	*pag)
+{
+	trace_xfs_perag_rele(pag->pag_mount, pag->pag_agno,
+			atomic_read(&pag->pag_active_ref), _RET_IP_);
+	if (atomic_dec_and_test(&pag->pag_active_ref))
+		wake_up(&pag->pag_active_wq);
+}
+
+/*
  * xfs_initialize_perag_data
  *
  * Read in each per-ag structure so we can count up the number of
@@ -173,6 +235,7 @@ __xfs_free_perag(
 	struct xfs_perag *pag = container_of(head, struct xfs_perag, rcu_head);
 
 	ASSERT(!delayed_work_pending(&pag->pag_blockgc_work));
+	ASSERT(atomic_read(&pag->pag_active_ref) == 0);
 	ASSERT(atomic_read(&pag->pag_ref) == 0);
 	kmem_free(pag);
 }
@@ -198,6 +261,8 @@ xfs_free_perag(
 		xfs_iunlink_destroy(pag);
 		xfs_buf_hash_destroy(pag);
 
+		/* drop the mount's active reference */
+		xfs_perag_rele(pag);
 		call_rcu(&pag->rcu_head, __xfs_free_perag);
 	}
 }
@@ -316,6 +381,7 @@ xfs_initialize_perag(
 		INIT_DELAYED_WORK(&pag->pag_blockgc_work, xfs_blockgc_worker);
 		INIT_RADIX_TREE(&pag->pag_ici_root, GFP_ATOMIC);
 		init_waitqueue_head(&pag->pagb_wait);
+		init_waitqueue_head(&pag->pag_active_wq);
 		pag->pagb_count = 0;
 		pag->pagb_tree = RB_ROOT;
 #endif /* __KERNEL__ */
@@ -327,6 +393,9 @@ xfs_initialize_perag(
 		error = xfs_iunlink_init(pag);
 		if (error)
 			goto out_hash_destroy;
+
+		/* Active ref owned by mount indicates AG is online. */
+		atomic_set(&pag->pag_active_ref, 1);
 
 		/* first new pag is fully initialized */
 		if (first_initialised == NULLAGNUMBER)
@@ -364,7 +433,8 @@ out_unwind_new_pags:
 			break;
 		xfs_buf_hash_destroy(pag);
 		xfs_iunlink_destroy(pag);
-		kmem_free(pag);
+		xfs_perag_rele(pag);
+		__xfs_free_perag(&pag->rcu_head);
 	}
 	return error;
 }
