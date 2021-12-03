@@ -32,6 +32,7 @@
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <asm/types.h>
 
 #include "common.h"
 
