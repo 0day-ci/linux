@@ -10,6 +10,7 @@
 #include "xfs_log_format.h"
 #include "xfs_trans_resv.h"
 #include "xfs_mount.h"
+#include "xfs_ag.h"
 #include "xfs_inode.h"
 #include "xfs_errortag.h"
 #include "xfs_error.h"
@@ -59,7 +60,7 @@ xfs_inode_buf_verify(
 		unlinked_ino = be32_to_cpu(dip->di_next_unlinked);
 		di_ok = xfs_verify_magic16(bp, dip->di_magic) &&
 			xfs_dinode_good_version(mp, dip->di_version) &&
-			xfs_verify_agino_or_null(mp, agno, unlinked_ino);
+			xfs_verify_agino_or_null(bp->b_pag, unlinked_ino);
 		if (unlikely(XFS_TEST_ERROR(!di_ok, mp,
 						XFS_ERRTAG_ITOBP_INOTOBP))) {
 			if (readahead) {

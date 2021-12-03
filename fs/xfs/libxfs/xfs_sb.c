@@ -196,6 +196,15 @@ xfs_validate_sb_write(
 	    (sbp->sb_fdblocks > sbp->sb_dblocks ||
 	     !xfs_verify_icount(mp, sbp->sb_icount) ||
 	     sbp->sb_ifree > sbp->sb_icount)) {
+	     /*
+		printk("pag blocks %d agblocks %d min_ino %d max_ino %d\n",
+			bp->b_pag->block_count,
+			xfs_ag_block_count(mp, bp->b_pag->pag_agno),
+			bp->b_pag->agino_min, bp->b_pag->agino_max);
+		*/
+		printk("sb dblocks %lld fdblocks %lld icount %lld, ifree %lld\n",
+			sbp->sb_dblocks, sbp->sb_fdblocks, sbp->sb_icount,
+			sbp->sb_ifree);
 		xfs_warn(mp, "SB summary counter sanity check failed");
 		return -EFSCORRUPTED;
 	}
