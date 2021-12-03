@@ -224,6 +224,15 @@ config RESET_SOCFPGA
 	  This enables the reset driver for the SoCFPGA ARMv7 platforms. This
 	  driver gets initialized early during platform init calls.
 
+config RESET_SUNPLUS
+	bool "Sunplus SoCs Reset Driver"
+	depends on ARCH_SUNPLUS || COMPILE_TEST
+	help
+	  This enables the reset driver support for Sunplus SP7021 SoC family.
+	  Say Y if you want to control reset signals by the reset controller.
+	  Otherwise, say N.
+	  This driver is selected automatically by arm/mach-sunplus platform config.
+
 config RESET_SUNXI
 	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
 	default ARCH_SUNXI
