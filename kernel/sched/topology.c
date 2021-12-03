@@ -1697,6 +1697,22 @@ int sched_cluster_handler(struct ctl_table *table, int write,
 
 	return ret;
 }
+
+static int __init sched_cluster_option(char *str)
+{
+	int enable;
+
+	if (get_option(&str, &enable)) {
+		if (enable != 0 && enable != 1)
+			return -EINVAL;
+
+		sysctl_sched_cluster = enable;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+early_param("sched_cluster", sched_cluster_option);
 #endif
 
 static struct sched_domain_topology_level *next_tl(struct sched_domain_topology_level *tl)
