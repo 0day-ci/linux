@@ -568,8 +568,16 @@ static void sdhci_pci_o2_set_clock(struct sdhci_host *host, unsigned int clock)
 	if ((host->timing == MMC_TIMING_UHS_SDR104) && (clock == 200000000)) {
 		pci_read_config_dword(chip->pdev, O2_SD_PLL_SETTING, &scratch_32);
 
+		/*SDR104 card mode PLL frequency value is 0x2c28*/
 		if ((scratch_32 & 0xFFFF0000) != 0x2c280000)
 			o2_pci_set_baseclk(chip, 0x2c280000);
+
+	} else {
+		pci_read_config_dword(chip->pdev, O2_SD_PLL_SETTING, &scratch_32);
+
+		/*SD2.0,SDR50 card mode PLL DMDN value is 0X2510*/
+		if ((scratch_32 & 0xFFFF0000) != 0x2510000)
+			o2_pci_set_baseclk(chip, 0x25100000);
 
 		/*If not SDR104 card mode, set 0x354 value 0*/
 		pci_read_config_dword(chip->pdev, O2_SD_OUTPUT_CLK_SOURCE_SWITCH, &scratch_32);
