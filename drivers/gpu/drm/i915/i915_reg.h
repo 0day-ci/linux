@@ -6892,7 +6892,7 @@ enum {
 #define   DVS_SOURCE_KEY	(1 << 22)
 #define   DVS_RGB_ORDER_XBGR	(1 << 20)
 #define   DVS_YUV_FORMAT_BT709	(1 << 18)
-#define   DVS_YUV_BYTE_ORDER_MASK (3 << 16)
+#define   DVS_YUV_ORDER_MASK	(3 << 16)
 #define   DVS_YUV_ORDER_YUYV	(0 << 16)
 #define   DVS_YUV_ORDER_UYVY	(1 << 16)
 #define   DVS_YUV_ORDER_YVYU	(2 << 16)
@@ -6971,7 +6971,7 @@ enum {
 #define   SPRITE_RGB_ORDER_RGBX		(1 << 20) /* only for 888 and 161616 */
 #define   SPRITE_YUV_TO_RGB_CSC_DISABLE	(1 << 19)
 #define   SPRITE_YUV_TO_RGB_CSC_FORMAT_BT709	(1 << 18) /* 0 is BT601 */
-#define   SPRITE_YUV_BYTE_ORDER_MASK	(3 << 16)
+#define   SPRITE_YUV_ORDER_MASK		(3 << 16)
 #define   SPRITE_YUV_ORDER_YUYV		(0 << 16)
 #define   SPRITE_YUV_ORDER_UYVY		(1 << 16)
 #define   SPRITE_YUV_ORDER_YVYU		(2 << 16)
@@ -7056,7 +7056,7 @@ enum {
 #define   SP_ALPHA_PREMULTIPLY		(1 << 23) /* CHV pipe B */
 #define   SP_SOURCE_KEY			(1 << 22)
 #define   SP_YUV_FORMAT_BT709		(1 << 18)
-#define   SP_YUV_BYTE_ORDER_MASK	(3 << 16)
+#define   SP_YUV_ORDER_MASK		(3 << 16)
 #define   SP_YUV_ORDER_YUYV		(0 << 16)
 #define   SP_YUV_ORDER_UYVY		(1 << 16)
 #define   SP_YUV_ORDER_YVYU		(2 << 16)
@@ -7197,10 +7197,10 @@ enum {
 #define   PLANE_CTL_YUV420_Y_PLANE		(1 << 19)
 #define   PLANE_CTL_YUV_TO_RGB_CSC_FORMAT_BT709	(1 << 18)
 #define   PLANE_CTL_YUV422_ORDER_MASK		(0x3 << 16)
-#define   PLANE_CTL_YUV422_YUYV			(0 << 16)
-#define   PLANE_CTL_YUV422_UYVY			(1 << 16)
-#define   PLANE_CTL_YUV422_YVYU			(2 << 16)
-#define   PLANE_CTL_YUV422_VYUY			(3 << 16)
+#define   PLANE_CTL_YUV422_ORDER_YUYV		(0 << 16)
+#define   PLANE_CTL_YUV422_ORDER_UYVY		(1 << 16)
+#define   PLANE_CTL_YUV422_ORDER_YVYU		(2 << 16)
+#define   PLANE_CTL_YUV422_ORDER_VYUY		(3 << 16)
 #define   PLANE_CTL_RENDER_DECOMPRESSION_ENABLE	(1 << 15)
 #define   PLANE_CTL_TRICKLE_FEED_DISABLE	(1 << 14)
 #define   PLANE_CTL_CLEAR_COLOR_DISABLE		(1 << 13) /* TGL+ */
@@ -7254,10 +7254,10 @@ enum {
 #define _PLANE_CUS_CTL_1_A			0x701c8
 #define _PLANE_CUS_CTL_2_A			0x702c8
 #define  PLANE_CUS_ENABLE			(1 << 31)
-#define  PLANE_CUS_PLANE_4_RKL			(0 << 30)
-#define  PLANE_CUS_PLANE_5_RKL			(1 << 30)
-#define  PLANE_CUS_PLANE_6			(0 << 30)
-#define  PLANE_CUS_PLANE_7			(1 << 30)
+#define  PLANE_CUS_Y_PLANE_4_RKL		(0 << 30)
+#define  PLANE_CUS_Y_PLANE_5_RKL		(1 << 30)
+#define  PLANE_CUS_Y_PLANE_6_ICL		(0 << 30)
+#define  PLANE_CUS_Y_PLANE_7_ICL		(1 << 30)
 #define  PLANE_CUS_HPHASE_SIGN_NEGATIVE		(1 << 19)
 #define  PLANE_CUS_HPHASE_0			(0 << 16)
 #define  PLANE_CUS_HPHASE_0_25			(1 << 16)
@@ -7289,12 +7289,12 @@ enum {
 #define _PLANE_NV12_BUF_CFG_1_A		0x70278
 #define _PLANE_NV12_BUF_CFG_2_A		0x70378
 
-#define _PLANE_CC_VAL_1_B			0x711b4
-#define _PLANE_CC_VAL_2_B			0x712b4
-#define _PLANE_CC_VAL_1(pipe)	_PIPE(pipe, _PLANE_CC_VAL_1_A, _PLANE_CC_VAL_1_B)
-#define _PLANE_CC_VAL_2(pipe)	_PIPE(pipe, _PLANE_CC_VAL_2_A, _PLANE_CC_VAL_2_B)
-#define PLANE_CC_VAL(pipe, plane)	\
-	_MMIO_PLANE(plane, _PLANE_CC_VAL_1(pipe), _PLANE_CC_VAL_2(pipe))
+#define _PLANE_CC_VAL_1_B		0x711b4
+#define _PLANE_CC_VAL_2_B		0x712b4
+#define _PLANE_CC_VAL_1(pipe, dw)	(_PIPE(pipe, _PLANE_CC_VAL_1_A, _PLANE_CC_VAL_1_B) + (dw) * 4)
+#define _PLANE_CC_VAL_2(pipe, dw)	(_PIPE(pipe, _PLANE_CC_VAL_2_A, _PLANE_CC_VAL_2_B) + (dw) * 4)
+#define PLANE_CC_VAL(pipe, plane, dw) \
+	_MMIO_PLANE((plane), _PLANE_CC_VAL_1((pipe), (dw)), _PLANE_CC_VAL_2((pipe), (dw)))
 
 /* Input CSC Register Definitions */
 #define _PLANE_INPUT_CSC_RY_GY_1_A	0x701E0
@@ -8483,8 +8483,9 @@ enum {
 							   _PIPEB_CHICKEN)
 #define   UNDERRUN_RECOVERY_DISABLE_ADLP	REG_BIT(30)
 #define   UNDERRUN_RECOVERY_ENABLE_DG2		REG_BIT(30)
-#define   PIXEL_ROUNDING_TRUNC_FB_PASSTHRU 	(1 << 15)
-#define   PER_PIXEL_ALPHA_BYPASS_EN		(1 << 7)
+#define   PIXEL_ROUNDING_TRUNC_FB_PASSTHRU	REG_BIT(15)
+#define   DG2_RENDER_CCSTAG_4_3_EN		REG_BIT(12)
+#define   PER_PIXEL_ALPHA_BYPASS_EN		REG_BIT(7)
 
 #define FF_MODE2			_MMIO(0x6604)
 #define   FF_MODE2_GS_TIMER_MASK	REG_GENMASK(31, 24)
