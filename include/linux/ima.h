@@ -220,6 +220,17 @@ struct ima_namespace {
 
 #ifdef CONFIG_IMA_QUEUE_EARLY_BOOT_KEYS
 	/*
+	 * Flag to indicate whether a key can be processed
+	 * right away or should be queued for processing later.
+	 */
+	bool ima_process_keys;
+
+	/*
+	 * To synchronize access to the list of keys that need to be measured
+	 */
+	struct mutex ima_keys_lock;
+	struct list_head ima_keys;
+	/*
 	 * If custom IMA policy is not loaded then keys queued up
 	 * for measurement should be freed. This worker is used
 	 * for handling this scenario.
