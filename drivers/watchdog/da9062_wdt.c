@@ -20,7 +20,8 @@
 #include <linux/regmap.h>
 #include <linux/of.h>
 
-static const unsigned int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
+static const unsigned int wdt_timeout[] = { 0, 3, 6, 12, 25, 51, 102, 204 };
+
 #define DA9062_TWDSCALE_DISABLE		0
 #define DA9062_TWDSCALE_MIN		1
 #define DA9062_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
