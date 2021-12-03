@@ -966,6 +966,7 @@ __i915_request_create(struct intel_context *ce, gfp_t gfp)
 
 err_unwind:
 	ce->ring->emit = rq->head;
+	intel_timeline_rollback_seqno(tl);
 
 	/* Make sure we didn't add ourselves to external state before freeing */
 	GEM_BUG_ON(!list_empty(&rq->sched.signalers_list));
