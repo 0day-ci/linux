@@ -901,6 +901,7 @@ properties:
               - fsl,ls1021a-qds
               - fsl,ls1021a-tsn
               - fsl,ls1021a-twr
+              - fsl,ls1021a-iot
           - const: fsl,ls1021a
 
       - description: LS1028A based Boards
