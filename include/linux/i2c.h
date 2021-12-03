@@ -22,6 +22,7 @@
 #include <linux/of.h>		/* for struct device_node */
 #include <linux/swab.h>		/* for swab16 */
 #include <uapi/linux/i2c.h>
+#include <linux/slab.h> /* for kzalloc */
 
 extern struct bus_type i2c_bus_type;
 extern struct device_type i2c_adapter_type;
@@ -697,6 +698,27 @@ struct i2c_adapter_quirks {
 	u16 max_comb_2nd_msg_len;
 };
 
+/**
+ * I2C statistics
+ * The list of statistics are currently copied from npcm7xx.
+ * Perhaps a more universal set of statistics can be used.
+ *
+ * The stats are currently modeled as pointers to members in the bus drivers.
+ * A null pointer indicates the counter is not supported by the bus driver.
+ */
+struct i2c_adapter_stats {
+	struct kobject* kobj;
+
+	/* a NULL value means the counter is not available */
+	u64* tx_complete_cnt;
+	u64* ber_cnt;
+	u64* nack_cnt;
+	u64* rec_succ_cnt;
+	u64* rec_fail_cnt;
+	u64* timeout_cnt;
+	u64* i2c_speed;
+};
+
 /* enforce max_num_msgs = 2 and use max_comb_*_len for length checks */
 #define I2C_AQ_COMB			BIT(0)
 /* first combined message must be write */
@@ -748,11 +770,16 @@ struct i2c_adapter {
 
 	struct i2c_bus_recovery_info *bus_recovery_info;
 	const struct i2c_adapter_quirks *quirks;
+	struct i2c_adapter_stats* stats;
 
 	struct irq_domain *host_notify_domain;
 	struct regulator *bus_regulator;
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+
+void i2c_adapter_create_stats_folder(struct i2c_adapter* adapter);
+void i2c_adapter_stats_register_counter(struct i2c_adapter* adapter,
+	const char* counter_name, void* data_source);
 
 static inline void *i2c_get_adapdata(const struct i2c_adapter *adap)
 {

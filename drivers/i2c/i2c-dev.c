@@ -765,6 +765,109 @@ static void __exit i2c_dev_exit(void)
 	unregister_chrdev_region(MKDEV(I2C_MAJOR, 0), I2C_MINORS);
 }
 
+
+static struct i2c_adapter* kobj_to_adapter(struct device* pdev) {
+	struct kobject* dev_kobj = ((struct kobject*)pdev)->parent;
+	struct device* dev = container_of(dev_kobj, struct device, kobj);
+	return to_i2c_adapter(dev);
+}
+
+static ssize_t ber_cnt_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* ber_cnt = kobj_to_adapter(pdev)->stats->ber_cnt;
+	if (ber_cnt == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *ber_cnt);
+}
+DEVICE_ATTR_RO(ber_cnt);
+
+ssize_t nack_cnt_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* nack_cnt = kobj_to_adapter(pdev)->stats->nack_cnt;
+	if (nack_cnt == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *nack_cnt);
+}
+DEVICE_ATTR_RO(nack_cnt);
+
+ssize_t rec_succ_cnt_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* rec_succ_cnt = kobj_to_adapter(pdev)->stats->rec_succ_cnt;
+	if (rec_succ_cnt == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *rec_succ_cnt);
+}
+DEVICE_ATTR_RO(rec_succ_cnt);
+
+ssize_t rec_fail_cnt_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* rec_fail_cnt = kobj_to_adapter(pdev)->stats->rec_fail_cnt;
+	if (rec_fail_cnt == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *rec_fail_cnt);
+}
+DEVICE_ATTR_RO(rec_fail_cnt);
+
+ssize_t timeout_cnt_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* timeout_cnt = kobj_to_adapter(pdev)->stats->timeout_cnt;
+	if (timeout_cnt == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *timeout_cnt);
+}
+DEVICE_ATTR_RO(timeout_cnt);
+
+ssize_t i2c_speed_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* i2c_speed = kobj_to_adapter(pdev)->stats->i2c_speed;
+	if (i2c_speed == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *i2c_speed);
+}
+DEVICE_ATTR_RO(i2c_speed);
+
+ssize_t tx_complete_cnt_show(struct device* pdev,
+	struct device_attribute* attr, char* buf) {
+	u64* tx_complete_cnt = kobj_to_adapter(pdev)->stats->tx_complete_cnt;
+	if (tx_complete_cnt == NULL) return 0;
+	return sysfs_emit(buf, "%llu\n", *tx_complete_cnt);
+}
+DEVICE_ATTR_RO(tx_complete_cnt);
+
+void i2c_adapter_create_stats_folder(struct i2c_adapter* adapter) {
+	adapter->stats = kzalloc(sizeof(struct i2c_adapter_stats), GFP_KERNEL);
+	adapter->stats->kobj = kobject_create_and_add("stats", &adapter->dev.kobj);;
+}
+
+void i2c_adapter_stats_register_counter(struct i2c_adapter* adapter,
+	const char* counter_name, void* data_source) {
+	int ret;
+	if (adapter->stats == NULL) {
+		i2c_adapter_create_stats_folder(adapter);
+	}
+
+	if (!strcmp(counter_name, "ber_cnt")) {
+		adapter->stats->ber_cnt = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_ber_cnt.attr);
+	} else if (!strcmp(counter_name, "nack_cnt")) {
+		adapter->stats->nack_cnt = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_nack_cnt.attr);
+	} else if (!strcmp(counter_name, "rec_succ_cnt")) {
+		adapter->stats->rec_succ_cnt = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_rec_succ_cnt.attr);
+	} else if (!strcmp(counter_name, "rec_fail_cnt")) {
+		adapter->stats->rec_fail_cnt = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_rec_fail_cnt.attr);
+	} else if (!strcmp(counter_name, "timeout_cnt")) {
+		adapter->stats->timeout_cnt = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_timeout_cnt.attr);
+	} else if (!strcmp(counter_name, "i2c_speed")) {
+		adapter->stats->i2c_speed = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_i2c_speed.attr);
+	} else if (!strcmp(counter_name, "tx_complete_cnt")) {
+		adapter->stats->tx_complete_cnt = data_source;
+		ret = sysfs_create_file(adapter->stats->kobj, &dev_attr_tx_complete_cnt.attr);
+	}
+
+	if (ret) {
+		printk("Failed to create sysfs file for %s", counter_name);
+	}
+}
+
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C /dev entries driver");
