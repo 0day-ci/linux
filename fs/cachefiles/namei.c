@@ -390,7 +390,7 @@ try_again:
 			ret = vfs_rename(&rd);
 		if (ret != 0)
 			trace_cachefiles_vfs_error(object, d_inode(dir),
-						   PTR_ERR(grave),
+						   ret,
 						   cachefiles_trace_rename_error);
 		if (ret != 0 && ret != -ENOMEM)
 			cachefiles_io_error(cache,
@@ -702,7 +702,7 @@ bool cachefiles_commit_tmpfile(struct cachefiles_cache *cache,
 		ret = vfs_link(object->file->f_path.dentry, &init_user_ns,
 			       d_inode(fan), dentry, NULL);
 	if (ret < 0) {
-		trace_cachefiles_vfs_error(object, d_inode(fan), PTR_ERR(dentry),
+		trace_cachefiles_vfs_error(object, d_inode(fan), ret,
 					   cachefiles_trace_link_error);
 		_debug("link fail %d", ret);
 	} else {
