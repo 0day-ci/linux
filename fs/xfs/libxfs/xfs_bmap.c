@@ -651,13 +651,10 @@ xfs_bmap_extents_to_btree(
 	*logflagsp = 0;
 	xfs_rmap_ino_bmbt_owner(&args.oinfo, ip->i_ino, whichfork);
 	if (tp->t_firstblock == NULLFSBLOCK) {
-		args.type = XFS_ALLOCTYPE_START_BNO;
-		args.fsbno = XFS_INO_TO_FSB(mp, ip->i_ino);
-		error = xfs_alloc_vextent(&args);
+		error = xfs_alloc_vextent_start_ag(&args,
+				XFS_INO_TO_FSB(mp, ip->i_ino));
 	} else if (tp->t_flags & XFS_TRANS_LOWMODE) {
-		args.type = XFS_ALLOCTYPE_START_BNO;
-		args.fsbno = tp->t_firstblock;
-		error = xfs_alloc_vextent(&args);
+		error = xfs_alloc_vextent_start_ag(&args, tp->t_firstblock);
 	} else {
 		args.type = XFS_ALLOCTYPE_NEAR_BNO;
 		args.fsbno = tp->t_firstblock;
@@ -813,9 +810,8 @@ xfs_bmap_local_to_extents(
 	 * file currently fits in an inode.
 	 */
 	if (tp->t_firstblock == NULLFSBLOCK) {
-		args.fsbno = XFS_INO_TO_FSB(args.mp, ip->i_ino);
-		args.type = XFS_ALLOCTYPE_START_BNO;
-		error = xfs_alloc_vextent(&args);
+		error = xfs_alloc_vextent_start_ag(&args,
+				XFS_INO_TO_FSB(args.mp, ip->i_ino));
 	} else {
 		args.fsbno = tp->t_firstblock;
 		args.type = XFS_ALLOCTYPE_NEAR_BNO;
@@ -3522,7 +3518,8 @@ xfs_btalloc_at_eof(
 	struct xfs_bmalloca	*ap,
 	struct xfs_alloc_arg	*args,
 	xfs_extlen_t		blen,
-	int			stripe_align)
+	int			stripe_align,
+	bool			ag_only)
 {
 	struct xfs_mount	*mp = args->mp;
 	xfs_alloctype_t		atype;
@@ -3587,7 +3584,10 @@ xfs_btalloc_at_eof(
 		args->minalignslop = 0;
 	}
 
-	error = xfs_alloc_vextent(args);
+	if (ag_only)
+		error = xfs_alloc_vextent(args);
+	else
+		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
 	if (error)
 		return error;
 
@@ -3617,7 +3617,6 @@ xfs_btalloc_nullfb_bestlen(
 	int			notinit = 0;
 	int			error = 0;
 
-	args->type = XFS_ALLOCTYPE_START_BNO;
 	args->total = ap->total;
 
 	startag = XFS_FSB_TO_AGNO(mp, args->fsbno);
@@ -3648,13 +3647,17 @@ xfs_btalloc_nullfb(
 {
 	struct xfs_mount	*mp = args->mp;
 	xfs_extlen_t		blen = 0;
+	bool			is_filestream = false;
 	int			error;
+
+	if ((ap->datatype & XFS_ALLOC_USERDATA) &&
+	    xfs_inode_is_filestream(ap->ip))
+		is_filestream = true;
 
 	/*
 	 * Determine the initial block number we will target for allocation.
 	 */
-	if ((ap->datatype & XFS_ALLOC_USERDATA) &&
-	    xfs_inode_is_filestream(ap->ip)) {
+	if (is_filestream) {
 		xfs_agnumber_t	agno = xfs_filestream_lookup_ag(ap->ip);
 		if (agno == NULLAGNUMBER)
 			agno = 0;
@@ -3670,8 +3673,7 @@ xfs_btalloc_nullfb(
 	 * the request.  If one isn't found, then adjust the minimum allocation
 	 * size to the largest space found.
 	 */
-	if ((ap->datatype & XFS_ALLOC_USERDATA) &&
-	    xfs_inode_is_filestream(ap->ip))
+	if (is_filestream)
 		error = xfs_bmap_btalloc_filestreams(ap, args, &blen);
 	else
 		error = xfs_btalloc_nullfb_bestlen(ap, args, &blen);
@@ -3679,14 +3681,18 @@ xfs_btalloc_nullfb(
 		return error;
 
 	if (ap->aeof) {
-		error = xfs_btalloc_at_eof(ap, args, blen, stripe_align);
+		error = xfs_btalloc_at_eof(ap, args, blen, stripe_align,
+				is_filestream);
 		if (error)
 			return error;
 		if (args->fsbno != NULLFSBLOCK)
 			return 0;
 	}
 
-	error = xfs_alloc_vextent(args);
+	if (is_filestream)
+		error = xfs_alloc_vextent(args);
+	else
+		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
 	if (error)
 		return error;
 	if (args->fsbno != NULLFSBLOCK)
@@ -3698,9 +3704,7 @@ xfs_btalloc_nullfb(
 	 */
 	if (args->minlen > ap->minlen) {
 		args->minlen = ap->minlen;
-		args->type = XFS_ALLOCTYPE_START_BNO;
-		args->fsbno = ap->blkno;
-		error = xfs_alloc_vextent(args);
+		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
 		if (error)
 			return error;
 	}
@@ -3737,10 +3741,7 @@ xfs_btalloc_low_mode(
 	args->total = args->minlen = ap->minlen;
 	if (xfs_inode_is_filestream(ap->ip))
 		return xfs_alloc_vextent_first_ag(args, ap->blkno);
-
-	args->fsbno = ap->blkno;
-	args->type = XFS_ALLOCTYPE_START_BNO;
-	return xfs_alloc_vextent(args);
+	return xfs_alloc_vextent_start_ag(args, ap->blkno);
 }
 
 /*
@@ -3765,7 +3766,8 @@ xfs_btalloc_near(
 	args->minlen = ap->minlen;
 
 	if (ap->aeof) {
-		error = xfs_btalloc_at_eof(ap, args, blen, stripe_align);
+		error = xfs_btalloc_at_eof(ap, args, blen, stripe_align,
+				true);
 		if (error)
 			return error;
 		if (args->fsbno != NULLFSBLOCK)

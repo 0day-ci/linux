@@ -216,8 +216,6 @@ xfs_bmbt_alloc_block(
 		return -ENOSPC;
 
 	if (args.fsbno == NULLFSBLOCK) {
-		args.fsbno = be64_to_cpu(start->l);
-		args.type = XFS_ALLOCTYPE_START_BNO;
 		/*
 		 * Make sure there is sufficient room left in the AG to
 		 * complete a full tree split for an extent insert.  If
@@ -230,7 +228,7 @@ xfs_bmbt_alloc_block(
 		 * block allocation here and corrupt the filesystem.
 		 */
 		args.minleft = args.tp->t_blk_res;
-		error = xfs_alloc_vextent(&args);
+		error = xfs_alloc_vextent_start_ag(&args, be64_to_cpu(start->l));
 		if (error)
 			goto error0;
 
@@ -246,8 +244,8 @@ xfs_bmbt_alloc_block(
 			cur->bc_tp->t_flags |= XFS_TRANS_LOWMODE;
 		}
 	} else if (cur->bc_tp->t_flags & XFS_TRANS_LOWMODE) {
-		args.type = XFS_ALLOCTYPE_START_BNO;
-		error = xfs_alloc_vextent(&args);
+		error = xfs_alloc_vextent_start_ag(&args,
+				cur->bc_tp->t_firstblock);
 	} else {
 		args.type = XFS_ALLOCTYPE_NEAR_BNO;
 		args.pag = xfs_perag_get(args.mp,
