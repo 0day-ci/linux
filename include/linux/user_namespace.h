@@ -156,14 +156,18 @@ static inline struct user_namespace *get_user_ns(struct user_namespace *ns)
 extern int create_user_ns(struct cred *new);
 extern int unshare_userns(unsigned long unshare_flags, struct cred **new_cred);
 extern void __put_user_ns(struct user_namespace *ns);
+extern void ima_ns_userns_early_teardown(struct ima_namespace *ns);
 
 static inline void put_user_ns(struct user_namespace *ns)
 {
 	if (ns) {
 		if (refcount_dec_and_test(&ns->ns.count))
 			__put_user_ns(ns);
-		else if (refcount_read(&ns->ns.count) == ns->refcount_teardown)
-			;
+		else if (refcount_read(&ns->ns.count) == ns->refcount_teardown) {
+#ifdef CONFIG_IMA_NS
+			ima_ns_userns_early_teardown(ns->ima_ns);
+#endif
+		}
 	}
 }
 
