@@ -1149,36 +1149,6 @@ xfs_alloc_ag_vextent(
 		ASSERT(0);
 		/* NOTREACHED */
 	}
-
-	if (error || args->agbno == NULLAGBLOCK)
-		return error;
-
-	ASSERT(args->len >= args->minlen);
-	ASSERT(args->len <= args->maxlen);
-	ASSERT(args->agbno % args->alignment == 0);
-
-	/* if not file data, insert new block into the reverse map btree */
-	if (!xfs_rmap_should_skip_owner_update(&args->oinfo)) {
-		error = xfs_rmap_alloc(args->tp, args->agbp, args->pag,
-				       args->agbno, args->len, &args->oinfo);
-		if (error)
-			return error;
-	}
-
-	if (!args->wasfromfl) {
-		error = xfs_alloc_update_counters(args->tp, args->agbp,
-						  -((long)(args->len)));
-		if (error)
-			return error;
-
-		ASSERT(!xfs_extent_busy_search(args->mp, args->pag,
-					      args->agbno, args->len));
-	}
-
-	xfs_ag_resv_alloc_extent(args->pag, args->resv, args);
-
-	XFS_STATS_INC(args->mp, xs_allocx);
-	XFS_STATS_ADD(args->mp, xs_allocb, args->len);
 	return error;
 }
 
@@ -3221,31 +3191,56 @@ xfs_alloc_vextent_prepare_ag(
 }
 
 /*
- * Post-process allocation results to set the allocated block number correctly
- * for the caller.
+ * Post-process allocation results to account for the allocation if it succeed
+ * and set the allocated block number correctly for the caller.
  *
- * XXX: xfs_alloc_vextent() should really be returning ENOSPC for ENOSPC, not
+ * XXX: we should really be returning ENOSPC for ENOSPC, not
  * hiding it behind a "successful" NULLFSBLOCK allocation.
  */
-static void
-xfs_alloc_vextent_set_fsbno(
+static int
+xfs_alloc_vextent_finish(
 	struct xfs_alloc_arg	*args)
 {
-	struct xfs_mount	*mp = args->mp;
+	int			error = 0;
 
 	/* Allocation failed with ENOSPC if NULLAGBLOCK was returned. */
 	if (args->agbno == NULLAGBLOCK) {
 		args->fsbno = NULLFSBLOCK;
-		return;
+		return 0;
 	}
 
-	args->fsbno = XFS_AGB_TO_FSB(mp, args->agno, args->agbno);
-#ifdef DEBUG
+	args->fsbno = XFS_AGB_TO_FSB(args->mp, args->agno, args->agbno);
+
 	ASSERT(args->len >= args->minlen);
 	ASSERT(args->len <= args->maxlen);
 	ASSERT(args->agbno % args->alignment == 0);
-	XFS_AG_CHECK_DADDR(mp, XFS_FSB_TO_DADDR(mp, args->fsbno), args->len);
-#endif
+	XFS_AG_CHECK_DADDR(args->mp, XFS_FSB_TO_DADDR(args->mp, args->fsbno),
+			args->len);
+
+	/* if not file data, insert new block into the reverse map btree */
+	if (!xfs_rmap_should_skip_owner_update(&args->oinfo)) {
+		error = xfs_rmap_alloc(args->tp, args->agbp, args->pag,
+				       args->agbno, args->len, &args->oinfo);
+		if (error)
+			return error;
+	}
+
+	if (!args->wasfromfl) {
+		error = xfs_alloc_update_counters(args->tp, args->agbp,
+						  -((long)(args->len)));
+		if (error)
+			return error;
+
+		ASSERT(!xfs_extent_busy_search(args->mp, args->pag,
+					      args->agbno, args->len));
+	}
+
+	xfs_ag_resv_alloc_extent(args->pag, args->resv, args);
+
+	XFS_STATS_INC(args->mp, xs_allocx);
+	XFS_STATS_ADD(args->mp, xs_allocb, args->len);
+
+	return 0;
 }
 
 /*
@@ -3282,8 +3277,7 @@ xfs_alloc_vextent_this_ag(
 			return error;
 	}
 
-	xfs_alloc_vextent_set_fsbno(args);
-	return 0;
+	return xfs_alloc_vextent_finish(args);
 }
 
 /*
@@ -3371,8 +3365,10 @@ xfs_alloc_vextent_iterate_ags(
 		xfs_perag_put(args->pag);
 		args->pag = NULL;
 	}
-	xfs_perag_put(args->pag);
-	args->pag = NULL;
+	/*
+	 * On success, perag is left referenced in args for the caller to clean
+	 * up after they've finished the allocation.
+	 */
 	return error;
 }
 
@@ -3418,8 +3414,12 @@ xfs_alloc_vextent_start_ag(
 
 	error = xfs_alloc_vextent_iterate_ags(args, start_agno,
 			XFS_ALLOC_FLAG_TRYLOCK);
-	if (error)
-		return error;
+	if (!error)
+		error = xfs_alloc_vextent_finish(args);
+	if (args->pag) {
+		xfs_perag_put(args->pag);
+		args->pag = NULL;
+	}
 
 	if (bump_rotor) {
 		if (args->agno == start_agno)
@@ -3430,8 +3430,7 @@ xfs_alloc_vextent_start_ag(
 				(mp->m_sb.sb_agcount * rotorstep);
 	}
 
-	xfs_alloc_vextent_set_fsbno(args);
-	return 0;
+	return error;
 }
 
 /*
@@ -3458,10 +3457,13 @@ xfs_alloc_vextent_first_ag(
 	args->fsbno = target;
 	error =  xfs_alloc_vextent_iterate_ags(args,
 			XFS_FSB_TO_AGNO(mp, args->fsbno), 0);
-	if (error)
-		return error;
-	xfs_alloc_vextent_set_fsbno(args);
-	return 0;
+	if (!error)
+		error = xfs_alloc_vextent_finish(args);
+	if (args->pag) {
+		xfs_perag_put(args->pag);
+		args->pag = NULL;
+	}
+	return error;
 }
 
 /*
@@ -3492,14 +3494,11 @@ xfs_alloc_vextent_exact_bno(
 	if (error)
 		return error;
 
-	if (args->agbp) {
+	if (args->agbp)
 		error = xfs_alloc_ag_vextent(args);
-		if (error)
-			return error;
-	}
-
-	xfs_alloc_vextent_set_fsbno(args);
-	return 0;
+	if (!error)
+		error = xfs_alloc_vextent_finish(args);
+	return error;
 }
 
 /*
@@ -3534,13 +3533,11 @@ xfs_alloc_vextent_near_bno(
 
 	if (args->agbp)
 		error = xfs_alloc_ag_vextent(args);
+	if (!error)
+		error = xfs_alloc_vextent_finish(args);
 	if (need_pag)
 		xfs_perag_put(args->pag);
-	if (error)
-		return error;
-
-	xfs_alloc_vextent_set_fsbno(args);
-	return 0;
+	return error;
 }
 
 /* Ensure that the freelist is at full capacity. */
