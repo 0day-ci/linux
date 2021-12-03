@@ -14,6 +14,7 @@
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
 
+#include <drm/drm_aperture.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_drv.h>
@@ -190,6 +191,10 @@ static int stm_drm_platform_probe(struct platform_device *pdev)
 		return PTR_ERR(ddev);
 
 	ret = drv_load(ddev);
+	if (ret)
+		goto err_put;
+
+	ret = drm_aperture_remove_framebuffers(false, &drv_driver);
 	if (ret)
 		goto err_put;
 
