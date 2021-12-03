@@ -39,6 +39,9 @@
 
 #define NALLOC 3 /* 1 normal, 1 for concurrent threads, 1 for preallocation */
 
+#define I915_PAGE_PRESENT BIT_ULL(0)
+#define I915_PAGE_RW BIT_ULL(1)
+
 #define I915_GTT_PAGE_SIZE_4K	BIT_ULL(12)
 #define I915_GTT_PAGE_SIZE_64K	BIT_ULL(16)
 #define I915_GTT_PAGE_SIZE_2M	BIT_ULL(21)
