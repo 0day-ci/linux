@@ -103,6 +103,11 @@ struct user_namespace {
 #ifdef CONFIG_IMA
 	struct ima_namespace	*ima_ns;
 #endif
+	/* The refcount at which to start tearing down dependent namespaces
+	 * (currently only IMA) that may hold additional references to the
+	 * user namespace.
+	 */
+	unsigned int            refcount_teardown;
 } __randomize_layout;
 
 struct ucounts {
@@ -154,8 +159,12 @@ extern void __put_user_ns(struct user_namespace *ns);
 
 static inline void put_user_ns(struct user_namespace *ns)
 {
-	if (ns && refcount_dec_and_test(&ns->ns.count))
-		__put_user_ns(ns);
+	if (ns) {
+		if (refcount_dec_and_test(&ns->ns.count))
+			__put_user_ns(ns);
+		else if (refcount_read(&ns->ns.count) == ns->refcount_teardown)
+			;
+	}
 }
 
 struct seq_operations;
