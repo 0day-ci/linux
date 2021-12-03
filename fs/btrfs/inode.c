@@ -8616,6 +8616,7 @@ static int btrfs_truncate(struct inode *inode, bool skip_writeback)
 		ret = btrfs_truncate_inode_items(trans, root, BTRFS_I(inode),
 						 &control);
 
+		inode_sub_bytes(inode, control.sub_bytes);
 		btrfs_inode_safe_disk_i_size_write(BTRFS_I(inode),
 						   control.last_size);
 
