@@ -9,6 +9,7 @@
 #define _MSCC_OCELOT_H_
 
 #include <linux/bitops.h>
+#include <linux/dsa/ocelot.h>
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/net_tstamp.h>

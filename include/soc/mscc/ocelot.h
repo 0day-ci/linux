@@ -692,6 +692,12 @@ struct ocelot {
 	/* Protects the PTP clock */
 	spinlock_t			ptp_clock_lock;
 	struct ptp_pin_desc		ptp_pins[OCELOT_PTP_PINS_NUM];
+
+	struct ocelot_fdma		*fdma;
+	/* Napi context used by FDMA. Needs to be in ocelot to avoid using a
+	 * backpointer in ocelot_fdma
+	 */
+	struct napi_struct		napi;
 };
 
 struct ocelot_policer {
