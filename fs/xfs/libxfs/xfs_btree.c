@@ -216,7 +216,7 @@ xfs_btree_check_sptr(
 {
 	if (level <= 0)
 		return false;
-	return xfs_verify_agbno(cur->bc_mp, cur->bc_ag.pag->pag_agno, agbno);
+	return xfs_verify_agbno(cur->bc_ag.pag, agbno);
 }
 
 /*
@@ -4508,10 +4508,10 @@ xfs_btree_sblock_verify(
 	/* sibling pointer verification */
 	agno = xfs_daddr_to_agno(mp, xfs_buf_daddr(bp));
 	if (block->bb_u.s.bb_leftsib != cpu_to_be32(NULLAGBLOCK) &&
-	    !xfs_verify_agbno(mp, agno, be32_to_cpu(block->bb_u.s.bb_leftsib)))
+	    !xfs_verify_agbno(bp->b_pag, be32_to_cpu(block->bb_u.s.bb_leftsib)))
 		return __this_address;
 	if (block->bb_u.s.bb_rightsib != cpu_to_be32(NULLAGBLOCK) &&
-	    !xfs_verify_agbno(mp, agno, be32_to_cpu(block->bb_u.s.bb_rightsib)))
+	    !xfs_verify_agbno(bp->b_pag, be32_to_cpu(block->bb_u.s.bb_rightsib)))
 		return __this_address;
 
 	return NULL;
