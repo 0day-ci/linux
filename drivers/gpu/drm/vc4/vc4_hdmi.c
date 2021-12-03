@@ -1411,8 +1411,15 @@ vc4_hdmi_encoder_compute_config(struct vc4_hdmi *vc4_hdmi,
 					     vc4_state, mode,
 					     conn_state->max_bpc,
 					     format);
-	if (ret)
-		return ret;
+	if (ret) {
+		format = VC4_HDMI_OUTPUT_YUV422;
+		ret = vc4_hdmi_encoder_compute_clock(vc4_hdmi,
+						     vc4_state, mode,
+						     conn_state->max_bpc,
+						     format);
+		if (ret)
+			return ret;
+	}
 
 	vc4_state->output_format = format;
 	return ret;
