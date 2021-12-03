@@ -1093,3 +1093,9 @@ config MMC_OWL
 
 config MMC_SDHCI_EXTERNAL_DMA
 	bool
+
+config MMC_LITEX
+	tristate "Support for the MMC Controller in LiteX SOCs"
+	depends on OF && LITEX
+	help
+	  Generic MCC driver for LiteX
