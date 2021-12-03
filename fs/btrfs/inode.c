@@ -5246,6 +5246,11 @@ void btrfs_evict_inode(struct inode *inode)
 	btrfs_i_size_write(BTRFS_I(inode), 0);
 
 	while (1) {
+		struct btrfs_truncate_control control = {
+			.new_size = 0,
+			.min_type = 0,
+		};
+
 		trans = evict_refill_and_join(root, rsv);
 		if (IS_ERR(trans))
 			goto free_rsv;
@@ -5253,7 +5258,7 @@ void btrfs_evict_inode(struct inode *inode)
 		trans->block_rsv = rsv;
 
 		ret = btrfs_truncate_inode_items(trans, root, BTRFS_I(inode),
-						 0, 0, NULL);
+						 &control);
 		trans->block_rsv = &fs_info->trans_block_rsv;
 		btrfs_end_transaction(trans);
 		btrfs_btree_balance_dirty(fs_info);
@@ -8522,6 +8527,9 @@ out_noreserve:
 
 static int btrfs_truncate(struct inode *inode, bool skip_writeback)
 {
+	struct btrfs_truncate_control control = {
+		.min_type = BTRFS_EXTENT_DATA_KEY,
+	};
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct btrfs_block_rsv *rsv;
@@ -8529,7 +8537,6 @@ static int btrfs_truncate(struct inode *inode, bool skip_writeback)
 	struct btrfs_trans_handle *trans;
 	u64 mask = fs_info->sectorsize - 1;
 	u64 min_size = btrfs_calc_metadata_size(fs_info, 1);
-	u64 extents_found = 0;
 
 	if (!skip_writeback) {
 		ret = btrfs_wait_ordered_range(inode, inode->i_size & (~mask),
@@ -8594,6 +8601,7 @@ static int btrfs_truncate(struct inode *inode, bool skip_writeback)
 		const u64 new_size = inode->i_size;
 		const u64 lock_start = ALIGN_DOWN(new_size, fs_info->sectorsize);
 
+		control.new_size = new_size;
 		lock_extent_bits(&BTRFS_I(inode)->io_tree, lock_start, (u64)-1,
 				 &cached_state);
 		/*
@@ -8606,9 +8614,7 @@ static int btrfs_truncate(struct inode *inode, bool skip_writeback)
 					(u64)-1, 0);
 
 		ret = btrfs_truncate_inode_items(trans, root, BTRFS_I(inode),
-						 inode->i_size,
-						 BTRFS_EXTENT_DATA_KEY,
-						 &extents_found);
+						 &control);
 		unlock_extent_cached(&BTRFS_I(inode)->io_tree, lock_start,
 				     (u64)-1, &cached_state);
 
@@ -8687,7 +8693,7 @@ out:
 	 * between the old i_size and the new i_size, and there were no prealloc
 	 * extents beyond i_size to drop.
 	 */
-	if (extents_found > 0)
+	if (control.extents_found > 0)
 		set_bit(BTRFS_INODE_NEEDS_FULL_SYNC, &BTRFS_I(inode)->runtime_flags);
 
 	return ret;
