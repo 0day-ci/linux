@@ -246,6 +246,8 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
 	if (ulpi_node) {
 		phy_node = of_get_next_available_child(ulpi_node, NULL);
 		ci->hsic = of_device_is_compatible(phy_node, "qcom,usb-hsic-phy");
+		if (!phy_node || !ci->hsic)
+			goto err_mux;
 		of_node_put(phy_node);
 	}
 	of_node_put(ulpi_node);
