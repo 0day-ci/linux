@@ -3235,19 +3235,24 @@ xfs_alloc_vextent_set_fsbno(
  */
 int
 xfs_alloc_vextent_this_ag(
-	struct xfs_alloc_arg	*args)
+	struct xfs_alloc_arg	*args,
+	xfs_agnumber_t		agno)
 {
 	struct xfs_mount	*mp = args->mp;
 	int			error;
+	xfs_rfsblock_t		target = XFS_AGB_TO_FSB(mp, agno, 0);
 
-	error = xfs_alloc_vextent_check_args(args, args->fsbno);
+	error = xfs_alloc_vextent_check_args(args, target);
 	if (error) {
 		if (error == -ENOSPC)
 			return 0;
 		return error;
 	}
 
-	args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
+	args->agno = agno;
+	args->agbno = 0;
+	args->fsbno = target;
+	args->type = XFS_ALLOCTYPE_THIS_AG;
 	error = xfs_alloc_ag_vextent(args);
 	if (error)
 		return error;
@@ -3419,6 +3424,36 @@ xfs_alloc_vextent_first_ag(
 			XFS_FSB_TO_AGNO(mp, args->fsbno), 0);
 	if (error)
 		return error;
+	xfs_alloc_vextent_set_fsbno(args);
+	return 0;
+}
+
+/*
+ * Allocate within a single AG only.
+ */
+int
+xfs_alloc_vextent_exact_bno(
+	struct xfs_alloc_arg	*args,
+	xfs_rfsblock_t		target)
+{
+	struct xfs_mount	*mp = args->mp;
+	int			error;
+
+	error = xfs_alloc_vextent_check_args(args, target);
+	if (error) {
+		if (error == -ENOSPC)
+			return 0;
+		return error;
+	}
+
+	args->agno = XFS_FSB_TO_AGNO(mp, target);
+	args->agbno = XFS_FSB_TO_AGBNO(mp, target);
+	args->fsbno = target;
+	args->type = XFS_ALLOCTYPE_THIS_BNO;
+	error = xfs_alloc_ag_vextent(args);
+	if (error)
+		return error;
+
 	xfs_alloc_vextent_set_fsbno(args);
 	return 0;
 }
