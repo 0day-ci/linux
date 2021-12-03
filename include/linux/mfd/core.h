@@ -123,6 +123,8 @@ struct mfd_cell {
 	int			num_parent_supplies;
 };
 
+int device_is_mfd(struct platform_device *pdev);
+
 /*
  * Convenience functions for clients using shared cells.  Refcounting
  * happens automatically, with the cell's enable/disable callbacks
