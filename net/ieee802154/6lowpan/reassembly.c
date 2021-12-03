@@ -366,10 +366,6 @@ static int __net_init lowpan_frags_ns_sysctl_register(struct net *net)
 				GFP_KERNEL);
 		if (table == NULL)
 			goto err_alloc;
-
-		/* Don't export sysctls to unprivileged users */
-		if (net->user_ns != &init_user_ns)
-			table[0].procname = NULL;
 	}
 
 	table[0].data	= &ieee802154_lowpan->fqdir->high_thresh;
