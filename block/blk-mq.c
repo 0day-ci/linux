@@ -2698,7 +2698,7 @@ static struct request *blk_mq_get_new_requests(struct request_queue *q,
 {
 	struct blk_mq_alloc_data data = {
 		.q		= q,
-		.nr_tags	= 1,
+		.shallow_depth	= 0
 	};
 	struct request *rq;
 
@@ -2717,6 +2717,9 @@ static struct request *blk_mq_get_new_requests(struct request_queue *q,
 		data.nr_tags = plug->nr_ios;
 		plug->nr_ios = 1;
 		data.cached_rq = &plug->cached_rq;
+	} else {
+		data.nr_tags = 1;
+		data.cached_rq = NULL;
 	}
 
 	rq = __blk_mq_alloc_requests(&data);
