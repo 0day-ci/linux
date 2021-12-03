@@ -301,6 +301,11 @@ static u32 timeline_advance(struct intel_timeline *tl)
 	return tl->seqno += 1 + tl->has_initial_breadcrumb;
 }
 
+void intel_timeline_rollback_seqno(struct intel_timeline *tl)
+{
+	timeline_rollback(tl);
+}
+
 static noinline int
 __intel_timeline_get_seqno(struct intel_timeline *tl,
 			   u32 *seqno)

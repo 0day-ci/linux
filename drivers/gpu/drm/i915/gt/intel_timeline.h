@@ -72,6 +72,7 @@ void intel_timeline_enter(struct intel_timeline *tl);
 int intel_timeline_get_seqno(struct intel_timeline *tl,
 			     struct i915_request *rq,
 			     u32 *seqno);
+void intel_timeline_rollback_seqno(struct intel_timeline *tl);
 void intel_timeline_exit(struct intel_timeline *tl);
 void intel_timeline_unpin(struct intel_timeline *tl);
 
