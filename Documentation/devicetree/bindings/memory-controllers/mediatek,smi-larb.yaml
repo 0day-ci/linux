@@ -81,7 +81,7 @@ allOf:
       properties:
         clock:
           items:
-            minItems: 3
+            minItems: 2
             maxItems: 3
         clock-names:
           items:
