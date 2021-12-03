@@ -325,6 +325,7 @@ static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id,
 	engine->id = id;
 	engine->legacy_idx = INVALID_ENGINE;
 	engine->mask = BIT(id);
+	engine->reset_domain = gt->engine_reset_domains[id];
 	engine->i915 = i915;
 	engine->gt = gt;
 	engine->uncore = gt->uncore;
@@ -642,6 +643,29 @@ int intel_engines_init_mmio(struct intel_gt *gt)
 
 	if (i915_inject_probe_failure(i915))
 		return -ENODEV;
+
+	if (GRAPHICS_VER(gt->i915) >= 11) {
+		gt->engine_reset_domains[RCS0] = GEN11_GRDOM_RENDER;
+		gt->engine_reset_domains[BCS0] = GEN11_GRDOM_BLT;
+		gt->engine_reset_domains[VCS0] = GEN11_GRDOM_MEDIA;
+		gt->engine_reset_domains[VCS1] = GEN11_GRDOM_MEDIA2;
+		gt->engine_reset_domains[VCS2] = GEN11_GRDOM_MEDIA3;
+		gt->engine_reset_domains[VCS3] = GEN11_GRDOM_MEDIA4;
+		gt->engine_reset_domains[VCS4] = GEN11_GRDOM_MEDIA5;
+		gt->engine_reset_domains[VCS5] = GEN11_GRDOM_MEDIA6;
+		gt->engine_reset_domains[VCS6] = GEN11_GRDOM_MEDIA7;
+		gt->engine_reset_domains[VCS7] = GEN11_GRDOM_MEDIA8;
+		gt->engine_reset_domains[VECS0] = GEN11_GRDOM_VECS;
+		gt->engine_reset_domains[VECS1] = GEN11_GRDOM_VECS2;
+		gt->engine_reset_domains[VECS2] = GEN11_GRDOM_VECS3;
+		gt->engine_reset_domains[VECS3] = GEN11_GRDOM_VECS4;
+	} else {
+		gt->engine_reset_domains[RCS0] = GEN6_GRDOM_RENDER;
+		gt->engine_reset_domains[BCS0] = GEN6_GRDOM_BLT;
+		gt->engine_reset_domains[VCS0] = GEN6_GRDOM_MEDIA;
+		gt->engine_reset_domains[VCS1] = GEN8_GRDOM_MEDIA2;
+		gt->engine_reset_domains[VECS0] = GEN6_GRDOM_VECS;
+	}
 
 	for (class = 0; class < MAX_ENGINE_CLASS + 1; ++class) {
 		setup_logical_ids(gt, logical_ids, class);

@@ -269,6 +269,7 @@ struct intel_engine_cs {
 	unsigned int guc_id;
 
 	intel_engine_mask_t mask;
+	intel_engine_mask_t reset_domain;
 	/**
 	 * @logical_mask: logical mask of engine, reported to user space via
 	 * query IOCTL and used to communicate with the GuC in logical space.

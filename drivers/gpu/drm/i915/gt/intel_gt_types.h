@@ -153,6 +153,7 @@ struct intel_gt {
 	} stats;
 
 	struct intel_engine_cs *engine[I915_NUM_ENGINES];
+	u32 engine_reset_domains[I915_NUM_ENGINES];
 	struct intel_engine_cs *engine_class[MAX_ENGINE_CLASS + 1]
 					    [MAX_ENGINE_INSTANCE + 1];
 	enum intel_submission_method submission_method;
