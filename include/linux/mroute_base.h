@@ -26,6 +26,7 @@
  */
 struct vif_device {
 	struct net_device *dev;
+	netdevice_tracker dev_tracker;
 	unsigned long bytes_in, bytes_out;
 	unsigned long pkt_in, pkt_out;
 	unsigned long rate_limit;
