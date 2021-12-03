@@ -141,14 +141,17 @@ static int v9fs_release_page(struct page *page, gfp_t gfp)
 
 	if (folio_test_private(folio))
 		return 0;
-#ifdef CONFIG_9P_FSCACHE
+
+	if (!IS_ENABLED(CONFIG_9P_FSCACHE))
+		return 1;
+
 	if (folio_test_fscache(folio)) {
 		if (!(gfp & __GFP_DIRECT_RECLAIM) || !(gfp & __GFP_FS))
 			return 0;
 		folio_wait_fscache(folio);
 	}
 	fscache_note_page_release(v9fs_inode_cookie(V9FS_I(inode)));
-#endif
+
 	return 1;
 }
 
