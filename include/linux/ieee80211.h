@@ -1874,6 +1874,7 @@ struct ieee80211_he_mcs_nss_supp {
 	__le16 tx_mcs_80p80;
 } __packed;
 
+#define HE_OPERATION_BSS_COLOR_DISABLED		((u32)BIT(31))
 /**
  * struct ieee80211_he_operation - HE capabilities element
  *

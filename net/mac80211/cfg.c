@@ -997,6 +997,8 @@ static int ieee80211_assign_beacon(struct ieee80211_sub_if_data *sdata,
 	struct beacon_data *new, *old;
 	int new_head_len, new_tail_len;
 	int size, err;
+	const u8 *cap;
+	struct ieee80211_he_operation *he_oper = NULL;
 	u32 changed = BSS_CHANGED_BEACON;
 
 	old = sdata_dereference(sdata->u.ap.beacon, sdata);
@@ -1082,6 +1084,27 @@ static int ieee80211_assign_beacon(struct ieee80211_sub_if_data *sdata,
 		}
 
 		changed |= BSS_CHANGED_FTM_RESPONDER;
+	}
+
+	if (sdata->vif.bss_conf.he_support) {
+		cap = cfg80211_find_ext_ie(WLAN_EID_EXT_HE_OPERATION,
+					   params->tail, params->tail_len);
+		if (cap && cap[1] >= sizeof(*he_oper) + 1)
+			he_oper = (void *)(cap + 3);
+
+		if (he_oper) {
+			if (he_oper->he_oper_params & HE_OPERATION_BSS_COLOR_DISABLED) {
+				if (sdata->vif.bss_conf.he_bss_color.enabled) {
+					sdata->vif.bss_conf.he_bss_color.enabled = false;
+					changed |= BSS_CHANGED_HE_BSS_COLOR;
+				}
+			} else {
+				if (!sdata->vif.bss_conf.he_bss_color.enabled) {
+					sdata->vif.bss_conf.he_bss_color.enabled = true;
+					changed |= BSS_CHANGED_HE_BSS_COLOR;
+				}
+			}
+		}
 	}
 
 	rcu_assign_pointer(sdata->u.ap.beacon, new);
