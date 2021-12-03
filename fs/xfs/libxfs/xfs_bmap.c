@@ -3478,9 +3478,7 @@ xfs_bmap_exact_minlen_extent_alloc(
 		ap->blkno = ap->tp->t_firstblock;
 	}
 
-	args.fsbno = ap->blkno;
 	args.oinfo = XFS_RMAP_OINFO_SKIP_UPDATE;
-	args.type = XFS_ALLOCTYPE_FIRST_AG;
 	args.minlen = args.maxlen = ap->minlen;
 	args.total = ap->total;
 
@@ -3492,7 +3490,7 @@ xfs_bmap_exact_minlen_extent_alloc(
 	args.resv = XFS_AG_RESV_NONE;
 	args.datatype = ap->datatype;
 
-	error = xfs_alloc_vextent(&args);
+	error = xfs_alloc_vextent_first_ag(&args, ap->blkno);
 	if (error)
 		return error;
 
@@ -3717,10 +3715,8 @@ xfs_btalloc_nullfb(
 	 * so they don't waste time on allocation modes that are unlikely to
 	 * succeed.
 	 */
-	args->fsbno = 0;
-	args->type = XFS_ALLOCTYPE_FIRST_AG;
 	args->total = ap->minlen;
-	error = xfs_alloc_vextent(args);
+	error = xfs_alloc_vextent_first_ag(args, 0);
 	if (error)
 		return error;
 	ap->tp->t_flags |= XFS_TRANS_LOWMODE;
@@ -3738,13 +3734,12 @@ xfs_btalloc_low_mode(
 {
 	ap->blkno = ap->tp->t_firstblock;
 	xfs_bmap_adjacent(ap);
-	args->fsbno = ap->blkno;
 	args->total = args->minlen = ap->minlen;
 	if (xfs_inode_is_filestream(ap->ip))
-		args->type = XFS_ALLOCTYPE_FIRST_AG;
-	else
-		args->type = XFS_ALLOCTYPE_START_BNO;
+		return xfs_alloc_vextent_first_ag(args, ap->blkno);
 
+	args->fsbno = ap->blkno;
+	args->type = XFS_ALLOCTYPE_START_BNO;
 	return xfs_alloc_vextent(args);
 }
 

@@ -240,9 +240,7 @@ xfs_bmbt_alloc_block(
 			 * satisfy a full btree split.  Try again and if
 			 * successful activate the lowspace algorithm.
 			 */
-			args.fsbno = 0;
-			args.type = XFS_ALLOCTYPE_FIRST_AG;
-			error = xfs_alloc_vextent(&args);
+			error = xfs_alloc_vextent_first_ag(&args, 0);
 			if (error)
 				goto error0;
 			cur->bc_tp->t_flags |= XFS_TRANS_LOWMODE;

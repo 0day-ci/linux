@@ -3168,7 +3168,8 @@ xfs_alloc_read_agf(
  */
 static int
 xfs_alloc_vextent_check_args(
-	struct xfs_alloc_arg	*args)
+	struct xfs_alloc_arg	*args,
+	xfs_rfsblock_t		target)
 {
 	struct xfs_mount	*mp = args->mp;
 	xfs_agblock_t		agsize;
@@ -3186,13 +3187,13 @@ xfs_alloc_vextent_check_args(
 		args->maxlen = agsize;
 	if (args->alignment == 0)
 		args->alignment = 1;
-	ASSERT(XFS_FSB_TO_AGNO(mp, args->fsbno) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, args->fsbno) < agsize);
+	ASSERT(XFS_FSB_TO_AGNO(mp, target) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, target) < agsize);
 	ASSERT(args->minlen <= args->maxlen);
 	ASSERT(args->minlen <= agsize);
 	ASSERT(args->mod < args->prod);
-	if (XFS_FSB_TO_AGNO(mp, args->fsbno) >= mp->m_sb.sb_agcount ||
-	    XFS_FSB_TO_AGBNO(mp, args->fsbno) >= agsize ||
+	if (XFS_FSB_TO_AGNO(mp, target) >= mp->m_sb.sb_agcount ||
+	    XFS_FSB_TO_AGBNO(mp, target) >= agsize ||
 	    args->minlen > args->maxlen || args->minlen > agsize ||
 	    args->mod >= args->prod) {
 		args->fsbno = NULLFSBLOCK;
@@ -3201,6 +3202,7 @@ xfs_alloc_vextent_check_args(
 	}
 	return 0;
 }
+
 /*
  * Post-process allocation results to set the allocated block number correctly
  * for the caller.
@@ -3239,7 +3241,7 @@ xfs_alloc_vextent_this_ag(
 	struct xfs_mount	*mp = args->mp;
 	int			error;
 
-	error = xfs_alloc_vextent_check_args(args);
+	error = xfs_alloc_vextent_check_args(args, args->fsbno);
 	if (error) {
 		if (error == -ENOSPC)
 			return 0;
@@ -3353,7 +3355,7 @@ xfs_alloc_vextent_start_ag(
 	bool			bump_rotor = false;
 	int			error;
 
-	error = xfs_alloc_vextent_check_args(args);
+	error = xfs_alloc_vextent_check_args(args, args->fsbno);
 	if (error) {
 		if (error == -ENOSPC)
 			return 0;
@@ -3394,14 +3396,15 @@ xfs_alloc_vextent_start_ag(
  * filesystem attempting blocking allocation. This does not wrap or try a second
  * pass, so will not recurse into AGs lower than indicated by fsbno.
  */
-static int
+int
 xfs_alloc_vextent_first_ag(
-	struct xfs_alloc_arg	*args)
+	struct xfs_alloc_arg	*args,
+	xfs_rfsblock_t		target)
 {
 	struct xfs_mount	*mp = args->mp;
 	int			error;
 
-	error = xfs_alloc_vextent_check_args(args);
+	error = xfs_alloc_vextent_check_args(args, target);
 	if (error) {
 		if (error == -ENOSPC)
 			return 0;
@@ -3409,6 +3412,7 @@ xfs_alloc_vextent_first_ag(
 	}
 
 	args->type = XFS_ALLOCTYPE_THIS_AG;
+	args->fsbno = target;
 	error =  xfs_alloc_vextent_iterate_ags(args,
 			XFS_FSB_TO_AGNO(mp, args->fsbno), 0);
 	if (error)
@@ -3437,8 +3441,6 @@ xfs_alloc_vextent(
 		return error;
 	case XFS_ALLOCTYPE_START_BNO:
 		return xfs_alloc_vextent_start_ag(args);
-	case XFS_ALLOCTYPE_FIRST_AG:
-		return xfs_alloc_vextent_first_ag(args);
 	default:
 		ASSERT(0);
 		/* NOTREACHED */
