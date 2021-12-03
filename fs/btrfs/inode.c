@@ -5247,6 +5247,7 @@ void btrfs_evict_inode(struct inode *inode)
 
 	while (1) {
 		struct btrfs_truncate_control control = {
+			.ino = btrfs_ino(BTRFS_I(inode)),
 			.new_size = 0,
 			.min_type = 0,
 		};
@@ -8528,6 +8529,7 @@ out_noreserve:
 static int btrfs_truncate(struct inode *inode, bool skip_writeback)
 {
 	struct btrfs_truncate_control control = {
+		.ino = btrfs_ino(BTRFS_I(inode)),
 		.min_type = BTRFS_EXTENT_DATA_KEY,
 		.clear_extent_range = true,
 	};
