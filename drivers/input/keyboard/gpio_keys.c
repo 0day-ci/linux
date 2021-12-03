@@ -38,7 +38,8 @@ struct gpio_button_data {
 	unsigned short *code;
 
 	struct hrtimer release_timer;
-	unsigned int release_delay;	/* in msecs, for IRQ-only buttons */
+	int auto_release_delay;	/* in msecs, for IRQ-only buttons */
+				/* a negative value means no auto-release */
 
 	struct delayed_work work;
 	struct hrtimer debounce_timer;
@@ -474,25 +475,25 @@ static irqreturn_t gpio_keys_irq_isr(int irq, void *dev_id)
 
 	spin_lock_irqsave(&bdata->lock, flags);
 
-	if (!bdata->key_pressed) {
+	if (!bdata->key_pressed || bdata->auto_release_delay < 0) {
 		if (bdata->button->wakeup)
 			pm_wakeup_event(bdata->input->dev.parent, 0);
 
-		input_report_key(input, *bdata->code, 1);
+		input_report_key(input, *bdata->code, !bdata->key_pressed);
 		input_sync(input);
 
-		if (!bdata->release_delay) {
+		if (!bdata->auto_release_delay) {
 			input_report_key(input, *bdata->code, 0);
 			input_sync(input);
 			goto out;
 		}
 
-		bdata->key_pressed = true;
+		bdata->key_pressed = !bdata->key_pressed;
 	}
 
-	if (bdata->release_delay)
+	if (bdata->auto_release_delay > 0)
 		hrtimer_start(&bdata->release_timer,
-			      ms_to_ktime(bdata->release_delay),
+			      ms_to_ktime(bdata->auto_release_delay),
 			      HRTIMER_MODE_REL_HARD);
 out:
 	spin_unlock_irqrestore(&bdata->lock, flags);
@@ -631,7 +632,6 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 			return -EINVAL;
 		}
 
-		bdata->release_delay = button->debounce_interval;
 		hrtimer_init(&bdata->release_timer,
 			     CLOCK_REALTIME, HRTIMER_MODE_REL_HARD);
 		bdata->release_timer.function = gpio_keys_irq_timer;
@@ -639,10 +639,20 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 		isr = gpio_keys_irq_isr;
 		irqflags = 0;
 
-		/*
-		 * For IRQ buttons, there is no interrupt for release.
-		 * So we don't need to reconfigure the trigger type for wakeup.
-		 */
+		if (irq_get_trigger_type(bdata->irq) == IRQ_TYPE_EDGE_BOTH) {
+			bdata->auto_release_delay = -1;
+			/*
+			 * Unlike with GPIOs, we do not know what the state of
+			 * the key is at initialization time, or after resume.
+			 * So we don't reconfigure the trigger type for wakeup.
+			 */
+		} else {
+			bdata->auto_release_delay = button->debounce_interval;
+			/*
+			 * There is no interrupt for release.  So we don't
+			 * need to reconfigure the trigger type for wakeup.
+			 */
+		}
 	}
 
 	bdata->code = &ddata->keymap[idx];
