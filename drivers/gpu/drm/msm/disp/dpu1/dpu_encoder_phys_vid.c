@@ -751,8 +751,6 @@ struct dpu_encoder_phys *dpu_encoder_phys_vid_init(
 
 fail:
 	DPU_ERROR("failed to create encoder\n");
-	if (phys_enc)
-		dpu_encoder_phys_vid_destroy(phys_enc);
 
 	return ERR_PTR(ret);
 }
