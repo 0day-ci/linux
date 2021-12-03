@@ -12,12 +12,33 @@
 #include <asm/debug-monitors.h>
 #include <asm/exception.h>
 #include <asm/fpsimd.h>
+#include <asm/insn.h>
+#include <asm/patching.h>
 #include <asm/syscall.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 
 long compat_arm_syscall(struct pt_regs *regs, int scno);
 long sys_ni_syscall(void);
+
+#ifdef CONFIG_CFI_CLANG
+unsigned long __init arch_syscall_addr(int nr)
+{
+	u32 insn;
+	unsigned long addr = (unsigned long)sys_call_table[nr];
+
+	/*
+	 * Clang's CFI will replace the address of each system call function
+	 * with the address of a jump table entry. In this case, the jump
+	 * target address is the actual address of the system call.
+	 */
+	aarch64_insn_read((void *)addr, &insn);
+	if (likely(aarch64_insn_is_b(insn)))
+		addr += aarch64_get_branch_offset(insn);
+
+	return addr;
+}
+#endif
 
 static long do_ni_syscall(struct pt_regs *regs, int scno)
 {
