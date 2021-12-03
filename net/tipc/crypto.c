@@ -599,6 +599,7 @@ static int tipc_aead_init(struct tipc_aead **aead, struct tipc_aead_key *ukey,
 	tmp->key = kmemdup(ukey, tipc_aead_key_size(ukey), GFP_KERNEL);
 	if (!tmp->key) {
 		tipc_aead_free(&tmp->rcu);
+		kfree_sensitive(tmp);
 		return -ENOMEM;
 	}
 	memcpy(&tmp->salt, ukey->key + keylen, TIPC_AES_GCM_SALT_SIZE);
