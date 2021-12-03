@@ -88,6 +88,11 @@ static struct file_system_type fs_type = {
  *        this file.
  * @iops: a point to a struct of inode_operations that should be used for
  *        this file/dir
+ * @mount: a pointer to a pointer for existing vfsmount to use or for
+ *         one to create
+ * @mount_count: pointer to integer for mount_count that goes along with
+ *               @mount
+ *
  *
  * This is the basic "create a file/dir/symlink" function for
  * securityfs.  It allows for a wide range of flexibility in creating
@@ -107,7 +112,8 @@ static struct file_system_type fs_type = {
 static struct dentry *securityfs_create_dentry(const char *name, umode_t mode,
 					struct dentry *parent, void *data,
 					const struct file_operations *fops,
-					const struct inode_operations *iops)
+					const struct inode_operations *iops,
+					struct vfsmount **mount, int *mount_count)
 {
 	struct dentry *dentry;
 	struct inode *dir, *inode;
@@ -118,12 +124,12 @@ static struct dentry *securityfs_create_dentry(const char *name, umode_t mode,
 
 	pr_debug("securityfs: creating file '%s'\n",name);
 
-	error = simple_pin_fs(&fs_type, &securityfs_mount, &securityfs_mount_count);
+	error = simple_pin_fs(&fs_type, mount, mount_count);
 	if (error)
 		return ERR_PTR(error);
 
 	if (!parent)
-		parent = securityfs_mount->mnt_root;
+		parent = (*mount)->mnt_root;
 
 	dir = d_inode(parent);
 
@@ -168,7 +174,7 @@ out1:
 	dentry = ERR_PTR(error);
 out:
 	inode_unlock(dir);
-	simple_release_fs(&securityfs_mount, &securityfs_mount_count);
+	simple_release_fs(mount, mount_count);
 	return dentry;
 }
 
@@ -201,7 +207,9 @@ struct dentry *securityfs_create_file(const char *name, umode_t mode,
 				      struct dentry *parent, void *data,
 				      const struct file_operations *fops)
 {
-	return securityfs_create_dentry(name, mode, parent, data, fops, NULL);
+	return securityfs_create_dentry(name, mode, parent, data, fops, NULL,
+					&securityfs_mount,
+					&securityfs_mount_count);
 }
 EXPORT_SYMBOL_GPL(securityfs_create_file);
 
@@ -231,6 +239,27 @@ struct dentry *securityfs_create_dir(const char *name, struct dentry *parent)
 }
 EXPORT_SYMBOL_GPL(securityfs_create_dir);
 
+static struct dentry *_securityfs_create_symlink(const char *name,
+						 struct dentry *parent,
+						 const char *target,
+						 const struct inode_operations *iops,
+						 struct vfsmount **mount, int *mount_count)
+{
+	struct dentry *dent;
+	char *link = NULL;
+
+	if (target) {
+		link = kstrdup(target, GFP_KERNEL);
+		if (!link)
+			return ERR_PTR(-ENOMEM);
+	}
+	dent = securityfs_create_dentry(name, S_IFLNK | 0444, parent,
+					link, NULL, iops, mount, mount_count);
+	if (IS_ERR(dent))
+		kfree(link);
+
+	return dent;
+}
 /**
  * securityfs_create_symlink - create a symlink in the securityfs filesystem
  *
@@ -262,37 +291,13 @@ struct dentry *securityfs_create_symlink(const char *name,
 					 const char *target,
 					 const struct inode_operations *iops)
 {
-	struct dentry *dent;
-	char *link = NULL;
-
-	if (target) {
-		link = kstrdup(target, GFP_KERNEL);
-		if (!link)
-			return ERR_PTR(-ENOMEM);
-	}
-	dent = securityfs_create_dentry(name, S_IFLNK | 0444, parent,
-					link, NULL, iops);
-	if (IS_ERR(dent))
-		kfree(link);
-
-	return dent;
+	return _securityfs_create_symlink(name, parent, target, iops,
+					  &securityfs_mount, &securityfs_mount_count);
 }
 EXPORT_SYMBOL_GPL(securityfs_create_symlink);
 
-/**
- * securityfs_remove - removes a file or directory from the securityfs filesystem
- *
- * @dentry: a pointer to a the dentry of the file or directory to be removed.
- *
- * This function removes a file or directory in securityfs that was previously
- * created with a call to another securityfs function (like
- * securityfs_create_file() or variants thereof.)
- *
- * This function is required to be called in order for the file to be
- * removed. No automatic cleanup of files will happen when a module is
- * removed; you are responsible here.
- */
-void securityfs_remove(struct dentry *dentry)
+static void _securityfs_remove(struct dentry *dentry,
+			       struct vfsmount **mount, int *mount_count)
 {
 	struct inode *dir;
 
@@ -309,8 +314,27 @@ void securityfs_remove(struct dentry *dentry)
 		dput(dentry);
 	}
 	inode_unlock(dir);
-	simple_release_fs(&securityfs_mount, &securityfs_mount_count);
+	simple_release_fs(mount, mount_count);
 }
+
+/**
+ * securityfs_remove - removes a file or directory from the securityfs filesystem
+ *
+ * @dentry: a pointer to a the dentry of the file or directory to be removed.
+ *
+ * This function removes a file or directory in securityfs that was previously
+ * created with a call to another securityfs function (like
+ * securityfs_create_file() or variants thereof.)
+ *
+ * This function is required to be called in order for the file to be
+ * removed. No automatic cleanup of files will happen when a module is
+ * removed; you are responsible here.
+ */
+void securityfs_remove(struct dentry *dentry)
+{
+	_securityfs_remove(dentry, &securityfs_mount, &securityfs_mount_count);
+}
+
 EXPORT_SYMBOL_GPL(securityfs_remove);
 
 #ifdef CONFIG_SECURITY
