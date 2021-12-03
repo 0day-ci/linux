@@ -74,7 +74,8 @@ xchk_fscount_warmup(
 	for_each_perag(mp, agno, pag) {
 		if (xchk_should_terminate(sc, &error))
 			break;
-		if (pag->pagi_init && pag->pagf_init)
+		if (xfs_perag_initialised_agi(pag) &&
+		    xfs_perag_initialised_agf(pag))
 			continue;
 
 		/* Lock both AG headers. */
@@ -89,7 +90,8 @@ xchk_fscount_warmup(
 		 * These are supposed to be initialized by the header read
 		 * function.
 		 */
-		if (!pag->pagi_init || !pag->pagf_init) {
+		if (!xfs_perag_initialised_agi(pag) ||
+		    !xfs_perag_initialised_agf(pag)) {
 			error = -EFSCORRUPTED;
 			break;
 		}
@@ -195,7 +197,8 @@ retry:
 			break;
 
 		/* This somehow got unset since the warmup? */
-		if (!pag->pagi_init || !pag->pagf_init) {
+		if (!xfs_perag_initialised_agi(pag) ||
+		    !xfs_perag_initialised_agf(pag)) {
 			error = -EFSCORRUPTED;
 			break;
 		}
