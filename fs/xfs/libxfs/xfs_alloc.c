@@ -2724,7 +2724,7 @@ xfs_alloc_fix_freelist(
 		 * Put each allocated block on the list.
 		 */
 		for (bno = targs.agbno; bno < targs.agbno + targs.len; bno++) {
-			error = xfs_alloc_put_freelist(tp, agbp,
+			error = xfs_alloc_put_freelist(pag, tp, agbp,
 							agflbp, bno, 0);
 			if (error)
 				goto out_agflbp_relse;
@@ -2854,6 +2854,7 @@ xfs_alloc_log_agf(
  */
 int
 xfs_alloc_put_freelist(
+	struct xfs_perag	*pag,
 	struct xfs_trans	*tp,
 	struct xfs_buf		*agbp,
 	struct xfs_buf		*agflbp,
@@ -2862,7 +2863,6 @@ xfs_alloc_put_freelist(
 {
 	struct xfs_mount	*mp = tp->t_mountp;
 	struct xfs_agf		*agf = agbp->b_addr;
-	struct xfs_perag	*pag;
 	__be32			*blockp;
 	int			error;
 	int			logflags;
@@ -2876,7 +2876,6 @@ xfs_alloc_put_freelist(
 	if (be32_to_cpu(agf->agf_fllast) == xfs_agfl_size(mp))
 		agf->agf_fllast = 0;
 
-	pag = agbp->b_pag;
 	ASSERT(!pag->pagf_agflreset);
 	be32_add_cpu(&agf->agf_flcount, 1);
 	pag->pagf_flcount++;
