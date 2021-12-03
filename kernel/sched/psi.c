@@ -942,6 +942,21 @@ void psi_memstall_leave(unsigned long *flags)
 	rq_unlock_irq(rq, &rf);
 }
 
+void psi_iostall_enter(void)
+{
+	if (static_branch_likely(&psi_disabled))
+		return;
+
+	psi_task_change(current, 0, TSK_IOWAIT);
+}
+
+void psi_iostall_leave(void)
+{
+	if (static_branch_likely(&psi_disabled))
+		return;
+
+	psi_task_change(current, TSK_IOWAIT, 0);
+}
 #ifdef CONFIG_CGROUPS
 int psi_cgroup_alloc(struct cgroup *cgroup)
 {

@@ -1172,7 +1172,17 @@ static pageout_t pageout(struct page *page, struct address_space *mapping)
 		};
 
 		SetPageReclaim(page);
+
+		/*
+		 * For the ram based swap device, there is no chance for reclaim
+		 * context sleeping on the congested IO while it really introduce
+		 * non-productive time. So count the period into PSI_IO.
+		 * Don't worry about the file page, just counting it in as it has
+		 * less chance to be here.
+		 */
+		psi_iostall_enter();
 		res = mapping->a_ops->writepage(page, &wbc);
+		psi_iostall_leave();
 		if (res < 0)
 			handle_write_error(mapping, page, res);
 		if (res == AOP_WRITEPAGE_ACTIVATE) {

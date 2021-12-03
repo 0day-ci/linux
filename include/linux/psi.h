@@ -23,6 +23,9 @@ void psi_task_switch(struct task_struct *prev, struct task_struct *next,
 void psi_memstall_enter(unsigned long *flags);
 void psi_memstall_leave(unsigned long *flags);
 
+void psi_iostall_enter(void);
+void psi_iostall_leave(void);
+
 int psi_show(struct seq_file *s, struct psi_group *group, enum psi_res res);
 
 #ifdef CONFIG_CGROUPS
@@ -44,6 +47,9 @@ static inline void psi_init(void) {}
 
 static inline void psi_memstall_enter(unsigned long *flags) {}
 static inline void psi_memstall_leave(unsigned long *flags) {}
+
+static inline void psi_iostall_enter(void) {}
+static inline void psi_iostall_leave(void) {}
 
 #ifdef CONFIG_CGROUPS
 static inline int psi_cgroup_alloc(struct cgroup *cgrp)
