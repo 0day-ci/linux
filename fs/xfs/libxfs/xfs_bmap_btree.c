@@ -247,11 +247,8 @@ xfs_bmbt_alloc_block(
 		error = xfs_alloc_vextent_start_ag(&args,
 				cur->bc_tp->t_firstblock);
 	} else {
-		args.type = XFS_ALLOCTYPE_NEAR_BNO;
-		args.pag = xfs_perag_get(args.mp,
-				XFS_FSB_TO_AGNO(args.mp, args.fsbno));
-		error = xfs_alloc_vextent_this_ag(&args);
-		xfs_perag_put(args.pag);
+		error = xfs_alloc_vextent_near_bno(&args,
+				cur->bc_tp->t_firstblock);
 	}
 	if (error)
 		goto error0;

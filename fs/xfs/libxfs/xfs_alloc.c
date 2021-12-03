@@ -3424,29 +3424,38 @@ xfs_alloc_vextent_first_ag(
 }
 
 /*
- * Allocate an extent (variable-size).
- * Depending on the allocation type, we either look in a single allocation
- * group or loop over the allocation groups to find the result.
+ * Allocate an extent as close to the target as possible. If there are not
+ * viable candidates in the AG, then fail the allocation.
  */
 int
-xfs_alloc_vextent(
-	struct xfs_alloc_arg	*args)
+xfs_alloc_vextent_near_bno(
+	struct xfs_alloc_arg	*args,
+	xfs_rfsblock_t		target)
 {
+	struct xfs_mount	*mp = args->mp;
+	bool			need_pag = !args->pag;
 	int			error;
 
-	switch (args->type) {
-	case XFS_ALLOCTYPE_NEAR_BNO:
-		args->pag = xfs_perag_get(args->mp,
-				XFS_FSB_TO_AGNO(args->mp, args->fsbno));
-		error = xfs_alloc_vextent_this_ag(args);
-		xfs_perag_put(args->pag);
+	error = xfs_alloc_vextent_check_args(args, target);
+	if (error) {
+		if (error == -ENOSPC)
+			return 0;
 		return error;
-	default:
-		ASSERT(0);
-		/* NOTREACHED */
 	}
-	/* Should never get here */
-	return -EFSCORRUPTED;
+
+	args->agno = XFS_FSB_TO_AGNO(mp, target);
+	args->agbno = XFS_FSB_TO_AGBNO(mp, target);
+	args->type = XFS_ALLOCTYPE_NEAR_BNO;
+	if (need_pag)
+		args->pag = xfs_perag_get(args->mp, args->agno);
+	error = xfs_alloc_ag_vextent(args);
+	if (need_pag)
+		xfs_perag_put(args->pag);
+	if (error)
+		return error;
+
+	xfs_alloc_vextent_set_fsbno(args);
+	return 0;
 }
 
 /* Ensure that the freelist is at full capacity. */

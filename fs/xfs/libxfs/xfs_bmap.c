@@ -656,11 +656,7 @@ xfs_bmap_extents_to_btree(
 	} else if (tp->t_flags & XFS_TRANS_LOWMODE) {
 		error = xfs_alloc_vextent_start_ag(&args, tp->t_firstblock);
 	} else {
-		args.type = XFS_ALLOCTYPE_NEAR_BNO;
-		args.fsbno = tp->t_firstblock;
-		args.pag = xfs_perag_get(mp, XFS_FSB_TO_AGNO(mp, args.fsbno));
-		error = xfs_alloc_vextent_this_ag(&args);
-		xfs_perag_put(args.pag);
+		error = xfs_alloc_vextent_near_bno(&args, tp->t_firstblock);
 	}
 	if (error)
 		goto out_root_realloc;
@@ -813,12 +809,7 @@ xfs_bmap_local_to_extents(
 		error = xfs_alloc_vextent_start_ag(&args,
 				XFS_INO_TO_FSB(args.mp, ip->i_ino));
 	} else {
-		args.fsbno = tp->t_firstblock;
-		args.type = XFS_ALLOCTYPE_NEAR_BNO;
-		args.pag = xfs_perag_get(args.mp,
-				XFS_FSB_TO_AGNO(args.mp, args.fsbno));
-		error = xfs_alloc_vextent_this_ag(&args);
-		xfs_perag_put(args.pag);
+		error = xfs_alloc_vextent_near_bno(&args, tp->t_firstblock);
 	}
 	if (error)
 		goto done;
@@ -3249,7 +3240,6 @@ xfs_bmap_btalloc_filestreams(
 	int			notinit = 0;
 	int			error;
 
-	args->type = XFS_ALLOCTYPE_NEAR_BNO;
 	args->total = ap->total;
 
 	start_agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
@@ -3585,7 +3575,7 @@ xfs_btalloc_at_eof(
 	}
 
 	if (ag_only)
-		error = xfs_alloc_vextent(args);
+		error = xfs_alloc_vextent_near_bno(args, ap->blkno);
 	else
 		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
 	if (error)
@@ -3666,7 +3656,6 @@ xfs_btalloc_nullfb(
 		ap->blkno = XFS_INO_TO_FSB(mp, ap->ip->i_ino);
 	}
 	xfs_bmap_adjacent(ap);
-	args->fsbno = ap->blkno;
 
 	/*
 	 * Search for an allocation group with a single extent large enough for
@@ -3690,7 +3679,7 @@ xfs_btalloc_nullfb(
 	}
 
 	if (is_filestream)
-		error = xfs_alloc_vextent(args);
+		error = xfs_alloc_vextent_near_bno(args, ap->blkno);
 	else
 		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
 	if (error)
@@ -3760,8 +3749,6 @@ xfs_btalloc_near(
 
 	ap->blkno = ap->tp->t_firstblock;
 	xfs_bmap_adjacent(ap);
-	args->fsbno = ap->blkno;
-	args->type = XFS_ALLOCTYPE_NEAR_BNO;
 	args->total = ap->total;
 	args->minlen = ap->minlen;
 
@@ -3773,7 +3760,7 @@ xfs_btalloc_near(
 		if (args->fsbno != NULLFSBLOCK)
 			return 0;
 	}
-	return xfs_alloc_vextent(args);
+	return xfs_alloc_vextent_near_bno(args, ap->blkno);
 }
 
 STATIC int
