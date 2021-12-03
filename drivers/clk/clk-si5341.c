@@ -1536,12 +1536,31 @@ static ssize_t clear_sticky_store(struct device *dev,
 }
 static DEVICE_ATTR_WO(clear_sticky);
 
+static ssize_t input_selected_show(struct device *dev,
+			       struct device_attribute *attr,
+			       char *buf)
+{
+	struct clk_si5341 *data = dev_get_drvdata(dev);
+	int res = si5341_clk_get_selected_input(data);
+	const char *input_name_dtb;
+
+	if (res < 0)
+		return res;
+	input_name_dtb =  __clk_get_name(devm_clk_get(dev,
+						si5341_input_clock_names[res]));
+	/* input id, input name, input name from DTB */
+	return snprintf(buf, PAGE_SIZE, "%d %s %s\n", res,
+			si5341_input_clock_names[res], input_name_dtb);
+}
+static DEVICE_ATTR_RO(input_selected);
+
 static const struct attribute *si5341_attributes[] = {
 	&dev_attr_input_present.attr,
 	&dev_attr_input_present_sticky.attr,
 	&dev_attr_pll_locked.attr,
 	&dev_attr_pll_locked_sticky.attr,
 	&dev_attr_clear_sticky.attr,
+	&dev_attr_input_selected.attr,
 	NULL
 };
 
