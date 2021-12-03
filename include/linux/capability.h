@@ -278,4 +278,10 @@ int get_vfs_caps_from_disk(struct user_namespace *mnt_userns,
 int cap_convert_nscap(struct user_namespace *mnt_userns, struct dentry *dentry,
 		      const void **ivalue, size_t size);
 
+static inline bool integrity_admin_ns_capable(struct user_namespace *ns)
+{
+	return ns_capable(ns, CAP_INTEGRITY_ADMIN) ||
+		ns_capable(ns, CAP_SYS_ADMIN);
+}
+
 #endif /* !_LINUX_CAPABILITY_H */

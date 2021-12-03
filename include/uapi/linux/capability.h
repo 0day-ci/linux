@@ -417,7 +417,12 @@ struct vfs_ns_cap_data {
 
 #define CAP_CHECKPOINT_RESTORE	40
 
-#define CAP_LAST_CAP         CAP_CHECKPOINT_RESTORE
+/* Allow setup IMA policy per container independently */
+/* No necessary to be superuser */
+
+#define CAP_INTEGRITY_ADMIN	41
+
+#define CAP_LAST_CAP		CAP_INTEGRITY_ADMIN
 
 #define cap_valid(x) ((x) >= 0 && (x) <= CAP_LAST_CAP)
 
