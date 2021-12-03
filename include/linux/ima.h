@@ -211,6 +211,15 @@ static inline int ima_inode_removexattr(struct dentry *dentry,
 }
 #endif /* CONFIG_IMA_APPRAISE */
 
+#define IMA_HASH_BITS 10
+#define IMA_MEASURE_HTABLE_SIZE (1 << IMA_HASH_BITS)
+
+struct ima_h_table {
+	atomic_long_t len;	/* number of stored measurements in the list */
+	atomic_long_t violations;
+	struct hlist_head queue[IMA_MEASURE_HTABLE_SIZE];
+};
+
 struct ima_namespace {
 	struct kref kref;
 	struct user_namespace *user_ns;
@@ -248,6 +257,8 @@ struct ima_namespace {
 	struct list_head __rcu *ima_rules;
 	/* current content of the policy */
 	int ima_policy_flag;
+
+	struct ima_h_table ima_htable;
 };
 
 extern struct ima_namespace init_ima_ns;
