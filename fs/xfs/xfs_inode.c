@@ -2219,8 +2219,8 @@ out:
 /* Return the imap, dinode pointer, and buffer for an inode. */
 STATIC int
 xfs_iunlink_map_ino(
+	struct xfs_perag	*pag,
 	struct xfs_trans	*tp,
-	xfs_agnumber_t		agno,
 	xfs_agino_t		agino,
 	struct xfs_imap		*imap,
 	struct xfs_dinode	**dipp,
@@ -2230,7 +2230,8 @@ xfs_iunlink_map_ino(
 	int			error;
 
 	imap->im_blkno = 0;
-	error = xfs_imap(mp, tp, XFS_AGINO_TO_INO(mp, agno, agino), imap, 0);
+	error = xfs_imap(pag, tp, XFS_AGINO_TO_INO(mp, pag->pag_agno, agino),
+			imap, 0);
 	if (error) {
 		xfs_warn(mp, "%s: xfs_imap returned error %d.",
 				__func__, error);
@@ -2279,7 +2280,7 @@ xfs_iunlink_map_prev(
 	/* See if our backref cache can find it faster. */
 	*agino = xfs_iunlink_lookup_backref(pag, target_agino);
 	if (*agino != NULLAGINO) {
-		error = xfs_iunlink_map_ino(tp, pag->pag_agno, *agino, imap,
+		error = xfs_iunlink_map_ino(pag, tp, *agino, imap,
 				dipp, bpp);
 		if (error)
 			return error;
@@ -2307,7 +2308,7 @@ xfs_iunlink_map_prev(
 			xfs_trans_brelse(tp, *bpp);
 
 		*agino = next_agino;
-		error = xfs_iunlink_map_ino(tp, pag->pag_agno, next_agino, imap,
+		error = xfs_iunlink_map_ino(pag, tp, next_agino, imap,
 				dipp, bpp);
 		if (error)
 			return error;
