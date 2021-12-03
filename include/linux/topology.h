@@ -46,6 +46,12 @@
 int arch_update_cpu_topology(void);
 void arch_rebuild_cpu_topology(void);
 
+#ifdef CONFIG_SCHED_CLUSTER
+void arch_set_def_cluster_topology(void);
+#else
+static inline void arch_set_def_sched_cluster(void) { };
+#endif
+
 /* Conform to ACPI 2.0 SLIT distance definitions */
 #define LOCAL_DISTANCE		10
 #define REMOTE_DISTANCE		20

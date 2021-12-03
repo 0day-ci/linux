@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
+#include <linux/sched/sysctl.h>
 
 static DEFINE_PER_CPU(struct scale_freq_data __rcu *, sft_data);
 static struct cpumask scale_freq_counters_mask;
@@ -212,6 +213,15 @@ void __weak arch_rebuild_cpu_topology(void)
 	pr_debug("sched_domain hierarchy rebuilt, flags updated\n");
 	update_topology = 0;
 }
+
+#ifdef CONFIG_SCHED_CLUSTER
+void __weak arch_set_def_cluster_topology(void)
+{
+	/* Use cluster topology by default unless disabled in boot option */
+	if (sysctl_sched_cluster > 1)
+		sysctl_sched_cluster = 1;
+}
+#endif
 
 /*
  * Updating the sched_domains can't be done directly from cpufreq callbacks

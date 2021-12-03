@@ -46,6 +46,7 @@
 #include <linux/sched/topology.h>
 #include <linux/sched/hotplug.h>
 #include <linux/sched/task_stack.h>
+#include <linux/sched/sysctl.h>
 #include <linux/percpu.h>
 #include <linux/memblock.h>
 #include <linux/err.h>
@@ -134,6 +135,23 @@ void arch_rebuild_cpu_topology(void)
 	rebuild_sched_domains();
 	x86_topology_update = false;
 }
+
+#ifdef CONFIG_SCHED_CLUSTER
+void arch_set_def_cluster_topology(void)
+{
+	/*
+	 * For hybrid CPUs, scheduling order between the CPUs should be
+	 * based strictly on CPU priority. Turn off cluster scheduling
+	 * for hybrid CPUs.
+	 */
+	if (sysctl_sched_cluster > 1) {
+		if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU))
+			sysctl_sched_cluster = 0;
+		else
+			sysctl_sched_cluster = 1;
+	}
+}
+#endif
 
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
 {

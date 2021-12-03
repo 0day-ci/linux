@@ -1660,6 +1660,8 @@ void set_sched_cluster(void)
 {
 	struct sched_domain_topology_level *tl;
 
+	arch_set_def_cluster_topology();
+
 	for (tl = sched_domain_topology; tl->mask; tl++) {
 		if (tl->sd_flags && (tl->sd_flags() & SD_CLUSTER)) {
 			if (!sysctl_sched_cluster)
@@ -1672,7 +1674,7 @@ void set_sched_cluster(void)
 }
 
 /* set via /proc/sys/kernel/sched_cluster */
-unsigned int __read_mostly sysctl_sched_cluster = 1;
+unsigned int __read_mostly sysctl_sched_cluster = 2;
 
 static DEFINE_MUTEX(sched_cluster_mutex);
 int sched_cluster_handler(struct ctl_table *table, int write,
