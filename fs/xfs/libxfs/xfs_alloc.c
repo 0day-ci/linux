@@ -3207,6 +3207,28 @@ xfs_alloc_vextent_set_fsbno(
  * Allocate within a single AG only.
  */
 static int
+__xfs_alloc_vextent_this_ag(
+	struct xfs_alloc_arg	*args)
+{
+	struct xfs_mount	*mp = args->mp;
+	int			error;
+
+	error = xfs_alloc_fix_freelist(args, 0);
+	if (error) {
+		trace_xfs_alloc_vextent_nofix(args);
+		return error;
+	}
+	if (!args->agbp) {
+		/* cannot allocate in this AG at all */
+		trace_xfs_alloc_vextent_noagbp(args);
+		args->agbno = NULLAGBLOCK;
+		return 0;
+	}
+	args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
+	return xfs_alloc_ag_vextent(args);
+}
+
+static int
 xfs_alloc_vextent_this_ag(
 	struct xfs_alloc_arg	*args)
 {
@@ -3222,24 +3244,13 @@ xfs_alloc_vextent_this_ag(
 
 	args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
 	args->pag = xfs_perag_get(mp, args->agno);
-	error = xfs_alloc_fix_freelist(args, 0);
-	if (error) {
-		trace_xfs_alloc_vextent_nofix(args);
-		goto out_error;
-	}
-	if (!args->agbp) {
-		trace_xfs_alloc_vextent_noagbp(args);
-		goto out_error;
-	}
-	args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
-	error = xfs_alloc_ag_vextent(args);
+	error = __xfs_alloc_vextent_this_ag(args);
+	xfs_perag_put(args->pag);
 	if (error)
-		goto out_error;
+		return error;
 
 	xfs_alloc_vextent_set_fsbno(args);
-out_error:
-	xfs_perag_put(args->pag);
-	return error;
+	return 0;
 }
 
 /*
@@ -3277,24 +3288,12 @@ xfs_alloc_vextent_iterate_ags(
 	args->agno = start_agno;
 	for (;;) {
 		args->pag = xfs_perag_get(mp, args->agno);
-		error = xfs_alloc_fix_freelist(args, flags);
-		if (error) {
-			trace_xfs_alloc_vextent_nofix(args);
+		error = __xfs_alloc_vextent_this_ag(args);
+		if (error || args->agbp)
 			break;
-		}
-		/*
-		 * If we get a buffer back then the allocation will fly.
-		 */
-		if (args->agbp) {
-			error = xfs_alloc_ag_vextent(args);
-			break;
-		}
 
 		trace_xfs_alloc_vextent_loopfailed(args);
 
-		/*
-		 * Didn't work, figure out the next iteration.
-		 */
 		if (args->agno == start_agno &&
 		    args->otype == XFS_ALLOCTYPE_START_BNO)
 			args->type = XFS_ALLOCTYPE_THIS_AG;
