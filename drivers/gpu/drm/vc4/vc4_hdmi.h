@@ -117,6 +117,13 @@ struct vc4_hdmi_audio {
 	bool streaming;
 };
 
+enum vc4_hdmi_output_format {
+	VC4_HDMI_OUTPUT_RGB,
+	VC4_HDMI_OUTPUT_YUV422,
+	VC4_HDMI_OUTPUT_YUV444,
+	VC4_HDMI_OUTPUT_YUV420,
+};
+
 /* General HDMI hardware state. */
 struct vc4_hdmi {
 	struct vc4_hdmi_audio audio;
@@ -235,6 +242,7 @@ encoder_to_vc4_hdmi(struct drm_encoder *encoder)
 struct vc4_hdmi_connector_state {
 	struct drm_connector_state	base;
 	unsigned long long		pixel_rate;
+	enum vc4_hdmi_output_format	output_format;
 };
 
 static inline struct vc4_hdmi_connector_state *
