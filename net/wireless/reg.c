@@ -1134,7 +1134,7 @@ int reg_reload_regdb(void)
 	request->wiphy_idx = WIPHY_IDX_INVALID;
 	request->alpha2[0] = current_regdomain->alpha2[0];
 	request->alpha2[1] = current_regdomain->alpha2[1];
-	request->initiator = NL80211_USER_REG_HINT_USER;
+	request->initiator = NL80211_REGDOM_SET_BY_CORE;
 	request->user_reg_hint_type = NL80211_USER_REG_HINT_USER;
 	request->reload = true;
 
