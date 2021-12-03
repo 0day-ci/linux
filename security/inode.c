@@ -21,6 +21,7 @@
 #include <linux/security.h>
 #include <linux/lsm_hooks.h>
 #include <linux/magic.h>
+#include <linux/user_namespace.h>
 
 static struct vfsmount *securityfs_mount;
 static int securityfs_mount_count;
@@ -53,7 +54,7 @@ static int securityfs_fill_super(struct super_block *sb, struct fs_context *fc)
 
 static int securityfs_get_tree(struct fs_context *fc)
 {
-	return get_tree_single(fc, securityfs_fill_super);
+	return get_tree_keyed(fc, securityfs_fill_super, fc->user_ns);
 }
 
 static const struct fs_context_operations securityfs_context_ops = {
@@ -71,7 +72,33 @@ static struct file_system_type fs_type = {
 	.name =		"securityfs",
 	.init_fs_context = securityfs_init_fs_context,
 	.kill_sb =	kill_litter_super,
+	.fs_flags =	FS_USERNS_MOUNT,
 };
+
+/**
+ * securityfs_ns_create_mount - create instance of securityfs in given user namespace
+ *
+ * @user_ns: the user namespace to create the vfsmount in
+ *
+ * This function returns a pointer to the vfsmount or an error code. The vfsmount
+ * has to be used when creating or removing filesystem dentries.
+ */
+struct vfsmount *securityfs_ns_create_mount(struct user_namespace *user_ns)
+{
+	struct fs_context *fc;
+	struct vfsmount *mnt;
+
+	fc = fs_context_for_mount(&fs_type, SB_KERNMOUNT);
+	if (IS_ERR(fc))
+		return ERR_CAST(fc);
+
+	put_user_ns(fc->user_ns);
+	fc->user_ns = get_user_ns(user_ns);
+
+	mnt = fc_mount(fc);
+	put_fs_context(fc);
+	return mnt;
+}
 
 /**
  * securityfs_create_dentry - create a dentry in the securityfs filesystem
@@ -214,6 +241,40 @@ struct dentry *securityfs_create_file(const char *name, umode_t mode,
 EXPORT_SYMBOL_GPL(securityfs_create_file);
 
 /**
+ * securityfs_ns_create_file - create a file in the securityfs_ns filesystem
+ *
+ * @name: a pointer to a string containing the name of the file to create.
+ * @mode: the permission that the file should have
+ * @parent: a pointer to the parent dentry for this file.  This should be a
+ *          directory dentry if set.  If this parameter is %NULL, then the
+ *          file will be created in the root of the securityfs_ns filesystem.
+ * @data: a pointer to something that the caller will want to get to later
+ *        on.  The inode.i_private pointer will point to this value on
+ *        the open() call.
+ * @fops: a pointer to a struct file_operations that should be used for
+ *        this file.
+ * @mount: Pointer to a pointer of a an existing vfsmount
+ * @mount_count: The mount_count that goes along with the @mount
+ *
+ * This function creates a file in securityfs_ns with the given @name.
+ *
+ * This function returns a pointer to a dentry if it succeeds.  This
+ * pointer must be passed to the securityfs_ns_remove() function when the file
+ * is to be removed (no automatic cleanup happens if your module is unloaded,
+ * you are responsible here).  If an error occurs, the function will return
+ * the error value (via ERR_PTR).
+ */
+struct dentry *securityfs_ns_create_file(const char *name, umode_t mode,
+					 struct dentry *parent, void *data,
+					 const struct file_operations *fops,
+					 struct vfsmount **mount, int *mount_count)
+{
+	return securityfs_create_dentry(name, mode, parent, data, fops, NULL,
+					mount, mount_count);
+}
+EXPORT_SYMBOL_GPL(securityfs_ns_create_file);
+
+/**
  * securityfs_create_dir - create a directory in the securityfs filesystem
  *
  * @name: a pointer to a string containing the name of the directory to
@@ -239,6 +300,33 @@ struct dentry *securityfs_create_dir(const char *name, struct dentry *parent)
 }
 EXPORT_SYMBOL_GPL(securityfs_create_dir);
 
+/**
+ * securityfs_ns_create_dir - create a directory in the securityfs_ns filesystem
+ *
+ * @name: a pointer to a string containing the name of the directory to
+ *        create.
+ * @parent: a pointer to the parent dentry for this file.  This should be a
+ *          directory dentry if set.  If this parameter is %NULL, then the
+ *          directory will be created in the root of the securityfs_ns filesystem.
+ * @mount: Pointer to a pointer of a an existing vfsmount
+ * @mount_count: The mount_count that goes along with the @mount
+ *
+ * This function creates a directory in securityfs_ns with the given @name.
+ *
+ * This function returns a pointer to a dentry if it succeeds.  This
+ * pointer must be passed to the securityfs_ns_remove() function when the file
+ * is to be removed (no automatic cleanup happens if your module is unloaded,
+ * you are responsible here).  If an error occurs, the function will return
+ * the error value (via ERR_PTR).
+ */
+struct dentry *securityfs_ns_create_dir(const char *name, struct dentry *parent,
+					struct vfsmount **mount, int *mount_count)
+{
+	return securityfs_ns_create_file(name, S_IFDIR | 0755, parent, NULL, NULL,
+					 mount, mount_count);
+}
+EXPORT_SYMBOL_GPL(securityfs_ns_create_dir);
+
 static struct dentry *_securityfs_create_symlink(const char *name,
 						 struct dentry *parent,
 						 const char *target,
@@ -260,6 +348,7 @@ static struct dentry *_securityfs_create_symlink(const char *name,
 
 	return dent;
 }
+
 /**
  * securityfs_create_symlink - create a symlink in the securityfs filesystem
  *
@@ -295,6 +384,39 @@ struct dentry *securityfs_create_symlink(const char *name,
 					  &securityfs_mount, &securityfs_mount_count);
 }
 EXPORT_SYMBOL_GPL(securityfs_create_symlink);
+
+/**
+ * securityfs_ns_create_symlink - create a symlink in the securityfs_ns filesystem
+ *
+ * @name: a pointer to a string containing the name of the symlink to
+ *        create.
+ * @parent: a pointer to the parent dentry for the symlink.  This should be a
+ *          directory dentry if set.  If this parameter is %NULL, then the
+ *          directory will be created in the root of the securityfs_ns filesystem.
+ * @target: a pointer to a string containing the name of the symlink's target.
+ *          If this parameter is %NULL, then the @iops parameter needs to be
+ *          setup to handle .readlink and .get_link inode_operations.
+ * @mount: Pointer to a pointer of a an existing vfsmount
+ * @mount_count: The mount_count that goes along with the @mount
+ *
+ * This function creates a symlink in securityfs_ns with the given @name.
+ *
+ * This function returns a pointer to a dentry if it succeeds.  This
+ * pointer must be passed to the securityfs_ns_remove() function when the file
+ * is to be removed (no automatic cleanup happens if your module is unloaded,
+ * you are responsible here).  If an error occurs, the function will return
+ * the error value (via ERR_PTR).
+ */
+struct dentry *securityfs_ns_create_symlink(const char *name,
+					    struct dentry *parent,
+					    const char *target,
+					    const struct inode_operations *iops,
+					    struct vfsmount **mount, int *mount_count)
+{
+	return _securityfs_create_symlink(name, parent, target, iops,
+					  mount, mount_count);
+}
+EXPORT_SYMBOL_GPL(securityfs_ns_create_symlink);
 
 static void _securityfs_remove(struct dentry *dentry,
 			       struct vfsmount **mount, int *mount_count)
@@ -336,6 +458,27 @@ void securityfs_remove(struct dentry *dentry)
 }
 
 EXPORT_SYMBOL_GPL(securityfs_remove);
+
+/**
+ * securityfs_ns_remove - removes a file or directory from the securityfs_ns filesystem
+ *
+ * @dentry: a pointer to a the dentry of the file or directory to be removed.
+ * @mount: Pointer to a pointer of a an existing vfsmount
+ * @mount_count: The mount_count that goes along with the @mount
+ *
+ * This function removes a file or directory in securityfs_ns that was previously
+ * created with a call to another securityfs_ns function (like
+ * securityfs_ns_create_file() or variants thereof.)
+ *
+ * This function is required to be called in order for the file to be
+ * removed. No automatic cleanup of files will happen when a module is
+ * removed; you are responsible here.
+ */
+void securityfs_ns_remove(struct dentry *dentry, struct vfsmount **mount, int *mount_count)
+{
+	_securityfs_remove(dentry, mount, mount_count);
+}
+EXPORT_SYMBOL_GPL(securityfs_ns_remove);
 
 #ifdef CONFIG_SECURITY
 static struct dentry *lsm_dentry;

@@ -1922,6 +1922,21 @@ struct dentry *securityfs_create_symlink(const char *name,
 					 const struct inode_operations *iops);
 extern void securityfs_remove(struct dentry *dentry);
 
+extern struct dentry *securityfs_ns_create_file(const char *name, umode_t mode,
+						struct dentry *parent, void *data,
+						const struct file_operations *fops,
+						struct vfsmount **mount, int *mount_count);
+extern struct dentry *securityfs_ns_create_dir(const char *name, struct dentry *parent,
+					       struct vfsmount **mount, int *mount_count);
+struct dentry *securityfs_ns_create_symlink(const char *name,
+					    struct dentry *parent,
+					    const char *target,
+					    const struct inode_operations *iops,
+					    struct vfsmount **mount, int *mount_count);
+extern void securityfs_ns_remove(struct dentry *dentry,
+				 struct vfsmount **mount, int *mount_count);
+struct vfsmount *securityfs_ns_create_mount(struct user_namespace *user_ns);
+
 #else /* CONFIG_SECURITYFS */
 
 static inline struct dentry *securityfs_create_dir(const char *name,
