@@ -3534,7 +3534,7 @@ xlog_recover_check_summary(
 	itotal = 0LL;
 	ifree = 0LL;
 	for_each_perag(mp, agno, pag) {
-		error = xfs_read_agf(mp, NULL, pag->pag_agno, 0, &agfbp);
+		error = xfs_read_agf(pag, NULL, 0, &agfbp);
 		if (error) {
 			xfs_alert(mp, "%s agf read failed agno %d error %d",
 						__func__, pag->pag_agno, error);
