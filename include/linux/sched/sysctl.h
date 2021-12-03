@@ -75,6 +75,12 @@ int sysctl_numa_balancing(struct ctl_table *table, int write, void *buffer,
 int sysctl_schedstats(struct ctl_table *table, int write, void *buffer,
 		size_t *lenp, loff_t *ppos);
 
+#ifdef CONFIG_SCHED_CLUSTER
+extern unsigned int sysctl_sched_cluster;
+int sched_cluster_handler(struct ctl_table *table, int write,
+		void *buffer, size_t *lenp, loff_t *ppos);
+#endif
+
 #if defined(CONFIG_ENERGY_MODEL) && defined(CONFIG_CPU_FREQ_GOV_SCHEDUTIL)
 extern unsigned int sysctl_sched_energy_aware;
 int sched_energy_aware_handler(struct ctl_table *table, int write,

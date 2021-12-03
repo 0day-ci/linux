@@ -1653,6 +1653,12 @@ this_rq_lock_irq(struct rq_flags *rf)
 	return rq;
 }
 
+#ifdef CONFIG_SCHED_CLUSTER
+extern void set_sched_cluster(void);
+#else
+static inline void set_sched_cluster(void) { }
+#endif
+
 #ifdef CONFIG_NUMA
 enum numa_topology_type {
 	NUMA_DIRECT,
