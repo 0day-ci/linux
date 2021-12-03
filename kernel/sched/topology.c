@@ -1504,6 +1504,8 @@ static unsigned long __read_mostly *sched_numa_onlined_nodes;
  * function:
  *
  *   SD_SHARE_CPUCAPACITY   - describes SMT topologies
+ *   SD_CLUSTER             - describes multiple CPU clusters in a
+ *                            last level cache
  *   SD_SHARE_PKG_RESOURCES - describes shared caches
  *   SD_NUMA                - describes NUMA topologies
  *
@@ -1514,6 +1516,7 @@ static unsigned long __read_mostly *sched_numa_onlined_nodes;
  */
 #define TOPOLOGY_SD_FLAGS		\
 	(SD_SHARE_CPUCAPACITY	|	\
+	 SD_CLUSTER		|	\
 	 SD_SHARE_PKG_RESOURCES |	\
 	 SD_NUMA		|	\
 	 SD_ASYM_PACKING)

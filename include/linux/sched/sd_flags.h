@@ -164,3 +164,10 @@ SD_FLAG(SD_OVERLAP, SDF_SHARED_PARENT | SDF_NEEDS_GROUPS)
  * NEEDS_GROUPS: No point in preserving domain if it has a single group.
  */
 SD_FLAG(SD_NUMA, SDF_SHARED_PARENT | SDF_NEEDS_GROUPS)
+
+/*
+ * Domain members in the same CPU cluster
+ *
+ * NEEDS_GROUPS: Cluster resroucres are shared between groups.
+ */
+SD_FLAG(SD_CLUSTER, SDF_NEEDS_GROUPS)
