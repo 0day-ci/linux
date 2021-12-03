@@ -67,6 +67,8 @@ struct ima_namespace *copy_ima_ns(struct ima_namespace *old_ns,
 
 void ima_ns_userns_early_teardown(struct ima_namespace *ns)
 {
+	pr_debug("%s: ns=0x%p\n", __func__, ns);
+	ima_fs_ns_free(ns);
 }
 EXPORT_SYMBOL(ima_ns_userns_early_teardown);
 

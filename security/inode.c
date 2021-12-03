@@ -22,6 +22,7 @@
 #include <linux/lsm_hooks.h>
 #include <linux/magic.h>
 #include <linux/user_namespace.h>
+#include <linux/ima.h>
 
 static struct vfsmount *securityfs_mount;
 static int securityfs_mount_count;
@@ -63,6 +64,13 @@ static const struct fs_context_operations securityfs_context_ops = {
 
 static int securityfs_init_fs_context(struct fs_context *fc)
 {
+	int rc;
+
+	if (fc->user_ns->ima_ns->late_fs_init) {
+		rc = fc->user_ns->ima_ns->late_fs_init(fc->user_ns);
+		if (rc)
+			return rc;
+	}
 	fc->ops = &securityfs_context_ops;
 	return 0;
 }
