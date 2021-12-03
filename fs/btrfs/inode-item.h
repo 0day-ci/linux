@@ -3,7 +3,16 @@
 #ifndef BTRFS_INODE_ITEM_H
 #define BTRFS_INODE_ITEM_H
 
+/*
+ * Return this if we need to call truncate_block for the last bit of the
+ * truncate.
+ */
+#define BTRFS_NEED_TRUNCATE_BLOCK 1
 
+int btrfs_truncate_inode_items(struct btrfs_trans_handle *trans,
+			       struct btrfs_root *root,
+			       struct btrfs_inode *inode, u64 new_size,
+			       u32 min_type, u64 *extents_found);
 int btrfs_insert_inode_ref(struct btrfs_trans_handle *trans,
 			   struct btrfs_root *root,
 			   const char *name, int name_len,
