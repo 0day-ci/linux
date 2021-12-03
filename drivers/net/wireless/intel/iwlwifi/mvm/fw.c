@@ -24,7 +24,7 @@
 #include "iwl-modparams.h"
 #include "iwl-nvm-parse.h"
 
-#define MVM_UCODE_ALIVE_TIMEOUT	(HZ)
+#define MVM_UCODE_ALIVE_TIMEOUT	(2 * HZ)
 #define MVM_UCODE_CALIB_TIMEOUT	(2 * HZ)
 
 #define UCODE_VALID_OK	cpu_to_le32(0x1)
