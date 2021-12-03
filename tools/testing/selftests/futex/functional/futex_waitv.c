@@ -217,12 +217,17 @@ int main(int argc, char *argv[])
 	}
 
 	/* Testing an invalid clockid */
+	waitv[0].uaddr = (uintptr_t)&futexes[0];
+	waitv[0].flags = FUTEX_PRIVATE_FLAG | FUTEX_32;
+	waitv[0].val = 0;
+	waitv[0].__reserved = 0;
+
 	if (clock_gettime(CLOCK_MONOTONIC, &to))
 		error("gettime64 failed\n", errno);
 
 	to.tv_sec++;
 
-	res = futex_waitv(NULL, NR_FUTEXES, 0, &to, CLOCK_TAI);
+	res = futex_waitv(waitv, 1, 0, &to, CLOCK_TAI);
 	if (res == EINVAL) {
 		ksft_test_result_fail("futex_waitv private returned: %d %s\n",
 				      res ? errno : res,
