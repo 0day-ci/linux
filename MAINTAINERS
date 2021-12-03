@@ -18233,6 +18233,7 @@ SUNPLUS IOP DRIVER
 M:	Tony Huang <tonyhuang.sunplus@gmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/misc/sunplu-iop.yaml
+F:	drivers/misc/iop
 
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
