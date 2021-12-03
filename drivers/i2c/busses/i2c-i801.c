@@ -372,11 +372,6 @@ static int i801_check_pre(struct i801_priv *priv)
 	return 0;
 }
 
-/*
- * Convert the status register to an error code, and clear it.
- * Note that status only contains the bits we want to clear, not the
- * actual register value.
- */
 static int i801_check_post(struct i801_priv *priv, int status)
 {
 	int result = 0;
@@ -440,9 +435,6 @@ static int i801_check_post(struct i801_priv *priv, int status)
 		dev_dbg(&priv->pci_dev->dev, "Lost arbitration\n");
 	}
 
-	/* Clear status flags except BYTE_DONE, to be cleared by caller */
-	outb_p(status, SMBHSTSTS(priv));
-
 	return result;
 }
 
@@ -457,8 +449,10 @@ static int i801_wait_intr(struct i801_priv *priv)
 		status = inb_p(SMBHSTSTS(priv));
 		busy = status & SMBHSTSTS_HOST_BUSY;
 		status &= STATUS_ERROR_FLAGS | SMBHSTSTS_INTR;
-		if (!busy && status)
+		if (!busy && status) {
+			outb_p(status, SMBHSTSTS(priv));
 			return status;
+		}
 	} while (time_is_after_eq_jiffies(timeout));
 
 	return -ETIMEDOUT;
@@ -473,8 +467,13 @@ static int i801_wait_byte_done(struct i801_priv *priv)
 	do {
 		usleep_range(250, 500);
 		status = inb_p(SMBHSTSTS(priv));
-		if (status & (STATUS_ERROR_FLAGS | SMBHSTSTS_BYTE_DONE))
-			return status & STATUS_ERROR_FLAGS;
+		status &= STATUS_ERROR_FLAGS | SMBHSTSTS_BYTE_DONE;
+		if (status & STATUS_ERROR_FLAGS) {
+			outb_p(status, SMBHSTSTS(priv));
+			return status;
+		} else if (status & SMBHSTSTS_BYTE_DONE) {
+			return 0;
+		}
 	} while (time_is_after_eq_jiffies(timeout));
 
 	return -ETIMEDOUT;
