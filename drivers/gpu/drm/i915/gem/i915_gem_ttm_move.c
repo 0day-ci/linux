@@ -371,6 +371,7 @@ int i915_ttm_move_notify(struct ttm_buffer_object *bo)
 	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
 	int ret;
 
+	GEM_BUG_ON(!obj);
 	ret = i915_gem_object_unbind(obj, I915_GEM_OBJECT_UNBIND_ACTIVE);
 	if (ret)
 		return ret;
@@ -506,7 +507,7 @@ static void i915_ttm_memcpy_init(struct i915_ttm_memcpy_arg *arg,
 
 	dst_reg = i915_ttm_region(bo->bdev, dst_mem->mem_type);
 	src_reg = i915_ttm_region(bo->bdev, bo->resource->mem_type);
-	GEM_BUG_ON(!dst_reg || !src_reg);
+	GEM_BUG_ON(!dst_reg || !src_reg || !obj);
 
 	arg->dst_iter = !i915_ttm_cpu_maps_iomem(dst_mem) ?
 		ttm_kmap_iter_tt_init(&arg->_dst_iter.tt, dst_ttm) :

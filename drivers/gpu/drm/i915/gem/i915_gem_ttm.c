@@ -906,6 +906,8 @@ vm_access_ttm(struct vm_area_struct *area, unsigned long addr,
 	struct drm_i915_gem_object *obj =
 		i915_ttm_to_gem(area->vm_private_data);
 
+	GEM_BUG_ON(!obj);
+
 	if (i915_gem_object_is_readonly(obj) && write)
 		return -EACCES;
 
@@ -966,6 +968,7 @@ static const struct drm_i915_gem_object_ops i915_gem_ttm_obj_ops = {
 void i915_ttm_bo_destroy(struct ttm_buffer_object *bo)
 {
 	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
+	GEM_BUG_ON(!obj);
 
 	i915_gem_object_release_memory_region(obj);
 	mutex_destroy(&obj->ttm.get_io_page.lock);
