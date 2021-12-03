@@ -655,6 +655,9 @@ delete:
 		else
 			control->last_size = new_size;
 		if (del_item) {
+			ASSERT(!pending_del_nr ||
+			       ((path->slots[0] + 1) == pending_del_slot));
+
 			if (!pending_del_nr) {
 				/* no pending yet, add ourselves */
 				pending_del_slot = path->slots[0];
@@ -664,8 +667,6 @@ delete:
 				/* hop on the pending chunk */
 				pending_del_nr++;
 				pending_del_slot = path->slots[0];
-			} else {
-				BUG();
 			}
 		} else {
 			break;
