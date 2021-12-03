@@ -5502,8 +5502,11 @@ static void skl_compute_plane_wm(const struct intel_crtc_state *crtc_state,
 	uint_fixed_16_16_t method1, method2;
 	uint_fixed_16_16_t selected_result;
 	u32 blocks, lines, min_ddb_alloc = 0;
+	bool dg2_async_flip_optimization = (DISPLAY_VER(dev_priv) >= 13) &&
+					   crtc_state->uapi.async_flip &&
+					   plane_id != PLANE_CURSOR;
 
-	if (latency == 0) {
+	if (latency == 0 || (dg2_async_flip_optimization && (level > 0))) {
 		/* reject it */
 		result->min_ddb_alloc = U16_MAX;
 		return;

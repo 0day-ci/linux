@@ -5992,6 +5992,16 @@ static bool needs_scaling(const struct intel_plane_state *state)
 	return (src_w != dst_w || src_h != dst_h);
 }
 
+static bool needs_async_flip_wm_override(struct intel_plane *plane,
+					 const struct intel_plane_state *new_plane_state,
+					 const struct intel_plane_state *old_plane_state)
+{
+	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
+
+	return (DISPLAY_VER(dev_priv) >= 13) && !old_plane_state->do_async_flip &&
+	       new_plane_state->do_async_flip;
+}
+
 int intel_plane_atomic_calc_changes(const struct intel_crtc_state *old_crtc_state,
 				    struct intel_crtc_state *new_crtc_state,
 				    const struct intel_plane_state *old_plane_state,
@@ -6111,7 +6121,8 @@ int intel_plane_atomic_calc_changes(const struct intel_crtc_state *old_crtc_stat
 			 needs_scaling(new_plane_state))))
 		new_crtc_state->disable_lp_wm = true;
 
-	if (new_crtc_state->uapi.async_flip && plane->async_flip)
+	if (new_crtc_state->uapi.async_flip && new_plane_state->do_async_flip &&
+	    !needs_async_flip_wm_override(plane, new_plane_state, old_plane_state))
 		new_plane_state->do_async_flip = true;
 
 	return 0;
