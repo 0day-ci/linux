@@ -195,7 +195,7 @@ static u64 compute_chunk_size_regular(struct btrfs_fs_info *info, u64 flags)
 
 	/* Handle BTRFS_BLOCK_GROUP_METADATA */
 	if (info->fs_devices->total_rw_bytes > 50ULL * SZ_1G)
-		return SZ_1G;
+		return 5ULL * SZ_1G;
 
 	return SZ_256M;
 }
