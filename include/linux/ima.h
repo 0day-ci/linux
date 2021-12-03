@@ -261,6 +261,11 @@ struct ima_namespace {
 	struct ima_h_table ima_htable;
 	struct list_head ima_measurements;
 	unsigned long binary_runtime_size;
+
+	/* IMA's filesystem */
+	struct mutex ima_write_mutex;
+	unsigned long ima_fs_flags;
+	int valid_policy;
 };
 
 extern struct ima_namespace init_ima_ns;
