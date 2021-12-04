@@ -295,7 +295,7 @@ void __init tauros2_init(unsigned int features)
 	} else {
 		ret = of_property_read_u32(node, "marvell,tauros2-cache-features", &f);
 		if (ret) {
-			pr_info("Not found marvell,tauros-cache-features property, "
+			pr_info("Not found marvell,tauros2-cache-features property, "
 				"disable extra features\n");
 			features = 0;
 		} else
