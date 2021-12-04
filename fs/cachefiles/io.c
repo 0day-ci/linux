@@ -486,9 +486,11 @@ static int __cachefiles_prepare_write(struct netfs_cache_resources *cres,
 	/* Partially allocated, but insufficient space: cull. */
 	fscache_count_no_write_space();
 	pos = cachefiles_inject_remove_error();
-	if (pos == 0)
-		ret = vfs_fallocate(file, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
-				    *_start, *_len);
+	if (pos != 0)
+		return 0;
+
+	ret = vfs_fallocate(file, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
+			    *_start, *_len);
 	if (ret < 0) {
 		trace_cachefiles_io_error(object, file_inode(file), ret,
 					  cachefiles_trace_fallocate_error);
