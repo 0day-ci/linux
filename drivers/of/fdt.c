@@ -466,6 +466,67 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
 }
 EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
 
+static int __init of_fdt_root_init(void)
+{
+	struct device_node *dt = NULL, *np;
+	void *fdt, *fdt_aligned;
+	int size, rc;
+
+#if !defined(CONFIG_OF_UNITTEST)
+	if (of_root)
+		return 0;
+#endif
+	size = __dtb_fdt_default_end - __dtb_fdt_default_begin;
+
+	fdt = kmalloc(size + FDT_ALIGN_SIZE, GFP_KERNEL);
+	if (!fdt)
+		return -ENOMEM;
+
+	fdt_aligned = PTR_ALIGN(fdt, FDT_ALIGN_SIZE);
+	memcpy(fdt_aligned, __dtb_fdt_default_begin, size);
+
+	if (!of_fdt_unflatten_tree((const unsigned long *)fdt_aligned,
+				   NULL, &dt)) {
+		pr_warn("%s: unflatten default tree failed\n", __func__);
+		kfree(fdt);
+		return -ENODATA;
+	}
+	if (!dt) {
+		pr_warn("%s: empty default tree\n", __func__);
+		kfree(fdt);
+		return -ENODATA;
+	}
+
+	/*
+	 * This lock normally encloses of_resolve_phandles()
+	 */
+	of_overlay_mutex_lock();
+
+	rc = of_resolve_phandles(dt);
+	if (rc) {
+		pr_err("%s: Failed to resolve phandles (rc=%i)\n", __func__, rc);
+		of_overlay_mutex_unlock();
+		return -EINVAL;
+	}
+
+	if (!of_root) {
+		of_root = dt;
+		for_each_of_allnodes(np)
+			__of_attach_node_sysfs(np);
+		of_aliases = of_find_node_by_path("/aliases");
+		of_chosen = of_find_node_by_path("/chosen");
+		of_overlay_mutex_unlock();
+		return 0;
+	}
+
+	unittest_data_add(dt);
+
+	of_overlay_mutex_unlock();
+
+	return 0;
+}
+pure_initcall(of_fdt_root_init);
+
 /* Everything below here references initial_boot_params directly. */
 int __initdata dt_root_addr_cells;
 int __initdata dt_root_size_cells;

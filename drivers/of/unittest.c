@@ -1408,73 +1408,15 @@ static void attach_node_and_children(struct device_node *np)
  *	unittest_data_add - Reads, copies data from
  *	linked tree and attaches it to the live tree
  */
-static int __init unittest_data_add(void)
+int __init unittest_data_add(struct device_node *dt)
 {
-	void *unittest_data;
-	void *unittest_data_align;
-	struct device_node *unittest_data_node = NULL, *np;
-	/*
-	 * __dtb_testcases_begin[] and __dtb_testcases_end[] are magically
-	 * created by cmd_dt_S_dtb in scripts/Makefile.lib
-	 */
-	extern uint8_t __dtb_testcases_begin[];
-	extern uint8_t __dtb_testcases_end[];
-	const int size = __dtb_testcases_end - __dtb_testcases_begin;
-	int rc;
-	void *ret;
-
-	if (!size) {
-		pr_warn("%s: testcases is empty\n", __func__);
-		return -ENODATA;
-	}
-
-	/* creating copy */
-	unittest_data = kmalloc(size + FDT_ALIGN_SIZE, GFP_KERNEL);
-	if (!unittest_data)
-		return -ENOMEM;
-
-	unittest_data_align = PTR_ALIGN(unittest_data, FDT_ALIGN_SIZE);
-	memcpy(unittest_data_align, __dtb_testcases_begin, size);
-
-	ret = of_fdt_unflatten_tree(unittest_data_align, NULL, &unittest_data_node);
-	if (!ret) {
-		pr_warn("%s: unflatten testcases tree failed\n", __func__);
-		kfree(unittest_data);
-		return -ENODATA;
-	}
-	if (!unittest_data_node) {
-		pr_warn("%s: testcases tree is empty\n", __func__);
-		kfree(unittest_data);
-		return -ENODATA;
-	}
-
-	/*
-	 * This lock normally encloses of_resolve_phandles()
-	 */
-	of_overlay_mutex_lock();
-
-	rc = of_resolve_phandles(unittest_data_node);
-	if (rc) {
-		pr_err("%s: Failed to resolve phandles (rc=%i)\n", __func__, rc);
-		of_overlay_mutex_unlock();
-		return -EINVAL;
-	}
-
-	if (!of_root) {
-		of_root = unittest_data_node;
-		for_each_of_allnodes(np)
-			__of_attach_node_sysfs(np);
-		of_aliases = of_find_node_by_path("/aliases");
-		of_chosen = of_find_node_by_path("/chosen");
-		of_overlay_mutex_unlock();
-		return 0;
-	}
+	struct device_node *np;
 
 	EXPECT_BEGIN(KERN_INFO,
 		     "Duplicate name in testcase-data, renamed to \"duplicate-name#1\"");
 
 	/* attach the sub-tree to live tree */
-	np = unittest_data_node->child;
+	np = dt->child;
 	while (np) {
 		struct device_node *next = np->sibling;
 
@@ -1485,8 +1427,6 @@ static int __init unittest_data_add(void)
 
 	EXPECT_END(KERN_INFO,
 		   "Duplicate name in testcase-data, renamed to \"duplicate-name#1\"");
-
-	of_overlay_mutex_unlock();
 
 	return 0;
 }
@@ -3266,7 +3206,6 @@ static inline __init void of_unittest_overlay_high_level(void) {}
 static int __init of_unittest(void)
 {
 	struct device_node *np;
-	int res;
 
 	pr_info("start of unittest - you will see error messages\n");
 
@@ -3275,9 +3214,6 @@ static int __init of_unittest(void)
 	if (IS_ENABLED(CONFIG_UML))
 		unittest_unflatten_overlay_base();
 
-	res = unittest_data_add();
-	if (res)
-		return res;
 	if (!of_aliases)
 		of_aliases = of_find_node_by_path("/aliases");
 

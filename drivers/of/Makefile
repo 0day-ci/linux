@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-y = base.o device.o platform.o property.o
+
 obj-$(CONFIG_OF_KOBJ) += kobj.o
 obj-$(CONFIG_OF_DYNAMIC) += dynamic.o
 obj-$(CONFIG_OF_FLATTREE) += fdt.o
@@ -17,6 +18,10 @@ ifdef CONFIG_KEXEC_FILE
 ifdef CONFIG_OF_FLATTREE
 obj-y	+= kexec.o
 endif
+endif
+
+ifndef CONFIG_OF_UNITTEST
+obj-$(CONFIG_OF_FLATTREE) += fdt_default.dtb.o
 endif
 
 obj-$(CONFIG_OF_UNITTEST) += unittest-data/
