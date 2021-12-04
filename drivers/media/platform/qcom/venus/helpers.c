@@ -197,6 +197,7 @@ int venus_helper_alloc_dpb_bufs(struct venus_inst *inst)
 
 		id = ida_alloc_min(&inst->dpb_ids, VB2_MAX_FRAME, GFP_KERNEL);
 		if (id < 0) {
+			kfree(buf);
 			ret = id;
 			goto fail;
 		}
