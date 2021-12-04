@@ -12,6 +12,7 @@
 
 #define MAX_INDEX	64
 #define MAX_STARS	38
+#define TASK_COMM_LEN	16
 
 /* my_map, my_hist_map */
 static int map_fd[2];
@@ -28,7 +29,7 @@ static void stars(char *str, long val, long max, int width)
 }
 
 struct task {
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 	__u64 pid_tgid;
 	__u64 uid_gid;
 };
