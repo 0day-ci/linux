@@ -12,6 +12,7 @@ obj-$(CONFIG_FPGA_XRT_LIB) += xrt-lib.o
 xrt-lib-objs :=			\
 	lib-drv.o		\
 	xroot.o			\
+	group.o			\
 	xrt-bus.dtb.o
 
 ccflags-y := -I$(FULL_XRT_PATH)/include

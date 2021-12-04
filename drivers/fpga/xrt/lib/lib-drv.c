@@ -200,9 +200,17 @@ fail:
 	return NULL;
 }
 
+/*
+ * Leaf driver's module init/fini callbacks. This is not a open infrastructure for dynamic
+ * plugging in drivers. All drivers should be statically added.
+ */
+static void (*leaf_init_fini_cbs[])(bool) = {
+	group_leaf_init_fini,
+};
+
 static __init int xrt_lib_init(void)
 {
-	int ret;
+	int ret, i;
 
 	ret = of_overlay_fdt_apply(__dtb_xrt_bus_begin,
 				   __dtb_xrt_bus_end - __dtb_xrt_bus_begin,
@@ -216,11 +224,19 @@ static __init int xrt_lib_init(void)
 		return ret;
 	}
 
+	for (i = 0; i < ARRAY_SIZE(leaf_init_fini_cbs); i++)
+		leaf_init_fini_cbs[i](true);
+
 	return 0;
 }
 
 static __exit void xrt_lib_fini(void)
 {
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(leaf_init_fini_cbs); i++)
+		leaf_init_fini_cbs[i](false);
+
 	bus_unregister(&xrt_bus_type);
 	of_overlay_remove(&xrt_bus_ovcs_id);
 }
