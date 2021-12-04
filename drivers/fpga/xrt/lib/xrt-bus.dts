@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+/plugin/;
+
+/*
+ * xrt bus node which is overlayed dynamically when xrt-lib is loaded.
+ */
+&{/} {
+	xrt-bus {
+		#address-cells=<2>;
+		#size-cells=<2>;
+	};
+};
