@@ -229,7 +229,6 @@ static void device_init_registers(struct vnt_private *priv)
 
 	/* Get Channel range */
 	priv->byMinChannel = 1;
-	priv->byMaxChannel = CB_MAX_CHANNEL;
 
 	/* Get Antena */
 	byValue = SROMbyReadEmbedded(priv->port_offset, EEP_OFS_ANTENNA);
