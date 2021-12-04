@@ -21,6 +21,8 @@
 
 #include <linux/types.h>
 
+#define TASK_COMM_LEN_16 16
+
 /*
  * Userspace sends this enum to register with the kernel that it is listening
  * for events on the connector.
@@ -110,7 +112,7 @@ struct proc_event {
 		struct comm_proc_event {
 			__kernel_pid_t process_pid;
 			__kernel_pid_t process_tgid;
-			char           comm[16];
+			char           comm[TASK_COMM_LEN_16];
 		} comm;
 
 		struct coredump_proc_event {
