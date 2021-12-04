@@ -277,15 +277,13 @@ skel_delete() is an example of how to do this::
     }
 
 
-If a program currently has an open handle to the device, we reset the
-flag ``device_present``. For every read, write, release and other
+If the driver probed the device successfully, the flag ``disconnected``
+is initialized and set to false. For every read, write and other
 functions that expect a device to be present, the driver first checks
-this flag to see if the device is still present. If not, it releases
-that the device has disappeared, and a ``-ENODEV`` error is returned to the
-user-space program. When the release function is eventually called, it
-determines if there is no device and if not, it does the cleanup that
-the ``skel_disconnect`` function normally does if there are no open files
-on the device (see Listing 5).
+this flag to see if the device is still present. If not, a ``-ENODEV``
+error is returned to the user-space program. When the device is
+disconnected, skel_disconnect() is called. It sets ``disconnected``
+to true and cleans up.
 
 Isochronous Data
 ================
