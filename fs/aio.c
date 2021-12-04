@@ -1620,6 +1620,50 @@ static void aio_poll_put_work(struct work_struct *work)
 	iocb_put(iocb);
 }
 
+/*
+ * Safely lock the waitqueue which the request is on, taking into account the
+ * fact that the waitqueue may be freed at any time before the lock is taken.
+ *
+ * Returns true on success, meaning that req->head->lock was locked and
+ * req->wait is on req->head.  Returns false if the request has already been
+ * removed from its waitqueue (which might no longer exist).
+ */
+static bool poll_iocb_lock_wq(struct poll_iocb *req)
+{
+	/*
+	 * Holding req->head->lock prevents req->wait being removed from the
+	 * waitqueue, and thus prevents the waitqueue from being freed
+	 * (POLLFREE) in the rare cases of ->poll() implementations where the
+	 * waitqueue may not live as long as the struct file.  However, taking
+	 * req->head->lock in the first place can race with POLLFREE.
+	 *
+	 * We solve this in a similar way as eventpoll does: by taking advantage
+	 * of the fact that all users of POLLFREE will RCU-delay the actual
+	 * free.  If we enter rcu_read_lock() and check that req->wait isn't
+	 * already removed, then req->head is guaranteed to be accessible until
+	 * rcu_read_unlock().  We can then lock req->head->lock and re-check
+	 * whether req->wait has been removed or not.
+	 */
+	rcu_read_lock();
+	if (list_empty_careful(&req->wait.entry)) {
+		rcu_read_unlock();
+		return false;
+	}
+	spin_lock(&req->head->lock);
+	if (list_empty(&req->wait.entry)) {
+		spin_unlock(&req->head->lock);
+		rcu_read_unlock();
+		return false;
+	}
+	rcu_read_unlock();
+	return true;
+}
+
+static void poll_iocb_unlock_wq(struct poll_iocb *req)
+{
+	spin_unlock(&req->head->lock);
+}
+
 static void aio_poll_complete_work(struct work_struct *work)
 {
 	struct poll_iocb *req = container_of(work, struct poll_iocb, work);
@@ -1639,21 +1683,22 @@ static void aio_poll_complete_work(struct work_struct *work)
 	 * avoid further branches in the fast path.
 	 */
 	spin_lock_irq(&ctx->ctx_lock);
-	spin_lock(&req->head->lock);
-	if (!mask && !READ_ONCE(req->cancelled)) {
-		/* Reschedule completion if another wakeup came in. */
-		if (req->work_need_resched) {
-			schedule_work(&req->work);
-			req->work_need_resched = false;
-		} else {
-			req->work_scheduled = false;
+	if (poll_iocb_lock_wq(req)) {
+		if (!mask && !READ_ONCE(req->cancelled)) {
+			/* Reschedule completion if another wakeup came in. */
+			if (req->work_need_resched) {
+				schedule_work(&req->work);
+				req->work_need_resched = false;
+			} else {
+				req->work_scheduled = false;
+			}
+			poll_iocb_unlock_wq(req);
+			spin_unlock_irq(&ctx->ctx_lock);
+			return;
 		}
-		spin_unlock(&req->head->lock);
-		spin_unlock_irq(&ctx->ctx_lock);
-		return;
-	}
-	list_del_init(&req->wait.entry);
-	spin_unlock(&req->head->lock);
+		list_del_init(&req->wait.entry);
+		poll_iocb_unlock_wq(req);
+	} /* else, POLLFREE has freed the waitqueue, so we must complete */
 	list_del_init(&iocb->ki_list);
 	iocb->ki_res.res = mangle_poll(mask);
 	spin_unlock_irq(&ctx->ctx_lock);
@@ -1667,13 +1712,12 @@ static int aio_poll_cancel(struct kiocb *iocb)
 	struct aio_kiocb *aiocb = container_of(iocb, struct aio_kiocb, rw);
 	struct poll_iocb *req = &aiocb->poll;
 
-	spin_lock(&req->head->lock);
-	WRITE_ONCE(req->cancelled, true);
-	if (!list_empty(&req->wait.entry)) {
+	if (poll_iocb_lock_wq(req)) {
+		WRITE_ONCE(req->cancelled, true);
 		list_del_init(&req->wait.entry);
-		schedule_work(&aiocb->poll.work);
-	}
-	spin_unlock(&req->head->lock);
+		schedule_work(&req->work);
+		poll_iocb_unlock_wq(req);
+	} /* else, the request was force-cancelled by POLLFREE already */
 
 	return 0;
 }
@@ -1717,6 +1761,14 @@ static int aio_poll_wake(struct wait_queue_entry *wait, unsigned mode, int sync,
 		if (iocb)
 			iocb_put(iocb);
 	} else {
+		if (mask & POLLFREE) {
+			/*
+			 * The waitqueue is going to be freed, so remove the
+			 * request from the waitqueue and mark it as cancelled.
+			 */
+			list_del_init(&req->wait.entry);
+			WRITE_ONCE(req->cancelled, true);
+		}
 		/*
 		 * Schedule the completion work if needed.  If it was already
 		 * scheduled, record that another wakeup came in.
@@ -1789,8 +1841,9 @@ static int aio_poll(struct aio_kiocb *aiocb, const struct iocb *iocb)
 	mask = vfs_poll(req->file, &apt.pt) & req->events;
 	spin_lock_irq(&ctx->ctx_lock);
 	if (likely(req->head)) {
-		spin_lock(&req->head->lock);
-		if (req->work_scheduled) {
+		bool on_queue = poll_iocb_lock_wq(req);
+
+		if (!on_queue || req->work_scheduled) {
 			/* async completion work was already scheduled */
 			if (apt.error)
 				cancel = true;
@@ -1803,12 +1856,13 @@ static int aio_poll(struct aio_kiocb *aiocb, const struct iocb *iocb)
 		} else if (cancel) {
 			/* cancel if possible (may be too late though) */
 			WRITE_ONCE(req->cancelled, true);
-		} else if (!list_empty(&req->wait.entry)) {
+		} else if (on_queue) {
 			/* actually waiting for an event */
 			list_add_tail(&aiocb->ki_list, &ctx->active_reqs);
 			aiocb->ki_cancel = aio_poll_cancel;
 		}
-		spin_unlock(&req->head->lock);
+		if (on_queue)
+			poll_iocb_unlock_wq(req);
 	}
 	if (mask) { /* no async, we'd stolen it */
 		aiocb->ki_res.res = mangle_poll(mask);
