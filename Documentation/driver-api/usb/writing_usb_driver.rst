@@ -218,36 +218,36 @@ do very much processing at that time. Our implementation of
 ``skel_write_bulk_callback`` merely reports if the urb was completed
 successfully or not and then returns.
 
-The read function works a bit differently from the write function in
+This read function works a bit differently from the write function in
 that we do not use an urb to transfer data from the device to the
-driver. Instead we call the :c:func:`usb_bulk_msg` function, which can be used
+driver. Instead we call usb_bulk_msg(), which can be used
 to send or receive data from a device without having to create urbs and
-handle urb completion callback functions. We call the :c:func:`usb_bulk_msg`
-function, giving it a buffer into which to place any data received from
+handle urb completion callback functions. We call usb_bulk_msg(),
+giving it a buffer into which to place any data received from
 the device and a timeout value. If the timeout period expires without
 receiving any data from the device, the function will fail and return an
 error message. This can be shown with the following code::
 
     /* do an immediate bulk read to get data from the device */
-    retval = usb_bulk_msg (skel->dev,
-			   usb_rcvbulkpipe (skel->dev,
-			   skel->bulk_in_endpointAddr),
-			   skel->bulk_in_buffer,
-			   skel->bulk_in_size,
-			   &count, 5000);
+    rv = usb_bulk_msg(dev->udev,
+		      usb_rcvbulkpipe (dev->udev,
+		      dev->bulk_in_endpointAddr),
+		      dev->bulk_in_buffer,
+	              dev->bulk_in_size,
+		      &len, 5000);
     /* if the read was successful, copy the data to user space */
-    if (!retval) {
-	    if (copy_to_user (buffer, skel->bulk_in_buffer, count))
-		    retval = -EFAULT;
+    if (!rv) {
+	    if (copy_to_user (buffer, dev->bulk_in_buffer, len))
+		    rv = -EFAULT;
 	    else
-		    retval = count;
+		    rv = len;
     }
 
 
-The :c:func:`usb_bulk_msg` function can be very useful for doing single reads
+usb_bulk_msg() can be very useful for doing single reads
 or writes to a device; however, if you need to read or write constantly to
 a device, it is recommended to set up your own urbs and submit them to
-the USB subsystem.
+the USB subsystem. The template uses urbs for read and write.
 
 When the user program releases the file handle that it has been using to
 talk to the device, the release function in the driver is called. In
