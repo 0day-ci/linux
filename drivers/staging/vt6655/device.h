@@ -200,7 +200,6 @@ struct vnt_private {
 	unsigned char byTopOFDMBasicRate;
 	unsigned char byTopCCKBasicRate;
 
-	unsigned char byMinChannel;
 	unsigned char byMaxChannel;
 
 	unsigned char preamble_type;
