@@ -4,19 +4,21 @@
 #include <sys/epoll.h>
 #include "test_ringbuf_multi.skel.h"
 
+#define TASK_COMM_LEN 16
+
 static int duration = 0;
 
-struct sample {
+struct sample_ringbuf {
 	int pid;
 	int seq;
 	long value;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 };
 
 static int process_sample(void *ctx, void *data, size_t len)
 {
 	int ring = (unsigned long)ctx;
-	struct sample *s = data;
+	struct sample_ringbuf *s = data;
 
 	switch (s->seq) {
 	case 0:

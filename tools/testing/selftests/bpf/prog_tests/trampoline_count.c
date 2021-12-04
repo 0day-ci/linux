@@ -5,6 +5,7 @@
 #include <test_progs.h>
 
 #define MAX_TRAMP_PROGS 38
+#define TASK_COMM_LEN 16
 
 struct inst {
 	struct bpf_object *obj;
@@ -51,7 +52,7 @@ void serial_test_trampoline_count(void)
 	int err, i = 0, duration = 0;
 	struct bpf_object *obj;
 	struct bpf_link *link;
-	char comm[16] = {};
+	char comm[TASK_COMM_LEN] = {};
 
 	/* attach 'allowed' trampoline programs */
 	for (i = 0; i < MAX_TRAMP_PROGS; i++) {

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2020 Facebook
 
-#include <linux/bpf.h>
+#include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 
 char _license[] SEC("license") = "GPL";
 
-struct sample {
+struct sample_ringbuf {
 	int pid;
 	int seq;
 	long value;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 };
 
 struct {
@@ -39,7 +39,7 @@ SEC("fentry/__x64_sys_getpgid")
 int test_ringbuf(void *ctx)
 {
 	int cur_pid = bpf_get_current_pid_tgid() >> 32;
-	struct sample *sample;
+	struct sample_ringbuf *sample;
 	int zero = 0;
 
 	if (cur_pid != pid)

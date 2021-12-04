@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2019 Facebook
 
-#include <linux/bpf.h>
-#include <stdint.h>
+#include <vmlinux.h>
 #include <stdbool.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
@@ -23,11 +22,11 @@ struct core_reloc_kernel_output {
 	int comm_len;
 };
 
-struct task_struct {
+struct task_struct_reloc {
 	int pid;
 	int tgid;
-	char comm[16];
-	struct task_struct *group_leader;
+	char comm[TASK_COMM_LEN];
+	struct task_struct_reloc *group_leader;
 };
 
 #define CORE_READ(dst, src) bpf_core_read(dst, sizeof(*(dst)), src)
@@ -35,7 +34,7 @@ struct task_struct {
 SEC("raw_tracepoint/sys_enter")
 int test_core_kernel(void *ctx)
 {
-	struct task_struct *task = (void *)bpf_get_current_task();
+	struct task_struct_reloc *task = (void *)bpf_get_current_task();
 	struct core_reloc_kernel_output *out = (void *)&data.out;
 	uint64_t pid_tgid = bpf_get_current_pid_tgid();
 	uint32_t real_tgid = (uint32_t)pid_tgid;

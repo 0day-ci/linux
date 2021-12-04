@@ -11,11 +11,12 @@
 
 #define LO_ADDR6 "::1"
 #define TEST_COMM "test_progs"
+#define TASK_COMM_LEN 16
 
 struct sk_stg {
 	__u32 pid;
 	__u32 last_notclose_state;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 };
 
 static struct test_sk_storage_tracing *skel;

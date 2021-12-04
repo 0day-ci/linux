@@ -6,6 +6,7 @@
 #include <test_progs.h>
 
 #define MAX_CNT 100000
+#define TASK_COMM_LEN 16
 
 static __u64 time_get_ns(void)
 {
@@ -67,7 +68,7 @@ void test_test_overhead(void)
 	struct bpf_object *obj;
 	struct bpf_link *link;
 	int err, duration = 0;
-	char comm[16] = {};
+	char comm[TASK_COMM_LEN] = {};
 
 	if (CHECK_FAIL(prctl(PR_GET_NAME, comm, 0L, 0L, 0L)))
 		return;

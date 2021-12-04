@@ -15,14 +15,15 @@
 #include "test_ringbuf.lskel.h"
 
 #define EDONE 7777
+#define TASK_COMM_LEN 16
 
 static int duration = 0;
 
-struct sample {
+struct sample_ringbuf {
 	int pid;
 	int seq;
 	long value;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 };
 
 static int sample_cnt;
@@ -39,7 +40,7 @@ static int atomic_xchg(int *cnt, int val)
 
 static int process_sample(void *ctx, void *data, size_t len)
 {
-	struct sample *s = data;
+	struct sample_ringbuf *s = data;
 
 	atomic_inc(&sample_cnt);
 
@@ -83,7 +84,7 @@ static void *poll_thread(void *input)
 
 void test_ringbuf(void)
 {
-	const size_t rec_sz = BPF_RINGBUF_HDR_SZ + sizeof(struct sample);
+	const size_t rec_sz = BPF_RINGBUF_HDR_SZ + sizeof(struct sample_ringbuf);
 	pthread_t thread;
 	long bg_ret = -1;
 	int err, cnt, rb_fd;
