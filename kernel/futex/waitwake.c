@@ -455,8 +455,8 @@ retry:
 
 		/*
 		 * Even if something went wrong, if we find out that a futex
-		 * was woken, we don't return error and return this index to
-		 * userspace
+		 * was woken, we don't return error and make userspace aware
+		 * of this by returning 1.
 		 */
 		*woken = unqueue_multiple(vs, i);
 		if (*woken >= 0)
