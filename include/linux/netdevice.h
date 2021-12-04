@@ -1866,6 +1866,7 @@ enum netdev_ml_priv_type {
  *	@pcpu_refcnt:		Number of references to this device
  *	@dev_refcnt:		Number of references to this device
  *	@todo_list:		Delayed register/unregister
+ *	@refcnt_tracker:	Tracker directory for tracked references to this device
  *	@link_watch_list:	XXX: need comments on this one
  *
  *	@reg_state:		Register/unregister state machine
@@ -1938,6 +1939,7 @@ enum netdev_ml_priv_type {
  *			keep a list of interfaces to be deleted.
  *
  *	@dev_addr_shadow:	Copy of @dev_addr to catch direct writes.
+ *	@linkwatch_dev_tracker: refcount tracker used by linkwatch.
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.

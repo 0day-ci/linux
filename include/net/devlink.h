@@ -664,6 +664,7 @@ struct devlink_health_reporter_ops {
  * @trap_name: Trap name.
  * @trap_group_name: Trap group name.
  * @input_dev: Input netdevice.
+ * @dev_tracker: refcount tracker for @input_dev
  * @fa_cookie: Flow action user cookie.
  * @trap_type: Trap type.
  */
