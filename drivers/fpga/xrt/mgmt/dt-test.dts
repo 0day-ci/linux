@@ -1,0 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+
+/ {
+	compatible = "xlnx,xrt-group";
+	#address-cells = <3>;
+	#size-cells = <2>;
+	ep_fpga_configuration_00@0,0,1e88000 {
+		reg = <0 0 0x1e88000 0 0x8000>;
+	};
+};
