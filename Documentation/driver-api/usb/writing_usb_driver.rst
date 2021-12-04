@@ -262,19 +262,18 @@ One of the more difficult problems that USB drivers must be able to
 handle smoothly is the fact that the USB device may be removed from the
 system at any point in time, even if a program is currently talking to
 it. It needs to be able to shut down any current reads and writes and
-notify the user-space programs that the device is no longer there. The
-following code (function ``skel_delete``) is an example of how to do
-this::
+notify the user-space programs that the device is no longer there.
+skel_delete() is an example of how to do this::
 
-    static inline void skel_delete (struct usb_skel *dev)
+    static void skel_delete(struct kref *kref)
     {
-	kfree (dev->bulk_in_buffer);
-	if (dev->bulk_out_buffer != NULL)
-	    usb_free_coherent (dev->udev, dev->bulk_out_size,
-		dev->bulk_out_buffer,
-		dev->write_urb->transfer_dma);
-	usb_free_urb (dev->write_urb);
-	kfree (dev);
+	struct usb_skel *dev = to_skel_dev(kref);
+
+	usb_free_urb(dev->bulk_in_urb);
+	usb_put_intf(dev->interface);
+	usb_put_dev(dev->udev);
+	kfree(dev->bulk_in_buffer);
+	kfree(dev);
     }
 
 
