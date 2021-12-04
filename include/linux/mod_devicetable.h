@@ -595,6 +595,8 @@ struct platform_device_id {
 	kernel_ulong_t driver_data;
 };
 
+#define MDIO_ANY_ID (~0)
+
 #define MDIO_NAME_SIZE		32
 #define MDIO_MODULE_PREFIX	"mdio:"
 
