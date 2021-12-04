@@ -279,6 +279,11 @@ struct task_group;
  * BPF programs.
  */
 enum {
+	/*
+	 * For the old hard-coded 16, which is exposed to userspace and can't
+	 * be changed.
+	 */
+	TASK_COMM_LEN_16 = 16,
 	TASK_COMM_LEN = 16,
 };
 
