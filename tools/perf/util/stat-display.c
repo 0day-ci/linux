@@ -516,7 +516,7 @@ static void printout(struct perf_stat_config *config, struct aggr_cpu_id id, int
 static void aggr_update_shadow(struct perf_stat_config *config,
 			       struct evlist *evlist)
 {
-	int cpu, s;
+	int idx, cpu, s;
 	struct aggr_cpu_id s2, id;
 	u64 val;
 	struct evsel *counter;
@@ -525,11 +525,12 @@ static void aggr_update_shadow(struct perf_stat_config *config,
 		id = config->aggr_map->map[s];
 		evlist__for_each_entry(evlist, counter) {
 			val = 0;
-			for (cpu = 0; cpu < evsel__nr_cpus(counter); cpu++) {
+			for (idx = 0; idx < evsel__nr_cpus(counter); idx++) {
+				cpu = perf_cpu_map__cpu(evsel__cpus(counter), idx);
 				s2 = config->aggr_get_id(config, evlist->core.cpus, cpu);
 				if (!cpu_map__compare_aggr_cpu_id(s2, id))
 					continue;
-				val += perf_counts(counter->counts, cpu, 0)->val;
+				val += perf_counts(counter->counts, idx, 0)->val;
 			}
 			perf_stat__update_shadow_stats(counter, val,
 					first_shadow_cpu(config, counter, id),
