@@ -201,7 +201,7 @@ struct vnt_private {
 	unsigned char byTopCCKBasicRate;
 
 	unsigned char byMinChannel;
-	unsigned char byMaxChannel;
+	unsigned char max_channel;
 
 	unsigned char preamble_type;
 	unsigned char byShortPreamble;
