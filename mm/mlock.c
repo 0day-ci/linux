@@ -9,6 +9,7 @@
 #include <linux/capability.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/anon_vma.h>
 #include <linux/sched/user.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
