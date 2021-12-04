@@ -250,12 +250,12 @@ a device, it is recommended to set up your own urbs and submit them to
 the USB subsystem. The template uses urbs for read and write.
 
 When the user program releases the file handle that it has been using to
-talk to the device, the release function in the driver is called. In
+talk to the device, skel_release() in the driver is called. In
 this function we decrement our private usage count and wait for possible
 pending writes::
 
-    /* decrement our usage count for the device */
-    --skel->open_count;
+    /* decrement the count on our device */
+    kref_put(&dev->kref, skel_delete);
 
 
 One of the more difficult problems that USB drivers must be able to
