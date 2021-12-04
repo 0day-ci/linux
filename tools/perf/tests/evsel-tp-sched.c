@@ -5,6 +5,8 @@
 #include "tests.h"
 #include "debug.h"
 
+#define TASK_COMM_LEN 16
+
 static int evsel__test_field(struct evsel *evsel, const char *name, int size, bool should_be_signed)
 {
 	struct tep_format_field *field = evsel__field(evsel, name);
@@ -43,7 +45,7 @@ static int test__perf_evsel__tp_sched_test(struct test_suite *test __maybe_unuse
 		return -1;
 	}
 
-	if (evsel__test_field(evsel, "prev_comm", 16, false))
+	if (evsel__test_field(evsel, "prev_comm", TASK_COMM_LEN, false))
 		ret = -1;
 
 	if (evsel__test_field(evsel, "prev_pid", 4, true))
@@ -55,7 +57,7 @@ static int test__perf_evsel__tp_sched_test(struct test_suite *test __maybe_unuse
 	if (evsel__test_field(evsel, "prev_state", sizeof(long), true))
 		ret = -1;
 
-	if (evsel__test_field(evsel, "next_comm", 16, false))
+	if (evsel__test_field(evsel, "next_comm", TASK_COMM_LEN, false))
 		ret = -1;
 
 	if (evsel__test_field(evsel, "next_pid", 4, true))
@@ -73,7 +75,7 @@ static int test__perf_evsel__tp_sched_test(struct test_suite *test __maybe_unuse
 		return -1;
 	}
 
-	if (evsel__test_field(evsel, "comm", 16, false))
+	if (evsel__test_field(evsel, "comm", TASK_COMM_LEN, false))
 		ret = -1;
 
 	if (evsel__test_field(evsel, "pid", 4, true))
