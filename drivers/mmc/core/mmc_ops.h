@@ -55,6 +55,8 @@ void mmc_run_bkops(struct mmc_card *card);
 int mmc_cmdq_enable(struct mmc_card *card);
 int mmc_cmdq_disable(struct mmc_card *card);
 int mmc_sanitize(struct mmc_card *card, unsigned int timeout_ms);
+int mmc_set_time(struct mmc_card *card, struct mmc_host *host,
+		 u8 rtc_info_type, u64 seconds);
 
 #endif
 

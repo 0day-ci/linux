@@ -1063,3 +1063,62 @@ int mmc_sanitize(struct mmc_card *card, unsigned int timeout_ms)
 	return err;
 }
 EXPORT_SYMBOL_GPL(mmc_sanitize);
+
+int mmc_set_time(struct mmc_card *card, struct mmc_host *host,
+		 u8 rtc_info_type, u64 seconds)
+{
+	struct mmc_request mrq = {};
+	struct mmc_command cmd = {};
+	struct mmc_data data = {};
+	struct scatterlist sg;
+	int err = 0;
+	u8 *data_buf;
+
+	data_buf = kzalloc(512, GFP_KERNEL);
+	if (!data_buf)
+		return -ENOMEM;
+
+	if (rtc_info_type == 0x01 || rtc_info_type == 0x02 ||
+	    rtc_info_type == 0x03) {
+		data_buf[0] = 0x01;
+		data_buf[1] = rtc_info_type;
+		memcpy(&data_buf[2], &seconds, sizeof(u64));
+	} else {
+		pr_err("%s: invalid rtc_info_type %d\n",
+		       mmc_hostname(host), rtc_info_type);
+		kfree(data_buf);
+		return -EINVAL;
+	}
+
+	mrq.cmd = &cmd;
+	mrq.data = &data;
+
+	cmd.opcode = MMC_SET_TIME;
+	cmd.arg = 0;
+	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
+
+	data.blksz = 512;
+	data.blocks = 1;
+	data.flags = MMC_DATA_WRITE;
+	data.sg = &sg;
+	data.sg_len = 1;
+	sg_init_one(&sg, data_buf, 512);
+
+	mmc_set_data_timeout(&data, card);
+
+	mmc_wait_for_req(host, &mrq);
+
+	if (cmd.error) {
+		err = cmd.error;
+		goto out;
+	}
+
+	if (data.error) {
+		err = data.error;
+		goto out;
+	}
+out:
+	kfree(data_buf);
+	return err;
+}
+EXPORT_SYMBOL_GPL(mmc_set_time);
