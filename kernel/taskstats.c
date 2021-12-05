@@ -284,7 +284,7 @@ static int add_del_listener(pid_t pid, const struct cpumask *mask, int isadd)
 	if (current_user_ns() != &init_user_ns)
 		return -EINVAL;
 
-	if (task_active_pid_ns(current) != &init_pid_ns)
+	if (!task_is_in_root_ns(current))
 		return -EINVAL;
 
 	if (isadd == REGISTER) {
