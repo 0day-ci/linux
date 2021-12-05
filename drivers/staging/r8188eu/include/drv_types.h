@@ -206,7 +206,6 @@ struct adapter {
 	struct wifidirect_info	wdinfo;
 
 	struct hal_data_8188e *HalData;
-	u32 hal_data_sz;
 
 	s32	bDriverStopped;
 	s32	bSurpriseRemoved;
