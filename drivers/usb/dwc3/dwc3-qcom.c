@@ -667,7 +667,7 @@ static int dwc3_qcom_of_register_core(struct platform_device *pdev)
 
 	prop->name = "tx-fifo-resize";
 	ret = of_add_property(dwc3_np, prop);
-	if (ret) {
+	if (ret && ret != -EEXIST) {
 		dev_err(dev, "unable to add property\n");
 		goto node_put;
 	}
