@@ -41,6 +41,8 @@ struct devlink_dev_stats {
 struct devlink {
 	u32 index;
 	struct list_head port_list;
+	/* Protect add/delete operations of devlink_port */
+	struct mutex port_list_lock;
 	struct list_head rate_list;
 	struct list_head sb_list;
 	struct list_head dpipe_table_list;
@@ -60,7 +62,7 @@ struct devlink {
 	struct device *dev;
 	possible_net_t _net;
 	/* Serializes access to devlink instance specific objects such as
-	 * port, sb, dpipe, resource, params, region, traps and more.
+	 * sb, dpipe, resource, params, region, traps and more.
 	 */
 	struct mutex lock;
 	u8 reload_failed:1;
@@ -1373,6 +1375,7 @@ static int devlink_nl_cmd_port_get_dumpit(struct sk_buff *msg,
 			goto retry;
 
 		mutex_lock(&devlink->lock);
+		mutex_lock(&devlink->port_list_lock);
 		list_for_each_entry(devlink_port, &devlink->port_list, list) {
 			if (idx < start) {
 				idx++;
@@ -1384,12 +1387,14 @@ static int devlink_nl_cmd_port_get_dumpit(struct sk_buff *msg,
 						   cb->nlh->nlmsg_seq,
 						   NLM_F_MULTI, cb->extack);
 			if (err) {
+				mutex_unlock(&devlink->port_list_lock);
 				mutex_unlock(&devlink->lock);
 				devlink_put(devlink);
 				goto out;
 			}
 			idx++;
 		}
+		mutex_unlock(&devlink->port_list_lock);
 		mutex_unlock(&devlink->lock);
 retry:
 		devlink_put(devlink);
@@ -4977,6 +4982,7 @@ static int devlink_nl_cmd_port_param_get_dumpit(struct sk_buff *msg,
 			goto retry;
 
 		mutex_lock(&devlink->lock);
+		mutex_lock(&devlink->port_list_lock);
 		list_for_each_entry(devlink_port, &devlink->port_list, list) {
 			list_for_each_entry(param_item,
 					    &devlink_port->param_list, list) {
@@ -4994,6 +5000,7 @@ static int devlink_nl_cmd_port_param_get_dumpit(struct sk_buff *msg,
 				if (err == -EOPNOTSUPP) {
 					err = 0;
 				} else if (err) {
+					mutex_unlock(&devlink->port_list_lock);
 					mutex_unlock(&devlink->lock);
 					devlink_put(devlink);
 					goto out;
@@ -5001,6 +5008,7 @@ static int devlink_nl_cmd_port_param_get_dumpit(struct sk_buff *msg,
 				idx++;
 			}
 		}
+		mutex_unlock(&devlink->port_list_lock);
 		mutex_unlock(&devlink->lock);
 retry:
 		devlink_put(devlink);
@@ -5531,13 +5539,15 @@ static int devlink_nl_cmd_region_get_devlink_dumpit(struct sk_buff *msg,
 		(*idx)++;
 	}
 
+	mutex_lock(&devlink->port_list_lock);
 	list_for_each_entry(port, &devlink->port_list, list) {
 		err = devlink_nl_cmd_region_get_port_dumpit(msg, cb, port, idx,
 							    start);
 		if (err)
-			goto out;
+			goto out_port;
 	}
-
+out_port:
+	mutex_unlock(&devlink->port_list_lock);
 out:
 	mutex_unlock(&devlink->lock);
 	return err;
@@ -7305,6 +7315,7 @@ retry_rep:
 			goto retry_port;
 
 		mutex_lock(&devlink->lock);
+		mutex_lock(&devlink->port_list_lock);
 		list_for_each_entry(port, &devlink->port_list, list) {
 			mutex_lock(&port->reporters_lock);
 			list_for_each_entry(reporter, &port->reporter_list, list) {
@@ -7319,6 +7330,7 @@ retry_rep:
 					cb->nlh->nlmsg_seq, NLM_F_MULTI);
 				if (err) {
 					mutex_unlock(&port->reporters_lock);
+					mutex_unlock(&devlink->port_list_lock);
 					mutex_unlock(&devlink->lock);
 					devlink_put(devlink);
 					goto out;
@@ -7327,6 +7339,7 @@ retry_rep:
 			}
 			mutex_unlock(&port->reporters_lock);
 		}
+		mutex_unlock(&devlink->port_list_lock);
 		mutex_unlock(&devlink->lock);
 retry_port:
 		devlink_put(devlink);
@@ -9029,6 +9042,7 @@ struct devlink *devlink_alloc_ns(const struct devlink_ops *ops,
 	xa_init_flags(&devlink->snapshot_ids, XA_FLAGS_ALLOC);
 	write_pnet(&devlink->_net, net);
 	INIT_LIST_HEAD(&devlink->port_list);
+	mutex_init(&devlink->port_list_lock);
 	INIT_LIST_HEAD(&devlink->rate_list);
 	INIT_LIST_HEAD(&devlink->sb_list);
 	INIT_LIST_HEAD_RCU(&devlink->dpipe_table_list);
@@ -9190,6 +9204,7 @@ void devlink_free(struct devlink *devlink)
 	WARN_ON(!list_empty(&devlink->dpipe_table_list));
 	WARN_ON(!list_empty(&devlink->sb_list));
 	WARN_ON(!list_empty(&devlink->rate_list));
+	mutex_destroy(&devlink->port_list_lock);
 	WARN_ON(!list_empty(&devlink->port_list));
 
 	xa_destroy(&devlink->snapshot_ids);
@@ -9261,9 +9276,9 @@ int devlink_port_register(struct devlink *devlink,
 	INIT_LIST_HEAD(&devlink_port->region_list);
 	INIT_DELAYED_WORK(&devlink_port->type_warn_dw, &devlink_port_type_warn);
 
-	mutex_lock(&devlink->lock);
+	mutex_lock(&devlink->port_list_lock);
 	list_add_tail(&devlink_port->list, &devlink->port_list);
-	mutex_unlock(&devlink->lock);
+	mutex_unlock(&devlink->port_list_lock);
 
 	devlink_port_notify(devlink_port, DEVLINK_CMD_PORT_NEW);
 	devlink_port_type_warn_schedule(devlink_port);
@@ -9282,9 +9297,9 @@ void devlink_port_unregister(struct devlink_port *devlink_port)
 
 	devlink_port_type_warn_cancel(devlink_port);
 	devlink_port_notify(devlink_port, DEVLINK_CMD_PORT_DEL);
-	mutex_lock(&devlink->lock);
+	mutex_lock(&devlink->port_list_lock);
 	list_del(&devlink_port->list);
-	mutex_unlock(&devlink->lock);
+	mutex_unlock(&devlink->port_list_lock);
 	WARN_ON(!list_empty(&devlink_port->reporter_list));
 	WARN_ON(!list_empty(&devlink_port->region_list));
 	mutex_destroy(&devlink_port->reporters_lock);
