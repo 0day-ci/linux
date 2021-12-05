@@ -517,10 +517,11 @@ static int uvc_default_frame_interval(struct uvc_video *video)
  */
 int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 {
-	int iframe;
+	int iframe, iformat;
 
 	INIT_LIST_HEAD(&video->req_free);
 	spin_lock_init(&video->req_lock);
+	spin_lock_init(&video->frame_lock);
 	INIT_WORK(&video->pump, uvcg_video_pump);
 
 	if (list_empty(&uvc->header->formats))
@@ -529,6 +530,10 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 	video->uvc = uvc;
 	video->cur_format = find_format_by_index(uvc, 1);
 	if (!video->cur_format)
+		return -EINVAL;
+
+	iformat = find_format_index(uvc, video->cur_format);
+	if (!iformat)
 		return -EINVAL;
 
 	iframe = uvc_frame_default(video->cur_format);
@@ -540,6 +545,11 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 		return -EINVAL;
 
 	video->cur_ival = uvc_default_frame_interval(video);
+
+	uvc_fill_streaming_control(uvc, &video->probe, iframe, iformat,
+				   video->cur_ival);
+	uvc_fill_streaming_control(uvc, &video->commit, iframe, iformat,
+				   video->cur_ival);
 
 	/* Initialize the video buffers queue. */
 	uvcg_queue_init(&video->queue, uvc->v4l2_dev.dev->parent,
