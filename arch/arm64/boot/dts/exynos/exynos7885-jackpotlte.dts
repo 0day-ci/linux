@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Samsung Galaxy A8 2018 (jackpotlte/SM-A530F) device tree source
+ *
+ * Copyright (c) 2021 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2021 Dávid Virág
+ *
+ */
+
+/dts-v1/;
+#include "exynos7885.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/ {
+	model = "Samsung Galaxy A8 (2018)";
+	compatible = "samsung,jackpotlte", "samsung,exynos7885";
+	chassis-type = "handset";
+
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	aliases {
+		serial0 = &serial_0;
+		serial1 = &serial_1;
+		serial2 = &serial_2;
+	};
+
+	chosen {
+		stdout-path = &serial_2;
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x3DA00000>,
+		      <0x0 0xC0000000 0x40000000>,
+		      <0x8 0x80000000 0x40000000>;
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&key_volup &key_voldown &key_power>;
+		volup {
+			label = "Volume Up";
+			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupt-parent = <&gpa1>;
+			linux,code = <KEY_VOLUMEUP>;
+			gpios = <&gpa1 5 GPIO_ACTIVE_LOW>;
+		};
+		voldown {
+			label = "Volume Down";
+			interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupt-parent = <&gpa1>;
+			linux,code = <KEY_VOLUMEDOWN>;
+			gpios = <&gpa1 6 GPIO_ACTIVE_LOW>;
+		};
+		powerkey {
+			label = "Power Key";
+			interrupts = <7 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupt-parent = <&gpa1>;
+			linux,code = <KEY_POWER>;
+			gpios = <&gpa1 7 GPIO_ACTIVE_LOW>;
+			wakeup-source;
+		};
+	};
+};
+
+&serial_2 {
+	status = "okay";
+};
+
+&pinctrl_alive {
+	key_volup: key-volup {
+		samsung,pins = "gpa1-5";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_F>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+		samsung,pin-drv = <0>;
+	};
+
+	key_voldown: key-voldown {
+		samsung,pins = "gpa1-6";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_F>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+		samsung,pin-drv = <0>;
+	};
+
+	key_power: key-power {
+		samsung,pins = "gpa1-7";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_F>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+		samsung,pin-drv = <0>;
+	};
+};
