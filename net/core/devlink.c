@@ -8979,6 +8979,7 @@ static struct genl_family devlink_nl_family __ro_after_init = {
 	.n_small_ops	= ARRAY_SIZE(devlink_nl_ops),
 	.mcgrps		= devlink_nl_mcgrps,
 	.n_mcgrps	= ARRAY_SIZE(devlink_nl_mcgrps),
+	.parallel_ops   = true,
 };
 
 static bool devlink_reload_actions_valid(const struct devlink_ops *ops)
