@@ -205,7 +205,7 @@ struct adapter {
 	struct	hostapd_priv	*phostapdpriv;
 	struct wifidirect_info	wdinfo;
 
-	void *HalData;
+	struct hal_data_8188e *HalData;
 	u32 hal_data_sz;
 
 	s32	bDriverStopped;

@@ -36,7 +36,7 @@ void SwLedOn(struct adapter *padapter, struct LED_871x *pLed)
 void SwLedOff(struct adapter *padapter, struct LED_871x *pLed)
 {
 	u8	LedCfg;
-	struct hal_data_8188e	*pHalData = GET_HAL_DATA(padapter);
+	struct hal_data_8188e *pHalData = padapter->HalData;
 
 	if (padapter->bSurpriseRemoved || padapter->bDriverStopped)
 		goto exit;
