@@ -1464,7 +1464,6 @@ static int load_with_options(int argc, char **argv, bool first_prog_only)
 	DECLARE_LIBBPF_OPTS(bpf_object_open_opts, open_opts,
 		.relaxed_maps = relaxed_maps,
 	);
-	struct bpf_object_load_attr load_attr = { 0 };
 	enum bpf_attach_type expected_attach_type;
 	struct map_replace *map_replace = NULL;
 	struct bpf_program *prog = NULL, *pos;
@@ -1598,6 +1597,10 @@ static int load_with_options(int argc, char **argv, bool first_prog_only)
 
 	set_max_rlimit();
 
+	if (verifier_logs)
+		/* log_level1 + log_level2 + stats, but not stable UAPI */
+		open_opts.kernel_log_level = 1 + 2 + 4;
+
 	obj = bpf_object__open_file(file, &open_opts);
 	if (libbpf_get_error(obj)) {
 		p_err("failed to open object file");
@@ -1677,12 +1680,7 @@ static int load_with_options(int argc, char **argv, bool first_prog_only)
 		goto err_close_obj;
 	}
 
-	load_attr.obj = obj;
-	if (verifier_logs)
-		/* log_level1 + log_level2 + stats, but not stable UAPI */
-		load_attr.log_level = 1 + 2 + 4;
-
-	err = bpf_object__load_xattr(&load_attr);
+	err = bpf_object__load(obj);
 	if (err) {
 		p_err("failed to load object file");
 		goto err_close_obj;
@@ -1807,7 +1805,6 @@ static int do_loader(int argc, char **argv)
 {
 	DECLARE_LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	DECLARE_LIBBPF_OPTS(gen_loader_opts, gen);
-	struct bpf_object_load_attr load_attr = {};
 	struct bpf_object *obj;
 	const char *file;
 	int err = 0;
@@ -1815,6 +1812,10 @@ static int do_loader(int argc, char **argv)
 	if (!REQ_ARGS(1))
 		return -1;
 	file = GET_ARG();
+
+	if (verifier_logs)
+		/* log_level1 + log_level2 + stats, but not stable UAPI */
+		open_opts.kernel_log_level = 1 + 2 + 4;
 
 	obj = bpf_object__open_file(file, &open_opts);
 	if (libbpf_get_error(obj)) {
@@ -1826,12 +1827,7 @@ static int do_loader(int argc, char **argv)
 	if (err)
 		goto err_close_obj;
 
-	load_attr.obj = obj;
-	if (verifier_logs)
-		/* log_level1 + log_level2 + stats, but not stable UAPI */
-		load_attr.log_level = 1 + 2 + 4;
-
-	err = bpf_object__load_xattr(&load_attr);
+	err = bpf_object__load(obj);
 	if (err) {
 		p_err("failed to load object file");
 		goto err_close_obj;
