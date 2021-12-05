@@ -15,6 +15,17 @@
 
 #include <linux/tracepoint.h>
 
+#if !defined(CONFIG_IWLWIFI_DEVICE_TRACING) || defined(__CHECKER__)
+#undef TRACE_EVENT
+#define TRACE_EVENT(name, proto, ...) \
+static inline void trace_ ## name(proto) {}
+#undef DECLARE_EVENT_CLASS
+#define DECLARE_EVENT_CLASS(...)
+#undef DEFINE_EVENT
+#define DEFINE_EVENT(evt_class, name, proto, ...) \
+static inline void trace_ ## name(proto) {}
+#endif
+
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM iwlmei_sap_cmd
 
