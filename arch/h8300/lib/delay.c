@@ -8,7 +8,7 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <asm/param.h>
-#include <asm/processor.h>
+#include <linux/processor.h>
 #include <asm/timex.h>
 
 void __delay(unsigned long cycles)
