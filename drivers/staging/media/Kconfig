@@ -24,6 +24,8 @@ source "drivers/staging/media/atomisp/Kconfig"
 
 source "drivers/staging/media/hantro/Kconfig"
 
+source "drivers/staging/media/i2c/Kconfig"
+
 source "drivers/staging/media/imx/Kconfig"
 
 source "drivers/staging/media/max96712/Kconfig"
