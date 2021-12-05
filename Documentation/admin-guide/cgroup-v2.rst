@@ -2099,74 +2099,110 @@ Cpuset Interface Files
 	It accepts only the following input values when written to.
 
 	  ========	================================
-	  "root"	a partition root
-	  "member"	a non-root member of a partition
+	  "member"	Non-root member of a partition
+	  "root"	Partition root
+	  "isolated"	Partition root without load balancing
 	  ========	================================
 
-	When set to be a partition root, the current cgroup is the
-	root of a new partition or scheduling domain that comprises
-	itself and all its descendants except those that are separate
-	partition roots themselves and their descendants.  The root
-	cgroup is always a partition root.
+	The root cgroup is always a partition root and its state
+	cannot be changed.  All other non-root cgroups start out as
+	"member".
 
-	There are constraints on where a partition root can be set.
-	It can only be set in a cgroup if all the following conditions
-	are true.
+	When set to "root", the current cgroup is the root of a new
+	partition or scheduling domain that comprises itself and
+	all its descendants except those that are separate partition
+	roots themselves and their descendants.
 
-	1) The "cpuset.cpus" is not empty and the list of CPUs are
-	   exclusive, i.e. they are not shared by any of its siblings.
-	2) The parent cgroup is a partition root.
-	3) The "cpuset.cpus" is also a proper subset of the parent's
-	   "cpuset.cpus.effective".
-	4) There is no child cgroups with cpuset enabled.  This is for
-	   eliminating corner cases that have to be handled if such a
-	   condition is allowed.
+	The value shown in "cpuset.cpus.effective" of a partition root is
+	the CPUs that the parent partition root can dedicate to the new
+	partition root.  They are subtracted from "cpuset.cpus.effective"
+	of the parent and may be different from "cpuset.cpus"
 
-	Setting it to partition root will take the CPUs away from the
-	effective CPUs of the parent cgroup.  Once it is set, this
-	file cannot be reverted back to "member" if there are any child
-	cgroups with cpuset enabled.
+	When set to "isolated", the CPUs in that partition root will
+	be in an isolated state without any load balancing from the
+	scheduler.  Tasks placed in such a partition with multiple
+	CPUs should be carefully distributed and bound to each of the
+	individual CPUs for optimal performance.
 
-	A parent partition cannot distribute all its CPUs to its
-	child partitions.  There must be at least one cpu left in the
-	parent partition.
+	A partition root ("root" or "isolated") can be in one of the
+	two possible states - valid or invalid.  An invalid partition
+	root is in a degraded state where some state information are
+	retained, but behaves more like a "member".
 
-	Once becoming a partition root, changes to "cpuset.cpus" is
-	generally allowed as long as the first condition above is true,
-	the change will not take away all the CPUs from the parent
-	partition and the new "cpuset.cpus" value is a superset of its
-	children's "cpuset.cpus" values.
+	On read, the "cpuset.cpus.partition" file can show the following
+	values.
 
-	Sometimes, external factors like changes to ancestors'
-	"cpuset.cpus" or cpu hotplug can cause the state of the partition
-	root to change.  On read, the "cpuset.sched.partition" file
-	can show the following values.
+	  ======================	==============================
+	  "member"			Non-root member of a partition
+	  "root"			Partition root
+	  "isolated"			Partition root without load balancing
+	  "root invalid (<reason>)"	Invalid partition root
+	  "isolated invalid (<reason>)"	Invalid isolated partition root
+	  ======================	==============================
 
-	  ==============	==============================
-	  "member"		Non-root member of a partition
-	  "root"		Partition root
-	  "root invalid"	Invalid partition root
-	  ==============	==============================
+	In the case of an invalid partition root, a descriptive string on
+	why the partition is invalid is included within parentheses.
 
-	It is a partition root if the first 2 partition root conditions
-	above are true and at least one CPU from "cpuset.cpus" is
-	granted by the parent cgroup.
+	Almost all possible state transitions among "member", valid
+	and invalid partition roots are allowed except from "member"
+	to invalid partition root.
 
-	A partition root can become invalid if none of CPUs requested
-	in "cpuset.cpus" can be granted by the parent cgroup or the
-	parent cgroup is no longer a partition root itself.  In this
-	case, it is not a real partition even though the restriction
-	of the first partition root condition above will still apply.
-	The cpu affinity of all the tasks in the cgroup will then be
-	associated with CPUs in the nearest ancestor partition.
+	Before the "member" to partition root transition can happen,
+	the following conditions must be met or the transition will
+	not be allowed.
 
-	An invalid partition root can be transitioned back to a
-	real partition root if at least one of the requested CPUs
-	can now be granted by its parent.  In this case, the cpu
-	affinity of all the tasks in the formerly invalid partition
-	will be associated to the CPUs of the newly formed partition.
-	Changing the partition state of an invalid partition root to
-	"member" is always allowed even if child cpusets are present.
+	1) The "cpuset.cpus" is non-empty and exclusive, i.e. they are
+	   not shared by any of its siblings.
+	2) The parent cgroup is a valid partition root.
+	3) The "cpuset.cpus" must contain at least one of the CPUs from
+	   parent's "cpuset.cpus", i.e. they overlap.
+	4) There is no child cgroups with cpuset enabled.  This avoids
+	   cpu migrations of multiple cgroups simultaneously which can
+	   be problematic.
+
+	Once becoming a partition root, the only rule restricting
+	changes made to "cpuset.cpus" is the exclusivity rule where
+	none of the siblings of a partition root can share CPUs with
+	it.
+
+	External events like hotplug or inappropriate changes to
+	"cpuset.cpus" can cause a valid partition root to become invalid.
+	Besides the exclusivity rule listed above, the other conditions
+	required to maintain the validity of a partition root are
+	as follows:
+
+	1) The parent cgroup is a valid partition root.
+	2) If "cpuset.cpus.effective" is empty, the partition must have
+	   no task associated with it. Otherwise, the partition becomes
+	   invalid and "cpuset.cpus.effective" will fall back to that
+	   of the nearest non-empty ancestor.
+
+	A corollary of a valid partition root is that
+	"cpuset.cpus.effective" is always a subset of "cpuset.cpus".
+	Note that a task cannot be moved to a cgroup with empty
+	"cpuset.cpus.effective".
+
+	A valid non-root parent partition may distribute out all its CPUs
+	to its child partitions when there is no task associated with it.
+
+	An invalid partition root will be reverted back to a valid
+	one if none of the validity constraints of a valid partition
+	root are violated due to hotplug events or proper changes to
+	"cpuset.cpus" files.
+
+	Changing a partition root (valid or invalid) to "member" is
+	always allowed.  If there are child partition roots underneath
+	it, they will become invalid and unrecoverable.  So care must
+	be taken to double check for this condition before disabling
+	a partition root.
+
+	Poll and inotify events are triggered whenever the state of
+	"cpuset.cpus.partition" changes.  That includes changes caused
+	by write to "cpuset.cpus.partition", cpu hotplug or other
+	changes that modify the validity status of the partition.
+	This will allow user space agents to monitor unexpected changes
+	to "cpuset.cpus.partition" without the need to do continuous
+	polling.
 
 
 Device controller
