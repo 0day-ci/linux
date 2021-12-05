@@ -1698,6 +1698,9 @@ static int i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	}
 	priv->features &= ~disable_features;
 
+	if (!(priv->features & FEATURE_BLOCK_BUFFER))
+		priv->features &= ~FEATURE_BLOCK_PROC;
+
 	err = pcim_enable_device(dev);
 	if (err) {
 		dev_err(&dev->dev, "Failed to enable SMBus PCI device (%d)\n",
