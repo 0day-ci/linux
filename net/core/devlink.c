@@ -8810,7 +8810,6 @@ static const struct genl_small_ops devlink_nl_ops[] = {
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = devlink_nl_cmd_reload,
 		.flags = GENL_ADMIN_PERM,
-		.internal_flags = DEVLINK_NL_FLAG_NO_LOCK,
 	},
 	{
 		.cmd = DEVLINK_CMD_PARAM_GET,
@@ -11448,10 +11447,15 @@ static void __net_exit devlink_pernet_pre_exit(struct net *net)
 			goto retry;
 
 		WARN_ON(!(devlink->features & DEVLINK_F_RELOAD));
+
+		mutex_lock(&devlink->lock);
+		xa_set_mark(&devlinks, devlink->index, DEVLINK_NESTED_LOCK);
 		err = devlink_reload(devlink, &init_net,
 				     DEVLINK_RELOAD_ACTION_DRIVER_REINIT,
 				     DEVLINK_RELOAD_LIMIT_UNSPEC,
 				     &actions_performed, NULL);
+		xa_clear_mark(&devlinks, devlink->index, DEVLINK_NESTED_LOCK);
+		mutex_unlock(&devlink->lock);
 		if (err && err != -EOPNOTSUPP)
 			pr_warn("Failed to reload devlink instance into init_net\n");
 retry:
