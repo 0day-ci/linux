@@ -2679,18 +2679,24 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 
 			hdrlen = ieee80211_fill_mesh_addresses(&hdr, &fc,
 					mesh_da, sdata->vif.addr);
-			if (is_multicast_ether_addr(mesh_da))
+			if (is_multicast_ether_addr(mesh_da)) {
 				/* DA TA mSA AE:SA */
 				meshhdrlen = ieee80211_new_mesh_header(
 						sdata, &mesh_hdr,
 						skb->data + ETH_ALEN, NULL);
-			else
+			} else {
 				/* RA TA mDA mSA AE:DA SA */
 				meshhdrlen = ieee80211_new_mesh_header(
 						sdata, &mesh_hdr, skb->data,
 						skb->data + ETH_ALEN);
 
+				/* cache unicast proxy headers */
+				if (ethertype >= ETH_P_802_3_MIN)
+					ctrl_flags |= IEEE80211_TX_CTRL_CHECK_FAST_MESH;
+			}
+
 		}
+
 		chanctx_conf = rcu_dereference(sdata->vif.chanctx_conf);
 		if (!chanctx_conf) {
 			ret = -ENOTCONN;
@@ -3621,6 +3627,79 @@ static bool ieee80211_xmit_fast(struct ieee80211_sub_if_data *sdata,
 	return true;
 }
 
+static bool ieee80211_mesh_xmit_fast(struct ieee80211_sub_if_data *sdata,
+				     struct sk_buff *skb, u32 ctrl_flags)
+{
+	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
+	struct ieee80211_tx_data tx;
+	struct ieee80211_tx_info *info;
+	struct mhdr_cache_entry *entry;
+	u16 ethertype = (skb->data[12] << 8) | skb->data[13];
+	struct ieee80211_key *key;
+	struct sta_info *sta;
+
+	if (ctrl_flags & IEEE80211_TX_CTRL_SKIP_MPATH_LOOKUP)
+		return false;
+
+	/* TODO reduce/combine multiple checks which aren't per packet */
+	if (ifmsh->mshcfg.dot11MeshNolearn)
+		return false;
+
+	if (!ieee80211_hw_check(&local->hw, SUPPORT_FAST_XMIT))
+		return false;
+
+	if (sdata->noack_map)
+		return false;
+
+	if (is_multicast_ether_addr(skb->data))
+		return false;
+
+	if (ethertype < ETH_P_802_3_MIN)
+		return false;
+
+	if (skb->sk && skb_shinfo(skb)->tx_flags & SKBTX_WIFI_STATUS)
+		return false;
+
+	/* Fill cached header for this eth data */
+	entry = mesh_fill_cached_hdr(sdata, skb);
+
+	if (!entry)
+		return false;
+
+	info = IEEE80211_SKB_CB(skb);
+	memset(info, 0, sizeof(*info));
+	info->band = entry->band;
+	info->control.vif = &sdata->vif;
+	info->flags = IEEE80211_TX_CTL_FIRST_FRAGMENT |
+		      IEEE80211_TX_CTL_DONTFRAG;
+
+	info->control.flags = IEEE80211_TX_CTRL_FAST_XMIT;
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	if (local->force_tx_status)
+		info->flags |= IEEE80211_TX_CTL_REQ_TX_STATUS;
+#endif
+
+	sta = entry->mpath->next_hop;
+	key = entry->key;
+
+	__skb_queue_head_init(&tx.skbs);
+
+	tx.flags = IEEE80211_TX_UNICAST;
+	tx.local = local;
+	tx.sdata = sdata;
+	tx.sta = sta;
+	tx.key = key;
+
+	ieee80211_xmit_fast_finish(sdata, sta, entry->pn_offs,
+				   key, &tx);
+
+	__skb_queue_tail(&tx.skbs, skb);
+	ieee80211_tx_frags(local, &sdata->vif, sta, &tx.skbs, false);
+	return true;
+}
+
 struct sk_buff *ieee80211_tx_dequeue(struct ieee80211_hw *hw,
 				     struct ieee80211_txq *txq)
 {
@@ -4176,6 +4255,10 @@ void __ieee80211_subif_start_xmit(struct sk_buff *skb,
 	}
 
 	rcu_read_lock();
+
+	if (ieee80211_vif_is_mesh(&sdata->vif) &&
+	    ieee80211_mesh_xmit_fast(sdata, skb, ctrl_flags))
+		goto out;
 
 	if (ieee80211_lookup_ra_sta(sdata, skb, &sta))
 		goto out_free;

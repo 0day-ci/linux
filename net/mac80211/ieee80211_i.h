@@ -725,6 +725,7 @@ struct ieee80211_if_mesh {
 	struct mesh_table *mpp_paths; /* Store paths for MPP&MAP */
 	int mesh_paths_generation;
 	int mpp_paths_generation;
+	struct mesh_hdr_cache *hdr_cache;
 };
 
 #ifdef CONFIG_MAC80211_MESH
