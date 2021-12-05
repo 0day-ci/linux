@@ -18,6 +18,7 @@
 #define IOSM_IP_TYPE_IPV6 0x60
 
 #define IOSM_IF_ID_PAYLOAD 2
+#define IOSM_QDISC_QUEUE_LEN 1000
 
 /**
  * struct iosm_netdev_priv - netdev WWAN driver specific private data
@@ -159,7 +160,7 @@ static void ipc_wwan_setup(struct net_device *iosm_dev)
 {
 	iosm_dev->header_ops = NULL;
 	iosm_dev->hard_header_len = 0;
-	iosm_dev->priv_flags |= IFF_NO_QUEUE;
+	iosm_dev->tx_queue_len = IOSM_QDISC_QUEUE_LEN;
 
 	iosm_dev->type = ARPHRD_NONE;
 	iosm_dev->mtu = ETH_DATA_LEN;
