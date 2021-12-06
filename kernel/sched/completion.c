@@ -38,6 +38,13 @@ void complete(struct completion *x)
 }
 EXPORT_SYMBOL(complete);
 
+void complete_put(refcount_t *r, struct completion *x)
+{
+	if (refcount_dec_and_test(r))
+		complete(x);
+}
+EXPORT_SYMBOL(complete_put);
+
 /**
  * complete_all: - signals all threads waiting on this completion
  * @x:  holds the state of this particular completion
