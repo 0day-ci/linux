@@ -300,16 +300,15 @@ static u8 fix_header(struct _adapter *adapter, u8 header, u16 header_addr)
 		for (i = 0; i < PGPKG_MAX_WORDS; i++) {
 			if (BIT(i) & word_en) {
 				if (BIT(i) & pkt.word_en) {
-					if (efuse_one_byte_read(
-							adapter, addr,
-							&value))
+					if (efuse_one_byte_read(adapter,
+								addr,
+								&value))
 						pkt.data[i * 2] = value;
 					else
 						return false;
-					if (efuse_one_byte_read(
-							adapter,
-							addr + 1,
-							&value))
+					if (efuse_one_byte_read(adapter,
+								addr + 1,
+								&value))
 						pkt.data[i * 2 + 1] =
 							value;
 					else
