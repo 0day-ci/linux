@@ -4090,7 +4090,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int highest_zoneidx)
 	bool boosted;
 	struct zone *zone;
 	struct scan_control sc = {
-		.gfp_mask = GFP_KERNEL,
+		.gfp_mask = GFP_KERNEL & ~__GFP_DIRECT_RECLAIM,
 		.order = order,
 		.may_unmap = 1,
 	};
