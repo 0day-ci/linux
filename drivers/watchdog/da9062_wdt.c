@@ -195,8 +195,11 @@ static int da9062_wdt_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	unsigned int timeout;
+	unsigned int mask;
 	struct da9062 *chip;
 	struct da9062_watchdog *wdt;
+	int ret;
+	u32 val;
 
 	chip = dev_get_drvdata(dev->parent);
 	if (!chip)
@@ -234,6 +237,30 @@ static int da9062_wdt_probe(struct platform_device *pdev)
 	if (timeout) {
 		da9062_wdt_set_timeout(&wdt->wdtdev, wdt->wdtdev.timeout);
 		set_bit(WDOG_HW_RUNNING, &wdt->wdtdev.status);
+	}
+
+	/*
+	 * Configure what happens on watchdog timeout. Can be specified with
+	 * "dlg,wdt-sd" dt-binding (0 -> POWERDOWN, 1 -> SHUTDOWN).
+	 * If "dlg,wdt-sd" dt-binding is NOT set use the default.
+	 */
+	ret = device_property_read_u32(dev, "dlg,wdt-sd", &val);
+	if (!ret) {
+		if (val)
+			/* Use da9062's SHUTDOWN mode */
+			mask = DA9062AA_WATCHDOG_SD_MASK;
+		else
+			/* Use da9062's POWERDOWN mode. */
+			mask = 0x0;
+
+		ret = regmap_update_bits(wdt->hw->regmap,
+						DA9062AA_CONFIG_I,
+						DA9062AA_WATCHDOG_SD_MASK,
+						mask);
+
+		if (ret)
+			dev_err(dev, "failed to set wdt reset mode: %d\n",
+				ret);
 	}
 
 	return devm_watchdog_register_device(dev, &wdt->wdtdev);
