@@ -221,7 +221,7 @@ static int expand_one_shrinker_info(struct mem_cgroup *memcg,
 	int nid;
 	int size = map_size + defer_size;
 
-	for_each_node(nid) {
+	for_each_online_node(nid) {
 		pn = memcg->nodeinfo[nid];
 		old = shrinker_info_protected(memcg, nid);
 		/* Not yet online memcg */
@@ -256,7 +256,7 @@ void free_shrinker_info(struct mem_cgroup *memcg)
 	struct shrinker_info *info;
 	int nid;
 
-	for_each_node(nid) {
+	for_each_online_node(nid) {
 		pn = memcg->nodeinfo[nid];
 		info = rcu_dereference_protected(pn->shrinker_info, true);
 		kvfree(info);
@@ -274,7 +274,7 @@ int alloc_shrinker_info(struct mem_cgroup *memcg)
 	map_size = shrinker_map_size(shrinker_nr_max);
 	defer_size = shrinker_defer_size(shrinker_nr_max);
 	size = map_size + defer_size;
-	for_each_node(nid) {
+	for_each_online_node(nid) {
 		info = kvzalloc_node(sizeof(*info) + size, GFP_KERNEL, nid);
 		if (!info) {
 			free_shrinker_info(memcg);
@@ -417,7 +417,7 @@ void reparent_shrinker_deferred(struct mem_cgroup *memcg)
 
 	/* Prevent from concurrent shrinker_info expand */
 	down_read(&shrinker_rwsem);
-	for_each_node(nid) {
+	for_each_online_node(nid) {
 		child_info = shrinker_info_protected(memcg, nid);
 		parent_info = shrinker_info_protected(parent, nid);
 		for (i = 0; i < shrinker_nr_max; i++) {
