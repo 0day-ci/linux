@@ -169,7 +169,11 @@ static struct platform_device *omap_usbhs_alloc_child(const char *name,
 	}
 
 	child->dev.dma_mask		= &usbhs_dmamask;
-	dma_set_coherent_mask(&child->dev, DMA_BIT_MASK(32));
+	ret = dma_set_coherent_mask(&child->dev, DMA_BIT_MASK(32));
+	if (ret) {
+		dev_err(&child->dev, "DMA enable failed\n");
+		goto err_alloc;
+	}
 	child->dev.parent		= dev;
 
 	ret = platform_device_add(child);
