@@ -7588,6 +7588,8 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/net/fsl,fec.yaml
 F:	drivers/net/ethernet/freescale/fec.h
 F:	drivers/net/ethernet/freescale/fec_main.c
+F:	drivers/net/ethernet/freescale/fec_phy.c
+F:	drivers/net/ethernet/freescale/fec_phy.h
 F:	drivers/net/ethernet/freescale/fec_ptp.c
 
 FREESCALE IMX / MXC FRAMEBUFFER DRIVER
