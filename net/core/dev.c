@@ -3975,10 +3975,16 @@ struct netdev_queue *netdev_core_pick_tx(struct net_device *dev,
 {
 	int queue_index = 0;
 
-#ifdef CONFIG_XPS
-	u32 sender_cpu = skb->sender_cpu - 1;
+#ifdef CONFIG_NET_CLS_ACT
+	if (skb->tc_skip_txqueue) {
+		queue_index = netdev_cap_txqueue(dev,
+						 skb_get_queue_mapping(skb));
+		return netdev_get_tx_queue(dev, queue_index);
+	}
+#endif
 
-	if (sender_cpu >= (u32)NR_CPUS)
+#ifdef CONFIG_XPS
+	if ((skb->sender_cpu - 1) >= (u32)NR_CPUS)
 		skb->sender_cpu = raw_smp_processor_id() + 1;
 #endif
 

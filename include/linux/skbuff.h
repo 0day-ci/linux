@@ -856,6 +856,7 @@ struct sk_buff {
 #endif
 #ifdef CONFIG_NET_CLS_ACT
 	__u8			tc_skip_classify:1;
+	__u8			tc_skip_txqueue:1;
 	__u8			tc_at_ingress:1;
 #endif
 	__u8			redirected:1;
