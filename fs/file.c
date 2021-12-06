@@ -265,8 +265,7 @@ static unsigned int count_open_files(struct fdtable *fdt)
 		if (fdt->open_fds[--i])
 			break;
 	}
-	i = (i + 1) * BITS_PER_LONG;
-	return i;
+	return (i + 1) * BITS_PER_LONG;
 }
 
 static unsigned int sane_fdtable_size(struct fdtable *fdt, unsigned int max_fds)
