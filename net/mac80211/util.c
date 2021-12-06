@@ -3386,10 +3386,13 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_sub_if_data *sdata,
 	const struct ieee80211_sta_he_cap *he_cap;
 	struct cfg80211_chan_def he_chandef = *chandef;
 	const struct ieee80211_he_6ghz_oper *he_6ghz_oper;
+	enum nl80211_regulatory_power_modes mode;
 	struct ieee80211_bss_conf *bss_conf = &sdata->vif.bss_conf;
 	bool support_80_80, support_160;
 	u8 he_phy_cap;
 	u32 freq;
+	u8 reg_info;
+	u8 reg_6g_power_mode;
 
 	if (chandef->chan->band != NL80211_BAND_6GHZ)
 		return true;
@@ -3426,9 +3429,29 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_sub_if_data *sdata,
 		return false;
 	}
 
+	/* 6G Power mode present in the beacon */
+	reg_info = (he_6ghz_oper->control & IEEE80211_HE_6GHZ_OPER_CTRL_REG_INFO) >>
+		   IEEE80211_HE_6GHZ_OPER_CTRL_REG_INFO_LSB;
+
+	/* 6G Power mode configured by the user */
+	reg_6g_power_mode = sdata->wdev.reg_6g_power_mode;
+
+	/**
+	 * For AP/AP_VLAN/MESH_POINT interfaces, the 6G power mode depends on the
+	 * mode configured by user (LPI/SP/VLP). For other interfaces (for ex STA)
+	 * mode depends on the power mode present in beacon as well as power mode
+	 * configured by the user for that interface
+	 */
+	if (iftype == NL80211_IFTYPE_AP || iftype == NL80211_IFTYPE_AP_VLAN ||
+	    iftype == NL80211_IFTYPE_MESH_POINT)
+		mode = reg_6g_power_mode;
+	else
+		mode = 3 * (1 + reg_6g_power_mode) + reg_info;
+
 	freq = ieee80211_channel_to_frequency(he_6ghz_oper->primary,
 					      NL80211_BAND_6GHZ);
-	he_chandef.chan = ieee80211_get_channel(sdata->local->hw.wiphy, freq);
+	he_chandef.chan = ieee80211_get_6g_channel_khz(sdata->local->hw.wiphy,
+						       MHZ_TO_KHZ(freq), mode);
 
 	switch (u8_get_bits(he_6ghz_oper->control,
 			    IEEE80211_HE_6GHZ_OPER_CTRL_REG_INFO)) {

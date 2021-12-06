@@ -218,6 +218,7 @@ struct ieee80211_reg_rule {
 	struct ieee80211_freq_range freq_range;
 	struct ieee80211_power_rule power_rule;
 	struct ieee80211_wmm_rule wmm_rule;
+	enum nl80211_regulatory_power_modes mode;
 	u32 flags;
 	u32 dfs_cac_ms;
 	bool has_wmm;

@@ -777,6 +777,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 			NLA_POLICY_NESTED(nl80211_mbssid_config_policy),
 	[NL80211_ATTR_MBSSID_ELEMS] = { .type = NLA_NESTED },
 	[NL80211_ATTR_RADAR_OFFCHAN] = { .type = NLA_FLAG },
+	[NL80211_ATTR_6G_REG_POWER_MODE] = NLA_POLICY_RANGE(NLA_U8, 0, 2),
 };
 
 /* policy for the key attributes */
@@ -3063,6 +3064,7 @@ int nl80211_parse_chandef(struct cfg80211_registered_device *rdev,
 {
 	struct netlink_ext_ack *extack = info->extack;
 	struct nlattr **attrs = info->attrs;
+	enum nl80211_regulatory_power_modes mode = NL80211_REG_AP_LPI;
 	u32 control_freq;
 
 	if (!attrs[NL80211_ATTR_WIPHY_FREQ])
@@ -3074,8 +3076,19 @@ int nl80211_parse_chandef(struct cfg80211_registered_device *rdev,
 		control_freq +=
 		    nla_get_u32(info->attrs[NL80211_ATTR_WIPHY_FREQ_OFFSET]);
 
+	if (info->attrs[NL80211_ATTR_6G_REG_POWER_MODE])
+		mode = nla_get_u8(info->attrs[NL80211_ATTR_6G_REG_POWER_MODE]);
+
 	memset(chandef, 0, sizeof(*chandef));
-	chandef->chan = ieee80211_get_channel_khz(&rdev->wiphy, control_freq);
+
+	if (control_freq >= MHZ_TO_KHZ(5945) && control_freq <= MHZ_TO_KHZ(7125))
+		chandef->chan = ieee80211_get_6g_channel_khz(&rdev->wiphy,
+							     control_freq,
+							     mode);
+	else
+		chandef->chan = ieee80211_get_channel_khz(&rdev->wiphy,
+							  control_freq);
+
 	chandef->width = NL80211_CHAN_WIDTH_20_NOHT;
 	chandef->center_freq1 = KHZ_TO_MHZ(control_freq);
 	chandef->freq1_offset = control_freq % 1000;

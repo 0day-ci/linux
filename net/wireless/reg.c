@@ -1595,7 +1595,8 @@ static u32 map_regdom_flags(u32 rd_flags)
 
 static const struct ieee80211_reg_rule *
 freq_reg_info_regd(u32 center_freq,
-		   const struct ieee80211_regdomain *regd, u32 bw)
+		   const struct ieee80211_regdomain *regd, u32 bw,
+		   enum nl80211_regulatory_power_modes mode)
 {
 	int i;
 	bool band_rule_found = false;
@@ -1609,7 +1610,12 @@ freq_reg_info_regd(u32 center_freq,
 		const struct ieee80211_freq_range *fr = NULL;
 
 		rr = &regd->reg_rules[i];
-		fr = &rr->freq_range;
+
+		if (rr->mode == mode)
+			fr = &rr->freq_range;
+
+		if (!fr)
+			continue;
 
 		/*
 		 * We only need to know if one frequency rule was
@@ -1641,7 +1647,7 @@ __freq_reg_info(struct wiphy *wiphy, u32 center_freq, u32 min_bw)
 	u32 bw;
 
 	for (bw = MHZ_TO_KHZ(bws[i]); bw >= min_bw; bw = MHZ_TO_KHZ(bws[i--])) {
-		reg_rule = freq_reg_info_regd(center_freq, regd, bw);
+		reg_rule = freq_reg_info_regd(center_freq, regd, bw, 0);
 		if (!IS_ERR(reg_rule))
 			return reg_rule;
 	}
@@ -2279,7 +2285,7 @@ static void reg_process_ht_flags_channel(struct wiphy *wiphy,
 	if (regd) {
 		const struct ieee80211_reg_rule *reg_rule =
 			freq_reg_info_regd(MHZ_TO_KHZ(channel->center_freq),
-					   regd, MHZ_TO_KHZ(20));
+					   regd, MHZ_TO_KHZ(20), 0);
 
 		if (!IS_ERR(reg_rule))
 			flags = reg_rule->flags;
@@ -2489,7 +2495,8 @@ static void update_all_wiphy_regulatory(enum nl80211_reg_initiator initiator)
 static void handle_channel_custom(struct wiphy *wiphy,
 				  struct ieee80211_channel *chan,
 				  const struct ieee80211_regdomain *regd,
-				  u32 min_bw)
+				  u32 min_bw,
+				  enum nl80211_regulatory_power_modes mode)
 {
 	u32 bw_flags = 0;
 	const struct ieee80211_reg_rule *reg_rule = NULL;
@@ -2498,7 +2505,7 @@ static void handle_channel_custom(struct wiphy *wiphy,
 
 	center_freq_khz = ieee80211_channel_to_khz(chan);
 	for (bw = MHZ_TO_KHZ(20); bw >= min_bw; bw = bw / 2) {
-		reg_rule = freq_reg_info_regd(center_freq_khz, regd, bw);
+		reg_rule = freq_reg_info_regd(center_freq_khz, regd, bw, mode);
 		if (!IS_ERR(reg_rule))
 			break;
 	}
@@ -2548,9 +2555,19 @@ static void handle_band_custom(struct wiphy *wiphy,
 			       const struct ieee80211_regdomain *regd)
 {
 	unsigned int i;
+	unsigned int j;
 
 	if (!sband)
 		return;
+
+	if (sband->band == NL80211_BAND_6GHZ) {
+		for (i = 0; i < NL80211_REG_NUM_POWER_MODES; i++)
+			for (j = 0; j < sband->chan_6g[i]->n_channels; j++)
+				handle_channel_custom(wiphy,
+						      &sband->chan_6g[i]->channels[j],
+						      regd, MHZ_TO_KHZ(20), i);
+		return;
+	}
 
 	/*
 	 * We currently assume that you always want at least 20 MHz,
@@ -2559,7 +2576,7 @@ static void handle_band_custom(struct wiphy *wiphy,
 	 */
 	for (i = 0; i < sband->n_channels; i++)
 		handle_channel_custom(wiphy, &sband->channels[i], regd,
-				      MHZ_TO_KHZ(20));
+				      MHZ_TO_KHZ(20), 0);
 }
 
 /* Used by drivers prior to wiphy registration */

@@ -165,6 +165,30 @@ int ieee80211_freq_khz_to_channel(u32 freq)
 }
 EXPORT_SYMBOL(ieee80211_freq_khz_to_channel);
 
+struct ieee80211_channel
+*ieee80211_get_6g_channel_khz(struct wiphy *wiphy, u32 freq,
+			      enum nl80211_regulatory_power_modes mode)
+{
+	struct ieee80211_supported_band *sband;
+	int i;
+
+	sband = wiphy->bands[NL80211_BAND_6GHZ];
+
+	if (!sband || mode >= NL80211_REG_NUM_POWER_MODES)
+		return NULL;
+
+	for (i = 0; i < sband->chan_6g[mode]->n_channels; i++) {
+		struct ieee80211_channel *chan =
+				&sband->chan_6g[mode]->channels[i];
+
+		if (ieee80211_channel_to_khz(chan) == freq)
+			return chan;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(ieee80211_get_6g_channel_khz);
+
 struct ieee80211_channel *ieee80211_get_channel_khz(struct wiphy *wiphy,
 						    u32 freq)
 {
