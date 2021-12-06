@@ -1355,7 +1355,6 @@ err_domain:
 err_str:
 	vduse_dev_destroy(dev);
 err:
-	kvfree(config_buf);
 	return ret;
 }
 
@@ -1406,6 +1405,8 @@ static long vduse_ioctl(struct file *file, unsigned int cmd,
 		}
 		config.name[VDUSE_NAME_MAX - 1] = '\0';
 		ret = vduse_create_dev(&config, buf, control->api_version);
+		if (ret)
+			kvfree(buf);
 		break;
 	}
 	case VDUSE_DESTROY_DEV: {
