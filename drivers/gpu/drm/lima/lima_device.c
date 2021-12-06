@@ -356,7 +356,9 @@ int lima_device_init(struct lima_device *ldev)
 	struct platform_device *pdev = to_platform_device(ldev->dev);
 	int err, i;
 
-	dma_set_coherent_mask(ldev->dev, DMA_BIT_MASK(32));
+	err = dma_set_coherent_mask(ldev->dev, DMA_BIT_MASK(32));
+	if (err)
+		return err;
 
 	err = lima_clk_init(ldev);
 	if (err)
