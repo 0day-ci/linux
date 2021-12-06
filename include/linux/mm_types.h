@@ -638,6 +638,9 @@ struct mm_struct {
 
 		/* numa_scan_seq prevents two threads setting pte_numa */
 		int numa_scan_seq;
+
+		/* Controls whether NUMA balancing is active for this mm. */
+		int numab_enabled;
 #endif
 		/*
 		 * An operation with batched TLB flushing is going on. Anything

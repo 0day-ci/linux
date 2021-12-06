@@ -1062,6 +1062,9 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) && !USE_SPLIT_PMD_PTLOCKS
 	mm->pmd_huge_pte = NULL;
 #endif
+#ifdef CONFIG_NUMA_BALANCING
+	mm->numab_enabled = NUMAB_DEFAULT;
+#endif
 	mm_init_uprobes_state(mm);
 	hugetlb_count_init(mm);
 

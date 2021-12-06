@@ -11169,8 +11169,12 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 		entity_tick(cfs_rq, se, queued);
 	}
 
-	if (static_branch_unlikely(&sched_numa_balancing))
+#ifdef CONFIG_NUMA_BALANCING
+	if (curr->mm && (curr->mm->numab_enabled == NUMAB_ENABLED
+	    || (static_branch_unlikely(&sched_numa_balancing)
+	    && curr->mm->numab_enabled == NUMAB_DEFAULT)))
 		task_tick_numa(rq, curr);
+#endif
 
 	update_misfit_status(curr, rq);
 	update_overutilized_status(task_rq(curr));

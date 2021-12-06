@@ -275,4 +275,11 @@ struct prctl_mm_map {
 #define PR_SET_VMA		0x53564d41
 # define PR_SET_VMA_ANON_NAME		0
 
+/* Set/get enabled per-process numa_balancing */
+#define PR_NUMA_BALANCING		63
+# define PR_SET_NUMAB_DISABLED		NUMAB_DISABLED
+# define PR_SET_NUMAB_ENABLED		NUMAB_ENABLED
+# define PR_SET_NUMAB_DEFAULT		NUMAB_DEFAULT
+# define PR_GET_NUMAB			3
+
 #endif /* _LINUX_PRCTL_H */
