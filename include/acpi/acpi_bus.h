@@ -354,6 +354,13 @@ struct acpi_device_data {
 	struct list_head subnodes;
 };
 
+struct acpi_device_location {
+	u32 pld_crc;
+	struct acpi_pld_info *pld;
+	struct list_head node;
+	struct list_head devices;
+};
+
 struct acpi_gpio_mapping;
 
 /* Device */
@@ -366,6 +373,7 @@ struct acpi_device {
 	struct list_head node;
 	struct list_head wakeup_list;
 	struct list_head del_list;
+	struct list_head location_list;
 	struct acpi_device_status status;
 	struct acpi_device_flags flags;
 	struct acpi_device_pnp pnp;
@@ -730,11 +738,17 @@ static inline void acpi_bus_put_acpi_device(struct acpi_device *adev)
 {
 	acpi_dev_put(adev);
 }
+
+struct acpi_device_location *acpi_device_get_location(struct acpi_device *adev);
 #else	/* CONFIG_ACPI */
 
 static inline int register_acpi_bus_type(void *bus) { return 0; }
 static inline int unregister_acpi_bus_type(void *bus) { return 0; }
 
+static inline struct acpi_device_location *acpi_device_get_location(struct acpi_device *adev)
+{
+	return NULL;
+}
 #endif				/* CONFIG_ACPI */
 
 #endif /*__ACPI_BUS_H__*/
