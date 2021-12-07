@@ -1048,8 +1048,7 @@ int intel_th_set_output(struct intel_th_device *thdev,
 	 * hub is instantiated together with the source device that
 	 * calls here, so guaranteed to be present.
 	 */
-	hubdrv = to_intel_th_driver(hub->dev.driver);
-	if (!hubdrv || !try_module_get(hubdrv->driver.owner))
+	if (!try_module_get(hubdrv->driver.owner))
 		return -EINVAL;
 
 	if (!hubdrv->set_output) {
