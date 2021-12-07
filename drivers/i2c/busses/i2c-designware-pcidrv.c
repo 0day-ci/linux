@@ -223,28 +223,20 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	struct dw_scl_sda_cfg *cfg;
 	struct dw_i2c_dev *i_dev;
 
-	if (id->driver_data >= ARRAY_SIZE(dw_pci_controllers)) {
-		dev_err(dev, "%s: invalid driver data %ld\n", __func__,
-			id->driver_data);
-		return -EINVAL;
-	}
+	if (id->driver_data >= ARRAY_SIZE(dw_pci_controllers))
+		return dev_err_probe(dev, -EINVAL, "invalid driver data %ld\n", id->driver_data);
 
 	controller = &dw_pci_controllers[id->driver_data];
 
 	r = pcim_enable_device(pdev);
-	if (r) {
-		dev_err(dev, "Failed to enable I2C PCI device (%d)\n",
-			r);
-		return r;
-	}
+	if (r)
+		return dev_err_probe(dev, r, "Failed to enable I2C PCI device\n");
 
 	pci_set_master(pdev);
 
 	r = pcim_iomap_regions(pdev, 1 << 0, pci_name(pdev));
-	if (r) {
-		dev_err(dev, "I/O memory remapping failed\n");
-		return r;
-	}
+	if (r)
+		return dev_err_probe(dev, r, "I/O memory remapping failed\n");
 
 	i_dev = devm_kzalloc(dev, sizeof(*i_dev), GFP_KERNEL);
 	if (!i_dev)
