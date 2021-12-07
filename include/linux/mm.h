@@ -577,6 +577,10 @@ enum page_entry_size {
  */
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
+    /*
+     * Called with mmap_lock lock held for write from __split_vma and
+     * remove_vma, therefore should never take that lock.
+     */
 	void (*close)(struct vm_area_struct * area);
 	/* Called any time before splitting to check if it's allowed */
 	int (*may_split)(struct vm_area_struct *area, unsigned long addr);
