@@ -26,4 +26,8 @@ extern int kvm_s390_pci_dev_open(struct zpci_dev *zdev);
 extern void kvm_s390_pci_dev_release(struct zpci_dev *zdev);
 extern int kvm_s390_pci_attach_kvm(struct zpci_dev *zdev, struct kvm *kvm);
 
+extern int kvm_s390_pci_interp_probe(struct zpci_dev *zdev);
+extern int kvm_s390_pci_interp_enable(struct zpci_dev *zdev);
+extern int kvm_s390_pci_interp_disable(struct zpci_dev *zdev);
+
 #endif /* ASM_KVM_PCI_H */
