@@ -29,7 +29,6 @@ iwlwifi-$(CONFIG_IWLWIFI_DEVICE_TRACING) += iwl-devtrace.o
 ccflags-y += -I$(src)
 
 obj-$(CONFIG_IWLDVM)	+= dvm/
-obj-$(CONFIG_IWLMVM)	+= mvm/
-obj-$(CONFIG_IWLMEI)	+= mei/
+obj-$(CONFIG_IWLMVM)	+= mvm/ mei/
 
 CFLAGS_iwl-devtrace.o := -I$(src)

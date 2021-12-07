@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
-obj-$(CONFIG_IWLMEI)	+= iwlmei.o
+ifdef CONFIG_IWLMEI
+obj-$(CONFIG_IWLWIFI)	+= iwlmei.o
+endif
 iwlmei-y += main.o
 iwlmei-y += net.o
 iwlmei-$(CONFIG_IWLWIFI_DEVICE_TRACING) += trace.o
