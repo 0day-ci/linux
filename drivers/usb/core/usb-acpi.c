@@ -176,22 +176,19 @@ usb_acpi_get_companion_for_port(struct usb_port *port_dev)
 static struct acpi_device *
 usb_acpi_find_companion_for_port(struct usb_port *port_dev)
 {
+	struct acpi_device_location *location;
 	struct acpi_device *adev;
-	struct acpi_pld_info *pld;
-	acpi_handle *handle;
-	acpi_status status;
 
 	adev = usb_acpi_get_companion_for_port(port_dev);
 	if (!adev)
 		return NULL;
 
-	handle = adev->handle;
-	status = acpi_get_physical_device_location(handle, &pld);
-	if (ACPI_SUCCESS(status) && pld) {
-		port_dev->location = USB_ACPI_LOCATION_VALID
-			| pld->group_token << 8 | pld->group_position;
-		port_dev->connect_type = usb_acpi_get_connect_type(handle, pld);
-		ACPI_FREE(pld);
+	location = acpi_device_get_location(adev);
+	if (location) {
+		port_dev->location = USB_ACPI_LOCATION_VALID |
+				     location->pld->group_token << 8 |
+				     location->pld->group_position;
+		port_dev->connect_type = usb_acpi_get_connect_type(adev->handle, location->pld);
 	}
 
 	return adev;
