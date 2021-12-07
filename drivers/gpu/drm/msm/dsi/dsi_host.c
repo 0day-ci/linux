@@ -159,7 +159,6 @@ struct msm_dsi_host {
 	struct drm_display_mode *mode;
 
 	/* connected device info */
-	struct device_node *device_node;
 	unsigned int channel;
 	unsigned int lanes;
 	enum mipi_dsi_pixel_format format;
@@ -1604,8 +1603,6 @@ static int dsi_host_detach(struct mipi_dsi_host *host,
 
 	dsi_dev_detach(msm_host->pdev);
 
-	msm_host->device_node = NULL;
-
 	DBG("id=%d", msm_host->id);
 	if (msm_host->dev)
 		queue_work(msm_host->workqueue, &msm_host->hpd_work);
@@ -1742,16 +1739,6 @@ static int dsi_host_parse_dt(struct msm_dsi_host *msm_host)
 		ret = -EINVAL;
 		goto err;
 	}
-
-	/* Get panel node from the output port's endpoint data */
-	device_node = of_graph_get_remote_node(np, 1, 0);
-	if (!device_node) {
-		DRM_DEV_DEBUG(dev, "%s: no valid device\n", __func__);
-		ret = -ENODEV;
-		goto err;
-	}
-
-	msm_host->device_node = device_node;
 
 	if (of_property_read_bool(np, "syscon-sfpb")) {
 		msm_host->sfpb = syscon_regmap_lookup_by_phandle(np,
@@ -2448,11 +2435,6 @@ int msm_dsi_host_set_display_mode(struct mipi_dsi_host *host,
 	return 0;
 }
 
-struct drm_panel *msm_dsi_host_get_panel(struct mipi_dsi_host *host)
-{
-	return of_drm_find_panel(to_msm_dsi_host(host)->device_node);
-}
-
 unsigned long msm_dsi_host_get_mode_flags(struct mipi_dsi_host *host)
 {
 	return to_msm_dsi_host(host)->mode_flags;
@@ -2462,7 +2444,7 @@ struct drm_bridge *msm_dsi_host_get_bridge(struct mipi_dsi_host *host)
 {
 	struct msm_dsi_host *msm_host = to_msm_dsi_host(host);
 
-	return of_drm_find_bridge(msm_host->device_node);
+	return devm_drm_of_get_bridge(&msm_host->pdev->dev, msm_host->pdev->dev.of_node, 1, 0);
 }
 
 void msm_dsi_host_snapshot(struct msm_disp_state *disp_state, struct mipi_dsi_host *host)

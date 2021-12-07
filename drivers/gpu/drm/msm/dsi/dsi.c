@@ -210,7 +210,7 @@ int msm_dsi_modeset_init(struct msm_dsi *msm_dsi, struct drm_device *dev,
 			 struct drm_encoder *encoder)
 {
 	struct msm_drm_private *priv;
-	struct drm_bridge *ext_bridge;
+	struct drm_connector *connector;
 	int ret;
 
 	if (WARN_ON(!encoder) || WARN_ON(!msm_dsi) || WARN_ON(!dev))
@@ -240,31 +240,17 @@ int msm_dsi_modeset_init(struct msm_dsi *msm_dsi, struct drm_device *dev,
 		goto fail;
 	}
 
-	/*
-	 * check if the dsi encoder output is connected to a panel or an
-	 * external bridge. We create a connector only if we're connected to a
-	 * drm_panel device. When we're connected to an external bridge, we
-	 * assume that the drm_bridge driver will create the connector itself.
-	 */
-	ext_bridge = msm_dsi_host_get_bridge(msm_dsi->host);
+	connector = msm_dsi_manager_ext_bridge_init(msm_dsi->id);
 
-	if (ext_bridge)
-		msm_dsi->connector =
-			msm_dsi_manager_ext_bridge_init(msm_dsi->id);
-	else
-		msm_dsi->connector =
-			msm_dsi_manager_connector_init(msm_dsi->id);
-
-	if (IS_ERR(msm_dsi->connector)) {
-		ret = PTR_ERR(msm_dsi->connector);
+	if (IS_ERR(connector)) {
+		ret = PTR_ERR(connector);
 		DRM_DEV_ERROR(dev->dev,
 			"failed to create dsi connector: %d\n", ret);
-		msm_dsi->connector = NULL;
 		goto fail;
 	}
 
 	priv->bridges[priv->num_bridges++]       = msm_dsi->bridge;
-	priv->connectors[priv->num_connectors++] = msm_dsi->connector;
+	priv->connectors[priv->num_connectors++] = connector;
 
 	return 0;
 fail:
@@ -273,12 +259,6 @@ fail:
 		msm_dsi_manager_bridge_destroy(msm_dsi->bridge);
 		msm_dsi->bridge = NULL;
 	}
-
-	/* don't destroy connector if we didn't make it */
-	if (msm_dsi->connector && !msm_dsi->external_bridge)
-		msm_dsi->connector->funcs->destroy(msm_dsi->connector);
-
-	msm_dsi->connector = NULL;
 
 	return ret;
 }
