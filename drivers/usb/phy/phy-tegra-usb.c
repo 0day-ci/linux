@@ -1300,18 +1300,26 @@ static int tegra_usb_phy_parse_pmc(struct device *dev,
 	err = devm_add_action_or_reset(dev, tegra_usb_phy_put_pmc_device,
 				       &pmc_pdev->dev);
 	if (err)
-		return err;
+		goto error_put_device;
 
-	if (!platform_get_drvdata(pmc_pdev))
-		return -EPROBE_DEFER;
+	if (!platform_get_drvdata(pmc_pdev)) {
+		err = -EPROBE_DEFER;
+		goto error_put_device;
+	}
 
 	phy->pmc_regmap = dev_get_regmap(&pmc_pdev->dev, "usb_sleepwalk");
-	if (!phy->pmc_regmap)
-		return -EINVAL;
+	if (!phy->pmc_regmap) {
+		err = -EINVAL;
+		goto error_put_device;
+	}
 
 	phy->instance = args.args[0];
 
 	return 0;
+
+error_put_device:
+	put_device(&pmc_pdev->dev);
+	return err;
 }
 
 static const struct tegra_phy_soc_config tegra20_soc_config = {
