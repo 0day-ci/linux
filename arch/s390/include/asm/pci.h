@@ -219,12 +219,18 @@ int zpci_unregister_ioat(struct zpci_dev *, u8);
 void zpci_remove_reserved_devices(void);
 void zpci_update_fh(struct zpci_dev *zdev, u32 fh);
 
+int zpci_get_mdd(u32 *mdd);
+
 /* CLP */
+void *clp_alloc_block(gfp_t gfp_mask);
+void clp_free_block(void *ptr);
 int clp_setup_writeback_mio(void);
 int clp_scan_pci_devices(void);
 int clp_query_pci_fn(struct zpci_dev *zdev);
 int clp_enable_fh(struct zpci_dev *zdev, u32 *fh, u8 nr_dma_as);
 int clp_disable_fh(struct zpci_dev *zdev, u32 *fh);
+int clp_list_pci(struct clp_req_rsp_list_pci *rrb, u32 *mdd,
+		 void (*cb)(struct clp_fh_list_entry *));
 int clp_get_state(u32 fid, enum zpci_state *state);
 int clp_refresh_fh(u32 fid, u32 *fh);
 

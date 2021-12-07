@@ -84,12 +84,12 @@ static __always_inline int clp_req(void *data, unsigned int lps)
 	return cc;
 }
 
-static void *clp_alloc_block(gfp_t gfp_mask)
+void *clp_alloc_block(gfp_t gfp_mask)
 {
 	return (void *) __get_free_pages(gfp_mask, get_order(CLP_BLK_SIZE));
 }
 
-static void clp_free_block(void *ptr)
+void clp_free_block(void *ptr)
 {
 	free_pages((unsigned long) ptr, get_order(CLP_BLK_SIZE));
 }
@@ -358,8 +358,8 @@ static int clp_list_pci_req(struct clp_req_rsp_list_pci *rrb,
 	return rc;
 }
 
-static int clp_list_pci(struct clp_req_rsp_list_pci *rrb, void *data,
-			void (*cb)(struct clp_fh_list_entry *, void *))
+int clp_list_pci(struct clp_req_rsp_list_pci *rrb, u32 *mdd,
+		 void (*cb)(struct clp_fh_list_entry *))
 {
 	u64 resume_token = 0;
 	int nentries, i, rc;
@@ -368,8 +368,12 @@ static int clp_list_pci(struct clp_req_rsp_list_pci *rrb, void *data,
 		rc = clp_list_pci_req(rrb, &resume_token, &nentries);
 		if (rc)
 			return rc;
+		if (mdd)
+			*mdd = rrb->response.mdd;
+		if (!cb)
+			return 0;
 		for (i = 0; i < nentries; i++)
-			cb(&rrb->response.fh_list[i], data);
+			cb(&rrb->response.fh_list[i]);
 	} while (resume_token);
 
 	return rc;
@@ -398,7 +402,7 @@ static int clp_find_pci(struct clp_req_rsp_list_pci *rrb, u32 fid,
 	return -ENODEV;
 }
 
-static void __clp_add(struct clp_fh_list_entry *entry, void *data)
+static void __clp_add(struct clp_fh_list_entry *entry)
 {
 	struct zpci_dev *zdev;
 

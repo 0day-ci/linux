@@ -531,6 +531,25 @@ void zpci_update_fh(struct zpci_dev *zdev, u32 fh)
 		zpci_do_update_iomap_fh(zdev, fh);
 }
 
+int zpci_get_mdd(u32 *mdd)
+{
+	struct clp_req_rsp_list_pci *rrb;
+	int rc;
+
+	if (!mdd)
+		return -EINVAL;
+
+	rrb = clp_alloc_block(GFP_KERNEL);
+	if (!rrb)
+		return -ENOMEM;
+
+	rc = clp_list_pci(rrb, mdd, NULL);
+
+	clp_free_block(rrb);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(zpci_get_mdd);
+
 static struct resource *__alloc_res(struct zpci_dev *zdev, unsigned long start,
 				    unsigned long size, unsigned long flags)
 {
