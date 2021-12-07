@@ -80,6 +80,36 @@ static void build_deinstantiation_desc(u32 *desc, int handle)
 }
 
 /*
+ * caam_ctrl_check_jr_perm - check if the job ring can be accessed
+ *				from Non-Secure World.
+ * @np - pointer to JR device node
+ *
+ * Return: - 0 if Job Ring is reserved in the Secure World
+ *	    - 1 if Job Ring is available in NS World
+ */
+static inline int caam_ctrl_check_jr_perm(const struct device_node *np)
+{
+	struct property *p;
+
+	/* read "status" property first */
+	p = of_find_property(np, "status", NULL);
+	if (p && (!strncmp(p->value, "disabled", p->length))) {
+		/*
+		 * "status" is set to "disabled", which would imply that the JR
+		 * is not available for NS World. All other possible combination
+		 * of "status" and "secure-status" would rather indicate that JR
+		 * is either available in NS-only, or in both S and NS Worlds.
+		 * In a later case, we indicate that this JR can be used by the
+		 * Kernel since the resource is shared.
+		 * For details, see:
+		 * Documentation/devicetree/bindings/arm/secure.txt
+		 */
+		return 0;
+	}
+	return 1;
+}
+
+/*
  * run_descriptor_deco0 - runs a descriptor on DECO0, under direct control of
  *			  the software (no JR/QI used).
  * @ctrldev - pointer to device
@@ -100,7 +130,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	int i;
 
 
-	if (ctrlpriv->virt_en == 1 ||
+	if ((ctrlpriv->caam_caps & CAAM_CAPS_VIRT_ENABLED) ||
 	    /*
 	     * Apparently on i.MX8M{Q,M,N,P} it doesn't matter if virt_en == 1
 	     * and the following steps should be performed regardless
@@ -169,7 +199,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	*status = rd_reg32(&deco->op_status_hi) &
 		  DECO_OP_STATUS_HI_ERR_MASK;
 
-	if (ctrlpriv->virt_en == 1)
+	if (ctrlpriv->caam_caps & CAAM_CAPS_VIRT_ENABLED)
 		clrsetbits_32(&ctrl->deco_rsr, DECORSR_JR0, 0);
 
 	/* Mark the DECO as free */
@@ -612,7 +642,7 @@ static bool check_version(struct fsl_mc_version *mc_version, u32 major,
 /* Probe routine for CAAM top (controller) level */
 static int caam_probe(struct platform_device *pdev)
 {
-	int ret, ring, gen_sk, ent_delay = RTSDCTL_ENT_DLY_MIN;
+	int ret, gen_sk, ent_delay = RTSDCTL_ENT_DLY_MIN;
 	u64 caam_id;
 	const struct soc_device_attribute *imx_soc_match;
 	struct device *dev;
@@ -622,8 +652,6 @@ static int caam_probe(struct platform_device *pdev)
 	struct dentry *dfs_root;
 	u32 scfgr, comp_params;
 	u8 rng_vid;
-	int pg_size;
-	int BLOCK_OFFSET = 0;
 	bool pr_support = false;
 
 	ctrlpriv = devm_kzalloc(&pdev->dev, sizeof(*ctrlpriv), GFP_KERNEL);
@@ -666,11 +694,12 @@ static int caam_probe(struct platform_device *pdev)
 	else
 		caam_ptr_sz = sizeof(u32);
 	caam_dpaa2 = !!(comp_params & CTPR_MS_DPAA2);
-	ctrlpriv->qi_present = !!(comp_params & CTPR_MS_QI_MASK);
+	if (comp_params & CTPR_MS_QI_MASK)
+		ctrlpriv->caam_caps |= CAAM_CAPS_QI_PRESENT;
 
 #ifdef CONFIG_CAAM_QI
 	/* If (DPAA 1.x) QI present, check whether dependencies are available */
-	if (ctrlpriv->qi_present && !caam_dpaa2) {
+	if ((ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) && !caam_dpaa2) {
 		ret = qman_is_probed();
 		if (!ret) {
 			return -EPROBE_DEFER;
@@ -689,33 +718,29 @@ static int caam_probe(struct platform_device *pdev)
 	}
 #endif
 
-	/* Allocating the BLOCK_OFFSET based on the supported page size on
-	 * the platform
-	 */
-	pg_size = (comp_params & CTPR_MS_PG_SZ_MASK) >> CTPR_MS_PG_SZ_SHIFT;
-	if (pg_size == 0)
-		BLOCK_OFFSET = PG_SIZE_4K;
-	else
-		BLOCK_OFFSET = PG_SIZE_64K;
+	/* Allocate control blocks based on the CAAM supported page size */
+	if (comp_params & CTPR_MS_PG_SZ_MASK)
+		ctrlpriv->caam_caps |= CAAM_CAPS_64K_PAGESIZE;
 
 	ctrlpriv->ctrl = (struct caam_ctrl __iomem __force *)ctrl;
 	ctrlpriv->assure = (struct caam_assurance __iomem __force *)
 			   ((__force uint8_t *)ctrl +
-			    BLOCK_OFFSET * ASSURE_BLOCK_NUMBER
+			    CAAM_CAPS_PG_SZ(ctrlpriv->caam_caps) * ASSURE_BLOCK_NUMBER
 			   );
 	ctrlpriv->deco = (struct caam_deco __iomem __force *)
 			 ((__force uint8_t *)ctrl +
-			 BLOCK_OFFSET * DECO_BLOCK_NUMBER
+			 CAAM_CAPS_PG_SZ(ctrlpriv->caam_caps) * DECO_BLOCK_NUMBER
 			 );
 
 	/* Get the IRQ of the controller (for security violations only) */
 	ctrlpriv->secvio_irq = irq_of_parse_and_map(nprop, 0);
 	np = of_find_compatible_node(NULL, NULL, "fsl,qoriq-mc");
-	ctrlpriv->mc_en = !!np;
+	if (np)
+		ctrlpriv->caam_caps |= CAAM_CAPS_MC_ENABLED;
 	of_node_put(np);
 
 #ifdef CONFIG_FSL_MC_BUS
-	if (ctrlpriv->mc_en) {
+	if (ctrlpriv->caam_caps & CAAM_CAPS_MC_ENABLED) {
 		struct fsl_mc_version *mc_version;
 
 		mc_version = fsl_mc_get_version();
@@ -732,7 +757,7 @@ static int caam_probe(struct platform_device *pdev)
 	 * In case of SoCs with Management Complex, MC f/w performs
 	 * the configuration.
 	 */
-	if (!ctrlpriv->mc_en)
+	if (!(ctrlpriv->caam_caps & CAAM_CAPS_MC_ENABLED))
 		clrsetbits_32(&ctrl->mcr, MCFGR_AWCACHE_MASK,
 			      MCFGR_AWCACHE_CACH | MCFGR_AWCACHE_BUFF |
 			      MCFGR_WDENABLE | MCFGR_LARGE_BURST);
@@ -745,7 +770,6 @@ static int caam_probe(struct platform_device *pdev)
 	 */
 	scfgr = rd_reg32(&ctrl->scfgr);
 
-	ctrlpriv->virt_en = 0;
 	if (comp_params & CTPR_MS_VIRT_EN_INCL) {
 		/* VIRT_EN_INCL = 1 & VIRT_EN_POR = 1 or
 		 * VIRT_EN_INCL = 1 & VIRT_EN_POR = 0 & SCFGR_VIRT_EN = 1
@@ -753,14 +777,14 @@ static int caam_probe(struct platform_device *pdev)
 		if ((comp_params & CTPR_MS_VIRT_EN_POR) ||
 		    (!(comp_params & CTPR_MS_VIRT_EN_POR) &&
 		       (scfgr & SCFGR_VIRT_EN)))
-				ctrlpriv->virt_en = 1;
+			ctrlpriv->caam_caps |= CAAM_CAPS_VIRT_ENABLED;
 	} else {
 		/* VIRT_EN_INCL = 0 && VIRT_EN_POR_VALUE = 1 */
 		if (comp_params & CTPR_MS_VIRT_EN_POR)
-				ctrlpriv->virt_en = 1;
+			ctrlpriv->caam_caps |= CAAM_CAPS_VIRT_ENABLED;
 	}
 
-	if (ctrlpriv->virt_en == 1)
+	if (ctrlpriv->caam_caps & CAAM_CAPS_VIRT_ENABLED)
 		clrsetbits_32(&ctrl->jrstart, 0, JRSTART_JR0_START |
 			      JRSTART_JR1_START | JRSTART_JR2_START |
 			      JRSTART_JR3_START);
@@ -785,10 +809,10 @@ static int caam_probe(struct platform_device *pdev)
 	caam_debugfs_init(ctrlpriv, dfs_root);
 
 	/* Check to see if (DPAA 1.x) QI present. If so, enable */
-	if (ctrlpriv->qi_present && !caam_dpaa2) {
+	if ((ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) && !caam_dpaa2) {
 		ctrlpriv->qi = (struct caam_queue_if __iomem __force *)
 			       ((__force uint8_t *)ctrl +
-				 BLOCK_OFFSET * QI_BLOCK_NUMBER
+				 CAAM_CAPS_PG_SZ(ctrlpriv->caam_caps) * QI_BLOCK_NUMBER
 			       );
 		/* This is all that's required to physically enable QI */
 		wr_reg32(&ctrlpriv->qi->qi_control_lo, QICTL_DQEN);
@@ -801,21 +825,32 @@ static int caam_probe(struct platform_device *pdev)
 #endif
 	}
 
-	ring = 0;
 	for_each_available_child_of_node(nprop, np)
 		if (of_device_is_compatible(np, "fsl,sec-v4.0-job-ring") ||
 		    of_device_is_compatible(np, "fsl,sec4.0-job-ring")) {
-			ctrlpriv->jr[ring] = (struct caam_job_ring __iomem __force *)
-					     ((__force uint8_t *)ctrl +
-					     (ring + JR_BLOCK_NUMBER) *
-					      BLOCK_OFFSET
-					     );
-			ctrlpriv->total_jobrs++;
-			ring++;
+			u32 ring_id;
+			/*
+			 * Get register page to see the start address of CB
+			 * This is used to index into the bitmap of available
+			 * job rings and indicate if it is available in NS world.
+			 */
+			ret = of_property_read_u32(np, "reg", &ring_id);
+			if (ret) {
+				dev_err(dev, "failed to get register address for jobr\n");
+				continue;
+			}
+			ring_id = ring_id >> CAAM_CAPS_PG_SHIFT(ctrlpriv->caam_caps);
+
+			if (caam_ctrl_check_jr_perm(np))
+				ctrlpriv->caam_caps |= CAAM_CAPS_JR_PRESENT(ring_id);
 		}
 
-	/* If no QI and no rings specified, quit and go home */
-	if ((!ctrlpriv->qi_present) && (!ctrlpriv->total_jobrs)) {
+	/*
+	 * If no QI, no rings specified or no rings available for NS -
+	 * quit and go home
+	 */
+	if (!(ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) &&
+	    (hweight_long(ctrlpriv->caam_caps & CAAM_CAPS_JOBRS_MASK) == 0)) {
 		dev_err(dev, "no queues configured, terminating\n");
 		return -ENOMEM;
 	}
@@ -832,7 +867,8 @@ static int caam_probe(struct platform_device *pdev)
 	 * already instantiated, do RNG instantiation
 	 * In case of SoCs with Management Complex, RNG is managed by MC f/w.
 	 */
-	if (!(ctrlpriv->mc_en && pr_support) && rng_vid >= 4) {
+	if (!((ctrlpriv->caam_caps & CAAM_CAPS_MC_ENABLED) && pr_support) &&
+	    rng_vid >= 4) {
 		ctrlpriv->rng4_sh_init =
 			rd_reg32(&ctrl->r4tst[0].rdsta);
 		/*
@@ -900,8 +936,9 @@ static int caam_probe(struct platform_device *pdev)
 	/* Report "alive" for developer to see */
 	dev_info(dev, "device ID = 0x%016llx (Era %d)\n", caam_id,
 		 ctrlpriv->era);
-	dev_info(dev, "job rings = %d, qi = %d\n",
-		 ctrlpriv->total_jobrs, ctrlpriv->qi_present);
+	dev_info(dev, "job rings = %ld, qi = %s\n",
+		 hweight_long(ctrlpriv->caam_caps & CAAM_CAPS_JOBRS_MASK),
+		 (ctrlpriv->caam_caps & CAAM_CAPS_QI_PRESENT) ? "yes" : "no");
 
 	ret = devm_of_platform_populate(dev);
 	if (ret)

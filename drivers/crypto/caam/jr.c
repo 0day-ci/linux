@@ -511,9 +511,24 @@ static int caam_jr_probe(struct platform_device *pdev)
 	struct device_node *nprop;
 	struct caam_job_ring __iomem *ctrl;
 	struct caam_drv_private_jr *jrpriv;
-	static int total_jobrs;
+	struct caam_drv_private *caamctrlpriv;
+	u32 ring_idx;
 	struct resource *r;
 	int error;
+
+	/*
+	 * Get register page to see the start address of CB.
+	 * Job Rings have their respective input base addresses
+	 * defined in the register IRBAR_JRx. This address is
+	 * present in the DT node and is aligned to the page
+	 * size defined at CAAM compile time.
+	 */
+	if (of_property_read_u32(pdev->dev.of_node, "reg", &ring_idx)) {
+		dev_err(&pdev->dev, "failed to get register address for jobr\n");
+		return -ENOMEM;
+	}
+	caamctrlpriv = dev_get_drvdata(pdev->dev.parent);
+	ring_idx = ring_idx >> CAAM_CAPS_PG_SHIFT(caamctrlpriv->caam_caps);
 
 	jrdev = &pdev->dev;
 	jrpriv = devm_kzalloc(jrdev, sizeof(*jrpriv), GFP_KERNEL);
@@ -523,7 +538,7 @@ static int caam_jr_probe(struct platform_device *pdev)
 	dev_set_drvdata(jrdev, jrpriv);
 
 	/* save ring identity relative to detection */
-	jrpriv->ridx = total_jobrs++;
+	jrpriv->ridx = ring_idx;
 
 	nprop = pdev->dev.of_node;
 	/* Get configuration properties from device tree */
