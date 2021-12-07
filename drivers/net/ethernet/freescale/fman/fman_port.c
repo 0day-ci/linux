@@ -1792,20 +1792,20 @@ static int fman_port_probe(struct platform_device *of_dev)
 	if (!fm_node) {
 		dev_err(port->dev, "%s: of_get_parent() failed\n", __func__);
 		err = -ENODEV;
-		goto return_err;
+		goto return_of_node_put;
 	}
 
 	fm_pdev = of_find_device_by_node(fm_node);
 	of_node_put(fm_node);
 	if (!fm_pdev) {
 		err = -EINVAL;
-		goto return_err;
+		goto return_of_node_put;
 	}
 
 	fman = dev_get_drvdata(&fm_pdev->dev);
 	if (!fman) {
 		err = -EINVAL;
-		goto return_err;
+		goto return_of_put_device;
 	}
 
 	err = of_property_read_u32(port_node, "cell-index", &val);
@@ -1813,7 +1813,7 @@ static int fman_port_probe(struct platform_device *of_dev)
 		dev_err(port->dev, "%s: reading cell-index for %pOF failed\n",
 			__func__, port_node);
 		err = -EINVAL;
-		goto return_err;
+		goto return_of_put_device;
 	}
 	port_id = (u8)val;
 	port->dts_params.id = port_id;
@@ -1847,7 +1847,7 @@ static int fman_port_probe(struct platform_device *of_dev)
 	}  else {
 		dev_err(port->dev, "%s: Illegal port type\n", __func__);
 		err = -EINVAL;
-		goto return_err;
+		goto return_of_put_device;
 	}
 
 	port->dts_params.type = port_type;
@@ -1861,7 +1861,7 @@ static int fman_port_probe(struct platform_device *of_dev)
 			dev_err(port->dev, "%s: incorrect qman-channel-id\n",
 				__func__);
 			err = -EINVAL;
-			goto return_err;
+			goto return_of_put_device;
 		}
 		port->dts_params.qman_channel_id = qman_channel_id;
 	}
@@ -1871,12 +1871,10 @@ static int fman_port_probe(struct platform_device *of_dev)
 		dev_err(port->dev, "%s: of_address_to_resource() failed\n",
 			__func__);
 		err = -ENOMEM;
-		goto return_err;
+		goto return_of_put_device;
 	}
 
 	port->dts_params.fman = fman;
-
-	of_node_put(port_node);
 
 	dev_res = __devm_request_region(port->dev, &res, res.start,
 					resource_size(&res), "fman-port");
@@ -1884,7 +1882,7 @@ static int fman_port_probe(struct platform_device *of_dev)
 		dev_err(port->dev, "%s: __devm_request_region() failed\n",
 			__func__);
 		err = -EINVAL;
-		goto free_port;
+		goto return_of_put_device;
 	}
 
 	port->dts_params.base_addr = devm_ioremap(port->dev, res.start,
@@ -1892,11 +1890,15 @@ static int fman_port_probe(struct platform_device *of_dev)
 	if (!port->dts_params.base_addr)
 		dev_err(port->dev, "%s: devm_ioremap() failed\n", __func__);
 
+	of_node_put(port_node);
+
 	dev_set_drvdata(&of_dev->dev, port);
 
 	return 0;
 
-return_err:
+return_of_put_device:
+	put_device(&fm_pdev->dev);
+return_of_node_put:
 	of_node_put(port_node);
 free_port:
 	kfree(port);
