@@ -48,6 +48,7 @@
 #include <asm/fpu/api.h>
 #include "kvm-s390.h"
 #include "gaccess.h"
+#include "pci.h"
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -502,6 +503,8 @@ int kvm_arch_init(void *opaque)
 		pr_err("A FLIC registration call failed with rc=%d\n", rc);
 		goto out;
 	}
+
+	kvm_s390_pci_init();
 
 	rc = kvm_s390_gib_init(GAL_ISC);
 	if (rc)
