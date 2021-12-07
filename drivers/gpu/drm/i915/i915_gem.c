@@ -1048,7 +1048,12 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 	if (ret)
 		return ret;
 
-	intel_uc_fetch_firmwares(&dev_priv->gt.uc);
+	ret = intel_uc_fetch_firmwares(&dev_priv->gt.uc);
+	if (ret) {
+		i915_probe_error(dev_priv, "Failed to fetch firmware\n");
+		return ret;
+	}
+
 	intel_wopcm_init(&dev_priv->wopcm);
 
 	ret = i915_init_ggtt(dev_priv);

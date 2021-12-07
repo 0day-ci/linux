@@ -273,14 +273,19 @@ static void guc_disable_communication(struct intel_guc *guc)
 	drm_dbg(&i915->drm, "GuC communication disabled\n");
 }
 
-static void __uc_fetch_firmwares(struct intel_uc *uc)
+static int __uc_fetch_firmwares(struct intel_uc *uc)
 {
+	struct drm_i915_private *i915 = uc_to_gt(uc)->i915;
 	int err;
 
 	GEM_BUG_ON(!intel_uc_wants_guc(uc));
 
 	err = intel_uc_fw_fetch(&uc->guc.fw);
 	if (err) {
+		/* GuC is mandatory on Gen12 and beyond */
+		if (GRAPHICS_VER(i915) >= 12)
+			return err;
+
 		/* Make sure we transition out of transient "SELECTED" state */
 		if (intel_uc_wants_huc(uc)) {
 			drm_dbg(&uc_to_gt(uc)->i915->drm,
@@ -289,11 +294,13 @@ static void __uc_fetch_firmwares(struct intel_uc *uc)
 						  INTEL_UC_FIRMWARE_ERROR);
 		}
 
-		return;
+		return 0;
 	}
 
 	if (intel_uc_wants_huc(uc))
 		intel_uc_fw_fetch(&uc->huc.fw);
+
+	return 0;
 }
 
 static void __uc_cleanup_firmwares(struct intel_uc *uc)
@@ -304,14 +311,19 @@ static void __uc_cleanup_firmwares(struct intel_uc *uc)
 
 static int __uc_init(struct intel_uc *uc)
 {
+	struct drm_i915_private *i915 = uc_to_gt(uc)->i915;
 	struct intel_guc *guc = &uc->guc;
 	struct intel_huc *huc = &uc->huc;
 	int ret;
 
 	GEM_BUG_ON(!intel_uc_wants_guc(uc));
 
-	if (!intel_uc_uses_guc(uc))
-		return 0;
+	if (!intel_uc_uses_guc(uc)) {
+		if (GRAPHICS_VER(i915) >= 12)
+			return -EINVAL;
+		else
+			return 0;
+	}
 
 	if (i915_inject_probe_failure(uc_to_gt(uc)->i915))
 		return -ENOMEM;

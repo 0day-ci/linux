@@ -17,7 +17,7 @@ struct intel_uc;
 
 struct intel_uc_ops {
 	int (*sanitize)(struct intel_uc *uc);
-	void (*init_fw)(struct intel_uc *uc);
+	int (*init_fw)(struct intel_uc *uc);
 	void (*fini_fw)(struct intel_uc *uc);
 	int (*init)(struct intel_uc *uc);
 	void (*fini)(struct intel_uc *uc);
@@ -104,7 +104,7 @@ static inline _TYPE intel_uc_##_NAME(struct intel_uc *uc) \
 	return _RET; \
 }
 intel_uc_ops_function(sanitize, sanitize, int, 0);
-intel_uc_ops_function(fetch_firmwares, init_fw, void, );
+intel_uc_ops_function(fetch_firmwares, init_fw, int, 0);
 intel_uc_ops_function(cleanup_firmwares, fini_fw, void, );
 intel_uc_ops_function(init, init, int, 0);
 intel_uc_ops_function(fini, fini, void, );
