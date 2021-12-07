@@ -1077,8 +1077,8 @@ struct dentry *d_find_alias_rcu(struct inode *inode)
 void d_prune_aliases(struct inode *inode)
 {
 	struct dentry *dentry;
-restart:
 	spin_lock(&inode->i_lock);
+restart:
 	hlist_for_each_entry(dentry, &inode->i_dentry, d_u.d_alias) {
 		spin_lock(&dentry->d_lock);
 		if (!dentry->d_lockref.count) {
