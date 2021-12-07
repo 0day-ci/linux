@@ -29,6 +29,7 @@
 #include <asm/ap.h>
 #include "gaccess.h"
 #include "kvm-s390.h"
+#include "pci.h"
 #include "trace.h"
 
 static int handle_ri(struct kvm_vcpu *vcpu)
@@ -332,6 +333,44 @@ retry:
 	if (rc < 0)
 		return rc;
 	kvm_s390_set_psw_cc(vcpu, rc);
+	return 0;
+}
+
+static int handle_rpcit(struct kvm_vcpu *vcpu)
+{
+	int reg1, reg2;
+	int rc;
+
+	if (vcpu->arch.sie_block->gpsw.mask & PSW_MASK_PSTATE)
+		return kvm_s390_inject_program_int(vcpu, PGM_PRIVILEGED_OP);
+
+	kvm_s390_get_regs_rre(vcpu, &reg1, &reg2);
+
+	rc = kvm_s390_pci_refresh_trans(vcpu, vcpu->run->s.regs.gprs[reg1],
+					vcpu->run->s.regs.gprs[reg2],
+					vcpu->run->s.regs.gprs[reg2+1]);
+
+	switch (rc) {
+	case 0:
+		kvm_s390_set_psw_cc(vcpu, 0);
+		break;
+	case -EOPNOTSUPP:
+		return -EOPNOTSUPP;
+	case -EINVAL:
+		kvm_s390_set_psw_cc(vcpu, 3);
+		break;
+	case -ENOMEM:
+		vcpu->run->s.regs.gprs[reg1] &= KVM_S390_RPCIT_STAT_MASK;
+		vcpu->run->s.regs.gprs[reg1] |= KVM_S390_RPCIT_INS_RES;
+		kvm_s390_set_psw_cc(vcpu, 1);
+		break;
+	default:
+		vcpu->run->s.regs.gprs[reg1] &= KVM_S390_RPCIT_STAT_MASK;
+		vcpu->run->s.regs.gprs[reg1] |= KVM_S390_RPCIT_ERR;
+		kvm_s390_set_psw_cc(vcpu, 1);
+		break;
+	}
+
 	return 0;
 }
 
@@ -1275,6 +1314,8 @@ int kvm_s390_handle_b9(struct kvm_vcpu *vcpu)
 		return handle_essa(vcpu);
 	case 0xaf:
 		return handle_pfmf(vcpu);
+	case 0xd3:
+		return handle_rpcit(vcpu);
 	default:
 		return -EOPNOTSUPP;
 	}

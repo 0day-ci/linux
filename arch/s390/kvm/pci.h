@@ -18,6 +18,10 @@
 
 #define KVM_S390_PCI_DTSM_MASK 0x40
 
+#define KVM_S390_RPCIT_STAT_MASK 0xffffffff00ffffffUL
+#define KVM_S390_RPCIT_INS_RES (0x10 << 24)
+#define KVM_S390_RPCIT_ERR (0x28 << 24)
+
 struct zpci_gaite {
 	unsigned int gisa;
 	u8 gisc;
