@@ -2759,6 +2759,10 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 		set_kvm_facility(kvm->arch.model.fac_mask, 70);
 		set_kvm_facility(kvm->arch.model.fac_list, 70);
 	}
+	if (sclp.has_aeni && test_facility(71)) {
+		set_kvm_facility(kvm->arch.model.fac_mask, 71);
+		set_kvm_facility(kvm->arch.model.fac_list, 71);
+	}
 
 	if (css_general_characteristics.aiv && test_facility(65))
 		set_kvm_facility(kvm->arch.model.fac_mask, 65);
