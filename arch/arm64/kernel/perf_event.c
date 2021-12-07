@@ -1215,6 +1215,26 @@ static int armv8_a78_pmu_init(struct arm_pmu *cpu_pmu)
 	return armv8_pmu_init_nogroups(cpu_pmu, "armv8_cortex_a78", NULL);
 }
 
+static int armv9_a510_pmu_init(struct arm_pmu *cpu_pmu)
+{
+	return armv8_pmu_init_nogroups(cpu_pmu, "armv9_cortex_a510", NULL);
+}
+
+static int armv9_a710_pmu_init(struct arm_pmu *cpu_pmu)
+{
+	return armv8_pmu_init_nogroups(cpu_pmu, "armv9_cortex_a710", NULL);
+}
+
+static int armv8_x1_pmu_init(struct arm_pmu *cpu_pmu)
+{
+	return armv8_pmu_init_nogroups(cpu_pmu, "armv8_cortex_x1", NULL);
+}
+
+static int armv9_x2_pmu_init(struct arm_pmu *cpu_pmu)
+{
+	return armv8_pmu_init_nogroups(cpu_pmu, "armv9_cortex_x2", NULL);
+}
+
 static int armv8_e1_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	return armv8_pmu_init_nogroups(cpu_pmu, "armv8_neoverse_e1", NULL);
@@ -1223,6 +1243,16 @@ static int armv8_e1_pmu_init(struct arm_pmu *cpu_pmu)
 static int armv8_n1_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	return armv8_pmu_init_nogroups(cpu_pmu, "armv8_neoverse_n1", NULL);
+}
+
+static int armv9_n2_pmu_init(struct arm_pmu *cpu_pmu)
+{
+	return armv8_pmu_init_nogroups(cpu_pmu, "armv9_neoverse_n2", NULL);
+}
+
+static int armv8_v1_pmu_init(struct arm_pmu *cpu_pmu)
+{
+	return armv8_pmu_init_nogroups(cpu_pmu, "armv8_neoverse_v1", NULL);
 }
 
 static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
@@ -1251,8 +1281,14 @@ static const struct of_device_id armv8_pmu_of_device_ids[] = {
 	{.compatible = "arm,cortex-a76-pmu",	.data = armv8_a76_pmu_init},
 	{.compatible = "arm,cortex-a77-pmu",	.data = armv8_a77_pmu_init},
 	{.compatible = "arm,cortex-a78-pmu",	.data = armv8_a78_pmu_init},
+	{.compatible = "arm,cortex-a510-pmu",	.data = armv9_a510_pmu_init},
+	{.compatible = "arm,cortex-a710-pmu",	.data = armv9_a710_pmu_init},
+	{.compatible = "arm,cortex-x1-pmu",	.data = armv8_x1_pmu_init},
+	{.compatible = "arm,cortex-x2-pmu",	.data = armv9_x2_pmu_init},
 	{.compatible = "arm,neoverse-e1-pmu",	.data = armv8_e1_pmu_init},
 	{.compatible = "arm,neoverse-n1-pmu",	.data = armv8_n1_pmu_init},
+	{.compatible = "arm,neoverse-n2-pmu",	.data = armv9_n2_pmu_init},
+	{.compatible = "arm,neoverse-v1-pmu",	.data = armv8_v1_pmu_init},
 	{.compatible = "cavium,thunder-pmu",	.data = armv8_thunder_pmu_init},
 	{.compatible = "brcm,vulcan-pmu",	.data = armv8_vulcan_pmu_init},
 	{},
