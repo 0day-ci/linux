@@ -668,7 +668,7 @@ static int mac_probe(struct platform_device *_of_dev)
 	if (err) {
 		dev_err(dev, "failed to read cell-index for %pOF\n", dev_node);
 		err = -EINVAL;
-		goto _return_of_node_put;
+		goto _return_of_put_device;
 	}
 	/* cell-index 0 => FMan id 1 */
 	fman_id = (u8)(val + 1);
@@ -677,7 +677,7 @@ static int mac_probe(struct platform_device *_of_dev)
 	if (!priv->fman) {
 		dev_err(dev, "fman_bind(%pOF) failed\n", dev_node);
 		err = -ENODEV;
-		goto _return_of_node_put;
+		goto _return_of_put_device;
 	}
 
 	of_node_put(dev_node);
@@ -758,7 +758,7 @@ static int mac_probe(struct platform_device *_of_dev)
 			dev_err(dev, "of_find_device_by_node(%pOF) failed\n",
 				dev_node);
 			err = -EINVAL;
-			goto _return_of_node_put;
+			goto _return_of_put_device;
 		}
 
 		mac_dev->port[i] = fman_port_bind(&of_dev->dev);
@@ -766,7 +766,7 @@ static int mac_probe(struct platform_device *_of_dev)
 			dev_err(dev, "dev_get_drvdata(%pOF) failed\n",
 				dev_node);
 			err = -EINVAL;
-			goto _return_of_node_put;
+			goto _return_of_put_device;
 		}
 		of_node_put(dev_node);
 	}
@@ -863,6 +863,8 @@ static int mac_probe(struct platform_device *_of_dev)
 
 	goto _return;
 
+_return_of_put_device:
+	put_device(&of_dev->dev);
 _return_of_node_put:
 	of_node_put(dev_node);
 _return_of_get_parent:
