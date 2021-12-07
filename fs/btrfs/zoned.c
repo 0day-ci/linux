@@ -592,12 +592,7 @@ int btrfs_get_dev_zone_info(struct btrfs_device *device, bool populate_cache)
 out:
 	kfree(zones);
 out_free_zone_info:
-	bitmap_free(zone_info->active_zones);
-	bitmap_free(zone_info->empty_zones);
-	bitmap_free(zone_info->seq_zones);
-	vfree(zone_info->zone_cache);
-	kfree(zone_info);
-	device->zone_info = NULL;
+	btrfs_destroy_dev_zone_info(device);
 
 	return ret;
 }
@@ -612,6 +607,7 @@ void btrfs_destroy_dev_zone_info(struct btrfs_device *device)
 	bitmap_free(zone_info->active_zones);
 	bitmap_free(zone_info->seq_zones);
 	bitmap_free(zone_info->empty_zones);
+	vfree(zone_info->zone_cache);
 	kfree(zone_info);
 	device->zone_info = NULL;
 }
