@@ -12,6 +12,7 @@
 
 #include <linux/pci.h>
 #include <linux/mutex.h>
+#include <linux/kvm_host.h>
 #include <asm/airq.h>
 #include <asm/kvm_pci.h>
 
@@ -30,6 +31,14 @@ struct zpci_aift {
 	struct kvm_zdev **kzdev;
 	spinlock_t gait_lock; /* Protects the gait, used during AEN forward */
 	struct mutex lock; /* Protects the other structures in aift */
+};
+
+static inline struct kvm *kvm_s390_pci_si_to_kvm(struct zpci_aift *aift,
+						 unsigned long si)
+{
+	if (aift->kzdev == 0 || aift->kzdev[si] == 0)
+		return 0;
+	return aift->kzdev[si]->kvm;
 };
 
 struct zpci_aift *kvm_s390_pci_get_aift(void);
