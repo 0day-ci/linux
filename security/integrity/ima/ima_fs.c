@@ -447,8 +447,9 @@ static const struct file_operations ima_measure_policy_ops = {
 	.llseek = generic_file_llseek,
 };
 
-static void ima_fs_ns_free_dentries(struct ima_namespace *ns)
+void ima_fs_ns_free_dentries(struct user_namespace *user_ns)
 {
+	struct ima_namespace *ns = user_ns->ima_ns;
 	int i;
 
 	for (i = IMAFS_DENTRY_LAST - 1; i >= 0; i--)
@@ -457,18 +458,36 @@ static void ima_fs_ns_free_dentries(struct ima_namespace *ns)
 	memset(ns->dentry, 0, sizeof(ns->dentry));
 }
 
-static int __init ima_fs_ns_init(struct user_namespace *user_ns)
+int ima_fs_ns_init(struct user_namespace *user_ns,
+		   struct dentry *root)
 {
 	struct ima_namespace *ns = user_ns->ima_ns;
 	struct dentry *ima_dir;
 
-	ns->dentry[IMAFS_DENTRY_DIR] = securityfs_create_dir("ima", integrity_dir);
+	/* already initialized? */
+	if (ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR])
+		return 0;
+
+	/* FIXME: update when evm and integrity are namespaced */
+	if (user_ns != &init_user_ns) {
+		ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR] =
+			securityfs_create_dir("integrity", root);
+		if (IS_ERR(ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR])) {
+			ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR] = NULL;
+			return -1;
+		}
+	} else
+		ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR] = integrity_dir;
+
+	ns->dentry[IMAFS_DENTRY_DIR] =
+	    securityfs_create_dir("ima",
+				  ns->dentry[IMAFS_DENTRY_INTEGRITY_DIR]);
 	if (IS_ERR(ns->dentry[IMAFS_DENTRY_DIR]))
-		return -1;
+		goto out;
 	ima_dir = ns->dentry[IMAFS_DENTRY_DIR];
 
 	ns->dentry[IMAFS_DENTRY_SYMLINK] =
-	    securityfs_create_symlink("ima", NULL, "integrity/ima", NULL);
+	    securityfs_create_symlink("ima", root, "integrity/ima", NULL);
 	if (IS_ERR(ns->dentry[IMAFS_DENTRY_SYMLINK]))
 		goto out;
 
@@ -508,11 +527,11 @@ static int __init ima_fs_ns_init(struct user_namespace *user_ns)
 
 	return 0;
 out:
-	ima_fs_ns_free_dentries(ns);
+	ima_fs_ns_free_dentries(user_ns);
 	return -1;
 }
 
 int __init ima_fs_init(void)
 {
-	return ima_fs_ns_init(&init_user_ns);
+	return ima_fs_ns_init(&init_user_ns, NULL);
 }
