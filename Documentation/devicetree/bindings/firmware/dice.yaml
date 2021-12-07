@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/firmware/dice.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Open Profile for DICE Device Tree Bindings
+
+description: |
+  This binding represents a reserved memory region containing secrets derived
+  derived following the Open Profile for DICE.
+
+  See https://pigweed.googlesource.com/open-dice/
+
+maintainers:
+  - David Brazdil <dbrazdil@google.com>
+
+properties:
+  compatible:
+    enum:
+      - google,dice
+
+  memory-region:
+    maxItems: 1
+    description: |
+      phandle to the reserved memory node to be associated with the device
+      The reserved memory node should be defined as per the bindings,
+      Documentation/devicetree/bindings/reserved-memory/reserved-memory.yaml
+
+required:
+  - compatible
+  - memory-region
+
+additionalProperties: false
+
+examples:
+  - |
+    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <1>;
+
+        dice_reserved: dice@12340000 {
+            reg = <0x00 0x12340000 0x2000>;
+            no-map;
+        };
+    };
+
+    dice {
+        compatible = "google,dice";
+        memory-region = <&dice_reserved>;
+    };
