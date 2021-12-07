@@ -511,7 +511,7 @@ static int intel_svm_alloc_pasid(struct device *dev, struct mm_struct *mm,
 	ioasid_t max_pasid = dev_is_pci(dev) ?
 			pci_max_pasids(to_pci_dev(dev)) : intel_pasid_max_id;
 
-	return iommu_sva_alloc_pasid(mm, PASID_MIN, max_pasid - 1);
+	return iommu_sva_alloc_pasid(mm, IOASID_ALLOC_BASE, max_pasid - 1);
 }
 
 static void intel_svm_free_pasid(struct mm_struct *mm)

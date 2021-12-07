@@ -6,6 +6,10 @@
 #include <linux/errno.h>
 
 #define INVALID_IOASID ((ioasid_t)-1)
+#define IOASID_DMA_NO_PASID	0 /* For DMA request w/o PASID */
+#define IOASID_DMA_PASID	1 /* For in-kernel DMA w/ PASID */
+#define IOASID_ALLOC_BASE	2 /* Start of the allocation */
+
 typedef unsigned int ioasid_t;
 typedef ioasid_t (*ioasid_alloc_fn_t)(ioasid_t min, ioasid_t max, void *data);
 typedef void (*ioasid_free_fn_t)(ioasid_t ioasid, void *data);

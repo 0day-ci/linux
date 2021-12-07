@@ -3238,7 +3238,7 @@ static ioasid_t intel_vcmd_ioasid_alloc(ioasid_t min, ioasid_t max, void *data)
 	 * PASID range. Host can partition guest PASID range based on
 	 * policies but it is out of guest's control.
 	 */
-	if (min < PASID_MIN || max > intel_pasid_max_id)
+	if (min < IOASID_ALLOC_BASE || max > intel_pasid_max_id)
 		return INVALID_IOASID;
 
 	if (vcmd_alloc_pasid(iommu, &ioasid))
@@ -4761,7 +4761,7 @@ static int aux_domain_add_dev(struct dmar_domain *domain,
 		u32 pasid;
 
 		/* No private data needed for the default pasid */
-		pasid = ioasid_alloc(NULL, PASID_MIN,
+		pasid = ioasid_alloc(NULL, IOASID_ALLOC_BASE,
 				     pci_max_pasids(to_pci_dev(dev)) - 1,
 				     NULL);
 		if (pasid == INVALID_IOASID) {

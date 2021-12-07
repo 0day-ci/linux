@@ -317,6 +317,8 @@ ioasid_t ioasid_alloc(struct ioasid_set *set, ioasid_t min, ioasid_t max,
 	data->private = private;
 	refcount_set(&data->refs, 1);
 
+	if (min < IOASID_ALLOC_BASE)
+		min = IOASID_ALLOC_BASE;
 	/*
 	 * Custom allocator needs allocator data to perform platform specific
 	 * operations.
