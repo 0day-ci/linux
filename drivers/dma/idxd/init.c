@@ -16,6 +16,7 @@
 #include <linux/idr.h>
 #include <linux/intel-svm.h>
 #include <linux/iommu.h>
+#include <linux/dma-iommu.h>
 #include <uapi/linux/idxd.h>
 #include <linux/dmaengine.h>
 #include "../dmaengine.h"
@@ -27,10 +28,6 @@ MODULE_VERSION(IDXD_DRIVER_VERSION);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_IMPORT_NS(IDXD);
-
-static bool sva = true;
-module_param(sva, bool, 0644);
-MODULE_PARM_DESC(sva, "Toggle SVA support on/off");
 
 bool tc_override;
 module_param(tc_override, bool, 0644);
@@ -530,36 +527,22 @@ static struct idxd_device *idxd_alloc(struct pci_dev *pdev, struct idxd_driver_d
 
 static int idxd_enable_system_pasid(struct idxd_device *idxd)
 {
-	int flags;
-	unsigned int pasid;
-	struct iommu_sva *sva;
+	u32 pasid;
 
-	flags = SVM_FLAG_SUPERVISOR_MODE;
-
-	sva = iommu_sva_bind_device(&idxd->pdev->dev, NULL, &flags);
-	if (IS_ERR(sva)) {
-		dev_warn(&idxd->pdev->dev,
-			 "iommu sva bind failed: %ld\n", PTR_ERR(sva));
-		return PTR_ERR(sva);
-	}
-
-	pasid = iommu_sva_get_pasid(sva);
-	if (pasid == IOMMU_PASID_INVALID) {
-		iommu_sva_unbind_device(sva);
+	pasid = iommu_enable_pasid_dma(&idxd->pdev->dev);
+	if (pasid == INVALID_IOASID) {
+		dev_err(&idxd->pdev->dev, "No kernel DMA PASID\n");
 		return -ENODEV;
 	}
-
-	idxd->sva = sva;
 	idxd->pasid = pasid;
-	dev_dbg(&idxd->pdev->dev, "system pasid: %u\n", pasid);
+
 	return 0;
 }
 
 static void idxd_disable_system_pasid(struct idxd_device *idxd)
 {
-
-	iommu_sva_unbind_device(idxd->sva);
-	idxd->sva = NULL;
+	iommu_disable_pasid_dma(&idxd->pdev->dev);
+	idxd->pasid = 0;
 }
 
 static int idxd_probe(struct idxd_device *idxd)
@@ -575,21 +558,17 @@ static int idxd_probe(struct idxd_device *idxd)
 
 	dev_dbg(dev, "IDXD reset complete\n");
 
-	if (IS_ENABLED(CONFIG_INTEL_IDXD_SVM) && sva) {
-		rc = iommu_dev_enable_feature(dev, IOMMU_DEV_FEAT_SVA);
-		if (rc == 0) {
-			rc = idxd_enable_system_pasid(idxd);
-			if (rc < 0) {
-				iommu_dev_disable_feature(dev, IOMMU_DEV_FEAT_SVA);
-				dev_warn(dev, "Failed to enable PASID. No SVA support: %d\n", rc);
-			} else {
-				set_bit(IDXD_FLAG_PASID_ENABLED, &idxd->flags);
-			}
-		} else {
-			dev_warn(dev, "Unable to turn on SVA feature.\n");
-		}
-	} else if (!sva) {
-		dev_warn(dev, "User forced SVA off via module param.\n");
+	/*
+	 * Try to enable both in-kernel and user DMA request with PASID.
+	 * PASID is supported unless both user and kernel PASID are
+	 * supported. Do not fail probe here in that idxd can still be
+	 * used w/o PASID or IOMMU.
+	 */
+	if (iommu_dev_enable_feature(dev, IOMMU_DEV_FEAT_SVA) ||
+		idxd_enable_system_pasid(idxd)) {
+		dev_warn(dev, "Failed to enable PASID\n");
+	} else {
+		set_bit(IDXD_FLAG_PASID_ENABLED, &idxd->flags);
 	}
 
 	idxd_read_caps(idxd);
