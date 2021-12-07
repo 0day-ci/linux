@@ -1023,6 +1023,47 @@ static int kvm_s390_vm_set_crypto(struct kvm *kvm, struct kvm_device_attr *attr)
 	return 0;
 }
 
+static void kvm_s390_vcpu_pci_setup(struct kvm_vcpu *vcpu)
+{
+	/*
+	 * If the facilities aren't available for PCI interpretation and
+	 * interrupt forwarding, we shouldn't be here.
+	 */
+	if (!vcpu->kvm->arch.use_zpci_interp)
+		return;
+
+	vcpu->arch.sie_block->ecb2 |= ECB2_ZPCI_LSI;
+	vcpu->arch.sie_block->ecb3 |= ECB3_AISII + ECB3_AISI;
+}
+
+void kvm_s390_vcpu_pci_enable_interp(struct kvm *kvm)
+{
+	struct kvm_vcpu *vcpu;
+	int i;
+
+	/*
+	 * If host facilities are available, turn on interpretation for the
+	 * life of this guest
+	 */
+	if (!test_facility(69) || !test_facility(70) || !test_facility(71) ||
+	    !test_facility(72))
+		return;
+
+	mutex_lock(&kvm->lock);
+
+	kvm->arch.use_zpci_interp = 1;
+
+	kvm_s390_vcpu_block_all(kvm);
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		kvm_s390_vcpu_pci_setup(vcpu);
+		kvm_s390_sync_request(KVM_REQ_VSIE_RESTART, vcpu);
+	}
+
+	kvm_s390_vcpu_unblock_all(kvm);
+	mutex_unlock(&kvm->lock);
+}
+
 static void kvm_s390_sync_request_broadcast(struct kvm *kvm, int req)
 {
 	int cx;
@@ -3287,6 +3328,8 @@ static int kvm_s390_vcpu_setup(struct kvm_vcpu *vcpu)
 	vcpu->arch.sie_block->hpid = HPID_KVM;
 
 	kvm_s390_vcpu_crypto_setup(vcpu);
+
+	kvm_s390_vcpu_pci_setup(vcpu);
 
 	mutex_lock(&vcpu->kvm->lock);
 	if (kvm_s390_pv_is_protected(vcpu->kvm)) {
