@@ -1045,11 +1045,12 @@ i2c_new_client_device(struct i2c_adapter *adap, struct i2c_board_info const *inf
 	client->dev.parent = &client->adapter->dev;
 	client->dev.bus = &i2c_bus_type;
 	client->dev.type = &i2c_client_type;
-	client->dev.of_node = of_node_get(info->of_node);
-	client->dev.fwnode = info->fwnode;
 
 	device_enable_async_suspend(&client->dev);
 	i2c_dev_set_name(adap, client, info);
+
+	device_set_node(&client->dev, info->fwnode);
+	client->dev.of_node = of_node_get(info->of_node);
 
 	if (info->swnode) {
 		status = device_add_software_node(&client->dev, info->swnode);
