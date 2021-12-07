@@ -2751,6 +2751,10 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 		set_kvm_facility(kvm->arch.model.fac_mask, 147);
 		set_kvm_facility(kvm->arch.model.fac_list, 147);
 	}
+	if (sclp.has_zpci_interp && test_facility(69)) {
+		set_kvm_facility(kvm->arch.model.fac_mask, 69);
+		set_kvm_facility(kvm->arch.model.fac_list, 69);
+	}
 
 	if (css_general_characteristics.aiv && test_facility(65))
 		set_kvm_facility(kvm->arch.model.fac_mask, 65);
