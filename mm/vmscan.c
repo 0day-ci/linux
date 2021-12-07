@@ -222,13 +222,16 @@ static int expand_one_shrinker_info(struct mem_cgroup *memcg,
 	int size = map_size + defer_size;
 
 	for_each_node(nid) {
+		int tmp = nid;
 		pn = memcg->nodeinfo[nid];
 		old = shrinker_info_protected(memcg, nid);
 		/* Not yet online memcg */
 		if (!old)
 			return 0;
 
-		new = kvmalloc_node(sizeof(*new) + size, GFP_KERNEL, nid);
+		if(!node_online(nid))
+			tmp = numa_mem_id();
+		new = kvmalloc_node(sizeof(*new) + size, GFP_KERNEL, tmp);
 		if (!new)
 			return -ENOMEM;
 
