@@ -1740,7 +1740,14 @@ static void domain_flush_piotlb(struct intel_iommu *iommu,
 	if (domain->default_pasid)
 		qi_flush_piotlb(iommu, did, domain->default_pasid,
 				addr, npages, ih);
-
+	if (domain->kernel_pasid && !domain_type_is_si(domain)) {
+		/*
+		 * REVISIT: we only do PASID IOTLB inval for FL, we could have SL
+		 * for PASID in the future such as vIOMMU PT. this doesn't get hit.
+		 */
+		qi_flush_piotlb(iommu, did, domain->kernel_pasid,
+				addr, npages, ih);
+	}
 	if (!list_empty(&domain->devices))
 		qi_flush_piotlb(iommu, did, PASID_RID2PASID, addr, npages, ih);
 }
@@ -5632,6 +5639,100 @@ static void intel_iommu_iotlb_sync_map(struct iommu_domain *domain,
 	}
 }
 
+static int intel_enable_pasid_dma(struct device *dev, u32 pasid)
+{
+	struct intel_iommu *iommu = device_to_iommu(dev, NULL, NULL);
+	struct device_domain_info *info;
+	unsigned long flags;
+	int ret = 0;
+
+	info = get_domain_info(dev);
+	if (!info)
+		return -ENODEV;
+
+	if (!dev_is_pci(dev) || !sm_supported(info->iommu))
+		return -EINVAL;
+
+	if (intel_iommu_enable_pasid(info->iommu, dev))
+		return -ENODEV;
+
+	spin_lock_irqsave(&device_domain_lock, flags);
+	spin_lock(&iommu->lock);
+	/*
+	 * Store PASID for IOTLB flush, but only needed for non-passthrough
+	 * unmap case. For passthrough, we only need to do IOTLB flush during
+	 * PASID teardown. Flush covers all devices in the same domain as the
+	 * domain ID is the same for the same SL.
+	 */
+	info->domain->kernel_pasid = pasid;
+
+	/*
+	 * Tracks how many attached devices are using the kernel PASID. Clear
+	 * the domain kernel PASID when all users called disable_pasid_dma().
+	 */
+	atomic_inc(&info->domain->kernel_pasid_user);
+
+	/*
+	 * Addressing modes (IOVA vs. PA) is a per device choice made by the
+	 * platform code. We must treat legacy DMA (request w/o PASID) and
+	 * DMA w/ PASID identially in terms of mapping. Here we just set up
+	 * the kernel PASID to match the mapping of RID2PASID/PASID0.
+	 */
+	if (hw_pass_through && domain_type_is_si(info->domain)) {
+		ret = intel_pasid_setup_pass_through(info->iommu, info->domain,
+						dev, pasid);
+		if (ret)
+			dev_err(dev, "Failed kernel PASID %d in BYPASS", pasid);
+
+	} else if (domain_use_first_level(info->domain)) {
+		/* We are using FL for IOVA, this is the default option */
+		ret = domain_setup_first_level(info->iommu, info->domain, dev,
+					       pasid);
+		if (ret)
+			dev_err(dev, "Failed kernel PASID %d IOVA FL", pasid);
+	} else {
+		ret = intel_pasid_setup_second_level(info->iommu, info->domain,
+						     dev, pasid);
+		if (ret)
+			dev_err(dev, "Failed kernel SPASID %d IOVA SL", pasid);
+	}
+
+	spin_unlock(&iommu->lock);
+	spin_unlock_irqrestore(&device_domain_lock, flags);
+
+	return ret;
+}
+
+static int intel_disable_pasid_dma(struct device *dev)
+{
+	struct intel_iommu *iommu = device_to_iommu(dev, NULL, NULL);
+	struct device_domain_info *info;
+	unsigned long flags;
+	int ret = 0;
+
+	info = get_domain_info(dev);
+	if (!info)
+		return -ENODEV;
+
+	if (!dev_is_pci(dev) || !sm_supported(info->iommu))
+		return -EINVAL;
+
+	spin_lock_irqsave(&device_domain_lock, flags);
+	spin_lock(&iommu->lock);
+
+	/* Tear down kernel PASID for this device */
+	intel_pasid_tear_down_entry(info->iommu, info->dev,
+				    info->domain->kernel_pasid,
+				    false);
+	/* Clear the domain kernel PASID when there is no users */
+	if (atomic_dec_and_test(&info->domain->kernel_pasid_user))
+		info->domain->kernel_pasid = 0;
+
+	spin_unlock(&iommu->lock);
+	spin_unlock_irqrestore(&device_domain_lock, flags);
+	return ret;
+}
+
 const struct iommu_ops intel_iommu_ops = {
 	.capable		= intel_iommu_capable,
 	.domain_alloc		= intel_iommu_domain_alloc,
@@ -5669,6 +5770,8 @@ const struct iommu_ops intel_iommu_ops = {
 	.sva_get_pasid		= intel_svm_get_pasid,
 	.page_response		= intel_svm_page_response,
 #endif
+	.enable_pasid_dma	= intel_enable_pasid_dma,
+	.disable_pasid_dma	= intel_disable_pasid_dma,
 };
 
 static void quirk_iommu_igfx(struct pci_dev *dev)

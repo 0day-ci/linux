@@ -567,7 +567,8 @@ struct dmar_domain {
 					 * The default pasid used for non-SVM
 					 * traffic on mediated devices.
 					 */
-
+	u32		kernel_pasid;	/* for in-kernel DMA w/ PASID */
+	atomic_t	kernel_pasid_user; /* count of kernel_pasid users */
 	struct iommu_domain domain;	/* generic domain data structure for
 					   iommu core */
 };

@@ -505,6 +505,13 @@ devtlb_invalidation_with_pasid(struct intel_iommu *iommu,
 		qi_flush_dev_iotlb(iommu, sid, pfsid, qdep, 0, 64 - VTD_PAGE_SHIFT);
 	else
 		qi_flush_dev_iotlb_pasid(iommu, sid, pfsid, pasid, qdep, 0, 64 - VTD_PAGE_SHIFT);
+	/*
+	 * Flush the kernel PASID if used by the device. This is the case where
+	 * a device driver uses IOVA via DMA map APIs for request with PASID.
+	 */
+	if (dev->pasid)
+		qi_flush_dev_iotlb_pasid(iommu, sid, pfsid, dev->pasid, qdep, 0,
+					 64 - VTD_PAGE_SHIFT);
 }
 
 void intel_pasid_tear_down_entry(struct intel_iommu *iommu, struct device *dev,
