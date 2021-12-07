@@ -18,6 +18,7 @@
 
 #include <soc/mscc/ocelot_vcap.h>
 #include <soc/mscc/ocelot_hsio.h>
+#include "ocelot_fdma.h"
 #include "ocelot.h"
 
 #define VSC7514_VCAP_POLICER_BASE			128
@@ -1048,6 +1049,7 @@ static int mscc_ocelot_probe(struct platform_device *pdev)
 		{ S1, "s1" },
 		{ S2, "s2" },
 		{ PTP, "ptp", 1 },
+		{ FDMA, "fdma", 1 },
 	};
 
 	if (!np && !pdev->dev.platform_data)
@@ -1082,6 +1084,9 @@ static int mscc_ocelot_probe(struct platform_device *pdev)
 
 		ocelot->targets[io_target[i].id] = target;
 	}
+
+	if (ocelot->targets[FDMA])
+		ocelot_fdma_init(pdev, ocelot);
 
 	hsio = syscon_regmap_lookup_by_compatible("mscc,ocelot-hsio");
 	if (IS_ERR(hsio)) {
@@ -1146,6 +1151,9 @@ static int mscc_ocelot_probe(struct platform_device *pdev)
 	if (err)
 		goto out_ocelot_devlink_unregister;
 
+	if (ocelot->fdma)
+		ocelot_fdma_start(ocelot);
+
 	err = ocelot_devlink_sb_register(ocelot);
 	if (err)
 		goto out_ocelot_release_ports;
@@ -1186,6 +1194,8 @@ static int mscc_ocelot_remove(struct platform_device *pdev)
 {
 	struct ocelot *ocelot = platform_get_drvdata(pdev);
 
+	if (ocelot->fdma)
+		ocelot_fdma_deinit(ocelot);
 	devlink_unregister(ocelot->devlink);
 	ocelot_deinit_timestamp(ocelot);
 	ocelot_devlink_sb_unregister(ocelot);
