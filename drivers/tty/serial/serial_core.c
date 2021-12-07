@@ -960,7 +960,7 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 		uport->fifosize = new_info->xmit_fifo_size;
 
  check_and_exit:
-	retval = 0;
+	retval = retval < 0 ? retval : 0;
 	if (uport->type == PORT_UNKNOWN)
 		goto exit;
 	if (tty_port_initialized(port)) {
