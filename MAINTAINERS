@@ -5715,7 +5715,7 @@ DMA-BUF HEAPS FRAMEWORK
 M:	Sumit Semwal <sumit.semwal@linaro.org>
 R:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
 R:	Liam Mark <lmark@codeaurora.org>
-R:	Laura Abbott <labbott@redhat.com>
+R:	Laura Abbott <labbott@kernel.org>
 R:	Brian Starkey <Brian.Starkey@arm.com>
 R:	John Stultz <john.stultz@linaro.org>
 L:	linux-media@vger.kernel.org
