@@ -1588,6 +1588,7 @@ struct ATTR_FILE_NAME *ni_fname_name(struct ntfs_inode *ni,
 {
 	struct ATTRIB *attr = NULL;
 	struct ATTR_FILE_NAME *fname;
+	struct le_str *fns;
 
 	*le = NULL;
 
@@ -1610,7 +1611,8 @@ next:
 	if (uni->len != fname->name_len)
 		goto next;
 
-	if (ntfs_cmp_names_cpu(uni, (struct le_str *)&fname->name_len, NULL,
+	fns = (struct le_str *)&fname->name_len;
+	if (ntfs_cmp_names(uni->name, uni->len, fns->name, fns->len, NULL,
 			       false))
 		goto next;
 
