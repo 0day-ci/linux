@@ -341,6 +341,7 @@ Code  Seq#    Include File                                           Comments
 0xAE  40-FF  linux/kvm.h                                             Kernel-based Virtual Machine
                                                                      <mailto:kvm@vger.kernel.org>
 0xAE  20-3F  linux/nitro_enclaves.h                                  Nitro Enclaves
+0xAE  40-5F  uapi/linux/dice.h                                       Open Profile for DICE driver
 0xAF  00-1F  linux/fsl_hypervisor.h                                  Freescale hypervisor
 0xB0  all                                                            RATIO devices in development:
                                                                      <mailto:vgo@ratio.de>
