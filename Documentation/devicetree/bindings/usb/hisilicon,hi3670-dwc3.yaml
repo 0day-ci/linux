@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/hisilicon,hi3670-dwc3.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: HiSilicon Kirin970 USB3 Controller
+
+maintainers:
+  - Mauro Carvalho Chehab <mchehab+huawei@kernel.org>
+
+description:
+  Bindings for the USB3 DWC3 controller present on Kirin970.
+
+properties:
+  compatible:
+    const: hisilicon,hi3670-dwc3
+
+  clocks:
+    maxItems: 4
+
+  clock-names:
+    items:
+      - const: clk_gate_abb_usb
+      - const: hclk_gate_usb3otg
+      - const: clk_gate_usb3otg_ref
+      - const: aclk_gate_usb3dvfs
+
+  ranges: true
+
+  assigned-clocks:
+    maxItems: 1
+
+  assigned-clock-rates:
+    maxItems: 1
+
+  resets:
+    maxItems: 4
+
+  '#address-cells':
+    const: 2
+
+  '#size-cells':
+    const: 2
+
+# Required child node:
+
+patternProperties:
+  "^usb@[0-9a-f]+$":
+    $ref: snps,dwc3.yaml#
+
+required:
+  - compatible
+  - ranges
+  - clocks
+  - clock-names
+  - assigned-clocks
+  - assigned-clock-rates
+  - resets
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/hi3670-clock.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    bus {
+      #address-cells = <2>;
+      #size-cells = <2>;
+
+      usb3: hisi_dwc3 {
+        compatible = "hisilicon,hi3670-dwc3";
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        clocks = <&crg_ctrl HI3670_CLK_GATE_ABB_USB>,
+                 <&crg_ctrl HI3670_HCLK_GATE_USB3OTG>,
+                 <&crg_ctrl HI3670_CLK_GATE_USB3OTG_REF>,
+                 <&crg_ctrl HI3670_ACLK_GATE_USB3DVFS>;
+        clock-names = "clk_gate_abb_usb",
+                      "hclk_gate_usb3otg",
+                      "clk_gate_usb3otg_ref",
+                      "aclk_gate_usb3dvfs";
+
+        assigned-clocks = <&crg_ctrl HI3670_ACLK_GATE_USB3DVFS>;
+        assigned-clock-rates = <238000000>;
+        resets = <&crg_rst 0x90 6>,
+                 <&crg_rst 0x90 7>,
+                 <&usb31_misc_rst 0xA0 8>,
+                 <&usb31_misc_rst 0xA0 9>;
+
+        dwc3: usb@ff100000 {
+          compatible = "snps,dwc3";
+          reg = <0x0 0xff100000 0x0 0x100000>;
+
+          interrupts = <0 159 IRQ_TYPE_LEVEL_HIGH>,
+                       <0 161 IRQ_TYPE_LEVEL_HIGH>;
+
+          phys = <&usb_phy>;
+          phy-names = "usb3-phy";
+        };
+      };
+    };
