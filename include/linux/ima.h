@@ -239,9 +239,19 @@ struct ima_namespace {
 	long ima_key_queue_timeout;
 	bool timer_expired;
 #endif
+
+	struct list_head ima_default_rules;
+	/* ns's policy rules */
+	struct list_head ima_policy_rules;
+	struct list_head ima_temp_rules;
+	/* Pointer to ns's current policy */
+	struct list_head __rcu *ima_rules;
+	/* current content of the policy */
+	int ima_policy_flag;
 };
 
 extern struct ima_namespace init_ima_ns;
+extern struct list_head ima_default_rules;
 
 #ifdef CONFIG_IMA_NS
 
