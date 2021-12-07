@@ -9,6 +9,30 @@
 
 #include "dsa_priv.h"
 
+static void qca_tag_handle_mdio_packet(struct sk_buff *skb,
+				       struct net_device *dev)
+{
+	struct mdio_ethhdr *mdio_ethhdr;
+	struct qca8k_port_tag *header;
+	struct dsa_port *cpu_dp;
+
+	cpu_dp = dev->dsa_ptr;
+	header = cpu_dp->priv;
+
+	mdio_ethhdr = (struct mdio_ethhdr *)skb_mac_header(skb);
+
+	header->data[0] = mdio_ethhdr->mdio_data;
+
+	/* Get the rest of the 12 byte of data */
+	memcpy(header->data + 1, skb->data, QCA_HDR_MDIO_DATA2_LEN);
+
+	/* Make sure the seq match the requested packet */
+	if (mdio_ethhdr->seq == header->seq)
+		header->ack = true;
+
+	complete(&header->rw_done);
+}
+
 static struct sk_buff *qca_tag_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct dsa_port *dp = dsa_slave_to_port(dev);
@@ -52,8 +76,10 @@ static struct sk_buff *qca_tag_rcv(struct sk_buff *skb, struct net_device *dev)
 	pk_type = FIELD_GET(QCA_HDR_RECV_TYPE, hdr);
 
 	/* MDIO read/write packet */
-	if (pk_type == QCA_HDR_RECV_TYPE_RW_REG_ACK)
+	if (pk_type == QCA_HDR_RECV_TYPE_RW_REG_ACK) {
+		qca_tag_handle_mdio_packet(skb, dev);
 		return NULL;
+	}
 
 	/* Remove QCA tag and recalculate checksum */
 	skb_pull_rcsum(skb, QCA_HDR_LEN);
