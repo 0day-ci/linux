@@ -13,6 +13,7 @@
 #include <linux/vfio_zdev.h>
 #include <asm/pci_clp.h>
 #include <asm/pci_io.h>
+#include <asm/kvm_pci.h>
 
 #include <linux/vfio_pci_core.h>
 
@@ -135,4 +136,57 @@ int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 	ret = zpci_pfip_cap(zdev, caps);
 
 	return ret;
+}
+
+static int vfio_pci_zdev_group_notifier(struct notifier_block *nb,
+					unsigned long action, void *data)
+{
+	struct kvm_zdev *kzdev = container_of(nb, struct kvm_zdev, nb);
+
+	if (action == VFIO_GROUP_NOTIFY_SET_KVM) {
+		if (!data || !kzdev->zdev)
+			return NOTIFY_DONE;
+		if (kvm_s390_pci_attach_kvm(kzdev->zdev, data))
+			return NOTIFY_DONE;
+	}
+
+	return NOTIFY_OK;
+}
+
+int vfio_pci_zdev_open(struct vfio_pci_core_device *vdev)
+{
+	unsigned long events = VFIO_GROUP_NOTIFY_SET_KVM;
+	struct zpci_dev *zdev = to_zpci(vdev->pdev);
+	int ret;
+
+	if (!zdev)
+		return -ENODEV;
+
+	ret = kvm_s390_pci_dev_open(zdev);
+	if (ret)
+		return -ENODEV;
+
+	zdev->kzdev->nb.notifier_call = vfio_pci_zdev_group_notifier;
+
+	ret = vfio_register_notifier(vdev->vdev.dev, VFIO_GROUP_NOTIFY,
+				     &events, &zdev->kzdev->nb);
+	if (ret)
+		kvm_s390_pci_dev_release(zdev);
+
+	return ret;
+}
+
+int vfio_pci_zdev_release(struct vfio_pci_core_device *vdev)
+{
+	struct zpci_dev *zdev = to_zpci(vdev->pdev);
+
+	if (!zdev || !zdev->kzdev)
+		return -ENODEV;
+
+	vfio_unregister_notifier(vdev->vdev.dev, VFIO_GROUP_NOTIFY,
+				 &zdev->kzdev->nb);
+
+	kvm_s390_pci_dev_release(zdev);
+
+	return 0;
 }
