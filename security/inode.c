@@ -54,7 +54,7 @@ static int securityfs_fill_super(struct super_block *sb, struct fs_context *fc)
 
 static int securityfs_get_tree(struct fs_context *fc)
 {
-	return get_tree_single(fc, securityfs_fill_super);
+	return get_tree_keyed(fc, securityfs_fill_super, fc->user_ns);
 }
 
 static const struct fs_context_operations securityfs_context_ops = {
@@ -67,11 +67,17 @@ static int securityfs_init_fs_context(struct fs_context *fc)
 	return 0;
 }
 
+static void securityfs_kill_super(struct super_block *sb)
+{
+	kill_litter_super(sb);
+}
+
 static struct file_system_type fs_type = {
 	.owner =	THIS_MODULE,
 	.name =		"securityfs",
 	.init_fs_context = securityfs_init_fs_context,
-	.kill_sb =	kill_litter_super,
+	.kill_sb =	securityfs_kill_super,
+	.fs_flags =	FS_USERNS_MOUNT,
 };
 
 /**
@@ -130,6 +136,8 @@ static struct dentry *securityfs_create_dentry(const char *name, umode_t mode,
 	if (!parent) {
 		if (ns == &init_user_ns)
 			parent = securityfs_mount->mnt_root;
+		else
+			return ERR_PTR(-EINVAL);
 	}
 
 	dir = d_inode(parent);
