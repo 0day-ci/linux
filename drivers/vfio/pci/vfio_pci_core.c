@@ -1176,6 +1176,8 @@ hot_reset_release:
 			return vfio_pci_zdev_feat_interp(vdev, feature, arg);
 		case VFIO_DEVICE_FEATURE_ZPCI_AIF:
 			return vfio_pci_zdev_feat_aif(vdev, feature, arg);
+		case VFIO_DEVICE_FEATURE_ZPCI_IOAT:
+			return vfio_pci_zdev_feat_ioat(vdev, feature, arg);
 		default:
 			return -ENOTTY;
 		}
