@@ -559,6 +559,7 @@ struct device {
 	void	(*release)(struct device *dev);
 	struct iommu_group	*iommu_group;
 	struct dev_iommu	*iommu;
+	u32			pasid;	/* For in-kernel DMA w/ PASID */
 
 	enum device_removable	removable;
 

@@ -168,6 +168,77 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
 }
 
 /**
+ * iommu_enable_pasid_dma --Enable in-kernel DMA request with PASID
+ * @dev:	Device to be enabled
+ *
+ * DMA request with PASID will be mapped the same way as the legacy DMA.
+ * If the device is in pass-through, PASID will also pass-through. If the
+ * device is in IOVA map, the supervisor PASID will point to the same IOVA
+ * page table.
+ *
+ * @return the kernel PASID to be used for DMA or INVALID_IOASID on failure
+ */
+ioasid_t iommu_enable_pasid_dma(struct device *dev)
+{
+	struct iommu_domain *dom;
+
+	if (dev->pasid) {
+		dev_err(dev, "PASID DMA already enabled\n");
+		return IOASID_DMA_PASID;
+	}
+	dom = iommu_get_domain_for_dev(dev);
+
+	if (!dom) {
+		dev_err(dev, "No IOMMU domain\n");
+		return INVALID_IOASID;
+	}
+
+	/*
+	 * Use the reserved kernel PASID for all devices. For now,
+	 * there is no need to have different PASIDs for in-kernel use.
+	 */
+	if (!dom->ops->enable_pasid_dma || dom->ops->enable_pasid_dma(dev, IOASID_DMA_PASID))
+		return INVALID_IOASID;
+	/* Used for device IOTLB flush */
+	dev->pasid = IOASID_DMA_PASID;
+
+	return IOASID_DMA_PASID;
+}
+EXPORT_SYMBOL(iommu_enable_pasid_dma);
+
+/**
+ * iommu_disable_pasid_dma --Disable in-kernel DMA request with PASID
+ * @dev:	Device's PASID DMA to be disabled
+ *
+ * It is the device driver's responsibility to ensure no more incoming DMA
+ * requests with the kernel PASID before calling this function. IOMMU driver
+ * ensures PASID cache, IOTLBs related to the kernel PASID are cleared and
+ * drained.
+ *
+ * @return 0 on success or error code on failure
+ */
+int iommu_disable_pasid_dma(struct device *dev)
+{
+	struct iommu_domain *dom;
+	int ret = 0;
+
+	if (!dev->pasid) {
+		dev_err(dev, "PASID DMA not enabled\n");
+		return -ENODEV;
+	}
+	dom = iommu_get_domain_for_dev(dev);
+	if (!dom->ops->disable_pasid_dma)
+		return -ENOTSUPP;
+
+	ret = dom->ops->disable_pasid_dma(dev);
+	if (!ret)
+		dev->pasid = 0;
+
+	return ret;
+}
+EXPORT_SYMBOL(iommu_disable_pasid_dma);
+
+/**
  * iommu_dma_get_resv_regions - Reserved region driver helper
  * @dev: Device from iommu_get_resv_regions()
  * @list: Reserved region list from iommu_get_resv_regions()
