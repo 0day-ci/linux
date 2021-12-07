@@ -5105,6 +5105,12 @@ static bool icl_need_wm1_wa(struct drm_i915_private *i915,
 	       (IS_DISPLAY_VER(i915, 12, 13) && plane_id == PLANE_CURSOR);
 }
 
+static bool dg2_need_min_ddb(struct drm_i915_private *i915,
+			     struct intel_crtc_state *crtc_state)
+{
+	return IS_DG2(i915) && crtc_state->uapi.async_flip;
+}
+
 static int
 skl_allocate_plane_ddb(struct intel_atomic_state *state,
 		       struct intel_crtc *crtc)
@@ -5213,9 +5219,15 @@ skl_allocate_plane_ddb(struct intel_atomic_state *state,
 			break;
 
 		rate = crtc_state->plane_data_rate[plane_id];
-		extra = min_t(u16, alloc_size,
-			      DIV64_U64_ROUND_UP(alloc_size * rate,
-						 total_data_rate));
+
+		if (dg2_need_min_ddb(dev_priv, crtc_state)) {
+			extra = 0;
+		} else {
+			extra = min_t(u16, alloc_size,
+				      DIV64_U64_ROUND_UP(alloc_size * rate,
+							 total_data_rate));
+		}
+
 		total[plane_id] = wm->wm[level].min_ddb_alloc + extra;
 		alloc_size -= extra;
 		total_data_rate -= rate;
@@ -5224,14 +5236,22 @@ skl_allocate_plane_ddb(struct intel_atomic_state *state,
 			break;
 
 		rate = crtc_state->uv_plane_data_rate[plane_id];
-		extra = min_t(u16, alloc_size,
-			      DIV64_U64_ROUND_UP(alloc_size * rate,
-						 total_data_rate));
+
+		if (dg2_need_min_ddb(dev_priv, crtc_state)) {
+			extra = 0;
+		} else {
+			extra = min_t(u16, alloc_size,
+				      DIV64_U64_ROUND_UP(alloc_size * rate,
+							 total_data_rate));
+		}
+
 		uv_total[plane_id] = wm->uv_wm[level].min_ddb_alloc + extra;
 		alloc_size -= extra;
 		total_data_rate -= rate;
 	}
-	drm_WARN_ON(&dev_priv->drm, alloc_size != 0 || total_data_rate != 0);
+
+	if (!dg2_need_min_ddb(dev_priv, crtc_state))
+		drm_WARN_ON(&dev_priv->drm, alloc_size != 0 || total_data_rate != 0);
 
 	/* Set the actual DDB start/end points for each plane */
 	start = alloc->start;
