@@ -59,11 +59,21 @@ struct mdio_ethhdr {
 	u16 hdr;		/* qca hdr */
 } __packed;
 
+enum mdio_cmd {
+	MDIO_WRITE = 0x0,
+	MDIO_READ
+};
+
 struct qca8k_port_tag {
 	void (*rw_reg_ack_handler)(struct dsa_port *dp,
 				   struct sk_buff *skb);
 	void (*mib_autocast_handler)(struct dsa_port *dp,
 				     struct sk_buff *skb);
+	struct completion rw_done;
+	struct mutex mdio_mutex; /* Enforce one mdio read/write at time */
+	bool ack;
+	u32 seq;
+	u32 data[4];
 };
 
 #endif /* __TAG_QCA_H */

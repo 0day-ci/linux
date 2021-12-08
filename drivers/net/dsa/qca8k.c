@@ -20,6 +20,7 @@
 #include <linux/phylink.h>
 #include <linux/gpio/consumer.h>
 #include <linux/etherdevice.h>
+#include <linux/dsa/tag_qca.h>
 
 #include "qca8k.h"
 
@@ -170,13 +171,161 @@ qca8k_rmw(struct qca8k_priv *priv, u32 reg, u32 mask, u32 write_val)
 	return regmap_update_bits(priv->regmap, reg, mask, write_val);
 }
 
+static struct sk_buff *qca8k_alloc_mdio_header(struct qca8k_port_tag *header, enum mdio_cmd cmd,
+					       u32 reg, u32 *val)
+{
+	struct mdio_ethhdr *mdio_ethhdr;
+	struct sk_buff *skb;
+	u16 hdr;
+
+	skb = dev_alloc_skb(QCA_HDR_MDIO_PKG_LEN);
+
+	prefetchw(skb->data);
+
+	skb_reset_mac_header(skb);
+	skb_set_network_header(skb, skb->len);
+
+	mdio_ethhdr = skb_push(skb, QCA_HDR_MDIO_HEADER_LEN + QCA_HDR_LEN);
+
+	hdr = FIELD_PREP(QCA_HDR_XMIT_VERSION, QCA_HDR_VERSION);
+	hdr |= QCA_HDR_XMIT_FROM_CPU;
+	hdr |= FIELD_PREP(QCA_HDR_XMIT_DP_BIT, BIT(0));
+	hdr |= FIELD_PREP(QCA_HDR_XMIT_CONTROL, QCA_HDR_XMIT_TYPE_RW_REG);
+
+	mdio_ethhdr->seq = FIELD_PREP(QCA_HDR_MDIO_SEQ_NUM, 200);
+
+	mdio_ethhdr->command = FIELD_PREP(QCA_HDR_MDIO_ADDR, reg);
+	mdio_ethhdr->command |= FIELD_PREP(QCA_HDR_MDIO_LENGTH, 4);
+	mdio_ethhdr->command |= FIELD_PREP(QCA_HDR_MDIO_CMD, cmd);
+	mdio_ethhdr->command |= FIELD_PREP(QCA_HDR_MDIO_CHECK_CODE, MDIO_CHECK_CODE_VAL);
+
+	if (cmd == MDIO_WRITE)
+		mdio_ethhdr->mdio_data = *val;
+
+	mdio_ethhdr->hdr = htons(hdr);
+
+	skb_put_zero(skb, QCA_HDR_MDIO_DATA2_LEN);
+	skb_put_zero(skb, QCA_HDR_MDIO_PADDING_LEN);
+
+	return skb;
+}
+
+static int qca8k_read_eth(struct qca8k_priv *priv, u32 reg, u32 *val)
+{
+	struct qca8k_port_tag *header = priv->header_mdio;
+	struct sk_buff *skb;
+	bool ack;
+	int ret;
+
+	skb = qca8k_alloc_mdio_header(header, MDIO_READ, reg, 0);
+	skb->dev = dsa_to_port(priv->ds, 0)->master;
+
+	mutex_lock(&header->mdio_mutex);
+
+	reinit_completion(&header->rw_done);
+	header->seq = 200;
+	header->ack = false;
+
+	dev_queue_xmit(skb);
+
+	ret = wait_for_completion_timeout(&header->rw_done, QCA8K_MDIO_RW_ETHERNET);
+
+	*val = header->data[0];
+	ack = header->ack;
+
+	mutex_unlock(&header->mdio_mutex);
+
+	if (ret <= 0)
+		return -ETIMEDOUT;
+
+	if (!ack)
+		return -EINVAL;
+
+	return 0;
+}
+
+static void qca8k_rw_reg_ack_handler(struct dsa_port *dp, struct sk_buff *skb)
+{
+	struct qca8k_port_tag *header = dp->priv;
+	struct mdio_ethhdr *mdio_ethhdr;
+
+	mdio_ethhdr = (struct mdio_ethhdr *)skb_mac_header(skb);
+
+	header->data[0] = mdio_ethhdr->mdio_data;
+
+	/* Get the rest of the 12 byte of data */
+	memcpy(header->data + 1, skb->data, QCA_HDR_MDIO_DATA2_LEN);
+
+	/* Make sure the seq match the requested packet */
+	if (mdio_ethhdr->seq == header->seq)
+		header->ack = true;
+
+	complete(&header->rw_done);
+}
+
+static int qca8k_write_eth(struct qca8k_priv *priv, u32 reg, u32 val)
+{
+	struct qca8k_port_tag *header = priv->header_mdio;
+	struct sk_buff *skb;
+	bool ack;
+	int ret;
+
+	skb = qca8k_alloc_mdio_header(header, MDIO_WRITE, reg, &val);
+	skb->dev = dsa_to_port(priv->ds, 0)->master;
+
+	mutex_lock(&header->mdio_mutex);
+
+	dev_queue_xmit(skb);
+
+	reinit_completion(&header->rw_done);
+	header->ack = false;
+	header->seq = 200;
+
+	ret = wait_for_completion_timeout(&header->rw_done, QCA8K_MDIO_RW_ETHERNET);
+
+	ack = header->ack;
+
+	mutex_unlock(&header->mdio_mutex);
+
+	if (ret <= 0)
+		return -ETIMEDOUT;
+
+	if (!ack)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int
+qca8k_regmap_update_bits_eth(struct qca8k_priv *priv, u32 reg, u32 mask, u32 write_val)
+{
+	u32 val = 0;
+	int ret;
+
+	ret = qca8k_read_eth(priv, reg, &val);
+	if (ret)
+		return ret;
+
+	val &= ~mask;
+	val |= write_val;
+
+	return qca8k_write_eth(priv, reg, val);
+}
+
 static int
 qca8k_regmap_read(void *ctx, uint32_t reg, uint32_t *val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	struct qca8k_port_tag *header_mdio;
 	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	int ret;
+
+	header_mdio = priv->header_mdio;
+
+	if (header_mdio)
+		if (!qca8k_read_eth(priv, reg, val))
+			return 0;
 
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
@@ -197,9 +346,16 @@ static int
 qca8k_regmap_write(void *ctx, uint32_t reg, uint32_t val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	struct qca8k_port_tag *header_mdio;
 	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	int ret;
+
+	header_mdio = priv->header_mdio;
+
+	if (header_mdio)
+		if (!qca8k_write_eth(priv, reg, val))
+			return 0;
 
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
@@ -220,10 +376,17 @@ static int
 qca8k_regmap_update_bits(void *ctx, uint32_t reg, uint32_t mask, uint32_t write_val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	struct qca8k_port_tag *header_mdio;
 	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	u32 val;
 	int ret;
+
+	header_mdio = priv->header_mdio;
+
+	if (header_mdio)
+		if (!qca8k_regmap_update_bits_eth(priv, reg, mask, write_val))
+			return 0;
 
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
@@ -1223,8 +1386,13 @@ qca8k_setup(struct dsa_switch *ds)
 	 * Configure specific switch configuration for ports
 	 */
 	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
+		struct dsa_port *dp = dsa_to_port(ds, i);
+
+		/* Set the header_mdio to be accessible by the qca tagger */
+		dp->priv = priv->header_mdio;
+
 		/* CPU port gets connected to all user ports of the switch */
-		if (dsa_is_cpu_port(ds, i)) {
+		if (dsa_port_is_cpu(dp)) {
 			ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
 					QCA8K_PORT_LOOKUP_MEMBER, dsa_user_ports(ds));
 			if (ret)
@@ -1232,7 +1400,7 @@ qca8k_setup(struct dsa_switch *ds)
 		}
 
 		/* Individual user ports get connected to CPU port only */
-		if (dsa_is_user_port(ds, i)) {
+		if (dsa_port_is_user(dp)) {
 			ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
 					QCA8K_PORT_LOOKUP_MEMBER,
 					BIT(cpu_port));
@@ -2382,6 +2550,38 @@ qca8k_port_lag_leave(struct dsa_switch *ds, int port,
 	return qca8k_lag_refresh_portmap(ds, port, lag, true);
 }
 
+static int qca8k_tag_proto_connect(struct dsa_switch *ds,
+				   const struct dsa_device_ops *tag_ops)
+{
+	struct qca8k_priv *qca8k_priv = ds->priv;
+	struct qca8k_port_tag *priv;
+	struct dsa_port *dp;
+	int i;
+
+	switch (tag_ops->proto) {
+	case DSA_TAG_PROTO_QCA:
+		for (i = 0; i < QCA8K_NUM_PORTS; i++) {
+			dp = dsa_to_port(ds, i);
+			priv = dp->priv;
+
+			if (!dsa_port_is_cpu(dp))
+				continue;
+
+			mutex_init(&priv->mdio_mutex);
+			init_completion(&priv->rw_done);
+			/* Cache the header mdio */
+			qca8k_priv->header_mdio = priv;
+			priv->rw_reg_ack_handler = qca8k_rw_reg_ack_handler;
+		}
+
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
 static const struct dsa_switch_ops qca8k_switch_ops = {
 	.get_tag_protocol	= qca8k_get_tag_protocol,
 	.setup			= qca8k_setup,
@@ -2417,6 +2617,7 @@ static const struct dsa_switch_ops qca8k_switch_ops = {
 	.get_phy_flags		= qca8k_get_phy_flags,
 	.port_lag_join		= qca8k_port_lag_join,
 	.port_lag_leave		= qca8k_port_lag_leave,
+	.tag_proto_connect	= qca8k_tag_proto_connect,
 };
 
 static int qca8k_read_switch_id(struct qca8k_priv *priv)
@@ -2452,6 +2653,7 @@ static int qca8k_read_switch_id(struct qca8k_priv *priv)
 static int
 qca8k_sw_probe(struct mdio_device *mdiodev)
 {
+	struct qca8k_port_tag *header_mdio;
 	struct qca8k_priv *priv;
 	int ret;
 
@@ -2461,6 +2663,13 @@ qca8k_sw_probe(struct mdio_device *mdiodev)
 	priv = devm_kzalloc(&mdiodev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
+
+	header_mdio = devm_kzalloc(&mdiodev->dev, sizeof(*header_mdio), GFP_KERNEL);
+	if (!header_mdio)
+		return -ENOMEM;
+
+	mutex_init(&header_mdio->mdio_mutex);
+	init_completion(&header_mdio->rw_done);
 
 	priv->bus = mdiodev->bus;
 	priv->dev = &mdiodev->dev;
@@ -2501,6 +2710,7 @@ qca8k_sw_probe(struct mdio_device *mdiodev)
 	priv->ds->priv = priv;
 	priv->ops = qca8k_switch_ops;
 	priv->ds->ops = &priv->ops;
+	priv->header_mdio = header_mdio;
 	mutex_init(&priv->reg_mutex);
 	dev_set_drvdata(&mdiodev->dev, priv);
 
