@@ -638,3 +638,7 @@
 &icssg1_mdio {
 	status = "disabled";
 };
+
+&gpmc0 {
+	status = "disabled";
+};
