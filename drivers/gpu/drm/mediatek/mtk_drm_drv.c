@@ -52,9 +52,47 @@ mtk_drm_mode_fb_create(struct drm_device *dev,
 	return drm_gem_fb_create(dev, file, cmd);
 }
 
+static bool is_lut_size_expected(const struct drm_device *dev,
+				 const struct drm_property_blob *lut)
+{
+	int len;
+
+	if (!lut)
+		return true;
+
+	len = drm_color_lut_size(lut);
+	if (len != MTK_LUT_SIZE) {
+		drm_dbg_state(dev, "Invalid LUT size; got %d, expected %d\n",
+			      len, MTK_LUT_SIZE);
+		return false;
+	}
+
+	return true;
+}
+
+static int mtk_drm_atomic_check(struct drm_device *dev,
+				struct drm_atomic_state *state)
+{
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *new_crtc_state;
+	int ret, i;
+
+	ret = drm_atomic_helper_check(dev, state);
+	if (ret)
+		return ret;
+
+	for_each_new_crtc_in_state (state, crtc, new_crtc_state, i) {
+		if (!is_lut_size_expected(dev, new_crtc_state->degamma_lut) ||
+		    !is_lut_size_expected(dev, new_crtc_state->gamma_lut))
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
 static const struct drm_mode_config_funcs mtk_drm_mode_config_funcs = {
 	.fb_create = mtk_drm_mode_fb_create,
-	.atomic_check = drm_atomic_helper_check,
+	.atomic_check = mtk_drm_atomic_check,
 	.atomic_commit = drm_atomic_helper_commit,
 };
 
