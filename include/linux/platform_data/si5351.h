@@ -89,6 +89,7 @@ enum si5351_disable_state {
  * @pll_reset: if true, clkout can reset its pll
  * @drive: output drive strength
  * @rate: initial clkout rate, or default if 0
+ * @phase: initial clkout phase offset (default 0)
  */
 struct si5351_clkout_config {
 	enum si5351_multisynth_src multisynth_src;
@@ -98,6 +99,7 @@ struct si5351_clkout_config {
 	bool pll_master;
 	bool pll_reset;
 	unsigned long rate;
+	unsigned long phase;
 };
 
 /**
