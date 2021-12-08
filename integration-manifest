@@ -1,0 +1,28 @@
+drm drm-fixes a687efed194bdc185fd7cb33920fe8b4e60ecb9e
+	Merge tag 'drm-intel-fixes-2021-12-02' of git://anongit.freedesktop.org/drm/drm-intel into drm-fixes
+drm-misc drm-misc-fixes e485382ea7eb4b81f4b59073cd831084820497de
+	drm/ttm: fix ttm_bo_swapout
+drm-intel drm-intel-fixes 0fcfb00b28c0b7884635dacf38e46d60bf3d4eb1
+	Linux 5.16-rc4
+drm drm-next c305ae99dfd4d0fe70c7fdf13ef5f7650a804ea7
+	Merge tag 'drm-intel-next-2021-11-30' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes bcae3af286f49bf4f6cda03f165fbe530f4a6bed
+	drm/locking: fix __stack_depot_* name conflict
+drm-intel drm-intel-next-fixes fa55b7dcdc43c1aa1ba12bca9d2dd4318c2a0dbf
+	Linux 5.16-rc1
+drm-misc drm-misc-next d6c75c295f67b26fad8ba2e72db80e0f744e9da9
+	omapdrm: dss: mark runtime PM functions __maybe_unused
+drm-intel drm-intel-next d4a23930490df39fd076a82649ddba6b3a6c8216
+	drm/i915: Allow cdclk squasher to be reconfigured live
+drm-intel drm-intel-gt-next 97c8ef443ae1f6493c02d6f433eb5a2b72d8b438
+	drm/i915/selftests: handle object rounding
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
