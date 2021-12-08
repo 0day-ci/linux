@@ -687,9 +687,35 @@ static const struct avs_spec skl_desc = {
 	.hipc_ctl_offset = SKL_ADSP_REG_HIPCCTL,
 };
 
+static const struct avs_spec apl_desc = {
+	.name = "apl",
+	.min_fw_version = {
+		.major = 9,
+		.minor = 22,
+		.hotfix = 1,
+		.build = 4323,
+	},
+	.dops = &apl_dsp_ops,
+	.core_init_mask = 3,
+	.attributes = AVS_PLATATTR_IMR,
+	.sram_base_offset = APL_ADSP_SRAM_BASE_OFFSET,
+	.sram_window_size = APL_ADSP_SRAM_WINDOW_SIZE,
+	.rom_status = APL_ADSP_SRAM_BASE_OFFSET,
+	.hipc_req_offset = SKL_ADSP_REG_HIPCI,
+	.hipc_req_ext_offset = SKL_ADSP_REG_HIPCIE,
+	.hipc_req_busy_mask = SKL_ADSP_HIPCI_BUSY,
+	.hipc_ack_offset = SKL_ADSP_REG_HIPCIE,
+	.hipc_ack_done_mask = SKL_ADSP_HIPCIE_DONE,
+	.hipc_rsp_offset = SKL_ADSP_REG_HIPCT,
+	.hipc_rsp_busy_mask = SKL_ADSP_HIPCT_BUSY,
+	.hipc_ctl_offset = SKL_ADSP_REG_HIPCCTL,
+};
+
 static const struct pci_device_id avs_ids[] = {
 	{ PCI_VDEVICE(INTEL, 0x9d70), (unsigned long)&skl_desc }, /* SKL */
 	{ PCI_VDEVICE(INTEL, 0x9d71), (unsigned long)&skl_desc }, /* KBL */
+	{ PCI_VDEVICE(INTEL, 0x5a98), (unsigned long)&apl_desc }, /* APL */
+	{ PCI_VDEVICE(INTEL, 0x3198), (unsigned long)&apl_desc }, /* GML */
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, avs_ids);

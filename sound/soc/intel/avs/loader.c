@@ -36,6 +36,8 @@
 #define AVS_EXT_MANIFEST_MAGIC		0x31454124
 #define SKL_MANIFEST_MAGIC		0x00000006
 #define SKL_ADSPFW_OFFSET		0x284
+#define APL_MANIFEST_MAGIC		0x44504324
+#define APL_ADSPFW_OFFSET		0x2000
 
 static bool debug_ignore_fw_version_check;
 module_param_named(ignore_fw_version, debug_ignore_fw_version_check, bool, 0444);
@@ -85,6 +87,8 @@ static int avs_fw_manifest_offset(struct firmware *fw)
 	switch (magic) {
 	case SKL_MANIFEST_MAGIC:
 		return SKL_ADSPFW_OFFSET;
+	case APL_MANIFEST_MAGIC:
+		return APL_ADSPFW_OFFSET;
 	default:
 		return -EINVAL;
 	}

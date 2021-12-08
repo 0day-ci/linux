@@ -48,6 +48,7 @@ struct avs_dsp_ops {
 	((adev)->spec->dops->op(adev, ## __VA_ARGS__))
 
 extern const struct avs_dsp_ops skl_dsp_ops;
+extern const struct avs_dsp_ops apl_dsp_ops;
 
 #define AVS_PLATATTR_CLDMA		BIT_ULL(0)
 #define AVS_PLATATTR_IMR		BIT_ULL(1)
@@ -230,6 +231,13 @@ int avs_dsp_disable_d0ix(struct avs_dev *adev);
 int avs_dsp_enable_d0ix(struct avs_dev *adev);
 
 unsigned int skl_log_buffer_offset(struct avs_dev *adev, u32 core);
+int apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable,
+		    u32 aging_period, u32 fifo_full_period,
+		    unsigned long resource_mask, u32 *priorities);
+int apl_log_buffer_status(struct avs_dev *adev, union avs_notify_msg *msg);
+int apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg);
+bool apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bool wake);
+int apl_set_d0ix(struct avs_dev *adev, bool enable);
 
 /* Firmware resources management */
 
@@ -307,5 +315,17 @@ unsigned int __kfifo_fromio_locked(struct kfifo *fifo, const void __iomem *src,
 #define avs_log_buffer_addr(adev, core) \
 	(avs_sram_addr(adev, AVS_DEBUG_WINDOW) + \
 	 avs_dsp_op(adev, log_buffer_offset, core))
+
+struct apl_log_buffer_layout {
+	u32 read_ptr;
+	u32 write_ptr;
+	u8 buffer[];
+} __packed;
+
+#define apl_log_payload_size(adev) \
+	(avs_log_buffer_size(adev) - sizeof(struct apl_log_buffer_layout))
+
+#define apl_log_payload_addr(addr) \
+	(addr + sizeof(struct apl_log_buffer_layout))
 
 #endif /* __SOUND_SOC_INTEL_AVS_H */

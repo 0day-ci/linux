@@ -3,7 +3,7 @@
 snd-soc-avs-objs := dsp.o ipc.o messages.o utils.o topology.o path.o \
 		    core.o loader.o pcm.o board_selection.o
 snd-soc-avs-objs += cldma.o
-snd-soc-avs-objs += skl.o
+snd-soc-avs-objs += skl.o apl.o
 
 snd-soc-avs-objs += trace.o
 # tell define_trace.h where to find the trace header
