@@ -66,6 +66,15 @@ struct tcp_authopt_info {
 	u32 dst_isn;
 };
 
+/* TCP authopt as found in header */
+struct tcphdr_authopt {
+	u8 num;
+	u8 len;
+	u8 keyid;
+	u8 rnextkeyid;
+	u8 mac[0];
+};
+
 #ifdef CONFIG_TCP_AUTHOPT
 void tcp_authopt_clear(struct sock *sk);
 int tcp_set_authopt(struct sock *sk, sockptr_t optval, unsigned int optlen);
