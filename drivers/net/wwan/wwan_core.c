@@ -823,6 +823,7 @@ static struct net_device *wwan_rtnl_alloc(struct nlattr *tb[],
 	struct wwan_device *wwandev = wwan_dev_get_by_name(devname);
 	struct net_device *dev;
 	unsigned int priv_size;
+	unsigned int num_txqs, num_rxqs;
 
 	if (IS_ERR(wwandev))
 		return ERR_CAST(wwandev);
@@ -833,9 +834,31 @@ static struct net_device *wwan_rtnl_alloc(struct nlattr *tb[],
 		goto out;
 	}
 
+	/* let wwan device driver determine TX queue number if it wants */
+	if (wwandev->ops->get_num_tx_queues) {
+		num_txqs = wwandev->ops->get_num_tx_queues(num_tx_queues);
+		if (num_txqs < 1 || num_txqs > 4096) {
+			dev = ERR_PTR(-EINVAL);
+			goto out;
+		}
+	} else {
+		num_txqs = num_tx_queues;
+	}
+
+	/* let wwan device driver determine RX queue number if it wants */
+	if (wwandev->ops->get_num_rx_queues) {
+		num_rxqs = wwandev->ops->get_num_rx_queues(num_rx_queues);
+		if (num_rxqs < 1 || num_rxqs > 4096) {
+			dev = ERR_PTR(-EINVAL);
+			goto out;
+		}
+	} else {
+		num_rxqs = num_rx_queues;
+	}
+
 	priv_size = sizeof(struct wwan_netdev_priv) + wwandev->ops->priv_size;
 	dev = alloc_netdev_mqs(priv_size, ifname, name_assign_type,
-			       wwandev->ops->setup, num_tx_queues, num_rx_queues);
+			       wwandev->ops->setup, num_txqs, num_rxqs);
 
 	if (dev) {
 		SET_NETDEV_DEV(dev, &wwandev->dev);

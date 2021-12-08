@@ -156,6 +156,10 @@ static inline void *wwan_netdev_drvpriv(struct net_device *dev)
  * @setup: set up a new netdev
  * @newlink: register the new netdev
  * @dellink: remove the given netdev
+ * @get_num_tx_queues: determine number of transmit queues
+ *                     to create when creating a new device.
+ * @get_num_rx_queues: determine number of receive queues
+ *                     to create when creating a new device.
  */
 struct wwan_ops {
 	unsigned int priv_size;
@@ -164,6 +168,8 @@ struct wwan_ops {
 		       u32 if_id, struct netlink_ext_ack *extack);
 	void (*dellink)(void *ctxt, struct net_device *dev,
 			struct list_head *head);
+	unsigned int (*get_num_tx_queues)(unsigned int hint_num);
+	unsigned int (*get_num_rx_queues)(unsigned int hint_num);
 };
 
 int wwan_register_ops(struct device *parent, const struct wwan_ops *ops,
