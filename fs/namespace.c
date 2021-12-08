@@ -31,6 +31,7 @@
 #include <uapi/linux/mount.h>
 #include <linux/fs_context.h>
 #include <linux/shmem_fs.h>
+#include <linux/uaccess-buffer.h>
 
 #include "pnode.h"
 #include "internal.h"
@@ -3197,7 +3198,12 @@ static void *copy_mount_options(const void __user * data)
 	if (!copy)
 		return ERR_PTR(-ENOMEM);
 
-	left = copy_from_user(copy, data, PAGE_SIZE);
+	/*
+	 * Use copy_from_user_nolog to avoid reporting overly large accesses in
+	 * the uaccess buffer, as this can lead to false positive reports in
+	 * downstream consumers.
+	 */
+	left = copy_from_user_nolog(copy, data, PAGE_SIZE);
 
 	/*
 	 * Not all architectures have an exact copy_from_user(). Resort to
