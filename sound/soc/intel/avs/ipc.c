@@ -20,9 +20,15 @@ static void avs_dsp_receive_rx(struct avs_dev *adev, u64 header)
 	union avs_reply_msg msg = AVS_MSG(header);
 
 	ipc->rx.header = header;
-	if (!msg.status)
+	if (!msg.status) {
+		/* update size in case of LARGE_CONFIG_GET */
+		if (msg.msg_target == AVS_MOD_MSG &&
+		    msg.global_msg_type == AVS_MOD_LARGE_CONFIG_GET)
+			ipc->rx.size = msg.ext.large_config.data_off_size;
+
 		memcpy_fromio(ipc->rx.data, avs_uplink_addr(adev),
 			      ipc->rx.size);
+	}
 }
 
 static void avs_dsp_process_notification(struct avs_dev *adev, u64 header)
