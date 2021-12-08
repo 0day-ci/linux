@@ -5866,3 +5866,42 @@ static void nvidia_ion_ahci_fixup(struct pci_dev *pdev)
 	pdev->dev_flags |= PCI_DEV_FLAGS_HAS_MSI_MASKING;
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NVIDIA, 0x0ab8, nvidia_ion_ahci_fixup);
+
+/*
+ * Bayhub OZ711LV2 SD controller has an errata that only allows DWORD accesses
+ * to the LTR max latency registers. Thus need to save and restore these
+ * registers manually.
+ */
+static void o2_seabird1_save_ltr(struct pci_dev *dev)
+{
+	struct pci_cap_saved_state *save_state;
+	u32 *reg32;
+
+	save_state = pci_find_saved_ext_cap(dev, PCI_EXT_CAP_ID_LTR);
+	if (save_state) {
+		reg32 = &save_state->cap.data[0];
+		/* Preserve PCI_LTR_MAX_SNOOP_LAT & PCI_LTR_MAX_NOSNOOP_LAT */
+		pci_read_config_dword(dev, 0x234, reg32);
+	} else {
+		pci_err(dev, "quirk can't save LTR snoop latency\n");
+	}
+}
+
+static void o2_seabird1_restore_ltr(struct pci_dev *dev)
+{
+	struct pci_cap_saved_state *save_state;
+	u32 *reg32;
+
+	save_state = pci_find_saved_ext_cap(dev, PCI_EXT_CAP_ID_LTR);
+	if (save_state) {
+		reg32 = &save_state->cap.data[0];
+		/* Restore PCI_LTR_MAX_SNOOP_LAT & PCI_LTR_MAX_NOSNOOP_LAT */
+		pci_write_config_dword(dev, 0x234, *reg32);
+	} else {
+		pci_err(dev, "quirk can't restore LTR snoop latency\n");
+	}
+}
+DECLARE_PCI_FIXUP_SUSPEND_LATE(PCI_VENDOR_ID_O2, PCI_DEVICE_ID_O2_SEABIRD1,
+			       o2_seabird1_save_ltr);
+DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_O2, PCI_DEVICE_ID_O2_SEABIRD1,
+			       o2_seabird1_restore_ltr);
