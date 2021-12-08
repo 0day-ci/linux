@@ -11,7 +11,7 @@ DECLARE_TRACEPOINT(page_ref_set);
 DECLARE_TRACEPOINT(page_ref_mod);
 DECLARE_TRACEPOINT(page_ref_mod_and_test);
 DECLARE_TRACEPOINT(page_ref_mod_and_return);
-DECLARE_TRACEPOINT(page_ref_mod_unless);
+DECLARE_TRACEPOINT(page_ref_add_unless);
 DECLARE_TRACEPOINT(page_ref_freeze);
 DECLARE_TRACEPOINT(page_ref_unfreeze);
 
@@ -30,7 +30,7 @@ extern void __page_ref_set(struct page *page, int v);
 extern void __page_ref_mod(struct page *page, int v);
 extern void __page_ref_mod_and_test(struct page *page, int v, int ret);
 extern void __page_ref_mod_and_return(struct page *page, int v, int ret);
-extern void __page_ref_mod_unless(struct page *page, int v, int u);
+extern void __page_ref_add_unless(struct page *page, int v, int u, int ret);
 extern void __page_ref_freeze(struct page *page, int v, int ret);
 extern void __page_ref_unfreeze(struct page *page, int v);
 
@@ -50,7 +50,7 @@ static inline void __page_ref_mod_and_test(struct page *page, int v, int ret)
 static inline void __page_ref_mod_and_return(struct page *page, int v, int ret)
 {
 }
-static inline void __page_ref_mod_unless(struct page *page, int v, int u)
+static inline void __page_ref_add_unless(struct page *page, int v, int u, int ret)
 {
 }
 static inline void __page_ref_freeze(struct page *page, int v, int ret)
@@ -237,8 +237,8 @@ static inline bool page_ref_add_unless(struct page *page, int nr, int u)
 {
 	bool ret = atomic_add_unless(&page->_refcount, nr, u);
 
-	if (page_ref_tracepoint_active(page_ref_mod_unless))
-		__page_ref_mod_unless(page, nr, ret);
+	if (page_ref_tracepoint_active(page_ref_add_unless))
+		__page_ref_add_unless(page, nr, u, ret);
 	return ret;
 }
 

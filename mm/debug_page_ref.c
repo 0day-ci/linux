@@ -33,12 +33,12 @@ void __page_ref_mod_and_return(struct page *page, int v, int ret)
 EXPORT_SYMBOL(__page_ref_mod_and_return);
 EXPORT_TRACEPOINT_SYMBOL(page_ref_mod_and_return);
 
-void __page_ref_mod_unless(struct page *page, int v, int u)
+void __page_ref_add_unless(struct page *page, int v, int u, int ret)
 {
-	trace_page_ref_mod_unless(page, v, u);
+	trace_page_ref_add_unless(page, v, u, ret);
 }
-EXPORT_SYMBOL(__page_ref_mod_unless);
-EXPORT_TRACEPOINT_SYMBOL(page_ref_mod_unless);
+EXPORT_SYMBOL(__page_ref_add_unless);
+EXPORT_TRACEPOINT_SYMBOL(page_ref_add_unless);
 
 void __page_ref_freeze(struct page *page, int v, int ret)
 {
