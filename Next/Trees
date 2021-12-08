@@ -46,7 +46,7 @@ input-current	git	git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input.git#f
 crypto-current	git	git://git.kernel.org/pub/scm/linux/kernel/git/herbert/crypto-2.6.git#master
 vfio-fixes	git	git://github.com/awilliam/linux-vfio.git#for-linus
 kselftest-fixes	git	git://git.kernel.org/pub/scm/linux/kernel/git/shuah/linux-kselftest.git#fixes
-modules-fixes	git	git://git.kernel.org/pub/scm/linux/kernel/git/jeyu/linux.git#modules-linus
+modules-fixes	git	git://git.kernel.org/pub/scm/linux/kernel/git/mcgrof/linux.git#modules-linus
 dmaengine-fixes	git	git://git.kernel.org/pub/scm/linux/kernel/git/vkoul/dmaengine.git#fixes
 backlight-fixes	git	git://git.kernel.org/pub/scm/linux/kernel/git/lee/backlight.git#for-backlight-fixes
 mtd-fixes	git	git://git.kernel.org/pub/scm/linux/kernel/git/mtd/linux.git#mtd/fixes
@@ -231,7 +231,7 @@ etnaviv		git	https://git.pengutronix.de/git/lst/linux#etnaviv/next
 regmap		git	git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git#for-next
 sound		git	git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git#for-next
 sound-asoc	git	git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git#for-next
-modules		git	git://git.kernel.org/pub/scm/linux/kernel/git/jeyu/linux.git#modules-next
+modules		git	git://git.kernel.org/pub/scm/linux/kernel/git/mcgrof/linux.git#modules-next
 input		git	git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input.git#next
 block		git	git://git.kernel.dk/linux-block.git#for-next
 device-mapper	git	git://git.kernel.org/pub/scm/linux/kernel/git/device-mapper/linux-dm.git#for-next
