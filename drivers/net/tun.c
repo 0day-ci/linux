@@ -2212,7 +2212,10 @@ static void tun_free_netdev(struct net_device *dev)
 	dev->tstats = NULL;
 
 	tun_flow_uninit(tun);
-	security_tun_dev_free_security(tun->security);
+	if (tun->security) {
+		security_tun_dev_free_security(tun->security);
+		tun->security = NULL;
+	}
 	__tun_set_ebpf(tun, &tun->steering_prog, NULL);
 	__tun_set_ebpf(tun, &tun->filter_prog, NULL);
 }
@@ -2779,7 +2782,11 @@ err_detach:
 
 err_free_flow:
 	tun_flow_uninit(tun);
-	security_tun_dev_free_security(tun->security);
+	if (tun->security) {
+		security_tun_dev_free_security(tun->security);
+		/* Let tun_free_netdev() know the free has already been done. */
+		tun->security = NULL;
+	}
 err_free_stat:
 	free_percpu(dev->tstats);
 err_free_dev:
