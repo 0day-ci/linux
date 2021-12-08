@@ -54,6 +54,7 @@ ABI will be found here.
    :maxdepth: 1
 
    sysfs-rules
+   uaccess-logging
 
 The rest of this manual consists of various unordered guides on how to
 configure specific aspects of kernel behavior to your liking.
