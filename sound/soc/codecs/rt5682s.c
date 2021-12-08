@@ -1573,6 +1573,14 @@ static const char * const rt5682s_adcdat_pin_select[] = {
 	"ADCDAT1", "ADCDAT2",
 };
 
+/* Out Switch */
+static const struct snd_kcontrol_new hpol_switch =
+	SOC_DAPM_SINGLE_AUTODISABLE("Switch", RT5682S_HP_CTRL_1,
+		RT5682S_L_MUTE_SFT, 1, 1);
+static const struct snd_kcontrol_new hpor_switch =
+	SOC_DAPM_SINGLE_AUTODISABLE("Switch", RT5682S_HP_CTRL_1,
+		RT5682S_R_MUTE_SFT, 1, 1);
+
 static SOC_VALUE_ENUM_SINGLE_DECL(rt5682s_adcdat_pin_enum,
 	RT5682S_GPIO_CTRL_1, RT5682S_GP4_PIN_SFT, RT5682S_GP4_PIN_MASK,
 	rt5682s_adcdat_pin_select, rt5682s_adcdat_pin_values);
@@ -1746,6 +1754,11 @@ static const struct snd_soc_dapm_widget rt5682s_dapm_widgets[] = {
 	SND_SOC_DAPM_PGA_S("HP Amp", 1, SND_SOC_NOPM, 0, 0, rt5682s_hp_amp_event,
 		SND_SOC_DAPM_POST_PMD | SND_SOC_DAPM_POST_PMU),
 
+	SND_SOC_DAPM_SWITCH("HPOL Playback", SND_SOC_NOPM, 0, 0,
+		&hpol_switch),
+	SND_SOC_DAPM_SWITCH("HPOR Playback", SND_SOC_NOPM, 0, 0,
+		&hpor_switch),
+
 	/* CLK DET */
 	SND_SOC_DAPM_SUPPLY("CLKDET SYS", RT5682S_CLK_DET,
 		RT5682S_SYS_CLK_DET_SFT, 0, NULL, 0),
@@ -1895,8 +1908,10 @@ static const struct snd_soc_dapm_route rt5682s_dapm_routes[] = {
 	{"HP Amp", NULL, "CLKDET SYS"},
 	{"HP Amp", NULL, "SAR"},
 
-	{"HPOL", NULL, "HP Amp"},
-	{"HPOR", NULL, "HP Amp"},
+	{"HPOL Playback", "Switch", "HP Amp"},
+	{"HPOR Playback", "Switch", "HP Amp"},
+	{"HPOL", NULL, "HPOL Playback"},
+	{"HPOR", NULL, "HPOR Playback"},
 };
 
 static int rt5682s_set_tdm_slot(struct snd_soc_dai *dai, unsigned int tx_mask,
