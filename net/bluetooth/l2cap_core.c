@@ -4118,7 +4118,7 @@ static struct l2cap_chan *l2cap_connect(struct l2cap_conn *conn,
 	result = L2CAP_CR_NO_MEM;
 
 	/* Check for valid dynamic CID range (as per Erratum 3253) */
-	if (scid < L2CAP_CID_DYN_START || scid > L2CAP_CID_DYN_END) {
+	if (scid < L2CAP_CID_DYN_START) {
 		result = L2CAP_CR_INVALID_SCID;
 		goto response;
 	}
