@@ -1286,23 +1286,13 @@ static void mv_dump_pci_cfg(struct pci_dev *pdev, unsigned bytes)
 	}
 }
 
-static void mv_dump_all_regs(void __iomem *mmio_base, int port,
-			     struct pci_dev *pdev)
+static void mv_dump_all_regs(void __iomem *mmio_base, struct pci_dev *pdev)
 {
-	void __iomem *hc_base = mv_hc_base(mmio_base,
-					   port >> MV_PORT_HC_SHIFT);
-	void __iomem *port_base;
 	int start_port, num_ports, p, start_hc, num_hcs, hc;
 
-	if (0 > port) {
-		start_hc = start_port = 0;
-		num_ports = 8;		/* shld be benign for 4 port devs */
-		num_hcs = 2;
-	} else {
-		start_hc = port >> MV_PORT_HC_SHIFT;
-		start_port = port;
-		num_ports = num_hcs = 1;
-	}
+	start_hc = start_port = 0;
+	num_ports = 8;		/* shld be benign for 4 port devs */
+	num_hcs = 2;
 	dev_printk(KERN_DEBUG, &pdev->dev,
 		   "%s: All registers for port(s) %u-%u:\n", __func__,
 		   start_port, num_ports > 1 ? num_ports - 1 : start_port);
@@ -1317,13 +1307,13 @@ static void mv_dump_all_regs(void __iomem *mmio_base, int port,
 	mv_dump_mem(&pdev->dev, mmio_base+0xf00, 0x4);
 	mv_dump_mem(&pdev->dev, mmio_base+0x1d00, 0x6c);
 	for (hc = start_hc; hc < start_hc + num_hcs; hc++) {
-		hc_base = mv_hc_base(mmio_base, hc);
+		void __iomem *hc_base = mv_hc_base(mmio_base, hc);
 		dev_printk(KERN_DEBUG, &pdev->dev, "%s: HC regs (HC %i):\n",
 			   __func__, hc);
 		mv_dump_mem(&pdev->dev, hc_base, 0x1c);
 	}
 	for (p = start_port; p < start_port + num_ports; p++) {
-		port_base = mv_port_base(mmio_base, p);
+		void __iomem *port_base = mv_port_base(mmio_base, p);
 		dev_printk(KERN_DEBUG, &pdev->dev, "%s: EDMA regs (port %i):\n",
 			   __func__, p);
 		mv_dump_mem(&pdev->dev, port_base, 0x54);
@@ -2973,7 +2963,7 @@ static int mv_pci_error(struct ata_host *host, void __iomem *mmio)
 	if (pci_dump) {
 		dev_printk(KERN_DEBUG, host->dev, "%s: All regs @ PCI error\n",
 			   __func__);
-		mv_dump_all_regs(mmio, -1, to_pci_dev(host->dev));
+		mv_dump_all_regs(mmio, to_pci_dev(host->dev));
 	}
 	writelfl(0, mmio + hpriv->irq_cause_offset);
 
