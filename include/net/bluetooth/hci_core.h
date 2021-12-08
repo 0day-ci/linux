@@ -646,6 +646,7 @@ struct hci_conn {
 	__u8		init_addr_type;
 	bdaddr_t	resp_addr;
 	__u8		resp_addr_type;
+	bdaddr_t	direct_rpa;
 	__u8		adv_instance;
 	__u16		handle;
 	__u16		state;
