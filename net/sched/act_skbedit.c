@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
+#include <net/cls_cgroup.h>
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
 #include <net/ip.h>
@@ -22,6 +23,25 @@
 
 static unsigned int skbedit_net_id;
 static struct tc_action_ops act_skbedit_ops;
+
+static u16 tcf_skbedit_hash(struct tcf_skbedit_params *params,
+			    struct sk_buff *skb)
+{
+	u16 queue_mapping = params->queue_mapping;
+	u16 mapping_mod = params->mapping_mod;
+	u32 hash;
+
+	if (!(params->flags & SKBEDIT_F_QUEUE_MAPPING_HASH_MASK))
+		return netdev_cap_txqueue(skb->dev, queue_mapping);
+
+	if (params->flags & SKBEDIT_F_QUEUE_MAPPING_CLASSID)
+		hash = jhash_1word(task_get_classid(skb), 0);
+	else if (params->flags & SKBEDIT_F_QUEUE_MAPPING_HASH)
+		hash = skb_get_hash(skb);
+
+	queue_mapping = queue_mapping + hash % mapping_mod;
+	return netdev_cap_txqueue(skb->dev, queue_mapping);
+}
 
 static int tcf_skbedit_act(struct sk_buff *skb, const struct tc_action *a,
 			   struct tcf_result *res)
@@ -57,10 +77,9 @@ static int tcf_skbedit_act(struct sk_buff *skb, const struct tc_action *a,
 			break;
 		}
 	}
-	if (params->flags & SKBEDIT_F_QUEUE_MAPPING &&
-	    skb->dev->real_num_tx_queues > params->queue_mapping) {
+	if (params->flags & SKBEDIT_F_QUEUE_MAPPING) {
 		netdev_xmit_skip_txqueue();
-		skb_set_queue_mapping(skb, params->queue_mapping);
+		skb_set_queue_mapping(skb, tcf_skbedit_hash(params, skb));
 	}
 	if (params->flags & SKBEDIT_F_MARK) {
 		skb->mark &= ~params->mask;
@@ -94,6 +113,7 @@ static const struct nla_policy skbedit_policy[TCA_SKBEDIT_MAX + 1] = {
 	[TCA_SKBEDIT_PTYPE]		= { .len = sizeof(u16) },
 	[TCA_SKBEDIT_MASK]		= { .len = sizeof(u32) },
 	[TCA_SKBEDIT_FLAGS]		= { .len = sizeof(u64) },
+	[TCA_SKBEDIT_QUEUE_MAPPING_MAX]	= { .len = sizeof(u16) },
 };
 
 static int tcf_skbedit_init(struct net *net, struct nlattr *nla,
@@ -110,6 +130,7 @@ static int tcf_skbedit_init(struct net *net, struct nlattr *nla,
 	struct tcf_skbedit *d;
 	u32 flags = 0, *priority = NULL, *mark = NULL, *mask = NULL;
 	u16 *queue_mapping = NULL, *ptype = NULL;
+	u16 mapping_mod = 0;
 	bool exists = false;
 	int ret = 0, err;
 	u32 index;
@@ -157,6 +178,25 @@ static int tcf_skbedit_init(struct net *net, struct nlattr *nla,
 
 		if (*pure_flags & SKBEDIT_F_INHERITDSFIELD)
 			flags |= SKBEDIT_F_INHERITDSFIELD;
+		if (*pure_flags & SKBEDIT_F_QUEUE_MAPPING_HASH_MASK) {
+			u16 *queue_mapping_max;
+
+			if (!tb[TCA_SKBEDIT_QUEUE_MAPPING_MAX])
+				return -EINVAL;
+
+			if (!tb[TCA_SKBEDIT_QUEUE_MAPPING])
+				return -EINVAL;
+
+			queue_mapping_max =
+				nla_data(tb[TCA_SKBEDIT_QUEUE_MAPPING_MAX]);
+
+			if (*queue_mapping_max < *queue_mapping)
+				return -EINVAL;
+
+			mapping_mod = *queue_mapping_max - *queue_mapping + 1;
+			flags |= *pure_flags &
+				 SKBEDIT_F_QUEUE_MAPPING_HASH_MASK;
+		}
 	}
 
 	parm = nla_data(tb[TCA_SKBEDIT_PARMS]);
@@ -206,8 +246,10 @@ static int tcf_skbedit_init(struct net *net, struct nlattr *nla,
 	params_new->flags = flags;
 	if (flags & SKBEDIT_F_PRIORITY)
 		params_new->priority = *priority;
-	if (flags & SKBEDIT_F_QUEUE_MAPPING)
+	if (flags & SKBEDIT_F_QUEUE_MAPPING) {
 		params_new->queue_mapping = *queue_mapping;
+		params_new->mapping_mod = mapping_mod;
+	}
 	if (flags & SKBEDIT_F_MARK)
 		params_new->mark = *mark;
 	if (flags & SKBEDIT_F_PTYPE)
@@ -274,6 +316,14 @@ static int tcf_skbedit_dump(struct sk_buff *skb, struct tc_action *a,
 		goto nla_put_failure;
 	if (params->flags & SKBEDIT_F_INHERITDSFIELD)
 		pure_flags |= SKBEDIT_F_INHERITDSFIELD;
+	if (params->flags & SKBEDIT_F_QUEUE_MAPPING_HASH_MASK) {
+		if (nla_put_u16(skb, TCA_SKBEDIT_QUEUE_MAPPING_MAX,
+				params->queue_mapping + params->mapping_mod - 1))
+			goto nla_put_failure;
+
+		pure_flags |= params->flags &
+			      SKBEDIT_F_QUEUE_MAPPING_HASH_MASK;
+	}
 	if (pure_flags != 0 &&
 	    nla_put(skb, TCA_SKBEDIT_FLAGS, sizeof(pure_flags), &pure_flags))
 		goto nla_put_failure;
