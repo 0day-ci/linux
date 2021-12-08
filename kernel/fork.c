@@ -96,6 +96,7 @@
 #include <linux/scs.h>
 #include <linux/io_uring.h>
 #include <linux/bpf.h>
+#include <linux/uaccess-buffer.h>
 
 #include <asm/pgalloc.h>
 #include <linux/uaccess.h>
@@ -754,6 +755,7 @@ void __put_task_struct(struct task_struct *tsk)
 	delayacct_tsk_free(tsk);
 	put_signal_struct(tsk->signal);
 	sched_core_free(tsk);
+	uaccess_buffer_free(tsk);
 
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
@@ -889,6 +891,8 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 
 	if (memcg_charge_kernel_stack(tsk))
 		goto free_stack;
+
+	uaccess_buffer_free(orig);
 
 	stack_vm_area = task_stack_vm_area(tsk);
 

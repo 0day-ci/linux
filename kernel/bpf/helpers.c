@@ -15,6 +15,7 @@
 #include <linux/pid_namespace.h>
 #include <linux/proc_ns.h>
 #include <linux/security.h>
+#include <linux/uaccess-buffer.h>
 
 #include "../../lib/kstrtox.h"
 
@@ -637,7 +638,11 @@ const struct bpf_func_proto bpf_event_output_data_proto =  {
 BPF_CALL_3(bpf_copy_from_user, void *, dst, u32, size,
 	   const void __user *, user_ptr)
 {
-	int ret = copy_from_user(dst, user_ptr, size);
+	/*
+	 * Avoid logging uaccesses here as the BPF program may not be following
+	 * the uaccess log rules.
+	 */
+	int ret = copy_from_user_nolog(dst, user_ptr, size);
 
 	if (unlikely(ret)) {
 		memset(dst, 0, size);

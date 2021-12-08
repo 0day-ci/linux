@@ -272,4 +272,7 @@ struct prctl_mm_map {
 # define PR_SCHED_CORE_SCOPE_THREAD_GROUP	1
 # define PR_SCHED_CORE_SCOPE_PROCESS_GROUP	2
 
+/* Configure uaccess logging feature */
+#define PR_SET_UACCESS_DESCRIPTOR_ADDR_ADDR	63
+
 #endif /* _LINUX_PRCTL_H */
