@@ -530,15 +530,34 @@ error:
 	return ret;
 }
 
-static bool device_path_matched(const char *path, struct btrfs_device *device)
+/*
+ * Check if the device in the 'path' matches with the device in the given
+ * struct btrfs_device '*device'.
+ * Returns:
+ *	0	If it is the same device.
+ *	1	If it is not the same device.
+ *	-errno	For error.
+ */
+static int device_matched(struct btrfs_device *device, const char *path)
 {
-	int found;
+	dev_t dev_old;
+	dev_t dev_new;
+	int error;
 
-	rcu_read_lock();
-	found = strcmp(rcu_str_deref(device->name), path);
-	rcu_read_unlock();
+	lockdep_assert_held(&device->fs_devices->device_list_mutex);
+	/* rcu is not required as we are inside the device_list_mutex */
+	error = lookup_bdev(device->name->str, &dev_old);
+	if (error)
+		return error;
 
-	return found == 0;
+	error = lookup_bdev(path, &dev_new);
+	if (error)
+		return error;
+
+	if (dev_old == dev_new)
+		return 0;
+
+	return 1;
 }
 
 /*
@@ -573,7 +592,7 @@ static int btrfs_free_stale_devices(const char *path,
 				continue;
 			if (path && !device->name)
 				continue;
-			if (path && !device_path_matched(path, device))
+			if (path && device_matched(device, path) != 0)
 				continue;
 			if (fs_devices->opened) {
 				/* for an already deleted device return 0 */
