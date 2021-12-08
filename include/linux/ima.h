@@ -259,6 +259,8 @@ struct ima_namespace {
 	int ima_policy_flag;
 
 	struct ima_h_table ima_htable;
+	struct list_head ima_measurements;
+	unsigned long binary_runtime_size;
 };
 
 extern struct ima_namespace init_ima_ns;
