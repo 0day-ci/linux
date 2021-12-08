@@ -12,7 +12,7 @@
 #include <linux/compat.h>
 #include <net/checksum.h>
 #include <linux/scatterlist.h>
-#include <linux/instrumented.h>
+#include <linux/instrumented-uaccess.h>
 
 #define PIPE_PARANOIA /* for now */
 
