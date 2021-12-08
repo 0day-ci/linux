@@ -1043,6 +1043,20 @@ static void dsa_tree_teardown_lags(struct dsa_switch_tree *dst)
 	kfree(dst->lags);
 }
 
+static int dsa_tree_bind_tag_proto(struct dsa_switch_tree *dst)
+{
+	const struct dsa_device_ops *tag_ops = dst->tag_ops;
+	int err;
+
+	if (tag_ops->connect) {
+		err = tag_ops->connect(dst);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
 static int dsa_tree_setup(struct dsa_switch_tree *dst)
 {
 	bool complete;
@@ -1065,6 +1079,10 @@ static int dsa_tree_setup(struct dsa_switch_tree *dst)
 	err = dsa_tree_setup_switches(dst);
 	if (err)
 		goto teardown_cpu_ports;
+
+	err = dsa_tree_bind_tag_proto(dst);
+	if (err)
+		goto teardown_switches;
 
 	err = dsa_tree_setup_master(dst);
 	if (err)
@@ -1155,13 +1173,21 @@ int dsa_tree_change_tag_proto(struct dsa_switch_tree *dst,
 	if (err)
 		goto out_unwind_tagger;
 
+	if (dst->tag_ops->disconnect)
+		dst->tag_ops->disconnect(dst);
+
 	dst->tag_ops = tag_ops;
+
+	err = dsa_tree_bind_tag_proto(dst);
+	if (err)
+		goto out_unwind_tagger;
 
 	rtnl_unlock();
 
 	return 0;
 
 out_unwind_tagger:
+	dst->tag_ops = old_tag_ops;
 	info.tag_ops = old_tag_ops;
 	dsa_tree_notify(dst, DSA_NOTIFIER_TAG_PROTO, &info);
 out_unlock:
