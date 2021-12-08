@@ -29,6 +29,7 @@
 #include <linux/regset.h>
 #include <linux/tracehook.h>
 #include <linux/elf.h>
+#include <linux/uaccess-buffer.h>
 
 #include <asm/compat.h>
 #include <asm/cpufeature.h>
@@ -1854,6 +1855,9 @@ int syscall_trace_enter(struct pt_regs *regs)
 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
 		trace_sys_enter(regs, regs->syscallno);
 
+	if (flags & _TIF_UACCESS_BUFFER_ENTRY)
+		uaccess_buffer_syscall_entry();
+
 	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
 			    regs->regs[2], regs->regs[3]);
 
@@ -1865,6 +1869,9 @@ void syscall_trace_exit(struct pt_regs *regs)
 	unsigned long flags = READ_ONCE(current_thread_info()->flags);
 
 	audit_syscall_exit(regs);
+
+	if (flags & _TIF_UACCESS_BUFFER_EXIT)
+		uaccess_buffer_syscall_exit();
 
 	if (flags & _TIF_SYSCALL_TRACEPOINT)
 		trace_sys_exit(regs, syscall_get_return_value(current, regs));
