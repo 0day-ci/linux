@@ -1063,7 +1063,9 @@ static int usbhid_start(struct hid_device *hid)
 	struct usb_host_interface *interface = intf->cur_altsetting;
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usbhid_device *usbhid = hid->driver_data;
+	struct usb_host_config *config;
 	unsigned int n, insize = 0;
+	int ncfg;
 	int ret;
 
 	mutex_lock(&usbhid->mutex);
@@ -1179,14 +1181,19 @@ static int usbhid_start(struct hid_device *hid)
 	/* Some keyboards don't work until their LEDs have been set.
 	 * Since BIOSes do set the LEDs, it must be safe for any device
 	 * that supports the keyboard boot protocol.
-	 * In addition, enable remote wakeup by default for all keyboard
-	 * devices supporting the boot protocol.
 	 */
 	if (interface->desc.bInterfaceSubClass == USB_INTERFACE_SUBCLASS_BOOT &&
 			interface->desc.bInterfaceProtocol ==
 				USB_INTERFACE_PROTOCOL_KEYBOARD) {
 		usbhid_set_leds(hid);
-		device_set_wakeup_enable(&dev->dev, 1);
+	}
+
+	for (ncfg = 0; ncfg < dev->descriptor.bNumConfigurations; ncfg++) {
+		config = &dev->config[ncfg];
+		if ((config->desc.bmAttributes & (1 << 5)) == 0)
+			break;
+		if (ncfg + 1 == dev->descriptor.bNumConfigurations)
+			device_set_wakeup_enable(&dev->dev, 1);
 	}
 
 	mutex_unlock(&usbhid->mutex);
