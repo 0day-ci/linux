@@ -1046,6 +1046,7 @@ static void dsa_tree_teardown_lags(struct dsa_switch_tree *dst)
 static int dsa_tree_bind_tag_proto(struct dsa_switch_tree *dst)
 {
 	const struct dsa_device_ops *tag_ops = dst->tag_ops;
+	struct dsa_notifier_tag_proto_info info;
 	int err;
 
 	if (tag_ops->connect) {
@@ -1053,6 +1054,16 @@ static int dsa_tree_bind_tag_proto(struct dsa_switch_tree *dst)
 		if (err)
 			return err;
 	}
+
+	info.tag_ops = tag_ops;
+	err = dsa_tree_notify(dst, DSA_NOTIFIER_TAG_PROTO_CONNECT, &info);
+	if (err && err != -EOPNOTSUPP)
+		goto out_disconnect;
+
+	return 0;
+out_disconnect:
+	if (tag_ops->disconnect)
+		tag_ops->disconnect(dst);
 
 	return 0;
 }

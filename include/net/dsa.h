@@ -946,6 +946,14 @@ struct dsa_switch_ops {
 	int	(*tag_8021q_vlan_add)(struct dsa_switch *ds, int port, u16 vid,
 				      u16 flags);
 	int	(*tag_8021q_vlan_del)(struct dsa_switch *ds, int port, u16 vid);
+
+	/*
+	 * Tagger connect operations. Use this to set special data/handler
+	 * for the current tagger set. The function require to provide explicit
+	 * support for the current tagger.
+	 */
+	int	(*tag_proto_connect)(struct dsa_switch *ds,
+				     const struct dsa_device_ops *tag_ops);
 };
 
 #define DSA_DEVLINK_PARAM_DRIVER(_id, _name, _type, _cmodes)		\
