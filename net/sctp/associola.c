@@ -499,8 +499,9 @@ void sctp_assoc_rm_peer(struct sctp_association *asoc,
 
 	/* Remove this peer from the list. */
 	list_del_rcu(&peer->transports);
-	/* Remove this peer from the transport hashtable */
+	/* Remove this peer from the transport hashtable and remove its reference */
 	sctp_unhash_transport(peer);
+	sctp_endpoint_put(asoc->ep);
 
 	/* Get the first transport of asoc. */
 	pos = asoc->peer.transport_addr_list.next;
@@ -710,11 +711,12 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* Set the peer's active state. */
 	peer->state = peer_state;
 
-	/* Add this peer into the transport hashtable */
+	/* Add this peer into the transport hashtable and take a reference */
 	if (sctp_hash_transport(peer)) {
 		sctp_transport_free(peer);
 		return NULL;
 	}
+	sctp_endpoint_hold(asoc->ep);
 
 	sctp_transport_pl_reset(peer);
 
