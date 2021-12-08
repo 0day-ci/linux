@@ -341,6 +341,7 @@ void cpuacct_charge(struct task_struct *tsk, u64 cputime)
 	struct cpuacct *ca;
 	int index = CPUACCT_STAT_SYSTEM;
 	struct pt_regs *regs = get_irq_regs() ? : task_pt_regs(tsk);
+	unsigned int cpu = task_cpu(tsk);
 
 	if (regs && user_mode(regs))
 		index = CPUACCT_STAT_USER;
@@ -348,7 +349,7 @@ void cpuacct_charge(struct task_struct *tsk, u64 cputime)
 	rcu_read_lock();
 
 	for (ca = task_ca(tsk); ca; ca = parent_ca(ca))
-		__this_cpu_add(ca->cpuusage->usages[index], cputime);
+		per_cpu_ptr(ca->cpuusage, cpu)->usages[index] += cputime;
 
 	rcu_read_unlock();
 }
