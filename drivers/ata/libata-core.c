@@ -969,6 +969,27 @@ const char *sata_spd_string(unsigned int spd)
 	return spd_str[spd - 1];
 }
 
+const char *ata_dev_class_string(unsigned int class)
+{
+	static const char * const class_str[] = {
+		"unknown",
+		"ATA",
+		"ATA (unsupported)",
+		"ATAPI",
+		"ATAPI (unsupported",
+		"PMP",
+		"PMP (unsupported)",
+		"SEMB",
+		"SEMB (unsupported)",
+		"ZAC",
+		"ZAC (unsupported)",
+		"none",
+	};
+	if (class == 0 || (class - 1) >= ARRAY_SIZE(class_str))
+		return "unknown";
+	return class_str[class - 1];
+}
+
 /**
  *	ata_dev_classify - determine device type based on ATA-spec signature
  *	@tf: ATA taskfile register set for device to be identified
@@ -1007,35 +1028,49 @@ unsigned int ata_dev_classify(const struct ata_taskfile *tf)
 	 * SEMB signature.  This is worked around in
 	 * ata_dev_read_id().
 	 */
-	if ((tf->lbam == 0) && (tf->lbah == 0)) {
-		DPRINTK("found ATA device by sig\n");
+	if ((tf->lbam == 0) && (tf->lbah == 0))
 		return ATA_DEV_ATA;
-	}
 
-	if ((tf->lbam == 0x14) && (tf->lbah == 0xeb)) {
-		DPRINTK("found ATAPI device by sig\n");
+	if ((tf->lbam == 0x14) && (tf->lbah == 0xeb))
 		return ATA_DEV_ATAPI;
-	}
 
-	if ((tf->lbam == 0x69) && (tf->lbah == 0x96)) {
-		DPRINTK("found PMP device by sig\n");
+	if ((tf->lbam == 0x69) && (tf->lbah == 0x96))
 		return ATA_DEV_PMP;
-	}
 
-	if ((tf->lbam == 0x3c) && (tf->lbah == 0xc3)) {
-		DPRINTK("found SEMB device by sig (could be ATA device)\n");
+	if ((tf->lbam == 0x3c) && (tf->lbah == 0xc3))
 		return ATA_DEV_SEMB;
-	}
 
-	if ((tf->lbam == 0xcd) && (tf->lbah == 0xab)) {
-		DPRINTK("found ZAC device by sig\n");
+	if ((tf->lbam == 0xcd) && (tf->lbah == 0xab))
 		return ATA_DEV_ZAC;
-	}
 
-	DPRINTK("unknown device\n");
 	return ATA_DEV_UNKNOWN;
 }
 EXPORT_SYMBOL_GPL(ata_dev_classify);
+
+/**
+ *     ata_port_classify - determine device type based on ATA-spec signature
+ *     @ap: ATA port device on which the classification should be run
+ *     @tf: ATA taskfile register set for device to be identified
+ *
+ *     A wrapper around ata_dev_classify() to provide additional logging
+ *
+ *     RETURNS:
+ *     Device type, %ATA_DEV_ATA, %ATA_DEV_ATAPI, %ATA_DEV_PMP,
+ *     %ATA_DEV_ZAC, or %ATA_DEV_UNKNOWN the event of failure.
+ */
+unsigned int ata_port_classify(struct ata_port *ap,
+			       const struct ata_taskfile *tf)
+{
+	unsigned int class = ata_dev_classify(tf);
+
+	if (class != ATA_DEV_UNKNOWN)
+		ata_port_dbg(ap, "found %s device by sig\n",
+			     ata_dev_class_string(class));
+	else
+		ata_port_dbg(ap, "found unknown device\n");
+	return class;
+}
+EXPORT_SYMBOL_GPL(ata_port_classify);
 
 /**
  *	ata_id_string - Convert IDENTIFY DEVICE page into string
