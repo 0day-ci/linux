@@ -74,6 +74,7 @@ struct avs_dev {
 	struct mutex modres_mutex;
 	struct ida ppl_ida;
 	struct list_head fw_list;
+	atomic_t *core_refs;
 
 	struct completion fw_ready;
 };
@@ -94,6 +95,10 @@ int avs_dsp_core_reset(struct avs_dev *adev, u32 core_mask, bool reset);
 int avs_dsp_core_stall(struct avs_dev *adev, u32 core_mask, bool stall);
 int avs_dsp_core_enable(struct avs_dev *adev, u32 core_mask);
 int avs_dsp_core_disable(struct avs_dev *adev, u32 core_mask);
+int avs_dsp_enable(struct avs_dev *adev, u32 core_mask);
+int avs_dsp_disable(struct avs_dev *adev, u32 core_mask);
+int avs_dsp_get_core(struct avs_dev *adev, u32 core_id);
+int avs_dsp_put_core(struct avs_dev *adev, u32 core_id);
 
 /* Inter Process Communication */
 
@@ -182,5 +187,14 @@ int avs_module_id_alloc(struct avs_dev *adev, u16 module_id);
 void avs_module_id_free(struct avs_dev *adev, u16 module_id, u8 instance_id);
 int avs_request_firmware(struct avs_dev *adev, const struct firmware **fw_p, const char *name);
 void avs_release_firmwares(struct avs_dev *adev);
+
+int avs_dsp_init_module(struct avs_dev *adev, u16 module_id, u8 ppl_instance_id,
+			u8 core_id, u8 domain, void *param, u32 param_size,
+			u16 *instance_id);
+void avs_dsp_delete_module(struct avs_dev *adev, u16 module_id, u16 instance_id,
+			   u8 ppl_instance_id, u8 core_id);
+int avs_dsp_create_pipeline(struct avs_dev *adev, u16 req_size, u8 priority,
+			    bool lp, u16 attributes, u8 *instance_id);
+int avs_dsp_delete_pipeline(struct avs_dev *adev, u8 instance_id);
 
 #endif /* __SOUND_SOC_INTEL_AVS_H */
