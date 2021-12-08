@@ -8,6 +8,7 @@
 #include <linux/spi/spi.h>
 #include <linux/crc7.h>
 #include <linux/crc-itu-t.h>
+#include <linux/of_gpio.h>
 
 #include "netdev.h"
 #include "cfg80211.h"
@@ -151,6 +152,31 @@ struct wilc_spi_special_cmd_rsp {
 	u8 rsp_cmd_type;
 	u8 status;
 } __packed;
+
+static void wilc_set_enable(struct spi_device *spi, bool on)
+{
+	int enable_gpio, reset_gpio;
+
+	enable_gpio = of_get_named_gpio(spi->dev.of_node, "chip_en-gpios", 0);
+	reset_gpio = of_get_named_gpio(spi->dev.of_node, "reset-gpios", 0);
+
+	if (on) {
+		if (gpio_is_valid(enable_gpio))
+			/* assert ENABLE */
+			gpio_direction_output(enable_gpio, 1);
+		mdelay(5);	/* 5ms delay required by WILC1000 */
+		if (gpio_is_valid(reset_gpio))
+			/* deassert RESET */
+			gpio_direction_output(reset_gpio, 1);
+	} else {
+		if (gpio_is_valid(reset_gpio))
+			/* assert RESET */
+			gpio_direction_output(reset_gpio, 0);
+		if (gpio_is_valid(enable_gpio))
+			/* deassert ENABLE */
+			gpio_direction_output(enable_gpio, 0);
+	}
+}
 
 static int wilc_bus_probe(struct spi_device *spi)
 {
@@ -977,9 +1003,11 @@ static int wilc_spi_reset(struct wilc *wilc)
 
 static int wilc_spi_deinit(struct wilc *wilc)
 {
-	/*
-	 * TODO:
-	 */
+	struct spi_device *spi = to_spi_device(wilc->dev);
+	struct wilc_spi *spi_priv = wilc->bus_data;
+
+	spi_priv->isinit = false;
+	wilc_set_enable(spi, false);
 	return 0;
 }
 
@@ -999,6 +1027,8 @@ static int wilc_spi_init(struct wilc *wilc, bool resume)
 
 		dev_err(&spi->dev, "Fail cmd read chip id...\n");
 	}
+
+	wilc_set_enable(spi, true);
 
 	/*
 	 * configure protocol
