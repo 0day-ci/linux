@@ -3522,7 +3522,7 @@ int amd_iommu_create_irq_domain(struct amd_iommu *iommu)
 	return 0;
 }
 
-int amd_iommu_update_ga(int cpu, bool is_run, void *data)
+int amd_iommu_update_ga(int cpu, void *data)
 {
 	unsigned long flags;
 	struct amd_iommu *iommu;
@@ -3552,8 +3552,10 @@ int amd_iommu_update_ga(int cpu, bool is_run, void *data)
 						APICID_TO_IRTE_DEST_LO(cpu);
 			ref->hi.fields.destination =
 						APICID_TO_IRTE_DEST_HI(cpu);
+			ref->lo.fields_vapic.is_run = true;
+		} else {
+			ref->lo.fields_vapic.is_run = false;
 		}
-		ref->lo.fields_vapic.is_run = is_run;
 		barrier();
 	}
 
