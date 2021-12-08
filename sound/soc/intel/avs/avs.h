@@ -79,6 +79,13 @@ struct avs_dev {
 	atomic_t *core_refs;
 
 	struct completion fw_ready;
+
+	struct nhlt_acpi_table *nhlt;
+	struct list_head comp_list;
+	struct mutex comp_list_mutex;
+	struct list_head path_list;
+	spinlock_t path_list_lock;
+	struct mutex path_mutex;
 };
 
 /* from hda_bus to avs_dev */
