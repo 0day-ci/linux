@@ -11,9 +11,11 @@
 
 #include <linux/device.h>
 #include <sound/hda_codec.h>
+#include <sound/soc-component.h>
 #include "messages.h"
 
 struct avs_dev;
+struct avs_tplg;
 
 struct avs_dsp_ops {
 	int (* const power)(struct avs_dev *, u32, bool);
@@ -196,5 +198,19 @@ void avs_dsp_delete_module(struct avs_dev *adev, u16 module_id, u16 instance_id,
 int avs_dsp_create_pipeline(struct avs_dev *adev, u16 req_size, u8 priority,
 			    bool lp, u16 attributes, u8 *instance_id);
 int avs_dsp_delete_pipeline(struct avs_dev *adev, u8 instance_id);
+
+/* Soc component members */
+
+struct avs_soc_component {
+	struct snd_soc_component base;
+	struct avs_tplg *tplg;
+
+	struct list_head node;
+};
+
+#define to_avs_soc_component(comp) \
+	container_of(comp, struct avs_soc_component, base)
+
+extern const struct snd_soc_dai_ops avs_dai_fe_ops;
 
 #endif /* __SOUND_SOC_INTEL_AVS_H */
