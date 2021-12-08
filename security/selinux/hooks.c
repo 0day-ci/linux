@@ -354,7 +354,7 @@ static void inode_free_security(struct inode *inode)
 }
 
 struct selinux_mnt_opts {
-	const char *fscontext, *context, *rootcontext, *defcontext;
+	char *fscontext, *context, *rootcontext, *defcontext;
 };
 
 static void selinux_free_mnt_opts(void *mnt_opts)
@@ -980,7 +980,7 @@ out:
 	return rc;
 }
 
-static int selinux_add_opt(int token, const char *s, void **mnt_opts)
+static int selinux_add_opt(int token, char *s, void **mnt_opts)
 {
 	struct selinux_mnt_opts *opts = *mnt_opts;
 
@@ -2798,6 +2798,58 @@ static int selinux_umount(struct vfsmount *mnt, int flags)
 
 	return superblock_has_perm(cred, mnt->mnt_sb,
 				   FILESYSTEM__UNMOUNT, NULL);
+}
+
+static int selinux_fs_context_init(struct fs_context *fc,
+				   struct dentry *reference)
+{
+	const struct superblock_security_struct *ref_sbsec;
+	struct inode_security_struct *ref_isec;
+	struct selinux_mnt_opts *opts;
+	u32 len;
+	int ret;
+
+	if (fc->purpose != FS_CONTEXT_FOR_SUBMOUNT)
+		return 0;
+
+	ref_sbsec = selinux_superblock(reference->d_sb);
+	if (!ref_sbsec)
+		return 0;
+
+	opts = kzalloc(sizeof(struct selinux_mnt_opts), GFP_KERNEL);
+	if (!opts)
+		return -ENOMEM;
+
+	fc->security = opts;
+
+	if (ref_sbsec->flags & FSCONTEXT_MNT) {
+		ret = security_sid_to_context(&selinux_state, ref_sbsec->sid,
+					      &opts->fscontext, &len);
+		if (ret < 0)
+			return ret;
+	}
+	if (ref_sbsec->flags & CONTEXT_MNT) {
+		ret = security_sid_to_context(&selinux_state, ref_sbsec->mntpoint_sid,
+					      &opts->context, &len);
+		if (ret < 0)
+			return ret;
+	}
+	if (ref_sbsec->flags & DEFCONTEXT_MNT) {
+		ret = security_sid_to_context(&selinux_state, ref_sbsec->def_sid,
+					      &opts->defcontext, &len);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* Should we use the mountpoint context or the root inode context? */
+	if (ref_sbsec->flags & ROOTCONTEXT_MNT) {
+		ref_isec = backing_inode_security(reference);
+		ret = security_sid_to_context(&selinux_state, ref_isec->sid,
+					      &opts->rootcontext, &len);
+		if (ret < 0)
+			return ret;
+	}
+	return 0;
 }
 
 static int selinux_fs_context_dup(struct fs_context *fc,
@@ -7267,6 +7319,7 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
 	/*
 	 * PUT "ALLOCATING" HOOKS HERE
 	 */
+	LSM_HOOK_INIT(fs_context_init, selinux_fs_context_init),
 	LSM_HOOK_INIT(msg_msg_alloc_security, selinux_msg_msg_alloc_security),
 	LSM_HOOK_INIT(msg_queue_alloc_security,
 		      selinux_msg_queue_alloc_security),
