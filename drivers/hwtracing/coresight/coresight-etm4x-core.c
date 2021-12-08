@@ -674,10 +674,15 @@ static int etm4_parse_event_config(struct coresight_device *csdev,
 	}
 
 	/* return stack - enable if selected and supported */
-	if ((attr->config & BIT(ETM_OPT_RETSTK)) && drvdata->retstack)
-		/* bit[12], Return stack enable bit */
-		config->cfg |= BIT(12);
-
+	if (attr->config & BIT(ETM_OPT_RETSTK)) {
+		if (!drvdata->retstack) {
+			ret = -EINVAL;
+			goto out;
+		} else {
+			/* bit[12], Return stack enable bit */
+			config->cfg |= BIT(12);
+		}
+	}
 	/*
 	 * Set any selected configuration and preset.
 	 *
