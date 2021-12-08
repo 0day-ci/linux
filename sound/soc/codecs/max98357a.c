@@ -73,6 +73,36 @@ static int max98357a_sdmode_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static int speaker_mute_get(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct max98357a_priv *max98357a = snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.enumerated.item[0] = max98357a->sdmode_switch;
+
+	return 0;
+}
+
+static int speaker_mute_put(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct max98357a_priv *max98357a = snd_soc_component_get_drvdata(component);
+	int mode = ucontrol->value.enumerated.item[0];
+
+	max98357a->sdmode_switch = mode;
+	gpiod_set_value_cansleep(max98357a->sdmode, mode);
+	dev_dbg(component->dev, "set sdmode to %d", mode);
+
+	return 0;
+}
+
+static const struct snd_kcontrol_new max98357a_snd_controls[] = {
+	SOC_SINGLE_BOOL_EXT("Playback Switch", 0,
+			    speaker_mute_get, speaker_mute_put),
+};
+
 static const struct snd_soc_dapm_widget max98357a_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("Speaker"),
 	SND_SOC_DAPM_OUT_DRV_E("SD_MODE", SND_SOC_NOPM, 0, 0, NULL, 0,
@@ -86,6 +116,8 @@ static const struct snd_soc_dapm_route max98357a_dapm_routes[] = {
 };
 
 static const struct snd_soc_component_driver max98357a_component_driver = {
+	.controls		= max98357a_snd_controls,
+	.num_controls		= ARRAY_SIZE(max98357a_snd_controls),
 	.dapm_widgets		= max98357a_dapm_widgets,
 	.num_dapm_widgets	= ARRAY_SIZE(max98357a_dapm_widgets),
 	.dapm_routes		= max98357a_dapm_routes,
