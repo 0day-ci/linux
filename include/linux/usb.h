@@ -754,8 +754,10 @@ static inline bool usb_acpi_power_manageable(struct usb_device *hdev, int index)
 	{ return true; }
 #endif
 
-/* USB autosuspend and autoresume */
 #ifdef CONFIG_PM
+extern int usb_enable_remote_wakeup(struct usb_device *udev);
+extern int usb_disable_remote_wakeup(struct usb_device *udev);
+
 extern void usb_enable_autosuspend(struct usb_device *udev);
 extern void usb_disable_autosuspend(struct usb_device *udev);
 
