@@ -1422,8 +1422,6 @@ static void ata_eh_request_sense(struct ata_queued_cmd *qc,
 		return;
 	}
 
-	DPRINTK("ATA request sense\n");
-
 	ata_tf_init(dev, &tf);
 	tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	tf.flags |= ATA_TFLAG_LBA | ATA_TFLAG_LBA48;
@@ -1463,8 +1461,6 @@ unsigned int atapi_eh_request_sense(struct ata_device *dev,
 		{ REQUEST_SENSE, 0, 0, 0, SCSI_SENSE_BUFFERSIZE, 0 };
 	struct ata_port *ap = dev->link->ap;
 	struct ata_taskfile tf;
-
-	DPRINTK("ATAPI request sense\n");
 
 	memset(sense_buf, 0, SCSI_SENSE_BUFFERSIZE);
 
