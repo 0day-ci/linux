@@ -1346,9 +1346,16 @@ static void determine_memory_type(struct amd64_pvt *pvt)
 	u32 dram_ctrl, dcsm;
 
 	if (pvt->umc) {
-		if ((pvt->umc[0].dimm_cfg | pvt->umc[1].dimm_cfg) & BIT(5))
+		u32 umc_cfg = 0, dimm_cfg = 0, i = 0;
+
+		for_each_umc(i) {
+			umc_cfg  |= pvt->umc[i].umc_cfg;
+			dimm_cfg |= pvt->umc[i].dimm_cfg;
+		}
+
+		if (dimm_cfg & BIT(5))
 			pvt->dram_type = MEM_LRDDR4;
-		else if ((pvt->umc[0].dimm_cfg | pvt->umc[1].dimm_cfg) & BIT(4))
+		else if (dimm_cfg & BIT(4))
 			pvt->dram_type = MEM_RDDR4;
 		else
 			pvt->dram_type = MEM_DDR4;
