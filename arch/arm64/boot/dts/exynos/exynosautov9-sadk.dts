@@ -41,6 +41,10 @@
 	};
 };
 
+&usi_0 {
+	status = "okay";
+};
+
 &serial_0 {
 	status = "okay";
 };
