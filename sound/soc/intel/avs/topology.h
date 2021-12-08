@@ -33,6 +33,8 @@ struct avs_tplg {
 	u32 num_pplcfgs;
 	struct avs_tplg_binding *bindings;
 	u32 num_bindings;
+	struct avs_tplg_path_template *condpath_tmpls;
+	u32 num_condpath_tmpls;
 
 	struct list_head path_tmpl_list;
 };
@@ -139,6 +141,13 @@ struct avs_tplg_path_template_id {
 struct avs_tplg_path_template {
 	u32 id;
 
+	/* Conditional path. */
+	struct avs_tplg_path_template_id source;
+	struct avs_tplg_path_template_id sink;
+	u32 cond_type;
+	bool overridable;
+	u8 priority;
+
 	struct list_head path_list;
 
 	struct avs_tplg *owner;
@@ -152,6 +161,9 @@ struct avs_tplg_path {
 	/* Path format requirements. */
 	struct avs_audio_format *fe_fmt;
 	struct avs_audio_format *be_fmt;
+	/* Condpath path-variant requirements. */
+	u32 source_path_id;
+	u32 sink_path_id;
 
 	struct list_head ppl_list;
 
