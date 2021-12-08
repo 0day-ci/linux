@@ -13,4 +13,9 @@
 
 extern struct __prci_clock __prci_init_clocks_fu540[NUM_CLOCK_FU540];
 
+static const struct prci_clk_desc prci_clk_fu540 = {
+	.clks = __prci_init_clocks_fu540,
+	.num_clks = ARRAY_SIZE(__prci_init_clocks_fu540),
+};
+
 #endif /* __SIFIVE_CLK_FU540_PRCI_H */
