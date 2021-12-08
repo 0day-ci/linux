@@ -16,6 +16,7 @@
 #include <linux/fs_context.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
+#include <linux/ima.h>
 #include <linux/init.h>
 #include <linux/namei.h>
 #include <linux/security.h>
@@ -41,6 +42,7 @@ static const struct super_operations securityfs_super_operations = {
 static int securityfs_fill_super(struct super_block *sb, struct fs_context *fc)
 {
 	static const struct tree_descr files[] = {{""}};
+	struct user_namespace *ns = fc->user_ns;
 	int error;
 
 	error = simple_fill_super(sb, SECURITYFS_MAGIC, files);
@@ -49,7 +51,10 @@ static int securityfs_fill_super(struct super_block *sb, struct fs_context *fc)
 
 	sb->s_op = &securityfs_super_operations;
 
-	return 0;
+	if (ns != &init_user_ns)
+		error = ima_securityfs_init(ns, sb->s_root);
+
+	return error;
 }
 
 static int securityfs_get_tree(struct fs_context *fc)
@@ -97,11 +102,15 @@ static struct file_system_type fs_type = {
  * securityfs_create_dir() function is recommended to be used
  * instead).
  *
- * This function returns a pointer to a dentry if it succeeds.  This
+ * This function returns a pointer to a dentry if it succeeds. If the
+ * dentry was created while the init_user_ns was active, then this
  * pointer must be passed to the securityfs_remove() function when the
  * file is to be removed (no automatic cleanup happens if your module
- * is unloaded, you are responsible here).  If an error occurs, the
- * function will return the error value (via ERR_PTR).
+ * is unloaded, you are responsible here). If any other user namespace
+ * was active then the dentry may be removed using securityfs_remove()
+ * when a module is removed but no cleanup must be done once the
+ * superblock was delete since then it will be deleted automatically.
+ * If an error occurs, the function will return the error value (via ERR_PTR).
  *
  * If securityfs is not enabled in the kernel, the value %-ENODEV is
  * returned.
@@ -169,7 +178,8 @@ static struct dentry *securityfs_create_dentry(const char *name, umode_t mode,
 		inode->i_fop = fops;
 	}
 	d_instantiate(dentry, inode);
-	dget(dentry);
+	if (ns == &init_user_ns)
+		dget(dentry);
 	inode_unlock(dir);
 	return dentry;
 

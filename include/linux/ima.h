@@ -66,6 +66,9 @@ static inline const char * const *arch_get_ima_policy(void)
 }
 #endif
 
+extern int ima_securityfs_init(struct user_namespace *user_ns,
+			       struct dentry *root);
+
 #else
 static inline enum hash_algo ima_get_current_hash_algo(void)
 {
@@ -154,6 +157,11 @@ static inline int ima_measure_critical_data(const char *event_label,
 	return -ENOENT;
 }
 
+static inline int ima_securityfs_init(struct user_namespace *ns, struct dentry *root)
+{
+	return 0;
+}
+
 #endif /* CONFIG_IMA */
 
 #ifndef CONFIG_IMA_KEXEC
@@ -221,7 +229,8 @@ struct ima_h_table {
 };
 
 enum {
-	IMAFS_DENTRY_DIR = 0,
+	IMAFS_DENTRY_INTEGRITY_DIR = 0,
+	IMAFS_DENTRY_DIR,
 	IMAFS_DENTRY_SYMLINK,
 	IMAFS_DENTRY_BINARY_RUNTIME_MEASUREMENTS,
 	IMAFS_DENTRY_ASCII_RUNTIME_MEASUREMENTS,
@@ -336,6 +345,7 @@ static inline struct ima_namespace *get_current_ns(void)
 {
 	return &init_ima_ns;
 }
+
 #endif /* CONFIG_IMA_NS */
 
 #if defined(CONFIG_IMA_APPRAISE) && defined(CONFIG_INTEGRITY_TRUSTED_KEYRING)
