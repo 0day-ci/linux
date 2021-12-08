@@ -153,6 +153,15 @@ int avs_dsp_get_core(struct avs_dev *adev, u32 core_id)
 
 	ref = &adev->core_refs[core_id];
 	if (atomic_add_return(1, ref) == 1) {
+		/*
+		 * No cores other than main-core can be running for DSP
+		 * to achieve d0ix. Conscious SET_D0IX IPC failure is permitted,
+		 * simply d0ix power state will no longer be attempted.
+		 */
+		ret = avs_dsp_disable_d0ix(adev);
+		if (ret && ret != -AVS_EIPC)
+			goto err_disable_d0ix;
+
 		ret = avs_dsp_enable(adev, mask);
 		if (ret)
 			goto err_enable_dsp;
@@ -161,6 +170,8 @@ int avs_dsp_get_core(struct avs_dev *adev, u32 core_id)
 	return 0;
 
 err_enable_dsp:
+	avs_dsp_enable_d0ix(adev);
+err_disable_d0ix:
 	atomic_dec(ref);
 err:
 	dev_err(adev->dev, "get core failed: %d\n", ret);
@@ -187,6 +198,9 @@ int avs_dsp_put_core(struct avs_dev *adev, u32 core_id)
 		ret = avs_dsp_disable(adev, mask);
 		if (ret)
 			goto err;
+
+		/* Match disable_d0ix in avs_dsp_get_core(). */
+		avs_dsp_enable_d0ix(adev);
 	}
 
 	return 0;

@@ -22,6 +22,7 @@ struct avs_dev;
 struct avs_tplg;
 struct avs_tplg_library;
 struct avs_soc_component;
+struct avs_ipc_msg;
 
 struct avs_dsp_ops {
 	int (* const power)(struct avs_dev *, u32, bool);
@@ -39,6 +40,8 @@ struct avs_dsp_ops {
 	unsigned int (* const log_buffer_offset)(struct avs_dev *, u32);
 	int (* const log_buffer_status)(struct avs_dev *, union avs_notify_msg *);
 	int (* const coredump)(struct avs_dev *, union avs_notify_msg *);
+	bool (* const d0ix_toggle)(struct avs_dev *, struct avs_ipc_msg *, bool);
+	int (* const set_d0ix)(struct avs_dev *, bool);
 };
 
 #define avs_dsp_op(adev, op, ...) \
@@ -167,6 +170,9 @@ struct avs_ipc {
 	struct completion busy_completion;
 
 	struct work_struct recovery_work;
+	struct delayed_work d0ix_work;
+	atomic_t d0ix_disable_depth;
+	bool in_d0ix;
 };
 
 #define AVS_EIPC	EREMOTEIO
@@ -216,6 +222,9 @@ int avs_dsp_send_rom_msg(struct avs_dev *adev, struct avs_ipc_msg *request);
 void avs_dsp_interrupt_control(struct avs_dev *adev, bool enable);
 int avs_ipc_init(struct avs_ipc *ipc, struct device *dev);
 void avs_ipc_block(struct avs_ipc *ipc);
+
+int avs_dsp_disable_d0ix(struct avs_dev *adev);
+int avs_dsp_enable_d0ix(struct avs_dev *adev);
 
 /* Firmware resources management */
 
