@@ -62,7 +62,7 @@ struct so_timestamping {
 /**
  * struct hwtstamp_config - %SIOCGHWTSTAMP and %SIOCSHWTSTAMP parameter
  *
- * @flags:	no flags defined right now, must be zero for %SIOCSHWTSTAMP
+ * @flags:	one of HWTSTAMP_FLAGS_*
  * @tx_type:	one of HWTSTAMP_TX_*
  * @rx_filter:	one of HWTSTAMP_FILTER_*
  *
@@ -76,6 +76,19 @@ struct hwtstamp_config {
 	int flags;
 	int tx_type;
 	int rx_filter;
+};
+
+/* possible values for hwtstamp_config->flags */
+enum hwtstamp_flags {
+	/*
+	 * With this flag the user should aware that the PHC index
+	 * get/set by syscall is not stable. e.g. the phc index of
+	 * bond active interface may changed after failover.
+	 */
+	HWTSTAMP_FLAGS_UNSTABLE_PHC = (1<<0),
+
+	/* add new constants above here */
+	__HWTSTAMP_FLAGS_CNT
 };
 
 /* possible values for hwtstamp_config->tx_type */
