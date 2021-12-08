@@ -1953,7 +1953,6 @@ void intel_ddi_sanitize_encoder_pll_mapping(struct intel_encoder *encoder)
 			return;
 	}
 
-	port_mask = BIT(encoder->port);
 	ddi_clk_needed = encoder->base.crtc;
 
 	if (encoder->type == INTEL_OUTPUT_DSI) {
