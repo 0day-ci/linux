@@ -4640,6 +4640,11 @@ void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
 	if (unlikely(cfs_b->quota == RUNTIME_INF))
 		return;
 
+	if (cfs_b->burst == 0 && cfs_b->runtime_snap == cfs_b->quota) {
+		cfs_b->runtime = cfs_b->quota;
+		return;
+	}
+
 	cfs_b->runtime += cfs_b->quota;
 	runtime = cfs_b->runtime_snap - cfs_b->runtime;
 	if (runtime > 0) {
