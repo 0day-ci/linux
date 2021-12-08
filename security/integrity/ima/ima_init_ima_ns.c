@@ -45,5 +45,10 @@ int __init ima_ns_init(void)
 struct ima_namespace init_ima_ns = {
 	.kref = KREF_INIT(1),
 	.user_ns = &init_user_ns,
+#ifdef CONFIG_IMA_QUEUE_EARLY_BOOT_KEYS
+	.ima_process_keys = false,
+	.ima_keys_lock = __MUTEX_INITIALIZER(init_ima_ns.ima_keys_lock),
+	.ima_keys = LIST_HEAD_INIT(init_ima_ns.ima_keys),
+#endif
 };
 EXPORT_SYMBOL(init_ima_ns);
