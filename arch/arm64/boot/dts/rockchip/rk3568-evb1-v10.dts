@@ -7,6 +7,7 @@
 /dts-v1/;
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/soc/rockchip,vop2.h>
 #include "rk3568.dtsi"
 
 / {
@@ -104,6 +105,12 @@
 		     &gmac1m1_rgmii_clk
 		     &gmac1m1_rgmii_bus>;
 	status = "okay";
+};
+
+&hdmi {
+	status = "okay";
+	avdd-0v9-supply = <&vdda0v9_image>;
+	avdd-1v8-supply = <&vcca1v8_image>;
 };
 
 &i2c0 {
@@ -389,4 +396,28 @@
 
 &uart2 {
 	status = "okay";
+};
+
+&vop {
+	status = "okay";
+	assigned-clocks = <&cru DCLK_VOP0>, <&cru DCLK_VOP1>;
+	assigned-clock-parents = <&pmucru PLL_HPLL>, <&cru PLL_VPLL>;
+};
+
+&vop_mmu {
+	status = "okay";
+};
+
+&hdmi_in {
+	hdmi_in_vp0: endpoint@0 {
+		reg = <0>;
+		remote-endpoint = <&vp0_out_hdmi>;
+	};
+};
+
+&vp0 {
+	vp0_out_hdmi: endpoint@RK3568_VOP2_EP_HDMI {
+		reg = <RK3568_VOP2_EP_HDMI>;
+		remote-endpoint = <&hdmi_in_vp0>;
+	};
 };
