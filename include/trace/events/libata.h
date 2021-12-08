@@ -621,6 +621,31 @@ DEFINE_EVENT(ata_transfer_data_template, atapi_send_cdb,
 	     TP_PROTO(struct ata_queued_cmd *qc, unsigned int offset, unsigned int count),
 	     TP_ARGS(qc, offset, count));
 
+DECLARE_EVENT_CLASS(ata_sff_template,
+
+	TP_PROTO(struct ata_port *ap),
+
+	TP_ARGS(ap),
+
+	TP_STRUCT__entry(
+		__field( unsigned int,	ata_port )
+		__field( unsigned char,	hsm_state )
+	),
+
+	TP_fast_assign(
+		__entry->ata_port	= ap->print_id;
+		__entry->hsm_state	= ap->hsm_task_state;
+	),
+
+	TP_printk("ata_port=%u task_state=%s",
+		  __entry->ata_port,
+		  show_sff_hsm_state_name(__entry->hsm_state))
+);
+
+DEFINE_EVENT(ata_sff_template, ata_sff_flush_pio_task,
+	     TP_PROTO(struct ata_port *ap),
+	     TP_ARGS(ap));
+
 #endif /*  _TRACE_LIBATA_H */
 
 /* This part must be outside protection */

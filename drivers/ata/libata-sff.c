@@ -1249,7 +1249,7 @@ EXPORT_SYMBOL_GPL(ata_sff_queue_pio_task);
 
 void ata_sff_flush_pio_task(struct ata_port *ap)
 {
-	DPRINTK("ENTER\n");
+	trace_ata_sff_flush_pio_task(ap);
 
 	cancel_delayed_work_sync(&ap->sff_pio_task);
 
@@ -1266,9 +1266,6 @@ void ata_sff_flush_pio_task(struct ata_port *ap)
 	spin_unlock_irq(ap->lock);
 
 	ap->sff_pio_task_link = NULL;
-
-	if (ata_msg_ctl(ap))
-		ata_port_dbg(ap, "%s: EXIT\n", __func__);
 }
 
 static void ata_sff_pio_task(struct work_struct *work)
