@@ -93,9 +93,12 @@ static resource_size_t random_page(resource_size_t last)
 	return prandom_u32_max(last >> PAGE_SHIFT) << PAGE_SHIFT;
 }
 
-static int iomemtest(struct intel_memory_region *mem, const void *caller)
+static int iomemtest(struct intel_memory_region *mem,
+		     bool test_all,
+		     const void *caller)
 {
 	resource_size_t last = resource_size(&mem->region) - PAGE_SIZE;
+	resource_size_t page;
 	int err;
 
 	/*
@@ -109,17 +112,25 @@ static int iomemtest(struct intel_memory_region *mem, const void *caller)
 	 * a random offset within as a quick spot check for bad memory.
 	 */
 
-	err = iopagetest(mem, 0, caller);
-	if (err)
-		return err;
+	if (test_all) {
+		for (page = 0; page <= last; page += PAGE_SIZE) {
+			err = iopagetest(mem, page, caller);
+			if (err)
+				return err;
+		}
+	} else {
+		err = iopagetest(mem, 0, caller);
+		if (err)
+			return err;
 
-	err = iopagetest(mem, last, caller);
-	if (err)
-		return err;
+		err = iopagetest(mem, last, caller);
+		if (err)
+			return err;
 
-	err = iopagetest(mem, random_page(last), caller);
-	if (err)
-		return err;
+		err = iopagetest(mem, random_page(last), caller);
+		if (err)
+			return err;
+	}
 
 	return 0;
 }
@@ -221,8 +232,9 @@ intel_memory_region_create(struct drm_i915_private *i915,
 			goto err_free;
 	}
 
-	if (io_start && IS_ENABLED(CONFIG_DRM_I915_DEBUG_GEM)) {
-		err = iomemtest(mem, (void *)_RET_IP_);
+	if (io_start &&
+	    (IS_ENABLED(CONFIG_DRM_I915_DEBUG_GEM) || i915->params.memtest)) {
+		err = iomemtest(mem, i915->params.memtest, (void *)_RET_IP_);
 		if (err)
 			goto err_release;
 	}
