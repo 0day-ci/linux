@@ -33,6 +33,7 @@ struct avs_dsp_ops {
 	int (* const load_lib)(struct avs_dev *, struct firmware *, u32);
 	int (* const transfer_mods)(struct avs_dev *, bool,
 				    struct avs_module_entry *, u32);
+	int (* const coredump)(struct avs_dev *, union avs_notify_msg *);
 };
 
 #define avs_dsp_op(adev, op, ...) \
@@ -147,6 +148,8 @@ struct avs_ipc {
 	struct mutex msg_mutex;
 	struct completion done_completion;
 	struct completion busy_completion;
+
+	struct work_struct recovery_work;
 };
 
 #define AVS_EIPC	EREMOTEIO
