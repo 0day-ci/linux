@@ -556,7 +556,7 @@ static const struct clk_ops si5351_pll_ops = {
  * MS[6,7] are integer (P1) divide only, P1 = divide value,
  * P2 and P3 are not applicable
  *
- * for 150MHz < fOUT <= 160MHz:
+ * for 150MHz < fOUT <= 200MHz:
  *
  * MSx_P1 = 0, MSx_P2 = 0, MSx_P3 = 1, MSx_INT = 1, MSx_DIVBY4 = 11b
  */
@@ -653,7 +653,7 @@ static long si5351_msynth_round_rate(struct clk_hw *hw, unsigned long rate,
 	if (hwdata->num >= 6 && rate > SI5351_MULTISYNTH67_MAX_FREQ)
 		rate = SI5351_MULTISYNTH67_MAX_FREQ;
 
-	/* multisync frequency is 1MHz .. 160MHz */
+	/* multisync frequency is 300kHz .. 200MHz */
 	if (rate > SI5351_MULTISYNTH_MAX_FREQ)
 		rate = SI5351_MULTISYNTH_MAX_FREQ;
 	if (rate < SI5351_MULTISYNTH_MIN_FREQ)
@@ -681,8 +681,8 @@ static long si5351_msynth_round_rate(struct clk_hw *hw, unsigned long rate,
 
 		*parent_rate = a * rate;
 	} else if (hwdata->num >= 6) {
-		/* determine the closest integer divider */
-		a = DIV_ROUND_CLOSEST(*parent_rate, rate);
+		/* determine the closest even integer divider */
+		a = DIV_ROUND_CLOSEST(*parent_rate/2, rate) * 2;
 		if (a < SI5351_MULTISYNTH_A_MIN)
 			a = SI5351_MULTISYNTH_A_MIN;
 		if (a > SI5351_MULTISYNTH67_A_MAX)
@@ -715,7 +715,8 @@ static long si5351_msynth_round_rate(struct clk_hw *hw, unsigned long rate,
 
 		b = 0;
 		c = 1;
-		if (rfrac)
+		/* Smallest divider in fractional mode must be > 8 (AN619)! */
+		if (rfrac && (a >= 8))
 			rational_best_approximation(rfrac, denom,
 			    SI5351_MULTISYNTH_B_MAX, SI5351_MULTISYNTH_C_MAX,
 			    &b, &c);
@@ -1039,11 +1040,11 @@ static long si5351_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
 		container_of(hw, struct si5351_hw_data, hw);
 	unsigned char rdiv;
 
-	/* clkout6/7 can only handle output freqencies < 150MHz */
+	/* clkout6/7 can only handle output frequencies < 150MHz */
 	if (hwdata->num >= 6 && rate > SI5351_CLKOUT67_MAX_FREQ)
 		rate = SI5351_CLKOUT67_MAX_FREQ;
 
-	/* clkout freqency is 8kHz - 160MHz */
+	/* clkout frequency is 2.5kHz - 200MHz */
 	if (rate > SI5351_CLKOUT_MAX_FREQ)
 		rate = SI5351_CLKOUT_MAX_FREQ;
 	if (rate < SI5351_CLKOUT_MIN_FREQ)
