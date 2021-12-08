@@ -4645,14 +4645,21 @@ void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
 		return;
 	}
 
-	cfs_b->runtime += cfs_b->quota;
-	runtime = cfs_b->runtime_snap - cfs_b->runtime;
+	runtime = cfs_b->runtime_snap - cfs_b->runtime - cfs_b->quota;
 	if (runtime > 0) {
 		cfs_b->burst_time += runtime;
 		cfs_b->nr_burst++;
+		cfs_b->burst_periods++;
 	}
 
-	cfs_b->runtime = min(cfs_b->runtime, cfs_b->quota + cfs_b->burst);
+	if (cfs_b->burst_periods > 1) {
+		cfs_b->runtime = cfs_b->quota;
+		cfs_b->burst_periods = 0;
+	} else {
+		cfs_b->runtime += cfs_b->quota;
+		cfs_b->runtime = min(cfs_b->runtime, cfs_b->quota + cfs_b->burst);
+	}
+
 	cfs_b->runtime_snap = cfs_b->runtime;
 }
 
