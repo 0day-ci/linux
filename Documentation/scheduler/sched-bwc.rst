@@ -65,6 +65,18 @@ there many cgroups or CPU is under utilized, the interference is
 limited. More details are shown in:
 https://lore.kernel.org/lkml/5371BD36-55AE-4F71-B9D7-B86DC32E3D2B@linux.alibaba.com/
 
+We need to limit the burst periods to 2, because we found something interesting
+that with the feature, tasks have chance to get more cpu than quota in working
+periods. As every task could be scheduled out or sleep, the task group can get
+some more cpu for its burst workload in this way. But even if there's no burst
+workload, it can use those power to do daily jobs. If the average workload of a
+taskgroup is just a little bit higher than its quota, it can escape from the
+throttle and using the burst power for lots of periods.
+
+Permitting 2 periods for the burst cpu can help aovid such kind of 'stealing'
+and the task group won't lose its burst power if the periods refresh lands in
+the middle of a burst workloads.
+
 Management
 ----------
 Quota, period and burst are managed within the cpu subsystem via cgroupfs.
