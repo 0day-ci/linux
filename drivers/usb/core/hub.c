@@ -1227,6 +1227,10 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 						port_resumed))
 				set_bit(port1, hub->change_bits);
 
+			if ((portstatus & USB_PORT_STAT_CONNECTION) &&
+			    usb_hub_to_struct_hub(udev))
+				usb_kick_hub_wq(udev);
+
 		} else if (udev->persist_enabled) {
 #ifdef CONFIG_PM
 			udev->reset_resume = 1;
