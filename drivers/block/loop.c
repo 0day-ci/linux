@@ -820,7 +820,7 @@ static inline int queue_on_root_worker(struct cgroup_subsys_state *css)
 
 static void loop_queue_work(struct loop_device *lo, struct loop_cmd *cmd)
 {
-	struct rb_node **node = &(lo->worker_tree.rb_node), *parent = NULL;
+	struct rb_node **node = &lo->worker_tree.rb_node, *parent = NULL;
 	struct loop_worker *cur_worker, *worker = NULL;
 	struct work_struct *work;
 	struct list_head *cmd_list;
@@ -829,8 +829,6 @@ static void loop_queue_work(struct loop_device *lo, struct loop_cmd *cmd)
 
 	if (queue_on_root_worker(cmd->blkcg_css))
 		goto queue_work;
-
-	node = &lo->worker_tree.rb_node;
 
 	while (*node) {
 		parent = *node;
