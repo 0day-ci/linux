@@ -977,6 +977,8 @@ void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	int h_physical_id = kvm_cpu_get_apicid(cpu);
 	struct vcpu_svm *svm = to_svm(vcpu);
 
+	lockdep_assert_preemption_disabled();
+
 	/*
 	 * Since the host physical APIC id is 8 bits,
 	 * we can support host APIC ID upto 255.
@@ -1010,6 +1012,8 @@ void avic_vcpu_put(struct kvm_vcpu *vcpu)
 	u64 entry;
 	struct vcpu_svm *svm = to_svm(vcpu);
 
+	lockdep_assert_preemption_disabled();
+
 	entry = READ_ONCE(*(svm->avic_physical_id_cache));
 
 	/* Nothing to do if IsRunning == '0' due to vCPU blocking. */
@@ -1022,31 +1026,37 @@ void avic_vcpu_put(struct kvm_vcpu *vcpu)
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
 }
 
-/*
- * This function is called during VCPU halt/unhalt.
- */
-static void avic_set_running(struct kvm_vcpu *vcpu, bool is_run)
-{
-	int cpu = get_cpu();
-
-	WARN_ON(cpu != vcpu->cpu);
-
-	if (kvm_vcpu_apicv_active(vcpu)) {
-		if (is_run)
-			avic_vcpu_load(vcpu, cpu);
-		else
-			avic_vcpu_put(vcpu);
-	}
-	put_cpu();
-}
-
 void svm_vcpu_blocking(struct kvm_vcpu *vcpu)
 {
-	avic_set_running(vcpu, false);
+	if (!kvm_vcpu_apicv_active(vcpu))
+		return;
+
+	preempt_disable();
+
+	/*
+	 * Unload the AVIC when the vCPU is about to block, _before_ the vCPU
+	 * actually blocks.  The vCPU needs to be marked IsRunning=0 before the
+	 * final pass over the vIRR via kvm_vcpu_check_block().  Any IRQs that
+	 * arrive before IsRunning=0 will not signal the doorbell, i.e. it's
+	 * KVM's responsibility to ensure there are no pending IRQs in the vIRR
+	 * after IsRunning is cleared, prior to scheduling out the vCPU.
+	 */
+	avic_vcpu_put(vcpu);
+
+	preempt_enable();
 }
 
 void svm_vcpu_unblocking(struct kvm_vcpu *vcpu)
 {
+	int cpu;
 
-	avic_set_running(vcpu, true);
+	if (!kvm_vcpu_apicv_active(vcpu))
+		return;
+
+	cpu = get_cpu();
+	WARN_ON(cpu != vcpu->cpu);
+
+	avic_vcpu_load(vcpu, cpu);
+
+	put_cpu();
 }
