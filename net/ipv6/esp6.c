@@ -412,7 +412,6 @@ static struct ip_esp_hdr *esp6_output_tcp_encap(struct xfrm_state *x,
 						struct esp_info *esp)
 {
 	__be16 *lenp = (void *)esp->esph;
-	struct ip_esp_hdr *esph;
 	unsigned int len;
 	struct sock *sk;
 
@@ -428,9 +427,8 @@ static struct ip_esp_hdr *esp6_output_tcp_encap(struct xfrm_state *x,
 		return ERR_CAST(sk);
 
 	*lenp = htons(len);
-	esph = (struct ip_esp_hdr *)(lenp + 1);
 
-	return esph;
+	return (struct ip_esp_hdr *)(lenp + 1);
 }
 #else
 static struct ip_esp_hdr *esp6_output_tcp_encap(struct xfrm_state *x,
