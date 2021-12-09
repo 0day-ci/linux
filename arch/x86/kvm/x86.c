@@ -1045,19 +1045,18 @@ void kvm_post_set_cr4(struct kvm_vcpu *vcpu, unsigned long old_cr4, unsigned lon
 	 * If CR4.PCIDE is changed 0 -> 1, there is no need to flush the TLB
 	 * according to the SDM; however, stale prev_roots could be reused
 	 * incorrectly in the future after a MOV to CR3 with NOFLUSH=1, so we
-	 * free them all.  KVM_REQ_MMU_RELOAD is fit for the both cases; it
-	 * is slow, but changing CR4.PCIDE is a rare case.
+	 * free them all.  kvm_mmu_unload() is fit for the both cases; it is
+	 * slow, but changing CR4.PCIDE is a rare case.
 	 *
 	 * If CR4.PGE is changed, the guest TLB must be flushed.
 	 *
-	 * Note: resetting MMU is a superset of KVM_REQ_MMU_RELOAD and
-	 * KVM_REQ_MMU_RELOAD is a superset of KVM_REQ_TLB_FLUSH_GUEST, hence
-	 * the usage of "else if".
+	 * Note: resetting MMU is a superset of unloading an MMU, and unloading
+	 * an MMU is a superset of KVM_REQ_TLB_FLUSH_GUEST, hence the "else if".
 	 */
 	if ((cr4 ^ old_cr4) & KVM_MMU_CR4_ROLE_BITS)
 		kvm_mmu_reset_context(vcpu);
 	else if ((cr4 ^ old_cr4) & X86_CR4_PCIDE)
-		kvm_make_request(KVM_REQ_MMU_RELOAD, vcpu);
+		kvm_mmu_unload(vcpu);
 	else if ((cr4 ^ old_cr4) & X86_CR4_PGE)
 		kvm_make_request(KVM_REQ_TLB_FLUSH_GUEST, vcpu);
 }
