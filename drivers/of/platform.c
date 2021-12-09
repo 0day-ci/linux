@@ -114,7 +114,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
 				  struct device *parent)
 {
 	struct platform_device *dev;
-	int rc, i, num_reg = 0, num_irq;
+	int rc, i, num_reg = 0, num_irq = 0;
 	struct resource *res, temp_res;
 
 	dev = platform_device_alloc("", PLATFORM_DEVID_NONE);
@@ -124,7 +124,14 @@ struct platform_device *of_device_alloc(struct device_node *np,
 	/* count the io and irq resources */
 	while (of_address_to_resource(np, num_reg, &temp_res) == 0)
 		num_reg++;
-	num_irq = of_irq_count(np);
+
+	/*
+	 * we don't want to map the interrupts of hierarchical interrupt domain
+	 * into the parent domain yet. This will be the job of the hierarchical
+	 * interrupt driver code to map the interrupts as and when needed.
+	 */
+	if (!of_property_read_bool(np, "not-interrupt-producer"))
+		num_irq = of_irq_count(np);
 
 	/* Populate the resource table */
 	if (num_irq || num_reg) {
@@ -140,7 +147,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
 			rc = of_address_to_resource(np, i, res);
 			WARN_ON(rc);
 		}
-		if (of_irq_to_resource_table(np, res, num_irq) != num_irq)
+		if (num_irq && of_irq_to_resource_table(np, res, num_irq) != num_irq)
 			pr_debug("not all legacy IRQ resources mapped for %pOFn\n",
 				 np);
 	}
