@@ -54,7 +54,21 @@ struct si2157_cmd {
 	unsigned rlen;
 };
 
+/* Old firmware namespace */
 #define SI2158_A20_FIRMWARE "dvb-tuner-si2158-a20-01.fw"
 #define SI2141_A10_FIRMWARE "dvb-tuner-si2141-a10-01.fw"
 #define SI2157_A30_FIRMWARE "dvb-tuner-si2157-a30-01.fw"
+
+/* New firmware namespace */
+#define SI2141_60_FIRMWARE "dvb_driver_si2141_0_ab23.fw"
+#define SI2141_61_FIRMWARE "dvb_driver_si2141_1_1b12.fw"
+#define SI2146_11_FIRMWARE "dvb_driver_si2146_1_1b3.fw"
+#define SI2147_50_FIRMWARE "dvb_driver_si2147_3_1b3.fw"
+#define SI2148_32_FIRMWARE "dvb_driver_si2148_0_eb15.fw"
+#define SI2148_33_FIRMWARE "dvb_driver_si2148_2_1b11.fw"
+#define SI2157_50_FIRMWARE "dvb_driver_si2157_3_1b3.fw"
+#define SI2158_50_FIRMWARE "dvb_driver_si2178b_0_ab15.fw"
+#define SI2158_51_FIRMWARE "dvb_driver_si2158b_4_1b3.fw"
+#define SI2177_50_FIRMWARE "dvb_driver_si2177_3_1b3.fw"
+
 #endif
