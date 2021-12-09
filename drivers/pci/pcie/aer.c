@@ -376,6 +376,8 @@ void pci_aer_init(struct pci_dev *dev)
 		return;
 
 	dev->aer_stats = kzalloc(sizeof(struct aer_stats), GFP_KERNEL);
+	if (!dev->aer_stats)
+		return;
 
 	/*
 	 * We save/restore PCI_ERR_UNCOR_MASK, PCI_ERR_UNCOR_SEVER,
