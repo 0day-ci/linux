@@ -207,16 +207,24 @@ the patch::
 
 	Fixes: 1f2e3d4c5b6a ("The first line of the commit specified by the first 12 characters of its SHA-1 ID")
 
-Another tag is used for linking web pages with additional backgrounds or
-details, for example a report about a bug fixed by the patch or a document
-with a specification implemented by the patch::
+A second kind of tags is used for linking web pages with additional details.
+There are three different tags of this sort which all use the following
+format::
 
-	Link: https://example.com/somewhere.html  optional-other-stuff
+	tag: <url>  optional-other-stuff
 
-Many maintainers when applying a patch also add this tag to link to the
-latest public review posting of the patch; often this is automatically done
-by tools like b4 or a git hook like the one described in
-'Documentation/maintainer/configure-git.rst'.
+The tags in common use are:
+
+ - ``Reported:`` points to a report of a problem fixed by this patch. The
+   provided URL thus might point to a entry in a bug tracker or a mail in a
+   mailing list archive. Typically this tag is followed by a "Reported-by:"
+   tag (see below).
+
+ - ``Link:`` points to websites providing additional backgrounds or details,
+   for example an earlier discussion that let to the development of the patch.
+
+ - ``Posted:`` this is a tag many maintainers add when applying a patch, to
+   make the commit point to the latest public review posting of the patch.
 
 A third kind of tags are used to document which developers were involved in
 the development of the patch. Each of these uses this format::

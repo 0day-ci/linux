@@ -113,20 +113,22 @@ collisions with shorter IDs a real possibility.  Bear in mind that, even if
 there is no collision with your six-character ID now, that condition may
 change five years from now.
 
-If related discussions or any other background information behind the change
-can be found on the web, add 'Link:' tags pointing to it. In case your patch
-fixes a bug, for example, add a tag with a URL referencing the report in the
-mailing list archives or a bug tracker; if the patch is a result of some
-earlier mailing list discussion or something documented on the web, point to
-it.
+Add tags linking to any related discussions or background information behind
+the change on the web. For example, if your patch fixes a bug, add a
+`Reported:` tag pointing to the report in the mailing list archives or a bug
+tracker::
 
-When linking to mailing list archives, preferably use the lore.kernel.org
-message archiver service. To create the link URL, use the contents of the
-``Message-Id`` header of the message without the surrounding angle brackets.
-For example::
+    Reported: https://lore.kernel.org/r/30th.anniversary.repost@klaava.Helsinki.FI/
+
+If the patch is a related to some earlier mailing list discussion or something
+documented on the web, point to it using a `Link:` tag::
 
     Link: https://lore.kernel.org/r/30th.anniversary.repost@klaava.Helsinki.FI/
 
+When linking to mailing list archives, preferably use the lore.kernel.org
+message archiver service. To create the link URL, use the contents of the
+``Message-Id`` header of the message without the surrounding angle brackets,
+e.g. "30th.anniversary.repost@klaava.Helsinki.FI" in the two examples above.
 Please check the link to make sure that it is actually working and points
 to the relevant message.
 
