@@ -186,17 +186,26 @@ static int net_hwtstamp_validate(struct ifreq *ifr)
 	struct hwtstamp_config cfg;
 	enum hwtstamp_tx_types tx_type;
 	enum hwtstamp_rx_filters rx_filter;
-	int tx_type_valid = 0;
+	enum hwtstamp_flags flag;
 	int rx_filter_valid = 0;
+	int tx_type_valid = 0;
+	int flag_valid = 0;
 
 	if (copy_from_user(&cfg, ifr->ifr_data, sizeof(cfg)))
 		return -EFAULT;
 
-	if (cfg.flags) /* reserved for future extensions */
-		return -EINVAL;
-
+	flag = cfg.flags;
 	tx_type = cfg.tx_type;
 	rx_filter = cfg.rx_filter;
+
+	switch (flag) {
+	case HWTSTAMP_FLAG_BONDED_PHC_INDEX:
+		flag_valid = 1;
+		break;
+	case __HWTSTAMP_FLAGS_CNT:
+		/* not a real value */
+		break;
+	}
 
 	switch (tx_type) {
 	case HWTSTAMP_TX_OFF:
@@ -234,7 +243,7 @@ static int net_hwtstamp_validate(struct ifreq *ifr)
 		break;
 	}
 
-	if (!tx_type_valid || !rx_filter_valid)
+	if (!flag_valid || !tx_type_valid || !rx_filter_valid)
 		return -ERANGE;
 
 	return 0;
