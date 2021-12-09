@@ -336,6 +336,7 @@ out_unmap:
 		if (data->map_base[idx])
 			iounmap(data->map_base[idx]);
 	}
+	put_device(&pdev->dev);
 out_free_data:
 	kfree(data);
 	return ret;
