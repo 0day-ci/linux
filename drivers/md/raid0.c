@@ -371,11 +371,16 @@ static int raid0_run(struct mddev *mddev)
 	if (md_check_no_bitmap(mddev))
 		return -EINVAL;
 
+	if (acct_bioset_init(mddev)) {
+		pr_err("md/raid0:%s: alloc acct bioset failed.\n", mdname(mddev));
+		return -ENOMEM;
+	}
+
 	/* if private is not null, we are here after takeover */
 	if (mddev->private == NULL) {
 		ret = create_strip_zones(mddev, &conf);
 		if (ret < 0)
-			return ret;
+			goto exit_acct_set;
 		mddev->private = conf;
 	}
 	conf = mddev->private;
@@ -421,6 +426,8 @@ static int raid0_run(struct mddev *mddev)
 
 free:
 	free_conf(conf);
+exit_acct_set:
+	acct_bioset_exit(mddev);
 	return ret;
 }
 
@@ -436,6 +443,7 @@ static void raid0_free(struct mddev *mddev, void *priv)
 	struct r0conf *conf = priv;
 
 	free_conf(conf);
+	acct_bioset_exit(mddev);
 }
 
 static void raid0_handle_discard(struct mddev *mddev, struct bio *bio)
