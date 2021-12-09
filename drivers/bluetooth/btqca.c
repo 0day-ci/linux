@@ -141,6 +141,53 @@ out:
 	return err;
 }
 
+static int qca_send_patch_config_cmd(struct hci_dev *hdev)
+{
+	struct sk_buff *skb;
+	int err = 0;
+	u8 cmd[] = {EDL_PATCH_CONFIG_CMD, 0x01, 0, 0, 0};
+	u8 rlen = 0x02;
+	struct edl_event_hdr *edl;
+	u8 rtype = EDL_PATCH_CONFIG_CMD;
+
+	bt_dev_dbg(hdev, "QCA Patch config");
+
+	skb = __hci_cmd_sync_ev(hdev, EDL_PATCH_CMD_OPCODE, sizeof(cmd),
+				cmd, HCI_EV_VENDOR, HCI_INIT_TIMEOUT);
+	if (IS_ERR(skb)) {
+		err = PTR_ERR(skb);
+		bt_dev_err(hdev, "Sending QCA Patch config failed (%d)", err);
+		return err;
+	}
+
+	if (skb->len != rlen) {
+		bt_dev_err(hdev, "QCA Patch config cmd size mismatch len %d", skb->len);
+		err = -EILSEQ;
+		goto out;
+	}
+
+	edl = (struct edl_event_hdr *)(skb->data);
+	if (!edl) {
+		bt_dev_err(hdev, "QCA Patch config with no header");
+		err = -EILSEQ;
+		goto out;
+	}
+
+	if (edl->cresp != EDL_PATCH_CONFIG_RES_EVT || edl->rtype != rtype) {
+		bt_dev_err(hdev, "QCA Wrong packet received %d %d", edl->cresp,
+			   edl->rtype);
+		err = -EIO;
+		goto out;
+	}
+
+out:
+	kfree(skb);
+	if (err)
+		bt_dev_err(hdev, "QCA Patch config cmd failed (%d)", err);
+
+	return err;
+}
+
 static int qca_send_reset(struct hci_dev *hdev)
 {
 	struct sk_buff *skb;
@@ -550,6 +597,9 @@ int qca_uart_setup(struct hci_dev *hdev, uint8_t baudrate,
 	 * ROM version is derived from last two bytes of soc_ver.
 	 */
 	rom_ver = ((soc_ver & 0x00000f00) >> 0x04) | (soc_ver & 0x0000000f);
+
+	if (soc_type == QCA_WCN6750)
+		qca_send_patch_config_cmd(hdev);
 
 	/* Download rampatch file */
 	config.type = TLV_TYPE_PATCH;
