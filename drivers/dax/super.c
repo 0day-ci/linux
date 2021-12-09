@@ -107,8 +107,6 @@ enum dax_device_flags {
 	DAXDEV_SYNC,
 	/* do not use uncached operations to write data */
 	DAXDEV_CACHED,
-	/* do not use mcsafe operations to read data */
-	DAXDEV_NOMCSAFE,
 };
 
 /**
@@ -171,8 +169,6 @@ size_t dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 	 * via access_ok() in vfs_red, so use the 'no check' version to bypass
 	 * the HARDENED_USERCOPY overhead.
 	 */
-	if (test_bit(DAXDEV_NOMCSAFE, &dax_dev->flags))
-		return _copy_to_iter(addr, bytes, i);
 	return _copy_mc_to_iter(addr, bytes, i);
 }
 
@@ -241,12 +237,6 @@ void set_dax_cached(struct dax_device *dax_dev)
 	set_bit(DAXDEV_CACHED, &dax_dev->flags);
 }
 EXPORT_SYMBOL_GPL(set_dax_cached);
-
-void set_dax_nomcsafe(struct dax_device *dax_dev)
-{
-	set_bit(DAXDEV_NOMCSAFE, &dax_dev->flags);
-}
-EXPORT_SYMBOL_GPL(set_dax_nomcsafe);
 
 bool dax_alive(struct dax_device *dax_dev)
 {

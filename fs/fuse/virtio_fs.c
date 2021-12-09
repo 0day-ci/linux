@@ -838,7 +838,6 @@ static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
 	if (IS_ERR(fs->dax_dev))
 		return PTR_ERR(fs->dax_dev);
 	set_dax_cached(fs->dax_dev);
-	set_dax_nomcsafe(fs->dax_dev);
 	return devm_add_action_or_reset(&vdev->dev, virtio_fs_cleanup_dax,
 					fs->dax_dev);
 }
