@@ -9326,6 +9326,8 @@ void __init sched_init(void)
 #endif
 	if (ptr) {
 		ptr = (unsigned long)kzalloc(ptr, GFP_NOWAIT);
+		if (!ptr)
+			return;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.se = (struct sched_entity **)ptr;
