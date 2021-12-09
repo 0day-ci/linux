@@ -267,6 +267,12 @@ static void micron_st_default_init(struct spi_nor *nor)
 	nor->flags &= ~SNOR_F_HAS_16BIT_SR;
 	nor->params->quad_enable = NULL;
 	nor->params->set_4byte_addr_mode = st_micron_set_4byte_addr_mode;
+
+	/*
+	 * mt25qu doesn't support all possible write protocols for erase, only
+	 * 1-1-0, 2-2-0, 4-4-0.
+	 */
+	nor->erase_proto = SNOR_PROTO_1_1_1;
 }
 
 static const struct spi_nor_fixups micron_st_fixups = {
