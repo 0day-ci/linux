@@ -151,6 +151,7 @@ config CLK_R8A77995
 config CLK_R8A779A0
 	bool "R-Car V3U clock support" if COMPILE_TEST
 	select CLK_RCAR_CPG_LIB
+	select CLK_RCAR_GEN4_CPG
 	select CLK_RENESAS_CPG_MSSR
 
 config CLK_R8A779F0
