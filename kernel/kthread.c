@@ -101,6 +101,8 @@ void set_kthread_struct(struct task_struct *p)
 		return;
 
 	kthread = kzalloc(sizeof(*kthread), GFP_KERNEL);
+	if (!kthread)
+		return;
 	/*
 	 * We abuse ->set_child_tid to avoid the new member and because it
 	 * can't be wrongly copied by copy_process(). We also rely on fact
