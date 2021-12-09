@@ -81,6 +81,33 @@ struct uvcg_format *find_format_by_index(struct uvc_device *uvc, int index)
 	return uformat;
 }
 
+int find_format_index(struct uvc_device *uvc, struct uvcg_format *uformat)
+{
+	struct uvcg_format_ptr *format;
+	int i = 1;
+
+	list_for_each_entry(format, &uvc->header->formats, entry) {
+		if (uformat == format->fmt)
+			return i;
+		i++;
+	}
+
+	return 0;
+}
+
+int find_ival_index(struct uvcg_frame *uframe, int dwFrameInterval)
+{
+	int i;
+
+	for (i = 0; i < uframe->frame.b_frame_interval_type; i++) {
+		if (dwFrameInterval == uframe->dw_frame_interval[i])
+			return i + 1;
+	}
+
+	/* fallback */
+	return 1;
+}
+
 struct uvcg_frame *find_frame_by_index(struct uvc_device *uvc,
 				       struct uvcg_format *uformat,
 				       int index)
@@ -169,8 +196,7 @@ static struct uvcg_frame *find_closest_frame_by_size(struct uvc_device *uvc,
  * Requests handling
  */
 
-static int
-uvc_send_response(struct uvc_device *uvc, struct uvc_request_data *data)
+int uvc_send_response(struct uvc_device *uvc, struct uvc_request_data *data)
 {
 	struct usb_composite_dev *cdev = uvc->func.config->cdev;
 	struct usb_request *req = uvc->control_req;
@@ -212,6 +238,8 @@ uvc_v4l2_get_format(struct file *file, void *fh, struct v4l2_format *fmt)
 	struct uvc_video *video = &uvc->video;
 	struct uvc_format_desc *fmtdesc;
 
+	spin_lock(&video->frame_lock);
+
 	fmtdesc = to_uvc_format(video->cur_format);
 
 	fmt->fmt.pix.pixelformat = fmtdesc->fcc;
@@ -225,6 +253,8 @@ uvc_v4l2_get_format(struct file *file, void *fh, struct v4l2_format *fmt)
 	fmt->fmt.pix.colorspace = V4L2_COLORSPACE_SRGB;
 	fmt->fmt.pix.priv = 0;
 
+	spin_unlock(&video->frame_lock);
+
 	return 0;
 }
 
@@ -236,6 +266,7 @@ uvc_v4l2_try_set_fmt(struct file *file, void *fh, struct v4l2_format *fmt)
 	struct uvc_video *video = &uvc->video;
 	struct uvcg_format *uformat;
 	struct uvcg_frame *uframe;
+	int iformat;
 	u8 *fcc;
 
 	if (fmt->type != video->queue.queue.type)
@@ -249,6 +280,10 @@ uvc_v4l2_try_set_fmt(struct file *file, void *fh, struct v4l2_format *fmt)
 
 	uformat = find_format_by_pix(uvc, fmt->fmt.pix.pixelformat);
 	if (!uformat)
+		return -EINVAL;
+
+	iformat = find_format_index(uvc, uformat);
+	if (!iformat)
 		return -EINVAL;
 
 	uframe = find_closest_frame_by_size(uvc, uformat,
@@ -297,8 +332,12 @@ uvc_v4l2_enum_frameintervals(struct file *file, void *fh,
 		if (fival->index >= 1)
 			return -EINVAL;
 
+		spin_lock(&video->frame_lock);
+
 		fival->discrete.numerator =
 			uframe->dw_frame_interval[video->cur_ival - 1];
+
+		spin_unlock(&video->frame_lock);
 	} else {
 		if (fival->index >= uframe->frame.b_frame_interval_type)
 			return -EINVAL;
@@ -330,8 +369,12 @@ uvc_v4l2_enum_framesizes(struct file *file, void *fh,
 		if (fsize->index >= 1)
 			return -EINVAL;
 
+		spin_lock(&video->frame_lock);
+
 		uformat = video->cur_format;
 		uframe = video->cur_frame;
+
+		spin_unlock(&video->frame_lock);
 	} else {
 		uformat = find_format_by_pix(uvc, fsize->pixel_format);
 		if (!uformat)
@@ -365,7 +408,11 @@ uvc_v4l2_enum_fmt(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 		if (f->index >= 1)
 			return -EINVAL;
 
+		spin_lock(&video->frame_lock);
+
 		uformat = video->cur_format;
+
+		spin_unlock(&video->frame_lock);
 	} else {
 		if (f->index >= uvc->header->num_fmt)
 			return -EINVAL;
@@ -489,14 +536,20 @@ uvc_v4l2_subscribe_event(struct v4l2_fh *fh,
 	if (sub->type < UVC_EVENT_FIRST || sub->type > UVC_EVENT_LAST)
 		return -EINVAL;
 
-	if (sub->type == UVC_EVENT_SETUP && uvc->func_connected)
+	if (sub->type == UVC_EVENT_STREAMON && uvc->func_connected)
 		return -EBUSY;
 
 	ret = v4l2_event_subscribe(fh, sub, 2, NULL);
 	if (ret < 0)
 		return ret;
 
-	if (sub->type == UVC_EVENT_SETUP) {
+	if (sub->type == UVC_EVENT_SETUP)
+		uvc->setup_subscribed = true;
+
+	if (sub->type == UVC_EVENT_DATA)
+		uvc->data_subscribed = true;
+
+	if (sub->type == UVC_EVENT_STREAMON) {
 		uvc->func_connected = true;
 		handle->is_uvc_app_handle = true;
 		uvc_function_connect(uvc);
@@ -525,7 +578,10 @@ uvc_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 	if (ret < 0)
 		return ret;
 
-	if (sub->type == UVC_EVENT_SETUP && handle->is_uvc_app_handle) {
+	if (sub->type == UVC_EVENT_SETUP)
+		uvc->setup_subscribed = false;
+
+	if (sub->type == UVC_EVENT_STREAMON && handle->is_uvc_app_handle) {
 		uvc_v4l2_disable(uvc);
 		handle->is_uvc_app_handle = false;
 	}
