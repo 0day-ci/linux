@@ -728,8 +728,10 @@ csio_wr_eq_destroy(struct csio_hw *hw, void *priv, int eq_idx,
 		return rv;
 	}
 
-	if (cbfn != NULL)
+	if (cbfn != NULL) {
+		mempool_free(mbp, hw->mb_mempool);
 		return 0;
+	}
 
 	return csio_wr_eq_destroy_rsp(hw, mbp, eq_idx);
 }
