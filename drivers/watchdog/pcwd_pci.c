@@ -215,10 +215,7 @@ static inline void pcipcwd_check_temperature_support(void)
 
 static int pcipcwd_get_option_switches(void)
 {
-	int option_switches;
-
-	option_switches = inb_p(pcipcwd_private.io_addr + 3);
-	return option_switches;
+	return inb_p(pcipcwd_private.io_addr + 3);
 }
 
 static void pcipcwd_show_card_info(void)
