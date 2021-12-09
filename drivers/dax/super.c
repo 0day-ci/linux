@@ -105,6 +105,10 @@ enum dax_device_flags {
 	DAXDEV_WRITE_CACHE,
 	/* flag to check if device supports synchronous flush */
 	DAXDEV_SYNC,
+	/* do not use uncached operations to write data */
+	DAXDEV_CACHED,
+	/* do not use mcsafe operations to read data */
+	DAXDEV_NOMCSAFE,
 };
 
 /**
@@ -146,9 +150,15 @@ size_t dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 	if (!dax_alive(dax_dev))
 		return 0;
 
-	return dax_dev->ops->copy_from_iter(dax_dev, pgoff, addr, bytes, i);
+	/*
+	 * The userspace address for the memory copy has already been validated
+	 * via access_ok() in vfs_write, so use the 'no check' version to bypass
+	 * the HARDENED_USERCOPY overhead.
+	 */
+	if (test_bit(DAXDEV_CACHED, &dax_dev->flags))
+		return _copy_from_iter(addr, bytes, i);
+	return _copy_from_iter_flushcache(addr, bytes, i);
 }
-EXPORT_SYMBOL_GPL(dax_copy_from_iter);
 
 size_t dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 		size_t bytes, struct iov_iter *i)
@@ -156,9 +166,15 @@ size_t dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 	if (!dax_alive(dax_dev))
 		return 0;
 
-	return dax_dev->ops->copy_to_iter(dax_dev, pgoff, addr, bytes, i);
+	/*
+	 * The userspace address for the memory copy has already been validated
+	 * via access_ok() in vfs_red, so use the 'no check' version to bypass
+	 * the HARDENED_USERCOPY overhead.
+	 */
+	if (test_bit(DAXDEV_NOMCSAFE, &dax_dev->flags))
+		return _copy_to_iter(addr, bytes, i);
+	return _copy_mc_to_iter(addr, bytes, i);
 }
-EXPORT_SYMBOL_GPL(dax_copy_to_iter);
 
 int dax_zero_page_range(struct dax_device *dax_dev, pgoff_t pgoff,
 			size_t nr_pages)
@@ -219,6 +235,18 @@ void set_dax_synchronous(struct dax_device *dax_dev)
 	set_bit(DAXDEV_SYNC, &dax_dev->flags);
 }
 EXPORT_SYMBOL_GPL(set_dax_synchronous);
+
+void set_dax_cached(struct dax_device *dax_dev)
+{
+	set_bit(DAXDEV_CACHED, &dax_dev->flags);
+}
+EXPORT_SYMBOL_GPL(set_dax_cached);
+
+void set_dax_nomcsafe(struct dax_device *dax_dev)
+{
+	set_bit(DAXDEV_NOMCSAFE, &dax_dev->flags);
+}
+EXPORT_SYMBOL_GPL(set_dax_nomcsafe);
 
 bool dax_alive(struct dax_device *dax_dev)
 {
