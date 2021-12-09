@@ -356,6 +356,7 @@ static sector_t raid0_size(struct mddev *mddev, sector_t sectors, int raid_disks
 	return array_sectors;
 }
 
+static void free_conf(struct r0conf *conf);
 static void raid0_free(struct mddev *mddev, void *priv);
 
 static int raid0_run(struct mddev *mddev)
@@ -413,17 +414,28 @@ static int raid0_run(struct mddev *mddev)
 	dump_zones(mddev);
 
 	ret = md_integrity_register(mddev);
+	if (ret)
+		goto free;
 
 	return ret;
+
+free:
+	free_conf(conf);
+	return ret;
+}
+
+static void free_conf(struct r0conf *conf)
+{
+	kfree(conf->strip_zone);
+	kfree(conf->devlist);
+	kfree(conf);
 }
 
 static void raid0_free(struct mddev *mddev, void *priv)
 {
 	struct r0conf *conf = priv;
 
-	kfree(conf->strip_zone);
-	kfree(conf->devlist);
-	kfree(conf);
+	free_conf(conf);
 }
 
 static void raid0_handle_discard(struct mddev *mddev, struct bio *bio)
