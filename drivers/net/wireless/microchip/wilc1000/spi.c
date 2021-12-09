@@ -12,6 +12,8 @@
 #include "netdev.h"
 #include "cfg80211.h"
 
+#define SPI_MODALIAS		"wilc1000_spi"
+
 static bool enable_crc7;	/* protect SPI commands with CRC7 */
 module_param(enable_crc7, bool, 0644);
 MODULE_PARM_DESC(enable_crc7,
@@ -205,7 +207,7 @@ MODULE_DEVICE_TABLE(of, wilc_of_match);
 
 static struct spi_driver wilc_spi_driver = {
 	.driver = {
-		.name = MODALIAS,
+		.name = SPI_MODALIAS,
 		.of_match_table = wilc_of_match,
 	},
 	.probe =  wilc_bus_probe,
