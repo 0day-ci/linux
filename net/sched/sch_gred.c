@@ -702,6 +702,8 @@ static int gred_change(struct Qdisc *sch, struct nlattr *opt,
 	}
 
 	prealloc = kzalloc(sizeof(*prealloc), GFP_KERNEL);
+	if (!prealloc)
+		return -ENOMEM;
 	sch_tree_lock(sch);
 
 	err = gred_change_vq(sch, ctl->DP, ctl, prio, stab, max_P, &prealloc,
