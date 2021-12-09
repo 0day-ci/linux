@@ -88,11 +88,10 @@ struct uvc_video {
 	struct work_struct pump;
 
 	/* Frame parameters */
-	u8 bpp;
-	u32 fcc;
-	unsigned int width;
-	unsigned int height;
-	unsigned int imagesize;
+	struct uvcg_format *cur_format;
+	struct uvcg_frame *cur_frame;
+	unsigned int cur_ival;
+
 	struct mutex mutex;	/* protects frame parameters */
 
 	unsigned int uvc_num_requests;
@@ -130,6 +129,8 @@ struct uvc_device {
 	struct uvc_video video;
 	bool func_connected;
 
+	struct uvcg_streaming_header *header;
+
 	/* Descriptors */
 	struct {
 		const struct uvc_descriptor_header * const *fs_control;
@@ -138,6 +139,8 @@ struct uvc_device {
 		const struct uvc_descriptor_header * const *hs_streaming;
 		const struct uvc_descriptor_header * const *ss_streaming;
 	} desc;
+
+	bool streamon;
 
 	unsigned int control_intf;
 	struct usb_ep *control_ep;
@@ -174,5 +177,11 @@ extern void uvc_endpoint_stream(struct uvc_device *dev);
 
 extern void uvc_function_connect(struct uvc_device *uvc);
 extern void uvc_function_disconnect(struct uvc_device *uvc);
+
+extern struct uvcg_format *find_format_by_index(struct uvc_device *uvc,
+						int index);
+extern struct uvcg_frame *find_frame_by_index(struct uvc_device *uvc,
+					      struct uvcg_format *uformat,
+					      int index);
 
 #endif /* _UVC_GADGET_H_ */
