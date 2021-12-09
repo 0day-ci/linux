@@ -6237,14 +6237,12 @@ AscMsgOutSDTR(ASC_DVC_VAR *asc_dvc, uchar sdtr_period, uchar sdtr_offset)
 static uchar
 AscCalSDTRData(ASC_DVC_VAR *asc_dvc, uchar sdtr_period, uchar syn_offset)
 {
-	uchar byte;
 	uchar sdtr_period_ix;
 
 	sdtr_period_ix = AscGetSynPeriodIndex(asc_dvc, sdtr_period);
 	if (sdtr_period_ix > asc_dvc->max_sdtr_index)
 		return 0xFF;
-	byte = (sdtr_period_ix << 4) | (syn_offset & ASC_SYN_MAX_OFFSET);
-	return byte;
+	return (sdtr_period_ix << 4) | (syn_offset & ASC_SYN_MAX_OFFSET);
 }
 
 static bool AscSetChipSynRegAtID(PortAddr iop_base, uchar id, uchar sdtr_data)
