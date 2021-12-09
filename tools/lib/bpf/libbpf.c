@@ -7884,6 +7884,10 @@ int bpf_object__pin_maps(struct bpf_object *obj, const char *path)
 		char *pin_path = NULL;
 		char buf[PATH_MAX];
 
+		if (bpf_map__is_internal(map) &&
+		    !kernel_supports(obj, FEAT_GLOBAL_DATA))
+			continue;
+
 		if (path) {
 			int len;
 
