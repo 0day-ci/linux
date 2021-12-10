@@ -321,7 +321,10 @@ static inline const char *btf_name_by_offset(const struct btf *btf,
 #endif
 
 enum kfunc_btf_id_set_types {
-	BTF_SET_CHECK,
+	BTF_SET_CHECK,    /* Allowed kfunc set */
+	BTF_SET_ACQUIRE,  /* Acquire kfunc set */
+	BTF_SET_RELEASE,  /* Release kfunc set */
+	BTF_SET_RET_NULL, /* kfunc with 'return type PTR_TO_BTF_ID_OR_NULL' set */
 	__BTF_SET_MAX,
 };
 
@@ -331,6 +334,9 @@ struct kfunc_btf_id_set {
 		struct btf_id_set *sets[__BTF_SET_MAX];
 		struct {
 			struct btf_id_set *set;
+			struct btf_id_set *acq_set;
+			struct btf_id_set *rel_set;
+			struct btf_id_set *null_set;
 		};
 	};
 	struct module *owner;
@@ -345,6 +351,12 @@ void unregister_kfunc_btf_id_set(struct kfunc_btf_id_list *l,
 				 struct kfunc_btf_id_set *s);
 bool bpf_check_mod_kfunc_call(struct kfunc_btf_id_list *klist, u32 kfunc_id,
 			      struct module *owner);
+bool bpf_is_mod_acquire_kfunc(struct kfunc_btf_id_list *klist, u32 kfunc_id,
+			      struct module *owner);
+bool bpf_is_mod_release_kfunc(struct kfunc_btf_id_list *klist, u32 kfunc_id,
+			      struct module *owner);
+bool bpf_is_mod_kfunc_ret_type_null(struct kfunc_btf_id_list *klist,
+				    u32 kfunc_id, struct module *owner);
 #else
 static inline void register_kfunc_btf_id_set(struct kfunc_btf_id_list *l,
 					     struct kfunc_btf_id_set *s)
@@ -359,9 +371,26 @@ static inline bool bpf_check_mod_kfunc_call(struct kfunc_btf_id_list *klist,
 {
 	return false;
 }
+static inline bool bpf_is_mod_acquire_kfunc(struct kfunc_btf_id_list *klist,
+					    u32 kfunc_id, struct module *owner)
+{
+	return false;
+}
+static inline bool bpf_is_mod_release_kfunc(struct kfunc_btf_id_list *klist,
+					    u32 kfunc_id, struct module *owner)
+{
+	return false;
+}
+static inline bool
+bpf_is_mod_kfunc_ret_type_null(struct kfunc_btf_id_list *klist, u32 kfunc_id,
+			       struct module *owner)
+{
+	return false;
+}
 #endif
 
 extern struct kfunc_btf_id_list bpf_tcp_ca_kfunc_list;
 extern struct kfunc_btf_id_list prog_test_kfunc_list;
+extern struct kfunc_btf_id_list xdp_kfunc_list;
 
 #endif
