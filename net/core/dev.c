@@ -3719,8 +3719,16 @@ no_lock_out:
 	 * separate lock before trying to get qdisc main lock.
 	 * This permits qdisc->running owner to get the lock more
 	 * often and dequeue packets faster.
+	 * On PREEMPT_RT it is possible to preempt the qdisc owner during xmit
+	 * and then other tasks will only enqueue packets. The packets will be
+	 * sent after the qdisc owner is scheduled again. To prevent this
+	 * scenario the task always serialize on the lock.
 	 */
-	contended = qdisc_is_running(q);
+	if (!IS_ENABLED(CONFIG_PREEMPT_RT))
+		contended = qdisc_is_running(q);
+	else
+		contended = true;
+
 	if (unlikely(contended))
 		spin_lock(&q->busylock);
 
