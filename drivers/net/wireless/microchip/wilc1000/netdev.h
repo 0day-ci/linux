@@ -125,6 +125,7 @@ struct wilc_priv {
 	u64 tx_cookie;
 
 	bool cfg_scanning;
+	bool power_save_mode;
 
 	u8 associated_bss[ETH_ALEN];
 	struct sta_info assoc_stainfo;
