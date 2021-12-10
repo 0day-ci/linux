@@ -5,11 +5,33 @@
 #include "kfunc_call_test.lskel.h"
 #include "kfunc_call_test_subprog.skel.h"
 #include "kfunc_call_test_subprog.lskel.h"
+#include "kfunc_call_test_fail1.skel.h"
+#include "kfunc_call_test_fail2.skel.h"
+#include "kfunc_call_test_fail3.skel.h"
+#include "kfunc_call_test_fail4.skel.h"
+#include "kfunc_call_test_fail5.skel.h"
+#include "kfunc_call_test_fail6.skel.h"
+#include "kfunc_call_test_fail7.skel.h"
+#include "kfunc_call_test_fail8.skel.h"
 
 static void test_main(void)
 {
 	struct kfunc_call_test_lskel *skel;
 	int prog_fd, retval, err;
+	void *fskel;
+
+#define FAIL(nr)                                                               \
+	({                                                                     \
+		fskel = kfunc_call_test_fail##nr##__open_and_load();           \
+		if (!ASSERT_EQ(fskel, NULL,                                    \
+			       "kfunc_call_test_fail" #nr                      \
+			       "__open_and_load")) {                           \
+			kfunc_call_test_fail##nr##__destroy(fskel);            \
+			return;                                                \
+		}                                                              \
+	})
+
+	FAIL(1); FAIL(2); FAIL(3); FAIL(4); FAIL(5); FAIL(6); FAIL(7); FAIL(8);
 
 	skel = kfunc_call_test_lskel__open_and_load();
 	if (!ASSERT_OK_PTR(skel, "skel"))
@@ -26,6 +48,12 @@ static void test_main(void)
 				NULL, NULL, (__u32 *)&retval, NULL);
 	ASSERT_OK(err, "bpf_prog_test_run(test2)");
 	ASSERT_EQ(retval, 3, "test2-retval");
+
+	prog_fd = skel->progs.kfunc_call_test_ref_btf_id.prog_fd;
+	err = bpf_prog_test_run(prog_fd, 1, &pkt_v4, sizeof(pkt_v4),
+				NULL, NULL, (__u32 *)&retval, NULL);
+	ASSERT_OK(err, "bpf_prog_test_run(test_ref_btf_id)");
+	ASSERT_EQ(retval, 0, "test_ref_btf_id-retval");
 
 	kfunc_call_test_lskel__destroy(skel);
 }
