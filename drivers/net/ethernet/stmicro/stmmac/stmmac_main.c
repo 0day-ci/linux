@@ -2473,13 +2473,16 @@ static bool stmmac_xdp_xmit_zc(struct stmmac_priv *priv, u32 queue, u32 budget)
  * @queue: TX queue index
  * Description: it reclaims the transmit resources after transmission completes.
  */
-static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue)
+static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue, bool is_threaded)
 {
 	struct stmmac_tx_queue *tx_q = &priv->tx_queue[queue];
 	unsigned int bytes_compl = 0, pkts_compl = 0;
 	unsigned int entry, xmits = 0, count = 0;
 
-	__netif_tx_lock_bh(netdev_get_tx_queue(priv->dev, queue));
+	if (is_threaded)
+		__netif_tx_lock(netdev_get_tx_queue(priv->dev, queue), smp_processor_id());
+	else
+		__netif_tx_lock_bh(netdev_get_tx_queue(priv->dev, queue));
 
 	priv->xstats.tx_clean++;
 
@@ -2638,7 +2641,10 @@ static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue)
 			      STMMAC_COAL_TIMER(priv->tx_coal_timer[queue]),
 			      HRTIMER_MODE_REL);
 
-	__netif_tx_unlock_bh(netdev_get_tx_queue(priv->dev, queue));
+	if (is_threaded)
+		__netif_tx_unlock(netdev_get_tx_queue(priv->dev, queue));
+	else
+		__netif_tx_unlock_bh(netdev_get_tx_queue(priv->dev, queue));
 
 	/* Combine decisions from TX clean and XSK TX */
 	return max(count, xmits);
@@ -5369,7 +5375,7 @@ static int stmmac_napi_poll_tx(struct napi_struct *napi, int budget)
 
 	priv->xstats.napi_poll++;
 
-	work_done = stmmac_tx_clean(priv, budget, chan);
+	work_done = stmmac_tx_clean(priv, budget, chan, !!napi->thread);
 	work_done = min(work_done, budget);
 
 	if (work_done < budget && napi_complete_done(napi, work_done)) {
@@ -5393,7 +5399,7 @@ static int stmmac_napi_poll_rxtx(struct napi_struct *napi, int budget)
 
 	priv->xstats.napi_poll++;
 
-	tx_done = stmmac_tx_clean(priv, budget, chan);
+	tx_done = stmmac_tx_clean(priv, budget, chan, !!napi->thread);
 	tx_done = min(tx_done, budget);
 
 	rx_done = stmmac_rx_zc(priv, budget, chan);
