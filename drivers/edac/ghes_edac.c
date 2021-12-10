@@ -235,6 +235,31 @@ static void ghes_scan_system(void)
 	system_scanned = true;
 }
 
+static int ghes_edac_mem_err_other_detail(const struct cper_sec_mem_err *mem,
+				char *msg, const char *location)
+{
+	u32 len, n;
+
+	if (!msg)
+		return 0;
+
+	n = 0;
+	len = 2 * CPER_REC_LEN - 1;
+
+	n += snprintf(msg + n, len - n, "APEI location: %s ", location);
+
+	if (mem->validation_bits & CPER_MEM_VALID_ERROR_STATUS) {
+		u64 status = mem->error_status;
+
+		n += snprintf(msg + n, len - n,  "status(0x%016llx): ",
+				(long long)status);
+		n += snprintf(msg + n, len - n, "%s ", cper_mem_err_status_str(status));
+	}
+
+	msg[n] = '\0';
+	return n;
+}
+
 void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 {
 	struct edac_raw_error_desc *e;
@@ -335,69 +360,7 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 
 	/* All other fields are mapped on e->other_detail */
 	p = pvt->other_detail;
-	p += snprintf(p, sizeof(pvt->other_detail),
-		"APEI location: %s ", e->location);
-	if (mem_err->validation_bits & CPER_MEM_VALID_ERROR_STATUS) {
-		u64 status = mem_err->error_status;
-
-		p += sprintf(p, "status(0x%016llx):", (long long)status);
-		switch ((status >> 8) & 0xff) {
-		case 1:
-			p += sprintf(p, "Error detected internal to the component ");
-			break;
-		case 16:
-			p += sprintf(p, "Error detected in the bus ");
-			break;
-		case 4:
-			p += sprintf(p, "Storage error in DRAM memory ");
-			break;
-		case 5:
-			p += sprintf(p, "Storage error in TLB ");
-			break;
-		case 6:
-			p += sprintf(p, "Storage error in cache ");
-			break;
-		case 7:
-			p += sprintf(p, "Error in one or more functional units ");
-			break;
-		case 8:
-			p += sprintf(p, "component failed self test ");
-			break;
-		case 9:
-			p += sprintf(p, "Overflow or undervalue of internal queue ");
-			break;
-		case 17:
-			p += sprintf(p, "Virtual address not found on IO-TLB or IO-PDIR ");
-			break;
-		case 18:
-			p += sprintf(p, "Improper access error ");
-			break;
-		case 19:
-			p += sprintf(p, "Access to a memory address which is not mapped to any component ");
-			break;
-		case 20:
-			p += sprintf(p, "Loss of Lockstep ");
-			break;
-		case 21:
-			p += sprintf(p, "Response not associated with a request ");
-			break;
-		case 22:
-			p += sprintf(p, "Bus parity error - must also set the A, C, or D Bits ");
-			break;
-		case 23:
-			p += sprintf(p, "Detection of a PATH_ERROR ");
-			break;
-		case 25:
-			p += sprintf(p, "Bus operation timeout ");
-			break;
-		case 26:
-			p += sprintf(p, "A read was issued to data that has been poisoned ");
-			break;
-		default:
-			p += sprintf(p, "reserved ");
-			break;
-		}
-	}
+	p += ghes_edac_mem_err_other_detail(mem_err, p, e->location);
 
 	if (p > pvt->other_detail)
 		*(p - 1) = '\0';
