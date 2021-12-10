@@ -342,7 +342,6 @@ create_s32_tzp_attr(k_po);
 create_s32_tzp_attr(k_pu);
 create_s32_tzp_attr(k_i);
 create_s32_tzp_attr(k_d);
-create_s32_tzp_attr(ziegler_nichols);
 create_s32_tzp_attr(integral_cutoff);
 create_s32_tzp_attr(slope);
 create_s32_tzp_attr(offset);
@@ -376,7 +375,6 @@ static struct attribute *thermal_zone_dev_attrs[] = {
 	&dev_attr_k_pu.attr,
 	&dev_attr_k_i.attr,
 	&dev_attr_k_d.attr,
-	&dev_attr_ziegler_nichols.attr,
 	&dev_attr_integral_cutoff.attr,
 	&dev_attr_slope.attr,
 	&dev_attr_offset.attr,
