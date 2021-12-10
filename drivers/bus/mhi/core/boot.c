@@ -18,6 +18,17 @@
 #include <linux/wait.h>
 #include "internal.h"
 
+struct mhi_fw_load_callback_ctx {
+	const char *fw_name;
+	struct mhi_controller *mhi_cntrl;
+};
+
+enum mhi_fw_load_status {
+	MHI_FW_LOAD_READY_STATE,
+	MHI_FW_ERROR_READY_STATE,
+	MHI_FW_ERROR_FW_LOAD,
+};
+
 /* Setup RDDM vector table for RDDM transfer and program RXVEC */
 void mhi_rddm_prepare(struct mhi_controller *mhi_cntrl,
 		      struct image_info *img_info)
@@ -386,14 +397,115 @@ static void mhi_firmware_copy(struct mhi_controller *mhi_cntrl,
 	}
 }
 
-void mhi_fw_load_handler(struct mhi_controller *mhi_cntrl)
+static void mhi_fw_load_finish(struct mhi_controller *mhi_cntrl, enum mhi_fw_load_status status)
 {
-	const struct firmware *firmware = NULL;
 	struct device *dev = &mhi_cntrl->mhi_dev->dev;
-	const char *fw_name;
-	void *buf;
+	int ret;
+
+	switch (status) {
+	case MHI_FW_LOAD_READY_STATE:
+		break;
+	case MHI_FW_ERROR_READY_STATE:
+		goto error_ready_state;
+	case MHI_FW_ERROR_FW_LOAD:
+		goto error_fw_load;
+	}
+
+	/* Transitioning into MHI RESET->READY state */
+	ret = mhi_ready_state_transition(mhi_cntrl);
+	if (ret) {
+		dev_err(dev, "MHI did not enter READY state\n");
+		goto error_ready_state;
+	}
+
+	dev_info(dev, "Wait for device to enter SBL or Mission mode\n");
+	return;
+
+error_ready_state:
+	if (mhi_cntrl->fbc_download) {
+		mhi_free_bhie_table(mhi_cntrl, mhi_cntrl->fbc_image);
+		mhi_cntrl->fbc_image = NULL;
+	}
+
+error_fw_load:
+	mhi_cntrl->pm_state = MHI_PM_FW_DL_ERR;
+	wake_up_all(&mhi_cntrl->state_event);
+}
+
+static void mhi_fw_load_callback(const struct firmware *firmware, void *context)
+{
+	struct mhi_fw_load_callback_ctx *ctx = context;
+	const char *fw_name = ctx->fw_name;
+	struct mhi_controller *mhi_cntrl = ctx->mhi_cntrl;
+	struct device *dev = &mhi_cntrl->mhi_dev->dev;
 	dma_addr_t dma_addr;
 	size_t size;
+	void *buf;
+	int ret;
+
+	kfree(context);
+
+	size = (mhi_cntrl->fbc_download) ? mhi_cntrl->sbl_size : firmware->size;
+
+	/* SBL size provided is maximum size, not necessarily the image size */
+	if (size > firmware->size)
+		size = firmware->size;
+
+	buf = dma_alloc_coherent(mhi_cntrl->cntrl_dev, size, &dma_addr,
+				 GFP_KERNEL);
+	if (!buf) {
+		release_firmware(firmware);
+		mhi_fw_load_finish(mhi_cntrl, MHI_FW_ERROR_FW_LOAD);
+	}
+
+	/* Download image using BHI */
+	memcpy(buf, firmware->data, size);
+	ret = mhi_fw_load_bhi(mhi_cntrl, dma_addr, size);
+	dma_free_coherent(mhi_cntrl->cntrl_dev, size, buf, dma_addr);
+
+	/* Error or in EDL mode, we're done */
+	if (ret) {
+		dev_err(dev, "MHI did not load image over BHI, ret: %d\n", ret);
+		release_firmware(firmware);
+		mhi_fw_load_finish(mhi_cntrl, MHI_FW_ERROR_FW_LOAD);
+	}
+
+	/* Wait for ready since EDL image was loaded */
+	if (fw_name == mhi_cntrl->edl_image) {
+		release_firmware(firmware);
+		mhi_fw_load_finish(mhi_cntrl, MHI_FW_LOAD_READY_STATE);
+	}
+
+	write_lock_irq(&mhi_cntrl->pm_lock);
+	mhi_cntrl->dev_state = MHI_STATE_RESET;
+	write_unlock_irq(&mhi_cntrl->pm_lock);
+
+	/*
+	 * If we're doing fbc, populate vector tables while
+	 * device transitioning into MHI READY state
+	 */
+	if (mhi_cntrl->fbc_download) {
+		ret = mhi_alloc_bhie_table(mhi_cntrl, &mhi_cntrl->fbc_image,
+					   firmware->size);
+		if (ret) {
+			release_firmware(firmware);
+			mhi_fw_load_finish(mhi_cntrl, MHI_FW_ERROR_FW_LOAD);
+		}
+
+		/* Load the firmware into BHIE vec table */
+		mhi_firmware_copy(mhi_cntrl, firmware, mhi_cntrl->fbc_image);
+	}
+
+	release_firmware(firmware);
+
+	mhi_fw_load_finish(mhi_cntrl, MHI_FW_LOAD_READY_STATE);
+}
+
+void mhi_fw_load_handler(struct mhi_controller *mhi_cntrl)
+{
+	struct device *dev = &mhi_cntrl->mhi_dev->dev;
+	struct mhi_fw_load_callback_ctx *cb_ctx;
+	const char *fw_name;
 	int i, ret;
 
 	if (MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state)) {
@@ -418,7 +530,7 @@ void mhi_fw_load_handler(struct mhi_controller *mhi_cntrl)
 
 	/* wait for ready on pass through or any other execution environment */
 	if (!MHI_FW_LOAD_CAPABLE(mhi_cntrl->ee))
-		goto fw_load_ready_state;
+		mhi_fw_load_finish(mhi_cntrl, MHI_FW_LOAD_READY_STATE);
 
 	fw_name = (mhi_cntrl->ee == MHI_EE_EDL) ?
 		mhi_cntrl->edl_image : mhi_cntrl->fw_image;
@@ -427,88 +539,19 @@ void mhi_fw_load_handler(struct mhi_controller *mhi_cntrl)
 						     !mhi_cntrl->seg_len))) {
 		dev_err(dev,
 			"No firmware image defined or !sbl_size || !seg_len\n");
-		goto error_fw_load;
+		mhi_fw_load_finish(mhi_cntrl, MHI_FW_ERROR_FW_LOAD);
 	}
 
-	ret = request_firmware(&firmware, fw_name, dev);
+	cb_ctx = kzalloc(sizeof(*cb_ctx), GFP_KERNEL);
+	if (!cb_ctx)
+		return;
+
+	ret = request_firmware_nowait(THIS_MODULE, true, fw_name, dev, GFP_KERNEL, cb_ctx,
+				      mhi_fw_load_callback);
 	if (ret) {
 		dev_err(dev, "Error loading firmware: %d\n", ret);
-		goto error_fw_load;
+		mhi_fw_load_finish(mhi_cntrl, MHI_FW_ERROR_FW_LOAD);
 	}
-
-	size = (mhi_cntrl->fbc_download) ? mhi_cntrl->sbl_size : firmware->size;
-
-	/* SBL size provided is maximum size, not necessarily the image size */
-	if (size > firmware->size)
-		size = firmware->size;
-
-	buf = dma_alloc_coherent(mhi_cntrl->cntrl_dev, size, &dma_addr,
-				 GFP_KERNEL);
-	if (!buf) {
-		release_firmware(firmware);
-		goto error_fw_load;
-	}
-
-	/* Download image using BHI */
-	memcpy(buf, firmware->data, size);
-	ret = mhi_fw_load_bhi(mhi_cntrl, dma_addr, size);
-	dma_free_coherent(mhi_cntrl->cntrl_dev, size, buf, dma_addr);
-
-	/* Error or in EDL mode, we're done */
-	if (ret) {
-		dev_err(dev, "MHI did not load image over BHI, ret: %d\n", ret);
-		release_firmware(firmware);
-		goto error_fw_load;
-	}
-
-	/* Wait for ready since EDL image was loaded */
-	if (fw_name == mhi_cntrl->edl_image) {
-		release_firmware(firmware);
-		goto fw_load_ready_state;
-	}
-
-	write_lock_irq(&mhi_cntrl->pm_lock);
-	mhi_cntrl->dev_state = MHI_STATE_RESET;
-	write_unlock_irq(&mhi_cntrl->pm_lock);
-
-	/*
-	 * If we're doing fbc, populate vector tables while
-	 * device transitioning into MHI READY state
-	 */
-	if (mhi_cntrl->fbc_download) {
-		ret = mhi_alloc_bhie_table(mhi_cntrl, &mhi_cntrl->fbc_image,
-					   firmware->size);
-		if (ret) {
-			release_firmware(firmware);
-			goto error_fw_load;
-		}
-
-		/* Load the firmware into BHIE vec table */
-		mhi_firmware_copy(mhi_cntrl, firmware, mhi_cntrl->fbc_image);
-	}
-
-	release_firmware(firmware);
-
-fw_load_ready_state:
-	/* Transitioning into MHI RESET->READY state */
-	ret = mhi_ready_state_transition(mhi_cntrl);
-	if (ret) {
-		dev_err(dev, "MHI did not enter READY state\n");
-		goto error_ready_state;
-	}
-
-	dev_info(dev, "Wait for device to enter SBL or Mission mode\n");
-	return;
-
-error_ready_state:
-	if (mhi_cntrl->fbc_download) {
-		mhi_free_bhie_table(mhi_cntrl, mhi_cntrl->fbc_image);
-		mhi_cntrl->fbc_image = NULL;
-	}
-
-error_fw_load:
-	mhi_cntrl->pm_state = MHI_PM_FW_DL_ERR;
-	wake_up_all(&mhi_cntrl->state_event);
 }
 
 int mhi_download_amss_image(struct mhi_controller *mhi_cntrl)
