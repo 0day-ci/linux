@@ -200,7 +200,10 @@ static int klp_check_stack_func(struct klp_func *func, unsigned long *entries,
 	for (i = 0; i < nr_entries; i++) {
 		address = entries[i];
 
-		if (klp_target_state == KLP_UNPATCHED) {
+		if (func->stack_only) {
+			func_addr = (unsigned long)func->old_func;
+			func_size = func->old_size;
+		} else if (klp_target_state == KLP_UNPATCHED) {
 			 /*
 			  * Check for the to-be-unpatched function
 			  * (the func itself).

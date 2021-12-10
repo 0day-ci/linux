@@ -29,6 +29,8 @@
  * @new_func:	pointer to the patched function code
  * @old_sympos: a hint indicating which symbol position the old function
  *		can be found (optional)
+ * @stack_only:	only search for the function (specified by old_name) on any
+ * 		task's stack
  * @old_func:	pointer to the function being patched
  * @kobj:	kobject for sysfs resources
  * @node:	list node for klp_object func_list
@@ -66,6 +68,7 @@ struct klp_func {
 	 * in kallsyms for the given object is used.
 	 */
 	unsigned long old_sympos;
+	bool stack_only;
 
 	/* internal */
 	void *old_func;

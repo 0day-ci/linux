@@ -89,6 +89,10 @@ static struct klp_func *klp_find_func(struct klp_object *obj,
 	struct klp_func *func;
 
 	klp_for_each_func(obj, func) {
+		/* Do not create nop klp_func for stack_only function */
+		if (func->stack_only)
+			return func;
+
 		if ((strcmp(old_func->old_name, func->old_name) == 0) &&
 		    (old_func->old_sympos == func->old_sympos)) {
 			return func;
@@ -499,6 +503,17 @@ static struct klp_func *klp_alloc_func_nop(struct klp_func *old_func,
 	return func;
 }
 
+static bool klp_is_object_stack_only(struct klp_object *old_obj)
+{
+	struct klp_func *old_func;
+
+	klp_for_each_func(old_obj, old_func)
+		if (!old_func->stack_only)
+			return false;
+
+	return true;
+}
+
 static int klp_add_object_nops(struct klp_patch *patch,
 			       struct klp_object *old_obj)
 {
@@ -508,6 +523,13 @@ static int klp_add_object_nops(struct klp_patch *patch,
 	obj = klp_find_object(patch, old_obj);
 
 	if (!obj) {
+		/*
+		 * Do not create nop klp_object for old_obj which contains
+		 * stack_only functions only.
+		 */
+		if (klp_is_object_stack_only(old_obj))
+			return 0;
+
 		obj = klp_alloc_object_dynamic(old_obj->name, patch);
 		if (!obj)
 			return -ENOMEM;
@@ -723,8 +745,9 @@ static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 	/*
 	 * NOPs get the address later. The patched module must be loaded,
 	 * see klp_init_object_loaded().
+	 * stack_only functions do not get new_func addresses at all.
 	 */
-	if (!func->new_func && !func->nop)
+	if (!func->new_func && !func->nop && !func->stack_only)
 		return -EINVAL;
 
 	if (strlen(func->old_name) >= KSYM_NAME_LEN)
@@ -803,6 +826,9 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 
 		if (func->nop)
 			func->new_func = func->old_func;
+
+		if (func->stack_only)
+			continue;
 
 		ret = kallsyms_lookup_size_offset((unsigned long)func->new_func,
 						  &func->new_size, NULL);

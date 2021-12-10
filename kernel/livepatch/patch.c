@@ -250,6 +250,9 @@ static void __klp_unpatch_object(struct klp_object *obj, bool nops_only)
 		if (nops_only && !func->nop)
 			continue;
 
+		if (func->stack_only)
+			continue;
+
 		if (func->patched)
 			klp_unpatch_func(func);
 	}
@@ -273,6 +276,9 @@ int klp_patch_object(struct klp_object *obj)
 		return -EINVAL;
 
 	klp_for_each_func(obj, func) {
+		if (func->stack_only)
+			continue;
+
 		ret = klp_patch_func(func);
 		if (ret) {
 			klp_unpatch_object(obj);
