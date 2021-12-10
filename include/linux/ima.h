@@ -212,7 +212,9 @@ static inline int ima_inode_removexattr(struct dentry *dentry,
 #endif /* CONFIG_IMA_APPRAISE */
 
 struct ima_namespace {
-	int avoid_zero_size;
+	struct rb_root ns_status_tree;
+	rwlock_t ns_status_lock;
+	struct kmem_cache *ns_status_cache;
 };
 
 extern struct ima_namespace init_ima_ns;
