@@ -220,6 +220,8 @@ Userspace to kernel:
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET``       get PHC virtual clocks info
   ``ETHTOOL_MSG_MODULE_SET``            set transceiver module parameters
   ``ETHTOOL_MSG_MODULE_GET``            get transceiver module parameters
+  ``ETHTOOL_RCLK_GET``                  get recovered clock parameters
+  ``ETHTOOL_RCLK_SET``                  set recovered clock parameters
   ===================================== =================================
 
 Kernel to userspace:
@@ -260,6 +262,8 @@ Kernel to userspace:
   ``ETHTOOL_MSG_STATS_GET_REPLY``          standard statistics
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET_REPLY``    PHC virtual clocks info
   ``ETHTOOL_MSG_MODULE_GET_REPLY``         transceiver module parameters
+  ``ETHTOOL_MSG_RCLK_GET_REPLY``           reference recovered clock config
+  ``ETHTOOL_MSG_RCLK_NTF``                 reference recovered clock config
   ======================================== =================================
 
 ``GET`` requests are sent by userspace applications to retrieve device
@@ -1598,6 +1602,62 @@ For SFF-8636 modules, low power mode is forced by the host according to table
 For CMIS modules, low power mode is forced by the host according to table 6-12
 in revision 5.0 of the specification.
 
+RCLK_GET
+========
+
+Get status of an output pin for PHY recovered frequency clock signal.
+
+Request contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_RCLK_HEADER``               nested  request header
+  ``ETHTOOL_A_RCLK_OUT_PIN_IDX``          u32     index of a pin
+  ======================================  ======  ==========================
+
+Kernel response contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_RCLK_OUT_PIN_IDX``          u32     index of a pin
+  ``ETHTOOL_A_RCLK_PIN_FLAGS``            u32     state of a pin
+  ``ETHTOOL_A_RCLK_RANGE_MIN_PIN``        u32     min index of RCLK pins
+  ``ETHTOOL_A_RCLK_RANGE_MAX_PIN``        u32     max index of RCLK pins
+  ======================================  ======  ==========================
+
+A device can support multiple recovered clock output pins. They typically are
+connected to the EEC and are used as a frequency reference.
+When a given pin on a given port is enabled, the PHY recovered frequency is
+fed onto that pin.
+Pins can be freely indexed and don't have to start with index 0.
+
+The ``ETHTOOL_A_RCLK_OUT_PIN_IDX`` is optional parameter. If present in
+the RCLK_GET request, the ``ETHTOOL_A_RCLK_PIN_FLAGS`` will be returned in a
+response, containing the state of the pin pointed by the index.
+
+If ``ETHTOOL_A_RCLK_OUT_PIN_IDX`` is not present in the RCLK_GET request,
+the range of available pins is returned:
+``ETHTOOL_A_RCLK_RANGE_MIN_PIN`` is the lowest recovered clock pin index.
+``ETHTOOL_A_RCLK_RANGE_MAX_PIN`` is the highest recovered clock pin index.
+
+RCLK_SET
+==========
+
+Set status of an output pin for PHY recovered frequency clock.
+
+Request contents:
+
+  ======================================  ======  ========================
+  ``ETHTOOL_A_RCLK_HEADER``               nested  request header
+  ``ETHTOOL_A_RCLK_OUT_PIN_IDX``          u32     index of a pin
+  ``ETHTOOL_A_RCLK_PIN_FLAGS``            u32     requested state
+  ======================================  ======  ========================
+
+``ETHTOOL_A_RCLK_OUT_PIN_IDX`` is the index of the pin for which a change of
+state is requested.
+``ETHTOOL_A_RCLK_PIN_FLAGS`` if the ``ETHTOOL_RCLK_PIN_FLAGS_ENA`` flag
+is set, the given output pin will be enabled, if not - the pin will be disabled
+
+
+
 Request translation
 ===================
 
@@ -1699,4 +1759,6 @@ are netlink only.
   n/a                                 ``ETHTOOL_MSG_PHC_VCLOCKS_GET``
   n/a                                 ``ETHTOOL_MSG_MODULE_GET``
   n/a                                 ``ETHTOOL_MSG_MODULE_SET``
+  n/a                                 ``ETHTOOL_MSG_RCLK_GET``
+  n/a                                 ``ETHTOOL_MSG_RCLK_SET``
   =================================== =====================================
