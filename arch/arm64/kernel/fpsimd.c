@@ -637,14 +637,19 @@ static void __fpsimd_to_sve(void *sst, struct user_fpsimd_state const *fst,
  */
 static void fpsimd_to_sve(struct task_struct *task)
 {
-	unsigned int vq;
+	unsigned int vq, vl;
 	void *sst = task->thread.sve_state;
 	struct user_fpsimd_state const *fst = &task->thread.uw.fpsimd_state;
 
 	if (!system_supports_sve())
 		return;
 
-	vq = sve_vq_from_vl(task_get_sve_vl(task));
+	if (thread_sm_enabled(&task->thread))
+		vl = task_get_sme_vl(task);
+	else
+		vl = task_get_sve_vl(task);
+
+	vq = sve_vq_from_vl(vl);
 	__fpsimd_to_sve(sst, fst, vq);
 }
 
@@ -661,7 +666,7 @@ static void fpsimd_to_sve(struct task_struct *task)
  */
 static void sve_to_fpsimd(struct task_struct *task)
 {
-	unsigned int vq;
+	unsigned int vq, vl;
 	void const *sst = task->thread.sve_state;
 	struct user_fpsimd_state *fst = &task->thread.uw.fpsimd_state;
 	unsigned int i;
@@ -670,7 +675,12 @@ static void sve_to_fpsimd(struct task_struct *task)
 	if (!system_supports_sve())
 		return;
 
-	vq = sve_vq_from_vl(task_get_sve_vl(task));
+	if (thread_sm_enabled(&task->thread))
+		vl = task_get_sme_vl(task);
+	else
+		vl = task_get_sve_vl(task);
+
+	vq = sve_vq_from_vl(vl);
 	for (i = 0; i < SVE_NUM_ZREGS; ++i) {
 		p = (__uint128_t const *)ZREG(sst, vq, i);
 		fst->vregs[i] = arm64_le128_to_cpu(*p);
@@ -811,8 +821,7 @@ int vec_set_vector_length(struct task_struct *task, enum vec_type type,
 	/*
 	 * To ensure the FPSIMD bits of the SVE vector registers are preserved,
 	 * write any live register state back to task_struct, and convert to a
-	 * regular FPSIMD thread.  Since the vector length can only be changed
-	 * with a syscall we can't be in streaming mode while reconfiguring.
+	 * regular FPSIMD thread.
 	 */
 	if (task == current) {
 		get_cpu_fpsimd_context();
