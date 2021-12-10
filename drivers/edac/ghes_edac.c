@@ -239,6 +239,7 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 {
 	struct edac_raw_error_desc *e;
 	struct mem_ctl_info *mci;
+	struct cper_mem_err_compact cmem;
 	struct ghes_pvt *pvt;
 	unsigned long flags;
 	char *p;
@@ -292,60 +293,10 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 
 	/* Error type, mapped on e->msg */
 	if (mem_err->validation_bits & CPER_MEM_VALID_ERROR_TYPE) {
+		u8 etype = mem_err->error_type;
+
 		p = pvt->msg;
-		switch (mem_err->error_type) {
-		case 0:
-			p += sprintf(p, "Unknown");
-			break;
-		case 1:
-			p += sprintf(p, "No error");
-			break;
-		case 2:
-			p += sprintf(p, "Single-bit ECC");
-			break;
-		case 3:
-			p += sprintf(p, "Multi-bit ECC");
-			break;
-		case 4:
-			p += sprintf(p, "Single-symbol ChipKill ECC");
-			break;
-		case 5:
-			p += sprintf(p, "Multi-symbol ChipKill ECC");
-			break;
-		case 6:
-			p += sprintf(p, "Master abort");
-			break;
-		case 7:
-			p += sprintf(p, "Target abort");
-			break;
-		case 8:
-			p += sprintf(p, "Parity Error");
-			break;
-		case 9:
-			p += sprintf(p, "Watchdog timeout");
-			break;
-		case 10:
-			p += sprintf(p, "Invalid address");
-			break;
-		case 11:
-			p += sprintf(p, "Mirror Broken");
-			break;
-		case 12:
-			p += sprintf(p, "Memory Sparing");
-			break;
-		case 13:
-			p += sprintf(p, "Scrub corrected error");
-			break;
-		case 14:
-			p += sprintf(p, "Scrub uncorrected error");
-			break;
-		case 15:
-			p += sprintf(p, "Physical Memory Map-out event");
-			break;
-		default:
-			p += sprintf(p, "reserved error (%d)",
-				     mem_err->error_type);
-		}
+		p += snprintf(p, sizeof(pvt->msg), "%s", cper_mem_err_type_str(etype));
 	} else {
 		strcpy(pvt->msg, "unknown error");
 	}
@@ -362,56 +313,13 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 
 	/* Memory error location, mapped on e->location */
 	p = e->location;
-	if (mem_err->validation_bits & CPER_MEM_VALID_NODE)
-		p += sprintf(p, "node:%d ", mem_err->node);
-	if (mem_err->validation_bits & CPER_MEM_VALID_CARD)
-		p += sprintf(p, "card:%d ", mem_err->card);
-	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE)
-		p += sprintf(p, "module:%d ", mem_err->module);
-	if (mem_err->validation_bits & CPER_MEM_VALID_RANK_NUMBER)
-		p += sprintf(p, "rank:%d ", mem_err->rank);
-	if (mem_err->validation_bits & CPER_MEM_VALID_BANK)
-		p += sprintf(p, "bank:%d ", mem_err->bank);
-	if (mem_err->validation_bits & CPER_MEM_VALID_BANK_GROUP)
-		p += sprintf(p, "bank_group:%d ",
-			     mem_err->bank >> CPER_MEM_BANK_GROUP_SHIFT);
-	if (mem_err->validation_bits & CPER_MEM_VALID_BANK_ADDRESS)
-		p += sprintf(p, "bank_address:%d ",
-			     mem_err->bank & CPER_MEM_BANK_ADDRESS_MASK);
-	if (mem_err->validation_bits & CPER_MEM_VALID_DEVICE)
-		p += sprintf(p, "device:%d ", mem_err->device);
-	if (mem_err->validation_bits & (CPER_MEM_VALID_ROW | CPER_MEM_VALID_ROW_EXT)) {
-		u32 row = mem_err->row;
+	cper_mem_err_pack(mem_err, &cmem);
+	p += cper_mem_err_location(&cmem, p);
 
-		row |= cper_get_mem_extension(mem_err->validation_bits, mem_err->extended);
-		p += sprintf(p, "row:%d ", row);
-	}
-	if (mem_err->validation_bits & CPER_MEM_VALID_COLUMN)
-		p += sprintf(p, "column:%d ", mem_err->column);
-	if (mem_err->validation_bits & CPER_MEM_VALID_BIT_POSITION)
-		p += sprintf(p, "bit_position:%d ", mem_err->bit_pos);
-	if (mem_err->validation_bits & CPER_MEM_VALID_REQUESTOR_ID)
-		p += sprintf(p, "requestor_id:0x%016llx ",
-			     (long long)mem_err->requestor_id);
-	if (mem_err->validation_bits & CPER_MEM_VALID_RESPONDER_ID)
-		p += sprintf(p, "responder_id:0x%016llx ",
-			     (long long)mem_err->responder_id);
-	if (mem_err->validation_bits & CPER_MEM_VALID_TARGET_ID)
-		p += sprintf(p, "target_id:0x%016llx ",
-			     (long long)mem_err->responder_id);
-	if (mem_err->validation_bits & CPER_MEM_VALID_CHIP_ID)
-		p += sprintf(p, "chip_id:%d ",
-			     mem_err->extended >> CPER_MEM_CHIP_ID_SHIFT);
 	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
-		const char *bank = NULL, *device = NULL;
 		struct dimm_info *dimm;
 
-		dmi_memdev_name(mem_err->mem_dev_handle, &bank, &device);
-		if (bank != NULL && device != NULL)
-			p += sprintf(p, "DIMM location:%s %s ", bank, device);
-		else
-			p += sprintf(p, "DIMM location:not present. DIMM DMI handle:0x%.4x ",
-				     mem_err->mem_dev_handle);
+		p += cper_dimm_err_location(&cmem, p);
 
 		dimm = find_dimm_by_handle(mci, mem_err->mem_dev_handle);
 		if (dimm) {
