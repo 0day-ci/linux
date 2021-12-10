@@ -446,7 +446,7 @@ static int ohci_da8xx_probe(struct platform_device *pdev)
 
 	hcd_irq = platform_get_irq(pdev, 0);
 	if (hcd_irq < 0) {
-		error = -ENODEV;
+		error = hcd_irq;
 		goto err;
 	}
 
