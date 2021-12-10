@@ -292,7 +292,7 @@ config ACPI_PROCESSOR
 	  To compile this driver as a module, choose M here:
 	  the module will be called processor.
 
-config ACPI_I2C_MULTI_INST
+config ACPI_BUS_MULTI_INST
 	tristate "I2C multi instantiate pseudo device driver"
 	depends on I2C
 	help
@@ -301,7 +301,7 @@ config ACPI_I2C_MULTI_INST
 	  for each device in the firmware-node.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called i2c-multi-instantiate.
+	  will be called bus-multi-instantiate.
 
 config ACPI_IPMI
 	tristate "IPMI"
