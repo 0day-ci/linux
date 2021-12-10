@@ -722,9 +722,6 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 		goto out_disable;
 	}
 
-	/* Ensure that all table entries are masked. */
-	msix_mask_all(base, tsize);
-
 	ret = msix_setup_entries(dev, base, entries, nvec, affd);
 	if (ret)
 		goto out_disable;
@@ -732,6 +729,9 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
 	if (ret)
 		goto out_avail;
+
+	/* Ensure that all table entries are masked. */
+	msix_mask_all(base, tsize);
 
 	/* Check if all MSI entries honor device restrictions */
 	ret = msi_verify_entries(dev);
