@@ -6471,13 +6471,11 @@ static int napi_threaded_poll(void *data)
 		for (;;) {
 			bool repoll = false;
 
-			local_bh_disable();
 
 			have = netpoll_poll_lock(napi);
 			__napi_poll(napi, &repoll);
 			netpoll_poll_unlock(have);
 
-			local_bh_enable();
 
 			if (!repoll)
 				break;
