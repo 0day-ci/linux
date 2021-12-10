@@ -35,6 +35,20 @@ static int __init default_canonical_fmt_setup(char *str)
 }
 __setup("ima_canonical_fmt", default_canonical_fmt_setup);
 
+static inline struct user_namespace *ima_user_ns_from_file(struct file *filp)
+{
+	return filp->f_path.mnt->mnt_sb->s_user_ns;
+}
+
+static int ima_open(struct inode *inode, struct file *file)
+{
+	struct user_namespace *user_ns = ima_user_ns_from_file(file);
+	struct ima_namespace *ns = user_ns->ima_ns;
+
+	file->private_data = ns;
+	return 0;
+}
+
 static ssize_t ima_show_htable_value(char __user *buf, size_t count,
 				     loff_t *ppos, atomic_long_t *val)
 {
@@ -49,12 +63,13 @@ static ssize_t ima_show_htable_violations(struct file *filp,
 					  char __user *buf,
 					  size_t count, loff_t *ppos)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct ima_namespace *ns = filp->private_data;
 
 	return ima_show_htable_value(buf, count, ppos, &ns->ima_htable.violations);
 }
 
 static const struct file_operations ima_htable_violations_ops = {
+	.open = ima_open,
 	.read = ima_show_htable_violations,
 	.llseek = generic_file_llseek,
 };
@@ -63,12 +78,13 @@ static ssize_t ima_show_measurements_count(struct file *filp,
 					   char __user *buf,
 					   size_t count, loff_t *ppos)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct ima_namespace *ns = filp->private_data;
 
 	return ima_show_htable_value(buf, count, ppos, &ns->ima_htable.len);
 }
 
 static const struct file_operations ima_measurements_count_ops = {
+	.open = ima_open,
 	.read = ima_show_measurements_count,
 	.llseek = generic_file_llseek,
 };
@@ -76,7 +92,7 @@ static const struct file_operations ima_measurements_count_ops = {
 /* returns pointer to hlist_node */
 static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct ima_namespace *ns = m->private;
 	loff_t l = *pos;
 	struct ima_queue_entry *qe;
 
@@ -94,7 +110,7 @@ static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
 
 static void *ima_measurements_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct ima_namespace *ns = m->private;
 	struct ima_queue_entry *qe = v;
 
 	/* lock protects when reading beyond last element
@@ -195,9 +211,26 @@ static const struct seq_operations ima_measurments_seqops = {
 	.show = ima_measurements_show
 };
 
+static int ima_seq_open(struct file *file, const struct seq_operations *seq_ops)
+{
+	struct user_namespace *user_ns = ima_user_ns_from_file(file);
+	struct ima_namespace *ns = user_ns->ima_ns;
+	struct seq_file *seq;
+	int err;
+
+	err = seq_open(file, seq_ops);
+	if (err)
+		return err;
+
+	seq = file->private_data;
+	seq->private = ns;
+
+	return 0;
+}
+
 static int ima_measurements_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &ima_measurments_seqops);
+	return ima_seq_open(file, &ima_measurments_seqops);
 }
 
 static const struct file_operations ima_measurements_ops = {
@@ -263,7 +296,7 @@ static const struct seq_operations ima_ascii_measurements_seqops = {
 
 static int ima_ascii_measurements_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &ima_ascii_measurements_seqops);
+	return ima_seq_open(file, &ima_ascii_measurements_seqops);
 }
 
 static const struct file_operations ima_ascii_measurements_ops = {
@@ -273,9 +306,8 @@ static const struct file_operations ima_ascii_measurements_ops = {
 	.release = seq_release,
 };
 
-static ssize_t ima_read_policy(char *path)
+static ssize_t ima_read_policy(struct ima_namespace *ns, char *path)
 {
-	struct ima_namespace *ns = get_current_ns();
 	void *data = NULL;
 	char *datap;
 	size_t size;
@@ -314,10 +346,23 @@ static ssize_t ima_read_policy(char *path)
 		return pathlen;
 }
 
+static struct ima_namespace *ima_filp_private(struct file *filp)
+{
+	if (!(filp->f_flags & O_WRONLY)) {
+#ifdef CONFIG_IMA_READ_POLICY
+		struct seq_file *seq;
+
+		seq = filp->private_data;
+		return seq->private;
+#endif
+	}
+	return filp->private_data;
+}
+
 static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 				size_t datalen, loff_t *ppos)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct ima_namespace *ns = ima_filp_private(file);
 	char *data;
 	ssize_t result;
 
@@ -340,7 +385,7 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 		goto out_free;
 
 	if (data[0] == '/') {
-		result = ima_read_policy(data);
+		result = ima_read_policy(ns, data);
 	} else if (ima_appraise & IMA_APPRAISE_POLICY) {
 		pr_err("signed policy file (specified as an absolute pathname) required\n");
 		integrity_audit_msg(AUDIT_INTEGRITY_STATUS, NULL, NULL,
@@ -386,7 +431,8 @@ static const struct seq_operations ima_policy_seqops = {
  */
 static int ima_open_policy(struct inode *inode, struct file *filp)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct user_namespace *user_ns = ima_user_ns_from_file(filp);
+	struct ima_namespace *ns = user_ns->ima_ns;
 
 	if (!(filp->f_flags & O_WRONLY)) {
 #ifndef	CONFIG_IMA_READ_POLICY
@@ -396,11 +442,13 @@ static int ima_open_policy(struct inode *inode, struct file *filp)
 			return -EACCES;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		return seq_open(filp, &ima_policy_seqops);
+		return ima_seq_open(filp, &ima_policy_seqops);
 #endif
 	}
 	if (test_and_set_bit(IMA_FS_BUSY, &ns->ima_fs_flags))
 		return -EBUSY;
+
+	filp->private_data = ns;
 	return 0;
 }
 
@@ -413,7 +461,7 @@ static int ima_open_policy(struct inode *inode, struct file *filp)
  */
 static int ima_release_policy(struct inode *inode, struct file *file)
 {
-	struct ima_namespace *ns = get_current_ns();
+	struct ima_namespace *ns = ima_filp_private(file);
 	const char *cause = ns->valid_policy ? "completed" : "failed";
 
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
