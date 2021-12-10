@@ -1093,3 +1093,12 @@ config MMC_OWL
 
 config MMC_SDHCI_EXTERNAL_DMA
 	bool
+
+config MMC_LITEX
+	tristate "LiteX MMC Host Controller support"
+	depends on OF
+	depends on PPC_MICROWATT || LITEX || COMPILE_TEST
+	help
+	  This selects support for the MMC Host Controller found in LiteX SoCs.
+
+	  If unsure, say N.
