@@ -320,9 +320,19 @@ static inline const char *btf_name_by_offset(const struct btf *btf,
 }
 #endif
 
+enum kfunc_btf_id_set_types {
+	BTF_SET_CHECK,
+	__BTF_SET_MAX,
+};
+
 struct kfunc_btf_id_set {
 	struct list_head list;
-	struct btf_id_set *set;
+	union {
+		struct btf_id_set *sets[__BTF_SET_MAX];
+		struct {
+			struct btf_id_set *set;
+		};
+	};
 	struct module *owner;
 };
 

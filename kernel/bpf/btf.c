@@ -6390,22 +6390,33 @@ void unregister_kfunc_btf_id_set(struct kfunc_btf_id_list *l,
 }
 EXPORT_SYMBOL_GPL(unregister_kfunc_btf_id_set);
 
-bool bpf_check_mod_kfunc_call(struct kfunc_btf_id_list *klist, u32 kfunc_id,
-			      struct module *owner)
+/* Caller must hold reference to module 'owner' */
+static bool kfunc_btf_id_set_contains(struct kfunc_btf_id_list *klist,
+				      u32 kfunc_id, struct module *owner,
+				      enum kfunc_btf_id_set_types type)
 {
-	struct kfunc_btf_id_set *s;
+	struct kfunc_btf_id_set *s = NULL;
+	bool ret = false;
 
-	if (!owner)
+	if (type >= __BTF_SET_MAX)
 		return false;
 	mutex_lock(&klist->mutex);
 	list_for_each_entry(s, &klist->list, list) {
-		if (s->owner == owner && btf_id_set_contains(s->set, kfunc_id)) {
-			mutex_unlock(&klist->mutex);
-			return true;
+		if (s->owner == owner && s->sets[type] &&
+		    btf_id_set_contains(s->sets[type], kfunc_id)) {
+			ret = true;
+			break;
 		}
+		/* continue search, since multiple sets may have same owner */
 	}
 	mutex_unlock(&klist->mutex);
-	return false;
+	return ret;
+}
+
+bool bpf_check_mod_kfunc_call(struct kfunc_btf_id_list *klist, u32 kfunc_id,
+			      struct module *owner)
+{
+	return kfunc_btf_id_set_contains(klist, kfunc_id, owner, BTF_SET_CHECK);
 }
 
 #endif
