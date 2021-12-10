@@ -6,7 +6,8 @@ TEST_PROGS := \
 	test-callbacks.sh \
 	test-shadow-vars.sh \
 	test-state.sh \
-	test-ftrace.sh
+	test-ftrace.sh \
+	test-func-stack-only.sh
 
 TEST_FILES := settings
 
