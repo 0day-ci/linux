@@ -3734,7 +3734,7 @@ static int em_hypercall(struct x86_emulate_ctxt *ctxt)
 	int rc = ctxt->ops->fix_hypercall(ctxt);
 
 	if (rc != X86EMUL_CONTINUE)
-		return rc;
+		return emulate_ud(ctxt);
 
 	/* Let the processor re-execute the fixed hypercall */
 	ctxt->_eip = ctxt->eip;

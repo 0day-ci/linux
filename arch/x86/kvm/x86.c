@@ -9026,11 +9026,20 @@ static int emulator_fix_hypercall(struct x86_emulate_ctxt *ctxt)
 	struct kvm_vcpu *vcpu = emul_to_vcpu(ctxt);
 	char instruction[3];
 	unsigned long rip = kvm_rip_read(vcpu);
+	struct x86_exception e;
+	int r;
 
 	static_call(kvm_x86_patch_hypercall)(vcpu, instruction);
 
-	return emulator_write_emulated(ctxt, rip, instruction, 3,
-		&ctxt->exception);
+	/*
+	 * Eat any exceptions, e.g. if RIP is not mapped writable, and simply
+	 * signal failure to the caller.  Faults on the write are (obviously)
+	 * not from the guest, though the guest is likely doomed in any case.
+	 */
+	r = emulator_write_emulated(ctxt, rip, instruction, 3, &e);
+	if (r != X86EMUL_CONTINUE)
+		return X86EMUL_UNHANDLEABLE;
+	return X86EMUL_CONTINUE;
 }
 
 static int dm_request_for_irq_injection(struct kvm_vcpu *vcpu)
