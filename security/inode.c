@@ -54,7 +54,7 @@ static int securityfs_fill_super(struct super_block *sb, struct fs_context *fc)
 
 static int securityfs_get_tree(struct fs_context *fc)
 {
-	return get_tree_single(fc, securityfs_fill_super);
+	return get_tree_keyed(fc, securityfs_fill_super, fc->user_ns);
 }
 
 static const struct fs_context_operations securityfs_context_ops = {
@@ -72,6 +72,7 @@ static struct file_system_type fs_type = {
 	.name =		"securityfs",
 	.init_fs_context = securityfs_init_fs_context,
 	.kill_sb =	kill_litter_super,
+	.fs_flags =	FS_USERNS_MOUNT,
 };
 
 /**
@@ -168,7 +169,6 @@ static struct dentry *securityfs_create_dentry(const char *name, umode_t mode,
 		inode->i_fop = fops;
 	}
 	d_instantiate(dentry, inode);
-	dget(dentry);
 	inode_unlock(dir);
 	return dentry;
 
@@ -306,23 +306,17 @@ EXPORT_SYMBOL_GPL(securityfs_create_symlink);
 void securityfs_remove(struct dentry *dentry)
 {
 	struct user_namespace *ns;
-	struct inode *dir;
 
 	if (!dentry || IS_ERR(dentry))
 		return;
 
 	ns = dentry->d_sb->s_user_ns;
 
-	dir = d_inode(dentry->d_parent);
-	inode_lock(dir);
 	if (simple_positive(dentry)) {
-		if (d_is_dir(dentry))
-			simple_rmdir(dir, dentry);
-		else
-			simple_unlink(dir, dentry);
+		d_delete(dentry);
 		dput(dentry);
 	}
-	inode_unlock(dir);
+
 	if (ns == &init_user_ns)
 		simple_release_fs(&init_securityfs_mount,
 				  &init_securityfs_mount_count);
