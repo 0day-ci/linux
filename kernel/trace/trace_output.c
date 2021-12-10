@@ -445,11 +445,13 @@ int trace_print_lat_fmt(struct trace_seq *s, struct trace_entry *entry)
 	char irqs_off;
 	int hardirq;
 	int softirq;
+	int bh_off;
 	int nmi;
 
 	nmi = entry->flags & TRACE_FLAG_NMI;
 	hardirq = entry->flags & TRACE_FLAG_HARDIRQ;
 	softirq = entry->flags & TRACE_FLAG_SOFTIRQ;
+	bh_off = entry->flags & TRACE_FLAG_BH_OFF;
 
 	irqs_off =
 		(entry->flags & TRACE_FLAG_IRQS_OFF) ? 'd' :
@@ -478,6 +480,7 @@ int trace_print_lat_fmt(struct trace_seq *s, struct trace_entry *entry)
 		(hardirq && softirq) ? 'H' :
 		hardirq              ? 'h' :
 		softirq              ? 's' :
+		bh_off		     ? 'b' :
 		                       '.' ;
 
 	trace_seq_printf(s, "%c%c%c",
