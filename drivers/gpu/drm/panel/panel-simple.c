@@ -1215,7 +1215,9 @@ static const struct panel_desc cdtech_s043wq26h_ct7 = {
 		.width = 95,
 		.height = 54,
 	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 	.bus_flags = DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
+	.connector_type = DRM_MODE_CONNECTOR_DPI,
 };
 
 /* S070PWS19HP-FC21 2017/04/22 */
