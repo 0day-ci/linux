@@ -438,8 +438,8 @@ static int submit_reloc(struct msm_gem_submit *submit, struct msm_gem_object *ob
 		return -EINVAL;
 	}
 
-	/* For now, just map the entire thing.  Eventually we probably
-	 * to do it page-by-page, w/ kmap() if not vmap()d..
+	/* For now, just map the entire thing.  Eventually it should probably
+	 * be done page-by-page, w/ kmap_local_page() if not vmap()d..
 	 */
 	ptr = msm_gem_get_vaddr_locked(&obj->base);
 
