@@ -378,6 +378,8 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 	if (mem_err->validation_bits & CPER_MEM_VALID_BANK_ADDRESS)
 		p += sprintf(p, "bank_address:%d ",
 			     mem_err->bank & CPER_MEM_BANK_ADDRESS_MASK);
+	if (mem_err->validation_bits & CPER_MEM_VALID_DEVICE)
+		p += sprintf(p, "device:%d ", mem_err->device);
 	if (mem_err->validation_bits & (CPER_MEM_VALID_ROW | CPER_MEM_VALID_ROW_EXT)) {
 		u32 row = mem_err->row;
 
@@ -385,9 +387,21 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 		p += sprintf(p, "row:%d ", row);
 	}
 	if (mem_err->validation_bits & CPER_MEM_VALID_COLUMN)
-		p += sprintf(p, "col:%d ", mem_err->column);
+		p += sprintf(p, "column:%d ", mem_err->column);
 	if (mem_err->validation_bits & CPER_MEM_VALID_BIT_POSITION)
-		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
+		p += sprintf(p, "bit_position:%d ", mem_err->bit_pos);
+	if (mem_err->validation_bits & CPER_MEM_VALID_REQUESTOR_ID)
+		p += sprintf(p, "requestor_id:0x%016llx ",
+			     (long long)mem_err->requestor_id);
+	if (mem_err->validation_bits & CPER_MEM_VALID_RESPONDER_ID)
+		p += sprintf(p, "responder_id:0x%016llx ",
+			     (long long)mem_err->responder_id);
+	if (mem_err->validation_bits & CPER_MEM_VALID_TARGET_ID)
+		p += sprintf(p, "target_id:0x%016llx ",
+			     (long long)mem_err->responder_id);
+	if (mem_err->validation_bits & CPER_MEM_VALID_CHIP_ID)
+		p += sprintf(p, "chip_id:%d ",
+			     mem_err->extended >> CPER_MEM_CHIP_ID_SHIFT);
 	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
 		const char *bank = NULL, *device = NULL;
 		struct dimm_info *dimm;
@@ -396,7 +410,7 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 		if (bank != NULL && device != NULL)
 			p += sprintf(p, "DIMM location:%s %s ", bank, device);
 		else
-			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
+			p += sprintf(p, "DIMM location:not present. DIMM DMI handle:0x%.4x ",
 				     mem_err->mem_dev_handle);
 
 		dimm = find_dimm_by_handle(mci, mem_err->mem_dev_handle);
@@ -405,9 +419,6 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 			strcpy(e->label, dimm->label);
 		}
 	}
-	if (mem_err->validation_bits & CPER_MEM_VALID_CHIP_ID)
-		p += sprintf(p, "chipID: %d ",
-			     mem_err->extended >> CPER_MEM_CHIP_ID_SHIFT);
 	if (p > e->location)
 		*(p - 1) = '\0';
 
@@ -421,7 +432,7 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 	if (mem_err->validation_bits & CPER_MEM_VALID_ERROR_STATUS) {
 		u64 status = mem_err->error_status;
 
-		p += sprintf(p, "status(0x%016llx): ", (long long)status);
+		p += sprintf(p, "status(0x%016llx):", (long long)status);
 		switch ((status >> 8) & 0xff) {
 		case 1:
 			p += sprintf(p, "Error detected internal to the component ");
@@ -479,15 +490,7 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
 			break;
 		}
 	}
-	if (mem_err->validation_bits & CPER_MEM_VALID_REQUESTOR_ID)
-		p += sprintf(p, "requestorID: 0x%016llx ",
-			     (long long)mem_err->requestor_id);
-	if (mem_err->validation_bits & CPER_MEM_VALID_RESPONDER_ID)
-		p += sprintf(p, "responderID: 0x%016llx ",
-			     (long long)mem_err->responder_id);
-	if (mem_err->validation_bits & CPER_MEM_VALID_TARGET_ID)
-		p += sprintf(p, "targetID: 0x%016llx ",
-			     (long long)mem_err->responder_id);
+
 	if (p > pvt->other_detail)
 		*(p - 1) = '\0';
 
