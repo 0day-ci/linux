@@ -1295,6 +1295,8 @@ static const struct panel_desc cdtech_s070wv95_ct16 = {
 		.width = 154,
 		.height = 85,
 	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+	.connector_type = DRM_MODE_CONNECTOR_DPI,
 };
 
 static const struct display_timing chefree_ch101olhlwh_002_timing = {
