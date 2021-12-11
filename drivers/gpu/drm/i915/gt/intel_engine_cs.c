@@ -350,9 +350,45 @@ static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id,
 	engine->props.timeslice_duration_ms =
 		CONFIG_DRM_I915_TIMESLICE_DURATION;
 
-	/* Override to uninterruptible for OpenCL workloads. */
-	if (GRAPHICS_VER(i915) == 12 && engine->class == RENDER_CLASS)
-		engine->props.preempt_timeout_ms = 0;
+	/*
+	 * Mid-thread pre-emption is not available in Gen12. Unfortunately,
+	 * some OpenCL workloads run quite long threads. That means they get
+	 * reset due to not pre-empting in a timely manner.
+	 * The execlist solution was to disable pre-emption completely.
+	 * However, pre-emption timeouts are the way GuC detects hung contexts
+	 * and triggers engine resets. Thus, without pre-emption, there is no
+	 * per engine reset. And full GT reset is much more intrusive. So keep
+	 * the timeout for GuC submission platforms and just bump it to be
+	 * much larger. Also bump the heartbeat timeout to match, otherwise
+	 * the heartbeat can expire before the pre-emption can timeout and
+	 * thus trigger a full GT reset anyway.
+	 */
+	if (GRAPHICS_VER(i915) == 12 && engine->class == RENDER_CLASS) {
+		if (intel_uc_wants_guc_submission(&gt->uc)) {
+			const unsigned long min_preempt = 7500;
+			const unsigned long min_beat = 5000;
+
+			if (engine->props.preempt_timeout_ms &&
+			    engine->props.preempt_timeout_ms < min_preempt) {
+				drm_info(&gt->i915->drm, "Bumping pre-emption timeout from %ld to %ld on %s to allow slow compute pre-emption\n",
+					 engine->props.preempt_timeout_ms,
+					 min_preempt, engine->name);
+
+				engine->props.preempt_timeout_ms = min_preempt;
+			}
+
+			if (engine->props.heartbeat_interval_ms &&
+			    engine->props.heartbeat_interval_ms < min_beat) {
+				drm_info(&gt->i915->drm, "Bumping heartbeat interval from %ld to %ld on %s to allow slow compute pre-emption\n",
+					 engine->props.heartbeat_interval_ms,
+					 min_beat, engine->name);
+
+				engine->props.heartbeat_interval_ms = min_beat;
+			}
+		} else {
+			engine->props.preempt_timeout_ms = 0;
+		}
+	}
 
 	engine->defaults = engine->props; /* never to change again */
 
