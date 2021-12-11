@@ -31,6 +31,7 @@ int create_cond_branch(struct ppc_inst *instr, const u32 *addr,
 int patch_branch(u32 *addr, unsigned long target, int flags);
 int patch_instruction(u32 *addr, struct ppc_inst instr);
 int raw_patch_instruction(u32 *addr, struct ppc_inst instr);
+void *patch_memory(void *dest, const void *src, size_t size);
 
 static inline unsigned long patch_site_addr(s32 *site)
 {

@@ -17,6 +17,7 @@
 #include <asm/code-patching.h>
 #include <asm/setup.h>
 #include <asm/inst.h>
+#include <asm/cacheflush.h>
 
 static int __patch_instruction(u32 *exec_addr, struct ppc_inst instr, u32 *patch_addr)
 {
@@ -178,11 +179,83 @@ out:
 
 	return err;
 }
+
+static int do_patch_memory(void *dest, const void *src, size_t size, unsigned long poke_addr)
+{
+	unsigned long patch_addr = poke_addr + offset_in_page(dest);
+
+	if (map_patch_area(dest, poke_addr)) {
+		pr_warn("failed to map %lx\n", poke_addr);
+		return -1;
+	}
+
+	memcpy((u8 *)patch_addr, src, size);
+
+	flush_icache_range(patch_addr, size);
+
+	if (unmap_patch_area(poke_addr)) {
+		pr_warn("failed to unmap %lx\n", poke_addr);
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * patch_memory - write data using the text poke area
+ *
+ * @dest:	destination address
+ * @src:	source address
+ * @size:	size in bytes
+ *
+ * like memcpy(), but using the text poke area. No atomicity guarantees.
+ * Do not use for instructions, use patch_instruction() instead.
+ * Handles crossing page boundaries, though you shouldn't need to.
+ *
+ * Return value:
+ * 	@dest
+ **/
+void *patch_memory(void *dest, const void *src, size_t size)
+{
+	size_t bytes_written, write_size;
+	unsigned long text_poke_addr;
+	unsigned long flags;
+
+	// If the poke area isn't set up, it's early boot and we can just memcpy.
+	if (!this_cpu_read(text_poke_area))
+		return memcpy(dest, src, size);
+
+	local_irq_save(flags);
+	text_poke_addr = (unsigned long)__this_cpu_read(text_poke_area)->addr;
+
+	for (bytes_written = 0;
+	     bytes_written < size;
+	     bytes_written += write_size) {
+		// Write as much as possible without crossing a page boundary.
+		write_size = min(size - bytes_written,
+				 PAGE_SIZE - offset_in_page(dest + bytes_written));
+
+		if (do_patch_memory(dest + bytes_written,
+				    src + bytes_written,
+				    write_size,
+				    text_poke_addr))
+			break;
+	}
+
+	local_irq_restore(flags);
+
+	return dest;
+}
 #else /* !CONFIG_STRICT_KERNEL_RWX */
 
 static int do_patch_instruction(u32 *addr, struct ppc_inst instr)
 {
 	return raw_patch_instruction(addr, instr);
+}
+
+void *patch_memory(void *dest, const void *src, size_t size)
+{
+	return memcpy(dest, src, size);
 }
 
 #endif /* CONFIG_STRICT_KERNEL_RWX */
