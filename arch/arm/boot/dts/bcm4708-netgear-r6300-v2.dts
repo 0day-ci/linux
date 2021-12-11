@@ -34,20 +34,32 @@
 			linux,default-trigger = "default-on";
 		};
 
-		power0 {
+		power-green {
 			label = "bcm53xx:green:power";
 			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "default-on";
 		};
 
-		power1 {
+		power-amber {
 			label = "bcm53xx:amber:power";
 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-on";
 		};
 
 		usb {
 			label = "bcm53xx:blue:usb";
 			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
+			trigger-sources = <&ohci_port1>, <&ehci_port1>, <&xhci_port1>;
+			linux,default-trigger = "usbport";
+		};
+
+		wan-green {
+			label = "bcm53xx:green:wan";
+			gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
+		};
+
+		wan-amber {
+			label = "bcm53xx:amber:wan";
+			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
 		};
 
 		wireless {
@@ -77,6 +89,14 @@
 			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
 		};
 	};
+};
+
+&usb2 {
+	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+};
+
+&usb3 {
+	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
 };
 
 &spi_nor {
