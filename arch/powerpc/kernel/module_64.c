@@ -350,11 +350,11 @@ static u32 stub_insns[] = {
  */
 static inline int create_ftrace_stub(struct ppc64_stub_entry *entry,
 					unsigned long addr,
-					struct module *me)
+					struct module *me,
+					void *(*write)(void *, const void *, size_t))
 {
 	long reladdr;
-
-	memcpy(entry->jump, stub_insns, sizeof(stub_insns));
+	struct ppc64_stub_entry tmp_entry;
 
 	/* Stub uses address relative to kernel toc (from the paca) */
 	reladdr = addr - kernel_toc_addr();
@@ -364,12 +364,20 @@ static inline int create_ftrace_stub(struct ppc64_stub_entry *entry,
 		return 0;
 	}
 
-	entry->jump[1] |= PPC_HA(reladdr);
-	entry->jump[2] |= PPC_LO(reladdr);
+	/*
+	 * In case @entry is write-protected, make our changes on the stack
+	 * so we can update the whole struct in one write().
+	 */
+	memcpy(&tmp_entry, entry, sizeof(struct ppc64_stub_entry));
 
+	memcpy(&tmp_entry.jump, stub_insns, sizeof(stub_insns));
+	tmp_entry.jump[1] |= PPC_HA(reladdr);
+	tmp_entry.jump[2] |= PPC_LO(reladdr);
 	/* Eventhough we don't use funcdata in the stub, it's needed elsewhere. */
-	entry->funcdata = func_desc(addr);
-	entry->magic = STUB_MAGIC;
+	tmp_entry.funcdata = func_desc(addr);
+	tmp_entry.magic = STUB_MAGIC;
+
+	write(entry, &tmp_entry, sizeof(struct ppc64_stub_entry));
 
 	return 1;
 }
@@ -392,7 +400,8 @@ static bool is_mprofile_ftrace_call(const char *name)
 #else
 static inline int create_ftrace_stub(struct ppc64_stub_entry *entry,
 					unsigned long addr,
-					struct module *me)
+					struct module *me,
+					void *(*write)(void *, const void *, size_t))
 {
 	return 0;
 }
@@ -419,14 +428,14 @@ static inline int create_stub(const Elf64_Shdr *sechdrs,
 			      struct ppc64_stub_entry *entry,
 			      unsigned long addr,
 			      struct module *me,
-			      const char *name)
+			      const char *name,
+			      void *(*write)(void *, const void *, size_t))
 {
 	long reladdr;
+	struct ppc64_stub_entry tmp_entry;
 
 	if (is_mprofile_ftrace_call(name))
-		return create_ftrace_stub(entry, addr, me);
-
-	memcpy(entry->jump, ppc64_stub_insns, sizeof(ppc64_stub_insns));
+		return create_ftrace_stub(entry, addr, me, write);
 
 	/* Stub uses address relative to r2. */
 	reladdr = (unsigned long)entry - my_r2(sechdrs, me);
@@ -437,10 +446,19 @@ static inline int create_stub(const Elf64_Shdr *sechdrs,
 	}
 	pr_debug("Stub %p get data from reladdr %li\n", entry, reladdr);
 
-	entry->jump[0] |= PPC_HA(reladdr);
-	entry->jump[1] |= PPC_LO(reladdr);
-	entry->funcdata = func_desc(addr);
-	entry->magic = STUB_MAGIC;
+	/*
+	 * In case @entry is write-protected, make our changes on the stack
+	 * so we can update the whole struct in one write().
+	 */
+	memcpy(&tmp_entry, entry, sizeof(struct ppc64_stub_entry));
+
+	memcpy(&tmp_entry.jump, ppc64_stub_insns, sizeof(ppc64_stub_insns));
+	tmp_entry.jump[0] |= PPC_HA(reladdr);
+	tmp_entry.jump[1] |= PPC_LO(reladdr);
+	tmp_entry.funcdata = func_desc(addr);
+	tmp_entry.magic = STUB_MAGIC;
+
+	write(entry, &tmp_entry, sizeof(struct ppc64_stub_entry));
 
 	return 1;
 }
@@ -450,7 +468,8 @@ static inline int create_stub(const Elf64_Shdr *sechdrs,
 static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 				   unsigned long addr,
 				   struct module *me,
-				   const char *name)
+				   const char *name,
+				   void *(*write)(void *, const void *, size_t))
 {
 	struct ppc64_stub_entry *stubs;
 	unsigned int i, num_stubs;
@@ -467,7 +486,7 @@ static unsigned long stub_for_addr(const Elf64_Shdr *sechdrs,
 			return (unsigned long)&stubs[i];
 	}
 
-	if (!create_stub(sechdrs, &stubs[i], addr, me, name))
+	if (!create_stub(sechdrs, &stubs[i], addr, me, name, write))
 		return 0;
 
 	return (unsigned long)&stubs[i];
@@ -496,15 +515,20 @@ static int restore_r2(const char *name, u32 *instruction, struct module *me)
 		return 0;
 	}
 	/* ld r2,R2_STACK_OFFSET(r1) */
-	*instruction = PPC_INST_LD_TOC;
+	if (me->state == MODULE_STATE_UNFORMED)
+		*instruction = PPC_INST_LD_TOC;
+	else
+		patch_instruction(instruction, ppc_inst(PPC_INST_LD_TOC));
+
 	return 1;
 }
 
-int apply_relocate_add(Elf64_Shdr *sechdrs,
-		       const char *strtab,
-		       unsigned int symindex,
-		       unsigned int relsec,
-		       struct module *me)
+static int __apply_relocate_add(Elf64_Shdr *sechdrs,
+				const char *strtab,
+				unsigned int symindex,
+				unsigned int relsec,
+				struct module *me,
+				void *(*write)(void *dest, const void *src, size_t len))
 {
 	unsigned int i;
 	Elf64_Rela *rela = (void *)sechdrs[relsec].sh_addr;
@@ -544,16 +568,17 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 		switch (ELF64_R_TYPE(rela[i].r_info)) {
 		case R_PPC64_ADDR32:
 			/* Simply set it */
-			*(u32 *)location = value;
+			write(location, &value, 4);
 			break;
 
 		case R_PPC64_ADDR64:
 			/* Simply set it */
-			*(unsigned long *)location = value;
+			write(location, &value, 8);
 			break;
 
 		case R_PPC64_TOC:
-			*(unsigned long *)location = my_r2(sechdrs, me);
+			value = my_r2(sechdrs, me);
+			write(location, &value, 8);
 			break;
 
 		case R_PPC64_TOC16:
@@ -564,17 +589,17 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				       me->name, value);
 				return -ENOEXEC;
 			}
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
+			value = (*((uint16_t *) location) & ~0xffff)
 				| (value & 0xffff);
+			write(location, &value, 2);
 			break;
 
 		case R_PPC64_TOC16_LO:
 			/* Subtract TOC pointer */
 			value -= my_r2(sechdrs, me);
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
+			value = (*((uint16_t *) location) & ~0xffff)
 				| (value & 0xffff);
+			write(location, &value, 2);
 			break;
 
 		case R_PPC64_TOC16_DS:
@@ -585,9 +610,9 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				       me->name, value);
 				return -ENOEXEC;
 			}
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xfffc)
+			value = (*((uint16_t *) location) & ~0xfffc)
 				| (value & 0xfffc);
+			write(location, &value, 2);
 			break;
 
 		case R_PPC64_TOC16_LO_DS:
@@ -598,18 +623,18 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				       me->name, value);
 				return -ENOEXEC;
 			}
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xfffc)
+			value = (*((uint16_t *) location) & ~0xfffc)
 				| (value & 0xfffc);
+			write(location, &value, 2);
 			break;
 
 		case R_PPC64_TOC16_HA:
 			/* Subtract TOC pointer */
 			value -= my_r2(sechdrs, me);
 			value = ((value + 0x8000) >> 16);
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
+			value = (*((uint16_t *) location) & ~0xffff)
 				| (value & 0xffff);
+			write(location, &value, 2);
 			break;
 
 		case R_PPC_REL24:
@@ -618,14 +643,15 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			    sym->st_shndx == SHN_LIVEPATCH) {
 				/* External: go via stub */
 				value = stub_for_addr(sechdrs, value, me,
-						strtab + sym->st_name);
+						      strtab + sym->st_name, write);
 				if (!value)
 					return -ENOENT;
 				if (!restore_r2(strtab + sym->st_name,
 							(u32 *)location + 1, me))
 					return -ENOEXEC;
-			} else
+			} else {
 				value += local_entry_offset(sym);
+			}
 
 			/* Convert value to relative */
 			value -= (unsigned long)location;
@@ -636,14 +662,15 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			}
 
 			/* Only replace bits 2 through 26 */
-			*(uint32_t *)location
-				= (*(uint32_t *)location & ~0x03fffffc)
+			value = (*(uint32_t *)location & ~0x03fffffc)
 				| (value & 0x03fffffc);
+			write(location, &value, 4);
 			break;
 
 		case R_PPC64_REL64:
 			/* 64 bits relative (used by features fixups) */
-			*location = value - (unsigned long)location;
+			value -= (unsigned long)location;
+			write(location, &value, 8);
 			break;
 
 		case R_PPC64_REL32:
@@ -655,7 +682,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				       me->name, (long int)value);
 				return -ENOEXEC;
 			}
-			*(u32 *)location = value;
+			write(location, &value, 4);
 			break;
 
 		case R_PPC64_TOCSAVE:
@@ -676,7 +703,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				break;
 			/*
 			 * Check for the large code model prolog sequence:
-		         *	ld r2, ...(r12)
+			 *	ld r2, ...(r12)
 			 *	add r2, r2, r12
 			 */
 			if ((((uint32_t *)location)[0] & ~0xfffc) != PPC_RAW_LD(_R2, _R12, 0))
@@ -688,25 +715,27 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			 *	addis r2, r12, (.TOC.-func)@ha
 			 *	addi  r2,  r2, (.TOC.-func)@l
 			 */
-			((uint32_t *)location)[0] = PPC_RAW_ADDIS(_R2, _R12, PPC_HA(value));
-			((uint32_t *)location)[1] = PPC_RAW_ADDI(_R2, _R2, PPC_LO(value));
+			patch_instruction(&((uint32_t *)location)[0],
+					  ppc_inst(PPC_RAW_ADDIS(_R2, _R12, PPC_HA(value))));
+			patch_instruction(&((uint32_t *)location)[1],
+					  ppc_inst(PPC_RAW_ADDI(_R2, _R2, PPC_LO(value))));
 			break;
 
 		case R_PPC64_REL16_HA:
 			/* Subtract location pointer */
 			value -= (unsigned long)location;
 			value = ((value + 0x8000) >> 16);
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
+			value = (*((uint16_t *) location) & ~0xffff)
 				| (value & 0xffff);
+			write(location, &value, 2);
 			break;
 
 		case R_PPC64_REL16_LO:
 			/* Subtract location pointer */
 			value -= (unsigned long)location;
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
+			value = (*((uint16_t *) location) & ~0xffff)
 				| (value & 0xffff);
+			write(location, &value, 2);
 			break;
 
 		default:
@@ -720,6 +749,20 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 	return 0;
 }
 
+int apply_relocate_add(Elf64_Shdr *sechdrs,
+		       const char *strtab,
+		       unsigned int symindex,
+		       unsigned int relsec,
+		       struct module *me)
+{
+	void *(*write)(void *, const void *, size_t) = memcpy;
+	bool early = me->state == MODULE_STATE_UNFORMED;
+
+	if (!early)
+		write = patch_memory;
+
+	return __apply_relocate_add(sechdrs, strtab, symindex, relsec, me, write);
+}
 #ifdef CONFIG_DYNAMIC_FTRACE
 int module_trampoline_target(struct module *mod, unsigned long addr,
 			     unsigned long *target)
@@ -749,7 +792,7 @@ int module_trampoline_target(struct module *mod, unsigned long addr,
 	if (copy_from_kernel_nofault(&funcdata, &stub->funcdata,
 			sizeof(funcdata))) {
 		pr_err("%s: fault reading funcdata for stub %lx for %s\n", __func__, addr, mod->name);
-                return -EFAULT;
+		return -EFAULT;
 	}
 
 	*target = stub_func_addr(funcdata);
@@ -759,15 +802,23 @@ int module_trampoline_target(struct module *mod, unsigned long addr,
 
 int module_finalize_ftrace(struct module *mod, const Elf_Shdr *sechdrs)
 {
+	void *(*write)(void *, const void *, size_t) = memcpy;
+	bool early = mod->state == MODULE_STATE_UNFORMED;
+
+	if (!early)
+		write = patch_memory;
+
 	mod->arch.tramp = stub_for_addr(sechdrs,
 					(unsigned long)ftrace_caller,
 					mod,
-					"ftrace_caller");
+					"ftrace_caller",
+					write);
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
 	mod->arch.tramp_regs = stub_for_addr(sechdrs,
 					(unsigned long)ftrace_regs_caller,
 					mod,
-					"ftrace_regs_caller");
+					"ftrace_regs_caller",
+					write);
 	if (!mod->arch.tramp_regs)
 		return -ENOENT;
 #endif
