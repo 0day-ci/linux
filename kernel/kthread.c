@@ -543,11 +543,7 @@ void kthread_set_per_cpu(struct task_struct *k, int cpu)
 
 bool kthread_is_per_cpu(struct task_struct *p)
 {
-	struct kthread *kthread = __to_kthread(p);
-	if (!kthread)
-		return false;
-
-	return test_bit(KTHREAD_IS_PER_CPU, &kthread->flags);
+	return (p->flags & PF_KTHREAD) && p->nr_cpus_allowed == 1;
 }
 
 /**
