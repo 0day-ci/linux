@@ -167,7 +167,7 @@ static struct platform_device pcm990_backlight_device = {
  * - LCD support is in use
  *  - GPIO16 is output for back light on/off with PWM
  *  - GPIO58 ... GPIO73 are outputs for display data
- *  - GPIO74 is output output for LCDFCLK
+ *  - GPIO74 is output for LCDFCLK
  *  - GPIO75 is output for LCDLCLK
  *  - GPIO76 is output for LCDPCLK
  *  - GPIO77 is output for LCDBIAS
