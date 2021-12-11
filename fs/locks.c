@@ -842,8 +842,11 @@ void
 posix_test_lock(struct file *filp, struct file_lock *fl)
 {
 	struct file_lock *cfl;
+	struct file_lock *checked_cfl = NULL;
 	struct file_lock_context *ctx;
 	struct inode *inode = locks_inode(filp);
+	void *res_data;
+	void *(*func)(void *priv, bool testonly);
 
 	ctx = smp_load_acquire(&inode->i_flctx);
 	if (!ctx || list_empty_careful(&ctx->flc_posix)) {
@@ -852,11 +855,24 @@ posix_test_lock(struct file *filp, struct file_lock *fl)
 	}
 
 	spin_lock(&ctx->flc_lock);
+retry:
 	list_for_each_entry(cfl, &ctx->flc_posix, fl_list) {
-		if (posix_locks_conflict(fl, cfl)) {
-			locks_copy_conflock(fl, cfl);
-			goto out;
+		if (!posix_locks_conflict(fl, cfl))
+			continue;
+		if (checked_cfl != cfl && cfl->fl_lmops &&
+				cfl->fl_lmops->lm_expire_lock) {
+			res_data = cfl->fl_lmops->lm_expire_lock(cfl, true);
+			if (res_data) {
+				func = cfl->fl_lmops->lm_expire_lock;
+				spin_unlock(&ctx->flc_lock);
+				func(res_data, false);
+				spin_lock(&ctx->flc_lock);
+				checked_cfl = cfl;
+				goto retry;
+			}
 		}
+		locks_copy_conflock(fl, cfl);
+		goto out;
 	}
 	fl->fl_type = F_UNLCK;
 out:
@@ -1026,10 +1042,13 @@ static int posix_lock_inode(struct inode *inode, struct file_lock *request,
 	struct file_lock *new_fl2 = NULL;
 	struct file_lock *left = NULL;
 	struct file_lock *right = NULL;
+	struct file_lock *checked_fl = NULL;
 	struct file_lock_context *ctx;
 	int error;
 	bool added = false;
 	LIST_HEAD(dispose);
+	void *res_data;
+	void *(*func)(void *priv, bool testonly);
 
 	ctx = locks_get_lock_context(inode, request->fl_type);
 	if (!ctx)
@@ -1056,9 +1075,24 @@ static int posix_lock_inode(struct inode *inode, struct file_lock *request,
 	 * blocker's list of waiters and the global blocked_hash.
 	 */
 	if (request->fl_type != F_UNLCK) {
+retry:
 		list_for_each_entry(fl, &ctx->flc_posix, fl_list) {
 			if (!posix_locks_conflict(request, fl))
 				continue;
+			if (checked_fl != fl && fl->fl_lmops &&
+					fl->fl_lmops->lm_expire_lock) {
+				res_data = fl->fl_lmops->lm_expire_lock(fl, true);
+				if (res_data) {
+					func = fl->fl_lmops->lm_expire_lock;
+					spin_unlock(&ctx->flc_lock);
+					percpu_up_read(&file_rwsem);
+					func(res_data, false);
+					percpu_down_read(&file_rwsem);
+					spin_lock(&ctx->flc_lock);
+					checked_fl = fl;
+					goto retry;
+				}
+			}
 			if (conflock)
 				locks_copy_conflock(conflock, fl);
 			error = -EAGAIN;
