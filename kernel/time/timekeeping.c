@@ -1148,7 +1148,7 @@ static int adjust_historical_crosststamp(struct system_time_snapshot *history,
 			return ret;
 	}
 
-	/* Fixup monotonic raw and real time time values */
+	/* Fixup monotonic raw and real time values */
 	if (interp_forward) {
 		ts->sys_monoraw = ktime_add_ns(history->raw, corr_raw);
 		ts->sys_realtime = ktime_add_ns(history->real, corr_real);
