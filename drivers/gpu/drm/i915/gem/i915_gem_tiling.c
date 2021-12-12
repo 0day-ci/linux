@@ -336,7 +336,7 @@ i915_gem_set_tiling_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_object *obj;
 	int err;
 
-	if (!dev_priv->ggtt.num_fences)
+	if (!to_gt(dev_priv)->ggtt->num_fences)
 		return -EOPNOTSUPP;
 
 	obj = i915_gem_object_lookup(file, args->handle);
@@ -419,7 +419,7 @@ i915_gem_get_tiling_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_object *obj;
 	int err = -ENOENT;
 
-	if (!dev_priv->ggtt.num_fences)
+	if (!to_gt(dev_priv)->ggtt->num_fences)
 		return -EOPNOTSUPP;
 
 	rcu_read_lock();
@@ -435,10 +435,10 @@ i915_gem_get_tiling_ioctl(struct drm_device *dev, void *data,
 
 	switch (args->tiling_mode) {
 	case I915_TILING_X:
-		args->swizzle_mode = dev_priv->ggtt.bit_6_swizzle_x;
+		args->swizzle_mode = to_gt(dev_priv)->ggtt->bit_6_swizzle_x;
 		break;
 	case I915_TILING_Y:
-		args->swizzle_mode = dev_priv->ggtt.bit_6_swizzle_y;
+		args->swizzle_mode = to_gt(dev_priv)->ggtt->bit_6_swizzle_y;
 		break;
 	default:
 	case I915_TILING_NONE:
