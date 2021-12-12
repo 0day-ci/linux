@@ -220,7 +220,7 @@ static u64 tiled_offset(const struct intel_gt *gt,
 		v += div64_u64_rem(x, 512, &x) << 12;
 		v += x;
 
-		swizzle = gt->ggtt->bit_6_swizzle_x;
+		swizzle = gt->ggtt.bit_6_swizzle_x;
 	} else {
 		const unsigned int ytile_span = 16;
 		const unsigned int ytile_height = 512;
@@ -230,7 +230,7 @@ static u64 tiled_offset(const struct intel_gt *gt,
 		v += div64_u64_rem(x, ytile_span, &x) * ytile_height;
 		v += x;
 
-		swizzle = gt->ggtt->bit_6_swizzle_y;
+		swizzle = gt->ggtt.bit_6_swizzle_y;
 	}
 
 	switch (swizzle) {
@@ -543,7 +543,7 @@ static bool has_bit17_swizzle(int sw)
 
 static bool bad_swizzling(struct drm_i915_private *i915)
 {
-	struct i915_ggtt *ggtt = to_gt(i915)->ggtt;
+	struct i915_ggtt *ggtt = &to_gt(i915)->ggtt;
 
 	if (i915->quirks & QUIRK_PIN_SWIZZLED_PAGES)
 		return true;

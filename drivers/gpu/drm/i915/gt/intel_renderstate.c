@@ -155,7 +155,7 @@ int intel_renderstate_init(struct intel_renderstate *so,
 		if (IS_ERR(obj))
 			return PTR_ERR(obj);
 
-		so->vma = i915_vma_instance(obj, &engine->gt->ggtt->vm, NULL);
+		so->vma = i915_vma_instance(obj, &engine->gt->ggtt.vm, NULL);
 		if (IS_ERR(so->vma)) {
 			err = PTR_ERR(so->vma);
 			goto err_obj;

@@ -1078,7 +1078,7 @@ static int intel_vgpu_aperture_rw(struct intel_vgpu *vgpu, u64 off,
 		return -EINVAL;
 	}
 
-	aperture_va = io_mapping_map_wc(&vgpu->gvt->gt->ggtt->iomap,
+	aperture_va = io_mapping_map_wc(&vgpu->gvt->gt->ggtt.iomap,
 					ALIGN_DOWN(off, PAGE_SIZE),
 					count + offset_in_page(off));
 	if (!aperture_va)

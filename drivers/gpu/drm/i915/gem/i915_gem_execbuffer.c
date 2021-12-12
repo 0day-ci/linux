@@ -1106,7 +1106,7 @@ static inline struct i915_ggtt *cache_to_ggtt(struct reloc_cache *cache)
 {
 	struct drm_i915_private *i915 =
 		container_of(cache, struct i915_execbuffer, reloc_cache)->i915;
-	return to_gt(i915)->ggtt;
+	return &to_gt(i915)->ggtt;
 }
 
 static void reloc_cache_reset(struct reloc_cache *cache, struct i915_execbuffer *eb)
@@ -2242,7 +2242,7 @@ static int eb_parse(struct i915_execbuffer *eb)
 		trampoline = shadow;
 
 		shadow = shadow_batch_pin(eb, pool->obj,
-					  &eb->gt->ggtt->vm,
+					  &eb->gt->ggtt.vm,
 					  PIN_GLOBAL);
 		if (IS_ERR(shadow)) {
 			err = PTR_ERR(shadow);

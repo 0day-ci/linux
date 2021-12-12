@@ -102,7 +102,7 @@ vma_create(struct drm_i915_gem_object *obj,
 	struct rb_node *rb, **p;
 
 	/* The aliasing_ppgtt should never be used directly! */
-	GEM_BUG_ON(vm == &vm->gt->ggtt->alias->vm);
+	GEM_BUG_ON(vm == &vm->gt->ggtt.alias->vm);
 
 	vma = i915_vma_alloc();
 	if (vma == NULL)

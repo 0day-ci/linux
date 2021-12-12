@@ -72,7 +72,7 @@ static struct intel_ring *mock_ring(struct intel_engine_cs *engine)
 	ring->vaddr = (void *)(ring + 1);
 	atomic_set(&ring->pin_count, 1);
 
-	ring->vma = create_ring_vma(engine->gt->ggtt, PAGE_SIZE);
+	ring->vma = create_ring_vma(&engine->gt->ggtt, PAGE_SIZE);
 	if (IS_ERR(ring->vma)) {
 		kfree(ring);
 		return NULL;

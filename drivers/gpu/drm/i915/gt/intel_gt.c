@@ -85,11 +85,6 @@ int intel_gt_probe_lmem(struct intel_gt *gt)
 	return 0;
 }
 
-void intel_gt_init_hw_early(struct intel_gt *gt, struct i915_ggtt *ggtt)
-{
-	gt->ggtt = ggtt;
-}
-
 static const struct intel_mmio_range icl_l3bank_steering_table[] = {
 	{ 0x00B100, 0x00B3FF },
 	{},
@@ -460,7 +455,7 @@ static int intel_gt_init_scratch(struct intel_gt *gt, unsigned int size)
 		return PTR_ERR(obj);
 	}
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		goto err_unref;
@@ -489,7 +484,7 @@ static struct i915_address_space *kernel_vm(struct intel_gt *gt)
 	if (INTEL_PPGTT(gt->i915) > INTEL_PPGTT_ALIASING)
 		return &i915_ppgtt_create(gt, I915_BO_ALLOC_PM_EARLY)->vm;
 	else
-		return i915_vm_get(&gt->ggtt->vm);
+		return i915_vm_get(&gt->ggtt.vm);
 }
 
 static int __engines_record_defaults(struct intel_gt *gt)

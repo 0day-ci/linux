@@ -441,7 +441,7 @@ fail:
 
 static u32 uc_fw_ggtt_offset(struct intel_uc_fw *uc_fw)
 {
-	struct i915_ggtt *ggtt = __uc_fw_to_gt(uc_fw)->ggtt;
+	struct i915_ggtt *ggtt = &__uc_fw_to_gt(uc_fw)->ggtt;
 	struct drm_mm_node *node = &ggtt->uc_fw;
 
 	GEM_BUG_ON(!drm_mm_node_allocated(node));
@@ -454,7 +454,7 @@ static u32 uc_fw_ggtt_offset(struct intel_uc_fw *uc_fw)
 static void uc_fw_bind_ggtt(struct intel_uc_fw *uc_fw)
 {
 	struct drm_i915_gem_object *obj = uc_fw->obj;
-	struct i915_ggtt *ggtt = __uc_fw_to_gt(uc_fw)->ggtt;
+	struct i915_ggtt *ggtt = &__uc_fw_to_gt(uc_fw)->ggtt;
 	struct i915_vma *dummy = &uc_fw->dummy;
 	u32 pte_flags = 0;
 
@@ -479,7 +479,7 @@ static void uc_fw_bind_ggtt(struct intel_uc_fw *uc_fw)
 static void uc_fw_unbind_ggtt(struct intel_uc_fw *uc_fw)
 {
 	struct drm_i915_gem_object *obj = uc_fw->obj;
-	struct i915_ggtt *ggtt = __uc_fw_to_gt(uc_fw)->ggtt;
+	struct i915_ggtt *ggtt = &__uc_fw_to_gt(uc_fw)->ggtt;
 	u64 start = uc_fw_ggtt_offset(uc_fw);
 
 	ggtt->vm.clear_range(&ggtt->vm, start, obj->base.size);

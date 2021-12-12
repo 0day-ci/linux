@@ -378,7 +378,7 @@ int intel_gvt_load_firmware(struct intel_gvt *gvt);
 #define HOST_HIGH_GM_SIZE MB_TO_BYTES(384)
 #define HOST_FENCE 4
 
-#define gvt_to_ggtt(gvt)	((gvt)->gt->ggtt)
+#define gvt_to_ggtt(gvt)	(&(gvt)->gt->ggtt)
 
 /* Aperture/GM space definitions for GVT device */
 #define gvt_aperture_sz(gvt)	  gvt_to_ggtt(gvt)->mappable_end

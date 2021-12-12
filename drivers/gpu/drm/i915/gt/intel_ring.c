@@ -168,7 +168,7 @@ intel_engine_create_ring(struct intel_engine_cs *engine, int size)
 
 	intel_ring_update_space(ring);
 
-	vma = create_ring_vma(engine->gt->ggtt, size);
+	vma = create_ring_vma(&engine->gt->ggtt, size);
 	if (IS_ERR(vma)) {
 		kfree(ring);
 		return ERR_CAST(vma);

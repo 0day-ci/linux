@@ -121,7 +121,7 @@ read_nonprivs(struct intel_context *ce)
 	i915_gem_object_flush_map(result);
 	i915_gem_object_unpin_map(result);
 
-	vma = i915_vma_instance(result, &engine->gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(result, &engine->gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		goto err_obj;
