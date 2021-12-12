@@ -4205,7 +4205,7 @@ static bool cea_db_is_hdmi_vsdb(const u8 *db)
 	if (cea_db_tag(db) != VENDOR_BLOCK)
 		return false;
 
-	if (cea_db_payload_len(db) < 5)
+	if (cea_db_payload_len(db) < 3)
 		return false;
 
 	return oui(db[3], db[2], db[1]) == HDMI_IEEE_OUI;
