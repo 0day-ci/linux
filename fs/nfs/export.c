@@ -22,9 +22,9 @@ enum {
 };
 
 
-static struct nfs_fh *nfs_exp_embedfh(__u32 *p)
+static unsigned char *nfs_exp_embedfh(__u32 *p)
 {
-	return (struct nfs_fh *)(p + EMBED_FH_OFF);
+	return (unsigned char *)(p + EMBED_FH_OFF);
 }
 
 /*
@@ -35,8 +35,8 @@ static int
 nfs_encode_fh(struct inode *inode, __u32 *p, int *max_len, struct inode *parent)
 {
 	struct nfs_fh *server_fh = NFS_FH(inode);
-	struct nfs_fh *clnt_fh = nfs_exp_embedfh(p);
-	size_t fh_size = offsetof(struct nfs_fh, data) + server_fh->size;
+	unsigned char *raw_fh = nfs_exp_embedfh(p);
+	size_t fh_size = server_fh->size;
 	int len = EMBED_FH_OFF + XDR_QUADLEN(fh_size);
 
 	dprintk("%s: max fh len %d inode %p parent %p",
@@ -53,7 +53,9 @@ nfs_encode_fh(struct inode *inode, __u32 *p, int *max_len, struct inode *parent)
 	p[FILEID_LOW_OFF] = NFS_FILEID(inode);
 	p[FILE_I_TYPE_OFF] = inode->i_mode & S_IFMT;
 	p[len - 1] = 0; /* Padding */
-	nfs_copy_fh(clnt_fh, server_fh);
+
+	memcpy(raw_fh, server_fh->data, server_fh->size);
+
 	*max_len = len;
 	dprintk("%s: result fh fileid %llu mode %u size %d\n",
 		__func__, NFS_FILEID(inode), inode->i_mode, *max_len);
@@ -65,18 +67,22 @@ nfs_fh_to_dentry(struct super_block *sb, struct fid *fid,
 		 int fh_len, int fh_type)
 {
 	struct nfs_fattr *fattr = NULL;
-	struct nfs_fh *server_fh = nfs_exp_embedfh(fid->raw);
-	size_t fh_size = offsetof(struct nfs_fh, data) + server_fh->size;
+	unsigned char *raw_server_fh = nfs_exp_embedfh(fid->raw);
 	const struct nfs_rpc_ops *rpc_ops;
 	struct dentry *dentry;
 	struct inode *inode;
-	int len = EMBED_FH_OFF + XDR_QUADLEN(fh_size);
 	u32 *p = fid->raw;
+	struct nfs_fh server_fh = { 0 };
 	int ret;
 
-	/* NULL translates to ESTALE */
-	if (fh_len < len || fh_type != len)
+	server_fh.size = (fh_len * XDR_UNIT) - (EMBED_FH_OFF * XDR_UNIT);
+	if (server_fh.size < 1) {
+		WARN_ON_ONCE(1);
+		/* NULL translates to ESTALE */
 		return NULL;
+	}
+
+	memcpy(server_fh.data, raw_server_fh, server_fh.size);
 
 	fattr = nfs_alloc_fattr_with_label(NFS_SB(sb));
 	if (fattr == NULL) {
@@ -90,20 +96,20 @@ nfs_fh_to_dentry(struct super_block *sb, struct fid *fid,
 
 	dprintk("%s: fileid %llu mode %d\n", __func__, fattr->fileid, fattr->mode);
 
-	inode = nfs_ilookup(sb, fattr, server_fh);
+	inode = nfs_ilookup(sb, fattr, &server_fh);
 	if (inode)
 		goto out_found;
 
 	rpc_ops = NFS_SB(sb)->nfs_client->rpc_ops;
-	ret = rpc_ops->getattr(NFS_SB(sb), server_fh, fattr, NULL);
+	ret = rpc_ops->getattr(NFS_SB(sb), &server_fh, fattr, NULL);
 	if (ret) {
 		dprintk("%s: getattr failed %d\n", __func__, ret);
-		trace_nfs_fh_to_dentry(sb, server_fh, fattr->fileid, ret);
+		trace_nfs_fh_to_dentry(sb, &server_fh, fattr->fileid, ret);
 		dentry = ERR_PTR(ret);
 		goto out_free_fattr;
 	}
 
-	inode = nfs_fhget(sb, server_fh, fattr);
+	inode = nfs_fhget(sb, &server_fh, fattr);
 
 out_found:
 	dentry = d_obtain_alias(inode);
