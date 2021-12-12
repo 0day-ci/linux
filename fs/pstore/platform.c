@@ -620,6 +620,11 @@ int pstore_register(struct pstore_info *psi)
 	 * through /sys/module/pstore/parameters/backend
 	 */
 	backend = kstrdup(psi->name, GFP_KERNEL);
+	if (!backend) {
+		pr_err("out of memory duplicating '%s'\n", psi->name);
+		mutex_unlock(&psinfo_lock);
+		return -ENOMEM;
+	}
 
 	pr_info("Registered %s as persistent store backend\n", psi->name);
 
