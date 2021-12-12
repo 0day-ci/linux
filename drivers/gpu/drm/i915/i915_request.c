@@ -1177,7 +1177,7 @@ __emit_semaphore_wait(struct i915_request *to,
 static bool
 can_use_semaphore_wait(struct i915_request *to, struct i915_request *from)
 {
-	return to->engine->gt->ggtt == from->engine->gt->ggtt;
+	return &to->engine->gt->ggtt == &from->engine->gt->ggtt;
 }
 
 static int

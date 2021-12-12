@@ -54,7 +54,7 @@ struct i915_request_coredump {
 };
 
 struct intel_engine_coredump {
-	const struct intel_engine_cs *engine;
+	struct intel_engine_cs *engine;
 
 	bool hung;
 	bool simulated;
@@ -113,7 +113,7 @@ struct intel_engine_coredump {
 };
 
 struct intel_gt_coredump {
-	const struct intel_gt *_gt;
+	struct intel_gt *_gt;
 	bool awake;
 	bool simulated;
 

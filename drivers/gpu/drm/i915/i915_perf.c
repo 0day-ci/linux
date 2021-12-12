@@ -1630,7 +1630,7 @@ static int alloc_noa_wait(struct i915_perf_stream *stream)
 	struct drm_i915_gem_object *bo;
 	struct i915_vma *vma;
 	const u64 delay_ticks = 0xffffffffffffffff -
-		intel_gt_ns_to_clock_interval(to_gt(stream->perf->i915)->ggtt->vm.gt,
+		intel_gt_ns_to_clock_interval(to_gt(stream->perf->i915)->ggtt.vm.gt,
 					      atomic64_read(&stream->perf->noa_programming_delay));
 	const u32 base = stream->engine->mmio_base;
 #define CS_GPR(x) GEN8_RING_CS_GPR(base, x)
@@ -1910,7 +1910,7 @@ retry:
 	__i915_gem_object_release_map(obj);
 
 	oa_bo->vma = i915_vma_instance(obj,
-				       &stream->engine->gt->ggtt->vm,
+				       &stream->engine->gt->ggtt.vm,
 				       NULL);
 	if (IS_ERR(oa_bo->vma)) {
 		err = PTR_ERR(oa_bo->vma);
@@ -3542,7 +3542,7 @@ err:
 
 static u64 oa_exponent_to_ns(struct i915_perf *perf, int exponent)
 {
-	return intel_gt_clock_interval_to_ns(to_gt(perf->i915)->ggtt->vm.gt,
+	return intel_gt_clock_interval_to_ns(to_gt(perf->i915)->ggtt.vm.gt,
 					     2ULL << exponent);
 }
 

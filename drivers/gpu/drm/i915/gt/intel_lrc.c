@@ -954,7 +954,7 @@ __lrc_alloc_state(struct intel_context *ce, struct intel_engine_cs *engine)
 	if (IS_ERR(obj))
 		return ERR_CAST(obj);
 
-	vma = i915_vma_instance(obj, &engine->gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &engine->gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		i915_gem_object_put(obj);
 		return vma;
@@ -1550,7 +1550,7 @@ static int lrc_create_wa_ctx(struct intel_engine_cs *engine)
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
 
-	vma = i915_vma_instance(obj, &engine->gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &engine->gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		goto err;

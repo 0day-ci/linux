@@ -543,7 +543,7 @@ alloc_context_vma(struct intel_engine_cs *engine)
 	if (IS_IVYBRIDGE(i915))
 		i915_gem_object_set_cache_coherency(obj, I915_CACHE_L3_LLC);
 
-	vma = i915_vma_instance(obj, &engine->gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &engine->gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		goto err_obj;

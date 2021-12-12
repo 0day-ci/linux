@@ -1434,7 +1434,7 @@ static int __igt_reset_evict_vma(struct intel_gt *gt,
 	unsigned int pin_flags;
 	int err;
 
-	if (!gt->ggtt->num_fences && flags & EXEC_OBJECT_NEEDS_FENCE)
+	if (!gt->ggtt.num_fences && flags & EXEC_OBJECT_NEEDS_FENCE)
 		return 0;
 
 	if (!engine || !intel_engine_can_store_dword(engine))
@@ -1586,7 +1586,7 @@ static int igt_reset_evict_ggtt(void *arg)
 {
 	struct intel_gt *gt = arg;
 
-	return __igt_reset_evict_vma(gt, &gt->ggtt->vm,
+	return __igt_reset_evict_vma(gt, &gt->ggtt.vm,
 				     evict_vma, EXEC_OBJECT_WRITE);
 }
 
@@ -1615,7 +1615,7 @@ static int igt_reset_evict_fence(void *arg)
 {
 	struct intel_gt *gt = arg;
 
-	return __igt_reset_evict_vma(gt, &gt->ggtt->vm,
+	return __igt_reset_evict_vma(gt, &gt->ggtt.vm,
 				     evict_fence, EXEC_OBJECT_NEEDS_FENCE);
 }
 

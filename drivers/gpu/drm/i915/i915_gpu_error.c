@@ -1012,11 +1012,11 @@ void __i915_gpu_coredump_free(struct kref *error_ref)
 }
 
 static struct i915_vma_coredump *
-i915_vma_coredump_create(const struct intel_gt *gt,
+i915_vma_coredump_create(struct intel_gt *gt,
 			 const struct i915_vma_snapshot *vsnap,
 			 struct i915_vma_compress *compress)
 {
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	const u64 slot = ggtt->error_capture.start;
 	struct i915_vma_coredump *dst;
 	struct sgt_iter iter;
@@ -1122,7 +1122,7 @@ i915_vma_coredump_create(const struct intel_gt *gt,
 
 static void gt_record_fences(struct intel_gt_coredump *gt)
 {
-	struct i915_ggtt *ggtt = gt->_gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->_gt->ggtt;
 	struct intel_uncore *uncore = gt->_gt->uncore;
 	int i;
 
@@ -1412,7 +1412,7 @@ static void add_vma(struct intel_engine_coredump *ee,
 }
 
 static struct i915_vma_coredump *
-create_vma_coredump(const struct intel_gt *gt, struct i915_vma *vma,
+create_vma_coredump(struct intel_gt *gt, struct i915_vma *vma,
 		    const char *name, struct i915_vma_compress *compress)
 {
 	struct i915_vma_coredump *ret = NULL;
@@ -1433,7 +1433,7 @@ create_vma_coredump(const struct intel_gt *gt, struct i915_vma *vma,
 }
 
 static void add_vma_coredump(struct intel_engine_coredump *ee,
-			     const struct intel_gt *gt,
+			     struct intel_gt *gt,
 			     struct i915_vma *vma,
 			     const char *name,
 			     struct i915_vma_compress *compress)

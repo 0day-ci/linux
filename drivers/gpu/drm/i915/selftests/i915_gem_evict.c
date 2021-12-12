@@ -105,7 +105,7 @@ static void cleanup_objects(struct i915_ggtt *ggtt, struct list_head *list)
 static int igt_evict_something(void *arg)
 {
 	struct intel_gt *gt = arg;
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	LIST_HEAD(objects);
 	int err;
 
@@ -151,7 +151,7 @@ cleanup:
 static int igt_overcommit(void *arg)
 {
 	struct intel_gt *gt = arg;
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	struct drm_i915_gem_object *obj;
 	struct i915_vma *vma;
 	LIST_HEAD(objects);
@@ -188,7 +188,7 @@ cleanup:
 static int igt_evict_for_vma(void *arg)
 {
 	struct intel_gt *gt = arg;
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	struct drm_mm_node target = {
 		.start = 0,
 		.size = 4096,
@@ -239,7 +239,7 @@ static void mock_color_adjust(const struct drm_mm_node *node,
 static int igt_evict_for_cache_color(void *arg)
 {
 	struct intel_gt *gt = arg;
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	const unsigned long flags = PIN_OFFSET_FIXED;
 	struct drm_mm_node target = {
 		.start = I915_GTT_PAGE_SIZE * 2,
@@ -330,7 +330,7 @@ cleanup:
 static int igt_evict_vm(void *arg)
 {
 	struct intel_gt *gt = arg;
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	LIST_HEAD(objects);
 	int err;
 
@@ -370,7 +370,7 @@ static int igt_evict_contexts(void *arg)
 {
 	const u64 PRETEND_GGTT_SIZE = 16ull << 20;
 	struct intel_gt *gt = arg;
-	struct i915_ggtt *ggtt = gt->ggtt;
+	struct i915_ggtt *ggtt = &gt->ggtt;
 	struct drm_i915_private *i915 = gt->i915;
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;

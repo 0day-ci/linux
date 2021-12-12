@@ -348,7 +348,7 @@ int intel_guc_init(struct intel_guc *guc)
 	guc_init_params(guc);
 
 	/* We need to notify the guc whenever we change the GGTT */
-	i915_ggtt_enable_guc(gt->ggtt);
+	i915_ggtt_enable_guc(&gt->ggtt);
 
 	intel_uc_fw_change_status(&guc->fw, INTEL_UC_FIRMWARE_LOADABLE);
 
@@ -376,7 +376,7 @@ void intel_guc_fini(struct intel_guc *guc)
 	if (!intel_uc_fw_is_loadable(&guc->fw))
 		return;
 
-	i915_ggtt_disable_guc(gt->ggtt);
+	i915_ggtt_disable_guc(&gt->ggtt);
 
 	if (intel_guc_slpc_is_used(guc))
 		intel_guc_slpc_fini(&guc->slpc);
@@ -659,7 +659,7 @@ struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size)
 	if (IS_ERR(obj))
 		return ERR_CAST(obj);
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma))
 		goto err;
 

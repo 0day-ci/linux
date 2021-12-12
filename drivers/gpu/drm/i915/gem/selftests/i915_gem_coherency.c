@@ -265,7 +265,7 @@ static bool needs_fence_registers(struct context *ctx)
 	if (intel_gt_is_wedged(gt))
 		return false;
 
-	return gt->ggtt->num_fences;
+	return gt->ggtt.num_fences;
 }
 
 static bool needs_mi_store_dword(struct context *ctx)

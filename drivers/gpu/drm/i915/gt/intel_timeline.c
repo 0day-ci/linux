@@ -25,7 +25,7 @@ static struct i915_vma *hwsp_alloc(struct intel_gt *gt)
 
 	i915_gem_object_set_cache_coherency(obj, I915_CACHE_LLC);
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma))
 		i915_gem_object_put(obj);
 

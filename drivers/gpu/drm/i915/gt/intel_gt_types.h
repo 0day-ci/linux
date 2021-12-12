@@ -69,7 +69,7 @@ enum intel_submission_method {
 struct intel_gt {
 	struct drm_i915_private *i915;
 	struct intel_uncore *uncore;
-	struct i915_ggtt *ggtt;
+	struct i915_ggtt ggtt;
 
 	struct intel_uc uc;
 

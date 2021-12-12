@@ -723,19 +723,19 @@ static void revoke_mmaps(struct intel_gt *gt)
 {
 	int i;
 
-	for (i = 0; i < gt->ggtt->num_fences; i++) {
+	for (i = 0; i < gt->ggtt.num_fences; i++) {
 		struct drm_vma_offset_node *node;
 		struct i915_vma *vma;
 		u64 vma_offset;
 
-		vma = READ_ONCE(gt->ggtt->fence_regs[i].vma);
+		vma = READ_ONCE(gt->ggtt.fence_regs[i].vma);
 		if (!vma)
 			continue;
 
 		if (!i915_vma_has_userfault(vma))
 			continue;
 
-		GEM_BUG_ON(vma->fence != &gt->ggtt->fence_regs[i]);
+		GEM_BUG_ON(vma->fence != &gt->ggtt.fence_regs[i]);
 
 		if (!vma->mmo)
 			continue;
@@ -793,7 +793,7 @@ static int gt_reset(struct intel_gt *gt, intel_engine_mask_t stalled_mask)
 
 	intel_uc_reset(&gt->uc, true);
 
-	intel_ggtt_restore_fences(gt->ggtt);
+	intel_ggtt_restore_fences(&gt->ggtt);
 
 	return err;
 }

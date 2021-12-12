@@ -999,7 +999,7 @@ static int live_timeslice_preempt(void *arg)
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		goto err_obj;
@@ -1306,7 +1306,7 @@ static int live_timeslice_queue(void *arg)
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		goto err_obj;
@@ -1561,7 +1561,7 @@ static int live_busywait_preempt(void *arg)
 		goto err_obj;
 	}
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		goto err_map;
@@ -3123,7 +3123,7 @@ static struct i915_vma *create_global(struct intel_gt *gt, size_t sz)
 	if (IS_ERR(obj))
 		return ERR_CAST(obj);
 
-	vma = i915_vma_instance(obj, &gt->ggtt->vm, NULL);
+	vma = i915_vma_instance(obj, &gt->ggtt.vm, NULL);
 	if (IS_ERR(vma)) {
 		i915_gem_object_put(obj);
 		return vma;
@@ -4205,7 +4205,7 @@ static int preserved_virtual_engine(struct intel_gt *gt,
 	u32 *cs;
 
 	scratch =
-		__vm_create_scratch_for_read_pinned(&siblings[0]->gt->ggtt->vm,
+		__vm_create_scratch_for_read_pinned(&siblings[0]->gt->ggtt.vm,
 						    PAGE_SIZE);
 	if (IS_ERR(scratch))
 		return PTR_ERR(scratch);

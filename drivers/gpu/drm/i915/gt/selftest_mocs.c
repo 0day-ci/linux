@@ -76,7 +76,7 @@ static int live_mocs_init(struct live_mocs *arg, struct intel_gt *gt)
 		arg->mocs = &arg->table;
 
 	arg->scratch =
-		__vm_create_scratch_for_read_pinned(&gt->ggtt->vm, PAGE_SIZE);
+		__vm_create_scratch_for_read_pinned(&gt->ggtt.vm, PAGE_SIZE);
 	if (IS_ERR(arg->scratch))
 		return PTR_ERR(arg->scratch);
 

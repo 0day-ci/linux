@@ -1374,7 +1374,7 @@ static int igt_ctx_readonly(void *arg)
 		goto out_file;
 	}
 
-	vm = ctx->vm ?: &to_gt(i915)->ggtt->alias->vm;
+	vm = ctx->vm ?: &to_gt(i915)->ggtt.alias->vm;
 	if (!vm || !vm->has_read_only) {
 		err = 0;
 		goto out_file;
@@ -1637,7 +1637,7 @@ static int read_from_scratch(struct i915_gem_context *ctx,
 		const u32 reg = engine->mmio_base + 0x420;
 
 		/* hsw: register access even to 3DPRIM! is protected */
-		vm = i915_vm_get(&engine->gt->ggtt->vm);
+		vm = i915_vm_get(&engine->gt->ggtt.vm);
 		vma = i915_vma_instance(obj, vm, NULL);
 		if (IS_ERR(vma)) {
 			err = PTR_ERR(vma);

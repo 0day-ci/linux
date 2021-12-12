@@ -2702,7 +2702,7 @@ static int engine_wa_list_verify(struct intel_context *ce,
 	if (!wal->count)
 		return 0;
 
-	vma = __vm_create_scratch_for_read(&ce->engine->gt->ggtt->vm,
+	vma = __vm_create_scratch_for_read(&ce->engine->gt->ggtt.vm,
 					   wal->count * sizeof(u32));
 	if (IS_ERR(vma))
 		return PTR_ERR(vma);

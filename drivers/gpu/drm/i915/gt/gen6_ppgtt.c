@@ -159,7 +159,7 @@ static void gen6_flush_pd(struct gen6_ppgtt *ppgtt, u64 start, u64 end)
 
 	mb();
 	ioread32(ppgtt->pd_addr + pde - 1);
-	gen6_ggtt_invalidate(ppgtt->base.vm.gt->ggtt);
+	gen6_ggtt_invalidate(&ppgtt->base.vm.gt->ggtt);
 	mb();
 
 	mutex_unlock(&ppgtt->flush);
@@ -385,7 +385,7 @@ static const struct drm_i915_gem_object_ops pd_dummy_obj_ops = {
 static struct i915_page_directory *
 gen6_alloc_top_pd(struct gen6_ppgtt *ppgtt)
 {
-	struct i915_ggtt * const ggtt = ppgtt->base.vm.gt->ggtt;
+	struct i915_ggtt * const ggtt = &ppgtt->base.vm.gt->ggtt;
 	struct i915_page_directory *pd;
 	int err;
 
@@ -433,7 +433,7 @@ void gen6_ppgtt_unpin(struct i915_ppgtt *base)
 
 struct i915_ppgtt *gen6_ppgtt_create(struct intel_gt *gt)
 {
-	struct i915_ggtt * const ggtt = gt->ggtt;
+	struct i915_ggtt * const ggtt = &gt->ggtt;
 	struct gen6_ppgtt *ppgtt;
 	int err;
 

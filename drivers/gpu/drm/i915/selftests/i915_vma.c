@@ -926,9 +926,9 @@ int i915_vma_mock_selftests(void)
 	mock_device_flush(i915);
 	i915_gem_drain_freed_objects(i915);
 	mock_fini_ggtt(ggtt);
+	mock_destroy_device(i915);
 	kfree(ggtt);
 out_put:
-	mock_destroy_device(i915);
 	return err;
 }
 
@@ -967,7 +967,7 @@ static int igt_vma_remapped_gtt(void *arg)
 	intel_wakeref_t wakeref;
 	int err = 0;
 
-	if (!i915_ggtt_has_aperture(to_gt(i915)->ggtt))
+	if (!i915_ggtt_has_aperture(&to_gt(i915)->ggtt))
 		return 0;
 
 	obj = i915_gem_object_create_internal(i915, 10 * 10 * PAGE_SIZE);
