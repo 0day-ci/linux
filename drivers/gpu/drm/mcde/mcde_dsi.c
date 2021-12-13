@@ -1110,6 +1110,7 @@ static int mcde_dsi_bind(struct device *dev, struct device *master,
 
 			bridge = of_drm_find_bridge(child);
 			if (!bridge) {
+				of_node_put(child);
 				dev_err(dev, "failed to find bridge\n");
 				return -EINVAL;
 			}
