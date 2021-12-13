@@ -44,6 +44,13 @@ enum {
 	MCU_EXT_EVENT_RDD_REPORT = 0x3a,
 	MCU_EXT_EVENT_CSA_NOTIFY = 0x4f,
 	MCU_EXT_EVENT_BCC_NOTIFY = 0x75,
+	MCU_EXT_EVENT_MURU_CTRL = 0x9f,
+};
+
+/* tx cmd tx statistics */
+enum {
+	MURU_SET_TXC_TX_STATS_EN = 150,
+	MURU_GET_TXC_TX_STATS = 151,
 };
 
 enum {
@@ -205,6 +212,44 @@ struct mt7915_mcu_tx {
 
 	struct edca edca[IEEE80211_NUM_ACS];
 } __packed;
+
+struct mt7915_mcu_muru_stats {
+	__le32 event_id;
+	struct {
+		__le32 cck_cnt;
+		__le32 ofdm_cnt;
+		__le32 htmix_cnt;
+		__le32 htgf_cnt;
+		__le32 vht_su_cnt;
+		__le32 vht_2mu_cnt;
+		__le32 vht_3mu_cnt;
+		__le32 vht_4mu_cnt;
+		__le32 he_su_cnt;
+		__le32 he_ext_su_cnt;
+		__le32 he_2ru_cnt;
+		__le32 he_2mu_cnt;
+		__le32 he_3ru_cnt;
+		__le32 he_3mu_cnt;
+		__le32 he_4ru_cnt;
+		__le32 he_4mu_cnt;
+		__le32 he_5to8ru_cnt;
+		__le32 he_9to16ru_cnt;
+		__le32 he_gtr16ru_cnt;
+	} dl;
+
+	struct {
+		__le32 hetrig_su_cnt;
+		__le32 hetrig_2ru_cnt;
+		__le32 hetrig_3ru_cnt;
+		__le32 hetrig_4ru_cnt;
+		__le32 hetrig_5to8ru_cnt;
+		__le32 hetrig_9to16ru_cnt;
+		__le32 hetrig_gtr16ru_cnt;
+		__le32 hetrig_2mu_cnt;
+		__le32 hetrig_3mu_cnt;
+		__le32 hetrig_4mu_cnt;
+	} ul;
+};
 
 #define WMM_AIFS_SET		BIT(0)
 #define WMM_CW_MIN_SET		BIT(1)
