@@ -65,7 +65,13 @@ static bool key_equal(const void *key1, const void *key2,
 
 struct hashmap *ids__new(void)
 {
-	return hashmap__new(key_hash, key_equal, NULL);
+	struct hashmap *hash;
+
+	hash = hashmap__new(key_hash, key_equal, NULL);
+	if (IS_ERR(hash))
+		return NULL;
+	else
+		return hash;
 }
 
 void ids__free(struct hashmap *ids)
