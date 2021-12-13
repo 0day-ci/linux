@@ -1036,3 +1036,33 @@ void media_remove_intf_links(struct media_interface *intf)
 	mutex_unlock(&mdev->graph_mutex);
 }
 EXPORT_SYMBOL_GPL(media_remove_intf_links);
+
+struct media_link *media_create_ancillary_link(struct media_entity *primary,
+					       struct media_entity *ancillary,
+					       u32 flags)
+{
+	struct media_link *link;
+
+	link = media_add_link(&primary->links);
+	if (!link)
+		return ERR_PTR(-ENOMEM);
+
+	link->gobj0 = &primary->graph_obj;
+	link->gobj1 = &ancillary->graph_obj;
+	link->flags = flags | MEDIA_LNK_FL_ANCILLARY_LINK;
+
+	/* Initialize graph object embedded at the new link */
+	media_gobj_create(primary->graph_obj.mdev, MEDIA_GRAPH_LINK,
+			  &link->graph_obj);
+
+	return link;
+}
+EXPORT_SYMBOL_GPL(media_create_ancillary_link);
+
+void media_remove_ancillary_link(struct media_link *link)
+{
+	list_del(&link->list);
+	media_gobj_destroy(&link->graph_obj);
+	kfree(link);
+}
+EXPORT_SYMBOL_GPL(media_remove_ancillary_link);

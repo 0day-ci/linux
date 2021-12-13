@@ -1104,6 +1104,35 @@ void media_remove_intf_links(struct media_interface *intf);
  * it will issue a call to @operation\(@entity, @args\).
  */
 
+/**
+ * media_create_ancillary_link() - creates a link between two entities
+ *
+ * @primary:	pointer to the primary &media_entity
+ * @ancillary:	pointer to the ancillary &media_entity
+ * @flags:	Link flags, as defined in
+ *		:ref:`include/uapi/linux/media.h <media_header>`
+ *		( seek for ``MEDIA_LNK_FL_*``)
+ *
+ *
+ * Valid values for flags:
+ *
+ * %MEDIA_LNK_FL_ENABLED
+ *   Indicates that the two entities are connected pieces of hardware that form
+ *   a single logical unit.
+ *
+ *   A typical example is a camera lens being linked to the sensor that it is
+ *   supporting.
+ *
+ * %MEDIA_LNK_FL_IMMUTABLE
+ *   Indicates that the link enabled state can't be modified at runtime. If
+ *   %MEDIA_LNK_FL_IMMUTABLE is set, then %MEDIA_LNK_FL_ENABLED must also be
+ *   set, since an immutable link is always enabled.
+ */
+struct media_link *
+media_create_ancillary_link(struct media_entity *primary,
+			    struct media_entity *ancillary,
+			    u32 flags);
+
 #define media_entity_call(entity, operation, args...)			\
 	(((entity)->ops && (entity)->ops->operation) ?			\
 	 (entity)->ops->operation((entity) , ##args) : -ENOIOCTLCMD)
