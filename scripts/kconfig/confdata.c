@@ -874,16 +874,21 @@ int conf_write(const char *name)
 	menu = rootmenu.list;
 	while (menu) {
 		sym = menu->sym;
-		if (!sym) {
-			if (!menu_is_visible(menu))
-				goto next;
-			str = menu_get_prompt(menu);
-			fprintf(out, "\n"
-				     "#\n"
-				     "# %s\n"
-				     "#\n", str);
-			need_newline = false;
-		} else if (!(sym->flags & SYMBOL_CHOICE) &&
+
+		if (menu_is_visible(menu)) {
+			enum prop_type type = menu->prompt->type;
+
+			if (type == P_MENU || type == P_COMMENT) {
+				str = menu_get_prompt(menu);
+				fprintf(out, "\n"
+					"#\n"
+					"# %s\n"
+					"#\n", str);
+				need_newline = false;
+			}
+		}
+
+		if (sym && !(sym->flags & SYMBOL_CHOICE) &&
 			   !(sym->flags & SYMBOL_WRITTEN)) {
 			sym_calc_value(sym);
 			if (!(sym->flags & SYMBOL_WRITE))
@@ -904,7 +909,8 @@ next:
 		if (menu->next)
 			menu = menu->next;
 		else while ((menu = menu->parent)) {
-			if (!menu->sym && menu_is_visible(menu) &&
+			if (menu_is_visible(menu) &&
+			    menu->prompt->type == P_MENU &&
 			    menu != &rootmenu) {
 				str = menu_get_prompt(menu);
 				fprintf(out, "# end of %s\n", str);
