@@ -268,6 +268,24 @@ u64 mark_spte_for_access_track(u64 spte)
 	return spte;
 }
 
+/* Restore an acc-track PTE back to a regular PTE */
+u64 restore_acc_track_spte(u64 spte)
+{
+	u64 new_spte = spte;
+	u64 saved_bits = (spte >> SHADOW_ACC_TRACK_SAVED_BITS_SHIFT)
+			 & SHADOW_ACC_TRACK_SAVED_BITS_MASK;
+
+	WARN_ON_ONCE(spte_ad_enabled(spte));
+	WARN_ON_ONCE(!is_access_track_spte(spte));
+
+	new_spte &= ~shadow_acc_track_mask;
+	new_spte &= ~(SHADOW_ACC_TRACK_SAVED_BITS_MASK <<
+		      SHADOW_ACC_TRACK_SAVED_BITS_SHIFT);
+	new_spte |= saved_bits;
+
+	return new_spte;
+}
+
 void kvm_mmu_set_mmio_spte_mask(u64 mmio_value, u64 mmio_mask, u64 access_mask)
 {
 	BUG_ON((u64)(unsigned)access_mask != access_mask);
