@@ -460,8 +460,10 @@ static void *of_iterate_over_cpus(void *(*func)(struct device_node *, int, int),
 		}
 #endif
 		ret = func(dp, cpuid, arg);
-		if (ret)
+		if (ret) {
+			of_node_put(dp);
 			return ret;
+		}
 	}
 	return NULL;
 }
