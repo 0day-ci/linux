@@ -660,6 +660,25 @@ static void scrub_spilled_slot(u8 *stype)
 		*stype = STACK_MISC;
 }
 
+static u32 vlog_alignment(u32 prev_insn_print_len)
+{
+	if (prev_insn_print_len < BPF_LOG_ALIGNMENT_POS)
+		return BPF_LOG_ALIGNMENT_POS - prev_insn_print_len;
+	return round_up(prev_insn_print_len, BPF_LOG_MIN_ALIGNMENT) -
+	       prev_insn_print_len;
+}
+
+static void print_insn_state(struct bpf_verifier_env *env, u32 prev_log_len,
+			     u32 prev_insn_print_len)
+{
+	if ((prev_log_len == env->log.len_used) &&
+	    (env->prev_insn_idx == env->insn_idx - 1)) {
+		bpf_vlog_reset(&env->log, prev_log_len - 1);
+		verbose(env, "%*c;", vlog_alignment(prev_insn_print_len), ' ');
+	} else
+		verbose(env, "%d:", env->insn_idx);
+}
+
 static void print_verifier_state(struct bpf_verifier_env *env,
 				 const struct bpf_func_state *state)
 {
@@ -11259,6 +11278,7 @@ static bool reg_type_mismatch(enum bpf_reg_type src, enum bpf_reg_type prev)
 
 static int do_check(struct bpf_verifier_env *env)
 {
+	u32 prev_log_len, prev_insn_print_len;
 	bool pop_log = !(env->log.level & BPF_LOG_LEVEL2);
 	struct bpf_verifier_state *state = env->cur_state;
 	struct bpf_insn *insns = env->prog->insnsi;
@@ -11316,7 +11336,8 @@ static int do_check(struct bpf_verifier_env *env)
 		    (env->log.level & BPF_LOG_LEVEL && do_print_state)) {
 			if (verifier_state_scratched(env) &&
 			    (env->log.level & BPF_LOG_LEVEL2))
-				verbose(env, "%d:", env->insn_idx);
+				print_insn_state(env, prev_log_len,
+						 prev_insn_print_len);
 			else
 				verbose(env, "\nfrom %d to %d%s:",
 					env->prev_insn_idx, env->insn_idx,
@@ -11334,8 +11355,11 @@ static int do_check(struct bpf_verifier_env *env)
 			};
 
 			verbose_linfo(env, env->insn_idx, "; ");
+			prev_log_len = env->log.len_used;
 			verbose(env, "%d: ", env->insn_idx);
 			print_bpf_insn(&cbs, insn, env->allow_ptr_leaks);
+			prev_insn_print_len = env->log.len_used - prev_log_len;
+			prev_log_len = env->log.len_used;
 		}
 
 		if (bpf_prog_is_dev_bound(env->prog->aux)) {

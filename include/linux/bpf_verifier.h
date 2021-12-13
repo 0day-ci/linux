@@ -388,6 +388,8 @@ static inline bool bpf_verifier_log_full(const struct bpf_verifier_log *log)
 #define BPF_LOG_LEVEL	(BPF_LOG_LEVEL1 | BPF_LOG_LEVEL2)
 #define BPF_LOG_MASK	(BPF_LOG_LEVEL | BPF_LOG_STATS)
 #define BPF_LOG_KERNEL	(BPF_LOG_MASK + 1) /* kernel internal flag */
+#define BPF_LOG_MIN_ALIGNMENT 8
+#define BPF_LOG_ALIGNMENT_POS 32
 
 static inline bool bpf_verifier_log_needed(const struct bpf_verifier_log *log)
 {
