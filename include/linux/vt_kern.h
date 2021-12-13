@@ -149,6 +149,7 @@ void hide_boot_cursor(bool hide);
 /* keyboard  provided interfaces */
 int vt_do_diacrit(unsigned int cmd, void __user *up, int eperm);
 int vt_do_kdskbmode(unsigned int console, unsigned int arg);
+int vt_do_kdskbledctl(unsigned int console, unsigned int arg);
 int vt_do_kdskbmeta(unsigned int console, unsigned int arg);
 int vt_do_kbkeycode_ioctl(int cmd, struct kbkeycode __user *user_kbkc,
 			  int perm);
@@ -157,6 +158,7 @@ int vt_do_kdsk_ioctl(int cmd, struct kbentry __user *user_kbe, int perm,
 int vt_do_kdgkb_ioctl(int cmd, struct kbsentry __user *user_kdgkb, int perm);
 int vt_do_kdskled(unsigned int console, int cmd, unsigned long arg, int perm);
 int vt_do_kdgkbmode(unsigned int console);
+int vt_do_kdgkbledctl(unsigned int console);
 int vt_do_kdgkbmeta(unsigned int console);
 void vt_reset_unicode(unsigned int console);
 int vt_get_shift_state(void);

@@ -405,6 +405,18 @@ static int vt_k_ioctl(struct tty_struct *tty, unsigned int cmd,
 	case KDGKBMODE:
 		return put_user(vt_do_kdgkbmode(console), (int __user *)arg);
 
+	case KDSKBLEDCTL:
+		if (!perm)
+			return -EPERM;
+		ret = vt_do_kdskbledctl(console, arg);
+		if (ret)
+			return ret;
+		tty_ldisc_flush(tty);
+		break;
+
+	case KDGKBLEDCTL:
+		return put_user(vt_do_kdgkbledctl(console), (int __user *)arg);
+
 	/* this could be folded into KDSKBMODE, but for compatibility
 	   reasons it is not so easy to fold KDGKBMETA into KDGKBMODE */
 	case KDSKBMETA:

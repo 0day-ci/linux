@@ -153,6 +153,7 @@ static int shift_state = 0;
 
 static unsigned int ledstate = -1U;			/* undefined */
 static unsigned char ledioctl;
+static bool vt_switch;
 
 /*
  * Notifier list for console keyboard events
@@ -414,6 +415,12 @@ void vt_set_leds_compute_shiftstate(void)
 {
 	unsigned long flags;
 
+	/*
+	 * When switching VT,according to the value of vt_switch,
+	 * judge whether it is necessary to force the keyboard light
+	 * state to be issued.
+	 */
+	vt_switch = true;
 	set_leds();
 
 	spin_lock_irqsave(&kbd_event_lock, flags);
@@ -1247,13 +1254,23 @@ void vt_kbd_con_stop(unsigned int console)
  */
 static void kbd_bh(struct tasklet_struct *unused)
 {
+	struct kbd_struct *kb;
 	unsigned int leds;
 	unsigned long flags;
+
+	kb = kbd_table + fg_console;
+	if (kb->kbdledctl == VC_LEDCTL_OFF)
+		return;
 
 	spin_lock_irqsave(&led_lock, flags);
 	leds = getleds();
 	leds |= (unsigned int)kbd->lockstate << 8;
 	spin_unlock_irqrestore(&led_lock, flags);
+
+	if (vt_switch) {
+		ledstate = ~leds;
+		vt_switch = false;
+	}
 
 	if (leds != ledstate) {
 		kbd_propagate_led_state(ledstate, leds);
@@ -1858,6 +1875,35 @@ int vt_do_kdskbmode(unsigned int console, unsigned int arg)
 }
 
 /**
+ *	vt_do_kdskbledctl		-	set whether VT can control led
+ *	@console: the console to use
+ *	@arg: the requested mode
+ *
+ *	Whether to allow the current vt to change the
+ *	keyboard light
+ */
+int vt_do_kdskbledctl(unsigned int console, unsigned int arg)
+{
+	struct kbd_struct *kb = &kbd_table[console];
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&kbd_event_lock, flags);
+	switch (arg) {
+	case K_LEDCTL_ON:
+		kb->kbdledctl = VC_LEDCTL_ON;
+		break;
+	case K_LEDCTL_OFF:
+		kb->kbdledctl = VC_LEDCTL_OFF;
+		break;
+	default:
+		ret = -EINVAL;
+	}
+	spin_unlock_irqrestore(&kbd_event_lock, flags);
+	return ret;
+}
+
+/**
  *	vt_do_kdskbmeta		-	set keyboard meta state
  *	@console: the console to use
  *	@arg: the requested meta state
@@ -2154,6 +2200,21 @@ int vt_do_kdgkbmode(unsigned int console)
 		return K_OFF;
 	default:
 		return K_XLATE;
+	}
+}
+
+int vt_do_kdgkbledctl(unsigned int console)
+{
+	struct kbd_struct *kb = &kbd_table[console];
+
+	/* This is a spot read so needs no locking */
+	switch (kb->kbdledctl) {
+	case VC_LEDCTL_ON:
+		return K_LEDCTL_ON;
+	case VC_LEDCTL_OFF:
+		return K_LEDCTL_OFF;
+	default:
+		return K_LEDCTL_ON;
 	}
 }
 

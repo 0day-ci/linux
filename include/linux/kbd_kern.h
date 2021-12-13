@@ -32,6 +32,10 @@ struct kbd_struct {
 #define VC_CTRLRLOCK	KG_CTRLR 	/* ctrlr lock mode */
 	unsigned char slockstate; 	/* for `sticky' Shift, Ctrl, etc. */
 
+	unsigned char kbdledctl:1； /* Whether to allow to control the led of the keyboard */
+#define VC_LEDCTL_ON  0	/* VT can set the keyboard light */
+#define VC_LEDCTL_OFF 1	/* Prohibit VT to set the keyboard light */
+
 	unsigned char ledmode:1;
 #define LED_SHOW_FLAGS 0        /* traditional state */
 #define LED_SHOW_IOCTL 1        /* only change leds upon ioctl */

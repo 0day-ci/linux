@@ -86,6 +86,11 @@ struct unimapinit {
 #define KDGKBMODE	0x4B44	/* gets current keyboard mode */
 #define KDSKBMODE	0x4B45	/* sets current keyboard mode */
 
+#define K_LEDCTL_ON 0x00
+#define K_LEDCTL_OFF 0x01
+#define KDGKBLEDCTL  0x4B73  /* set whether to allow control of keyboard lights */
+#define KDSKBLEDCTL  0x4B74  /* get whether the keyboard light is currently allowed to be set */
+
 #define		K_METABIT	0x03
 #define		K_ESCPREFIX	0x04
 #define KDGKBMETA	0x4B62	/* gets meta key handling mode */
@@ -179,6 +184,6 @@ struct console_font {
 
 /* note: 0x4B00-0x4B4E all have had a value at some time;
    don't reuse for the time being */
-/* note: 0x4B60-0x4B6D, 0x4B70-0x4B72 used above */
+/* note: 0x4B60-0x4B6D, 0x4B70-0x4B74 used above */
 
 #endif /* _UAPI_LINUX_KD_H */
