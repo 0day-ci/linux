@@ -157,13 +157,18 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 		if (kvm_mmu_page_as_id(_root) != _as_id) {		\
 		} else
 
-static struct kvm_mmu_page *alloc_tdp_mmu_page(struct kvm_vcpu *vcpu, gfn_t gfn,
-					       union kvm_mmu_page_role role)
+static struct kvm_mmu_page *alloc_tdp_mmu_page_from_caches(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu_page *sp;
 
 	sp = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_page_header_cache);
 	sp->spt = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_shadow_page_cache);
+
+	return sp;
+}
+
+static void init_tdp_mmu_page(struct kvm_mmu_page *sp, gfn_t gfn, union kvm_mmu_page_role role)
+{
 	set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
 
 	sp->role = role;
@@ -171,11 +176,9 @@ static struct kvm_mmu_page *alloc_tdp_mmu_page(struct kvm_vcpu *vcpu, gfn_t gfn,
 	sp->tdp_mmu_page = true;
 
 	trace_kvm_mmu_get_page(sp, true);
-
-	return sp;
 }
 
-static struct kvm_mmu_page *alloc_child_tdp_mmu_page(struct kvm_vcpu *vcpu, struct tdp_iter *iter)
+static void init_child_tdp_mmu_page(struct kvm_mmu_page *child_sp, struct tdp_iter *iter)
 {
 	struct kvm_mmu_page *parent_sp;
 	union kvm_mmu_page_role role;
@@ -185,7 +188,17 @@ static struct kvm_mmu_page *alloc_child_tdp_mmu_page(struct kvm_vcpu *vcpu, stru
 	role = parent_sp->role;
 	role.level--;
 
-	return alloc_tdp_mmu_page(vcpu, iter->gfn, role);
+	init_tdp_mmu_page(child_sp, iter->gfn, role);
+}
+
+static struct kvm_mmu_page *alloc_child_tdp_mmu_page(struct kvm_vcpu *vcpu, struct tdp_iter *iter)
+{
+	struct kvm_mmu_page *child_sp;
+
+	child_sp = alloc_tdp_mmu_page_from_caches(vcpu);
+	init_child_tdp_mmu_page(child_sp, iter);
+
+	return child_sp;
 }
 
 hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu)
@@ -210,7 +223,10 @@ hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu)
 			goto out;
 	}
 
-	root = alloc_tdp_mmu_page(vcpu, 0, role);
+	root = alloc_tdp_mmu_page_from_caches(vcpu);
+
+	init_tdp_mmu_page(root, 0, role);
+
 	refcount_set(&root->tdp_mmu_root_count, 1);
 
 	spin_lock(&kvm->arch.tdp_mmu_pages_lock);
