@@ -66,6 +66,8 @@ static inline struct cgroup_fs_context *cgroup_fc2context(struct fs_context *fc)
 }
 
 struct cgroup_file_ctx {
+	struct cgroup_namespace	*ns;
+
 	struct {
 		bool			started;
 		struct css_task_iter	iter;
