@@ -2251,6 +2251,9 @@ static int cpuset_init_fs_context(struct fs_context *fc)
 	struct cgroup_fs_context *ctx;
 	int err;
 
+	if (!agent)
+		return -ENOMEM;
+
 	err = cgroup_init_fs_context(fc);
 	if (err) {
 		kfree(agent);
