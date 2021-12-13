@@ -595,12 +595,6 @@ void page_cache_async_ra(struct readahead_control *ractl,
 
 	ClearPageReadahead(page);
 
-	/*
-	 * Defer asynchronous read-ahead on IO congestion.
-	 */
-	if (inode_read_congested(ractl->mapping->host))
-		return;
-
 	if (blk_cgroup_congested())
 		return;
 
