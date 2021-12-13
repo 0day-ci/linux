@@ -352,6 +352,8 @@ extern int pi_inject_timer;
 
 extern bool report_ignored_msrs;
 
+extern bool eagerly_split_huge_pages_for_dirty_logging;
+
 static inline u64 nsec_to_cycles(struct kvm_vcpu *vcpu, u64 nsec)
 {
 	return pvclock_scale_delta(nsec, vcpu->arch.virtual_tsc_mult,

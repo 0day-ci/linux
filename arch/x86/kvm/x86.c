@@ -187,7 +187,7 @@ module_param(force_emulation_prefix, bool, S_IRUGO);
 int __read_mostly pi_inject_timer = -1;
 module_param(pi_inject_timer, bint, S_IRUGO | S_IWUSR);
 
-static bool __read_mostly eagerly_split_huge_pages_for_dirty_logging = true;
+bool __read_mostly eagerly_split_huge_pages_for_dirty_logging = true;
 module_param(eagerly_split_huge_pages_for_dirty_logging, bool, 0644);
 
 /*

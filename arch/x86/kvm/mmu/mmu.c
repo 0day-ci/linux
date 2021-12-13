@@ -1362,6 +1362,20 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 		gfn_t start = slot->base_gfn + gfn_offset + __ffs(mask);
 		gfn_t end = slot->base_gfn + gfn_offset + __fls(mask);
 
+		/*
+		 * Try to proactively split any huge pages down to 4KB so that
+		 * vCPUs don't have to take write-protection faults.
+		 *
+		 * Drop the MMU lock since huge page splitting uses its own
+		 * locking scheme and does not require the write lock in all
+		 * cases.
+		 */
+		if (READ_ONCE(eagerly_split_huge_pages_for_dirty_logging)) {
+			write_unlock(&kvm->mmu_lock);
+			kvm_mmu_try_split_huge_pages(kvm, slot, start, end, PG_LEVEL_4K);
+			write_lock(&kvm->mmu_lock);
+		}
+
 		kvm_mmu_slot_gfn_write_protect(kvm, slot, start, PG_LEVEL_2M);
 
 		/* Cross two large pages? */
@@ -5811,18 +5825,28 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 		kvm_arch_flush_remote_tlbs_memslot(kvm, memslot);
 }
 
-void kvm_mmu_slot_try_split_huge_pages(struct kvm *kvm,
-				       const struct kvm_memory_slot *memslot,
-				       int target_level)
+void kvm_mmu_try_split_huge_pages(struct kvm *kvm,
+				   const struct kvm_memory_slot *memslot,
+				   u64 start, u64 end,
+				   int target_level)
 {
-	u64 start = memslot->base_gfn;
-	u64 end = start + memslot->npages;
-
 	if (is_tdp_mmu_enabled(kvm)) {
 		read_lock(&kvm->mmu_lock);
 		kvm_tdp_mmu_try_split_huge_pages(kvm, memslot, start, end, target_level);
 		read_unlock(&kvm->mmu_lock);
 	}
+}
+
+void kvm_mmu_slot_try_split_huge_pages(struct kvm *kvm,
+					const struct kvm_memory_slot *memslot,
+					int target_level)
+{
+	u64 start, end;
+
+	start = memslot->base_gfn;
+	end = start + memslot->npages;
+
+	kvm_mmu_try_split_huge_pages(kvm, memslot, start, end, target_level);
 }
 
 static bool kvm_mmu_zap_collapsible_spte(struct kvm *kvm,
