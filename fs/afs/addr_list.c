@@ -90,8 +90,10 @@ struct afs_vlserver_list *afs_parse_text_addrs(struct afs_net *net,
 			problem = "nul";
 			goto inval;
 		}
-		if (*p == delim)
+		if (*p == delim) {
+			p++;
 			continue;
+		}
 		nr++;
 		if (*p == '[') {
 			p++;
@@ -146,6 +148,10 @@ struct afs_vlserver_list *afs_parse_text_addrs(struct afs_net *net,
 		if (*p == '[') {
 			p++;
 			q = memchr(p, ']', end - p);
+			if (!q) {
+				problem = "brace2";
+				goto bad_address;
+			}
 		} else {
 			for (q = p; q < end; q++)
 				if (*q == '+' || *q == delim)
