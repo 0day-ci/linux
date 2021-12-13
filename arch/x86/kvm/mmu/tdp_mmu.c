@@ -1325,6 +1325,8 @@ tdp_mmu_split_huge_page_atomic(struct kvm *kvm, struct tdp_iter *iter, struct kv
 	u64 child_spte;
 	int i;
 
+	trace_kvm_mmu_split_huge_page(iter->gfn, huge_spte, level);
+
 	init_child_tdp_mmu_page(sp, iter);
 
 	for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
