@@ -779,18 +779,6 @@ bool __kvm_tdp_mmu_zap_gfn_range(struct kvm *kvm, int as_id, gfn_t start,
 	return flush;
 }
 
-void kvm_tdp_mmu_zap_all(struct kvm *kvm)
-{
-	bool flush = false;
-	int i;
-
-	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
-		flush = kvm_tdp_mmu_zap_gfn_range(kvm, i, 0, -1ull, flush);
-
-	if (flush)
-		kvm_flush_remote_tlbs(kvm);
-}
-
 static struct kvm_mmu_page *next_invalidated_root(struct kvm *kvm,
 						  struct kvm_mmu_page *prev_root)
 {
@@ -886,6 +874,19 @@ void kvm_tdp_mmu_invalidate_all_roots(struct kvm *kvm)
 	list_for_each_entry(root, &kvm->arch.tdp_mmu_roots, link)
 		if (refcount_inc_not_zero(&root->tdp_mmu_root_count))
 			root->role.invalid = true;
+}
+
+void kvm_tdp_mmu_zap_all(struct kvm *kvm)
+{
+	/*
+	 * We need to zap all roots, including already-invalid ones.  The
+	 * easiest way is to ensure there's only invalid roots which then,
+	 * for efficiency, we zap while mmu_lock is taken exclusively.
+	 * Since the MMU notifier is being torn down, contention on the
+	 * mmu_lock is not an issue.
+	 */
+	kvm_tdp_mmu_invalidate_all_roots(kvm);
+	kvm_tdp_mmu_zap_invalidated_roots(kvm, false);
 }
 
 /*
