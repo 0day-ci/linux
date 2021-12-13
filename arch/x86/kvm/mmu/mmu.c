@@ -5680,7 +5680,7 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 
 	if (is_tdp_mmu_enabled(kvm)) {
 		read_lock(&kvm->mmu_lock);
-		kvm_tdp_mmu_zap_invalidated_roots(kvm);
+		kvm_tdp_mmu_zap_invalidated_roots(kvm, true);
 		read_unlock(&kvm->mmu_lock);
 	}
 }

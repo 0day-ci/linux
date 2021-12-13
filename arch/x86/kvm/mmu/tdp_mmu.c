@@ -821,14 +821,18 @@ static struct kvm_mmu_page *next_invalidated_root(struct kvm *kvm,
  * only has to do a trivial amount of work. Since the roots are invalid,
  * no new SPTEs should be created under them.
  */
-void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm)
+void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm, bool shared)
 {
 	struct kvm_mmu_page *next_root;
 	struct kvm_mmu_page *root;
 	bool flush = false;
 
-	lockdep_assert_held_read(&kvm->mmu_lock);
+	kvm_lockdep_assert_mmu_lock_held(kvm, shared);
 
+	/*
+	 * rcu_read_lock is only needed for shared == true, but we
+	 * always take it for simplicity.
+	 */
 	rcu_read_lock();
 
 	root = next_invalidated_root(kvm, NULL);
@@ -838,13 +842,10 @@ void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm)
 
 		rcu_read_unlock();
 
-		flush = zap_gfn_range(kvm, root, 0, -1ull, true, flush, true);
+		flush = zap_gfn_range(kvm, root, 0, -1ull, true, flush, shared);
 
-		/*
-		 * Put the reference acquired in
-		 * kvm_tdp_mmu_invalidate_roots
-		 */
-		kvm_tdp_mmu_put_root(kvm, root, true);
+		/* Put the reference acquired in kvm_tdp_mmu_invalidate_roots.  */
+		kvm_tdp_mmu_put_root(kvm, root, shared);
 
 		root = next_root;
 
