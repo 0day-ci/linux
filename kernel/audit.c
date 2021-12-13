@@ -197,6 +197,9 @@ static struct audit_ctl_mutex {
 struct audit_context_entry {
 	struct list_head	list;
 	int			type;	/* Audit record type */
+	union {
+		struct lsmblob	lsm_subjs;
+	};
 };
 
 /* The audit_buffer is used when formatting an audit record.  The caller
@@ -2149,15 +2152,30 @@ int audit_log_task_context(struct audit_buffer *ab)
 	if (!lsmblob_is_set(&blob))
 		return 0;
 
-	error = security_secid_to_secctx(&blob, &context, LSMBLOB_FIRST);
-	if (error) {
-		if (error != -EINVAL)
-			goto error_path;
-		return 0;
-	}
+	if (!lsm_multiple_contexts()) {
+		error = security_secid_to_secctx(&blob, &context,
+						 LSMBLOB_FIRST);
+		if (error) {
+			if (error != -EINVAL)
+				goto error_path;
+			return 0;
+		}
+		audit_log_format(ab, " subj=%s", context.context);
+		security_release_secctx(&context);
+	} else {
+		struct audit_context_entry *ace;
 
-	audit_log_format(ab, " subj=%s", context.context);
-	security_release_secctx(&context);
+		audit_log_format(ab, " subj=?");
+		ace = kzalloc(sizeof(*ace), ab->gfp_mask);
+		if (!ace) {
+			error = -ENOMEM;
+			goto error_path;
+		}
+		INIT_LIST_HEAD(&ace->list);
+		ace->type = AUDIT_MAC_TASK_CONTEXTS;
+		ace->lsm_subjs = blob;
+		list_add(&ace->list, &ab->aux_records);
+	}
 	return 0;
 
 error_path:
@@ -2419,9 +2437,12 @@ void audit_log_end(struct audit_buffer *ab)
 	struct audit_context_entry *entry;
 	struct audit_context mcontext;
 	struct audit_context *mctx;
+	struct lsmcontext lcontext;
 	struct audit_buffer *mab;
 	struct list_head *l;
 	struct list_head *n;
+	int rc;
+	int i;
 
 	if (!ab)
 		return;
@@ -2434,6 +2455,7 @@ void audit_log_end(struct audit_buffer *ab)
 	}
 
 	if (ab->ctx == NULL) {
+		mcontext.context = AUDIT_CTX_SYSCALL;
 		mcontext.stamp = ab->stamp;
 		mctx = &mcontext;
 	} else
@@ -2447,7 +2469,27 @@ void audit_log_end(struct audit_buffer *ab)
 			continue;
 		}
 		switch (entry->type) {
-		/* Don't know of any quite yet. */
+		case AUDIT_MAC_TASK_CONTEXTS:
+			for (i = 0; i < LSMBLOB_ENTRIES; i++) {
+				if (entry->lsm_subjs.secid[i] == 0)
+					continue;
+				rc = security_secid_to_secctx(&entry->lsm_subjs,
+							      &lcontext, i);
+				if (rc) {
+					if (rc != -EINVAL)
+						audit_panic("error in audit_log_end");
+					audit_log_format(mab, "%ssubj_%s=?",
+							 i ? " " : "",
+							 lsm_slot_to_name(i));
+				} else {
+					audit_log_format(mab, "%ssubj_%s=%s",
+							 i ? " " : "",
+							 lsm_slot_to_name(i),
+							 lcontext.context);
+					security_release_secctx(&lcontext);
+				}
+			}
+			break;
 		default:
 			audit_panic("Unknown type in audit_log_end");
 			break;
