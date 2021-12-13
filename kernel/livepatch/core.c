@@ -1052,10 +1052,7 @@ int klp_enable_patch(struct klp_patch *patch)
 	}
 
 	ret = klp_init_patch_early(patch);
-	if (ret) {
-		mutex_unlock(&klp_mutex);
-		return ret;
-	}
+		goto err;
 
 	ret = klp_init_patch(patch);
 	if (ret)
