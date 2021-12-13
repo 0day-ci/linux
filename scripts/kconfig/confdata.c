@@ -880,10 +880,16 @@ int conf_write(const char *name)
 
 			if (type == P_MENU || type == P_COMMENT) {
 				str = menu_get_prompt(menu);
-				fprintf(out, "\n"
-					"#\n"
-					"# %s\n"
-					"#\n", str);
+
+				if (type == P_MENU)
+					fprintf(out, "\n"
+						"#\n"
+						"# %s\n"
+						"#\n", str);
+				else
+					fprintf(out, "\n"
+						"### %s\n", str);
+
 				need_newline = false;
 			}
 		}
