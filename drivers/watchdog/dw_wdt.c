@@ -155,6 +155,9 @@ static unsigned int dw_wdt_get_min_timeout(struct dw_wdt *dw_wdt)
 			break;
 	}
 
+	if (idx == DW_WDT_NUM_TOPS)
+		return 1;
+
 	return dw_wdt->timeouts[idx].sec;
 }
 
