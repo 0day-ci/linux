@@ -357,12 +357,22 @@ static int __init vc4_drm_register(void)
 {
 	int ret;
 
-	ret = platform_register_drivers(component_drivers,
-					ARRAY_SIZE(component_drivers));
-	if (ret)
-		return ret;
+	if (!drm_firmware_drivers_only()) {
+		ret = platform_register_drivers(component_drivers,
+						ARRAY_SIZE(component_drivers));
+		if (ret)
+			return ret;
 
-	return platform_driver_register(&vc4_platform_driver);
+		ret = platform_driver_register(&vc4_platform_driver);
+		if (ret)
+			return ret;
+	} else {
+		ret = platform_driver_register(&vc4_v3d_driver);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static void __exit vc4_drm_unregister(void)
