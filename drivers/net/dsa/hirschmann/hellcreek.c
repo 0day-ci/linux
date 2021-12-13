@@ -710,8 +710,9 @@ static int __hellcreek_fdb_add(struct hellcreek *hellcreek,
 	u16 meta = 0;
 
 	dev_dbg(hellcreek->dev, "Add static FDB entry: MAC=%pM, MASK=0x%02x, "
-		"OBT=%d, REPRIO_EN=%d, PRIO=%d\n", entry->mac, entry->portmask,
-		entry->is_obt, entry->reprio_en, entry->reprio_tc);
+		"OBT=%d, PASS_BLOCKED=%d, REPRIO_EN=%d, PRIO=%d\n", entry->mac,
+		entry->portmask, entry->is_obt, entry->pass_blocked,
+		entry->reprio_en, entry->reprio_tc);
 
 	/* Add mac address */
 	hellcreek_write(hellcreek, entry->mac[1] | (entry->mac[0] << 8), HR_FDBWDH);
@@ -722,6 +723,8 @@ static int __hellcreek_fdb_add(struct hellcreek *hellcreek,
 	meta |= entry->portmask << HR_FDBWRM0_PORTMASK_SHIFT;
 	if (entry->is_obt)
 		meta |= HR_FDBWRM0_OBT;
+	if (entry->pass_blocked)
+		meta |= HR_FDBWRM0_PASS_BLOCKED;
 	if (entry->reprio_en) {
 		meta |= HR_FDBWRM0_REPRIO_EN;
 		meta |= entry->reprio_tc << HR_FDBWRM0_REPRIO_TC_SHIFT;
@@ -1055,7 +1058,7 @@ static int hellcreek_setup_fdb(struct hellcreek *hellcreek)
 		.portmask     = 0x03,	/* Management ports */
 		.age	      = 0,
 		.is_obt	      = 0,
-		.pass_blocked = 0,
+		.pass_blocked = 1,
 		.is_static    = 1,
 		.reprio_tc    = 6,	/* TC: 6 as per IEEE 802.1AS */
 		.reprio_en    = 1,
@@ -1066,7 +1069,7 @@ static int hellcreek_setup_fdb(struct hellcreek *hellcreek)
 		.portmask     = 0x03,	/* Management ports */
 		.age	      = 0,
 		.is_obt	      = 0,
-		.pass_blocked = 0,
+		.pass_blocked = 1,
 		.is_static    = 1,
 		.reprio_tc    = 6,	/* TC: 6 as per IEEE 802.1AS */
 		.reprio_en    = 1,
