@@ -16,11 +16,15 @@ static void ipi_remote_fence_i(void *info)
 
 void flush_icache_all(void)
 {
+	int ret = -EINVAL;
+
 	local_flush_icache_all();
 
 	if (IS_ENABLED(CONFIG_RISCV_SBI))
-		sbi_remote_fence_i(NULL);
-	else
+		ret = sbi_remote_fence_i(NULL);
+
+	/* fall back to ipi_remote_fence_i if sbi failed or not available */
+	if (ret)
 		on_each_cpu(ipi_remote_fence_i, NULL, 1);
 }
 EXPORT_SYMBOL(flush_icache_all);
@@ -66,13 +70,18 @@ void flush_icache_mm(struct mm_struct *mm, bool local)
 		 * with flush_icache_deferred().
 		 */
 		smp_mb();
-	} else if (IS_ENABLED(CONFIG_RISCV_SBI)) {
-		cpumask_t hartid_mask;
-
-		riscv_cpuid_to_hartid_mask(&others, &hartid_mask);
-		sbi_remote_fence_i(cpumask_bits(&hartid_mask));
 	} else {
-		on_each_cpu_mask(&others, ipi_remote_fence_i, NULL, 1);
+		int ret = -EINVAL;
+
+		if (IS_ENABLED(CONFIG_RISCV_SBI)) {
+			cpumask_t hartid_mask;
+
+			riscv_cpuid_to_hartid_mask(&others, &hartid_mask);
+			ret = sbi_remote_fence_i(cpumask_bits(&hartid_mask));
+		}
+
+		if (ret)
+			on_each_cpu_mask(&others, ipi_remote_fence_i, NULL, 1);
 	}
 
 	preempt_enable();
