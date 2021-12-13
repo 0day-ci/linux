@@ -206,8 +206,7 @@ static struct dw_pci_controller dw_pci_controllers[] = {
 	},
 };
 
-#ifdef CONFIG_PM
-static int i2c_dw_pci_suspend(struct device *d)
+static int __maybe_unused i2c_dw_pci_suspend(struct device *d)
 {
 	struct dw_i2c_dev *dev = dev_get_drvdata(d);
 
@@ -217,7 +216,7 @@ static int i2c_dw_pci_suspend(struct device *d)
 	return 0;
 }
 
-static int i2c_dw_pci_resume(struct device *d)
+static int __maybe_unused i2c_dw_pci_resume(struct device *d)
 {
 	struct dw_i2c_dev *dev = dev_get_drvdata(d);
 	int ret;
@@ -227,7 +226,6 @@ static int i2c_dw_pci_resume(struct device *d)
 
 	return ret;
 }
-#endif
 
 static UNIVERSAL_DEV_PM_OPS(i2c_dw_pm_ops, i2c_dw_pci_suspend,
 			    i2c_dw_pci_resume, NULL);
