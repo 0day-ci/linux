@@ -1658,6 +1658,7 @@ static int rtw_pci_napi_poll(struct napi_struct *napi, int budget)
 					      priv);
 	int work_done = 0;
 
+	rtw_pci_link_ps(rtwdev, false);
 	while (work_done < budget) {
 		u32 work_done_once;
 
@@ -1681,6 +1682,7 @@ static int rtw_pci_napi_poll(struct napi_struct *napi, int budget)
 		if (rtw_pci_get_hw_rx_ring_nr(rtwdev, rtwpci))
 			napi_schedule(napi);
 	}
+	rtw_pci_link_ps(rtwdev, true);
 
 	return work_done;
 }
