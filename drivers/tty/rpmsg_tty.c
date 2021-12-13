@@ -27,10 +27,13 @@ static DEFINE_MUTEX(idr_lock);	/* protects tty_idr */
 static struct tty_driver *rpmsg_tty_driver;
 
 struct rpmsg_tty_port {
-	struct tty_port		port;	 /* TTY port data */
+	struct tty_port		*port;	 /* TTY port data */
+	struct tty_struct	*tty;	 /* TTY associated structure */
 	int			id;	 /* TTY rpmsg index */
 	struct rpmsg_device	*rpdev;	 /* rpmsg device */
 };
+
+static const struct tty_port_operations rpmsg_tty_port_ops = { };
 
 static int rpmsg_tty_cb(struct rpmsg_device *rpdev, void *data, int len, void *priv, u32 src)
 {
@@ -39,21 +42,60 @@ static int rpmsg_tty_cb(struct rpmsg_device *rpdev, void *data, int len, void *p
 
 	if (!len)
 		return -EINVAL;
-	copied = tty_insert_flip_string(&cport->port, data, len);
+	copied = tty_insert_flip_string(cport->port, data, len);
 	if (copied != len)
 		dev_err_ratelimited(&rpdev->dev, "Trunc buffer: available space is %d\n", copied);
-	tty_flip_buffer_push(&cport->port);
+	tty_flip_buffer_push(cport->port);
 
 	return 0;
 }
 
 static int rpmsg_tty_install(struct tty_driver *driver, struct tty_struct *tty)
 {
-	struct rpmsg_tty_port *cport = idr_find(&tty_idr, tty->index);
+	struct rpmsg_tty_port *cport;
+	struct tty_port *port;
+
+	mutex_lock(&idr_lock);
+	cport = idr_find(&tty_idr, tty->index);
+	mutex_unlock(&idr_lock);
+
+	if (!cport)
+		return -ENXIO;
+
+	port = kzalloc(sizeof(*port), GFP_KERNEL);
+	if (!port)
+		return -ENOMEM;
+
+	tty_port_init(port);
+	port->ops = &rpmsg_tty_port_ops;
 
 	tty->driver_data = cport;
 
-	return tty_port_install(&cport->port, driver, tty);
+	cport->port = port;
+	cport->tty = tty;
+
+	return tty_port_install(port, driver, tty);
+}
+
+static void rpmsg_tty_cleanup(struct tty_struct *tty)
+{
+	struct tty_port *port = tty->port;
+	struct rpmsg_tty_port *cport;
+
+	WARN_ON(!port);
+
+	mutex_lock(&idr_lock);
+	cport = idr_find(&tty_idr, tty->index);
+	mutex_unlock(&idr_lock);
+
+	if (cport) {
+		cport->tty = NULL;
+		cport->port = NULL;
+	}
+
+	tty_port_destroy(port);
+	kfree(port);
+	tty->port = NULL;
 }
 
 static int rpmsg_tty_open(struct tty_struct *tty, struct file *filp)
@@ -106,12 +148,19 @@ static unsigned int rpmsg_tty_write_room(struct tty_struct *tty)
 	return size;
 }
 
+static void rpmsg_tty_hangup(struct tty_struct *tty)
+{
+	tty_port_hangup(tty->port);
+}
+
 static const struct tty_operations rpmsg_tty_ops = {
 	.install	= rpmsg_tty_install,
 	.open		= rpmsg_tty_open,
 	.close		= rpmsg_tty_close,
 	.write		= rpmsg_tty_write,
 	.write_room	= rpmsg_tty_write_room,
+	.hangup		= rpmsg_tty_hangup,
+	.cleanup	= rpmsg_tty_cleanup,
 };
 
 static struct rpmsg_tty_port *rpmsg_tty_alloc_cport(void)
@@ -146,8 +195,6 @@ static void rpmsg_tty_release_cport(struct rpmsg_tty_port *cport)
 	kfree(cport);
 }
 
-static const struct tty_port_operations rpmsg_tty_port_ops = { };
-
 static int rpmsg_tty_probe(struct rpmsg_device *rpdev)
 {
 	struct rpmsg_tty_port *cport;
@@ -159,13 +206,9 @@ static int rpmsg_tty_probe(struct rpmsg_device *rpdev)
 	if (IS_ERR(cport))
 		return dev_err_probe(dev, PTR_ERR(cport), "Failed to alloc tty port\n");
 
-	tty_port_init(&cport->port);
-	cport->port.ops = &rpmsg_tty_port_ops;
-
-	tty_dev = tty_port_register_device(&cport->port, rpmsg_tty_driver,
-					   cport->id, dev);
+	tty_dev = tty_register_device(rpmsg_tty_driver, cport->id, dev);
 	if (IS_ERR(tty_dev)) {
-		ret = dev_err_probe(dev, PTR_ERR(tty_dev), "Failed to register tty port\n");
+		ret = dev_err_probe(dev, PTR_ERR(tty_dev), "Failed to register tty\n");
 		goto err_destroy;
 	}
 
@@ -179,7 +222,6 @@ static int rpmsg_tty_probe(struct rpmsg_device *rpdev)
 	return 0;
 
 err_destroy:
-	tty_port_destroy(&cport->port);
 	rpmsg_tty_release_cport(cport);
 
 	return ret;
@@ -188,16 +230,19 @@ err_destroy:
 static void rpmsg_tty_remove(struct rpmsg_device *rpdev)
 {
 	struct rpmsg_tty_port *cport = dev_get_drvdata(&rpdev->dev);
+	struct tty_struct *tty = cport->tty;
 
 	dev_dbg(&rpdev->dev, "Removing rpmsg tty device %d\n", cport->id);
 
-	/* User hang up to release the tty */
-	if (tty_port_initialized(&cport->port))
-		tty_port_tty_hangup(&cport->port, false);
+	/*
+	 * If there's a process with the device open, do a synchronous hangup of the TTY.
+	 * This may cause the process to call close asynchronously, but it's not guaranteed.
+	 */
+	if (tty)
+		tty_vhangup(tty);
 
 	tty_unregister_device(rpmsg_tty_driver, cport->id);
 
-	tty_port_destroy(&cport->port);
 	rpmsg_tty_release_cport(cport);
 }
 
