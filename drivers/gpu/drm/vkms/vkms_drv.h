@@ -97,6 +97,7 @@ struct vkms_config {
 	bool writeback;
 	bool cursor;
 	bool overlay;
+	unsigned int num_overlay_planes;
 	/* only set when instantiated */
 	struct vkms_device *dev;
 };
