@@ -1912,7 +1912,7 @@ void blk_cgroup_bio_start(struct bio *bio)
 	struct blkg_iostat_set *bis;
 	unsigned long flags;
 
-	cpu = get_cpu();
+	cpu = get_cpu_light();
 	bis = per_cpu_ptr(bio->bi_blkg->iostat_cpu, cpu);
 	flags = u64_stats_update_begin_irqsave(&bis->sync);
 
@@ -1929,7 +1929,7 @@ void blk_cgroup_bio_start(struct bio *bio)
 	u64_stats_update_end_irqrestore(&bis->sync, flags);
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys))
 		cgroup_rstat_updated(bio->bi_blkg->blkcg->css.cgroup, cpu);
-	put_cpu();
+	put_cpu_light();
 }
 
 static int __init blkcg_init(void)
