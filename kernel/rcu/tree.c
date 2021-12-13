@@ -2453,7 +2453,7 @@ int rcutree_dead_cpu(unsigned int cpu)
 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
 		return 0;
 
-	WRITE_ONCE(rcu_state.n_online_cpus, rcu_state.n_online_cpus - 1);
+	atomic_dec(&rcu_state.n_online_cpus);
 	/* Adjust any no-longer-needed kthreads. */
 	rcu_boost_kthread_setaffinity(rnp, -1);
 	// Stop-machine done, so allow nohz_full to disable tick.
@@ -3733,7 +3733,7 @@ static int rcu_blocking_is_gp(void)
 	 * in the code, without the need for additional memory barriers.
 	 * Those memory barriers are provided by CPU-hotplug code.
 	 */
-	ret = READ_ONCE(rcu_state.n_online_cpus) <= 1;
+	ret = atomic_read(&rcu_state.n_online_cpus) <= 1;
 	preempt_enable();
 	return ret;
 }
@@ -4201,7 +4201,7 @@ int rcutree_prepare_cpu(unsigned int cpu)
 	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 	rcu_spawn_one_boost_kthread(rnp);
 	rcu_spawn_cpu_nocb_kthread(cpu);
-	WRITE_ONCE(rcu_state.n_online_cpus, rcu_state.n_online_cpus + 1);
+	atomic_inc(&rcu_state.n_online_cpus);
 
 	return 0;
 }
