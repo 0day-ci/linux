@@ -731,15 +731,19 @@ static int brcmstb_pm_probe(struct platform_device *pdev)
 	for_each_matching_node(dn, ddr_shimphy_dt_ids) {
 		i = ctrl.num_memc;
 		if (i >= MAX_NUM_MEMC) {
+			of_node_put(dn);
 			pr_warn("too many MEMCs (max %d)\n", MAX_NUM_MEMC);
 			break;
 		}
 
 		base = of_io_request_and_map(dn, 0, dn->full_name);
 		if (IS_ERR(base)) {
-			if (!ctrl.support_warm_boot)
+			if (!ctrl.support_warm_boot) {
+				of_node_put(dn);
 				break;
+			}
 
+			of_node_put(dn);
 			pr_err("error mapping DDR SHIMPHY %d\n", i);
 			return PTR_ERR(base);
 		}
@@ -752,6 +756,7 @@ static int brcmstb_pm_probe(struct platform_device *pdev)
 	for_each_matching_node(dn, brcmstb_memc_of_match) {
 		base = of_iomap(dn, 0);
 		if (!base) {
+			of_node_put(dn);
 			pr_err("error mapping DDR Sequencer %d\n", i);
 			return -ENOMEM;
 		}
@@ -759,6 +764,7 @@ static int brcmstb_pm_probe(struct platform_device *pdev)
 		of_id = of_match_node(brcmstb_memc_of_match, dn);
 		if (!of_id) {
 			iounmap(base);
+			of_node_put(dn);
 			return -EINVAL;
 		}
 
