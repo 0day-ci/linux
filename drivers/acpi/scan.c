@@ -19,6 +19,7 @@
 #include <linux/dma-map-ops.h>
 #include <linux/platform_data/x86/apple.h>
 #include <linux/pgtable.h>
+#include <linux/crc32.h>
 
 #include "internal.h"
 
@@ -42,6 +43,8 @@ static LIST_HEAD(acpi_scan_handlers_list);
 DEFINE_MUTEX(acpi_device_lock);
 LIST_HEAD(acpi_wakeup_device_list);
 static DEFINE_MUTEX(acpi_hp_context_lock);
+static LIST_HEAD(acpi_location_list);
+static DEFINE_MUTEX(acpi_location_lock);
 
 /*
  * The UART device described by the SPCR table is the only object which needs
@@ -485,6 +488,7 @@ static void acpi_device_del(struct acpi_device *device)
 			break;
 		}
 
+	list_del(&device->location_list);
 	list_del(&device->wakeup_list);
 	mutex_unlock(&acpi_device_lock);
 
@@ -654,6 +658,78 @@ static int acpi_tie_acpi_dev(struct acpi_device *adev)
 	return 0;
 }
 
+static void acpi_store_device_location(struct acpi_device *adev)
+{
+	struct acpi_device_location *location;
+	struct acpi_pld_info *pld;
+	acpi_status status;
+	u32 crc;
+
+	status = acpi_get_physical_device_location(adev->handle, &pld);
+	if (ACPI_FAILURE(status))
+		return;
+
+	crc = crc32(~0, pld, sizeof(*pld));
+
+	mutex_lock(&acpi_location_lock);
+
+	list_for_each_entry(location, &acpi_location_list, node) {
+		if (location->pld_crc == crc) {
+			ACPI_FREE(pld);
+			goto out_add_to_location;
+		}
+	}
+
+	/* The location does not exist yet so creating it. */
+
+	location = kzalloc(sizeof(*location), GFP_KERNEL);
+	if (!location) {
+		acpi_handle_err(adev->handle, "Unable to store location\n");
+		goto err_unlock;
+	}
+
+	list_add_tail(&location->node, &acpi_location_list);
+	INIT_LIST_HEAD(&location->devices);
+	location->pld = pld;
+	location->pld_crc = crc;
+
+out_add_to_location:
+	list_add_tail(&adev->location_list, &location->devices);
+
+err_unlock:
+	mutex_unlock(&acpi_location_lock);
+}
+
+/**
+ * acpi_device_get_location - Get the device location
+ * @adev: ACPI device handle
+ *
+ * Returns the location of @adev when it's known. The location is known for all
+ * ACPI devices that have _PLD (Physical Location of Device). When the location
+ * is not known, the function returns NULL.
+ */
+struct acpi_device_location *acpi_device_get_location(struct acpi_device *adev)
+{
+	struct acpi_device_location *location;
+	struct list_head *tmp;
+
+	mutex_lock(&acpi_location_lock);
+
+	list_for_each_entry(location, &acpi_location_list, node) {
+		list_for_each(tmp, &location->devices) {
+			if (tmp == &adev->location_list)
+				goto out_unlock;
+		}
+	}
+	location = NULL;
+
+out_unlock:
+	mutex_unlock(&acpi_location_lock);
+
+	return location;
+}
+EXPORT_SYMBOL_GPL(acpi_device_get_location);
+
 static int __acpi_device_add(struct acpi_device *device,
 			     void (*release)(struct device *))
 {
@@ -670,6 +746,7 @@ static int __acpi_device_add(struct acpi_device *device,
 	INIT_LIST_HEAD(&device->wakeup_list);
 	INIT_LIST_HEAD(&device->physical_node_list);
 	INIT_LIST_HEAD(&device->del_list);
+	INIT_LIST_HEAD(&device->location_list);
 	mutex_init(&device->physical_node_lock);
 
 	mutex_lock(&acpi_device_lock);
@@ -711,6 +788,8 @@ static int __acpi_device_add(struct acpi_device *device,
 
 	if (device->wakeup.flags.valid)
 		list_add_tail(&device->wakeup_list, &acpi_wakeup_device_list);
+
+	acpi_store_device_location(device);
 
 	mutex_unlock(&acpi_device_lock);
 
