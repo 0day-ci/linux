@@ -2206,10 +2206,6 @@ static void tun_free_netdev(struct net_device *dev)
 	BUG_ON(!(list_empty(&tun->disabled)));
 
 	free_percpu(dev->tstats);
-	/* We clear tstats so that tun_set_iff() can tell if
-	 * tun_free_netdev() has been called from register_netdevice().
-	 */
-	dev->tstats = NULL;
 
 	tun_flow_uninit(tun);
 	security_tun_dev_free_security(tun->security);
@@ -2770,18 +2766,15 @@ static int tun_set_iff(struct net *net, struct file *file, struct ifreq *ifr)
 
 err_detach:
 	tun_detach_all(dev);
-	/* We are here because register_netdevice() has failed.
-	 * If register_netdevice() already called tun_free_netdev()
-	 * while dealing with the error, dev->stats has been cleared.
-	 */
-	if (!dev->tstats)
-		goto err_free_dev;
-
 err_free_flow:
-	tun_flow_uninit(tun);
-	security_tun_dev_free_security(tun->security);
+	/* if NETREG_UNREGISTERING, destructor will be called later */
+	if (dev->reg_state != NETREG_UNREGISTERING) {
+		tun_flow_uninit(tun);
+		security_tun_dev_free_security(tun->security);
+	}
 err_free_stat:
-	free_percpu(dev->tstats);
+	if (dev->reg_state != NETREG_UNREGISTERING)
+		free_percpu(dev->tstats);
 err_free_dev:
 	free_netdev(dev);
 	return err;
