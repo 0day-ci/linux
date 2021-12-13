@@ -1278,6 +1278,11 @@ void __init early_init_dt_scan_nodes(void)
 	memblock_cap_memory_range(cap_mem_addr, cap_mem_size);
 }
 
+void __init early_init_dt_cap_memory_range(void)
+{
+	memblock_cap_memory_range(cap_mem_addr, cap_mem_size);
+}
+
 bool __init early_init_dt_scan(void *params)
 {
 	bool status;
