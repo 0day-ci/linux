@@ -573,6 +573,7 @@ static int cmdq_probe(struct platform_device *pdev)
 				cmdq->clocks[alias_id].id = clk_names[alias_id];
 				cmdq->clocks[alias_id].clk = of_clk_get(node, 0);
 				if (IS_ERR(cmdq->clocks[alias_id].clk)) {
+					of_node_put(node);
 					dev_err(dev, "failed to get gce clk: %d\n", alias_id);
 					return PTR_ERR(cmdq->clocks[alias_id].clk);
 				}
