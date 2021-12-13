@@ -14,6 +14,13 @@
 unsigned long sbi_spec_version __ro_after_init = SBI_SPEC_VERSION_DEFAULT;
 EXPORT_SYMBOL(sbi_spec_version);
 
+static void __sbi_set_timer_none(uint64_t stime_value) {}
+
+static int __sbi_send_ipi_none(const unsigned long *hart_mask)
+{
+	return -EOPNOTSUPP;
+}
+
 static int __sbi_rfence_none(int fid, const unsigned long *hart_mask,
 			     unsigned long start, unsigned long size,
 			     unsigned long arg4, unsigned long arg5)
@@ -21,8 +28,9 @@ static int __sbi_rfence_none(int fid, const unsigned long *hart_mask,
 	return -EOPNOTSUPP;
 }
 
-static void (*__sbi_set_timer)(uint64_t stime) __ro_after_init;
-static int (*__sbi_send_ipi)(const unsigned long *hart_mask) __ro_after_init;
+static void (*__sbi_set_timer)(uint64_t stime) __ro_after_init = __sbi_set_timer_none;
+static int (*__sbi_send_ipi)(const unsigned long *hart_mask)
+			    __ro_after_init = __sbi_send_ipi_none;
 static int (*__sbi_rfence)(int fid, const unsigned long *hart_mask,
 			   unsigned long start, unsigned long size,
 			   unsigned long arg4, unsigned long arg5)
