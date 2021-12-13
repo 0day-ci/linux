@@ -4247,18 +4247,10 @@ static int rtw_test(
 
 	DBG_88E("+%s\n", __func__);
 	len = wrqu->data.length;
+	pbuf = strndup_user(wrqu->data.pointer, len);
+	if (IS_ERR(pbuf))
+		return PTR_ERR(pbuf);
 
-	pbuf = kzalloc(len, GFP_KERNEL);
-	if (!pbuf) {
-		DBG_88E("%s: no memory!\n", __func__);
-		return -ENOMEM;
-	}
-
-	if (copy_from_user(pbuf, wrqu->data.pointer, len)) {
-		kfree(pbuf);
-		DBG_88E("%s: copy from user fail!\n", __func__);
-		return -EFAULT;
-	}
 	DBG_88E("%s: string =\"%s\"\n", __func__, pbuf);
 
 	ptmp = (char *)pbuf;
