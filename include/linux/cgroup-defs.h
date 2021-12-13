@@ -74,6 +74,11 @@ enum {
 
 	/* Control group has to be killed. */
 	CGRP_KILL,
+
+#ifdef CONFIG_NUMA_BALANCING
+	/* Control group set numabalaning disable. */
+	CGRP_NUMABALANCING_DISABLE,
+#endif
 };
 
 /* cgroup_root->flags */
@@ -357,6 +362,21 @@ struct cgroup_freezer_state {
 	int nr_frozen_tasks;
 };
 
+#ifdef CONFIG_NUMA_BALANCING
+struct cgroup_numabalancing_state {
+	/* Should the cgroup and its descendants be changed state. */
+	bool nb_disable;
+
+	/* Should the cgroup actually be set as numabalancing disable? */
+	int e_nb_disable;
+};
+
+#else /* CONFIG_NUMA_BALANCING */
+
+struct cgroup_numabalancing_state { };
+
+#endif /* CONFIG_NUMA_BALANCING */
+
 struct cgroup {
 	/* self css with NULL ->ss, points back to this cgroup */
 	struct cgroup_subsys_state self;
@@ -485,6 +505,9 @@ struct cgroup {
 
 	/* Used to store internal freezer state */
 	struct cgroup_freezer_state freezer;
+
+	/* Used to store numabalancing state */
+	struct cgroup_numabalancing_state nb_state;
 
 	/* ids of the ancestors at each level including self */
 	u64 ancestor_ids[];

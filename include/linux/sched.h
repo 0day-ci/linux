@@ -1242,6 +1242,9 @@ struct task_struct {
 	u64				last_sum_exec_runtime;
 	struct callback_head		numa_work;
 
+	/* Mark if numabalancing is disabled in cgroup level */
+	int				numa_cgrp_disable;
+
 	/*
 	 * This pointer is only modified for current in syscall and
 	 * pagefault context (and for tasks being destroyed), so it can be read

@@ -2495,6 +2495,13 @@ static int cgroup_migrate_execute(struct cgroup_mgctx *mgctx)
 			 */
 			cgroup_freezer_migrate_task(task, from_cset->dfl_cgrp,
 						    to_cset->dfl_cgrp);
+
+#ifdef CONFIG_NUMA_BALANCING
+			if (to_cset->dfl_cgrp->nb_state.nb_disable)
+				WRITE_ONCE(task->numa_cgrp_disable, 1);
+			else
+				WRITE_ONCE(task->numa_cgrp_disable, 0);
+#endif
 			put_css_set_locked(from_cset);
 
 		}
@@ -3558,6 +3565,11 @@ static int cgroup_events_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "populated %d\n", cgroup_is_populated(cgrp));
 	seq_printf(seq, "frozen %d\n", test_bit(CGRP_FROZEN, &cgrp->flags));
 
+#ifdef CONFIG_NUMA_BALANCING
+	seq_printf(seq, "numabalancing_disable %d\n",
+		   test_bit(CGRP_NUMABALANCING_DISABLE, &cgrp->flags));
+#endif
+
 	return 0;
 }
 
@@ -3699,6 +3711,118 @@ bool cgroup_psi_enabled(void)
 }
 
 #endif /* CONFIG_PSI */
+
+#ifdef CONFIG_NUMA_BALANCING
+static void __cgroup_numabalancing_disable_set(struct cgroup *cgrp, bool nb_disable)
+{
+	struct css_task_iter it;
+	struct task_struct *task;
+
+	lockdep_assert_held(&cgroup_mutex);
+
+	spin_lock_irq(&css_set_lock);
+	if (nb_disable)
+		set_bit(CGRP_NUMABALANCING_DISABLE, &cgrp->flags);
+	else
+		clear_bit(CGRP_NUMABALANCING_DISABLE, &cgrp->flags);
+	spin_unlock_irq(&css_set_lock);
+
+	css_task_iter_start(&cgrp->self, 0, &it);
+	while ((task = css_task_iter_next(&it))) {
+		/*
+		 * We don't care about NUMA placement if the task is exiting.
+		 * And we don't NUMA balance for kthreads.
+		 */
+		if (task->flags & (PF_EXITING | PF_KTHREAD))
+			continue;
+		task->numa_cgrp_disable = nb_disable;
+	}
+	css_task_iter_end(&it);
+}
+
+static void cgroup_numabalancing_disable_set(struct cgroup *cgrp, bool nb_disable)
+{
+	struct cgroup_subsys_state *css;
+	struct cgroup *dsct;
+
+	lockdep_assert_held(&cgroup_mutex);
+
+	/*
+	 * Nothing changed? Just exit.
+	 */
+	if (cgrp->nb_state.nb_disable == nb_disable)
+		return;
+
+	cgrp->nb_state.nb_disable = nb_disable;
+
+	/*
+	 * Propagate changes downwards the cgroup tree.
+	 */
+	css_for_each_descendant_pre(css, &cgrp->self) {
+		dsct = css->cgroup;
+
+		if (cgroup_is_dead(dsct))
+			continue;
+
+		if (nb_disable) {
+			dsct->nb_state.e_nb_disable++;
+			/*
+			 * Already be set because of ancestor's settings?
+			 */
+			if (dsct->nb_state.e_nb_disable > 1)
+				continue;
+		} else {
+			dsct->nb_state.e_nb_disable--;
+			/*
+			 * Still keep numabalancing disable because of ancestor's settings?
+			 */
+			if (dsct->nb_state.e_nb_disable > 0)
+				continue;
+
+			WARN_ON_ONCE(dsct->nb_state.e_nb_disable < 0);
+		}
+
+		/*
+		 * Do change actual state: numabalancing disable or enable.
+		 */
+		__cgroup_numabalancing_disable_set(dsct, nb_disable);
+	}
+}
+
+static int cgroup_numabalancing_disable_show(struct seq_file *seq, void *v)
+{
+	struct cgroup *cgrp = seq_css(seq)->cgroup;
+
+	seq_printf(seq, "%d\n", cgrp->nb_state.nb_disable);
+
+	return 0;
+}
+
+static ssize_t cgroup_numabalancing_disable_write(struct kernfs_open_file *of,
+				   char *buf, size_t nbytes, loff_t off)
+{
+	struct cgroup *cgrp;
+	ssize_t ret;
+	int nb_disable;
+
+	ret = kstrtoint(strstrip(buf), 0, &nb_disable);
+	if (ret)
+		return ret;
+
+	if (nb_disable < 0 || nb_disable > 1)
+		return -ERANGE;
+
+	cgrp = cgroup_kn_lock_live(of->kn, false);
+	if (!cgrp)
+		return -ENOENT;
+
+	cgroup_numabalancing_disable_set(cgrp, nb_disable);
+
+	cgroup_kn_unlock(of->kn);
+
+	return nbytes;
+}
+#endif /* CONFIG_NUMA_BALANCING */
 
 static int cgroup_freeze_show(struct seq_file *seq, void *v)
 {
@@ -5040,6 +5164,14 @@ static struct cftype cgroup_base_files[] = {
 		.release = cgroup_pressure_release,
 	},
 #endif /* CONFIG_PSI */
+#ifdef CONFIG_NUMA_BALANCING
+	{
+		.name = "cgroup.numabalancing_disable",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = cgroup_numabalancing_disable_show,
+		.write = cgroup_numabalancing_disable_write,
+	},
+#endif /* CONFIG_NUMA_BALANCING */
 	{ }	/* terminate */
 };
 
@@ -5366,6 +5498,14 @@ static struct cgroup *cgroup_create(struct cgroup *parent, const char *name,
 		set_bit(CGRP_FROZEN, &cgrp->flags);
 	}
 
+#ifdef CONFIG_NUMA_BALANCING
+	/*
+	 * New cgroup inherits effective numabalancing disable counter.
+	 */
+	cgrp->nb_state.e_nb_disable = parent->nb_state.e_nb_disable;
+	if (cgrp->nb_state.e_nb_disable)
+		set_bit(CGRP_NUMABALANCING_DISABLE, &cgrp->flags);
+#endif
 	spin_lock_irq(&css_set_lock);
 	for (tcgrp = cgrp; tcgrp; tcgrp = cgroup_parent(tcgrp)) {
 		cgrp->ancestor_ids[tcgrp->level] = cgroup_id(tcgrp);
@@ -6313,6 +6453,11 @@ void cgroup_post_fork(struct task_struct *child,
 		 * userspace.
 		 */
 		kill = test_bit(CGRP_KILL, &cgrp_flags);
+
+#ifdef CONFIG_NUMA_BALANCING
+		if (test_bit(CGRP_NUMABALANCING_DISABLE, &cgrp_flags))
+			child->numa_cgrp_disable = 1;
+#endif
 	}
 
 	spin_unlock_irq(&css_set_lock);

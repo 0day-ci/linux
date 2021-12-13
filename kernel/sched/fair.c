@@ -2585,7 +2585,8 @@ void task_numa_fault(int last_cpupid, int mem_node, int pages, int flags)
 	struct numa_group *ng;
 	int priv;
 
-	if (!static_branch_likely(&sched_numa_balancing))
+	if (!static_branch_likely(&sched_numa_balancing) ||
+		READ_ONCE(p->numa_cgrp_disable))
 		return;
 
 	/* for example, ksmd faulting in a user's mm */
@@ -2866,6 +2867,9 @@ static void task_tick_numa(struct rq *rq, struct task_struct *curr)
 	if ((curr->flags & (PF_EXITING | PF_KTHREAD)) || work->next != work)
 		return;
 
+	if (READ_ONCE(curr->numa_cgrp_disable))
+		return;
+
 	/*
 	 * Using runtime rather than walltime has the dual advantage that
 	 * we (mostly) drive the selection from busy threads and that the
@@ -2890,7 +2894,8 @@ static void update_scan_period(struct task_struct *p, int new_cpu)
 	int src_nid = cpu_to_node(task_cpu(p));
 	int dst_nid = cpu_to_node(new_cpu);
 
-	if (!static_branch_likely(&sched_numa_balancing))
+	if (!static_branch_likely(&sched_numa_balancing) ||
+		READ_ONCE(p->numa_cgrp_disable))
 		return;
 
 	if (!p->mm || !p->numa_faults || (p->flags & PF_EXITING))
@@ -7695,7 +7700,8 @@ static int migrate_degrades_locality(struct task_struct *p, struct lb_env *env)
 	unsigned long src_weight, dst_weight;
 	int src_nid, dst_nid, dist;
 
-	if (!static_branch_likely(&sched_numa_balancing))
+	if (!static_branch_likely(&sched_numa_balancing) ||
+		READ_ONCE(p->numa_cgrp_disable))
 		return -1;
 
 	if (!p->numa_faults || !(env->sd->flags & SD_NUMA))
