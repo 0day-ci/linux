@@ -750,7 +750,7 @@ again_locked:
 		set_bit(FSCACHE_COOKIE_NO_DATA_TO_READ, &cookie->flags);
 		__fscache_set_cookie_state(cookie, FSCACHE_COOKIE_STATE_QUIESCENT);
 		wake = true;
-		break;
+		goto again_locked;
 
 	case FSCACHE_COOKIE_STATE_DROPPED:
 		break;
