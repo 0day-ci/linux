@@ -2918,10 +2918,6 @@ static void intel_cpufreq_adjust_perf(unsigned int cpunum,
 
 	/* Optimization: Avoid unnecessary divisions. */
 
-	target_pstate = cap_pstate;
-	if (target_perf < capacity)
-		target_pstate = DIV_ROUND_UP(cap_pstate * target_perf, capacity);
-
 	min_pstate = cap_pstate;
 	if (min_perf < capacity)
 		min_pstate = DIV_ROUND_UP(cap_pstate * min_perf, capacity);
@@ -2935,6 +2931,10 @@ static void intel_cpufreq_adjust_perf(unsigned int cpunum,
 	max_pstate = min(cap_pstate, cpu->max_perf_ratio);
 	if (max_pstate < min_pstate)
 		max_pstate = min_pstate;
+
+	target_pstate = cap_pstate;
+	if (target_perf < capacity)
+		target_pstate = DIV_ROUND_UP((cap_pstate - min_pstate) * target_perf, capacity) + min_pstate;
 
 	target_pstate = clamp_t(int, target_pstate, min_pstate, max_pstate);
 
