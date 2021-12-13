@@ -1576,7 +1576,8 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 	}
 
 	/* protect tsk->signal and tsk->sighand from disappearing */
-	read_lock(&tasklist_lock);
+	if (tsk != current)
+		read_lock(&tasklist_lock);
 	if (!tsk->sighand) {
 		retval = -ESRCH;
 		goto out;
@@ -1611,7 +1612,8 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 	     IS_ENABLED(CONFIG_POSIX_TIMERS))
 		update_rlimit_cpu(tsk, new_rlim->rlim_cur);
 out:
-	read_unlock(&tasklist_lock);
+	if (tsk != current)
+		read_unlock(&tasklist_lock);
 	return retval;
 }
 
