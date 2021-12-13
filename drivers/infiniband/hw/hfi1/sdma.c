@@ -839,15 +839,15 @@ struct sdma_engine *sdma_select_user_engine(struct hfi1_devdata *dd,
 		goto out;
 
 	rcu_read_lock();
-	cpu_id = smp_processor_id();
+	cpu_id = get_cpu();
 	rht_node = rhashtable_lookup(dd->sdma_rht, &cpu_id,
 				     sdma_rht_params);
-
 	if (rht_node && rht_node->map[vl]) {
 		struct sdma_rht_map_elem *map = rht_node->map[vl];
 
 		sde = map->sde[selector & map->mask];
 	}
+	put_cpu();
 	rcu_read_unlock();
 
 	if (sde)
