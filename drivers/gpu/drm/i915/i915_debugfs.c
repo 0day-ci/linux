@@ -665,6 +665,7 @@ static int
 i915_drop_caches_set(void *data, u64 val)
 {
 	struct drm_i915_private *i915 = data;
+	unsigned int flags;
 	int ret;
 
 	DRM_DEBUG("Dropping caches: 0x%08llx [0x%08llx]\n",
@@ -675,6 +676,7 @@ i915_drop_caches_set(void *data, u64 val)
 		return ret;
 
 	fs_reclaim_acquire(GFP_KERNEL);
+	flags = memalloc_noreclaim_save();
 	if (val & DROP_BOUND)
 		i915_gem_shrink(NULL, i915, LONG_MAX, NULL, I915_SHRINK_BOUND);
 
@@ -683,6 +685,7 @@ i915_drop_caches_set(void *data, u64 val)
 
 	if (val & DROP_SHRINK_ALL)
 		i915_gem_shrink_all(i915);
+	memalloc_noreclaim_restore(flags);
 	fs_reclaim_release(GFP_KERNEL);
 
 	if (val & DROP_RCU)
