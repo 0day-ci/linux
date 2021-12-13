@@ -1264,6 +1264,171 @@ bool kvm_tdp_mmu_wrprot_slot(struct kvm *kvm,
 	return spte_set;
 }
 
+static struct kvm_mmu_page *alloc_tdp_mmu_page_from_kernel(gfp_t gfp)
+{
+	struct kvm_mmu_page *sp;
+
+	gfp |= __GFP_ZERO;
+
+	sp = kmem_cache_alloc(mmu_page_header_cache, gfp);
+	if (!sp)
+		return NULL;
+
+	sp->spt = (void *)__get_free_page(gfp);
+	if (!sp->spt) {
+		kmem_cache_free(mmu_page_header_cache, sp);
+		return NULL;
+	}
+
+	return sp;
+}
+
+static struct kvm_mmu_page *alloc_tdp_mmu_page_for_split(struct kvm *kvm, bool *dropped_lock)
+{
+	struct kvm_mmu_page *sp;
+
+	lockdep_assert_held_read(&kvm->mmu_lock);
+
+	*dropped_lock = false;
+
+	/*
+	 * Since we are allocating while under the MMU lock we have to be
+	 * careful about GFP flags. Use GFP_NOWAIT to avoid blocking on direct
+	 * reclaim and to avoid making any filesystem callbacks (which can end
+	 * up invoking KVM MMU notifiers, resulting in a deadlock).
+	 *
+	 * If this allocation fails we drop the lock and retry with reclaim
+	 * allowed.
+	 */
+	sp = alloc_tdp_mmu_page_from_kernel(GFP_NOWAIT | __GFP_ACCOUNT);
+	if (sp)
+		return sp;
+
+	rcu_read_unlock();
+	read_unlock(&kvm->mmu_lock);
+
+	*dropped_lock = true;
+
+	sp = alloc_tdp_mmu_page_from_kernel(GFP_KERNEL_ACCOUNT);
+
+	read_lock(&kvm->mmu_lock);
+	rcu_read_lock();
+
+	return sp;
+}
+
+static bool
+tdp_mmu_split_huge_page_atomic(struct kvm *kvm, struct tdp_iter *iter, struct kvm_mmu_page *sp)
+{
+	const u64 huge_spte = iter->old_spte;
+	const int level = iter->level;
+	u64 child_spte;
+	int i;
+
+	init_child_tdp_mmu_page(sp, iter);
+
+	for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
+		child_spte = make_huge_page_split_spte(huge_spte, level, i, ACC_ALL);
+
+		/*
+		 * No need for atomics since child_sp has not been installed
+		 * in the table yet and thus is not reachable by any other
+		 * thread.
+		 */
+		sp->spt[i] = child_spte;
+	}
+
+	if (!tdp_mmu_install_sp_atomic(kvm, iter, sp, false))
+		return false;
+
+	/*
+	 * tdp_mmu_install_sp_atomic will handle subtracting the split huge
+	 * page from stats, but we have to manually update the new present child
+	 * pages.
+	 */
+	kvm_update_page_stats(kvm, level - 1, PT64_ENT_PER_PAGE);
+
+	return true;
+}
+
+static int tdp_mmu_split_huge_pages_root(struct kvm *kvm, struct kvm_mmu_page *root,
+					 gfn_t start, gfn_t end, int target_level)
+{
+	struct kvm_mmu_page *sp = NULL;
+	struct tdp_iter iter;
+	bool dropped_lock;
+
+	rcu_read_lock();
+
+	/*
+	 * Traverse the page table splitting all huge pages above the target
+	 * level into one lower level. For example, if we encounter a 1GB page
+	 * we split it into 512 2MB pages.
+	 *
+	 * Since the TDP iterator uses a pre-order traversal, we are guaranteed
+	 * to visit an SPTE before ever visiting its children, which means we
+	 * will correctly recursively split huge pages that are more than one
+	 * level above the target level (e.g. splitting 1GB to 2MB to 4KB).
+	 */
+	for_each_tdp_pte_min_level(iter, root, target_level + 1, start, end) {
+retry:
+		if (tdp_mmu_iter_cond_resched(kvm, &iter, false, true))
+			continue;
+
+		if (!is_shadow_present_pte(iter.old_spte) || !is_large_pte(iter.old_spte))
+			continue;
+
+		if (!sp) {
+			sp = alloc_tdp_mmu_page_for_split(kvm, &dropped_lock);
+			if (!sp)
+				return -ENOMEM;
+
+			if (dropped_lock) {
+				tdp_iter_restart(&iter);
+				continue;
+			}
+		}
+
+		if (!tdp_mmu_split_huge_page_atomic(kvm, &iter, sp))
+			goto retry;
+
+		sp = NULL;
+	}
+
+	/*
+	 * It's possible to exit the loop having never used the last sp if, for
+	 * example, a vCPU doing HugePage NX splitting wins the race and
+	 * installs its own sp in place of the last sp we tried to split.
+	 */
+	if (sp)
+		tdp_mmu_free_sp(sp);
+
+	rcu_read_unlock();
+
+	return 0;
+}
+
+int kvm_tdp_mmu_try_split_huge_pages(struct kvm *kvm,
+				     const struct kvm_memory_slot *slot,
+				     gfn_t start, gfn_t end,
+				     int target_level)
+{
+	struct kvm_mmu_page *root;
+	int r = 0;
+
+	lockdep_assert_held_read(&kvm->mmu_lock);
+
+	for_each_tdp_mmu_root_yield_safe(kvm, root, slot->as_id, true) {
+		r = tdp_mmu_split_huge_pages_root(kvm, root, start, end, target_level);
+		if (r) {
+			kvm_tdp_mmu_put_root(kvm, root, true);
+			break;
+		}
+	}
+
+	return r;
+}
+
 /*
  * Clear the dirty status of all the SPTEs mapping GFNs in the memslot. If
  * AD bits are enabled, this will involve clearing the dirty bit on each SPTE.

@@ -187,6 +187,9 @@ module_param(force_emulation_prefix, bool, S_IRUGO);
 int __read_mostly pi_inject_timer = -1;
 module_param(pi_inject_timer, bint, S_IRUGO | S_IWUSR);
 
+static bool __read_mostly eagerly_split_huge_pages_for_dirty_logging = true;
+module_param(eagerly_split_huge_pages_for_dirty_logging, bool, 0644);
+
 /*
  * Restoring the host value for MSRs that are only consumed when running in
  * usermode, e.g. SYSCALL MSRs and TSC_AUX, can be deferred until the CPU
@@ -11836,6 +11839,13 @@ static void kvm_mmu_slot_apply_flags(struct kvm *kvm,
 		 */
 		if (kvm_dirty_log_manual_protect_and_init_set(kvm))
 			return;
+
+		/*
+		 * Attempt to split all large pages into 4K pages so that vCPUs
+		 * do not have to take write-protection faults.
+		 */
+		if (READ_ONCE(eagerly_split_huge_pages_for_dirty_logging))
+			kvm_mmu_slot_try_split_huge_pages(kvm, new, PG_LEVEL_4K);
 
 		if (kvm_x86_ops.cpu_dirty_log_size) {
 			kvm_mmu_slot_leaf_clear_dirty(kvm, new);
