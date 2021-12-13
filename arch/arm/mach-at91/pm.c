@@ -644,6 +644,7 @@ static __init int at91_dt_ramc(bool phy_mandatory)
 		soc_pm.data.ramc[idx] = of_iomap(np, 0);
 		if (!soc_pm.data.ramc[idx]) {
 			pr_err("unable to map ramc[%d] cpu registers\n", idx);
+			of_node_put(np);
 			ret = -ENOMEM;
 			goto unmap_ramc;
 		}
@@ -669,6 +670,7 @@ static __init int at91_dt_ramc(bool phy_mandatory)
 		soc_pm.data.ramc_phy = of_iomap(np, 0);
 		if (!soc_pm.data.ramc_phy) {
 			pr_err("unable to map ramc phy cpu registers\n");
+			of_node_put(np);
 			ret = -ENOMEM;
 			goto unmap_ramc;
 		}
