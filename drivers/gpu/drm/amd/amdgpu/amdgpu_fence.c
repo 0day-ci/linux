@@ -76,7 +76,7 @@ void amdgpu_fence_slab_fini(void)
 /*
  * Cast helper
  */
-static const struct dma_fence_ops amdgpu_fence_ops;
+static struct dma_fence_ops amdgpu_fence_ops;
 static inline struct amdgpu_fence *to_amdgpu_fence(struct dma_fence *f)
 {
 	struct amdgpu_fence *__f = container_of(f, struct amdgpu_fence, base);
@@ -158,19 +158,20 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f, struct amd
 	}
 
 	seq = ++ring->fence_drv.sync_seq;
-	if (job != NULL && job->job_run_counter) {
+	if (job && job->job_run_counter) {
 		/* reinit seq for resubmitted jobs */
 		fence->seqno = seq;
+		set_bit(AMDGPU_FENCE_FLAG_EMBED_IN_JOB_BIT, &fence->flags);
 	} else {
+		amdgpu_fence_ops.init_flags = 0;
+		if (job)
+			set_bit(AMDGPU_FENCE_FLAG_EMBED_IN_JOB_BIT,
+				&amdgpu_fence_ops.init_flags);
+
 		dma_fence_init(fence, &amdgpu_fence_ops,
 				&ring->fence_drv.lock,
 				adev->fence_context + ring->idx,
 				seq);
-	}
-
-	if (job != NULL) {
-		/* mark this fence has a parent job */
-		set_bit(AMDGPU_FENCE_FLAG_EMBED_IN_JOB_BIT, &fence->flags);
 	}
 
 	amdgpu_ring_emit_fence(ring, ring->fence_drv.gpu_addr,
@@ -720,7 +721,7 @@ static void amdgpu_fence_release(struct dma_fence *f)
 	call_rcu(&f->rcu, amdgpu_fence_free);
 }
 
-static const struct dma_fence_ops amdgpu_fence_ops = {
+static struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
