@@ -132,6 +132,13 @@ struct dma_fence_ops {
 	bool use_64bit_seqno;
 
 	/**
+	 * @init_flags:
+	 *
+	 * The initial value of fence flags (A mask of DMA_FENCE_FLAG_* defined).
+	 */
+	unsigned long init_flags;
+
+	/**
 	 * @get_driver_name:
 	 *
 	 * Returns the driver name. This is a callback to allow drivers to
