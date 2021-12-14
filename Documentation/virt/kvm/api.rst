@@ -6580,6 +6580,9 @@ branch to guests' 0x200 interrupt vector.
 
 :Architectures: x86
 :Parameters: args[0] defines which exits are disabled
+             args[1] defines vCPU bitmask based on vCPU ID, 1 on
+                     corresponding vCPU ID bit would enable exists
+                     on that vCPU
 :Returns: 0 on success, -EINVAL when args[0] contains invalid exits
 
 Valid bits in args[0] are::
@@ -6588,13 +6591,16 @@ Valid bits in args[0] are::
   #define KVM_X86_DISABLE_EXITS_HLT              (1 << 1)
   #define KVM_X86_DISABLE_EXITS_PAUSE            (1 << 2)
   #define KVM_X86_DISABLE_EXITS_CSTATE           (1 << 3)
+  #define KVM_X86_DISABLE_EXITS_PER_VCPU         (1UL << 63)
 
 Enabling this capability on a VM provides userspace with a way to no
 longer intercept some instructions for improved latency in some
 workloads, and is suggested when vCPUs are associated to dedicated
 physical CPUs.  More bits can be added in the future; userspace can
 just pass the KVM_CHECK_EXTENSION result to KVM_ENABLE_CAP to disable
-all such vmexits.
+all such vmexits. Set KVM_X86_DISABLE_EXITS_PER_VCPU enables per-vCPU
+exits disabling based on the vCPUs bitmask for args[1], currently only
+set for HLT exits.
 
 Do not enable KVM_FEATURE_PV_UNHALT if you disable HLT exits.
 

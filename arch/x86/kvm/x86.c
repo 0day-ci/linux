@@ -5784,6 +5784,9 @@ split_irqchip_unlock:
 			kvm->arch.pause_in_guest = true;
 		if (cap->args[0] & KVM_X86_DISABLE_EXITS_CSTATE)
 			kvm->arch.cstate_in_guest = true;
+		if ((cap->args[0] & KVM_X86_DISABLE_EXITS_PER_VCPU) &&
+			cap->args[1])
+			kvm->arch.exits_disable_vcpu_mask = cap->args[1];
 		r = 0;
 		break;
 	case KVM_CAP_MSR_PLATFORM_INFO:
@@ -12147,7 +12150,7 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
 		     vcpu->arch.exception.pending))
 		return false;
 
-	if (kvm_hlt_in_guest(vcpu->kvm) && !kvm_can_deliver_async_pf(vcpu))
+	if (kvm_hlt_in_guest(vcpu) && !kvm_can_deliver_async_pf(vcpu))
 		return false;
 
 	/*

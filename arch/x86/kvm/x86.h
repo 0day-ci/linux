@@ -377,9 +377,10 @@ static inline bool kvm_mwait_in_guest(struct kvm *kvm)
 	return kvm->arch.mwait_in_guest;
 }
 
-static inline bool kvm_hlt_in_guest(struct kvm *kvm)
+static inline bool kvm_hlt_in_guest(struct kvm_vcpu *vcpu)
 {
-	return kvm->arch.hlt_in_guest;
+	return vcpu->kvm->arch.hlt_in_guest && (rol64(1UL, vcpu->vcpu_id) &
+			~vcpu->kvm->arch.exits_disable_vcpu_mask);
 }
 
 static inline bool kvm_pause_in_guest(struct kvm *kvm)

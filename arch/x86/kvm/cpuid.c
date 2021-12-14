@@ -177,7 +177,7 @@ void kvm_update_cpuid_runtime(struct kvm_vcpu *vcpu)
 		best->ebx = xstate_required_size(vcpu->arch.xcr0, true);
 
 	best = kvm_find_kvm_cpuid_features(vcpu);
-	if (kvm_hlt_in_guest(vcpu->kvm) && best &&
+	if (kvm_hlt_in_guest(vcpu) && best &&
 		(best->eax & (1 << KVM_FEATURE_PV_UNHALT)))
 		best->eax &= ~(1 << KVM_FEATURE_PV_UNHALT);
 
