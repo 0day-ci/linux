@@ -291,6 +291,25 @@ out:
 	return (rule->flags & FIB_RULE_INVERT) ? !ret : ret;
 }
 
+static bool fib_rule_should_suppress(const struct fib_rule *rule,
+				     const struct net_device *dev,
+				     int prefixlen)
+{
+	/* do not accept result if the route does
+	 * not meet the required prefix length
+	 */
+	if (prefixlen <= rule->suppress_prefixlen)
+		return true;
+
+	/* do not accept result if the route uses a device
+	 * belonging to a forbidden interface group
+	 */
+	if (rule->suppress_ifgroup != -1 && dev && dev->group == rule->suppress_ifgroup)
+		return true;
+
+	return false;
+}
+
 static bool fib4_rule_suppress(struct fib_rule *rule,
 			       int flags,
 			       struct fib_lookup_arg *arg)
@@ -304,30 +323,19 @@ static bool fib4_rule_suppress(struct fib_rule *rule,
 		dev = nhc->nhc_dev;
 	}
 
-	/* do not accept result if the route does
-	 * not meet the required prefix length
-	 */
-	if (result->prefixlen <= rule->suppress_prefixlen)
-		goto suppress_route;
-
-	/* do not accept result if the route uses a device
-	 * belonging to a forbidden interface group
-	 */
-	if (rule->suppress_ifgroup != -1 && dev && dev->group == rule->suppress_ifgroup)
-		goto suppress_route;
-
+	if (fib_rule_should_suppress(rule, dev, result->prefixlen)) {
+		if (!(arg->flags & FIB_LOOKUP_NOREF))
+			fib_info_put(result->fi);
+		return true;
+	}
 	return false;
-
-suppress_route:
-	if (!(arg->flags & FIB_LOOKUP_NOREF))
-		fib_info_put(result->fi);
-	return true;
 }
 
 static bool fib6_rule_suppress(struct fib_rule *rule,
 			       int flags,
 			       struct fib_lookup_arg *arg)
 {
+#if IS_ENABLED(CONFIG_IPV6)
 	struct fib6_result *res = arg->result;
 	struct rt6_info *rt = res->rt6;
 	struct net_device *dev = NULL;
@@ -338,23 +346,13 @@ static bool fib6_rule_suppress(struct fib_rule *rule,
 	if (rt->rt6i_idev)
 		dev = rt->rt6i_idev->dev;
 
-	/* do not accept result if the route does
-	 * not meet the required prefix length
-	 */
-	if (rt->rt6i_dst.plen <= rule->suppress_prefixlen)
-		goto suppress_route;
+	if (fib_rule_should_suppress(rule, dev, rt->rt6i_dst.plen)) {
+		ip6_rt_put_flags(rt, flags);
+		return true;
+	}
 
-	/* do not accept result if the route uses a device
-	 * belonging to a forbidden interface group
-	 */
-	if (rule->suppress_ifgroup != -1 && dev && dev->group == rule->suppress_ifgroup)
-		goto suppress_route;
-
+#endif
 	return false;
-
-suppress_route:
-	ip6_rt_put_flags(rt, flags);
-	return true;
 }
 
 static bool fib_rule_suppress(int family,
