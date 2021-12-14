@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/interrupt-controller/fsl,ls-extirq.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Freescale Layerscape external interrupt driver
+
+maintainers:
+  - Rasmus Villemoes <linux@rasmusvillemoes.dk>
+
+description: |
+  Some Layerscape SOCs (LS1021A, LS1043A, LS1046A LS1088A, LS208xA, LX216xA)
+  support inverting the polarity of certain external interrupt lines.
+  The device node must be a child of the node representing the
+  Supplemental Configuration Unit (SCFG).
+
+properties:
+  compatible:
+    oneOf:
+      - const: fsl,ls1021a-extirq
+      - const: fsl,ls1043a-extirq
+      - const: fsl,ls1088a-extirq
+      - items:
+          - const: fsl,ls1046a-extirq
+          - const: fsl,ls1043a-extirq
+      - items:
+          - const: fsl,lx2160a-extirq
+          - const: fsl,ls1088a-extirq
+      - items:
+          - const: fsl,ls2080a-extirq
+          - const: fsl,ls1088a-extirq
+
+  reg:
+    description: |
+      Specifies the offset to the Interrupt Polarity Control Register (INTPCR)
+      in the SCFG or the External Interrupt Control Register (IRQCR) in the
+      ISC.
+    maxItems: 1
+
+  "#interrupt-cells":
+    description: |
+      Specifies the number of cells needed to encode an interrupt source. Must
+      be equal to 2. The first element is the index of the external interrupt
+      line. The second element is the trigger type.
+    const: 2
+
+  "#address-cells":
+    const: 0
+
+  interrupt-controller: true
+
+  fsl,extirq-map:
+    description: |
+      An array of elements through which the mapping between external
+      interrupts and GIC interrupts is specified. This isn't really a phandle
+      array, it just contains some phandles. It should really be an array where
+      the items are extirq-map-spec elements, but it seems like the
+      vendor-props.yaml don't allow us to reference such things.
+    type: object
+    $ref: "/schemas/types.yaml#/definitions/phandle-array"
+
+required:
+  - compatible
+  - reg
+  - "#interrupt-cells"
+  - interrupt-controller
+  - fsl,extirq-map
+
+additionalProperties: false
+
+$defs:
+  extirq-map-spec:
+    description: |
+      The first member of each array element is the index of the extirq line.
+      The second member must be zero. The third member must be a phandle to the
+      interrupt parent. The remaining number of members in an array element
+      depends on the "#interrupt-cells" property of the interrupt parent, and
+      are used to specify the parent interrupt.
+    type: array
+    items:
+      $ref: "/schemas/types.yaml#/definitions/cell"
+    minItems: 4
+    maxItems: 4095
+
+examples:
+  - |
+    scfg: scfg@1570000 {
+        compatible = "fsl,ls1021a-scfg", "syscon";
+        reg = <0x0 0x1570000 0x0 0x10000>;
+        big-endian;
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges = <0x0 0x0 0x1570000 0x10000>;
+
+        extirq: interrupt-controller@1ac {
+            compatible = "fsl,ls1021a-extirq";
+            #interrupt-cells = <2>;
+            #address-cells = <0>;
+            interrupt-controller;
+            reg = <0x1ac 4>;
+            fsl,extirq-map =
+                <0 0 &gic GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
+                <1 0 &gic GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
+                <2 0 &gic GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
+                <3 0 &gic GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
+                <4 0 &gic GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
+                <5 0 &gic GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+        };
+    };
