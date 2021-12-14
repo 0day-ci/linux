@@ -53,7 +53,17 @@ static int rpmsg_tty_install(struct tty_driver *driver, struct tty_struct *tty)
 
 	tty->driver_data = cport;
 
+	tty_port_get(&cport->port);
 	return tty_port_install(&cport->port, driver, tty);
+}
+
+static void rpmsg_tty_cleanup(struct tty_struct *tty)
+{
+	struct tty_port *port = tty->port;
+
+	WARN_ON(!port);
+
+	tty_port_put(port);
 }
 
 static int rpmsg_tty_open(struct tty_struct *tty, struct file *filp)
@@ -106,12 +116,19 @@ static unsigned int rpmsg_tty_write_room(struct tty_struct *tty)
 	return size;
 }
 
+static void rpmsg_tty_hangup(struct tty_struct *tty)
+{
+	tty_port_hangup(tty->port);
+}
+
 static const struct tty_operations rpmsg_tty_ops = {
 	.install	= rpmsg_tty_install,
 	.open		= rpmsg_tty_open,
 	.close		= rpmsg_tty_close,
 	.write		= rpmsg_tty_write,
 	.write_room	= rpmsg_tty_write_room,
+	.hangup		= rpmsg_tty_hangup,
+	.cleanup	= rpmsg_tty_cleanup,
 };
 
 static struct rpmsg_tty_port *rpmsg_tty_alloc_cport(void)
@@ -139,6 +156,8 @@ static struct rpmsg_tty_port *rpmsg_tty_alloc_cport(void)
 
 static void rpmsg_tty_release_cport(struct rpmsg_tty_port *cport)
 {
+	tty_port_destroy(&cport->port);
+
 	mutex_lock(&idr_lock);
 	idr_remove(&tty_idr, cport->id);
 	mutex_unlock(&idr_lock);
@@ -146,7 +165,17 @@ static void rpmsg_tty_release_cport(struct rpmsg_tty_port *cport)
 	kfree(cport);
 }
 
-static const struct tty_port_operations rpmsg_tty_port_ops = { };
+static void rpmsg_tty_destruct_port(struct tty_port *port)
+{
+	struct rpmsg_tty_port *cport = container_of(port, struct rpmsg_tty_port, port);
+
+	rpmsg_tty_release_cport(cport);
+}
+
+static const struct tty_port_operations rpmsg_tty_port_ops = {
+	.destruct = rpmsg_tty_destruct_port,
+};
+
 
 static int rpmsg_tty_probe(struct rpmsg_device *rpdev)
 {
@@ -179,7 +208,6 @@ static int rpmsg_tty_probe(struct rpmsg_device *rpdev)
 	return 0;
 
 err_destroy:
-	tty_port_destroy(&cport->port);
 	rpmsg_tty_release_cport(cport);
 
 	return ret;
@@ -188,17 +216,20 @@ err_destroy:
 static void rpmsg_tty_remove(struct rpmsg_device *rpdev)
 {
 	struct rpmsg_tty_port *cport = dev_get_drvdata(&rpdev->dev);
+	struct tty_struct *tty;
 
 	dev_dbg(&rpdev->dev, "Removing rpmsg tty device %d\n", cport->id);
 
 	/* User hang up to release the tty */
-	if (tty_port_initialized(&cport->port))
-		tty_port_tty_hangup(&cport->port, false);
+	tty = tty_port_tty_get(&cport->port);
+	if (tty) {
+		tty_vhangup(tty);
+		tty_kref_put(tty);
+	}
 
 	tty_unregister_device(rpmsg_tty_driver, cport->id);
 
-	tty_port_destroy(&cport->port);
-	rpmsg_tty_release_cport(cport);
+	tty_port_put(&cport->port);
 }
 
 static struct rpmsg_device_id rpmsg_driver_tty_id_table[] = {
