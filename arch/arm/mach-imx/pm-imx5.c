@@ -130,11 +130,11 @@ struct imx5_cpu_suspend_info {
 	struct imx5_suspend_io_state io_state[MX5_MAX_SUSPEND_IOSTATE];
 } __aligned(8);
 
-static void __iomem *ccm_base;
-static void __iomem *cortex_base;
-static void __iomem *gpc_base;
-static void __iomem *suspend_ocram_base;
-static void (*imx5_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
+static void __iomem *ccm_base __ro_after_init;
+static void __iomem *cortex_base __ro_after_init;
+static void __iomem *gpc_base __ro_after_init;
+static void __iomem *suspend_ocram_base __ro_after_init;
+static void (*imx5_suspend_in_ocram_fn)(void __iomem *ocram_vbase) __ro_after_init;
 
 /*
  * set cpu low power mode before WFI instruction. This function is called

@@ -36,10 +36,10 @@
 #define GPC_PGC_C1			0x840
 #define BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7	0x2
 
-static void __iomem *src_base;
+static void __iomem *src_base __ro_after_init;
 static DEFINE_SPINLOCK(scr_lock);
-static bool gpr_v2;
-static void __iomem *gpc_base;
+static bool gpr_v2 __ro_after_init;
+static void __iomem *gpc_base __ro_after_init;
 
 static const int sw_reset_bits[5] = {
 	BP_SRC_SCR_SW_GPU_RST,

@@ -23,9 +23,9 @@
 #include "common.h"
 #include "hardware.h"
 
-static void __iomem *wdog_base;
-static struct clk *wdog_clk;
-static int wcr_enable = (1 << 2);
+static void __iomem *wdog_base __ro_after_init;
+static struct clk *wdog_clk __ro_after_init;
+static int wcr_enable __ro_after_init = (1 << 2);
 
 /*
  * Reset the system. It is called by machine_restart().

@@ -43,8 +43,8 @@
 #define TZIC_SWINT	0x0F00	/* Software Interrupt Rigger Register */
 #define TZIC_ID0	0x0FD0	/* Indentification Register 0 */
 
-static void __iomem *tzic_base;
-static struct irq_domain *domain;
+static void __iomem *tzic_base __ro_after_init;
+static struct irq_domain *domain __ro_after_init;
 
 #define TZIC_NUM_IRQS 128
 

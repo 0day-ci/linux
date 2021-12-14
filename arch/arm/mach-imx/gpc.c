@@ -27,7 +27,7 @@
 #define IMR_NUM			4
 #define GPC_MAX_IRQS		(IMR_NUM * 32)
 
-static void __iomem *gpc_base;
+static void __iomem *gpc_base __ro_after_init;
 static u32 gpc_wake_irqs[IMR_NUM];
 static u32 gpc_saved_imrs[IMR_NUM];
 

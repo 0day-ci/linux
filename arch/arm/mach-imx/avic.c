@@ -44,9 +44,9 @@
 #define MX25_CCM_LPIMR0	0x68
 #define MX25_CCM_LPIMR1	0x6C
 
-static void __iomem *avic_base;
-static void __iomem *mx25_ccm_base;
-static struct irq_domain *domain;
+static void __iomem *avic_base __ro_after_init;
+static void __iomem *mx25_ccm_base __ro_after_init;
+static struct irq_domain *domain __ro_after_init;
 
 #ifdef CONFIG_FIQ
 static int avic_set_irq_fiq(unsigned int hwirq, unsigned int type)

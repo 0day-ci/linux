@@ -25,7 +25,7 @@
 #define BM_PMCTRL_RUNM		(3 << BP_PMCTRL_RUNM)
 #define BM_PMCTRL_STOPM		(7 << BP_PMCTRL_STOPM)
 
-static void __iomem *smc1_base;
+static void __iomem *smc1_base __ro_after_init;
 
 int imx7ulp_set_lpm(enum ulp_cpu_pwr_mode mode)
 {
