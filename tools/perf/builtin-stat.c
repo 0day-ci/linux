@@ -1832,6 +1832,18 @@ static int add_default_attributes(void)
 		if (!force_metric_only)
 			stat_config.metric_only = true;
 
+		if (arch_topdown_use_json_metrics()) {
+			if (metricgroup__parse_groups_to_evlist(evsel_list, "TopDownL1",
+								stat_config.metric_no_group,
+								stat_config.metric_no_merge,
+								&stat_config.metric_events) < 0) {
+				pr_err("Could not form list of metrics for topdown\n");
+				return -1;
+			}
+
+			goto end_of_topdown_setup;
+		}
+
 		if (pmu_have_event("cpu", topdown_metric_L2_attrs[5])) {
 			metric_attrs = topdown_metric_L2_attrs;
 			max_level = 2;
@@ -1895,6 +1907,7 @@ setup_metrics:
 			fprintf(stderr, "System does not support topdown\n");
 			return -1;
 		}
+end_of_topdown_setup:
 		free(str);
 	}
 
