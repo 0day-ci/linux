@@ -131,6 +131,18 @@
 			#interrupt-cells = <3>;
 			interrupt-controller;
 			reg = <0x2 0x3b100000 0x0 0x8000>;
+
+			affinities {
+				e-core-pmu-affinity {
+					fiq-index = <AIC_CPU_PMU_E>;
+					affinity = <&cpu0 &cpu1 &cpu2 &cpu3>;
+				};
+
+				p-core-pmu-affinity {
+					fiq-index = <AIC_CPU_PMU_P>;
+					affinity = <&cpu4 &cpu5 &cpu6 &cpu7>;
+				};
+			};
 		};
 
 		pinctrl_ap: pinctrl@23c100000 {
