@@ -18255,6 +18255,7 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 W:	https://sunplus-tibbo.atlassian.net/wiki/spaces/doc/overview
 F:	Documentation/devicetree/bindings/net/sunplus,sp7021-emac.yaml
+F:	drivers/net/ethernet/sunplus/
 
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
