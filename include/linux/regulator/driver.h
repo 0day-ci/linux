@@ -253,7 +253,6 @@ enum regulator_type {
 
 /**
  * struct regulator_desc - Static regulator descriptor
- *
  * Each regulator registered with the core is described with a
  * structure of this type and a struct regulator_config.  This
  * structure contains the non-varying parts of the regulator
@@ -348,6 +347,7 @@ enum regulator_type {
  * @ramp_delay_table:	Table for mapping the regulator ramp-rate values. Values
  *			should be given in units of V/S (uV/uS). See the
  *			regulator_set_ramp_delay_regmap().
+ * @n_ramp_values:	Number of entries in the @ramp_delay_table
  *
  * @enable_time: Time taken for initial enable of regulator (in uS).
  * @off_on_delay: guard time (in uS), before re-enabling a regulator
@@ -434,7 +434,6 @@ struct regulator_desc {
 
 /**
  * struct regulator_config - Dynamic regulator descriptor
- *
  * Each regulator registered with the core is described with a
  * structure of this type and a struct regulator_desc.  This structure
  * contains the runtime variable parts of the regulator description.
