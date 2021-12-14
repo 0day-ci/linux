@@ -18,7 +18,7 @@
 /// this kind were cleaned-up from the kernel. This cocci rule checks that
 /// the macro is not explicitly or implicitly reintroduced.
 ///
-// Confidence: High
+// Confidence: Low
 // Copyright: (C) 2020 Denis Efremov ISPRAS
 // Options: --no-includes --include-headers
 //
