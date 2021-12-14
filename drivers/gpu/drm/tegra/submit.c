@@ -140,16 +140,7 @@ static void *alloc_copy_user_array(void __user *from, size_t count, size_t size)
 	if (copy_len > 0x4000)
 		return ERR_PTR(-E2BIG);
 
-	data = kvmalloc(copy_len, GFP_KERNEL);
-	if (!data)
-		return ERR_PTR(-ENOMEM);
-
-	if (copy_from_user(data, from, copy_len)) {
-		kvfree(data);
-		return ERR_PTR(-EFAULT);
-	}
-
-	return data;
+	return vmemdup_user(from, copy_len);
 }
 
 static int submit_copy_gather_data(struct gather_bo **pbo, struct device *dev,
