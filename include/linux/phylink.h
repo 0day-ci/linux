@@ -408,9 +408,7 @@ struct phylink_pcs_ops {
 	void (*pcs_get_state)(struct phylink_pcs *pcs,
 			      struct phylink_link_state *state);
 	int (*pcs_config)(struct phylink_pcs *pcs, unsigned int mode,
-			  phy_interface_t interface,
-			  const unsigned long *advertising,
-			  bool permit_pause_to_mac);
+			  const struct phylink_link_state *state);
 	void (*pcs_an_restart)(struct phylink_pcs *pcs);
 	void (*pcs_link_up)(struct phylink_pcs *pcs, unsigned int mode,
 			    phy_interface_t interface, int speed, int duplex);
@@ -439,13 +437,10 @@ void pcs_get_state(struct phylink_pcs *pcs,
  * pcs_config() - Configure the PCS mode and advertisement
  * @pcs: a pointer to a &struct phylink_pcs.
  * @mode: one of %MLO_AN_FIXED, %MLO_AN_PHY, %MLO_AN_INBAND.
- * @interface: interface mode to be used
- * @advertising: adertisement ethtool link mode mask
- * @permit_pause_to_mac: permit forwarding pause resolution to MAC
+ * @state: the state to configure, containing the interface and advertisement
  *
  * Configure the PCS for the operating mode, the interface mode, and set
- * the advertisement mask. @permit_pause_to_mac indicates whether the
- * hardware may forward the pause mode resolution to the MAC.
+ * the advertisement mask.
  *
  * When operating in %MLO_AN_INBAND, inband should always be enabled,
  * otherwise inband should be disabled.
@@ -458,8 +453,7 @@ void pcs_get_state(struct phylink_pcs *pcs,
  * For most 10GBASE-R, there is no advertisement.
  */
 int pcs_config(struct phylink_pcs *pcs, unsigned int mode,
-	       phy_interface_t interface, const unsigned long *advertising,
-	       bool permit_pause_to_mac);
+	       const struct phylink_link_state *state);
 
 /**
  * pcs_an_restart() - restart 802.3z BaseX autonegotiation

@@ -6149,9 +6149,7 @@ static void mvpp2_xlg_pcs_get_state(struct phylink_pcs *pcs,
 
 static int mvpp2_xlg_pcs_config(struct phylink_pcs *pcs,
 				unsigned int mode,
-				phy_interface_t interface,
-				const unsigned long *advertising,
-				bool permit_pause_to_mac)
+				const struct phylink_link_state *state)
 {
 	return 0;
 }
@@ -6197,9 +6195,7 @@ static void mvpp2_gmac_pcs_get_state(struct phylink_pcs *pcs,
 }
 
 static int mvpp2_gmac_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
-				 phy_interface_t interface,
-				 const unsigned long *advertising,
-				 bool permit_pause_to_mac)
+				 const struct phylink_link_state *state)
 {
 	struct mvpp2_port *port = mvpp2_pcs_to_port(pcs);
 	u32 mask, val, an, old_an, changed;
@@ -6216,7 +6212,7 @@ static int mvpp2_gmac_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
 			MVPP2_GMAC_CONFIG_FULL_DUPLEX;
 		val = MVPP2_GMAC_IN_BAND_AUTONEG;
 
-		if (interface == PHY_INTERFACE_MODE_SGMII) {
+		if (state->interface == PHY_INTERFACE_MODE_SGMII) {
 			/* SGMII mode receives the speed and duplex from PHY */
 			val |= MVPP2_GMAC_AN_SPEED_EN |
 			       MVPP2_GMAC_AN_DUPLEX_EN;
@@ -6225,18 +6221,21 @@ static int mvpp2_gmac_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
 			val |= MVPP2_GMAC_CONFIG_GMII_SPEED |
 			       MVPP2_GMAC_CONFIG_FULL_DUPLEX;
 
-			/* The FLOW_CTRL_AUTONEG bit selects either the hardware
-			 * automatically or the bits in MVPP22_GMAC_CTRL_4_REG
-			 * manually controls the GMAC pause modes.
+			/* The FLOW_CTRL_AUTONEG bit selects whether flow
+			 * control should come from autonegotiation or whether
+			 * it should be manually configured (by
+			 * MVPP22_GMAC_CTRL_4_REG). If it is cleared (to select
+			 * manual configuration) then flow control
+			 * advertisement will be ignored.
 			 */
-			if (permit_pause_to_mac)
+			if (state->pause & MLO_PAUSE_AN)
 				val |= MVPP2_GMAC_FLOW_CTRL_AUTONEG;
 
 			/* Configure advertisement bits */
 			mask |= MVPP2_GMAC_FC_ADV_EN | MVPP2_GMAC_FC_ADV_ASM_EN;
-			if (phylink_test(advertising, Pause))
+			if (phylink_test(state->advertising, Pause))
 				val |= MVPP2_GMAC_FC_ADV_EN;
-			if (phylink_test(advertising, Asym_Pause))
+			if (phylink_test(state->advertising, Asym_Pause))
 				val |= MVPP2_GMAC_FC_ADV_ASM_EN;
 		}
 	} else {
@@ -6635,8 +6634,7 @@ static void mvpp2_acpi_start(struct mvpp2_port *port)
 			   port->phy_interface);
 	mvpp2_mac_config(&port->phylink_config, MLO_AN_INBAND, &state);
 	port->phylink_pcs.ops->pcs_config(&port->phylink_pcs, MLO_AN_INBAND,
-					  port->phy_interface,
-					  state.advertising, false);
+					  &state);
 	mvpp2_mac_finish(&port->phylink_config, MLO_AN_INBAND,
 			 port->phy_interface);
 	mvpp2_mac_link_up(&port->phylink_config, NULL,

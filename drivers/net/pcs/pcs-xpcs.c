@@ -831,13 +831,11 @@ int xpcs_do_config(struct dw_xpcs *xpcs, phy_interface_t interface,
 EXPORT_SYMBOL_GPL(xpcs_do_config);
 
 static int xpcs_config(struct phylink_pcs *pcs, unsigned int mode,
-		       phy_interface_t interface,
-		       const unsigned long *advertising,
-		       bool permit_pause_to_mac)
+		       const struct phylink_link_state *state)
 {
 	struct dw_xpcs *xpcs = phylink_pcs_to_xpcs(pcs);
 
-	return xpcs_do_config(xpcs, interface, mode);
+	return xpcs_do_config(xpcs, state->interface, mode);
 }
 
 static int xpcs_get_state_c73(struct dw_xpcs *xpcs,

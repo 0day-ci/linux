@@ -540,9 +540,7 @@ static void macb_usx_pcs_get_state(struct phylink_pcs *pcs,
 
 static int macb_usx_pcs_config(struct phylink_pcs *pcs,
 			       unsigned int mode,
-			       phy_interface_t interface,
-			       const unsigned long *advertising,
-			       bool permit_pause_to_mac)
+			       const struct phylink_link_state *state)
 {
 	struct macb *bp = container_of(pcs, struct macb, phylink_pcs);
 
@@ -565,9 +563,7 @@ static void macb_pcs_an_restart(struct phylink_pcs *pcs)
 
 static int macb_pcs_config(struct phylink_pcs *pcs,
 			   unsigned int mode,
-			   phy_interface_t interface,
-			   const unsigned long *advertising,
-			   bool permit_pause_to_mac)
+			   const struct phylink_link_state *state)
 {
 	return 0;
 }

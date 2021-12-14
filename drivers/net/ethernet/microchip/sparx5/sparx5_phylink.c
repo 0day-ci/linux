@@ -84,9 +84,7 @@ static void sparx5_pcs_get_state(struct phylink_pcs *pcs,
 
 static int sparx5_pcs_config(struct phylink_pcs *pcs,
 			     unsigned int mode,
-			     phy_interface_t interface,
-			     const unsigned long *advertising,
-			     bool permit_pause_to_mac)
+			     const struct phylink_link_state *state)
 {
 	struct sparx5_port *port = sparx5_pcs_to_port(pcs);
 	struct sparx5_port_config conf;
@@ -94,16 +92,16 @@ static int sparx5_pcs_config(struct phylink_pcs *pcs,
 
 	conf = port->conf;
 	conf.power_down = false;
-	conf.portmode = interface;
+	conf.portmode = state->interface;
 	conf.inband = phylink_autoneg_inband(mode);
-	conf.autoneg = phylink_test(advertising, Autoneg);
+	conf.autoneg = phylink_test(state->advertising, Autoneg);
 	conf.pause_adv = 0;
-	if (phylink_test(advertising, Pause))
+	if (phylink_test(state->advertising, Pause))
 		conf.pause_adv |= ADVERTISE_1000XPAUSE;
-	if (phylink_test(advertising, Asym_Pause))
+	if (phylink_test(state->advertising, Asym_Pause))
 		conf.pause_adv |= ADVERTISE_1000XPSE_ASYM;
-	if (sparx5_is_baser(interface)) {
-		if (phylink_test(advertising, FIBRE))
+	if (sparx5_is_baser(state->interface)) {
+		if (phylink_test(state->advertising, FIBRE))
 			conf.media = PHY_MEDIA_SR;
 		else
 			conf.media = PHY_MEDIA_DAC;

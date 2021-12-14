@@ -86,19 +86,17 @@ static void lan966x_pcs_get_state(struct phylink_pcs *pcs,
 
 static int lan966x_pcs_config(struct phylink_pcs *pcs,
 			      unsigned int mode,
-			      phy_interface_t interface,
-			      const unsigned long *advertising,
-			      bool permit_pause_to_mac)
+			      const struct phylink_link_state *state)
 {
 	struct lan966x_port *port = lan966x_pcs_to_port(pcs);
 	struct lan966x_port_config config;
 	int ret;
 
 	config = port->config;
-	config.portmode = interface;
+	config.portmode = state->interface;
 	config.inband = phylink_autoneg_inband(mode);
-	config.autoneg = phylink_test(advertising, Autoneg);
-	config.advertising = advertising;
+	config.autoneg = phylink_test(state->advertising, Autoneg);
+	config.advertising = state->advertising;
 
 	ret = lan966x_port_pcs_set(port, &config);
 	if (ret)

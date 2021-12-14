@@ -182,18 +182,18 @@ static int lynx_pcs_config_usxgmii(struct mdio_device *pcs, unsigned int mode,
 }
 
 static int lynx_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
-			   phy_interface_t ifmode,
-			   const unsigned long *advertising,
-			   bool permit)
+			   const struct phylink_link_state *state)
 {
 	struct lynx_pcs *lynx = phylink_pcs_to_lynx(pcs);
 
-	switch (ifmode) {
+	switch (state->interface) {
 	case PHY_INTERFACE_MODE_1000BASEX:
-		return lynx_pcs_config_1000basex(lynx->mdio, mode, advertising);
+		return lynx_pcs_config_1000basex(lynx->mdio, mode,
+						 state->advertising);
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
-		return lynx_pcs_config_sgmii(lynx->mdio, mode, advertising);
+		return lynx_pcs_config_sgmii(lynx->mdio, mode,
+					     state->advertising);
 	case PHY_INTERFACE_MODE_2500BASEX:
 		if (phylink_autoneg_inband(mode)) {
 			dev_err(&lynx->mdio->dev,
@@ -202,7 +202,8 @@ static int lynx_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
 		}
 		break;
 	case PHY_INTERFACE_MODE_USXGMII:
-		return lynx_pcs_config_usxgmii(lynx->mdio, mode, advertising);
+		return lynx_pcs_config_usxgmii(lynx->mdio, mode,
+					       state->advertising);
 	case PHY_INTERFACE_MODE_10GBASER:
 		/* Nothing to do here for 10GBASER */
 		break;

@@ -768,10 +768,7 @@ static void phylink_major_config(struct phylink *pl, bool restart,
 
 	if (pl->pcs_ops) {
 		err = pl->pcs_ops->pcs_config(pl->pcs, pl->cur_link_an_mode,
-					      state->interface,
-					      state->advertising,
-					      !!(pl->link_config.pause &
-						 MLO_PAUSE_AN));
+					      state);
 		if (err < 0)
 			phylink_err(pl, "pcs_config failed: %pe\n",
 				    ERR_PTR(err));
@@ -821,9 +818,7 @@ static int phylink_change_inband_advert(struct phylink *pl)
 	 * the programmed advertisement has changed.
 	 */
 	ret = pl->pcs_ops->pcs_config(pl->pcs, pl->cur_link_an_mode,
-				      pl->link_config.interface,
-				      pl->link_config.advertising,
-				      !!(pl->link_config.pause & MLO_PAUSE_AN));
+				      &pl->link_config);
 	if (ret < 0)
 		return ret;
 
