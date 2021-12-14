@@ -139,6 +139,13 @@ config ARM_DMC620_PMU
 	  Support for PMU events monitoring on the ARM DMC-620 memory
 	  controller.
 
+config APPLE_M1_CPU_PMU
+	bool "Apple M1 CPU PMU support"
+	depends on ARM_PMU && ARCH_APPLE
+	help
+	  Provides support for the non-architectural CPU PMUs present on
+	  the Apple M1 SoCs and derivatives.
+
 source "drivers/perf/hisilicon/Kconfig"
 
 endmenu
