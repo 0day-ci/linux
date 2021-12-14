@@ -2623,6 +2623,12 @@ static int its_alloc_tables(struct its_node *its)
 			return err;
 		}
 
+		if ((i == 2) && is_kdump_kernel() && is_v4_1(its)) {
+			val = its_read_baser(its, baser);
+			val &= ~GITS_BASER_VALID;
+			its_write_baser(its, baser, val);
+		}
+
 		/* Update settings which will be used for next BASERn */
 		cache = baser->val & GITS_BASER_CACHEABILITY_MASK;
 		shr = baser->val & GITS_BASER_SHAREABILITY_MASK;
