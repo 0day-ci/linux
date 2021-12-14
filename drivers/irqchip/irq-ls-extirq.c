@@ -101,9 +101,15 @@ ls_extirq_parse_map(struct ls_extirq_data *priv, struct device_node *node)
 	u32 mapsize;
 	int ret;
 
-	map = of_get_property(node, "interrupt-map", &mapsize);
-	if (!map)
-		return -ENOENT;
+	map = of_get_property(node, "fsl,extirq-map", &mapsize);
+	if (!map) {
+		map = of_get_property(node, "interrupt-map", &mapsize);
+		if (!map)
+			return -ENOENT;
+
+		pr_warn("\"interrupt-map\" is a reserved OF property, and support for it will be removed. Please use \"fsl,extirq-map\" instead.\n");
+	}
+
 	if (mapsize % sizeof(*map))
 		return -EINVAL;
 	mapsize /= sizeof(*map);
