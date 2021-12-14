@@ -691,6 +691,11 @@ static int irdma_cqp_create_qp_cmd(struct irdma_qp *iwqp)
 	return status ? -ENOMEM : 0;
 }
 
+static inline u16 irdma_get_src_port(struct irdma_qp *iwqp)
+{
+	return 0xc000 + (hash_32_generic(iwqp->ibqp.qp_num, 14) & 0x3fff);
+}
+
 static void irdma_roce_fill_and_set_qpctx_info(struct irdma_qp *iwqp,
 					       struct irdma_qp_host_ctx_info *ctx_info)
 {
@@ -704,7 +709,7 @@ static void irdma_roce_fill_and_set_qpctx_info(struct irdma_qp *iwqp,
 	udp_info->cwnd = iwdev->roce_cwnd;
 	udp_info->rexmit_thresh = 2;
 	udp_info->rnr_nak_thresh = 2;
-	udp_info->src_port = 0xc000;
+	udp_info->src_port = irdma_get_src_port(iwqp);
 	udp_info->dst_port = ROCE_V2_UDP_DPORT;
 	roce_info = &iwqp->roce_info;
 	ether_addr_copy(roce_info->mac_addr, iwdev->netdev->dev_addr);
