@@ -353,6 +353,7 @@ struct qca8k_priv {
 	struct dsa_switch_ops ops;
 	struct gpio_desc *reset_gpio;
 	unsigned int port_mtu[QCA8K_NUM_PORTS];
+	const struct net_device *master; /* Track if mdio/mib Ethernet is available */
 };
 
 struct qca8k_mib_desc {
