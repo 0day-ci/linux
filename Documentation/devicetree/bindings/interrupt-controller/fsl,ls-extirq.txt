@@ -18,9 +18,13 @@ Required properties:
 - reg: Specifies the Interrupt Polarity Control Register (INTPCR) in
   the SCFG or the External Interrupt Control Register (IRQCR) in
   the ISC.
-- interrupt-map: Specifies the mapping from external interrupts to GIC
-  interrupts.
-- interrupt-map-mask: Must be <0xffffffff 0>.
+- fsl,extirq-map: An array of elements through which the mapping between
+  external interrupts and GIC interrupts is specified. The first member of each
+  array element is the index of the extirq line. The second member must be
+  zero. The third member must be a phandle to the interrupt parent (the GIC).
+  The remaining number of members in an array element depends on the
+  #interrupt-cells property of the interrupt parent, and are used to specify
+  the parent interrupt.
 
 Example:
 	scfg: scfg@1570000 {
@@ -37,14 +41,13 @@ Example:
 			#address-cells = <0>;
 			interrupt-controller;
 			reg = <0x1ac 4>;
-			interrupt-map =
+			fsl,extirq-map =
 				<0 0 &gic GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
 				<1 0 &gic GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
 				<2 0 &gic GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
 				<3 0 &gic GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
 				<4 0 &gic GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
 				<5 0 &gic GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-			interrupt-map-mask = <0xffffffff 0x0>;
 		};
 	};
 
