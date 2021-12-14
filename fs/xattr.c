@@ -560,11 +560,9 @@ setxattr(struct user_namespace *mnt_userns, struct dentry *d,
 	if (size) {
 		if (size > XATTR_SIZE_MAX)
 			return -E2BIG;
-		kvalue = kvmalloc(size, GFP_KERNEL);
-		if (!kvalue)
-			return -ENOMEM;
-		if (copy_from_user(kvalue, value, size)) {
-			error = -EFAULT;
+		kvalue = vmemdup_user(value, size);
+		if (IS_ERR(kvalue)) {
+			error = PTR_ERR(kvalue);
 			goto out;
 		}
 		if ((strcmp(kname, XATTR_NAME_POSIX_ACL_ACCESS) == 0) ||
