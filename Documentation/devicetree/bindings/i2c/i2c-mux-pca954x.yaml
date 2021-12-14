@@ -11,6 +11,7 @@ maintainers:
 
 description:
   The binding supports NXP PCA954x and PCA984x I2C mux/switch devices.
+  Compatible with Maxim MAX7356 - MAX7358 I2C mux/switch devices.
 
 allOf:
   - $ref: /schemas/i2c/i2c-mux.yaml#
@@ -19,6 +20,9 @@ properties:
   compatible:
     oneOf:
       - enum:
+          - maxim,max7356
+          - maxim,max7357
+          - maxim,max7358
           - nxp,pca9540
           - nxp,pca9542
           - nxp,pca9543
@@ -40,6 +44,7 @@ properties:
 
   interrupts:
     maxItems: 1
+    description: Only supported on NXP devices. Unsupported on Maxim MAX735x.
 
   "#interrupt-cells":
     const: 2
@@ -99,6 +104,41 @@ examples:
                 #address-cells = <1>;
                 #size-cells = <0>;
                 reg = <4>;
+
+                rtc@51 {
+                    compatible = "nxp,pcf8563";
+                    reg = <0x51>;
+                };
+            };
+        };
+    };
+
+  - |
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        i2c-mux@74 {
+            compatible = "maxim,max7357";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x74>;
+
+            i2c@1 {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <1>;
+
+                eeprom@54 {
+                    compatible = "atmel,24c08";
+                    reg = <0x54>;
+                };
+            };
+
+            i2c@7 {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <7>;
 
                 rtc@51 {
                     compatible = "nxp,pcf8563";
