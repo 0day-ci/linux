@@ -635,6 +635,58 @@ static inline struct dentry *lock_parent(struct dentry *dentry)
 	return __lock_parent(dentry);
 }
 
+/*
+ * Move cached negative dentry to the tail of parent->d_subdirs.
+ * This lets walkers skip them all together at first sight.
+ * Must be called at dput of negative dentry with d_lock held.
+ * Releases d_lock.
+ */
+static void sweep_negative(struct dentry *dentry)
+{
+	struct dentry *parent;
+
+	rcu_read_lock();
+	parent = lock_parent(dentry);
+	if (!parent) {
+		rcu_read_unlock();
+		return;
+	}
+
+	/*
+	 * If we did not hold a reference to dentry (as in the case of dput),
+	 * and dentry->d_lock was dropped in lock_parent(), then we could now be
+	 * holding onto a dead dentry. Be careful to check d_count and unlock
+	 * before dropping RCU lock, otherwise we could corrupt freed memory.
+	 */
+	if (!d_count(dentry) && d_is_negative(dentry) &&
+		!d_is_tail_negative(dentry)) {
+		dentry->d_flags |= DCACHE_TAIL_NEGATIVE;
+		list_move_tail(&dentry->d_child, &parent->d_subdirs);
+	}
+
+	spin_unlock(&parent->d_lock);
+	spin_unlock(&dentry->d_lock);
+	rcu_read_unlock();
+}
+
+/*
+ * Undo sweep_negative() and move to the head of parent->d_subdirs.
+ * Must be called before converting negative dentry into positive.
+ * Must hold dentry->d_lock, we may drop and re-grab it via lock_parent().
+ * Must be hold a reference or be otherwise sure the dentry cannot be killed.
+ */
+static void recycle_negative(struct dentry *dentry)
+{
+	struct dentry *parent;
+
+	parent = lock_parent(dentry);
+	dentry->d_flags &= ~DCACHE_TAIL_NEGATIVE;
+	if (parent) {
+		list_move(&dentry->d_child, &parent->d_subdirs);
+		spin_unlock(&parent->d_lock);
+	}
+}
+
 static inline bool retain_dentry(struct dentry *dentry)
 {
 	WARN_ON(d_in_lookup(dentry));
@@ -740,7 +792,7 @@ got_locks:
 static inline bool fast_dput(struct dentry *dentry)
 {
 	int ret;
-	unsigned int d_flags;
+	unsigned int d_flags, required;
 
 	/*
 	 * If we have a d_op->d_delete() operation, we sould not
@@ -788,6 +840,8 @@ static inline bool fast_dput(struct dentry *dentry)
 	 * a 'delete' op, and it's referenced and already on
 	 * the LRU list.
 	 *
+	 * Cached negative dentry must be swept to the tail.
+	 *
 	 * NOTE! Since we aren't locked, these values are
 	 * not "stable". However, it is sufficient that at
 	 * some point after we dropped the reference the
@@ -805,11 +859,16 @@ static inline bool fast_dput(struct dentry *dentry)
 	 */
 	smp_rmb();
 	d_flags = READ_ONCE(dentry->d_flags);
+
+	required = DCACHE_REFERENCED | DCACHE_LRU_LIST |
+		(d_flags_negative(d_flags) ? DCACHE_TAIL_NEGATIVE : 0);
+
 	d_flags &= DCACHE_REFERENCED | DCACHE_LRU_LIST |
-			DCACHE_DISCONNECTED | DCACHE_DONTCACHE;
+			DCACHE_DISCONNECTED | DCACHE_DONTCACHE |
+			DCACHE_TAIL_NEGATIVE;
 
 	/* Nothing to do? Dropping the reference was all we needed? */
-	if (d_flags == (DCACHE_REFERENCED | DCACHE_LRU_LIST) && !d_unhashed(dentry))
+	if (d_flags == required && !d_unhashed(dentry))
 		return true;
 
 	/*
@@ -881,7 +940,10 @@ void dput(struct dentry *dentry)
 		rcu_read_unlock();
 
 		if (likely(retain_dentry(dentry))) {
-			spin_unlock(&dentry->d_lock);
+			if (d_is_negative(dentry) && !d_is_tail_negative(dentry))
+				sweep_negative(dentry); /* drops d_lock */
+			else
+				spin_unlock(&dentry->d_lock);
 			return;
 		}
 
@@ -1973,6 +2035,8 @@ static void __d_instantiate(struct dentry *dentry, struct inode *inode)
 	WARN_ON(d_in_lookup(dentry));
 
 	spin_lock(&dentry->d_lock);
+	if (d_is_tail_negative(dentry))
+		recycle_negative(dentry);
 	/*
 	 * Decrement negative dentry count if it was in the LRU list.
 	 */
@@ -2697,6 +2761,13 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 	struct inode *dir = NULL;
 	unsigned n;
 	spin_lock(&dentry->d_lock);
+	/*
+	 * Tail negative dentries must become positive before associating an
+	 * inode. recycle_negative() is safe to use because we hold a reference
+	 * to dentry.
+	 */
+	if (inode && d_is_tail_negative(dentry))
+		recycle_negative(dentry);
 	if (unlikely(d_in_lookup(dentry))) {
 		dir = dentry->d_parent->d_inode;
 		n = start_dir_add(dir);
@@ -2713,7 +2784,11 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 	__d_rehash(dentry);
 	if (dir)
 		end_dir_add(dir, n);
-	spin_unlock(&dentry->d_lock);
+
+	if (!inode && !d_is_tail_negative(dentry))
+		sweep_negative(dentry); /* drops d_lock */
+	else
+		spin_unlock(&dentry->d_lock);
 	if (inode)
 		spin_unlock(&inode->i_lock);
 }

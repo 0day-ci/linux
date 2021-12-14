@@ -221,6 +221,7 @@ struct dentry_operations {
 #define DCACHE_PAR_LOOKUP		0x10000000 /* being looked up (with parent locked shared) */
 #define DCACHE_DENTRY_CURSOR		0x20000000
 #define DCACHE_NORCU			0x40000000 /* No RCU delay for freeing */
+#define DCACHE_TAIL_NEGATIVE		0x80000000 /* All following siblings are negative */
 
 extern seqlock_t rename_lock;
 
@@ -497,6 +498,11 @@ static inline bool d_really_is_positive(const struct dentry *dentry)
 static inline int simple_positive(const struct dentry *dentry)
 {
 	return d_really_is_positive(dentry) && !d_unhashed(dentry);
+}
+
+static inline bool d_is_tail_negative(const struct dentry *dentry)
+{
+	return unlikely(dentry->d_flags & DCACHE_TAIL_NEGATIVE);
 }
 
 extern void d_set_fallthru(struct dentry *dentry);
