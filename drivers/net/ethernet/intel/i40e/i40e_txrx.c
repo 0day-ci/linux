@@ -1671,6 +1671,8 @@ static bool i40e_alloc_mapped_page(struct i40e_ring *rx_ring,
 	if (unlikely(!page)) {
 		rx_ring->rx_stats.alloc_page_failed++;
 		return false;
+	} else {
+		rx_ring->rx_stats.page_alloc_count++;
 	}
 
 	/* map page for use */
