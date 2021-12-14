@@ -301,6 +301,8 @@ static int sctp_sock_dump(struct sctp_transport *tsp, void *p)
 	struct sctp_association *assoc;
 	int err = 0;
 
+	sctp_endpoint_hold(ep);
+	sock_hold(sk);
 	lock_sock(sk);
 	list_for_each_entry(assoc, &ep->asocs, asocs) {
 		if (cb->args[4] < cb->args[1])
@@ -341,6 +343,8 @@ next:
 	cb->args[4] = 0;
 release:
 	release_sock(sk);
+	sock_put(sk);
+	sctp_endpoint_put(ep);
 	return err;
 }
 
