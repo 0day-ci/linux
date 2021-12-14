@@ -31,8 +31,28 @@ properties:
       Phandle to a regulator that provides power to the PHY. This regulator
       will be managed during the PHY power on/off sequence.
 
+  tx-amplitude-microvolt:
+    description:
+      Transmit amplitude voltages in microvolts, peak-to-peak. If this property
+      contains multiple values for various PHY modes, the
+      'tx-amplitude-microvolt-names' property must be provided and contain
+      corresponding mode names.
+
+  tx-amplitude-microvolt-names:
+    description: |
+      Names of the modes corresponding to voltages in the
+      'tx-amplitude-microvolt' property. Required only if multiple voltages
+      are provided.
+
+      If a value of 'default' is provided, the system should use it for any PHY
+      mode that is otherwise not defined here. If 'default' is not provided, the
+      system should use manufacturer default value.
+
 required:
   - '#phy-cells'
+
+dependencies:
+  tx-amplitude-microvolt-names: [ tx-amplitude-microvolt ]
 
 additionalProperties: true
 
@@ -46,6 +66,8 @@ examples:
     phy: phy {
       #phy-cells = <1>;
       phy-supply = <&phy_regulator>;
+      tx-amplitude-microvolt = <915000>, <1100000>, <1200000>;
+      tx-amplitude-microvolt-names = "2500base-x", "usb-hs", "usb-ss";
     };
 
     ethernet-controller {
