@@ -444,6 +444,7 @@ struct amdgpu_sa_bo {
 
 int amdgpu_fence_slab_init(void);
 void amdgpu_fence_slab_fini(void);
+bool is_job_embedded_fence(struct dma_fence *f);
 
 /*
  * IRQS.

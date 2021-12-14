@@ -4483,9 +4483,8 @@ int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 
 			ptr = &ring->fence_drv.fences[j];
 			old = rcu_dereference_protected(*ptr, 1);
-			if (old && test_bit(AMDGPU_FENCE_FLAG_EMBED_IN_JOB_BIT, &old->flags)) {
+			if (old && is_job_embedded_fence(old))
 				RCU_INIT_POINTER(*ptr, NULL);
-			}
 		}
 		/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
 		amdgpu_fence_driver_force_completion(ring);
