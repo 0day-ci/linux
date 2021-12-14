@@ -1,0 +1,67 @@
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_en
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Dither enable. Write 1 to enable dither or 0 to disable it.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_raw
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		This raw, unscaled value refers to the dither signal amplitude.
+		The same scale as in out_voltageY_raw applies. However, the
+		offset might be different as it's always 0 for this attribute.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_raw_available
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Available range for dither raw amplitude values.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_frequency
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Sets the dither signal frequency.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_frequency_available
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Returns the available values for the dither frequency.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_phase
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Sets the dither signal phase.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_dither_phase_available
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Returns the available values for the dither phase.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_toggle_en
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Toggle enable. Write 1 to enable toggle or 0 to disable it.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_raw1
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		It has the same meaning as out_voltageY_raw. This attribute is
+		specific to toggle enabled channels and refers to the DAC output
+		code in the INPUT_B register while regular out_voltageY_raw
+		refers to INPUT_A. The same scale, offset, etc applies.
+
+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_symbol
+KernelVersion:	5.16
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Performs a SW toggle. This attribute is specific to toggle
+		enabled channels and allows to toggle between out_voltageY_raw
+		and out_voltageY_raw1 through software. Writing 0 will select
+		out_voltageY_raw while 1 selects out_voltageY_raw1.
