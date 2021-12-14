@@ -1,0 +1,146 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/iio/dac/adi,ltc2688.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Analog Devices LTC2688 DAC
+
+maintainers:
+  - Nuno Sá <nuno.sa@analog.com>
+
+description: |
+  Analog Devices LTC2688 16 channel, 16 bit, +-15V DAC
+  https://www.analog.com/media/en/technical-documentation/data-sheets/ltc2688.pdf
+
+properties:
+  compatible:
+    enum:
+      - adi,ltc2688
+
+  reg:
+    maxItems: 1
+
+  vcc-supply:
+    description: Analog Supply Voltage Input.
+
+  iovcc-supply:
+    description: Digital Input/Output Supply Voltage.
+
+  vref-supply:
+    description:
+      Reference Input/Output. The voltage at the REF pin sets the full-scale
+      range of all channels. By default, the internal reference is routed to
+      this pin.
+
+  reset-gpios:
+    description:
+      If specified, it will be asserted during driver probe. As the line is
+      active low, it should be marked GPIO_ACTIVE_LOW.
+    maxItems: 1
+
+  clocks:
+    minItems: 1
+    maxItems: 3
+
+  clock-names:
+    minItems: 1
+    maxItems: 3
+    items:
+      enum: [TGP1, TGP2, TGP3]
+
+  '#address-cells':
+    const: 1
+
+  '#size-cells':
+    const: 0
+
+patternProperties:
+  "^channel@([0-9]|1[0-5])$":
+    type: object
+
+    properties:
+      reg:
+        description: The channel number representing the DAC output channel.
+        maximum: 15
+
+      adi,toggle-mode:
+        description:
+          Set the channel as a toggle enabled channel. Toggle operation enables
+          fast switching of a DAC output between two different DAC codes without
+          any SPI transaction. It will result in a different ABI for the
+          channel.
+        type: boolean
+
+      adi,output-range-millivolt:
+        description:
+          Specify the channel output full scale range. Allowed values are
+            <0 5000>
+            <0 10000>
+            <-5000 5000>
+            <-10000 10000>
+            <-15000 15000>
+        $ref: /schemas/types.yaml#/definitions/int32-array
+
+      adi,overrange:
+        description: Enable 5% overrange over the selected full scale range.
+        type: boolean
+
+      adi,toggle-dither-input:
+        description:
+          Selects the TGPx pin to be associated with this channel. This setting
+          only makes sense for toggle or dither enabled channels. If
+          @adi,toggle-mode is not set and this property is given, the channel is
+          assumed to be a dither capable channel. Note that multiple channels
+          can be mapped to the same pin. If this setting is given, the
+          respective @clock must also be provided. Mappings between this and
+          clocks
+            0 - TGP1
+            1 - TGP2
+            2 - TGP3
+        $ref: /schemas/types.yaml#/definitions/uint32
+        enum: [0, 1, 2]
+
+    required:
+      - reg
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+
+    spi {
+          #address-cells = <1>;
+          #size-cells = <0>;
+          ltc2688: ltc2688@0 {
+                  compatible = "adi,ltc2688";
+                  reg = <0>;
+
+                  vcc-supply = <&vcc>;
+                  iovcc-supply = <&vcc>;
+                  vref-supply = <&vref>;
+
+                  clocks = <&clock_tgp2>;
+                  clock-names = "TGP2";
+
+                  #address-cells = <1>;
+                  #size-cells = <0>;
+                  channel@0 {
+                          reg = <0>;
+                          adi,toggle-mode;
+                          adi,overrange;
+                  };
+
+                  channel@1 {
+                          reg = <1>;
+                          adi,output-range-millivolt = <(-10000) 10000>;
+                          adi,toggle-dither-input = <2>;
+                  };
+          };
+    };
+
+...
