@@ -2,7 +2,7 @@
 /// These iterators only exit normally when the loop cursor is NULL, so there
 /// is no point to call of_node_put on the final value.
 ///
-// Confidence: High
+// Confidence: Low
 // Copyright: (C) 2010-2012 Nicolas Palix.
 // Copyright: (C) 2010-2012 Julia Lawall, INRIA/LIP6.
 // Copyright: (C) 2010-2012 Gilles Muller, INRIA/LiP6.
