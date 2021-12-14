@@ -5785,7 +5785,7 @@ init_complete:
 	init_context = NULL;
 
 	if (err)
-		return err;
+		goto out;
 
 	/* Wait to be woken up by the spawner before proceeding. */
 	kthread_parkme();
@@ -5793,6 +5793,15 @@ init_complete:
 	if (!kthread_should_stop())
 		err = thread_fn(kvm, data);
 
+out:
+	/*
+	 * We need to move the kthread back to its original cgroups, so that it
+	 * doesn't linger in the cgroups of the user process after that has
+	 * already terminated. exit_mm() in do_exit() signals kthread_stop() to
+	 * return, whereas, removal of the task from the cgroups happens in
+	 * cgroup_exit() which happens after exit_mm().
+	 */
+	WARN_ON(cgroup_attach_task_all(kthreadd_task, current));
 	return err;
 }
 
