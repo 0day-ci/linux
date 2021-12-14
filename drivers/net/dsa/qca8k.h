@@ -363,6 +363,14 @@ struct qca8k_ports_config {
 	u8 rgmii_tx_delay[QCA8K_NUM_CPU_PORTS]; /* 0: CPU port0, 1: CPU port6 */
 };
 
+struct qca8k_mdio_cache {
+/* The 32bit switch registers are accessed indirectly. To achieve this we need
+ * to set the page of the register. Track the last page that was set to reduce
+ * mdio writes
+ */
+	u16 page;
+};
+
 struct qca8k_priv {
 	u8 switch_id;
 	u8 switch_revision;
@@ -383,6 +391,7 @@ struct qca8k_priv {
 	const struct net_device *master; /* Track if mdio/mib Ethernet is available */
 	struct qca8k_mdio_hdr_data mdio_hdr_data;
 	struct qca8k_mib_hdr_data mib_hdr_data;
+	struct qca8k_mdio_cache mdio_cache;
 };
 
 struct qca8k_mib_desc {
