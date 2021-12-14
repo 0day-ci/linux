@@ -490,6 +490,16 @@ W:	http://wiki.analog.com/AD7879
 W:	http://ez.analog.com/community/linux-device-drivers
 F:	drivers/input/touchscreen/ad7879.c
 
+ADDI9036 TOF FRONTEND DRIVER
+M:	Bogdan Togorean <bogdan.togorean@analog.com>
+L:	linux-media@vger.kernel.org
+S:	Supported
+W:	https://www.analog.com/en/products/addi9036.html
+W:	http://ez.analog.com/community/linux-device-drivers
+T:	git git://linuxtv.org/media_tree.git
+F:	Documentation/devicetree/bindings/media/i2c/adi,addi9036.yaml
+F:	drivers/media/i2c/addi9036.c
+
 ADDRESS SPACE LAYOUT RANDOMIZATION (ASLR)
 M:	Jiri Kosina <jikos@kernel.org>
 S:	Maintained
