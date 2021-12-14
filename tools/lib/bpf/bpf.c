@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <linux/bpf.h>
 #include <limits.h>
+#include <sys/resource.h>
 #include "bpf.h"
 #include "libbpf.h"
 #include "libbpf_internal.h"
@@ -94,6 +95,106 @@ static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size, int
 	return fd;
 }
 
+/* Probe whether kernel switched from memlock-based (RLIMIT_MEMLOCK) to
+ * memcg-based memory accounting for BPF maps and progs. This was done in [0].
+ * We use the difference in reporting memlock value in BPF map's fdinfo before
+ * and after [0] to detect whether memcg accounting is done for BPF subsystem
+ * or not.
+ *
+ * Before the change, memlock value for ARRAY map would be calculated as:
+ *
+ *   memlock = sizeof(struct bpf_array) + round_up(value_size, 8) * max_entries;
+ *   memlock = round_up(memlock, PAGE_SIZE);
+ *
+ *
+ * After, memlock is approximated as:
+ *
+ *   memlock = round_up(key_size + value_size, 8) * max_entries;
+ *   memlock = round_up(memlock, PAGE_SIZE);
+ *
+ * In this check we use the fact that sizeof(struct bpf_array) is about 300
+ * bytes, so if we use value_size = (PAGE_SIZE - 100), before memcg
+ * approximation memlock would be rounded up to 2 * PAGE_SIZE, while with
+ * memcg approximation it will stay at single PAGE_SIZE (key_size is 4 for
+ * array and doesn't make much difference given 100 byte decrement we use for
+ * value_size).
+ *
+ *   [0] https://lore.kernel.org/bpf/20201201215900.3569844-1-guro@fb.com/
+ */
+int probe_memcg_account(void)
+{
+	const size_t map_create_attr_sz = offsetofend(union bpf_attr, map_extra);
+	long page_sz = sysconf(_SC_PAGESIZE), memlock_sz;
+	char buf[128];
+	union bpf_attr attr;
+	int map_fd;
+	FILE *f;
+
+	memset(&attr, 0, map_create_attr_sz);
+	attr.map_type = BPF_MAP_TYPE_ARRAY;
+	attr.key_size = 4;
+	attr.value_size = page_sz - 100;
+	attr.max_entries = 1;
+	map_fd = sys_bpf_fd(BPF_MAP_CREATE, &attr, map_create_attr_sz);
+	if (map_fd < 0)
+		return -errno;
+
+	sprintf(buf, "/proc/self/fdinfo/%d", map_fd);
+	f = fopen(buf, "r");
+	while (f && !feof(f) && fgets(buf, sizeof(buf), f)) {
+		if (fscanf(f, "memlock: %ld\n", &memlock_sz) == 1) {
+			fclose(f);
+			close(map_fd);
+			return memlock_sz == page_sz ? 1 : 0;
+		}
+	}
+
+	/* proc FS is disabled or we failed to parse fdinfo properly, assume
+	 * we need setrlimit
+	 */
+	if (f)
+		fclose(f);
+	close(map_fd);
+	return 0;
+}
+
+static bool memlock_bumped;
+static rlim_t memlock_rlim = RLIM_INFINITY;
+
+int libbpf_set_memlock_rlim(size_t memlock_bytes)
+{
+	if (memlock_bumped)
+		return libbpf_err(-EBUSY);
+
+	memlock_rlim = memlock_bytes;
+	return 0;
+}
+
+int bump_rlimit_memlock(void)
+{
+	struct rlimit rlim;
+
+	/* this the default in libbpf 1.0, but for now user has to opt-in explicitly */
+	if (!(libbpf_mode & LIBBPF_STRICT_AUTO_RLIMIT_MEMLOCK))
+		return 0;
+
+	/* if kernel supports memcg-based accounting, skip bumping RLIMIT_MEMLOCK */
+	if (memlock_bumped || kernel_supports(NULL, FEAT_MEMCG_ACCOUNT))
+		return 0;
+
+	memlock_bumped = true;
+
+	/* zero memlock_rlim_max disables auto-bumping RLIMIT_MEMLOCK */
+	if (memlock_rlim == 0)
+		return 0;
+
+	rlim.rlim_cur = rlim.rlim_max = memlock_rlim;
+	if (setrlimit(RLIMIT_MEMLOCK, &rlim))
+		return -errno;
+
+	return 0;
+}
+
 int bpf_map_create(enum bpf_map_type map_type,
 		   const char *map_name,
 		   __u32 key_size,
@@ -104,6 +205,8 @@ int bpf_map_create(enum bpf_map_type map_type,
 	const size_t attr_sz = offsetofend(union bpf_attr, map_extra);
 	union bpf_attr attr;
 	int fd;
+
+	bump_rlimit_memlock();
 
 	memset(&attr, 0, attr_sz);
 
@@ -250,6 +353,8 @@ int bpf_prog_load_v0_6_0(enum bpf_prog_type prog_type,
 	int fd, attempts;
 	union bpf_attr attr;
 	char *log_buf;
+
+	bump_rlimit_memlock();
 
 	if (!OPTS_VALID(opts, bpf_prog_load_opts))
 		return libbpf_err(-EINVAL);
@@ -455,6 +560,8 @@ int bpf_verify_program(enum bpf_prog_type type, const struct bpf_insn *insns,
 {
 	union bpf_attr attr;
 	int fd;
+
+	bump_rlimit_memlock();
 
 	memset(&attr, 0, sizeof(attr));
 	attr.prog_type = type;
@@ -1055,6 +1162,8 @@ int bpf_btf_load(const void *btf_data, size_t btf_size, const struct bpf_btf_loa
 	size_t log_size;
 	__u32 log_level;
 	int fd;
+
+	bump_rlimit_memlock();
 
 	memset(&attr, 0, attr_sz);
 
