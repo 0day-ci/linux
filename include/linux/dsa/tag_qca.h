@@ -69,4 +69,11 @@ struct mib_ethhdr {
 	__be16 hdr;		/* qca hdr */
 } __packed;
 
+struct tag_qca_priv {
+	void (*rw_reg_ack_handler)(struct dsa_port *dp,
+				   struct sk_buff *skb);
+	void (*mib_autocast_handler)(struct dsa_port *dp,
+				     struct sk_buff *skb);
+};
+
 #endif /* __TAG_QCA_H */
