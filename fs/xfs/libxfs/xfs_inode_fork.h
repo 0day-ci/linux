@@ -156,14 +156,20 @@ static inline xfs_extnum_t
 xfs_dfork_data_extents(
 	struct xfs_dinode	*dip)
 {
-	return be32_to_cpu(dip->di_nextents);
+	if (xfs_dinode_has_nrext64(dip))
+		return be64_to_cpu(dip->di_big_dextcnt);
+	else
+		return be32_to_cpu(dip->di_nextents);
 }
 
 static inline xfs_extnum_t
 xfs_dfork_attr_extents(
 	struct xfs_dinode	*dip)
 {
-	return be16_to_cpu(dip->di_anextents);
+	if (xfs_dinode_has_nrext64(dip))
+		return be32_to_cpu(dip->di_big_aextcnt);
+	else
+		return be16_to_cpu(dip->di_anextents);
 }
 
 static inline xfs_extnum_t
