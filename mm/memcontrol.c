@@ -2090,7 +2090,12 @@ struct obj_stock {
 #endif
 };
 
+/*
+ * The local_lock protects the whole memcg_stock_pcp structure including
+ * the embedded obj_stock structures.
+ */
 struct memcg_stock_pcp {
+	local_lock_t lock;
 	struct mem_cgroup *cached; /* this never be root cgroup */
 	unsigned int nr_pages;
 	struct obj_stock task_obj;
@@ -2139,7 +2144,7 @@ static bool consume_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
 	if (nr_pages > MEMCG_CHARGE_BATCH)
 		return ret;
 
-	local_irq_save(flags);
+	local_lock_irqsave(&memcg_stock.lock, flags);
 
 	stock = this_cpu_ptr(&memcg_stock);
 	if (memcg == stock->cached && stock->nr_pages >= nr_pages) {
@@ -2147,7 +2152,7 @@ static bool consume_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
 		ret = true;
 	}
 
-	local_irq_restore(flags);
+	local_unlock_irqrestore(&memcg_stock.lock, flags);
 
 	return ret;
 }
@@ -2183,7 +2188,7 @@ static void drain_local_stock(struct work_struct *dummy)
 	 * drain_stock races is that we always operate on local CPU stock
 	 * here with IRQ disabled
 	 */
-	local_irq_save(flags);
+	local_lock_irqsave(&memcg_stock.lock, flags);
 
 	stock = this_cpu_ptr(&memcg_stock);
 	drain_obj_stock(&stock->irq_obj);
@@ -2192,7 +2197,7 @@ static void drain_local_stock(struct work_struct *dummy)
 	drain_stock(stock);
 	clear_bit(FLUSHING_CACHED_CHARGE, &stock->flags);
 
-	local_irq_restore(flags);
+	local_unlock_irqrestore(&memcg_stock.lock, flags);
 }
 
 /*
@@ -2204,7 +2209,7 @@ static void refill_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
 	struct memcg_stock_pcp *stock;
 	unsigned long flags;
 
-	local_irq_save(flags);
+	local_lock_irqsave(&memcg_stock.lock, flags);
 
 	stock = this_cpu_ptr(&memcg_stock);
 	if (stock->cached != memcg) { /* reset if necessary */
@@ -2217,7 +2222,7 @@ static void refill_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
 	if (stock->nr_pages > MEMCG_CHARGE_BATCH)
 		drain_stock(stock);
 
-	local_irq_restore(flags);
+	local_unlock_irqrestore(&memcg_stock.lock, flags);
 }
 
 /*
@@ -2773,29 +2778,34 @@ retry:
  * which is cheap in non-preempt kernel. The interrupt context object stock
  * can only be accessed after disabling interrupt. User context code can
  * access interrupt object stock, but not vice versa.
+ *
+ * This task and interrupt context optimization is disabled for PREEMPT_RT
+ * as there is no performance gain in this case and changes will be made to
+ * irq_obj only.
+ *
+ * For non-PREEMPT_RT, we are not replacing preempt_disable() by local_lock()
+ * as nesting of task_obj and irq_obj are allowed which may cause lockdep
+ * splat if local_lock() is used. Using separate local locks will complicate
+ * the interaction between obj_stock and the broader memcg_stock object.
  */
 static inline struct obj_stock *get_obj_stock(unsigned long *pflags)
 {
-	struct memcg_stock_pcp *stock;
-
-	if (likely(in_task())) {
+	if (likely(in_task()) && !IS_ENABLED(CONFIG_PREEMPT_RT)) {
 		*pflags = 0UL;
 		preempt_disable();
-		stock = this_cpu_ptr(&memcg_stock);
-		return &stock->task_obj;
+		return this_cpu_ptr(&memcg_stock.task_obj);
 	}
 
-	local_irq_save(*pflags);
-	stock = this_cpu_ptr(&memcg_stock);
-	return &stock->irq_obj;
+	local_lock_irqsave(&memcg_stock.lock, *pflags);
+	return this_cpu_ptr(&memcg_stock.irq_obj);
 }
 
 static inline void put_obj_stock(unsigned long flags)
 {
-	if (likely(in_task()))
+	if (likely(in_task()) && !IS_ENABLED(CONFIG_PREEMPT_RT))
 		preempt_enable();
 	else
-		local_irq_restore(flags);
+		local_unlock_irqrestore(&memcg_stock.lock, flags);
 }
 
 /*
@@ -7059,9 +7069,12 @@ static int __init mem_cgroup_init(void)
 	cpuhp_setup_state_nocalls(CPUHP_MM_MEMCQ_DEAD, "mm/memctrl:dead", NULL,
 				  memcg_hotplug_cpu_dead);
 
-	for_each_possible_cpu(cpu)
-		INIT_WORK(&per_cpu_ptr(&memcg_stock, cpu)->work,
-			  drain_local_stock);
+	for_each_possible_cpu(cpu) {
+		struct memcg_stock_pcp *stock = per_cpu_ptr(&memcg_stock, cpu);
+
+		INIT_WORK(&stock->work, drain_local_stock);
+		local_lock_init(&stock->lock);
+	}
 
 	for_each_node(node) {
 		struct mem_cgroup_tree_per_node *rtpn;
