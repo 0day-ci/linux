@@ -11,9 +11,11 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <net/net_namespace.h>
+#include <net/nexthop.h>
 #include <net/sock.h>
 #include <net/fib_rules.h>
 #include <net/ip_tunnels.h>
+#include <net/ip6_route.h>
 #include <linux/indirect_call_wrapper.h>
 
 #if defined(CONFIG_IPV6) && defined(CONFIG_IPV6_MULTIPLE_TABLES)
@@ -289,6 +291,87 @@ out:
 	return (rule->flags & FIB_RULE_INVERT) ? !ret : ret;
 }
 
+static bool fib4_rule_suppress(struct fib_rule *rule,
+			       int flags,
+			       struct fib_lookup_arg *arg)
+{
+	struct fib_result *result = (struct fib_result *)arg->result;
+	struct net_device *dev = NULL;
+
+	if (result->fi) {
+		struct fib_nh_common *nhc = fib_info_nhc(result->fi, 0);
+
+		dev = nhc->nhc_dev;
+	}
+
+	/* do not accept result if the route does
+	 * not meet the required prefix length
+	 */
+	if (result->prefixlen <= rule->suppress_prefixlen)
+		goto suppress_route;
+
+	/* do not accept result if the route uses a device
+	 * belonging to a forbidden interface group
+	 */
+	if (rule->suppress_ifgroup != -1 && dev && dev->group == rule->suppress_ifgroup)
+		goto suppress_route;
+
+	return false;
+
+suppress_route:
+	if (!(arg->flags & FIB_LOOKUP_NOREF))
+		fib_info_put(result->fi);
+	return true;
+}
+
+static bool fib6_rule_suppress(struct fib_rule *rule,
+			       int flags,
+			       struct fib_lookup_arg *arg)
+{
+	struct fib6_result *res = arg->result;
+	struct rt6_info *rt = res->rt6;
+	struct net_device *dev = NULL;
+
+	if (!rt)
+		return false;
+
+	if (rt->rt6i_idev)
+		dev = rt->rt6i_idev->dev;
+
+	/* do not accept result if the route does
+	 * not meet the required prefix length
+	 */
+	if (rt->rt6i_dst.plen <= rule->suppress_prefixlen)
+		goto suppress_route;
+
+	/* do not accept result if the route uses a device
+	 * belonging to a forbidden interface group
+	 */
+	if (rule->suppress_ifgroup != -1 && dev && dev->group == rule->suppress_ifgroup)
+		goto suppress_route;
+
+	return false;
+
+suppress_route:
+	ip6_rt_put_flags(rt, flags);
+	return true;
+}
+
+static bool fib_rule_suppress(int family,
+			      struct fib_rule *rule,
+			      int flags,
+			      struct fib_lookup_arg *arg)
+{
+	switch (family) {
+	case AF_INET:
+		return fib4_rule_suppress(rule, flags, arg);
+	case AF_INET6:
+		return fib6_rule_suppress(rule, flags, arg);
+	}
+
+	return false;
+}
+
 int fib_rules_lookup(struct fib_rules_ops *ops, struct flowi *fl,
 		     int flags, struct fib_lookup_arg *arg)
 {
@@ -320,10 +403,7 @@ jumped:
 					       fib4_rule_action,
 					       rule, fl, flags, arg);
 
-		if (!err && ops->suppress && INDIRECT_CALL_MT(ops->suppress,
-							      fib6_rule_suppress,
-							      fib4_rule_suppress,
-							      rule, flags, arg))
+		if (!err && fib_rule_suppress(ops->family, rule, flags, arg))
 			continue;
 
 		if (err != -EAGAIN) {
