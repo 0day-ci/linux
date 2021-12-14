@@ -1156,7 +1156,16 @@ EXPORT_SYMBOL(kblockd_schedule_work);
 int kblockd_mod_delayed_work_on(int cpu, struct delayed_work *dwork,
 				unsigned long delay)
 {
-	return mod_delayed_work_on(cpu, kblockd_workqueue, dwork, delay);
+	/*
+	 * Avoid hammering on work addition, if the work item is already
+	 * pending. This is safe the work pending state is cleared before
+	 * the work item is started, so if we see it set, then we know that
+	 * whatever was previously queued on the block side will get run by
+	 * an existing pending work item.
+	 */
+	if (!work_pending(&dwork->work))
+		return mod_delayed_work_on(cpu, kblockd_workqueue, dwork, delay);
+	return true;
 }
 EXPORT_SYMBOL(kblockd_mod_delayed_work_on);
 
