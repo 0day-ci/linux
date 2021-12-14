@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/phy/phy.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Common PHY Provider Generic Binding
+
+description:
+  This is the generic binding for common PHYs providers.
+
+maintainers:
+  - Kishon Vijay Abraham I <kishon@ti.com>
+  - Vinod Koul <vkoul@kernel.org>
+
+select:
+  required:
+    - '#phy-cells'
+
+properties:
+  '#phy-cells':
+    $ref: '/schemas/types.yaml#/definitions/uint32'
+    description:
+      Number of cells in a PHY specifier. The meaning of all those cells is
+      defined by the binding for the PHY node. The PHY provider can use the
+      values in cells to find the appropriate PHY.
+    maximum: 16
+
+  phy-supply:
+    description:
+      Phandle to a regulator that provides power to the PHY. This regulator
+      will be managed during the PHY power on/off sequence.
+
+required:
+  - '#phy-cells'
+
+additionalProperties: true
+
+examples:
+  - |
+    phy_regulator: regulator {
+      compatible = "regulator-fixed";
+      regulator-name = "phy-regulator";
+    };
+
+    phy: phy {
+      #phy-cells = <1>;
+      phy-supply = <&phy_regulator>;
+    };
+
+    ethernet-controller {
+      phys = <&phy 0>;
+      phy-names = "ethphy";
+    };
+
+    usb {
+      phys = <&phy 1>, <&phy 2>;
+      phy-names = "usb2phy", "usb3phy";
+    };
