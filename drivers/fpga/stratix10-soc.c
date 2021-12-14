@@ -245,7 +245,7 @@ static int s10_send_buf(struct fpga_manager *mgr, const char *buf, size_t count)
 	int ret;
 	uint i;
 
-	/* get/lock a buffer that that's not being used */
+	/* get/lock a buffer that is not being used */
 	for (i = 0; i < NUM_SVC_BUFS; i++)
 		if (!test_and_set_bit_lock(SVC_BUF_LOCK,
 					   &priv->svc_bufs[i].lock))
