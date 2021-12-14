@@ -4535,23 +4535,27 @@ int btrfs_previous_item(struct btrfs_root *root,
 {
 	struct btrfs_key found_key;
 	struct extent_buffer *leaf;
-	u32 nritems;
+	const u32 nritems = btrfs_header_nritems(path->nodes[0]);
 	int ret;
+
+	/*
+	 * Refer to btrfs_previous_item() for the reason of all nritems related
+	 * checks/modifications.
+	 */
+	if (nritems == 0)
+		return 1;
+	if (unlikely(path->slots[0] > nritems))
+		path->slots[0] = nritems;
 
 	while (1) {
 		if (path->slots[0] == 0) {
 			ret = btrfs_prev_leaf(root, path);
 			if (ret != 0)
 				return ret;
-		} else {
-			path->slots[0]--;
 		}
 		leaf = path->nodes[0];
-		nritems = btrfs_header_nritems(leaf);
-		if (nritems == 0)
-			return 1;
-		if (path->slots[0] == nritems)
-			path->slots[0]--;
+		ASSERT(btrfs_header_nritems(leaf));
+		path->slots[0]--;
 
 		btrfs_item_key_to_cpu(leaf, &found_key, path->slots[0]);
 		if (found_key.objectid < min_objectid)
@@ -4576,23 +4580,39 @@ int btrfs_previous_extent_item(struct btrfs_root *root,
 {
 	struct btrfs_key found_key;
 	struct extent_buffer *leaf;
-	u32 nritems;
+	const u32 nritems = btrfs_header_nritems(path->nodes[0]);
 	int ret;
+
+	/*
+	 * Check nritems first, if the tree is empty we exit immediately.
+	 * And if this leave is not empty, none of the tree blocks of this root
+	 * should be empty.
+	 */
+	if (nritems == 0)
+		return 1;
+
+	/*
+	 * If we're several slots beyond nritems, we reset slot to nritems,
+	 * and it will be handled properly inside the loop.
+	 */
+	if (unlikely(path->slots[0] > nritems))
+		path->slots[0] = nritems;
 
 	while (1) {
 		if (path->slots[0] == 0) {
 			ret = btrfs_prev_leaf(root, path);
 			if (ret != 0)
 				return ret;
-		} else {
-			path->slots[0]--;
 		}
 		leaf = path->nodes[0];
-		nritems = btrfs_header_nritems(leaf);
-		if (nritems == 0)
-			return 1;
-		if (path->slots[0] == nritems)
-			path->slots[0]--;
+		ASSERT(btrfs_header_nritems(leaf));
+		/*
+		 * This is for both regular case and above btrfs_prev_leaf() case.
+		 * As btrfs_prev_leaf() will return with path->slots[0] == nritems,
+		 * and we're sure no tree block is empty, we can go safely
+		 * reduce slots[0] here.
+		 */
+		path->slots[0]--;
 
 		btrfs_item_key_to_cpu(leaf, &found_key, path->slots[0]);
 		if (found_key.objectid < min_objectid)
