@@ -2895,7 +2895,7 @@ static inline int __security_genfs_sid(struct selinux_policy *policy,
 
 	for (genfs = policydb->genfs; genfs; genfs = genfs->next) {
 		cmp = strcmp(fstype, genfs->fstype);
-		if (cmp <= 0)
+		if (cmp == 0)
 			break;
 	}
 
