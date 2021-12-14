@@ -867,9 +867,6 @@ static int klp_init_patch_early(struct klp_patch *patch)
 	struct klp_object *obj;
 	struct klp_func *func;
 
-	if (!patch->objs)
-		return -EINVAL;
-
 	INIT_LIST_HEAD(&patch->list);
 	INIT_LIST_HEAD(&patch->obj_list);
 	kobject_init(&patch->kobj, &klp_ktype_patch);
@@ -888,9 +885,6 @@ static int klp_init_patch_early(struct klp_patch *patch)
 			klp_init_func_early(obj, func);
 		}
 	}
-
-	if (!try_module_get(patch->mod))
-		return -ENODEV;
 
 	return 0;
 }
@@ -1025,7 +1019,7 @@ int klp_enable_patch(struct klp_patch *patch)
 {
 	int ret;
 
-	if (!patch || !patch->mod)
+	if (!patch || !patch->mod || !patch->objs)
 		return -EINVAL;
 
 	if (!is_livepatch_module(patch->mod)) {
@@ -1051,11 +1045,12 @@ int klp_enable_patch(struct klp_patch *patch)
 		return -EINVAL;
 	}
 
+	if (!try_module_get(patch->mod))
+		return -ENODEV;
+
 	ret = klp_init_patch_early(patch);
-	if (ret) {
-		mutex_unlock(&klp_mutex);
-		return ret;
-	}
+	if (ret)
+		goto err;
 
 	ret = klp_init_patch(patch);
 	if (ret)
