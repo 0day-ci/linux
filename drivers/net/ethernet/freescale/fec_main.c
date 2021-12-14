@@ -4086,6 +4086,7 @@ static int __maybe_unused fec_resume(struct device *dev)
 		ret = regulator_enable(fep->reg_phy);
 		if (ret)
 			return ret;
+		phy_reset_after_power_on(ndev->phydev);
 	}
 
 	rtnl_lock();
