@@ -7,6 +7,7 @@
 #include <asm/mmu_context.h>
 
 #include "cpuid.h"
+#include "evmcs.h"
 #include "hyperv.h"
 #include "mmu.h"
 #include "nested.h"
@@ -5095,27 +5096,44 @@ static int handle_vmread(struct kvm_vcpu *vcpu)
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
+	/* Normal or Enlightened VMPTRLD must be performed first */
+	if (vmx->nested.current_vmptr == INVALID_GPA &&
+	    !evmptr_is_valid(vmx->nested.hv_evmcs_vmptr))
+		return nested_vmx_failInvalid(vcpu);
+
 	/*
 	 * In VMX non-root operation, when the VMCS-link pointer is INVALID_GPA,
 	 * any VMREAD sets the ALU flags for VMfailInvalid.
 	 */
-	if (vmx->nested.current_vmptr == INVALID_GPA ||
-	    (is_guest_mode(vcpu) &&
-	     get_vmcs12(vcpu)->vmcs_link_pointer == INVALID_GPA))
+	if (is_guest_mode(vcpu) &&
+	    get_vmcs12(vcpu)->vmcs_link_pointer == INVALID_GPA)
 		return nested_vmx_failInvalid(vcpu);
 
 	/* Decode instruction info and find the field to read */
 	field = kvm_register_read(vcpu, (((instr_info) >> 28) & 0xf));
 
-	offset = vmcs12_field_offset(field);
-	if (offset < 0)
-		return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
+	/*
+	 * Inside guest mode, Enlightened VMCS is not the ultimate source of
+	 * truth, shadow VMCS12/VMCS02 are.
+	 */
+	if (evmptr_is_valid(vmx->nested.hv_evmcs_vmptr) && !is_guest_mode(vcpu)) {
+		offset = evmcs_field_offset(field, NULL);
+		if (offset < 0)
+			return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 
-	if (!is_guest_mode(vcpu) && is_vmcs12_ext_field(field))
-		copy_vmcs02_to_vmcs12_rare(vcpu, vmcs12);
+		/* Read the field, zero-extended to a u64 value */
+		value = evmcs_read_any(vmx->nested.hv_evmcs, field, offset);
+	} else {
+		offset = vmcs12_field_offset(field);
+		if (offset < 0)
+			return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 
-	/* Read the field, zero-extended to a u64 value */
-	value = vmcs12_read_any(vmcs12, field, offset);
+		if (!is_guest_mode(vcpu) && is_vmcs12_ext_field(field))
+			copy_vmcs02_to_vmcs12_rare(vcpu, vmcs12);
+
+		/* Read the field, zero-extended to a u64 value */
+		value = vmcs12_read_any(vmcs12, field, offset);
+	}
 
 	/*
 	 * Now copy part of this value to register or memory, as requested.
