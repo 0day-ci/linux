@@ -80,6 +80,7 @@ extern const int phy_10gbit_features_array[1];
 #define PHY_IS_INTERNAL		0x00000001
 #define PHY_RST_AFTER_CLK_EN	0x00000002
 #define PHY_POLL_CABLE_TEST	0x00000004
+#define PHY_RST_AFTER_POWER_ON	0x00000008
 #define MDIO_DEVICE_IS_PHY	0x80000000
 
 /**
@@ -1499,6 +1500,7 @@ int phy_speed_up(struct phy_device *phydev);
 
 int phy_restart_aneg(struct phy_device *phydev);
 int phy_reset_after_clk_enable(struct phy_device *phydev);
+int phy_reset_after_power_on(struct phy_device *phydev);
 
 #if IS_ENABLED(CONFIG_PHYLIB)
 int phy_start_cable_test(struct phy_device *phydev,

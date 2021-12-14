@@ -1878,6 +1878,30 @@ int phy_reset_after_clk_enable(struct phy_device *phydev)
 }
 EXPORT_SYMBOL(phy_reset_after_clk_enable);
 
+/**
+ * phy_reset_after_power_on - perform a PHY reset if needed
+ * @phydev: target phy_device struct
+ *
+ * Description: Some PHYs or hardware design, need a reset after power was
+ *   enabled and rely on that software reset. This function evaluates the flags
+ *   and perform the reset if it's needed.
+ *   Returns < 0 on error, 0 if the phy wasn't reset and 1 if the phy was reset.
+ */
+int phy_reset_after_power_on(struct phy_device *phydev)
+{
+	if (!phydev || !phydev->drv)
+		return -ENODEV;
+
+	if (phydev->drv->flags & PHY_RST_AFTER_POWER_ON) {
+		phy_device_reset(phydev, 1);
+		phy_device_reset(phydev, 0);
+		return 1;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(phy_reset_after_power_on);
+
 /* Generic PHY support and helper functions */
 
 /**
