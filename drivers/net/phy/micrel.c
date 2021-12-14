@@ -1777,6 +1777,7 @@ static struct phy_driver ksphy_driver[] = {
 	.phy_id_mask	= MICREL_PHY_ID_MASK,
 	.name		= "Micrel KSZ9031 Gigabit PHY",
 	.driver_data	= &ksz9021_type,
+	.flags		= PHY_RST_AFTER_POWER_ON,
 	.probe		= kszphy_probe,
 	.get_features	= ksz9031_get_features,
 	.config_init	= ksz9031_config_init,
@@ -1822,6 +1823,7 @@ static struct phy_driver ksphy_driver[] = {
 	.name		= "Microchip KSZ9131 Gigabit PHY",
 	/* PHY_GBIT_FEATURES */
 	.driver_data	= &ksz9021_type,
+	.flags		= PHY_RST_AFTER_POWER_ON,
 	.probe		= kszphy_probe,
 	.config_init	= ksz9131_config_init,
 	.config_intr	= kszphy_config_intr,
