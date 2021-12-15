@@ -143,13 +143,12 @@ static unsigned int __get_bytesperpixel(struct vpfe_device *vpfe,
 {
 	struct vpfe_subdev_info *sdinfo = vpfe->current_subdev;
 	unsigned int bus_width = sdinfo->vpfe_param.bus_width;
-	u32 bpp, bus_width_bytes, clocksperpixel;
+	u32 bus_width_bytes, clocksperpixel;
 
 	bus_width_bytes = ALIGN(bus_width, 8) >> 3;
 	clocksperpixel = DIV_ROUND_UP(fmt->bitsperpixel, bus_width);
-	bpp = clocksperpixel * bus_width_bytes;
 
-	return bpp;
+	return clocksperpixel * bus_width_bytes;
 }
 
 /*  Print Four-character-code (FOURCC) */
