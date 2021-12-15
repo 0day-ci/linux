@@ -98,21 +98,33 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 	call_rcu(&root->rcu_head, tdp_mmu_free_sp_rcu_callback);
 }
 
+enum tdp_mmu_roots_iter_type {
+	ALL_ROOTS = -1,
+	VALID_ROOTS = 0,
+	INVALID_ROOTS = 1,
+};
+
 /*
  * Returns the next root after @prev_root (or the first root if @prev_root is
  * NULL).  A reference to the returned root is acquired, and the reference to
  * @prev_root is released (the caller obviously must hold a reference to
  * @prev_root if it's non-NULL).
  *
- * If @only_valid is true, invalid roots are skipped.
+ * If @type is not ALL_ROOTS, (in)valid roots are skipped accordingly.
  *
  * Returns NULL if the end of tdp_mmu_roots was reached.
  */
 static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 					      struct kvm_mmu_page *prev_root,
-					      bool shared, bool only_valid)
+					      bool shared,
+					      enum tdp_mmu_roots_iter_type type)
 {
 	struct kvm_mmu_page *next_root;
+
+	kvm_lockdep_assert_mmu_lock_held(kvm, shared);
+
+	/* Ensure correctness for the below comparison against role.invalid. */
+	BUILD_BUG_ON(!!VALID_ROOTS || !INVALID_ROOTS);
 
 	rcu_read_lock();
 
@@ -125,7 +137,7 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 						   typeof(*next_root), link);
 
 	while (next_root) {
-		if ((!only_valid || !next_root->role.invalid) &&
+		if ((type == ALL_ROOTS || (type == !!next_root->role.invalid)) &&
 		    kvm_tdp_mmu_get_root(kvm, next_root))
 			break;
 
@@ -151,18 +163,21 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
  * mode. In the unlikely event that this thread must free a root, the lock
  * will be temporarily dropped and reacquired in write mode.
  */
-#define __for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared, _only_valid)\
-	for (_root = tdp_mmu_next_root(_kvm, NULL, _shared, _only_valid);	\
+#define __for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared, _type) \
+	for (_root = tdp_mmu_next_root(_kvm, NULL, _shared, _type);		\
 	     _root;								\
-	     _root = tdp_mmu_next_root(_kvm, _root, _shared, _only_valid))	\
-		if (kvm_mmu_page_as_id(_root) != _as_id) {			\
+	     _root = tdp_mmu_next_root(_kvm, _root, _shared, _type))		\
+		if (_as_id > 0 && kvm_mmu_page_as_id(_root) != _as_id) {	\
 		} else
 
+#define for_each_invalid_tdp_mmu_root_yield_safe(_kvm, _root)			\
+	__for_each_tdp_mmu_root_yield_safe(_kvm, _root, -1, true, INVALID_ROOTS)
+
 #define for_each_valid_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared)	\
-	__for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared, true)
+	__for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared, VALID_ROOTS)
 
 #define for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared)		\
-	__for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared, false)
+	__for_each_tdp_mmu_root_yield_safe(_kvm, _root, _as_id, _shared, ALL_ROOTS)
 
 #define for_each_tdp_mmu_root(_kvm, _root, _as_id)				\
 	list_for_each_entry_rcu(_root, &_kvm->arch.tdp_mmu_roots, link,		\
@@ -808,28 +823,6 @@ void kvm_tdp_mmu_zap_all(struct kvm *kvm)
 		kvm_flush_remote_tlbs(kvm);
 }
 
-static struct kvm_mmu_page *next_invalidated_root(struct kvm *kvm,
-						  struct kvm_mmu_page *prev_root)
-{
-	struct kvm_mmu_page *next_root;
-
-	if (prev_root)
-		next_root = list_next_or_null_rcu(&kvm->arch.tdp_mmu_roots,
-						  &prev_root->link,
-						  typeof(*prev_root), link);
-	else
-		next_root = list_first_or_null_rcu(&kvm->arch.tdp_mmu_roots,
-						   typeof(*next_root), link);
-
-	while (next_root && !(next_root->role.invalid &&
-			      refcount_read(&next_root->tdp_mmu_root_count)))
-		next_root = list_next_or_null_rcu(&kvm->arch.tdp_mmu_roots,
-						  &next_root->link,
-						  typeof(*next_root), link);
-
-	return next_root;
-}
-
 /*
  * Since kvm_tdp_mmu_zap_all_fast has acquired a reference to each
  * invalidated root, they will not be freed until this function drops the
@@ -840,35 +833,20 @@ static struct kvm_mmu_page *next_invalidated_root(struct kvm *kvm,
  */
 void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm)
 {
-	struct kvm_mmu_page *next_root;
 	struct kvm_mmu_page *root;
 	bool flush = false;
 
 	lockdep_assert_held_read(&kvm->mmu_lock);
 
-	rcu_read_lock();
-
-	root = next_invalidated_root(kvm, NULL);
-
-	while (root) {
-		next_root = next_invalidated_root(kvm, root);
-
-		rcu_read_unlock();
-
+	for_each_invalid_tdp_mmu_root_yield_safe(kvm, root) {
 		flush = zap_gfn_range(kvm, root, 0, -1ull, true, flush, true);
 
 		/*
-		 * Put the reference acquired in
-		 * kvm_tdp_mmu_invalidate_roots
+		 * Put the reference acquired in kvm_tdp_mmu_invalidate_roots().
+		 * Note, the iterator holds its own reference.
 		 */
 		kvm_tdp_mmu_put_root(kvm, root, true);
-
-		root = next_root;
-
-		rcu_read_lock();
 	}
-
-	rcu_read_unlock();
 
 	if (flush)
 		kvm_flush_remote_tlbs(kvm);
