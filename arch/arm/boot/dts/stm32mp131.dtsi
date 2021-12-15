@@ -4,6 +4,7 @@
  * Author: Alexandre Torgue <alexandre.torgue@foss.st.com> for STMicroelectronics.
  */
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/stm32-exti.h>
 
 / {
 	#address-cells = <1>;
@@ -113,6 +114,52 @@
 			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&clk_hsi>;
 			status = "disabled";
+		};
+
+		exti: interrupt-controller@5000d000 {
+			compatible = "st,stm32mp13-exti", "syscon";
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			reg = <0x5000d000 0x400>;
+			st,exti-mapping = <0 6 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <1 7 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <2 8 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <3 9 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <4 10 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <5 24 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <6 65 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <7 66 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <8 67 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <9 68 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <10 41 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <11 43 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <12 77 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <13 78 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <14 106 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <15 109 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <16 1 STM32_EXTI_TYPE_CONFIGURABLE>,
+					  <19 3 STM32_EXTI_TYPE_DIRECT>,
+					  <21 32 STM32_EXTI_TYPE_DIRECT>,
+					  <22 34 STM32_EXTI_TYPE_DIRECT>,
+					  <23 73 STM32_EXTI_TYPE_DIRECT>,
+					  <24 93 STM32_EXTI_TYPE_DIRECT>,
+					  <25 114 STM32_EXTI_TYPE_DIRECT>,
+					  <26 38 STM32_EXTI_TYPE_DIRECT>,
+					  <27 39 STM32_EXTI_TYPE_DIRECT>,
+					  <28 40 STM32_EXTI_TYPE_DIRECT>,
+					  <29 72 STM32_EXTI_TYPE_DIRECT>,
+					  <30 53 STM32_EXTI_TYPE_DIRECT>,
+					  <31 54 STM32_EXTI_TYPE_DIRECT>,
+					  <32 83 STM32_EXTI_TYPE_DIRECT>,
+					  <33 84 STM32_EXTI_TYPE_DIRECT>,
+					  <44 96 STM32_EXTI_TYPE_DIRECT>,
+					  <47 92 STM32_EXTI_TYPE_DIRECT>,
+					  <48 116 STM32_EXTI_TYPE_DIRECT>,
+					  <50 117 STM32_EXTI_TYPE_DIRECT>,
+					  <52 118 STM32_EXTI_TYPE_DIRECT>,
+					  <53 119 STM32_EXTI_TYPE_DIRECT>,
+					  <68 63 STM32_EXTI_TYPE_DIRECT>,
+					  <70 98 STM32_EXTI_TYPE_DIRECT>;
 		};
 
 		syscfg: syscon@50020000 {
