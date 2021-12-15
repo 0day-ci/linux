@@ -722,6 +722,9 @@ static void drm_atomic_plane_print_state(struct drm_printer *p,
 		   drm_get_color_encoding_name(state->color_encoding));
 	drm_printf(p, "\tcolor-range=%s\n",
 		   drm_get_color_range_name(state->color_range));
+	drm_printf(p, "\talpha=%x\n", state->alpha);
+	drm_printf(p, "\tblend_mode=%s\n",
+		   drm_get_pixel_blend_mode_name(state->pixel_blend_mode));
 
 	if (plane->funcs->atomic_print_state)
 		plane->funcs->atomic_print_state(p, state);
