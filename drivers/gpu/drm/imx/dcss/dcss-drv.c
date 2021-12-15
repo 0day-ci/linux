@@ -38,6 +38,9 @@ static int dcss_drv_platform_probe(struct platform_device *pdev)
 	int err = 0;
 	bool hdmi_output = true;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	if (!dev->of_node)
 		return -ENODEV;
 
