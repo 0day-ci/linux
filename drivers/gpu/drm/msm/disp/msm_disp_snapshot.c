@@ -28,6 +28,28 @@ static ssize_t __maybe_unused disp_devcoredump_read(char *buffer, loff_t offset,
 	return count - iter.remain;
 }
 
+struct msm_disp_state *
+msm_disp_snapshot_state_sync(struct msm_kms *kms)
+{
+	struct drm_device *drm_dev = kms->dev;
+	struct msm_disp_state *disp_state;
+
+	WARN_ON(!mutex_is_locked(&kms->dump_mutex));
+
+	disp_state = kzalloc(sizeof(struct msm_disp_state), GFP_KERNEL);
+	if (!disp_state)
+		return ERR_PTR(-ENOMEM);
+
+	disp_state->dev = drm_dev->dev;
+	disp_state->drm_dev = drm_dev;
+
+	INIT_LIST_HEAD(&disp_state->blocks);
+
+	msm_disp_snapshot_capture_state(disp_state);
+
+	return disp_state;
+}
+
 static void _msm_disp_snapshot_work(struct kthread_work *work)
 {
 	struct msm_kms *kms = container_of(work, struct msm_kms, dump_work);
@@ -35,21 +57,13 @@ static void _msm_disp_snapshot_work(struct kthread_work *work)
 	struct msm_disp_state *disp_state;
 	struct drm_printer p;
 
-	disp_state = kzalloc(sizeof(struct msm_disp_state), GFP_KERNEL);
-	if (!disp_state)
-		return;
-
-	disp_state->dev = drm_dev->dev;
-	disp_state->drm_dev = drm_dev;
-
-	INIT_LIST_HEAD(&disp_state->blocks);
-
 	/* Serialize dumping here */
 	mutex_lock(&kms->dump_mutex);
-
-	msm_disp_snapshot_capture_state(disp_state);
-
+	disp_state = msm_disp_snapshot_state_sync(kms);
 	mutex_unlock(&kms->dump_mutex);
+
+	if (IS_ERR(disp_state))
+		return;
 
 	if (MSM_DISP_SNAPSHOT_DUMP_IN_CONSOLE) {
 		p = drm_info_printer(disp_state->drm_dev->dev);
