@@ -9,6 +9,7 @@
 #include <linux/platform_device.h>
 #include <linux/component.h>
 #include <linux/pm_runtime.h>
+#include <drm/drm_drv.h>
 #include <drm/drm_of.h>
 #include "komeda_dev.h"
 #include "komeda_kms.h"
@@ -116,6 +117,9 @@ static int komeda_platform_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct component_match *match = NULL;
 	struct device_node *child;
+
+	if (drm_firmware_drivers_only())
+		return -EINVAL;
 
 	if (!dev->of_node)
 		return -ENODEV;
