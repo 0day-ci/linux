@@ -195,6 +195,9 @@ static int shmob_drm_probe(struct platform_device *pdev)
 	unsigned int i;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	if (pdata == NULL) {
 		dev_err(&pdev->dev, "no platform data\n");
 		return -EINVAL;
