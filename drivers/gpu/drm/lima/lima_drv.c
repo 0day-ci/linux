@@ -375,6 +375,9 @@ static int lima_pdev_probe(struct platform_device *pdev)
 	struct drm_device *ddev;
 	int err;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	err = lima_sched_slab_init();
 	if (err)
 		return err;
