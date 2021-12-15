@@ -435,6 +435,34 @@ out:
 }
 
 /*
+ * remove duplicate path delimiters. Windows is supposed to do that
+ * but there are some bugs that prevent rename from working if there are
+ * multiple delimiters.
+ */
+void sanitize_path(char *path) {
+        char *pos = path, last = *path;
+        unsigned int offset = 0;
+
+        while(*(++pos)) {
+                if ((*pos == '/' || *pos == '\\') && (last == '/' || last == '\\')) {
+                        offset++;
+                        continue;
+                }
+
+                last = *pos;
+                *(pos - offset) = *pos;
+        }
+
+        pos = pos - offset - 1;
+
+        /* At this point, there should be only zero or one delimiter at the end of the string */
+        if (*pos != '/' && *pos != '\\')
+                pos++;
+
+        *pos = '\0';
+}
+
+/*
  * Parse a devname into substrings and populate the ctx->UNC and ctx->prepath
  * fields with the result. Returns 0 on success and an error otherwise
  * (e.g. ENOMEM or EINVAL)
@@ -496,6 +524,8 @@ smb3_parse_devname(const char *devname, struct smb3_fs_context *ctx)
 	ctx->prepath = kstrdup(pos, GFP_KERNEL);
 	if (!ctx->prepath)
 		return -ENOMEM;
+
+	sanitize_path(ctx->prepath);
 
 	return 0;
 }
