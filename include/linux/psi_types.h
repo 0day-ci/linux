@@ -136,6 +136,9 @@ struct psi_trigger {
 	/* Tracking window */
 	struct psi_window win;
 
+	/*real time trigger flag*/
+	u32 rt;
+
 	/*
 	 * Time last event was generated. Used for rate-limiting
 	 * events to one per window

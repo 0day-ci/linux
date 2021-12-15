@@ -152,6 +152,7 @@
 #include <linux/psi.h>
 #include "sched.h"
 
+extern unsigned int sysctl_sched_latency;
 static int psi_bug __read_mostly;
 
 DEFINE_STATIC_KEY_FALSE(psi_disabled);
@@ -466,9 +467,12 @@ static void psi_avgs_work(struct work_struct *work)
 static void window_reset(struct psi_window *win, u64 now, u64 value,
 			 u64 prev_growth)
 {
+	struct psi_trigger *t = container_of(win, struct psi_trigger, win);
+
 	win->start_time = now;
 	win->start_value = value;
 	win->prev_growth = prev_growth;
+	t->rt = t->rt ? 5 : 0;
 }
 
 /*
@@ -549,6 +553,17 @@ static u64 update_triggers(struct psi_group *group, u64 now)
 		growth = window_update(&t->win, now, total[t->state]);
 		if (growth < t->threshold)
 			continue;
+
+		/* wakeup if trigger has rt and at least 5 sched_latency surpassed*/
+		if (t->rt && growth >= t->threshold) {
+			u64 rt_trigger_time = min(t->last_event_time + t->win.size,
+				sysctl_sched_latency * t->rt + t->last_event_time);
+			if (now < rt_trigger_time)
+				continue;
+			if (cmpxchg(&t->event, 0, 1) == 0)
+				wake_up_interruptible(&t->event_wait);
+			t->rt += 5;
+		}
 
 		/* Limit event signaling to once per window */
 		if (now < t->last_event_time + t->win.size)
@@ -1127,13 +1142,14 @@ struct psi_trigger *psi_trigger_create(struct psi_group *group,
 	enum psi_states state;
 	u32 threshold_us;
 	u32 window_us;
+	u32 rt = 0;
 
 	if (static_branch_likely(&psi_disabled))
 		return ERR_PTR(-EOPNOTSUPP);
 
-	if (sscanf(buf, "some %u %u", &threshold_us, &window_us) == 2)
+	if (sscanf(buf, "some %u %u %u", &threshold_us, &window_us, &rt) >= 2)
 		state = PSI_IO_SOME + res * 2;
-	else if (sscanf(buf, "full %u %u", &threshold_us, &window_us) == 2)
+	else if (sscanf(buf, "full %u %u %u", &threshold_us, &window_us, &rt) >= 2)
 		state = PSI_IO_FULL + res * 2;
 	else
 		return ERR_PTR(-EINVAL);
@@ -1163,6 +1179,7 @@ struct psi_trigger *psi_trigger_create(struct psi_group *group,
 	t->last_event_time = 0;
 	init_waitqueue_head(&t->event_wait);
 	kref_init(&t->refcount);
+	t->rt = rt ? 5 : 0;
 
 	mutex_lock(&group->trigger_lock);
 
