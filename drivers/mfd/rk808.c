@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/regmap.h>
+#include <linux/reboot.h>
 
 struct rk808_reg_data {
 	int addr;
@@ -533,6 +534,7 @@ static void rk808_pm_power_off(void)
 	int ret;
 	unsigned int reg, bit;
 	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
+	dev_err(&rk808_i2c_client->dev, "poweroff device!\n");
 
 	switch (rk808->variant) {
 	case RK805_ID:
@@ -552,12 +554,51 @@ static void rk808_pm_power_off(void)
 		bit = DEV_OFF;
 		break;
 	default:
+		dev_err(&rk808_i2c_client->dev, "poweroff device not supported!\n");
 		return;
 	}
 	ret = regmap_update_bits(rk808->regmap, reg, bit, bit);
 	if (ret)
 		dev_err(&rk808_i2c_client->dev, "Failed to shutdown device!\n");
 }
+
+static int rk808_restart_notify(struct notifier_block *this, unsigned long mode, void *cmd)
+{
+	int ret;
+	unsigned int reg, bit;
+	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
+
+	switch (rk808->variant) {
+	case RK805_ID:
+		reg = RK805_DEV_CTRL_REG;
+		bit = DEV_OFF_RST;
+		break;
+	case RK808_ID:
+		reg = RK808_DEVCTRL_REG,
+		bit = DEV_OFF;
+		break;
+	case RK817_ID:
+		reg = RK817_SYS_CFG(3);
+		bit = DEV_RST;
+		break;
+	case RK818_ID:
+		reg = RK818_DEVCTRL_REG;
+		bit = DEV_OFF_RST;
+		break;
+	default:
+		return NOTIFY_DONE;
+	}
+	ret = regmap_update_bits(rk808->regmap, reg, bit, bit);
+	if (ret)
+		dev_err(&rk808_i2c_client->dev, "Failed to restart device!\n");
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block rk808_restart_handler = {
+	.notifier_call = rk808_restart_notify,
+	.priority = 255,
+};
 
 static void rk8xx_shutdown(struct i2c_client *client)
 {
@@ -727,6 +768,13 @@ static int rk808_probe(struct i2c_client *client,
 	if (of_property_read_bool(np, "rockchip,system-power-controller")) {
 		rk808_i2c_client = client;
 		pm_power_off = rk808_pm_power_off;
+		rk808->nb = &rk808_restart_handler;
+
+		dev_warn(&client->dev, "register restart handler\n");
+
+		ret = register_restart_handler(rk808->nb);
+		if (ret)
+			dev_err(&client->dev, "failed to register restart handler, %d\n", ret);
 	}
 
 	return 0;
