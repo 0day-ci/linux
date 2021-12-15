@@ -243,6 +243,9 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
 	struct drm_device *drm;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
