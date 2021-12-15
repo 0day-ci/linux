@@ -1567,6 +1567,19 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
 	kfree(s);
 }
 
+static void vop_crtc_print_state(struct drm_printer *p,
+				 const struct drm_crtc_state *state)
+{
+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(state);
+
+	drm_printf(p, "\toutput_type=%s\n",
+		   drm_get_connector_type_name(s->output_type));
+	drm_printf(p, "\toutput_mode=%d\n", s->output_mode);
+	drm_printf(p, "\toutput_bpc=%d\n", s->output_bpc);
+	drm_printf(p, "\toutput_flags=%x\n", s->output_flags);
+	drm_printf(p, "\tenable_afbc=%d\n", s->enable_afbc);
+}
+
 static void vop_crtc_reset(struct drm_crtc *crtc)
 {
 	struct rockchip_crtc_state *crtc_state =
@@ -1650,6 +1663,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
 	.reset = vop_crtc_reset,
 	.atomic_duplicate_state = vop_crtc_duplicate_state,
 	.atomic_destroy_state = vop_crtc_destroy_state,
+	.atomic_print_state = vop_crtc_print_state,
 	.enable_vblank = vop_crtc_enable_vblank,
 	.disable_vblank = vop_crtc_disable_vblank,
 	.set_crc_source = vop_crtc_set_crc_source,
