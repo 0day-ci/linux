@@ -616,3 +616,24 @@ int drm_plane_create_blend_mode_property(struct drm_plane *plane,
 	return 0;
 }
 EXPORT_SYMBOL(drm_plane_create_blend_mode_property);
+
+static const char * const pixel_blend_mode_name[] = {
+	[DRM_MODE_BLEND_PIXEL_NONE] = "None",
+	[DRM_MODE_BLEND_PREMULTI] = "Pre-multiplied",
+	[DRM_MODE_BLEND_COVERAGE] = "Coverage",
+};
+
+/**
+ * drm_get_pixel_blend_mode_name - return a string for color encoding
+ * @encoding: color encoding to compute name of
+ *
+ * In contrast to the other drm_get_*_name functions this one here returns a
+ * const pointer and hence is threadsafe.
+ */
+const char *drm_get_pixel_blend_mode_name(uint16_t blend_mode)
+{
+	if (WARN_ON(blend_mode >= ARRAY_SIZE(pixel_blend_mode_name)))
+		return "unknown";
+
+	return pixel_blend_mode_name[blend_mode];
+}
