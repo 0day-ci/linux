@@ -89,6 +89,8 @@ static void __i915_vma_resource_unhold(struct i915_vma_resource *vma_res)
 		return;
 
 	dma_fence_signal(&vma_res->unbind_fence);
+	if (vma_res->bi.pages_rsgt)
+		i915_refct_sgt_put(vma_res->bi.pages_rsgt);
 	vma_res->vm = NULL;
 }
 

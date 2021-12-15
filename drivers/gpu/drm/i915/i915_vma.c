@@ -289,7 +289,6 @@ struct i915_vma_work {
 	struct i915_vma_resource *vma_res;
 	struct drm_i915_gem_object *pinned;
 	struct i915_sw_dma_fence_cb cb;
-	struct i915_refct_sgt *rsgt;
 	enum i915_cache_level cache_level;
 	unsigned int flags;
 };
@@ -317,8 +316,6 @@ static void __vma_release(struct dma_fence_work *work)
 	i915_vm_put(vw->vm);
 	if (vw->vma_res)
 		i915_vma_resource_put(vw->vma_res);
-	if (vw->rsgt)
-		i915_refct_sgt_put(vw->rsgt);
 }
 
 static const struct dma_fence_work_ops bind_ops = {
@@ -393,8 +390,8 @@ i915_vma_resource_init_from_vma(struct i915_vma_resource *vma_res,
 	struct drm_i915_gem_object *obj = vma->obj;
 
 	i915_vma_resource_init(vma_res, vma->vm, vma->pages, &vma->page_sizes,
-			       i915_gem_object_is_readonly(obj),
-			       i915_gem_object_is_lmem(obj),
+			       obj->mm.rsgt, i915_gem_object_is_readonly(obj),
+			       i915_gem_object_is_lmem(obj), obj->mm.region,
 			       vma->ops, vma->private, vma->node.start,
 			       vma->node.size, vma->size);
 }
@@ -485,8 +482,6 @@ int i915_vma_bind(struct i915_vma *vma,
 		work->vma_res = i915_vma_resource_get(vma->resource);
 		work->cache_level = cache_level;
 		work->flags = bind_flags;
-		if (vma->obj->mm.rsgt)
-			work->rsgt = i915_refct_sgt_get(vma->obj->mm.rsgt);
 
 		/*
 		 * Note we only want to chain up to the migration fence on
@@ -1421,7 +1416,7 @@ struct dma_fence *__i915_vma_evict(struct i915_vma *vma, bool async)
 	GEM_BUG_ON(i915_vma_has_userfault(vma));
 
 	/* Object backend must be async capable. */
-	GEM_WARN_ON(async && !vma->obj->mm.rsgt);
+	GEM_WARN_ON(async && !vma->resource->bi.pages_rsgt);
 
 	if (likely(atomic_read(&vma->vm->open))) {
 		trace_i915_vma_unbind(vma);
@@ -1435,9 +1430,6 @@ struct dma_fence *__i915_vma_evict(struct i915_vma *vma, bool async)
 
 	atomic_and(~(I915_VMA_BIND_MASK | I915_VMA_ERROR | I915_VMA_GGTT_WRITE),
 		   &vma->flags);
-
-	/* Object backend must be async capable. */
-	GEM_WARN_ON(async && !vma->obj->mm.rsgt);
 
 	i915_vma_detach(vma);
 
