@@ -158,6 +158,9 @@ static int tve200_probe(struct platform_device *pdev)
 	int irq;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
