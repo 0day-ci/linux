@@ -2,7 +2,7 @@
 #ifndef _BPF_CGROUP_H
 #define _BPF_CGROUP_H
 
-#include <linux/bpf.h>
+#include <linux/bpf-cgroup-types.h>
 #include <linux/errno.h>
 #include <linux/jump_label.h>
 #include <linux/percpu.h>
@@ -16,6 +16,7 @@ struct cgroup;
 struct sk_buff;
 struct bpf_map;
 struct bpf_prog;
+struct bpf_prog_aux;
 struct bpf_sock_ops_kern;
 struct bpf_cgroup_storage;
 struct ctl_table;
@@ -193,15 +194,6 @@ int __cgroup_bpf_run_filter_getsockopt(struct sock *sk, int level,
 int __cgroup_bpf_run_filter_getsockopt_kern(struct sock *sk, int level,
 					    int optname, void *optval,
 					    int *optlen, int retval);
-
-static inline enum bpf_cgroup_storage_type cgroup_storage_type(
-	struct bpf_map *map)
-{
-	if (map->map_type == BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE)
-		return BPF_CGROUP_STORAGE_PERCPU;
-
-	return BPF_CGROUP_STORAGE_SHARED;
-}
 
 struct bpf_cgroup_storage *
 cgroup_storage_lookup(struct bpf_cgroup_storage_map *map,

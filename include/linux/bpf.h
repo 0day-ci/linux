@@ -288,6 +288,15 @@ static inline bool bpf_map_support_seq_show(const struct bpf_map *map)
 		map->ops->map_seq_show_elem;
 }
 
+static inline enum bpf_cgroup_storage_type cgroup_storage_type(
+	struct bpf_map *map)
+{
+	if (map->map_type == BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE)
+		return BPF_CGROUP_STORAGE_PERCPU;
+
+	return BPF_CGROUP_STORAGE_SHARED;
+}
+
 int map_check_no_btf(const struct bpf_map *map,
 		     const struct btf *btf,
 		     const struct btf_type *key_type,
