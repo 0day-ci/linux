@@ -32,11 +32,21 @@ properties:
     $ref: "/schemas/types.yaml#/definitions/phandle"
     description: The phandle of MT8195 HDMI codec node.
 
+  clocks:
+    items:
+      - description: phandle and clock specifier for codec MCLK.
+
+  clock-names:
+    items:
+      - const: i2so1_mclk
+
 additionalProperties: false
 
 required:
   - compatible
   - mediatek,platform
+  - clocks
+  - clock-names
 
 examples:
   - |
@@ -44,6 +54,8 @@ examples:
     sound: mt8195-sound {
         compatible = "mediatek,mt8195_mt6359_rt1011_rt5682";
         mediatek,platform = <&afe>;
+        clocks = <&topckgen 235>; //CLK_TOP_APLL12_DIV2
+        clock-names = "i2so1_mclk";
         pinctrl-names = "default";
         pinctrl-0 = <&aud_pins_default>;
     };

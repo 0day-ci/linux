@@ -42,11 +42,21 @@ properties:
       A list of the desired dai-links in the sound card. Each entry is a
       name defined in the machine driver.
 
+  clocks:
+    items:
+      - description: phandle and clock specifier for codec MCLK.
+
+  clock-names:
+    items:
+      - const: i2so1_mclk
+
 additionalProperties: false
 
 required:
   - compatible
   - mediatek,platform
+  - clocks
+  - clock-names
 
 examples:
   - |
@@ -54,6 +64,8 @@ examples:
     sound: mt8195-sound {
         compatible = "mediatek,mt8195_mt6359_rt1019_rt5682";
         mediatek,platform = <&afe>;
+        clocks = <&topckgen 235>; //CLK_TOP_APLL12_DIV2
+        clock-names = "i2so1_mclk";
         pinctrl-names = "default";
         pinctrl-0 = <&aud_pins_default>;
     };
