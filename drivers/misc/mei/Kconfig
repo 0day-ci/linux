@@ -49,3 +49,15 @@ config INTEL_MEI_TXE
 source "drivers/misc/mei/hdcp/Kconfig"
 source "drivers/misc/mei/pxp/Kconfig"
 
+config INTEL_MEI_GSC
+	tristate "Intel MEI GSC embedded device"
+	select INTEL_MEI
+	select INTEL_MEI_ME
+	depends on X86 && PCI
+	depends on DRM_I915
+	help
+	  Intel platform driver for MEI devices embedded in a graphics device.
+
+	  MEI device can be embedded in a standalone Intel graphics devices,
+	  to support range of security tasks.
+	  Currently supported device is DG1.
