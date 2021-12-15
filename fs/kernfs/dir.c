@@ -603,6 +603,8 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 	atomic_set(&kn->count, 1);
 	atomic_set(&kn->active, KN_DEACTIVATED_BIAS);
 	RB_CLEAR_NODE(&kn->rb);
+	spin_lock_init(&kn->kernfs_open_node_lock);
+	mutex_init(&kn->kernfs_open_file_mutex);
 
 	kn->name = name;
 	kn->mode = mode;

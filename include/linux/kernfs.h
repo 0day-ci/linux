@@ -162,6 +162,8 @@ struct kernfs_node {
 	unsigned short		flags;
 	umode_t			mode;
 	struct kernfs_iattrs	*iattr;
+	spinlock_t kernfs_open_node_lock;
+	struct mutex kernfs_open_file_mutex;
 };
 
 /*
