@@ -8,6 +8,8 @@
 MODULE=0
 dev_makeswap=-1
 dev_mounted=-1
+dev_start=-1
+dev_end=-1
 
 # Kselftest framework requirement - SKIP code is 4.
 ksft_skip=4
@@ -29,19 +31,22 @@ zram_cleanup()
 {
 	echo "zram cleanup"
 	local i=
-	for i in $(seq 0 $dev_makeswap); do
+	for i in $(seq $dev_start $dev_makeswap); do
 		swapoff /dev/zram$i
 	done
 
-	for i in $(seq 0 $dev_mounted); do
+	for i in $(seq $dev_start $dev_mounted); do
 		umount /dev/zram$i
 	done
 
-	for i in $(seq 0 $(($dev_num - 1))); do
+	for i in $(seq $dev_start $dev_end); do
 		echo 1 > /sys/block/zram${i}/reset
-		rm -rf zram$i
+		rm -rf zram${i}
 	done
 
+	for i in $(seq $dev_start $dev_end); do
+		echo $i > /sys/class/zram-control/hot_remove
+	done
 }
 
 zram_unload()
@@ -54,32 +59,30 @@ zram_unload()
 
 zram_load()
 {
-	# check zram module exists
-	MODULE_PATH=/lib/modules/`uname -r`/kernel/drivers/block/zram/zram.ko
-	if [ -f $MODULE_PATH ]; then
-		MODULE=1
-		echo "create '$dev_num' zram device(s)"
+	echo "create '$dev_num' zram device(s)"
+
+	if [ ! -d "/sys/class/zram-control" ]; then
 		modprobe zram num_devices=$dev_num
-		if [ $? -ne 0 ]; then
-			echo "failed to insert zram module"
-			exit 1
+		if grep -q '^zram' /proc/modules; then
+			echo "ERROR: No zram.ko module"
+			echo "$TCID : CONFIG_ZRAM is not set"
+			exit $ksft_skip
 		fi
-
-		dev_num_created=$(ls /dev/zram* | wc -w)
-
-		if [ "$dev_num_created" -ne "$dev_num" ]; then
-			echo "unexpected num of devices: $dev_num_created"
-			ERR_CODE=-1
-		else
-			echo "zram load module successful"
-		fi
-	elif [ -b /dev/zram0 ]; then
-		echo "/dev/zram0 device file found: OK"
-	else
-		echo "ERROR: No zram.ko module or no /dev/zram0 device found"
-		echo "$TCID : CONFIG_ZRAM is not set"
-		exit 1
+		MODULE=1
+		dev_start=0
+		dev_end=$(($dev_num - 1))
+		echo "all zram devices(/dev/zram0~$dev_end) successfully created"
+		return
 	fi
+
+	dev_start=$(ls /dev/zram* | wc -w)
+	dev_end=$(($dev_start + $dev_num - 1))
+
+	for i in $(seq $dev_start $dev_end); do
+		cat /sys/class/zram-control/hot_add > /dev/null
+	done
+
+	echo "all zram devices(/dev/zram$dev_start~$dev_end) successfully created"
 }
 
 zram_compress_alg()
@@ -88,13 +91,13 @@ zram_compress_alg()
 
 	local algs=$(cat /sys/block/zram0/comp_algorithm)
 	echo "supported algs: $algs"
-	local i=0
+	local i=$dev_start
 	for alg in $zram_algs; do
 		local sys_path="/sys/block/zram${i}/comp_algorithm"
 		echo "$alg" >	$sys_path || \
 			echo "FAIL can't set '$alg' to $sys_path"
 		i=$(($i + 1))
-		echo "$sys_path = '$alg' ($i/$dev_num)"
+		echo "$sys_path = '$alg'"
 	done
 
 	echo "zram set compression algorithm: OK"
@@ -103,14 +106,14 @@ zram_compress_alg()
 zram_set_disksizes()
 {
 	echo "set disk size to zram device(s)"
-	local i=0
+	local i=$dev_start
 	for ds in $zram_sizes; do
 		local sys_path="/sys/block/zram${i}/disksize"
 		echo "$ds" >	$sys_path || \
 			echo "FAIL can't set '$ds' to $sys_path"
 
 		i=$(($i + 1))
-		echo "$sys_path = '$ds' ($i/$dev_num)"
+		echo "$sys_path = '$ds'"
 	done
 
 	echo "zram set disksizes: OK"
@@ -120,14 +123,14 @@ zram_set_memlimit()
 {
 	echo "set memory limit to zram device(s)"
 
-	local i=0
+	local i=$dev_start
 	for ds in $zram_mem_limits; do
 		local sys_path="/sys/block/zram${i}/mem_limit"
 		echo "$ds" >	$sys_path || \
 			echo "FAIL can't set '$ds' to $sys_path"
 
 		i=$(($i + 1))
-		echo "$sys_path = '$ds' ($i/$dev_num)"
+		echo "$sys_path = '$ds'"
 	done
 
 	echo "zram set memory limit: OK"
@@ -137,7 +140,7 @@ zram_makeswap()
 {
 	echo "make swap with zram device(s)"
 	local i=0
-	for i in $(seq 0 $(($dev_num - 1))); do
+	for i in $(seq $dev_start $dev_end); do
 		mkswap /dev/zram$i > err.log 2>&1
 		if [ $? -ne 0 ]; then
 			cat err.log
@@ -160,7 +163,7 @@ zram_makeswap()
 zram_swapoff()
 {
 	local i=
-	for i in $(seq 0 $dev_makeswap); do
+	for i in $(seq $dev_start $dev_makeswap); do
 		swapoff /dev/zram$i > err.log 2>&1
 		if [ $? -ne 0 ]; then
 			cat err.log
@@ -174,7 +177,7 @@ zram_swapoff()
 
 zram_makefs()
 {
-	local i=0
+	local i=$dev_start
 	for fs in $zram_filesystems; do
 		# if requested fs not supported default it to ext2
 		which mkfs.$fs > /dev/null 2>&1 || fs=ext2
@@ -193,7 +196,7 @@ zram_makefs()
 zram_mount()
 {
 	local i=0
-	for i in $(seq 0 $(($dev_num - 1))); do
+	for i in $(seq $dev_start $dev_end); do
 		echo "mount /dev/zram$i"
 		mkdir zram$i
 		mount /dev/zram$i zram$i > /dev/null || \
