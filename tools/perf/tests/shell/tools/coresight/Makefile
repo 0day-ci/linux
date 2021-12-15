@@ -8,7 +8,8 @@ SUBDIRS = \
 	asm_pure_loop \
 	thread_loop \
 	bubble_sort \
-	bubble_sort_thread
+	bubble_sort_thread \
+        memcpy
 
 all: $(SUBDIRS)
 $(SUBDIRS):
