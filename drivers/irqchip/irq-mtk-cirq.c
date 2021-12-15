@@ -60,8 +60,6 @@ static void mtk_cirq_unmask(struct irq_data *data)
 
 static int mtk_cirq_set_type(struct irq_data *data, unsigned int type)
 {
-	int ret;
-
 	switch (type & IRQ_TYPE_SENSE_MASK) {
 	case IRQ_TYPE_EDGE_FALLING:
 		mtk_cirq_write_mask(data, CIRQ_POL_CLR);
@@ -84,8 +82,7 @@ static int mtk_cirq_set_type(struct irq_data *data, unsigned int type)
 	}
 
 	data = data->parent_data;
-	ret = data->chip->irq_set_type(data, type);
-	return ret;
+	return data->chip->irq_set_type(data, type);
 }
 
 static struct irq_chip mtk_cirq_chip = {
