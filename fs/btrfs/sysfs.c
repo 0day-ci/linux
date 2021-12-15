@@ -12,6 +12,7 @@
 #include <crypto/hash.h>
 
 #include "ctree.h"
+#include "rcu-string.h"
 #include "discard.h"
 #include "disk-io.h"
 #include "send.h"
@@ -1600,8 +1601,12 @@ int btrfs_sysfs_add_device(struct btrfs_device *device)
 {
 	int ret;
 	unsigned int nofs_flag;
+	struct kobject *disk_kobj;
 	struct kobject *devices_kobj;
 	struct kobject *devinfo_kobj;
+
+	if (!device->bdev)
+		return 0;
 
 	/*
 	 * Make sure we use the fs_info::fs_devices to fetch the kobjects even
@@ -1614,16 +1619,14 @@ int btrfs_sysfs_add_device(struct btrfs_device *device)
 
 	nofs_flag = memalloc_nofs_save();
 
-	if (device->bdev) {
-		struct kobject *disk_kobj = bdev_kobj(device->bdev);
+	disk_kobj = bdev_kobj(device->bdev);
 
-		ret = sysfs_create_link(devices_kobj, disk_kobj, disk_kobj->name);
-		if (ret) {
-			btrfs_warn(device->fs_info,
-				"creating sysfs device link for devid %llu failed: %d",
-				device->devid, ret);
-			goto out;
-		}
+	ret = sysfs_create_link(devices_kobj, disk_kobj, disk_kobj->name);
+	if (ret) {
+		btrfs_warn(device->fs_info,
+			   "creating sysfs device link for devid %llu failed: %d",
+			   device->devid, ret);
+		goto out;
 	}
 
 	init_completion(&device->kobj_unregister);
