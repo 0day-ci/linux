@@ -29,6 +29,7 @@
 
 #include <linux/acpi.h>
 #include <linux/device.h>
+#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/oom.h>
 #include <linux/pci.h>
@@ -68,6 +69,7 @@
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
 #include "gt/intel_rc6.h"
+#include "gt/intel_gsc.h"
 
 #include "pxp/intel_pxp_pm.h"
 
@@ -713,12 +715,20 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
  */
 static void i915_driver_unregister(struct drm_i915_private *dev_priv)
 {
+	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
+
 	i915_switcheroo_unregister(dev_priv);
 
 	intel_unregister_dsm_handler();
 
 	intel_runtime_pm_disable(&dev_priv->runtime_pm);
 	intel_power_domains_disable(dev_priv);
+
+	/*
+	 * mfd devices may be registered individually either by gt or display,
+	 * but they are unregistered all at once from i915
+	 */
+	mfd_remove_devices(&pdev->dev);
 
 	intel_display_driver_unregister(dev_priv);
 

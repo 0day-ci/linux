@@ -2530,6 +2530,8 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define GEN11_VEBOX2_RING_BASE		0x1d8000
 #define XEHP_VEBOX3_RING_BASE		0x1e8000
 #define XEHP_VEBOX4_RING_BASE		0x1f8000
+#define GSC_DG1_HECI1_BASE	0x00258000
+#define GSC_DG1_HECI2_BASE	0x00259000
 #define BLT_RING_BASE		0x22000
 #define RING_TAIL(base)		_MMIO((base) + 0x30)
 #define RING_HEAD(base)		_MMIO((base) + 0x34)
@@ -8139,6 +8141,7 @@ enum {
 #define OTHER_GUC_INSTANCE	0
 #define OTHER_GTPM_INSTANCE	1
 #define OTHER_KCR_INSTANCE	4
+#define OTHER_GSC_INSTANCE	6
 
 #define GEN11_INTR_IDENTITY_REG(x)	_MMIO(0x190060 + ((x) * 4))
 
