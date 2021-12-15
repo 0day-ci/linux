@@ -665,6 +665,9 @@ static int __init etnaviv_init(void)
 	int ret;
 	struct device_node *np;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	etnaviv_validate_init();
 
 	ret = platform_driver_register(&etnaviv_gpu_driver);
