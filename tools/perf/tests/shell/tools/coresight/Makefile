@@ -7,7 +7,8 @@ include ../../../../../../tools/scripts/utilities.mak
 SUBDIRS = \
 	asm_pure_loop \
 	thread_loop \
-	bubble_sort
+	bubble_sort \
+	bubble_sort_thread
 
 all: $(SUBDIRS)
 $(SUBDIRS):
