@@ -91,6 +91,9 @@ static int udl_usb_probe(struct usb_interface *interface,
 	int r;
 	struct udl_device *udl;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	udl = udl_driver_create(interface);
 	if (IS_ERR(udl))
 		return PTR_ERR(udl);
