@@ -310,6 +310,9 @@ static int aspeed_gfx_probe(struct platform_device *pdev)
 	struct aspeed_gfx *priv;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	priv = devm_drm_dev_alloc(&pdev->dev, &aspeed_gfx_driver,
 				  struct aspeed_gfx, drm);
 	if (IS_ERR(priv))
