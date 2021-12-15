@@ -1682,12 +1682,15 @@ static void pci_restore_config_space(struct pci_dev *pdev)
 	}
 }
 
-static void pci_restore_rebar_state(struct pci_dev *pdev)
+static void __pci_restore_rebar_state(struct pci_dev *pdev, int cap)
 {
 	unsigned int pos, nbars, i;
 	u32 ctrl;
 
-	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_REBAR);
+	if (WARN_ON(cap != PCI_EXT_CAP_ID_REBAR && cap != PCI_EXT_CAP_ID_VF_REBAR))
+		return;
+
+	pos = pci_find_ext_capability(pdev, cap);
 	if (!pos)
 		return;
 
@@ -1707,6 +1710,14 @@ static void pci_restore_rebar_state(struct pci_dev *pdev)
 		ctrl |= size << PCI_REBAR_CTRL_BAR_SHIFT;
 		pci_write_config_dword(pdev, pos + PCI_REBAR_CTRL, ctrl);
 	}
+}
+
+static void pci_restore_rebar_state(struct pci_dev *pdev)
+{
+	__pci_restore_rebar_state(pdev, PCI_EXT_CAP_ID_REBAR);
+#ifdef CONFIG_PCI_IOV
+	__pci_restore_rebar_state(pdev, PCI_EXT_CAP_ID_VF_REBAR);
+#endif
 }
 
 /**
@@ -3639,10 +3650,18 @@ void pci_acs_init(struct pci_dev *dev)
  */
 static int pci_rebar_find_pos(struct pci_dev *pdev, int bar)
 {
+	int cap = PCI_EXT_CAP_ID_REBAR;
 	unsigned int pos, nbars, i;
 	u32 ctrl;
 
-	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_REBAR);
+#ifdef CONFIG_PCI_IOV
+	if (bar >= PCI_IOV_RESOURCES) {
+		cap = PCI_EXT_CAP_ID_VF_REBAR;
+		bar -= PCI_IOV_RESOURCES;
+	}
+#endif
+
+	pos = pci_find_ext_capability(pdev, cap);
 	if (!pos)
 		return -ENOTSUPP;
 

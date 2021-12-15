@@ -407,13 +407,36 @@ void pci_release_resource(struct pci_dev *dev, int resno)
 }
 EXPORT_SYMBOL(pci_release_resource);
 
+static int pci_memory_decoding(struct pci_dev *dev)
+{
+	u16 cmd;
+
+	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+	if (cmd & PCI_COMMAND_MEMORY)
+		return -EBUSY;
+
+	return 0;
+}
+
+#ifdef CONFIG_PCI_IOV
+static int pci_vf_memory_decoding(struct pci_dev *dev)
+{
+	u16 cmd;
+
+	pci_read_config_word(dev, dev->sriov->pos + PCI_SRIOV_CTRL, &cmd);
+	if (cmd & PCI_SRIOV_CTRL_MSE)
+		return -EBUSY;
+
+	return 0;
+}
+#endif
+
 int pci_resize_resource(struct pci_dev *dev, int resno, int size)
 {
 	struct resource *res = dev->resource + resno;
 	struct pci_host_bridge *host;
 	int old, ret;
 	u32 sizes;
-	u16 cmd;
 
 	/* Check if we must preserve the firmware's resource assignment */
 	host = pci_find_host_bridge(dev->bus);
@@ -424,9 +447,14 @@ int pci_resize_resource(struct pci_dev *dev, int resno, int size)
 	if (!(res->flags & IORESOURCE_UNSET))
 		return -EBUSY;
 
-	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-	if (cmd & PCI_COMMAND_MEMORY)
-		return -EBUSY;
+#ifdef CONFIG_PCI_IOV
+	if (resno >= PCI_IOV_RESOURCES)
+		ret = pci_vf_memory_decoding(dev);
+	else
+#endif
+	ret = pci_memory_decoding(dev);
+	if (ret)
+		return ret;
 
 	sizes = pci_rebar_get_possible_sizes(dev, resno);
 	if (!sizes)
@@ -445,6 +473,14 @@ int pci_resize_resource(struct pci_dev *dev, int resno, int size)
 
 	res->end = res->start + pci_rebar_size_to_bytes(size) - 1;
 
+#ifdef CONFIG_PCI_IOV
+	if (resno >= PCI_IOV_RESOURCES) {
+		dev->sriov->barsz[resno - PCI_IOV_RESOURCES] = pci_rebar_size_to_bytes(size);
+		res->end = res->start +
+			resource_size(res) * pci_sriov_get_totalvfs(dev) - 1;
+	}
+#endif
+
 	/* Check if the new config works by trying to assign everything. */
 	if (dev->bus->self) {
 		ret = pci_reassign_bridge_resources(dev->bus->self, res->flags);
@@ -456,6 +492,15 @@ int pci_resize_resource(struct pci_dev *dev, int resno, int size)
 error_resize:
 	pci_rebar_set_size(dev, resno, old);
 	res->end = res->start + pci_rebar_size_to_bytes(old) - 1;
+
+#ifdef CONFIG_PCI_IOV
+	if (resno >= PCI_IOV_RESOURCES) {
+		dev->sriov->barsz[resno - PCI_IOV_RESOURCES] = pci_rebar_size_to_bytes(old);
+		res->end = res->start +
+			pci_rebar_size_to_bytes(old) * pci_sriov_get_totalvfs(dev) - 1;
+	}
+#endif
+
 	return ret;
 }
 EXPORT_SYMBOL(pci_resize_resource);
