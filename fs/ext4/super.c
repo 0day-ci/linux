@@ -3196,7 +3196,7 @@ int ext4_alloc_flex_bg_array(struct super_block *sb, ext4_group_t ngroup)
 	rcu_assign_pointer(sbi->s_flex_groups, new_groups);
 	sbi->s_flex_groups_allocated = size;
 	if (old_groups)
-		ext4_kvfree_array_rcu(old_groups);
+		kvfree_rcu(old_groups);
 	return 0;
 }
 
