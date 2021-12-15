@@ -545,6 +545,7 @@ static void rk808_pm_power_off(void)
 		reg = RK808_DEVCTRL_REG,
 		bit = DEV_OFF_RST;
 		break;
+	case RK809_ID:
 	case RK817_ID:
 		reg = RK817_SYS_CFG(3);
 		bit = DEV_OFF;
@@ -577,6 +578,7 @@ static int rk808_restart_notify(struct notifier_block *this, unsigned long mode,
 		reg = RK808_DEVCTRL_REG,
 		bit = DEV_OFF;
 		break;
+	case RK809_ID:
 	case RK817_ID:
 		reg = RK817_SYS_CFG(3);
 		bit = DEV_RST;
