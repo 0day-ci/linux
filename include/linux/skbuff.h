@@ -435,8 +435,16 @@ enum {
 	/* device driver is going to provide hardware time stamp */
 	SKBTX_IN_PROGRESS = 1 << 2,
 
+	/* shinfo stores a future tx_delivery_tstamp instead of hwtstamps */
+	SKBTX_DELIVERY_TSTAMP = 1 << 3,
+
 	/* generate wifi status information (where possible) */
 	SKBTX_WIFI_STATUS = 1 << 4,
+
+	/* skb->tstamp stored a future delivery time which
+	 * was set by a local sk and it can be fowarded.
+	 */
+	SKBTX_DELIVERY_TSTAMP_ALLOW_FWD = 1 << 5,
 
 	/* generate software time stamp when entering packet scheduling */
 	SKBTX_SCHED_TSTAMP = 1 << 6,
@@ -530,7 +538,14 @@ struct skb_shared_info {
 	/* Warning: this field is not always filled in (UFO)! */
 	unsigned short	gso_segs;
 	struct sk_buff	*frag_list;
-	struct skb_shared_hwtstamps hwtstamps;
+	union {
+		/* If SKBTX_DELIVERY_TSTAMP is set in tx_flags,
+		 * tx_delivery_tstamp is stored instead of
+		 * hwtstamps.
+		 */
+		struct skb_shared_hwtstamps hwtstamps;
+		u64 tx_delivery_tstamp;
+	};
 	unsigned int	gso_type;
 	u32		tskey;
 
@@ -1463,7 +1478,42 @@ static inline unsigned int skb_end_offset(const struct sk_buff *skb)
 
 static inline struct skb_shared_hwtstamps *skb_hwtstamps(struct sk_buff *skb)
 {
+	if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_DELIVERY_TSTAMP)) {
+		skb_shinfo(skb)->tx_flags &= ~SKBTX_DELIVERY_TSTAMP;
+		skb_shinfo(skb)->tx_delivery_tstamp = 0;
+	}
 	return &skb_shinfo(skb)->hwtstamps;
+}
+
+/* Caller only needs to read the hwtstamps as ktime.
+ * To update hwtstamps,  HW device driver should call the writable
+ * version skb_hwtstamps() that returns a pointer.
+ */
+static inline ktime_t skb_hwtstamps_ktime(const struct sk_buff *skb)
+{
+	if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_DELIVERY_TSTAMP))
+		return 0;
+	return skb_shinfo(skb)->hwtstamps.hwtstamp;
+}
+
+static inline void skb_scrub_tstamp(struct sk_buff *skb)
+{
+	if (skb_shinfo(skb)->tx_flags & SKBTX_DELIVERY_TSTAMP_ALLOW_FWD) {
+		skb_shinfo(skb)->tx_delivery_tstamp = skb->tstamp;
+		skb_shinfo(skb)->tx_flags |= SKBTX_DELIVERY_TSTAMP;
+		skb_shinfo(skb)->tx_flags &= ~SKBTX_DELIVERY_TSTAMP_ALLOW_FWD;
+	}
+	skb->tstamp = 0;
+}
+
+static inline void skb_restore_delivery_time(struct sk_buff *skb)
+{
+	if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_DELIVERY_TSTAMP)) {
+		skb->tstamp = skb_shinfo(skb)->tx_delivery_tstamp;
+		skb_shinfo(skb)->tx_delivery_tstamp = 0;
+		skb_shinfo(skb)->tx_flags &= ~SKBTX_DELIVERY_TSTAMP;
+		skb_shinfo(skb)->tx_flags |= SKBTX_DELIVERY_TSTAMP_ALLOW_FWD;
+	}
 }
 
 static inline struct ubuf_info *skb_zcopy(struct sk_buff *skb)

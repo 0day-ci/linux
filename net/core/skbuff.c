@@ -5324,7 +5324,7 @@ void skb_scrub_packet(struct sk_buff *skb, bool xnet)
 
 	ipvs_reset(skb);
 	skb->mark = 0;
-	skb->tstamp = 0;
+	skb_scrub_tstamp(skb);
 }
 EXPORT_SYMBOL_GPL(skb_scrub_packet);
 

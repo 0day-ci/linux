@@ -451,12 +451,12 @@ static int __packet_get_status(const struct packet_sock *po, void *frame)
 static __u32 tpacket_get_timestamp(struct sk_buff *skb, struct timespec64 *ts,
 				   unsigned int flags)
 {
-	struct skb_shared_hwtstamps *shhwtstamps = skb_hwtstamps(skb);
+	ktime_t hwtstamp = skb_hwtstamps_ktime(skb);
 
-	if (shhwtstamps &&
-	    (flags & SOF_TIMESTAMPING_RAW_HARDWARE) &&
-	    ktime_to_timespec64_cond(shhwtstamps->hwtstamp, ts))
+	if (hwtstamp && (flags & SOF_TIMESTAMPING_RAW_HARDWARE)) {
+		*ts = ktime_to_timespec64(hwtstamp);
 		return TP_STATUS_TS_RAW_HARDWARE;
+	}
 
 	if ((flags & SOF_TIMESTAMPING_SOFTWARE) &&
 	    ktime_to_timespec64_cond(skb->tstamp, ts))
