@@ -239,7 +239,6 @@ struct tcm *sita_init(u16 width, u16 height)
 
 	spin_lock_init(&tcm->lock);
 	tcm->bitmap = (unsigned long *)(tcm + 1);
-	bitmap_clear(tcm->bitmap, 0, width*height);
 
 	tcm->map_size = width*height;
 
