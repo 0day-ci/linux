@@ -193,11 +193,8 @@ EXPORT_SYMBOL(pch_ch_control_write);
 u32 pch_ch_event_read(struct pci_dev *pdev)
 {
 	struct pch_dev *chip = pci_get_drvdata(pdev);
-	u32 val;
 
-	val = ioread32(&chip->regs->ch_event);
-
-	return val;
+	return ioread32(&chip->regs->ch_event);
 }
 EXPORT_SYMBOL(pch_ch_event_read);
 
@@ -212,22 +209,16 @@ EXPORT_SYMBOL(pch_ch_event_write);
 u32 pch_src_uuid_lo_read(struct pci_dev *pdev)
 {
 	struct pch_dev *chip = pci_get_drvdata(pdev);
-	u32 val;
 
-	val = ioread32(&chip->regs->src_uuid_lo);
-
-	return val;
+	return ioread32(&chip->regs->src_uuid_lo);
 }
 EXPORT_SYMBOL(pch_src_uuid_lo_read);
 
 u32 pch_src_uuid_hi_read(struct pci_dev *pdev)
 {
 	struct pch_dev *chip = pci_get_drvdata(pdev);
-	u32 val;
 
-	val = ioread32(&chip->regs->src_uuid_hi);
-
-	return val;
+	return ioread32(&chip->regs->src_uuid_hi);
 }
 EXPORT_SYMBOL(pch_src_uuid_hi_read);
 
@@ -663,12 +654,9 @@ static void __exit ptp_pch_exit(void)
 
 static s32 __init ptp_pch_init(void)
 {
-	s32 ret;
-
 	/* register the driver with the pci core */
-	ret = pci_register_driver(&pch_driver);
 
-	return ret;
+	return pci_register_driver(&pch_driver);
 }
 
 module_init(ptp_pch_init);
