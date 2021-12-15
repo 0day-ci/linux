@@ -297,7 +297,20 @@ static const char *shell_test__description(char *description, size_t size,
 	for (int __i = 0; __i < nr && (ent = entlist[__i]); __i++)	\
 		if (!is_directory(base, ent) && \
 			is_executable_file(base, ent) && \
-			ent->d_name[0] != '.')
+			ent->d_name[0] != '.' && \
+			(shell_file_is_sh(ent->d_name) == 0))
+
+static int shell_file_is_sh(const char *file)
+{
+	const char *ext;
+
+	ext = strchr(file, '.');
+	if (!ext)
+		return -1;
+	if (!strcmp(ext, ".sh"))
+		return 0;
+	return -1;
+}
 
 static const char *shell_tests__dir(char *path, size_t size)
 {
