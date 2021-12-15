@@ -602,6 +602,9 @@ static size_t ef100_update_stats(struct efx_nic *efx,
 				 struct rtnl_link_stats64 *core_stats)
 {
 	__le64 *mc_stats = kmalloc(array_size(efx->num_mac_stats, sizeof(__le64)), GFP_ATOMIC);
+	if (!mc_stats)
+		return 0;
+
 	struct ef100_nic_data *nic_data = efx->nic_data;
 	DECLARE_BITMAP(mask, EF100_STAT_COUNT) = {};
 	u64 *stats = nic_data->stats;
