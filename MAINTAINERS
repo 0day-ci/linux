@@ -1894,6 +1894,9 @@ F:	tools/perf/arch/arm/util/auxtrace.c
 F:	tools/perf/arch/arm/util/cs-etm.c
 F:	tools/perf/arch/arm/util/cs-etm.h
 F:	tools/perf/arch/arm/util/pmu.c
+F:	tools/perf/tests/shell/coresight_*
+F:	tools/perf/tests/shell/tools/Makefile
+F:	tools/perf/tests/shell/tools/coresight/*
 F:	tools/perf/util/cs-etm-decoder/*
 F:	tools/perf/util/cs-etm.*
 

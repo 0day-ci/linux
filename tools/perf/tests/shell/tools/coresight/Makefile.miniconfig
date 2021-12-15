@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Carsten Haitzler <carsten.haitzler@arm.com>, 2021
+
+ifndef DESTDIR
+prefix ?= $(HOME)
+endif
+
+DESTDIR_SQ = $(subst ','\'',$(DESTDIR))
+perfexecdir = libexec/perf-core
+perfexec_instdir = $(perfexecdir)
+
+ifneq ($(filter /%,$(firstword $(perfexecdir))),)
+perfexec_instdir = $(perfexecdir)
+else
+perfexec_instdir = $(prefix)/$(perfexecdir)
+endif
+
+perfexec_instdir_SQ = $(subst ','\'',$(perfexec_instdir))
+INSTALL = install
+
+include ../../../../../../scripts/Makefile.include
+include ../../../../../../scripts/Makefile.arch
+include ../../../../../../scripts/utilities.mak
