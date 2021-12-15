@@ -9,7 +9,8 @@ SUBDIRS = \
 	thread_loop \
 	bubble_sort \
 	bubble_sort_thread \
-        memcpy
+        memcpy \
+        memcpy_thread
 
 all: $(SUBDIRS)
 $(SUBDIRS):
