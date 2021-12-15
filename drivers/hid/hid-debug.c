@@ -1025,7 +1025,14 @@ static const char *absolutes[ABS_CNT] = {
 
 static const char *misc[MSC_MAX + 1] = {
 	[MSC_SERIAL] = "Serial",	[MSC_PULSELED] = "Pulseled",
-	[MSC_GESTURE] = "Gesture",	[MSC_RAW] = "RawData"
+	[MSC_GESTURE] = "Gesture",	[MSC_RAW] = "RawData",
+	[MSC_PEN_ID] = "PenID",		[MSC_PEN_COLOR] "PenColor",
+	[MSC_PEN_LINE_STYLE_INK] = "PenLineStyleInk",
+	[MSC_PEN_LINE_STYLE_PENCIL] = "PenLineStylePencil",
+	[MSC_PEN_LINE_STYLE_HIGHLIGHTER] = "PenLineStyleHighlighter",
+	[MSC_PEN_LINE_STYLE_CHISEL_MARKER] = "PenLineStyleChiselMarker",
+	[MSC_PEN_LINE_STYLE_BRUSH] = "PenLineStyleBrush",
+	[MSC_PEN_LINE_STYLE_NO_PREFERENCE] = "PenLineStyleNoPreference",
 };
 
 static const char *leds[LED_MAX + 1] = {

@@ -901,14 +901,24 @@
  * Misc events
  */
 
-#define MSC_SERIAL		0x00
-#define MSC_PULSELED		0x01
-#define MSC_GESTURE		0x02
-#define MSC_RAW			0x03
-#define MSC_SCAN		0x04
-#define MSC_TIMESTAMP		0x05
-#define MSC_MAX			0x07
-#define MSC_CNT			(MSC_MAX+1)
+#define MSC_SERIAL			0x00
+#define MSC_PULSELED			0x01
+#define MSC_GESTURE			0x02
+#define MSC_RAW				0x03
+#define MSC_SCAN			0x04
+#define MSC_TIMESTAMP			0x05
+/* USI Pen events */
+#define MSC_PEN_ID			0x06
+#define MSC_PEN_COLOR			0x07
+#define MSC_PEN_LINE_STYLE_INK			0x08
+#define MSC_PEN_LINE_STYLE_PENCIL		0x09
+#define MSC_PEN_LINE_STYLE_HIGHLIGHTER		0x0a
+#define MSC_PEN_LINE_STYLE_CHISEL_MARKER	0x0b
+#define MSC_PEN_LINE_STYLE_BRUSH		0x0c
+#define MSC_PEN_LINE_STYLE_NO_PREFERENCE	0x0d
+/* TODO: Add USI diagnostic & battery events too */
+#define MSC_MAX				0x0d
+#define MSC_CNT				(MSC_MAX + 1)
 
 /*
  * LEDs

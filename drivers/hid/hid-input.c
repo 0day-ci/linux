@@ -833,6 +833,10 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			}
 			break;
 
+		case 0x38: /* Transducer Index */
+			map_msc(MSC_PEN_ID);
+			goto ignore;
+
 		case 0x3b: /* Battery Strength */
 			hidinput_setup_battery(device, HID_INPUT_REPORT, field, false);
 			usage->type = EV_PWR;
@@ -878,6 +882,42 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 		case 0x5b: /* TransducerSerialNumber */
 		case 0x6e: /* TransducerSerialNumber2 */
 			map_msc(MSC_SERIAL);
+			break;
+
+		case 0x5c: /* Digitizer Preferred Color */
+			map_msc(MSC_PEN_COLOR);
+			break;
+
+		case 0x5e: /* Digitizer Preferred Line Width */
+			map_abs_clear(ABS_TOOL_WIDTH);
+			break;
+
+		case 0x70: /* Preferred Line Style -> not an input usage */
+		case 0x71: /* Preferred Line Style is Locked */
+			goto ignore;
+
+		case 0x72: /* Ink */
+			map_msc(MSC_PEN_LINE_STYLE_INK);
+			break;
+
+		case 0x73: /* Pencil */
+			map_msc(MSC_PEN_LINE_STYLE_PENCIL);
+			break;
+
+		case 0x74: /* Highlighter */
+			map_msc(MSC_PEN_LINE_STYLE_HIGHLIGHTER);
+			break;
+
+		case 0x75: /* Chisel Marker */
+			map_msc(MSC_PEN_LINE_STYLE_CHISEL_MARKER);
+			break;
+
+		case 0x76: /* Brush */
+			map_msc(MSC_PEN_LINE_STYLE_BRUSH);
+			break;
+
+		case 0x77: /* No Preference */
+			map_msc(MSC_PEN_LINE_STYLE_NO_PREFERENCE);
 			break;
 
 		default:  goto unknown;
