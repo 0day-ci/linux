@@ -435,7 +435,7 @@ static int run_shell_tests(int argc, const char *argv[], int i, int width,
 			continue;
 
 		st.file = ent->d_name;
-		pr_info("%2d: %-*s:", i, width, test_suite.desc);
+		pr_info("%3d: %-*s:", i, width, test_suite.desc);
 
 		if (intlist__find(skiplist, i)) {
 			color_fprintf(stderr, PERF_COLOR_YELLOW, " Skip (user override)\n");
@@ -485,7 +485,7 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 				continue;
 		}
 
-		pr_info("%2d: %-*s:", i, width, test_description(t, -1));
+		pr_info("%3d: %-*s:", i, width, test_description(t, -1));
 
 		if (intlist__find(skiplist, i)) {
 			color_fprintf(stderr, PERF_COLOR_YELLOW, " Skip (user override)\n");
@@ -525,7 +525,7 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 							curr, argc, argv))
 					continue;
 
-				pr_info("%2d.%1d: %-*s:", i, subi + 1, subw,
+				pr_info("%3d.%1d: %-*s:", i, subi + 1, subw,
 					test_description(t, subi));
 				test_and_print(t, subi);
 			}
@@ -560,7 +560,7 @@ static int perf_test__list_shell(int argc, const char **argv, int i)
 		if (!perf_test__matches(t.desc, curr, argc, argv))
 			continue;
 
-		pr_info("%2d: %s\n", i, t.desc);
+		pr_info("%3d: %s\n", i, t.desc);
 
 	}
 
@@ -582,14 +582,14 @@ static int perf_test__list(int argc, const char **argv)
 		if (!perf_test__matches(test_description(t, -1), curr, argc, argv))
 			continue;
 
-		pr_info("%2d: %s\n", i, test_description(t, -1));
+		pr_info("%3d: %s\n", i, test_description(t, -1));
 
 		if (has_subtests(t)) {
 			int subn = num_subtests(t);
 			int subi;
 
 			for (subi = 0; subi < subn; subi++)
-				pr_info("%2d:%1d: %s\n", i, subi + 1,
+				pr_info("%3d:%1d: %s\n", i, subi + 1,
 					test_description(t, subi));
 		}
 	}
