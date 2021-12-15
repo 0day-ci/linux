@@ -322,6 +322,10 @@ enum rw_hint {
 #define IOCB_NOIO		(1 << 20)
 /* can use bio alloc cache */
 #define IOCB_ALLOC_CACHE	(1 << 21)
+/* iocb supports bio passback */
+#define IOCB_BIO_PASSBACK	(1 << 22)
+/* iocb->private holds bio to put */
+#define IOCB_PRIV_IS_BIO	(1 << 23)
 
 struct kiocb {
 	struct file		*ki_filp;
