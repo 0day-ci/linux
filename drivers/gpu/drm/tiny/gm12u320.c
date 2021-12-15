@@ -636,6 +636,9 @@ static int gm12u320_usb_probe(struct usb_interface *interface,
 	struct drm_device *dev;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	/*
 	 * The gm12u320 presents itself to the system as 2 usb mass-storage
 	 * interfaces, we only care about / need the first one.
