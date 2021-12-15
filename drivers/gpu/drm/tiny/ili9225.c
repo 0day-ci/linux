@@ -369,6 +369,9 @@ static int ili9225_probe(struct spi_device *spi)
 	u32 rotation = 0;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	dbidev = devm_drm_dev_alloc(dev, &ili9225_driver,
 				    struct mipi_dbi_dev, drm);
 	if (IS_ERR(dbidev))
