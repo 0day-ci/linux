@@ -126,6 +126,9 @@ static struct pci_driver sis_pci_driver = {
 
 static int __init sis_init(void)
 {
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	driver.num_ioctls = sis_max_ioctl;
 	return drm_legacy_pci_init(&driver, &sis_pci_driver);
 }
