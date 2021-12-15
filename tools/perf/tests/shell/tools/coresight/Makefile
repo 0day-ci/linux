@@ -10,7 +10,8 @@ SUBDIRS = \
 	bubble_sort \
 	bubble_sort_thread \
         memcpy \
-        memcpy_thread
+        memcpy_thread \
+        unroll_loop_thread
 
 all: $(SUBDIRS)
 $(SUBDIRS):
