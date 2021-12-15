@@ -382,6 +382,9 @@ static int hdlcd_probe(struct platform_device *pdev)
 	struct device_node *port;
 	struct component_match *match = NULL;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	/* there is only one output port inside each device, find it */
 	port = of_graph_get_remote_node(pdev->dev.of_node, 0, 0);
 	if (!port)
