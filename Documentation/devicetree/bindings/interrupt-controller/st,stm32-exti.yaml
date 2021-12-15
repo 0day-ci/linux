@@ -41,6 +41,17 @@ properties:
     description:
       Interrupts references to primary interrupt controller
 
+  st,exti-mapping:
+    $ref: "/schemas/types.yaml#/definitions/uint32-matrix"
+    description: |
+            Define mapping between EXTI lines and GIC irq lines. Should be:
+            st,exti-mapping = <EXTI_LINE GIC_IRQ EXTI_TYPE>, ...;
+            With:
+            - EXTI_LINE: EXTI line number.
+            - GIC_IRQ: GIC IRQ associated to the EXTI line.
+            - EXTI_TYPE: STM32_EXTI_TYPE_CONFIGURABLE or STM32_EXTI_TYPE_DIRECT.
+              Defined in include/dt-bindings/interrupt-controller/stm32-exti.h
+
 required:
   - "#interrupt-cells"
   - compatible
