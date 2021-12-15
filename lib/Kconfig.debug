@@ -2122,8 +2122,7 @@ config BACKTRACE_SELF_TEST
 
 config TEST_REF_TRACKER
 	tristate "Self test for reference tracker"
-	depends on DEBUG_KERNEL && STACKTRACE_SUPPORT
-	select REF_TRACKER
+	depends on DEBUG_KERNEL && STACKTRACE_SUPPORT && REF_TRACKER
 	help
 	  This option provides a kernel module performing tests
 	  using reference tracker infrastructure.
