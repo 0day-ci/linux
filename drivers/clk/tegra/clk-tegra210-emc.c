@@ -52,12 +52,10 @@ static u8 tegra210_clk_emc_get_parent(struct clk_hw *hw)
 {
 	struct tegra210_clk_emc *emc = to_tegra210_clk_emc(hw);
 	u32 value;
-	u8 src;
 
 	value = readl_relaxed(emc->regs + CLK_SOURCE_EMC);
-	src = FIELD_GET(CLK_SOURCE_EMC_2X_CLK_SRC, value);
 
-	return src;
+	return FIELD_GET(CLK_SOURCE_EMC_2X_CLK_SRC, value);
 }
 
 static unsigned long tegra210_clk_emc_recalc_rate(struct clk_hw *hw,
