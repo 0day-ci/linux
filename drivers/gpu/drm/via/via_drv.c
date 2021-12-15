@@ -106,6 +106,9 @@ static struct pci_driver via_pci_driver = {
 
 static int __init via_init(void)
 {
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	driver.num_ioctls = via_max_ioctl;
 	via_init_command_verifier();
 	return drm_legacy_pci_init(&driver, &via_pci_driver);
