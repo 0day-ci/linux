@@ -99,6 +99,11 @@ int main(int argc, char *argv[])
 	vcpu_run(vm, VCPU_ID);
 	ASSERT_EQ(vcpu_get_msr(vm, VCPU_ID, MSR_IA32_PERF_CAPABILITIES), PMU_CAP_FW_WRITES);
 
+	/* Re-create guest VM after KVM_RUN so CPUID can be changed */
+	kvm_vm_free(vm);
+	vm = vm_create_default(VCPU_ID, 0, guest_code);
+	vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+
 	/* testcase 2, check valid LBR formats are accepted */
 	vcpu_set_msr(vm, 0, MSR_IA32_PERF_CAPABILITIES, 0);
 	ASSERT_EQ(vcpu_get_msr(vm, VCPU_ID, MSR_IA32_PERF_CAPABILITIES), 0);
