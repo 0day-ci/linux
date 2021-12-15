@@ -1886,8 +1886,7 @@ static int clear_qf_name(struct super_block *sb, int qtype)
 		return -1;
 	}
 	rcu_assign_pointer(sbi->s_qf_names[qtype], NULL);
-	synchronize_rcu();
-	kfree(old_qname);
+	kvfree_rcu(old_qname);
 	return 1;
 }
 #endif
