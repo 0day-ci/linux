@@ -29,6 +29,7 @@ MODULE_ALIAS_CRYPTO("ghash");
 #define GHASH_BLOCK_SIZE	16
 #define GHASH_DIGEST_SIZE	16
 #define GCM_IV_SIZE		12
+#define UNROLL_DATA_SIZE	1024
 
 struct ghash_key {
 	be128			k;
@@ -59,6 +60,19 @@ asmlinkage int pmull_gcm_decrypt(int bytes, u8 dst[], const u8 src[],
 				 u64 const h[][2], u64 dg[], u8 ctr[],
 				 u32 const rk[], int rounds, const u8 l[],
 				 const u8 tag[], u64 authsize);
+asmlinkage size_t pmull_gcm_encrypt_unroll(const unsigned char *in,
+				 size_t len,
+				 unsigned char *out,
+				 u64 Xi[][2],
+				 unsigned char ivec[16],
+				 const void *key, int rounds,
+				 uint8_t *tag);
+asmlinkage size_t pmull_gcm_decrypt_unroll(const uint8_t *ciphertext,
+				 uint64_t plaintext_length,
+				 uint8_t *plaintext, uint64_t Xi[][2],
+				 unsigned char ivec[16], const void *key,
+				 int rounds, uint8_t *tag,
+                                 uint8_t *otag, uint64_t authsize);
 
 static int ghash_init(struct shash_desc *desc)
 {
@@ -255,6 +269,16 @@ static int gcm_setkey(struct crypto_aead *tfm, const u8 *inkey,
 	gf128mul_lle(&h, &ctx->ghash_key.k);
 	ghash_reflect(ctx->ghash_key.h[3], &h);
 
+	ghash_reflect(ctx->ghash_key.h[6], &ctx->ghash_key.k);
+	h = ctx->ghash_key.k;
+	gf128mul_lle(&h, &ctx->ghash_key.k);
+	ghash_reflect(ctx->ghash_key.h[8], &h);
+
+	gf128mul_lle(&h, &ctx->ghash_key.k);
+	ghash_reflect(ctx->ghash_key.h[9], &h);
+
+	gf128mul_lle(&h, &ctx->ghash_key.k);
+	ghash_reflect(ctx->ghash_key.h[11], &h);
 	return 0;
 }
 
@@ -350,14 +374,21 @@ static int gcm_encrypt(struct aead_request *req)
 	be128 lengths;
 	u8 *tag;
 	int err;
+	int unroll4_flag = 0;
 
 	lengths.a = cpu_to_be64(req->assoclen * 8);
 	lengths.b = cpu_to_be64(req->cryptlen * 8);
 
+	if (req->cryptlen >= UNROLL_DATA_SIZE)
+		unroll4_flag = 1;
 	if (req->assoclen)
 		gcm_calculate_auth_mac(req, dg);
 
 	memcpy(iv, req->iv, GCM_IV_SIZE);
+	if (unroll4_flag) {
+		ctx->ghash_key.h[4][1] = cpu_to_be64(((u64 *)dg)[0]);
+		ctx->ghash_key.h[4][0] = cpu_to_be64(((u64 *)dg)[1]);
+	}
 	put_unaligned_be32(2, iv + GCM_IV_SIZE);
 
 	err = skcipher_walk_aead_encrypt(&walk, req, false);
@@ -377,11 +408,23 @@ static int gcm_encrypt(struct aead_request *req)
 			tag = NULL;
 		}
 
-		kernel_neon_begin();
-		pmull_gcm_encrypt(nbytes, dst, src, ctx->ghash_key.h,
-				  dg, iv, ctx->aes_key.key_enc, nrounds,
-				  tag);
-		kernel_neon_end();
+		if (unroll4_flag) {
+			kernel_neon_begin();
+			pmull_gcm_encrypt_unroll(src, nbytes*8, dst,
+						 &ctx->ghash_key.h[4],
+						 iv,
+						 ctx->aes_key.key_enc,
+						 nrounds, tag);
+			kernel_neon_end();
+		} else {
+			kernel_neon_begin();
+			pmull_gcm_encrypt(nbytes, dst, src,
+					  ctx->ghash_key.h,
+					  dg, iv,
+					  ctx->aes_key.key_enc,
+					  nrounds, tag);
+			kernel_neon_end();
+		}
 
 		if (unlikely(!nbytes))
 			break;
@@ -418,14 +461,22 @@ static int gcm_decrypt(struct aead_request *req)
 	u8 *tag;
 	int ret;
 	int err;
+	int unroll4_flag = 0;
 
 	lengths.a = cpu_to_be64(req->assoclen * 8);
 	lengths.b = cpu_to_be64((req->cryptlen - authsize) * 8);
+
+	if (req->cryptlen >= UNROLL_DATA_SIZE)
+		unroll4_flag = 1;
 
 	if (req->assoclen)
 		gcm_calculate_auth_mac(req, dg);
 
 	memcpy(iv, req->iv, GCM_IV_SIZE);
+	if (unroll4_flag) {
+		ctx->ghash_key.h[4][1] = cpu_to_be64(((u64 *)dg)[0]);
+		ctx->ghash_key.h[4][0] = cpu_to_be64(((u64 *)dg)[1]);
+	}
 	put_unaligned_be32(2, iv + GCM_IV_SIZE);
 
 	scatterwalk_map_and_copy(otag, req->src,
@@ -449,11 +500,23 @@ static int gcm_decrypt(struct aead_request *req)
 			tag = NULL;
 		}
 
-		kernel_neon_begin();
-		ret = pmull_gcm_decrypt(nbytes, dst, src, ctx->ghash_key.h,
-					dg, iv, ctx->aes_key.key_enc,
-					nrounds, tag, otag, authsize);
-		kernel_neon_end();
+		if (unroll4_flag) {
+			kernel_neon_begin();
+			ret = pmull_gcm_decrypt_unroll(src, nbytes*8,
+						dst,
+						&ctx->ghash_key.h[4], iv,
+						ctx->aes_key.key_enc, nrounds,
+						tag, otag, authsize);
+			kernel_neon_end();
+		} else {
+			kernel_neon_begin();
+			ret = pmull_gcm_decrypt(nbytes, dst, src,
+						ctx->ghash_key.h,
+						dg, iv, ctx->aes_key.key_enc,
+						nrounds, tag, otag, authsize);
+			kernel_neon_end();
+		}
+
 
 		if (unlikely(!nbytes))
 			break;
@@ -485,7 +548,7 @@ static struct aead_alg gcm_aes_alg = {
 	.base.cra_priority	= 300,
 	.base.cra_blocksize	= 1,
 	.base.cra_ctxsize	= sizeof(struct gcm_aes_ctx) +
-				  4 * sizeof(u64[2]),
+				  12 * sizeof(u64[2]),
 	.base.cra_module	= THIS_MODULE,
 };
 
