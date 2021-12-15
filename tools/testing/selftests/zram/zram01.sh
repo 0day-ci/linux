@@ -15,9 +15,6 @@ ERR_CODE=0
 
 # Test will create the following number of zram devices:
 dev_num=1
-# This is a list of parameters for zram devices.
-# Number of items must be equal to 'dev_num' parameter.
-zram_max_streams="2"
 
 # The zram sysfs node 'disksize' value can be either in bytes,
 # or you can use mem suffixes. But in some old kernels, mem
@@ -72,7 +69,6 @@ zram_fill_fs()
 
 check_prereqs
 zram_load
-zram_max_streams
 zram_compress_alg
 zram_set_disksizes
 zram_set_memlimit

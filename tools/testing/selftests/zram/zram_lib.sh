@@ -82,28 +82,6 @@ zram_load()
 	fi
 }
 
-zram_max_streams()
-{
-	echo "set max_comp_streams to zram device(s)"
-
-	local i=0
-	for max_s in $zram_max_streams; do
-		local sys_path="/sys/block/zram${i}/max_comp_streams"
-		echo $max_s > $sys_path || \
-			echo "FAIL failed to set '$max_s' to $sys_path"
-		sleep 1
-		local max_streams=$(cat $sys_path)
-
-		[ "$max_s" -ne "$max_streams" ] && \
-			echo "FAIL can't set max_streams '$max_s', get $max_stream"
-
-		i=$(($i + 1))
-		echo "$sys_path = '$max_streams' ($i/$dev_num)"
-	done
-
-	echo "zram max streams: OK"
-}
-
 zram_compress_alg()
 {
 	echo "test that we can set compression algorithm"
