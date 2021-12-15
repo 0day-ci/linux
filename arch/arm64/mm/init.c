@@ -173,6 +173,7 @@ int pfn_is_map_memory(unsigned long pfn)
 EXPORT_SYMBOL(pfn_is_map_memory);
 
 static phys_addr_t memory_limit __ro_after_init = PHYS_ADDR_MAX;
+static phys_addr_t max_addr __ro_after_init = PHYS_ADDR_MAX;
 
 /*
  * Limit the memory size that was specified via FDT.
@@ -188,6 +189,18 @@ static int __init early_mem(char *p)
 	return 0;
 }
 early_param("mem", early_mem);
+
+static int __init set_max_addr(char *p)
+{
+	if (!p)
+		return 1;
+
+	max_addr = memparse(p, &p) & PAGE_MASK;
+	pr_notice("Memory max addr set to 0x%llx\n", max_addr);
+
+	return 0;
+}
+early_param("max_addr", set_max_addr);
 
 void __init arm64_memblock_init(void)
 {
@@ -252,6 +265,9 @@ void __init arm64_memblock_init(void)
 		memblock_mem_limit_remove_map(memory_limit);
 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
 	}
+
+	if (max_addr != PHYS_ADDR_MAX)
+		memblock_cap_memory_range(0, max_addr);
 
 	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
 		/*
@@ -427,4 +443,9 @@ void dump_mem_limit(void)
 	} else {
 		pr_emerg("Memory Limit: none\n");
 	}
+
+	if (max_addr != PHYS_ADDR_MAX)
+		pr_emerg("Max addr: 0x%llx\n", max_addr);
+	else
+		pr_emerg("Max addr: none\n");
 }
