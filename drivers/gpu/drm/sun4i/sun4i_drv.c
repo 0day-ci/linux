@@ -373,6 +373,9 @@ static int sun4i_drv_probe(struct platform_device *pdev)
 	struct endpoint_list list;
 	int i, ret, count = 0;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	INIT_KFIFO(list.fifo);
 
 	for (i = 0;; i++) {
