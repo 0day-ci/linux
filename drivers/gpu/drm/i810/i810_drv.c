@@ -80,6 +80,9 @@ static struct pci_driver i810_pci_driver = {
 
 static int __init i810_init(void)
 {
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	if (num_possible_cpus() > 1) {
 		pr_err("drm/i810 does not support SMP\n");
 		return -EINVAL;
