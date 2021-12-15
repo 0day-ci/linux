@@ -74,6 +74,9 @@ static struct pci_driver tdfx_pci_driver = {
 
 static int __init tdfx_init(void)
 {
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	return drm_legacy_pci_init(&driver, &tdfx_pci_driver);
 }
 
