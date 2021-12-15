@@ -113,10 +113,9 @@ static ssize_t nfs_netns_identifier_store(struct kobject *kobj,
 	if (!p)
 		return -ENOMEM;
 	old = rcu_dereference_protected(xchg(&c->identifier, (char __rcu *)p), 1);
-	if (old) {
-		synchronize_rcu();
-		kfree(old);
-	}
+	if (old)
+		kvfree_rcu(old);
+
 	return count;
 }
 
