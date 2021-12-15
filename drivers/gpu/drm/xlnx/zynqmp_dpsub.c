@@ -191,6 +191,9 @@ static int zynqmp_dpsub_probe(struct platform_device *pdev)
 	struct zynqmp_dpsub *dpsub;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	/* Allocate private data. */
 	dpsub = devm_drm_dev_alloc(&pdev->dev, &zynqmp_dpsub_drm_driver,
 				   struct zynqmp_dpsub, drm);
