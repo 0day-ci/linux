@@ -21,6 +21,7 @@
 #include <linux/syscore_ops.h>
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/stm32-exti.h>
 
 #define IRQS_PER_BANK 32
 
@@ -46,7 +47,7 @@ struct stm32_desc_irq {
 
 struct stm32_exti_drv_data {
 	const struct stm32_exti_bank **exti_banks;
-	const struct stm32_desc_irq *desc_irqs;
+	struct stm32_desc_irq *desc_irqs;
 	u32 bank_nr;
 	u32 irq_nr;
 };
@@ -66,6 +67,8 @@ struct stm32_exti_host_data {
 	struct stm32_exti_chip_data *chips_data;
 	const struct stm32_exti_drv_data *drv_data;
 	struct hwspinlock *hwlock;
+	struct stm32_desc_irq *desc_irqs;
+	u32 irq_nr;
 };
 
 static struct stm32_exti_host_data *stm32_host_data;
@@ -169,7 +172,7 @@ static const struct stm32_exti_bank *stm32mp1_exti_banks[] = {
 static struct irq_chip stm32_exti_h_chip;
 static struct irq_chip stm32_exti_h_chip_direct;
 
-static const struct stm32_desc_irq stm32mp1_desc_irq[] = {
+static struct stm32_desc_irq stm32mp1_desc_irq[] = {
 	{ .exti = 0, .irq_parent = 6, .chip = &stm32_exti_h_chip },
 	{ .exti = 1, .irq_parent = 7, .chip = &stm32_exti_h_chip },
 	{ .exti = 2, .irq_parent = 8, .chip = &stm32_exti_h_chip },
@@ -221,20 +224,28 @@ static const struct stm32_exti_drv_data stm32mp1_drv_data = {
 	.irq_nr = ARRAY_SIZE(stm32mp1_desc_irq),
 };
 
-static const struct
-stm32_desc_irq *stm32_exti_get_desc(const struct stm32_exti_drv_data *drv_data,
-				    irq_hw_number_t hwirq)
+static struct
+stm32_desc_irq *stm32_exti_get_desc(struct stm32_exti_host_data *host_data, irq_hw_number_t hwirq)
 {
-	const struct stm32_desc_irq *desc = NULL;
+	const struct stm32_exti_drv_data *drv_data = host_data->drv_data;
+	struct stm32_desc_irq *desc = NULL;
+	u32 irq_nr;
 	int i;
 
-	if (!drv_data->desc_irqs)
+	if (host_data->desc_irqs) {
+		desc = &host_data->desc_irqs[0];
+		irq_nr = host_data->irq_nr;
+	} else if (drv_data && drv_data->desc_irqs) {
+		desc = &drv_data->desc_irqs[0];
+		irq_nr = drv_data->irq_nr;
+	} else {
 		return NULL;
+	}
 
-	for (i = 0; i < drv_data->irq_nr; i++) {
-		desc = &drv_data->desc_irqs[i];
+	for (i = 0; i < irq_nr; i++) {
 		if (desc->exti == hwirq)
 			break;
+		desc++;
 	}
 
 	return desc;
@@ -657,7 +668,7 @@ static int stm32_exti_h_domain_alloc(struct irq_domain *dm,
 {
 	struct stm32_exti_host_data *host_data = dm->host_data;
 	struct stm32_exti_chip_data *chip_data;
-	const struct stm32_desc_irq *desc;
+	struct stm32_desc_irq *desc;
 	struct irq_fwspec *fwspec = data;
 	struct irq_fwspec p_fwspec;
 	irq_hw_number_t hwirq;
@@ -668,7 +679,7 @@ static int stm32_exti_h_domain_alloc(struct irq_domain *dm,
 	chip_data = &host_data->chips_data[bank];
 
 
-	desc = stm32_exti_get_desc(host_data->drv_data, hwirq);
+	desc = stm32_exti_get_desc(host_data, hwirq);
 	if (!desc)
 		return -EINVAL;
 
@@ -682,6 +693,50 @@ static int stm32_exti_h_domain_alloc(struct irq_domain *dm,
 		p_fwspec.param[2] = IRQ_TYPE_LEVEL_HIGH;
 
 		return irq_domain_alloc_irqs_parent(dm, virq, 1, &p_fwspec);
+	}
+
+	return 0;
+}
+
+static int stm32_exti_get_irq_mapping(struct device *dev, struct stm32_exti_host_data *host_data)
+{
+	struct device_node *np = dev->of_node;
+	const __be32 *p = NULL;
+	struct property *prop;
+	int i, ret;
+	u32 chip;
+
+	prop = of_find_property(np, "st,exti-mapping", NULL);
+	if (!prop) {
+		dev_dbg(dev, "st,exti-mapping DT property not provided");
+		return 0;
+	}
+
+	ret = of_property_count_elems_of_size(np, "st,exti-mapping",
+					      STM32_EXTI_MAPPING_CELL_NB * sizeof(u32));
+	if (ret <= 0) {
+		dev_err(dev, "Wrong EXTI/GIC mapping!\n");
+		return ret;
+	}
+
+	host_data->irq_nr = ret;
+
+	host_data->desc_irqs = devm_kzalloc(dev, host_data->irq_nr * sizeof(*host_data->desc_irqs),
+					    GFP_KERNEL);
+	if (!host_data->desc_irqs)
+		return -ENOMEM;
+
+	for (i = 0; i < host_data->irq_nr; i++) {
+		p = of_prop_next_u32(prop, p, &host_data->desc_irqs[i].exti);
+		p = of_prop_next_u32(prop, p, &host_data->desc_irqs[i].irq_parent);
+		p = of_prop_next_u32(prop, p, &chip);
+
+		if (chip == STM32_EXTI_TYPE_CONFIGURABLE)
+			host_data->desc_irqs[i].chip = &stm32_exti_h_chip;
+		else if (chip == STM32_EXTI_TYPE_DIRECT)
+			host_data->desc_irqs[i].chip = &stm32_exti_h_chip_direct;
+		else
+			return -EINVAL;
 	}
 
 	return 0;
@@ -909,6 +964,10 @@ static int stm32_exti_probe(struct platform_device *pdev)
 		dev_err(dev, "Could not register exti domain\n");
 		return -ENOMEM;
 	}
+
+	ret = stm32_exti_get_irq_mapping(dev, host_data);
+	if (ret)
+		return ret;
 
 	ret = devm_add_action_or_reset(dev, stm32_exti_remove_irq, domain);
 	if (ret)
