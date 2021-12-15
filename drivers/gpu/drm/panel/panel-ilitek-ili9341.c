@@ -611,6 +611,9 @@ static int ili9341_dbi_probe(struct spi_device *spi, struct gpio_desc *dc,
 	u32 rotation = 0;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	vcc = devm_regulator_get_optional(dev, "vcc");
 	if (IS_ERR(vcc))
 		dev_err(dev, "get optional vcc failed\n");
