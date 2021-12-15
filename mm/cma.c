@@ -500,7 +500,9 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 		trace_cma_alloc_busy_retry(cma->name, pfn, pfn_to_page(pfn),
 					   count, align);
 		/* try again with a bit different memory target */
-		start = bitmap_no + mask + 1;
+		start = ALIGN(bitmap_no + mask + 1,
+			      pageblock_nr_pages >> cma->order_per_bit);
+
 	}
 
 	trace_cma_alloc_finish(cma->name, pfn, page, count, align);
