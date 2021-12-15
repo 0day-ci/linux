@@ -938,6 +938,9 @@ static int malidp_platform_probe(struct platform_device *pdev)
 	struct device_node *port;
 	struct component_match *match = NULL;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	if (!pdev->dev.of_node)
 		return -ENODEV;
 
