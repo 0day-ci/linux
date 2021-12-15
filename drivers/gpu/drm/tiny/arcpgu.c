@@ -378,6 +378,9 @@ static int arcpgu_probe(struct platform_device *pdev)
 	struct arcpgu_drm_private *arcpgu;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	arcpgu = devm_drm_dev_alloc(&pdev->dev, &arcpgu_drm_driver,
 				    struct arcpgu_drm_private, drm);
 	if (IS_ERR(arcpgu))
