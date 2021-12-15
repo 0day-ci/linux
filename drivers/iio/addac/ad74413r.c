@@ -840,7 +840,7 @@ static int ad74413r_update_scan_mode(struct iio_dev *indio_dev,
 {
 	struct ad74413r_state *st = iio_priv(indio_dev);
 	struct spi_transfer *xfer = st->adc_samples_xfer;
-	u8 *rx_buf = &st->adc_samples_buf.rx_buf[-1 * AD74413R_FRAME_SIZE];
+	u8 *rx_buf = st->adc_samples_buf.rx_buf;
 	u8 *tx_buf = st->adc_samples_tx_buf;
 	unsigned int channel;
 	int ret;
@@ -877,9 +877,8 @@ static int ad74413r_update_scan_mode(struct iio_dev *indio_dev,
 		if (ret)
 			goto out;
 
-		st->adc_active_channels++;
 
-		if (xfer == st->adc_samples_xfer)
+		if (xfer == st->adc_samples_xfer || st->adc_active_channels == 0)
 			xfer->rx_buf = NULL;
 		else
 			xfer->rx_buf = rx_buf;
@@ -896,7 +895,10 @@ static int ad74413r_update_scan_mode(struct iio_dev *indio_dev,
 
 		xfer++;
 		tx_buf += AD74413R_FRAME_SIZE;
-		rx_buf += AD74413R_FRAME_SIZE;
+		if (st->adc_active_channels)
+			rx_buf += AD74413R_FRAME_SIZE;
+
+		st->adc_active_channels++;
 	}
 
 	xfer->rx_buf = rx_buf;
