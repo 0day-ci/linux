@@ -10,6 +10,7 @@
 #include <linux/refcount.h>
 
 #include "i915_gem.h"
+#include "i915_sw_fence.h"
 
 struct i915_page_sizes {
 	/**
@@ -39,6 +40,12 @@ struct i915_page_sizes {
  * @hold_count: Number of holders blocking the fence from finishing.
  * The vma itself is keeping a hold, which is released when unbind
  * is scheduled.
+ * @work: Work struct for deferred unbind work.
+ * @chain: Pointer to struct i915_sw_fence used to await dependencies.
+ * @rb: Rb node for the vm's pending unbind interval tree.
+ * @__subtree_last: Interval tree private member.
+ * @vm: non-refcounted pointer to the vm.
+ * @ops: Pointer to the backend i915_vma_ops.
  * @private: Bind backend private info.
  * @start: Offset into the address space of bind range start.
  * @node_size: Size of the allocated range manager node.
@@ -46,6 +53,8 @@ struct i915_page_sizes {
  * @page_sizes_gtt: Resulting page sizes from the bind operation.
  * @bound_flags: Flags indicating binding status.
  * @allocated: Backend private data. TODO: Should move into @private.
+ * @immediate_unbind: Unbind can be done immediately and don't need to be
+ * deferred to a work item awaiting unsignaled fences.
  *
  * The lifetime of a struct i915_vma_resource is from a binding request to
  * the actual possible asynchronous unbind has completed.
@@ -55,6 +64,11 @@ struct i915_vma_resource {
 	/* See above for description of the lock. */
 	spinlock_t lock;
 	refcount_t hold_count;
+	struct work_struct work;
+	struct i915_sw_fence chain;
+	struct rb_node rb;
+	unsigned long __subtree_last;
+	struct i915_address_space *vm;
 
 	/**
 	 * struct i915_vma_bindinfo - Information needed for async bind
@@ -74,13 +88,16 @@ struct i915_vma_resource {
 		bool lmem:1;
 	} bi;
 
+	const struct i915_vma_ops *ops;
 	void *private;
 	unsigned long start;
 	unsigned long node_size;
 	unsigned long vma_size;
 	u32 page_sizes_gtt;
+
 	u32 bound_flags;
 	bool allocated:1;
+	bool immediate_unbind:1;
 };
 
 bool i915_vma_resource_hold(struct i915_vma_resource *vma_res,
@@ -120,10 +137,12 @@ static inline void i915_vma_resource_put(struct i915_vma_resource *vma_res)
 /**
  * i915_vma_resource_init - Initialize a vma resource.
  * @vma_res: The vma resource to initialize
+ * @vm: Pointer to the vm.
  * @pages: The pages sg-table.
  * @page_sizes: Page sizes of the pages.
  * @readonly: Whether the vma should be bound read-only.
  * @lmem: Whether the vma points to lmem.
+ * @ops: The backend ops.
  * @private: Bind backend private info.
  * @start: Offset into the address space of bind range start.
  * @node_size: Size of the allocated range manager node.
@@ -135,20 +154,24 @@ static inline void i915_vma_resource_put(struct i915_vma_resource *vma_res)
  * allocation is not allowed.
  */
 static inline void i915_vma_resource_init(struct i915_vma_resource *vma_res,
+					  struct i915_address_space *vm,
 					  struct sg_table *pages,
 					  const struct i915_page_sizes *page_sizes,
 					  bool readonly,
 					  bool lmem,
+					  const struct i915_vma_ops *ops,
 					  void *private,
 					  unsigned long start,
 					  unsigned long node_size,
 					  unsigned long size)
 {
 	__i915_vma_resource_init(vma_res);
+	vma_res->vm = vm;
 	vma_res->bi.pages = pages;
 	vma_res->bi.page_sizes = *page_sizes;
 	vma_res->bi.readonly = readonly;
 	vma_res->bi.lmem = lmem;
+	vma_res->ops = ops;
 	vma_res->private = private;
 	vma_res->start = start;
 	vma_res->node_size = node_size;
@@ -158,6 +181,21 @@ static inline void i915_vma_resource_init(struct i915_vma_resource *vma_res,
 static inline void i915_vma_resource_fini(struct i915_vma_resource *vma_res)
 {
 	GEM_BUG_ON(refcount_read(&vma_res->hold_count) != 1);
+	i915_sw_fence_fini(&vma_res->chain);
 }
+
+int i915_vma_resource_bind_dep_sync(struct i915_address_space *vm,
+				    unsigned long first,
+				    unsigned long last,
+				    bool intr);
+
+int i915_vma_resource_bind_dep_await(struct i915_address_space *vm,
+				     struct i915_sw_fence *sw_fence,
+				     unsigned long first,
+				     unsigned long last,
+				     bool intr,
+				     gfp_t gfp);
+
+void i915_vma_resource_bind_dep_sync_all(struct i915_address_space *vm);
 
 #endif
