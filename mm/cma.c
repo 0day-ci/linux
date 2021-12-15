@@ -433,6 +433,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 	unsigned long i;
 	struct page *page = NULL;
 	int ret = -ENOMEM;
+	int loop = 0;
 
 	if (!cma || !cma->count || !cma->bitmap)
 		goto out;
@@ -460,6 +461,16 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 				offset);
 		if (bitmap_no >= bitmap_maxno) {
 			spin_unlock_irq(&cma->lock);
+			pr_debug("%s(): alloc fail, retry loop %d\n", __func__, loop++);
+			/*
+			 * rescan as others may finish the memory migration
+			 * and quit if no available CMA memory found finally
+			 */
+			if (start) {
+				schedule();
+				start = 0;
+				continue;
+			}
 			break;
 		}
 		bitmap_set(cma->bitmap, bitmap_no, bitmap_count);
