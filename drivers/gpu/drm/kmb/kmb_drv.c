@@ -484,6 +484,9 @@ static int kmb_probe(struct platform_device *pdev)
 	struct device_node *dsi_node;
 	struct platform_device *dsi_pdev;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	/* The bridge (ADV 7535) will return -EPROBE_DEFER until it
 	 * has a mipi_dsi_host to register its device to. So, we
 	 * first register the DSI host during probe time, and then return
