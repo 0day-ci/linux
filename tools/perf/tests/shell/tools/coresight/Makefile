@@ -5,7 +5,8 @@ include ../../../../../../tools/scripts/Makefile.arch
 include ../../../../../../tools/scripts/utilities.mak
 
 SUBDIRS = \
-	asm_pure_loop
+	asm_pure_loop \
+	thread_loop
 
 all: $(SUBDIRS)
 $(SUBDIRS):
