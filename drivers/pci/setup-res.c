@@ -484,7 +484,7 @@ int pci_resize_resource(struct pci_dev *dev, int resno, int size)
 	/* Check if the new config works by trying to assign everything. */
 	if (dev->bus->self) {
 		ret = pci_reassign_bridge_resources(dev->bus->self, res->flags);
-		if (ret)
+		if (ret && ret != -ENOENT)
 			goto error_resize;
 	}
 	return 0;
