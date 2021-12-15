@@ -9,6 +9,7 @@
 #include <linux/page_idle.h>
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
+#include <linux/hugetlb.h>
 
 #include "prmtv-common.h"
 
@@ -85,6 +86,42 @@ void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm, unsigned long addr)
 	put_page(page);
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 }
+
+#ifdef CONFIG_HUGETLB_PAGE
+void damon_hugetlb_mkold(pte_t *pte, struct mm_struct *mm,
+			 struct vm_area_struct *vma, unsigned long addr)
+{
+	bool referenced = false;
+	struct hstate *h = hstate_vma(vma);
+	pte_t entry;
+	struct page *page;
+
+	entry = huge_ptep_get(pte);
+	page = pte_page(entry);
+	if (!page)
+		return;
+
+	get_page(page);
+
+	if (pte_young(entry)) {
+		referenced = true;
+		entry = pte_mkold(entry);
+		huge_ptep_set_access_flags(vma, addr, pte, entry,
+					   vma->vm_flags & VM_WRITE);
+	}
+
+#ifdef CONFIG_MMU_NOTIFIER
+	if (mmu_notifier_clear_young(mm, addr, addr + huge_page_size(h)))
+		referenced = true;
+#endif /* CONFIG_MMU_NOTIFIER */
+
+	if (referenced)
+		set_page_young(page);
+
+	set_page_idle(page);
+	put_page(page);
+}
+#endif
 
 #define DAMON_MAX_SUBSCORE	(100)
 #define DAMON_MAX_AGE_IN_LOG	(32)
