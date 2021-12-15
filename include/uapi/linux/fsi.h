@@ -55,4 +55,10 @@ struct scom_access {
 #define FSI_SCOM_WRITE	_IOWR('s', 0x02, struct scom_access)
 #define FSI_SCOM_RESET	_IOW('s', 0x03, __u32)
 
+/*
+ * /dev/sbefifo* ioctl interface
+ */
+
+#define FSI_SBEFIFO_READ_TIMEOUT	_IOW('s', 0x00, __u32)
+
 #endif /* _UAPI_LINUX_FSI_H */
