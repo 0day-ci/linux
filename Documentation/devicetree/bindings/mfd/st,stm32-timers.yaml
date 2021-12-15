@@ -46,6 +46,19 @@ properties:
     minItems: 1
     maxItems: 7
 
+  interrupts:
+    maxItems: 4
+
+  interrupt-names:
+    anyOf:
+      - items:
+          - const: global
+      - items:
+          - const: brk
+          - const: up
+          - const: trg-com
+          - const: cc
+
   "#address-cells":
     const: 1
 
