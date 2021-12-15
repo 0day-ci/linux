@@ -317,6 +317,7 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
 	pte_t *orig_pte, *pte, ptent;
 	spinlock_t *ptl;
 	struct page *page = NULL;
+	int ret;
 	LIST_HEAD(page_list);
 
 	if (fatal_signal_pending(current))
@@ -373,12 +374,15 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
 		ClearPageReferenced(page);
 		test_and_clear_page_young(page);
 		if (pageout) {
-			if (!isolate_lru_page(page)) {
+			get_page(page);
+			ret = isolate_lru_page(page);
+			if (!ret) {
 				if (PageUnevictable(page))
 					putback_lru_page(page);
 				else
 					list_add(&page->lru, &page_list);
 			}
+			put_page(page);
 		} else
 			deactivate_page(page);
 huge_unlock:
@@ -459,12 +463,15 @@ regular_page:
 		ClearPageReferenced(page);
 		test_and_clear_page_young(page);
 		if (pageout) {
-			if (!isolate_lru_page(page)) {
+			get_page(page);
+			ret = isolate_lru_page(page);
+			if (!ret) {
 				if (PageUnevictable(page))
 					putback_lru_page(page);
 				else
 					list_add(&page->lru, &page_list);
 			}
+			put_page(page);
 		} else
 			deactivate_page(page);
 	}
