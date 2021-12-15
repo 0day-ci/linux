@@ -305,6 +305,9 @@ static int st7586_probe(struct spi_device *spi)
 	size_t bufsize;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	dbidev = devm_drm_dev_alloc(dev, &st7586_driver,
 				    struct mipi_dbi_dev, drm);
 	if (IS_ERR(dbidev))
