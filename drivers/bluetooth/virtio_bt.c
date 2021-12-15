@@ -362,7 +362,8 @@ static int virtbt_probe(struct virtio_device *vdev)
 	}
 
 	virtio_device_ready(vdev);
-	if (virtbt_open_vdev(vbt))
+	err = virtbt_open_vdev(vbt);
+	if (err)
 		goto open_failed;
 
 	return 0;
