@@ -28,6 +28,9 @@ struct z_erofs_collection {
 	/* I: page offset of start position of decompression */
 	unsigned short pageofs;
 
+	/* I: page offset of start position of compression for inline case */
+	unsigned short mpageofs;
+
 	/* L: maximum relative page index in pagevec[] */
 	unsigned short nr_pages;
 
@@ -64,6 +67,9 @@ struct z_erofs_pcluster {
 
 	/* I: physical cluster size in pages */
 	unsigned short pclusterpages;
+
+	/* I: tailpacking inline physical cluster size */
+	unsigned short inline_size;
 
 	/* I: compression algorithm format */
 	unsigned char algorithmformat;
@@ -172,6 +178,11 @@ static inline void z_erofs_onlinepage_endio(struct page *page)
 		unlock_page(page);
 	}
 	erofs_dbg("%s, page %p value %x", __func__, page, atomic_read(u.o));
+}
+
+static inline bool z_erofs_pcluster_is_inline(struct z_erofs_pcluster *pcl)
+{
+	return !!pcl->inline_size;
 }
 
 #define Z_EROFS_VMAP_ONSTACK_PAGES	\
