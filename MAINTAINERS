@@ -16152,7 +16152,7 @@ F:	sound/soc/codecs/rt*
 REALTEK RTL83xx SMI DSA ROUTER CHIPS
 M:	Linus Walleij <linus.walleij@linaro.org>
 S:	Maintained
-F:	Documentation/devicetree/bindings/net/dsa/realtek-smi.txt
+F:	Documentation/devicetree/bindings/net/dsa/realtek-*.txt
 F:	drivers/net/dsa/realtek/*
 
 REALTEK WIRELESS DRIVER (rtlwifi family)
