@@ -302,6 +302,8 @@ intel_dp_mst_atomic_check(struct drm_connector *connector,
 	if (!old_conn_state->crtc)
 		return 0;
 
+	mgr = &enc_to_mst(to_intel_encoder(old_conn_state->best_encoder))->primary->dp.mst_mgr;
+
 	/* We only want to free VCPI if this state disables the CRTC on this
 	 * connector
 	 */
@@ -309,6 +311,15 @@ intel_dp_mst_atomic_check(struct drm_connector *connector,
 		struct intel_crtc *crtc = to_intel_crtc(new_crtc);
 		struct intel_crtc_state *crtc_state =
 			intel_atomic_get_new_crtc_state(state, crtc);
+		struct drm_dp_mst_topology_state *topology_state;
+		u8 link_coding_cap = intel_dp_is_uhbr(crtc_state) ?
+			DP_CAP_ANSI_128B132B : DP_CAP_ANSI_8B10B;
+
+		topology_state = drm_atomic_get_mst_topology_state(&state->base, mgr);
+		if (IS_ERR(topology_state))
+			return PTR_ERR(topology_state);
+
+		drm_dp_mst_update_slots(topology_state, link_coding_cap);
 
 		if (!crtc_state ||
 		    !drm_atomic_crtc_needs_modeset(&crtc_state->uapi) ||
@@ -316,7 +327,6 @@ intel_dp_mst_atomic_check(struct drm_connector *connector,
 			return 0;
 	}
 
-	mgr = &enc_to_mst(to_intel_encoder(old_conn_state->best_encoder))->primary->dp.mst_mgr;
 	ret = drm_dp_atomic_release_vcpi_slots(&state->base, mgr,
 					       intel_connector->port);
 
@@ -357,6 +367,7 @@ static void intel_mst_disable_dp(struct intel_atomic_state *state,
 	struct intel_connector *connector =
 		to_intel_connector(old_conn_state->connector);
 	struct drm_i915_private *i915 = to_i915(connector->base.dev);
+	int start_slot = intel_dp_is_uhbr(old_crtc_state) ? 0 : 1;
 	int ret;
 
 	drm_dbg_kms(&i915->drm, "active links %d\n",
@@ -366,7 +377,7 @@ static void intel_mst_disable_dp(struct intel_atomic_state *state,
 
 	drm_dp_mst_reset_vcpi_slots(&intel_dp->mst_mgr, connector->port);
 
-	ret = drm_dp_update_payload_part1(&intel_dp->mst_mgr, 1);
+	ret = drm_dp_update_payload_part1(&intel_dp->mst_mgr, start_slot);
 	if (ret) {
 		drm_dbg_kms(&i915->drm, "failed to update payload %d\n", ret);
 	}
@@ -475,6 +486,7 @@ static void intel_mst_pre_enable_dp(struct intel_atomic_state *state,
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_connector *connector =
 		to_intel_connector(conn_state->connector);
+	int start_slot = intel_dp_is_uhbr(pipe_config) ? 0 : 1;
 	int ret;
 	bool first_mst_stream;
 
@@ -509,7 +521,7 @@ static void intel_mst_pre_enable_dp(struct intel_atomic_state *state,
 
 	intel_dp->active_mst_links++;
 
-	ret = drm_dp_update_payload_part1(&intel_dp->mst_mgr, 1);
+	ret = drm_dp_update_payload_part1(&intel_dp->mst_mgr, start_slot);
 
 	/*
 	 * Before Gen 12 this is not done as part of
