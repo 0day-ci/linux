@@ -878,7 +878,7 @@ config SPI_SYNQUACER
 
 config SPI_MXIC
 	tristate "Macronix MX25F0A SPI controller"
-	depends on SPI_MASTER
+	depends on SPI_MASTER && MTD_NAND_ECC
 	help
 	  This selects the Macronix MX25F0A SPI controller driver.
 
