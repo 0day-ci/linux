@@ -200,10 +200,10 @@ void ima_file_free(struct file *file)
 	ima_check_last_writer(iint, inode, file);
 }
 
-static int process_measurement(struct ima_namespace *ns,
-			       struct file *file, const struct cred *cred,
-			       u32 secid, char *buf, loff_t size, int mask,
-			       enum ima_hooks func)
+static int __process_measurement(struct ima_namespace *ns,
+				 struct file *file, const struct cred *cred,
+				 u32 secid, char *buf, loff_t size, int mask,
+				 enum ima_hooks func)
 {
 	struct inode *inode = file_inode(file);
 	struct integrity_iint_cache *iint = NULL;
@@ -403,6 +403,28 @@ out:
 			set_bit(IMA_UPDATE_XATTR, &iint->atomic_flags);
 	}
 	return 0;
+}
+
+static int process_measurement(struct ima_namespace *ns,
+			       struct file *file, const struct cred *cred,
+			       u32 secid, char *buf, loff_t size, int mask,
+			       enum ima_hooks func)
+{
+	struct user_namespace *user_ns = ima_user_ns(ns);
+	int ret = 0;
+
+	while (user_ns) {
+		ns = user_ns->ima_ns;
+
+		ret = __process_measurement(ns, file, cred, secid, buf, size,
+					    mask, func);
+		if (ret)
+			break;
+
+		user_ns = user_ns->parent;
+	};
+
+	return ret;
 }
 
 /**

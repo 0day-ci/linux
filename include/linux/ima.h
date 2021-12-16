@@ -66,6 +66,15 @@ static inline const char * const *arch_get_ima_policy(void)
 }
 #endif
 
+static inline struct user_namespace *ima_user_ns(struct ima_namespace *ns)
+{
+	struct user_namespace *user_ns;
+
+	user_ns = current_user_ns();
+	WARN_ON(user_ns->ima_ns != ns);
+	return user_ns;
+}
+
 #else
 static inline enum hash_algo ima_get_current_hash_algo(void)
 {
