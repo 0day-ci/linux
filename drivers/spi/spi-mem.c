@@ -163,7 +163,7 @@ static bool spi_mem_check_buswidth(struct spi_mem *mem,
 bool spi_mem_dtr_supports_op(struct spi_mem *mem,
 			     const struct spi_mem_op *op)
 {
-	if (op->cmd.nbytes != 2)
+	if (op->cmd.dtr && op->cmd.nbytes != 2)
 		return false;
 
 	return spi_mem_check_buswidth(mem, op);
