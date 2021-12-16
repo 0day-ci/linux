@@ -775,7 +775,7 @@ static int ina2xx_capture_thread(void *data)
 	struct ina2xx_chip_info *chip = iio_priv(indio_dev);
 	int sampling_us = SAMPLING_PERIOD(chip);
 	int ret;
-	struct timespec64 next, now, delta;
+	ktime_t next, now;
 	s64 delay_us;
 
 	/*
@@ -785,7 +785,7 @@ static int ina2xx_capture_thread(void *data)
 	if (!chip->allow_async_readout)
 		sampling_us -= 200;
 
-	ktime_get_ts64(&next);
+	next = ktime_get();
 
 	do {
 		while (!chip->allow_async_readout) {
@@ -798,7 +798,7 @@ static int ina2xx_capture_thread(void *data)
 			 * reset the reference timestamp.
 			 */
 			if (ret == 0)
-				ktime_get_ts64(&next);
+				next = ktime_get();
 			else
 				break;
 		}
@@ -807,7 +807,7 @@ static int ina2xx_capture_thread(void *data)
 		if (ret < 0)
 			return ret;
 
-		ktime_get_ts64(&now);
+		now = ktime_get();
 
 		/*
 		 * Advance the timestamp for the next poll by one sampling
@@ -816,11 +816,10 @@ static int ina2xx_capture_thread(void *data)
 		 * multiple times, i.e. samples are dropped.
 		 */
 		do {
-			timespec64_add_ns(&next, 1000 * sampling_us);
-			delta = timespec64_sub(next, now);
-			delay_us = div_s64(timespec64_to_ns(&delta), 1000);
-		} while (delay_us <= 0);
+			next = ktime_add_us(next, sampling_us);
+		} while (next <= now);
 
+		delay_us = ktime_to_us(ktime_sub(next, now));
 		usleep_range(delay_us, (delay_us * 3) >> 1);
 
 	} while (!kthread_should_stop());
