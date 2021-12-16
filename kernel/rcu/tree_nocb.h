@@ -1259,7 +1259,8 @@ static void rcu_spawn_cpu_nocb_kthread(int cpu)
 		}
 		WRITE_ONCE(rdp_gp->nocb_gp_kthread, t);
 	}
-	 mutex_unlock(&rdp_gp->nocb_gp_kthread_mutex);
+
+	mutex_unlock(&rdp_gp->nocb_gp_kthread_mutex);
 
 	/* Spawn the kthread for this CPU. */
 	t = kthread_run(rcu_nocb_cb_kthread, rdp,
