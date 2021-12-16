@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/regulator/da9063-regulator.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Regulator driver for Dialog DA9063/DA9063L Power Management Integrated Circuit (PMIC)
+
+maintainers:
+  - Support Opensource <support.opensource@diasemi.com>
+
+description: |
+  This module is part of the DA9063 MFD device. For more details, see
+  Documentation/devicetree/bindings/mfd/da9063.yaml.
+
+  The regulator controller is represented as a sub-node of the PMIC node
+  on the device tree.
+
+  This node defines the settings for the LDOs and BUCKs.
+  The DA9063(L) regulators are bound using their names listed below:
+
+  bcore1    : BUCK CORE1
+  bcore2    : BUCK CORE2
+  bpro      : BUCK PRO
+  bmem      : BUCK MEM
+  bio       : BUCK IO
+  bperi     : BUCK PERI
+  ldo1      : LDO_1	(DA9063 only)
+  ldo2      : LDO_2	(DA9063 only)
+  ldo3      : LDO_3
+  ldo4      : LDO_4	(DA9063 only)
+  ldo5      : LDO_5	(DA9063 only)
+  ldo6      : LDO_6	(DA9063 only)
+  ldo7      : LDO_7
+  ldo8      : LDO_8
+  ldo9      : LDO_9
+  ldo10     : LDO_10	(DA9063 only)
+  ldo11     : LDO_11
+
+  The component follows the standard regulator framework and the bindings
+  details of individual regulator device can be found in:
+  Documentation/devicetree/bindings/regulator/regulator.txt
+
+properties:
+  compatible:
+    const: dlg,da9063-regulator
+
+required:
+  - compatible
+
+additionalProperties: false

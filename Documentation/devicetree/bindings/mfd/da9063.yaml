@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mfd/da9063.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Dialog DA9063/DA9063L Power Management Integrated Circuit (PMIC)
+
+maintainers:
+  - Support Opensource <support.opensource@diasemi.com>
+
+description: |
+  DA9063 consists of a large and varied group of sub-devices (I2C Only):
+
+  Device                   Supply Names    Description
+  ------                   ------------    -----------
+  da9063-regulator        :               : LDOs & BUCKs
+  da9063-onkey            :               : On Key
+  da9063-rtc              :               : Real-Time Clock (DA9063 only)
+  da9063-watchdog         :               : Watchdog
+
+properties:
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+              - dlg,da9063
+              - dlg,da9063l
+
+  reg:
+    description:
+      I2C device address.
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  interrupt-controller: true
+
+  regulators:
+    $ref: ../regulator/da9063-regulator.yaml
+
+  onkey:
+    $ref: ../input/da9063-onkey.yaml
+
+  rtc:
+    $ref: ../rtc/da9063-rtc.yaml
+
+  watchdog:
+    $ref: ../watchdog/da9063-watchdog.yaml
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - interrupt-controller
+
+additionalProperties: false
+
+examples:
+  - |
+        #include <dt-bindings/interrupt-controller/irq.h>
+
+        i2c1 {
+                #size-cells = <0>;
+                #address-cells = <1>;
+
+                pmic0: da9063@58 {
+                        compatible = "dlg,da9063";
+                        reg = <0x58>;
+                        interrupt-parent = <&gpio6>;
+                        interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+                        interrupt-controller;
+
+                        rtc {
+                                compatible = "dlg,da9063-rtc";
+                        };
+
+                        wdt {
+                                compatible = "dlg,da9063-watchdog";
+                        };
+
+                        onkey {
+                                compatible = "dlg,da9063-onkey";
+                                dlg,disable-key-power;
+                        };
+
+                        regulators {
+                                DA9063_BCORE1: bcore1 {
+                                        regulator-name = "BCORE1";
+                                        regulator-min-microvolt = <300000>;
+                                        regulator-max-microvolt = <1570000>;
+                                        regulator-min-microamp = <500000>;
+                                        regulator-max-microamp = <2000000>;
+                                        regulator-boot-on;
+                                };
+                                DA9063_LDO11: ldo11 {
+                                        regulator-name = "LDO_11";
+                                        regulator-min-microvolt = <900000>;
+                                        regulator-max-microvolt = <3600000>;
+                                        regulator-boot-on;
+                                };
+                        };
+                };
+        };
