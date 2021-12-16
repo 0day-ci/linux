@@ -677,6 +677,7 @@ static const struct spi_controller_mem_ops stm32_qspi_mem_ops = {
 	.dirmap_create	= stm32_qspi_dirmap_create,
 	.dirmap_read	= stm32_qspi_dirmap_read,
 	.poll_status	= stm32_qspi_poll_status,
+	.caps		= &spi_mem_no_caps,
 };
 
 static int stm32_qspi_probe(struct platform_device *pdev)

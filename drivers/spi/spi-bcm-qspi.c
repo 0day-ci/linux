@@ -1435,6 +1435,7 @@ static void bcm_qspi_hw_uninit(struct bcm_qspi *qspi)
 
 static const struct spi_controller_mem_ops bcm_qspi_mem_ops = {
 	.exec_op = bcm_qspi_exec_mem_op,
+	.caps = &spi_mem_no_caps,
 };
 
 struct bcm_qspi_data {

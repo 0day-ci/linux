@@ -125,6 +125,7 @@ static const struct spi_controller_mem_ops rpcif_spi_mem_ops = {
 	.exec_op	= rpcif_spi_mem_exec_op,
 	.dirmap_create	= rpcif_spi_mem_dirmap_create,
 	.dirmap_read	= rpcif_spi_mem_dirmap_read,
+	.caps		= &spi_mem_no_caps,
 };
 
 static int rpcif_spi_probe(struct platform_device *pdev)

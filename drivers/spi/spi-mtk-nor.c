@@ -740,7 +740,8 @@ static size_t mtk_max_msg_size(struct spi_device *spi)
 static const struct spi_controller_mem_ops mtk_nor_mem_ops = {
 	.adjust_op_size = mtk_nor_adjust_op_size,
 	.supports_op = mtk_nor_supports_op,
-	.exec_op = mtk_nor_exec_op
+	.exec_op = mtk_nor_exec_op,
+	.caps = &spi_mem_no_caps,
 };
 
 static const struct of_device_id mtk_nor_match[] = {

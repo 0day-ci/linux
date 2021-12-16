@@ -655,6 +655,7 @@ static int ti_qspi_exec_mem_op(struct spi_mem *mem,
 static const struct spi_controller_mem_ops ti_qspi_mem_ops = {
 	.exec_op = ti_qspi_exec_mem_op,
 	.adjust_op_size = ti_qspi_adjust_op_size,
+	.caps = &spi_mem_no_caps,
 };
 
 static int ti_qspi_start_transfer_one(struct spi_master *master,

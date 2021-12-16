@@ -615,6 +615,7 @@ static int zynq_qspi_exec_mem_op(struct spi_mem *mem,
 static const struct spi_controller_mem_ops zynq_qspi_mem_ops = {
 	.supports_op = zynq_qspi_supports_op,
 	.exec_op = zynq_qspi_exec_mem_op,
+	.caps = &spi_mem_no_caps,
 };
 
 /**

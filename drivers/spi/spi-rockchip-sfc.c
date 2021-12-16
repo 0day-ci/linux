@@ -533,6 +533,7 @@ static int rockchip_sfc_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *o
 static const struct spi_controller_mem_ops rockchip_sfc_mem_ops = {
 	.exec_op = rockchip_sfc_exec_mem_op,
 	.adjust_op_size = rockchip_sfc_adjust_op_size,
+	.caps = &spi_mem_no_caps,
 };
 
 static irqreturn_t rockchip_sfc_irq_handler(int irq, void *dev_id)

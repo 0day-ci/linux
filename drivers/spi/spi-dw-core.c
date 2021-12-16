@@ -768,6 +768,7 @@ static void dw_spi_init_mem_ops(struct dw_spi *dws)
 		dws->mem_ops.adjust_op_size = dw_spi_adjust_mem_op_size;
 		dws->mem_ops.supports_op = dw_spi_supports_mem_op;
 		dws->mem_ops.exec_op = dw_spi_exec_mem_op;
+		dws->mem_ops.caps = &spi_mem_no_caps;
 		if (!dws->max_mem_freq)
 			dws->max_mem_freq = dws->max_freq;
 	}

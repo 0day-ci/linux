@@ -661,6 +661,7 @@ static const struct spi_controller_mem_ops npcm_fiu_mem_ops = {
 	.dirmap_create = npcm_fiu_dirmap_create,
 	.dirmap_read = npcm_fiu_direct_read,
 	.dirmap_write = npcm_fiu_direct_write,
+	.caps = &spi_mem_no_caps,
 };
 
 static const struct of_device_id npcm_fiu_dt_ids[] = {

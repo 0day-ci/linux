@@ -1070,6 +1070,7 @@ static const struct spi_controller_mem_ops nxp_fspi_mem_ops = {
 	.supports_op = nxp_fspi_supports_op,
 	.exec_op = nxp_fspi_exec_op,
 	.get_name = nxp_fspi_get_name,
+	.caps = &spi_mem_no_caps,
 };
 
 static int nxp_fspi_probe(struct platform_device *pdev)

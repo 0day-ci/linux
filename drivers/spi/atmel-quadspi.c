@@ -466,7 +466,8 @@ static const char *atmel_qspi_get_name(struct spi_mem *spimem)
 static const struct spi_controller_mem_ops atmel_qspi_mem_ops = {
 	.supports_op = atmel_qspi_supports_op,
 	.exec_op = atmel_qspi_exec_op,
-	.get_name = atmel_qspi_get_name
+	.get_name = atmel_qspi_get_name,
+	.caps = &spi_mem_no_caps,
 };
 
 static int atmel_qspi_setup(struct spi_device *spi)

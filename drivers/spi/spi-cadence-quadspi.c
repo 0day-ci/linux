@@ -1589,10 +1589,15 @@ static const char *cqspi_get_name(struct spi_mem *mem)
 	return devm_kasprintf(dev, GFP_KERNEL, "%s.%d", dev_name(dev), mem->spi->chip_select);
 }
 
+const struct spi_controller_mem_caps cqspi_mem_caps = {
+	.dtr = true,
+};
+
 static const struct spi_controller_mem_ops cqspi_mem_ops = {
 	.exec_op = cqspi_exec_mem_op,
 	.get_name = cqspi_get_name,
 	.supports_op = cqspi_supports_mem_op,
+	.caps = &cqspi_mem_caps,
 };
 
 static int cqspi_setup_flash(struct cqspi_st *cqspi)

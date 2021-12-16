@@ -1082,6 +1082,7 @@ static const struct dev_pm_ops zynqmp_qspi_dev_pm_ops = {
 
 static const struct spi_controller_mem_ops zynqmp_qspi_mem_ops = {
 	.exec_op = zynqmp_qspi_exec_op,
+	.caps = &spi_mem_no_caps,
 };
 
 /**

@@ -366,6 +366,7 @@ bool spi_mem_dtr_supports_op(struct spi_mem *mem,
 
 int spi_mem_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op);
 
+const struct spi_controller_mem_caps spi_mem_no_caps;
 bool spi_mem_supports_op(struct spi_mem *mem,
 			 const struct spi_mem_op *op);
 

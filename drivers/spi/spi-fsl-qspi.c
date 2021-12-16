@@ -838,6 +838,7 @@ static const struct spi_controller_mem_ops fsl_qspi_mem_ops = {
 	.supports_op = fsl_qspi_supports_op,
 	.exec_op = fsl_qspi_exec_op,
 	.get_name = fsl_qspi_get_name,
+	.caps = &spi_mem_no_caps,
 };
 
 static int fsl_qspi_probe(struct platform_device *pdev)

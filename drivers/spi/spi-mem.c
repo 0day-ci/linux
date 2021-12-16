@@ -160,6 +160,9 @@ static bool spi_mem_check_buswidth(struct spi_mem *mem,
 	return true;
 }
 
+const struct spi_controller_mem_caps spi_mem_no_caps = {};
+EXPORT_SYMBOL_GPL(spi_mem_no_caps);
+
 bool spi_mem_dtr_supports_op(struct spi_mem *mem,
 			     const struct spi_mem_op *op)
 {

@@ -372,6 +372,7 @@ static const struct spi_controller_mem_ops hisi_sfc_v3xx_mem_ops = {
 	.adjust_op_size = hisi_sfc_v3xx_adjust_op_size,
 	.supports_op = hisi_sfc_v3xx_supports_op,
 	.exec_op = hisi_sfc_v3xx_exec_op,
+	.caps = &spi_mem_no_caps,
 };
 
 static irqreturn_t hisi_sfc_v3xx_isr(int irq, void *data)

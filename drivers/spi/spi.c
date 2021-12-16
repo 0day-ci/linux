@@ -2855,6 +2855,9 @@ static int spi_controller_check_ops(struct spi_controller *ctlr)
 	if (ctlr->mem_ops) {
 		if (!ctlr->mem_ops->exec_op)
 			return -EINVAL;
+
+		if (!ctlr->mem_ops->caps)
+			return -EINVAL;
 	} else if (!ctlr->transfer && !ctlr->transfer_one &&
 		   !ctlr->transfer_one_message) {
 		return -EINVAL;
