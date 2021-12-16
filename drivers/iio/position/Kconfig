@@ -6,6 +6,16 @@
 
 menu "Linear and angular position sensors"
 
+config AS5600
+	tristate "ams AS5600 angular position sensor"
+	depends on I2C
+	help
+	  Say Y here if you want to build support for the ams 5600
+	  12-Bit Programmable Contactless Potentiometer.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called as5600.
+
 config IQS624_POS
 	tristate "Azoteq IQS624/625 angular position sensors"
 	depends on MFD_IQS62X || COMPILE_TEST
