@@ -4755,8 +4755,12 @@ long ext4_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		goto out;
 
 	if (file->f_flags & O_SYNC && EXT4_SB(inode->i_sb)->s_journal) {
+		ext4_fc_stop_update(inode);
 		ret = ext4_fc_commit(EXT4_SB(inode->i_sb)->s_journal,
 					EXT4_I(inode)->i_sync_tid);
+		inode_unlock(inode);
+		trace_ext4_fallocate_exit(inode, offset, max_blocks, ret);
+		return ret;
 	}
 out:
 	inode_unlock(inode);
