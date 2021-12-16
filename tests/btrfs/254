@@ -1,0 +1,48 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2021 SUSE Linux Products GmbH. All Rights Reserved.
+#
+# FS QA Test 254
+#
+# Make sure running read-only scrub on read-only mounted btrfs won't crash
+# the kernel at unmount time
+#
+. ./common/preamble
+_begin_fstest auto quick scrub
+
+# Override the default cleanup function.
+# _cleanup()
+# {
+# 	cd /
+# 	rm -r -f $tmp.*
+# }
+
+# Import common functions.
+. ./common/filter
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs btrfs
+_require_scratch
+
+_scratch_mkfs >> $seqres.full
+_scratch_mount
+
+# Fill the fs with some content for later scrub
+_pwrite_byte 0xff 0 64k "$SCRATCH_MNT/foobar" | _filter_xfs_io
+
+# Cycle mount to read-only
+_scratch_cycle_mount ro
+
+# Do the read-only scrub.
+# For unpatched kernel, this would lead to a new transaction
+# on read-only fs, which will not be committed
+$BTRFS_UTIL_PROG scrub start -Br "$SCRATCH_MNT"  >> $seqres.full
+
+# At unmount time, if kernel has CONFIG_BTRFS_ASSERT, then it would
+# crash at one ASSERT(), cause by above uncommitted transaction.
+
+# success, all done
+status=0
+exit
