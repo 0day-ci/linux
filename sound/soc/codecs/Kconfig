@@ -614,6 +614,8 @@ config SND_SOC_CS35L36
 
 config SND_SOC_CS35L41_LIB
 	tristate
+	default y if SND_HDA_SCODEC_CS35L41=y
+	default m if SND_HDA_SCODEC_CS35L41=m
 	default y if SND_SOC_CS35L41=y
 	default m if SND_SOC_CS35L41=m
 
