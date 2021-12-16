@@ -1251,6 +1251,9 @@ config IMA_NS
 	  Allow the creation of IMA namespaces for each user namespace.
 	  Namespaced IMA enables having IMA features work separately
 	  in each IMA namespace.
+	  Currently, only the audit status flags are stored in the namespace,
+	  which allows the same file to be audited each time it is accessed
+	  in a new namespace.
 
 endif # NAMESPACES
 
