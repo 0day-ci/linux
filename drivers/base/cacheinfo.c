@@ -32,12 +32,6 @@ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu)
 }
 
 #ifdef CONFIG_OF
-static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
-					   struct cacheinfo *sib_leaf)
-{
-	return sib_leaf->fw_token == this_leaf->fw_token;
-}
-
 /* OF properties to query for a given cache type */
 struct cache_type_info {
 	const char *size_prop;
@@ -228,16 +222,6 @@ static int cache_setup_of_node(unsigned int cpu)
 }
 #else
 static inline int cache_setup_of_node(unsigned int cpu) { return 0; }
-static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
-					   struct cacheinfo *sib_leaf)
-{
-	/*
-	 * For non-DT/ACPI systems, assume unique level 1 caches, system-wide
-	 * shared caches for all other levels. This will be used only if
-	 * arch specific code has not populated shared_cpu_map
-	 */
-	return !(this_leaf->level == 1);
-}
 #endif
 
 int __weak cache_setup_acpi(unsigned int cpu)
@@ -274,16 +258,15 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
 			continue;
 
 		cpumask_set_cpu(cpu, &this_leaf->shared_cpu_map);
-		for_each_online_cpu(i) {
+		for_each_cpu(i, &this_leaf->cpu_affinity_map) {
 			struct cpu_cacheinfo *sib_cpu_ci = get_cpu_cacheinfo(i);
 
 			if (i == cpu || !sib_cpu_ci->info_list)
 				continue;/* skip if itself or no cacheinfo */
+
 			sib_leaf = sib_cpu_ci->info_list + index;
-			if (cache_leaves_are_shared(this_leaf, sib_leaf)) {
-				cpumask_set_cpu(cpu, &sib_leaf->shared_cpu_map);
-				cpumask_set_cpu(i, &this_leaf->shared_cpu_map);
-			}
+			cpumask_set_cpu(cpu, &sib_leaf->shared_cpu_map);
+			cpumask_set_cpu(i, &this_leaf->shared_cpu_map);
 		}
 		/* record the maximum cache line size */
 		if (this_leaf->coherency_line_size > coherency_max_size)
