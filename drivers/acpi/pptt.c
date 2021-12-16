@@ -418,6 +418,30 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
 	}
 }
 
+static void acpi_set_cache_cpumask(struct acpi_table_header *table,
+				   struct cacheinfo *this_leaf,
+				   struct acpi_pptt_processor *match_cpu_node)
+{
+	int cpu;
+
+	/*
+	 * If we found the cache first, we'd still need to walk from each cpu.
+	 */
+	for_each_possible_cpu(cpu) {
+		u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
+		struct acpi_pptt_processor *cpu_node;
+		struct acpi_pptt_cache *cache;
+
+		cache = acpi_find_cache_node(table, acpi_cpu_id,
+					     this_leaf->type,
+					     this_leaf->level, &cpu_node);
+		if (!cache || cpu_node != match_cpu_node)
+			continue;
+
+		cpumask_set_cpu(cpu, &this_leaf->cpu_affinity_map);
+	}
+}
+
 static void cache_setup_acpi_cpu(struct acpi_table_header *table,
 				 unsigned int cpu)
 {
@@ -435,10 +459,11 @@ static void cache_setup_acpi_cpu(struct acpi_table_header *table,
 						   this_leaf->level,
 						   &cpu_node);
 		pr_debug("found = %p %p\n", found_cache, cpu_node);
-		if (found_cache)
+		if (found_cache) {
 			update_cache_properties(this_leaf, found_cache,
 			                        cpu_node, table->revision);
-
+			acpi_set_cache_cpumask(table, this_leaf, cpu_node);
+		}
 		index++;
 	}
 }
