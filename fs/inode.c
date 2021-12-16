@@ -1008,6 +1008,9 @@ EXPORT_SYMBOL(lockdep_annotate_inode_mutex_key);
 void unlock_new_inode(struct inode *inode)
 {
 	lockdep_annotate_inode_mutex_key(inode);
+	if (inode->i_mapping->a_ops &&
+	    inode->i_mapping->a_ops->direct_IO)
+		set_bit(AS_CAN_DIO, &inode->i_mapping->flags);
 	spin_lock(&inode->i_lock);
 	WARN_ON(!(inode->i_state & I_NEW));
 	inode->i_state &= ~I_NEW & ~I_CREATING;

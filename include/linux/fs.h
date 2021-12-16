@@ -448,7 +448,7 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
  * @nrpages: Number of page entries, protected by the i_pages lock.
  * @writeback_index: Writeback starts here.
  * @a_ops: Methods.
- * @flags: Error bits and flags (AS_*).
+ * @flags: Error bits and flags (AS_*). (enum mapping_flags)
  * @wb_err: The most recent error which has occurred.
  * @private_lock: For use by the owner of the address_space.
  * @private_list: For use by the owner of the address_space.

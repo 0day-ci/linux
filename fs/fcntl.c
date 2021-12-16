@@ -26,6 +26,7 @@
 #include <linux/memfd.h>
 #include <linux/compat.h>
 #include <linux/mount.h>
+#include <linux/pagemap.h>
 
 #include <linux/poll.h>
 #include <asm/siginfo.h>
@@ -57,9 +58,9 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 
 	/* Pipe packetized mode is controlled by O_DIRECT flag */
 	if (!S_ISFIFO(inode->i_mode) && (arg & O_DIRECT)) {
-		if (!filp->f_mapping || !filp->f_mapping->a_ops ||
-			!filp->f_mapping->a_ops->direct_IO)
-				return -EINVAL;
+		if (!filp->f_mapping ||
+		    !test_bit(AS_CAN_DIO, &filp->f_mapping->flags))
+			return -EINVAL;
 	}
 
 	if (filp->f_op->check_flags)

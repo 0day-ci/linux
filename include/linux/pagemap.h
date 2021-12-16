@@ -81,10 +81,11 @@ enum mapping_flags {
 	AS_ENOSPC	= 1,	/* ENOSPC on async write */
 	AS_MM_ALL_LOCKS	= 2,	/* under mm_take_all_locks() */
 	AS_UNEVICTABLE	= 3,	/* e.g., ramdisk, SHM_LOCK */
-	AS_EXITING	= 4, 	/* final truncate in progress */
+	AS_EXITING	= 4,	/* final truncate in progress */
 	/* writeback related tags are not used */
 	AS_NO_WRITEBACK_TAGS = 5,
 	AS_LARGE_FOLIO_SUPPORT = 6,
+	AS_CAN_DIO	= 7,	/* DIO is supported */
 };
 
 /**
