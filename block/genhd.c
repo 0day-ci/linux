@@ -539,7 +539,7 @@ out_del_block_link:
 out_device_del:
 	device_del(ddev);
 out_disk_release_events:
-	disk_release_events(disk);
+	/* disk_release() will call disk_release_events(). */
 out_free_ext_minor:
 	if (disk->major == BLOCK_EXT_MAJOR)
 		blk_free_ext_minor(disk->first_minor);
