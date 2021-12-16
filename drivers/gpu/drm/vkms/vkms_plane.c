@@ -20,6 +20,11 @@ static const u32 vkms_plane_formats[] = {
 	DRM_FORMAT_XRGB8888
 };
 
+static const u64 vkms_plane_modifiers[] = {
+	DRM_FORMAT_MOD_LINEAR,
+	DRM_FORMAT_MOD_INVALID
+};
+
 static struct drm_plane_state *
 vkms_plane_duplicate_state(struct drm_plane *plane)
 {
@@ -100,12 +105,39 @@ static void vkms_formats_for_plane_type(enum drm_plane_type type,
 	}
 }
 
+static bool vkms_format_mod_supported(struct drm_plane *plane, u32 format,
+				      u64 modifier)
+{
+	bool modifier_found = false;
+	unsigned int i;
+	const u32 *formats;
+	int nformats;
+
+	for (i = 0; i < ARRAY_SIZE(vkms_plane_modifiers) - 1; i++) {
+		if (vkms_plane_modifiers[i] == modifier)
+			modifier_found = true;
+	}
+
+	if (!modifier_found)
+		return false;
+
+	vkms_formats_for_plane_type(plane->type, &formats, &nformats);
+
+	for (i = 0; i < nformats; i++) {
+		if (formats[i] == format)
+			return true;
+	}
+
+	return false;
+}
+
 static const struct drm_plane_funcs vkms_plane_funcs = {
 	.update_plane		= drm_atomic_helper_update_plane,
 	.disable_plane		= drm_atomic_helper_disable_plane,
 	.reset			= vkms_plane_reset,
 	.atomic_duplicate_state = vkms_plane_duplicate_state,
 	.atomic_destroy_state	= vkms_plane_destroy_state,
+	.format_mod_supported	= vkms_format_mod_supported,
 };
 
 static void vkms_plane_atomic_update(struct drm_plane *plane,
@@ -190,7 +222,7 @@ struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
 	plane = drmm_universal_plane_alloc(dev, struct vkms_plane, base, 1 << index,
 					   &vkms_plane_funcs,
 					   formats, nformats,
-					   NULL, type, NULL);
+					   vkms_plane_modifiers, type, NULL);
 	if (IS_ERR(plane))
 		return plane;
 
