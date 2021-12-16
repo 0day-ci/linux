@@ -146,6 +146,8 @@ struct ima_namespace {
 	struct mutex ima_write_mutex;
 	unsigned long ima_fs_flags;
 	int valid_policy;
+
+	struct dentry *policy_dentry;
 } __randomize_layout;
 
 extern const int read_idmap[];
