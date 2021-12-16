@@ -1955,7 +1955,7 @@ static int rtl8367c_detect(struct realtek_priv *priv)
 		mb->priv = priv;
 		mb->chip_id = chip_id;
 		mb->chip_ver = chip_ver;
-		mb->port_mask = BIT(priv->num_ports) - 1;
+		mb->port_mask = GENMASK(priv->num_ports-1,0);
 		mb->learn_limit_max = RTL8367C_LEARN_LIMIT_MAX;
 		mb->jam_table = rtl8367c_init_jam_8367c;
 		mb->jam_size = ARRAY_SIZE(rtl8367c_init_jam_8367c);
