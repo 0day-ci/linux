@@ -732,7 +732,7 @@ int adv748x_hdmi_init(struct adv748x_hdmi *hdmi)
 	hdmi->aspect_ratio.denominator = 9;
 
 	adv748x_subdev_init(&hdmi->sd, state, &adv748x_ops_hdmi,
-			    MEDIA_ENT_F_IO_DTV, "hdmi");
+			    MEDIA_ENT_F_IO_DTV, 0, "hdmi");
 
 	hdmi->pads[ADV748X_HDMI_SINK].flags = MEDIA_PAD_FL_SINK;
 	hdmi->pads[ADV748X_HDMI_SOURCE].flags = MEDIA_PAD_FL_SOURCE;

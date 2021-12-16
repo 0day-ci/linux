@@ -510,7 +510,7 @@ int adv748x_afe_init(struct adv748x_afe *afe)
 	afe->curr_norm = V4L2_STD_NTSC_M;
 
 	adv748x_subdev_init(&afe->sd, state, &adv748x_afe_ops,
-			    MEDIA_ENT_F_ATV_DECODER, "afe");
+			    MEDIA_ENT_F_ATV_DECODER, 0, "afe");
 
 	/* Identify the first connector found as a default input if set */
 	for (i = ADV748X_PORT_AIN0; i <= ADV748X_PORT_AIN7; i++) {
