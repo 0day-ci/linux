@@ -304,26 +304,30 @@ int sio_pool_init(void)
 static void sio_write_complete(struct kiocb *iocb, long ret)
 {
 	struct swap_iocb *sio = container_of(iocb, struct swap_iocb, iocb);
-	struct page *page = sio->bvec[0].bv_page;
+	int p;
 
-	if (ret != 0 && ret != PAGE_SIZE) {
-		/*
-		 * In the case of swap-over-nfs, this can be a
-		 * temporary failure if the system has limited
-		 * memory for allocating transmit buffers.
-		 * Mark the page dirty and avoid
-		 * folio_rotate_reclaimable but rate-limit the
-		 * messages but do not flag PageError like
-		 * the normal direct-to-bio case as it could
-		 * be temporary.
-		 */
-		set_page_dirty(page);
-		ClearPageReclaim(page);
-		pr_err_ratelimited("Write error %ld on dio swapfile (%llu)\n",
-				   ret, page_file_offset(page));
-	} else
-		count_vm_event(PSWPOUT);
-	end_page_writeback(page);
+	for (p = 0; p < sio->pages; p++) {
+		struct page *page = sio->bvec[p].bv_page;
+
+		if (ret != 0 && ret != PAGE_SIZE * sio->pages) {
+			/*
+			 * In the case of swap-over-nfs, this can be a
+			 * temporary failure if the system has limited
+			 * memory for allocating transmit buffers.
+			 * Mark the page dirty and avoid
+			 * folio_rotate_reclaimable but rate-limit the
+			 * messages but do not flag PageError like
+			 * the normal direct-to-bio case as it could
+			 * be temporary.
+			 */
+			set_page_dirty(page);
+			ClearPageReclaim(page);
+			pr_err_ratelimited("Write error %ld on dio swapfile (%llu)\n",
+					   ret, page_file_offset(page));
+		} else
+			count_vm_event(PSWPOUT);
+		end_page_writeback(page);
+	}
 	mempool_free(sio, sio_pool);
 }
 
@@ -336,24 +340,39 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 
 	VM_BUG_ON_PAGE(!PageSwapCache(page), page);
 	if (data_race(sis->flags & SWP_FS_OPS)) {
-		struct swap_iocb *sio;
+		struct swap_iocb *sio = NULL;
 		struct file *swap_file = sis->swap_file;
-		struct address_space *mapping = swap_file->f_mapping;
-		struct iov_iter from;
+		loff_t pos = page_file_offset(page);
 
 		set_page_writeback(page);
 		unlock_page(page);
-		sio = mempool_alloc(sio_pool, GFP_NOIO);
-		init_sync_kiocb(&sio->iocb, swap_file);
-		sio->iocb.ki_complete = sio_write_complete;
-		sio->iocb.ki_pos = page_file_offset(page);
-		sio->bvec[0].bv_page = page;
-		sio->bvec[0].bv_len = PAGE_SIZE;
-		sio->bvec[0].bv_offset = 0;
-		iov_iter_bvec(&from, WRITE, &sio->bvec[0], 1, PAGE_SIZE);
-		ret = mapping->a_ops->swap_rw(&sio->iocb, &from);
-		if (ret != -EIOCBQUEUED)
-			sio_write_complete(&sio->iocb, ret);
+
+		if (wbc->plug)
+			sio = *wbc->plug;
+		if (sio) {
+			if (sio->iocb.ki_filp != swap_file ||
+			    sio->iocb.ki_pos + sio->pages * PAGE_SIZE != pos) {
+				swap_write_unplug(sio);
+				sio = NULL;
+			}
+		}
+		if (!sio) {
+			sio = mempool_alloc(sio_pool, GFP_NOIO);
+			init_sync_kiocb(&sio->iocb, swap_file);
+			sio->iocb.ki_complete = sio_write_complete;
+			sio->iocb.ki_pos = pos;
+			sio->pages = 0;
+		}
+		sio->bvec[sio->pages].bv_page = page;
+		sio->bvec[sio->pages].bv_len = PAGE_SIZE;
+		sio->bvec[sio->pages].bv_offset = 0;
+		sio->pages += 1;
+		if (sio->pages == ARRAY_SIZE(sio->bvec) || !wbc->plug) {
+			swap_write_unplug(sio);
+			sio = NULL;
+		}
+		if (wbc->plug)
+			*wbc->plug = sio;
 
 		return ret;
 	}
@@ -378,6 +397,19 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 	submit_bio(bio);
 
 	return 0;
+}
+
+void swap_write_unplug(struct swap_iocb *sio)
+{
+	struct iov_iter from;
+	struct address_space *mapping = sio->iocb.ki_filp->f_mapping;
+	int ret;
+
+	iov_iter_bvec(&from, WRITE, sio->bvec, sio->pages,
+		      PAGE_SIZE * sio->pages);
+	ret = mapping->a_ops->swap_rw(&sio->iocb, &from);
+	if (ret != -EIOCBQUEUED)
+		sio_write_complete(&sio->iocb, ret);
 }
 
 static void sio_read_complete(struct kiocb *iocb, long ret)
