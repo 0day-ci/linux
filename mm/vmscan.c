@@ -1465,6 +1465,21 @@ static unsigned int demote_page_list(struct list_head *demote_pages,
 	return nr_succeeded;
 }
 
+static bool test_may_enter_fs(struct page *page, gfp_t gfp_mask)
+{
+	if (gfp_mask & __GFP_FS)
+		return true;
+	if (!PageSwapCache(page) || !(gfp_mask & __GFP_IO))
+		return false;
+	/* We can "enter_fs" for swap-cache with only __GFP_IO
+	 * providing this isn't SWP_FS_OPS.
+	 * ->flags can be updated non-atomicially (scan_swap_map_slots),
+	 * but that will never affect SWP_FS_OPS, so the data_race
+	 * is safe.
+	 */
+	return !data_race(page_swap_info(page)->flags & SWP_FS_OPS);
+}
+
 /*
  * shrink_page_list() returns the number of reclaimed pages
  */
@@ -1514,8 +1529,7 @@ retry:
 		if (!sc->may_unmap && page_mapped(page))
 			goto keep_locked;
 
-		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
-			(PageSwapCache(page) && (sc->gfp_mask & __GFP_IO));
+		may_enter_fs = test_may_enter_fs(page, sc->gfp_mask);
 
 		/*
 		 * The number of dirty pages determines if a node is marked
@@ -1683,7 +1697,8 @@ retry:
 						goto activate_locked_split;
 				}
 
-				may_enter_fs = true;
+				may_enter_fs = test_may_enter_fs(page,
+								 sc->gfp_mask);
 
 				/* Adding to swap updated mapping */
 				mapping = page_mapping(page);
