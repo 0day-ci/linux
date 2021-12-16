@@ -1362,7 +1362,7 @@ static void wait_reserve_ticket(struct btrfs_fs_info *fs_info,
 }
 
 /**
- * Do the appropriate flushing and waiting for a ticket
+ * handle_reserve_ticket() - Do the appropriate flushing and waiting for a ticket
  *
  * @fs_info:    the filesystem
  * @space_info: space info for the reservation
@@ -1455,7 +1455,7 @@ static inline bool can_steal(enum btrfs_reserve_flush_enum flush)
 }
 
 /**
- * Try to reserve bytes from the block_rsv's space
+ * __reserve_bytes() - Try to reserve bytes from the block_rsv's space
  *
  * @fs_info:    the filesystem
  * @space_info: space info we want to allocate from
@@ -1581,9 +1581,9 @@ static int __reserve_bytes(struct btrfs_fs_info *fs_info,
 }
 
 /**
- * Trye to reserve metadata bytes from the block_rsv's space
+ * btrfs_reserve_metadata_bytes() - Trye to reserve metadata bytes from the block_rsv's space
  *
- * @root:       the root we're allocating for
+ * @fs_info:    the filesystem
  * @block_rsv:  block_rsv we're allocating for
  * @orig_bytes: number of bytes we want
  * @flush:      whether or not we can flush to make our reservation
@@ -1616,7 +1616,7 @@ int btrfs_reserve_metadata_bytes(struct btrfs_fs_info *fs_info,
 }
 
 /**
- * Try to reserve data bytes for an allocation
+ * btrfs_reserve_data_bytes() - Try to reserve data bytes for an allocation
  *
  * @fs_info: the filesystem
  * @bytes:   number of bytes we need

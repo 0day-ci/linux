@@ -399,7 +399,7 @@ do_insert:
 }
 
 /**
- * Search @tree for an entry that contains @offset. Such entry would have
+ * __etree_search() - Search @tree for an entry that contains @offset. Such entry would have
  * entry->start <= offset && entry->end >= offset.
  *
  * @tree:       the tree to search
@@ -1598,7 +1598,7 @@ out:
 }
 
 /**
- * Find a contiguous area of bits
+ * find_contiguous_extent_bit() - Find a contiguous area of bits
  *
  * @tree:      io tree to check
  * @start:     offset to start the search from
@@ -1636,7 +1636,8 @@ int find_contiguous_extent_bit(struct extent_io_tree *tree, u64 start,
 }
 
 /**
- * Find the first range that has @bits not set. This range could start before
+ * find_first_clear_extent_bit() - Find the first range that has @bits not set.
+ *				   This range could start before.
  * @start.
  *
  * @tree:      the tree to search
@@ -3185,15 +3186,14 @@ struct bio *btrfs_bio_clone_partial(struct bio *orig, u64 offset, u64 size)
 }
 
 /**
- * Attempt to add a page to bio
+ * btrfs_bio_add_page() - Attempt to add a page to bio
  *
- * @bio:	destination bio
+ * @bio_ctrl:	record both the bio, and its bio_flags
  * @page:	page to add to the bio
  * @disk_bytenr:  offset of the new bio or to check whether we are adding
  *                a contiguous page to the previous one
  * @pg_offset:	starting offset in the page
  * @size:	portion of page that we want to write
- * @prev_bio_flags:  flags of previous bio to see if we can merge the current one
  * @bio_flags:	flags of the current bio to see if we can merge them
  *
  * Attempt to add a page to bio considering stripe alignment etc.
@@ -4933,7 +4933,8 @@ out:
 }
 
 /**
- * Walk the list of dirty pages of the given address space and write all of them.
+ * extent_write_cache_pages() - Walk the list of dirty pages of the given
+ *				address space and write all of them.
  *
  * @mapping: address space structure to write
  * @wbc:     subtract the number of written pages from *@wbc->nr_to_write

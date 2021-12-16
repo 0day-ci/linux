@@ -1781,7 +1781,7 @@ struct btrfs_device *btrfs_zoned_get_device(struct btrfs_fs_info *fs_info,
 }
 
 /**
- * Activate block group and underlying device zones
+ * btrfs_zone_activate() - Activate block group and underlying device zones
  *
  * @block_group: the block group to activate
  *

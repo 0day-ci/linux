@@ -194,7 +194,7 @@ void btrfs_free_reserved_data_space(struct btrfs_inode *inode,
 }
 
 /**
- * Release any excessive reservation
+ * btrfs_inode_rsv_release() - Release any excessive reservation
  *
  * @inode:       the inode we need to release from
  * @qgroup_free: free or convert qgroup meta. Unlike normal operation, qgroup
@@ -366,7 +366,7 @@ int btrfs_delalloc_reserve_metadata(struct btrfs_inode *inode, u64 num_bytes)
 }
 
 /**
- * Release a metadata reservation for an inode
+ * btrfs_delalloc_release_metadata() - Release a metadata reservation for an inode
  *
  * @inode: the inode to release the reservation for.
  * @num_bytes: the number of bytes we are releasing.
@@ -464,7 +464,7 @@ int btrfs_delalloc_reserve_space(struct btrfs_inode *inode,
 }
 
 /**
- * Release data and metadata space for delalloc
+ * btrfs_delalloc_release_space() - Release data and metadata space for delalloc
  *
  * @inode:       inode we're releasing space for
  * @reserved:    list of changed/reserved ranges
