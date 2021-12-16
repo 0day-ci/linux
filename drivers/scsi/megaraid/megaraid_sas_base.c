@@ -5995,10 +5995,7 @@ megasas_alloc_irq_vectors(struct megasas_instance *instance)
 			instance->msix_vectors - instance->iopoll_q_count,
 			i, instance->iopoll_q_count);
 
-	if (i > 0)
-		instance->msix_vectors = i;
-	else
-		instance->msix_vectors = 0;
+	instance->msix_vectors = max(i, 0);
 
 	if (instance->smp_affinity_enable)
 		megasas_set_high_iops_queue_affinity_and_hint(instance);
