@@ -1,0 +1,22 @@
+What:		/sys/devices/platform/soc@B/9c000400.iop/sp_iop_state1
+Date:		December 2021
+KernelVersion:	5.15
+Contact:	Tony Huang <tonyhuang.sunplus@gmail.com>
+Description:
+		SP7021 has three power states:S0, S1 and S3.
+		S0:Default domain is on. IOP domain is on. AO domain is on.
+		S1:Default domain is off. IOP domain is on. AO domain is on.
+		S3:Default domain is off. IOP domain is off. AO domain is on.
+		Read sysfs sp_iop_s1mode, system enter S1 mode.
+
+What:		/sys/devices/platform/soc@B/9c000400.iop/sp_iop_mode
+Date:		December 2021
+KernelVersion:	5.15
+Contact:	Tony Huang <tonyhuang.sunplus@gmail.com>
+Description:
+		Operation mode of IOP is switched to standby mode by writing
+		"1" to sysfs.
+		Operation mode of IOP is switched to normal mode by writing
+		"0" to sysfs.
+
+
