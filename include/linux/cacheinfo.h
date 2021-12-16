@@ -56,7 +56,8 @@ struct cacheinfo {
 	unsigned int ways_of_associativity;
 	unsigned int physical_line_partition;
 	unsigned int size;
-	cpumask_t shared_cpu_map;
+	cpumask_t cpu_affinity_map;	/* possible CPUs */
+	cpumask_t shared_cpu_map;	/* online CPUs */
 	unsigned int attributes;
 #define CACHE_WRITE_THROUGH	BIT(0)
 #define CACHE_WRITE_BACK	BIT(1)

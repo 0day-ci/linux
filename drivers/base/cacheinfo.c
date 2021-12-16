@@ -149,6 +149,7 @@ static void cache_of_set_id(struct cacheinfo *this_leaf, struct device_node *np)
 		id = of_get_cpu_hwid(cpu_node, 0);
 		while ((cache_node = of_find_next_cache_node(cache_node))) {
 			if (cache_node == np) {
+				cpumask_set_cpu(cpu, &this_leaf->cpu_affinity_map);
 				if (id < min_id) {
 					min_id = id;
 					of_node_put(cache_node);
