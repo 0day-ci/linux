@@ -186,47 +186,31 @@ panfrost_copy_in_sync(struct drm_device *dev,
 		  struct drm_panfrost_submit *args,
 		  struct panfrost_job *job)
 {
-	u32 *handles;
-	int ret = 0;
-	int i, in_fence_count;
+	int i;
+	u32 __user *user_handles = u64_to_user_ptr(args->in_syncs);
 
-	in_fence_count = args->in_sync_count;
-
-	if (!in_fence_count)
-		return 0;
-
-	handles = kvmalloc_array(in_fence_count, sizeof(u32), GFP_KERNEL);
-	if (!handles) {
-		ret = -ENOMEM;
-		DRM_DEBUG("Failed to allocate incoming syncobj handles\n");
-		goto fail;
-	}
-
-	if (copy_from_user(handles,
-			   (void __user *)(uintptr_t)args->in_syncs,
-			   in_fence_count * sizeof(u32))) {
-		ret = -EFAULT;
-		DRM_DEBUG("Failed to copy in syncobj handles\n");
-		goto fail;
-	}
-
-	for (i = 0; i < in_fence_count; i++) {
+	for (i = 0; i < args->in_sync_count; i++) {
 		struct dma_fence *fence;
+		u32 handle;
+		int ret;
 
-		ret = drm_syncobj_find_fence(file_priv, handles[i], 0, 0,
+		ret = copy_from_user(&handle, user_handles + i,
+				     sizeof(handle));
+		if (ret)
+			return -EFAULT;
+
+		ret = drm_syncobj_find_fence(file_priv, handle, 0, 0,
 					     &fence);
 		if (ret)
-			goto fail;
+			return ret;
 
 		ret = drm_sched_job_add_dependency(&job->base, fence);
 
 		if (ret)
-			goto fail;
+			return ret;
 	}
 
-fail:
-	kvfree(handles);
-	return ret;
+	return 0;
 }
 
 static int panfrost_ioctl_submit(struct drm_device *dev, void *data,
