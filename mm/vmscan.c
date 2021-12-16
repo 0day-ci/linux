@@ -58,6 +58,7 @@
 #include <linux/balloon_compaction.h>
 
 #include "internal.h"
+#include "swap.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/vmscan.h>
