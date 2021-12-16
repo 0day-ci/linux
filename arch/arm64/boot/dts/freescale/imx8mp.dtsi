@@ -877,7 +877,8 @@
 
 		usb3_phy0: usb-phy@381f0040 {
 			compatible = "fsl,imx8mp-usb-phy";
-			reg = <0x381f0040 0x40>;
+			reg = <0x381f0040 0x40>,
+			      <0x381f0000 0x20>;
 			clocks = <&clk IMX8MP_CLK_USB_PHY_ROOT>;
 			clock-names = "phy";
 			assigned-clocks = <&clk IMX8MP_CLK_USB_PHY_REF>;
@@ -919,7 +920,8 @@
 
 		usb3_phy1: usb-phy@382f0040 {
 			compatible = "fsl,imx8mp-usb-phy";
-			reg = <0x382f0040 0x40>;
+			reg = <0x382f0040 0x40>,
+			      <0x382f0000 0x20>;
 			clocks = <&clk IMX8MP_CLK_USB_PHY_ROOT>;
 			clock-names = "phy";
 			assigned-clocks = <&clk IMX8MP_CLK_USB_PHY_REF>;
