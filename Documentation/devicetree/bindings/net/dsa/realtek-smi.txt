@@ -13,6 +13,7 @@ Required properties:
       "realtek,rtl8365mb" (4+1 ports)
       "realtek,rtl8366rb" (4+1 ports)
       "realtek,rtl8366s"  (4+1 ports)
+      "realtek,rtl8367s"  (5+2 ports)
 
 Required properties:
 - mdc-gpios: GPIO line for the MDC clock line.

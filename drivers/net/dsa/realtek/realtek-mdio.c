@@ -265,6 +265,7 @@ static const struct of_device_id realtek_mdio_of_match[] = {
 	{ .compatible = "realtek,rtl8366s", .data = NULL, },
 #if IS_ENABLED(CONFIG_NET_DSA_REALTEK_RTL8367C)
 	{ .compatible = "realtek,rtl8365mb", .data = &rtl8367c_variant, },
+	{ .compatible = "realtek,rtl8367s", .data = &rtl8367c_variant, },
 #endif
 	{ /* sentinel */ },
 };

@@ -90,15 +90,23 @@
 #include "realtek.h"
 
 /* Chip-specific data and limits */
-#define RTL8367C_CHIP_ID_8365MB_VC		0x6367
+#define RTL8367C_CHIP_ID_8367C			0x6367
+/* 0x0276 and 0x0597 as well */
 
-#define RTL8367C_LEARN_LIMIT_MAX	2112
+#define RTL8367C_CHIP_ID_8365MB_VC		RTL8367C_CHIP_ID_8367C
+#define RTL8367C_CHIP_VER_8365MB_VC		0x0040
+
+#define RTL8367C_CHIP_ID_8367S			RTL8367C_CHIP_ID_8367C
+#define RTL8367C_CHIP_VER_8367S			0x00A0
+
+#define RTL8367C_LEARN_LIMIT_MAX		2112
 
 /* Family-specific data and limits */
 #define RTL8367C_PHYADDRMAX	7
 #define RTL8367C_NUM_PHYREGS	32
 #define RTL8367C_PHYREGMAX	(RTL8367C_NUM_PHYREGS - 1)
-#define RTL8367C_MAX_NUM_PORTS  7
+// RTL8370MB and RTL8310SR, possibly suportable by this driver, have 10 ports
+#define RTL8367C_MAX_NUM_PORTS		10
 
 /* Chip identification registers */
 #define RTL8367C_CHIP_ID_REG		0x1300
@@ -1952,10 +1960,21 @@ static int rtl8367c_detect(struct realtek_priv *priv)
 	}
 
 	switch (chip_id) {
-	case RTL8367C_CHIP_ID_8365MB_VC:
-		dev_info(priv->dev,
-			"found an RTL8365MB-VC switch (ver=0x%04x)\n",
-			chip_ver);
+	case RTL8367C_CHIP_ID_8367C:
+		if (chip_ver == RTL8367C_CHIP_VER_8365MB_VC) {
+			dev_info(priv->dev,
+				"found an RTL8365MB-VC switch (ver=0x%04x)\n",
+				chip_ver);
+		} else if (chip_ver == RTL8367C_CHIP_VER_8367S) {
+			dev_info(priv->dev,
+				"found an RTL8367S switch (ver=0x%04x)\n",
+				chip_ver);
+		} else {
+			dev_err(priv->dev, "found an RTL8367C switch with "
+				"unrecognized chip version (ver=0x%04x)\n",
+				chip_ver);
+			return -ENODEV;
+		}
 
 		priv->num_ports = RTL8367C_MAX_NUM_PORTS;
 
