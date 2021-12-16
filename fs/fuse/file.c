@@ -229,8 +229,10 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
 	bool is_wb_truncate = (file->f_flags & O_TRUNC) &&
 			  fc->atomic_o_trunc &&
 			  fc->writeback_cache;
-	bool dax_truncate = (file->f_flags & O_TRUNC) &&
+	bool is_dax_truncate = (file->f_flags & O_TRUNC) &&
 			  fc->atomic_o_trunc && FUSE_IS_DAX(inode);
+	bool may_truncate = fc->atomic_o_trunc &&
+			  (fc->writeback_cache || FUSE_IS_DAX(inode));
 
 	if (fuse_is_bad(inode))
 		return -EIO;
@@ -239,12 +241,12 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
 	if (err)
 		return err;
 
-	if (is_wb_truncate || dax_truncate) {
+	if (may_truncate)
 		inode_lock(inode);
+	if (is_wb_truncate || is_dax_truncate)
 		fuse_set_nowrite(inode);
-	}
 
-	if (dax_truncate) {
+	if (is_dax_truncate) {
 		filemap_invalidate_lock(inode->i_mapping);
 		err = fuse_dax_break_layouts(inode, 0, 0);
 		if (err)
@@ -256,13 +258,13 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
 		fuse_finish_open(inode, file);
 
 out:
-	if (dax_truncate)
+	if (is_dax_truncate)
 		filemap_invalidate_unlock(inode->i_mapping);
 
-	if (is_wb_truncate | dax_truncate) {
+	if (is_wb_truncate | is_dax_truncate)
 		fuse_release_nowrite(inode);
+	if (may_truncate)
 		inode_unlock(inode);
-	}
 
 	return err;
 }
