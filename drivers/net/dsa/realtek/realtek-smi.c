@@ -328,17 +328,17 @@ static const struct regmap_config realtek_smi_mdio_regmap_config = {
 
 static int realtek_smi_mdio_read(struct mii_bus *bus, int addr, int regnum)
 {
-	struct realtek_priv *priv = bus->priv;
+	struct dsa_switch *ds = ((struct realtek_priv *)bus->priv)->ds;
 
-	return priv->ops->phy_read(priv, addr, regnum);
+	return ds->ops->phy_read(ds, addr, regnum);
 }
 
 static int realtek_smi_mdio_write(struct mii_bus *bus, int addr, int regnum,
 				  u16 val)
 {
-	struct realtek_priv *priv = bus->priv;
+	struct dsa_switch *ds = ((struct realtek_priv *)bus->priv)->ds;
 
-	return priv->ops->phy_write(priv, addr, regnum, val);
+	return ds->ops->phy_write(ds, addr, regnum, val);
 }
 
 int realtek_smi_setup_mdio(struct dsa_switch *ds)
