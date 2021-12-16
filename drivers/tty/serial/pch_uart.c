@@ -698,7 +698,7 @@ static bool filter(struct dma_chan *chan, void *slave)
 	}
 }
 
-static void pch_request_dma(struct uart_port *port)
+static int pch_request_dma(struct uart_port *port)
 {
 	dma_cap_mask_t mask;
 	struct dma_chan *chan;
@@ -723,7 +723,7 @@ static void pch_request_dma(struct uart_port *port)
 	if (!chan) {
 		dev_err(priv->port.dev, "%s:dma_request_channel FAILS(Tx)\n",
 			__func__);
-		return;
+		return 0;
 	}
 	priv->chan_tx = chan;
 
@@ -739,13 +739,20 @@ static void pch_request_dma(struct uart_port *port)
 			__func__);
 		dma_release_channel(priv->chan_tx);
 		priv->chan_tx = NULL;
-		return;
+		return 0;
 	}
 
 	/* Get Consistent memory for DMA */
 	priv->rx_buf_virt = dma_alloc_coherent(port->dev, port->fifosize,
 				    &priv->rx_buf_dma, GFP_KERNEL);
+	if (!priv->rx_buf_virt) {
+		dma_release_channel(priv->chan_tx);
+		priv->chan_tx = NULL;
+		return -ENOMEM;
+	}
+
 	priv->chan_rx = chan;
+	return 0;
 }
 
 static void pch_dma_rx_complete(void *arg)
@@ -1321,8 +1328,11 @@ static int pch_uart_startup(struct uart_port *port)
 	if (ret < 0)
 		return ret;
 
-	if (priv->use_dma)
-		pch_request_dma(port);
+	if (priv->use_dma) {
+		ret = pch_request_dma(port);
+		if (ret)
+			return ret;
+	}
 
 	priv->start_rx = 1;
 	pch_uart_hal_enable_interrupt(priv, PCH_UART_HAL_RX_INT |
@@ -1469,6 +1479,7 @@ static int pch_uart_verify_port(struct uart_port *port,
 				struct serial_struct *serinfo)
 {
 	struct eg20t_port *priv;
+	int ret;
 
 	priv = container_of(port, struct eg20t_port, port);
 	if (serinfo->flags & UPF_LOW_LATENCY) {
@@ -1483,7 +1494,9 @@ static int pch_uart_verify_port(struct uart_port *port,
 		return -EOPNOTSUPP;
 #endif
 		if (!priv->use_dma) {
-			pch_request_dma(port);
+			ret = pch_request_dma(port);
+			if (ret)
+				return ret;
 			if (priv->chan_rx)
 				priv->use_dma = 1;
 		}
