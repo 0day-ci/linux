@@ -745,6 +745,12 @@ static void pch_request_dma(struct uart_port *port)
 	/* Get Consistent memory for DMA */
 	priv->rx_buf_virt = dma_alloc_coherent(port->dev, port->fifosize,
 				    &priv->rx_buf_dma, GFP_KERNEL);
+	if (!priv->rx_buf_virt) {
+		dma_release_channel(priv->chan_tx);
+		priv->chan_tx = NULL;
+		return;
+	}
+
 	priv->chan_rx = chan;
 }
 
