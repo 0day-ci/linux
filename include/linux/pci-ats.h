@@ -35,11 +35,14 @@ static inline bool pci_pri_supported(struct pci_dev *pdev)
 #endif /* CONFIG_PCI_PRI */
 
 #ifdef CONFIG_PCI_PASID
+bool pci_pasid_supported(struct pci_dev *dev);
 int pci_enable_pasid(struct pci_dev *pdev, int features);
 void pci_disable_pasid(struct pci_dev *pdev);
 int pci_pasid_features(struct pci_dev *pdev);
 int pci_max_pasids(struct pci_dev *pdev);
 #else /* CONFIG_PCI_PASID */
+static inline bool pci_pasid_supported(struct pci_dev *d)
+{ return false; }
 static inline int pci_enable_pasid(struct pci_dev *pdev, int features)
 { return -EINVAL; }
 static inline void pci_disable_pasid(struct pci_dev *pdev) { }

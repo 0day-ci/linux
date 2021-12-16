@@ -349,6 +349,18 @@ void pci_pasid_init(struct pci_dev *pdev)
 	pdev->pasid_cap = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PASID);
 }
 
+bool pci_pasid_supported(struct pci_dev *pdev)
+{
+	if (!pdev->pasid_cap)
+		return false;
+
+	if (!pdev->eetlp_prefix_path)
+		return false;
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(pci_pasid_supported);
+
 /**
  * pci_enable_pasid - Enable the PASID capability
  * @pdev: PCI device structure

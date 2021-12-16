@@ -21,6 +21,7 @@
 #include <linux/notifier.h>
 #include <linux/err.h>
 #include <linux/pci.h>
+#include <linux/pci-ats.h>
 #include <linux/bitops.h>
 #include <linux/property.h>
 #include <linux/fsl/mc.h>
@@ -1473,6 +1474,9 @@ struct iommu_group *pci_device_group(struct device *dev)
 			continue;
 
 		if (pci_acs_path_enabled(bus->self, NULL, REQ_ACS_FLAGS))
+			break;
+
+		if (pci_pasid_supported(pdev))
 			break;
 
 		pdev = bus->self;
