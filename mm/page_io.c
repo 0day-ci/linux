@@ -307,10 +307,9 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 
 		set_page_writeback(page);
 		unlock_page(page);
-		ret = mapping->a_ops->direct_IO(&kiocb, &from);
-		if (ret == PAGE_SIZE) {
+		ret = mapping->a_ops->swap_rw(&kiocb, &from);
+		if (ret == 0) {
 			count_vm_event(PSWPOUT);
-			ret = 0;
 		} else {
 			/*
 			 * In the case of swap-over-nfs, this can be a
@@ -378,10 +377,11 @@ int swap_readpage(struct page *page, bool synchronous)
 	}
 
 	if (data_race(sis->flags & SWP_FS_OPS)) {
-		struct file *swap_file = sis->swap_file;
-		struct address_space *mapping = swap_file->f_mapping;
+		//struct file *swap_file = sis->swap_file;
+		//struct address_space *mapping = swap_file->f_mapping;
 
-		ret = mapping->a_ops->readpage(swap_file, page);
+		/* This needs to use ->swap_rw() */
+		ret = -EINVAL;
 		if (!ret)
 			count_vm_event(PSWPIN);
 		goto out;
@@ -433,18 +433,4 @@ int swap_readpage(struct page *page, bool synchronous)
 out:
 	psi_memstall_leave(&pflags);
 	return ret;
-}
-
-int swap_set_page_dirty(struct page *page)
-{
-	struct swap_info_struct *sis = page_swap_info(page);
-
-	if (data_race(sis->flags & SWP_FS_OPS)) {
-		struct address_space *mapping = sis->swap_file->f_mapping;
-
-		VM_BUG_ON_PAGE(!PageSwapCache(page), page);
-		return mapping->a_ops->set_page_dirty(page);
-	} else {
-		return __set_page_dirty_no_writeback(page);
-	}
 }
