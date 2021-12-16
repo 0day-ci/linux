@@ -612,6 +612,11 @@ config SND_SOC_CS35L36
 	tristate "Cirrus Logic CS35L36 CODEC"
 	depends on I2C
 
+config SND_SOC_CS35L41_LIB
+	tristate
+	default y if SND_SOC_CS35L41=y
+	default m if SND_SOC_CS35L41=m
+
 config SND_SOC_CS35L41
 	tristate
 	default y if SND_SOC_CS35L41_SPI=y
