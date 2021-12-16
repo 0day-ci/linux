@@ -1131,6 +1131,11 @@ extern struct zone *next_zone(struct zone *zone);
 			; /* do nothing */		\
 		else
 
+#define for_each_pgdat_zone(pgdat, zone)				\
+	for (zone = (pgdat)->node_zones;				\
+	     zone < (pgdat)->node_zones + MAX_NR_ZONES - 1 && zone;	\
+	     zone++)
+
 static inline struct zone *zonelist_zone(struct zoneref *zoneref)
 {
 	return zoneref->zone;

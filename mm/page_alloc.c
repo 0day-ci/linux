@@ -5724,6 +5724,55 @@ static inline void show_node(struct zone *zone)
 		printk("Node %d ", zone_to_nid(zone));
 }
 
+/**
+ * si_mem_available_node - helper to calculate the size of available memory
+ *			   of the given node
+ * @val: pointer to struct sysinfo
+ * @nid: the node id
+ */
+long si_mem_available_node(struct sysinfo *val, int nid)
+{
+	long available;
+	unsigned long pagecache;
+	unsigned long reclaimable;
+	unsigned long wmark_low = 0;
+	struct pglist_data *pgdat = NODE_DATA(nid);
+	struct zone *zone;
+
+	for_each_pgdat_zone(pgdat, zone)
+		wmark_low += low_wmark_pages(zone);
+
+	/*
+	 * Estimate the amount of memory available for userspace allocations,
+	 * without causing swapping.
+	 */
+	available = val->freeram - pgdat->totalreserve_pages;
+
+	/*
+	 * Not all the page cache can be freed, otherwise the system will
+	 * start swapping. Assume at least half of the page cache, or the
+	 * low watermark worth of cache, needs to stay.
+	 */
+	pagecache = node_page_state(pgdat, NR_ACTIVE_FILE) +
+		    node_page_state(pgdat, NR_INACTIVE_FILE);
+	pagecache -= min(pagecache / 2, wmark_low);
+	available += pagecache;
+
+	/*
+	 * Part of the reclaimable slab and other kernel memory consists of
+	 * items that are in use, and cannot be freed. Cap this estimate at the
+	 * low watermark.
+	 */
+	reclaimable = node_page_state_pages(pgdat, NR_SLAB_RECLAIMABLE_B) +
+		      node_page_state(pgdat, NR_KERNEL_MISC_RECLAIMABLE);
+	reclaimable -= min(reclaimable / 2, wmark_low);
+	available += reclaimable;
+
+	if (available < 0)
+		available = 0;
+	return available;
+}
+
 long si_mem_available(void)
 {
 	long available;
