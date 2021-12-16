@@ -4,20 +4,15 @@ Realtek SMI-based Switches
 The SMI "Simple Management Interface" is a two-wire protocol using
 bit-banged GPIO that while it reuses the MDIO lines MCK and MDIO does
 not use the MDIO protocol. This binding defines how to specify the
-SMI-based Realtek devices.
+SMI-based Realtek devices. The realtek-smi driver is a platform driver
+and it must be inserted inside a platform node.
 
 Required properties:
 
 - compatible: must be exactly one of:
       "realtek,rtl8365mb" (4+1 ports)
-      "realtek,rtl8366"
       "realtek,rtl8366rb" (4+1 ports)
       "realtek,rtl8366s"  (4+1 ports)
-      "realtek,rtl8367"
-      "realtek,rtl8367b"
-      "realtek,rtl8368s"  (8 port)
-      "realtek,rtl8369"
-      "realtek,rtl8370"   (8 port)
 
 Required properties:
 - mdc-gpios: GPIO line for the MDC clock line.
