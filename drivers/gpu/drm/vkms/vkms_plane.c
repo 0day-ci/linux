@@ -83,6 +83,23 @@ static void vkms_plane_reset(struct drm_plane *plane)
 	__drm_gem_reset_shadow_plane(plane, &vkms_state->base);
 }
 
+static void vkms_formats_for_plane_type(enum drm_plane_type type,
+					const u32 **formats, int *nformats)
+{
+	switch (type) {
+	case DRM_PLANE_TYPE_CURSOR:
+	case DRM_PLANE_TYPE_OVERLAY:
+		*formats = vkms_plane_formats;
+		*nformats = ARRAY_SIZE(vkms_plane_formats);
+		break;
+	case DRM_PLANE_TYPE_PRIMARY:
+	default:
+		*formats = vkms_formats;
+		*nformats = ARRAY_SIZE(vkms_formats);
+		break;
+	}
+}
+
 static const struct drm_plane_funcs vkms_plane_funcs = {
 	.update_plane		= drm_atomic_helper_update_plane,
 	.disable_plane		= drm_atomic_helper_disable_plane,
@@ -167,24 +184,8 @@ struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
 	const u32 *formats;
 	int nformats;
 
-	switch (type) {
-	case DRM_PLANE_TYPE_PRIMARY:
-		formats = vkms_formats;
-		nformats = ARRAY_SIZE(vkms_formats);
-		funcs = &vkms_primary_helper_funcs;
-		break;
-	case DRM_PLANE_TYPE_CURSOR:
-	case DRM_PLANE_TYPE_OVERLAY:
-		formats = vkms_plane_formats;
-		nformats = ARRAY_SIZE(vkms_plane_formats);
-		funcs = &vkms_primary_helper_funcs;
-		break;
-	default:
-		formats = vkms_formats;
-		nformats = ARRAY_SIZE(vkms_formats);
-		funcs = &vkms_primary_helper_funcs;
-		break;
-	}
+	funcs = &vkms_primary_helper_funcs;
+	vkms_formats_for_plane_type(type, &formats, &nformats);
 
 	plane = drmm_universal_plane_alloc(dev, struct vkms_plane, base, 1 << index,
 					   &vkms_plane_funcs,
