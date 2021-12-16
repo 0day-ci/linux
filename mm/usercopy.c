@@ -17,6 +17,7 @@
 #include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
 #include <linux/thread_info.h>
+#include <linux/vmalloc.h>
 #include <linux/atomic.h>
 #include <linux/jump_label.h>
 #include <asm/sections.h>
@@ -234,6 +235,21 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 		if ((unsigned long)ptr + n - 1 > page_end)
 			usercopy_abort("kmap", NULL, to_user,
 					offset_in_page(ptr), n);
+		return;
+	}
+
+	if (is_vmalloc_addr(ptr)) {
+		struct vm_struct *vm = find_vm_area(ptr);
+		unsigned long offset;
+
+		if (!vm) {
+			usercopy_abort("vmalloc", "no area", to_user, 0, n);
+			return;
+		}
+
+		offset = ptr - vm->addr;
+		if (offset + n > vm->size)
+			usercopy_abort("vmalloc", NULL, to_user, offset, n);
 		return;
 	}
 
