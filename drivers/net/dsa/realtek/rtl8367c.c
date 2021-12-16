@@ -91,7 +91,6 @@
 
 /* Chip-specific data and limits */
 #define RTL8367C_CHIP_ID_8365MB_VC		0x6367
-#define RTL8367C_CPU_PORT_NUM_8365MB_VC		6
 
 #define RTL8367C_LEARN_LIMIT_MAX	2112
 
@@ -99,7 +98,7 @@
 #define RTL8367C_PHYADDRMAX	7
 #define RTL8367C_NUM_PHYREGS	32
 #define RTL8367C_PHYREGMAX	(RTL8367C_NUM_PHYREGS - 1)
-#define RTL8367C_MAX_NUM_PORTS	(RTL8367C_CPU_PORT_NUM_8365MB_VC + 1)
+#define RTL8367C_MAX_NUM_PORTS  7
 
 /* Chip identification registers */
 #define RTL8367C_CHIP_ID_REG		0x1300
@@ -1816,9 +1815,18 @@ static int rtl8367c_setup(struct dsa_switch *ds)
 		dev_info(priv->dev, "no interrupt support\n");
 
 	/* Configure CPU tagging */
-	ret = rtl8367c_cpu_config(priv);
-	if (ret)
-		goto out_teardown_irq;
+	for (i = 0; i < priv->num_ports; i++) {
+		if (!(dsa_is_cpu_port(priv->ds, i)))
+			continue;
+		priv->cpu_port = i;
+		mb->cpu.mask = BIT(priv->cpu_port);
+		mb->cpu.trap_port = priv->cpu_port;
+		ret = rtl8367c_cpu_config(priv);
+		if (ret)
+			goto out_teardown_irq;
+
+		break;
+	}
 
 	/* Configure ports */
 	for (i = 0; i < priv->num_ports; i++) {
@@ -1949,8 +1957,7 @@ static int rtl8367c_detect(struct realtek_priv *priv)
 			"found an RTL8365MB-VC switch (ver=0x%04x)\n",
 			chip_ver);
 
-		priv->cpu_port = RTL8367C_CPU_PORT_NUM_8365MB_VC;
-		priv->num_ports = priv->cpu_port + 1;
+		priv->num_ports = RTL8367C_MAX_NUM_PORTS;
 
 		mb->priv = priv;
 		mb->chip_id = chip_id;
@@ -1961,8 +1968,6 @@ static int rtl8367c_detect(struct realtek_priv *priv)
 		mb->jam_size = ARRAY_SIZE(rtl8367c_init_jam_8367c);
 
 		mb->cpu.enable = 1;
-		mb->cpu.mask = BIT(priv->cpu_port);
-		mb->cpu.trap_port = priv->cpu_port;
 		mb->cpu.insert = RTL8367C_CPU_INSERT_TO_ALL;
 		mb->cpu.position = RTL8367C_CPU_POS_AFTER_SA;
 		mb->cpu.rx_length = RTL8367C_CPU_RXLEN_64BYTES;
