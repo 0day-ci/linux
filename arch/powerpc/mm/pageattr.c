@@ -30,8 +30,6 @@ static int change_page_attr(pte_t *ptep, unsigned long addr, void *data)
 	long action = (long)data;
 	pte_t pte;
 
-	spin_lock(&init_mm.page_table_lock);
-
 	pte = ptep_get(ptep);
 
 	/* modify the PTE bits as desired, then apply */
@@ -60,8 +58,6 @@ static int change_page_attr(pte_t *ptep, unsigned long addr, void *data)
 		asm volatile("ptesync": : :"memory");
 
 	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-
-	spin_unlock(&init_mm.page_table_lock);
 
 	return 0;
 }
