@@ -276,7 +276,7 @@ mt7921_pm_set(void *data, u64 val)
 	struct mt7921_dev *dev = data;
 	struct mt76_connac_pm *pm = &dev->pm;
 
-	mt7921_mutex_acquire(dev);
+	mutex_lock(&dev->mt76.mutex);
 
 	if (val == pm->enable)
 		goto out;
@@ -286,6 +286,7 @@ mt7921_pm_set(void *data, u64 val)
 		pm->stats.last_doze_event = jiffies;
 	}
 	pm->enable = val;
+	mt76_connac_pm_wake(&dev->mphy, &dev->pm);
 
 	ieee80211_iterate_active_interfaces(mt76_hw(dev),
 					    IEEE80211_IFACE_ITER_RESUME_ALL,
@@ -293,8 +294,9 @@ mt7921_pm_set(void *data, u64 val)
 
 	mt76_connac_mcu_set_deep_sleep(&dev->mt76, pm->ds_enable);
 
+	mt76_connac_power_save_sched(&dev->mphy, &dev->pm);
 out:
-	mt7921_mutex_release(dev);
+	mutex_unlock(&dev->mt76.mutex);
 
 	return 0;
 }
