@@ -25,6 +25,10 @@ I. For patch submitters
 
        make dt_binding_check
 
+     Make sure yamllint is installed and dt-schema is up to date::
+
+       pip3 install dtschema --upgrade
+
      See Documentation/devicetree/bindings/writing-schema.rst for more details
      about schema and tools setup.
 
