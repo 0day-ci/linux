@@ -17,6 +17,8 @@
 #include <kvm_util.h>
 #include <processor.h>
 
+#include "guest_modes.h"
+
 #define VCPU_ID 0
 
 /*
@@ -412,6 +414,8 @@ int main(int argc, char *argv[])
 #ifdef __x86_64__
 	int i, loops;
 #endif
+
+	guest_modes_append_default();
 
 	/* Tell stdout not to buffer its content */
 	setbuf(stdout, NULL);

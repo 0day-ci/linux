@@ -16,6 +16,7 @@
 #include "kvm_util.h"
 #include "processor.h"
 #include "test_util.h"
+#include "guest_modes.h"
 
 #define VCPU_ID_SOURCE 0
 #define VCPU_ID_TARGET 1
@@ -75,6 +76,8 @@ int main(void)
 	struct kvm_vcpu_init init;
 	struct kvm_vm *vm;
 	struct ucall uc;
+
+	guest_modes_append_default();
 
 	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
 	kvm_vm_elf_load(vm, program_invocation_name);

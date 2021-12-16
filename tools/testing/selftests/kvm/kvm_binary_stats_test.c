@@ -17,6 +17,7 @@
 #include "test_util.h"
 
 #include "kvm_util.h"
+#include "guest_modes.h"
 #include "asm/kvm.h"
 #include "linux/kvm.h"
 
@@ -206,6 +207,8 @@ int main(int argc, char *argv[])
 	struct kvm_vm **vms;
 	int max_vm = DEFAULT_NUM_VM;
 	int max_vcpu = DEFAULT_NUM_VCPU;
+
+	guest_modes_append_default();
 
 	/* Get the number of VMs and VCPUs that would be created for testing. */
 	if (argc > 1) {

@@ -14,6 +14,7 @@
 #include "kvm_util.h"
 #include "processor.h"
 #include "vgic.h"
+#include "guest_modes.h"
 
 #define NR_VCPUS		4
 
@@ -698,6 +699,8 @@ int main(int ac, char **av)
 {
 	int ret;
 	int pa_bits;
+
+	guest_modes_append_default();
 
 	pa_bits = vm_guest_mode_params[VM_MODE_DEFAULT].pa_bits;
 	max_phys_size = 1ULL << pa_bits;

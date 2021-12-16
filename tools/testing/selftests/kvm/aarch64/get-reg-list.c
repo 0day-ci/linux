@@ -33,6 +33,7 @@
 #include "kvm_util.h"
 #include "test_util.h"
 #include "processor.h"
+#include "guest_modes.h"
 
 static struct kvm_reg_list *reg_list;
 static __u64 *blessed_reg, blessed_n;
@@ -587,6 +588,8 @@ int main(int ac, char **av)
 	struct vcpu_config *c, *sel = NULL;
 	int i, ret = 0;
 	pid_t pid;
+
+	guest_modes_append_default();
 
 	for (i = 1; i < ac; ++i) {
 		if (strcmp(av[i], "--core-reg-fixup") == 0)

@@ -25,6 +25,8 @@
 #include <kvm_util.h>
 #include <processor.h>
 
+#include "guest_modes.h"
+
 #define VCPU_ID 0
 
 #define MEM_SIZE		((512U << 20) + 4096)
@@ -1014,6 +1016,8 @@ int main(int argc, char *argv[])
 
 	if (!parse_args(argc, argv, &targs))
 		return -1;
+
+	guest_modes_append_default();
 
 	rbestslottime.slottimens = 0;
 	for (tctr = targs.tfirst; tctr <= targs.tlast; tctr++) {

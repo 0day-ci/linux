@@ -19,6 +19,7 @@
 #include "kvm_util.h"
 #include "processor.h"
 #include "test_util.h"
+#include "guest_modes.h"
 
 #define VCPU_ID 0
 
@@ -222,6 +223,8 @@ int main(int argc, char *argv[])
 	}
 
 	sys_rseq(0);
+
+	guest_modes_append_default();
 
 	/*
 	 * Create and run a dummy VM that immediately exits to userspace via

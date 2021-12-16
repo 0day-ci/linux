@@ -35,6 +35,7 @@
 #include "arch_timer.h"
 #include "gic.h"
 #include "vgic.h"
+#include "guest_modes.h"
 
 #define NR_VCPUS_DEF			4
 #define NR_TEST_ITERS_DEF		5
@@ -459,6 +460,8 @@ err:
 int main(int argc, char *argv[])
 {
 	struct kvm_vm *vm;
+
+	guest_modes_append_default();
 
 	/* Tell stdout not to buffer its content */
 	setbuf(stdout, NULL);

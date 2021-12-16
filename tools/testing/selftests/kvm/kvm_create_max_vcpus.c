@@ -17,6 +17,7 @@
 #include "test_util.h"
 
 #include "kvm_util.h"
+#include "guest_modes.h"
 #include "asm/kvm.h"
 #include "linux/kvm.h"
 
@@ -50,6 +51,8 @@ int main(int argc, char *argv[])
 
 	pr_info("KVM_CAP_MAX_VCPU_ID: %d\n", kvm_max_vcpu_id);
 	pr_info("KVM_CAP_MAX_VCPUS: %d\n", kvm_max_vcpus);
+
+	guest_modes_append_default();
 
 	/*
 	 * Check that we're allowed to open nr_fds_wanted file descriptors and

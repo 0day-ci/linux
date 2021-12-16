@@ -16,6 +16,7 @@
 #include "test_util.h"
 #include "kvm_util.h"
 #include "processor.h"
+#include "guest_modes.h"
 
 #define NR_VCPUS		4
 #define ST_GPA_BASE		(1 << 30)
@@ -272,6 +273,8 @@ int main(int ac, char **av)
 	pthread_attr_init(&attr);
 	pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpuset);
 	pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+
+	guest_modes_append_default();
 
 	/* Create a one VCPU guest and an identity mapped memslot for the steal time structure */
 	vm = vm_create_default(0, 0, guest_code);
