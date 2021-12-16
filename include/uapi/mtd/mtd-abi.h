@@ -92,6 +92,25 @@ struct mtd_write_req {
 };
 
 /**
+ * struct mtd_read_req_ecc_stats - ECC statistics for a read operation
+ *
+ * @uncorrectable_errors: the number of uncorrectable errors that happened
+ *			  during the read operation
+ * @corrected_bitflips: the number of bitflips corrected during the read
+ *			operation
+ * @max_bitflips: the maximum number of bitflips detected in any single ECC
+ *		  step for the data read during the operation; this information
+ *		  can be used to decide whether the data stored in a specific
+ *		  region of the MTD device should be moved somewhere else to
+ *		  avoid data loss.
+ */
+struct mtd_read_req_ecc_stats {
+	__u32 uncorrectable_errors;
+	__u32 corrected_bitflips;
+	__u32 max_bitflips;
+};
+
+/**
  * struct mtd_read_req - data structure for requesting a read operation
  *
  * @start:	start address
@@ -101,6 +120,7 @@ struct mtd_write_req {
  * @usr_oob:	user-provided OOB buffer
  * @mode:	MTD mode (see "MTD operation modes")
  * @padding:	reserved, must be set to 0
+ * @ecc_stats:	ECC statistics for the read operation
  *
  * This structure supports ioctl(MEMREAD) operations, allowing data and/or OOB
  * reads in various modes. To read from OOB-only, set @usr_data == NULL, and to
@@ -115,6 +135,7 @@ struct mtd_read_req {
 	__u64 usr_oob;
 	__u8 mode;
 	__u8 padding[7];
+	struct mtd_read_req_ecc_stats ecc_stats;
 };
 
 #define MTD_ABSENT		0

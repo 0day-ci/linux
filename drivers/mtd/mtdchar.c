@@ -714,6 +714,10 @@ static int mtdchar_read_ioctl(struct mtd_info *mtd,
 	if (!usr_oob)
 		req.ooblen = 0;
 
+	req.ecc_stats.uncorrectable_errors = 0;
+	req.ecc_stats.corrected_bitflips = 0;
+	req.ecc_stats.max_bitflips = 0;
+
 	if (req.start + req.len > mtd->size) {
 		ret = -EINVAL;
 		goto out;
@@ -738,12 +742,14 @@ static int mtdchar_read_ioctl(struct mtd_info *mtd,
 	}
 
 	while (req.len > 0 || (!usr_data && req.ooblen > 0)) {
+		struct mtd_req_stats stats;
 		struct mtd_oob_ops ops = {
 			.mode = req.mode,
 			.len = min_t(size_t, req.len, datbuf_len),
 			.ooblen = min_t(size_t, req.ooblen, oobbuf_len),
 			.datbuf = datbuf,
 			.oobbuf = oobbuf,
+			.stats = &stats,
 		};
 
 		/*
@@ -757,6 +763,13 @@ static int mtdchar_read_ioctl(struct mtd_info *mtd,
 			ops.len -= mtd_mod_by_ws(req.start + ops.len, mtd);
 
 		ret = mtd_read_oob(mtd, (loff_t)req.start, &ops);
+
+		req.ecc_stats.uncorrectable_errors +=
+			stats.uncorrectable_errors;
+		req.ecc_stats.corrected_bitflips += stats.corrected_bitflips;
+		req.ecc_stats.max_bitflips =
+			max(req.ecc_stats.max_bitflips, stats.max_bitflips);
+
 		if (ret && !mtd_is_bitflip_or_eccerr(ret))
 			break;
 
@@ -772,6 +785,19 @@ static int mtdchar_read_ioctl(struct mtd_info *mtd,
 
 		req.ooblen -= ops.oobretlen;
 		usr_oob += ops.oobretlen;
+	}
+
+	/*
+	 * As multiple iterations of the above loop (and therefore multiple
+	 * mtd_read_oob() calls) may be necessary to complete the read request,
+	 * adjust the final return code to ensure it accounts for all detected
+	 * ECC errors.
+	 */
+	if (!ret || mtd_is_bitflip(ret)) {
+		if (req.ecc_stats.uncorrectable_errors > 0)
+			ret = -EBADMSG;
+		else if (req.ecc_stats.corrected_bitflips > 0)
+			ret = -EUCLEAN;
 	}
 
 out:
