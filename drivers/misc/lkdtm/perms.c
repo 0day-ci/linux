@@ -138,6 +138,8 @@ void lkdtm_EXEC_STACK(void)
 void lkdtm_EXEC_KMALLOC(void)
 {
 	u32 *kmalloc_area = kmalloc(EXEC_SIZE, GFP_KERNEL);
+	if (!kmalloc_area)
+		return;
 	execute_location(kmalloc_area, CODE_WRITE);
 	kfree(kmalloc_area);
 }
@@ -145,6 +147,8 @@ void lkdtm_EXEC_KMALLOC(void)
 void lkdtm_EXEC_VMALLOC(void)
 {
 	u32 *vmalloc_area = vmalloc(EXEC_SIZE);
+	if (!vmalloc_area)
+		return;
 	execute_location(vmalloc_area, CODE_WRITE);
 	vfree(vmalloc_area);
 }
