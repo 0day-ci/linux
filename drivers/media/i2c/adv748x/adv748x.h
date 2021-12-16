@@ -73,6 +73,9 @@ enum adv748x_csi2_pads {
 /* CSI2 transmitters can have 2 internal connections, HDMI/AFE */
 #define ADV748X_CSI2_MAX_SUBDEVS 2
 
+/* CSI2 number of streams: 1 for each CSI-2 Virtual channel output. */
+#define ADV748X_CSI2_STREAMS	4
+
 struct adv748x_csi2 {
 	struct adv748x_state *state;
 	struct v4l2_mbus_framefmt format;

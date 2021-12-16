@@ -139,6 +139,50 @@ static const struct v4l2_subdev_video_ops adv748x_csi2_video_ops = {
  * But we must support setting the pad formats for format propagation.
  */
 
+static int adv748x_csi2_init_cfg(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_state *state)
+{
+	/* One route for each virtual channel. Route 0 enabled by default. */
+	struct v4l2_subdev_route routes[ADV748X_CSI2_STREAMS] = {
+		{
+			.sink_pad = ADV748X_CSI2_SINK,
+			.sink_stream = 0,
+			.source_pad = ADV748X_CSI2_SOURCE,
+			.source_stream = 0,
+			.flags = V4L2_SUBDEV_ROUTE_FL_ACTIVE,
+		},
+		{
+			.sink_pad = ADV748X_CSI2_SINK,
+			.sink_stream = 0,
+			.source_pad = ADV748X_CSI2_SOURCE,
+			.source_stream = 1,
+		},
+		{
+			.sink_pad = ADV748X_CSI2_SINK,
+			.sink_stream = 0,
+			.source_pad = ADV748X_CSI2_SOURCE,
+			.source_stream = 2,
+		},
+		{
+			.sink_pad = ADV748X_CSI2_SINK,
+			.sink_stream = 0,
+			.source_pad = ADV748X_CSI2_SOURCE,
+			.source_stream = 3,
+		},
+	};
+	struct v4l2_subdev_krouting routing;
+	int ret;
+
+	routing.num_routes = ADV748X_CSI2_STREAMS;
+	routing.routes = routes;
+
+	v4l2_subdev_lock_state(state);
+	ret = v4l2_subdev_set_routing(sd, state, &routing);
+	v4l2_subdev_unlock_state(state);
+
+	return ret;
+}
+
 static struct v4l2_mbus_framefmt *
 adv748x_csi2_get_pad_format(struct v4l2_subdev *sd,
 			    struct v4l2_subdev_state *sd_state,
@@ -244,6 +288,7 @@ static int adv748x_csi2_get_mbus_config(struct v4l2_subdev *sd, unsigned int pad
 }
 
 static const struct v4l2_subdev_pad_ops adv748x_csi2_pad_ops = {
+	.init_cfg = adv748x_csi2_init_cfg,
 	.get_fmt = adv748x_csi2_get_format,
 	.set_fmt = adv748x_csi2_set_format,
 	.get_mbus_config = adv748x_csi2_get_mbus_config,
@@ -313,7 +358,8 @@ int adv748x_csi2_init(struct adv748x_state *state, struct adv748x_csi2 *tx)
 		return 0;
 
 	adv748x_subdev_init(&tx->sd, state, &adv748x_csi2_ops,
-			    MEDIA_ENT_F_VID_IF_BRIDGE, 0,
+			    MEDIA_ENT_F_VID_IF_BRIDGE,
+			    V4L2_SUBDEV_FL_MULTIPLEXED,
 			    is_txa(tx) ? "txa" : "txb");
 
 	/* Ensure that matching is based upon the endpoint fwnodes */
@@ -330,9 +376,13 @@ int adv748x_csi2_init(struct adv748x_state *state, struct adv748x_csi2 *tx)
 	if (ret)
 		return ret;
 
-	ret = adv748x_csi2_init_controls(tx);
+	ret = v4l2_subdev_init_finalize(&tx->sd);
 	if (ret)
 		goto err_free_media;
+
+	ret = adv748x_csi2_init_controls(tx);
+	if (ret)
+		goto err_free_state;
 
 	ret = v4l2_async_register_subdev(&tx->sd);
 	if (ret)
@@ -342,6 +392,8 @@ int adv748x_csi2_init(struct adv748x_state *state, struct adv748x_csi2 *tx)
 
 err_free_ctrl:
 	v4l2_ctrl_handler_free(&tx->ctrl_hdl);
+err_free_state:
+	v4l2_subdev_cleanup(&tx->sd);
 err_free_media:
 	media_entity_cleanup(&tx->sd.entity);
 
@@ -354,6 +406,7 @@ void adv748x_csi2_cleanup(struct adv748x_csi2 *tx)
 		return;
 
 	v4l2_async_unregister_subdev(&tx->sd);
+	v4l2_subdev_cleanup(&tx->sd);
 	media_entity_cleanup(&tx->sd.entity);
 	v4l2_ctrl_handler_free(&tx->ctrl_hdl);
 }
