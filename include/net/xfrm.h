@@ -232,6 +232,11 @@ struct xfrm_state {
 	u32			replay_maxage;
 	u32			replay_maxdiff;
 
+	/* mapping change rate limiting */
+	unsigned long new_mapping;	/* jiffies */
+	unsigned long mapping_maxage;	/* jiffies for input SA */
+	__be16 new_mapping_sport;
+
 	/* Replay detection notification timer */
 	struct timer_list	rtimer;
 
