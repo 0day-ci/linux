@@ -205,6 +205,14 @@
 				regulator-always-on;
 			};
 		};
+
+		pmic_rtc: rtc {
+			compatible = "dlg,da9063-rtc";
+		};
+
+		da9063_wdog: wdt {
+			compatible = "dlg,da9063-watchdog";
+		};
 	};
 };
 
