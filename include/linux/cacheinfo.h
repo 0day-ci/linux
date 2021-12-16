@@ -123,4 +123,28 @@ static inline int get_cpu_cacheinfo_id(int cpu, int level)
 	return -1;
 }
 
+/*
+ * Get the CPU affinity of the cache associated with @cpu at level @level and
+ * with identifier @id.
+ * cpuhp lock must be held.
+ */
+static inline int cacheinfo_get_cache_affinity(int cpu, int level, int id,
+					       cpumask_t *mask)
+{
+	struct cpu_cacheinfo *ci = get_cpu_cacheinfo(cpu);
+	int i;
+
+	for (i = 0; ci->info_list && i < ci->num_leaves; i++) {
+		if ((ci->info_list[i].level == level) &&
+		    (ci->info_list[i].attributes & CACHE_ID) &&
+		    (ci->info_list[i].id == id)) {
+			cpumask_copy(mask, &ci->info_list[i].cpu_affinity_map);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
+
 #endif /* _LINUX_CACHEINFO_H */
