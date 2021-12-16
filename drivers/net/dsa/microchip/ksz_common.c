@@ -301,7 +301,6 @@ int ksz_port_mdb_del(struct dsa_switch *ds, int port,
 	struct ksz_device *dev = ds->priv;
 	struct alu_struct alu;
 	int index;
-	int ret = 0;
 
 	for (index = 0; index < dev->num_statics; index++) {
 		if (!dev->dev_ops->r_sta_mac_table(dev, index, &alu)) {
@@ -323,7 +322,7 @@ int ksz_port_mdb_del(struct dsa_switch *ds, int port,
 	dev->dev_ops->w_sta_mac_table(dev, index, &alu);
 
 exit:
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(ksz_port_mdb_del);
 
