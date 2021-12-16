@@ -16,7 +16,8 @@ properties:
       - fsl,imx8mp-usb-phy
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 2
 
   "#phy-cells":
     const: 0
@@ -32,12 +33,61 @@ properties:
     description:
       A phandle to the regulator for USB VBUS.
 
+  fsl,permanently-attached:
+    type: boolean
+    description:
+      Indicates if the device atached to a downstream port is
+      permanently attached.
+
+  fsl,disable-port-power-control:
+    type: boolean
+    description:
+      Indicates whether the host controller implementation includes port
+      power control. Defines Bit 3 in capability register (HCCPARAMS).
+
+  fsl,over-current-active-low:
+    type: boolean
+    description:
+      Over current signal polarity is active low.
+
+  fsl,power-active-low:
+    type: boolean
+    description:
+      Power pad (PWR) polarity is active low.
+
 required:
   - compatible
   - reg
   - "#phy-cells"
   - clocks
   - clock-names
+
+if:
+  properties:
+    compatible:
+      contains:
+        enum:
+          - fsl,imx8mp-usb-phy
+
+then:
+  properties:
+    reg:
+      minItems: 2
+      maxItems: 2
+      items:
+        - description: PHY register base address
+        - description: Glue layer base address
+
+else:
+  properties:
+    reg:
+      maxItems: 1
+      items:
+        - description: PHY register base address
+    fsl,permanently-attached: false
+    fsl,disable-port-power-control: false
+    fsl,over-current-active-low: false
+    fsl,power-active-low: false
 
 additionalProperties: false
 
