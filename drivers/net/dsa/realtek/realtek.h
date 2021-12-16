@@ -50,6 +50,8 @@ struct realtek_priv {
 	struct gpio_desc	*mdio;
 	struct regmap		*map;
 	struct mii_bus		*slave_mii_bus;
+	struct mii_bus		*bus;
+	int                     phy_id;
 
 	unsigned int		clk_delay;
 	u8			cmd_read;
@@ -66,6 +68,7 @@ struct realtek_priv {
 	struct rtl8366_mib_counter *mib_counters;
 
 	const struct realtek_ops *ops;
+	int 		 	(*setup)(struct dsa_switch *ds);
 	int 		 	(*setup_interface)(struct dsa_switch *ds);
 	int 			(*write_reg_noack)(struct realtek_priv *priv, u32 addr, u32 data);
 
