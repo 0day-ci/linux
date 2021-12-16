@@ -506,10 +506,10 @@ static const struct of_device_id realtek_smi_of_match[] = {
 		.compatible = "realtek,rtl8366s",
 		.data = NULL,
 	},
-#if IS_ENABLED(CONFIG_NET_DSA_REALTEK_RTL8365MB)
+#if IS_ENABLED(CONFIG_NET_DSA_REALTEK_RTL8367C)
 	{
 		.compatible = "realtek,rtl8365mb",
-		.data = &rtl8365mb_variant,
+		.data = &rtl8367c_variant,
 	},
 #endif
 	{ /* sentinel */ },

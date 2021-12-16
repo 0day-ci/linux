@@ -1025,7 +1025,7 @@ static struct phy_driver realtek_drvs[] = {
 		.write_page	= rtl821x_write_page,
 	}, {
 		PHY_ID_MATCH_EXACT(0x001cc942),
-		.name		= "RTL8365MB-VC Gigabit Ethernet",
+		.name		= "RTL8367C Gigabit Ethernet",
 		/* Interrupt handling analogous to RTL8366RB */
 		.config_intr	= genphy_no_config_intr,
 		.handle_interrupt = genphy_handle_interrupt_no_ack,

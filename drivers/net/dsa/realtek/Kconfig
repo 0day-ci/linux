@@ -16,14 +16,17 @@ config NET_DSA_REALTEK_SMI
 	help
 	  Select to enable support for registering switches connected through SMI.
 
-config NET_DSA_REALTEK_RTL8365MB
-	tristate "Realtek RTL8365MB switch subdriver"
+config NET_DSA_REALTEK_RTL8367C
+	tristate "Realtek RTL8367C switch subdriver"
 	default y
 	depends on NET_DSA_REALTEK
 	depends on NET_DSA_REALTEK_SMI
 	select NET_DSA_TAG_RTL8_4
 	help
-	  Select to enable support for Realtek RTL8365MB
+	  Select to enable support for Realtek RTL8365MB-VC. This subdriver
+	  might also support RTL8363NB, RTL8363NB-VB, RTL8363SC, RTL8363SC-VB, RTL8364NB,
+	  RTL8364NB-VB, RTL8366SC, RTL8367RB-VB, RTL8367S, RTL8367SB, RTL8370MB, RTL8310SR
+	  in the future.
 
 config NET_DSA_REALTEK_RTL8366RB
 	tristate "Realtek RTL8366RB switch subdriver"
