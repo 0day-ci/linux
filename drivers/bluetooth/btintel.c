@@ -2355,8 +2355,13 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 	 * As a workaround, send HCI Reset command first which will reset the
 	 * number of completed commands and allow normal command processing
 	 * from now on.
+	 *
+	 * For INTEL_BROKEN_LED, these devices have an issue with LED which
+	 * doesn't go off immediately during shutdown. Set the flag
+	 * here to send the LED OFF command during shutdown.
 	 */
-	if (btintel_test_flag(hdev, INTEL_BROKEN_INITIAL_NCMD)) {
+	if (btintel_test_flag(hdev, INTEL_BROKEN_INITIAL_NCMD) ||
+				btintel_test_flag(hdev, INTEL_BROKEN_LED)) {
 		skb = __hci_cmd_sync(hdev, HCI_OP_RESET, 0, NULL,
 				     HCI_INIT_TIMEOUT);
 		if (IS_ERR(skb)) {
@@ -2427,12 +2432,6 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 			if (ver.hw_variant == 0x08 && ver.fw_variant == 0x22)
 				set_bit(HCI_QUIRK_WIDEBAND_SPEECH_SUPPORTED,
 					&hdev->quirks);
-
-			/* These devices have an issue with LED which doesn't
-			 * go off immediately during shutdown. Set the flag
-			 * here to send the LED OFF command during shutdown.
-			 */
-			btintel_set_flag(hdev, INTEL_BROKEN_LED);
 
 			err = btintel_legacy_rom_setup(hdev, &ver);
 			break;
