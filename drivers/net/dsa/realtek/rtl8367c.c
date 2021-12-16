@@ -197,22 +197,26 @@
 #define RTL8367C_EXT_PORT_MODE_100FX		13
 
 /* EXT port interface mode configuration registers 0~1 */
-#define RTL8367C_DIGITAL_INTERFACE_SELECT_REG0		0x1305
-#define RTL8367C_DIGITAL_INTERFACE_SELECT_REG1		0x13C3
-#define RTL8367C_DIGITAL_INTERFACE_SELECT_REG(_extport)   \
-		(RTL8367C_DIGITAL_INTERFACE_SELECT_REG0 + \
-		 ((_extport) >> 1) * (0x13C3 - 0x1305))
-#define   RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_MASK(_extport) \
-		(0xF << (((_extport) % 2)))
-#define   RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_OFFSET(_extport) \
-		(((_extport) % 2) * 4)
+#define RTL8367C_DIGITAL_INTERFACE_SELECT_REG0		0x1305 /*EXT1*/
+#define RTL8367C_DIGITAL_INTERFACE_SELECT_REG1		0x13C3 /*EXT2*/
+#define RTL8367C_DIGITAL_INTERFACE_SELECT_REG(_extint) \
+		(_extint==1 ? RTL8367C_DIGITAL_INTERFACE_SELECT_REG0 : \
+		 _extint==2 ? RTL8367C_DIGITAL_INTERFACE_SELECT_REG1 : \
+		 0x0)
+#define   RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_MASK(_extint) \
+		(0xF << (((_extint) % 2)))
+#define   RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_OFFSET(_extint) \
+		(((_extint) % 2) * 4)
 
-/* EXT port RGMII TX/RX delay configuration registers 1~2 */
-#define RTL8367C_EXT_RGMXF_REG1		0x1307
-#define RTL8367C_EXT_RGMXF_REG2		0x13C5
-#define RTL8367C_EXT_RGMXF_REG(_extport)   \
-		(RTL8367C_EXT_RGMXF_REG1 + \
-		 (((_extport) >> 1) * (0x13C5 - 0x1307)))
+/* EXT port RGMII TX/RX delay configuration registers 0~2 */
+#define RTL8367C_EXT_RGMXF_REG0		0x1306 /*EXT0*/
+#define RTL8367C_EXT_RGMXF_REG1		0x1307 /*EXT1*/
+#define RTL8367C_EXT_RGMXF_REG2		0x13C5 /*EXT2*/
+#define RTL8367C_EXT_RGMXF_REG(_extint) \
+		(_extint==0 ? RTL8367C_EXT_RGMXF_REG0 : \
+		 _extint==1 ? RTL8367C_EXT_RGMXF_REG1 : \
+		 _extint==2 ? RTL8367C_EXT_RGMXF_REG2 : \
+		 0x0)
 #define   RTL8367C_EXT_RGMXF_RXDELAY_MASK	0x0007
 #define   RTL8367C_EXT_RGMXF_TXDELAY_MASK	0x0008
 
@@ -222,13 +226,14 @@
 #define RTL8367C_PORT_SPEED_1000M	2
 
 /* EXT port force configuration registers 0~2 */
-#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG0			0x1310
-#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG1			0x1311
-#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG2			0x13C4
-#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG(_extport)   \
-		(RTL8367C_DIGITAL_INTERFACE_FORCE_REG0 + \
-		 ((_extport) & 0x1) +                     \
-		 ((((_extport) >> 1) & 0x1) * (0x13C4 - 0x1310)))
+#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG0		0x1310 /*EXT0*/
+#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG1		0x1311 /*EXT1*/
+#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG2		0x13C4 /*EXT2*/
+#define RTL8367C_DIGITAL_INTERFACE_FORCE_REG(_extint) \
+		(_extint==0 ? RTL8367C_DIGITAL_INTERFACE_FORCE_REG0 : \
+		 _extint==1 ? RTL8367C_DIGITAL_INTERFACE_FORCE_REG1 : \
+		 _extint==2 ? RTL8367C_DIGITAL_INTERFACE_FORCE_REG2 : \
+		 0x0)
 #define   RTL8367C_DIGITAL_INTERFACE_FORCE_EN_MASK		0x1000
 #define   RTL8367C_DIGITAL_INTERFACE_FORCE_NWAY_MASK		0x0080
 #define   RTL8367C_DIGITAL_INTERFACE_FORCE_TXPAUSE_MASK		0x0040
@@ -511,6 +516,7 @@ struct rtl8367c_cpu {
  *         access via rtl8367c_get_stats64
  * @stats_lock: protect the stats structure during read/update
  * @mib_work: delayed work for polling MIB counters
+ * @ext_int: the external interface related to this port (-1 to none)
  */
 struct rtl8367c_port {
 	struct realtek_priv *priv;
@@ -518,6 +524,7 @@ struct rtl8367c_port {
 	struct rtnl_link_stats64 stats;
 	spinlock_t stats_lock;
 	struct delayed_work mib_work;
+	int ext_int;
 };
 
 /**
@@ -733,21 +740,25 @@ static int rtl8367c_ext_config_rgmii(struct realtek_priv *priv, int port,
 {
 	struct device_node *dn;
 	struct dsa_port *dp;
+	struct rtl8367c_port *p;
+	struct rtl8367c *mb;
 	int tx_delay = 0;
 	int rx_delay = 0;
-	int ext_port;
+	int ext_int;
 	u32 val;
 	int ret;
 
-	if (port == priv->cpu_port) {
-		ext_port = 1;
-	} else {
+	if (port != priv->cpu_port) {
 		dev_err(priv->dev, "only one EXT port is currently supported\n");
 		return -EINVAL;
 	}
 
 	dp = dsa_to_port(priv->ds, port);
 	dn = dp->dn;
+
+	mb = priv->chip_data;
+	p = &mb->ports[port];
+	ext_int = p->ext_int;
 
 	/* Set the RGMII TX/RX delay
 	 *
@@ -792,7 +803,7 @@ static int rtl8367c_ext_config_rgmii(struct realtek_priv *priv, int port,
 	}
 
 	ret = regmap_update_bits(
-		priv->map, RTL8367C_EXT_RGMXF_REG(ext_port),
+		priv->map, RTL8367C_EXT_RGMXF_REG(ext_int),
 		RTL8367C_EXT_RGMXF_TXDELAY_MASK |
 			RTL8367C_EXT_RGMXF_RXDELAY_MASK,
 		FIELD_PREP(RTL8367C_EXT_RGMXF_TXDELAY_MASK, tx_delay) |
@@ -801,11 +812,11 @@ static int rtl8367c_ext_config_rgmii(struct realtek_priv *priv, int port,
 		return ret;
 
 	ret = regmap_update_bits(
-		priv->map, RTL8367C_DIGITAL_INTERFACE_SELECT_REG(ext_port),
-		RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_MASK(ext_port),
+		priv->map, RTL8367C_DIGITAL_INTERFACE_SELECT_REG(ext_int),
+		RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_MASK(ext_int),
 		RTL8367C_EXT_PORT_MODE_RGMII
 			<< RTL8367C_DIGITAL_INTERFACE_SELECT_MODE_OFFSET(
-				   ext_port));
+				   ext_int));
 	if (ret)
 		return ret;
 
@@ -816,21 +827,25 @@ static int rtl8367c_ext_config_forcemode(struct realtek_priv *priv, int port,
 					  bool link, int speed, int duplex,
 					  bool tx_pause, bool rx_pause)
 {
+	struct rtl8367c_port *p;
+	struct rtl8367c *mb;
 	u32 r_tx_pause;
 	u32 r_rx_pause;
 	u32 r_duplex;
 	u32 r_speed;
 	u32 r_link;
-	int ext_port;
+	int ext_int;
 	int val;
 	int ret;
 
-	if (port == priv->cpu_port) {
-		ext_port = 1;
-	} else {
+	if (port != priv->cpu_port) {
 		dev_err(priv->dev, "only one EXT port is currently supported\n");
 		return -EINVAL;
 	}
+
+	mb = priv->chip_data;
+	p = &mb->ports[port];
+	ext_int = p->ext_int;
 
 	if (link) {
 		/* Force the link up with the desired configuration */
@@ -878,7 +893,7 @@ static int rtl8367c_ext_config_forcemode(struct realtek_priv *priv, int port,
 			 r_duplex) |
 	      FIELD_PREP(RTL8367C_DIGITAL_INTERFACE_FORCE_SPEED_MASK, r_speed);
 	ret = regmap_write(priv->map,
-			   RTL8367C_DIGITAL_INTERFACE_FORCE_REG(ext_port),
+			   RTL8367C_DIGITAL_INTERFACE_FORCE_REG(ext_int),
 			   val);
 	if (ret)
 		return ret;
@@ -1807,7 +1822,9 @@ static int rtl8367c_setup(struct dsa_switch *ds)
 
 	/* Configure ports */
 	for (i = 0; i < priv->num_ports; i++) {
+		struct device_node *dn;
 		struct rtl8367c_port *p = &mb->ports[i];
+		u32 val;
 
 		if (dsa_is_unused_port(priv->ds, i))
 			continue;
@@ -1831,6 +1848,23 @@ static int rtl8367c_setup(struct dsa_switch *ds)
 		 * administratively down by default.
 		 */
 		rtl8367c_port_stp_state_set(priv->ds, i, BR_STATE_DISABLED);
+
+		dn = dsa_to_port(priv->ds, i)->dn;
+
+		if (!of_property_read_u32(dn, "realtek,ext-int", &val)) {
+			if (val < 0 || val > 2) {
+				dev_err(priv->dev,
+					 "realtek,ext-int must be between 0 and 2 \n");
+				return -EINVAL;
+			}
+			p->ext_int = val;
+		} else {
+			if (dsa_is_cpu_port(priv->ds, i))
+				/* existing default */
+				p->ext_int = 1;
+			else
+				p->ext_int = -1;
+		}
 	}
 
 	/* Set maximum packet length to 1536 bytes */
