@@ -732,15 +732,18 @@ int __page_mapcount(struct page *page)
 {
 	int ret;
 
-	ret = atomic_read(&page->_mapcount) + 1;
+	if (PageHuge(page))
+		return compound_mapcount(page);
 	/*
 	 * For file THP page->_mapcount contains total number of mapping
 	 * of the page: no need to look into compound_mapcount.
 	 */
-	if (!PageAnon(page) && !PageHuge(page))
-		return ret;
+	if (!PageAnon(page))
+		return atomic_read(&page->_mapcount) + 1;
+
+	ret = atomic_read(&page->_mapcount) + 1;
 	page = compound_head(page);
-	ret += atomic_read(compound_mapcount_ptr(page)) + 1;
+	ret += head_compound_mapcount(page);
 	if (PageDoubleMap(page))
 		ret--;
 	return ret;
