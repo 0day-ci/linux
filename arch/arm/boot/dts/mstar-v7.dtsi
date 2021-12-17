@@ -123,6 +123,26 @@
 				clocks = <&xtal_div2>;
 			};
 
+			timer@6040 {
+				compatible = "mstar,msc313e-timer";
+				reg = <0x6040 0x40>;
+				clocks = <&xtal_div2>;
+				interrupts-extended = <&intc_fiq GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
+			timer1: timer@6080 {
+				compatible = "mstar,msc313e-timer";
+				reg = <0x6080 0x40>;
+				clocks = <&xtal_div2>;
+				interrupts-extended = <&intc_fiq GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
+			timer2: timer@60c0 {
+				compatible = "mstar,msc313e-timer";
+				reg = <0x60c0 0x40>;
+				clocks = <&xtal_div2>;
+				interrupts-extended = <&intc_fiq GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+			};
 
 			intc_fiq: interrupt-controller@201310 {
 				compatible = "mstar,mst-intc";
