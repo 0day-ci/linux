@@ -833,7 +833,7 @@ static struct platform_driver atmel_hlcdc_dc_platform_driver = {
 		.of_match_table = atmel_hlcdc_dc_of_match,
 	},
 };
-module_platform_driver(atmel_hlcdc_dc_platform_driver);
+drm_module_platform_driver(atmel_hlcdc_dc_platform_driver);
 
 MODULE_AUTHOR("Jean-Jacques Hiblot <jjhiblot@traphandler.com>");
 MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
