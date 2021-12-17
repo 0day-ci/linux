@@ -28,6 +28,12 @@ properties:
   interrupts:
     maxItems: 1
 
+  interrupt-controller:
+    description: marks this device as being an interrupt provider
+
+  "#interrupt-cells":
+    const: 1
+
   clocks:
     maxItems: 1
     description:
