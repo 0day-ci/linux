@@ -201,7 +201,7 @@ static void ef4_init_napi_channel(struct ef4_channel *channel);
 static void ef4_fini_napi(struct ef4_nic *efx);
 static void ef4_fini_napi_channel(struct ef4_channel *channel);
 static void ef4_fini_struct(struct ef4_nic *efx);
-static void ef4_start_all(struct ef4_nic *efx);
+static int ef4_start_all(struct ef4_nic *efx);
 static void ef4_stop_all(struct ef4_nic *efx);
 
 #define EF4_ASSERT_RESET_SERIALISED(efx)		\
@@ -590,7 +590,7 @@ fail:
  * to propagate configuration changes (mtu, checksum offload), or
  * to clear hardware error conditions
  */
-static void ef4_start_datapath(struct ef4_nic *efx)
+static int ef4_start_datapath(struct ef4_nic *efx)
 {
 	netdev_features_t old_features = efx->net_dev->features;
 	bool old_rx_scatter = efx->rx_scatter;
@@ -598,6 +598,7 @@ static void ef4_start_datapath(struct ef4_nic *efx)
 	struct ef4_rx_queue *rx_queue;
 	struct ef4_channel *channel;
 	size_t rx_buf_len;
+	int rc;
 
 	/* Calculate the rx buffer allocation parameters required to
 	 * support the current MTU, including padding for header
@@ -668,7 +669,10 @@ static void ef4_start_datapath(struct ef4_nic *efx)
 		}
 
 		ef4_for_each_channel_rx_queue(rx_queue, channel) {
-			ef4_init_rx_queue(rx_queue);
+			rc = ef4_init_rx_queue(rx_queue);
+			if (rc)
+				goto fail;
+
 			atomic_inc(&efx->active_queues);
 			ef4_stop_eventq(channel);
 			ef4_fast_push_rx_descriptors(rx_queue, false);
@@ -680,6 +684,17 @@ static void ef4_start_datapath(struct ef4_nic *efx)
 
 	if (netif_device_present(efx->net_dev))
 		netif_tx_wake_all_queues(efx->net_dev);
+
+	return 0;
+
+fail:
+	ef4_for_each_channel(channel, efx) {
+		ef4_for_each_channel_rx_queue(rx_queue, channel)
+			ef4_fini_rx_queue(rx_queue);
+		ef4_for_each_possible_channel_tx_queue(tx_queue, channel)
+			ef4_fini_tx_queue(tx_queue);
+	}
+	return rc;
 }
 
 static void ef4_stop_datapath(struct ef4_nic *efx)
@@ -851,7 +866,10 @@ out:
 			  "unable to restart interrupts on channel reallocation\n");
 		ef4_schedule_reset(efx, RESET_TYPE_DISABLE);
 	} else {
-		ef4_start_all(efx);
+		rc = ef4_start_all(efx);
+		if (rc)
+			return rc;
+
 		netif_device_attach(efx->net_dev);
 	}
 	return rc;
@@ -1810,8 +1828,10 @@ static int ef4_probe_all(struct ef4_nic *efx)
  * is safe to call multiple times, so long as the NIC is not disabled.
  * Requires the RTNL lock.
  */
-static void ef4_start_all(struct ef4_nic *efx)
+static int ef4_start_all(struct ef4_nic *efx)
 {
+	int rc;
+
 	EF4_ASSERT_RESET_SERIALISED(efx);
 	BUG_ON(efx->state == STATE_DISABLED);
 
@@ -1819,10 +1839,12 @@ static void ef4_start_all(struct ef4_nic *efx)
 	 * of these flags are safe to read under just the rtnl lock */
 	if (efx->port_enabled || !netif_running(efx->net_dev) ||
 	    efx->reset_pending)
-		return;
+		return 0;
 
 	ef4_start_port(efx);
-	ef4_start_datapath(efx);
+	rc = ef4_start_datapath(efx);
+	if (rc)
+		return rc;
 
 	/* Start the hardware monitor if there is one */
 	if (efx->type->monitor != NULL)
@@ -1834,6 +1856,8 @@ static void ef4_start_all(struct ef4_nic *efx)
 	spin_lock_bh(&efx->stats_lock);
 	efx->type->update_stats(efx, NULL, NULL);
 	spin_unlock_bh(&efx->stats_lock);
+
+	return 0;
 }
 
 /* Quiesce the hardware and software data path, and regular activity
@@ -2070,7 +2094,10 @@ int ef4_net_open(struct net_device *net_dev)
 	 * before the monitor starts running */
 	ef4_link_status_changed(efx);
 
-	ef4_start_all(efx);
+	rc = ef4_start_all(efx);
+	if (rc)
+		return rc;
+
 	ef4_selftest_async_start(efx);
 	return 0;
 }
@@ -2136,7 +2163,10 @@ static int ef4_change_mtu(struct net_device *net_dev, int new_mtu)
 	ef4_mac_reconfigure(efx);
 	mutex_unlock(&efx->mac_lock);
 
-	ef4_start_all(efx);
+	rc = ef4_start_all(efx);
+	if (rc)
+		return rc;
+
 	netif_device_attach(efx->net_dev);
 	return 0;
 }
@@ -2405,7 +2435,9 @@ int ef4_reset_up(struct ef4_nic *efx, enum reset_type method, bool ok)
 
 	mutex_unlock(&efx->mac_lock);
 
-	ef4_start_all(efx);
+	rc = ef4_start_all(efx);
+	if (rc)
+		return rc;
 
 	return 0;
 
@@ -2990,7 +3022,9 @@ static int ef4_pm_thaw(struct device *dev)
 		efx->phy_op->reconfigure(efx);
 		mutex_unlock(&efx->mac_lock);
 
-		ef4_start_all(efx);
+		rc = ef4_start_all(efx);
+		if (rc)
+			goto fail;
 
 		netif_device_attach(efx->net_dev);
 
