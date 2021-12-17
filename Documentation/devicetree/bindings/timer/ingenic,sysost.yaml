@@ -20,6 +20,12 @@ properties:
   compatible:
     enum:
       - ingenic,x1000-ost
+      - ingenic,x1600-ost
+      - ingenic,x1830-ost
+      - ingenic,x2000-ost64
+      - ingenic,x2000-ost32
+      - ingenic,x2500-ost64
+      - ingenic,x2500-ost32
 
   reg:
     maxItems: 1
