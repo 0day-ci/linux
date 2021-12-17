@@ -654,7 +654,8 @@ static void print_verifier_state(struct bpf_verifier_env *env,
 				verbose(env, "%s", kernel_type_name(reg->btf, reg->btf_id));
 			verbose(env, "(id=%d", reg->id);
 			if (reg_type_may_be_refcounted_or_null(t))
-				verbose(env, ",ref_obj_id=%d", reg->ref_obj_id);
+				verbose(env, ",%sref_obj_id=%d", reg->ref_obj_id ? "" : "parent_",
+					reg->ref_obj_id ?: reg->parent_ref_obj_id);
 			if (t != SCALAR_VALUE)
 				verbose(env, ",off=%d", reg->off);
 			if (type_is_pkt_pointer(t))
@@ -1501,7 +1502,8 @@ static void mark_reg_not_init(struct bpf_verifier_env *env,
 static void mark_btf_ld_reg(struct bpf_verifier_env *env,
 			    struct bpf_reg_state *regs, u32 regno,
 			    enum bpf_reg_type reg_type,
-			    struct btf *btf, u32 btf_id)
+			    struct btf *btf, u32 btf_id,
+			    u32 parent_ref_obj_id)
 {
 	if (reg_type == SCALAR_VALUE) {
 		mark_reg_unknown(env, regs, regno);
@@ -1510,6 +1512,7 @@ static void mark_btf_ld_reg(struct bpf_verifier_env *env,
 	mark_reg_known_zero(env, regs, regno);
 	regs[regno].type = PTR_TO_BTF_ID;
 	regs[regno].btf = btf;
+	regs[regno].parent_ref_obj_id = parent_ref_obj_id;
 	regs[regno].btf_id = btf_id;
 }
 
@@ -4152,8 +4155,14 @@ static int check_ptr_to_btf_access(struct bpf_verifier_env *env,
 	if (ret < 0)
 		return ret;
 
-	if (atype == BPF_READ && value_regno >= 0)
-		mark_btf_ld_reg(env, regs, value_regno, ret, reg->btf, btf_id);
+	if (atype == BPF_READ && value_regno >= 0) {
+		if (WARN_ON_ONCE(reg->ref_obj_id && reg->parent_ref_obj_id)) {
+			verbose(env, "verifier internal error: both ref and parent ref set\n");
+			return -EACCES;
+		}
+		mark_btf_ld_reg(env, regs, value_regno, ret, reg->btf, btf_id,
+				reg->ref_obj_id ?: reg->parent_ref_obj_id);
+	}
 
 	return 0;
 }
@@ -4207,8 +4216,14 @@ static int check_ptr_to_map_access(struct bpf_verifier_env *env,
 	if (ret < 0)
 		return ret;
 
-	if (value_regno >= 0)
-		mark_btf_ld_reg(env, regs, value_regno, ret, btf_vmlinux, btf_id);
+	if (value_regno >= 0) {
+		if (WARN_ON_ONCE(reg->ref_obj_id && reg->parent_ref_obj_id)) {
+			verbose(env, "verifier internal error: both ref and parent ref set\n");
+			return -EACCES;
+		}
+		mark_btf_ld_reg(env, regs, value_regno, ret, btf_vmlinux, btf_id,
+				reg->ref_obj_id ?: reg->parent_ref_obj_id);
+	}
 
 	return 0;
 }
@@ -5881,23 +5896,35 @@ static void mark_pkt_end(struct bpf_verifier_state *vstate, int regn, bool range
 		reg->range = AT_PKT_END;
 }
 
-static void release_reg_references(struct bpf_verifier_env *env,
+static int release_reg_references(struct bpf_verifier_env *env,
 				   struct bpf_func_state *state,
 				   int ref_obj_id)
 {
 	struct bpf_reg_state *regs = state->regs, *reg;
 	int i;
 
-	for (i = 0; i < MAX_BPF_REG; i++)
-		if (regs[i].ref_obj_id == ref_obj_id)
+	for (i = 0; i < MAX_BPF_REG; i++) {
+		if (WARN_ON_ONCE(regs[i].ref_obj_id && regs[i].parent_ref_obj_id)) {
+			verbose(env, "verifier internal error: both ref and parent ref set\n");
+			return -EACCES;
+		}
+		if (regs[i].ref_obj_id == ref_obj_id ||
+		    regs[i].parent_ref_obj_id == ref_obj_id)
 			mark_reg_unknown(env, regs, i);
+	}
 
 	bpf_for_each_spilled_reg(i, state, reg) {
 		if (!reg)
 			continue;
-		if (reg->ref_obj_id == ref_obj_id)
+		if (WARN_ON_ONCE(reg->ref_obj_id && reg->parent_ref_obj_id)) {
+			verbose(env, "verifier internal error: both ref and parent ref set\n");
+			return -EACCES;
+		}
+		if (reg->ref_obj_id == ref_obj_id ||
+		    reg->parent_ref_obj_id == ref_obj_id)
 			__mark_reg_unknown(env, reg);
 	}
+	return 0;
 }
 
 /* The pointer with the specified id has released its reference to kernel
@@ -5914,8 +5941,11 @@ static int release_reference(struct bpf_verifier_env *env,
 	if (err)
 		return err;
 
-	for (i = 0; i <= vstate->curframe; i++)
-		release_reg_references(env, vstate->frame[i], ref_obj_id);
+	for (i = 0; i <= vstate->curframe; i++) {
+		err = release_reg_references(env, vstate->frame[i], ref_obj_id);
+		if (err)
+			return err;
+	}
 
 	return 0;
 }

@@ -128,6 +128,16 @@ struct bpf_reg_state {
 	 * allowed and has the same effect as bpf_sk_release(sk).
 	 */
 	u32 ref_obj_id;
+	/* This is set for pointers which are derived from referenced
+	 * pointer (e.g. PTR_TO_BTF_ID pointer walking), so that the
+	 * pointers obtained by walking referenced PTR_TO_BTF_ID
+	 * are appropriately invalidated when the lifetime of their
+	 * parent object ends.
+	 *
+	 * Only one of ref_obj_id and parent_ref_obj_id can be set,
+	 * never both at once.
+	 */
+	u32 parent_ref_obj_id;
 	/* For scalar types (SCALAR_VALUE), this represents our knowledge of
 	 * the actual value.
 	 * For pointer types, this represents the variable part of the offset
