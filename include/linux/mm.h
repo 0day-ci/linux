@@ -2975,6 +2975,7 @@ struct page *follow_page(struct vm_area_struct *vma, unsigned long address,
 #define FOLL_SPLIT_PMD	0x20000	/* split huge pmd before returning */
 #define FOLL_PIN	0x40000	/* pages must be released via unpin_user_page */
 #define FOLL_FAST_ONLY	0x80000	/* gup_fast: prevent fall-back to slow gup */
+#define FOLL_NOUNSHARE	0x100000 /* don't trigger unsharing on shared anon pages */
 
 /*
  * FOLL_PIN and FOLL_LONGTERM may be used in various combinations with each
@@ -3029,6 +3030,12 @@ struct page *follow_page(struct vm_area_struct *vma, unsigned long address,
  * releasing pages: get_user_pages*() pages must be released via put_page(),
  * while pin_user_pages*() pages must be released via unpin_user_page().
  *
+ * FOLL_NOUNSHARE should be set when no unsharing should be triggered when
+ * eventually taking a read-only reference on a shared anonymous page, because
+ * we are sure that user space cannot use that reference for reading the page
+ * after eventually unmapping the page. FOLL_NOUNSHARE is implicitly set for the
+ * follow_page() API.
+ *
  * Please see Documentation/core-api/pin_user_pages.rst for more information.
  */
 
@@ -3042,6 +3049,9 @@ static inline int vm_fault_to_errno(vm_fault_t vm_fault, int foll_flags)
 		return -EFAULT;
 	return 0;
 }
+
+extern bool gup_must_unshare(unsigned int flags, struct page *page,
+			     bool is_head);
 
 typedef int (*pte_fn_t)(pte_t *pte, unsigned long addr, void *data);
 extern int apply_to_page_range(struct mm_struct *mm, unsigned long address,
