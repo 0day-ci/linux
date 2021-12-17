@@ -4018,27 +4018,6 @@ static void rcu_barrier_entrain(struct rcu_data *rdp)
 }
 
 /*
- * If needed, entrain an rcu_barrier() callback on rdp->cblist.
- * Wrapper for rcu_barrier_entrain() to be called without locks held.
- * Returns false without entraining anything if rdp->cpu is online, in
- * which case it is not safe to manipulate its callback list.  Otherwise,
- * entrains a callback if needed and then returns true either way.
- */
-static bool rcu_barrier_entrain_if_ofl(struct rcu_data *rdp)
-{
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&rdp->barrier_lock, flags);
-	if (rcu_rdp_cpu_online(rdp)) {
-		raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
-		return false;
-	}
-	rcu_barrier_entrain(rdp);
-	raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
-	return true;
-}
-
-/*
  * Called with preemption disabled, and from cross-cpu IRQ context.
  */
 static void rcu_barrier_handler(void *cpu_in)
@@ -4115,22 +4094,20 @@ retry:
 			rcu_barrier_trace(TPS("NQ"), cpu, rcu_state.barrier_sequence);
 			continue;
 		}
-		raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
-		if (rcu_rdp_cpu_online(rdp)) {
-			if (smp_call_function_single(cpu, rcu_barrier_handler, (void *)cpu, 1)) {
-				schedule_timeout_uninterruptible(1);
-				goto retry;
-			}
+		if (!rcu_rdp_cpu_online(rdp)) {
+			rcu_barrier_entrain(rdp);
 			WARN_ON_ONCE(READ_ONCE(rdp->barrier_seq_snap) != gseq);
-			rcu_barrier_trace(TPS("OnlineQ"), cpu, rcu_state.barrier_sequence);
+			raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
+			rcu_barrier_trace(TPS("OfflineNoCBQ"), cpu, rcu_state.barrier_sequence);
 			continue;
 		}
-		if (!rcu_barrier_entrain_if_ofl(rdp)) {
+		raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
+		if (smp_call_function_single(cpu, rcu_barrier_handler, (void *)cpu, 1)) {
 			schedule_timeout_uninterruptible(1);
 			goto retry;
 		}
 		WARN_ON_ONCE(READ_ONCE(rdp->barrier_seq_snap) != gseq);
-		rcu_barrier_trace(TPS("OfflineNoCBQ"), cpu, rcu_state.barrier_sequence);
+		rcu_barrier_trace(TPS("OnlineQ"), cpu, rcu_state.barrier_sequence);
 	}
 
 	/*
@@ -4441,8 +4418,10 @@ void rcutree_migrate_callbacks(int cpu)
 	    rcu_segcblist_empty(&rdp->cblist))
 		return;  /* No callbacks to migrate. */
 
-	local_irq_save(flags);
-	WARN_ON_ONCE(!rcu_barrier_entrain_if_ofl(rdp));
+	raw_spin_lock_irqsave(&rdp->barrier_lock, flags);
+	WARN_ON_ONCE(rcu_rdp_cpu_online(rdp));
+	rcu_barrier_entrain(rdp);
+	raw_spin_unlock(&rdp->barrier_lock); /* irqs remain disabled. */
 	my_rdp = this_cpu_ptr(&rcu_data);
 	my_rnp = my_rdp->mynode;
 	rcu_nocb_lock(my_rdp); /* irqs already disabled. */
