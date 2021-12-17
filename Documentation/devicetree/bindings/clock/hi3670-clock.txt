@@ -15,6 +15,7 @@ Required Properties:
 	- "hisilicon,hi3670-iomcu"
 	- "hisilicon,hi3670-media1-crg"
 	- "hisilicon,hi3670-media2-crg"
+	- "hisilicon,hi3670-pmctrl"
 
 - reg: physical base address of the controller and length of memory mapped
   region.
