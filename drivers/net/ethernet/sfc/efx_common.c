@@ -309,7 +309,10 @@ int efx_change_mtu(struct net_device *net_dev, int new_mtu)
 	efx_mac_reconfigure(efx, true);
 	mutex_unlock(&efx->mac_lock);
 
-	efx_start_all(efx);
+	rc = efx_start_all(efx);
+	if (rc)
+		return rc;
+
 	efx_device_attach_if_not_resetting(efx);
 	return 0;
 }
@@ -361,11 +364,12 @@ void efx_start_monitor(struct efx_nic *efx)
  * to propagate configuration changes (mtu, checksum offload), or
  * to clear hardware error conditions
  */
-static void efx_start_datapath(struct efx_nic *efx)
+static int efx_start_datapath(struct efx_nic *efx)
 {
 	netdev_features_t old_features = efx->net_dev->features;
 	bool old_rx_scatter = efx->rx_scatter;
 	size_t rx_buf_len;
+	int ret;
 
 	/* Calculate the rx buffer allocation parameters required to
 	 * support the current MTU, including padding for header
@@ -431,12 +435,15 @@ static void efx_start_datapath(struct efx_nic *efx)
 	efx->txq_wake_thresh = efx->txq_stop_thresh / 2;
 
 	/* Initialise the channels */
-	efx_start_channels(efx);
+	ret = efx_start_channels(efx);
+	if (ret)
+		return ret;
 
 	efx_ptp_start_datapath(efx);
 
 	if (netif_device_present(efx->net_dev))
 		netif_tx_wake_all_queues(efx->net_dev);
+	return 0;
 }
 
 static void efx_stop_datapath(struct efx_nic *efx)
@@ -524,8 +531,9 @@ static void efx_stop_port(struct efx_nic *efx)
  * is safe to call multiple times, so long as the NIC is not disabled.
  * Requires the RTNL lock.
  */
-void efx_start_all(struct efx_nic *efx)
+int efx_start_all(struct efx_nic *efx)
 {
+	int ret;
 	EFX_ASSERT_RESET_SERIALISED(efx);
 	BUG_ON(efx->state == STATE_DISABLED);
 
@@ -534,10 +542,12 @@ void efx_start_all(struct efx_nic *efx)
 	 */
 	if (efx->port_enabled || !netif_running(efx->net_dev) ||
 	    efx->reset_pending)
-		return;
+		return 0;
 
 	efx_start_port(efx);
-	efx_start_datapath(efx);
+	ret = efx_start_datapath(efx);
+	if (ret)
+		return ret;
 
 	/* Start the hardware monitor if there is one */
 	efx_start_monitor(efx);
@@ -557,6 +567,8 @@ void efx_start_all(struct efx_nic *efx)
 		efx->type->update_stats(efx, NULL, NULL);
 		spin_unlock_bh(&efx->stats_lock);
 	}
+
+	return 0;
 }
 
 /* Quiesce the hardware and software data path, and regular activity
@@ -786,7 +798,9 @@ int efx_reset_up(struct efx_nic *efx, enum reset_type method, bool ok)
 
 	mutex_unlock(&efx->mac_lock);
 
-	efx_start_all(efx);
+	rc = efx_start_all(efx);
+	if (rc)
+		goto fail;
 
 	if (efx->type->udp_tnl_push_ports)
 		efx->type->udp_tnl_push_ports(efx);

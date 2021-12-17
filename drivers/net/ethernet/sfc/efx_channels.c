@@ -855,7 +855,10 @@ out:
 			  "unable to restart interrupts on channel reallocation\n");
 		efx_schedule_reset(efx, RESET_TYPE_DISABLE);
 	} else {
-		efx_start_all(efx);
+		rc = efx_start_all(efx);
+		if (rc)
+			goto rollback;
+
 		efx_device_attach_if_not_resetting(efx);
 	}
 	return rc;
@@ -1101,11 +1104,12 @@ void efx_disable_interrupts(struct efx_nic *efx)
 	efx->type->irq_disable_non_ev(efx);
 }
 
-void efx_start_channels(struct efx_nic *efx)
+int efx_start_channels(struct efx_nic *efx)
 {
 	struct efx_tx_queue *tx_queue;
 	struct efx_rx_queue *rx_queue;
 	struct efx_channel *channel;
+	int ret;
 
 	efx_for_each_channel(channel, efx) {
 		efx_for_each_channel_tx_queue(tx_queue, channel) {
@@ -1114,7 +1118,10 @@ void efx_start_channels(struct efx_nic *efx)
 		}
 
 		efx_for_each_channel_rx_queue(rx_queue, channel) {
-			efx_init_rx_queue(rx_queue);
+			ret = efx_init_rx_queue(rx_queue);
+			if (ret)
+				return ret;
+
 			atomic_inc(&efx->active_queues);
 			efx_stop_eventq(channel);
 			efx_fast_push_rx_descriptors(rx_queue, false);
@@ -1123,6 +1130,7 @@ void efx_start_channels(struct efx_nic *efx)
 
 		WARN_ON(channel->rx_pkt_n_frags);
 	}
+	return 0;
 }
 
 void efx_stop_channels(struct efx_nic *efx)

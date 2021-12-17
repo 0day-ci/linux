@@ -162,7 +162,9 @@ static int ef100_net_open(struct net_device *net_dev)
 	if (rc)
 		goto fail;
 
-	efx_start_all(efx);
+	rc = efx_start_all(efx);
+	if (rc)
+		goto fail;
 
 	/* Link state detection is normally event-driven; we have
 	 * to poll now because we could have missed a change

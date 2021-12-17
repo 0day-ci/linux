@@ -131,7 +131,7 @@ void efx_discard_rx_packet(struct efx_channel *channel,
 	efx_free_rx_buffers(rx_queue, rx_buf, n_frags);
 }
 
-static void efx_init_rx_recycle_ring(struct efx_rx_queue *rx_queue)
+static int efx_init_rx_recycle_ring(struct efx_rx_queue *rx_queue)
 {
 	unsigned int bufs_in_recycle_ring, page_ring_size;
 	struct efx_nic *efx = rx_queue->efx;
@@ -150,7 +150,11 @@ static void efx_init_rx_recycle_ring(struct efx_rx_queue *rx_queue)
 					    efx->rx_bufs_per_page);
 	rx_queue->page_ring = kcalloc(page_ring_size,
 				      sizeof(*rx_queue->page_ring), GFP_KERNEL);
+	if (!rx_queue->page_ring)
+		return -ENOMEM;
+
 	rx_queue->page_ptr_mask = page_ring_size - 1;
+	return 0;
 }
 
 static void efx_fini_rx_recycle_ring(struct efx_rx_queue *rx_queue)
@@ -222,7 +226,7 @@ int efx_probe_rx_queue(struct efx_rx_queue *rx_queue)
 	return rc;
 }
 
-void efx_init_rx_queue(struct efx_rx_queue *rx_queue)
+int efx_init_rx_queue(struct efx_rx_queue *rx_queue)
 {
 	unsigned int max_fill, trigger, max_trigger;
 	struct efx_nic *efx = rx_queue->efx;
@@ -236,7 +240,9 @@ void efx_init_rx_queue(struct efx_rx_queue *rx_queue)
 	rx_queue->notified_count = 0;
 	rx_queue->removed_count = 0;
 	rx_queue->min_fill = -1U;
-	efx_init_rx_recycle_ring(rx_queue);
+	rc = efx_init_rx_recycle_ring(rx_queue);
+	if (rc)
+		return rc;
 
 	rx_queue->page_remove = 0;
 	rx_queue->page_add = rx_queue->page_ptr_mask + 1;
@@ -275,6 +281,8 @@ void efx_init_rx_queue(struct efx_rx_queue *rx_queue)
 
 	/* Set up RX descriptor ring */
 	efx_nic_init_rx(rx_queue);
+
+	return 0;
 }
 
 void efx_fini_rx_queue(struct efx_rx_queue *rx_queue)

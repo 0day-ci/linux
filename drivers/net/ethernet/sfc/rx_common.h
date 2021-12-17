@@ -47,7 +47,7 @@ void efx_discard_rx_packet(struct efx_channel *channel,
 			   unsigned int n_frags);
 
 int efx_probe_rx_queue(struct efx_rx_queue *rx_queue);
-void efx_init_rx_queue(struct efx_rx_queue *rx_queue);
+int efx_init_rx_queue(struct efx_rx_queue *rx_queue);
 void efx_fini_rx_queue(struct efx_rx_queue *rx_queue);
 void efx_remove_rx_queue(struct efx_rx_queue *rx_queue);
 void efx_destroy_rx_queue(struct efx_rx_queue *rx_queue);

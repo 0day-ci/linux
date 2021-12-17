@@ -28,7 +28,7 @@ void efx_fini_struct(struct efx_nic *efx);
 void efx_link_clear_advertising(struct efx_nic *efx);
 void efx_link_set_wanted_fc(struct efx_nic *efx, u8);
 
-void efx_start_all(struct efx_nic *efx);
+int efx_start_all(struct efx_nic *efx);
 void efx_stop_all(struct efx_nic *efx);
 
 void efx_net_stats(struct net_device *net_dev, struct rtnl_link_stats64 *stats);

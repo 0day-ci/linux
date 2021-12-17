@@ -540,7 +540,10 @@ int efx_net_open(struct net_device *net_dev)
 	 * before the monitor starts running */
 	efx_link_status_changed(efx);
 
-	efx_start_all(efx);
+	rc = efx_start_all(efx);
+	if (rc)
+		return rc;
+
 	if (efx->state == STATE_DISABLED || efx->reset_pending)
 		netif_device_detach(efx->net_dev);
 	efx_selftest_async_start(efx);
@@ -1183,7 +1186,9 @@ static int efx_pm_thaw(struct device *dev)
 		efx_mcdi_port_reconfigure(efx);
 		mutex_unlock(&efx->mac_lock);
 
-		efx_start_all(efx);
+		rc = efx_start_all(efx);
+		if (rc)
+			goto fail;
 
 		efx_device_attach_if_not_resetting(efx);
 
