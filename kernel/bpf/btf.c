@@ -6558,6 +6558,7 @@ bool bpf_is_mod_kfunc_ret_type_null(struct kfunc_btf_id_list *klist,
 
 DEFINE_KFUNC_BTF_ID_LIST(bpf_tcp_ca_kfunc_list);
 DEFINE_KFUNC_BTF_ID_LIST(prog_test_kfunc_list);
+DEFINE_KFUNC_BTF_ID_LIST(xdp_kfunc_list);
 
 #endif
 

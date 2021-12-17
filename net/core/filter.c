@@ -10008,11 +10008,35 @@ const struct bpf_prog_ops tc_cls_act_prog_ops = {
 	.test_run		= bpf_prog_test_run_skb,
 };
 
+static bool xdp_check_kfunc_call(u32 kfunc_id, struct module *owner)
+{
+	return bpf_check_mod_kfunc_call(&xdp_kfunc_list, kfunc_id, owner);
+}
+
+static bool xdp_is_acquire_kfunc(u32 kfunc_id, struct module *owner)
+{
+	return bpf_is_mod_acquire_kfunc(&xdp_kfunc_list, kfunc_id, owner);
+}
+
+static bool xdp_is_release_kfunc(u32 kfunc_id, struct module *owner)
+{
+	return bpf_is_mod_release_kfunc(&xdp_kfunc_list, kfunc_id, owner);
+}
+
+static bool xdp_is_kfunc_ret_type_null(u32 kfunc_id, struct module *owner)
+{
+	return bpf_is_mod_kfunc_ret_type_null(&xdp_kfunc_list, kfunc_id, owner);
+}
+
 const struct bpf_verifier_ops xdp_verifier_ops = {
 	.get_func_proto		= xdp_func_proto,
 	.is_valid_access	= xdp_is_valid_access,
 	.convert_ctx_access	= xdp_convert_ctx_access,
 	.gen_prologue		= bpf_noop_prologue,
+	.check_kfunc_call	= xdp_check_kfunc_call,
+	.is_acquire_kfunc	= xdp_is_acquire_kfunc,
+	.is_release_kfunc	= xdp_is_release_kfunc,
+	.is_kfunc_ret_type_null = xdp_is_kfunc_ret_type_null,
 };
 
 const struct bpf_prog_ops xdp_prog_ops = {

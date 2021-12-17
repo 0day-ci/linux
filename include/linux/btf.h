@@ -363,6 +363,7 @@ bool bpf_is_mod_kfunc_ret_type_null(struct kfunc_btf_id_list *klist,
 
 extern struct kfunc_btf_id_list bpf_tcp_ca_kfunc_list;
 extern struct kfunc_btf_id_list prog_test_kfunc_list;
+extern struct kfunc_btf_id_list xdp_kfunc_list;
 #else
 static inline void register_kfunc_btf_id_set(struct kfunc_btf_id_list *l,
 					     struct kfunc_btf_id_set *s)
@@ -396,6 +397,7 @@ bpf_is_mod_kfunc_ret_type_null(struct kfunc_btf_id_list *klist, u32 kfunc_id,
 
 static struct kfunc_btf_id_list bpf_tcp_ca_kfunc_list __maybe_unused;
 static struct kfunc_btf_id_list prog_test_kfunc_list __maybe_unused;
+static struct kfunc_btf_id_list xdp_kfunc_list __maybe_unused;
 #endif
 
 #endif
