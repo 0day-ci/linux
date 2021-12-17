@@ -2506,12 +2506,11 @@ int total_mapcount(struct page *page)
 
 	if (likely(!PageCompound(page)))
 		return atomic_read(&page->_mapcount) + 1;
-
-	compound = compound_mapcount(page);
-	nr = compound_nr(page);
 	if (PageHuge(page))
-		return compound;
-	ret = compound;
+		return head_compound_mapcount(page);
+
+	nr = compound_nr(page);
+	ret = compound = head_compound_mapcount(page);
 	for (i = 0; i < nr; i++)
 		ret += atomic_read(&page[i]._mapcount) + 1;
 	/* File pages has compound_mapcount included in _mapcount */
