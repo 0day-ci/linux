@@ -628,7 +628,7 @@ static struct platform_driver kmb_platform_driver = {
 	},
 };
 
-module_platform_driver(kmb_platform_driver);
+drm_module_platform_driver(kmb_platform_driver);
 
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("Keembay Display driver");
