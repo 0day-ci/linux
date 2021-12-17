@@ -1294,6 +1294,7 @@ static void page_remove_file_rmap(struct page *page, bool compound)
 
 static void page_remove_anon_compound_rmap(struct page *page)
 {
+	unsigned long irq_flags;
 	int i, nr;
 
 	if (!atomic_add_negative(-1, compound_mapcount_ptr(page)))
@@ -1308,23 +1309,30 @@ static void page_remove_anon_compound_rmap(struct page *page)
 
 	__mod_lruvec_page_state(page, NR_ANON_THPS, -thp_nr_pages(page));
 
-	if (TestClearPageDoubleMap(page)) {
-		/*
-		 * Subpages can be mapped with PTEs too. Check how many of
-		 * them are still mapped.
-		 */
-		for (i = 0, nr = 0; i < thp_nr_pages(page); i++) {
-			if (atomic_add_negative(-1, &page[i]._mapcount))
-				nr++;
-		}
+	if (PageDoubleMap(page)) {
+		thp_mapcount_lock(page, &irq_flags);
+		if (TestClearPageDoubleMap(page)) {
+			/*
+			 * Subpages can be mapped with PTEs too. Check how many
+			 * of them are still mapped.
+			 */
+			for (i = 0, nr = 0; i < thp_nr_pages(page); i++) {
+				if (atomic_add_negative(-1, &page[i]._mapcount))
+					nr++;
+			}
+			thp_mapcount_unlock(page, irq_flags);
 
-		/*
-		 * Queue the page for deferred split if at least one small
-		 * page of the compound page is unmapped, but at least one
-		 * small page is still mapped.
-		 */
-		if (nr && nr < thp_nr_pages(page))
-			deferred_split_huge_page(page);
+			/*
+			 * Queue the page for deferred split if at least one
+			 * small page of the compound page is unmapped, but at
+			 * least one small page is still mapped.
+			 */
+			if (nr && nr < thp_nr_pages(page))
+				deferred_split_huge_page(page);
+		} else {
+			thp_mapcount_unlock(page, irq_flags);
+			nr = thp_nr_pages(page);
+		}
 	} else {
 		nr = thp_nr_pages(page);
 	}

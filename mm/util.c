@@ -730,6 +730,8 @@ EXPORT_SYMBOL(folio_mapping);
 /* Slow path of page_mapcount() for compound pages */
 int __page_mapcount(struct page *page)
 {
+	struct page *head_page;
+	unsigned int seqcount;
 	int ret;
 
 	if (PageHuge(page))
@@ -741,11 +743,16 @@ int __page_mapcount(struct page *page)
 	if (!PageAnon(page))
 		return atomic_read(&page->_mapcount) + 1;
 
-	ret = atomic_read(&page->_mapcount) + 1;
-	page = compound_head(page);
-	ret += head_compound_mapcount(page);
-	if (PageDoubleMap(page))
-		ret--;
+	/* The mapcount_seqlock is so far only required for anonymous THP. */
+	head_page = compound_head(page);
+	do {
+		seqcount = thp_mapcount_read_begin(head_page);
+		ret = atomic_read(&page->_mapcount) + 1;
+		ret += head_compound_mapcount(head_page);
+		if (PageDoubleMap(head_page))
+			ret--;
+	} while (thp_mapcount_read_retry(head_page, seqcount));
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(__page_mapcount);

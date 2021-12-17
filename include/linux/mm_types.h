@@ -140,6 +140,15 @@ struct page {
 			unsigned char compound_order;
 			atomic_t compound_mapcount;
 			unsigned int compound_nr; /* 1 << compound_order */
+			/*
+			 * THP only: allow for atomic reading of the mapcount,
+			 * for example when we might be racing with a concurrent
+			 * THP split. Initialized for all THP but locking is
+			 * so far only required for anon THP where such races
+			 * apply. Write access is serialized via the
+			 * PG_locked-based spinlock in the first tail page.
+			 */
+			raw_seqcount_t mapcount_seqcount;
 		};
 		struct {	/* Second tail page of compound page */
 			unsigned long _compound_pad_1;	/* compound_head */

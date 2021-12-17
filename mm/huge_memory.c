@@ -527,6 +527,7 @@ void prep_transhuge_page(struct page *page)
 
 	INIT_LIST_HEAD(page_deferred_list(page));
 	set_compound_page_dtor(page, TRANSHUGE_PAGE_DTOR);
+	thp_mapcount_seqcount_init(page);
 }
 
 bool is_transparent_hugepage(struct page *page)
@@ -1959,11 +1960,11 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		unsigned long haddr, bool freeze)
 {
 	struct mm_struct *mm = vma->vm_mm;
+	unsigned long addr, irq_flags;
 	struct page *page;
 	pgtable_t pgtable;
 	pmd_t old_pmd, _pmd;
 	bool young, write, soft_dirty, pmd_migration = false, uffd_wp = false;
-	unsigned long addr;
 	int i;
 
 	VM_BUG_ON(haddr & ~HPAGE_PMD_MASK);
@@ -2109,6 +2110,13 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		int val = 1;
 
 		/*
+		 * lock_page_memcg() is taken before thp_mapcount_lock() in
+		 * page_remove_anon_compound_rmap(), respect the same locking
+		 * order.
+		 */
+		lock_page_memcg(page);
+		thp_mapcount_lock(page, &irq_flags);
+		/*
 		 * Set PG_double_map before dropping compound_mapcount to avoid
 		 * false-negative page_mapped().
 		 *
@@ -2121,7 +2129,6 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		for (i = 0; i < HPAGE_PMD_NR; i++)
 			atomic_add(val, &page[i]._mapcount);
 
-		lock_page_memcg(page);
 		if (atomic_add_negative(-1, compound_mapcount_ptr(page))) {
 			/* Last compound_mapcount is gone. */
 			__mod_lruvec_page_state(page, NR_ANON_THPS,
@@ -2132,6 +2139,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 					atomic_dec(&page[i]._mapcount);
 			}
 		}
+		thp_mapcount_unlock(page, irq_flags);
 		unlock_page_memcg(page);
 	}
 
@@ -2501,6 +2509,8 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 int total_mapcount(struct page *page)
 {
 	int i, compound, nr, ret;
+	unsigned int seqcount;
+	bool double_map;
 
 	VM_BUG_ON_PAGE(PageTail(page), page);
 
@@ -2510,13 +2520,19 @@ int total_mapcount(struct page *page)
 		return head_compound_mapcount(page);
 
 	nr = compound_nr(page);
-	ret = compound = head_compound_mapcount(page);
-	for (i = 0; i < nr; i++)
-		ret += atomic_read(&page[i]._mapcount) + 1;
+
+	do {
+		seqcount = thp_mapcount_read_begin(page);
+		ret = compound = head_compound_mapcount(page);
+		for (i = 0; i < nr; i++)
+			ret += atomic_read(&page[i]._mapcount) + 1;
+		double_map = PageDoubleMap(page);
+	} while (thp_mapcount_read_retry(page, seqcount));
+
 	/* File pages has compound_mapcount included in _mapcount */
 	if (!PageAnon(page))
 		return ret - compound * nr;
-	if (PageDoubleMap(page))
+	if (double_map)
 		ret -= nr;
 	return ret;
 }
@@ -2548,6 +2564,7 @@ int total_mapcount(struct page *page)
 int page_trans_huge_mapcount(struct page *page, int *total_mapcount)
 {
 	int i, ret, _total_mapcount, mapcount;
+	unsigned int seqcount;
 
 	/* hugetlbfs shouldn't call it */
 	VM_BUG_ON_PAGE(PageHuge(page), page);
@@ -2561,17 +2578,22 @@ int page_trans_huge_mapcount(struct page *page, int *total_mapcount)
 
 	page = compound_head(page);
 
-	_total_mapcount = ret = 0;
-	for (i = 0; i < thp_nr_pages(page); i++) {
-		mapcount = atomic_read(&page[i]._mapcount) + 1;
-		ret = max(ret, mapcount);
-		_total_mapcount += mapcount;
-	}
-	if (PageDoubleMap(page)) {
-		ret -= 1;
-		_total_mapcount -= thp_nr_pages(page);
-	}
-	mapcount = compound_mapcount(page);
+	do {
+		_total_mapcount = ret = 0;
+
+		seqcount = thp_mapcount_read_begin(page);
+		for (i = 0; i < thp_nr_pages(page); i++) {
+			mapcount = atomic_read(&page[i]._mapcount) + 1;
+			ret = max(ret, mapcount);
+			_total_mapcount += mapcount;
+		}
+		if (PageDoubleMap(page)) {
+			ret -= 1;
+			_total_mapcount -= thp_nr_pages(page);
+		}
+		mapcount = compound_mapcount(page);
+	} while (thp_mapcount_read_retry(page, seqcount));
+
 	ret += mapcount;
 	_total_mapcount += mapcount;
 	if (total_mapcount)

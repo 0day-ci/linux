@@ -318,6 +318,49 @@ static inline struct list_head *page_deferred_list(struct page *page)
 	return &page[2].deferred_list;
 }
 
+static inline void thp_mapcount_seqcount_init(struct page *page)
+{
+	raw_seqcount_init(&page[1].mapcount_seqcount);
+}
+
+static inline unsigned int thp_mapcount_read_begin(struct page *page)
+{
+	VM_BUG_ON_PAGE(PageTail(page), page);
+	return raw_read_seqcount_begin(&page[1].mapcount_seqcount);
+}
+
+static inline bool thp_mapcount_read_retry(struct page *page,
+					   unsigned int seqcount)
+{
+	VM_BUG_ON_PAGE(PageTail(page), page);
+	if (!raw_read_seqcount_retry(&page[1].mapcount_seqcount, seqcount))
+		return false;
+	cpu_relax();
+	return true;
+}
+
+static inline void thp_mapcount_lock(struct page *page,
+				     unsigned long *irq_flags)
+{
+	VM_BUG_ON_PAGE(PageTail(page), page);
+	/*
+	 * Prevent deadlocks in thp_mapcount_read_begin() if it is called in IRQ
+	 * context.
+	 */
+	local_irq_save(*irq_flags);
+	bit_spin_lock(PG_locked, &page[1].flags);
+	raw_write_seqcount_begin(&page[1].mapcount_seqcount);
+}
+
+static inline void thp_mapcount_unlock(struct page *page,
+				       unsigned long irq_flags)
+{
+	VM_BUG_ON_PAGE(PageTail(page), page);
+	raw_write_seqcount_end(&page[1].mapcount_seqcount);
+	bit_spin_unlock(PG_locked, &page[1].flags);
+	local_irq_restore(irq_flags);
+}
+
 #else /* CONFIG_TRANSPARENT_HUGEPAGE */
 #define HPAGE_PMD_SHIFT ({ BUILD_BUG(); 0; })
 #define HPAGE_PMD_MASK ({ BUILD_BUG(); 0; })
@@ -467,6 +510,28 @@ static inline bool thp_migration_supported(void)
 {
 	return false;
 }
+
+static inline unsigned int thp_mapcount_read_begin(struct page *page)
+{
+	return 0;
+}
+
+static inline bool thp_mapcount_read_retry(struct page *page,
+					   unsigned int seqcount)
+{
+	return false;
+}
+
+static inline void thp_mapcount_lock(struct page *page,
+				     unsigned long *irq_flags)
+{
+}
+
+static inline void thp_mapcount_unlock(struct page *page,
+				       unsigned long irq_flags)
+{
+}
+
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 
 /**
