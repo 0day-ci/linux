@@ -286,7 +286,7 @@ static struct platform_driver zynqmp_dpsub_driver = {
 	},
 };
 
-module_platform_driver(zynqmp_dpsub_driver);
+drm_module_platform_driver(zynqmp_dpsub_driver);
 
 MODULE_AUTHOR("Xilinx, Inc.");
 MODULE_DESCRIPTION("ZynqMP DP Subsystem Driver");
