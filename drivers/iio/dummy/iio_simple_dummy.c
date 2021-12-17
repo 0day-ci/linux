@@ -577,7 +577,7 @@ static struct iio_sw_device *iio_dummy_probe(const char *name)
 	swd = kzalloc(sizeof(*swd), GFP_KERNEL);
 	if (!swd) {
 		ret = -ENOMEM;
-		goto error_kzalloc;
+		return ERR_PTR(ret);
 	}
 	/*
 	 * Allocate an IIO device.
@@ -589,8 +589,9 @@ static struct iio_sw_device *iio_dummy_probe(const char *name)
 	 */
 	indio_dev = iio_device_alloc(parent, sizeof(*st));
 	if (!indio_dev) {
+		kfree(swd);
 		ret = -ENOMEM;
-		goto error_ret;
+		return ERR_PTR(ret);
 	}
 
 	st = iio_priv(indio_dev);
@@ -616,6 +617,10 @@ static struct iio_sw_device *iio_dummy_probe(const char *name)
 	 *    indio_dev->name = spi_get_device_id(spi)->name;
 	 */
 	indio_dev->name = kstrdup(name, GFP_KERNEL);
+	if (!indio_dev->name) {
+		ret = -ENOMEM;
+		goto error_free_device;
+	}
 
 	/* Provide description of available channels */
 	indio_dev->channels = iio_dummy_channels;
@@ -650,10 +655,9 @@ error_unconfigure_buffer:
 error_unregister_events:
 	iio_simple_dummy_events_unregister(indio_dev);
 error_free_device:
+	kfree(indio_dev->name);
 	iio_device_free(indio_dev);
-error_ret:
 	kfree(swd);
-error_kzalloc:
 	return ERR_PTR(ret);
 }
 
