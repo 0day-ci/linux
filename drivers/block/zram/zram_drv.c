@@ -482,7 +482,7 @@ static ssize_t backing_dev_store(struct device *dev,
 	int err;
 	struct zram *zram = dev_to_zram(dev);
 
-	file_name = kmalloc(PATH_MAX, GFP_KERNEL);
+	file_name = kmemdup_nul(buf, PATH_MAX, GFP_KERNEL);
 	if (!file_name)
 		return -ENOMEM;
 
@@ -493,7 +493,6 @@ static ssize_t backing_dev_store(struct device *dev,
 		goto out;
 	}
 
-	strlcpy(file_name, buf, PATH_MAX);
 	/* ignore trailing newline */
 	sz = strlen(file_name);
 	if (sz > 0 && file_name[sz - 1] == '\n')
@@ -1024,10 +1023,10 @@ static ssize_t comp_algorithm_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct zram *zram = dev_to_zram(dev);
-	char compressor[ARRAY_SIZE(zram->compressor)];
+	char *compressor;
 	size_t sz;
 
-	strlcpy(compressor, buf, sizeof(compressor));
+	compressor = kmemdup_nul(buf, sizeof(zram->compressor), GFP_KERNEL);
 	/* ignore trailing newline */
 	sz = strlen(compressor);
 	if (sz > 0 && compressor[sz - 1] == '\n')
@@ -1982,7 +1981,7 @@ static int zram_add(void)
 	if (ret)
 		goto out_cleanup_disk;
 
-	strlcpy(zram->compressor, default_compressor, sizeof(zram->compressor));
+	strcpy(zram->compressor, default_compressor);
 
 	zram_debugfs_register(zram);
 	pr_info("Added device: %s\n", zram->disk->disk_name);
