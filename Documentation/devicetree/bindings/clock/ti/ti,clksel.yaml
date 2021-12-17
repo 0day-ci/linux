@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/ti/ti,clksel.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Binding for TI clksel clock
+
+maintainers:
+  - Tony Lindgren <tony@atomide.com>
+
+description: |
+  The TI CLKSEL clocks consist of consist of a mux, divider, multiplier and
+  gate bits.
+
+properties:
+  compatible:
+    const: ti,clksel
+
+  reg:
+    maxItems: 1
+    description: The CLKSEL register
+
+  "#clock-cells":
+    const: 1
+
+required:
+  - compatible
+  - reg
+  - "#clock-cells"
+
+additionalProperties: true
+
+examples:
+  - |
+    clksel_gfx_fclk: clock@52c {
+      compatible = "ti,clksel";
+      reg = <0x25c 0x4>;
+      #clock-cells = <1>;
+    };
+...
