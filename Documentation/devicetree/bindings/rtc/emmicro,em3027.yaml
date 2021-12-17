@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/rtc/emmicro,em3027.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: EM Microelectronic EM3027 RTC Device Tree Bindings
+
+maintainers:
+  - Alexandre Belloni <alexandre.belloni@bootlin.com>
+
+properties:
+  compatible:
+    const: emmicro,em3027
+
+  reg:
+    maxItems: 1
+
+allOf:
+  - $ref: "rtc.yaml#"
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+
+examples:
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      rtc@56 {
+        compatible = "emmicro,em3027";
+        reg = <0x56>;
+      };
+    };
