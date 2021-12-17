@@ -307,7 +307,7 @@ static struct platform_driver kirin_drm_platform_driver = {
 	},
 };
 
-module_platform_driver(kirin_drm_platform_driver);
+drm_module_platform_driver(kirin_drm_platform_driver);
 
 MODULE_AUTHOR("Xinliang Liu <xinliang.liu@linaro.org>");
 MODULE_AUTHOR("Xinliang Liu <z.liuxinliang@hisilicon.com>");
