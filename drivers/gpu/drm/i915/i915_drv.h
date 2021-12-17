@@ -117,6 +117,14 @@
 
 struct drm_i915_gem_object;
 
+enum cdclk_actions {
+	CDCLK_MODESET = 0,
+	CDCLK_SQUASH,
+	CDCLK_CRAWL,
+	CDCLK_NOOP,
+	CDCLK_ACTIONS
+};
+
 /* Threshold == 5 for long IRQs, 50 for short */
 #define HPD_STORM_DEFAULT_THRESHOLD 50
 
@@ -782,6 +790,11 @@ struct drm_i915_private {
 		const struct intel_cdclk_vals *table;
 
 		struct intel_global_obj obj;
+
+		struct cdclk_steps {
+			enum cdclk_actions action;
+			u32 cdclk;
+		} steps[CDCLK_ACTIONS];
 	} cdclk;
 
 	struct {
