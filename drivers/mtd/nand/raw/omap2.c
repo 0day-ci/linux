@@ -2352,7 +2352,7 @@ static int omap_nand_remove(struct platform_device *pdev)
 	return ret;
 }
 
-static const struct of_device_id omap_nand_ids[] = {
+const struct of_device_id omap_nand_ids[] = {
 	{ .compatible = "ti,omap2-nand", },
 	{},
 };

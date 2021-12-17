@@ -61,4 +61,9 @@ struct gpmc_nand_regs {
 	void __iomem	*gpmc_bch_result5[GPMC_BCH_NUM_REMAINDER];
 	void __iomem	*gpmc_bch_result6[GPMC_BCH_NUM_REMAINDER];
 };
+
+#if defined(CONFIG_MTD_NAND_OMAP2)
+extern const struct of_device_id omap_nand_ids[];
+#endif
+
 #endif

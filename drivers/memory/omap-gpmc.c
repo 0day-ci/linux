@@ -2091,6 +2091,7 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
 	u32 val;
 	struct gpio_desc *waitpin_desc = NULL;
 	struct gpmc_device *gpmc = platform_get_drvdata(pdev);
+	bool is_nand = false;
 
 	if (of_property_read_u32(child, "reg", &cs) < 0) {
 		dev_err(&pdev->dev, "%pOF has no 'reg' property\n",
@@ -2183,7 +2184,12 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
 		}
 	}
 
-	if (of_device_is_compatible(child, "ti,omap2-nand")) {
+#if defined(CONFIG_MTD_NAND_OMAP2)
+	if (of_match_node(omap_nand_ids, child))
+		is_nand = true;
+#endif
+
+	if (is_nand) {
 		/* NAND specific setup */
 		val = 8;
 		of_property_read_u32(child, "nand-bus-width", &val);
