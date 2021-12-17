@@ -461,6 +461,12 @@ config MTD_NAND_PL35X
 	  Enables support for PrimeCell SMC PL351 and PL353 NAND
 	  controller found on Zynq7000.
 
+config MTD_NAND_RZN1
+	tristate "Renesas RZ/N1D, RZ/N1S, RZ/N1L NAND controller"
+	depends on ARCH_RENESAS || COMPILE_TEST
+	help
+	  Enables support for Renesas RZ/N1x SoC family NAND controller.
+
 comment "Misc"
 
 config MTD_SM_COMMON
