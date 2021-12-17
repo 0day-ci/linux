@@ -144,6 +144,8 @@ struct psi_trigger {
 
 	/* Refcounting to prevent premature destruction */
 	struct kref refcount;
+
+	bool new_stall;
 };
 
 struct psi_group {

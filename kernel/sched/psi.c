@@ -466,9 +466,12 @@ static void psi_avgs_work(struct work_struct *work)
 static void window_reset(struct psi_window *win, u64 now, u64 value,
 			 u64 prev_growth)
 {
+	struct psi_trigger *t = container_of(win, struct psi_trigger, win);
+
 	win->start_time = now;
 	win->start_value = value;
 	win->prev_growth = prev_growth;
+	t->new_stall = false;
 }
 
 /*
@@ -523,7 +526,6 @@ static void init_triggers(struct psi_group *group, u64 now)
 static u64 update_triggers(struct psi_group *group, u64 now)
 {
 	struct psi_trigger *t;
-	bool new_stall = false;
 	u64 *total = group->total[PSI_POLL];
 
 	/*
@@ -531,19 +533,26 @@ static u64 update_triggers(struct psi_group *group, u64 now)
 	 * watchers know when their specified thresholds are exceeded.
 	 */
 	list_for_each_entry(t, &group->triggers, node) {
-		u64 growth;
-
 		/* Check for stall activity */
 		if (group->polling_total[t->state] == total[t->state])
 			continue;
 
 		/*
-		 * Multiple triggers might be looking at the same state,
-		 * remember to update group->polling_total[] once we've
-		 * been through all of them. Also remember to extend the
-		 * polling time if we see new stall activity.
+		 * update the trigger if there is new stall which will be
+		 * reset when run out of the window
 		 */
-		new_stall = true;
+		t->new_stall = true;
+
+		memcpy(&group->polling_total[t->state], &total[t->state],
+				sizeof(group->polling_total[t->state]));
+	}
+
+	list_for_each_entry(t, &group->triggers, node) {
+		u64 growth;
+
+		/* check if new stall happened during this window*/
+		if (!t->new_stall)
+			continue;
 
 		/* Calculate growth since last update */
 		growth = window_update(&t->win, now, total[t->state]);
@@ -559,10 +568,6 @@ static u64 update_triggers(struct psi_group *group, u64 now)
 			wake_up_interruptible(&t->event_wait);
 		t->last_event_time = now;
 	}
-
-	if (new_stall)
-		memcpy(group->polling_total, total,
-				sizeof(group->polling_total));
 
 	return now + group->poll_min_period;
 }
@@ -1163,6 +1168,7 @@ struct psi_trigger *psi_trigger_create(struct psi_group *group,
 	t->last_event_time = 0;
 	init_waitqueue_head(&t->event_wait);
 	kref_init(&t->refcount);
+	t->new_stall = false;
 
 	mutex_lock(&group->trigger_lock);
 
