@@ -295,7 +295,7 @@ static struct platform_driver shmob_drm_platform_driver = {
 	},
 };
 
-module_platform_driver(shmob_drm_platform_driver);
+drm_module_platform_driver(shmob_drm_platform_driver);
 
 MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
 MODULE_DESCRIPTION("Renesas SH Mobile DRM Driver");
