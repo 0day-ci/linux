@@ -29,6 +29,8 @@
 
 #include <linux/list.h>
 #include <linux/irqreturn.h>
+#include <linux/pci.h>
+#include <linux/platform_device.h>
 
 #include <drm/drm_device.h>
 
@@ -603,5 +605,53 @@ static inline bool drm_drv_uses_atomic_modeset(struct drm_device *dev)
 int drm_dev_set_unique(struct drm_device *dev, const char *name);
 
 extern bool drm_firmware_drivers_only(void);
+
+/**
+ * drm_pci_register_driver() - register a DRM driver for PCI devices
+ * @drv: PCI driver structure
+ *
+ * Returns zero on success or a negative errno code on failure.
+ */
+static inline int drm_pci_register_driver(struct pci_driver *drv)
+{
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
+	return pci_register_driver(drv);
+}
+
+/**
+ * drm_module_pci_driver() - helper macro for registering a DRM PCI driver
+ *
+ * Helper macro for DRM PCI drivers which do not do anything special in their
+ * module init/exit and just need the DRM specific module init.
+ */
+#define drm_module_pci_driver(__pci_driver) \
+	module_driver(__pci_driver, drm_pci_register_driver, \
+		      pci_unregister_driver)
+
+/**
+ * drm_platform_driver_register - register a DRM driver for platform devices
+ * @drv: platform driver structure
+ *
+ * Returns zero on success or a negative errno code on failure.
+ */
+static inline int drm_platform_driver_register(struct platform_driver *drv)
+{
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
+	return platform_driver_register(drv);
+}
+
+/**
+ * drm_module_platform_driver() - helper macro for registering a DRM platform driver
+ *
+ * Helper macro for DRM platform drivers which do not do anything special in their
+ * module init/exit and just need the DRM specific module init.
+ */
+#define drm_module_platform_driver(__platform_driver) \
+	module_driver(__platform_driver, drm_platform_driver_register, \
+		      platform_driver_unregister)
 
 #endif
