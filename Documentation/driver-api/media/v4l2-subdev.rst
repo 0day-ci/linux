@@ -518,6 +518,63 @@ The :c:func:`v4l2_i2c_new_subdev` function will call
 :c:type:`i2c_board_info` structure using the ``client_type`` and the
 ``addr`` to fill it.
 
+Centrally managed subdev active state
+-------------------------------------
+
+Traditionally V4L2 subdev drivers maintained internal state for the active
+device configuration. This is often implemented e.g. as an array of
+struct v4l2_mbus_framefmt, one entry for each pad, and similarly for cropping
+and composition rectangles.
+
+In addition to the active configuration, each subdev file-handle has an array of
+struct v4l2_subdev_pad_config, managed by V4L2 core, which contains the try
+configuration.
+
+To simplify the subdev drivers the V4L2 subdev API now optionally supports a
+centrally managed active configuration represented by
+:c:type:`v4l2_subdev_state`. One instance of state, which contains the active
+device configuration, is associated with the sub-device itself as part of
+the :c:type:`v4l2_subdev` structure, while the core associates to each open
+file-handle a try state, which contains the configuration valid in the
+file-handle context only.
+
+Sub-device drivers can opt-in and use state to manage their active configuration
+by initializing the subdevice state with a call to v4l2_subdev_init_finalize()
+before registering the sub-device. They must also call v4l2_subdev_cleanup()
+to release all the acquired resources before unregistering the sub-device.
+The core automatically initializes a state for each open file-handle where to
+store the try configurations and releases them at file-handle closing time.
+
+V4L2 sub-device operations that use both the :ref:`ACTIVE and TRY formats
+<v4l2-subdev-format-whence>` receive the correct state to operate on as a
+'state' parameter. The sub-device driver can access and modify the
+configuration stored in the provided state after having locked it by calling
+:c:func:`v4l2_subdev_lock_state()`. The driver must then call
+:c:func:`v4l2_subdev_unlock_state()` to unlock the state when done.
+
+Operations that do not receive a state parameter implicitly operate on the
+subdevice active state, which drivers can exclusively access by
+calling :c:func:`v4l2_subdev_lock_active_state()`. The sub-device active state
+must equally be released by calling :c:func:`v4l2_subdev_unlock_state()`.
+
+Drivers must never manually access the state stored in the :c:type:`v4l2_subdev`
+or in the file-handle without going through the designated helpers.
+
+While the V4L2 core will pass the correct try- or active-state to the
+subdevice operations, device drivers might call operations on other
+subdevices by using :c:func:`v4l2_subdev_call()` kAPI and pass NULL as the
+state. This is only a problem for subdev drivers which use the
+centrally managed active-state and are used in media pipelines with older
+subdev drivers. In these cases the called subdev ops must also handle the NULL
+case. This can be easily managed by the use of
+:c:func:`v4l2_subdev_lock_and_return_state()` helper.
+
+:c:func:`v4l2_subdev_lock_and_return_state()` should only be used when porting
+an existing driver to the new state management when it cannot be guaranteed
+that the current callers will pass the state properly. The function prints a
+notice when the passed state is NULL to encourage the porting of the callers
+to the new state management.
+
 V4L2 sub-device functions and data structures
 ---------------------------------------------
 
