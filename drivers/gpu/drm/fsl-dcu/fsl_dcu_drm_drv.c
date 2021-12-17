@@ -368,7 +368,7 @@ static struct platform_driver fsl_dcu_drm_platform_driver = {
 	},
 };
 
-module_platform_driver(fsl_dcu_drm_platform_driver);
+drm_module_platform_driver(fsl_dcu_drm_platform_driver);
 
 MODULE_DESCRIPTION("Freescale DCU DRM Driver");
 MODULE_LICENSE("GPL");
