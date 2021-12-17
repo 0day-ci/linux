@@ -2029,3 +2029,23 @@ err_request:
 	usb4_usb3_port_clear_cm_request(port);
 	return ret;
 }
+
+/**
+ * usb4_port_clx_supported() - Check if CLx is supported by the link
+ * @port: Port to check for CLx support for
+ *
+ * PORT_CS_18_CPS bit reflects if the link supports CLx including
+ * active cables (if connected on the link).
+ */
+bool usb4_port_clx_supported(struct tb_port *port)
+{
+	int ret;
+	u32 val;
+
+	ret = tb_port_read(port, &val, TB_CFG_PORT,
+			   port->cap_usb4 + PORT_CS_18, 1);
+	if (ret)
+		return false;
+
+	return !!(val & PORT_CS_18_CPS);
+}

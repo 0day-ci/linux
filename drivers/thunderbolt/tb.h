@@ -109,6 +109,13 @@ struct tb_switch_tmu {
 	enum tb_switch_tmu_rate rate_request;
 };
 
+enum tb_clx {
+	TB_CLX_DISABLE,
+	TB_CL0S,
+	TB_CL1,
+	TB_CL2,
+};
+
 /**
  * struct tb_switch - a thunderbolt switch
  * @dev: Device for the switch
@@ -157,6 +164,7 @@ struct tb_switch_tmu {
  * @min_dp_main_credits: Router preferred minimum number of buffers for DP MAIN
  * @max_pcie_credits: Router preferred number of buffers for PCIe
  * @max_dma_credits: Router preferred number of buffers for DMA/P2P
+ * @clx: CLx state on the upstream link of the switch
  *
  * When the switch is being added or removed to the domain (other
  * switches) you need to have domain lock held.
@@ -205,6 +213,7 @@ struct tb_switch {
 	unsigned int min_dp_main_credits;
 	unsigned int max_pcie_credits;
 	unsigned int max_dma_credits;
+	enum tb_clx clx;
 };
 
 /**
@@ -860,6 +869,20 @@ static inline bool tb_switch_is_titan_ridge(const struct tb_switch *sw)
 	return false;
 }
 
+static inline bool tb_switch_is_tiger_lake(const struct tb_switch *sw)
+{
+	if (sw->config.vendor_id == PCI_VENDOR_ID_INTEL) {
+		switch (sw->config.device_id) {
+		case PCI_DEVICE_ID_INTEL_TGL_NHI0:
+		case PCI_DEVICE_ID_INTEL_TGL_NHI1:
+		case PCI_DEVICE_ID_INTEL_TGL_H_NHI0:
+		case PCI_DEVICE_ID_INTEL_TGL_H_NHI1:
+			return true;
+		}
+	}
+	return false;
+}
+
 /**
  * tb_switch_is_usb4() - Is the switch USB4 compliant
  * @sw: Switch to check
@@ -902,6 +925,11 @@ bool tb_switch_tmu_hifi_is_enabled(struct tb_switch *sw, bool unidirect);
 void tb_switch_tmu_configure(struct tb_switch *sw,
 			     enum tb_switch_tmu_rate rate,
 			     bool unidirectional);
+
+int tb_switch_enable_clx(struct tb_switch *sw, enum tb_clx clx);
+int tb_switch_disable_clx(struct tb_switch *sw, enum tb_clx clx);
+bool tb_switch_is_clx_enabled(struct tb_switch *sw);
+
 int tb_wait_for_port(struct tb_port *port, bool wait_if_unplugged);
 int tb_port_add_nfc_credits(struct tb_port *port, int credits);
 int tb_port_clear_counter(struct tb_port *port, int counter);
@@ -1123,6 +1151,7 @@ static inline struct usb4_port *tb_to_usb4_port_device(struct device *dev)
 struct usb4_port *usb4_port_device_add(struct tb_port *port);
 void usb4_port_device_remove(struct usb4_port *usb4);
 int usb4_port_device_resume(struct usb4_port *usb4);
+bool usb4_port_clx_supported(struct tb_port *port);
 
 /* Keep link controller awake during update */
 #define QUIRK_FORCE_POWER_LINK_CONTROLLER		BIT(0)
