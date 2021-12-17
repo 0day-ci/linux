@@ -359,7 +359,7 @@ static struct platform_driver aspeed_gfx_platform_driver = {
 	},
 };
 
-module_platform_driver(aspeed_gfx_platform_driver);
+drm_module_platform_driver(aspeed_gfx_platform_driver);
 
 MODULE_AUTHOR("Joel Stanley <joel@jms.id.au>");
 MODULE_DESCRIPTION("ASPEED BMC DRM/KMS driver");
