@@ -3393,6 +3393,32 @@ out:
 	return ret;
 }
 
+/*
+ * If when freeing a log tree we fail to iterate over the entire tree due to a
+ * past writeback failure, then we have not properly freed every metadata extent.
+ * In that case we use this function that does not iterate the log tree but it
+ * still adjusts the reserved bytes in the block group of each metadata extent.
+ */
+static void unaccount_all_log_buffers(struct btrfs_root *log)
+{
+	struct btrfs_fs_info *fs_info = log->fs_info;
+	u64 start = 0;
+	u64 end;
+
+	while (!find_first_extent_bit(&log->dirty_log_pages, start, &start, &end,
+				      EXTENT_DIRTY | EXTENT_NEW, NULL)) {
+		u64 bytenr;
+
+		for (bytenr = start; bytenr < end; bytenr += fs_info->nodesize) {
+			unaccount_log_buffer(fs_info, bytenr);
+			cond_resched();
+		}
+
+		start = end + 1;
+	}
+
+}
+
 static void free_log_tree(struct btrfs_trans_handle *trans,
 			  struct btrfs_root *log)
 {
@@ -3405,10 +3431,12 @@ static void free_log_tree(struct btrfs_trans_handle *trans,
 	if (log->node) {
 		ret = walk_log_tree(trans, log, &wc);
 		if (ret) {
-			if (trans)
+			if (trans) {
 				btrfs_abort_transaction(trans, ret);
-			else
+			} else {
 				btrfs_handle_fs_error(log->fs_info, ret, NULL);
+				unaccount_all_log_buffers(log);
+			}
 		}
 	}
 
