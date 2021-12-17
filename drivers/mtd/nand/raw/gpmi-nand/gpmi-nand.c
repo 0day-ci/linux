@@ -570,6 +570,27 @@ err_out:
 	return ret;
 }
 
+struct edo_mode {
+	u32 tRC_min;
+	long clk_rate;
+	u8 wrn_dly_sel;
+};
+
+static const struct edo_mode edo_modes[] = {
+	{.tRC_min = 30000, .clk_rate = 22000000,
+	 .wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_4_TO_8NS},
+	{.tRC_min = 30000, .clk_rate = 22000000,
+	 .wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_4_TO_8NS},
+	{.tRC_min = 30000, .clk_rate = 22000000,
+	 .wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_4_TO_8NS},
+	{.tRC_min = 30000, .clk_rate = 22000000,
+	 .wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_4_TO_8NS},
+	{.tRC_min = 25000, .clk_rate = 80000000,
+	 .wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_NO_DELAY},
+	{.tRC_min = 20000, .clk_rate = 100000000,
+	 .wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_NO_DELAY},
+};
+
 /*
  * <1> Firstly, we should know what's the GPMI-clock means.
  *     The GPMI-clock is the internal clock in the gpmi nand controller.
@@ -644,8 +665,8 @@ err_out:
  *         RDN_DELAY = -----------------------     {3}
  *                           RP
  */
-static void gpmi_nfc_compute_timings(struct gpmi_nand_data *this,
-				     const struct nand_sdr_timings *sdr)
+static int gpmi_nfc_compute_timings(struct gpmi_nand_data *this,
+				    const struct nand_sdr_timings *sdr)
 {
 	struct gpmi_nfc_hardware_timing *hw = &this->hw;
 	struct resources *r = &this->resources;
@@ -657,22 +678,35 @@ static void gpmi_nfc_compute_timings(struct gpmi_nand_data *this,
 	int sample_delay_ps, sample_delay_factor;
 	u16 busy_timeout_cycles;
 	u8 wrn_dly_sel;
+	long clk_rate;
+	int i, emode = -1;
 
-	if (sdr->tRC_min >= 30000) {
-		/* ONFI non-EDO modes [0-3] */
-		hw->clk_rate = 22000000;
-		wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_4_TO_8NS;
-	} else if (sdr->tRC_min >= 25000) {
-		/* ONFI EDO mode 4 */
-		hw->clk_rate = 80000000;
-		wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_NO_DELAY;
-	} else {
-		/* ONFI EDO mode 5 */
-		hw->clk_rate = 100000000;
-		wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_NO_DELAY;
+	/* Search the required EDO mode */
+	for (i = 0; i < ARRAY_SIZE(edo_modes); i++) {
+		if (sdr->tRC_min >= edo_modes[i].tRC_min) {
+			emode = i;
+			break;
+		}
 	}
 
-	hw->clk_rate = clk_round_rate(r->clock[0], hw->clk_rate);
+	if (emode < 0) {
+		dev_err(this->dev, "tRC_min %d not supported\n", sdr->tRC_min);
+		return -ENOTSUPP;
+	}
+
+	clk_rate = clk_round_rate(r->clock[0], edo_modes[emode].clk_rate);
+	if (emode > 0 && !(clk_rate <= edo_modes[emode].clk_rate &&
+			   clk_rate > edo_modes[emode - 1].clk_rate)) {
+		dev_err(this->dev,
+			"edo mode %d clock setting: expected %ld, got %ld\n",
+			emode, edo_modes[emode].clk_rate, clk_rate);
+		return -ENOTSUPP;
+	}
+
+	dev_dbg(this->dev, "edo mode %d @ %ld Hz\n", emode, clk_rate);
+
+	hw->clk_rate = clk_rate;
+	wrn_dly_sel = edo_modes[emode].wrn_dly_sel;
 
 	/* SDR core timings are given in picoseconds */
 	period_ps = div_u64((u64)NSEC_PER_SEC * 1000, hw->clk_rate);
@@ -714,6 +748,7 @@ static void gpmi_nfc_compute_timings(struct gpmi_nand_data *this,
 		hw->ctrl1n |= BF_GPMI_CTRL1_RDN_DELAY(sample_delay_factor) |
 			      BM_GPMI_CTRL1_DLL_ENABLE |
 			      (use_half_period ? BM_GPMI_CTRL1_HALF_PERIOD : 0);
+	return 0;
 }
 
 static int gpmi_nfc_apply_timings(struct gpmi_nand_data *this)
@@ -769,6 +804,7 @@ static int gpmi_setup_interface(struct nand_chip *chip, int chipnr,
 {
 	struct gpmi_nand_data *this = nand_get_controller_data(chip);
 	const struct nand_sdr_timings *sdr;
+	int ret;
 
 	/* Retrieve required NAND timings */
 	sdr = nand_get_sdr_timings(conf);
@@ -784,7 +820,9 @@ static int gpmi_setup_interface(struct nand_chip *chip, int chipnr,
 		return 0;
 
 	/* Do the actual derivation of the controller timings */
-	gpmi_nfc_compute_timings(this, sdr);
+	ret = gpmi_nfc_compute_timings(this, sdr);
+	if (ret)
+		return ret;
 
 	this->hw.must_apply_timings = true;
 
