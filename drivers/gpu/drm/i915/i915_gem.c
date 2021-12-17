@@ -165,6 +165,9 @@ try_again:
 					} else {
 						ret = -EBUSY;
 					}
+				} else if (flags & I915_GEM_OBJECT_UNBIND_ASYNC) {
+					assert_object_held(vma->obj);
+					ret = i915_vma_unbind_async(vma);
 				} else {
 					ret = i915_vma_unbind(vma);
 				}
