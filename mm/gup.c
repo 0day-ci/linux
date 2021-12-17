@@ -67,8 +67,7 @@ bool gup_must_unshare(unsigned int flags, struct page *page, bool is_head)
 	if (PageKsm(page))
 		return false;
 	if (PageHuge(page))
-		/* TODO: handle hugetlb as well. */
-		return false;
+		return __page_mapcount(page) > 1;
 	if (is_head) {
 		VM_BUG_ON(!PageTransHuge(page));
 		return page_trans_huge_mapcount(page, NULL) > 1;
