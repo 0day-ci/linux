@@ -1722,8 +1722,6 @@ void pm_runtime_get_suppliers(struct device *dev)
 void pm_runtime_put_suppliers(struct device *dev)
 {
 	struct device_link *link;
-	unsigned long flags;
-	bool put;
 	int idx;
 
 	idx = device_links_read_lock();
@@ -1731,11 +1729,17 @@ void pm_runtime_put_suppliers(struct device *dev)
 	list_for_each_entry_rcu(link, &dev->links.suppliers, c_node,
 				device_links_read_lock_held())
 		if (link->supplier_preactivated) {
+			bool put;
+
 			link->supplier_preactivated = false;
-			spin_lock_irqsave(&dev->power.lock, flags);
+
+			spin_lock_irq(&dev->power.lock);
+
 			put = pm_runtime_status_suspended(dev) &&
 			      refcount_dec_not_one(&link->rpm_active);
-			spin_unlock_irqrestore(&dev->power.lock, flags);
+
+			spin_unlock_irq(&dev->power.lock);
+
 			if (put)
 				pm_runtime_put(link->supplier);
 		}
