@@ -292,15 +292,17 @@ out:
 
 static int sctp_sock_dump(struct sctp_transport *tsp, void *p)
 {
-	struct sctp_endpoint *ep = tsp->asoc->ep;
+	struct sctp_endpoint *ep;
 	struct sctp_comm_param *commp = p;
-	struct sock *sk = ep->base.sk;
+	struct sock *sk;
 	struct sk_buff *skb = commp->skb;
 	struct netlink_callback *cb = commp->cb;
 	const struct inet_diag_req_v2 *r = commp->r;
 	struct sctp_association *assoc;
 	int err = 0;
 
+	ep = sctp_endpoint_hold(tsp->asoc->ep);
+	sk = ep->base.sk;
 	lock_sock(sk);
 	list_for_each_entry(assoc, &ep->asocs, asocs) {
 		if (cb->args[4] < cb->args[1])
@@ -341,6 +343,7 @@ next:
 	cb->args[4] = 0;
 release:
 	release_sock(sk);
+	sctp_endpoint_put(ep);
 	return err;
 }
 
