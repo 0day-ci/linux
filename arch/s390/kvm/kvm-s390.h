@@ -489,4 +489,29 @@ void kvm_s390_vcpu_crypto_reset_all(struct kvm *kvm);
  */
 extern unsigned int diag9c_forwarding_hz;
 
+#define S390_KVM_TOPOLOGY_NEW_CPU -1
+/**
+ * kvm_s390_topology_changed
+ * @vcpu: the virtual CPU
+ *
+ * If the topology facility is present, checks if the CPU toplogy
+ * viewed by the guest changed due to load balancing or CPU hotplug.
+ */
+static inline bool kvm_s390_topology_changed(struct kvm_vcpu *vcpu)
+{
+	if (!test_kvm_facility(vcpu->kvm, 11))
+		return false;
+
+	/* A new vCPU has been hotplugged */
+	if (vcpu->arch.prev_cpu == S390_KVM_TOPOLOGY_NEW_CPU)
+		return true;
+
+	/* The real CPU backing up the vCPU moved to another socket */
+	if (topology_physical_package_id(vcpu->cpu) !=
+	    topology_physical_package_id(vcpu->arch.prev_cpu))
+		return true;
+
+	return false;
+}
+
 #endif
