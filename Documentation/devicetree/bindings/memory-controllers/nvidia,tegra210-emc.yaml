@@ -44,14 +44,17 @@ properties:
     description:
       phandle of the memory controller node
 
+allOf:
+  - $ref: ../thermal/thermal-cooling-devices.yaml
+
+unevaluatedProperties: false
+
 required:
   - compatible
   - reg
   - clocks
   - clock-names
   - nvidia,memory-controller
-
-additionalProperties: false
 
 examples:
   - |
@@ -79,4 +82,5 @@ examples:
         interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
         memory-region = <&emc_table>;
         nvidia,memory-controller = <&mc>;
+        #cooling-cells = <2>;
     };
