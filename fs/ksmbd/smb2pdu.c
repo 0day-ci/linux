@@ -6638,6 +6638,12 @@ static int smb2_set_flock_flags(struct file_lock *flock, int flags)
 {
 	int cmd = -EINVAL;
 
+	if ((flock->fl_file->f_op->lock) &&
+	    ((flags == SMB2_LOCKFLAG_SHARED) ||
+	     (flags == SMB2_LOCKFLAG_EXCLUSIVE))) {
+		ksmbd_debug(SMB, "force fail immediately request\n");
+		flags |= SMB2_LOCKFLAG_FAIL_IMMEDIATELY;
+	}
 	/* Checking for wrong flag combination during lock request*/
 	switch (flags) {
 	case SMB2_LOCKFLAG_SHARED:
