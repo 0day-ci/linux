@@ -4108,13 +4108,14 @@ void rcu_barrier(void)
 retry:
 		if (smp_load_acquire(&rdp->barrier_seq_snap) == gseq)
 			continue;
+		raw_spin_lock_irqsave(&rdp->barrier_lock, flags);
 		if (!rcu_segcblist_n_cbs(&rdp->cblist)) {
-			raw_spin_lock_irqsave(&rdp->barrier_lock, flags);
 			WRITE_ONCE(rdp->barrier_seq_snap, gseq);
 			raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
 			rcu_barrier_trace(TPS("NQ"), cpu, rcu_state.barrier_sequence);
 			continue;
 		}
+		raw_spin_unlock_irqrestore(&rdp->barrier_lock, flags);
 		if (rcu_rdp_cpu_online(rdp)) {
 			if (smp_call_function_single(cpu, rcu_barrier_handler, (void *)cpu, 1)) {
 				schedule_timeout_uninterruptible(1);
