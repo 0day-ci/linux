@@ -168,6 +168,22 @@ else
 	echo "[PASS]"
 fi
 
+echo "--------------------------------------------------------"
+echo "running "GUP interaction with COW tests.
+echo "--------------------------------------------------------"
+./gup_cow
+ret_val=$?
+
+if [ $ret_val -eq 0 ]; then
+	echo "[PASS]"
+elif [ $ret_val -eq $ksft_skip ]; then
+	echo "[SKIP]"
+	exitcode=$ksft_skip
+else
+	echo "[FAIL]"
+	exitcode=1
+fi
+
 echo "-------------------"
 echo "running userfaultfd"
 echo "-------------------"
