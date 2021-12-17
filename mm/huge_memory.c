@@ -2101,21 +2101,25 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		pte = pte_offset_map(&_pmd, addr);
 		BUG_ON(!pte_none(*pte));
 		set_pte_at(mm, addr, pte, entry);
-		if (!pmd_migration)
-			atomic_inc(&page[i]._mapcount);
 		pte_unmap(pte);
 	}
 
 	if (!pmd_migration) {
+		/* Sub-page mapcount accounting for above small mappings. */
+		int val = 1;
+
 		/*
 		 * Set PG_double_map before dropping compound_mapcount to avoid
 		 * false-negative page_mapped().
+		 *
+		 * The first to set PageDoubleMap() has to increment all
+		 * sub-page mapcounts by one.
 		 */
-		if (compound_mapcount(page) > 1 &&
-		    !TestSetPageDoubleMap(page)) {
-			for (i = 0; i < HPAGE_PMD_NR; i++)
-				atomic_inc(&page[i]._mapcount);
-		}
+		if (compound_mapcount(page) > 1 && !TestSetPageDoubleMap(page))
+			val++;
+
+		for (i = 0; i < HPAGE_PMD_NR; i++)
+			atomic_add(val, &page[i]._mapcount);
 
 		lock_page_memcg(page);
 		if (atomic_add_negative(-1, compound_mapcount_ptr(page))) {
