@@ -441,7 +441,7 @@ static struct platform_driver sun4i_drv_platform_driver = {
 		.pm = &sun4i_drv_drm_pm_ops,
 	},
 };
-module_platform_driver(sun4i_drv_platform_driver);
+drm_module_platform_driver(sun4i_drv_platform_driver);
 
 MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
 MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
