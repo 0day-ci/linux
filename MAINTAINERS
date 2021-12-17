@@ -18220,6 +18220,7 @@ SUNPLUS PWM DRIVER
 M:	Hammer Hsieh <hammer.hsieh@sunplus.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/pwm/pwm-sunplus.yaml
+F:	drivers/pwm/pwm-sunplus.c
 
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
