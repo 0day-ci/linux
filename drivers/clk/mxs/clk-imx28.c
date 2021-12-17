@@ -243,6 +243,9 @@ static void __init mx28_clocks_init(struct device_node *np)
 
 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
 
+	/* GPMI set parent to ref_gpmi instead of osc */
+	clk_set_parent(clks[gpmi_sel], clks[ref_gpmi]);
+
 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
 		clk_prepare_enable(clks[clks_init_on[i]]);
 }
