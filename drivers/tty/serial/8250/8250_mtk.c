@@ -621,7 +621,7 @@ static int __maybe_unused mtk8250_suspend(struct device *dev)
 	serial8250_suspend_port(data->line);
 
 	pinctrl_pm_select_sleep_state(dev);
-	if (irq >= 0) {
+	if (irq > 0) {
 		err = enable_irq_wake(irq);
 		if (err) {
 			dev_err(dev,
@@ -641,7 +641,7 @@ static int __maybe_unused mtk8250_resume(struct device *dev)
 	struct mtk8250_data *data = dev_get_drvdata(dev);
 	int irq = data->rx_wakeup_irq;
 
-	if (irq >= 0)
+	if (irq > 0)
 		disable_irq_wake(irq);
 	pinctrl_pm_select_default_state(dev);
 
