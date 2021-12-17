@@ -282,13 +282,6 @@ struct thermal_zone_params {
 	 * 		Used by thermal zone drivers (default 0).
 	 */
 	int offset;
-
-	/*
-	 * Ziegler-Nichols estimation setting. Allows the user to decide
-	 * whether to use original PID coefficients or calculate using
-	 * the Ziegler-Nichols algorithm
-	 */
-	s32 ziegler_nichols;
 };
 
 /**

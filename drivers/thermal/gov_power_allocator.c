@@ -100,6 +100,8 @@ struct zn_coefficients {
 	s32 base_trough;
 	s32 oscillation_count;
 	enum pivot_type prev_pivot;
+
+	int zn_state;
 };
 
 /**
@@ -431,7 +433,7 @@ static inline s32 get_oscillation_count(s32 curr_err,
  * get_zn_state() - Update and get the current Ziegler-Nichols State
  * @tzp: The thermal zone params to check to determine the current state
  * @zn_state: The current state which should be returned if no changes are
- * made
+ *            made
  *
  * Return: The next zieger-nichols state for this pass of the PID controller
  */
@@ -514,9 +516,21 @@ static inline void ziegler_nichols(struct thermal_zone_device *tz, s32 next_err,
 	bool is_safe =
 		is_temperature_safe((control_temp - next_err), control_temp);
 
-	if (tz->tzp->ziegler_nichols == ZN_RESET) {
+	zn_coeffs->zn_state = get_zn_state(tz->tzp, zn_coeffs->zn_state);
+	switch (zn_coeffs->zn_state) {
+	case ZN_ORIGINAL: {
+		set_original_pid_coefficients(tz->tzp);
+		zn_coeffs->zn_state = ZN_OFF;
+		return;
+	}
+	case ZN_RESET: {
 		reset_ziegler_nichols(zn_coeffs);
-		tz->tzp->ziegler_nichols = ZN_ON;
+		zn_coeffs->zn_state = ZN_ON;
+		break;
+	}
+
+	case ZN_OFF:
+		return;
 	}
 
 	/* Override default PID Coefficients. These will be updated later according to the
@@ -556,7 +570,7 @@ static inline void ziegler_nichols(struct thermal_zone_device *tz, s32 next_err,
 	} else {
 		set_zn_pid_coefficients(tz->tzp, zn_coeffs->period,
 					zn_coeffs->k_ultimate);
-		tz->tzp->ziegler_nichols = ZN_OFF;
+		zn_coeffs->zn_state = ZN_OFF;
 	}
 	return;
 
@@ -573,7 +587,7 @@ set_zn:
 					zn_coeffs->k_ultimate);
 		((struct power_allocator_params *)tz->governor_data)
 			->err_integral = 0;
-		tz->tzp->ziegler_nichols = ZN_OFF;
+		zn_coeffs->zn_state = ZN_OFF;
 	} else {
 		if (peak_trough == PEAK)
 			zn_coeffs->t_prev_peak = t_now;
@@ -613,24 +627,7 @@ static u32 pid_controller(struct thermal_zone_device *tz,
 
 	err = control_temp - tz->temperature;
 
-	switch (tz->tzp->ziegler_nichols) {
-	case ZN_ORIGINAL: {
-		set_original_pid_coefficients(tz->tzp);
-		tz->tzp->ziegler_nichols = ZN_OFF;
-		break;
-	}
-	case ZN_RESET: {
-		ziegler_nichols(tz, err, control_temp);
-		tz->tzp->ziegler_nichols = ZN_ON;
-		break;
-	}
-	case ZN_ON: {
-		ziegler_nichols(tz, err, control_temp);
-		break;
-	}
-	default:
-		break;
-	}
+	ziegler_nichols(tz, err, control_temp);
 
 	err = int_to_frac(err);
 
@@ -1064,6 +1061,7 @@ static int power_allocator_bind(struct thermal_zone_device *tz)
 		return -ENOMEM;
 
 	params->zn_coeffs = zn_coeffs;
+	zn_coeffs->zn_state = ZN_ON;
 
 	if (!tz->tzp) {
 		tz->tzp = kzalloc(sizeof(*tz->tzp), GFP_KERNEL);
