@@ -70,16 +70,24 @@ required:
 examples:
   - |
     #include <dt-bindings/clock/mt8183-clk.h>
-    pmic {
-        compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
+
+    i2c {
+      #address-cells = <1>;
+      #size-cels = <0>;
+
+      pmic@48 {
+        compatible = "ti,palmas";
+        reg = <0x48>;
+
         adc {
-            compatible = "ti,palmas-gpadc";
-            interrupts = <18 0
-                          16 0
-                          17 0>;
-            #io-channel-cells = <1>;
-            ti,channel0-current-microamp = <5>;
-            ti,channel3-current-microamp = <10>;
+          compatible = "ti,palmas-gpadc";
+          interrupts = <18 0>,
+                       <16 0>,
+                       <17 0>;
+          #io-channel-cells = <1>;
+          ti,channel0-current-microamp = <5>;
+          ti,channel3-current-microamp = <10>;
         };
+      };
     };
 ...

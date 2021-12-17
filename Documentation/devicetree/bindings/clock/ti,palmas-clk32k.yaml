@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: GPL-2.0-only
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/ti,palmas-clk32k.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Texas Instruments Palmas family of Power-Management ICs (clocks)
+
+maintainers:
+  - Michael Turquette <mturquette@baylibre.com>
+  - Stephen Boyd <sboyd@kernel.org>
+
+description:
+  Palmas devices have two clock output pins for 32KHz, KG and KG_AUDIO. This binding uses the
+  common clock binding ./clock-bindings.txt.
+
+properties:
+  compatible:
+    enum:
+      - ti,palmas-clk32kg
+      - ti,palmas-clk32kgaudio
+
+  "#clock-cells":
+    const: 0
+
+  ti,external-sleep-control:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: |
+      The external enable input pins controlled the enable/disable of clocks. The external enable
+      input pins ENABLE1, ENABLE2 and NSLEEP. The valid values for the external pins are:
+
+        PALMAS_EXT_CONTROL_PIN_ENABLE1 for ENABLE1 pin
+        PALMAS_EXT_CONTROL_PIN_ENABLE2 for ENABLE2 pin
+        PALMAS_EXT_CONTROL_PIN_NSLEEP for NSLEEP pin
+
+      Option 0 or missing this property means the clock is enabled/disabled via register access
+      and these pins do not have any control. The macros of external control pins for DTS are
+      defined in dt-bindings/mfd/palmas.h.
+    enum: [ 0, 1, 2, 3 ]
+
+additionalProperties: false
+
+required:
+  - compatible
+  - "#clock-cells"
+
+examples:
+  - |
+    #include <dt-bindings/mfd/palmas.h>
+
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      tps65913@58 {
+        compatible = "ti,tps65913", "ti,palmas";
+        reg = <0x58>;
+
+        #interrupt-cells = <2>;
+        interrupt-controller;
+
+        clk32k {
+          compatible = "ti,palmas-clk32kg";
+          #clock-cells = <0>;
+          ti,external-sleep-control = <PALMAS_EXT_CONTROL_PIN_NSLEEP>;
+        };
+      };
+    };
