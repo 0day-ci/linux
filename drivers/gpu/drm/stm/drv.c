@@ -236,7 +236,7 @@ static struct platform_driver stm_drm_platform_driver = {
 	},
 };
 
-module_platform_driver(stm_drm_platform_driver);
+drm_module_platform_driver(stm_drm_platform_driver);
 
 MODULE_AUTHOR("Philippe Cornu <philippe.cornu@st.com>");
 MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
