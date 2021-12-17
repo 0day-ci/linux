@@ -1,0 +1,151 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/leds/backlight/ti,lp8550.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Texas Instruments LP855x family devicetree bindings
+
+maintainers:
+  - Milo Kim <milo.kim@ti.com>
+  - Rob Herring <robh+dt@kernel.org>
+
+properties:
+  compatible:
+    enum:
+      - ti,lp8550
+      - ti,lp8551
+      - ti,lp8552
+      - ti,lp8553
+      - ti,lp8555
+      - ti,lp8556
+      - ti,lp8557
+
+  reg:
+    maxItems: 1
+
+  dev-ctrl:
+    $ref: /schemas/types.yaml#/definitions/uint8
+    description: Value of DEVICE CONTROL register. It depends on the device.
+
+  bl-name:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: Backlight device name
+
+  init-brt:
+    $ref: /schemas/types.yaml#/definitions/uint8
+    description: Initial value of backlight brightness
+
+  pwm-period:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: PWM period value. Set only PWM input mode used
+
+  pwm-names:
+    maxItems: 1
+
+  pwms:
+    maxItems: 1
+
+  power-supply:
+    description: Regulator which controls the 3V rail
+
+  enable-supply:
+    description: Regulator which controls the EN/VDDIO input
+
+patternProperties:
+  '^rom_[0-9a-f]{2}h$':
+    type: object
+    properties:
+      rom-addr:
+        $ref: /schemas/types.yaml#/definitions/uint8
+        description: Register address of ROM area to be updated
+
+      rom-val:
+        $ref: /schemas/types.yaml#/definitions/uint8
+        description: Register value to be updated
+
+    additionalProperties: false
+
+    required:
+      - rom-addr
+      - rom-val
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - dev-ctrl
+
+examples:
+  # LP8555
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      backlight@2c {
+        compatible = "ti,lp8555";
+        reg = <0x2c>;
+
+        dev-ctrl = /bits/ 8 <0x00>;
+        pwm-period = <10000>;
+
+        /* 4V OV, 4 output LED0 string enabled */
+        rom_14h {
+          rom-addr = /bits/ 8 <0x14>;
+          rom-val = /bits/ 8 <0xcf>;
+        };
+
+        /* Heavy smoothing, 24ms ramp time step */
+        rom_15h {
+          rom-addr = /bits/ 8 <0x15>;
+          rom-val = /bits/ 8 <0xc7>;
+        };
+
+        /* 4 output LED1 string enabled */
+        rom_19h {
+          rom-addr = /bits/ 8 <0x19>;
+          rom-val = /bits/ 8 <0x0f>;
+        };
+      };
+    };
+
+  # LP8556
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      backlight@2c {
+        compatible = "ti,lp8556";
+        reg = <0x2c>;
+
+        bl-name = "lcd-bl";
+        dev-ctrl = /bits/ 8 <0x85>;
+        init-brt = /bits/ 8 <0x10>;
+      };
+    };
+
+  # LP8557
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      backlight@2c {
+        compatible = "ti,lp8557";
+        reg = <0x2c>;
+        enable-supply = <&backlight_vddio>;
+        power-supply = <&backlight_vdd>;
+
+        dev-ctrl = /bits/ 8 <0x41>;
+        init-brt = /bits/ 8 <0x0a>;
+
+        /* 4V OV, 4 output LED string enabled */
+        rom_14h {
+          rom-addr = /bits/ 8 <0x14>;
+          rom-val = /bits/ 8 <0xcf>;
+        };
+      };
+    };
