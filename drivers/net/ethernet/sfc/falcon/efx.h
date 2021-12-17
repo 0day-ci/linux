@@ -39,7 +39,7 @@ void ef4_set_default_rx_indir_table(struct ef4_nic *efx);
 void ef4_rx_config_page_split(struct ef4_nic *efx);
 int ef4_probe_rx_queue(struct ef4_rx_queue *rx_queue);
 void ef4_remove_rx_queue(struct ef4_rx_queue *rx_queue);
-void ef4_init_rx_queue(struct ef4_rx_queue *rx_queue);
+int ef4_init_rx_queue(struct ef4_rx_queue *rx_queue);
 void ef4_fini_rx_queue(struct ef4_rx_queue *rx_queue);
 void ef4_fast_push_rx_descriptors(struct ef4_rx_queue *rx_queue, bool atomic);
 void ef4_rx_slow_fill(struct timer_list *t);
