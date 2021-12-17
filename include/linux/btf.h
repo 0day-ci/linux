@@ -320,9 +320,19 @@ static inline const char *btf_name_by_offset(const struct btf *btf,
 }
 #endif
 
+enum kfunc_btf_id_set_type {
+	BTF_SET_CHECK,
+	__BTF_SET_MAX,
+};
+
 struct kfunc_btf_id_set {
 	struct list_head list;
-	struct btf_id_set *set;
+	union {
+		struct btf_id_set *sets[__BTF_SET_MAX];
+		struct {
+			struct btf_id_set *set;
+		};
+	};
 	struct module *owner;
 };
 
@@ -361,7 +371,8 @@ static struct kfunc_btf_id_list prog_test_kfunc_list __maybe_unused;
 #endif
 
 #define DEFINE_KFUNC_BTF_ID_SET(set, name)                                     \
-	struct kfunc_btf_id_set name = { LIST_HEAD_INIT(name.list), (set),     \
+	struct kfunc_btf_id_set name = { LIST_HEAD_INIT(name.list),            \
+					 { { (set) } },                        \
 					 THIS_MODULE }
 
 #endif
