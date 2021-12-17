@@ -87,6 +87,56 @@ Read path::
 	} while (read_seqcount_retry(&foo_seqcount, seq));
 
 
+Raw sequence counters (``raw_seqcount_t``)
+==========================================
+
+This is the raw counting mechanism, which does not protect against multiple
+writers and does not perform any lockdep tracking.  Write side critical sections
+must thus be serialized by an external lock.
+
+It is primary useful when a fixed, minimal sequence counter size is
+required and the lockdep overhead cannot be tolerated or is unused.
+Prefer using a :ref:`seqcount_t`, a :ref:`seqlock_t` or a
+:ref:`seqcount_locktype_t` if possible.
+
+The raw sequence counter is very similar to the :ref:`seqcount_t`, however,
+it can only be used with functions that don't perform any implicit lockdep
+tracking: primarily the *raw* function variants.
+
+Initialization::
+
+	/* dynamic */
+	raw_seqcount_t foo_seqcount;
+	raw_seqcount_init(&foo_seqcount);
+
+	/* static */
+	static raw_seqcount_t foo_seqcount = RAW_SEQCNT_ZERO(foo_seqcount);
+
+	/* C99 struct init */
+	struct {
+		.seq   = RAW_SEQCNT_ZERO(foo.seq),
+	} foo;
+
+Write path::
+
+	/* Serialized context with disabled preemption */
+
+	raw_write_seqcount_begin(&foo_seqcount);
+
+	/* ... [[write-side critical section]] ... */
+
+	raw_write_seqcount_end(&foo_seqcount);
+
+Read path::
+
+	do {
+		seq = raw_read_seqcount_begin(&foo_seqcount);
+
+		/* ... [[read-side critical section]] ... */
+
+	} while (raw_read_seqcount_retry(&foo_seqcount, seq));
+
+
 .. _seqcount_locktype_t:
 
 Sequence counters with associated locks (``seqcount_LOCKNAME_t``)
