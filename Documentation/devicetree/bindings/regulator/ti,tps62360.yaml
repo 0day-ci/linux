@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: GPL-2.0-only
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/regulator/ti,tps62360.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Texas Instruments TPS62360 voltage regulator
+
+maintainers:
+  - Mark Brown <broonie@kernel.org>
+
+properties:
+  compatible:
+    enum:
+      - ti,tps62360
+      - ti,tps62361
+      - ti,tps62362
+      - ti,tps62363
+
+  reg:
+    maxItems: 1
+
+  ti,enable-vout-discharge:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: Enable output discharge.
+
+  ti,enable-pull-down:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: Enable pull down.
+
+  ti,vsel0-gpio:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: GPIO for controlling VSEL0 line. If this property is missing, then assume that
+      there is no GPIO for VSEL0 control.
+
+  ti,vsel1-gpio:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: GPIO for controlling VSEL1 line. If this property is missing, then assume that
+      there is no GPIO for VSEL1 control.
+
+  ti,vsel0-state-high:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: Initial state of VSEL0 input is high. If this property is missing, then assume
+      the state as low (0).
+
+  ti,vsel1-state-high:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: Initial state of VSEL1 input is high. If this property is missing, then assume
+      the state as low (0).
+
+allOf:
+  - $ref: regulator.yaml
+
+unevaluatedProperties: false
+
+required:
+  - compatible
+  - reg
+
+examples:
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      regulator@60 {
+        compatible = "ti,tps62361";
+        reg = <0x60>;
+        regulator-name = "tps62361-vout";
+        regulator-min-microvolt = <500000>;
+        regulator-max-microvolt = <1500000>;
+        regulator-boot-on;
+        ti,vsel0-gpio = <&gpio1 16 0>;
+        ti,vsel1-gpio = <&gpio1 17 0>;
+        ti,vsel0-state-high;
+        ti,vsel1-state-high;
+        ti,enable-pull-down;
+        ti,enable-vout-discharge;
+      };
+    };
