@@ -2716,10 +2716,10 @@ static int mv643xx_eth_shared_of_add_port(struct platform_device *pdev,
 	memset(&ppd, 0, sizeof(ppd));
 	ppd.shared = pdev;
 
-	memset(&res, 0, sizeof(res));
-	if (of_irq_to_resource(pnp, 0, &res) <= 0) {
+	ret = of_irq_to_resource(pnp, 0, &res);
+	if (ret <= 0) {
 		dev_err(&pdev->dev, "missing interrupt on %pOFn\n", pnp);
-		return -EINVAL;
+		return ret ? ret : -ENXIO;
 	}
 
 	if (of_property_read_u32(pnp, "reg", &ppd.port_number)) {
