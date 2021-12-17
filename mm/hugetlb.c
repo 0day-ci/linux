@@ -5113,14 +5113,15 @@ static void unmap_ref_private(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
- * Hugetlb_cow() should be called with page lock of the original hugepage held.
+ * __wp_hugetlb() should be called with page lock of the original hugepage held.
  * Called with hugetlb_fault_mutex_table held and pte_page locked so we
  * cannot race with other handlers or page migration.
  * Keep the pte_same checks anyway to make transition from the mutex easier.
  */
-static vm_fault_t hugetlb_cow(struct mm_struct *mm, struct vm_area_struct *vma,
-		       unsigned long address, pte_t *ptep,
-		       struct page *pagecache_page, spinlock_t *ptl)
+static __always_inline vm_fault_t
+__wp_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma,
+	     unsigned long address, pte_t *ptep, struct page *pagecache_page,
+	     spinlock_t *ptl, bool unshare)
 {
 	pte_t pte;
 	struct hstate *h = hstate_vma(vma);
@@ -5134,11 +5135,21 @@ static vm_fault_t hugetlb_cow(struct mm_struct *mm, struct vm_area_struct *vma,
 	old_page = pte_page(pte);
 
 retry_avoidcopy:
-	/* If no-one else is actually using this page, avoid the copy
-	 * and just make the page writable */
-	if (page_mapcount(old_page) == 1 && PageAnon(old_page)) {
-		page_move_anon_rmap(old_page, vma);
-		set_huge_ptep_writable(vma, haddr, ptep);
+	if (!unshare) {
+		/*
+		 * If no-one else is actually using this page, avoid the copy
+		 * and just make the page writable.
+		 */
+		if (page_mapcount(old_page) == 1 && PageAnon(old_page)) {
+			page_move_anon_rmap(old_page, vma);
+			set_huge_ptep_writable(vma, haddr, ptep);
+			return 0;
+		}
+	} else if (!PageAnon(old_page) || page_mapcount(old_page) == 1) {
+		/*
+		 * GUP-triggered unsharing only applies to shared anonymous
+		 * pages. If that does no longer apply, there is nothing to do.
+		 */
 		return 0;
 	}
 
@@ -5239,11 +5250,11 @@ retry_avoidcopy:
 	if (likely(ptep && pte_same(huge_ptep_get(ptep), pte))) {
 		ClearHPageRestoreReserve(new_page);
 
-		/* Break COW */
+		/* Break COW or unshare */
 		huge_ptep_clear_flush(vma, haddr, ptep);
 		mmu_notifier_invalidate_range(mm, range.start, range.end);
 		set_huge_pte_at(mm, haddr, ptep,
-				make_huge_pte(vma, new_page, 1));
+				make_huge_pte(vma, new_page, !unshare));
 		page_remove_rmap(old_page, true);
 		hugepage_add_new_anon_rmap(new_page, vma, haddr);
 		SetHPageMigratable(new_page);
@@ -5253,7 +5264,10 @@ retry_avoidcopy:
 	spin_unlock(ptl);
 	mmu_notifier_invalidate_range_end(&range);
 out_release_all:
-	/* No restore in case of successful pagetable update (Break COW) */
+	/*
+	 * No restore in case of successful pagetable update (Break COW or
+	 * unshare)
+	 */
 	if (new_page != old_page)
 		restore_reserve_on_error(h, vma, haddr, new_page);
 	put_page(new_page);
@@ -5262,6 +5276,23 @@ out_release_old:
 
 	spin_lock(ptl); /* Caller expects lock to be held */
 	return ret;
+}
+
+static vm_fault_t
+wp_hugetlb_cow(struct mm_struct *mm, struct vm_area_struct *vma,
+	       unsigned long address, pte_t *ptep, struct page *pagecache_page,
+	       spinlock_t *ptl)
+{
+	return __wp_hugetlb(mm, vma, address, ptep, pagecache_page, ptl,
+			    false);
+}
+
+static vm_fault_t
+wp_hugetlb_unshare(struct mm_struct *mm, struct vm_area_struct *vma,
+		   unsigned long address, pte_t *ptep,
+		   struct page *pagecache_page, spinlock_t *ptl)
+{
+	return __wp_hugetlb(mm, vma, address, ptep, pagecache_page, ptl, true);
 }
 
 /* Return the pagecache page at a given address within a VMA */
@@ -5376,7 +5407,8 @@ static vm_fault_t hugetlb_no_page(struct mm_struct *mm,
 	/*
 	 * Currently, we are forced to kill the process in the event the
 	 * original mapper has unmapped pages from the child due to a failed
-	 * COW. Warn that such a situation has occurred as it may not be obvious
+	 * COW/unsharing. Warn that such a situation has occurred as it may not
+	 * be obvious.
 	 */
 	if (is_vma_resv_set(vma, HPAGE_RESV_UNMAPPED)) {
 		pr_warn_ratelimited("PID %d killed due to inadequate hugepage pool\n",
@@ -5502,7 +5534,7 @@ retry:
 	hugetlb_count_add(pages_per_huge_page(h), mm);
 	if ((flags & FAULT_FLAG_WRITE) && !(vma->vm_flags & VM_SHARED)) {
 		/* Optimization, do the COW without a second fault */
-		ret = hugetlb_cow(mm, vma, address, ptep, page, ptl);
+		ret = wp_hugetlb_cow(mm, vma, address, ptep, page, ptl);
 	}
 
 	spin_unlock(ptl);
@@ -5632,14 +5664,15 @@ vm_fault_t hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		goto out_mutex;
 
 	/*
-	 * If we are going to COW the mapping later, we examine the pending
-	 * reservations for this page now. This will ensure that any
+	 * If we are going to COW/unshare the mapping later, we examine the
+	 * pending reservations for this page now. This will ensure that any
 	 * allocations necessary to record that reservation occur outside the
 	 * spinlock. For private mappings, we also lookup the pagecache
 	 * page now as it is used to determine if a reservation has been
 	 * consumed.
 	 */
-	if ((flags & FAULT_FLAG_WRITE) && !huge_pte_write(entry)) {
+	if ((flags & (FAULT_FLAG_WRITE|FAULT_FLAG_UNSHARE)) &&
+	    !huge_pte_write(entry)) {
 		if (vma_needs_reservation(h, vma, haddr) < 0) {
 			ret = VM_FAULT_OOM;
 			goto out_mutex;
@@ -5654,14 +5687,17 @@ vm_fault_t hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	ptl = huge_pte_lock(h, mm, ptep);
 
-	/* Check for a racing update before calling hugetlb_cow */
+	/*
+	 * Check for a racing update before calling wp_hugetlb_cow /
+	 * wp_hugetlb_unshare
+	 */
 	if (unlikely(!pte_same(entry, huge_ptep_get(ptep))))
 		goto out_ptl;
 
 	/*
-	 * hugetlb_cow() requires page locks of pte_page(entry) and
-	 * pagecache_page, so here we need take the former one
-	 * when page != pagecache_page or !pagecache_page.
+	 * wp_hugetlb_cow()/wp_hugetlb_unshare() requires page locks of
+	 * pte_page(entry) and pagecache_page, so here we need take the former
+	 * one when page != pagecache_page or !pagecache_page.
 	 */
 	page = pte_page(entry);
 	if (page != pagecache_page)
@@ -5674,11 +5710,15 @@ vm_fault_t hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (flags & FAULT_FLAG_WRITE) {
 		if (!huge_pte_write(entry)) {
-			ret = hugetlb_cow(mm, vma, address, ptep,
-					  pagecache_page, ptl);
+			ret = wp_hugetlb_cow(mm, vma, address, ptep,
+					     pagecache_page, ptl);
 			goto out_put_page;
 		}
 		entry = huge_pte_mkdirty(entry);
+	} else if (flags & FAULT_FLAG_UNSHARE && !huge_pte_write(entry)) {
+		ret = wp_hugetlb_unshare(mm, vma, address, ptep, pagecache_page,
+					 ptl);
+		goto out_put_page;
 	}
 	entry = pte_mkyoung(entry);
 	if (huge_ptep_set_access_flags(vma, haddr, ptep, entry,
