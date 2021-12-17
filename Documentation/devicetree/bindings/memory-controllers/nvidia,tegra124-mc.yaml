@@ -19,7 +19,9 @@ description: |
 
 properties:
   compatible:
-    const: nvidia,tegra124-mc
+    enum:
+      - nvidia,tegra124-mc
+      - nvidia,tegra132-mc
 
   reg:
     maxItems: 1
