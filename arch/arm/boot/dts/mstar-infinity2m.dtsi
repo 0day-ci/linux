@@ -6,6 +6,14 @@
 
 #include "mstar-infinity.dtsi"
 
+/ {
+	clk_timer: timer_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <432000000>;
+	};
+};
+
 &cpus {
 	cpu1: cpu@1 {
 		device_type = "cpu";
@@ -19,4 +27,14 @@
 		reg = <0x204000 0x200>;
 		status = "disabled";
 	};
+};
+
+&timer1 {
+	compatible = "sstar,ssd20xd-timer";
+	clocks = <&clk_timer>;
+};
+
+&timer2 {
+	compatible = "sstar,ssd20xd-timer";
+	clocks = <&clk_timer>;
 };
