@@ -410,7 +410,7 @@ static struct platform_driver mxsfb_platform_driver = {
 	},
 };
 
-module_platform_driver(mxsfb_platform_driver);
+drm_module_platform_driver(mxsfb_platform_driver);
 
 MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
 MODULE_DESCRIPTION("Freescale MXS DRM/KMS driver");
