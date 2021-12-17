@@ -1281,6 +1281,40 @@ unlock:
 	spin_unlock(vmf->ptl);
 }
 
+
+static bool __page_trans_huge_anon_shared(struct page *page)
+{
+	int i, mapcount;
+
+	mapcount = head_compound_mapcount(page);
+	if (mapcount > 1)
+		return true;
+	if (PageDoubleMap(page))
+		mapcount -= 1;
+	for (i = 0; i < thp_nr_pages(page); i++) {
+		if (atomic_read(&page[i]._mapcount) + mapcount + 1 > 1)
+			return true;
+	}
+	return false;
+}
+
+/* A lightweight check corresponding to "page_trans_huge_mapcount() > 1". */
+bool page_trans_huge_anon_shared(struct page *page)
+{
+	unsigned int seqcount;
+	bool shared;
+
+	VM_BUG_ON_PAGE(PageHuge(page) || PageTail(page), page);
+	VM_BUG_ON_PAGE(!PageAnon(page) || !PageTransHuge(page), page);
+
+	do {
+		seqcount = thp_mapcount_read_begin(page);
+		shared = __page_trans_huge_anon_shared(page);
+	} while (thp_mapcount_read_retry(page, seqcount));
+
+	return shared;
+}
+
 vm_fault_t do_huge_pmd_wp_page(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;

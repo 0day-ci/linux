@@ -361,6 +361,8 @@ static inline void thp_mapcount_unlock(struct page *page,
 	local_irq_restore(irq_flags);
 }
 
+extern bool page_trans_huge_anon_shared(struct page *page);
+
 #else /* CONFIG_TRANSPARENT_HUGEPAGE */
 #define HPAGE_PMD_SHIFT ({ BUILD_BUG(); 0; })
 #define HPAGE_PMD_MASK ({ BUILD_BUG(); 0; })
@@ -530,6 +532,11 @@ static inline void thp_mapcount_lock(struct page *page,
 static inline void thp_mapcount_unlock(struct page *page,
 				       unsigned long irq_flags)
 {
+}
+
+static inline bool page_trans_huge_anon_shared(struct page *page)
+{
+	return false;
 }
 
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */

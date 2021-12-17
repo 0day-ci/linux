@@ -70,7 +70,7 @@ bool gup_must_unshare(unsigned int flags, struct page *page, bool is_head)
 		return __page_mapcount(page) > 1;
 	if (is_head) {
 		VM_BUG_ON(!PageTransHuge(page));
-		return page_trans_huge_mapcount(page, NULL) > 1;
+		return page_trans_huge_anon_shared(page);
 	}
 	return page_mapcount(page) > 1;
 }
