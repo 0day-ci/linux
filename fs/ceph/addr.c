@@ -1449,19 +1449,6 @@ static vm_fault_t ceph_page_mkwrite(struct vm_fault *vmf)
 	sb_start_pagefault(inode->i_sb);
 	ceph_block_sigs(&oldset);
 
-	if (ci->i_inline_version != CEPH_INLINE_NONE) {
-		struct page *locked_page = NULL;
-		if (off == 0) {
-			lock_page(page);
-			locked_page = page;
-		}
-		err = ceph_uninline_data(vma->vm_file, locked_page);
-		if (locked_page)
-			unlock_page(locked_page);
-		if (err < 0)
-			goto out_free;
-	}
-
 	if (off + thp_size(page) <= size)
 		len = thp_size(page);
 	else
@@ -1586,13 +1573,14 @@ void ceph_fill_inline_data(struct inode *inode, struct page *locked_page,
 	}
 }
 
-int ceph_uninline_data(struct file *filp, struct page *locked_page)
+int ceph_uninline_data(struct file *file)
 {
-	struct inode *inode = file_inode(filp);
+	struct inode *inode = file_inode(file);
 	struct ceph_inode_info *ci = ceph_inode(inode);
 	struct ceph_fs_client *fsc = ceph_inode_to_client(inode);
 	struct ceph_osd_request *req;
-	struct page *page = NULL;
+	struct folio *folio = NULL;
+	struct page *pages[1];
 	u64 len, inline_version;
 	int err = 0;
 	bool from_pagecache = false;
@@ -1608,34 +1596,30 @@ int ceph_uninline_data(struct file *filp, struct page *locked_page)
 	    inline_version == CEPH_INLINE_NONE)
 		goto out;
 
-	if (locked_page) {
-		page = locked_page;
-		WARN_ON(!PageUptodate(page));
-	} else if (ceph_caps_issued(ci) &
-		   (CEPH_CAP_FILE_CACHE|CEPH_CAP_FILE_LAZYIO)) {
-		page = find_get_page(inode->i_mapping, 0);
-		if (page) {
-			if (PageUptodate(page)) {
+	if (ceph_caps_issued(ci) & (CEPH_CAP_FILE_CACHE|CEPH_CAP_FILE_LAZYIO)) {
+		folio = filemap_get_folio(inode->i_mapping, 0);
+		if (folio) {
+			if (folio_test_uptodate(folio)) {
 				from_pagecache = true;
-				lock_page(page);
+				folio_lock(folio);
 			} else {
-				put_page(page);
-				page = NULL;
+				folio_put(folio);
+				folio = NULL;
 			}
 		}
 	}
 
-	if (page) {
+	if (folio) {
 		len = i_size_read(inode);
-		if (len > PAGE_SIZE)
-			len = PAGE_SIZE;
+		if (len >  folio_size(folio))
+			len = folio_size(folio);
 	} else {
-		page = __page_cache_alloc(GFP_NOFS);
-		if (!page) {
+		folio = filemap_alloc_folio(GFP_NOFS, 0);
+		if (!folio) {
 			err = -ENOMEM;
 			goto out;
 		}
-		err = __ceph_do_getattr(inode, page,
+		err = __ceph_do_getattr(inode, folio_page(folio, 0),
 					CEPH_STAT_CAP_INLINE_DATA, true);
 		if (err < 0) {
 			/* no inline data */
@@ -1673,7 +1657,8 @@ int ceph_uninline_data(struct file *filp, struct page *locked_page)
 		goto out;
 	}
 
-	osd_req_op_extent_osd_data_pages(req, 1, &page, len, 0, false, false);
+	pages[0] = folio_page(folio, 0);
+	osd_req_op_extent_osd_data_pages(req, 1, pages, len, 0, false, false);
 
 	{
 		__le64 xattr_buf = cpu_to_le64(inline_version);
@@ -1710,12 +1695,10 @@ out_put:
 	if (err == -ECANCELED)
 		err = 0;
 out:
-	if (page && page != locked_page) {
-		if (from_pagecache) {
-			unlock_page(page);
-			put_page(page);
-		} else
-			__free_pages(page, 0);
+	if (folio) {
+		if (from_pagecache)
+			folio_unlock(folio);
+		folio_put(folio);
 	}
 
 	dout("uninline_data %p %llx.%llx inline_version %llu = %d\n",
