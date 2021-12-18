@@ -37,7 +37,7 @@ static inline void release_bus(struct wilc *wilc, enum bus_release release)
 	mutex_unlock(&wilc->hif_cs);
 }
 
-static void init_txq_entry(struct sk_buff *tqe, struct wilc_vif *vif,
+static void init_txq_entry(struct sk_buff *tqe,
 			   u8 type, enum ip_pkt_priority q_num)
 {
 	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(tqe);
@@ -53,7 +53,7 @@ static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 type, u8 q_num,
 	struct wilc_vif *vif = netdev_priv(dev);
 	struct wilc *wilc = vif->wilc;
 
-	init_txq_entry(tqe, vif, type, q_num);
+	init_txq_entry(tqe, type, q_num);
 	if (type == WILC_NET_PKT && vif->ack_filter.enabled)
 		tcp_process(dev, tqe);
 
@@ -68,7 +68,7 @@ static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 type, u8 q_num,
 {
 	struct wilc *wilc = vif->wilc;
 
-	init_txq_entry(tqe, vif, type, q_num);
+	init_txq_entry(tqe, type, q_num);
 
 	mutex_lock(&wilc->txq_add_to_head_cs);
 
