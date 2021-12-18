@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/soc/qcom/qcom,smp2p.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Qualcomm Shared Memory Point 2 Point
+
+description: |
+  The Shared Memory Point to Point (SMP2P) protocol facilitates communication of
+  a single 32-bit value between two processors.  Each value has a single writer
+  (the local side) and a single reader (the remote side).  Values are uniquely
+  identified in the system by the directed edge (local processor ID to remote
+  processor ID) and a string identifier.
+
+maintainers:
+  - Bjorn Andersson <bjorn.andersson@linaro.org>
+
+properties:
+  compatible:
+    const: qcom,smp2p
+
+  interrupts:
+    maxItems: 1
+
+  mboxes:
+    description: >
+      reference to the associated doorbell in APCS, as described
+      in mailbox/mailbox.txt
+
+  qcom,ipc:
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    description: >
+      three entries specifying the outgoing ipc bit used for
+      signaling the remote end of the smp2p edge
+    minItems: 1
+    maxItems: 32 # no hard limit
+    items:
+      items:
+        - description: phandle to a syscon node representing the apcs registers
+        - description: offset to the register within the syscon
+        - description: the IPC bit within the register
+
+  qcom,smem:
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    description: indentifiers of the smem items used for this edge
+    items:
+      - items:
+          - description: identifier of inbound smem items
+      - items:
+          - description: identifier of outbound smem items
+
+  qcom,local-pid:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: specifies the identifier of the local endpoint of this edge
+
+  qcom,remote-pid:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: specifies the identifier of the remote endpoint of this edge
+
+patternProperties:
+  "^((master|slave)-kernel|ipa-ap-to-modem|ipa-modem-to-ap|)$":
+    type: object
+    properties:
+      interrupt-controller:
+        description: >
+          marks the entry as inbound, if not specified
+          this node will denote the outgoing entry
+
+      '#interrupt-cells':
+        const: 2
+
+      qcom,entry-name:
+        $ref: /schemas/types.yaml#/definitions/string
+        description: >
+          specifies the name of this entry, for inbound entries this will be
+          used to match against the remotely allocated entry and for outbound
+          entries this name is used for allocating entries
+
+      '#qcom,smem-state-cells':
+        $ref: /schemas/types.yaml#/definitions/uint32
+        description: required for outgoing entries
+        const: 1
+
+    required:
+      - qcom,entry-name
+
+    oneOf:
+      - required:
+          - interrupt-controller
+          - '#interrupt-cells'
+      - required:
+          - '#qcom,smem-state-cells'
+
+    additionalProperties: false
+
+required:
+  - compatible
+  - qcom,smem
+  - qcom,local-pid
+  - qcom,remote-pid
+
+anyOf:
+  - required:
+      - mboxes
+  - required:
+      - qcom,ipc
+
+additionalProperties: false
+
+examples:
+  # The following example shows the SMP2P setup with the wireless processor,
+  # defined from the 8974 apps processor's point-of-view. It encompasses one
+  # inbound and one outbound entry:
+  - |
+    wcnss-smp2p {
+        compatible = "qcom,smp2p";
+        qcom,smem = <431>, <451>;
+
+        interrupts = <0 143 1>;
+
+        qcom,ipc = <&apcs 8 18>;
+
+        qcom,local-pid = <0>;
+        qcom,remote-pid = <4>;
+
+        wcnss_smp2p_out: master-kernel {
+            qcom,entry-name = "master-kernel";
+
+            #qcom,smem-state-cells = <1>;
+        };
+
+        wcnss_smp2p_in: slave-kernel {
+            qcom,entry-name = "slave-kernel";
+
+            interrupt-controller;
+            #interrupt-cells = <2>;
+        };
+    };
