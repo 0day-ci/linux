@@ -236,7 +236,7 @@ struct wilc {
 
 	struct completion cfg_event;
 	struct completion sync_event;
-	struct completion txq_event;
+	wait_queue_head_t txq_event;
 	struct completion txq_thread_started;
 
 	struct task_struct *txq_thread;

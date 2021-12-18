@@ -75,7 +75,7 @@ static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 q_num,
 
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
 
-	complete(&wilc->txq_event);
+	wake_up_interruptible(&wilc->txq_event);
 }
 
 static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 q_num,
@@ -94,7 +94,7 @@ static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 q_num,
 
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
 	mutex_unlock(&wilc->txq_add_to_head_cs);
-	complete(&wilc->txq_event);
+	wake_up_interruptible(&wilc->txq_event);
 }
 
 #define NOT_TCP_ACK			(-1)
@@ -196,7 +196,6 @@ static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 	struct wilc *wilc = vif->wilc;
 	struct tcp_ack_filter *f = &vif->ack_filter;
 	u32 i = 0;
-	u32 dropped = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&wilc->txq_spinlock, flags);
@@ -226,7 +225,6 @@ static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 					tqe->tx_complete_func(tqe->priv,
 							      tqe->status);
 				kfree(tqe);
-				dropped++;
 			}
 		}
 	}
@@ -239,12 +237,6 @@ static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 		f->pending_base = 0;
 
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
-
-	while (dropped > 0) {
-		wait_for_completion_timeout(&wilc->txq_event,
-					    msecs_to_jiffies(1));
-		dropped--;
-	}
 }
 
 void wilc_enable_tcp_ack_filter(struct wilc_vif *vif, bool value)

@@ -1692,7 +1692,7 @@ static void wlan_init_locks(struct wilc *wl)
 	spin_lock_init(&wl->txq_spinlock);
 	mutex_init(&wl->txq_add_to_head_cs);
 
-	init_completion(&wl->txq_event);
+	init_waitqueue_head(&wl->txq_event);
 	init_completion(&wl->cfg_event);
 	init_completion(&wl->sync_event);
 	init_completion(&wl->txq_thread_started);
