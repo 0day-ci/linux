@@ -163,7 +163,7 @@ struct ack_session_info {
 struct pending_acks {
 	u32 ack_num;
 	u32 session_index;
-	struct txq_entry_t  *txqe;
+	struct sk_buff *txqe;
 };
 
 struct tcp_ack_filter {
@@ -245,15 +245,14 @@ struct wilc {
 
 	/* lock to protect issue of wid command to firmware */
 	struct mutex cfg_cmd_lock;
-	struct wilc_cfg_frame cfg_frame;
-	u32 cfg_frame_offset;
+	struct sk_buff *cfg_skb;
 	u8 cfg_seq_no;
 
 	u8 *rx_buffer;
 	u32 rx_buffer_offset;
 	u8 *tx_buffer;
 
-	struct txq_handle txq[NQUEUES];
+	struct sk_buff_head txq[NQUEUES];
 	atomic_t txq_entries;
 	struct txq_fw_recv_queue_stat fw[NQUEUES];
 

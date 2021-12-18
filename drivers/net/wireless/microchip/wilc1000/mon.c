@@ -95,45 +95,21 @@ void wilc_wfi_monitor_rx(struct net_device *mon_dev, u8 *buff, u32 size)
 	netif_rx(skb);
 }
 
-struct tx_complete_mon_data {
-	int size;
-	void *buff;
-};
-
-static void mgmt_tx_complete(void *priv, int status)
-{
-	struct tx_complete_mon_data *pv_data = priv;
-	/*
-	 * in case of fully hosting mode, the freeing will be done
-	 * in response to the cfg packet
-	 */
-	kfree(pv_data->buff);
-
-	kfree(pv_data);
-}
-
 static int mon_mgmt_tx(struct net_device *dev, const u8 *buf, size_t len)
 {
-	struct tx_complete_mon_data *mgmt_tx = NULL;
+	struct wilc_vif *vif = netdev_priv(dev);
+	struct sk_buff *skb;
 
 	if (!dev)
 		return -EFAULT;
 
 	netif_stop_queue(dev);
-	mgmt_tx = kmalloc(sizeof(*mgmt_tx), GFP_ATOMIC);
-	if (!mgmt_tx)
+	skb = wilc_wlan_alloc_skb(vif, len);
+	if (!skb)
 		return -ENOMEM;
+	skb_put_data(skb, buf, len);
 
-	mgmt_tx->buff = kmemdup(buf, len, GFP_ATOMIC);
-	if (!mgmt_tx->buff) {
-		kfree(mgmt_tx);
-		return -ENOMEM;
-	}
-
-	mgmt_tx->size = len;
-
-	wilc_wlan_txq_add_mgmt_pkt(dev, mgmt_tx, mgmt_tx->buff, mgmt_tx->size,
-				   mgmt_tx_complete);
+	wilc_wlan_txq_add_mgmt_pkt(dev, skb);
 
 	netif_wake_queue(dev);
 	return 0;

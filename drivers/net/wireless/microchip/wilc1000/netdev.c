@@ -718,19 +718,10 @@ static void wilc_set_multicast_list(struct net_device *dev)
 		kfree(mc_list);
 }
 
-static void wilc_tx_complete(void *priv, int status)
-{
-	struct tx_complete_data *pv_data = priv;
-
-	dev_kfree_skb(pv_data->skb);
-	kfree(pv_data);
-}
-
 netdev_tx_t wilc_mac_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct wilc_vif *vif = netdev_priv(ndev);
 	struct wilc *wilc = vif->wilc;
-	struct tx_complete_data *tx_data = NULL;
 	int queue_count;
 
 	if (skb->dev != ndev) {
@@ -738,22 +729,9 @@ netdev_tx_t wilc_mac_xmit(struct sk_buff *skb, struct net_device *ndev)
 		return NETDEV_TX_OK;
 	}
 
-	tx_data = kmalloc(sizeof(*tx_data), GFP_ATOMIC);
-	if (!tx_data) {
-		dev_kfree_skb(skb);
-		netif_wake_queue(ndev);
-		return NETDEV_TX_OK;
-	}
-
-	tx_data->buff = skb->data;
-	tx_data->size = skb->len;
-	tx_data->skb  = skb;
-
 	vif->netstats.tx_packets++;
-	vif->netstats.tx_bytes += tx_data->size;
-	queue_count = wilc_wlan_txq_add_net_pkt(ndev, tx_data,
-						tx_data->buff, tx_data->size,
-						wilc_tx_complete);
+	vif->netstats.tx_bytes += skb->len;
+	queue_count = wilc_wlan_txq_add_net_pkt(ndev, skb);
 
 	if (queue_count > FLOW_CONTROL_UPPER_THRESHOLD) {
 		int srcu_idx;

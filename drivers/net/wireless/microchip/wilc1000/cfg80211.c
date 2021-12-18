@@ -1038,14 +1038,6 @@ out_rx_mgmt:
 	cfg80211_rx_mgmt(&priv->wdev, freq, 0, buff, size, 0);
 }
 
-static void wilc_wfi_mgmt_tx_complete(void *priv, int status)
-{
-	struct wilc_p2p_mgmt_data *pv_data = priv;
-
-	kfree(pv_data->buff);
-	kfree(pv_data);
-}
-
 static void wilc_wfi_remain_on_channel_expired(void *data, u64 cookie)
 {
 	struct wilc_vif *vif = data;
@@ -1124,7 +1116,7 @@ static int mgmt_tx(struct wiphy *wiphy,
 	const u8 *buf = params->buf;
 	size_t len = params->len;
 	const struct ieee80211_mgmt *mgmt;
-	struct wilc_p2p_mgmt_data *mgmt_tx;
+	struct sk_buff *skb;
 	struct wilc_vif *vif = netdev_priv(wdev->netdev);
 	struct wilc_priv *priv = &vif->priv;
 	struct host_if_drv *wfi_drv = priv->hif_drv;
@@ -1141,20 +1133,11 @@ static int mgmt_tx(struct wiphy *wiphy,
 	if (!ieee80211_is_mgmt(mgmt->frame_control))
 		goto out;
 
-	mgmt_tx = kmalloc(sizeof(*mgmt_tx), GFP_KERNEL);
-	if (!mgmt_tx) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	skb = wilc_wlan_alloc_skb(vif, len);
+	if (!skb)
+		return -ENOMEM;
 
-	mgmt_tx->buff = kmemdup(buf, len, GFP_KERNEL);
-	if (!mgmt_tx->buff) {
-		ret = -ENOMEM;
-		kfree(mgmt_tx);
-		goto out;
-	}
-
-	mgmt_tx->size = len;
+	skb_put_data(skb, buf, len);
 
 	if (ieee80211_is_probe_resp(mgmt->frame_control)) {
 		wilc_set_mac_chnl_num(vif, chan->hw_value);
@@ -1176,7 +1159,7 @@ static int mgmt_tx(struct wiphy *wiphy,
 		goto out_set_timeout;
 
 	vendor_ie = cfg80211_find_vendor_ie(WLAN_OUI_WFA, WLAN_OUI_TYPE_WFA_P2P,
-					    mgmt_tx->buff + ie_offset,
+					    skb->data + ie_offset,
 					    len - ie_offset);
 	if (!vendor_ie)
 		goto out_set_timeout;
@@ -1189,9 +1172,7 @@ out_set_timeout:
 
 out_txq_add_pkt:
 
-	wilc_wlan_txq_add_mgmt_pkt(wdev->netdev, mgmt_tx,
-				   mgmt_tx->buff, mgmt_tx->size,
-				   wilc_wfi_mgmt_tx_complete);
+	wilc_wlan_txq_add_mgmt_pkt(wdev->netdev, skb);
 
 out:
 
@@ -1732,7 +1713,7 @@ int wilc_cfg80211_init(struct wilc **wilc, struct device *dev, int io_type,
 	wl->hif_func = ops;
 
 	for (i = 0; i < NQUEUES; i++)
-		INIT_LIST_HEAD(&wl->txq[i].txq_head.list);
+		skb_queue_head_init(&wl->txq[i]);
 
 	INIT_LIST_HEAD(&wl->rxq_head.list);
 	INIT_LIST_HEAD(&wl->vif_list);
