@@ -635,7 +635,7 @@ static int fill_vmm_table(const struct wilc *wilc,
 	u32 sum;
 	u8 ac_preserve_ratio[NQUEUES] = {1, 1, 1, 1};
 	u8 *num_pkts_to_add;
-	bool max_size_over = 0, ac_exist = 0;
+	bool ac_exist = 0;
 	int vmm_sz = 0;
 	struct sk_buff *tqe_q[NQUEUES];
 	struct wilc_skb_tx_cb *tx_cb;
@@ -645,20 +645,17 @@ static int fill_vmm_table(const struct wilc *wilc,
 
 	i = 0;
 	sum = 0;
-	max_size_over = 0;
 	num_pkts_to_add = ac_desired_ratio;
 	do {
 		ac_exist = 0;
-		for (ac = 0; (ac < NQUEUES) && (!max_size_over); ac++) {
+		for (ac = 0; ac < NQUEUES; ac++) {
 			if (!tqe_q[ac])
 				continue;
 
 			ac_exist = 1;
-			for (k = 0; (k < num_pkts_to_add[ac]) &&
-			     (!max_size_over) && tqe_q[ac]; k++) {
+			for (k = 0; (k < num_pkts_to_add[ac]) && tqe_q[ac]; k++) {
 				if (i >= (WILC_VMM_TBL_SIZE - 1)) {
-					max_size_over = 1;
-					break;
+					goto out;
 				}
 
 				tx_cb = WILC_SKB_TX_CB(tqe_q[ac]);
@@ -673,8 +670,7 @@ static int fill_vmm_table(const struct wilc *wilc,
 				vmm_sz = ALIGN(vmm_sz, 4);
 
 				if ((sum + vmm_sz) > WILC_TX_BUFF_SIZE) {
-					max_size_over = 1;
-					break;
+					goto out;
 				}
 				vmm_table[i] = vmm_sz / 4;
 				if (tx_cb->type == WILC_CFG_PKT)
@@ -690,8 +686,8 @@ static int fill_vmm_table(const struct wilc *wilc,
 			}
 		}
 		num_pkts_to_add = ac_preserve_ratio;
-	} while (!max_size_over && ac_exist);
-
+	} while (ac_exist);
+out:
 	vmm_table[i] = 0x0;
 	return i;
 }
