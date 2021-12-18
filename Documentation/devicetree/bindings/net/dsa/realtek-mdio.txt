@@ -1,0 +1,91 @@
+Realtek MDIO-based Switches
+==========================
+
+Realtek MDIO-based switches use MDIO protocol as opposed to Realtek
+SMI-based switches. The realtek-mdio driver is an mdio driver and it must
+be inserted inside an mdio node.
+
+Required properties:
+
+- compatible: must be exactly one of (same as realtek-smi):
+      "realtek,rtl8365mb" (4+1 ports)
+      "realtek,rtl8366"               (not supported yet)
+      "realtek,rtl8366rb" (4+1 ports)
+      "realtek,rtl8366s"  (4+1 ports) (not supported yet)
+      "realtek,rtl8367"               (not supported yet)
+      "realtek,rtl8367b"              (not supported yet)
+      "realtek,rtl8368s"  (8 port)    (not supported yet)
+      "realtek,rtl8369"               (not supported yet)
+      "realtek,rtl8370"   (8 port)    (not supported yet)
+
+Required properties:
+- reg: MDIO PHY ID to access the switch
+
+Optional properties:
+- realtek,disable-leds: if the LED drivers are not used in the
+  hardware design this will disable them so they are not turned on
+  and wasting power.
+
+See net/dsa/dsa.txt for a list of additional required and optional properties
+and subnodes of DSA switches.
+
+Optional properties of dsa port:
+
+- realtek,ext-int: defines the external interface number (0, 1, 2). By default, 1.
+
+Examples:
+
+An example for the RTL8367S:
+
+&mdio0 {
+	switch {
+		compatible = "realtek,rtl8367s";
+		reg = <29>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+
+			port@0 {
+				reg = <0>;
+				label = "lan4";
+			};
+
+			port@1 {
+				reg = <1>;
+				label = "lan3";
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "lan2";
+			};
+
+			port@3 {
+				reg = <3>;
+				label = "lan1";
+			};
+
+			port@4 {
+				reg = <4>;
+				label = "wan";
+			};
+
+			port@7 {
+				reg = <7>;
+				ethernet = <&ethernet>;
+				phy-mode = "rgmii";
+				realtek,ext-int = <2>;
+				tx-internal-delay-ps = <2000>;
+				rx-internal-delay-ps = <0>;
+
+				fixed-link {
+					speed = <1000>;
+					full-duplex;
+				};
+			};
+		};
+	};
+};
+
