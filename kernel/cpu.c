@@ -2583,10 +2583,13 @@ EXPORT_SYMBOL(cpu_all_bits);
 #ifdef CONFIG_INIT_ALL_POSSIBLE
 struct cpumask __cpu_possible_mask __read_mostly
 	= {CPU_BITS_ALL};
+atomic_t __num_possible_cpus __read_mostly = ATOMIC_INIT(NR_CPUS);
 #else
 struct cpumask __cpu_possible_mask __read_mostly;
+atomic_t __num_possible_cpus __read_mostly;
 #endif
 EXPORT_SYMBOL(__cpu_possible_mask);
+EXPORT_SYMBOL(__num_possible_cpus);
 
 struct cpumask __cpu_online_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_online_mask);
@@ -2611,6 +2614,7 @@ void init_cpu_present(const struct cpumask *src)
 void init_cpu_possible(const struct cpumask *src)
 {
 	cpumask_copy(&__cpu_possible_mask, src);
+	atomic_set(&__num_possible_cpus, cpumask_weight(cpu_possible_mask));
 }
 
 void init_cpu_online(const struct cpumask *src)
@@ -2639,6 +2643,24 @@ void set_cpu_online(unsigned int cpu, bool online)
 			atomic_dec(&__num_online_cpus);
 	}
 }
+
+void reset_cpu_possible_mask(void)
+{
+	bitmap_zero(cpumask_bits(&__cpu_possible_mask), NR_CPUS);
+	atomic_set(&__num_possible_cpus, 0);
+}
+
+void set_cpu_possible(unsigned int cpu, bool possible)
+{
+	if (possible) {
+		if (!cpumask_test_and_set_cpu(cpu, &__cpu_possible_mask))
+			atomic_inc(&__num_possible_cpus);
+	} else {
+		if (cpumask_test_and_clear_cpu(cpu, &__cpu_possible_mask))
+			atomic_dec(&__num_possible_cpus);
+	}
+}
+EXPORT_SYMBOL(set_cpu_possible);
 
 /*
  * Activate the first processor.
