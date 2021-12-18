@@ -94,6 +94,15 @@ static struct regmap *ocelot_mfd_regmap_init(struct ocelot_mfd_core *core,
 	return regmap;
 }
 
+struct regmap *ocelot_mfd_get_regmap_from_resource(struct device *dev,
+						   const struct resource *res)
+{
+	struct ocelot_mfd_core *core = dev_get_drvdata(dev);
+
+	return ocelot_mfd_regmap_init(core, res);
+}
+EXPORT_SYMBOL(ocelot_mfd_get_regmap_from_resource);
+
 int ocelot_mfd_init(struct ocelot_mfd_config *config)
 {
 	struct device *dev = config->dev;

@@ -968,4 +968,16 @@ ocelot_mrp_del_ring_role(struct ocelot *ocelot, int port,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_MFD_OCELOT_CORE)
+struct regmap *ocelot_mfd_get_regmap_from_resource(struct device *dev,
+						   const struct resource *res);
+#else
+static inline regmap *
+ocelot_mfd_get_regmap_from_resource(struct device *dev,
+				    const struct resource *res)
+{
+	return NULL;
+}
+#endif
+
 #endif
