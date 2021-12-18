@@ -920,29 +920,27 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
 
 	ret = send_vmm_table(wilc, i, vmm_table);
-
-	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
-
-	if (ret < 0)
-		goto out_unlock;
-
-	entries = ret;
-	if (entries == 0) {
-		/* No VMM space available in firmware.  Inform caller
-		 * to retry later.
-		 */
-		ret = WILC_VMM_ENTRY_FULL_RETRY;
-		goto out_unlock;
+	if (ret <= 0) {
+		if (ret == 0)
+			/* No VMM space available in firmware.  Inform
+			 * caller to retry later.
+			 */
+			ret = WILC_VMM_ENTRY_FULL_RETRY;
+		goto out_release_bus;
 	}
 
+	release_bus(wilc, WILC_BUS_RELEASE_ONLY);
+
+	entries = ret;
 	len = copy_packets(wilc, entries, vmm_table, vmm_entries_ac);
 	if (len <= 0)
 		goto out_unlock;
 
-	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
+	acquire_bus(wilc, WILC_BUS_ACQUIRE_ONLY);
 
 	ret = send_packets(wilc, len);
 
+out_release_bus:
 	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
 
 out_unlock:
