@@ -1188,6 +1188,9 @@ static int qcom_pcie_get_resources_2_7_0(struct qcom_pcie *pcie)
 		res->ref_clk_src = devm_clk_get(dev, "ref");
 		if (IS_ERR(res->ref_clk_src))
 			return PTR_ERR(res->ref_clk_src);
+
+		/* Ensure that the TCXO is a clock source for pcie_pipe_clk_src */
+		clk_set_parent(res->pipe_clk_src, res->ref_clk_src);
 	}
 
 	res->pipe_clk = devm_clk_get(dev, "pipe");
@@ -1208,9 +1211,9 @@ static int qcom_pcie_init_2_7_0(struct qcom_pcie *pcie)
 		return ret;
 	}
 
-	/* Set TCXO as clock source for pcie_pipe_clk_src */
+	/* Set pipe clock as clock source for pcie_pipe_clk_src */
 	if (pcie->pipe_clk_need_muxing)
-		clk_set_parent(res->pipe_clk_src, res->ref_clk_src);
+		clk_set_parent(res->pipe_clk_src, res->phy_pipe_clk);
 
 	ret = clk_bulk_prepare_enable(res->num_clks, res->clks);
 	if (ret < 0)
@@ -1276,16 +1279,17 @@ static void qcom_pcie_deinit_2_7_0(struct qcom_pcie *pcie)
 	struct qcom_pcie_resources_2_7_0 *res = &pcie->res.v2_7_0;
 
 	clk_bulk_disable_unprepare(res->num_clks, res->clks);
+
+	/* Set TCXO as clock source for pcie_pipe_clk_src */
+	if (pcie->pipe_clk_need_muxing)
+		clk_set_parent(res->pipe_clk_src, res->ref_clk_src);
+
 	regulator_bulk_disable(ARRAY_SIZE(res->supplies), res->supplies);
 }
 
 static int qcom_pcie_post_init_2_7_0(struct qcom_pcie *pcie)
 {
 	struct qcom_pcie_resources_2_7_0 *res = &pcie->res.v2_7_0;
-
-	/* Set pipe clock as clock source for pcie_pipe_clk_src */
-	if (pcie->pipe_clk_need_muxing)
-		clk_set_parent(res->pipe_clk_src, res->phy_pipe_clk);
 
 	return clk_prepare_enable(res->pipe_clk);
 }
@@ -1548,11 +1552,6 @@ static int qcom_pcie_probe(struct platform_device *pdev)
 	if (!pci)
 		return -ENOMEM;
 
-	pm_runtime_enable(dev);
-	ret = pm_runtime_resume_and_get(dev);
-	if (ret < 0)
-		goto err_pm_runtime_disable;
-
 	pci->dev = dev;
 	pci->ops = &dw_pcie_ops;
 	pp = &pci->pp;
@@ -1563,32 +1562,29 @@ static int qcom_pcie_probe(struct platform_device *pdev)
 	pcie->pipe_clk_need_muxing = pcie_cfg->pipe_clk_need_muxing;
 
 	pcie->reset = devm_gpiod_get_optional(dev, "perst", GPIOD_OUT_HIGH);
-	if (IS_ERR(pcie->reset)) {
-		ret = PTR_ERR(pcie->reset);
-		goto err_pm_runtime_put;
-	}
+	if (IS_ERR(pcie->reset))
+		return PTR_ERR(pcie->reset);
 
 	pcie->parf = devm_platform_ioremap_resource_byname(pdev, "parf");
-	if (IS_ERR(pcie->parf)) {
-		ret = PTR_ERR(pcie->parf);
-		goto err_pm_runtime_put;
-	}
+	if (IS_ERR(pcie->parf))
+		return PTR_ERR(pcie->parf);
 
 	pcie->elbi = devm_platform_ioremap_resource_byname(pdev, "elbi");
-	if (IS_ERR(pcie->elbi)) {
-		ret = PTR_ERR(pcie->elbi);
-		goto err_pm_runtime_put;
-	}
+	if (IS_ERR(pcie->elbi))
+		return PTR_ERR(pcie->elbi);
 
 	pcie->phy = devm_phy_optional_get(dev, "pciephy");
-	if (IS_ERR(pcie->phy)) {
-		ret = PTR_ERR(pcie->phy);
-		goto err_pm_runtime_put;
-	}
+	if (IS_ERR(pcie->phy))
+		return PTR_ERR(pcie->phy);
 
 	ret = pcie->ops->get_resources(pcie);
 	if (ret)
-		goto err_pm_runtime_put;
+		return ret;
+
+	pm_runtime_enable(dev);
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret < 0)
+		goto err_pm_runtime_disable;
 
 	pp->ops = &qcom_pcie_dw_ops;
 
