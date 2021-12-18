@@ -336,7 +336,7 @@ void qed_rdma_bmap_free(struct qed_hwfn *p_hwfn,
 
 	/* print aligned non-zero lines, if any */
 	for (item = 0, line = 0; line < last_line; line++, item += 8)
-		if (bitmap_weight((unsigned long *)&pmap[item], 64 * 8))
+		if (!bitmap_empty((unsigned long *)&pmap[item], 64 * 8))
 			DP_NOTICE(p_hwfn,
 				  "line 0x%04x: 0x%016llx 0x%016llx 0x%016llx 0x%016llx 0x%016llx 0x%016llx 0x%016llx 0x%016llx\n",
 				  line,
@@ -350,7 +350,7 @@ void qed_rdma_bmap_free(struct qed_hwfn *p_hwfn,
 
 	/* print last unaligned non-zero line, if any */
 	if ((bmap->max_count % (64 * 8)) &&
-	    (bitmap_weight((unsigned long *)&pmap[item],
+	    (!bitmap_empty((unsigned long *)&pmap[item],
 			   bmap->max_count - item * 64))) {
 		offset = sprintf(str_last_line, "line 0x%04x: ", line);
 		for (; item < last_item; item++)
