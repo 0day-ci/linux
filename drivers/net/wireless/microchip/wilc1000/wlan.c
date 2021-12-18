@@ -1271,15 +1271,13 @@ static int wilc_wlan_cfg_commit(struct wilc_vif *vif, int type,
 	struct wilc *wilc = vif->wilc;
 	struct wilc_cfg_frame *cfg = &wilc->cfg_frame;
 	int t_len = wilc->cfg_frame_offset + sizeof(struct wilc_cfg_cmd_hdr);
+	struct wilc_cfg_cmd_hdr *hdr;
 
-	if (type == WILC_CFG_SET)
-		cfg->hdr.cmd_type = 'W';
-	else
-		cfg->hdr.cmd_type = 'Q';
-
-	cfg->hdr.seq_no = wilc->cfg_seq_no % 256;
-	cfg->hdr.total_len = cpu_to_le16(t_len);
-	cfg->hdr.driver_handler = cpu_to_le32(drv_handler);
+	hdr = &cfg->hdr;
+	hdr->cmd_type = (type == WILC_CFG_SET) ? 'W' : 'Q';
+	hdr->seq_no = wilc->cfg_seq_no % 256;
+	hdr->total_len = cpu_to_le16(t_len);
+	hdr->driver_handler = cpu_to_le32(drv_handler);
 	wilc->cfg_seq_no = cfg->hdr.seq_no;
 
 	if (!wilc_wlan_txq_add_cfg_pkt(vif, (u8 *)&cfg->hdr, t_len))
