@@ -6006,7 +6006,7 @@ static void sched_core_cpu_starting(unsigned int cpu)
 	WARN_ON_ONCE(rq->core != rq);
 
 	/* if we're the first, we'll be our own leader */
-	if (cpumask_weight(smt_mask) == 1)
+	if (cpumask_weight_eq(smt_mask, 1))
 		goto unlock;
 
 	/* find the leader */
@@ -6047,7 +6047,7 @@ static void sched_core_cpu_deactivate(unsigned int cpu)
 	sched_core_lock(cpu, &flags);
 
 	/* if we're the last man standing, nothing to do */
-	if (cpumask_weight(smt_mask) == 1) {
+	if (cpumask_weight_eq(smt_mask, 1)) {
 		WARN_ON_ONCE(rq->core != rq);
 		goto unlock;
 	}
@@ -9053,7 +9053,7 @@ int sched_cpu_activate(unsigned int cpu)
 	/*
 	 * When going up, increment the number of cores with SMT present.
 	 */
-	if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
+	if (cpumask_weight_eq(cpu_smt_mask(cpu), 2))
 		static_branch_inc_cpuslocked(&sched_smt_present);
 #endif
 	set_cpu_active(cpu, true);
@@ -9128,7 +9128,7 @@ int sched_cpu_deactivate(unsigned int cpu)
 	/*
 	 * When going down, decrement the number of cores with SMT present.
 	 */
-	if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
+	if (cpumask_weight_eq(cpu_smt_mask(cpu), 2))
 		static_branch_dec_cpuslocked(&sched_smt_present);
 
 	sched_core_cpu_deactivate(cpu);

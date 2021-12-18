@@ -1608,7 +1608,7 @@ static void remove_siblinginfo(int cpu)
 		/*/
 		 * last thread sibling in this cpu core going down
 		 */
-		if (cpumask_weight(topology_sibling_cpumask(cpu)) == 1)
+		if (cpumask_weight_eq(topology_sibling_cpumask(cpu), 1))
 			cpu_data(sibling).booted_cores--;
 	}
 
@@ -1617,7 +1617,7 @@ static void remove_siblinginfo(int cpu)
 
 	for_each_cpu(sibling, topology_sibling_cpumask(cpu)) {
 		cpumask_clear_cpu(cpu, topology_sibling_cpumask(sibling));
-		if (cpumask_weight(topology_sibling_cpumask(sibling)) == 1)
+		if (cpumask_weight_eq(topology_sibling_cpumask(sibling), 1))
 			cpu_data(sibling).smt_active = false;
 	}
 
