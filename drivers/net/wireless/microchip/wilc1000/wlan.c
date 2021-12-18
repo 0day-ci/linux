@@ -12,6 +12,8 @@
 
 #define WAKE_UP_TRIAL_RETRY		10000
 
+static const u8 factors[NQUEUES] = {1, 1, 1, 1};
+
 static inline bool is_wilc1000(u32 id)
 {
 	return (id & (~WILC_CHIP_REV_FIELD)) == WILC_1000_BASE_ID;
@@ -283,10 +285,23 @@ static int wilc_wlan_txq_add_cfg_pkt(struct wilc_vif *vif, u8 *buffer,
 	return 1;
 }
 
+static void init_q_limits(struct wilc *wl)
+{
+	struct wilc_tx_queue_status *q = &wl->tx_q_limit;
+	int i;
+
+	for (i = 0; i < AC_BUFFER_SIZE; i++)
+		q->buffer[i] = i % NQUEUES;
+
+	for (i = 0; i < NQUEUES; i++) {
+		q->cnt[i] = AC_BUFFER_SIZE * factors[i] / NQUEUES;
+		q->sum += q->cnt[i];
+	}
+	q->end_index = AC_BUFFER_SIZE - 1;
+}
+
 static bool is_ac_q_limit(struct wilc *wl, u8 q_num)
 {
-	u8 factors[NQUEUES] = {1, 1, 1, 1};
-	u16 i;
 	unsigned long flags;
 	struct wilc_tx_queue_status *q = &wl->tx_q_limit;
 	u8 end_index;
@@ -294,17 +309,6 @@ static bool is_ac_q_limit(struct wilc *wl, u8 q_num)
 	bool ret = false;
 
 	spin_lock_irqsave(&wl->txq_spinlock, flags);
-	if (!q->initialized) {
-		for (i = 0; i < AC_BUFFER_SIZE; i++)
-			q->buffer[i] = i % NQUEUES;
-
-		for (i = 0; i < NQUEUES; i++) {
-			q->cnt[i] = AC_BUFFER_SIZE * factors[i] / NQUEUES;
-			q->sum += q->cnt[i];
-		}
-		q->end_index = AC_BUFFER_SIZE - 1;
-		q->initialized = 1;
-	}
 
 	end_index = q->end_index;
 	q->cnt[q->buffer[end_index]] -= factors[q->buffer[end_index]];
@@ -1484,6 +1488,8 @@ int wilc_wlan_init(struct net_device *dev)
 		ret = -EIO;
 		goto fail;
 	}
+
+	init_q_limits(wilc);
 
 	if (!wilc->tx_buffer)
 		wilc->tx_buffer = kmalloc(WILC_TX_BUFF_SIZE, GFP_KERNEL);
