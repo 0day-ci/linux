@@ -653,10 +653,9 @@ static int fill_vmm_table(const struct wilc *wilc,
 				continue;
 
 			ac_exist = 1;
-			for (k = 0; (k < num_pkts_to_add[ac]) && tqe_q[ac]; k++) {
-				if (i >= (WILC_VMM_TBL_SIZE - 1)) {
+			for (k = 0; k < num_pkts_to_add[ac] && tqe_q[ac]; k++) {
+				if (i >= WILC_VMM_TBL_SIZE - 1)
 					goto out;
-				}
 
 				tx_cb = WILC_SKB_TX_CB(tqe_q[ac]);
 				if (tx_cb->type == WILC_CFG_PKT)
@@ -669,9 +668,8 @@ static int fill_vmm_table(const struct wilc *wilc,
 				vmm_sz += tqe_q[ac]->len;
 				vmm_sz = ALIGN(vmm_sz, 4);
 
-				if ((sum + vmm_sz) > WILC_TX_BUFF_SIZE) {
+				if (sum + vmm_sz > WILC_TX_BUFF_SIZE)
 					goto out;
-				}
 				vmm_table[i] = vmm_sz / 4;
 				if (tx_cb->type == WILC_CFG_PKT)
 					vmm_table[i] |= BIT(10);
@@ -735,10 +733,8 @@ static int send_vmm_table(struct wilc *wilc, int i, const u32 *vmm_table)
 
 	timeout = 200;
 	do {
-		ret = func->hif_block_tx(wilc,
-					 WILC_VMM_TBL_RX_SHADOW_BASE,
-					 (u8 *)vmm_table,
-					 ((i + 1) * 4));
+		ret = func->hif_block_tx(wilc, WILC_VMM_TBL_RX_SHADOW_BASE,
+					 (u8 *)vmm_table, (i + 1) * 4);
 		if (ret)
 			break;
 
