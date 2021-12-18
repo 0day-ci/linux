@@ -192,11 +192,14 @@ out:
 
 static void wilc_wlan_tx_packet_done(struct txq_entry_t *tqe, int status)
 {
+	struct wilc_vif *vif = tqe->vif;
+	int ack_idx = tqe->ack_idx;
+
 	tqe->status = status;
 	if (tqe->tx_complete_func)
 		tqe->tx_complete_func(tqe->priv, tqe->status);
-	if (tqe->ack_idx != NOT_TCP_ACK && tqe->ack_idx < MAX_PENDING_ACKS)
-		tqe->vif->ack_filter.pending_acks[tqe->ack_idx].txqe = NULL;
+	if (ack_idx != NOT_TCP_ACK && ack_idx < MAX_PENDING_ACKS)
+		vif->ack_filter.pending_acks[ack_idx].txqe = NULL;
 	kfree(tqe);
 }
 
