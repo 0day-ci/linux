@@ -104,7 +104,22 @@ struct regmap *ocelot_mfd_get_regmap_from_resource(struct device *dev,
 }
 EXPORT_SYMBOL(ocelot_mfd_get_regmap_from_resource);
 
+static const struct resource vsc7512_miim1_resources[] = {
+	{
+		.start = 0x710700c0,
+		.end = 0x710700e3,
+		.name = "gcb_miim1",
+		.flags = IORESOURCE_MEM,
+	},
+};
+
 static const struct mfd_cell vsc7512_devs[] = {
+	{
+		.name = "ocelot-miim1",
+		.of_compatible = "mscc,ocelot-miim",
+		.num_resources = ARRAY_SIZE(vsc7512_miim1_resources),
+		.resources = vsc7512_miim1_resources,
+	},
 	{
 		.name = "ocelot-ext-switch",
 		.of_compatible = "mscc,vsc7512-ext-switch",
