@@ -1095,6 +1095,15 @@ static int irdma_query_pkey(struct ib_device *ibdev, u32 port, u16 index,
 	return 0;
 }
 
+
+static u16 irdma_get_udp_sport(u32 fl, u32 lqpn, u32 rqpn)
+{
+	if (!fl)
+		fl = rdma_calc_flow_label(lqpn, rqpn);
+
+	return rdma_flow_label_to_udp_sport(fl);
+}
+
 /**
  * irdma_modify_qp_roce - modify qp request
  * @ibqp: qp's pointer for modify
@@ -1159,6 +1168,10 @@ int irdma_modify_qp_roce(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 		udp_info->rexmit_thresh = attr->retry_cnt;
 
 	ctx_info->roce_info->pd_id = iwpd->sc_pd.pd_id;
+
+	udp_info->src_port = irdma_get_udp_sport(udp_info->flow_label,
+						 ibqp->qp_num,
+						 roce_info->dest_qp);
 
 	if (attr_mask & IB_QP_AV) {
 		struct irdma_av *av = &iwqp->roce_ah.av;
