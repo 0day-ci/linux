@@ -11,14 +11,6 @@
 #ifndef __SIGNAL_COMMON_H
 #define __SIGNAL_COMMON_H
 
-/* #define DEBUG_SIG */
-
-#ifdef DEBUG_SIG
-#  define DEBUGP(fmt, args...) printk("%s: " fmt, __func__, ##args)
-#else
-#  define DEBUGP(fmt, args...)
-#endif
-
 /*
  * Determine which stack to use..
  */
