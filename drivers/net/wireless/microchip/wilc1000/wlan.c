@@ -893,10 +893,10 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		u8 mgmt_ptk = 0;
 
 		tqe = wilc_wlan_txq_remove_from_head(wilc, vmm_entries_ac[i]);
-		ac_pkt_num_to_chip[vmm_entries_ac[i]]++;
 		if (!tqe)
 			break;
 
+		ac_pkt_num_to_chip[vmm_entries_ac[i]]++;
 		vif = tqe->vif;
 		if (vmm_table[i] == 0)
 			break;
