@@ -71,8 +71,8 @@ static irqreturn_t iio_simple_dummy_trigger_h(int irq, void *p)
 		int i, j;
 
 		for (i = 0, j = 0;
-		     i < bitmap_weight(indio_dev->active_scan_mask,
-				       indio_dev->masklength);
+		     bitmap_weight_gt(indio_dev->active_scan_mask,
+				       indio_dev->masklength, i);
 		     i++, j++) {
 			j = find_next_bit(indio_dev->active_scan_mask,
 					  indio_dev->masklength, j);
