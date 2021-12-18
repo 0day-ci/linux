@@ -252,14 +252,6 @@
 				"U19 INR", "ACODEC LORP",
 				"Lineout", "U19 OUTL",
 				"Lineout", "U19 OUTR";
-
-		assigned-clocks = <&clkc CLKID_MPLL2>,
-				  <&clkc CLKID_MPLL0>,
-				  <&clkc CLKID_MPLL1>;
-		assigned-clock-parents = <0>, <0>, <0>;
-		assigned-clock-rates = <294912000>,
-				       <270950400>,
-				       <393216000>;
 		status = "okay";
 
 		dai-link-0 {
@@ -365,6 +357,13 @@
 };
 
 &clkc_audio {
+	assigned-clocks = <&clkc CLKID_MPLL2>,
+				<&clkc CLKID_MPLL0>,
+				<&clkc CLKID_MPLL1>;
+	assigned-clock-parents = <0>, <0>, <0>;
+	assigned-clock-rates = <294912000>,
+					<270950400>,
+					<393216000>;
 	status = "okay";
 };
 
