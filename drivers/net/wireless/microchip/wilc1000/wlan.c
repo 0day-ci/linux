@@ -200,6 +200,14 @@ static void wilc_wlan_tx_packet_done(struct txq_entry_t *tqe, int status)
 	kfree(tqe);
 }
 
+static void wilc_wlan_txq_drop_net_pkt(struct txq_entry_t *tqe)
+{
+	struct wilc *wilc = tqe->vif->wilc;
+
+	wilc_wlan_txq_remove(wilc, tqe->q_num, tqe);
+	wilc_wlan_tx_packet_done(tqe, 1);
+}
+
 static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 {
 	struct wilc_vif *vif = netdev_priv(dev);
@@ -228,10 +236,8 @@ static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 			struct txq_entry_t *tqe;
 
 			tqe = f->pending_acks[i].txqe;
-			if (tqe) {
-				wilc_wlan_txq_remove(wilc, tqe->q_num, tqe);
-				wilc_wlan_tx_packet_done(tqe, 1);
-			}
+			if (tqe)
+				wilc_wlan_txq_drop_net_pkt(tqe);
 		}
 	}
 	f->pending_acks_idx = 0;
