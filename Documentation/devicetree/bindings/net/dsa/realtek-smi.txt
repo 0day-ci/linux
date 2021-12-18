@@ -62,6 +62,10 @@ See net/mdio.txt for additional MDIO bus properties.
 See net/dsa/dsa.txt for a list of additional required and optional properties
 and subnodes of DSA switches.
 
+Optional properties of dsa port:
+
+- realtek,ext-int: defines the external interface number (0, 1, 2). By default, 1.
+
 Examples:
 
 An example for the RTL8366RB:
