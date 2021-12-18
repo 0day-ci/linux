@@ -14,6 +14,7 @@ Required properties:
       "realtek,rtl8366s"  (4+1 ports) (not supported yet)
       "realtek,rtl8367"               (not supported yet)
       "realtek,rtl8367b"              (not supported yet)
+      "realtek,rtl8367s"  (5+2 ports)
       "realtek,rtl8368s"  (8 port)    (not supported yet)
       "realtek,rtl8369"               (not supported yet)
       "realtek,rtl8370"   (8 port)    (not supported yet)
