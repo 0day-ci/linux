@@ -886,8 +886,13 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 			goto put_pages;
 		}
 
+		mmap_read_lock(current->mm);
+
 		gup_rc = get_user_pages(mem_region.userspace_addr + memory_size, 1, FOLL_GET,
 					ne_mem_region->pages + i, NULL);
+
+		mmap_read_unlock(current->mm);
+
 		if (gup_rc < 0) {
 			rc = gup_rc;
 
