@@ -605,43 +605,40 @@ void host_sleep_notify(struct wilc *wilc)
 }
 EXPORT_SYMBOL_GPL(host_sleep_notify);
 
-int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
+/**
+ * Fill VMM table with packets waiting to be sent.  The packets are
+ * added based on access category (priority) but also balanced to
+ * provide fairness.  Since this function peeks at the packet queues,
+ * the txq_add_to_head_cs mutex must be acquired before calling this
+ * function.
+ *
+ * @wilc - Pointer to the wilc structure.
+ * @ac_desired_ratio: First-round limit on number of packets to add from the
+ *	respective queue.
+ * @vmm_table: Pointer to the VMM table to fill.
+ * @vmm_entries_ac: Pointer to the queue-number table to fill.
+ *	For each packet added to the VMM table, this will be filled in
+ *	with the queue-number (access-category) that the packet is coming
+ *	from.
+ *
+ * @return
+ *	The number of VMM entries filled in.  The table is 0-terminated
+ *	so the returned number is at most WILC_VMM_TBL_SIZE-1.
+ */
+static int fill_vmm_table(const struct wilc *wilc,
+			  u8 ac_desired_ratio[NQUEUES],
+			  u32 vmm_table[WILC_VMM_TBL_SIZE],
+			  u8 vmm_entries_ac[WILC_VMM_TBL_SIZE])
 {
-	int i, entries = 0;
+	int i;
 	u8 k, ac;
 	u32 sum;
-	u32 reg;
-	u8 ac_desired_ratio[NQUEUES] = {0, 0, 0, 0};
 	u8 ac_preserve_ratio[NQUEUES] = {1, 1, 1, 1};
 	u8 *num_pkts_to_add;
-	u8 vmm_entries_ac[WILC_VMM_TBL_SIZE];
-	u32 offset = 0;
 	bool max_size_over = 0, ac_exist = 0;
 	int vmm_sz = 0;
 	struct sk_buff *tqe_q[NQUEUES];
 	struct wilc_skb_tx_cb *tx_cb;
-	int ret = 0;
-	int counter;
-	int timeout;
-	u32 vmm_table[WILC_VMM_TBL_SIZE];
-	u8 ac_pkt_num_to_chip[NQUEUES] = {0, 0, 0, 0};
-	const struct wilc_hif_func *func;
-	int srcu_idx;
-	u8 *txb = wilc->tx_buffer;
-	struct wilc_vif *vif;
-
-	if (wilc->quit)
-		goto out_update_cnt;
-
-	if (ac_balance(wilc, ac_desired_ratio))
-		return -EINVAL;
-
-	mutex_lock(&wilc->txq_add_to_head_cs);
-
-	srcu_idx = srcu_read_lock(&wilc->srcu);
-	list_for_each_entry_rcu(vif, &wilc->vif_list, list)
-		wilc_wlan_txq_filter_dup_tcp_ack(vif->ndev);
-	srcu_read_unlock(&wilc->srcu, srcu_idx);
 
 	for (ac = 0; ac < NQUEUES; ac++)
 		tqe_q[ac] = skb_peek(&wilc->txq[ac]);
@@ -695,11 +692,28 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		num_pkts_to_add = ac_preserve_ratio;
 	} while (!max_size_over && ac_exist);
 
-	if (i == 0)
-		goto out_unlock;
 	vmm_table[i] = 0x0;
+	return i;
+}
 
-	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
+/**
+ * Send the VMM table to the chip and get back the number of entries
+ * that the chip can accept.  The bus must have been acquired before
+ * calling this function.
+ *
+ * @wilc: Pointer to the wilc structure.
+ * @i: The number of entries in the VMM table.
+ * @vmm_table: The VMM table to send.
+ *
+ * @return
+ *	The number of VMM table entries the chip can accept.
+ */
+static int send_vmm_table(struct wilc *wilc, int i, const u32 *vmm_table)
+{
+	const struct wilc_hif_func *func;
+	int ret, counter, entries, timeout;
+	u32 reg;
+
 	counter = 0;
 	func = wilc->hif_func;
 	do {
@@ -721,7 +735,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	} while (!wilc->quit);
 
 	if (ret)
-		goto out_release_bus;
+		return ret;
 
 	timeout = 200;
 	do {
@@ -759,22 +773,36 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 				break;
 			reg &= ~BIT(0);
 			ret = func->hif_write_reg(wilc, WILC_HOST_TX_CTRL, reg);
+		} else {
+			ret = entries;
 		}
 	} while (0);
+	return ret;
+}
 
-	if (ret)
-		goto out_release_bus;
-
-	if (entries == 0) {
-		/*
-		 * No VMM space available in firmware so retry to transmit
-		 * the packet from tx queue.
-		 */
-		ret = WILC_VMM_ENTRY_FULL_RETRY;
-		goto out_release_bus;
-	}
-
-	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
+/**
+ * Copy a set of packets to the transmit buffer.  The
+ * txq_add_to_head_cs mutex must still be held when calling this
+ * function.
+ *
+ * @wilc - Pointer to the wilc structure.
+ * @entries: The number of packets to send from the VMM table.
+ * @vmm_table: The VMM table to send.
+ * @vmm_entries_ac: Table index i contains the number of the queue to
+ *	take the i-th packet from.
+ *
+ * @return
+ *	Negative number on error, 0 on success.
+ */
+static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
+			u8 *vmm_entries_ac)
+{
+	u8 ac_pkt_num_to_chip[NQUEUES] = {0, 0, 0, 0};
+	struct wilc_skb_tx_cb *tx_cb;
+	u8 *txb = wilc->tx_buffer;
+	struct wilc_vif *vif;
+	int i, vmm_sz;
+	u32 offset;
 
 	offset = 0;
 	i = 0;
@@ -829,16 +857,92 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	} while (--entries);
 	for (i = 0; i < NQUEUES; i++)
 		wilc->fw[i].count += ac_pkt_num_to_chip[i];
+	return offset;
+}
 
-	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
+/**
+ * Send the packets in the VMM table to the chip.  The bus must have
+ * been acquired.
+ *
+ * @wilc - Pointer to the wilc structure.
+ * @length: The length of the buffer containing the packets to be
+ *	sent to the chip.
+ *
+ * @return
+ *	Negative number on error, 0 on success.
+ */
+static int send_packets(struct wilc *wilc, int len)
+{
+	const struct wilc_hif_func *func = wilc->hif_func;
+	int ret;
+	u8 *txb = wilc->tx_buffer;
 
 	ret = func->hif_clear_int_ext(wilc, ENABLE_TX_VMM);
 	if (ret)
-		goto out_release_bus;
+		return ret;
 
-	ret = func->hif_block_tx_ext(wilc, 0, txb, offset);
+	ret = func->hif_block_tx_ext(wilc, 0, txb, len);
+	return ret;
+}
 
-out_release_bus:
+int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
+{
+	int i, entries, len;
+	u8 ac;
+	u8 ac_desired_ratio[NQUEUES] = {0, 0, 0, 0};
+	u8 vmm_entries_ac[WILC_VMM_TBL_SIZE];
+	struct sk_buff *tqe_q[NQUEUES];
+	int ret = 0;
+	u32 vmm_table[WILC_VMM_TBL_SIZE];
+	int srcu_idx;
+	struct wilc_vif *vif;
+
+	if (wilc->quit)
+		goto out_update_cnt;
+
+	if (ac_balance(wilc, ac_desired_ratio))
+		return -EINVAL;
+
+	mutex_lock(&wilc->txq_add_to_head_cs);
+
+	srcu_idx = srcu_read_lock(&wilc->srcu);
+	list_for_each_entry_rcu(vif, &wilc->vif_list, list)
+		wilc_wlan_txq_filter_dup_tcp_ack(vif->ndev);
+	srcu_read_unlock(&wilc->srcu, srcu_idx);
+
+	for (ac = 0; ac < NQUEUES; ac++)
+		tqe_q[ac] = skb_peek(&wilc->txq[ac]);
+
+	i = fill_vmm_table(wilc, ac_desired_ratio, vmm_table, vmm_entries_ac);
+	if (i == 0)
+		goto out_unlock;
+
+	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
+
+	ret = send_vmm_table(wilc, i, vmm_table);
+
+	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
+
+	if (ret < 0)
+		goto out_unlock;
+
+	entries = ret;
+	if (entries == 0) {
+		/* No VMM space available in firmware.  Inform caller
+		 * to retry later.
+		 */
+		ret = WILC_VMM_ENTRY_FULL_RETRY;
+		goto out_unlock;
+	}
+
+	len = copy_packets(wilc, entries, vmm_table, vmm_entries_ac);
+	if (len <= 0)
+		goto out_unlock;
+
+	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
+
+	ret = send_packets(wilc, len);
+
 	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
 
 out_unlock:
