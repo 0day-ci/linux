@@ -672,7 +672,7 @@ static int fill_vmm_table(const struct wilc *wilc,
 					goto out;
 				vmm_table[i] = vmm_sz / 4;
 				if (tx_cb->type == WILC_CFG_PKT)
-					vmm_table[i] |= BIT(10);
+					vmm_table[i] |= WILC_VMM_CFG_PKT;
 
 				cpu_to_le32s(&vmm_table[i]);
 				vmm_entries_ac[i] = ac;
@@ -715,7 +715,7 @@ static int send_vmm_table(struct wilc *wilc, int i, const u32 *vmm_table)
 		if (ret)
 			break;
 
-		if ((reg & 0x1) == 0) {
+		if ((reg & WILC_HOST_TX_CTRL_BUSY) == 0) {
 			ac_update_fw_ac_pkt_info(wilc, reg);
 			break;
 		}
@@ -763,7 +763,7 @@ static int send_vmm_table(struct wilc *wilc, int i, const u32 *vmm_table)
 			ret = func->hif_read_reg(wilc, WILC_HOST_TX_CTRL, &reg);
 			if (ret)
 				break;
-			reg &= ~BIT(0);
+			reg &= ~WILC_HOST_TX_CTRL_BUSY;
 			ret = func->hif_write_reg(wilc, WILC_HOST_TX_CTRL, reg);
 		} else {
 			ret = entries;
