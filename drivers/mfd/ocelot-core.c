@@ -113,7 +113,22 @@ static const struct resource vsc7512_miim1_resources[] = {
 	},
 };
 
+static const struct resource vsc7512_pinctrl_resources[] = {
+	{
+		.start = 0x71070034,
+		.end = 0x7107009f,
+		.name = "gcb_gpio",
+		.flags = IORESOURCE_MEM,
+	},
+};
+
 static const struct mfd_cell vsc7512_devs[] = {
+	{
+		.name = "pinctrl-ocelot",
+		.of_compatible = "mscc,ocelot-pinctrl",
+		.num_resources = ARRAY_SIZE(vsc7512_pinctrl_resources),
+		.resources = vsc7512_pinctrl_resources,
+	},
 	{
 		.name = "ocelot-miim1",
 		.of_compatible = "mscc,ocelot-miim",
@@ -164,6 +179,10 @@ int ocelot_mfd_init(struct ocelot_mfd_config *config)
 
 	ret = mfd_add_devices(dev, PLATFORM_DEVID_NONE, vsc7512_devs,
 			      ARRAY_SIZE(vsc7512_devs), NULL, 0, NULL);
+	if (ret) {
+		dev_err(dev, "error adding mfd devices\n");
+		return ret;
+	}
 
 	dev_info(dev, "ocelot mfd core setup complete\n");
 
