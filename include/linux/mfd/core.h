@@ -10,6 +10,7 @@
 #ifndef MFD_CORE_H
 #define MFD_CORE_H
 
+#include <generated/autoconf.h>
 #include <linux/platform_device.h>
 
 #define MFD_RES_SIZE(arr) (sizeof(arr) / sizeof(struct resource))
@@ -122,6 +123,15 @@ struct mfd_cell {
 	const char * const	*parent_supplies;
 	int			num_parent_supplies;
 };
+
+#ifdef CONFIG_MFD_CORE
+int device_is_mfd(struct platform_device *pdev);
+#else
+static inline int device_is_mfd(struct platform_device *pdev)
+{
+	return 0;
+}
+#endif
 
 /*
  * Convenience functions for clients using shared cells.  Refcounting
