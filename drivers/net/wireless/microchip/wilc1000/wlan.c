@@ -12,7 +12,11 @@
 
 #define WAKE_UP_TRIAL_RETRY		10000
 
+#define NOT_TCP_ACK			(-1)
+
 static const u8 factors[NQUEUES] = {1, 1, 1, 1};
+
+static void tcp_process(struct net_device *, struct txq_entry_t *);
 
 static inline bool is_wilc1000(u32 id)
 {
@@ -60,12 +64,25 @@ wilc_wlan_txq_remove_from_head(struct wilc *wilc, u8 q_num)
 	return tqe;
 }
 
-static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 q_num,
+static void init_txq_entry(struct txq_entry_t *tqe, struct wilc_vif *vif,
+			   u8 type, enum ip_pkt_priority q_num)
+{
+	tqe->vif = vif;
+	tqe->q_num = q_num;
+	tqe->type = type;
+	tqe->ack_idx = NOT_TCP_ACK;
+}
+
+static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 type, u8 q_num,
 				      struct txq_entry_t *tqe)
 {
 	unsigned long flags;
 	struct wilc_vif *vif = netdev_priv(dev);
 	struct wilc *wilc = vif->wilc;
+
+	init_txq_entry(tqe, vif, type, q_num);
+	if (type == WILC_NET_PKT && vif->ack_filter.enabled)
+		tcp_process(dev, tqe);
 
 	spin_lock_irqsave(&wilc->txq_spinlock, flags);
 
@@ -78,11 +95,13 @@ static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 q_num,
 	wake_up_interruptible(&wilc->txq_event);
 }
 
-static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 q_num,
+static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 type, u8 q_num,
 				      struct txq_entry_t *tqe)
 {
 	unsigned long flags;
 	struct wilc *wilc = vif->wilc;
+
+	init_txq_entry(tqe, vif, type, q_num);
 
 	mutex_lock(&wilc->txq_add_to_head_cs);
 
@@ -96,8 +115,6 @@ static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 q_num,
 	mutex_unlock(&wilc->txq_add_to_head_cs);
 	wake_up_interruptible(&wilc->txq_event);
 }
-
-#define NOT_TCP_ACK			(-1)
 
 static inline void add_tcp_session(struct wilc_vif *vif, u32 src_prt,
 				   u32 dst_prt, u32 seq)
@@ -281,16 +298,12 @@ static int wilc_wlan_txq_add_cfg_pkt(struct wilc_vif *vif, u8 *buffer,
 		return 0;
 	}
 
-	tqe->type = WILC_CFG_PKT;
 	tqe->buffer = buffer;
 	tqe->buffer_size = buffer_size;
 	tqe->tx_complete_func = NULL;
 	tqe->priv = NULL;
-	tqe->q_num = AC_VO_Q;
-	tqe->ack_idx = NOT_TCP_ACK;
-	tqe->vif = vif;
 
-	wilc_wlan_txq_add_to_head(vif, AC_VO_Q, tqe);
+	wilc_wlan_txq_add_to_head(vif, WILC_CFG_PKT, AC_VO_Q, tqe);
 
 	return 1;
 }
@@ -452,15 +465,12 @@ int wilc_wlan_txq_add_net_pkt(struct net_device *dev,
 		tx_complete_fn(tx_data, 0);
 		return 0;
 	}
-	tqe->type = WILC_NET_PKT;
 	tqe->buffer = buffer;
 	tqe->buffer_size = buffer_size;
 	tqe->tx_complete_func = tx_complete_fn;
 	tqe->priv = tx_data;
-	tqe->vif = vif;
 
 	q_num = ac_classify(wilc, tx_data->skb);
-	tqe->q_num = q_num;
 	if (ac_change(wilc, &q_num)) {
 		tx_complete_fn(tx_data, 0);
 		kfree(tqe);
@@ -468,10 +478,7 @@ int wilc_wlan_txq_add_net_pkt(struct net_device *dev,
 	}
 
 	if (is_ac_q_limit(wilc, q_num)) {
-		tqe->ack_idx = NOT_TCP_ACK;
-		if (vif->ack_filter.enabled)
-			tcp_process(dev, tqe);
-		wilc_wlan_txq_add_to_tail(dev, q_num, tqe);
+		wilc_wlan_txq_add_to_tail(dev, WILC_NET_PKT, q_num, tqe);
 	} else {
 		tx_complete_fn(tx_data, 0);
 		kfree(tqe);
@@ -505,15 +512,11 @@ int wilc_wlan_txq_add_mgmt_pkt(struct net_device *dev, void *priv, u8 *buffer,
 		tx_complete_fn(priv, 0);
 		return 0;
 	}
-	tqe->type = WILC_MGMT_PKT;
 	tqe->buffer = buffer;
 	tqe->buffer_size = buffer_size;
 	tqe->tx_complete_func = tx_complete_fn;
 	tqe->priv = priv;
-	tqe->q_num = AC_VO_Q;
-	tqe->ack_idx = NOT_TCP_ACK;
-	tqe->vif = vif;
-	wilc_wlan_txq_add_to_tail(dev, AC_VO_Q, tqe);
+	wilc_wlan_txq_add_to_tail(dev, WILC_MGMT_PKT, AC_VO_Q, tqe);
 	return 1;
 }
 
