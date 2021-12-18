@@ -333,6 +333,13 @@ struct txq_entry_t {
 	void (*tx_complete_func)(void *priv, int status);
 };
 
+#define wilc_skb_tx_cb	txq_entry_t
+
+static inline struct wilc_skb_tx_cb *WILC_SKB_TX_CB(struct txq_entry_t *tqe)
+{
+	return (struct wilc_skb_tx_cb *)tqe;
+}
+
 struct txq_fw_recv_queue_stat {
 	u8 acm;
 	u8 count;
