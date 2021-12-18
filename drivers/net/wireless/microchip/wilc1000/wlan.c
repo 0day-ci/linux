@@ -1276,8 +1276,14 @@ static int wilc_wlan_cfg_commit(struct wilc_vif *vif, int type,
 	return 0;
 }
 
-int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
-		      u32 buffer_size, int commit, u32 drv_handler)
+/**
+ * Add a WID set/query to the current config packet and optionally
+ * submit the resulting packet to the chip and wait for its reply.
+ * Returns 0 on failure, positive number on success.
+ */
+static int wilc_wlan_cfg_apply_wid(struct wilc_vif *vif, int start, u16 wid,
+				   u8 *buffer, u32 buffer_size, int commit,
+				   u32 drv_handler, bool set)
 {
 	u32 offset;
 	int ret_size;
@@ -1289,8 +1295,12 @@ int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
 		wilc->cfg_frame_offset = 0;
 
 	offset = wilc->cfg_frame_offset;
-	ret_size = wilc_wlan_cfg_set_wid(wilc->cfg_frame.frame, offset,
-					 wid, buffer, buffer_size);
+	if (set)
+		ret_size = wilc_wlan_cfg_set_wid(wilc->cfg_frame.frame, offset,
+						 wid, buffer, buffer_size);
+	else
+		ret_size = wilc_wlan_cfg_get_wid(wilc->cfg_frame.frame, offset,
+						 wid);
 	offset += ret_size;
 	wilc->cfg_frame_offset = offset;
 
@@ -1299,9 +1309,11 @@ int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
 		return ret_size;
 	}
 
-	netdev_dbg(vif->ndev, "%s: seqno[%d]\n", __func__, wilc->cfg_seq_no);
+	netdev_dbg(vif->ndev, "%s: %s seqno[%d]\n",
+		   __func__, set ? "set" : "get", wilc->cfg_seq_no);
 
-	if (wilc_wlan_cfg_commit(vif, WILC_CFG_SET, drv_handler))
+	if (wilc_wlan_cfg_commit(vif, set ? WILC_CFG_SET : WILC_CFG_QUERY,
+				 drv_handler))
 		ret_size = 0;
 
 	if (!wait_for_completion_timeout(&wilc->cfg_event,
@@ -1317,41 +1329,18 @@ int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
 	return ret_size;
 }
 
+int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
+		      u32 buffer_size, int commit, u32 drv_handler)
+{
+	return wilc_wlan_cfg_apply_wid(vif, start, wid, buffer, buffer_size,
+				       commit, drv_handler, true);
+}
+
 int wilc_wlan_cfg_get(struct wilc_vif *vif, int start, u16 wid, int commit,
 		      u32 drv_handler)
 {
-	u32 offset;
-	int ret_size;
-	struct wilc *wilc = vif->wilc;
-
-	mutex_lock(&wilc->cfg_cmd_lock);
-
-	if (start)
-		wilc->cfg_frame_offset = 0;
-
-	offset = wilc->cfg_frame_offset;
-	ret_size = wilc_wlan_cfg_get_wid(wilc->cfg_frame.frame, offset, wid);
-	offset += ret_size;
-	wilc->cfg_frame_offset = offset;
-
-	if (!commit) {
-		mutex_unlock(&wilc->cfg_cmd_lock);
-		return ret_size;
-	}
-
-	if (wilc_wlan_cfg_commit(vif, WILC_CFG_QUERY, drv_handler))
-		ret_size = 0;
-
-	if (!wait_for_completion_timeout(&wilc->cfg_event,
-					 WILC_CFG_PKTS_TIMEOUT)) {
-		netdev_dbg(vif->ndev, "%s: Timed Out\n", __func__);
-		ret_size = 0;
-	}
-	wilc->cfg_frame_offset = 0;
-	wilc->cfg_seq_no += 1;
-	mutex_unlock(&wilc->cfg_cmd_lock);
-
-	return ret_size;
+	return wilc_wlan_cfg_apply_wid(vif, start, wid, NULL, 0,
+				       commit, drv_handler, false);
 }
 
 int wilc_send_config_pkt(struct wilc_vif *vif, u8 mode, struct wid *wids,
