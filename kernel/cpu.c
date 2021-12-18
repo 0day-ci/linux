@@ -2603,6 +2603,9 @@ EXPORT_SYMBOL(__num_present_cpus);
 struct cpumask __cpu_active_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_active_mask);
 
+atomic_t __num_active_cpus __read_mostly;
+EXPORT_SYMBOL(__num_active_cpus);
+
 struct cpumask __cpu_dying_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_dying_mask);
 
@@ -2677,6 +2680,18 @@ void set_cpu_present(unsigned int cpu, bool present)
 	}
 }
 EXPORT_SYMBOL(set_cpu_present);
+
+void set_cpu_active(unsigned int cpu, bool active)
+{
+	if (active) {
+		if (!cpumask_test_and_set_cpu(cpu, &__cpu_active_mask))
+			atomic_inc(&__num_active_cpus);
+	} else {
+		if (cpumask_test_and_clear_cpu(cpu, &__cpu_active_mask))
+			atomic_dec(&__num_active_cpus);
+	}
+}
+EXPORT_SYMBOL(set_cpu_active);
 
 /*
  * Activate the first processor.
