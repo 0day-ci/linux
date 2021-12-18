@@ -64,7 +64,7 @@ qtd_fill(struct ehci_hcd *ehci, struct ehci_qtd *qtd, dma_addr_t buf,
 		}
 
 		/* short packets may only terminate transfers */
-		if (count != len)
+		if (count != len && maxpacket > 0)
 			count -= (count % maxpacket);
 	}
 	qtd->hw_token = cpu_to_hc32(ehci, (count << 16) | token);

@@ -903,7 +903,6 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 	temp = scnprintf(next, size, "complete %ld unlink %ld\n",
 		ehci->stats.complete, ehci->stats.unlink);
 	size -= temp;
-	next += temp;
 #endif
 
 done:

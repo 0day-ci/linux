@@ -561,7 +561,6 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 
 			} else {
 				/* we've seen it and what's after */
-				temp = 0;
 				ed = NULL;
 			}
 
