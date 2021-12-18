@@ -41,7 +41,7 @@ static void wilc_wlan_txq_remove(struct wilc *wilc, u8 q_num,
 				 struct txq_entry_t *tqe)
 {
 	list_del(&tqe->list);
-	wilc->txq_entries -= 1;
+	atomic_dec(&wilc->txq_entries);
 	wilc->txq[q_num].count--;
 }
 
@@ -57,7 +57,7 @@ wilc_wlan_txq_remove_from_head(struct wilc *wilc, u8 q_num)
 		tqe = list_first_entry(&wilc->txq[q_num].txq_head.list,
 				       struct txq_entry_t, list);
 		list_del(&tqe->list);
-		wilc->txq_entries -= 1;
+		atomic_dec(&wilc->txq_entries);
 		wilc->txq[q_num].count--;
 	}
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
@@ -87,7 +87,7 @@ static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 type, u8 q_num,
 	spin_lock_irqsave(&wilc->txq_spinlock, flags);
 
 	list_add_tail(&tqe->list, &wilc->txq[q_num].txq_head.list);
-	wilc->txq_entries += 1;
+	atomic_inc(&wilc->txq_entries);
 	wilc->txq[q_num].count++;
 
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
@@ -108,7 +108,7 @@ static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 type, u8 q_num,
 	spin_lock_irqsave(&wilc->txq_spinlock, flags);
 
 	list_add(&tqe->list, &wilc->txq[q_num].txq_head.list);
-	wilc->txq_entries += 1;
+	atomic_inc(&wilc->txq_entries);
 	wilc->txq[q_num].count++;
 
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
@@ -484,7 +484,7 @@ int wilc_wlan_txq_add_net_pkt(struct net_device *dev,
 		kfree(tqe);
 	}
 
-	return wilc->txq_entries;
+	return atomic_read(&wilc->txq_entries);
 }
 
 int wilc_wlan_txq_add_mgmt_pkt(struct net_device *dev, void *priv, u8 *buffer,
@@ -952,7 +952,7 @@ out_unlock:
 	mutex_unlock(&wilc->txq_add_to_head_cs);
 
 out_update_cnt:
-	*txq_count = wilc->txq_entries;
+	*txq_count = atomic_read(&wilc->txq_entries);
 	return ret;
 }
 

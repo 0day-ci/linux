@@ -254,7 +254,7 @@ struct wilc {
 	u8 *tx_buffer;
 
 	struct txq_handle txq[NQUEUES];
-	int txq_entries;
+	atomic_t txq_entries;
 	struct txq_fw_recv_queue_stat fw[NQUEUES];
 
 	struct wilc_tx_queue_status tx_q_limit;
