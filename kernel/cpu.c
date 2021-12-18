@@ -2597,6 +2597,9 @@ EXPORT_SYMBOL(__cpu_online_mask);
 struct cpumask __cpu_present_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_present_mask);
 
+atomic_t __num_present_cpus __read_mostly;
+EXPORT_SYMBOL(__num_present_cpus);
+
 struct cpumask __cpu_active_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_active_mask);
 
@@ -2609,6 +2612,7 @@ EXPORT_SYMBOL(__num_online_cpus);
 void init_cpu_present(const struct cpumask *src)
 {
 	cpumask_copy(&__cpu_present_mask, src);
+	atomic_set(&__num_present_cpus, cpumask_weight(cpu_present_mask));
 }
 
 void init_cpu_possible(const struct cpumask *src)
@@ -2661,6 +2665,18 @@ void set_cpu_possible(unsigned int cpu, bool possible)
 	}
 }
 EXPORT_SYMBOL(set_cpu_possible);
+
+void set_cpu_present(unsigned int cpu, bool present)
+{
+	if (present) {
+		if (!cpumask_test_and_set_cpu(cpu, &__cpu_present_mask))
+			atomic_inc(&__num_present_cpus);
+	} else {
+		if (cpumask_test_and_clear_cpu(cpu, &__cpu_present_mask))
+			atomic_dec(&__num_present_cpus);
+	}
+}
+EXPORT_SYMBOL(set_cpu_present);
 
 /*
  * Activate the first processor.

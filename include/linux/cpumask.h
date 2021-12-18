@@ -100,6 +100,7 @@ extern struct cpumask __cpu_dying_mask;
 
 extern atomic_t __num_online_cpus;
 extern atomic_t __num_possible_cpus;
+extern atomic_t __num_present_cpus;
 
 extern cpumask_t cpus_booted_once_mask;
 
@@ -873,15 +874,7 @@ void init_cpu_online(const struct cpumask *src);
 
 void set_cpu_possible(unsigned int cpu, bool possible);
 void reset_cpu_possible_mask(void);
-
-static inline void
-set_cpu_present(unsigned int cpu, bool present)
-{
-	if (present)
-		cpumask_set_cpu(cpu, &__cpu_present_mask);
-	else
-		cpumask_clear_cpu(cpu, &__cpu_present_mask);
-}
+void set_cpu_present(unsigned int cpu, bool present);
 
 void set_cpu_online(unsigned int cpu, bool online);
 
@@ -965,7 +958,19 @@ static inline unsigned int num_possible_cpus(void)
 {
 	return atomic_read(&__num_possible_cpus);
 }
-#define num_present_cpus()	cpumask_weight(cpu_present_mask)
+
+/**
+ * num_present_cpus() - Read the number of present CPUs
+ *
+ * Despite the fact that __num_present_cpus is of type atomic_t, this
+ * interface gives only a momentary snapshot and is not protected against
+ * concurrent CPU hotplug operations unless invoked from a cpuhp_lock held
+ * region.
+ */
+static inline unsigned int num_present_cpus(void)
+{
+	return atomic_read(&__num_present_cpus);
+}
 #define num_active_cpus()	cpumask_weight(cpu_active_mask)
 
 static inline bool cpu_online(unsigned int cpu)
