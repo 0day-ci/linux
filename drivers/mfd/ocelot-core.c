@@ -6,6 +6,7 @@
 #include <asm/byteorder.h>
 #include <linux/spi/spi.h>
 #include <linux/kconfig.h>
+#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
 
@@ -103,6 +104,13 @@ struct regmap *ocelot_mfd_get_regmap_from_resource(struct device *dev,
 }
 EXPORT_SYMBOL(ocelot_mfd_get_regmap_from_resource);
 
+static const struct mfd_cell vsc7512_devs[] = {
+	{
+		.name = "ocelot-ext-switch",
+		.of_compatible = "mscc,vsc7512-ext-switch",
+	},
+};
+
 int ocelot_mfd_init(struct ocelot_mfd_config *config)
 {
 	struct device *dev = config->dev;
@@ -139,7 +147,10 @@ int ocelot_mfd_init(struct ocelot_mfd_config *config)
 		return ret;
 	}
 
-	/* Create and loop over all child devices here */
+	ret = mfd_add_devices(dev, PLATFORM_DEVID_NONE, vsc7512_devs,
+			      ARRAY_SIZE(vsc7512_devs), NULL, 0, NULL);
+
+	dev_info(dev, "ocelot mfd core setup complete\n");
 
 	return 0;
 }
@@ -147,7 +158,7 @@ EXPORT_SYMBOL(ocelot_mfd_init);
 
 int ocelot_mfd_remove(struct ocelot_mfd_config *config)
 {
-	/* Loop over all children and remove them */
+	mfd_remove_devices(config->dev);
 
 	return 0;
 }
