@@ -147,7 +147,30 @@ else
 	cp System.map "$tmpdir/boot/System.map-$version"
 	cp $KCONFIG_CONFIG "$tmpdir/boot/config-$version"
 fi
-cp "$($MAKE -s -f $srctree/Makefile image_name)" "$tmpdir/$installed_image_path"
+
+vmlinux=$($MAKE -s -f $srctree/Makefile image_name)
+key=
+if is_enabled CONFIG_EFI_STUB && is_enabled CONFIG_MODULE_SIG; then
+	cert=$(grep ^CONFIG_MODULE_SIG_KEY= include/config/auto.conf | cut -d\" -f2)
+	if [ ! -f $cert ]; then
+		cert=$srctree/$cert
+	fi
+
+	key=${cert%pem}priv
+	if [ ! -f $key ]; then
+		key=$cert
+	fi
+
+	if ! command -v sbsign >/dev/null; then
+		key=
+	fi
+fi
+
+if [ -n "$key" ]; then
+	sbsign --key $key --cert $cert "$vmlinux" --output "$tmpdir/$installed_image_path"
+else
+	cp "$vmlinux" "$tmpdir/$installed_image_path"
+fi
 
 if is_enabled CONFIG_OF_EARLY_FLATTREE; then
 	# Only some architectures with OF support have this target
