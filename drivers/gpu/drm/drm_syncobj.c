@@ -958,17 +958,30 @@ static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
 	list_del_init(&wait->node);
 }
 
-static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
-						  void __user *user_points,
-						  uint32_t count,
-						  uint32_t flags,
-						  signed long timeout,
-						  uint32_t *idx)
+static int drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
+					  void __user *user_points,
+					  uint32_t count, uint32_t flags,
+					  struct timespec64 *timeout,
+					  uint32_t *idx)
 {
 	struct syncobj_wait_entry *entries;
 	struct dma_fence *fence;
 	uint64_t *points;
 	uint32_t signaled_count, i;
+	u64 slack = 0;
+	ktime_t expires, *to = NULL;
+	int ret = 0, timed_out = 0;
+
+	if (timeout->tv_sec | timeout->tv_nsec) {
+		slack = select_estimate_accuracy(timeout);
+		to = &expires;
+		*to = timespec64_to_ktime(*timeout);
+	} else {
+		/*
+		 * Avoid scheduling a hrtimer wait if timeout is zero.
+		 */
+		timed_out = 1;
+	}
 
 	if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT)
 		lockdep_assert_none_held_once();
@@ -982,13 +995,13 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 
 	} else if (copy_from_user(points, user_points,
 				  sizeof(uint64_t) * count)) {
-		timeout = -EFAULT;
+		ret = -EFAULT;
 		goto err_free_points;
 	}
 
 	entries = kcalloc(count, sizeof(*entries), GFP_KERNEL);
 	if (!entries) {
-		timeout = -ENOMEM;
+		ret = -ENOMEM;
 		goto err_free_points;
 	}
 	/* Walk the list of sync objects and initialize entries.  We do
@@ -1008,7 +1021,7 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 			if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT) {
 				continue;
 			} else {
-				timeout = -EINVAL;
+				ret = -EINVAL;
 				goto cleanup_entries;
 			}
 		}
@@ -1072,17 +1085,18 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 		if (signaled_count == count)
 			goto done_waiting;
 
-		if (timeout == 0) {
-			timeout = -ETIME;
+		if (timed_out) {
+			ret = -ETIME;
 			goto done_waiting;
 		}
 
 		if (signal_pending(current)) {
-			timeout = -ERESTARTSYS;
+			ret = -ERESTARTSYS;
 			goto done_waiting;
 		}
 
-		timeout = schedule_timeout(timeout);
+		timed_out =
+			!schedule_hrtimeout_range(to, slack, HRTIMER_MODE_ABS);
 	} while (1);
 
 done_waiting:
@@ -1101,7 +1115,7 @@ cleanup_entries:
 err_free_points:
 	kfree(points);
 
-	return timeout;
+	return ret;
 }
 
 /**
@@ -1143,28 +1157,27 @@ static int drm_syncobj_array_wait(struct drm_device *dev,
 				  struct drm_syncobj_timeline_wait *timeline_wait,
 				  struct drm_syncobj **syncobjs, bool timeline)
 {
-	signed long timeout = 0;
+	int ret = 0;
+	struct timespec64 timeout;
 	uint32_t first = ~0;
 
 	if (!timeline) {
-		timeout = drm_timeout_abs_to_jiffies(wait->timeout_nsec);
-		timeout = drm_syncobj_array_wait_timeout(syncobjs,
-							 NULL,
-							 wait->count_handles,
-							 wait->flags,
-							 timeout, &first);
-		if (timeout < 0)
-			return timeout;
+		timeout = ns_to_timespec64(wait->timeout_nsec);
+		ret = drm_syncobj_array_wait_timeout(syncobjs, NULL,
+						     wait->count_handles,
+						     wait->flags, &timeout,
+						     &first);
+		if (ret < 0)
+			return ret;
 		wait->first_signaled = first;
 	} else {
-		timeout = drm_timeout_abs_to_jiffies(timeline_wait->timeout_nsec);
-		timeout = drm_syncobj_array_wait_timeout(syncobjs,
-							 u64_to_user_ptr(timeline_wait->points),
-							 timeline_wait->count_handles,
-							 timeline_wait->flags,
-							 timeout, &first);
-		if (timeout < 0)
-			return timeout;
+		timeout = ns_to_timespec64(timeline_wait->timeout_nsec);
+		ret = drm_syncobj_array_wait_timeout(
+			syncobjs, u64_to_user_ptr(timeline_wait->points),
+			timeline_wait->count_handles, timeline_wait->flags,
+			&timeout, &first);
+		if (ret < 0)
+			return ret;
 		timeline_wait->first_signaled = first;
 	}
 	return 0;
