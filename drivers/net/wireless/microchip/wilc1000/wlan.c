@@ -1275,10 +1275,9 @@ static int wilc_wlan_cfg_commit(struct wilc_vif *vif, int type,
 
 	hdr = &cfg->hdr;
 	hdr->cmd_type = (type == WILC_CFG_SET) ? 'W' : 'Q';
-	hdr->seq_no = wilc->cfg_seq_no % 256;
+	hdr->seq_no = wilc->cfg_seq_no;
 	hdr->total_len = cpu_to_le16(t_len);
 	hdr->driver_handler = cpu_to_le32(drv_handler);
-	wilc->cfg_seq_no = cfg->hdr.seq_no;
 
 	if (!wilc_wlan_txq_add_cfg_pkt(vif, (u8 *)&cfg->hdr, t_len))
 		return -1;
@@ -1333,7 +1332,7 @@ static int wilc_wlan_cfg_apply_wid(struct wilc_vif *vif, int start, u16 wid,
 	}
 
 	wilc->cfg_frame_offset = 0;
-	wilc->cfg_seq_no += 1;
+	wilc->cfg_seq_no = (wilc->cfg_seq_no + 1) % 256;
 	mutex_unlock(&wilc->cfg_cmd_lock);
 
 	return ret_size;
