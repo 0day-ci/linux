@@ -633,8 +633,8 @@ static int fill_vmm_table(const struct wilc *wilc,
 	int i;
 	u8 k, ac;
 	u32 sum;
-	u8 ac_preserve_ratio[NQUEUES] = {1, 1, 1, 1};
-	u8 *num_pkts_to_add;
+	static const u8 ac_preserve_ratio[NQUEUES] = {1, 1, 1, 1};
+	const u8 *num_pkts_to_add;
 	bool ac_exist = 0;
 	int vmm_sz = 0;
 	struct sk_buff *tqe_q[NQUEUES];
