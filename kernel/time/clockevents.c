@@ -416,7 +416,7 @@ static void __clockevents_unbind(void *arg)
  */
 static int clockevents_unbind(struct clock_event_device *ced, int cpu)
 {
-	struct ce_unbind cu = { .ce = ced, .res = -ENODEV };
+	struct ce_unbind cu = { .ce = ced, .res = -ENXIO };
 
 	smp_call_function_single(cpu, __clockevents_unbind, &cu, 1);
 	return cu.res;
