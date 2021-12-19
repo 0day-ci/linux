@@ -145,4 +145,11 @@ struct clone_args {
 			 SCHED_FLAG_KEEP_ALL		| \
 			 SCHED_FLAG_UTIL_CLAMP)
 
+/*
+ * For the one which is exposed to userspace and thus can't be changed.
+ */
+enum {
+	TASK_COMM_LEN_16 = 16,
+};
+
 #endif /* _UAPI_LINUX_SCHED_H */

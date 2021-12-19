@@ -20,6 +20,7 @@
 #define _UAPICN_PROC_H
 
 #include <linux/types.h>
+#include "sched.h"
 
 /*
  * Userspace sends this enum to register with the kernel that it is listening
@@ -110,7 +111,7 @@ struct proc_event {
 		struct comm_proc_event {
 			__kernel_pid_t process_pid;
 			__kernel_pid_t process_tgid;
-			char           comm[16];
+			char           comm[TASK_COMM_LEN_16];
 		} comm;
 
 		struct coredump_proc_event {

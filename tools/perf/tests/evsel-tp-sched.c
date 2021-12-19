@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/err.h>
+#include <linux/sched.h>
 #include <traceevent/event-parse.h>
 #include "evsel.h"
 #include "tests.h"
@@ -43,7 +44,7 @@ static int test__perf_evsel__tp_sched_test(struct test_suite *test __maybe_unuse
 		return -1;
 	}
 
-	if (evsel__test_field(evsel, "prev_comm", 16, false))
+	if (evsel__test_field(evsel, "prev_comm", TASK_COMM_LEN_16, false))
 		ret = -1;
 
 	if (evsel__test_field(evsel, "prev_pid", 4, true))
@@ -55,7 +56,7 @@ static int test__perf_evsel__tp_sched_test(struct test_suite *test __maybe_unuse
 	if (evsel__test_field(evsel, "prev_state", sizeof(long), true))
 		ret = -1;
 
-	if (evsel__test_field(evsel, "next_comm", 16, false))
+	if (evsel__test_field(evsel, "next_comm", TASK_COMM_LEN_16, false))
 		ret = -1;
 
 	if (evsel__test_field(evsel, "next_pid", 4, true))
@@ -73,7 +74,7 @@ static int test__perf_evsel__tp_sched_test(struct test_suite *test __maybe_unuse
 		return -1;
 	}
 
-	if (evsel__test_field(evsel, "comm", 16, false))
+	if (evsel__test_field(evsel, "comm", TASK_COMM_LEN_16, false))
 		ret = -1;
 
 	if (evsel__test_field(evsel, "pid", 4, true))
