@@ -29,6 +29,7 @@
 #include <linux/audit.h>
 #include <linux/rhashtable.h>
 #include <linux/if_tunnel.h>
+#include <linux/icmp.h>
 #include <net/dst.h>
 #include <net/flow.h>
 #include <net/xfrm.h>
@@ -3475,6 +3476,123 @@ static inline int secpath_has_nontransport(const struct sec_path *sp, int k, int
 	return 0;
 }
 
+static bool icmp_err_packet(const struct flowi *fl, unsigned short family)
+{
+	const struct flowi6 *fl6 = &fl->u.ip6;
+	const struct flowi4 *fl4 = &fl->u.ip4;
+
+	if (family == AF_INET)
+		if (fl4->flowi4_proto == IPPROTO_ICMP &&
+		    (fl4->fl4_icmp_type == ICMP_DEST_UNREACH ||
+		      fl4->fl4_icmp_type == ICMP_TIME_EXCEEDED))
+			return false;
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (fl6->flowi6_proto == IPPROTO_ICMPV6 &&
+	    (fl6->fl6_icmp_type == ICMPV6_DEST_UNREACH ||
+	      fl6->fl6_icmp_type == ICMPV6_TIME_EXCEED))
+		return false;
+#endif
+	return true;
+}
+
+static struct sk_buff *xfrm_icmp_flow_decode(struct sk_buff *skb,
+					     unsigned short family,
+					     struct flowi *fl,
+					     struct flowi *fl1)
+{
+	struct net *net = dev_net(skb->dev);
+	struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
+
+	if (!pskb_pull(newskb, (sizeof(struct iphdr) + sizeof(struct icmphdr))))
+		return NULL;
+	skb_reset_network_header(newskb);
+
+	if (xfrm_decode_session_reverse(newskb, fl1, family) < 0) {
+		kfree_skb(newskb);
+		XFRM_INC_STATS(net, LINUX_MIB_XFRMINHDRERROR);
+		return NULL;
+	}
+
+	/* inherit more from the old flow ???
+	 * the inner skb may have these values different from outer skb
+	 */
+
+	fl1->flowi_oif = fl->flowi_oif;
+	fl1->flowi_mark = fl->flowi_mark;
+	fl1->flowi_tos = fl->flowi_tos;
+	nf_nat_decode_session(newskb, fl1, family);
+
+	return newskb;
+}
+
+static bool xfrm_sa_icmp_flow(struct sk_buff *skb,
+			      unsigned short family, const struct xfrm_selector *sel,
+			      struct flowi *fl)
+{
+	bool ret = false;
+
+	if (!icmp_err_packet(fl, family)) {
+		struct flowi fl1;
+		struct sk_buff *newskb = xfrm_icmp_flow_decode(skb, family, fl, &fl1);
+
+		if (!newskb)
+			return ret;
+
+		ret = xfrm_selector_match(sel, &fl1, family);
+		kfree_skb(newskb);
+	}
+
+	return ret;
+}
+
+static inline
+struct xfrm_policy *xfrm_in_fwd_icmp(struct sk_buff *skb, struct flowi *fl,
+				     unsigned short family, u32 if_id)
+{
+	struct xfrm_policy *pol = NULL;
+
+	if (!icmp_err_packet(fl, family)) {
+		struct flowi fl1;
+		struct net *net = dev_net(skb->dev);
+		struct sk_buff *newskb = xfrm_icmp_flow_decode(skb, family, fl, &fl1);
+
+		if (!newskb)
+			return pol;
+		pol = xfrm_policy_lookup(net, &fl1, family, XFRM_POLICY_FWD, if_id);
+		kfree_skb(newskb);
+	}
+
+	return pol;
+}
+
+static inline
+struct dst_entry *xfrm_out_fwd_icmp(struct sk_buff *skb, struct flowi *fl,
+				    unsigned short family, struct dst_entry *dst)
+{
+	if (!icmp_err_packet(fl, family)) {
+		struct net *net = dev_net(skb->dev);
+		struct dst_entry *dst2;
+		struct flowi fl1;
+		struct sk_buff *newskb = xfrm_icmp_flow_decode(skb, family, fl, &fl1);
+
+		if (!newskb)
+			return dst;
+
+		dst2 = xfrm_lookup(net, dst, &fl1, NULL, XFRM_LOOKUP_QUEUE);
+
+		kfree_skb(newskb);
+
+		if (IS_ERR(dst2))
+			return dst;
+
+		if (dst2->xfrm)
+			dst = dst2;
+	}
+
+	return dst;
+}
+
 int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 			unsigned short family)
 {
@@ -3521,9 +3639,17 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 
 		for (i = sp->len - 1; i >= 0; i--) {
 			struct xfrm_state *x = sp->xvec[i];
+			int ret = 0;
+
 			if (!xfrm_selector_match(&x->sel, &fl, family)) {
-				XFRM_INC_STATS(net, LINUX_MIB_XFRMINSTATEMISMATCH);
-				return 0;
+				ret = true;
+				if (x->props.flags & XFRM_STATE_ICMP &&
+				    xfrm_sa_icmp_flow(skb, family, &x->sel, &fl))
+					ret = false;
+				if (ret) {
+					XFRM_INC_STATS(net, LINUX_MIB_XFRMINSTATEMISMATCH);
+					return 0;
+				}
 			}
 		}
 	}
@@ -3545,6 +3671,9 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 		XFRM_INC_STATS(net, LINUX_MIB_XFRMINPOLERROR);
 		return 0;
 	}
+
+	if (!pol && dir == XFRM_POLICY_FWD)
+		pol = xfrm_in_fwd_icmp(skb, &fl, family, if_id);
 
 	if (!pol) {
 		if (!xfrm_default_allow(net, dir)) {
@@ -3675,6 +3804,10 @@ int __xfrm_route_forward(struct sk_buff *skb, unsigned short family)
 		res = 0;
 		dst = NULL;
 	}
+
+	if (dst && !dst->xfrm)
+		dst = xfrm_out_fwd_icmp(skb, &fl, family, dst);
+
 	skb_dst_set(skb, dst);
 	return res;
 }
