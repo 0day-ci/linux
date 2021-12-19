@@ -32,6 +32,7 @@ Documentation/dev-tools/testing-overview.rst
    kgdb
    kselftest
    kunit/index
+   gpio-sloppy-logic-analyzer
 
 
 .. only::  subproject and html
