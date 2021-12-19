@@ -6642,13 +6642,13 @@ static int smb2_set_flock_flags(struct file_lock *flock, int flags)
 	switch (flags) {
 	case SMB2_LOCKFLAG_SHARED:
 		ksmbd_debug(SMB, "received shared request\n");
-		cmd = F_SETLKW;
+		cmd = F_SETLK;
 		flock->fl_type = F_RDLCK;
 		flock->fl_flags |= FL_SLEEP;
 		break;
 	case SMB2_LOCKFLAG_EXCLUSIVE:
 		ksmbd_debug(SMB, "received exclusive request\n");
-		cmd = F_SETLKW;
+		cmd = F_SETLK;
 		flock->fl_type = F_WRLCK;
 		flock->fl_flags |= FL_SLEEP;
 		break;
