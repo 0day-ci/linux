@@ -30,14 +30,13 @@ struct macvtap_dev {
 	struct tap_dev    tap;
 };
 
-/*
- * Variables for dealing with macvtaps device numbers.
- */
+/* Variables for dealing with macvtaps device numbers. */
 static dev_t macvtap_major;
 
 static const void *macvtap_net_namespace(struct device *d)
 {
 	struct net_device *dev = to_net_dev(d->parent);
+
 	return dev_net(dev);
 }
 
@@ -47,6 +46,7 @@ static struct class macvtap_class = {
 	.ns_type = &net_ns_type_operations,
 	.namespace = macvtap_net_namespace,
 };
+
 static struct cdev macvtap_cdev;
 
 #define TUN_OFFLOADS (NETIF_F_HW_CSUM | NETIF_F_TSO_ECN | NETIF_F_TSO | \
