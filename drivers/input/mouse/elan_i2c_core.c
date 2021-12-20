@@ -33,6 +33,7 @@
 #include <linux/jiffies.h>
 #include <linux/completion.h>
 #include <linux/of.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/property.h>
 #include <linux/regulator/consumer.h>
 #include <asm/unaligned.h>
@@ -85,8 +86,6 @@ struct elan_tp_data {
 	u16			fw_validpage_count;
 	u16			fw_page_size;
 	u32			fw_signature_address;
-
-	bool			irq_wake;
 
 	u8			min_baseline;
 	u8			max_baseline;
@@ -1368,11 +1367,13 @@ static int elan_probe(struct i2c_client *client,
 	}
 
 	/*
-	 * Systems using device tree should set up wakeup via DTS,
+	 * Systems using device tree or ACPI should set up wakeup via DTS/ACPI,
 	 * the rest will configure device as wakeup source by default.
 	 */
-	if (!dev->of_node)
+	if (!dev->of_node && !ACPI_COMPANION(dev)) {
 		device_init_wakeup(dev, true);
+		dev_pm_set_wake_irq(dev, client->irq);
+	}
 
 	return 0;
 }
@@ -1394,13 +1395,10 @@ static int __maybe_unused elan_suspend(struct device *dev)
 
 	disable_irq(client->irq);
 
-	if (device_may_wakeup(dev)) {
+	if (device_may_wakeup(dev))
 		ret = elan_sleep(data);
-		/* Enable wake from IRQ */
-		data->irq_wake = (enable_irq_wake(client->irq) == 0);
-	} else {
+	else
 		ret = elan_disable_power(data);
-	}
 
 	mutex_unlock(&data->sysfs_mutex);
 	return ret;
@@ -1411,11 +1409,6 @@ static int __maybe_unused elan_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct elan_tp_data *data = i2c_get_clientdata(client);
 	int error;
-
-	if (device_may_wakeup(dev) && data->irq_wake) {
-		disable_irq_wake(client->irq);
-		data->irq_wake = false;
-	}
 
 	error = elan_enable_power(data);
 	if (error) {
