@@ -9,6 +9,7 @@
  * battery charging and regulator control, firmware update.
  */
 
+#include <linux/acpi.h>
 #include <linux/of_platform.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
@@ -336,11 +337,14 @@ int cros_ec_suspend(struct cros_ec_device *ec_dev)
 		dev_dbg(ec_dev->dev, "Error %d sending suspend event to ec",
 			ret);
 
-	if (device_may_wakeup(dev))
+	/*
+	 * For non-ACPI subsystems we need to explicitly enable the wake source.
+	 * For ACPI systems, the ACPI subsystem will handle all the details.
+	 */
+	if (device_may_wakeup(dev) && !ACPI_COMPANION(ec_dev->dev))
 		ec_dev->wake_enabled = !enable_irq_wake(ec_dev->irq);
 
 	disable_irq(ec_dev->irq);
-	ec_dev->was_wake_device = ec_dev->wake_enabled;
 	ec_dev->suspended = true;
 
 	return 0;
