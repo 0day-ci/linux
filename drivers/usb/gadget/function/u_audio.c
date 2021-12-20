@@ -544,6 +544,20 @@ static void set_reported_srate(struct uac_rtd_params *prm, int srate)
 	}
 }
 
+static void stop_substream(struct uac_rtd_params *prm)
+{
+	unsigned long _flags;
+	struct snd_pcm_substream *substream;
+
+	substream = prm->ss;
+	if (substream) {
+		snd_pcm_stream_lock_irqsave(substream, _flags);
+		if (snd_pcm_running(substream))
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_DRAINING);
+		snd_pcm_stream_unlock_irqrestore(substream, _flags);
+	}
+}
+
 int u_audio_start_capture(struct g_audio *audio_dev)
 {
 	struct snd_uac_chip *uac = audio_dev->uac;
@@ -630,6 +644,7 @@ void u_audio_stop_capture(struct g_audio *audio_dev)
 {
 	struct snd_uac_chip *uac = audio_dev->uac;
 
+	stop_substream(&uac->c_prm);
 	set_reported_srate(&uac->c_prm, 0);
 	if (audio_dev->in_ep_fback)
 		free_ep_fback(&uac->c_prm, audio_dev->in_ep_fback);
@@ -713,6 +728,7 @@ void u_audio_stop_playback(struct g_audio *audio_dev)
 {
 	struct snd_uac_chip *uac = audio_dev->uac;
 
+	stop_substream(&uac->p_prm);
 	set_reported_srate(&uac->p_prm, 0);
 	free_ep(&uac->p_prm, audio_dev->in_ep);
 }
