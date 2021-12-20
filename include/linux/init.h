@@ -355,7 +355,7 @@ void __init parse_early_options(char *cmdline);
 
 #else /* MODULE */
 
-#define __setup_param(str, unique_id, fn)	/* nothing */
+#define __setup_param(str, unique_id, fn, early)/* nothing */
 #define __setup(str, func) 			/* nothing */
 #endif
 
