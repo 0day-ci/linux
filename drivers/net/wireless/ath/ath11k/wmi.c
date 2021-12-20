@@ -614,8 +614,7 @@ int ath11k_wmi_mgmt_send(struct ath11k *ar, u32 vdev_id, u32 buf_id,
 	u32 buf_len;
 	int ret, len;
 
-	buf_len = frame->len < WMI_MGMT_SEND_DOWNLD_LEN ?
-		  frame->len : WMI_MGMT_SEND_DOWNLD_LEN;
+	buf_len = min(frame->len, WMI_MGMT_SEND_DOWNLD_LEN);
 
 	len = sizeof(*cmd) + sizeof(*frame_tlv) + roundup(buf_len, 4);
 
