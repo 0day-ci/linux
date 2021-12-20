@@ -407,7 +407,7 @@ struct efx_rx_queue {
 	unsigned int page_recycle_count;
 	unsigned int page_recycle_failed;
 	unsigned int page_recycle_full;
-	unsigned int page_ptr_mask;
+	int page_ptr_mask;
 	unsigned int max_fill;
 	unsigned int fast_fill_trigger;
 	unsigned int min_fill;
