@@ -65,13 +65,6 @@ enum bm2835_mmal_ctrl_type {
 	MMAL_CONTROL_TYPE_CLUSTER, /* special cluster entry */
 };
 
-struct bm2835_mmal_v4l2_ctrl;
-
-typedef	int(bm2835_mmal_v4l2_ctrl_cb)(
-				struct bm2835_mmal_dev *dev,
-				struct v4l2_ctrl *ctrl,
-				const struct bm2835_mmal_v4l2_ctrl *mmal_ctrl);
-
 struct bm2835_mmal_v4l2_ctrl {
 	u32 id; /* v4l2 control identifier */
 	enum bm2835_mmal_ctrl_type type;
@@ -84,7 +77,8 @@ struct bm2835_mmal_v4l2_ctrl {
 	u64 step; /* step size of the control */
 	const s64 *imenu; /* integer menu array */
 	u32 mmal_id; /* mmal parameter id */
-	bm2835_mmal_v4l2_ctrl_cb *setter;
+	int (*bm2835_mmal_v4l2_ctrl_cb)(struct bm2835_mmal_dev *dev, struct v4l2_ctrl *ctrl,
+					const struct bm2835_mmal_v4l2_ctrl *mmal_ctrl);
 };
 
 struct v4l2_to_mmal_effects_setting {
@@ -898,12 +892,12 @@ static int bm2835_mmal_s_ctrl(struct v4l2_ctrl *ctrl)
 	const struct bm2835_mmal_v4l2_ctrl *mmal_ctrl = ctrl->priv;
 	int ret;
 
-	if (!mmal_ctrl || mmal_ctrl->id != ctrl->id || !mmal_ctrl->setter) {
+	if (!mmal_ctrl || mmal_ctrl->id != ctrl->id || !mmal_ctrl->bm2835_mmal_v4l2_ctrl_cb) {
 		pr_warn("mmal_ctrl:%p ctrl id:%d\n", mmal_ctrl, ctrl->id);
 		return -EINVAL;
 	}
 
-	ret = mmal_ctrl->setter(dev, ctrl, mmal_ctrl);
+	ret = mmal_ctrl->bm2835_mmal_v4l2_ctrl_cb(dev, ctrl, mmal_ctrl);
 	if (ret)
 		pr_warn("ctrl id:%d/MMAL param %08X- returned ret %d\n",
 			ctrl->id, mmal_ctrl->mmal_id, ret);
@@ -924,7 +918,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_SATURATION,
-		.setter = ctrl_set_rational,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_rational,
 	},
 	{
 		.id = V4L2_CID_SHARPNESS,
@@ -935,7 +929,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_SHARPNESS,
-		.setter = ctrl_set_rational,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_rational,
 	},
 	{
 		.id = V4L2_CID_CONTRAST,
@@ -946,7 +940,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_CONTRAST,
-		.setter = ctrl_set_rational,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_rational,
 	},
 	{
 		.id = V4L2_CID_BRIGHTNESS,
@@ -957,7 +951,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_BRIGHTNESS,
-		.setter = ctrl_set_rational,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_rational,
 	},
 	{
 		.id = V4L2_CID_ISO_SENSITIVITY,
@@ -968,7 +962,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = iso_qmenu,
 		.mmal_id = MMAL_PARAMETER_ISO,
-		.setter = ctrl_set_iso,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_iso,
 	},
 	{
 		.id = V4L2_CID_ISO_SENSITIVITY_AUTO,
@@ -979,7 +973,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_ISO,
-		.setter = ctrl_set_iso,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_iso,
 	},
 	{
 		.id = V4L2_CID_IMAGE_STABILIZATION,
@@ -990,7 +984,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_VIDEO_STABILISATION,
-		.setter = ctrl_set_value,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_value,
 	},
 	{
 		.id = V4L2_CID_EXPOSURE_AUTO,
@@ -1001,7 +995,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 0,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_EXPOSURE_MODE,
-		.setter = ctrl_set_exposure,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_exposure,
 	},
 	{
 		.id = V4L2_CID_EXPOSURE_ABSOLUTE,
@@ -1013,7 +1007,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_SHUTTER_SPEED,
-		.setter = ctrl_set_exposure,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_exposure,
 	},
 	{
 		.id = V4L2_CID_AUTO_EXPOSURE_BIAS,
@@ -1024,7 +1018,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 0,
 		.imenu = ev_bias_qmenu,
 		.mmal_id = MMAL_PARAMETER_EXPOSURE_COMP,
-		.setter = ctrl_set_value_ev,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_value_ev,
 	},
 	{
 		.id = V4L2_CID_EXPOSURE_AUTO_PRIORITY,
@@ -1036,7 +1030,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.imenu = NULL,
 		/* Dummy MMAL ID as it gets mapped into FPS range */
 		.mmal_id = 0,
-		.setter = ctrl_set_exposure,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_exposure,
 	},
 	{
 		.id = V4L2_CID_EXPOSURE_METERING,
@@ -1047,7 +1041,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 0,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_EXP_METERING_MODE,
-		.setter = ctrl_set_metering_mode,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_metering_mode,
 	},
 	{
 		.id = V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE,
@@ -1058,7 +1052,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 0,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_AWB_MODE,
-		.setter = ctrl_set_awb_mode,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_awb_mode,
 	},
 	{
 		.id = V4L2_CID_RED_BALANCE,
@@ -1069,7 +1063,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_CUSTOM_AWB_GAINS,
-		.setter = ctrl_set_awb_gains,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_awb_gains,
 	},
 	{
 		.id = V4L2_CID_BLUE_BALANCE,
@@ -1080,7 +1074,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_CUSTOM_AWB_GAINS,
-		.setter = ctrl_set_awb_gains,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_awb_gains,
 	},
 	{
 		.id = V4L2_CID_COLORFX,
@@ -1091,7 +1085,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 0,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_IMAGE_EFFECT,
-		.setter = ctrl_set_image_effect,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_image_effect,
 	},
 	{
 		.id = V4L2_CID_COLORFX_CBCR,
@@ -1102,7 +1096,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_COLOUR_EFFECT,
-		.setter = ctrl_set_colfx,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_colfx,
 	},
 	{
 		.id = V4L2_CID_ROTATE,
@@ -1113,7 +1107,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 90,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_ROTATION,
-		.setter = ctrl_set_rotate,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_rotate,
 	},
 	{
 		.id = V4L2_CID_HFLIP,
@@ -1124,7 +1118,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_MIRROR,
-		.setter = ctrl_set_flip,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_flip,
 	},
 	{
 		.id = V4L2_CID_VFLIP,
@@ -1135,7 +1129,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_MIRROR,
-		.setter = ctrl_set_flip,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_flip,
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
@@ -1146,7 +1140,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 0,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_RATECONTROL,
-		.setter = ctrl_set_bitrate_mode,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_bitrate_mode,
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDEO_BITRATE,
@@ -1157,7 +1151,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 25 * 1000,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_VIDEO_BIT_RATE,
-		.setter = ctrl_set_bitrate,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_bitrate,
 	},
 	{
 		.id = V4L2_CID_JPEG_COMPRESSION_QUALITY,
@@ -1168,7 +1162,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_JPEG_Q_FACTOR,
-		.setter = ctrl_set_image_encode_output,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_image_encode_output,
 	},
 	{
 		.id = V4L2_CID_POWER_LINE_FREQUENCY,
@@ -1179,7 +1173,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_FLICKER_AVOID,
-		.setter = ctrl_set_flicker_avoidance,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_flicker_avoidance,
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER,
@@ -1190,7 +1184,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_VIDEO_ENCODE_INLINE_HEADER,
-		.setter = ctrl_set_video_encode_param_output,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_video_encode_param_output,
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE,
@@ -1204,7 +1198,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_PROFILE,
-		.setter = ctrl_set_video_encode_profile_level,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_video_encode_profile_level,
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDEO_H264_LEVEL,
@@ -1226,7 +1220,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_PROFILE,
-		.setter = ctrl_set_video_encode_profile_level,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_video_encode_profile_level,
 	},
 	{
 		.id = V4L2_CID_SCENE_MODE,
@@ -1238,7 +1232,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_PROFILE,
-		.setter = ctrl_set_scene_mode,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_scene_mode,
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD,
@@ -1249,7 +1243,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
 		.step = 1,
 		.imenu = NULL,
 		.mmal_id = MMAL_PARAMETER_INTRAPERIOD,
-		.setter = ctrl_set_video_encode_param_output,
+		.bm2835_mmal_v4l2_ctrl_cb = ctrl_set_video_encode_param_output,
 	},
 };
 
@@ -1259,8 +1253,8 @@ int bm2835_mmal_set_all_camera_controls(struct bm2835_mmal_dev *dev)
 	int ret = 0;
 
 	for (c = 0; c < V4L2_CTRL_COUNT; c++) {
-		if ((dev->ctrls[c]) && (v4l2_ctrls[c].setter)) {
-			ret = v4l2_ctrls[c].setter(dev, dev->ctrls[c],
+		if ((dev->ctrls[c]) && (v4l2_ctrls[c].bm2835_mmal_v4l2_ctrl_cb)) {
+			ret = v4l2_ctrls[c].bm2835_mmal_v4l2_ctrl_cb(dev, dev->ctrls[c],
 						   &v4l2_ctrls[c]);
 			if (ret) {
 				v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
