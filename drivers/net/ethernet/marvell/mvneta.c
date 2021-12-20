@@ -4634,8 +4634,7 @@ mvneta_ethtool_set_ringparam(struct net_device *dev,
 
 	if ((ring->rx_pending == 0) || (ring->tx_pending == 0))
 		return -EINVAL;
-	pp->rx_ring_size = ring->rx_pending < MVNETA_MAX_RXD ?
-		ring->rx_pending : MVNETA_MAX_RXD;
+	pp->rx_ring_size = min(ring->rx_pending, MVNETA_MAX_RXD);
 
 	pp->tx_ring_size = clamp_t(u16, ring->tx_pending,
 				   MVNETA_MAX_SKB_DESCS * 2, MVNETA_MAX_TXD);
