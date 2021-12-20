@@ -376,13 +376,18 @@ EXPORT_SYMBOL_GPL(sysfs_create_files);
  * @attr: attribute descriptor.
  * @group: group name.
  */
-int sysfs_add_file_to_group(struct kobject *kobj,
-		const struct attribute *attr, const char *group)
+int __sysfs_add_file_to_group(struct kobject *kobj,
+			      const struct attribute *attr,
+			      const struct bin_attribute *battr,
+			      const char *group)
 {
 	struct kernfs_node *parent;
 	kuid_t uid;
 	kgid_t gid;
 	int error;
+
+	if (WARN_ON((attr && battr) || (!attr && !battr)))
+		return -EINVAL;
 
 	if (group) {
 		parent = kernfs_find_and_get(kobj->sd, group);
@@ -395,13 +400,31 @@ int sysfs_add_file_to_group(struct kobject *kobj,
 		return -ENOENT;
 
 	kobject_get_ownership(kobj, &uid, &gid);
-	error = sysfs_add_file_mode_ns(parent, attr, attr->mode, uid, gid,
-				       NULL);
+	if (attr)
+		error = sysfs_add_file_mode_ns(parent, attr, attr->mode, uid,
+					       gid, NULL);
+	else
+		error = sysfs_add_bin_file_mode_ns(parent, battr, battr->attr.mode,
+						   uid, gid, NULL);
 	kernfs_put(parent);
 
 	return error;
 }
+
+int sysfs_add_file_to_group(struct kobject *kobj, const struct attribute *attr,
+			    const char *group)
+{
+	return __sysfs_add_file_to_group(kobj, attr, NULL, group);
+}
 EXPORT_SYMBOL_GPL(sysfs_add_file_to_group);
+
+int sysfs_add_bin_file_to_group(struct kobject *kobj,
+				const struct bin_attribute *battr,
+				const char *group)
+{
+	return __sysfs_add_file_to_group(kobj, NULL, battr, group);
+}
+EXPORT_SYMBOL_GPL(sysfs_add_bin_file_to_group);
 
 /**
  * sysfs_chmod_file - update the modified mode value on an object attribute.

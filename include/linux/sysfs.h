@@ -302,6 +302,9 @@ void sysfs_remove_groups(struct kobject *kobj,
 			 const struct attribute_group **groups);
 int sysfs_add_file_to_group(struct kobject *kobj,
 			const struct attribute *attr, const char *group);
+int sysfs_add_bin_file_to_group(struct kobject *kobj,
+				const struct bin_attribute *battr,
+				const char *group);
 void sysfs_remove_file_from_group(struct kobject *kobj,
 			const struct attribute *attr, const char *group);
 int sysfs_merge_group(struct kobject *kobj,
