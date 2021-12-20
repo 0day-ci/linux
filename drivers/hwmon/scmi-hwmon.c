@@ -73,9 +73,23 @@ static int scmi_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
 	struct scmi_sensors *scmi_sensors = dev_get_drvdata(dev);
 
 	sensor = *(scmi_sensors->info[type] + channel);
+	/*
+	 * Can fail with EIO if the backing SCMI Sensor FW version tried to
+	 * report a negative value.
+	 */
 	ret = sensor_ops->reading_get(scmi_sensors->ph, sensor->id, &value);
 	if (ret)
 		return ret;
+
+	/*
+	 * Cannot accept either valid positive values so big that would be
+	 * interpreted as negative by HWMON signed long *val return value.
+	 */
+	if (value & BIT(63)) {
+		dev_warn_once(dev,
+			      "Reported unsigned value too big.\n");
+		return -EIO;
+	}
 
 	ret = scmi_hwmon_scale(sensor, &value);
 	if (!ret)
