@@ -486,7 +486,9 @@ static int virtio_mem_sbm_mb_states_prepare_next_mb(struct virtio_mem *vm)
 
 #define virtio_mem_sbm_for_each_mb_rev(_vm, _mb_id, _state) \
 	for (_mb_id = _vm->sbm.next_mb_id - 1; \
-	     _mb_id >= _vm->sbm.first_mb_id && _vm->sbm.mb_count[_state]; \
+	     _mb_id >= _vm->sbm.first_mb_id && \
+	     _mb_id < _vm->sbm.next_mb_id && \
+	     _vm->sbm.mb_count[_state]; \
 	     _mb_id--) \
 		if (virtio_mem_sbm_get_mb_state(_vm, _mb_id) == _state)
 
