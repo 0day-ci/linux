@@ -4606,8 +4606,6 @@ static void iavf_remove(struct pci_dev *pdev)
 	iavf_reset_interrupt_capability(adapter);
 	iavf_free_q_vectors(adapter);
 
-	cancel_delayed_work_sync(&adapter->watchdog_task);
-
 	cancel_work_sync(&adapter->adminq_task);
 
 	iavf_free_rss(adapter);
