@@ -52,20 +52,14 @@ static int bcm2835_devm_add_vchi_ctx(struct device *dev)
 	return 0;
 }
 
-typedef int (*bcm2835_audio_newpcm_func)(struct bcm2835_chip *chip,
-					 const char *name,
-					 enum snd_bcm2835_route route,
-					 u32 numchannels);
-
-typedef int (*bcm2835_audio_newctl_func)(struct bcm2835_chip *chip);
-
 struct bcm2835_audio_driver {
 	struct device_driver driver;
 	const char *shortname;
 	const char *longname;
 	int minchannels;
-	bcm2835_audio_newpcm_func newpcm;
-	bcm2835_audio_newctl_func newctl;
+	int (*bcm2835_audio_newpcm)(struct bcm2835_chip *chip, const char *name,
+				    enum snd_bcm2835_route route, u32 numchannels);
+	int (*bcm2835_audio_newctl)(struct bcm2835_chip *chip);
 	enum snd_bcm2835_route route;
 };
 
@@ -104,8 +98,8 @@ static struct bcm2835_audio_driver bcm2835_audio_alsa = {
 	.shortname = "bcm2835 ALSA",
 	.longname  = "bcm2835 ALSA",
 	.minchannels = 2,
-	.newpcm = bcm2835_audio_alsa_newpcm,
-	.newctl = snd_bcm2835_new_ctl,
+	.bcm2835_audio_newpcm = bcm2835_audio_alsa_newpcm,
+	.bcm2835_audio_newctl = snd_bcm2835_new_ctl,
 };
 
 static struct bcm2835_audio_driver bcm2835_audio_hdmi = {
@@ -116,8 +110,8 @@ static struct bcm2835_audio_driver bcm2835_audio_hdmi = {
 	.shortname = "bcm2835 HDMI",
 	.longname  = "bcm2835 HDMI",
 	.minchannels = 1,
-	.newpcm = bcm2835_audio_simple_newpcm,
-	.newctl = snd_bcm2835_new_hdmi_ctl,
+	.bcm2835_audio_newpcm = bcm2835_audio_simple_newpcm,
+	.bcm2835_audio_newctl = snd_bcm2835_new_hdmi_ctl,
 	.route = AUDIO_DEST_HDMI
 };
 
@@ -129,8 +123,8 @@ static struct bcm2835_audio_driver bcm2835_audio_headphones = {
 	.shortname = "bcm2835 Headphones",
 	.longname  = "bcm2835 Headphones",
 	.minchannels = 1,
-	.newpcm = bcm2835_audio_simple_newpcm,
-	.newctl = snd_bcm2835_new_headphones_ctl,
+	.bcm2835_audio_newpcm = bcm2835_audio_simple_newpcm,
+	.bcm2835_audio_newctl = snd_bcm2835_new_headphones_ctl,
 	.route = AUDIO_DEST_HEADPHONES
 };
 
@@ -189,7 +183,7 @@ static int snd_add_child_device(struct device *dev,
 	strscpy(card->shortname, audio_driver->shortname, sizeof(card->shortname));
 	strscpy(card->longname, audio_driver->longname, sizeof(card->longname));
 
-	err = audio_driver->newpcm(chip, audio_driver->shortname,
+	err = audio_driver->bcm2835_audio_newpcm(chip, audio_driver->shortname,
 		audio_driver->route,
 		numchans);
 	if (err) {
@@ -197,7 +191,7 @@ static int snd_add_child_device(struct device *dev,
 		goto error;
 	}
 
-	err = audio_driver->newctl(chip);
+	err = audio_driver->bcm2835_audio_newctl(chip);
 	if (err) {
 		dev_err(dev, "Failed to create controls, error %d\n", err);
 		goto error;
