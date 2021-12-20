@@ -10849,7 +10849,8 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	rcu_read_lock();
 	sd = rcu_dereference_check_sched_domain(this_rq->sd);
 
-	if (!READ_ONCE(this_rq->rd->overload) ||
+	if ((!READ_ONCE(this_rq->rd->overload) &&
+	    !READ_ONCE(this_rq->rd->overutilized)) ||
 	    (sd && this_rq->avg_idle < sd->max_newidle_lb_cost)) {
 
 		if (sd)
