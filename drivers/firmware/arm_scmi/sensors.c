@@ -730,6 +730,14 @@ static int scmi_sensor_reading_get(const struct scmi_protocol_handle *ph,
 			*value = get_unaligned_le64(t->rx.buf);
 	}
 
+	if (!ret && si->version > SCMIv2_SENSOR_PROTOCOL && *value & BIT(63)) {
+		dev_warn_once(ph->dev,
+			      "SCMI FW Sensor version:0x%X reported negative value %ld\n",
+			      si->version, (long)*value);
+		*value = 0;
+		ret = -EIO;
+	}
+
 	ph->xops->xfer_put(ph, t);
 	return ret;
 }
