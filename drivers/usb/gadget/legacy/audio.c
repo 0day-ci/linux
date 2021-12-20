@@ -283,10 +283,18 @@ static int audio_bind(struct usb_composite_dev *cdev)
 #ifndef CONFIG_GADGET_UAC1_LEGACY
 	uac1_opts = container_of(fi_uac1, struct f_uac1_opts, func_inst);
 	uac1_opts->p_chmask = p_chmask;
-	uac1_opts->p_srate = p_srate;
+
+	for (i = 0; i < p_srates_cnt; ++i)
+		uac1_opts->p_srates[i] = p_srates[i];
+	uac1_opts->p_srate = p_srates[0];
+
 	uac1_opts->p_ssize = p_ssize;
 	uac1_opts->c_chmask = c_chmask;
-	uac1_opts->c_srate = c_srate;
+
+	for (i = 0; i < c_srates_cnt; ++i)
+		uac1_opts->c_srates[i] = c_srates[i];
+	uac1_opts->c_srate = c_srates[0];
+
 	uac1_opts->c_ssize = c_ssize;
 	uac1_opts->req_number = UAC1_DEF_REQ_NUM;
 #else /* CONFIG_GADGET_UAC1_LEGACY */
