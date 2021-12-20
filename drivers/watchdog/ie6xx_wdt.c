@@ -271,6 +271,9 @@ static int ie6xx_wdt_remove(struct platform_device *pdev)
 	struct resource *res;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
+	if (!res)
+		return -EINVAL;
+
 	ie6xx_wdt_stop(NULL);
 	watchdog_unregister_device(&ie6xx_wdt_dev);
 	ie6xx_wdt_debugfs_exit();
