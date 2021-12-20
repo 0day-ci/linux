@@ -329,9 +329,9 @@ int pci_bridge_emul_init(struct pci_bridge_emul *bridge,
 
 	/*
 	 * class_revision: Class is high 24 bits and revision is low 8 bit of this member,
-	 * while class for PCI Bridge Normal Decode has the 24-bit value: PCI_CLASS_BRIDGE_PCI << 8
+	 * while class for PCI Bridge Normal Decode has the 24-bit value: PCI_CLASS_BRIDGE_PCI_NORMAL
 	 */
-	bridge->conf.class_revision |= cpu_to_le32((PCI_CLASS_BRIDGE_PCI << 8) << 8);
+	bridge->conf.class_revision |= cpu_to_le32(PCI_CLASS_BRIDGE_PCI_NORMAL << 8);
 	bridge->conf.header_type = PCI_HEADER_TYPE_BRIDGE;
 	bridge->conf.cache_line_size = 0x10;
 	bridge->conf.status = cpu_to_le16(PCI_STATUS_CAP_LIST);
