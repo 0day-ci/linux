@@ -99,6 +99,8 @@ struct drm_encoder {
 	struct drm_device *dev;
 	struct list_head head;
 
+	struct device_node *port;
+
 	struct drm_mode_object base;
 	char *name;
 	/**
