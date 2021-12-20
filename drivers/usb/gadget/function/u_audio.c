@@ -64,6 +64,7 @@ struct uac_rtd_params {
   int mute;
 
 	struct snd_kcontrol *snd_kctl_rate; /* read-only current rate */
+	int rep_srate; /* srate reported by snd_kctl_rate */
 
   spinlock_t lock; /* lock for control transfers */
 
@@ -496,8 +497,6 @@ static inline void free_ep_fback(struct uac_rtd_params *prm, struct usb_ep *ep)
 int u_audio_set_capture_srate(struct g_audio *audio_dev, int srate)
 {
 	struct uac_params *params = &audio_dev->params;
-	struct snd_uac_chip *uac = audio_dev->uac;
-	struct uac_rtd_params *prm = &uac->c_prm;
 	int i;
 
 	dev_dbg(&audio_dev->gadget->dev, "%s: srate %d\n", __func__, srate);
@@ -516,8 +515,6 @@ EXPORT_SYMBOL_GPL(u_audio_set_capture_srate);
 
 int u_audio_set_playback_srate(struct g_audio *audio_dev, int srate)
 {
-	struct snd_uac_chip *uac = audio_dev->uac;
-	struct uac_rtd_params *prm = &uac->p_prm;
 	struct uac_params *params = &audio_dev->params;
 	int i;
 
@@ -534,6 +531,18 @@ int u_audio_set_playback_srate(struct g_audio *audio_dev, int srate)
 	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(u_audio_set_playback_srate);
+
+static void set_reported_srate(struct uac_rtd_params *prm, int srate)
+{
+	struct snd_kcontrol *kctl = prm->snd_kctl_rate;
+
+	if (prm->rep_srate != srate) {
+		prm->rep_srate = srate;
+		snd_ctl_notify(prm->uac->card, SNDRV_CTL_EVENT_MASK_VALUE,
+				&kctl->id);
+		pr_debug("Setting '%s' to %d", kctl->id.name, srate);
+	}
+}
 
 int u_audio_start_capture(struct g_audio *audio_dev)
 {
@@ -573,6 +582,8 @@ int u_audio_start_capture(struct g_audio *audio_dev)
 		if (usb_ep_queue(ep, prm->reqs[i], GFP_ATOMIC))
 			dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 	}
+
+	set_reported_srate(&uac->c_prm, params->c_srate);
 
 	ep_fback = audio_dev->in_ep_fback;
 	if (!ep_fback)
@@ -619,6 +630,7 @@ void u_audio_stop_capture(struct g_audio *audio_dev)
 {
 	struct snd_uac_chip *uac = audio_dev->uac;
 
+	set_reported_srate(&uac->c_prm, 0);
 	if (audio_dev->in_ep_fback)
 		free_ep_fback(&uac->c_prm, audio_dev->in_ep_fback);
 	free_ep(&uac->c_prm, audio_dev->out_ep);
@@ -691,6 +703,8 @@ int u_audio_start_playback(struct g_audio *audio_dev)
 			dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 	}
 
+	set_reported_srate(&uac->p_prm, params->p_srate);
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(u_audio_start_playback);
@@ -699,6 +713,7 @@ void u_audio_stop_playback(struct g_audio *audio_dev)
 {
 	struct snd_uac_chip *uac = audio_dev->uac;
 
+	set_reported_srate(&uac->p_prm, 0);
 	free_ep(&uac->p_prm, audio_dev->in_ep);
 }
 EXPORT_SYMBOL_GPL(u_audio_stop_playback);
@@ -1001,19 +1016,6 @@ static int get_max_srate(const int *srates)
 	return max_srate;
 }
 
-static int get_min_srate(const int *srates)
-{
-	int i, min_srate = INT_MAX;
-
-	for (i = 0; i < UAC_MAX_RATES; i++) {
-		if (srates[i] == 0)
-			break;
-		if (srates[i] < min_srate)
-			min_srate = srates[i];
-	}
-	return min_srate;
-}
-
 static int uac_pcm_rate_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
 {
@@ -1030,7 +1032,7 @@ static int uac_pcm_rate_info(struct snd_kcontrol *kcontrol,
 		srates = params->c_srates;
 	else
 		srates = params->p_srates;
-	uinfo->value.integer.min = get_min_srate(srates);
+	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = get_max_srate(srates);
 	return 0;
 }
@@ -1039,14 +1041,8 @@ static int uac_pcm_rate_get(struct snd_kcontrol *kcontrol,
 						 struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
-	struct snd_uac_chip *uac = prm->uac;
-	struct g_audio *audio_dev = uac->audio_dev;
-	struct uac_params *params = &audio_dev->params;
 
-	if (prm == &uac->c_prm)
-		ucontrol->value.integer.value[0] = params->c_srate;
-	else
-		ucontrol->value.integer.value[0] = params->p_srate;
+	ucontrol->value.integer.value[0] = prm->rep_srate;
 
 	return 0;
 }
