@@ -56,13 +56,15 @@
 #define PTP_PEROUT_ONE_SHOT		(1<<0)
 #define PTP_PEROUT_DUTY_CYCLE		(1<<1)
 #define PTP_PEROUT_PHASE		(1<<2)
+#define PTP_PEROUT_REVERSE_POLARITY	(1<<3)
 
 /*
  * flag fields valid for the new PTP_PEROUT_REQUEST2 ioctl.
  */
 #define PTP_PEROUT_VALID_FLAGS		(PTP_PEROUT_ONE_SHOT | \
 					 PTP_PEROUT_DUTY_CYCLE | \
-					 PTP_PEROUT_PHASE)
+					 PTP_PEROUT_PHASE | \
+					 PTP_PEROUT_REVERSE_POLARITY)
 
 /*
  * No flags are valid for the original PTP_PEROUT_REQUEST ioctl
