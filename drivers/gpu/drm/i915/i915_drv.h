@@ -762,9 +762,6 @@ struct drm_i915_private {
 	/* backlight registers and fields in struct intel_panel */
 	struct mutex backlight_lock;
 
-	/* protects panel power sequencer state */
-	struct mutex pps_mutex;
-
 	unsigned int fsb_freq, mem_freq, is_ddr3;
 	unsigned int skl_preferred_vco_freq;
 	unsigned int max_cdclk_freq;

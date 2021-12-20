@@ -27,7 +27,7 @@ intel_wakeref_t intel_pps_lock(struct intel_dp *intel_dp)
 	 * See intel_pps_reset_all() why we need a power domain reference here.
 	 */
 	wakeref = intel_display_power_get(dev_priv, POWER_DOMAIN_DISPLAY_CORE);
-	mutex_lock(&dev_priv->pps_mutex);
+	mutex_lock(&intel_dp->pps_mutex);
 
 	return wakeref;
 }
@@ -37,7 +37,7 @@ intel_wakeref_t intel_pps_unlock(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	mutex_unlock(&dev_priv->pps_mutex);
+	mutex_unlock(&intel_dp->pps_mutex);
 	intel_display_power_put(dev_priv, POWER_DOMAIN_DISPLAY_CORE, wakeref);
 
 	return 0;
@@ -162,7 +162,7 @@ vlv_power_sequencer_pipe(struct intel_dp *intel_dp)
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	enum pipe pipe;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	/* We should never land here with regular DP ports */
 	drm_WARN_ON(&dev_priv->drm, !intel_dp_is_edp(intel_dp));
@@ -210,7 +210,7 @@ bxt_power_sequencer_idx(struct intel_dp *intel_dp)
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	int backlight_controller = dev_priv->vbt.backlight.controller;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	/* We should never land here with regular DP ports */
 	drm_WARN_ON(&dev_priv->drm, !intel_dp_is_edp(intel_dp));
@@ -280,7 +280,7 @@ vlv_initial_power_sequencer_setup(struct intel_dp *intel_dp)
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	enum port port = dig_port->base.port;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	/* try to find a pipe with this port selected */
 	/* first pick one where the panel is on */
@@ -359,7 +359,7 @@ static void intel_pps_get_registers(struct intel_dp *intel_dp,
 				    struct pps_registers *regs)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
-	int pps_idx = 0;
+	int pps_idx = dp_to_dig_port(intel_dp)->base.port;
 
 	memset(regs, 0, sizeof(*regs));
 
@@ -405,7 +405,7 @@ static bool edp_have_panel_power(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if ((IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) &&
 	    intel_dp->pps.pps_pipe == INVALID_PIPE)
@@ -418,7 +418,7 @@ static bool edp_have_panel_vdd(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if ((IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) &&
 	    intel_dp->pps.pps_pipe == INVALID_PIPE)
@@ -461,7 +461,7 @@ static void wait_panel_status(struct intel_dp *intel_dp,
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	i915_reg_t pp_stat_reg, pp_ctrl_reg;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	intel_pps_verify_state(intel_dp);
 
@@ -554,7 +554,7 @@ static  u32 ilk_get_pp_control(struct intel_dp *intel_dp)
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	u32 control;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	control = intel_de_read(dev_priv, _pp_ctrl_reg(intel_dp));
 	if (drm_WARN_ON(&dev_priv->drm, !HAS_DDI(dev_priv) &&
@@ -578,7 +578,7 @@ bool intel_pps_vdd_on_unlocked(struct intel_dp *intel_dp)
 	i915_reg_t pp_stat_reg, pp_ctrl_reg;
 	bool need_to_disable = !intel_dp->pps.want_panel_vdd;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if (!intel_dp_is_edp(intel_dp))
 		return false;
@@ -655,7 +655,7 @@ static void intel_pps_vdd_off_sync_unlocked(struct intel_dp *intel_dp)
 	u32 pp;
 	i915_reg_t pp_stat_reg, pp_ctrl_reg;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	drm_WARN_ON(&dev_priv->drm, intel_dp->pps.want_panel_vdd);
 
@@ -737,9 +737,7 @@ static void edp_panel_vdd_schedule_off(struct intel_dp *intel_dp)
  */
 void intel_pps_vdd_off_unlocked(struct intel_dp *intel_dp, bool sync)
 {
-	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
-
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if (!intel_dp_is_edp(intel_dp))
 		return;
@@ -762,7 +760,7 @@ void intel_pps_on_unlocked(struct intel_dp *intel_dp)
 	u32 pp;
 	i915_reg_t pp_ctrl_reg;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if (!intel_dp_is_edp(intel_dp))
 		return;
@@ -823,7 +821,7 @@ void intel_pps_off_unlocked(struct intel_dp *intel_dp)
 	u32 pp;
 	i915_reg_t pp_ctrl_reg;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if (!intel_dp_is_edp(intel_dp))
 		return;
@@ -982,11 +980,10 @@ static void vlv_steal_power_sequencer(struct drm_i915_private *dev_priv,
 {
 	struct intel_encoder *encoder;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
-
 	for_each_intel_dp(&dev_priv->drm, encoder) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
+		lockdep_assert_held(&intel_dp->pps_mutex);
 		drm_WARN(&dev_priv->drm, intel_dp->pps.active_pipe == pipe,
 			 "stealing pipe %c power sequencer from active [ENCODER:%d:%s]\n",
 			 pipe_name(pipe), encoder->base.base.id,
@@ -1012,7 +1009,7 @@ void vlv_pps_init(struct intel_encoder *encoder,
 	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	drm_WARN_ON(&dev_priv->drm, intel_dp->pps.active_pipe != INVALID_PIPE);
 
@@ -1055,7 +1052,7 @@ static void intel_pps_vdd_sanitize(struct intel_dp *intel_dp)
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	if (!edp_have_panel_vdd(intel_dp))
 		return;
@@ -1160,7 +1157,7 @@ static void pps_init_delays(struct intel_dp *intel_dp)
 	struct edp_power_seq cur, vbt, spec,
 		*final = &intel_dp->pps.pps_delays;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	/* already initialized? */
 	if (final->t11_t12 != 0)
@@ -1258,7 +1255,7 @@ static void pps_init_registers(struct intel_dp *intel_dp, bool force_disable_vdd
 	enum port port = dp_to_dig_port(intel_dp)->base.port;
 	const struct edp_power_seq *seq = &intel_dp->pps.pps_delays;
 
-	lockdep_assert_held(&dev_priv->pps_mutex);
+	lockdep_assert_held(&intel_dp->pps_mutex);
 
 	intel_pps_get_registers(intel_dp, &regs);
 

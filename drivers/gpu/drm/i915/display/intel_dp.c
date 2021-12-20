@@ -5089,6 +5089,7 @@ intel_dp_init_connector(struct intel_digital_port *dig_port,
 	intel_dp->reset_link_params = true;
 	intel_dp->pps.pps_pipe = INVALID_PIPE;
 	intel_dp->pps.active_pipe = INVALID_PIPE;
+	mutex_init(&intel_dp->pps_mutex);
 
 	/* Preserve the current hw state. */
 	intel_dp->DP = intel_de_read(dev_priv, intel_dp->output_reg);
