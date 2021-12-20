@@ -323,6 +323,22 @@ static void smack_log_callback(struct audit_buffer *ab, void *a)
 		audit_log_format(ab, " labels_differ");
 	else
 		audit_log_format(ab, " requested=%s", sad->request);
+
+        if (ad->type == LSM_AUDIT_DATA_PTRACE) {
+                struct task_struct *tsk = sad->tracer_tsk;
+
+                if (tsk) {
+                        pid_t pid = task_tgid_nr(tsk);
+
+                        if (pid) {
+                                char comm[sizeof(tsk->comm)];
+
+                                audit_log_format(ab, " tracer-pid=%d tracer-comm=", pid);
+                                audit_log_untrustedstring(ab,
+                                        memcpy(comm, tsk->comm, sizeof(comm)));
+                        }
+                }
+	}
 }
 
 /**

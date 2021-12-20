@@ -266,6 +266,7 @@ struct smack_audit_data {
 	char *object;
 	char *request;
 	int result;
+	struct task_struct *tracer_tsk;
 };
 
 /*
@@ -497,6 +498,16 @@ static inline void smk_ad_setfield_u_net_sk(struct smk_audit_info *a,
 {
 	a->a.u.net->sk = sk;
 }
+static inline void smk_ad_setfield_u_tracer(struct smk_audit_info *a,
+                                        struct task_struct *t)
+{
+       a->a.smack_audit_data->tracer_tsk = t;
+}
+static inline void smk_ad_setfield_u_tracee(struct smk_audit_info *a,
+                                        struct task_struct *t)
+{
+       a->a.u.tsk = t;
+}
 
 #else /* no AUDIT */
 
@@ -522,6 +533,14 @@ static inline void smk_ad_setfield_u_fs_path(struct smk_audit_info *a,
 }
 static inline void smk_ad_setfield_u_net_sk(struct smk_audit_info *a,
 					    struct sock *sk)
+{
+}
+static inline void smk_ad_setfield_u_tracer(struct smk_audit_info *a,
+						struct task_struct *t)
+{
+}
+static inline void smk_ad_setfield_u_tracee(struct smk_audit_info *a,
+						struct task_struct *t)
 {
 }
 #endif

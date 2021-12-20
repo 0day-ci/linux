@@ -76,6 +76,7 @@ struct common_audit_data {
 #define LSM_AUDIT_DATA_IBENDPORT 14
 #define LSM_AUDIT_DATA_LOCKDOWN 15
 #define LSM_AUDIT_DATA_NOTIFICATION 16
+#define LSM_AUDIT_DATA_PTRACE   17
 	union 	{
 		struct path path;
 		struct dentry *dentry;

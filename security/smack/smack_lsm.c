@@ -416,19 +416,12 @@ static inline unsigned int smk_ptrace_mode(unsigned int mode)
  */
 static int smk_ptrace_rule_check(struct task_struct *tracer,
 				 struct smack_known *tracee_known,
-				 unsigned int mode, const char *func)
+				 unsigned int mode, struct smk_audit_info *saip)
 {
 	int rc;
-	struct smk_audit_info ad, *saip = NULL;
 	struct task_smack *tsp;
 	struct smack_known *tracer_known;
 	const struct cred *tracercred;
-
-	if ((mode & PTRACE_MODE_NOAUDIT) == 0) {
-		smk_ad_init(&ad, func, LSM_AUDIT_DATA_TASK);
-		smk_ad_setfield_u_tsk(&ad, tracer);
-		saip = &ad;
-	}
 
 	rcu_read_lock();
 	tracercred = __task_cred(tracer);
@@ -480,10 +473,17 @@ static int smk_ptrace_rule_check(struct task_struct *tracer,
 static int smack_ptrace_access_check(struct task_struct *ctp, unsigned int mode)
 {
 	struct smack_known *skp;
+	struct smk_audit_info ad, *saip = NULL;
 
 	skp = smk_of_task_struct_obj(ctp);
+	if ((mode & PTRACE_MODE_NOAUDIT) == 0) {
+		smk_ad_init(&ad, __func__, LSM_AUDIT_DATA_PTRACE);
+		smk_ad_setfield_u_tracer(&ad, current);
+		smk_ad_setfield_u_tracee(&ad, ctp);
+		saip = &ad;
+	}
 
-	return smk_ptrace_rule_check(current, skp, mode, __func__);
+	return smk_ptrace_rule_check(current, skp, mode, saip);
 }
 
 /**
@@ -498,10 +498,15 @@ static int smack_ptrace_traceme(struct task_struct *ptp)
 {
 	int rc;
 	struct smack_known *skp;
+	struct smk_audit_info ad, *saip = NULL;
 
 	skp = smk_of_task(smack_cred(current_cred()));
+	smk_ad_init(&ad, __func__, LSM_AUDIT_DATA_PTRACE);
+	smk_ad_setfield_u_tracer(&ad, ptp);
+	smk_ad_setfield_u_tracee(&ad, current);
+	saip = &ad;
 
-	rc = smk_ptrace_rule_check(ptp, skp, PTRACE_MODE_ATTACH, __func__);
+	rc = smk_ptrace_rule_check(ptp, skp, PTRACE_MODE_ATTACH, saip);
 	return rc;
 }
 
@@ -897,15 +902,21 @@ static int smack_bprm_creds_for_exec(struct linux_binprm *bprm)
 
 	if (bprm->unsafe & LSM_UNSAFE_PTRACE) {
 		struct task_struct *tracer;
+		struct smk_audit_info ad, *saip = NULL;
 		rc = 0;
+
+		smk_ad_init(&ad, __func__, LSM_AUDIT_DATA_PTRACE);
+		smk_ad_setfield_u_tracee(&ad, current);
+		saip = &ad;
 
 		rcu_read_lock();
 		tracer = ptrace_parent(current);
+		smk_ad_setfield_u_tracer(&ad, tracer);
 		if (likely(tracer != NULL))
 			rc = smk_ptrace_rule_check(tracer,
 						   isp->smk_task,
 						   PTRACE_MODE_ATTACH,
-						   __func__);
+						   saip);
 		rcu_read_unlock();
 
 		if (rc != 0)

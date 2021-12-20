@@ -318,6 +318,21 @@ static void dump_common_audit_data(struct audit_buffer *ab,
 		}
 		break;
 	}
+	case LSM_AUDIT_DATA_PTRACE: {
+		struct task_struct *tsk = a->u.tsk;
+		if (tsk) {
+			pid_t pid = task_tgid_nr(tsk);
+
+			if (pid) {
+				char comm[sizeof(tsk->comm)];
+
+				audit_log_format(ab, " tracee-pid=%d tracee-comm=", pid);
+				audit_log_untrustedstring(ab,
+					memcpy(comm, tsk->comm, sizeof(comm)));
+			}
+		}
+		break;
+	}
 	case LSM_AUDIT_DATA_NET:
 		if (a->u.net->sk) {
 			const struct sock *sk = a->u.net->sk;
