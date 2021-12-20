@@ -333,7 +333,7 @@ static struct usb_endpoint_descriptor fs_epout_desc = {
 	.bEndpointAddress = USB_DIR_OUT,
 	/* .bmAttributes = DYNAMIC */
 	/* .wMaxPacketSize = DYNAMIC */
-	.bInterval = 1,
+	/* .bInterval = DYNAMIC */
 };
 
 static struct usb_endpoint_descriptor hs_epout_desc = {
@@ -342,7 +342,7 @@ static struct usb_endpoint_descriptor hs_epout_desc = {
 
 	/* .bmAttributes = DYNAMIC */
 	/* .wMaxPacketSize = DYNAMIC */
-	.bInterval = 4,
+	/* .bInterval = DYNAMIC */
 };
 
 static struct usb_endpoint_descriptor ss_epout_desc = {
@@ -352,7 +352,7 @@ static struct usb_endpoint_descriptor ss_epout_desc = {
 	.bEndpointAddress = USB_DIR_OUT,
 	/* .bmAttributes = DYNAMIC */
 	/* .wMaxPacketSize = DYNAMIC */
-	.bInterval = 4,
+	/* .bInterval = DYNAMIC */
 };
 
 static struct usb_ss_ep_comp_descriptor ss_epout_desc_comp = {
@@ -467,7 +467,7 @@ static struct usb_endpoint_descriptor fs_epin_desc = {
 	.bEndpointAddress = USB_DIR_IN,
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_ASYNC,
 	/* .wMaxPacketSize = DYNAMIC */
-	.bInterval = 1,
+	/* .bInterval = DYNAMIC */
 };
 
 static struct usb_endpoint_descriptor hs_epin_desc = {
@@ -476,7 +476,7 @@ static struct usb_endpoint_descriptor hs_epin_desc = {
 
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_ASYNC,
 	/* .wMaxPacketSize = DYNAMIC */
-	.bInterval = 4,
+	/* .bInterval = DYNAMIC */
 };
 
 static struct usb_endpoint_descriptor ss_epin_desc = {
@@ -486,7 +486,7 @@ static struct usb_endpoint_descriptor ss_epin_desc = {
 	.bEndpointAddress = USB_DIR_IN,
 	.bmAttributes = USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_ASYNC,
 	/* .wMaxPacketSize = DYNAMIC */
-	.bInterval = 4,
+	/* .bInterval = DYNAMIC */
 };
 
 static struct usb_ss_ep_comp_descriptor ss_epin_desc_comp = {
@@ -659,29 +659,11 @@ static int get_max_srate(const int *srates)
 	return max_srate;
 }
 
-static int set_ep_max_packet_size(const struct f_uac2_opts *uac2_opts,
-	struct usb_endpoint_descriptor *ep_desc,
-	enum usb_device_speed speed, bool is_playback)
+static int get_max_bw_for_binterval(const struct f_uac2_opts *uac2_opts,
+	u8 binterval, unsigned int factor, bool is_playback)
 {
 	int chmask, srate, ssize;
-	u16 max_size_bw, max_size_ep;
-	unsigned int factor;
-
-	switch (speed) {
-	case USB_SPEED_FULL:
-		max_size_ep = 1023;
-		factor = 1000;
-		break;
-
-	case USB_SPEED_HIGH:
-	case USB_SPEED_SUPER:
-		max_size_ep = 1024;
-		factor = 8000;
-		break;
-
-	default:
-		return -EINVAL;
-	}
+	u16 max_size_bw;
 
 	if (is_playback) {
 		chmask = uac2_opts->p_chmask;
@@ -699,14 +681,52 @@ static int set_ep_max_packet_size(const struct f_uac2_opts *uac2_opts,
 		srate = srate * (1000 + uac2_opts->fb_max) / 1000;
 		// updated srate is always bigger, therefore DIV_ROUND_UP always yields +1
 		max_size_bw = num_channels(chmask) * ssize *
-			(DIV_ROUND_UP(srate, factor / (1 << (ep_desc->bInterval - 1))));
+			(DIV_ROUND_UP(srate, factor / (1 << (binterval - 1))));
 	} else {
 		// adding 1 frame provision for Win10
 		max_size_bw = num_channels(chmask) * ssize *
-			(DIV_ROUND_UP(srate, factor / (1 << (ep_desc->bInterval - 1))) + 1);
+			(DIV_ROUND_UP(srate, factor / (1 << (binterval - 1))) + 1);
 	}
+	return max_size_bw;
+}
+
+static int set_ep_max_packet_size_bint(const struct f_uac2_opts *uac2_opts,
+	struct usb_endpoint_descriptor *ep_desc,
+	enum usb_device_speed speed, bool is_playback)
+{
+	u16 max_size_bw, max_size_ep;
+	u8 binterval;
+
+	switch (speed) {
+	case USB_SPEED_FULL:
+		max_size_ep = 1023;
+		// fixed
+		binterval = 1;
+		max_size_bw = get_max_bw_for_binterval(uac2_opts, binterval, 1000,
+			is_playback);
+		break;
+
+	case USB_SPEED_HIGH:
+	case USB_SPEED_SUPER:
+		max_size_ep = 1024;
+		// checking bInterval from 4 (= 1ms) to 1 if the required bandwidth fits
+		for (binterval = 4; binterval > 0; --binterval) {
+			max_size_bw = get_max_bw_for_binterval(uac2_opts, binterval, 8000,
+					is_playback);
+			if (max_size_bw <= max_size_ep) {
+				// found largest bInterval/max_size_bw fitting max_size_ep
+				break;
+			}
+		}
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
 	ep_desc->wMaxPacketSize = cpu_to_le16(min_t(u16, max_size_bw,
 						    max_size_ep));
+	ep_desc->bInterval = binterval;
 
 	return 0;
 }
@@ -1119,42 +1139,42 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	}
 
 	/* Calculate wMaxPacketSize according to audio bandwidth */
-	ret = set_ep_max_packet_size(uac2_opts, &fs_epin_desc, USB_SPEED_FULL,
+	ret = set_ep_max_packet_size_bint(uac2_opts, &fs_epin_desc, USB_SPEED_FULL,
 				     true);
 	if (ret < 0) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 		return ret;
 	}
 
-	ret = set_ep_max_packet_size(uac2_opts, &fs_epout_desc, USB_SPEED_FULL,
+	ret = set_ep_max_packet_size_bint(uac2_opts, &fs_epout_desc, USB_SPEED_FULL,
 				     false);
 	if (ret < 0) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 		return ret;
 	}
 
-	ret = set_ep_max_packet_size(uac2_opts, &hs_epin_desc, USB_SPEED_HIGH,
+	ret = set_ep_max_packet_size_bint(uac2_opts, &hs_epin_desc, USB_SPEED_HIGH,
 				     true);
 	if (ret < 0) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 		return ret;
 	}
 
-	ret = set_ep_max_packet_size(uac2_opts, &hs_epout_desc, USB_SPEED_HIGH,
+	ret = set_ep_max_packet_size_bint(uac2_opts, &hs_epout_desc, USB_SPEED_HIGH,
 				     false);
 	if (ret < 0) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 		return ret;
 	}
 
-	ret = set_ep_max_packet_size(uac2_opts, &ss_epin_desc, USB_SPEED_SUPER,
+	ret = set_ep_max_packet_size_bint(uac2_opts, &ss_epin_desc, USB_SPEED_SUPER,
 				     true);
 	if (ret < 0) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 		return ret;
 	}
 
-	ret = set_ep_max_packet_size(uac2_opts, &ss_epout_desc, USB_SPEED_SUPER,
+	ret = set_ep_max_packet_size_bint(uac2_opts, &ss_epout_desc, USB_SPEED_SUPER,
 				     false);
 	if (ret < 0) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
