@@ -31,6 +31,7 @@ static blk_status_t t10_pi_generate(struct blk_integrity_iter *iter,
 		csum_fn *fn, enum t10_dif_type type)
 {
 	unsigned int i;
+	unsigned int pi_size = iter->interval >> SECTOR_SHIFT;
 
 	for (i = 0 ; i < iter->data_size ; i += iter->interval) {
 		struct t10_pi_tuple *pi = iter->prot_buf;
@@ -45,7 +46,7 @@ static blk_status_t t10_pi_generate(struct blk_integrity_iter *iter,
 
 		iter->data_buf += iter->interval;
 		iter->prot_buf += sizeof(struct t10_pi_tuple);
-		iter->seed++;
+		iter->seed+= pi_size;
 	}
 
 	return BLK_STS_OK;
@@ -55,6 +56,7 @@ static blk_status_t t10_pi_verify(struct blk_integrity_iter *iter,
 		csum_fn *fn, enum t10_dif_type type)
 {
 	unsigned int i;
+	unsigned int pi_size = iter->interval >> SECTOR_SHIFT;
 
 	BUG_ON(type == T10_PI_TYPE0_PROTECTION);
 
@@ -94,7 +96,7 @@ static blk_status_t t10_pi_verify(struct blk_integrity_iter *iter,
 next:
 		iter->data_buf += iter->interval;
 		iter->prot_buf += sizeof(struct t10_pi_tuple);
-		iter->seed++;
+		iter->seed += pi_size;
 	}
 
 	return BLK_STS_OK;
@@ -135,6 +137,7 @@ static void t10_pi_type1_prepare(struct request *rq)
 	const int tuple_sz = rq->q->integrity.tuple_size;
 	u32 ref_tag = t10_pi_ref_tag(rq);
 	struct bio *bio;
+	unsigned int pi_size = 1 << (rq->q->integrity.interval_exp - SECTOR_SHIFT);
 
 	__rq_for_each_bio(bio, rq) {
 		struct bio_integrity_payload *bip = bio_integrity(bio);
@@ -156,7 +159,8 @@ static void t10_pi_type1_prepare(struct request *rq)
 
 				if (be32_to_cpu(pi->ref_tag) == virt)
 					pi->ref_tag = cpu_to_be32(ref_tag);
-				virt++;
+
+				virt += pi_size;
 				ref_tag++;
 				p += tuple_sz;
 			}
@@ -185,6 +189,7 @@ static void t10_pi_type1_complete(struct request *rq, unsigned int nr_bytes)
 	const int tuple_sz = rq->q->integrity.tuple_size;
 	u32 ref_tag = t10_pi_ref_tag(rq);
 	struct bio *bio;
+	unsigned int pi_size = 1 << (rq->q->integrity.interval_exp - SECTOR_SHIFT);
 
 	__rq_for_each_bio(bio, rq) {
 		struct bio_integrity_payload *bip = bio_integrity(bio);
@@ -202,7 +207,8 @@ static void t10_pi_type1_complete(struct request *rq, unsigned int nr_bytes)
 
 				if (be32_to_cpu(pi->ref_tag) == ref_tag)
 					pi->ref_tag = cpu_to_be32(virt);
-				virt++;
+
+				virt+= pi_size;
 				ref_tag++;
 				intervals--;
 				p += tuple_sz;
