@@ -113,6 +113,12 @@ static int __init fadump_cma_init(void)
 	}
 
 	/*
+	 * If CMA activation fails, do not let the reserved memory be exposed
+	 * to buddy allocator. As good as 'fadump=nocma' case.
+	 */
+	cma_dont_free_pages_on_error(fadump_cma);
+
+	/*
 	 * So we now have successfully initialized cma area for fadump.
 	 */
 	pr_info("Initialized 0x%lx bytes cma area at %ldMB from 0x%lx "
