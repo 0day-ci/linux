@@ -403,6 +403,17 @@ static int __init renesas_soc_init(void)
 		chipid = ioremap(family->reg, 4);
 	}
 
+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+	if (!soc_dev_attr)
+		return -ENOMEM;
+
+	np = of_find_node_by_path("/");
+	of_property_read_string(np, "model", &soc_dev_attr->machine);
+	of_node_put(np);
+
+	soc_dev_attr->family = kstrdup_const(family->name, GFP_KERNEL);
+	soc_dev_attr->soc_id = kstrdup_const(soc_id, GFP_KERNEL);
+
 	if (chipid) {
 		product = readl(chipid + id->offset);
 		iounmap(chipid);
@@ -417,6 +428,12 @@ static int __init renesas_soc_init(void)
 
 			eshi = ((product >> 4) & 0x0f) + 1;
 			eslo = product & 0xf;
+			soc_dev_attr->revision = kasprintf(GFP_KERNEL, "ES%u.%u",
+							   eshi, eslo);
+		}  else if (id == &id_rzg2l) {
+			eshi =  ((product >> 28) & 0x0f);
+			soc_dev_attr->revision = kasprintf(GFP_KERNEL, "Rev %u",
+							   eshi);
 		}
 
 		if (soc->id &&
@@ -425,20 +442,6 @@ static int __init renesas_soc_init(void)
 			return -ENODEV;
 		}
 	}
-
-	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-	if (!soc_dev_attr)
-		return -ENOMEM;
-
-	np = of_find_node_by_path("/");
-	of_property_read_string(np, "model", &soc_dev_attr->machine);
-	of_node_put(np);
-
-	soc_dev_attr->family = kstrdup_const(family->name, GFP_KERNEL);
-	soc_dev_attr->soc_id = kstrdup_const(soc_id, GFP_KERNEL);
-	if (eshi)
-		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "ES%u.%u", eshi,
-						   eslo);
 
 	pr_info("Detected Renesas %s %s %s\n", soc_dev_attr->family,
 		soc_dev_attr->soc_id, soc_dev_attr->revision ?: "");
