@@ -42,11 +42,6 @@ struct vchiq_mmal_port_buffer {
 
 struct vchiq_mmal_port;
 
-typedef void (*vchiq_mmal_buffer_cb)(
-		struct vchiq_mmal_instance  *instance,
-		struct vchiq_mmal_port *port,
-		int status, struct mmal_buffer *buffer);
-
 struct vchiq_mmal_port {
 	u32 enabled:1;
 	u32 handle;
@@ -76,7 +71,9 @@ struct vchiq_mmal_port {
 	/* Count of buffers the VPU has yet to return */
 	atomic_t buffers_with_vpu;
 	/* callback on buffer completion */
-	vchiq_mmal_buffer_cb buffer_cb;
+	void (*vchiq_mmal_buffer_cb)(struct vchiq_mmal_instance  *instance,
+				     struct vchiq_mmal_port *port, int status,
+				     struct mmal_buffer *buffer);
 	/* callback context */
 	void *cb_ctx;
 };
@@ -126,7 +123,9 @@ int vchiq_mmal_component_disable(
 int vchiq_mmal_port_enable(
 		struct vchiq_mmal_instance *instance,
 		struct vchiq_mmal_port *port,
-		vchiq_mmal_buffer_cb buffer_cb);
+		void (*vchiq_mmal_buffer_cb)(struct vchiq_mmal_instance  *instance,
+					     struct vchiq_mmal_port *port, int status,
+					     struct mmal_buffer *buffer));
 
 /* disable a port
  *

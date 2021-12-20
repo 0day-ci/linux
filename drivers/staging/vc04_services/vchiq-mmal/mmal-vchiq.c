@@ -269,10 +269,10 @@ static void buffer_work_cb(struct work_struct *work)
 
 	atomic_dec(&msg_context->u.bulk.port->buffers_with_vpu);
 
-	msg_context->u.bulk.port->buffer_cb(msg_context->u.bulk.instance,
-					    msg_context->u.bulk.port,
-					    msg_context->u.bulk.status,
-					    msg_context->u.bulk.buffer);
+	msg_context->u.bulk.port->vchiq_mmal_buffer_cb(msg_context->u.bulk.instance,
+						       msg_context->u.bulk.port,
+						       msg_context->u.bulk.status,
+						       msg_context->u.bulk.buffer);
 }
 
 /* workqueue scheduled callback to handle receiving buffers
@@ -1327,13 +1327,12 @@ static int port_disable(struct vchiq_mmal_instance *instance,
 			mmalbuf = list_entry(buf_head, struct mmal_buffer,
 					     list);
 			list_del(buf_head);
-			if (port->buffer_cb) {
+			if (port->vchiq_mmal_buffer_cb) {
 				mmalbuf->length = 0;
 				mmalbuf->mmal_flags = 0;
 				mmalbuf->dts = MMAL_TIME_UNKNOWN;
 				mmalbuf->pts = MMAL_TIME_UNKNOWN;
-				port->buffer_cb(instance,
-						port, 0, mmalbuf);
+				port->vchiq_mmal_buffer_cb(instance, port, 0, mmalbuf);
 			}
 		}
 
@@ -1363,7 +1362,7 @@ static int port_enable(struct vchiq_mmal_instance *instance,
 
 	port->enabled = 1;
 
-	if (port->buffer_cb) {
+	if (port->vchiq_mmal_buffer_cb) {
 		/* send buffer headers to videocore */
 		hdr_count = 1;
 		list_for_each_safe(buf_head, q, &port->buffers) {
@@ -1454,9 +1453,10 @@ EXPORT_SYMBOL_GPL(vchiq_mmal_port_parameter_get);
  * enables a port and queues buffers for satisfying callbacks if we
  * provide a callback handler
  */
-int vchiq_mmal_port_enable(struct vchiq_mmal_instance *instance,
-			   struct vchiq_mmal_port *port,
-			   vchiq_mmal_buffer_cb buffer_cb)
+int vchiq_mmal_port_enable(struct vchiq_mmal_instance *instance, struct vchiq_mmal_port *port,
+			   void (*vchiq_mmal_buffer_cb)(struct vchiq_mmal_instance  *instance,
+							struct vchiq_mmal_port *port, int status,
+							struct mmal_buffer *buffer))
 {
 	int ret;
 
@@ -1469,7 +1469,7 @@ int vchiq_mmal_port_enable(struct vchiq_mmal_instance *instance,
 		goto unlock;
 	}
 
-	port->buffer_cb = buffer_cb;
+	port->vchiq_mmal_buffer_cb = vchiq_mmal_buffer_cb;
 
 	ret = port_enable(instance, port);
 
