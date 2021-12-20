@@ -52,7 +52,7 @@ config THERMAL_EMERGENCY_POWEROFF_DELAY_MS
 config THERMAL_HWMON
 	bool
 	prompt "Expose thermal sensors as hwmon device"
-	depends on HWMON=y || HWMON=THERMAL
+	depends on HWMON
 	default y
 	help
 	  In case a sensor is registered with the thermal
