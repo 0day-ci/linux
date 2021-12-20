@@ -961,6 +961,9 @@ static bool __intel_gt_unset_wedged(struct intel_gt *gt)
 	}
 	spin_unlock(&timelines->lock);
 
+	/* Ensure that all non-kernel contexts are unpinned as well */
+	intel_gt_retire_requests(gt);
+
 	/* We must reset pending GPU events before restoring our submission */
 	ok = !HAS_EXECLISTS(gt->i915); /* XXX better agnosticism desired */
 	if (!INTEL_INFO(gt->i915)->gpu_reset_clobbers_display)

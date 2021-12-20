@@ -1455,8 +1455,16 @@ void intel_engines_reset_default_submission(struct intel_gt *gt)
 	enum intel_engine_id id;
 
 	for_each_engine(engine, gt, id) {
+		struct intel_context *ce = engine->kernel_context;
+
 		if (engine->sanitize)
 			engine->sanitize(engine);
+
+		/* Reset RING_HEAD so we don't consume the old
+		 * poisoned request on unwedging
+		 */
+		if (ce)
+			ce->ops->reset(ce);
 
 		engine->set_default_submission(engine);
 	}
