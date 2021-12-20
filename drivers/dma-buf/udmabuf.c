@@ -274,8 +274,11 @@ static long udmabuf_create(struct miscdevice *device,
 	flags = 0;
 	if (head->flags & UDMABUF_FLAGS_CLOEXEC)
 		flags |= O_CLOEXEC;
-	return dma_buf_fd(buf, flags);
+	ret = dma_buf_fd(buf, flags);
+	if (ret < 0) {
+		dma_buf_put(buf);
 
+	return ret;
 err:
 	while (pgbuf > 0)
 		put_page(ubuf->pages[--pgbuf]);
