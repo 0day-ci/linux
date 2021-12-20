@@ -47,11 +47,12 @@ properties:
       - enum:
           - cec
           - grf
-          - vpll
+          - ref
       - enum:
           - grf
-          - vpll
-      - const: vpll
+          - ref
+      - const:
+          - ref
 
   ddc-i2c-bus:
     $ref: /schemas/types.yaml#/definitions/phandle
