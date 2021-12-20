@@ -8641,25 +8641,27 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 
 		nr_running = rq->nr_running;
 		sgs->sum_nr_running += nr_running;
-
-		if (nr_running > 1)
-			*sg_status |= SG_OVERLOAD;
-
-		if (cpu_overutilized(i))
-			*sg_status |= SG_OVERUTILIZED;
-
 #ifdef CONFIG_NUMA_BALANCING
 		sgs->nr_numa_running += rq->nr_numa_running;
 		sgs->nr_preferred_running += rq->nr_preferred_running;
 #endif
+		if (nr_running > 1)
+			*sg_status |= SG_OVERLOAD;
+
 		/*
 		 * No need to call idle_cpu() if nr_running is not 0
 		 */
 		if (!nr_running && idle_cpu(i)) {
 			sgs->idle_cpus++;
-			/* Idle cpu can't have misfit task */
+			/*
+			 * Idle cpu can neither be overutilized nor have a
+			 * misfit task.
+			 */
 			continue;
 		}
+
+		if (cpu_overutilized(i))
+			*sg_status |= SG_OVERUTILIZED;
 
 		if (local_group)
 			continue;
