@@ -44,11 +44,12 @@ properties:
     items:
       - {}
       - {}
-      # The next three clocks are all optional, but shall be specified in this
+      # The next four clocks are all optional, but shall be specified in this
       # order when present.
       - description: The HDMI CEC controller main clock
       - description: Power for GRF IO
       - description: External clock for some HDMI PHY
+      - description: hclk
 
   clock-names:
     minItems: 2
@@ -59,11 +60,16 @@ properties:
           - cec
           - grf
           - ref
+          - hclk
       - enum:
           - grf
           - ref
-      - const:
+          - hclk
+      - enum:
           - ref
+          - hclk
+      - const:
+          - hclk
 
   ddc-i2c-bus:
     $ref: /schemas/types.yaml#/definitions/phandle
