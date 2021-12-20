@@ -3009,6 +3009,7 @@ struct softnet_data {
 	/* written and read only by owning cpu: */
 	struct {
 		u16 recursion;
+		u8  skip_txqueue;
 		u8  more;
 	} xmit;
 #ifdef CONFIG_RPS
@@ -4694,6 +4695,24 @@ static inline netdev_tx_t netdev_start_xmit(struct sk_buff *skb, struct net_devi
 		txq_trans_update(txq);
 
 	return rc;
+}
+
+static inline void netdev_xmit_skip_txqueue(bool skip)
+{
+	__this_cpu_write(softnet_data.xmit.skip_txqueue, skip);
+}
+
+static inline bool netdev_xmit_txqueue_skipped(void)
+{
+	return __this_cpu_read(softnet_data.xmit.skip_txqueue);
+}
+
+static inline struct netdev_queue *
+netdev_tx_queue_mapping(struct net_device *dev, struct sk_buff *skb)
+{
+       int qm = skb_get_queue_mapping(skb);
+
+       return netdev_get_tx_queue(dev, netdev_cap_txqueue(dev, qm));
 }
 
 int netdev_class_create_file_ns(const struct class_attribute *class_attr,
