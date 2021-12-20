@@ -381,7 +381,6 @@ static bool nxp_c45_get_hwtxts(struct nxp_c45_phy *priv,
 	bool valid;
 	u16 reg;
 
-	mutex_lock(&priv->ptp_lock);
 	phy_write_mmd(priv->phydev, MDIO_MMD_VEND1, VEND1_EGR_RING_CTRL,
 		      RING_DONE);
 	reg = phy_read_mmd(priv->phydev, MDIO_MMD_VEND1, VEND1_EGR_RING_DATA_0);
@@ -401,8 +400,6 @@ static bool nxp_c45_get_hwtxts(struct nxp_c45_phy *priv,
 	hwts->sec |= (reg & RING_DATA_3_SEC_1_0) >> 14;
 
 nxp_c45_get_hwtxts_out:
-	mutex_unlock(&priv->ptp_lock);
-
 	return valid;
 }
 
