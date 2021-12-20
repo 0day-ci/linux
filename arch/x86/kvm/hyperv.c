@@ -2409,10 +2409,6 @@ int kvm_get_hv_cpuid(struct kvm_vcpu *vcpu, struct kvm_cpuid2 *cpuid,
 	if (kvm_x86_ops.nested_ops->get_evmcs_version)
 		evmcs_ver = kvm_x86_ops.nested_ops->get_evmcs_version(vcpu);
 
-	/* Skip NESTED_FEATURES if eVMCS is not supported */
-	if (!evmcs_ver)
-		--nent;
-
 	if (cpuid->nent < nent)
 		return -E2BIG;
 
@@ -2512,8 +2508,7 @@ int kvm_get_hv_cpuid(struct kvm_vcpu *vcpu, struct kvm_cpuid2 *cpuid,
 
 		case HYPERV_CPUID_NESTED_FEATURES:
 			ent->eax = evmcs_ver;
-			if (evmcs_ver)
-				ent->eax |= HV_X64_NESTED_MSR_BITMAP;
+			ent->eax |= HV_X64_NESTED_MSR_BITMAP;
 
 			break;
 
