@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/arm/sunplus/sunplus,idle-state.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sunplus cpuidle state
+
+maintainers:
+  - edwin.chiu <edwin.chiu@sunplus.com>
+
+description: |
+  Sunplus SOC cpuidle state
+
+properties:
+  compatible:
+    const: arm,idle-state
+
+  entry-latency-us:
+    description:
+      Worst case latency in microseconds required to enter the idle state.
+
+  exit-latency-us:
+    description:
+      Worst case latency in microseconds required to exit the idle state.
+      The exit-latency-us duration may be guaranteed only after
+      entry-latency-us has passed.
+
+  min-residency-us:
+    description:
+      Minimum residency duration in microseconds, inclusive of preparation
+      and entry, for this idle state to be considered worthwhile energy wise
+      (refer to section 2 of this document for a complete description).
+
+required:
+  - compatible
+  - entry-latency-us
+  - exit-latency-us
+  - min-residency-us
+
+additionalProperties: true
+
+examples:
+  - |
+    idle-states {
+      CLUSTER_SLEEP_BIG: cluster-sleep-big {
+        compatible = "arm,idle-state";
+        entry-latency-us = <8000>;
+        exit-latency-us = <700>;
+        min-residency-us = <9000>;
+      };
+    };
+
+...
