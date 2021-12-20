@@ -312,9 +312,14 @@ static const char *timbuart_type(struct uart_port *port)
  */
 static void timbuart_release_port(struct uart_port *port)
 {
+	struct resource *res;
+	int size;
 	struct platform_device *pdev = to_platform_device(port->dev);
-	int size =
-		resource_size(platform_get_resource(pdev, IORESOURCE_MEM, 0));
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res)
+		size = 0;
+	else
+		size = resource_size(res);
 
 	if (port->flags & UPF_IOREMAP) {
 		iounmap(port->membase);
