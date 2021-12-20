@@ -55,6 +55,7 @@ struct nvmem_cell_entry {
 	struct device_node	*np;
 	struct nvmem_device	*nvmem;
 	struct list_head	node;
+	struct bin_attribute	battr;
 };
 
 struct nvmem_cell {
@@ -72,6 +73,10 @@ static DEFINE_MUTEX(nvmem_lookup_mutex);
 static LIST_HEAD(nvmem_lookup_list);
 
 static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
+
+static int __nvmem_cell_read(struct nvmem_device *nvmem,
+		      struct nvmem_cell_entry *cell,
+		      void *buf, size_t *len, const char *id);
 
 static int __nvmem_reg_read(struct nvmem_device *nvmem, unsigned int offset,
 			    void *val, size_t bytes)
@@ -336,8 +341,18 @@ static const struct attribute_group nvmem_bin_group = {
 	.is_bin_visible = nvmem_bin_attr_is_visible,
 };
 
+static struct bin_attribute *nvmem_cells_bin_attrs[] = {
+	NULL,
+};
+
+static const struct attribute_group nvmem_cells_group = {
+	.name		= "cells",
+	.bin_attrs	= nvmem_cells_bin_attrs,
+};
+
 static const struct attribute_group *nvmem_dev_groups[] = {
 	&nvmem_bin_group,
+	&nvmem_cells_group,
 	NULL,
 };
 
@@ -429,7 +444,13 @@ static struct bus_type nvmem_bus_type = {
 
 static void nvmem_cell_entry_drop(struct nvmem_cell_entry *cell)
 {
+	struct device *dev = &cell->nvmem->dev;
+
 	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_REMOVE, cell);
+
+	sysfs_remove_file_from_group(&dev->kobj, &cell->battr.attr,
+				     nvmem_cells_group.name);
+
 	mutex_lock(&nvmem_mutex);
 	list_del(&cell->node);
 	mutex_unlock(&nvmem_mutex);
@@ -446,11 +467,50 @@ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
 		nvmem_cell_entry_drop(cell);
 }
 
+static ssize_t nvmem_cell_attr_read(struct file *filp, struct kobject *kobj,
+				    struct bin_attribute *battr, char *buf,
+				    loff_t pos, size_t count)
+{
+	struct nvmem_cell_entry *cell = container_of(battr, struct nvmem_cell_entry, battr);
+	struct nvmem_device *nvmem = cell->nvmem;
+	size_t bytes;
+	u8 *data;
+	int err;
+
+	if (pos >= cell->bytes)
+		return 0;
+
+	data = kzalloc(cell->bytes, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	err = __nvmem_cell_read(nvmem, cell, data, &bytes, NULL);
+	if (!err)
+		memcpy(buf, data + pos, count - pos);
+
+	kfree(data);
+
+	return err ? err : bytes;
+}
+
 static void nvmem_cell_entry_add(struct nvmem_cell_entry *cell)
 {
+	struct device *dev = &cell->nvmem->dev;
+	int err;
+
 	mutex_lock(&nvmem_mutex);
 	list_add_tail(&cell->node, &cell->nvmem->cells);
 	mutex_unlock(&nvmem_mutex);
+
+	sysfs_attr_init(&cell->battr.attr);
+	cell->battr.attr.name = cell->name;
+	cell->battr.attr.mode = 0400;
+	cell->battr.read = nvmem_cell_attr_read;
+	err = sysfs_add_bin_file_to_group(&dev->kobj, &cell->battr,
+					  nvmem_cells_group.name);
+	if (err)
+		dev_warn(dev, "Failed to add %s cell: %d\n", cell->name, err);
+
 	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_ADD, cell);
 }
 

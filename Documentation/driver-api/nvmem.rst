@@ -185,6 +185,17 @@ ex::
   *
   0001000
 
+Single cells can be read using files located at::
+
+	/sys/bus/nvmem/devices/*/cells/*
+
+ex::
+
+  hexdump -C /sys/bus/nvmem/devices/mtd0/cells/mac
+
+  00000000  10 7b 44 c4 8a b0                                 |.{D...|
+  00000006
+
 7. DeviceTree Binding
 =====================
 
