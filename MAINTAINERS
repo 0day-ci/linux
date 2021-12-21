@@ -9335,6 +9335,13 @@ L:	linux-kernel@vger.kernel.org
 S:	Supported
 F:	arch/x86/include/asm/intel-family.h
 
+INTEL DYNAMIC LOAD BALANCER DRIVER
+M:	Mike Ximing Chen <mike.ximing.chen@intel.com>
+S:	Maintained
+F:	Documentation/ABI/testing/sysfs-driver-dlb
+F:	drivers/misc/dlb/
+F:	include/uapi/linux/dlb.h
+
 INTEL DRM DRIVERS (excluding Poulsbo, Moorestown and derivative chipsets)
 M:	Jani Nikula <jani.nikula@linux.intel.com>
 M:	Joonas Lahtinen <joonas.lahtinen@linux.intel.com>

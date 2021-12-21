@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config INTEL_DLB
+	tristate "Intel Dynamic Load Balancer Driver"
+	depends on 64BIT && PCI && X86
+	help
+	  This driver supports the Intel Dynamic Load Balancer (DLB), a
+	  PCIe device (PCI ID 8086:27xx) that provides load-balanced,
+	  prioritized scheduling of core-to-core communication and improves
+	  DPDK Event Device library performance.
+
+	  The user-space interface is described in
+	  include/uapi/linux/dlb_user.h
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called dlb.
+
+	  If unsure, select N.

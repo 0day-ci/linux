@@ -17,6 +17,7 @@ fit into other categories.
    ad525x_dpot
    apds990x
    bh1770glc
+   dlb
    eeprom
    c2port
    dw-xdata-pcie
