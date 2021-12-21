@@ -459,7 +459,7 @@ static int msic_get(void *data, u64 *val)
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(fops_msic, msic_get, msic_set, "%llu\n");
+DEFINE_DEBUGFS_ATTRIBUTE(fops_msic, msic_get, msic_set, "%llu\n");
 
 void axon_msi_debug_setup(struct device_node *dn, struct axon_msic *msic)
 {
