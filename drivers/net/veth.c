@@ -718,6 +718,14 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq,
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(rq->xdp_prog);
 	if (unlikely(!xdp_prog)) {
+		if (unlikely(skb_shared(skb) || skb_head_is_locked(skb))) {
+			struct sk_buff *nskb = skb_copy(skb, GFP_ATOMIC | __GFP_NOWARN);
+
+			if (!nskb)
+				goto drop;
+			consume_skb(skb);
+			skb = nskb;
+		}
 		rcu_read_unlock();
 		goto out;
 	}
