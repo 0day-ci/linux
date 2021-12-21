@@ -32,6 +32,14 @@ properties:
       considered 'near' to the device (an object is near to the
       sensor).
 
+  label:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: |
+      All iio devices can have a label, which will be carried on to userspace
+      as a sysfs attribute. This is useful when having several iio devices that
+      represent different instances of the same hardware, as the name attribute
+      would then not be enough to differentiate between them.
+
 additionalProperties: true
 
 ...
