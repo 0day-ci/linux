@@ -190,6 +190,14 @@ unwind:
 	return ret;
 }
 
+static struct dlb_hw_domain *dlb_get_domain_from_id(struct dlb_hw *hw, u32 id)
+{
+	if (id >= DLB_MAX_NUM_DOMAINS)
+		return NULL;
+
+	return &hw->domains[id];
+}
+
 static int dlb_attach_ldb_queues(struct dlb_hw *hw,
 				 struct dlb_function_resources *rsrcs,
 				 struct dlb_hw_domain *domain, u32 num_queues,
@@ -724,6 +732,202 @@ int dlb_hw_create_sched_domain(struct dlb_hw *hw,
 	resp->status = 0;
 
 	return 0;
+}
+
+/*
+ * dlb_domain_reset_software_state() - returns domain's resources
+ * @hw: dlb_hw handle for a particular device.
+ * @domain: pointer to scheduling domain.
+ *
+ * This function returns the resources allocated/assigned to a domain back to
+ * the device/function level resource pool. These resources include ldb/dir
+ * queues,  ports, history lists, etc. It is called by the dlb_reset_domain().
+ * When a domain is created/initialized, resources are moved to a domain from
+ * the resource pool.
+ *
+ */
+static int dlb_domain_reset_software_state(struct dlb_hw *hw,
+					   struct dlb_hw_domain *domain)
+{
+	struct dlb *dlb = container_of(hw, struct dlb, hw);
+	struct dlb_dir_pq_pair *tmp_dir_port;
+	struct dlb_function_resources *rsrcs;
+	struct dlb_ldb_queue *tmp_ldb_queue;
+	struct dlb_ldb_port *tmp_ldb_port;
+	struct dlb_dir_pq_pair *dir_port;
+	struct dlb_ldb_queue *ldb_queue;
+	struct dlb_ldb_port *ldb_port;
+	int ret, i;
+
+	lockdep_assert_held(&dlb->resource_mutex);
+
+	rsrcs = domain->parent_func;
+
+	/* Move the domain's ldb queues to the function's avail list */
+	list_for_each_entry_safe(ldb_queue, tmp_ldb_queue,
+				 &domain->used_ldb_queues, domain_list) {
+		if (ldb_queue->sn_cfg_valid) {
+			struct dlb_sn_group *grp;
+
+			grp = &hw->rsrcs.sn_groups[ldb_queue->sn_group];
+
+			dlb_sn_group_free_slot(grp, ldb_queue->sn_slot);
+			ldb_queue->sn_cfg_valid = false;
+		}
+
+		ldb_queue->owned = false;
+		ldb_queue->num_mappings = 0;
+		ldb_queue->num_pending_additions = 0;
+
+		list_del(&ldb_queue->domain_list);
+		list_add(&ldb_queue->func_list, &rsrcs->avail_ldb_queues);
+		rsrcs->num_avail_ldb_queues++;
+	}
+
+	list_for_each_entry_safe(ldb_queue, tmp_ldb_queue,
+				 &domain->avail_ldb_queues, domain_list) {
+		ldb_queue->owned = false;
+
+		list_del(&ldb_queue->domain_list);
+		list_add(&ldb_queue->func_list, &rsrcs->avail_ldb_queues);
+		rsrcs->num_avail_ldb_queues++;
+	}
+
+	/* Move the domain's ldb ports to the function's avail list */
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++) {
+		list_for_each_entry_safe(ldb_port, tmp_ldb_port,
+				 &domain->used_ldb_ports[i], domain_list) {
+			int j;
+
+			ldb_port->owned = false;
+			ldb_port->configured = false;
+			ldb_port->num_pending_removals = 0;
+			ldb_port->num_mappings = 0;
+			ldb_port->init_tkn_cnt = 0;
+			for (j = 0; j < DLB_MAX_NUM_QIDS_PER_LDB_CQ; j++)
+				ldb_port->qid_map[j].state =
+					DLB_QUEUE_UNMAPPED;
+
+			list_del(&ldb_port->domain_list);
+			list_add(&ldb_port->func_list,
+				 &rsrcs->avail_ldb_ports[i]);
+			rsrcs->num_avail_ldb_ports[i]++;
+		}
+
+		list_for_each_entry_safe(ldb_port, tmp_ldb_port,
+				 &domain->avail_ldb_ports[i], domain_list) {
+			ldb_port->owned = false;
+
+			list_del(&ldb_port->domain_list);
+			list_add(&ldb_port->func_list,
+				 &rsrcs->avail_ldb_ports[i]);
+			rsrcs->num_avail_ldb_ports[i]++;
+		}
+	}
+
+	/* Move the domain's dir ports to the function's avail list */
+	list_for_each_entry_safe(dir_port, tmp_dir_port,
+				 &domain->used_dir_pq_pairs, domain_list) {
+		dir_port->owned = false;
+		dir_port->port_configured = false;
+		dir_port->init_tkn_cnt = 0;
+
+		list_del(&dir_port->domain_list);
+
+		list_add(&dir_port->func_list, &rsrcs->avail_dir_pq_pairs);
+		rsrcs->num_avail_dir_pq_pairs++;
+	}
+
+	list_for_each_entry_safe(dir_port, tmp_dir_port,
+				 &domain->avail_dir_pq_pairs, domain_list) {
+		dir_port->owned = false;
+
+		list_del(&dir_port->domain_list);
+
+		list_add(&dir_port->func_list, &rsrcs->avail_dir_pq_pairs);
+		rsrcs->num_avail_dir_pq_pairs++;
+	}
+
+	/* Return hist list entries to the function */
+	ret = dlb_bitmap_set_range(rsrcs->avail_hist_list_entries,
+				   domain->hist_list_entry_base,
+				   domain->total_hist_list_entries);
+	if (ret) {
+		dev_err(hw_to_dev(hw),
+			"[%s()] Internal error: domain hist list base doesn't match the function's bitmap.\n",
+			__func__);
+		return ret;
+	}
+
+	domain->total_hist_list_entries = 0;
+	domain->avail_hist_list_entries = 0;
+	domain->hist_list_entry_base = 0;
+	domain->hist_list_entry_offset = 0;
+
+	rsrcs->num_avail_qed_entries += domain->num_ldb_credits;
+	domain->num_ldb_credits = 0;
+
+	rsrcs->num_avail_dqed_entries += domain->num_dir_credits;
+	domain->num_dir_credits = 0;
+
+	rsrcs->num_avail_aqed_entries += domain->num_avail_aqed_entries;
+	rsrcs->num_avail_aqed_entries += domain->num_used_aqed_entries;
+	domain->num_avail_aqed_entries = 0;
+	domain->num_used_aqed_entries = 0;
+
+	domain->num_pending_removals = 0;
+	domain->num_pending_additions = 0;
+	domain->configured = false;
+	domain->started = false;
+
+	/*
+	 * Move the domain out of the used_domains list and back to the
+	 * function's avail_domains list.
+	 */
+	list_move(&domain->func_list, &rsrcs->avail_domains);
+	rsrcs->num_avail_domains++;
+
+	return 0;
+}
+
+static void dlb_log_reset_domain(struct dlb_hw *hw, u32 domain_id)
+{
+	dev_dbg(hw_to_dev(hw), "DLB reset domain:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n", domain_id);
+}
+
+/**
+ * dlb_reset_domain() - reset a scheduling domain
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ *
+ * This function resets and frees a DLB 2.0 scheduling domain and its associated
+ * resources.
+ *
+ * Pre-condition: the driver must ensure software has stopped sending QEs
+ * through this domain's producer ports before invoking this function, or
+ * undefined behavior will result.
+ *
+ * Return:
+ * Returns 0 upon success, -1 otherwise.
+ *
+ * EINVAL - Invalid domain ID, or the domain is not configured.
+ * EFAULT - Internal error. (Possibly caused if software is the pre-condition
+ *	    is not met.)
+ * ETIMEDOUT - Hardware component didn't reset in the expected time.
+ */
+int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id)
+{
+	struct dlb_hw_domain *domain;
+
+	dlb_log_reset_domain(hw, domain_id);
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain || !domain->configured)
+		return -EINVAL;
+
+	return dlb_domain_reset_software_state(hw, domain);
 }
 
 /**

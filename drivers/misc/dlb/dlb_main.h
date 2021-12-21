@@ -139,6 +139,12 @@ struct dlb_sn_group {
 	u32 id;
 };
 
+static inline void
+dlb_sn_group_free_slot(struct dlb_sn_group *group, int slot)
+{
+	group->slot_use_bitmap &= ~(BIT(slot));
+}
+
 /*
  * Scheduling domain level resource data structure.
  *
@@ -271,6 +277,7 @@ struct dlb {
 	enum dlb_device_type type;
 	int id;
 	dev_t dev_number;
+	u8 domain_reset_failed;
 };
 
 /*************************/
@@ -335,6 +342,34 @@ static inline void dlb_bitmap_free(struct dlb_bitmap *bitmap)
 	bitmap_free(bitmap->map);
 
 	kfree(bitmap);
+}
+
+/**
+ * dlb_bitmap_set_range() - set a range of bitmap entries
+ * @bitmap: pointer to dlb_bitmap structure.
+ * @bit: starting bit index.
+ * @len: length of the range.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise.
+ *
+ * Errors:
+ * EINVAL - bitmap is NULL or is uninitialized, or the range exceeds the bitmap
+ *	    length.
+ */
+static inline int dlb_bitmap_set_range(struct dlb_bitmap *bitmap,
+				       unsigned int bit,
+				       unsigned int len)
+{
+	if (!bitmap || !bitmap->map)
+		return -EINVAL;
+
+	if (bitmap->len <= bit)
+		return -EINVAL;
+
+	bitmap_set(bitmap->map, bit, len);
+
+	return 0;
 }
 
 /**
@@ -460,6 +495,7 @@ void dlb_resource_free(struct dlb_hw *hw);
 int dlb_hw_create_sched_domain(struct dlb_hw *hw,
 			       struct dlb_create_sched_domain_args *args,
 			       struct dlb_cmd_response *resp);
+int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
 void dlb_clr_pmcsr_disable(struct dlb_hw *hw);
 
 /* Prototypes for dlb_configfs.c */

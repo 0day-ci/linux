@@ -101,12 +101,20 @@ int dlb_init_domain(struct dlb *dlb, u32 domain_id)
 static int __dlb_free_domain(struct dlb_domain *domain)
 {
 	struct dlb *dlb = domain->dlb;
+	int ret;
+
+	ret = dlb_reset_domain(&dlb->hw, domain->id);
+	if (ret) {
+		dlb->domain_reset_failed = true;
+		dev_err(dlb->dev,
+			"Internal error: Domain reset failed. To recover, reset the device.\n");
+	}
 
 	dlb->sched_domains[domain->id] = NULL;
 
 	kfree(domain);
 
-	return 0;
+	return ret;
 }
 
 void dlb_free_domain(struct kref *kref)

@@ -20,13 +20,21 @@ static int dlb_configfs_create_sched_domain(struct dlb *dlb,
 
 	mutex_lock(&dlb->resource_mutex);
 
+	if (dlb->domain_reset_failed) {
+		response.status = DLB_ST_DOMAIN_RESET_FAILED;
+		ret = -EINVAL;
+		goto unlock;
+	}
+
 	ret = dlb_hw_create_sched_domain(&dlb->hw, arg, &response);
 	if (ret)
 		goto unlock;
 
 	ret = dlb_init_domain(dlb, response.id);
-	if (ret)
+	if (ret) {
+		dlb_reset_domain(&dlb->hw, response.id);
 		goto unlock;
+	}
 
 	domain = dlb->sched_domains[response.id];
 
