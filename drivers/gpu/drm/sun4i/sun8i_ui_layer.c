@@ -331,6 +331,12 @@ static void sun8i_ui_layer_atomic_update(struct drm_plane *plane,
 			      true, zpos, old_zpos);
 }
 
+static bool sun8i_ui_layer_format_mod_supported(struct drm_plane *plane,
+						u32 format, u64 modifier)
+{
+	return (modifier == DRM_FORMAT_MOD_LINEAR);
+}
+
 static const struct drm_plane_helper_funcs sun8i_ui_layer_helper_funcs = {
 	.atomic_check	= sun8i_ui_layer_atomic_check,
 	.atomic_disable	= sun8i_ui_layer_atomic_disable,
@@ -344,6 +350,7 @@ static const struct drm_plane_funcs sun8i_ui_layer_funcs = {
 	.disable_plane		= drm_atomic_helper_disable_plane,
 	.reset			= drm_atomic_helper_plane_reset,
 	.update_plane		= drm_atomic_helper_update_plane,
+	.format_mod_supported	= sun8i_ui_layer_format_mod_supported,
 };
 
 static const u32 sun8i_ui_layer_formats[] = {
