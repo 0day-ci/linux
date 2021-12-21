@@ -233,8 +233,20 @@ bool pci_bus_generic_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
 int pci_idt_bus_quirk(struct pci_bus *bus, int devfn, u32 *pl, int crs_timeout);
 
 int pci_setup_device(struct pci_dev *dev);
-int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
-		    struct resource *res, unsigned int reg);
+
+int __pci_bus_read_base(struct pci_bus *bus, unsigned int devfn,
+			enum pci_bar_type type,
+			struct resource *res, unsigned int reg,
+			bool mmio_always_on);
+static inline int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
+				  struct resource *res, unsigned int reg)
+{
+	res->name = pci_name(dev);
+
+	return __pci_bus_read_base(dev->bus, dev->devfn, type, res, reg,
+				   dev->mmio_always_on);
+}
+
 void pci_configure_ari(struct pci_dev *dev);
 void __pci_bus_size_bridges(struct pci_bus *bus,
 			struct list_head *realloc_head);

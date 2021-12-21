@@ -130,7 +130,7 @@ static u64 pci_size(u64 base, u64 maxbase, u64 mask)
 	return size;
 }
 
-static inline unsigned long decode_bar(struct pci_dev *dev, u32 bar)
+static inline unsigned long decode_bar(u32 bar)
 {
 	u32 mem_type;
 	unsigned long flags;
@@ -166,16 +166,21 @@ static inline unsigned long decode_bar(struct pci_dev *dev, u32 bar)
 #define PCI_COMMAND_DECODE_ENABLE	(PCI_COMMAND_MEMORY | PCI_COMMAND_IO)
 
 /**
- * __pci_read_base - Read a PCI BAR
- * @dev: the PCI device
+ * __pci_bus_read_base - Read a PCI BAR
+ * @bus: the PCI bus
+ * @devfn: the PCI device and function
  * @type: type of the BAR
  * @res: resource buffer to be filled in
  * @pos: BAR position in the config space
+ * @mmio_always_on: disallow turning off IO/MEM decoding during BAR sizing
  *
  * Returns 1 if the BAR is 64-bit, or 0 if 32-bit.
+ * In case of error resulting @res->flags is 0.
  */
-int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
-		    struct resource *res, unsigned int pos)
+int __pci_bus_read_base(struct pci_bus *bus, unsigned int devfn,
+			enum pci_bar_type type,
+			struct resource *res, unsigned int pos,
+			bool mmio_always_on)
 {
 	u32 l = 0, sz = 0, mask;
 	u64 l64, sz64, mask64;
@@ -185,20 +190,18 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	mask = type ? PCI_ROM_ADDRESS_MASK : ~0;
 
 	/* No printks while decoding is disabled! */
-	if (!dev->mmio_always_on) {
-		pci_read_config_word(dev, PCI_COMMAND, &orig_cmd);
+	if (!mmio_always_on) {
+		pci_bus_read_config_word(bus, devfn, PCI_COMMAND, &orig_cmd);
 		if (orig_cmd & PCI_COMMAND_DECODE_ENABLE) {
-			pci_write_config_word(dev, PCI_COMMAND,
+			pci_bus_write_config_word(bus, devfn, PCI_COMMAND,
 				orig_cmd & ~PCI_COMMAND_DECODE_ENABLE);
 		}
 	}
 
-	res->name = pci_name(dev);
-
-	pci_read_config_dword(dev, pos, &l);
-	pci_write_config_dword(dev, pos, l | mask);
-	pci_read_config_dword(dev, pos, &sz);
-	pci_write_config_dword(dev, pos, l);
+	pci_bus_read_config_dword(bus, devfn, pos, &l);
+	pci_bus_write_config_dword(bus, devfn, pos, l | mask);
+	pci_bus_read_config_dword(bus, devfn, pos, &sz);
+	pci_bus_write_config_dword(bus, devfn, pos, l);
 
 	/*
 	 * All bits set in sz means the device isn't working properly.
@@ -217,7 +220,7 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		l = 0;
 
 	if (type == pci_bar_unknown) {
-		res->flags = decode_bar(dev, l);
+		res->flags = decode_bar(l);
 		res->flags |= IORESOURCE_SIZEALIGN;
 		if (res->flags & IORESOURCE_IO) {
 			l64 = l & PCI_BASE_ADDRESS_IO_MASK;
@@ -237,26 +240,25 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	}
 
 	if (res->flags & IORESOURCE_MEM_64) {
-		pci_read_config_dword(dev, pos + 4, &l);
-		pci_write_config_dword(dev, pos + 4, ~0);
-		pci_read_config_dword(dev, pos + 4, &sz);
-		pci_write_config_dword(dev, pos + 4, l);
+		pci_bus_read_config_dword(bus, devfn, pos + 4, &l);
+		pci_bus_write_config_dword(bus, devfn, pos + 4, ~0);
+		pci_bus_read_config_dword(bus, devfn, pos + 4, &sz);
+		pci_bus_write_config_dword(bus, devfn, pos + 4, l);
 
 		l64 |= ((u64)l << 32);
 		sz64 |= ((u64)sz << 32);
 		mask64 |= ((u64)~0 << 32);
 	}
 
-	if (!dev->mmio_always_on && (orig_cmd & PCI_COMMAND_DECODE_ENABLE))
-		pci_write_config_word(dev, PCI_COMMAND, orig_cmd);
+	if (!mmio_always_on && (orig_cmd & PCI_COMMAND_DECODE_ENABLE))
+		pci_bus_write_config_word(bus, devfn, PCI_COMMAND, orig_cmd);
 
 	if (!sz64)
 		goto fail;
 
 	sz64 = pci_size(l64, sz64, mask64);
 	if (!sz64) {
-		pci_info(dev, FW_BUG "reg 0x%x: invalid BAR (can't size)\n",
-			 pos);
+		pci_bus_info(bus, devfn, FW_BUG "reg 0x%x: invalid BAR (can't size)\n", pos);
 		goto fail;
 	}
 
@@ -266,8 +268,9 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			res->flags |= IORESOURCE_UNSET | IORESOURCE_DISABLED;
 			res->start = 0;
 			res->end = 0;
-			pci_err(dev, "reg 0x%x: can't handle BAR larger than 4GB (size %#010llx)\n",
-				pos, (unsigned long long)sz64);
+			pci_bus_err(bus, devfn,
+				    "reg 0x%x: can't handle BAR larger than 4GB (size %#010llx)\n",
+				    pos, (unsigned long long)sz64);
 			goto out;
 		}
 
@@ -276,8 +279,9 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			res->flags |= IORESOURCE_UNSET;
 			res->start = 0;
 			res->end = sz64 - 1;
-			pci_info(dev, "reg 0x%x: can't handle BAR above 4GB (bus address %#010llx)\n",
-				 pos, (unsigned long long)l64);
+			pci_bus_info(bus, devfn,
+				     "reg 0x%x: can't handle BAR above 4GB (bus address %#010llx)\n",
+				     pos, (unsigned long long)l64);
 			goto out;
 		}
 	}
@@ -285,8 +289,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	region.start = l64;
 	region.end = l64 + sz64 - 1;
 
-	pcibios_bus_to_resource(dev->bus, res, &region);
-	pcibios_resource_to_bus(dev->bus, &inverted_region, res);
+	pcibios_bus_to_resource(bus, res, &region);
+	pcibios_resource_to_bus(bus, &inverted_region, res);
 
 	/*
 	 * If "A" is a BAR value (a bus address), "bus_to_resource(A)" is
@@ -303,18 +307,17 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		res->flags |= IORESOURCE_UNSET;
 		res->start = 0;
 		res->end = region.end - region.start;
-		pci_info(dev, "reg 0x%x: initial BAR value %#010llx invalid\n",
-			 pos, (unsigned long long)region.start);
+		pci_bus_info(bus, devfn, "reg 0x%x: initial BAR value %#010llx invalid\n",
+			     pos, (unsigned long long)region.start);
 	}
 
 	goto out;
-
 
 fail:
 	res->flags = 0;
 out:
 	if (res->flags)
-		pci_info(dev, "reg 0x%x: %pR\n", pos, res);
+		pci_bus_info(bus, devfn, "reg 0x%x: %pR\n", pos, res);
 
 	return (res->flags & IORESOURCE_MEM_64) ? 1 : 0;
 }
