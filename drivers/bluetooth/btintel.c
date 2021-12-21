@@ -2549,10 +2549,6 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 		if (INTEL_HW_VARIANT(ver_tlv.cnvi_bt) == 0x18)
 			set_bit(HCI_QUIRK_VALID_LE_STATES, &hdev->quirks);
 
-		/* Setup MSFT Extension support */
-		btintel_set_msft_opcode(hdev,
-					INTEL_HW_VARIANT(ver_tlv.cnvi_bt));
-
 		err = btintel_bootloader_setup_tlv(hdev, &ver_tlv);
 		break;
 	default:
@@ -2560,6 +2556,8 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 			   INTEL_HW_VARIANT(ver_tlv.cnvi_bt));
 		return -EINVAL;
 	}
+	/* Setup MSFT Extension support */
+	btintel_set_msft_opcode(hdev, INTEL_HW_VARIANT(ver_tlv.cnvi_bt));
 
 exit_error:
 	kfree_skb(skb);
