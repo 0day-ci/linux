@@ -11,6 +11,8 @@ struct dlb_device_configfs {
 	struct dlb *dlb;
 };
 
+extern struct dlb_device_configfs dlb_dev_configfs[16];
+
 struct dlb_cfs_domain {
 	struct config_group group;
 	struct config_group *dev_grp;
@@ -56,6 +58,8 @@ struct dlb_cfs_port {
 	struct config_group *domain_grp;
 	unsigned int status;
 	unsigned int port_id;
+	unsigned int pp_fd;
+	unsigned int cq_fd;
 	/* Input parameters */
 	unsigned int is_ldb;
 	unsigned int cq_depth;
@@ -117,5 +121,71 @@ int dlb_configfs_get_dlb_domain(struct config_group *domain_grp,
 		return -EINVAL;
 
 	return 0;
+}
+
+static inline struct config_item *to_item(struct list_head *entry)
+{
+	return container_of(entry, struct config_item, ci_entry);
+}
+
+/*
+ * Find configfs group for a port from a port_id.
+ *
+ */
+static inline
+struct dlb_cfs_port *dlb_configfs_get_port_from_id(struct dlb *dlb,
+					struct dlb_domain *dlb_domain,
+					int port_id)
+{
+	struct dlb_cfs_domain *dlb_cfs_domain = NULL;
+	struct dlb_cfs_port *dlb_cfs_port = NULL;
+	struct config_group *dev_grp;
+	struct list_head *entry;
+	int grp_found = 0;
+
+	dev_grp = &dlb_dev_configfs[dlb->id].dev_group;
+
+	list_for_each(entry, &dev_grp->cg_children) {
+		struct config_item *item = to_item(entry);
+
+		if (config_item_name(item))
+			dev_dbg(dlb->dev,
+				"%s: item = %s\n", __func__,
+				config_item_name(item));
+
+		dlb_cfs_domain = to_dlb_cfs_domain(item);
+
+		if (dlb_cfs_domain->domain_id == dlb_domain->id) {
+			grp_found = 1;
+			break;
+		}
+	}
+
+	if (!grp_found)
+		return NULL;
+
+	grp_found = 0;
+
+	list_for_each(entry, &dlb_cfs_domain->group.cg_children) {
+		struct config_item *item = to_item(entry);
+
+		if (strnstr(config_item_name(item), "port", 5)) {
+			dev_dbg(dlb->dev,
+				"%s: item = %s\n", __func__,
+				config_item_name(item));
+
+			dlb_cfs_port = to_dlb_cfs_port(item);
+
+			if (dlb_cfs_port->port_id == port_id) {
+				grp_found = 1;
+				break;
+			}
+		}
+	}
+
+	if (!grp_found)
+		return NULL;
+
+	return dlb_cfs_port;
 }
 #endif /* DLB_CONFIGFS_H */

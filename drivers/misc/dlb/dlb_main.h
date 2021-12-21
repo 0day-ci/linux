@@ -12,6 +12,7 @@
 #include <linux/pci.h>
 #include <linux/types.h>
 #include <linux/bitfield.h>
+#include <linux/file.h>
 
 #include <uapi/linux/dlb.h>
 #include "dlb_args.h"
@@ -318,6 +319,8 @@ struct dlb_hw {
 #define DLB_NUM_FUNCS_PER_DEVICE (1 + DLB_MAX_NUM_VDEVS)
 #define DLB_MAX_NUM_DEVICES	 (DLB_MAX_NUM_PFS * DLB_NUM_FUNCS_PER_DEVICE)
 
+extern struct mutex dlb_driver_mutex;
+
 enum dlb_device_type {
 	DLB_PF,
 };
@@ -332,6 +335,8 @@ int dlb_pf_wait_for_device_ready(struct dlb *dlb, struct pci_dev *pdev);
 void dlb_pf_init_hardware(struct dlb *dlb);
 
 extern const struct file_operations dlb_domain_fops;
+extern const struct file_operations dlb_pp_fops;
+extern const struct file_operations dlb_cq_fops;
 
 struct dlb_port {
 	void *cq_base;
@@ -357,12 +362,18 @@ struct dlb {
 	struct dlb_port ldb_port[DLB_MAX_NUM_LDB_PORTS];
 	struct dlb_port dir_port[DLB_MAX_NUM_DIR_PORTS];
 	/*
+	 * Anonymous inode used to share an address_space for all domain
+	 * device file mappings.
+	 */
+	struct inode *inode;
+	/*
 	 * The resource mutex serializes access to driver data structures and
 	 * hardware registers.
 	 */
 	struct mutex resource_mutex;
 	enum dlb_device_type type;
 	int id;
+	u32 inode_cnt;
 	dev_t dev_number;
 	u8 domain_reset_failed;
 };
@@ -576,6 +587,13 @@ static inline struct device *hw_to_dev(struct dlb_hw *hw)
 	return dlb->dev;
 }
 
+/* Prototypes for dlb_file.c */
+void dlb_release_fs(struct dlb *dlb);
+struct file *dlb_getfile(struct dlb *dlb,
+			 int flags,
+			 const struct file_operations *fops,
+			 const char *name);
+
 /* Prototypes for dlb_resource.c */
 int dlb_resource_init(struct dlb_hw *hw);
 void dlb_resource_free(struct dlb_hw *hw);
@@ -597,6 +615,8 @@ int dlb_hw_create_ldb_port(struct dlb_hw *hw, u32 domain_id,
 			   uintptr_t cq_dma_base,
 			   struct dlb_cmd_response *resp);
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
+int dlb_ldb_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
+int dlb_dir_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
 void dlb_clr_pmcsr_disable(struct dlb_hw *hw);
 int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
 			       struct dlb_get_ldb_queue_depth_args *args,
@@ -611,5 +631,9 @@ void dlb_hw_enable_sparse_dir_cq_mode(struct dlb_hw *hw);
 int dlb_configfs_create_device(struct dlb *dlb);
 int configfs_dlb_init(void);
 void configfs_dlb_exit(void);
+int dlb_configfs_reset_port_fd(struct dlb *dlb,
+			       struct dlb_domain *dlb_domain,
+			       int port_id);
+
 
 #endif /* __DLB_MAIN_H */

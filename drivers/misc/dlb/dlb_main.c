@@ -16,6 +16,9 @@
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Intel(R) Dynamic Load Balancer (DLB) Driver");
 
+/* The driver mutex protects data structures that used by multiple devices. */
+DEFINE_MUTEX(dlb_driver_mutex);
+
 static struct class *dlb_class;
 static struct cdev dlb_cdev;
 static dev_t dlb_devt;
@@ -224,6 +227,123 @@ static int dlb_domain_close(struct inode *i, struct file *f)
 const struct file_operations dlb_domain_fops = {
 	.owner   = THIS_MODULE,
 	.release = dlb_domain_close,
+};
+
+static unsigned long dlb_get_pp_addr(struct dlb *dlb, struct dlb_port *port)
+{
+	unsigned long pgoff = dlb->hw.func_phys_addr;
+
+	if (port->is_ldb)
+		pgoff += DLB_LDB_PP_OFFSET(port->id);
+	else
+		pgoff += DLB_DIR_PP_OFFSET(port->id);
+
+	return pgoff;
+}
+
+static int dlb_pp_mmap(struct file *f, struct vm_area_struct *vma)
+{
+	struct dlb_port *port = f->private_data;
+	struct dlb_domain *domain = port->domain;
+	struct dlb *dlb = domain->dlb;
+	unsigned long pgoff;
+	pgprot_t pgprot;
+	int ret;
+
+	mutex_lock(&dlb->resource_mutex);
+
+	if ((vma->vm_end - vma->vm_start) != DLB_PP_SIZE) {
+		ret = -EINVAL;
+		goto end;
+	}
+
+	pgprot = pgprot_noncached(vma->vm_page_prot);
+
+	pgoff = dlb_get_pp_addr(dlb, port);
+	ret = io_remap_pfn_range(vma,
+				 vma->vm_start,
+				 pgoff >> PAGE_SHIFT,
+				 vma->vm_end - vma->vm_start,
+				 pgprot);
+
+end:
+	mutex_unlock(&dlb->resource_mutex);
+
+	return ret;
+}
+
+static int dlb_cq_mmap(struct file *f, struct vm_area_struct *vma)
+{
+	struct dlb_port *port = f->private_data;
+	struct dlb_domain *domain = port->domain;
+	struct dlb *dlb = domain->dlb;
+	struct page *page;
+	int ret;
+
+	mutex_lock(&dlb->resource_mutex);
+
+	if ((vma->vm_end - vma->vm_start) != DLB_CQ_SIZE) {
+		ret = -EINVAL;
+		goto end;
+	}
+
+	page = virt_to_page(port->cq_base);
+
+	ret = remap_pfn_range(vma,
+			      vma->vm_start,
+			      page_to_pfn(page),
+			      vma->vm_end - vma->vm_start,
+			      vma->vm_page_prot);
+end:
+	mutex_unlock(&dlb->resource_mutex);
+
+	return ret;
+}
+
+static void dlb_port_unmap(struct dlb *dlb, struct dlb_port *port)
+{
+	if (!port->cq_base) {
+		unmap_mapping_range(dlb->inode->i_mapping,
+				    (unsigned long)port->cq_base,
+				    DLB_CQ_SIZE, 1);
+	} else {
+		unmap_mapping_range(dlb->inode->i_mapping,
+				    dlb_get_pp_addr(dlb, port),
+				    DLB_PP_SIZE, 1);
+	}
+}
+
+static int dlb_port_close(struct inode *i, struct file *f)
+{
+	struct dlb_port *port = f->private_data;
+	struct dlb_domain *domain = port->domain;
+	struct dlb *dlb = domain->dlb;
+
+	mutex_lock(&dlb->resource_mutex);
+
+	kref_put(&domain->refcnt, dlb_free_domain);
+
+	dlb_port_unmap(dlb, port);
+	dlb_configfs_reset_port_fd(dlb, domain, port->id);
+
+	/* Decrement the refcnt of the pseudo-FS used to allocate the inode */
+	dlb_release_fs(dlb);
+
+	mutex_unlock(&dlb->resource_mutex);
+
+	return 0;
+}
+
+const struct file_operations dlb_pp_fops = {
+	.owner   = THIS_MODULE,
+	.release = dlb_port_close,
+	.mmap    = dlb_pp_mmap,
+};
+
+const struct file_operations dlb_cq_fops = {
+	.owner   = THIS_MODULE,
+	.release = dlb_port_close,
+	.mmap    = dlb_cq_mmap,
 };
 
 /**********************************/

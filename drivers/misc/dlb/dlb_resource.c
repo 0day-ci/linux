@@ -210,6 +210,30 @@ static struct dlb_hw_domain *dlb_get_domain_from_id(struct dlb_hw *hw, u32 id)
 	return &hw->domains[id];
 }
 
+static struct dlb_ldb_port *
+dlb_get_domain_ldb_port(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
+{
+	struct dlb_ldb_port *port;
+	int i;
+
+	if (id >= DLB_MAX_NUM_LDB_PORTS)
+		return NULL;
+
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++) {
+		list_for_each_entry(port, &domain->used_ldb_ports[i], domain_list) {
+			if (!vdev_req && port->id == id)
+				return port;
+		}
+
+		list_for_each_entry(port, &domain->avail_ldb_ports[i], domain_list) {
+			if (!vdev_req && port->id == id)
+				return port;
+		}
+	}
+
+	return NULL;
+}
+
 static struct dlb_dir_pq_pair *
 dlb_get_domain_used_dir_pq(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
 {
@@ -219,6 +243,27 @@ dlb_get_domain_used_dir_pq(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
 		return NULL;
 
 	list_for_each_entry(port, &domain->used_dir_pq_pairs, domain_list) {
+		if (!vdev_req && port->id == id)
+			return port;
+	}
+
+	return NULL;
+}
+
+static struct dlb_dir_pq_pair *
+dlb_get_domain_dir_pq(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
+{
+	struct dlb_dir_pq_pair *port;
+
+	if (id >= DLB_MAX_NUM_DIR_PORTS)
+		return NULL;
+
+	list_for_each_entry(port, &domain->used_dir_pq_pairs, domain_list) {
+		if (!vdev_req && port->id == id)
+			return port;
+	}
+
+	list_for_each_entry(port, &domain->avail_dir_pq_pairs, domain_list) {
 		if (!vdev_req && port->id == id)
 			return port;
 	}
@@ -3145,6 +3190,70 @@ int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id)
 	dlb_domain_reset_registers(hw, domain);
 
 	return dlb_domain_reset_software_state(hw, domain);
+}
+
+/**
+ * dlb_ldb_port_owned_by_domain() - query whether a port is owned by a domain
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @port_id: port ID.
+ *
+ * This function returns whether a load-balanced port is owned by a specified
+ * domain.
+ *
+ * Return:
+ * Returns 0 if false, 1 if true, <0 otherwise.
+ *
+ * EINVAL - Invalid domain or port ID, or the domain is not configured.
+ */
+int dlb_ldb_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_port *port;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain || !domain->configured)
+		return -EINVAL;
+
+	port = dlb_get_domain_ldb_port(port_id, false, domain);
+
+	if (!port)
+		return -EINVAL;
+
+	return port->domain_id == domain->id;
+}
+
+/**
+ * dlb_dir_port_owned_by_domain() - query whether a port is owned by a domain
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @port_id: port ID.
+ *
+ * This function returns whether a directed port is owned by a specified
+ * domain.
+ *
+ * Return:
+ * Returns 0 if false, 1 if true, <0 otherwise.
+ *
+ * EINVAL - Invalid domain or port ID, or the domain is not configured.
+ */
+int dlb_dir_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id)
+{
+	struct dlb_dir_pq_pair *port;
+	struct dlb_hw_domain *domain;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain || !domain->configured)
+		return -EINVAL;
+
+	port = dlb_get_domain_dir_pq(port_id, false, domain);
+
+	if (!port)
+		return -EINVAL;
+
+	return port->domain_id == domain->id;
 }
 
 /**

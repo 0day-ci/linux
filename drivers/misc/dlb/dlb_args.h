@@ -189,6 +189,8 @@ struct dlb_get_dir_queue_depth_args {
 struct dlb_create_ldb_port_args {
 	/* Output parameters */
 	struct dlb_cmd_response response;
+	__u32 pp_fd;
+	__u32 cq_fd;
 	/* Input parameters */
 	__u16 cq_depth;
 	__u16 cq_depth_threshold;
@@ -216,12 +218,41 @@ struct dlb_create_ldb_port_args {
 struct dlb_create_dir_port_args {
 	/* Output parameters */
 	struct dlb_cmd_response response;
+	__u32 pp_fd;
+	__u32 cq_fd;
 	/* Input parameters */
 	__u16 cq_depth;
 	__u16 cq_depth_threshold;
 	__s32 queue_id;
 };
 
+/*
+ * dlb_get_port_fd_args: Used to get file descriptor to mmap a producer port
+ *	(PP) or a consumer queue (CQ)
+ *
+ *	The port must have been previously created in the device's configfs.
+ *	The fd is used to mmap the PP/CQ region.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ * @response.id: fd.
+ *
+ * Input parameters:
+ * @port_id: port ID.
+ */
+struct dlb_get_port_fd_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	/* Input parameters */
+	__u32 port_id;
+};
+
+/*
+ * Mapping sizes for memory mapping the consumer queue (CQ) memory space, and
+ * producer port (PP) MMIO space.
+ */
 #define DLB_CQ_SIZE 65536
+#define DLB_PP_SIZE 4096
 
 #endif /* __DLB_ARGS_H */

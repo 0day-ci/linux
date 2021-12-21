@@ -45,6 +45,90 @@ DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_dir_queue)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_ldb_queue_depth)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_dir_queue_depth)
 
+static int dlb_create_port_fd(struct dlb *dlb,
+			      const char *prefix,
+			      u32 id,
+			      const struct file_operations *fops,
+			      int *fd,
+			      struct file **f)
+{
+	char *name;
+	int ret;
+
+	ret = get_unused_fd_flags(O_RDWR);
+	if (ret < 0)
+		return ret;
+
+	*fd = ret;
+
+	name = kasprintf(GFP_KERNEL, "%s:%d", prefix, id);
+	if (!name) {
+		put_unused_fd(*fd);
+		return -ENOMEM;
+	}
+
+	*f = dlb_getfile(dlb, O_RDWR | O_CLOEXEC, fops, name);
+
+	kfree(name);
+
+	if (IS_ERR(*f)) {
+		put_unused_fd(*fd);
+		return PTR_ERR(*f);
+	}
+
+	return 0;
+}
+
+static int dlb_domain_get_port_fd(struct dlb *dlb,
+				  struct dlb_domain *domain,
+				  u32 port_id,
+				  int *fd,
+				  const char *name,
+				  const struct file_operations *fops,
+				  bool is_ldb)
+{
+	struct dlb_port *port;
+	struct file *file;
+	int ret;
+
+	if (is_ldb && dlb_ldb_port_owned_by_domain(&dlb->hw, domain->id,
+						   port_id) != 1) {
+		ret = -EINVAL;
+		goto end;
+	}
+
+	if (!is_ldb && dlb_dir_port_owned_by_domain(&dlb->hw, domain->id,
+						    port_id) != 1) {
+		ret = -EINVAL;
+		goto end;
+	}
+
+	port = (is_ldb) ? &dlb->ldb_port[port_id] : &dlb->dir_port[port_id];
+
+	if (!port->valid) {
+		ret = -EINVAL;
+		goto end;
+	}
+
+	ret = dlb_create_port_fd(dlb, name, port_id, fops, fd, &file);
+	if (ret < 0)
+		goto end;
+
+	file->private_data = port;
+end:
+	/*
+	 * Save fd_install() until after the last point of failure. The domain
+	 * refcnt is decremented in the close callback.
+	 */
+	if (ret == 0) {
+		kref_get(&domain->refcnt);
+
+		fd_install(*fd, file);
+	}
+
+	return ret;
+}
+
 static int dlb_domain_configfs_create_ldb_port(struct dlb *dlb,
 					       struct dlb_domain *domain,
 					       void *karg)
@@ -132,6 +216,7 @@ static int dlb_domain_configfs_create_dir_port(struct dlb *dlb,
 	dlb->dir_port[response.id].cq_base = cq_base;
 	dlb->dir_port[response.id].cq_dma_base = cq_dma_base;
 	dlb->dir_port[response.id].valid = true;
+
 unlock:
 	if (ret && cq_dma_base)
 		dma_free_coherent(&dlb->pdev->dev,
@@ -198,6 +283,28 @@ unlock:
 	memcpy(karg, &response, sizeof(response));
 
 	return ret;
+}
+
+/*
+ * Reset the file descriptors for the producer port and consumer queue. Used
+ * a port is closed.
+ *
+ */
+int dlb_configfs_reset_port_fd(struct dlb *dlb,
+			       struct dlb_domain *dlb_domain,
+			       int port_id)
+{
+	struct dlb_cfs_port *dlb_cfs_port;
+
+	dlb_cfs_port = dlb_configfs_get_port_from_id(dlb, dlb_domain, port_id);
+
+	if (!dlb_cfs_port)
+		return -EINVAL;
+
+	dlb_cfs_port->pp_fd = 0xffffffff;
+	dlb_cfs_port->cq_fd = 0xffffffff;
+
+	return 0;
 }
 
 /*
@@ -457,6 +564,52 @@ static ssize_t dlb_cfs_port_##name##_show(				\
 	return sprintf(page, "%llx\n", to_dlb_cfs_port(item)->name);	\
 }									\
 
+#define DLB_CONFIGFS_PORT_SHOW_FD(name)					\
+static ssize_t dlb_cfs_port_##name##_show(				\
+	struct config_item *item,					\
+	char *page)							\
+{									\
+	struct dlb_cfs_port *dlb_cfs_port = to_dlb_cfs_port(item);	\
+	char filename[16], prefix[16];					\
+	struct dlb_domain *domain;					\
+	struct dlb *dlb = NULL;						\
+	int port_id, is_ldb;						\
+	int fd, ret;							\
+									\
+	if (to_dlb_cfs_port(item)->name != 0xffffffff)			\
+		goto end;						\
+									\
+	ret = dlb_configfs_get_dlb_domain(dlb_cfs_port->domain_grp,	\
+					    &dlb, &domain);		\
+	if (ret)							\
+		return ret;						\
+									\
+	port_id = dlb_cfs_port->port_id;				\
+	is_ldb = dlb_cfs_port->is_ldb;					\
+									\
+	if (is_ldb)							\
+		sprintf(filename, "dlb_ldb");				\
+	else								\
+		sprintf(filename, "dlb_dir");				\
+									\
+	if (!strcmp(#name, "pp_fd")) {					\
+		sprintf(prefix, "%s_pp:", filename);			\
+		ret = dlb_domain_get_port_fd(dlb, domain, port_id,	\
+				&fd, prefix, &dlb_pp_fops, is_ldb);	\
+		dlb_cfs_port->pp_fd = fd;				\
+	} else {							\
+		sprintf(prefix, "%s_cq:", filename);			\
+		ret = dlb_domain_get_port_fd(dlb, domain, port_id,	\
+				&fd, prefix, &dlb_cq_fops, is_ldb);	\
+		dlb_cfs_port->cq_fd = fd;				\
+	}								\
+									\
+	if (ret)							\
+		return ret;						\
+end:									\
+	return sprintf(page, "%u\n", to_dlb_cfs_port(item)->name);	\
+}									\
+
 #define DLB_CONFIGFS_PORT_STORE(name)					\
 static ssize_t dlb_cfs_port_##name##_store(				\
 	struct config_item *item,					\
@@ -489,6 +642,8 @@ static ssize_t dlb_cfs_port_##name##_store(				\
 	return count;							\
 }									\
 
+DLB_CONFIGFS_PORT_SHOW_FD(pp_fd)
+DLB_CONFIGFS_PORT_SHOW_FD(cq_fd)
 DLB_CONFIGFS_PORT_SHOW(status)
 DLB_CONFIGFS_PORT_SHOW(port_id)
 DLB_CONFIGFS_PORT_SHOW(is_ldb)
@@ -556,6 +711,9 @@ static ssize_t dlb_cfs_port_create_store(struct config_item *item,
 		dlb_cfs_port->port_id = args.response.id;
 	}
 
+	dlb_cfs_port->pp_fd = 0xffffffff;
+	dlb_cfs_port->cq_fd = 0xffffffff;
+
 	if (ret) {
 		dev_err(dlb->dev,
 			"creat port %s failed: ret=%d\n",
@@ -566,6 +724,8 @@ static ssize_t dlb_cfs_port_create_store(struct config_item *item,
 	return count;
 }
 
+CONFIGFS_ATTR_RO(dlb_cfs_port_, pp_fd);
+CONFIGFS_ATTR_RO(dlb_cfs_port_, cq_fd);
 CONFIGFS_ATTR_RO(dlb_cfs_port_, status);
 CONFIGFS_ATTR_RO(dlb_cfs_port_, port_id);
 CONFIGFS_ATTR(dlb_cfs_port_, is_ldb);
@@ -576,6 +736,8 @@ CONFIGFS_ATTR(dlb_cfs_port_, create);
 CONFIGFS_ATTR(dlb_cfs_port_, queue_id);
 
 static struct configfs_attribute *dlb_cfs_port_attrs[] = {
+	&dlb_cfs_port_attr_pp_fd,
+	&dlb_cfs_port_attr_cq_fd,
 	&dlb_cfs_port_attr_status,
 	&dlb_cfs_port_attr_port_id,
 	&dlb_cfs_port_attr_is_ldb,
