@@ -32,6 +32,12 @@ properties:
       considered 'near' to the device (an object is near to the
       sensor).
 
+  label:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: >
+      Optional descriptive label that allows to uniquely identify a device
+      within the system.
+
 additionalProperties: true
 
 ...
