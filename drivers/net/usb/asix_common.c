@@ -83,7 +83,7 @@ static int asix_check_host_enable(struct usbnet *dev, int in_pm)
 			break;
 	}
 
-	return ret;
+	return i >= 30? -ETIMEDOUT: ret;
 }
 
 static void reset_asix_rx_fixup_info(struct asix_rx_fixup_info *rx)
