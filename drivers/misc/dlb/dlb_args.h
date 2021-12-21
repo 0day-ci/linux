@@ -266,6 +266,69 @@ struct dlb_start_domain_args {
 };
 
 /*
+ * dlb_map_qid_args: Used to map a load-balanced queue to a load-balanced port.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ *
+ * Input parameters:
+ * @port_id: Load-balanced port ID.
+ * @qid: Load-balanced queue ID.
+ * @priority: Queue->port service priority.
+ */
+struct dlb_map_qid_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	/* Input parameters */
+	__u32 port_id;
+	__u32 qid;
+	__u32 priority;
+};
+
+/*
+ * dlb_unmap_qid_args: Used to nnmap a load-balanced queue to a load-balanced
+ *	port.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ *
+ * Input parameters:
+ * @port_id: Load-balanced port ID.
+ * @qid: Load-balanced queue ID.
+ */
+struct dlb_unmap_qid_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	/* Input parameters */
+	__u32 port_id;
+	__u32 qid;
+};
+
+/*
+ * dlb_pending_port_unmaps_args: Used to get number of queue unmap operations in
+ *	progress for a load-balanced port.
+ *
+ *	Note: This is a snapshot; the number of unmap operations in progress
+ *	is subject to change at any time.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ * @response.id: number of unmaps in progress.
+ *
+ * Input parameters:
+ * @port_id: Load-balanced port ID.
+ */
+struct dlb_pending_port_unmaps_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	/* Input parameters */
+	__u32 port_id;
+};
+
+/*
  * Mapping sizes for memory mapping the consumer queue (CQ) memory space, and
  * producer port (PP) MMIO space.
  */

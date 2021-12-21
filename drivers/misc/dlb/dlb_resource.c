@@ -211,6 +211,30 @@ static struct dlb_hw_domain *dlb_get_domain_from_id(struct dlb_hw *hw, u32 id)
 }
 
 static struct dlb_ldb_port *
+dlb_get_domain_used_ldb_port(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
+{
+	struct dlb_ldb_port *port;
+	int i;
+
+	if (id >= DLB_MAX_NUM_LDB_PORTS)
+		return NULL;
+
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++) {
+		list_for_each_entry(port, &domain->used_ldb_ports[i], domain_list) {
+			if (!vdev_req && port->id == id)
+				return port;
+		}
+
+		list_for_each_entry(port, &domain->avail_ldb_ports[i], domain_list) {
+			if (!vdev_req && port->id == id)
+				return port;
+		}
+	}
+
+	return NULL;
+}
+
+static struct dlb_ldb_port *
 dlb_get_domain_ldb_port(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
 {
 	struct dlb_ldb_port *port;
@@ -1114,6 +1138,122 @@ static int dlb_verify_start_domain_args(struct dlb_hw *hw, u32 domain_id,
 	return 0;
 }
 
+static int dlb_verify_map_qid_args(struct dlb_hw *hw, u32 domain_id,
+				   struct dlb_map_qid_args *args,
+				   struct dlb_cmd_response *resp,
+				   struct dlb_hw_domain **out_domain,
+				   struct dlb_ldb_port **out_port,
+				   struct dlb_ldb_queue **out_queue)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+	struct dlb_ldb_port *port;
+	int id;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	id = args->port_id;
+
+	port = dlb_get_domain_used_ldb_port(id, false, domain);
+
+	if (!port || !port->configured) {
+		resp->status = DLB_ST_INVALID_PORT_ID;
+		return -EINVAL;
+	}
+
+	if (args->priority >= DLB_QID_PRIORITIES) {
+		resp->status = DLB_ST_INVALID_PRIORITY;
+		return -EINVAL;
+	}
+
+	queue = dlb_get_domain_ldb_queue(args->qid, false, domain);
+
+	if (!queue || !queue->configured) {
+		resp->status = DLB_ST_INVALID_QID;
+		return -EINVAL;
+	}
+
+	if (queue->domain_id != domain->id) {
+		resp->status = DLB_ST_INVALID_QID;
+		return -EINVAL;
+	}
+
+	if (port->domain_id != domain->id) {
+		resp->status = DLB_ST_INVALID_PORT_ID;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+	*out_queue = queue;
+	*out_port = port;
+
+	return 0;
+}
+
+static int dlb_verify_unmap_qid_args(struct dlb_hw *hw, u32 domain_id,
+				     struct dlb_unmap_qid_args *args,
+				     struct dlb_cmd_response *resp,
+				     struct dlb_hw_domain **out_domain,
+				     struct dlb_ldb_port **out_port,
+				     struct dlb_ldb_queue **out_queue)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+	struct dlb_ldb_port *port;
+	int id;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	id = args->port_id;
+
+	port = dlb_get_domain_used_ldb_port(id, false, domain);
+
+	if (!port || !port->configured) {
+		resp->status = DLB_ST_INVALID_PORT_ID;
+		return -EINVAL;
+	}
+
+	if (port->domain_id != domain->id) {
+		resp->status = DLB_ST_INVALID_PORT_ID;
+		return -EINVAL;
+	}
+
+	queue = dlb_get_domain_ldb_queue(args->qid, false, domain);
+
+	if (!queue || !queue->configured) {
+		dev_err(hw_to_dev(hw), "[%s()] Can't unmap unconfigured queue %d\n",
+			__func__, args->qid);
+		resp->status = DLB_ST_INVALID_QID;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+	*out_port = port;
+	*out_queue = queue;
+
+	return 0;
+}
+
 static void dlb_configure_domain_credits(struct dlb_hw *hw,
 					 struct dlb_hw_domain *domain)
 {
@@ -1957,6 +2097,145 @@ int dlb_hw_create_dir_port(struct dlb_hw *hw, u32 domain_id,
 	return 0;
 }
 
+static void dlb_log_map_qid(struct dlb_hw *hw, u32 domain_id,
+			    struct dlb_map_qid_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB map QID arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n",
+		domain_id);
+	dev_dbg(hw_to_dev(hw), "\tPort ID:   %d\n",
+		args->port_id);
+	dev_dbg(hw_to_dev(hw), "\tQueue ID:  %d\n",
+		args->qid);
+	dev_dbg(hw_to_dev(hw), "\tPriority:  %d\n",
+		args->priority);
+}
+
+/**
+ * dlb_hw_map_qid() - map a load-balanced queue to a load-balanced port
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: map QID arguments.
+ * @resp: response structure.
+ *
+ * This function configures the DLB to schedule QEs from the specified queue
+ * to the specified port. Each load-balanced port can be mapped to up to 8
+ * queues; each load-balanced queue can potentially map to all the
+ * load-balanced ports.
+ *
+ * A successful return does not necessarily mean the mapping was configured. If
+ * this function is unable to immediately map the queue to the port, it will
+ * add the requested operation to a per-port list of pending map/unmap
+ * operations, and (if it's not already running) launch a kernel thread that
+ * periodically attempts to process all pending operations. In a sense, this is
+ * an asynchronous function.
+ *
+ * This asynchronicity creates two views of the state of hardware: the actual
+ * hardware state and the requested state (as if every request completed
+ * immediately). If there are any pending map/unmap operations, the requested
+ * state will differ from the actual state. All validation is performed with
+ * respect to the pending state; for instance, if there are 8 pending map
+ * operations for port X, a request for a 9th will fail because a load-balanced
+ * port can only map up to 8 queues.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, invalid port or queue ID, or
+ *	    the domain is not configured.
+ * EFAULT - Internal error (resp->status not set).
+ */
+int dlb_hw_map_qid(struct dlb_hw *hw, u32 domain_id,
+		   struct dlb_map_qid_args *args,
+		   struct dlb_cmd_response *resp)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+	struct dlb_ldb_port *port;
+	int ret;
+
+	dlb_log_map_qid(hw, domain_id, args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_map_qid_args(hw, domain_id, args, resp,
+				      &domain, &port, &queue);
+	if (ret)
+		return ret;
+
+	resp->status = 0;
+
+	return 0;
+}
+
+static void dlb_log_unmap_qid(struct dlb_hw *hw, u32 domain_id,
+			      struct dlb_unmap_qid_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB unmap QID arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n",
+		domain_id);
+	dev_dbg(hw_to_dev(hw), "\tPort ID:   %d\n",
+		args->port_id);
+	dev_dbg(hw_to_dev(hw), "\tQueue ID:  %d\n",
+		args->qid);
+	if (args->qid < DLB_MAX_NUM_LDB_QUEUES)
+		dev_dbg(hw_to_dev(hw), "\tQueue's num mappings:  %d\n",
+			hw->rsrcs.ldb_queues[args->qid].num_mappings);
+}
+
+/**
+ * dlb_hw_unmap_qid() - Unmap a load-balanced queue from a load-balanced port
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: unmap QID arguments.
+ * @resp: response structure.
+ *
+ * This function configures the DLB to stop scheduling QEs from the specified
+ * queue to the specified port.
+ *
+ * A successful return does not necessarily mean the mapping was removed. If
+ * this function is unable to immediately unmap the queue from the port, it
+ * will add the requested operation to a per-port list of pending map/unmap
+ * operations, and (if it's not already running) launch a kernel thread that
+ * periodically attempts to process all pending operations. See
+ * dlb_hw_map_qid() for more details.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, invalid port or queue ID, or
+ *	    the domain is not configured.
+ * EFAULT - Internal error (resp->status not set).
+ */
+int dlb_hw_unmap_qid(struct dlb_hw *hw, u32 domain_id,
+		     struct dlb_unmap_qid_args *args,
+		     struct dlb_cmd_response *resp)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+	struct dlb_ldb_port *port;
+	int ret;
+
+	dlb_log_unmap_qid(hw, domain_id, args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_unmap_qid_args(hw, domain_id, args, resp,
+					&domain, &port, &queue);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static u32 dlb_ldb_cq_inflight_count(struct dlb_hw *hw,
 				     struct dlb_ldb_port *port)
 {
@@ -2293,6 +2572,57 @@ int dlb_hw_get_dir_queue_depth(struct dlb_hw *hw, u32 domain_id,
 	}
 
 	resp->id = dlb_dir_queue_depth(hw, queue);
+
+	return 0;
+}
+
+static void
+dlb_log_pending_port_unmaps_args(struct dlb_hw *hw,
+				 struct dlb_pending_port_unmaps_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB unmaps in progress arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tPort ID: %d\n", args->port_id);
+}
+
+/**
+ * dlb_hw_pending_port_unmaps() - returns the number of unmap operations in
+ *	progress.
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: number of unmaps in progress args
+ * @resp: response structure.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the number of unmaps in progress.
+ *
+ * Errors:
+ * EINVAL - Invalid port ID.
+ */
+int dlb_hw_pending_port_unmaps(struct dlb_hw *hw, u32 domain_id,
+			       struct dlb_pending_port_unmaps_args *args,
+			       struct dlb_cmd_response *resp)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_port *port;
+
+	dlb_log_pending_port_unmaps_args(hw, args);
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	port = dlb_get_domain_used_ldb_port(args->port_id, false, domain);
+	if (!port || !port->configured) {
+		resp->status = DLB_ST_INVALID_PORT_ID;
+		return -EINVAL;
+	}
+
+	resp->id = port->num_pending_removals;
 
 	return 0;
 }

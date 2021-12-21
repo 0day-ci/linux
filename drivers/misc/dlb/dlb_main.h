@@ -616,6 +616,12 @@ int dlb_hw_create_ldb_port(struct dlb_hw *hw, u32 domain_id,
 			   struct dlb_cmd_response *resp);
 int dlb_hw_start_domain(struct dlb_hw *hw, u32 domain_id, void *unused,
 			struct dlb_cmd_response *resp);
+int dlb_hw_map_qid(struct dlb_hw *hw, u32 domain_id,
+		   struct dlb_map_qid_args *args,
+		   struct dlb_cmd_response *resp);
+int dlb_hw_unmap_qid(struct dlb_hw *hw, u32 domain_id,
+		     struct dlb_unmap_qid_args *args,
+		     struct dlb_cmd_response *resp);
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
 int dlb_ldb_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
 int dlb_dir_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
@@ -625,6 +631,9 @@ int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
 			       struct dlb_cmd_response *resp);
 int dlb_hw_get_dir_queue_depth(struct dlb_hw *hw, u32 domain_id,
 			       struct dlb_get_dir_queue_depth_args *args,
+			       struct dlb_cmd_response *resp);
+int dlb_hw_pending_port_unmaps(struct dlb_hw *hw, u32 domain_id,
+			       struct dlb_pending_port_unmaps_args *args,
 			       struct dlb_cmd_response *resp);
 void dlb_hw_enable_sparse_ldb_cq_mode(struct dlb_hw *hw);
 void dlb_hw_enable_sparse_dir_cq_mode(struct dlb_hw *hw);

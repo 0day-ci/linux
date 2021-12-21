@@ -45,6 +45,8 @@ DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_dir_queue)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_ldb_queue_depth)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_dir_queue_depth)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(start_domain)
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(map_qid)
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(unmap_qid)
 
 static int dlb_create_port_fd(struct dlb *dlb,
 			      const char *prefix,
@@ -611,6 +613,15 @@ end:									\
 	return sprintf(page, "%u\n", to_dlb_cfs_port(item)->name);	\
 }									\
 
+#define DLB_CONFIGFS_PORT_LINK_SHOW(name, port)				\
+static ssize_t dlb_cfs_port_##name##_##port##_show(			\
+	struct config_item *item,					\
+	char *page)							\
+{									\
+	return sprintf(page, "Ox%08x\n",				\
+	       to_dlb_cfs_port(item)->name[port]);			\
+}
+
 #define DLB_CONFIGFS_PORT_STORE(name)					\
 static ssize_t dlb_cfs_port_##name##_store(				\
 	struct config_item *item,					\
@@ -643,6 +654,55 @@ static ssize_t dlb_cfs_port_##name##_store(				\
 	return count;							\
 }									\
 
+#define DLB_CONFIGFS_PORT_LINK_STORE(name, port)			\
+static ssize_t dlb_cfs_port_##name##_##port##_store(			\
+	struct config_item *item,					\
+	const char *page,						\
+	size_t count)							\
+{									\
+	struct dlb_cfs_port *dlb_cfs_port = to_dlb_cfs_port(item);	\
+	struct dlb_domain *dlb_domain;					\
+	struct dlb *dlb = NULL;						\
+	int ret;							\
+									\
+	ret = dlb_configfs_get_dlb_domain(dlb_cfs_port->domain_grp,	\
+					  &dlb, &dlb_domain);		\
+	if (ret)							\
+		return ret;						\
+									\
+	ret = kstrtoint(page, 16, &dlb_cfs_port->name[port]);		\
+	if (ret)							\
+		return ret;						\
+									\
+	if (dlb_cfs_port->name[port] & 0x10000) {			\
+		struct dlb_map_qid_args args;				\
+									\
+		args.port_id = dlb_cfs_port->port_id;			\
+		args.qid = dlb_cfs_port->name[port] & 0xff;		\
+		args.priority = (dlb_cfs_port->name[port] >> 8) & 0xff;	\
+									\
+		ret = dlb_domain_configfs_map_qid(dlb, dlb_domain,	\
+						  &args);		\
+									\
+		dlb_cfs_port->status = args.response.status;		\
+	} else {							\
+		struct dlb_unmap_qid_args args;				\
+									\
+		args.port_id = dlb_cfs_port->port_id;			\
+		args.qid = dlb_cfs_port->name[port] & 0xff;		\
+									\
+		ret = dlb_domain_configfs_unmap_qid(dlb, dlb_domain,	\
+						    &args);		\
+									\
+		dlb_cfs_port->status = args.response.status;		\
+	}								\
+									\
+	if (ret)							\
+		return ret;						\
+									\
+	return count;							\
+}
+
 DLB_CONFIGFS_PORT_SHOW_FD(pp_fd)
 DLB_CONFIGFS_PORT_SHOW_FD(cq_fd)
 DLB_CONFIGFS_PORT_SHOW(status)
@@ -652,12 +712,28 @@ DLB_CONFIGFS_PORT_SHOW(cq_depth)
 DLB_CONFIGFS_PORT_SHOW(cq_depth_threshold)
 DLB_CONFIGFS_PORT_SHOW(cq_history_list_size)
 DLB_CONFIGFS_PORT_SHOW(create)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 0)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 1)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 2)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 3)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 4)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 5)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 6)
+DLB_CONFIGFS_PORT_LINK_SHOW(queue_link, 7)
 DLB_CONFIGFS_PORT_SHOW(queue_id)
 
 DLB_CONFIGFS_PORT_STORE(is_ldb)
 DLB_CONFIGFS_PORT_STORE(cq_depth)
 DLB_CONFIGFS_PORT_STORE(cq_depth_threshold)
 DLB_CONFIGFS_PORT_STORE(cq_history_list_size)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 0)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 1)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 2)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 3)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 4)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 5)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 6)
+DLB_CONFIGFS_PORT_LINK_STORE(queue_link, 7)
 DLB_CONFIGFS_PORT_STORE(queue_id)
 
 static ssize_t dlb_cfs_port_create_store(struct config_item *item,
@@ -682,6 +758,7 @@ static ssize_t dlb_cfs_port_create_store(struct config_item *item,
 
 	if (dlb_cfs_port->is_ldb) {
 		struct dlb_create_ldb_port_args args = {0};
+		int i;
 
 		args.cq_depth = dlb_cfs_port->cq_depth;
 		args.cq_depth_threshold = dlb_cfs_port->cq_depth_threshold;
@@ -695,6 +772,10 @@ static ssize_t dlb_cfs_port_create_store(struct config_item *item,
 
 		dlb_cfs_port->status = args.response.status;
 		dlb_cfs_port->port_id = args.response.id;
+
+		/* reset the links */
+		for (i = 0; i < DLB_MAX_NUM_QIDS_PER_LDB_CQ; i++)
+			dlb_cfs_port->queue_link[i] = 0x1ffff;
 	} else {
 		struct dlb_create_dir_port_args args = {0};
 
@@ -734,6 +815,14 @@ CONFIGFS_ATTR(dlb_cfs_port_, cq_depth);
 CONFIGFS_ATTR(dlb_cfs_port_, cq_depth_threshold);
 CONFIGFS_ATTR(dlb_cfs_port_, cq_history_list_size);
 CONFIGFS_ATTR(dlb_cfs_port_, create);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_0);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_1);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_2);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_3);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_4);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_5);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_6);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_link_7);
 CONFIGFS_ATTR(dlb_cfs_port_, queue_id);
 
 static struct configfs_attribute *dlb_cfs_port_attrs[] = {
@@ -746,6 +835,14 @@ static struct configfs_attribute *dlb_cfs_port_attrs[] = {
 	&dlb_cfs_port_attr_cq_depth_threshold,
 	&dlb_cfs_port_attr_cq_history_list_size,
 	&dlb_cfs_port_attr_create,
+	&dlb_cfs_port_attr_queue_link_0,
+	&dlb_cfs_port_attr_queue_link_1,
+	&dlb_cfs_port_attr_queue_link_2,
+	&dlb_cfs_port_attr_queue_link_3,
+	&dlb_cfs_port_attr_queue_link_4,
+	&dlb_cfs_port_attr_queue_link_5,
+	&dlb_cfs_port_attr_queue_link_6,
+	&dlb_cfs_port_attr_queue_link_7,
 	&dlb_cfs_port_attr_queue_id,
 
 	NULL,
@@ -957,6 +1054,7 @@ static struct config_group *dlb_cfs_domain_make_queue_port(struct config_group *
 {
 	if (strstr(name, "port")) {
 		struct dlb_cfs_port *dlb_cfs_port;
+		int i;
 
 		dlb_cfs_port = kzalloc(sizeof(*dlb_cfs_port), GFP_KERNEL);
 		if (!dlb_cfs_port)
@@ -966,6 +1064,9 @@ static struct config_group *dlb_cfs_domain_make_queue_port(struct config_group *
 
 		config_group_init_type_name(&dlb_cfs_port->group, name,
 					    &dlb_cfs_port_type);
+
+		for (i = 0; i < 8; i++)
+			dlb_cfs_port->queue_link[i] = 0xffffffff;
 
 		dlb_cfs_port->queue_id = 0xffffffff;
 		dlb_cfs_port->port_id = 0xffffffff;

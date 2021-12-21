@@ -68,6 +68,9 @@ struct dlb_cfs_port {
 	unsigned int cq_history_list_size;
 	unsigned int create;
 
+	/* For LDB port only */
+	unsigned int queue_link[DLB_MAX_NUM_QIDS_PER_LDB_CQ];
+
 	/* For DIR port only, default = 0xffffffff */
 	unsigned int queue_id;
 
