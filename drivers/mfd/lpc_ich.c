@@ -1084,12 +1084,21 @@ wdt_done:
 	return ret;
 }
 
+static void lpc_ich_test_spi_write(struct pci_dev *dev, unsigned int devfn,
+				   struct intel_spi_boardinfo *info)
+{
+	u32 bcr;
+
+	pci_bus_read_config_dword(dev->bus, devfn, BCR, &bcr);
+	info->writeable = !!(bcr & BCR_WPD);
+}
+
 static int lpc_ich_init_spi(struct pci_dev *dev)
 {
 	struct lpc_ich_priv *priv = pci_get_drvdata(dev);
 	struct resource *res = &intel_spi_res[0];
 	struct intel_spi_boardinfo *info;
-	u32 spi_base, rcba, bcr;
+	u32 spi_base, rcba;
 
 	info = devm_kzalloc(&dev->dev, sizeof(*info), GFP_KERNEL);
 	if (!info)
@@ -1113,8 +1122,7 @@ static int lpc_ich_init_spi(struct pci_dev *dev)
 			res->start = spi_base + SPIBASE_LPT;
 			res->end = res->start + SPIBASE_LPT_SZ - 1;
 
-			pci_read_config_dword(dev, BCR, &bcr);
-			info->writeable = !!(bcr & BCR_WPD);
+			lpc_ich_test_spi_write(dev, dev->devfn, info);
 		}
 		break;
 
@@ -1135,8 +1143,7 @@ static int lpc_ich_init_spi(struct pci_dev *dev)
 			res->start = spi_base & 0xfffffff0;
 			res->end = res->start + SPIBASE_APL_SZ - 1;
 
-			pci_bus_read_config_dword(bus, spi, BCR, &bcr);
-			info->writeable = !!(bcr & BCR_WPD);
+			lpc_ich_test_spi_write(dev, spi, info);
 		}
 
 		pci_bus_write_config_byte(bus, p2sb, 0xe1, 0x1);
