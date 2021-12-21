@@ -5071,6 +5071,18 @@ static int kvm_vcpu_ioctl_enable_cap(struct kvm_vcpu *vcpu,
 			kvm_update_pv_runtime(vcpu);
 
 		return 0;
+
+	case KVM_CAP_X86_DISABLE_EXITS:
+		if (cap->args[0] && (cap->args[0] &
+				~KVM_X86_DISABLE_VALID_EXITS))
+			return -EINVAL;
+
+		vcpu->arch.hlt_in_guest = (cap->args[0] &
+			KVM_X86_DISABLE_EXITS_HLT) ? true : false;
+
+		static_call(kvm_x86_update_disabled_exits)(vcpu);
+		return 0;
+
 	default:
 		return -EINVAL;
 	}

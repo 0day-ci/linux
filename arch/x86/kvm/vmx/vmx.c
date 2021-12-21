@@ -7532,6 +7532,14 @@ static bool vmx_check_apicv_inhibit_reasons(ulong bit)
 	return supported & BIT(bit);
 }
 
+static void vmx_update_disabled_exits(struct kvm_vcpu *vcpu)
+{
+	if (kvm_hlt_in_guest(vcpu))
+		exec_controls_clearbit(to_vmx(vcpu), CPU_BASED_HLT_EXITING);
+	else
+		exec_controls_setbit(to_vmx(vcpu), CPU_BASED_HLT_EXITING);
+}
+
 static struct kvm_x86_ops vmx_x86_ops __initdata = {
 	.name = "kvm_intel",
 
@@ -7668,6 +7676,8 @@ static struct kvm_x86_ops vmx_x86_ops __initdata = {
 	.complete_emulated_msr = kvm_complete_insn_gp,
 
 	.vcpu_deliver_sipi_vector = kvm_vcpu_deliver_sipi_vector,
+
+	.update_disabled_exits = vmx_update_disabled_exits,
 };
 
 static __init void vmx_setup_user_return_msrs(void)

@@ -4556,6 +4556,14 @@ static void svm_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu, u8 vector)
 	sev_vcpu_deliver_sipi_vector(vcpu, vector);
 }
 
+static void svm_update_disabled_exits(struct kvm_vcpu *vcpu)
+{
+	if (kvm_hlt_in_guest(vcpu))
+		svm_clr_intercept(to_svm(vcpu), INTERCEPT_HLT);
+	else
+		svm_set_intercept(to_svm(vcpu), INTERCEPT_HLT);
+}
+
 static void svm_vm_destroy(struct kvm *kvm)
 {
 	avic_vm_destroy(kvm);
@@ -4705,6 +4713,8 @@ static struct kvm_x86_ops svm_x86_ops __initdata = {
 	.complete_emulated_msr = svm_complete_emulated_msr,
 
 	.vcpu_deliver_sipi_vector = svm_vcpu_deliver_sipi_vector,
+
+	.update_disabled_exits = svm_update_disabled_exits,
 };
 
 static struct kvm_x86_init_ops svm_init_ops __initdata = {

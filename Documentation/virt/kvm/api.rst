@@ -6581,7 +6581,7 @@ branch to guests' 0x200 interrupt vector.
 :Architectures: x86
 :Parameters: args[0] defines which exits are disabled
 :Returns: 0 on success, -EINVAL when args[0] contains invalid exits
-          or if any vCPU has already been created
+          or if any vCPU has already been created for vm ioctl
 
 Valid bits in args[0] are::
 
@@ -6595,7 +6595,8 @@ longer intercept some instructions for improved latency in some
 workloads, and is suggested when vCPUs are associated to dedicated
 physical CPUs.  More bits can be added in the future; userspace can
 just pass the KVM_CHECK_EXTENSION result to KVM_ENABLE_CAP to disable
-all such vmexits.
+all such vmexits. vCPUs scoped capability support is also added for
+HLT exits.
 
 Do not enable KVM_FEATURE_PV_UNHALT if you disable HLT exits.
 
