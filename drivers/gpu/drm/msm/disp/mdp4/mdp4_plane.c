@@ -80,6 +80,13 @@ static int mdp4_plane_set_property(struct drm_plane *plane,
 	return -EINVAL;
 }
 
+static bool mdp4_plane_format_mod_supported(struct drm_plane *plane, u32 format,
+		u64 modifier)
+{
+	return (modifier == DRM_FORMAT_MOD_SAMSUNG_64_32_TILE) ||
+	       (modifier == DRM_FORMAT_MOD_LINEAR);
+}
+
 static const struct drm_plane_funcs mdp4_plane_funcs = {
 		.update_plane = drm_atomic_helper_update_plane,
 		.disable_plane = drm_atomic_helper_disable_plane,
@@ -88,6 +95,7 @@ static const struct drm_plane_funcs mdp4_plane_funcs = {
 		.reset = drm_atomic_helper_plane_reset,
 		.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
 		.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+		.format_mod_supported = mdp4_plane_format_mod_supported,
 };
 
 static void mdp4_plane_cleanup_fb(struct drm_plane *plane,
