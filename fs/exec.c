@@ -1344,9 +1344,7 @@ int begin_new_exec(struct linux_binprm * bprm)
 	 * is wrong, but userspace depends on it. This should be testing
 	 * bprm->secureexec instead.
 	 */
-	if (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP ||
-	    !(uid_eq(current_euid(), current_uid()) &&
-	      gid_eq(current_egid(), current_gid())))
+	if (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP || bprm->is_sugid)
 		set_dumpable(current->mm, suid_dumpable);
 	else
 		set_dumpable(current->mm, SUID_DUMP_USER);
@@ -1619,11 +1617,13 @@ static void bprm_fill_uid(struct linux_binprm *bprm, struct file *file)
 	if (mode & S_ISUID) {
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
 		bprm->cred->euid = uid;
+		bprm->is_sugid = 1;
 	}
 
 	if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
 		bprm->cred->egid = gid;
+		bprm->is_sugid = 1;
 	}
 }
 
