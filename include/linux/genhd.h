@@ -227,23 +227,27 @@ void blk_drop_partitions(struct gendisk *disk);
 struct gendisk *__alloc_disk_node(struct request_queue *q, int node_id,
 		struct lock_class_key *lkclass);
 extern void put_disk(struct gendisk *disk);
-struct gendisk *__blk_alloc_disk(int node, struct lock_class_key *lkclass);
+struct gendisk *__blk_alloc_disk(int node, bool alloc_srcu,
+		struct lock_class_key *lkclass);
 
 /**
- * blk_alloc_disk - allocate a gendisk structure
+ * __alloc_disk - allocate a gendisk structure
  * @node_id: numa node to allocate on
+ * @alloc_srcu: allocate srcu instance for supporting blocking ->queue_rq
  *
  * Allocate and pre-initialize a gendisk structure for use with BIO based
  * drivers.
  *
  * Context: can sleep
  */
-#define blk_alloc_disk(node_id)						\
+#define __alloc_disk(node_id, alloc_srcu)				\
 ({									\
 	static struct lock_class_key __key;				\
 									\
-	__blk_alloc_disk(node_id, &__key);				\
+	__blk_alloc_disk(node_id, alloc_srcu, &__key);			\
 })
+#define blk_alloc_disk(node_id) __alloc_disk(node_id, false)
+#define blk_alloc_disk_srcu(node_id) __alloc_disk(node_id, true)
 void blk_cleanup_disk(struct gendisk *disk);
 
 int __register_blkdev(unsigned int major, const char *name,
