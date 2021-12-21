@@ -351,6 +351,7 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 		  const struct adt7x10_ops *ops)
 {
 	struct adt7x10_data *data;
+	struct device *hdev;
 	int ret;
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
@@ -395,9 +396,9 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 	if (ret)
 		goto exit_restore;
 
-	data->hwmon_dev = hwmon_device_register(dev);
-	if (IS_ERR(data->hwmon_dev)) {
-		ret = PTR_ERR(data->hwmon_dev);
+	hdev = hwmon_device_register(dev);
+	if (IS_ERR(hdev)) {
+		ret = PTR_ERR(hdev);
 		goto exit_remove;
 	}
 
@@ -411,10 +412,12 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 			goto exit_hwmon_device_unregister;
 	}
 
+	data->hwmon_dev = hdev;
+
 	return 0;
 
 exit_hwmon_device_unregister:
-	hwmon_device_unregister(data->hwmon_dev);
+	hwmon_device_unregister(hdev);
 exit_remove:
 	sysfs_remove_group(&dev->kobj, &adt7x10_group);
 exit_restore:
