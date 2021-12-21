@@ -1458,7 +1458,7 @@ static void page_check_dirty_writeback(struct page *page,
 		mapping->a_ops->is_dirty_writeback(page, dirty, writeback);
 }
 
-static struct page *alloc_demote_page(struct page *page, unsigned long node)
+struct page *alloc_demote_page(struct page *page, unsigned long node)
 {
 	struct migration_target_control mtc = {
 		/*

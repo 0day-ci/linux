@@ -181,6 +181,7 @@ extern unsigned long highest_memmap_pfn;
 extern int isolate_lru_page(struct page *page);
 extern void putback_lru_page(struct page *page);
 extern void reclaim_throttle(pg_data_t *pgdat, enum vmscan_throttle_state reason);
+extern struct page *alloc_demote_page(struct page *page, unsigned long node);
 
 /*
  * in mm/rmap.c:
