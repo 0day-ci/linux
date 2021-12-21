@@ -969,6 +969,7 @@ static int __init xdbc_init(void)
 	if (early_xdbc_console.index == -1 ||
 	    (early_xdbc_console.flags & CON_BOOT)) {
 		xdbc_trace("hardware not used anymore\n");
+		ret = -ENODEV;
 		goto free_and_quit;
 	}
 
