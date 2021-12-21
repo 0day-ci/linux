@@ -1,0 +1,130 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/leds/leds-ktd20xx.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: LED driver for KTD20xx RGB LED from Kinetic.
+
+maintainers:
+  - Florian Eckert <fe@dev.tdt.de>
+
+description: |
+  The KTD20XX is multi-channel, I2C LED driver. Into can control up to 12
+  LEDs per device. The RGB value can be set for each LED. Due to hardware
+  limitations, the full RGB range cannot be used. Only 7 colors and the
+  color black can be set (black means off).
+  R G B
+  0 0 0 = Black (off)
+  0 0 1 = Blue
+  0 1 0 = Green
+  0 1 1 = Cyan
+  1 0 0 = Red
+  1 0 1 = Magenta
+  1 1 0 = Yellow
+  1 1 1 = White
+
+properties:
+  compatible:
+    enum:
+      - kinetic,ktd20xx
+
+  reg:
+    maxItems: 1
+    description:
+      I2C slave address
+      ktd2061/58/59/60 0x68 0x69 0x6A 0x6B
+
+  '#address-cells':
+    const: 1
+
+  '#size-cells':
+    const: 0
+
+  'kinetic,led-current':
+    $ref: /schemas/types.yaml#/definitions/uint8
+    description:
+      This value is a current setting for all LEDs connected to this device.
+      If this value is not set then the default value off 0x28 (5mA) is set.
+      This means all LEDs get 5mA. The max value is 24mA. We have the following
+      mapping in 125uA steps. We can set a maximum of 24mA.
+      0000 0000 (0x00) = 0uA
+      0000 0001 (0x01) = 125uA
+      .... ....
+      0010 1000 (0x28) = 5mA
+      .... ....
+      1100 0000 (0xC0) = 24mA
+      1100 0001 (0xC1) = 24mA
+      .... ....
+      1111 1111 (0xFF) = 24mA
+    minimum: 0
+    maximum: 255
+
+patternProperties:
+  '^multi-led@[0-9a-f]$':
+    type: object
+    allOf:
+      - $ref: leds-class-multicolor.yaml#
+    description:
+      This node represents one of the Multicolor LED. No subnodes need to
+      be added for subchannels since this controller only supports 1bit
+      RGB values. We could display seven different colors and the color
+      black which means off.
+
+    properties:
+      reg:
+        minimum: 0
+        maximum: 11
+        description:
+          This property identifies wired connection of the LED to this device.
+          0x00  LEDA1
+          0x01  LEDA2
+          0x02  LEDA3
+          0x03  LEDA4
+          0x04  LEDB1
+          0x05  LEDB2
+          0x06  LEDB3
+          0x07  LEDB4
+          0x08  LEDC1
+          0x09  LEDC2
+          0x0A  LEDC3
+          0x0B  LEDC4
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+   #include <dt-bindings/leds/common.h>
+
+   i2c {
+       #address-cells = <1>;
+       #size-cells = <0>;
+
+       led-controller@14 {
+           compatible = "kinetic,ktd20xx";
+           reg = <0x68>;
+           #address-cells = <1>;
+           #size-cells = <0>;
+           kinetic,led-current = <0x28>; // Current for all LEDs is 5mA
+
+           multi-led@0 {
+               reg = <0x0>;
+               color = <LED_COLOR_ID_MULTI>;
+               function = LED_FUNCTION_CHARGING;
+               linux,default-trigger = "default-on";
+          };
+
+          multi-led@2 {
+            reg = <0x2>;
+            color = <LED_COLOR_ID_MULTI>;
+            function = LED_FUNCTION_STANDBY;
+            linux,default-trigger = "default-on";
+         };
+       };
+    };
+
+...
