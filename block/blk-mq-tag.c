@@ -253,7 +253,8 @@ static bool bt_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
 	if (!rq)
 		return true;
 
-	if (rq->q == hctx->queue && rq->mq_hctx == hctx)
+	if (rq->q == hctx->queue && (rq->mq_hctx == hctx ||
+				blk_mq_is_shared_tags(hctx->flags)))
 		ret = iter_data->fn(hctx, rq, iter_data->data, reserved);
 	blk_mq_put_rq_ref(rq);
 	return ret;
@@ -484,6 +485,14 @@ void blk_mq_queue_tag_busy_iter(struct request_queue *q, busy_iter_fn *fn,
 		if (tags->nr_reserved_tags)
 			bt_for_each(hctx, &tags->breserved_tags, fn, priv, true);
 		bt_for_each(hctx, &tags->bitmap_tags, fn, priv, false);
+		
+		/* In case of shared bitmap if shared_tags is allocated, it is not required
+		 * to iterate all the hctx. Looping one hctx is good enough.
+		 */
+		if (blk_mq_is_shared_tags(hctx->flags)) {
+			blk_queue_exit(q);
+			return;
+		}
 	}
 	blk_queue_exit(q);
 }
