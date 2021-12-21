@@ -402,9 +402,11 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 	}
 
 	if (irq > 0) {
-		ret = request_threaded_irq(irq, NULL, adt7x10_irq_handler,
-				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-				dev_name(dev), dev);
+		ret = devm_request_threaded_irq(dev, irq, NULL,
+						adt7x10_irq_handler,
+						IRQF_TRIGGER_FALLING |
+						IRQF_ONESHOT,
+						dev_name(dev), dev);
 		if (ret)
 			goto exit_hwmon_device_unregister;
 	}
@@ -424,9 +426,6 @@ EXPORT_SYMBOL_GPL(adt7x10_probe);
 void adt7x10_remove(struct device *dev, int irq)
 {
 	struct adt7x10_data *data = dev_get_drvdata(dev);
-
-	if (irq > 0)
-		free_irq(irq, dev);
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&dev->kobj, &adt7x10_group);
