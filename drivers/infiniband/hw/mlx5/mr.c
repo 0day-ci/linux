@@ -1977,7 +1977,7 @@ int mlx5_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 			return rc;
 	}
 
-	if (mr->umem) {
+	if (udata && mr->umem) {
 		bool is_odp = is_odp_mr(mr);
 
 		if (!is_odp)
@@ -1985,7 +1985,7 @@ int mlx5_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 				   &dev->mdev->priv.reg_pages);
 		ib_umem_release(mr->umem);
 		if (is_odp)
-			mlx5_ib_free_odp_mr(mr);
+			mlx5_ib_free_odp_mr(mr, udata);
 	}
 
 	if (mr->cache_ent) {

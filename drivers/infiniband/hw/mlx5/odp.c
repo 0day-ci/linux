@@ -530,7 +530,7 @@ out_mr:
 	return ERR_PTR(err);
 }
 
-void mlx5_ib_free_odp_mr(struct mlx5_ib_mr *mr)
+void mlx5_ib_free_odp_mr(struct mlx5_ib_mr *mr, struct ib_udata *udata)
 {
 	struct mlx5_ib_mr *mtt;
 	unsigned long idx;
@@ -541,7 +541,7 @@ void mlx5_ib_free_odp_mr(struct mlx5_ib_mr *mr)
 	 */
 	xa_for_each(&mr->implicit_children, idx, mtt) {
 		xa_erase(&mr->implicit_children, idx);
-		mlx5_ib_dereg_mr(&mtt->ibmr, NULL);
+		mlx5_ib_dereg_mr(&mtt->ibmr, udata);
 	}
 }
 
