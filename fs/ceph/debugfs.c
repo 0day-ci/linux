@@ -387,8 +387,8 @@ static int congestion_kb_get(void *data, u64 *val)
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(congestion_kb_fops, congestion_kb_get,
-			congestion_kb_set, "%llu\n");
+DEFINE_DEBUGFS_ATTRIBUTE(congestion_kb_fops, congestion_kb_get,
+			 congestion_kb_set, "%llu\n");
 
 
 void ceph_fs_debugfs_cleanup(struct ceph_fs_client *fsc)
