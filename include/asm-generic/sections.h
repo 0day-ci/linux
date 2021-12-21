@@ -78,7 +78,7 @@ extern __visible const void __nosave_begin, __nosave_end;
 static inline bool memory_contains(void *begin, void *end, void *virt,
 				   size_t size)
 {
-	return virt >= begin && virt + size <= end;
+	return virt >= begin && virt + size < end;
 }
 
 /**
