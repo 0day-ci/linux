@@ -10632,6 +10632,12 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/leds/backlight/kinetic,ktd253.yaml
 F:	drivers/video/backlight/ktd253-backlight.c
 
+KTD20XX LED CONTROLLER DRIVER
+M:	Florian Eckert <fe@dev.tdt.de>
+L:	linux-leds@vger.kernel.org
+S:	Maintained
+F:	drivers/leds/leds-ktd20xx.c
+
 KTEST
 M:	Steven Rostedt <rostedt@goodmis.org>
 M:	John Hawley <warthog9@eaglescrag.net>
