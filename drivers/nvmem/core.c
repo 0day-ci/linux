@@ -839,12 +839,12 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 
 	rval = device_register(&nvmem->dev);
 	if (rval)
-		goto err_put_device;
+		return ERR_PTR(rval);
 
 	if (config->compat) {
 		rval = nvmem_sysfs_setup_compat(nvmem, config);
 		if (rval)
-			goto err_device_del;
+			goto err_device_unreg;
 	}
 
 	if (config->cells) {
@@ -870,10 +870,8 @@ err_remove_cells:
 err_teardown_compat:
 	if (config->compat)
 		nvmem_sysfs_remove_compat(nvmem, config);
-err_device_del:
-	device_del(&nvmem->dev);
-err_put_device:
-	put_device(&nvmem->dev);
+err_device_unreg:
+	device_unregister(&nvmem->dev);
 
 	return ERR_PTR(rval);
 }
