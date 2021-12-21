@@ -770,7 +770,7 @@ static void ad3552r_calc_gain_and_offset(struct ad3552r_desc *dac, s32 ch)
 	dac->ch_data[ch].scale_dec = DIV_ROUND_CLOSEST((s64)rem * 1000000,
 							65536);
 
-	dac->ch_data[ch].offset_int = div_s64_rem(v_min * 65536, span, &rem);
+	dac->ch_data[ch].offset_int = div_s64_rem(v_min * 65536L, span, &rem);
 	tmp = (s64)rem * 1000000;
 	dac->ch_data[ch].offset_dec = div_s64(tmp, span);
 }
