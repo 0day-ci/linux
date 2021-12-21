@@ -13,6 +13,8 @@
 #include <linux/types.h>
 #include <linux/bitfield.h>
 
+#include "dlb_args.h"
+
 /*
  * Hardware related #defines and data structures.
  *
@@ -327,6 +329,14 @@ static inline void dlb_bitmap_free(struct dlb_bitmap *bitmap)
 /* Prototypes for dlb_resource.c */
 int dlb_resource_init(struct dlb_hw *hw);
 void dlb_resource_free(struct dlb_hw *hw);
+int dlb_hw_create_sched_domain(struct dlb_hw *hw,
+			       struct dlb_create_sched_domain_args *args,
+			       struct dlb_cmd_response *resp);
 void dlb_clr_pmcsr_disable(struct dlb_hw *hw);
+
+/* Prototypes for dlb_configfs.c */
+int dlb_configfs_create_device(struct dlb *dlb);
+int configfs_dlb_init(void);
+void configfs_dlb_exit(void);
 
 #endif /* __DLB_MAIN_H */

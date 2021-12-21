@@ -190,6 +190,16 @@ unwind:
 	return ret;
 }
 
+int dlb_hw_create_sched_domain(struct dlb_hw *hw,
+			       struct dlb_create_sched_domain_args *args,
+			       struct dlb_cmd_response *resp)
+{
+	resp->id = 0;
+	resp->status = 0;
+
+	return 0;
+}
+
 /**
  * dlb_clr_pmcsr_disable() - power on bulk of DLB 2.0 logic
  * @hw: dlb_hw handle for a particular device.

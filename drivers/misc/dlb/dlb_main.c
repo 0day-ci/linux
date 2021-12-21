@@ -128,6 +128,10 @@ static int dlb_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	if (ret)
 		goto dma_set_mask_fail;
 
+	ret = dlb_configfs_create_device(dlb);
+	if (ret)
+		goto configfs_create_fail;
+
 	/*
 	 * PM enable must be done before any other MMIO accesses, and this
 	 * setting is persistent across device reset.
@@ -157,6 +161,7 @@ init_driver_state_fail:
 resource_init_fail:
 dlb_reset_fail:
 wait_for_device_ready_fail:
+configfs_create_fail:
 dma_set_mask_fail:
 	device_destroy(dlb_class, dlb->dev_number);
 map_pci_bar_fail:
@@ -225,6 +230,8 @@ static int __init dlb_init_module(void)
 	if (err)
 		goto cdev_add_fail;
 
+	configfs_dlb_init();
+
 	err = pci_register_driver(&dlb_pci_driver);
 	if (err < 0) {
 		pr_err("dlb: pci_register_driver() returned %d\n", err);
@@ -247,6 +254,8 @@ alloc_chrdev_fail:
 static void __exit dlb_exit_module(void)
 {
 	pci_unregister_driver(&dlb_pci_driver);
+
+	configfs_dlb_exit();
 
 	cdev_del(&dlb_cdev);
 

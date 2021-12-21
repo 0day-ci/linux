@@ -3,4 +3,4 @@
 obj-$(CONFIG_INTEL_DLB) := dlb.o
 
 dlb-objs := dlb_main.o
-dlb-objs += dlb_pf_ops.o dlb_resource.o
+dlb-objs += dlb_pf_ops.o dlb_resource.o dlb_configfs.o
