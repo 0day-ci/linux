@@ -89,9 +89,11 @@ static inline void netpoll_poll_unlock(void *have)
 		smp_store_release(&napi->poll_owner, -1);
 }
 
+DECLARE_PER_CPU(int, _netpoll_tx_running);
+
 static inline bool netpoll_tx_running(struct net_device *dev)
 {
-	return irqs_disabled();
+	return this_cpu_read(_netpoll_tx_running);
 }
 
 #else

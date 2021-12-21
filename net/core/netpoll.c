@@ -70,6 +70,27 @@ module_param(carrier_timeout, uint, 0644);
 #define np_notice(np, fmt, ...)				\
 	pr_notice("%s: " fmt, np->name, ##__VA_ARGS__)
 
+DEFINE_PER_CPU(int, _netpoll_tx_running);
+EXPORT_PER_CPU_SYMBOL(_netpoll_tx_running);
+
+#define netpoll_tx_begin(flags)				\
+	do {						\
+		if (!IS_ENABLED(CONFIG_PREEMPT_RT))	\
+			local_irq_save(flags);		\
+		else					\
+			rcu_read_lock_bh();		\
+		this_cpu_write(_netpoll_tx_running, 1);	\
+	} while (0)
+
+#define netpoll_tx_end(flags)				\
+	do {						\
+		this_cpu_write(_netpoll_tx_running, 0);	\
+		if (!IS_ENABLED(CONFIG_PREEMPT_RT))	\
+			local_irq_restore(flags);	\
+		else					\
+			rcu_read_unlock_bh();		\
+	} while (0)
+
 static netdev_tx_t netpoll_start_xmit(struct sk_buff *skb,
 				      struct net_device *dev,
 				      struct netdev_queue *txq)
@@ -102,7 +123,7 @@ static void queue_process(struct work_struct *work)
 	struct netpoll_info *npinfo =
 		container_of(work, struct netpoll_info, tx_work.work);
 	struct sk_buff *skb;
-	unsigned long flags;
+	unsigned long __maybe_unused flags;
 
 	while ((skb = skb_dequeue(&npinfo->txq))) {
 		struct net_device *dev = skb->dev;
@@ -114,7 +135,7 @@ static void queue_process(struct work_struct *work)
 			continue;
 		}
 
-		local_irq_save(flags);
+		netpoll_tx_begin(flags);
 		/* check if skb->queue_mapping is still valid */
 		q_index = skb_get_queue_mapping(skb);
 		if (unlikely(q_index >= dev->real_num_tx_queues)) {
@@ -127,13 +148,13 @@ static void queue_process(struct work_struct *work)
 		    !dev_xmit_complete(netpoll_start_xmit(skb, dev, txq))) {
 			skb_queue_head(&npinfo->txq, skb);
 			HARD_TX_UNLOCK(dev, txq);
-			local_irq_restore(flags);
+			netpoll_tx_end(flags);
 
 			schedule_delayed_work(&npinfo->tx_work, HZ/10);
 			return;
 		}
 		HARD_TX_UNLOCK(dev, txq);
-		local_irq_restore(flags);
+		netpoll_tx_end(flags);
 	}
 }
 
@@ -243,7 +264,7 @@ static void refill_skbs(void)
 static void zap_completion_queue(void)
 {
 	unsigned long flags;
-	struct softnet_data *sd = &get_cpu_var(softnet_data);
+	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 
 	if (sd->completion_queue) {
 		struct sk_buff *clist;
@@ -264,8 +285,6 @@ static void zap_completion_queue(void)
 			}
 		}
 	}
-
-	put_cpu_var(softnet_data);
 }
 
 static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
@@ -314,7 +333,8 @@ static netdev_tx_t __netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 	/* It is up to the caller to keep npinfo alive. */
 	struct netpoll_info *npinfo;
 
-	lockdep_assert_irqs_disabled();
+	if (!IS_ENABLED(CONFIG_PREEMPT_RT))
+		lockdep_assert_irqs_disabled();
 
 	dev = np->dev;
 	npinfo = rcu_dereference_bh(dev->npinfo);
@@ -350,7 +370,7 @@ static netdev_tx_t __netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 			udelay(USEC_PER_POLL);
 		}
 
-		WARN_ONCE(!irqs_disabled(),
+		WARN_ONCE(!IS_ENABLED(CONFIG_PREEMPT_RT) && !irqs_disabled(),
 			"netpoll_send_skb_on_dev(): %s enabled interrupts in poll (%pS)\n",
 			dev->name, dev->netdev_ops->ndo_start_xmit);
 
@@ -365,16 +385,16 @@ static netdev_tx_t __netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 
 netdev_tx_t netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 {
-	unsigned long flags;
+	unsigned long __maybe_unused flags;
 	netdev_tx_t ret;
 
 	if (unlikely(!np)) {
 		dev_kfree_skb_irq(skb);
 		ret = NET_XMIT_DROP;
 	} else {
-		local_irq_save(flags);
+		netpoll_tx_begin(flags);
 		ret = __netpoll_send_skb(np, skb);
-		local_irq_restore(flags);
+		netpoll_tx_end(flags);
 	}
 	return ret;
 }
