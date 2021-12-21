@@ -57,6 +57,52 @@
 
 #define PCI_DEVICE_ID_INTEL_DLB_PF		0x2710
 
+/*
+ * Hardware-defined base addresses. Those prefixed 'DLB_DRV' are only used by
+ * the PF driver.
+ */
+#define DLB_DRV_LDB_PP_BASE   0x2300000
+#define DLB_DRV_LDB_PP_STRIDE 0x1000
+#define DLB_DRV_LDB_PP_BOUND  (DLB_DRV_LDB_PP_BASE + \
+				DLB_DRV_LDB_PP_STRIDE * DLB_MAX_NUM_LDB_PORTS)
+#define DLB_DRV_DIR_PP_BASE   0x2200000
+#define DLB_DRV_DIR_PP_STRIDE 0x1000
+#define DLB_DRV_DIR_PP_BOUND  (DLB_DRV_DIR_PP_BASE + \
+				DLB_DRV_DIR_PP_STRIDE * DLB_MAX_NUM_DIR_PORTS)
+#define DLB_LDB_PP_BASE       0x2100000
+#define DLB_LDB_PP_STRIDE     0x1000
+#define DLB_LDB_PP_BOUND      (DLB_LDB_PP_BASE + \
+				DLB_LDB_PP_STRIDE * DLB_MAX_NUM_LDB_PORTS)
+#define DLB_LDB_PP_OFFSET(id) (DLB_LDB_PP_BASE + (id) * DLB_PP_SIZE)
+#define DLB_DIR_PP_BASE       0x2000000
+#define DLB_DIR_PP_STRIDE     0x1000
+#define DLB_DIR_PP_BOUND      (DLB_DIR_PP_BASE + \
+				DLB_DIR_PP_STRIDE * DLB_MAX_NUM_DIR_PORTS)
+#define DLB_DIR_PP_OFFSET(id) (DLB_DIR_PP_BASE + (id) * DLB_PP_SIZE)
+
+struct dlb_hcw {
+	u64 data;
+	/* Word 3 */
+	u16 opaque;
+	u8 qid;
+	u8 sched_type:2;
+	u8 priority:3;
+	u8 msg_type:3;
+	/* Word 4 */
+	u16 lock_id;
+	u8 ts_flag:1;
+	u8 rsvd1:2;
+	u8 no_dec:1;
+	u8 cmp_id:4;
+	u8 cq_token:1;
+	u8 qe_comp:1;
+	u8 qe_frag:1;
+	u8 qe_valid:1;
+	u8 int_arm:1;
+	u8 error:1;
+	u8 rsvd:2;
+};
+
 struct dlb_ldb_queue {
 	struct list_head domain_list;
 	struct list_head func_list;
