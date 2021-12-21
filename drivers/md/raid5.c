@@ -5715,6 +5715,11 @@ static void make_discard_request(struct mddev *mddev, struct bio *bi)
 		set_bit(R5_Overlap, &sh->dev[sh->pd_idx].flags);
 		if (test_bit(STRIPE_SYNCING, &sh->state)) {
 			raid5_release_stripe(sh);
+			/* Bail out if REQ_NOWAIT is set */
+			if (bi->bi_opf & REQ_NOWAIT) {
+				bio_wouldblock_error(bi);
+				return;
+			}
 			schedule();
 			goto again;
 		}
@@ -5727,6 +5732,11 @@ static void make_discard_request(struct mddev *mddev, struct bio *bi)
 				set_bit(R5_Overlap, &sh->dev[d].flags);
 				spin_unlock_irq(&sh->stripe_lock);
 				raid5_release_stripe(sh);
+				/* Bail out if REQ_NOWAIT is set */
+				if (bi->bi_opf & REQ_NOWAIT) {
+					bio_wouldblock_error(bi);
+					return;
+				}
 				schedule();
 				goto again;
 			}
@@ -5820,6 +5830,16 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 	bi->bi_next = NULL;
 
 	md_account_bio(mddev, &bi);
+	/* Bail out if REQ_NOWAIT is set */
+	if ((bi->bi_opf & REQ_NOWAIT) &&
+	    (conf->reshape_progress != MaxSector) &&
+	    (mddev->reshape_backwards
+	    ? (logical_sector > conf->reshape_progress && logical_sector <= conf->reshape_safe)
+	    : (logical_sector >= conf->reshape_safe && logical_sector < conf->reshape_progress))) {
+		bio_wouldblock_error(bi);
+		return true;
+	}
+
 	prepare_to_wait(&conf->wait_for_overlap, &w, TASK_UNINTERRUPTIBLE);
 	for (; logical_sector < last_sector; logical_sector += RAID5_STRIPE_SECTORS(conf)) {
 		int previous;
