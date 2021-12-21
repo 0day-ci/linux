@@ -357,6 +357,17 @@ static const struct attribute_group adt7x10_group = {
 	.attrs = adt7x10_attributes,
 };
 
+static void adt7x10_restore_config(void *private)
+{
+	struct adt7x10_data *data = private;
+	struct device *dev = data->bus_dev;
+
+	if (data->oldconfig == data->config)
+		return;
+
+	adt7x10_write_byte(dev, ADT7X10_CONFIG, data->oldconfig);
+}
+
 int adt7x10_probe(struct device *dev, const char *name, int irq,
 		  const struct adt7x10_ops *ops)
 {
@@ -397,14 +408,18 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 	}
 	dev_dbg(dev, "Config %02x\n", data->config);
 
+	ret = devm_add_action_or_reset(dev, adt7x10_restore_config, data);
+	if (ret)
+		return ret;
+
 	ret = adt7x10_fill_cache(dev);
 	if (ret)
-		goto exit_restore;
+		return ret;
 
 	/* Register sysfs hooks */
 	ret = sysfs_create_group(&dev->kobj, &adt7x10_group);
 	if (ret)
-		goto exit_restore;
+		return ret;
 
 	/*
 	 * The I2C device will already have it's own 'name' attribute, but for
@@ -440,8 +455,6 @@ exit_remove_name:
 		device_remove_file(dev, &dev_attr_name);
 exit_remove:
 	sysfs_remove_group(&dev->kobj, &adt7x10_group);
-exit_restore:
-	adt7x10_write_byte(dev, ADT7X10_CONFIG, data->oldconfig);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(adt7x10_probe);
@@ -457,8 +470,6 @@ void adt7x10_remove(struct device *dev, int irq)
 	if (data->name)
 		device_remove_file(dev, &dev_attr_name);
 	sysfs_remove_group(&dev->kobj, &adt7x10_group);
-	if (data->oldconfig != data->config)
-		adt7x10_write_byte(dev, ADT7X10_CONFIG, data->oldconfig);
 }
 EXPORT_SYMBOL_GPL(adt7x10_remove);
 
