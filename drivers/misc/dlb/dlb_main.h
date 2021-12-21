@@ -16,6 +16,7 @@
  * Hardware related #defines and data structures.
  *
  */
+
 #define DLB_MAX_NUM_VDEVS			16
 #define DLB_MAX_NUM_DOMAINS			32
 #define DLB_MAX_NUM_LDB_QUEUES			32 /* LDB == load-balanced */
@@ -41,6 +42,15 @@
 
 #define PCI_DEVICE_ID_INTEL_DLB_PF		0x2710
 
+struct dlb_hw {
+	/* BAR 0 address */
+	void __iomem *csr_kva;
+	unsigned long csr_phys_addr;
+	/* BAR 2 address */
+	void __iomem *func_kva;
+	unsigned long func_phys_addr;
+};
+
 /*
  * The dlb driver uses a different minor number for each device file, of which
  * there are:
@@ -56,9 +66,18 @@ enum dlb_device_type {
 	DLB_PF,
 };
 
+struct dlb;
+
+int dlb_pf_map_pci_bar_space(struct dlb *dlb, struct pci_dev *pdev);
+void dlb_pf_unmap_pci_bar_space(struct dlb *dlb, struct pci_dev *pdev);
+
 struct dlb {
 	struct pci_dev *pdev;
+	struct dlb_hw hw;
+	struct device *dev;
+	enum dlb_device_type type;
 	int id;
+	dev_t dev_number;
 };
 
 #endif /* __DLB_MAIN_H */

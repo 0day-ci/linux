@@ -16,9 +16,37 @@ MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Intel(R) Dynamic Load Balancer (DLB) Driver");
 
 static struct class *dlb_class;
+static struct cdev dlb_cdev;
 static dev_t dlb_devt;
 static DEFINE_IDR(dlb_ids);
 static DEFINE_MUTEX(dlb_ids_lock);
+
+static int dlb_device_create(struct dlb *dlb, struct pci_dev *pdev)
+{
+	/*
+	 * Create a new device in order to create a /dev/dlb node. This device
+	 * is a child of the DLB PCI device.
+	 */
+	dlb->dev_number = MKDEV(MAJOR(dlb_devt), dlb->id);
+	dlb->dev = device_create(dlb_class, &pdev->dev, dlb->dev_number, dlb,
+				 "dlb%d", dlb->id);
+	if (IS_ERR(dlb->dev)) {
+		dev_err(dlb->dev, "device_create() returned %ld\n",
+			PTR_ERR(dlb->dev));
+
+		return PTR_ERR(dlb->dev);
+	}
+
+	return 0;
+}
+
+/********************************/
+/****** Char dev callbacks ******/
+/********************************/
+
+static const struct file_operations dlb_fops = {
+	.owner   = THIS_MODULE,
+};
 
 /**********************************/
 /****** PCI driver callbacks ******/
@@ -71,8 +99,24 @@ static int dlb_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	if (ret != 0)
 		dev_info(&pdev->dev, "AER is not supported\n");
 
+	ret = dlb_pf_map_pci_bar_space(dlb, pdev);
+	if (ret)
+		goto map_pci_bar_fail;
+
+	ret = dlb_device_create(dlb, pdev);
+	if (ret)
+		goto map_pci_bar_fail;
+
+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+	if (ret)
+		goto dma_set_mask_fail;
+
 	return 0;
 
+dma_set_mask_fail:
+	device_destroy(dlb_class, dlb->dev_number);
+map_pci_bar_fail:
+	pci_disable_pcie_error_reporting(pdev);
 pci_enable_device_fail:
 	mutex_lock(&dlb_ids_lock);
 	idr_remove(&dlb_ids, dlb->id);
@@ -84,6 +128,8 @@ alloc_id_fail:
 static void dlb_remove(struct pci_dev *pdev)
 {
 	struct dlb *dlb = pci_get_drvdata(pdev);
+
+	device_destroy(dlb_class, dlb->dev_number);
 
 	pci_disable_pcie_error_reporting(pdev);
 
@@ -107,6 +153,7 @@ static struct pci_driver dlb_pci_driver = {
 
 static int __init dlb_init_module(void)
 {
+	int dlb_major;
 	int err;
 
 	dlb_class = class_create(THIS_MODULE, "dlb");
@@ -126,6 +173,12 @@ static int __init dlb_init_module(void)
 		goto alloc_chrdev_fail;
 	}
 
+	dlb_major = MAJOR(dlb_devt);
+	cdev_init(&dlb_cdev, &dlb_fops);
+	err = cdev_add(&dlb_cdev, MKDEV(dlb_major, 0), DLB_MAX_NUM_DEVICES);
+	if (err)
+		goto cdev_add_fail;
+
 	err = pci_register_driver(&dlb_pci_driver);
 	if (err < 0) {
 		pr_err("dlb: pci_register_driver() returned %d\n", err);
@@ -136,6 +189,8 @@ static int __init dlb_init_module(void)
 	return 0;
 
 pci_register_fail:
+	cdev_del(&dlb_cdev);
+cdev_add_fail:
 	unregister_chrdev_region(dlb_devt, DLB_MAX_NUM_DEVICES);
 alloc_chrdev_fail:
 	class_destroy(dlb_class);
@@ -146,6 +201,8 @@ alloc_chrdev_fail:
 static void __exit dlb_exit_module(void)
 {
 	pci_unregister_driver(&dlb_pci_driver);
+
+	cdev_del(&dlb_cdev);
 
 	unregister_chrdev_region(dlb_devt, DLB_MAX_NUM_DEVICES);
 
