@@ -14,6 +14,10 @@
 #include <linux/page_idle.h>
 #include <linux/pagewalk.h>
 #include <linux/sched/mm.h>
+#include <linux/migrate.h>
+#include <linux/mm_inline.h>
+#include <linux/swapops.h>
+#include "../internal.h"
 
 #include "prmtv-common.h"
 
@@ -597,6 +601,156 @@ static unsigned long damos_madvise(struct damon_target *target,
 }
 #endif	/* CONFIG_ADVISE_SYSCALLS */
 
+static bool damos_isolate_page(struct page *page, struct list_head *demote_list)
+{
+	struct page *head = compound_head(page);
+
+	/* Do not interfere with other mappings of this page */
+	if (page_mapcount(head) != 1)
+		return false;
+
+	/* No need migration if the target demotion node is empty. */
+	if (next_demotion_node(page_to_nid(head)) == NUMA_NO_NODE)
+		return false;
+
+	if (isolate_lru_page(head))
+		return false;
+
+	list_add_tail(&head->lru, demote_list);
+	mod_node_page_state(page_pgdat(head),
+			    NR_ISOLATED_ANON + page_is_file_lru(head),
+			    thp_nr_pages(head));
+	return true;
+}
+
+static int damos_migrate_pmd_entry(pmd_t *pmd, unsigned long addr,
+				   unsigned long end, struct mm_walk *walk)
+{
+	struct vm_area_struct *vma = walk->vma;
+	struct list_head *demote_list = walk->private;
+	spinlock_t *ptl;
+	struct page *page;
+	pte_t *pte, *mapped_pte;
+
+	if (!vma_migratable(vma))
+		return -EFAULT;
+
+	ptl = pmd_trans_huge_lock(pmd, vma);
+	if (ptl) {
+		/* Bail out if THP migration is not supported. */
+		if (!thp_migration_supported())
+			goto thp_out;
+
+		/* If the THP pte is under migration, do not bother it. */
+		if (unlikely(is_pmd_migration_entry(*pmd)))
+			goto thp_out;
+
+		page = damon_get_page(pmd_pfn(*pmd));
+		if (!page)
+			goto thp_out;
+
+		damos_isolate_page(page, demote_list);
+
+		put_page(page);
+thp_out:
+		spin_unlock(ptl);
+		return 0;
+	}
+
+	/* regular page handling */
+	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
+		return -EINVAL;
+
+	mapped_pte = pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+	for (; addr != end; pte++, addr += PAGE_SIZE) {
+		if (pte_none(*pte) || !pte_present(*pte))
+			continue;
+
+		page = damon_get_page(pte_pfn(*pte));
+		if (!page)
+			continue;
+
+		damos_isolate_page(page, demote_list);
+		put_page(page);
+	}
+	pte_unmap_unlock(mapped_pte, ptl);
+	cond_resched();
+
+	return 0;
+}
+
+static const struct mm_walk_ops damos_migrate_pages_walk_ops = {
+	.pmd_entry              = damos_migrate_pmd_entry,
+};
+
+/*
+ * damos_demote() - demote cold pages from fast memory to slow memory
+ * @target:    the given target
+ * @r:         region of the target
+ *
+ * On tiered memory system, if DAMON monitored cold pages on fast memory
+ * node (DRAM), we can demote them to slow memory node proactively in case
+ * accumulating much more cold memory on fast memory node (DRAM) to reclaim.
+ *
+ * Return:
+ * = 0 means no pages were demoted.
+ * > 0 means how many cold pages were demoted successfully.
+ * < 0 means errors happened.
+ */
+static int damos_demote(struct damon_target *target, struct damon_region *r)
+{
+	struct mm_struct *mm;
+	LIST_HEAD(demote_pages);
+	LIST_HEAD(pagelist);
+	int target_nid, nr_pages, ret = 0;
+	unsigned int nr_succeeded, demoted_pages = 0;
+	struct page *page, *page2;
+
+	/* Validate if allowing to do page demotion */
+	if (!numa_demotion_enabled)
+		return -EINVAL;
+
+	mm = damon_get_mm(target);
+	if (!mm)
+		return -ENOMEM;
+
+	mmap_read_lock(mm);
+	walk_page_range(mm, PAGE_ALIGN(r->ar.start), PAGE_ALIGN(r->ar.end),
+			&damos_migrate_pages_walk_ops, &demote_pages);
+	mmap_read_unlock(mm);
+
+	mmput(mm);
+	if (list_empty(&demote_pages))
+		return 0;
+
+	list_for_each_entry_safe(page, page2, &demote_pages, lru) {
+		list_add(&page->lru, &pagelist);
+		target_nid = next_demotion_node(page_to_nid(page));
+		nr_pages = thp_nr_pages(page);
+
+		ret = migrate_pages(&pagelist, alloc_demote_page, NULL,
+				    target_nid, MIGRATE_SYNC, MR_DEMOTION,
+				    &nr_succeeded);
+		if (ret) {
+			if (!list_empty(&pagelist)) {
+				list_del(&page->lru);
+				mod_node_page_state(page_pgdat(page),
+						    NR_ISOLATED_ANON + page_is_file_lru(page),
+						    -nr_pages);
+				putback_lru_page(page);
+			}
+		} else {
+			__count_vm_events(PGDEMOTE_DIRECT, nr_succeeded);
+			demoted_pages += nr_succeeded;
+		}
+
+		INIT_LIST_HEAD(&pagelist);
+		cond_resched();
+	}
+
+	return demoted_pages;
+}
+
 static unsigned long damon_va_apply_scheme(struct damon_ctx *ctx,
 		struct damon_target *t, struct damon_region *r,
 		struct damos *scheme)
@@ -619,6 +773,8 @@ static unsigned long damon_va_apply_scheme(struct damon_ctx *ctx,
 	case DAMOS_NOHUGEPAGE:
 		madv_action = MADV_NOHUGEPAGE;
 		break;
+	case DAMOS_DEMOTE:
+		return damos_demote(t, r);
 	case DAMOS_STAT:
 		return 0;
 	default:

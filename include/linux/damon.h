@@ -87,6 +87,8 @@ struct damon_target {
  * @DAMOS_PAGEOUT:	Call ``madvise()`` for the region with MADV_PAGEOUT.
  * @DAMOS_HUGEPAGE:	Call ``madvise()`` for the region with MADV_HUGEPAGE.
  * @DAMOS_NOHUGEPAGE:	Call ``madvise()`` for the region with MADV_NOHUGEPAGE.
+ * @DAMOS_DEMOTE:	Migate cold pages from fast memory type (DRAM) to slow
+ * memory type (persistent memory).
  * @DAMOS_STAT:		Do nothing but count the stat.
  */
 enum damos_action {
@@ -95,6 +97,7 @@ enum damos_action {
 	DAMOS_PAGEOUT,
 	DAMOS_HUGEPAGE,
 	DAMOS_NOHUGEPAGE,
+	DAMOS_DEMOTE,
 	DAMOS_STAT,		/* Do nothing but only record the stat */
 };
 
