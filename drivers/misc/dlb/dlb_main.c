@@ -21,6 +21,23 @@ static dev_t dlb_devt;
 static DEFINE_IDR(dlb_ids);
 static DEFINE_MUTEX(dlb_ids_lock);
 
+static int dlb_reset_device(struct pci_dev *pdev)
+{
+	int ret;
+
+	ret = pci_save_state(pdev);
+	if (ret)
+		return ret;
+
+	ret = __pci_reset_function_locked(pdev);
+	if (ret)
+		return ret;
+
+	pci_restore_state(pdev);
+
+	return 0;
+}
+
 static int dlb_device_create(struct dlb *dlb, struct pci_dev *pdev)
 {
 	/*
@@ -111,8 +128,35 @@ static int dlb_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	if (ret)
 		goto dma_set_mask_fail;
 
+	/*
+	 * PM enable must be done before any other MMIO accesses, and this
+	 * setting is persistent across device reset.
+	 */
+	dlb_pf_enable_pm(dlb);
+
+	ret = dlb_pf_wait_for_device_ready(dlb, pdev);
+	if (ret)
+		goto wait_for_device_ready_fail;
+
+	ret = dlb_reset_device(pdev);
+	if (ret)
+		goto dlb_reset_fail;
+
+	ret = dlb_resource_init(&dlb->hw);
+	if (ret)
+		goto resource_init_fail;
+
+	ret = dlb_pf_init_driver_state(dlb);
+	if (ret)
+		goto init_driver_state_fail;
+
 	return 0;
 
+init_driver_state_fail:
+	dlb_resource_free(&dlb->hw);
+resource_init_fail:
+dlb_reset_fail:
+wait_for_device_ready_fail:
 dma_set_mask_fail:
 	device_destroy(dlb_class, dlb->dev_number);
 map_pci_bar_fail:
@@ -128,6 +172,8 @@ alloc_id_fail:
 static void dlb_remove(struct pci_dev *pdev)
 {
 	struct dlb *dlb = pci_get_drvdata(pdev);
+
+	dlb_resource_free(&dlb->hw);
 
 	device_destroy(dlb_class, dlb->dev_number);
 
