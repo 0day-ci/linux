@@ -1761,7 +1761,7 @@ static struct mapped_device *alloc_dev(int minor)
 	 * established. If request-based table is loaded: blk-mq will
 	 * override accordingly.
 	 */
-	md->disk = blk_alloc_disk(md->numa_node_id);
+	md->disk = blk_alloc_disk_srcu(md->numa_node_id);
 	if (!md->disk)
 		goto bad;
 	md->queue = md->disk->queue;
@@ -2046,7 +2046,8 @@ int dm_setup_md_queue(struct mapped_device *md, struct dm_table *t)
 	switch (type) {
 	case DM_TYPE_REQUEST_BASED:
 		md->disk->fops = &dm_rq_blk_dops;
-		r = dm_mq_init_request_queue(md, t);
+		r = dm_mq_init_request_queue(md, t,
+				dm_table_has_blocking_dev(t));
 		if (r) {
 			DMERR("Cannot initialize queue for request-based dm mapped device");
 			return r;

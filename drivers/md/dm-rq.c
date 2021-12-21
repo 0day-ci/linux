@@ -535,7 +535,8 @@ static const struct blk_mq_ops dm_mq_ops = {
 	.init_request = dm_mq_init_request,
 };
 
-int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t)
+int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t,
+			     bool blocking)
 {
 	struct dm_target *immutable_tgt;
 	int err;
@@ -550,6 +551,8 @@ int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t)
 	md->tag_set->flags = BLK_MQ_F_SHOULD_MERGE | BLK_MQ_F_STACKING;
 	md->tag_set->nr_hw_queues = dm_get_blk_mq_nr_hw_queues();
 	md->tag_set->driver_data = md;
+	if (blocking)
+		md->tag_set->flags |= BLK_MQ_F_BLOCKING;
 
 	md->tag_set->cmd_size = sizeof(struct dm_rq_target_io);
 	immutable_tgt = dm_table_get_immutable_target(t);

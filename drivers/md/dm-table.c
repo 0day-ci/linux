@@ -1875,6 +1875,20 @@ static bool dm_table_supports_write_zeroes(struct dm_table *t)
 	return true;
 }
 
+/* If the device can block inside ->queue_rq */
+static int device_is_io_blocking(struct dm_target *ti, struct dm_dev *dev,
+			      sector_t start, sector_t len, void *data)
+{
+	struct request_queue *q = bdev_get_queue(dev->bdev);
+
+	return blk_queue_blocking(q);
+}
+
+bool dm_table_has_blocking_dev(struct dm_table *t)
+{
+	return dm_table_any_dev_attr(t, device_is_io_blocking, NULL);
+}
+
 static int device_not_nowait_capable(struct dm_target *ti, struct dm_dev *dev,
 				     sector_t start, sector_t len, void *data)
 {

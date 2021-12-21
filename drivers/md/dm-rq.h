@@ -30,7 +30,8 @@ struct dm_rq_clone_bio_info {
 	struct bio clone;
 };
 
-int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t);
+int dm_mq_init_request_queue(struct mapped_device *md, struct dm_table *t,
+			     bool blocking);
 void dm_mq_cleanup_mapped_device(struct mapped_device *md);
 
 void dm_start_queue(struct request_queue *q);
