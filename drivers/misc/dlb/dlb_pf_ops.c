@@ -2,6 +2,7 @@
 /* Copyright(C) 2016-2020 Intel Corporation. All rights reserved. */
 
 #include <linux/delay.h>
+#include <linux/pm_runtime.h>
 
 #include "dlb_main.h"
 #include "dlb_regs.h"
@@ -42,6 +43,13 @@ int dlb_pf_map_pci_bar_space(struct dlb *dlb, struct pci_dev *pdev)
 int dlb_pf_init_driver_state(struct dlb *dlb)
 {
 	mutex_init(&dlb->resource_mutex);
+
+	/*
+	 * Allow PF runtime power-management (forbidden by default by the PCI
+	 * layer during scan). The driver puts the device into D3hot while
+	 * there are no scheduling domains to service.
+	 */
+	pm_runtime_allow(&dlb->pdev->dev);
 
 	return 0;
 }

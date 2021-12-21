@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/pm_runtime.h>
 #include <linux/uaccess.h>
 
 #include "dlb_main.h"
@@ -72,12 +73,32 @@ static int dlb_open(struct inode *i, struct file *f)
 	f->private_data = dlb;
 	dlb->f = f;
 
+	/*
+	 * Increment the device's usage count and immediately wake it
+	 * if it was suspended.
+	 */
+	pm_runtime_get_sync(&dlb->pdev->dev);
+
+	return 0;
+}
+
+static int dlb_close(struct inode *i, struct file *f)
+{
+	struct dlb *dlb = f->private_data;
+
+	/*
+	 * Decrement the device's usage count and suspend it when
+	 * the application stops using it.
+	 */
+	pm_runtime_put_sync_suspend(&dlb->pdev->dev);
+
 	return 0;
 }
 
 static const struct file_operations dlb_fops = {
 	.owner   = THIS_MODULE,
 	.open    = dlb_open,
+	.release = dlb_close,
 };
 
 int dlb_init_domain(struct dlb *dlb, u32 domain_id)
@@ -94,6 +115,12 @@ int dlb_init_domain(struct dlb *dlb, u32 domain_id)
 	domain->dlb = dlb;
 
 	dlb->sched_domains[domain_id] = domain;
+
+	/*
+	 * The matching put is in dlb_free_domain, executed when the domain's
+	 * refcnt reaches zero.
+	 */
+	pm_runtime_get_sync(&dlb->pdev->dev);
 
 	return 0;
 }
@@ -119,7 +146,21 @@ static int __dlb_free_domain(struct dlb_domain *domain)
 
 void dlb_free_domain(struct kref *kref)
 {
-	__dlb_free_domain(container_of(kref, struct dlb_domain, refcnt));
+	struct dlb_domain *domain;
+	struct dlb *dlb;
+
+	domain = container_of(kref, struct dlb_domain, refcnt);
+
+	dlb = domain->dlb;
+
+	__dlb_free_domain(domain);
+
+	/*
+	 * Decrement the device's usage count and suspend it when
+	 * the last application stops using it. The matching get is in
+	 * dlb_init_domain.
+	 */
+	pm_runtime_put_sync_suspend(&dlb->pdev->dev);
 }
 
 static int dlb_domain_close(struct inode *i, struct file *f)
@@ -230,6 +271,14 @@ static int dlb_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	if (ret)
 		goto init_driver_state_fail;
 
+	/*
+	 * Undo the 'get' operation by the PCI layer during probe and
+	 * (if PF) immediately suspend the device. Since the device is only
+	 * enabled when an application requests it, an autosuspend delay is
+	 * likely not beneficial.
+	 */
+	pm_runtime_put_sync_suspend(&pdev->dev);
+
 	return 0;
 
 init_driver_state_fail:
@@ -254,6 +303,9 @@ static void dlb_remove(struct pci_dev *pdev)
 {
 	struct dlb *dlb = pci_get_drvdata(pdev);
 
+	/* Undo the PM operation in dlb_probe(). */
+	pm_runtime_get_noresume(&pdev->dev);
+
 	dlb_resource_free(&dlb->hw);
 
 	device_destroy(dlb_class, dlb->dev_number);
@@ -265,17 +317,61 @@ static void dlb_remove(struct pci_dev *pdev)
 	mutex_unlock(&dlb_ids_lock);
 }
 
+#ifdef CONFIG_PM
+static void dlb_reset_hardware_state(struct dlb *dlb)
+{
+	dlb_reset_device(dlb->pdev);
+}
+
+static int dlb_runtime_suspend(struct device *dev)
+{
+	/* Return and let the PCI subsystem put the device in D3hot. */
+
+	return 0;
+}
+
+static int dlb_runtime_resume(struct device *dev)
+{
+	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
+	struct dlb *dlb = pci_get_drvdata(pdev);
+	int ret;
+
+	/*
+	 * The PCI subsystem put the device in D0, but the device may not have
+	 * completed powering up. Wait until the device is ready before
+	 * proceeding.
+	 */
+	ret = dlb_pf_wait_for_device_ready(dlb, pdev);
+	if (ret)
+		return ret;
+
+	/* Now reinitialize the device state. */
+	dlb_reset_hardware_state(dlb);
+
+	return 0;
+}
+#endif
+
 static struct pci_device_id dlb_id_table[] = {
 	{ PCI_DEVICE_DATA(INTEL, DLB_PF, DLB_PF) },
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, dlb_id_table);
 
+#ifdef CONFIG_PM
+static const struct dev_pm_ops dlb_pm_ops = {
+	SET_RUNTIME_PM_OPS(dlb_runtime_suspend, dlb_runtime_resume, NULL)
+};
+#endif
+
 static struct pci_driver dlb_pci_driver = {
 	.name		 = "dlb",
 	.id_table	 = dlb_id_table,
 	.probe		 = dlb_probe,
 	.remove		 = dlb_remove,
+#ifdef CONFIG_PM
+	.driver.pm	 = &dlb_pm_ops,
+#endif
 };
 
 static int __init dlb_init_module(void)
