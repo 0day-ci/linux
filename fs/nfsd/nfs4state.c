@@ -6942,6 +6942,11 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		goto out;
 	}
 
+	if (!nf) {
+		status = nfserr_openmode;
+		goto out;
+	}
+
 	/*
 	 * Most filesystems with their own ->lock operations will block
 	 * the nfsd thread waiting to acquire the lock.  That leads to
@@ -6951,11 +6956,6 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	 */
 	if (nf->nf_file->f_op->lock)
 		fl_flags &= ~FL_SLEEP;
-
-	if (!nf) {
-		status = nfserr_openmode;
-		goto out;
-	}
 
 	nbl = find_or_allocate_block(lock_sop, &fp->fi_fhandle, nn);
 	if (!nbl) {
