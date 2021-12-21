@@ -74,10 +74,8 @@ enum vm_guest_mode {
 #if defined(__x86_64__)
 unsigned long vm_compute_max_gfn(struct kvm_vm *vm);
 #else
-static inline unsigned long vm_compute_max_gfn(struct kvm_vm *vm)
-{
-	return ((1ULL << vm->pa_bits) >> vm->page_shift) - 1;
-}
+#define vm_compute_max_gfn(vm) \
+	((unsigned long)(((1ULL << (vm)->pa_bits) >> (vm)->page_shift) - 1))
 #endif
 
 #define MIN_PAGE_SIZE		(1U << MIN_PAGE_SHIFT)
