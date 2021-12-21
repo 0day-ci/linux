@@ -890,6 +890,390 @@ static int dlb_domain_reset_software_state(struct dlb_hw *hw,
 	return 0;
 }
 
+static void __dlb_domain_reset_ldb_port_registers(struct dlb_hw *hw,
+						  struct dlb_ldb_port *port)
+{
+	DLB_CSR_WR(hw,
+		   SYS_LDB_PP2VAS(port->id),
+		   SYS_LDB_PP2VAS_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ2VAS(port->id),
+		   CHP_LDB_CQ2VAS_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_PP2VDEV(port->id),
+		   SYS_LDB_PP2VDEV_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_PP_V(port->id),
+		   SYS_LDB_PP_V_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_LDB_DSBL(port->id),
+		   LSP_CQ_LDB_DSBL_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ_DEPTH(port->id),
+		   CHP_LDB_CQ_DEPTH_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_LDB_INFL_LIM(port->id),
+		   LSP_CQ_LDB_INFL_LIM_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_HIST_LIST_LIM(port->id),
+		   CHP_HIST_LIST_LIM_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_HIST_LIST_BASE(port->id),
+		   CHP_HIST_LIST_BASE_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_HIST_LIST_POP_PTR(port->id),
+		   CHP_HIST_LIST_POP_PTR_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_HIST_LIST_PUSH_PTR(port->id),
+		   CHP_HIST_LIST_PUSH_PTR_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ_INT_DEPTH_THRSH(port->id),
+		   CHP_LDB_CQ_INT_DEPTH_THRSH_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ_TMR_THRSH(port->id),
+		   CHP_LDB_CQ_TMR_THRSH_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ_INT_ENB(port->id),
+		   CHP_LDB_CQ_INT_ENB_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_CQ_ISR(port->id),
+		   SYS_LDB_CQ_ISR_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_LDB_TKN_DEPTH_SEL(port->id),
+		   LSP_CQ_LDB_TKN_DEPTH_SEL_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ_TKN_DEPTH_SEL(port->id),
+		   CHP_LDB_CQ_TKN_DEPTH_SEL_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_LDB_CQ_WPTR(port->id),
+		   CHP_LDB_CQ_WPTR_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_LDB_TKN_CNT(port->id),
+		   LSP_CQ_LDB_TKN_CNT_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_CQ_ADDR_L(port->id),
+		   SYS_LDB_CQ_ADDR_L_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_CQ_ADDR_U(port->id),
+		   SYS_LDB_CQ_ADDR_U_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_CQ_AT(port->id),
+		   SYS_LDB_CQ_AT_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_CQ_PASID(port->id),
+		   SYS_LDB_CQ_PASID_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_LDB_CQ2VF_PF_RO(port->id),
+		   SYS_LDB_CQ2VF_PF_RO_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_LDB_TOT_SCH_CNTL(port->id),
+		   LSP_CQ_LDB_TOT_SCH_CNTL_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_LDB_TOT_SCH_CNTH(port->id),
+		   LSP_CQ_LDB_TOT_SCH_CNTH_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ2QID0(port->id),
+		   LSP_CQ2QID0_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ2QID1(port->id),
+		   LSP_CQ2QID1_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ2PRIOV(port->id),
+		   LSP_CQ2PRIOV_RST);
+}
+
+static void dlb_domain_reset_ldb_port_registers(struct dlb_hw *hw,
+						struct dlb_hw_domain *domain)
+{
+	struct dlb_ldb_port *port;
+	int i;
+
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++) {
+		list_for_each_entry(port, &domain->used_ldb_ports[i], domain_list)
+			__dlb_domain_reset_ldb_port_registers(hw, port);
+	}
+}
+
+static void
+__dlb_domain_reset_dir_port_registers(struct dlb_hw *hw,
+				      struct dlb_dir_pq_pair *port)
+{
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ2VAS(port->id),
+		   CHP_DIR_CQ2VAS_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_DIR_DSBL(port->id),
+		   LSP_CQ_DIR_DSBL_RST);
+
+	DLB_CSR_WR(hw, SYS_DIR_CQ_OPT_CLR, port->id);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ_DEPTH(port->id),
+		   CHP_DIR_CQ_DEPTH_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ_INT_DEPTH_THRSH(port->id),
+		   CHP_DIR_CQ_INT_DEPTH_THRSH_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ_TMR_THRSH(port->id),
+		   CHP_DIR_CQ_TMR_THRSH_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ_INT_ENB(port->id),
+		   CHP_DIR_CQ_INT_ENB_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ_ISR(port->id),
+		   SYS_DIR_CQ_ISR_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_DIR_TKN_DEPTH_SEL_DSI(port->id),
+		   LSP_CQ_DIR_TKN_DEPTH_SEL_DSI_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ_TKN_DEPTH_SEL(port->id),
+		   CHP_DIR_CQ_TKN_DEPTH_SEL_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ_WPTR(port->id),
+		   CHP_DIR_CQ_WPTR_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_DIR_TKN_CNT(port->id),
+		   LSP_CQ_DIR_TKN_CNT_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ_ADDR_L(port->id),
+		   SYS_DIR_CQ_ADDR_L_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ_ADDR_U(port->id),
+		   SYS_DIR_CQ_ADDR_U_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ_AT(port->id),
+		   SYS_DIR_CQ_AT_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ_PASID(port->id),
+		   SYS_DIR_CQ_PASID_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ_FMT(port->id),
+		   SYS_DIR_CQ_FMT_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_CQ2VF_PF_RO(port->id),
+		   SYS_DIR_CQ2VF_PF_RO_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_DIR_TOT_SCH_CNTL(port->id),
+		   LSP_CQ_DIR_TOT_SCH_CNTL_RST);
+
+	DLB_CSR_WR(hw,
+		   LSP_CQ_DIR_TOT_SCH_CNTH(port->id),
+		   LSP_CQ_DIR_TOT_SCH_CNTH_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_PP2VAS(port->id),
+		   SYS_DIR_PP2VAS_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_DIR_CQ2VAS(port->id),
+		   CHP_DIR_CQ2VAS_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_PP2VDEV(port->id),
+		   SYS_DIR_PP2VDEV_RST);
+
+	DLB_CSR_WR(hw,
+		   SYS_DIR_PP_V(port->id),
+		   SYS_DIR_PP_V_RST);
+}
+
+static void dlb_domain_reset_dir_port_registers(struct dlb_hw *hw,
+						struct dlb_hw_domain *domain)
+{
+	struct dlb_dir_pq_pair *port;
+
+	list_for_each_entry(port, &domain->used_dir_pq_pairs, domain_list)
+		__dlb_domain_reset_dir_port_registers(hw, port);
+}
+
+static void dlb_domain_reset_ldb_queue_registers(struct dlb_hw *hw,
+						 struct dlb_hw_domain *domain)
+{
+	struct dlb_ldb_queue *queue;
+
+	list_for_each_entry(queue, &domain->used_ldb_queues, domain_list) {
+		unsigned int queue_id = queue->id;
+		int i;
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_NALDB_TOT_ENQ_CNTL(queue_id),
+			   LSP_QID_NALDB_TOT_ENQ_CNTL_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_NALDB_TOT_ENQ_CNTH(queue_id),
+			   LSP_QID_NALDB_TOT_ENQ_CNTH_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_ATM_TOT_ENQ_CNTL(queue_id),
+			   LSP_QID_ATM_TOT_ENQ_CNTL_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_ATM_TOT_ENQ_CNTH(queue_id),
+			   LSP_QID_ATM_TOT_ENQ_CNTH_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_NALDB_MAX_DEPTH(queue_id),
+			   LSP_QID_NALDB_MAX_DEPTH_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_LDB_INFL_LIM(queue_id),
+			   LSP_QID_LDB_INFL_LIM_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_AQED_ACTIVE_LIM(queue_id),
+			   LSP_QID_AQED_ACTIVE_LIM_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_ATM_DEPTH_THRSH(queue_id),
+			   LSP_QID_ATM_DEPTH_THRSH_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_NALDB_DEPTH_THRSH(queue_id),
+			   LSP_QID_NALDB_DEPTH_THRSH_RST);
+
+		DLB_CSR_WR(hw,
+			   SYS_LDB_QID_ITS(queue_id),
+			   SYS_LDB_QID_ITS_RST);
+
+		DLB_CSR_WR(hw,
+			   CHP_ORD_QID_SN(queue_id),
+			   CHP_ORD_QID_SN_RST);
+
+		DLB_CSR_WR(hw,
+			   CHP_ORD_QID_SN_MAP(queue_id),
+			   CHP_ORD_QID_SN_MAP_RST);
+
+		DLB_CSR_WR(hw,
+			   SYS_LDB_QID_V(queue_id),
+			   SYS_LDB_QID_V_RST);
+
+		DLB_CSR_WR(hw,
+			   SYS_LDB_QID_CFG_V(queue_id),
+			   SYS_LDB_QID_CFG_V_RST);
+
+		if (queue->sn_cfg_valid) {
+			u32 offs[2];
+
+			offs[0] = RO_GRP_0_SLT_SHFT(queue->sn_slot);
+			offs[1] = RO_GRP_1_SLT_SHFT(queue->sn_slot);
+
+			DLB_CSR_WR(hw,
+				   offs[queue->sn_group],
+				   RO_GRP_0_SLT_SHFT_RST);
+		}
+
+		for (i = 0; i < LSP_QID2CQIDIX_NUM; i++) {
+			DLB_CSR_WR(hw,
+				   LSP_QID2CQIDIX(queue_id, i),
+				   LSP_QID2CQIDIX_00_RST);
+
+			DLB_CSR_WR(hw,
+				   LSP_QID2CQIDIX2(queue_id, i),
+				   LSP_QID2CQIDIX2_00_RST);
+
+			DLB_CSR_WR(hw,
+				   ATM_QID2CQIDIX(queue_id, i),
+				   ATM_QID2CQIDIX_00_RST);
+		}
+	}
+}
+
+static void dlb_domain_reset_dir_queue_registers(struct dlb_hw *hw,
+						 struct dlb_hw_domain *domain)
+{
+	struct dlb_dir_pq_pair *queue;
+
+	list_for_each_entry(queue, &domain->used_dir_pq_pairs, domain_list) {
+		DLB_CSR_WR(hw,
+			   LSP_QID_DIR_MAX_DEPTH(queue->id),
+			   LSP_QID_DIR_MAX_DEPTH_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_DIR_TOT_ENQ_CNTL(queue->id),
+			   LSP_QID_DIR_TOT_ENQ_CNTL_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_DIR_TOT_ENQ_CNTH(queue->id),
+			   LSP_QID_DIR_TOT_ENQ_CNTH_RST);
+
+		DLB_CSR_WR(hw,
+			   LSP_QID_DIR_DEPTH_THRSH(queue->id),
+			   LSP_QID_DIR_DEPTH_THRSH_RST);
+
+		DLB_CSR_WR(hw,
+			   SYS_DIR_QID_ITS(queue->id),
+			   SYS_DIR_QID_ITS_RST);
+
+		DLB_CSR_WR(hw,
+			   SYS_DIR_QID_V(queue->id),
+			   SYS_DIR_QID_V_RST);
+	}
+}
+
+static void dlb_domain_reset_registers(struct dlb_hw *hw,
+				       struct dlb_hw_domain *domain)
+{
+	dlb_domain_reset_ldb_port_registers(hw, domain);
+
+	dlb_domain_reset_dir_port_registers(hw, domain);
+
+	dlb_domain_reset_ldb_queue_registers(hw, domain);
+
+	dlb_domain_reset_dir_queue_registers(hw, domain);
+
+	DLB_CSR_WR(hw,
+		   CHP_CFG_LDB_VAS_CRD(domain->id),
+		   CHP_CFG_LDB_VAS_CRD_RST);
+
+	DLB_CSR_WR(hw,
+		   CHP_CFG_DIR_VAS_CRD(domain->id),
+		   CHP_CFG_DIR_VAS_CRD_RST);
+}
+
 static void dlb_log_reset_domain(struct dlb_hw *hw, u32 domain_id)
 {
 	dev_dbg(hw_to_dev(hw), "DLB reset domain:\n");
@@ -926,6 +1310,9 @@ int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id)
 
 	if (!domain || !domain->configured)
 		return -EINVAL;
+
+	/* Reset the QID and port state. */
+	dlb_domain_reset_registers(hw, domain);
 
 	return dlb_domain_reset_software_state(hw, domain);
 }
