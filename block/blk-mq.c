@@ -259,7 +259,7 @@ EXPORT_SYMBOL_GPL(blk_mq_quiesce_queue_nowait);
  */
 void blk_mq_wait_quiesce_done(struct request_queue *q)
 {
-	if (blk_queue_has_srcu(q))
+	if (blk_queue_blocking(q))
 		synchronize_srcu(q->srcu);
 	else
 		synchronize_rcu();
@@ -4024,8 +4024,8 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 int blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 		struct request_queue *q)
 {
-	WARN_ON_ONCE(blk_queue_has_srcu(q) !=
-			!!(set->flags & BLK_MQ_F_BLOCKING));
+	if (set->flags & BLK_MQ_F_BLOCKING)
+		blk_queue_flag_set(QUEUE_FLAG_BLOCKING, q);
 
 	/* mark the queue as mq asap */
 	q->mq_ops = set->ops;

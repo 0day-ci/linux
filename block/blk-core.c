@@ -449,7 +449,7 @@ struct request_queue *blk_alloc_queue(int node_id, bool alloc_srcu)
 		return NULL;
 
 	if (alloc_srcu) {
-		blk_queue_flag_set(QUEUE_FLAG_HAS_SRCU, q);
+		q->has_srcu = true;
 		if (init_srcu_struct(q->srcu) != 0)
 			goto fail_q;
 	}
