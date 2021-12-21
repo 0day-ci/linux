@@ -126,8 +126,11 @@
  * IN_FORMATS:
  *     Blob property which contains the set of buffer format and modifier
  *     pairs supported by this plane. The blob is a struct
- *     drm_format_modifier_blob. Without this property the plane doesn't
- *     support buffers with modifiers. Userspace cannot change this property.
+ *     drm_format_modifier_blob and the drm_plane_funcs.format_mod_supported
+ *     function must be implemented by the driver to determine if the given
+ *     format/modifier combination is valid for the plane. Without this property
+ *     the plane doesn't support buffers with modifiers. Userspace cannot change
+ *     this property.
  *
  *     Note that userspace can check the &DRM_CAP_ADDFB2_MODIFIERS driver
  *     capability for general modifier support. If this flag is set then every
