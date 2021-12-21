@@ -56,6 +56,7 @@ struct adt7x10_data {
 	const struct adt7x10_ops *ops;
 	const char		*name;
 	struct device		*hwmon_dev;
+	struct device		*bus_dev;
 	struct mutex		update_lock;
 	u8			config;
 	u8			oldconfig;
@@ -368,6 +369,7 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 
 	data->ops = ops;
 	data->name = name;
+	data->bus_dev = dev;
 
 	dev_set_drvdata(dev, data);
 	mutex_init(&data->update_lock);
