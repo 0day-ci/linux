@@ -48,12 +48,6 @@ static int adt7410_i2c_probe(struct i2c_client *client)
 	return adt7x10_probe(&client->dev, client->name, client->irq, &adt7410_i2c_ops);
 }
 
-static int adt7410_i2c_remove(struct i2c_client *client)
-{
-	adt7x10_remove(&client->dev, client->irq);
-	return 0;
-}
-
 static const struct i2c_device_id adt7410_ids[] = {
 	{ "adt7410", 0 },
 	{ "adt7420", 0 },
@@ -68,7 +62,6 @@ static struct i2c_driver adt7410_driver = {
 		.pm	= ADT7X10_DEV_PM_OPS,
 	},
 	.probe_new	= adt7410_i2c_probe,
-	.remove		= adt7410_i2c_remove,
 	.id_table	= adt7410_ids,
 	.address_list	= I2C_ADDRS(0x48, 0x49, 0x4a, 0x4b),
 };
