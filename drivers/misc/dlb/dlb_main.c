@@ -125,12 +125,56 @@ int dlb_init_domain(struct dlb *dlb, u32 domain_id)
 	return 0;
 }
 
+static void dlb_release_port_memory(struct dlb *dlb,
+				    struct dlb_port *port,
+				    bool check_domain,
+				    u32 domain_id)
+{
+	if (port->valid &&
+	    (!check_domain || port->domain->id == domain_id))
+		dma_free_coherent(&dlb->pdev->dev,
+				  DLB_CQ_SIZE,
+				  port->cq_base,
+				  port->cq_dma_base);
+
+	port->valid = false;
+}
+
+static void dlb_release_domain_memory(struct dlb *dlb,
+				      bool check_domain,
+				      u32 domain_id)
+{
+	struct dlb_port *port;
+	int i;
+
+	for (i = 0; i < DLB_MAX_NUM_LDB_PORTS; i++) {
+		port = &dlb->ldb_port[i];
+
+		dlb_release_port_memory(dlb, port, check_domain, domain_id);
+	}
+
+	for (i = 0; i < DLB_MAX_NUM_DIR_PORTS; i++) {
+		port = &dlb->dir_port[i];
+
+		dlb_release_port_memory(dlb, port, check_domain, domain_id);
+	}
+}
+
+static void dlb_release_device_memory(struct dlb *dlb)
+{
+	dlb_release_domain_memory(dlb, false, 0);
+}
+
 static int __dlb_free_domain(struct dlb_domain *domain)
 {
 	struct dlb *dlb = domain->dlb;
 	int ret;
 
 	ret = dlb_reset_domain(&dlb->hw, domain->id);
+
+	/* Unpin and free all memory pages associated with the domain */
+	dlb_release_domain_memory(dlb, true, domain->id);
+
 	if (ret) {
 		dlb->domain_reset_failed = true;
 		dev_err(dlb->dev,
@@ -271,6 +315,8 @@ static int dlb_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	if (ret)
 		goto init_driver_state_fail;
 
+	dlb_pf_init_hardware(dlb);
+
 	/*
 	 * Undo the 'get' operation by the PCI layer during probe and
 	 * (if PF) immediately suspend the device. Since the device is only
@@ -308,6 +354,8 @@ static void dlb_remove(struct pci_dev *pdev)
 
 	dlb_resource_free(&dlb->hw);
 
+	dlb_release_device_memory(dlb);
+
 	device_destroy(dlb_class, dlb->dev_number);
 
 	pci_disable_pcie_error_reporting(pdev);
@@ -321,6 +369,9 @@ static void dlb_remove(struct pci_dev *pdev)
 static void dlb_reset_hardware_state(struct dlb *dlb)
 {
 	dlb_reset_device(dlb->pdev);
+
+	/* Reinitialize any other hardware state */
+	dlb_pf_init_hardware(dlb);
 }
 
 static int dlb_runtime_suspend(struct device *dev)

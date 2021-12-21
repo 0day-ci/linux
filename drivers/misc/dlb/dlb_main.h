@@ -329,8 +329,18 @@ void dlb_pf_unmap_pci_bar_space(struct dlb *dlb, struct pci_dev *pdev);
 int dlb_pf_init_driver_state(struct dlb *dlb);
 void dlb_pf_enable_pm(struct dlb *dlb);
 int dlb_pf_wait_for_device_ready(struct dlb *dlb, struct pci_dev *pdev);
+void dlb_pf_init_hardware(struct dlb *dlb);
 
 extern const struct file_operations dlb_domain_fops;
+
+struct dlb_port {
+	void *cq_base;
+	dma_addr_t cq_dma_base;
+	struct dlb_domain *domain;
+	int id;
+	u8 is_ldb;
+	u8 valid;
+};
 
 struct dlb_domain {
 	struct dlb *dlb;
@@ -344,6 +354,8 @@ struct dlb {
 	struct device *dev;
 	struct dlb_domain *sched_domains[DLB_MAX_NUM_DOMAINS];
 	struct file *f;
+	struct dlb_port ldb_port[DLB_MAX_NUM_LDB_PORTS];
+	struct dlb_port dir_port[DLB_MAX_NUM_DIR_PORTS];
 	/*
 	 * The resource mutex serializes access to driver data structures and
 	 * hardware registers.
@@ -576,6 +588,14 @@ int dlb_hw_create_ldb_queue(struct dlb_hw *hw, u32 domain_id,
 int dlb_hw_create_dir_queue(struct dlb_hw *hw, u32 domain_id,
 			    struct dlb_create_dir_queue_args *args,
 			    struct dlb_cmd_response *resp);
+int dlb_hw_create_dir_port(struct dlb_hw *hw, u32 domain_id,
+			   struct dlb_create_dir_port_args *args,
+			   uintptr_t cq_dma_base,
+			   struct dlb_cmd_response *resp);
+int dlb_hw_create_ldb_port(struct dlb_hw *hw, u32 domain_id,
+			   struct dlb_create_ldb_port_args *args,
+			   uintptr_t cq_dma_base,
+			   struct dlb_cmd_response *resp);
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
 void dlb_clr_pmcsr_disable(struct dlb_hw *hw);
 int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
@@ -584,6 +604,8 @@ int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
 int dlb_hw_get_dir_queue_depth(struct dlb_hw *hw, u32 domain_id,
 			       struct dlb_get_dir_queue_depth_args *args,
 			       struct dlb_cmd_response *resp);
+void dlb_hw_enable_sparse_ldb_cq_mode(struct dlb_hw *hw);
+void dlb_hw_enable_sparse_dir_cq_mode(struct dlb_hw *hw);
 
 /* Prototypes for dlb_configfs.c */
 int dlb_configfs_create_device(struct dlb *dlb);

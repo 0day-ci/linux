@@ -884,6 +884,163 @@ static void dlb_configure_dir_queue(struct dlb_hw *hw,
 	queue->queue_configured = true;
 }
 
+static bool
+dlb_cq_depth_is_valid(u32 depth)
+{
+	/* Valid values for depth are
+	 * 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, and 1024.
+	 */
+	if (!is_power_of_2(depth) || depth > 1024)
+		return false;
+
+	return true;
+}
+
+static int
+dlb_verify_create_ldb_port_args(struct dlb_hw *hw, u32 domain_id,
+				uintptr_t cq_dma_base,
+				struct dlb_create_ldb_port_args *args,
+				struct dlb_cmd_response *resp,
+				struct dlb_hw_domain **out_domain,
+				struct dlb_ldb_port **out_port, int *out_cos_id)
+{
+	struct dlb_ldb_port *port = NULL;
+	struct dlb_hw_domain *domain;
+	int i, id;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	if (domain->started) {
+		resp->status = DLB_ST_DOMAIN_STARTED;
+		return -EINVAL;
+	}
+
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++) {
+		id = i % DLB_NUM_COS_DOMAINS;
+
+		port = list_first_entry_or_null(&domain->avail_ldb_ports[id],
+						typeof(*port), domain_list);
+		if (port)
+			break;
+	}
+
+	if (!port) {
+		resp->status = DLB_ST_LDB_PORTS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	/* DLB requires 64B alignment */
+	if (!IS_ALIGNED(cq_dma_base, 64)) {
+		resp->status = DLB_ST_INVALID_CQ_VIRT_ADDR;
+		return -EINVAL;
+	}
+
+	if (!dlb_cq_depth_is_valid(args->cq_depth)) {
+		resp->status = DLB_ST_INVALID_CQ_DEPTH;
+		return -EINVAL;
+	}
+
+	/* The history list size must be >= 1 */
+	if (!args->cq_history_list_size) {
+		resp->status = DLB_ST_INVALID_HIST_LIST_DEPTH;
+		return -EINVAL;
+	}
+
+	if (args->cq_history_list_size > domain->avail_hist_list_entries) {
+		resp->status = DLB_ST_HIST_LIST_ENTRIES_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+	*out_port = port;
+	*out_cos_id = id;
+
+	return 0;
+}
+
+static int
+dlb_verify_create_dir_port_args(struct dlb_hw *hw, u32 domain_id,
+				uintptr_t cq_dma_base,
+				struct dlb_create_dir_port_args *args,
+				struct dlb_cmd_response *resp,
+				struct dlb_hw_domain **out_domain,
+				struct dlb_dir_pq_pair **out_port)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_dir_pq_pair *pq;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	if (domain->started) {
+		resp->status = DLB_ST_DOMAIN_STARTED;
+		return -EINVAL;
+	}
+
+	if (args->queue_id != -1) {
+		/*
+		 * If the user claims the queue is already configured, validate
+		 * the queue ID, its domain, and whether the queue is
+		 * configured.
+		 */
+		pq = dlb_get_domain_used_dir_pq(args->queue_id,
+						false,
+						domain);
+
+		if (!pq || pq->domain_id != domain->id ||
+		    !pq->queue_configured) {
+			resp->status = DLB_ST_INVALID_DIR_QUEUE_ID;
+			return -EINVAL;
+		}
+	} else {
+		/*
+		 * If the port's queue is not configured, validate that a free
+		 * port-queue pair is available.
+		 */
+		pq = list_first_entry_or_null(&domain->avail_dir_pq_pairs,
+					      typeof(*pq), domain_list);
+		if (!pq) {
+			resp->status = DLB_ST_DIR_PORTS_UNAVAILABLE;
+			return -EINVAL;
+		}
+	}
+
+	/* DLB requires 64B alignment */
+	if (!IS_ALIGNED(cq_dma_base, 64)) {
+		resp->status = DLB_ST_INVALID_CQ_VIRT_ADDR;
+		return -EINVAL;
+	}
+
+	if (!dlb_cq_depth_is_valid(args->cq_depth)) {
+		resp->status = DLB_ST_INVALID_CQ_DEPTH;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+	*out_port = pq;
+
+	return 0;
+}
+
 static void dlb_configure_domain_credits(struct dlb_hw *hw,
 					 struct dlb_hw_domain *domain)
 {
@@ -1283,6 +1440,146 @@ int dlb_hw_create_dir_queue(struct dlb_hw *hw, u32 domain_id,
 	resp->status = 0;
 
 	resp->id = queue->id;
+
+	return 0;
+}
+
+static void
+dlb_log_create_ldb_port_args(struct dlb_hw *hw, u32 domain_id,
+			     uintptr_t cq_dma_base,
+			     struct dlb_create_ldb_port_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB create load-balanced port arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID:                 %d\n",
+		domain_id);
+	dev_dbg(hw_to_dev(hw), "\tCQ depth:                  %d\n",
+		args->cq_depth);
+	dev_dbg(hw_to_dev(hw), "\tCQ hist list size:         %d\n",
+		args->cq_history_list_size);
+	dev_dbg(hw_to_dev(hw), "\tCQ base address:           0x%lx\n",
+		cq_dma_base);
+}
+
+/**
+ * dlb_hw_create_ldb_port() - create a load-balanced port
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: port creation arguments.
+ * @cq_dma_base: base address of the CQ memory. This can be a PA or an IOVA.
+ * @resp: response structure.
+ *
+ * This function creates a load-balanced port.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the port ID.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, a credit setting is invalid, a
+ *	    pointer address is not properly aligned, the domain is not
+ *	    configured, or the domain has already been started.
+ * EFAULT - Internal error (resp->status not set).
+ */
+int dlb_hw_create_ldb_port(struct dlb_hw *hw, u32 domain_id,
+			   struct dlb_create_ldb_port_args *args,
+			   uintptr_t cq_dma_base,
+			   struct dlb_cmd_response *resp)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_port *port;
+	int ret, cos_id;
+
+	dlb_log_create_ldb_port_args(hw, domain_id, cq_dma_base,
+				     args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_create_ldb_port_args(hw, domain_id, cq_dma_base, args,
+					      resp, &domain,
+					      &port, &cos_id);
+	if (ret)
+		return ret;
+
+	/*
+	 * Configuration succeeded, so move the resource from the 'avail' to
+	 * the 'used' list.
+	 */
+	list_move(&port->domain_list, &domain->used_ldb_ports[cos_id]);
+
+	resp->status = 0;
+	resp->id = port->id;
+
+	return 0;
+}
+
+static void
+dlb_log_create_dir_port_args(struct dlb_hw *hw,
+			     u32 domain_id, uintptr_t cq_dma_base,
+			     struct dlb_create_dir_port_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB create directed port arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID:                 %d\n",
+		domain_id);
+	dev_dbg(hw_to_dev(hw), "\tCQ depth:                  %d\n",
+		args->cq_depth);
+	dev_dbg(hw_to_dev(hw), "\tCQ base address:           0x%lx\n",
+		cq_dma_base);
+}
+
+/**
+ * dlb_hw_create_dir_port() - create a directed port
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: port creation arguments.
+ * @cq_dma_base: base address of the CQ memory. This can be a PA or an IOVA.
+ * @resp: response structure.
+ *
+ * This function creates a directed port.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the port ID.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, a credit setting is invalid, a
+ *	    pointer address is not properly aligned, the domain is not
+ *	    configured, or the domain has already been started.
+ * EFAULT - Internal error (resp->status not set).
+ */
+int dlb_hw_create_dir_port(struct dlb_hw *hw, u32 domain_id,
+			   struct dlb_create_dir_port_args *args,
+			   uintptr_t cq_dma_base,
+			   struct dlb_cmd_response *resp)
+{
+	struct dlb_dir_pq_pair *port;
+	struct dlb_hw_domain *domain;
+	int ret;
+
+	dlb_log_create_dir_port_args(hw, domain_id, cq_dma_base, args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_create_dir_port_args(hw, domain_id, cq_dma_base,
+					      args, resp,
+					      &domain, &port);
+	if (ret)
+		return ret;
+
+	/*
+	 * Configuration succeeded, so move the resource from the 'avail' to
+	 * the 'used' list (if it's not already there).
+	 */
+	if (args->queue_id == -1)
+		list_move(&port->domain_list, &domain->used_dir_pq_pairs);
+
+	resp->status = 0;
+	resp->id = port->id;
 
 	return 0;
 }
@@ -2400,6 +2697,15 @@ int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id)
 
 	dlb_domain_disable_ldb_queue_write_perms(hw, domain);
 
+	/*
+	 * Disable the LDB CQs and drain them in order to complete the map and
+	 * unmap procedures, which require zero CQ inflights and zero QID
+	 * inflights respectively.
+	 */
+	dlb_domain_disable_ldb_cqs(hw, domain);
+
+	dlb_domain_drain_ldb_cqs(hw, domain, false);
+
 	/* Re-enable the CQs in order to drain the mapped queues. */
 	dlb_domain_enable_ldb_cqs(hw, domain);
 
@@ -2442,4 +2748,39 @@ void dlb_clr_pmcsr_disable(struct dlb_hw *hw)
 	pmcsr_dis &= ~CM_CFG_PM_PMCSR_DISABLE_DISABLE;
 
 	DLB_CSR_WR(hw, CM_CFG_PM_PMCSR_DISABLE, pmcsr_dis);
+}
+
+/**
+ * dlb_hw_enable_sparse_ldb_cq_mode() - enable sparse mode for load-balanced
+ *      ports.
+ * @hw: dlb_hw handle for a particular device.
+ *
+ * This function must be called prior to configuring scheduling domains.
+ */
+void dlb_hw_enable_sparse_ldb_cq_mode(struct dlb_hw *hw)
+{
+	u32 ctrl;
+
+	ctrl = DLB_CSR_RD(hw, CHP_CFG_CHP_CSR_CTRL);
+
+	ctrl |= CHP_CFG_CHP_CSR_CTRL_CFG_64BYTES_QE_LDB_CQ_MODE;
+
+	DLB_CSR_WR(hw, CHP_CFG_CHP_CSR_CTRL, ctrl);
+}
+
+/**
+ * dlb_hw_enable_sparse_dir_cq_mode() - enable sparse mode for directed ports.
+ * @hw: dlb_hw handle for a particular device.
+ *
+ * This function must be called prior to configuring scheduling domains.
+ */
+void dlb_hw_enable_sparse_dir_cq_mode(struct dlb_hw *hw)
+{
+	u32 ctrl;
+
+	ctrl = DLB_CSR_RD(hw, CHP_CFG_CHP_CSR_CTRL);
+
+	ctrl |= CHP_CFG_CHP_CSR_CTRL_CFG_64BYTES_QE_DIR_CQ_MODE;
+
+	DLB_CSR_WR(hw, CHP_CFG_CHP_CSR_CTRL, ctrl);
 }

@@ -167,4 +167,61 @@ struct dlb_get_dir_queue_depth_args {
 	/* Input parameters */
 	__u32 queue_id;
 };
-#endif /* DLB_ARGS_H */
+
+/*
+ * dlb_create_ldb_port_args: Used to configure a load-balanced port.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ * @response.id: port ID.
+ *
+ * Input parameters:
+ * @cq_depth: Depth of the port's CQ. Must be a power-of-two between 8 and
+ *	1024, inclusive.
+ * @cq_depth_threshold: CQ depth interrupt threshold. A value of N means that
+ *	the CQ interrupt won't fire until there are N or more outstanding CQ
+ *	tokens.
+ * @num_hist_list_entries: Number of history list entries. This must be
+ *	greater than or equal cq_depth.
+ */
+
+struct dlb_create_ldb_port_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	/* Input parameters */
+	__u16 cq_depth;
+	__u16 cq_depth_threshold;
+	__u16 cq_history_list_size;
+};
+
+/*
+ * dlb_create_dir_port_args: Used to configure a directed port.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ * @response.id: Port ID.
+ *
+ * Input parameters:
+ * @cq_depth: Depth of the port's CQ. Must be a power-of-two between 8 and
+ *	1024, inclusive.
+ * @cq_depth_threshold: CQ depth interrupt threshold. A value of N means that
+ *	the CQ interrupt won't fire until there are N or more outstanding CQ
+ *	tokens.
+ * @qid: Queue ID. If the corresponding directed queue is already created,
+ *	specify its ID here. Else this argument must be 0xFFFFFFFF to indicate
+ *	that the port is being created before the queue.
+ */
+struct dlb_create_dir_port_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	/* Input parameters */
+	__u16 cq_depth;
+	__u16 cq_depth_threshold;
+	__s32 queue_id;
+};
+
+#define DLB_CQ_SIZE 65536
+
+#endif /* __DLB_ARGS_H */

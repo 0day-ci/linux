@@ -51,11 +51,35 @@ struct dlb_cfs_queue {
 
 };
 
+struct dlb_cfs_port {
+	struct config_group group;
+	struct config_group *domain_grp;
+	unsigned int status;
+	unsigned int port_id;
+	/* Input parameters */
+	unsigned int is_ldb;
+	unsigned int cq_depth;
+	unsigned int cq_depth_threshold;
+	unsigned int cq_history_list_size;
+	unsigned int create;
+
+	/* For DIR port only, default = 0xffffffff */
+	unsigned int queue_id;
+
+};
+
 static inline
 struct dlb_cfs_queue *to_dlb_cfs_queue(struct config_item *item)
 {
 	return container_of(to_config_group(item),
 			    struct dlb_cfs_queue, group);
+}
+
+static inline
+struct dlb_cfs_port *to_dlb_cfs_port(struct config_item *item)
+{
+	return container_of(to_config_group(item),
+			    struct dlb_cfs_port, group);
 }
 
 static inline

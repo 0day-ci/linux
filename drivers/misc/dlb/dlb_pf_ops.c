@@ -95,3 +95,10 @@ int dlb_pf_wait_for_device_ready(struct dlb *dlb, struct pci_dev *pdev)
 
 	return 0;
 }
+
+void dlb_pf_init_hardware(struct dlb *dlb)
+{
+	/* Use sparse mode as default */
+	dlb_hw_enable_sparse_ldb_cq_mode(&dlb->hw);
+	dlb_hw_enable_sparse_dir_cq_mode(&dlb->hw);
+}

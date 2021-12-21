@@ -45,6 +45,109 @@ DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_dir_queue)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_ldb_queue_depth)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_dir_queue_depth)
 
+static int dlb_domain_configfs_create_ldb_port(struct dlb *dlb,
+					       struct dlb_domain *domain,
+					       void *karg)
+{
+	struct dlb_cmd_response response = {0};
+	struct dlb_create_ldb_port_args *arg = karg;
+	dma_addr_t cq_dma_base = 0;
+	void *cq_base;
+	int ret;
+
+	mutex_lock(&dlb->resource_mutex);
+
+	cq_base = dma_alloc_coherent(&dlb->pdev->dev,
+				     DLB_CQ_SIZE,
+				     &cq_dma_base,
+				     GFP_KERNEL);
+	if (!cq_base) {
+		response.status = DLB_ST_NO_MEMORY;
+		ret = -ENOMEM;
+		goto unlock;
+	}
+
+	ret = dlb_hw_create_ldb_port(&dlb->hw, domain->id,
+				     arg, (uintptr_t)cq_dma_base,
+				     &response);
+	if (ret)
+		goto unlock;
+
+	/* Fill out the per-port data structure */
+	dlb->ldb_port[response.id].id = response.id;
+	dlb->ldb_port[response.id].is_ldb = true;
+	dlb->ldb_port[response.id].domain = domain;
+	dlb->ldb_port[response.id].cq_base = cq_base;
+	dlb->ldb_port[response.id].cq_dma_base = cq_dma_base;
+	dlb->ldb_port[response.id].valid = true;
+
+unlock:
+	if (ret && cq_dma_base)
+		dma_free_coherent(&dlb->pdev->dev,
+				  DLB_CQ_SIZE,
+				  cq_base,
+				  cq_dma_base);
+
+	mutex_unlock(&dlb->resource_mutex);
+
+	BUILD_BUG_ON(offsetof(typeof(*arg), response) != 0);
+
+	memcpy(karg, &response, sizeof(response));
+
+	return ret;
+}
+
+static int dlb_domain_configfs_create_dir_port(struct dlb *dlb,
+					       struct dlb_domain *domain,
+					       void *karg)
+{
+	struct dlb_cmd_response response = {0};
+	struct dlb_create_dir_port_args *arg = karg;
+	dma_addr_t cq_dma_base = 0;
+	void *cq_base;
+	int ret;
+
+	mutex_lock(&dlb->resource_mutex);
+
+	cq_base = dma_alloc_coherent(&dlb->pdev->dev,
+				     DLB_CQ_SIZE,
+				     &cq_dma_base,
+				     GFP_KERNEL);
+	if (!cq_base) {
+		response.status = DLB_ST_NO_MEMORY;
+		ret = -ENOMEM;
+		goto unlock;
+	}
+
+	ret = dlb_hw_create_dir_port(&dlb->hw, domain->id,
+				     arg, (uintptr_t)cq_dma_base,
+				     &response);
+	if (ret)
+		goto unlock;
+
+	/* Fill out the per-port data structure */
+	dlb->dir_port[response.id].id = response.id;
+	dlb->dir_port[response.id].is_ldb = false;
+	dlb->dir_port[response.id].domain = domain;
+	dlb->dir_port[response.id].cq_base = cq_base;
+	dlb->dir_port[response.id].cq_dma_base = cq_dma_base;
+	dlb->dir_port[response.id].valid = true;
+unlock:
+	if (ret && cq_dma_base)
+		dma_free_coherent(&dlb->pdev->dev,
+				  DLB_CQ_SIZE,
+				  cq_base,
+				  cq_dma_base);
+
+	mutex_unlock(&dlb->resource_mutex);
+
+	BUILD_BUG_ON(offsetof(typeof(*arg), response) != 0);
+
+	memcpy(karg, &response, sizeof(response));
+
+	return ret;
+}
+
 static int dlb_configfs_create_sched_domain(struct dlb *dlb,
 					    void *karg)
 {
@@ -331,6 +434,180 @@ static const struct config_item_type dlb_cfs_queue_type = {
 };
 
 /*
+ * ------ Configfs for dlb ports ---------
+ *
+ * These are the templates for show and store functions in port
+ * groups/directories, which minimizes replication of boilerplate
+ * code to copy arguments. Most attributes, use the simple template.
+ * "name" is the attribute name in the group.
+ */
+#define DLB_CONFIGFS_PORT_SHOW(name)					\
+static ssize_t dlb_cfs_port_##name##_show(				\
+	struct config_item *item,					\
+	char *page)							\
+{									\
+	return sprintf(page, "%u\n", to_dlb_cfs_port(item)->name);	\
+}									\
+
+#define DLB_CONFIGFS_PORT_SHOW64(name)					\
+static ssize_t dlb_cfs_port_##name##_show(				\
+	struct config_item *item,					\
+	char *page)							\
+{									\
+	return sprintf(page, "%llx\n", to_dlb_cfs_port(item)->name);	\
+}									\
+
+#define DLB_CONFIGFS_PORT_STORE(name)					\
+static ssize_t dlb_cfs_port_##name##_store(				\
+	struct config_item *item,					\
+	const char *page,						\
+	size_t count)							\
+{									\
+	struct dlb_cfs_port *dlb_cfs_port = to_dlb_cfs_port(item);	\
+	int ret;							\
+									\
+	ret = kstrtoint(page, 10, &dlb_cfs_port->name);			\
+	if (ret)							\
+		return ret;						\
+									\
+	return count;							\
+}									\
+
+#define DLB_CONFIGFS_PORT_STORE64(name)					\
+static ssize_t dlb_cfs_port_##name##_store(				\
+	struct config_item *item,					\
+	const char *page,						\
+	size_t count)							\
+{									\
+	int ret;							\
+	struct dlb_cfs_port *dlb_cfs_port = to_dlb_cfs_port(item);	\
+									\
+	ret = kstrtoll(page, 16, &dlb_cfs_port->name);			\
+	if (ret)							\
+		return ret;						\
+									\
+	return count;							\
+}									\
+
+DLB_CONFIGFS_PORT_SHOW(status)
+DLB_CONFIGFS_PORT_SHOW(port_id)
+DLB_CONFIGFS_PORT_SHOW(is_ldb)
+DLB_CONFIGFS_PORT_SHOW(cq_depth)
+DLB_CONFIGFS_PORT_SHOW(cq_depth_threshold)
+DLB_CONFIGFS_PORT_SHOW(cq_history_list_size)
+DLB_CONFIGFS_PORT_SHOW(create)
+DLB_CONFIGFS_PORT_SHOW(queue_id)
+
+DLB_CONFIGFS_PORT_STORE(is_ldb)
+DLB_CONFIGFS_PORT_STORE(cq_depth)
+DLB_CONFIGFS_PORT_STORE(cq_depth_threshold)
+DLB_CONFIGFS_PORT_STORE(cq_history_list_size)
+DLB_CONFIGFS_PORT_STORE(queue_id)
+
+static ssize_t dlb_cfs_port_create_store(struct config_item *item,
+					 const char *page, size_t count)
+{
+	struct dlb_cfs_port *dlb_cfs_port = to_dlb_cfs_port(item);
+	struct dlb_domain *dlb_domain;
+	struct dlb *dlb = NULL;
+	int ret;
+
+	ret = dlb_configfs_get_dlb_domain(dlb_cfs_port->domain_grp,
+					  &dlb, &dlb_domain);
+	if (ret)
+		return ret;
+
+	ret = kstrtoint(page, 10, &dlb_cfs_port->create);
+	if (ret)
+		return ret;
+
+	if (dlb_cfs_port->create == 0)
+		return count;
+
+	if (dlb_cfs_port->is_ldb) {
+		struct dlb_create_ldb_port_args args = {0};
+
+		args.cq_depth = dlb_cfs_port->cq_depth;
+		args.cq_depth_threshold = dlb_cfs_port->cq_depth_threshold;
+		args.cq_history_list_size = dlb_cfs_port->cq_history_list_size;
+
+		dev_dbg(dlb->dev,
+			"Creating ldb port: %s\n",
+			dlb_cfs_port->group.cg_item.ci_namebuf);
+
+		ret = dlb_domain_configfs_create_ldb_port(dlb, dlb_domain, &args);
+
+		dlb_cfs_port->status = args.response.status;
+		dlb_cfs_port->port_id = args.response.id;
+	} else {
+		struct dlb_create_dir_port_args args = {0};
+
+		args.queue_id = dlb_cfs_port->queue_id;
+		args.cq_depth = dlb_cfs_port->cq_depth;
+		args.cq_depth_threshold = dlb_cfs_port->cq_depth_threshold;
+
+		dev_dbg(dlb->dev,
+			"Creating dir port: %s\n",
+			dlb_cfs_port->group.cg_item.ci_namebuf);
+
+		ret = dlb_domain_configfs_create_dir_port(dlb, dlb_domain, &args);
+
+		dlb_cfs_port->status = args.response.status;
+		dlb_cfs_port->port_id = args.response.id;
+	}
+
+	if (ret) {
+		dev_err(dlb->dev,
+			"creat port %s failed: ret=%d\n",
+			dlb_cfs_port->group.cg_item.ci_namebuf, ret);
+		return ret;
+	}
+
+	return count;
+}
+
+CONFIGFS_ATTR_RO(dlb_cfs_port_, status);
+CONFIGFS_ATTR_RO(dlb_cfs_port_, port_id);
+CONFIGFS_ATTR(dlb_cfs_port_, is_ldb);
+CONFIGFS_ATTR(dlb_cfs_port_, cq_depth);
+CONFIGFS_ATTR(dlb_cfs_port_, cq_depth_threshold);
+CONFIGFS_ATTR(dlb_cfs_port_, cq_history_list_size);
+CONFIGFS_ATTR(dlb_cfs_port_, create);
+CONFIGFS_ATTR(dlb_cfs_port_, queue_id);
+
+static struct configfs_attribute *dlb_cfs_port_attrs[] = {
+	&dlb_cfs_port_attr_status,
+	&dlb_cfs_port_attr_port_id,
+	&dlb_cfs_port_attr_is_ldb,
+	&dlb_cfs_port_attr_cq_depth,
+	&dlb_cfs_port_attr_cq_depth_threshold,
+	&dlb_cfs_port_attr_cq_history_list_size,
+	&dlb_cfs_port_attr_create,
+	&dlb_cfs_port_attr_queue_id,
+
+	NULL,
+};
+
+static void dlb_cfs_port_release(struct config_item *item)
+{
+	kfree(to_dlb_cfs_port(item));
+}
+
+static struct configfs_item_operations dlb_cfs_port_item_ops = {
+	.release	= dlb_cfs_port_release,
+};
+
+/*
+ * Note that, since no extra work is required on ->drop_item(),
+ * no ->drop_item() is provided.
+ */
+static const struct config_item_type dlb_cfs_port_type = {
+	.ct_item_ops	= &dlb_cfs_port_item_ops,
+	.ct_attrs	= dlb_cfs_port_attrs,
+	.ct_owner	= THIS_MODULE,
+};
+
+/*
  * ------ Configfs for dlb domains---------
  *
  * These are the templates for show and store functions in domain
@@ -474,7 +751,23 @@ static struct configfs_attribute *dlb_cfs_domain_attrs[] = {
 static struct config_group *dlb_cfs_domain_make_queue_port(struct config_group *group,
 							   const char *name)
 {
-	if (strstr(name, "queue")) {
+	if (strstr(name, "port")) {
+		struct dlb_cfs_port *dlb_cfs_port;
+
+		dlb_cfs_port = kzalloc(sizeof(*dlb_cfs_port), GFP_KERNEL);
+		if (!dlb_cfs_port)
+			return ERR_PTR(-ENOMEM);
+
+		dlb_cfs_port->domain_grp = group;
+
+		config_group_init_type_name(&dlb_cfs_port->group, name,
+					    &dlb_cfs_port_type);
+
+		dlb_cfs_port->queue_id = 0xffffffff;
+		dlb_cfs_port->port_id = 0xffffffff;
+
+		return &dlb_cfs_port->group;
+	} else if (strstr(name, "queue")) {
 		struct dlb_cfs_queue *dlb_cfs_queue;
 
 		dlb_cfs_queue = kzalloc(sizeof(*dlb_cfs_queue), GFP_KERNEL);
