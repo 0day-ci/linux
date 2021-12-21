@@ -102,7 +102,9 @@ static const u8 ADT7X10_REG_TEMP[4] = {
 
 static irqreturn_t adt7x10_irq_handler(int irq, void *private)
 {
-	struct device *dev = private;
+	struct device *hdev = private;
+	struct adt7x10_data *d = dev_get_drvdata(hdev);
+	struct device *dev = d->bus_dev;
 	int status;
 
 	status = adt7x10_read_byte(dev, ADT7X10_STATUS);
@@ -407,7 +409,7 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 						adt7x10_irq_handler,
 						IRQF_TRIGGER_FALLING |
 						IRQF_ONESHOT,
-						dev_name(dev), dev);
+						dev_name(dev), hdev);
 		if (ret)
 			goto exit_hwmon_device_unregister;
 	}
