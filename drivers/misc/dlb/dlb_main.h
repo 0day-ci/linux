@@ -330,6 +330,7 @@ struct dlb;
 int dlb_pf_map_pci_bar_space(struct dlb *dlb, struct pci_dev *pdev);
 void dlb_pf_unmap_pci_bar_space(struct dlb *dlb, struct pci_dev *pdev);
 int dlb_pf_init_driver_state(struct dlb *dlb);
+int dlb_pf_sysfs_create(struct dlb *dlb);
 void dlb_pf_enable_pm(struct dlb *dlb);
 int dlb_pf_wait_for_device_ready(struct dlb *dlb, struct pci_dev *pdev);
 void dlb_pf_init_hardware(struct dlb *dlb);
@@ -625,6 +626,8 @@ int dlb_hw_unmap_qid(struct dlb_hw *hw, u32 domain_id,
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
 int dlb_ldb_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
 int dlb_dir_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
+int dlb_hw_get_num_resources(struct dlb_hw *hw,
+			     struct dlb_get_num_resources_args *arg);
 void dlb_clr_pmcsr_disable(struct dlb_hw *hw);
 int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
 			       struct dlb_get_ldb_queue_depth_args *args,

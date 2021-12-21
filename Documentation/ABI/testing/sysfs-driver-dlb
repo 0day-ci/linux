@@ -1,0 +1,116 @@
+What:		/sys/bus/pci/devices/.../total_resources/num_atomic_inflights
+What:		/sys/bus/pci/devices/.../total_resources/num_dir_credits
+What:		/sys/bus/pci/devices/.../total_resources/num_dir_ports
+What:		/sys/bus/pci/devices/.../total_resources/num_hist_list_entries
+What:		/sys/bus/pci/devices/.../total_resources/num_ldb_credits
+What:		/sys/bus/pci/devices/.../total_resources/num_ldb_ports
+What:		/sys/bus/pci/devices/.../total_resources/num_cos0_ldb_ports
+What:		/sys/bus/pci/devices/.../total_resources/num_cos1_ldb_ports
+What:		/sys/bus/pci/devices/.../total_resources/num_cos2_ldb_ports
+What:		/sys/bus/pci/devices/.../total_resources/num_cos3_ldb_ports
+What:		/sys/bus/pci/devices/.../total_resources/num_ldb_queues
+What:		/sys/bus/pci/devices/.../total_resources/num_sched_domains
+Date:		Oct 15, 2021
+KernelVersion:	5.15
+Contact:	mike.ximing.chen@intel.com
+Description:
+		The total_resources subdirectory contains read-only files that
+		indicate the total number of resources in the device.
+
+		num_atomic_inflights:  Total number of atomic inflights in the
+				       device. Atomic inflights refers to the
+				       on-device storage used by the atomic
+				       scheduler.
+
+		num_dir_credits:       Total number of directed credits in the
+				       device.
+
+		num_dir_ports:	       Total number of directed ports (and
+				       queues) in the device.
+
+		num_hist_list_entries: Total number of history list entries in
+				       the device.
+
+		num_ldb_credits:       Total number of load-balanced credits in
+				       the device.
+
+		num_ldb_ports:	       Total number of load-balanced ports in
+				       the device.
+
+		num_cos<M>_ldb_ports:  Total number of load-balanced ports
+				       belonging to class-of-service M in the
+				       device.
+
+		num_ldb_queues:	       Total number of load-balanced queues in
+				       the device.
+
+		num_sched_domains:     Total number of scheduling domains in the
+				       device.
+
+What:		/sys/bus/pci/devices/.../avail_resources/num_atomic_inflights
+What:		/sys/bus/pci/devices/.../avail_resources/num_dir_credits
+What:		/sys/bus/pci/devices/.../avail_resources/num_dir_ports
+What:		/sys/bus/pci/devices/.../avail_resources/num_hist_list_entries
+What:		/sys/bus/pci/devices/.../avail_resources/num_ldb_credits
+What:		/sys/bus/pci/devices/.../avail_resources/num_ldb_ports
+What:		/sys/bus/pci/devices/.../avail_resources/num_cos0_ldb_ports
+What:		/sys/bus/pci/devices/.../avail_resources/num_cos1_ldb_ports
+What:		/sys/bus/pci/devices/.../avail_resources/num_cos2_ldb_ports
+What:		/sys/bus/pci/devices/.../avail_resources/num_cos3_ldb_ports
+What:		/sys/bus/pci/devices/.../avail_resources/num_ldb_queues
+What:		/sys/bus/pci/devices/.../avail_resources/num_sched_domains
+What:		/sys/bus/pci/devices/.../avail_resources/max_ctg_hl_entries
+Date:		Oct 15, 2021
+KernelVersion:	5.15
+Contact:	mike.ximing.chen@intel.com
+Description:
+		The avail_resources subdirectory contains read-only files that
+		indicate the available number of resources in the device.
+		"Available" here means resources that are not currently in use
+		by an application or, in the case of a physical function
+		device, assigned to a virtual function.
+
+		num_atomic_inflights:  Available number of atomic inflights in
+				       the device.
+
+		num_dir_ports:	       Available number of directed ports (and
+				       queues) in the device.
+
+		num_hist_list_entries: Available number of history list entries
+				       in the device.
+
+		num_ldb_credits:       Available number of load-balanced credits
+				       in the device.
+
+		num_ldb_ports:	       Available number of load-balanced ports
+				       in the device.
+
+		num_cos<M>_ldb_ports:  Available number of load-balanced ports
+				       belonging to class-of-service M in the
+				       device.
+
+		num_ldb_queues:	       Available number of load-balanced queues
+				       in the device.
+
+		num_sched_domains:     Available number of scheduling domains in
+				       the device.
+
+		max_ctg_hl_entries:    Maximum contiguous history list entries
+				       available in the device.
+
+				       Each scheduling domain is created with
+				       an allocation of history list entries,
+				       and each domain's allocation of entries
+				       must be contiguous.
+
+What:		/sys/bus/pci/devices/.../dev_id
+Date:		Oct 15, 2021
+KernelVersion:	5.15
+Contact:	mike.ximing.chen@intel.com
+Description:	Device ID used in /dev, i.e. /dev/dlb<device ID>
+
+		Each DLB 2.0 PF and VF device is granted a unique ID by the
+		kernel driver, and this ID is used to construct the device's
+		/dev directory: /dev/dlb<device ID>. This sysfs file can be read
+		to determine a device's ID, which allows the user to map a
+		device file to a PCI BDF.

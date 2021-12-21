@@ -58,6 +58,40 @@ struct dlb_create_sched_domain_args {
 	__u32 num_dir_credits;
 };
 
+/*
+ * dlb_get_num_resources_args: Used to get the number of available resources
+ *      (queues, ports, etc.) that this device owns.
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	request arg is invalid, the driver won't set status.
+ * @num_domains: Number of available scheduling domains.
+ * @num_ldb_queues: Number of available load-balanced queues.
+ * @num_ldb_ports: Total number of available load-balanced ports.
+ * @num_dir_ports: Number of available directed ports. There is one directed
+ *	queue for every directed port.
+ * @num_atomic_inflights: Amount of available temporary atomic QE storage.
+ * @num_hist_list_entries: Amount of history list storage.
+ * @max_contiguous_hist_list_entries: History list storage is allocated in
+ *	a contiguous chunk, and this return value is the longest available
+ *	contiguous range of history list entries.
+ * @num_ldb_credits: Amount of available load-balanced QE storage.
+ * @num_dir_credits: Amount of available directed QE storage.
+ */
+struct dlb_get_num_resources_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+	__u32 num_sched_domains;
+	__u32 num_ldb_queues;
+	__u32 num_ldb_ports;
+	__u32 num_dir_ports;
+	__u32 num_atomic_inflights;
+	__u32 num_hist_list_entries;
+	__u32 max_contiguous_hist_list_entries;
+	__u32 num_ldb_credits;
+	__u32 num_dir_credits;
+};
+
 /*************************************************/
 /* 'domain' level control/access data structures */
 /*************************************************/

@@ -409,6 +409,10 @@ static int dlb_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
 	if (ret)
 		goto dma_set_mask_fail;
 
+	ret = dlb_pf_sysfs_create(dlb);
+	if (ret)
+		goto sysfs_create_fail;
+
 	ret = dlb_configfs_create_device(dlb);
 	if (ret)
 		goto configfs_create_fail;
@@ -453,6 +457,7 @@ resource_init_fail:
 dlb_reset_fail:
 wait_for_device_ready_fail:
 configfs_create_fail:
+sysfs_create_fail:
 dma_set_mask_fail:
 	device_destroy(dlb_class, dlb->dev_number);
 map_pci_bar_fail:

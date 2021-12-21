@@ -3856,6 +3856,56 @@ int dlb_dir_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id)
 }
 
 /**
+ * dlb_hw_get_num_resources() - query the PCI function's available resources
+ * @hw: dlb_hw handle for a particular device.
+ * @arg: pointer to resource counts.
+ *
+ * This function returns the number of available resources for the PF or for a
+ * VF.
+ *
+ * Return:
+ * Returns 0 upon success, -EINVAL if input argument is
+ * invalid.
+ */
+int dlb_hw_get_num_resources(struct dlb_hw *hw,
+			     struct dlb_get_num_resources_args *arg)
+{
+	struct dlb_function_resources *rsrcs;
+	struct dlb_bitmap *map;
+	int i;
+
+	if (!hw || !arg)
+		return -EINVAL;
+
+	rsrcs = &hw->pf;
+
+	arg->num_sched_domains = rsrcs->num_avail_domains;
+
+	arg->num_ldb_queues = rsrcs->num_avail_ldb_queues;
+
+	arg->num_ldb_ports = 0;
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++)
+		arg->num_ldb_ports += rsrcs->num_avail_ldb_ports[i];
+
+	arg->num_dir_ports = rsrcs->num_avail_dir_pq_pairs;
+
+	arg->num_atomic_inflights = rsrcs->num_avail_aqed_entries;
+
+	map = rsrcs->avail_hist_list_entries;
+
+	arg->num_hist_list_entries = bitmap_weight(map->map, map->len);
+
+	arg->max_contiguous_hist_list_entries =
+		dlb_bitmap_longest_set_range(map);
+
+	arg->num_ldb_credits = rsrcs->num_avail_qed_entries;
+
+	arg->num_dir_credits = rsrcs->num_avail_dqed_entries;
+
+	return 0;
+}
+
+/**
  * dlb_clr_pmcsr_disable() - power on bulk of DLB 2.0 logic
  * @hw: dlb_hw handle for a particular device.
  *
