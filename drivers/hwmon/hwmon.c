@@ -71,8 +71,23 @@ name_show(struct device *dev, struct device_attribute *attr, char *buf)
 }
 static DEVICE_ATTR_RO(name);
 
+static ssize_t
+label_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	const char *label;
+	int ret;
+
+	ret = device_property_read_string(dev, "label", &label);
+	if (ret < 0)
+		return ret;
+
+	return sysfs_emit(buf, "%s\n", label);
+}
+static DEVICE_ATTR_RO(label);
+
 static struct attribute *hwmon_dev_attrs[] = {
 	&dev_attr_name.attr,
+	&dev_attr_label.attr,
 	NULL
 };
 
@@ -81,7 +96,12 @@ static umode_t hwmon_dev_name_is_visible(struct kobject *kobj,
 {
 	struct device *dev = kobj_to_dev(kobj);
 
-	if (to_hwmon_device(dev)->name == NULL)
+	if (attr == &dev_attr_name.attr &&
+	    to_hwmon_device(dev)->name == NULL)
+		return 0;
+
+	if (attr == &dev_attr_label.attr &&
+	    !device_property_present(dev, "label"))
 		return 0;
 
 	return attr->mode;
