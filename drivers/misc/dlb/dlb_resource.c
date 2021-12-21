@@ -198,6 +198,38 @@ static struct dlb_hw_domain *dlb_get_domain_from_id(struct dlb_hw *hw, u32 id)
 	return &hw->domains[id];
 }
 
+static struct dlb_dir_pq_pair *
+dlb_get_domain_used_dir_pq(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
+{
+	struct dlb_dir_pq_pair *port;
+
+	if (id >= DLB_MAX_NUM_DIR_PORTS)
+		return NULL;
+
+	list_for_each_entry(port, &domain->used_dir_pq_pairs, domain_list) {
+		if (!vdev_req && port->id == id)
+			return port;
+	}
+
+	return NULL;
+}
+
+static struct dlb_ldb_queue *
+dlb_get_domain_ldb_queue(u32 id, bool vdev_req, struct dlb_hw_domain *domain)
+{
+	struct dlb_ldb_queue *queue;
+
+	if (id >= DLB_MAX_NUM_LDB_QUEUES)
+		return NULL;
+
+	list_for_each_entry(queue, &domain->used_ldb_queues, domain_list) {
+		if (!vdev_req && queue->id == id)
+			return queue;
+	}
+
+	return NULL;
+}
+
 static int dlb_attach_ldb_queues(struct dlb_hw *hw,
 				 struct dlb_function_resources *rsrcs,
 				 struct dlb_hw_domain *domain, u32 num_queues,
@@ -586,6 +618,154 @@ dlb_verify_create_sched_dom_args(struct dlb_function_resources *rsrcs,
 	return 0;
 }
 
+static int
+dlb_verify_create_ldb_queue_args(struct dlb_hw *hw, u32 domain_id,
+				 struct dlb_create_ldb_queue_args *args,
+				 struct dlb_cmd_response *resp,
+				 struct dlb_hw_domain **out_domain,
+				 struct dlb_ldb_queue **out_queue)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+	int i;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	if (domain->started) {
+		resp->status = DLB_ST_DOMAIN_STARTED;
+		return -EINVAL;
+	}
+
+	queue = list_first_entry_or_null(&domain->avail_ldb_queues,
+					 typeof(*queue), domain_list);
+	if (!queue) {
+		resp->status = DLB_ST_LDB_QUEUES_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (args->num_sequence_numbers) {
+		for (i = 0; i < DLB_MAX_NUM_SEQUENCE_NUMBER_GROUPS; i++) {
+			struct dlb_sn_group *group = &hw->rsrcs.sn_groups[i];
+
+			if (group->sequence_numbers_per_queue ==
+			    args->num_sequence_numbers &&
+			    !dlb_sn_group_full(group))
+				break;
+		}
+
+		if (i == DLB_MAX_NUM_SEQUENCE_NUMBER_GROUPS) {
+			resp->status = DLB_ST_SEQUENCE_NUMBERS_UNAVAILABLE;
+			return -EINVAL;
+		}
+	}
+
+	if (args->num_qid_inflights > 4096) {
+		resp->status = DLB_ST_INVALID_QID_INFLIGHT_ALLOCATION;
+		return -EINVAL;
+	}
+
+	/* Inflights must be <= number of sequence numbers if ordered */
+	if (args->num_sequence_numbers != 0 &&
+	    args->num_qid_inflights > args->num_sequence_numbers) {
+		resp->status = DLB_ST_INVALID_QID_INFLIGHT_ALLOCATION;
+		return -EINVAL;
+	}
+
+	if (domain->num_avail_aqed_entries < args->num_atomic_inflights) {
+		resp->status = DLB_ST_ATOMIC_INFLIGHTS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (args->num_atomic_inflights &&
+	    args->lock_id_comp_level != 0 &&
+	    args->lock_id_comp_level != 64 &&
+	    args->lock_id_comp_level != 128 &&
+	    args->lock_id_comp_level != 256 &&
+	    args->lock_id_comp_level != 512 &&
+	    args->lock_id_comp_level != 1024 &&
+	    args->lock_id_comp_level != 2048 &&
+	    args->lock_id_comp_level != 4096 &&
+	    args->lock_id_comp_level != 65536) {
+		resp->status = DLB_ST_INVALID_LOCK_ID_COMP_LEVEL;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+	*out_queue = queue;
+
+	return 0;
+}
+
+static int
+dlb_verify_create_dir_queue_args(struct dlb_hw *hw, u32 domain_id,
+				 struct dlb_create_dir_queue_args *args,
+				 struct dlb_cmd_response *resp,
+				 struct dlb_hw_domain **out_domain,
+				 struct dlb_dir_pq_pair **out_queue)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_dir_pq_pair *pq;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	if (domain->started) {
+		resp->status = DLB_ST_DOMAIN_STARTED;
+		return -EINVAL;
+	}
+
+	/*
+	 * If the user claims the port is already configured, validate the port
+	 * ID, its domain, and whether the port is configured.
+	 */
+	if (args->port_id != -1) {
+		pq = dlb_get_domain_used_dir_pq(args->port_id,
+						false,
+						domain);
+
+		if (!pq || pq->domain_id != domain->id ||
+		    !pq->port_configured) {
+			resp->status = DLB_ST_INVALID_PORT_ID;
+			return -EINVAL;
+		}
+	} else {
+		/*
+		 * If the queue's port is not configured, validate that a free
+		 * port-queue pair is available.
+		 */
+		pq = list_first_entry_or_null(&domain->avail_dir_pq_pairs,
+					      typeof(*pq), domain_list);
+		if (!pq) {
+			resp->status = DLB_ST_DIR_QUEUES_UNAVAILABLE;
+			return -EINVAL;
+		}
+	}
+
+	*out_domain = domain;
+	*out_queue = pq;
+
+	return 0;
+}
+
 static void dlb_configure_domain_credits(struct dlb_hw *hw,
 					 struct dlb_hw_domain *domain)
 {
@@ -646,6 +826,68 @@ dlb_domain_attach_resources(struct dlb_hw *hw,
 	domain->started = false;
 
 	rsrcs->num_avail_domains--;
+
+	return 0;
+}
+
+static int
+dlb_ldb_queue_attach_to_sn_group(struct dlb_hw *hw,
+				 struct dlb_ldb_queue *queue,
+				 struct dlb_create_ldb_queue_args *args)
+{
+	int slot = -1;
+	int i;
+
+	queue->sn_cfg_valid = false;
+
+	if (args->num_sequence_numbers == 0)
+		return 0;
+
+	for (i = 0; i < DLB_MAX_NUM_SEQUENCE_NUMBER_GROUPS; i++) {
+		struct dlb_sn_group *group = &hw->rsrcs.sn_groups[i];
+
+		if (group->sequence_numbers_per_queue ==
+		    args->num_sequence_numbers &&
+		    !dlb_sn_group_full(group)) {
+			slot = dlb_sn_group_alloc_slot(group);
+			if (slot >= 0)
+				break;
+		}
+	}
+
+	if (slot == -1) {
+		dev_err(hw_to_dev(hw),
+			"[%s():%d] Internal error: no sequence number slots available\n",
+			__func__, __LINE__);
+		return -EFAULT;
+	}
+
+	queue->sn_cfg_valid = true;
+	queue->sn_group = i;
+	queue->sn_slot = slot;
+	return 0;
+}
+
+static int
+dlb_ldb_queue_attach_resources(struct dlb_hw *hw,
+			       struct dlb_hw_domain *domain,
+			       struct dlb_ldb_queue *queue,
+			       struct dlb_create_ldb_queue_args *args)
+{
+	int ret;
+
+	ret = dlb_ldb_queue_attach_to_sn_group(hw, queue, args);
+	if (ret)
+		return ret;
+
+	/* Attach QID inflights */
+	queue->num_qid_inflights = args->num_qid_inflights;
+
+	/* Attach atomic inflights */
+	queue->aqed_limit = args->num_atomic_inflights;
+
+	domain->num_avail_aqed_entries -= args->num_atomic_inflights;
+	domain->num_used_aqed_entries += args->num_atomic_inflights;
 
 	return 0;
 }
@@ -730,6 +972,145 @@ int dlb_hw_create_sched_domain(struct dlb_hw *hw,
 
 	resp->id = domain->id;
 	resp->status = 0;
+
+	return 0;
+}
+
+static void
+dlb_log_create_ldb_queue_args(struct dlb_hw *hw, u32 domain_id,
+			      struct dlb_create_ldb_queue_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB create load-balanced queue arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID:                  %d\n",
+		domain_id);
+	dev_dbg(hw_to_dev(hw), "\tNumber of sequence numbers: %d\n",
+		args->num_sequence_numbers);
+	dev_dbg(hw_to_dev(hw), "\tNumber of QID inflights:    %d\n",
+		args->num_qid_inflights);
+	dev_dbg(hw_to_dev(hw), "\tNumber of ATM inflights:    %d\n",
+		args->num_atomic_inflights);
+}
+
+/**
+ * dlb_hw_create_ldb_queue() - create a load-balanced queue
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: queue creation arguments.
+ * @resp: response structure.
+ *
+ * This function creates a load-balanced queue.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the queue ID.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, the domain is not configured,
+ *	    the domain has already been started, or the requested queue name is
+ *	    already in use.
+ * EFAULT - Internal error (resp->status not set).
+ */
+int dlb_hw_create_ldb_queue(struct dlb_hw *hw, u32 domain_id,
+			    struct dlb_create_ldb_queue_args *args,
+			    struct dlb_cmd_response *resp)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+	int ret;
+
+	dlb_log_create_ldb_queue_args(hw, domain_id, args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_create_ldb_queue_args(hw, domain_id, args, resp,
+					       &domain, &queue);
+	if (ret)
+		return ret;
+
+	ret = dlb_ldb_queue_attach_resources(hw, domain, queue, args);
+	if (ret) {
+		dev_err(hw_to_dev(hw),
+			"[%s():%d] Internal error: failed to attach the ldb queue resources\n",
+			__func__, __LINE__);
+		return ret;
+	}
+
+	queue->num_mappings = 0;
+
+	queue->configured = true;
+
+	/*
+	 * Configuration succeeded, so move the resource from the 'avail' to
+	 * the 'used' list.
+	 */
+	list_move(&queue->domain_list, &domain->used_ldb_queues);
+
+	resp->status = 0;
+	resp->id = queue->id;
+
+	return 0;
+}
+
+static void
+dlb_log_create_dir_queue_args(struct dlb_hw *hw, u32 domain_id,
+			      struct dlb_create_dir_queue_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB create directed queue arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n", domain_id);
+	dev_dbg(hw_to_dev(hw), "\tPort ID:   %d\n", args->port_id);
+}
+
+/**
+ * dlb_hw_create_dir_queue() - create a directed queue
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: queue creation arguments.
+ * @resp: response structure.
+ *
+ * This function creates a directed queue.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the queue ID.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, the domain is not configured,
+ *	    or the domain has already been started.
+ * EFAULT - Internal error (resp->status not set).
+ */
+int dlb_hw_create_dir_queue(struct dlb_hw *hw, u32 domain_id,
+			    struct dlb_create_dir_queue_args *args,
+			    struct dlb_cmd_response *resp)
+{
+	struct dlb_dir_pq_pair *queue;
+	struct dlb_hw_domain *domain;
+	int ret;
+
+	dlb_log_create_dir_queue_args(hw, domain_id, args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_create_dir_queue_args(hw, domain_id, args, resp,
+					       &domain, &queue);
+	if (ret)
+		return ret;
+
+	/*
+	 * Configuration succeeded, so move the resource from the 'avail' to
+	 * the 'used' list (if it's not already there).
+	 */
+	if (args->port_id == -1)
+		list_move(&queue->domain_list, &domain->used_dir_pq_pairs);
+
+	resp->status = 0;
+
+	resp->id = queue->id;
 
 	return 0;
 }
@@ -886,6 +1267,131 @@ static int dlb_domain_reset_software_state(struct dlb_hw *hw,
 	 */
 	list_move(&domain->func_list, &rsrcs->avail_domains);
 	rsrcs->num_avail_domains++;
+
+	return 0;
+}
+
+static void dlb_log_get_dir_queue_depth(struct dlb_hw *hw, u32 domain_id,
+					u32 queue_id)
+{
+	dev_dbg(hw_to_dev(hw), "DLB get directed queue depth:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n", domain_id);
+	dev_dbg(hw_to_dev(hw), "\tQueue ID: %d\n", queue_id);
+}
+
+/**
+ * dlb_hw_get_dir_queue_depth() - returns the depth of a directed queue
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: queue depth args
+ * @resp: response structure.
+ *
+ * This function returns the depth of a directed queue.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the depth.
+ *
+ * Errors:
+ * EINVAL - Invalid domain ID or queue ID.
+ */
+int dlb_hw_get_dir_queue_depth(struct dlb_hw *hw, u32 domain_id,
+			       struct dlb_get_dir_queue_depth_args *args,
+			       struct dlb_cmd_response *resp)
+{
+	struct dlb_dir_pq_pair *queue;
+	struct dlb_hw_domain *domain;
+	int id;
+
+	id = domain_id;
+
+	dlb_log_get_dir_queue_depth(hw, domain_id, args->queue_id);
+
+	domain = dlb_get_domain_from_id(hw, id);
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	id = args->queue_id;
+
+	queue = dlb_get_domain_used_dir_pq(id, false, domain);
+	if (!queue) {
+		resp->status = DLB_ST_INVALID_QID;
+		return -EINVAL;
+	}
+
+	resp->id = 0;
+
+	return 0;
+}
+
+static u32 dlb_ldb_queue_depth(struct dlb_hw *hw, struct dlb_ldb_queue *queue)
+{
+	u32 aqed, ldb, atm;
+
+	aqed = DLB_CSR_RD(hw, LSP_QID_AQED_ACTIVE_CNT(queue->id));
+	ldb = DLB_CSR_RD(hw, LSP_QID_LDB_ENQUEUE_CNT(queue->id));
+	atm = DLB_CSR_RD(hw, LSP_QID_ATM_ACTIVE(queue->id));
+
+	return FIELD_GET(LSP_QID_AQED_ACTIVE_CNT_COUNT, aqed)
+	       + FIELD_GET(LSP_QID_LDB_ENQUEUE_CNT_COUNT, ldb)
+	       + FIELD_GET(LSP_QID_ATM_ACTIVE_COUNT, atm);
+}
+
+static bool dlb_ldb_queue_is_empty(struct dlb_hw *hw, struct dlb_ldb_queue *queue)
+{
+	return dlb_ldb_queue_depth(hw, queue) == 0;
+}
+
+static void dlb_log_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
+					u32 queue_id)
+{
+	dev_dbg(hw_to_dev(hw), "DLB get load-balanced queue depth:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n", domain_id);
+	dev_dbg(hw_to_dev(hw), "\tQueue ID: %d\n", queue_id);
+}
+
+/**
+ * dlb_hw_get_ldb_queue_depth() - returns the depth of a load-balanced queue
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @args: queue depth args
+ * @resp: response structure.
+ *
+ * This function returns the depth of a load-balanced queue.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the depth.
+ *
+ * Errors:
+ * EINVAL - Invalid domain ID or queue ID.
+ */
+int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
+			       struct dlb_get_ldb_queue_depth_args *args,
+			       struct dlb_cmd_response *resp)
+{
+	struct dlb_hw_domain *domain;
+	struct dlb_ldb_queue *queue;
+
+	dlb_log_get_ldb_queue_depth(hw, domain_id, args->queue_id);
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	queue = dlb_get_domain_ldb_queue(args->queue_id, false, domain);
+	if (!queue) {
+		resp->status = DLB_ST_INVALID_QID;
+		return -EINVAL;
+	}
+
+	resp->id = 0;
 
 	return 0;
 }
@@ -1254,6 +1760,27 @@ static void dlb_domain_reset_dir_queue_registers(struct dlb_hw *hw,
 	}
 }
 
+static int dlb_domain_verify_reset_success(struct dlb_hw *hw,
+					   struct dlb_hw_domain *domain)
+{
+	struct dlb_ldb_queue *queue;
+
+	/*
+	 * Confirm that all the domain's queue's inflight counts and AQED
+	 * active counts are 0.
+	 */
+	list_for_each_entry(queue, &domain->used_ldb_queues, domain_list) {
+		if (!dlb_ldb_queue_is_empty(hw, queue)) {
+			dev_err(hw_to_dev(hw),
+				"[%s()] Internal error: failed to empty ldb queue %d\n",
+				__func__, queue->id);
+			return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+
 static void dlb_domain_reset_registers(struct dlb_hw *hw,
 				       struct dlb_hw_domain *domain)
 {
@@ -1303,6 +1830,7 @@ static void dlb_log_reset_domain(struct dlb_hw *hw, u32 domain_id)
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id)
 {
 	struct dlb_hw_domain *domain;
+	int ret;
 
 	dlb_log_reset_domain(hw, domain_id);
 
@@ -1310,6 +1838,16 @@ int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id)
 
 	if (!domain || !domain->configured)
 		return -EINVAL;
+
+	/*
+	 * For each queue owned by this domain, disable its write permissions to
+	 * cause any traffic sent to it to be dropped. Well-behaved software
+	 * should not be sending QEs at this point.
+	 */
+
+	ret = dlb_domain_verify_reset_success(hw, domain);
+	if (ret)
+		return ret;
 
 	/* Reset the QID and port state. */
 	dlb_domain_reset_registers(hw, domain);

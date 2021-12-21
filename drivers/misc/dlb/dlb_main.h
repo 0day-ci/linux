@@ -139,6 +139,35 @@ struct dlb_sn_group {
 	u32 id;
 };
 
+static inline bool dlb_sn_group_full(struct dlb_sn_group *group)
+{
+	/* SN mask
+	 *	0x0000ffff,  64 SNs per queue,   mode 0
+	 *	0x000000ff,  128 SNs per queue,  mode 1
+	 *	0x0000000f,  256 SNs per queue,  mode 2
+	 *	0x00000003,  512 SNs per queue,  mode 3
+	 *	0x00000001,  1024 SNs per queue, mode 4
+	 */
+	u32 mask = GENMASK(15 >> group->mode, 0);
+
+	return group->slot_use_bitmap == mask;
+}
+
+static inline int dlb_sn_group_alloc_slot(struct dlb_sn_group *group)
+{
+	u32 bound = 16 >> group->mode; /* {16, 8, 4, 2, 1} */
+	u32 i;
+
+	for (i = 0; i < bound; i++) {
+		if (!(group->slot_use_bitmap & BIT(i))) {
+			group->slot_use_bitmap |= BIT(i);
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 static inline void
 dlb_sn_group_free_slot(struct dlb_sn_group *group, int slot)
 {
@@ -495,8 +524,20 @@ void dlb_resource_free(struct dlb_hw *hw);
 int dlb_hw_create_sched_domain(struct dlb_hw *hw,
 			       struct dlb_create_sched_domain_args *args,
 			       struct dlb_cmd_response *resp);
+int dlb_hw_create_ldb_queue(struct dlb_hw *hw, u32 domain_id,
+			    struct dlb_create_ldb_queue_args *args,
+			    struct dlb_cmd_response *resp);
+int dlb_hw_create_dir_queue(struct dlb_hw *hw, u32 domain_id,
+			    struct dlb_create_dir_queue_args *args,
+			    struct dlb_cmd_response *resp);
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
 void dlb_clr_pmcsr_disable(struct dlb_hw *hw);
+int dlb_hw_get_ldb_queue_depth(struct dlb_hw *hw, u32 domain_id,
+			       struct dlb_get_ldb_queue_depth_args *args,
+			       struct dlb_cmd_response *resp);
+int dlb_hw_get_dir_queue_depth(struct dlb_hw *hw, u32 domain_id,
+			       struct dlb_get_dir_queue_depth_args *args,
+			       struct dlb_cmd_response *resp);
 
 /* Prototypes for dlb_configfs.c */
 int dlb_configfs_create_device(struct dlb *dlb);

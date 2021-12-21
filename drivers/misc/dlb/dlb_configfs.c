@@ -9,6 +9,42 @@
 
 struct dlb_device_configfs dlb_dev_configfs[16];
 
+/*
+ * DLB domain configfs callback template minimizes replication of boilerplate
+ * code to copy arguments, acquire and release the resource lock, and execute
+ * the command.  The arguments and response structure name should have the
+ * format dlb_<lower_name>_args.
+ */
+#define DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(lower_name)		   \
+static int dlb_domain_configfs_##lower_name(struct dlb *dlb,		   \
+				   struct dlb_domain *domain,		   \
+				   void *karg)				   \
+{									   \
+	struct dlb_cmd_response response = {0};				   \
+	struct dlb_##lower_name##_args *arg = karg;			   \
+	int ret;							   \
+									   \
+	mutex_lock(&dlb->resource_mutex);				   \
+									   \
+	ret = dlb_hw_##lower_name(&dlb->hw,				   \
+				  domain->id,				   \
+				  arg,					   \
+				  &response);				   \
+									   \
+	mutex_unlock(&dlb->resource_mutex);				   \
+									   \
+	BUILD_BUG_ON(offsetof(typeof(*arg), response) != 0);		   \
+									   \
+	memcpy(karg, &response, sizeof(response));			   \
+									   \
+	return ret;							   \
+}
+
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_ldb_queue)
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_dir_queue)
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_ldb_queue_depth)
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_dir_queue_depth)
+
 static int dlb_configfs_create_sched_domain(struct dlb *dlb,
 					    void *karg)
 {
@@ -86,6 +122,213 @@ unlock:
  *                    enable                   ...
  *                    ...
  */
+
+/*
+ * ------ Configfs for dlb queues ---------
+ *
+ * These are the templates for show and store functions in queue
+ * groups/directories, which minimizes replication of boilerplate
+ * code to copy arguments. All attributes, except for "create" store,
+ * use the template. "name" is the attribute name in the group.
+ */
+#define DLB_CONFIGFS_QUEUE_SHOW(name)				\
+static ssize_t dlb_cfs_queue_##name##_show(			\
+	struct config_item *item,				\
+	char *page)						\
+{								\
+	return sprintf(page, "%u\n",				\
+	       to_dlb_cfs_queue(item)->name);			\
+}								\
+
+#define DLB_CONFIGFS_QUEUE_STORE(name)				\
+static ssize_t dlb_cfs_queue_##name##_store(			\
+	struct config_item *item,				\
+	const char *page,					\
+	size_t count)						\
+{								\
+	struct dlb_cfs_queue *dlb_cfs_queue =			\
+				to_dlb_cfs_queue(item);		\
+	int ret;						\
+								\
+	ret = kstrtoint(page, 10,				\
+			 &dlb_cfs_queue->name);			\
+	if (ret)						\
+		return ret;					\
+								\
+	return count;						\
+}								\
+
+static ssize_t dlb_cfs_queue_queue_depth_show(struct config_item *item,
+					      char *page)
+{
+	struct dlb_cfs_queue *dlb_cfs_queue = to_dlb_cfs_queue(item);
+	struct dlb_domain *dlb_domain;
+	struct dlb *dlb = NULL;
+	int ret;
+
+	ret = dlb_configfs_get_dlb_domain(dlb_cfs_queue->domain_grp,
+					  &dlb, &dlb_domain);
+	if (ret)
+		return ret;
+
+	if (dlb_cfs_queue->is_ldb) {
+		struct dlb_get_ldb_queue_depth_args args = {0};
+
+		args.queue_id = dlb_cfs_queue->queue_id;
+		ret = dlb_domain_configfs_get_ldb_queue_depth(dlb,
+						dlb_domain, &args);
+
+		dlb_cfs_queue->status = args.response.status;
+		dlb_cfs_queue->queue_depth = args.response.id;
+	} else {
+		struct dlb_get_dir_queue_depth_args args = {0};
+
+		args.queue_id = dlb_cfs_queue->queue_id;
+		ret = dlb_domain_configfs_get_dir_queue_depth(dlb,
+						dlb_domain, &args);
+
+		dlb_cfs_queue->status = args.response.status;
+		dlb_cfs_queue->queue_depth = args.response.id;
+	}
+
+	if (ret) {
+		dev_err(dlb->dev,
+			"Getting queue depth failed: ret=%d\n", ret);
+		return ret;
+	}
+
+	return sprintf(page, "%u\n", dlb_cfs_queue->queue_depth);
+}
+
+DLB_CONFIGFS_QUEUE_SHOW(status)
+DLB_CONFIGFS_QUEUE_SHOW(queue_id)
+DLB_CONFIGFS_QUEUE_SHOW(is_ldb)
+DLB_CONFIGFS_QUEUE_SHOW(depth_threshold)
+DLB_CONFIGFS_QUEUE_SHOW(num_sequence_numbers)
+DLB_CONFIGFS_QUEUE_SHOW(num_qid_inflights)
+DLB_CONFIGFS_QUEUE_SHOW(num_atomic_inflights)
+DLB_CONFIGFS_QUEUE_SHOW(lock_id_comp_level)
+DLB_CONFIGFS_QUEUE_SHOW(port_id)
+DLB_CONFIGFS_QUEUE_SHOW(create)
+
+DLB_CONFIGFS_QUEUE_STORE(is_ldb)
+DLB_CONFIGFS_QUEUE_STORE(depth_threshold)
+DLB_CONFIGFS_QUEUE_STORE(num_sequence_numbers)
+DLB_CONFIGFS_QUEUE_STORE(num_qid_inflights)
+DLB_CONFIGFS_QUEUE_STORE(num_atomic_inflights)
+DLB_CONFIGFS_QUEUE_STORE(lock_id_comp_level)
+DLB_CONFIGFS_QUEUE_STORE(port_id)
+
+static ssize_t dlb_cfs_queue_create_store(struct config_item *item,
+					  const char *page, size_t count)
+{
+	struct dlb_cfs_queue *dlb_cfs_queue = to_dlb_cfs_queue(item);
+	struct dlb_domain *dlb_domain;
+	struct dlb *dlb = NULL;
+	int ret;
+
+	ret = dlb_configfs_get_dlb_domain(dlb_cfs_queue->domain_grp,
+					  &dlb, &dlb_domain);
+	if (ret)
+		return ret;
+
+	ret = kstrtoint(page, 10, &dlb_cfs_queue->create);
+	if (ret)
+		return ret;
+
+	if (dlb_cfs_queue->create == 0)  /* ToDo ? */
+		return count;
+
+	if (dlb_cfs_queue->is_ldb) {
+		struct dlb_create_ldb_queue_args args = {0};
+
+		args.num_sequence_numbers = dlb_cfs_queue->num_sequence_numbers;
+		args.num_qid_inflights = dlb_cfs_queue->num_qid_inflights;
+		args.num_atomic_inflights = dlb_cfs_queue->num_atomic_inflights;
+		args.lock_id_comp_level = dlb_cfs_queue->lock_id_comp_level;
+		args.depth_threshold = dlb_cfs_queue->depth_threshold;
+
+		dev_dbg(dlb->dev,
+			"Creating ldb queue: %s\n",
+			dlb_cfs_queue->group.cg_item.ci_namebuf);
+
+		ret = dlb_domain_configfs_create_ldb_queue(dlb, dlb_domain, &args);
+
+		dlb_cfs_queue->status = args.response.status;
+		dlb_cfs_queue->queue_id = args.response.id;
+	} else {
+		struct dlb_create_dir_queue_args args = {0};
+
+		args.port_id = dlb_cfs_queue->port_id;
+		args.depth_threshold = dlb_cfs_queue->depth_threshold;
+
+		dev_dbg(dlb->dev,
+			"Creating ldb queue: %s\n",
+			dlb_cfs_queue->group.cg_item.ci_namebuf);
+
+		ret = dlb_domain_configfs_create_dir_queue(dlb, dlb_domain, &args);
+
+		dlb_cfs_queue->status = args.response.status;
+		dlb_cfs_queue->queue_id = args.response.id;
+	}
+
+	if (ret) {
+		dev_err(dlb->dev,
+			"create queue() failed: ret=%d is_ldb=%u\n", ret,
+			dlb_cfs_queue->is_ldb);
+		return ret;
+	}
+
+	return count;
+}
+
+CONFIGFS_ATTR_RO(dlb_cfs_queue_, status);
+CONFIGFS_ATTR_RO(dlb_cfs_queue_, queue_id);
+CONFIGFS_ATTR_RO(dlb_cfs_queue_, queue_depth);
+CONFIGFS_ATTR(dlb_cfs_queue_, is_ldb);
+CONFIGFS_ATTR(dlb_cfs_queue_, depth_threshold);
+CONFIGFS_ATTR(dlb_cfs_queue_, num_sequence_numbers);
+CONFIGFS_ATTR(dlb_cfs_queue_, num_qid_inflights);
+CONFIGFS_ATTR(dlb_cfs_queue_, num_atomic_inflights);
+CONFIGFS_ATTR(dlb_cfs_queue_, lock_id_comp_level);
+CONFIGFS_ATTR(dlb_cfs_queue_, port_id);
+CONFIGFS_ATTR(dlb_cfs_queue_, create);
+
+static struct configfs_attribute *dlb_cfs_queue_attrs[] = {
+	&dlb_cfs_queue_attr_status,
+	&dlb_cfs_queue_attr_queue_id,
+	&dlb_cfs_queue_attr_queue_depth,
+	&dlb_cfs_queue_attr_is_ldb,
+	&dlb_cfs_queue_attr_depth_threshold,
+	&dlb_cfs_queue_attr_num_sequence_numbers,
+	&dlb_cfs_queue_attr_num_qid_inflights,
+	&dlb_cfs_queue_attr_num_atomic_inflights,
+	&dlb_cfs_queue_attr_lock_id_comp_level,
+	&dlb_cfs_queue_attr_port_id,
+	&dlb_cfs_queue_attr_create,
+
+	NULL,
+};
+
+static void dlb_cfs_queue_release(struct config_item *item)
+{
+	kfree(to_dlb_cfs_queue(item));
+}
+
+static struct configfs_item_operations dlb_cfs_queue_item_ops = {
+	.release	= dlb_cfs_queue_release,
+};
+
+/*
+ * Note that, since no extra work is required on ->drop_item(),
+ * no ->drop_item() is provided. no _group_ops either because we
+ * don't need to create any groups or items in queue configfs.
+ */
+static const struct config_item_type dlb_cfs_queue_type = {
+	.ct_item_ops	= &dlb_cfs_queue_item_ops,
+	.ct_attrs	= dlb_cfs_queue_attrs,
+	.ct_owner	= THIS_MODULE,
+};
 
 /*
  * ------ Configfs for dlb domains---------
@@ -228,6 +471,30 @@ static struct configfs_attribute *dlb_cfs_domain_attrs[] = {
 	NULL,
 };
 
+static struct config_group *dlb_cfs_domain_make_queue_port(struct config_group *group,
+							   const char *name)
+{
+	if (strstr(name, "queue")) {
+		struct dlb_cfs_queue *dlb_cfs_queue;
+
+		dlb_cfs_queue = kzalloc(sizeof(*dlb_cfs_queue), GFP_KERNEL);
+		if (!dlb_cfs_queue)
+			return ERR_PTR(-ENOMEM);
+
+		dlb_cfs_queue->domain_grp = group;
+
+		config_group_init_type_name(&dlb_cfs_queue->group, name,
+					    &dlb_cfs_queue_type);
+
+		dlb_cfs_queue->queue_id = 0xffffffff;
+		dlb_cfs_queue->port_id = 0xffffffff;
+
+		return &dlb_cfs_queue->group;
+	}
+
+	return ERR_PTR(-EINVAL);
+}
+
 static void dlb_cfs_domain_release(struct config_item *item)
 {
 	kfree(to_dlb_cfs_domain(item));
@@ -237,8 +504,17 @@ static struct configfs_item_operations dlb_cfs_domain_item_ops = {
 	.release	= dlb_cfs_domain_release,
 };
 
+/*
+ * Note that, since no extra work is required on ->drop_item(),
+ * no ->drop_item() is provided.
+ */
+static struct configfs_group_operations dlb_cfs_domain_group_ops = {
+	.make_group     = dlb_cfs_domain_make_queue_port,
+};
+
 static const struct config_item_type dlb_cfs_domain_type = {
 	.ct_item_ops	= &dlb_cfs_domain_item_ops,
+	.ct_group_ops	= &dlb_cfs_domain_group_ops,
 	.ct_attrs	= dlb_cfs_domain_attrs,
 	.ct_owner	= THIS_MODULE,
 };
