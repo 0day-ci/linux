@@ -43,8 +43,8 @@ err:
 	return ret;
 }
 
-static int __must_check of_clk_bulk_get_all(struct device_node *np,
-					    struct clk_bulk_data **clks)
+int __must_check of_clk_bulk_get_all(struct device_node *np,
+				     struct clk_bulk_data **clks)
 {
 	struct clk_bulk_data *clk_bulk;
 	int num_clks;
@@ -68,6 +68,7 @@ static int __must_check of_clk_bulk_get_all(struct device_node *np,
 
 	return num_clks;
 }
+EXPORT_SYMBOL_GPL(of_clk_bulk_get_all);
 
 void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
 {

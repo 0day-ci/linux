@@ -373,6 +373,18 @@ int __must_check clk_bulk_get_all(struct device *dev,
 				  struct clk_bulk_data **clks);
 
 /**
+ * of_clk_bulk_get_all - lookup and obtain all available references to clock
+ *			 producer.
+ * @np: device node for clock "consumer"
+ * @clks: pointer to the clk_bulk_data table of consumer
+ *
+ * Same with clk_bulk_get_all except the first parameter use device node
+ * pointer.
+ */
+int __must_check of_clk_bulk_get_all(struct device_node *np,
+				     struct clk_bulk_data **clks);
+
+/**
  * clk_bulk_get_optional - lookup and obtain a number of references to clock producer
  * @dev: device for clock "consumer"
  * @num_clks: the number of clk_bulk_data
@@ -804,6 +816,12 @@ static inline int __must_check clk_bulk_get_optional(struct device *dev,
 
 static inline int __must_check clk_bulk_get_all(struct device *dev,
 					 struct clk_bulk_data **clks)
+{
+	return 0;
+}
+
+static inline int __must_check of_clk_bulk_get_all(struct device *dev,
+						   struct clk_bulk_data **clks)
 {
 	return 0;
 }
