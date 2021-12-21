@@ -1086,6 +1086,34 @@ dlb_verify_create_dir_port_args(struct dlb_hw *hw, u32 domain_id,
 	return 0;
 }
 
+static int dlb_verify_start_domain_args(struct dlb_hw *hw, u32 domain_id,
+					struct dlb_cmd_response *resp,
+					struct dlb_hw_domain **out_domain)
+{
+	struct dlb_hw_domain *domain;
+
+	domain = dlb_get_domain_from_id(hw, domain_id);
+
+	if (!domain) {
+		resp->status = DLB_ST_INVALID_DOMAIN_ID;
+		return -EINVAL;
+	}
+
+	if (!domain->configured) {
+		resp->status = DLB_ST_DOMAIN_NOT_CONFIGURED;
+		return -EINVAL;
+	}
+
+	if (domain->started) {
+		resp->status = DLB_ST_DOMAIN_STARTED;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+
+	return 0;
+}
+
 static void dlb_configure_domain_credits(struct dlb_hw *hw,
 					 struct dlb_hw_domain *domain)
 {
@@ -2468,6 +2496,84 @@ static void dlb_domain_reset_ldb_port_registers(struct dlb_hw *hw,
 		list_for_each_entry(port, &domain->used_ldb_ports[i], domain_list)
 			__dlb_domain_reset_ldb_port_registers(hw, port);
 	}
+}
+
+static void dlb_log_start_domain(struct dlb_hw *hw, u32 domain_id)
+{
+	dev_dbg(hw_to_dev(hw), "DLB start domain arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tDomain ID: %d\n", domain_id);
+}
+
+/**
+ * dlb_hw_start_domain() - start a scheduling domain
+ * @hw: dlb_hw handle for a particular device.
+ * @domain_id: domain ID.
+ * @unused: unused.
+ * @resp: response structure.
+ *
+ * This function starts a scheduling domain, which allows applications to send
+ * traffic through it. Once a domain is started, its resources can no longer be
+ * configured (besides QID remapping and port enable/disable).
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error.
+ *
+ * Errors:
+ * EINVAL - the domain is not configured, or the domain is already started.
+ */
+int
+dlb_hw_start_domain(struct dlb_hw *hw, u32 domain_id, void *unused,
+		    struct dlb_cmd_response *resp)
+{
+	struct dlb_dir_pq_pair *dir_queue;
+	struct dlb_ldb_queue *ldb_queue;
+	struct dlb_hw_domain *domain;
+	int ret;
+
+	dlb_log_start_domain(hw, domain_id);
+
+	ret = dlb_verify_start_domain_args(hw, domain_id, resp,
+					   &domain);
+	if (ret)
+		return ret;
+
+	/*
+	 * Enable load-balanced and directed queue write permissions for the
+	 * queues this domain owns. Without this, the DLB will drop all
+	 * incoming traffic to those queues.
+	 */
+	list_for_each_entry(ldb_queue, &domain->used_ldb_queues, domain_list) {
+		u32 vasqid_v = 0;
+		unsigned int offs;
+
+		vasqid_v |= SYS_LDB_VASQID_V_VASQID_V;
+
+		offs = domain->id * DLB_MAX_NUM_LDB_QUEUES +
+			ldb_queue->id;
+
+		DLB_CSR_WR(hw, SYS_LDB_VASQID_V(offs), vasqid_v);
+	}
+
+	list_for_each_entry(dir_queue, &domain->used_dir_pq_pairs, domain_list) {
+		u32 vasqid_v = 0;
+		unsigned int offs;
+
+		vasqid_v |= SYS_DIR_VASQID_V_VASQID_V;
+
+		offs = domain->id * DLB_MAX_NUM_DIR_PORTS +
+			dir_queue->id;
+
+		DLB_CSR_WR(hw, SYS_DIR_VASQID_V(offs), vasqid_v);
+	}
+
+	dlb_flush_csr(hw);
+
+	domain->started = true;
+
+	resp->status = 0;
+
+	return 0;
 }
 
 static void

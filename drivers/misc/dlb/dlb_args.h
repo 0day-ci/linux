@@ -249,6 +249,23 @@ struct dlb_get_port_fd_args {
 };
 
 /*
+ * dlb_start_domain_args: Used to mark the end of the domain configuration. This
+ *	must be called before passing QEs into the device, and no configuration
+ *	via configfs can be done once the domain has started. Sending QEs into the
+ *	device before starting the domain will result in undefined behavior.
+ * Input parameters:
+ * - (None)
+ *
+ * Output parameters:
+ * @response.status: Detailed error code. In certain cases, such as if the
+ *	configfs request arg is invalid, the driver won't set status.
+ */
+struct dlb_start_domain_args {
+	/* Output parameters */
+	struct dlb_cmd_response response;
+};
+
+/*
  * Mapping sizes for memory mapping the consumer queue (CQ) memory space, and
  * producer port (PP) MMIO space.
  */

@@ -614,6 +614,8 @@ int dlb_hw_create_ldb_port(struct dlb_hw *hw, u32 domain_id,
 			   struct dlb_create_ldb_port_args *args,
 			   uintptr_t cq_dma_base,
 			   struct dlb_cmd_response *resp);
+int dlb_hw_start_domain(struct dlb_hw *hw, u32 domain_id, void *unused,
+			struct dlb_cmd_response *resp);
 int dlb_reset_domain(struct dlb_hw *hw, u32 domain_id);
 int dlb_ldb_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);
 int dlb_dir_port_owned_by_domain(struct dlb_hw *hw, u32 domain_id, u32 port_id);

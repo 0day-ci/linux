@@ -44,6 +44,7 @@ DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_ldb_queue)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(create_dir_queue)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_ldb_queue_depth)
 DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(get_dir_queue_depth)
+DLB_DOMAIN_CONFIGFS_CALLBACK_TEMPLATE(start_domain)
 
 static int dlb_create_port_fd(struct dlb *dlb,
 			      const char *prefix,
@@ -814,6 +815,7 @@ DLB_CONFIGFS_DOMAIN_SHOW(num_hist_list_entries)
 DLB_CONFIGFS_DOMAIN_SHOW(num_ldb_credits)
 DLB_CONFIGFS_DOMAIN_SHOW(num_dir_credits)
 DLB_CONFIGFS_DOMAIN_SHOW(create)
+DLB_CONFIGFS_DOMAIN_SHOW(start)
 
 DLB_CONFIGFS_DOMAIN_STORE(num_ldb_queues)
 DLB_CONFIGFS_DOMAIN_STORE(num_ldb_ports)
@@ -882,6 +884,44 @@ static ssize_t dlb_cfs_domain_create_store(struct config_item *item,
 	return count;
 }
 
+static ssize_t dlb_cfs_domain_start_store(struct config_item *item,
+					  const char *page, size_t count)
+{
+	struct dlb_cfs_domain *dlb_cfs_domain = to_dlb_cfs_domain(item);
+	struct dlb_device_configfs *dlb_dev_configfs;
+	struct dlb_domain *dlb_domain;
+	struct dlb *dlb;
+	int ret;
+
+	dlb_dev_configfs = container_of(dlb_cfs_domain->dev_grp,
+					struct dlb_device_configfs,
+					dev_group);
+	dlb = dlb_dev_configfs->dlb;
+
+	ret = kstrtoint(page, 10, &dlb_cfs_domain->start);
+	if (ret)
+		return ret;
+
+	if (dlb_cfs_domain->start == 1) {
+		struct dlb_start_domain_args args;
+
+		memcpy(&args.response, &dlb_cfs_domain->status,
+		       sizeof(struct dlb_start_domain_args));
+
+		dlb_domain = dlb->sched_domains[dlb_cfs_domain->domain_id];
+		ret = dlb_domain_configfs_start_domain(dlb, dlb_domain, &args);
+
+		dlb_cfs_domain->status = args.response.status;
+
+		if (ret) {
+			dev_err(dlb->dev,
+				"start sched domain failed: ret=%d\n", ret);
+			return ret;
+		}
+	}
+	return count;
+}
+
 CONFIGFS_ATTR_RO(dlb_cfs_domain_, domain_fd);
 CONFIGFS_ATTR_RO(dlb_cfs_domain_, status);
 CONFIGFS_ATTR_RO(dlb_cfs_domain_, domain_id);
@@ -893,6 +933,7 @@ CONFIGFS_ATTR(dlb_cfs_domain_, num_hist_list_entries);
 CONFIGFS_ATTR(dlb_cfs_domain_, num_ldb_credits);
 CONFIGFS_ATTR(dlb_cfs_domain_, num_dir_credits);
 CONFIGFS_ATTR(dlb_cfs_domain_, create);
+CONFIGFS_ATTR(dlb_cfs_domain_, start);
 
 static struct configfs_attribute *dlb_cfs_domain_attrs[] = {
 	&dlb_cfs_domain_attr_domain_fd,
@@ -906,6 +947,7 @@ static struct configfs_attribute *dlb_cfs_domain_attrs[] = {
 	&dlb_cfs_domain_attr_num_ldb_credits,
 	&dlb_cfs_domain_attr_num_dir_credits,
 	&dlb_cfs_domain_attr_create,
+	&dlb_cfs_domain_attr_start,
 
 	NULL,
 };
