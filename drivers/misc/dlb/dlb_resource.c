@@ -1200,6 +1200,38 @@ static int dlb_verify_map_qid_args(struct dlb_hw *hw, u32 domain_id,
 	return 0;
 }
 
+static bool dlb_port_find_slot(struct dlb_ldb_port *port,
+			       enum dlb_qid_map_state state, int *slot)
+{
+	int i;
+
+	for (i = 0; i < DLB_MAX_NUM_QIDS_PER_LDB_CQ; i++) {
+		if (port->qid_map[i].state == state)
+			break;
+	}
+
+	*slot = i;
+
+	return (i < DLB_MAX_NUM_QIDS_PER_LDB_CQ);
+}
+
+static bool dlb_port_find_slot_queue(struct dlb_ldb_port *port,
+				     enum dlb_qid_map_state state,
+				     struct dlb_ldb_queue *queue, int *slot)
+{
+	int i;
+
+	for (i = 0; i < DLB_MAX_NUM_QIDS_PER_LDB_CQ; i++) {
+		if (port->qid_map[i].state == state &&
+		    port->qid_map[i].qid == queue->id)
+			break;
+	}
+
+	*slot = i;
+
+	return (i < DLB_MAX_NUM_QIDS_PER_LDB_CQ);
+}
+
 static int dlb_verify_unmap_qid_args(struct dlb_hw *hw, u32 domain_id,
 				     struct dlb_unmap_qid_args *args,
 				     struct dlb_cmd_response *resp,
@@ -1720,6 +1752,125 @@ static int dlb_configure_dir_port(struct dlb_hw *hw, struct dlb_hw_domain *domai
 	return 0;
 }
 
+static int dlb_ldb_port_map_qid_static(struct dlb_hw *hw, struct dlb_ldb_port *p,
+				       struct dlb_ldb_queue *q, u8 priority)
+{
+	u32 lsp_qid2cq2;
+	u32 lsp_qid2cq;
+	u32 atm_qid2cq;
+	u32 cq2priov;
+	u32 cq2qid;
+	int i;
+
+	/* Look for a pending or already mapped slot, else an unused slot */
+	if (!dlb_port_find_slot_queue(p, DLB_QUEUE_MAP_IN_PROG, q, &i) &&
+	    !dlb_port_find_slot_queue(p, DLB_QUEUE_MAPPED, q, &i) &&
+	    !dlb_port_find_slot(p, DLB_QUEUE_UNMAPPED, &i)) {
+		dev_err(hw_to_dev(hw),
+			"[%s():%d] Internal error: CQ has no available QID mapping slots\n",
+			__func__, __LINE__);
+		return -EFAULT;
+	}
+
+	/* Read-modify-write the priority and valid bit register */
+	cq2priov = DLB_CSR_RD(hw, LSP_CQ2PRIOV(p->id));
+
+	cq2priov |= (1U << (i + LSP_CQ2PRIOV_V_LOC)) & LSP_CQ2PRIOV_V;
+	cq2priov |= ((priority & 0x7) << (i + LSP_CQ2PRIOV_PRIO_LOC) * 3)
+		    & LSP_CQ2PRIOV_PRIO;
+
+	DLB_CSR_WR(hw, LSP_CQ2PRIOV(p->id), cq2priov);
+
+	/* Read-modify-write the QID map register */
+	if (i < 4)
+		cq2qid = DLB_CSR_RD(hw, LSP_CQ2QID0(p->id));
+	else
+		cq2qid = DLB_CSR_RD(hw, LSP_CQ2QID1(p->id));
+
+	if (i == 0 || i == 4) {
+		cq2qid &= ~LSP_CQ2QID0_QID_P0;
+		cq2qid |= FIELD_PREP(LSP_CQ2QID0_QID_P0, q->id);
+	} else if (i == 1 || i == 5) {
+		cq2qid &= ~LSP_CQ2QID0_QID_P1;
+		cq2qid |= FIELD_PREP(LSP_CQ2QID0_QID_P1, q->id);
+	} else if (i == 2 || i == 6) {
+		cq2qid &= ~LSP_CQ2QID0_QID_P2;
+		cq2qid |= FIELD_PREP(LSP_CQ2QID0_QID_P2, q->id);
+	} else if (i == 3 || i == 7) {
+		cq2qid &= ~LSP_CQ2QID0_QID_P3;
+		cq2qid |= FIELD_PREP(LSP_CQ2QID0_QID_P3, q->id);
+	}
+
+	if (i < 4)
+		DLB_CSR_WR(hw, LSP_CQ2QID0(p->id), cq2qid);
+	else
+		DLB_CSR_WR(hw, LSP_CQ2QID1(p->id), cq2qid);
+
+	atm_qid2cq = DLB_CSR_RD(hw,
+				ATM_QID2CQIDIX(q->id,
+					       p->id / 4));
+
+	lsp_qid2cq = DLB_CSR_RD(hw,
+				LSP_QID2CQIDIX(q->id,
+					       p->id / 4));
+
+	lsp_qid2cq2 = DLB_CSR_RD(hw,
+				 LSP_QID2CQIDIX2(q->id,
+						 p->id / 4));
+
+	switch (p->id % 4) {
+	case 0:
+		atm_qid2cq |= (1 << (i + ATM_QID2CQIDIX_00_CQ_P0_LOC));
+		lsp_qid2cq |= (1 << (i + LSP_QID2CQIDIX_00_CQ_P0_LOC));
+		lsp_qid2cq2 |= (1 << (i + LSP_QID2CQIDIX2_00_CQ_P0_LOC));
+		break;
+
+	case 1:
+		atm_qid2cq |= (1 << (i + ATM_QID2CQIDIX_00_CQ_P1_LOC));
+		lsp_qid2cq |= (1 << (i + LSP_QID2CQIDIX_00_CQ_P1_LOC));
+		lsp_qid2cq2 |= (1 << (i + LSP_QID2CQIDIX2_00_CQ_P1_LOC));
+		break;
+
+	case 2:
+		atm_qid2cq |= (1 << (i + ATM_QID2CQIDIX_00_CQ_P2_LOC));
+		lsp_qid2cq |= (1 << (i + LSP_QID2CQIDIX_00_CQ_P2_LOC));
+		lsp_qid2cq2 |= (1 << (i + LSP_QID2CQIDIX2_00_CQ_P2_LOC));
+		break;
+
+	case 3:
+		atm_qid2cq |= (1 << (i + ATM_QID2CQIDIX_00_CQ_P3_LOC));
+		lsp_qid2cq |= (1 << (i + LSP_QID2CQIDIX_00_CQ_P3_LOC));
+		lsp_qid2cq2 |= (1 << (i + LSP_QID2CQIDIX2_00_CQ_P3_LOC));
+		break;
+	}
+
+	DLB_CSR_WR(hw,
+		   ATM_QID2CQIDIX(q->id, p->id / 4),
+		   atm_qid2cq);
+
+	DLB_CSR_WR(hw,
+		   LSP_QID2CQIDIX(q->id, p->id / 4),
+		   lsp_qid2cq);
+
+	DLB_CSR_WR(hw,
+		   LSP_QID2CQIDIX2(q->id, p->id / 4),
+		   lsp_qid2cq2);
+
+	dlb_flush_csr(hw);
+
+	p->qid_map[i].qid = q->id;
+	p->qid_map[i].priority = priority;
+
+	return 0;
+}
+
+static int dlb_ldb_port_map_qid(struct dlb_hw *hw, struct dlb_hw_domain *domain,
+				struct dlb_ldb_port *port,
+				struct dlb_ldb_queue *queue, u8 prio)
+{
+	return dlb_ldb_port_map_qid_static(hw, port, queue, prio);
+}
+
 static void
 dlb_log_create_sched_domain_args(struct dlb_hw *hw,
 				 struct dlb_create_sched_domain_args *args)
@@ -2155,6 +2306,7 @@ int dlb_hw_map_qid(struct dlb_hw *hw, u32 domain_id,
 	struct dlb_ldb_queue *queue;
 	struct dlb_ldb_port *port;
 	int ret;
+	u8 prio;
 
 	dlb_log_map_qid(hw, domain_id, args);
 
@@ -2166,6 +2318,17 @@ int dlb_hw_map_qid(struct dlb_hw *hw, u32 domain_id,
 				      &domain, &port, &queue);
 	if (ret)
 		return ret;
+
+	prio = args->priority;
+
+	ret = dlb_ldb_port_map_qid(hw, domain, port, queue, prio);
+
+	/* If ret is less than zero, it's due to an internal error */
+	if (ret < 0)
+		return ret;
+
+	if (port->enabled)
+		dlb_ldb_port_cq_enable(hw, port);
 
 	resp->status = 0;
 
