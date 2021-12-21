@@ -1175,6 +1175,14 @@
 			status = "disabled";
 		};
 
+		imem: imem@146bf000 {
+			compatible = "simple-mfd";
+			reg = <0x0 0x146bf000 0x0 0x1000>;
+			ranges = <0x0 0x0 0x146bf000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+		};
+
 		qupv3_id_1: geniqup@ac0000 {
 			compatible = "qcom,geni-se-qup";
 			reg = <0x0 0x00ac0000 0x0 0x6000>;
