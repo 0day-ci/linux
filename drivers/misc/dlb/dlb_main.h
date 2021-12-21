@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/bitfield.h>
 
+#include <uapi/linux/dlb.h>
 #include "dlb_args.h"
 
 /*
@@ -248,10 +249,20 @@ int dlb_pf_init_driver_state(struct dlb *dlb);
 void dlb_pf_enable_pm(struct dlb *dlb);
 int dlb_pf_wait_for_device_ready(struct dlb *dlb, struct pci_dev *pdev);
 
+extern const struct file_operations dlb_domain_fops;
+
+struct dlb_domain {
+	struct dlb *dlb;
+	struct kref refcnt;
+	u8 id;
+};
+
 struct dlb {
 	struct pci_dev *pdev;
 	struct dlb_hw hw;
 	struct device *dev;
+	struct dlb_domain *sched_domains[DLB_MAX_NUM_DOMAINS];
+	struct file *f;
 	/*
 	 * The resource mutex serializes access to driver data structures and
 	 * hardware registers.
@@ -324,6 +335,123 @@ static inline void dlb_bitmap_free(struct dlb_bitmap *bitmap)
 	bitmap_free(bitmap->map);
 
 	kfree(bitmap);
+}
+
+/**
+ * dlb_bitmap_clear_range() - clear a range of bitmap entries
+ * @bitmap: pointer to dlb_bitmap structure.
+ * @bit: starting bit index.
+ * @len: length of the range.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise.
+ *
+ * Errors:
+ * EINVAL - bitmap is NULL or is uninitialized, or the range exceeds the bitmap
+ *	    length.
+ */
+static inline int dlb_bitmap_clear_range(struct dlb_bitmap *bitmap,
+					 unsigned int bit,
+					 unsigned int len)
+{
+	if (!bitmap || !bitmap->map)
+		return -EINVAL;
+
+	if (bitmap->len <= bit)
+		return -EINVAL;
+
+	bitmap_clear(bitmap->map, bit, len);
+
+	return 0;
+}
+
+/**
+ * dlb_bitmap_find_set_bit_range() - find an range of set bits
+ * @bitmap: pointer to dlb_bitmap structure.
+ * @len: length of the range.
+ *
+ * This function looks for a range of set bits of length @len.
+ *
+ * Return:
+ * Returns the base bit index upon success, < 0 otherwise.
+ *
+ * Errors:
+ * ENOENT - unable to find a length *len* range of set bits.
+ * EINVAL - bitmap is NULL or is uninitialized, or len is invalid.
+ */
+static inline int dlb_bitmap_find_set_bit_range(struct dlb_bitmap *bitmap,
+						unsigned int len)
+{
+	struct dlb_bitmap *complement_mask = NULL;
+	int ret;
+
+	if (!bitmap || !bitmap->map || len == 0)
+		return -EINVAL;
+
+	if (bitmap->len < len)
+		return -ENOENT;
+
+	ret = dlb_bitmap_alloc(&complement_mask, bitmap->len);
+	if (ret)
+		return ret;
+
+	bitmap_zero(complement_mask->map, complement_mask->len);
+
+	bitmap_complement(complement_mask->map, bitmap->map, bitmap->len);
+
+	ret = bitmap_find_next_zero_area(complement_mask->map,
+					 complement_mask->len,
+					 0,
+					 len,
+					 0);
+
+	dlb_bitmap_free(complement_mask);
+
+	/* No set bit range of length len? */
+	return (ret >= (int)bitmap->len) ? -ENOENT : ret;
+}
+
+/**
+ * dlb_bitmap_longest_set_range() - returns longest contiguous range of set
+ *				     bits
+ * @bitmap: pointer to dlb_bitmap structure.
+ *
+ * Return:
+ * Returns the bitmap's longest contiguous range of set bits upon success,
+ * <0 otherwise.
+ *
+ * Errors:
+ * EINVAL - bitmap is NULL or is uninitialized.
+ */
+static inline int dlb_bitmap_longest_set_range(struct dlb_bitmap *bitmap)
+{
+	int max_len, len;
+	int start, end;
+
+	if (!bitmap || !bitmap->map)
+		return -EINVAL;
+
+	if (bitmap_weight(bitmap->map, bitmap->len) == 0)
+		return 0;
+
+	max_len = 0;
+	bitmap_for_each_set_region(bitmap->map, start, end, 0, bitmap->len) {
+		len = end - start;
+		if (max_len < len)
+			max_len = len;
+	}
+	return max_len;
+}
+
+int dlb_init_domain(struct dlb *dlb, u32 domain_id);
+void dlb_free_domain(struct kref *kref);
+
+static inline struct device *hw_to_dev(struct dlb_hw *hw)
+{
+	struct dlb *dlb;
+
+	dlb = container_of(hw, struct dlb, hw);
+	return dlb->dev;
 }
 
 /* Prototypes for dlb_resource.c */

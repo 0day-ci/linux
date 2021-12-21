@@ -61,8 +61,76 @@ static int dlb_device_create(struct dlb *dlb, struct pci_dev *pdev)
 /****** Char dev callbacks ******/
 /********************************/
 
+static int dlb_open(struct inode *i, struct file *f)
+{
+	struct dlb *dlb;
+
+	mutex_lock(&dlb_ids_lock);
+	dlb = idr_find(&dlb_ids, iminor(i));
+	mutex_unlock(&dlb_ids_lock);
+
+	f->private_data = dlb;
+	dlb->f = f;
+
+	return 0;
+}
+
 static const struct file_operations dlb_fops = {
 	.owner   = THIS_MODULE,
+	.open    = dlb_open,
+};
+
+int dlb_init_domain(struct dlb *dlb, u32 domain_id)
+{
+	struct dlb_domain *domain;
+
+	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+	if (!domain)
+		return -ENOMEM;
+
+	domain->id = domain_id;
+
+	kref_init(&domain->refcnt);
+	domain->dlb = dlb;
+
+	dlb->sched_domains[domain_id] = domain;
+
+	return 0;
+}
+
+static int __dlb_free_domain(struct dlb_domain *domain)
+{
+	struct dlb *dlb = domain->dlb;
+
+	dlb->sched_domains[domain->id] = NULL;
+
+	kfree(domain);
+
+	return 0;
+}
+
+void dlb_free_domain(struct kref *kref)
+{
+	__dlb_free_domain(container_of(kref, struct dlb_domain, refcnt));
+}
+
+static int dlb_domain_close(struct inode *i, struct file *f)
+{
+	struct dlb_domain *domain = f->private_data;
+	struct dlb *dlb = domain->dlb;
+
+	mutex_lock(&dlb->resource_mutex);
+
+	kref_put(&domain->refcnt, dlb_free_domain);
+
+	mutex_unlock(&dlb->resource_mutex);
+
+	return 0;
+}
+
+const struct file_operations dlb_domain_fops = {
+	.owner   = THIS_MODULE,
+	.release = dlb_domain_close,
 };
 
 /**********************************/

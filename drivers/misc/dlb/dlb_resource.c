@@ -190,11 +190,537 @@ unwind:
 	return ret;
 }
 
+static int dlb_attach_ldb_queues(struct dlb_hw *hw,
+				 struct dlb_function_resources *rsrcs,
+				 struct dlb_hw_domain *domain, u32 num_queues,
+				 struct dlb_cmd_response *resp)
+{
+	unsigned int i;
+
+	if (rsrcs->num_avail_ldb_queues < num_queues) {
+		resp->status = DLB_ST_LDB_QUEUES_UNAVAILABLE;
+		dev_dbg(hw_to_dev(hw), "[%s()] Internal error: %d\n", __func__,
+			resp->status);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < num_queues; i++) {
+		struct dlb_ldb_queue *queue;
+
+		queue = list_first_entry_or_null(&rsrcs->avail_ldb_queues,
+						 typeof(*queue), func_list);
+		if (!queue) {
+			dev_err(hw_to_dev(hw),
+				"[%s()] Internal error: domain validation failed\n",
+				__func__);
+			return -EFAULT;
+		}
+
+		list_del(&queue->func_list);
+
+		queue->domain_id = domain->id;
+		queue->owned = true;
+
+		list_add(&queue->domain_list, &domain->avail_ldb_queues);
+	}
+
+	rsrcs->num_avail_ldb_queues -= num_queues;
+
+	return 0;
+}
+
+static struct dlb_ldb_port *
+dlb_get_next_ldb_port(struct dlb_hw *hw, struct dlb_function_resources *rsrcs,
+		      u32 domain_id, u32 cos_id)
+{
+	struct dlb_ldb_port *port;
+
+	/*
+	 * To reduce the odds of consecutive load-balanced ports mapping to the
+	 * same queue(s), the driver attempts to allocate ports whose neighbors
+	 * are owned by a different domain.
+	 */
+	list_for_each_entry(port, &rsrcs->avail_ldb_ports[cos_id], func_list) {
+		u32 next, prev;
+		u32 phys_id;
+
+		phys_id = port->id;
+		next = phys_id + 1;
+		prev = phys_id - 1;
+
+		if (phys_id == DLB_MAX_NUM_LDB_PORTS - 1)
+			next = 0;
+		if (phys_id == 0)
+			prev = DLB_MAX_NUM_LDB_PORTS - 1;
+
+		if (!hw->rsrcs.ldb_ports[next].owned ||
+		    hw->rsrcs.ldb_ports[next].domain_id == domain_id)
+			continue;
+
+		if (!hw->rsrcs.ldb_ports[prev].owned ||
+		    hw->rsrcs.ldb_ports[prev].domain_id == domain_id)
+			continue;
+
+		return port;
+	}
+
+	/*
+	 * Failing that, the driver looks for a port with one neighbor owned by
+	 * a different domain and the other unallocated.
+	 */
+	list_for_each_entry(port, &rsrcs->avail_ldb_ports[cos_id], func_list) {
+		u32 next, prev;
+		u32 phys_id;
+
+		phys_id = port->id;
+		next = phys_id + 1;
+		prev = phys_id - 1;
+
+		if (phys_id == DLB_MAX_NUM_LDB_PORTS - 1)
+			next = 0;
+		if (phys_id == 0)
+			prev = DLB_MAX_NUM_LDB_PORTS - 1;
+
+		if (!hw->rsrcs.ldb_ports[prev].owned &&
+		    hw->rsrcs.ldb_ports[next].owned &&
+		    hw->rsrcs.ldb_ports[next].domain_id != domain_id)
+			return port;
+
+		if (!hw->rsrcs.ldb_ports[next].owned &&
+		    hw->rsrcs.ldb_ports[prev].owned &&
+		    hw->rsrcs.ldb_ports[prev].domain_id != domain_id)
+			return port;
+	}
+
+	/*
+	 * Failing that, the driver looks for a port with both neighbors
+	 * unallocated.
+	 */
+	list_for_each_entry(port, &rsrcs->avail_ldb_ports[cos_id], func_list) {
+		u32 next, prev;
+		u32 phys_id;
+
+		phys_id = port->id;
+		next = phys_id + 1;
+		prev = phys_id - 1;
+
+		if (phys_id == DLB_MAX_NUM_LDB_PORTS - 1)
+			next = 0;
+		if (phys_id == 0)
+			prev = DLB_MAX_NUM_LDB_PORTS - 1;
+
+		if (!hw->rsrcs.ldb_ports[prev].owned &&
+		    !hw->rsrcs.ldb_ports[next].owned)
+			return port;
+	}
+
+	/* If all else fails, the driver returns the next available port. */
+	return list_first_entry_or_null(&rsrcs->avail_ldb_ports[cos_id],
+					typeof(*port), func_list);
+}
+
+static int __dlb_attach_ldb_ports(struct dlb_hw *hw,
+				  struct dlb_function_resources *rsrcs,
+				  struct dlb_hw_domain *domain, u32 num_ports,
+				  u32 cos_id, struct dlb_cmd_response *resp)
+{
+	unsigned int i;
+
+	if (rsrcs->num_avail_ldb_ports[cos_id] < num_ports) {
+		resp->status = DLB_ST_LDB_PORTS_UNAVAILABLE;
+		dev_dbg(hw_to_dev(hw),
+			"[%s()] Internal error: %d\n",
+			__func__, resp->status);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < num_ports; i++) {
+		struct dlb_ldb_port *port;
+
+		port = dlb_get_next_ldb_port(hw, rsrcs,
+					     domain->id, cos_id);
+		if (!port) {
+			dev_err(hw_to_dev(hw),
+				"[%s()] Internal error: domain validation failed\n",
+				__func__);
+			return -EFAULT;
+		}
+
+		list_del(&port->func_list);
+
+		port->domain_id = domain->id;
+		port->owned = true;
+
+		list_add(&port->domain_list,
+			 &domain->avail_ldb_ports[cos_id]);
+	}
+
+	rsrcs->num_avail_ldb_ports[cos_id] -= num_ports;
+
+	return 0;
+}
+
+static int dlb_attach_ldb_ports(struct dlb_hw *hw,
+				struct dlb_function_resources *rsrcs,
+				struct dlb_hw_domain *domain,
+				struct dlb_create_sched_domain_args *args,
+				struct dlb_cmd_response *resp)
+{
+	unsigned int i, j;
+	int ret;
+
+	/* Allocate num_ldb_ports from any class-of-service */
+	for (i = 0; i < args->num_ldb_ports; i++) {
+		for (j = 0; j < DLB_NUM_COS_DOMAINS; j++) {
+			ret = __dlb_attach_ldb_ports(hw, rsrcs, domain, 1, j, resp);
+			if (ret == 0)
+				break;
+		}
+
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int dlb_attach_dir_ports(struct dlb_hw *hw,
+				struct dlb_function_resources *rsrcs,
+				struct dlb_hw_domain *domain, u32 num_ports,
+				struct dlb_cmd_response *resp)
+{
+	unsigned int i;
+
+	if (rsrcs->num_avail_dir_pq_pairs < num_ports) {
+		resp->status = DLB_ST_DIR_PORTS_UNAVAILABLE;
+		dev_dbg(hw_to_dev(hw),
+			"[%s()] Internal error: %d\n",
+			__func__, resp->status);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < num_ports; i++) {
+		struct dlb_dir_pq_pair *port;
+
+		port = list_first_entry_or_null(&rsrcs->avail_dir_pq_pairs,
+						typeof(*port), func_list);
+		if (!port) {
+			dev_err(hw_to_dev(hw),
+				"[%s()] Internal error: domain validation failed\n",
+				__func__);
+			return -EFAULT;
+		}
+
+		list_del(&port->func_list);
+
+		port->domain_id = domain->id;
+		port->owned = true;
+
+		list_add(&port->domain_list, &domain->avail_dir_pq_pairs);
+	}
+
+	rsrcs->num_avail_dir_pq_pairs -= num_ports;
+
+	return 0;
+}
+
+static int dlb_attach_ldb_credits(struct dlb_function_resources *rsrcs,
+				  struct dlb_hw_domain *domain, u32 num_credits,
+				  struct dlb_cmd_response *resp)
+{
+	if (rsrcs->num_avail_qed_entries < num_credits) {
+		resp->status = DLB_ST_LDB_CREDITS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	rsrcs->num_avail_qed_entries -= num_credits;
+	domain->num_ldb_credits += num_credits;
+	return 0;
+}
+
+static int dlb_attach_dir_credits(struct dlb_function_resources *rsrcs,
+				  struct dlb_hw_domain *domain, u32 num_credits,
+				  struct dlb_cmd_response *resp)
+{
+	if (rsrcs->num_avail_dqed_entries < num_credits) {
+		resp->status = DLB_ST_DIR_CREDITS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	rsrcs->num_avail_dqed_entries -= num_credits;
+	domain->num_dir_credits += num_credits;
+	return 0;
+}
+
+static int dlb_attach_atomic_inflights(struct dlb_function_resources *rsrcs,
+				       struct dlb_hw_domain *domain,
+				       u32 num_atomic_inflights,
+				       struct dlb_cmd_response *resp)
+{
+	if (rsrcs->num_avail_aqed_entries < num_atomic_inflights) {
+		resp->status = DLB_ST_ATOMIC_INFLIGHTS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	rsrcs->num_avail_aqed_entries -= num_atomic_inflights;
+	domain->num_avail_aqed_entries += num_atomic_inflights;
+	return 0;
+}
+
+static int
+dlb_attach_domain_hist_list_entries(struct dlb_function_resources *rsrcs,
+				    struct dlb_hw_domain *domain,
+				    u32 num_hist_list_entries,
+				    struct dlb_cmd_response *resp)
+{
+	struct dlb_bitmap *bitmap;
+	int base;
+
+	if (num_hist_list_entries) {
+		bitmap = rsrcs->avail_hist_list_entries;
+
+		base = dlb_bitmap_find_set_bit_range(bitmap,
+						     num_hist_list_entries);
+		if (base < 0)
+			goto error;
+
+		domain->total_hist_list_entries = num_hist_list_entries;
+		domain->avail_hist_list_entries = num_hist_list_entries;
+		domain->hist_list_entry_base = base;
+		domain->hist_list_entry_offset = 0;
+
+		dlb_bitmap_clear_range(bitmap, base, num_hist_list_entries);
+	}
+	return 0;
+
+error:
+	resp->status = DLB_ST_HIST_LIST_ENTRIES_UNAVAILABLE;
+	return -EINVAL;
+}
+
+static int
+dlb_verify_create_sched_dom_args(struct dlb_function_resources *rsrcs,
+				 struct dlb_create_sched_domain_args *args,
+				 struct dlb_cmd_response *resp,
+				 struct dlb_hw_domain **out_domain)
+{
+	u32 num_avail_ldb_ports, req_ldb_ports;
+	struct dlb_bitmap *avail_hl_entries;
+	unsigned int max_contig_hl_range;
+	struct dlb_hw_domain *domain;
+	int i;
+
+	avail_hl_entries = rsrcs->avail_hist_list_entries;
+
+	max_contig_hl_range = dlb_bitmap_longest_set_range(avail_hl_entries);
+
+	num_avail_ldb_ports = 0;
+	req_ldb_ports = 0;
+	for (i = 0; i < DLB_NUM_COS_DOMAINS; i++)
+		num_avail_ldb_ports += rsrcs->num_avail_ldb_ports[i];
+
+	req_ldb_ports += args->num_ldb_ports;
+
+	if (rsrcs->num_avail_domains < 1) {
+		resp->status = DLB_ST_DOMAIN_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	domain = list_first_entry_or_null(&rsrcs->avail_domains,
+					  typeof(*domain), func_list);
+	if (!domain) {
+		resp->status = DLB_ST_DOMAIN_UNAVAILABLE;
+		return -EFAULT;
+	}
+
+	if (rsrcs->num_avail_ldb_queues < args->num_ldb_queues) {
+		resp->status = DLB_ST_LDB_QUEUES_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (req_ldb_ports > num_avail_ldb_ports) {
+		resp->status = DLB_ST_LDB_PORTS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (args->num_ldb_queues > 0 && req_ldb_ports == 0) {
+		resp->status = DLB_ST_LDB_PORT_REQUIRED_FOR_LDB_QUEUES;
+		return -EINVAL;
+	}
+
+	if (rsrcs->num_avail_dir_pq_pairs < args->num_dir_ports) {
+		resp->status = DLB_ST_DIR_PORTS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (rsrcs->num_avail_qed_entries < args->num_ldb_credits) {
+		resp->status = DLB_ST_LDB_CREDITS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (rsrcs->num_avail_dqed_entries < args->num_dir_credits) {
+		resp->status = DLB_ST_DIR_CREDITS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (rsrcs->num_avail_aqed_entries < args->num_atomic_inflights) {
+		resp->status = DLB_ST_ATOMIC_INFLIGHTS_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	if (max_contig_hl_range < args->num_hist_list_entries) {
+		resp->status = DLB_ST_HIST_LIST_ENTRIES_UNAVAILABLE;
+		return -EINVAL;
+	}
+
+	*out_domain = domain;
+
+	return 0;
+}
+
+static void dlb_configure_domain_credits(struct dlb_hw *hw,
+					 struct dlb_hw_domain *domain)
+{
+	u32 reg;
+
+	reg = FIELD_PREP(CHP_CFG_LDB_VAS_CRD_COUNT, domain->num_ldb_credits);
+	DLB_CSR_WR(hw, CHP_CFG_LDB_VAS_CRD(domain->id), reg);
+
+	reg = FIELD_PREP(CHP_CFG_DIR_VAS_CRD_COUNT, domain->num_dir_credits);
+	DLB_CSR_WR(hw, CHP_CFG_DIR_VAS_CRD(domain->id), reg);
+}
+
+static int
+dlb_domain_attach_resources(struct dlb_hw *hw,
+			    struct dlb_function_resources *rsrcs,
+			    struct dlb_hw_domain *domain,
+			    struct dlb_create_sched_domain_args *args,
+			    struct dlb_cmd_response *resp)
+{
+	int ret;
+
+	ret = dlb_attach_ldb_queues(hw, rsrcs, domain, args->num_ldb_queues, resp);
+	if (ret)
+		return ret;
+
+	ret = dlb_attach_ldb_ports(hw, rsrcs, domain, args, resp);
+	if (ret)
+		return ret;
+
+	ret = dlb_attach_dir_ports(hw, rsrcs, domain, args->num_dir_ports, resp);
+	if (ret)
+		return ret;
+
+	ret = dlb_attach_ldb_credits(rsrcs, domain,
+				     args->num_ldb_credits, resp);
+	if (ret)
+		return ret;
+
+	ret = dlb_attach_dir_credits(rsrcs, domain, args->num_dir_credits, resp);
+	if (ret)
+		return ret;
+
+	ret = dlb_attach_domain_hist_list_entries(rsrcs, domain,
+						  args->num_hist_list_entries,
+						  resp);
+	if (ret)
+		return ret;
+
+	ret = dlb_attach_atomic_inflights(rsrcs, domain,
+					  args->num_atomic_inflights, resp);
+	if (ret)
+		return ret;
+
+	dlb_configure_domain_credits(hw, domain);
+
+	domain->configured = true;
+
+	domain->started = false;
+
+	rsrcs->num_avail_domains--;
+
+	return 0;
+}
+
+static void
+dlb_log_create_sched_domain_args(struct dlb_hw *hw,
+				 struct dlb_create_sched_domain_args *args)
+{
+	dev_dbg(hw_to_dev(hw), "DLB create sched domain arguments:\n");
+	dev_dbg(hw_to_dev(hw), "\tNumber of LDB queues:          %d\n",
+		args->num_ldb_queues);
+	dev_dbg(hw_to_dev(hw), "\tNumber of LDB ports (any CoS): %d\n",
+		args->num_ldb_ports);
+	dev_dbg(hw_to_dev(hw), "\tNumber of DIR ports:           %d\n",
+		args->num_dir_ports);
+	dev_dbg(hw_to_dev(hw), "\tNumber of ATM inflights:       %d\n",
+		args->num_atomic_inflights);
+	dev_dbg(hw_to_dev(hw), "\tNumber of hist list entries:   %d\n",
+		args->num_hist_list_entries);
+	dev_dbg(hw_to_dev(hw), "\tNumber of LDB credits:         %d\n",
+		args->num_ldb_credits);
+	dev_dbg(hw_to_dev(hw), "\tNumber of DIR credits:         %d\n",
+		args->num_dir_credits);
+}
+
+/**
+ * dlb_hw_create_sched_domain() - create a scheduling domain
+ * @hw: dlb_hw handle for a particular device.
+ * @args: scheduling domain creation arguments.
+ * @resp: response structure.
+ *
+ * This function creates a scheduling domain containing the resources specified
+ * in args. The individual resources (queues, ports, credits) can be configured
+ * after creating a scheduling domain.
+ *
+ * Return:
+ * Returns 0 upon success, < 0 otherwise. If an error occurs, resp->status is
+ * assigned a detailed error code from enum dlb_error. If successful, resp->id
+ * contains the domain ID.
+ *
+ * Errors:
+ * EINVAL - A requested resource is unavailable, or the requested domain name
+ *	    is already in use.
+ * EFAULT - Internal error (resp->status not set).
+ */
 int dlb_hw_create_sched_domain(struct dlb_hw *hw,
 			       struct dlb_create_sched_domain_args *args,
 			       struct dlb_cmd_response *resp)
 {
-	resp->id = 0;
+	struct dlb_function_resources *rsrcs;
+	struct dlb_hw_domain *domain;
+	int ret;
+
+	rsrcs = &hw->pf;
+
+	dlb_log_create_sched_domain_args(hw, args);
+
+	/*
+	 * Verify that hardware resources are available before attempting to
+	 * satisfy the request. This simplifies the error unwinding code.
+	 */
+	ret = dlb_verify_create_sched_dom_args(rsrcs, args, resp, &domain);
+	if (ret)
+		return ret;
+
+	dlb_init_domain_rsrc_lists(domain);
+
+	ret = dlb_domain_attach_resources(hw, rsrcs, domain, args, resp);
+	if (ret) {
+		dev_err(hw_to_dev(hw),
+			"[%s()] Internal error: failed to verify args.\n",
+			__func__);
+
+		return ret;
+	}
+
+	/*
+	 * Configuration succeeded, so move the resource from the 'avail' to
+	 * the 'used' list (if it's not already there).
+	 */
+	list_move(&domain->func_list, &rsrcs->used_domains);
+
+	resp->id = domain->id;
 	resp->status = 0;
 
 	return 0;

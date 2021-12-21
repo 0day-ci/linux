@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright(c) 2017-2020 Intel Corporation
 
+#include <linux/anon_inodes.h>
+#include <linux/version.h>
 #include <linux/configfs.h>
+#include <linux/fdtable.h>
 #include "dlb_configfs.h"
 
 struct dlb_device_configfs dlb_dev_configfs[16];
@@ -11,12 +14,38 @@ static int dlb_configfs_create_sched_domain(struct dlb *dlb,
 {
 	struct dlb_create_sched_domain_args *arg = karg;
 	struct dlb_cmd_response response = {0};
-	int ret;
+	struct dlb_domain *domain;
+	u32 flags = O_RDONLY;
+	int ret, fd;
 
 	mutex_lock(&dlb->resource_mutex);
 
 	ret = dlb_hw_create_sched_domain(&dlb->hw, arg, &response);
+	if (ret)
+		goto unlock;
 
+	ret = dlb_init_domain(dlb, response.id);
+	if (ret)
+		goto unlock;
+
+	domain = dlb->sched_domains[response.id];
+
+	if (dlb->f->f_mode & FMODE_WRITE)
+		flags = O_RDWR;
+
+	fd = anon_inode_getfd("[dlbdomain]", &dlb_domain_fops,
+			      domain, flags);
+
+	if (fd < 0) {
+		dev_err(dlb->dev, "Failed to get anon fd.\n");
+		kref_put(&domain->refcnt, dlb_free_domain);
+		ret = fd;
+		goto unlock;
+	}
+
+	arg->domain_fd = fd;
+
+unlock:
 	mutex_unlock(&dlb->resource_mutex);
 
 	memcpy(karg, &response, sizeof(response));
@@ -84,6 +113,7 @@ static ssize_t dlb_cfs_domain_##name##_store(			\
 	return count;						\
 }								\
 
+DLB_CONFIGFS_DOMAIN_SHOW(domain_fd)
 DLB_CONFIGFS_DOMAIN_SHOW(status)
 DLB_CONFIGFS_DOMAIN_SHOW(domain_id)
 DLB_CONFIGFS_DOMAIN_SHOW(num_ldb_queues)
@@ -137,6 +167,7 @@ static ssize_t dlb_cfs_domain_create_store(struct config_item *item,
 
 		dlb_cfs_domain->status = args.response.status;
 		dlb_cfs_domain->domain_id = args.response.id;
+		dlb_cfs_domain->domain_fd = args.domain_fd;
 
 		if (ret) {
 			dev_err(dlb->dev,
@@ -145,11 +176,23 @@ static ssize_t dlb_cfs_domain_create_store(struct config_item *item,
 		}
 
 		dlb_cfs_domain->create = 1;
+	} else if (create_in == 0 && dlb_cfs_domain->create == 1) {
+		dev_dbg(dlb->dev,
+			"Close domain: %s\n",
+			dlb_cfs_domain->group.cg_item.ci_namebuf);
+
+		ret = close_fd(dlb_cfs_domain->domain_fd);
+		if (ret)
+			dev_err(dlb->dev,
+				"close sched domain failed: ret=%d\n", ret);
+
+		dlb_cfs_domain->create = 0;
 	}
 
 	return count;
 }
 
+CONFIGFS_ATTR_RO(dlb_cfs_domain_, domain_fd);
 CONFIGFS_ATTR_RO(dlb_cfs_domain_, status);
 CONFIGFS_ATTR_RO(dlb_cfs_domain_, domain_id);
 CONFIGFS_ATTR(dlb_cfs_domain_, num_ldb_queues);
@@ -162,6 +205,7 @@ CONFIGFS_ATTR(dlb_cfs_domain_, num_dir_credits);
 CONFIGFS_ATTR(dlb_cfs_domain_, create);
 
 static struct configfs_attribute *dlb_cfs_domain_attrs[] = {
+	&dlb_cfs_domain_attr_domain_fd,
 	&dlb_cfs_domain_attr_status,
 	&dlb_cfs_domain_attr_domain_id,
 	&dlb_cfs_domain_attr_num_ldb_queues,
