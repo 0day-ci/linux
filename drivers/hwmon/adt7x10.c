@@ -297,6 +297,95 @@ static int adt7x10_alarm_read(struct adt7x10_data *data, unsigned int index,
 	return 0;
 }
 
+static umode_t adt7x10_is_visible(const void *data,
+				  enum hwmon_sensor_types type,
+				  u32 attr, int channel)
+{
+	umode_t mode = 0444;
+
+	switch (attr) {
+	case hwmon_temp_max:
+	case hwmon_temp_min:
+	case hwmon_temp_crit:
+	case hwmon_temp_max_hyst:
+		mode |= 0200;
+		break;
+	default:
+		break;
+	}
+
+	return mode;
+}
+
+static int adt7x10_read(struct device *dev, enum hwmon_sensor_types type,
+			u32 attr, int channel, long *val)
+{
+	struct adt7x10_data *data = dev_get_drvdata(dev);
+
+	switch (attr) {
+	case hwmon_temp_input:
+		return adt7x10_temp_read(data, 0, val);
+	case hwmon_temp_max:
+		return adt7x10_temp_read(data, 1, val);
+	case hwmon_temp_min:
+		return adt7x10_temp_read(data, 2, val);
+	case hwmon_temp_crit:
+		return adt7x10_temp_read(data, 3, val);
+	case hwmon_temp_max_hyst:
+		return adt7x10_hyst_read(data, 1, val);
+	case hwmon_temp_min_hyst:
+		return adt7x10_hyst_read(data, 2, val);
+	case hwmon_temp_crit_hyst:
+		return adt7x10_hyst_read(data, 3, val);
+	case hwmon_temp_min_alarm:
+		return adt7x10_alarm_read(data, ADT7X10_STAT_T_LOW, val);
+	case hwmon_temp_max_alarm:
+		return adt7x10_alarm_read(data, ADT7X10_STAT_T_HIGH, val);
+	case hwmon_temp_crit_alarm:
+		return adt7x10_alarm_read(data, ADT7X10_STAT_T_CRIT, val);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int adt7x10_write(struct device *dev, enum hwmon_sensor_types type,
+			 u32 attr, int channel, long val)
+{
+	struct adt7x10_data *data = dev_get_drvdata(dev);
+
+	switch (attr) {
+	case hwmon_temp_max:
+		return adt7x10_temp_write(data, 1, val);
+	case hwmon_temp_min:
+		return adt7x10_temp_write(data, 2, val);
+	case hwmon_temp_crit:
+		return adt7x10_temp_write(data, 3, val);
+	case hwmon_temp_max_hyst:
+		return adt7x10_hyst_write(data, val);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static const struct hwmon_channel_info *adt7x10_info[] = {
+	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_MIN |
+			   HWMON_T_CRIT | HWMON_T_MAX_HYST | HWMON_T_MIN_HYST |
+			   HWMON_T_CRIT_HYST | HWMON_T_MIN_ALARM |
+			   HWMON_T_MAX_ALARM | HWMON_T_CRIT_ALARM),
+	NULL,
+};
+
+static const struct hwmon_ops adt7x10_hwmon_ops = {
+	.is_visible = adt7x10_is_visible,
+	.read = adt7x10_read,
+	.write = adt7x10_write,
+};
+
+static const struct hwmon_chip_info adt7x10_chip_info = {
+	.ops = &adt7x10_hwmon_ops,
+	.info = adt7x10_info,
+};
+
 int adt7x10_probe(struct device *dev, const char *name, int irq,
 		  const struct adt7x10_ops *ops)
 {
@@ -341,7 +430,9 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 	if (ret)
 		goto exit_restore;
 
-	hdev = hwmon_device_register(dev);
+	hdev = hwmon_device_register_with_info(dev, name, data,
+					       &adt7x10_chip_info, NULL);
+
 	if (IS_ERR(hdev)) {
 		ret = PTR_ERR(hdev);
 		goto exit_restore;
