@@ -54,7 +54,6 @@
 /* Each client has this additional data */
 struct adt7x10_data {
 	const struct adt7x10_ops *ops;
-	struct device		*hwmon_dev;
 	struct device		*bus_dev;
 	struct mutex		update_lock;
 	u8			config;
@@ -430,8 +429,8 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 	if (ret)
 		goto exit_restore;
 
-	hdev = hwmon_device_register_with_info(dev, name, data,
-					       &adt7x10_chip_info, NULL);
+	hdev = devm_hwmon_device_register_with_info(dev, name, data,
+						    &adt7x10_chip_info, NULL);
 
 	if (IS_ERR(hdev)) {
 		ret = PTR_ERR(hdev);
@@ -445,15 +444,11 @@ int adt7x10_probe(struct device *dev, const char *name, int irq,
 						IRQF_ONESHOT,
 						dev_name(dev), hdev);
 		if (ret)
-			goto exit_hwmon_device_unregister;
+			goto exit_restore;
 	}
-
-	data->hwmon_dev = hdev;
 
 	return 0;
 
-exit_hwmon_device_unregister:
-	hwmon_device_unregister(hdev);
 exit_restore:
 	adt7x10_write_byte(dev, ADT7X10_CONFIG, data->oldconfig);
 	return ret;
@@ -464,7 +459,6 @@ void adt7x10_remove(struct device *dev, int irq)
 {
 	struct adt7x10_data *data = dev_get_drvdata(dev);
 
-	hwmon_device_unregister(data->hwmon_dev);
 	if (data->oldconfig != data->config)
 		adt7x10_write_byte(dev, ADT7X10_CONFIG, data->oldconfig);
 }
