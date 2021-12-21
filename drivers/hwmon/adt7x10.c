@@ -219,14 +219,11 @@ static int ADT7X10_REG_TO_TEMP(struct adt7x10_data *data, s16 reg)
 
 /* sysfs attributes for hwmon */
 
-static ssize_t adt7x10_temp_show(struct device *dev,
-				 struct device_attribute *da, char *buf)
+static int adt7x10_temp_read(struct adt7x10_data *data, int index, long *val)
 {
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-	struct adt7x10_data *data = dev_get_drvdata(dev);
+	struct device *dev = data->bus_dev;
 
-
-	if (attr->index == 0) {
+	if (index == 0) {
 		int ret;
 
 		ret = adt7x10_update_temp(dev);
@@ -234,8 +231,38 @@ static ssize_t adt7x10_temp_show(struct device *dev,
 			return ret;
 	}
 
-	return sprintf(buf, "%d\n", ADT7X10_REG_TO_TEMP(data,
-		       data->temp[attr->index]));
+	*val = ADT7X10_REG_TO_TEMP(data, data->temp[index]);
+
+	return 0;
+}
+
+static ssize_t adt7x10_temp_show(struct device *dev,
+				 struct device_attribute *da, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct adt7x10_data *data = dev_get_drvdata(dev);
+	long val;
+	int ret;
+
+	ret = adt7x10_temp_read(data, attr->index, &val);
+	if (ret)
+		return ret;
+
+	return sprintf(buf, "%ld\n", val);
+}
+
+static int adt7x10_temp_write(struct adt7x10_data *data, unsigned int nr,
+			      long temp)
+{
+	struct device *dev = data->bus_dev;
+	int ret;
+
+	mutex_lock(&data->update_lock);
+	data->temp[nr] = ADT7X10_TEMP_TO_REG(temp);
+	ret = adt7x10_write_word(dev, ADT7X10_REG_TEMP[nr], data->temp[nr]);
+	mutex_unlock(&data->update_lock);
+
+	return ret;
 }
 
 static ssize_t adt7x10_temp_store(struct device *dev,
@@ -252,21 +279,14 @@ static ssize_t adt7x10_temp_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	mutex_lock(&data->update_lock);
-	data->temp[nr] = ADT7X10_TEMP_TO_REG(temp);
-	ret = adt7x10_write_word(dev, ADT7X10_REG_TEMP[nr], data->temp[nr]);
-	if (ret)
-		count = ret;
-	mutex_unlock(&data->update_lock);
-	return count;
+	ret = adt7x10_temp_write(data, nr, temp);
+
+	return ret ?: count;
 }
 
-static ssize_t adt7x10_t_hyst_show(struct device *dev,
-				   struct device_attribute *da, char *buf)
+static int adt7x10_hyst_read(struct adt7x10_data *data, unsigned int nr,
+			     long *val)
 {
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-	struct adt7x10_data *data = dev_get_drvdata(dev);
-	int nr = attr->index;
 	int hyst;
 
 	hyst = (data->hyst & ADT7X10_T_HYST_MASK) * 1000;
@@ -277,8 +297,39 @@ static ssize_t adt7x10_t_hyst_show(struct device *dev,
 	 */
 	if (nr == 2)	/* min has positive offset, others have negative */
 		hyst = -hyst;
-	return sprintf(buf, "%d\n",
-		       ADT7X10_REG_TO_TEMP(data, data->temp[nr]) - hyst);
+
+	*val = ADT7X10_REG_TO_TEMP(data, data->temp[nr]) - hyst;
+
+	return 0;
+}
+
+static ssize_t adt7x10_t_hyst_show(struct device *dev,
+				   struct device_attribute *da, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct adt7x10_data *data = dev_get_drvdata(dev);
+	int nr = attr->index;
+	long val;
+	int ret;
+
+	ret = adt7x10_hyst_read(data, nr, &val);
+	if (ret)
+		return ret;
+
+	return sprintf(buf, "%ld\n", val);
+}
+
+static int adt7x10_hyst_write(struct adt7x10_data *data, long hyst)
+{
+	struct device *dev = data->bus_dev;
+	int limit;
+
+	/* convert absolute hysteresis value to a 4 bit delta value */
+	limit = ADT7X10_REG_TO_TEMP(data, data->temp[1]);
+	hyst = clamp_val(hyst, ADT7X10_TEMP_MIN, ADT7X10_TEMP_MAX);
+	data->hyst = clamp_val(DIV_ROUND_CLOSEST(limit - hyst, 1000),
+			       0, ADT7X10_T_HYST_MASK);
+	return adt7x10_write_byte(dev, ADT7X10_T_HYST, data->hyst);
 }
 
 static ssize_t adt7x10_t_hyst_store(struct device *dev,
@@ -286,35 +337,46 @@ static ssize_t adt7x10_t_hyst_store(struct device *dev,
 				    const char *buf, size_t count)
 {
 	struct adt7x10_data *data = dev_get_drvdata(dev);
-	int limit, ret;
+	int ret;
 	long hyst;
 
 	ret = kstrtol(buf, 10, &hyst);
 	if (ret)
 		return ret;
-	/* convert absolute hysteresis value to a 4 bit delta value */
-	limit = ADT7X10_REG_TO_TEMP(data, data->temp[1]);
-	hyst = clamp_val(hyst, ADT7X10_TEMP_MIN, ADT7X10_TEMP_MAX);
-	data->hyst = clamp_val(DIV_ROUND_CLOSEST(limit - hyst, 1000),
-				   0, ADT7X10_T_HYST_MASK);
-	ret = adt7x10_write_byte(dev, ADT7X10_T_HYST, data->hyst);
-	if (ret)
-		return ret;
 
-	return count;
+	ret = adt7x10_hyst_write(data, hyst);
+
+	return ret ?: count;
 }
 
-static ssize_t adt7x10_alarm_show(struct device *dev,
-				  struct device_attribute *da, char *buf)
+static int adt7x10_alarm_read(struct adt7x10_data *data, unsigned int index,
+			      long *val)
 {
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct device *dev = data->bus_dev;
 	int ret;
 
 	ret = adt7x10_read_byte(dev, ADT7X10_STATUS);
 	if (ret < 0)
 		return ret;
 
-	return sprintf(buf, "%d\n", !!(ret & attr->index));
+	*val = !!(ret & index);
+
+	return 0;
+}
+
+static ssize_t adt7x10_alarm_show(struct device *dev,
+				  struct device_attribute *da, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct adt7x10_data *data = dev_get_drvdata(dev);
+	long val;
+	int ret;
+
+	ret = adt7x10_alarm_read(data, attr->index, &val);
+	if (ret)
+		return ret;
+
+	return sprintf(buf, "%ld\n", val);
 }
 
 static SENSOR_DEVICE_ATTR_RO(temp1_input, adt7x10_temp, 0);
