@@ -92,6 +92,17 @@ struct pi433_device {
 	u32			rx_bytes_to_drop;
 	u32			rx_bytes_dropped;
 	unsigned int		rx_position;
+	/*
+	 * rx_lock is used to avoid race-conditions that can be triggered from userspace.
+	 *
+	 * For instance, if a program in userspace is reading the char device
+	 * allocated in this module then another program won't be able to change RX
+	 * configuration of the RF69 hardware module via ioctl and vice versa.
+	 *
+	 * utilization summary:
+	 *  - pi433_read: blocks are read until rx read something (up to the buffer size)
+	 *  - pi433_ioctl: during pending read request, change of config not allowed
+	 */
 	struct mutex		rx_lock;
 	wait_queue_head_t	rx_wait_queue;
 
