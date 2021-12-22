@@ -1480,8 +1480,8 @@ static struct page *alloc_demote_page(struct page *page, unsigned long node)
  * another node.  Pages which are not demoted are left on
  * @demote_pages.
  */
-static unsigned int demote_page_list(struct list_head *demote_pages,
-				     struct pglist_data *pgdat)
+unsigned int demote_page_list(struct list_head *demote_pages,
+			      struct pglist_data *pgdat)
 {
 	int target_nid = next_demotion_node(pgdat->node_id);
 	unsigned int nr_succeeded;
