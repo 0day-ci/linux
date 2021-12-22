@@ -498,7 +498,10 @@ int __must_check device_add_disk(struct device *parent, struct gendisk *disk,
 	if (ret)
 		goto out_put_slave_dir;
 
-	if (!(disk->flags & GENHD_FL_HIDDEN)) {
+	if (disk->flags & GENHD_FL_HIDDEN) {
+		/* needed so that the extended dev_t gets freed */
+		disk->part0->bd_dev = MKDEV(disk->major, disk->first_minor);
+	} else {
 		ret = bdi_register(disk->bdi, "%u:%u",
 				   disk->major, disk->first_minor);
 		if (ret)
