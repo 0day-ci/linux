@@ -4215,14 +4215,21 @@ static const char *find_kallsyms_symbol(struct module *mod,
 					unsigned long *offset)
 {
 	unsigned int i, best = 0;
-	unsigned long nextval, bestval;
+	unsigned long baseval, nextval, bestval;
 	struct mod_kallsyms *kallsyms = rcu_dereference_sched(mod->kallsyms);
+	char *module_base_name;
 
 	/* At worse, next value is at end of module */
-	if (within_module_init(addr, mod))
+	if (within_module_init(addr, mod)) {
+		baseval = (unsigned long)mod->init_layout.base;
 		nextval = (unsigned long)mod->init_layout.base+mod->init_layout.text_size;
-	else
+		module_base_name = "[module __init]";
+
+	} else {
+		baseval = (unsigned long)mod->core_layout.base;
 		nextval = (unsigned long)mod->core_layout.base+mod->core_layout.text_size;
+		module_base_name = "[module]";
+	}
 
 	bestval = kallsyms_symbol_value(&kallsyms->symtab[best]);
 
@@ -4251,6 +4258,19 @@ static const char *find_kallsyms_symbol(struct module *mod,
 		}
 		if (thisval > addr && thisval < nextval)
 			nextval = thisval;
+	}
+
+	if ((is_module_text_address(addr) &&
+		(bestval < baseval || bestval > nextval))) {
+		/*
+		 * return MODULE base and offset if we could not find
+		 * any best match for text address
+		 */
+		if (size)
+			*size = nextval - baseval;
+		if (offset)
+			*offset = addr - baseval;
+		return module_base_name;
 	}
 
 	if (!best)
