@@ -56,7 +56,7 @@ struct loop_device {
 	struct gendisk		*lo_disk;
 	struct mutex		lo_mutex;
 	bool			idr_visible;
-	struct work_struct      rundown_work;
+	struct task_struct	*rundown_owner; /* current or NULL */
 };
 
 struct loop_cmd {
