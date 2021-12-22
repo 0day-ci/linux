@@ -1998,6 +1998,20 @@ void net_dec_egress_queue(void)
 	static_branch_dec(&egress_needed_key);
 }
 EXPORT_SYMBOL_GPL(net_dec_egress_queue);
+
+static DEFINE_STATIC_KEY_FALSE(txqueue_needed_key);
+
+void net_inc_queue_mapping(void)
+{
+	static_branch_inc(&txqueue_needed_key);
+}
+EXPORT_SYMBOL_GPL(net_inc_queue_mapping);
+
+void net_dec_queue_mapping(void)
+{
+	static_branch_dec(&txqueue_needed_key);
+}
+EXPORT_SYMBOL_GPL(net_dec_queue_mapping);
 #endif
 
 static DEFINE_STATIC_KEY_FALSE(netstamp_needed_key);
@@ -3860,6 +3874,25 @@ sch_handle_egress(struct sk_buff *skb, int *ret, struct net_device *dev)
 
 	return skb;
 }
+
+static inline struct netdev_queue *
+netdev_tx_queue_mapping(struct net_device *dev, struct sk_buff *skb)
+{
+       int qm = skb_get_queue_mapping(skb);
+
+       return netdev_get_tx_queue(dev, netdev_cap_txqueue(dev, qm));
+}
+
+static inline bool netdev_xmit_txqueue_skipped(void)
+{
+	return __this_cpu_read(softnet_data.xmit.skip_txqueue);
+}
+
+void netdev_xmit_skip_txqueue(bool skip)
+{
+	__this_cpu_write(softnet_data.xmit.skip_txqueue, skip);
+}
+EXPORT_SYMBOL_GPL(netdev_xmit_skip_txqueue);
 #endif /* CONFIG_NET_EGRESS */
 
 #ifdef CONFIG_XPS
@@ -4052,6 +4085,9 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 	skb->tc_at_ingress = 0;
 #endif
 #ifdef CONFIG_NET_EGRESS
+	if (static_branch_unlikely(&txqueue_needed_key))
+		netdev_xmit_skip_txqueue(false);
+
 	if (static_branch_unlikely(&egress_needed_key)) {
 		if (nf_hook_egress_active()) {
 			skb = nf_hook_egress(skb, &rc, dev);
@@ -4064,7 +4100,14 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 			goto out;
 		nf_skip_egress(skb, false);
 	}
+
+	if (static_branch_unlikely(&txqueue_needed_key) &&
+	    netdev_xmit_txqueue_skipped())
+		txq = netdev_tx_queue_mapping(dev, skb);
+	else
 #endif
+		txq = netdev_core_pick_tx(dev, skb, sb_dev);
+
 	/* If device/qdisc don't need skb->dst, release it right now while
 	 * its hot in this cpu cache.
 	 */
@@ -4073,7 +4116,6 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 	else
 		skb_dst_force(skb);
 
-	txq = netdev_core_pick_tx(dev, skb, sb_dev);
 	q = rcu_dereference_bh(txq->qdisc);
 
 	trace_net_dev_queue(skb);

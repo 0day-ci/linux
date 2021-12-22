@@ -58,8 +58,12 @@ static int tcf_skbedit_act(struct sk_buff *skb, const struct tc_action *a,
 		}
 	}
 	if (params->flags & SKBEDIT_F_QUEUE_MAPPING &&
-	    skb->dev->real_num_tx_queues > params->queue_mapping)
+	    skb->dev->real_num_tx_queues > params->queue_mapping) {
+#ifdef CONFIG_NET_EGRESS
+		netdev_xmit_skip_txqueue(true);
+#endif
 		skb_set_queue_mapping(skb, params->queue_mapping);
+	}
 	if (params->flags & SKBEDIT_F_MARK) {
 		skb->mark &= ~params->mask;
 		skb->mark |= params->mark & params->mask;
@@ -225,6 +229,11 @@ static int tcf_skbedit_init(struct net *net, struct nlattr *nla,
 	if (goto_ch)
 		tcf_chain_put_by_act(goto_ch);
 
+#ifdef CONFIG_NET_EGRESS
+	if (flags & SKBEDIT_F_QUEUE_MAPPING)
+		net_inc_queue_mapping();
+#endif
+
 	return ret;
 put_chain:
 	if (goto_ch)
@@ -295,8 +304,13 @@ static void tcf_skbedit_cleanup(struct tc_action *a)
 	struct tcf_skbedit_params *params;
 
 	params = rcu_dereference_protected(d->params, 1);
-	if (params)
+	if (params) {
+#ifdef CONFIG_NET_EGRESS
+		if (params->flags & SKBEDIT_F_QUEUE_MAPPING)
+			net_dec_queue_mapping();
+#endif
 		kfree_rcu(params, rcu);
+	}
 }
 
 static int tcf_skbedit_walker(struct net *net, struct sk_buff *skb,
