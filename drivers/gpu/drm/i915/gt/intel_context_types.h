@@ -9,6 +9,7 @@
 #include <linux/average.h>
 #include <linux/kref.h>
 #include <linux/list.h>
+#include <linux/llist.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
 
@@ -224,7 +225,7 @@ struct intel_context {
 	 * list when context is pending to be destroyed (deregistered with the
 	 * GuC), protected by guc->submission_state.lock
 	 */
-	struct list_head destroyed_link;
+	struct llist_node destroyed_link;
 
 	/** @parallel: sub-structure for parallel submission members */
 	struct {

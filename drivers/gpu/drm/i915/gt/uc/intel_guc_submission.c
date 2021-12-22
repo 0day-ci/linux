@@ -1771,7 +1771,7 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	spin_lock_init(&guc->submission_state.lock);
 	INIT_LIST_HEAD(&guc->submission_state.guc_id_list);
 	ida_init(&guc->submission_state.guc_ids);
-	INIT_LIST_HEAD(&guc->submission_state.destroyed_contexts);
+	init_llist_head(&guc->submission_state.destroyed_contexts);
 	INIT_WORK(&guc->submission_state.destroyed_worker,
 		  destroyed_worker_func);
 
@@ -2696,26 +2696,18 @@ static void __guc_context_destroy(struct intel_context *ce)
 	}
 }
 
+#define take_destroyed_contexts(guc) \
+	llist_del_all(&guc->submission_state.destroyed_contexts)
+
 static void guc_flush_destroyed_contexts(struct intel_guc *guc)
 {
-	struct intel_context *ce;
-	unsigned long flags;
+	struct intel_context *ce, *cn;
 
 	GEM_BUG_ON(!submission_disabled(guc) &&
 		   guc_submission_initialized(guc));
 
-	while (!list_empty(&guc->submission_state.destroyed_contexts)) {
-		spin_lock_irqsave(&guc->submission_state.lock, flags);
-		ce = list_first_entry_or_null(&guc->submission_state.destroyed_contexts,
-					      struct intel_context,
-					      destroyed_link);
-		if (ce)
-			list_del_init(&ce->destroyed_link);
-		spin_unlock_irqrestore(&guc->submission_state.lock, flags);
-
-		if (!ce)
-			break;
-
+	llist_for_each_entry_safe(ce, cn, take_destroyed_contexts(guc),
+				 destroyed_link) {
 		release_guc_id(guc, ce);
 		__guc_context_destroy(ce);
 	}
@@ -2723,23 +2715,11 @@ static void guc_flush_destroyed_contexts(struct intel_guc *guc)
 
 static void deregister_destroyed_contexts(struct intel_guc *guc)
 {
-	struct intel_context *ce;
-	unsigned long flags;
+	struct intel_context *ce, *cn;
 
-	while (!list_empty(&guc->submission_state.destroyed_contexts)) {
-		spin_lock_irqsave(&guc->submission_state.lock, flags);
-		ce = list_first_entry_or_null(&guc->submission_state.destroyed_contexts,
-					      struct intel_context,
-					      destroyed_link);
-		if (ce)
-			list_del_init(&ce->destroyed_link);
-		spin_unlock_irqrestore(&guc->submission_state.lock, flags);
-
-		if (!ce)
-			break;
-
+	llist_for_each_entry_safe(ce, cn, take_destroyed_contexts(guc),
+				 destroyed_link)
 		guc_lrc_desc_unpin(ce);
-	}
 }
 
 static void destroyed_worker_func(struct work_struct *w)
@@ -2771,8 +2751,8 @@ static void guc_context_destroy(struct kref *kref)
 	if (likely(!destroy)) {
 		if (!list_empty(&ce->guc_id.link))
 			list_del_init(&ce->guc_id.link);
-		list_add_tail(&ce->destroyed_link,
-			      &guc->submission_state.destroyed_contexts);
+		llist_add(&ce->destroyed_link,
+			  &guc->submission_state.destroyed_contexts);
 	} else {
 		__release_guc_id(guc, ce);
 	}

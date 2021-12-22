@@ -8,6 +8,7 @@
 
 #include <linux/xarray.h>
 #include <linux/delay.h>
+#include <linux/llist.h>
 
 #include "intel_uncore.h"
 #include "intel_guc_fw.h"
@@ -112,7 +113,7 @@ struct intel_guc {
 		 * @destroyed_contexts: list of contexts waiting to be destroyed
 		 * (deregistered with the GuC)
 		 */
-		struct list_head destroyed_contexts;
+		struct llist_head destroyed_contexts;
 		/**
 		 * @destroyed_worker: worker to deregister contexts, need as we
 		 * need to take a GT PM reference and can't from destroy
