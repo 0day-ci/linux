@@ -1500,8 +1500,12 @@ enqueue_task_rt(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_rt_entity *rt_se = &p->rt;
 
-	if (flags & ENQUEUE_WAKEUP)
+	if (flags & ENQUEUE_WAKEUP) {
 		rt_se->timeout = 0;
+
+		if (p->policy == SCHED_RR)
+			p->rt.time_slice = sched_rr_timeslice;
+	}
 
 	check_schedstat_required();
 	update_stats_wait_start_rt(rt_rq_of_se(rt_se), rt_se);
@@ -1553,7 +1557,12 @@ static void requeue_task_rt(struct rq *rq, struct task_struct *p, int head)
 
 static void yield_task_rt(struct rq *rq)
 {
-	requeue_task_rt(rq, rq->curr, 0);
+	struct task_struct *p = rq->curr;
+
+	if (p->policy == SCHED_RR)
+		p->rt.time_slice = sched_rr_timeslice;
+
+	requeue_task_rt(rq, p, 0);
 }
 
 #ifdef CONFIG_SMP
