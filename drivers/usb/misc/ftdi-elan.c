@@ -1627,7 +1627,6 @@ wait:if (ftdi->disconnected > 0) {
 			char data[30 *3 + 4];
 			char *d = data;
 			int m = (sizeof(data) - 1) / 3 - 1;
-			int l = 0;
 			struct u132_target *target = &ftdi->target[ed];
 			struct u132_command *command = &ftdi->command[
 				COMMAND_MASK & ftdi->command_next];
@@ -1651,7 +1650,6 @@ wait:if (ftdi->disconnected > 0) {
 				} else if (i++ < m) {
 					int w = sprintf(d, " %02X", *b++);
 					d += w;
-					l += w;
 				} else
 					d += sprintf(d, " ..");
 			}
