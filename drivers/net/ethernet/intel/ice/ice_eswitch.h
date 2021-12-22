@@ -29,12 +29,18 @@ void ice_eswitch_set_target_vsi(struct sk_buff *skb,
 				struct ice_tx_offload_params *off);
 netdev_tx_t
 ice_eswitch_port_start_xmit(struct sk_buff *skb, struct net_device *netdev);
+bool ice_is_eswitch_supported(struct ice_pf *pf);
+void ice_eswitch_set_cap(struct ice_pf *pf);
+void ice_eswitch_clear_cap(struct ice_pf *pf);
 #else /* CONFIG_ICE_SWITCHDEV */
 static inline void ice_eswitch_release(struct ice_pf *pf) { }
 
 static inline void ice_eswitch_stop_all_tx_queues(struct ice_pf *pf) { }
 static inline void ice_eswitch_replay_vf_mac_rule(struct ice_vf *vf) { }
 static inline void ice_eswitch_del_vf_mac_rule(struct ice_vf *vf) { }
+
+static inline void ice_eswitch_set_cap(struct ice_pf *pf) { }
+static inline void ice_eswitch_clear_cap(struct ice_pf *pf) { }
 
 static inline int
 ice_eswitch_add_vf_mac_rule(struct ice_pf *pf, struct ice_vf *vf,
@@ -80,6 +86,12 @@ static inline netdev_tx_t
 ice_eswitch_port_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
 	return NETDEV_TX_BUSY;
+}
+
+static inline bool
+ice_is_eswitch_supported(struct ice_pf *pf)
+{
+	return false;
 }
 #endif /* CONFIG_ICE_SWITCHDEV */
 #endif /* _ICE_ESWITCH_H_ */

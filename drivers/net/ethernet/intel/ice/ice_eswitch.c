@@ -679,3 +679,32 @@ int ice_eswitch_rebuild(struct ice_pf *pf)
 
 	return 0;
 }
+
+/**
+ * ice_is_eswitch_supported - check if eswitch can be supported
+ * @pf: pointer to PF structure
+ */
+bool ice_is_eswitch_supported(struct ice_pf *pf)
+{
+	return test_bit(ICE_FLAG_ESWITCH_CAPABLE, pf->flags);
+}
+
+/**
+ * ice_eswitch_set_cap - set eswitch cap based on SRIOV cap
+ * @pf: pointer to PF structure
+ */
+void ice_eswitch_set_cap(struct ice_pf *pf)
+{
+	clear_bit(ICE_FLAG_ESWITCH_CAPABLE, pf->flags);
+	if (test_bit(ICE_FLAG_SRIOV_CAPABLE, pf->flags))
+		set_bit(ICE_FLAG_ESWITCH_CAPABLE, pf->flags);
+}
+
+/**
+ * ice_eswitch_clear_cap - clear switchdev cap when driver can't support it
+ * @pf: pointer to PF structure
+ */
+void ice_eswitch_clear_cap(struct ice_pf *pf)
+{
+	clear_bit(ICE_FLAG_ESWITCH_CAPABLE, pf->flags);
+}

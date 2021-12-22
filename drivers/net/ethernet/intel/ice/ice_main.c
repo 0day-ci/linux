@@ -3735,6 +3735,8 @@ static void ice_set_pf_caps(struct ice_pf *pf)
 	if (func_caps->common_cap.ieee_1588)
 		set_bit(ICE_FLAG_PTP_SUPPORTED, pf->flags);
 
+	ice_eswitch_set_cap(pf);
+
 	pf->max_pf_txqs = func_caps->common_cap.num_txq;
 	pf->max_pf_rxqs = func_caps->common_cap.num_rxq;
 }
@@ -3810,11 +3812,13 @@ static int ice_ena_msix_range(struct ice_pf *pf)
 	}
 
 	/* reserve for switchdev */
-	needed = ICE_ESWITCH_MSIX;
-	if (v_left < needed)
-		goto no_hw_vecs_left_err;
-	v_budget += needed;
-	v_left -= needed;
+	if (ice_is_eswitch_supported(pf)) {
+		needed = ICE_ESWITCH_MSIX;
+		if (v_left < needed)
+			goto no_hw_vecs_left_err;
+		v_budget += needed;
+		v_left -= needed;
+	}
 
 	/* total used for non-traffic vectors */
 	v_other = v_budget;
@@ -3920,6 +3924,7 @@ no_hw_vecs_left_err:
 		needed, v_left);
 	err = -ERANGE;
 exit_err:
+	ice_eswitch_clear_cap(pf);
 	pf->num_rdma_msix = 0;
 	pf->num_lan_msix = 0;
 	return err;
