@@ -354,10 +354,23 @@ struct acpi_device_data {
 	struct list_head subnodes;
 };
 
+/*
+ * struct acpi_device_location - Device location based on _PLD
+ * @devices: List of devices that share this location
+ * @node: Entry in the internal list of locations
+ * @pld_crc: CRC-32 hash of the _PLD
+ */
+struct acpi_device_location {
+	struct list_head devices;
+	struct list_head node;
+	u32 pld_crc;
+};
+
 struct acpi_gpio_mapping;
 
 /* Device */
 struct acpi_device {
+	u32 pld_crc;
 	int device_type;
 	acpi_handle handle;		/* no handle for fixed hardware */
 	struct fwnode_handle fwnode;
@@ -734,7 +747,6 @@ static inline void acpi_bus_put_acpi_device(struct acpi_device *adev)
 
 static inline int register_acpi_bus_type(void *bus) { return 0; }
 static inline int unregister_acpi_bus_type(void *bus) { return 0; }
-
 #endif				/* CONFIG_ACPI */
 
 #endif /*__ACPI_BUS_H__*/
