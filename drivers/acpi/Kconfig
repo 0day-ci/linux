@@ -524,6 +524,11 @@ config ACPI_PPTT
 	bool
 endif
 
+config ACPI_PCC_OPREGION
+	bool "PCC Opregion"
+	depends on PCC
+	default y
+
 source "drivers/acpi/pmic/Kconfig"
 
 config ACPI_VIOT
