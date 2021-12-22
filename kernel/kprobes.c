@@ -62,7 +62,6 @@ static bool kprobes_all_disarmed;
 
 /* This protects 'kprobe_table' and 'optimizing_list' */
 static DEFINE_MUTEX(kprobe_mutex);
-static DEFINE_PER_CPU(struct kprobe *, kprobe_instance);
 
 kprobe_opcode_t * __weak kprobe_lookup_name(const char *name,
 					unsigned int __unused)
@@ -353,17 +352,6 @@ struct kprobe_insn_cache kprobe_optinsn_slots = {
 #endif
 #endif
 
-/* We have preemption disabled.. so it is safe to use __ versions */
-static inline void set_kprobe_instance(struct kprobe *kp)
-{
-	__this_cpu_write(kprobe_instance, kp);
-}
-
-static inline void reset_kprobe_instance(void)
-{
-	__this_cpu_write(kprobe_instance, NULL);
-}
-
 /*
  * This routine is called either:
  *	- under the 'kprobe_mutex' - during kprobe_[un]register().
@@ -421,11 +409,8 @@ void opt_pre_handler(struct kprobe *p, struct pt_regs *regs)
 	struct kprobe *kp;
 
 	list_for_each_entry_rcu(kp, &p->list, list) {
-		if (kp->pre_handler && likely(!kprobe_disabled(kp))) {
-			set_kprobe_instance(kp);
+		if (kp->pre_handler && likely(!kprobe_disabled(kp)))
 			kp->pre_handler(kp, regs);
-		}
-		reset_kprobe_instance();
 	}
 }
 NOKPROBE_SYMBOL(opt_pre_handler);
@@ -1177,11 +1162,9 @@ static int aggr_pre_handler(struct kprobe *p, struct pt_regs *regs)
 
 	list_for_each_entry_rcu(kp, &p->list, list) {
 		if (kp->pre_handler && likely(!kprobe_disabled(kp))) {
-			set_kprobe_instance(kp);
 			if (kp->pre_handler(kp, regs))
 				return 1;
 		}
-		reset_kprobe_instance();
 	}
 	return 0;
 }
@@ -1193,11 +1176,8 @@ static void aggr_post_handler(struct kprobe *p, struct pt_regs *regs,
 	struct kprobe *kp;
 
 	list_for_each_entry_rcu(kp, &p->list, list) {
-		if (kp->post_handler && likely(!kprobe_disabled(kp))) {
-			set_kprobe_instance(kp);
+		if (kp->post_handler && likely(!kprobe_disabled(kp)))
 			kp->post_handler(kp, regs, flags);
-			reset_kprobe_instance();
-		}
 	}
 }
 NOKPROBE_SYMBOL(aggr_post_handler);
