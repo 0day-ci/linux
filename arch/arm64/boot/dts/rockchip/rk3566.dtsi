@@ -6,6 +6,10 @@
 	compatible = "rockchip,rk3566";
 };
 
+&multiphy {
+	compatible = "rockchip,rk3566-naneng-multiphy";
+};
+
 &power {
 	power-domain@RK3568_PD_PIPE {
 		reg = <RK3568_PD_PIPE>;
