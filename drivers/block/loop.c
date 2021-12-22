@@ -1175,10 +1175,8 @@ static void loop_rundown_completed(struct loop_device *lo)
 	module_put(THIS_MODULE);
 }
 
-static void loop_rundown_workfn(struct work_struct *work)
+static void loop_rundown_start(struct loop_device *lo)
 {
-	struct loop_device *lo = container_of(work, struct loop_device,
-					      rundown_work);
 	struct block_device *bdev = lo->lo_device;
 	struct gendisk *disk = lo->lo_disk;
 
@@ -1188,6 +1186,18 @@ static void loop_rundown_workfn(struct work_struct *work)
 	loop_rundown_completed(lo);
 }
 
+static void loop_rundown_callbackfn(struct callback_head *callback)
+{
+	loop_rundown_start(container_of(callback, struct loop_device,
+					rundown.callback));
+}
+
+static void loop_rundown_workfn(struct work_struct *work)
+{
+	loop_rundown_start(container_of(work, struct loop_device,
+					rundown.work));
+}
+
 static void loop_schedule_rundown(struct loop_device *lo)
 {
 	struct block_device *bdev = lo->lo_device;
@@ -1195,8 +1205,13 @@ static void loop_schedule_rundown(struct loop_device *lo)
 
 	__module_get(disk->fops->owner);
 	kobject_get(&bdev->bd_device.kobj);
-	INIT_WORK(&lo->rundown_work, loop_rundown_workfn);
-	queue_work(system_long_wq, &lo->rundown_work);
+	if (!(current->flags & PF_KTHREAD)) {
+		init_task_work(&lo->rundown.callback, loop_rundown_callbackfn);
+		if (!task_work_add(current, &lo->rundown.callback, TWA_RESUME))
+			return;
+	}
+	INIT_WORK(&lo->rundown.work, loop_rundown_workfn);
+	queue_work(system_long_wq, &lo->rundown.work);
 }
 
 static int loop_clr_fd(struct loop_device *lo)
