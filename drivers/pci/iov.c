@@ -1014,6 +1014,27 @@ int pci_iov_bus_range(struct pci_bus *bus)
 }
 
 /**
+ * pci_reset_iov_state - reset the state of the IOV capability
+ * @dev: the PCI device
+ */
+void pci_reset_iov_state(struct pci_dev *dev)
+{
+	struct pci_sriov *iov = dev->sriov;
+
+	if (!dev->is_physfn)
+		return;
+	if (!iov->num_VFs)
+		return;
+
+	sriov_del_vfs(dev);
+
+	if (iov->link != dev->devfn)
+		sysfs_remove_link(&dev->dev.kobj, "dep_link");
+
+	iov->num_VFs = 0;
+}
+
+/**
  * pci_enable_sriov - enable the SR-IOV capability
  * @dev: the PCI device
  * @nr_virtfn: number of virtual functions to enable
