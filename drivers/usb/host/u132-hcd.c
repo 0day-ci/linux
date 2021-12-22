@@ -2335,14 +2335,12 @@ static int u132_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 			char data[30 * 3 + 4];
 			char *d = data;
 			int m = (sizeof(data) - 1) / 3;
-			int l = 0;
 			data[0] = 0;
 			while (urb_size-- > 0) {
 				if (i > m) {
 				} else if (i++ < m) {
 					int w = sprintf(d, " %02X", *b++);
 					d += w;
-					l += w;
 				} else
 					d += sprintf(d, " ..");
 			}
