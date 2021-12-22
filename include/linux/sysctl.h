@@ -131,14 +131,14 @@ static inline void *proc_sys_poll_event(struct ctl_table_poll *poll)
 /* A sysctl table is an array of struct ctl_table: */
 struct ctl_table {
 	const char *procname;		/* Text ID for /proc/sys, or zero */
-	void *data;
-	int maxlen;
-	umode_t mode;
+	void *data;			/* a pointer to data for use by proc_handler */
+	int maxlen;			/* the maximum size in bytes of the data */
+	umode_t mode;			/* the file permissions for the /proc/sys file */
 	struct ctl_table *child;	/* Deprecated */
 	proc_handler *proc_handler;	/* Callback for text formatting */
-	struct ctl_table_poll *poll;
+	struct ctl_table_poll *poll;	/* Support for userspace poll() to watch for changes */
 	void *extra1;
-	void *extra2;
+	void *extra2;			/* extra pointers usually as minimum and maximum of data */
 } __randomize_layout;
 
 struct ctl_node {
