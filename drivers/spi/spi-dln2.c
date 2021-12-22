@@ -688,6 +688,8 @@ static int dln2_spi_probe(struct platform_device *pdev)
 	if (!master)
 		return -ENOMEM;
 
+	device_set_node(&master->dev, dev_fwnode(dev));
+
 	platform_set_drvdata(pdev, master);
 
 	dln2 = spi_master_get_devdata(master);
@@ -699,7 +701,6 @@ static int dln2_spi_probe(struct platform_device *pdev)
 	}
 
 	dln2->master = master;
-	dln2->master->dev.of_node = dev->of_node;
 	dln2->pdev = pdev;
 	dln2->port = pdata->port;
 	/* cs/mode can never be 0xff, so the first transfer will set them */
