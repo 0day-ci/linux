@@ -2,6 +2,7 @@
 /* Copyright (C) 2018-2020, Intel Corporation. */
 
 #include "ice.h"
+#include "ice_irq.h"
 
 /**
  * ice_is_arfs_active - helper to check is aRFS is active
@@ -616,7 +617,7 @@ int ice_set_cpu_rx_rmap(struct ice_vsi *vsi)
 	base_idx = vsi->base_vector;
 	ice_for_each_q_vector(vsi, i)
 		if (irq_cpu_rmap_add(netdev->rx_cpu_rmap,
-				     pf->msix_entries[base_idx + i].vector)) {
+				     ice_get_irq_num(pf, base_idx + 1))) {
 			ice_free_cpu_rx_rmap(vsi);
 			return -EINVAL;
 		}

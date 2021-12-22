@@ -11,6 +11,7 @@
 #include "ice_txrx.h"
 #include "ice_txrx_lib.h"
 #include "ice_lib.h"
+#include "ice_irq.h"
 
 static struct xdp_buff **ice_xdp_buf(struct ice_rx_ring *rx_ring, u32 idx)
 {
@@ -94,7 +95,7 @@ ice_qvec_dis_irq(struct ice_vsi *vsi, struct ice_rx_ring *rx_ring,
 
 		wr32(hw, GLINT_DYN_CTL(q_vector->reg_idx), 0);
 		ice_flush(hw);
-		synchronize_irq(pf->msix_entries[v_idx + base].vector);
+		synchronize_irq(ice_get_irq_num(pf, v_idx + base));
 	}
 }
 

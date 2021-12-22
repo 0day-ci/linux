@@ -9,6 +9,7 @@
 #include "ice_dcb_lib.h"
 #include "ice_devlink.h"
 #include "ice_vsi_vlan_ops.h"
+#include "ice_irq.h"
 
 /**
  * ice_vsi_type_str - maps VSI type enum to string equivalents
@@ -2659,7 +2660,7 @@ void ice_vsi_free_irq(struct ice_vsi *vsi)
 		u16 vector = i + base;
 		int irq_num;
 
-		irq_num = pf->msix_entries[vector].vector;
+		irq_num = ice_get_irq_num(pf, vector);
 
 		/* free only the irqs that were actually requested */
 		if (!vsi->q_vectors[i] ||
@@ -2837,7 +2838,7 @@ void ice_vsi_dis_irq(struct ice_vsi *vsi)
 		return;
 
 	ice_for_each_q_vector(vsi, i)
-		synchronize_irq(pf->msix_entries[i + base].vector);
+		synchronize_irq(ice_get_irq_num(pf, i + base));
 }
 
 /**
