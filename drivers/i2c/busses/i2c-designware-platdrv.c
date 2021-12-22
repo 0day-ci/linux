@@ -51,6 +51,7 @@ static const struct acpi_device_id dw_i2c_acpi_match[] = {
 	{ "AMD0010", ACCESS_INTR_MASK },
 	{ "AMDI0010", ACCESS_INTR_MASK },
 	{ "AMDI0510", 0 },
+	{ "AMDI9999", ACCESS_INTR_MASK | ARBITRATION_SEMAPHORE },
 	{ "APMC0D0F", 0 },
 	{ "HISI02A1", 0 },
 	{ "HISI02A2", 0 },
@@ -333,6 +334,8 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	pm_runtime_put_sync(&pdev->dev);
 	dw_i2c_plat_pm_cleanup(dev);
+
+	i2c_dw_remove_lock_support(dev);
 
 	reset_control_assert(dev->rst);
 

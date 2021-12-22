@@ -297,6 +297,7 @@ struct dw_i2c_dev {
 
 #define ACCESS_INTR_MASK	BIT(0)
 #define ACCESS_NO_IRQ_SUSPEND	BIT(1)
+#define ARBITRATION_SEMAPHORE	BIT(2)
 
 #define MODEL_MSCC_OCELOT	BIT(8)
 #define MODEL_BAIKAL_BT1	BIT(9)
@@ -369,10 +370,16 @@ static inline void i2c_dw_configure(struct dw_i2c_dev *dev)
 		i2c_dw_configure_master(dev);
 }
 
-#if IS_ENABLED(CONFIG_I2C_DESIGNWARE_BAYTRAIL)
+#if IS_ENABLED(CONFIG_I2C_DESIGNWARE_BAYTRAIL) || IS_ENABLED(CONFIG_I2C_DESIGNWARE_AMDPSP)
 extern int i2c_dw_probe_lock_support(struct dw_i2c_dev *dev);
 #else
 static inline int i2c_dw_probe_lock_support(struct dw_i2c_dev *dev) { return 0; }
+#endif
+
+#if IS_ENABLED(CONFIG_I2C_DESIGNWARE_AMDPSP)
+extern void i2c_dw_remove_lock_support(struct dw_i2c_dev *dev);
+#else
+static inline void i2c_dw_remove_lock_support(struct dw_i2c_dev *dev) { return; }
 #endif
 
 int i2c_dw_validate_speed(struct dw_i2c_dev *dev);
