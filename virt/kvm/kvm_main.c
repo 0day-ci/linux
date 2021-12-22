@@ -5785,7 +5785,7 @@ init_complete:
 	init_context = NULL;
 
 	if (err)
-		return err;
+		goto out;
 
 	/* Wait to be woken up by the spawner before proceeding. */
 	kthread_parkme();
@@ -5793,6 +5793,19 @@ init_complete:
 	if (!kthread_should_stop())
 		err = thread_fn(kvm, data);
 
+out:
+	/*
+	 * We need to move the kthread back to its original cgroups, so that it
+	 * doesn't linger in the cgroups of the user process after the user
+	 * process has already terminated.
+	 *
+	 * kthread_stop() waits on 'exited' completion condition which is set
+	 * in exit_mm(), via mm_release(), in do_exit(). However, kthread
+	 * is removed from cgroups in the cgroup_exit() which is called after
+	 * exit_mm(). This causes lingering of kthreads in cgroups after main
+	 * VM process has finished.
+	 */
+	WARN_ON(cgroup_attach_task_all(NULL, current));
 	return err;
 }
 

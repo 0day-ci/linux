@@ -51,12 +51,17 @@ bool cgroup1_ssid_disabled(int ssid)
  * @from: attach to all cgroups of a given task
  * @tsk: the task to be attached
  *
+ * If @from is NULL then use kthreadd_task for finding the destination cgroups.
+ *
  * Return: %0 on success or a negative errno code on failure
  */
 int cgroup_attach_task_all(struct task_struct *from, struct task_struct *tsk)
 {
 	struct cgroup_root *root;
 	int retval = 0;
+
+	if (!from)
+		from = kthreadd_task;
 
 	mutex_lock(&cgroup_mutex);
 	percpu_down_write(&cgroup_threadgroup_rwsem);
