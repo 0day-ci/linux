@@ -1,0 +1,28 @@
+drm drm-fixes a2fbfd517117157e99160ff1b39b171872dcba07
+	Merge tag 'amd-drm-fixes-5.16-2021-12-15' of https://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes 67f74302f45d5d862f22ced3297624e50ac352f0
+	drm/nouveau: wait for the exclusive fence after the shared ones v2
+drm-intel drm-intel-fixes 7807bf28fe02a76bf112916c6b9194f282f5e43c
+	drm/i915/guc: Only assign guc_id.id when stealing guc_id
+drm drm-next 1c405ca11bf563de1725e5ecfb4a74ee289d2ee9
+	Merge tag 'mediatek-drm-next-5.17' of https://git.kernel.org/pub/scm/linux/kernel/git/chunkuang.hu/linux into drm-next
+drm-misc drm-misc-next-fixes 58fa0d90eddeda37b32597eda139e888ebe5af04
+	drm/vmwgfx: Fix possible usage of an uninitialized variable
+drm-intel drm-intel-next-fixes 1c405ca11bf563de1725e5ecfb4a74ee289d2ee9
+	Merge tag 'mediatek-drm-next-5.17' of https://git.kernel.org/pub/scm/linux/kernel/git/chunkuang.hu/linux into drm-next
+drm-misc drm-misc-next 5664e3c907e20523cda622268716867e77648d0c
+	drm/bridge: ti-sn65dsi83: Add vcc supply regulator support
+drm-intel drm-intel-next 7e28d0b26759846485978ada860ef4a427e06c8f
+	drm/i915/adl-n: Enable ADL-N platform
+drm-intel drm-intel-gt-next c2ea703dcafccf18d7d77d8b68fb08c2d9842b7a
+	drm/i915: Require the vm mutex for i915_vma_bind()
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
