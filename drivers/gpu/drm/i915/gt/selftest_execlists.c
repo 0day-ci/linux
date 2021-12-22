@@ -1540,13 +1540,16 @@ static int live_busywait_preempt(void *arg)
 	 */
 
 	ctx_hi = kernel_context(gt->i915, NULL);
-	if (!ctx_hi)
-		return -ENOMEM;
+	if (IS_ERR(ctx_hi))
+		return IS_ERR(ctx_hi);
+
 	ctx_hi->sched.priority = I915_CONTEXT_MAX_USER_PRIORITY;
 
 	ctx_lo = kernel_context(gt->i915, NULL);
-	if (!ctx_lo)
+	if (IS_ERR(ctx_lo)) {
+		err = PTR_ERR(ctx_lo);
 		goto err_ctx_hi;
+	}
 	ctx_lo->sched.priority = I915_CONTEXT_MIN_USER_PRIORITY;
 
 	obj = i915_gem_object_create_internal(gt->i915, PAGE_SIZE);
@@ -1742,13 +1745,17 @@ static int live_preempt(void *arg)
 		goto err_spin_hi;
 
 	ctx_hi = kernel_context(gt->i915, NULL);
-	if (!ctx_hi)
+	if (IS_ERR(ctx_hi)) {
+		err = PTR_ERR(ctx_hi);
 		goto err_spin_lo;
+	}
 	ctx_hi->sched.priority = I915_CONTEXT_MAX_USER_PRIORITY;
 
 	ctx_lo = kernel_context(gt->i915, NULL);
-	if (!ctx_lo)
+	if (IS_ERR(ctx_lo)) {
+		err = PTR_ERR(ctx_lo);
 		goto err_ctx_hi;
+	}
 	ctx_lo->sched.priority = I915_CONTEXT_MIN_USER_PRIORITY;
 
 	for_each_engine(engine, gt, id) {
@@ -1834,12 +1841,16 @@ static int live_late_preempt(void *arg)
 		goto err_spin_hi;
 
 	ctx_hi = kernel_context(gt->i915, NULL);
-	if (!ctx_hi)
+	if (IS_ERR(ctx_hi)) {
+		err = PTR_ERR(ctx_hi);
 		goto err_spin_lo;
+	}
 
 	ctx_lo = kernel_context(gt->i915, NULL);
-	if (!ctx_lo)
+	if (IS_ERR(ctx_lo)) {
+		err = PTR_ERR(ctx_lo);
 		goto err_ctx_hi;
+	}
 
 	/* Make sure ctx_lo stays before ctx_hi until we trigger preemption. */
 	ctx_lo->sched.priority = 1;
@@ -1928,8 +1939,8 @@ struct preempt_client {
 static int preempt_client_init(struct intel_gt *gt, struct preempt_client *c)
 {
 	c->ctx = kernel_context(gt->i915, NULL);
-	if (!c->ctx)
-		return -ENOMEM;
+	if (IS_ERR(c->ctx))
+		return PTR_ERR(c->ctx);
 
 	if (igt_spinner_init(&c->spin, gt))
 		goto err_ctx;
@@ -3385,13 +3396,17 @@ static int live_preempt_timeout(void *arg)
 		return -ENOMEM;
 
 	ctx_hi = kernel_context(gt->i915, NULL);
-	if (!ctx_hi)
+	if (IS_ERR(ctx_hi)) {
+		err = PTR_ERR(ctx_hi);
 		goto err_spin_lo;
+	}
 	ctx_hi->sched.priority = I915_CONTEXT_MAX_USER_PRIORITY;
 
 	ctx_lo = kernel_context(gt->i915, NULL);
-	if (!ctx_lo)
+	if (IS_ERR(ctx_lo)) {
+		err = PTR_ERR(ctx_lo);
 		goto err_ctx_hi;
+	}
 	ctx_lo->sched.priority = I915_CONTEXT_MIN_USER_PRIORITY;
 
 	for_each_engine(engine, gt, id) {
@@ -3683,8 +3698,10 @@ static int live_preempt_smoke(void *arg)
 
 	for (n = 0; n < smoke.ncontext; n++) {
 		smoke.contexts[n] = kernel_context(smoke.gt->i915, NULL);
-		if (!smoke.contexts[n])
+		if (IS_ERR(smoke.contexts[n])) {
+			err = PTR_ERR(smoke.contexts[n]);
 			goto err_ctx;
+		}
 	}
 
 	for (n = 0; n < ARRAY_SIZE(phase); n++) {
