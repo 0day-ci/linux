@@ -948,6 +948,8 @@ void blkdev_put(struct block_device *bdev, fmode_t mode)
 	else
 		blkdev_put_whole(bdev, mode);
 	mutex_unlock(&disk->open_mutex);
+	if (bdev->bd_disk->fops->post_release)
+		bdev->bd_disk->fops->post_release(bdev->bd_disk);
 
 	module_put(disk->fops->owner);
 	blkdev_put_no_open(bdev);
