@@ -258,7 +258,11 @@ static int uvc_get_video_ctrl(struct uvc_streaming *stream,
 			query == UVC_GET_DEF)
 		return -EIO;
 
-	data = kmalloc(size, GFP_KERNEL);
+	/*
+	 * Make sure we parse really received data
+	 * by allocating a zeroed buffer.
+	 */
+	data = kzalloc(size, GFP_KERNEL);
 	if (data == NULL)
 		return -ENOMEM;
 
