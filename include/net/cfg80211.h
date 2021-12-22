@@ -361,6 +361,28 @@ struct ieee80211_sta_he_cap {
 };
 
 /**
+ * struct ieee80211_sta_eht_cap - STA's EHT capabilities
+ *
+ * This structure describes parameters needed to describe 802.11be EHT
+ * capabilities for a STA.
+ *
+ * @has_eht: true if EHT data is valid.
+ * @eht_cap_elem: Fixed portion of the EHT capabilities element.
+ * @mcs_nss: The supported NSS/MCS combinations.
+ * @mcs_nss_len: Length of NSS/MCS combinations data.
+ * @ppe_thres: Holds the PPE Thresholds data.
+ * @ppe_thres_len: Length PPE Thresholds data.
+ */
+struct ieee80211_sta_eht_cap {
+	bool has_eht;
+	struct ieee80211_eht_cap_elem eht_cap_elem;
+	u8 *mcs_nss;
+	u8 mcs_nss_len;
+	u8 *ppe_thres;
+	u8 ppe_thres_len;
+};
+
+/**
  * struct ieee80211_sband_iftype_data - sband data per interface type
  *
  * This structure encapsulates sband data that is relevant for the
@@ -374,6 +396,7 @@ struct ieee80211_sta_he_cap {
  * @vendor_elems: vendor element(s) to advertise
  * @vendor_elems.data: vendor element(s) data
  * @vendor_elems.len: vendor element(s) length
+ * @eht_cap: holds the EHT capabilities.
  */
 struct ieee80211_sband_iftype_data {
 	u16 types_mask;
@@ -383,6 +406,7 @@ struct ieee80211_sband_iftype_data {
 		const u8 *data;
 		unsigned int len;
 	} vendor_elems;
+	struct ieee80211_sta_eht_cap eht_cap;
 };
 
 /**
@@ -519,6 +543,38 @@ ieee80211_get_sband_iftype_data(const struct ieee80211_supported_band *sband,
 	}
 
 	return NULL;
+}
+
+/**
+ * ieee80211_get_eht_iftype_cap - return EHT capabilities for an sband's iftype
+ * @sband: the sband to search for the iftype on
+ * @iftype: enum nl80211_iftype
+ *
+ * Return: pointer to the struct ieee80211_sta_eht_cap, or NULL is none found
+ */
+static inline const struct ieee80211_sta_eht_cap *
+ieee80211_get_eht_iftype_cap(const struct ieee80211_supported_band *sband,
+			     u8 iftype)
+{
+	const struct ieee80211_sband_iftype_data *data =
+		ieee80211_get_sband_iftype_data(sband, iftype);
+
+	if (data && data->eht_cap.has_eht)
+		return &data->eht_cap;
+
+	return NULL;
+}
+
+/**
+ * ieee80211_get_eht_sta_cap - return EHT capabilities for an sband's STA
+ * @sband: the sband to search for the STA on
+ *
+ * Return: pointer to the struct ieee80211_sta_eht_cap, or NULL is none found
+ */
+static inline const struct ieee80211_sta_eht_cap *
+ieee80211_get_eht_sta_cap(const struct ieee80211_supported_band *sband)
+{
+	return ieee80211_get_eht_iftype_cap(sband, NL80211_IFTYPE_STATION);
 }
 
 /**
