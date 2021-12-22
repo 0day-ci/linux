@@ -519,25 +519,34 @@ ice_eswitch_mode_set(struct devlink *devlink, u16 mode,
 		     struct netlink_ext_ack *extack)
 {
 	struct ice_pf *pf = devlink_priv(devlink);
+	struct device *dev = ice_pf_to_dev(pf);
 
 	if (pf->eswitch_mode == mode)
 		return 0;
 
 	if (pf->num_alloc_vfs) {
-		dev_info(ice_pf_to_dev(pf), "Changing eswitch mode is allowed only if there is no VFs created");
-		NL_SET_ERR_MSG_MOD(extack, "Changing eswitch mode is allowed only if there is no VFs created");
+		dev_info(dev, "Changing eswitch mode is allowed only if there is no VFs created\n");
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Changing eswitch mode is allowed only if there is no VFs created");
+		return -EOPNOTSUPP;
+	}
+
+	if (!ice_is_eswitch_supported(pf)) {
+		dev_info(dev, "There is no eswitch support or eswitch resource allocation failed\n");
+		NL_SET_ERR_MSG_MOD(extack,
+				   "There is no eswitch support or eswitch resource allocation failed");
 		return -EOPNOTSUPP;
 	}
 
 	switch (mode) {
 	case DEVLINK_ESWITCH_MODE_LEGACY:
-		dev_info(ice_pf_to_dev(pf), "PF %d changed eswitch mode to legacy",
+		dev_info(ice_pf_to_dev(pf), "PF %d changed eswitch mode to legacy\n",
 			 pf->hw.pf_id);
 		NL_SET_ERR_MSG_MOD(extack, "Changed eswitch mode to legacy");
 		break;
 	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
 	{
-		dev_info(ice_pf_to_dev(pf), "PF %d changed eswitch mode to switchdev",
+		dev_info(ice_pf_to_dev(pf), "PF %d changed eswitch mode to switchdev\n",
 			 pf->hw.pf_id);
 		NL_SET_ERR_MSG_MOD(extack, "Changed eswitch mode to switchdev");
 		break;
