@@ -803,6 +803,11 @@ static loff_t devkmsg_llseek(struct file *file, loff_t offset, int whence)
 		/* after the last record */
 		atomic64_set(&user->seq, prb_next_seq(prb));
 		break;
+	case SEEK_CUR:
+		/* For compatibility with userspace expecting SEEK_CUR
+		 * to not yield EINVAL. */
+		ret = -ESPIPE;
+		break;
 	default:
 		ret = -EINVAL;
 	}
