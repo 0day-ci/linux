@@ -584,11 +584,29 @@ static int mps2_init_port(struct platform_device *pdev,
 
 
 	if (mps_port->flags & UART_PORT_COMBINED_IRQ) {
-		mps_port->port.irq = platform_get_irq(pdev, 0);
+		ret = platform_get_irq(pdev, 0);
+		if (ret < 0)
+			return ret;
+
+		mps_port->port.irq = ret;
 	} else {
-		mps_port->rx_irq = platform_get_irq(pdev, 0);
-		mps_port->tx_irq = platform_get_irq(pdev, 1);
-		mps_port->port.irq = platform_get_irq(pdev, 2);
+		ret = platform_get_irq(pdev, 0);
+		if (ret < 0)
+			return ret;
+
+		mps_port->rx_irq = ret;
+
+		ret = platform_get_irq(pdev, 1);
+		if (ret < 0)
+			return ret;
+
+		mps_port->tx_irq = ret;
+
+		ret = platform_get_irq(pdev, 2);
+		if (ret < 0)
+			return ret;
+
+		mps_port->port.irq = ret;
 	}
 
 	return ret;
