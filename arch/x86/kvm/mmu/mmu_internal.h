@@ -69,6 +69,8 @@ struct kvm_mmu_page {
 		DECLARE_BITMAP(unsync_child_bitmap, 512);
 		struct {
 			bool tdp_mmu_defunct_root;
+			struct work_struct tdp_mmu_async_work;
+			void *tdp_mmu_async_data;
 		};
 	};
 

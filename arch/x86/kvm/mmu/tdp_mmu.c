@@ -81,6 +81,38 @@ static void tdp_mmu_free_sp_rcu_callback(struct rcu_head *head)
 static void tdp_mmu_zap_root(struct kvm *kvm, struct kvm_mmu_page *root,
 			     bool shared);
 
+static void tdp_mmu_zap_root_async(struct work_struct *work)
+{
+	struct kvm_mmu_page *root = container_of(work, struct kvm_mmu_page,
+						 tdp_mmu_async_work);
+	struct kvm *kvm = root->tdp_mmu_async_data;
+
+	read_lock(&kvm->mmu_lock);
+
+	/*
+	 * A TLB flush is not necessary as KVM performs a local TLB flush when
+	 * allocating a new root (see kvm_mmu_load()), and when migrating vCPU
+	 * to a different pCPU.  Note, the local TLB flush on reuse also
+	 * invalidates any paging-structure-cache entries, i.e. TLB entries for
+	 * intermediate paging structures, that may be zapped, as such entries
+	 * are associated with the ASID on both VMX and SVM.
+	 */
+	tdp_mmu_zap_root(kvm, root, true);
+
+	/*
+	 * Drop the refcount using kvm_tdp_mmu_put_root() to test its logic for
+	 * avoiding an infinite loop.  By design, the root is reachable while
+	 * it's being asynchronously zapped, thus a different task can put its
+	 * last reference, i.e. flowing through kvm_tdp_mmu_put_root() for an
+	 * asynchronously zapped root is unavoidable.
+	 */
+	kvm_tdp_mmu_put_root(kvm, root, true);
+
+	read_unlock(&kvm->mmu_lock);
+
+	kvm_put_kvm(kvm);
+}
+
 void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 			  bool shared)
 {
@@ -143,15 +175,26 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 	refcount_set(&root->tdp_mmu_root_count, 1);
 
 	/*
-	 * Zap the root, then put the refcount "acquired" above.   Recursively
-	 * call kvm_tdp_mmu_put_root() to test the above logic for avoiding an
-	 * infinite loop by freeing invalid roots.  By design, the root is
-	 * reachable while it's being zapped, thus a different task can put its
-	 * last reference, i.e. flowing through kvm_tdp_mmu_put_root() for a
-	 * defunct root is unavoidable.
+	 * Attempt to acquire a reference to KVM itself.  If KVM is alive, then
+	 * zap the root asynchronously in a worker, otherwise it must be zapped
+	 * directly here.  Wait to do this check until after the refcount is
+	 * reset so that tdp_mmu_zap_root() can safely yield.
+	 *
+	 * In both flows, zap the root, then put the refcount "acquired" above.
+	 * When putting the reference, use kvm_tdp_mmu_put_root() to test the
+	 * above logic for avoiding an infinite loop by freeing invalid roots.
+	 * By design, the root is reachable while it's being zapped, thus a
+	 * different task can put its last reference, i.e. flowing through
+	 * kvm_tdp_mmu_put_root() for a defunct root is unavoidable.
 	 */
-	tdp_mmu_zap_root(kvm, root, shared);
-	kvm_tdp_mmu_put_root(kvm, root, shared);
+	if (kvm_get_kvm_safe(kvm)) {
+		root->tdp_mmu_async_data = kvm;
+		INIT_WORK(&root->tdp_mmu_async_work, tdp_mmu_zap_root_async);
+		schedule_work(&root->tdp_mmu_async_work);
+	} else {
+		tdp_mmu_zap_root(kvm, root, shared);
+		kvm_tdp_mmu_put_root(kvm, root, shared);
+	}
 }
 
 enum tdp_mmu_roots_iter_type {
@@ -949,7 +992,11 @@ void kvm_tdp_mmu_zap_all(struct kvm *kvm)
 
 	/*
 	 * Zap all roots, including defunct roots, as all SPTEs must be dropped
-	 * before returning to the caller.
+	 * before returning to the caller.  Zap directly even if the root is
+	 * also being zapped by a worker.  Walking zapped top-level SPTEs isn't
+	 * all that expensive and mmu_lock is already held, which means the
+	 * worker has yielded, i.e. flushing the work instead of zapping here
+	 * isn't guaranteed to be any faster.
 	 *
 	 * A TLB flush is unnecessary, KVM zaps everything if and only the VM
 	 * is being destroyed or the userspace VMM has exited.  In both cases,
