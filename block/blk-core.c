@@ -71,7 +71,7 @@ struct kmem_cache *blk_requestq_srcu_cachep;
 /*
  * Controlling structure to kblockd
  */
-static struct workqueue_struct *kblockd_workqueue;
+struct workqueue_struct *kblockd_workqueue;
 
 /**
  * blk_queue_flag_set - atomically set a queue flag
@@ -1152,13 +1152,6 @@ int kblockd_schedule_work(struct work_struct *work)
 	return queue_work(kblockd_workqueue, work);
 }
 EXPORT_SYMBOL(kblockd_schedule_work);
-
-int kblockd_mod_delayed_work_on(int cpu, struct delayed_work *dwork,
-				unsigned long delay)
-{
-	return mod_delayed_work_on(cpu, kblockd_workqueue, dwork, delay);
-}
-EXPORT_SYMBOL(kblockd_mod_delayed_work_on);
 
 void blk_start_plug_nr_ios(struct blk_plug *plug, unsigned short nr_ios)
 {
