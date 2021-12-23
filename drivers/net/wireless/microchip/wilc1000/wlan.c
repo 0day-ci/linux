@@ -345,12 +345,16 @@ static inline u8 ac_classify(struct wilc *wilc, struct sk_buff *skb)
 	return q_num;
 }
 
-static inline int ac_balance(struct wilc *wl, u8 *ratio)
+/**
+ * ac_balance() - balance queues by favoring ones with fewer packets pending
+ * @wl: Pointer to the wilc structure.
+ * @ratio: Pointer to array of length NQUEUES in which this function
+ *	returns the number of packets that may be scheduled for each
+ *	access category.
+ */
+static inline void ac_balance(const struct wilc *wl, u8 *ratio)
 {
 	u8 i, max_count = 0;
-
-	if (!ratio)
-		return -EINVAL;
 
 	for (i = 0; i < NQUEUES; i++)
 		if (wl->fw[i].count > max_count)
@@ -358,8 +362,6 @@ static inline int ac_balance(struct wilc *wl, u8 *ratio)
 
 	for (i = 0; i < NQUEUES; i++)
 		ratio[i] = max_count - wl->fw[i].count;
-
-	return 0;
 }
 
 static inline void ac_update_fw_ac_pkt_info(struct wilc *wl, u32 reg)
@@ -894,8 +896,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	if (wilc->quit)
 		goto out_update_cnt;
 
-	if (ac_balance(wilc, ac_desired_ratio))
-		return -EINVAL;
+	ac_balance(wilc, ac_desired_ratio);
 
 	mutex_lock(&wilc->txq_add_to_head_cs);
 
