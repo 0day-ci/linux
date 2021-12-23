@@ -498,6 +498,33 @@ static int nvmem_cell_info_to_nvmem_cell_entry(struct nvmem_device *nvmem,
 }
 
 /**
+ * nvmem_find_cell_of_node() - Find DT node matching nvmem cell
+ *
+ * @nvmem: nvmem device to add cells to.
+ * @name: nvmem cell name
+ *
+ * Runtime created nvmem cells (those not coming from DT) may still need to be
+ * referenced in DT. This function allows finding DT node referencing nvmem cell
+ * by its name. Such a DT node can be used by nvmem consumers.
+ *
+ * Return: NULL or pointer to DT node
+ */
+static struct device_node *nvmem_find_cell_of_node(struct nvmem_device *nvmem,
+						   const char *name)
+{
+	struct device_node *child;
+	const char *label;
+
+	for_each_child_of_node(nvmem->dev.of_node, child) {
+		if (!of_property_read_string(child, "label", &label) &&
+		    !strcmp(label, name))
+			return child;
+	}
+
+	return NULL;
+}
+
+/**
  * nvmem_add_cells() - Add cell information to an nvmem device
  *
  * @nvmem: nvmem device to add cells to.
@@ -529,6 +556,8 @@ static int nvmem_add_cells(struct nvmem_device *nvmem,
 			kfree(cells[i]);
 			goto err;
 		}
+
+		cells[i]->np = nvmem_find_cell_of_node(nvmem, cells[i]->name);
 
 		nvmem_cell_entry_add(cells[i]);
 	}
