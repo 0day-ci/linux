@@ -49,6 +49,9 @@ patternProperties:
         description:
           Offset and size in bytes within the storage device.
 
+      label:
+        description: name of NVMEM cell
+
       bits:
         maxItems: 1
         items:
