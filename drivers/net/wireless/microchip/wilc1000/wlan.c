@@ -935,6 +935,44 @@ static int copy_and_send_packets(struct wilc *wilc, int entries)
 	return ret;
 }
 
+/**
+ * zero_copy_send_packets() - send packets to the chip (copy-free).
+ * @wilc: Pointer to the wilc structure.
+ * @entries: The number of packets to send from the VMM table.
+ *
+ * Zero-copy version of sending the packets in the VMM table to the
+ * chip.
+ *
+ * Context: The wilc1000 bus must have been released but the chip
+ *	must be awake.
+ *
+ * Return: Negative number on error, 0 on success.
+ */
+static int zero_copy_send_packets(struct wilc *wilc, int entries)
+{
+	const struct wilc_hif_func *func = wilc->hif_func;
+	struct wilc_skb_tx_cb *tx_cb;
+	struct sk_buff *tqe;
+	int ret, i = 0;
+
+	acquire_bus(wilc, WILC_BUS_ACQUIRE_ONLY);
+
+	ret = func->hif_clear_int_ext(wilc, ENABLE_TX_VMM);
+	if (ret == 0)
+		ret = func->hif_sk_buffs_tx(wilc, 0, entries, &wilc->chipq);
+
+	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
+
+	for (i = 0; i < entries; ++i) {
+		tqe = __skb_dequeue(&wilc->chipq);
+		tx_cb = WILC_SKB_TX_CB(tqe);
+		wilc->fw[tx_cb->q_num].count++;
+		wilc->chipq_bytes -= tqe->len;
+		wilc_wlan_tx_packet_done(tqe, ret == 0);
+	}
+	return ret;
+}
+
 int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 {
 	int vmm_table_len, entries;
@@ -966,7 +1004,10 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	if (entries <= 0) {
 		ret = entries;
 	} else {
-		ret = copy_and_send_packets(wilc, entries);
+		if (wilc->hif_func->hif_sk_buffs_tx)
+			ret = zero_copy_send_packets(wilc, entries);
+		else
+			ret = copy_and_send_packets(wilc, entries);
 	}
 	if (ret >= 0 && entries < vmm_table_len)
 		ret = WILC_VMM_ENTRY_FULL_RETRY;

@@ -367,6 +367,8 @@ struct wilc_hif_func {
 	int (*hif_read_size)(struct wilc *wilc, u32 *size);
 	int (*hif_block_tx_ext)(struct wilc *wilc, u32 addr, u8 *buf, u32 size);
 	int (*hif_block_rx_ext)(struct wilc *wilc, u32 addr, u8 *buf, u32 size);
+	int (*hif_sk_buffs_tx)(struct wilc *wilc, u32 addr,
+			       size_t num_skbs, struct sk_buff_head *skbs);
 	int (*hif_sync_ext)(struct wilc *wilc, int nint);
 	int (*enable_interrupt)(struct wilc *nic);
 	void (*disable_interrupt)(struct wilc *nic);
