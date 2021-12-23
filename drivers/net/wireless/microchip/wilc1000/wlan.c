@@ -641,6 +641,37 @@ static u32 vmm_table_entry(struct sk_buff *tqe, u32 vmm_sz)
 }
 
 /**
+ * set_header() - set WILC-specific header
+ * @wilc: Pointer to the wilc structure.
+ * @tqe: The packet to add to the chip queue.
+ * @vmm_sz: The final size of the packet, including VMM header and padding.
+ * @hdr: Pointer to the header to set
+ */
+static void set_header(struct wilc *wilc, struct sk_buff *tqe,
+		       u32 vmm_sz, void *hdr)
+{
+	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(tqe);
+	u32 mgmt_pkt = 0, vmm_hdr, prio, data_len = tqe->len;
+	struct wilc_vif *vif;
+
+	/* add the VMM header word: */
+	if (tx_cb->type == WILC_MGMT_PKT)
+		mgmt_pkt = FIELD_PREP(WILC_VMM_HDR_MGMT_FIELD, 1);
+	vmm_hdr = cpu_to_le32(mgmt_pkt |
+			      FIELD_PREP(WILC_VMM_HDR_TYPE, tx_cb->type) |
+			      FIELD_PREP(WILC_VMM_HDR_PKT_SIZE, data_len) |
+			      FIELD_PREP(WILC_VMM_HDR_BUFF_SIZE, vmm_sz));
+	memcpy(hdr, &vmm_hdr, 4);
+
+	if (tx_cb->type == WILC_NET_PKT) {
+		vif = netdev_priv(tqe->dev);
+		prio = cpu_to_le32(tx_cb->q_num);
+		memcpy(hdr + 4, &prio, sizeof(prio));
+		memcpy(hdr + 8, vif->bssid, ETH_ALEN);
+	}
+}
+
+/**
  * fill_vmm_table() - Fill VMM table with packets to be sent
  * @wilc: Pointer to the wilc structure.
  * @vmm_table: Pointer to the VMM table to fill.
@@ -827,7 +858,6 @@ static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 	u8 ac_pkt_num_to_chip[NQUEUES] = {0, 0, 0, 0};
 	struct wilc_skb_tx_cb *tx_cb;
 	u8 *txb = wilc->tx_buffer;
-	struct wilc_vif *vif;
 	int i, vmm_sz;
 	u32 offset;
 
@@ -835,9 +865,7 @@ static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 	i = 0;
 	do {
 		struct sk_buff *tqe;
-		u32 header, buffer_offset;
-		char *bssid;
-		u8 mgmt_ptk = 0;
+		u32 buffer_offset;
 
 		tqe = skb_dequeue(&wilc->txq[vmm_entries_ac[i]]);
 		if (!tqe)
@@ -845,7 +873,6 @@ static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 
 		atomic_dec(&wilc->txq_entries);
 		ac_pkt_num_to_chip[vmm_entries_ac[i]]++;
-		vif = netdev_priv(tqe->dev);
 		tx_cb = WILC_SKB_TX_CB(tqe);
 		if (vmm_table[i] == 0)
 			break;
@@ -854,25 +881,8 @@ static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 		vmm_sz = FIELD_GET(WILC_VMM_BUFFER_SIZE, vmm_table[i]);
 		vmm_sz *= 4;
 
-		if (tx_cb->type == WILC_MGMT_PKT)
-			mgmt_ptk = 1;
-
-		header = (FIELD_PREP(WILC_VMM_HDR_TYPE, tx_cb->type) |
-			  FIELD_PREP(WILC_VMM_HDR_MGMT_FIELD, mgmt_ptk) |
-			  FIELD_PREP(WILC_VMM_HDR_PKT_SIZE, tqe->len) |
-			  FIELD_PREP(WILC_VMM_HDR_BUFF_SIZE, vmm_sz));
-
-		cpu_to_le32s(&header);
-		memcpy(&txb[offset], &header, 4);
 		buffer_offset = tx_hdr_len(tx_cb->type);
-		if (tx_cb->type == WILC_NET_PKT) {
-			int prio = tx_cb->q_num;
-
-			bssid = vif->bssid;
-			memcpy(&txb[offset + 4], &prio, sizeof(prio));
-			memcpy(&txb[offset + 8], bssid, 6);
-		}
-
+		set_header(wilc, tqe, vmm_sz, txb + offset);
 		memcpy(&txb[offset + buffer_offset], tqe->data, tqe->len);
 		offset += vmm_sz;
 		i++;
