@@ -1015,7 +1015,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 	ret = kvm_arch_create_vm_debugfs(kvm);
 	if (ret) {
 		kvm_destroy_vm_debugfs(kvm);
-		return i;
+		return ret;
 	}
 
 	return 0;
@@ -4727,7 +4727,7 @@ EXPORT_SYMBOL_GPL(file_is_kvm);
 
 static int kvm_dev_ioctl_create_vm(unsigned long type)
 {
-	int r;
+	int r, ret;
 	struct kvm *kvm;
 	struct file *file;
 
@@ -4759,10 +4759,11 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	 * cases it will be called by the final fput(file) and will take
 	 * care of doing kvm_put_kvm(kvm).
 	 */
-	if (kvm_create_vm_debugfs(kvm, r) < 0) {
+	ret = kvm_create_vm_debugfs(kvm, r);
+	if (ret) {
 		put_unused_fd(r);
 		fput(file);
-		return -ENOMEM;
+		return ret;
 	}
 	kvm_uevent_notify_change(KVM_EVENT_CREATE_VM, kvm);
 
