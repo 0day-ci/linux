@@ -650,21 +650,14 @@ static int wilc_spi_write_cmd(struct wilc *wilc, u8 cmd, u32 adr, u32 data,
 	return 0;
 }
 
-static int wilc_spi_dma_rw(struct wilc *wilc, u8 cmd, u32 adr, u8 *b, u32 sz)
+static int wilc_spi_dma_init_cmd(struct wilc *wilc, struct wilc_spi_cmd *c,
+				 u8 cmd, u32 adr, u32 sz)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
 	struct wilc_spi *spi_priv = wilc->bus_data;
-	u16 crc_recv, crc_calc;
-	u8 wb[32], rb[32];
-	int cmd_len, resp_len;
-	int retry, ix = 0;
-	u8 crc[2], *crc7;
-	struct wilc_spi_cmd *c;
-	struct wilc_spi_rsp_data *r;
+	int cmd_len;
+	u8 *crc7;
 
-	memset(wb, 0x0, sizeof(wb));
-	memset(rb, 0x0, sizeof(rb));
-	c = (struct wilc_spi_cmd *)wb;
 	c->cmd_type = cmd;
 	if (cmd == CMD_DMA_WRITE || cmd == CMD_DMA_READ) {
 		c->u.dma_cmd.addr[0] = adr >> 16;
@@ -687,10 +680,32 @@ static int wilc_spi_dma_rw(struct wilc *wilc, u8 cmd, u32 adr, u8 *b, u32 sz)
 		return -EINVAL;
 	}
 	if (spi_priv->crc7_enabled) {
-		crc7 = wb + cmd_len;
-		*crc7 = wilc_get_crc7(wb, cmd_len);
+		crc7 = (u8 *)c + cmd_len;
+		*crc7 = wilc_get_crc7((u8 *)c, cmd_len);
 		cmd_len += 1;
 	}
+	return cmd_len;
+}
+
+static int wilc_spi_dma_rw(struct wilc *wilc, u8 cmd, u32 adr, u8 *b, u32 sz)
+{
+	struct spi_device *spi = to_spi_device(wilc->dev);
+	struct wilc_spi *spi_priv = wilc->bus_data;
+	u16 crc_recv, crc_calc;
+	u8 wb[32], rb[32];
+	int cmd_len, resp_len;
+	int retry, ix = 0;
+	u8 crc[2];
+	struct wilc_spi_cmd *c;
+	struct wilc_spi_rsp_data *r;
+
+	memset(wb, 0x0, sizeof(wb));
+	memset(rb, 0x0, sizeof(rb));
+	c = (struct wilc_spi_cmd *)wb;
+
+	cmd_len = wilc_spi_dma_init_cmd(wilc, c, cmd, adr, sz);
+	if (cmd_len < 0)
+		return -EINVAL;
 
 	resp_len = sizeof(*r);
 
