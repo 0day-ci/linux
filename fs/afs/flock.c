@@ -778,11 +778,19 @@ int afs_lock(struct file *file, int cmd, struct file_lock *fl)
 	fl->fl_u.afs.debug_id = atomic_inc_return(&afs_file_lock_debug_id);
 	trace_afs_flock_op(vnode, fl, afs_flock_op_lock);
 
-	if (fl->fl_type == F_UNLCK)
+	if (fl->fl_type == F_UNLCK) {
 		ret = afs_do_unlk(file, fl);
-	else
+	} else {
+		bool async = (fl->fl_flags & FL_SLEEP) && IS_SETLK(cmd);
+
+		if (async)
+			fl->fl_flags &= ~FL_SLEEP;
+
 		ret = afs_do_setlk(file, fl);
 
+		if (async)
+			fl->fl_flags |= FL_SLEEP;
+	}
 	switch (ret) {
 	case 0:		op = afs_flock_op_return_ok; break;
 	case -EAGAIN:	op = afs_flock_op_return_eagain; break;
