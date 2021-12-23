@@ -341,7 +341,6 @@ struct txq_fw_recv_queue_stat {
 struct txq_handle {
 	struct txq_entry_t txq_head;
 	u16 count;
-	struct txq_fw_recv_queue_stat fw;
 };
 
 struct rxq_entry_t {

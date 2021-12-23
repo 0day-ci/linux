@@ -373,32 +373,32 @@ static inline int ac_balance(struct wilc *wl, u8 *ratio)
 		return -EINVAL;
 
 	for (i = 0; i < NQUEUES; i++)
-		if (wl->txq[i].fw.count > max_count)
-			max_count = wl->txq[i].fw.count;
+		if (wl->fw[i].count > max_count)
+			max_count = wl->fw[i].count;
 
 	for (i = 0; i < NQUEUES; i++)
-		ratio[i] = max_count - wl->txq[i].fw.count;
+		ratio[i] = max_count - wl->fw[i].count;
 
 	return 0;
 }
 
 static inline void ac_update_fw_ac_pkt_info(struct wilc *wl, u32 reg)
 {
-	wl->txq[AC_BK_Q].fw.count = FIELD_GET(BK_AC_COUNT_FIELD, reg);
-	wl->txq[AC_BE_Q].fw.count = FIELD_GET(BE_AC_COUNT_FIELD, reg);
-	wl->txq[AC_VI_Q].fw.count = FIELD_GET(VI_AC_COUNT_FIELD, reg);
-	wl->txq[AC_VO_Q].fw.count = FIELD_GET(VO_AC_COUNT_FIELD, reg);
+	wl->fw[AC_BK_Q].count = FIELD_GET(BK_AC_COUNT_FIELD, reg);
+	wl->fw[AC_BE_Q].count = FIELD_GET(BE_AC_COUNT_FIELD, reg);
+	wl->fw[AC_VI_Q].count = FIELD_GET(VI_AC_COUNT_FIELD, reg);
+	wl->fw[AC_VO_Q].count = FIELD_GET(VO_AC_COUNT_FIELD, reg);
 
-	wl->txq[AC_BK_Q].fw.acm = FIELD_GET(BK_AC_ACM_STAT_FIELD, reg);
-	wl->txq[AC_BE_Q].fw.acm = FIELD_GET(BE_AC_ACM_STAT_FIELD, reg);
-	wl->txq[AC_VI_Q].fw.acm = FIELD_GET(VI_AC_ACM_STAT_FIELD, reg);
-	wl->txq[AC_VO_Q].fw.acm = FIELD_GET(VO_AC_ACM_STAT_FIELD, reg);
+	wl->fw[AC_BK_Q].acm = FIELD_GET(BK_AC_ACM_STAT_FIELD, reg);
+	wl->fw[AC_BE_Q].acm = FIELD_GET(BE_AC_ACM_STAT_FIELD, reg);
+	wl->fw[AC_VI_Q].acm = FIELD_GET(VI_AC_ACM_STAT_FIELD, reg);
+	wl->fw[AC_VO_Q].acm = FIELD_GET(VO_AC_ACM_STAT_FIELD, reg);
 }
 
 static inline u8 ac_change(struct wilc *wilc, u8 *ac)
 {
 	do {
-		if (wilc->txq[*ac].fw.acm == 0)
+		if (wilc->fw[*ac].acm == 0)
 			return 0;
 		(*ac)++;
 	} while (*ac < NQUEUES);
@@ -920,7 +920,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		kfree(tqe);
 	} while (--entries);
 	for (i = 0; i < NQUEUES; i++)
-		wilc->txq[i].fw.count += ac_pkt_num_to_chip[i];
+		wilc->fw[i].count += ac_pkt_num_to_chip[i];
 
 	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
 
