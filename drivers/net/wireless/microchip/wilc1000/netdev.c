@@ -144,10 +144,12 @@ static int wilc_txq_task(void *vp)
 	int ret;
 	u32 txq_count;
 	struct wilc *wl = vp;
+	long timeout;
 
 	complete(&wl->txq_thread_started);
 	while (1) {
-		wait_for_completion(&wl->txq_event);
+		wait_event_interruptible(wl->txq_event,
+					 (wl->txq_entries > 0 || wl->close));
 
 		if (wl->close) {
 			complete(&wl->txq_thread_started);
@@ -169,6 +171,11 @@ static int wilc_txq_task(void *vp)
 						netif_wake_queue(ifc->ndev);
 				}
 				srcu_read_unlock(&wl->srcu, srcu_idx);
+			}
+			if (ret == WILC_VMM_ENTRY_FULL_RETRY) {
+				timeout = msecs_to_jiffies(1);
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule_timeout(timeout);
 			}
 		} while (ret == WILC_VMM_ENTRY_FULL_RETRY && !wl->close);
 	}
@@ -419,12 +426,11 @@ static void wlan_deinitialize_threads(struct net_device *dev)
 
 	wl->close = 1;
 
-	complete(&wl->txq_event);
-
 	if (wl->txq_thread) {
 		kthread_stop(wl->txq_thread);
 		wl->txq_thread = NULL;
 	}
+	wake_up_interruptible(&wl->txq_event);
 }
 
 static void wilc_wlan_deinitialize(struct net_device *dev)
@@ -446,7 +452,6 @@ static void wilc_wlan_deinitialize(struct net_device *dev)
 			wl->hif_func->disable_interrupt(wl);
 			mutex_unlock(&wl->hif_cs);
 		}
-		complete(&wl->txq_event);
 
 		wlan_deinitialize_threads(dev);
 		deinit_irq(dev);
