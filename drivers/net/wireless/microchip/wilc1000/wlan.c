@@ -190,6 +190,16 @@ out:
 	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
 }
 
+static void wilc_wlan_tx_packet_done(struct txq_entry_t *tqe, int status)
+{
+	tqe->status = status;
+	if (tqe->tx_complete_func)
+		tqe->tx_complete_func(tqe->priv, tqe->status);
+	if (tqe->ack_idx != NOT_TCP_ACK && tqe->ack_idx < MAX_PENDING_ACKS)
+		tqe->vif->ack_filter.pending_acks[tqe->ack_idx].txqe = NULL;
+	kfree(tqe);
+}
+
 static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 {
 	struct wilc_vif *vif = netdev_priv(dev);
@@ -220,11 +230,7 @@ static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 			tqe = f->pending_acks[i].txqe;
 			if (tqe) {
 				wilc_wlan_txq_remove(wilc, tqe->q_num, tqe);
-				tqe->status = 1;
-				if (tqe->tx_complete_func)
-					tqe->tx_complete_func(tqe->priv,
-							      tqe->status);
-				kfree(tqe);
+				wilc_wlan_tx_packet_done(tqe, 1);
 			}
 		}
 	}
@@ -911,13 +917,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		       tqe->buffer, tqe->buffer_size);
 		offset += vmm_sz;
 		i++;
-		tqe->status = 1;
-		if (tqe->tx_complete_func)
-			tqe->tx_complete_func(tqe->priv, tqe->status);
-		if (tqe->ack_idx != NOT_TCP_ACK &&
-		    tqe->ack_idx < MAX_PENDING_ACKS)
-			vif->ack_filter.pending_acks[tqe->ack_idx].txqe = NULL;
-		kfree(tqe);
+		wilc_wlan_tx_packet_done(tqe, 1);
 	} while (--entries);
 	for (i = 0; i < NQUEUES; i++)
 		wilc->fw[i].count += ac_pkt_num_to_chip[i];
@@ -1236,11 +1236,8 @@ void wilc_wlan_cleanup(struct net_device *dev)
 
 	wilc->quit = 1;
 	for (ac = 0; ac < NQUEUES; ac++) {
-		while ((tqe = wilc_wlan_txq_remove_from_head(wilc, ac))) {
-			if (tqe->tx_complete_func)
-				tqe->tx_complete_func(tqe->priv, 0);
-			kfree(tqe);
-		}
+		while ((tqe = wilc_wlan_txq_remove_from_head(wilc, ac)))
+			wilc_wlan_tx_packet_done(tqe, 0);
 	}
 
 	while ((rqe = wilc_wlan_rxq_remove(wilc)))
