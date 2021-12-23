@@ -160,55 +160,50 @@ static int __init setup_parent_interrupt(struct realtek_ictl_priority *prio_ctl,
 	return request_irq(parent, realtek_irq_dispatch, flags, "rtl-intc", prio_ctl);
 }
 
-static int __init map_interrupts(struct device_node *node)
+static int __init route_interrupts(struct device_node *node)
 {
 	struct realtek_ictl_priority *prio_ctl;
-	struct device_node *cpu_ictl;
-	const __be32 *imap;
-	u32 imaplen, soc_int, priority, tmp;
-	int ret, i;
+	unsigned int num_prio, parent_idx;
+	const __be32 *routing_table;
+	int table_len;
+	u32 hw_irq;
+	int ret;
 
-	ret = of_property_read_u32(node, "#address-cells", &tmp);
-	if (ret || tmp)
-		return -EINVAL;
-
-	imap = of_get_property(node, "interrupt-map", &imaplen);
-	if (!imap || imaplen % 3)
-		return -EINVAL;
-
-	for (i = 0; i < imaplen; i += 3 * sizeof(u32)) {
-		soc_int = be32_to_cpup(imap);
-		if (soc_int > 31)
-			return -EINVAL;
-
-		cpu_ictl = of_find_node_by_phandle(be32_to_cpup(imap + 1));
-		if (!cpu_ictl)
-			return -EINVAL;
-		ret = of_property_read_u32(cpu_ictl, "#interrupt-cells", &tmp);
-		if (ret || tmp != 1)
-			return -EINVAL;
-		of_node_put(cpu_ictl);
-
-		/* Map priority (1..6) to MIPS CPU interrupt (2..7) */
-		priority = be32_to_cpup(imap + 2);
-		if (priority > 6 || priority < 1)
-			return -EINVAL;
-
-		prio_ctl = &priorities[priority - 1];
-
-		if (!prio_ctl->routing_value) {
-			ret = setup_parent_interrupt(prio_ctl, priority + 1);
-			if (ret)
-				return ret;
-
-			prio_ctl->routing_value = priority;
-		}
-
-		set_routing(prio_ctl, soc_int);
-
-		imap += 3;
+	num_prio = of_irq_count(node);
+	if (num_prio > RTL_ICTL_NUM_PRIO) {
+		pr_err("too many parent interrupts\n");
+		return -ENODEV;
 	}
 
+	for (parent_idx = 0; parent_idx < num_prio; parent_idx++) {
+		prio_ctl = &priorities[parent_idx];
+
+		ret = irq_of_parse_and_map(node, parent_idx);
+		if (ret < 0)
+			return ret;
+
+		ret = setup_parent_interrupt(prio_ctl, ret);
+		if (ret)
+			return ret;
+
+		prio_ctl->routing_value = parent_idx + 1;
+	}
+
+	routing_table = of_get_property(node, "realtek,interrupt-routing", &table_len);
+	if (!routing_table)
+		return -ENOENT;
+
+	for (table_len /= sizeof(*routing_table); table_len >= 2; table_len -= 2) {
+		hw_irq = be32_to_cpup(routing_table++);
+		if (hw_irq > 31)
+			return -EINVAL;
+
+		parent_idx = be32_to_cpup(routing_table++);
+		if (parent_idx >= num_prio)
+			return -EINVAL;
+
+		set_routing(&priorities[parent_idx], hw_irq);
+	}
 
 	return 0;
 }
@@ -231,9 +226,9 @@ static int __init realtek_rtl_of_init(struct device_node *node, struct device_no
 
 	realtek_ictl_domain = irq_domain_add_simple(node, 32, 0, &irq_domain_ops, NULL);
 
-	ret = map_interrupts(node);
+	ret = route_interrupts(node);
 	if (ret) {
-		pr_err("invalid interrupt map\n");
+		pr_err("invalid interrupt routing\n");
 		return ret;
 	}
 
