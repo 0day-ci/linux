@@ -1263,6 +1263,11 @@ void wilc_wlan_cleanup(struct net_device *dev)
 	struct wilc *wilc = vif->wilc;
 
 	wilc->quit = 1;
+
+	while ((tqe = __skb_dequeue(&wilc->chipq)))
+		wilc_wlan_tx_packet_done(tqe, 0);
+	wilc->chipq_bytes = 0;
+
 	for (ac = 0; ac < NQUEUES; ac++) {
 		while ((tqe = skb_dequeue(&wilc->txq[ac])))
 			wilc_wlan_tx_packet_done(tqe, 0);

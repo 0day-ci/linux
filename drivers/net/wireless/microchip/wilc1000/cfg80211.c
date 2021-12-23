@@ -1716,6 +1716,9 @@ int wilc_cfg80211_init(struct wilc **wilc, struct device *dev, int io_type,
 	for (i = 0; i < NQUEUES; i++)
 		skb_queue_head_init(&wl->txq[i]);
 
+	skb_queue_head_init(&wl->chipq);
+	wl->chipq_bytes = 0;
+
 	INIT_LIST_HEAD(&wl->rxq_head.list);
 	INIT_LIST_HEAD(&wl->vif_list);
 

@@ -261,6 +261,24 @@ struct wilc {
 	struct wilc_tx_queue_status tx_q_limit;
 	struct rxq_entry_t rxq_head;
 
+	/* The chip queue contains sk_buffs that are ready to be
+	 * transferred to the wilc1000 chip.  In particular, they
+	 * already have the VMM and Ethernet headers (for net packets)
+	 * and they are padded to a size that is an integer-multiple
+	 * of 4 bytes.
+	 *
+	 * This queue is usually empty on return from
+	 * wilc_wlan_handle_txq().  However, when the chip does fill
+	 * up, the packets that didn't fit will be held until there is
+	 * space again.
+	 *
+	 * This queue is only accessed by the txq handler thread, so
+	 * no locking is required.
+	 */
+	struct sk_buff_head chipq;
+	/* Total number of bytes queued on the chipq: */
+	int chipq_bytes;
+
 	const struct firmware *firmware;
 
 	struct device *dev;
