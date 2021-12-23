@@ -265,11 +265,12 @@ void sched_core_account_forceidle(struct rq *rq)
 		rq_i = cpu_rq(i);
 		p = rq_i->core_pick ?: rq_i->curr;
 
-		if (!rq->core->core_cookie)
-			continue;
 		if (p == rq_i->idle && rq_i->nr_running) {
 			cpustat = kcpustat_cpu(i).cpustat;
-			cpustat[CPUTIME_COOKIED_FORCEIDLE] += delta;
+			if (rq->core->core_cookie)
+				cpustat[CPUTIME_COOKIED_FORCEIDLE] += delta;
+			else
+				cpustat[CPUTIME_UNCOOKIED_FORCEIDLE] += delta;
 		}
 	}
 

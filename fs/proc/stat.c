@@ -110,7 +110,7 @@ static int show_stat(struct seq_file *p, void *v)
 	int i, j;
 	u64 user, nice, system, idle, iowait, irq, softirq, steal;
 #ifdef CONFIG_SCHED_CORE
-	u64 cookied_forceidle = 0;
+	u64 cookied_forceidle, uncookied_forceidle, forceidle;
 #endif
 	u64 guest, guest_nice;
 	u64 sum = 0;
@@ -121,6 +121,9 @@ static int show_stat(struct seq_file *p, void *v)
 	user = nice = system = idle = iowait =
 		irq = softirq = steal = 0;
 	guest = guest_nice = 0;
+#ifdef CONFIG_SCHED_CORE
+	cookied_forceidle = uncookied_forceidle = forceidle = 0;
+#endif
 	getboottime64(&boottime);
 	/* shift boot timestamp according to the timens offset */
 	timens_sub_boottime(&boottime);
@@ -145,6 +148,8 @@ static int show_stat(struct seq_file *p, void *v)
 		sum		+= arch_irq_stat_cpu(i);
 #ifdef CONFIG_SCHED_CORE
 		cookied_forceidle	+= cpustat[CPUTIME_COOKIED_FORCEIDLE];
+		uncookied_forceidle	+= cpustat[CPUTIME_UNCOOKIED_FORCEIDLE];
+		forceidle		= cookied_forceidle + uncookied_forceidle;
 #endif
 
 		for (j = 0; j < NR_SOFTIRQS; j++) {
@@ -168,6 +173,8 @@ static int show_stat(struct seq_file *p, void *v)
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest_nice));
 #ifdef CONFIG_SCHED_CORE
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(cookied_forceidle));
+	seq_put_decimal_ull(p, " ", nsec_to_clock_t(uncookied_forceidle));
+	seq_put_decimal_ull(p, " ", nsec_to_clock_t(forceidle));
 #endif
 	seq_putc(p, '\n');
 
@@ -190,6 +197,8 @@ static int show_stat(struct seq_file *p, void *v)
 		guest_nice	= cpustat[CPUTIME_GUEST_NICE];
 #ifdef CONFIG_SCHED_CORE
 		cookied_forceidle	= cpustat[CPUTIME_COOKIED_FORCEIDLE];
+		uncookied_forceidle	= cpustat[CPUTIME_UNCOOKIED_FORCEIDLE];
+		forceidle		= cookied_forceidle + uncookied_forceidle;
 #endif
 		seq_printf(p, "cpu%d", i);
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(user));
@@ -204,6 +213,8 @@ static int show_stat(struct seq_file *p, void *v)
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest_nice));
 #ifdef CONFIG_SCHED_CORE
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(cookied_forceidle));
+		seq_put_decimal_ull(p, " ", nsec_to_clock_t(uncookied_forceidle));
+		seq_put_decimal_ull(p, " ", nsec_to_clock_t(forceidle));
 #endif
 		seq_putc(p, '\n');
 	}
