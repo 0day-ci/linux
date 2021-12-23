@@ -149,7 +149,8 @@ static int wilc_txq_task(void *vp)
 	complete(&wl->txq_thread_started);
 	while (1) {
 		wait_event_interruptible(wl->txq_event,
-					 (wl->txq_entries > 0 || wl->close));
+					 (atomic_read(&wl->txq_entries) > 0 ||
+					  wl->close));
 
 		if (wl->close) {
 			complete(&wl->txq_thread_started);
