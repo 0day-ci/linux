@@ -924,6 +924,10 @@ struct wilc_vif *wilc_netdev_ifc_init(struct wilc *wl, const char *name,
 	if (!ndev)
 		return ERR_PTR(-ENOMEM);
 
+	ndev->needed_headroom = ETH_CONFIG_PKT_HDR_OFFSET;
+	/* we may need up to 3 bytes of padding: */
+	ndev->needed_tailroom = 3;
+
 	vif = netdev_priv(ndev);
 	ndev->ieee80211_ptr = &vif->priv.wdev;
 	strcpy(ndev->name, name);
