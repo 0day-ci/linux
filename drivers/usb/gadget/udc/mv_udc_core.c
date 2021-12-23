@@ -1472,6 +1472,9 @@ udc_prime_status(struct mv_udc *udc, u8 direction, u16 status, bool empty)
 		req->req.dma = dma_map_single(ep->udc->gadget.dev.parent,
 				req->req.buf, req->req.length,
 				ep_dir(ep) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+		retval = dma_mapping_error(ep->udc->gadget.dev.parent, req->req.dma);
+		if (retval)
+			goto out;
 		req->mapped = 1;
 	}
 
