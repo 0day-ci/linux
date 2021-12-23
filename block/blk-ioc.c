@@ -286,7 +286,6 @@ int set_task_ioprio(struct task_struct *task, int ioprio)
 		}
 		if (task->io_context) {
 			kmem_cache_free(iocontext_cachep, ioc);
-			ioc = task->io_context;
 		} else {
 			task->io_context = ioc;
 		}
