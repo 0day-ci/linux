@@ -67,10 +67,12 @@ wilc_wlan_txq_remove_from_head(struct wilc *wilc, u8 q_num)
 static void init_txq_entry(struct txq_entry_t *tqe, struct wilc_vif *vif,
 			   u8 type, enum ip_pkt_priority q_num)
 {
+	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(tqe);
+
 	tqe->vif = vif;
-	tqe->q_num = q_num;
-	tqe->type = type;
-	tqe->ack_idx = NOT_TCP_ACK;
+	tx_cb->type = type;
+	tx_cb->q_num = q_num;
+	tx_cb->ack_idx = NOT_TCP_ACK;
 }
 
 static void wilc_wlan_txq_add_to_tail(struct net_device *dev, u8 type, u8 q_num,
@@ -143,6 +145,7 @@ static inline void add_tcp_pending_ack(struct wilc_vif *vif, u32 ack,
 				       u32 session_index,
 				       struct txq_entry_t *txqe)
 {
+	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(txqe);
 	struct tcp_ack_filter *f = &vif->ack_filter;
 	u32 i = f->pending_base + f->pending_acks_idx;
 
@@ -150,7 +153,7 @@ static inline void add_tcp_pending_ack(struct wilc_vif *vif, u32 ack,
 		f->pending_acks[i].ack_num = ack;
 		f->pending_acks[i].txqe = txqe;
 		f->pending_acks[i].session_index = session_index;
-		txqe->ack_idx = i;
+		tx_cb->ack_idx = i;
 		f->pending_acks_idx++;
 	}
 }
@@ -210,7 +213,8 @@ out:
 static void wilc_wlan_tx_packet_done(struct txq_entry_t *tqe, int status)
 {
 	struct wilc_vif *vif = tqe->vif;
-	int ack_idx = tqe->ack_idx;
+	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(tqe);
+	int ack_idx = tx_cb->ack_idx;
 
 	tqe->status = status;
 	if (tqe->tx_complete_func)
@@ -224,10 +228,11 @@ static void wilc_wlan_txq_drop_net_pkt(struct txq_entry_t *tqe)
 {
 	struct wilc_vif *vif = tqe->vif;
 	struct wilc *wilc = vif->wilc;
+	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(tqe);
 
 	vif->ndev->stats.tx_dropped++;
 
-	wilc_wlan_txq_remove(wilc, tqe->q_num, tqe);
+	wilc_wlan_txq_remove(wilc, tx_cb->q_num, tqe);
 	wilc_wlan_tx_packet_done(tqe, 1);
 }
 
@@ -728,6 +733,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	bool max_size_over = 0, ac_exist = 0;
 	int vmm_sz = 0;
 	struct txq_entry_t *tqe_q[NQUEUES];
+	struct wilc_skb_tx_cb *tx_cb;
 	int ret = 0;
 	int counter;
 	int timeout;
@@ -772,9 +778,10 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 					break;
 				}
 
-				if (tqe_q[ac]->type == WILC_CFG_PKT)
+				tx_cb = WILC_SKB_TX_CB(tqe_q[ac]);
+				if (tx_cb->type == WILC_CFG_PKT)
 					vmm_sz = ETH_CONFIG_PKT_HDR_OFFSET;
-				else if (tqe_q[ac]->type == WILC_NET_PKT)
+				else if (tx_cb->type == WILC_NET_PKT)
 					vmm_sz = ETH_ETHERNET_HDR_OFFSET;
 				else
 					vmm_sz = HOST_HDR_OFFSET;
@@ -787,7 +794,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 					break;
 				}
 				vmm_table[i] = vmm_sz / 4;
-				if (tqe_q[ac]->type == WILC_CFG_PKT)
+				if (tx_cb->type == WILC_CFG_PKT)
 					vmm_table[i] |= BIT(10);
 
 				cpu_to_le32s(&vmm_table[i]);
@@ -898,6 +905,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 
 		ac_pkt_num_to_chip[vmm_entries_ac[i]]++;
 		vif = tqe->vif;
+		tx_cb = WILC_SKB_TX_CB(tqe);
 		if (vmm_table[i] == 0)
 			break;
 
@@ -905,20 +913,20 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		vmm_sz = FIELD_GET(WILC_VMM_BUFFER_SIZE, vmm_table[i]);
 		vmm_sz *= 4;
 
-		if (tqe->type == WILC_MGMT_PKT)
+		if (tx_cb->type == WILC_MGMT_PKT)
 			mgmt_ptk = 1;
 
-		header = (FIELD_PREP(WILC_VMM_HDR_TYPE, tqe->type) |
+		header = (FIELD_PREP(WILC_VMM_HDR_TYPE, tx_cb->type) |
 			  FIELD_PREP(WILC_VMM_HDR_MGMT_FIELD, mgmt_ptk) |
 			  FIELD_PREP(WILC_VMM_HDR_PKT_SIZE, tqe->buffer_size) |
 			  FIELD_PREP(WILC_VMM_HDR_BUFF_SIZE, vmm_sz));
 
 		cpu_to_le32s(&header);
 		memcpy(&txb[offset], &header, 4);
-		if (tqe->type == WILC_CFG_PKT) {
+		if (tx_cb->type == WILC_CFG_PKT) {
 			buffer_offset = ETH_CONFIG_PKT_HDR_OFFSET;
-		} else if (tqe->type == WILC_NET_PKT) {
-			int prio = tqe->q_num;
+		} else if (tx_cb->type == WILC_NET_PKT) {
+			int prio = tx_cb->q_num;
 
 			bssid = tqe->vif->bssid;
 			buffer_offset = ETH_ETHERNET_HDR_OFFSET;
