@@ -906,6 +906,22 @@ static int send_packets(struct wilc *wilc, int len)
 	return func->hif_block_tx_ext(wilc, 0, wilc->tx_buffer, len);
 }
 
+static int copy_and_send_packets(struct wilc *wilc, int entries,
+				 u32 vmm_table[WILC_VMM_TBL_SIZE],
+				 u8 vmm_entries_ac[WILC_VMM_TBL_SIZE])
+{
+	int len, ret;
+
+	len = copy_packets(wilc, entries, vmm_table, vmm_entries_ac);
+	if (len <= 0)
+		return len;
+
+	acquire_bus(wilc, WILC_BUS_ACQUIRE_ONLY);
+	ret = send_packets(wilc, len);
+	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
+	return ret;
+}
+
 int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 {
 	int vmm_table_len, entries;
@@ -940,12 +956,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	if (entries <= 0) {
 		ret = entries;
 	} else {
-		ret = copy_packets(wilc, entries, vmm_table, vmm_entries_ac);
-		if (ret > 0) {
-			acquire_bus(wilc, WILC_BUS_ACQUIRE_ONLY);
-			ret = send_packets(wilc, ret);
-			release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
-		}
+		ret = copy_and_send_packets(wilc, entries, vmm_table, vmm_entries_ac);
 	}
 	if (ret >= 0 && entries < vmm_table_len)
 		ret = WILC_VMM_ENTRY_FULL_RETRY;
