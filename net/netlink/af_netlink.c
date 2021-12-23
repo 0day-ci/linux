@@ -1522,7 +1522,7 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 portid,
 	consume_skb(info.skb2);
 
 	if (info.delivered) {
-		if (info.congested && gfpflags_allow_blocking(allocation))
+		if (info.congested)
 			yield();
 		return 0;
 	}
