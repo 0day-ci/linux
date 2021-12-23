@@ -202,7 +202,10 @@ static void wilc_wlan_tx_packet_done(struct txq_entry_t *tqe, int status)
 
 static void wilc_wlan_txq_drop_net_pkt(struct txq_entry_t *tqe)
 {
-	struct wilc *wilc = tqe->vif->wilc;
+	struct wilc_vif *vif = tqe->vif;
+	struct wilc *wilc = vif->wilc;
+
+	vif->ndev->stats.tx_dropped++;
 
 	wilc_wlan_txq_remove(wilc, tqe->q_num, tqe);
 	wilc_wlan_tx_packet_done(tqe, 1);
