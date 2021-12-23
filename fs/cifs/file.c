@@ -1847,6 +1847,7 @@ int cifs_lock(struct file *file, int cmd, struct file_lock *flock)
 	int lock = 0, unlock = 0;
 	bool wait_flag = false;
 	bool posix_lck = false;
+	bool async = false;
 	struct cifs_sb_info *cifs_sb;
 	struct cifs_tcon *tcon;
 	struct cifsFileInfo *cfile;
@@ -1890,8 +1891,17 @@ int cifs_lock(struct file *file, int cmd, struct file_lock *flock)
 		return -EOPNOTSUPP;
 	}
 
+	async = (flock->fl_flags & FL_SLEEP) && IS_SETLK(cmd);
+	if (async) {
+		flock->fl_flags &= ~FL_SLEEP;
+		wait_flag = false;
+	}
+
 	rc = cifs_setlk(file, flock, type, wait_flag, posix_lck, lock, unlock,
 			xid);
+	if (async)
+		flock->fl_flags |= FL_SLEEP;
+
 	free_xid(xid);
 	return rc;
 }
