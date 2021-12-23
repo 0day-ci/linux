@@ -320,34 +320,24 @@ enum ip_pkt_priority {
 	AC_BK_Q = 3
 };
 
-struct txq_entry_t {
-	struct list_head list;
-	int type;
-	u8 q_num;
-	int ack_idx;
-	u8 *buffer;
-	int buffer_size;
-	void *priv;
-	int status;
-	struct wilc_vif *vif;
-	void (*tx_complete_func)(void *priv, int status);
+/* When queueing a tx packet, this info is stored in the sk_buff's
+ * control buffer (cb).
+ */
+struct wilc_skb_tx_cb {
+	u8 type;			/* one of WILC_*_PKT */
+	enum ip_pkt_priority q_num;	/* AC queue this packet is on */
+	int ack_idx;			/* TCP ack index */
 };
 
-#define wilc_skb_tx_cb	txq_entry_t
-
-static inline struct wilc_skb_tx_cb *WILC_SKB_TX_CB(struct txq_entry_t *tqe)
+static inline struct wilc_skb_tx_cb *WILC_SKB_TX_CB(struct sk_buff *skb)
 {
-	return (struct wilc_skb_tx_cb *)tqe;
+	BUILD_BUG_ON(sizeof(struct wilc_skb_tx_cb) > sizeof(skb->cb));
+	return (struct wilc_skb_tx_cb *)&skb->cb[0];
 }
 
 struct txq_fw_recv_queue_stat {
 	u8 acm;
 	u8 count;
-};
-
-struct txq_handle {
-	struct txq_entry_t txq_head;
-	u16 count;
 };
 
 struct rxq_entry_t {
@@ -382,22 +372,11 @@ struct wilc_hif_func {
 
 #define WILC_MAX_CFG_FRAME_SIZE		1468
 
-struct tx_complete_data {
-	int size;
-	void *buff;
-	struct sk_buff *skb;
-};
-
 struct wilc_cfg_cmd_hdr {
 	u8 cmd_type;
 	u8 seq_no;
 	__le16 total_len;
 	__le32 driver_handler;
-};
-
-struct wilc_cfg_frame {
-	struct wilc_cfg_cmd_hdr hdr;
-	u8 frame[WILC_MAX_CFG_FRAME_SIZE];
 };
 
 struct wilc_cfg_rsp {
@@ -411,19 +390,16 @@ int wilc_wlan_firmware_download(struct wilc *wilc, const u8 *buffer,
 				u32 buffer_size);
 int wilc_wlan_start(struct wilc *wilc);
 int wilc_wlan_stop(struct wilc *wilc, struct wilc_vif *vif);
-int wilc_wlan_txq_add_net_pkt(struct net_device *dev,
-			      struct tx_complete_data *tx_data, u8 *buffer,
-			      u32 buffer_size,
-			      void (*tx_complete_fn)(void *, int));
+int wilc_wlan_txq_add_net_pkt(struct net_device *dev, struct sk_buff *skb);
 int wilc_wlan_handle_txq(struct wilc *wl, u32 *txq_count);
 void wilc_handle_isr(struct wilc *wilc);
+struct sk_buff *wilc_wlan_alloc_skb(struct wilc_vif *vif, size_t len);
 void wilc_wlan_cleanup(struct net_device *dev);
 int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
 		      u32 buffer_size, int commit, u32 drv_handler);
 int wilc_wlan_cfg_get(struct wilc_vif *vif, int start, u16 wid, int commit,
 		      u32 drv_handler);
-int wilc_wlan_txq_add_mgmt_pkt(struct net_device *dev, void *priv, u8 *buffer,
-			       u32 buffer_size, void (*func)(void *, int));
+int wilc_wlan_txq_add_mgmt_pkt(struct net_device *dev, struct sk_buff *skb);
 void wilc_enable_tcp_ack_filter(struct wilc_vif *vif, bool value);
 int wilc_wlan_get_num_conn_ifcs(struct wilc *wilc);
 netdev_tx_t wilc_mac_xmit(struct sk_buff *skb, struct net_device *dev);
