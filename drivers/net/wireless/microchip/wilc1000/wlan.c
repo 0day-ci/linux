@@ -603,6 +603,33 @@ void host_sleep_notify(struct wilc *wilc)
 EXPORT_SYMBOL_GPL(host_sleep_notify);
 
 /**
+ * tx_hdr_len() - calculate tx packet header length
+ * @type: The packet type for which to return the header length.
+ *
+ * Calculate the total header size for a given packet type.  This size
+ * includes the 4 bytes required to hold the VMM header.
+ *
+ * Return: The total size of the header in bytes.
+ */
+static u32 tx_hdr_len(u8 type)
+{
+	switch (type) {
+	case WILC_NET_PKT:
+		return ETH_ETHERNET_HDR_OFFSET;
+
+	case WILC_CFG_PKT:
+		return ETH_CONFIG_PKT_HDR_OFFSET;
+
+	case WILC_MGMT_PKT:
+		return HOST_HDR_OFFSET;
+
+	default:
+		pr_err("%s: Invalid packet type %d.", __func__, type);
+		return 4;
+	}
+}
+
+/**
  * fill_vmm_table() - Fill VMM table with packets to be sent
  * @wilc: Pointer to the wilc structure.
  * @ac_desired_ratio: First-round limit on number of packets to add from the
@@ -658,13 +685,7 @@ static int fill_vmm_table(const struct wilc *wilc,
 					goto out;
 
 				tx_cb = WILC_SKB_TX_CB(tqe_q[ac]);
-				if (tx_cb->type == WILC_CFG_PKT)
-					vmm_sz = ETH_CONFIG_PKT_HDR_OFFSET;
-				else if (tx_cb->type == WILC_NET_PKT)
-					vmm_sz = ETH_ETHERNET_HDR_OFFSET;
-				else
-					vmm_sz = HOST_HDR_OFFSET;
-
+				vmm_sz = tx_hdr_len(tx_cb->type);
 				vmm_sz += tqe_q[ac]->len;
 				vmm_sz = ALIGN(vmm_sz, 4);
 
@@ -834,17 +855,13 @@ static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 
 		cpu_to_le32s(&header);
 		memcpy(&txb[offset], &header, 4);
-		if (tx_cb->type == WILC_CFG_PKT) {
-			buffer_offset = ETH_CONFIG_PKT_HDR_OFFSET;
-		} else if (tx_cb->type == WILC_NET_PKT) {
+		buffer_offset = tx_hdr_len(tx_cb->type);
+		if (tx_cb->type == WILC_NET_PKT) {
 			int prio = tx_cb->q_num;
 
 			bssid = vif->bssid;
-			buffer_offset = ETH_ETHERNET_HDR_OFFSET;
 			memcpy(&txb[offset + 4], &prio, sizeof(prio));
 			memcpy(&txb[offset + 8], bssid, 6);
-		} else {
-			buffer_offset = HOST_HDR_OFFSET;
 		}
 
 		memcpy(&txb[offset + buffer_offset], tqe->data, tqe->len);
