@@ -712,9 +712,9 @@ out:
 }
 
 /**
- * send_vmm_table() - Send the VMM table to the chip
+ * send_vmm_table() - send the VMM table to the chip
  * @wilc: Pointer to the wilc structure.
- * @i: The number of entries in the VMM table.
+ * @vmm_table_len: The number of entries in the VMM table.
  * @vmm_table: The VMM table to send.
  *
  * Send the VMM table to the chip and get back the number of entries
@@ -723,10 +723,10 @@ out:
  * Context: The bus must have been acquired before calling this
  * function.
  *
- * Return:
- *	The number of VMM table entries the chip can accept.
+ * Return: The number of VMM table entries the chip can accept.
  */
-static int send_vmm_table(struct wilc *wilc, int i, const u32 *vmm_table)
+static int send_vmm_table(struct wilc *wilc,
+			  int vmm_table_len, const u32 *vmm_table)
 {
 	const struct wilc_hif_func *func;
 	int ret, counter, entries, timeout;
@@ -758,7 +758,8 @@ static int send_vmm_table(struct wilc *wilc, int i, const u32 *vmm_table)
 	timeout = 200;
 	do {
 		ret = func->hif_block_tx(wilc, WILC_VMM_TBL_RX_SHADOW_BASE,
-					 (u8 *)vmm_table, (i + 1) * 4);
+					 (u8 *)vmm_table,
+					 (vmm_table_len + 1) * 4);
 		if (ret)
 			break;
 
@@ -899,7 +900,7 @@ static int send_packets(struct wilc *wilc, int len)
 
 int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 {
-	int i, entries, len;
+	int vmm_table_len, entries, len;
 	u8 ac_desired_ratio[NQUEUES] = {0, 0, 0, 0};
 	u8 vmm_entries_ac[WILC_VMM_TBL_SIZE];
 	int ret = 0;
@@ -919,13 +920,13 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		wilc_wlan_txq_filter_dup_tcp_ack(vif->ndev);
 	srcu_read_unlock(&wilc->srcu, srcu_idx);
 
-	i = fill_vmm_table(wilc, ac_desired_ratio, vmm_table, vmm_entries_ac);
-	if (i == 0)
+	vmm_table_len = fill_vmm_table(wilc, ac_desired_ratio, vmm_table, vmm_entries_ac);
+	if (vmm_table_len == 0)
 		goto out_unlock;
 
 	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
 
-	ret = send_vmm_table(wilc, i, vmm_table);
+	ret = send_vmm_table(wilc, vmm_table_len, vmm_table);
 	if (ret <= 0) {
 		if (ret == 0)
 			/* No VMM space available in firmware.  Inform
