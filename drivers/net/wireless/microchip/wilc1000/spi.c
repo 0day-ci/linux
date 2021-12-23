@@ -80,6 +80,18 @@ static int wilc_spi_reset(struct wilc *wilc);
 #define PROTOCOL_REG_CRC16_MASK			GENMASK(3, 3)
 #define PROTOCOL_REG_CRC7_MASK			GENMASK(2, 2)
 
+/* The response to data packets is two bytes long.  For efficiency's
+ * sake, when DMAing data to WILC, we ignore the responses for all
+ * data packets except the final one.  The downside of this
+ * optimization is that when the final data packet is short, we may
+ * receive (part of) the response to the second-to-last packet before
+ * the one for the final packet.  To handle this, we always read 4
+ * bytes and then search for the last byte that contains the "Response
+ * Start" code (0xc in the top 4 bits).  We then know that this byte
+ * is the first response byte of the final data packet.
+ */
+#define WILC_SPI_DATA_RSP_BYTES	4
+
 /*
  * The SPI data packet size may be any integer power of two in the
  * range from 256 to 8192 bytes.
@@ -950,31 +962,13 @@ static int wilc_spi_write_reg(struct wilc *wilc, u32 addr, u32 data)
 	return 0;
 }
 
-static int spi_data_rsp(struct wilc *wilc, u8 cmd)
+static int spi_data_check_rsp(struct wilc *wilc,
+			      u8 rsp[WILC_SPI_DATA_RSP_BYTES])
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
-	int result, i;
-	u8 rsp[4];
+	int i;
 
-	/*
-	 * The response to data packets is two bytes long.  For
-	 * efficiency's sake, wilc_spi_write() wisely ignores the
-	 * responses for all packets but the final one.  The downside
-	 * of that optimization is that when the final data packet is
-	 * short, we may receive (part of) the response to the
-	 * second-to-last packet before the one for the final packet.
-	 * To handle this, we always read 4 bytes and then search for
-	 * the last byte that contains the "Response Start" code (0xc
-	 * in the top 4 bits).  We then know that this byte is the
-	 * first response byte of the final data packet.
-	 */
-	result = wilc_spi_rx(wilc, rsp, sizeof(rsp));
-	if (result) {
-		dev_err(&spi->dev, "Failed bus error...\n");
-		return result;
-	}
-
-	for (i = sizeof(rsp) - 2; i >= 0; --i)
+	for (i = WILC_SPI_DATA_RSP_BYTES - 2; i >= 0; --i)
 		if (FIELD_GET(RSP_START_FIELD, rsp[i]) == RSP_START_TAG)
 			break;
 
@@ -994,6 +988,20 @@ static int spi_data_rsp(struct wilc *wilc, u8 cmd)
 		return -1;
 	}
 	return 0;
+}
+
+static int spi_data_rsp(struct wilc *wilc, u8 cmd)
+{
+	struct spi_device *spi = to_spi_device(wilc->dev);
+	u8 rsp[WILC_SPI_DATA_RSP_BYTES];
+	int result;
+
+	result = wilc_spi_rx(wilc, rsp, sizeof(rsp));
+	if (result) {
+		dev_err(&spi->dev, "Failed bus error...\n");
+		return result;
+	}
+	return spi_data_check_rsp(wilc, rsp);
 }
 
 static int wilc_spi_write(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
