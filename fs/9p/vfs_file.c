@@ -135,12 +135,17 @@ static int v9fs_file_do_lock(struct file *filp, int cmd, struct file_lock *fl)
 	int res = 0;
 	unsigned char fl_type;
 	struct v9fs_session_info *v9ses;
+	bool async = false;
 
 	fid = filp->private_data;
 	BUG_ON(fid == NULL);
 
 	if ((fl->fl_flags & FL_POSIX) != FL_POSIX)
 		BUG();
+
+	async = (fl->fl_flags & FL_SLEEP) && IS_SETLK(cmd);
+	if (async)
+		fl->fl_flags &= ~FL_SLEEP;
 
 	res = locks_lock_file_wait(filp, fl);
 	if (res < 0)
@@ -230,6 +235,8 @@ out_unlock:
 	if (flock.client_id != fid->clnt->name)
 		kfree(flock.client_id);
 out:
+	if (async)
+		fl->fl_flags |= FL_SLEEP;
 	return res;
 }
 
