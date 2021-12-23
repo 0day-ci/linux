@@ -209,6 +209,41 @@ static const struct panfrost_model gpu_models[] = {
 		GPU_REV(g31, 1, 0)),
 };
 
+static void panfrost_decode_coherent_groups(struct panfrost_features *features)
+{
+	struct panfrost_coherent_group *current_group;
+	u64 group_present;
+	u64 group_mask;
+	u64 first_set, first_set_prev;
+	u32 nr_group = 0;
+
+	if (features->mem_features & GROUPS_L2_COHERENT)
+		group_present = features->l2_present;
+	else
+		group_present = features->shader_present;
+
+	current_group = features->core_groups;
+	first_set = group_present & ~(group_present - 1);
+
+	while (group_present != 0 && nr_group < MAX_COHERENT_GROUPS) {
+		group_present -= first_set;
+		first_set_prev = first_set;
+
+		first_set = group_present & ~(group_present - 1);
+		group_mask = (first_set - 1) & ~(first_set_prev - 1);
+		current_group->core_mask = group_mask & features->shader_present;
+		current_group->nr_cores = hweight64(current_group->core_mask);
+
+		nr_group++;
+		current_group++;
+	}
+
+	if (group_present) {
+		pr_warn("%s: too many coherent groups, expected <= %d",
+			__func__, MAX_COHERENT_GROUPS);
+	}
+}
+
 static void panfrost_gpu_init_features(struct panfrost_device *pfdev)
 {
 	u32 gpu_id, num_js, major, minor, status, rev;
@@ -217,6 +252,7 @@ static void panfrost_gpu_init_features(struct panfrost_device *pfdev)
 	u64 hw_issues = hw_issues_all;
 	const struct panfrost_model *model;
 	int i;
+	unsigned long core_mask[64/BITS_PER_LONG];
 
 	pfdev->features.l2_features = gpu_read(pfdev, GPU_L2_FEATURES);
 	pfdev->features.core_features = gpu_read(pfdev, GPU_CORE_FEATURES);
@@ -296,6 +332,7 @@ static void panfrost_gpu_init_features(struct panfrost_device *pfdev)
 
 	bitmap_from_u64(pfdev->features.hw_features, hw_feat);
 	bitmap_from_u64(pfdev->features.hw_issues, hw_issues);
+	panfrost_decode_coherent_groups(&pfdev->features);
 
 	dev_info(pfdev->dev, "mali-%s id 0x%x major 0x%x minor 0x%x status 0x%x",
 		 name, gpu_id, major, minor, status);
@@ -314,6 +351,14 @@ static void panfrost_gpu_init_features(struct panfrost_device *pfdev)
 
 	dev_info(pfdev->dev, "shader_present=0x%0llx l2_present=0x%0llx",
 		 pfdev->features.shader_present, pfdev->features.l2_present);
+	dev_info(pfdev->dev, "%u core groups\n", pfdev->features.nr_core_groups);
+	for (i = 0; i < (int)pfdev->features.nr_core_groups; i++) {
+		bitmap_from_u64(core_mask, pfdev->features.core_groups[i].core_mask);
+		dev_info(pfdev->dev, "core group %u: cores: %64pbl (total %u)\n",
+			 i,
+			 core_mask,
+			 pfdev->features.core_groups[i].nr_cores);
+	}
 }
 
 void panfrost_gpu_power_on(struct panfrost_device *pfdev)

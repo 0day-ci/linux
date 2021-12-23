@@ -132,10 +132,20 @@ static void panfrost_job_write_affinity(struct panfrost_device *pfdev,
 
 	/*
 	 * Use all cores for now.
-	 * Eventually we may need to support tiler only jobs and h/w with
-	 * multiple (2) coherent core groups
+	 * Eventually we may need to support tiler only jobs
 	 */
 	affinity = pfdev->features.shader_present;
+
+	/* Userspace does not set the requirements properly yet.
+	 * Adjust affinity of all jobs on dual core group GPUs
+	 */
+	if (pfdev->features.nr_core_groups > 1) {
+		if (js == 2)
+			affinity &= pfdev->features.core_groups[1].core_mask;
+		else
+			affinity &= pfdev->features.core_groups[0].core_mask;
+		dev_dbg(pfdev->dev, "js: %d, affinity: %llxu\n", js, affinity);
+	}
 
 	job_write(pfdev, JS_AFFINITY_NEXT_LO(js), lower_32_bits(affinity));
 	job_write(pfdev, JS_AFFINITY_NEXT_HI(js), upper_32_bits(affinity));

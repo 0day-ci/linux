@@ -23,6 +23,12 @@ struct panfrost_perfcnt;
 
 #define NUM_JOB_SLOTS 3
 #define MAX_PM_DOMAINS 3
+#define MAX_COHERENT_GROUPS 2
+
+struct panfrost_coherent_group {
+	u64 core_mask;
+	unsigned int nr_cores;
+};
 
 struct panfrost_features {
 	u16 id;
@@ -54,6 +60,7 @@ struct panfrost_features {
 
 	unsigned long hw_features[64 / BITS_PER_LONG];
 	unsigned long hw_issues[64 / BITS_PER_LONG];
+	struct panfrost_coherent_group core_groups[MAX_COHERENT_GROUPS];
 };
 
 /*
