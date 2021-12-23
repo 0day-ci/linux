@@ -681,7 +681,7 @@ static void set_header(struct wilc *wilc, struct sk_buff *tqe,
  * WILC_VMM_TBL_SIZE packets or up to WILC_TX_BUFF_SIZE bytes.
  */
 static int schedule_packets(struct wilc *wilc,
-			    int i, u32 vmm_table[WILC_VMM_TBL_SIZE])
+			    int vmm_table_len, u32 vmm_table[WILC_VMM_TBL_SIZE])
 {
 	u8 k, ac;
 	static const u8 ac_preserve_ratio[NQUEUES] = {1, 1, 1, 1};
@@ -702,8 +702,8 @@ static int schedule_packets(struct wilc *wilc,
 
 			ac_exist = 1;
 			for (k = 0; k < num_pkts_to_add[ac]; k++) {
-				if (i >= WILC_VMM_TBL_SIZE - 1)
-					return i;
+				if (vmm_table_len >= WILC_VMM_TBL_SIZE - 1)
+					return vmm_table_len;
 
 				tqe = skb_dequeue(&wilc->txq[ac]);
 				if (!tqe)
@@ -717,21 +717,21 @@ static int schedule_packets(struct wilc *wilc,
 				if (wilc->chipq_bytes + vmm_sz > WILC_TX_BUFF_SIZE) {
 					/* return packet to its queue */
 					skb_queue_head(&wilc->txq[ac], tqe);
-					return i;
+					return vmm_table_len;
 				}
 				atomic_dec(&wilc->txq_entries);
 
 				__skb_queue_tail(&wilc->chipq, tqe);
 				wilc->chipq_bytes += tqe->len;
 
-				vmm_table[i] = vmm_table_entry(tqe, vmm_sz);
-				i++;
+				vmm_table[vmm_table_len] = vmm_table_entry(tqe, vmm_sz);
+				vmm_table_len++;
 
 			}
 		}
 		num_pkts_to_add = ac_preserve_ratio;
 	} while (ac_exist);
-	return i;
+	return vmm_table_len;
 }
 
 /**
@@ -747,12 +747,9 @@ static int schedule_packets(struct wilc *wilc,
  */
 static int fill_vmm_table(struct wilc *wilc, u32 vmm_table[WILC_VMM_TBL_SIZE])
 {
-	int i;
-	int vmm_sz = 0;
+	int vmm_table_len = 0, vmm_sz = 0;
 	struct sk_buff *tqe;
 	struct wilc_skb_tx_cb *tx_cb;
-
-	i = 0;
 
 	if (unlikely(wilc->chipq_bytes > 0)) {
 		/* fill in packets that are already on the chipq: */
@@ -761,16 +758,16 @@ static int fill_vmm_table(struct wilc *wilc, u32 vmm_table[WILC_VMM_TBL_SIZE])
 			vmm_sz = tx_hdr_len(tx_cb->type);
 			vmm_sz += tqe->len;
 			vmm_sz = ALIGN(vmm_sz, 4);
-			vmm_table[i++] = vmm_table_entry(tqe, vmm_sz);
+			vmm_table[vmm_table_len++] = vmm_table_entry(tqe, vmm_sz);
 		}
 	}
 
-	i = schedule_packets(wilc, i, vmm_table);
-	if (i > 0) {
-		WARN_ON(i >= WILC_VMM_TBL_SIZE);
-		vmm_table[i] = 0x0;
+	vmm_table_len = schedule_packets(wilc, vmm_table_len, vmm_table);
+	if (vmm_table_len > 0) {
+		WARN_ON(vmm_table_len >= WILC_VMM_TBL_SIZE);
+		vmm_table[vmm_table_len] = 0x0;
 	}
-	return i;
+	return vmm_table_len;
 }
 
 /**
