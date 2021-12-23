@@ -643,8 +643,6 @@ static u32 vmm_table_entry(struct sk_buff *tqe, u32 vmm_sz)
 /**
  * fill_vmm_table() - Fill VMM table with packets to be sent
  * @wilc: Pointer to the wilc structure.
- * @ac_desired_ratio: First-round limit on number of packets to add from the
- *	respective queue.
  * @vmm_table: Pointer to the VMM table to fill.
  * @vmm_entries_ac: Pointer to the queue-number table to fill.
  *	For each packet added to the VMM table, this will be filled in
@@ -664,7 +662,6 @@ static u32 vmm_table_entry(struct sk_buff *tqe, u32 vmm_sz)
  *	so the returned number is at most WILC_VMM_TBL_SIZE-1.
  */
 static int fill_vmm_table(const struct wilc *wilc,
-			  u8 ac_desired_ratio[NQUEUES],
 			  u32 vmm_table[WILC_VMM_TBL_SIZE],
 			  u8 vmm_entries_ac[WILC_VMM_TBL_SIZE])
 {
@@ -672,6 +669,7 @@ static int fill_vmm_table(const struct wilc *wilc,
 	u8 k, ac;
 	u32 sum;
 	static const u8 ac_preserve_ratio[NQUEUES] = {1, 1, 1, 1};
+	u8 ac_desired_ratio[NQUEUES];
 	const u8 *num_pkts_to_add;
 	bool ac_exist = 0;
 	int vmm_sz = 0;
@@ -683,6 +681,8 @@ static int fill_vmm_table(const struct wilc *wilc,
 
 	i = 0;
 	sum = 0;
+
+	ac_balance(wilc, ac_desired_ratio);
 	num_pkts_to_add = ac_desired_ratio;
 	do {
 		ac_exist = 0;
@@ -909,7 +909,6 @@ static int send_packets(struct wilc *wilc, int len)
 int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 {
 	int vmm_table_len, entries, len;
-	u8 ac_desired_ratio[NQUEUES] = {0, 0, 0, 0};
 	u8 vmm_entries_ac[WILC_VMM_TBL_SIZE];
 	int ret = 0;
 	u32 vmm_table[WILC_VMM_TBL_SIZE];
@@ -919,8 +918,6 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	if (wilc->quit)
 		goto out_update_cnt;
 
-	ac_balance(wilc, ac_desired_ratio);
-
 	mutex_lock(&wilc->txq_add_to_head_cs);
 
 	srcu_idx = srcu_read_lock(&wilc->srcu);
@@ -928,7 +925,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 		wilc_wlan_txq_filter_dup_tcp_ack(vif->ndev);
 	srcu_read_unlock(&wilc->srcu, srcu_idx);
 
-	vmm_table_len = fill_vmm_table(wilc, ac_desired_ratio, vmm_table, vmm_entries_ac);
+	vmm_table_len = fill_vmm_table(wilc, vmm_table, vmm_entries_ac);
 	if (vmm_table_len == 0)
 		goto out_unlock;
 
