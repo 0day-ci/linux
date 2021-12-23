@@ -1407,18 +1407,16 @@ EXPORT_SYMBOL(tcp_v4_md5_hash_skb);
 /* Called with rcu_read_lock() */
 static bool tcp_v4_inbound_md5_hash(const struct sock *sk,
 				    const struct sk_buff *skb,
-				    int dif, int sdif)
+				    int dif, int sdif,
+				    const u8 *hash_location)
 {
 #ifdef CONFIG_TCP_MD5SIG
 	/*
-	 * This gets called for each TCP segment that arrives
-	 * so we want to be efficient.
 	 * We have 3 drop cases:
 	 * o No MD5 hash and one expected.
 	 * o MD5 hash and we're not expecting one.
 	 * o MD5 hash and its wrong.
 	 */
-	const __u8 *hash_location = NULL;
 	struct tcp_md5sig_key *hash_expected;
 	const struct iphdr *iph = ip_hdr(skb);
 	const struct tcphdr *th = tcp_hdr(skb);
@@ -1433,7 +1431,6 @@ static bool tcp_v4_inbound_md5_hash(const struct sock *sk,
 
 	addr = (union tcp_md5_addr *)&iph->saddr;
 	hash_expected = tcp_md5_do_lookup(sk, l3index, addr, AF_INET);
-	hash_location = tcp_parse_md5sig_option(th);
 
 	/* We've parsed the options - do we have a hash? */
 	if (!hash_expected && !hash_location)
@@ -1956,6 +1953,45 @@ static void tcp_v4_fill_cb(struct sk_buff *skb, const struct iphdr *iph,
 			skb->tstamp || skb_hwtstamps(skb)->hwtstamp;
 }
 
+static int tcp_v4_sig_check(struct sock *sk,
+			    struct sk_buff *skb,
+			    int dif,
+			    int sdif)
+{
+	const u8 *md5, *ao;
+	int ret;
+
+	ret = tcp_parse_sig_options(tcp_hdr(skb), &md5, &ao);
+	if (ret)
+		return ret;
+	ret = tcp_authopt_inbound_check(sk, skb, ao);
+	if (ret < 0)
+		return ret;
+	if (ret == 1)
+		return 0;
+	return tcp_v4_inbound_md5_hash(sk, skb, dif, sdif, md5);
+}
+
+static int tcp_v4_sig_check_req(struct request_sock *req,
+				struct sk_buff *skb,
+				int dif,
+				int sdif)
+{
+	struct sock *lsk = req->rsk_listener;
+	const u8 *md5, *ao;
+	int ret;
+
+	ret = tcp_parse_sig_options(tcp_hdr(skb), &md5, &ao);
+	if (ret)
+		return ret;
+	ret = tcp_authopt_inbound_check_req(req, skb, ao);
+	if (ret < 0)
+		return ret;
+	if (ret == 1)
+		return 0;
+	return tcp_v4_inbound_md5_hash(lsk, skb, dif, sdif, md5);
+}
+
 /*
  *	From tcp_input.c
  */
@@ -2013,7 +2049,7 @@ process:
 		struct sock *nsk;
 
 		sk = req->rsk_listener;
-		if (unlikely(tcp_v4_inbound_md5_hash(sk, skb, dif, sdif))) {
+		if (unlikely(tcp_v4_sig_check_req(req, skb, dif, sdif))) {
 			sk_drops_add(sk, skb);
 			reqsk_put(req);
 			goto discard_it;
@@ -2083,7 +2119,7 @@ process:
 	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
 
-	if (tcp_v4_inbound_md5_hash(sk, skb, dif, sdif))
+	if (tcp_v4_sig_check(sk, skb, dif, sdif))
 		goto discard_and_relse;
 
 	nf_reset_ct(skb);
