@@ -4436,7 +4436,7 @@ static int binder_thread_release(struct binder_proc *proc,
 
 	/*
 	 * This is needed to avoid races between wake_up_poll() above and
-	 * and ep_remove_waitqueue() called for other reasons (eg the epoll file
+	 * ep_remove_waitqueue() called for other reasons (eg the epoll file
 	 * descriptor being closed); ep_remove_waitqueue() holds an RCU read
 	 * lock, so we can be sure it's done after calling synchronize_rcu().
 	 */
