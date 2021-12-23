@@ -858,29 +858,26 @@ static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 }
 
 /**
- * send_packets() - Send packets to the chip
+ * send_packets() - send the transmit buffer to the chip
  * @wilc: Pointer to the wilc structure.
- * @len: The length of the buffer containing the packets to be sent to
- *	the chip.
+ * @len: The length of the buffer containing the packets to be to the chip.
  *
- * Send the packets in the VMM table to the chip.
+ * Send the packets in the transmit buffer to the chip.
  *
  * Context: The bus must have been acquired.
  *
- * Return:
- *	Negative number on error, 0 on success.
+ * Return: Negative number on error, 0 on success.
  */
 static int send_packets(struct wilc *wilc, int len)
 {
 	const struct wilc_hif_func *func = wilc->hif_func;
 	int ret;
-	u8 *txb = wilc->tx_buffer;
 
 	ret = func->hif_clear_int_ext(wilc, ENABLE_TX_VMM);
 	if (ret)
 		return ret;
 
-	return func->hif_block_tx_ext(wilc, 0, txb, len);
+	return func->hif_block_tx_ext(wilc, 0, wilc->tx_buffer, len);
 }
 
 int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
