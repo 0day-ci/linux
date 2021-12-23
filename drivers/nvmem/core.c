@@ -683,6 +683,7 @@ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 	struct device *dev = &nvmem->dev;
 	struct nvmem_cell_entry *cell;
 	const __be32 *addr;
+	const char *label;
 	int len;
 
 	parent = dev->of_node;
@@ -706,7 +707,11 @@ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 		cell->nvmem = nvmem;
 		cell->offset = be32_to_cpup(addr++);
 		cell->bytes = be32_to_cpup(addr);
-		cell->name = kasprintf(GFP_KERNEL, "%pOFn", child);
+
+		if (!of_property_read_string(child, "label", &label))
+			cell->name = kasprintf(GFP_KERNEL, "%s", label);
+		else
+			cell->name = kasprintf(GFP_KERNEL, "%pOFn", child);
 
 		addr = of_get_property(child, "bits", &len);
 		if (addr && len == (2 * sizeof(u32))) {
