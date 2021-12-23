@@ -818,8 +818,8 @@ static int send_vmm_table(struct wilc *wilc,
  * Context: The txq_add_to_head_cs mutex must still be held when
  * calling this function.
  *
- * Return:
- *	Negative number on error, 0 on success.
+ * Return: Number of bytes copied to the transmit buffer (always
+ *	non-negative).
  */
 static int copy_packets(struct wilc *wilc, int entries, u32 *vmm_table,
 			u8 *vmm_entries_ac)
@@ -908,7 +908,7 @@ static int send_packets(struct wilc *wilc, int len)
 
 int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 {
-	int vmm_table_len, entries, len;
+	int vmm_table_len, entries;
 	u8 vmm_entries_ac[WILC_VMM_TBL_SIZE];
 	int ret = 0;
 	u32 vmm_table[WILC_VMM_TBL_SIZE];
@@ -931,29 +931,24 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 
 	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
 
-	ret = send_vmm_table(wilc, vmm_table_len, vmm_table);
-	if (ret <= 0) {
-		if (ret == 0)
-			/* No VMM space available in firmware.  Inform
-			 * caller to retry later.
-			 */
-			ret = WILC_VMM_ENTRY_FULL_RETRY;
-		goto out_release_bus;
+	entries = send_vmm_table(wilc, vmm_table_len, vmm_table);
+
+	release_bus(wilc, (entries > 0 ?
+			   WILC_BUS_RELEASE_ONLY :
+			   WILC_BUS_RELEASE_ALLOW_SLEEP));
+
+	if (entries <= 0) {
+		ret = entries;
+	} else {
+		ret = copy_packets(wilc, entries, vmm_table, vmm_entries_ac);
+		if (ret > 0) {
+			acquire_bus(wilc, WILC_BUS_ACQUIRE_ONLY);
+			ret = send_packets(wilc, ret);
+			release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
+		}
 	}
-
-	release_bus(wilc, WILC_BUS_RELEASE_ONLY);
-
-	entries = ret;
-	len = copy_packets(wilc, entries, vmm_table, vmm_entries_ac);
-	if (len <= 0)
-		goto out_unlock;
-
-	acquire_bus(wilc, WILC_BUS_ACQUIRE_ONLY);
-
-	ret = send_packets(wilc, len);
-
-out_release_bus:
-	release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP);
+	if (ret >= 0 && entries < vmm_table_len)
+		ret = WILC_VMM_ENTRY_FULL_RETRY;
 
 out_unlock:
 	mutex_unlock(&wilc->txq_add_to_head_cs);
