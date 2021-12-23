@@ -43,6 +43,12 @@ patternProperties:
   "@[0-9a-f]+(,[0-7])?$":
     type: object
 
+    description: |
+      NVMEM cell - a part of NVMEM containing one specific information.
+
+      Cells can be fully defined by a binding or stored in NVMEM device specific
+      data and just referenced in DT by a name (label).
+
     properties:
       reg:
         maxItems: 1
@@ -64,8 +70,11 @@ patternProperties:
               description:
                 Size in bit within the address range specified by reg.
 
-    required:
-      - reg
+    oneOf:
+      - required:
+          - reg
+      - required:
+          - label
 
 additionalProperties: true
 
