@@ -629,6 +629,17 @@ static u32 tx_hdr_len(u8 type)
 	}
 }
 
+static u32 vmm_table_entry(struct sk_buff *tqe, u32 vmm_sz)
+{
+	struct wilc_skb_tx_cb *tx_cb = WILC_SKB_TX_CB(tqe);
+	u32 entry;
+
+	entry = vmm_sz / 4;
+	if (tx_cb->type == WILC_CFG_PKT)
+		entry |= WILC_VMM_CFG_PKT;
+	return cpu_to_le32(entry);
+}
+
 /**
  * fill_vmm_table() - Fill VMM table with packets to be sent
  * @wilc: Pointer to the wilc structure.
@@ -691,11 +702,7 @@ static int fill_vmm_table(const struct wilc *wilc,
 
 				if (sum + vmm_sz > WILC_TX_BUFF_SIZE)
 					goto out;
-				vmm_table[i] = vmm_sz / 4;
-				if (tx_cb->type == WILC_CFG_PKT)
-					vmm_table[i] |= WILC_VMM_CFG_PKT;
-
-				cpu_to_le32s(&vmm_table[i]);
+				vmm_table[i] = vmm_table_entry(tqe_q[ac], vmm_sz);
 				vmm_entries_ac[i] = ac;
 
 				i++;
