@@ -1426,7 +1426,7 @@ err_out:
 	if (surface)
 		vmw_surface_unreference(&surface);
 
-	if (ret) {
+	if (ret || !vfb) {
 		DRM_ERROR("failed to create vmw_framebuffer: %i\n", ret);
 		ttm_base_object_unref(&user_obj);
 		return ERR_PTR(ret);
