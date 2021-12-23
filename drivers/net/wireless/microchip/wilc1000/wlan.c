@@ -130,15 +130,13 @@ static inline void tcp_process(struct net_device *dev, struct sk_buff *tqe)
 	const struct tcphdr *tcp_hdr_ptr;
 	u32 ihl, total_length, data_offset;
 
-	mutex_lock(&vif->ack_filter_lock);
-
 	if (eth_hdr_ptr->h_proto != htons(ETH_P_IP))
-		goto out;
+		return;
 
 	ip_hdr_ptr = buffer + ETH_HLEN;
 
 	if (ip_hdr_ptr->protocol != IPPROTO_TCP)
-		goto out;
+		return;
 
 	ihl = ip_hdr_ptr->ihl << 2;
 	tcp_hdr_ptr = buffer + ETH_HLEN + ihl;
@@ -150,6 +148,9 @@ static inline void tcp_process(struct net_device *dev, struct sk_buff *tqe)
 
 		seq_no = ntohl(tcp_hdr_ptr->seq);
 		ack_no = ntohl(tcp_hdr_ptr->ack_seq);
+
+		mutex_lock(&vif->ack_filter_lock);
+
 		for (i = 0; i < f->tcp_session; i++) {
 			u32 j = f->ack_session_info[i].seq_num;
 
@@ -163,10 +164,9 @@ static inline void tcp_process(struct net_device *dev, struct sk_buff *tqe)
 			add_tcp_session(vif, 0, 0, seq_no);
 
 		add_tcp_pending_ack(vif, ack_no, i, tqe);
-	}
 
-out:
-	mutex_unlock(&vif->ack_filter_lock);
+		mutex_unlock(&vif->ack_filter_lock);
+	}
 }
 
 static void wilc_wlan_tx_packet_done(struct sk_buff *tqe, int status)
