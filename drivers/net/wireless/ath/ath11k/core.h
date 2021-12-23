@@ -577,6 +577,7 @@ struct ath11k {
 #endif
 	bool dfs_block_radar_events;
 	struct ath11k_thermal thermal;
+	int hw_rate_code;
 };
 
 struct ath11k_band_cap {
