@@ -41,17 +41,6 @@ MODULE_PARM_DESC(enable_crc16,
  */
 #define WILC_SPI_RSP_HDR_EXTRA_DATA	8
 
-struct wilc_spi {
-	bool isinit;		/* true if SPI protocol has been configured */
-	bool probing_crc;	/* true if we're probing chip's CRC config */
-	bool crc7_enabled;	/* true if crc7 is currently enabled */
-	bool crc16_enabled;	/* true if crc16 is currently enabled */
-	struct wilc_gpios {
-		struct gpio_desc *enable;	/* ENABLE GPIO or NULL */
-		struct gpio_desc *reset;	/* RESET GPIO or NULL */
-	} gpios;
-};
-
 static const struct wilc_hif_func wilc_hif_spi;
 
 static int wilc_spi_reset(struct wilc *wilc);
@@ -108,6 +97,17 @@ static int wilc_spi_reset(struct wilc *wilc);
 
 #define WILC_SPI_COMMAND_STAT_SUCCESS		0
 #define WILC_GET_RESP_HDR_START(h)		(((h) >> 4) & 0xf)
+
+struct wilc_spi {
+	bool isinit;		/* true if SPI protocol has been configured */
+	bool probing_crc;	/* true if we're probing chip's CRC config */
+	bool crc7_enabled;	/* true if crc7 is currently enabled */
+	bool crc16_enabled;	/* true if crc16 is currently enabled */
+	struct wilc_gpios {
+		struct gpio_desc *enable;	/* ENABLE GPIO or NULL */
+		struct gpio_desc *reset;	/* RESET GPIO or NULL */
+	} gpios;
+};
 
 struct wilc_spi_cmd {
 	u8 cmd_type;
