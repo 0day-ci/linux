@@ -142,7 +142,7 @@ int mlx5e_hv_vhca_stats_create(struct mlx5e_priv *priv)
 				    PTR_ERR(agent));
 
 		kvfree(priv->stats_agent.buf);
-		return IS_ERR_OR_NULL(agent);
+		return agent ? PTR_ERR(agent) : -ENODEV;
 	}
 
 	priv->stats_agent.agent = agent;
