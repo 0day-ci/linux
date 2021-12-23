@@ -31,6 +31,11 @@ MODULE_PARM_DESC(enable_crc16,
 		 "\t\t\tData transfers can be large and the CPU-cycle cost\n"
 		 "\t\t\tof enabling this may be substantial.");
 
+static bool disable_zero_copy_tx;
+module_param(disable_zero_copy_tx, bool, 0644);
+MODULE_PARM_DESC(disable_zero_copy_tx,
+		 "Disable zero-copy when sending packets.");
+
 /*
  * For CMD_SINGLE_READ and CMD_INTERNAL_READ, WILC may insert one or
  * more zero bytes between the command response and the DATA Start tag
@@ -41,7 +46,7 @@ MODULE_PARM_DESC(enable_crc16,
  */
 #define WILC_SPI_RSP_HDR_EXTRA_DATA	8
 
-static const struct wilc_hif_func wilc_hif_spi;
+static struct wilc_hif_func wilc_hif_spi;
 
 static int wilc_spi_reset(struct wilc *wilc);
 static int wilc_spi_write_sk_buffs(struct wilc *wilc, u32 addr,
@@ -253,6 +258,9 @@ static int wilc_bus_probe(struct spi_device *spi)
 	spi_priv = kzalloc(sizeof(*spi_priv), GFP_KERNEL);
 	if (!spi_priv)
 		return -ENOMEM;
+
+	if (!disable_zero_copy_tx)
+		wilc_hif_spi.hif_sk_buffs_tx = wilc_spi_write_sk_buffs;
 
 	ret = wilc_cfg80211_init(&wilc, &spi->dev, WILC_HIF_SPI, &wilc_hif_spi);
 	if (ret)
@@ -1424,7 +1432,7 @@ static int wilc_spi_sync_ext(struct wilc *wilc, int nint)
 }
 
 /* Global spi HIF function table */
-static const struct wilc_hif_func wilc_hif_spi = {
+static struct wilc_hif_func wilc_hif_spi = {
 	.hif_init = wilc_spi_init,
 	.hif_deinit = wilc_spi_deinit,
 	.hif_read_reg = wilc_spi_read_reg,
@@ -1436,7 +1444,6 @@ static const struct wilc_hif_func wilc_hif_spi = {
 	.hif_read_size = wilc_spi_read_size,
 	.hif_block_tx_ext = wilc_spi_write,
 	.hif_block_rx_ext = wilc_spi_read,
-	.hif_sk_buffs_tx = wilc_spi_write_sk_buffs,
 	.hif_sync_ext = wilc_spi_sync_ext,
 	.hif_reset = wilc_spi_reset,
 };
