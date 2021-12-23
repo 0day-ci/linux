@@ -243,6 +243,7 @@
 
 #define WILC_VMM_ENTRY_COUNT		GENMASK(8, 3)
 #define WILC_VMM_ENTRY_AVAILABLE	BIT(2)
+#define WILC_VMM_TABLE_UPDATED		BIT(1)
 /*******************************************/
 /*        E0 and later Interrupt flags.    */
 /*******************************************/

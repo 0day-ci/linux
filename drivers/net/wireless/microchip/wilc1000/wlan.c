@@ -763,7 +763,8 @@ static int send_vmm_table(struct wilc *wilc,
 		if (ret)
 			break;
 
-		ret = func->hif_write_reg(wilc, WILC_HOST_VMM_CTL, 0x2);
+		ret = func->hif_write_reg(wilc, WILC_HOST_VMM_CTL,
+					  WILC_VMM_TABLE_UPDATED);
 		if (ret)
 			break;
 
