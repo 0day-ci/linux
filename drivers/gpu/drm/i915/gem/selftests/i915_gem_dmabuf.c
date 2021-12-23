@@ -428,12 +428,14 @@ static int igt_dmabuf_export_vmap(void *arg)
 	if (memchr_inv(ptr, 0, dmabuf->size)) {
 		pr_err("Exported object not initialiased to zero!\n");
 		err = -EINVAL;
-		goto out;
+		goto out_dma_map;
 	}
 
 	memset(ptr, 0xc5, dmabuf->size);
 
 	err = 0;
+
+out_dma_map:
 	dma_buf_vunmap(dmabuf, &map);
 out:
 	dma_buf_put(dmabuf);
