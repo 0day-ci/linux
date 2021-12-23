@@ -161,10 +161,10 @@ EXPORT_SYMBOL_GPL(devm_platform_ioremap_resource_byname);
  * For example::
  *
  *		int irq = platform_get_irq_optional(pdev, 0);
- *		if (irq < 0)
+ *		if (irq <= 0)
  *			return irq;
  *
- * Return: non-zero IRQ number on success, negative error number on failure.
+ * Return: positive IRQ number on success, negative error number and zero on failure.
  */
 int platform_get_irq_optional(struct platform_device *dev, unsigned int num)
 {
