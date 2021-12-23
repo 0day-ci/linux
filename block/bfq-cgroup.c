@@ -730,8 +730,18 @@ static struct bfq_group *__bfq_bic_change_cgroup(struct bfq_data *bfqd,
 
 	if (sync_bfqq) {
 		entity = &sync_bfqq->entity;
-		if (entity->sched_data != &bfqg->sched_data)
+		if (entity->sched_data != &bfqg->sched_data) {
+			/*
+			 * Moving bfqq that is shared with another process?
+			 * Split the queues at the nearest occasion as the
+			 * processes can be in different cgroups now.
+			 */
+			if (bfq_bfqq_coop(sync_bfqq)) {
+				bic->stably_merged = false;
+				bfq_mark_bfqq_split_coop(sync_bfqq);
+			}
 			bfq_bfqq_move(bfqd, sync_bfqq, bfqg);
+		}
 	}
 
 	return bfqg;
