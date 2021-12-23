@@ -42,7 +42,6 @@ struct loop_device {
 	spinlock_t		lo_lock;
 	int			lo_state;
 	spinlock_t              lo_work_lock;
-	struct workqueue_struct *workqueue;
 	struct work_struct      rootcg_work;
 	struct list_head        rootcg_cmd_list;
 	struct list_head        idle_worker_list;

@@ -89,6 +89,7 @@
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 static DEFINE_MUTEX(loop_validate_mutex);
+static struct workqueue_struct *loop_workqueue;
 
 /**
  * loop_global_lock_killable() - take locks for safe loop_validate_file() test
@@ -884,7 +885,7 @@ queue_work:
 		cmd_list = &lo->rootcg_cmd_list;
 	}
 	list_add_tail(&cmd->list_entry, cmd_list);
-	queue_work(lo->workqueue, work);
+	queue_work(loop_workqueue, work);
 	spin_unlock_irq(&lo->lo_work_lock);
 }
 
@@ -1006,15 +1007,6 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	    !file->f_op->write_iter)
 		lo->lo_flags |= LO_FLAGS_READ_ONLY;
 
-	lo->workqueue = alloc_workqueue("loop%d",
-					WQ_UNBOUND | WQ_FREEZABLE,
-					0,
-					lo->lo_number);
-	if (!lo->workqueue) {
-		error = -ENOMEM;
-		goto out_unlock;
-	}
-
 	disk_force_media_change(lo->lo_disk, DISK_EVENT_MEDIA_CHANGE);
 	set_disk_ro(lo->lo_disk, (lo->lo_flags & LO_FLAGS_READ_ONLY) != 0);
 
@@ -1115,7 +1107,6 @@ static void __loop_clr_fd(struct loop_device *lo)
 	/* freeze request queue during the transition */
 	blk_mq_freeze_queue(lo->lo_queue);
 
-	destroy_workqueue(lo->workqueue);
 	spin_lock_irq(&lo->lo_work_lock);
 	list_for_each_entry_safe(worker, pos, &lo->idle_worker_list,
 				idle_list) {
@@ -2212,15 +2203,11 @@ static int __init loop_init(void)
 		max_part = (1UL << part_shift) - 1;
 	}
 
-	if ((1UL << part_shift) > DISK_MAX_PARTS) {
-		err = -EINVAL;
-		goto err_out;
-	}
+	if ((1UL << part_shift) > DISK_MAX_PARTS)
+		return -EINVAL;
 
-	if (max_loop > 1UL << (MINORBITS - part_shift)) {
-		err = -EINVAL;
-		goto err_out;
-	}
+	if (max_loop > 1UL << (MINORBITS - part_shift))
+		return -EINVAL;
 
 	/*
 	 * If max_loop is specified, create that many devices upfront.
@@ -2235,9 +2222,14 @@ static int __init loop_init(void)
 	else
 		nr = CONFIG_BLK_DEV_LOOP_MIN_COUNT;
 
+	loop_workqueue = alloc_workqueue("loop", WQ_MEM_RECLAIM | WQ_FREEZABLE,
+					 0);
+	if (!loop_workqueue)
+		return -ENOMEM;
+
 	err = misc_register(&loop_misc);
 	if (err < 0)
-		goto err_out;
+		goto destroy_workqueue;
 
 
 	if (__register_blkdev(LOOP_MAJOR, "loop", loop_probe)) {
@@ -2254,7 +2246,8 @@ static int __init loop_init(void)
 
 misc_out:
 	misc_deregister(&loop_misc);
-err_out:
+destroy_workqueue:
+	destroy_workqueue(loop_workqueue);
 	return err;
 }
 
@@ -2276,6 +2269,7 @@ static void __exit loop_exit(void)
 		loop_remove(lo);
 
 	idr_destroy(&loop_index_idr);
+	destroy_workqueue(loop_workqueue);
 }
 
 module_init(loop_init);
