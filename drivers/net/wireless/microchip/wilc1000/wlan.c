@@ -1604,12 +1604,12 @@ int wilc_wlan_init(struct net_device *dev)
 
 	init_q_limits(wilc);
 
-	if (!wilc->tx_buffer)
+	if (!wilc->hif_func->hif_sk_buffs_tx && !wilc->tx_buffer) {
 		wilc->tx_buffer = kmalloc(WILC_TX_BUFF_SIZE, GFP_KERNEL);
-
-	if (!wilc->tx_buffer) {
-		ret = -ENOBUFS;
-		goto fail;
+		if (!wilc->tx_buffer) {
+			ret = -ENOBUFS;
+			goto fail;
+		}
 	}
 
 	if (!wilc->rx_buffer)
