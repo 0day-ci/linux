@@ -1503,7 +1503,7 @@ static inline int clone_security(struct xfrm_state *x, struct xfrm_sec_ctx *secu
 	return 0;
 }
 
-static struct xfrm_state *xfrm_state_clone(struct xfrm_state *orig,
+static struct xfrm_state *xfrm_state_clone1(struct xfrm_state *orig,
 					   struct xfrm_encap_tmpl *encap)
 {
 	struct net *net = xs_net(orig);
@@ -1578,8 +1578,20 @@ static struct xfrm_state *xfrm_state_clone(struct xfrm_state *orig,
 	memcpy(&x->mark, &orig->mark, sizeof(x->mark));
 	memcpy(&x->props.smark, &orig->props.smark, sizeof(x->props.smark));
 
-	if (xfrm_init_state(x) < 0)
-		goto error;
+	return x;
+
+ error:
+	xfrm_state_put(x);
+out:
+	return NULL;
+}
+
+static int *xfrm_state_clone2(struct xfrm_state *orig,
+			      struct xfrm_state *x)
+{
+	int err = xfrm_init_state(x);
+	if (err < 0)
+		return err;
 
 	x->props.flags = orig->props.flags;
 	x->props.extra_flags = orig->props.extra_flags;
@@ -1594,12 +1606,7 @@ static struct xfrm_state *xfrm_state_clone(struct xfrm_state *orig,
 	x->replay = orig->replay;
 	x->preplay = orig->preplay;
 
-	return x;
-
- error:
-	xfrm_state_put(x);
-out:
-	return NULL;
+	return 0;
 }
 
 struct xfrm_state *xfrm_migrate_state_find(struct xfrm_migrate *m, struct net *net,
@@ -1660,9 +1667,13 @@ struct xfrm_state *xfrm_state_migrate(struct xfrm_state *x,
 {
 	struct xfrm_state *xc;
 
-	xc = xfrm_state_clone(x, encap);
+	xc = xfrm_state_clone1(x, encap);
 	if (!xc)
 		return NULL;
+
+	xc->props.family = m->new_family;
+	if (xfrm_state_clone2(x, xc) < 0)
+		goto error;
 
 	memcpy(&xc->id.daddr, &m->new_daddr, sizeof(xc->id.daddr));
 	memcpy(&xc->props.saddr, &m->new_saddr, sizeof(xc->props.saddr));
