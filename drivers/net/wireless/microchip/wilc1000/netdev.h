@@ -202,7 +202,6 @@ struct wilc_tx_queue_status {
 	u16 end_index;
 	u16 cnt[NQUEUES];
 	u16 sum;
-	bool initialized;
 };
 
 struct wilc {
