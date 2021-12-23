@@ -810,6 +810,18 @@ static void tdp_mmu_zap_root(struct kvm *kvm, struct kvm_mmu_page *root,
 	gfn_t start = 0;
 
 	/*
+	 * To avoid RCU stalls due to recursively removing huge swaths of SPs,
+	 * split the zap into two passes.  On the first pass, zap at the 1gb
+	 * level, and then zap top-level SPs on the second pass.  "1gb" is not
+	 * arbitrary, as KVM must be able to zap a 1gb shadow page without
+	 * inducing a stall to allow in-place replacement with a 1gb hugepage.
+	 *
+	 * Because zapping a SP recurses on its children, stepping down to
+	 * PG_LEVEL_4K in the iterator itself is unnecessary.
+	 */
+	int zap_level = PG_LEVEL_1G;
+
+	/*
 	 * The root must have an elevated refcount so that it's reachable via
 	 * mmu_notifier callbacks, which allows this path to yield and drop
 	 * mmu_lock.  When handling an unmap/release mmu_notifier command, KVM
@@ -825,17 +837,17 @@ static void tdp_mmu_zap_root(struct kvm *kvm, struct kvm_mmu_page *root,
 
 	rcu_read_lock();
 
-	/*
-	 * No need to try to step down in the iterator when zapping an entire
-	 * root, zapping an upper-level SPTE will recurse on its children.
-	 */
+start:
 	for_each_tdp_pte_min_level(iter, root->spt, root->role.level,
-				   root->role.level, start, end) {
+				   zap_level, start, end) {
 retry:
 		if (tdp_mmu_iter_cond_resched(kvm, &iter, false, shared))
 			continue;
 
 		if (!is_shadow_present_pte(iter.old_spte))
+			continue;
+
+		if (iter.level > zap_level)
 			continue;
 
 		if (!shared) {
@@ -844,6 +856,11 @@ retry:
 			iter.old_spte = kvm_tdp_mmu_read_spte(iter.sptep);
 			goto retry;
 		}
+	}
+
+	if (zap_level < root->role.level) {
+		zap_level = root->role.level;
+		goto start;
 	}
 
 	rcu_read_unlock();
