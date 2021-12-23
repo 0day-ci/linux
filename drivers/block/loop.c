@@ -667,7 +667,7 @@ static ssize_t loop_attr_backing_file_show(struct loop_device *lo, char *buf)
 	spin_unlock_irq(&lo->lo_lock);
 
 	if (IS_ERR_OR_NULL(p))
-		ret = PTR_ERR(p);
+		ret = p ? PTR_ERR(p) : -ENOENT;
 	else {
 		ret = strlen(p);
 		memmove(buf, p, ret);
