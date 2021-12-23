@@ -863,6 +863,7 @@ void wilc_netdev_cleanup(struct wilc *wilc)
 
 	srcu_idx = srcu_read_lock(&wilc->srcu);
 	list_for_each_entry_rcu(vif, &wilc->vif_list, list) {
+		mutex_destroy(&vif->ack_filter_lock);
 		if (vif->ndev)
 			unregister_netdev(vif->ndev);
 	}
@@ -929,6 +930,7 @@ struct wilc_vif *wilc_netdev_ifc_init(struct wilc *wl, const char *name,
 	vif->wilc = wl;
 	vif->ndev = ndev;
 	ndev->ml_priv = vif;
+	mutex_init(&vif->ack_filter_lock);
 
 	ndev->netdev_ops = &wilc_netdev_ops;
 

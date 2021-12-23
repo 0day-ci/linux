@@ -190,6 +190,8 @@ struct wilc_vif {
 	struct timer_list during_ip_timer;
 	struct timer_list periodic_rssi;
 	struct rf_info periodic_stat;
+	/* protect ack_filter */
+	struct mutex ack_filter_lock;
 	struct tcp_ack_filter ack_filter;
 	bool connecting;
 	struct wilc_priv priv;
@@ -225,9 +227,6 @@ struct wilc {
 
 	/* protect head of transmit queue */
 	struct mutex txq_add_to_head_cs;
-
-	/* protect txq_entry_t transmit queue */
-	spinlock_t txq_spinlock;
 
 	/* protect rxq_entry_t receiver queue */
 	struct mutex rxq_cs;

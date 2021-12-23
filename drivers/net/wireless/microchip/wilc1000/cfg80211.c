@@ -1670,7 +1670,6 @@ static void wlan_init_locks(struct wilc *wl)
 	mutex_init(&wl->vif_mutex);
 	mutex_init(&wl->deinit_lock);
 
-	spin_lock_init(&wl->txq_spinlock);
 	mutex_init(&wl->txq_add_to_head_cs);
 	mutex_init(&wl->tx_q_limit_lock);
 

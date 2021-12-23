@@ -124,15 +124,13 @@ static inline void tcp_process(struct net_device *dev, struct sk_buff *tqe)
 	void *buffer = tqe->data;
 	const struct ethhdr *eth_hdr_ptr = buffer;
 	int i;
-	unsigned long flags;
 	struct wilc_vif *vif = netdev_priv(dev);
-	struct wilc *wilc = vif->wilc;
 	struct tcp_ack_filter *f = &vif->ack_filter;
 	const struct iphdr *ip_hdr_ptr;
 	const struct tcphdr *tcp_hdr_ptr;
 	u32 ihl, total_length, data_offset;
 
-	spin_lock_irqsave(&wilc->txq_spinlock, flags);
+	mutex_lock(&vif->ack_filter_lock);
 
 	if (eth_hdr_ptr->h_proto != htons(ETH_P_IP))
 		goto out;
@@ -168,7 +166,7 @@ static inline void tcp_process(struct net_device *dev, struct sk_buff *tqe)
 	}
 
 out:
-	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
+	mutex_unlock(&vif->ack_filter_lock);
 }
 
 static void wilc_wlan_tx_packet_done(struct sk_buff *tqe, int status)
@@ -201,12 +199,10 @@ static void wilc_wlan_txq_drop_net_pkt(struct sk_buff *tqe)
 static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 {
 	struct wilc_vif *vif = netdev_priv(dev);
-	struct wilc *wilc = vif->wilc;
 	struct tcp_ack_filter *f = &vif->ack_filter;
 	u32 i = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&wilc->txq_spinlock, flags);
+	mutex_lock(&vif->ack_filter_lock);
 	for (i = f->pending_base;
 	     i < (f->pending_base + f->pending_acks_idx); i++) {
 		u32 index;
@@ -238,7 +234,7 @@ static void wilc_wlan_txq_filter_dup_tcp_ack(struct net_device *dev)
 	else
 		f->pending_base = 0;
 
-	spin_unlock_irqrestore(&wilc->txq_spinlock, flags);
+	mutex_unlock(&vif->ack_filter_lock);
 }
 
 void wilc_enable_tcp_ack_filter(struct wilc_vif *vif, bool value)
