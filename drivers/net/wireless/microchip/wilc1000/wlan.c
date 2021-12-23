@@ -70,12 +70,9 @@ static void wilc_wlan_txq_add_to_head(struct wilc_vif *vif, u8 type, u8 q_num,
 
 	init_txq_entry(tqe, type, q_num);
 
-	mutex_lock(&wilc->txq_add_to_head_cs);
-
 	skb_queue_head(&wilc->txq[q_num], tqe);
 	atomic_inc(&wilc->txq_entries);
 
-	mutex_unlock(&wilc->txq_add_to_head_cs);
 	wake_up_interruptible(&wilc->txq_event);
 }
 
@@ -848,9 +845,6 @@ static int send_vmm_table(struct wilc *wilc,
  *
  * Copy a number of packets to the transmit buffer.
  *
- * Context: The txq_add_to_head_cs mutex must still be held when
- * calling this function.
- *
  * Return: Number of bytes copied to the transmit buffer (always
  *	non-negative).
  */
@@ -940,8 +934,6 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	if (wilc->quit)
 		goto out_update_cnt;
 
-	mutex_lock(&wilc->txq_add_to_head_cs);
-
 	srcu_idx = srcu_read_lock(&wilc->srcu);
 	list_for_each_entry_rcu(vif, &wilc->vif_list, list)
 		wilc_wlan_txq_filter_dup_tcp_ack(vif->ndev);
@@ -949,7 +941,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 
 	vmm_table_len = fill_vmm_table(wilc, vmm_table);
 	if (vmm_table_len == 0)
-		goto out_unlock;
+		goto out_update_cnt;
 
 	acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP);
 
@@ -966,9 +958,6 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	}
 	if (ret >= 0 && entries < vmm_table_len)
 		ret = WILC_VMM_ENTRY_FULL_RETRY;
-
-out_unlock:
-	mutex_unlock(&wilc->txq_add_to_head_cs);
 
 out_update_cnt:
 	*txq_count = atomic_read(&wilc->txq_entries);

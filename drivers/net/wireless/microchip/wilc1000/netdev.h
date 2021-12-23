@@ -225,9 +225,6 @@ struct wilc {
 	struct srcu_struct srcu;
 	u8 open_ifcs;
 
-	/* protect head of transmit queue */
-	struct mutex txq_add_to_head_cs;
-
 	/* protect rxq_entry_t receiver queue */
 	struct mutex rxq_cs;
 
