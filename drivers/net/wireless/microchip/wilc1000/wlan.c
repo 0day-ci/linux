@@ -279,13 +279,12 @@ static void init_q_limits(struct wilc *wl)
 
 static bool is_ac_q_limit(struct wilc *wl, u8 q_num)
 {
-	unsigned long flags;
 	struct wilc_tx_queue_status *q = &wl->tx_q_limit;
 	u8 end_index;
 	u8 q_limit;
 	bool ret = false;
 
-	spin_lock_irqsave(&wl->txq_spinlock, flags);
+	mutex_lock(&wl->tx_q_limit_lock);
 
 	end_index = q->end_index;
 	q->cnt[q->buffer[end_index]] -= factors[q->buffer[end_index]];
@@ -306,7 +305,7 @@ static bool is_ac_q_limit(struct wilc *wl, u8 q_num)
 	if (skb_queue_len(&wl->txq[q_num]) <= q_limit)
 		ret = true;
 
-	spin_unlock_irqrestore(&wl->txq_spinlock, flags);
+	mutex_unlock(&wl->tx_q_limit_lock);
 
 	return ret;
 }

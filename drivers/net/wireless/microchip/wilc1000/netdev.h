@@ -257,6 +257,8 @@ struct wilc {
 	atomic_t txq_entries;
 	struct txq_fw_recv_queue_stat fw[NQUEUES];
 
+	/* protect tx_q_limit state */
+	struct mutex tx_q_limit_lock;
 	struct wilc_tx_queue_status tx_q_limit;
 	struct rxq_entry_t rxq_head;
 

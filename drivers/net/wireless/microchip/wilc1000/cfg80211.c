@@ -1672,6 +1672,7 @@ static void wlan_init_locks(struct wilc *wl)
 
 	spin_lock_init(&wl->txq_spinlock);
 	mutex_init(&wl->txq_add_to_head_cs);
+	mutex_init(&wl->tx_q_limit_lock);
 
 	init_waitqueue_head(&wl->txq_event);
 	init_completion(&wl->cfg_event);
@@ -1688,6 +1689,7 @@ void wlan_deinit_locks(struct wilc *wilc)
 	mutex_destroy(&wilc->txq_add_to_head_cs);
 	mutex_destroy(&wilc->vif_mutex);
 	mutex_destroy(&wilc->deinit_lock);
+	mutex_destroy(&wilc->tx_q_limit_lock);
 	cleanup_srcu_struct(&wilc->srcu);
 }
 
