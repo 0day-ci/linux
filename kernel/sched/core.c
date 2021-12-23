@@ -5720,7 +5720,6 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	need_sync = !!rq->core->core_cookie;
 
 	/* reset state */
-	rq->core->core_cookie = 0UL;
 	if (rq->core->core_forceidle_count) {
 		if (!core_clock_updated) {
 			update_rq_clock(rq->core);
@@ -5734,6 +5733,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		need_sync = true;
 		fi_before = true;
 	}
+	rq->core->core_cookie = 0UL;
 
 	/*
 	 * core->core_task_seq, core->core_pick_seq, rq->core_sched_seq
@@ -5818,7 +5818,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		}
 	}
 
-	if (schedstat_enabled() && rq->core->core_forceidle_count) {
+	if (rq->core->core_forceidle_count) {
 		if (cookie)
 			rq->core->core_forceidle_start = rq_clock(rq->core);
 		rq->core->core_forceidle_occupation = occ;

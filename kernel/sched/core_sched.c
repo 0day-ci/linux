@@ -239,13 +239,14 @@ out:
 #ifdef CONFIG_SCHEDSTATS
 
 /* REQUIRES: rq->core's clock recently updated. */
-void __sched_core_account_forceidle(struct rq *rq)
+void sched_core_account_forceidle(struct rq *rq)
 {
 	const struct cpumask *smt_mask = cpu_smt_mask(cpu_of(rq));
 	u64 delta, now = rq_clock(rq->core);
 	struct rq *rq_i;
 	struct task_struct *p;
 	int i;
+	u64 *cpustat;
 
 	lockdep_assert_rq_held(rq);
 
@@ -259,6 +260,21 @@ void __sched_core_account_forceidle(struct rq *rq)
 		return;
 
 	rq->core->core_forceidle_start = now;
+
+	for_each_cpu(i, smt_mask) {
+		rq_i = cpu_rq(i);
+		p = rq_i->core_pick ?: rq_i->curr;
+
+		if (!rq->core->core_cookie)
+			continue;
+		if (p == rq_i->idle && rq_i->nr_running) {
+			cpustat = kcpustat_cpu(i).cpustat;
+			cpustat[CPUTIME_COOKIED_FORCEIDLE] += delta;
+		}
+	}
+
+	if (!schedstat_enabled())
+		return;
 
 	if (WARN_ON_ONCE(!rq->core->core_forceidle_occupation)) {
 		/* can't be forced idle without a running task */
@@ -292,7 +308,7 @@ void __sched_core_tick(struct rq *rq)
 	if (rq != rq->core)
 		update_rq_clock(rq->core);
 
-	__sched_core_account_forceidle(rq);
+	sched_core_account_forceidle(rq);
 }
 
 #endif /* CONFIG_SCHEDSTATS */

@@ -109,6 +109,9 @@ static int show_stat(struct seq_file *p, void *v)
 {
 	int i, j;
 	u64 user, nice, system, idle, iowait, irq, softirq, steal;
+#ifdef CONFIG_SCHED_CORE
+	u64 cookied_forceidle = 0;
+#endif
 	u64 guest, guest_nice;
 	u64 sum = 0;
 	u64 sum_softirq = 0;
@@ -140,6 +143,9 @@ static int show_stat(struct seq_file *p, void *v)
 		guest_nice	+= cpustat[CPUTIME_GUEST_NICE];
 		sum		+= kstat_cpu_irqs_sum(i);
 		sum		+= arch_irq_stat_cpu(i);
+#ifdef CONFIG_SCHED_CORE
+		cookied_forceidle	+= cpustat[CPUTIME_COOKIED_FORCEIDLE];
+#endif
 
 		for (j = 0; j < NR_SOFTIRQS; j++) {
 			unsigned int softirq_stat = kstat_softirqs_cpu(j, i);
@@ -160,6 +166,9 @@ static int show_stat(struct seq_file *p, void *v)
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(steal));
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest));
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest_nice));
+#ifdef CONFIG_SCHED_CORE
+	seq_put_decimal_ull(p, " ", nsec_to_clock_t(cookied_forceidle));
+#endif
 	seq_putc(p, '\n');
 
 	for_each_online_cpu(i) {
@@ -179,6 +188,9 @@ static int show_stat(struct seq_file *p, void *v)
 		steal		= cpustat[CPUTIME_STEAL];
 		guest		= cpustat[CPUTIME_GUEST];
 		guest_nice	= cpustat[CPUTIME_GUEST_NICE];
+#ifdef CONFIG_SCHED_CORE
+		cookied_forceidle	= cpustat[CPUTIME_COOKIED_FORCEIDLE];
+#endif
 		seq_printf(p, "cpu%d", i);
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(user));
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(nice));
@@ -190,6 +202,9 @@ static int show_stat(struct seq_file *p, void *v)
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(steal));
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest));
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest_nice));
+#ifdef CONFIG_SCHED_CORE
+		seq_put_decimal_ull(p, " ", nsec_to_clock_t(cookied_forceidle));
+#endif
 		seq_putc(p, '\n');
 	}
 	seq_put_decimal_ull(p, "intr ", (unsigned long long)sum);

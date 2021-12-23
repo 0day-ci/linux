@@ -1858,19 +1858,13 @@ static inline void flush_smp_call_function_from_idle(void) { }
 
 #if defined(CONFIG_SCHED_CORE) && defined(CONFIG_SCHEDSTATS)
 
-extern void __sched_core_account_forceidle(struct rq *rq);
-
-static inline void sched_core_account_forceidle(struct rq *rq)
-{
-	if (schedstat_enabled())
-		__sched_core_account_forceidle(rq);
-}
+extern void sched_core_account_forceidle(struct rq *rq);
 
 extern void __sched_core_tick(struct rq *rq);
 
 static inline void sched_core_tick(struct rq *rq)
 {
-	if (sched_core_enabled(rq) && schedstat_enabled())
+	if (sched_core_enabled(rq))
 		__sched_core_tick(rq);
 }
 
