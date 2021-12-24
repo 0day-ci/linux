@@ -83,6 +83,67 @@ TRACE_EVENT(hugepage_splitting,
 		      __entry->addr, __entry->pte)
 );
 
+TRACE_EVENT(set_migration_pmd,
+
+	TP_PROTO(struct mm_struct *mm, unsigned long address,
+		 pmd_t *pmdp, struct page *page, unsigned long pmdval),
+
+	TP_ARGS(mm, address, pmdp, page, pmdval),
+
+	TP_STRUCT__entry(
+		__field(struct mm_struct *, mm)
+		__field(unsigned long, address)
+		__field(pmd_t *, pmdp)
+		__field(struct page *, page)
+		__field(unsigned long, pmdval)
+	),
+
+	TP_fast_assign(
+		__entry->mm = mm;
+		__entry->address = address;
+		__entry->pmdp = pmdp;
+		__entry->page = page;
+		__entry->pmdval = pmdval;
+	),
+
+	TP_printk("mm=%p, address=%lx, pmdp=%p, page=%p pmdval=%lx",
+		__entry->mm,
+		__entry->address,
+		__entry->pmdp,
+		__entry->page,
+		__entry->pmdval)
+);
+
+TRACE_EVENT(remove_migration_pmd,
+
+	TP_PROTO(struct mm_struct *mm, unsigned long address,
+		 pmd_t *pmdp, struct page *page, unsigned long pmdval),
+
+	TP_ARGS(mm, address, pmdp, page, pmdval),
+
+	TP_STRUCT__entry(
+		__field(struct mm_struct *, mm)
+		__field(unsigned long, address)
+		__field(pmd_t *, pmdp)
+		__field(struct page *, page)
+		__field(unsigned long, pmdval)
+	),
+
+	TP_fast_assign(
+		__entry->mm = mm;
+		__entry->address = address;
+		__entry->pmdp = pmdp;
+		__entry->page = page;
+		__entry->pmdval = pmdval;
+	),
+
+	TP_printk("mm=%p, address=%lx, pmdp=%p, page=%p pmdval=%lx",
+		__entry->mm,
+		__entry->address,
+		__entry->pmdp,
+		__entry->page,
+		__entry->pmdval)
+);
 #endif /* _TRACE_THP_H */
 
 /* This part must be outside protection */
