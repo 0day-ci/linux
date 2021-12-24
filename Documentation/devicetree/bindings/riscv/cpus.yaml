@@ -78,6 +78,15 @@ properties:
       - rv64imac
       - rv64imafdc
 
+  riscv,isa-ext:
+    description:
+      Identifies the specific RISC-V instruction set architecture extensions
+      supported by one or multiple harts. All the multi-letter extensions
+      should be listed here as a boolean property. This subnode can be under
+      /cpus or under individual cpu node. In case of former, it represent
+      the common ISA extensions for all harts. The name of the boolean property
+      must match the actual ISA extension name in all lowercase format.
+    $ref: "/schemas/types.yaml#/definitions/boolean"
   # RISC-V requires 'timebase-frequency' in /cpus, so disallow it here
   timebase-frequency: false
 
