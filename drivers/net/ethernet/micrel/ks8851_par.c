@@ -320,7 +320,10 @@ static int ks8851_probe_par(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	netdev->irq = platform_get_irq(pdev, 0);
+	ret = platform_get_irq(pdev, 0);
+	if (ret < 0)
+		return ret;
+	netdev->irq = ret;
 
 	return ks8851_probe_common(netdev, dev, msg_enable);
 }
