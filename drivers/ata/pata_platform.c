@@ -184,8 +184,9 @@ static int pata_platform_probe(struct platform_device *pdev)
 {
 	struct resource *io_res;
 	struct resource *ctl_res;
-	struct resource *irq_res;
+	struct resource irq_res;
 	struct pata_platform_info *pp_info = dev_get_platdata(&pdev->dev);
+	int irq;
 
 	/*
 	 * Simple resource validation ..
@@ -212,9 +213,15 @@ static int pata_platform_probe(struct platform_device *pdev)
 	/*
 	 * And the IRQ
 	 */
-	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	irq = platform_get_irq_optional(pdev, 0);
+	if (irq < 0 && irq != -ENXIO)
+		return irq;
+	if (irq > 0) {
+		memset(&irq_res, 0x0, sizeof(struct resource));
+		irq_res.start = irq;
+	}
 
-	return __pata_platform_probe(&pdev->dev, io_res, ctl_res, irq_res,
+	return __pata_platform_probe(&pdev->dev, io_res, ctl_res, irq > 0 ? &irq_res : NULL,
 				     pp_info ? pp_info->ioport_shift : 0,
 				     pio_mask, &pata_platform_sht, false);
 }
