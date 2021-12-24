@@ -265,14 +265,6 @@ static int pata_platform_get_pdata(struct platform_device *pdev,
 	struct pata_platform_info *pp_info = dev_get_platdata(&pdev->dev);
 	int ret;
 
-	/*
-	 * Simple resource validation ..
-	 */
-	if ((pdev->num_resources != 3) && (pdev->num_resources != 2)) {
-		dev_err(&pdev->dev, "invalid number of resources\n");
-		return -EINVAL;
-	}
-
 	ret = pata_platform_get_resources(pdev, priv);
 	if (ret)
 		return ret;
