@@ -65,10 +65,12 @@ static void rxe_mr_init(int access, struct rxe_mr *mr)
 	mr->map_shift = ilog2(RXE_BUF_PER_MAP);
 }
 
-static void rxe_mr_free_map_set(int num_map, struct rxe_map_set *set)
+static void rxe_mr_free_map_set(int num_map, struct rxe_map_set **setp)
 {
 	int i;
+	struct rxe_map_set *set = *setp;
 
+	*setp = NULL;
 	for (i = 0; i < num_map; i++)
 		kfree(set->map[i]);
 
@@ -140,7 +142,7 @@ static int rxe_mr_alloc(struct rxe_mr *mr, int num_buf, int both)
 	if (both) {
 		ret = rxe_mr_alloc_map_set(num_map, &mr->next_map_set);
 		if (ret) {
-			rxe_mr_free_map_set(mr->num_map, mr->cur_map_set);
+			rxe_mr_free_map_set(mr->num_map, &mr->cur_map_set);
 			goto err_out;
 		}
 	}
@@ -238,7 +240,7 @@ int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 	return 0;
 
 err_cleanup_map:
-	rxe_mr_free_map_set(mr->num_map, mr->cur_map_set);
+	rxe_mr_free_map_set(mr->num_map, &mr->cur_map_set);
 err_release_umem:
 	ib_umem_release(umem);
 err_out:
@@ -706,8 +708,8 @@ void rxe_mr_cleanup(struct rxe_pool_elem *elem)
 	ib_umem_release(mr->umem);
 
 	if (mr->cur_map_set)
-		rxe_mr_free_map_set(mr->num_map, mr->cur_map_set);
+		rxe_mr_free_map_set(mr->num_map, &mr->cur_map_set);
 
 	if (mr->next_map_set)
-		rxe_mr_free_map_set(mr->num_map, mr->next_map_set);
+		rxe_mr_free_map_set(mr->num_map, &mr->next_map_set);
 }
