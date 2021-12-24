@@ -53,6 +53,7 @@ struct vhost_vdpa {
 static DEFINE_IDA(vhost_vdpa_ida);
 
 static dev_t vhost_vdpa_major;
+static struct class *vhost_vdpa_class;
 
 static void handle_vq_kick(struct vhost_work *work)
 {
@@ -1140,6 +1141,7 @@ static int vhost_vdpa_probe(struct vdpa_device *vdpa)
 	v->dev.release = vhost_vdpa_release_dev;
 	v->dev.parent = &vdpa->dev;
 	v->dev.devt = MKDEV(MAJOR(vhost_vdpa_major), minor);
+	v->dev.class = vhost_vdpa_class;
 	v->vqs = kmalloc_array(v->nvqs, sizeof(struct vhost_virtqueue),
 			       GFP_KERNEL);
 	if (!v->vqs) {
@@ -1197,6 +1199,10 @@ static int __init vhost_vdpa_init(void)
 {
 	int r;
 
+	vhost_vdpa_class = class_create(THIS_MODULE, "vhost-vdpa");
+	if (IS_ERR(vhost_vdpa_class))
+		return PTR_ERR(vhost_vdpa_class);
+
 	r = alloc_chrdev_region(&vhost_vdpa_major, 0, VHOST_VDPA_DEV_MAX,
 				"vhost-vdpa");
 	if (r)
@@ -1211,6 +1217,7 @@ static int __init vhost_vdpa_init(void)
 err_vdpa_register_driver:
 	unregister_chrdev_region(vhost_vdpa_major, VHOST_VDPA_DEV_MAX);
 err_alloc_chrdev:
+	class_destroy(vhost_vdpa_class);
 	return r;
 }
 module_init(vhost_vdpa_init);
@@ -1219,6 +1226,7 @@ static void __exit vhost_vdpa_exit(void)
 {
 	vdpa_unregister_driver(&vhost_vdpa_driver);
 	unregister_chrdev_region(vhost_vdpa_major, VHOST_VDPA_DEV_MAX);
+	class_destroy(vhost_vdpa_class);
 }
 module_exit(vhost_vdpa_exit);
 
