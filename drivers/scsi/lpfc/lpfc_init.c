@@ -7858,7 +7858,6 @@ lpfc_sli4_driver_resource_setup(struct lpfc_hba *phba)
 	LPFC_MBOXQ_t *mboxq;
 	MAILBOX_t *mb;
 	int rc, i, max_buf_size;
-	int longs;
 	int extra;
 	uint64_t wwn;
 	u32 if_type;
@@ -8286,9 +8285,8 @@ lpfc_sli4_driver_resource_setup(struct lpfc_hba *phba)
 	}
 
 	/* Allocate eligible FCF bmask memory for FCF roundrobin failover */
-	longs = (LPFC_SLI4_FCF_TBL_INDX_MAX + BITS_PER_LONG - 1)/BITS_PER_LONG;
-	phba->fcf.fcf_rr_bmask = kcalloc(longs, sizeof(unsigned long),
-					 GFP_KERNEL);
+	phba->fcf.fcf_rr_bmask = bitmap_zalloc(LPFC_SLI4_FCF_TBL_INDX_MAX,
+					       GFP_KERNEL);
 	if (!phba->fcf.fcf_rr_bmask) {
 		lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
 				"2759 Failed allocate memory for FCF round "
@@ -8387,7 +8385,7 @@ out_free_hba_cpu_map:
 out_free_hba_eq_hdl:
 	kfree(phba->sli4_hba.hba_eq_hdl);
 out_free_fcf_rr_bmask:
-	kfree(phba->fcf.fcf_rr_bmask);
+	bitmap_free(phba->fcf.fcf_rr_bmask);
 out_remove_rpi_hdrs:
 	lpfc_sli4_remove_rpi_hdrs(phba);
 out_free_active_sgl:
@@ -8441,7 +8439,7 @@ lpfc_sli4_driver_resource_unset(struct lpfc_hba *phba)
 	lpfc_sli4_remove_rpis(phba);
 
 	/* Free eligible FCF index bmask */
-	kfree(phba->fcf.fcf_rr_bmask);
+	bitmap_free(phba->fcf.fcf_rr_bmask);
 
 	/* Free the ELS sgl list */
 	lpfc_free_active_sgl(phba);
