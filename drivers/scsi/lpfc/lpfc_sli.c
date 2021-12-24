@@ -20220,8 +20220,7 @@ lpfc_check_next_fcf_pri_level(struct lpfc_hba *phba)
 	 * Clear the rr_bmask and set all of the bits that are at this
 	 * priority.
 	 */
-	memset(phba->fcf.fcf_rr_bmask, 0,
-			sizeof(*phba->fcf.fcf_rr_bmask));
+	bitmap_zero(phba->fcf.fcf_rr_bmask, LPFC_SLI4_FCF_TBL_INDX_MAX);
 	spin_lock_irq(&phba->hbalock);
 	list_for_each_entry(fcf_pri, &phba->fcf.fcf_pri_list, list) {
 		if (fcf_pri->fcf_rec.flag & LPFC_FCF_FLOGI_FAILED)

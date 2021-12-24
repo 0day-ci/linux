@@ -1517,7 +1517,8 @@ lpfc_sli4_clear_fcf_rr_bmask(struct lpfc_hba *phba)
 {
 	struct lpfc_fcf_pri *fcf_pri;
 	struct lpfc_fcf_pri *next_fcf_pri;
-	memset(phba->fcf.fcf_rr_bmask, 0, sizeof(*phba->fcf.fcf_rr_bmask));
+
+	bitmap_zero(phba->fcf.fcf_rr_bmask, LPFC_SLI4_FCF_TBL_INDX_MAX);
 	spin_lock_irq(&phba->hbalock);
 	list_for_each_entry_safe(fcf_pri, next_fcf_pri,
 				&phba->fcf.fcf_pri_list, list) {
@@ -2476,8 +2477,8 @@ static int lpfc_sli4_fcf_pri_list_add(struct lpfc_hba *phba,
 	if (new_fcf_pri->fcf_rec.priority <=  current_fcf_pri) {
 		list_add(&new_fcf_pri->list, &phba->fcf.fcf_pri_list);
 		if (new_fcf_pri->fcf_rec.priority <  current_fcf_pri) {
-			memset(phba->fcf.fcf_rr_bmask, 0,
-				sizeof(*phba->fcf.fcf_rr_bmask));
+			bitmap_zero(phba->fcf.fcf_rr_bmask,
+				    LPFC_SLI4_FCF_TBL_INDX_MAX);
 			/* fcfs_at_this_priority_level = 1; */
 			phba->fcf.eligible_fcf_cnt = 1;
 		} else
