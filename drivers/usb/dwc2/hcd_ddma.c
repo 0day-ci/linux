@@ -143,6 +143,7 @@ static void dwc2_desc_list_free(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 
 static int dwc2_frame_list_alloc(struct dwc2_hsotg *hsotg, gfp_t mem_flags)
 {
+	dma_addr_t addr;
 	if (hsotg->frame_list)
 		return 0;
 
@@ -151,9 +152,13 @@ static int dwc2_frame_list_alloc(struct dwc2_hsotg *hsotg, gfp_t mem_flags)
 	if (!hsotg->frame_list)
 		return -ENOMEM;
 
-	hsotg->frame_list_dma = dma_map_single(hsotg->dev, hsotg->frame_list,
-					       hsotg->frame_list_sz,
-					       DMA_TO_DEVICE);
+	addr = dma_map_single(hsotg->dev, hsotg->frame_list,
+			      hsotg->frame_list_sz,
+			      DMA_TO_DEVICE);
+	if (dma_mapping_error(hsotg->dev, addr))
+		return -ENOMEM;
+
+	hsotg->frame_list_dma = addr;
 
 	return 0;
 }
