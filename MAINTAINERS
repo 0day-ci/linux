@@ -18220,6 +18220,7 @@ SUNPLUS SD/SDIO HOST CONTROLLER INTERFACE DRIVER
 M:	Li-hao Kuo <lhjeff911@gmail.com>
 L:	linux-mmc@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/mmc/sunplus-sd2.yaml
 F:	drivers/mmc/host/sunplus_sd2.c
 
 SUPERH
