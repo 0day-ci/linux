@@ -183,6 +183,13 @@ config SMPRO_ERRMON
 	  If you say yes here you get support for error monitor function
 	  provides by Ampere Computing's SoC with SMpro processor.
 
+config SMPRO_MISC
+	tristate "Ampere Computing SMPro miscellaneous driver"
+	depends on MFD_SMPRO || COMPILE_TEST
+	help
+	  If you say yes here you get support for the miscellaleous function
+	  provides by Ampere Computing's SoC with SMpro processor.
+
 config CS5535_MFGPT
 	tristate "CS5535/CS5536 Geode Multi-Function General Purpose Timer (MFGPT) support"
 	depends on MFD_CS5535

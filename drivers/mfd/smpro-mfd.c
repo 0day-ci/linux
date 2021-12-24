@@ -28,6 +28,7 @@ static const struct regmap_config simple_word_regmap_config = {
 static const struct mfd_cell smpro_devs[] = {
 	MFD_CELL_NAME("smpro-hwmon"),
 	MFD_CELL_NAME("smpro-errmon"),
+	MFD_CELL_NAME("smpro-misc"),
 };
 
 static int smpro_mfd_probe(struct i2c_client *i2c)
