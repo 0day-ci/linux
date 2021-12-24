@@ -71,6 +71,21 @@ static void print_isa(struct seq_file *f, const char *isa)
 	seq_puts(f, "\n");
 }
 
+static void print_isa_ext(struct seq_file *f)
+{
+	struct riscv_isa_ext_data *edata;
+	int count = 0;
+
+	seq_puts(f, "isa-ext\t\t: ");
+	list_for_each_entry(edata, &riscv_isa_ext_list, node) {
+		if (count)
+			seq_puts(f, ",");
+		seq_write(f, edata->uprop, strnlen(edata->uprop, RISCV_ISA_EXT_NAME_LEN_MAX));
+		count++;
+	}
+	seq_puts(f, "\n");
+}
+
 static void print_mmu(struct seq_file *f, const char *mmu_type)
 {
 #if defined(CONFIG_32BIT)
@@ -113,6 +128,7 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "hart\t\t: %lu\n", cpuid_to_hartid_map(cpu_id));
 	if (!of_property_read_string(node, "riscv,isa", &isa))
 		print_isa(m, isa);
+	print_isa_ext(m);
 	if (!of_property_read_string(node, "mmu-type", &mmu))
 		print_mmu(m, mmu);
 	if (!of_property_read_string(node, "compatible", &compat)

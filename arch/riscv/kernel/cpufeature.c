@@ -7,6 +7,8 @@
  */
 
 #include <linux/bitmap.h>
+#include <linux/list.h>
+#include <linux/slab.h>
 #include <linux/of.h>
 #include <asm/processor.h>
 #include <asm/hwcap.h>
@@ -17,6 +19,8 @@ unsigned long elf_hwcap __read_mostly;
 
 /* Host ISA bitmap */
 static DECLARE_BITMAP(riscv_isa, RISCV_ISA_EXT_MAX) __read_mostly;
+
+LIST_HEAD(riscv_isa_ext_list);
 
 #ifdef CONFIG_FPU
 __ro_after_init DEFINE_STATIC_KEY_FALSE(cpu_hwcap_fpu);
@@ -59,12 +63,60 @@ bool __riscv_isa_extension_available(const unsigned long *isa_bitmap, int bit)
 }
 EXPORT_SYMBOL_GPL(__riscv_isa_extension_available);
 
+#define __RISCV_ISA_EXT_DATA(DTPROP, UPROP, EXTID) \
+	{							\
+		.dtprop = #DTPROP,				\
+		.uprop = #UPROP,				\
+		.isa_ext_id = EXTID,				\
+	}
+
+static struct riscv_isa_ext_data isa_ext_arr[] = {
+	__RISCV_ISA_EXT_DATA("", "", RISCV_ISA_EXT_MAX),
+};
+
+int riscv_isa_ext_list_add(struct riscv_isa_ext_data *edata)
+{
+	struct device_node *node, *enode;
+	int eid;
+
+	if (!edata || !edata->dtprop)
+		return -EINVAL;
+
+	node = of_find_node_by_path("/cpus");
+	if (!node) {
+		pr_err("No CPU information found in DT\n");
+		return -ENOENT;
+	}
+
+	enode = of_get_child_by_name(node, "riscv,isa-ext");
+	if (!enode) {
+		pr_err("No riscv-isa-ext found in DT\n");
+		return -ENOENT;
+	}
+
+	eid = edata->isa_ext_id;
+	if (eid < RISCV_ISA_EXT_BASE || eid >= RISCV_ISA_EXT_MAX)
+		return -EINVAL;
+
+	if (!of_property_read_bool(enode, edata->dtprop)) {
+		pr_err("The ISA extension %s is not present in DT\n", edata->dtprop);
+		return -ENODEV;
+	}
+
+	/* Enable the extension id in the riscv_isa for easier probing */
+	riscv_isa[0] |= 1 << eid;
+	list_add(&edata->node, &riscv_isa_ext_list);
+	pr_info("RISC-V ISA extension '%s' available\n", edata->uprop);
+
+	return 0;
+}
+
 void __init riscv_fill_hwcap(void)
 {
 	struct device_node *node;
 	const char *isa;
 	char print_str[BITS_PER_LONG + 1];
-	size_t i, j, isa_len;
+	size_t i, j, isa_len, ext_arr_sz;
 	static unsigned long isa2hwcap[256] = {0};
 
 	isa2hwcap['i'] = isa2hwcap['I'] = COMPAT_HWCAP_ISA_I;
@@ -148,4 +200,8 @@ void __init riscv_fill_hwcap(void)
 	if (elf_hwcap & (COMPAT_HWCAP_ISA_F | COMPAT_HWCAP_ISA_D))
 		static_branch_enable(&cpu_hwcap_fpu);
 #endif
+
+	ext_arr_sz = ARRAY_SIZE(isa_ext_arr);
+	for (i = 0; i < ext_arr_sz - 1; i++)
+		riscv_isa_ext_list_add(&isa_ext_arr[i]);
 }
