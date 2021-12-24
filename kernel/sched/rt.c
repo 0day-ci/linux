@@ -544,6 +544,7 @@ static void sched_rt_rq_enqueue(struct rt_rq *rt_rq)
 
 	int cpu = cpu_of(rq);
 
+	update_rq_clock(rq);
 	rt_se = rt_rq->tg->rt_se[cpu];
 
 	if (rt_rq->rt_nr_running) {
