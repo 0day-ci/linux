@@ -87,6 +87,18 @@ bool regmap_check_range_table(struct regmap *map, unsigned int reg,
 }
 EXPORT_SYMBOL_GPL(regmap_check_range_table);
 
+void regmap_acquire_lock(struct regmap *map)
+{
+	map->lock(map->lock_arg);
+}
+EXPORT_SYMBOL_GPL(regmap_acquire_lock);
+
+void regmap_release_lock(struct regmap *map)
+{
+	map->unlock(map->lock_arg);
+}
+EXPORT_SYMBOL_GPL(regmap_release_lock);
+
 bool regmap_writeable(struct regmap *map, unsigned int reg)
 {
 	if (map->max_register && reg > map->max_register)
