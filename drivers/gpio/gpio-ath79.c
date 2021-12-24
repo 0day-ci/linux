@@ -285,7 +285,13 @@ static int ath79_gpio_probe(struct platform_device *pdev)
 					     GFP_KERNEL);
 		if (!girq->parents)
 			return -ENOMEM;
-		girq->parents[0] = platform_get_irq(pdev, 0);
+
+		err = platform_get_irq(pdev, 0);
+		if (err < 0)
+			return err;
+
+		girq->parents[0] = err;
+
 		girq->default_type = IRQ_TYPE_NONE;
 		girq->handler = handle_simple_irq;
 	}
