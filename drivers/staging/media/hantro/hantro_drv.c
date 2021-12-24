@@ -280,6 +280,26 @@ static int hantro_try_ctrl(struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
+#define HANTRO_JPEG_ACTIVE_MARKERS	(V4L2_JPEG_ACTIVE_MARKER_APP0 | \
+					 V4L2_JPEG_ACTIVE_MARKER_COM | \
+					 V4L2_JPEG_ACTIVE_MARKER_DQT | \
+					 V4L2_JPEG_ACTIVE_MARKER_DHT)
+
+static int hantro_jpeg_try_ctrl(struct v4l2_ctrl *ctrl)
+{
+	switch (ctrl->id) {
+	case V4L2_CID_JPEG_COMPRESSION_QUALITY:
+		break;
+	case V4L2_CID_JPEG_ACTIVE_MARKER:
+		ctrl->val = HANTRO_JPEG_ACTIVE_MARKERS;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int hantro_jpeg_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct hantro_ctx *ctx;
@@ -292,6 +312,8 @@ static int hantro_jpeg_s_ctrl(struct v4l2_ctrl *ctrl)
 	switch (ctrl->id) {
 	case V4L2_CID_JPEG_COMPRESSION_QUALITY:
 		ctx->jpeg_quality = ctrl->val;
+		break;
+	case V4L2_CID_JPEG_ACTIVE_MARKER:
 		break;
 	default:
 		return -EINVAL;
@@ -325,6 +347,7 @@ static const struct v4l2_ctrl_ops hantro_ctrl_ops = {
 };
 
 static const struct v4l2_ctrl_ops hantro_jpeg_ctrl_ops = {
+	.try_ctrl = hantro_jpeg_try_ctrl,
 	.s_ctrl = hantro_jpeg_s_ctrl,
 };
 
@@ -341,6 +364,14 @@ static const struct hantro_ctrl controls[] = {
 			.max = 100,
 			.step = 1,
 			.def = 50,
+			.ops = &hantro_jpeg_ctrl_ops,
+		},
+	}, {
+		.codec = HANTRO_JPEG_ENCODER,
+		.cfg = {
+			.id = V4L2_CID_JPEG_ACTIVE_MARKER,
+			.max = HANTRO_JPEG_ACTIVE_MARKERS,
+			.def = HANTRO_JPEG_ACTIVE_MARKERS,
 			.ops = &hantro_jpeg_ctrl_ops,
 		},
 	}, {
