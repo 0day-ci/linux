@@ -1479,7 +1479,7 @@ static int ksz886x_cable_test_wait_for_completion(struct phy_device *phydev)
 				    !(val & KSZ8081_LMD_ENABLE_TEST),
 				    30000, 100000, true);
 
-	return ret < 0 ? ret : 0;
+	return min(ret, 0);
 }
 
 static int ksz886x_cable_test_one_pair(struct phy_device *phydev, int pair)
