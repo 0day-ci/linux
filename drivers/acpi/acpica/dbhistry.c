@@ -24,9 +24,9 @@ typedef struct history_info {
 } HISTORY_INFO;
 
 static HISTORY_INFO acpi_gbl_history_buffer[HISTORY_SIZE];
-static u16 acpi_gbl_lo_history = 0;
-static u16 acpi_gbl_num_history = 0;
-static u16 acpi_gbl_next_history_index = 0;
+static u16 acpi_gbl_lo_history;
+static u16 acpi_gbl_num_history;
+static u16 acpi_gbl_next_history_index;
 
 /*******************************************************************************
  *
