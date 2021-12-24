@@ -450,6 +450,14 @@ qp_init:
 	return err;
 }
 
+static u16 rxe_get_udp_sport(u32 fl, u32 lqpn, u32 rqpn)
+{
+	if (!fl)
+		fl = rdma_calc_flow_label(lqpn, rqpn);
+
+	return rdma_flow_label_to_udp_sport(fl);
+}
+
 static int rxe_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 			 int mask, struct ib_udata *udata)
 {
@@ -467,6 +475,16 @@ static int rxe_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 	err = rxe_qp_from_attr(qp, attr, mask, udata);
 	if (err)
 		goto err1;
+
+	if (mask & IB_QP_AV) {
+		if (attr->ah_attr.ah_flags & IB_AH_GRH) {
+			u32 fl = attr->ah_attr.grh.flow_label;
+			u32 lqp = qp->ibqp.qp_num;
+			u32 rqp = qp->attr.dest_qp_num;
+
+			qp->src_port = rxe_get_udp_sport(fl, lqp, rqp);
+		}
+	}
 
 	return 0;
 
