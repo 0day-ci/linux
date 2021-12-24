@@ -1261,11 +1261,11 @@ static int fjes_probe(struct platform_device *plat_dev)
 	}
 	hw->hw_res.start = res->start;
 	hw->hw_res.size = resource_size(res);
-	hw->hw_res.irq = platform_get_irq(plat_dev, 0);
-	if (hw->hw_res.irq < 0) {
-		err = hw->hw_res.irq;
+
+	err = platform_get_irq(plat_dev, 0);
+	if (err < 0)
 		goto err_free_control_wq;
-	}
+	hw->hw_res.irq = err;
 
 	err = fjes_hw_init(&adapter->hw);
 	if (err)
