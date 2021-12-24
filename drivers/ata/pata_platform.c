@@ -199,14 +199,14 @@ static int pata_platform_probe(struct platform_device *pdev)
 	 * Get the I/O base first
 	 */
 	io_res = platform_get_mem_or_io(pdev, 0);
-	if (unlikely(!io_res))
+	if (!io_res)
 		return -EINVAL;
 
 	/*
 	 * Then the CTL base
 	 */
 	ctl_res = platform_get_mem_or_io(pdev, 1);
-	if (unlikely(!ctl_res))
+	if (!ctl_res)
 		return -EINVAL;
 
 	/*
