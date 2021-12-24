@@ -154,12 +154,8 @@ static void sprd_drm_shutdown(struct platform_device *pdev)
 {
 	struct drm_device *drm = platform_get_drvdata(pdev);
 
-	if (!drm) {
-		drm_warn(drm, "drm device is not available, no shutdown\n");
-		return;
-	}
-
-	drm_atomic_helper_shutdown(drm);
+	if (drm)
+		drm_atomic_helper_shutdown(drm);
 }
 
 static const struct of_device_id drm_match_table[] = {
