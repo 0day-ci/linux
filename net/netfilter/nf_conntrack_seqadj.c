@@ -186,11 +186,13 @@ int nf_ct_seq_adjust(struct sk_buff *skb,
 	else
 		seqoff = this_way->offset_before;
 
-	newseq = htonl(ntohl(tcph->seq) + seqoff);
-	inet_proto_csum_replace4(&tcph->check, skb, tcph->seq, newseq, false);
-	pr_debug("Adjusting sequence number from %u->%u\n",
-		 ntohl(tcph->seq), ntohl(newseq));
-	tcph->seq = newseq;
+	if (seqoff) {
+		newseq = htonl(ntohl(tcph->seq) + seqoff);
+		inet_proto_csum_replace4(&tcph->check, skb, tcph->seq, newseq, false);
+		pr_debug("Adjusting sequence number from %u->%u\n",
+			 ntohl(tcph->seq), ntohl(newseq));
+		tcph->seq = newseq;
+	}
 
 	if (!tcph->ack)
 		goto out;
@@ -200,6 +202,9 @@ int nf_ct_seq_adjust(struct sk_buff *skb,
 		ackoff = other_way->offset_after;
 	else
 		ackoff = other_way->offset_before;
+
+	if (!ackoff)
+		goto out;
 
 	newack = htonl(ntohl(tcph->ack_seq) - ackoff);
 	inet_proto_csum_replace4(&tcph->check, skb, tcph->ack_seq, newack,
