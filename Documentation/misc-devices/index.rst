@@ -26,6 +26,7 @@ fit into other categories.
    lis3lv02d
    max6875
    pci-endpoint-test
+   smpro-errmon
    spear-pcie-gadget
    uacce
    xilinx_sdfec
