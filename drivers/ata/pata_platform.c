@@ -114,7 +114,7 @@ int __pata_platform_probe(struct device *dev, struct resource *io_res,
 	/*
 	 * And the IRQ
 	 */
-	if (irq_res && irq_res->start > 0) {
+	if (irq_res) {
 		irq = irq_res->start;
 		irq_flags = (irq_res->flags & IRQF_TRIGGER_MASK) | IRQF_SHARED;
 	}
