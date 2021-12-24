@@ -2071,11 +2071,11 @@ static int smc911x_drv_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(ndev, &pdev->dev);
 
 	ndev->dma = (unsigned char)-1;
-	ndev->irq = platform_get_irq(pdev, 0);
-	if (ndev->irq < 0) {
-		ret = ndev->irq;
+
+	ret = platform_get_irq(pdev, 0);
+	if (ret < 0)
 		goto release_both;
-	}
+	ndev->irq = ret;
 
 	lp = netdev_priv(ndev);
 	lp->netdev = ndev;
