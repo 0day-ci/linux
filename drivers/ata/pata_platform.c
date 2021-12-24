@@ -253,8 +253,7 @@ static int pata_of_platform_get_pdata(struct platform_device *ofdev,
 
 	priv->use16bit = of_property_read_bool(dn, "ata-generic,use16bit");
 
-	priv->pio_mask = 1 << pio_mode;
-	priv->pio_mask |= (1 << pio_mode) - 1;
+	priv->pio_mask = GENMASK(pio_mode, 0);
 
 	return 0;
 }
