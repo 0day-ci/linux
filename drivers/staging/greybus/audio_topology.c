@@ -146,7 +146,11 @@ static const char **gb_generate_enum_strings(struct gbaudio_module_info *gb,
 	__u8 *data;
 
 	items = le32_to_cpu(gbenum->items);
+
 	strings = devm_kcalloc(gb->dev, items, sizeof(char *), GFP_KERNEL);
+	if (!strings)
+		return NULL;
+
 	data = gbenum->names;
 
 	for (i = 0; i < items; i++) {
@@ -654,7 +658,10 @@ static int gbaudio_tplg_create_enum_kctl(struct gbaudio_module_info *gb,
 
 	/* since count=1, and reg is dummy */
 	gbe->items = le32_to_cpu(gb_enum->items);
+
 	gbe->texts = gb_generate_enum_strings(gb, gb_enum);
+	if (!gbe->texts)
+		return -ENOMEM;
 
 	/* debug enum info */
 	dev_dbg(gb->dev, "Max:%d, name_length:%d\n", gbe->items,
@@ -861,7 +868,10 @@ static int gbaudio_tplg_create_enum_ctl(struct gbaudio_module_info *gb,
 
 	/* since count=1, and reg is dummy */
 	gbe->items = le32_to_cpu(gb_enum->items);
+
 	gbe->texts = gb_generate_enum_strings(gb, gb_enum);
+	if (!gbe->texts)
+		return -ENOMEM;
 
 	/* debug enum info */
 	dev_dbg(gb->dev, "Max:%d, name_length:%d\n", gbe->items,
@@ -1070,8 +1080,12 @@ static int gbaudio_tplg_create_widget(struct gbaudio_module_info *module,
 			csize += offsetof(struct gb_audio_ctl_elem_info, value);
 			csize += offsetof(struct gb_audio_enumerated, names);
 			csize += le16_to_cpu(gbenum->names_length);
+
 			control->texts = (const char * const *)
 				gb_generate_enum_strings(module, gbenum);
+			if (!control->texts)
+				return -ENOMEM;
+
 			control->items = le32_to_cpu(gbenum->items);
 		} else {
 			csize = sizeof(struct gb_audio_control);
@@ -1179,8 +1193,12 @@ static int gbaudio_tplg_process_kcontrols(struct gbaudio_module_info *module,
 			csize += offsetof(struct gb_audio_ctl_elem_info, value);
 			csize += offsetof(struct gb_audio_enumerated, names);
 			csize += le16_to_cpu(gbenum->names_length);
+
 			control->texts = (const char * const *)
 				gb_generate_enum_strings(module, gbenum);
+			if (!control->texts)
+				return -ENOMEM;
+
 			control->items = le32_to_cpu(gbenum->items);
 		} else {
 			csize = sizeof(struct gb_audio_control);
