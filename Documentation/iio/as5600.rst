@@ -1,0 +1,143 @@
+.. SPDX-License-Identifier: GPL-2.0-or-later
+
+=================
+ams AS5600 driver
+=================
+
+
+Overview
+========
+
+The ams AS5600 is a 12-Bit Programmable Contactless Potentiometer. Its
+i2c address is 0x36.
+
+For more information, see the datasheet at
+
+  https://ams.com/documents/20143/36005/AS5600_DS000365_5-00.pdf
+
+
+Accessing the device registers
+==============================
+
+If needed, the device can be configured through debugfs, where most
+register fields are accessible.
+
+.. flat-table:: Registers and fields
+
+  * - Register
+    - Field
+    - Index
+    - Writable range
+
+  * - ZMCO
+    - ZMCO
+    - 0
+
+  * - ZPOS
+    - ZPOS
+    - 1
+    - 0 to 4095
+
+  * - MPOS
+    - MPOS
+    - 2
+    - 0 to 4095
+
+  * - MANG
+    - MANG
+    - 3
+
+  * - CONF
+    - PM
+    - 4
+    - 0 to 3
+
+  * - CONF
+    - HYST
+    - 5
+    - 0 to 3
+
+  * - CONF
+    - OUTS
+    - 6
+    - 0 to 3
+
+  * - CONF
+    - PWMF
+    - 7
+    - 0 to 3
+
+  * - CONF
+    - SF
+    - 8
+    - 0 to 3
+
+  * - CONF
+    - FTH
+    - 9
+    - 0 to 7
+
+  * - CONF
+    - WD
+    - 10
+    - 0 or 1
+
+  * - STATUS
+    - MH
+    - 11
+
+  * - STATUS
+    - ML
+    - 12
+
+  * - STATUS
+    - MD
+    - 13
+
+  * - AGC
+    - AGC
+    - 14
+
+  * - MAGNITUDE
+    - MAGNITUDE
+    - 15
+
+These registers allow the user to check the device and, if needed, to
+configure it.
+
+Assuming the device is iio:device0, its debugfs path will be::
+
+  AS5600=/sys/kernel/debug/iio/iio:device0/direct_reg_access
+
+Locate the index of a register to access in the table above, then use
+the following commands to read a value::
+
+  $ echo <index> > $AS5600/direct_reg_access
+  $ cat $AS5600/direct_reg_access
+
+or this to write a value::
+
+  $ echo <index> <value> > $AS5600/direct_reg_access
+
+For instance, this would return 1 if the magnet is present::
+
+  $ echo 13 > $AS5600/direct_reg_access
+  $ cat $AS5600/direct_reg_access
+
+
+Channels
+========
+
+The driver provides 2 channels. The channel 0 returns the raw,
+unscaled data. The channel 1 returns the data as was scaled by the
+device when ZPOS / MPOS are used. All angles returned have a value of
+0 to 4095.
+
+ZPOS and MPOS let a user restrict the angle returned, which improves
+the precision returned, since the angle returned is still in the 0 to
+4095 range. The minimal angle recommended is 18 degrees. For instance,
+this sets ZPOS and MPOS to a 70 degrees angle (4096/360*70=796), starting
+at some given offset (1200)::
+
+  echo 1 1200 > $AS5600
+  echo 2 1996 > $AS5600

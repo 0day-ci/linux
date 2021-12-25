@@ -9,4 +9,6 @@ Industrial I/O
 
    iio_configfs
 
+   as5600
+
    ep93xx_adc
