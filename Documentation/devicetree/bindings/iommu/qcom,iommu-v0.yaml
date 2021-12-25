@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+
+$id: "http://devicetree.org/schemas/iommu/qcom,iommu-v0.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Qualcomm IOMMU for APQ8064
+
+maintainers:
+  - Will Deacon <will@kernel.org>
+
+description: >
+  The MSM IOMMU is an implementation compatible with the ARM VMSA short
+  descriptor page tables. It provides address translation for bus masters
+  outside of the CPU, each connected to the IOMMU through a port called micro-TLB.
+
+properties:
+  compatible:
+    const: qcom,apq8064-iommu
+
+  clocks:
+    items:
+      - description: interface clock for register accesses
+      - description: functional clock for bus accesses
+
+  clock-names:
+    oneOf:
+      - items:
+          - const: smmu_pclk
+          - const: smmu_clk
+      - items:
+          - const: smmu_pclk
+          - const: iommu_clk
+  reg:
+    maxItems: 1
+
+  interrupts:
+    description: >
+      Specifiers for the MMU fault interrupts. For instances that
+      support secure mode two interrupts must be specified, for non-secure and
+      secure mode, in that order. For instances that don't support secure mode a
+      single interrupt must be specified.
+
+  "#iommu-cells":
+    const: 1
+
+  qcom,ncb:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: The total number of context banks in the IOMMU.
+
+# Each bus master connected to an IOMMU must reference the IOMMU
+# in its device node with the following property:
+#   A reference to the IOMMU in multiple cells. The first cell is a
+#   phandle to the IOMMU and the second cell is the stream id.
+#   A single master device can be connected to more than one iommu
+#   and multiple contexts in each of the iommu. So multiple entries
+#   are required to list all the iommus and the stream ids that the
+#   master is connected to.
+
+required:
+  - clocks
+  - clock-names
+  - reg
+  - interrupts
+  - qcom,ncb
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
+
+    mdp_port0: iommu@7500000 {
+            compatible = "qcom,apq8064-iommu";
+            #iommu-cells = <1>;
+            clock-names =
+                "smmu_pclk",
+                "smmu_clk";
+            clocks =
+                <&clk SMMU_AHB_CLK>,
+                <&clk MDP_AXI_CLK>;
+            reg = <0x07500000 0x100000>;
+            interrupts =
+                <0 63 0>,
+                <0 64 0>;
+            qcom,ncb = <2>;
+    };
+
+    /* mdp: mdp@5100000 {
+            compatible = "qcom,mdp4";
+            ...
+
+            iommus = <&mdp_port0 0
+                      &mdp_port0 2>;
+    };*/
