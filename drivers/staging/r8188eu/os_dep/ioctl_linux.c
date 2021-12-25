@@ -4229,43 +4229,6 @@ static int rtw_tdls_get(struct net_device *dev,
 	return 0;
 }
 
-static int rtw_test(
-	struct net_device *dev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu, char *extra)
-{
-	u32 len;
-	u8 *pbuf, *pch;
-	char *ptmp;
-	u8 *delim = ",";
-
-	DBG_88E("+%s\n", __func__);
-	len = wrqu->data.length;
-
-	pbuf = kzalloc(len, GFP_KERNEL);
-	if (!pbuf) {
-		DBG_88E("%s: no memory!\n", __func__);
-		return -ENOMEM;
-	}
-
-	if (copy_from_user(pbuf, wrqu->data.pointer, len)) {
-		kfree(pbuf);
-		DBG_88E("%s: copy from user fail!\n", __func__);
-		return -EFAULT;
-	}
-	DBG_88E("%s: string =\"%s\"\n", __func__, pbuf);
-
-	ptmp = (char *)pbuf;
-	pch = strsep(&ptmp, delim);
-	if (!pch || strlen(pch) == 0) {
-		kfree(pbuf);
-		DBG_88E("%s: parameter error(level 1)!\n", __func__);
-		return -EFAULT;
-	}
-	kfree(pbuf);
-	return 0;
-}
-
 static iw_handler rtw_handlers[] = {
 	IW_HANDLER(SIOCGIWNAME, rtw_wx_get_name),
 	IW_HANDLER(SIOCGIWFREQ, rtw_wx_get_freq),
@@ -4431,7 +4394,6 @@ NULL,					/* 0x03 */
 	NULL,				/* 0x1A */
 	NULL,				/* 0x1B */
 	NULL,				/*  0x1C is reserved for hostapd */
-	rtw_test,			/*  0x1D */
 };
 
 static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
