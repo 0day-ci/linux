@@ -54,16 +54,16 @@ static int bpck_read_regr( PIA *pi, int cont, int regr )
 	switch (pi->mode) {
 
 	case 0: w0(r & 0xf); w0(r); t2(2); t2(4);
-	        l = r1();
-        	t2(4);
-        	h = r1();
-        	return j44(l,h);
+		l = r1();
+		t2(4);
+		h = r1();
+		return j44(l, h);
 
 	case 1: w0(r & 0xf); w0(r); t2(2);
-	        e2(); t2(0x20);
+		e2(); t2(0x20);
 		t2(4); h = r0();
-	        t2(1); t2(0x20);
-	        return h;
+		t2(1); t2(0x20);
+		return h;
 
 	case 2:
 	case 3:
@@ -288,9 +288,9 @@ static int bpck_test_proto( PIA *pi, char * scratch, int verbose )
 		WR(0x13,0x7f);
 		w0(0x13); t2(2);
 		for(i=0;i<TEST_LEN;i++) {
-                    t2(4); l = r1();
-                    t2(4); h = r1();
-                    buf[i] = j44(l,h);
+		    t2(4); l = r1();
+		    t2(4); h = r1();
+		    buf[i] = j44(l, h);
 		}
 		bpck_disconnect(pi);
 		break;
