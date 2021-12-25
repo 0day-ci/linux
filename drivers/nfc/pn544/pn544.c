@@ -552,6 +552,8 @@ static int pn544_hci_complete_target_discovered(struct nfc_hci_dev *hdev,
 			r = nfc_hci_send_cmd(hdev, PN544_RF_READER_F_GATE,
 					     PN544_RF_READER_CMD_ACTIVATE_NEXT,
 					     uid_skb->data, uid_skb->len, NULL);
+			if (r < 0)
+				return r;
 			kfree_skb(uid_skb);
 		}
 	} else if (target->supported_protocols & NFC_PROTO_ISO14443_MASK) {
