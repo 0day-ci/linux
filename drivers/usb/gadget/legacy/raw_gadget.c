@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * USB Raw Gadget driver.
  * See Documentation/usb/raw-gadget.rst for more details.
