@@ -386,8 +386,10 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 	struct sk_buff *entskb = entry->skb;
 	struct net_device *indev;
 	struct net_device *outdev;
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	struct nf_conn *ct = NULL;
 	enum ip_conntrack_info ctinfo = 0;
+#endif
 	struct nfnl_ct_hook *nfnl_ct;
 	bool csum_verify;
 	char *secdata = NULL;
@@ -594,8 +596,10 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 	if (seclen && nla_put(skb, NFQA_SECCTX, seclen, secdata))
 		goto nla_put_failure;
 
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	if (ct && nfnl_ct->build(skb, ct, ctinfo, NFQA_CT, NFQA_CT_INFO) < 0)
 		goto nla_put_failure;
+#endif
 
 	if (cap_len > data_len &&
 	    nla_put_be32(skb, NFQA_CAP_LEN, htonl(cap_len)))
@@ -1103,13 +1107,13 @@ static int nfqnl_recv_verdict_batch(struct sk_buff *skb,
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 static struct nf_conn *nfqnl_ct_parse(struct nfnl_ct_hook *nfnl_ct,
 				      const struct nlmsghdr *nlh,
 				      const struct nlattr * const nfqa[],
 				      struct nf_queue_entry *entry,
 				      enum ip_conntrack_info *ctinfo)
 {
-#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	struct nf_conn *ct;
 
 	ct = nf_ct_get(entry->skb, ctinfo);
@@ -1124,10 +1128,8 @@ static struct nf_conn *nfqnl_ct_parse(struct nfnl_ct_hook *nfnl_ct,
 				      NETLINK_CB(entry->skb).portid,
 				      nlmsg_report(nlh));
 	return ct;
-#else
-	return NULL;
-#endif
 }
+#endif
 
 static int nfqa_parse_bridge(struct nf_queue_entry *entry,
 			     const struct nlattr * const nfqa[])
@@ -1171,11 +1173,13 @@ static int nfqnl_recv_verdict(struct sk_buff *skb, const struct nfnl_info *info,
 	struct nfnl_queue_net *q = nfnl_queue_pernet(info->net);
 	u_int16_t queue_num = ntohs(info->nfmsg->res_id);
 	struct nfqnl_msg_verdict_hdr *vhdr;
-	enum ip_conntrack_info ctinfo;
 	struct nfqnl_instance *queue;
 	struct nf_queue_entry *entry;
 	struct nfnl_ct_hook *nfnl_ct;
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	struct nf_conn *ct = NULL;
+	enum ip_conntrack_info ctinfo = 0;
+#endif
 	unsigned int verdict;
 	int err;
 
@@ -1197,11 +1201,13 @@ static int nfqnl_recv_verdict(struct sk_buff *skb, const struct nfnl_info *info,
 	/* rcu lock already held from nfnl->call_rcu. */
 	nfnl_ct = rcu_dereference(nfnl_ct_hook);
 
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	if (nfqa[NFQA_CT]) {
 		if (nfnl_ct != NULL)
 			ct = nfqnl_ct_parse(nfnl_ct, info->nlh, nfqa, entry,
 					    &ctinfo);
 	}
+#endif
 
 	if (entry->state.pf == PF_BRIDGE) {
 		err = nfqa_parse_bridge(entry, nfqa);
@@ -1217,8 +1223,10 @@ static int nfqnl_recv_verdict(struct sk_buff *skb, const struct nfnl_info *info,
 				 payload_len, entry, diff) < 0)
 			verdict = NF_DROP;
 
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
 		if (ct && diff)
 			nfnl_ct->seq_adjust(entry->skb, ct, ctinfo, diff);
+#endif
 	}
 
 	if (nfqa[NFQA_MARK])
