@@ -422,7 +422,13 @@ static int enable_net_traffic(struct net_device *dev, struct usb_device *usb)
 	ret = read_mii_word(pegasus, pegasus->phy, MII_LPA, &linkpart);
 	if (ret < 0)
 		goto fail;
-	data[0] = 0xc8; /* TX & RX enable, append status, no CRC */
+	/* At least two hardware revisions of the D-Link DSB-650TX (USB IDs
+	 * 2001:4002 and 2001:400b) include the Ethernet FCS in the packets,
+	 * even if RXCS is set to 0 in the EC0 register and the hardware is
+	 * instructed to not include the Ethernet FCS in the packet.Therefore,
+	 * it seems best to set RXCS to 1 and later ignore the Ethernet FCS.
+	 */
+	data[0] = 0xc9; /* TX & RX enable, append status, CRC */
 	data[1] = 0;
 	if (linkpart & (ADVERTISE_100FULL | ADVERTISE_10FULL))
 		data[1] |= 0x20;	/* set full duplex */
@@ -513,6 +519,13 @@ static void read_bulk_callback(struct urb *urb)
 		pkt_len = buf[count - 3] << 8;
 		pkt_len += buf[count - 4];
 		pkt_len &= 0xfff;
+		/* The FCS at the end of the packet is ignored. So subtract
+		 * its length to ignore it.
+		 */
+		pkt_len -= ETH_FCS_LEN;
+		/* Subtract the length of the received status at the end of the
+		 * packet as it is not part of the Ethernet frame.
+		 */
 		pkt_len -= 4;
 	}
 
