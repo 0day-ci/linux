@@ -602,13 +602,6 @@ static bool i9xx_cursor_get_hw_state(struct intel_plane *plane,
 	return ret;
 }
 
-static bool intel_cursor_format_mod_supported(struct drm_plane *_plane,
-					      u32 format, u64 modifier)
-{
-	return modifier == DRM_FORMAT_MOD_LINEAR &&
-		format == DRM_FORMAT_ARGB8888;
-}
-
 static int
 intel_legacy_cursor_update(struct drm_plane *_plane,
 			   struct drm_crtc *_crtc,
@@ -745,7 +738,6 @@ static const struct drm_plane_funcs intel_cursor_plane_funcs = {
 	.destroy = intel_plane_destroy,
 	.atomic_duplicate_state = intel_plane_duplicate_state,
 	.atomic_destroy_state = intel_plane_destroy_state,
-	.format_mod_supported = intel_cursor_format_mod_supported,
 };
 
 struct intel_plane *
