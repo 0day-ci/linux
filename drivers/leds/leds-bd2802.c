@@ -241,7 +241,7 @@ static void bd2802_enable(struct bd2802_led *led, enum led_ids id)
 	if (id == LED1)
 		value = LED_CTL(other_led_on, 1);
 	else
-		value = LED_CTL(1 , other_led_on);
+		value = LED_CTL(1, other_led_on);
 
 	bd2802_write_byte(led->client, BD2802_REG_CONTROL, value);
 }
