@@ -81,6 +81,8 @@ static void vkms_plane_reset(struct drm_plane *plane)
 	}
 
 	__drm_gem_reset_shadow_plane(plane, &vkms_state->base);
+	vkms_state->base.base.zpos = drm_plane_index(plane);
+	vkms_state->base.base.normalized_zpos = drm_plane_index(plane);
 }
 
 static const struct drm_plane_funcs vkms_plane_funcs = {
@@ -158,6 +160,22 @@ static const struct drm_plane_helper_funcs vkms_primary_helper_funcs = {
 	DRM_GEM_SHADOW_PLANE_HELPER_FUNCS,
 };
 
+static int vkms_plane_create_zpos_property(struct vkms_plane *plane)
+{
+	int ret;
+	unsigned int zpos = drm_plane_index(&plane->base);
+
+	if (plane->base.type == DRM_PLANE_TYPE_OVERLAY) {
+		ret = drm_plane_create_zpos_property(&plane->base, zpos,
+						     1, NUM_OVERLAY_PLANES);
+	} else {
+		ret = drm_plane_create_zpos_immutable_property(&plane->base,
+							       zpos);
+	}
+
+	return ret;
+}
+
 struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
 				   enum drm_plane_type type, int index)
 {
@@ -166,6 +184,7 @@ struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
 	struct vkms_plane *plane;
 	const u32 *formats;
 	int nformats;
+	int ret;
 
 	switch (type) {
 	case DRM_PLANE_TYPE_PRIMARY:
@@ -194,6 +213,10 @@ struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
 		return plane;
 
 	drm_plane_helper_add(&plane->base, funcs);
+
+	ret = vkms_plane_create_zpos_property(plane);
+	if (ret)
+		return ERR_PTR(ret);
 
 	return plane;
 }
