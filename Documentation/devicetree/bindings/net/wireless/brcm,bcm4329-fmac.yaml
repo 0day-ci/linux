@@ -4,7 +4,7 @@
 $id: http://devicetree.org/schemas/net/wireless/brcm,bcm4329-fmac.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: Broadcom BCM4329 family fullmac wireless SDIO devices
+title: Broadcom BCM4329 family fullmac wireless SDIO/PCIE devices
 
 maintainers:
   - Arend van Spriel <arend@broadcom.com>
@@ -36,16 +36,22 @@ properties:
               - brcm,bcm43455-fmac
               - brcm,bcm43456-fmac
               - brcm,bcm4354-fmac
+              - brcm,bcm4355c1-fmac
               - brcm,bcm4356-fmac
               - brcm,bcm4359-fmac
+              - brcm,bcm4364b2-fmac
+              - brcm,bcm4364b3-fmac
+              - brcm,bcm4377b3-fmac
+              - brcm,bcm4378b1-fmac
+              - brcm,bcm4387c2-fmac
               - cypress,cyw4373-fmac
               - cypress,cyw43012-fmac
           - const: brcm,bcm4329-fmac
       - const: brcm,bcm4329-fmac
 
   reg:
-    description: SDIO function number for the device, for most cases
-      this will be 1.
+    description: SDIO function number for the device (for most cases
+      this will be 1) or PCI device identifier.
 
   interrupts:
     maxItems: 1
@@ -74,6 +80,26 @@ properties:
       brcmfmac firmware country code and revision.
     items:
       pattern: '^[A-Z][A-Z]-[A-Z][0-9A-Z]-[0-9]+$'
+
+  brcm,cal-blob:
+    $ref: /schemas/types.yaml#/definitions/uint8-array
+    description: A per-device calibration blob for the Wi-Fi radio. This
+      should be filled in by the bootloader from platform configuration
+      data, if necessary, and will be uploaded to the device if present.
+
+  apple,module-instance:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: Module codename used to identify a specific board on
+      Apple platforms. This is used to build the firmware filenames, to allow
+      different platforms to have different firmware and/or NVRAM config.
+
+  apple,antenna-sku:
+    $def: /schemas/types.yaml#/definitions/string
+    description: Antenna SKU used to identify a specific antenna configuration
+      on Apple platforms. This is use to build firmware filenames, to allow
+      platforms with different antenna configs to have different firmware and/or
+      NVRAM. This would normally be filled in by the bootloader from platform
+      configuration data.
 
 required:
   - compatible
