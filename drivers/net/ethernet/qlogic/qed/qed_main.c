@@ -65,6 +65,9 @@ MODULE_LICENSE("GPL");
 
 MODULE_FIRMWARE(QED_FW_FILE_NAME);
 
+#define QED_FW_REPO		\
+	"https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
+
 /* MFW speed capabilities maps */
 
 struct qed_mfw_speed_map {
@@ -1285,6 +1288,9 @@ static int qed_slowpath_start(struct qed_dev *cdev,
 			DP_NOTICE(cdev,
 				  "Failed to find fw file - /lib/firmware/%s\n",
 				  QED_FW_FILE_NAME);
+			DP_NOTICE(cdev,
+				  "you may need to download firmware from %s",
+				  QED_FW_REPO);
 			goto err;
 		}
 
