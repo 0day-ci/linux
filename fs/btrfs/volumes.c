@@ -7763,7 +7763,7 @@ static int btrfs_device_init_dev_stats(struct btrfs_device *device,
 			btrfs_dev_stat_set(device, i, 0);
 		device->dev_stats_valid = 1;
 		btrfs_release_path(path);
-		return ret < 0 ? ret : 0;
+		return min(ret, 0);
 	}
 	slot = path->slots[0];
 	eb = path->nodes[0];
