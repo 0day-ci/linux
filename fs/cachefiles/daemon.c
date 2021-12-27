@@ -29,6 +29,8 @@ static ssize_t cachefiles_daemon_write(struct file *, const char __user *,
 				       size_t, loff_t *);
 static __poll_t cachefiles_daemon_poll(struct file *,
 					   struct poll_table_struct *);
+static ssize_t cachefiles_demand_read(struct file *, char __user *, size_t,
+				      loff_t *);
 static __poll_t cachefiles_demand_poll(struct file *,
 					   struct poll_table_struct *);
 static int cachefiles_daemon_frun(struct cachefiles_cache *, char *);
@@ -63,6 +65,7 @@ const struct file_operations cachefiles_demand_fops = {
 	.owner		= THIS_MODULE,
 	.open		= cachefiles_daemon_open,
 	.release	= cachefiles_daemon_release,
+	.read		= cachefiles_demand_read,
 	.write		= cachefiles_daemon_write,
 	.poll		= cachefiles_demand_poll,
 	.llseek		= noop_llseek,
@@ -320,6 +323,32 @@ static __poll_t cachefiles_daemon_poll(struct file *file,
 		mask |= EPOLLOUT;
 
 	return mask;
+}
+
+static ssize_t cachefiles_demand_read(struct file *file, char __user *_buffer,
+				      size_t buflen, loff_t *pos)
+{
+	struct cachefiles_cache *cache = file->private_data;
+	struct cachefiles_req *req;
+	int n, id = 0;
+
+	if (!test_bit(CACHEFILES_READY, &cache->flags))
+		return 0;
+
+	spin_lock(&cache->reqs_lock);
+	req = idr_get_next(&cache->reqs, &id);
+	spin_unlock(&cache->reqs_lock);
+	if (!req)
+		return 0;
+
+	n = sizeof(req->req_in);
+	if (n > buflen)
+		return -EMSGSIZE;
+
+	if (copy_to_user(_buffer, &req->req_in, n) != 0)
+		return -EFAULT;
+
+	return n;
 }
 
 static __poll_t cachefiles_demand_poll(struct file *file,
