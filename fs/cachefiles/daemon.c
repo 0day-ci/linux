@@ -29,6 +29,8 @@ static ssize_t cachefiles_daemon_write(struct file *, const char __user *,
 				       size_t, loff_t *);
 static __poll_t cachefiles_daemon_poll(struct file *,
 					   struct poll_table_struct *);
+static __poll_t cachefiles_demand_poll(struct file *,
+					   struct poll_table_struct *);
 static int cachefiles_daemon_frun(struct cachefiles_cache *, char *);
 static int cachefiles_daemon_fcull(struct cachefiles_cache *, char *);
 static int cachefiles_daemon_fstop(struct cachefiles_cache *, char *);
@@ -62,6 +64,7 @@ const struct file_operations cachefiles_demand_fops = {
 	.open		= cachefiles_daemon_open,
 	.release	= cachefiles_daemon_release,
 	.write		= cachefiles_daemon_write,
+	.poll		= cachefiles_demand_poll,
 	.llseek		= noop_llseek,
 };
 
@@ -315,6 +318,21 @@ static __poll_t cachefiles_daemon_poll(struct file *file,
 
 	if (test_bit(CACHEFILES_CULLING, &cache->flags))
 		mask |= EPOLLOUT;
+
+	return mask;
+}
+
+static __poll_t cachefiles_demand_poll(struct file *file,
+					   struct poll_table_struct *poll)
+{
+	struct cachefiles_cache *cache = file->private_data;
+	__poll_t mask;
+
+	poll_wait(file, &cache->daemon_pollwq, poll);
+	mask = 0;
+
+	if (!idr_is_empty(&cache->reqs))
+		mask |= EPOLLIN;
 
 	return mask;
 }
