@@ -18,13 +18,7 @@ static void erofs_priv_cleanup(struct address_space *mapping, void *netfs_priv)
 
 static void erofs_issue_op(struct netfs_read_subrequest *subreq)
 {
-	/*
-	 * TODO: implement demand-read logic later.
-	 * We rely on user daemon to prepare blob files under corresponding
-	 * directory, and we can reach here if blob files don't exist.
-	 */
-
-	netfs_subreq_terminated(subreq, -EOPNOTSUPP, false);
+	netfs_demand_read(subreq);
 }
 
 const struct netfs_read_request_ops erofs_req_ops = {
