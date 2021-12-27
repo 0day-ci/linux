@@ -77,12 +77,24 @@ static inline void do_copy_page(struct page *from, struct page *to,
 	kunmap_atomic(vfrom);
 }
 
+static struct page *erofs_fscache_get_page(struct erofs_cookie_ctx *ctx,
+					   erofs_blk_t blkaddr)
+{
+	struct page *page;
+
+	page = erofs_readpage_from_fscache(ctx, blkaddr);
+	if (!IS_ERR(page))
+		lock_page(page);
+	return page;
+}
+
 static int erofs_fscache_do_readpage(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
 	struct erofs_inode *vi = EROFS_I(inode);
 	struct super_block *sb = inode->i_sb;
 	struct erofs_map_blocks map;
+	struct erofs_map_dev mdev;
 	erofs_off_t o_la, pa;
 	size_t offset, len;
 	struct page *ipage;
@@ -105,6 +117,15 @@ static int erofs_fscache_do_readpage(struct file *file, struct page *page)
 		return 0;
 	}
 
+	mdev = (struct erofs_map_dev) {
+		.m_deviceid = map.m_deviceid,
+		.m_pa = map.m_pa,
+	};
+
+	ret = erofs_map_dev(inode->i_sb, &mdev);
+	if (ret)
+		return ret;
+
 	/*
 	 * 1) For FLAT_PLAIN/FLAT_INLINE layout, the output map.m_la shall be
 	 * equal to o_la, and the output map.m_pa is exactly the physical
@@ -114,9 +135,9 @@ static int erofs_fscache_do_readpage(struct file *file, struct page *page)
 	 * physical address of this chunk boundary. So we need to recalculate
 	 * the actual physical address of o_la.
 	 */
-	pa = map.m_pa + o_la - map.m_la;
+	pa = mdev.m_pa + o_la - map.m_la;
 
-	ipage = erofs_get_meta_page(sb, erofs_blknr(pa));
+	ipage = erofs_fscache_get_page(mdev.m_ctx, erofs_blknr(pa));
 	if (IS_ERR(ipage))
 		return PTR_ERR(ipage);
 

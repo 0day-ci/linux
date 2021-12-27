@@ -447,6 +447,7 @@ static inline int z_erofs_map_blocks_iter(struct inode *inode,
 struct erofs_map_dev {
 	struct block_device *m_bdev;
 	struct dax_device *m_daxdev;
+	struct erofs_cookie_ctx *m_ctx;
 
 	erofs_off_t m_pa;
 	unsigned int m_deviceid;
