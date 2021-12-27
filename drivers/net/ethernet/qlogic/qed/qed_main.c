@@ -1285,6 +1285,9 @@ static int qed_slowpath_start(struct qed_dev *cdev,
 			DP_NOTICE(cdev,
 				  "Failed to find fw file - /lib/firmware/%s\n",
 				  QED_FW_FILE_NAME);
+			DP_NOTICE(cdev,
+				  "you may need to download firmware from %s",
+				  FW_REPO);
 			goto err;
 		}
 

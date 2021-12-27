@@ -1210,6 +1210,9 @@ struct qed_common_ops {
 	int (*get_esl_status)(struct qed_dev *cdev, bool *esl_active);
 };
 
+#define FW_REPO		\
+	"https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
+
 #define MASK_FIELD(_name, _value) \
 	((_value) &= (_name ## _MASK))
 
