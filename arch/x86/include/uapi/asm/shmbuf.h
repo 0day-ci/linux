@@ -13,9 +13,11 @@
  * from other 32-bit architectures.
  */
 
+#include <asm/ipcbuf.h>
+
 struct shmid64_ds {
 	struct ipc64_perm	shm_perm;	/* operation perms */
-	size_t			shm_segsz;	/* size of segment (bytes) */
+	__kernel_size_t		shm_segsz;	/* size of segment (bytes) */
 	__kernel_long_t		shm_atime;	/* last attach time */
 	__kernel_long_t		shm_dtime;	/* last detach time */
 	__kernel_long_t		shm_ctime;	/* last change time */
