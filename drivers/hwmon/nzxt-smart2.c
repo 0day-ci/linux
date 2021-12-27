@@ -458,7 +458,7 @@ static int send_output_report(struct drvdata *drvdata, const void *data,
 
 	ret = hid_hw_output_report(drvdata->hid, drvdata->output_buffer,
 				   sizeof(drvdata->output_buffer));
-	return ret < 0 ? ret : 0;
+	return min(ret, 0);
 }
 
 static int set_pwm(struct drvdata *drvdata, int channel, long val)
