@@ -390,7 +390,7 @@ struct dentry *rproc_create_trace_file(const char *name, struct rproc *rproc,
 
 	tfile = debugfs_create_file(name, 0400, rproc->dbg_dir, trace,
 				    &trace_rproc_ops);
-	if (!tfile) {
+	if (IS_ERR(tfile)) {
 		dev_err(&rproc->dev, "failed to create debugfs trace entry\n");
 		return NULL;
 	}
