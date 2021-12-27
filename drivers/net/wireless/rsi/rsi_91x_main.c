@@ -193,6 +193,10 @@ int rsi_read_pkt(struct rsi_common *common, u8 *rx_pkt, s32 rcv_pkt_len)
 			break;
 
 		case RSI_WIFI_DATA_Q:
+			if (!rcv_pkt_len && offset + length >
+				RSI_MAX_RX_USB_PKT_SIZE)
+				goto fail;
+
 			skb = rsi_prepare_skb(common,
 					      (frame_desc + offset),
 					      length,
