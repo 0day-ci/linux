@@ -663,6 +663,16 @@ static int erofs_fc_fill_super(struct super_block *sb, struct fs_context *fc)
 	else
 		sbi->dax_dev = NULL;
 
+	if (!sb->s_bdev) {
+		struct erofs_cookie_ctx *bootstrap;
+
+		bootstrap = erofs_fscache_get_ctx(sb, ctx->opt.uuid);
+		if (IS_ERR(bootstrap))
+			return PTR_ERR(bootstrap);
+
+		sbi->bootstrap = bootstrap;
+	}
+
 	err = erofs_read_superblock(sb);
 	if (err)
 		return err;
@@ -820,6 +830,7 @@ static void erofs_kill_sb(struct super_block *sb)
 		return;
 
 	erofs_free_dev_context(sbi->devs);
+	erofs_fscache_put_ctx(sbi->bootstrap);
 	fs_put_dax(sbi->dax_dev);
 	kfree(sbi);
 	sb->s_fs_info = NULL;
@@ -837,6 +848,8 @@ static void erofs_put_super(struct super_block *sb)
 	iput(sbi->managed_cache);
 	sbi->managed_cache = NULL;
 #endif
+	erofs_fscache_put_ctx(sbi->bootstrap);
+	sbi->bootstrap = NULL;
 }
 
 static struct file_system_type erofs_fs_type = {
