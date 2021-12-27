@@ -1084,7 +1084,8 @@ static struct counter_count quad8_counts[] = {
 
 static irqreturn_t quad8_irq_handler(int irq, void *private)
 {
-	struct quad8 *const priv = private;
+	struct counter_device *counter = private;
+	struct quad8 *const priv = counter_priv(counter);
 	const unsigned long base = priv->base;
 	unsigned long irq_status;
 	unsigned long channel;
@@ -1115,7 +1116,7 @@ static irqreturn_t quad8_irq_handler(int irq, void *private)
 			continue;
 		}
 
-		counter_push_event(&priv->counter, event, channel);
+		counter_push_event(counter, event, channel);
 	}
 
 	/* Clear pending interrupts on device */
@@ -1192,7 +1193,7 @@ static int quad8_probe(struct device *dev, unsigned int id)
 	outb(QUAD8_CHAN_OP_ENABLE_INTERRUPT_FUNC, base[id] + QUAD8_REG_CHAN_OP);
 
 	err = devm_request_irq(dev, irq[id], quad8_irq_handler, IRQF_SHARED,
-			       counter->name, priv);
+			       counter->name, counter);
 	if (err)
 		return err;
 
