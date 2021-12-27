@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/iomap.h>
+#include <linux/fscache.h>
 #include "erofs_fs.h"
 
 /* redefine pr_fmt "erofs: " */
@@ -568,6 +569,10 @@ static inline int z_erofs_load_lzma_config(struct super_block *sb,
 	return 0;
 }
 #endif	/* !CONFIG_EROFS_FS_ZIP */
+
+/* fscache.c */
+int erofs_fscache_init(void);
+void erofs_fscache_cleanup(void);
 
 #define EFSCORRUPTED    EUCLEAN         /* Filesystem is corrupted */
 
