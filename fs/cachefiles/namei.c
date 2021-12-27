@@ -511,8 +511,18 @@ out:
  */
 static bool cachefiles_create_file(struct cachefiles_object *object)
 {
+	struct cachefiles_cache *cache = object->volume->cache;
 	struct file *file;
 	int ret;
+
+	/*
+	 * Demand read mode requires that backing files have been prepared with
+	 * correct file size under corresponding directory. We can get here when
+	 * the backing file doesn't exist under corresponding directory, or the
+	 * file size is unexpected 0.
+	 */
+	if (test_bit(CACHEFILES_DEMAND_MODE, &cache->flags))
+		return false;
 
 	ret = cachefiles_has_space(object->volume->cache, 1, 0,
 				   cachefiles_has_space_for_create);
@@ -528,6 +538,32 @@ static bool cachefiles_create_file(struct cachefiles_object *object)
 	_debug("create -> %pD{ino=%lu}", file, file_inode(file)->i_ino);
 	object->file = file;
 	return true;
+}
+
+/*
+ * Fs using fscache for demand reading may have no idea of the file size of
+ * backing files. Thus the demand read mode requires that backing files have
+ * been prepared with correct file size under corresponding directory. Then
+ * fscache backend is responsible for taking the file size of the backing file
+ * as the object size.
+ */
+static int cachefiles_recheck_size(struct cachefiles_object *object,
+				   struct file *file)
+{
+	loff_t size;
+	struct cachefiles_cache *cache = object->volume->cache;
+
+	if (!test_bit(CACHEFILES_DEMAND_MODE, &cache->flags))
+		return 0;
+
+	size = i_size_read(file_inode(file));
+	if (size) {
+		object->cookie->object_size = size;
+		return 0;
+	} else {
+		return -EINVAL;
+	}
+
 }
 
 /*
@@ -568,6 +604,10 @@ static bool cachefiles_open_file(struct cachefiles_object *object,
 		goto error_fput;
 	}
 	_debug("file -> %pd positive", dentry);
+
+	ret = cachefiles_recheck_size(object, file);
+	if (ret < 0)
+		goto check_failed;
 
 	ret = cachefiles_check_auxdata(object, file);
 	if (ret < 0)
