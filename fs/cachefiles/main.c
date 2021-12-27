@@ -39,6 +39,12 @@ static struct miscdevice cachefiles_dev = {
 	.fops	= &cachefiles_daemon_fops,
 };
 
+static struct miscdevice cachefiles_demand_dev = {
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name	= "cachefiles_demand",
+	.fops	= &cachefiles_demand_fops,
+};
+
 /*
  * initialise the fs caching module
  */
@@ -52,6 +58,9 @@ static int __init cachefiles_init(void)
 	ret = misc_register(&cachefiles_dev);
 	if (ret < 0)
 		goto error_dev;
+	ret = misc_register(&cachefiles_demand_dev);
+	if (ret < 0)
+		goto error_demand_dev;
 
 	/* create an object jar */
 	ret = -ENOMEM;
@@ -68,6 +77,8 @@ static int __init cachefiles_init(void)
 	return 0;
 
 error_object_jar:
+	misc_deregister(&cachefiles_demand_dev);
+error_demand_dev:
 	misc_deregister(&cachefiles_dev);
 error_dev:
 	cachefiles_unregister_error_injection();
@@ -86,6 +97,7 @@ static void __exit cachefiles_exit(void)
 	pr_info("Unloading\n");
 
 	kmem_cache_destroy(cachefiles_object_jar);
+	misc_deregister(&cachefiles_demand_dev);
 	misc_deregister(&cachefiles_dev);
 	cachefiles_unregister_error_injection();
 }

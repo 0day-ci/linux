@@ -145,6 +145,7 @@ extern int cachefiles_has_space(struct cachefiles_cache *cache,
  * daemon.c
  */
 extern const struct file_operations cachefiles_daemon_fops;
+extern const struct file_operations cachefiles_demand_fops;
 
 /*
  * error_inject.c

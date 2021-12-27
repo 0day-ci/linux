@@ -56,6 +56,14 @@ const struct file_operations cachefiles_daemon_fops = {
 	.llseek		= noop_llseek,
 };
 
+const struct file_operations cachefiles_demand_fops = {
+	.owner		= THIS_MODULE,
+	.open		= cachefiles_daemon_open,
+	.release	= cachefiles_daemon_release,
+	.write		= cachefiles_daemon_write,
+	.llseek		= noop_llseek,
+};
+
 struct cachefiles_daemon_cmd {
 	char name[8];
 	int (*handler)(struct cachefiles_cache *cache, char *args);
