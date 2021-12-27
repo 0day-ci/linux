@@ -542,7 +542,7 @@ static int __asix_mdio_write(struct net_device *netdev, int phy_id, int loc,
 out:
 	mutex_unlock(&dev->phy_mutex);
 
-	return ret < 0 ? ret : 0;
+	return min(ret, 0);
 }
 
 void asix_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
