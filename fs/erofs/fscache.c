@@ -6,6 +6,65 @@
 
 static struct fscache_volume *volume;
 
+static int erofs_begin_cache_operation(struct netfs_read_request *rreq)
+{
+	return fscache_begin_read_operation(&rreq->cache_resources,
+					    rreq->netfs_priv);
+}
+
+static void erofs_priv_cleanup(struct address_space *mapping, void *netfs_priv)
+{
+}
+
+static void erofs_issue_op(struct netfs_read_subrequest *subreq)
+{
+	/*
+	 * TODO: implement demand-read logic later.
+	 * We rely on user daemon to prepare blob files under corresponding
+	 * directory, and we can reach here if blob files don't exist.
+	 */
+
+	netfs_subreq_terminated(subreq, -EOPNOTSUPP, false);
+}
+
+const struct netfs_read_request_ops erofs_req_ops = {
+	.begin_cache_operation  = erofs_begin_cache_operation,
+	.cleanup		= erofs_priv_cleanup,
+	.issue_op		= erofs_issue_op,
+};
+
+struct page *erofs_readpage_from_fscache(struct erofs_cookie_ctx *ctx,
+					 pgoff_t index)
+{
+	struct folio *folio;
+	struct page *page;
+	struct super_block *sb = ctx->inode->i_sb;
+	int ret;
+
+	page = find_or_create_page(ctx->inode->i_mapping, index, GFP_KERNEL);
+	if (unlikely(!page)) {
+		erofs_err(sb, "failed to allocate page");
+		return ERR_PTR(-ENOMEM);
+	}
+
+	/* The content is already buffered in the address space */
+	if (PageUptodate(page)) {
+		unlock_page(page);
+		return page;
+	}
+
+	/* Or a new page cache is created, then read the content from fscache */
+	folio = page_folio(page);
+
+	ret = netfs_readpage(NULL, folio, &erofs_req_ops, ctx->cookie);
+	if (unlikely(ret || !PageUptodate(page))) {
+		erofs_err(sb, "failed to read from fscache");
+		return ERR_PTR(-EINVAL);
+	}
+
+	return page;
+}
+
 static int erofs_fscache_init_cookie(struct erofs_cookie_ctx *ctx, char *path)
 {
 	struct fscache_cookie *cookie;

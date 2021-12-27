@@ -585,6 +585,9 @@ struct erofs_cookie_ctx *erofs_fscache_get_ctx(struct super_block *sb,
 					       char *path);
 void erofs_fscache_put_ctx(struct erofs_cookie_ctx *ctx);
 
+struct page *erofs_readpage_from_fscache(struct erofs_cookie_ctx *ctx,
+					 pgoff_t index);
+
 #define EFSCORRUPTED    EUCLEAN         /* Filesystem is corrupted */
 
 #endif	/* __EROFS_INTERNAL_H */

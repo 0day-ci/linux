@@ -334,24 +334,21 @@ err_out:
 
 static int erofs_read_superblock(struct super_block *sb)
 {
-	struct erofs_sb_info *sbi;
+	struct erofs_sb_info *sbi = EROFS_SB(sb);
 	struct page *page;
 	struct erofs_super_block *dsb;
 	unsigned int blkszbits;
 	void *data;
 	int ret;
 
-	/* TODO: metadata path in nodev mode */
 	if (sb->s_bdev)
 		page = read_mapping_page(sb->s_bdev->bd_inode->i_mapping, 0, NULL);
 	else
-		page = ERR_PTR(-EOPNOTSUPP);
+		page = erofs_readpage_from_fscache(sbi->bootstrap, 0);
 	if (IS_ERR(page)) {
 		erofs_err(sb, "cannot read erofs superblock");
 		return PTR_ERR(page);
 	}
-
-	sbi = EROFS_SB(sb);
 
 	data = kmap(page);
 	dsb = (struct erofs_super_block *)(data + EROFS_SUPER_OFFSET);

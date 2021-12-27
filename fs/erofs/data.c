@@ -19,8 +19,8 @@ struct page *erofs_get_meta_page(struct super_block *sb, erofs_blk_t blkaddr)
 		page = read_cache_page_gfp(mapping, blkaddr,
 				mapping_gfp_constraint(mapping, ~__GFP_FS));
 	} else {
-		/* TODO: data path in nodev mode */
-		page = ERR_PTR(-EINVAL);
+		page = erofs_readpage_from_fscache(EROFS_SB(sb)->bootstrap,
+						   blkaddr);
 	}
 
 	/* should already be PageUptodate */
