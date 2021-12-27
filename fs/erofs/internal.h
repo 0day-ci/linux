@@ -52,6 +52,7 @@ struct erofs_device_info {
 	char *path;
 	struct block_device *bdev;
 	struct dax_device *dax_dev;
+	struct erofs_cookie_ctx *ctx;
 
 	u32 blocks;
 	u32 mapped_blkaddr;
