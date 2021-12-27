@@ -815,11 +815,11 @@ static void __init viper_tpm_init(void)
 					      sizeof(i2c_tpm_data))) {
 			if (platform_device_add(tpm_device)) {
 				errstr = "register TPM i2c bus";
-				goto error_free_tpm;
+				goto exit_put_device;
 			}
 		} else {
 			errstr = "allocate TPM i2c bus data";
-			goto error_free_tpm;
+			goto exit_put_device;
 		}
 	} else {
 		errstr = "allocate TPM i2c device";
@@ -827,9 +827,8 @@ static void __init viper_tpm_init(void)
 	}
 
 	return;
-
-error_free_tpm:
-	kfree(tpm_device);
+exit_put_device:
+	platform_device_put(tpm_device);
 error_tpm:
 	pr_err("viper: Couldn't %s, giving up\n", errstr);
 }
