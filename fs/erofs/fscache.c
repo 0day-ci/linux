@@ -65,6 +65,97 @@ struct page *erofs_readpage_from_fscache(struct erofs_cookie_ctx *ctx,
 	return page;
 }
 
+static inline void do_copy_page(struct page *from, struct page *to,
+				size_t offset, size_t len)
+{
+	char *vfrom, *vto;
+
+	vfrom = kmap_atomic(from);
+	vto = kmap_atomic(to);
+	memcpy(vto, vfrom + offset, len);
+	kunmap_atomic(vto);
+	kunmap_atomic(vfrom);
+}
+
+static int erofs_fscache_do_readpage(struct file *file, struct page *page)
+{
+	struct inode *inode = page->mapping->host;
+	struct erofs_inode *vi = EROFS_I(inode);
+	struct super_block *sb = inode->i_sb;
+	struct erofs_map_blocks map;
+	erofs_off_t o_la, pa;
+	size_t offset, len;
+	struct page *ipage;
+	int ret;
+
+	if (erofs_inode_is_data_compressed(vi->datalayout)) {
+		erofs_info(sb, "compressed layout not supported yet");
+		return -EOPNOTSUPP;
+	}
+
+	o_la = page_offset(page);
+	map.m_la = o_la;
+
+	ret = erofs_map_blocks(inode, &map, EROFS_GET_BLOCKS_RAW);
+	if (ret)
+		return ret;
+
+	if (!(map.m_flags & EROFS_MAP_MAPPED)) {
+		zero_user(page, 0, PAGE_SIZE);
+		return 0;
+	}
+
+	/*
+	 * 1) For FLAT_PLAIN/FLAT_INLINE layout, the output map.m_la shall be
+	 * equal to o_la, and the output map.m_pa is exactly the physical
+	 * address of o_la.
+	 * 2) For CHUNK_BASED layout, the output map.m_la is rounded down to the
+	 * nearest chunk boundary, and the output map.m_pa is actually the
+	 * physical address of this chunk boundary. So we need to recalculate
+	 * the actual physical address of o_la.
+	 */
+	pa = map.m_pa + o_la - map.m_la;
+
+	ipage = erofs_get_meta_page(sb, erofs_blknr(pa));
+	if (IS_ERR(ipage))
+		return PTR_ERR(ipage);
+
+	/*
+	 * @offset refers to the page offset inside @ipage.
+	 * 1) Except for the inline layout, the offset shall all be 0, and @pa
+	 * shall be aligned with EROFS_BLKSIZ in this case. Thus we can
+	 * conveniently get the offset from @pa.
+	 * 2) While for the inline layout, the offset may be non-zero. Since
+	 * currently only flat layout supports inline, we can calculate the
+	 * offset from the corresponding physical address.
+	 */
+	offset = erofs_blkoff(pa);
+	len = min_t(u64, map.m_llen, PAGE_SIZE);
+
+	do_copy_page(ipage, page, offset, len);
+
+	unlock_page(ipage);
+	return 0;
+}
+
+static int erofs_fscache_readpage(struct file *file, struct page *page)
+{
+	int ret;
+
+	ret = erofs_fscache_do_readpage(file, page);
+	if (ret)
+		SetPageError(page);
+	else
+		SetPageUptodate(page);
+
+	unlock_page(page);
+	return ret;
+}
+
+const struct address_space_operations erofs_fscache_access_aops = {
+	.readpage = erofs_fscache_readpage,
+};
+
 static int erofs_fscache_init_cookie(struct erofs_cookie_ctx *ctx, char *path)
 {
 	struct fscache_cookie *cookie;
