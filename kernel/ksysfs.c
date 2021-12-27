@@ -182,6 +182,23 @@ static ssize_t rcu_normal_store(struct kobject *kobj,
 KERNEL_ATTR_RW(rcu_normal);
 #endif /* #ifndef CONFIG_TINY_RCU */
 
+static ssize_t capabilities_show(struct kobject *unused0,
+				struct kobj_attribute *unused1, char *buf)
+{
+	int at = 0;
+	int i;
+
+	for (i = 0; i < CAP_LAST_CAP; i++) {
+		if (at >= PAGE_SIZE)
+			return at;
+
+		at += sysfs_emit_at(buf, at, "%d\t%s\n", i, cap_strings[i]);
+	}
+
+	return at;
+}
+KERNEL_ATTR_RO(capabilities);
+
 /*
  * Make /sys/kernel/notes give the raw contents of our kernel .notes section.
  */
@@ -229,6 +246,7 @@ static struct attribute * kernel_attrs[] = {
 	&rcu_expedited_attr.attr,
 	&rcu_normal_attr.attr,
 #endif
+	&capabilities_attr.attr,
 	NULL
 };
 
