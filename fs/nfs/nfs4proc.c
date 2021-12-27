@@ -7199,8 +7199,11 @@ static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock 
 	int status;
 
 	request->fl_flags |= FL_ACCESS;
-	status = locks_lock_inode_wait(state->inode, request);
-	if (status < 0)
+	if ((request->fl_flags && FL_SLEEP) && IS_SETLK(cmd))
+		status = posix_lock_file(request->fl_file, request, NULL);
+	else
+		status = locks_lock_inode_wait(state->inode, request);
+	if (status)
 		goto out;
 	mutex_lock(&sp->so_delegreturn_mutex);
 	down_read(&nfsi->rwsem);
