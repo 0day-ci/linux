@@ -15,6 +15,7 @@
 #include <linux/kdev_t.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/wait.h>
 
@@ -24,6 +25,11 @@
 /* Provides a unique ID for each counter device */
 static DEFINE_IDA(counter_ida);
 
+struct counter_device_allochelper {
+	struct counter_device counter;
+	unsigned long privdata[];
+};
+
 static void counter_device_release(struct device *dev)
 {
 	struct counter_device *const counter =
@@ -31,6 +37,9 @@ static void counter_device_release(struct device *dev)
 
 	counter_chrdev_remove(counter);
 	ida_free(&counter_ida, dev->id);
+
+	if (!counter->legacy_device)
+		kfree(container_of(counter, struct counter_device_allochelper, counter));
 }
 
 static struct device_type counter_device_type = {
@@ -53,7 +62,14 @@ static dev_t counter_devt;
  */
 void *counter_priv(const struct counter_device *const counter)
 {
-	return counter->priv;
+	if (counter->legacy_device) {
+		return counter->priv;
+	} else {
+		struct counter_device_allochelper *ch =
+			container_of(counter, struct counter_device_allochelper, counter);
+
+		return &ch->privdata;
+	}
 }
 EXPORT_SYMBOL_GPL(counter_priv);
 
@@ -73,6 +89,8 @@ int counter_register(struct counter_device *const counter)
 	struct device *const dev = &counter->dev;
 	int id;
 	int err;
+
+	counter->legacy_device = true;
 
 	/* Acquire unique ID */
 	id = ida_alloc(&counter_ida, GFP_KERNEL);
@@ -113,6 +131,100 @@ err_free_id:
 	return err;
 }
 EXPORT_SYMBOL_GPL(counter_register);
+
+/**
+ * counter_alloc - allocate a counter_device
+ * @sizeof_priv: size of the driver private data
+ *
+ * This is part one of counter registration. The structure is allocated
+ * dynamically to ensure the right lifetime for the embedded struct device.
+ *
+ * If this succeeds, call counter_put() to get rid of the counter_device again.
+ */
+struct counter_device *counter_alloc(size_t sizeof_priv)
+{
+	struct counter_device_allochelper *ch;
+	struct counter_device *counter;
+	struct device *dev;
+	int id, err;
+
+	ch = kzalloc(sizeof(*ch) + sizeof_priv, GFP_KERNEL);
+	if (!ch) {
+		err = -ENOMEM;
+		goto err_alloc_ch;
+	}
+
+	counter = &ch->counter;
+	dev = &counter->dev;
+
+	/* Acquire unique ID */
+	err = ida_alloc(&counter_ida, GFP_KERNEL);
+	if (err < 0) {
+		goto err_ida_alloc;
+	}
+	dev->id = err;
+
+	err = counter_chrdev_add(counter);
+	if (err < 0)
+		goto err_chrdev_add;
+
+	device_initialize(dev);
+	/* Configure device structure for Counter */
+	dev->type = &counter_device_type;
+	dev->bus = &counter_bus_type;
+	dev->devt = MKDEV(MAJOR(counter_devt), id);
+
+	mutex_init(&counter->ops_exist_lock);
+
+	return counter;
+
+err_chrdev_add:
+
+	ida_free(&counter_ida, dev->id);
+err_ida_alloc:
+
+	kfree(ch);
+err_alloc_ch:
+
+	return ERR_PTR(err);
+}
+EXPORT_SYMBOL_GPL(counter_alloc);
+
+void counter_put(struct counter_device *counter)
+{
+	put_device(&counter->dev);
+}
+
+/**
+ * counter_add - complete registration of a counter
+ * @counter: the counter to add
+ *
+ * This is part two of counter registration.
+ *
+ * If this succeeds, call counter_unregister() to get rid of the counter_device again.
+ */
+int counter_add(struct counter_device *counter)
+{
+	int err;
+	struct device *dev = &counter->dev;
+
+	get_device(&counter->dev);
+
+	if (counter->parent) {
+		dev->parent = counter->parent;
+		dev->of_node = counter->parent->of_node;
+	}
+
+	err = counter_sysfs_add(counter);
+	if (err < 0)
+		return err;
+
+	/* implies device_add(dev) */
+	err = cdev_device_add(&counter->chrdev, dev);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(counter_add);
 
 /**
  * counter_unregister - unregister Counter from the system
@@ -167,6 +279,41 @@ int devm_counter_register(struct device *dev,
 	return devm_add_action_or_reset(dev, devm_counter_release, counter);
 }
 EXPORT_SYMBOL_GPL(devm_counter_register);
+
+static void devm_counter_put(void *counter)
+{
+	counter_put(counter);
+}
+
+struct counter_device *devm_counter_alloc(struct device *dev, size_t sizeof_priv)
+{
+	struct counter_device *counter;
+	int err;
+
+	counter = counter_alloc(sizeof_priv);
+	if (IS_ERR(counter))
+		return counter;
+
+	err = devm_add_action_or_reset(dev, devm_counter_put, counter);
+	if (err < 0)
+		return ERR_PTR(err);
+
+	return counter;
+}
+EXPORT_SYMBOL_GPL(devm_counter_alloc);
+
+int devm_counter_add(struct device *dev,
+		     struct counter_device *const counter)
+{
+	int err;
+
+	err = counter_add(counter);
+	if (err < 0)
+		return err;
+
+	return devm_add_action_or_reset(dev, devm_counter_release, counter);
+}
+EXPORT_SYMBOL_GPL(devm_counter_add);
 
 #define COUNTER_DEV_MAX 256
 
