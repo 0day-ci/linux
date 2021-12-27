@@ -93,6 +93,7 @@ struct erofs_sb_lz4_info {
 
 struct erofs_cookie_ctx {
 	struct fscache_cookie *cookie;
+	struct inode *inode;
 };
 
 struct erofs_sb_info {

@@ -34,6 +34,33 @@ static void erofs_fscache_cleanup_cookie(struct erofs_cookie_ctx *ctx)
 	ctx->cookie = NULL;
 }
 
+static const struct address_space_operations erofs_fscache_aops = {
+};
+
+static int erofs_fscache_get_inode(struct erofs_cookie_ctx *ctx,
+				   struct super_block *sb)
+{
+	struct inode *const inode = new_inode(sb);
+
+	if (!inode)
+		return -ENOMEM;
+
+	set_nlink(inode, 1);
+	inode->i_size = OFFSET_MAX;
+
+	inode->i_mapping->a_ops = &erofs_fscache_aops;
+	mapping_set_gfp_mask(inode->i_mapping,
+			GFP_NOFS | __GFP_HIGHMEM | __GFP_MOVABLE);
+	ctx->inode = inode;
+	return 0;
+}
+
+static void erofs_fscache_put_inode(struct erofs_cookie_ctx *ctx)
+{
+	iput(ctx->inode);
+	ctx->inode = NULL;
+}
+
 static int erofs_fscahce_init_ctx(struct erofs_cookie_ctx *ctx,
 				  struct super_block *sb, char *path)
 {
@@ -45,12 +72,20 @@ static int erofs_fscahce_init_ctx(struct erofs_cookie_ctx *ctx,
 		return ret;
 	}
 
+	ret = erofs_fscache_get_inode(ctx, sb);
+	if (ret) {
+		erofs_err(sb, "failed to get anonymous inode\n");
+		erofs_fscache_cleanup_cookie(ctx);
+		return ret;
+	}
+
 	return 0;
 }
 
 static void erofs_fscache_cleanup_ctx(struct erofs_cookie_ctx *ctx)
 {
 	erofs_fscache_cleanup_cookie(ctx);
+	erofs_fscache_put_inode(ctx);
 }
 
 struct erofs_cookie_ctx *erofs_fscache_get_ctx(struct super_block *sb,
