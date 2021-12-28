@@ -617,4 +617,14 @@ config MCHP_EIC
 	help
 	  Support for Microchip External Interrupt Controller.
 
+config IRQ_INVERTER
+	bool "IRQ inverter support"
+	select IRQ_DOMAIN
+	help
+	  Support for virtual interrupt line that represent inverted signal
+	  of other interrupt line.
+
+	  This is intended for cases when both interrupt source and interrupt
+	  consumer use interrupt's trigger type to configure interrupt signal
+	  polarity, but the interrupt signal is negated by hardware in between.
 endmenu
