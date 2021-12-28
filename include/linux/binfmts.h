@@ -41,7 +41,11 @@ struct linux_binprm {
 		 * Set when errors can no longer be returned to the
 		 * original userspace.
 		 */
-		point_of_no_return:1;
+		point_of_no_return:1,
+		/*
+		 * Is this a suid/sgid binary?
+		 */
+		suid_bin:1;
 #ifdef __alpha__
 	unsigned int taso:1;
 #endif

@@ -1619,11 +1619,13 @@ static void bprm_fill_uid(struct linux_binprm *bprm, struct file *file)
 	if (mode & S_ISUID) {
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
 		bprm->cred->euid = uid;
+		bprm->suid_bin = 1;
 	}
 
 	if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
 		bprm->cred->egid = gid;
+		bprm->suid_bin = 1;
 	}
 }
 
