@@ -9,6 +9,10 @@
 #ifdef CONFIG_SHADOW_CALL_STACK
 	scs_sp	.req	x18
 
+	.macro scs_reload tsk
+	ldr	scs_sp, [\tsk, #TSK_TI_SCS_BASE]
+	.endm
+
 	.macro scs_load tsk
 	ldr	scs_sp, [\tsk, #TSK_TI_SCS_SP]
 	.endm
@@ -17,6 +21,9 @@
 	str	scs_sp, [\tsk, #TSK_TI_SCS_SP]
 	.endm
 #else
+	.macro scs_reload tsk
+	.endm
+
 	.macro scs_load tsk
 	.endm
 
