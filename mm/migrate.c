@@ -1105,6 +1105,8 @@ static int unmap_and_move(new_page_t get_new_page,
 	rc = __unmap_and_move(page, newpage, force, mode);
 	if (rc == MIGRATEPAGE_SUCCESS)
 		set_page_owner_migrate_reason(newpage, reason);
+	else
+		report_page_pinners(page, reason, rc);
 
 out:
 	if (rc != -EAGAIN) {
@@ -1273,7 +1275,8 @@ put_anon:
 	if (rc == MIGRATEPAGE_SUCCESS) {
 		move_hugetlb_state(hpage, new_hpage, reason);
 		put_new_page = NULL;
-	}
+	} else
+		report_page_pinners(hpage, reason, rc);
 
 out_unlock:
 	unlock_page(hpage);

@@ -23,6 +23,9 @@ enum page_ext_flags {
 	PAGE_EXT_YOUNG,
 	PAGE_EXT_IDLE,
 #endif
+#if defined(CONFIG_PAGE_PIN_OWNER)
+	PAGE_EXT_PIN_OWNER,
+#endif
 };
 
 /*

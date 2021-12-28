@@ -7,6 +7,7 @@
 #include <linux/vmalloc.h>
 #include <linux/kmemleak.h>
 #include <linux/page_owner.h>
+#include <linux/page_pin_owner.h>
 #include <linux/page_idle.h>
 #include <linux/page_table_check.h>
 
@@ -78,6 +79,9 @@ static struct page_ext_operations *page_ext_ops[] __initdata = {
 #endif
 #ifdef CONFIG_PAGE_TABLE_CHECK
 	&page_table_check_ops,
+#endif
+#ifdef CONFIG_PAGE_PIN_OWNER
+	&page_pin_owner_ops,
 #endif
 };
 
