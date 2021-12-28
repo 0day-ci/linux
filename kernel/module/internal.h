@@ -99,3 +99,23 @@ static inline char *find_kallsyms_symbol(struct module *mod, unsigned long addr,
 	return NULL;
 }
 #endif /* CONFIG_KALLSYMS */
+
+#ifdef CONFIG_SYSFS
+extern int mod_sysfs_setup(struct module *mod, const struct load_info *info, struct kernel_param *kparam, unsigned int num_params);
+extern void mod_sysfs_fini(struct module *mod);
+extern void module_remove_modinfo_attrs(struct module *mod, int end);
+extern void del_usage_links(struct module *mod);
+extern void init_param_lock(struct module *mod);
+#else /* !CONFIG_SYSFS */
+static int mod_sysfs_setup(struct module *mod,
+                          const struct load_info *info,
+                          struct kernel_param *kparam,
+                          unsigned int num_params)
+{
+       return 0;
+}
+static inline void mod_sysfs_fini(struct module *mod) { }
+static inline void module_remove_modinfo_attrs(struct module *mod, int end) { }
+static inline void del_usage_links(struct module *mod) { }
+static inline void init_param_lock(struct module *mod) { }
+#endif /* CONFIG_SYSFS */

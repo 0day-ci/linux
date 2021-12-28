@@ -12,6 +12,9 @@
 #include <linux/proc_fs.h>
 #include "internal.h"
 
+extern void print_unload_info(struct seq_file *m, struct module *mod);
+extern char *module_flags(struct module *mod, char *buf);
+
 /* Called by the /proc file system to return a list of modules. */
 static void *m_start(struct seq_file *m, loff_t *pos)
 {
