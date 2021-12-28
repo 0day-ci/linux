@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
+#include <linux/sched.h>
 
 #include <linux/gpio/consumer.h>
 #include <linux/usb/phy_companion.h>
@@ -128,6 +129,7 @@ struct cpcap_charger_ddata {
 	struct list_head irq_list;
 	struct delayed_work detect_work;
 	struct delayed_work vbus_work;
+	struct delayed_work ramp_work;
 	struct gpio_desc *gpio[2];		/* gpio_reven0 & 1 */
 
 	struct iio_channel *channels[CPCAP_CHARGER_IIO_NR];
@@ -142,6 +144,7 @@ struct cpcap_charger_ddata {
 	int status;
 	int voltage;
 	int limit_current;
+	int set_current;
 };
 
 struct cpcap_interrupt_desc {
@@ -440,6 +443,21 @@ static int cpcap_charger_enable(struct cpcap_charger_ddata *ddata,
 	return error;
 }
 
+static int cpcap_charger_get_charge_current_reg(struct cpcap_charger_ddata *ddata)
+{
+	int error;
+	unsigned int val;
+
+	error = regmap_read(ddata->reg, CPCAP_REG_CRM, &val);
+
+	if (error) {
+		dev_err(ddata->dev, "%s failed with %i\n", __func__, error);
+		return -1;
+	}
+
+	return val & 0xf;
+}
+
 static bool cpcap_charger_vbus_valid(struct cpcap_charger_ddata *ddata)
 {
 	int error, value = 0;
@@ -607,6 +625,9 @@ static void cpcap_charger_disconnect(struct cpcap_charger_ddata *ddata,
 		break;
 	}
 
+	cancel_delayed_work_sync(&ddata->ramp_work);
+	ddata->set_current = 0;
+
 	error = cpcap_charger_disable(ddata);
 	if (error) {
 		cpcap_charger_update_state(ddata, POWER_SUPPLY_STATUS_UNKNOWN);
@@ -616,6 +637,40 @@ static void cpcap_charger_disconnect(struct cpcap_charger_ddata *ddata,
 	cpcap_charger_update_state(ddata, state);
 	power_supply_changed(ddata->usb);
 	schedule_delayed_work(&ddata->detect_work, delay);
+}
+
+static void cpcap_charger_ramp_work(struct work_struct *work)
+{
+	struct cpcap_charger_ddata *ddata;
+	int ichrg;
+	int vchrg;
+	int ichrg_current;
+	int error;
+
+	ddata = container_of(work, struct cpcap_charger_ddata,
+		     ramp_work.work);
+
+	ichrg_current = cpcap_charger_get_charge_current_reg(ddata);
+	ichrg = cpcap_charger_current_to_regval(ddata->set_current);
+	vchrg = cpcap_charger_voltage_to_regval(ddata->voltage);
+	if (ichrg_current < ichrg)
+		++ichrg_current;
+	else if (ichrg_current > ichrg)
+		ichrg_current = ichrg;
+	else
+		return;
+
+	error = cpcap_charger_enable(ddata,
+					CPCAP_REG_CRM_VCHRG(vchrg),
+					ichrg_current, 0);
+	if (error) {
+		dev_err(ddata->dev, "cpcap_charger_enable failed with %i\n", error);
+		cpcap_charger_update_state(ddata, POWER_SUPPLY_STATUS_UNKNOWN);
+	} else {
+		if (ichrg_current == ichrg && ddata->status != POWER_SUPPLY_STATUS_CHARGING)
+			cpcap_charger_update_state(ddata, POWER_SUPPLY_STATUS_CHARGING);
+		schedule_delayed_work(&ddata->ramp_work, HZ/20);
+	}
 }
 
 static void cpcap_usb_detect(struct work_struct *work)
@@ -651,13 +706,10 @@ static void cpcap_usb_detect(struct work_struct *work)
 		return;
 	}
 
-	/* Delay for 80ms to avoid vbus bouncing when usb cable is plugged in */
-	usleep_range(80000, 120000);
-
 	/* Throttle chrgcurr2 interrupt for charger done and retry */
 	switch (ddata->status) {
 	case POWER_SUPPLY_STATUS_CHARGING:
-		if (s.chrgcurr2)
+		if (s.chrgcurr2 || delayed_work_pending(&ddata->ramp_work))
 			break;
 		new_state = POWER_SUPPLY_STATUS_FULL;
 
@@ -683,8 +735,6 @@ static void cpcap_usb_detect(struct work_struct *work)
 
 	if (!ddata->feeding_vbus && cpcap_charger_vbus_valid(ddata) &&
 	    s.chrgcurr1) {
-		int max_current;
-		int vchrg, ichrg;
 		union power_supply_propval val;
 		struct power_supply *battery;
 
@@ -701,25 +751,18 @@ static void cpcap_usb_detect(struct work_struct *work)
 			goto out_err;
 
 		if (val.intval) {
-			max_current = 1596000;
+			ddata->set_current = 1596000;
 		} else {
 			dev_info(ddata->dev, "battery not inserted, charging disabled\n");
-			max_current = 0;
+			ddata->set_current = 0;
 		}
 
-		if (max_current > ddata->limit_current)
-			max_current = ddata->limit_current;
-
-		ichrg = cpcap_charger_current_to_regval(max_current);
-		vchrg = cpcap_charger_voltage_to_regval(ddata->voltage);
-		error = cpcap_charger_enable(ddata,
-					     CPCAP_REG_CRM_VCHRG(vchrg),
-					     ichrg, 0);
-		if (error)
-			goto out_err;
-		cpcap_charger_update_state(ddata,
-					   POWER_SUPPLY_STATUS_CHARGING);
+		if (ddata->set_current > ddata->limit_current)
+			ddata->set_current = ddata->limit_current;
+		if (!delayed_work_pending(&ddata->ramp_work))
+			schedule_delayed_work(&ddata->ramp_work, HZ/20);
 	} else {
+		ddata->set_current = 0;
 		error = cpcap_charger_disable(ddata);
 		if (error)
 			goto out_err;
@@ -902,6 +945,7 @@ static int cpcap_charger_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&ddata->irq_list);
 	INIT_DELAYED_WORK(&ddata->detect_work, cpcap_usb_detect);
 	INIT_DELAYED_WORK(&ddata->vbus_work, cpcap_charger_vbus_work);
+	INIT_DELAYED_WORK(&ddata->ramp_work, cpcap_charger_ramp_work);
 	platform_set_drvdata(pdev, ddata);
 
 	error = cpcap_charger_init_iio(ddata);
@@ -964,6 +1008,7 @@ static void cpcap_charger_shutdown(struct platform_device *pdev)
 	cpcap_charger_update_state(ddata, POWER_SUPPLY_STATUS_DISCHARGING);
 	cancel_delayed_work_sync(&ddata->vbus_work);
 	cancel_delayed_work_sync(&ddata->detect_work);
+	cancel_delayed_work_sync(&ddata->ramp_work);
 }
 
 static int cpcap_charger_remove(struct platform_device *pdev)
