@@ -951,7 +951,7 @@ int radeon_vm_bo_update(struct radeon_device *rdev,
 
 		if (mem->mem_type == TTM_PL_TT) {
 			bo_va->flags |= RADEON_VM_PAGE_SYSTEM;
-			if (!(bo_va->bo->flags & (RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC)))
+			if (bo_va->bo && !(bo_va->bo->flags & (RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC)))
 				bo_va->flags |= RADEON_VM_PAGE_SNOOPED;
 
 		} else {
