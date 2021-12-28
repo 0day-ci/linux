@@ -19,6 +19,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/slab.h>
+#include <linux/usb/typec_dp.h>
+#include <linux/usb/typec_mux.h>
 
 #include <dt-bindings/phy/phy.h>
 
@@ -3017,6 +3019,9 @@ struct qmp_phy_dp_clks {
  * @phy_mutex: mutex lock for PHY common block initialization
  * @init_count: phy common block initialization count
  * @ufs_reset: optional UFS PHY reset handle
+ * @sw: typec switch for receiving orientation changes
+ * @mux: typec mux for DP muxing
+ * @orientation: carries current CC orientation
  */
 struct qcom_qmp {
 	struct device *dev;
@@ -3032,6 +3037,10 @@ struct qcom_qmp {
 	int init_count;
 
 	struct reset_control *ufs_reset;
+
+	struct typec_switch *sw;
+	struct typec_mux *mux;
+	enum typec_orientation orientation;
 };
 
 static void qcom_qmp_v3_phy_dp_aux_init(struct qmp_phy *qphy);
@@ -4349,30 +4358,23 @@ static void qcom_qmp_v3_phy_configure_dp_tx(struct qmp_phy *qphy)
 
 static bool qcom_qmp_phy_configure_dp_mode(struct qmp_phy *qphy)
 {
+	const struct phy_configure_opts_dp *dp_opts = &qphy->dp_opts;
+	bool reverse = qphy->qmp->orientation == TYPEC_ORIENTATION_REVERSE;
 	u32 val;
-	bool reverse = false;
 
 	val = DP_PHY_PD_CTL_PWRDN | DP_PHY_PD_CTL_AUX_PWRDN |
 	      DP_PHY_PD_CTL_PLL_PWRDN | DP_PHY_PD_CTL_DP_CLAMP_EN;
 
-	/*
-	 * TODO: Assume orientation is CC1 for now and two lanes, need to
-	 * use type-c connector to understand orientation and lanes.
-	 *
-	 * Otherwise val changes to be like below if this code understood
-	 * the orientation of the type-c cable.
-	 *
-	 * if (lane_cnt == 4 || orientation == ORIENTATION_CC2)
-	 *	val |= DP_PHY_PD_CTL_LANE_0_1_PWRDN;
-	 * if (lane_cnt == 4 || orientation == ORIENTATION_CC1)
-	 *	val |= DP_PHY_PD_CTL_LANE_2_3_PWRDN;
-	 * if (orientation == ORIENTATION_CC2)
-	 *	writel(0x4c, qphy->pcs + QSERDES_V3_DP_PHY_MODE);
-	 */
-	val |= DP_PHY_PD_CTL_LANE_2_3_PWRDN;
+	if (dp_opts->lanes == 4 || reverse)
+		val |= DP_PHY_PD_CTL_LANE_0_1_PWRDN;
+	if (dp_opts->lanes == 4 || !reverse)
+		val |= DP_PHY_PD_CTL_LANE_2_3_PWRDN;
 	writel(val, qphy->pcs + QSERDES_DP_PHY_PD_CTL);
 
-	writel(0x5c, qphy->pcs + QSERDES_DP_PHY_MODE);
+	if (reverse)
+		writel(0x4c, qphy->pcs + QSERDES_DP_PHY_MODE);
+	else
+		writel(0x5c, qphy->pcs + QSERDES_DP_PHY_MODE);
 
 	return reverse;
 }
@@ -5777,6 +5779,123 @@ static const struct dev_pm_ops qcom_qmp_phy_pm_ops = {
 			   qcom_qmp_phy_runtime_resume, NULL)
 };
 
+#if IS_ENABLED(CONFIG_TYPEC)
+static int qcom_qmp_phy_typec_switch_set(struct typec_switch *sw,
+		enum typec_orientation orientation)
+{
+	struct qcom_qmp *qmp = typec_switch_get_drvdata(sw);
+	void __iomem *dp_com = qmp->dp_com;
+
+	qmp->orientation = orientation;
+
+	if (orientation == TYPEC_ORIENTATION_REVERSE)
+		qphy_setbits(dp_com, QPHY_V3_DP_COM_TYPEC_CTRL, 0x01);
+	else
+		qphy_clrbits(dp_com, QPHY_V3_DP_COM_TYPEC_CTRL, 0x01);
+
+	return 0;
+}
+
+static int qcom_qmp_phy_typec_mux_set(struct typec_mux *mux,
+				      struct typec_mux_state *state)
+{
+	struct qcom_qmp *qmp = typec_mux_get_drvdata(mux);
+	void __iomem *dp_com = qmp->dp_com;
+	bool dp_mode;
+	bool usb_mode;
+
+	switch (state->mode) {
+	case TYPEC_STATE_SAFE:
+	case TYPEC_STATE_USB:
+		/*
+		 * TODO: Figure out if we should clear DP_MODE when we enter a
+		 * USB-only state.
+		 */
+		dp_mode = true;
+		usb_mode = true;
+		break;
+	case TYPEC_DP_STATE_A:
+	case TYPEC_DP_STATE_C:
+	case TYPEC_DP_STATE_E:
+		dp_mode = true;
+		usb_mode = false;
+		break;
+	case TYPEC_DP_STATE_B:
+	case TYPEC_DP_STATE_D:
+	case TYPEC_DP_STATE_F:
+		dp_mode = true;
+		usb_mode = true;
+		break;
+	}
+
+	qphy_setbits(dp_com, QPHY_V3_DP_COM_RESET_OVRD_CTRL,
+		     SW_DPPHY_RESET_MUX | SW_USB3PHY_RESET_MUX);
+	if (dp_mode)
+		qphy_setbits(dp_com, QPHY_V3_DP_COM_PHY_MODE_CTRL, DP_MODE);
+	else
+		qphy_clrbits(dp_com, QPHY_V3_DP_COM_PHY_MODE_CTRL, DP_MODE);
+
+	if (usb_mode)
+		qphy_setbits(dp_com, QPHY_V3_DP_COM_PHY_MODE_CTRL, USB3_MODE);
+	else
+		qphy_clrbits(dp_com, QPHY_V3_DP_COM_PHY_MODE_CTRL, USB3_MODE);
+
+	qphy_setbits(dp_com, QPHY_V3_DP_COM_SW_RESET, SW_RESET);
+	qphy_clrbits(dp_com, QPHY_V3_DP_COM_SWI_CTRL, 0x03);
+	qphy_clrbits(dp_com, QPHY_V3_DP_COM_SW_RESET, SW_RESET);
+
+	return 0;
+}
+
+static int qcom_qmp_phy_typec_register(struct qcom_qmp *qmp,
+				       const struct qmp_phy_cfg *cfg)
+{
+	struct typec_switch_desc sw_desc = {};
+	struct typec_mux_desc mux_desc = {};
+	struct device *dev = qmp->dev;
+
+	if (!cfg->has_phy_dp_com_ctrl)
+		return 0;
+
+	sw_desc.drvdata = qmp;
+	sw_desc.fwnode = dev->fwnode;
+	sw_desc.set = qcom_qmp_phy_typec_switch_set;
+	qmp->sw = typec_switch_register(dev, &sw_desc);
+	if (IS_ERR(qmp->sw)) {
+		dev_err(dev, "Error registering typec switch: %pe\n", qmp->sw);
+		return PTR_ERR(qmp->sw);
+	}
+
+	mux_desc.drvdata = qmp;
+	mux_desc.fwnode = dev->fwnode;
+	mux_desc.set = qcom_qmp_phy_typec_mux_set;
+	qmp->mux = typec_mux_register(dev, &mux_desc);
+	if (IS_ERR(qmp->mux)) {
+		dev_err(dev, "Error registering typec mux: %pe\n", qmp->mux);
+		typec_switch_unregister(qmp->sw);
+		return PTR_ERR(qmp->mux);
+	}
+
+	return 0;
+}
+
+static void qcom_qmp_phy_typec_unregister(struct qcom_qmp *qmp)
+{
+	typec_mux_unregister(qmp->mux);
+	typec_switch_unregister(qmp->sw);
+}
+#else
+static int qcom_qmp_phy_typec_register(struct qcom_qmp *qmp,
+				       const struct qmp_phy_cfg *cfg)
+{
+	return 0;
+}
+
+static void qcom_qmp_phy_typec_unregister(struct qcom_qmp *qmp)
+{
+}
+#endif
+
 static int qcom_qmp_phy_probe(struct platform_device *pdev)
 {
 	struct qcom_qmp *qmp;
@@ -5859,7 +5978,15 @@ static int qcom_qmp_phy_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	num = of_get_available_child_count(dev->of_node);
+	ret = qcom_qmp_phy_typec_register(qmp, cfg);
+	if (ret)
+		return ret;
+
+	num = 0;
+	for_each_available_child_of_node(dev->of_node, child) {
+		if (!of_node_name_eq(child, "port"))
+			num++;
+	}
 	/* do we have a rogue child node ? */
 	if (num > expected_phys)
 		return -EINVAL;
@@ -5885,6 +6012,9 @@ static int qcom_qmp_phy_probe(struct platform_device *pdev)
 			cfg = usb_cfg;
 			serdes = usb_serdes;
 		}
+
+		if (of_node_name_eq(child, "port"))
+			continue;
 
 		/* Create per-lane phy */
 		ret = qcom_qmp_phy_create(dev, child, id, serdes, cfg);
@@ -5930,8 +6060,18 @@ err_node_put:
 	return ret;
 }
 
+static int qcom_qmp_phy_remove(struct platform_device *pdev)
+{
+	struct qcom_qmp *qmp = platform_get_drvdata(pdev);
+
+	qcom_qmp_phy_typec_unregister(qmp);
+
+	return 0;
+}
+
 static struct platform_driver qcom_qmp_phy_driver = {
 	.probe		= qcom_qmp_phy_probe,
+	.remove		= qcom_qmp_phy_remove,
 	.driver = {
 		.name	= "qcom-qmp-phy",
 		.pm	= &qcom_qmp_phy_pm_ops,
