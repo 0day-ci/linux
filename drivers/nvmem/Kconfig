@@ -21,6 +21,13 @@ config NVMEM_SYSFS
 	 This interface is mostly used by userspace applications to
 	 read/write directly into nvmem.
 
+config NVMEM_TRANSFORMATIONS
+	bool "Support cell transformations"
+	help
+	  Say Y to support to expand one NVMEM cell into multiple values. For
+	  example, when the NVMEM cell stores a base MAC address and it should
+	  be expanded to be used for multiple network adapters.
+
 config NVMEM_IMX_IIM
 	tristate "i.MX IC Identification Module support"
 	depends on ARCH_MXC || COMPILE_TEST

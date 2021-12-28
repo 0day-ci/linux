@@ -138,6 +138,15 @@ int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem);
 void nvmem_add_cell_table(struct nvmem_cell_table *table);
 void nvmem_del_cell_table(struct nvmem_cell_table *table);
 
+#if IS_ENABLED(CONFIG_NVMEM_TRANSFORMATIONS)
+nvmem_cell_post_process_t nvmem_get_transformations(struct device_node *np);
+#else
+static inline nvmem_cell_post_process_t nvmem_get_transformations(struct device_node *np)
+{
+	return NULL;
+}
+#endif
+
 #else
 
 static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)

@@ -836,6 +836,13 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 		}
 	}
 
+	/*
+	 * Transformations are using the same post process hook, therefore they
+	 * are mutually exclusive.
+	 */
+	if (!nvmem->cell_post_process)
+		nvmem->cell_post_process = nvmem_get_transformations(nvmem->dev.of_node);
+
 	dev_dbg(&nvmem->dev, "Registering nvmem device %s\n", config->name);
 
 	rval = device_register(&nvmem->dev);
