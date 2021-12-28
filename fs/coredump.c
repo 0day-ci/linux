@@ -514,6 +514,7 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 	struct core_name cn;
 	struct mm_struct *mm = current->mm;
 	struct linux_binfmt * binfmt;
+	struct inode *pwd_inode;
 	const struct cred *old_cred;
 	struct cred *cred;
 	int retval = 0;
@@ -558,6 +559,20 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		cred->fsuid = GLOBAL_ROOT_UID;	/* Dump root private */
 		need_suid_safe = true;
 	}
+
+	/*
+	 * If we are a set-uid/gid root process and the current directory is
+	 * owned by root but not universally writable, prohibit dumps under
+	 * this path.
+	 *
+	 * Mitigate https://www.openwall.com/lists/oss-security/2021/10/20/2
+	 */
+	pwd_inode = current->fs->pwd.dentry->d_inode;
+	if (current->flags & PF_SUID &&
+	    capable(CAP_SYS_ADMIN) &&
+	    uid_eq(pwd_inode->i_uid, GLOBAL_ROOT_UID) &&
+	    !(pwd_inode->i_mode & 0002))
+		need_suid_safe = true;
 
 	retval = coredump_wait(siginfo->si_signo, &core_state);
 	if (retval < 0)
