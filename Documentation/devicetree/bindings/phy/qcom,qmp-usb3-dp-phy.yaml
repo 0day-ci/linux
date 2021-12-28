@@ -77,6 +77,20 @@ properties:
     description:
       Phandle to a regulator supply to any specific refclk pll block.
 
+  port:
+    $ref: /schemas/graph.yaml#/properties/port
+    description:
+      A port node to link the QMP to a TypeC controller for the purpose of
+      handling altmode muxing and orientation switching.
+
+  mode-switch:
+    description: Flag the port as possible handle of altmode switching
+    type: boolean
+
+  orientation-switch:
+    description: Flag the port as possible handler of orientation switching
+    type: boolean
+
 #Required nodes:
 patternProperties:
   "^usb3-phy@[0-9a-f]+$":
