@@ -3038,8 +3038,8 @@ struct qcom_qmp {
 
 	struct reset_control *ufs_reset;
 
-	struct typec_switch *sw;
-	struct typec_mux *mux;
+	struct typec_switch_dev *sw;
+	struct typec_mux_dev *mux;
 	enum typec_orientation orientation;
 };
 
@@ -5780,7 +5780,7 @@ static const struct dev_pm_ops qcom_qmp_phy_pm_ops = {
 };
 
 #if IS_ENABLED(CONFIG_TYPEC)
-static int qcom_qmp_phy_typec_switch_set(struct typec_switch *sw,
+static int qcom_qmp_phy_typec_switch_set(struct typec_switch_dev *sw,
 		enum typec_orientation orientation)
 {
 	struct qcom_qmp *qmp = typec_switch_get_drvdata(sw);
@@ -5796,7 +5796,7 @@ static int qcom_qmp_phy_typec_switch_set(struct typec_switch *sw,
 	return 0;
 }
 
-static int qcom_qmp_phy_typec_mux_set(struct typec_mux *mux,
+static int qcom_qmp_phy_typec_mux_set(struct typec_mux_dev *mux,
 				      struct typec_mux_state *state)
 {
 	struct qcom_qmp *qmp = typec_mux_get_drvdata(mux);
