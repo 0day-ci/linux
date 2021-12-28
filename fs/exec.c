@@ -1310,7 +1310,11 @@ int begin_new_exec(struct linux_binprm * bprm)
 	me->flags &= ~(PF_RANDOMIZE | PF_FORKNOEXEC | PF_KTHREAD |
 					PF_NOFREEZE | PF_NO_SETAFFINITY);
 
-	if (bprm->suid_bin)
+	/*
+	 * We set the PF_SUID flags for security reasons. There is no
+	 * point in setting it if the parent is root.
+	 */
+	if (bprm->suid_bin && !capable(CAP_SYS_ADMIN))
 		me->flags |= PF_SUID;
 
 	flush_thread();
