@@ -1798,7 +1798,7 @@ int smc_conn_create(struct smc_sock *smc, struct smc_init_info *ini)
 	}
 	spin_unlock_bh(lgr_lock);
 	if (rc)
-		return rc;
+		goto out_unreg;
 
 	if (role == SMC_CLNT && !ini->first_contact_peer &&
 	    ini->first_contact_local) {
@@ -1819,7 +1819,7 @@ create:
 		rc = smc_lgr_register_conn(conn, true);
 		write_unlock_bh(&lgr->conns_lock);
 		if (rc)
-			goto out;
+			goto out_unreg;
 	}
 	conn->local_tx_ctrl.common.type = SMC_CDC_MSG_TYPE;
 	conn->local_tx_ctrl.len = SMC_WR_TX_SIZE;
@@ -1836,6 +1836,12 @@ create:
 #endif
 
 out:
+	return rc;
+out_unreg:
+	/* fail to register connection into a link group */
+	if (!lgr->conns_num && !delayed_work_pending(&lgr->free_work))
+		smc_lgr_schedule_free_work(lgr);
+	conn->lgr = NULL;
 	return rc;
 }
 
