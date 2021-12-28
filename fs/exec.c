@@ -1309,6 +1309,10 @@ int begin_new_exec(struct linux_binprm * bprm)
 
 	me->flags &= ~(PF_RANDOMIZE | PF_FORKNOEXEC | PF_KTHREAD |
 					PF_NOFREEZE | PF_NO_SETAFFINITY);
+
+	if (bprm->suid_bin)
+		me->flags |= PF_SUID;
+
 	flush_thread();
 	me->personality &= ~bprm->per_clear;
 
