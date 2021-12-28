@@ -141,6 +141,7 @@ static int rxe_mr_alloc(struct rxe_mr *mr, int num_buf, int both)
 		ret = rxe_mr_alloc_map_set(num_map, &mr->next_map_set);
 		if (ret) {
 			rxe_mr_free_map_set(mr->num_map, mr->cur_map_set);
+			mr->cur_map_set = NULL;
 			goto err_out;
 		}
 	}
@@ -214,7 +215,7 @@ int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 				pr_warn("%s: Unable to get virtual address\n",
 						__func__);
 				err = -ENOMEM;
-				goto err_cleanup_map;
+				goto err_release_umem;
 			}
 
 			buf->addr = (uintptr_t)vaddr;
@@ -237,8 +238,6 @@ int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 
 	return 0;
 
-err_cleanup_map:
-	rxe_mr_free_map_set(mr->num_map, mr->cur_map_set);
 err_release_umem:
 	ib_umem_release(umem);
 err_out:
