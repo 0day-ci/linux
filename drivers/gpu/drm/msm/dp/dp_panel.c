@@ -197,6 +197,8 @@ int dp_panel_read_sink_caps(struct dp_panel *dp_panel,
 	kfree(dp_panel->edid);
 	dp_panel->edid = NULL;
 
+	dp_panel->connector = connector;
+
 	dp_panel->edid = drm_get_edid(connector,
 					      &panel->aux->ddc);
 	if (!dp_panel->edid) {
