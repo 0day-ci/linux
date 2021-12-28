@@ -1826,8 +1826,9 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 	spin_lock_irq (&dev->lock);
 	value = -EINVAL;
 	if (dev->buf) {
+		spin_unlock_irq(&dev->lock);
 		kfree(kbuf);
-		goto fail;
+		return value;
 	}
 	dev->buf = kbuf;
 
@@ -1835,8 +1836,10 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 	dev->config = (void *) kbuf;
 	total = le16_to_cpu(dev->config->wTotalLength);
 	if (!is_valid_config(dev->config, total) ||
-			total > length - USB_DT_DEVICE_SIZE)
+			total > length - USB_DT_DEVICE_SIZE) {
+		dev->config = NULL;
 		goto fail;
+	}
 	kbuf += total;
 	length -= total;
 
@@ -1845,8 +1848,11 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 		dev->hs_config = (void *) kbuf;
 		total = le16_to_cpu(dev->hs_config->wTotalLength);
 		if (!is_valid_config(dev->hs_config, total) ||
-				total > length - USB_DT_DEVICE_SIZE)
+				total > length - USB_DT_DEVICE_SIZE) {
+			dev->config = NULL;
+			dev->hs_config = NULL;
 			goto fail;
+		}
 		kbuf += total;
 		length -= total;
 	} else {
@@ -1856,13 +1862,20 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 	/* could support multiple configs, using another encoding! */
 
 	/* device descriptor (tweaked for paranoia) */
-	if (length != USB_DT_DEVICE_SIZE)
+	if (length != USB_DT_DEVICE_SIZE) {
+		dev->config = NULL;
+		dev->hs_config = NULL;
 		goto fail;
+	}
 	dev->dev = (void *)kbuf;
 	if (dev->dev->bLength != USB_DT_DEVICE_SIZE
 			|| dev->dev->bDescriptorType != USB_DT_DEVICE
-			|| dev->dev->bNumConfigurations != 1)
+			|| dev->dev->bNumConfigurations != 1) {
+		dev->config = NULL;
+		dev->hs_config = NULL;
+		dev->dev = NULL;
 		goto fail;
+	}
 	dev->dev->bcdUSB = cpu_to_le16 (0x0200);
 
 	/* triggers gadgetfs_bind(); then we can enumerate. */
