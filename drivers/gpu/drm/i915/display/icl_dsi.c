@@ -1899,7 +1899,7 @@ static void icl_dphy_param_init(struct intel_dsi *intel_dsi)
 	}
 
 	/* trail cnt in escape clocks*/
-	trail_cnt = DIV_ROUND_UP(tclk_trail_ns, tlpx_ns);
+	trail_cnt = tclk_trail_ns > tlpx_ns ? tclk_trail_ns / tlpx_ns : 1;
 	if (trail_cnt > ICL_TRAIL_CNT_MAX) {
 		drm_dbg_kms(&dev_priv->drm, "trail_cnt out of range (%d)\n",
 			    trail_cnt);
