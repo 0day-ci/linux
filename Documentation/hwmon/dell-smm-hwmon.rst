@@ -29,22 +29,50 @@ Temperature sensors and fans can be queried and set via the standard
 ``X`` such that ``/sys/class/hwmon/hwmonX/name`` has content
 ``dell_smm``). A number of other attributes can be read or written:
 
-=============================== ======= =======================================
-Name				Perm	Description
-=============================== ======= =======================================
-fan[1-3]_input                  RO      Fan speed in RPM.
-fan[1-3]_label                  RO      Fan label.
-fan[1-3]_min                    RO      Minimal Fan speed in RPM
-fan[1-3]_max                    RO      Maximal Fan speed in RPM
-fan[1-3]_target                 RO      Expected Fan speed in RPM
-pwm[1-3]                        RW      Control the fan PWM duty-cycle.
-pwm1_enable                     WO      Enable or disable automatic BIOS fan
-                                        control (not supported on all laptops,
-                                        see below for details).
-temp[1-10]_input                RO      Temperature reading in milli-degrees
-                                        Celsius.
-temp[1-10]_label                RO      Temperature sensor label.
-=============================== ======= =======================================
+.. flat-table::
+   :header-rows: 1
+   :widths: 4 1 5
+
+   * - Name
+     - Perm
+     - Description
+
+   * - fan[1-3]_input
+     - RO
+     - Fan speed in RPM
+
+   * - fan[1-3]_label
+     - RO
+     - Fan label
+
+   * - fan[1-3]_min
+     - RO
+     - Minimal Fan speed in RPM
+
+   * - fan[1-3]_max
+     - RO
+     - Maximal Fan speed in RPM
+
+   * - fan[1-3]_target
+     - RO
+     - Expected Fan speed in RPM
+
+   * - pwm[1-3]
+     - RW
+     - Control the fan PWM duty-cycle
+
+   * - pwm1_enable
+     - WO
+     - Enable or disable automatic BIOS fan control (not supported
+       on all laptops, see below for details)
+
+   * - temp[1-10]_input
+     - RO
+     - Temperature reading in milli-degrees Celsius
+
+   * - temp[1-10]_label
+     - RO
+     - Temperature sensor label
 
 Disabling automatic BIOS fan control
 ------------------------------------
