@@ -305,6 +305,66 @@ static int nau8821_biq_coeff_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int nau8821_slew_rate_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct nau8821 *nau8821 = snd_soc_component_get_drvdata(component);
+	unsigned int value;
+
+	regmap_read(nau8821->regmap, NAU8821_R13_DMIC_CTRL, &value);
+	nau8821->def_mclk_src = (value & NAU8821_DMIC_SLEW_MASK)
+		>> NAU8821_DMIC_SLEW_SFT;
+	ucontrol->value.bytes.data[0] = nau8821->def_mclk_src;
+
+	return 0;
+}
+
+static int nau8821_slew_rate_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct nau8821 *nau8821 = snd_soc_component_get_drvdata(component);
+
+	nau8821->def_mclk_src = ucontrol->value.integer.value[0];
+
+	regmap_update_bits(component->regmap, NAU8821_R13_DMIC_CTRL,
+		NAU8821_DMIC_SLEW_MASK,
+		nau8821->def_mclk_src << NAU8821_DMIC_SLEW_SFT);
+
+	return 0;
+}
+
+static int nau8821_dmic_clock_speed_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct nau8821 *nau8821 = snd_soc_component_get_drvdata(component);
+	unsigned int value;
+
+	regmap_read(nau8821->regmap, NAU8821_R13_DMIC_CTRL, &value);
+	nau8821->def_dmic_clock = (value & NAU8821_DMIC_SRC_MASK)
+		>> NAU8821_DMIC_SRC_SFT;
+	ucontrol->value.bytes.data[0] = nau8821->def_dmic_clock;
+
+	return 0;
+}
+
+static int nau8821_dmic_clock_speed_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct nau8821 *nau8821 = snd_soc_component_get_drvdata(component);
+
+	nau8821->def_dmic_clock = ucontrol->value.integer.value[0];
+
+	regmap_update_bits(component->regmap, NAU8821_R13_DMIC_CTRL,
+		NAU8821_DMIC_SRC_MASK,
+		nau8821->def_dmic_clock << NAU8821_DMIC_SRC_SFT);
+
+	return 0;
+}
+
 static const char * const nau8821_adc_decimation[] = {
 	"32", "64", "128", "256" };
 
@@ -318,6 +378,20 @@ static const char * const nau8821_dac_oversampl[] = {
 static const struct soc_enum nau8821_dac_oversampl_enum =
 	SOC_ENUM_SINGLE(NAU8821_R2C_DAC_CTRL1, NAU8821_DAC_OVERSAMPLE_SFT,
 		ARRAY_SIZE(nau8821_dac_oversampl), nau8821_dac_oversampl);
+
+static const char *const dmic_slew_text[] = {"0", "1", "2", "3", "4", "5",
+	"6", "7"};
+
+static const struct soc_enum nau8821_slew_rate_enum =
+		SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(dmic_slew_text),
+		dmic_slew_text);
+
+static const char *const dmic_clock_speed_text[] = {"3.072", "1.536", "0.768",
+	"0.384"};
+
+static const struct soc_enum nau8821_dmic_clock_speed_enum =
+		SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(dmic_clock_speed_text),
+		dmic_clock_speed_text);
 
 static const DECLARE_TLV_DB_MINMAX_MUTE(adc_vol_tlv, -6600, 2400);
 static const DECLARE_TLV_DB_MINMAX_MUTE(sidetone_vol_tlv, -4200, 0);
@@ -350,6 +424,11 @@ static const struct snd_kcontrol_new nau8821_controls[] = {
 		nau8821_biq_coeff_get, nau8821_biq_coeff_put),
 	SOC_SINGLE("ADC Phase Switch", NAU8821_R1B_TDM_CTRL,
 		NAU8821_ADCPHS_SFT, 1, 0),
+	SOC_ENUM_EXT("Slew Rate Selection", nau8821_slew_rate_enum,
+			nau8821_slew_rate_get, nau8821_slew_rate_put),
+	SOC_ENUM_EXT("DMIC Clock Speed Selection",
+		nau8821_dmic_clock_speed_enum, nau8821_dmic_clock_speed_get,
+		nau8821_dmic_clock_speed_put),
 };
 
 static const struct snd_kcontrol_new nau8821_dmic_mode_switch =
