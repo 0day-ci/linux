@@ -1341,19 +1341,23 @@ static void read_dct_base_mask(struct amd64_pvt *pvt)
 	}
 }
 
+static enum mem_type determine_memory_type_df(struct amd64_umc *umc)
+{
+	if (umc->dimm_cfg & BIT(5))
+		return MEM_LRDDR4;
+
+	if (umc->dimm_cfg & BIT(4))
+		return MEM_RDDR4;
+
+	return MEM_DDR4;
+}
+
 static void determine_memory_type(struct amd64_pvt *pvt)
 {
 	u32 dram_ctrl, dcsm;
 
-	if (pvt->umc) {
-		if ((pvt->umc[0].dimm_cfg | pvt->umc[1].dimm_cfg) & BIT(5))
-			pvt->dram_type = MEM_LRDDR4;
-		else if ((pvt->umc[0].dimm_cfg | pvt->umc[1].dimm_cfg) & BIT(4))
-			pvt->dram_type = MEM_RDDR4;
-		else
-			pvt->dram_type = MEM_DDR4;
+	if (pvt->umc)
 		return;
-	}
 
 	switch (pvt->fam) {
 	case 0xf:
@@ -3272,8 +3276,8 @@ static int init_csrows_df(struct mem_ctl_info *mci)
 			edac_dbg(1, "MC node: %d, csrow: %d\n",
 					pvt->mc_node_id, cs);
 
+			dimm->mtype = determine_memory_type_df(&pvt->umc[umc]);
 			dimm->nr_pages = get_csrow_nr_pages(pvt, umc, cs);
-			dimm->mtype = pvt->dram_type;
 			dimm->edac_mode = edac_mode;
 			dimm->dtype = dev_type;
 			dimm->grain = 64;
