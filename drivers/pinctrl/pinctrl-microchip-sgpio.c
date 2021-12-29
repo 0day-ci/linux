@@ -51,6 +51,15 @@ enum {
 	SGPIO_FLAGS_HAS_IRQ	= BIT(0),
 };
 
+enum {
+	FUNC_GPIO,
+	FUNC_BLINK0,
+	FUNC_BLINK1,
+	FUNC_ACTIVITY0,
+	FUNC_ACTIVITY1,
+	FUNC_MAX,
+};
+
 struct sgpio_properties {
 	int arch;
 	int flags;
@@ -60,16 +69,22 @@ struct sgpio_properties {
 #define SGPIO_LUTON_AUTO_REPEAT  BIT(5)
 #define SGPIO_LUTON_PORT_WIDTH   GENMASK(3, 2)
 #define SGPIO_LUTON_CLK_FREQ     GENMASK(11, 0)
+#define SGPIO_LUTON_SIO_BMODE_0	 GENMASK(21, 20)
+#define SGPIO_LUTON_SIO_BMODE_1	 GENMASK(19, 18)
 #define SGPIO_LUTON_BIT_SOURCE   GENMASK(11, 0)
 
 #define SGPIO_OCELOT_AUTO_REPEAT BIT(10)
 #define SGPIO_OCELOT_PORT_WIDTH  GENMASK(8, 7)
 #define SGPIO_OCELOT_CLK_FREQ    GENMASK(19, 8)
+#define SGPIO_OCELOT_SIO_BMODE_0 GENMASK(20, 19)
+#define SGPIO_OCELOT_SIO_BMODE_1 GENMASK(22, 21)
 #define SGPIO_OCELOT_BIT_SOURCE  GENMASK(23, 12)
 
 #define SGPIO_SPARX5_AUTO_REPEAT BIT(6)
 #define SGPIO_SPARX5_PORT_WIDTH  GENMASK(4, 3)
 #define SGPIO_SPARX5_CLK_FREQ    GENMASK(19, 8)
+#define SGPIO_SPARX5_SIO_BMODE_0 GENMASK(16, 15)
+#define SGPIO_SPARX5_SIO_BMODE_1 GENMASK(18, 17)
 #define SGPIO_SPARX5_BIT_SOURCE  GENMASK(23, 12)
 
 #define SGPIO_MASTER_INTR_ENA    BIT(0)
@@ -98,22 +113,46 @@ static const struct sgpio_properties properties_sparx5 = {
 	.regoff = { 0x00, 0x06, 0x26, 0x04, 0x05, 0x2a, 0x32, 0x3a, 0x3e, 0x42 },
 };
 
-static const char * const functions[] = { "gpio" };
+static const char * const function_names[] = {
+	[FUNC_GPIO] = "gpio",
+	[FUNC_BLINK0] = "blink0",
+	[FUNC_BLINK1] = "blink1",
+	[FUNC_ACTIVITY0] = "activity0",
+	[FUNC_ACTIVITY1] = "activity1",
+};
+
+static const int function_values[] = {
+	[FUNC_GPIO] = 0,
+	[FUNC_BLINK0] = 2,
+	[FUNC_BLINK1] = 3,
+	[FUNC_ACTIVITY0] = 4,
+	[FUNC_ACTIVITY1] = 5,
+};
+
+struct sgpio_pmx_func {
+	const char **groups;
+	unsigned int ngroups;
+};
 
 struct sgpio_bank {
 	struct sgpio_priv *priv;
 	bool is_input;
 	struct gpio_chip gpio;
 	struct pinctrl_desc pctl_desc;
+	struct sgpio_pmx_func func[FUNC_MAX];
+	struct pinctrl_pin_desc *pins;
 };
 
 struct sgpio_priv {
 	struct device *dev;
 	struct sgpio_bank in;
 	struct sgpio_bank out;
+	int ngpios;
 	u32 bitcount;
 	u32 ports;
 	u32 clock;
+	u32 bmode0;
+	u32 bmode1;
 	struct regmap *regs;
 	const struct sgpio_properties *properties;
 };
@@ -221,6 +260,32 @@ static inline void sgpio_configure_clock(struct sgpio_priv *priv, u32 clkfrq)
 		return;
 	}
 	sgpio_clrsetbits(priv, REG_SIO_CLOCK, 0, clr, set);
+}
+
+static inline void sgpio_configure_blink_modes(struct sgpio_priv *priv)
+{
+	u32 clr, set;
+
+	switch (priv->properties->arch) {
+	case SGPIO_ARCH_LUTON:
+		clr = SGPIO_LUTON_SIO_BMODE_0 | SGPIO_LUTON_SIO_BMODE_1;
+		set = FIELD_PREP(SGPIO_LUTON_SIO_BMODE_0, priv->bmode0) |
+		      FIELD_PREP(SGPIO_LUTON_SIO_BMODE_1, priv->bmode1);
+		break;
+	case SGPIO_ARCH_OCELOT:
+		clr = SGPIO_OCELOT_SIO_BMODE_0 | SGPIO_OCELOT_SIO_BMODE_1;
+		set = FIELD_PREP(SGPIO_OCELOT_SIO_BMODE_0, priv->bmode0) |
+		      FIELD_PREP(SGPIO_OCELOT_SIO_BMODE_1, priv->bmode1);
+		break;
+	case SGPIO_ARCH_SPARX5:
+		clr = SGPIO_SPARX5_SIO_BMODE_0 | SGPIO_SPARX5_SIO_BMODE_1;
+		set = FIELD_PREP(SGPIO_SPARX5_SIO_BMODE_0, priv->bmode0) |
+		      FIELD_PREP(SGPIO_SPARX5_SIO_BMODE_1, priv->bmode1);
+		break;
+	default:
+		return;
+	}
+	sgpio_clrsetbits(priv, REG_SIO_CONFIG, 0, clr, set);
 }
 
 static void sgpio_output_set(struct sgpio_priv *priv,
@@ -352,13 +417,18 @@ static const struct pinconf_ops sgpio_confops = {
 
 static int sgpio_get_functions_count(struct pinctrl_dev *pctldev)
 {
-	return 1;
+	struct sgpio_bank *bank = pinctrl_dev_get_drvdata(pctldev);
+
+	if (bank->is_input)
+		return 1;
+	else
+		return ARRAY_SIZE(function_names);
 }
 
 static const char *sgpio_get_function_name(struct pinctrl_dev *pctldev,
 					   unsigned int function)
 {
-	return functions[0];
+	return function_names[function];
 }
 
 static int sgpio_get_function_groups(struct pinctrl_dev *pctldev,
@@ -366,8 +436,10 @@ static int sgpio_get_function_groups(struct pinctrl_dev *pctldev,
 				     const char *const **groups,
 				     unsigned *const num_groups)
 {
-	*groups  = functions;
-	*num_groups = ARRAY_SIZE(functions);
+	struct sgpio_bank *bank = pinctrl_dev_get_drvdata(pctldev);
+
+	*groups  = bank->func[function].groups;
+	*num_groups = bank->func[function].ngroups;
 
 	return 0;
 }
@@ -375,6 +447,15 @@ static int sgpio_get_function_groups(struct pinctrl_dev *pctldev,
 static int sgpio_pinmux_set_mux(struct pinctrl_dev *pctldev,
 				unsigned int selector, unsigned int group)
 {
+	struct sgpio_bank *bank = pinctrl_dev_get_drvdata(pctldev);
+	struct sgpio_priv *priv = bank->priv;
+	struct sgpio_port_addr addr;
+	int f;
+
+	f = function_values[selector];
+	sgpio_pin_to_addr(priv, group, &addr);
+	sgpio_output_set(priv, &addr, f);
+
 	return 0;
 }
 
@@ -693,6 +774,30 @@ static void sgpio_irq_handler(struct irq_desc *desc)
 	}
 }
 
+static int sgpio_create_group_func_map(struct device *dev,
+				       struct sgpio_bank *bank)
+{
+	struct sgpio_priv *priv = bank->priv;
+	int f, i;
+
+	if (bank->is_input)
+		return 0;
+
+	for (f = 0; f < FUNC_MAX; f++) {
+		bank->func[f].ngroups = priv->ngpios;
+		bank->func[f].groups = devm_kcalloc(dev, priv->ngpios,
+						    sizeof(char *), GFP_KERNEL);
+
+		if (!bank->func[f].groups)
+			return -ENOMEM;
+
+		for (i = 0; i < priv->ngpios; i++)
+			bank->func[f].groups[i] = bank->pins[i].name;
+	}
+
+	return 0;
+}
+
 static int microchip_sgpio_register_bank(struct device *dev,
 					 struct sgpio_priv *priv,
 					 struct fwnode_handle *fwnode,
@@ -716,6 +821,7 @@ static int microchip_sgpio_register_bank(struct device *dev,
 		ngpios = 64;
 	}
 
+	priv->ngpios = ngpios;
 	priv->bitcount = ngpios / SGPIO_BITS_PER_WORD;
 	if (priv->bitcount > SGPIO_MAX_BITS) {
 		dev_err(dev, "Bit width exceeds maximum (%d)\n",
@@ -738,6 +844,7 @@ static int microchip_sgpio_register_bank(struct device *dev,
 
 	pctl_desc->npins = ngpios;
 	pctl_desc->pins = pins;
+	bank->pins = pins;
 
 	for (i = 0; i < ngpios; i++) {
 		struct sgpio_port_addr addr;
@@ -751,6 +858,12 @@ static int microchip_sgpio_register_bank(struct device *dev,
 					      addr.port, addr.bit);
 		if (!pins[i].name)
 			return -ENOMEM;
+	}
+
+	ret = sgpio_create_group_func_map(dev, bank);
+	if (ret) {
+		dev_err(dev, "Unable to create group func map.\n");
+		return ret;
 	}
 
 	pctldev = devm_pinctrl_register(dev, pctl_desc, bank);
@@ -894,6 +1007,18 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 	for (port = 0; port < SGPIO_BITS_PER_WORD; port++)
 		sgpio_writel(priv, 0, REG_PORT_CONFIG, port);
 	sgpio_writel(priv, priv->ports, REG_PORT_ENABLE, 0);
+
+	/*
+	 * The datasheet and register definitions contradict themselves, at
+	 * least for the VSC7512. The Datasheet Revision 4.2 describes both
+	 * default blink modes as 20 Hz, but the registers show the default
+	 * blink mode 0 as 5 Hz. Two identical blink modes aren't very useful,
+	 * so override BMODE_0 here to match the 5Hz "default" described in the
+	 * register map.
+	 */
+	if (priv->properties->arch == SGPIO_ARCH_OCELOT)
+		priv->bmode0 = 2;
+	sgpio_configure_blink_modes(priv);
 
 	return 0;
 }
