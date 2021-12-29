@@ -263,35 +263,40 @@ static u32 nvmet_format_ana_group(struct nvmet_req *req, u32 grpid,
 	desc->nnsids = cpu_to_le32(count);
 	desc->chgcnt = cpu_to_le64(nvmet_ana_chgcnt);
 	desc->state = req->port->ana_state[grpid];
-	memset(desc->rsvd17, 0, sizeof(desc->rsvd17));
 	return struct_size(desc, nsids, count);
 }
 
 static void nvmet_execute_get_log_page_ana(struct nvmet_req *req)
 {
-	struct nvme_ana_rsp_hdr hdr = { 0, };
+	struct nvme_ana_rsp_hdr *hdr;
 	struct nvme_ana_group_desc *desc;
-	size_t offset = sizeof(struct nvme_ana_rsp_hdr); /* start beyond hdr */
+	u64 offset = nvmet_get_log_page_offset(req->cmd);
 	size_t len;
+	void *buffer;
 	u32 grpid;
 	u16 ngrps = 0;
 	u16 status;
 
-	status = NVME_SC_INTERNAL;
-	desc = kmalloc(struct_size(desc, nsids, NVMET_MAX_NAMESPACES),
-		       GFP_KERNEL);
-	if (!desc)
+	if (offset & 0x3) {
+		req->error_loc =
+			offsetof(struct nvme_get_log_page_command, lpo);
+		status = NVME_SC_INVALID_FIELD | NVME_SC_DNR;
 		goto out;
+	}
+
+	status = NVME_SC_INTERNAL;
+	len = sizeof(*hdr) + struct_size(desc, nsids, NVMET_MAX_NAMESPACES);
+	buffer = kzalloc(len, GFP_KERNEL);
+	if (!buffer)
+		goto out;
+	hdr = buffer;
+	desc = buffer + sizeof(*hdr);
 
 	down_read(&nvmet_ana_sem);
 	for (grpid = 1; grpid <= NVMET_MAX_ANAGRPS; grpid++) {
 		if (!nvmet_ana_group_enabled[grpid])
 			continue;
-		len = nvmet_format_ana_group(req, grpid, desc);
-		status = nvmet_copy_to_sgl(req, offset, desc, len);
-		if (status)
-			break;
-		offset += len;
+		nvmet_format_ana_group(req, grpid, desc);
 		ngrps++;
 	}
 	for ( ; grpid <= NVMET_MAX_ANAGRPS; grpid++) {
@@ -299,15 +304,15 @@ static void nvmet_execute_get_log_page_ana(struct nvmet_req *req)
 			ngrps++;
 	}
 
-	hdr.chgcnt = cpu_to_le64(nvmet_ana_chgcnt);
-	hdr.ngrps = cpu_to_le16(ngrps);
+	hdr->chgcnt = cpu_to_le64(nvmet_ana_chgcnt);
+	hdr->ngrps = cpu_to_le16(ngrps);
 	nvmet_clear_aen_bit(req, NVME_AEN_BIT_ANA_CHANGE);
 	up_read(&nvmet_ana_sem);
 
-	kfree(desc);
+	status = nvmet_copy_to_sgl(req, 0, buffer + offset,
+				   nvmet_get_log_page_len(req->cmd));
 
-	/* copy the header last once we know the number of groups */
-	status = nvmet_copy_to_sgl(req, 0, &hdr, sizeof(hdr));
+	kfree(buffer);
 out:
 	nvmet_req_complete(req, status);
 }
