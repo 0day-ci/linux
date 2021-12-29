@@ -1058,7 +1058,10 @@ service_callback(enum vchiq_reason reason, struct vchiq_header *header,
 
 	DEBUG_TRACE(SERVICE_CALLBACK_LINE);
 
+	rcu_read_lock();
 	service = handle_to_service(handle);
+	rcu_read_unlock();
+
 	if (WARN_ON(!service))
 		return VCHIQ_SUCCESS;
 
