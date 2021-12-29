@@ -49,7 +49,6 @@
 #include <mach/audio.h>
 #include <linux/platform_data/video-pxafb.h>
 #include <linux/platform_data/mmc-pxamci.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/usb-ohci-pxa27x.h>
 #include <linux/platform_data/keypad-pxa27x.h>
 #include <mach/smemc.h>
@@ -360,31 +359,6 @@ static struct pxamci_platform_data mainstone_mci_platform_data = {
 	.exit			= mainstone_mci_exit,
 };
 
-static void mainstone_irda_transceiver_mode(struct device *dev, int mode)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	if (mode & IR_SIRMODE) {
-		MST_MSCWR1 &= ~MST_MSCWR1_IRDA_FIR;
-	} else if (mode & IR_FIRMODE) {
-		MST_MSCWR1 |= MST_MSCWR1_IRDA_FIR;
-	}
-	pxa2xx_transceiver_mode(dev, mode);
-	if (mode & IR_OFF) {
-		MST_MSCWR1 = (MST_MSCWR1 & ~MST_MSCWR1_IRDA_MASK) | MST_MSCWR1_IRDA_OFF;
-	} else {
-		MST_MSCWR1 = (MST_MSCWR1 & ~MST_MSCWR1_IRDA_MASK) | MST_MSCWR1_IRDA_FULL;
-	}
-	local_irq_restore(flags);
-}
-
-static struct pxaficp_platform_data mainstone_ficp_platform_data = {
-	.gpio_pwdown		= -1,
-	.transceiver_cap	= IR_SIRMODE | IR_FIRMODE | IR_OFF,
-	.transceiver_mode	= mainstone_irda_transceiver_mode,
-};
-
 static struct gpio_keys_button gpio_keys_button[] = {
 	[0] = {
 		.desc	= "wakeup",
@@ -596,7 +570,6 @@ static void __init mainstone_init(void)
 	mainstone_backlight_register();
 
 	pxa_set_mci_info(&mainstone_mci_platform_data);
-	pxa_set_ficp_info(&mainstone_ficp_platform_data);
 	pxa_set_ohci_info(&mainstone_ohci_platform_data);
 	pxa_set_i2c_info(NULL);
 	pxa_set_ac97_info(&mst_audio_ops);

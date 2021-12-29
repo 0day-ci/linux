@@ -42,7 +42,6 @@
 
 #include "pxa27x.h"
 #include <mach/hx4700.h>
-#include <linux/platform_data/irda-pxaficp.h>
 
 #include <sound/ak4641.h>
 #include <video/platform_lcd.h>
@@ -149,15 +148,6 @@ static unsigned long hx4700_pin_config[] __initdata = {
 	GPIO108_GPIO,	/* GSM_READY */
 	GPIO58_GPIO,	/* TSC2046_nPENIRQ */
 	GPIO66_GPIO,	/* nSDIO_IRQ */
-};
-
-/*
- * IRDA
- */
-
-static struct pxaficp_platform_data ficp_info = {
-	.gpio_pwdown		= GPIO105_HX4700_nIR_ON,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
 };
 
 /*
@@ -891,7 +881,6 @@ static void __init hx4700_init(void)
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 	pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
 
-	pxa_set_ficp_info(&ficp_info);
 	pxa27x_set_i2c_power_info(NULL);
 	pxa_set_i2c_info(NULL);
 	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));

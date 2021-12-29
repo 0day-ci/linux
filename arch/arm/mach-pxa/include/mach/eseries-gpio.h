@@ -38,9 +38,6 @@
 #define GPIO_E800_PCMCIA_PWR0    20
 #define GPIO_E800_PCMCIA_PWR1    73
 
-/* e7xx IrDA power control */
-#define GPIO_E7XX_IR_OFF         38
-
 /* e740 audio control GPIOs */
 #define GPIO_E740_WM9705_nAVDD2  16
 #define GPIO_E740_MIC_ON         40

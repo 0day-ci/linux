@@ -33,7 +33,6 @@
 #include <mach/palmld.h>
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/keypad-pxa27x.h>
 #include <linux/platform_data/asoc-palm27x.h>
 #include "palm27x.h"
@@ -351,7 +350,6 @@ static void __init palmld_init(void)
 	palm27x_mmc_init(&palmld_mci_gpio_table);
 	palm27x_pm_init(PALMLD_STR_BASE);
 	palm27x_lcd_init(-1, &palm_320x480_lcd_mode);
-	palm27x_irda_init(GPIO_NR_PALMLD_IR_DISABLE);
 	palm27x_ac97_init(PALMLD_BAT_MIN_VOLTAGE, PALMLD_BAT_MAX_VOLTAGE,
 			GPIO_NR_PALMLD_EARPHONE_DETECT, 95);
 	palm27x_pwm_init(GPIO_NR_PALMLD_BL_POWER, GPIO_NR_PALMLD_LCD_POWER);

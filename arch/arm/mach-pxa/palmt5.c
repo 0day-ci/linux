@@ -33,7 +33,6 @@
 #include "palmt5.h"
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/keypad-pxa27x.h>
 #include "udc.h"
 #include <linux/platform_data/asoc-palm27x.h>
@@ -202,7 +201,6 @@ static void __init palmt5_init(void)
 	palm27x_lcd_init(-1, &palm_320x480_lcd_mode);
 	palm27x_udc_init(GPIO_NR_PALMT5_USB_DETECT_N,
 			GPIO_NR_PALMT5_USB_PULLUP, 1);
-	palm27x_irda_init(GPIO_NR_PALMT5_IR_DISABLE);
 	palm27x_ac97_init(PALMT5_BAT_MIN_VOLTAGE, PALMT5_BAT_MAX_VOLTAGE,
 			GPIO_NR_PALMT5_EARPHONE_DETECT, 95);
 	palm27x_pwm_init(GPIO_NR_PALMT5_BL_POWER, GPIO_NR_PALMT5_LCD_POWER);

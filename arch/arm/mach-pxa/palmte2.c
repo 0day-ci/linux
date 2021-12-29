@@ -33,7 +33,6 @@
 #include "palmte2.h"
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include "udc.h"
 #include <linux/platform_data/asoc-palm27x.h>
 
@@ -186,14 +185,6 @@ static struct platform_device palmte2_backlight = {
 		.parent		= &pxa25x_device_pwm0.dev,
 		.platform_data	= &palmte2_backlight_data,
 	},
-};
-
-/******************************************************************************
- * IrDA
- ******************************************************************************/
-static struct pxaficp_platform_data palmte2_ficp_platform_data = {
-	.gpio_pwdown		= GPIO_NR_PALMTE2_IR_DISABLE,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
 };
 
 /******************************************************************************

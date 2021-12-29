@@ -44,17 +44,11 @@
 #include <mach/audio.h>
 #include <linux/platform_data/video-pxafb.h>
 #include <linux/platform_data/mmc-pxamci.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/usb-ohci-pxa27x.h>
 #include <mach/smemc.h>
 
 #include "generic.h"
 #include "devices.h"
-
-/*	comment out the following line if you want to use the
- *	Standard UART from PXA for serial / irda transmission
- *	and acivate it if you have status leds connected */
-#define STATUS_LEDS_ON_STUART_PINS 1
 
 /*****************************************************************************
  * MultiFunctionPins of CPU
@@ -94,13 +88,8 @@ static unsigned long trizeps4_pin_config[] __initdata = {
 	GPIO43_BTUART_TXD,
 	GPIO44_BTUART_CTS,
 	GPIO45_BTUART_RTS,
-#ifdef STATUS_LEDS_ON_STUART_PINS
 	GPIO46_GPIO,
 	GPIO47_GPIO,
-#else
-	GPIO46_STUART_RXD,
-	GPIO47_STUART_TXD,
-#endif
 	/* PCMCIA */
 	GPIO11_GPIO,			/* TRIZEPS4_CD_IRQ */
 	GPIO13_GPIO,			/* TRIZEPS4_READY_NINT */
@@ -233,7 +222,6 @@ static struct platform_device dm9000_device = {
  * LED's on GPIO pins of PXA
  ****************************************************************************/
 static struct gpio_led trizeps4_led[] = {
-#ifdef STATUS_LEDS_ON_STUART_PINS
 	{
 		.name = "led0:orange:heartbeat",	/* */
 		.default_trigger = "heartbeat",
@@ -246,7 +234,6 @@ static struct gpio_led trizeps4_led[] = {
 		.gpio = GPIO_SYS_BUSY_LED,
 		.active_low = 1,
 	},
-#endif
 };
 
 static struct gpio_led_platform_data trizeps4_led_data = {
@@ -353,57 +340,6 @@ static struct pxamci_platform_data trizeps4_mci_platform_data = {
 	.get_ro		= NULL,	/* write-protection not supported */
 	.setpower 	= NULL,	/* power-switching not supported */
 };
-
-/****************************************************************************
- * IRDA mode switching on stuart
- ****************************************************************************/
-#ifndef STATUS_LEDS_ON_STUART_PINS
-static short trizeps_conxs_ircr;
-
-static int trizeps4_irda_startup(struct device *dev)
-{
-	trizeps_conxs_ircr &= ~ConXS_IRCR_SD;
-	IRCR_writew(trizeps_conxs_ircr);
-	return 0;
-}
-
-static void trizeps4_irda_shutdown(struct device *dev)
-{
-	trizeps_conxs_ircr |= ConXS_IRCR_SD;
-	IRCR_writew(trizeps_conxs_ircr);
-}
-
-static void trizeps4_irda_transceiver_mode(struct device *dev, int mode)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	/* Switch mode */
-	if (mode & IR_SIRMODE)
-		trizeps_conxs_ircr &= ~ConXS_IRCR_MODE;	/* Slow mode */
-	else if (mode & IR_FIRMODE)
-		trizeps_conxs_ircr |= ConXS_IRCR_MODE;	/* Fast mode */
-
-	/* Switch power */
-	if (mode & IR_OFF)
-		trizeps_conxs_ircr |= ConXS_IRCR_SD;
-	else
-		trizeps_conxs_ircr &= ~ConXS_IRCR_SD;
-
-	IRCR_writew(trizeps_conxs_ircr);
-	local_irq_restore(flags);
-
-	pxa2xx_transceiver_mode(dev, mode);
-}
-
-static struct pxaficp_platform_data trizeps4_ficp_platform_data = {
-	.gpio_pwdown		= -1,
-	.transceiver_cap	= IR_SIRMODE | IR_FIRMODE | IR_OFF,
-	.transceiver_mode	= trizeps4_irda_transceiver_mode,
-	.startup		= trizeps4_irda_startup,
-	.shutdown		= trizeps4_irda_shutdown,
-};
-#endif
 
 /****************************************************************************
  * OHCI USB port
@@ -516,9 +452,6 @@ static void __init trizeps4_init(void)
 		pxa_set_fb_info(NULL, &toshiba_lcd);
 
 	pxa_set_mci_info(&trizeps4_mci_platform_data);
-#ifndef STATUS_LEDS_ON_STUART_PINS
-	pxa_set_ficp_info(&trizeps4_ficp_platform_data);
-#endif
 	pxa_set_ohci_info(&trizeps4_ohci_platform_data);
 	pxa_set_ac97_info(NULL);
 	pxa_set_i2c_info(NULL);

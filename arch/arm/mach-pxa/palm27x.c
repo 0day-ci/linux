@@ -28,7 +28,6 @@
 #include <mach/audio.h>
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include "udc.h"
 #include <linux/platform_data/asoc-palm27x.h>
 #include "palm27x.h"
@@ -186,21 +185,6 @@ void __init palm27x_udc_init(int vbus, int pullup, int vbus_inverted)
 
 	gpiod_add_lookup_table(&palm27x_udc_gpiod_table);
 	platform_device_register(&palm27x_gpio_vbus);
-}
-#endif
-
-/******************************************************************************
- * IrDA
- ******************************************************************************/
-#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-static struct pxaficp_platform_data palm27x_ficp_platform_data = {
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-};
-
-void __init palm27x_irda_init(int pwdn)
-{
-	palm27x_ficp_platform_data.gpio_pwdown = pwdn;
-	pxa_set_ficp_info(&palm27x_ficp_platform_data);
 }
 #endif
 

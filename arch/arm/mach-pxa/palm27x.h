@@ -41,12 +41,6 @@ extern void __init palm27x_udc_init(int vbus, int pullup,
 static inline void palm27x_udc_init(int vbus, int pullup, int vbus_inverted) {}
 #endif
 
-#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-extern void __init palm27x_irda_init(int pwdn);
-#else
-static inline void palm27x_irda_init(int pwdn) {}
-#endif
-
 #if	defined(CONFIG_TOUCHSCREEN_WM97XX) || \
 	defined(CONFIG_TOUCHSCREEN_WM97XX_MODULE)
 extern void __init palm27x_ac97_init(int minv, int maxv, int jack,

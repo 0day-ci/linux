@@ -33,7 +33,6 @@
 #include <mach/palmtc.h>
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include "udc.h"
 
 #include "generic.h"
@@ -209,23 +208,6 @@ static void __init palmtc_pwm_init(void)
 }
 #else
 static inline void palmtc_pwm_init(void) {}
-#endif
-
-/******************************************************************************
- * IrDA
- ******************************************************************************/
-#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-static struct pxaficp_platform_data palmtc_ficp_platform_data = {
-	.gpio_pwdown		= GPIO_NR_PALMTC_IR_DISABLE,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-};
-
-static void __init palmtc_irda_init(void)
-{
-	pxa_set_ficp_info(&palmtc_ficp_platform_data);
-}
-#else
-static inline void palmtc_irda_init(void) {}
 #endif
 
 /******************************************************************************
@@ -518,7 +500,6 @@ static void __init palmtc_init(void)
 	palmtc_mmc_init();
 	palmtc_keys_init();
 	palmtc_pwm_init();
-	palmtc_irda_init();
 	palmtc_mkp_init();
 	palmtc_udc_init();
 	palmtc_ts_init();

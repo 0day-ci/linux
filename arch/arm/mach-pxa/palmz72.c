@@ -38,7 +38,6 @@
 #include "palmz72.h"
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/keypad-pxa27x.h>
 #include "udc.h"
 #include <linux/platform_data/asoc-palm27x.h>
@@ -297,7 +296,6 @@ static void __init palmz72_init(void)
 	palm27x_lcd_init(-1, &palm_320x320_lcd_mode);
 	palm27x_udc_init(GPIO_NR_PALMZ72_USB_DETECT_N,
 			GPIO_NR_PALMZ72_USB_PULLUP, 0);
-	palm27x_irda_init(GPIO_NR_PALMZ72_IR_DISABLE);
 	palm27x_ac97_init(PALMZ72_BAT_MIN_VOLTAGE, PALMZ72_BAT_MAX_VOLTAGE,
 			-1, 113);
 	palm27x_pwm_init(-1, -1);

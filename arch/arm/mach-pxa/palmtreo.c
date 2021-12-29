@@ -33,7 +33,6 @@
 #include "palmtreo.h"
 #include <linux/platform_data/mmc-pxamci.h>
 #include <linux/platform_data/video-pxafb.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/keypad-pxa27x.h>
 #include "udc.h"
 #include <linux/platform_data/usb-ohci-pxa27x.h>
@@ -417,7 +416,6 @@ static void __init palmphone_common_init(void)
 	palm27x_pm_init(TREO_STR_BASE);
 	palm27x_lcd_init(GPIO_NR_TREO_BL_POWER, &palm_320x320_new_lcd_mode);
 	palm27x_udc_init(GPIO_NR_TREO_USB_DETECT, GPIO_NR_TREO_USB_PULLUP, 1);
-	palm27x_irda_init(GPIO_NR_TREO_IR_EN);
 	palm27x_ac97_init(-1, -1, -1, 95);
 	palm27x_pwm_init(GPIO_NR_TREO_BL_POWER, -1);
 	palm27x_power_init(GPIO_NR_TREO_POWER_DETECT, -1);

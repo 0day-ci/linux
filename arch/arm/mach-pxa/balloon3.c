@@ -46,7 +46,6 @@
 #include <linux/platform_data/mmc-pxamci.h>
 #include "udc.h"
 #include "pxa27x-udc.h"
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/usb-ohci-pxa27x.h>
 
 #include "generic.h"
@@ -328,22 +327,6 @@ static void __init balloon3_udc_init(void)
 }
 #else
 static inline void balloon3_udc_init(void) {}
-#endif
-
-/******************************************************************************
- * IrDA
- ******************************************************************************/
-#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-static struct pxaficp_platform_data balloon3_ficp_platform_data = {
-	.transceiver_cap	= IR_FIRMODE | IR_SIRMODE | IR_OFF,
-};
-
-static void __init balloon3_irda_init(void)
-{
-	pxa_set_ficp_info(&balloon3_ficp_platform_data);
-}
-#else
-static inline void balloon3_irda_init(void) {}
 #endif
 
 /******************************************************************************
@@ -780,7 +763,6 @@ static void __init balloon3_init(void)
 	pxa_set_stuart_info(NULL);
 
 	balloon3_i2c_init();
-	balloon3_irda_init();
 	balloon3_lcd_init();
 	balloon3_leds_init();
 	balloon3_mmc_init();

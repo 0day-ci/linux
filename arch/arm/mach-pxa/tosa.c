@@ -41,7 +41,6 @@
 
 #include "pxa25x.h"
 #include <mach/reset.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/mmc-pxamci.h>
 #include "udc.h"
 #include "tosa_bt.h"
@@ -302,68 +301,6 @@ static struct gpiod_lookup_table tosa_mci_gpio_table = {
 			    "power", GPIO_ACTIVE_HIGH),
 		{ },
 	},
-};
-
-/*
- * Irda
- */
-static void tosa_irda_transceiver_mode(struct device *dev, int mode)
-{
-	if (mode & IR_OFF) {
-		gpio_set_value(TOSA_GPIO_IR_POWERDWN, 0);
-		pxa2xx_transceiver_mode(dev, mode);
-		gpio_direction_output(TOSA_GPIO_IRDA_TX, 0);
-	} else {
-		pxa2xx_transceiver_mode(dev, mode);
-		gpio_set_value(TOSA_GPIO_IR_POWERDWN, 1);
-	}
-}
-
-static int tosa_irda_startup(struct device *dev)
-{
-	int ret;
-
-	ret = gpio_request(TOSA_GPIO_IRDA_TX, "IrDA TX");
-	if (ret)
-		goto err_tx;
-	ret = gpio_direction_output(TOSA_GPIO_IRDA_TX, 0);
-	if (ret)
-		goto err_tx_dir;
-
-	ret = gpio_request(TOSA_GPIO_IR_POWERDWN, "IrDA powerdown");
-	if (ret)
-		goto err_pwr;
-
-	ret = gpio_direction_output(TOSA_GPIO_IR_POWERDWN, 0);
-	if (ret)
-		goto err_pwr_dir;
-
-	tosa_irda_transceiver_mode(dev, IR_SIRMODE | IR_OFF);
-
-	return 0;
-
-err_pwr_dir:
-	gpio_free(TOSA_GPIO_IR_POWERDWN);
-err_pwr:
-err_tx_dir:
-	gpio_free(TOSA_GPIO_IRDA_TX);
-err_tx:
-	return ret;
-}
-
-static void tosa_irda_shutdown(struct device *dev)
-{
-	tosa_irda_transceiver_mode(dev, IR_SIRMODE | IR_OFF);
-	gpio_free(TOSA_GPIO_IR_POWERDWN);
-	gpio_free(TOSA_GPIO_IRDA_TX);
-}
-
-static struct pxaficp_platform_data tosa_ficp_platform_data = {
-	.gpio_pwdown		= -1,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-	.transceiver_mode	= tosa_irda_transceiver_mode,
-	.startup		= tosa_irda_startup,
-	.shutdown		= tosa_irda_shutdown,
 };
 
 /*
@@ -945,7 +882,6 @@ static void __init tosa_init(void)
 
 	gpiod_add_lookup_table(&tosa_mci_gpio_table);
 	pxa_set_mci_info(&tosa_mci_platform_data);
-	pxa_set_ficp_info(&tosa_ficp_platform_data);
 	pxa_set_i2c_info(NULL);
 	pxa_set_ac97_info(NULL);
 	platform_scoop_config = &tosa_pcmcia_config;

@@ -49,7 +49,6 @@
 #include <mach/audio.h>
 #include <mach/lubbock.h>
 #include "udc.h"
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/video-pxafb.h>
 #include <linux/platform_data/mmc-pxamci.h>
 #include "pm.h"
@@ -454,26 +453,6 @@ static struct pxamci_platform_data lubbock_mci_platform_data = {
 	.exit 			= lubbock_mci_exit,
 };
 
-static void lubbock_irda_transceiver_mode(struct device *dev, int mode)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	if (mode & IR_SIRMODE) {
-		lubbock_set_misc_wr(BIT(4), 0);
-	} else if (mode & IR_FIRMODE) {
-		lubbock_set_misc_wr(BIT(4), BIT(4));
-	}
-	pxa2xx_transceiver_mode(dev, mode);
-	local_irq_restore(flags);
-}
-
-static struct pxaficp_platform_data lubbock_ficp_platform_data = {
-	.gpio_pwdown		= -1,
-	.transceiver_cap	= IR_SIRMODE | IR_FIRMODE,
-	.transceiver_mode	= lubbock_irda_transceiver_mode,
-};
-
 static void __init lubbock_init(void)
 {
 	int flashboot = (LUB_CONF_SWITCHES & 1);
@@ -499,7 +478,6 @@ static void __init lubbock_init(void)
 	pxa_set_udc_info(&udc_info);
 	pxa_set_fb_info(NULL, &sharp_lm8v31);
 	pxa_set_mci_info(&lubbock_mci_platform_data);
-	pxa_set_ficp_info(&lubbock_ficp_platform_data);
 	pxa_set_ac97_info(NULL);
 
 	lubbock_flash_data[0].width = lubbock_flash_data[1].width =

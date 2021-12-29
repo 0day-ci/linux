@@ -38,7 +38,6 @@
 #include <mach/magician.h>
 #include <linux/platform_data/video-pxafb.h>
 #include <linux/platform_data/mmc-pxamci.h>
-#include <linux/platform_data/irda-pxaficp.h>
 #include <linux/platform_data/usb-ohci-pxa27x.h>
 
 #include <linux/regulator/max1586.h>
@@ -121,16 +120,6 @@ static unsigned long magician_pin_config[] __initdata = {
 	GPIO107_GPIO,	/* DS1WM_IRQ */
 	GPIO108_GPIO,	/* GSM_READY */
 	GPIO115_GPIO,	/* nPEN_IRQ */
-};
-
-/*
- * IrDA
- */
-
-static struct pxaficp_platform_data magician_ficp_info = {
-	.gpio_pwdown		= GPIO83_MAGICIAN_nIR_EN,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-	.gpio_pwdown_inverted	= 0,
 };
 
 /*
@@ -1001,7 +990,6 @@ static void __init magician_init(void)
 
 	pwm_add_table(magician_pwm_lookup, ARRAY_SIZE(magician_pwm_lookup));
 
-	pxa_set_ficp_info(&magician_ficp_info);
 	pxa27x_set_i2c_power_info(&magician_i2c_power_info);
 	pxa_set_i2c_info(&i2c_info);
 

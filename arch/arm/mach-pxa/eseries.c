@@ -37,7 +37,6 @@
 #include <mach/audio.h>
 #include <linux/platform_data/video-pxafb.h>
 #include "udc.h"
-#include <linux/platform_data/irda-pxaficp.h>
 
 #include "devices.h"
 #include "generic.h"
@@ -65,11 +64,6 @@ static struct gpiod_lookup_table e7xx_gpio_vbus_gpiod_table __maybe_unused = {
 static struct platform_device e7xx_gpio_vbus __maybe_unused = {
 	.name	= "gpio-vbus",
 	.id	= -1,
-};
-
-struct pxaficp_platform_data e7xx_ficp_platform_data = {
-	.gpio_pwdown		= GPIO_E7XX_IR_OFF,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
 };
 
 int eseries_tmio_enable(struct platform_device *dev)
@@ -542,7 +536,6 @@ static void __init e740_init(void)
 	gpiod_add_lookup_table(&e7xx_gpio_vbus_gpiod_table);
 	platform_add_devices(ARRAY_AND_SIZE(e740_devices));
 	pxa_set_ac97_info(NULL);
-	pxa_set_ficp_info(&e7xx_ficp_platform_data);
 }
 
 MACHINE_START(E740, "Toshiba e740")
@@ -742,7 +735,6 @@ static void __init e750_init(void)
 	gpiod_add_lookup_table(&e7xx_gpio_vbus_gpiod_table);
 	platform_add_devices(ARRAY_AND_SIZE(e750_devices));
 	pxa_set_ac97_info(NULL);
-	pxa_set_ficp_info(&e7xx_ficp_platform_data);
 }
 
 MACHINE_START(E750, "Toshiba e750")

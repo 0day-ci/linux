@@ -42,7 +42,6 @@
 #include "pxa25x.h"
 #include <linux/platform_data/mmc-pxamci.h>
 #include "udc.h"
-#include <linux/platform_data/irda-pxaficp.h>
 #include <mach/poodle.h>
 #include <linux/platform_data/video-pxafb.h>
 
@@ -300,15 +299,6 @@ static struct gpiod_lookup_table poodle_mci_gpio_table = {
 };
 
 /*
- * Irda
- */
-static struct pxaficp_platform_data poodle_ficp_platform_data = {
-	.gpio_pwdown		= POODLE_GPIO_IR_ON,
-	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-};
-
-
-/*
  * USB Device Controller
  */
 static struct pxa2xx_udc_mach_info udc_info __initdata = {
@@ -446,7 +436,6 @@ static void __init poodle_init(void)
 	pxa_set_udc_info(&udc_info);
 	gpiod_add_lookup_table(&poodle_mci_gpio_table);
 	pxa_set_mci_info(&poodle_mci_platform_data);
-	pxa_set_ficp_info(&poodle_ficp_platform_data);
 	pxa_set_i2c_info(NULL);
 	i2c_register_board_info(0, ARRAY_AND_SIZE(poodle_i2c_devices));
 	poodle_init_spi();
