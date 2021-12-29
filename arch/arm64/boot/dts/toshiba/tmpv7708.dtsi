@@ -481,7 +481,6 @@
 			device_type = "pci";
 			bus-range = <0x00 0xff>;
 			num-lanes = <2>;
-			num-viewport = <8>;
 
 			#address-cells = <3>;
 			#size-cells = <2>;
