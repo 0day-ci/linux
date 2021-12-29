@@ -332,23 +332,20 @@ static int ax88772_reset(struct usbnet *dev)
 	ret = asix_write_cmd(dev, AX_CMD_WRITE_NODE_ID, 0, 0,
 			     ETH_ALEN, data->mac_addr, 0);
 	if (ret < 0)
-		goto out;
+		return ret;
 
 	/* Set RX_CTL to default values with 2k buffer, and enable cactus */
 	ret = asix_write_rx_ctl(dev, AX_DEFAULT_RX_CTL, 0);
 	if (ret < 0)
-		goto out;
+		return ret;
 
 	ret = asix_write_medium_mode(dev, AX88772_MEDIUM_DEFAULT, 0);
 	if (ret < 0)
-		goto out;
+		return ret;
 
 	phy_start(priv->phydev);
 
 	return 0;
-
-out:
-	return ret;
 }
 
 static int ax88772_hw_reset(struct usbnet *dev, int in_pm)
