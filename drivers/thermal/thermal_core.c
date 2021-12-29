@@ -431,6 +431,7 @@ static int thermal_zone_device_set_mode(struct thermal_zone_device *tz,
 					enum thermal_device_mode mode)
 {
 	int ret = 0;
+	int trip;
 
 	mutex_lock(&tz->lock);
 
@@ -453,8 +454,14 @@ static int thermal_zone_device_set_mode(struct thermal_zone_device *tz,
 
 	if (mode == THERMAL_DEVICE_ENABLED)
 		thermal_notify_tz_enable(tz->id);
-	else
+	else {
+		/* make sure all previous throttlings are cleared */
+		thermal_zone_device_init(tz);
+		for (trip = 0; trip < tz->trips; trip++)
+			handle_thermal_trip(tz, trip);
+
 		thermal_notify_tz_disable(tz->id);
+	}
 
 	return ret;
 }
