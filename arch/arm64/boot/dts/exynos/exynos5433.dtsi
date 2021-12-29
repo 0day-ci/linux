@@ -1960,7 +1960,6 @@
 				 <&cmu_fsys CLK_PCLK_PCIE_PHY>;
 			clock-names = "pcie", "pcie_bus";
 			num-lanes = <1>;
-			num-viewport = <3>;
 			bus-range = <0x00 0xff>;
 			phys = <&pcie_phy>;
 			ranges = <0x81000000 0 0	  0x0c001000 0 0x00010000>,
