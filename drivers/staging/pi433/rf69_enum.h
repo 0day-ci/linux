@@ -109,13 +109,32 @@ enum fifo_fill_condition {
 	always
 };
 
+/*
+ * Defines the packet format used.
+ *
+ * In both modes the length of the payload is limited to 255 bytes if AES
+ * is not enabled or 64 bytes otherwise.
+ */
 enum packet_format {
+    /*
+     * Used when the size of payload is fixed in advance. This mode of
+     * operation may be of interest to minimize RF overhead by 1 byte as
+     * no length byte field is required
+     */
 	packet_length_fix,
+    /*
+     * Used when the size of payload isn't known in advance. It requires the
+     * transmitter to send the length byte in each packet so the receiver
+     * would know how to operate properly
+     */
 	packet_length_var
 };
 
+/* Defines the condition to start packet transmission */
 enum tx_start_condition {
+    /* the number of bytes in the FIFO exceeds FIFO_THRESHOLD */
 	fifo_level,
+    /* at least one byte in the FIFO */
 	fifo_not_empty
 };
 
