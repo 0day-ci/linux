@@ -330,6 +330,9 @@ int fjes_hw_init(struct fjes_hw *hw)
 	ret = fjes_hw_setup(hw);
 
 	hw->hw_info.trace = vzalloc(FJES_DEBUG_BUFFER_SIZE);
+	if (!hw->hw_info.trace)
+		return -ENOMEM;
+
 	hw->hw_info.trace_size = FJES_DEBUG_BUFFER_SIZE;
 
 	return ret;
