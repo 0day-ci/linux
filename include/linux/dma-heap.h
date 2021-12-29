@@ -11,6 +11,7 @@
 
 #include <linux/cdev.h>
 #include <linux/types.h>
+#include <linux/scatterlist.h>
 
 struct dma_heap;
 
@@ -39,6 +40,20 @@ struct dma_heap_export_info {
 	const char *name;
 	const struct dma_heap_ops *ops;
 	void *priv;
+};
+
+/**
+ * struct dma_heap_attachment - holds device-heap attachment data
+ * @dev:	device attached to the heap
+ * @table:	sgtables for tracking the associated pages
+ * @list:	list of dma_heap_attachment
+ * @mapped:	true if attachment is actually mapped on the device
+ */
+struct dma_heap_attachment {
+	struct device *dev;
+	struct sg_table *table;
+	struct list_head list;
+	bool mapped;
 };
 
 /**
