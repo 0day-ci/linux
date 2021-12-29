@@ -2007,7 +2007,6 @@
 		#size-cells = <2>;
 		device_type = "pci";
 		num-lanes = <1>;
-		num-viewport = <8>;
 		linux,pci-domain = <1>;
 
 		clocks = <&bpmp TEGRA194_CLK_PEX0_CORE_1>;
@@ -2061,7 +2060,6 @@
 		#size-cells = <2>;
 		device_type = "pci";
 		num-lanes = <1>;
-		num-viewport = <8>;
 		linux,pci-domain = <2>;
 
 		clocks = <&bpmp TEGRA194_CLK_PEX0_CORE_2>;
@@ -2115,7 +2113,6 @@
 		#size-cells = <2>;
 		device_type = "pci";
 		num-lanes = <1>;
-		num-viewport = <8>;
 		linux,pci-domain = <3>;
 
 		clocks = <&bpmp TEGRA194_CLK_PEX0_CORE_3>;
@@ -2169,7 +2166,6 @@
 		#size-cells = <2>;
 		device_type = "pci";
 		num-lanes = <4>;
-		num-viewport = <8>;
 		linux,pci-domain = <4>;
 
 		clocks = <&bpmp TEGRA194_CLK_PEX0_CORE_4>;
@@ -2223,7 +2219,6 @@
 		#size-cells = <2>;
 		device_type = "pci";
 		num-lanes = <8>;
-		num-viewport = <8>;
 		linux,pci-domain = <0>;
 
 		clocks = <&bpmp TEGRA194_CLK_PEX0_CORE_0>;
@@ -2277,7 +2272,6 @@
 		#size-cells = <2>;
 		device_type = "pci";
 		num-lanes = <8>;
-		num-viewport = <8>;
 		linux,pci-domain = <5>;
 
 		pinctrl-names = "default";
