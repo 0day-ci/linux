@@ -519,11 +519,18 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	unsigned char fl_flags = fl->fl_flags;
 	unsigned char fl_type;
 	int status = -ENOLCK;
+	bool async = false;
 
 	if (nsm_monitor(host) < 0)
 		goto out;
 	req->a_args.state = nsm_local_state;
 
+	async = !req->a_args.block &&
+		((fl_flags & FL_SLEEP_POSIX) == FL_SLEEP_POSIX);
+	if (async) {
+		fl->fl_flags &= ~FL_SLEEP;
+		req->a_args.block = 1;
+	}
 	fl->fl_flags |= FL_ACCESS;
 	status = do_vfs_lock(fl);
 	fl->fl_flags = fl_flags;
@@ -573,8 +580,11 @@ again:
 			up_read(&host->h_rwsem);
 			goto again;
 		}
-		/* Ensure the resulting lock will get added to granted list */
-		fl->fl_flags |= FL_SLEEP;
+		if (async)
+			fl->fl_flags &= ~FL_SLEEP;
+		else
+			/* Ensure the resulting lock will get added to granted list */
+			fl->fl_flags |= FL_SLEEP;
 		if (do_vfs_lock(fl) < 0)
 			printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n", __func__);
 		up_read(&host->h_rwsem);
