@@ -7093,7 +7093,7 @@ static int _nfs4_do_setlk(struct nfs4_state *state, int cmd, struct file_lock *f
 			recovery_type == NFS_LOCK_NEW ? GFP_KERNEL : GFP_NOFS);
 	if (data == NULL)
 		return -ENOMEM;
-	if (IS_SETLKW(cmd))
+	if (IS_SETLKW(cmd) || (fl->fl_flags & FL_SLEEP))
 		data->arg.block = 1;
 	nfs4_init_sequence(&data->arg.seq_args, &data->res.seq_res, 1,
 				recovery_type > NFS_LOCK_NEW);
@@ -7199,6 +7199,9 @@ static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock 
 	int status;
 
 	request->fl_flags |= FL_ACCESS;
+	if (((fl_flags & FL_SLEEP_POSIX) == FL_SLEEP_POSIX) && IS_SETLK(cmd))
+		request->fl_flags &= ~FL_SLEEP;
+
 	status = locks_lock_inode_wait(state->inode, request);
 	if (status < 0)
 		goto out;
