@@ -112,7 +112,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&cp1_pcie_reset_pins>;
 	num-lanes = <2>;
-	num-viewport = <8>;
 	marvell,reset-gpio = <&cp1_gpio1 0 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 	/* Generic PHY, providing serdes lanes */

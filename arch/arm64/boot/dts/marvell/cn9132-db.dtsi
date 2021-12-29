@@ -153,7 +153,6 @@
 &cp2_pcie0 {
 	status = "okay";
 	num-lanes = <2>;
-	num-viewport = <8>;
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp2_comphy0 0
 		&cp2_comphy1 0>;
@@ -163,7 +162,6 @@
 &cp2_pcie2 {
 	status = "okay";
 	num-lanes = <1>;
-	num-viewport = <8>;
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp2_comphy5 2>;
 };

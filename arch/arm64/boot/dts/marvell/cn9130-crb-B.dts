@@ -12,7 +12,6 @@
 &cp0_pcie0 {
 	status = "okay";
 	num-lanes = <1>;
-	num-viewport = <8>;
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp0_comphy0 0>;
 	iommu-map =
