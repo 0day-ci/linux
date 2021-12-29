@@ -310,6 +310,9 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		if (state == TCP_TIME_WAIT)
 			timeo = TCP_TIMEWAIT_LEN;
 
+		if (BPF_SOCK_OPS_TEST_FLAG(tcp_sk(sk), BPF_SOCK_OPS_TW_CLOSE_FLAG))
+			tcp_sk(sk)->bpf_sock_ops_cb_flags &= ~BPF_SOCK_OPS_STATE_CB_FLAG;
+
 		/* tw_timer is pinned, so we need to make sure BH are disabled
 		 * in following section, otherwise timer handler could run before
 		 * we complete the initialization.
