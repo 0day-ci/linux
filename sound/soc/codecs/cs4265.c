@@ -590,13 +590,13 @@ static int cs4265_i2c_probe(struct i2c_client *i2c_client,
 	}
 
 	cs4265->reset_gpio = devm_gpiod_get_optional(&i2c_client->dev,
-		"reset", GPIOD_OUT_LOW);
+		"reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(cs4265->reset_gpio))
 		return PTR_ERR(cs4265->reset_gpio);
 
 	if (cs4265->reset_gpio) {
 		mdelay(1);
-		gpiod_set_value_cansleep(cs4265->reset_gpio, 1);
+		gpiod_set_value_cansleep(cs4265->reset_gpio, 0);
 	}
 
 	i2c_set_clientdata(i2c_client, cs4265);
