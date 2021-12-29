@@ -551,12 +551,12 @@ static bool pci_endpoint_test_write(struct pci_endpoint_test *test,
 	pci_endpoint_test_writel(test, PCI_ENDPOINT_TEST_IRQ_TYPE, irq_type);
 	pci_endpoint_test_writel(test, PCI_ENDPOINT_TEST_IRQ_NUMBER, 1);
 	pci_endpoint_test_writel(test, PCI_ENDPOINT_TEST_COMMAND,
-				 COMMAND_READ);
+				 COMMAND_WRITE);
 
 	wait_for_completion(&test->irq_raised);
 
 	reg = pci_endpoint_test_readl(test, PCI_ENDPOINT_TEST_STATUS);
-	if (reg & STATUS_READ_SUCCESS)
+	if (reg & STATUS_WRITE_SUCCESS)
 		ret = true;
 
 	dma_unmap_single(dev, orig_phys_addr, size + alignment,
@@ -643,7 +643,7 @@ static bool pci_endpoint_test_read(struct pci_endpoint_test *test,
 	pci_endpoint_test_writel(test, PCI_ENDPOINT_TEST_IRQ_TYPE, irq_type);
 	pci_endpoint_test_writel(test, PCI_ENDPOINT_TEST_IRQ_NUMBER, 1);
 	pci_endpoint_test_writel(test, PCI_ENDPOINT_TEST_COMMAND,
-				 COMMAND_WRITE);
+				 COMMAND_READ);
 
 	wait_for_completion(&test->irq_raised);
 
