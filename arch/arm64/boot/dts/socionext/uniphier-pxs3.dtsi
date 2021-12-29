@@ -802,7 +802,6 @@
 			clocks = <&sys_clk 24>;
 			resets = <&sys_rst 24>;
 			num-lanes = <1>;
-			num-viewport = <1>;
 			bus-range = <0x0 0xff>;
 			device_type = "pci";
 			ranges =
