@@ -770,10 +770,30 @@ void kfree_skb(struct sk_buff *skb)
 	if (!skb_unref(skb))
 		return;
 
-	trace_kfree_skb(skb, __builtin_return_address(0));
+	trace_kfree_skb(skb, __builtin_return_address(0),
+			SKB_DROP_REASON_NOT_SPECIFIED);
 	__kfree_skb(skb);
 }
 EXPORT_SYMBOL(kfree_skb);
+
+/**
+ *	kfree_skb_with_reason - free an sk_buff with reason
+ *	@skb: buffer to free
+ *	@reason: reason why this skb is dropped
+ *
+ *	The same as kfree_skb() except that this function will pass
+ *	the drop reason to 'kfree_skb' tracepoint.
+ */
+void kfree_skb_with_reason(struct sk_buff *skb,
+			   enum skb_drop_reason reason)
+{
+	if (!skb_unref(skb))
+		return;
+
+	trace_kfree_skb(skb, __builtin_return_address(0), reason);
+	__kfree_skb(skb);
+}
+EXPORT_SYMBOL(kfree_skb_with_reason);
 
 void kfree_skb_list(struct sk_buff *segs)
 {
