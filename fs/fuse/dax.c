@@ -878,11 +878,11 @@ static int dmap_writeback_invalidate(struct inode *inode,
 		return ret;
 	}
 
-	ret = invalidate_inode_pages2_range(inode->i_mapping,
+	ret = fuse_invalidate_inode_pages_range(inode,
 					    start_pos >> PAGE_SHIFT,
 					    end_pos >> PAGE_SHIFT);
 	if (ret)
-		pr_debug("fuse: invalidate_inode_pages2_range() failed err=%d\n",
+		pr_debug("fuse: fuse_invalidate_inode_pages_range() failed err=%d\n",
 			 ret);
 
 	return ret;

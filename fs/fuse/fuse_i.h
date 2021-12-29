@@ -149,6 +149,9 @@ struct fuse_inode {
 	/** Lock to protect write related fields */
 	spinlock_t lock;
 
+	/** Lock for serializing page invalidation and atomic_o_trunc open */
+	struct mutex atomic_trunc_mutex;
+
 #ifdef CONFIG_FUSE_DAX
 	/*
 	 * Dax specific inode data
@@ -1314,5 +1317,9 @@ struct fuse_file *fuse_file_open(struct fuse_mount *fm, u64 nodeid,
 				 unsigned int open_flags, bool isdir);
 void fuse_file_release(struct inode *inode, struct fuse_file *ff,
 		       unsigned int open_flags, fl_owner_t id, bool isdir);
+
+int fuse_invalidate_inode_pages(struct inode *inode);
+int fuse_invalidate_inode_pages_range(struct inode *inode,
+				      pgoff_t start, pgoff_t end);
 
 #endif /* _FS_FUSE_I_H */

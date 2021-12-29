@@ -124,6 +124,28 @@ static void fuse_file_put(struct fuse_file *ff, bool sync, bool isdir)
 	}
 }
 
+int fuse_invalidate_inode_pages_range(struct inode *inode, pgoff_t start,
+					pgoff_t end)
+{
+	int ret;
+	struct fuse_conn *fc = get_fuse_conn(inode);
+	bool may_truncate = fc->atomic_o_trunc &&
+			    (fc->writeback_cache || FUSE_IS_DAX(inode));
+
+	if (may_truncate)
+		mutex_lock(&get_fuse_inode(inode)->atomic_trunc_mutex);
+	ret = invalidate_inode_pages2_range(inode->i_mapping, start, end);
+	if (may_truncate)
+		mutex_unlock(&get_fuse_inode(inode)->atomic_trunc_mutex);
+
+	return ret;
+}
+
+int fuse_invalidate_inode_pages(struct inode *inode)
+{
+	return fuse_invalidate_inode_pages_range(inode, 0, -1);
+}
+
 struct fuse_file *fuse_file_open(struct fuse_mount *fm, u64 nodeid,
 				 unsigned int open_flags, bool isdir)
 {
@@ -214,7 +236,7 @@ void fuse_finish_open(struct inode *inode, struct file *file)
 		file_update_time(file);
 		fuse_invalidate_attr_mask(inode, FUSE_STATX_MODSIZE);
 	} else if (!(ff->open_flags & FOPEN_KEEP_CACHE)) {
-		invalidate_inode_pages2(inode->i_mapping);
+		fuse_invalidate_inode_pages(inode);
 	}
 
 	if ((file->f_mode & FMODE_WRITE) && fc->writeback_cache)
@@ -241,6 +263,7 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
 
 	if (is_wb_truncate || dax_truncate) {
 		inode_lock(inode);
+		mutex_lock(&get_fuse_inode(inode)->atomic_trunc_mutex);
 		fuse_set_nowrite(inode);
 	}
 
@@ -261,6 +284,7 @@ out:
 
 	if (is_wb_truncate | dax_truncate) {
 		fuse_release_nowrite(inode);
+		mutex_unlock(&get_fuse_inode(inode)->atomic_trunc_mutex);
 		inode_unlock(inode);
 	}
 
@@ -2408,7 +2432,7 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
 		if (vma->vm_flags & VM_MAYSHARE)
 			return -ENODEV;
 
-		invalidate_inode_pages2(file->f_mapping);
+		fuse_invalidate_inode_pages(file_inode(file));
 
 		return generic_file_mmap(file, vma);
 	}

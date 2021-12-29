@@ -86,6 +86,7 @@ static struct inode *fuse_alloc_inode(struct super_block *sb)
 	fi->state = 0;
 	mutex_init(&fi->mutex);
 	spin_lock_init(&fi->lock);
+	mutex_init(&fi->atomic_trunc_mutex);
 	fi->forget = fuse_alloc_forget();
 	if (!fi->forget)
 		goto out_free;
@@ -107,6 +108,7 @@ static void fuse_free_inode(struct inode *inode)
 	struct fuse_inode *fi = get_fuse_inode(inode);
 
 	mutex_destroy(&fi->mutex);
+	mutex_destroy(&fi->atomic_trunc_mutex);
 	kfree(fi->forget);
 #ifdef CONFIG_FUSE_DAX
 	kfree(fi->dax);
@@ -299,7 +301,7 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 		}
 
 		if (inval)
-			invalidate_inode_pages2(inode->i_mapping);
+			fuse_invalidate_inode_pages(inode);
 	}
 
 	if (IS_ENABLED(CONFIG_FUSE_DAX))
@@ -448,8 +450,7 @@ int fuse_reverse_inval_inode(struct fuse_conn *fc, u64 nodeid,
 			pg_end = -1;
 		else
 			pg_end = (offset + len - 1) >> PAGE_SHIFT;
-		invalidate_inode_pages2_range(inode->i_mapping,
-					      pg_start, pg_end);
+		fuse_invalidate_inode_pages_range(inode, pg_start, pg_end);
 	}
 	iput(inode);
 	return 0;
