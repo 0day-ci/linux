@@ -25,9 +25,11 @@ ip_default_ttl - INTEGER
 ip_no_pmtu_disc - INTEGER
 	Disable Path MTU Discovery. If enabled in mode 1 and a
 	fragmentation-required ICMP is received, the PMTU to this
-	destination will be set to min_pmtu (see below). You will need
-	to raise min_pmtu to the smallest interface MTU on your system
-	manually if you want to avoid locally generated fragments.
+	destination will be set to the smallest of the old MTU
+        and ip_rt_min_pmtu (see __ip_rt_update_pmtu() in
+        net/ipv4/route.c). You will need to raise min_pmtu to the
+        smallest interface MTU on your system manually if you want to
+        avoid locally generated fragments.
 
 	In mode 2 incoming Path MTU Discovery messages will be
 	discarded. Outgoing frames are handled the same as in mode 1,
@@ -49,7 +51,7 @@ ip_no_pmtu_disc - INTEGER
 	Default: FALSE
 
 min_pmtu - INTEGER
-	default 552 - minimum discovered Path MTU
+	default 552 - minimum set Path MTU
 
 ip_forward_use_pmtu - BOOLEAN
 	By default we don't trust protocol path MTUs while forwarding
