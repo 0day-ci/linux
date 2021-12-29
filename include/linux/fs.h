@@ -1045,6 +1045,7 @@ static inline struct file *get_file(struct file *f)
 #define FL_RECLAIM	4096	/* reclaiming from a reboot server */
 
 #define FL_CLOSE_POSIX (FL_POSIX | FL_CLOSE)
+#define FL_SLEEP_POSIX (FL_POSIX | FL_SLEEP)
 
 /*
  * Special return value from posix_lock_file() and vfs_lock_file() for

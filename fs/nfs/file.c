@@ -753,6 +753,7 @@ static int
 do_setlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
+	unsigned int flags = fl->fl_flags;
 	int status;
 
 	/*
@@ -769,9 +770,11 @@ do_setlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	 */
 	if (!is_local)
 		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	else if (((flags & FL_SLEEP_POSIX) == FL_SLEEP_POSIX) && IS_SETLK(cmd))
+		status = posix_lock_file(filp, fl, NULL);
 	else
 		status = locks_lock_file_wait(filp, fl);
-	if (status < 0)
+	if (status)
 		goto out;
 
 	/*
