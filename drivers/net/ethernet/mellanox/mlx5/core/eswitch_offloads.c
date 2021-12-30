@@ -1241,6 +1241,8 @@ static int esw_add_fdb_peer_miss_rules(struct mlx5_eswitch *esw,
 
 	if (mlx5_core_is_ecpf_esw_manager(esw->dev)) {
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_PF);
+		if (IS_ERR(vport))
+			return PTR_ERR(vport);
 		esw_set_peer_miss_rule_source_port(esw, peer_dev->priv.eswitch,
 						   spec, MLX5_VPORT_PF);
 
@@ -1255,6 +1257,8 @@ static int esw_add_fdb_peer_miss_rules(struct mlx5_eswitch *esw,
 
 	if (mlx5_ecpf_vport_exists(esw->dev)) {
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_ECPF);
+		if (IS_ERR(vport))
+			return PTR_ERR(vport);
 		MLX5_SET(fte_match_set_misc, misc, source_port, MLX5_VPORT_ECPF);
 		flow = mlx5_add_flow_rules(esw->fdb_table.offloads.slow_fdb,
 					   spec, &flow_act, &dest, 1);
@@ -1292,11 +1296,15 @@ add_vf_flow_err:
 	}
 	if (mlx5_ecpf_vport_exists(esw->dev)) {
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_ECPF);
+		if (IS_ERR(vport))
+			return PTR_ERR(vport);
 		mlx5_del_flow_rules(flows[vport->index]);
 	}
 add_ecpf_flow_err:
 	if (mlx5_core_is_ecpf_esw_manager(esw->dev)) {
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_PF);
+		if (IS_ERR(vport))
+			return PTR_ERR(vport);
 		mlx5_del_flow_rules(flows[vport->index]);
 	}
 add_pf_flow_err:
@@ -1320,11 +1328,15 @@ static void esw_del_fdb_peer_miss_rules(struct mlx5_eswitch *esw)
 
 	if (mlx5_ecpf_vport_exists(esw->dev)) {
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_ECPF);
+		if (IS_ERR(vport))
+			return;
 		mlx5_del_flow_rules(flows[vport->index]);
 	}
 
 	if (mlx5_core_is_ecpf_esw_manager(esw->dev)) {
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_PF);
+		if (IS_ERR(vport))
+			return;
 		mlx5_del_flow_rules(flows[vport->index]);
 	}
 	kvfree(flows);
@@ -2396,6 +2408,9 @@ static int esw_set_uplink_slave_ingress_root(struct mlx5_core_dev *master,
 	if (master) {
 		esw = master->priv.eswitch;
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_UPLINK);
+		if (IS_ERR(vport))
+			return PTR_ERR(vport);
+
 		MLX5_SET(set_flow_table_root_in, in, table_of_other_vport, 1);
 		MLX5_SET(set_flow_table_root_in, in, table_vport_number,
 			 MLX5_VPORT_UPLINK);
@@ -2416,6 +2431,9 @@ static int esw_set_uplink_slave_ingress_root(struct mlx5_core_dev *master,
 	} else {
 		esw = slave->priv.eswitch;
 		vport = mlx5_eswitch_get_vport(esw, MLX5_VPORT_UPLINK);
+		if (IS_ERR(vport))
+			return PTR_ERR(vport);
+
 		ns = mlx5_get_flow_vport_acl_namespace(slave,
 						       MLX5_FLOW_NAMESPACE_ESW_INGRESS,
 						       vport->index);
@@ -2602,6 +2620,8 @@ static void esw_unset_master_egress_rule(struct mlx5_core_dev *dev)
 
 	vport = mlx5_eswitch_get_vport(dev->priv.eswitch,
 				       dev->priv.eswitch->manager_vport);
+	if (IS_ERR(vport))
+		return;
 
 	esw_acl_egress_ofld_cleanup(vport);
 }
