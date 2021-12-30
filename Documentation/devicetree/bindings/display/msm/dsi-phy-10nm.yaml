@@ -35,6 +35,18 @@ properties:
       Connected to DSI0_MIPI_DSI_PLL_VDDA0P9 pin for sc7180 target and
       connected to VDDA_MIPI_DSI_0_PLL_0P9 pin for sdm845 target
 
+  phy-drive-strength-cfg:
+    type: array
+    description:
+      Register values of DSIPHY_RESCODE_OFFSET_TOP and DSIPHY_RESCODE_OFFSET_BOT
+      for all five lanes to adjust the phy drive strength.
+
+  phy-drive-level-cfg:
+    type: array
+    description:
+      Register values of DSIPHY_RESCODE_OFFSET_TOP for all five lanes to adjust
+      phy drive level/amplitude.
+
 required:
   - compatible
   - reg
@@ -64,5 +76,12 @@ examples:
          clocks = <&dispcc DISP_CC_MDSS_AHB_CLK>,
                   <&rpmhcc RPMH_CXO_CLK>;
          clock-names = "iface", "ref";
+
+         phy-drive-strength-cfg = [00 00
+                                   00 00
+                                   00 00
+                                   00 00
+                                   00 00];
+         phy-drive-level-cfg = [59 59 59 59 59];
      };
 ...
