@@ -271,6 +271,8 @@ void panic(const char *fmt, ...)
 	 */
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
 
+	panic_print_sys_info();
+
 	kmsg_dump(KMSG_DUMP_PANIC);
 
 	/*
@@ -300,8 +302,6 @@ void panic(const char *fmt, ...)
 	 */
 	debug_locks_off();
 	console_flush_on_panic(CONSOLE_FLUSH_PENDING);
-
-	panic_print_sys_info();
 
 	if (!panic_blink)
 		panic_blink = no_blink;
