@@ -1,7 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-menu "Android"
-
-config ANDROID
+menuconfig ANDROID
 	bool "Android Drivers"
 	help
 	  Enable support for various drivers needed on the Android platform
@@ -55,5 +53,3 @@ config ANDROID_BINDER_IPC_SELFTEST
 	  alignments.
 
 endif # if ANDROID
-
-endmenu
