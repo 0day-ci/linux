@@ -1663,7 +1663,7 @@ static int ext4_fc_replay_add_range(struct super_block *sb,
 		return 0;
 	}
 
-	ret = ext4_fc_record_modified_inode(sb, inode->i_ino);
+	ext4_fc_record_modified_inode(sb, inode->i_ino);
 
 	start = le32_to_cpu(ex->ee_block);
 	start_pblk = ext4_ext_pblock(ex);
@@ -1788,7 +1788,7 @@ ext4_fc_replay_del_range(struct super_block *sb, struct ext4_fc_tl *tl,
 		return 0;
 	}
 
-	ret = ext4_fc_record_modified_inode(sb, inode->i_ino);
+	ext4_fc_record_modified_inode(sb, inode->i_ino);
 
 	jbd_debug(1, "DEL_RANGE, inode %ld, lblk %d, len %d\n",
 			inode->i_ino, le32_to_cpu(lrange.fc_lblk),
