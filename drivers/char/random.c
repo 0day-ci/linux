@@ -1027,7 +1027,7 @@ static void _extract_crng(struct crng_state *crng,
 				    &input_pool : NULL);
 	}
 	spin_lock_irqsave(&crng->lock, flags);
-	if (arch_get_random_long(&v))
+	if (unlikely(!crng_ready()) && arch_get_random_long(&v))
 		crng->state[14] ^= v;
 	chacha20_block(&crng->state[0], out);
 	if (crng->state[12] == 0)
