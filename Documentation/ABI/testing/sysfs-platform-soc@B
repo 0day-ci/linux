@@ -1,0 +1,25 @@
+What:		/sys/devices/platform/soc@B/9c000400.iop/sp_iop_mailbox
+Date:		December 2021
+KernelVersion:	5.16
+Contact:	Tony Huang <tonyhuang.sunplus@gmail.com>
+Description:
+		Show 8051 mailbox0 data.
+
+What:		/sys/devices/platform/soc@B/9c000400.iop/sp_iop_mode
+Date:		December 2021
+KernelVersion:	5.16
+Contact:	Tony Huang <tonyhuang.sunplus@gmail.com>
+Description:
+		Read-Write.
+
+		Write this file.
+		Operation mode of IOP is switched to standby mode by writing
+		"1" to sysfs.
+		Operation mode of IOP is switched to normal mode by writing
+		"0" to sysfs.
+
+		Read this file.
+		Show operation mode of IOP. "0" is normal mode. "1" is standby
+		mode.
+
+

@@ -18269,7 +18269,9 @@ F:	drivers/net/ethernet/dlink/sundance.c
 SUNPLUS IOP DRIVER
 M:	Tony Huang <tonyhuang.sunplus@gmail.com>
 S:	Maintained
+F:	Documentation/ABI/testing/sysfs-platform-soc@B
 F:	Documentation/devicetree/bindings/misc/sunplu-iop.yaml
+F:	drivers/misc/sunplus_iop.c
 
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
