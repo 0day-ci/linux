@@ -158,20 +158,22 @@ static inline struct throtl_grp *blkg_to_tg(struct blkcg_gq *blkg)
 static inline int blk_throtl_init(struct request_queue *q) { return 0; }
 static inline void blk_throtl_exit(struct request_queue *q) { }
 static inline void blk_throtl_register_queue(struct request_queue *q) { }
-static inline void blk_throtl_charge_bio_split(struct bio *bio) { }
+static inline void blk_throtl_charge_for_iops_limit(struct bio *bio) { }
 static inline bool blk_throtl_bio(struct bio *bio) { return false; }
 #else /* CONFIG_BLK_DEV_THROTTLING */
 int blk_throtl_init(struct request_queue *q);
 void blk_throtl_exit(struct request_queue *q);
 void blk_throtl_register_queue(struct request_queue *q);
-void blk_throtl_charge_bio_split(struct bio *bio);
+void blk_throtl_charge_for_iops_limit(struct bio *bio);
 bool __blk_throtl_bio(struct bio *bio);
 static inline bool blk_throtl_bio(struct bio *bio)
 {
 	struct throtl_grp *tg = blkg_to_tg(bio->bi_blkg);
 
-	if (bio_flagged(bio, BIO_THROTTLED))
+	if (bio_flagged(bio, BIO_THROTTLED)) {
+		blk_throtl_charge_for_iops_limit(bio);
 		return false;
+	}
 	if (!tg->has_rules[bio_data_dir(bio)])
 		return false;
 

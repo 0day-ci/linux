@@ -2043,7 +2043,7 @@ static inline void throtl_update_latency_buckets(struct throtl_data *td)
 }
 #endif
 
-void blk_throtl_charge_bio_split(struct bio *bio)
+void blk_throtl_charge_for_iops_limit(struct bio *bio)
 {
 	struct blkcg_gq *blkg = bio->bi_blkg;
 	struct throtl_grp *parent = blkg_to_tg(blkg);
