@@ -555,8 +555,7 @@ static int hpfs_rename(struct user_namespace *mnt_userns, struct inode *old_dir,
 	de.hidden = new_name[0] == '.';
 
 	if (new_inode) {
-		int r;
-		if ((r = hpfs_remove_dirent(old_dir, dno, dep, &qbh, 1)) != 2) {
+		if (hpfs_remove_dirent(old_dir, dno, dep, &qbh, 1) != 2) {
 			if ((nde = map_dirent(new_dir, hpfs_i(new_dir)->i_dno, new_name, new_len, NULL, &qbh1))) {
 				clear_nlink(new_inode);
 				copy_de(nde, &de);
