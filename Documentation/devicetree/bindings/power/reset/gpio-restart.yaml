@@ -62,17 +62,26 @@ properties:
             restart handlers
 
   active-delay:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: Delay (default 100) to wait after driving gpio active [ms]
+    $ref: '#/properties/active-delay-ms'
+    deprecated: true
 
   inactive-delay:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    description: Delay (default 100) to wait after driving gpio inactive [ms]
+    $ref: '#/properties/inactive-delay-ms'
+    deprecated: true
 
   wait-delay:
-    $ref: /schemas/types.yaml#/definitions/uint32
+    $ref: '#/properties/wait-delay-ms'
+    deprecated: true
+
+  active-delay-ms:
+    description: Delay (default 100 ms) to wait after driving gpio active
+
+  inactive-delay-ms:
+    description: Delay (default 100 ms) to wait after driving gpio inactive
+
+  wait-delay-ms:
     description:
-      Delay (default 3000) to wait after completing restart sequence [ms]
+      Delay (default 3000 ms) to wait after completing restart sequence
 
 required:
   - compatible
@@ -86,7 +95,7 @@ examples:
       compatible = "gpio-restart";
       gpios = <&gpio 4 0>;
       priority = <128>;
-      active-delay = <100>;
-      inactive-delay = <100>;
-      wait-delay = <3000>;
+      active-delay-ms = <100>;
+      inactive-delay-ms = <100>;
+      wait-delay-ms = <3000>;
     };
