@@ -39,6 +39,10 @@ struct msm_dsi_phy_cfg {
 	const int quirks;
 	bool has_phy_regulator;
 	bool has_phy_lane;
+
+	/* phy tuning config counts per lane */
+	u32 drive_strength_cfg_count;
+	u32 drive_level_cfg_count;
 };
 
 extern const struct msm_dsi_phy_cfg dsi_phy_28nm_hpm_cfgs;
@@ -82,6 +86,24 @@ struct msm_dsi_dphy_timing {
 #define DSI_PIXEL_PLL_CLK		1
 #define NUM_PROVIDED_CLKS		2
 
+#define DSI_LANE_MAX			5
+#define DSI_MAX_SETTINGS		8
+
+/**
+ * struct dsi_phy_per_lane_cfgs - Holds register values for PHY parameters
+ * @val: Register values for all lanes
+ * @count_per_lane: Number of values per lane.
+ */
+struct dsi_phy_per_lane_cfgs {
+	u8 val[DSI_LANE_MAX][DSI_MAX_SETTINGS];
+	u32 count_per_lane;
+};
+
+struct msm_dsi_phy_tuning_cfg {
+	struct dsi_phy_per_lane_cfgs drive_strength;
+	struct dsi_phy_per_lane_cfgs drive_level;
+};
+
 struct msm_dsi_phy {
 	struct platform_device *pdev;
 	void __iomem *base;
@@ -99,6 +121,7 @@ struct msm_dsi_phy {
 
 	struct msm_dsi_dphy_timing timing;
 	const struct msm_dsi_phy_cfg *cfg;
+	struct msm_dsi_phy_tuning_cfg tuning_cfg;
 
 	enum msm_dsi_phy_usecase usecase;
 	bool regulator_ldo_mode;

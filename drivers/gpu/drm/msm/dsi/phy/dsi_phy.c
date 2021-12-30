@@ -671,10 +671,42 @@ static int dsi_phy_get_id(struct msm_dsi_phy *phy)
 	return -EINVAL;
 }
 
+static int dsi_phy_parse_dt_per_lane_cfgs(struct platform_device *pdev,
+					  struct dsi_phy_per_lane_cfgs *cfg,
+					  char *property)
+{
+	int i = 0, j = 0;
+	const u8 *data;
+	u32 len = 0;
+
+	data = of_get_property(pdev->dev.of_node, property, &len);
+	if (!data) {
+		DRM_DEV_ERROR(&pdev->dev, "couldn't find %s property\n", property);
+		return -EINVAL;
+	}
+
+	if (len != DSI_LANE_MAX * cfg->count_per_lane) {
+		DRM_DEV_ERROR(&pdev->dev, "incorrect phy %s settings, exp=%d, act=%d\n",
+		       property, (DSI_LANE_MAX * cfg->count_per_lane), len);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < DSI_LANE_MAX; i++) {
+		for (j = 0; j < cfg->count_per_lane; j++) {
+			cfg->val[i][j] = *data;
+			data++;
+		}
+	}
+
+	return 0;
+}
+
 static int dsi_phy_driver_probe(struct platform_device *pdev)
 {
 	struct msm_dsi_phy *phy;
 	struct device *dev = &pdev->dev;
+	struct dsi_phy_per_lane_cfgs *strength;
+	struct dsi_phy_per_lane_cfgs *level;
 	u32 phy_type;
 	int ret;
 
@@ -708,6 +740,29 @@ static int dsi_phy_driver_probe(struct platform_device *pdev)
 				"qcom,dsi-phy-regulator-ldo-mode");
 	if (!of_property_read_u32(dev->of_node, "phy-type", &phy_type))
 		phy->cphy_mode = (phy_type == PHY_TYPE_CPHY);
+
+	/* dsi phy tuning configurations */
+	if (phy->cfg->drive_strength_cfg_count) {
+		strength = &phy->tuning_cfg.drive_strength;
+		strength->count_per_lane = phy->cfg->drive_strength_cfg_count;
+		ret = dsi_phy_parse_dt_per_lane_cfgs(pdev, strength,
+						"phy-drive-strength-cfg");
+		if (ret) {
+			DRM_DEV_ERROR(dev, "failed to parse PHY drive strength cfg, %d\n", ret);
+			goto fail;
+		}
+	}
+
+	if (phy->cfg->drive_level_cfg_count) {
+		level = &phy->tuning_cfg.drive_level;
+		level->count_per_lane = phy->cfg->drive_level_cfg_count;
+		ret = dsi_phy_parse_dt_per_lane_cfgs(pdev, level,
+						"phy-drive-level-cfg");
+		if (ret) {
+			DRM_DEV_ERROR(dev, "failed to parse PHY drive level cfg, %d\n", ret);
+			goto fail;
+		}
+	}
 
 	phy->base = msm_ioremap_size(pdev, "dsi_phy", "DSI_PHY", &phy->base_size);
 	if (IS_ERR(phy->base)) {

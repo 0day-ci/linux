@@ -775,10 +775,20 @@ static void dsi_phy_hw_v3_0_lane_settings(struct msm_dsi_phy *phy)
 		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_CFG2(i), 0x0);
 		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_CFG3(i),
 			      i == 4 ? 0x80 : 0x0);
-		dsi_phy_write(lane_base +
-			      REG_DSI_10nm_PHY_LN_OFFSET_TOP_CTRL(i), 0x0);
-		dsi_phy_write(lane_base +
-			      REG_DSI_10nm_PHY_LN_OFFSET_BOT_CTRL(i), 0x0);
+
+		/* platform specific dsi phy drive strength adjustment */
+		if (phy->cfg->drive_strength_cfg_count) {
+			dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_OFFSET_TOP_CTRL(i),
+				phy->tuning_cfg.drive_strength.val[i][0]);
+			dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_OFFSET_BOT_CTRL(i),
+				phy->tuning_cfg.drive_strength.val[i][1]);
+		} else {
+			dsi_phy_write(lane_base +
+				      REG_DSI_10nm_PHY_LN_OFFSET_TOP_CTRL(i), 0x0);
+			dsi_phy_write(lane_base +
+				      REG_DSI_10nm_PHY_LN_OFFSET_BOT_CTRL(i), 0x0);
+		}
+
 		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_TX_DCTRL(i),
 			      tx_dctrl[i]);
 	}
@@ -834,8 +844,13 @@ static int dsi_10nm_phy_enable(struct msm_dsi_phy *phy,
 	/* Select MS1 byte-clk */
 	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_GLBL_CTRL, 0x10);
 
-	/* Enable LDO */
-	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_VREG_CTRL, 0x59);
+	/* Enable LDO with platform specific drive level/amplitude adjustment */
+	if (phy->cfg->drive_level_cfg_count) {
+		dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_VREG_CTRL,
+			phy->tuning_cfg.drive_level.val[0][0]);
+	} else {
+		dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_VREG_CTRL, 0x59);
+	}
 
 	/* Configure PHY lane swap (TODO: we need to calculate this) */
 	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_LANE_CFG0, 0x21);
@@ -941,6 +956,8 @@ const struct msm_dsi_phy_cfg dsi_phy_10nm_cfgs = {
 	.max_pll_rate = 3500000000UL,
 	.io_start = { 0xae94400, 0xae96400 },
 	.num_dsi_phy = 2,
+	.drive_strength_cfg_count = 2,
+	.drive_level_cfg_count = 1,
 };
 
 const struct msm_dsi_phy_cfg dsi_phy_10nm_8998_cfgs = {
@@ -963,4 +980,6 @@ const struct msm_dsi_phy_cfg dsi_phy_10nm_8998_cfgs = {
 	.io_start = { 0xc994400, 0xc996400 },
 	.num_dsi_phy = 2,
 	.quirks = DSI_PHY_10NM_QUIRK_OLD_TIMINGS,
+	.drive_strength_cfg_count = 2,
+	.drive_level_cfg_count = 1,
 };
