@@ -608,7 +608,8 @@ int drm_color_lut_check(const struct drm_property_blob *lut, u32 tests)
 		if (tests & DRM_COLOR_LUT_EQUAL_CHANNELS) {
 			if (entry[i].red != entry[i].blue ||
 			    entry[i].red != entry[i].green) {
-				DRM_DEBUG_KMS("All LUT entries must have equal r/g/b\n");
+				drm_dbg_kms(lut->dev,
+					    "All LUT entries must have equal r/g/b\n");
 				return -EINVAL;
 			}
 		}
@@ -617,7 +618,8 @@ int drm_color_lut_check(const struct drm_property_blob *lut, u32 tests)
 			if (entry[i].red < entry[i - 1].red ||
 			    entry[i].green < entry[i - 1].green ||
 			    entry[i].blue < entry[i - 1].blue) {
-				DRM_DEBUG_KMS("LUT entries must never decrease.\n");
+				drm_dbg_kms(lut->dev,
+					    "LUT entries must never decrease.\n");
 				return -EINVAL;
 			}
 		}

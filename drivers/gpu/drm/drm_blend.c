@@ -450,7 +450,7 @@ static int drm_atomic_helper_crtc_normalize_zpos(struct drm_crtc *crtc,
 	int i, n = 0;
 	int ret = 0;
 
-	DRM_DEBUG_ATOMIC("[CRTC:%d:%s] calculating normalized zpos values\n",
+	drm_dbg_atomic(dev, "[CRTC:%d:%s] calculating normalized zpos values\n",
 			 crtc->base.id, crtc->name);
 
 	states = kmalloc_array(total_planes, sizeof(*states), GFP_KERNEL);
@@ -469,7 +469,7 @@ static int drm_atomic_helper_crtc_normalize_zpos(struct drm_crtc *crtc,
 			goto done;
 		}
 		states[n++] = plane_state;
-		DRM_DEBUG_ATOMIC("[PLANE:%d:%s] processing zpos value %d\n",
+		drm_dbg_atomic(dev, "[PLANE:%d:%s] processing zpos value %d\n",
 				 plane->base.id, plane->name,
 				 plane_state->zpos);
 	}
@@ -480,7 +480,7 @@ static int drm_atomic_helper_crtc_normalize_zpos(struct drm_crtc *crtc,
 		plane = states[i]->plane;
 
 		states[i]->normalized_zpos = i;
-		DRM_DEBUG_ATOMIC("[PLANE:%d:%s] normalized zpos value %d\n",
+		drm_dbg_atomic(dev, "[PLANE:%d:%s] normalized zpos value %d\n",
 				 plane->base.id, plane->name, i);
 	}
 	crtc_state->zpos_changed = true;

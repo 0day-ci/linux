@@ -162,25 +162,28 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
 		return;
 
 	if (mode->force) {
-		DRM_INFO("forcing %s connector %s\n", connector->name,
+		drm_info(connector->dev, "forcing %s connector %s\n",
+			 connector->name,
 			 drm_get_connector_force_name(mode->force));
 		connector->force = mode->force;
 	}
 
 	if (mode->panel_orientation != DRM_MODE_PANEL_ORIENTATION_UNKNOWN) {
-		DRM_INFO("cmdline forces connector %s panel_orientation to %d\n",
+		drm_info(connector->dev,
+			 "cmdline forces connector %s panel_orientation to %d\n",
 			 connector->name, mode->panel_orientation);
 		drm_connector_set_panel_orientation(connector,
 						    mode->panel_orientation);
 	}
 
-	DRM_DEBUG_KMS("cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
-		      connector->name, mode->name,
-		      mode->xres, mode->yres,
-		      mode->refresh_specified ? mode->refresh : 60,
-		      mode->rb ? " reduced blanking" : "",
-		      mode->margins ? " with margins" : "",
-		      mode->interlace ?  " interlaced" : "");
+	drm_dbg_kms(connector->dev,
+		    "cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
+		    connector->name, mode->name,
+		    mode->xres, mode->yres,
+		    mode->refresh_specified ? mode->refresh : 60,
+		    mode->rb ? " reduced blanking" : "",
+		    mode->margins ? " with margins" : "",
+		    mode->interlace ?  " interlaced" : "");
 }
 
 static void drm_connector_free(struct kref *kref)
@@ -252,9 +255,9 @@ int drm_connector_init(struct drm_device *dev,
 	/* connector index is used with 32bit bitmasks */
 	ret = ida_simple_get(&config->connector_ida, 0, 32, GFP_KERNEL);
 	if (ret < 0) {
-		DRM_DEBUG_KMS("Failed to allocate %s connector index: %d\n",
-			      drm_connector_enum_list[connector_type].name,
-			      ret);
+		drm_dbg_kms(dev, "Failed to allocate %s connector index: %d\n",
+			    drm_connector_enum_list[connector_type].name,
+			    ret);
 		goto out_put;
 	}
 	connector->index = ret;
@@ -2159,12 +2162,14 @@ int drm_connector_update_edid_property(struct drm_connector *connector,
 		old_edid = (const struct edid *)connector->edid_blob_ptr->data;
 		if (old_edid) {
 			if (!drm_edid_are_equal(edid, old_edid)) {
-				DRM_DEBUG_KMS("[CONNECTOR:%d:%s] Edid was changed.\n",
-					      connector->base.id, connector->name);
+				drm_dbg_kms(dev,
+					    "[CONNECTOR:%d:%s] Edid was changed.\n",
+					    connector->base.id, connector->name);
 
 				connector->epoch_counter += 1;
-				DRM_DEBUG_KMS("Updating change counter to %llu\n",
-					      connector->epoch_counter);
+				drm_dbg_kms(dev,
+					    "Updating change counter to %llu\n",
+					    connector->epoch_counter);
 			}
 		}
 	}
