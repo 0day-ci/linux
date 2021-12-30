@@ -1052,9 +1052,11 @@ iomap_finish_ioend(struct iomap_ioend *ioend, int error)
 			next = bio->bi_private;
 
 		/* walk each page on bio, ending page IO on them */
-		bio_for_each_segment_all(bv, bio, iter_all)
+		bio_for_each_segment_all(bv, bio, iter_all) {
 			iomap_finish_page_writeback(inode, bv->bv_page, error,
 					bv->bv_len);
+			cond_resched();
+		}
 		bio_put(bio);
 	}
 	/* The ioend has been freed by bio_put() */
