@@ -180,7 +180,7 @@ static inline enum comp_state check_psn(struct rxe_qp *qp,
 	diff = psn_compare(pkt->psn, wqe->last_psn);
 	if (diff > 0) {
 		if (wqe->state == wqe_state_pending) {
-			if (wqe->mask & WR_ATOMIC_OR_READ_MASK)
+			if (wqe->mask & WR_READ_OR_WRITE_MASK)
 				return COMPST_ERROR_RETRY;
 
 			reset_retry_counters(qp);
@@ -200,7 +200,7 @@ static inline enum comp_state check_psn(struct rxe_qp *qp,
 			return COMPST_COMP_ACK;
 		else
 			return COMPST_DONE;
-	} else if ((diff > 0) && (wqe->mask & WR_ATOMIC_OR_READ_MASK)) {
+	} else if ((diff > 0) && (wqe->mask & WR_READ_OR_WRITE_MASK)) {
 		return COMPST_DONE;
 	} else {
 		return COMPST_CHECK_ACK;
