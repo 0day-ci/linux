@@ -592,6 +592,9 @@ static int acpi_pci_root_add(struct acpi_device *device,
 	is_pcie = strcmp(acpi_device_hid(device), "PNP0A08") == 0;
 	negotiate_os_control(root, &no_aspm, is_pcie);
 
+	if (pci_reassign_all_bus)
+		pci_add_flags(PCI_REASSIGN_ALL_BUS);
+
 	/*
 	 * TBD: Need PCI interface for enumeration/configuration of roots.
 	 */

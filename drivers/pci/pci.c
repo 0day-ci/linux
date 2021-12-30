@@ -142,6 +142,9 @@ static bool pcie_ats_disabled;
 /* If set, the PCI config space of each device is printed during boot. */
 bool pci_early_dump;
 
+/* If set, the pci will reassign resources*/
+bool pci_reassign_all_bus;
+
 bool pci_ats_disabled(void)
 {
 	return pcie_ats_disabled;
@@ -6846,6 +6849,8 @@ static int __init pci_setup(char *str)
 				pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
 			} else if (!strncmp(str, "disable_acs_redir=", 18)) {
 				disable_acs_redir_param = str + 18;
+			} else if (!strncmp(str, "reassign_all_bus", 16)) {
+				pci_reassign_all_bus = true;
 			} else {
 				pr_err("PCI: Unknown option `%s'\n", str);
 			}
