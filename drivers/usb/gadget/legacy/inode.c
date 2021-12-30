@@ -1847,7 +1847,7 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 		total = le16_to_cpu(dev->hs_config->wTotalLength);
 		if (!is_valid_config(dev->hs_config, total) ||
 				total > length - USB_DT_DEVICE_SIZE)
-			goto fail;
+			goto fail1;
 		kbuf += total;
 		length -= total;
 	} else {
@@ -1858,12 +1858,12 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 
 	/* device descriptor (tweaked for paranoia) */
 	if (length != USB_DT_DEVICE_SIZE)
-		goto fail;
+		goto fail1;
 	dev->dev = (void *)kbuf;
 	if (dev->dev->bLength != USB_DT_DEVICE_SIZE
 			|| dev->dev->bDescriptorType != USB_DT_DEVICE
 			|| dev->dev->bNumConfigurations != 1)
-		goto fail;
+		goto fail2;
 	dev->dev->bcdUSB = cpu_to_le16 (0x0200);
 
 	/* triggers gadgetfs_bind(); then we can enumerate. */
@@ -1875,6 +1875,9 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 
 	value = usb_gadget_probe_driver(&gadgetfs_driver);
 	if (value != 0) {
+		dev->dev = NULL;
+		dev->hs_config = NULL;
+		dev->config = NULL;
 		kfree (dev->buf);
 		dev->buf = NULL;
 	} else {
@@ -1892,7 +1895,12 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 	}
 	return value;
 
+fail2:
+	dev->dev = NULL;
+fail1:
+	dev->hs_config = NULL;
 fail:
+	dev->config = NULL;
 	spin_unlock_irq (&dev->lock);
 	pr_debug ("%s: %s fail %zd, %p\n", shortname, __func__, value, dev);
 	kfree (dev->buf);
