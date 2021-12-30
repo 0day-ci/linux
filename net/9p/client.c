@@ -1042,6 +1042,17 @@ struct p9_client *p9_client_create(const char *dev_name, char *options)
 	p9_debug(P9_DEBUG_MUX, "clnt %p trans %p msize %d protocol %d\n",
 		 clnt, clnt->trans_mod, clnt->msize, clnt->proto_version);
 
+	/*
+	 * due to linear message buffers being used by client ATM
+	 */
+	if (clnt->msize > KMALLOC_MAX_SIZE) {
+		clnt->msize = KMALLOC_MAX_SIZE;
+		pr_info("Limiting 'msize' to %zu as this is the maximum "
+			"supported by this client version.\n",
+			(size_t) KMALLOC_MAX_SIZE
+		);
+	}
+
 	err = clnt->trans_mod->create(clnt, dev_name, options);
 	if (err)
 		goto put_trans;
