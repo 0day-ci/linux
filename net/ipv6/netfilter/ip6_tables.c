@@ -986,7 +986,7 @@ static int get_info(struct net *net, void __user *user, const int *len)
 		struct xt_table_info tmp;
 
 		if (in_compat_syscall()) {
-			ret = compat_table_info(private, &tmp);
+			compat_table_info(private, &tmp);
 			xt_compat_flush_offsets(AF_INET6);
 			private = &tmp;
 		}
