@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/nvmem/u-boot,env.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: U-Boot environment variables
+
+description: |
+  U-Boot uses environment variables to store device parameters and
+  configuration. They may be used for booting process, setup or keeping end user
+  interesting info.
+
+  Data is stored on flash partition in a U-Boot specific format (CRC32 and NUL
+  separated key-value pairs).
+
+  This binding allows specifying data location and format (default one or vendor
+  specific).
+
+maintainers:
+  - Rafał Miłecki <rafal@milecki.pl>
+
+allOf:
+  - $ref: nvmem.yaml#
+
+properties:
+  compatible:
+    enum:
+      - u-boot,env
+      - brcm,env
+
+  reg:
+    maxItems: 1
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        partition@0 {
+            label = "uboot";
+            reg = <0x0 0x100000>;
+
+            #address-cells = <1>;
+            #size-cells = <1>;
+
+            nvmem@10000 {
+                compatible = "u-boot,env";
+                reg = <0x10000 0x10000>;
+            };
+        };
+    };
