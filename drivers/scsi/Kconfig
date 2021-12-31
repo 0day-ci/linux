@@ -1240,13 +1240,14 @@ config SCSI_DEBUG
 	tristate "SCSI debugging host and device simulator"
 	depends on SCSI
 	select CRC_T10DIF
+	select SGL_ALLOC
 	help
 	  This pseudo driver simulates one or more hosts (SCSI initiators),
 	  each with one or more targets, each with one or more logical units.
 	  Defaults to one of each, creating a small RAM disk device. Many
 	  parameters found in the /sys/bus/pseudo/drivers/scsi_debug
 	  directory can be tweaked at run time.
-	  See <http://sg.danny.cz/sg/sdebug26.html> for more information.
+	  See <https://sg.danny.cz/sg/scsi_debug.html> for more information.
 	  Mainly used for testing and best as a module. If unsure, say N.
 
 config SCSI_MESH
