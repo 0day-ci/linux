@@ -1250,6 +1250,9 @@ out:
  * @state: the state we're requesting
  * @flags: the modifier flags
  * @gh: the holder structure
+ * @ip: Get the return address of the current function, that is, the function
+ *	is called by another function, and then when the function is finished,
+ *	the return address is the address at that time.
  *
  */
 
