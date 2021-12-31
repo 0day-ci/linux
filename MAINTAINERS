@@ -17973,6 +17973,13 @@ F:	include/dt-bindings/spmi/spmi.h
 F:	include/linux/spmi.h
 F:	include/trace/events/spmi.h
 
+SPRAID SCSI/Raid DRIVERS
+M:	Yanling Song <yanling.song@ramaxel.com>
+L:	linux-scsi@vger.kernel.org
+S:	Maintained
+F:	Documentation/scsi/spraid.rst
+F:	drivers/scsi/spraid/
+
 SPU FILE SYSTEM
 M:	Jeremy Kerr <jk@ozlabs.org>
 L:	linuxppc-dev@lists.ozlabs.org
