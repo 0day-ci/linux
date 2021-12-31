@@ -556,7 +556,6 @@ struct rtl8365mb_port {
  * @chip_ver: chip silicon revision
  * @port_mask: mask of all ports
  * @learn_limit_max: maximum number of L2 addresses the chip can learn
- * @cpu: CPU tagging and CPU port configuration for this chip
  * @mib_lock: prevent concurrent reads of MIB counters
  * @ports: per-port data
  * @jam_table: chip-specific initialization jam table
@@ -571,7 +570,6 @@ struct rtl8365mb {
 	u32 chip_ver;
 	u32 port_mask;
 	u32 learn_limit_max;
-	struct rtl8365mb_cpu cpu;
 	struct mutex mib_lock;
 	struct rtl8365mb_port ports[RTL8365MB_MAX_NUM_PORTS];
 	const struct rtl8365mb_jam_tbl_entry *jam_table;
@@ -769,17 +767,20 @@ static int rtl8365mb_ext_config_rgmii(struct realtek_priv *priv, int port,
 	u32 val;
 	int ret;
 
-	if (port != priv->cpu_port) {
-		dev_err(priv->dev, "only one EXT interface is currently supported\n");
+	mb = priv->chip_data;
+	p = &mb->ports[port];
+	ext_int = p->ext_int;
+
+	if (ext_int == RTL8365MB_NOT_EXT) {
+		dev_err(priv->dev,
+			"Port %d is not identified as extenal interface.\n",
+			port);
 		return -EINVAL;
 	}
 
 	dp = dsa_to_port(priv->ds, port);
 	dn = dp->dn;
 
-	mb = priv->chip_data;
-	p = &mb->ports[port];
-	ext_int = p->ext_int;
 
 	/* Set the RGMII TX/RX delay
 	 *
@@ -859,14 +860,16 @@ static int rtl8365mb_ext_config_forcemode(struct realtek_priv *priv, int port,
 	int val;
 	int ret;
 
-	if (port != priv->cpu_port) {
-		dev_err(priv->dev, "only one EXT interface is currently supported\n");
-		return -EINVAL;
-	}
-
 	mb = priv->chip_data;
 	p = &mb->ports[port];
 	ext_int = p->ext_int;
+
+	if (ext_int == RTL8365MB_NOT_EXT) {
+		dev_err(priv->dev,
+			"Port %d is not identified as extenal interface.\n",
+			port);
+		return -EINVAL;
+	}
 
 	if (link) {
 		/* Force the link up with the desired configuration */
@@ -1734,10 +1737,8 @@ static void rtl8365mb_irq_teardown(struct realtek_priv *priv)
 	}
 }
 
-static int rtl8365mb_cpu_config(struct realtek_priv *priv)
+static int rtl8365mb_cpu_config(struct realtek_priv *priv, struct rtl8365mb_cpu *cpu)
 {
-	struct rtl8365mb *mb = priv->chip_data;
-	struct rtl8365mb_cpu *cpu = &mb->cpu;
 	u32 val;
 	int ret;
 
@@ -1810,6 +1811,7 @@ static int rtl8365mb_reset_chip(struct realtek_priv *priv)
 static int rtl8365mb_setup(struct dsa_switch *ds)
 {
 	struct realtek_priv *priv = ds->priv;
+	struct rtl8365mb_cpu cpu;
 	struct rtl8365mb *mb;
 	int ret;
 	int i;
@@ -1837,13 +1839,20 @@ static int rtl8365mb_setup(struct dsa_switch *ds)
 		dev_info(priv->dev, "no interrupt support\n");
 
 	/* Configure CPU tagging */
+	cpu.mask = 0;
 	for (i = 0; i < priv->num_ports; i++) {
 		if (!(dsa_is_cpu_port(priv->ds, i)))
 			continue;
-		priv->cpu_port = i;
-		mb->cpu.mask = BIT(priv->cpu_port);
-		mb->cpu.trap_port = priv->cpu_port;
-		ret = rtl8365mb_cpu_config(priv);
+
+		cpu.enable = 1;
+		cpu.insert = RTL8365MB_CPU_INSERT_TO_ALL;
+		cpu.position = RTL8365MB_CPU_POS_AFTER_SA;
+		cpu.rx_length = RTL8365MB_CPU_RXLEN_64BYTES;
+		cpu.format = RTL8365MB_CPU_FORMAT_8BYTES;
+		cpu.trap_port = i;
+		cpu.mask |= BIT(i);
+
+		ret = rtl8365mb_cpu_config(priv, &cpu);
 		if (ret)
 			goto out_teardown_irq;
 
@@ -1862,7 +1871,7 @@ static int rtl8365mb_setup(struct dsa_switch *ds)
 		dn = dsa_to_port(priv->ds, i)->dn;
 
 		/* Forward only to the CPU */
-		ret = rtl8365mb_port_set_isolation(priv, i, BIT(priv->cpu_port));
+		ret = rtl8365mb_port_set_isolation(priv, i, cpu.mask);
 		if (ret)
 			goto out_teardown_irq;
 
@@ -2002,12 +2011,6 @@ static int rtl8365mb_detect(struct realtek_priv *priv)
 		mb->learn_limit_max = RTL8365MB_LEARN_LIMIT_MAX;
 		mb->jam_table = rtl8365mb_init_jam_8365mb_vc;
 		mb->jam_size = ARRAY_SIZE(rtl8365mb_init_jam_8365mb_vc);
-
-		mb->cpu.enable = 1;
-		mb->cpu.insert = RTL8365MB_CPU_INSERT_TO_ALL;
-		mb->cpu.position = RTL8365MB_CPU_POS_AFTER_SA;
-		mb->cpu.rx_length = RTL8365MB_CPU_RXLEN_64BYTES;
-		mb->cpu.format = RTL8365MB_CPU_FORMAT_8BYTES;
 
 		break;
 	default:
