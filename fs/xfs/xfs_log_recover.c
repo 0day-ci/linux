@@ -3540,7 +3540,7 @@ STATIC void
 xlog_recover_check_summary(
 	struct xlog		*log)
 {
-	struct xfs_mount	*mp = log->l_mp;
+	struct xfs_mount	*mp;
 	struct xfs_perag	*pag;
 	struct xfs_buf		*agfbp;
 	struct xfs_buf		*agibp;
