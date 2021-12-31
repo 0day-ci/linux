@@ -18,6 +18,41 @@
 			linux,default-trigger = "default-on";
 		};
 	};
+
+	i2c0mux {
+		compatible = "i2c-mux-pinctrl";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		i2c-parent = <&i2c0>;
+
+		pinctrl-names = "i2c0", "i2c0-vc";
+		pinctrl-0 = <&i2c0_gpio0>;
+		pinctrl-1 = <&i2c0_gpio44>;
+
+		i2c@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
+		i2c@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			rtc@51 {
+				/* Attention: An alarm resets the machine */
+				compatible = "nxp,pcf85063";
+				reg = <0x51>;
+			};
+		};
+	};
+};
+
+&i2c0 {
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
 };
 
 &ddc0 {
