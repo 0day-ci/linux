@@ -459,14 +459,14 @@ OBJDUMP		= llvm-objdump
 READELF		= llvm-readelf
 STRIP		= llvm-strip
 else
-CC		= $(CROSS_COMPILE)gcc
-LD		= $(CROSS_COMPILE)ld
-AR		= $(CROSS_COMPILE)ar
-NM		= $(CROSS_COMPILE)nm
-OBJCOPY		= $(CROSS_COMPILE)objcopy
-OBJDUMP		= $(CROSS_COMPILE)objdump
-READELF		= $(CROSS_COMPILE)readelf
-STRIP		= $(CROSS_COMPILE)strip
+CC		= $(realpath $(CROSS_COMPILE))gcc
+LD		= $(realpath $(CROSS_COMPILE))ld
+AR		= $(realpath $(CROSS_COMPILE))ar
+NM		= $(realpath $(CROSS_COMPILE))nm
+OBJCOPY		= $(realpath $(CROSS_COMPILE))objcopy
+OBJDUMP		= $(realpath $(CROSS_COMPILE))objdump
+READELF		= $(realpath $(CROSS_COMPILE))readelf
+STRIP		= $(realpath $(CROSS_COMPILE))strip
 endif
 RUSTC		= rustc
 RUSTDOC		= rustdoc
