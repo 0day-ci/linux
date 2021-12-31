@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/iio/adc/ti,ads1018.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TI ADS1018 4 channel I2C analog to digital converter
+
+maintainers:
+  - Iain Hunter <iain@hunterembedded.co.uk>
+
+description: |
+  Datasheet at: https://www.ti.com/lit/gpn/ads1018
+  Supports both single ended and differential channels.
+
+properties:
+  compatible:
+    const: ti,ads1018
+
+  reg:
+    maxItems: 1
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 0
+
+  "#io-channel-cells":
+    const: 1
+
+  spi-max-frequency: true
+  spi-cpol: true
+  spi-cpha: true
+
+required:
+  - compatible
+  - reg
+  - "#address-cells"
+  - "#size-cells"
+  - spi-cpha
+
+additionalProperties: false
+
+patternProperties:
+  "^channel@([0-3])$":
+    $ref: "adc.yaml"
+    type: object
+
+    properties:
+      reg:
+        description: |
+            Must be 0, actual channel selected in ti,adc-channels for single ended
+            or ti-adc-channels-diff for differential
+        $ref: /schemas/types.yaml#/definitions/uint32
+        enum: [0]
+
+      ti,adc-channels:
+        description: |
+          List of single-ended channels muxed for this ADC. It can have up to 4
+          channels numbered 0-3
+        $ref: /schemas/types.yaml#/definitions/uint32-array
+        deprecated: true
+
+      ti,adc-diff-channels:
+        description: |
+          List of differential channels muxed for this ADC between the pins vinp
+          and vinn. The 4 possible options are:
+          vinp=0, vinn=1
+          vinp=0, vinn=3
+          vinp=1, vinn=3
+          vinp=2, vinn=3
+
+          They are listed in a pair <vinp vinn>.
+
+          Note: At least one of "ti,adc-channels" or "ti,adc-diff-channels" is
+          required.
+        $ref: /schemas/types.yaml#/definitions/uint32-matrix
+        items:
+          items:
+            - description: |
+                "vinp" indicates positive input number
+              minimum: 0
+              maximum: 2
+            - description: |
+                "vinn" indicates negative input number
+              minimum: 1
+              maximum: 3
+
+
+    required:
+      - reg
+
+examples:
+  - |
+    // example on SPI1 with single ended channel 1
+    spi {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        adc@1 {
+            compatible = "ti,ads1018";
+            reg = <0x0>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+            spi-cpha;
+            ti,adc-channels = <1>;
+        };
+    };
+  - |
+    // example on SPI0 with differential between inputs 0 and 3
+    spi {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        adc@0 {
+            compatible = "ti,ads1018";
+            reg = <0x0>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+            spi-cpha;
+            ti,adc-diff-channels = <0 3>;
+        };
+    };
+
+...
