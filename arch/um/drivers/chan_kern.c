@@ -102,6 +102,7 @@ static int open_one_chan(struct chan *chan)
 	}
 
 	chan->fd = fd;
+	chan->fd_blocking = ret;
 
 	chan->opened = 1;
 	return 0;
@@ -222,6 +223,8 @@ static void close_one_chan(struct chan *chan, int delay_free_irq)
 	}
 	if (chan->ops->close != NULL)
 		(*chan->ops->close)(chan->fd, chan->data);
+
+	os_set_fd_block(chan->fd, chan->fd_blocking);
 
 	chan->opened = 0;
 	chan->fd = -1;

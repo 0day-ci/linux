@@ -22,6 +22,7 @@ struct chan {
 	unsigned int output:1;
 	unsigned int opened:1;
 	unsigned int enabled:1;
+	unsigned int fd_blocking:1;
 	int fd;
 	const struct chan_ops *ops;
 	void *data;
