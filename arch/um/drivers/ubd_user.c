@@ -42,7 +42,7 @@ int start_io_thread(unsigned long sp, int *fd_out)
 
 	err = os_set_fd_block(*fd_out, 0);
 	err = os_set_fd_block(kernel_fd, 0);
-	if (err) {
+	if (err < 0) {
 		printk("start_io_thread - failed to set nonblocking I/O.\n");
 		goto out_close;
 	}

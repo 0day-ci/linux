@@ -161,7 +161,7 @@ static int xterm_open(int input, int output, int primary, void *d,
 	}
 
 	err = os_set_fd_block(new, 0);
-	if (err) {
+	if (err < 0) {
 		printk(UM_KERN_ERR "xterm_open : failed to set xterm "
 		       "descriptor non-blocking, err = %d\n", -err);
 		goto out_close2;

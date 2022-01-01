@@ -83,7 +83,7 @@ static const struct chan_ops not_configged_ops = {
 
 static int open_one_chan(struct chan *chan)
 {
-	int fd, err;
+	int fd, ret;
 
 	if (chan->opened)
 		return 0;
@@ -95,10 +95,10 @@ static int open_one_chan(struct chan *chan)
 	if (fd < 0)
 		return fd;
 
-	err = os_set_fd_block(fd, 0);
-	if (err) {
+	ret = os_set_fd_block(fd, 0);
+	if (ret < 0) {
 		(*chan->ops->close)(fd, chan->data);
-		return err;
+		return ret;
 	}
 
 	chan->fd = fd;

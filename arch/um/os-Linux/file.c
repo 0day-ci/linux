@@ -445,10 +445,13 @@ int os_clear_fd_async(int fd)
 int os_set_fd_block(int fd, int blocking)
 {
 	int flags;
+	int oldmode;
 
 	flags = fcntl(fd, F_GETFL);
 	if (flags < 0)
 		return -errno;
+
+	oldmode = !!(flags & O_NONBLOCK);
 
 	if (blocking)
 		flags &= ~O_NONBLOCK;
@@ -458,7 +461,7 @@ int os_set_fd_block(int fd, int blocking)
 	if (fcntl(fd, F_SETFL, flags) < 0)
 		return -errno;
 
-	return 0;
+	return oldmode;
 }
 
 int os_accept_connection(int fd)

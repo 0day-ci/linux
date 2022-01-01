@@ -732,7 +732,7 @@ static int __init mconsole_init(void)
 		printk(KERN_ERR "Failed to initialize management console\n");
 		return 1;
 	}
-	if (os_set_fd_block(sock, 0))
+	if (os_set_fd_block(sock, 0) < 0)
 		goto out;
 
 	register_reboot_notifier(&reboot_notifier);
