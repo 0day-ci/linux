@@ -342,6 +342,7 @@ static void free_irq_by_irq_and_dev(unsigned int irq, void *dev)
 				continue;
 
 			os_del_epoll_fd(entry->fd);
+			os_clear_fd_async(entry->fd);
 			reg->events = 0;
 			update_or_free_irq_entry(entry);
 			goto out;
@@ -396,8 +397,10 @@ int deactivate_all_fds(void)
 	os_set_ioignore();
 
 	/* we can no longer call kfree() here so just deactivate */
-	list_for_each_entry(entry, &active_fds, list)
+	list_for_each_entry(entry, &active_fds, list) {
 		os_del_epoll_fd(entry->fd);
+		os_clear_fd_async(entry->fd);
+	}
 	os_close_epoll_fd();
 	return 0;
 }
