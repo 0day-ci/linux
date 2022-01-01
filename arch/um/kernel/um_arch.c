@@ -17,17 +17,18 @@
 #include <linux/kmsg_dump.h>
 #include <linux/suspend.h>
 
-#include <asm/processor.h>
+#include <arch.h>
+#include <as-layout.h>
 #include <asm/cpufeature.h>
+#include <asm/processor.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
-#include <as-layout.h>
-#include <arch.h>
 #include <init.h>
 #include <kern.h>
 #include <kern_util.h>
 #include <mem_user.h>
 #include <os.h>
+#include <uml_console.h>
 
 #include "um_arch.h"
 
@@ -245,6 +246,7 @@ static int panic_exit(struct notifier_block *self, unsigned long unused1,
 	bust_spinlocks(1);
 	bust_spinlocks(0);
 	uml_exitcode = 1;
+	uml_console_exit();
 	os_dump_core();
 	return 0;
 }

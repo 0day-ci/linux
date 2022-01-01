@@ -180,13 +180,13 @@ static int stdio_init(void)
 }
 late_initcall(stdio_init);
 
-static void console_exit(void)
+void uml_console_exit(void)
 {
 	if (!con_init_done)
 		return;
 	close_lines(vts, ARRAY_SIZE(vts));
 }
-__uml_exitcall(console_exit);
+__uml_exitcall(uml_console_exit);
 
 static int console_chan_setup(char *str)
 {
