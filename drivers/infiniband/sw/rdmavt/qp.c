@@ -84,10 +84,15 @@ EXPORT_SYMBOL(ib_rvt_state_ops);
 /* platform specific: return the last level cache (llc) size, in KiB */
 static int rvt_wss_llc_size(void)
 {
+#if !defined(CONFIG_UML)
 	/* assume that the boot CPU value is universal for all CPUs */
 	return boot_cpu_data.x86_cache_size;
+#else /* CONFIG_UML */
+	return 1024;	/* fake 1 MB LLC size */
+#endif
 }
 
+#if !defined(CONFIG_UML)
 /* platform specific: cacheless copy */
 static void cacheless_memcpy(void *dst, void *src, size_t n)
 {
@@ -99,6 +104,13 @@ static void cacheless_memcpy(void *dst, void *src, size_t n)
 	 */
 	__copy_user_nocache(dst, (void __user *)src, n, 0);
 }
+#else
+/* for CONFIG_UML, this is just a plain memcpy() */
+static void cacheless_memcpy(void *dst, void *src, size_t n)
+{
+	memcpy(dst, src, n);
+}
+#endif
 
 void rvt_wss_exit(struct rvt_dev_info *rdi)
 {
