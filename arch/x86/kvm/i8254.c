@@ -34,6 +34,7 @@
 
 #include <linux/kvm_host.h>
 #include <linux/slab.h>
+#include <linux/cgroup.h>
 
 #include "ioapic.h"
 #include "irq.h"
@@ -647,6 +648,32 @@ static void pit_mask_notifer(struct kvm_irq_mask_notifier *kimn, bool mask)
 		kvm_pit_reset_reinject(pit);
 }
 
+struct pit_attach_cgroups_struct {
+	struct kthread_work work;
+	struct task_struct *owner;
+	int ret;
+};
+
+static void pit_attach_cgroups_work(struct kthread_work *work)
+{
+	struct pit_attach_cgroups_struct *attach;
+
+	attach = container_of(work, struct pit_attach_cgroups_struct, work);
+	attach->ret = cgroup_attach_task_all(attach->owner, current);
+}
+
+
+static int pit_attach_cgroups(struct kvm_pit *pit)
+{
+	struct pit_attach_cgroups_struct attach;
+
+	attach.owner = current;
+	kthread_init_work(&attach.work, pit_attach_cgroups_work);
+	kthread_queue_work(pit->worker, &attach.work);
+	kthread_flush_work(&attach.work);
+	return attach.ret;
+}
+
 static const struct kvm_io_device_ops pit_dev_ops = {
 	.read     = pit_ioport_read,
 	.write    = pit_ioport_write,
@@ -682,6 +709,10 @@ struct kvm_pit *kvm_create_pit(struct kvm *kvm, u32 flags)
 	pit->worker = kthread_create_worker(0, "kvm-pit/%d", pid_nr);
 	if (IS_ERR(pit->worker))
 		goto fail_kthread;
+
+	ret = pit_attach_cgroups(pit);
+	if (ret < 0)
+		goto fail_attach_cgroups;
 
 	kthread_init_work(&pit->expired, pit_do_work);
 
@@ -723,6 +754,7 @@ fail_register_speaker:
 fail_register_pit:
 	mutex_unlock(&kvm->slots_lock);
 	kvm_pit_set_reinject(pit, false);
+fail_attach_cgroups:
 	kthread_destroy_worker(pit->worker);
 fail_kthread:
 	kvm_free_irq_source_id(kvm, pit->irq_source_id);
