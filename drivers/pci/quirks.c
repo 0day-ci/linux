@@ -12,6 +12,7 @@
  * file, where their drivers can use them.
  */
 
+#include <linux/bug.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/export.h>
@@ -5869,3 +5870,98 @@ static void nvidia_ion_ahci_fixup(struct pci_dev *pdev)
 	pdev->dev_flags |= PCI_DEV_FLAGS_HAS_MSI_MASKING;
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NVIDIA, 0x0ab8, nvidia_ion_ahci_fixup);
+
+/*
+ * Retrain the link of a downstream PCIe port by hand if necessary.
+ *
+ * This is needed at least where a downstream port of the ASMedia ASM2824
+ * Gen 3 switch is wired to the upstream port of the Pericom PI7C9X2G304
+ * Gen 2 switch, and observed with the Delock Riser Card PCI Express x1 >
+ * 2 x PCIe x1 device, P/N 41433, plugged into the SiFive HiFive Unmatched
+ * board.
+ *
+ * In such a configuration the switches are supposed to negotiate the link
+ * speed of preferably 5.0GT/s, falling back to 2.5GT/s.  However the link
+ * continues switching between the two speeds indefinitely and the data
+ * link layer never reaches the active state, with link training reported
+ * repeatedly active ~84% of the time.  Forcing the target link speed to
+ * 2.5GT/s with the upstream ASM2824 device makes the two switches talk to
+ * each other correctly however.  And more interestingly retraining with a
+ * higher target link speed afterwards lets the two successfully negotiate
+ * 5.0GT/s.
+ *
+ * With the ASM2824 we can rely on the otherwise optional Data Link Layer
+ * Link Active status bit and in the failed link training scenario it will
+ * be off along with the Link Bandwidth Management Status indicating that
+ * hardware has changed the link speed or width in an attempt to correct
+ * unreliable link operation.  For a port that has been left unconnected
+ * both bits will be clear.  So use this information to detect the problem
+ * rather than polling the Link Training bit and watching out for flips or
+ * at least the active status.
+ *
+ * Restrict the speed to 2.5GT/s then with the Target Link Speed field,
+ * request a retrain and wait 200ms for the data link to go up.  If this
+ * turns out successful, then lift the restriction, letting the devices
+ * negotiate a higher speed.  Also check for a 2.5GT/s speed restriction
+ * the firmware may have already arranged and lift it too with ports that
+ * already report their data link being up.
+ */
+static void pcie_downstream_link_retrain(struct pci_dev *dev)
+{
+	u16 lnksta, lnkctl2;
+	u8 pos;
+
+	pos = pci_find_capability(dev, PCI_CAP_ID_EXP);
+	BUG_ON(!pos);
+
+	pci_read_config_word(dev, pos + PCI_EXP_LNKCTL2, &lnkctl2);
+	pci_read_config_word(dev, pos + PCI_EXP_LNKSTA, &lnksta);
+	if ((lnksta & (PCI_EXP_LNKSTA_LBMS | PCI_EXP_LNKSTA_DLLLA)) ==
+	    PCI_EXP_LNKSTA_LBMS) {
+		unsigned long timeout;
+		u16 lnkctl;
+
+		pci_info(dev, "broken device, retraining non-functional downstream link at 2.5GT/s...\n");
+
+		pci_read_config_word(dev, pos + PCI_EXP_LNKCTL, &lnkctl);
+		lnkctl |= PCI_EXP_LNKCTL_RL;
+		lnkctl2 &= ~PCI_EXP_LNKCTL2_TLS;
+		lnkctl2 |= PCI_EXP_LNKCTL2_TLS_2_5GT;
+		pci_write_config_word(dev, pos + PCI_EXP_LNKCTL2, lnkctl2);
+		pci_write_config_word(dev, pos + PCI_EXP_LNKCTL, lnkctl);
+
+		timeout = jiffies + msecs_to_jiffies(200);
+		do {
+			pci_read_config_word(dev, pos + PCI_EXP_LNKSTA,
+					     &lnksta);
+			if (lnksta & PCI_EXP_LNKSTA_DLLLA)
+				break;
+			usleep_range(10000, 20000);
+		} while (time_before(jiffies, timeout));
+
+		pci_info(dev, "retraining %s!\n",
+			 lnksta & PCI_EXP_LNKSTA_DLLLA ?
+			 "succeeded" : "failed");
+	}
+
+	if ((lnksta & PCI_EXP_LNKSTA_DLLLA) &&
+	    (lnkctl2 & PCI_EXP_LNKCTL2_TLS) == PCI_EXP_LNKCTL2_TLS_2_5GT) {
+		u32 lnkcap;
+		u16 lnkctl;
+
+		pci_info(dev, "removing 2.5GT/s downstream link speed restriction\n");
+		pci_read_config_word(dev, pos + PCI_EXP_LNKCTL, &lnkctl);
+		pci_read_config_dword(dev, pos + PCI_EXP_LNKCAP, &lnkcap);
+		lnkctl |= PCI_EXP_LNKCTL_RL;
+		lnkctl2 &= ~PCI_EXP_LNKCTL2_TLS;
+		lnkctl2 |= lnkcap & PCI_EXP_LNKCAP_SLS;
+		pci_write_config_word(dev, pos + PCI_EXP_LNKCTL2, lnkctl2);
+		pci_write_config_word(dev, pos + PCI_EXP_LNKCTL, lnkctl);
+	}
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ASMEDIA,
+			 PCI_DEVICE_ID_ASMEDIA_ASM2824,
+			 pcie_downstream_link_retrain);
+DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_ASMEDIA,
+			       PCI_DEVICE_ID_ASMEDIA_ASM2824,
+			       pcie_downstream_link_retrain);
