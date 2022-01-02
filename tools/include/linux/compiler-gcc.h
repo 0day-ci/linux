@@ -16,6 +16,10 @@
 # define __fallthrough __attribute__ ((fallthrough))
 #endif
 
+#ifndef __has_attribute
+# define __has_attribute(x) 0  /* Compatibility with GCC versions < 5.x */
+#endif
+
 #if __has_attribute(__error__)
 # define __compiletime_error(message) __attribute__((error(message)))
 #endif
