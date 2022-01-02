@@ -4284,7 +4284,7 @@ out:
 	/*
 	 * Return the order kswapd stopped reclaiming at as
 	 * prepare_kswapd_sleep() takes it into account. If another caller
-	 * entered the allocator slow path while kswapd was awake, order will
+	 * entered the allqocator slow path while kswapd was awake, order will
 	 * remain at the higher level.
 	 */
 	return sc.order;
@@ -4308,7 +4308,7 @@ static enum zone_type kswapd_highest_zoneidx(pg_data_t *pgdat,
 static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_order,
 				unsigned int highest_zoneidx)
 {
-	long remaining = 0;
+	long remaining = ~0;
 	DEFINE_WAIT(wait);
 
 	if (freezing(current) || kthread_should_stop())
