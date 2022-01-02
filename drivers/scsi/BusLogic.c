@@ -2149,6 +2149,7 @@ static void __init blogic_inithoststruct(struct blogic_adapter *adapter,
 	host->can_queue = adapter->drvr_qdepth;
 	host->sg_tablesize = adapter->drvr_sglimit;
 	host->cmd_per_lun = adapter->untag_qdepth;
+	host->no_trailing_allocation_length = true;
 }
 
 /*
