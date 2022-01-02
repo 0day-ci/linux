@@ -12,6 +12,8 @@ ib_qib-y := qib_diag.o qib_driver.o qib_eeprom.o \
 # 6120 has no fallback if no MSI interrupts, others can do INTx
 ib_qib-$(CONFIG_PCI_MSI) += qib_iba6120.o
 
+ifeq ($(CONFIG_UML),)
 ib_qib-$(CONFIG_X86_64) += qib_wc_x86_64.o
+endif
 ib_qib-$(CONFIG_PPC64) += qib_wc_ppc64.o
 ib_qib-$(CONFIG_DEBUG_FS) += qib_debugfs.o
