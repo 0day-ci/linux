@@ -80,10 +80,9 @@ struct atusb_chip_data {
  * in atusb->err and reject all subsequent requests until the error is cleared.
  */
 
-static int atusb_control_msg(struct atusb *atusb, unsigned int pipe,
-			     __u8 request, __u8 requesttype,
-			     __u16 value, __u16 index,
-			     void *data, __u16 size, int timeout)
+static int atusb_control_msg_recv(struct atusb *atusb, __u8 request, __u8 requesttype,
+				  __u16 value, __u16 index,
+				  void *data, __u16 size, int timeout)
 {
 	struct usb_device *usb_dev = atusb->usb_dev;
 	int ret;
@@ -91,8 +90,30 @@ static int atusb_control_msg(struct atusb *atusb, unsigned int pipe,
 	if (atusb->err)
 		return atusb->err;
 
-	ret = usb_control_msg(usb_dev, pipe, request, requesttype,
-			      value, index, data, size, timeout);
+	ret = usb_control_msg_recv(usb_dev, 0, request, requesttype,
+				   value, index, data, size, timeout, GFP_KERNEL);
+	if (ret < 0) {
+		atusb->err = ret;
+		dev_err(&usb_dev->dev,
+			"%s: req 0x%02x val 0x%x idx 0x%x, error %d\n",
+			__func__, request, value, index, ret);
+	}
+
+	return ret;
+}
+
+static int atusb_control_msg_send(struct atusb *atusb, __u8 request, __u8 requesttype,
+				  __u16 value, __u16 index,
+				  void *data, __u16 size, int timeout)
+{
+	struct usb_device *usb_dev = atusb->usb_dev;
+	int ret;
+
+	if (atusb->err)
+		return atusb->err;
+
+	ret = usb_control_msg_send(usb_dev, 0, request, requesttype,
+				   value, index, data, size, timeout, GFP_KERNEL);
 	if (ret < 0) {
 		atusb->err = ret;
 		dev_err(&usb_dev->dev,
@@ -107,8 +128,7 @@ static int atusb_command(struct atusb *atusb, u8 cmd, u8 arg)
 	struct usb_device *usb_dev = atusb->usb_dev;
 
 	dev_dbg(&usb_dev->dev, "%s: cmd = 0x%x\n", __func__, cmd);
-	return atusb_control_msg(atusb, usb_sndctrlpipe(usb_dev, 0),
-				 cmd, ATUSB_REQ_TO_DEV, arg, 0, NULL, 0, 1000);
+	return atusb_control_msg_send(atusb, cmd, ATUSB_REQ_TO_DEV, arg, 0, NULL, 0, 1000);
 }
 
 static int atusb_write_reg(struct atusb *atusb, u8 reg, u8 value)
@@ -116,9 +136,8 @@ static int atusb_write_reg(struct atusb *atusb, u8 reg, u8 value)
 	struct usb_device *usb_dev = atusb->usb_dev;
 
 	dev_dbg(&usb_dev->dev, "%s: 0x%02x <- 0x%02x\n", __func__, reg, value);
-	return atusb_control_msg(atusb, usb_sndctrlpipe(usb_dev, 0),
-				 ATUSB_REG_WRITE, ATUSB_REQ_TO_DEV,
-				 value, reg, NULL, 0, 1000);
+	return atusb_control_msg_send(atusb, ATUSB_REG_WRITE, ATUSB_REQ_TO_DEV,
+				      value, reg, NULL, 0, 1000);
 }
 
 static int atusb_read_reg(struct atusb *atusb, u8 reg)
@@ -133,9 +152,8 @@ static int atusb_read_reg(struct atusb *atusb, u8 reg)
 		return -ENOMEM;
 
 	dev_dbg(&usb_dev->dev, "%s: reg = 0x%x\n", __func__, reg);
-	ret = atusb_control_msg(atusb, usb_rcvctrlpipe(usb_dev, 0),
-				ATUSB_REG_READ, ATUSB_REQ_FROM_DEV,
-				0, reg, buffer, 1, 1000);
+	ret = atusb_control_msg_recv(atusb, ATUSB_REG_READ, ATUSB_REQ_FROM_DEV,
+				     0, reg, buffer, 1, 1000);
 
 	if (ret >= 0) {
 		value = buffer[0];
@@ -805,9 +823,8 @@ static int atusb_get_and_show_revision(struct atusb *atusb)
 		return -ENOMEM;
 
 	/* Get a couple of the ATMega Firmware values */
-	ret = atusb_control_msg(atusb, usb_rcvctrlpipe(usb_dev, 0),
-				ATUSB_ID, ATUSB_REQ_FROM_DEV, 0, 0,
-				buffer, 3, 1000);
+	ret = atusb_control_msg_recv(atusb, ATUSB_ID, ATUSB_REQ_FROM_DEV, 0, 0,
+				     buffer, 3, 1000);
 	if (ret >= 0) {
 		atusb->fw_ver_maj = buffer[0];
 		atusb->fw_ver_min = buffer[1];
@@ -861,9 +878,8 @@ static int atusb_get_and_show_build(struct atusb *atusb)
 	if (!build)
 		return -ENOMEM;
 
-	ret = atusb_control_msg(atusb, usb_rcvctrlpipe(usb_dev, 0),
-				ATUSB_BUILD, ATUSB_REQ_FROM_DEV, 0, 0,
-				build, ATUSB_BUILD_SIZE, 1000);
+	ret = atusb_control_msg_recv(atusb, ATUSB_BUILD, ATUSB_REQ_FROM_DEV, 0, 0,
+				     build, ATUSB_BUILD_SIZE, 1000);
 	if (ret >= 0) {
 		build[ret] = 0;
 		dev_info(&usb_dev->dev, "Firmware: build %s\n", build);
@@ -985,9 +1001,8 @@ static int atusb_set_extended_addr(struct atusb *atusb)
 		return -ENOMEM;
 
 	/* Firmware is new enough so we fetch the address from EEPROM */
-	ret = atusb_control_msg(atusb, usb_rcvctrlpipe(usb_dev, 0),
-				ATUSB_EUI64_READ, ATUSB_REQ_FROM_DEV, 0, 0,
-				buffer, IEEE802154_EXTENDED_ADDR_LEN, 1000);
+	ret = atusb_control_msg_recv(atusb, ATUSB_EUI64_READ, ATUSB_REQ_FROM_DEV, 0, 0,
+				     buffer, IEEE802154_EXTENDED_ADDR_LEN, 1000);
 	if (ret < 0) {
 		dev_err(&usb_dev->dev, "failed to fetch extended address, random address set\n");
 		ieee802154_random_extended_addr(&atusb->hw->phy->perm_extended_addr);
