@@ -1,0 +1,17 @@
+What:		/sys/class/net/<iface>/available_timestamping_providers
+Date:		January 2022
+Contact:	Richard Cochran <richardcochran@gmail.com>
+Description:
+		Enumerates the available providers for SO_TIMESTAMPING.
+		The possible values are:
+		- "mac"  The MAC provides time stamping.
+		- "phy"  The PHY or MII device provides time stamping.
+
+What:		/sys/class/net/<iface>/current_timestamping_provider
+Date:		January 2022
+Contact:	Richard Cochran <richardcochran@gmail.com>
+Description:
+		Show the current SO_TIMESTAMPING provider.
+		The possible values are:
+		- "mac"  The MAC provides time stamping.
+		- "phy"  The PHY or MII device provides time stamping.

@@ -618,6 +618,64 @@ static ssize_t threaded_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(threaded);
 
+static ssize_t available_timestamping_providers_show(struct device *dev,
+						     struct device_attribute *attr,
+						     char *buf)
+{
+	const struct ethtool_ops *ops;
+	struct net_device *netdev;
+	struct phy_device *phydev;
+	int ret = 0;
+
+	netdev = to_net_dev(dev);
+	phydev = netdev->phydev;
+	ops = netdev->ethtool_ops;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+
+	ret += sprintf(buf, "%s\n", "mac");
+	buf += 4;
+
+	if (phy_has_tsinfo(phydev)) {
+		ret += sprintf(buf, "%s\n", "phy");
+		buf += 4;
+	}
+
+	rtnl_unlock();
+
+	return ret;
+}
+static DEVICE_ATTR_RO(available_timestamping_providers);
+
+static ssize_t current_timestamping_provider_show(struct device *dev,
+						  struct device_attribute *attr,
+						  char *buf)
+{
+	const struct ethtool_ops *ops;
+	struct net_device *netdev;
+	struct phy_device *phydev;
+	int ret;
+
+	netdev = to_net_dev(dev);
+	phydev = netdev->phydev;
+	ops = netdev->ethtool_ops;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+
+	if (phy_has_tsinfo(phydev)) {
+		ret = sprintf(buf, "%s\n", "phy");
+	} else {
+		ret = sprintf(buf, "%s\n", "mac");
+	}
+
+	rtnl_unlock();
+
+	return ret;
+}
+static DEVICE_ATTR_RO(current_timestamping_provider);
+
 static struct attribute *net_class_attrs[] __ro_after_init = {
 	&dev_attr_netdev_group.attr,
 	&dev_attr_type.attr,
@@ -651,6 +709,8 @@ static struct attribute *net_class_attrs[] __ro_after_init = {
 	&dev_attr_carrier_up_count.attr,
 	&dev_attr_carrier_down_count.attr,
 	&dev_attr_threaded.attr,
+	&dev_attr_available_timestamping_providers.attr,
+	&dev_attr_current_timestamping_provider.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(net_class);

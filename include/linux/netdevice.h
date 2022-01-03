@@ -1687,6 +1687,11 @@ enum netdev_ml_priv_type {
 	ML_PRIV_CAN,
 };
 
+enum timestamping_layer {
+	MAC_TIMESTAMPING,
+	PHY_TIMESTAMPING,
+};
+
 /**
  *	struct net_device - The DEVICE structure.
  *
@@ -1926,6 +1931,9 @@ enum netdev_ml_priv_type {
  *	@wol_enabled:	Wake-on-LAN is enabled
  *
  *	@threaded:	napi threaded mode is enabled
+ *
+ *	@selected_timestamping_layer:	Tracks whether the MAC or the PHY
+ *					performs packet time stamping.
  *
  *	@net_notifier_list:	List of per-net netdev notifier block
  *				that follow this device when it is moved
@@ -2262,6 +2270,8 @@ struct net_device {
 	bool			proto_down;
 	unsigned		wol_enabled:1;
 	unsigned		threaded:1;
+
+	enum timestamping_layer selected_timestamping_layer;
 
 	struct list_head	net_notifier_list;
 

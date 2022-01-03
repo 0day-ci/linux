@@ -1415,6 +1415,7 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 
 	phydev->phy_link_change = phy_link_change;
 	if (dev) {
+		dev->selected_timestamping_layer = PHY_TIMESTAMPING;
 		phydev->attached_dev = dev;
 		dev->phydev = phydev;
 
@@ -1727,6 +1728,7 @@ void phy_detach(struct phy_device *phydev)
 
 	phy_suspend(phydev);
 	if (dev) {
+		dev->selected_timestamping_layer = MAC_TIMESTAMPING;
 		phydev->attached_dev->phydev = NULL;
 		phydev->attached_dev = NULL;
 	}
