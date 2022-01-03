@@ -153,7 +153,8 @@ static inline bool has_pending_signals(sigset_t *signal, sigset_t *blocked)
 
 static bool recalc_sigpending_tsk(struct task_struct *t)
 {
-	if ((t->jobctl & (JOBCTL_PENDING_MASK | JOBCTL_TRAP_FREEZE)) ||
+	if ((t->jobctl & (JOBCTL_PENDING_MASK | JOBCTL_TRAP_FREEZE |
+			  JOBCTL_WILL_EXIT)) ||
 	    PENDING(&t->pending, &t->blocked) ||
 	    PENDING(&t->signal->shared_pending, &t->blocked) ||
 	    cgroup_task_frozen(t)) {
@@ -911,7 +912,7 @@ static bool prepare_signal(int sig, struct task_struct *p, bool force)
 		if (core_state) {
 			if (sig == SIGKILL) {
 				struct task_struct *dumper = core_state->dumper.task;
-				sigaddset(&dumper->pending.signal, SIGKILL);
+				dumper->jobctl |= JOBCTL_WILL_EXIT;
 				signal_wake_up(dumper, 1);
 			}
 		}
@@ -985,7 +986,7 @@ static inline bool wants_signal(int sig, struct task_struct *p)
 	if (sigismember(&p->blocked, sig))
 		return false;
 
-	if (p->flags & PF_EXITING)
+	if (p->jobctl & JOBCTL_WILL_EXIT)
 		return false;
 
 	if (sig == SIGKILL)
@@ -1363,10 +1364,9 @@ int force_sig_info(struct kernel_siginfo *info)
 
 void schedule_task_exit_locked(struct task_struct *task)
 {
-	task_clear_jobctl_pending(task, JOBCTL_PENDING_MASK);
-	/* Only bother with threads that might be alive */
-	if (!(task->flags & PF_POSTCOREDUMP)) {
-		sigaddset(&task->pending.signal, SIGKILL);
+	if (!(task->jobctl & JOBCTL_WILL_EXIT)) {
+		task_clear_jobctl_pending(task, JOBCTL_PENDING_MASK);
+		task->jobctl |= JOBCTL_WILL_EXIT;
 		signal_wake_up(task, 1);
 	}
 }
@@ -2695,9 +2695,8 @@ relock:
 		int exit_code;
 
 		/* Has this task already been marked for death? */
-		if (__fatal_signal_pending(current)) {
+		if (current->jobctl & JOBCTL_WILL_EXIT) {
 			ksig->info.si_signo = signr = SIGKILL;
-			sigdelset(&current->pending.signal, SIGKILL);
 			trace_signal_deliver(SIGKILL, SEND_SIG_NOINFO,
 				&sighand->action[SIGKILL - 1]);
 			recalc_sigpending();
@@ -2935,7 +2934,7 @@ static void retarget_shared_pending(struct task_struct *tsk, sigset_t *which)
 
 	t = tsk;
 	while_each_thread(tsk, t) {
-		if (t->flags & PF_EXITING)
+		if (t->jobctl & JOBCTL_WILL_EXIT)
 			continue;
 
 		if (!has_pending_signals(&retarget, &t->blocked))

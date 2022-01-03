@@ -907,7 +907,7 @@ do_group_exit(int exit_code)
 
 	if (sig->flags & SIGNAL_GROUP_EXIT)
 		exit_code = sig->group_exit_code;
-	else if (sig->group_exec_task)
+	else if (current->jobctl & JOBCTL_WILL_EXIT)
 		exit_code = 0;
 	else if (!thread_group_empty(current)) {
 		struct sighand_struct *const sighand = current->sighand;
@@ -916,7 +916,7 @@ do_group_exit(int exit_code)
 		if (sig->flags & SIGNAL_GROUP_EXIT)
 			/* Another thread got here before we took the lock.  */
 			exit_code = sig->group_exit_code;
-		else if (sig->group_exec_task)
+		else if (current->jobctl & JOBCTL_WILL_EXIT)
 			exit_code = 0;
 		else {
 			struct task_struct *t;
