@@ -4910,7 +4910,7 @@ void issue_auth(struct adapter *padapter, struct sta_info *psta, unsigned short 
 		if ((pmlmeinfo->auth_seq == 3) && (pmlmeinfo->state & WIFI_FW_AUTH_STATE) && (use_shared_key == 1)) {
 			pframe = rtw_set_ie(pframe, _CHLGETXT_IE_, 128, pmlmeinfo->chg_txt, &pattrib->pktlen);
 
-			SetPrivacy(fctrl);
+			set_privacy(fctrl);
 
 			pattrib->hdrlen = sizeof(struct rtw_ieee80211_hdr_3addr);
 

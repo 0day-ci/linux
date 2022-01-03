@@ -762,7 +762,7 @@ s32 rtw_make_wlanhdr(struct adapter *padapter, u8 *hdr, struct pkt_attrib *pattr
 			set_m_data(fctrl);
 
 		if (pattrib->encrypt)
-			SetPrivacy(fctrl);
+			set_privacy(fctrl);
 
 		if (qos_option) {
 			qc = (unsigned short *)(hdr + pattrib->hdrlen - 2);
