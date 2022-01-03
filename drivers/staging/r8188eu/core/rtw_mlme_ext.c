@@ -416,7 +416,7 @@ void mgt_dispatcher(struct adapter *padapter, struct recv_frame *precv_frame)
 	u8 *pframe = precv_frame->rx_data;
 	struct sta_info *psta = rtw_get_stainfo(&padapter->stapriv, GetAddr2Ptr(pframe));
 
-	if (GetFrameType(pframe) != WIFI_MGT_TYPE)
+	if (get_frame_type(pframe) != WIFI_MGT_TYPE)
 		return;
 
 	/* receive the frames that ra(a1) is my address or ra(a1) is bc address. */

@@ -972,7 +972,7 @@ static int aes_cipher(u8 *key, uint hdrlen, u8 *pframe, uint plen)
 	u8 aes_out[16];
 	u8 padded_buffer[16];
 	u8 mic[8];
-	uint	frtype  = GetFrameType(pframe);
+	uint	frtype  = get_frame_type(pframe);
 	uint	frsubtype  = GetFrameSubType(pframe);
 
 	frsubtype = frsubtype >> 4;
@@ -1166,7 +1166,7 @@ static int aes_decipher(struct adapter *padapter, u8 *key, uint hdrlen,
 	u8 mic[8];
 
 /*	uint	offset = 0; */
-	uint	frtype  = GetFrameType(pframe);
+	uint	frtype  = get_frame_type(pframe);
 	uint	frsubtype  = GetFrameSubType(pframe);
 
 	frsubtype = frsubtype >> 4;

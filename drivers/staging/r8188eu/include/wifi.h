@@ -204,7 +204,7 @@ enum WIFI_REG_DOMAIN {
 #define get_order(pbuf)					\
 	(((*(__le16 *)(pbuf)) & cpu_to_le16(_ORDER_)) != 0)
 
-#define GetFrameType(pbuf)				\
+#define get_frame_type(pbuf)				\
 	(le16_to_cpu(*(__le16 *)(pbuf)) & (BIT(3) | BIT(2)))
 
 #define SetFrameType(pbuf, type)	\
@@ -361,7 +361,7 @@ static inline unsigned char *get_hdr_bssid(unsigned char *pframe)
 
 static inline int IsFrameTypeCtrl(unsigned char *pframe)
 {
-	if (WIFI_CTRL_TYPE == GetFrameType(pframe))
+	if (WIFI_CTRL_TYPE == get_frame_type(pframe))
 		return true;
 	else
 		return false;
