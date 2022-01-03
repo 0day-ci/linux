@@ -1052,9 +1052,6 @@ static void complete_signal(int sig, struct task_struct *p, enum pid_type type)
 			 * running and doing things after a slower
 			 * thread has the fatal signal pending.
 			 */
-			signal->flags = SIGNAL_GROUP_EXIT;
-			signal->group_exit_code = sig;
-			signal->group_stop_count = 0;
 			t = p;
 			do {
 				schedule_task_exit_locked(t, sig);
@@ -1365,10 +1362,17 @@ int force_sig_info(struct kernel_siginfo *info)
 void schedule_task_exit_locked(struct task_struct *task, int exit_code)
 {
 	if (!(task->jobctl & JOBCTL_WILL_EXIT)) {
+		struct signal_struct *signal = task->signal;
 		task_clear_jobctl_pending(task, JOBCTL_PENDING_MASK);
 		task->jobctl |= JOBCTL_WILL_EXIT;
 		task->exit_code = exit_code;
 		signal_wake_up(task, 1);
+		signal->quick_threads--;
+		if (signal->quick_threads == 0) {
+			signal->flags = SIGNAL_GROUP_EXIT;
+			signal->group_exit_code = exit_code;
+			signal->group_stop_count = 0;
+		}
 	}
 }
 

@@ -925,14 +925,8 @@ do_group_exit(int exit_code)
 		else {
 			struct task_struct *t;
 
-			sig->group_exit_code = exit_code;
-			sig->flags = SIGNAL_GROUP_EXIT;
-			sig->group_stop_count = 0;
-			__for_each_thread(sig, t) {
-				if (t == current)
-					continue;
+			__for_each_thread(sig, t)
 				schedule_task_exit_locked(t, exit_code);
-			}
 		}
 		spin_unlock_irq(&sighand->siglock);
 	}
