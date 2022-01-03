@@ -347,8 +347,8 @@ void truncate_inode_pages_range(struct address_space *mapping,
 	pgoff_t		indices[PAGEVEC_SIZE];
 	pgoff_t		index;
 	int		i;
-	struct folio *	folio;
-	bool partial_end;
+	struct folio	*folio;
+	bool		same_folio;
 
 	if (mapping_empty(mapping))
 		goto out;
@@ -385,12 +385,10 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		cond_resched();
 	}
 
-	partial_end = ((lend + 1) % PAGE_SIZE) > 0;
+	same_folio = (lstart >> PAGE_SHIFT) == (lend >> PAGE_SHIFT);
 	folio = __filemap_get_folio(mapping, lstart >> PAGE_SHIFT, FGP_LOCK, 0);
 	if (folio) {
-		bool same_folio = lend < folio_pos(folio) + folio_size(folio);
-		if (same_folio)
-			partial_end = false;
+		same_folio = lend < folio_pos(folio) + folio_size(folio);
 		if (!truncate_inode_partial_folio(folio, lstart, lend)) {
 			start = folio->index + folio_nr_pages(folio);
 			if (same_folio)
@@ -401,8 +399,9 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		folio = NULL;
 	}
 
-	if (partial_end)
-		folio = __filemap_get_folio(mapping, end, FGP_LOCK, 0);
+	if (!same_folio)
+		folio = __filemap_get_folio(mapping, lend >> PAGE_SHIFT,
+						FGP_LOCK, 0);
 	if (folio) {
 		if (!truncate_inode_partial_folio(folio, lstart, lend))
 			end = folio->index;

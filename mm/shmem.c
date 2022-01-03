@@ -908,10 +908,10 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 	struct folio_batch fbatch;
 	pgoff_t indices[PAGEVEC_SIZE];
 	struct folio *folio;
+	bool same_folio;
 	long nr_swaps_freed = 0;
 	pgoff_t index;
 	int i;
-	bool partial_end;
 
 	if (lend == -1)
 		end = -1;	/* unsigned, so actually very big */
@@ -947,18 +947,14 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 		index++;
 	}
 
-	partial_end = ((lend + 1) % PAGE_SIZE) > 0;
+	same_folio = (lstart >> PAGE_SHIFT) == (lend >> PAGE_SHIFT);
 	shmem_get_folio(inode, lstart >> PAGE_SHIFT, &folio, SGP_READ);
 	if (folio) {
-		bool same_page;
-
-		same_page = lend < folio_pos(folio) + folio_size(folio);
-		if (same_page)
-			partial_end = false;
+		same_folio = lend < folio_pos(folio) + folio_size(folio);
 		folio_mark_dirty(folio);
 		if (!truncate_inode_partial_folio(folio, lstart, lend)) {
 			start = folio->index + folio_nr_pages(folio);
-			if (same_page)
+			if (same_folio)
 				end = folio->index;
 		}
 		folio_unlock(folio);
@@ -966,8 +962,8 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 		folio = NULL;
 	}
 
-	if (partial_end)
-		shmem_get_folio(inode, end, &folio, SGP_READ);
+	if (!same_folio)
+		shmem_get_folio(inode, lend >> PAGE_SHIFT, &folio, SGP_READ);
 	if (folio) {
 		folio_mark_dirty(folio);
 		if (!truncate_inode_partial_folio(folio, lstart, lend))
