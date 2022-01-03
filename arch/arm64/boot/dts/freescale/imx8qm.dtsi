@@ -163,6 +163,9 @@
 			compatible = "fsl,imx8qm-iomuxc";
 		};
 
+		rtc: rtc {
+			compatible = "fsl,imx8qxp-sc-rtc";
+		};
 	};
 
 	/* sorted in register address */
