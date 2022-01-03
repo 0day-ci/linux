@@ -61,8 +61,7 @@ static inline int ptrace_report_syscall(unsigned long message)
 	if (!(ptrace & PT_PTRACED))
 		return 0;
 
-	current->ptrace_message = message;
-	ptrace_notify(SIGTRAP | ((ptrace & PT_TRACESYSGOOD) ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((ptrace & PT_TRACESYSGOOD) ? 0x80 : 0), message);
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
@@ -74,7 +73,6 @@ static inline int ptrace_report_syscall(unsigned long message)
 		current->exit_code = 0;
 	}
 
-	current->ptrace_message = 0;
 	return fatal_signal_pending(current);
 }
 
@@ -143,7 +141,7 @@ static inline void tracehook_report_syscall_exit(struct pt_regs *regs, int step)
 static inline void tracehook_signal_handler(int stepping)
 {
 	if (stepping)
-		ptrace_notify(SIGTRAP);
+		ptrace_notify(SIGTRAP, 0);
 }
 
 /**
