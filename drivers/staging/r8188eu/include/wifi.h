@@ -181,7 +181,7 @@ enum WIFI_REG_DOMAIN {
 #define get_m_frag(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_MORE_FRAG_)) != 0)
 
 #define clear_m_frag(pbuf)	\
-	*(__le16 *)(pbuf) &= (~cpu_to_le16(_MORE_FRAG_))
+	(*(__le16 *)(pbuf) &= (~cpu_to_le16(_MORE_FRAG_)))
 
 #define SetRetry(pbuf)	\
 	*(__le16 *)(pbuf) |= cpu_to_le16(_RETRY_)
