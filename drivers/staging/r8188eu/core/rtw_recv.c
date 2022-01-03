@@ -1036,7 +1036,7 @@ static int validate_recv_data_frame(struct adapter *adapter,
 	/* parsing QC field */
 	if (pattrib->qos == 1) {
 		pattrib->priority = get_priority((ptr + 24));
-		pattrib->ack_policy = GetAckpolicy((ptr + 24));
+		pattrib->ack_policy = get_ack_policy((ptr + 24));
 		pattrib->amsdu = GetAMsdu((ptr + 24));
 		pattrib->hdrlen = pattrib->to_fr_ds == 3 ? 32 : 26;
 

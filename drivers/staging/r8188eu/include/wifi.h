@@ -244,7 +244,7 @@ enum WIFI_REG_DOMAIN {
 #define set_ack_policy(pbuf, ack)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16((ack & 3) << 5))
 
-#define GetAckpolicy(pbuf) (((le16_to_cpu(*(__le16 *)pbuf)) >> 5) & 0x3)
+#define get_ack_policy(pbuf) (((le16_to_cpu(*(__le16 *)pbuf)) >> 5) & 0x3)
 
 #define GetAMsdu(pbuf) (((le16_to_cpu(*(__le16 *)pbuf)) >> 7) & 0x1)
 
