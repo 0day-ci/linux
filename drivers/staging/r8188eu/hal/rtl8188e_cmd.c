@@ -309,7 +309,7 @@ static void ConstructPSPoll(struct adapter *adapt, u8 *pframe, u32 *pLength)
 	set_frame_subtype(pframe, WIFI_PSPOLL);
 
 	/*  AID. */
-	SetDuration(pframe, (pmlmeinfo->aid | 0xc000));
+	set_duration(pframe, (pmlmeinfo->aid | 0xc000));
 
 	/*  BSSID. */
 	memcpy(pwlanhdr->addr1, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);

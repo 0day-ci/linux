@@ -230,7 +230,7 @@ enum WIFI_REG_DOMAIN {
 			cpu_to_le16((unsigned short)(0xfff0 & (num << 4))); \
 	} while (0)
 
-#define SetDuration(pbuf, dur) \
+#define set_duration(pbuf, dur) \
 	*(__le16 *)((size_t)(pbuf) + 2) = cpu_to_le16(0xffff & (dur))
 
 #define SetPriority(pbuf, tid)	\
