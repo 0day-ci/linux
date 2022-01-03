@@ -1112,7 +1112,7 @@ static int validate_recv_frame(struct adapter *adapter, struct recv_frame *precv
 	pattrib->mfrag = get_m_frag(ptr);
 	pattrib->mdata = get_m_data(ptr);
 	pattrib->privacy = get_privacy(ptr);
-	pattrib->order = GetOrder(ptr);
+	pattrib->order = get_order(ptr);
 
 	/* Dump rx packets */
 	GetHalDefVar8188EUsb(adapter, HAL_DEF_DBG_DUMP_RXPKT, &bDumpRxPkt);
