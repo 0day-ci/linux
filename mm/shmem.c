@@ -727,9 +727,8 @@ static int shmem_add_to_page_cache(struct page *page,
 	do {
 		void *entry;
 		xas_lock_irq(&xas);
-		while ((entry = xas_find_conflict(&xas)) != NULL) {
-			if (entry == expected)
-				continue;
+		entry = xas_find_conflict(&xas);
+		if (entry != expected) {
 			xas_set_err(&xas, -EEXIST);
 			goto unlock;
 		}
