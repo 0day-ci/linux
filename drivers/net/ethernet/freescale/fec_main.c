@@ -2935,21 +2935,18 @@ static int fec_enet_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 	if (!netif_running(ndev))
 		return -EINVAL;
 
+	switch (cmd) {
+	case SIOCSHWTSTAMP:
+		return fep->bufdesc_ex ? fec_ptp_set(ndev, rq) :
+		-EOPNOTSUPP;
+
+	case SIOCGHWTSTAMP:
+		return fep->bufdesc_ex ? fec_ptp_get(ndev, rq) :
+		-EOPNOTSUPP;
+	}
+
 	if (!phydev)
 		return -ENODEV;
-
-	if (fep->bufdesc_ex) {
-		bool use_fec_hwts = !phy_has_hwtstamp(phydev);
-
-		if (cmd == SIOCSHWTSTAMP) {
-			if (use_fec_hwts)
-				return fec_ptp_set(ndev, rq);
-			fec_ptp_disable_hwts(ndev);
-		} else if (cmd == SIOCGHWTSTAMP) {
-			if (use_fec_hwts)
-				return fec_ptp_get(ndev, rq);
-		}
-	}
 
 	return phy_mii_ioctl(phydev, rq, cmd);
 }

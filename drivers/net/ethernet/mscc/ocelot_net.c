@@ -755,17 +755,18 @@ static int ocelot_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ocelot *ocelot = priv->port.ocelot;
 	int port = priv->chip_port;
 
-	/* If the attached PHY device isn't capable of timestamping operations,
-	 * use our own (when possible).
-	 */
-	if (!phy_has_hwtstamp(dev->phydev) && ocelot->ptp) {
-		switch (cmd) {
-		case SIOCSHWTSTAMP:
-			return ocelot_hwstamp_set(ocelot, port, ifr);
-		case SIOCGHWTSTAMP:
-			return ocelot_hwstamp_get(ocelot, port, ifr);
-		}
+	switch (cmd) {
+	case SIOCSHWTSTAMP:
+		return ocelot->ptp ? ocelot_hwstamp_set(ocelot, port, ifr) :
+		-EOPNOTSUPP;
+
+	case SIOCGHWTSTAMP:
+		return ocelot->ptp ? ocelot_hwstamp_get(ocelot, port, ifr) :
+		-EOPNOTSUPP;
 	}
+
+	if (!dev->phydev)
+		return -ENODEV;
 
 	return phy_mii_ioctl(dev->phydev, ifr, cmd);
 }
