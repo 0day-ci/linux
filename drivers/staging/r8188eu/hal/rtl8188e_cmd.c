@@ -345,7 +345,7 @@ static void ConstructNullFunctionData(struct adapter *adapt, u8 *pframe,
 
 	switch (cur_network->network.InfrastructureMode) {
 	case Ndis802_11Infrastructure:
-		SetToDs(fctrl);
+		set_to_ds(fctrl);
 		memcpy(pwlanhdr->addr1, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);
 		memcpy(pwlanhdr->addr2, myid(&adapt->eeprompriv), ETH_ALEN);
 		memcpy(pwlanhdr->addr3, StaAddr, ETH_ALEN);

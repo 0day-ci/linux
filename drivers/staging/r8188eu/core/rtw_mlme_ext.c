@@ -5409,7 +5409,7 @@ static int _issue_nulldata(struct adapter *padapter, unsigned char *da, unsigned
 	if ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE)
 		SetFrDs(fctrl);
 	else if ((pmlmeinfo->state & 0x03) == WIFI_FW_STATION_STATE)
-		SetToDs(fctrl);
+		set_to_ds(fctrl);
 
 	if (power_mode)
 		SetPwrMgt(fctrl);
@@ -5524,7 +5524,7 @@ static int _issue_qos_nulldata(struct adapter *padapter, unsigned char *da, u16 
 	if ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE)
 		SetFrDs(fctrl);
 	else if ((pmlmeinfo->state & 0x03) == WIFI_FW_STATION_STATE)
-		SetToDs(fctrl);
+		set_to_ds(fctrl);
 
 	qc = (unsigned short *)(pframe + pattrib->hdrlen - 2);
 

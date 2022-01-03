@@ -163,7 +163,7 @@ enum WIFI_REG_DOMAIN {
 #define _PRIVACY_	BIT(14)
 #define _ORDER_		BIT(15)
 
-#define SetToDs(pbuf)	\
+#define set_to_ds(pbuf)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16(_TO_DS_))
 
 #define GetToDs(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_TO_DS_)) != 0)
