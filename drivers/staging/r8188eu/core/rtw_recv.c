@@ -632,7 +632,7 @@ int sta2sta_data_frame(struct adapter *adapter, struct recv_frame *precv_frame, 
 		}
 	} else if (check_fwstate(pmlmepriv, WIFI_MP_STATE)) {
 		memcpy(pattrib->dst, get_addr_1_ptr(ptr), ETH_ALEN);
-		memcpy(pattrib->src, GetAddr2Ptr(ptr), ETH_ALEN);
+		memcpy(pattrib->src, get_addr_2_ptr(ptr), ETH_ALEN);
 		memcpy(pattrib->bssid, GetAddr3Ptr(ptr), ETH_ALEN);
 		memcpy(pattrib->ra, pattrib->dst, ETH_ALEN);
 		memcpy(pattrib->ta, pattrib->src, ETH_ALEN);
@@ -719,7 +719,7 @@ static int ap2sta_data_frame(
 	} else if (check_fwstate(pmlmepriv, WIFI_MP_STATE) &&
 		   check_fwstate(pmlmepriv, _FW_LINKED)) {
 		memcpy(pattrib->dst, get_addr_1_ptr(ptr), ETH_ALEN);
-		memcpy(pattrib->src, GetAddr2Ptr(ptr), ETH_ALEN);
+		memcpy(pattrib->src, get_addr_2_ptr(ptr), ETH_ALEN);
 		memcpy(pattrib->bssid, GetAddr3Ptr(ptr), ETH_ALEN);
 		memcpy(pattrib->ra, pattrib->dst, ETH_ALEN);
 		memcpy(pattrib->ta, pattrib->src, ETH_ALEN);
@@ -833,7 +833,7 @@ static int validate_recv_ctrl_frame(struct adapter *padapter,
 		struct sta_info *psta = NULL;
 
 		aid = get_aid(pframe);
-		psta = rtw_get_stainfo(pstapriv, GetAddr2Ptr(pframe));
+		psta = rtw_get_stainfo(pstapriv, get_addr_2_ptr(pframe));
 
 		if (!psta || psta->aid != aid)
 			return _FAIL;
@@ -941,7 +941,7 @@ static int validate_recv_mgnt_frame(struct adapter *padapter,
 		return _SUCCESS;
 
 	/* for rx pkt statistics */
-	psta = rtw_get_stainfo(&padapter->stapriv, GetAddr2Ptr(precv_frame->rx_data));
+	psta = rtw_get_stainfo(&padapter->stapriv, get_addr_2_ptr(precv_frame->rx_data));
 	if (psta) {
 		psta->sta_stats.rx_mgnt_pkts++;
 		if (get_frame_subtype(precv_frame->rx_data) == WIFI_BEACON) {
@@ -1008,7 +1008,7 @@ static int validate_recv_data_frame(struct adapter *adapter,
 		break;
 	case 3:
 		memcpy(pattrib->ra, get_addr_1_ptr(ptr), ETH_ALEN);
-		memcpy(pattrib->ta, GetAddr2Ptr(ptr), ETH_ALEN);
+		memcpy(pattrib->ta, get_addr_2_ptr(ptr), ETH_ALEN);
 		ret = _FAIL;
 		break;
 	default:

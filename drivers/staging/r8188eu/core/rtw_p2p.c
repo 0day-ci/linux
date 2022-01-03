@@ -963,7 +963,7 @@ u32 process_p2p_devdisc_req(struct wifidirect_info *pwdinfo, u8 *pframe, uint le
 	}
 
 	/* issue Device Discoverability Response */
-	issue_p2p_devdisc_resp(pwdinfo, GetAddr2Ptr(pframe), status, dialogToken);
+	issue_p2p_devdisc_resp(pwdinfo, get_addr_2_ptr(pframe), status, dialogToken);
 
 	return (status == P2P_STATUS_SUCCESS) ? true : false;
 }
@@ -1001,7 +1001,7 @@ u8 process_p2p_provdisc_req(struct wifidirect_info *pwdinfo,  u8 *pframe, uint l
 				memcpy(pwdinfo->rx_prov_disc_info.strconfig_method_desc_of_prov_disc_req, "pad", 3);
 				break;
 			}
-			issue_p2p_provision_resp(pwdinfo, GetAddr2Ptr(pframe), frame_body, uconfig_method);
+			issue_p2p_provision_resp(pwdinfo, get_addr_2_ptr(pframe), frame_body, uconfig_method);
 		}
 	}
 	DBG_88E("[%s] config method = %s\n", __func__, pwdinfo->rx_prov_disc_info.strconfig_method_desc_of_prov_disc_req);
@@ -1439,7 +1439,7 @@ u8 process_p2p_presence_req(struct wifidirect_info *pwdinfo, u8 *pframe, uint le
 
 	/* todo: check NoA attribute */
 
-	issue_p2p_presence_resp(pwdinfo, GetAddr2Ptr(pframe), status, dialogToken);
+	issue_p2p_presence_resp(pwdinfo, get_addr_2_ptr(pframe), status, dialogToken);
 
 	return true;
 }
