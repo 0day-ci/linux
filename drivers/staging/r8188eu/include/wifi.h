@@ -171,9 +171,9 @@ enum WIFI_REG_DOMAIN {
 #define set_fr_ds(pbuf)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16(_FROM_DS_))
 
-#define GetFrDs(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_FROM_DS_)) != 0)
+#define get_fr_ds(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_FROM_DS_)) != 0)
 
-#define get_tofr_ds(pframe)	((get_to_ds(pframe) << 1) | GetFrDs(pframe))
+#define get_tofr_ds(pframe)	((get_to_ds(pframe) << 1) | get_fr_ds(pframe))
 
 #define set_m_frag(pbuf)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16(_MORE_FRAG_))
@@ -286,7 +286,7 @@ enum WIFI_REG_DOMAIN {
 #define GetAid(pbuf)	(le16_to_cpu(*(__le16 *)((size_t)(pbuf) + 2)) & 0x3fff)
 
 #define GetTid(pbuf)	(le16_to_cpu(*(__le16 *)((size_t)(pbuf) +	\
-			(((get_to_ds(pbuf)<<1) | GetFrDs(pbuf)) == 3 ?	\
+			(((get_to_ds(pbuf)<<1) | get_fr_ds(pbuf)) == 3 ?	\
 			30 : 24))) & 0x000f)
 
 #define GetAddr1Ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 4))
@@ -308,7 +308,7 @@ static inline int IS_MCAST(unsigned char *da)
 static inline unsigned char *get_da(unsigned char *pframe)
 {
 	unsigned char	*da;
-	unsigned int to_fr_ds = (get_to_ds(pframe) << 1) | GetFrDs(pframe);
+	unsigned int to_fr_ds = (get_to_ds(pframe) << 1) | get_fr_ds(pframe);
 
 	switch (to_fr_ds) {
 	case 0x00:	/*  ToDs=0, FromDs=0 */
@@ -330,7 +330,7 @@ static inline unsigned char *get_da(unsigned char *pframe)
 static inline unsigned char *get_sa(unsigned char *pframe)
 {
 	unsigned char	*sa;
-	unsigned int	to_fr_ds = (get_to_ds(pframe) << 1) | GetFrDs(pframe);
+	unsigned int	to_fr_ds = (get_to_ds(pframe) << 1) | get_fr_ds(pframe);
 
 	switch (to_fr_ds) {
 	case 0x00:	/*  ToDs=0, FromDs=0 */
@@ -352,7 +352,7 @@ static inline unsigned char *get_sa(unsigned char *pframe)
 static inline unsigned char *get_hdr_bssid(unsigned char *pframe)
 {
 	unsigned char	*sa;
-	unsigned int	to_fr_ds = (get_to_ds(pframe) << 1) | GetFrDs(pframe);
+	unsigned int	to_fr_ds = (get_to_ds(pframe) << 1) | get_fr_ds(pframe);
 
 	switch (to_fr_ds) {
 	case 0x00:	/*  ToDs=0, FromDs=0 */
