@@ -1063,7 +1063,7 @@ static int de_thread(struct task_struct *tsk)
 		if (t == tsk)
 			continue;
 		sig->notify_count++;
-		schedule_task_exit_locked(t);
+		schedule_task_exit_locked(t, 0);
 	}
 
 	while (sig->notify_count) {

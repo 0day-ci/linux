@@ -735,6 +735,11 @@ void __noreturn do_exit(long code)
 	struct task_struct *tsk = current;
 	int group_dead;
 
+	spin_lock_irq(&tsk->sighand->siglock);
+	schedule_task_exit_locked(tsk, code);
+	code = tsk->exit_code;
+	spin_unlock_irq(&tsk->sighand->siglock);
+
 	WARN_ON(blk_needs_flush_plug(tsk));
 
 	kcov_task_exit(tsk);
@@ -773,7 +778,6 @@ void __noreturn do_exit(long code)
 		tty_audit_exit();
 	audit_free(tsk);
 
-	tsk->exit_code = code;
 	taskstats_exit(tsk, group_dead);
 
 	exit_mm();
@@ -908,7 +912,7 @@ do_group_exit(int exit_code)
 	if (sig->flags & SIGNAL_GROUP_EXIT)
 		exit_code = sig->group_exit_code;
 	else if (current->jobctl & JOBCTL_WILL_EXIT)
-		exit_code = 0;
+		exit_code = current->exit_code;
 	else if (!thread_group_empty(current)) {
 		struct sighand_struct *const sighand = current->sighand;
 
@@ -917,7 +921,7 @@ do_group_exit(int exit_code)
 			/* Another thread got here before we took the lock.  */
 			exit_code = sig->group_exit_code;
 		else if (current->jobctl & JOBCTL_WILL_EXIT)
-			exit_code = 0;
+			exit_code = current->exit_code;
 		else {
 			struct task_struct *t;
 
@@ -927,7 +931,7 @@ do_group_exit(int exit_code)
 			__for_each_thread(sig, t) {
 				if (t == current)
 					continue;
-				schedule_task_exit_locked(t);
+				schedule_task_exit_locked(t, exit_code);
 			}
 		}
 		spin_unlock_irq(&sighand->siglock);
