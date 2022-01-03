@@ -1395,7 +1395,8 @@ static enum drm_mode_status tda998x_bridge_mode_valid(struct drm_bridge *bridge,
 	return MODE_OK;
 }
 
-static void tda998x_bridge_enable(struct drm_bridge *bridge)
+static void tda998x_bridge_atomic_enable(struct drm_bridge *bridge,
+					  struct drm_bridge_state *old_bridge_state)
 {
 	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
 
@@ -1413,7 +1414,8 @@ static void tda998x_bridge_enable(struct drm_bridge *bridge)
 	}
 }
 
-static void tda998x_bridge_disable(struct drm_bridge *bridge)
+static void tda998x_bridge_atomic_disable(struct drm_bridge *bridge,
+					   struct drm_bridge_state *old_bridge_state)
 {
 	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
 
@@ -1680,9 +1682,12 @@ static const struct drm_bridge_funcs tda998x_bridge_funcs = {
 	.attach = tda998x_bridge_attach,
 	.detach = tda998x_bridge_detach,
 	.mode_valid = tda998x_bridge_mode_valid,
-	.disable = tda998x_bridge_disable,
+	.atomic_disable = tda998x_bridge_atomic_disable,
 	.mode_set = tda998x_bridge_mode_set,
-	.enable = tda998x_bridge_enable,
+	.atomic_enable = tda998x_bridge_atomic_enable,
+	.atomic_duplicate_state = drm_atomic_helper_bridge_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_bridge_destroy_state,
+	.atomic_reset = drm_atomic_helper_bridge_reset,
 };
 
 /* I2C driver functions */
