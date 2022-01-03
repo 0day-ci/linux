@@ -298,8 +298,7 @@ static long pps_cdev_compat_ioctl(struct file *file,
 
 static int pps_cdev_open(struct inode *inode, struct file *file)
 {
-	struct pps_device *pps = container_of(inode->i_cdev,
-						struct pps_device, cdev);
+	struct pps_device *pps = inode->i_cdev->private;
 	file->private_data = pps;
 	kobject_get(&pps->dev->kobj);
 	return 0;
@@ -307,8 +306,7 @@ static int pps_cdev_open(struct inode *inode, struct file *file)
 
 static int pps_cdev_release(struct inode *inode, struct file *file)
 {
-	struct pps_device *pps = container_of(inode->i_cdev,
-						struct pps_device, cdev);
+	struct pps_device *pps = inode->i_cdev->private;
 	kobject_put(&pps->dev->kobj);
 	return 0;
 }
@@ -332,7 +330,7 @@ static void pps_device_destruct(struct device *dev)
 {
 	struct pps_device *pps = dev_get_drvdata(dev);
 
-	cdev_del(&pps->cdev);
+	cdev_del(pps->cdev);
 
 	/* Now we can release the ID for re-use */
 	pr_debug("deallocating pps%d\n", pps->id);
@@ -368,10 +366,14 @@ int pps_register_cdev(struct pps_device *pps)
 
 	devt = MKDEV(MAJOR(pps_devt), pps->id);
 
-	cdev_init(&pps->cdev, &pps_cdev_fops);
-	pps->cdev.owner = pps->info.owner;
+	pps->cdev = cdev_alloc();
+	if (!pps->cdev)
+		goto free_idr;
+	pps->cdev->owner = pps->info.owner;
+	pps->cdev->ops = &pps_cdev_fops;
+	pps->cdev->private = pps;
 
-	err = cdev_add(&pps->cdev, devt, 1);
+	err = cdev_add(pps->cdev, devt, 1);
 	if (err) {
 		pr_err("%s: failed to add char device %d:%d\n",
 				pps->info.name, MAJOR(pps_devt), pps->id);
@@ -393,7 +395,7 @@ int pps_register_cdev(struct pps_device *pps)
 	return 0;
 
 del_cdev:
-	cdev_del(&pps->cdev);
+	cdev_del(pps->cdev);
 
 free_idr:
 	mutex_lock(&pps_idr_lock);
