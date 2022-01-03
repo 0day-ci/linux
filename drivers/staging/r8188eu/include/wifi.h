@@ -193,7 +193,7 @@ enum WIFI_REG_DOMAIN {
 #define set_m_data(pbuf)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16(_MORE_DATA_))
 
-#define GetMData(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_MORE_DATA_)) != 0)
+#define get_m_data(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_MORE_DATA_)) != 0)
 
 #define ClearMData(pbuf)	\
 	*(__le16 *)(pbuf) &= (~cpu_to_le16(_MORE_DATA_))
