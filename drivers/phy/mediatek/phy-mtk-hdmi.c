@@ -6,15 +6,6 @@
 
 #include "phy-mtk-hdmi.h"
 
-static int mtk_hdmi_phy_power_on(struct phy *phy);
-static int mtk_hdmi_phy_power_off(struct phy *phy);
-
-static const struct phy_ops mtk_hdmi_phy_dev_ops = {
-	.power_on = mtk_hdmi_phy_power_on,
-	.power_off = mtk_hdmi_phy_power_off,
-	.owner = THIS_MODULE,
-};
-
 inline struct mtk_hdmi_phy *to_mtk_hdmi_phy(struct clk_hw *hw)
 {
 	return container_of(hw, struct mtk_hdmi_phy, pll_hw);
@@ -42,6 +33,12 @@ static int mtk_hdmi_phy_power_off(struct phy *phy)
 
 	return 0;
 }
+
+static const struct phy_ops mtk_hdmi_phy_dev_ops = {
+	.power_on = mtk_hdmi_phy_power_on,
+	.power_off = mtk_hdmi_phy_power_off,
+	.owner = THIS_MODULE,
+};
 
 static const struct phy_ops *
 mtk_hdmi_phy_dev_get_ops(const struct mtk_hdmi_phy *hdmi_phy)
