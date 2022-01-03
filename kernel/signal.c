@@ -1371,23 +1371,6 @@ void schedule_task_exit_locked(struct task_struct *task)
 	}
 }
 
-/*
- * Nuke all other threads in the group.
- */
-int zap_other_threads(struct task_struct *p)
-{
-	struct task_struct *t = p;
-	int count = 0;
-
-	p->signal->group_stop_count = 0;
-
-	while_each_thread(p, t) {
-		count++;
-		schedule_task_exit_locked(t);
-	}
-	return count;
-}
-
 struct sighand_struct *__lock_task_sighand(struct task_struct *tsk,
 					   unsigned long *flags)
 {

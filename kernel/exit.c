@@ -919,9 +919,16 @@ do_group_exit(int exit_code)
 		else if (sig->group_exec_task)
 			exit_code = 0;
 		else {
+			struct task_struct *t;
+
 			sig->group_exit_code = exit_code;
 			sig->flags = SIGNAL_GROUP_EXIT;
-			zap_other_threads(current);
+			sig->group_stop_count = 0;
+			__for_each_thread(sig, t) {
+				if (t == current)
+					continue;
+				schedule_task_exit_locked(t);
+			}
 		}
 		spin_unlock_irq(&sighand->siglock);
 	}
