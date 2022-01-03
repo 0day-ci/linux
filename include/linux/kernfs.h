@@ -166,6 +166,7 @@ struct kernfs_node {
 	struct kernfs_iattrs	*iattr;
 	spinlock_t kernfs_open_node_lock;
 	struct mutex kernfs_open_file_mutex;
+	struct rw_semaphore	kernfs_iop_rwsem;
 };
 
 /*

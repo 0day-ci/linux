@@ -750,11 +750,13 @@ int kernfs_add_one(struct kernfs_node *kn)
 		goto out_unlock;
 
 	/* Update timestamps on the parent */
+	down_write(&parent->kernfs_iop_rwsem);
 	ps_iattr = parent->iattr;
 	if (ps_iattr) {
 		ktime_get_real_ts64(&ps_iattr->ia_ctime);
 		ps_iattr->ia_mtime = ps_iattr->ia_ctime;
 	}
+	up_write(&parent->kernfs_iop_rwsem);
 
 	up_write(&root->kernfs_rwsem);
 
@@ -1380,8 +1382,10 @@ static void __kernfs_remove(struct kernfs_node *kn)
 
 			/* update timestamps on the parent */
 			if (ps_iattr) {
+				down_write(&pos->parent->kernfs_iop_rwsem);
 				ktime_get_real_ts64(&ps_iattr->ia_ctime);
 				ps_iattr->ia_mtime = ps_iattr->ia_ctime;
+				up_write(&pos->parent->kernfs_iop_rwsem);
 			}
 
 			kernfs_put(pos);
