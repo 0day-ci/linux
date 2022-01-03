@@ -649,7 +649,9 @@ static long blkdev_fallocate(struct file *file, int mode, loff_t start,
 	if ((start | len) & (bdev_logical_block_size(bdev) - 1))
 		return -EINVAL;
 
-	filemap_invalidate_lock(inode->i_mapping);
+	/* fallocate() might take minutes with lock held. */
+	if (filemap_invalidate_lock_killable(inode->i_mapping))
+		return -EINTR;
 
 	/* Invalidate the page cache, including dirty pages. */
 	error = truncate_bdev_range(bdev, file->f_mode, start, end);
