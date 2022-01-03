@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd.
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/i2c/i2c-sunplus.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sunplus I2C controller
+
+allOf:
+  - $ref: /schemas/i2c/i2c-controller.yaml#
+
+maintainers:
+  - Li-hao Kuo <lhjeff911@gmail.com>
+
+properties:
+  compatible:
+    enum:
+      - sunplus,sp7021-i2cm
+      - sunplus,q645-i2cm
+
+  reg:
+    items:
+      - description: I2C registers
+      - description: I2C DMA registers
+      - description: I2C DMA power registers
+
+  reg-names:
+    items:
+      - const: i2cm
+      - const: i2cmdma
+      - const: i2cdmapower
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+  resets:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - interrupts
+  - clocks
+  - resets
+  - pinctrl-names
+  - pinctrl-0
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/sp-sp7021.h>
+    #include <dt-bindings/reset/sp-sp7021.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+    i2c@9C004600 {
+        compatible = "sunplus,sp7021-i2cm";
+			reg = <0x9c004600 0x80>, <0x9c004680 0x80>, <0x9c000000 0x80>;
+			reg-names = "i2cm", "i2cmdma", "i2cdmapower";
+        interrupt-parent = <&intc>;
+        interrupts = <174 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc I2CM0>;
+        resets = <&rstc RST_I2CM0>;
+        clock-frequency = <100000>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&i2cm0_pins>;
+    };
+...
