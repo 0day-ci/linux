@@ -759,7 +759,7 @@ s32 rtw_make_wlanhdr(struct adapter *padapter, u8 *hdr, struct pkt_attrib *pattr
 		}
 
 		if (pattrib->mdata)
-			SetMData(fctrl);
+			set_m_data(fctrl);
 
 		if (pattrib->encrypt)
 			SetPrivacy(fctrl);
