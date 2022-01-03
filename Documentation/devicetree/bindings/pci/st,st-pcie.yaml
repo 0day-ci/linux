@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/pci/st,st-pcie.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: PCIe RC controller on ST STi platform
+
+maintainers:
+  - Alain Volmat <avolmat@me.com>
+
+allOf:
+  - $ref: /schemas/pci/snps,dw-pcie.yaml#
+
+properties:
+  compatible:
+    const: st,stih407-pcie
+
+  reg:
+    items:
+      - description: Controller control and status registers.
+      - description: PCIe configuration registers.
+      - description: Memory made available to the controller
+
+  reg-names:
+    items:
+      - const: dbi
+      - const: config
+      - const: mem-window
+
+  interrupts:
+    maxItems: 1
+
+  resets:
+    items:
+    - description: Controller reset
+    - description: Powerdown reset (optional)
+    minItems: 1
+
+  reset-names:
+    items:
+      - const: softreset
+      - const: powerdown
+    minItems: 1
+
+  phys:
+    maxItems: 1
+
+  phy-names:
+    const: pcie
+
+  reset-gpios: true
+
+  st,syscfg:
+    $ref: "/schemas/types.yaml#/definitions/phandle-array"
+    description: syscfg node phandle and offsets of the 2 registers
+                 controlling root complex and ltssm.
+
+required:
+  - interrupts
+  - '#interrupt-cells'
+  - interrupt-map
+  - interrupt-map-mask
+  - resets
+  - reset-names
+  - phys
+  - phy-names
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/phy/phy.h>
+    #include <dt-bindings/reset/stih407-resets.h>
+    pcie1: pcie@9b10000 {
+      compatible = "st,stih407-pcie";
+      device_type = "pci";
+      #address-cells = <3>;
+      #size-cells = <2>;
+      reg = <0x09b10000 0x1000>,
+            <0x3fff0000 0x10000>,
+            <0x40000000 0xc0000000>;
+      reg-names = "dbi", "config", "mem-window";
+
+      #interrupt-cells = <1>;
+      interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+      interrupt-names = "msi";
+      interrupt-map-mask = <0 0 0 7>;
+      interrupt-map = <0 0 0 1 &intc GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>,
+                      <0 0 0 2 &intc GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>,
+                      <0 0 0 3 &intc GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>,
+                      <0 0 0 4 &intc GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+
+      st,syscfg = <&syscfg_core 0xdc 0xe4>;
+
+      ranges = <0x82000000 0 0x30000000 0x30000000 0 0x05550000>, /* non-prefetchable memory */
+               <0xc2000000 0 0x35550000 0x35550000 0 0x0AAA0000>; /* prefetchable memory */
+      bus-range = <0x00 0xff>;
+
+      resets = <&softreset STIH407_PCIE1_SOFTRESET>,
+               <&powerdown STIH407_PCIE1_POWERDOWN>;
+
+      reset-names = "softreset", "powerdown";
+
+      phys = <&phy_port1 PHY_TYPE_PCIE>;
+      phy-names = "pcie";
+
+      reset-gpios = <&pio34 5 GPIO_ACTIVE_LOW>;
+    };
