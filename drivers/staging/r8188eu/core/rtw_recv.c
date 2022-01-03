@@ -474,7 +474,7 @@ void process_pwrbit_data(struct adapter *padapter, struct recv_frame *precv_fram
 
 	psta = rtw_get_stainfo(pstapriv, pattrib->src);
 
-	pwrbit = GetPwrMgt(ptr);
+	pwrbit = get_pwr_mgt(ptr);
 
 	if (psta) {
 		if (pwrbit) {
@@ -1108,7 +1108,7 @@ static int validate_recv_frame(struct adapter *adapter, struct recv_frame *precv
 	pattrib->frag_num = GetFragNum(ptr);
 	pattrib->seq_num = GetSequence(ptr);
 
-	pattrib->pw_save = GetPwrMgt(ptr);
+	pattrib->pw_save = get_pwr_mgt(ptr);
 	pattrib->mfrag = get_m_frag(ptr);
 	pattrib->mdata = GetMData(ptr);
 	pattrib->privacy = GetPrivacy(ptr);

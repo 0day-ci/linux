@@ -188,7 +188,7 @@ enum WIFI_REG_DOMAIN {
 #define set_pwr_mgt(pbuf)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16(_PWRMGT_))
 
-#define GetPwrMgt(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_PWRMGT_)) != 0)
+#define get_pwr_mgt(pbuf)	(((*(__le16 *)(pbuf)) & cpu_to_le16(_PWRMGT_)) != 0)
 
 #define ClearPwrMgt(pbuf)	\
 	*(__le16 *)(pbuf) &= (~cpu_to_le16(_PWRMGT_))
