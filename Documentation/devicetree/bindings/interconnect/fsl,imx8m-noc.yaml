@@ -47,6 +47,11 @@ properties:
   operating-points-v2: true
   opp-table: true
 
+  fsl,icc-id:
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    description:
+      unique ID used for linking i.MX bus or ddrc node to inteconnect
+
   fsl,ddrc:
     $ref: "/schemas/types.yaml#/definitions/phandle"
     description:
