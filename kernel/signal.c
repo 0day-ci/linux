@@ -1056,9 +1056,7 @@ static void complete_signal(int sig, struct task_struct *p, enum pid_type type)
 			signal->group_stop_count = 0;
 			t = p;
 			do {
-				task_clear_jobctl_pending(t, JOBCTL_PENDING_MASK);
-				sigaddset(&t->pending.signal, SIGKILL);
-				signal_wake_up(t, 1);
+				schedule_task_exit_locked(t);
 			} while_each_thread(p, t);
 			return;
 		}
@@ -1363,6 +1361,16 @@ int force_sig_info(struct kernel_siginfo *info)
 	return force_sig_info_to_task(info, current, HANDLER_CURRENT);
 }
 
+void schedule_task_exit_locked(struct task_struct *task)
+{
+	task_clear_jobctl_pending(task, JOBCTL_PENDING_MASK);
+	/* Only bother with threads that might be alive */
+	if (!(task->flags & PF_POSTCOREDUMP)) {
+		sigaddset(&task->pending.signal, SIGKILL);
+		signal_wake_up(task, 1);
+	}
+}
+
 /*
  * Nuke all other threads in the group.
  */
@@ -1374,16 +1382,9 @@ int zap_other_threads(struct task_struct *p)
 	p->signal->group_stop_count = 0;
 
 	while_each_thread(p, t) {
-		task_clear_jobctl_pending(t, JOBCTL_PENDING_MASK);
 		count++;
-
-		/* Don't bother with already dead threads */
-		if (t->exit_state)
-			continue;
-		sigaddset(&t->pending.signal, SIGKILL);
-		signal_wake_up(t, 1);
+		schedule_task_exit_locked(t);
 	}
-
 	return count;
 }
 
@@ -2706,12 +2707,12 @@ relock:
 
 	for (;;) {
 		struct k_sigaction *ka;
+		bool group_exit = true;
 		enum pid_type type;
 		int exit_code;
 
 		/* Has this task already been marked for death? */
-		if ((signal->flags & SIGNAL_GROUP_EXIT) ||
-		     signal->group_exec_task) {
+		if (__fatal_signal_pending(current)) {
 			ksig->info.si_signo = signr = SIGKILL;
 			sigdelset(&current->pending.signal, SIGKILL);
 			trace_signal_deliver(SIGKILL, SEND_SIG_NOINFO,
@@ -2719,8 +2720,10 @@ relock:
 			recalc_sigpending();
 			if (signal->flags & SIGNAL_GROUP_EXIT)
 				exit_code = signal->group_exit_code;
-			else
+			else {
 				exit_code = 0;
+				group_exit = false;
+			}
 			goto fatal;
 		}
 
@@ -2880,7 +2883,10 @@ relock:
 		/*
 		 * Death signals, no core dump.
 		 */
-		do_group_exit(exit_code);
+		if (group_exit)
+			do_group_exit(exit_code);
+		else
+			do_exit(exit_code);
 		/* NOTREACHED */
 	}
 	spin_unlock_irq(&sighand->siglock);
