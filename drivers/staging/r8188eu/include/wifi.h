@@ -198,7 +198,7 @@ enum WIFI_REG_DOMAIN {
 #define set_privacy(pbuf)	\
 	(*(__le16 *)(pbuf) |= cpu_to_le16(_PRIVACY_))
 
-#define GetPrivacy(pbuf)					\
+#define get_privacy(pbuf)					\
 	(((*(__le16 *)(pbuf)) & cpu_to_le16(_PRIVACY_)) != 0)
 
 #define ClearPrivacy(pbuf)	\

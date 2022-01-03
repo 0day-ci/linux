@@ -886,7 +886,7 @@ unsigned int OnAuthClient(struct adapter *padapter, struct recv_frame *precv_fra
 	if (!(pmlmeinfo->state & WIFI_FW_AUTH_STATE))
 		return _SUCCESS;
 
-	offset = (GetPrivacy(pframe)) ? 4 : 0;
+	offset = (get_privacy(pframe)) ? 4 : 0;
 
 	seq	= le16_to_cpu(*(__le16 *)((size_t)pframe + WLAN_HDR_A3_LEN + offset + 2));
 	status	= le16_to_cpu(*(__le16 *)((size_t)pframe + WLAN_HDR_A3_LEN + offset + 4));
