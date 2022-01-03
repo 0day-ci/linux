@@ -130,6 +130,11 @@
 	status = "okay";
 };
 
+&pcie1 {
+	reset-gpios = <&pio34 5 GPIO_ACTIVE_LOW>;
+	status = "okay";
+};
+
 &pwm1 {
 	status = "okay";
 };
