@@ -1037,7 +1037,7 @@ static int validate_recv_data_frame(struct adapter *adapter,
 	if (pattrib->qos == 1) {
 		pattrib->priority = get_priority((ptr + 24));
 		pattrib->ack_policy = get_ack_policy((ptr + 24));
-		pattrib->amsdu = GetAMsdu((ptr + 24));
+		pattrib->amsdu = get_a_msdu((ptr + 24));
 		pattrib->hdrlen = pattrib->to_fr_ds == 3 ? 32 : 26;
 
 		if (pattrib->priority != 0 && pattrib->priority != 3)
