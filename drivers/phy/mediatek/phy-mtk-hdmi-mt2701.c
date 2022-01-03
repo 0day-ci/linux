@@ -4,6 +4,11 @@
  * Author: Chunhui Dai <chunhui.dai@mediatek.com>
  */
 
+#include <linux/clk-provider.h>
+#include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/module.h>
+#include <linux/regmap.h>
 #include "phy-mtk-hdmi.h"
 
 #define HDMI_CON0	0x00
