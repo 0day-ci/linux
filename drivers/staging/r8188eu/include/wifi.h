@@ -254,7 +254,7 @@ enum WIFI_REG_DOMAIN {
 
 #define get_addr_2_ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 10))
 
-#define GetAddr3Ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 16))
+#define get_addr_3_ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 16))
 
 #define GetAddr4Ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 24))
 
@@ -279,10 +279,10 @@ static inline unsigned char *get_da(unsigned char *pframe)
 		da = get_addr_1_ptr(pframe);
 		break;
 	case 0x02:	/*  ToDs=1, FromDs=0 */
-		da = GetAddr3Ptr(pframe);
+		da = get_addr_3_ptr(pframe);
 		break;
 	default:	/*  ToDs=1, FromDs=1 */
-		da = GetAddr3Ptr(pframe);
+		da = get_addr_3_ptr(pframe);
 		break;
 	}
 	return da;
@@ -298,7 +298,7 @@ static inline unsigned char *get_sa(unsigned char *pframe)
 		sa = get_addr_2_ptr(pframe);
 		break;
 	case 0x01:	/*  ToDs=0, FromDs=1 */
-		sa = GetAddr3Ptr(pframe);
+		sa = get_addr_3_ptr(pframe);
 		break;
 	case 0x02:	/*  ToDs=1, FromDs=0 */
 		sa = get_addr_2_ptr(pframe);
@@ -317,7 +317,7 @@ static inline unsigned char *get_hdr_bssid(unsigned char *pframe)
 
 	switch (to_fr_ds) {
 	case 0x00:	/*  ToDs=0, FromDs=0 */
-		sa = GetAddr3Ptr(pframe);
+		sa = get_addr_3_ptr(pframe);
 		break;
 	case 0x01:	/*  ToDs=0, FromDs=1 */
 		sa = get_addr_2_ptr(pframe);
