@@ -991,7 +991,7 @@ s32 rtw_xmitframe_coalesce(struct adapter *padapter, struct sk_buff *pkt, struct
 			pattrib->last_txcmdsz = pattrib->hdrlen + pattrib->iv_len + ((pattrib->nr_frags == 1) ? llc_sz : 0) +
 						((pattrib->bswenc) ? pattrib->icv_len : 0) + mem_sz;
 
-			ClearMFrag(mem_start);
+			clear_m_frag(mem_start);
 
 			break;
 		}
