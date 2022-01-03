@@ -631,6 +631,46 @@
 			status = "disabled";
 		};
 
+		pcie1: pcie@9b10000 {
+			compatible = "st,stih407-pcie";
+			device_type = "pci";
+			reg = <0x09b10000 0x00001000>,	/* cntrl registers */
+			      <0x3fff0000 0x00010000>,	/* config space */
+			      <0x40000000 0xc0000000>;	/* lmi mem window */
+
+			reg-names = "dbi",
+				    "config",
+				    "mem-window";
+
+			st,syscfg = <&syscfg_core 0xdc 0xe4>;
+
+			#interrupt-cells = <1>;
+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "msi";
+			interrupt-map-mask = <0 0 0 7>;
+			interrupt-map = <0 0 0 1 &intc GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>,
+					<0 0 0 2 &intc GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>,
+					<0 0 0 3 &intc GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>,
+					<0 0 0 4 &intc GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+
+			#address-cells = <3>;
+			#size-cells = <2>;
+			/* non-prefetchable and prefetchable */
+			ranges = <0x82000000 0 0x30000000 0x30000000 0 0x05550000>,
+				 <0xc2000000 0 0x35550000 0x35550000 0 0x0AAA0000>;
+			bus-range = <0x00 0xff>;
+
+			resets = <&softreset STIH407_PCIE1_SOFTRESET>,
+				 <&powerdown STIH407_PCIE1_POWERDOWN>;
+
+			reset-names = "softreset", "powerdown";
+
+			phys = <&phy_port1 PHY_TYPE_PCIE>;
+			phy-names = "pcie";
+
+			status = "disabled";
+		};
+
 		sata0: sata@9b20000 {
 			compatible = "st,ahci";
 			reg = <0x9b20000 0x1000>;
