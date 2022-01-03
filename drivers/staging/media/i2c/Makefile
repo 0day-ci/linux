@@ -1,0 +1,1 @@
+obj-$(CONFIG_VIDEO_OVM6211) += ovm6211.o
