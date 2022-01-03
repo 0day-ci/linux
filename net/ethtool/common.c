@@ -545,10 +545,20 @@ int __ethtool_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
 	memset(info, 0, sizeof(*info));
 	info->cmd = ETHTOOL_GET_TS_INFO;
 
-	if (phy_has_tsinfo(phydev))
-		return phy_ts_info(phydev, info);
-	if (ops->get_ts_info)
-		return ops->get_ts_info(dev, info);
+	switch (dev->selected_timestamping_layer) {
+
+	case MAC_TIMESTAMPING:
+		if (ops->get_ts_info)
+			return ops->get_ts_info(dev, info);
+		break;
+
+	case PHY_TIMESTAMPING:
+		if (phy_has_tsinfo(phydev)) {
+			return phy_ts_info(phydev, info);
+		}
+		WARN_ON(1);
+		return -ENODEV;
+	}
 
 	info->so_timestamping = SOF_TIMESTAMPING_RX_SOFTWARE |
 				SOF_TIMESTAMPING_SOFTWARE;

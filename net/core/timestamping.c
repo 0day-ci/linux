@@ -28,6 +28,9 @@ void skb_clone_tx_timestamp(struct sk_buff *skb)
 	if (!skb->sk)
 		return;
 
+	if (skb->dev->selected_timestamping_layer != PHY_TIMESTAMPING)
+		return;
+
 	type = classify(skb);
 	if (type == PTP_CLASS_NONE)
 		return;
@@ -48,6 +51,9 @@ bool skb_defer_rx_timestamp(struct sk_buff *skb)
 	unsigned int type;
 
 	if (!skb->dev || !skb->dev->phydev || !skb->dev->phydev->mii_ts)
+		return false;
+
+	if (skb->dev->selected_timestamping_layer != PHY_TIMESTAMPING)
 		return false;
 
 	if (skb_headroom(skb) < ETH_HLEN)

@@ -260,6 +260,43 @@ static int dev_eth_ioctl(struct net_device *dev,
 	return err;
 }
 
+static int dev_hwtstamp_ioctl(struct net_device *dev,
+			      struct ifreq *ifr, unsigned int cmd)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+	int err;
+
+	err = dsa_ndo_eth_ioctl(dev, ifr, cmd);
+	if (err == 0 || err != -EOPNOTSUPP)
+		return err;
+
+	if (!netif_device_present(dev))
+		return -ENODEV;
+
+	switch (dev->selected_timestamping_layer) {
+
+	case MAC_TIMESTAMPING:
+		if (ops->ndo_do_ioctl == phy_do_ioctl) {
+			/* Some drivers set .ndo_do_ioctl to phy_do_ioctl. */
+			err = -EOPNOTSUPP;
+		} else {
+			err = ops->ndo_eth_ioctl(dev, ifr, cmd);
+		}
+		break;
+
+	case PHY_TIMESTAMPING:
+		if (phy_has_hwtstamp(dev->phydev)) {
+			err = phy_mii_ioctl(dev->phydev, ifr, cmd);
+		} else {
+			err = -ENODEV;
+			WARN_ON(1);
+		}
+		break;
+	}
+
+	return err;
+}
+
 static int dev_siocbond(struct net_device *dev,
 			struct ifreq *ifr, unsigned int cmd)
 {
@@ -395,6 +432,9 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, void __user *data,
 			return err;
 		fallthrough;
 
+	case SIOCGHWTSTAMP:
+		return dev_hwtstamp_ioctl(dev, ifr, cmd);
+
 	/*
 	 *	Unknown or private ioctl
 	 */
@@ -405,9 +445,7 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, void __user *data,
 
 		if (cmd == SIOCGMIIPHY ||
 		    cmd == SIOCGMIIREG ||
-		    cmd == SIOCSMIIREG ||
-		    cmd == SIOCSHWTSTAMP ||
-		    cmd == SIOCGHWTSTAMP) {
+		    cmd == SIOCSMIIREG) {
 			err = dev_eth_ioctl(dev, ifr, cmd);
 		} else if (cmd == SIOCBONDENSLAVE ||
 		    cmd == SIOCBONDRELEASE ||

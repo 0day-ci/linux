@@ -11,7 +11,10 @@ What:		/sys/class/net/<iface>/current_timestamping_provider
 Date:		January 2022
 Contact:	Richard Cochran <richardcochran@gmail.com>
 Description:
-		Show the current SO_TIMESTAMPING provider.
+		Shows or sets the current SO_TIMESTAMPING provider.
+		When changing the value, some packets in the kernel
+		networking stack may still be delivered with time
+		stamps from the previous provider.
 		The possible values are:
 		- "mac"  The MAC provides time stamping.
 		- "phy"  The PHY or MII device provides time stamping.

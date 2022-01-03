@@ -664,17 +664,59 @@ static ssize_t current_timestamping_provider_show(struct device *dev,
 	if (!rtnl_trylock())
 		return restart_syscall();
 
-	if (phy_has_tsinfo(phydev)) {
-		ret = sprintf(buf, "%s\n", "phy");
-	} else {
+	switch (netdev->selected_timestamping_layer) {
+	case MAC_TIMESTAMPING:
 		ret = sprintf(buf, "%s\n", "mac");
+		break;
+	case PHY_TIMESTAMPING:
+		ret = sprintf(buf, "%s\n", "phy");
+		break;
 	}
 
 	rtnl_unlock();
 
 	return ret;
 }
-static DEVICE_ATTR_RO(current_timestamping_provider);
+
+static ssize_t current_timestamping_provider_store(struct device *dev,
+						   struct device_attribute *attr,
+						   const char *buf, size_t len)
+{
+	struct net_device *netdev = to_net_dev(dev);
+	struct net *net = dev_net(netdev);
+	enum timestamping_layer flavor;
+
+	if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (!strcmp(buf, "mac\n"))
+		flavor = MAC_TIMESTAMPING;
+	else if (!strcmp(buf, "phy\n"))
+		flavor = PHY_TIMESTAMPING;
+	else
+		return -EINVAL;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+
+	if (!dev_isalive(netdev))
+		goto out;
+
+	if (netdev->selected_timestamping_layer != flavor) {
+		const struct net_device_ops *ops = netdev->netdev_ops;
+		struct ifreq ifr = {0};
+
+		/* Disable time stamping in the current layer. */
+		if (netif_device_present(netdev) && ops->ndo_eth_ioctl)
+			ops->ndo_eth_ioctl(netdev, &ifr, SIOCSHWTSTAMP);
+
+		netdev->selected_timestamping_layer = flavor;
+	}
+out:
+	rtnl_unlock();
+	return len;
+}
+static DEVICE_ATTR_RW(current_timestamping_provider);
 
 static struct attribute *net_class_attrs[] __ro_after_init = {
 	&dev_attr_netdev_group.attr,
