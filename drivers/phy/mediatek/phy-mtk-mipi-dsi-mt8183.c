@@ -4,7 +4,11 @@
  * Author: jitao.shi <jitao.shi@mediatek.com>
  */
 
+#include <linux/clk-provider.h>
+#include <linux/delay.h>
+#include <linux/module.h>
 #include <linux/regmap.h>
+#include <linux/phy/phy.h>
 #include "phy-mtk-mipi-dsi.h"
 
 #define MIPITX_LANE_CON		0x000c

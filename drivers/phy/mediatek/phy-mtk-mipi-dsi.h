@@ -7,16 +7,10 @@
 #ifndef _MTK_MIPI_TX_H
 #define _MTK_MIPI_TX_H
 
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
-#include <linux/delay.h>
-#include <linux/io.h>
-#include <linux/module.h>
-#include <linux/nvmem-consumer.h>
-#include <linux/of_device.h>
-#include <linux/platform_device.h>
+#include <linux/types.h>
+#include <linux/regmap.h>
 #include <linux/phy/phy.h>
-#include <linux/slab.h>
 
 struct mtk_mipitx_data {
 	const u32 mppll_preserve;
