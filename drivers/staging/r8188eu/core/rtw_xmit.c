@@ -772,7 +772,7 @@ s32 rtw_make_wlanhdr(struct adapter *padapter, u8 *hdr, struct pkt_attrib *pattr
 
 			set_eosp(qc, pattrib->eosp);
 
-			SetAckpolicy(qc, pattrib->ack_policy);
+			set_ack_policy(qc, pattrib->ack_policy);
 		}
 
 		/* TODO: fill HT Control Field */

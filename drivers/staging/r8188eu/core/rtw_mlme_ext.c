@@ -5532,7 +5532,7 @@ static int _issue_qos_nulldata(struct adapter *padapter, unsigned char *da, u16 
 
 	set_eosp(qc, pattrib->eosp);
 
-	SetAckpolicy(qc, pattrib->ack_policy);
+	set_ack_policy(qc, pattrib->ack_policy);
 
 	memcpy(pwlanhdr->addr1, da, ETH_ALEN);
 	memcpy(pwlanhdr->addr2, myid(&padapter->eeprompriv), ETH_ALEN);

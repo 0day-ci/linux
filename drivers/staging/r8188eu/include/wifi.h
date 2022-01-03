@@ -241,7 +241,7 @@ enum WIFI_REG_DOMAIN {
 #define set_eosp(pbuf, eosp)	\
 		(*(__le16 *)(pbuf) |= cpu_to_le16((eosp & 1) << 4))
 
-#define SetAckpolicy(pbuf, ack)	\
+#define set_ack_policy(pbuf, ack)	\
 	*(__le16 *)(pbuf) |= cpu_to_le16((ack & 3) << 5)
 
 #define GetAckpolicy(pbuf) (((le16_to_cpu(*(__le16 *)pbuf)) >> 5) & 0x3)
