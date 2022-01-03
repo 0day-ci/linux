@@ -825,6 +825,14 @@ ethtool_params_from_link_mode(struct ethtool_link_ksettings *link_ksettings,
 int ethtool_get_phc_vclocks(struct net_device *dev, int **vclock_index);
 
 /**
+ * ethtool_get_ts_info_by_layer - Obtains time stamping capabilities from the MAC or PHY layer.
+ * @dev: pointer to net_device structure
+ * @info: buffer to hold the result
+ * Returns zero on sauces, non-zero otherwise.
+ */
+int ethtool_get_ts_info_by_layer(struct net_device *dev, struct ethtool_ts_info *info);
+
+/**
  * ethtool_sprintf - Write formatted string to ethtool string data
  * @data: Pointer to start of string to update
  * @fmt: Format of string to write

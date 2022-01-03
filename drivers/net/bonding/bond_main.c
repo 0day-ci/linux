@@ -5364,23 +5364,13 @@ static int bond_ethtool_get_ts_info(struct net_device *bond_dev,
 				    struct ethtool_ts_info *info)
 {
 	struct bonding *bond = netdev_priv(bond_dev);
-	const struct ethtool_ops *ops;
 	struct net_device *real_dev;
-	struct phy_device *phydev;
 
 	rcu_read_lock();
 	real_dev = bond_option_active_slave_get_rcu(bond);
 	rcu_read_unlock();
-	if (real_dev) {
-		ops = real_dev->ethtool_ops;
-		phydev = real_dev->phydev;
-
-		if (phy_has_tsinfo(phydev)) {
-			return phy_ts_info(phydev, info);
-		} else if (ops->get_ts_info) {
-			return ops->get_ts_info(real_dev, info);
-		}
-	}
+	if (real_dev)
+		return ethtool_get_ts_info_by_layer(real_dev, info);
 
 	info->so_timestamping = SOF_TIMESTAMPING_RX_SOFTWARE |
 				SOF_TIMESTAMPING_SOFTWARE;
