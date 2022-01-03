@@ -1962,8 +1962,17 @@ static long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	case RNDRESEEDCRNG:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		if (crng_init < 2)
+		if (!crng_ready()) {
+			unsigned long flags, i;
+			u32 new_key[8];
+			_extract_entropy(&input_pool, new_key, sizeof(new_key), 0);
+			spin_lock_irqsave(&primary_crng.lock, flags);
+			for (i = 0; i < ARRAY_SIZE(new_key); ++i)
+				primary_crng.state[4 + i] ^= new_key[i];
+			spin_unlock_irqrestore(&primary_crng.lock, flags);
+			memzero_explicit(new_key, sizeof(new_key));
 			return -ENODATA;
+		}
 		crng_reseed(&primary_crng, &input_pool);
 		WRITE_ONCE(crng_global_init_time, jiffies - 1);
 		return 0;
