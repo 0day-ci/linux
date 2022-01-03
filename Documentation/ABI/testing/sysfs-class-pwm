@@ -86,3 +86,11 @@ Description:
 		Capture information about a PWM signal. The output format is a
 		pair unsigned integers (period and duty cycle), separated by a
 		single space.
+
+What:		/sys/class/pwm/pwmchip<N>/pwmX/count
+Date:		December 2021
+KernelVersion:  5.17
+Contact:	Vishakha Joshi <vishakha.joshi@intel.com>
+Description:
+		The PWM repeat count of the number of cycles in the waveform.
+		The default value for the count is zero with infinite repetition.

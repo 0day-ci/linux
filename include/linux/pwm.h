@@ -52,6 +52,7 @@ enum {
  * struct pwm_state - state of a PWM channel
  * @period: PWM period (in nanoseconds)
  * @duty_cycle: PWM duty cycle (in nanoseconds)
+ * @count: PWM repeat count
  * @polarity: PWM polarity
  * @enabled: PWM enabled status
  * @usage_power: If set, the PWM driver is only required to maintain the power
@@ -62,6 +63,7 @@ enum {
 struct pwm_state {
 	u64 period;
 	u64 duty_cycle;
+	u32 count;
 	enum pwm_polarity polarity;
 	bool enabled;
 	bool usage_power;
