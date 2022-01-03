@@ -832,7 +832,7 @@ static int validate_recv_ctrl_frame(struct adapter *padapter,
 		u8 wmmps_ac = 0;
 		struct sta_info *psta = NULL;
 
-		aid = GetAid(pframe);
+		aid = get_aid(pframe);
 		psta = rtw_get_stainfo(pstapriv, GetAddr2Ptr(pframe));
 
 		if (!psta || psta->aid != aid)
