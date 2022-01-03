@@ -384,4 +384,15 @@ config PCIE_FU740
 	  Say Y here if you want PCIe controller support for the SiFive
 	  FU740.
 
+config PCIE_STI
+	tristate "STMicroelectronics PCIe Controller for STi SoCs"
+	depends on ARCH_STI || COMPILE_TEST
+	depends on OF && PCI_MSI_IRQ_DOMAIN
+	select PCIE_DW_HOST
+	help
+	  Enable PCIe controller support on STMicroelectronics STi SoCs.
+	  This controller is based on Designware hardware and therefore
+	  the driver re-uses the Designware core functions to implement
+	  the driver.
+
 endmenu
