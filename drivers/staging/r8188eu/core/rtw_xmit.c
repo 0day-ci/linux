@@ -784,7 +784,7 @@ s32 rtw_make_wlanhdr(struct adapter *padapter, u8 *hdr, struct pkt_attrib *pattr
 
 			pattrib->seqnum = psta->sta_xmitpriv.txseq_tid[pattrib->priority];
 
-			SetSeqNum(hdr, pattrib->seqnum);
+			set_seq_num(hdr, pattrib->seqnum);
 
 			/* check if enable ampdu */
 			if (pattrib->ht_en && psta->htpriv.ampdu_enable) {

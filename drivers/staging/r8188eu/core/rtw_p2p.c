@@ -145,7 +145,7 @@ static void issue_group_disc_req(struct wifidirect_info *pwdinfo, u8 *da)
 	memcpy(pwlanhdr->addr2, pwdinfo->interface_addr, ETH_ALEN);
 	memcpy(pwlanhdr->addr3, pwdinfo->interface_addr, ETH_ALEN);
 
-	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
+	set_seq_num(pwlanhdr, pmlmeext->mgnt_seq);
 	pmlmeext->mgnt_seq++;
 	set_frame_subtype(pframe, WIFI_ACTION);
 
@@ -204,7 +204,7 @@ static void issue_p2p_devdisc_resp(struct wifidirect_info *pwdinfo, u8 *da, u8 s
 	memcpy(pwlanhdr->addr2, pwdinfo->device_addr, ETH_ALEN);
 	memcpy(pwlanhdr->addr3, pwdinfo->device_addr, ETH_ALEN);
 
-	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
+	set_seq_num(pwlanhdr, pmlmeext->mgnt_seq);
 	pmlmeext->mgnt_seq++;
 	set_frame_subtype(pframe, WIFI_ACTION);
 
@@ -274,7 +274,7 @@ static void issue_p2p_provision_resp(struct wifidirect_info *pwdinfo, u8 *raddr,
 	memcpy(pwlanhdr->addr2, myid(&padapter->eeprompriv), ETH_ALEN);
 	memcpy(pwlanhdr->addr3, myid(&padapter->eeprompriv), ETH_ALEN);
 
-	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
+	set_seq_num(pwlanhdr, pmlmeext->mgnt_seq);
 	pmlmeext->mgnt_seq++;
 	set_frame_subtype(pframe, WIFI_ACTION);
 
@@ -351,7 +351,7 @@ static void issue_p2p_presence_resp(struct wifidirect_info *pwdinfo, u8 *da, u8 
 	memcpy(pwlanhdr->addr2, pwdinfo->interface_addr, ETH_ALEN);
 	memcpy(pwlanhdr->addr3, pwdinfo->interface_addr, ETH_ALEN);
 
-	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
+	set_seq_num(pwlanhdr, pmlmeext->mgnt_seq);
 	pmlmeext->mgnt_seq++;
 	set_frame_subtype(pframe, WIFI_ACTION);
 

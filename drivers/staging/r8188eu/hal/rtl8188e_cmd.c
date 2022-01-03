@@ -227,7 +227,7 @@ static void ConstructBeacon(struct adapter *adapt, u8 *pframe, u32 *pLength)
 	memcpy(pwlanhdr->addr2, myid(&adapt->eeprompriv), ETH_ALEN);
 	memcpy(pwlanhdr->addr3, get_my_bssid(cur_network), ETH_ALEN);
 
-	SetSeqNum(pwlanhdr, 0/*pmlmeext->mgnt_seq*/);
+	set_seq_num(pwlanhdr, 0/*pmlmeext->mgnt_seq*/);
 	set_frame_subtype(pframe, WIFI_BEACON);
 
 	pframe += sizeof(struct rtw_ieee80211_hdr_3addr);
@@ -364,7 +364,7 @@ static void ConstructNullFunctionData(struct adapter *adapt, u8 *pframe,
 		break;
 	}
 
-	SetSeqNum(pwlanhdr, 0);
+	set_seq_num(pwlanhdr, 0);
 
 	if (bQoS) {
 		struct rtw_ieee80211_hdr_3addr_qos *pwlanqoshdr;
@@ -406,7 +406,7 @@ static void ConstructProbeRsp(struct adapter *adapt, u8 *pframe, u32 *pLength, u
 	memcpy(pwlanhdr->addr2, mac, ETH_ALEN);
 	memcpy(pwlanhdr->addr3, bssid, ETH_ALEN);
 
-	SetSeqNum(pwlanhdr, 0);
+	set_seq_num(pwlanhdr, 0);
 	set_frame_subtype(fctrl, WIFI_PROBERSP);
 
 	pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
