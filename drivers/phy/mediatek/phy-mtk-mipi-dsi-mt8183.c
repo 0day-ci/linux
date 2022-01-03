@@ -4,6 +4,7 @@
  * Author: jitao.shi <jitao.shi@mediatek.com>
  */
 
+#include <linux/regmap.h>
 #include "phy-mtk-mipi-dsi.h"
 
 #define MIPITX_LANE_CON		0x000c
@@ -70,17 +71,17 @@ static int mtk_mipi_tx_pll_enable(struct clk_hw *hw)
 		return -EINVAL;
 	}
 
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_CON4, RG_DSI_PLL_IBIAS);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_PLL_CON4, RG_DSI_PLL_IBIAS);
 
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_PWR_ON);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_PWR_ON);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
 	udelay(1);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_ISO_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_ISO_EN);
 	pcw = div_u64(((u64)mipi_tx->data_rate * txdiv) << 24, 26000000);
-	writel(pcw, mipi_tx->regs + MIPITX_PLL_CON0);
-	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_POSDIV,
+	regmap_write(mipi_tx->regmap, MIPITX_PLL_CON0, pcw);
+	regmap_update_bits(mipi_tx->regmap, MIPITX_PLL_CON1, RG_DSI_PLL_POSDIV,
 				txdiv0 << 8);
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
 
 	return 0;
 }
@@ -89,10 +90,10 @@ static void mtk_mipi_tx_pll_disable(struct clk_hw *hw)
 {
 	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
 
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
 
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_ISO_EN);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_PWR_ON);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_ISO_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_PWR_ON);
 }
 
 static long mtk_mipi_tx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
@@ -121,7 +122,7 @@ static void mtk_mipi_tx_config_calibration_data(struct mtk_mipi_tx *mipi_tx)
 			mipi_tx->rt_code[i] |= 0x10 << 5;
 
 		for (j = 0; j < 10; j++)
-			mtk_mipi_tx_update_bits(mipi_tx,
+			regmap_update_bits(mipi_tx->regmap,
 				MIPITX_D2P_RTCODE * (i + 1) + j * 4,
 				1, mipi_tx->rt_code[i] >> j & 1);
 	}
@@ -132,26 +133,26 @@ static void mtk_mipi_tx_power_on_signal(struct phy *phy)
 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
 
 	/* BG_LPF_EN / BG_CORE_EN */
-	writel(RG_DSI_PAD_TIEL_SEL | RG_DSI_BG_CORE_EN,
-	       mipi_tx->regs + MIPITX_LANE_CON);
+	regmap_write(mipi_tx->regmap, MIPITX_LANE_CON,
+		    (RG_DSI_PAD_TIEL_SEL | RG_DSI_BG_CORE_EN));
 	usleep_range(30, 100);
-	writel(RG_DSI_BG_CORE_EN | RG_DSI_BG_LPF_EN,
-	       mipi_tx->regs + MIPITX_LANE_CON);
+	regmap_write(mipi_tx->regmap, MIPITX_LANE_CON,
+		    (RG_DSI_BG_LPF_EN | RG_DSI_BG_CORE_EN));
 
 	/* Switch OFF each Lane */
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D0_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D1_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D2_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D3_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_CK_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_D0_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_D1_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_D2_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_D3_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_clear_bits(mipi_tx->regmap, MIPITX_CK_SW_CTL_EN, DSI_SW_CTL_EN);
 
-	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_VOLTAGE_SEL,
+	regmap_update_bits(mipi_tx->regmap, MIPITX_VOLTAGE_SEL,
 				RG_DSI_HSTX_LDO_REF_SEL,
 				(mipi_tx->mipitx_drive - 3000) / 200 << 6);
 
 	mtk_mipi_tx_config_calibration_data(mipi_tx);
 
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_CK_CKMODE_EN, DSI_CK_CKMODE_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_CK_CKMODE_EN, DSI_CK_CKMODE_EN);
 }
 
 static void mtk_mipi_tx_power_off_signal(struct phy *phy)
@@ -159,15 +160,15 @@ static void mtk_mipi_tx_power_off_signal(struct phy *phy)
 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
 
 	/* Switch ON each Lane */
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D0_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D1_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D2_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D3_SW_CTL_EN, DSI_SW_CTL_EN);
-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_CK_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_D0_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_D1_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_D2_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_D3_SW_CTL_EN, DSI_SW_CTL_EN);
+	regmap_set_bits(mipi_tx->regmap, MIPITX_CK_SW_CTL_EN, DSI_SW_CTL_EN);
 
-	writel(RG_DSI_PAD_TIEL_SEL | RG_DSI_BG_CORE_EN,
-	       mipi_tx->regs + MIPITX_LANE_CON);
-	writel(RG_DSI_PAD_TIEL_SEL, mipi_tx->regs + MIPITX_LANE_CON);
+	regmap_write(mipi_tx->regmap, MIPITX_LANE_CON,
+		    (RG_DSI_PAD_TIEL_SEL | RG_DSI_BG_CORE_EN));
+	regmap_write(mipi_tx->regmap, MIPITX_LANE_CON, RG_DSI_PAD_TIEL_SEL);
 }
 
 const struct mtk_mipitx_data mt8183_mipitx_data = {

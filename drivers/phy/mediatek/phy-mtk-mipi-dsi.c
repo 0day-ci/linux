@@ -3,35 +3,12 @@
  * Copyright (c) 2015 MediaTek Inc.
  */
 
+#include <linux/regmap.h>
 #include "phy-mtk-mipi-dsi.h"
 
 inline struct mtk_mipi_tx *mtk_mipi_tx_from_clk_hw(struct clk_hw *hw)
 {
 	return container_of(hw, struct mtk_mipi_tx, pll_hw);
-}
-
-void mtk_mipi_tx_clear_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
-			    u32 bits)
-{
-	u32 temp = readl(mipi_tx->regs + offset);
-
-	writel(temp & ~bits, mipi_tx->regs + offset);
-}
-
-void mtk_mipi_tx_set_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
-			  u32 bits)
-{
-	u32 temp = readl(mipi_tx->regs + offset);
-
-	writel(temp | bits, mipi_tx->regs + offset);
-}
-
-void mtk_mipi_tx_update_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
-			     u32 mask, u32 data)
-{
-	u32 temp = readl(mipi_tx->regs + offset);
-
-	writel((temp & ~mask) | (data & mask), mipi_tx->regs + offset);
 }
 
 int mtk_mipi_tx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -126,6 +103,13 @@ static void mtk_mipi_tx_get_calibration_datal(struct mtk_mipi_tx *mipi_tx)
 	kfree(buf);
 }
 
+static const struct regmap_config mtk_mipi_tx_regmap_config = {
+	.reg_bits = 32,
+	.reg_stride = 4,
+	.val_bits = 32,
+	.disable_locking = true,
+};
+
 static int mtk_mipi_tx_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -139,6 +123,7 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
 	};
 	struct phy *phy;
 	struct phy_provider *phy_provider;
+	void __iomem *regs;
 	int ret;
 
 	mipi_tx = devm_kzalloc(dev, sizeof(*mipi_tx), GFP_KERNEL);
@@ -147,9 +132,13 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
 
 	mipi_tx->driver_data = of_device_get_match_data(dev);
 
-	mipi_tx->regs = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(mipi_tx->regs))
-		return PTR_ERR(mipi_tx->regs);
+	regs = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(regs))
+		return PTR_ERR(regs);
+
+	mipi_tx->regmap = devm_regmap_init_mmio(dev, regs, &mtk_mipi_tx_regmap_config);
+	if (IS_ERR(mipi_tx->regmap))
+		return PTR_ERR(mipi_tx->regmap);
 
 	ref_clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(ref_clk)) {
