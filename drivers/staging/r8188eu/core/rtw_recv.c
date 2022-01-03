@@ -1105,7 +1105,7 @@ static int validate_recv_frame(struct adapter *adapter, struct recv_frame *precv
 
 	pattrib->to_fr_ds = get_tofr_ds(ptr);
 
-	pattrib->frag_num = GetFragNum(ptr);
+	pattrib->frag_num = get_frag_num(ptr);
 	pattrib->seq_num = get_sequence(ptr);
 
 	pattrib->pw_save = get_pwr_mgt(ptr);
