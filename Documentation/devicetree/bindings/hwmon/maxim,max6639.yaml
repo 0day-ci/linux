@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+
+$id: http://devicetree.org/schemas/hwmon/maxim,max6639.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Maxim max6639
+
+maintainers:
+  - Roland Stigge <stigge@antcom.de>
+
+description: |
+  The MAX6639 is a 2-channel temperature monitor with dual, automatic, PWM
+  fan-speed controller.  It monitors its own temperature and one external
+  diode-connected transistor or the temperatures of two external diode-connected
+  transistors, typically available in CPUs, FPGAs, or GPUs.
+
+  Datasheets:
+    https://datasheets.maximintegrated.com/en/ds/MAX6639-MAX6639F.pdf
+
+properties:
+  compatible:
+    enum:
+      - maxim,max6639
+
+  reg:
+    maxItems: 1
+
+  polarity:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [0, 1]
+    description:
+      PWM output is low at 100% duty cycle when this bit is set to zero. PWM
+      output is high at 100% duty cycle when this bit is set to 1.
+      Fans PWM polarity is set to high (1) by default.
+
+  pulses-per-revolution:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [1, 2, 3, 4]
+    description:
+      Value specifying the number of pulses per revolution of the controlled
+      FAN.
+
+  rpm-range:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [2000, 4000, 8000, 16000]
+    description:
+      Scales the tachometer counter by setting the maximum (full-scale) value
+      of the RPM range.
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      max6639@10 {
+        compatible = "maxim,max6639";
+        reg = <0x10>;
+        polarity = <1>;
+        pulses-per-revolution = <2>;
+        rpm-range = <4000>;
+      };
+    };
