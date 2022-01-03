@@ -172,7 +172,7 @@ void __ptrace_unlink(struct task_struct *child)
 
 static bool looks_like_a_spurious_pid(struct task_struct *task)
 {
-	if (task->exit_code != ((PTRACE_EVENT_EXEC << 8) | SIGTRAP))
+	if (task->ptrace_code != ((PTRACE_EVENT_EXEC << 8) | SIGTRAP))
 		return false;
 
 	if (task_pid_vnr(task) == task->ptrace_message)
@@ -573,7 +573,7 @@ static int ptrace_detach(struct task_struct *child, unsigned int data)
 	 * tasklist_lock avoids the race with wait_task_stopped(), see
 	 * the comment in ptrace_resume().
 	 */
-	child->exit_code = data;
+	child->ptrace_code = data;
 	__ptrace_detach(current, child);
 	write_unlock_irq(&tasklist_lock);
 
@@ -863,11 +863,11 @@ static int ptrace_resume(struct task_struct *child, long request,
 	}
 
 	/*
-	 * Change ->exit_code and ->state under siglock to avoid the race
-	 * with wait_task_stopped() in between; a non-zero ->exit_code will
+	 * Change ->ptrace_code and ->state under siglock to avoid the race
+	 * with wait_task_stopped() in between; a non-zero ->ptrace_code will
 	 * wrongly look like another report from tracee.
 	 *
-	 * Note that we need siglock even if ->exit_code == data and/or this
+	 * Note that we need siglock even if ->ptrace_code == data and/or this
 	 * status was not reported yet, the new status must not be cleared by
 	 * wait_task_stopped() after resume.
 	 *
@@ -878,7 +878,7 @@ static int ptrace_resume(struct task_struct *child, long request,
 	need_siglock = data && !thread_group_empty(current);
 	if (need_siglock)
 		spin_lock_irq(&child->sighand->siglock);
-	child->exit_code = data;
+	child->ptrace_code = data;
 	wake_up_state(child, __TASK_TRACED);
 	if (need_siglock)
 		spin_unlock_irq(&child->sighand->siglock);

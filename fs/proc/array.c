@@ -522,6 +522,9 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 		cgtime = sig->cgtime;
 		rsslim = READ_ONCE(sig->rlim[RLIMIT_RSS].rlim_cur);
 
+		if (task_is_traced(task) && !(task->jobctl & JOBCTL_LISTENING))
+			exit_code = task->ptrace_code;
+
 		/* add up live thread stats at the group level */
 		if (whole) {
 			struct task_struct *t = task;

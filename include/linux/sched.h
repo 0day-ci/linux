@@ -1184,6 +1184,7 @@ struct task_struct {
 	/* Ptrace state: */
 	unsigned long			ptrace_message;
 	kernel_siginfo_t		*last_siginfo;
+	int				ptrace_code;
 
 	struct task_io_accounting	ioac;
 #ifdef CONFIG_PSI
