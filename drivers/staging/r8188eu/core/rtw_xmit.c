@@ -924,7 +924,7 @@ s32 rtw_xmitframe_coalesce(struct adapter *padapter, struct sk_buff *pkt, struct
 
 		pframe = mem_start;
 
-		SetMFrag(mem_start);
+		set_m_frag(mem_start);
 
 		pframe += pattrib->hdrlen;
 		mpdu_len -= pattrib->hdrlen;
