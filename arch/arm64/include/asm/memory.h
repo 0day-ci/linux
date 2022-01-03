@@ -354,6 +354,7 @@ static inline void *phys_to_virt(phys_addr_t x)
 })
 
 void dump_mem_limit(void);
+bool has_mem_limit_reduced(void);
 #endif /* !ASSEMBLY */
 
 /*

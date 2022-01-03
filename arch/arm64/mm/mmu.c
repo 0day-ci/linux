@@ -1537,6 +1537,18 @@ static int prevent_bootmem_remove_notifier(struct notifier_block *nb,
 	if ((action != MEM_GOING_OFFLINE) && (action != MEM_OFFLINE))
 		return NOTIFY_OK;
 
+	if (has_mem_limit_reduced()) {
+		/*
+		 * Physical memory limit has been reduced via the 'mem=' kernel
+		 * command line option. Memory beyond reduced limit could now be
+		 * removed and reassigned (guest ?) transparently to the kernel.
+		 * This might cause subsequent kexec kernel to crash or at least
+		 * corrupt the memory when accessing UEFI memory map enumerated
+		 * boot memory which might have been repurposed.
+		 */
+		pr_warn_once("Memory limit reduced, kexec might be problematic\n");
+	}
+
 	for (; pfn < end_pfn; pfn += PAGES_PER_SECTION) {
 		unsigned long start = PFN_PHYS(pfn);
 		unsigned long end = start + (1UL << PA_SECTION_SHIFT);
