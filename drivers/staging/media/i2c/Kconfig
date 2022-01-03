@@ -1,0 +1,9 @@
+config VIDEO_OVM6211
+	tristate "OmniVision OVM6211 sensor support"
+	depends on I2C && VIDEO_V4L2
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OVM6211 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ovm6211.
