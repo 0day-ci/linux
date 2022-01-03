@@ -58,6 +58,7 @@ extern void pm_runtime_get_suppliers(struct device *dev);
 extern void pm_runtime_put_suppliers(struct device *dev);
 extern void pm_runtime_new_link(struct device *dev);
 extern void pm_runtime_drop_link(struct device_link *link);
+extern void pm_runtime_release_supplier(struct device_link *link, bool check_idle);
 
 extern int devm_pm_runtime_enable(struct device *dev);
 
@@ -283,6 +284,8 @@ static inline void pm_runtime_get_suppliers(struct device *dev) {}
 static inline void pm_runtime_put_suppliers(struct device *dev) {}
 static inline void pm_runtime_new_link(struct device *dev) {}
 static inline void pm_runtime_drop_link(struct device_link *link) {}
+static inline void pm_runtime_release_supplier(struct device_link *link,
+					       bool check_idle) {}
 
 #endif /* !CONFIG_PM */
 
@@ -384,9 +387,8 @@ static inline int pm_runtime_get(struct device *dev)
  * The possible return values of this function are the same as for
  * pm_runtime_resume() and the runtime PM usage counter of @dev remains
  * incremented in all cases, even if it returns an error code.
- * Consider using pm_runtime_resume_and_get() instead of it, especially
- * if its return value is checked by the caller, as this is likely to result
- * in cleaner code.
+ * Consider using pm_runtime_resume_and_get() instead of it if its return
+ * value is checked by the caller, as this is likely to result in cleaner code.
  */
 static inline int pm_runtime_get_sync(struct device *dev)
 {
@@ -401,7 +403,7 @@ static inline int pm_runtime_get_sync(struct device *dev)
  * PM usage counter. Return 0 if the runtime PM usage counter of @dev has been
  * incremented or a negative error code otherwise.
  */
-static inline int pm_runtime_resume_and_get(struct device *dev)
+static inline __must_check int pm_runtime_resume_and_get(struct device *dev)
 {
 	int ret;
 
