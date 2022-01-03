@@ -5530,7 +5530,7 @@ static int _issue_qos_nulldata(struct adapter *padapter, unsigned char *da, u16 
 
 	set_priority(qc, tid);
 
-	SetEOSP(qc, pattrib->eosp);
+	set_eosp(qc, pattrib->eosp);
 
 	SetAckpolicy(qc, pattrib->ack_policy);
 

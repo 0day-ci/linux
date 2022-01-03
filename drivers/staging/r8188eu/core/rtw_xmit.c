@@ -770,7 +770,7 @@ s32 rtw_make_wlanhdr(struct adapter *padapter, u8 *hdr, struct pkt_attrib *pattr
 			if (pattrib->priority)
 				set_priority(qc, pattrib->priority);
 
-			SetEOSP(qc, pattrib->eosp);
+			set_eosp(qc, pattrib->eosp);
 
 			SetAckpolicy(qc, pattrib->ack_policy);
 		}
