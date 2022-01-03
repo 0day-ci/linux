@@ -151,19 +151,6 @@ int shmem_getpage(struct inode *inode, pgoff_t index,
 		mapping_gfp_mask(inode->i_mapping), NULL, NULL, NULL);
 }
 
-static int shmem_get_folio(struct inode *inode, pgoff_t index,
-		struct folio **foliop, enum sgp_type sgp)
-{
-	struct page *page = NULL;
-	int ret = shmem_getpage(inode, index, &page, sgp);
-
-	if (page)
-		*foliop = page_folio(page);
-	else
-		*foliop = NULL;
-	return ret;
-}
-
 static inline struct shmem_sb_info *SHMEM_SB(struct super_block *sb)
 {
 	return sb->s_fs_info;
@@ -894,6 +881,28 @@ void shmem_unlock_mapping(struct address_space *mapping)
 	}
 }
 
+static struct folio *shmem_get_partial_folio(struct inode *inode, pgoff_t index)
+{
+	struct folio *folio;
+	struct page *page;
+
+	/*
+	 * At first avoid shmem_getpage(,,,SGP_READ): that fails
+	 * beyond i_size, and reports fallocated pages as holes.
+	 */
+	folio = __filemap_get_folio(inode->i_mapping, index,
+					FGP_ENTRY | FGP_LOCK, 0);
+	if (!folio || !xa_is_value(folio))
+		return folio;
+	/*
+	 * But read a page back from swap if any of it is within i_size
+	 * (although in some cases this is just a waste of time).
+	 */
+	page = NULL;
+	shmem_getpage(inode, index, &page, SGP_READ);
+	return page ? page_folio(page) : NULL;
+}
+
 /*
  * Remove range of pages and swap entries from page cache, and free them.
  * If !unfalloc, truncate or punch hole; if unfalloc, undo failed fallocate.
@@ -948,7 +957,7 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 	}
 
 	same_folio = (lstart >> PAGE_SHIFT) == (lend >> PAGE_SHIFT);
-	shmem_get_folio(inode, lstart >> PAGE_SHIFT, &folio, SGP_READ);
+	folio = shmem_get_partial_folio(inode, lstart >> PAGE_SHIFT);
 	if (folio) {
 		same_folio = lend < folio_pos(folio) + folio_size(folio);
 		folio_mark_dirty(folio);
@@ -963,7 +972,7 @@ static void shmem_undo_range(struct inode *inode, loff_t lstart, loff_t lend,
 	}
 
 	if (!same_folio)
-		shmem_get_folio(inode, lend >> PAGE_SHIFT, &folio, SGP_READ);
+		folio = shmem_get_partial_folio(inode, lend >> PAGE_SHIFT);
 	if (folio) {
 		folio_mark_dirty(folio);
 		if (!truncate_inode_partial_folio(folio, lstart, lend))
