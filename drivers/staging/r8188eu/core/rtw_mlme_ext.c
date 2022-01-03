@@ -5528,7 +5528,7 @@ static int _issue_qos_nulldata(struct adapter *padapter, unsigned char *da, u16 
 
 	qc = (unsigned short *)(pframe + pattrib->hdrlen - 2);
 
-	SetPriority(qc, tid);
+	set_priority(qc, tid);
 
 	SetEOSP(qc, pattrib->eosp);
 

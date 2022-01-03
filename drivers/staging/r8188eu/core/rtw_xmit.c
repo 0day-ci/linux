@@ -768,7 +768,7 @@ s32 rtw_make_wlanhdr(struct adapter *padapter, u8 *hdr, struct pkt_attrib *pattr
 			qc = (unsigned short *)(hdr + pattrib->hdrlen - 2);
 
 			if (pattrib->priority)
-				SetPriority(qc, pattrib->priority);
+				set_priority(qc, pattrib->priority);
 
 			SetEOSP(qc, pattrib->eosp);
 
