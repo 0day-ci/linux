@@ -15,6 +15,7 @@
 #include <linux/of_device.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/regmap.h>
 #include <linux/types.h>
 
 struct mtk_hdmi_phy;
@@ -28,7 +29,7 @@ struct mtk_hdmi_phy_conf {
 };
 
 struct mtk_hdmi_phy {
-	void __iomem *regs;
+	struct regmap *regmap;
 	struct device *dev;
 	struct mtk_hdmi_phy_conf *conf;
 	struct clk *pll;
@@ -42,12 +43,6 @@ struct mtk_hdmi_phy {
 	unsigned int ibias_up;
 };
 
-void mtk_hdmi_phy_clear_bits(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
-			     u32 bits);
-void mtk_hdmi_phy_set_bits(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
-			   u32 bits);
-void mtk_hdmi_phy_mask(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
-		       u32 val, u32 mask);
 struct mtk_hdmi_phy *to_mtk_hdmi_phy(struct clk_hw *hw);
 
 extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_8173_conf;
