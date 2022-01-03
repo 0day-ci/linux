@@ -256,7 +256,7 @@ enum WIFI_REG_DOMAIN {
 
 #define get_addr_3_ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 16))
 
-#define GetAddr4Ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 24))
+#define get_addr_4_ptr(pbuf)	((unsigned char *)((size_t)(pbuf) + 24))
 
 static inline int IS_MCAST(unsigned char *da)
 {
@@ -304,7 +304,7 @@ static inline unsigned char *get_sa(unsigned char *pframe)
 		sa = get_addr_2_ptr(pframe);
 		break;
 	default:	/*  ToDs=1, FromDs=1 */
-		sa = GetAddr4Ptr(pframe);
+		sa = get_addr_4_ptr(pframe);
 		break;
 	}
 	return sa;
