@@ -351,7 +351,7 @@ static void ConstructNullFunctionData(struct adapter *adapt, u8 *pframe,
 		memcpy(pwlanhdr->addr3, StaAddr, ETH_ALEN);
 		break;
 	case Ndis802_11APMode:
-		SetFrDs(fctrl);
+		set_fr_ds(fctrl);
 		memcpy(pwlanhdr->addr1, StaAddr, ETH_ALEN);
 		memcpy(pwlanhdr->addr2, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);
 		memcpy(pwlanhdr->addr3, myid(&adapt->eeprompriv), ETH_ALEN);
