@@ -5412,7 +5412,7 @@ static int _issue_nulldata(struct adapter *padapter, unsigned char *da, unsigned
 		set_to_ds(fctrl);
 
 	if (power_mode)
-		SetPwrMgt(fctrl);
+		set_pwr_mgt(fctrl);
 
 	memcpy(pwlanhdr->addr1, da, ETH_ALEN);
 	memcpy(pwlanhdr->addr2, myid(&padapter->eeprompriv), ETH_ALEN);

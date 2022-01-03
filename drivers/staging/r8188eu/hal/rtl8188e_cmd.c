@@ -305,7 +305,7 @@ static void ConstructPSPoll(struct adapter *adapt, u8 *pframe, u32 *pLength)
 	/*  Frame control. */
 	fctrl = &pwlanhdr->frame_ctl;
 	*(fctrl) = 0;
-	SetPwrMgt(fctrl);
+	set_pwr_mgt(fctrl);
 	SetFrameSubType(pframe, WIFI_PSPOLL);
 
 	/*  AID. */
@@ -341,7 +341,7 @@ static void ConstructNullFunctionData(struct adapter *adapt, u8 *pframe,
 	fctrl = &pwlanhdr->frame_ctl;
 	*(fctrl) = 0;
 	if (bForcePowerSave)
-		SetPwrMgt(fctrl);
+		set_pwr_mgt(fctrl);
 
 	switch (cur_network->network.InfrastructureMode) {
 	case Ndis802_11Infrastructure:
