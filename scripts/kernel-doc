@@ -53,10 +53,6 @@ See Documentation/doc-guide/kernel-doc.rst for the documentation comment syntax.
 
 # more perldoc at the end of the file
 
-# Still to do:
-# 	- add perldoc documentation
-# 	- Look more closely at some of the scarier bits :)
-
 ## init lots of data
 
 my $errors = 0;
@@ -2496,6 +2492,11 @@ Treat warnings as errors.
 =back
 
 =cut
+
+TODO
+
+- add perldoc documentation
+- Look more closely at some of the scarier bits :)
 
 PRE-GIT MUSEUM
 
