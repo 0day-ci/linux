@@ -1880,6 +1880,7 @@ static const struct nla_policy ifla_policy[IFLA_MAX+1] = {
 	[IFLA_PROTO_DOWN_REASON] = { .type = NLA_NESTED },
 	[IFLA_NEW_IFINDEX]	= NLA_POLICY_MIN(NLA_S32, 1),
 	[IFLA_PARENT_DEV_NAME]	= { .type = NLA_NUL_STRING },
+	[IFLA_IFINDEX_LIST]     = { .type = NLA_BINARY },
 };
 
 static const struct nla_policy ifla_info_policy[IFLA_INFO_MAX+1] = {
@@ -3008,6 +3009,11 @@ static int rtnl_setlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 		goto errout;
 	}
 
+	if (tb[IFLA_IFINDEX_LIST]) {
+		NL_SET_ERR_MSG(extack, "ifindex list attribute cannot be used in setlink");
+		goto errout;
+	}
+
 	err = do_setlink(skb, dev, ifm, extack, tb, ifname, 0);
 errout:
 	return err;
@@ -3047,6 +3053,57 @@ static int rtnl_group_dellink(const struct net *net, int group)
 	unregister_netdevice_many(&list_kill);
 
 	return 0;
+}
+
+static int rtnl_list_dellink(struct net *net, int *ifindices, int size,
+			     struct netlink_ext_ack *extack)
+{
+	const int num_devices = size / sizeof(int);
+	struct net_device *dev;
+	LIST_HEAD(list_kill);
+	int i, j, ret;
+
+	if (size <= 0 || size % sizeof(int))
+		return -EINVAL;
+
+	for (i = 0; i < num_devices; i++) {
+		const struct rtnl_link_ops *ops;
+
+		ret = -ENODEV;
+		dev = __dev_get_by_index(net, ifindices[i]);
+		if (!dev) {
+			NL_SET_ERR_MSG(extack, "Unknown ifindex");
+			goto cleanup;
+		}
+
+		ret = -EOPNOTSUPP;
+		ops = dev->rtnl_link_ops;
+		if (!ops || !ops->dellink) {
+			NL_SET_ERR_MSG(extack, "Device cannot be deleted");
+			goto cleanup;
+		}
+
+		dev->bulk_delete = 1;
+	}
+
+	for_each_netdev(net, dev) {
+		if (dev->bulk_delete) {
+			dev->rtnl_link_ops->dellink(dev, &list_kill);
+			dev->bulk_delete = 0;
+		}
+	}
+
+	unregister_netdevice_many(&list_kill);
+
+	return 0;
+
+cleanup:
+	for (j = 0; j < i; j++) {
+		dev = __dev_get_by_index(net, ifindices[j]);
+		dev->bulk_delete = 0;
+	}
+
+	return ret;
 }
 
 int rtnl_delete_link(struct net_device *dev)
@@ -3092,6 +3149,11 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh,
 			return PTR_ERR(tgt_net);
 	}
 
+	if (tb[IFLA_GROUP] && tb[IFLA_IFINDEX_LIST]) {
+		NL_SET_ERR_MSG(extack, "Can't pass both IFLA_GROUP and IFLA_IFINDEX_LIST");
+		return -EOPNOTSUPP;
+	}
+
 	err = -EINVAL;
 	ifm = nlmsg_data(nlh);
 	if (ifm->ifi_index > 0)
@@ -3101,6 +3163,9 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh,
 				   tb[IFLA_ALT_IFNAME], NULL);
 	else if (tb[IFLA_GROUP])
 		err = rtnl_group_dellink(tgt_net, nla_get_u32(tb[IFLA_GROUP]));
+	else if (tb[IFLA_IFINDEX_LIST])
+		err = rtnl_list_dellink(tgt_net, nla_data(tb[IFLA_IFINDEX_LIST]),
+					nla_len(tb[IFLA_IFINDEX_LIST]), extack);
 	else
 		goto out;
 
@@ -3283,6 +3348,12 @@ replay:
 		nla_strscpy(ifname, tb[IFLA_IFNAME], IFNAMSIZ);
 	else
 		ifname[0] = '\0';
+
+	err = -EINVAL;
+	if (tb[IFLA_IFINDEX_LIST]) {
+		NL_SET_ERR_MSG(extack, "ifindex list attribute cannot be used in newlink");
+		return err;
+	}
 
 	ifm = nlmsg_data(nlh);
 	if (ifm->ifi_index > 0)
@@ -3575,6 +3646,12 @@ static int rtnl_getlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 	err = rtnl_ensure_unique_netns(tb, extack, true);
 	if (err < 0)
 		return err;
+
+	err = -EINVAL;
+	if (tb[IFLA_IFINDEX_LIST]) {
+		NL_SET_ERR_MSG(extack, "ifindex list attribute cannot be used in getlink");
+		return err;
+	}
 
 	if (tb[IFLA_TARGET_NETNSID]) {
 		netnsid = nla_get_s32(tb[IFLA_TARGET_NETNSID]);
