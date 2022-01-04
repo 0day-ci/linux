@@ -318,7 +318,8 @@ int process_buffer_measurement(struct ima_namespace *ns,
 			       int pcr, const char *func_data,
 			       bool buf_hash, u8 *digest, size_t digest_len);
 void ima_audit_measurement(struct integrity_iint_cache *iint,
-			   const unsigned char *filename);
+			   const unsigned char *filename,
+			   struct ns_status *status);
 int ima_alloc_init_template(struct ima_event_data *event_data,
 			    struct ima_template_entry **entry,
 			    struct ima_template_desc *template_desc);
@@ -530,6 +531,14 @@ struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
 
 void ima_free_ns_status_tree(struct ima_namespace *ns);
 
+#define IMA_NS_STATUS_ACTIONS   IMA_AUDIT
+#define IMA_NS_STATUS_FLAGS     IMA_AUDITED
+
+unsigned long iint_flags(struct integrity_iint_cache *iint,
+			 struct ns_status *status);
+unsigned long set_iint_flags(struct integrity_iint_cache *iint,
+			     struct ns_status *status, unsigned long flags);
+
 #else
 
 static inline struct ima_namespace *
@@ -544,6 +553,22 @@ static inline struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
 						  struct integrity_iint_cache *iint)
 {
 	return NULL;
+}
+
+#define IMA_NS_STATUS_ACTIONS	0
+
+static inline unsigned long iint_flags(struct integrity_iint_cache *iint,
+				       struct ns_status *status)
+{
+	return iint->flags;
+}
+
+static inline unsigned long set_iint_flags(struct integrity_iint_cache *iint,
+					   struct ns_status *status,
+					   unsigned long flags)
+{
+	iint->flags = flags;
+	return flags;
 }
 
 #endif /* CONFIG_IMA_NS */
