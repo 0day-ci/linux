@@ -180,7 +180,8 @@ static const struct file_operations mmu_rmaps_stat_fops = {
 
 int kvm_arch_create_vm_debugfs(struct kvm *kvm)
 {
-	debugfs_create_file("mmu_rmaps_stat", 0644, kvm->debugfs_dentry, kvm,
-			    &mmu_rmaps_stat_fops);
+	if (kvm_memslots_have_rmaps(kvm))
+		debugfs_create_file("mmu_rmaps_stat", 0644, kvm->debugfs_dentry, kvm,
+				    &mmu_rmaps_stat_fops);
 	return 0;
 }
