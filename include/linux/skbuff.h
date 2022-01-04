@@ -287,7 +287,9 @@ struct tc_skb_ext {
 	__u32 chain;
 	__u16 mru;
 	__u16 zone;
-	bool post_ct;
+	bool post_ct:1;
+	bool post_ct_snat:1;
+	bool post_ct_dnat:1;
 };
 #endif
 
