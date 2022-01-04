@@ -1300,6 +1300,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
 	if (ret)
 		return ret;
 
+	if (!host->mmc->ocr_avail) {
+		dev_err(&pdev->dev, "Could not get mmc regulator\n");
+		return -EINVAL;
+	}
+
 	host->reg_base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(host->reg_base))
 		return PTR_ERR(host->reg_base);
