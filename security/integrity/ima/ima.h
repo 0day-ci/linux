@@ -509,20 +509,19 @@ struct user_namespace *ima_user_ns_from_file(const struct file *filp)
 	return file_inode(filp)->i_sb->s_user_ns;
 }
 
+#ifdef CONFIG_IMA_NS
+
 static inline struct ima_namespace
 *ima_ns_from_user_ns(struct user_namespace *user_ns)
 {
-	if (user_ns == &init_user_ns)
-		return &init_ima_ns;
-	return NULL;
+	/* Pairs with smp_store_releases() in create_ima_ns(). */
+	return smp_load_acquire(&user_ns->ima_ns);
 }
 
 static inline struct ima_namespace *get_current_ns(void)
 {
-	return &init_ima_ns;
+	return ima_ns_from_user_ns(current_user_ns());
 }
-
-#ifdef CONFIG_IMA_NS
 
 struct ima_namespace *create_ima_ns(struct user_namespace *user_ns);
 
@@ -531,6 +530,11 @@ struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
 				    struct integrity_iint_cache *iint);
 
 void ima_free_ns_status_tree(struct ima_namespace *ns);
+
+static inline struct ima_namespace *ima_ns_from_file(const struct file *filp)
+{
+	return ima_user_ns_from_file(filp)->ima_ns;
+}
 
 #define IMA_NS_STATUS_ACTIONS   IMA_AUDIT
 #define IMA_NS_STATUS_FLAGS     IMA_AUDITED
@@ -541,6 +545,20 @@ unsigned long set_iint_flags(struct integrity_iint_cache *iint,
 			     struct ns_status *status, unsigned long flags);
 
 #else
+
+static inline struct ima_namespace
+*ima_ns_from_user_ns(struct user_namespace *user_ns)
+{
+	if (user_ns == &init_user_ns)
+		return &init_ima_ns;
+	return NULL;
+}
+
+
+static inline struct ima_namespace *get_current_ns(void)
+{
+	return &init_ima_ns;
+}
 
 static inline struct ima_namespace *
 create_ima_ns(struct user_namespace *user_ns)
@@ -570,6 +588,11 @@ static inline unsigned long set_iint_flags(struct integrity_iint_cache *iint,
 {
 	iint->flags = flags;
 	return flags;
+}
+
+static inline struct ima_namespace *ima_ns_from_file(const struct file *filp)
+{
+	return &init_ima_ns;
 }
 
 #endif /* CONFIG_IMA_NS */

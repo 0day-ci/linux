@@ -26,7 +26,8 @@ struct ima_namespace *create_ima_ns(struct user_namespace *user_ns)
 	if (err)
 		goto fail_free;
 
-	user_ns->ima_ns = ns;
+	/* Pairs with smp_load_acquire() in ima_ns_from_user_ns(). */
+	smp_store_release(&user_ns->ima_ns, ns);
 
 	return ns;
 

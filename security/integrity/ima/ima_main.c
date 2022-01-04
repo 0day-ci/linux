@@ -483,7 +483,7 @@ int ima_file_mmap(struct file *file, unsigned long prot)
 	struct ima_namespace *ns = get_current_ns();
 	u32 secid;
 
-	if (file && (prot & PROT_EXEC)) {
+	if (ns && file && (prot & PROT_EXEC)) {
 		security_task_getsecid_subj(current, &secid);
 		return process_measurement(ns, file, current_cred(), secid,
 					   NULL, 0, MAY_EXEC, MMAP_CHECK);
@@ -519,7 +519,7 @@ int ima_file_mprotect(struct vm_area_struct *vma, unsigned long prot)
 	int pcr;
 
 	/* Is mprotect making an mmap'ed file executable? */
-	if (!(ns->ima_policy_flag & IMA_APPRAISE) || !vma->vm_file ||
+	if (!ns || !(ns->ima_policy_flag & IMA_APPRAISE) || !vma->vm_file ||
 	    !(prot & PROT_EXEC) || (vma->vm_flags & VM_EXEC))
 		return 0;
 
@@ -565,6 +565,9 @@ int ima_bprm_check(struct linux_binprm *bprm)
 	int ret;
 	u32 secid;
 
+	if (!ns)
+		return 0;
+
 	security_task_getsecid_subj(current, &secid);
 	ret = process_measurement(ns, bprm->file, current_cred(), secid, NULL,
 				  0, MAY_EXEC, BPRM_CHECK);
@@ -590,6 +593,9 @@ int ima_file_check(struct file *file, int mask)
 {
 	struct ima_namespace *ns = get_current_ns();
 	u32 secid;
+
+	if (!ns)
+		return 0;
 
 	security_task_getsecid_subj(current, &secid);
 	return process_measurement(ns, file, current_cred(), secid, NULL, 0,
@@ -656,7 +662,7 @@ int ima_file_hash(struct file *file, char *buf, size_t buf_size)
 {
 	struct ima_namespace *ns = get_current_ns();
 
-	if (!file)
+	if (!ns || !file)
 		return -EINVAL;
 
 	return __ima_inode_hash(ns, file_inode(file), buf, buf_size);
@@ -685,7 +691,7 @@ int ima_inode_hash(struct inode *inode, char *buf, size_t buf_size)
 {
 	struct ima_namespace *ns = get_current_ns();
 
-	if (!inode)
+	if (!ns || !inode)
 		return -EINVAL;
 
 	return __ima_inode_hash(ns, inode, buf, buf_size);
@@ -708,7 +714,7 @@ void ima_post_create_tmpfile(struct user_namespace *mnt_userns,
 	struct integrity_iint_cache *iint;
 	int must_appraise;
 
-	if (!ns->ima_policy_flag || !S_ISREG(inode->i_mode))
+	if (!ns || !ns->ima_policy_flag || !S_ISREG(inode->i_mode))
 		return;
 
 	must_appraise = ima_must_appraise(ns, mnt_userns, inode, MAY_ACCESS,
@@ -742,7 +748,7 @@ void ima_post_path_mknod(struct user_namespace *mnt_userns,
 	struct inode *inode = dentry->d_inode;
 	int must_appraise;
 
-	if (!ns->ima_policy_flag || !S_ISREG(inode->i_mode))
+	if (!ns || !ns->ima_policy_flag || !S_ISREG(inode->i_mode))
 		return;
 
 	must_appraise = ima_must_appraise(ns, mnt_userns, inode, MAY_ACCESS,
@@ -777,6 +783,9 @@ int ima_read_file(struct file *file, enum kernel_read_file_id read_id,
 	struct ima_namespace *ns = get_current_ns();
 	enum ima_hooks func;
 	u32 secid;
+
+	if (!ns)
+		return 0;
 
 	/*
 	 * Do devices using pre-allocated memory run the risk of the
@@ -828,6 +837,9 @@ int ima_post_read_file(struct file *file, void *buf, loff_t size,
 	struct ima_namespace *ns = get_current_ns();
 	enum ima_hooks func;
 	u32 secid;
+
+	if (!ns)
+		return 0;
 
 	/* permit signed certs */
 	if (!file && read_id == READING_X509_CERTIFICATE)
@@ -1071,7 +1083,7 @@ void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
 	struct ima_namespace *ns = get_current_ns();
 	struct fd f;
 
-	if (!buf || !size)
+	if (!ns || !buf || !size)
 		return;
 
 	f = fdget(kernel_fd);
@@ -1110,6 +1122,9 @@ int ima_measure_critical_data(const char *event_label,
 			      bool hash, u8 *digest, size_t digest_len)
 {
 	struct ima_namespace *ns = get_current_ns();
+
+	if (!ns)
+		return -EINVAL;
 
 	if (!event_name || !event_label || !buf || !buf_len)
 		return -ENOPARAM;
