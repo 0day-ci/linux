@@ -215,6 +215,7 @@ static int brcmf_init_nvram_parser(struct nvram_parser *nvp,
 	else
 		size = data_len;
 	/* Add space for properties we may add */
+	size += strlen(BRCMF_FW_DEFAULT_BOARDREV) + 1;
 	size += BRCMF_FW_MACADDR_LEN + 1;
 	/* Alloc for extra 0 byte + roundup by 4 + length field */
 	size += 1 + 3 + sizeof(u32);
