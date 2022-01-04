@@ -505,6 +505,14 @@ config OWL_DMA
 	help
 	  Enable support for the Actions Semi Owl SoCs DMA controller.
 
+config OXNAS_DMA
+	bool "Oxford Semiconductor OXNAS SoC Family DMA support"
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	depends on ARCH_OXNAS || COMPILE_TEST
+	help
+	  Support for Oxford Semiconductor OXNAS SoC Family DMA engine
+
 config PCH_DMA
 	tristate "Intel EG20T PCH / LAPIS Semicon IOH(ML7213/ML7223/ML7831) DMA"
 	depends on PCI && (X86_32 || COMPILE_TEST)
