@@ -495,13 +495,10 @@ static inline long in_from_reg(u16 reg, u8 src)
 
 static u16 nct6683_read(struct nct6683_data *data, u16 reg)
 {
-	int res;
-
 	outb_p(0xff, data->addr + EC_PAGE_REG);		/* unlock */
 	outb_p(reg >> 8, data->addr + EC_PAGE_REG);
 	outb_p(reg & 0xff, data->addr + EC_INDEX_REG);
-	res = inb_p(data->addr + EC_DATA_REG);
-	return res;
+	return inb_p(data->addr + EC_DATA_REG);
 }
 
 static u16 nct6683_read16(struct nct6683_data *data, u16 reg)
