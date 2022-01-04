@@ -574,7 +574,7 @@ static int cros_ec_lightbar_remove(struct platform_device *pd)
 	return 0;
 }
 
-static int __maybe_unused cros_ec_lightbar_resume(struct device *dev)
+static int cros_ec_lightbar_resume(struct device *dev)
 {
 	struct cros_ec_dev *ec_dev = dev_get_drvdata(dev->parent);
 
@@ -584,7 +584,7 @@ static int __maybe_unused cros_ec_lightbar_resume(struct device *dev)
 	return lb_send_empty_cmd(ec_dev, LIGHTBAR_CMD_RESUME);
 }
 
-static int __maybe_unused cros_ec_lightbar_suspend(struct device *dev)
+static int cros_ec_lightbar_suspend(struct device *dev)
 {
 	struct cros_ec_dev *ec_dev = dev_get_drvdata(dev->parent);
 
@@ -594,13 +594,13 @@ static int __maybe_unused cros_ec_lightbar_suspend(struct device *dev)
 	return lb_send_empty_cmd(ec_dev, LIGHTBAR_CMD_SUSPEND);
 }
 
-static SIMPLE_DEV_PM_OPS(cros_ec_lightbar_pm_ops,
+DEFINE_SIMPLE_DEV_PM_OPS(cros_ec_lightbar_pm_ops,
 			 cros_ec_lightbar_suspend, cros_ec_lightbar_resume);
 
 static struct platform_driver cros_ec_lightbar_driver = {
 	.driver = {
 		.name = DRV_NAME,
-		.pm = &cros_ec_lightbar_pm_ops,
+		.pm = pm_sleep_ptr(&cros_ec_lightbar_pm_ops),
 	},
 	.probe = cros_ec_lightbar_probe,
 	.remove = cros_ec_lightbar_remove,

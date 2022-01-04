@@ -266,7 +266,6 @@ static void cros_ec_rpmsg_remove(struct rpmsg_device *rpdev)
 	cancel_work_sync(&ec_rpmsg->host_event_work);
 }
 
-#ifdef CONFIG_PM_SLEEP
 static int cros_ec_rpmsg_suspend(struct device *dev)
 {
 	struct cros_ec_device *ec_dev = dev_get_drvdata(dev);
@@ -280,9 +279,8 @@ static int cros_ec_rpmsg_resume(struct device *dev)
 
 	return cros_ec_resume(ec_dev);
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(cros_ec_rpmsg_pm_ops, cros_ec_rpmsg_suspend,
+DEFINE_SIMPLE_DEV_PM_OPS(cros_ec_rpmsg_pm_ops, cros_ec_rpmsg_suspend,
 			 cros_ec_rpmsg_resume);
 
 static const struct of_device_id cros_ec_rpmsg_of_match[] = {
@@ -295,7 +293,7 @@ static struct rpmsg_driver cros_ec_driver_rpmsg = {
 	.drv = {
 		.name   = "cros-ec-rpmsg",
 		.of_match_table = cros_ec_rpmsg_of_match,
-		.pm	= &cros_ec_rpmsg_pm_ops,
+		.pm	= pm_sleep_ptr(&cros_ec_rpmsg_pm_ops),
 	},
 	.probe		= cros_ec_rpmsg_probe,
 	.remove		= cros_ec_rpmsg_remove,

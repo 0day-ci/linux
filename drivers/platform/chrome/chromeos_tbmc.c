@@ -38,7 +38,7 @@ static int chromeos_tbmc_query_switch(struct acpi_device *adev,
 	return 0;
 }
 
-static __maybe_unused int chromeos_tbmc_resume(struct device *dev)
+static int chromeos_tbmc_resume(struct device *dev)
 {
 	struct acpi_device *adev = to_acpi_device(dev);
 
@@ -101,7 +101,7 @@ static const struct acpi_device_id chromeos_tbmc_acpi_device_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, chromeos_tbmc_acpi_device_ids);
 
-static SIMPLE_DEV_PM_OPS(chromeos_tbmc_pm_ops, NULL,
+DEFINE_SIMPLE_DEV_PM_OPS(chromeos_tbmc_pm_ops, NULL,
 		chromeos_tbmc_resume);
 
 static struct acpi_driver chromeos_tbmc_driver = {
@@ -112,7 +112,7 @@ static struct acpi_driver chromeos_tbmc_driver = {
 		.add = chromeos_tbmc_add,
 		.notify = chromeos_tbmc_notify,
 	},
-	.drv.pm = &chromeos_tbmc_pm_ops,
+	.drv.pm = pm_sleep_ptr(&chromeos_tbmc_pm_ops),
 };
 
 module_acpi_driver(chromeos_tbmc_driver);

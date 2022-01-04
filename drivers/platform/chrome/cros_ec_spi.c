@@ -793,7 +793,6 @@ static int cros_ec_spi_remove(struct spi_device *spi)
 	return cros_ec_unregister(ec_dev);
 }
 
-#ifdef CONFIG_PM_SLEEP
 static int cros_ec_spi_suspend(struct device *dev)
 {
 	struct cros_ec_device *ec_dev = dev_get_drvdata(dev);
@@ -807,9 +806,8 @@ static int cros_ec_spi_resume(struct device *dev)
 
 	return cros_ec_resume(ec_dev);
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(cros_ec_spi_pm_ops, cros_ec_spi_suspend,
+DEFINE_SIMPLE_DEV_PM_OPS(cros_ec_spi_pm_ops, cros_ec_spi_suspend,
 			 cros_ec_spi_resume);
 
 static const struct of_device_id cros_ec_spi_of_match[] = {
@@ -828,7 +826,7 @@ static struct spi_driver cros_ec_driver_spi = {
 	.driver	= {
 		.name	= "cros-ec-spi",
 		.of_match_table = cros_ec_spi_of_match,
-		.pm	= &cros_ec_spi_pm_ops,
+		.pm	= pm_sleep_ptr(&cros_ec_spi_pm_ops),
 	},
 	.probe		= cros_ec_spi_probe,
 	.remove		= cros_ec_spi_remove,

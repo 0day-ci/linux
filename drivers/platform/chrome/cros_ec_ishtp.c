@@ -736,7 +736,7 @@ static int cros_ec_ishtp_reset(struct ishtp_cl_device *cl_device)
  *
  * Return: 0 for success, negative error code for failure.
  */
-static int __maybe_unused cros_ec_ishtp_suspend(struct device *device)
+static int cros_ec_ishtp_suspend(struct device *device)
 {
 	struct ishtp_cl_device *cl_device = ishtp_dev_to_cl_device(device);
 	struct ishtp_cl	*cros_ish_cl = ishtp_get_drvdata(cl_device);
@@ -751,7 +751,7 @@ static int __maybe_unused cros_ec_ishtp_suspend(struct device *device)
  *
  * Return: 0 for success, negative error code for failure.
  */
-static int __maybe_unused cros_ec_ishtp_resume(struct device *device)
+static int cros_ec_ishtp_resume(struct device *device)
 {
 	struct ishtp_cl_device *cl_device = ishtp_dev_to_cl_device(device);
 	struct ishtp_cl	*cros_ish_cl = ishtp_get_drvdata(cl_device);
@@ -760,7 +760,7 @@ static int __maybe_unused cros_ec_ishtp_resume(struct device *device)
 	return cros_ec_resume(client_data->ec_dev);
 }
 
-static SIMPLE_DEV_PM_OPS(cros_ec_ishtp_pm_ops, cros_ec_ishtp_suspend,
+DEFINE_SIMPLE_DEV_PM_OPS(cros_ec_ishtp_pm_ops, cros_ec_ishtp_suspend,
 			 cros_ec_ishtp_resume);
 
 static struct ishtp_cl_driver	cros_ec_ishtp_driver = {
@@ -770,7 +770,7 @@ static struct ishtp_cl_driver	cros_ec_ishtp_driver = {
 	.remove = cros_ec_ishtp_remove,
 	.reset = cros_ec_ishtp_reset,
 	.driver = {
-		.pm = &cros_ec_ishtp_pm_ops,
+		.pm = pm_sleep_ptr(&cros_ec_ishtp_pm_ops),
 	},
 };
 

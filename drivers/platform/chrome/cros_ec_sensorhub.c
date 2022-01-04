@@ -216,7 +216,6 @@ static int cros_ec_sensorhub_probe(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
 /*
  * When the EC is suspending, we must stop sending interrupt,
  * we may use the same interrupt line for waking up the device.
@@ -241,16 +240,15 @@ static int cros_ec_sensorhub_resume(struct device *dev)
 		return cros_ec_sensorhub_ring_fifo_enable(sensorhub, true);
 	return 0;
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(cros_ec_sensorhub_pm_ops,
+DEFINE_SIMPLE_DEV_PM_OPS(cros_ec_sensorhub_pm_ops,
 		cros_ec_sensorhub_suspend,
 		cros_ec_sensorhub_resume);
 
 static struct platform_driver cros_ec_sensorhub_driver = {
 	.driver = {
 		.name = DRV_NAME,
-		.pm = &cros_ec_sensorhub_pm_ops,
+		.pm = pm_sleep_ptr(&cros_ec_sensorhub_pm_ops),
 	},
 	.probe = cros_ec_sensorhub_probe,
 };
