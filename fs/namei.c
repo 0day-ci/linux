@@ -3426,6 +3426,12 @@ static int do_open(struct nameidata *nd,
 		error = vfs_open(&nd->path, file);
 	if (!error)
 		error = ima_file_check(file, op->acc_mode);
+	if (!error && (file->f_flags & O_DIRECT)) {
+		if (!file->f_mapping->a_ops || !file->f_mapping->a_ops->direct_IO) {
+			do_unlinkat(AT_FDCWD, getname_kernel(nd->name->name));
+			return -EINVAL;
+		}
+	}
 	if (!error && do_truncate)
 		error = handle_truncate(mnt_userns, file);
 	if (unlikely(error > 0)) {
