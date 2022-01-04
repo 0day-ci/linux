@@ -136,9 +136,11 @@ static long acrn_dev_ioctl(struct file *filp, unsigned int cmd,
 		if (IS_ERR(vm_param))
 			return PTR_ERR(vm_param);
 
-		if ((vm_param->reserved0 | vm_param->reserved1) != 0)
-			return -EINVAL;
-
+		if ((vm_param->reserved0 | vm_param->reserved1) != 0) {
+			ret = -EINVAL;
+			kfree(vm_param);
+			break;
+		}
 		vm = acrn_vm_create(vm, vm_param);
 		if (!vm) {
 			ret = -EINVAL;
