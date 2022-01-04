@@ -2506,6 +2506,9 @@ static int eb_pin_timeline(struct i915_execbuffer *eb, struct intel_context *ce,
 			i915_request_put(rq);
 
 			tl = intel_context_timeline_lock(ce);
+			if (IS_ERR(tl))
+				return PTR_ERR(tl);
+
 			intel_context_exit(ce);
 			intel_context_timeline_unlock(tl);
 
