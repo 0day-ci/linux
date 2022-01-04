@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/dma/oxsemi,ox810se-dma.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Oxford Semiconductor DMA Controller Device Tree Bindings
+
+maintainers:
+  - Neil Armstrong <narmstrong@baylibre.com>
+
+allOf:
+  - $ref: "dma-controller.yaml#"
+
+properties:
+  "#dma-cells":
+    const: 1
+
+  compatible:
+    const: oxsemi,ox810se-dma
+
+  reg:
+    maxItems: 2
+
+  reg-names:
+    items:
+      - const: dma
+      - const: sgdma
+
+  interrupts:
+    maxItems: 5
+
+  clocks:
+    maxItems: 1
+
+  resets:
+    maxItems: 2
+
+  reset-names:
+    items:
+      - const: dma
+      - const: sgdma
+
+  dma-channels: true
+
+  oxsemi,targets-types:
+    description:
+      Table with allowed memory ranges and memory type associated.
+    $ref: "/schemas/types.yaml#/definitions/uint32-matrix"
+    minItems: 4
+    items:
+      items:
+        - description:
+            The first cell defines the memory range start address
+        - description:
+            The first cell defines the memory range end address
+        - description:
+            The third cell represents memory type, 0 for SATA,
+            1 for DPE RX, 2 for DPE TX, 5 for AUDIO TX, 6 for AUDIO RX,
+            15 for DRAM MEMORY.
+          enum: [ 0, 1, 2, 5, 6, 15 ]
+
+required:
+  - "#dma-cells"
+  - dma-channels
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - resets
+  - reset-names
+  - oxsemi,targets-types
+
+additionalProperties: false
+
+examples:
+  - |
+    dma: dma-controller@600000 {
+        compatible = "oxsemi,ox810se-dma";
+        reg = <0x600000 0x100000>, <0xc00000 0x100000>;
+        reg-names = "dma", "sgdma";
+        interrupts = <13>, <14>, <15>, <16>, <20>;
+        clocks = <&stdclk 1>;
+        resets = <&reset 8>, <&reset 24>;
+        reset-names = "dma", "sgdma";
+
+        /* Encodes the authorized memory types */
+        oxsemi,targets-types =
+            <0x45900000 0x45a00000 0>,  /* SATA */
+            <0x42000000 0x43000000 0>,  /* SATA DATA */
+            <0x48000000 0x58000000 15>, /* DDR */
+            <0x58000000 0x58020000 15>; /* SRAM */
+
+        #dma-cells = <1>;
+        dma-channels = <5>;
+    };
+...
