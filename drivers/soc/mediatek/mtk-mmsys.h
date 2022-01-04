@@ -92,6 +92,7 @@ struct mtk_mmsys_driver_data {
 	const char *clk_driver;
 	const struct mtk_mmsys_routes *routes;
 	const unsigned int num_routes;
+	bool has_gce_client_reg;
 };
 
 /*

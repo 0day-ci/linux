@@ -8,9 +8,11 @@
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/of_device.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include <linux/reset-controller.h>
 #include <linux/soc/mediatek/mtk-mmsys.h>
+#include <linux/soc/mediatek/mtk-cmdq.h>
 
 #include "mtk-mmsys.h"
 #include "mt8167-mmsys.h"
@@ -54,6 +56,7 @@ static const struct mtk_mmsys_driver_data mt8183_mmsys_driver_data = {
 	.clk_driver = "clk-mt8183-mm",
 	.routes = mmsys_mt8183_routing_table,
 	.num_routes = ARRAY_SIZE(mmsys_mt8183_routing_table),
+	.has_gce_client_reg = true,
 };
 
 static const struct mtk_mmsys_driver_data mt8192_mmsys_driver_data = {
@@ -73,6 +76,8 @@ struct mtk_mmsys {
 	const struct mtk_mmsys_driver_data *data;
 	spinlock_t lock; /* protects mmsys_sw_rst_b reg */
 	struct reset_controller_dev rcdev;
+	struct cmdq_client_reg cmdq_base;
+	phys_addr_t addr;
 };
 
 void mtk_mmsys_ddp_connect(struct device *dev,
@@ -111,6 +116,17 @@ void mtk_mmsys_ddp_disconnect(struct device *dev,
 		}
 }
 EXPORT_SYMBOL_GPL(mtk_mmsys_ddp_disconnect);
+
+void mtk_mmsys_write_reg_by_cmdq(struct device *dev,
+				 struct mmsys_cmdq_cmd *cmd,
+				 u32 offset, u32 value, u32 mask)
+{
+	struct mtk_mmsys *mmsys = dev_get_drvdata(dev);
+
+	cmdq_pkt_write_mask(cmd->pkt, mmsys->cmdq_base.subsys,
+			    mmsys->addr + offset, value, mask);
+}
+EXPORT_SYMBOL_GPL(mtk_mmsys_write_reg_by_cmdq);
 
 static int mtk_mmsys_reset_update(struct reset_controller_dev *rcdev, unsigned long id,
 				  bool assert)
@@ -170,6 +186,7 @@ static int mtk_mmsys_probe(struct platform_device *pdev)
 	struct platform_device *clks;
 	struct platform_device *drm;
 	struct mtk_mmsys *mmsys;
+	struct resource res;
 	int ret;
 
 	mmsys = devm_kzalloc(dev, sizeof(*mmsys), GFP_KERNEL);
@@ -193,6 +210,19 @@ static int mtk_mmsys_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "Couldn't register mmsys reset controller: %d\n", ret);
 		return ret;
+	}
+
+	if (of_address_to_resource(dev->of_node, 0, &res) < 0)
+		mmsys->addr = 0L;
+	else
+		mmsys->addr = res.start;
+
+	if (mmsys->data->has_gce_client_reg) {
+		ret = cmdq_dev_get_client_reg(dev, &mmsys->cmdq_base, 0);
+		if (ret) {
+			dev_err(dev, "No mediatek,gce-client-reg!\n");
+			return ret;
+		}
 	}
 
 	mmsys->data = of_device_get_match_data(&pdev->dev);
