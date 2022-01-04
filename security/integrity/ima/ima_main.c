@@ -153,6 +153,35 @@ static void ima_rdwr_violation_check(struct ima_namespace *ns,
 				  "invalid_pcr", "open_writers");
 }
 
+#ifdef CONFIG_IMA_NS
+
+static void mask_iint_ns_status_flags(struct integrity_iint_cache *iint,
+				      unsigned long mask)
+{
+	struct ns_status *status;
+	unsigned long flags;
+
+	read_lock(&iint->ns_list_lock);
+	list_for_each_entry(status, &iint->ns_list, ns_next) {
+		flags = iint_flags(iint, status) & mask;
+		set_iint_flags(iint, status, flags);
+	}
+	read_unlock(&iint->ns_list_lock);
+}
+
+#else
+
+static void mask_iint_ns_status_flags(struct integrity_iint_cache *iint,
+				      unsigned long mask)
+{
+	unsigned long flags;
+
+	flags = iint_flags(iint, NULL) & mask;
+	set_iint_flags(iint, NULL, flags);
+}
+
+#endif
+
 static void ima_check_last_writer(struct integrity_iint_cache *iint,
 				  struct inode *inode, struct file *file)
 {
@@ -169,8 +198,10 @@ static void ima_check_last_writer(struct integrity_iint_cache *iint,
 		if (!IS_I_VERSION(inode) ||
 		    !inode_eq_iversion(inode, iint->version) ||
 		    (iint->flags & IMA_NEW_FILE)) {
-			iint->flags &= ~(IMA_DONE_MASK | IMA_NEW_FILE);
+			mask_iint_ns_status_flags(iint,
+					~(IMA_DONE_MASK | IMA_NEW_FILE));
 			iint->measured_pcrs = 0;
+
 			if (update)
 				ima_update_xattr(iint, file);
 		}
