@@ -16,6 +16,12 @@ use strict;
 ## This software falls under the GNU General Public License.     ##
 ## Please read the COPYING file for more information             ##
 
+=head1 NAME
+
+kernel-doc - Print formatted kernel documentation to stdout
+
+=cut
+
 # 18/01/2001 - 	Cleanups
 # 		Functions prototyped as foo(void) same as foo()
 # 		Stop eval'ing where we don't need to.
