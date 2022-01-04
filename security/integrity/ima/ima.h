@@ -119,6 +119,10 @@ struct ima_kexec_hdr {
 	u64 count;
 };
 
+struct ima_namespace {
+} __randomize_layout;
+extern struct ima_namespace init_ima_ns;
+
 extern const int read_idmap[];
 
 #ifdef CONFIG_HAVE_IMA_KEXEC
@@ -136,6 +140,7 @@ extern bool ima_canonical_fmt;
 /* Internal IMA function definitions */
 int ima_init(void);
 int ima_fs_init(void);
+int ima_ns_init(void);
 int ima_add_template_entry(struct ima_template_entry *entry, int violation,
 			   const char *op, struct inode *inode,
 			   const unsigned char *filename);
@@ -449,5 +454,10 @@ static inline int ima_filter_rule_match(u32 secid, u32 field, u32 op,
 #else
 #define	POLICY_FILE_FLAGS	S_IWUSR
 #endif /* CONFIG_IMA_READ_POLICY */
+
+static inline struct ima_namespace *get_current_ns(void)
+{
+	return &init_ima_ns;
+}
 
 #endif /* __LINUX_IMA_H */
