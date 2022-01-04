@@ -2371,8 +2371,10 @@ M:	Neil Armstrong <narmstrong@baylibre.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	linux-oxnas@groups.io (moderated for non-subscribers)
 S:	Maintained
+F:	Documentation/devicetree/bindings/dma/oxsemi,ox810se-dma.yaml
 F:	arch/arm/boot/dts/ox8*.dts*
 F:	arch/arm/mach-oxnas/
+F:	drivers/dma/oxnas_adma.c
 F:	drivers/power/reset/oxnas-restart.c
 N:	oxnas
 
