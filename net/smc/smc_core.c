@@ -171,8 +171,10 @@ static int smc_lgr_register_conn(struct smc_connection *conn, bool first)
 
 	if (!conn->lgr->is_smcd) {
 		rc = smcr_lgr_conn_assign_link(conn, first);
-		if (rc)
+		if (rc) {
+			conn->lgr = NULL;
 			return rc;
+		}
 	}
 	/* find a new alert_token_local value not yet used by some connection
 	 * in this link group
@@ -1832,8 +1834,10 @@ create:
 		write_lock_bh(&lgr->conns_lock);
 		rc = smc_lgr_register_conn(conn, true);
 		write_unlock_bh(&lgr->conns_lock);
-		if (rc)
+		if (rc) {
+			smc_lgr_schedule_free_work(lgr);
 			goto out;
+		}
 	}
 	conn->local_tx_ctrl.common.type = SMC_CDC_MSG_TYPE;
 	conn->local_tx_ctrl.len = SMC_WR_TX_SIZE;
