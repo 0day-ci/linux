@@ -107,7 +107,7 @@ int btrfs_attach_subpage(const struct btrfs_fs_info *fs_info,
 		ASSERT(PageLocked(page));
 
 	/* Either not subpage, or the page already has private attached */
-	if (fs_info->sectorsize == PAGE_SIZE || PagePrivate(page))
+	if (!btrfs_is_subpage(fs_info, page) || PagePrivate(page))
 		return 0;
 
 	subpage = btrfs_alloc_subpage(fs_info, type);
@@ -124,7 +124,7 @@ void btrfs_detach_subpage(const struct btrfs_fs_info *fs_info,
 	struct btrfs_subpage *subpage;
 
 	/* Either not subpage, or already detached */
-	if (fs_info->sectorsize == PAGE_SIZE || !PagePrivate(page))
+	if (!btrfs_is_subpage(fs_info, page) || !PagePrivate(page))
 		return;
 
 	subpage = (struct btrfs_subpage *)detach_page_private(page);
@@ -175,7 +175,7 @@ void btrfs_page_inc_eb_refs(const struct btrfs_fs_info *fs_info,
 {
 	struct btrfs_subpage *subpage;
 
-	if (fs_info->sectorsize == PAGE_SIZE)
+	if (!btrfs_is_subpage(fs_info, page))
 		return;
 
 	ASSERT(PagePrivate(page) && page->mapping);
@@ -190,7 +190,7 @@ void btrfs_page_dec_eb_refs(const struct btrfs_fs_info *fs_info,
 {
 	struct btrfs_subpage *subpage;
 
-	if (fs_info->sectorsize == PAGE_SIZE)
+	if (!btrfs_is_subpage(fs_info, page))
 		return;
 
 	ASSERT(PagePrivate(page) && page->mapping);
@@ -208,6 +208,7 @@ static void btrfs_subpage_assert(const struct btrfs_fs_info *fs_info,
 	ASSERT(PagePrivate(page) && page->private);
 	ASSERT(IS_ALIGNED(start, fs_info->sectorsize) &&
 	       IS_ALIGNED(len, fs_info->sectorsize));
+	ASSERT(btrfs_is_subpage(fs_info, page));
 	/*
 	 * The range check only works for mapped page, we can still have
 	 * unmapped page like dummy extent buffer pages.
@@ -319,7 +320,7 @@ bool btrfs_subpage_end_and_test_writer(const struct btrfs_fs_info *fs_info,
 int btrfs_page_start_writer_lock(const struct btrfs_fs_info *fs_info,
 		struct page *page, u64 start, u32 len)
 {
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE) {
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page)) {
 		lock_page(page);
 		return 0;
 	}
@@ -336,7 +337,7 @@ int btrfs_page_start_writer_lock(const struct btrfs_fs_info *fs_info,
 void btrfs_page_end_writer_lock(const struct btrfs_fs_info *fs_info,
 		struct page *page, u64 start, u32 len)
 {
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE)
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page))
 		return unlock_page(page);
 	btrfs_subpage_clamp_range(page, &start, &len);
 	if (btrfs_subpage_end_and_test_writer(fs_info, page, start, len))
@@ -620,7 +621,7 @@ IMPLEMENT_BTRFS_SUBPAGE_TEST_OP(checked);
 void btrfs_page_set_##name(const struct btrfs_fs_info *fs_info,		\
 		struct page *page, u64 start, u32 len)			\
 {									\
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE) {	\
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page)) {	\
 		set_page_func(page);					\
 		return;							\
 	}								\
@@ -629,7 +630,7 @@ void btrfs_page_set_##name(const struct btrfs_fs_info *fs_info,		\
 void btrfs_page_clear_##name(const struct btrfs_fs_info *fs_info,	\
 		struct page *page, u64 start, u32 len)			\
 {									\
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE) {	\
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page)) {	\
 		clear_page_func(page);					\
 		return;							\
 	}								\
@@ -638,14 +639,14 @@ void btrfs_page_clear_##name(const struct btrfs_fs_info *fs_info,	\
 bool btrfs_page_test_##name(const struct btrfs_fs_info *fs_info,	\
 		struct page *page, u64 start, u32 len)			\
 {									\
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE)	\
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page))	\
 		return test_page_func(page);				\
 	return btrfs_subpage_test_##name(fs_info, page, start, len);	\
 }									\
 void btrfs_page_clamp_set_##name(const struct btrfs_fs_info *fs_info,	\
 		struct page *page, u64 start, u32 len)			\
 {									\
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE) {	\
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page)) {	\
 		set_page_func(page);					\
 		return;							\
 	}								\
@@ -655,7 +656,7 @@ void btrfs_page_clamp_set_##name(const struct btrfs_fs_info *fs_info,	\
 void btrfs_page_clamp_clear_##name(const struct btrfs_fs_info *fs_info, \
 		struct page *page, u64 start, u32 len)			\
 {									\
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE) {	\
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page)) {	\
 		clear_page_func(page);					\
 		return;							\
 	}								\
@@ -665,7 +666,7 @@ void btrfs_page_clamp_clear_##name(const struct btrfs_fs_info *fs_info, \
 bool btrfs_page_clamp_test_##name(const struct btrfs_fs_info *fs_info,	\
 		struct page *page, u64 start, u32 len)			\
 {									\
-	if (unlikely(!fs_info) || fs_info->sectorsize == PAGE_SIZE)	\
+	if (unlikely(!fs_info) || !btrfs_is_subpage(fs_info, page))	\
 		return test_page_func(page);				\
 	btrfs_subpage_clamp_range(page, &start, &len);			\
 	return btrfs_subpage_test_##name(fs_info, page, start, len);	\
@@ -694,7 +695,7 @@ void btrfs_page_assert_not_dirty(const struct btrfs_fs_info *fs_info,
 		return;
 
 	ASSERT(!PageDirty(page));
-	if (fs_info->sectorsize == PAGE_SIZE)
+	if (!btrfs_is_subpage(fs_info, page))
 		return;
 
 	ASSERT(PagePrivate(page) && page->private);
@@ -722,8 +723,8 @@ void btrfs_page_unlock_writer(struct btrfs_fs_info *fs_info, struct page *page,
 	struct btrfs_subpage *subpage;
 
 	ASSERT(PageLocked(page));
-	/* For regular page size case, we just unlock the page */
-	if (fs_info->sectorsize == PAGE_SIZE)
+	/* For non-subpage case, we just unlock the page */
+	if (!btrfs_is_subpage(fs_info, page))
 		return unlock_page(page);
 
 	ASSERT(PagePrivate(page) && page->private);
