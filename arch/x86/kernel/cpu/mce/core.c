@@ -1307,7 +1307,7 @@ static void queue_task_work(struct mce *m, char *msg, void (*func)(struct callba
 	if (count > 1)
 		return;
 
-	task_work_add(current, &current->mce_kill_me, TWA_RESUME);
+	task_work_add(current, &current->mce_kill_me);
 }
 
 /* Handle unconfigured int18 (should never happen) */

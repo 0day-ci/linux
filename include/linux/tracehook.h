@@ -203,7 +203,7 @@ static inline void tracehook_notify_resume(struct pt_regs *regs)
 
 /*
  * called by exit_to_user_mode_loop() if ti_work & _TIF_NOTIFY_SIGNAL. This
- * is currently used by TWA_SIGNAL based task_work, which requires breaking
+ * is currently used by signal based task_work, which requires breaking
  * wait loops to ensure that task_work is noticed and run.
  */
 static inline void tracehook_notify_signal(void)

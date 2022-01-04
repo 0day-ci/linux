@@ -2256,7 +2256,6 @@ static void io_req_task_work_add(struct io_kiocb *req)
 {
 	struct task_struct *tsk = req->task;
 	struct io_uring_task *tctx = tsk->io_uring;
-	enum task_work_notify_mode notify;
 	struct io_wq_work_node *node;
 	unsigned long flags;
 	bool running;
@@ -2276,14 +2275,15 @@ static void io_req_task_work_add(struct io_kiocb *req)
 
 	/*
 	 * SQPOLL kernel thread doesn't need notification, just a wakeup. For
-	 * all other cases, use TWA_SIGNAL unconditionally to ensure we're
-	 * processing task_work. There's no reliable way to tell if TWA_RESUME
-	 * will do the job.
+	 * all other cases, use set_notify_signal unconditionally to ensure
+	 * we're processing the task_work. There's no reliable way to tell if
+	 * task_work_add will do the job.
 	 */
-	notify = (req->ctx->flags & IORING_SETUP_SQPOLL) ? TWA_NONE : TWA_SIGNAL;
-	if (likely(!task_work_add(tsk, &tctx->task_work, notify))) {
-		if (notify == TWA_NONE)
+	if (likely(!task_work_add_nonotify(tsk, &tctx->task_work))) {
+		if (req->ctx->flags & IORING_SETUP_SQPOLL)
 			wake_up_process(tsk);
+		else
+			set_notify_signal(tsk);
 		return;
 	}
 
@@ -9522,7 +9522,7 @@ static __cold void io_ring_exit_work(struct work_struct *work)
 					ctx_node);
 		/* don't spin on a single task if cancellation failed */
 		list_rotate_left(&ctx->tctx_list);
-		ret = task_work_add(node->task, &exit.task_work, TWA_SIGNAL);
+		ret = task_work_add_nonotify(node->task, &exit.task_work);
 		if (WARN_ON_ONCE(ret))
 			continue;
 

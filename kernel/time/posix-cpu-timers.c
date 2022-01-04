@@ -1201,7 +1201,7 @@ static inline void __run_posix_cpu_timers(struct task_struct *tsk)
 
 	/* Schedule task work to actually expire the timers */
 	tsk->posix_cputimers_work.scheduled = true;
-	task_work_add(tsk, &tsk->posix_cputimers_work.work, TWA_RESUME);
+	task_work_add(tsk, &tsk->posix_cputimers_work.work);
 }
 
 static inline bool posix_cpu_timers_enable_work(struct task_struct *tsk,

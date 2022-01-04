@@ -361,7 +361,8 @@ static bool io_queue_worker_create(struct io_worker *worker,
 	atomic_inc(&wq->worker_refs);
 	init_task_work(&worker->create_work, func);
 	worker->create_index = acct->index;
-	if (!task_work_add(wq->task, &worker->create_work, TWA_SIGNAL)) {
+	if (!task_work_add_nonotify(wq->task, &worker->create_work)) {
+		set_notify_signal(wq->task);
 		/*
 		 * EXIT may have been set after checking it above, check after
 		 * adding the task_work and remove any creation item if it is
