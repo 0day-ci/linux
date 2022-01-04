@@ -594,28 +594,39 @@ static int brcmf_fw_complete_request(const struct firmware *fw,
 	return (cur->flags & BRCMF_FW_REQF_OPTIONAL) ? 0 : ret;
 }
 
-static int brcm_alt_fw_paths(const char *path, const char *board_type,
+static int brcm_alt_fw_paths(const char *path, struct brcmf_fw *fwctx,
 			     const char *alt_paths[BRCMF_FW_MAX_ALT_PATHS])
 {
+	const char **board_types = fwctx->req->board_types;
+	unsigned int i;
 	char alt_path[BRCMF_FW_NAME_LEN];
 	const char *suffix;
 
 	memset(alt_paths, 0, array_size(sizeof(*alt_paths),
 					BRCMF_FW_MAX_ALT_PATHS));
 
+	if (!board_types[0])
+		return -ENOENT;
+
 	suffix = strrchr(path, '.');
 	if (!suffix || suffix == path)
 		return -EINVAL;
 
-	/* strip extension at the end */
-	strscpy(alt_path, path, BRCMF_FW_NAME_LEN);
-	alt_path[suffix - path] = 0;
+	for (i = 0; i < BRCMF_FW_MAX_ALT_PATHS; i++) {
+		if (!board_types[i])
+		    break;
 
-	strlcat(alt_path, ".", BRCMF_FW_NAME_LEN);
-	strlcat(alt_path, board_type, BRCMF_FW_NAME_LEN);
-	strlcat(alt_path, suffix, BRCMF_FW_NAME_LEN);
+		/* strip extension at the end */
+		strscpy(alt_path, path, BRCMF_FW_NAME_LEN);
+		alt_path[suffix - path] = 0;
 
-	alt_paths[0] = kstrdup(alt_path, GFP_KERNEL);
+		strlcat(alt_path, ".", BRCMF_FW_NAME_LEN);
+		strlcat(alt_path, board_types[i], BRCMF_FW_NAME_LEN);
+		strlcat(alt_path, suffix, BRCMF_FW_NAME_LEN);
+
+		alt_paths[i] = kstrdup(alt_path, GFP_KERNEL);
+		brcmf_dbg(TRACE, "FW alt path: %s\n", alt_paths[i]);
+	}
 
 	return 0;
 }
@@ -637,11 +648,10 @@ static int brcmf_fw_request_firmware(const struct firmware **fw,
 	unsigned int i;
 
 	/* Files can be board-specific, first try a board-specific path */
-	if (fwctx->req->board_type) {
+	if (fwctx->req->board_types[0]) {
 		const char *alt_paths[BRCMF_FW_MAX_ALT_PATHS];
 
-		if (brcm_alt_fw_paths(cur->path, fwctx->req->board_type,
-				      alt_paths) != 0)
+		if (brcm_alt_fw_paths(cur->path, fwctx, alt_paths) != 0)
 			goto fallback;
 
 		for (i = 0; i < BRCMF_FW_MAX_ALT_PATHS && alt_paths[i]; i++) {
@@ -750,8 +760,7 @@ int brcmf_fw_get_firmwares(struct device *dev, struct brcmf_fw_request *req,
 	fwctx->done = fw_cb;
 
 	/* First try alternative board-specific path if any */
-	if (brcm_alt_fw_paths(first->path, req->board_type,
-			      fwctx->alt_paths) == 0) {
+	if (brcm_alt_fw_paths(first->path, fwctx, fwctx->alt_paths) == 0) {
 		fwctx->alt_index = 0;
 		ret = request_firmware_nowait(THIS_MODULE, true,
 					      fwctx->alt_paths[0],

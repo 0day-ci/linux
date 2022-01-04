@@ -68,7 +68,7 @@ struct brcmf_fw_request {
 	u16 domain_nr;
 	u16 bus_nr;
 	u32 n_items;
-	const char *board_type;
+	const char *board_types[BRCMF_FW_MAX_ALT_PATHS];
 	struct brcmf_fw_item items[];
 };
 
