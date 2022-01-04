@@ -54,30 +54,9 @@ See Documentation/doc-guide/kernel-doc.rst for the documentation comment syntax.
 
 # more perldoc at the end of the file
 
-# 18/01/2001 - 	Cleanups
-# 		Functions prototyped as foo(void) same as foo()
-# 		Stop eval'ing where we don't need to.
-# -- huggie@earth.li
-
-# 27/06/2001 -  Allowed whitespace after initial "/**" and
-#               allowed comments before function declarations.
-# -- Christian Kreibich <ck@whoop.org>
-
 # Still to do:
 # 	- add perldoc documentation
 # 	- Look more closely at some of the scarier bits :)
-
-# 26/05/2001 - 	Support for separate source and object trees.
-#		Return error code.
-# 		Keith Owens <kaos@ocs.com.au>
-
-# 23/09/2001 - Added support for typedefs, structs, enums and unions
-#              Support for Context section; can be terminated using empty line
-#              Small fixes (like spaces vs. \s in regex)
-# -- Tim Jansen <tim@tjansen.de>
-
-# 25/07/2012 - Added support for HTML5
-# -- Dan Luedtke <mail@danrl.de>
 
 ## init lots of data
 
@@ -2518,3 +2497,25 @@ Treat warnings as errors.
 =back
 
 =cut
+
+PRE-GIT MUSEUM
+
+Original formatting preserved for its historical value.
+
+# 18/01/2001 - 	Cleanups
+# 		Functions prototyped as foo(void) same as foo()
+# 		Stop eval'ing where we don't need to.
+# -- huggie@earth.li
+
+# 27/06/2001 -  Allowed whitespace after initial "/**" and
+#               allowed comments before function declarations.
+# -- Christian Kreibich <ck@whoop.org>
+
+# 26/05/2001 - 	Support for separate source and object trees.
+#		Return error code.
+# 		Keith Owens <kaos@ocs.com.au>
+
+# 23/09/2001 - Added support for typedefs, structs, enums and unions
+#              Support for Context section; can be terminated using empty line
+#              Small fixes (like spaces vs. \s in regex)
+# -- Tim Jansen <tim@tjansen.de>
