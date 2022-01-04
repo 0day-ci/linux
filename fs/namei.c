@@ -3277,6 +3277,13 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
 			goto out_dput;
 		}
 
+		if (open_flag & O_DIRECT) {
+			if (!dir_inode->i_mapping || !dir_inode->i_mapping->a_ops ||
+					!dir_inode->i_mapping->a_ops->direct_IO) {
+				error = -EINVAL;
+				goto out_dput;
+			}
+		}
 		error = dir_inode->i_op->create(mnt_userns, dir_inode, dentry,
 						mode, open_flag & O_EXCL);
 		if (error)
