@@ -683,7 +683,8 @@ tcp_rmem - vector of 3 INTEGERs: min, default, max
 	default: initial size of receive buffer used by TCP sockets.
 	This value overrides net.core.rmem_default used by other protocols.
 	Default: 131072 bytes.
-	This value results in initial window of 65535.
+	This value results in initial window of 65535. Increasing this value
+	won't raise the initial advertised window above 65535.
 
 	max: maximal size of receive buffer allowed for automatically
 	selected receiver buffers for TCP socket. This value does not override
