@@ -146,6 +146,7 @@ struct ima_namespace {
 	int valid_policy;
 
 	struct dentry *policy_dentry;
+	bool policy_dentry_removed;
 } __randomize_layout;
 extern struct ima_namespace init_ima_ns;
 
