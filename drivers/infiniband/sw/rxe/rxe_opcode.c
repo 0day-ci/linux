@@ -879,9 +879,9 @@ struct rxe_opcode_info rxe_opcode[RXE_NUM_OPCODE] = {
 			[RXE_ATMETH]	= RXE_BTH_BYTES
 						+ RXE_RDETH_BYTES
 						+ RXE_DETH_BYTES,
-			[RXE_PAYLOAD]	= RXE_BTH_BYTES +
+			[RXE_PAYLOAD]	= RXE_BTH_BYTES
 						+ RXE_ATMETH_BYTES
-						+ RXE_DETH_BYTES +
+						+ RXE_DETH_BYTES
 						+ RXE_RDETH_BYTES,
 		}
 	},
@@ -900,9 +900,9 @@ struct rxe_opcode_info rxe_opcode[RXE_NUM_OPCODE] = {
 			[RXE_ATMETH]	= RXE_BTH_BYTES
 						+ RXE_RDETH_BYTES
 						+ RXE_DETH_BYTES,
-			[RXE_PAYLOAD]	= RXE_BTH_BYTES +
+			[RXE_PAYLOAD]	= RXE_BTH_BYTES
 						+ RXE_ATMETH_BYTES
-						+ RXE_DETH_BYTES +
+						+ RXE_DETH_BYTES
 						+ RXE_RDETH_BYTES,
 		}
 	},
