@@ -316,7 +316,6 @@ static int cros_ec_i2c_remove(struct i2c_client *client)
 	return cros_ec_unregister(ec_dev);
 }
 
-#ifdef CONFIG_PM_SLEEP
 static int cros_ec_i2c_suspend(struct device *dev)
 {
 	struct cros_ec_device *ec_dev = to_ec_dev(dev);
@@ -330,10 +329,9 @@ static int cros_ec_i2c_resume(struct device *dev)
 
 	return cros_ec_resume(ec_dev);
 }
-#endif
 
 static const struct dev_pm_ops cros_ec_i2c_pm_ops = {
-	SET_LATE_SYSTEM_SLEEP_PM_OPS(cros_ec_i2c_suspend, cros_ec_i2c_resume)
+	LATE_SYSTEM_SLEEP_PM_OPS(cros_ec_i2c_suspend, cros_ec_i2c_resume)
 };
 
 #ifdef CONFIG_OF
@@ -363,7 +361,7 @@ static struct i2c_driver cros_ec_driver = {
 		.name	= "cros-ec-i2c",
 		.acpi_match_table = ACPI_PTR(cros_ec_i2c_acpi_id),
 		.of_match_table = of_match_ptr(cros_ec_i2c_of_match),
-		.pm	= &cros_ec_i2c_pm_ops,
+		.pm	= pm_sleep_ptr(&cros_ec_i2c_pm_ops),
 	},
 	.probe		= cros_ec_i2c_probe,
 	.remove		= cros_ec_i2c_remove,

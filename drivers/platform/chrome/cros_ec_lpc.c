@@ -504,7 +504,6 @@ static const struct dmi_system_id cros_ec_lpc_dmi_table[] __initconst = {
 };
 MODULE_DEVICE_TABLE(dmi, cros_ec_lpc_dmi_table);
 
-#ifdef CONFIG_PM_SLEEP
 static int cros_ec_lpc_suspend(struct device *dev)
 {
 	struct cros_ec_device *ec_dev = dev_get_drvdata(dev);
@@ -518,17 +517,16 @@ static int cros_ec_lpc_resume(struct device *dev)
 
 	return cros_ec_resume(ec_dev);
 }
-#endif
 
 static const struct dev_pm_ops cros_ec_lpc_pm_ops = {
-	SET_LATE_SYSTEM_SLEEP_PM_OPS(cros_ec_lpc_suspend, cros_ec_lpc_resume)
+	LATE_SYSTEM_SLEEP_PM_OPS(cros_ec_lpc_suspend, cros_ec_lpc_resume)
 };
 
 static struct platform_driver cros_ec_lpc_driver = {
 	.driver = {
 		.name = DRV_NAME,
 		.acpi_match_table = cros_ec_lpc_acpi_device_ids,
-		.pm = &cros_ec_lpc_pm_ops,
+		.pm = pm_sleep_ptr(&cros_ec_lpc_pm_ops),
 	},
 	.probe = cros_ec_lpc_probe,
 	.remove = cros_ec_lpc_remove,
