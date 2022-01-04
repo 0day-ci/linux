@@ -287,6 +287,50 @@ struct dma_buf_ops {
 	void (*vunmap)(struct dma_buf *dmabuf, struct dma_buf_map *map);
 };
 
+#ifdef CONFIG_DMABUF_SYSFS_STATS
+enum sysfs_entry_status {
+	SYSFS_ENTRY_UNINITIALIZED,
+	SYSFS_ENTRY_INIT_IN_PROGRESS,
+	SYSFS_ENTRY_ERROR,
+	SYSFS_ENTRY_INIT_ABORTED,
+	SYSFS_ENTRY_INITIALIZED,
+};
+
+/*
+ * struct dma_buf_sysfs_entry_metadata - Holds the current status for the
+ * DMA-BUF sysfs entry.
+ *
+ * @status: holds the current status for the DMA-BUF sysfs entry. The status of
+ * the sysfs entry has the following path.
+ *
+ *			SYSFS_ENTRY_UNINITIALIZED
+ *		 __________________|____________________
+ *		|					|
+ *	  SYSFS_ENTRY_INIT_IN_PROGRESS	    SYSFS_ENTRY_INIT_ABORTED (DMA-BUF
+ *		|						      gets freed
+ *		|						      before
+ *		|						      init)
+ *	________|_____________________________________
+ *	|			  |		      |
+ * SYSFS_ENTRY_INITIALIZED	  |	  SYSFS_ENTRY_INIT_ABORTED
+ *				  |		  (DMA-BUF gets freed during kobject
+ *				  |		  init)
+ *				  |
+ *				  |
+ *		      SYSFS_ENTRY_ERROR
+ *		      (error during kobject init)
+ *
+ * @sysfs_entry_lock: protects access to @status.
+ */
+struct dma_buf_sysfs_entry_metadata {
+	enum sysfs_entry_status status;
+	/*
+	 * Protects sysfs_entry_metadata->status
+	 */
+	spinlock_t sysfs_entry_lock;
+};
+#endif
+
 /**
  * struct dma_buf - shared buffer object
  *
@@ -452,6 +496,8 @@ struct dma_buf {
 		struct kobject kobj;
 		struct dma_buf *dmabuf;
 	} *sysfs_entry;
+
+	struct dma_buf_sysfs_entry_metadata *sysfs_entry_metadata;
 #endif
 };
 
