@@ -4,14 +4,16 @@
 use warnings;
 use strict;
 
-## Copyright (c) 1998 Michael Zucchi, All Rights Reserved        ##
-## Copyright (C) 2000, 1  Tim Waugh <twaugh@redhat.com>          ##
-## Copyright (C) 2001  Simon Huggins                             ##
-## Copyright (C) 2005-2012  Randy Dunlap                         ##
-## Copyright (C) 2012  Dan Luedtke                               ##
-## 								 ##
-## #define enhancements by Armin Kuster <akuster@mvista.com>	 ##
-## Copyright (c) 2000 MontaVista Software, Inc.			 ##
+# Copyright (C) 1998 Michael Zucchi, All Rights Reserved
+# Copyright (C) 2000, 1 Tim Waugh <twaugh@redhat.com>
+# Copyright (C) 2001 Simon Huggins
+# Copyright (C) 2005-2012  Randy Dunlap
+# Copyright (C) 2012 Dan Luedtke
+#
+# #define enhancements by Armin Kuster <akuster@mvista.com>
+# Copyright (C) 2000 MontaVista Software, Inc.
+#
+# Copyright (C) 2022 Tomasz Warniełło (POD)
 
 use Pod::Usage qw/pod2usage/;
 
