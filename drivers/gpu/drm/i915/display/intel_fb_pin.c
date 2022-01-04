@@ -104,7 +104,7 @@ intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb,
 	 * we should always have valid PTE following the scanout preventing
 	 * the VT-d warning.
 	 */
-	if (intel_scanout_needs_vtd_wa(dev_priv) && alignment < 256 * 1024)
+	if (intel_vtd_scanout_needs_wa(dev_priv) && alignment < 256 * 1024)
 		alignment = 256 * 1024;
 
 	/*
