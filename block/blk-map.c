@@ -260,31 +260,26 @@ static int bio_map_user_iov(struct request *rq, struct iov_iter *iter,
 
 		npages = DIV_ROUND_UP(offs + bytes, PAGE_SIZE);
 
-		if (unlikely(offs & queue_dma_alignment(rq->q))) {
-			ret = -EINVAL;
-			j = 0;
-		} else {
-			for (j = 0; j < npages; j++) {
-				struct page *page = pages[j];
-				unsigned int n = PAGE_SIZE - offs;
-				bool same_page = false;
+		for (j = 0; j < npages; j++) {
+			struct page *page = pages[j];
+			unsigned int n = PAGE_SIZE - offs;
+			bool same_page = false;
 
-				if (n > bytes)
-					n = bytes;
+			if (n > bytes)
+				n = bytes;
 
-				if (!bio_add_hw_page(rq->q, bio, page, n, offs,
-						     max_sectors, &same_page)) {
-					if (same_page)
-						put_page(page);
-					break;
-				}
-
-				added += n;
-				bytes -= n;
-				offs = 0;
+			if (!bio_add_hw_page(rq->q, bio, page, n, offs,
+					     max_sectors, &same_page)) {
+				if (same_page)
+					put_page(page);
+				break;
 			}
-			iov_iter_advance(iter, added);
+
+			added += n;
+			bytes -= n;
+			offs = 0;
 		}
+		iov_iter_advance(iter, added);
 		/*
 		 * release the pages we didn't map into the bio, if any
 		 */
