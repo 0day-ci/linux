@@ -163,6 +163,7 @@ extern bool ima_canonical_fmt;
 int ima_init(void);
 int ima_fs_init(void);
 int ima_ns_init(void);
+int ima_init_namespace(struct ima_namespace *ns);
 int ima_add_template_entry(struct ima_namespace *ns,
 			   struct ima_template_entry *entry, int violation,
 			   const char *op, struct inode *inode,
@@ -502,5 +503,20 @@ static inline struct ima_namespace *get_current_ns(void)
 {
 	return &init_ima_ns;
 }
+
+#ifdef CONFIG_IMA_NS
+
+struct ima_namespace *create_ima_ns(struct user_namespace *user_ns);
+
+#else
+
+static inline struct ima_namespace *
+create_ima_ns(struct user_namespace *user_ns)
+{
+	WARN(1, "Cannot create an IMA namespace\n");
+	return ERR_PTR(-EFAULT);
+}
+
+#endif /* CONFIG_IMA_NS */
 
 #endif /* __LINUX_IMA_H */
