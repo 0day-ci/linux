@@ -907,16 +907,16 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
 
 	switch (psr_table->lines_to_wait) {
 	case 0:
-		i915->vbt.psr.lines_to_wait = PSR_0_LINES_TO_WAIT;
+		i915->vbt.psr.lines_to_wait = 0;
 		break;
 	case 1:
-		i915->vbt.psr.lines_to_wait = PSR_1_LINE_TO_WAIT;
+		i915->vbt.psr.lines_to_wait = 1;
 		break;
 	case 2:
-		i915->vbt.psr.lines_to_wait = PSR_4_LINES_TO_WAIT;
+		i915->vbt.psr.lines_to_wait = 4;
 		break;
 	case 3:
-		i915->vbt.psr.lines_to_wait = PSR_8_LINES_TO_WAIT;
+		i915->vbt.psr.lines_to_wait = 8;
 		break;
 	default:
 		drm_dbg_kms(&i915->drm,
