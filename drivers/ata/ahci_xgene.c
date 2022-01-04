@@ -239,6 +239,7 @@ static bool xgene_ahci_is_memram_inited(struct xgene_ahci_context *ctx)
 static unsigned int xgene_ahci_read_id(struct ata_device *dev,
 				       struct ata_taskfile *tf, u16 *id)
 {
+	__le16 *__id = (__le16 *)id;
 	u32 err_mask;
 
 	err_mask = ata_do_dev_read_id(dev, tf, id);
@@ -259,7 +260,7 @@ static unsigned int xgene_ahci_read_id(struct ata_device *dev,
 	 *
 	 * Clear reserved bit 8 (DEVSLP bit) as we don't support DEVSLP
 	 */
-	id[ATA_ID_FEATURE_SUPP] &= cpu_to_le16(~(1 << 8));
+	__id[ATA_ID_FEATURE_SUPP] &= cpu_to_le16(~(1 << 8));
 
 	return 0;
 }
