@@ -40,6 +40,7 @@ static void destroy_ima_ns(struct ima_namespace *ns)
 {
 	pr_debug("DESTROY ima_ns: %p\n", ns);
 	ima_free_policy_rules(ns);
+	ima_free_ns_status_tree(ns);
 	kmem_cache_free(imans_cachep, ns);
 }
 

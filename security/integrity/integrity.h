@@ -138,6 +138,10 @@ struct integrity_iint_cache {
 	enum integrity_status ima_creds_status:4;
 	enum integrity_status evm_status:4;
 	struct ima_digest_data *ima_hash;
+#ifdef CONFIG_IMA_NS
+	rwlock_t ns_list_lock;
+	struct list_head ns_list;
+#endif
 };
 
 /* rbtree tree calls to lookup, insert, delete

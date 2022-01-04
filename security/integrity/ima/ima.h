@@ -123,6 +123,10 @@ struct ima_h_table {
 };
 
 struct ima_namespace {
+	struct rb_root ns_status_tree;
+	rwlock_t ns_tree_lock;
+	struct kmem_cache *ns_status_cache;
+
 	struct list_head ima_default_rules;
 	/* ns's policy rules */
 	struct list_head ima_policy_rules;
@@ -158,6 +162,18 @@ static inline void ima_load_kexec_buffer(void) {}
  * platform native format.  The canonical format is defined as little-endian.
  */
 extern bool ima_canonical_fmt;
+
+struct ns_status {
+	struct list_head ns_next;
+	struct rb_node rb_node;
+	struct integrity_iint_cache *iint;
+	struct inode *inode;
+	struct ima_namespace *ns;
+	ino_t i_ino;
+	u32 i_generation;
+	unsigned long flags;
+	struct llist_node gc_llist; /* used while freeing */
+};
 
 /* Internal IMA function definitions */
 int ima_init(void);
@@ -508,6 +524,12 @@ static inline struct ima_namespace *get_current_ns(void)
 
 struct ima_namespace *create_ima_ns(struct user_namespace *user_ns);
 
+struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+				    struct inode *inode,
+				    struct integrity_iint_cache *iint);
+
+void ima_free_ns_status_tree(struct ima_namespace *ns);
+
 #else
 
 static inline struct ima_namespace *
@@ -515,6 +537,13 @@ create_ima_ns(struct user_namespace *user_ns)
 {
 	WARN(1, "Cannot create an IMA namespace\n");
 	return ERR_PTR(-EFAULT);
+}
+
+static inline struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+						  struct inode *inode,
+						  struct integrity_iint_cache *iint)
+{
+	return NULL;
 }
 
 #endif /* CONFIG_IMA_NS */
