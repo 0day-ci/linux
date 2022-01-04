@@ -1949,6 +1949,7 @@ static int fuse_writepage_locked(struct page *page)
 err_nofile:
 	__free_page(tmp_page);
 err_free:
+	kfree(ap->pages);
 	kfree(wpa);
 err:
 	mapping_set_error(page->mapping, error);
