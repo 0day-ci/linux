@@ -9,6 +9,7 @@
 
 #include "i915_drv.h"
 #include "i915_gemfs.h"
+#include "intel_vtd.h"
 
 int i915_gemfs_init(struct drm_i915_private *i915)
 {
