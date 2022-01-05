@@ -18220,6 +18220,7 @@ SUNPLUS MMC DRIVER
 M:	Tony Huang <tonyhuang.sunplus@gmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/mmcc/sunplu-mmc.yaml
+F:	drivers/mmc/host/sunplus_mmc.c
 
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
