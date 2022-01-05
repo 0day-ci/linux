@@ -364,6 +364,10 @@ int mt7921_dma_init(struct mt7921_dev *dev)
 	if (ret)
 		return ret;
 
+	ret = __mt7921e_mcu_drv_pmctrl(dev);
+	if (ret)
+		return ret;
+
 	ret = mt7921_wfsys_reset(dev);
 	if (ret)
 		return ret;
