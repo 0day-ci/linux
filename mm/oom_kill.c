@@ -1051,13 +1051,14 @@ EXPORT_SYMBOL_GPL(unregister_oom_notifier);
 bool out_of_memory(struct oom_control *oc)
 {
 	unsigned long freed = 0;
+	bool sysrq_forced = oc->order == -1;
 
 	if (oom_killer_disabled)
 		return false;
 
 	if (!is_memcg_oom(oc)) {
 		blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
-		if (freed > 0)
+		if (freed > 0 && !sysrq_forced)
 			/* Got some memory back in the last second. */
 			return true;
 	}
