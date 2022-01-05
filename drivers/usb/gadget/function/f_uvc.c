@@ -322,6 +322,8 @@ uvc_function_set_alt(struct usb_function *f, unsigned interface, unsigned alt)
 		if (uvc->video.ep)
 			usb_ep_disable(uvc->video.ep);
 
+		uvc->streamon = 0;
+
 		memset(&v4l2_event, 0, sizeof(v4l2_event));
 		v4l2_event.type = UVC_EVENT_STREAMOFF;
 		v4l2_event_queue(&uvc->vdev, &v4l2_event);
@@ -344,6 +346,8 @@ uvc_function_set_alt(struct usb_function *f, unsigned interface, unsigned alt)
 		if (ret)
 			return ret;
 		usb_ep_enable(uvc->video.ep);
+
+		uvc->streamon = 1;
 
 		memset(&v4l2_event, 0, sizeof(v4l2_event));
 		v4l2_event.type = UVC_EVENT_STREAMON;
@@ -880,6 +884,7 @@ static void uvc_free(struct usb_function *f)
 	struct uvc_device *uvc = to_uvc(f);
 	struct f_uvc_opts *opts = container_of(f->fi, struct f_uvc_opts,
 					       func_inst);
+	config_item_put(&uvc->header->item);
 	--opts->refcnt;
 	kfree(uvc);
 }
@@ -907,6 +912,7 @@ static struct usb_function *uvc_alloc(struct usb_function_instance *fi)
 	struct uvc_device *uvc;
 	struct f_uvc_opts *opts;
 	struct uvc_descriptor_header **strm_cls;
+	struct config_item *streaming, *header, *h;
 
 	uvc = kzalloc(sizeof(*uvc), GFP_KERNEL);
 	if (uvc == NULL)
@@ -938,6 +944,28 @@ static struct usb_function *uvc_alloc(struct usb_function_instance *fi)
 	uvc->desc.fs_streaming = opts->fs_streaming;
 	uvc->desc.hs_streaming = opts->hs_streaming;
 	uvc->desc.ss_streaming = opts->ss_streaming;
+
+	streaming = config_group_find_item(&opts->func_inst.group, "streaming");
+	if (!streaming) {
+		config_item_put(streaming);
+		return ERR_PTR(-ENOMEM);
+	}
+	header = config_group_find_item(to_config_group(streaming), "header");
+	config_item_put(streaming);
+	if (!header) {
+		config_item_put(header);
+		return ERR_PTR(-ENOMEM);
+	}
+	h = config_group_find_item(to_config_group(header), "h");
+	config_item_put(header);
+	if (!h) {
+		config_item_put(h);
+		return ERR_PTR(-ENOMEM);
+	}
+	uvc->header = to_uvcg_streaming_header(h);
+	if (!uvc->header->linked)
+		return ERR_PTR(-EBUSY);
+
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
 
