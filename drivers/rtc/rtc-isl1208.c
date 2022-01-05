@@ -880,15 +880,17 @@ isl1208_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (rc)
 		return rc;
 
-	if (client->irq > 0)
+	if (client->irq > 0) {
 		rc = isl1208_setup_irq(client, client->irq);
-	if (rc)
-		return rc;
+		if (rc)
+			return rc;
+	}
 
-	if (evdet_irq > 0 && evdet_irq != client->irq)
+	if (evdet_irq > 0 && evdet_irq != client->irq) {
 		rc = isl1208_setup_irq(client, evdet_irq);
-	if (rc)
-		return rc;
+		if (rc)
+			return rc;
+	}
 
 	rc = devm_rtc_nvmem_register(isl1208->rtc, &isl1208->nvmem_config);
 	if (rc)
