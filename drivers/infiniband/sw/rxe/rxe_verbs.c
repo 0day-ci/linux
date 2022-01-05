@@ -468,6 +468,16 @@ static int rxe_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 	if (err)
 		goto err1;
 
+	if (mask & IB_QP_AV) {
+		if (attr->ah_attr.ah_flags & IB_AH_GRH) {
+			u32 fl = attr->ah_attr.grh.flow_label;
+			u32 lqp = qp->ibqp.qp_num;
+			u32 rqp = qp->attr.dest_qp_num;
+
+			qp->src_port = rdma_get_udp_sport(fl, lqp, rqp);
+		}
+	}
+
 	return 0;
 
 err1:
