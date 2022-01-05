@@ -856,6 +856,22 @@ static inline int d_revalidate(struct dentry *dentry, unsigned int flags)
 		return 1;
 }
 
+static inline bool complete_walk_rcu(struct nameidata *nd)
+{
+	if (nd->flags & LOOKUP_RCU) {
+		/*
+		 * We don't want to zero nd->root for scoped-lookups or
+		 * externally-managed nd->root.
+		 */
+		if (!(nd->state & ND_ROOT_PRESET))
+			if (!(nd->flags & LOOKUP_IS_SCOPED))
+				nd->root.mnt = NULL;
+		nd->flags &= ~LOOKUP_CACHED;
+		return try_to_unlazy(nd);
+	}
+	return true;
+}
+
 /**
  * complete_walk - successful completion of path walk
  * @nd:  pointer nameidata
@@ -871,18 +887,8 @@ static int complete_walk(struct nameidata *nd)
 	struct dentry *dentry = nd->path.dentry;
 	int status;
 
-	if (nd->flags & LOOKUP_RCU) {
-		/*
-		 * We don't want to zero nd->root for scoped-lookups or
-		 * externally-managed nd->root.
-		 */
-		if (!(nd->state & ND_ROOT_PRESET))
-			if (!(nd->flags & LOOKUP_IS_SCOPED))
-				nd->root.mnt = NULL;
-		nd->flags &= ~LOOKUP_CACHED;
-		if (!try_to_unlazy(nd))
-			return -ECHILD;
-	}
+	if (!complete_walk_rcu(nd))
+		return -ECHILD;
 
 	if (unlikely(nd->flags & LOOKUP_IS_SCOPED)) {
 		/*
@@ -3325,10 +3331,9 @@ static const char *open_last_lookups(struct nameidata *nd,
 		BUG_ON(nd->flags & LOOKUP_RCU);
 	} else {
 		/* create side of things */
-		if (nd->flags & LOOKUP_RCU) {
-			if (!try_to_unlazy(nd))
-				return ERR_PTR(-ECHILD);
-		}
+		if (!complete_walk_rcu(nd))
+			return ERR_PTR(-ECHILD);
+
 		audit_inode(nd->name, dir, AUDIT_INODE_PARENT);
 		/* trailing slashes? */
 		if (unlikely(nd->last.name[nd->last.len]))
