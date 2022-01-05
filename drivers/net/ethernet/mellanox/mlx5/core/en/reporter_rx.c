@@ -87,8 +87,10 @@ static int mlx5e_rx_reporter_err_icosq_cqe_recover(void *ctx)
 		goto out;
 	}
 
-	if (state != MLX5_SQC_STATE_ERR)
+	if (state != MLX5_SQC_STATE_ERR) {
+		err = -EINVAL;
 		goto out;
+	}
 
 	mlx5e_deactivate_rq(rq);
 	if (xskrq)
