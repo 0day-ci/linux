@@ -49,6 +49,7 @@
 #include "i915_irq.h"
 #include "i915_scheduler.h"
 #include "intel_pm.h"
+#include "intel_vtd.h"
 
 static inline struct drm_i915_private *node_to_i915(struct drm_info_node *node)
 {
