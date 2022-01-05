@@ -361,7 +361,7 @@ s32 rtl8723b_FirmwareDownload(struct adapter *padapter, bool  bUsedWoWLANFw)
 		netdev_emerg(padapter->pnetdev,
 			     "Firmware size:%u exceed %u\n",
 			     pFirmware->fw_length, FW_8723B_SIZE);
-		goto release_fw1;
+		goto exit;
 	}
 
 	pFirmwareBuf = pFirmware->fw_buffer_sz;
