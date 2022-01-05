@@ -1168,6 +1168,11 @@ int irdma_modify_qp_roce(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 
 		memset(&iwqp->roce_ah, 0, sizeof(iwqp->roce_ah));
 		if (attr->ah_attr.ah_flags & IB_AH_GRH) {
+			u32 fl = attr->ah_attr.grh.flow_label;
+			u32 lqp = ibqp->qp_num;
+			u32 rqp = roce_info->dest_qp;
+
+			udp_info->src_port = rdma_get_udp_sport(fl, lqp, rqp);
 			udp_info->ttl = attr->ah_attr.grh.hop_limit;
 			udp_info->flow_label = attr->ah_attr.grh.flow_label;
 			udp_info->tos = attr->ah_attr.grh.traffic_class;
