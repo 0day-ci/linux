@@ -546,10 +546,15 @@ int fsi_occ_submit(struct device *dev, const void *request, size_t req_len,
 	dev_dbg(dev, "resp_status=%02x resp_data_len=%d\n",
 		resp->return_status, resp_data_length);
 
-	/* Grab the rest */
+	/*
+	 * Grab the rest, including the occ response header again, just in case
+	 * it changed in between our two getsram operations (this can happen
+	 * despite the sequence number check if the driver state is reset). The
+	 * data length shouldn't change at OCC runtime, and the response
+	 * status, which may have changed, has to be checked by users anyway.
+	 */
 	if (resp_data_length > 1) {
-		/* already got 3 bytes resp, also need 2 bytes checksum */
-		rc = occ_getsram(occ, 8, &resp->data[3], resp_data_length - 1);
+		rc = occ_getsram(occ, 0, resp, resp_data_length + 7);
 		if (rc)
 			goto done;
 	}
