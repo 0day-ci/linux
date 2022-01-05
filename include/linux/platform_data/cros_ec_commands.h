@@ -55,6 +55,10 @@
 #define EC_HOST_CMD_REGION0    0x800
 #define EC_HOST_CMD_REGION1    0x880
 #define EC_HOST_CMD_REGION_SIZE 0x80
+/*
+ * Other machines report only the region spanned by the Microchip MEC EC.
+ */
+#define EC_HOST_CMD_MEC_REGION_SIZE 0x08
 
 /* EC command register bit functions */
 #define EC_LPC_CMDR_DATA	BIT(0)  /* Data ready for host to read */
