@@ -306,3 +306,4 @@ module_platform_driver(cros_ec_pwm_driver);
 MODULE_ALIAS("platform:cros-ec-pwm");
 MODULE_DESCRIPTION("ChromeOS EC PWM driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
