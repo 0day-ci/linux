@@ -25,6 +25,7 @@
 #include <linux/atomic.h>
 #include <linux/acpi.h>
 #include <linux/firmware.h>
+#include <linux/pci.h>
 #include <crypto/hash.h>
 #include <linux/usb/r8152.h>
 
@@ -1605,6 +1606,7 @@ static int vendor_mac_passthru_addr_read(struct r8152 *tp, struct sockaddr *sa)
 	char *mac_obj_name;
 	acpi_object_type mac_obj_type;
 	int mac_strlen;
+	struct net_device *ndev;
 
 	if (tp->lenovo_macpassthru) {
 		mac_obj_name = "\\MACA";
@@ -1662,6 +1664,18 @@ static int vendor_mac_passthru_addr_read(struct r8152 *tp, struct sockaddr *sa)
 		ret = -EINVAL;
 		goto amacout;
 	}
+	rcu_read_lock();
+	for_each_netdev_rcu(&init_net, ndev) {
+		if (ndev->dev.parent && dev_is_pci(ndev->dev.parent) &&
+				!pci_is_thunderbolt_attached(to_pci_dev(ndev->dev.parent)))
+			continue;
+		if (strncmp(buf, ndev->dev_addr, 6) == 0) {
+			rcu_read_unlock();
+			goto amacout;
+		}
+	}
+	rcu_read_unlock();
+
 	memcpy(sa->sa_data, buf, 6);
 	netif_info(tp, probe, tp->netdev,
 		   "Using pass-thru MAC addr %pM\n", sa->sa_data);
