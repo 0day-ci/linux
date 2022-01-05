@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/fpga/xlnx,alveo-pr-isolation.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Xilinx Partial Reconfig Isolation for Alveo platforms
+
+description: |
+  The Partial Reconfig ensures glitch free operation of the inputs from
+  a reconfigurable partition during partial reconfiguration on Alveo
+  platform.
+
+maintainers:
+  - Lizhi Hou <lizhi.hou@xilinx.com>
+
+properties:
+  compatible:
+    const: xlnx,alveo-pr-isolation
+
+  reg:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    bus {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        pr-isolation-ulp@41000 {
+            compatible = "xlnx,alveo-pr-isolation";
+            reg = <0 0x41000 0 0x1000>;
+        };
+    };
