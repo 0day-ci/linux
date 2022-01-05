@@ -363,6 +363,13 @@ out:
 
 static bool acpi_s2idle_valid(void)
 {
+	/* AMD systems must have low level firmware support */
+	if (acpi_s2idle_vendor_amd())
+#if IS_ENABLED(CONFIG_AMD_PMC)
+		return lps0_device_handle && !sleep_no_lps0;
+#else
+		return false;
+#endif
 	return true;
 }
 
@@ -449,6 +456,9 @@ static int lps0_device_attach(struct acpi_device *adev,
 	 */
 	if (!acpi_s2idle_vendor_amd())
 		acpi_ec_mark_gpe_for_wake();
+
+	/* reset these so we update valid */
+	s2idle_set_ops(&acpi_s2idle_ops_lps0);
 
 	return 0;
 }
