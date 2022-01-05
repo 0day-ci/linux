@@ -34,12 +34,17 @@ properties:
     minItems: 1
     maxItems: 8
 
+  dma-channels:
+    minimum: 1
+    maximum: 4
+
   '#dma-cells':
     const: 1
 
 required:
   - compatible
   - reg
+  - dma-channels
   - interrupts
   - '#dma-cells'
 
@@ -50,6 +55,7 @@ examples:
     dma@3000000 {
       compatible = "sifive,fu540-c000-pdma";
       reg = <0x3000000 0x8000>;
+      dma-channels = <4>;
       interrupts = <23 24 25 26 27 28 29 30>;
       #dma-cells = <1>;
     };
