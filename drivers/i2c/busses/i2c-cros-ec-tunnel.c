@@ -317,5 +317,6 @@ static struct platform_driver ec_i2c_tunnel_driver = {
 module_platform_driver(ec_i2c_tunnel_driver);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("EC I2C tunnel driver");
 MODULE_ALIAS("platform:cros-ec-i2c-tunnel");
