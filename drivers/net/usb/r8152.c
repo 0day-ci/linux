@@ -773,9 +773,6 @@ enum rtl8152_flags {
 	RX_EPROTO,
 };
 
-#define DEVICE_ID_THINKPAD_THUNDERBOLT3_DOCK_GEN2	0x3082
-#define DEVICE_ID_THINKPAD_USB_C_DOCK_GEN2		0xa387
-
 struct tally_counter {
 	__le64	tx_packets;
 	__le64	rx_packets;
