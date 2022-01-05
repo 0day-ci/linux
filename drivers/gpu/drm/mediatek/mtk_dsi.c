@@ -941,8 +941,10 @@ static const struct mipi_dsi_host_ops mtk_dsi_ops = {
 	.transfer = mtk_dsi_host_transfer,
 };
 
-static int mtk_dsi_encoder_init(struct drm_device *drm, struct mtk_dsi *dsi)
+static int mtk_dsi_encoder_init(struct device *dev, struct drm_device *drm)
 {
+	struct mtk_dsi *dsi = dev_get_drvdata(dev);
+	struct drm_panel *panel;
 	int ret;
 
 	ret = drm_simple_encoder_init(drm, &dsi->encoder,
@@ -967,6 +969,15 @@ static int mtk_dsi_encoder_init(struct drm_device *drm, struct mtk_dsi *dsi)
 	}
 	drm_connector_attach_encoder(dsi->connector, &dsi->encoder);
 
+	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0, &panel,
+					  &dsi->next_bridge);
+	/* A drm_panel can have its own orientation. If there is no panel, set the
+	 * orientation to NORMAL. */
+	if (ret || !panel) {
+		drm_connector_set_panel_orientation(
+			dsi->connector, DRM_MODE_PANEL_ORIENTATION_NORMAL);
+	}
+
 	return 0;
 
 err_cleanup_encoder:
@@ -976,11 +987,8 @@ err_cleanup_encoder:
 
 static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
 {
-	int ret;
 	struct drm_device *drm = data;
-	struct mtk_dsi *dsi = dev_get_drvdata(dev);
-
-	ret = mtk_dsi_encoder_init(drm, dsi);
+	int ret = mtk_dsi_encoder_init(dev, drm);
 	if (ret)
 		return ret;
 
