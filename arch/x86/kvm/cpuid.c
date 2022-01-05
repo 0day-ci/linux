@@ -782,6 +782,21 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 		eax.split.mask_length = cap.events_mask_len;
 
 		edx.split.num_counters_fixed = min(cap.num_counters_fixed, MAX_FIXED_COUNTERS);
+
+		/*
+		 * The 8th Intel pre-defined architectural event (Topdown Slots) will be supported
+		 * if the 4th fixed counter exists && EAX[31:24] > 7 && EBX[7] = 0.
+		 *
+		 * Currently, KVM needs to set EAX[31:24] < 8 or EBX[7] == 1
+		 * to make this event unavailable in a consistent way.
+		 */
+		if (edx.split.num_counters_fixed < 4) {
+			if (eax.split.mask_length > 7)
+				eax.split.mask_length--;
+			if (eax.split.mask_length > 7)
+				cap.events_mask |= BIT_ULL(7);
+		}
+
 		edx.split.bit_width_fixed = cap.bit_width_fixed;
 		if (cap.version)
 			edx.split.anythread_deprecated = 1;
