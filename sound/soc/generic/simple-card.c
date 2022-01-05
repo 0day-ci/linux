@@ -30,6 +30,7 @@ static const struct snd_soc_ops simple_ops = {
 
 static int asoc_simple_parse_dai(struct device_node *node,
 				 struct snd_soc_dai_link_component *dlc,
+				 bool is_plat,
 				 int *is_single_link)
 {
 	struct of_phandle_args args;
@@ -46,28 +47,31 @@ static int asoc_simple_parse_dai(struct device_node *node,
 	if (ret)
 		return ret;
 
-	/*
-	 * FIXME
-	 *
-	 * Here, dlc->dai_name is pointer to CPU/Codec DAI name.
-	 * If user unbinded CPU or Codec driver, but not for Sound Card,
-	 * dlc->dai_name is keeping unbinded CPU or Codec
-	 * driver's pointer.
-	 *
-	 * If user re-bind CPU or Codec driver again, ALSA SoC will try
-	 * to rebind Card via snd_soc_try_rebind_card(), but because of
-	 * above reason, it might can't bind Sound Card.
-	 * Because Sound Card is pointing to released dai_name pointer.
-	 *
-	 * To avoid this rebind Card issue,
-	 * 1) It needs to alloc memory to keep dai_name eventhough
-	 *    CPU or Codec driver was unbinded, or
-	 * 2) user need to rebind Sound Card everytime
-	 *    if he unbinded CPU or Codec.
-	 */
-	ret = snd_soc_of_get_dai_name(node, &dlc->dai_name);
-	if (ret < 0)
-		return ret;
+	/* dai_name is not required and may not exist for plat component */
+	if (!is_plat) {
+		/*
+		 * FIXME
+		 *
+		 * Here, dlc->dai_name is pointer to CPU/Codec DAI name.
+		 * If user unbinded CPU or Codec driver, but not for Sound Card,
+		 * dlc->dai_name is keeping unbinded CPU or Codec
+		 * driver's pointer.
+		 *
+		 * If user re-bind CPU or Codec driver again, ALSA SoC will try
+		 * to rebind Card via snd_soc_try_rebind_card(), but because of
+		 * above reason, it might can't bind Sound Card.
+		 * Because Sound Card is pointing to released dai_name pointer.
+		 *
+		 * To avoid this rebind Card issue,
+		 * 1) It needs to alloc memory to keep dai_name eventhough
+		 *    CPU or Codec driver was unbinded, or
+		 * 2) user need to rebind Sound Card everytime
+		 *    if he unbinded CPU or Codec.
+		 */
+		ret = snd_soc_of_get_dai_name(node, &dlc->dai_name);
+		if (ret < 0)
+			return ret;
+	}
 
 	dlc->of_node = args.np;
 
@@ -134,7 +138,7 @@ static int simple_parse_node(struct asoc_simple_priv *priv,
 
 	simple_parse_mclk_fs(top, np, dai_props, prefix);
 
-	ret = asoc_simple_parse_dai(np, dlc, cpu);
+	ret = asoc_simple_parse_dai(np, dlc, false, cpu);
 	if (ret)
 		return ret;
 
@@ -289,7 +293,7 @@ static int simple_dai_link_of(struct asoc_simple_priv *priv,
 	if (ret < 0)
 		goto dai_link_of_err;
 
-	ret = asoc_simple_parse_dai(plat, platforms, NULL);
+	ret = asoc_simple_parse_dai(plat, platforms, true, NULL);
 	if (ret < 0)
 		goto dai_link_of_err;
 
