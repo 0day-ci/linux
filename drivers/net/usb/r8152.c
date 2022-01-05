@@ -29,6 +29,8 @@
 #include <crypto/hash.h>
 #include <linux/usb/r8152.h>
 
+static struct usb_driver rtl8152_driver;
+
 /* Information for net-next */
 #define NETNEXT_VERSION		"12"
 
@@ -9581,6 +9583,9 @@ static int rtl8152_probe(struct usb_interface *intf,
 	struct r8152 *tp;
 	struct net_device *netdev;
 	int ret;
+	struct device_driver *rtl8152_drv = &rtl8152_driver.drvwrap.driver;
+
+	rtl8152_drv->probe_type = PROBE_FORCE_SYNCHRONOUS;
 
 	if (version == RTL_VER_UNKNOWN)
 		return -ENODEV;
