@@ -540,3 +540,4 @@ module_platform_driver(extcon_cros_ec_driver);
 MODULE_DESCRIPTION("ChromeOS Embedded Controller extcon driver");
 MODULE_AUTHOR("Benson Leung <bleung@chromium.org>");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
