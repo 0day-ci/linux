@@ -1570,7 +1570,20 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 
 			/* MADV_FREE page check */
 			if (!PageSwapBacked(page)) {
-				if (!PageDirty(page)) {
+				int ref_count = page_ref_count(page);
+				int map_count = page_mapcount(page);
+
+				/*
+				 * The only page refs must be from the isolation
+				 * (checked by the caller shrink_page_list() too)
+				 * and one or more rmap's (dropped by discard:).
+				 *
+				 * Check the reference count before dirty flag
+				 * with memory barrier; see __remove_mapping().
+				 */
+				smp_rmb();
+				if ((ref_count - 1 == map_count) &&
+				    !PageDirty(page)) {
 					/* Invalidate as we cleared the pte */
 					mmu_notifier_invalidate_range(mm,
 						address, address + PAGE_SIZE);
