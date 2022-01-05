@@ -6188,8 +6188,6 @@ static int log_new_ancestors(struct btrfs_trans_handle *trans,
 		if (ret < 0)
 			return ret;
 
-		leaf = path->nodes[0];
-		slot = path->slots[0];
 		if (slot >= btrfs_header_nritems(leaf)) {
 			ret = btrfs_next_leaf(root, path);
 			if (ret < 0)
