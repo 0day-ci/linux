@@ -1898,6 +1898,8 @@ err_work_queue:
 	destroy_workqueue(delta->work_queue);
 err_v4l2:
 	v4l2_device_unregister(&delta->v4l2_dev);
+disable_pm_runtime:
+	pm_runtime_disable(dev);
 err:
 	return ret;
 }
