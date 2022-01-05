@@ -1005,9 +1005,11 @@ static int printer_func_setup(struct usb_function *f,
 				break;
 			}
 			value = strlen(dev->pnp_string);
+			memcpy(buf + 2, dev->pnp_string, value);
+
+			value += 2;
 			buf[0] = (value >> 8) & 0xFF;
 			buf[1] = value & 0xFF;
-			memcpy(buf + 2, dev->pnp_string, value);
 			DBG(dev, "1284 PNP String: %x %s\n", value,
 			    dev->pnp_string);
 			break;
