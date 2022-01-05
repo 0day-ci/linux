@@ -33,8 +33,8 @@
 #include "mmal-parameters.h"
 #include "bcm2835-camera.h"
 
-#define BM2835_MMAL_VERSION "0.0.2"
-#define BM2835_MMAL_MODULE_NAME "bcm2835-v4l2"
+#define BCM2835_MMAL_VERSION "0.0.2"
+#define BCM2835_MMAL_MODULE_NAME "bcm2835-v4l2"
 #define MIN_WIDTH 32
 #define MIN_HEIGHT 32
 #define MIN_BUFFER_SIZE (80 * 1024)
@@ -1894,8 +1894,7 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
 		dev->capture.fmt = &formats[3]; /* JPEG */
 
 		/* v4l device registration */
-		dev->camera_num = v4l2_device_set_name(&dev->v4l2_dev,
-						       BM2835_MMAL_MODULE_NAME,
+		dev->camera_num = v4l2_device_set_name(&dev->v4l2_dev, BCM2835_MMAL_MODULE_NAME,
 						       &camera_instance);
 		ret = v4l2_device_register(NULL, &dev->v4l2_dev);
 		if (ret) {
@@ -1954,9 +1953,8 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
 			goto unreg_dev;
 		}
 
-		v4l2_info(&dev->v4l2_dev,
-			  "Broadcom 2835 MMAL video capture ver %s loaded.\n",
-			  BM2835_MMAL_VERSION);
+		v4l2_info(&dev->v4l2_dev, "Broadcom 2835 MMAL video capture ver %s loaded.\n",
+			  BCM2835_MMAL_VERSION);
 
 		gdev[camera] = dev;
 	}
@@ -2008,5 +2006,5 @@ module_platform_driver(bcm2835_camera_driver)
 MODULE_DESCRIPTION("Broadcom 2835 MMAL video capture");
 MODULE_AUTHOR("Vincent Sanders");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(BM2835_MMAL_VERSION);
+MODULE_VERSION(BCM2835_MMAL_VERSION);
 MODULE_ALIAS("platform:bcm2835-camera");
