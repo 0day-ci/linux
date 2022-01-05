@@ -462,6 +462,8 @@ static int i915_ttm_shrinker_release_pages(struct drm_i915_gem_object *obj,
 	if (bo->ttm->page_flags & TTM_TT_FLAG_SWAPPED)
 		return 0;
 
+	ttm_bo_unmap_virtual(bo);
+
 	bo->ttm->page_flags |= TTM_TT_FLAG_SWAPPED;
 	ret = ttm_bo_validate(bo, &place, &ctx);
 	if (ret) {
