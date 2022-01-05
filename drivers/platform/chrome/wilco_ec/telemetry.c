@@ -469,4 +469,5 @@ module_exit(telem_module_exit);
 MODULE_AUTHOR("Nick Crews <ncrews@chromium.org>");
 MODULE_DESCRIPTION("Wilco EC telemetry driver");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_ALIAS("platform:" DRV_NAME);

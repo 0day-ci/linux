@@ -256,6 +256,7 @@ module_init(cros_usbpd_notify_init);
 module_exit(cros_usbpd_notify_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS power delivery notifier device");
 MODULE_AUTHOR("Jon Flatley <jflat@chromium.org>");
 MODULE_ALIAS("platform:" DRV_NAME);

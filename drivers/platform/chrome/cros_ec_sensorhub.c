@@ -261,3 +261,4 @@ MODULE_ALIAS("platform:" DRV_NAME);
 MODULE_AUTHOR("Gwendal Grignou <gwendal@chromium.org>");
 MODULE_DESCRIPTION("ChromeOS EC MEMS Sensor Hub Driver");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);

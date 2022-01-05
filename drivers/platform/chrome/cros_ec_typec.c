@@ -1167,3 +1167,4 @@ module_platform_driver(cros_typec_driver);
 MODULE_AUTHOR("Prashant Malani <pmalani@chromium.org>");
 MODULE_DESCRIPTION("Chrome OS EC Type C control");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
