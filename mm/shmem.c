@@ -39,6 +39,8 @@
 #include <linux/frontswap.h>
 #include <linux/fs_parser.h>
 #include <linux/swapfile.h>
+#include <linux/mm_inline.h>
+#include <linux/fadvise.h>
 
 static struct vfsmount *shm_mnt;
 
@@ -2805,6 +2807,175 @@ out:
 	return error;
 }
 
+static void shmem_isolate_pages_range(struct address_space *mapping, loff_t start,
+				loff_t end, struct list_head *list)
+{
+	XA_STATE(xas, &mapping->i_pages, start);
+	struct page *page;
+
+	rcu_read_lock();
+	xas_for_each(&xas, page, end) {
+		if (xas_retry(&xas, page))
+			continue;
+		if (xa_is_value(page))
+			continue;
+		if (!get_page_unless_zero(page))
+			continue;
+		if (isolate_lru_page(page))
+			continue;
+
+		list_add(&page->lru, list);
+		__mod_node_page_state(page_pgdat(page),
+				NR_ISOLATED_ANON + page_is_file_lru(page), compound_nr(page));
+		put_page(page);
+		if (need_resched()) {
+			xas_pause(&xas);
+			cond_resched_rcu();
+		}
+	}
+	rcu_read_unlock();
+}
+
+static int shmem_fadvise_dontneed(struct address_space *mapping, loff_t start,
+				loff_t end)
+{
+	int ret;
+	struct page *page;
+	LIST_HEAD(list);
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_NONE,
+		.nr_to_write = LONG_MAX,
+		.range_start = 0,
+		.range_end = LLONG_MAX,
+		.for_reclaim = 1,
+	};
+
+	if (!shmem_mapping(mapping))
+		return -EINVAL;
+
+	if (!total_swap_pages)
+		return 0;
+
+	lru_add_drain();
+	shmem_isolate_pages_range(mapping, start, end, &list);
+
+	while (!list_empty(&list)) {
+		page = lru_to_page(&list);
+		list_del(&page->lru);
+		if (page_mapped(page))
+			goto keep;
+		if (!trylock_page(page))
+			goto keep;
+		if (unlikely(PageTransHuge(page))) {
+			if (split_huge_page_to_list(page, &list))
+				goto keep;
+		}
+
+		clear_page_dirty_for_io(page);
+		SetPageReclaim(page);
+		ret = shmem_writepage(page, &wbc);
+		if (ret || PageWriteback(page)) {
+			if (ret)
+				unlock_page(page);
+			goto keep;
+		}
+
+		if (!PageWriteback(page))
+			ClearPageReclaim(page);
+
+		/*
+		 * shmem_writepage() place the page in the swapcache.
+		 * Delete the page from the swapcache and release the
+		 * page.
+		 */
+		__mod_node_page_state(page_pgdat(page),
+				NR_ISOLATED_ANON + page_is_file_lru(page), compound_nr(page));
+		lock_page(page);
+		delete_from_swap_cache(page);
+		unlock_page(page);
+		put_page(page);
+		continue;
+keep:
+		putback_lru_page(page);
+		__mod_node_page_state(page_pgdat(page),
+				NR_ISOLATED_ANON + page_is_file_lru(page), compound_nr(page));
+	}
+
+	return 0;
+}
+
+static int shmem_fadvise_willneed(struct address_space *mapping,
+				 pgoff_t start, pgoff_t long end)
+{
+	XA_STATE(xas, &mapping->i_pages, start);
+	struct page *page;
+
+	rcu_read_lock();
+	xas_for_each(&xas, page, end) {
+		if (!xa_is_value(page))
+			continue;
+		xas_pause(&xas);
+		rcu_read_unlock();
+
+		page = shmem_read_mapping_page(mapping, xas.xa_index);
+		if (!IS_ERR(page))
+			put_page(page);
+
+		rcu_read_lock();
+		if (need_resched()) {
+			xas_pause(&xas);
+			cond_resched_rcu();
+		}
+	}
+	rcu_read_unlock();
+
+	return 0;
+}
+
+static int shmem_fadvise(struct file *file, loff_t offset, loff_t len, int advice)
+{
+	loff_t endbyte;
+	pgoff_t start_index;
+	pgoff_t end_index;
+	struct address_space *mapping;
+	int ret = 0;
+
+	mapping = file->f_mapping;
+	if (!mapping || len < 0)
+		return -EINVAL;
+
+	endbyte = (u64)offset + (u64)len;
+	if (!len || endbyte < len)
+		endbyte = -1;
+	else
+		endbyte--;
+
+
+	start_index = offset >> PAGE_SHIFT;
+	end_index   = endbyte >> PAGE_SHIFT;
+	switch (advice) {
+	case POSIX_FADV_DONTNEED:
+		ret = shmem_fadvise_dontneed(mapping, start_index, end_index);
+		break;
+	case POSIX_FADV_WILLNEED:
+		ret = shmem_fadvise_willneed(mapping, start_index, end_index);
+		break;
+	case POSIX_FADV_NORMAL:
+	case POSIX_FADV_RANDOM:
+	case POSIX_FADV_SEQUENTIAL:
+	case POSIX_FADV_NOREUSE:
+		/*
+		 * No bad return value, but ignore advice. May have to
+		 * implement in future.
+		 */
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
 static int shmem_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	struct shmem_sb_info *sbinfo = SHMEM_SB(dentry->d_sb);
@@ -3826,6 +3997,7 @@ static const struct file_operations shmem_file_operations = {
 	.splice_write	= iter_file_splice_write,
 	.fallocate	= shmem_fallocate,
 #endif
+	.fadvise	= shmem_fadvise,
 };
 
 static const struct inode_operations shmem_inode_operations = {
