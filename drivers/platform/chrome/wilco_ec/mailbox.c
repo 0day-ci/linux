@@ -212,4 +212,4 @@ int wilco_ec_mailbox(struct wilco_ec_device *ec, struct wilco_ec_message *msg)
 	return ret;
 
 }
-EXPORT_SYMBOL_GPL(wilco_ec_mailbox);
+EXPORT_SYMBOL_NS_GPL(wilco_ec_mailbox, PL_CHROMEOS);

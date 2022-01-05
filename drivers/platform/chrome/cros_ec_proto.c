@@ -189,7 +189,7 @@ int cros_ec_prepare_tx(struct cros_ec_device *ec_dev,
 
 	return EC_MSG_TX_PROTO_BYTES + msg->outsize;
 }
-EXPORT_SYMBOL(cros_ec_prepare_tx);
+EXPORT_SYMBOL_NS(cros_ec_prepare_tx, PL_CHROMEOS);
 
 /**
  * cros_ec_check_result() - Check ec_msg->result.
@@ -217,7 +217,7 @@ int cros_ec_check_result(struct cros_ec_device *ec_dev,
 		return 0;
 	}
 }
-EXPORT_SYMBOL(cros_ec_check_result);
+EXPORT_SYMBOL_NS(cros_ec_check_result, PL_CHROMEOS);
 
 /*
  * cros_ec_get_host_event_wake_mask
@@ -557,7 +557,7 @@ exit:
 	kfree(proto_msg);
 	return ret;
 }
-EXPORT_SYMBOL(cros_ec_query_all);
+EXPORT_SYMBOL_NS(cros_ec_query_all, PL_CHROMEOS);
 
 /**
  * cros_ec_cmd_xfer_status() - Send a command to the ChromeOS EC.
@@ -625,7 +625,7 @@ int cros_ec_cmd_xfer_status(struct cros_ec_device *ec_dev,
 
 	return ret;
 }
-EXPORT_SYMBOL(cros_ec_cmd_xfer_status);
+EXPORT_SYMBOL_NS(cros_ec_cmd_xfer_status, PL_CHROMEOS);
 
 static int get_next_event_xfer(struct cros_ec_device *ec_dev,
 			       struct cros_ec_command *msg,
@@ -767,7 +767,7 @@ int cros_ec_get_next_event(struct cros_ec_device *ec_dev,
 
 	return ret;
 }
-EXPORT_SYMBOL(cros_ec_get_next_event);
+EXPORT_SYMBOL_NS(cros_ec_get_next_event, PL_CHROMEOS);
 
 /**
  * cros_ec_get_host_event() - Return a mask of event set by the ChromeOS EC.
@@ -797,7 +797,7 @@ u32 cros_ec_get_host_event(struct cros_ec_device *ec_dev)
 
 	return host_event;
 }
-EXPORT_SYMBOL(cros_ec_get_host_event);
+EXPORT_SYMBOL_NS(cros_ec_get_host_event, PL_CHROMEOS);
 
 /**
  * cros_ec_check_features() - Test for the presence of EC features
@@ -830,7 +830,7 @@ bool cros_ec_check_features(struct cros_ec_dev *ec, int feature)
 
 	return !!(features->flags[feature / 32] & EC_FEATURE_MASK_0(feature));
 }
-EXPORT_SYMBOL_GPL(cros_ec_check_features);
+EXPORT_SYMBOL_NS_GPL(cros_ec_check_features, PL_CHROMEOS);
 
 /**
  * cros_ec_get_sensor_count() - Return the number of MEMS sensors supported.
@@ -896,7 +896,7 @@ int cros_ec_get_sensor_count(struct cros_ec_dev *ec)
 	}
 	return sensor_count;
 }
-EXPORT_SYMBOL_GPL(cros_ec_get_sensor_count);
+EXPORT_SYMBOL_NS_GPL(cros_ec_get_sensor_count, PL_CHROMEOS);
 
 /**
  * cros_ec_command - Send a command to the EC.
@@ -944,4 +944,4 @@ error:
 	kfree(msg);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(cros_ec_command);
+EXPORT_SYMBOL_NS_GPL(cros_ec_command, PL_CHROMEOS);

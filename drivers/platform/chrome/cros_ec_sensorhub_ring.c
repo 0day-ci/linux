@@ -86,7 +86,7 @@ int cros_ec_sensorhub_register_push_data(struct cros_ec_sensorhub *sensorhub,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(cros_ec_sensorhub_register_push_data);
+EXPORT_SYMBOL_NS_GPL(cros_ec_sensorhub_register_push_data, PL_CHROMEOS);
 
 void cros_ec_sensorhub_unregister_push_data(struct cros_ec_sensorhub *sensorhub,
 					    u8 sensor_num)
@@ -94,7 +94,7 @@ void cros_ec_sensorhub_unregister_push_data(struct cros_ec_sensorhub *sensorhub,
 	sensorhub->push_data[sensor_num].indio_dev = NULL;
 	sensorhub->push_data[sensor_num].push_data_cb = NULL;
 }
-EXPORT_SYMBOL_GPL(cros_ec_sensorhub_unregister_push_data);
+EXPORT_SYMBOL_NS_GPL(cros_ec_sensorhub_unregister_push_data, PL_CHROMEOS);
 
 /**
  * cros_ec_sensorhub_ring_fifo_enable() - Enable or disable interrupt generation

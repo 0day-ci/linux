@@ -76,7 +76,7 @@ int wilco_ec_get_property(struct wilco_ec_device *ec,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(wilco_ec_get_property);
+EXPORT_SYMBOL_NS_GPL(wilco_ec_get_property, PL_CHROMEOS);
 
 int wilco_ec_set_property(struct wilco_ec_device *ec,
 			  struct wilco_ec_property_msg *prop_msg)
@@ -99,7 +99,7 @@ int wilco_ec_set_property(struct wilco_ec_device *ec,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(wilco_ec_set_property);
+EXPORT_SYMBOL_NS_GPL(wilco_ec_set_property, PL_CHROMEOS);
 
 int wilco_ec_get_byte_property(struct wilco_ec_device *ec, u32 property_id,
 			       u8 *val)
@@ -119,7 +119,7 @@ int wilco_ec_get_byte_property(struct wilco_ec_device *ec, u32 property_id,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(wilco_ec_get_byte_property);
+EXPORT_SYMBOL_NS_GPL(wilco_ec_get_byte_property, PL_CHROMEOS);
 
 int wilco_ec_set_byte_property(struct wilco_ec_device *ec, u32 property_id,
 			       u8 val)
@@ -132,4 +132,4 @@ int wilco_ec_set_byte_property(struct wilco_ec_device *ec, u32 property_id,
 
 	return wilco_ec_set_property(ec, &msg);
 }
-EXPORT_SYMBOL_GPL(wilco_ec_set_byte_property);
+EXPORT_SYMBOL_NS_GPL(wilco_ec_set_byte_property, PL_CHROMEOS);

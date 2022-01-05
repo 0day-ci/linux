@@ -38,7 +38,7 @@ int cros_usbpd_register_notify(struct notifier_block *nb)
 	return blocking_notifier_chain_register(&cros_usbpd_notifier_list,
 						nb);
 }
-EXPORT_SYMBOL_GPL(cros_usbpd_register_notify);
+EXPORT_SYMBOL_NS_GPL(cros_usbpd_register_notify, PL_CHROMEOS);
 
 /**
  * cros_usbpd_unregister_notify - Unregister notifier callback for PD events.
@@ -51,7 +51,7 @@ void cros_usbpd_unregister_notify(struct notifier_block *nb)
 {
 	blocking_notifier_chain_unregister(&cros_usbpd_notifier_list, nb);
 }
-EXPORT_SYMBOL_GPL(cros_usbpd_unregister_notify);
+EXPORT_SYMBOL_NS_GPL(cros_usbpd_unregister_notify, PL_CHROMEOS);
 
 static void cros_usbpd_get_event_and_notify(struct device  *dev,
 					    struct cros_ec_device *ec_dev)
