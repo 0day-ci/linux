@@ -2269,8 +2269,8 @@ static const struct reg_whitelist {
 	.size = 8
 } };
 
-int i915_reg_read_ioctl(struct drm_device *dev,
-			void *data, struct drm_file *file)
+int intel_uncore_reg_read_ioctl(struct drm_device *dev,
+				void *data, struct drm_file *file)
 {
 	struct drm_i915_private *i915 = to_i915(dev);
 	struct intel_uncore *uncore = &i915->uncore;

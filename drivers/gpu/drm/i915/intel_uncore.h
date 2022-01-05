@@ -457,7 +457,7 @@ static inline int intel_uncore_write_and_verify(struct intel_uncore *uncore,
 #define raw_reg_write(base, reg, value) \
 	writel(value, base + i915_mmio_reg_offset(reg))
 
-int i915_reg_read_ioctl(struct drm_device *dev, void *data,
-			struct drm_file *file);
+int intel_uncore_reg_read_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file);
 
 #endif /* !__INTEL_UNCORE_H__ */
