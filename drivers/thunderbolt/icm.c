@@ -109,7 +109,7 @@ struct icm {
 	int (*driver_ready)(struct tb *tb,
 			    enum tb_security_level *security_level,
 			    u8 *proto_version, size_t *nboot_acl, bool *rpm);
-	void (*set_uuid)(struct tb *tb);
+	int (*set_uuid)(struct tb *tb);
 	void (*device_connected)(struct tb *tb,
 				 const struct icm_pkg_header *hdr);
 	void (*device_disconnected)(struct tb *tb,
@@ -1643,7 +1643,7 @@ icm_icl_driver_ready(struct tb *tb, enum tb_security_level *security_level,
 	return 0;
 }
 
-static void icm_icl_set_uuid(struct tb *tb)
+static int icm_icl_set_uuid(struct tb *tb)
 {
 	struct tb_nhi *nhi = tb->nhi;
 	u32 uuid[4];
@@ -1654,6 +1654,10 @@ static void icm_icl_set_uuid(struct tb *tb)
 	uuid[3] = 0xffffffff;
 
 	tb->root_switch->uuid = kmemdup(uuid, sizeof(uuid), GFP_KERNEL);
+	if (!tb->root_switch->uuid)
+		return -ENOMEM;
+
+	return 0;
 }
 
 static void
@@ -1743,6 +1747,11 @@ static void icm_handle_event(struct tb *tb, enum tb_cfg_pkg_type type,
 
 	INIT_WORK(&n->work, icm_handle_notification);
 	n->pkg = kmemdup(buf, size, GFP_KERNEL);
+	if (!n->pkg) {
+		kfree(n);
+		return;
+	}
+
 	n->tb = tb;
 
 	queue_work(tb->wq, &n->work);
@@ -2156,8 +2165,11 @@ static int icm_start(struct tb *tb)
 	tb->root_switch->no_nvm_upgrade = !icm->can_upgrade_nvm;
 	tb->root_switch->rpm = icm->rpm;
 
-	if (icm->set_uuid)
-		icm->set_uuid(tb);
+	if (icm->set_uuid) {
+		ret = icm->set_uuid(tb);
+		if (ret)
+			return ret;
+	}
 
 	ret = tb_switch_add(tb->root_switch);
 	if (ret) {
