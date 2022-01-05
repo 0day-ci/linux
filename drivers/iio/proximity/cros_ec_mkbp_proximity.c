@@ -268,4 +268,5 @@ static struct platform_driver cros_ec_mkbp_proximity_driver = {
 module_platform_driver(cros_ec_mkbp_proximity_driver);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC MKBP proximity sensor driver");

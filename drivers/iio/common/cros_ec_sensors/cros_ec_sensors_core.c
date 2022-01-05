@@ -851,3 +851,4 @@ EXPORT_SYMBOL_GPL(cros_ec_sensors_pm_ops);
 
 MODULE_DESCRIPTION("ChromeOS EC sensor hub core functions");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
