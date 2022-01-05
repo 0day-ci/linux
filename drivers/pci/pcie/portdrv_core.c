@@ -219,7 +219,8 @@ static int get_port_device_capability(struct pci_dev *dev)
 
 #ifdef CONFIG_PCIEAER
 	if (dev->aer_cap && pci_aer_available() &&
-	    (pcie_ports_native || host->native_aer)) {
+	    (pcie_ports_native || host->native_aer) &&
+	    !dev->external_facing) {
 		services |= PCIE_PORT_SERVICE_AER;
 
 		/*
