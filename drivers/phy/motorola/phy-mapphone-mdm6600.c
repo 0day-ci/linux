@@ -630,6 +630,9 @@ cleanup:
 	if (error < 0)
 		phy_mdm6600_device_power_off(ddata);
 
+disable_pm:
+	pm_runtime_disable(ddata->dev);
+
 	return error;
 }
 
