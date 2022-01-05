@@ -1062,6 +1062,7 @@ static struct platform_driver cros_ec_codec_platform_driver = {
 module_platform_driver(cros_ec_codec_platform_driver);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC codec driver");
 MODULE_AUTHOR("Cheng-Yi Chiang <cychiang@chromium.org>");
 MODULE_ALIAS("platform:cros-ec-codec");
