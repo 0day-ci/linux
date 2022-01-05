@@ -300,6 +300,8 @@ gem_destroy:
 	v3d_gem_destroy(drm);
 dma_free:
 	dma_free_wc(dev, 4096, v3d->mmu_scratch, v3d->mmu_scratch_paddr);
+pm_disable:
+	pm_runtime_disable(dev);
 	return ret;
 }
 
