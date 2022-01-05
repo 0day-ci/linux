@@ -416,3 +416,4 @@ MODULE_ALIAS("platform:" DRV_NAME);
 MODULE_AUTHOR("Enric Balletbo i Serra <enric.balletbo@collabora.com>");
 MODULE_DESCRIPTION("ChromeOS EC Miscellaneous Character Driver");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);

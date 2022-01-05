@@ -368,5 +368,6 @@ static struct platform_driver cros_ec_sysfs_driver = {
 module_platform_driver(cros_ec_sysfs_driver);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("Expose the ChromeOS EC through sysfs");
 MODULE_ALIAS("platform:" DRV_NAME);

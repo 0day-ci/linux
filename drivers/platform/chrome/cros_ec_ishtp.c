@@ -794,3 +794,4 @@ MODULE_DESCRIPTION("ChromeOS EC ISHTP Client Driver");
 MODULE_AUTHOR("Rushikesh S Kadam <rushikesh.s.kadam@intel.com>");
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);

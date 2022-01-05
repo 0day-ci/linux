@@ -838,4 +838,5 @@ static struct spi_driver cros_ec_driver_spi = {
 module_spi_driver(cros_ec_driver_spi);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("SPI interface for ChromeOS Embedded Controller");

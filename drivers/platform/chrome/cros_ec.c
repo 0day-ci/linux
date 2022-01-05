@@ -398,4 +398,5 @@ EXPORT_SYMBOL(cros_ec_resume);
 #endif
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC core driver");

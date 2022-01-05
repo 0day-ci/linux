@@ -526,5 +526,6 @@ static struct platform_driver cros_ec_debugfs_driver = {
 module_platform_driver(cros_ec_debugfs_driver);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("Debug logs for ChromeOS EC");
 MODULE_ALIAS("platform:" DRV_NAME);

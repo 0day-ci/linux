@@ -263,5 +263,6 @@ static struct platform_driver cros_usbpd_logger_driver = {
 module_platform_driver(cros_usbpd_logger_driver);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("Logging driver for ChromeOS EC USBPD Charger.");
 MODULE_ALIAS("platform:" DRV_NAME);

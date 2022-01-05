@@ -597,4 +597,5 @@ module_init(cros_ec_lpc_init);
 module_exit(cros_ec_lpc_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC LPC driver");

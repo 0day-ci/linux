@@ -304,4 +304,5 @@ static struct rpmsg_driver cros_ec_driver_rpmsg = {
 module_rpmsg_driver(cros_ec_driver_rpmsg);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC multi function device (rpmsg)");

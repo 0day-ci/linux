@@ -373,4 +373,5 @@ static struct i2c_driver cros_ec_driver = {
 module_i2c_driver(cros_ec_driver);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("I2C interface for ChromeOS Embedded Controller");
