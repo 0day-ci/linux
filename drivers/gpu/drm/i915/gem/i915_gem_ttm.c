@@ -399,6 +399,8 @@ int i915_ttm_purge(struct drm_i915_gem_object *obj)
 	if (obj->mm.madv == __I915_MADV_PURGED)
 		return 0;
 
+	ttm_bo_unmap_virtual(bo);
+
 	ret = ttm_bo_validate(bo, &place, &ctx);
 	if (ret)
 		return ret;
