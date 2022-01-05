@@ -382,5 +382,6 @@ static struct platform_driver cros_pchg_driver = {
 module_platform_driver(cros_pchg_driver);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC peripheral device charger");
 MODULE_ALIAS("platform:" DRV_NAME);
