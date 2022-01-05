@@ -25,7 +25,7 @@ config HYPERV_UTILS
 
 config HYPERV_BALLOON
 	tristate "Microsoft Hyper-V Balloon driver"
-	depends on HYPERV
+	depends on HYPERV && (X86 || (ARM64 && ARM64_4K_PAGES))
 	select PAGE_REPORTING
 	help
 	  Select this option to enable Hyper-V Balloon driver.
