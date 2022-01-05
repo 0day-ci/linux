@@ -640,3 +640,4 @@ static void __exit hammer_exit(void)
 module_exit(hammer_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(PL_CHROMEOS);
