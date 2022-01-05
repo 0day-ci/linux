@@ -361,6 +361,16 @@ out:
 	return ret;
 }
 
+static const struct platform_s2idle_ops acpi_s2idle_ops_lps0 = {
+	.begin = acpi_s2idle_begin,
+	.prepare = acpi_s2idle_prepare,
+	.prepare_late = acpi_s2idle_prepare_late,
+	.wake = acpi_s2idle_wake,
+	.restore_early = acpi_s2idle_restore_early,
+	.restore = acpi_s2idle_restore,
+	.end = acpi_s2idle_end,
+};
+
 static int lps0_device_attach(struct acpi_device *adev,
 			      const struct acpi_device_id *not_used)
 {
@@ -507,16 +517,6 @@ void acpi_s2idle_restore_early(void)
 					ACPI_LPS0_SCREEN_ON,
 					lps0_dsm_func_mask, lps0_dsm_guid);
 }
-
-static const struct platform_s2idle_ops acpi_s2idle_ops_lps0 = {
-	.begin = acpi_s2idle_begin,
-	.prepare = acpi_s2idle_prepare,
-	.prepare_late = acpi_s2idle_prepare_late,
-	.wake = acpi_s2idle_wake,
-	.restore_early = acpi_s2idle_restore_early,
-	.restore = acpi_s2idle_restore,
-	.end = acpi_s2idle_end,
-};
 
 void acpi_s2idle_setup(void)
 {

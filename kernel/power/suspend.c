@@ -73,13 +73,6 @@ bool pm_suspend_default_s2idle(void)
 }
 EXPORT_SYMBOL_GPL(pm_suspend_default_s2idle);
 
-void s2idle_set_ops(const struct platform_s2idle_ops *ops)
-{
-	lock_system_sleep();
-	s2idle_ops = ops;
-	unlock_system_sleep();
-}
-
 static void s2idle_begin(void)
 {
 	s2idle_state = S2IDLE_STATE_NONE;
@@ -167,6 +160,13 @@ static bool valid_state(suspend_state_t state)
 	 */
 	return suspend_ops && suspend_ops->valid && suspend_ops->valid(state) &&
 		suspend_ops->enter;
+}
+
+void s2idle_set_ops(const struct platform_s2idle_ops *ops)
+{
+	lock_system_sleep();
+	s2idle_ops = ops;
+	unlock_system_sleep();
 }
 
 void __init pm_states_init(void)
