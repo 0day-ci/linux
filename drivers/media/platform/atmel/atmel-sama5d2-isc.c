@@ -559,6 +559,9 @@ unprepare_clk:
 cleanup_subdev:
 	isc_subdev_cleanup(isc);
 
+disable_pm_runtime:
+	pm_runtime_disable(dev);
+
 unregister_v4l2_device:
 	v4l2_device_unregister(&isc->v4l2_dev);
 
