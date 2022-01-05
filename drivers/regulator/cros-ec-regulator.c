@@ -252,5 +252,6 @@ static struct platform_driver cros_ec_regulator_driver = {
 module_platform_driver(cros_ec_regulator_driver);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PL_CHROMEOS);
 MODULE_DESCRIPTION("ChromeOS EC controlled regulator");
 MODULE_AUTHOR("Pi-Hsun Shih <pihsun@chromium.org>");
