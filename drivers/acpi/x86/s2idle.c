@@ -361,6 +361,11 @@ out:
 	return ret;
 }
 
+static bool acpi_s2idle_valid(void)
+{
+	return true;
+}
+
 static const struct platform_s2idle_ops acpi_s2idle_ops_lps0 = {
 	.begin = acpi_s2idle_begin,
 	.prepare = acpi_s2idle_prepare,
@@ -369,6 +374,7 @@ static const struct platform_s2idle_ops acpi_s2idle_ops_lps0 = {
 	.restore_early = acpi_s2idle_restore_early,
 	.restore = acpi_s2idle_restore,
 	.end = acpi_s2idle_end,
+	.valid = acpi_s2idle_valid,
 };
 
 static int lps0_device_attach(struct acpi_device *adev,

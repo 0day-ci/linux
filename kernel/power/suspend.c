@@ -46,7 +46,7 @@ static const char * const mem_sleep_labels[] = {
 };
 const char *mem_sleep_states[PM_SUSPEND_MAX];
 
-suspend_state_t mem_sleep_current = PM_SUSPEND_TO_IDLE;
+suspend_state_t mem_sleep_current = PM_SUSPEND_MAX;
 suspend_state_t mem_sleep_default = PM_SUSPEND_MAX;
 suspend_state_t pm_suspend_target_state;
 EXPORT_SYMBOL_GPL(pm_suspend_target_state);
@@ -152,6 +152,10 @@ EXPORT_SYMBOL_GPL(s2idle_wake);
 
 static bool valid_state(suspend_state_t state)
 {
+	/* PM_SUSPEND_TO_IDLE may require low-level support on some platforms */
+	if (state == PM_SUSPEND_TO_IDLE)
+		return s2idle_ops && s2idle_ops->valid && s2idle_ops->valid();
+
 	/*
 	 * The PM_SUSPEND_STANDBY and PM_SUSPEND_MEM states require low-level
 	 * support and need to be valid to the low-level implementation.
@@ -166,6 +170,13 @@ void s2idle_set_ops(const struct platform_s2idle_ops *ops)
 {
 	lock_system_sleep();
 	s2idle_ops = ops;
+	if (valid_state(PM_SUSPEND_TO_IDLE)) {
+		mem_sleep_states[PM_SUSPEND_TO_IDLE] = mem_sleep_labels[PM_SUSPEND_TO_IDLE];
+		/* if supported, update to suspend to idle for default when ops set */
+		if (mem_sleep_current == PM_SUSPEND_MAX ||
+		    mem_sleep_default == PM_SUSPEND_TO_IDLE)
+			mem_sleep_current = PM_SUSPEND_TO_IDLE;
+	}
 	unlock_system_sleep();
 }
 
@@ -174,11 +185,6 @@ void __init pm_states_init(void)
 	/* "mem" and "freeze" are always present in /sys/power/state. */
 	pm_states[PM_SUSPEND_MEM] = pm_labels[PM_SUSPEND_MEM];
 	pm_states[PM_SUSPEND_TO_IDLE] = pm_labels[PM_SUSPEND_TO_IDLE];
-	/*
-	 * Suspend-to-idle should be supported even without any suspend_ops,
-	 * initialize mem_sleep_states[] accordingly here.
-	 */
-	mem_sleep_states[PM_SUSPEND_TO_IDLE] = mem_sleep_labels[PM_SUSPEND_TO_IDLE];
 }
 
 static int __init mem_sleep_default_setup(char *str)
@@ -235,11 +241,6 @@ int suspend_valid_only_mem(suspend_state_t state)
 	return state == PM_SUSPEND_MEM;
 }
 EXPORT_SYMBOL_GPL(suspend_valid_only_mem);
-
-static bool sleep_state_supported(suspend_state_t state)
-{
-	return state == PM_SUSPEND_TO_IDLE || valid_state(state);
-}
 
 static int platform_suspend_prepare(suspend_state_t state)
 {
@@ -346,7 +347,7 @@ static int suspend_prepare(suspend_state_t state)
 {
 	int error;
 
-	if (!sleep_state_supported(state))
+	if (!valid_state(state))
 		return -EPERM;
 
 	pm_prepare_console();
@@ -478,7 +479,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	int error;
 	bool wakeup = false;
 
-	if (!sleep_state_supported(state))
+	if (!valid_state(state))
 		return -ENOSYS;
 
 	pm_suspend_target_state = state;

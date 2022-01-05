@@ -797,12 +797,18 @@ void acpi_s2idle_end(void)
 	acpi_scan_lock_release();
 }
 
+static bool acpi_s2idle_valid(void)
+{
+	return true;
+}
+
 static const struct platform_s2idle_ops acpi_s2idle_ops = {
 	.begin = acpi_s2idle_begin,
 	.prepare = acpi_s2idle_prepare,
 	.wake = acpi_s2idle_wake,
 	.restore = acpi_s2idle_restore,
 	.end = acpi_s2idle_end,
+	.valid = acpi_s2idle_valid,
 };
 
 void __weak acpi_s2idle_setup(void)

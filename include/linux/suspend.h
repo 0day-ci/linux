@@ -195,6 +195,7 @@ struct platform_s2idle_ops {
 	void (*restore_early)(void);
 	void (*restore)(void);
 	void (*end)(void);
+	bool (*valid)(void);
 };
 
 #ifdef CONFIG_SUSPEND
