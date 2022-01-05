@@ -62,6 +62,10 @@ properties:
       - const: mac
       - const: mdio
 
+  mdio:
+    $ref: mdio.yaml#
+    unevaluatedProperties: false
+
 required:
   - compatible
   - reg
