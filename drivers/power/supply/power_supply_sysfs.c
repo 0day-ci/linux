@@ -403,6 +403,8 @@ void power_supply_init_attrs(struct device_type *dev_type)
 {
 	int i;
 
+	BUILD_BUG_ON(ARRAY_SIZE(power_supply_attrs) != __POWER_SUPPLY_PROP_CNT);
+
 	dev_type->groups = power_supply_attr_groups;
 
 	for (i = 0; i < ARRAY_SIZE(power_supply_attrs); i++) {
