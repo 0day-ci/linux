@@ -408,7 +408,8 @@ err_disable:
 err_clk:
 	if (hva->clk)
 		clk_unprepare(hva->clk);
-
+disable_pm_runtime:
+	pm_runtime_disable(dev);
 	return ret;
 }
 
