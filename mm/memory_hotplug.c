@@ -1900,8 +1900,18 @@ int __ref offline_pages(unsigned long start_pfn, unsigned long nr_pages,
 	zone_pcp_disable(zone);
 	lru_cache_disable();
 
-	/* set above range as isolated */
+	/*
+	 * set above range as isolated
+	 *
+	 * start_pfn and end_pfn are the same as isolate_start and isolate_end,
+	 * because start_pfn and end_pfn are already PAGES_PER_SECTION
+	 * (>= MAX_ORDER_NR_PAGES) aligned; if start_pfn is
+	 * pageblock_nr_pages aligned in memmap_on_memory case, there is no
+	 * need to isolate pages before start_pfn, since they are used by
+	 * memmap thus not user visible.
+	 */
 	ret = start_isolate_page_range(start_pfn, end_pfn,
+				       start_pfn, end_pfn,
 				       MIGRATE_MOVABLE,
 				       MEMORY_OFFLINE | REPORT_FAILURE);
 	if (ret) {
