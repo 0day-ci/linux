@@ -41,6 +41,18 @@ extern struct mutex of_mutex;
 extern struct list_head aliases_lookup;
 extern struct kset *of_kset;
 
+#if defined(CONFIG_OF_UNITTEST)
+extern u8 __dtb_testcases_begin[];
+extern u8 __dtb_testcases_end[];
+#define __dtb_fdt_default_begin		__dtb_testcases_begin
+#define __dtb_fdt_default_end		__dtb_testcases_end
+void __init unittest_data_add(struct device_node *dt);
+#else
+extern u8 __dtb_fdt_default_begin[];
+extern u8 __dtb_fdt_default_end[];
+static inline void unittest_data_add(struct device_node *dt) {}
+#endif
+
 #if defined(CONFIG_OF_DYNAMIC)
 extern int of_property_notify(int action, struct device_node *np,
 			      struct property *prop, struct property *old_prop);
@@ -84,6 +96,11 @@ static inline void __of_detach_node_sysfs(struct device_node *np) {}
 
 #if defined(CONFIG_OF_RESOLVE)
 int of_resolve_phandles(struct device_node *tree);
+#else
+static inline int of_resolve_phandles(struct device_node *tree)
+{
+	return 0;
+}
 #endif
 
 void __of_phandle_cache_inv_entry(phandle handle);
