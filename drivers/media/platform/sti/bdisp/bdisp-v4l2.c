@@ -1396,6 +1396,8 @@ err_pm:
 err_remove:
 	bdisp_debugfs_remove(bdisp);
 	v4l2_device_unregister(&bdisp->v4l2_dev);
+disable_pm_runtime:
+	pm_runtime_disable(dev);
 err_clk:
 	if (!IS_ERR(bdisp->clock))
 		clk_unprepare(bdisp->clock);
