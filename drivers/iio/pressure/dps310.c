@@ -812,9 +812,17 @@ static const struct i2c_device_id dps310_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, dps310_id);
 
+static const struct acpi_device_id __maybe_unused dps310_acpi_match[] = {
+	{ "IFX3100" },
+	{ },
+};
+
+MODULE_DEVICE_TABLE(acpi, dps310_acpi_match);
+
 static struct i2c_driver dps310_driver = {
 	.driver = {
 		.name = DPS310_DEV_NAME,
+		.acpi_match_table = ACPI_PTR(dps310_acpi_match),
 	},
 	.probe = dps310_probe,
 	.id_table = dps310_id,
