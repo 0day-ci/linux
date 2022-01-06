@@ -355,10 +355,8 @@ int kvmppc_emulate_loadstore(struct kvm_vcpu *vcpu)
 		}
 	}
 
-	if (emulated == EMULATE_FAIL) {
+	if (emulated == EMULATE_FAIL)
 		advance = 0;
-		kvmppc_core_queue_program(vcpu, 0);
-	}
 
 	trace_kvm_ppc_instr(inst, kvmppc_get_pc(vcpu), emulated);
 
