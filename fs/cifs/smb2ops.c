@@ -4416,6 +4416,20 @@ static inline void smb2_sg_set_buf(struct scatterlist *sg, const void *buf,
 	sg_set_page(sg, addr, buflen, offset_in_page(buf));
 }
 
+struct cifs_init_sg_priv {
+		struct scatterlist *sg;
+		unsigned int idx;
+};
+
+static ssize_t cifs_init_sg_scan(struct iov_iter *i, const void *p,
+				 size_t len, size_t off, void *_priv)
+{
+	struct cifs_init_sg_priv *priv = _priv;
+
+	smb2_sg_set_buf(&priv->sg[priv->idx++], p, len);
+	return 0;
+}
+
 /* Assumes the first rqst has a transform header as the first iov.
  * I.e.
  * rqst[0].rq_iov[0]  is transform header
@@ -4425,43 +4439,44 @@ static inline void smb2_sg_set_buf(struct scatterlist *sg, const void *buf,
 static struct scatterlist *
 init_sg(int num_rqst, struct smb_rqst *rqst, u8 *sign)
 {
+	struct cifs_init_sg_priv priv;
 	unsigned int sg_len;
-	struct scatterlist *sg;
 	unsigned int i;
 	unsigned int j;
-	unsigned int idx = 0;
+	ssize_t rc;
 	int skip;
 
 	sg_len = 1;
-	for (i = 0; i < num_rqst; i++)
-		sg_len += rqst[i].rq_nvec + rqst[i].rq_npages;
+	for (i = 0; i < num_rqst; i++) {
+		sg_len += rqst[i].rq_nvec;
+		sg_len += iov_iter_npages(&rqst[i].rq_iter, INT_MAX);
+	}
 
-	sg = kmalloc_array(sg_len, sizeof(struct scatterlist), GFP_KERNEL);
-	if (!sg)
+	priv.sg = kmalloc_array(sg_len, sizeof(struct scatterlist), GFP_KERNEL);
+	if (!priv.sg)
 		return NULL;
 
-	sg_init_table(sg, sg_len);
+	sg_init_table(priv.sg, sg_len);
 	for (i = 0; i < num_rqst; i++) {
+		struct iov_iter *iter = &rqst[i].rq_iter;
+
 		for (j = 0; j < rqst[i].rq_nvec; j++) {
 			/*
 			 * The first rqst has a transform header where the
 			 * first 20 bytes are not part of the encrypted blob
 			 */
 			skip = (i == 0) && (j == 0) ? 20 : 0;
-			smb2_sg_set_buf(&sg[idx++],
+			smb2_sg_set_buf(&priv.sg[priv.idx++],
 					rqst[i].rq_iov[j].iov_base + skip,
 					rqst[i].rq_iov[j].iov_len - skip);
-			}
-
-		for (j = 0; j < rqst[i].rq_npages; j++) {
-			unsigned int len, offset;
-
-			rqst_page_get_length(&rqst[i], j, &len, &offset);
-			sg_set_page(&sg[idx++], rqst[i].rq_pages[j], len, offset);
 		}
+
+		rc = iov_iter_scan(iter, iov_iter_count(iter),
+				   cifs_init_sg_scan, &priv);
+		WARN_ON(rc < 0);
 	}
-	smb2_sg_set_buf(&sg[idx], sign, SMB2_SIGNATURE_SIZE);
-	return sg;
+	smb2_sg_set_buf(&priv.sg[priv.idx], sign, SMB2_SIGNATURE_SIZE);
+	return priv.sg;
 }
 
 static int
@@ -4598,18 +4613,30 @@ free_req:
 	return rc;
 }
 
+/*
+ * Clear a read buffer, discarding the folios which have XA_MARK_0 set.
+ */
+static void netfs_clear_buffer(struct xarray *buffer)
+{
+       struct folio *folio;
+       XA_STATE(xas, buffer, 0);
+
+       rcu_read_lock();
+       xas_for_each_marked(&xas, folio, ULONG_MAX, XA_MARK_0) {
+               folio_put(folio);
+       }
+       rcu_read_unlock();
+       xa_destroy(buffer);
+}
+
 void
 smb3_free_compound_rqst(int num_rqst, struct smb_rqst *rqst)
 {
-	int i, j;
+	int i;
 
-	for (i = 0; i < num_rqst; i++) {
-		if (rqst[i].rq_pages) {
-			for (j = rqst[i].rq_npages - 1; j >= 0; j--)
-				put_page(rqst[i].rq_pages[j]);
-			kfree(rqst[i].rq_pages);
-		}
-	}
+	for (i = 0; i < num_rqst; i++)
+		if (!xa_empty(&rqst[i].rq_buffer))
+			netfs_clear_buffer(&rqst[i].rq_buffer);
 }
 
 /*
@@ -4629,50 +4656,37 @@ static int
 smb3_init_transform_rq(struct TCP_Server_Info *server, int num_rqst,
 		       struct smb_rqst *new_rq, struct smb_rqst *old_rq)
 {
-	struct page **pages;
 	struct smb2_transform_hdr *tr_hdr = new_rq[0].rq_iov[0].iov_base;
-	unsigned int npages;
+	struct page *page;
 	unsigned int orig_len = 0;
 	int i, j;
 	int rc = -ENOMEM;
 
 	for (i = 1; i < num_rqst; i++) {
-		npages = old_rq[i - 1].rq_npages;
-		pages = kmalloc_array(npages, sizeof(struct page *),
-				      GFP_KERNEL);
-		if (!pages)
-			goto err_free;
+		struct smb_rqst *old = &old_rq[i - 1];
+		struct smb_rqst *new = &new_rq[i];
+		struct xarray *buffer = &new->rq_buffer;
+		unsigned int npages;
+		size_t size = iov_iter_count(&old->rq_iter), seg;
 
-		new_rq[i].rq_pages = pages;
-		new_rq[i].rq_npages = npages;
-		new_rq[i].rq_offset = old_rq[i - 1].rq_offset;
-		new_rq[i].rq_pagesz = old_rq[i - 1].rq_pagesz;
-		new_rq[i].rq_tailsz = old_rq[i - 1].rq_tailsz;
-		new_rq[i].rq_iov = old_rq[i - 1].rq_iov;
-		new_rq[i].rq_nvec = old_rq[i - 1].rq_nvec;
+		orig_len += size;
+		xa_init(buffer);
 
-		orig_len += smb_rqst_len(server, &old_rq[i - 1]);
-
+		npages = DIV_ROUND_UP(size, PAGE_SIZE);
 		for (j = 0; j < npages; j++) {
-			pages[j] = alloc_page(GFP_KERNEL|__GFP_HIGHMEM);
-			if (!pages[j])
+			page = alloc_page(GFP_KERNEL|__GFP_HIGHMEM);
+			if (!xa_store(buffer, j, page, GFP_KERNEL))
 				goto err_free;
+
+			seg = min(size, PAGE_SIZE);
+			if (copy_page_from_iter(page, 0, seg, &old->rq_iter) != seg) {
+				rc = -EFAULT;
+				goto err_free;
+			}
 		}
 
-		/* copy pages form the old */
-		for (j = 0; j < npages; j++) {
-			char *dst, *src;
-			unsigned int offset, len;
-
-			rqst_page_get_length(&new_rq[i], j, &len, &offset);
-
-			dst = (char *) kmap(new_rq[i].rq_pages[j]) + offset;
-			src = (char *) kmap(old_rq[i - 1].rq_pages[j]) + offset;
-
-			memcpy(dst, src, len);
-			kunmap(new_rq[i].rq_pages[j]);
-			kunmap(old_rq[i - 1].rq_pages[j]);
-		}
+		new->rq_iov = old->rq_iov;
+		new->rq_nvec = old->rq_nvec;
 	}
 
 	/* fill the 1st iov with a transform header */
@@ -4715,10 +4729,6 @@ decrypt_raw_data(struct TCP_Server_Info *server, char *buf,
 
 	rqst.rq_iov = iov;
 	rqst.rq_nvec = 2;
-	rqst.rq_pages = pages;
-	rqst.rq_npages = npages;
-	rqst.rq_pagesz = PAGE_SIZE;
-	rqst.rq_tailsz = (page_data_size % PAGE_SIZE) ? : PAGE_SIZE;
 
 	rc = crypt_message(server, 1, &rqst, 0);
 	cifs_dbg(FYI, "Decrypt message returned %d\n", rc);

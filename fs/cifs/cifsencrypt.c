@@ -24,12 +24,27 @@
 #include "../smbfs_common/arc4.h"
 #include <crypto/aead.h>
 
+static ssize_t cifs_signature_scan(struct iov_iter *i, const void *p,
+				   size_t len, size_t off, void *priv)
+{
+	struct shash_desc *shash = priv;
+	int rc;
+
+	rc = crypto_shash_update(shash, p, len);
+	if (rc) {
+		cifs_dbg(VFS, "%s: Could not update with payload\n", __func__);
+		return rc;
+	}
+
+	return len;
+}
+
 int __cifs_calc_signature(struct smb_rqst *rqst,
 			struct TCP_Server_Info *server, char *signature,
 			struct shash_desc *shash)
 {
 	int i;
-	int rc;
+	ssize_t rc;
 	struct kvec *iov = rqst->rq_iov;
 	int n_vec = rqst->rq_nvec;
 	int is_smb2 = server->vals->header_preamble_size == 0;
@@ -62,25 +77,10 @@ int __cifs_calc_signature(struct smb_rqst *rqst,
 		}
 	}
 
-	/* now hash over the rq_pages array */
-	for (i = 0; i < rqst->rq_npages; i++) {
-		void *kaddr;
-		unsigned int len, offset;
-
-		rqst_page_get_length(rqst, i, &len, &offset);
-
-		kaddr = (char *) kmap(rqst->rq_pages[i]) + offset;
-
-		rc = crypto_shash_update(shash, kaddr, len);
-		if (rc) {
-			cifs_dbg(VFS, "%s: Could not update with payload\n",
-				 __func__);
-			kunmap(rqst->rq_pages[i]);
-			return rc;
-		}
-
-		kunmap(rqst->rq_pages[i]);
-	}
+	rc = iov_iter_scan(&rqst->rq_iter, iov_iter_count(&rqst->rq_iter),
+			   cifs_signature_scan, shash);
+	if (rc < 0)
+		return rc;
 
 	rc = crypto_shash_final(shash, signature);
 	if (rc)
