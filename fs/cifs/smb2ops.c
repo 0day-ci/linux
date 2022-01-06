@@ -4598,18 +4598,30 @@ free_req:
 	return rc;
 }
 
+/*
+ * Clear a read buffer, discarding the folios which have XA_MARK_0 set.
+ */
+static void netfs_clear_buffer(struct xarray *buffer)
+{
+       struct folio *folio;
+       XA_STATE(xas, buffer, 0);
+
+       rcu_read_lock();
+       xas_for_each_marked(&xas, folio, ULONG_MAX, XA_MARK_0) {
+               folio_put(folio);
+       }
+       rcu_read_unlock();
+       xa_destroy(buffer);
+}
+
 void
 smb3_free_compound_rqst(int num_rqst, struct smb_rqst *rqst)
 {
-	int i, j;
+	int i;
 
-	for (i = 0; i < num_rqst; i++) {
-		if (rqst[i].rq_pages) {
-			for (j = rqst[i].rq_npages - 1; j >= 0; j--)
-				put_page(rqst[i].rq_pages[j]);
-			kfree(rqst[i].rq_pages);
-		}
-	}
+	for (i = 0; i < num_rqst; i++)
+		if (!xa_empty(&rqst[i].rq_buffer))
+			netfs_clear_buffer(&rqst[i].rq_buffer);
 }
 
 /*
@@ -4637,42 +4649,30 @@ smb3_init_transform_rq(struct TCP_Server_Info *server, int num_rqst,
 	int rc = -ENOMEM;
 
 	for (i = 1; i < num_rqst; i++) {
-		npages = old_rq[i - 1].rq_npages;
-		pages = kmalloc_array(npages, sizeof(struct page *),
-				      GFP_KERNEL);
-		if (!pages)
-			goto err_free;
+		struct smb_rqst *old = &old_rq[i - 1];
+		struct smb_rqst *new = &new_rq[i];
+		struct xarray *buffer = &new->rq_buffer;
+		unsigned int npages;
+		size_t size = iov_iter_count(&old->rq_iter), seg;
 
-		new_rq[i].rq_pages = pages;
-		new_rq[i].rq_npages = npages;
-		new_rq[i].rq_offset = old_rq[i - 1].rq_offset;
-		new_rq[i].rq_pagesz = old_rq[i - 1].rq_pagesz;
-		new_rq[i].rq_tailsz = old_rq[i - 1].rq_tailsz;
-		new_rq[i].rq_iov = old_rq[i - 1].rq_iov;
-		new_rq[i].rq_nvec = old_rq[i - 1].rq_nvec;
+		orig_len += size;
+		xa_init(buffer);
 
-		orig_len += smb_rqst_len(server, &old_rq[i - 1]);
-
+		npages = DIV_ROUND_UP(size, PAGE_SIZE);
 		for (j = 0; j < npages; j++) {
-			pages[j] = alloc_page(GFP_KERNEL|__GFP_HIGHMEM);
-			if (!pages[j])
+			page = alloc_page(GFP_KERNEL|__GFP_HIGHMEM);
+			if (!xa_store(buffer, j, page, gfp))
 				goto err_free;
+
+			seg = min(size, PAGE_SIZE);
+			if (copy_page_from_iter(page, 0, seg, &old->rq_iter) != seg) {
+				rc = -EFAULT;
+				goto err_free;
+			}
 		}
 
-		/* copy pages form the old */
-		for (j = 0; j < npages; j++) {
-			char *dst, *src;
-			unsigned int offset, len;
-
-			rqst_page_get_length(&new_rq[i], j, &len, &offset);
-
-			dst = (char *) kmap(new_rq[i].rq_pages[j]) + offset;
-			src = (char *) kmap(old_rq[i - 1].rq_pages[j]) + offset;
-
-			memcpy(dst, src, len);
-			kunmap(new_rq[i].rq_pages[j]);
-			kunmap(old_rq[i - 1].rq_pages[j]);
-		}
+		new->rq_iov = old->rq_iov;
+		new->rq_nvec = old->rq_nvec;
 	}
 
 	/* fill the 1st iov with a transform header */
