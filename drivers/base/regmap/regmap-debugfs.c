@@ -589,6 +589,7 @@ void regmap_debugfs_init(struct regmap *map)
 				return;
 		}
 		name = map->debugfs_name;
+		kfree(map->debugfs_name);
 	} else {
 		name = devname;
 	}
@@ -600,6 +601,7 @@ void regmap_debugfs_init(struct regmap *map)
 		if (!map->debugfs_name)
 				return;
 		name = map->debugfs_name;
+		kfree(map->debugfs_name);
 		dummy_index++;
 	}
 
