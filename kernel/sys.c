@@ -220,7 +220,6 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 		niceval = MAX_NICE;
 
 	rcu_read_lock();
-	read_lock(&tasklist_lock);
 	switch (which) {
 	case PRIO_PROCESS:
 		if (who)
@@ -231,6 +230,7 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 			error = set_one_prio(p, niceval, error);
 		break;
 	case PRIO_PGRP:
+		read_lock(&tasklist_lock);
 		if (who)
 			pgrp = find_vpid(who);
 		else
@@ -238,6 +238,7 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 		do_each_pid_thread(pgrp, PIDTYPE_PGID, p) {
 			error = set_one_prio(p, niceval, error);
 		} while_each_pid_thread(pgrp, PIDTYPE_PGID, p);
+		read_unlock(&tasklist_lock);
 		break;
 	case PRIO_USER:
 		uid = make_kuid(cred->user_ns, who);
@@ -258,7 +259,6 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 		break;
 	}
 out_unlock:
-	read_unlock(&tasklist_lock);
 	rcu_read_unlock();
 out:
 	return error;
@@ -283,7 +283,6 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 		return -EINVAL;
 
 	rcu_read_lock();
-	read_lock(&tasklist_lock);
 	switch (which) {
 	case PRIO_PROCESS:
 		if (who)
@@ -297,6 +296,7 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 		}
 		break;
 	case PRIO_PGRP:
+		read_lock(&tasklist_lock);
 		if (who)
 			pgrp = find_vpid(who);
 		else
@@ -306,6 +306,7 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 			if (niceval > retval)
 				retval = niceval;
 		} while_each_pid_thread(pgrp, PIDTYPE_PGID, p);
+		read_unlock(&tasklist_lock);
 		break;
 	case PRIO_USER:
 		uid = make_kuid(cred->user_ns, who);
@@ -329,7 +330,6 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
 		break;
 	}
 out_unlock:
-	read_unlock(&tasklist_lock);
 	rcu_read_unlock();
 
 	return retval;
