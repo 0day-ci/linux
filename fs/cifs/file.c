@@ -3276,11 +3276,13 @@ static ssize_t __cifs_writev(
 		ctx->iter = *from;
 		ctx->len = len;
 	} else {
-		rc = setup_aio_ctx_iter(ctx, from, WRITE);
-		if (rc) {
+		rc = extract_iter_to_iter(from, &ctx->iter, &ctx->bv);
+		if (rc < 0) {
 			kref_put(&ctx->refcount, cifs_aio_ctx_release);
 			return rc;
 		}
+		ctx->npages = rc;
+		ctx->len = iov_iter_count(&ctx->iter);
 	}
 
 	/* grab a lock here due to read response handlers can access ctx */
@@ -3566,80 +3568,6 @@ cifs_uncached_readv_complete(struct work_struct *work)
 	kref_put(&rdata->refcount, cifs_uncached_readdata_release);
 }
 
-static int
-uncached_fill_pages(struct TCP_Server_Info *server,
-		    struct cifs_readdata *rdata, struct iov_iter *iter,
-		    unsigned int len)
-{
-	int result = 0;
-	unsigned int i;
-	unsigned int nr_pages = rdata->nr_pages;
-	unsigned int page_offset = rdata->page_offset;
-
-	rdata->got_bytes = 0;
-	rdata->tailsz = PAGE_SIZE;
-	for (i = 0; i < nr_pages; i++) {
-		struct page *page = rdata->pages[i];
-		size_t n;
-		unsigned int segment_size = rdata->pagesz;
-
-		if (i == 0)
-			segment_size -= page_offset;
-		else
-			page_offset = 0;
-
-
-		if (len <= 0) {
-			/* no need to hold page hostage */
-			rdata->pages[i] = NULL;
-			rdata->nr_pages--;
-			put_page(page);
-			continue;
-		}
-
-		n = len;
-		if (len >= segment_size)
-			/* enough data to fill the page */
-			n = segment_size;
-		else
-			rdata->tailsz = len;
-		len -= n;
-
-		if (iter)
-			result = copy_page_from_iter(
-					page, page_offset, n, iter);
-#ifdef CONFIG_CIFS_SMB_DIRECT
-		else if (rdata->mr)
-			result = n;
-#endif
-		else
-			result = cifs_read_page_from_socket(
-					server, page, page_offset, n);
-		if (result < 0)
-			break;
-
-		rdata->got_bytes += result;
-	}
-
-	return rdata->got_bytes > 0 && result != -ECONNABORTED ?
-						rdata->got_bytes : result;
-}
-
-static int
-cifs_uncached_read_into_pages(struct TCP_Server_Info *server,
-			      struct cifs_readdata *rdata, unsigned int len)
-{
-	return uncached_fill_pages(server, rdata, NULL, len);
-}
-
-static int
-cifs_uncached_copy_into_pages(struct TCP_Server_Info *server,
-			      struct cifs_readdata *rdata,
-			      struct iov_iter *iter)
-{
-	return uncached_fill_pages(server, rdata, iter, iter->count);
-}
-
 static int cifs_resend_rdata(struct cifs_readdata *rdata,
 			struct list_head *rdata_list,
 			struct cifs_aio_ctx *ctx)
@@ -3725,7 +3653,6 @@ cifs_send_async_read(loff_t offset, size_t len, struct cifsFileInfo *open_file,
 	int rc;
 	pid_t pid;
 	struct TCP_Server_Info *server;
-	struct page **pagevec;
 	size_t start;
 	struct iov_iter direct_iov = ctx->iter;
 
@@ -3756,23 +3683,6 @@ cifs_send_async_read(loff_t offset, size_t len, struct cifsFileInfo *open_file,
 		cur_len = min_t(const size_t, len, rsize);
 
 		if (ctx->direct_io) {
-			ssize_t result;
-
-			result = iov_iter_get_pages_alloc(
-					&direct_iov, &pagevec,
-					cur_len, &start);
-			if (result < 0) {
-				cifs_dbg(VFS,
-					 "Couldn't get user pages (rc=%zd) iter type %d iov_offset %zd count %zd\n",
-					 result, iov_iter_type(&direct_iov),
-					 direct_iov.iov_offset,
-					 direct_iov.count);
-				dump_stack();
-
-				rc = result;
-				add_credits_and_wake_if(server, credits, 0);
-				break;
-			}
 			cur_len = (size_t)result;
 			iov_iter_advance(&direct_iov, cur_len);
 
@@ -3815,15 +3725,14 @@ cifs_send_async_read(loff_t offset, size_t len, struct cifsFileInfo *open_file,
 
 		rdata->server = server;
 		rdata->cfile = cifsFileInfo_get(open_file);
-		rdata->nr_pages = npages;
+		rdata->nr_pages = ctx->npages;
 		rdata->offset = offset;
 		rdata->bytes = cur_len;
 		rdata->pid = pid;
 		rdata->pagesz = PAGE_SIZE;
-		rdata->read_into_pages = cifs_uncached_read_into_pages;
-		rdata->copy_into_pages = cifs_uncached_copy_into_pages;
 		rdata->credits = credits_on_stack;
 		rdata->ctx = ctx;
+		rdata->iter = ctx->iter;
 		kref_get(&ctx->refcount);
 
 		rc = adjust_credits(server, &rdata->credits, rdata->bytes);
@@ -4013,11 +3922,13 @@ static ssize_t __cifs_readv(
 		ctx->iter = *to;
 		ctx->len = len;
 	} else {
-		rc = setup_aio_ctx_iter(ctx, to, READ);
-		if (rc) {
+		rc = extract_iter_to_iter(to, &ctx->iter, &ctx->bv);
+		if (rc < 0) {
 			kref_put(&ctx->refcount, cifs_aio_ctx_release);
 			return rc;
 		}
+		ctx->npages = rc;
+		ctx->len = iov_iter_count(&ctx->iter);
 		len = ctx->len;
 	}
 
@@ -4180,112 +4091,6 @@ int cifs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	return rc;
 }
 
-static int
-readpages_fill_pages(struct TCP_Server_Info *server,
-		     struct cifs_readdata *rdata, struct iov_iter *iter,
-		     unsigned int len)
-{
-	int result = 0;
-	unsigned int i;
-	u64 eof;
-	pgoff_t eof_index;
-	unsigned int nr_pages = rdata->nr_pages;
-	unsigned int page_offset = rdata->page_offset;
-
-	/* determine the eof that the server (probably) has */
-	eof = CIFS_I(rdata->mapping->host)->server_eof;
-	eof_index = eof ? (eof - 1) >> PAGE_SHIFT : 0;
-	cifs_dbg(FYI, "eof=%llu eof_index=%lu\n", eof, eof_index);
-
-	rdata->got_bytes = 0;
-	rdata->tailsz = PAGE_SIZE;
-	for (i = 0; i < nr_pages; i++) {
-		struct page *page = rdata->pages[i];
-		unsigned int to_read = rdata->pagesz;
-		size_t n;
-
-		if (i == 0)
-			to_read -= page_offset;
-		else
-			page_offset = 0;
-
-		n = to_read;
-
-		if (len >= to_read) {
-			len -= to_read;
-		} else if (len > 0) {
-			/* enough for partial page, fill and zero the rest */
-			zero_user(page, len + page_offset, to_read - len);
-			n = rdata->tailsz = len;
-			len = 0;
-		} else if (page->index > eof_index) {
-			/*
-			 * The VFS will not try to do readahead past the
-			 * i_size, but it's possible that we have outstanding
-			 * writes with gaps in the middle and the i_size hasn't
-			 * caught up yet. Populate those with zeroed out pages
-			 * to prevent the VFS from repeatedly attempting to
-			 * fill them until the writes are flushed.
-			 */
-			zero_user(page, 0, PAGE_SIZE);
-			lru_cache_add(page);
-			flush_dcache_page(page);
-			SetPageUptodate(page);
-			unlock_page(page);
-			put_page(page);
-			rdata->pages[i] = NULL;
-			rdata->nr_pages--;
-			continue;
-		} else {
-			/* no need to hold page hostage */
-			lru_cache_add(page);
-			unlock_page(page);
-			put_page(page);
-			rdata->pages[i] = NULL;
-			rdata->nr_pages--;
-			continue;
-		}
-
-		if (iter)
-			result = copy_page_from_iter(
-					page, page_offset, n, iter);
-#ifdef CONFIG_CIFS_SMB_DIRECT
-		else if (rdata->mr)
-			result = n;
-#endif
-		else
-			result = cifs_read_iter_from_socket(server, &rdata->iter, n);
-		if (result < 0)
-			break;
-
-		rdata->got_bytes += result;
-	}
-
-	return rdata->got_bytes > 0 && result != -ECONNABORTED ?
-						rdata->got_bytes : result;
-}
-
-static int
-cifs_readpages_read_into_pages(struct TCP_Server_Info *server,
-			       struct cifs_readdata *rdata, unsigned int len)
-{
-	int rc;
-
-	rc = cifs_read_iter_from_socket(server, &rdata->iter, len);
-	if (rc > 0)
-		rdata->got_bytes += rc;
-	return rc;
-}
-
-static int
-cifs_readpages_copy_into_pages(struct TCP_Server_Info *server,
-			       struct cifs_readdata *rdata,
-			       struct iov_iter *iter)
-{
-	printk("cifs_readpages_copy_into_pages\n");
-	return readpages_fill_pages(server, rdata, iter, iter->count);
-}
-
 /*
  * Issue a read operation on behalf of the netfs helper functions.  We're asked
  * to make a read of a certain size at a point in the file.  We are permitted
@@ -4337,18 +4142,16 @@ static void cifs_req_issue_op(struct netfs_read_subrequest *subreq)
 		goto out;
 	}
 
-	rdata->subreq = subreq;
-	rdata->cfile = cifsFileInfo_get(open_file);
-	rdata->server = server;
-	rdata->mapping = rreq->mapping;
-	rdata->offset = subreq->start + subreq->transferred;
-	rdata->bytes = subreq->len   - subreq->transferred;
-	rdata->pid = pid;
-	rdata->pagesz = PAGE_SIZE;
-	rdata->tailsz = PAGE_SIZE;
-	rdata->read_into_pages = cifs_readpages_read_into_pages;
-	rdata->copy_into_pages = cifs_readpages_copy_into_pages;
-	rdata->credits = credits_on_stack;
+	rdata->subreq	= subreq;
+	rdata->cfile	= cifsFileInfo_get(open_file);
+	rdata->server	= server;
+	rdata->mapping	= rreq->mapping;
+	rdata->offset	= subreq->start + subreq->transferred;
+	rdata->bytes	= subreq->len   - subreq->transferred;
+	rdata->pid	= pid;
+	rdata->pagesz	= PAGE_SIZE;
+	rdata->tailsz	= PAGE_SIZE;
+	rdata->credits	= credits_on_stack;
 
 	iov_iter_xarray(&rdata->iter, READ, &rreq->mapping->i_pages,
 			rdata->offset, rdata->bytes);
@@ -4652,7 +4455,7 @@ oplock_break_done:
  * In the non-cached mode (mount with cache=none), we shunt off direct read and write requests
  * so this method should never be called.
  *
- * Direct IO is not yet supported in the cached mode. 
+ * Direct IO is not yet supported in the cached mode.
  */
 static ssize_t
 cifs_direct_io(struct kiocb *iocb, struct iov_iter *iter)
