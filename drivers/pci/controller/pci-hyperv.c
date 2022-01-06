@@ -1899,8 +1899,21 @@ static void hv_pci_assign_numa_node(struct hv_pcibus_device *hbus)
 		if (!hv_dev)
 			continue;
 
-		if (hv_dev->desc.flags & HV_PCI_DEVICE_FLAG_NUMA_AFFINITY)
-			set_dev_node(&dev->dev, hv_dev->desc.virtual_numa_node);
+		if (hv_dev->desc.flags & HV_PCI_DEVICE_FLAG_NUMA_AFFINITY) {
+			int cpu;
+			bool found_node = false;
+
+			for_each_possible_cpu(cpu)
+				if (cpu_to_node(cpu) ==
+				    hv_dev->desc.virtual_numa_node) {
+					found_node = true;
+					break;
+				}
+
+			if (found_node)
+				set_dev_node(&dev->dev,
+					     hv_dev->desc.virtual_numa_node);
+		}
 
 		put_pcichild(hv_dev);
 	}
