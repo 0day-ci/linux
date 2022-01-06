@@ -611,6 +611,15 @@ static int adreno_resume(struct device *dev)
 static int adreno_suspend(struct device *dev)
 {
 	struct msm_gpu *gpu = dev_to_gpu(dev);
+	int ret = 0;
+
+	ret = wait_event_timeout(gpu->retire_event,
+				 !msm_gpu_active(gpu),
+				 msecs_to_jiffies(1000));
+	if (ret == 0) {
+		dev_err(dev, "Timeout waiting for GPU to suspend\n");
+		return -EBUSY;
+	}
 
 	return gpu->funcs->pm_suspend(gpu);
 }
