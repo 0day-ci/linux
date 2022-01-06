@@ -103,7 +103,7 @@ MODULE_DEVICE_TABLE(of, lis3lv02d_i2c_dt_ids);
 static int lis3lv02d_i2c_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
 {
-	int ret = 0;
+	int ret = 0, err;
 	struct lis3lv02d_platform_data *pdata = client->dev.platform_data;
 
 #ifdef CONFIG_OF
@@ -158,11 +158,19 @@ static int lis3lv02d_i2c_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, &lis3_dev);
 
 	/* Provide power over the init call */
-	lis3_reg_ctrl(&lis3_dev, LIS3_REG_ON);
+	err = lis3_reg_ctrl(&lis3_dev, LIS3_REG_ON);
+	if (err) {
+		ret = err;
+		goto fail2;
+	}
 
 	ret = lis3lv02d_init_device(&lis3_dev);
 
-	lis3_reg_ctrl(&lis3_dev, LIS3_REG_OFF);
+	err = lis3_reg_ctrl(&lis3_dev, LIS3_REG_OFF);
+	if (err) {
+		ret = err;
+		goto fail2;
+	}
 
 	if (ret)
 		goto fail2;
