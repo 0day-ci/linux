@@ -40,10 +40,17 @@
 #include <linux/sysfs.h>
 #include <linux/rcupdate.h>
 
+enum padata_work_flags {
+	PADATA_WORK_FINISHED	= 1,
+	PADATA_WORK_UNDO	= 2,
+};
+
 struct padata_work {
 	struct work_struct	pw_work;
 	struct list_head	pw_list;  /* padata_free_works linkage */
+	enum padata_work_flags	pw_flags;
 	void			*pw_data;
+	struct task_struct	*pw_task;
 	/* holds job units from padata_mt_job::start to pw_error_start */
 	unsigned long		pw_error_offset;
 	unsigned long		pw_error_start;
@@ -58,9 +65,8 @@ static LIST_HEAD(padata_free_works);
 struct padata_mt_job_state {
 	spinlock_t		lock;
 	struct completion	completion;
+	struct task_struct	*niced_task;
 	struct padata_mt_job	*job;
-	int			nworks;
-	int			nworks_fini;
 	int			error; /* first error from thread_fn */
 	unsigned long		chunk_size;
 	unsigned long		position;
@@ -451,12 +457,44 @@ static int padata_setup_cpumasks(struct padata_instance *pinst)
 	return err;
 }
 
+static void padata_wait_for_helpers(struct padata_mt_job_state *ps,
+				    struct list_head *unfinished_works,
+				    struct list_head *finished_works)
+{
+	struct padata_work *work;
+
+	if (list_empty(unfinished_works))
+		return;
+
+	spin_lock(&ps->lock);
+	while (!list_empty(unfinished_works)) {
+		work = list_first_entry(unfinished_works, struct padata_work,
+					pw_list);
+		if (!(work->pw_flags & PADATA_WORK_FINISHED)) {
+			set_user_nice(work->pw_task, task_nice(current));
+			ps->niced_task = work->pw_task;
+			spin_unlock(&ps->lock);
+
+			wait_for_completion(&ps->completion);
+
+			spin_lock(&ps->lock);
+			WARN_ON_ONCE(!(work->pw_flags & PADATA_WORK_FINISHED));
+		}
+		/*
+		 * Leave works used in padata_undo() on ps->failed_works.
+		 * padata_undo() will move them to finished_works.
+		 */
+		if (!(work->pw_flags & PADATA_WORK_UNDO))
+			list_move(&work->pw_list, finished_works);
+	}
+	spin_unlock(&ps->lock);
+}
+
 static int padata_mt_helper(void *__pw)
 {
 	struct padata_work *pw = __pw;
 	struct padata_mt_job_state *ps = pw->pw_data;
 	struct padata_mt_job *job = ps->job;
-	bool done;
 
 	spin_lock(&ps->lock);
 
@@ -488,6 +526,7 @@ static int padata_mt_helper(void *__pw)
 				ps->error = ret;
 			/* Save information about where the job failed. */
 			if (job->undo_fn) {
+				pw->pw_flags |= PADATA_WORK_UNDO;
 				list_move(&pw->pw_list, &ps->failed_works);
 				pw->pw_error_start = position;
 				pw->pw_error_offset = position_offset;
@@ -496,12 +535,10 @@ static int padata_mt_helper(void *__pw)
 		}
 	}
 
-	++ps->nworks_fini;
-	done = (ps->nworks_fini == ps->nworks);
-	spin_unlock(&ps->lock);
-
-	if (done)
+	pw->pw_flags |= PADATA_WORK_FINISHED;
+	if (ps->niced_task == current)
 		complete(&ps->completion);
+	spin_unlock(&ps->lock);
 
 	return 0;
 }
@@ -520,7 +557,7 @@ static int padata_error_cmp(void *unused, const struct list_head *a,
 }
 
 static void padata_undo(struct padata_mt_job_state *ps,
-			struct list_head *works_list,
+			struct list_head *finished_works,
 			struct padata_work *stack_work)
 {
 	struct list_head *failed_works = &ps->failed_works;
@@ -548,11 +585,12 @@ static void padata_undo(struct padata_mt_job_state *ps,
 
 		if (failed_work) {
 			undo_pos = failed_work->pw_error_end;
-			/* main thread's stack_work stays off works_list */
+			/* main thread's stack_work stays off finished_works */
 			if (failed_work == stack_work)
 				list_del(&failed_work->pw_list);
 			else
-				list_move(&failed_work->pw_list, works_list);
+				list_move(&failed_work->pw_list,
+					  finished_works);
 		} else {
 			undo_pos = undo_end;
 		}
@@ -577,16 +615,17 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	struct cgroup_subsys_state *cpu_css;
 	struct padata_work my_work, *pw;
 	struct padata_mt_job_state ps;
-	LIST_HEAD(works);
-	int nworks;
+	LIST_HEAD(unfinished_works);
+	LIST_HEAD(finished_works);
+	int nworks, req;
 
 	if (job->size == 0)
 		return 0;
 
 	/* Ensure at least one thread when size < min_chunk. */
-	nworks = max(job->size / job->min_chunk, 1ul);
-	nworks = min(nworks, job->max_threads);
-	nworks = min(nworks, current->nr_cpus_allowed);
+	req = max(job->size / job->min_chunk, 1ul);
+	req = min(req, job->max_threads);
+	req = min(req, current->nr_cpus_allowed);
 
 #ifdef CONFIG_CGROUP_SCHED
 	/*
@@ -596,23 +635,23 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	 */
 	rcu_read_lock();
 	cpu_css = task_css(current, cpu_cgrp_id);
-	nworks = min(nworks, max_cfs_bandwidth_cpus(cpu_css));
+	req = min(req, max_cfs_bandwidth_cpus(cpu_css));
 	rcu_read_unlock();
 #endif
 
-	if (nworks == 1) {
+	if (req == 1) {
 		/* Single thread, no coordination needed, cut to the chase. */
 		return job->thread_fn(job->start, job->start + job->size,
 				      job->fn_arg);
 	}
+
+	nworks = padata_work_alloc_mt(req, &unfinished_works);
 
 	spin_lock_init(&ps.lock);
 	init_completion(&ps.completion);
 	lockdep_init_map(&ps.lockdep_map, map_name, key, 0);
 	INIT_LIST_HEAD(&ps.failed_works);
 	ps.job		  = job;
-	ps.nworks	  = padata_work_alloc_mt(nworks, &works);
-	ps.nworks_fini	  = 0;
 	ps.error	  = 0;
 	ps.position	  = job->start;
 	ps.remaining_size = job->size;
@@ -623,41 +662,42 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	 * increasing the number of chunks, guarantee at least the minimum
 	 * chunk size from the caller, and honor the caller's alignment.
 	 */
-	ps.chunk_size = job->size / (ps.nworks * load_balance_factor);
+	ps.chunk_size = job->size / (nworks * load_balance_factor);
 	ps.chunk_size = max(ps.chunk_size, job->min_chunk);
 	ps.chunk_size = roundup(ps.chunk_size, job->align);
 
 	lock_map_acquire(&ps.lockdep_map);
 	lock_map_release(&ps.lockdep_map);
 
-	list_for_each_entry(pw, &works, pw_list) {
-		struct task_struct *task;
-
+	list_for_each_entry(pw, &unfinished_works, pw_list) {
 		pw->pw_data = &ps;
-		task = kthread_create(padata_mt_helper, pw, "padata");
-		if (IS_ERR(task)) {
-			--ps.nworks;
+		pw->pw_task = kthread_create(padata_mt_helper, pw, "padata");
+		if (IS_ERR(pw->pw_task)) {
+			pw->pw_flags = PADATA_WORK_FINISHED;
 		} else {
 			/* Helper threads shouldn't disturb other workloads. */
-			set_user_nice(task, MAX_NICE);
-			kthread_bind_mask(task, current->cpus_ptr);
+			set_user_nice(pw->pw_task, MAX_NICE);
 
-			wake_up_process(task);
+			pw->pw_flags = 0;
+			kthread_bind_mask(pw->pw_task, current->cpus_ptr);
+
+			wake_up_process(pw->pw_task);
 		}
 	}
 
 	/* Use the current task, which saves starting a kthread. */
 	my_work.pw_data = &ps;
+	my_work.pw_flags = 0;
 	INIT_LIST_HEAD(&my_work.pw_list);
 	padata_mt_helper(&my_work);
 
 	/* Wait for all the helpers to finish. */
-	wait_for_completion(&ps.completion);
+	padata_wait_for_helpers(&ps, &unfinished_works, &finished_works);
 
 	if (ps.error && job->undo_fn)
-		padata_undo(&ps, &works, &my_work);
+		padata_undo(&ps, &finished_works, &my_work);
 
-	padata_works_free(&works);
+	padata_works_free(&finished_works);
 	return ps.error;
 }
 
