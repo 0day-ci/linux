@@ -162,6 +162,7 @@ static struct attribute *ttm_mem_zone_attrs[] = {
 	&ttm_mem_used,
 	NULL
 };
+ATTRIBUTE_GROUPS(ttm_mem_zone);
 
 static const struct sysfs_ops ttm_mem_zone_ops = {
 	.show = &ttm_mem_zone_show,
@@ -171,7 +172,7 @@ static const struct sysfs_ops ttm_mem_zone_ops = {
 static struct kobj_type ttm_mem_zone_kobj_type = {
 	.release = &ttm_mem_zone_kobj_release,
 	.sysfs_ops = &ttm_mem_zone_ops,
-	.default_attrs = ttm_mem_zone_attrs,
+	.default_groups = ttm_mem_zone_groups,
 };
 
 static struct attribute ttm_mem_global_lower_mem_limit = {
@@ -226,6 +227,7 @@ static struct attribute *ttm_mem_global_attrs[] = {
 	&ttm_mem_global_lower_mem_limit,
 	NULL
 };
+ATTRIBUTE_GROUPS(ttm_mem_global);
 
 static const struct sysfs_ops ttm_mem_global_ops = {
 	.show = &ttm_mem_global_show,
@@ -234,7 +236,7 @@ static const struct sysfs_ops ttm_mem_global_ops = {
 
 static struct kobj_type ttm_mem_glob_kobj_type = {
 	.sysfs_ops = &ttm_mem_global_ops,
-	.default_attrs = ttm_mem_global_attrs,
+	.default_groups = ttm_mem_global_groups,
 };
 
 static bool ttm_zones_above_swap_target(struct ttm_mem_global *glob,
