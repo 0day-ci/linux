@@ -571,6 +571,7 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	/* Ensure at least one thread when size < min_chunk. */
 	nworks = max(job->size / job->min_chunk, 1ul);
 	nworks = min(nworks, job->max_threads);
+	nworks = min(nworks, current->nr_cpus_allowed);
 
 	if (nworks == 1) {
 		/* Single thread, no coordination needed, cut to the chase. */
@@ -607,10 +608,12 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 
 		pw->pw_data = &ps;
 		task = kthread_create(padata_mt_helper, pw, "padata");
-		if (IS_ERR(task))
+		if (IS_ERR(task)) {
 			--ps.nworks;
-		else
+		} else {
+			kthread_bind_mask(task, current->cpus_ptr);
 			wake_up_process(task);
+		}
 	}
 
 	/* Use the current task, which saves starting a kthread. */
