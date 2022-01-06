@@ -69,7 +69,9 @@ static int lis3_i2c_init(struct lis3lv02d *lis3)
 	u8 reg;
 	int ret;
 
-	lis3_reg_ctrl(lis3, LIS3_REG_ON);
+	ret = lis3_reg_ctrl(lis3, LIS3_REG_ON);
+	if (ret)
+		return ret;
 
 	lis3->read(lis3, WHO_AM_I, &reg);
 	if (reg != lis3->whoami)
