@@ -5297,6 +5297,20 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
 
 /*
+ * Intel Titan Ridge returns incorrect Supported Link Speeds Vector
+ * when max Link Speed is 2.5GT/s. This results in an extra 1s delay during
+ * resume_noirq with pcie tunneling enabled. Override that value:
+ */
+void quirk_intel_tbt_supported_link_speeds(struct pci_dev *pdev)
+{
+	pci_info(pdev, "applying Supported Link Speeds quirk\n");
+	pdev->supported_link_speed = PCIE_SPEED_2_5GT;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x15e7, quirk_intel_tbt_supported_link_speeds);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x15ea, quirk_intel_tbt_supported_link_speeds);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x15ef, quirk_intel_tbt_supported_link_speeds);
+
+/*
  * FLR may cause the following to devices to hang:
  *
  * AMD Starship/Matisse HD Audio Controller 0x1487
