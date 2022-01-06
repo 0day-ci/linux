@@ -67,7 +67,7 @@ config HAS_RUST
 config RUSTC_VERSION
 	depends on HAS_RUST
 	int
-	default $(shell,$(srctree)/scripts/rust-version.sh $(RUSTC))
+	default $(shell,/bin/sh $(srctree)/scripts/rust-version.sh $(RUSTC))
 
 config CC_CAN_LINK
 	bool
