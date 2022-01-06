@@ -12,6 +12,7 @@ struct sysinfo {
 	__kernel_ulong_t freeram;	/* Available memory size */
 	__kernel_ulong_t sharedram;	/* Amount of shared memory */
 	__kernel_ulong_t bufferram;	/* Memory used by buffers */
+	__kernel_ulong_t availram;	/* Memory available for allocation */
 	__kernel_ulong_t totalswap;	/* Total swap space size */
 	__kernel_ulong_t freeswap;	/* swap space still available */
 	__u16 procs;		   	/* Number of current processes */

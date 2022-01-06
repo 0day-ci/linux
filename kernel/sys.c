@@ -2608,6 +2608,7 @@ static int do_sysinfo(struct sysinfo *info)
 	info->freeram <<= bitcount;
 	info->sharedram <<= bitcount;
 	info->bufferram <<= bitcount;
+	info->availram <<= bitcount;
 	info->totalswap <<= bitcount;
 	info->freeswap <<= bitcount;
 	info->totalhigh <<= bitcount;
@@ -2637,6 +2638,7 @@ struct compat_sysinfo {
 	u32 freeram;
 	u32 sharedram;
 	u32 bufferram;
+	u32 availram;
 	u32 totalswap;
 	u32 freeswap;
 	u16 procs;
@@ -2669,6 +2671,7 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 		s.freeram >>= bitcount;
 		s.sharedram >>= bitcount;
 		s.bufferram >>= bitcount;
+		s.availram >>= bitcount;
 		s.totalswap >>= bitcount;
 		s.freeswap >>= bitcount;
 		s.totalhigh >>= bitcount;
@@ -2684,6 +2687,7 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	s_32.freeram = s.freeram;
 	s_32.sharedram = s.sharedram;
 	s_32.bufferram = s.bufferram;
+	s_32.availram = s.availram;
 	s_32.totalswap = s.totalswap;
 	s_32.freeswap = s.freeswap;
 	s_32.procs = s.procs;
