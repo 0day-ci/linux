@@ -1116,9 +1116,7 @@ static int pi433_probe(struct spi_device *spi)
 		spi->mode, spi->bits_per_word, spi->max_speed_hz);
 
 	/* Ping the chip by reading the version register */
-	retval = spi_w8r8(spi, 0x10);
-	if (retval < 0)
-		return retval;
+	retval = rf69_get_chip_version(spi);
 
 	switch (retval) {
 	case 0x24:
