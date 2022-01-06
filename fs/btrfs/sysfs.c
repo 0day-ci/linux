@@ -1647,6 +1647,22 @@ BTRFS_ATTR_RW(devid, allocation_hint, btrfs_devinfo_allocation_hint_show,
 				      btrfs_devinfo_allocation_hint_store);
 
 
+static ssize_t btrfs_devinfo_major_minor_show(struct kobject *kobj,
+					struct kobj_attribute *a, char *buf)
+{
+	struct btrfs_device *device = container_of(kobj, struct btrfs_device,
+						   devid_kobj);
+
+	if (device->bdev)
+		return scnprintf(buf, PAGE_SIZE, "%d:%d\n",
+			MAJOR(device->bdev->bd_dev),
+			MINOR(device->bdev->bd_dev));
+	else
+		return scnprintf(buf, PAGE_SIZE, "N/A\n");
+}
+
+BTRFS_ATTR(devid, major_minor, btrfs_devinfo_major_minor_show);
+
 /*
  * Information about one device.
  *
@@ -1661,6 +1677,7 @@ static struct attribute *devid_attrs[] = {
 	BTRFS_ATTR_PTR(devid, scrub_speed_max),
 	BTRFS_ATTR_PTR(devid, writeable),
 	BTRFS_ATTR_PTR(devid, allocation_hint),
+	BTRFS_ATTR_PTR(devid, major_minor),
 	NULL
 };
 ATTRIBUTE_GROUPS(devid);
