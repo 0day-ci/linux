@@ -1650,7 +1650,12 @@ static int fastrpc_rpmsg_probe(struct rpmsg_device *rpdev)
 	kref_init(&data->refcount);
 
 	dev_set_drvdata(&rpdev->dev, data);
-	dma_set_mask_and_coherent(rdev, DMA_BIT_MASK(32));
+	err = dma_set_mask_and_coherent(rdev, DMA_BIT_MASK(32));
+	if (err) {
+		kfree(data);
+		return err;
+	}
+
 	INIT_LIST_HEAD(&data->users);
 	spin_lock_init(&data->lock);
 	idr_init(&data->ctx_idr);
