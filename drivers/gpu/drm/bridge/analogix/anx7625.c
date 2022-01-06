@@ -1098,9 +1098,18 @@ static void anx7625_init_gpio(struct anx7625_data *platform)
 	/* Gpio for chip power enable */
 	platform->pdata.gpio_p_on =
 		devm_gpiod_get_optional(dev, "enable", GPIOD_OUT_LOW);
+	if (IS_ERR_OR_NULL(platform->pdata.gpio_p_on)) {
+		DRM_DEV_DEBUG_DRIVER(dev, "no enable gpio found\n");
+		platform->pdata.gpio_p_on = NULL;
+	}
+
 	/* Gpio for chip reset */
 	platform->pdata.gpio_reset =
 		devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR_OR_NULL(platform->pdata.gpio_reset)) {
+		DRM_DEV_DEBUG_DRIVER(dev, "no reset gpio found\n");
+		platform->pdata.gpio_reset = NULL;
+	}
 
 	if (platform->pdata.gpio_p_on && platform->pdata.gpio_reset) {
 		platform->pdata.low_power_mode = 1;
@@ -1962,40 +1971,54 @@ static const struct drm_bridge_funcs anx7625_bridge_funcs = {
 static int anx7625_register_i2c_dummy_clients(struct anx7625_data *ctx,
 					      struct i2c_client *client)
 {
+	int err = 0;
+
 	ctx->i2c.tx_p0_client = i2c_new_dummy_device(client->adapter,
 						     TX_P0_ADDR >> 1);
-	if (!ctx->i2c.tx_p0_client)
-		return -ENOMEM;
+	if (IS_ERR(ctx->i2c.tx_p0_client))
+		return PTR_ERR(ctx->i2c.tx_p0_client);
 
 	ctx->i2c.tx_p1_client = i2c_new_dummy_device(client->adapter,
 						     TX_P1_ADDR >> 1);
-	if (!ctx->i2c.tx_p1_client)
+	if (IS_ERR(ctx->i2c.tx_p1_client)) {
+		err = PTR_ERR(ctx->i2c.tx_p1_client);
 		goto free_tx_p0;
+	}
 
 	ctx->i2c.tx_p2_client = i2c_new_dummy_device(client->adapter,
 						     TX_P2_ADDR >> 1);
-	if (!ctx->i2c.tx_p2_client)
+	if (IS_ERR(ctx->i2c.tx_p2_client)) {
+		err = PTR_ERR(ctx->i2c.tx_p2_client);
 		goto free_tx_p1;
+	}
 
 	ctx->i2c.rx_p0_client = i2c_new_dummy_device(client->adapter,
 						     RX_P0_ADDR >> 1);
-	if (!ctx->i2c.rx_p0_client)
+	if (IS_ERR(ctx->i2c.rx_p0_client)) {
+		err = PTR_ERR(ctx->i2c.rx_p0_client);
 		goto free_tx_p2;
+	}
 
 	ctx->i2c.rx_p1_client = i2c_new_dummy_device(client->adapter,
 						     RX_P1_ADDR >> 1);
-	if (!ctx->i2c.rx_p1_client)
+	if (IS_ERR(ctx->i2c.rx_p1_client)) {
+		err = PTR_ERR(ctx->i2c.rx_p1_client);
 		goto free_rx_p0;
+	}
 
 	ctx->i2c.rx_p2_client = i2c_new_dummy_device(client->adapter,
 						     RX_P2_ADDR >> 1);
-	if (!ctx->i2c.rx_p2_client)
+	if (IS_ERR(ctx->i2c.rx_p2_client)) {
+		err = PTR_ERR(ctx->i2c.rx_p2_client);
 		goto free_rx_p1;
+	}
 
 	ctx->i2c.tcpc_client = i2c_new_dummy_device(client->adapter,
 						    TCPC_INTERFACE_ADDR >> 1);
-	if (!ctx->i2c.tcpc_client)
+	if (IS_ERR(ctx->i2c.tcpc_client)) {
+		err = PTR_ERR(ctx->i2c.tcpc_client);
 		goto free_rx_p2;
+	}
 
 	return 0;
 
@@ -2012,7 +2035,7 @@ free_tx_p1:
 free_tx_p0:
 	i2c_unregister_device(ctx->i2c.tx_p0_client);
 
-	return -ENOMEM;
+	return err;
 }
 
 static void anx7625_unregister_i2c_dummy_clients(struct anx7625_data *ctx)
