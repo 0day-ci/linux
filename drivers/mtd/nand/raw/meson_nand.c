@@ -2,7 +2,7 @@
 /*
  * Amlogic Meson Nand Flash Controller Driver
  *
- * Copyright (c) 2018 Amlogic, inc.
+ * Copyright (c) 2018-2021 Amlogic, inc.
  * Author: Liang Yang <liang.yang@amlogic.com>
  */
 
@@ -10,6 +10,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/mtd/rawnand.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mfd/syscon.h>
@@ -55,6 +56,7 @@
 #define NFC_REG_VER		0x38
 
 #define NFC_RB_IRQ_EN		BIT(21)
+#define NFC_CMD_FIFO_RESET	BIT(31)
 
 #define CMDRWGEN(cmd_dir, ran, bch, short_mode, page_size, pages)	\
 	(								\
@@ -104,6 +106,9 @@
 
 #define PER_INFO_BYTE		8
 
+#define CLK_DIV_SHIFT		0
+#define CLK_DIV_WIDTH		6
+
 struct meson_nfc_nand_chip {
 	struct list_head node;
 	struct nand_chip nand;
@@ -151,15 +156,15 @@ struct meson_nfc {
 	struct nand_controller controller;
 	struct clk *core_clk;
 	struct clk *device_clk;
-	struct clk *phase_tx;
-	struct clk *phase_rx;
+	struct clk *nand_clk;
+	struct clk_divider nand_divider;
 
 	unsigned long clk_rate;
 	u32 bus_timing;
 
 	struct device *dev;
 	void __iomem *reg_base;
-	struct regmap *reg_clk;
+	void __iomem *reg_clk;
 	struct completion completion;
 	struct list_head chips;
 	const struct meson_nfc_data *data;
@@ -406,12 +411,14 @@ static int meson_nfc_queue_rb(struct meson_nfc *nfc, int timeout_ms)
 	cmd = NFC_CMD_RB | NFC_CMD_RB_INT
 		| nfc->param.chip_select | nfc->timing.tbers_max;
 	writel(cmd, nfc->reg_base + NFC_REG_CMD);
-
+	meson_nfc_drain_cmd(nfc);
 	ret = wait_for_completion_timeout(&nfc->completion,
 					  msecs_to_jiffies(timeout_ms));
 	if (ret == 0)
 		ret = -1;
 
+	/* reset command fifo to avoid lock */
+	writel(NFC_CMD_FIFO_RESET, nfc->reg_base + NFC_REG_CMD);
 	return ret;
 }
 
@@ -988,8 +995,9 @@ static const struct mtd_ooblayout_ops meson_ooblayout_ops = {
 static int meson_nfc_clk_init(struct meson_nfc *nfc)
 {
 	int ret;
+	struct clk_init_data init = {0};
+	const char *fix_div2_pll_name[1];
 
-	/* request core clock */
 	nfc->core_clk = devm_clk_get(nfc->dev, "core");
 	if (IS_ERR(nfc->core_clk)) {
 		dev_err(nfc->dev, "failed to get core clock\n");
@@ -1002,21 +1010,25 @@ static int meson_nfc_clk_init(struct meson_nfc *nfc)
 		return PTR_ERR(nfc->device_clk);
 	}
 
-	nfc->phase_tx = devm_clk_get(nfc->dev, "tx");
-	if (IS_ERR(nfc->phase_tx)) {
-		dev_err(nfc->dev, "failed to get TX clk\n");
-		return PTR_ERR(nfc->phase_tx);
-	}
+	init.name = devm_kstrdup(nfc->dev, "nfc#div", GFP_KERNEL);
+	init.ops = &clk_divider_ops;
+	fix_div2_pll_name[0] = __clk_get_name(nfc->device_clk);
+	init.parent_names = fix_div2_pll_name;
+	init.num_parents = 1;
+	nfc->nand_divider.reg = nfc->reg_clk;
+	nfc->nand_divider.shift = CLK_DIV_SHIFT;
+	nfc->nand_divider.width = CLK_DIV_WIDTH;
+	nfc->nand_divider.hw.init = &init;
+	nfc->nand_divider.flags = CLK_DIVIDER_ONE_BASED |
+				  CLK_DIVIDER_ROUND_CLOSEST |
+          			  CLK_DIVIDER_ALLOW_ZERO;
 
-	nfc->phase_rx = devm_clk_get(nfc->dev, "rx");
-	if (IS_ERR(nfc->phase_rx)) {
-		dev_err(nfc->dev, "failed to get RX clk\n");
-		return PTR_ERR(nfc->phase_rx);
-	}
+	nfc->nand_clk = devm_clk_register(nfc->dev, &nfc->nand_divider.hw);
+	if (IS_ERR(nfc->nand_clk))
+		return PTR_ERR(nfc->nand_clk);
 
 	/* init SD_EMMC_CLOCK to sane defaults w/min clock rate */
-	regmap_update_bits(nfc->reg_clk,
-			   0, CLK_SELECT_NAND, CLK_SELECT_NAND);
+	writel(CLK_SELECT_NAND | readl(nfc->reg_clk), nfc->reg_clk);
 
 	ret = clk_prepare_enable(nfc->core_clk);
 	if (ret) {
@@ -1030,29 +1042,21 @@ static int meson_nfc_clk_init(struct meson_nfc *nfc)
 		goto err_device_clk;
 	}
 
-	ret = clk_prepare_enable(nfc->phase_tx);
+	ret = clk_prepare_enable(nfc->nand_clk);
 	if (ret) {
-		dev_err(nfc->dev, "failed to enable TX clock\n");
-		goto err_phase_tx;
-	}
-
-	ret = clk_prepare_enable(nfc->phase_rx);
-	if (ret) {
-		dev_err(nfc->dev, "failed to enable RX clock\n");
-		goto err_phase_rx;
+		dev_err(nfc->dev, "pre enable NFC divider fail\n");
+		goto err_nand_clk;
 	}
 
 	ret = clk_set_rate(nfc->device_clk, 24000000);
 	if (ret)
-		goto err_disable_rx;
+		goto err_disable_clk;
 
 	return 0;
 
-err_disable_rx:
-	clk_disable_unprepare(nfc->phase_rx);
-err_phase_rx:
-	clk_disable_unprepare(nfc->phase_tx);
-err_phase_tx:
+err_disable_clk:
+	clk_disable_unprepare(nfc->nand_clk);
+err_nand_clk:
 	clk_disable_unprepare(nfc->device_clk);
 err_device_clk:
 	clk_disable_unprepare(nfc->core_clk);
@@ -1061,8 +1065,7 @@ err_device_clk:
 
 static void meson_nfc_disable_clk(struct meson_nfc *nfc)
 {
-	clk_disable_unprepare(nfc->phase_rx);
-	clk_disable_unprepare(nfc->phase_tx);
+	clk_disable_unprepare(nfc->nand_clk);
 	clk_disable_unprepare(nfc->device_clk);
 	clk_disable_unprepare(nfc->core_clk);
 }
@@ -1375,6 +1378,7 @@ static int meson_nfc_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct meson_nfc *nfc;
 	struct resource *res;
+	u32 ext_clk_reg;
 	int ret, irq;
 
 	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
@@ -1396,9 +1400,15 @@ static int meson_nfc_probe(struct platform_device *pdev)
 	if (IS_ERR(nfc->reg_base))
 		return PTR_ERR(nfc->reg_base);
 
-	nfc->reg_clk =
-		syscon_regmap_lookup_by_phandle(dev->of_node,
-						"amlogic,mmc-syscon");
+	ret = of_property_read_u32(pdev->dev.of_node,
+				   "sd_emmc_c_clkc",
+				   &ext_clk_reg);
+	if (ret) {
+		dev_err(dev, "failed to get NAND external clock register\n");
+		return ret;
+	}
+
+	nfc->reg_clk = devm_ioremap(&pdev->dev, ext_clk_reg, sizeof(int));
 	if (IS_ERR(nfc->reg_clk)) {
 		dev_err(dev, "Failed to lookup clock base\n");
 		return PTR_ERR(nfc->reg_clk);
