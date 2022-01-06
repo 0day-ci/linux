@@ -10021,6 +10021,25 @@ static long tg_get_cfs_burst(struct task_group *tg)
 	return burst_us;
 }
 
+/* Returns the max whole number of CPUs that @css's bandwidth settings allow. */
+int max_cfs_bandwidth_cpus(struct cgroup_subsys_state *css)
+{
+	struct task_group *tg = css_tg(css);
+	u64 quota_us, period_us;
+
+	if (tg == &root_task_group)
+		return nr_cpu_ids;
+
+	quota_us = tg_get_cfs_quota(tg);
+
+	if (quota_us == RUNTIME_INF)
+		return nr_cpu_ids;
+
+	period_us = tg_get_cfs_period(tg);
+
+	return quota_us / period_us;
+}
+
 static s64 cpu_cfs_quota_read_s64(struct cgroup_subsys_state *css,
 				  struct cftype *cft)
 {

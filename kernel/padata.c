@@ -24,6 +24,7 @@
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include <linux/cgroup.h>
 #include <linux/completion.h>
 #include <linux/export.h>
 #include <linux/cpumask.h>
@@ -34,6 +35,7 @@
 #include <linux/padata.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
+#include <linux/sched/cgroup.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/rcupdate.h>
@@ -572,6 +574,7 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 {
 	/* In case threads finish at different times. */
 	static const unsigned long load_balance_factor = 4;
+	struct cgroup_subsys_state *cpu_css;
 	struct padata_work my_work, *pw;
 	struct padata_mt_job_state ps;
 	LIST_HEAD(works);
@@ -584,6 +587,18 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	nworks = max(job->size / job->min_chunk, 1ul);
 	nworks = min(nworks, job->max_threads);
 	nworks = min(nworks, current->nr_cpus_allowed);
+
+#ifdef CONFIG_CGROUP_SCHED
+	/*
+	 * Cap threads at the max number of CPUs current's CFS bandwidth
+	 * settings allow.  Keep it simple, don't try to keep this value up to
+	 * date.  The ifdef guards cpu_cgrp_id.
+	 */
+	rcu_read_lock();
+	cpu_css = task_css(current, cpu_cgrp_id);
+	nworks = min(nworks, max_cfs_bandwidth_cpus(cpu_css));
+	rcu_read_unlock();
+#endif
 
 	if (nworks == 1) {
 		/* Single thread, no coordination needed, cut to the chase. */
