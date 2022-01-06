@@ -20,6 +20,7 @@ properties:
       - sprd,sc2723-adc
       - sprd,sc2730-adc
       - sprd,sc2731-adc
+      - sprd,ump9620-adc
 
   reg:
     maxItems: 1
@@ -36,10 +37,28 @@ properties:
   nvmem-cells:
     maxItems: 2
 
+if:
+  not:
+    properties:
+      compatible:
+        contains:
+          enum:
+            - sprd,ump9620-adc
+then:
   nvmem-cell-names:
     items:
       - const: big_scale_calib
       - const: small_scale_calib
+
+else:
+  nvmem-cell-names:
+    items:
+      - const: big_scale_calib1
+      - const: big_scale_calib2
+      - const: small_scale_calib1
+      - const: small_scale_calib2
+      - const: vbat_det_cal1
+      - const: vbat_det_cal2
 
 required:
   - compatible
