@@ -487,6 +487,8 @@ struct sched_entity {
 	struct cfs_rq			*my_q;
 	/* cached value of my_q->h_nr_running */
 	unsigned long			runnable_weight;
+	/* sum_exec_runtime at the start of the remote charging period */
+	u64				remote_runtime_begin;
 #endif
 
 #ifdef CONFIG_SMP

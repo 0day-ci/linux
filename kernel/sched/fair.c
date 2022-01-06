@@ -4655,10 +4655,19 @@ static inline u64 sched_cfs_bandwidth_slice(void)
  */
 void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
 {
-	if (unlikely(cfs_b->quota == RUNTIME_INF))
+	u64 quota = cfs_b->quota;
+	u64 payment;
+
+	if (unlikely(quota == RUNTIME_INF))
 		return;
 
-	cfs_b->runtime += cfs_b->quota;
+	if (cfs_b->debt) {
+		payment = min(quota, cfs_b->debt);
+		cfs_b->debt -= payment;
+		quota -= payment;
+	}
+
+	cfs_b->runtime += quota;
 	cfs_b->runtime = min(cfs_b->runtime, cfs_b->quota + cfs_b->burst);
 }
 
@@ -5406,6 +5415,32 @@ static void __maybe_unused unthrottle_offline_cfs_rqs(struct rq *rq)
 	rcu_read_unlock();
 }
 
+static void incur_cfs_debt(struct rq *rq, struct sched_entity *se,
+			   struct task_group *tg, u64 debt)
+{
+	if (!cfs_bandwidth_used())
+		return;
+
+	while (tg != &root_task_group) {
+		struct cfs_rq *cfs_rq = tg->cfs_rq[cpu_of(rq)];
+
+		if (cfs_rq->runtime_enabled) {
+			struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
+			u64 payment;
+
+			raw_spin_lock(&cfs_b->lock);
+
+			payment = min(cfs_b->runtime, debt);
+			cfs_b->runtime -= payment;
+			cfs_b->debt += debt - payment;
+
+			raw_spin_unlock(&cfs_b->lock);
+		}
+
+		tg = tg->parent;
+	}
+}
+
 #else /* CONFIG_CFS_BANDWIDTH */
 
 static inline bool cfs_bandwidth_used(void)
@@ -5448,6 +5483,8 @@ static inline struct cfs_bandwidth *tg_cfs_bandwidth(struct task_group *tg)
 static inline void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b) {}
 static inline void update_runtime_enabled(struct rq *rq) {}
 static inline void unthrottle_offline_cfs_rqs(struct rq *rq) {}
+static inline void incur_cfs_debt(struct rq *rq, struct sched_entity *se,
+				  struct task_group *tg, u64 debt) {}
 
 #endif /* CONFIG_CFS_BANDWIDTH */
 
@@ -11452,6 +11489,59 @@ done:
 	mutex_unlock(&shares_mutex);
 	return 0;
 }
+
+#define INCUR_DEBT		1
+
+static void cpu_cgroup_remote(struct task_struct *p, struct task_group *tg,
+			      int flags)
+{
+	struct sched_entity *se = &p->se;
+	struct cfs_rq *cfs_rq;
+	struct rq_flags rf;
+	struct rq *rq;
+
+	/*
+	 * User tasks might change task groups between calls to this function,
+	 * which isn't handled for now, so disallow them.
+	 */
+	if (!(p->flags & PF_KTHREAD))
+		return;
+
+	/* kthreads already run in the root, so no need for remote charging. */
+	if (tg == &root_task_group)
+		return;
+
+	rq = task_rq_lock(p, &rf);
+	update_rq_clock(rq);
+
+	cfs_rq = cfs_rq_of(se);
+	update_curr(cfs_rq);
+
+	if (flags & INCUR_DEBT) {
+		u64 debt = se->sum_exec_runtime - se->remote_runtime_begin;
+
+		if (unlikely((s64)debt <= 0))
+			goto out;
+
+		incur_cfs_debt(rq, se, tg, debt);
+	}
+
+out:
+	se->remote_runtime_begin = se->sum_exec_runtime;
+
+	task_rq_unlock(rq, p, &rf);
+}
+
+void cpu_cgroup_remote_begin_fair(struct task_struct *p, struct task_group *tg)
+{
+	cpu_cgroup_remote(p, tg, 0);
+}
+
+void cpu_cgroup_remote_charge_fair(struct task_struct *p, struct task_group *tg)
+{
+	cpu_cgroup_remote(p, tg, INCUR_DEBT);
+}
+
 #else /* CONFIG_FAIR_GROUP_SCHED */
 
 void free_fair_sched_group(struct task_group *tg) { }

@@ -9913,6 +9913,7 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota,
 	cfs_b->period = ns_to_ktime(period);
 	cfs_b->quota = quota;
 	cfs_b->burst = burst;
+	cfs_b->debt = 0;
 
 	__refill_cfs_bandwidth_runtime(cfs_b);
 
@@ -10181,6 +10182,44 @@ static int cpu_cfs_stat_show(struct seq_file *sf, void *v)
 	return 0;
 }
 #endif /* CONFIG_CFS_BANDWIDTH */
+
+/**
+ * cpu_cgroup_remote_begin - begin charging p's CPU usage to a remote css
+ * @p: the kernel thread whose CPU usage should be accounted
+ * @css: the css to which the CPU usage should be accounted
+ *
+ * Begin charging a kernel thread's CPU usage to a remote (non-root) task group
+ * to account CPU time that the kernel thread spends working on behalf of the
+ * group.  Pair with at least one subsequent call to cpu_cgroup_remote_charge()
+ * to complete the charge.
+ *
+ * Supports CFS bandwidth and cgroup2 CPU accounting stats but not weight-based
+ * control for now.
+ */
+void cpu_cgroup_remote_begin(struct task_struct *p,
+			     struct cgroup_subsys_state *css)
+{
+	if (p->sched_class == &fair_sched_class)
+		cpu_cgroup_remote_begin_fair(p, css_tg(css));
+}
+
+/**
+ * cpu_cgroup_remote_charge - account p's CPU usage to a remote css
+ * @p: the kernel thread whose CPU usage should be accounted
+ * @css: the css to which the CPU usage should be accounted
+ *
+ * Account a kernel thread's CPU usage to a remote (non-root) task group.  Pair
+ * with a previous call to cpu_cgroup_remote_begin() with the same @p and @css.
+ * This may be invoked multiple times after the initial
+ * cpu_cgroup_remote_begin() to account additional CPU usage.
+ */
+void cpu_cgroup_remote_charge(struct task_struct *p,
+			      struct cgroup_subsys_state *css)
+{
+	if (p->sched_class == &fair_sched_class)
+		cpu_cgroup_remote_charge_fair(p, css_tg(css));
+}
+
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
 #ifdef CONFIG_RT_GROUP_SCHED

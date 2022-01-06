@@ -367,6 +367,7 @@ struct cfs_bandwidth {
 	u64			quota;
 	u64			runtime;
 	u64			burst;
+	u64			debt;
 	s64			hierarchical_quota;
 
 	u8			idle;
@@ -472,6 +473,10 @@ extern void free_fair_sched_group(struct task_group *tg);
 extern int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent);
 extern void online_fair_sched_group(struct task_group *tg);
 extern void unregister_fair_sched_group(struct task_group *tg);
+extern void cpu_cgroup_remote_begin_fair(struct task_struct *p,
+					 struct task_group *tg);
+extern void cpu_cgroup_remote_charge_fair(struct task_struct *p,
+					  struct task_group *tg);
 extern void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 			struct sched_entity *se, int cpu,
 			struct sched_entity *parent);

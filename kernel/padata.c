@@ -43,6 +43,7 @@
 enum padata_work_flags {
 	PADATA_WORK_FINISHED	= 1,
 	PADATA_WORK_UNDO	= 2,
+	PADATA_WORK_MAIN_THR	= 4,
 };
 
 struct padata_work {
@@ -75,6 +76,7 @@ struct padata_mt_job_state {
 #ifdef CONFIG_LOCKDEP
 	struct lockdep_map	lockdep_map;
 #endif
+	struct cgroup_subsys_state *cpu_css;
 };
 
 static void padata_free_pd(struct parallel_data *pd);
@@ -495,6 +497,10 @@ static int padata_mt_helper(void *__pw)
 	struct padata_work *pw = __pw;
 	struct padata_mt_job_state *ps = pw->pw_data;
 	struct padata_mt_job *job = ps->job;
+	bool is_main = pw->pw_flags & PADATA_WORK_MAIN_THR;
+
+	if (!is_main)
+		cpu_cgroup_remote_begin(current, ps->cpu_css);
 
 	spin_lock(&ps->lock);
 
@@ -518,6 +524,10 @@ static int padata_mt_helper(void *__pw)
 		ret = job->thread_fn(position, end, job->fn_arg);
 
 		lock_map_release(&ps->lockdep_map);
+
+		if (!is_main)
+			cpu_cgroup_remote_charge(current, ps->cpu_css);
+
 		spin_lock(&ps->lock);
 
 		if (ret) {
@@ -612,7 +622,6 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 {
 	/* In case threads finish at different times. */
 	static const unsigned long load_balance_factor = 4;
-	struct cgroup_subsys_state *cpu_css;
 	struct padata_work my_work, *pw;
 	struct padata_mt_job_state ps;
 	LIST_HEAD(unfinished_works);
@@ -628,18 +637,20 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	req = min(req, current->nr_cpus_allowed);
 
 #ifdef CONFIG_CGROUP_SCHED
+	ps.cpu_css = task_get_css(current, cpu_cgrp_id);
+
 	/*
 	 * Cap threads at the max number of CPUs current's CFS bandwidth
 	 * settings allow.  Keep it simple, don't try to keep this value up to
 	 * date.  The ifdef guards cpu_cgrp_id.
 	 */
-	rcu_read_lock();
-	cpu_css = task_css(current, cpu_cgrp_id);
-	req = min(req, max_cfs_bandwidth_cpus(cpu_css));
-	rcu_read_unlock();
+	req = min(req, max_cfs_bandwidth_cpus(ps.cpu_css));
 #endif
 
 	if (req == 1) {
+#ifdef CONFIG_CGROUP_SCHED
+		css_put(ps.cpu_css);
+#endif
 		/* Single thread, no coordination needed, cut to the chase. */
 		return job->thread_fn(job->start, job->start + job->size,
 				      job->fn_arg);
@@ -687,12 +698,15 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 
 	/* Use the current task, which saves starting a kthread. */
 	my_work.pw_data = &ps;
-	my_work.pw_flags = 0;
+	my_work.pw_flags = PADATA_WORK_MAIN_THR;
 	INIT_LIST_HEAD(&my_work.pw_list);
 	padata_mt_helper(&my_work);
 
 	/* Wait for all the helpers to finish. */
 	padata_wait_for_helpers(&ps, &unfinished_works, &finished_works);
+#ifdef CONFIG_CGROUP_SCHED
+	css_put(ps.cpu_css);
+#endif
 
 	if (ps.error && job->undo_fn)
 		padata_undo(&ps, &finished_works, &my_work);
