@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/arm/sunplus/sunplus,idle-state.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sunplus SOC cpuidle state
+
+maintainers:
+  - Edwin Chiu<edwinchiu0505tw@gmail.com>
+
+description: |
+  Sunplus SOC cpuidle state
+
+properties:
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+              - sunplus,sp7021-idle-state
+
+  entry-latency-us:
+    description:
+      Worst case latency in microseconds required to enter the idle state.
+
+  exit-latency-us:
+    description:
+      Worst case latency in microseconds required to exit the idle state.
+      The exit-latency-us duration may be guaranteed only after
+      entry-latency-us has passed.
+
+  min-residency-us:
+    description:
+      Minimum residency duration in microseconds, inclusive of preparation
+      and entry, for this idle state to be considered worthwhile energy wise
+      (refer to section 2 of this document for a complete description).
+
+required:
+  - compatible
+  - entry-latency-us
+  - exit-latency-us
+  - min-residency-us
+
+additionalProperties: true
+
+examples:
+  - |
+
+    idle-state {
+      CPU_IDLE: cpu_idle {
+        compatible = "sunplus,sp7021-idle-state";
+        entry-latency-us = <8000>;
+        exit-latency-us = <700>;
+        min-residency-us = <9000>;
+      };
+    };
+
+...
