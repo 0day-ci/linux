@@ -29,6 +29,7 @@
 #include <linux/cpumask.h>
 #include <linux/err.h>
 #include <linux/cpu.h>
+#include <linux/kthread.h>
 #include <linux/list_sort.h>
 #include <linux/padata.h>
 #include <linux/mutex.h>
@@ -36,8 +37,6 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/rcupdate.h>
-
-#define	PADATA_WORK_ONSTACK	1	/* Work's memory is on stack */
 
 struct padata_work {
 	struct work_struct	pw_work;
@@ -70,7 +69,6 @@ struct padata_mt_job_state {
 };
 
 static void padata_free_pd(struct parallel_data *pd);
-static void padata_mt_helper(struct work_struct *work);
 
 static int padata_index_to_cpu(struct parallel_data *pd, int cpu_index)
 {
@@ -108,17 +106,7 @@ static struct padata_work *padata_work_alloc(void)
 	return pw;
 }
 
-static void padata_work_init(struct padata_work *pw, work_func_t work_fn,
-			     void *data, int flags)
-{
-	if (flags & PADATA_WORK_ONSTACK)
-		INIT_WORK_ONSTACK(&pw->pw_work, work_fn);
-	else
-		INIT_WORK(&pw->pw_work, work_fn);
-	pw->pw_data = data;
-}
-
-static int padata_work_alloc_mt(int nworks, void *data, struct list_head *head)
+static int padata_work_alloc_mt(int nworks, struct list_head *head)
 {
 	int i;
 
@@ -129,7 +117,6 @@ static int padata_work_alloc_mt(int nworks, void *data, struct list_head *head)
 
 		if (!pw)
 			break;
-		padata_work_init(pw, padata_mt_helper, data, 0);
 		list_add(&pw->pw_list, head);
 	}
 	spin_unlock(&padata_works_lock);
@@ -234,7 +221,8 @@ int padata_do_parallel(struct padata_shell *ps,
 	rcu_read_unlock_bh();
 
 	if (pw) {
-		padata_work_init(pw, padata_parallel_worker, padata, 0);
+		INIT_WORK(&pw->pw_work, padata_parallel_worker);
+		pw->pw_data = padata;
 		queue_work(pinst->parallel_wq, &pw->pw_work);
 	} else {
 		/* Maximum works limit exceeded, run in the current task. */
@@ -449,9 +437,9 @@ static int padata_setup_cpumasks(struct padata_instance *pinst)
 	return err;
 }
 
-static void padata_mt_helper(struct work_struct *w)
+static int padata_mt_helper(void *__pw)
 {
-	struct padata_work *pw = container_of(w, struct padata_work, pw_work);
+	struct padata_work *pw = __pw;
 	struct padata_mt_job_state *ps = pw->pw_data;
 	struct padata_mt_job *job = ps->job;
 	bool done;
@@ -500,6 +488,8 @@ static void padata_mt_helper(struct work_struct *w)
 
 	if (done)
 		complete(&ps->completion);
+
+	return 0;
 }
 
 static int padata_error_cmp(void *unused, const struct list_head *a,
@@ -593,7 +583,7 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	lockdep_init_map(&ps.lockdep_map, map_name, key, 0);
 	INIT_LIST_HEAD(&ps.failed_works);
 	ps.job		  = job;
-	ps.nworks	  = padata_work_alloc_mt(nworks, &ps, &works);
+	ps.nworks	  = padata_work_alloc_mt(nworks, &works);
 	ps.nworks_fini	  = 0;
 	ps.error	  = 0;
 	ps.position	  = job->start;
@@ -612,13 +602,21 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	lock_map_acquire(&ps.lockdep_map);
 	lock_map_release(&ps.lockdep_map);
 
-	list_for_each_entry(pw, &works, pw_list)
-		queue_work(system_unbound_wq, &pw->pw_work);
+	list_for_each_entry(pw, &works, pw_list) {
+		struct task_struct *task;
 
-	/* Use the current thread, which saves starting a workqueue worker. */
-	padata_work_init(&my_work, padata_mt_helper, &ps, PADATA_WORK_ONSTACK);
+		pw->pw_data = &ps;
+		task = kthread_create(padata_mt_helper, pw, "padata");
+		if (IS_ERR(task))
+			--ps.nworks;
+		else
+			wake_up_process(task);
+	}
+
+	/* Use the current task, which saves starting a kthread. */
+	my_work.pw_data = &ps;
 	INIT_LIST_HEAD(&my_work.pw_list);
-	padata_mt_helper(&my_work.pw_work);
+	padata_mt_helper(&my_work);
 
 	/* Wait for all the helpers to finish. */
 	wait_for_completion(&ps.completion);
@@ -626,7 +624,6 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 	if (ps.error && job->undo_fn)
 		padata_undo(&ps, &works, &my_work);
 
-	destroy_work_on_stack(&my_work.pw_work);
 	padata_works_free(&works);
 	return ps.error;
 }
