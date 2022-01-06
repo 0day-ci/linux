@@ -11,6 +11,7 @@
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 /* PMIC global registers definition */
 #define SC2730_MODULE_EN		0x1808
@@ -82,6 +83,9 @@
 
 /* ADC default channel reference voltage is 2.8V */
 #define SC27XX_ADC_REFVOL_VDD28		2800000
+
+/* 10s delay before suspending the ADC IP */
+#define SC27XX_ADC_AUTOSUSPEND_DELAY	10000
 
 enum sc27xx_pmic_type {
 	SC27XX_ADC,
@@ -618,6 +622,9 @@ static int sc27xx_adc_read(struct sc27xx_adc_data *data, int channel,
 		return ret;
 	}
 
+	if (data->var_data->pmic_type == UMP9620_ADC)
+		pm_runtime_get_sync(data->indio_dev->dev.parent);
+
 	/*
 	 * According to the sc2721 chip data sheet, the reference voltage of
 	 * specific channel 30 and channel 31 in ADC module needs to be set from
@@ -698,6 +705,11 @@ unlock_adc:
 			if (ret)
 				dev_err(data->dev, "failed to set the volref 2.8V\n");
 		}
+	}
+
+	if (data->var_data->pmic_type == UMP9620_ADC) {
+		pm_runtime_mark_last_busy(data->indio_dev->dev.parent);
+		pm_runtime_put_autosuspend(data->indio_dev->dev.parent);
 	}
 
 	hwspin_unlock_raw(data->hwlock);
@@ -947,6 +959,10 @@ static int sc27xx_adc_enable(struct sc27xx_adc_data *data)
 		ret = regmap_update_bits(data->regmap, UMP9620_XTL_WAIT_CTRL0,
 					 UMP9620_XTL_WAIT_CTRL0_EN,
 					 UMP9620_XTL_WAIT_CTRL0_EN);
+		if (ret) {
+			dev_err(data->dev, "failed to set the UMP9620 ADC clk26m bit8 on IP\n");
+			goto clean_adc_clk26m_bit8;
+		}
 	}
 
 	/* Enable ADC work clock */
@@ -987,6 +1003,11 @@ disable_clk:
 disable_adc:
 	regmap_update_bits(data->regmap, data->var_data->module_en,
 			   SC27XX_MODULE_ADC_EN, 0);
+
+clean_adc_clk26m_bit8:
+	if (data->var_data->pmic_type == UMP9620_ADC)
+		regmap_update_bits(data->regmap, UMP9620_XTL_WAIT_CTRL0,
+				UMP9620_XTL_WAIT_CTRL0_EN, 0);
 
 	return ret;
 }
@@ -1086,6 +1107,8 @@ static int sc27xx_adc_probe(struct platform_device *pdev)
 	if (!indio_dev)
 		return -ENOMEM;
 
+	platform_set_drvdata(pdev, indio_dev);
+
 	sc27xx_data = iio_priv(indio_dev);
 
 	sc27xx_data->regmap = dev_get_regmap(dev->parent, NULL);
@@ -1126,7 +1149,10 @@ static int sc27xx_adc_probe(struct platform_device *pdev)
 		}
 	}
 
+	sc27xx_data->dev = dev;
 	sc27xx_data->var_data = pdata;
+	sc27xx_data->indio_dev = indio_dev;
+
 	sc27xx_data->var_data->init_scale(sc27xx_data);
 
 	ret = sc27xx_adc_enable(sc27xx_data);
@@ -1137,18 +1163,39 @@ static int sc27xx_adc_probe(struct platform_device *pdev)
 
 	ret = devm_add_action_or_reset(dev, sc27xx_adc_disable, sc27xx_data);
 	if (ret) {
+		sc27xx_adc_disable(sc27xx_data);
 		dev_err(dev, "failed to add ADC disable action\n");
 		return ret;
 	}
 
+	indio_dev->dev.parent = dev;
 	indio_dev->name = dev_name(dev);
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->info = &sc27xx_info;
 	indio_dev->channels = sc27xx_channels;
 	indio_dev->num_channels = ARRAY_SIZE(sc27xx_channels);
+
+	if (sc27xx_data->var_data->pmic_type == UMP9620_ADC) {
+		pm_runtime_set_autosuspend_delay(dev,
+						 SC27XX_ADC_AUTOSUSPEND_DELAY);
+		pm_runtime_use_autosuspend(dev);
+		pm_runtime_set_suspended(dev);
+		pm_runtime_enable(dev);
+	}
+
 	ret = devm_iio_device_register(dev, indio_dev);
-	if (ret)
+	if (ret) {
 		dev_err(dev, "could not register iio (ADC)");
+		goto err_iio_register;
+	}
+
+	return 0;
+
+err_iio_register:
+	if (sc27xx_data->var_data->pmic_type == UMP9620_ADC) {
+		pm_runtime_put(dev);
+		pm_runtime_disable(dev);
+	}
 
 	return ret;
 }
@@ -1163,11 +1210,65 @@ static const struct of_device_id sc27xx_adc_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, sc27xx_adc_of_match);
 
+static int sc27xx_adc_remove(struct platform_device *pdev)
+{
+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+	struct sc27xx_adc_data *sc27xx_data = iio_priv(indio_dev);
+
+	if (sc27xx_data->var_data->pmic_type == UMP9620_ADC) {
+		pm_runtime_put(&pdev->dev);
+		pm_runtime_disable(&pdev->dev);
+
+		/* set the UMP9620 ADC clk26m bit8 on IP */
+		regmap_update_bits(sc27xx_data->regmap, UMP9620_XTL_WAIT_CTRL0,
+				UMP9620_XTL_WAIT_CTRL0_EN, 0);
+	}
+
+	return 0;
+}
+
+static int sc27xx_adc_runtime_suspend(struct device *dev)
+{
+	struct sc27xx_adc_data *sc27xx_data = iio_priv(dev_get_drvdata(dev));
+
+	/* clean the UMP9620 ADC clk26m bit8 on IP */
+	if (sc27xx_data->var_data->pmic_type == UMP9620_ADC)
+		regmap_update_bits(sc27xx_data->regmap, UMP9620_XTL_WAIT_CTRL0,
+				UMP9620_XTL_WAIT_CTRL0_EN, 0);
+
+	return 0;
+}
+
+static int sc27xx_adc_runtime_resume(struct device *dev)
+{
+	int ret = 0;
+	struct sc27xx_adc_data *sc27xx_data = iio_priv(dev_get_drvdata(dev));
+
+	/* set the UMP9620 ADC clk26m bit8 on IP */
+	if (sc27xx_data->var_data->pmic_type == UMP9620_ADC) {
+		ret = regmap_update_bits(sc27xx_data->regmap, UMP9620_XTL_WAIT_CTRL0,
+				UMP9620_XTL_WAIT_CTRL0_EN, UMP9620_XTL_WAIT_CTRL0_EN);
+		if (ret) {
+			dev_err(dev, "failed to set the UMP9620 ADC clk26m bit8 on IP\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops sc27xx_adc_pm_ops = {
+	.runtime_suspend = &sc27xx_adc_runtime_suspend,
+	.runtime_resume = &sc27xx_adc_runtime_resume,
+};
+
 static struct platform_driver sc27xx_adc_driver = {
 	.probe = sc27xx_adc_probe,
+	.remove = sc27xx_adc_remove,
 	.driver = {
 		.name = "sc27xx-adc",
 		.of_match_table = sc27xx_adc_of_match,
+		.pm	= &sc27xx_adc_pm_ops,
 	},
 };
 
