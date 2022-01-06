@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
+#include <linux/panic_notifier.h>
 #include <linux/kdebug.h>
 #include <linux/kprobes.h>
 #include <linux/export.h>
@@ -127,12 +128,34 @@ static int notifier_call_chain_robust(struct notifier_block **nl,
  *	use a spinlock, and call_chain is synchronized by RCU (no locks).
  */
 
+/*
+ * The following helper is part of the panic notifier filter infrastructure;
+ * users can filter what functions they wish to allow being registered in the
+ * notifier system, restricted to the panic notifier. This is useful for kdump
+ * for example, when some notifiers are relevant but running all of them imposes
+ * risks to the kdump kernel reliability.
+ */
+static bool is_panic_notifier_filtered(struct notifier_block *n)
+{
+	int i;
+
+	for (i = 0; i < panic_nf_count; i++) {
+		if ((unsigned long)(n->notifier_call) == panic_nf_functions[i])
+			return true;
+	}
+
+	return false;
+}
+
 /**
  *	atomic_notifier_chain_register - Add notifier to an atomic notifier chain
  *	@nh: Pointer to head of the atomic notifier chain
  *	@n: New entry in notifier chain
  *
  *	Adds a notifier to an atomic notifier chain.
+ *	If "panic_notifier_filter" is provided, we hereby filter the
+ *	panic_notifier_list and only allow registering the functions
+ *	that are present in the filter.
  *
  *	Currently always returns zero.
  */
@@ -140,10 +163,16 @@ int atomic_notifier_chain_register(struct atomic_notifier_head *nh,
 		struct notifier_block *n)
 {
 	unsigned long flags;
-	int ret;
+	int ret = 0;
 
 	spin_lock_irqsave(&nh->lock, flags);
+	if (unlikely(panic_nf_count) && nh == &panic_notifier_list)
+		if (!is_panic_notifier_filtered(n))
+			goto panic_filtered_out;
+
 	ret = notifier_chain_register(&nh->head, n);
+
+panic_filtered_out:
 	spin_unlock_irqrestore(&nh->lock, flags);
 	return ret;
 }
@@ -155,6 +184,9 @@ EXPORT_SYMBOL_GPL(atomic_notifier_chain_register);
  *	@n: Entry to remove from notifier chain
  *
  *	Removes a notifier from an atomic notifier chain.
+ *	If "panic_notifier_filter" is provided, we hereby filter the
+ *	panic_notifier_list and only allow unregistering the functions
+ *	that are present in the filter.
  *
  *	Returns zero on success or %-ENOENT on failure.
  */
@@ -162,10 +194,16 @@ int atomic_notifier_chain_unregister(struct atomic_notifier_head *nh,
 		struct notifier_block *n)
 {
 	unsigned long flags;
-	int ret;
+	int ret = 0;
 
 	spin_lock_irqsave(&nh->lock, flags);
+	if (unlikely(panic_nf_count) && nh == &panic_notifier_list)
+		if (!is_panic_notifier_filtered(n))
+			goto panic_filtered_out;
+
 	ret = notifier_chain_unregister(&nh->head, n);
+
+panic_filtered_out:
 	spin_unlock_irqrestore(&nh->lock, flags);
 	synchronize_rcu();
 	return ret;
