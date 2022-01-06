@@ -11524,6 +11524,11 @@ static void cpu_cgroup_remote(struct task_struct *p, struct task_group *tg,
 			goto out;
 
 		incur_cfs_debt(rq, se, tg, debt);
+
+		/* cputime accounting is only supported in cgroup2. */
+		__cgroup_account_cputime(tg->css.cgroup, debt);
+		__cgroup_account_cputime_field(tg->css.cgroup, CPUTIME_SYSTEM,
+					       debt);
 	}
 
 out:
