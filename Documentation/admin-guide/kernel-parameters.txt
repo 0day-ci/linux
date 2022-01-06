@@ -3721,13 +3721,25 @@
 	panic_on_warn	panic() instead of WARN().  Useful to cause kdump
 			on a WARN().
 
+	panic_notifier_filter=[function-list]
+			Limit the functions registered by the panic notifier
+			infrastructure. This allowlist is composed by function
+			names, comma separated (invalid symbols are filtered
+			out). Such functionality is useful for kdump users
+			that set "crash_kexec_post_notifiers" in order to
+			execute	panic notifiers, but at the same time wish to
+			have just a subset of notifiers, not all of them. The
+			list of functions is limited to 16 entries currently.
+
 	crash_kexec_post_notifiers
 			Run kdump after running panic-notifiers and dumping
 			kmsg. This only for the users who doubt kdump always
 			succeeds in any situation.
 			Note that this also increases risks of kdump failure,
 			because some panic notifiers can make the crashed
-			kernel more unstable.
+			kernel more unstable. See the "panic_notifier_filter"
+			parameter to have more control of which notifiers to
+			execute.
 
 	parkbd.port=	[HW] Parallel port number the keyboard adapter is
 			connected to, default is 0.
