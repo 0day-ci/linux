@@ -73,6 +73,12 @@ void bpf_jit_build_prologue(u32 *image, struct codegen_context *ctx)
 {
 	int i;
 
+#ifdef PPC64_ELF_ABI_v2
+	PPC_BPF_LL(_R2, _R13, offsetof(struct paca_struct, kernel_toc));
+#else
+	EMIT(PPC_RAW_NOP());
+#endif
+
 	/*
 	 * Initialize tail_call_cnt if we do tail calls.
 	 * Otherwise, put in NOPs so that it can be skipped when we are
@@ -87,7 +93,7 @@ void bpf_jit_build_prologue(u32 *image, struct codegen_context *ctx)
 		EMIT(PPC_RAW_NOP());
 	}
 
-#define BPF_TAILCALL_PROLOGUE_SIZE	8
+#define BPF_TAILCALL_PROLOGUE_SIZE	12
 
 	if (bpf_has_stack_frame(ctx)) {
 		/*
