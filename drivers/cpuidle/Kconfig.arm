@@ -118,3 +118,10 @@ config ARM_QCOM_SPM_CPUIDLE
 	  The Subsystem Power Manager (SPM) controls low power modes for the
 	  CPU and L2 cores. It interface with various system drivers to put
 	  the cores in low power modes.
+
+config ARM_SUNPLUS_CPUIDLE
+	bool "CPU Idle Driver For SUNPLUS SoCs"
+	depends on !ARM64
+	select DT_IDLE_STATES
+	help
+	  Select this to enable cpuidle on SP7021 processors.
