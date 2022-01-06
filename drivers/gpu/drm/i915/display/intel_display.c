@@ -3774,8 +3774,8 @@ static void bdw_set_pipemisc(const struct intel_crtc_state *crtc_state)
 		val |= PIPEMISC_10_BPC;
 		break;
 	case 36:
-		/* Port output 12BPC defined for ADLP+ */
-		if (DISPLAY_VER(dev_priv) > 12)
+		/* Port output 12BPC defined for ADLP+ except for DG2 */
+		if (DISPLAY_VER(dev_priv) > 12 && !IS_DG2(dev_priv))
 			val |= PIPEMISC_12_BPC_ADLP;
 		break;
 	default:
@@ -3835,7 +3835,7 @@ int bdw_get_pipemisc_bpp(struct intel_crtc *crtc)
 	case PIPEMISC_10_BPC:
 		return 30;
 	/*
-	 * PORT OUTPUT 12 BPC defined for ADLP+.
+	 * PORT OUTPUT 12 BPC defined for ADLP+ (except DG2)
 	 *
 	 * TODO:
 	 * For previous platforms with DSI interface, bits 5:7
@@ -3845,7 +3845,7 @@ int bdw_get_pipemisc_bpp(struct intel_crtc *crtc)
 	 * MIPI DSI HW readout.
 	 */
 	case PIPEMISC_12_BPC_ADLP:
-		if (DISPLAY_VER(dev_priv) > 12)
+		if (DISPLAY_VER(dev_priv) > 12 && !IS_DG2(dev_priv))
 			return 36;
 		fallthrough;
 	default:
