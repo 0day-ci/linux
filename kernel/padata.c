@@ -638,7 +638,10 @@ int padata_do_multithreaded_job(struct padata_mt_job *job,
 		if (IS_ERR(task)) {
 			--ps.nworks;
 		} else {
+			/* Helper threads shouldn't disturb other workloads. */
+			set_user_nice(task, MAX_NICE);
 			kthread_bind_mask(task, current->cpus_ptr);
+
 			wake_up_process(task);
 		}
 	}
