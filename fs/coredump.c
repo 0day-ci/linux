@@ -752,7 +752,7 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		core_dumped = binfmt->core_dump(&cprm);
 		/*
 		 * Ensures that file size is big enough to contain the current
-		 * file postion. This prevents gdb from complaining about
+		 * file position. This prevents gdb from complaining about
 		 * a truncated file if the last "write" to the file was
 		 * dump_skip.
 		 */
