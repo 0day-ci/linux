@@ -605,6 +605,9 @@ void regmap_debugfs_init(struct regmap *map)
 
 	map->debugfs = debugfs_create_dir(name, regmap_debugfs_root);
 
+	kfree(map->debugfs_name);
+	map->debugfs_name = NULL;
+
 	debugfs_create_file("name", 0400, map->debugfs,
 			    map, &regmap_name_fops);
 
