@@ -602,8 +602,7 @@ err_probe:
 err_enable_device:
 	if (reg_dev)
 		put_device(&vp_dev->vdev.dev);
-	else
-		kfree(vp_dev);
+	kfree(vp_dev);
 	return rc;
 }
 
