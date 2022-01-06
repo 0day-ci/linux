@@ -505,6 +505,7 @@ static int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
 	for (;;) {
 		unsigned long *rinp, *routp, *rexp, *inp, *outp, *exp;
 		bool can_busy_loop = false;
+		bool bad_fd = false;
 
 		inp = fds->in; outp = fds->out; exp = fds->ex;
 		rinp = fds->res_in; routp = fds->res_out; rexp = fds->res_ex;
@@ -561,6 +562,8 @@ static int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
 					} else if (busy_flag & mask)
 						can_busy_loop = true;
 
+				} else {
+					bad_fd = true;
 				}
 			}
 			if (res_in)
@@ -576,6 +579,10 @@ static int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
 			break;
 		if (table.error) {
 			retval = table.error;
+			break;
+		}
+		if (bad_fd) {
+			retval = -EBADF;
 			break;
 		}
 
