@@ -1582,7 +1582,7 @@ static ssize_t btrfs_devinfo_allocation_hint_show(struct kobject *kobj,
 						   devid_kobj);
 
 	return scnprintf(buf, PAGE_SIZE, "0x%08llx\n",
-		device->type & BTRFS_DEV_ALLOCATION_HINT_MASK);
+		device->flags & BTRFS_DEV_ALLOCATION_HINT_MASK);
 }
 
 static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
@@ -1595,7 +1595,7 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 	int ret;
 	struct btrfs_trans_handle *trans;
 
-	u64 type, prev_type;
+	u64 flags, prev_flags;
 
 	device = container_of(kobj, struct btrfs_device, devid_kobj);
 	fs_info = device->fs_info;
@@ -1606,24 +1606,25 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 	if (sb_rdonly(fs_info->sb))
 		return -EROFS;
 
-	ret = kstrtou64(buf, 0, &type);
+	ret = kstrtou64(buf, 0, &flags);
 	if (ret < 0)
 		return -EINVAL;
 
 	/* for now, allow to touch only the 'allocation hint' bits */
-	if (type & ~BTRFS_DEV_ALLOCATION_HINT_MASK)
+	if (flags & ~BTRFS_DEV_ALLOCATION_HINT_MASK)
 		return -EINVAL;
 
 	/* check if a change is really needed */
-	if ((device->type & BTRFS_DEV_ALLOCATION_HINT_MASK) == type)
+	if ((device->flags & BTRFS_DEV_ALLOCATION_HINT_MASK) == flags)
 		return len;
 
 	trans = btrfs_start_transaction(root, 1);
 	if (IS_ERR(trans))
 		return PTR_ERR(trans);
 
-	prev_type = device->type;
-	device->type = (device->type & ~BTRFS_DEV_ALLOCATION_HINT_MASK) | type;
+	prev_flags = device->flags;
+	device->flags = (device->flags & ~BTRFS_DEV_ALLOCATION_HINT_MASK) |
+			flags;
 
 	ret = btrfs_update_device(trans, device);
 
@@ -1639,7 +1640,7 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 
 	return len;
 abort:
-	device->type = prev_type;
+	device->flags = prev_flags;
 	return  ret;
 }
 BTRFS_ATTR_RW(devid, allocation_hint, btrfs_devinfo_allocation_hint_show,

@@ -421,8 +421,8 @@ struct btrfs_dev_item {
 	/* minimal io size for this device */
 	__le32 sector_size;
 
-	/* type and info about this device */
-	__le64 type;
+	/* device flags (e.g. allocation hint) */
+	__le64 flags;
 
 	/* expected generation for this device */
 	__le64 generation;
