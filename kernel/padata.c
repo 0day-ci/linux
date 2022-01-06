@@ -50,6 +50,7 @@ struct padata_work {
 
 static DEFINE_SPINLOCK(padata_works_lock);
 static struct padata_work *padata_works;
+static unsigned int padata_works_inuse;
 static LIST_HEAD(padata_free_works);
 
 struct padata_mt_job_state {
@@ -98,11 +99,16 @@ static struct padata_work *padata_work_alloc(void)
 
 	lockdep_assert_held(&padata_works_lock);
 
-	if (list_empty(&padata_free_works))
-		return NULL;	/* No more work items allowed to be queued. */
+	/* Are more work items allowed to be queued? */
+	if (padata_works_inuse >= num_online_cpus())
+		return NULL;
+
+	if (WARN_ON_ONCE(list_empty(&padata_free_works)))
+		return NULL;
 
 	pw = list_first_entry(&padata_free_works, struct padata_work, pw_list);
 	list_del(&pw->pw_list);
+	++padata_works_inuse;
 	return pw;
 }
 
@@ -111,7 +117,11 @@ static int padata_work_alloc_mt(int nworks, struct list_head *head)
 	int i;
 
 	spin_lock(&padata_works_lock);
-	/* Start at 1 because the current task participates in the job. */
+	/*
+	 * Increment inuse and start iterating at 1 to account for the main
+	 * thread participating in the job with its stack-allocated work.
+	 */
+	++padata_works_inuse;
 	for (i = 1; i < nworks; ++i) {
 		struct padata_work *pw = padata_work_alloc();
 
@@ -128,20 +138,22 @@ static void padata_work_free(struct padata_work *pw)
 {
 	lockdep_assert_held(&padata_works_lock);
 	list_add(&pw->pw_list, &padata_free_works);
+	WARN_ON_ONCE(!padata_works_inuse);
+	--padata_works_inuse;
 }
 
 static void padata_works_free(struct list_head *works)
 {
 	struct padata_work *cur, *next;
 
-	if (list_empty(works))
-		return;
-
 	spin_lock(&padata_works_lock);
 	list_for_each_entry_safe(cur, next, works, pw_list) {
 		list_del(&cur->pw_list);
 		padata_work_free(cur);
 	}
+	/* To account for the main thread finishing its part of the job. */
+	WARN_ON_ONCE(!padata_works_inuse);
+	--padata_works_inuse;
 	spin_unlock(&padata_works_lock);
 }
 
