@@ -94,6 +94,31 @@ CFLAGS_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o := $(dml_ccflags)
 CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dml1_display_rq_dlg_calc.o := $(dml_rcflags)
 CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o := $(dml_rcflags)
 
+ifdef CONFIG_ARM64
+ifdef CONFIG_DRM_AMD_DC_DCN
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20v2.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20v2.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/dcn20_fpu.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn21/display_mode_vba_21.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn21/display_rq_dlg_calc_21.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn30/display_mode_vga_30.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn30/display_mode_vga_30.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn30/display_mode_vba_30.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn30/display_rq_dlg_calc_30.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn31/display_mode_vba_31.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn31/display_rq_dlg_calc_31.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn301/dcn301_fpu.o += -mgeneral-regs-only
+endif
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_mode_lib.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_mode_vba.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dsc/rc_calc_fpu.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dml1_display_rq_dlg_calc.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dml_common_defs.o += -mgeneral-regs-only
+endif
+
 DML = display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o \
 
 ifdef CONFIG_DRM_AMD_DC_DCN

@@ -20,7 +20,9 @@ ifdef CONFIG_CC_IS_GCC
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
 endif
+ifndef CONFIG_ARM64
 CFLAGS_$(AMDDALPATH)/dc/dcn303/dcn303_resource.o += -mhard-float
+endif
 endif
 
 ifdef CONFIG_X86
@@ -32,6 +34,10 @@ CFLAGS_$(AMDDALPATH)/dc/dcn303/dcn303_resource.o += -mpreferred-stack-boundary=4
 else
 CFLAGS_$(AMDDALPATH)/dc/dcn303/dcn303_resource.o += -msse2
 endif
+endif
+
+ifdef CONFIG_ARM64
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dcn303/dcn303_resource.o += -mgeneral-regs-only
 endif
 
 AMD_DAL_DCN3_03 = $(addprefix $(AMDDALPATH)/dc/dcn303/,$(DCN3_03))

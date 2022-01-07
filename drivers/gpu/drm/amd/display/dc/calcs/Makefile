@@ -57,6 +57,12 @@ CFLAGS_REMOVE_$(AMDDALPATH)/dc/calcs/dcn_calcs.o := $(calcs_rcflags)
 CFLAGS_REMOVE_$(AMDDALPATH)/dc/calcs/dcn_calc_auto.o := $(calcs_rcflags)
 CFLAGS_REMOVE_$(AMDDALPATH)/dc/calcs/dcn_calc_math.o := $(calcs_rcflags)
 
+ifdef CONFIG_ARM64
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/calcs/dcn_calcs.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/calcs/dcn_calc_auto.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/calcs/dcn_calc_math.o += -mgeneral-regs-only
+endif
+
 BW_CALCS = dce_calcs.o bw_fixed.o custom_float.o
 
 ifdef CONFIG_DRM_AMD_DC_DCN

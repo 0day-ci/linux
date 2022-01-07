@@ -30,6 +30,10 @@ CFLAGS_$(AMDDALPATH)/dc/dcn21/dcn21_resource.o += -msse2
 endif
 endif
 
+ifdef CONFIG_ARM64
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dcn21/dcn21_resource.o += -mgeneral-regs-only
+endif
+
 AMD_DAL_DCN21 = $(addprefix $(AMDDALPATH)/dc/dcn21/,$(DCN21))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_DCN21)

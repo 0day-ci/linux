@@ -145,6 +145,13 @@ AMD_DAL_CLK_MGR_DCN301 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn301/,$(CLK_MGR_
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN301)
 
+ifdef CONFIG_ARM64
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn21/rn_clk_mgr.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn301/dcn30_clk_mgr.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn301/vg_clk_mgr.o += -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn30/dcn30_clk_mgr.o += -mgeneral-regs-only
+endif
+
 ###############################################################################
 # DCN31
 ###############################################################################
