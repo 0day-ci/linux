@@ -151,7 +151,7 @@ int rtw_recv_indicatepkt(struct adapter *padapter,
 
 				rtw_xmit_entry(skb, pnetdev);
 
-				if (bmcast)
+				if (bmcast && pskb2)
 					skb = pskb2;
 				else
 					goto _recv_indicatepkt_end;
