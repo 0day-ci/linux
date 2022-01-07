@@ -708,7 +708,8 @@ static int kill_accessing_process(struct task_struct *p, unsigned long pfn,
 	if (ret == 1 && priv.tk.addr)
 		kill_proc(&priv.tk, pfn, flags);
 	mmap_read_unlock(p->mm);
-	return ret ? -EFAULT : -EHWPOISON;
+
+	return (ret < 0) ? -EFAULT : -EHWPOISON;
 }
 
 static const char *action_name[] = {
