@@ -167,8 +167,13 @@ Before jumping into the kernel, the following conditions must be met:
 
   All forms of interrupts must be masked in PSTATE.DAIF (Debug, SError,
   IRQ and FIQ).
-  The CPU must be in non-secure state, either in EL2 (RECOMMENDED in order
-  to have access  to the virtualisation extensions), or in EL1.
+  If the CPU supports two security states, Linux must be entered in
+  non-secure state, either in EL2 (RECOMMENDED in order to have access
+  to the virtualisation extensions) or in EL1.
+  If the CPU only supports a single security state, Linux can be run even
+  when this single state is "secure".
+  The exception level the kernel is entered in must support the VMSA
+  memory model.
 
 - Caches, MMUs
 
