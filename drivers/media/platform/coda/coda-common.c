@@ -406,9 +406,13 @@ static struct vdoa_data *coda_get_vdoa_data(void)
 		goto out;
 
 	vdoa_data = platform_get_drvdata(vdoa_pdev);
-	if (!vdoa_data)
+	if (!vdoa_data) {
 		vdoa_data = ERR_PTR(-EPROBE_DEFER);
+		goto put;
+	}
 
+put:
+	put_device(&vdoa_pdev->dev);
 out:
 	of_node_put(vdoa_node);
 
