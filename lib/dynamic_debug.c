@@ -58,6 +58,7 @@ struct ddebug_query {
 	const char *function;
 	const char *format;
 	unsigned int first_lineno, last_lineno;
+	unsigned int class_id;
 };
 
 struct ddebug_iter {
@@ -138,13 +139,13 @@ static void vpr_info_dq(const struct ddebug_query *query, const char *msg)
 			fmtlen--;
 	}
 
-	v3pr_info("%s: func=\"%s\" file=\"%s\" module=\"%s\" format=\"%.*s\" lineno=%u-%u\n",
+	v3pr_info("%s: func=\"%s\" file=\"%s\" module=\"%s\" format=\"%.*s\" lineno=%u-%u class=%u\n",
 		 msg,
 		 query->function ?: "",
 		 query->filename ?: "",
 		 query->module ?: "",
 		 fmtlen, query->format ?: "",
-		 query->first_lineno, query->last_lineno);
+		 query->first_lineno, query->last_lineno, query->class_id);
 }
 
 /*
@@ -173,6 +174,10 @@ static int ddebug_change(const struct ddebug_query *query,
 
 		for (i = 0; i < dt->num_ddebugs; i++) {
 			struct _ddebug *dp = &dt->ddebugs[i];
+
+			/* match against the class_id, if > 0 */
+			if (query->class_id && query->class_id != dp->class_id)
+				continue;
 
 			/* match against the source filename */
 			if (query->filename &&
@@ -310,6 +315,22 @@ static inline int parse_lineno(const char *str, unsigned int *val)
 	}
 	return 0;
 }
+/*
+ * class_id is 0-15. 0 is default, is nonsense in active search
+ */
+static inline int parse_class(struct ddebug_query *query, const char *str)
+{
+	int rc;
+	unsigned int val;
+
+	rc = kstrtouint(str, 10, &val);
+	if (rc < 0 || !val || val > 15) {
+		pr_err("expecting class:[1-15], not %s\n", str);
+		return -EINVAL;
+	}
+	query->class_id = val;
+	return 0;
+}
 
 static int parse_linerange(struct ddebug_query *query, const char *first)
 {
@@ -423,6 +444,9 @@ static int ddebug_parse_query(char *words[], int nwords,
 			rc = check_set(&query->format, arg, "format");
 		} else if (!strcmp(keyword, "line")) {
 			if (parse_linerange(query, arg))
+				return -EINVAL;
+		} else if (!strcmp(keyword, "class")) {
+			if (parse_class(query, arg))
 				return -EINVAL;
 		} else {
 			pr_err("unknown keyword \"%s\"\n", keyword);
@@ -1007,7 +1031,7 @@ static int ddebug_proc_show(struct seq_file *m, void *p)
 		   iter->table->mod_name, dp->function,
 		   ddebug_describe_flags(dp->flags, &flags));
 	seq_escape(m, dp->format, "\t\r\n\"");
-	seq_puts(m, "\"\n");
+	seq_printf(m, "\" cls:%u\n", dp->class_id);
 
 	return 0;
 }
