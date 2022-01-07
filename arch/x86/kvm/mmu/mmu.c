@@ -2586,6 +2586,11 @@ int mmu_try_to_unsync_pages(struct kvm *kvm, const struct kvm_memory_slot *slot,
 	if (kvm_slot_page_track_is_active(kvm, slot, gfn, KVM_PAGE_TRACK_WRITE))
 		return -EPERM;
 
+	if (!can_unsync)
+		return -EPERM;
+
+	if (prefetch)
+		return -EEXIST;
 	/*
 	 * The page is not write-tracked, mark existing shadow pages unsync
 	 * unless KVM is synchronizing an unsync SP (can_unsync = false).  In
@@ -2593,14 +2598,8 @@ int mmu_try_to_unsync_pages(struct kvm *kvm, const struct kvm_memory_slot *slot,
 	 * allowing shadow pages to become unsync (writable by the guest).
 	 */
 	for_each_gfn_indirect_valid_sp(kvm, sp, gfn) {
-		if (!can_unsync)
-			return -EPERM;
-
 		if (sp->unsync)
 			continue;
-
-		if (prefetch)
-			return -EEXIST;
 
 		/*
 		 * TDP MMU page faults require an additional spinlock as they
