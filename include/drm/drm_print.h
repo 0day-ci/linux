@@ -31,6 +31,7 @@
 #include <linux/seq_file.h>
 #include <linux/device.h>
 #include <linux/debugfs.h>
+#include <linux/dynamic_debug.h>
 
 #include <drm/drm.h>
 
@@ -414,8 +415,8 @@ void __drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
 	__drm_dev_dbg(dev, eCat, fmt, ##__VA_ARGS__)
 #else
 #define drm_dev_dbg(dev, eCat, fmt, ...)				\
-	_dynamic_func_call_no_desc(fmt, __drm_dev_dbg,			\
-				   dev, eCat, fmt, ##__VA_ARGS__)
+	_dynamic_func_call_no_desc_cls(fmt, eCat, __drm_dev_dbg,	\
+				       dev, eCat, fmt, ##__VA_ARGS__)
 #endif
 
 /**
@@ -524,11 +525,11 @@ __printf(1, 2)
 void __drm_err(const char *format, ...);
 
 #if !defined(CONFIG_DRM_USE_DYNAMIC_DEBUG)
-#define __drm_dbg(fmt, ...)		___drm_dbg(fmt, ##__VA_ARGS__)
+#define __drm_dbg(fmt, ...)		___drm_dbg(NULL, fmt, ##__VA_ARGS__)
 #else
 #define __drm_dbg(eCat, fmt, ...)					\
-	_dynamic_func_call_no_desc(fmt, ___drm_dbg,			\
-				   eCat, fmt, ##__VA_ARGS__)
+	_dynamic_func_call_no_desc_cls(fmt, eCat, ___drm_dbg,		\
+				       eCat, fmt, ##__VA_ARGS__)
 #endif
 
 /* Macros to make printk easier */
