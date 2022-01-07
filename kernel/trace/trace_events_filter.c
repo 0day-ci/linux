@@ -5,6 +5,7 @@
  * Copyright (C) 2009 Tom Zanussi <tzanussi@gmail.com>
  */
 
+#include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/ctype.h>
 #include <linux/mutex.h>
@@ -654,11 +655,49 @@ DEFINE_EQUALITY_PRED(32);
 DEFINE_EQUALITY_PRED(16);
 DEFINE_EQUALITY_PRED(8);
 
+/* user space strings temp buffer */
+#define USTRING_BUF_SIZE	512
+
+struct ustring_buffer {
+	char		buffer[USTRING_BUF_SIZE];
+};
+
+static __percpu struct ustring_buffer *ustring_per_cpu;
+
+static __always_inline char *test_string(char *str)
+{
+	struct ustring_buffer *ubuf;
+	char __user *ustr;
+	char *kstr;
+
+	if (!ustring_per_cpu)
+		return NULL;
+
+	ubuf = this_cpu_ptr(ustring_per_cpu);
+	kstr = ubuf->buffer;
+
+	if (likely((unsigned long)str >= TASK_SIZE)) {
+		/* For safety, do not trust the string pointer */
+		if (!strncpy_from_kernel_nofault(kstr, str, USTRING_BUF_SIZE))
+			return NULL;
+	} else {
+		/* user space address? */
+		ustr = str;
+		if (!strncpy_from_user_nofault(kstr, ustr, USTRING_BUF_SIZE))
+			return NULL;
+	}
+	return kstr;
+}
+
 /* Filter predicate for fixed sized arrays of characters */
 static int filter_pred_string(struct filter_pred *pred, void *event)
 {
 	char *addr = (char *)(event + pred->offset);
 	int cmp, match;
+
+	addr = test_string(addr);
+	if (!addr)
+		return 0;
 
 	cmp = pred->regex.match(addr, &pred->regex, pred->regex.field_len);
 
@@ -671,10 +710,16 @@ static int filter_pred_string(struct filter_pred *pred, void *event)
 static int filter_pred_pchar(struct filter_pred *pred, void *event)
 {
 	char **addr = (char **)(event + pred->offset);
+	char *str;
 	int cmp, match;
-	int len = strlen(*addr) + 1;	/* including tailing '\0' */
+	int len;
 
-	cmp = pred->regex.match(*addr, &pred->regex, len);
+	str = test_string(*addr);
+	if (!str)
+		return 0;
+
+	len = strlen(str) + 1;	/* including tailing '\0' */
+	cmp = pred->regex.match(str, &pred->regex, len);
 
 	match = cmp ^ pred->not;
 
@@ -784,6 +829,10 @@ static int filter_pred_none(struct filter_pred *pred, void *event)
 
 static int regex_match_full(char *str, struct regex *r, int len)
 {
+	str = test_string(str);
+	if (!str)
+		return 0;
+
 	/* len of zero means str is dynamic and ends with '\0' */
 	if (!len)
 		return strcmp(str, r->pattern) == 0;
@@ -793,6 +842,10 @@ static int regex_match_full(char *str, struct regex *r, int len)
 
 static int regex_match_front(char *str, struct regex *r, int len)
 {
+	str = test_string(str);
+	if (!str)
+		return 0;
+
 	if (len && len < r->len)
 		return 0;
 
@@ -801,6 +854,10 @@ static int regex_match_front(char *str, struct regex *r, int len)
 
 static int regex_match_middle(char *str, struct regex *r, int len)
 {
+	str = test_string(str);
+	if (!str)
+		return 0;
+
 	if (!len)
 		return strstr(str, r->pattern) != NULL;
 
@@ -811,6 +868,10 @@ static int regex_match_end(char *str, struct regex *r, int len)
 {
 	int strlen = len - 1;
 
+	str = test_string(str);
+	if (!str)
+		return 0;
+
 	if (strlen >= r->len &&
 	    memcmp(str + strlen - r->len, r->pattern, r->len) == 0)
 		return 1;
@@ -819,6 +880,10 @@ static int regex_match_end(char *str, struct regex *r, int len)
 
 static int regex_match_glob(char *str, struct regex *r, int len __maybe_unused)
 {
+	str = test_string(str);
+	if (!str)
+		return 0;
+
 	if (glob_match(r->pattern, str))
 		return 1;
 	return 0;
@@ -1335,6 +1400,13 @@ static int parse_pred(const char *str, void *data,
 		strncpy(pred->regex.pattern, str + s, len);
 		pred->regex.pattern[len] = 0;
 
+		if (!ustring_per_cpu) {
+			/* Once allocated, keep it around for good */
+			ustring_per_cpu = alloc_percpu(struct ustring_buffer);
+			if (!ustring_per_cpu)
+				goto err_mem;
+		}
+
 		filter_build_regex(pred);
 
 		if (field->filter_type == FILTER_COMM) {
@@ -1415,6 +1487,9 @@ static int parse_pred(const char *str, void *data,
 err_free:
 	kfree(pred);
 	return -EINVAL;
+err_mem:
+	kfree(pred);
+	return -ENOMEM;
 }
 
 enum {
