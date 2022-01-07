@@ -2974,6 +2974,8 @@ static int emac_init_config(struct emac_instance *dev)
 #endif
 	}
 
+	of_get_ethdev_label(np, dev->ndev);
+
 	/* Read MAC-address */
 	err = of_get_ethdev_address(np, dev->ndev);
 	if (err) {

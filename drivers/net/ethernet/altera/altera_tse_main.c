@@ -1523,6 +1523,8 @@ static int altera_tse_probe(struct platform_device *pdev)
 	 */
 	priv->rx_dma_buf_sz = ALTERA_RXDMABUFFER_SIZE;
 
+	of_get_ethdev_label(pdev->dev.of_node, ndev);
+
 	/* get default MAC address from device tree */
 	ret = of_get_ethdev_address(pdev->dev.of_node, ndev);
 	if (ret)

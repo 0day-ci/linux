@@ -2002,6 +2002,8 @@ static int netcp_create_interface(struct netcp_device *netcp_device,
 	netcp->tx_resume_threshold = netcp->tx_pause_threshold;
 	netcp->node_interface = node_interface;
 
+	of_get_ethdev_label(node_interface, ndev);
+
 	ret = of_property_read_u32(node_interface, "efuse-mac", &efuse_mac);
 	if (efuse_mac) {
 		if (of_address_to_resource(node, NETCP_EFUSE_REG_INDEX, &res)) {

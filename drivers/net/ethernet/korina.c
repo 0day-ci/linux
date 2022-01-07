@@ -1296,6 +1296,8 @@ static int korina_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	lp = netdev_priv(dev);
 
+	of_get_ethdev_label(pdev->dev.of_node, dev);
+
 	if (mac_addr)
 		eth_hw_addr_set(dev, mac_addr);
 	else if (of_get_ethdev_address(pdev->dev.of_node, dev) < 0)

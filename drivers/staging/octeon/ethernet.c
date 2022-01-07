@@ -409,6 +409,8 @@ int cvm_oct_common_init(struct net_device *dev)
 	struct octeon_ethernet *priv = netdev_priv(dev);
 	int ret;
 
+	of_get_ethdev_label(priv->of_node, dev);
+
 	ret = of_get_ethdev_address(priv->of_node, dev);
 	if (ret)
 		eth_hw_addr_random(dev);

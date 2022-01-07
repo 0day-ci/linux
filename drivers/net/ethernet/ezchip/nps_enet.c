@@ -600,6 +600,8 @@ static s32 nps_enet_probe(struct platform_device *pdev)
 	}
 	dev_dbg(dev, "Registers base address is 0x%p\n", priv->regs_base);
 
+	of_get_ethdev_label(dev->of_node, ndev);
+
 	/* set kernel MAC address to dev */
 	err = of_get_ethdev_address(dev->of_node, ndev);
 	if (err)

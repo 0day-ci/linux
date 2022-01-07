@@ -3731,6 +3731,7 @@ static int ucc_geth_probe(struct platform_device* ofdev)
 		goto err_free_netdev;
 	}
 
+	of_get_ethdev_label(np, dev);
 	of_get_ethdev_address(np, dev);
 
 	ugeth->ug_info = ug_info;

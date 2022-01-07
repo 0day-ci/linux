@@ -197,6 +197,8 @@ static void ks8851_init_mac(struct ks8851_net *ks, struct device_node *np)
 	struct net_device *dev = ks->netdev;
 	int ret;
 
+	of_get_ethdev_label(np, dev);
+
 	ret = of_get_ethdev_address(np, dev);
 	if (!ret) {
 		ks8851_write_mac_addr(dev);

@@ -346,6 +346,7 @@ static int qca_uart_probe(struct serdev_device *serdev)
 	INIT_WORK(&qca->tx_work, qcauart_transmit);
 
 	of_property_read_u32(serdev->dev.of_node, "current-speed", &speed);
+	of_get_ethdev_label(serdev->dev.of_node, qca->net_dev);
 
 	ret = of_get_ethdev_address(serdev->dev.of_node, qca->net_dev);
 	if (ret) {

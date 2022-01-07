@@ -140,6 +140,8 @@ static int bgmac_probe(struct bcma_device *core)
 
 	bcma_set_drvdata(core, bgmac);
 
+	of_get_ethdev_label(bgmac->dev->of_node, bgmac->net_dev);
+
 	err = of_get_ethdev_address(bgmac->dev->of_node, bgmac->net_dev);
 	if (err == -EPROBE_DEFER)
 		return err;

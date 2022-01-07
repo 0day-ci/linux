@@ -940,6 +940,8 @@ int arc_emac_probe(struct net_device *ndev, int interface)
 		goto out_clken;
 	}
 
+	of_get_ethdev_label(dev->of_node, ndev);
+
 	/* Get MAC address from device tree */
 	err = of_get_ethdev_address(dev->of_node, ndev);
 	if (err)

@@ -117,6 +117,8 @@ static int sxgbe_platform_probe(struct platform_device *pdev)
 		goto err_drv_remove;
 	}
 
+	of_get_ethdev_label(node, priv->dev);
+
 	/* Get MAC address if available (DT) */
 	of_get_ethdev_address(node, priv->dev);
 

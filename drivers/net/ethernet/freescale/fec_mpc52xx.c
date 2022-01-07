@@ -885,6 +885,8 @@ static int mpc52xx_fec_probe(struct platform_device *op)
 		/* TX */
 	priv->t_irq = bcom_get_task_irq(priv->tx_dmatsk);
 
+	of_get_ethdev_label(np, ndev);
+
 	/*
 	 * MAC address init:
 	 *

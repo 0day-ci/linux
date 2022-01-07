@@ -851,6 +851,8 @@ static int emac_probe(struct platform_device *pdev)
 		goto out_release_sram;
 	}
 
+	of_get_ethdev_label(np, ndev);
+
 	/* Read MAC-address from DT */
 	ret = of_get_ethdev_address(np, ndev);
 	if (ret) {

@@ -1346,6 +1346,8 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
 
 	pldat->phy_node = of_parse_phandle(np, "phy-handle", 0);
 
+	of_get_ethdev_label(np, ndev);
+
 	/* Get MAC address from current HW setting (POR state is all zeros) */
 	__lpc_get_mac(pldat, addr);
 	eth_hw_addr_set(ndev, addr);
