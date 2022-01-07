@@ -4878,6 +4878,7 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 	struct cfs_bandwidth *cfs_b = tg_cfs_bandwidth(cfs_rq->tg);
 	struct sched_entity *se;
 	long task_delta, idle_task_delta;
+	u64 throttled_time;
 
 	se = cfs_rq->tg->se[cpu_of(rq)];
 
@@ -4886,7 +4887,9 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 	update_rq_clock(rq);
 
 	raw_spin_lock(&cfs_b->lock);
-	cfs_b->throttled_time += rq_clock(rq) - cfs_rq->throttled_clock;
+	throttled_time = rq_clock(rq) - cfs_rq->throttled_clock;
+	cfs_b->throttled_time += throttled_time;
+	cfs_rq->throttled_time += throttled_time;
 	list_del_rcu(&cfs_rq->throttled_list);
 	raw_spin_unlock(&cfs_b->lock);
 

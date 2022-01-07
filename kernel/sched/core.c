@@ -10612,8 +10612,8 @@ static struct cftype cpu_legacy_files[] = {
 	{ }	/* Terminate */
 };
 
-static int cpu_extra_stat_show(struct seq_file *sf,
-			       struct cgroup_subsys_state *css)
+static void __cpu_extra_stat_show(struct seq_file *sf,
+				  struct cgroup_subsys_state *css)
 {
 #ifdef CONFIG_CFS_BANDWIDTH
 	{
@@ -10635,6 +10635,40 @@ static int cpu_extra_stat_show(struct seq_file *sf,
 			   throttled_usec, cfs_b->nr_burst, burst_usec);
 	}
 #endif
+}
+
+static void __cpu_extra_stat_percpu_show(struct seq_file *sf,
+					 struct cgroup_subsys_state *css)
+{
+#ifdef CONFIG_CFS_BANDWIDTH
+	{
+		struct task_group *tg = css_tg(css);
+		struct cfs_rq *cfs_rq;
+		u64 throttled_usec;
+		int cpu;
+
+		seq_puts(sf, "throttled_usec");
+		for_each_possible_cpu(cpu) {
+			cfs_rq = tg->cfs_rq[cpu];
+
+			throttled_usec = READ_ONCE(cfs_rq->throttled_time);
+			do_div(throttled_usec, NSEC_PER_USEC);
+
+			seq_printf(sf, " %llu", throttled_usec);
+		}
+		seq_puts(sf, "\n");
+	}
+#endif
+}
+
+static int cpu_extra_stat_show(struct seq_file *sf,
+			       struct cgroup_subsys_state *css,
+			       bool percpu)
+{
+	if (percpu)
+		__cpu_extra_stat_percpu_show(sf, css);
+	else
+		__cpu_extra_stat_show(sf, css);
 	return 0;
 }
 
