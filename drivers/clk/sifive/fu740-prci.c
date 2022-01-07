@@ -8,7 +8,6 @@
 
 #include <dt-bindings/clock/sifive-fu740-prci.h>
 
-#include "fu540-prci.h"
 #include "sifive-prci.h"
 
 /* PRCI integration data for each WRPLL instance */
@@ -131,4 +130,9 @@ struct __prci_clock __prci_init_clocks_fu740[] = {
 		.parent_name = "hfclk",
 		.ops = &sifive_fu740_prci_pcie_aux_clk_ops,
 	},
+};
+
+struct prci_clk_desc prci_clk_fu740 = {
+	.clks = __prci_init_clocks_fu740,
+	.num_clks = ARRAY_SIZE(__prci_init_clocks_fu740),
 };
