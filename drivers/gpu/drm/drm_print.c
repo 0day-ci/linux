@@ -36,6 +36,9 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_print.h>
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/drm.h>
+
 /*
  * __drm_debug: Enable debug output.
  * Bitmask of DRM_UT_x. See include/drm/drm_print.h for details.
@@ -269,13 +272,15 @@ void drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
 	vaf.fmt = format;
 	vaf.va = &args;
 
-	if (dev)
+	if (dev) {
 		dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
 			   __builtin_return_address(0), &vaf);
-	else
+		trace_drm_devdbg(dev, category, &vaf);
+	} else {
 		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
 		       __builtin_return_address(0), &vaf);
-
+		trace_drm_debug(category, &vaf);
+	}
 	va_end(args);
 }
 EXPORT_SYMBOL(drm_dev_dbg);
@@ -294,6 +299,8 @@ void __drm_dbg(enum drm_debug_category category, const char *format, ...)
 
 	printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
 	       __builtin_return_address(0), &vaf);
+
+	trace_drm_debug(category, &vaf);
 
 	va_end(args);
 }
