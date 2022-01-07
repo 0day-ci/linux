@@ -136,7 +136,8 @@ static void parse_error(struct filter_parse_error *pe, int err, int pos)
 	pe->lasterr_pos = pos;
 }
 
-typedef int (*parse_pred_fn)(const char *str, void *data, int pos,
+typedef int (*parse_pred_fn)(const char *str, struct trace_event_call *data,
+			     int pos,
 			     struct filter_parse_error *pe,
 			     struct filter_pred **pred);
 
@@ -408,7 +409,7 @@ enum {
  */
 static struct prog_entry *
 predicate_parse(const char *str, int nr_parens, int nr_preds,
-		parse_pred_fn parse_pred, void *data,
+		parse_pred_fn parse_pred, struct trace_event_call *data,
 		struct filter_parse_error *pe)
 {
 	struct prog_entry *prog_stack;
@@ -1149,7 +1150,7 @@ static filter_pred_fn_t select_comparison_fn(enum filter_op_ids op,
 }
 
 /* Called when a predicate is encountered by predicate_parse() */
-static int parse_pred(const char *str, void *data,
+static int parse_pred(const char *str, struct trace_event_call *data,
 		      int pos, struct filter_parse_error *pe,
 		      struct filter_pred **pred_ptr)
 {
