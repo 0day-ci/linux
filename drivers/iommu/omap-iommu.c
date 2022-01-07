@@ -1684,6 +1684,7 @@ static struct iommu_device *omap_iommu_probe_device(struct device *dev)
 		oiommu = platform_get_drvdata(pdev);
 		if (!oiommu) {
 			of_node_put(np);
+			put_device(&pdev->dev);
 			kfree(arch_data);
 			return ERR_PTR(-EINVAL);
 		}
