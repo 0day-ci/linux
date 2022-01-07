@@ -278,14 +278,14 @@ void __drm_dev_dbg(struct _ddebug *desc, const struct device *dev,
 				   __builtin_return_address(0), &vaf);
 
 		if (desc->flags & _DPRINTK_FLAGS_TRACE)
-			trace_drm_devdbg(dev, category, &vaf);
+			trace_drm_devdbg(dev, desc, &vaf);
 	} else {
 		if (desc->flags & _DPRINTK_FLAGS_PRINTK)
 			printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
 			       __builtin_return_address(0), &vaf);
 
 		if (desc->flags & _DPRINTK_FLAGS_TRACE)
-			trace_drm_debug(category, &vaf);
+			trace_drm_debug(desc, &vaf);
 	}
 	va_end(args);
 }
@@ -306,7 +306,7 @@ void ___drm_dbg(struct _ddebug *desc, enum drm_debug_category category, const ch
 	printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
 	       __builtin_return_address(0), &vaf);
 
-	trace_drm_debug(category, &vaf);
+	trace_drm_debug(desc, &vaf);
 
 	va_end(args);
 }

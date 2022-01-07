@@ -9,25 +9,25 @@
 
 /* drm_debug() was called, pass its args */
 TRACE_EVENT(drm_debug,
-	TP_PROTO(int drm_debug_category, struct va_format *vaf),
+	TP_PROTO(struct _ddebug *desc, struct va_format *vaf),
 
-	TP_ARGS(drm_debug_category, vaf),
+	TP_ARGS(desc, vaf),
 
 	TP_STRUCT__entry(
-		__field(int, drm_debug_category)
+		__field(struct _ddebug *, desc)
 		__dynamic_array(char, msg, 256)
 	),
 
 	TP_fast_assign(
 		int len;
+		char *p = __get_str(msg);
 
-		__entry->drm_debug_category = drm_debug_category;
-		vsnprintf(__get_str(msg), 256, vaf->fmt, *vaf->va);
+		__entry->desc = desc;
+		len = vsnprintf(p, 256, vaf->fmt, *vaf->va);
 
-		len = strlen(__get_str(msg));
-		if ((len > 0) && (__get_str(msg)[len-1] == '\n'))
+		if ((len > 0) && (len < 256) && p[len-1] == '\n')
 			len -= 1;
-		__get_str(msg)[len] = 0;
+		p[len] = 0;
 	),
 
 	TP_printk("%s", __get_str(msg))
@@ -35,30 +35,30 @@ TRACE_EVENT(drm_debug,
 
 /* drm_devdbg() was called, pass its args, preserving order */
 TRACE_EVENT(drm_devdbg,
-	TP_PROTO(const struct device *dev, int drm_debug_category, struct va_format *vaf),
+	TP_PROTO(const struct device *dev, struct _ddebug *desc, struct va_format *vaf),
 
-	TP_ARGS(dev, drm_debug_category, vaf),
+	TP_ARGS(dev, desc, vaf),
 
 	TP_STRUCT__entry(
-		__field(const struct device*, dev)
-		__field(int, drm_debug_category)
+		__field(const struct device *, dev)
+		__field(struct _ddebug *, desc)
 		__dynamic_array(char, msg, 256)
 	),
 
 	TP_fast_assign(
 		int len;
+		char *p = __get_str(msg);
 
-		__entry->drm_debug_category = drm_debug_category;
+		__entry->desc = desc;
 		__entry->dev = dev;
-		vsnprintf(__get_str(msg), 256, vaf->fmt, *vaf->va);
+		len = vsnprintf(p, 256, vaf->fmt, *vaf->va);
 
-		len = strlen(__get_str(msg));
-		if ((len > 0) && (__get_str(msg)[len-1] == '\n'))
+		if ((len > 0) && (len < 256) && p[len-1] == '\n')
 			len -= 1;
-		__get_str(msg)[len] = 0;
+		p[len] = 0;
 	),
 
-	TP_printk("cat:%d, %s %s", __entry->drm_debug_category,
+	TP_printk("cat:%d, %s %s", __entry->desc->class_id,
 		  dev_name(__entry->dev), __get_str(msg))
 );
 
