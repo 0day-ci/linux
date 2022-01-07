@@ -535,43 +535,6 @@ error:
 }
 
 /*
- * Check if the device in the 'path' matches with the device in the given
- * struct btrfs_device '*device'.
- * Returns:
- *	0	If it is the same device.
- *	1	If it is not the same device.
- *	-errno	For error.
- */
-static int device_matched(struct btrfs_device *device, dev_t dev_new)
-{
-	char *device_name;
-	dev_t dev_old;
-	int ret;
-
-	device_name = kzalloc(BTRFS_PATH_NAME_MAX, GFP_KERNEL);
-	if (!device_name)
-		return -ENOMEM;
-
-	rcu_read_lock();
-	ret = sprintf(device_name, "%s", rcu_str_deref(device->name));
-	rcu_read_unlock();
-	if (!ret) {
-		kfree(device_name);
-		return -EINVAL;
-	}
-
-	ret = lookup_bdev(device_name, &dev_old);
-	kfree(device_name);
-	if (ret)
-		return ret;
-
-	if (dev_old == dev_new)
-		return 0;
-
-	return 1;
-}
-
-/*
  *  Search and remove all stale (devices which are not mounted) devices.
  *  When both inputs are NULL, it will search and release all stale devices.
  *  devt:	Optional. When provided will it release all unmounted devices
@@ -601,9 +564,7 @@ static int btrfs_free_stale_devices(dev_t devt,
 					 &fs_devices->devices, dev_list) {
 			if (skip_device && skip_device == device)
 				continue;
-			if (devt && !device->name)
-				continue;
-			if (devt && device_matched(device, devt) != 0)
+			if (devt && device->devt != devt)
 				continue;
 			if (fs_devices->opened) {
 				/* for an already deleted device return 0 */
