@@ -181,6 +181,7 @@ static struct tty_buffer *tty_buffer_alloc(struct tty_port *port, size_t size)
 
 found:
 	tty_buffer_reset(p, size);
+	memset((char *)p + sizeof(struct tty_buffer), 0, 2 * size);
 	atomic_add(size, &port->buf.mem_used);
 	return p;
 }
