@@ -7152,9 +7152,8 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 	left_path->nodes[left_level] =
 			btrfs_clone_extent_buffer(left_root->commit_root);
 	if (!left_path->nodes[left_level]) {
-		up_read(&fs_info->commit_root_sem);
 		ret = -ENOMEM;
-		goto out;
+		goto out_unlock;
 	}
 
 	right_level = btrfs_header_level(right_root->commit_root);
@@ -7162,9 +7161,8 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 	right_path->nodes[right_level] =
 			btrfs_clone_extent_buffer(right_root->commit_root);
 	if (!right_path->nodes[right_level]) {
-		up_read(&fs_info->commit_root_sem);
 		ret = -ENOMEM;
-		goto out;
+		goto out_unlock;
 	}
 	/*
 	 * Our right root is the parent root, while the left root is the "send"
@@ -7204,7 +7202,7 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 						       left_level, right_level,
 						       sctx);
 			if (ret < 0)
-				goto out;
+				goto out_unlock;
 			sctx->last_reloc_trans = fs_info->last_reloc_trans;
 		}
 
@@ -7216,7 +7214,7 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 			if (ret == -1)
 				left_end_reached = ADVANCE;
 			else if (ret < 0)
-				goto out;
+				goto out_unlock;
 			advance_left = 0;
 		}
 		if (advance_right && !right_end_reached) {
@@ -7227,13 +7225,13 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 			if (ret == -1)
 				right_end_reached = ADVANCE;
 			else if (ret < 0)
-				goto out;
+				goto out_unlock;
 			advance_right = 0;
 		}
 
 		if (left_end_reached && right_end_reached) {
 			ret = 0;
-			goto out;
+			goto out_unlock;
 		} else if (left_end_reached) {
 			if (right_level == 0) {
 				up_read(&fs_info->commit_root_sem);
@@ -7241,9 +7239,9 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 						&right_key,
 						BTRFS_COMPARE_TREE_DELETED,
 						sctx);
-				down_read(&fs_info->commit_root_sem);
 				if (ret < 0)
 					goto out;
+				down_read(&fs_info->commit_root_sem);
 			}
 			advance_right = ADVANCE;
 			continue;
@@ -7254,9 +7252,9 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 						&left_key,
 						BTRFS_COMPARE_TREE_NEW,
 						sctx);
-				down_read(&fs_info->commit_root_sem);
 				if (ret < 0)
 					goto out;
+				down_read(&fs_info->commit_root_sem);
 			}
 			advance_left = ADVANCE;
 			continue;
@@ -7293,9 +7291,9 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 				advance_right = ADVANCE;
 			}
 
-			down_read(&fs_info->commit_root_sem);
 			if (ret < 0)
 				goto out;
+			down_read(&fs_info->commit_root_sem);
 		} else if (left_level == right_level) {
 			cmp = btrfs_comp_cpu_keys(&left_key, &right_key);
 			if (cmp < 0) {
@@ -7335,8 +7333,9 @@ static int btrfs_compare_trees(struct btrfs_root *left_root,
 		}
 	}
 
-out:
+out_unlock:
 	up_read(&fs_info->commit_root_sem);
+out:
 	btrfs_free_path(left_path);
 	btrfs_free_path(right_path);
 	kvfree(tmp_buf);
