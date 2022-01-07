@@ -137,7 +137,7 @@ patternProperties:
           OMAP Mailbox specifier denoting the sub-mailbox, to be used for
           communication with the remote processor. This property should match
           with the sub-mailbox node used in the firmware image.
-        maxItems: 1
+        maxItems: 2
 
       memory-region:
         description: |
