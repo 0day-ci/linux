@@ -290,7 +290,7 @@ static int cmos_read_alarm(struct device *dev, struct rtc_wkalrm *t)
 		.time = &t->time,
 	};
 
-	/* This not only a rtc_op, but also called directly */
+	/* Fail if the RTC alarm is not supported */
 	if (!is_valid_irq(cmos->irq))
 		return -EIO;
 
@@ -523,7 +523,7 @@ static int cmos_set_alarm(struct device *dev, struct rtc_wkalrm *t)
 	unsigned char rtc_control;
 	int ret;
 
-	/* This not only a rtc_op, but also called directly */
+	/* Fail if the RTC alarm is not supported */
 	if (!is_valid_irq(cmos->irq))
 		return -EIO;
 
