@@ -270,7 +270,11 @@ extern void flush_sigqueue(struct sigpending *queue);
 /* Test if 'sig' is valid signal. Use this instead of testing _NSIG directly */
 static inline int valid_signal(unsigned long sig)
 {
-	return sig <= _NSIG ? 1 : 0;
+	/* max usable signal number is limited by both _NSIG and task's
+	 * exit_code, and the max available signal number encoded in
+	 * task's exit_code is 127.
+	 */
+	return sig <= min(_NSIG, 127) ? 1 : 0;
 }
 
 struct timespec;
