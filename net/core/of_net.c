@@ -168,3 +168,18 @@ int of_get_ethdev_address(struct device_node *np, struct net_device *dev)
 	return ret;
 }
 EXPORT_SYMBOL(of_get_ethdev_address);
+
+int of_get_ethdev_label(struct device_node *np, struct net_device *dev)
+{
+	const char *name = of_get_property(np, "label", NULL);
+
+	if (!name)
+		return -ENOENT;
+
+	if (strlen(name) >= sizeof(dev->name))
+		return -ENAMETOOLONG;
+
+	strcpy(dev->name, name);
+	return 0;
+}
+EXPORT_SYMBOL(of_get_ethdev_label);
