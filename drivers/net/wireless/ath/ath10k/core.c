@@ -1081,6 +1081,32 @@ int ath10k_core_check_dt(struct ath10k *ar)
 }
 EXPORT_SYMBOL(ath10k_core_check_dt);
 
+int ath10k_core_parse_default_bdf_dt(struct ath10k *ar)
+{
+	struct device_node *node;
+	const char *board_name = NULL;
+
+	ar->id.default_bdf[0] = '\0';
+
+	node = ar->dev->of_node;
+	if (!node)
+		return -ENOENT;
+
+	of_property_read_string(node, "qcom,ath10k-default-bdf",
+				&board_name);
+	if (!board_name)
+		return -ENODATA;
+
+	if (strscpy(ar->id.default_bdf,
+		    board_name, sizeof(ar->id.default_bdf)) < 0)
+		ath10k_warn(ar,
+			    "default board name is longer than allocated buffer, board_name: %s; allocated size: %d\n",
+			    board_name, sizeof(ar->id.default_bdf));
+
+	return 0;
+}
+EXPORT_SYMBOL(ath10k_core_parse_default_bdf_dt);
+
 static int ath10k_download_fw(struct ath10k *ar)
 {
 	u32 address, data_len;
@@ -1440,6 +1466,10 @@ static int ath10k_core_fetch_board_data_api_n(struct ath10k *ar,
 
 	if (ret == -ENOENT && fallback_boardname2)
 		ret = ath10k_core_search_bd(ar, fallback_boardname2, data, len);
+
+	/* check default BDF name if provided in device tree */
+	if (ret == -ENOENT && ar->id.default_bdf[0] != '\0')
+		ret = ath10k_core_search_bd(ar, ar->id.default_bdf, data, len);
 
 	if (ret == -ENOENT) {
 		ath10k_err(ar,
