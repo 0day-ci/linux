@@ -2999,10 +2999,11 @@ int mt7915_mcu_muru_debug_set(struct mt7915_dev *dev, bool enabled)
 	struct {
 		__le32 cmd;
 		u8 enable;
-	} data = {
-		.cmd = cpu_to_le32(MURU_SET_TXC_TX_STATS_EN),
-		.enable = enabled,
-	};
+	} data;
+
+	memset(&data, 0, sizeof(data));
+	data.cmd = cpu_to_le32(MURU_SET_TXC_TX_STATS_EN);
+	data.enable = enabled;
 
 	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(MURU_CTRL), &data,
 				sizeof(data), false);
@@ -3014,15 +3015,15 @@ int mt7915_mcu_muru_debug_get(struct mt7915_phy *phy, void *ms)
 	struct sk_buff *skb;
 	struct mt7915_mcu_muru_stats *mu_stats =
 				(struct mt7915_mcu_muru_stats *)ms;
-	int ret;
-
 	struct {
 		__le32 cmd;
 		u8 band_idx;
-	} req = {
-		.cmd = cpu_to_le32(MURU_GET_TXC_TX_STATS),
-		.band_idx = phy != &dev->phy,
-	};
+	} req;
+	int ret;
+
+	memset(&req, 0, sizeof(req));
+	req.cmd = cpu_to_le32(MURU_GET_TXC_TX_STATS);
+	req.band_idx = phy != &dev->phy;
 
 	ret = mt76_mcu_send_and_get_msg(&dev->mt76, MCU_EXT_CMD(MURU_CTRL),
 					&req, sizeof(req), true, &skb);
