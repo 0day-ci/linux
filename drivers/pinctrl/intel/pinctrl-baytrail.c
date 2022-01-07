@@ -32,6 +32,7 @@
 #define BYT_VAL_REG		0x008
 #define BYT_DFT_REG		0x00c
 #define BYT_INT_STAT_REG	0x800
+#define BYT_DIRECT_IRQ_REG	0x980
 #define BYT_DEBOUNCE_REG	0x9d0
 
 /* BYT_CONF0_REG register bits */
@@ -1465,6 +1466,27 @@ static void byt_gpio_irq_handler(struct irq_desc *desc)
 	chip->irq_eoi(data);
 }
 
+static bool byt_direct_irq_sanity_check(struct intel_pinctrl *vg, int pin, u32 value)
+{
+	u8 *match, direct_irq[16];
+
+	if (!(value & (BYT_TRIG_POS | BYT_TRIG_NEG))) {
+		dev_warn(vg->dev,
+			 FW_BUG "pin %i: direct_irq_en set without trigger, clearing\n", pin);
+		return false;
+	}
+
+	memcpy_fromio(direct_irq, vg->communities->pad_regs + BYT_DIRECT_IRQ_REG,
+		      sizeof(direct_irq));
+	match = memchr(direct_irq, pin, sizeof(direct_irq));
+	if (match)
+		dev_dbg(vg->dev, "Pin %i: uses direct IRQ %ld\n", pin, match - direct_irq);
+	else
+		dev_warn(vg->dev, FW_BUG "pin %i: direct_irq_en set but no IRQ assigned, clearing\n", pin);
+
+	return match;
+}
+
 static void byt_init_irq_valid_mask(struct gpio_chip *chip,
 				    unsigned long *valid_mask,
 				    unsigned int ngpios)
@@ -1492,8 +1514,13 @@ static void byt_init_irq_valid_mask(struct gpio_chip *chip,
 
 		value = readl(reg);
 		if (value & BYT_DIRECT_IRQ_EN) {
-			clear_bit(i, valid_mask);
-			dev_dbg(vg->dev, "excluding GPIO %d from IRQ domain\n", i);
+			if (byt_direct_irq_sanity_check(vg, i, value)) {
+				clear_bit(i, valid_mask);
+			} else {
+				value &= ~(BYT_DIRECT_IRQ_EN | BYT_TRIG_POS |
+					   BYT_TRIG_NEG | BYT_TRIG_LVL);
+				writel(value, reg);
+			}
 		} else if ((value & BYT_PIN_MUX) == byt_get_gpio_mux(vg, i)) {
 			byt_gpio_clear_triggering(vg, i);
 			dev_dbg(vg->dev, "disabling GPIO %d\n", i);
