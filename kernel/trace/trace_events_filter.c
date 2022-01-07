@@ -10,6 +10,7 @@
 #include <linux/mutex.h>
 #include <linux/perf_event.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 
 #include "trace.h"
 #include "trace_output.h"
@@ -672,12 +673,30 @@ static int filter_pred_string(struct filter_pred *pred, void *event)
 static int filter_pred_pchar(struct filter_pred *pred, void *event)
 {
 	char *addr = (char *)(event + pred->offset);
+	char *udata, *cmp_buff;
 	int cmp, match;
-	int len = strlen(addr) + 1;	/* including tailing '\0' */
+	int len, poffset;
 
-	cmp = pred->regex.match(addr, &pred->regex, len);
+	if (unlikely(pred->field->uaccess)) {
+		udata = kmalloc(PAGE_SIZE, GFP_KERNEL);
+		if (!udata)
+			return -ENOMEM;
+		poffset = (ulong)addr & (PAGE_SIZE - 1);
+		cmp_buff = udata + poffset;
+		if (copy_from_user(cmp_buff, addr, PAGE_SIZE - poffset)) {
+			kfree(udata);
+			return -EFAULT;
+		}
+	} else {
+		cmp_buff = addr;
+	}
+	len = strlen(cmp_buff) + 1;	/* including tailing '\0' */
+
+	cmp = pred->regex.match(cmp_buff, &pred->regex, len);
 
 	match = cmp ^ pred->not;
+	if (unlikely(pred->field->uaccess))
+		kfree(udata);
 
 	return match;
 }
@@ -1220,6 +1239,7 @@ static int parse_pred(const char *str, struct trace_event_call *data,
 		return -ENOMEM;
 
 	pred->field = field;
+	field->uaccess = 0;
 	pred->offset = field->offset;
 	pred->op = op;
 
@@ -1321,8 +1341,11 @@ static int parse_pred(const char *str, struct trace_event_call *data,
 
 		} else if (field->filter_type == FILTER_DYN_STRING)
 			pred->fn = filter_pred_strloc;
-		else
+		else {
 			pred->fn = filter_pred_pchar;
+			if (data->class == &event_class_syscall_enter)
+				pred->field->uaccess = 1;
+		}
 		/* go past the last quote */
 		i++;
 

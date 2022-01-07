@@ -1281,6 +1281,7 @@ struct ftrace_event_field {
 	int			offset;
 	int			size;
 	int			is_signed;
+	int			uaccess;
 };
 
 struct prog_entry;
