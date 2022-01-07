@@ -42,5 +42,6 @@ struct module_signature {
 
 int mod_check_sig(const struct module_signature *ms, size_t file_len,
 		  const char *name);
+int mod_parse_sig(const void *data, size_t *len, size_t *sig_len, const char *name);
 
 #endif /* _LINUX_MODULE_SIGNATURE_H */
