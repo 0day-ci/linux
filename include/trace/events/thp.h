@@ -83,6 +83,43 @@ TRACE_EVENT(hugepage_splitting,
 		      __entry->addr, __entry->pte)
 );
 
+TRACE_EVENT(set_migration_pmd,
+
+	TP_PROTO(unsigned long addr, unsigned long pmd),
+
+	TP_ARGS(addr, pmd),
+
+	TP_STRUCT__entry(
+		__field(unsigned long, addr)
+		__field(unsigned long, pmd)
+	),
+
+	TP_fast_assign(
+		__entry->addr = addr;
+		__entry->pmd = pmd;
+	),
+
+	TP_printk("create pmd migration entry addr=%lx, pmd=%lx", __entry->addr, __entry->pmd)
+);
+
+TRACE_EVENT(remove_migration_pmd,
+
+	TP_PROTO(unsigned long addr, unsigned long pmd),
+
+	TP_ARGS(addr, pmd),
+
+	TP_STRUCT__entry(
+		__field(unsigned long, addr)
+		__field(unsigned long, pmd)
+	),
+
+	TP_fast_assign(
+		__entry->addr = addr;
+		__entry->pmd = pmd;
+	),
+
+	TP_printk("remove pmd migration entry addr=%lx, val=%lx", __entry->addr, __entry->pmd)
+);
 #endif /* _TRACE_THP_H */
 
 /* This part must be outside protection */
