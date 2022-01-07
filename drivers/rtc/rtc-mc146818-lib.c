@@ -21,7 +21,7 @@ bool mc146818_avoid_UIP(void (*callback)(unsigned char seconds, void *param),
 	unsigned long flags;
 	unsigned char seconds;
 
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < 20; i++) {
 		spin_lock_irqsave(&rtc_lock, flags);
 
 		/*
@@ -79,8 +79,8 @@ bool mc146818_avoid_UIP(void (*callback)(unsigned char seconds, void *param),
 EXPORT_SYMBOL_GPL(mc146818_avoid_UIP);
 
 /*
- * If the UIP (Update-in-progress) bit of the RTC is set for more then
- * 10ms, the RTC is apparently broken or not present.
+ * If the UIP (Update-in-progress) bit of the RTC is set for more than
+ * 20ms, the RTC is apparently broken or not present.
  */
 bool mc146818_does_rtc_work(void)
 {
