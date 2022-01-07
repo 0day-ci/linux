@@ -26,7 +26,7 @@
 		pwms = <&pwm0 0 1000000 0>;
 		brightness-levels = <0 4 8 16 32 64 128 255>;
 		default-brightness-level = <5>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	clkin_gmac: external-gmac-clock {
@@ -594,7 +594,7 @@
 		interrupts = <RK_PD5 IRQ_TYPE_EDGE_FALLING>;
 		irq-gpios = <&gpio4 RK_PD5 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio4 RK_PD6 GPIO_ACTIVE_HIGH>;
-		status = "disabled";
+		status = "okay";
 	};
 };
 
@@ -633,7 +633,7 @@
 
 /* enable for pine64 panel display support */
 &mipi_dsi {
-	status = "disabled";
+	status = "okay";
 	clock-master;
 
 	ports {
