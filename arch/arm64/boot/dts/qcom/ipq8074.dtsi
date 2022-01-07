@@ -82,6 +82,17 @@
 		};
 	};
 
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		memory@4ac00000 {
+			no-map;
+			reg = <0x0 0x4ac00000 0x0 0x00400000>;
+		};
+	};
+
 	soc: soc {
 		#address-cells = <0x1>;
 		#size-cells = <0x1>;
