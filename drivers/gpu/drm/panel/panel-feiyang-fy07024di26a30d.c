@@ -65,7 +65,8 @@ static int feiyang_prepare(struct drm_panel *panel)
 	/* T3 (dvdd rise + avdd start + avdd rise) T3 >= 20ms */
 	msleep(20);
 
-	gpiod_set_value(ctx->reset, 0);
+	if (ctx->reset)
+		gpiod_set_value(ctx->reset, 0);
 
 	/*
 	 * T5 + T6 (avdd rise + video & logic signal rise)
@@ -73,7 +74,8 @@ static int feiyang_prepare(struct drm_panel *panel)
 	 */
 	msleep(20);
 
-	gpiod_set_value(ctx->reset, 1);
+	if (ctx->reset)
+		gpiod_set_value(ctx->reset, 1);
 
 	/* T12 (video & logic signal rise + backlight rise) T12 >= 200ms */
 	msleep(200);
@@ -126,7 +128,8 @@ static int feiyang_unprepare(struct drm_panel *panel)
 	/* T13 (backlight fall + video & logic signal fall) T13 >= 200ms */
 	msleep(200);
 
-	gpiod_set_value(ctx->reset, 0);
+	if (ctx->reset)
+		gpiod_set_value(ctx->reset, 0);
 
 	regulator_disable(ctx->avdd);
 
@@ -211,7 +214,7 @@ static int feiyang_dsi_probe(struct mipi_dsi_device *dsi)
 		return PTR_ERR(ctx->avdd);
 	}
 
-	ctx->reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
+	ctx->reset = devm_gpiod_get_optional(&dsi->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->reset)) {
 		dev_err(&dsi->dev, "Couldn't get our reset GPIO\n");
 		return PTR_ERR(ctx->reset);
