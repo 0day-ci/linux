@@ -228,6 +228,7 @@ of the characters::
 The flags are::
 
   p    enables the pr_debug() callsite.
+  T    enables callsite to issue a dyndbg:* trace-event
   f    Include the function name in the printed message
   l    Include line number in the printed message
   m    Include module name in the printed message
