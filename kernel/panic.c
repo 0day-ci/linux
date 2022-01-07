@@ -31,6 +31,7 @@
 #include <linux/console.h>
 #include <linux/bug.h>
 #include <linux/ratelimit.h>
+#include <linux/kallsyms.h>
 #include <linux/debugfs.h>
 #include <asm/sections.h>
 
@@ -66,6 +67,16 @@ EXPORT_SYMBOL_GPL(panic_timeout);
 #define PANIC_PRINT_FTRACE_INFO		0x00000010
 #define PANIC_PRINT_ALL_PRINTK_MSG	0x00000020
 unsigned long panic_print;
+
+/*
+ * Kernel has currently < 30 panic handlers no matter the arch,
+ * based on some code counting; so 16 items seems a good amount;
+ * users that are filtering panic notifiers shouldn't add all
+ * of them in theory, that doesn't make sense...
+ */
+#define	PANIC_NF_MAX	16
+unsigned long panic_nf_functions[PANIC_NF_MAX];
+int panic_nf_count;
 
 ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
@@ -145,6 +156,38 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 		nmi_panic_self_stop(regs);
 }
 EXPORT_SYMBOL(nmi_panic);
+
+static int __init panic_notifier_filter_setup(char *buf)
+{
+	char *func;
+	unsigned long addr;
+
+	if (!buf)
+		return -EINVAL;
+
+	while ((func = strsep(&buf, ","))) {
+		addr = kallsyms_lookup_name(func);
+
+		if (!addr) {
+			pr_warn("panic_notifier_filter: invalid symbol %s\n", func);
+			continue;
+		}
+
+		if (panic_nf_count < PANIC_NF_MAX) {
+			panic_nf_functions[panic_nf_count] = addr;
+			panic_nf_count++;
+			pr_info("panic_notifier_filter: added symbol %s\n", func);
+		} else {
+			pr_warn("panic_notifier_filter: exceeded maximum notifiers (%d), aborting\n",
+				PANIC_NF_MAX);
+			panic_nf_count = 0;
+			break;
+		}
+	}
+
+	return 0;
+}
+early_param("panic_notifier_filter", panic_notifier_filter_setup);
 
 static void panic_print_sys_info(void)
 {
