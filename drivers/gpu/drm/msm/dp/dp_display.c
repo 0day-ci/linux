@@ -1476,17 +1476,6 @@ int msm_dp_modeset_init(struct msm_dp *dp_display, struct drm_device *dev,
 
 	dp_display->encoder = encoder;
 
-	dp_display->connector = dp_drm_connector_init(dp_display);
-	if (IS_ERR(dp_display->connector)) {
-		ret = PTR_ERR(dp_display->connector);
-		DRM_DEV_ERROR(dev->dev,
-			"failed to create dp connector: %d\n", ret);
-		dp_display->connector = NULL;
-		return ret;
-	}
-
-	priv->connectors[priv->num_connectors++] = dp_display->connector;
-
 	dp_display->bridge = msm_dp_bridge_init(dp_display, dev, encoder);
 	if (IS_ERR(dp_display->bridge)) {
 		ret = PTR_ERR(dp_display->bridge);
@@ -1497,6 +1486,17 @@ int msm_dp_modeset_init(struct msm_dp *dp_display, struct drm_device *dev,
 	}
 
 	priv->bridges[priv->num_bridges++] = dp_display->bridge;
+
+	dp_display->connector = dp_drm_connector_init(dp_display);
+	if (IS_ERR(dp_display->connector)) {
+		ret = PTR_ERR(dp_display->connector);
+		DRM_DEV_ERROR(dev->dev,
+			"failed to create dp connector: %d\n", ret);
+		dp_display->connector = NULL;
+		return ret;
+	}
+
+	priv->connectors[priv->num_connectors++] = dp_display->connector;
 
 	return 0;
 }
