@@ -615,7 +615,7 @@ kunit_tool) only fully supports running tests inside of UML and QEMU; however,
 this is only due to our own time limitations as humans working on KUnit. It is
 entirely possible to support other emulators and even actual hardware, but for
 now QEMU and UML is what is fully supported within the KUnit Wrapper. Again, to
-be clear, this is just the Wrapper. The actualy KUnit tests and the KUnit
+be clear, this is just the Wrapper. The actual KUnit tests and the KUnit
 library they are written in is fully architecture agnostic and can be used in
 virtually any setup, you just won't have the benefit of typing a single command
 out of the box and having everything magically work perfectly.
