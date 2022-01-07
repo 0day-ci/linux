@@ -113,6 +113,15 @@ static bool overlaps(const unsigned long ptr, unsigned long n,
 	return true;
 }
 
+static bool inside_init_area(const unsigned long ptr, unsigned long n,
+		char *start, char *end)
+{
+	unsigned long initlow = (unsigned long) start;
+	unsigned long inithigh = (unsigned long) end;
+
+	return (ptr >= initlow && (ptr + n) < inithigh);
+}
+
 /* Is this address range in the kernel text area? */
 static inline void check_kernel_text_object(const unsigned long ptr,
 					    unsigned long n, bool to_user)
@@ -120,6 +129,12 @@ static inline void check_kernel_text_object(const unsigned long ptr,
 	unsigned long textlow = (unsigned long)_stext;
 	unsigned long texthigh = (unsigned long)_etext;
 	unsigned long textlow_linear, texthigh_linear;
+
+	/* Ok if inside the former init sections */
+	if (inside_init_area(ptr, n, __init_begin, __init_end))
+		return;
+	if (inside_init_area(ptr, n, _sinittext, _einittext))
+		return;
 
 	if (overlaps(ptr, n, textlow, texthigh))
 		usercopy_abort("kernel text", NULL, to_user, ptr - textlow, n);
