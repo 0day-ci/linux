@@ -641,29 +641,39 @@ const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode);
 
 static inline struct iommu_fwspec *dev_iommu_fwspec_get(struct device *dev)
 {
+	struct iommu_fwspec *fwspec = NULL;
+
+	device_lock(dev);
 	if (dev->iommu)
-		return dev->iommu->fwspec;
-	else
-		return NULL;
+		fwspec = dev->iommu->fwspec;
+	device_unlock(dev);
+	return fwspec;
 }
 
 static inline void dev_iommu_fwspec_set(struct device *dev,
 					struct iommu_fwspec *fwspec)
 {
+	device_lock(dev);
 	dev->iommu->fwspec = fwspec;
+	device_unlock(dev);
 }
 
 static inline void *dev_iommu_priv_get(struct device *dev)
 {
+	void *priv = NULL;
+
+	device_lock(dev);
 	if (dev->iommu)
-		return dev->iommu->priv;
-	else
-		return NULL;
+		priv = dev->iommu->priv;
+	device_unlock(dev);
+	return priv;
 }
 
 static inline void dev_iommu_priv_set(struct device *dev, void *priv)
 {
+	device_lock(dev);
 	dev->iommu->priv = priv;
+	device_unlock(dev);
 }
 
 int iommu_probe_device(struct device *dev);

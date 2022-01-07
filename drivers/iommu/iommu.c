@@ -201,15 +201,19 @@ static struct dev_iommu *dev_iommu_get(struct device *dev)
 		return NULL;
 
 	mutex_init(&param->lock);
+	device_lock(dev);
 	dev->iommu = param;
+	device_unlock(dev);
 	return param;
 }
 
 static void dev_iommu_free(struct device *dev)
 {
 	iommu_fwspec_free(dev);
+	device_lock(dev);
 	kfree(dev->iommu);
 	dev->iommu = NULL;
+	device_unlock(dev);
 }
 
 static int __iommu_probe_device(struct device *dev, struct list_head *group_list)
