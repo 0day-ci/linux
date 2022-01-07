@@ -21,6 +21,13 @@
 #define RSEQ_CS_PREEMPT_MIGRATE_FLAGS (RSEQ_CS_FLAG_NO_RESTART_ON_MIGRATE | \
 				       RSEQ_CS_FLAG_NO_RESTART_ON_PREEMPT)
 
+#ifdef RSEQ_ARCH_HAS_ABORT_AT_IP
+static bool rseq_has_abort_at_ip(void) { return true; }
+#else
+static bool rseq_has_abort_at_ip(void) { return false; }
+static void rseq_abort_at_ip(struct pt_regs *regs, unsigned long ip) { }
+#endif
+
 /*
  *
  * Restartable sequences are a lightweight interface that allows
@@ -261,6 +268,8 @@ static int rseq_ip_fixup(struct pt_regs *regs)
 	trace_rseq_ip_fixup(ip, rseq_cs.start_ip, rseq_cs.post_commit_offset,
 			    rseq_cs.abort_ip);
 	instruction_pointer_set(regs, (unsigned long)rseq_cs.abort_ip);
+	if (rseq_cs.flags & RSEQ_CS_FLAG_ABORT_AT_IP)
+		rseq_abort_at_ip(regs, ip);
 	return 0;
 }
 
@@ -329,6 +338,12 @@ SYSCALL_DEFINE4(rseq, struct rseq __user *, rseq, u32, rseq_len,
 		int, flags, u32, sig)
 {
 	int ret;
+
+	if (flags & RSEQ_FLAG_QUERY_ABORT_AT_IP) {
+		if (flags & ~RSEQ_FLAG_QUERY_ABORT_AT_IP)
+			return -EINVAL;
+		return rseq_has_abort_at_ip() ? 0 : -EINVAL;
+	}
 
 	if (flags & RSEQ_FLAG_UNREGISTER) {
 		if (flags & ~RSEQ_FLAG_UNREGISTER)
