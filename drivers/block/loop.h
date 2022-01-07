@@ -56,7 +56,10 @@ struct loop_device {
 	struct gendisk		*lo_disk;
 	struct mutex		lo_mutex;
 	bool			idr_visible;
-	struct work_struct      rundown_work;
+	union {
+		struct work_struct   work;
+		struct callback_head callback;
+	} rundown;
 };
 
 struct loop_cmd {

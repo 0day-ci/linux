@@ -89,6 +89,7 @@
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 static DEFINE_MUTEX(loop_validate_mutex);
+static DECLARE_WAIT_QUEUE_HEAD(loop_rundown_wait);
 
 /**
  * loop_global_lock_killable() - take locks for safe loop_validate_file() test
@@ -1172,13 +1173,12 @@ static void loop_rundown_completed(struct loop_device *lo)
 	mutex_lock(&lo->lo_mutex);
 	lo->lo_state = Lo_unbound;
 	mutex_unlock(&lo->lo_mutex);
+	wake_up_all(&loop_rundown_wait);
 	module_put(THIS_MODULE);
 }
 
-static void loop_rundown_workfn(struct work_struct *work)
+static void loop_rundown_start(struct loop_device *lo)
 {
-	struct loop_device *lo = container_of(work, struct loop_device,
-					      rundown_work);
 	struct block_device *bdev = lo->lo_device;
 	struct gendisk *disk = lo->lo_disk;
 
@@ -1188,6 +1188,18 @@ static void loop_rundown_workfn(struct work_struct *work)
 	loop_rundown_completed(lo);
 }
 
+static void loop_rundown_callbackfn(struct callback_head *callback)
+{
+	loop_rundown_start(container_of(callback, struct loop_device,
+					rundown.callback));
+}
+
+static void loop_rundown_workfn(struct work_struct *work)
+{
+	loop_rundown_start(container_of(work, struct loop_device,
+					rundown.work));
+}
+
 static void loop_schedule_rundown(struct loop_device *lo)
 {
 	struct block_device *bdev = lo->lo_device;
@@ -1195,8 +1207,13 @@ static void loop_schedule_rundown(struct loop_device *lo)
 
 	__module_get(disk->fops->owner);
 	kobject_get(&bdev->bd_device.kobj);
-	INIT_WORK(&lo->rundown_work, loop_rundown_workfn);
-	queue_work(system_long_wq, &lo->rundown_work);
+	if (!(current->flags & PF_KTHREAD)) {
+		init_task_work(&lo->rundown.callback, loop_rundown_callbackfn);
+		if (!task_work_add(current, &lo->rundown.callback, TWA_RESUME))
+			return;
+	}
+	INIT_WORK(&lo->rundown.work, loop_rundown_workfn);
+	queue_work(system_long_wq, &lo->rundown.work);
 }
 
 static int loop_clr_fd(struct loop_device *lo)
@@ -1721,19 +1738,60 @@ static int lo_compat_ioctl(struct block_device *bdev, fmode_t mode,
 }
 #endif
 
+struct loop_rundown_waiter {
+	struct callback_head callback;
+	struct loop_device *lo;
+};
+
+static void loop_rundown_waiter_callbackfn(struct callback_head *callback)
+{
+	struct loop_rundown_waiter *lrw =
+		container_of(callback, struct loop_rundown_waiter, callback);
+
+	/*
+	 * Locklessly wait for completion of __loop_clr_fd().
+	 * This should be safe because of the following rules.
+	 *
+	 *  (a) From locking dependency perspective, this function is called
+	 *      without any locks held.
+	 *  (b) From execution ordering perspective, this function is called
+	 *      by the moment lo_open() from open() syscall returns to user
+	 *      mode.
+	 *  (c) From use-after-free protection perspective, this function is
+	 *      called before loop_remove() is called, for lo->lo_refcnt taken
+	 *      by lo_open() prevents loop_control_remove() and loop_exit().
+	 */
+	wait_event_killable(loop_rundown_wait, data_race(lrw->lo->lo_state) != Lo_rundown);
+	kfree(lrw);
+}
+
 static int lo_open(struct block_device *bdev, fmode_t mode)
 {
 	struct loop_device *lo = bdev->bd_disk->private_data;
+	struct loop_rundown_waiter *lrw =
+		kmalloc(sizeof(*lrw), GFP_KERNEL | __GFP_NOWARN);
 	int err;
 
+	if (!lrw)
+		return -ENOMEM;
 	err = mutex_lock_killable(&lo->lo_mutex);
-	if (err)
+	if (err) {
+		kfree(lrw);
 		return err;
+	}
 	if (lo->lo_state == Lo_deleting)
 		err = -ENXIO;
 	else
 		atomic_inc(&lo->lo_refcnt);
 	mutex_unlock(&lo->lo_mutex);
+	if (!err && !(current->flags & PF_KTHREAD)) {
+		init_task_work(&lrw->callback, loop_rundown_waiter_callbackfn);
+		lrw->lo = lo;
+		if (task_work_add(current, &lrw->callback, TWA_RESUME))
+			kfree(lrw);
+	} else {
+		kfree(lrw);
+	}
 	return err;
 }
 
