@@ -461,6 +461,11 @@ struct cgroup {
 	struct cgroup_base_stat bstat;
 	struct prev_cputime prev_cputime;	/* for printing out cputime */
 
+	/* Per-cpu basic resource statistics. These are NULL on root. */
+	struct cgroup_base_stat __percpu *bstat_cpu;
+	struct cgroup_base_stat __percpu *last_bstat_cpu;
+	struct prev_cputime __percpu *prev_cputime_cpu;
+
 	/*
 	 * list of pidlists, up to two for each namespace (one for procs, one
 	 * for tasks); created on demand.

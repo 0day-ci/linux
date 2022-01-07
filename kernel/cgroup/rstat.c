@@ -250,7 +250,19 @@ int cgroup_rstat_init(struct cgroup *cgrp)
 	if (!cgrp->rstat_cpu) {
 		cgrp->rstat_cpu = alloc_percpu(struct cgroup_rstat_cpu);
 		if (!cgrp->rstat_cpu)
-			return -ENOMEM;
+			goto error_nomem;
+
+		cgrp->last_bstat_cpu = alloc_percpu(struct cgroup_base_stat);
+		if (!cgrp->last_bstat_cpu)
+			goto error_nomem;
+
+		cgrp->bstat_cpu = alloc_percpu(struct cgroup_base_stat);
+		if (!cgrp->bstat_cpu)
+			goto error_nomem;
+
+		cgrp->prev_cputime_cpu = alloc_percpu(struct prev_cputime);
+		if (!cgrp->prev_cputime_cpu)
+			goto error_nomem;
 	}
 
 	/* ->updated_children list is self terminated */
@@ -262,6 +274,21 @@ int cgroup_rstat_init(struct cgroup *cgrp)
 	}
 
 	return 0;
+
+error_nomem:
+	free_percpu(cgrp->rstat_cpu);
+	cgrp->rstat_cpu = NULL;
+
+	free_percpu(cgrp->last_bstat_cpu);
+	cgrp->last_bstat_cpu = NULL;
+
+	free_percpu(cgrp->bstat_cpu);
+	cgrp->bstat_cpu = NULL;
+
+	free_percpu(cgrp->prev_cputime_cpu);
+	cgrp->prev_cputime_cpu = NULL;
+
+	return -ENOMEM;
 }
 
 void cgroup_rstat_exit(struct cgroup *cgrp)
@@ -281,6 +308,12 @@ void cgroup_rstat_exit(struct cgroup *cgrp)
 
 	free_percpu(cgrp->rstat_cpu);
 	cgrp->rstat_cpu = NULL;
+	free_percpu(cgrp->last_bstat_cpu);
+	cgrp->last_bstat_cpu = NULL;
+	free_percpu(cgrp->bstat_cpu);
+	cgrp->bstat_cpu = NULL;
+	free_percpu(cgrp->prev_cputime_cpu);
+	cgrp->prev_cputime_cpu = NULL;
 }
 
 void __init cgroup_rstat_boot(void)
@@ -316,11 +349,16 @@ static void cgroup_base_stat_flush(struct cgroup *cgrp, int cpu)
 	struct cgroup_rstat_cpu *rstatc = cgroup_rstat_cpu(cgrp, cpu);
 	struct cgroup *parent = cgroup_parent(cgrp);
 	struct cgroup_base_stat cur, delta;
+	struct cgroup_base_stat *bstat_cpu, *last_bstat_cpu;
 	unsigned seq;
 
 	/* Root-level stats are sourced from system-wide CPU stats */
 	if (!parent)
 		return;
+
+	/* these are not present on root */
+	bstat_cpu = per_cpu_ptr(cgrp->bstat_cpu, cpu);
+	last_bstat_cpu = per_cpu_ptr(cgrp->last_bstat_cpu, cpu);
 
 	/* fetch the current per-cpu values */
 	do {
@@ -328,10 +366,12 @@ static void cgroup_base_stat_flush(struct cgroup *cgrp, int cpu)
 		cur.cputime = rstatc->bstat.cputime;
 	} while (__u64_stats_fetch_retry(&rstatc->bsync, seq));
 
+
 	/* propagate percpu delta to global */
 	delta = cur;
 	cgroup_base_stat_sub(&delta, &rstatc->last_bstat);
 	cgroup_base_stat_add(&cgrp->bstat, &delta);
+	cgroup_base_stat_add(bstat_cpu, &delta);
 	cgroup_base_stat_add(&rstatc->last_bstat, &delta);
 
 	/* propagate global delta to parent (unless that's root) */
@@ -340,6 +380,11 @@ static void cgroup_base_stat_flush(struct cgroup *cgrp, int cpu)
 		cgroup_base_stat_sub(&delta, &cgrp->last_bstat);
 		cgroup_base_stat_add(&parent->bstat, &delta);
 		cgroup_base_stat_add(&cgrp->last_bstat, &delta);
+
+		delta = *bstat_cpu;
+		cgroup_base_stat_sub(&delta, last_bstat_cpu);
+		cgroup_base_stat_add(per_cpu_ptr(parent->bstat_cpu, cpu), &delta);
+		cgroup_base_stat_add(last_bstat_cpu, &delta);
 	}
 }
 
@@ -397,6 +442,30 @@ void __cgroup_account_cputime_field(struct cgroup *cgrp,
 	cgroup_base_stat_cputime_account_end(cgrp, rstatc, flags);
 }
 
+/* See root_cgroup_cputime. Note that this does not first reset cputime. */
+static void root_cgroup_add_cputime_cpu(struct task_cputime *cputime, int cpu)
+{
+	struct kernel_cpustat kcpustat;
+	u64 *cpustat = kcpustat.cpustat;
+	u64 user = 0;
+	u64 sys = 0;
+
+	kcpustat_cpu_fetch(&kcpustat, cpu);
+
+	user += cpustat[CPUTIME_USER];
+	user += cpustat[CPUTIME_NICE];
+	cputime->utime += user;
+
+	sys += cpustat[CPUTIME_SYSTEM];
+	sys += cpustat[CPUTIME_IRQ];
+	sys += cpustat[CPUTIME_SOFTIRQ];
+	cputime->stime += sys;
+
+	cputime->sum_exec_runtime += user;
+	cputime->sum_exec_runtime += sys;
+	cputime->sum_exec_runtime += cpustat[CPUTIME_STEAL];
+}
+
 /*
  * compute the cputime for the root cgroup by getting the per cpu data
  * at a global level, then categorizing the fields in a manner consistent
@@ -411,25 +480,7 @@ static void root_cgroup_cputime(struct task_cputime *cputime)
 	cputime->utime = 0;
 	cputime->sum_exec_runtime = 0;
 	for_each_possible_cpu(i) {
-		struct kernel_cpustat kcpustat;
-		u64 *cpustat = kcpustat.cpustat;
-		u64 user = 0;
-		u64 sys = 0;
-
-		kcpustat_cpu_fetch(&kcpustat, i);
-
-		user += cpustat[CPUTIME_USER];
-		user += cpustat[CPUTIME_NICE];
-		cputime->utime += user;
-
-		sys += cpustat[CPUTIME_SYSTEM];
-		sys += cpustat[CPUTIME_IRQ];
-		sys += cpustat[CPUTIME_SOFTIRQ];
-		cputime->stime += sys;
-
-		cputime->sum_exec_runtime += user;
-		cputime->sum_exec_runtime += sys;
-		cputime->sum_exec_runtime += cpustat[CPUTIME_STEAL];
+		root_cgroup_add_cputime_cpu(cputime, i);
 	}
 }
 
@@ -460,4 +511,72 @@ void cgroup_base_stat_cputime_show(struct seq_file *seq)
 		   "user_usec %llu\n"
 		   "system_usec %llu\n",
 		   usage, utime, stime);
+}
+
+void cgroup_base_stat_percpu_cputime_show(struct seq_file *seq)
+{
+	static DEFINE_MUTEX(mutex);
+	static DEFINE_PER_CPU(struct cgroup_base_stat, cached_percpu_stats);
+	struct cgroup_base_stat *cached_bstat;
+	struct cgroup *cgrp = seq_css(seq)->cgroup;
+	u64 val;
+	int cpu;
+
+	/* protects cached_percpu_stats */
+	mutex_lock(&mutex);
+
+	if (cgroup_parent(cgrp)) {
+		struct cgroup_base_stat *bstat_cpu;
+
+		cgroup_rstat_flush_hold(cgrp);
+
+		for_each_possible_cpu(cpu) {
+			bstat_cpu = per_cpu_ptr(cgrp->bstat_cpu, cpu);
+			cached_bstat = per_cpu_ptr(&cached_percpu_stats, cpu);
+
+			cached_bstat->cputime.sum_exec_runtime =
+				bstat_cpu->cputime.sum_exec_runtime;
+			cputime_adjust(&bstat_cpu->cputime,
+				       per_cpu_ptr(cgrp->prev_cputime_cpu, cpu),
+				       &cached_bstat->cputime.utime,
+				       &cached_bstat->cputime.stime);
+		}
+
+		cgroup_rstat_flush_release();
+	} else {
+		for_each_possible_cpu(cpu) {
+			cached_bstat = per_cpu_ptr(&cached_percpu_stats, cpu);
+			memset(cached_bstat, 0, sizeof(*cached_bstat));
+			root_cgroup_add_cputime_cpu(&cached_bstat->cputime, cpu);
+		}
+	}
+
+	seq_puts(seq, "usage_usec");
+	for_each_possible_cpu(cpu) {
+		cached_bstat = per_cpu_ptr(&cached_percpu_stats, cpu);
+		val = cached_bstat->cputime.sum_exec_runtime;
+		do_div(val, NSEC_PER_USEC);
+		seq_printf(seq, " %llu", val);
+	}
+	seq_puts(seq, "\n");
+
+	seq_puts(seq, "user_usec");
+	for_each_possible_cpu(cpu) {
+		cached_bstat = per_cpu_ptr(&cached_percpu_stats, cpu);
+		val = cached_bstat->cputime.utime;
+		do_div(val, NSEC_PER_USEC);
+		seq_printf(seq, " %llu", val);
+	}
+	seq_puts(seq, "\n");
+
+	seq_puts(seq, "system_usec");
+	for_each_possible_cpu(cpu) {
+		cached_bstat = per_cpu_ptr(&cached_percpu_stats, cpu);
+		val = cached_bstat->cputime.stime;
+		do_div(val, NSEC_PER_USEC);
+		seq_printf(seq, " %llu", val);
+	}
+	seq_puts(seq, "\n");
+
+	mutex_unlock(&mutex);
 }
