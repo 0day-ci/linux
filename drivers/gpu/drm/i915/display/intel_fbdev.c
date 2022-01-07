@@ -194,6 +194,17 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	int ret;
 
 	if (intel_fb &&
+	    (sizes->fb_width < intel_fb->base.width ||
+	     sizes->fb_height < intel_fb->base.height)) {
+		drm_dbg_kms(&dev_priv->drm,
+			    "BIOS fb too large (%dx%d), we require (%dx%d),"
+			    " releasing it\n",
+			    intel_fb->base.width, intel_fb->base.height,
+			    sizes->fb_width, sizes->fb_height);
+		drm_framebuffer_put(&intel_fb->base);
+		intel_fb = ifbdev->fb = NULL;
+	}
+	if (intel_fb &&
 	    (sizes->fb_width > intel_fb->base.width ||
 	     sizes->fb_height > intel_fb->base.height)) {
 		drm_dbg_kms(&dev_priv->drm,
