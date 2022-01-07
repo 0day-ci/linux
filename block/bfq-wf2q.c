@@ -610,6 +610,7 @@ static void bfq_idle_insert(struct bfq_service_tree *st,
 	struct bfq_entity *first_idle = st->first_idle;
 	struct bfq_entity *last_idle = st->last_idle;
 
+	BUG_ON(bfq_entity_service_tree(entity) != st);
 	if (!first_idle || bfq_gt(first_idle->finish, entity->finish))
 		st->first_idle = entity;
 	if (!last_idle || bfq_gt(entity->finish, last_idle->finish))

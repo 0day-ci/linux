@@ -814,12 +814,24 @@ out:
  * bfq_flush_idle_tree - deactivate any entity on the idle tree of @st.
  * @st: the service tree being flushed.
  */
-static void bfq_flush_idle_tree(struct bfq_service_tree *st)
+static void bfq_flush_idle_tree(struct bfq_sched_data *sched_data,
+				struct bfq_service_tree *st)
 {
 	struct bfq_entity *entity = st->first_idle;
+	int count = 0;
 
-	for (; entity ; entity = st->first_idle)
+	for (; entity ; entity = st->first_idle) {
+		if (entity->sched_data != sched_data) {
+			printk(KERN_ERR "entity %d sched_data %p (parent %p) "
+				"my_sched_data %p on_st %d not matching "
+				"service tree!\n", count,
+				entity->sched_data, entity->parent,
+				entity->my_sched_data, entity->on_st_or_in_serv);
+			BUG_ON(1);
+		}
 		__bfq_deactivate_entity(entity, false);
+		count++;
+	}
 }
 
 /**
@@ -928,7 +940,7 @@ static void bfq_pd_offline(struct blkg_policy_data *pd)
 		 * bfq_reparent_active_queues(), the queue to move is
 		 * empty and gets expired.
 		 */
-		bfq_flush_idle_tree(st);
+		bfq_flush_idle_tree(&bfqg->sched_data, st);
 	}
 
 	__bfq_deactivate_entity(entity, false);
