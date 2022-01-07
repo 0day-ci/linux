@@ -1072,7 +1072,6 @@ out_unlock:
 static int nvmf_dev_show(struct seq_file *seq_file, void *private)
 {
 	struct nvme_ctrl *ctrl;
-	int ret = 0;
 
 	mutex_lock(&nvmf_dev_mutex);
 	ctrl = seq_file->private;
@@ -1086,7 +1085,7 @@ static int nvmf_dev_show(struct seq_file *seq_file, void *private)
 
 out_unlock:
 	mutex_unlock(&nvmf_dev_mutex);
-	return ret;
+	return 0;
 }
 
 static int nvmf_dev_open(struct inode *inode, struct file *file)
