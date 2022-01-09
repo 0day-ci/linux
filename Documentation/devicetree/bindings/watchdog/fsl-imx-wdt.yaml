@@ -55,6 +55,13 @@ properties:
       If present, the watchdog device is configured to assert its
       external reset (WDOG_B) instead of issuing a software reset.
 
+  fsl,ping-during-suspend:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      If present, the kernel will ping the watchdog during suspend.
+      This should be used on platforms that don't enter low power mode
+      during suspend.
+
 required:
   - compatible
   - interrupts
