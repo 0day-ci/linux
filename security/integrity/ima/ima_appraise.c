@@ -13,7 +13,10 @@
 #include <linux/magic.h>
 #include <linux/ima.h>
 #include <linux/evm.h>
+#include <linux/fsverity.h>
 #include <keys/system_keyring.h>
+#include <uapi/linux/fsverity.h>
+#include <uapi/linux/ima.h>
 
 #include "ima.h"
 
@@ -183,6 +186,8 @@ enum hash_algo ima_get_hash_algo(const struct evm_ima_xattr_data *xattr_value,
 		return ima_hash_algo;
 
 	switch (xattr_value->type) {
+	case IMA_VERITY_DIGSIG:
+		fallthrough;
 	case EVM_IMA_XATTR_DIGSIG:
 		sig = (typeof(sig))xattr_value;
 		if (sig->version != 2 || xattr_len <= sizeof(*sig)
@@ -226,6 +231,47 @@ int ima_read_xattr(struct dentry *dentry,
 }
 
 /*
+ * calc_tbs_hash - calculate hash of a digest and digest metadata
+ * @type: signature type [IMA_VERITY_DIGSIG]
+ * @algo: hash algorithm [enum hash_algo]
+ * @digest: pointer to the digest to be hashed
+ * @hash: (out) pointer to the hash
+ *
+ * The IMA signature is a signature over the hash of fs-verity's file digest
+ * with other digest metadata, not just fs-verity's file digest. Calculate
+ * the to be signed hash.
+ *
+ * Return 0 on success, error code otherwise.
+ */
+static int calc_tbs_hash(enum evm_ima_xattr_type xattr_type,
+			 enum hash_algo algo, const u8 *digest,
+			 struct ima_digest_data *hash)
+{
+	struct ima_tbs_hash *tbs_h;
+	int rc = 0;
+
+	if (xattr_type != IMA_VERITY_DIGSIG)
+		return -EINVAL;
+
+	tbs_h = kzalloc(sizeof(*tbs_h) + hash_digest_size[algo], GFP_KERNEL);
+	if (!tbs_h)
+		return -ENOMEM;
+
+	tbs_h->type = xattr_type;
+	tbs_h->algo = algo;
+	memcpy(tbs_h->digest, digest, hash_digest_size[algo]);
+
+	hash->algo = algo;
+	hash->length = hash_digest_size[algo];
+
+	rc = ima_calc_buffer_hash(tbs_h,
+				  sizeof(*tbs_h) + hash_digest_size[algo],
+				  hash);
+	kfree(tbs_h);
+	return rc;
+}
+
+/*
  * xattr_verify - verify xattr digest or signature
  *
  * Verify whether the hash or signature matches the file contents.
@@ -236,7 +282,9 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 			struct evm_ima_xattr_data *xattr_value, int xattr_len,
 			enum integrity_status *status, const char **cause)
 {
+	struct ima_digest_data *hash = NULL;
 	int rc = -EINVAL, hash_start = 0;
+	u8 algo;  /* Digest algorithm [enum hash_algo] */
 
 	switch (xattr_value->type) {
 	case IMA_XATTR_DIGEST_NG:
@@ -272,6 +320,38 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 		}
 		*status = INTEGRITY_PASS;
 		break;
+	case IMA_VERITY_DIGSIG:
+		set_bit(IMA_DIGSIG, &iint->atomic_flags);
+
+		algo = iint->ima_hash->algo;
+		hash = kzalloc(sizeof(*hash) + hash_digest_size[algo],
+			       GFP_KERNEL);
+		if (!hash) {
+			*cause = "verity-hashing-error";
+			*status = INTEGRITY_FAIL;
+			break;
+		}
+
+		rc = calc_tbs_hash(IMA_VERITY_DIGSIG, iint->ima_hash->algo,
+				   iint->ima_hash->digest, hash);
+		if (rc) {
+			*cause = "verity-hashing-error";
+			*status = INTEGRITY_FAIL;
+			break;
+		}
+
+		rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
+					     (const char *)xattr_value,
+					     xattr_len, hash->digest,
+					     hash->length);
+		if (rc) {
+			*cause = "invalid-verity-signature";
+			*status = INTEGRITY_FAIL;
+		} else {
+			*status = INTEGRITY_PASS;
+		}
+
+		break;
 	case EVM_IMA_XATTR_DIGSIG:
 		set_bit(IMA_DIGSIG, &iint->atomic_flags);
 		rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
@@ -303,6 +383,7 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 		break;
 	}
 
+	kfree(hash);
 	return rc;
 }
 

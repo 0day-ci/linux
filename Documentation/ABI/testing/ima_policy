@@ -151,6 +151,16 @@ Description:
 
 			appraise func=SETXATTR_CHECK appraise_algos=sha256,sha384,sha512
 
+		Example of measure and appraise rules allowing fs-verity
+		signed digests on a particular filesystem identified by
+		it's fsuuid:
+
+			measure func=BPRM_CHECK digest_type=hash|verity \
+				fsuuid=... template=ima-sig
+			appraise func=BPRM_CHECK digest_type=hash|verity \
+				fsuuid=...
+
+
 		Example of measure rule allowing fs-verity's digests on a
 		particular filesystem with indication of type of digest.
 
