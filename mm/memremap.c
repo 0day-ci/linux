@@ -494,6 +494,48 @@ struct dev_pagemap *get_dev_pagemap(unsigned long pfn,
 }
 EXPORT_SYMBOL_GPL(get_dev_pagemap);
 
+/**
+ * pfn_to_devmap_page - get page pointer which belongs to dev_pagemap by @pfn
+ * @pfn: page frame number to lookup page_map
+ * @pgmap: to save pgmap address which is for putting reference
+ *
+ * If @pgmap is non-NULL, then pfn is on ZONE_DEVICE and return page pointer.
+ */
+struct page *pfn_to_devmap_page(unsigned long pfn, struct dev_pagemap **pgmap)
+{
+	unsigned long nr = pfn_to_section_nr(pfn);
+	struct mem_section *ms;
+	struct page *page = NULL;
+
+	if (nr >= NR_MEM_SECTIONS)
+		return NULL;
+
+	if (IS_ENABLED(CONFIG_HAVE_ARCH_PFN_VALID) && !pfn_valid(pfn))
+		return NULL;
+
+	ms = __nr_to_section(nr);
+	if (!valid_section(ms))
+		return NULL;
+	if (!pfn_section_valid(ms, pfn))
+		return NULL;
+
+	/*
+	 * Two types of sections may include valid pfns:
+	 * - The pfns of section belong to ZONE_DEVICE and ZONE_{NORMAL,MOVABLE}
+	 *   at the same time.
+	 * - All pfns in one section are offline but valid.
+	 */
+	if (!online_device_section(ms) && online_section(ms))
+		return NULL;
+
+	*pgmap = get_dev_pagemap(pfn, NULL);
+	if (*pgmap)
+		page = pfn_to_page(pfn);
+
+	return page;
+}
+EXPORT_SYMBOL_GPL(pfn_to_devmap_page);
+
 #ifdef CONFIG_DEV_PAGEMAP_OPS
 void free_devmap_managed_page(struct page *page)
 {
