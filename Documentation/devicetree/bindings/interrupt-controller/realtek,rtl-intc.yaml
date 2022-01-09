@@ -6,6 +6,10 @@ $schema: http://devicetree.org/meta-schemas/core.yaml#
 
 title: Realtek RTL SoC interrupt controller devicetree bindings
 
+description:
+  Interrupt router for Realtek MIPS SoCs, allowing each SoC interrupt to be
+  routed to one parent interrupt, or left disconnected.
+
 maintainers:
   - Birger Koblitz <mail@birger-koblitz.de>
   - Bert Vermeulen <bert@biot.com>
@@ -13,45 +17,79 @@ maintainers:
 
 properties:
   compatible:
-    const: realtek,rtl-intc
+    oneOf:
+      - items:
+          - enum:
+              - realtek,rtl8380-intc
+          - const: realtek,rtl-intc
+      - const: realtek,rtl-intc
+        deprecated: true
 
-  "#interrupt-cells":
-    const: 1
+  "#interrupt-cells": true
 
   reg:
     maxItems: 1
 
   interrupts:
-    maxItems: 1
+    minItems: 1
+    maxItems: 15
+    description:
+      List of parent interrupts, in the order that they are connected to this
+      interrupt router's outputs.
 
   interrupt-controller: true
-
-  "#address-cells":
-    const: 0
-
-  interrupt-map:
-    description: Describes mapping from SoC interrupts to CPU interrupts
 
 required:
   - compatible
   - reg
   - "#interrupt-cells"
   - interrupt-controller
-  - "#address-cells"
-  - interrupt-map
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          const: realtek,rtl-intc
+    then:
+      properties:
+        "#interrupt-cells":
+          const: 1
+
+        "#address-cells":
+          const: 0
+
+        interrupt-map: true
+      required:
+        - "#address-cells"
+        - interrupt-map
+    else:
+      properties:
+        "#interrupt-cells":
+          description:
+            Two cells to specify which line to connect to, and which output it should
+            be routed to. Both cells use a zero-based index.
+          const: 2
+      required:
+        - interrupts
 
 additionalProperties: false
 
 examples:
   - |
     intc: interrupt-controller@3000 {
-      compatible = "realtek,rtl-intc";
-      #interrupt-cells = <1>;
+      compatible = "realtek,rtl8380-intc", "realtek,rtl-intc";
+      #interrupt-cells = <2>;
       interrupt-controller;
-      reg = <0x3000 0x20>;
-      #address-cells = <0>;
-      interrupt-map =
-              <31 &cpuintc 2>,
-              <30 &cpuintc 1>,
-              <29 &cpuintc 5>;
+      reg = <0x3000 0x18>;
+
+      interrupt-parent = <&cpuintc>;
+      interrupts = <2>, <3>, <4>, <5>, <6>;
+    };
+
+    irq-consumer@0 {
+      reg = <0 4>;
+      interrupt-parent = <&intc>;
+      interrupts =
+        <19 3>, /* IRQ 19, routed to output 3 (cpuintc 5) */
+        <18 4>; /* IRQ 18, routed to output 4 (cpuintc 6) */
     };
