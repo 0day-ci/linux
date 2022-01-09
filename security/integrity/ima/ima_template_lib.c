@@ -392,7 +392,14 @@ out:
 int ima_eventdigest_type_init(struct ima_event_data *event_data,
 			      struct ima_field_data *field_data)
 {
-	static const char * const digest_type[] = {"hash"};
+	static const char * const digest_type[] = {"hash", "verity"};
+
+	if (event_data->iint->flags & IMA_VERITY_DIGEST) {
+		return ima_write_template_field_data(digest_type[1],
+						     strlen(digest_type[1]),
+						     DATA_FMT_STRING,
+						     field_data);
+	}
 
 	return ima_write_template_field_data(digest_type[0],
 					     strlen(digest_type[0]),
