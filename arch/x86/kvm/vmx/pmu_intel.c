@@ -212,6 +212,9 @@ static bool intel_is_valid_msr(struct kvm_vcpu *vcpu, u32 msr)
 	case MSR_CORE_PERF_GLOBAL_STATUS:
 	case MSR_CORE_PERF_GLOBAL_CTRL:
 	case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+	case MSR_RAPL_POWER_UNIT:
+	case MSR_PKG_POWER_LIMIT:
+	case MSR_PKG_ENERGY_STATUS:
 		ret = pmu->version > 1;
 		break;
 	default:

@@ -1377,6 +1377,9 @@ static const u32 msrs_to_save_all[] = {
 	MSR_F15H_PERF_CTL3, MSR_F15H_PERF_CTL4, MSR_F15H_PERF_CTL5,
 	MSR_F15H_PERF_CTR0, MSR_F15H_PERF_CTR1, MSR_F15H_PERF_CTR2,
 	MSR_F15H_PERF_CTR3, MSR_F15H_PERF_CTR4, MSR_F15H_PERF_CTR5,
+
+	MSR_RAPL_POWER_UNIT, MSR_PKG_POWER_LIMIT, MSR_PKG_ENERGY_STATUS,
+	MSR_AMD_RAPL_POWER_UNIT, MSR_AMD_PKG_ENERGY_STATUS,
 };
 
 static u32 msrs_to_save[ARRAY_SIZE(msrs_to_save_all)];
@@ -3400,6 +3403,7 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
 int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 {
 	bool pr = false;
+	u16 it = 0;
 	u32 msr = msr_info->index;
 	u64 data = msr_info->data;
 
@@ -3686,6 +3690,23 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			return 1;
 		vcpu->arch.msr_misc_features_enables = data;
 		break;
+	case MSR_RAPL_POWER_UNIT:
+	case MSR_AMD_RAPL_POWER_UNIT:
+		/* Apply the value on all vCPUs */
+		for (; it < vcpu->kvm->created_vcpus; ++it)
+			vcpu->kvm->vcpus[it]->arch.power_unit = data;
+		break;
+	case MSR_PKG_POWER_LIMIT:
+		/* Apply the value on all vCPUs */
+		for (; it < vcpu->kvm->created_vcpus; ++it)
+			vcpu->kvm->vcpus[it]->arch.power_limit = data;
+		break;
+	case MSR_PKG_ENERGY_STATUS:
+	case MSR_AMD_PKG_ENERGY_STATUS:
+		/* Apply the value on all vCPUs */
+		for (; it < vcpu->kvm->created_vcpus; ++it)
+			vcpu->kvm->vcpus[it]->arch.energy_status = data;
+		break;
 	default:
 		if (kvm_pmu_is_valid_msr(vcpu, msr))
 			return kvm_pmu_set_msr(vcpu, msr_info);
@@ -3759,12 +3780,22 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	 * data here. Do not conditionalize this on CPUID, as KVM does not do
 	 * so for existing CPU-specific MSRs.
 	 */
-	case MSR_RAPL_POWER_UNIT:
 	case MSR_PP0_ENERGY_STATUS:	/* Power plane 0 (core) */
 	case MSR_PP1_ENERGY_STATUS:	/* Power plane 1 (graphics uncore) */
-	case MSR_PKG_ENERGY_STATUS:	/* Total package */
 	case MSR_DRAM_ENERGY_STATUS:	/* DRAM controller */
+		kvm_pmu_is_valid_msr(vcpu, msr_info->index);
 		msr_info->data = 0;
+		break;
+	case MSR_RAPL_POWER_UNIT:
+	case MSR_AMD_RAPL_POWER_UNIT:
+		msr_info->data = vcpu->arch.power_unit;
+		break;
+	case MSR_PKG_POWER_LIMIT:
+		msr_info->data = vcpu->arch.power_limit;
+		break;
+	case MSR_PKG_ENERGY_STATUS:	/* Total package */
+	case MSR_AMD_PKG_ENERGY_STATUS:
+		msr_info->data = vcpu->arch.energy_status;
 		break;
 	case MSR_F15H_PERF_CTL0 ... MSR_F15H_PERF_CTR5:
 		if (kvm_pmu_is_valid_msr(vcpu, msr_info->index))

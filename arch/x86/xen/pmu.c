@@ -157,6 +157,12 @@ static int is_intel_pmu_msr(u32 msr_index, int *type, int *index)
 		*type = MSR_TYPE_GLOBAL;
 		return true;
 
+	case MSR_RAPL_POWER_UNIT:
+	case MSR_PKG_POWER_LIMIT:
+	case MSR_PKG_ENERGY_STATUS:
+		*type = MSR_TYPE_GLOBAL;
+		return true;
+
 	default:
 
 		if ((msr_index >= MSR_CORE_PERF_FIXED_CTR0) &&

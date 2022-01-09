@@ -915,6 +915,11 @@ struct kvm_vcpu_arch {
 #if IS_ENABLED(CONFIG_HYPERV)
 	hpa_t hv_root_tdp;
 #endif
+
+	/* RAPL values */
+	u64 power_unit;
+	u64 power_limit;
+	u64 energy_status;
 };
 
 struct kvm_lpage_info {
