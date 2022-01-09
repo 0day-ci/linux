@@ -31,9 +31,9 @@
 #include "bnxt_nvm_defs.h"	/* NVRAM content constant and structure defs */
 #include "bnxt_fw_hdr.h"	/* Firmware hdr constant and structure defs */
 #include "bnxt_coredump.h"
-#define FLASH_NVRAM_TIMEOUT	((HWRM_CMD_TIMEOUT) * 100)
-#define FLASH_PACKAGE_TIMEOUT	((HWRM_CMD_TIMEOUT) * 200)
-#define INSTALL_PACKAGE_TIMEOUT	((HWRM_CMD_TIMEOUT) * 200)
+#define FLASH_NVRAM_TIMEOUT	(bp->hwrm_cmd_max_timeout)
+#define FLASH_PACKAGE_TIMEOUT	(bp->hwrm_cmd_max_timeout)
+#define INSTALL_PACKAGE_TIMEOUT	(bp->hwrm_cmd_max_timeout)
 
 static u32 bnxt_get_msglevel(struct net_device *dev)
 {
