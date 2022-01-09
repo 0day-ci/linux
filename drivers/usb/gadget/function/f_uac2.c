@@ -106,14 +106,11 @@ enum {
 	STR_AS_IN_ALT1,
 };
 
-static char clksrc_in[8];
-static char clksrc_out[8];
-
 static struct usb_string strings_fn[] = {
 	[STR_ASSOC].s = "Source/Sink",
 	[STR_IF_CTRL].s = "Topology Control",
-	[STR_CLKSRC_IN].s = clksrc_in,
-	[STR_CLKSRC_OUT].s = clksrc_out,
+	[STR_CLKSRC_IN].s = "Input Clock",
+	[STR_CLKSRC_OUT].s = "Output Clock",
 	[STR_USB_IT].s = "USBH Out",
 	[STR_IO_IT].s = "USBD Out",
 	[STR_USB_OT].s = "USBH In",
@@ -1065,9 +1062,6 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 
 	init_p_srate = uac2_opts->p_srates[0];
 	init_c_srate = uac2_opts->c_srates[0];
-
-	snprintf(clksrc_in, sizeof(clksrc_in), "%uHz", init_p_srate);
-	snprintf(clksrc_out, sizeof(clksrc_out), "%uHz", init_c_srate);
 
 	ret = usb_interface_id(cfg, fn);
 	if (ret < 0) {
