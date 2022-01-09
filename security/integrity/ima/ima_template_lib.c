@@ -387,6 +387,19 @@ out:
 }
 
 /*
+ * This function writes the digest type of an event.
+ */
+int ima_eventdigest_type_init(struct ima_event_data *event_data,
+			      struct ima_field_data *field_data)
+{
+	static const char * const digest_type[] = {"hash"};
+
+	return ima_write_template_field_data(digest_type[0],
+					     strlen(digest_type[0]),
+					     DATA_FMT_STRING, field_data);
+}
+
+/*
  * This function writes the digest of the file which is expected to match the
  * digest contained in the file's appended signature.
  */
