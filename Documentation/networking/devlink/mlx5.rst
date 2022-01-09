@@ -17,6 +17,7 @@ Parameters
      - Validation
    * - ``enable_roce``
      - driverinit
+     - This is a boolean value (0 or 1, false or true).
    * - ``io_eq_size``
      - driverinit
      - The range is between 64 and 4096.
