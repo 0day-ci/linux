@@ -180,8 +180,19 @@ static bool vcpu_allowed_register_width(struct kvm_vcpu *vcpu)
 	if (kvm_has_mte(vcpu->kvm) && is32bit)
 		return false;
 
+	/*
+	 * Make sure vcpu->arch.target setting is visible from others so
+	 * that the width consistency checking between two vCPUs is done
+	 * by at least one of them at KVM_ARM_VCPU_INIT.
+	 */
+	smp_mb();
+
 	/* Check that the vcpus are either all 32bit or all 64bit */
 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
+		/* Skip if KVM_ARM_VCPU_INIT is not done for the vcpu yet */
+		if (tmp->arch.target == -1)
+			continue;
+
 		if (vcpu_has_feature(tmp, KVM_ARM_VCPU_EL1_32BIT) != is32bit)
 			return false;
 	}
