@@ -28,6 +28,7 @@
 #include <linux/crash_dump.h>
 #include <linux/prefetch.h>
 #include <linux/blk-crypto.h>
+#include <linux/blk-cgroup.h>
 
 #include <trace/events/block.h>
 
@@ -370,6 +371,9 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 #if defined(CONFIG_BLK_DEV_INTEGRITY)
 	rq->nr_integrity_segments = 0;
 #endif
+#ifdef CONFIG_BLK_RQ_BLKCG_GQ
+	rq->blkg = NULL;
+#endif
 	rq->end_io = NULL;
 	rq->end_io_data = NULL;
 
@@ -600,6 +604,10 @@ static void __blk_mq_free_request(struct request *rq)
 	struct blk_mq_hw_ctx *hctx = rq->mq_hctx;
 	const int sched_tag = rq->internal_tag;
 
+#ifdef CONFIG_BLK_RQ_BLKCG_GQ
+	if (rq->blkg)
+		blkg_put(rq->blkg);
+#endif
 	blk_crypto_free_request(rq);
 	blk_pm_mark_last_busy(rq);
 	rq->mq_hctx = NULL;
@@ -2305,6 +2313,12 @@ static void blk_mq_bio_to_request(struct request *rq, struct bio *bio,
 	rq->__sector = bio->bi_iter.bi_sector;
 	rq->write_hint = bio->bi_write_hint;
 	blk_rq_bio_prep(rq, bio, nr_segs);
+#ifdef CONFIG_BLK_RQ_BLKCG_GQ
+	if (bio->bi_blkg) {
+		blkg_get(bio->bi_blkg);
+		rq->blkg = bio->bi_blkg;
+	}
+#endif
 
 	/* This can't fail, since GFP_NOIO includes __GFP_DIRECT_RECLAIM. */
 	err = blk_crypto_rq_bio_prep(rq, bio, GFP_NOIO);

@@ -32,6 +32,9 @@ config BLK_BIO_IOCOST
 config BLK_RQ_ALLOC_TIME
 	bool
 
+config BLK_RQ_BLKCG_GQ
+	bool
+
 config BLK_CGROUP_RWSTAT
 	bool
 

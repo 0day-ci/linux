@@ -793,6 +793,10 @@ static struct request *attempt_merge(struct request_queue *q,
 	if (req->ioprio != next->ioprio)
 		return NULL;
 
+#ifdef CONFIG_BLK_RQ_BLKCG_GQ
+	if (req->blkg != next->blkg)
+		return NULL;
+#endif
 	/*
 	 * If we are allowed to merge, then append bio list
 	 * from next to rq and release next. merge_requests_fn
@@ -929,6 +933,11 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 
 	if (rq->ioprio != bio_prio(bio))
 		return false;
+
+#ifdef CONFIG_BLK_RQ_BLKCG_GQ
+	if (rq->blkg != bio->bi_blkg)
+		return false;
+#endif
 
 	return true;
 }
