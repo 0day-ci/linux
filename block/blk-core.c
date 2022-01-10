@@ -910,6 +910,18 @@ void submit_bio_noacct(struct bio *bio)
 }
 EXPORT_SYMBOL(submit_bio_noacct);
 
+/*
+ * Usually for submitting one bio which has been checked by
+ * submit_bio_checks already. The typical use case is for handling
+ * blk-throttle iops limit correctly.
+ */
+void resubmit_bio_noacct(struct bio *bio)
+{
+	submit_bio_noacct(bio);
+	blk_throtl_charge_bio_split(bio);
+}
+EXPORT_SYMBOL(resubmit_bio_noacct);
+
 /**
  * submit_bio - submit a bio to the block device layer for I/O
  * @bio: The &struct bio which describes the I/O
