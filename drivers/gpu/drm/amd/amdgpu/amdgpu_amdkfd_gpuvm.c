@@ -190,6 +190,20 @@ release:
 	return ret;
 }
 
+size_t amdgpu_amdkfd_get_available_memory(struct amdgpu_device *adev)
+{
+	uint64_t reserved_for_pt =
+		ESTIMATE_PT_SIZE(amdgpu_amdkfd_total_mem_size);
+	size_t available_memory;
+
+	spin_lock(&kfd_mem_limit.mem_limit_lock);
+	available_memory =
+		adev->gmc.real_vram_size -
+		adev->kfd.vram_used - reserved_for_pt;
+	spin_unlock(&kfd_mem_limit.mem_limit_lock);
+	return available_memory;
+}
+
 static void unreserve_mem_limit(struct amdgpu_device *adev,
 		uint64_t size, u32 alloc_flag)
 {
