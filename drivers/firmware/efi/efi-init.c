@@ -204,6 +204,13 @@ static __init void reserve_regions(void)
 				memblock_reserve(paddr, size);
 		}
 	}
+
+	/*
+	 * Done, filter !nomap memory we just added so that the
+	 * usable range is enforced. This is normally only set
+	 * for crash kernels on some architectures.
+	 */
+	memblock_enforce_usable_range();
 }
 
 void __init efi_init(void)
