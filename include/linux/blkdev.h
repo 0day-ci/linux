@@ -42,7 +42,7 @@ struct blk_crypto_profile;
  * Maximum number of blkcg policies allowed to be registered concurrently.
  * Defined here to simplify include dependency.
  */
-#define BLKCG_MAX_POLS		6
+#define BLKCG_MAX_POLS		7
 /*
  * Non blk-rq-qos blkcg policies include blk-throttle and bfq
  */

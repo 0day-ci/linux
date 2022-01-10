@@ -156,6 +156,15 @@ config BLK_CGROUP_IOPRIO
 	scheduler and block devices process requests. Only some I/O schedulers
 	and some block devices support I/O priorities.
 
+config BLK_CGROUP_IOSTAT
+	tristate "IO statistics monitor per cgroup"
+	select BLK_RQ_BLKCG_GQ
+	select BLK_RQ_ALLOC_TIME
+	depends on BLK_CGROUP
+	help
+	Monitor IO statistics, including bw, iops, queue latency and device
+	latency, in per-cgroup level.
+
 config BLK_DEBUG_FS
 	bool "Block layer debugging information in debugfs"
 	default y
