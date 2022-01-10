@@ -741,6 +741,9 @@ static int dsi_phy_driver_probe(struct platform_device *pdev)
 		}
 	}
 
+	if (phy->cfg->ops.tuning_cfg_init)
+		phy->cfg->ops.tuning_cfg_init(phy);
+
 	ret = dsi_phy_regulator_init(phy);
 	if (ret)
 		goto fail;
