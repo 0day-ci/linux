@@ -109,7 +109,7 @@ static void i915_gem_object_userptr_drop_ref(struct drm_i915_gem_object *obj)
 {
 	struct page **pvec = NULL;
 
-	assert_object_held_shared(obj);
+	assert_object_held(obj);
 
 	if (!--obj->userptr.page_ref) {
 		pvec = obj->userptr.pvec;
