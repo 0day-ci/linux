@@ -6629,6 +6629,13 @@ int cgroup_parse_float(const char *input, unsigned dec_shift, s64 *v)
 	*v = whole * power_of_ten(dec_shift) + frac;
 	return 0;
 }
+EXPORT_SYMBOL_GPL(cgroup_parse_float);
+
+void pr_cont_cgroup_path(struct cgroup *cgrp)
+{
+	pr_cont_kernfs_path(cgrp->kn);
+}
+EXPORT_SYMBOL_GPL(pr_cont_cgroup_path);
 
 /*
  * sock->sk_cgrp_data handling.  For more info, see sock_cgroup_data

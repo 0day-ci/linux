@@ -666,10 +666,7 @@ static inline void pr_cont_cgroup_name(struct cgroup *cgrp)
 	pr_cont_kernfs_name(cgrp->kn);
 }
 
-static inline void pr_cont_cgroup_path(struct cgroup *cgrp)
-{
-	pr_cont_kernfs_path(cgrp->kn);
-}
+void pr_cont_cgroup_path(struct cgroup *cgrp);
 
 static inline struct psi_group *cgroup_psi(struct cgroup *cgrp)
 {
