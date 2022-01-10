@@ -72,6 +72,8 @@ struct btrfs_device {
 	/* the mode sent to blkdev_get */
 	fmode_t mode;
 
+	/* Device's major-minor number */
+	dev_t devt;
 	unsigned long dev_state;
 	blk_status_t last_flush_error;
 
