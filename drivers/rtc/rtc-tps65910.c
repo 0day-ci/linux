@@ -304,7 +304,6 @@ static int tps65910_set_offset(struct device *dev, long offset)
 {
 	int calibration;
 	s64 tmp;
-	int ret;
 
 	/* Make sure offset value is within supported range */
 	if (offset < MIN_OFFSET || offset > MAX_OFFSET)
@@ -321,9 +320,7 @@ static int tps65910_set_offset(struct device *dev, long offset)
 	/* Offset value operates in negative way, so swap sign */
 	calibration = (int)-tmp;
 
-	ret = tps65910_rtc_set_calibration(dev, calibration);
-
-	return ret;
+	return tps65910_rtc_set_calibration(dev, calibration);
 }
 
 static irqreturn_t tps65910_rtc_interrupt(int irq, void *rtc)
