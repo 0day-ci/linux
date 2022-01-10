@@ -235,7 +235,6 @@ static int qcom_swrm_cpu_reg_write(struct qcom_swrm_ctrl *ctrl, int reg,
 static u32 swrm_get_packed_reg_val(u8 *cmd_id, u8 cmd_data,
 				   u8 dev_addr, u16 reg_addr)
 {
-	u32 val;
 	u8 id = *cmd_id;
 
 	if (id != SWR_BROADCAST_CMD_ID) {
@@ -245,9 +244,8 @@ static u32 swrm_get_packed_reg_val(u8 *cmd_id, u8 cmd_data,
 			id = 0;
 		*cmd_id = id;
 	}
-	val = SWRM_REG_VAL_PACK(cmd_data, dev_addr, id, reg_addr);
 
-	return val;
+	return SWRM_REG_VAL_PACK(cmd_data, dev_addr, id, reg_addr);
 }
 
 static int swrm_wait_for_rd_fifo_avail(struct qcom_swrm_ctrl *swrm)
