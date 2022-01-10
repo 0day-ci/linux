@@ -701,12 +701,15 @@ void elevator_init_mq(struct request_queue *q)
 	 * requests, then no need to quiesce queue which may add long boot
 	 * latency, especially when lots of disks are involved.
 	 */
+
+	mutex_lock(&q->sysfs_lock);
 	blk_mq_freeze_queue(q);
 	blk_mq_cancel_work_sync(q);
 
 	err = blk_mq_init_sched(q, e);
 
 	blk_mq_unfreeze_queue(q);
+	mutex_unlock(&q->sysfs_lock);
 
 	if (err) {
 		pr_warn("\"%s\" elevator initialization failed, "

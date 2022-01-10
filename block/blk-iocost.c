@@ -662,7 +662,7 @@ static struct ioc *rqos_to_ioc(struct rq_qos *rqos)
 
 static struct ioc *q_to_ioc(struct request_queue *q)
 {
-	return rqos_to_ioc(rq_qos_id(q, RQ_QOS_COST));
+	return rqos_to_ioc(rq_qos_by_id(q, RQ_QOS_COST));
 }
 
 static const char *q_name(struct request_queue *q)
@@ -3162,6 +3162,7 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 			     size_t nbytes, loff_t off)
 {
 	struct block_device *bdev;
+	struct rq_qos *rqos;
 	struct ioc *ioc;
 	u32 qos[NR_QOS_PARAMS];
 	bool enable, user;
@@ -3172,14 +3173,15 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 
-	ioc = q_to_ioc(bdev_get_queue(bdev));
-	if (!ioc) {
+	rqos = rq_qos_get(bdev_get_queue(bdev), RQ_QOS_COST);
+	if (!rqos) {
 		ret = blk_iocost_init(bdev_get_queue(bdev));
 		if (ret)
 			goto err;
-		ioc = q_to_ioc(bdev_get_queue(bdev));
+		rqos = rq_qos_get(bdev_get_queue(bdev), RQ_QOS_COST);
 	}
 
+	ioc = rqos_to_ioc(rqos);
 	spin_lock_irq(&ioc->lock);
 	memcpy(qos, ioc->params.qos, sizeof(qos));
 	enable = ioc->enabled;
@@ -3272,10 +3274,12 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 	ioc_refresh_params(ioc, true);
 	spin_unlock_irq(&ioc->lock);
 
+	rq_qos_put(rqos);
 	blkdev_put_no_open(bdev);
 	return nbytes;
 einval:
 	ret = -EINVAL;
+	rq_qos_put(rqos);
 err:
 	blkdev_put_no_open(bdev);
 	return ret;
@@ -3329,6 +3333,7 @@ static ssize_t ioc_cost_model_write(struct kernfs_open_file *of, char *input,
 				    size_t nbytes, loff_t off)
 {
 	struct block_device *bdev;
+	struct rq_qos *rqos;
 	struct ioc *ioc;
 	u64 u[NR_I_LCOEFS];
 	bool user;
@@ -3339,14 +3344,15 @@ static ssize_t ioc_cost_model_write(struct kernfs_open_file *of, char *input,
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 
-	ioc = q_to_ioc(bdev_get_queue(bdev));
+	rqos = rq_qos_get(bdev_get_queue(bdev), RQ_QOS_COST);
 	if (!ioc) {
 		ret = blk_iocost_init(bdev_get_queue(bdev));
 		if (ret)
 			goto err;
-		ioc = q_to_ioc(bdev_get_queue(bdev));
+		rqos = rq_qos_get(bdev_get_queue(bdev), RQ_QOS_COST);
 	}
 
+	ioc = rqos_to_ioc(rqos);
 	spin_lock_irq(&ioc->lock);
 	memcpy(u, ioc->params.i_lcoefs, sizeof(u));
 	user = ioc->user_cost_model;
@@ -3397,11 +3403,13 @@ static ssize_t ioc_cost_model_write(struct kernfs_open_file *of, char *input,
 	ioc_refresh_params(ioc, true);
 	spin_unlock_irq(&ioc->lock);
 
+	rq_qos_put(rqos);
 	blkdev_put_no_open(bdev);
 	return nbytes;
 
 einval:
 	ret = -EINVAL;
+	rq_qos_put(rqos);
 err:
 	blkdev_put_no_open(bdev);
 	return ret;

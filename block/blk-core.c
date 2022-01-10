@@ -51,6 +51,7 @@
 #include "blk-mq-sched.h"
 #include "blk-pm.h"
 #include "blk-throttle.h"
+#include "blk-rq-qos.h"
 
 struct dentry *blk_debugfs_root;
 
@@ -377,6 +378,7 @@ void blk_cleanup_queue(struct request_queue *q)
 	 * it is safe to free requests now.
 	 */
 	mutex_lock(&q->sysfs_lock);
+	rq_qos_exit(q);
 	if (q->elevator)
 		blk_mq_sched_free_rqs(q);
 	mutex_unlock(&q->sysfs_lock);
