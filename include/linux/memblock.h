@@ -481,6 +481,8 @@ phys_addr_t memblock_reserved_size(void);
 phys_addr_t memblock_start_of_DRAM(void);
 phys_addr_t memblock_end_of_DRAM(void);
 void memblock_enforce_memory_limit(phys_addr_t memory_limit);
+void memblock_set_usable_range(phys_addr_t base, phys_addr_t size);
+void memblock_enforce_usable_range(void);
 void memblock_cap_memory_range(phys_addr_t base, phys_addr_t size);
 void memblock_mem_limit_remove_map(phys_addr_t limit);
 bool memblock_is_memory(phys_addr_t addr);

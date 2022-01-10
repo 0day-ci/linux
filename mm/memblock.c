@@ -101,6 +101,7 @@ unsigned long max_low_pfn;
 unsigned long min_low_pfn;
 unsigned long max_pfn;
 unsigned long long max_possible_pfn;
+phys_addr_t usable_start, usable_size;
 
 static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
 static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_RESERVED_REGIONS] __initdata_memblock;
@@ -1721,6 +1722,42 @@ void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
 	memblock_remove_range(&memblock.reserved, 0, base);
 	memblock_remove_range(&memblock.reserved,
 			base + size, PHYS_ADDR_MAX);
+}
+
+/**
+ * memblock_set_usable_range - set usable memory range
+ * @base: physical address that is the start of the range
+ * @size: size of the range.
+ *
+ * Used when a firmware property limits the range of usable
+ * memory, like for the linux,usable-memory-range property
+ * used by ARM crash kernels.
+ */
+void __init memblock_set_usable_range(phys_addr_t base, phys_addr_t size)
+{
+	usable_start = base;
+	usable_size = size;
+}
+
+/**
+ * memblock_enforce_usable_range - cap memory ranges to usable range
+ *
+ * Some architectures call this during boot after firmware memory ranges
+ * have been scanned, to make sure they fall within the usable range
+ * set by memblock_set_usable_range.
+ *
+ * This may be called more than once if there are multiple firmware sources
+ * for memory ranges.
+ *
+ * Avoid "no memory registered" warning - the warning itself is
+ * useful, but we know this can be called with no registered
+ * memory (e.g. when the synthetic DT for the crash kernel has
+ * been parsed on EFI arm64 systems).
+ */
+void __init memblock_enforce_usable_range(void)
+{
+	if (memblock_memory->total_size)
+		memblock_cap_memory_range(usable_start, usable_size);
 }
 
 void __init memblock_mem_limit_remove_map(phys_addr_t limit)
