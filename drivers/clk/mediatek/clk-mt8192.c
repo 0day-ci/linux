@@ -1179,6 +1179,10 @@ static const struct mtk_pll_data plls[] = {
 
 static struct clk_onecell_data *top_clk_data;
 
+/* Control registers in the infra block used to set a chicken bit */
+#define INFRA_CTRL 0x290
+#define INFRA_CTRL_DISABLE_MFG2ACP BIT(9)
+
 static void clk_mt8192_top_init_early(struct device_node *node)
 {
 	int i;
@@ -1224,6 +1228,29 @@ static int clk_mt8192_top_probe(struct platform_device *pdev)
 	return of_clk_add_provider(node, of_clk_src_onecell_get, top_clk_data);
 }
 
+/*
+ * Disable ACP on the infra clock. Setting this quirk is required for 3D to
+ * work correctly. Without this quirk, any work queued to the Mali GPU faults,
+ * for example raising a Data Invalid Fault. This suggests the GPU is failing
+ * to read back the contents of shared CPU/GPU memory correctly, perhaps due to
+ * a MT8192 platform integration issue breaking memory or caches.
+ *
+ * Relevant downstream change:
+ * https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/2781271/5
+ */
+static int clk_mt8192_infra_disable_mfg2acp(struct platform_device *pdev)
+{
+	void __iomem *base = devm_platform_ioremap_resource(pdev, 0);
+	void __iomem *infra_ctrl = base + INFRA_CTRL;
+
+	if (IS_ERR(base))
+		return PTR_ERR(base);
+
+	writel(readl(infra_ctrl) | INFRA_CTRL_DISABLE_MFG2ACP, infra_ctrl);
+
+	return 0;
+}
+
 static int clk_mt8192_infra_probe(struct platform_device *pdev)
 {
 	struct clk_onecell_data *clk_data;
@@ -1235,6 +1262,10 @@ static int clk_mt8192_infra_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	r = mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks), clk_data);
+	if (r)
+		return r;
+
+	r = clk_mt8192_infra_disable_mfg2acp(pdev);
 	if (r)
 		return r;
 
