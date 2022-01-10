@@ -17,6 +17,8 @@
 #define DRIVER_AUTHOR   "Intel Corporation"
 #define IFCVF_DRIVER_NAME       "ifcvf"
 
+static struct vdpa_config_ops ifc_vdpa_ops;
+
 static irqreturn_t ifcvf_config_changed(int irq, void *arg)
 {
 	struct ifcvf_hw *vf = arg;
@@ -63,13 +65,20 @@ static void ifcvf_free_irq(struct ifcvf_adapter *adapter, int queues)
 	struct ifcvf_hw *vf = &adapter->vf;
 	int i;
 
+	if (vf->vector_per_vq)
+		for (i = 0; i < queues; i++) {
+			devm_free_irq(&pdev->dev, vf->vring[i].irq, &vf->vring[i]);
+			vf->vring[i].irq = -EINVAL;
+		}
+	else
+		devm_free_irq(&pdev->dev, vf->vring[0].irq, vf);
 
-	for (i = 0; i < queues; i++) {
-		devm_free_irq(&pdev->dev, vf->vring[i].irq, &vf->vring[i]);
-		vf->vring[i].irq = -EINVAL;
+
+	if (vf->config_irq != -EINVAL) {
+		devm_free_irq(&pdev->dev, vf->config_irq, vf);
+		vf->config_irq = -EINVAL;
 	}
 
-	devm_free_irq(&pdev->dev, vf->config_irq, vf);
 	ifcvf_free_irq_vectors(pdev);
 }
 
@@ -191,52 +200,35 @@ static int ifcvf_request_config_irq(struct ifcvf_adapter *adapter, int config_ve
 
 static int ifcvf_request_irq(struct ifcvf_adapter *adapter)
 {
-	struct pci_dev *pdev = adapter->pdev;
 	struct ifcvf_hw *vf = &adapter->vf;
-	int vector, i, ret, irq;
-	u16 max_intr;
+	u16 nvectors, max_vectors;
+	int config_vector, ret;
 
-	/* all queues and config interrupt  */
-	max_intr = vf->nr_vring + 1;
+	nvectors = ifcvf_alloc_vectors(adapter);
+	if (nvectors < 0)
+		return nvectors;
 
-	ret = pci_alloc_irq_vectors(pdev, max_intr,
-				    max_intr, PCI_IRQ_MSIX);
-	if (ret < 0) {
-		IFCVF_ERR(pdev, "Failed to alloc IRQ vectors\n");
+	vf->vector_per_vq = true;
+	max_vectors = vf->nr_vring + 1;
+	config_vector = vf->nr_vring;
+
+	if (nvectors < max_vectors) {
+		vf->vector_per_vq = false;
+		config_vector = 1;
+		ifc_vdpa_ops.get_vq_irq = NULL;
+	}
+
+	if (nvectors < 2)
+		config_vector = 0;
+
+	ret = ifcvf_request_vq_irq(adapter, vf->vector_per_vq);
+	if (ret)
 		return ret;
-	}
 
-	snprintf(vf->config_msix_name, 256, "ifcvf[%s]-config\n",
-		 pci_name(pdev));
-	vector = 0;
-	vf->config_irq = pci_irq_vector(pdev, vector);
-	ret = devm_request_irq(&pdev->dev, vf->config_irq,
-			       ifcvf_config_changed, 0,
-			       vf->config_msix_name, vf);
-	if (ret) {
-		IFCVF_ERR(pdev, "Failed to request config irq\n");
+	ret = ifcvf_request_config_irq(adapter, config_vector);
+
+	if (ret)
 		return ret;
-	}
-
-	for (i = 0; i < vf->nr_vring; i++) {
-		snprintf(vf->vring[i].msix_name, 256, "ifcvf[%s]-%d\n",
-			 pci_name(pdev), i);
-		vector = i + IFCVF_MSI_QUEUE_OFF;
-		irq = pci_irq_vector(pdev, vector);
-		ret = devm_request_irq(&pdev->dev, irq,
-				       ifcvf_intr_handler, 0,
-				       vf->vring[i].msix_name,
-				       &vf->vring[i]);
-		if (ret) {
-			IFCVF_ERR(pdev,
-				  "Failed to request irq for vq %d\n", i);
-			ifcvf_free_irq(adapter, i);
-
-			return ret;
-		}
-
-		vf->vring[i].irq = irq;
-	}
 
 	return 0;
 }
@@ -573,7 +565,7 @@ static struct vdpa_notification_area ifcvf_get_vq_notification(struct vdpa_devic
  * IFCVF currently does't have on-chip IOMMU, so not
  * implemented set_map()/dma_map()/dma_unmap()
  */
-static const struct vdpa_config_ops ifc_vdpa_ops = {
+static struct vdpa_config_ops ifc_vdpa_ops = {
 	.get_features	= ifcvf_vdpa_get_features,
 	.set_features	= ifcvf_vdpa_set_features,
 	.get_status	= ifcvf_vdpa_get_status,
