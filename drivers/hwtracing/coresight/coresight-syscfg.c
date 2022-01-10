@@ -764,7 +764,7 @@ struct device *cscfg_device(void)
 /* Must have a release function or the kernel will complain on module unload */
 static void cscfg_dev_release(struct device *dev)
 {
-	kfree(cscfg_mgr);
+	put_device(dev);
 	cscfg_mgr = NULL;
 }
 
