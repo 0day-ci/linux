@@ -35,6 +35,35 @@ properties:
       Connected to DSI0_MIPI_DSI_PLL_VDDA0P9 pin for sc7180 target and
       connected to VDDA_MIPI_DSI_0_PLL_0P9 pin for sdm845 target
 
+  phy-rescode-offset-top:
+    $ref: /schemas/types.yaml#/definitions/uint8-array
+    minItems: 5
+    maxItems: 5
+    description:
+      Integer array of offset for pull-up legs rescode for all five lanes.
+      To offset the drive strength from the calibrated value in an increasing
+      or decreasing manner, use 6 bit two’s complement values.
+
+  phy-rescode-offset-bot:
+    $ref: /schemas/types.yaml#/definitions/uint8-array
+    minItems: 5
+    maxItems: 5
+    description:
+      Integer array of offset for pull-down legs rescode for all five lanes.
+      To offset the drive strength from the calibrated value in an increasing
+      or decreasing manner, use 6 bit two’s complement values.
+
+  phy-drive-ldo-level:
+    $ref: /schemas/types.yaml#/definitions/uint8
+    minimum: 0
+    maximum: 7
+    description:
+      The PHY LDO has an amplitude tuning feature to adjust the LDO output
+      for the HSTX drive. To offset the drive level from the default value,
+      supported levels are with the following mapping:
+      0 = 375mV, 1 = 400mV, 2 = 425mV, 3 = 450mV, 4 = 475mV, 5 = 500mV,
+      6 = 500mV, 7 = 500mV
+
 required:
   - compatible
   - reg
@@ -64,5 +93,9 @@ examples:
          clocks = <&dispcc DISP_CC_MDSS_AHB_CLK>,
                   <&rpmhcc RPMH_CXO_CLK>;
          clock-names = "iface", "ref";
+
+         phy-resocde-offset-top = /bits/ 8 <0x0 0x0 0x0 0x0 0x0>;
+         phy-rescode-offset-bot = /bits/ 8 <0x0 0x0 0x0 0x0 0x0>;
+         phy-drive-ldo-level = /bits/ 8 <1>;
      };
 ...
