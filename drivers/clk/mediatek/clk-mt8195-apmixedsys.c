@@ -126,9 +126,12 @@ static int clk_mt8195_apmixed_probe(struct platform_device *pdev)
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 	if (r)
-		goto free_apmixed_data;
+		goto unregister_clk;
 
 	return r;
+
+unregister_clk:
+	mtk_clk_unregister(clk_data);
 
 free_apmixed_data:
 	mtk_free_clk_data(clk_data);

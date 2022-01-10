@@ -303,6 +303,15 @@ void mtk_clk_register_dividers(const struct mtk_clk_divider *mcds,
 	}
 }
 
+void mtk_clk_unregister(struct clk_onecell_data *clk_data)
+{
+	int i;
+
+	for (i = 0; i < clk_data->clk_num; i++)
+		clk_unregister(clk_data->clks[i]);
+}
+EXPORT_SYMBOL_GPL(mtk_clk_unregister);
+
 int mtk_clk_simple_probe(struct platform_device *pdev)
 {
 	const struct mtk_clk_desc *mcd;
@@ -324,9 +333,12 @@ int mtk_clk_simple_probe(struct platform_device *pdev)
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 	if (r)
-		goto free_data;
+		goto unregister_clk;
 
 	return r;
+
+unregister_clk:
+	mtk_clk_unregister(clk_data);
 
 free_data:
 	mtk_free_clk_data(clk_data);

@@ -68,11 +68,12 @@ static int clk_mt8195_apusys_pll_probe(struct platform_device *pdev)
 	mtk_clk_register_plls(node, apusys_plls, ARRAY_SIZE(apusys_plls), clk_data);
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 	if (r)
-		goto free_apusys_pll_data;
+		goto unregister_clk;
 
 	return r;
 
-free_apusys_pll_data:
+unregister_clk:
+	mtk_clk_unregister(clk_data);
 	mtk_free_clk_data(clk_data);
 	return r;
 }

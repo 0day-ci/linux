@@ -1254,9 +1254,12 @@ static int clk_mt8195_topck_probe(struct platform_device *pdev)
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, top_clk_data);
 	if (r)
-		goto free_top_data;
+		goto unregister_clk;
 
 	return r;
+
+unregister_clk:
+	mtk_clk_unregister(top_clk_data);
 
 free_top_data:
 	mtk_free_clk_data(top_clk_data);
