@@ -334,15 +334,12 @@ static int sierra_net_send_cmd(struct usbnet *dev,
 
 static int sierra_net_send_sync(struct usbnet *dev)
 {
-	int  status;
 	struct sierra_net_data *priv = sierra_net_get_private(dev);
 
 	dev_dbg(&dev->udev->dev, "%s", __func__);
 
-	status = sierra_net_send_cmd(dev, priv->sync_msg,
+	return sierra_net_send_cmd(dev, priv->sync_msg,
 			sizeof(priv->sync_msg), "SYNC");
-
-	return status;
 }
 
 static void sierra_net_set_ctx_index(struct sierra_net_data *priv, u8 ctx_ix)
