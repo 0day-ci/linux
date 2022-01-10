@@ -243,7 +243,6 @@ static int chipone_probe(struct mipi_dsi_device *dsi)
 		return ret;
 
 	icn->bridge.funcs = &chipone_bridge_funcs;
-	icn->bridge.type = DRM_MODE_CONNECTOR_DPI;
 	icn->bridge.of_node = dev->of_node;
 
 	drm_bridge_add(&icn->bridge);
