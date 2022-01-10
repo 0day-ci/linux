@@ -111,7 +111,7 @@ config BLK_WBT_MQ
 	Enable writeback throttling by default for request-based block devices.
 
 config BLK_CGROUP_IOLATENCY
-	bool "Enable support for latency based cgroup IO protection"
+	tristate "Enable support for latency based cgroup IO protection"
 	depends on BLK_CGROUP
 	help
 	Enabling this option enables the .latency interface for IO throttling.
