@@ -3743,7 +3743,8 @@ static bool bond_flow_ip(struct sk_buff *skb, struct flow_keys *fk, const void *
 	}
 
 	if (l34 && *ip_proto >= 0)
-		fk->ports.ports = __skb_flow_get_ports(skb, *nhoff, *ip_proto, data, hlen);
+		/* nhoff is relative to skb->head instead of the usual skb->data */
+		fk->ports.ports = skb_flow_get_ports(skb, *nhoff - skb_headroom(skb), *ip_proto);
 
 	return true;
 }
