@@ -1063,6 +1063,54 @@ static int sanitise_mte_tags(struct kvm *kvm, kvm_pfn_t pfn,
 	return 0;
 }
 
+static bool fast_mark_writable(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+		struct kvm_memory_slot *memslot, unsigned long fault_status)
+{
+	int ret;
+	bool writable;
+	bool write_fault = kvm_is_write_fault(vcpu);
+	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+	kvm_pfn_t pfn;
+	struct kvm *kvm = vcpu->kvm;
+	bool logging_active = memslot_is_logging(memslot);
+	unsigned long fault_level = kvm_vcpu_trap_get_fault_level(vcpu);
+	unsigned long fault_granule;
+
+	fault_granule = 1UL << ARM64_HW_PGTABLE_LEVEL_SHIFT(fault_level);
+
+	/* Make sure the fault can be handled in the fast path.
+	 * Only handle write permission fault on non-hugepage during dirty
+	 * logging period.
+	 */
+	if (fault_status != FSC_PERM || fault_granule != PAGE_SIZE
+			|| !logging_active || !write_fault)
+		return false;
+
+
+	/* Pin the pfn to make sure it couldn't be freed and be resued for
+	 * another gfn.
+	 */
+	pfn = __gfn_to_pfn_memslot(memslot, gfn, true, NULL,
+				   write_fault, &writable, NULL);
+	if (is_error_pfn(pfn) || !writable)
+		return false;
+
+	read_lock(&kvm->mmu_lock);
+	ret = kvm_pgtable_stage2_relax_perms(
+			vcpu->arch.hw_mmu->pgt, fault_ipa, PAGE_HYP);
+
+	if (!ret) {
+		kvm_set_pfn_dirty(pfn);
+		mark_page_dirty_in_slot(kvm, memslot, gfn);
+	}
+	read_unlock(&kvm->mmu_lock);
+
+	kvm_set_pfn_accessed(pfn);
+	kvm_release_pfn_clean(pfn);
+
+	return true;
+}
+
 static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			  struct kvm_memory_slot *memslot, unsigned long hva,
 			  unsigned long fault_status)
@@ -1085,6 +1133,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	enum kvm_pgtable_prot prot = KVM_PGTABLE_PROT_R;
 	struct kvm_pgtable *pgt;
 
+	if (fast_mark_writable(vcpu, fault_ipa, memslot, fault_status))
+		return 0;
 	fault_granule = 1UL << ARM64_HW_PGTABLE_LEVEL_SHIFT(fault_level);
 	write_fault = kvm_is_write_fault(vcpu);
 	exec_fault = kvm_vcpu_trap_is_exec_fault(vcpu);
