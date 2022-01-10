@@ -6,6 +6,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/mfd/syscon.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
@@ -1313,3 +1314,4 @@ static int __init clk_mt8192_init(void)
 }
 
 arch_initcall(clk_mt8192_init);
+MODULE_LICENSE("GPL");
