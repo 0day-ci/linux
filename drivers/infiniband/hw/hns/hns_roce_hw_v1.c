@@ -4545,6 +4545,7 @@ static int hns_roce_get_cfg(struct hns_roce_dev *hr_dev)
 				hr_dev->iboe.netdevs[port_cnt] = netdev;
 				hr_dev->iboe.phy_port[port_cnt] = phy_port;
 			} else {
+				put_device(&pdev->dev);
 				dev_err(dev, "no netdev found with pdev %s\n",
 					pdev->name);
 				return -ENODEV;
