@@ -360,6 +360,37 @@ static void dwc3_ref_clk_period(struct dwc3 *dwc)
 
 
 /**
+ * dwc3_ref_clk_fladj - Reference clock period adjustment configuration
+ * @dwc: Pointer to our controller context structure
+ *
+ * GFLADJ_REFCLK_FLADJ should be set based on the fractional portion of the
+ * reference clock period, where the integer portion is set in GUCTL_REFCLKPER.
+ * Calculated as: ((125000/ref_clk_period_integer)-(125000/ref_clk_period)) * ref_clk_period
+ * where ref_clk_period_integer is the period specified in GUCTL_REFCLKPER and
+ * ref_clk_period is the period including fractional value.
+ * This value can be specified in the device tree if the default value is incorrect.
+ * Note that 0 is a valid value.
+ */
+static void dwc3_ref_clk_fladj(struct dwc3 *dwc)
+{
+	u32 reg;
+	u32 reg_new;
+
+	if (DWC3_VER_IS_PRIOR(DWC3, 250A))
+		return;
+
+	if (!dwc->ref_clk_fladj_set)
+		return;
+
+	reg = dwc3_readl(dwc->regs, DWC3_GFLADJ);
+	reg_new = reg & ~DWC3_GFLADJ_REFCLK_FLADJ_MASK;
+	reg_new |= FIELD_PREP(DWC3_GFLADJ_REFCLK_FLADJ_MASK, dwc->ref_clk_fladj);
+	if (reg_new != reg)
+		dwc3_writel(dwc->regs, DWC3_GFLADJ, reg_new);
+}
+
+
+/**
  * dwc3_free_one_event_buffer - Frees one event buffer
  * @dwc: Pointer to our controller context structure
  * @evt: Pointer to event buffer to be freed
@@ -1033,6 +1064,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
 
 	/* Adjust Reference Clock Period */
 	dwc3_ref_clk_period(dwc);
+	dwc3_ref_clk_fladj(dwc);
 
 	dwc3_set_incr_burst_type(dwc);
 
@@ -1418,6 +1450,9 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				 &dwc->fladj);
 	device_property_read_u32(dev, "snps,ref-clock-period-ns",
 				 &dwc->ref_clk_per);
+	if (!device_property_read_u32(dev, "snps,ref-clock-fladj",
+				      &dwc->ref_clk_fladj))
+		dwc->ref_clk_fladj_set = true;
 
 	dwc->dis_metastability_quirk = device_property_read_bool(dev,
 				"snps,dis_metastability_quirk");
