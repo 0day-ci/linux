@@ -387,5 +387,10 @@ extern int do_set_thread_area(struct task_struct *p, int idx,
 # define do_set_thread_area_64(p, s, t)	(0)
 #endif
 
+#ifdef CONFIG_RSEQ
+# define RSEQ_ARCH_HAS_ABORT_AT_IP
+int rseq_abort_at_ip(struct pt_regs *regs, unsigned long ip);
+#endif
+
 #endif /* !__ASSEMBLY__ */
 #endif /* _ASM_X86_PTRACE_H */

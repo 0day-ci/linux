@@ -1368,3 +1368,15 @@ void user_single_step_report(struct pt_regs *regs)
 {
 	send_sigtrap(regs, 0, TRAP_BRKPT);
 }
+
+int rseq_abort_at_ip(struct pt_regs *regs, unsigned long ip)
+{
+	if (user_64bit_mode(regs)) {
+		/* Need to skip redzone for leaf functions. */
+		regs->sp -= sizeof(u64) + 128;
+		return put_user(ip, (u64 __user *)regs->sp);
+	} else {
+		regs->sp -= sizeof(u32);
+		return put_user(ip, (u32 __user *)regs->sp);
+	}
+}
