@@ -3961,6 +3961,7 @@ bad:
  */
 static int dm_integrity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 {
+	const char *devname = dm_table_device_name(ti->table);
 	struct dm_integrity_c *ic;
 	char dummy;
 	int r;
@@ -4203,8 +4204,8 @@ static int dm_integrity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		goto bad;
 	}
 
-	ic->metadata_wq = alloc_workqueue("dm-integrity-metadata",
-					  WQ_MEM_RECLAIM, METADATA_WORKQUEUE_MAX_ACTIVE);
+	ic->metadata_wq = alloc_workqueue("dm-integrity-metadata/%s", WQ_MEM_RECLAIM,
+					  METADATA_WORKQUEUE_MAX_ACTIVE, devname);
 	if (!ic->metadata_wq) {
 		ti->error = "Cannot allocate workqueue";
 		r = -ENOMEM;
@@ -4215,22 +4216,22 @@ static int dm_integrity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	 * If this workqueue were percpu, it would cause bio reordering
 	 * and reduced performance.
 	 */
-	ic->wait_wq = alloc_ordered_workqueue("dm-integrity-wait", WQ_MEM_RECLAIM);
+	ic->wait_wq = alloc_ordered_workqueue("dm-integrity-wait/%s", WQ_MEM_RECLAIM, devname);
 	if (!ic->wait_wq) {
 		ti->error = "Cannot allocate workqueue";
 		r = -ENOMEM;
 		goto bad;
 	}
 
-	ic->offload_wq = alloc_workqueue("dm-integrity-offload", WQ_MEM_RECLAIM,
-					  METADATA_WORKQUEUE_MAX_ACTIVE);
+	ic->offload_wq = alloc_workqueue("dm-integrity-offload/%s", WQ_MEM_RECLAIM,
+					  METADATA_WORKQUEUE_MAX_ACTIVE, devname);
 	if (!ic->offload_wq) {
 		ti->error = "Cannot allocate workqueue";
 		r = -ENOMEM;
 		goto bad;
 	}
 
-	ic->commit_wq = alloc_workqueue("dm-integrity-commit", WQ_MEM_RECLAIM, 1);
+	ic->commit_wq = alloc_workqueue("dm-integrity-commit/%s", WQ_MEM_RECLAIM, 1, devname);
 	if (!ic->commit_wq) {
 		ti->error = "Cannot allocate workqueue";
 		r = -ENOMEM;
@@ -4239,7 +4240,7 @@ static int dm_integrity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	INIT_WORK(&ic->commit_work, integrity_commit);
 
 	if (ic->mode == 'J' || ic->mode == 'B') {
-		ic->writer_wq = alloc_workqueue("dm-integrity-writer", WQ_MEM_RECLAIM, 1);
+		ic->writer_wq = alloc_workqueue("dm-integrity-writer/%s", WQ_MEM_RECLAIM, 1, devname);
 		if (!ic->writer_wq) {
 			ti->error = "Cannot allocate workqueue";
 			r = -ENOMEM;
@@ -4398,7 +4399,7 @@ try_smaller_buffer:
 	}
 
 	if (ic->internal_hash) {
-		ic->recalc_wq = alloc_workqueue("dm-integrity-recalc", WQ_MEM_RECLAIM, 1);
+		ic->recalc_wq = alloc_workqueue("dm-integrity-recalc/%s", WQ_MEM_RECLAIM, 1, devname);
 		if (!ic->recalc_wq ) {
 			ti->error = "Cannot allocate workqueue";
 			r = -ENOMEM;
