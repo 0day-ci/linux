@@ -26,6 +26,9 @@ menuconfig BLOCK
 
 if BLOCK
 
+config BLK_BIO_IOCOST
+	bool
+
 config BLK_RQ_ALLOC_TIME
 	bool
 
@@ -134,6 +137,7 @@ config BLK_CGROUP_IOCOST
 	bool "Enable support for cost model based cgroup IO controller"
 	depends on BLK_CGROUP
 	select BLK_RQ_ALLOC_TIME
+	select BLK_BIO_IOCOST
 	help
 	Enabling this option enables the .weight interface for cost
 	model based proportional IO control.  The IO controller

@@ -268,7 +268,7 @@ void bio_init(struct bio *bio, struct bio_vec *table,
 #ifdef CONFIG_BLK_CGROUP
 	bio->bi_blkg = NULL;
 	bio->bi_issue.value = 0;
-#ifdef CONFIG_BLK_CGROUP_IOCOST
+#ifdef CONFIG_BLK_BIO_IOCOST
 	bio->bi_iocost_cost = 0;
 #endif
 #endif
