@@ -482,11 +482,8 @@ static ssize_t queue_wb_lat_store(struct request_queue *q, const char *page,
 		return -EINVAL;
 
 	rqos = wbt_rq_qos(q);
-	if (!rqos) {
-		ret = wbt_init(q);
-		if (ret)
-			return ret;
-	}
+	if (!rqos)
+		return -EOPNOTSUPP;
 
 	if (val == -1)
 		val = wbt_default_latency_nsec(q);
