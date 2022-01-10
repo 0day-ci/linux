@@ -557,9 +557,14 @@ Connecting with gdb to a serial port
    Example (using a directly connected port)::
 
            % gdb ./vmlinux
-           (gdb) set remotebaud 115200
+           (gdb) set serial baud 115200
            (gdb) target remote /dev/ttyS0
 
+   Example (using a directly connected port with gdb version < 7.8)::
+
+           % gdb ./vmlinux
+           (gdb) set remotebaud 115200
+           (gdb) target remote /dev/ttyS0
 
    Example (kgdb to a terminal server on TCP port 2012)::
 
