@@ -181,6 +181,7 @@ struct ath11k_hw_params {
 	u32 num_vdevs;
 	u32 num_peers;
 	bool supports_suspend;
+	bool supports_ap_vlan;
 	u32 hal_desc_sz;
 	bool supports_regdb;
 	bool fix_l1ss;

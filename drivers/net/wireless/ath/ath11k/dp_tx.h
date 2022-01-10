@@ -15,6 +15,20 @@ struct ath11k_dp_htt_wbm_tx_status {
 	int ack_rssi;
 };
 
+#define HTT_TX_MSDU_DESC_INFO0_VALID_ENCRYPT_TYPE	BIT(8)
+#define HTT_TX_MSDU_DESC_INFO0_ENCRYPT_TYPE		GENMASK(16, 15)
+#define HTT_TX_MSDU_DESC_INFO0_HOST_TX_DESC_POOL	BIT(31)
+
+struct htt_tx_msdu_desc_ext {
+	__le32 info0;
+	__le32 info1;
+	__le32 info2;
+	__le32 info3;
+	__le32 info4;
+	__le32 info5;
+	__le32 info6;
+} __packed;
+
 void ath11k_dp_tx_update_txcompl(struct ath11k *ar, struct hal_tx_status *ts);
 int ath11k_dp_tx_htt_h2t_ver_req_msg(struct ath11k_base *ab);
 int ath11k_dp_tx(struct ath11k *ar, struct ath11k_vif *arvif,

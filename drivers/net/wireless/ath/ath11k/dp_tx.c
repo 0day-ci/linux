@@ -78,6 +78,44 @@ enum hal_encrypt_type ath11k_dp_tx_get_encrypt_type(u32 cipher)
 	}
 }
 
+#define HTT_META_DATA_ALIGNMENT    0x8
+
+static int ath11k_dp_metadata_align_skb(struct sk_buff *skb, u8 align_len)
+{
+	if (unlikely(skb_cow_head(skb, align_len)))
+		return -ENOMEM;
+
+	skb_push(skb, align_len);
+	memset(skb->data, 0, align_len);
+	return 0;
+}
+
+static int ath11k_dp_prepare_htt_metadata(struct sk_buff *skb,
+					  u8 *htt_metadata_size)
+{
+	u8 htt_desc_size;
+	/* Size rounded of multiple of 8 bytes */
+	u8 htt_desc_size_aligned;
+	struct htt_tx_msdu_desc_ext *desc_ext;
+	int ret;
+
+	htt_desc_size = sizeof(*desc_ext);
+	htt_desc_size_aligned = ALIGN(htt_desc_size, HTT_META_DATA_ALIGNMENT);
+
+	ret = ath11k_dp_metadata_align_skb(skb, htt_desc_size_aligned);
+	if (unlikely(ret))
+		return ret;
+
+	desc_ext = (struct htt_tx_msdu_desc_ext *)skb->data;
+	desc_ext->info0 =
+		__cpu_to_le32(FIELD_PREP(HTT_TX_MSDU_DESC_INFO0_VALID_ENCRYPT_TYPE, 1) |
+			      FIELD_PREP(HTT_TX_MSDU_DESC_INFO0_ENCRYPT_TYPE, 0) |
+			      FIELD_PREP(HTT_TX_MSDU_DESC_INFO0_HOST_TX_DESC_POOL, 1));
+	*htt_metadata_size = htt_desc_size_aligned;
+
+	return 0;
+}
+
 int ath11k_dp_tx(struct ath11k *ar, struct ath11k_vif *arvif,
 		 struct ath11k_sta *arsta, struct sk_buff *skb)
 {
@@ -95,6 +133,7 @@ int ath11k_dp_tx(struct ath11k *ar, struct ath11k_vif *arvif,
 	int ret;
 	u8 ring_selector = 0, ring_map = 0;
 	bool tcl_ring_retry;
+	u8 align_pad, htt_meta_size = 0;
 
 	if (unlikely(test_bit(ATH11K_FLAG_CRASH_FLUSH, &ar->ab->dev_flags)))
 		return -ESHUTDOWN;
@@ -211,15 +250,42 @@ tcl_ring_sel:
 		goto fail_remove_idr;
 	}
 
+	/* Add metadata for sw encrypted vlan group traffic */
+	if (!test_bit(ATH11K_FLAG_HW_CRYPTO_DISABLED, &ar->ab->dev_flags) &&
+	    !(info->flags & IEEE80211_TX_CTL_HW_80211_ENCAP) &&
+	    !info->control.hw_key &&
+	    ieee80211_has_protected(hdr->frame_control)) {
+		/* HW requirement is that metadata should always point to a
+		 * 8-byte aligned address. So we add alignment pad to start of
+		 * buffer. HTT Metadata should be ensured to be multiple of 8-bytes
+		 *  to get 8-byte aligned start address along with align_pad added
+		 */
+		align_pad = ((unsigned long)skb->data) & (HTT_META_DATA_ALIGNMENT - 1);
+		ret = ath11k_dp_metadata_align_skb(skb, align_pad);
+		if (unlikely(ret))
+			goto fail_remove_idr;
+
+		ti.pkt_offset += align_pad;
+		ret = ath11k_dp_prepare_htt_metadata(skb, &htt_meta_size);
+		if (unlikely(ret))
+			goto fail_pull_skb;
+
+		ti.pkt_offset += htt_meta_size;
+		ti.meta_data_flags |= HTT_TCL_META_DATA_VALID_HTT;
+		ti.flags0 |= FIELD_PREP(HAL_TCL_DATA_CMD_INFO1_TO_FW, 1);
+		ti.encap_type = HAL_TCL_ENCAP_TYPE_RAW;
+		ti.encrypt_type = HAL_ENCRYPT_TYPE_OPEN;
+	}
+
 	ti.paddr = dma_map_single(ab->dev, skb->data, skb->len, DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(ab->dev, ti.paddr))) {
 		atomic_inc(&ab->soc_stats.tx_err.misc_fail);
 		ath11k_warn(ab, "failed to DMA map data Tx buffer\n");
 		ret = -ENOMEM;
-		goto fail_remove_idr;
+		goto fail_pull_skb;
 	}
 
-	ti.data_len = skb->len;
+	ti.data_len = skb->len - ti.pkt_offset;
 	skb_cb->paddr = ti.paddr;
 	skb_cb->vif = arvif->vif;
 	skb_cb->ar = ar;
@@ -273,6 +339,10 @@ tcl_ring_sel:
 
 fail_unmap_dma:
 	dma_unmap_single(ab->dev, ti.paddr, ti.data_len, DMA_TO_DEVICE);
+
+fail_pull_skb:
+	if (ti.pkt_offset)
+		skb_pull(skb, ti.pkt_offset);
 
 fail_remove_idr:
 	spin_lock_bh(&tx_ring->tx_idr_lock);
