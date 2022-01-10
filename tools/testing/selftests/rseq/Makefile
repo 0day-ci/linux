@@ -13,7 +13,8 @@ LDLIBS += -lpthread
 OVERRIDE_TARGETS = 1
 
 TEST_GEN_PROGS = basic_test basic_percpu_ops_test param_test \
-		param_test_benchmark param_test_compare_twice
+		param_test_benchmark param_test_compare_twice \
+		rseq_ext_abort_at_ip
 
 TEST_GEN_PROGS_EXTENDED = librseq.so
 

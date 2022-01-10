@@ -72,6 +72,27 @@ static int sys_rseq(volatile struct rseq *rseq_abi, uint32_t rseq_len,
 	return syscall(__NR_rseq, rseq_abi, rseq_len, flags, sig);
 }
 
+/*
+ * Return 0 if extension is available, negative error otherwise.
+ */
+int rseq_query_extension(enum rseq_extension ext)
+{
+	int ret;
+	unsigned int flags;
+
+	switch (ext) {
+	case RSEQ_EXT_ABORT_AT_IP:
+		flags = RSEQ_FLAG_QUERY_ABORT_AT_IP;
+		break;
+	default:
+		return -EINVAL;
+	}
+	ret = sys_rseq(NULL, 0, flags, 0);
+	if (!ret)
+		return 0;
+	return -errno;
+}
+
 int rseq_register_current_thread(void)
 {
 	int rc, ret = 0;

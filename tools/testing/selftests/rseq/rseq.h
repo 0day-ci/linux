@@ -67,6 +67,12 @@ extern int __rseq_handled;
 		abort();		\
 	} while (0)
 
+enum rseq_extension {
+	RSEQ_EXT_ABORT_AT_IP = 0,
+};
+
+#define ASM_RSEQ_CS_FLAG_ABORT_AT_IP	(1U << 3)
+
 #if defined(__x86_64__) || defined(__i386__)
 #include <rseq-x86.h>
 #elif defined(__ARMEL__)
@@ -161,5 +167,11 @@ static inline void rseq_prepare_unload(void)
 {
 	rseq_clear_rseq_cs();
 }
+
+/*
+ * Query whether rseq extension is available. Return 0 if available, negative
+ * error value otherwise.
+ */
+int rseq_query_extension(enum rseq_extension ext);
 
 #endif  /* RSEQ_H_ */
