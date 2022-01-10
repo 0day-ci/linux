@@ -212,7 +212,7 @@ static void smc_lgr_unregister_conn(struct smc_connection *conn)
 {
 	struct smc_link_group *lgr = conn->lgr;
 
-	if (!lgr)
+	if (!smc_conn_lgr_valid(conn))
 		return;
 	write_lock_bh(&lgr->conns_lock);
 	if (conn->alert_token_local) {
@@ -1132,7 +1132,7 @@ void smc_conn_free(struct smc_connection *conn)
 		return;
 
 	conn->freed = 1;
-	if (!conn->alert_token_local)
+	if (!smc_conn_lgr_valid(conn))
 		/* The connection was registered in a link group
 		 * defore, but now it is unregistered from it.
 		 */
@@ -2259,14 +2259,16 @@ static int __smc_buf_create(struct smc_sock *smc, bool is_smcd, bool is_rmb)
 
 void smc_sndbuf_sync_sg_for_cpu(struct smc_connection *conn)
 {
-	if (!conn->lgr || conn->lgr->is_smcd || !smc_link_active(conn->lnk))
+	if (!smc_conn_lgr_valid(conn) || conn->lgr->is_smcd ||
+	    !smc_link_active(conn->lnk))
 		return;
 	smc_ib_sync_sg_for_cpu(conn->lnk, conn->sndbuf_desc, DMA_TO_DEVICE);
 }
 
 void smc_sndbuf_sync_sg_for_device(struct smc_connection *conn)
 {
-	if (!conn->lgr || conn->lgr->is_smcd || !smc_link_active(conn->lnk))
+	if (!smc_conn_lgr_valid(conn) || conn->lgr->is_smcd ||
+	    !smc_link_active(conn->lnk))
 		return;
 	smc_ib_sync_sg_for_device(conn->lnk, conn->sndbuf_desc, DMA_TO_DEVICE);
 }
@@ -2275,7 +2277,7 @@ void smc_rmb_sync_sg_for_cpu(struct smc_connection *conn)
 {
 	int i;
 
-	if (!conn->lgr || conn->lgr->is_smcd)
+	if (!smc_conn_lgr_valid(conn) || conn->lgr->is_smcd)
 		return;
 	for (i = 0; i < SMC_LINKS_PER_LGR_MAX; i++) {
 		if (!smc_link_active(&conn->lgr->lnk[i]))
@@ -2289,7 +2291,7 @@ void smc_rmb_sync_sg_for_device(struct smc_connection *conn)
 {
 	int i;
 
-	if (!conn->lgr || conn->lgr->is_smcd)
+	if (!smc_conn_lgr_valid(conn) || conn->lgr->is_smcd)
 		return;
 	for (i = 0; i < SMC_LINKS_PER_LGR_MAX; i++) {
 		if (!smc_link_active(&conn->lgr->lnk[i]))
