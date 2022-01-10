@@ -34,7 +34,7 @@
  */
 
 
-#define TASKSTATS_VERSION	11
+#define TASKSTATS_VERSION	12
 #define TS_COMM_LEN		32	/* should be >= TASK_COMM_LEN
 					 * in linux/sched.h */
 
@@ -174,6 +174,21 @@ struct taskstats {
 	__u64	ac_btime64;		/* 64-bit begin time */
 	/* v11: thread group ID to identify process vs. (non-leader) thread */
 	__u32   ac_tgid;
+	/* v12: lightweight information to identify process binary files
+	 * I would prefer the fully resolved path, but presume that would need
+	 * growing of the struct by PATH_MAX bytes. A hash sum might be an
+	 * alternative, but expensive again. Suggestions welcome. My client
+	 * application maps device and inode to path in userspace, having
+	 * possible failure modes (changes in mounts, filesystem operations),
+	 * in mind.
+	 *
+	 * I kept both fields at 64 bits. Device ID usually has only 16 bits
+	 * relevant for userspace resolving it to MAJOR and MINOR. Limiting
+	 * to that preferred? Or store MAJOR:MINOR as two values here?
+	 * Both values are zero if no executable file is present.
+	 */
+	__u64   ac_exe_dev;     /* program binary device ID */
+	__u64   ac_exe_inode;   /* program binary inode number */
 };
 
 
