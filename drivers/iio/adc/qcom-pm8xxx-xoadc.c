@@ -175,7 +175,7 @@ struct xoadc_channel {
 	const char *datasheet_name;
 	u8 pre_scale_mux:2;
 	u8 amux_channel:4;
-	const struct vadc_prescale_ratio prescale;
+	const struct u32_fract prescale;
 	enum iio_chan_type type;
 	enum vadc_scale_fn_type scale_fn_type;
 	u8 amux_ip_rsv:3;

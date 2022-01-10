@@ -122,7 +122,7 @@ struct vadc_priv {
 	struct mutex		 lock;
 };
 
-static const struct vadc_prescale_ratio vadc_prescale_ratios[] = {
+static const struct u32_fract vadc_prescale_ratios[] = {
 	{.num =  1, .den =  1},
 	{.num =  1, .den =  3},
 	{.num =  1, .den =  4},
