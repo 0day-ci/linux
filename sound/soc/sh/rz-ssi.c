@@ -201,12 +201,36 @@ static bool rz_ssi_stream_is_valid(struct rz_ssi_priv *ssi,
 	return ret;
 }
 
+static struct snd_pcm_substream *rz_ssi_get_substream(struct rz_ssi_stream *strm)
+{
+	struct rz_ssi_priv *ssi = strm->priv;
+	struct snd_pcm_substream *substream;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ssi->lock, flags);
+	substream = strm->substream;
+	spin_unlock_irqrestore(&ssi->lock, flags);
+
+	return substream;
+}
+
+static void rz_ssi_set_substream(struct rz_ssi_stream *strm,
+				 struct snd_pcm_substream *substream)
+{
+	struct rz_ssi_priv *ssi = strm->priv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ssi->lock, flags);
+	strm->substream = substream;
+	spin_unlock_irqrestore(&ssi->lock, flags);
+}
+
 static void rz_ssi_stream_init(struct rz_ssi_stream *strm,
 			       struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 
-	strm->substream = substream;
+	rz_ssi_set_substream(strm, substream);
 	strm->sample_width = samples_to_bytes(runtime, 1);
 	strm->dma_buffer_pos = 0;
 	strm->period_counter = 0;
@@ -223,12 +247,13 @@ static void rz_ssi_stream_init(struct rz_ssi_stream *strm,
 static void rz_ssi_stream_quit(struct rz_ssi_priv *ssi,
 			       struct rz_ssi_stream *strm)
 {
-	struct snd_soc_dai *dai = rz_ssi_get_dai(strm->substream);
-	unsigned long flags;
+	struct snd_pcm_substream *substream;
+	struct snd_soc_dai *dai;
 
-	spin_lock_irqsave(&ssi->lock, flags);
-	strm->substream = NULL;
-	spin_unlock_irqrestore(&ssi->lock, flags);
+	substream = rz_ssi_get_substream(strm);
+	rz_ssi_set_substream(strm, NULL);
+
+	dai = rz_ssi_get_dai(substream);
 
 	if (strm->oerr_num > 0)
 		dev_info(dai->dev, "overrun = %d\n", strm->oerr_num);
@@ -301,7 +326,8 @@ static int rz_ssi_clk_setup(struct rz_ssi_priv *ssi, unsigned int rate,
 
 static int rz_ssi_start(struct rz_ssi_priv *ssi, struct rz_ssi_stream *strm)
 {
-	bool is_play = rz_ssi_stream_is_play(ssi, strm->substream);
+	struct snd_pcm_substream *substream = rz_ssi_get_substream(strm);
+	bool is_play = rz_ssi_stream_is_play(ssi, substream);
 	u32 ssicr, ssifcr;
 
 	ssicr = rz_ssi_reg_readl(ssi, SSICR);
@@ -382,7 +408,7 @@ static int rz_ssi_stop(struct rz_ssi_priv *ssi, struct rz_ssi_stream *strm)
 
 static void rz_ssi_pointer_update(struct rz_ssi_stream *strm, int frames)
 {
-	struct snd_pcm_substream *substream = strm->substream;
+	struct snd_pcm_substream *substream = rz_ssi_get_substream(strm);
 	struct snd_pcm_runtime *runtime;
 	int current_period;
 
@@ -399,14 +425,14 @@ static void rz_ssi_pointer_update(struct rz_ssi_stream *strm, int frames)
 
 	current_period = strm->buffer_pos / runtime->period_size;
 	if (strm->period_counter != current_period) {
-		snd_pcm_period_elapsed(strm->substream);
+		snd_pcm_period_elapsed(substream);
 		strm->period_counter = current_period;
 	}
 }
 
 static int rz_ssi_pio_recv(struct rz_ssi_priv *ssi, struct rz_ssi_stream *strm)
 {
-	struct snd_pcm_substream *substream = strm->substream;
+	struct snd_pcm_substream *substream = rz_ssi_get_substream(strm);
 	struct snd_pcm_runtime *runtime;
 	bool done = false;
 	u16 *buf;
@@ -464,7 +490,7 @@ static int rz_ssi_pio_recv(struct rz_ssi_priv *ssi, struct rz_ssi_stream *strm)
 
 static int rz_ssi_pio_send(struct rz_ssi_priv *ssi, struct rz_ssi_stream *strm)
 {
-	struct snd_pcm_substream *substream = strm->substream;
+	struct snd_pcm_substream *substream = rz_ssi_get_substream(strm);
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int sample_space;
 	int samples = 0;
@@ -588,7 +614,7 @@ static int rz_ssi_dma_slave_config(struct rz_ssi_priv *ssi,
 static int rz_ssi_dma_transfer(struct rz_ssi_priv *ssi,
 			       struct rz_ssi_stream *strm)
 {
-	struct snd_pcm_substream *substream = strm->substream;
+	struct snd_pcm_substream *substream = rz_ssi_get_substream(strm);
 	struct dma_async_tx_descriptor *desc;
 	struct snd_pcm_runtime *runtime;
 	enum dma_transfer_direction dir;
@@ -646,12 +672,13 @@ static int rz_ssi_dma_transfer(struct rz_ssi_priv *ssi,
 static void rz_ssi_dma_complete(void *data)
 {
 	struct rz_ssi_stream *strm = (struct rz_ssi_stream *)data;
+	struct snd_pcm_substream *substream = rz_ssi_get_substream(strm);
 
-	if (!strm->running || !strm->substream || !strm->substream->runtime)
+	if (!strm->running || !substream || !substream->runtime)
 		return;
 
 	/* Note that next DMA transaction has probably already started */
-	rz_ssi_pointer_update(strm, strm->substream->runtime->period_size);
+	rz_ssi_pointer_update(strm, substream->runtime->period_size);
 
 	/* Queue up another DMA transaction */
 	rz_ssi_dma_transfer(strm->priv, strm);
