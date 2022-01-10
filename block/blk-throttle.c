@@ -2050,6 +2050,9 @@ void blk_throtl_charge_bio_split(struct bio *bio)
 	struct throtl_service_queue *parent_sq;
 	bool rw = bio_data_dir(bio);
 
+	if (!bio_flagged(bio, BIO_THROTTLED))
+		return;
+
 	do {
 		if (!parent->has_rules[rw])
 			break;
