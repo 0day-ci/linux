@@ -565,7 +565,7 @@ static struct rb_node *bfq_find_deepest(struct rb_node *node)
 
 /**
  * bfq_active_extract - remove an entity from the active tree.
- * @st: the service_tree containing the tree.
+ * @st: the service_tree containing the entity.
  * @entity: the entity being removed.
  */
 static void bfq_active_extract(struct bfq_service_tree *st,
