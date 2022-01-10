@@ -301,7 +301,6 @@ static int bh1770_lux_update_thresholds(struct bh1770_chip *chip,
 					u16 threshold_hi, u16 threshold_lo)
 {
 	u8 data[4];
-	int ret;
 
 	/* sysfs may call this when the chip is powered off */
 	if (pm_runtime_suspended(&chip->client->dev))
@@ -330,11 +329,10 @@ static int bh1770_lux_update_thresholds(struct bh1770_chip *chip,
 	data[2] = threshold_lo;
 	data[3] = threshold_lo >> 8;
 
-	ret = i2c_smbus_write_i2c_block_data(chip->client,
+	return i2c_smbus_write_i2c_block_data(chip->client,
 					BH1770_ALS_TH_UP_0,
 					ARRAY_SIZE(data),
 					data);
-	return ret;
 }
 
 static int bh1770_lux_get_result(struct bh1770_chip *chip)
