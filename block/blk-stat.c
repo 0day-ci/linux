@@ -18,36 +18,6 @@ struct blk_queue_stats {
 	bool enable_accounting;
 };
 
-void blk_rq_stat_init(struct blk_rq_stat *stat)
-{
-	stat->min = -1ULL;
-	stat->max = stat->nr_samples = stat->mean = 0;
-	stat->batch = 0;
-}
-
-/* src is a per-cpu stat, mean isn't initialized */
-void blk_rq_stat_sum(struct blk_rq_stat *dst, struct blk_rq_stat *src)
-{
-	if (!src->nr_samples)
-		return;
-
-	dst->min = min(dst->min, src->min);
-	dst->max = max(dst->max, src->max);
-
-	dst->mean = div_u64(src->batch + dst->mean * dst->nr_samples,
-				dst->nr_samples + src->nr_samples);
-
-	dst->nr_samples += src->nr_samples;
-}
-
-void blk_rq_stat_add(struct blk_rq_stat *stat, u64 value)
-{
-	stat->min = min(stat->min, value);
-	stat->max = max(stat->max, value);
-	stat->batch += value;
-	stat->nr_samples++;
-}
-
 void blk_stat_add(struct request *rq, u64 now)
 {
 	struct request_queue *q = rq->q;

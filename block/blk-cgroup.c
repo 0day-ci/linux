@@ -55,9 +55,17 @@ static struct blkcg_policy *blkcg_policy[BLKCG_MAX_POLS];
 static LIST_HEAD(all_blkcgs);		/* protected by blkcg_pol_mutex */
 
 bool blkcg_debug_stats = false;
+EXPORT_SYMBOL_GPL(blkcg_debug_stats);
+
 static struct workqueue_struct *blkcg_punt_bio_wq;
 
 #define BLKG_DESTROY_BATCH_SIZE  64
+
+bool blkcg_debug_stats_enabled(void)
+{
+	return blkcg_debug_stats;
+}
+EXPORT_SYMBOL_GPL(blkcg_debug_stats_enabled);
 
 static bool blkcg_policy_enabled(struct request_queue *q,
 				 const struct blkcg_policy *pol)
@@ -494,6 +502,7 @@ const char *blkg_dev_name(struct blkcg_gq *blkg)
 		return NULL;
 	return bdi_dev_name(blkg->q->disk->bdi);
 }
+EXPORT_SYMBOL_GPL(blkg_dev_name);
 
 /**
  * blkcg_print_blkgs - helper for printing per-blkg data
@@ -606,6 +615,7 @@ struct block_device *blkcg_conf_open_bdev(char **inputp)
 	*inputp = input;
 	return bdev;
 }
+EXPORT_SYMBOL_GPL(blkcg_conf_open_bdev);
 
 /**
  * blkg_conf_prep - parse and prepare for per-blkg config update
@@ -1778,6 +1788,7 @@ void blkcg_schedule_throttle(struct request_queue *q, bool use_memdelay)
 		current->use_memdelay = use_memdelay;
 	set_notify_resume(current);
 }
+EXPORT_SYMBOL_GPL(blkcg_schedule_throttle);
 
 /**
  * blkcg_add_delay - add delay to this blkg
@@ -1795,6 +1806,7 @@ void blkcg_add_delay(struct blkcg_gq *blkg, u64 now, u64 delta)
 	blkcg_scale_delay(blkg, now);
 	atomic64_add(delta, &blkg->delay_nsec);
 }
+EXPORT_SYMBOL_GPL(blkcg_add_delay);
 
 /**
  * blkg_tryget_closest - try and get a blkg ref on the closet blkg

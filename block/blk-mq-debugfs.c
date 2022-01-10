@@ -835,6 +835,7 @@ void blk_mq_debugfs_unregister_rqos(struct rq_qos *rqos)
 	debugfs_remove_recursive(rqos->debugfs_dir);
 	rqos->debugfs_dir = NULL;
 }
+EXPORT_SYMBOL_GPL(blk_mq_debugfs_unregister_rqos);
 
 void blk_mq_debugfs_register_rqos(struct rq_qos *rqos)
 {
@@ -855,6 +856,7 @@ void blk_mq_debugfs_register_rqos(struct rq_qos *rqos)
 
 	debugfs_create_files(rqos->debugfs_dir, rqos, rqos->ops->debugfs_attrs);
 }
+EXPORT_SYMBOL_GPL(blk_mq_debugfs_register_rqos);
 
 void blk_mq_debugfs_unregister_queue_rqos(struct request_queue *q)
 {

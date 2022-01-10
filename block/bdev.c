@@ -761,11 +761,6 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 	return bdev;
 }
 
-void blkdev_put_no_open(struct block_device *bdev)
-{
-	put_device(&bdev->bd_device);
-}
-
 /**
  * blkdev_get_by_dev - open a block device by device number
  * @dev: device number of block device to open

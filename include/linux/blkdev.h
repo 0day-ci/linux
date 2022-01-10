@@ -1297,7 +1297,10 @@ void blkdev_put(struct block_device *bdev, fmode_t mode);
 
 /* just for blk-cgroup, don't use elsewhere */
 struct block_device *blkdev_get_no_open(dev_t dev);
-void blkdev_put_no_open(struct block_device *bdev);
+static inline void blkdev_put_no_open(struct block_device *bdev)
+{
+	put_device(&bdev->bd_device);
+}
 
 struct block_device *bdev_alloc(struct gendisk *disk, u8 partno);
 void bdev_add(struct block_device *bdev, dev_t dev);

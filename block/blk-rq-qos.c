@@ -33,6 +33,7 @@ bool rq_wait_inc_below(struct rq_wait *rq_wait, unsigned int limit)
 {
 	return atomic_inc_below(&rq_wait->inflight, limit);
 }
+EXPORT_SYMBOL_GPL(rq_wait_inc_below);
 
 void __rq_qos_cleanup(struct rq_qos *rqos, struct bio *bio)
 {
@@ -296,6 +297,7 @@ void rq_qos_wait(struct rq_wait *rqw, void *private_data,
 	} while (1);
 	finish_wait(&rqw->wait, &data.wq);
 }
+EXPORT_SYMBOL_GPL(rq_qos_wait);
 
 void rq_qos_exit(struct request_queue *q)
 {
