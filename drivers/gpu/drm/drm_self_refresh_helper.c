@@ -204,8 +204,12 @@ void drm_self_refresh_helper_alter_state(struct drm_atomic_state *state)
 		struct drm_self_refresh_data *sr_data;
 		unsigned int delay;
 
-		/* Don't trigger the entry timer when we're already in SR */
-		if (crtc_state->self_refresh_active)
+		/*
+		 * Don't trigger the entry timer when we're already inactive.
+		 * Note that the inactive state hints that either we're already
+		 * in SR or the entire display pipeline is already disabled.
+		 */
+		if (!crtc_state->active)
 			continue;
 
 		sr_data = crtc->self_refresh_data;
