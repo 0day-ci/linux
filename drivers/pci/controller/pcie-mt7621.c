@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/sys_soc.h>
+#include <asm/mips-cps.h>
 
 /* MediaTek-specific configuration registers */
 #define PCIE_FTS_NUM			0x70c
