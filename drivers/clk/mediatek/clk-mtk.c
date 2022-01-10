@@ -332,5 +332,6 @@ free_data:
 	mtk_free_clk_data(clk_data);
 	return r;
 }
+EXPORT_SYMBOL_GPL(mtk_clk_simple_probe);
 
 MODULE_LICENSE("GPL");
