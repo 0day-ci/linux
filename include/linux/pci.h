@@ -511,6 +511,7 @@ struct pci_dev {
 	struct pci_p2pdma __rcu *p2pdma;
 #endif
 	u16		acs_cap;	/* ACS Capability offset */
+	u8		supported_link_speed; /* Override Supported Link Speed value from device */
 	phys_addr_t	rom;		/* Physical address if not from BAR */
 	size_t		romlen;		/* Length if not from BAR */
 	char		*driver_override; /* Driver name to force a match */

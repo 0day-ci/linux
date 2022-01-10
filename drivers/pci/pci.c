@@ -6136,6 +6136,10 @@ enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev)
 {
 	u32 lnkcap2, lnkcap;
 
+	/* Use overridden value of Supported Link Speed */
+	if (dev->supported_link_speed)
+		return dev->supported_link_speed;
+
 	/*
 	 * Link Capabilities 2 was added in PCIe r3.0, sec 7.8.18.  The
 	 * implementation note there recommends using the Supported Link
