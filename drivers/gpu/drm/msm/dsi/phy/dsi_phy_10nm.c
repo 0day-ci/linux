@@ -775,10 +775,13 @@ static void dsi_phy_hw_v3_0_lane_settings(struct msm_dsi_phy *phy)
 		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_CFG2(i), 0x0);
 		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_CFG3(i),
 			      i == 4 ? 0x80 : 0x0);
-		dsi_phy_write(lane_base +
-			      REG_DSI_10nm_PHY_LN_OFFSET_TOP_CTRL(i), 0x0);
-		dsi_phy_write(lane_base +
-			      REG_DSI_10nm_PHY_LN_OFFSET_BOT_CTRL(i), 0x0);
+
+		/* platform specific dsi phy drive strength adjustment */
+		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_OFFSET_TOP_CTRL(i),
+				phy->tuning_cfg.rescode_offset_top[i]);
+		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_OFFSET_BOT_CTRL(i),
+				phy->tuning_cfg.rescode_offset_bot[i]);
+
 		dsi_phy_write(lane_base + REG_DSI_10nm_PHY_LN_TX_DCTRL(i),
 			      tx_dctrl[i]);
 	}
@@ -834,8 +837,9 @@ static int dsi_10nm_phy_enable(struct msm_dsi_phy *phy,
 	/* Select MS1 byte-clk */
 	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_GLBL_CTRL, 0x10);
 
-	/* Enable LDO */
-	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_VREG_CTRL, 0x59);
+	/* Enable LDO with platform specific drive level/amplitude adjustment */
+	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_VREG_CTRL,
+		      phy->tuning_cfg.vreg_ctrl);
 
 	/* Configure PHY lane swap (TODO: we need to calculate this) */
 	dsi_phy_write(base + REG_DSI_10nm_PHY_CMN_LANE_CFG0, 0x21);
@@ -922,6 +926,39 @@ static void dsi_10nm_phy_disable(struct msm_dsi_phy *phy)
 	DBG("DSI%d PHY disabled", phy->id);
 }
 
+static void dsi_10nm_phy_tuning_cfg_init(struct msm_dsi_phy *phy)
+{
+	struct device *dev = &phy->pdev->dev;
+	u8 offset_top[DSI_LANE_MAX] = { 0 }; /* No offset */
+	u8 offset_bot[DSI_LANE_MAX] = { 0 }; /* No offset */
+	u8 ldo_level = 0x1; /* 400mV */
+	int ret, i;
+
+	/* Drive strength adjustment parameters */
+	ret = of_property_read_u8_array(dev->of_node, "phy-resocde-offset-top",
+					offset_top, DSI_LANE_MAX);
+	if (ret && ret != -EINVAL)
+		DRM_DEV_ERROR(dev, "failed to parse phy-resocde-offset-top, %d\n", ret);
+
+	for (i = 0; i < DSI_LANE_MAX; i++)
+		phy->tuning_cfg.rescode_offset_top[i] = 0x3f & offset_top[i];
+
+	ret = of_property_read_u8_array(dev->of_node, "phy-resocde-offset-bot",
+					offset_bot, DSI_LANE_MAX);
+	if (ret && ret != -EINVAL)
+		DRM_DEV_ERROR(dev, "failed to parse phy-resocde-offset-bot, %d\n", ret);
+
+	for (i = 0; i < DSI_LANE_MAX; i++)
+		phy->tuning_cfg.rescode_offset_bot[i] = 0x3f & offset_bot[i];
+
+	/* Drive level/amplitude adjustment parameters */
+	ret = of_property_read_u8(dev->of_node, "phy-drive-ldo-level", &ldo_level);
+	if (ret && ret != -EINVAL)
+		DRM_DEV_ERROR(dev, "failed to parse phy-drive-ldo-level, %d\n", ret);
+
+	phy->tuning_cfg.vreg_ctrl = 0x58 | (0x7 & ldo_level);
+}
+
 const struct msm_dsi_phy_cfg dsi_phy_10nm_cfgs = {
 	.has_phy_lane = true,
 	.reg_cfg = {
@@ -936,6 +973,7 @@ const struct msm_dsi_phy_cfg dsi_phy_10nm_cfgs = {
 		.pll_init = dsi_pll_10nm_init,
 		.save_pll_state = dsi_10nm_pll_save_state,
 		.restore_pll_state = dsi_10nm_pll_restore_state,
+		.tuning_cfg_init = dsi_10nm_phy_tuning_cfg_init,
 	},
 	.min_pll_rate = 1000000000UL,
 	.max_pll_rate = 3500000000UL,
@@ -957,6 +995,7 @@ const struct msm_dsi_phy_cfg dsi_phy_10nm_8998_cfgs = {
 		.pll_init = dsi_pll_10nm_init,
 		.save_pll_state = dsi_10nm_pll_save_state,
 		.restore_pll_state = dsi_10nm_pll_restore_state,
+		.tuning_cfg_init = dsi_10nm_phy_tuning_cfg_init,
 	},
 	.min_pll_rate = 1000000000UL,
 	.max_pll_rate = 3500000000UL,
