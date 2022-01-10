@@ -1562,7 +1562,7 @@ static void __split_and_process_bio(struct mapped_device *md,
 
 			bio_chain(b, bio);
 			trace_block_split(b, bio->bi_iter.bi_sector);
-			submit_bio_noacct(bio);
+			resubmit_bio_noacct(bio);
 		}
 	}
 
