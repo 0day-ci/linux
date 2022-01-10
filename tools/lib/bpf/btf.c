@@ -1620,19 +1620,34 @@ static int btf_commit_type(struct btf *btf, int data_sz)
 struct btf_pipe {
 	const struct btf *src;
 	struct btf *dst;
+	struct hashmap str_off_map; /* map string offsets from src to dst */
 };
 
 static int btf_rewrite_str(__u32 *str_off, void *ctx)
 {
 	struct btf_pipe *p = ctx;
+	void *mapped_off;
 	int off;
+	int err;
 
 	if (!*str_off) /* nothing to do for empty strings */
 		return 0;
 
+	if (hashmap__find(&p->str_off_map, (void *)(long)*str_off, &mapped_off)) {
+		*str_off = (__u32)(long)mapped_off;
+		return 0;
+	}
+
 	off = btf__add_str(p->dst, btf__str_by_offset(p->src, *str_off));
 	if (off < 0)
 		return off;
+
+	/* Remember string mapping from src to dst.  It avoids
+	 * performing expensive string comparisons.
+	 */
+	err = hashmap__append(&p->str_off_map, (void *)(long)*str_off, (void *)(long)off);
+	if (err)
+		return err;
 
 	*str_off = off;
 	return 0;
@@ -1680,12 +1695,18 @@ static int btf_rewrite_type_ids(__u32 *type_id, void *ctx)
 	return 0;
 }
 
+static size_t btf_dedup_identity_hash_fn(const void *key, void *ctx);
+static bool btf_dedup_equal_fn(const void *k1, const void *k2, void *ctx);
+
 int btf__add_btf(struct btf *btf, const struct btf *src_btf)
 {
 	struct btf_pipe p = { .src = src_btf, .dst = btf };
 	int data_sz, sz, cnt, i, err, old_strs_len;
 	__u32 *off;
 	void *t;
+
+	/* Map the string offsets from src_btf to the offsets from btf to improve performance */
+	hashmap__init(&p.str_off_map, btf_dedup_identity_hash_fn, btf_dedup_equal_fn, NULL);
 
 	/* appending split BTF isn't supported yet */
 	if (src_btf->base_btf)
@@ -1754,6 +1775,8 @@ int btf__add_btf(struct btf *btf, const struct btf *src_btf)
 	btf->hdr->str_off += data_sz;
 	btf->nr_types += cnt;
 
+	hashmap__clear(&p.str_off_map);
+
 	/* return type ID of the first added BTF type */
 	return btf->start_id + btf->nr_types - cnt;
 err_out:
@@ -1766,6 +1789,8 @@ err_out:
 	/* and now restore original strings section size; types data size
 	 * wasn't modified, so doesn't need restoring, see big comment above */
 	btf->hdr->str_len = old_strs_len;
+
+	hashmap__clear(&p.str_off_map);
 
 	return libbpf_err(err);
 }
