@@ -157,4 +157,6 @@ u16 ifcvf_get_vq_state(struct ifcvf_hw *hw, u16 qid);
 int ifcvf_set_vq_state(struct ifcvf_hw *hw, u16 qid, u16 num);
 struct ifcvf_adapter *vf_to_adapter(struct ifcvf_hw *hw);
 int ifcvf_probed_virtio_net(struct ifcvf_hw *hw);
+int ifcvf_set_vq_vector(struct ifcvf_hw *hw, u16 qid, int vector);
+int ifcvf_set_config_vector(struct ifcvf_hw *hw, int vector);
 #endif /* _IFCVF_H_ */
