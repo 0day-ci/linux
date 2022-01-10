@@ -828,6 +828,8 @@
 				#stream-id-cells = <1>;
 				iommus = <&smmu 0x860>;
 				snps,quirk-frame-length-adjustment = <0x20>;
+				snps,ref-clock-period-ns = <50>;
+				snps,ref-clock-fladj = <0>;
 				/* dma-coherent; */
 			};
 		};
@@ -855,6 +857,8 @@
 				#stream-id-cells = <1>;
 				iommus = <&smmu 0x861>;
 				snps,quirk-frame-length-adjustment = <0x20>;
+				snps,ref-clock-period-ns = <50>;
+				snps,ref-clock-fladj = <0>;
 				/* dma-coherent; */
 			};
 		};
