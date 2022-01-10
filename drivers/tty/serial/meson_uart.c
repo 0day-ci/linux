@@ -863,6 +863,10 @@ static const struct of_device_id meson_uart_dt_match[] = {
 		.compatible = "amlogic,meson-g12a-uart",
 		.data = (void *)true,
 	},
+	{
+		.compatible = "amlogic,meson-s4-uart",
+		.data = (void *)true,
+	},
 	/*
 	 * deprecated, don't use anymore because it doesn't differentiate
 	 * between GXBB, GXL and G12A which have different revisions
