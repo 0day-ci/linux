@@ -451,6 +451,15 @@ static int occ_trigger_attn(struct occ *occ)
 	return rc;
 }
 
+static void fsi_occ_print_timeout(struct occ *occ, struct occ_response *resp,
+				  u8 seq_no, u8 cmd_type)
+{
+	dev_err(occ->dev,
+		"resp timeout status=%02x seq=%d cmd=%d, our seq=%d cmd=%d\n",
+		resp->return_status, resp->seq_no, resp->cmd_type, seq_no,
+		cmd_type);
+}
+
 int fsi_occ_submit(struct device *dev, const void *request, size_t req_len,
 		   void *response, size_t *resp_len)
 {
@@ -461,12 +470,14 @@ int fsi_occ_submit(struct device *dev, const void *request, size_t req_len,
 	struct occ_response *resp = response;
 	size_t user_resp_len = *resp_len;
 	u8 seq_no;
+	u8 cmd_type;
 	u16 checksum = 0;
 	u16 resp_data_length;
 	const u8 *byte_request = (const u8 *)request;
-	unsigned long start;
+	unsigned long end;
 	int rc;
 	size_t i;
+	bool retried = false;
 
 	*resp_len = 0;
 
@@ -477,6 +488,8 @@ int fsi_occ_submit(struct device *dev, const void *request, size_t req_len,
 		dev_dbg(dev, "Bad resplen %zd\n", user_resp_len);
 		return -EINVAL;
 	}
+
+	cmd_type = byte_request[1];
 
 	/* Checksum the request, ignoring first byte (sequence number). */
 	for (i = 1; i < req_len - 2; ++i)
@@ -509,30 +522,30 @@ int fsi_occ_submit(struct device *dev, const void *request, size_t req_len,
 	if (rc)
 		goto done;
 
-	/* Read occ response header */
-	start = jiffies;
+retry:
+	end = jiffies + timeout;
 	do {
+		/* Read occ response header */
 		rc = occ_getsram(occ, 0, resp, 8);
 		if (rc)
 			goto done;
 
 		if (resp->return_status == OCC_RESP_CMD_IN_PRG ||
 		    resp->return_status == OCC_RESP_CRIT_INIT ||
-		    resp->seq_no != seq_no) {
-			rc = -ETIMEDOUT;
-
-			if (time_after(jiffies, start + timeout)) {
-				dev_err(occ->dev, "resp timeout status=%02x "
-					"resp seq_no=%d our seq_no=%d\n",
-					resp->return_status, resp->seq_no,
-					seq_no);
+		    resp->seq_no != seq_no || resp->cmd_type != cmd_type) {
+			if (time_after(jiffies, end)) {
+				fsi_occ_print_timeout(occ, resp, seq_no,
+						      cmd_type);
+				rc = -ETIMEDOUT;
 				goto done;
 			}
 
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(wait_time);
+		} else {
+			break;
 		}
-	} while (rc);
+	} while (true);
 
 	/* Extract size of response data */
 	resp_data_length = get_unaligned_be16(&resp->data_length);
@@ -543,16 +556,28 @@ int fsi_occ_submit(struct device *dev, const void *request, size_t req_len,
 		goto done;
 	}
 
-	dev_dbg(dev, "resp_status=%02x resp_data_len=%d\n",
-		resp->return_status, resp_data_length);
-
-	/* Grab the rest */
+	/* Now get the entire response; get header again in case it changed */
 	if (resp_data_length > 1) {
-		/* already got 3 bytes resp, also need 2 bytes checksum */
-		rc = occ_getsram(occ, 8, &resp->data[3], resp_data_length - 1);
+		rc = occ_getsram(occ, 0, resp, resp_data_length + 7);
 		if (rc)
 			goto done;
+
+		if (resp->return_status == OCC_RESP_CMD_IN_PRG ||
+		    resp->return_status == OCC_RESP_CRIT_INIT ||
+		    resp->seq_no != seq_no || resp->cmd_type != cmd_type) {
+			if (!retried) {
+				retried = true;
+				goto retry;
+			}
+
+			fsi_occ_print_timeout(occ, resp, seq_no, cmd_type);
+			rc = -ETIMEDOUT;
+			goto done;
+		}
 	}
+
+	dev_dbg(dev, "resp_status=%02x resp_data_len=%d\n",
+		resp->return_status, resp_data_length);
 
 	occ->client_response_size = resp_data_length + 7;
 	rc = occ_verify_checksum(occ, resp, resp_data_length);
@@ -598,7 +623,7 @@ static int occ_probe(struct platform_device *pdev)
 	occ->version = (uintptr_t)of_device_get_match_data(dev);
 	occ->dev = dev;
 	occ->sbefifo = dev->parent;
-	occ->sequence_number = 1;
+	occ->sequence_number = (u8)((jiffies % 0xff) + 1);
 	mutex_init(&occ->occ_lock);
 
 	if (dev->of_node) {
