@@ -2821,7 +2821,7 @@ sub process {
 			$in_commit_log = 0;
 
 			$p1_prefix = $1;
-			if (!$file && $tree && $p1_prefix ne '' &&
+			if (!$file && $tree && $p1_prefix ne '' && $p1_prefix ne 'b' &&
 			    -e "$root/$p1_prefix") {
 				WARN("PATCH_PREFIX",
 				     "patch prefix '$p1_prefix' exists, appears to be a -p0 patch\n");
