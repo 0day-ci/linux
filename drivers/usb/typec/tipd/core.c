@@ -744,10 +744,14 @@ static int tps6598x_probe(struct i2c_client *client)
 
 		irq_handler = cd321x_interrupt;
 	} else {
+		ret = tps6598x_read64(tps, TPS_REG_INT_MASK1, &mask1);
+		if (ret)
+			return ret;
+
 		/* Enable power status, data status and plug event interrupts */
-		mask1 = TPS_REG_INT_POWER_STATUS_UPDATE |
-			TPS_REG_INT_DATA_STATUS_UPDATE |
-			TPS_REG_INT_PLUG_EVENT;
+		mask1 |= TPS_REG_INT_POWER_STATUS_UPDATE |
+			 TPS_REG_INT_DATA_STATUS_UPDATE |
+			 TPS_REG_INT_PLUG_EVENT;
 	}
 
 	/* Make sure the controller has application firmware running */
