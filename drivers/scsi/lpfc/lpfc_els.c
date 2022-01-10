@@ -4664,7 +4664,8 @@ lpfc_els_retry(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 			break;
 
 		case LSRJT_LOGICAL_BSY:
-			if ((cmd == ELS_CMD_PLOGI) ||
+			if ((cmd == ELS_CMD_FLOGI) ||
+			    (cmd == ELS_CMD_PLOGI) ||
 			    (cmd == ELS_CMD_PRLI) ||
 			    (cmd == ELS_CMD_NVMEPRLI)) {
 				delay = 1000;
