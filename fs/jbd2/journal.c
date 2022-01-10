@@ -1287,6 +1287,8 @@ static int jbd2_min_tag_size(void)
 
 /**
  * jbd2_journal_shrink_scan()
+ * @shrink: A callback you can register to apply pressure to ageable caches.
+ * @sc: pass information from page reclaim to the shrinkers.
  *
  * Scan the checkpointed buffer on the checkpoint list and release the
  * journal_head.
@@ -1312,6 +1314,8 @@ static unsigned long jbd2_journal_shrink_scan(struct shrinker *shrink,
 
 /**
  * jbd2_journal_shrink_count()
+ * @shrink: A callback you can register to apply pressure to ageable caches.
+ * @sc: pass information from page reclaim to the shrinkers.
  *
  * Count the number of checkpoint buffers on the checkpoint list.
  */
