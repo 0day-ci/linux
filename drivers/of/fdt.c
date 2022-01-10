@@ -1275,7 +1275,8 @@ void __init early_init_dt_scan_nodes(void)
 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
 
 	/* Handle linux,usable-memory-range property */
-	memblock_cap_memory_range(cap_mem_addr, cap_mem_size);
+	memblock_set_usable_range(cap_mem_addr, cap_mem_size);
+	memblock_enforce_usable_range();
 }
 
 bool __init early_init_dt_scan(void *params)
