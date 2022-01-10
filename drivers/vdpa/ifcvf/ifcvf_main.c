@@ -162,6 +162,32 @@ static int ifcvf_request_vq_irq(struct ifcvf_adapter *adapter, u8 vector_per_vq)
 	return ret;
 }
 
+static int ifcvf_request_config_irq(struct ifcvf_adapter *adapter, int config_vector)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	struct ifcvf_hw *vf = &adapter->vf;
+	int ret;
+
+	if (!config_vector) {
+		IFCVF_INFO(pdev, "No config interrupt because of no vectors\n");
+		vf->config_irq = -EINVAL;
+		return 0;
+	}
+
+	snprintf(vf->config_msix_name, 256, "ifcvf[%s]-config\n",
+		 pci_name(pdev));
+	vf->config_irq = pci_irq_vector(pdev, config_vector);
+	ret = devm_request_irq(&pdev->dev, vf->config_irq,
+			       ifcvf_config_changed, 0,
+			       vf->config_msix_name, vf);
+	if (ret) {
+		IFCVF_ERR(pdev, "Failed to request config irq\n");
+		return ret;
+	}
+		ifcvf_set_config_vector(vf, config_vector);
+
+	return 0;
+}
 
 static int ifcvf_request_irq(struct ifcvf_adapter *adapter)
 {
