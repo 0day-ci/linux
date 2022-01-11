@@ -46,6 +46,7 @@
 		clock-names = "fck";
 		clocks = <&k3_clks 114 1>;
 		power-domains = <&k3_pds 114 TI_SCI_PD_EXCLUSIVE>;
+		status = "disabled";
 	};
 
 	mcu_spi0: spi@40300000 {
@@ -56,6 +57,7 @@
 		power-domains = <&k3_pds 142 TI_SCI_PD_EXCLUSIVE>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+		status = "disabled";
 	};
 
 	mcu_spi1: spi@40310000 {
@@ -66,6 +68,7 @@
 		power-domains = <&k3_pds 143 TI_SCI_PD_EXCLUSIVE>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+		status = "disabled";
 	};
 
 	mcu_spi2: spi@40320000 {
@@ -76,6 +79,7 @@
 		power-domains = <&k3_pds 144 TI_SCI_PD_EXCLUSIVE>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+		status = "disabled";
 	};
 
 	tscadc0: tscadc@40200000 {
@@ -89,6 +93,7 @@
 		dmas = <&mcu_udmap 0x7100>,
 			<&mcu_udmap 0x7101 >;
 		dma-names = "fifo0", "fifo1";
+		status = "disabled";
 
 		adc {
 			#io-channel-cells = <1>;
@@ -107,6 +112,7 @@
 		dmas = <&mcu_udmap 0x7102>,
 			<&mcu_udmap 0x7103>;
 		dma-names = "fifo0", "fifo1";
+		status = "disabled";
 
 		adc {
 			#io-channel-cells = <1>;
@@ -172,6 +178,7 @@
 			     <GIC_SPI 545 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "int0", "int1";
 		bosch,mram-cfg = <0x0 128 64 64 64 64 32 32>;
+		status = "disabled";
 	};
 
 	m_can1: mcan@40568000 {
@@ -187,6 +194,7 @@
 			     <GIC_SPI 548 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "int0", "int1";
 		bosch,mram-cfg = <0x0 128 64 64 64 64 32 32>;
+		status = "disabled";
 	};
 
 	fss: fss@47000000 {
@@ -251,6 +259,8 @@
 		dma-names = "tx0", "tx1", "tx2", "tx3",
 			    "tx4", "tx5", "tx6", "tx7",
 			    "rx";
+
+		status = "disabled";
 
 		ethernet-ports {
 			#address-cells = <1>;

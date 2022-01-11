@@ -275,12 +275,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_uart0_pins_default>;
 	power-domains = <&k3_pds 146 TI_SCI_PD_SHARED>;
+	status = "okay";
 };
 
 &wkup_i2c0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&wkup_i2c0_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 
 	pca9554: gpio@39 {
 		compatible = "nxp,pca9554";
@@ -300,6 +302,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_i2c0_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 
 	pca9555: gpio@21 {
 		compatible = "nxp,pca9555";
@@ -313,17 +316,20 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_i2c1_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 };
 
 &main_i2c2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_i2c2_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 };
 
 &ecap0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&ecap0_pins_default>;
+	status = "okay";
 };
 
 &main_spi0 {
@@ -332,6 +338,7 @@
 	#address-cells = <1>;
 	#size-cells= <0>;
 	ti,pindir-d0-out-d1-in;
+	status = "okay";
 
 	flash@0{
 		compatible = "jedec,spi-nor";
@@ -351,6 +358,7 @@
 	non-removable;
 	ti,driver-strength-ohm = <50>;
 	disable-wp;
+	status = "okay";
 };
 
 /*
@@ -364,6 +372,11 @@
 	pinctrl-0 = <&main_mmc1_pins_default>;
 	ti,driver-strength-ohm = <50>;
 	disable-wp;
+	status = "okay";
+};
+
+&dwc3_1 {
+	status = "okay";
 };
 
 &usb1 {
@@ -372,60 +385,29 @@
 	dr_mode = "otg";
 };
 
-&dwc3_0 {
-	status = "disabled";
-};
-
-&usb0_phy {
-	status = "disabled";
+&usb1_phy {
+	status = "okay";
 };
 
 &tscadc0 {
+	status = "okay";
+
 	adc {
 		ti,adc-channels = <0 1 2 3 4 5 6 7>;
 	};
 };
 
 &tscadc1 {
+	status = "okay";
+
 	adc {
 		ti,adc-channels = <0 1 2 3 4 5 6 7>;
 	};
 };
 
-&serdes0 {
-	status = "disabled";
-};
-
-&serdes1 {
-	status = "disabled";
-};
-
-&pcie0_rc {
-	status = "disabled";
-};
-
-&pcie0_ep {
-	status = "disabled";
-};
-
-&pcie1_rc {
-	status = "disabled";
-};
-
-&pcie1_ep {
-	status = "disabled";
-};
-
-&m_can0 {
-	status = "disabled";
-};
-
-&m_can1 {
-	status = "disabled";
-};
-
 &mailbox0_cluster0 {
 	interrupts = <436>;
+	status = "okay";
 
 	mbox_mcu_r5fss0_core0: mbox-mcu-r5fss0-core0 {
 		ti,mbox-tx = <1 0 0>;
@@ -435,51 +417,12 @@
 
 &mailbox0_cluster1 {
 	interrupts = <432>;
+	status = "okay";
 
 	mbox_mcu_r5fss0_core1: mbox-mcu-r5fss0-core1 {
 		ti,mbox-tx = <1 0 0>;
 		ti,mbox-rx = <0 0 0>;
 	};
-};
-
-&mailbox0_cluster2 {
-	status = "disabled";
-};
-
-&mailbox0_cluster3 {
-	status = "disabled";
-};
-
-&mailbox0_cluster4 {
-	status = "disabled";
-};
-
-&mailbox0_cluster5 {
-	status = "disabled";
-};
-
-&mailbox0_cluster6 {
-	status = "disabled";
-};
-
-&mailbox0_cluster7 {
-	status = "disabled";
-};
-
-&mailbox0_cluster8 {
-	status = "disabled";
-};
-
-&mailbox0_cluster9 {
-	status = "disabled";
-};
-
-&mailbox0_cluster10 {
-	status = "disabled";
-};
-
-&mailbox0_cluster11 {
-	status = "disabled";
 };
 
 &mcu_r5fss0_core0 {
@@ -497,6 +440,7 @@
 &ospi0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcu_fss0_ospi0_pins_default>;
+	status = "okay";
 
 	flash@0{
 		compatible = "jedec,spi-nor";
@@ -517,6 +461,7 @@
 &mcu_cpsw {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcu_cpsw_pins_default &mcu_mdio_pins_default>;
+	status = "okay";
 };
 
 &davinci_mdio {
@@ -530,32 +475,4 @@
 &cpsw_port1 {
 	phy-mode = "rgmii-rxid";
 	phy-handle = <&phy0>;
-};
-
-&mcasp0 {
-	status = "disabled";
-};
-
-&mcasp1 {
-	status = "disabled";
-};
-
-&mcasp2 {
-	status = "disabled";
-};
-
-&dss {
-	status = "disabled";
-};
-
-&icssg0_mdio {
-	status = "disabled";
-};
-
-&icssg1_mdio {
-	status = "disabled";
-};
-
-&icssg2_mdio {
-	status = "disabled";
 };
