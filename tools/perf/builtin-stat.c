@@ -93,6 +93,7 @@
 
 #include <linux/ctype.h>
 #include <perf/evlist.h>
+#include <linux/string.h>
 
 #define DEFAULT_SEPARATOR	" "
 #define FREEZE_ON_SMI_PATH	"devices/cpu/freeze_on_smi"
@@ -1625,6 +1626,75 @@ static int perf_stat_init_aggr_mode_file(struct perf_stat *st)
 	return 0;
 }
 
+// Return the number of elements in the array excluding the final
+// NULL array element.
+static size_t str_array_len(const char **str)
+{
+	size_t c = 0;
+	while (str[c] != NULL) {
+		++c;
+	}
+	return c;
+}
+
+// Checks if topdown kernel events listed by the given
+// array of event names are supported.
+//
+// The input array is not modified.
+//
+// Returns 1 if supported,
+//         0 if not supported,
+//         -1 if some unexpected error occurred while checking
+static int check_events_available(const char **orig_events_array)
+{
+	char *str = NULL;
+	size_t basic_events_len = str_array_len(orig_events_array);
+	size_t basic_events_cpy_bytes = sizeof(const char *) * (basic_events_len + 1);
+	const char **basic_events = NULL;
+
+	// This function shouldn't have any side effects.
+	// Since topdown_filter_events mutates the arrays it inspects,
+	// this function takes temporary shallow copies of the input
+	// string array
+	basic_events = memdup(orig_events_array, basic_events_cpy_bytes);
+	if (basic_events == NULL) {
+		pr_err("Out of memory, could not copy topdown events array\n");
+		return -1;
+	}
+
+	if (topdown_filter_events(basic_events, &str, 1) < 0) {
+		pr_err("Out of memory, could not form events string\n");
+		free(basic_events);
+		return -1;
+	}
+	if (basic_events[0] && str) {
+		free(basic_events);
+		free(str);
+		return 1;
+	}
+	free(basic_events);
+	free(str);
+
+	return 0;
+}
+
+// Checks if topdown kernel events support has been detected
+// on this system.
+//
+// Returns 1 if supported,
+//         0 if not supported,
+//         -1 if some unexpected error occurred while checking
+static int topdown_kernel_events_supported(void)
+{
+	int l1_and_l2_available = check_events_available(topdown_metric_L2_attrs);
+
+	if (l1_and_l2_available == 0) {
+		return check_events_available(topdown_attrs);
+	} else {
+		return l1_and_l2_available;
+	}
+}
+
 static int try_non_json_metrics_topdown(void)
 {
 	int err = 0;
@@ -1710,6 +1780,27 @@ static int try_json_metrics_topdown(void)
 		return -1;
 	}
 	return 0;
+}
+
+enum topdown_mechanism {
+	TOPDOWN_JSON_METRICS,
+	TOPDOWN_KERNEL_EVENTS,
+	TOPDOWN_DETECTION_ERROR,
+};
+
+static enum topdown_mechanism choose_topdown_mechanism(void)
+{
+	int kernel_events_supported = topdown_kernel_events_supported();
+
+	if (kernel_events_supported > 0) {
+		pr_debug("topdown kernel events are supported\n");
+		return TOPDOWN_KERNEL_EVENTS;
+	} else if (kernel_events_supported == 0) {
+		pr_debug("topdown kernel events are unsupported\n");
+		return TOPDOWN_JSON_METRICS;
+	} else {
+		return TOPDOWN_DETECTION_ERROR;
+	}
 }
 
 /*
@@ -1911,17 +2002,24 @@ static int add_default_attributes(void)
 	}
 
 	if (topdown_run) {
+		int topdown_err = 0;
 		if (!force_metric_only)
 			stat_config.metric_only = true;
 
-		if (topdown_can_use_json_metrics()) {
-			err = try_json_metrics_topdown();
-			if (err)
-				return err;
-		} else {
-			err = try_non_json_metrics_topdown();
-			if (err)
-				return err;
+		switch (choose_topdown_mechanism()) {
+		case TOPDOWN_JSON_METRICS:
+			topdown_err = try_json_metrics_topdown();
+			break;
+		case TOPDOWN_DETECTION_ERROR:
+			return -1;
+		case TOPDOWN_KERNEL_EVENTS:
+		default:
+			topdown_err = try_non_json_metrics_topdown();
+			break;
+		}
+
+		if (topdown_err < 0) {
+			return -1;
 		}
 	}
 
