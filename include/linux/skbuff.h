@@ -1498,7 +1498,7 @@ static inline void skb_zcopy_init(struct sk_buff *skb, struct ubuf_info *uarg)
 static inline void skb_zcopy_set(struct sk_buff *skb, struct ubuf_info *uarg,
 				 bool *have_ref)
 {
-	if (skb && uarg && !skb_zcopy(skb)) {
+	if (uarg && !skb_zcopy(skb)) {
 		if (unlikely(have_ref && *have_ref))
 			*have_ref = false;
 		else

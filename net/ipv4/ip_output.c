@@ -1011,7 +1011,8 @@ static int __ip_append_data(struct sock *sk,
 			paged = true;
 		} else {
 			uarg->zerocopy = 0;
-			skb_zcopy_set(skb, uarg, &extra_uref);
+			if (skb)
+				skb_zcopy_set(skb, uarg, &extra_uref);
 		}
 	}
 

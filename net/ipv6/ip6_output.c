@@ -1522,7 +1522,8 @@ emsgsize:
 			paged = true;
 		} else {
 			uarg->zerocopy = 0;
-			skb_zcopy_set(skb, uarg, &extra_uref);
+			if (skb)
+				skb_zcopy_set(skb, uarg, &extra_uref);
 		}
 	}
 
