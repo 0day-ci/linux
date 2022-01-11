@@ -123,17 +123,6 @@ struct va_format {
  */
 #define DEPRECATED	"[Deprecated]: "
 
-/*
- * Dummy printk for disabled debugging statements to use whilst maintaining
- * gcc's format checking.
- */
-#define no_printk(fmt, ...)				\
-({							\
-	if (0)						\
-		printk(fmt, ##__VA_ARGS__);		\
-	0;						\
-})
-
 #ifdef CONFIG_EARLY_PRINTK
 extern asmlinkage __printf(1, 2)
 void early_printk(const char *fmt, ...);

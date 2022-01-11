@@ -6,6 +6,17 @@
 #include <linux/kern_levels.h>
 #include <linux/linkage.h>
 
+/*
+ * Dummy printk for disabled debugging statements to use whilst maintaining
+ * gcc's format checking.
+ */
+#define no_printk(fmt, ...)				\
+({							\
+	if (0)						\
+		_printk(fmt, ##__VA_ARGS__);		\
+	0;						\
+})
+
 /* Low level printk API. Use carefully! */
 
 #ifdef CONFIG_PRINTK
