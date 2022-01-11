@@ -529,6 +529,7 @@ struct rproc_dump_segment {
  * @elf_machine: firmware ELF machine
  * @cdev: character device of the rproc
  * @cdev_put_on_release: flag to indicate if remoteproc should be shutdown on @char_dev release
+ * @self_recovery: flag to indicate if remoteproc support self recovery
  */
 struct rproc {
 	struct list_head node;
@@ -568,6 +569,7 @@ struct rproc {
 	u16 elf_machine;
 	struct cdev cdev;
 	bool cdev_put_on_release;
+	bool self_recovery;
 };
 
 /**
