@@ -36,7 +36,6 @@ enum goya_dma_direction {
 	DMA_SRAM_TO_HOST,
 	DMA_DRAM_TO_HOST,
 	DMA_DRAM_TO_DRAM,
-	DMA_SRAM_TO_SRAM,
 	DMA_ENUM_MAX
 };
 
