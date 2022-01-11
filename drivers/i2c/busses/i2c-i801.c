@@ -288,6 +288,11 @@ struct i801_priv {
 	 * ACPI AML use. Protected by acpi_lock.
 	 */
 	bool acpi_reserved;
+	/*
+	 * If set to true ACPI AML tried to use SMBus but block_acpi was
+	 * set. Protected by acpi_lock.
+	 */
+	bool acpi_blocked;
 	struct mutex acpi_lock;
 };
 
@@ -319,6 +324,11 @@ MODULE_PARM_DESC(disable_features, "Disable selected driver features:\n"
 	"\t\t  0x08  disable the I2C block read functionality\n"
 	"\t\t  0x10  don't use interrupts\n"
 	"\t\t  0x20  disable SMBus Host Notify ");
+
+static bool block_acpi;
+module_param(block_acpi, bool, S_IRUGO);
+MODULE_PARM_DESC(block_acpi, "Prevent ACPI AML from accessing SMBus. "
+	"[0] = allow ACPI access, 1 = deny ACPI access");
 
 /* Make sure the SMBus host is ready to start transmitting.
    Return 0 if it is, -EBUSY if it is not. */
@@ -1585,23 +1595,48 @@ i801_acpi_io_handler(u32 function, acpi_physical_address address, u32 bits,
 	acpi_status status;
 
 	/*
-	 * Once BIOS AML code touches the OpRegion we warn and inhibit any
-	 * further access from the driver itself. This device is now owned
-	 * by the system firmware.
+	 * If BIOS AML code tries to touches the OpRegion we have two options:
+	 * Warn and inhibit any further access from the driver, or warn and
+	 * inhibit all access from the BIOS.
 	 */
 	mutex_lock(&priv->acpi_lock);
 
-	if (!priv->acpi_reserved && i801_acpi_is_smbus_ioport(priv, address)) {
-		priv->acpi_reserved = true;
+	if (i801_acpi_is_smbus_ioport(priv, address)) {
+		if (block_acpi) {
+			/*
+			 * Refuse to allow the BIOS to use SMBus. SMBus does
+			 * have a lock bit in the status register that in theory
+			 * can be used to safely share the SMBus between the
+			 * BIOS and the kernel, but some badly behaved BIOS
+			 * implementations don't use it. In that case, the only
+			 * way to ensure continued safe access from the driver
+			 * is to cripple the BIOS.
+			 */
+			if (!priv->acpi_blocked) {
+				dev_warn(&pdev->dev,
+					 "BIOS tried to access SMBus registers\n");
+				dev_warn(&pdev->dev,
+					 "BIOS SMBus register access inhibited\n");
+				priv->acpi_blocked = true;
+			}
+			mutex_unlock(&priv->acpi_lock);
+			return -EPERM;
+		}
+		if (!priv->acpi_reserved) {
+			/* This device is now owned by the system firmware. */
+			priv->acpi_reserved = true;
 
-		dev_warn(&pdev->dev, "BIOS is accessing SMBus registers\n");
-		dev_warn(&pdev->dev, "Driver SMBus register access inhibited\n");
+			dev_warn(&pdev->dev,
+				 "BIOS is accessing SMBus registers\n");
+			dev_warn(&pdev->dev,
+				 "Driver SMBus register access inhibited\n");
 
-		/*
-		 * BIOS is accessing the host controller so prevent it from
-		 * suspending automatically from now on.
-		 */
-		pm_runtime_get_sync(&pdev->dev);
+			/*
+			 * BIOS is accessing the host controller so prevent it
+			 * from suspending automatically from now on.
+			 */
+			pm_runtime_get_sync(&pdev->dev);
+		}
 	}
 
 	if ((function & ACPI_IO_MASK) == ACPI_READ)
