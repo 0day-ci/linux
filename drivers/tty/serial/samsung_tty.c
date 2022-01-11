@@ -2164,6 +2164,9 @@ s3c24xx_get_driver_data(struct platform_device *pdev)
 		const struct of_device_id *match;
 
 		match = of_match_node(s3c24xx_uart_dt_match, pdev->dev.of_node);
+		if (!match)
+			return NULL;
+
 		return (struct s3c24xx_serial_drv_data *)match->data;
 	}
 #endif
