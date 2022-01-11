@@ -1127,7 +1127,7 @@ static int __must_check ax25_connect(struct socket *sock,
 	struct sockaddr *uaddr, int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
-	ax25_cb *ax25 = sk_to_ax25(sk), *ax25t;
+	ax25_cb *ax25, *ax25t;
 	struct full_sockaddr_ax25 *fsa = (struct full_sockaddr_ax25 *)uaddr;
 	ax25_digi *digi = NULL;
 	int ct = 0, err = 0;
@@ -1154,6 +1154,8 @@ static int __must_check ax25_connect(struct socket *sock,
 		return -EINVAL;
 
 	lock_sock(sk);
+
+	ax25 = sk_to_ax25(sk);
 
 	/* deal with restarts */
 	if (sock->state == SS_CONNECTING) {
