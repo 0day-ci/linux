@@ -516,6 +516,9 @@ typec_register_altmode(struct device *parent,
 	struct altmode *alt;
 	int ret;
 
+	if (id < 0)
+		return ERR_PTR(id);
+
 	alt = kzalloc(sizeof(*alt), GFP_KERNEL);
 	if (!alt) {
 		altmode_id_remove(parent, id);
