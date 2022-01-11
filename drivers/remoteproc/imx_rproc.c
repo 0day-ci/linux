@@ -89,6 +89,7 @@ struct imx_rproc {
 	struct work_struct		rproc_work;
 	struct workqueue_struct		*workqueue;
 	void __iomem			*rsc_table;
+	bool				has_clk;
 };
 
 static const struct imx_rproc_att imx_rproc_att_imx8mn[] = {
@@ -705,6 +706,9 @@ static int imx_rproc_clk_enable(struct imx_rproc *priv)
 	if (dcfg->method == IMX_RPROC_NONE)
 		return 0;
 
+	if (!priv->has_clk)
+		return 0;
+
 	priv->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(priv->clk)) {
 		dev_err(dev, "Failed to get clock\n");
@@ -749,6 +753,7 @@ static int imx_rproc_probe(struct platform_device *pdev)
 	priv->rproc = rproc;
 	priv->dcfg = dcfg;
 	priv->dev = dev;
+	priv->has_clk = true;
 
 	dev_set_drvdata(dev, rproc);
 	priv->workqueue = create_workqueue(dev_name(dev));
