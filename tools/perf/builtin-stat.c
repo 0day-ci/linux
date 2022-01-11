@@ -1625,6 +1625,84 @@ static int perf_stat_init_aggr_mode_file(struct perf_stat *st)
 	return 0;
 }
 
+static int try_non_json_metrics_topdown(void)
+{
+	int err;
+	const char **metric_attrs = topdown_metric_attrs;
+	unsigned int max_level = 1;
+	char *str = NULL;
+	bool warn = false;
+
+	if (!force_metric_only)
+		stat_config.metric_only = true;
+
+	if (pmu_have_event("cpu", topdown_metric_L2_attrs[5])) {
+		metric_attrs = topdown_metric_L2_attrs;
+		max_level = 2;
+	}
+
+	if (stat_config.topdown_level > max_level) {
+		pr_err("Invalid top-down metrics level. The max level is %u.\n", max_level);
+		return -1;
+	} else if (!stat_config.topdown_level)
+		stat_config.topdown_level = max_level;
+
+	if (topdown_filter_events(metric_attrs, &str, 1) < 0) {
+		pr_err("Out of memory\n");
+		return -1;
+	}
+	if (metric_attrs[0] && str) {
+		if (!stat_config.interval && !stat_config.metric_only) {
+			fprintf(stat_config.output,
+				"Topdown accuracy may decrease when measuring long periods.\n"
+				"Please print the result regularly, e.g. -I1000\n");
+		}
+		goto setup_metrics;
+	}
+
+	zfree(&str);
+
+	if (stat_config.aggr_mode != AGGR_GLOBAL &&
+		stat_config.aggr_mode != AGGR_CORE) {
+		pr_err("top down event configuration requires --per-core mode\n");
+		return -1;
+	}
+	stat_config.aggr_mode = AGGR_CORE;
+	if (nr_cgroups || !target__has_cpu(&target)) {
+		pr_err("top down event configuration requires system-wide mode (-a)\n");
+		return -1;
+	}
+
+	if (topdown_filter_events(topdown_attrs, &str,
+			arch_topdown_check_group(&warn)) < 0) {
+		pr_err("Out of memory\n");
+		return -1;
+	}
+	if (topdown_attrs[0] && str) {
+		struct parse_events_error errinfo;
+		if (warn)
+			arch_topdown_group_warn();
+setup_metrics:
+		parse_events_error__init(&errinfo);
+		err = parse_events(evsel_list, str, &errinfo);
+		if (err) {
+			fprintf(stderr,
+				"Cannot set up top down events %s: %d\n",
+				str, err);
+			parse_events_error__print(&errinfo, str);
+			parse_events_error__exit(&errinfo);
+			free(str);
+			return -1;
+		}
+		parse_events_error__exit(&errinfo);
+	} else {
+		fprintf(stderr, "System does not support topdown\n");
+		return -1;
+	}
+	free(str);
+	return err;
+}
+
 /*
  * Add default attributes, if there were no attributes specified or
  * if -d/--detailed, -d -d or -d -d -d is used:
@@ -1824,14 +1902,6 @@ static int add_default_attributes(void)
 	}
 
 	if (topdown_run) {
-		const char **metric_attrs = topdown_metric_attrs;
-		unsigned int max_level = 1;
-		char *str = NULL;
-		bool warn = false;
-
-		if (!force_metric_only)
-			stat_config.metric_only = true;
-
 		if (topdown_can_use_json_metrics()) {
 			if (metricgroup__parse_groups_to_evlist(evsel_list, "TopDownL1",
 								stat_config.metric_no_group,
@@ -1840,75 +1910,12 @@ static int add_default_attributes(void)
 				pr_err("Could not form list of metrics for topdown\n");
 				return -1;
 			}
-
-			goto end_of_topdown_setup;
-		}
-
-		if (pmu_have_event("cpu", topdown_metric_L2_attrs[5])) {
-			metric_attrs = topdown_metric_L2_attrs;
-			max_level = 2;
-		}
-
-		if (stat_config.topdown_level > max_level) {
-			pr_err("Invalid top-down metrics level. The max level is %u.\n", max_level);
-			return -1;
-		} else if (!stat_config.topdown_level)
-			stat_config.topdown_level = max_level;
-
-		if (topdown_filter_events(metric_attrs, &str, 1) < 0) {
-			pr_err("Out of memory\n");
-			return -1;
-		}
-		if (metric_attrs[0] && str) {
-			if (!stat_config.interval && !stat_config.metric_only) {
-				fprintf(stat_config.output,
-					"Topdown accuracy may decrease when measuring long periods.\n"
-					"Please print the result regularly, e.g. -I1000\n");
-			}
-			goto setup_metrics;
-		}
-
-		zfree(&str);
-
-		if (stat_config.aggr_mode != AGGR_GLOBAL &&
-		    stat_config.aggr_mode != AGGR_CORE) {
-			pr_err("top down event configuration requires --per-core mode\n");
-			return -1;
-		}
-		stat_config.aggr_mode = AGGR_CORE;
-		if (nr_cgroups || !target__has_cpu(&target)) {
-			pr_err("top down event configuration requires system-wide mode (-a)\n");
-			return -1;
-		}
-
-		if (topdown_filter_events(topdown_attrs, &str,
-				arch_topdown_check_group(&warn)) < 0) {
-			pr_err("Out of memory\n");
-			return -1;
-		}
-		if (topdown_attrs[0] && str) {
-			struct parse_events_error errinfo;
-			if (warn)
-				arch_topdown_group_warn();
-setup_metrics:
-			parse_events_error__init(&errinfo);
-			err = parse_events(evsel_list, str, &errinfo);
-			if (err) {
-				fprintf(stderr,
-					"Cannot set up top down events %s: %d\n",
-					str, err);
-				parse_events_error__print(&errinfo, str);
-				parse_events_error__exit(&errinfo);
-				free(str);
-				return -1;
-			}
-			parse_events_error__exit(&errinfo);
 		} else {
-			fprintf(stderr, "System does not support topdown\n");
-			return -1;
+			err = try_non_json_metrics_topdown();
+			if (err)
+				return err;
 		}
-end_of_topdown_setup:
-		free(str);
+
 	}
 
 	if (!evsel_list->core.nr_entries) {
