@@ -17,4 +17,12 @@ config AD74413R
 	  To compile this driver as a module, choose M here: the
 	  module will be called ad74413r.
 
+config ONE_BIT_ADC_DAC
+	tristate "ONE_BIT_ADC_DAC driver"
+	help
+	  Say yes here to build support for ONE_BIT_ADC_DAC driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called one-bit-adc-dac.
+
 endmenu
