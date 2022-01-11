@@ -1627,14 +1627,11 @@ static int perf_stat_init_aggr_mode_file(struct perf_stat *st)
 
 static int try_non_json_metrics_topdown(void)
 {
-	int err;
+	int err = 0;
 	const char **metric_attrs = topdown_metric_attrs;
 	unsigned int max_level = 1;
 	char *str = NULL;
 	bool warn = false;
-
-	if (!force_metric_only)
-		stat_config.metric_only = true;
 
 	if (pmu_have_event("cpu", topdown_metric_L2_attrs[5])) {
 		metric_attrs = topdown_metric_L2_attrs;
@@ -1701,6 +1698,18 @@ setup_metrics:
 	}
 	free(str);
 	return err;
+}
+
+static int try_json_metrics_topdown(void)
+{
+	if (metricgroup__parse_groups_to_evlist(evsel_list, "TopDownL1",
+						stat_config.metric_no_group,
+						stat_config.metric_no_merge,
+						&stat_config.metric_events) < 0) {
+		pr_err("Could not form list of metrics for topdown\n");
+		return -1;
+	}
+	return 0;
 }
 
 /*
@@ -1902,20 +1911,18 @@ static int add_default_attributes(void)
 	}
 
 	if (topdown_run) {
+		if (!force_metric_only)
+			stat_config.metric_only = true;
+
 		if (topdown_can_use_json_metrics()) {
-			if (metricgroup__parse_groups_to_evlist(evsel_list, "TopDownL1",
-								stat_config.metric_no_group,
-								stat_config.metric_no_merge,
-								&stat_config.metric_events) < 0) {
-				pr_err("Could not form list of metrics for topdown\n");
-				return -1;
-			}
+			err = try_json_metrics_topdown();
+			if (err)
+				return err;
 		} else {
 			err = try_non_json_metrics_topdown();
 			if (err)
 				return err;
 		}
-
 	}
 
 	if (!evsel_list->core.nr_entries) {
