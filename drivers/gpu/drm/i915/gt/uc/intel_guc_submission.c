@@ -1350,7 +1350,8 @@ submission_disabled(struct intel_guc *guc)
 	struct i915_sched_engine * const sched_engine = guc->sched_engine;
 
 	return unlikely(!sched_engine ||
-			!__tasklet_is_enabled(&sched_engine->tasklet));
+			!__tasklet_is_enabled(&sched_engine->tasklet) ||
+			intel_gt_is_wedged(guc_to_gt(guc)));
 }
 
 static void disable_submission(struct intel_guc *guc)
@@ -1726,7 +1727,7 @@ void intel_guc_submission_reset_finish(struct intel_guc *guc)
 {
 	/* Reset called during driver load or during wedge? */
 	if (unlikely(!guc_submission_initialized(guc) ||
-		     test_bit(I915_WEDGED, &guc_to_gt(guc)->reset.flags))) {
+		     intel_gt_is_wedged(guc_to_gt(guc)))) {
 		return;
 	}
 
@@ -3249,8 +3250,6 @@ static void guc_parent_context_unpin(struct intel_context *ce)
 	GEM_BUG_ON(!intel_context_is_parent(ce));
 	GEM_BUG_ON(!intel_engine_is_virtual(ce->engine));
 
-	if (ce->parallel.last_rq)
-		i915_request_put(ce->parallel.last_rq);
 	unpin_guc_id(guc, ce);
 	lrc_unpin(ce);
 }
@@ -3980,6 +3979,11 @@ static void guc_handle_context_reset(struct intel_guc *guc,
 		   !context_blocked(ce))) {
 		capture_error_state(guc, ce);
 		guc_context_replay(ce);
+	} else {
+		drm_err(&guc_to_gt(guc)->i915->drm,
+			"Invalid GuC engine reset notificaion for 0x%04X on %s: banned = %d, blocked = %d",
+			ce->guc_id.id, ce->engine->name, intel_context_is_banned(ce),
+			context_blocked(ce));
 	}
 }
 
@@ -4014,6 +4018,24 @@ int intel_guc_context_reset_process_msg(struct intel_guc *guc,
 
 	guc_handle_context_reset(guc, ce);
 	intel_context_put(ce);
+
+	return 0;
+}
+
+int intel_guc_error_capture_process_msg(struct intel_guc *guc,
+					const u32 *msg, u32 len)
+{
+	int status;
+
+	if (unlikely(len != 1)) {
+		drm_dbg(&guc_to_gt(guc)->i915->drm, "Invalid length %u", len);
+		return -EPROTO;
+	}
+
+	status = msg[0];
+	drm_info(&guc_to_gt(guc)->i915->drm, "Got error capture: status = %d", status);
+
+	/* FIXME: Do something with the capture */
 
 	return 0;
 }
