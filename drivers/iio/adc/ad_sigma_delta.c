@@ -13,6 +13,7 @@
 #include <linux/spi/spi.h>
 #include <linux/err.h>
 #include <linux/module.h>
+#include <linux/list.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -24,6 +25,161 @@
 
 #include <asm/unaligned.h>
 
+static irqreturn_t ad_sd_data_rdy_trig_poll(int irq, void *private);
+
+struct ad_sigma_delta_interrupt {
+	/* Constant from time of creation */
+	int			irq;
+	struct spi_master	*master;
+
+	/* Protected by global lock */
+	struct list_head	list;
+	int			refcnt;
+
+	/* Protected by lock on corresponding SPI bus */
+	struct ad_sigma_delta	*active;
+};
+
+static DEFINE_MUTEX(interrupt_lock);
+static LIST_HEAD(interrupt_list);
+
+static void adsdi_enable(struct ad_sigma_delta *a)
+{
+	struct ad_sigma_delta_interrupt *intr = a->interrupt;
+
+	WARN_ON(intr->active);
+	intr->active = a;
+	pr_debug("ad_sigma_delta: enable %d for %p\n", intr->irq, a);
+	enable_irq(intr->irq);
+}
+
+static void adsdi_disable(struct ad_sigma_delta *a, int nosync)
+{
+	struct ad_sigma_delta_interrupt *intr = a->interrupt;
+
+	if (nosync)
+		disable_irq_nosync(intr->irq);
+	else
+		disable_irq(intr->irq);
+
+	pr_debug("ad_sigma_delta: disable %d for %p\n", intr->irq, intr->active);
+
+	/* In the case of a timeout, it's possible for adsdi_disable to
+	 * be called twice by the same instance (if the interrupt runs
+	 * between the call to check and the call to disable).
+	 *
+	 * We still need to disable first before checking intr->active.
+	 * Then we can roll back if we've done it twice.
+	 */
+	if (intr->active != a) {
+		WARN_ON(intr->active);
+		pr_debug("ad_sigma_delta: double-disable\n");
+		enable_irq(intr->irq);
+	}
+
+	intr->active = NULL;
+}
+
+static int adsdi_get(struct ad_sigma_delta_interrupt **intr_ret,
+		     int irq, struct spi_master *master,
+		     int flags)
+{
+	struct ad_sigma_delta_interrupt *intr = NULL;
+	struct list_head *ptr;
+	int ret = 0;
+
+	mutex_lock(&interrupt_lock);
+
+	/* Try to find an existing instance */
+	list_for_each(ptr, &interrupt_list) {
+		struct ad_sigma_delta_interrupt *i = list_entry(ptr,
+			struct ad_sigma_delta_interrupt, list);
+
+		if (i->irq == irq) {
+			/* No instance will attempt to wait for the
+			 * interrupt without the SPI bus locked, which
+			 * we can rely on to ensure correct operation.
+			 * However, we would like to detect
+			 * misconfiguration that would lead to unsafe
+			 * access.
+			 */
+			if (i->master != master) {
+				pr_err(
+				    "ad_sigma_delta: SPI master mismatch on IRQ %d\n",
+				    irq);
+				ret = -EINVAL;
+				goto fail_search;
+			}
+
+			intr = i;
+			break;
+		}
+	}
+
+	/* Allocate a new one if necessary */
+	if (!intr) {
+		intr = kmalloc(sizeof(*intr), GFP_KERNEL);
+		if (!intr) {
+			ret = -ENOMEM;
+			pr_err("ad_sigma_delta: can't allocate memory\n");
+			goto fail_search;
+		}
+
+		intr->irq = irq;
+		intr->refcnt = 0;
+		intr->active = NULL;
+		intr->master = master;
+
+		ret = request_irq(irq,
+				  ad_sd_data_rdy_trig_poll,
+				  flags | IRQF_NO_AUTOEN,
+				  "ad_sigma_delta",
+				  intr);
+		if (ret)
+			goto fail_search;
+
+		pr_debug("ad_sigma_delta: sharing interrupt %d\n", irq);
+		list_add(&intr->list, &interrupt_list);
+	}
+
+	intr->refcnt++;
+	*intr_ret = intr;
+
+fail_search:
+	mutex_unlock(&interrupt_lock);
+	return ret;
+}
+
+static void adsdi_put(struct ad_sigma_delta_interrupt *intr)
+{
+	mutex_lock(&interrupt_lock);
+	if (!--intr->refcnt) {
+		pr_debug("ad_sigma_delta: interrupt %d deallocated\n",
+			intr->irq);
+		free_irq(intr->irq, intr);
+		list_del(&intr->list);
+		kfree(intr);
+	}
+	mutex_unlock(&interrupt_lock);
+}
+
+static void devm_adsdi_release(void *arg)
+{
+	adsdi_put(arg);
+}
+
+static int devm_adsdi_get(struct device *dev,
+			  struct ad_sigma_delta_interrupt **intr_ret,
+			  int irq, struct spi_master *master,
+			  int flags)
+{
+	const int ret = adsdi_get(intr_ret, irq, master, flags);
+
+	if (ret < 0)
+		return ret;
+
+	return devm_add_action_or_reset(dev, devm_adsdi_release, *intr_ret);
+}
 
 #define AD_SD_COMM_CHAN_MASK	0x3
 
@@ -221,11 +377,11 @@ int ad_sd_calibrate(struct ad_sigma_delta *sigma_delta,
 		goto out;
 
 	sigma_delta->irq_dis = false;
-	enable_irq(sigma_delta->spi->irq);
+	adsdi_enable(sigma_delta);
 	timeout = wait_for_completion_timeout(&sigma_delta->completion, 2 * HZ);
 	if (timeout == 0) {
 		sigma_delta->irq_dis = true;
-		disable_irq_nosync(sigma_delta->spi->irq);
+		adsdi_disable(sigma_delta, 0);
 		ret = -EIO;
 	} else {
 		ret = 0;
@@ -294,7 +450,7 @@ int ad_sigma_delta_single_conversion(struct iio_dev *indio_dev,
 	ad_sigma_delta_set_mode(sigma_delta, AD_SD_MODE_SINGLE);
 
 	sigma_delta->irq_dis = false;
-	enable_irq(sigma_delta->spi->irq);
+	adsdi_enable(sigma_delta);
 	ret = wait_for_completion_interruptible_timeout(
 			&sigma_delta->completion, HZ);
 
@@ -314,7 +470,7 @@ int ad_sigma_delta_single_conversion(struct iio_dev *indio_dev,
 
 out:
 	if (!sigma_delta->irq_dis) {
-		disable_irq_nosync(sigma_delta->spi->irq);
+		adsdi_disable(sigma_delta, 0);
 		sigma_delta->irq_dis = true;
 	}
 
@@ -361,7 +517,7 @@ static int ad_sd_buffer_postenable(struct iio_dev *indio_dev)
 		goto err_unlock;
 
 	sigma_delta->irq_dis = false;
-	enable_irq(sigma_delta->spi->irq);
+	adsdi_enable(sigma_delta);
 
 	return 0;
 
@@ -379,7 +535,7 @@ static int ad_sd_buffer_postdisable(struct iio_dev *indio_dev)
 	wait_for_completion_timeout(&sigma_delta->completion, HZ);
 
 	if (!sigma_delta->irq_dis) {
-		disable_irq_nosync(sigma_delta->spi->irq);
+		adsdi_disable(sigma_delta, 0);
 		sigma_delta->irq_dis = true;
 	}
 
@@ -425,7 +581,7 @@ static irqreturn_t ad_sd_trigger_handler(int irq, void *p)
 
 	iio_trigger_notify_done(indio_dev->trig);
 	sigma_delta->irq_dis = false;
-	enable_irq(sigma_delta->spi->irq);
+	adsdi_enable(sigma_delta);
 
 	return IRQ_HANDLED;
 }
@@ -438,10 +594,17 @@ static const struct iio_buffer_setup_ops ad_sd_buffer_setup_ops = {
 
 static irqreturn_t ad_sd_data_rdy_trig_poll(int irq, void *private)
 {
-	struct ad_sigma_delta *sigma_delta = private;
+	struct ad_sigma_delta_interrupt *intr = private;
+	struct ad_sigma_delta *sigma_delta = intr->active;
 
+	WARN_ON(!sigma_delta);
+	if (!sigma_delta)
+		return IRQ_NONE;
+
+	pr_debug("ad_sigma_delta: interrupt %d fired for %p\n",
+		intr->irq, sigma_delta);
 	complete(&sigma_delta->completion);
-	disable_irq_nosync(irq);
+	adsdi_disable(sigma_delta, 1);
 	sigma_delta->irq_dis = true;
 	iio_trigger_poll(sigma_delta->trig);
 
@@ -486,11 +649,11 @@ static int devm_ad_sd_probe_trigger(struct device *dev, struct iio_dev *indio_de
 	init_completion(&sigma_delta->completion);
 
 	sigma_delta->irq_dis = true;
-	ret = devm_request_irq(dev, sigma_delta->spi->irq,
-			       ad_sd_data_rdy_trig_poll,
-			       sigma_delta->info->irq_flags | IRQF_NO_AUTOEN,
-			       indio_dev->name,
-			       sigma_delta);
+	ret = devm_adsdi_get(dev,
+			&sigma_delta->interrupt,
+			sigma_delta->spi->irq,
+			sigma_delta->spi->master,
+			sigma_delta->info->irq_flags);
 	if (ret)
 		return ret;
 

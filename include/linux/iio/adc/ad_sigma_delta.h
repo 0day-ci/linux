@@ -54,6 +54,9 @@ struct ad_sigma_delta_info {
 	unsigned long irq_flags;
 };
 
+/* Data relating to interrupt sharing */
+struct ad_sigma_delta_interrupt;
+
 /**
  * struct ad_sigma_delta - Sigma Delta device struct
  * @spi: The spi device associated with the Sigma Delta device.
@@ -76,6 +79,7 @@ struct ad_sigma_delta {
 	uint8_t			comm;
 
 	const struct ad_sigma_delta_info *info;
+	struct ad_sigma_delta_interrupt *interrupt;
 
 	/*
 	 * DMA (thus cache coherency maintenance) requires the
