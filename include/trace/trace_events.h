@@ -108,6 +108,9 @@ TRACE_MAKE_SYSTEM_STR();
 #undef __bitmask
 #define __bitmask(item, nr_bits) __dynamic_array(char, item, -1)
 
+#undef __sockaddr
+#define __sockaddr(field, len) __dynamic_array(u8, field, len)
+
 #undef TP_STRUCT__entry
 #define TP_STRUCT__entry(args...) args
 
@@ -206,6 +209,9 @@ TRACE_MAKE_SYSTEM_STR();
 #undef __bitmask
 #define __bitmask(item, nr_bits) __dynamic_array(unsigned long, item, -1)
 
+#undef __sockaddr
+#define __sockaddr(field, len) __dynamic_array(u8, field, len)
+
 #undef DECLARE_EVENT_CLASS
 #define DECLARE_EVENT_CLASS(call, proto, args, tstruct, assign, print)	\
 	struct trace_event_data_offsets_##call {			\
@@ -301,6 +307,9 @@ TRACE_MAKE_SYSTEM_STR();
 		__bitmask_size = __get_dynamic_array_len(field);	\
 		trace_print_bitmask_seq(p, __bitmask, __bitmask_size);	\
 	})
+
+#undef __get_sockaddr
+#define __get_sockaddr(field)	((struct sockaddr *)__get_dynamic_array(field))
 
 #undef __print_flags
 #define __print_flags(flag, delim, flag_array...)			\
@@ -471,6 +480,9 @@ static struct trace_event_functions trace_event_type_funcs_##call = {	\
 #undef __bitmask
 #define __bitmask(item, nr_bits) __dynamic_array(unsigned long, item, -1)
 
+#undef __sockaddr
+#define __sockaddr(field, len) __dynamic_array(u8, field, len)
+
 #undef DECLARE_EVENT_CLASS
 #define DECLARE_EVENT_CLASS(call, proto, args, tstruct, func, print)	\
 static struct trace_event_fields trace_event_fields_##call[] = {	\
@@ -541,6 +553,9 @@ static struct trace_event_fields trace_event_fields_##call[] = {	\
 #undef __bitmask
 #define __bitmask(item, nr_bits) __dynamic_array(unsigned long, item,	\
 					 __bitmask_size_in_longs(nr_bits))
+
+#undef __sockaddr
+#define __sockaddr(field, len) __dynamic_array(u8, field, len)
 
 #undef DECLARE_EVENT_CLASS
 #define DECLARE_EVENT_CLASS(call, proto, args, tstruct, assign, print)	\
@@ -705,6 +720,9 @@ static inline notrace int trace_event_get_offsets_##call(		\
 #undef __assign_bitmask
 #define __assign_bitmask(dst, src, nr_bits)					\
 	memcpy(__get_bitmask(dst), (src), __bitmask_size_in_bytes(nr_bits))
+
+#define __assign_sockaddr(dest, src, len)					\
+	memcpy(__get_dynamic_array(dest), src, len)
 
 #undef TP_fast_assign
 #define TP_fast_assign(args...) args
