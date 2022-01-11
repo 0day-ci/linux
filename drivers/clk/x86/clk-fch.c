@@ -46,6 +46,7 @@ static int fch_clk_probe(struct platform_device *pdev)
 {
 	struct fch_clk_data *fch_data;
 	struct pci_dev *rdev;
+	int ret;
 
 	fch_data = dev_get_platdata(&pdev->dev);
 	if (!fch_data || !fch_data->base)
@@ -60,36 +61,88 @@ static int fch_clk_probe(struct platform_device *pdev)
 	if (pci_match_id(fch_pci_ids, rdev)) {
 		hws[ST_CLK_48M] = clk_hw_register_fixed_rate(NULL, "clk48MHz",
 			NULL, 0, 48000000);
+		if (IS_ERR(hws[ST_CLK_48M])) {
+			ret = PTR_ERR(hws[ST_CLK_48M]);
+			goto err_st_clk_48m;
+		}
+
 		hws[ST_CLK_25M] = clk_hw_register_fixed_rate(NULL, "clk25MHz",
 			NULL, 0, 25000000);
+		if (IS_ERR(hws[ST_CLK_25M])) {
+			ret = PTR_ERR(hws[ST_CLK_25M]);
+			goto err_st_clk_25m;
+		}
 
-		hws[ST_CLK_MUX] = clk_hw_register_mux(NULL, "oscout1_mux",
+		hws[ST_CLK_MUX] = devm_clk_hw_register_mux(NULL, "oscout1_mux",
 			clk_oscout1_parents, ARRAY_SIZE(clk_oscout1_parents),
 			0, fch_data->base + CLKDRVSTR2, OSCOUT1CLK25MHZ, 3, 0,
 			NULL);
+		if (IS_ERR(hws[ST_CLK_MUX])) {
+			ret = PTR_ERR(hws[ST_CLK_MUX]);
+			goto err_st_clk_mux;
+		}
 
-		clk_set_parent(hws[ST_CLK_MUX]->clk, hws[ST_CLK_48M]->clk);
+		ret = clk_set_parent(hws[ST_CLK_MUX]->clk, hws[ST_CLK_48M]->clk);
+		if (ret)
+			goto err_clk_set_parent;
 
 		hws[ST_CLK_GATE] = clk_hw_register_gate(NULL, "oscout1",
 			"oscout1_mux", 0, fch_data->base + MISCCLKCNTL1,
 			OSCCLKENB, CLK_GATE_SET_TO_DISABLE, NULL);
+		if (IS_ERR(hws[ST_CLK_GATE])) {
+			ret = PTR_ERR(hws[ST_CLK_GATE]);
+			goto err_st_clk_gate;
+		}
 
-		devm_clk_hw_register_clkdev(&pdev->dev, hws[ST_CLK_GATE],
-					    fch_data->name, NULL);
+		ret = devm_clk_hw_register_clkdev(&pdev->dev, hws[ST_CLK_GATE],
+			fch_data->name, NULL);
+		if (ret)
+			goto err_register_st_clk_gate;
 	} else {
 		hws[CLK_48M_FIXED] = clk_hw_register_fixed_rate(NULL, "clk48MHz",
 			NULL, 0, 48000000);
+		if (IS_ERR(hws[CLK_48M_FIXED])) {
+			ret = PTR_ERR(hws[CLK_48M_FIXED]);
+			goto err_clk_48m_fixed;
+		}
 
 		hws[CLK_GATE_FIXED] = clk_hw_register_gate(NULL, "oscout1",
 			"clk48MHz", 0, fch_data->base + MISCCLKCNTL1,
 			OSCCLKENB, 0, NULL);
+		if (IS_ERR(hws[CLK_GATE_FIXED])) {
+			ret = PTR_ERR(hws[CLK_GATE_FIXED]);
+			goto err_clk_gate_fixed;
+		}
 
-		devm_clk_hw_register_clkdev(&pdev->dev, hws[CLK_GATE_FIXED],
-					    fch_data->name, NULL);
+		ret = devm_clk_hw_register_clkdev(&pdev->dev, hws[CLK_GATE_FIXED],
+			fch_data->name, NULL);
+		if (ret)
+			goto err_register_gate_fixed;
 	}
 
 	pci_dev_put(rdev);
 	return 0;
+
+err_register_st_clk_gate:
+	clk_hw_unregister_gate(hws[ST_CLK_GATE]);
+err_st_clk_gate:
+err_clk_set_parent:
+	clk_hw_unregister_mux(hws[ST_CLK_MUX]);
+err_st_clk_mux:
+	clk_hw_unregister_fixed_rate(hws[ST_CLK_25M]);
+err_st_clk_25m:
+	clk_hw_unregister_fixed_rate(hws[ST_CLK_48M]);
+err_st_clk_48m:
+	pci_dev_put(rdev);
+	return ret;
+
+err_register_gate_fixed:
+	clk_hw_unregister_gate(hws[CLK_GATE_FIXED]);
+err_clk_gate_fixed:
+	clk_hw_unregister_fixed_rate(hws[CLK_48M_FIXED]);
+err_clk_48m_fixed:
+	pci_dev_put(rdev);
+	return ret;
 }
 
 static int fch_clk_remove(struct platform_device *pdev)
