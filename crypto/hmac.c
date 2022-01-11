@@ -169,6 +169,7 @@ static int hmac_create(struct crypto_template *tmpl, struct rtattr **tb)
 	struct crypto_alg *alg;
 	struct shash_alg *salg;
 	u32 mask;
+	u32 type;
 	int err;
 	int ds;
 	int ss;
@@ -182,8 +183,9 @@ static int hmac_create(struct crypto_template *tmpl, struct rtattr **tb)
 		return -ENOMEM;
 	spawn = shash_instance_ctx(inst);
 
+	type = CRYPTO_ALG_FIPS_INTERNAL;
 	err = crypto_grab_shash(spawn, shash_crypto_instance(inst),
-				crypto_attr_alg_name(tb[1]), 0, mask);
+				crypto_attr_alg_name(tb[1]), type, mask);
 	if (err)
 		goto err_free_inst;
 	salg = crypto_spawn_shash_alg(spawn);

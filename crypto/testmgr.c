@@ -1664,7 +1664,8 @@ static int test_hash_vs_generic_impl(const char *generic_driver,
 	if (strcmp(generic_driver, driver) == 0) /* Already the generic impl? */
 		return 0;
 
-	generic_tfm = crypto_alloc_shash(generic_driver, 0, 0);
+	generic_tfm = crypto_alloc_shash(generic_driver,
+					 CRYPTO_ALG_FIPS_INTERNAL, 0);
 	if (IS_ERR(generic_tfm)) {
 		err = PTR_ERR(generic_tfm);
 		if (err == -ENOENT) {
@@ -2387,7 +2388,8 @@ static int test_aead_vs_generic_impl(struct aead_extra_tests_ctx *ctx)
 	if (strcmp(generic_driver, driver) == 0) /* Already the generic impl? */
 		return 0;
 
-	generic_tfm = crypto_alloc_aead(generic_driver, 0, 0);
+	generic_tfm = crypto_alloc_aead(generic_driver,
+					CRYPTO_ALG_FIPS_INTERNAL, 0);
 	if (IS_ERR(generic_tfm)) {
 		err = PTR_ERR(generic_tfm);
 		if (err == -ENOENT) {
@@ -2986,7 +2988,8 @@ static int test_skcipher_vs_generic_impl(const char *generic_driver,
 	if (strcmp(generic_driver, driver) == 0) /* Already the generic impl? */
 		return 0;
 
-	generic_tfm = crypto_alloc_skcipher(generic_driver, 0, 0);
+	generic_tfm = crypto_alloc_skcipher(generic_driver,
+					    CRYPTO_ALG_FIPS_INTERNAL, 0);
 	if (IS_ERR(generic_tfm)) {
 		err = PTR_ERR(generic_tfm);
 		if (err == -ENOENT) {
@@ -5328,7 +5331,6 @@ static const struct alg_test_desc alg_test_descs[] = {
 	}, {
 		.alg = "sha1",
 		.test = alg_test_hash,
-		.fips_allowed = 1,
 		.suite = {
 			.hash = __VECS(sha1_tv_template)
 		}
@@ -5637,9 +5639,6 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 		if (i < 0)
 			goto notest;
 
-		if (fips_enabled && !alg_test_descs[i].fips_allowed)
-			goto non_fips_alg;
-
 		rc = alg_test_cipher(alg_test_descs + i, driver, type, mask);
 		goto test_done;
 	}
@@ -5649,8 +5648,7 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 	if (i < 0 && j < 0)
 		goto notest;
 
-	if (fips_enabled && ((i >= 0 && !alg_test_descs[i].fips_allowed) ||
-			     (j >= 0 && !alg_test_descs[j].fips_allowed)))
+	if (fips_enabled && (j >= 0 && !alg_test_descs[j].fips_allowed))
 		goto non_fips_alg;
 
 	rc = 0;
@@ -5671,10 +5669,15 @@ test_done:
 		}
 		WARN(1, "alg: self-tests for %s (%s) failed (rc=%d)",
 		     driver, alg, rc);
-	} else {
-		if (fips_enabled)
-			pr_info("alg: self-tests for %s (%s) passed\n",
+	} else if (fips_enabled) {
+		pr_info("alg: self-tests for %s (%s) passed\n",
+			driver, alg);
+
+		if (i >= 0 && !alg_test_descs[i].fips_allowed) {
+			pr_info("alg: %s (%s) is disabled due to FIPS\n",
 				driver, alg);
+			rc = -ECANCELED;
+		}
 	}
 
 	return rc;

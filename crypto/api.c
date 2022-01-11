@@ -314,6 +314,10 @@ struct crypto_alg *crypto_alg_mod_lookup(const char *name, u32 type, u32 mask)
 	if (!((type | mask) & CRYPTO_ALG_INTERNAL))
 		mask |= CRYPTO_ALG_INTERNAL;
 
+	/* Ditto for FIPS_INTERNAL. */
+	if (!((type | mask) & CRYPTO_ALG_FIPS_INTERNAL))
+		mask |= CRYPTO_ALG_FIPS_INTERNAL;
+
 	larval = crypto_larval_lookup(name, type, mask);
 	if (IS_ERR(larval) || !crypto_is_larval(larval))
 		return larval;
