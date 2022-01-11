@@ -5,6 +5,7 @@
 #include <linux/stdarg.h>
 #include <linux/init.h>
 #include <linux/kern_levels.h>
+#include <linux/printk_core.h>
 #include <linux/linkage.h>
 #include <linux/cache.h>
 #include <linux/ratelimit_types.h>
@@ -144,32 +145,6 @@ void early_printk(const char *s, ...) { }
 struct dev_printk_info;
 
 #ifdef CONFIG_PRINTK
-asmlinkage __printf(4, 0)
-int vprintk_emit(int facility, int level,
-		 const struct dev_printk_info *dev_info,
-		 const char *fmt, va_list args);
-
-asmlinkage __printf(1, 0)
-int vprintk(const char *fmt, va_list args);
-
-asmlinkage __printf(1, 2) __cold
-int _printk(const char *fmt, ...);
-
-/*
- * Special printk facility for scheduler/timekeeping use only, _DO_NOT_USE_ !
- */
-__printf(1, 2) __cold int _printk_deferred(const char *fmt, ...);
-
-extern void __printk_safe_enter(void);
-extern void __printk_safe_exit(void);
-/*
- * The printk_deferred_enter/exit macros are available only as a hack for
- * some code paths that need to defer all printk console printing. Interrupts
- * must be disabled for the deferred duration.
- */
-#define printk_deferred_enter __printk_safe_enter
-#define printk_deferred_exit __printk_safe_exit
-
 /*
  * Please don't use printk_ratelimit(), because it shares ratelimiting state
  * with all other unrelated printk_ratelimit() callsites.  Instead use
@@ -189,7 +164,6 @@ devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write, void *buf,
 
 extern void wake_up_klogd(void);
 
-char *log_buf_addr_get(void);
 u32 log_buf_len_get(void);
 void log_buf_vmcoreinfo_setup(void);
 void __init setup_log_buf(int early);
@@ -200,30 +174,6 @@ extern asmlinkage void dump_stack_lvl(const char *log_lvl) __cold;
 extern asmlinkage void dump_stack(void) __cold;
 void printk_trigger_flush(void);
 #else
-static inline __printf(1, 0)
-int vprintk(const char *s, va_list args)
-{
-	return 0;
-}
-static inline __printf(1, 2) __cold
-int _printk(const char *s, ...)
-{
-	return 0;
-}
-static inline __printf(1, 2) __cold
-int _printk_deferred(const char *s, ...)
-{
-	return 0;
-}
-
-static inline void printk_deferred_enter(void)
-{
-}
-
-static inline void printk_deferred_exit(void)
-{
-}
-
 static inline int printk_ratelimit(void)
 {
 	return 0;
@@ -236,11 +186,6 @@ static inline bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 
 static inline void wake_up_klogd(void)
 {
-}
-
-static inline char *log_buf_addr_get(void)
-{
-	return NULL;
 }
 
 static inline u32 log_buf_len_get(void)

@@ -185,7 +185,7 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 
 #include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/printk.h>
+#include <linux/printk_core.h>
 
 static inline int ddebug_add_module(struct _ddebug *tab, unsigned int n,
 				    const char *modname)
@@ -202,9 +202,8 @@ static inline int ddebug_dyndbg_module_param_cb(char *param, char *val,
 						const char *modname)
 {
 	if (strstr(param, "dyndbg")) {
-		/* avoid pr_warn(), which wants pr_fmt() fully defined */
-		printk(KERN_WARNING "dyndbg param is supported only in "
-			"CONFIG_DYNAMIC_DEBUG builds\n");
+		/* Use raw _printk() to avoid cyclic dependency. */
+		_printk(KERN_WARNING "dyndbg param is supported only in CONFIG_DYNAMIC_DEBUG builds\n");
 		return 0; /* allow and ignore */
 	}
 	return -EINVAL;
@@ -223,7 +222,8 @@ static inline int ddebug_dyndbg_module_param_cb(char *param, char *val,
 
 static inline int dynamic_debug_exec_queries(const char *query, const char *modname)
 {
-	pr_warn("kernel not built with CONFIG_DYNAMIC_DEBUG_CORE\n");
+	/* Use raw _printk() to avoid cyclic dependency. */
+	_printk(KERN_WARNING "kernel not built with CONFIG_DYNAMIC_DEBUG_CORE\n");
 	return 0;
 }
 

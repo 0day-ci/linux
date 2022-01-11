@@ -15341,6 +15341,7 @@ R:	Steven Rostedt <rostedt@goodmis.org>
 R:	John Ogness <john.ogness@linutronix.de>
 S:	Maintained
 F:	include/linux/printk.h
+F:	include/linux/printk_core.h
 F:	kernel/printk/
 
 PRINTK INDEXING
