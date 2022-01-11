@@ -75,9 +75,6 @@ patternProperties:
     allOf:
       - $ref: spi-peripheral-props.yaml
 
-    required:
-      - controller-data
-
     unevaluatedProperties: false
 
 required:
