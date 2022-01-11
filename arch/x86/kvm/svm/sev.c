@@ -258,6 +258,7 @@ static int sev_guest_init(struct kvm *kvm, struct kvm_sev_cmd *argp)
 		goto e_free;
 
 	INIT_LIST_HEAD(&sev->regions_list);
+	INIT_LIST_HEAD(&sev->mirror_vms);
 
 	return 0;
 
@@ -1623,22 +1624,41 @@ static void sev_unlock_vcpus_for_migration(struct kvm *kvm)
 	}
 }
 
-static void sev_migrate_from(struct kvm_sev_info *dst,
-			      struct kvm_sev_info *src)
+static void sev_migrate_from(struct kvm *dst_kvm, struct kvm *src_kvm)
 {
+	struct kvm_sev_info *dst = &to_kvm_svm(dst_kvm)->sev_info;
+	struct kvm_sev_info *src = &to_kvm_svm(src_kvm)->sev_info;
+	struct kvm_sev_info *mirror, *tmp;
+
 	dst->active = true;
 	dst->asid = src->asid;
 	dst->handle = src->handle;
 	dst->pages_locked = src->pages_locked;
 	dst->enc_context_owner = src->enc_context_owner;
+	dst->num_mirrored_vms = src->num_mirrored_vms;
 
 	src->asid = 0;
 	src->active = false;
 	src->handle = 0;
 	src->pages_locked = 0;
 	src->enc_context_owner = NULL;
+	src->num_mirrored_vms = 0;
 
 	list_cut_before(&dst->regions_list, &src->regions_list, &src->regions_list);
+	list_cut_before(&dst->mirror_vms, &src->mirror_vms, &src->mirror_vms);
+
+	/*
+	 * If this VM has mirrors we need to update the KVM refcounts from the
+	 * source to the destination.
+	 */
+	if (dst->num_mirrored_vms > 0) {
+		list_for_each_entry_safe(mirror, tmp, &dst->mirror_vms,
+					  mirror_entry) {
+			kvm_get_kvm(dst_kvm);
+			kvm_put_kvm(src_kvm);
+			mirror->enc_context_owner = dst_kvm;
+		}
+	}
 }
 
 static int sev_es_migrate_from(struct kvm *dst, struct kvm *src)
@@ -1708,15 +1728,6 @@ int svm_vm_migrate_from(struct kvm *kvm, unsigned int source_fd)
 
 	src_sev = &to_kvm_svm(source_kvm)->sev_info;
 
-	/*
-	 * VMs mirroring src's encryption context rely on it to keep the
-	 * ASID allocated, but below we are clearing src_sev->asid.
-	 */
-	if (src_sev->num_mirrored_vms) {
-		ret = -EBUSY;
-		goto out_unlock;
-	}
-
 	dst_sev->misc_cg = get_current_misc_cg();
 	cg_cleanup_sev = dst_sev;
 	if (dst_sev->misc_cg != src_sev->misc_cg) {
@@ -1738,7 +1749,7 @@ int svm_vm_migrate_from(struct kvm *kvm, unsigned int source_fd)
 		if (ret)
 			goto out_source_vcpu;
 	}
-	sev_migrate_from(dst_sev, src_sev);
+	sev_migrate_from(kvm, source_kvm);
 	kvm_vm_dead(source_kvm);
 	cg_cleanup_sev = src_sev;
 	ret = 0;
@@ -2009,9 +2020,10 @@ int svm_vm_copy_asid_from(struct kvm *kvm, unsigned int source_fd)
 	source_sev = &to_kvm_svm(source_kvm)->sev_info;
 	kvm_get_kvm(source_kvm);
 	source_sev->num_mirrored_vms++;
+	mirror_sev = &to_kvm_svm(kvm)->sev_info;
+	list_add_tail(&mirror_sev->mirror_entry, &source_sev->mirror_vms);
 
 	/* Set enc_context_owner and copy its encryption context over */
-	mirror_sev = &to_kvm_svm(kvm)->sev_info;
 	mirror_sev->enc_context_owner = source_kvm;
 	mirror_sev->active = true;
 	mirror_sev->asid = source_sev->asid;
@@ -2050,10 +2062,17 @@ void sev_vm_destroy(struct kvm *kvm)
 	if (is_mirroring_enc_context(kvm)) {
 		struct kvm *owner_kvm = sev->enc_context_owner;
 		struct kvm_sev_info *owner_sev = &to_kvm_svm(owner_kvm)->sev_info;
+		struct kvm_sev_info *mirror, *tmp;
 
 		mutex_lock(&owner_kvm->lock);
 		if (!WARN_ON(!owner_sev->num_mirrored_vms))
 			owner_sev->num_mirrored_vms--;
+
+		list_for_each_entry_safe(mirror, tmp, &owner_sev->mirror_vms,
+					  mirror_entry)
+			if (mirror == sev)
+				list_del(&mirror->mirror_entry);
+
 		mutex_unlock(&owner_kvm->lock);
 		kvm_put_kvm(owner_kvm);
 		return;
