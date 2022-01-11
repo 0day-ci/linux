@@ -44,6 +44,7 @@ struct drm_printer;
 struct drm_privacy_screen;
 struct edid;
 struct i2c_adapter;
+struct drm_writeback_connector;
 
 enum drm_connector_force {
 	DRM_FORCE_UNSPECIFIED,
@@ -1532,6 +1533,8 @@ struct drm_connector {
 	 * need the CRTC driving this output, &drm_connector_state.crtc.
 	 */
 	struct drm_encoder *encoder;
+
+	struct drm_writeback_connector *wb_connector;
 
 #define MAX_ELD_BYTES	128
 	/** @eld: EDID-like data, if present */

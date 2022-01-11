@@ -22,7 +22,7 @@ struct drm_writeback_connector {
 	/**
 	 * @base: base drm_connector object
 	 */
-	struct drm_connector base;
+	struct drm_connector *base;
 
 	/**
 	 * @encoder: Internal encoder used by the connector to fulfill
@@ -31,7 +31,7 @@ struct drm_writeback_connector {
 	 * by passing the @enc_funcs parameter to drm_writeback_connector_init()
 	 * function.
 	 */
-	struct drm_encoder encoder;
+	struct drm_encoder *encoder;
 
 	/**
 	 * @pixel_formats_blob_ptr:
@@ -143,7 +143,7 @@ struct drm_writeback_job {
 static inline struct drm_writeback_connector *
 drm_connector_to_writeback(struct drm_connector *connector)
 {
-	return container_of(connector, struct drm_writeback_connector, base);
+	return connector->wb_connector;
 }
 
 int drm_writeback_connector_init(struct drm_device *dev,
