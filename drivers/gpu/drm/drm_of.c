@@ -249,6 +249,22 @@ int drm_of_find_panel_or_bridge(const struct device_node *np,
 	if (panel)
 		*panel = NULL;
 
+	/**
+	 * Some OF graphs don't require 'port' or 'ports' to represent the
+	 * downstream panel or bridge; instead it simply adds a child node
+	 * on a given parent node.
+	 *
+	 * Lookup that child node for a given parent however that child is
+	 * neither a 'port' nor a 'ports' node.
+	 */
+	for_each_available_child_of_node(np, remote) {
+		if (of_node_name_eq(remote, "port") ||
+		    of_node_name_eq(remote, "ports"))
+			continue;
+
+		goto of_find_panel_or_bridge;
+	}
+
 	/*
 	 * of_graph_get_remote_node() produces a noisy error message if port
 	 * node isn't found and the absence of the port is a legit case here,
@@ -259,6 +275,8 @@ int drm_of_find_panel_or_bridge(const struct device_node *np,
 		return -ENODEV;
 
 	remote = of_graph_get_remote_node(np, port, endpoint);
+
+of_find_panel_or_bridge:
 	if (!remote)
 		return -ENODEV;
 
