@@ -20,6 +20,7 @@ properties:
       - fsl,imx8mn-cm7
       - fsl,imx8mp-cm7
       - fsl,imx8qxp-cm4
+      - fsl,imx8qm-cm4
       - fsl,imx8ulp-cm33
       - fsl,imx7d-cm4
       - fsl,imx7ulp-cm4
@@ -62,6 +63,9 @@ properties:
 
   power-domains:
     maxItems: 8
+
+  reg:
+    maxItems: 1
 
   rsrc-id:
     description:
