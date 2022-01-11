@@ -4161,7 +4161,7 @@ static int __mem_cgroup_usage_register_event(struct mem_cgroup *memcg,
 	struct mem_cgroup_threshold_ary *new;
 	unsigned long threshold;
 	unsigned long usage;
-	int i, size, ret;
+	int size, ret;
 
 	ret = page_counter_memparse(args, "-1", &threshold);
 	if (ret)
@@ -4193,9 +4193,13 @@ static int __mem_cgroup_usage_register_event(struct mem_cgroup *memcg,
 	new->size = size;
 
 	/* Copy thresholds (if any) to new array */
-	if (thresholds->primary)
+	if (thresholds->primary) {
 		memcpy(new->entries, thresholds->primary->entries,
 		       flex_array_size(new, entries, size - 1));
+		new->current_threshold = thresholds->primary->current_threshold;
+	} else {
+		new->current_threshold = -1;
+	}
 
 	/* Add new threshold */
 	new->entries[size - 1].eventfd = eventfd;
@@ -4205,18 +4209,17 @@ static int __mem_cgroup_usage_register_event(struct mem_cgroup *memcg,
 	sort(new->entries, size, sizeof(*new->entries),
 			compare_thresholds, NULL);
 
-	/* Find current threshold */
-	new->current_threshold = -1;
-	for (i = 0; i < size; i++) {
-		if (new->entries[i].threshold <= usage) {
-			/*
-			 * new->current_threshold will not be used until
-			 * rcu_assign_pointer(), so it's safe to increment
-			 * it here.
-			 */
-			++new->current_threshold;
-		} else
-			break;
+	/*
+	 * If the threshold added here is less or equal to usage, this means
+	 * current_threshold need to increase by one.
+	 */
+	if (threshold <= usage) {
+		/*
+		 * new->current_threshold will not be used until
+		 * rcu_assign_pointer(), so it's safe to increment
+		 * it here.
+		 */
+		new->current_threshold++;
 	}
 
 	/* Free old spare buffer and save old primary buffer as spare */
