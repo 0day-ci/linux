@@ -70,6 +70,13 @@ int metricgroup__parse_groups(const struct option *opt,
 			      bool metric_no_group,
 			      bool metric_no_merge,
 			      struct rblist *metric_events);
+
+int metricgroup__parse_groups_to_evlist(struct evlist *perf_evlist,
+					const char *str,
+					bool metric_no_group,
+					bool metric_no_merge,
+					struct rblist *metric_events);
+
 const struct pmu_event *metricgroup__find_metric(const char *metric,
 						 const struct pmu_events_map *map);
 int metricgroup__parse_groups_test(struct evlist *evlist,

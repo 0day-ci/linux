@@ -1511,6 +1511,18 @@ int metricgroup__parse_groups(const struct option *opt,
 			    metric_no_merge, NULL, metric_events, map);
 }
 
+int metricgroup__parse_groups_to_evlist(struct evlist *perf_evlist,
+					const char *str,
+					bool metric_no_group,
+					bool metric_no_merge,
+					struct rblist *metric_events)
+{
+	const struct pmu_events_map *map = pmu_events_map__find();
+
+	return parse_groups(perf_evlist, str, metric_no_group,
+			    metric_no_merge, NULL, metric_events, map);
+}
+
 int metricgroup__parse_groups_test(struct evlist *evlist,
 				   const struct pmu_events_map *map,
 				   const char *str,
