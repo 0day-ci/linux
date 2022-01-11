@@ -322,6 +322,7 @@ static int addr_cnt;
 #define GSM1_ESCAPE_BITS	0x20
 #define XON			0x11
 #define XOFF			0x13
+#define ASCII_MASK		0x7F
 
 static const struct tty_port_operations gsm_port_ops;
 
@@ -521,7 +522,7 @@ static void gsm_print_packet(const char *hdr, int addr, int cr,
  *	@output: output buffer
  *	@len: length of input
  *
- *	Expand a buffer by bytestuffing it. The worst case size change
+ *	Expand a buffer by byte stuffing it. The worst case size change
  *	is doubling and the caller is responsible for handing out
  *	suitable sized buffers.
  */
@@ -531,7 +532,8 @@ static int gsm_stuff_frame(const u8 *input, u8 *output, int len)
 	int olen = 0;
 	while (len--) {
 		if (*input == GSM1_SOF || *input == GSM1_ESCAPE
-		    || *input == XON || *input == XOFF) {
+		    || (*input & ASCII_MASK) == XON
+		    || (*input & ASCII_MASK) == XOFF) {
 			*output++ = GSM1_ESCAPE;
 			*output++ = *input++ ^ GSM1_ESCAPE_BITS;
 			olen++;
