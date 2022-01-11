@@ -4,6 +4,7 @@
  */
 
 #include <soc/tegra/mc.h>
+#include <linux/platform_device.h>
 
 #include <dt-bindings/memory/tegra194-mc.h>
 
@@ -16,8 +17,114 @@ static void tegra194_mc_clear_interrupt(struct tegra_mc *mc)
 	mc_writel(mc, MC_INTSTATUS_CLEAR, MC_INTSTATUS);
 }
 
+static const struct tegra_mc_error int_mc_errors[] = {
+	{
+		.int_bit = MC_INT_DECERR_EMEM,
+		.msg = "EMEM address decode error",
+		.status_reg = MC_ERR_STATUS,
+		.addr_reg = MC_ERR_ADR,
+		.addr_reg_hi = MC_ERR_ADR_HI,
+	},
+	{
+		.int_bit = MC_INT_SECURITY_VIOLATION,
+		.msg = "non secure access to secure region",
+		.status_reg = MC_ERR_STATUS,
+		.addr_reg = MC_ERR_ADR,
+		.addr_reg_hi = MC_ERR_ADR_HI,
+	},
+	{
+		.int_bit = MC_INT_DECERR_VPR,
+		.msg = "MC request violates VPR requirements",
+		.status_reg = MC_ERR_VPR_STATUS,
+		.addr_reg = MC_ERR_VPR_ADR,
+	},
+	{
+		.int_bit = MC_INT_SECERR_SEC,
+		.msg = "MC request violated SEC carveout requirements",
+		.status_reg = MC_ERR_SEC_STATUS,
+		.addr_reg = MC_ERR_SEC_ADR,
+	},
+	{
+		.int_bit = MC_INT_DECERR_MTS,
+		.msg = "MTS carveout access violation",
+		.status_reg = MC_ERR_MTS_STATUS,
+		.addr_reg = MC_ERR_MTS_ADR,
+	},
+	{
+		.int_bit = MC_INT_DECERR_GENERALIZED_CARVEOUT,
+		.msg = "GSC access violation",
+		.status_reg = MC_ERR_GENERALIZED_CARVEOUT_STATUS,
+		.addr_reg = MC_ERR_GENERALIZED_CARVEOUT_ADR,
+		.addr_reg_hi = MC_ERR_GENERALIZED_CARVEOUT_STATUS_1,
+	},
+};
+
+static irqreturn_t tegra194_mc_handle_irq(int irq, void *data)
+{
+	struct tegra_mc *mc = data;
+	unsigned long status;
+	unsigned int bit;
+
+	status = mc_readl(mc, MC_INTSTATUS) & mc->soc->intmask;
+	if (!status)
+		return IRQ_NONE;
+
+	for_each_set_bit(bit, &status, 32) {
+		const char *error = int_mc_errors[bit].msg ?: "unknown";
+		const char *client = "unknown";
+		const char *direction, *secure;
+		phys_addr_t addr = 0;
+		unsigned int i;
+		u8 id;
+		u32 value;
+
+		value = mc_readl(mc, int_mc_errors[bit].status_reg);
+
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
+		if (mc->soc->num_address_bits > 32) {
+			if (int_mc_errors[bit].addr_reg_hi)
+				addr = mc_readl(mc,
+						int_mc_errors[bit].addr_reg_hi);
+			else
+				addr = ((value >> MC_ERR_STATUS_ADR_HI_SHIFT) &
+					MC_ERR_STATUS_ADR_HI_MASK);
+			addr <<= 32;
+		}
+#endif
+		addr |= mc_readl(mc, int_mc_errors[bit].addr_reg);
+
+		if (value & MC_ERR_STATUS_RW)
+			direction = "write";
+		else
+			direction = "read";
+
+		if (value & MC_ERR_STATUS_SECURITY)
+			secure = "secure ";
+		else
+			secure = "";
+
+		id = value & mc->soc->client_id_mask;
+
+		for (i = 0; i < mc->soc->num_clients; i++) {
+			if (mc->soc->clients[i].id == id) {
+				client = mc->soc->clients[i].name;
+				break;
+			}
+		}
+
+		dev_err_ratelimited(mc->dev, "%s: %s%s @%pa: %s\n",
+				    client, secure, direction, &addr, error);
+	}
+
+	/* clear interrupts */
+	mc_writel(mc, status, MC_INTSTATUS);
+
+	return IRQ_HANDLED;
+}
+
 const struct tegra_mc_interrupt_ops tegra194_mc_interrupt_ops = {
 	.clear_interrupt = tegra194_mc_clear_interrupt,
+	.handle_irq = tegra194_mc_handle_irq,
 };
 
 static const struct tegra_mc_client tegra194_mc_clients[] = {
@@ -1358,6 +1465,7 @@ const struct tegra_mc_soc tegra194_mc_soc = {
 	.num_clients = ARRAY_SIZE(tegra194_mc_clients),
 	.clients = tegra194_mc_clients,
 	.num_address_bits = 40,
+	.client_id_mask = 0xff,
 	.intmask = MC_INT_DECERR_ROUTE_SANITY | MC_INT_WCAM_ERR |
 		   MC_INT_DECERR_GENERALIZED_CARVEOUT | MC_INT_DECERR_MTS |
 		   MC_INT_SECERR_SEC | MC_INT_DECERR_VPR |

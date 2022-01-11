@@ -43,6 +43,7 @@
 #define MC_EMEM_ARB_OVERRIDE				0xe8
 #define MC_TIMING_CONTROL_DBG				0xf8
 #define MC_TIMING_CONTROL				0xfc
+#define MC_ERR_ADR_HI					0x11fc
 
 #define MC_ERR_VPR_STATUS				0x654
 #define MC_ERR_VPR_ADR					0x658
@@ -50,6 +51,7 @@
 #define MC_ERR_SEC_ADR					0x680
 #define MC_ERR_MTS_STATUS				0x9b0
 #define MC_ERR_MTS_ADR					0x9b4
+#define MC_ERR_GENERALIZED_CARVEOUT_STATUS_1		0xbfc
 #define MC_ERR_GENERALIZED_CARVEOUT_STATUS		0xc00
 #define MC_ERR_GENERALIZED_CARVEOUT_ADR			0xc04
 
