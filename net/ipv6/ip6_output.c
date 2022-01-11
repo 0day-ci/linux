@@ -1513,10 +1513,13 @@ emsgsize:
 		csummode = CHECKSUM_PARTIAL;
 
 	if (flags & MSG_ZEROCOPY && length && sock_flag(sk, SOCK_ZEROCOPY)) {
-		uarg = msg_zerocopy_realloc(sk, length, skb_zcopy(skb));
+		if (skb)
+			uarg = skb_zcopy(skb);
+		extra_uref = !uarg; /* only ref on new uarg */
+
+		uarg = msg_zerocopy_realloc(sk, length, uarg);
 		if (!uarg)
 			return -ENOBUFS;
-		extra_uref = !skb_zcopy(skb);	/* only ref on new uarg */
 		if (rt->dst.dev->features & NETIF_F_SG &&
 		    csummode == CHECKSUM_PARTIAL) {
 			paged = true;
