@@ -4054,8 +4054,9 @@ struct dwc2_tt *dwc2_host_get_tt_info(struct dwc2_hsotg *hsotg, void *context,
 			 * For single_tt we need one schedule.  For multi_tt
 			 * we need one per port.
 			 */
-			bitmap_size = DWC2_ELEMENTS_PER_LS_BITMAP *
-				      sizeof(dwc_tt->periodic_bitmaps[0]);
+			bitmap_size =
+				flex_array_size(dwc_tt, periodic_bitmaps,
+						DWC2_ELEMENTS_PER_LS_BITMAP);
 			if (urb->dev->tt->multi)
 				bitmap_size *= urb->dev->tt->hub->maxchild;
 
