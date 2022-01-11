@@ -523,6 +523,11 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
 		base = dt_mem_next_cell(dt_root_addr_cells, &prop);
 		size = dt_mem_next_cell(dt_root_size_cells, &prop);
 
+		if (size && memblock_is_reserved(base)) {
+			pr_warn("WARNING: 0x%08llx+0x%08llx overlaps reserved memory region\n",
+				(u64)base, (u64)size);
+		}
+
 		if (size &&
 		    early_init_dt_reserve_memory_arch(base, size, nomap) == 0)
 			pr_debug("Reserved memory: reserved region for node '%s': base %pa, size %lu MiB\n",
