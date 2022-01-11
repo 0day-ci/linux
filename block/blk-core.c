@@ -818,7 +818,7 @@ static void __submit_bio(struct bio *bio)
  * bio_list_on_stack[1] contains bios that were submitted before the current
  *	->submit_bio_bio, but that haven't been processed yet.
  */
-static void __submit_bio_noacct(struct bio *bio)
+static void __submit_bio_noacct_generic(struct bio *bio)
 {
 	struct bio_list bio_list_on_stack[2];
 
@@ -884,9 +884,9 @@ static void __submit_bio_noacct_mq(struct bio *bio)
  * systems and other upper level users of the block layer should use
  * submit_bio() instead.
  */
-void submit_bio_noacct(struct bio *bio)
+void __submit_bio_noacct(struct bio *bio, bool check)
 {
-	if (unlikely(!submit_bio_checks(bio)))
+	if (unlikely(check && !submit_bio_checks(bio)))
 		return;
 
 	/*
@@ -900,9 +900,9 @@ void submit_bio_noacct(struct bio *bio)
 	else if (!bio->bi_bdev->bd_disk->fops->submit_bio)
 		__submit_bio_noacct_mq(bio);
 	else
-		__submit_bio_noacct(bio);
+		__submit_bio_noacct_generic(bio);
 }
-EXPORT_SYMBOL(submit_bio_noacct);
+EXPORT_SYMBOL(__submit_bio_noacct);
 
 /**
  * submit_bio - submit a bio to the block device layer for I/O

@@ -599,7 +599,12 @@ static inline unsigned int blk_queue_depth(struct request_queue *q)
 
 extern int blk_register_queue(struct gendisk *disk);
 extern void blk_unregister_queue(struct gendisk *disk);
-void submit_bio_noacct(struct bio *bio);
+void __submit_bio_noacct(struct bio *bio, bool check);
+
+static inline void submit_bio_noacct(struct bio *bio)
+{
+	__submit_bio_noacct(bio, true);
+}
 
 extern int blk_lld_busy(struct request_queue *q);
 extern void blk_queue_split(struct bio **);
