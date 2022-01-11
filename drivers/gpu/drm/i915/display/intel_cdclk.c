@@ -31,6 +31,7 @@
 #include "intel_crtc.h"
 #include "intel_de.h"
 #include "intel_display_types.h"
+#include "intel_pci_config.h"
 #include "intel_pcode.h"
 #include "intel_psr.h"
 #include "vlv_sideband.h"
@@ -62,6 +63,17 @@
  * really need to know about RAWCLK is its frequency so that various
  * dividers can be programmed correctly.
  */
+
+struct intel_cdclk_funcs {
+	void (*get_cdclk)(struct drm_i915_private *i915,
+			  struct intel_cdclk_config *cdclk_config);
+	void (*set_cdclk)(struct drm_i915_private *i915,
+			  const struct intel_cdclk_config *cdclk_config,
+			  enum pipe pipe);
+	int (*bw_calc_min_cdclk)(struct intel_atomic_state *state);
+	int (*modeset_calc_cdclk)(struct intel_cdclk_state *state);
+	u8 (*calc_voltage_level)(int cdclk);
+};
 
 void intel_cdclk_get_cdclk(struct drm_i915_private *dev_priv,
 			   struct intel_cdclk_config *cdclk_config)
