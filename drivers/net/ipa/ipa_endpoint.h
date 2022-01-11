@@ -53,6 +53,7 @@ enum ipa_endpoint_name {
  * @netdev:		Network device pointer, if endpoint uses one
  * @replenish_enabled:	Whether receive buffer replenishing is enabled
  * @replenish_ready:	Number of replenish transactions without doorbell
+ * @replenish_active:	1 when replenishing is active, 0 otherwise
  * @replenish_saved:	Replenish requests held while disabled
  * @replenish_backlog:	Number of buffers needed to fill hardware queue
  * @replenish_work:	Work item used for repeated replenish failures
@@ -74,6 +75,7 @@ struct ipa_endpoint {
 	/* Receive buffer replenishing for RX endpoints */
 	bool replenish_enabled;
 	u32 replenish_ready;
+	atomic_t replenish_active;
 	atomic_t replenish_saved;
 	atomic_t replenish_backlog;
 	struct delayed_work replenish_work;		/* global wq */
