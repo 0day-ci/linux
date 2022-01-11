@@ -542,9 +542,11 @@ static int evsel__add_modifiers(struct evsel *evsel, char *bf, size_t size)
 			r += scnprintf(bf + r, size - r, "%c", mod);	\
 		} } while(0)
 
-	if (attr->exclude_kernel || attr->exclude_user || attr->exclude_hv) {
+	if (attr->exclude_kernel || attr->exclude_user ||
+	    attr->exclude_hv || attr->exclude_machine) {
 		MOD_PRINT(kernel, 'k');
 		MOD_PRINT(user, 'u');
+		MOD_PRINT(machine, 'm');
 		MOD_PRINT(hv, 'h');
 		exclude_guest_default = true;
 	}

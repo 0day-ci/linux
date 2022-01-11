@@ -1867,6 +1867,7 @@ struct event_modifier {
 	int weak;
 	int exclusive;
 	int bpf_counter;
+	int em;
 };
 
 static int get_event_modifier(struct event_modifier *mod, char *str,
@@ -1874,6 +1875,7 @@ static int get_event_modifier(struct event_modifier *mod, char *str,
 {
 	int eu = evsel ? evsel->core.attr.exclude_user : 0;
 	int ek = evsel ? evsel->core.attr.exclude_kernel : 0;
+	int em = evsel ? evsel->core.attr.exclude_machine : 0;
 	int eh = evsel ? evsel->core.attr.exclude_hv : 0;
 	int eH = evsel ? evsel->core.attr.exclude_host : 0;
 	int eG = evsel ? evsel->core.attr.exclude_guest : 0;
@@ -1884,7 +1886,7 @@ static int get_event_modifier(struct event_modifier *mod, char *str,
 	int pinned = evsel ? evsel->core.attr.pinned : 0;
 	int exclusive = evsel ? evsel->core.attr.exclusive : 0;
 
-	int exclude = eu | ek | eh;
+	int exclude = eu | ek | eh | em;
 	int exclude_GH = evsel ? evsel->exclude_GH : 0;
 	int weak = 0;
 	int bpf_counter = 0;
@@ -1894,17 +1896,17 @@ static int get_event_modifier(struct event_modifier *mod, char *str,
 	while (*str) {
 		if (*str == 'u') {
 			if (!exclude)
-				exclude = eu = ek = eh = 1;
+				exclude = eu = ek = eh = em = 1;
 			if (!exclude_GH && !perf_guest)
 				eG = 1;
 			eu = 0;
 		} else if (*str == 'k') {
 			if (!exclude)
-				exclude = eu = ek = eh = 1;
+				exclude = eu = ek = eh = em = 1;
 			ek = 0;
 		} else if (*str == 'h') {
 			if (!exclude)
-				exclude = eu = ek = eh = 1;
+				exclude = eu = ek = eh = em = 1;
 			eh = 0;
 		} else if (*str == 'G') {
 			if (!exclude_GH)
@@ -1933,6 +1935,10 @@ static int get_event_modifier(struct event_modifier *mod, char *str,
 			weak = 1;
 		} else if (*str == 'b') {
 			bpf_counter = 1;
+		} else if (*str == 'm') {
+			if (!exclude)
+				exclude = eu = ek = eh = em = 1;
+			em = 0;
 		} else
 			break;
 
@@ -1958,6 +1964,7 @@ static int get_event_modifier(struct event_modifier *mod, char *str,
 	mod->eH = eH;
 	mod->eG = eG;
 	mod->eI = eI;
+	mod->em = em;
 	mod->precise = precise;
 	mod->precise_max = precise_max;
 	mod->exclude_GH = exclude_GH;
@@ -1979,7 +1986,7 @@ static int check_modifier(char *str)
 	char *p = str;
 
 	/* The sizeof includes 0 byte as well. */
-	if (strlen(str) > (sizeof("ukhGHpppPSDIWeb") - 1))
+	if (strlen(str) > (sizeof("ukmhGHpppPSDIWeb") - 1))
 		return -1;
 
 	while (*p) {
@@ -2011,6 +2018,7 @@ int parse_events__modifier_event(struct list_head *list, char *str, bool add)
 
 		evsel->core.attr.exclude_user   = mod.eu;
 		evsel->core.attr.exclude_kernel = mod.ek;
+		evsel->core.attr.exclude_machine= mod.em;
 		evsel->core.attr.exclude_hv     = mod.eh;
 		evsel->core.attr.precise_ip     = mod.precise;
 		evsel->core.attr.exclude_host   = mod.eH;
