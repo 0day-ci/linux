@@ -5,6 +5,7 @@
 
 #include <linux/compiler.h>
 #include <linux/ftrace.h>
+#include <linux/rethook.h>
 
 /*
  * fprobe_entry - function entry for fprobe
@@ -27,7 +28,10 @@ struct fprobe {
 	struct ftrace_ops	ftrace;
 	unsigned long		nmissed;
 	unsigned int		flags;
+	struct rethook		*rethook;
+
 	void (*entry_handler) (struct fprobe *, unsigned long, struct pt_regs *);
+	void (*exit_handler) (struct fprobe *, unsigned long, struct pt_regs *);
 };
 
 #define FPROBE_FL_DISABLED	1
