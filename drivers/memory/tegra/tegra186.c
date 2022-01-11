@@ -12,6 +12,8 @@
 
 #include <soc/tegra/mc.h>
 
+#include "mc.h"
+
 #if defined(CONFIG_ARCH_TEGRA_186_SOC)
 #include <dt-bindings/memory/tegra186-mc.h>
 #endif
@@ -19,6 +21,8 @@
 #define MC_SID_STREAMID_OVERRIDE_MASK GENMASK(7, 0)
 #define MC_SID_STREAMID_SECURITY_WRITE_ACCESS_DISABLED BIT(16)
 #define MC_SID_STREAMID_SECURITY_OVERRIDE BIT(8)
+
+#define MC_INTSTATUS_CLEAR			0x00033340
 
 static void tegra186_mc_program_sid(struct tegra_mc *mc)
 {
@@ -138,6 +142,15 @@ static int tegra186_mc_probe_device(struct tegra_mc *mc, struct device *dev)
 
 	return 0;
 }
+
+static void tegra186_mc_clear_interrupt(struct tegra_mc *mc)
+{
+	mc_writel(mc, MC_INTSTATUS_CLEAR, MC_INTSTATUS);
+}
+
+const struct tegra_mc_interrupt_ops tegra186_mc_interrupt_ops = {
+	.clear_interrupt = tegra186_mc_clear_interrupt,
+};
 
 const struct tegra_mc_ops tegra186_mc_ops = {
 	.probe = tegra186_mc_probe,
@@ -876,5 +889,6 @@ const struct tegra_mc_soc tegra186_mc_soc = {
 	.clients = tegra186_mc_clients,
 	.num_address_bits = 40,
 	.ops = &tegra186_mc_ops,
+	.interrupt_ops = &tegra186_mc_interrupt_ops,
 };
 #endif

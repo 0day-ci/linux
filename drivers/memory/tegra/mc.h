@@ -148,6 +148,7 @@ extern const struct tegra_mc_soc tegra234_mc_soc;
     defined(CONFIG_ARCH_TEGRA_210_SOC)
 int tegra30_mc_probe(struct tegra_mc *mc);
 extern const struct tegra_mc_ops tegra30_mc_ops;
+extern const struct tegra_mc_interrupt_ops tegra30_mc_interrupt_ops;
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA_186_SOC) || \

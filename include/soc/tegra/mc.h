@@ -170,6 +170,11 @@ struct tegra_mc_icc_ops {
 						void *data);
 };
 
+struct tegra_mc_interrupt_ops {
+	void (*clear_interrupt)(struct tegra_mc *mc);
+	irqreturn_t (*handle_irq)(int irq, void *data);
+};
+
 struct tegra_mc_ops {
 	/*
 	 * @probe: Callback to set up SoC-specific bits of the memory controller. This is called
@@ -179,7 +184,6 @@ struct tegra_mc_ops {
 	void (*remove)(struct tegra_mc *mc);
 	int (*suspend)(struct tegra_mc *mc);
 	int (*resume)(struct tegra_mc *mc);
-	irqreturn_t (*handle_irq)(int irq, void *data);
 	int (*probe_device)(struct tegra_mc *mc, struct device *dev);
 };
 
@@ -205,6 +209,7 @@ struct tegra_mc_soc {
 
 	const struct tegra_mc_icc_ops *icc_ops;
 	const struct tegra_mc_ops *ops;
+	const struct tegra_mc_interrupt_ops *interrupt_ops;
 };
 
 struct tegra_mc {

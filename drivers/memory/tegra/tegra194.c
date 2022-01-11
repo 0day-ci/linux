@@ -9,6 +9,17 @@
 
 #include "mc.h"
 
+#define MC_INTSTATUS_CLEAR			0x00133340
+
+static void tegra194_mc_clear_interrupt(struct tegra_mc *mc)
+{
+	mc_writel(mc, MC_INTSTATUS_CLEAR, MC_INTSTATUS);
+}
+
+const struct tegra_mc_interrupt_ops tegra194_mc_interrupt_ops = {
+	.clear_interrupt = tegra194_mc_clear_interrupt,
+};
+
 static const struct tegra_mc_client tegra194_mc_clients[] = {
 	{
 		.id = TEGRA194_MEMORY_CLIENT_PTCR,
@@ -1348,4 +1359,5 @@ const struct tegra_mc_soc tegra194_mc_soc = {
 	.clients = tegra194_mc_clients,
 	.num_address_bits = 40,
 	.ops = &tegra186_mc_ops,
+	.interrupt_ops = &tegra194_mc_interrupt_ops,
 };

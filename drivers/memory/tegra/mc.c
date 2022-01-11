@@ -605,9 +605,12 @@ static irqreturn_t tegra30_mc_handle_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+const struct tegra_mc_interrupt_ops tegra30_mc_interrupt_ops = {
+	.handle_irq = tegra30_mc_handle_irq,
+};
+
 const struct tegra_mc_ops tegra30_mc_ops = {
 	.probe = tegra30_mc_probe,
-	.handle_irq = tegra30_mc_handle_irq,
 };
 #endif
 
@@ -757,16 +760,21 @@ static int tegra_mc_probe(struct platform_device *pdev)
 			return err;
 	}
 
-	if (mc->soc->ops && mc->soc->ops->handle_irq) {
+	if (mc->soc->interrupt_ops && mc->soc->interrupt_ops->handle_irq) {
 		mc->irq = platform_get_irq(pdev, 0);
 		if (mc->irq < 0)
 			return mc->irq;
 
 		WARN(!mc->soc->client_id_mask, "missing client ID mask for this SoC\n");
 
+		/* clear any mc-errs that occurred before. */
+		if (mc->soc->interrupt_ops->clear_interrupt)
+			mc->soc->interrupt_ops->clear_interrupt(mc);
+
 		mc_writel(mc, mc->soc->intmask, MC_INTMASK);
 
-		err = devm_request_irq(&pdev->dev, mc->irq, mc->soc->ops->handle_irq, 0,
+		err = devm_request_irq(&pdev->dev, mc->irq,
+				       mc->soc->interrupt_ops->handle_irq, 0,
 				       dev_name(&pdev->dev), mc);
 		if (err < 0) {
 			dev_err(&pdev->dev, "failed to request IRQ#%u: %d\n", mc->irq,

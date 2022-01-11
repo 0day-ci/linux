@@ -786,11 +786,15 @@ static irqreturn_t tegra20_mc_handle_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static const struct tegra_mc_interrupt_ops tegra20_mc_interrupt_ops = {
+	.handle_irq = tegra20_mc_handle_irq,
+};
+
 static const struct tegra_mc_ops tegra20_mc_ops = {
 	.probe = tegra20_mc_probe,
 	.suspend = tegra20_mc_suspend,
 	.resume = tegra20_mc_resume,
-	.handle_irq = tegra20_mc_handle_irq,
+	.interrupt_ops = tegra20_mc_interrupt_ops,
 };
 
 const struct tegra_mc_soc tegra20_mc_soc = {
