@@ -6,6 +6,7 @@
 #include <linux/arm-smccc.h>
 #include <linux/clk.h>
 #include <linux/err.h>
+#include <linux/firmware/imx/sci.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/mailbox_client.h>
@@ -59,6 +60,8 @@
 #define IMX_SIP_RPROC_STARTED		0x01
 #define IMX_SIP_RPROC_STOP		0x02
 
+#define	IMX_SC_IRQ_GROUP_REBOOTED	5
+
 /**
  * struct imx_rproc_mem - slim internal memory structure
  * @cpu_addr: MPU virtual address of the memory region
@@ -90,6 +93,23 @@ struct imx_rproc {
 	struct workqueue_struct		*workqueue;
 	void __iomem			*rsc_table;
 	bool				has_clk;
+	struct imx_sc_ipc		*ipc_handle;
+	struct notifier_block		proc_nb;
+	u32				rproc_pt;
+	u32				rsrc;
+};
+
+static const struct imx_rproc_att imx_rproc_att_imx8qxp[] = {
+	/* dev addr , sys addr  , size	    , flags */
+	{ 0x08000000, 0x08000000, 0x10000000, 0},
+	/* TCML/U */
+	{ 0x1FFE0000, 0x34FE0000, 0x00040000, ATT_OWN | ATT_IOMEM },
+	/* OCRAM(Low 96KB) */
+	{ 0x21000000, 0x00100000, 0x00018000, 0},
+	/* OCRAM */
+	{ 0x21100000, 0x00100000, 0x00040000, 0},
+	/* DDR (Data) */
+	{ 0x80000000, 0x80000000, 0x60000000, 0 },
 };
 
 static const struct imx_rproc_att imx_rproc_att_imx8mn[] = {
@@ -234,6 +254,12 @@ static const struct imx_rproc_dcfg imx_rproc_cfg_imx8ulp = {
 	.att		= imx_rproc_att_imx8ulp,
 	.att_size	= ARRAY_SIZE(imx_rproc_att_imx8ulp),
 	.method		= IMX_RPROC_NONE,
+};
+
+static const struct imx_rproc_dcfg imx_rproc_cfg_imx8qxp = {
+	.att		= imx_rproc_att_imx8qxp,
+	.att_size	= ARRAY_SIZE(imx_rproc_att_imx8qxp),
+	.method		= IMX_RPROC_SCU_API,
 };
 
 static const struct imx_rproc_dcfg imx_rproc_cfg_imx7ulp = {
@@ -491,6 +517,11 @@ static int imx_rproc_attach(struct rproc *rproc)
 	return 0;
 }
 
+static int imx_rproc_detach(struct rproc *rproc)
+{
+	return 0;
+}
+
 static struct resource_table *imx_rproc_get_loaded_rsc_table(struct rproc *rproc, size_t *table_sz)
 {
 	struct imx_rproc *priv = rproc->priv;
@@ -506,6 +537,7 @@ static struct resource_table *imx_rproc_get_loaded_rsc_table(struct rproc *rproc
 static const struct rproc_ops imx_rproc_ops = {
 	.prepare	= imx_rproc_prepare,
 	.attach		= imx_rproc_attach,
+	.detach		= imx_rproc_detach,
 	.start		= imx_rproc_start,
 	.stop		= imx_rproc_stop,
 	.kick		= imx_rproc_kick,
@@ -652,6 +684,22 @@ static void imx_rproc_free_mbox(struct rproc *rproc)
 	mbox_free_channel(priv->rx_ch);
 }
 
+static int imx_rproc_partition_notify(struct notifier_block *nb,
+				      unsigned long event, void *group)
+{
+	struct imx_rproc *priv = container_of(nb, struct imx_rproc, proc_nb);
+
+	/* Ignore other irqs */
+	if (!((event & BIT(priv->rproc_pt)) && (*(u8 *)group == IMX_SC_IRQ_GROUP_REBOOTED)))
+		return 0;
+
+	rproc_report_crash(priv->rproc, RPROC_WATCHDOG);
+
+	pr_info("Patition%d reset!\n", priv->rproc_pt);
+
+	return 0;
+}
+
 static int imx_rproc_detect_mode(struct imx_rproc *priv)
 {
 	struct regmap_config config = { .name = "imx-rproc" };
@@ -661,6 +709,7 @@ static int imx_rproc_detect_mode(struct imx_rproc *priv)
 	struct arm_smccc_res res;
 	int ret;
 	u32 val;
+	u8 pt;
 
 	switch (dcfg->method) {
 	case IMX_RPROC_NONE:
@@ -670,6 +719,52 @@ static int imx_rproc_detect_mode(struct imx_rproc *priv)
 		arm_smccc_smc(IMX_SIP_RPROC, IMX_SIP_RPROC_STARTED, 0, 0, 0, 0, 0, 0, &res);
 		if (res.a0)
 			priv->rproc->state = RPROC_DETACHED;
+		return 0;
+	case IMX_RPROC_SCU_API:
+		ret = imx_scu_get_handle(&priv->ipc_handle);
+		if (ret)
+			return ret;
+		ret = of_property_read_u32(dev->of_node, "rsrc-id", &priv->rsrc);
+		if (ret) {
+			dev_err(dev, "no rsrc-id\n");
+			return ret;
+		}
+
+		/*
+		 * If Mcore resource is not owned by Acore partition, It is kicked by ROM,
+		 * and Linux could only do IPC with Mcore and nothing else.
+		 */
+		if (!imx_sc_rm_is_resource_owned(priv->ipc_handle, priv->rsrc)) {
+
+			priv->has_clk = false;
+			priv->rproc->self_recovery = true;
+			priv->rproc->state = RPROC_DETACHED;
+
+			/* Get partition id and enable irq in SCFW */
+			ret = imx_sc_rm_get_resource_owner(priv->ipc_handle, priv->rsrc, &pt);
+			if (ret) {
+				dev_err(dev, "not able to get resource owner\n");
+				return ret;
+			}
+
+			priv->rproc_pt = pt;
+			priv->proc_nb.notifier_call = imx_rproc_partition_notify;
+
+			ret = imx_scu_irq_register_notifier(&priv->proc_nb);
+			if (ret) {
+				dev_warn(dev, "register scu notifier failed.\n");
+				return ret;
+			}
+
+			ret = imx_scu_irq_group_enable(IMX_SC_IRQ_GROUP_REBOOTED,
+						       BIT(priv->rproc_pt), true);
+			if (ret) {
+				imx_scu_irq_unregister_notifier(&priv->proc_nb);
+				dev_warn(dev, "Enable irq failed.\n");
+				return ret;
+			}
+		}
+
 		return 0;
 	default:
 		break;
@@ -828,6 +923,7 @@ static const struct of_device_id imx_rproc_of_match[] = {
 	{ .compatible = "fsl,imx8mm-cm4", .data = &imx_rproc_cfg_imx8mq },
 	{ .compatible = "fsl,imx8mn-cm7", .data = &imx_rproc_cfg_imx8mn },
 	{ .compatible = "fsl,imx8mp-cm7", .data = &imx_rproc_cfg_imx8mn },
+	{ .compatible = "fsl,imx8qxp-cm4", .data = &imx_rproc_cfg_imx8qxp },
 	{ .compatible = "fsl,imx8ulp-cm33", .data = &imx_rproc_cfg_imx8ulp },
 	{},
 };
