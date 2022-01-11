@@ -40,7 +40,9 @@ struct module_signature {
 	__be32	sig_len;	/* Length of signature data */
 };
 
-int mod_check_sig(const struct module_signature *ms, size_t file_len,
+int mod_check_sig(const struct module_signature *ms, unsigned long file_len,
+		  const char *name);
+int mod_parse_sig(const void *data, unsigned long *len, unsigned long *sig_len,
 		  const char *name);
 
 #endif /* _LINUX_MODULE_SIGNATURE_H */
