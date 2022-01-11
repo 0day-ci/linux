@@ -47,6 +47,11 @@ struct simd_skcipher_ctx {
 	struct cryptd_skcipher *cryptd_tfm;
 };
 
+#ifdef CONFIG_CRYPTO_MANAGER_EXTRA_TESTS
+DEFINE_PER_CPU(bool, crypto_simd_disabled_for_test);
+EXPORT_PER_CPU_SYMBOL_GPL(crypto_simd_disabled_for_test);
+#endif
+
 static int simd_skcipher_setkey(struct crypto_skcipher *tfm, const u8 *key,
 				unsigned int key_len)
 {
