@@ -44,6 +44,15 @@
 #define MC_TIMING_CONTROL_DBG				0xf8
 #define MC_TIMING_CONTROL				0xfc
 
+#define MC_ERR_VPR_STATUS				0x654
+#define MC_ERR_VPR_ADR					0x658
+#define MC_ERR_SEC_STATUS				0x67c
+#define MC_ERR_SEC_ADR					0x680
+#define MC_ERR_MTS_STATUS				0x9b0
+#define MC_ERR_MTS_ADR					0x9b4
+#define MC_ERR_GENERALIZED_CARVEOUT_STATUS		0xc00
+#define MC_ERR_GENERALIZED_CARVEOUT_ADR			0xc04
+
 #define MC_INT_DECERR_ROUTE_SANITY			BIT(20)
 #define MC_INT_WCAM_ERR					BIT(19)
 #define MC_INT_SCRUB_ECC_WR_ACK				BIT(18)
@@ -163,6 +172,14 @@ extern const struct tegra_mc_ops tegra186_mc_ops;
 
 extern const char * const tegra_mc_status_names[32];
 extern const char * const tegra_mc_error_names[8];
+
+struct tegra_mc_error {
+	u32 int_bit;
+	const char *msg;
+	u32 status_reg;
+	u32 addr_reg;
+	u32 addr_reg_hi;
+};
 
 /*
  * These IDs are for internal use of Tegra ICC drivers. The ID numbers are
