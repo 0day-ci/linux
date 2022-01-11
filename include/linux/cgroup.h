@@ -774,10 +774,17 @@ void cgroup_rstat_flush_release(void);
 #ifdef CONFIG_CGROUP_CPUACCT
 void cpuacct_charge(struct task_struct *tsk, u64 cputime);
 void cpuacct_account_field(struct task_struct *tsk, int index, u64 val);
+#ifdef CONFIG_SCHED_CORE
+void cpuacct_account_forceidle(int cpu, struct task_struct *task, u64 cputime);
+#endif
 #else
 static inline void cpuacct_charge(struct task_struct *tsk, u64 cputime) {}
 static inline void cpuacct_account_field(struct task_struct *tsk, int index,
 					 u64 val) {}
+#ifdef CONFIG_SCHED_CORE
+static inline void cpuacct_account_forceidle(int cpu, struct task_struct *task,
+					     u64 cputime) {}
+#endif
 #endif
 
 void __cgroup_account_cputime(struct cgroup *cgrp, u64 delta_exec);

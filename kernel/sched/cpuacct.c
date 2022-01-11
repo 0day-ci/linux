@@ -27,6 +27,9 @@ struct cpuacct {
 	/* cpuusage holds pointer to a u64-type object on every CPU */
 	u64 __percpu	*cpuusage;
 	struct kernel_cpustat __percpu	*cpustat;
+#ifdef CONFIG_SCHED_CORE
+	u64 __percpu	*forceidle;
+#endif
 };
 
 static inline struct cpuacct *css_ca(struct cgroup_subsys_state *css)
@@ -46,9 +49,15 @@ static inline struct cpuacct *parent_ca(struct cpuacct *ca)
 }
 
 static DEFINE_PER_CPU(u64, root_cpuacct_cpuusage);
+#ifdef CONFIG_SCHED_CORE
+static DEFINE_PER_CPU(u64, root_cpuacct_forceidle);
+#endif
 static struct cpuacct root_cpuacct = {
 	.cpustat	= &kernel_cpustat,
 	.cpuusage	= &root_cpuacct_cpuusage,
+#ifdef CONFIG_SCHED_CORE
+	.forceidle	= &root_cpuacct_forceidle,
+#endif
 };
 
 /* Create a new CPU accounting group */
@@ -72,8 +81,18 @@ cpuacct_css_alloc(struct cgroup_subsys_state *parent_css)
 	if (!ca->cpustat)
 		goto out_free_cpuusage;
 
+#ifdef CONFIG_SCHED_CORE
+	ca->forceidle = alloc_percpu(u64);
+	if (!ca->forceidle)
+		goto out_free_cpustat;
+#endif
+
 	return &ca->css;
 
+#ifdef CONFIG_SCHED_CORE
+out_free_cpustat:
+	free_percpu(ca->cpustat);
+#endif
 out_free_cpuusage:
 	free_percpu(ca->cpuusage);
 out_free_ca:
@@ -290,6 +309,37 @@ static int cpuacct_stats_show(struct seq_file *sf, void *v)
 	return 0;
 }
 
+#ifdef CONFIG_SCHED_CORE
+static u64 __forceidle_read(struct cpuacct *ca, int cpu)
+{
+	return *per_cpu_ptr(ca->forceidle, cpu);
+}
+static int cpuacct_percpu_forceidle_seq_show(struct seq_file *m, void *V)
+{
+	struct cpuacct *ca = css_ca(seq_css(m));
+	u64 percpu;
+	int i;
+
+	for_each_possible_cpu(i) {
+		percpu = __forceidle_read(ca, i);
+		seq_printf(m, "%llu ", (unsigned long long) percpu);
+	}
+	seq_printf(m, "\n");
+	return 0;
+}
+static u64 cpuacct_forceidle_read(struct cgroup_subsys_state *css,
+				  struct cftype *cft)
+{
+	struct cpuacct *ca = css_ca(css);
+	u64 totalforceidle = 0;
+	int i;
+
+	for_each_possible_cpu(i)
+		totalforceidle += __forceidle_read(ca, i);
+	return totalforceidle;
+}
+#endif
+
 static struct cftype files[] = {
 	{
 		.name = "usage",
@@ -324,6 +374,16 @@ static struct cftype files[] = {
 		.name = "stat",
 		.seq_show = cpuacct_stats_show,
 	},
+#ifdef CONFIG_SCHED_CORE
+	{
+		.name = "forceidle",
+		.read_u64 = cpuacct_forceidle_read,
+	},
+	{
+		.name = "forceidle_percpu",
+		.seq_show = cpuacct_percpu_forceidle_seq_show,
+	},
+#endif
 	{ }	/* terminate */
 };
 
@@ -358,6 +418,25 @@ void cpuacct_account_field(struct task_struct *tsk, int index, u64 val)
 		__this_cpu_add(ca->cpustat->cpustat[index], val);
 	rcu_read_unlock();
 }
+
+#ifdef CONFIG_SCHED_CORE
+void cpuacct_account_forceidle(int cpu, struct task_struct *tsk, u64 cputime)
+{
+	struct cpuacct *ca;
+	u64 *fi;
+
+	rcu_read_lock();
+	/*
+	 * We have hold rq->core->__lock here, which protects ca->forceidle
+	 * percpu.
+	 */
+	for (ca = task_ca(tsk); ca; ca = parent_ca(ca)) {
+		fi = per_cpu_ptr(ca->forceidle, cpu);
+		*fi += cputime;
+	}
+	rcu_read_unlock();
+}
+#endif
 
 struct cgroup_subsys cpuacct_cgrp_subsys = {
 	.css_alloc	= cpuacct_css_alloc,

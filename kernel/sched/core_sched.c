@@ -284,6 +284,7 @@ void __sched_core_account_forceidle(struct rq *rq)
 			continue;
 
 		__schedstat_add(p->stats.core_forceidle_sum, delta);
+		cpuacct_account_forceidle(i, p, delta);
 	}
 }
 
