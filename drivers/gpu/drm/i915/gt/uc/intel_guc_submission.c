@@ -147,6 +147,8 @@ guc_create_parallel(struct intel_engine_cs **engines,
  */
 #define NUMBER_MULTI_LRC_GUC_ID(guc)	\
 	((guc)->submission_state.num_guc_ids / 16)
+#define NUMBER_SINGLE_LRC_GUC_ID(guc)	\
+	((guc)->submission_state.num_guc_ids - NUMBER_MULTI_LRC_GUC_ID(guc))
 
 /*
  * Below is a set of functions which control the GuC scheduling state which
@@ -1775,11 +1777,6 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	INIT_WORK(&guc->submission_state.destroyed_worker,
 		  destroyed_worker_func);
 
-	guc->submission_state.guc_ids_bitmap =
-		bitmap_zalloc(NUMBER_MULTI_LRC_GUC_ID(guc), GFP_KERNEL);
-	if (!guc->submission_state.guc_ids_bitmap)
-		return -ENOMEM;
-
 	spin_lock_init(&guc->timestamp.lock);
 	INIT_DELAYED_WORK(&guc->timestamp.work, guc_timestamp_ping);
 	guc->timestamp.ping_delay = (POLL_TIME_CLKS / gt->clock_frequency + 1) * HZ;
@@ -1795,7 +1792,8 @@ void intel_guc_submission_fini(struct intel_guc *guc)
 	guc_flush_destroyed_contexts(guc);
 	guc_lrc_desc_pool_destroy(guc);
 	i915_sched_engine_put(guc->sched_engine);
-	bitmap_free(guc->submission_state.guc_ids_bitmap);
+	if (guc->submission_state.guc_ids_bitmap)
+		bitmap_free(guc->submission_state.guc_ids_bitmap);
 }
 
 static inline void queue_request(struct i915_sched_engine *sched_engine,
@@ -1862,6 +1860,33 @@ static void guc_submit_request(struct i915_request *rq)
 	spin_unlock_irqrestore(&sched_engine->lock, flags);
 }
 
+static int new_mlrc_guc_id(struct intel_guc *guc, struct intel_context *ce)
+{
+	int ret;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+	GEM_BUG_ON(!guc->submission_state.guc_ids_bitmap);
+
+	ret =  bitmap_find_free_region(guc->submission_state.guc_ids_bitmap,
+				       NUMBER_MULTI_LRC_GUC_ID(guc),
+				       order_base_2(ce->parallel.number_children
+						    + 1));
+	if (likely(!(ret < 0)))
+		ret += NUMBER_SINGLE_LRC_GUC_ID(guc);
+
+	return ret;
+}
+
+static int new_slrc_guc_id(struct intel_guc *guc, struct intel_context *ce)
+{
+	GEM_BUG_ON(intel_context_is_parent(ce));
+
+	return ida_simple_get(&guc->submission_state.guc_ids,
+			      0, NUMBER_SINGLE_LRC_GUC_ID(guc),
+			      GFP_KERNEL | __GFP_RETRY_MAYFAIL |
+			      __GFP_NOWARN);
+}
+
 static int new_guc_id(struct intel_guc *guc, struct intel_context *ce)
 {
 	int ret;
@@ -1869,16 +1894,10 @@ static int new_guc_id(struct intel_guc *guc, struct intel_context *ce)
 	GEM_BUG_ON(intel_context_is_child(ce));
 
 	if (intel_context_is_parent(ce))
-		ret = bitmap_find_free_region(guc->submission_state.guc_ids_bitmap,
-					      NUMBER_MULTI_LRC_GUC_ID(guc),
-					      order_base_2(ce->parallel.number_children
-							   + 1));
+		ret = new_mlrc_guc_id(guc, ce);
 	else
-		ret = ida_simple_get(&guc->submission_state.guc_ids,
-				     NUMBER_MULTI_LRC_GUC_ID(guc),
-				     guc->submission_state.num_guc_ids,
-				     GFP_KERNEL | __GFP_RETRY_MAYFAIL |
-				     __GFP_NOWARN);
+		ret = new_slrc_guc_id(guc, ce);
+
 	if (unlikely(ret < 0))
 		return ret;
 
@@ -1987,6 +2006,14 @@ static int pin_guc_id(struct intel_guc *guc, struct intel_context *ce)
 	unsigned long flags, tries = PIN_GUC_ID_TRIES;
 
 	GEM_BUG_ON(atomic_read(&ce->guc_id.ref));
+
+	if (unlikely(intel_context_is_parent(ce) &&
+		     !guc->submission_state.guc_ids_bitmap)) {
+		guc->submission_state.guc_ids_bitmap =
+			bitmap_zalloc(NUMBER_MULTI_LRC_GUC_ID(guc), GFP_KERNEL);
+		if (!guc->submission_state.guc_ids_bitmap)
+			return -ENOMEM;
+	}
 
 try_again:
 	spin_lock_irqsave(&guc->submission_state.lock, flags);
