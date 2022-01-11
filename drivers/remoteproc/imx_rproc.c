@@ -490,10 +490,18 @@ static int imx_rproc_attach(struct rproc *rproc)
 static struct resource_table *imx_rproc_get_loaded_rsc_table(struct rproc *rproc, size_t *table_sz)
 {
 	struct imx_rproc *priv = rproc->priv;
+	struct resource_table *table;
 
 	/* The resource table has already been mapped in imx_rproc_addr_init */
 	if (!priv->rsc_table)
 		return NULL;
+
+	table = priv->rsc_table;
+	/* Gabage data check */
+	if (table->ver >= 0xff || table->num >= 0xff || table->reserved[0] || table->reserved[1]) {
+		dev_err(priv->dev, "Ignore invalid rsc table\n");
+		return NULL;
+	}
 
 	*table_sz = SZ_1K;
 	return (struct resource_table *)priv->rsc_table;
