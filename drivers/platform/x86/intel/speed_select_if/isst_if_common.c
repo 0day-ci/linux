@@ -693,10 +693,12 @@ int isst_if_cdev_register(int device_type, struct isst_if_cmd_cb *cb)
 	if (!misc_usage_count) {
 		int ret;
 
+		mutex_unlock(&punit_misc_dev_lock);
 		misc_device_ret = misc_register(&isst_if_char_driver);
 		if (misc_device_ret)
-			goto unlock_exit;
+			return misc_device_ret;
 
+		mutex_lock(&punit_misc_dev_lock);
 		ret = isst_if_cpu_info_init();
 		if (ret) {
 			misc_deregister(&isst_if_char_driver);
@@ -731,7 +733,9 @@ void isst_if_cdev_unregister(int device_type)
 	if (device_type == ISST_IF_DEV_MBOX)
 		isst_delete_hash();
 	if (!misc_usage_count && !misc_device_ret) {
+		mutex_unlock(&punit_misc_dev_lock);
 		misc_deregister(&isst_if_char_driver);
+		mutex_lock(&punit_misc_dev_lock);
 		isst_if_cpu_info_exit();
 	}
 	mutex_unlock(&punit_misc_dev_lock);
