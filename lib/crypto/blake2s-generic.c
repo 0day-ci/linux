@@ -42,7 +42,7 @@ void blake2s_compress_generic(struct blake2s_state *state,const u8 *block,
 {
 	u32 m[16];
 	u32 v[16];
-	int i;
+	int i, j;
 
 	WARN_ON(IS_ENABLED(DEBUG) &&
 		(nblocks > 1 && inc != BLAKE2S_BLOCK_SIZE));
@@ -82,17 +82,23 @@ void blake2s_compress_generic(struct blake2s_state *state,const u8 *block,
 	G(r, 6, v[2], v[ 7], v[ 8], v[13]); \
 	G(r, 7, v[3], v[ 4], v[ 9], v[14]); \
 } while (0)
-		ROUND(0);
-		ROUND(1);
-		ROUND(2);
-		ROUND(3);
-		ROUND(4);
-		ROUND(5);
-		ROUND(6);
-		ROUND(7);
-		ROUND(8);
-		ROUND(9);
-
+		if (IS_ENABLED(CONFIG_CC_OPTIMIZE_FOR_SIZE)) {
+			for (i = 0; i < 10; ++i) {
+				for (j = 0; j < 8; ++j)
+					G(i, j, v[j % 4], v[((j + (j / 4)) % 4) + 4], v[((j + 2 * (j / 4)) % 4) + 8], v[((j + 3 * (j / 4)) % 4) + 12]);
+			}
+		} else {
+			ROUND(0);
+			ROUND(1);
+			ROUND(2);
+			ROUND(3);
+			ROUND(4);
+			ROUND(5);
+			ROUND(6);
+			ROUND(7);
+			ROUND(8);
+			ROUND(9);
+		}
 #undef G
 #undef ROUND
 
