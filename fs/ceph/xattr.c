@@ -918,6 +918,64 @@ static inline int __get_request_mask(struct inode *in) {
 	return mask;
 }
 
+static inline bool ceph_is_passthrough_vxattr(const char *name)
+{
+	const char *vxattr_list[] = {
+		"ceph.dir.pin",
+		"ceph.dir.pin.random",
+		"ceph.dir.pin.distributed",
+		"ceph.dir.layout",
+		"ceph.dir.layout.object_size",
+		"ceph.dir.layout.stripe_count",
+		"ceph.dir.layout.stripe_unit",
+		"ceph.dir.layout.pool",
+		"ceph.dir.layout.pool_name",
+		"ceph.dir.layout.pool_id",
+		"ceph.dir.layout.pool_namespace",
+		"ceph.file.layout",
+		"ceph.file.layout.object_size",
+		"ceph.file.layout.stripe_count",
+		"ceph.file.layout.stripe_unit",
+		"ceph.file.layout.pool",
+		"ceph.file.layout.pool_name",
+		"ceph.file.layout.pool_id",
+		"ceph.file.layout.pool_namespace",
+	};
+	int i = 0;
+	int n = sizeof(vxattr_list)/sizeof(vxattr_list[0]);
+
+	while (i < n) {
+		if (!strcmp(name, vxattr_list[i]))
+			return true;
+		i++;
+	}
+	return false;
+}
+
+/* check if the entire cluster supports the given feature */
+static inline bool ceph_cluster_has_feature(struct inode *inode, int feature_bit)
+{
+	int64_t i;
+	struct ceph_fs_client *fsc = ceph_inode_to_client(inode);
+	struct ceph_mds_session **sessions = fsc->mdsc->sessions;
+	int64_t num_sessions = atomic_read(&fsc->mdsc->num_sessions);
+
+	if (fsc->mdsc->stopping)
+		return false;
+
+	if (!sessions)
+		return false;
+
+	for (i = 0; i < num_sessions; i++) {
+		struct ceph_mds_session *session = sessions[i];
+		if (!session)
+			return false;
+		if (!test_bit(feature_bit, &session->s_features))
+			return false;
+	}
+	return true;
+}
+
 ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 		      size_t size)
 {
@@ -926,6 +984,13 @@ ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 	struct ceph_vxattr *vxattr = NULL;
 	int req_mask;
 	ssize_t err;
+
+	if (ceph_is_passthrough_vxattr(name) &&
+	    ceph_cluster_has_feature(inode, CEPHFS_FEATURE_GETVXATTR)) {
+		err = ceph_do_getvxattr(inode, name, value, size);
+		return err;
+	}
+	dout("vxattr is not passthrough or kclient doesn't support GETVXATTR\n");
 
 	/* let's see if a virtual xattr was requested */
 	vxattr = ceph_match_vxattr(inode, name);
