@@ -2752,12 +2752,18 @@ static int validate_super(struct btrfs_fs_info *fs_info,
 	}
 
 	/*
-	 * For 4K page size, we only support 4K sector size.
-	 * For 64K page size, we support 64K and 4K sector sizes.
+	 * We only support sectorsize <= PAGE_SIZE case.
+	 *
+	 * For 4K page size (e.g. x86_64), it only supports 4K sector size.
+	 * For 16K page size (e.g. PPC/ARM), it supports 4K, 8K and 16K
+	 * sector sizes.
+	 * For 64K and higher page size (e.g. PPC/ARM), it supports 4K, 8K,
+	 * 16K, 32K and 64K sector sizes (aka, all sector sizes).
+	 *
+	 * For the future, 4K will be the default sectorsize for all btrfs
+	 * and will get supported on all archtectures.
 	 */
-	if ((PAGE_SIZE == SZ_4K && sectorsize != PAGE_SIZE) ||
-	    (PAGE_SIZE == SZ_64K && (sectorsize != SZ_4K &&
-				     sectorsize != SZ_64K))) {
+	if (sectorsize > PAGE_SIZE) {
 		btrfs_err(fs_info,
 			"sectorsize %llu not yet supported for page size %lu",
 			sectorsize, PAGE_SIZE);

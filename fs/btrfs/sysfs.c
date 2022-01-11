@@ -390,13 +390,12 @@ static ssize_t supported_sectorsizes_show(struct kobject *kobj,
 					  char *buf)
 {
 	ssize_t ret = 0;
+	u32 sectorsize;
 
-	/* 4K sector size is also supported with 64K page size */
-	if (PAGE_SIZE == SZ_64K)
-		ret += sysfs_emit_at(buf, ret, "%u ", SZ_4K);
-
-	/* Only sectorsize == PAGE_SIZE is now supported */
-	ret += sysfs_emit_at(buf, ret, "%lu\n", PAGE_SIZE);
+	/* We support any sectorsize <= PAGE_SIZE */
+	for (sectorsize = SZ_4K; sectorsize <= PAGE_SIZE; sectorsize <<= 1)
+		ret += sysfs_emit_at(buf, ret, "%u%s", sectorsize,
+				     sectorsize == PAGE_SIZE ? "\n" : " ");
 
 	return ret;
 }
