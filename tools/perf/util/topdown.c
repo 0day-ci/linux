@@ -59,10 +59,10 @@ __weak bool arch_topdown_sample_read(struct evsel *leader __maybe_unused)
 
 bool topdown_can_use_json_metrics(void)
 {
-#if defined(__aarch64__)
-	return true;
-#else
+#if defined(__i386__) || defined(__x86_64__)
 	return false;
+#else
+	return true;
 #endif
 }
 

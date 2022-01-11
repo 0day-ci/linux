@@ -1790,16 +1790,20 @@ enum topdown_mechanism {
 
 static enum topdown_mechanism choose_topdown_mechanism(void)
 {
-	int kernel_events_supported = topdown_kernel_events_supported();
+	if (topdown_can_use_json_metrics()) {
+		int kernel_events_supported = topdown_kernel_events_supported();
 
-	if (kernel_events_supported > 0) {
-		pr_debug("topdown kernel events are supported\n");
-		return TOPDOWN_KERNEL_EVENTS;
-	} else if (kernel_events_supported == 0) {
-		pr_debug("topdown kernel events are unsupported\n");
-		return TOPDOWN_JSON_METRICS;
+		if (kernel_events_supported > 0) {
+			pr_debug("topdown kernel events are supported\n");
+			return TOPDOWN_KERNEL_EVENTS;
+		} else if (kernel_events_supported == 0) {
+			pr_debug("topdown kernel events are unsupported\n");
+			return TOPDOWN_JSON_METRICS;
+		} else {
+			return TOPDOWN_DETECTION_ERROR;
+		}
 	} else {
-		return TOPDOWN_DETECTION_ERROR;
+		return TOPDOWN_KERNEL_EVENTS;
 	}
 }
 
