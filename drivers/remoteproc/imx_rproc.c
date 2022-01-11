@@ -83,6 +83,9 @@ struct imx_rproc_mem {
 #define ATT_CORE_MASK   0xffff
 #define ATT_CORE(I)     BIT((I))
 
+static int imx_rproc_xtr_mbox_init(struct rproc *rproc);
+static void imx_rproc_free_mbox(struct rproc *rproc);
+
 struct imx_rproc {
 	struct device			*dev;
 	struct regmap			*regmap;
@@ -323,6 +326,10 @@ static int imx_rproc_start(struct rproc *rproc)
 	struct arm_smccc_res res;
 	int ret;
 
+	ret = imx_rproc_xtr_mbox_init(rproc);
+	if (ret)
+		return ret;
+
 	switch (dcfg->method) {
 	case IMX_RPROC_MMIO:
 		ret = regmap_update_bits(priv->regmap, dcfg->src_reg, dcfg->src_mask,
@@ -379,6 +386,8 @@ static int imx_rproc_stop(struct rproc *rproc)
 
 	if (ret)
 		dev_err(dev, "Failed to stop remote core\n");
+	else
+		imx_rproc_free_mbox(rproc);
 
 	return ret;
 }
@@ -558,11 +567,12 @@ static void imx_rproc_kick(struct rproc *rproc, int vqid)
 
 static int imx_rproc_attach(struct rproc *rproc)
 {
-	return 0;
+	return imx_rproc_xtr_mbox_init(rproc);
 }
 
 static int imx_rproc_detach(struct rproc *rproc)
 {
+	imx_rproc_free_mbox(rproc);
 	return 0;
 }
 
@@ -697,6 +707,9 @@ static int imx_rproc_xtr_mbox_init(struct rproc *rproc)
 	struct mbox_client *cl;
 	int ret;
 
+	if (priv->tx_ch && priv->rx_ch)
+		return 0;
+
 	if (!of_get_property(dev->of_node, "mbox-names", NULL))
 		return 0;
 
@@ -731,6 +744,8 @@ static void imx_rproc_free_mbox(struct rproc *rproc)
 
 	mbox_free_channel(priv->tx_ch);
 	mbox_free_channel(priv->rx_ch);
+	priv->tx_ch = NULL;
+	priv->rx_ch = NULL;
 }
 
 static int imx_rproc_partition_notify(struct notifier_block *nb,
@@ -966,23 +981,19 @@ static int imx_rproc_probe(struct platform_device *pdev)
 		goto err_put_rproc;
 	}
 
-	ret = imx_rproc_xtr_mbox_init(rproc);
-	if (ret)
-		goto err_put_wkq;
-
 	ret = imx_rproc_addr_init(priv, pdev);
 	if (ret) {
 		dev_err(dev, "failed on imx_rproc_addr_init\n");
-		goto err_put_mbox;
+		goto err_put_wkq;
 	}
 
 	ret = imx_rproc_detect_mode(priv);
 	if (ret)
-		goto err_put_mbox;
+		goto err_put_wkq;
 
 	ret = imx_rproc_clk_enable(priv);
 	if (ret)
-		goto err_put_mbox;
+		goto err_put_wkq;
 
 	INIT_WORK(&priv->rproc_work, imx_rproc_vq_work);
 
@@ -999,8 +1010,6 @@ static int imx_rproc_probe(struct platform_device *pdev)
 
 err_put_clk:
 	clk_disable_unprepare(priv->clk);
-err_put_mbox:
-	imx_rproc_free_mbox(rproc);
 err_put_wkq:
 	destroy_workqueue(priv->workqueue);
 err_put_rproc:
@@ -1016,7 +1025,6 @@ static int imx_rproc_remove(struct platform_device *pdev)
 
 	clk_disable_unprepare(priv->clk);
 	rproc_del(rproc);
-	imx_rproc_free_mbox(rproc);
 	destroy_workqueue(priv->workqueue);
 	rproc_free(rproc);
 
