@@ -550,7 +550,7 @@ static const struct mtk_thermal_data mt8183_thermal_data = {
 };
 
 /**
- * raw_to_mcelsius - convert a raw ADC value to mcelsius
+ * raw_to_mcelsius_v1 - convert a raw ADC value to mcelsius v1
  * @mt:	The thermal controller
  * @sensno:	sensor number
  * @raw:	raw ADC value
@@ -573,6 +573,15 @@ static int raw_to_mcelsius_v1(struct mtk_thermal *mt, int sensno, s32 raw)
 	return mt->degc_cali * 500 - tmp;
 }
 
+/**
+ * raw_to_mcelsius_v2 - convert a raw ADC value to mcelsius v2
+ * @mt:	The thermal controller
+ * @sensno:	sensor number
+ * @raw:	raw ADC value
+ *
+ * This converts the raw ADC value to mcelsius using the SoC specific
+ * calibration constants
+ */
 static int raw_to_mcelsius_v2(struct mtk_thermal *mt, int sensno, s32 raw)
 {
 	s32 format_1;
