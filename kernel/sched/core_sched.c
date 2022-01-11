@@ -242,7 +242,7 @@ out:
 void __sched_core_account_forceidle(struct rq *rq)
 {
 	const struct cpumask *smt_mask = cpu_smt_mask(cpu_of(rq));
-	u64 delta, now = rq_clock(rq->core);
+	u64 delta_per_idlecpu, delta, now = rq_clock(rq->core);
 	struct rq *rq_i;
 	struct task_struct *p;
 	int i;
@@ -254,7 +254,7 @@ void __sched_core_account_forceidle(struct rq *rq)
 	if (rq->core->core_forceidle_start == 0)
 		return;
 
-	delta = now - rq->core->core_forceidle_start;
+	delta_per_idlecpu = delta = now - rq->core->core_forceidle_start;
 	if (unlikely((s64)delta <= 0))
 		return;
 
@@ -276,6 +276,9 @@ void __sched_core_account_forceidle(struct rq *rq)
 	for_each_cpu(i, smt_mask) {
 		rq_i = cpu_rq(i);
 		p = rq_i->core_pick ?: rq_i->curr;
+
+		if (rq_i->in_forcedidle)
+			rq->rq_forceidle_time += delta_per_idlecpu;
 
 		if (p == rq_i->idle)
 			continue;

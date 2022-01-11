@@ -1086,6 +1086,9 @@ struct rq {
 	/* try_to_wake_up() stats */
 	unsigned int		ttwu_count;
 	unsigned int		ttwu_local;
+#ifdef CONFIG_SCHED_CORE
+	u64			rq_forceidle_time;
+#endif
 #endif
 
 #ifdef CONFIG_CPU_IDLE
@@ -1115,6 +1118,7 @@ struct rq {
 	unsigned int		core_forceidle_seq;
 	unsigned int		core_forceidle_occupation;
 	u64			core_forceidle_start;
+	bool			in_forcedidle;
 #endif
 };
 

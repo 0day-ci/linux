@@ -285,8 +285,10 @@ static void __sched_core_flip(bool enabled)
 
 		sched_core_lock(cpu, &flags);
 
-		for_each_cpu(t, smt_mask)
+		for_each_cpu(t, smt_mask) {
 			cpu_rq(t)->core_enabled = enabled;
+			cpu_rq(t)->in_forcedidle = false;
+		}
 
 		cpu_rq(cpu)->core->core_forceidle_start = 0;
 
@@ -5687,6 +5689,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		 * another cpu during offline.
 		 */
 		rq->core_pick = NULL;
+		rq->in_forcedidle = false;
 		return __pick_next_task(rq, prev, rf);
 	}
 
@@ -5807,9 +5810,11 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 
 		rq_i->core_pick = p;
 
+		rq->in_forcedidle = false;
 		if (p == rq_i->idle) {
 			if (rq_i->nr_running) {
 				rq->core->core_forceidle_count++;
+				rq_i->in_forcedidle = true;
 				if (!fi_before)
 					rq->core->core_forceidle_seq++;
 			}

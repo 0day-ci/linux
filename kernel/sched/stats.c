@@ -108,6 +108,16 @@ void __update_stats_enqueue_sleeper(struct rq *rq, struct task_struct *p,
 	}
 }
 
+#ifdef CONFIG_SCHED_CORE
+static inline u64 get_rq_forceidle_time(struct rq *rq) {
+	return rq->rq_forceidle_time;
+}
+#else
+static inline u64 get_rq_forceidle_time(struct rq *rq) {
+	return 0;
+}
+#endif
+
 /*
  * Current schedstat API version.
  *
@@ -125,21 +135,24 @@ static int show_schedstat(struct seq_file *seq, void *v)
 		seq_printf(seq, "timestamp %lu\n", jiffies);
 	} else {
 		struct rq *rq;
+		u64 rq_forceidle_time;
 #ifdef CONFIG_SMP
 		struct sched_domain *sd;
 		int dcount = 0;
 #endif
 		cpu = (unsigned long)(v - 2);
 		rq = cpu_rq(cpu);
+		rq_forceidle_time = get_rq_forceidle_time(rq);
 
 		/* runqueue-specific stats */
 		seq_printf(seq,
-		    "cpu%d %u 0 %u %u %u %u %llu %llu %lu",
+		    "cpu%d %u 0 %u %u %u %u %llu %llu %lu %llu",
 		    cpu, rq->yld_count,
 		    rq->sched_count, rq->sched_goidle,
 		    rq->ttwu_count, rq->ttwu_local,
 		    rq->rq_cpu_time,
-		    rq->rq_sched_info.run_delay, rq->rq_sched_info.pcount);
+		    rq->rq_sched_info.run_delay, rq->rq_sched_info.pcount,
+		    rq_forceidle_time);
 
 		seq_printf(seq, "\n");
 
