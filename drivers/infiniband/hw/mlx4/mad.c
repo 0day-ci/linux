@@ -998,8 +998,8 @@ int mlx4_ib_process_mad(struct ib_device *ibdev, int mad_flags, u32 port_num,
 		     (in->mad_hdr.attr_id == IB_PMA_PORT_COUNTERS ||
 		      in->mad_hdr.attr_id == IB_PMA_PORT_COUNTERS_EXT ||
 		      in->mad_hdr.attr_id == IB_PMA_CLASS_PORT_INFO)))
-			return iboe_process_mad(ibdev, mad_flags, port_num,
-						in_wc, in_grh, in, out);
+			return ib_process_mad(ibdev, mad_flags, port_num,
+					      in_wc, in_grh, in, out);
 
 		return ib_process_mad(ibdev, mad_flags, port_num, in_wc, in_grh,
 				      in, out);
