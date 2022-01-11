@@ -1,0 +1,28 @@
+drm drm-fixes 936a93775b7c4f2293f651f64c4139c82e19a164
+	Merge tag 'amd-drm-fixes-5.16-2021-12-31' of ssh://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes c71af3dae3e34d2fde0c19623cf7f8483321f0e3
+	drm/sun4i: dw-hdmi: Fix missing put_device() call in sun8i_hdmi_phy_get
+drm-intel drm-intel-fixes df0cc57e057f18e44dac8e6c18aba47ab53202f9
+	Linux 5.16
+drm drm-next cb6846fbb83b574c85c2a80211b402a6347b60b1
+	Merge tag 'amd-drm-next-5.17-2021-12-30' of ssh://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes 69e630016ef4e4a1745310c446f204dc6243e907
+	drm/atomic: Check new_crtc_state->active to determine if CRTC needs disable in self refresh mode
+drm-intel drm-intel-next-fixes 6ef295e34297433c78ea02dfcf1c649a769050bb
+	drm/i915/ttm: ensure we unmap when purging
+drm-misc drm-misc-next d1f5a6d9d02e3e1dd91379e642f5bc4133f5cf2b
+	drm/doc: overview before functions for drm_writeback.c
+drm-intel drm-intel-next 43571e15c057f69734d0ee3be45fdf9e4adee614
+	drm/i915: Drop unused _PORT3 and _PORT4 TC phy register offsets
+drm-intel drm-intel-gt-next afd088ac05f120d22e06f8404b2672f5841d0da0
+	drm/i915/guc: Improve GuC loading status check/error reports
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
