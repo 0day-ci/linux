@@ -5054,7 +5054,7 @@ static int alloc_mem_cgroup_per_node_info(struct mem_cgroup *memcg, int node)
 	 *       function.
 	 */
 	if (!node_state(node, N_NORMAL_MEMORY))
-		tmp = -1;
+		tmp = NUMA_NO_NODE;
 	pn = kzalloc_node(sizeof(*pn), GFP_KERNEL, tmp);
 	if (!pn)
 		return 1;
