@@ -3475,8 +3475,7 @@ mega_m_to_n(void __user *arg, nitioctl_t *uioc)
 		/*
 		 * Choose the xferlen bigger of input and output data
 		 */
-		uioc->xferlen = uioc_mimd.outlen > uioc_mimd.inlen ?
-			uioc_mimd.outlen : uioc_mimd.inlen;
+		uioc->xferlen = max(uioc_mimd.outlen, uioc_mimd.inlen);
 
 		if( uioc_mimd.outlen ) uioc->flags = UIOC_RD;
 		if( uioc_mimd.inlen ) uioc->flags |= UIOC_WR;
