@@ -396,6 +396,7 @@ static void virtio_vdpa_remove(struct vdpa_device *vdpa)
 {
 	struct virtio_vdpa_device *vd_dev = vdpa_get_drvdata(vdpa);
 
+	virtio_break_device(&vd_dev->vdev);
 	unregister_virtio_device(&vd_dev->vdev);
 }
 
