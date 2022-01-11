@@ -77,8 +77,11 @@ struct imx_rproc_mem {
 
 /* att flags */
 /* M4 own area. Can be mapped at probe */
-#define ATT_OWN		BIT(1)
-#define ATT_IOMEM	BIT(2)
+#define ATT_OWN         BIT(31)
+#define ATT_IOMEM       BIT(30)
+/* I = [0:7] */
+#define ATT_CORE_MASK   0xffff
+#define ATT_CORE(I)     BIT((I))
 
 struct imx_rproc {
 	struct device			*dev;
@@ -98,9 +101,23 @@ struct imx_rproc {
 	struct notifier_block		proc_nb;
 	u32				rproc_pt;
 	u32				rsrc;
+	u32				reg;
 	int                             num_pd;
 	struct device                   **pd_dev;
 	struct device_link              **pd_dev_link;
+};
+
+static const struct imx_rproc_att imx_rproc_att_imx8qm[] = {
+	/* dev addr , sys addr  , size      , flags */
+	{ 0x08000000, 0x08000000, 0x10000000, 0},
+	/* TCML */
+	{ 0x1FFE0000, 0x34FE0000, 0x00020000, ATT_OWN | ATT_CORE(0)},
+	{ 0x1FFE0000, 0x38FE0000, 0x00020000, ATT_OWN | ATT_CORE(1)},
+	/* TCMU */
+	{ 0x20000000, 0x35000000, 0x00020000, ATT_OWN | ATT_CORE(0)},
+	{ 0x20000000, 0x39000000, 0x00020000, ATT_OWN | ATT_CORE(1)},
+	/* DDR (Data) */
+	{ 0x80000000, 0x80000000, 0x60000000, 0 },
 };
 
 static const struct imx_rproc_att imx_rproc_att_imx8qxp[] = {
@@ -260,6 +277,12 @@ static const struct imx_rproc_dcfg imx_rproc_cfg_imx8ulp = {
 	.method		= IMX_RPROC_NONE,
 };
 
+static const struct imx_rproc_dcfg imx_rproc_cfg_imx8qm = {
+	.att            = imx_rproc_att_imx8qm,
+	.att_size       = ARRAY_SIZE(imx_rproc_att_imx8qm),
+	.method         = IMX_RPROC_SCU_API,
+};
+
 static const struct imx_rproc_dcfg imx_rproc_cfg_imx8qxp = {
 	.att		= imx_rproc_att_imx8qxp,
 	.att_size	= ARRAY_SIZE(imx_rproc_att_imx8qxp),
@@ -310,7 +333,10 @@ static int imx_rproc_start(struct rproc *rproc)
 		ret = res.a0;
 		break;
 	case IMX_RPROC_SCU_API:
-		ret = imx_sc_pm_cpu_start(priv->ipc_handle, priv->rsrc, true, 0x34fe0000);
+		if (priv->reg)
+			ret = imx_sc_pm_cpu_start(priv->ipc_handle, priv->rsrc, true, 0x38fe0000);
+		else
+			ret = imx_sc_pm_cpu_start(priv->ipc_handle, priv->rsrc, true, 0x34fe0000);
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -342,7 +368,10 @@ static int imx_rproc_stop(struct rproc *rproc)
 			dev_info(dev, "Not in wfi, force stopped\n");
 		break;
 	case IMX_RPROC_SCU_API:
-		ret = imx_sc_pm_cpu_start(priv->ipc_handle, priv->rsrc, false, 0x34fe0000);
+		if (priv->reg)
+			ret = imx_sc_pm_cpu_start(priv->ipc_handle, priv->rsrc, false, 0x38fe0000);
+		else
+			ret = imx_sc_pm_cpu_start(priv->ipc_handle, priv->rsrc, false, 0x34fe0000);
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -363,6 +392,11 @@ static int imx_rproc_da_to_sys(struct imx_rproc *priv, u64 da,
 	/* parse address translation table */
 	for (i = 0; i < dcfg->att_size; i++) {
 		const struct imx_rproc_att *att = &dcfg->att[i];
+
+		if (att->flags & ATT_CORE_MASK) {
+			if (!((BIT(priv->reg)) & (att->flags & ATT_CORE_MASK)))
+				continue;
+		}
 
 		if (da >= att->da && da + len < att->da + att->size) {
 			unsigned int offset = da - att->da;
@@ -574,6 +608,11 @@ static int imx_rproc_addr_init(struct imx_rproc *priv,
 
 		if (!(att->flags & ATT_OWN))
 			continue;
+
+		if (att->flags & ATT_CORE_MASK) {
+			if (!((BIT(priv->reg)) & (att->flags & ATT_CORE_MASK)))
+				continue;
+		}
 
 		if (b >= IMX_RPROC_MEM_MAX)
 			break;
@@ -790,6 +829,13 @@ static int imx_rproc_detect_mode(struct imx_rproc *priv)
 			return ret;
 		}
 
+		priv->reg = of_get_cpu_hwid(dev->of_node, 0);
+		if (priv->reg == ~0U)
+			priv->reg = 0;
+
+		if (priv->reg > 1)
+			return -EINVAL;
+
 		priv->has_clk = false;
 		/*
 		 * If Mcore resource is not owned by Acore partition, It is kicked by ROM,
@@ -986,6 +1032,7 @@ static const struct of_device_id imx_rproc_of_match[] = {
 	{ .compatible = "fsl,imx8mn-cm7", .data = &imx_rproc_cfg_imx8mn },
 	{ .compatible = "fsl,imx8mp-cm7", .data = &imx_rproc_cfg_imx8mn },
 	{ .compatible = "fsl,imx8qxp-cm4", .data = &imx_rproc_cfg_imx8qxp },
+	{ .compatible = "fsl,imx8qm-cm4", .data = &imx_rproc_cfg_imx8qm },
 	{ .compatible = "fsl,imx8ulp-cm33", .data = &imx_rproc_cfg_imx8ulp },
 	{},
 };
