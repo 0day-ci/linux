@@ -1183,7 +1183,9 @@ static void rcu_spawn_one_nocb_kthread(int cpu)
 	struct rcu_data *rdp = per_cpu_ptr(&rcu_data, cpu);
 	struct rcu_data *rdp_gp;
 	struct task_struct *t;
+	struct sched_param sp;
 
+	sp.sched_priority = kthread_prio;
 	/*
 	 * If this isn't a no-CBs CPU or if it already has an rcuo kthread,
 	 * then nothing to do.
@@ -1199,6 +1201,8 @@ static void rcu_spawn_one_nocb_kthread(int cpu)
 		if (WARN_ONCE(IS_ERR(t), "%s: Could not start rcuo GP kthread, OOM is now expected behavior\n", __func__))
 			return;
 		WRITE_ONCE(rdp_gp->nocb_gp_kthread, t);
+		if (kthread_prio)
+			sched_setscheduler_nocheck(t, SCHED_FIFO, &sp);
 	}
 
 	/* Spawn the kthread for this CPU. */
