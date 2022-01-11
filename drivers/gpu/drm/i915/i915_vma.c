@@ -694,6 +694,20 @@ i915_vma_insert(struct i915_vma *vma, u64 size, u64 alignment, u64 flags)
 	}
 
 	color = 0;
+
+	if (HAS_64K_PAGES(vma->vm->i915) && i915_gem_object_is_lmem(vma->obj)) {
+		alignment = max(alignment, I915_GTT_PAGE_SIZE_64K);
+		/*
+		 * DG2 can not have different sized pages in any given PDE (2MB range).
+		 * Keeping things simple, we force any lmem object to reserve
+		 * 2MB chunks, preventing any smaller pages being used alongside
+		 */
+		if (IS_DG2(vma->vm->i915)) {
+			alignment = max(alignment, I915_GTT_PAGE_SIZE_2M);
+			size = round_up(size, I915_GTT_PAGE_SIZE_2M);
+		}
+	}
+
 	if (i915_vm_has_cache_coloring(vma->vm))
 		color = vma->obj->cache_level;
 
