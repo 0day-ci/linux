@@ -167,6 +167,7 @@ enum intel_ppgtt_type {
 	func(has_overlay); \
 	func(has_psr); \
 	func(has_psr_hw_tracking); \
+	func(has_psr2_sel_fetch); \
 	func(overlay_needs_physical); \
 	func(supports_tv);
 
