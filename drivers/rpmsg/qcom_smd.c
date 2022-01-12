@@ -1280,17 +1280,11 @@ static void qcom_channel_state_worker(struct work_struct *work)
 	unsigned long flags;
 
 	/*
-	 * Register a device for any closed channel where the remote processor
-	 * is showing interest in opening the channel.
+	 * Register a device for any closed channel.
 	 */
 	spin_lock_irqsave(&edge->channels_lock, flags);
 	list_for_each_entry(channel, &edge->channels, list) {
 		if (channel->state != SMD_CHANNEL_CLOSED)
-			continue;
-
-		remote_state = GET_RX_CHANNEL_INFO(channel, state);
-		if (remote_state != SMD_CHANNEL_OPENING &&
-		    remote_state != SMD_CHANNEL_OPENED)
 			continue;
 
 		if (channel->registered)
