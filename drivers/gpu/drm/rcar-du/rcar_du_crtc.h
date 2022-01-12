@@ -28,6 +28,7 @@ struct rcar_du_vsp;
  * @dev: the DU device
  * @clock: the CRTC functional clock
  * @extclock: external pixel dot clock (optional)
+ * @rstc: reset controller (optional)
  * @mmio_offset: offset of the CRTC registers in the DU MMIO block
  * @index: CRTC hardware index
  * @initialized: whether the CRTC has been initialized and clocks enabled
@@ -50,6 +51,7 @@ struct rcar_du_crtc {
 	struct rcar_du_device *dev;
 	struct clk *clock;
 	struct clk *extclock;
+	struct reset_control *rstc;
 	unsigned int mmio_offset;
 	unsigned int index;
 	bool initialized;

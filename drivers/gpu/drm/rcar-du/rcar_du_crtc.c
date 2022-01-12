@@ -10,6 +10,7 @@
 #include <linux/clk.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
+#include <linux/reset.h>
 #include <linux/sys_soc.h>
 
 #include <drm/drm_atomic.h>
@@ -218,6 +219,42 @@ static void rcar_du_crtc_set_display_timing(struct rcar_du_crtc *rcrtc)
 	unsigned int hdse_offset;
 	u32 dsmr;
 	u32 escr;
+
+	if (rcar_du_has(rcdu, RCAR_DU_FEATURE_RZG2L)) {
+		u32 ditr0, ditr1, ditr2, ditr3, ditr4, ditr5, pbcr0;
+
+		clk_set_rate(rcrtc->extclock, mode_clock);
+
+		ditr0 = (DU_DITR0_DEMD_HIGH
+		| ((mode->flags & DRM_MODE_FLAG_PVSYNC) ? DU_DITR0_VSPOL : 0)
+		| ((mode->flags & DRM_MODE_FLAG_PHSYNC) ? DU_DITR0_HSPOL : 0));
+
+		ditr1 = DU_DITR1_VSA(mode->vsync_end - mode->vsync_start)
+		      | DU_DITR1_VACTIVE(mode->vdisplay);
+
+		ditr2 = DU_DITR2_VBP(mode->vtotal - mode->vsync_end)
+		      | DU_DITR2_VFP(mode->vsync_start - mode->vdisplay);
+
+		ditr3 = DU_DITR3_HSA(mode->hsync_end - mode->hsync_start)
+		      | DU_DITR3_HACTIVE(mode->hdisplay);
+
+		ditr4 = DU_DITR4_HBP(mode->htotal - mode->hsync_end)
+		      | DU_DITR4_HFP(mode->hsync_start - mode->hdisplay);
+
+		ditr5 = DU_DITR5_VSFT(0) | DU_DITR5_HSFT(0);
+
+		pbcr0 = DU_PBCR0_PB_DEP(0x1F);
+
+		rcar_du_write(rcdu, DU_DITR0, ditr0);
+		rcar_du_write(rcdu, DU_DITR1, ditr1);
+		rcar_du_write(rcdu, DU_DITR2, ditr2);
+		rcar_du_write(rcdu, DU_DITR3, ditr3);
+		rcar_du_write(rcdu, DU_DITR4, ditr4);
+		rcar_du_write(rcdu, DU_DITR5, ditr5);
+		rcar_du_write(rcdu, DU_PBCR0, pbcr0);
+
+		return;
+	}
 
 	if (rcdu->info->dpll_mask & (1 << rcrtc->index)) {
 		unsigned long target = mode_clock;
@@ -531,16 +568,23 @@ static void rcar_du_cmm_setup(struct drm_crtc *crtc)
 
 static void rcar_du_crtc_setup(struct rcar_du_crtc *rcrtc)
 {
-	/* Set display off and background to black */
-	rcar_du_crtc_write(rcrtc, DOOR, DOOR_RGB(0, 0, 0));
-	rcar_du_crtc_write(rcrtc, BPOR, BPOR_RGB(0, 0, 0));
+	struct rcar_du_device *rcdu = rcrtc->dev;
 
-	/* Configure display timings and output routing */
-	rcar_du_crtc_set_display_timing(rcrtc);
-	rcar_du_group_set_routing(rcrtc->group);
+	if (!rcar_du_has(rcdu, RCAR_DU_FEATURE_RZG2L)) {
+		/* Set display off and background to black */
+		rcar_du_crtc_write(rcrtc, DOOR, DOOR_RGB(0, 0, 0));
+		rcar_du_crtc_write(rcrtc, BPOR, BPOR_RGB(0, 0, 0));
 
-	/* Start with all planes disabled. */
-	rcar_du_group_write(rcrtc->group, rcrtc->index % 2 ? DS2PR : DS1PR, 0);
+		/* Configure display timings and output routing */
+		rcar_du_crtc_set_display_timing(rcrtc);
+		rcar_du_group_set_routing(rcrtc->group);
+
+		/* Start with all planes disabled. */
+		rcar_du_group_write(rcrtc->group, rcrtc->index % 2 ? DS2PR : DS1PR, 0);
+	} else {
+		/* Configure display timings and output routing */
+		rcar_du_crtc_set_display_timing(rcrtc);
+	}
 
 	/* Enable the VSP compositor. */
 	if (rcar_du_has(rcrtc->dev, RCAR_DU_FEATURE_VSP1_SOURCE))
@@ -560,6 +604,12 @@ static int rcar_du_crtc_get(struct rcar_du_crtc *rcrtc)
 	 */
 	if (rcrtc->initialized)
 		return 0;
+
+	if (rcrtc->rstc) {
+		ret = reset_control_deassert(rcrtc->rstc);
+		if (ret < 0)
+			goto error_reset;
+	}
 
 	ret = clk_prepare_enable(rcrtc->clock);
 	if (ret < 0)
@@ -582,6 +632,9 @@ error_group:
 	clk_disable_unprepare(rcrtc->extclock);
 error_clock:
 	clk_disable_unprepare(rcrtc->clock);
+error_reset:
+	if (rcrtc->rstc)
+		reset_control_assert(rcrtc->rstc);
 	return ret;
 }
 
@@ -591,23 +644,28 @@ static void rcar_du_crtc_put(struct rcar_du_crtc *rcrtc)
 
 	clk_disable_unprepare(rcrtc->extclock);
 	clk_disable_unprepare(rcrtc->clock);
+	if (rcrtc->rstc)
+		reset_control_assert(rcrtc->rstc);
 
 	rcrtc->initialized = false;
 }
 
 static void rcar_du_crtc_start(struct rcar_du_crtc *rcrtc)
 {
+	struct rcar_du_device *rcdu = rcrtc->dev;
 	bool interlaced;
 
-	/*
-	 * Select master sync mode. This enables display operation in master
-	 * sync mode (with the HSYNC and VSYNC signals configured as outputs and
-	 * actively driven).
-	 */
-	interlaced = rcrtc->crtc.mode.flags & DRM_MODE_FLAG_INTERLACE;
-	rcar_du_crtc_dsysr_clr_set(rcrtc, DSYSR_TVM_MASK | DSYSR_SCM_MASK,
-				   (interlaced ? DSYSR_SCM_INT_VIDEO : 0) |
-				   DSYSR_TVM_MASTER);
+	if (!rcar_du_has(rcdu, RCAR_DU_FEATURE_RZG2L)) {
+		/*
+		 * Select master sync mode. This enables display operation in master
+		 * sync mode (with the HSYNC and VSYNC signals configured as outputs and
+		 * actively driven).
+		 */
+		interlaced = rcrtc->crtc.mode.flags & DRM_MODE_FLAG_INTERLACE;
+		rcar_du_crtc_dsysr_clr_set(rcrtc, DSYSR_TVM_MASK | DSYSR_SCM_MASK,
+					   (interlaced ? DSYSR_SCM_INT_VIDEO : 0) |
+					   DSYSR_TVM_MASTER);
+	}
 
 	rcar_du_group_start_stop(rcrtc->group, true);
 }
@@ -1229,6 +1287,14 @@ int rcar_du_crtc_create(struct rcar_du_group *rgrp, unsigned int swindex,
 		name = NULL;
 	}
 
+	if (rcar_du_has(rcdu, RCAR_DU_FEATURE_RZG2L)) {
+		rcrtc->rstc = devm_reset_control_get_shared(rcdu->dev, NULL);
+		if (IS_ERR(rcrtc->rstc)) {
+			dev_err(rcdu->dev, "can't get cpg reset\n");
+			return PTR_ERR(rcrtc->rstc);
+		}
+	}
+
 	rcrtc->clock = devm_clk_get(rcdu->dev, name);
 	if (IS_ERR(rcrtc->clock)) {
 		dev_err(rcdu->dev, "no clock for DU channel %u\n", hwindex);
@@ -1249,6 +1315,14 @@ int rcar_du_crtc_create(struct rcar_du_group *rgrp, unsigned int swindex,
 		ret = PTR_ERR(clk);
 		dev_err(rcdu->dev, "can't get dclkin.%u: %d\n", hwindex, ret);
 		return ret;
+	}
+
+	if (rcar_du_has(rcdu, RCAR_DU_FEATURE_RZG2L)) {
+		clk = devm_clk_get(rcdu->dev, "vclk");
+		if (!IS_ERR(clk))
+			rcrtc->extclock = clk;
+		else if (PTR_ERR(clk) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
 	}
 
 	init_waitqueue_head(&rcrtc->flip_wait);
@@ -1287,27 +1361,29 @@ int rcar_du_crtc_create(struct rcar_du_group *rgrp, unsigned int swindex,
 
 	drm_crtc_helper_add(crtc, &crtc_helper_funcs);
 
-	/* Register the interrupt handler. */
-	if (rcar_du_has(rcdu, RCAR_DU_FEATURE_CRTC_IRQ)) {
-		/* The IRQ's are associated with the CRTC (sw)index. */
-		irq = platform_get_irq(pdev, swindex);
-		irqflags = 0;
-	} else {
-		irq = platform_get_irq(pdev, 0);
-		irqflags = IRQF_SHARED;
-	}
+	if (!rcar_du_has(rcdu, RCAR_DU_FEATURE_RZG2L)) {
+		/* Register the interrupt handler. */
+		if (rcar_du_has(rcdu, RCAR_DU_FEATURE_CRTC_IRQ)) {
+			/* The IRQ's are associated with the CRTC (sw)index. */
+			irq = platform_get_irq(pdev, swindex);
+			irqflags = 0;
+		} else {
+			irq = platform_get_irq(pdev, 0);
+			irqflags = IRQF_SHARED;
+		}
 
-	if (irq < 0) {
-		dev_err(rcdu->dev, "no IRQ for CRTC %u\n", swindex);
-		return irq;
-	}
+		if (irq < 0) {
+			dev_err(rcdu->dev, "no IRQ for CRTC %u\n", swindex);
+			return irq;
+		}
 
-	ret = devm_request_irq(rcdu->dev, irq, rcar_du_crtc_irq, irqflags,
-			       dev_name(rcdu->dev), rcrtc);
-	if (ret < 0) {
-		dev_err(rcdu->dev,
-			"failed to register IRQ for CRTC %u\n", swindex);
-		return ret;
+		ret = devm_request_irq(rcdu->dev, irq, rcar_du_crtc_irq, irqflags,
+				       dev_name(rcdu->dev), rcrtc);
+		if (ret < 0) {
+			dev_err(rcdu->dev,
+				"failed to register IRQ for CRTC %u\n", swindex);
+			return ret;
+		}
 	}
 
 	rcar_du_crtc_crc_init(rcrtc);

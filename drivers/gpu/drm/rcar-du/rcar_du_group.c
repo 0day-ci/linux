@@ -224,6 +224,11 @@ static void __rcar_du_group_start_stop(struct rcar_du_group *rgrp, bool start)
 {
 	struct rcar_du_device *rcdu = rgrp->dev;
 
+	if (!rcar_du_has(rgrp->dev, RCAR_DU_FEATURE_GROUP)) {
+		rcar_du_write(rgrp->dev, DU_MCR0, start ? DU_MCR0_DI_EN : 0);
+		return;
+	}
+
 	/*
 	 * Group start/stop is controlled by the DRES and DEN bits of DSYSR0
 	 * for the first group and DSYSR2 for the second group. On most DU

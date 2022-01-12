@@ -33,6 +33,7 @@ struct rcar_du_device;
 #define RCAR_DU_FEATURE_TVM_SYNC	BIT(4)	/* Has TV switch/sync modes */
 #define RCAR_DU_FEATURE_PLANE		BIT(5)	/* HW supports DU planes */
 #define RCAR_DU_FEATURE_GROUP		BIT(6)	/* HW supports DU groups */
+#define RCAR_DU_FEATURE_RZG2L		BIT(7)	/* Use RZ/G2L registers */
 
 #define RCAR_DU_QUIRK_ALIGN_128B	BIT(0)	/* Align pitches to 128 bytes */
 
