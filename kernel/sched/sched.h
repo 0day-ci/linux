@@ -1027,7 +1027,12 @@ struct rq {
 	/* Ensure that all clocks are in the same cache line */
 	u64			clock_task ____cacheline_aligned;
 	u64			clock_pelt;
+	u64			clock_pelt_lag;
 	unsigned long		lost_idle_time;
+
+#ifndef CONFIG_64BIT
+	u64                     clock_pelt_lag_copy;
+#endif
 
 	atomic_t		nr_iowait;
 

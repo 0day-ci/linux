@@ -618,6 +618,12 @@ struct rq *task_rq_lock(struct task_struct *p, struct rq_flags *rf)
 	}
 }
 
+static void update_rq_clock_pelt_lag(struct rq *rq)
+{
+	u64_u32_store(rq->clock_pelt_lag,
+		      rq->clock - rq->clock_task + rq->clock_pelt);
+}
+
 /*
  * RQ-clock updating methods:
  */
@@ -674,6 +680,7 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
 		update_irq_load_avg(rq, irq_delta + steal);
 #endif
 	update_rq_clock_pelt(rq, delta);
+	update_rq_clock_pelt_lag(rq);
 }
 
 void update_rq_clock(struct rq *rq)
