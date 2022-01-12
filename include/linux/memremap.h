@@ -137,6 +137,8 @@ void *devm_memremap_pages(struct device *dev, struct dev_pagemap *pgmap);
 void devm_memunmap_pages(struct device *dev, struct dev_pagemap *pgmap);
 struct dev_pagemap *get_dev_pagemap(unsigned long pfn,
 		struct dev_pagemap *pgmap);
+struct page *pfn_to_devmap_page(unsigned long pfn,
+		struct dev_pagemap **pgmap);
 bool pgmap_pfn_valid(struct dev_pagemap *pgmap, unsigned long pfn);
 
 unsigned long vmem_altmap_offset(struct vmem_altmap *altmap);
@@ -162,6 +164,12 @@ static inline void devm_memunmap_pages(struct device *dev,
 
 static inline struct dev_pagemap *get_dev_pagemap(unsigned long pfn,
 		struct dev_pagemap *pgmap)
+{
+	return NULL;
+}
+
+static inline struct page *pfn_to_devmap_page(unsigned long pfn,
+		struct dev_pagemap **pgmap)
 {
 	return NULL;
 }

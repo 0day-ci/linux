@@ -494,6 +494,25 @@ struct dev_pagemap *get_dev_pagemap(unsigned long pfn,
 }
 EXPORT_SYMBOL_GPL(get_dev_pagemap);
 
+/**
+ * pfn_to_devmap_page - get page pointer which belongs to dev_pagemap by @pfn
+ * @pfn: page frame number to lookup page_map
+ * @pgmap: to save pgmap address which is for putting reference
+ *
+ * If @pgmap is non-NULL, then pfn is on ZONE_DEVICE. Meanwhile check if
+ * pfn is valid in @pgmap, if yes return page pointer.
+ */
+struct page *pfn_to_devmap_page(unsigned long pfn, struct dev_pagemap **pgmap)
+{
+	if (pfn_valid(pfn)) {
+		*pgmap = get_dev_pagemap(pfn, NULL);
+		if (*pgmap && pgmap_pfn_valid(*pgmap, pfn))
+			return pfn_to_page(pfn);
+	}
+
+	return NULL;
+}
+
 #ifdef CONFIG_DEV_PAGEMAP_OPS
 void free_devmap_managed_page(struct page *page)
 {
