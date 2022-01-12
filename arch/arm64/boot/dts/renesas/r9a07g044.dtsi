@@ -611,6 +611,18 @@
 			status = "disabled";
 		};
 
+		vspd0: vsp@10870000 {
+			compatible = "renesas,vsp2-r9a07g044";
+			reg = <0 0x10870000 0 0x10000>;
+			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&cpg CPG_MOD R9A07G044_LCDC_CLK_A>,
+				 <&cpg CPG_MOD R9A07G044_LCDC_CLK_P>,
+				 <&cpg CPG_MOD R9A07G044_LCDC_CLK_D>;
+			power-domains = <&cpg>;
+			resets = <&cpg R9A07G044_LCDC_RESET_N>;
+			renesas,fcp = <&fcpvd0>;
+		};
+
 		fcpvd0: fcp@10880000 {
 			compatible = "renesas,fcpv";
 			reg = <0 0x10880000 0 0x10000>;
