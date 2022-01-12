@@ -2594,6 +2594,7 @@ struct page *ksm_might_need_to_copy(struct page *page,
 		SetPageDirty(new_page);
 		__SetPageUptodate(new_page);
 		__SetPageLocked(new_page);
+		count_vm_event(KSM_SWPIN_COPY);
 	}
 
 	return new_page;
