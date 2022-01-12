@@ -959,6 +959,41 @@ int fwnode_irq_get(const struct fwnode_handle *fwnode, unsigned int index)
 EXPORT_SYMBOL(fwnode_irq_get);
 
 /**
+ * fwnode_irq_get_byname - Get IRQ from a fwnode using its name
+ * @fwnode:	Pointer to the firmware node
+ * @name:	IRQ name in interrupt-names property in fwnode
+ *
+ * Returns Linux IRQ number on success, errno otherwise.
+ */
+int fwnode_irq_get_byname(const struct fwnode_handle *fwnode, const char *name)
+{
+	int index;
+
+	if (unlikely(!name))
+		return -EINVAL;
+
+	index = fwnode_property_match_string(fwnode, "interrupt-names",  name);
+	if (index < 0)
+		return index;
+
+	return fwnode_irq_get(fwnode, index);
+}
+EXPORT_SYMBOL(fwnode_irq_get_byname);
+
+/**
+ * device_irq_get_byname - Get IRQ of a device using interrupt name
+ * @dev:	Device to get the interrupt
+ * @name:	IRQ name in interrupt-names property in fwnode
+ *
+ * Returns Linux IRQ number on success, errno otherwise.
+ */
+int device_irq_get_byname(struct device *dev, const char *name)
+{
+	return fwnode_irq_get_byname(dev_fwnode(dev), name);
+}
+EXPORT_SYMBOL_GPL(device_irq_get_byname);
+
+/**
  * fwnode_graph_get_next_endpoint - Get next endpoint firmware node
  * @fwnode: Pointer to the parent firmware node
  * @prev: Previous endpoint node or %NULL to get the first
