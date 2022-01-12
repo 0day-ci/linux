@@ -102,8 +102,7 @@ ieee802154_del_iface(struct wpan_phy *wpan_phy, struct wpan_dev *wpan_dev)
 	return 0;
 }
 
-static int
-ieee802154_change_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
+int ieee802154_change_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
 {
 	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
 	int ret;

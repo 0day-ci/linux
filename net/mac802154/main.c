@@ -157,6 +157,14 @@ int ieee802154_register_hw(struct ieee802154_hw *hw)
 
 	ieee802154_setup_wpan_phy_pib(local->phy);
 
+	/* Ensure proper channel selection */
+	rtnl_lock();
+	rc = ieee802154_change_channel(local->phy, local->phy->current_page,
+				       local->phy->current_channel);
+	rtnl_unlock();
+	if (rc)
+		goto out_wq;
+
 	if (!(hw->flags & IEEE802154_HW_CSMA_PARAMS)) {
 		local->phy->supported.min_csma_backoffs = 4;
 		local->phy->supported.max_csma_backoffs = 4;
