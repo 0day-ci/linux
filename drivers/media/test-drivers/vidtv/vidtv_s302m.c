@@ -468,6 +468,7 @@ struct vidtv_encoder
 
 	ctx = kzalloc(priv_sz, GFP_KERNEL);
 	if (!ctx) {
+		kfree(e->name);
 		kfree(e);
 		return NULL;
 	}
