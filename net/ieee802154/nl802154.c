@@ -226,6 +226,7 @@ static const struct nla_policy nl802154_policy[NL802154_ATTR_MAX+1] = {
 	[NL802154_ATTR_PAN] = { .type = NLA_NESTED },
 	[NL802154_ATTR_MAX_PAN_ENTRIES] = { .type = NLA_U32 },
 	[NL802154_ATTR_PANS_EXPIRATION] = { .type = NLA_U32 },
+	[NL802154_ATTR_BEACON_INTERVAL] = { .type = NLA_U8 },
 
 #ifdef CONFIG_IEEE802154_NL802154_EXPERIMENTAL
 	[NL802154_ATTR_SEC_ENABLED] = { .type = NLA_U8, },
@@ -1686,6 +1687,70 @@ static int nl802154_set_pans_expiration(struct sk_buff *skb,
 	return 0;
 }
 
+static int
+nl802154_send_beacons(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg802154_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wpan_dev *wpan_dev = dev->ieee802154_ptr;
+	struct wpan_phy *wpan_phy = &rdev->wpan_phy;
+	struct cfg802154_beacons_request *request;
+	int err;
+
+	/* Avoid sending beacons on monitor interfaces */
+	if (wpan_dev->iftype == NL802154_IFTYPE_MONITOR)
+		return -EOPNOTSUPP;
+
+	request = kzalloc(sizeof(*request), GFP_KERNEL);
+	if (!request)
+		return -ENOMEM;
+
+	request->wpan_dev = wpan_dev;
+	request->wpan_phy = wpan_phy;
+
+	if (info->attrs[NL802154_ATTR_BEACON_INTERVAL]) {
+		request->interval = nla_get_u8(info->attrs[NL802154_ATTR_BEACON_INTERVAL]);
+		if (request->interval > IEEE802154_ACTIVE_SCAN_DURATION) {
+			pr_err("Interval is out of range\n");
+			err = -EINVAL;
+			goto free_request;
+		}
+	} else {
+		/* Use maximum duration order by default */
+		request->interval = IEEE802154_MAX_SCAN_DURATION;
+	}
+
+	err = rdev_send_beacons(rdev, request);
+	if (err) {
+		pr_err("Failure starting sending beacons (%d)\n", err);
+		goto free_request;
+	}
+
+	if (wpan_dev->netdev)
+		dev_hold(wpan_dev->netdev);
+
+free_request:
+	kfree(request);
+
+	return err;
+}
+
+static int
+nl802154_stop_beacons(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg802154_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wpan_dev *wpan_dev = dev->ieee802154_ptr;
+	int err;
+
+	err = rdev_stop_beacons(rdev, wpan_dev);
+
+	if (err != -ESRCH && wpan_dev->netdev)
+		dev_put(wpan_dev->netdev);
+
+	return err;
+}
+
 #ifdef CONFIG_IEEE802154_NL802154_EXPERIMENTAL
 static const struct nla_policy nl802154_dev_addr_policy[NL802154_DEV_ADDR_ATTR_MAX + 1] = {
 	[NL802154_DEV_ADDR_ATTR_PAN_ID] = { .type = NLA_U16 },
@@ -2814,6 +2879,22 @@ static const struct genl_ops nl802154_ops[] = {
 		.doit = nl802154_set_pans_expiration,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL802154_FLAG_NEED_NETDEV |
+				  NL802154_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL802154_CMD_SEND_BEACONS,
+		.doit = nl802154_send_beacons,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL802154_FLAG_NEED_NETDEV |
+				  NL802154_FLAG_CHECK_NETDEV_UP |
+				  NL802154_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL802154_CMD_STOP_BEACONS,
+		.doit = nl802154_stop_beacons,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL802154_FLAG_NEED_NETDEV |
+				  NL802154_FLAG_CHECK_NETDEV_UP |
 				  NL802154_FLAG_NEED_RTNL,
 	},
 #ifdef CONFIG_IEEE802154_NL802154_EXPERIMENTAL

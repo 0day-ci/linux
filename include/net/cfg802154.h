@@ -88,6 +88,24 @@ struct cfg802154_scan_request {
 	struct wpan_phy *wpan_phy;
 };
 
+/**
+ * struct cfg802154_beacons_request - beacons request descriptor
+ *
+ * @interval: interval n between sendings, in multiple order of the super frame
+ *            duration: aBaseSuperframeDuration * (2^n) unless the interval
+ *            order is greater or equal to 15, in this case beacons won't be
+ *            passively sent out at a fixed rate but instead inform the device
+ *            that it should answer beacon requests as part of active scan
+ *            procedures
+ * @wpan_dev: the concerned wpan device
+ * @wpan_phy: the wpan phy this was for
+ */
+struct cfg802154_beacons_request {
+	u8 interval;
+	struct wpan_dev *wpan_dev;
+	struct wpan_phy *wpan_phy;
+};
+
 struct cfg802154_ops {
 	struct net_device * (*add_virtual_intf_deprecated)(struct wpan_phy *wpan_phy,
 							   const char *name,
@@ -130,6 +148,10 @@ struct cfg802154_ops {
 				struct cfg802154_scan_request *request);
 	int	(*abort_scan)(struct wpan_phy *wpan_phy,
 			      struct wpan_dev *wpan_dev);
+	int	(*send_beacons)(struct wpan_phy *wpan_phy,
+				struct cfg802154_beacons_request *request);
+	int	(*stop_beacons)(struct wpan_phy *wpan_phy,
+				struct wpan_dev *wpan_dev);
 #ifdef CONFIG_IEEE802154_NL802154_EXPERIMENTAL
 	void	(*get_llsec_table)(struct wpan_phy *wpan_phy,
 				   struct wpan_dev *wpan_dev,
