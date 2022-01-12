@@ -7499,13 +7499,57 @@ static int intel_bigjoiner_add_affected_planes(struct intel_atomic_state *state)
 	return 0;
 }
 
+static bool scaling_affects_cdclk(struct intel_plane_state *old_plane_state,
+				  struct intel_plane_state *new_plane_state)
+{
+	struct drm_i915_private *i915 = to_i915(new_plane_state->uapi.plane->dev);
+	int old_src_w = drm_rect_width(&old_plane_state->uapi.src) >> 16;
+	int old_src_h = drm_rect_height(&old_plane_state->uapi.src) >> 16;
+	int old_dst_w = drm_rect_width(&old_plane_state->uapi.dst);
+	int old_dst_h = drm_rect_height(&old_plane_state->uapi.dst);
+	int new_src_w = drm_rect_width(&new_plane_state->uapi.src) >> 16;
+	int new_src_h = drm_rect_height(&new_plane_state->uapi.src) >> 16;
+	int new_dst_w = drm_rect_width(&new_plane_state->uapi.dst);
+	int new_dst_h = drm_rect_height(&new_plane_state->uapi.dst);
+	int old_hscale_ratio, new_hscale_ratio;
+	int old_vscale_ratio, new_vscale_ratio;
+
+	if (needs_scaling(old_plane_state) != needs_scaling(new_plane_state))
+		return true;
+
+	if (!old_dst_w || !old_dst_h)
+		return true;
+
+	old_hscale_ratio = DIV_ROUND_UP(old_src_w, old_dst_w);
+	old_vscale_ratio = DIV_ROUND_UP(old_src_h, old_dst_h);
+
+	if (!new_dst_w || !new_dst_h)
+		return true;
+
+	new_hscale_ratio = DIV_ROUND_UP(new_src_w, new_dst_w);
+	new_vscale_ratio = DIV_ROUND_UP(new_src_h, new_dst_h);
+
+	if ((old_hscale_ratio != new_hscale_ratio) ||
+	    (old_vscale_ratio != new_vscale_ratio)) {
+		drm_dbg_kms(&i915->drm, "Scaling ratios changed from %dx%d"
+			    " to %dx%d - need cdclk recalc\n",
+			    old_hscale_ratio, old_vscale_ratio,
+			    new_hscale_ratio, new_vscale_ratio);
+		return true;
+	}
+
+	return false;
+}
+
 static int intel_atomic_check_planes(struct intel_atomic_state *state)
 {
 	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
 	struct intel_crtc_state *old_crtc_state, *new_crtc_state;
 	struct intel_plane_state *plane_state;
+	struct intel_plane_state *old_plane_state;
 	struct intel_plane *plane;
 	struct intel_crtc *crtc;
+	bool need_cdclk_calc = false;
 	int i, ret;
 
 	ret = icl_add_linked_planes(state);
@@ -7516,7 +7560,7 @@ static int intel_atomic_check_planes(struct intel_atomic_state *state)
 	if (ret)
 		return ret;
 
-	for_each_new_intel_plane_in_state(state, plane, plane_state, i) {
+	for_each_oldnew_intel_plane_in_state(state, plane, old_plane_state, plane_state, i) {
 		ret = intel_plane_atomic_check(state, plane);
 		if (ret) {
 			drm_dbg_atomic(&dev_priv->drm,
@@ -7524,6 +7568,9 @@ static int intel_atomic_check_planes(struct intel_atomic_state *state)
 				       plane->base.base.id, plane->base.name);
 			return ret;
 		}
+
+		if (scaling_affects_cdclk(old_plane_state, plane_state))
+			need_cdclk_calc = true;
 	}
 
 	for_each_oldnew_intel_crtc_in_state(state, crtc, old_crtc_state,
@@ -7539,18 +7586,21 @@ static int intel_atomic_check_planes(struct intel_atomic_state *state)
 		 * the planes' minimum cdclk calculation. Add such planes
 		 * to the state before we compute the minimum cdclk.
 		 */
-		if (!active_planes_affects_min_cdclk(dev_priv))
+		if (!active_planes_affects_min_cdclk(dev_priv) && !need_cdclk_calc)
 			continue;
 
 		old_active_planes = old_crtc_state->active_planes & ~BIT(PLANE_CURSOR);
 		new_active_planes = new_crtc_state->active_planes & ~BIT(PLANE_CURSOR);
 
-		if (hweight8(old_active_planes) == hweight8(new_active_planes))
+		if ((hweight8(old_active_planes) == hweight8(new_active_planes)) &&
+		    !need_cdclk_calc)
 			continue;
 
 		ret = intel_crtc_add_planes_to_state(state, crtc, new_active_planes);
 		if (ret)
 			return ret;
+
+
 	}
 
 	return 0;
