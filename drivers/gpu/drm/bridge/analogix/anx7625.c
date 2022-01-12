@@ -1674,6 +1674,7 @@ static int anx7625_attach_dsi(struct anx7625_data *ctx)
 	dsi->mode_flags = MIPI_DSI_MODE_VIDEO	|
 		MIPI_DSI_MODE_VIDEO_SYNC_PULSE	|
 		MIPI_DSI_MODE_VIDEO_HSE;
+	dsi->hs_packet_end_aligned = true;
 
 	ret = devm_mipi_dsi_attach(dev, dsi);
 	if (ret) {
