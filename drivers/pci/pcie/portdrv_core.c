@@ -358,6 +358,14 @@ int pcie_port_device_register(struct pci_dev *dev)
 		}
 	}
 
+	/*
+	 * Some platforms have dedicated interrupt line from root complex to
+	 * interrupt controller for PCIe services like AER/PME etc., check
+	 * if platform registered with any such IRQ.
+	 */
+	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT)
+		pci_check_platform_service_irqs(dev, irqs, capabilities);
+
 	/* Allocate child services if any */
 	status = -ENODEV;
 	nr_service = 0;
