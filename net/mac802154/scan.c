@@ -19,10 +19,15 @@
 
 #define IEEE802154_BEACON_MHR_SZ 13
 #define IEEE802154_BEACON_PL_SZ 4
+#define IEEE802154_BEACON_REQ_MHR_SZ 7
+#define IEEE802154_BEACON_REQ_PL_SZ 1
 #define IEEE802154_CRC_SZ 2
 #define IEEE802154_BEACON_SKB_SZ (IEEE802154_BEACON_MHR_SZ + \
 				  IEEE802154_BEACON_PL_SZ + \
 				  IEEE802154_CRC_SZ)
+#define IEEE802154_BEACON_REQ_SKB_SZ (IEEE802154_BEACON_REQ_MHR_SZ + \
+				      IEEE802154_BEACON_REQ_PL_SZ +  \
+				      IEEE802154_CRC_SZ)
 
 static bool mac802154_check_promiscuous(struct ieee802154_local *local)
 {
@@ -167,6 +172,41 @@ int mac802154_stop_beacons_locked(struct ieee802154_local *local)
 	return 0;
 }
 
+static int mac802154_scan_prepare_beacon_req(struct ieee802154_local *local)
+{
+	memset(&local->beacon_req, 0, sizeof(local->beacon_req));
+	local->beacon_req.mhr.fc.type = IEEE802154_FC_TYPE_MAC_CMD;
+	local->beacon_req.mhr.fc.dest_addr_mode = IEEE802154_SHORT_ADDRESSING;
+	local->beacon_req.mhr.fc.version = IEEE802154_2003_STD;
+	local->beacon_req.mhr.fc.source_addr_mode = IEEE802154_NO_ADDRESSING;
+	local->beacon_req.mhr.dest.mode = IEEE802154_ADDR_SHORT;
+	local->beacon_req.mhr.dest.pan_id = cpu_to_le16(IEEE802154_PANID_BROADCAST);
+	local->beacon_req.mhr.dest.short_addr = cpu_to_le16(IEEE802154_ADDR_BROADCAST);
+	local->beacon_req.mac_pl.cmd_id = IEEE802154_CMD_BEACON_REQ;
+
+	return 0;
+}
+
+static int mac802154_scan_send_beacon_req_locked(struct ieee802154_local *local)
+{
+	struct sk_buff *skb;
+	int ret;
+
+	lockdep_assert_held(&local->scan_lock);
+
+	skb = alloc_skb(IEEE802154_BEACON_REQ_SKB_SZ, GFP_KERNEL);
+	if (!skb)
+		return -ENOBUFS;
+
+	ret = ieee802154_beacon_req_push(skb, &local->beacon_req);
+	if (ret) {
+		kfree_skb(skb);
+		return ret;
+	}
+
+	return drv_xmit_async(local, skb);
+}
+
 static int mac802154_scan_send_beacon_locked(struct ieee802154_local *local,
 					     struct wpan_dev *wpan_dev)
 {
@@ -236,6 +276,9 @@ void mac802154_scan_work(struct work_struct *work)
 		ieee802154_set_symbol_duration(local->phy);
 	} while (ret);
 
+	if (scan_req->type == NL802154_SCAN_ACTIVE)
+		mac802154_scan_send_beacon_req_locked(local);
+
 queue_work:
 	scan_duration = mac802154_scan_get_channel_time(scan_req->duration,
 							local->phy->symbol_duration);
@@ -262,8 +305,8 @@ int mac802154_trigger_scan_locked(struct ieee802154_sub_if_data *sdata,
 	if (mac802154_scan_is_ongoing(local))
 		return -EBUSY;
 
-	/* TODO: support other scanning type */
-	if (request->type != NL802154_SCAN_PASSIVE)
+	if (request->type != NL802154_SCAN_PASSIVE &&
+	    request->type != NL802154_SCAN_ACTIVE)
 		return -EOPNOTSUPP;
 
 	/* Store scanning parameters */
@@ -275,6 +318,9 @@ int mac802154_trigger_scan_locked(struct ieee802154_sub_if_data *sdata,
 		get_random_bytes(&local->scan_addr, sizeof(local->scan_addr));
 	else
 		local->scan_addr = cpu_to_le64(get_unaligned_be64(sdata->dev->dev_addr));
+
+	if (request->type == NL802154_SCAN_ACTIVE)
+		mac802154_scan_prepare_beacon_req(local);
 
 	local->scan_channel_idx = -1;
 	atomic_set(&local->scanning, 1);

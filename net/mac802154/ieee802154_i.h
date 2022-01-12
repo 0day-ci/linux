@@ -56,6 +56,7 @@ struct ieee802154_local {
 	struct cfg802154_scan_request __rcu *scan_req;
 	struct ieee802154_sub_if_data __rcu *scan_sdata;
 	struct delayed_work scan_work;
+	struct ieee802154_beacon_req_frame beacon_req;
 
 	/* Beacons handling */
 	bool ongoing_beacons_request;
