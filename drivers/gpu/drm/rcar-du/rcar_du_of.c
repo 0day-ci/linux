@@ -200,7 +200,7 @@ static void __init rcar_du_of_lvds_patch(const struct of_device_id *of_ids)
 	struct device_node *lvds_node;
 	struct device_node *soc_node;
 	struct device_node *du_node;
-	char compatible[22];
+	char compatible[24];
 	const char *soc_name;
 	unsigned int i;
 	int ret;
