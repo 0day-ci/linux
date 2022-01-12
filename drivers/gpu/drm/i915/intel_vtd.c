@@ -8,7 +8,7 @@
 #include "intel_vtd.h"
 
 void
-i915_print_iommu_status(struct drm_i915_private *i915, struct drm_printer *p)
+intel_vtd_print_iommu_status(struct drm_i915_private *i915, struct drm_printer *p)
 {
 	drm_printf(p, "iommu: %s\n", enableddisabled(intel_vtd_active(i915)));
 }
