@@ -1235,6 +1235,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
 	sun7i-a20-icnova-swac.dtb \
 	sun7i-a20-lamobo-r1.dtb \
 	sun7i-a20-linutronix-testbox-v2.dtb \
+	sun7i-a20-haoyu-marsboard.dtb \
 	sun7i-a20-m3.dtb \
 	sun7i-a20-mk808c.dtb \
 	sun7i-a20-olimex-som-evb.dtb \
