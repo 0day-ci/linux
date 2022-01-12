@@ -438,6 +438,7 @@ static void otx2vf_do_set_rx_mode(struct work_struct *work)
 
 static int otx2vf_change_mtu(struct net_device *netdev, int new_mtu)
 {
+	struct otx2_nic *vf = netdev_priv(netdev);
 	bool if_up = netif_running(netdev);
 	int err = 0;
 
@@ -447,6 +448,8 @@ static int otx2vf_change_mtu(struct net_device *netdev, int new_mtu)
 	netdev_info(netdev, "Changing MTU from %d to %d\n",
 		    netdev->mtu, new_mtu);
 	netdev->mtu = new_mtu;
+
+	vf->hw.rbuf_len = 0;
 
 	if (if_up)
 		err = otx2vf_open(netdev);

@@ -177,6 +177,7 @@ struct otx2_hw {
 	u16			pool_cnt;
 	u16			rqpool_cnt;
 	u16			sqpool_cnt;
+	u16			rbuf_len;
 
 	/* NPA */
 	u32			stack_pg_ptrs;  /* No of ptrs per stack page */

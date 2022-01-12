@@ -66,6 +66,8 @@ static int otx2_change_mtu(struct net_device *netdev, int new_mtu)
 		    netdev->mtu, new_mtu);
 	netdev->mtu = new_mtu;
 
+	pf->hw.rbuf_len = 0;
+
 	if (if_up)
 		err = otx2_open(netdev);
 
@@ -1305,6 +1307,9 @@ static int otx2_get_rbuf_size(struct otx2_nic *pf, int mtu)
 	int frame_size;
 	int total_size;
 	int rbuf_size;
+
+	if (pf->hw.rbuf_len)
+		return pf->hw.rbuf_len;
 
 	/* The data transferred by NIX to memory consists of actual packet
 	 * plus additional data which has timestamp and/or EDSA/HIGIG2
