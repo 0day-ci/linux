@@ -30,6 +30,9 @@ struct cfg802154_registered_device {
 	unsigned int pan_entries;
 	unsigned int pan_generation;
 
+	/* scanning */
+	struct cfg802154_scan_request *scan_req;
+
 	/* must be last because of the way we do wpan_phy_priv(),
 	 * and it should at least be aligned to NETDEV_ALIGN
 	 */
