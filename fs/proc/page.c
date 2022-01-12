@@ -15,6 +15,7 @@
 #include <linux/page_idle.h>
 #include <linux/kernel-page-flags.h>
 #include <linux/uaccess.h>
+#include <linux/memremap.h>
 #include "internal.h"
 
 #define KPMSIZE sizeof(u64)
@@ -46,6 +47,7 @@ static ssize_t kpagecount_read(struct file *file, char __user *buf,
 {
 	const unsigned long max_dump_pfn = get_max_dump_pfn();
 	u64 __user *out = (u64 __user *)buf;
+	struct dev_pagemap *pgmap = NULL;
 	struct page *ppage;
 	unsigned long src = *ppos;
 	unsigned long pfn;
@@ -60,16 +62,19 @@ static ssize_t kpagecount_read(struct file *file, char __user *buf,
 	count = min_t(unsigned long, count, (max_dump_pfn * KPMSIZE) - src);
 
 	while (count > 0) {
-		/*
-		 * TODO: ZONE_DEVICE support requires to identify
-		 * memmaps that were actually initialized.
-		 */
 		ppage = pfn_to_online_page(pfn);
+		if (!ppage)
+			ppage = pfn_to_devmap_page(pfn, &pgmap);
 
 		if (!ppage || PageSlab(ppage) || page_has_type(ppage))
 			pcount = 0;
 		else
 			pcount = page_mapcount(ppage);
+
+		if (pgmap) {
+			put_dev_pagemap(pgmap);
+			pgmap = NULL;
+		}
 
 		if (put_user(pcount, out)) {
 			ret = -EFAULT;
@@ -229,10 +234,12 @@ static ssize_t kpageflags_read(struct file *file, char __user *buf,
 {
 	const unsigned long max_dump_pfn = get_max_dump_pfn();
 	u64 __user *out = (u64 __user *)buf;
+	struct dev_pagemap *pgmap = NULL;
 	struct page *ppage;
 	unsigned long src = *ppos;
 	unsigned long pfn;
 	ssize_t ret = 0;
+	u64 flags;
 
 	pfn = src / KPMSIZE;
 	if (src & KPMMASK || count & KPMMASK)
@@ -242,13 +249,17 @@ static ssize_t kpageflags_read(struct file *file, char __user *buf,
 	count = min_t(unsigned long, count, (max_dump_pfn * KPMSIZE) - src);
 
 	while (count > 0) {
-		/*
-		 * TODO: ZONE_DEVICE support requires to identify
-		 * memmaps that were actually initialized.
-		 */
 		ppage = pfn_to_online_page(pfn);
+		if (!ppage)
+			ppage = pfn_to_devmap_page(pfn, &pgmap);
 
-		if (put_user(stable_page_flags(ppage), out)) {
+		flags = stable_page_flags(ppage);
+		if (pgmap) {
+			put_dev_pagemap(pgmap);
+			pgmap = NULL;
+		}
+
+		if (put_user(flags, out)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -277,6 +288,7 @@ static ssize_t kpagecgroup_read(struct file *file, char __user *buf,
 {
 	const unsigned long max_dump_pfn = get_max_dump_pfn();
 	u64 __user *out = (u64 __user *)buf;
+	struct dev_pagemap *pgmap = NULL;
 	struct page *ppage;
 	unsigned long src = *ppos;
 	unsigned long pfn;
@@ -291,16 +303,19 @@ static ssize_t kpagecgroup_read(struct file *file, char __user *buf,
 	count = min_t(unsigned long, count, (max_dump_pfn * KPMSIZE) - src);
 
 	while (count > 0) {
-		/*
-		 * TODO: ZONE_DEVICE support requires to identify
-		 * memmaps that were actually initialized.
-		 */
 		ppage = pfn_to_online_page(pfn);
+		if (!ppage)
+			ppage = pfn_to_devmap_page(pfn, &pgmap);
 
 		if (ppage)
 			ino = page_cgroup_ino(ppage);
 		else
 			ino = 0;
+
+		if (pgmap) {
+			put_dev_pagemap(pgmap);
+			pgmap = NULL;
+		}
 
 		if (put_user(ino, out)) {
 			ret = -EFAULT;
