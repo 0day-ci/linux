@@ -603,6 +603,7 @@ struct ath11k {
 	struct completion finish_11d_ch_list;
 	bool pending_11d;
 	bool regdom_set_by_user;
+	u8 twt_enabled;
 };
 
 struct ath11k_band_cap {
