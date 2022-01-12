@@ -216,12 +216,14 @@ void kvm_pic_clear_all(struct kvm_pic *s, int irq_source_id)
  */
 static inline void pic_intack(struct kvm_kpic_state *s, int irq)
 {
-	s->isr |= 1 << irq;
+	int mask;
+	mask = 1 << irq;
+	s->isr |= mask;
 	/*
 	 * We don't clear a level sensitive interrupt here
 	 */
-	if (!(s->elcr & (1 << irq)))
-		s->irr &= ~(1 << irq);
+	if (!(s->elcr & mask))
+		s->irr &= ~mask;
 
 	if (s->auto_eoi) {
 		if (s->rotate_on_auto_eoi)
