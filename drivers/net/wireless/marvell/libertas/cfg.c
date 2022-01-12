@@ -854,16 +854,13 @@ void lbs_send_mic_failureevent(struct lbs_private *priv, u32 event)
 static int lbs_remove_wep_keys(struct lbs_private *priv)
 {
 	struct cmd_ds_802_11_set_wep cmd;
-	int ret;
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.hdr.size = cpu_to_le16(sizeof(cmd));
 	cmd.keyindex = cpu_to_le16(priv->wep_tx_key);
 	cmd.action = cpu_to_le16(CMD_ACT_REMOVE);
 
-	ret = lbs_cmd_with_response(priv, CMD_802_11_SET_WEP, &cmd);
-
-	return ret;
+	return lbs_cmd_with_response(priv, CMD_802_11_SET_WEP, &cmd);
 }
 
 /*
@@ -949,9 +946,7 @@ static int lbs_enable_rsn(struct lbs_private *priv, int enable)
 	cmd.action = cpu_to_le16(CMD_ACT_SET);
 	cmd.enable = cpu_to_le16(enable);
 
-	ret = lbs_cmd_with_response(priv, CMD_802_11_ENABLE_RSN, &cmd);
-
-	return ret;
+	return lbs_cmd_with_response(priv, CMD_802_11_ENABLE_RSN, &cmd);
 }
 
 
@@ -976,7 +971,6 @@ static int lbs_set_key_material(struct lbs_private *priv,
 				const u8 *key, u16 key_len)
 {
 	struct cmd_key_material cmd;
-	int ret;
 
 	/*
 	 * Example for WPA (TKIP):
@@ -1004,9 +998,7 @@ static int lbs_set_key_material(struct lbs_private *priv,
 	if (key && key_len)
 		memcpy(cmd.param.key, key, key_len);
 
-	ret = lbs_cmd_with_response(priv, CMD_802_11_KEY_MATERIAL, &cmd);
-
-	return ret;
+	return lbs_cmd_with_response(priv, CMD_802_11_KEY_MATERIAL, &cmd);
 }
 
 
