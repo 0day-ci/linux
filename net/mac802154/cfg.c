@@ -103,16 +103,12 @@ ieee802154_del_iface(struct wpan_phy *wpan_phy, struct wpan_dev *wpan_dev)
 }
 
 static int
-ieee802154_set_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
+ieee802154_change_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
 {
 	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
 	int ret;
 
 	ASSERT_RTNL();
-
-	if (wpan_phy->current_page == page &&
-	    wpan_phy->current_channel == channel)
-		return 0;
 
 	ret = drv_set_channel(local, page, channel);
 	if (!ret) {
@@ -121,6 +117,18 @@ ieee802154_set_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
 	}
 
 	return ret;
+}
+
+static int
+ieee802154_set_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
+{
+	ASSERT_RTNL();
+
+	if (wpan_phy->current_page == page &&
+	    wpan_phy->current_channel == channel)
+		return 0;
+
+	return ieee802154_change_channel(wpan_phy, page, channel);
 }
 
 static int
