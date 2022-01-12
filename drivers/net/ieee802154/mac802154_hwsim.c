@@ -748,46 +748,79 @@ static int hwsim_add_one(struct genl_info *info, struct device *dev,
 	hw->phy->supported.page[0].nchunks = 3;
 	/* 868 MHz BPSK	802.15.4-2003 */
 	hw->phy->supported.page[0].chunk[0].channels |= 1;
+	hw->phy->supported.page[0].chunk[0].protocol = IEEE802154_BPSK_PHY;
+	hw->phy->supported.page[0].chunk[0].band = IEEE802154_868_MHZ_BAND;
 	/* 915 MHz BPSK	802.15.4-2003 */
 	hw->phy->supported.page[0].chunk[1].channels |= 0x7fe;
+	hw->phy->supported.page[0].chunk[1].protocol = IEEE802154_BPSK_PHY;
+	hw->phy->supported.page[0].chunk[1].band = IEEE802154_915_MHZ_BAND;
 	/* 2.4 GHz O-QPSK 802.15.4-2003 */
 	hw->phy->supported.page[0].chunk[2].channels |= 0x7FFF800;
+	hw->phy->supported.page[0].chunk[2].protocol = IEEE802154_OQPSK_PHY;
+	hw->phy->supported.page[0].chunk[2].band = IEEE802154_2400_MHZ_BAND;
 
 	hw->phy->supported.page[1].nchunks = 2;
 	/* 868 MHz ASK 802.15.4-2006 */
 	hw->phy->supported.page[1].chunk[0].channels |= 1;
+	hw->phy->supported.page[1].chunk[0].protocol = IEEE802154_ASK_PHY;
+	hw->phy->supported.page[1].chunk[0].band = IEEE802154_868_MHZ_BAND;
 	/* 915 MHz ASK 802.15.4-2006 */
 	hw->phy->supported.page[1].chunk[1].channels |= 0x7fe;
+	hw->phy->supported.page[1].chunk[1].protocol = IEEE802154_ASK_PHY;
+	hw->phy->supported.page[1].chunk[1].band = IEEE802154_915_MHZ_BAND;
 
 	hw->phy->supported.page[2].nchunks = 2;
 	/* 868 MHz O-QPSK 802.15.4-2006 */
 	hw->phy->supported.page[2].chunk[0].channels |= 1;
+	hw->phy->supported.page[2].chunk[0].protocol = IEEE802154_OQPSK_PHY;
+	hw->phy->supported.page[2].chunk[0].band = IEEE802154_868_MHZ_BAND;
 	/* 915 MHz O-QPSK 802.15.4-2006 */
 	hw->phy->supported.page[2].chunk[1].channels |= 0x7fe;
+	hw->phy->supported.page[2].chunk[1].protocol = IEEE802154_OQPSK_PHY;
+	hw->phy->supported.page[2].chunk[1].band = IEEE802154_915_MHZ_BAND;
 
 	hw->phy->supported.page[3].nchunks = 1;
 	/* 2.4 GHz CSS 802.15.4a-2007 */
 	hw->phy->supported.page[3].chunk[0].channels |= 0x3fff;
+	hw->phy->supported.page[3].chunk[0].protocol = IEEE802154_CSS_PHY;
+	hw->phy->supported.page[3].chunk[0].band = IEEE802154_2400_MHZ_BAND;
 
 	hw->phy->supported.page[4].nchunks = 3;
 	/* UWB Sub-gigahertz 802.15.4a-2007 */
 	hw->phy->supported.page[4].chunk[0].channels |= 1;
+	hw->phy->supported.page[4].chunk[0].protocol = IEEE802154_HRP_UWB_PHY;
+	hw->phy->supported.page[4].chunk[0].band = IEEE802154_250_750_MHZ_BAND;
+	hw->phy->supported.page[4].chunk[0].prf = IEEE802154_62890KHZ_MEAN_PRF;
 	/* UWB Low band 802.15.4a-2007 */
 	hw->phy->supported.page[4].chunk[1].channels |= 0x1e;
+	hw->phy->supported.page[4].chunk[1].protocol = IEEE802154_HRP_UWB_PHY;
+	hw->phy->supported.page[4].chunk[1].band = IEEE802154_3100_4800_MHZ_BAND;
+	hw->phy->supported.page[4].chunk[1].prf = IEEE802154_62890KHZ_MEAN_PRF;
 	/* UWB High band 802.15.4a-2007 */
 	hw->phy->supported.page[4].chunk[2].channels |= 0xffe0;
+	hw->phy->supported.page[4].chunk[2].protocol = IEEE802154_HRP_UWB_PHY;
+	hw->phy->supported.page[4].chunk[2].band = IEEE802154_6000_10600_MHZ_BAND;
+	hw->phy->supported.page[4].chunk[2].prf = IEEE802154_62890KHZ_MEAN_PRF;
 
 	hw->phy->supported.page[5].nchunks = 2;
 	/* 750 MHz O-QPSK 802.15.4c-2009 */
 	hw->phy->supported.page[5].chunk[0].channels |= 0xf;
+	hw->phy->supported.page[5].chunk[0].protocol = IEEE802154_OQPSK_PHY;
+	hw->phy->supported.page[5].chunk[0].band = IEEE802154_750_MHZ_BAND;
 	/* 750 MHz MPSK 802.15.4c-2009 */
 	hw->phy->supported.page[5].chunk[1].channels |= 0xf0;
+	hw->phy->supported.page[5].chunk[1].protocol = IEEE802154_MQPSK_PHY;
+	hw->phy->supported.page[5].chunk[1].band = IEEE802154_750_MHZ_BAND;
 
 	hw->phy->supported.page[6].nchunks = 2;
 	/* 950 MHz BPSK 802.15.4d-2009 */
 	hw->phy->supported.page[6].chunk[0].channels |= 0x3ff;
+	hw->phy->supported.page[6].chunk[0].protocol = IEEE802154_BPSK_PHY;
+	hw->phy->supported.page[6].chunk[0].band = IEEE802154_950_MHZ_BAND;
 	/* 950 MHz GFSK 802.15.4d-2009 */
 	hw->phy->supported.page[6].chunk[1].channels |= 0x3ffc00;
+	hw->phy->supported.page[6].chunk[1].protocol = IEEE802154_GFSK_PHY;
+	hw->phy->supported.page[6].chunk[1].band = IEEE802154_950_MHZ_BAND;
 
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
 

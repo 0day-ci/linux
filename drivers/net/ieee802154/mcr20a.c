@@ -1003,7 +1003,10 @@ static void mcr20a_hw_setup(struct mcr20a_local *lp)
 	phy->cca.mode = NL802154_CCA_ENERGY;
 
 	phy->supported.page[0].nchunks = 1;
+	/* 2.4 GHz O-QPSK */
 	phy->supported.page[0].chunk[0].channels = MCR20A_VALID_CHANNELS;
+	phy->supported.page[0].chunk[0].protocol = IEEE802154_OQPSK_PHY;
+	phy->supported.page[0].chunk[0].band = IEEE802154_2400_MHZ_BAND;
 	phy->current_page = 0;
 	/* MCR20A default reset value */
 	phy->current_channel = 20;

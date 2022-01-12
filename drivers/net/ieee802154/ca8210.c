@@ -2963,7 +2963,10 @@ static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 {
 	/* Support channels 11-26 */
 	ca8210_hw->phy->supported.page[0].nchunks = 1;
+	/* 2.4 GHz O-QPSK */
 	ca8210_hw->phy->supported.page[0].chunk[0].channels = CA8210_VALID_CHANNELS;
+	ca8210_hw->phy->supported.page[0].chunk[0].protocol = IEEE802154_OQPSK_PHY;
+	ca8210_hw->phy->supported.page[0].chunk[0].band = IEEE802154_2400_MHZ_BAND;
 	ca8210_hw->phy->supported.tx_powers_size = CA8210_MAX_TX_POWERS;
 	ca8210_hw->phy->supported.tx_powers = ca8210_tx_powers;
 	ca8210_hw->phy->supported.cca_ed_levels_size = CA8210_MAX_ED_LEVELS;
