@@ -698,13 +698,12 @@ mplsip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	    u8 type, u8 code, int offset, __be32 info)
 {
 	__u32 rel_info = ntohl(info);
-	int err, rel_msg = 0;
+	int rel_msg = 0;
 	u8 rel_type = type;
 	u8 rel_code = code;
 
-	err = ip6_tnl_err(skb, IPPROTO_MPLS, opt, &rel_type, &rel_code,
+	return ip6_tnl_err(skb, IPPROTO_MPLS, opt, &rel_type, &rel_code,
 			  &rel_msg, &rel_info, offset);
-	return err;
 }
 
 static int ip4ip6_dscp_ecn_decapsulate(const struct ip6_tnl *t,
