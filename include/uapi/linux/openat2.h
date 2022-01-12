@@ -39,5 +39,7 @@ struct open_how {
 					completed through cached lookup. May
 					return -EAGAIN if that's not
 					possible. */
+#define RESOLVE_EMPTY_PATH	0x40 /* If pathname is an empty string, open
+					the file referred by dirfd */
 
 #endif /* _UAPI_LINUX_OPENAT2_H */

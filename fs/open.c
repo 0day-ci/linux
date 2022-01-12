@@ -1133,6 +1133,8 @@ inline int build_open_flags(const struct open_how *how, struct open_flags *op)
 			return -EAGAIN;
 		lookup_flags |= LOOKUP_CACHED;
 	}
+	if (how->resolve & RESOLVE_EMPTY_PATH)
+		lookup_flags |= LOOKUP_EMPTY;
 
 	op->lookup_flags = lookup_flags;
 	return 0;
@@ -1205,7 +1207,7 @@ static long do_sys_openat2(int dfd, const char __user *filename,
 	if (fd)
 		return fd;
 
-	tmp = getname(filename);
+	tmp = getname_flags(filename, op.lookup_flags, 0);
 	if (IS_ERR(tmp))
 		return PTR_ERR(tmp);
 
