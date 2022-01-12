@@ -2385,6 +2385,25 @@ static int ca8210_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 	return link_to_linux_err(status);
 }
 
+static int ca8210_enter_scan_mode(struct ieee802154_hw *hw,
+				  struct cfg802154_scan_request *request)
+{
+	/* This xceiver can only send dataframes */
+	if (request->type != NL802154_SCAN_PASSIVE)
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+
+static int ca8210_enter_beacons_mode(struct ieee802154_hw *hw,
+				     struct cfg802154_beacons_request *request)
+{
+	/* This xceiver can only send dataframes */
+	return -EOPNOTSUPP;
+}
+
+static void ca8210_exit_scan_beacons_mode(struct ieee802154_hw *hw) { }
+
 static const struct ieee802154_ops ca8210_phy_ops = {
 	.start = ca8210_start,
 	.stop = ca8210_stop,
@@ -2397,7 +2416,11 @@ static const struct ieee802154_ops ca8210_phy_ops = {
 	.set_cca_ed_level = ca8210_set_cca_ed_level,
 	.set_csma_params = ca8210_set_csma_params,
 	.set_frame_retries = ca8210_set_frame_retries,
-	.set_promiscuous_mode = ca8210_set_promiscuous_mode
+	.set_promiscuous_mode = ca8210_set_promiscuous_mode,
+	.enter_scan_mode = ca8210_enter_scan_mode,
+	.exit_scan_mode = ca8210_exit_scan_beacons_mode,
+	.enter_beacons_mode = ca8210_enter_beacons_mode,
+	.exit_beacons_mode = ca8210_exit_scan_beacons_mode,
 };
 
 /* Test/EVBME Interface */
