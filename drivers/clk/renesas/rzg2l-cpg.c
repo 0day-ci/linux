@@ -317,6 +317,126 @@ static const struct rzg2l_pll5_param dpi_mode_param[] = {
 	{ 3000000000, 1, 125,        0, 1, 1, 0, 0, 0, 0 }, /* 3000 MHz */
 };
 
+static int rzg2l_cpg_pll5_param_get_index(unsigned long rate,
+					  const struct rzg2l_pll5_param *pll5tab,
+					  unsigned int n)
+{
+	unsigned int  i;
+	int index = 0, prev_index = 0;
+
+	for (i = 0; i < n; i++) {
+		if (pll5tab[i].frequency == rate) {
+			index = i;
+			break;
+		}
+		if (pll5tab[i].frequency > rate) {
+			if ((pll5tab[i].frequency - rate) > (rate - pll5tab[prev_index].frequency))
+				index = prev_index;
+			else
+				index = i;
+			break;
+		}
+		prev_index = i;
+	}
+
+	if (i == n)
+		index = i - 1;
+
+	return index;
+}
+
+struct dsi_div_hw_data {
+	struct clk_hw hw;
+	u32 conf;
+	unsigned long rate;
+	struct rzg2l_cpg_priv *priv;
+};
+
+#define to_dsi_div_hw_data(_hw)	container_of(_hw, struct dsi_div_hw_data, hw)
+
+static unsigned long rzg2l_cpg_dsi_div_recalc_rate(struct clk_hw *hw,
+						   unsigned long parent_rate)
+{
+	struct dsi_div_hw_data *dsi_div = to_dsi_div_hw_data(hw);
+
+	return dsi_div->rate;
+}
+
+static long rzg2l_cpg_dsi_div_round_rate(struct clk_hw *hw,
+					 unsigned long rate,
+					 unsigned long *parent_rate)
+{
+	struct dsi_div_hw_data *dsi_div = to_dsi_div_hw_data(hw);
+	struct rzg2l_cpg_priv *priv = dsi_div->priv;
+	const struct rzg2l_pll5_param *dtable = priv->pll5_table;
+	int index = rzg2l_cpg_pll5_param_get_index(rate, dtable, priv->num_pll5_entries);
+
+	dsi_div->rate = dtable[index].frequency;
+	*parent_rate = dtable[index].dsi_div * dsi_div->rate;
+
+	return dsi_div->rate;
+}
+
+static int rzg2l_cpg_dsi_div_set_rate(struct clk_hw *hw,
+				      unsigned long rate,
+				      unsigned long parent_rate)
+{
+	struct dsi_div_hw_data *dsi_div = to_dsi_div_hw_data(hw);
+	struct rzg2l_cpg_priv *priv = dsi_div->priv;
+	const struct rzg2l_pll5_param *dtable = priv->pll5_table;
+	int id = rzg2l_cpg_pll5_param_get_index(rate, dtable, priv->num_pll5_entries);
+
+	writel(0x01010000 | (dtable[id].dsi_div_a << 0) | (dtable[id].dsi_div_b << 8),
+	       priv->base + CPG_PL5_SDIV);
+
+	return 0;
+}
+
+static const struct clk_ops rzg2l_cpg_dsi_div_ops = {
+	.recalc_rate = rzg2l_cpg_dsi_div_recalc_rate,
+	.round_rate = rzg2l_cpg_dsi_div_round_rate,
+	.set_rate = rzg2l_cpg_dsi_div_set_rate,
+};
+
+static struct clk * __init
+rzg2l_cpg_dsi_div_clk_register(const struct cpg_core_clk *core,
+			       struct clk **clks,
+			       struct rzg2l_cpg_priv *priv)
+{
+	struct dsi_div_hw_data *clk_hw_data;
+	const struct clk *parent;
+	const char *parent_name;
+	struct clk_init_data init;
+	struct clk_hw *clk_hw;
+	int ret;
+
+	parent = clks[core->parent & 0xffff];
+	if (IS_ERR(parent))
+		return ERR_CAST(parent);
+
+	clk_hw_data = devm_kzalloc(priv->dev, sizeof(*clk_hw_data), GFP_KERNEL);
+	if (!clk_hw_data)
+		return ERR_PTR(-ENOMEM);
+
+	clk_hw_data->priv = priv;
+
+	parent_name = __clk_get_name(parent);
+	init.name = core->name;
+	init.ops = &rzg2l_cpg_dsi_div_ops;
+	init.flags = CLK_SET_RATE_PARENT;
+	init.parent_names = &parent_name;
+	init.num_parents = 1;
+
+	clk_hw = &clk_hw_data->hw;
+	clk_hw->init = &init;
+
+	ret = devm_clk_hw_register(priv->dev, clk_hw);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return clk_hw->clk;
+}
+
 static int rzg2l_cpg_sipll5_get_index(unsigned long rate,
 				      const struct rzg2l_pll5_param *pll5tab,
 				      unsigned int n)
@@ -720,6 +840,9 @@ rzg2l_cpg_register_core_clk(const struct cpg_core_clk *core,
 		break;
 	case CLK_TYPE_PLL5_4_MUX:
 		clk = rzg2l_cpg_pll5_4_mux_clk_register(core, priv);
+		break;
+	case CLK_TYPE_DSI_DIV:
+		clk = rzg2l_cpg_dsi_div_clk_register(core, priv->clks, priv);
 		break;
 	default:
 		goto fail;
