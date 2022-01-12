@@ -1211,7 +1211,8 @@ static int adf7242_probe(struct spi_device *spi)
 	hw->extra_tx_headroom = 0;
 
 	/* We support only 2.4 Ghz */
-	hw->phy->supported.channels[0] = 0x7FFF800;
+	hw->phy->supported.page[0].nchunks = 1;
+	hw->phy->supported.page[0].chunk[0].channels = 0x7FFF800;
 
 	hw->flags = IEEE802154_HW_OMIT_CKSUM |
 		    IEEE802154_HW_CSMA_PARAMS |

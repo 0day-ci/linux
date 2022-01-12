@@ -916,7 +916,8 @@ static int atusb_get_and_conf_chip(struct atusb *atusb)
 	switch (part_num) {
 	case 2:
 		chip = "AT86RF230";
-		atusb->hw->phy->supported.channels[0] = 0x7FFF800;
+		atusb->hw->phy->supported.page[0].nchunks = 1;
+		atusb->hw->phy->supported.page[0].chunk[0].channels = 0x7FFF800;
 		atusb->hw->phy->current_channel = 11;	/* reset default */
 		atusb->hw->phy->symbol_duration = 16;
 		atusb->hw->phy->supported.tx_powers = atusb_powers;
@@ -926,7 +927,8 @@ static int atusb_get_and_conf_chip(struct atusb *atusb)
 		break;
 	case 3:
 		chip = "AT86RF231";
-		atusb->hw->phy->supported.channels[0] = 0x7FFF800;
+		atusb->hw->phy->supported.page[0].nchunks = 1;
+		atusb->hw->phy->supported.page[0].chunk[0].channels = 0x7FFF800;
 		atusb->hw->phy->current_channel = 11;	/* reset default */
 		atusb->hw->phy->symbol_duration = 16;
 		atusb->hw->phy->supported.tx_powers = atusb_powers;
@@ -937,8 +939,10 @@ static int atusb_get_and_conf_chip(struct atusb *atusb)
 	case 7:
 		chip = "AT86RF212";
 		atusb->hw->flags |= IEEE802154_HW_LBT;
-		atusb->hw->phy->supported.channels[0] = 0x00007FF;
-		atusb->hw->phy->supported.channels[2] = 0x00007FF;
+		atusb->hw->phy->supported.page[0].nchunks = 1;
+		atusb->hw->phy->supported.page[0].chunk[0].channels = 0x00007FF;
+		atusb->hw->phy->supported.page[2].nchunks = 1;
+		atusb->hw->phy->supported.page[2].chunk[0].channels = 0x00007FF;
 		atusb->hw->phy->current_channel = 5;
 		atusb->hw->phy->symbol_duration = 25;
 		atusb->hw->phy->supported.lbt = NL802154_SUPPORTED_BOOL_BOTH;

@@ -31,6 +31,7 @@ static int ieee802154_nl_fill_phy(struct sk_buff *msg, u32 portid,
 	void *hdr;
 	int i, pages = 0;
 	uint32_t *buf = kcalloc(32, sizeof(uint32_t), GFP_KERNEL);
+	u32 chans;
 
 	pr_debug("%s\n", __func__);
 
@@ -48,8 +49,11 @@ static int ieee802154_nl_fill_phy(struct sk_buff *msg, u32 portid,
 	    nla_put_u8(msg, IEEE802154_ATTR_CHANNEL, phy->current_channel))
 		goto nla_put_failure;
 	for (i = 0; i < 32; i++) {
-		if (phy->supported.channels[i])
-			buf[pages++] = phy->supported.channels[i] | (i << 27);
+		chans = cfg802154_get_supported_chans(phy, i);
+		if (!chans)
+			continue;
+
+		buf[pages++] = chans | (i << 27);
 	}
 	if (pages &&
 	    nla_put(msg, IEEE802154_ATTR_CHANNEL_PAGE_LIST,

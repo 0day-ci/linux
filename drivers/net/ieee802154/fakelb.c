@@ -137,36 +137,49 @@ static int fakelb_add_one(struct device *dev)
 	phy = hw->priv;
 	phy->hw = hw;
 
+	hw->phy->supported.page[0].nchunks = 3;
 	/* 868 MHz BPSK	802.15.4-2003 */
-	hw->phy->supported.channels[0] |= 1;
+	hw->phy->supported.page[0].chunk[0].channels |= 1;
 	/* 915 MHz BPSK	802.15.4-2003 */
-	hw->phy->supported.channels[0] |= 0x7fe;
+	hw->phy->supported.page[0].chunk[1].channels |= 0x7fe;
 	/* 2.4 GHz O-QPSK 802.15.4-2003 */
-	hw->phy->supported.channels[0] |= 0x7FFF800;
+	hw->phy->supported.page[0].chunk[2].channels |= 0x7FFF800;
+
+	hw->phy->supported.page[1].nchunks = 2;
 	/* 868 MHz ASK 802.15.4-2006 */
-	hw->phy->supported.channels[1] |= 1;
+	hw->phy->supported.page[1].chunk[0].channels |= 1;
 	/* 915 MHz ASK 802.15.4-2006 */
-	hw->phy->supported.channels[1] |= 0x7fe;
+	hw->phy->supported.page[1].chunk[1].channels |= 0x7fe;
+
+	hw->phy->supported.page[2].nchunks = 2;
 	/* 868 MHz O-QPSK 802.15.4-2006 */
-	hw->phy->supported.channels[2] |= 1;
+	hw->phy->supported.page[2].chunk[0].channels |= 1;
 	/* 915 MHz O-QPSK 802.15.4-2006 */
-	hw->phy->supported.channels[2] |= 0x7fe;
+	hw->phy->supported.page[2].chunk[1].channels |= 0x7fe;
+
+	hw->phy->supported.page[3].nchunks = 1;
 	/* 2.4 GHz CSS 802.15.4a-2007 */
-	hw->phy->supported.channels[3] |= 0x3fff;
+	hw->phy->supported.page[3].chunk[0].channels |= 0x3fff;
+
+	hw->phy->supported.page[4].nchunks = 3;
 	/* UWB Sub-gigahertz 802.15.4a-2007 */
-	hw->phy->supported.channels[4] |= 1;
+	hw->phy->supported.page[4].chunk[0].channels |= 1;
 	/* UWB Low band 802.15.4a-2007 */
-	hw->phy->supported.channels[4] |= 0x1e;
+	hw->phy->supported.page[4].chunk[1].channels |= 0x1e;
 	/* UWB High band 802.15.4a-2007 */
-	hw->phy->supported.channels[4] |= 0xffe0;
+	hw->phy->supported.page[4].chunk[2].channels |= 0xffe0;
+
+	hw->phy->supported.page[5].nchunks = 2;
 	/* 750 MHz O-QPSK 802.15.4c-2009 */
-	hw->phy->supported.channels[5] |= 0xf;
+	hw->phy->supported.page[5].chunk[0].channels |= 0xf;
 	/* 750 MHz MPSK 802.15.4c-2009 */
-	hw->phy->supported.channels[5] |= 0xf0;
+	hw->phy->supported.page[5].chunk[1].channels |= 0xf0;
+
+	hw->phy->supported.page[6].nchunks = 2;
 	/* 950 MHz BPSK 802.15.4d-2009 */
-	hw->phy->supported.channels[6] |= 0x3ff;
+	hw->phy->supported.page[6].chunk[0].channels |= 0x3ff;
 	/* 950 MHz GFSK 802.15.4d-2009 */
-	hw->phy->supported.channels[6] |= 0x3ffc00;
+	hw->phy->supported.page[6].chunk[1].channels |= 0x3ffc00;
 
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
 	/* fake phy channel 13 as default */

@@ -1287,7 +1287,8 @@ static int mrf24j40_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, devrec);
 	devrec->hw = hw;
 	devrec->hw->parent = &spi->dev;
-	devrec->hw->phy->supported.channels[0] = CHANNEL_MASK;
+	devrec->hw->phy->supported.page[0].nchunks = 1;
+	devrec->hw->phy->supported.page[0].chunk[0].channels = CHANNEL_MASK;
 	devrec->hw->flags = IEEE802154_HW_TX_OMIT_CKSUM | IEEE802154_HW_AFILT |
 			    IEEE802154_HW_CSMA_PARAMS |
 			    IEEE802154_HW_PROMISCUOUS;

@@ -320,6 +320,21 @@ nl802154_put_flags(struct sk_buff *msg, int attr, u32 mask)
 	return 0;
 }
 
+u32 cfg802154_get_supported_chans(struct wpan_phy *phy, unsigned int page)
+{
+	struct phy_page *ppage;
+	unsigned int chunk;
+	u32 supported = 0;
+
+	ppage = &phy->supported.page[page];
+
+	for (chunk = 0; chunk <= ppage->nchunks; chunk++)
+		supported |= ppage->chunk[chunk].channels;
+
+	return supported;
+}
+EXPORT_SYMBOL(cfg802154_get_supported_chans);
+
 static int
 nl802154_send_wpan_phy_channels(struct cfg802154_registered_device *rdev,
 				struct sk_buff *msg)
@@ -333,7 +348,7 @@ nl802154_send_wpan_phy_channels(struct cfg802154_registered_device *rdev,
 
 	for (page = 0; page <= IEEE802154_MAX_PAGE; page++) {
 		if (nla_put_u32(msg, NL802154_ATTR_SUPPORTED_CHANNEL,
-				rdev->wpan_phy.supported.channels[page]))
+				cfg802154_get_supported_chans(&rdev->wpan_phy, page)))
 			return -ENOBUFS;
 	}
 	nla_nest_end(msg, nl_page);
@@ -347,6 +362,7 @@ nl802154_put_capabilities(struct sk_buff *msg,
 {
 	const struct wpan_phy_supported *caps = &rdev->wpan_phy.supported;
 	struct nlattr *nl_caps, *nl_channels;
+	u32 chans;
 	int i;
 
 	nl_caps = nla_nest_start_noflag(msg, NL802154_ATTR_WPAN_PHY_CAPS);
@@ -358,10 +374,12 @@ nl802154_put_capabilities(struct sk_buff *msg,
 		return -ENOBUFS;
 
 	for (i = 0; i <= IEEE802154_MAX_PAGE; i++) {
-		if (caps->channels[i]) {
-			if (nl802154_put_flags(msg, i, caps->channels[i]))
-				return -ENOBUFS;
-		}
+		chans = cfg802154_get_supported_chans(&rdev->wpan_phy, i);
+		if (!chans)
+			continue;
+
+		if (nl802154_put_flags(msg, i, chans))
+			return -ENOBUFS;
 	}
 
 	nla_nest_end(msg, nl_channels);
@@ -965,7 +983,7 @@ static int nl802154_set_channel(struct sk_buff *skb, struct genl_info *info)
 
 	/* check 802.15.4 constraints */
 	if (page > IEEE802154_MAX_PAGE || channel > IEEE802154_MAX_CHANNEL ||
-	    !(rdev->wpan_phy.supported.channels[page] & BIT(channel)))
+	    !(cfg802154_get_supported_chans(&rdev->wpan_phy, page) & BIT(channel)))
 		return -EINVAL;
 
 	return rdev_set_channel(rdev, page, channel);

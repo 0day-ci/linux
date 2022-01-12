@@ -1558,7 +1558,8 @@ at86rf230_detect_device(struct at86rf230_local *lp)
 	case 3:
 		chip = "at86rf231";
 		lp->data = &at86rf231_data;
-		lp->hw->phy->supported.channels[0] = 0x7FFF800;
+		lp->hw->phy->supported.page[0].nchunks = 1;
+		lp->hw->phy->supported.page[0].chunk[0].channels = 0x7FFF800;
 		lp->hw->phy->current_channel = 11;
 		lp->hw->phy->symbol_duration = 16;
 		lp->hw->phy->supported.tx_powers = at86rf231_powers;
@@ -1570,8 +1571,10 @@ at86rf230_detect_device(struct at86rf230_local *lp)
 		chip = "at86rf212";
 		lp->data = &at86rf212_data;
 		lp->hw->flags |= IEEE802154_HW_LBT;
-		lp->hw->phy->supported.channels[0] = 0x00007FF;
-		lp->hw->phy->supported.channels[2] = 0x00007FF;
+		lp->hw->phy->supported.page[0].nchunks = 1;
+		lp->hw->phy->supported.page[0].chunk[0].channels = 0x00007FF;
+		lp->hw->phy->supported.page[2].nchunks = 1;
+		lp->hw->phy->supported.page[2].chunk[0].channels = 0x00007FF;
 		lp->hw->phy->current_channel = 5;
 		lp->hw->phy->symbol_duration = 25;
 		lp->hw->phy->supported.lbt = NL802154_SUPPORTED_BOOL_BOTH;
@@ -1583,7 +1586,8 @@ at86rf230_detect_device(struct at86rf230_local *lp)
 	case 11:
 		chip = "at86rf233";
 		lp->data = &at86rf233_data;
-		lp->hw->phy->supported.channels[0] = 0x7FFF800;
+		lp->hw->phy->supported.page[0].nchunks = 1;
+		lp->hw->phy->supported.page[0].chunk[0].channels = 0x7FFF800;
 		lp->hw->phy->current_channel = 13;
 		lp->hw->phy->symbol_duration = 16;
 		lp->hw->phy->supported.tx_powers = at86rf233_powers;

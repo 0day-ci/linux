@@ -47,4 +47,6 @@ struct cfg802154_registered_device *
 cfg802154_rdev_by_wpan_phy_idx(int wpan_phy_idx);
 struct wpan_phy *wpan_phy_idx_to_wpan_phy(int wpan_phy_idx);
 
+u32 cfg802154_get_supported_chans(struct wpan_phy *phy, unsigned int page);
+
 #endif /* __IEEE802154_CORE_H */

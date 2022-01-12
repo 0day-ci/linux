@@ -131,9 +131,18 @@ wpan_phy_supported_bool(bool b, enum nl802154_supported_bool_states st)
 	return false;
 }
 
+struct phy_channels {
+	u32 channels;
+};
+
+struct phy_page {
+	unsigned int nchunks;
+	struct phy_channels chunk[3];
+};
+
 struct wpan_phy_supported {
-	u32 channels[IEEE802154_MAX_PAGE + 1],
-	    cca_modes, cca_opts, iftypes;
+	struct phy_page page[IEEE802154_MAX_PAGE + 1];
+	u32 cca_modes, cca_opts, iftypes;
 	enum nl802154_supported_bool_states lbt;
 	u8 min_minbe, max_minbe, min_maxbe, max_maxbe,
 	   min_csma_backoffs, max_csma_backoffs;

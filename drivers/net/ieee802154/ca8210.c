@@ -2962,7 +2962,8 @@ static const s32 ca8210_ed_levels[CA8210_MAX_ED_LEVELS] = {
 static void ca8210_hw_setup(struct ieee802154_hw *ca8210_hw)
 {
 	/* Support channels 11-26 */
-	ca8210_hw->phy->supported.channels[0] = CA8210_VALID_CHANNELS;
+	ca8210_hw->phy->supported.page[0].nchunks = 1;
+	ca8210_hw->phy->supported.page[0].chunk[0].channels = CA8210_VALID_CHANNELS;
 	ca8210_hw->phy->supported.tx_powers_size = CA8210_MAX_TX_POWERS;
 	ca8210_hw->phy->supported.tx_powers = ca8210_tx_powers;
 	ca8210_hw->phy->supported.cca_ed_levels_size = CA8210_MAX_ED_LEVELS;
