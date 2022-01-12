@@ -16,6 +16,7 @@
 #include "gt/intel_gt_requests.h"
 
 #include "i915_trace.h"
+#include "intel_vtd.h"
 
 static bool swap_available(void)
 {

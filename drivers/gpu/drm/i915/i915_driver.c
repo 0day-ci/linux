@@ -91,6 +91,7 @@
 #include "intel_pcode.h"
 #include "intel_pm.h"
 #include "intel_region_ttm.h"
+#include "intel_vtd.h"
 #include "vlv_suspend.h"
 
 static const struct drm_driver i915_drm_driver;
@@ -743,12 +744,6 @@ static void i915_driver_unregister(struct drm_i915_private *dev_priv)
 	drm_dev_unplug(&dev_priv->drm);
 
 	i915_gem_driver_unregister(dev_priv);
-}
-
-void
-i915_print_iommu_status(struct drm_i915_private *i915, struct drm_printer *p)
-{
-	drm_printf(p, "iommu: %s\n", enableddisabled(intel_vtd_active(i915)));
 }
 
 static void i915_welcome_messages(struct drm_i915_private *dev_priv)

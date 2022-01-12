@@ -15,6 +15,7 @@
 #include "i915_drv.h"
 #include "i915_gem_stolen.h"
 #include "i915_vgpu.h"
+#include "intel_vtd.h"
 
 /*
  * The BIOS typically reserves some of the system's memory for the exclusive

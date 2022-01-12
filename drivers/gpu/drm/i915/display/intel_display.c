@@ -75,6 +75,7 @@
 #include "g4x_dp.h"
 #include "g4x_hdmi.h"
 #include "i915_drv.h"
+#include "i9xx_plane.h"
 #include "icl_dsi.h"
 #include "intel_acpi.h"
 #include "intel_atomic.h"
@@ -109,12 +110,12 @@
 #include "intel_sprite.h"
 #include "intel_tc.h"
 #include "intel_vga.h"
-#include "i9xx_plane.h"
+#include "intel_vtd.h"
 #include "skl_scaler.h"
 #include "skl_universal_plane.h"
+#include "vlv_dsi.h"
 #include "vlv_dsi_pll.h"
 #include "vlv_sideband.h"
-#include "vlv_dsi.h"
 
 static void intel_set_transcoder_timings(const struct intel_crtc_state *crtc_state);
 static void intel_set_pipe_src_size(const struct intel_crtc_state *crtc_state);

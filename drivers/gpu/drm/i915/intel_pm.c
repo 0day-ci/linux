@@ -51,6 +51,7 @@
 #include "i915_irq.h"
 #include "intel_pcode.h"
 #include "intel_pm.h"
+#include "intel_vtd.h"
 #include "vlv_sideband.h"
 #include "../../../platform/x86/intel_ips.h"
 

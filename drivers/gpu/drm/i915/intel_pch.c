@@ -5,6 +5,7 @@
 
 #include "i915_drv.h"
 #include "intel_pch.h"
+#include "intel_vtd.h"
 
 /* Map PCH device id to PCH type, or PCH_NONE if unknown. */
 static enum intel_pch

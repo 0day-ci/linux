@@ -27,8 +27,9 @@
 
 #include "display/intel_cdclk.h"
 #include "display/intel_de.h"
-#include "intel_device_info.h"
 #include "i915_drv.h"
+#include "intel_device_info.h"
+#include "intel_vtd.h"
 
 #define PLATFORM_NAME(x) [INTEL_##x] = #x
 static const char * const platform_names[] = {

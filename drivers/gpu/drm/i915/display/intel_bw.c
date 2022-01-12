@@ -11,6 +11,7 @@
 #include "intel_display_types.h"
 #include "intel_pcode.h"
 #include "intel_pm.h"
+#include "intel_vtd.h"
 
 /* Parameters for Qclk Geyserville (QGV) */
 struct intel_qgv_point {

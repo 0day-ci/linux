@@ -54,6 +54,7 @@ i915-y += i915_driver.o \
 	  intel_sbi.o \
 	  intel_step.o \
 	  intel_uncore.o \
+	  intel_vtd.o \
 	  intel_wakeref.o \
 	  vlv_sideband.o \
 	  vlv_suspend.o
