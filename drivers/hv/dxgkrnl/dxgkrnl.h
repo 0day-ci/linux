@@ -100,8 +100,8 @@ struct dxgpagingqueue {
  * a message from host.
  */
 enum dxghosteventtype {
-	dxghostevent_cpu_event,
-	dxghostevent_dma_fence
+	dxghostevent_cpu_event = 1,
+	dxghostevent_dma_fence = 2
 };
 
 struct dxghostevent {
