@@ -113,6 +113,99 @@ ieee802154_alloc_hw(size_t priv_data_len, const struct ieee802154_ops *ops)
 }
 EXPORT_SYMBOL(ieee802154_alloc_hw);
 
+void ieee802154_set_symbol_duration(struct wpan_phy *phy)
+{
+	struct phy_page *page = &phy->supported.page[phy->current_page];
+	struct phy_channels *chan;
+	unsigned int chunk;
+	u32 duration = 0;
+
+	for (chunk = 0; chunk < page->nchunks; chunk++) {
+		if (page->chunk[chunk].channels & phy->current_channel)
+			break;
+	}
+
+	if (chunk == page->nchunks)
+		goto set_duration;
+
+	chan = &page->chunk[chunk];
+	switch (chan->protocol) {
+	case IEEE802154_BPSK_PHY:
+		switch (chan->band) {
+		case IEEE802154_868_MHZ_BAND:
+			/* 868 MHz BPSK	802.15.4-2003: 20 ksym/s */
+			duration = 50 * 1000;
+			break;
+		case IEEE802154_915_MHZ_BAND:
+			/* 915 MHz BPSK	802.15.4-2003: 40 ksym/s */
+			duration = 25 * 1000;
+			break;
+		default:
+			break;
+		}
+		break;
+	case IEEE802154_OQPSK_PHY:
+		switch (chan->band) {
+		case IEEE802154_868_MHZ_BAND:
+			/* 868 MHz O-QPSK 802.15.4-2006: 25 ksym/s */
+			duration = 40 * 1000;
+			break;
+		case IEEE802154_915_MHZ_BAND:
+		case IEEE802154_2400_MHZ_BAND:
+			/* 915/2400 MHz O-QPSK 802.15.4-2006: 62.5 ksym/s */
+			duration = 16 * 1000;
+			break;
+		default:
+			break;
+		}
+		break;
+	case IEEE802154_CSS_PHY:
+		switch (chan->band) {
+		case IEEE802154_2400_MHZ_BAND:
+			/* 2.4 GHz CSS 802.15.4a-2007: 1/6 Msym/s */
+			duration = 6 * 1000;
+			break;
+		default:
+			break;
+		}
+		break;
+	case IEEE802154_HRP_UWB_PHY:
+		switch (chan->band) {
+		case IEEE802154_250_750_MHZ_BAND:
+		case IEEE802154_3100_4800_MHZ_BAND:
+		case IEEE802154_6000_10600_MHZ_BAND:
+			break;
+		default:
+			goto set_duration;
+		}
+
+		/* UWB 802.15.4a-2007: 993.6 or 1017.6 or 3974.4 ns */
+		switch (chan->prf) {
+		case IEEE802154_16100KHZ_MEAN_PRF:
+			duration = 994;
+			break;
+		case IEEE802154_4030KHZ_MEAN_PRF:
+			duration = 3974;
+			break;
+		case IEEE802154_62890KHZ_MEAN_PRF:
+			duration = 1018;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+set_duration:
+	if (!duration)
+		pr_debug("Unknown PHY symbol duration, the driver should be fixed\n");
+	else
+		phy->symbol_duration = duration;
+}
+EXPORT_SYMBOL(ieee802154_set_symbol_duration);
+
 void ieee802154_free_hw(struct ieee802154_hw *hw)
 {
 	struct ieee802154_local *local = hw_to_local(hw);
