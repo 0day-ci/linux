@@ -25,6 +25,7 @@
 #include "intel_rps.h"
 #include "intel_uncore.h"
 #include "shmem_utils.h"
+#include "sysfs_gt.h"
 #include "pxp/intel_pxp.h"
 
 static void
@@ -453,6 +454,7 @@ void intel_gt_driver_register(struct intel_gt *gt)
 	intel_rps_driver_register(&gt->rps);
 
 	intel_gt_debugfs_register(gt);
+	intel_gt_sysfs_register(gt);
 }
 
 static int intel_gt_init_scratch(struct intel_gt *gt, unsigned int size)
