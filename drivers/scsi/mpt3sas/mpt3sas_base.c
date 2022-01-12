@@ -5715,6 +5715,7 @@ _base_release_memory_pools(struct MPT3SAS_ADAPTER *ioc)
 						ct->chain_buffer_dma);
 			}
 			kfree(ioc->chain_lookup[i].chains_per_smid);
+			cond_resched();
 		}
 		dma_pool_destroy(ioc->chain_dma_pool);
 		kfree(ioc->chain_lookup);
