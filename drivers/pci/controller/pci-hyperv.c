@@ -701,7 +701,7 @@ static int hv_pci_vec_alloc_device_irq(struct irq_domain *domain,
 				       irq_hw_number_t *hwirq)
 {
 	struct hv_pci_chip_data *chip_data = domain->host_data;
-	unsigned int index;
+	int index;
 
 	/* Find and allocate region from the SPI bitmap */
 	mutex_lock(&chip_data->map_lock);
