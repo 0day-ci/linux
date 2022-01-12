@@ -152,7 +152,6 @@ config SUN3
 config VIRT
 	bool "Virtual M68k Machine support"
 	depends on MMU
-	select LEGACY_TIMER_TICK
 	select M68040
 	select MMU_MOTOROLA if MMU
 	select GOLDFISH
