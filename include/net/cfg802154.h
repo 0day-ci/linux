@@ -48,6 +48,24 @@ struct ieee802154_addr {
 	};
 };
 
+/**
+ * struct ieee802154_pan_desc - PAN descriptor information
+ * @coord: PAN ID and coordinator address
+ * @page: page this PAN is on
+ * @channel: channel this PAN is on
+ * @superframe_spec: SuperFrame specification as received
+ * @link_quality: link quality indicator at which the beacon was received
+ * @gts_permit: the PAN coordinator accepts GTS requests
+ */
+struct ieee802154_pan_desc {
+	struct ieee802154_addr *coord;
+	u8 page;
+	u8 channel;
+	u16 superframe_spec;
+	u8 link_quality;
+	bool gts_permit;
+};
+
 struct cfg802154_ops {
 	struct net_device * (*add_virtual_intf_deprecated)(struct wpan_phy *wpan_phy,
 							   const char *name,
@@ -466,5 +484,18 @@ static inline const char *wpan_phy_name(struct wpan_phy *phy)
 }
 
 void ieee802154_set_symbol_duration(struct wpan_phy *phy);
+
+/**
+ * cfg802154_record_pan - Advertize a new PAN following a beacon's reception
+ * @wpan_phy: PHY receiving the beacon
+ * @pan: PAN descriptor
+ *
+ * Tells the internal pan management layer to either register this PAN if it is
+ * new or at least update its entry if already discovered.
+ *
+ * Returns 0 on success, a negative error code otherwise.
+ */
+int cfg802154_record_pan(struct wpan_phy *wpan_phy,
+			 struct ieee802154_pan_desc *pan);
 
 #endif /* __NET_CFG802154_H */

@@ -115,6 +115,8 @@ wpan_phy_new(const struct cfg802154_ops *ops, size_t priv_size)
 		kfree(rdev);
 		return NULL;
 	}
+	spin_lock_init(&rdev->pan_lock);
+	INIT_LIST_HEAD(&rdev->pan_list);
 
 	/* atomic_inc_return makes it start at 1, make it start at 0 */
 	rdev->wpan_phy_idx--;
