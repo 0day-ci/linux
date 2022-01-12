@@ -1423,14 +1423,16 @@ void kvm_tdp_mmu_zap_collapsible_sptes(struct kvm *kvm,
 /*
  * Removes write access on the last level SPTE mapping this GFN and unsets the
  * MMU-writable bit to ensure future writes continue to be intercepted.
- * Returns true if an SPTE was set and a TLB flush is needed.
+ *
+ * Returns true if a TLB flush is needed to ensure no CPU has a writable
+ * version of the SPTE in its TLB.
  */
 static bool write_protect_gfn(struct kvm *kvm, struct kvm_mmu_page *root,
 			      gfn_t gfn, int min_level)
 {
 	struct tdp_iter iter;
 	u64 new_spte;
-	bool spte_set = false;
+	bool flush = false;
 
 	BUG_ON(min_level > KVM_MAX_HUGEPAGE_LEVEL);
 
@@ -1442,19 +1444,30 @@ static bool write_protect_gfn(struct kvm *kvm, struct kvm_mmu_page *root,
 		    !is_last_spte(iter.old_spte, iter.level))
 			continue;
 
-		if (!is_writable_pte(iter.old_spte))
-			break;
-
 		new_spte = iter.old_spte &
 			~(PT_WRITABLE_MASK | shadow_mmu_writable_mask);
 
 		tdp_mmu_set_spte(kvm, &iter, new_spte);
-		spte_set = true;
+
+		/*
+		 * The TLB flush can be skipped if the old SPTE cannot be
+		 * locklessly be made writable, which implies it is already
+		 * write-protected due to being !MMU-writable or !Host-writable.
+		 * This guarantees no CPU currently has a writable version of
+		 * this SPTE in its TLB.
+		 *
+		 * Otherwise the old SPTE was either not write-protected or was
+		 * write-protected but for dirty logging (which does not flush
+		 * TLBs before dropping the MMU lock), so a TLB flush is
+		 * required.
+		 */
+		if (spte_can_locklessly_be_made_writable(iter.old_spte))
+			flush = true;
 	}
 
 	rcu_read_unlock();
 
-	return spte_set;
+	return flush;
 }
 
 /*
