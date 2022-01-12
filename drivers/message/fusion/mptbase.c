@@ -4327,14 +4327,14 @@ initChainBuffers(MPT_ADAPTER *ioc)
 		sz = ioc->req_depth * sizeof(int);
 		mem = kmalloc(sz, GFP_ATOMIC);
 		if (mem == NULL)
-			return -1;
+			return -ENOMEM;
 
 		ioc->ReqToChain = (int *) mem;
 		dinitprintk(ioc, printk(MYIOC_s_DEBUG_FMT "ReqToChain alloc  @ %p, sz=%d bytes\n",
 			 	ioc->name, mem, sz));
 		mem = kmalloc(sz, GFP_ATOMIC);
 		if (mem == NULL)
-			return -1;
+			return -ENOMEM;
 
 		ioc->RequestNB = (int *) mem;
 		dinitprintk(ioc, printk(MYIOC_s_DEBUG_FMT "RequestNB alloc  @ %p, sz=%d bytes\n",
@@ -4401,7 +4401,7 @@ initChainBuffers(MPT_ADAPTER *ioc)
 	if (ioc->ChainToChain == NULL) {
 		mem = kmalloc(sz, GFP_ATOMIC);
 		if (mem == NULL)
-			return -1;
+			return -ENOMEM;
 
 		ioc->ChainToChain = (int *) mem;
 		dinitprintk(ioc, printk(MYIOC_s_DEBUG_FMT "ChainToChain alloc @ %p, sz=%d bytes\n",
@@ -4440,7 +4440,7 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 
 	if (ioc->reply_frames == NULL) {
 		if ( (num_chain = initChainBuffers(ioc)) < 0)
-			return -1;
+			return -ENOMEM;
 		/*
 		 * 1078 errata workaround for the 36GB limitation
 		 */
