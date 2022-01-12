@@ -856,6 +856,18 @@ static inline int d_revalidate(struct dentry *dentry, unsigned int flags)
 		return 1;
 }
 
+static inline bool nd_reset_root_and_unlazy(struct nameidata *nd)
+{
+	/*
+	 * We don't want to zero nd->root for scoped-lookups or
+	 * externally-managed nd->root.
+	 */
+	if (!(nd->state & ND_ROOT_PRESET))
+		if (!(nd->flags & LOOKUP_IS_SCOPED))
+			nd->root.mnt = NULL;
+	return try_to_unlazy(nd);
+}
+
 /**
  * complete_walk - successful completion of path walk
  * @nd:  pointer nameidata
@@ -872,15 +884,8 @@ static int complete_walk(struct nameidata *nd)
 	int status;
 
 	if (nd->flags & LOOKUP_RCU) {
-		/*
-		 * We don't want to zero nd->root for scoped-lookups or
-		 * externally-managed nd->root.
-		 */
-		if (!(nd->state & ND_ROOT_PRESET))
-			if (!(nd->flags & LOOKUP_IS_SCOPED))
-				nd->root.mnt = NULL;
 		nd->flags &= ~LOOKUP_CACHED;
-		if (!try_to_unlazy(nd))
+		if (!nd_reset_root_and_unlazy(nd))
 			return -ECHILD;
 	}
 
@@ -3326,7 +3331,7 @@ static const char *open_last_lookups(struct nameidata *nd,
 	} else {
 		/* create side of things */
 		if (nd->flags & LOOKUP_RCU) {
-			if (!try_to_unlazy(nd))
+			if (!nd_reset_root_and_unlazy(nd))
 				return ERR_PTR(-ECHILD);
 		}
 		audit_inode(nd->name, dir, AUDIT_INODE_PARENT);
