@@ -57,6 +57,14 @@ struct ieee802154_local {
 	struct ieee802154_sub_if_data __rcu *scan_sdata;
 	struct delayed_work scan_work;
 
+	/* Beacons handling */
+	bool ongoing_beacons_request;
+	struct mutex beacons_lock;
+	unsigned int beacons_interval;
+	struct delayed_work beacons_work;
+	struct ieee802154_sub_if_data __rcu *beacons_sdata;
+	struct ieee802154_beacon_frame beacon;
+
 	bool started;
 	bool suspended;
 
@@ -188,6 +196,11 @@ static inline bool mac802154_scan_is_ongoing(struct ieee802154_local *local)
 {
 	return atomic_read(&local->scanning);
 }
+
+void mac802154_beacons_work(struct work_struct *work);
+int mac802154_send_beacons_locked(struct ieee802154_sub_if_data *sdata,
+				  struct cfg802154_beacons_request *request);
+int mac802154_stop_beacons_locked(struct ieee802154_local *local);
 
 /* interface handling */
 int ieee802154_iface_init(void);

@@ -17,6 +17,13 @@
 #include "driver-ops.h"
 #include "../ieee802154/nl802154.h"
 
+#define IEEE802154_BEACON_MHR_SZ 13
+#define IEEE802154_BEACON_PL_SZ 4
+#define IEEE802154_CRC_SZ 2
+#define IEEE802154_BEACON_SKB_SZ (IEEE802154_BEACON_MHR_SZ + \
+				  IEEE802154_BEACON_PL_SZ + \
+				  IEEE802154_CRC_SZ)
+
 static bool mac802154_check_promiscuous(struct ieee802154_local *local)
 {
 	struct ieee802154_sub_if_data *sdata;
@@ -102,6 +109,86 @@ static unsigned int mac802154_scan_get_channel_time(u8 duration_order,
 
 	return usecs_to_jiffies(base_super_frame_duration *
 				(BIT(duration_order) + 1));
+}
+
+int mac802154_send_beacons_locked(struct ieee802154_sub_if_data *sdata,
+				  struct cfg802154_beacons_request *request)
+{
+	struct ieee802154_local *local = sdata->local;
+
+	lockdep_assert_held(&local->beacons_lock);
+
+	if (local->ongoing_beacons_request)
+		return -EBUSY;
+
+	local->ongoing_beacons_request = true;
+
+	memset(&local->beacon, 0, sizeof(local->beacon));
+	local->beacon.mhr.fc.type = IEEE802154_BEACON_FRAME;
+	local->beacon.mhr.fc.security_enabled = 0;
+	local->beacon.mhr.fc.frame_pending = 0;
+	local->beacon.mhr.fc.ack_request = 0;
+	local->beacon.mhr.fc.intra_pan = 0;
+	local->beacon.mhr.fc.dest_addr_mode = IEEE802154_NO_ADDRESSING;
+	local->beacon.mhr.fc.version = IEEE802154_2003_STD;
+	local->beacon.mhr.fc.source_addr_mode = IEEE802154_EXTENDED_ADDRESSING;
+	atomic_set(&request->wpan_dev->bsn, -1);
+	local->beacon.mhr.source.mode = IEEE802154_ADDR_LONG;
+	local->beacon.mhr.source.pan_id = cpu_to_le16(request->wpan_dev->pan_id);
+	local->beacon.mhr.source.extended_addr = cpu_to_le64(request->wpan_dev->extended_addr);
+	local->beacon.mac_pl.beacon_order = request->interval;
+	local->beacon.mac_pl.superframe_order = request->interval;
+	local->beacon.mac_pl.final_cap_slot = 0xf;
+	local->beacon.mac_pl.battery_life_ext = 0;
+	local->beacon.mac_pl.pan_coordinator = 1;
+	local->beacon.mac_pl.assoc_permit = 1;
+
+	rcu_assign_pointer(local->beacons_sdata, sdata);
+
+	/* Start the beacon work */
+	local->beacons_interval =
+		mac802154_scan_get_channel_time(request->interval,
+						request->wpan_phy->symbol_duration);
+	ieee802154_queue_delayed_work(&local->hw, &local->beacons_work, 0);
+
+	return 0;
+}
+
+int mac802154_stop_beacons_locked(struct ieee802154_local *local)
+{
+	lockdep_assert_held(&local->beacons_lock);
+
+	if (!local->ongoing_beacons_request)
+		return -ESRCH;
+
+	local->ongoing_beacons_request = false;
+	cancel_delayed_work(&local->beacons_work);
+
+	return 0;
+}
+
+static int mac802154_scan_send_beacon_locked(struct ieee802154_local *local,
+					     struct wpan_dev *wpan_dev)
+{
+	struct sk_buff *skb;
+	int ret;
+
+	lockdep_assert_held(&local->beacons_lock);
+
+	/* Update the sequence number */
+	local->beacon.mhr.seq = atomic_inc_return(&wpan_dev->bsn);
+
+	skb = alloc_skb(IEEE802154_BEACON_SKB_SZ, GFP_KERNEL);
+	if (!skb)
+		return -ENOBUFS;
+
+	ret = ieee802154_beacon_push(skb, &local->beacon);
+	if (ret) {
+		kfree_skb(skb);
+		return ret;
+	}
+
+	return drv_xmit_async(local, skb);
 }
 
 void mac802154_scan_work(struct work_struct *work)
@@ -203,6 +290,38 @@ int mac802154_trigger_scan_locked(struct ieee802154_sub_if_data *sdata,
 	ieee802154_queue_delayed_work(&local->hw, &local->scan_work, 0);
 
 	return 0;
+}
+
+void mac802154_beacons_work(struct work_struct *work)
+{
+	struct ieee802154_local *local =
+		container_of(work, struct ieee802154_local, beacons_work.work);
+	struct ieee802154_sub_if_data *sdata;
+	struct wpan_dev *wpan_dev;
+	int ret;
+
+	mutex_lock(&local->beacons_lock);
+
+	if (!local->ongoing_beacons_request)
+		goto unlock_mutex;
+
+	if (local->suspended)
+		goto queue_work;
+
+	sdata = rcu_dereference_protected(local->beacons_sdata,
+					  lockdep_is_held(&local->beacons_lock));
+	wpan_dev = &sdata->wpan_dev;
+
+	ret = mac802154_scan_send_beacon_locked(local, wpan_dev);
+	if (ret)
+		pr_err("Error when transmitting beacon (%d)\n", ret);
+
+queue_work:
+	ieee802154_queue_delayed_work(&local->hw, &local->beacons_work,
+				      local->beacons_interval);
+
+unlock_mutex:
+	mutex_unlock(&local->beacons_lock);
 }
 
 int mac802154_scan_process_beacon(struct ieee802154_local *local,

@@ -109,8 +109,10 @@ int ieee802154_change_channel(struct wpan_phy *wpan_phy, u8 page, u8 channel)
 
 	ASSERT_RTNL();
 
-	/* Refuse to change channels during a scanning operation */
-	if (mac802154_scan_is_ongoing(local))
+	/* Refuse to change channels during a scanning operation or when a
+	 * beacons request is ongoing.
+	 */
+	if (mac802154_scan_is_ongoing(local) || local->ongoing_beacons_request)
 		return -EBUSY;
 
 	ret = drv_set_channel(local, page, channel);
@@ -301,6 +303,39 @@ static int mac802154_abort_scan(struct wpan_phy *wpan_phy,
 	mutex_lock(&local->scan_lock);
 	ret = mac802154_abort_scan_locked(local);
 	mutex_unlock(&local->scan_lock);
+
+	return ret;
+}
+
+static int mac802154_send_beacons(struct wpan_phy *wpan_phy,
+				  struct cfg802154_beacons_request *request)
+{
+	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
+	struct ieee802154_sub_if_data *sdata;
+	int ret;
+
+	sdata = IEEE802154_WPAN_DEV_TO_SUB_IF(request->wpan_dev);
+
+	ASSERT_RTNL();
+
+	mutex_lock(&local->beacons_lock);
+	ret = mac802154_send_beacons_locked(sdata, request);
+	mutex_unlock(&local->beacons_lock);
+
+	return ret;
+}
+
+static int mac802154_stop_beacons(struct wpan_phy *wpan_phy,
+				  struct wpan_dev *wpan_dev)
+{
+	struct ieee802154_local *local = wpan_phy_priv(wpan_phy);
+	int ret;
+
+	ASSERT_RTNL();
+
+	mutex_lock(&local->beacons_lock);
+	ret = mac802154_stop_beacons_locked(local);
+	mutex_unlock(&local->beacons_lock);
 
 	return ret;
 }
@@ -514,6 +549,8 @@ const struct cfg802154_ops mac802154_config_ops = {
 	.set_ackreq_default = ieee802154_set_ackreq_default,
 	.trigger_scan = mac802154_trigger_scan,
 	.abort_scan = mac802154_abort_scan,
+	.send_beacons = mac802154_send_beacons,
+	.stop_beacons = mac802154_stop_beacons,
 #ifdef CONFIG_IEEE802154_NL802154_EXPERIMENTAL
 	.get_llsec_table = ieee802154_get_llsec_table,
 	.lock_llsec_table = ieee802154_lock_llsec_table,
