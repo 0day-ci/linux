@@ -5825,15 +5825,26 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 	}
 
 	/*
-	 * We can flush all the TLBs out of the mmu lock without TLB
-	 * corruption since we just change the spte from writable to
-	 * readonly so that we only need to care the case of changing
-	 * spte from present to present (changing the spte from present
-	 * to nonpresent will flush all the TLBs immediately), in other
-	 * words, the only case we care is mmu_spte_update() where we
-	 * have checked Host-writable | MMU-writable instead of
-	 * PT_WRITABLE_MASK, that means it does not depend on PT_WRITABLE_MASK
-	 * anymore.
+	 * It is safe to flush TLBs outside of the MMU lock since SPTEs are only
+	 * being changed from writable to read-only (i.e. the mapping to host
+	 * PFNs is not changing). All we care about is that CPUs start using the
+	 * read-only mappings from this point forward to ensure the dirty bitmap
+	 * gets updated, but that does not need to run under the MMU lock.
+	 *
+	 * Note that there are other reasons why SPTEs can be write-protected
+	 * besides dirty logging: (1) to intercept guest page table
+	 * modifications when doing shadow paging and (2) to protecting guest
+	 * memory that is not host-writable. Both of these usecases require
+	 * flushing the TLB under the MMU lock to ensure CPUs are not running
+	 * with writable SPTEs in their TLB. The tricky part is knowing when it
+	 * is safe to skip a TLB flush if an SPTE is already write-protected,
+	 * since it could have been write-protected for dirty-logging which does
+	 * not flush under the lock.
+	 *
+	 * To handle this each SPTE has an MMU-writable bit and a Host-writable
+	 * bit (KVM-specific bits that are not used by hardware). These bits
+	 * allow KVM to deduce *why* a given SPTE is currently write-protected,
+	 * so that it knows when it needs to flush TLBs under the MMU lock.
 	 */
 	if (flush)
 		kvm_arch_flush_remote_tlbs_memslot(kvm, memslot);
