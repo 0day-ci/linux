@@ -32,12 +32,20 @@
 
 u32 rcar_du_group_read(struct rcar_du_group *rgrp, u32 reg)
 {
+	struct rcar_du_device *rcdu = rgrp->dev;
+
+	if (!rcar_du_has(rcdu, RCAR_DU_FEATURE_GROUP))
+		return 0;
+
 	return rcar_du_read(rgrp->dev, rgrp->mmio_offset + reg);
 }
 
 void rcar_du_group_write(struct rcar_du_group *rgrp, u32 reg, u32 data)
 {
-	rcar_du_write(rgrp->dev, rgrp->mmio_offset + reg, data);
+	struct rcar_du_device *rcdu = rgrp->dev;
+
+	if (rcar_du_has(rcdu, RCAR_DU_FEATURE_GROUP))
+		rcar_du_write(rgrp->dev, rgrp->mmio_offset + reg, data);
 }
 
 static void rcar_du_group_setup_pins(struct rcar_du_group *rgrp)
