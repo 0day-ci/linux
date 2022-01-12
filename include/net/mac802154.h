@@ -204,6 +204,15 @@ enum ieee802154_hw_flags {
  *
  * set_promiscuous_mode
  *	  Enables or disable promiscuous mode.
+ *
+ * enter_scan_mode
+ *	  Enters the scan mode, may then refuse certain operations.
+ *	  Can be NULL, if the driver has no internal configuration to do.
+ *	  Returns either zero, or negative errno.
+ *
+ * exit_scan_mode
+ *	  Exits the scan mode and returns to a fully functioning state.
+ *	  Should only be provided if ->enter_scan_mode() is populated.
  */
 struct ieee802154_ops {
 	struct module	*owner;
@@ -230,6 +239,9 @@ struct ieee802154_ops {
 					     s8 retries);
 	int             (*set_promiscuous_mode)(struct ieee802154_hw *hw,
 						const bool on);
+	int		(*enter_scan_mode)(struct ieee802154_hw *hw,
+					   struct cfg802154_scan_request *request);
+	void		(*exit_scan_mode)(struct ieee802154_hw *hw);
 };
 
 /**

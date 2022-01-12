@@ -103,6 +103,8 @@ int mac802154_abort_scan_locked(struct ieee802154_local *local)
 
 	cancel_delayed_work(&local->scan_work);
 
+	drv_exit_scan_mode(local);
+
 	return mac802154_end_of_scan(local);
 }
 
@@ -326,6 +328,11 @@ int mac802154_trigger_scan_locked(struct ieee802154_sub_if_data *sdata,
 		get_random_bytes(&local->scan_addr, sizeof(local->scan_addr));
 	else
 		local->scan_addr = cpu_to_le64(get_unaligned_be64(sdata->dev->dev_addr));
+
+	/* Let the drivers know  about the starting scanning operation */
+	ret = drv_enter_scan_mode(local, request);
+	if (ret)
+		return ret;
 
 	if (request->type == NL802154_SCAN_ACTIVE)
 		mac802154_scan_prepare_beacon_req(local);

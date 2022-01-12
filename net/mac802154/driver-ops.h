@@ -282,4 +282,33 @@ drv_set_promiscuous_mode(struct ieee802154_local *local, bool on)
 	return ret;
 }
 
+static inline int drv_enter_scan_mode(struct ieee802154_local *local,
+				      struct cfg802154_scan_request *request)
+{
+	int ret;
+
+	might_sleep();
+
+	if (!local->ops->enter_scan_mode || !local->ops->exit_scan_mode)
+		return 0;
+
+	trace_802154_drv_enter_scan_mode(local, request);
+	ret = local->ops->enter_scan_mode(&local->hw, request);
+	trace_802154_drv_return_int(local, ret);
+
+	return ret;
+}
+
+static inline void drv_exit_scan_mode(struct ieee802154_local *local)
+{
+	might_sleep();
+
+	if (!local->ops->enter_scan_mode || !local->ops->exit_scan_mode)
+		return;
+
+	trace_802154_drv_exit_scan_mode(local);
+	local->ops->exit_scan_mode(&local->hw);
+	trace_802154_drv_return_void(local);
+}
+
 #endif /* __MAC802154_DRIVER_OPS */
