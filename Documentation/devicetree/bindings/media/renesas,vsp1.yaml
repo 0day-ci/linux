@@ -19,6 +19,7 @@ properties:
     enum:
       - renesas,vsp1 # R-Car Gen2 and RZ/G1
       - renesas,vsp2 # R-Car Gen3 and RZ/G2
+      - renesas,vsp2-r9a07g044 # RZ/G2L and RZ/V2L
 
   reg:
     maxItems: 1
@@ -27,7 +28,8 @@ properties:
     maxItems: 1
 
   clocks:
-    maxItems: 1
+    minItems: 1
+    maxItems: 3
 
   power-domains:
     maxItems: 1
