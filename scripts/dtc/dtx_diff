@@ -62,7 +62,7 @@ Otherwise DTx is treated as a dts source file (aka .dts).
    may not work since \${ARCH} is part of the include path.  Two possible
    workarounds:
 
-      `basename $0` \\
+      diff -u \\
           <(ARCH=arch_of_dtx_1 `basename $0` DTx_1) \\
           <(ARCH=arch_of_dtx_2 `basename $0` DTx_2)
 
