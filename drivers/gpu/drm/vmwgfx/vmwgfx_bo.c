@@ -778,17 +778,13 @@ int vmw_dumb_create(struct drm_file *file_priv,
 {
 	struct vmw_private *dev_priv = vmw_priv(dev);
 	struct vmw_buffer_object *vbo;
-	int ret;
 
 	args->pitch = args->width * ((args->bpp + 7) / 8);
 	args->size = ALIGN(args->pitch * args->height, PAGE_SIZE);
 
-	ret = vmw_gem_object_create_with_handle(dev_priv, file_priv,
+	return vmw_gem_object_create_with_handle(dev_priv, file_priv,
 						args->size, &args->handle,
 						&vbo);
-
-	return ret;
-}
 
 /**
  * vmw_bo_swap_notify - swapout notify callback.
