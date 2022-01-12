@@ -48,6 +48,15 @@ struct ieee802154_local {
 
 	struct hrtimer ifs_timer;
 
+	/* Scanning */
+	struct mutex scan_lock;
+	atomic_t scanning;
+	__le64 scan_addr;
+	int scan_channel_idx;
+	struct cfg802154_scan_request __rcu *scan_req;
+	struct ieee802154_sub_if_data __rcu *scan_sdata;
+	struct delayed_work scan_work;
+
 	bool started;
 	bool suspended;
 
@@ -166,6 +175,19 @@ void mac802154_get_table(struct net_device *dev,
 void mac802154_unlock_table(struct net_device *dev);
 
 int mac802154_wpan_update_llsec(struct net_device *dev);
+
+/* scanning handling */
+void mac802154_scan_work(struct work_struct *work);
+int mac802154_trigger_scan_locked(struct ieee802154_sub_if_data *sdata,
+				  struct cfg802154_scan_request *request);
+int mac802154_abort_scan_locked(struct ieee802154_local *local);
+int mac802154_scan_process_beacon(struct ieee802154_local *local,
+				  struct sk_buff *skb);
+
+static inline bool mac802154_scan_is_ongoing(struct ieee802154_local *local)
+{
+	return atomic_read(&local->scanning);
+}
 
 /* interface handling */
 int ieee802154_iface_init(void);

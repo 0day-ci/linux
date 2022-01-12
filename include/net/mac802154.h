@@ -486,4 +486,18 @@ void ieee802154_stop_queue(struct ieee802154_hw *hw);
 void ieee802154_xmit_complete(struct ieee802154_hw *hw, struct sk_buff *skb,
 			      bool ifs_handling);
 
+/**
+ * ieee802154_queue_delayed_work - add work onto the mac802154 workqueue
+ *
+ * Drivers and mac802154 use this to queue delayed work onto the mac802154
+ * workqueue.
+ *
+ * @hw: the hardware struct for the interface we are adding work for
+ * @dwork: delayable work to queue onto the mac802154 workqueue
+ * @delay: number of jiffies to wait before queueing
+ */
+void ieee802154_queue_delayed_work(struct ieee802154_hw *hw,
+				   struct delayed_work *dwork,
+				   unsigned long delay);
+
 #endif /* NET_MAC802154_H */

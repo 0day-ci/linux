@@ -94,10 +94,15 @@ ieee802154_subif_frame(struct ieee802154_sub_if_data *sdata,
 
 	switch (mac_cb(skb)->type) {
 	case IEEE802154_FC_TYPE_BEACON:
-	case IEEE802154_FC_TYPE_ACK:
-	case IEEE802154_FC_TYPE_MAC_CMD:
+		if (mac802154_scan_is_ongoing(sdata->local)) {
+			rc = mac802154_scan_process_beacon(sdata->local, skb);
+			if (!rc)
+				goto success;
+		}
 		goto fail;
-
+	case IEEE802154_FC_TYPE_MAC_CMD:
+	case IEEE802154_FC_TYPE_ACK:
+		goto fail;
 	case IEEE802154_FC_TYPE_DATA:
 		return ieee802154_deliver_skb(skb);
 	default:
@@ -109,6 +114,10 @@ ieee802154_subif_frame(struct ieee802154_sub_if_data *sdata,
 fail:
 	kfree_skb(skb);
 	return NET_RX_DROP;
+
+success:
+	kfree_skb(skb);
+	return NET_RX_SUCCESS;
 }
 
 static void
@@ -268,10 +277,12 @@ void ieee802154_rx(struct ieee802154_local *local, struct sk_buff *skb)
 
 	ieee802154_monitors_rx(local, skb);
 
-	/* Check if transceiver doesn't validate the checksum.
-	 * If not we validate the checksum here.
+	/* Check if the transceiver doesn't validate the checksum, or if the
+	 * check might have been disabled like during a scan. In these cases,
+	 * we validate the checksum here.
 	 */
-	if (local->hw.flags & IEEE802154_HW_RX_DROP_BAD_CKSUM) {
+	if (local->hw.flags & IEEE802154_HW_RX_DROP_BAD_CKSUM ||
+	    mac802154_scan_is_ongoing(local)) {
 		crc = crc_ccitt(0, skb->data, skb->len);
 		if (crc) {
 			rcu_read_unlock();

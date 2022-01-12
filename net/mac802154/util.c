@@ -94,3 +94,29 @@ void ieee802154_stop_device(struct ieee802154_local *local)
 	hrtimer_cancel(&local->ifs_timer);
 	drv_stop(local);
 }
+
+/* Nothing should have been stuffed into the workqueue during
+ * the suspend->resume cycle.
+ */
+static bool ieee802154_can_queue_work(struct ieee802154_local *local)
+{
+	if (local->suspended) {
+		pr_warn("queueing ieee802154 work while suspended\n");
+		return false;
+	}
+
+	return true;
+}
+
+void ieee802154_queue_delayed_work(struct ieee802154_hw *hw,
+				   struct delayed_work *dwork,
+				   unsigned long delay)
+{
+	struct ieee802154_local *local = hw_to_local(hw);
+
+	if (!ieee802154_can_queue_work(local))
+		return;
+
+	queue_delayed_work(local->workqueue, dwork, delay);
+}
+EXPORT_SYMBOL(ieee802154_queue_delayed_work);

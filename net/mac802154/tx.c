@@ -54,6 +54,9 @@ ieee802154_tx(struct ieee802154_local *local, struct sk_buff *skb)
 	struct net_device *dev = skb->dev;
 	int ret;
 
+	if (unlikely(mac802154_scan_is_ongoing(local)))
+		return NETDEV_TX_BUSY;
+
 	if (!(local->hw.flags & IEEE802154_HW_TX_OMIT_CKSUM)) {
 		struct sk_buff *nskb;
 		u16 crc;
