@@ -213,6 +213,17 @@ enum ieee802154_hw_flags {
  * exit_scan_mode
  *	  Exits the scan mode and returns to a fully functioning state.
  *	  Should only be provided if ->enter_scan_mode() is populated.
+ *
+ * enter_beacons_mode
+ *	  Enters the beacons mode, the stack will either send beacons at a fixed
+ *	  rate or upon request depending on the configuration.
+ *	  Can be NULL, if the driver has no internal configuration to do.
+ *	  Returns either zero, or negative errno.
+ *
+ * exit_beacons_mode
+ *	  Exits the beacons mode and returns to a fully functioning state.
+ *	  Should only be provided if ->enter_beacons_mode() is populated.
+ *	  Returns either zero, or negative errno.
  */
 struct ieee802154_ops {
 	struct module	*owner;
@@ -242,6 +253,9 @@ struct ieee802154_ops {
 	int		(*enter_scan_mode)(struct ieee802154_hw *hw,
 					   struct cfg802154_scan_request *request);
 	void		(*exit_scan_mode)(struct ieee802154_hw *hw);
+	int		(*enter_beacons_mode)(struct ieee802154_hw *hw,
+					      struct cfg802154_beacons_request *request);
+	void		(*exit_beacons_mode)(struct ieee802154_hw *hw);
 };
 
 /**

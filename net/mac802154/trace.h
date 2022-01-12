@@ -292,6 +292,27 @@ DEFINE_EVENT(local_only_evt4, 802154_drv_exit_scan_mode,
 	TP_ARGS(local)
 );
 
+TRACE_EVENT(802154_drv_enter_beacons_mode,
+	TP_PROTO(struct ieee802154_local *local,
+		 struct cfg802154_beacons_request *request),
+	TP_ARGS(local, request),
+	TP_STRUCT__entry(
+		LOCAL_ENTRY
+		__field(u8, interval)
+	),
+	TP_fast_assign(
+		LOCAL_ASSIGN;
+		__entry->interval = request->interval;
+	),
+	TP_printk(LOCAL_PR_FMT ", send beacons at interval: %d",
+		  LOCAL_PR_ARG, __entry->interval)
+);
+
+DEFINE_EVENT(local_only_evt4, 802154_drv_exit_beacons_mode,
+	TP_PROTO(struct ieee802154_local *local),
+	TP_ARGS(local)
+);
+
 #endif /* !__MAC802154_DRIVER_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH

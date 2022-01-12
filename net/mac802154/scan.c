@@ -122,6 +122,7 @@ int mac802154_send_beacons_locked(struct ieee802154_sub_if_data *sdata,
 				  struct cfg802154_beacons_request *request)
 {
 	struct ieee802154_local *local = sdata->local;
+	int ret;
 
 	lockdep_assert_held(&local->beacons_lock);
 
@@ -129,6 +130,13 @@ int mac802154_send_beacons_locked(struct ieee802154_sub_if_data *sdata,
 		return -EBUSY;
 
 	local->ongoing_beacons_request = true;
+
+	/* Either let the hardware handle the beacons or handle them manually */
+	ret = drv_enter_beacons_mode(local, request);
+	if (ret) {
+		local->ongoing_beacons_request = false;
+		return ret;
+	}
 
 	memset(&local->beacon, 0, sizeof(local->beacon));
 	local->beacon.mhr.fc.type = IEEE802154_BEACON_FRAME;
@@ -178,6 +186,8 @@ int mac802154_stop_beacons_locked(struct ieee802154_local *local)
 
 	if (local->beacons_interval >= 0)
 		cancel_delayed_work(&local->beacons_work);
+
+	drv_exit_beacons_mode(local);
 
 	return 0;
 }

@@ -311,4 +311,33 @@ static inline void drv_exit_scan_mode(struct ieee802154_local *local)
 	trace_802154_drv_return_void(local);
 }
 
+static inline int drv_enter_beacons_mode(struct ieee802154_local *local,
+					 struct cfg802154_beacons_request *request)
+{
+	int ret;
+
+	might_sleep();
+
+	if (!local->ops->enter_beacons_mode || !local->ops->exit_beacons_mode)
+		return 0;
+
+	trace_802154_drv_enter_beacons_mode(local, request);
+	ret = local->ops->enter_beacons_mode(&local->hw, request);
+	trace_802154_drv_return_int(local, ret);
+
+	return ret;
+}
+
+static inline void drv_exit_beacons_mode(struct ieee802154_local *local)
+{
+	might_sleep();
+
+	if (!local->ops->enter_beacons_mode || !local->ops->exit_beacons_mode)
+		return;
+
+	trace_802154_drv_exit_beacons_mode(local);
+	local->ops->exit_beacons_mode(&local->hw);
+	trace_802154_drv_return_void(local);
+}
+
 #endif /* __MAC802154_DRIVER_OPS */
