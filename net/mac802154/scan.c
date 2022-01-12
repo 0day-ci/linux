@@ -142,13 +142,19 @@ int mac802154_send_beacons_locked(struct ieee802154_sub_if_data *sdata,
 	local->beacon.mhr.source.pan_id = cpu_to_le16(request->wpan_dev->pan_id);
 	local->beacon.mhr.source.extended_addr = cpu_to_le64(request->wpan_dev->extended_addr);
 	local->beacon.mac_pl.beacon_order = request->interval;
-	local->beacon.mac_pl.superframe_order = request->interval;
+	if (request->interval <= IEEE802154_MAX_SCAN_DURATION)
+		local->beacon.mac_pl.superframe_order = request->interval;
 	local->beacon.mac_pl.final_cap_slot = 0xf;
 	local->beacon.mac_pl.battery_life_ext = 0;
 	local->beacon.mac_pl.pan_coordinator = 1;
 	local->beacon.mac_pl.assoc_permit = 1;
 
 	rcu_assign_pointer(local->beacons_sdata, sdata);
+
+	if (request->interval == IEEE802154_ACTIVE_SCAN_DURATION) {
+		local->beacons_interval = -1;
+		return 0;
+	}
 
 	/* Start the beacon work */
 	local->beacons_interval =
@@ -167,7 +173,9 @@ int mac802154_stop_beacons_locked(struct ieee802154_local *local)
 		return -ESRCH;
 
 	local->ongoing_beacons_request = false;
-	cancel_delayed_work(&local->beacons_work);
+
+	if (local->beacons_interval >= 0)
+		cancel_delayed_work(&local->beacons_work);
 
 	return 0;
 }
@@ -363,8 +371,9 @@ void mac802154_beacons_work(struct work_struct *work)
 		pr_err("Error when transmitting beacon (%d)\n", ret);
 
 queue_work:
-	ieee802154_queue_delayed_work(&local->hw, &local->beacons_work,
-				      local->beacons_interval);
+	if (local->beacons_interval >= 0)
+		ieee802154_queue_delayed_work(&local->hw, &local->beacons_work,
+					      local->beacons_interval);
 
 unlock_mutex:
 	mutex_unlock(&local->beacons_lock);

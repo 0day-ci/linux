@@ -29,6 +29,11 @@ static int ieee802154_deliver_skb(struct sk_buff *skb)
 	return netif_receive_skb(skb);
 }
 
+static bool mac802154_should_answer_beacon_req(struct ieee802154_local *local)
+{
+	return local->ongoing_beacons_request && local->beacons_interval < 0;
+}
+
 static int
 ieee802154_subif_frame(struct ieee802154_sub_if_data *sdata,
 		       struct sk_buff *skb, const struct ieee802154_hdr *hdr)
@@ -101,6 +106,14 @@ ieee802154_subif_frame(struct ieee802154_sub_if_data *sdata,
 		}
 		goto fail;
 	case IEEE802154_FC_TYPE_MAC_CMD:
+		if (ieee802154_frame_is_beacon_req(skb) &&
+		    mac802154_should_answer_beacon_req(sdata->local)) {
+			ieee802154_queue_delayed_work(&sdata->local->hw,
+						      &sdata->local->beacons_work,
+						      0);
+			goto success;
+		}
+		goto fail;
 	case IEEE802154_FC_TYPE_ACK:
 		goto fail;
 	case IEEE802154_FC_TYPE_DATA:

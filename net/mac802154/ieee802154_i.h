@@ -61,7 +61,7 @@ struct ieee802154_local {
 	/* Beacons handling */
 	bool ongoing_beacons_request;
 	struct mutex beacons_lock;
-	unsigned int beacons_interval;
+	int beacons_interval;
 	struct delayed_work beacons_work;
 	struct ieee802154_sub_if_data __rcu *beacons_sdata;
 	struct ieee802154_beacon_frame beacon;
@@ -134,6 +134,21 @@ static inline bool
 ieee802154_sdata_running(struct ieee802154_sub_if_data *sdata)
 {
 	return test_bit(SDATA_STATE_RUNNING, &sdata->state);
+}
+
+static inline bool ieee802154_frame_is_beacon_req(struct sk_buff *skb)
+{
+	struct ieee802154_mac_cmd_pl mac_pl;
+	int ret;
+
+	if (mac_cb(skb)->type != IEEE802154_FC_TYPE_MAC_CMD)
+		return false;
+
+	ret = ieee802154_beacon_req_pl_pull(skb, &mac_pl);
+	if (ret)
+		return false;
+
+	return mac_pl.cmd_id == IEEE802154_CMD_BEACON_REQ;
 }
 
 extern struct ieee802154_mlme_ops mac802154_mlme_wpan;

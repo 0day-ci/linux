@@ -179,9 +179,11 @@ int ieee802154_hdr_peek_addrs(const struct sk_buff *skb,
  */
 int ieee802154_hdr_peek(const struct sk_buff *skb, struct ieee802154_hdr *hdr);
 
-/* pushes a beacon_req or a beacon frame into an skb */
+/* pushes/pulls a beacon_req or a beacon frame into/from an skb */
 int ieee802154_beacon_req_push(struct sk_buff *skb,
 			       struct ieee802154_beacon_req_frame *breq);
+int ieee802154_beacon_req_pl_pull(struct sk_buff *skb,
+				  struct ieee802154_mac_cmd_pl *mac_pl);
 int ieee802154_beacon_push(struct sk_buff *skb,
 			   struct ieee802154_beacon_frame *beacon);
 
