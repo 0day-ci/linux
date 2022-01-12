@@ -3833,6 +3833,9 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, unsigned nsid,
 	ns->disk = disk;
 	ns->queue = disk->queue;
 
+	if (dev_is_removable(ctrl->dev))
+		ns->disk->flags |= GENHD_FL_REMOVABLE;
+
 	if (ctrl->opts && ctrl->opts->data_digest)
 		blk_queue_flag_set(QUEUE_FLAG_STABLE_WRITES, ns->queue);
 
