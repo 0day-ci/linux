@@ -1618,7 +1618,7 @@ static int probe_iommu_group(struct device *dev, void *data)
 {
 	struct list_head *group_list = data;
 	struct iommu_group *group;
-	int ret;
+	int ret = 0;
 
 	/* Device is probed already if in a group */
 	group = iommu_group_get(dev);
@@ -1627,9 +1627,13 @@ static int probe_iommu_group(struct device *dev, void *data)
 		return 0;
 	}
 
-	ret = __iommu_probe_device(dev, group_list);
-	if (ret == -ENODEV)
-		ret = 0;
+	ret = device_trylock(dev);
+	if (ret) {
+		ret = __iommu_probe_device(dev, group_list);
+		if (ret == -ENODEV)
+			ret = 0;
+		device_unlock(dev);
+	}
 
 	return ret;
 }
