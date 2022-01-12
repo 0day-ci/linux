@@ -110,12 +110,8 @@ out:
 static int aqc111_write_cmd_nopm(struct usbnet *dev, u8 cmd, u16 value,
 				 u16 index, u16 size, void *data)
 {
-	int ret;
-
-	ret = __aqc111_write_cmd(dev, cmd, USB_DIR_OUT | USB_TYPE_VENDOR |
+	return  __aqc111_write_cmd(dev, cmd, USB_DIR_OUT | USB_TYPE_VENDOR |
 				 USB_RECIP_DEVICE, value, index, size, data);
-
-	return ret;
 }
 
 static int aqc111_write_cmd(struct usbnet *dev, u8 cmd, u16 value,
