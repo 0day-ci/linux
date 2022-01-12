@@ -73,7 +73,7 @@ static void mock_device_release(struct drm_device *dev)
 	destroy_workqueue(i915->wq);
 
 	intel_region_ttm_device_fini(i915);
-	intel_gt_driver_late_release(to_gt(i915));
+	intel_gt_driver_late_release(i915);
 	intel_memory_regions_driver_release(i915);
 
 	drm_mode_config_cleanup(&i915->drm);
@@ -179,7 +179,6 @@ struct drm_i915_private *mock_gem_device(void)
 
 	i915_gem_init__mm(i915);
 	intel_gt_init_early(to_gt(i915), i915);
-	__intel_gt_init_early(to_gt(i915), i915);
 	mock_uncore_init(&i915->uncore, i915);
 	atomic_inc(&to_gt(i915)->wakeref.count); /* disable; no hw support */
 	to_gt(i915)->awake = -ENODEV;
@@ -227,7 +226,7 @@ err_unlock:
 err_drv:
 	intel_region_ttm_device_fini(i915);
 err_ttm:
-	intel_gt_driver_late_release(to_gt(i915));
+	intel_gt_driver_late_release(i915);
 	intel_memory_regions_driver_release(i915);
 	drm_mode_config_cleanup(&i915->drm);
 	mock_destroy_device(i915);
