@@ -4537,15 +4537,24 @@ static int intel_dp_get_modes(struct drm_connector *connector)
 {
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct edid *edid;
+	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	int num_modes = 0;
 
 	edid = intel_connector->detect_edid;
 	if (edid) {
 		num_modes = intel_connector_update_modes(connector, edid);
 
-		if (intel_vrr_is_capable(connector))
+		if (intel_vrr_is_capable(connector)) {
+			drm_dbg_kms(&dev_priv->drm, "VRR capable  = TRUE for [CONNECTOR:%d:%s]\n",
+				    connector->base.id, connector->name);
 			drm_connector_set_vrr_capable_property(connector,
 							       true);
+		} else {
+			drm_dbg_kms(&dev_priv->drm, "VRR capable = false for [CONNECTOR:%d:%s]\n",
+				    connector->base.id, connector->name);
+			drm_connector_set_vrr_capable_property(connector,
+							       false);
+		}
 	}
 
 	/* Also add fixed mode, which may or may not be present in EDID */
