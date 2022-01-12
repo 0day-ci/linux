@@ -54,6 +54,7 @@ enum clk_ids {
 	CLK_SD1_DIV4,
 	CLK_SEL_GPU2,
 	CLK_SEL_PLL5_4,
+	CLK_M2_DIV2,
 
 	/* Module Clocks */
 	MOD_CLK_BASE,
@@ -156,6 +157,8 @@ static const struct cpg_core_clk r9a07g044_core_clks[] __initconst = {
 	DEF_DIV("G", R9A07G044_CLK_G, CLK_SEL_GPU2, DIVGPU, dtable_1_8,
 		CLK_DIVIDER_HIWORD_MASK),
 	DEF_FIXED("M1", R9A07G044_CLK_M1, CLK_PLL5_FOUTPOSTDIV, 1, 1),
+	DEF_FIXED("M2", R9A07G044_CLK_M2, CLK_PLL3_533, 1, 2),
+	DEF_FIXED("M2_DIV2", CLK_M2_DIV2, R9A07G044_CLK_M2, 1, 2),
 };
 
 static struct rzg2l_mod_clk r9a07g044_mod_clks[] = {
