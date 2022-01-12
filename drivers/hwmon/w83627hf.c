@@ -283,9 +283,7 @@ static int TEMP_FROM_REG(u8 reg)
 
 static inline unsigned long pwm_freq_from_reg_627hf(u8 reg)
 {
-	unsigned long freq;
-	freq = W83627HF_BASE_PWM_FREQ >> reg;
-	return freq;
+	return W83627HF_BASE_PWM_FREQ >> reg;
 }
 static inline u8 pwm_freq_to_reg_627hf(unsigned long val)
 {
