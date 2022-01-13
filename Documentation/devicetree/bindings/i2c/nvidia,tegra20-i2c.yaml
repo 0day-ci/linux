@@ -80,6 +80,11 @@ properties:
           support for 64 KiB transactions whereas earlier chips supported no
           more than 4 KiB per transactions.
         const: nvidia,tegra194-i2c
+      - description: |
+          Tegra234 has 8 generic I2C controllers, two of which are in the AON
+          (always-on) partition of the SoC. All of these controllers are
+          similar to those found on Tegra194.
+        const: nvidia,tegra234-i2c
 
   reg:
     maxItems: 1
