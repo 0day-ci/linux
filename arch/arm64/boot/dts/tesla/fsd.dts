@@ -150,3 +150,7 @@
 &spi_2 {
 	status = "okay";
 };
+
+&adc {
+	status = "okay";
+};

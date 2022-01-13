@@ -788,6 +788,17 @@
 			num-cs = <1>;
 			status = "disabled";
 		};
+
+		adc: adc@141A0000 {
+			compatible = "samsung,exynos-adc-v3";
+			reg = <0x0 0x141A0000 0x0 0x100>;
+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clock_peric PERIC_PCLK_ADCIF>;
+			clock-names = "adc";
+			#io-channel-cells = <1>;
+			io-channel-ranges;
+			status = "disabled";
+		};
 	};
 };
 
