@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Samsung's Exynos5420 Chagallwifi board device tree source
+ *
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ * Copyright (c) 2022 Henrik Grimler
+ */
+
+/dts-v1/;
+#include "exynos5420-galaxy-tab-common.dtsi"
+
+/ {
+	model = "Samsung Chagallwifi based on exynos5420";
+	compatible = "samsung,chagallwifi", "samsung,exynos5420", \
+		     "samsung,exynos5";
+};
+
+&s2mps11 {
+	regulators {
+		ldo15_reg: LDO15 {
+			/* Unused */
+			regulator-name = "VDD_LDO15";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+		};
+
+		ldo17_reg: LDO17 {
+			regulator-name = "VDD_IRLED_3V3";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3350000>;
+			regulator-always-on;
+			regulator-boot-on;
+
+			regulator-state-mem {
+				regulator-off-in-suspend;
+			};
+		};
+
+		ldo28_reg: LDO28 {
+			/* Unused */
+			regulator-name = "VDD_LDO28";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+		};
+
+		ldo29_reg: LDO29 {
+			regulator-name = "VDD_TCON_1V8";
+			regulator-min-microvolt = <1900000>;
+			regulator-max-microvolt = <1900000>;
+
+			regulator-state-mem {
+				regulator-off-in-suspend;
+			};
+		};
+	};
+};
