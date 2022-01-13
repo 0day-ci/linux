@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Tesla FSD board device tree source
+ *
+ * Copyright (c) 2017-2021 Samsung Electronics Co., Ltd.
+ *		https://www.samsung.com
+ * Copyright (c) 2017-2021 Tesla, Inc.
+ *		https://www.tesla.com
+ */
+
+/dts-v1/;
+#include "fsd.dtsi"
+
+/ {
+	model = "Tesla Full Self-Driving (FSD) SoC";
+	compatible = "tesla,fsd";
+
+	aliases {
+		serial0 = &serial_0;
+		serial1 = &serial_1;
+	};
+
+	chosen {
+		stdout-path = &serial_0;
+		linux,initrd-start = <0xE0000000>;
+		linux,initrd-end = <0xE4F00000>;
+		bootargs = "console=ttySAC0,115200n8
+			earlycon=exynos4210,0x14180000 root=/dev/ram0
+			init=/linuxrc";
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x2 0x00000000>;
+	};
+};
+
+&fin_pll {
+	clock-frequency = <24000000>;
+};
+
+&serial_0 {
+	status = "okay";
+};
+
+&serial_1 {
+	status = "okay";
+};
+
+&clock_cmu {
+	status = "okay";
+};
+
+&clock_imem {
+	status = "okay";
+};
+
+&clock_peric {
+	status = "okay";
+};
+
+&smmu_isp {
+	status = "okay";
+};
+
+&clock_fsys0 {
+	status = "okay";
+};
+
+&clock_fsys1 {
+	status = "okay";
+};
+
+&smmu_peric {
+	status = "okay";
+};
+
+&smmu_imem {
+	status = "okay";
+};
+
+&smmu_fsys0 {
+	status = "okay";
+};
+
+&hsi2c_0 {
+	status = "okay";
+};
+
+&hsi2c_1 {
+	status = "okay";
+};
+
+&hsi2c_2 {
+	status = "okay";
+};
+
+&hsi2c_3 {
+	status = "okay";
+};
+
+&hsi2c_4 {
+	status = "okay";
+};
+
+&hsi2c_5 {
+	status = "okay";
+};
+
+&hsi2c_6 {
+	status = "okay";
+};
+
+&hsi2c_7 {
+	status = "okay";
+};
+
+&pwm_0 {
+	status = "okay";
+};
+
+&pwm_1 {
+	status = "okay";
+};
+
+&mdma0 {
+	status = "okay";
+};
+
+&mdma1 {
+	status = "okay";
+};
+
+&pdma0 {
+	status = "okay";
+};
+
+&pdma1 {
+	status = "okay";
+};
