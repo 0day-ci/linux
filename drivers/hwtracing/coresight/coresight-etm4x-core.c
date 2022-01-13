@@ -692,6 +692,16 @@ static int etm4_parse_event_config(struct coresight_device *csdev,
 		ret = cscfg_csdev_enable_active_config(csdev, cfg_hash, preset);
 	}
 
+	/* branch broadcast - enable if selected and supported */
+	if (attr->config & BIT(ETM_OPT_BRANCH_BROADCAST)) {
+		if (!drvdata->trcbb) {
+			ret = -EINVAL;
+			goto out;
+		} else {
+			config->cfg |= BIT(ETM4_CFG_BIT_BB);
+		}
+	}
+
 out:
 	return ret;
 }
