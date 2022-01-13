@@ -14,6 +14,7 @@ properties:
     enum:
       - samsung,exynos-adc-v1                 # Exynos5250
       - samsung,exynos-adc-v2
+      - samsung,exynos-adc-v3
       - samsung,exynos3250-adc
       - samsung,exynos4212-adc                # Exynos4212 and Exynos4412
       - samsung,exynos7-adc
