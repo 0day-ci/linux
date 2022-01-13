@@ -138,3 +138,15 @@
 &pdma1 {
 	status = "okay";
 };
+
+&spi_0 {
+	status = "okay";
+};
+
+&spi_1 {
+	status = "okay";
+};
+
+&spi_2 {
+	status = "okay";
+};
