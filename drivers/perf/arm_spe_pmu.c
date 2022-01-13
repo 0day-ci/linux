@@ -711,7 +711,7 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
 	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
 		return -EOPNOTSUPP;
 
-	spe_pmu->pmscr_cx = perfmon_capable();
+	spe_pmu->pmscr_cx = perfmon_capable() || (event->cpu != -1);
 	reg = arm_spe_event_to_pmscr(event);
 	if (!perfmon_capable() &&
 	    (reg & (BIT(SYS_PMSCR_EL1_PA_SHIFT) |
