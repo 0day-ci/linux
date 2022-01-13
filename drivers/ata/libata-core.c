@@ -154,6 +154,10 @@ static int atapi_an;
 module_param(atapi_an, int, 0444);
 MODULE_PARM_DESC(atapi_an, "Enable ATAPI AN media presence notification (0=0ff [default], 1=on)");
 
+int debounce_delay_ms = -1;
+module_param_named(debounce_delay_ms, libata_debounce_delay_ms, int, 0644);
+MODULE_PARM_DESC(debounce_delay_ms, "Delay amount milliseconds in sata_link_resume() to work around controller issues (negative values mean default value in code (200 ms)");
+
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");

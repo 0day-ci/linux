@@ -2557,6 +2557,12 @@
 	lapic_timer_c2_ok	[X86,APIC] trust the local apic timer
 			in C2 power state.
 
+	libata.libata_debounce_delay_ms=	[LIBATA] Set debounce delay in
+			ms
+
+			libata.dma<0	  Use default value from code
+			libata.dma>1	  Debounce delay in milliseconds
+
 	libata.dma=	[LIBATA] DMA control
 			libata.dma=0	  Disable all PATA and SATA DMA
 			libata.dma=1	  PATA and SATA Disk DMA only
