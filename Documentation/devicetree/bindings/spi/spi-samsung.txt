@@ -11,6 +11,7 @@ Required SoC Specific Properties:
     - samsung,s5pv210-spi: for s5pv210 and s5pc110 platforms
     - samsung,exynos5433-spi: for exynos5433 compatible controllers
     - samsung,exynos7-spi: for exynos7 platforms <DEPRECATED>
+    - tesla,fsd-spi: spi controller support for Tesla Full Self-Driving SoC
 
 - reg: physical base address of the controller and length of memory mapped
   region.
