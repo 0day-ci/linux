@@ -4122,7 +4122,11 @@ static inline void __netif_tx_lock(struct netdev_queue *txq, int cpu)
 {
 	spin_lock(&txq->_xmit_lock);
 	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
+#ifdef CONFIG_PREEMPT_RT_FULL
+	WRITE_ONCE(txq->xmit_lock_owner, current);
+#else
 	WRITE_ONCE(txq->xmit_lock_owner, cpu);
+#endif
 }
 
 static inline bool __netif_tx_acquire(struct netdev_queue *txq)
@@ -4140,7 +4144,11 @@ static inline void __netif_tx_lock_bh(struct netdev_queue *txq)
 {
 	spin_lock_bh(&txq->_xmit_lock);
 	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
+#ifdef CONFIG_PREEMPT_RT_FULL
+	WRITE_ONCE(txq->xmit_lock_owner, current);
+#else
 	WRITE_ONCE(txq->xmit_lock_owner, smp_processor_id());
+#endif
 }
 
 static inline bool __netif_tx_trylock(struct netdev_queue *txq)
@@ -4149,7 +4157,11 @@ static inline bool __netif_tx_trylock(struct netdev_queue *txq)
 
 	if (likely(ok)) {
 		/* Pairs with READ_ONCE() in __dev_queue_xmit() */
+#ifdef CONFIG_PREEMPT_RT_FULL
+		WRITE_ONCE(txq->xmit_lock_owner, current);
+#else
 		WRITE_ONCE(txq->xmit_lock_owner, smp_processor_id());
+#endif
 	}
 	return ok;
 }
@@ -4157,14 +4169,22 @@ static inline bool __netif_tx_trylock(struct netdev_queue *txq)
 static inline void __netif_tx_unlock(struct netdev_queue *txq)
 {
 	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
+#ifdef CONFIG_PREEMPT_RT_FULL
+	WRITE_ONCE(txq->xmit_lock_owner, NULL);
+#else
 	WRITE_ONCE(txq->xmit_lock_owner, -1);
+#endif
 	spin_unlock(&txq->_xmit_lock);
 }
 
 static inline void __netif_tx_unlock_bh(struct netdev_queue *txq)
 {
 	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
+#ifdef CONFIG_PREEMPT_RT_FULL
+	WRITE_ONCE(txq->xmit_lock_owner, NULL);
+#else
 	WRITE_ONCE(txq->xmit_lock_owner, -1);
+#endif
 	spin_unlock_bh(&txq->_xmit_lock);
 }
 
