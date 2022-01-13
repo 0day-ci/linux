@@ -336,7 +336,7 @@ static inline uint8_t *encode_tag_length(uint8_t *buf, uint8_t tag,
 	return buf + 3;
 }
 
-static uint32_t derive_pub_key(const void *pub_key, uint32_t len, uint8_t *buf)
+static uint32_t format_pub_key(const void *pub_key, uint32_t len, uint8_t *buf)
 {
 	uint8_t *cur = buf;
 	uint32_t n_len = definite_length(len) + 1 + len + 1;
@@ -409,7 +409,7 @@ static int tpm_key_query(const struct kernel_pkey_params *params,
 	if (IS_ERR(tfm))
 		return PTR_ERR(tfm);
 
-	der_pub_key_len = derive_pub_key(tk->pub_key, tk->pub_key_len,
+	der_pub_key_len = format_pub_key(tk->pub_key, tk->pub_key_len,
 					 der_pub_key);
 
 	ret = crypto_akcipher_set_pub_key(tfm, der_pub_key, der_pub_key_len);
@@ -463,7 +463,7 @@ static int tpm_key_encrypt(struct tpm_key *tk,
 	if (IS_ERR(tfm))
 		return PTR_ERR(tfm);
 
-	der_pub_key_len = derive_pub_key(tk->pub_key, tk->pub_key_len,
+	der_pub_key_len = format_pub_key(tk->pub_key, tk->pub_key_len,
 					 der_pub_key);
 
 	ret = crypto_akcipher_set_pub_key(tfm, der_pub_key, der_pub_key_len);
@@ -758,7 +758,7 @@ static int tpm_key_verify_signature(const struct key *key,
 	if (IS_ERR(tfm))
 		return PTR_ERR(tfm);
 
-	der_pub_key_len = derive_pub_key(tk->pub_key, tk->pub_key_len,
+	der_pub_key_len = format_pub_key(tk->pub_key, tk->pub_key_len,
 					 der_pub_key);
 
 	ret = crypto_akcipher_set_pub_key(tfm, der_pub_key, der_pub_key_len);
