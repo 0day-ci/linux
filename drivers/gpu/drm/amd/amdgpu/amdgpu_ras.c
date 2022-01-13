@@ -1714,8 +1714,7 @@ static void amdgpu_ras_error_status_query(struct amdgpu_device *adev,
 	}
 
 	if (block_obj->hw_ops->query_ras_error_status)
-	block_obj->hw_ops->query_ras_error_status(adev);
-
+		block_obj->hw_ops->query_ras_error_status(adev);
 }
 
 static void amdgpu_ras_query_err_status(struct amdgpu_device *adev)
@@ -2722,7 +2721,7 @@ struct amdgpu_ras* amdgpu_ras_get_context(struct amdgpu_device *adev)
 int amdgpu_ras_set_context(struct amdgpu_device *adev, struct amdgpu_ras* ras_con)
 {
 	if (!adev)
-	return -EINVAL;;
+		return -EINVAL;
 
 	adev->psp.ras_context.ras = ras_con;
 	return 0;
