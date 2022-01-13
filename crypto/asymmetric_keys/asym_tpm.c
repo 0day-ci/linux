@@ -900,7 +900,11 @@ static int extract_key_parameters(struct tpm_key *tk)
 	return 0;
 }
 
-/* Given the blob, parse it and load it into the TPM */
+/*
+ * Verify that a supported TPM is present, then parse the key blob.  We don't
+ * actually load the key into the TPM here; that happens only for the actual
+ * sign and decrypt operations.
+ */
 struct tpm_key *tpm_key_create(const void *blob, uint32_t blob_len)
 {
 	int r;
