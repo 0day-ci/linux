@@ -1720,6 +1720,7 @@ static int rtl2832u_rc_query(struct dvb_usb_device *d)
 		{IR_RX_BUF_CTRL,         0x80, 0xff},
 		{IR_RX_CTRL,             0x80, 0xff},
 	};
+	u32 idle_length;
 
 	/* init remote controller */
 	if (!dev->rc_active) {
@@ -1770,6 +1771,22 @@ static int rtl2832u_rc_query(struct dvb_usb_device *d)
 	if (ret)
 		goto err;
 
+	dev_dbg(&d->intf->dev, "IR_RX_BUF=%*ph\n", len, buf);
+
+	/* if the receiver is not idle yet, do not process */
+	idle_length = 0;
+	if (len > 2) {
+		if (!(buf[len - 1] & 0x80))
+			idle_length += buf[len - 1] & 0x7f;
+		if (!(buf[len - 2] & 0x80))
+			idle_length += buf[len - 2] & 0x7f;
+	}
+
+	dev_dbg(&d->intf->dev, "idle_length=%x\n", idle_length);
+
+	if (idle_length < 0xbf)
+		return 0;
+
 	/* let hw receive new code */
 	for (i = 0; i < ARRAY_SIZE(refresh_tab); i++) {
 		ret = rtl28xxu_wr_reg_mask(d, refresh_tab[i].reg,
@@ -1807,9 +1824,12 @@ static int rtl2832u_get_rc_config(struct dvb_usb_device *d,
 	rc->allowed_protos = RC_PROTO_BIT_ALL_IR_DECODER;
 	rc->driver_type = RC_DRIVER_IR_RAW;
 	rc->query = rtl2832u_rc_query;
-	rc->interval = 200;
-	/* we program idle len to 0xc0, set timeout to one less */
-	rc->timeout = 0xbf * 51;
+	rc->interval = 50;
+	/*
+	 * The idle len is set to 0xc0, set timeout to one less plus
+	 * the query interval with some extra margin for error
+	 */
+	rc->timeout = 0xbf * 51 + MS_TO_US(60);
 
 	return 0;
 }
