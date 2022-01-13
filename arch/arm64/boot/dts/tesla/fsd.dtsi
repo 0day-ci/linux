@@ -29,6 +29,9 @@
 		hsi2c5 = &hsi2c_5;
 		hsi2c6 = &hsi2c_6;
 		hsi2c7 = &hsi2c_7;
+		pinctrl0 = &pinctrl_fsys0;
+		pinctrl1 = &pinctrl_peric;
+		pinctrl2 = &pinctrl_pmu;
 	};
 
 	cpus {
@@ -711,5 +714,24 @@
 			clock-names = "hsi2c";
 			status = "disabled";
 		};
+
+		pinctrl_fsys0: pinctrl@15020000 {
+			compatible = "tesla,fsd-pinctrl";
+			reg = <0x0 0x15020000 0x0 0x1000>;
+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		pinctrl_peric: pinctrl@141F0000 {
+			compatible = "tesla,fsd-pinctrl";
+			reg = <0x0 0x141F0000 0x0 0x1000>;
+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		pinctrl_pmu: pinctrl@114F0000 {
+			compatible = "tesla,fsd-pinctrl";
+			reg = <0x0 0x114F0000 0x0 0x1000>;
+		};
 	};
 };
+
+#include "fsd-pinctrl.dtsi"
