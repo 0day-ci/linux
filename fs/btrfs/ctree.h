@@ -145,6 +145,8 @@ enum {
 	BTRFS_FS_STATE_DUMMY_FS_INFO,
 
 	BTRFS_FS_STATE_NO_CSUMS,
+	/* Quota is in disabling process */
+	BTRFS_FS_STATE_QUOTA_DISABLING,
 };
 
 #define BTRFS_BACKREF_REV_MAX		256
