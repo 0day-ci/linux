@@ -882,6 +882,10 @@ static int iwl_mvm_sar_geo_init(struct iwl_mvm *mvm)
 		     offsetof(struct iwl_geo_tx_power_profiles_cmd_v4, ops) !=
 		     offsetof(struct iwl_geo_tx_power_profiles_cmd_v5, ops));
 
+	/* not supporting GEO is not a failure, so return 0 */
+	if (!iwl_sar_geo_support(&mvm->fwrt))
+		return 0;
+
 	/* the ops field is at the same spot for all versions, so set in v1 */
 	cmd.v1.ops = cpu_to_le32(IWL_PER_CHAIN_OFFSET_SET_TABLES);
 
@@ -1741,7 +1745,7 @@ int iwl_mvm_up(struct iwl_mvm *mvm)
 	ret = iwl_mvm_sar_init(mvm);
 	if (ret == 0)
 		ret = iwl_mvm_sar_geo_init(mvm);
-	else if (ret < 0)
+	if (ret < 0)
 		goto error;
 
 	ret = iwl_mvm_sgom_init(mvm);
