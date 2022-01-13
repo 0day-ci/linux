@@ -1215,8 +1215,10 @@ static int bnx2fc_vport_destroy(struct fc_vport *vport)
 	mutex_unlock(&n_port->lp_mutex);
 	bnx2fc_free_vport(interface->hba, port->lport);
 	bnx2fc_port_shutdown(port->lport);
-	bnx2fc_interface_put(interface);
 	queue_work(bnx2fc_wq, &port->destroy_work);
+	flush_work(&port->destroy_work);
+	bnx2fc_interface_put(interface);
+
 	return 0;
 }
 
@@ -1653,8 +1655,9 @@ static void __bnx2fc_destroy(struct bnx2fc_interface *interface)
 	bnx2fc_interface_cleanup(interface);
 	bnx2fc_stop(interface);
 	list_del(&interface->list);
-	bnx2fc_interface_put(interface);
 	queue_work(bnx2fc_wq, &port->destroy_work);
+	flush_work(&port->destroy_work);
+	bnx2fc_interface_put(interface);
 }
 
 /**
