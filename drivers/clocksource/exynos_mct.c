@@ -78,6 +78,10 @@ enum {
 	MCT_L5_IRQ,
 	MCT_L6_IRQ,
 	MCT_L7_IRQ,
+	MCT_L8_IRQ,
+	MCT_L9_IRQ,
+	MCT_L10_IRQ,
+	MCT_L11_IRQ,
 	MCT_NR_IRQS,
 };
 
@@ -89,7 +93,7 @@ static int mct_irqs[MCT_NR_IRQS];
 struct mct_clock_event_device {
 	struct clock_event_device evt;
 	unsigned long base;
-	char name[10];
+	char name[11];
 };
 
 static void exynos4_mct_write(unsigned int value, unsigned long offset)
