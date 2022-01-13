@@ -1201,6 +1201,8 @@ patternProperties:
     description: THine Electronics, Inc.
   "^thingyjp,.*":
     description: thingy.jp
+  "^thundercomm,.*":
+    description: Thundercomm Technology Co., Ltd.
   "^ti,.*":
     description: Texas Instruments
   "^tianma,.*":
