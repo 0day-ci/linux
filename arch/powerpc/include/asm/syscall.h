@@ -105,7 +105,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
 
 static inline int syscall_get_arch(struct task_struct *task)
 {
-	if (is_32bit_task())
+	if (IS_ENABLED(CONFIG_PPC32))
+		return AUDIT_ARCH_PPC;
+	else if (IS_ENABLED(CONFIG_COMPAT) && test_tsk_thread_flag(task, TIF_32BIT))
 		return AUDIT_ARCH_PPC;
 	else if (IS_ENABLED(CONFIG_CPU_LITTLE_ENDIAN))
 		return AUDIT_ARCH_PPC64LE;
