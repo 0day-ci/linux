@@ -137,7 +137,8 @@ static int mt7663s_probe(struct sdio_func *func,
 		goto error;
 	}
 
-	mdev->sdio.xmit_buf = devm_kmalloc(mdev->dev, MT76S_XMIT_BUF_SZ,
+	mdev->sdio.xmit_buf_sz = mt76s_get_xmit_buf_sz(mdev, MT76S_XMIT_BUF_SZ);
+	mdev->sdio.xmit_buf = devm_kmalloc(mdev->dev, mdev->sdio.xmit_buf_sz,
 					   GFP_KERNEL);
 	if (!mdev->sdio.xmit_buf) {
 		ret = -ENOMEM;

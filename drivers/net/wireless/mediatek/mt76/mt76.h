@@ -496,7 +496,7 @@ struct mt76_usb {
 	} mcu;
 };
 
-#define MT76S_XMIT_BUF_SZ	(16 * PAGE_SIZE)
+#define MT76S_XMIT_BUF_SZ	0x3fe00
 #define MT76S_NUM_TX_ENTRIES	256
 #define MT76S_NUM_RX_ENTRIES	512
 struct mt76_sdio {
@@ -507,6 +507,7 @@ struct mt76_sdio {
 	struct work_struct stat_work;
 
 	u8 *xmit_buf;
+	u32 xmit_buf_sz;
 
 	struct sdio_func *func;
 	void *intr_data;
@@ -1278,6 +1279,7 @@ void mt76u_queues_deinit(struct mt76_dev *dev);
 
 int mt76s_init(struct mt76_dev *dev, struct sdio_func *func,
 	       const struct mt76_bus_ops *bus_ops);
+u32 mt76s_get_xmit_buf_sz(struct mt76_dev *dev, u32 dev_xmit_sz);
 int mt76s_alloc_rx_queue(struct mt76_dev *dev, enum mt76_rxq_id qid);
 int mt76s_alloc_tx(struct mt76_dev *dev);
 void mt76s_deinit(struct mt76_dev *dev);

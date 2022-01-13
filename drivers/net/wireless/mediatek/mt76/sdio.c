@@ -12,6 +12,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mmc/sdio_func.h>
+#include <linux/mmc/card.h>
+#include <linux/mmc/host.h>
 #include <linux/sched.h>
 #include <linux/kthread.h>
 
@@ -298,6 +300,17 @@ release:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mt76s_hw_init);
+
+u32 mt76s_get_xmit_buf_sz(struct mt76_dev *dev, u32 dev_max_len)
+{
+	struct sdio_func *func = dev->sdio.func;
+	u32 host_max_len = min_t(u32, func->card->host->max_req_size,
+				 func->cur_blksize *
+				 func->card->host->max_blk_count);
+
+	return min_t(u32, host_max_len, dev_max_len);
+}
+EXPORT_SYMBOL_GPL(mt76s_get_xmit_buf_sz);
 
 int mt76s_alloc_rx_queue(struct mt76_dev *dev, enum mt76_rxq_id qid)
 {

@@ -248,7 +248,7 @@ static int mt76s_tx_run_queue(struct mt76_dev *dev, struct mt76_queue *q)
 		}
 
 		pad = roundup(e->skb->len, 4) - e->skb->len;
-		if (len + e->skb->len + pad + 4 > MT76S_XMIT_BUF_SZ)
+		if (len + e->skb->len + pad + 4 > dev->sdio.xmit_buf_sz)
 			break;
 
 		if (mt76s_tx_pick_quota(sdio, mcu, e->buf_sz, &pse_sz,
