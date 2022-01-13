@@ -86,6 +86,7 @@ struct rxe_send_wr {
 			__aligned_u64 remote_addr;
 			__u32	rkey;
 			__u32	reserved;
+			__aligned_u64 atomic_wr;
 		} rdma;
 		struct {
 			__aligned_u64 remote_addr;

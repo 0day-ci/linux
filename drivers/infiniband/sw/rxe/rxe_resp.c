@@ -258,7 +258,7 @@ static enum resp_states check_op_valid(struct rxe_qp *qp,
 	case IB_QPT_RC:
 		if (((pkt->mask & RXE_READ_MASK) &&
 		     !(qp->attr.qp_access_flags & IB_ACCESS_REMOTE_READ)) ||
-		    ((pkt->mask & RXE_WRITE_MASK) &&
+		    ((pkt->mask & (RXE_WRITE_MASK | RXE_ATOMIC_WRITE_MASK)) &&
 		     !(qp->attr.qp_access_flags & IB_ACCESS_REMOTE_WRITE)) ||
 		    ((pkt->mask & RXE_ATOMIC_MASK) &&
 		     !(qp->attr.qp_access_flags & IB_ACCESS_REMOTE_ATOMIC))) {
@@ -362,7 +362,7 @@ static enum resp_states check_resource(struct rxe_qp *qp,
 		}
 	}
 
-	if (pkt->mask & RXE_READ_OR_ATOMIC_MASK) {
+	if (pkt->mask & (RXE_READ_OR_ATOMIC_MASK | RXE_ATOMIC_WRITE_MASK)) {
 		/* it is the requesters job to not send
 		 * too many read/atomic ops, we just
 		 * recycle the responder resource queue
@@ -413,7 +413,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 	enum resp_states state;
 	int access;
 
-	if (pkt->mask & RXE_READ_OR_WRITE_MASK) {
+	if (pkt->mask & (RXE_READ_OR_WRITE_MASK | RXE_ATOMIC_WRITE_MASK)) {
 		if (pkt->mask & RXE_RETH_MASK) {
 			qp->resp.va = reth_va(pkt);
 			qp->resp.offset = 0;
@@ -479,7 +479,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 		goto err;
 	}
 
-	if (pkt->mask & RXE_WRITE_MASK)	 {
+	if (pkt->mask & (RXE_WRITE_MASK | RXE_ATOMIC_WRITE_MASK)) {
 		if (resid > mtu) {
 			if (pktlen != mtu || bth_pad(pkt)) {
 				state = RESPST_ERR_LENGTH;
@@ -589,6 +589,26 @@ static enum resp_states process_atomic(struct rxe_qp *qp,
 	ret = RESPST_NONE;
 out:
 	return ret;
+}
+
+static enum resp_states process_atomic_write(struct rxe_qp *qp,
+					     struct rxe_pkt_info *pkt)
+{
+	struct rxe_mr *mr = qp->resp.mr;
+
+	u64 *src = payload_addr(pkt);
+
+	u64 *dst = iova_to_vaddr(mr, qp->resp.va + qp->resp.offset, sizeof(u64));
+	if (!dst || (uintptr_t)dst & 7)
+		return RESPST_ERR_MISALIGNED_ATOMIC;
+
+	/* Do atomic write after all prior operations have completed */
+	smp_store_release(dst, *src);
+
+	/* decrease resp.resid to zero */
+	qp->resp.resid -= sizeof(u64);
+
+	return RESPST_NONE;
 }
 
 static struct sk_buff *prepare_ack_packet(struct rxe_qp *qp,
@@ -801,6 +821,10 @@ static enum resp_states execute(struct rxe_qp *qp, struct rxe_pkt_info *pkt)
 		err = process_atomic(qp, pkt);
 		if (err)
 			return err;
+	} else if (pkt->mask & RXE_ATOMIC_WRITE_MASK) {
+		err = process_atomic_write(qp, pkt);
+		if (err)
+			return err;
 	} else {
 		/* Unreachable */
 		WARN_ON_ONCE(1);
@@ -965,9 +989,12 @@ static int send_resp(struct rxe_qp *qp, struct rxe_pkt_info *pkt,
 	struct sk_buff *skb;
 	struct resp_res *res;
 
+	int opcode = pkt->mask & RXE_ATOMIC_MASK ?
+				IB_OPCODE_RC_ATOMIC_ACKNOWLEDGE :
+				IB_OPCODE_RC_RDMA_READ_RESPONSE_ONLY;
+
 	skb = prepare_ack_packet(qp, pkt, &ack_pkt,
-				 IB_OPCODE_RC_ATOMIC_ACKNOWLEDGE, 0, pkt->psn,
-				 syndrome);
+				 opcode, 0, pkt->psn, syndrome);
 	if (!skb) {
 		rc = -ENOMEM;
 		goto out;
@@ -978,7 +1005,7 @@ static int send_resp(struct rxe_qp *qp, struct rxe_pkt_info *pkt,
 	rxe_advance_resp_resource(qp);
 
 	skb_get(skb);
-	res->type = RXE_ATOMIC_MASK;
+	res->type = pkt->mask & (RXE_ATOMIC_MASK | RXE_ATOMIC_WRITE_MASK);
 	res->resp.skb = skb;
 	res->first_psn = ack_pkt.psn;
 	res->last_psn  = ack_pkt.psn;
@@ -1001,7 +1028,7 @@ static enum resp_states acknowledge(struct rxe_qp *qp,
 
 	if (qp->resp.aeth_syndrome != AETH_ACK_UNLIMITED)
 		send_ack(qp, pkt, qp->resp.aeth_syndrome, pkt->psn);
-	else if (pkt->mask & RXE_ATOMIC_MASK)
+	else if (pkt->mask & (RXE_ATOMIC_MASK | RXE_ATOMIC_WRITE_MASK))
 		send_resp(qp, pkt, AETH_ACK_UNLIMITED);
 	else if (bth_ack(pkt))
 		send_ack(qp, pkt, AETH_ACK_UNLIMITED, pkt->psn);
