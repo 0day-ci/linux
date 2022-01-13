@@ -2059,13 +2059,14 @@ void x86_pmu_show_pmu_cap(int num_counters, int num_counters_fixed,
  */
 void x86_pmu_update_cpu_context(struct pmu *pmu, int cpu)
 {
-	struct perf_cpu_context *cpuctx;
+	/* XXX: Don't need this quirk anymore */
+	/*struct perf_cpu_context *cpuctx;
 
 	if (!pmu->pmu_cpu_context)
 		return;
 
 	cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
-	cpuctx->ctx.pmu = pmu;
+	cpuctx->ctx.pmu = pmu;*/
 }
 
 static int __init init_hw_perf_events(void)
@@ -2636,15 +2637,15 @@ static const struct attribute_group *x86_pmu_attr_groups[] = {
 	NULL,
 };
 
-static void x86_pmu_sched_task(struct perf_event_context *ctx, bool sched_in)
+static void x86_pmu_sched_task(struct perf_event_pmu_context *pmu_ctx, bool sched_in)
 {
-	static_call_cond(x86_pmu_sched_task)(ctx, sched_in);
+	static_call_cond(x86_pmu_sched_task)(pmu_ctx, sched_in);
 }
 
-static void x86_pmu_swap_task_ctx(struct perf_event_context *prev,
-				  struct perf_event_context *next)
+static void x86_pmu_swap_task_ctx(struct perf_event_pmu_context *prev_epc,
+				  struct perf_event_pmu_context *next_epc)
 {
-	static_call_cond(x86_pmu_swap_task_ctx)(prev, next);
+	static_call_cond(x86_pmu_swap_task_ctx)(prev_epc, next_epc);
 }
 
 void perf_check_microcode(void)

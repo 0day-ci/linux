@@ -794,7 +794,7 @@ struct x86_pmu {
 	void		(*cpu_dead)(int cpu);
 
 	void		(*check_microcode)(void);
-	void		(*sched_task)(struct perf_event_context *ctx,
+	void		(*sched_task)(struct perf_event_pmu_context *pmu_ctx,
 				      bool sched_in);
 
 	/*
@@ -871,12 +871,12 @@ struct x86_pmu {
 	int		(*set_topdown_event_period)(struct perf_event *event);
 
 	/*
-	 * perf task context (i.e. struct perf_event_context::task_ctx_data)
+	 * perf task context (i.e. struct perf_event_pmu_context::task_ctx_data)
 	 * switch helper to bridge calls from perf/core to perf/x86.
 	 * See struct pmu::swap_task_ctx() usage for examples;
 	 */
-	void		(*swap_task_ctx)(struct perf_event_context *prev,
-					 struct perf_event_context *next);
+	void		(*swap_task_ctx)(struct perf_event_pmu_context *prev_epc,
+					 struct perf_event_pmu_context *next_epc);
 
 	/*
 	 * AMD bits
@@ -1337,7 +1337,7 @@ void intel_pmu_pebs_enable_all(void);
 
 void intel_pmu_pebs_disable_all(void);
 
-void intel_pmu_pebs_sched_task(struct perf_event_context *ctx, bool sched_in);
+void intel_pmu_pebs_sched_task(struct perf_event_pmu_context *pmu_ctx, bool sched_in);
 
 void intel_pmu_auto_reload_read(struct perf_event *event);
 
@@ -1345,10 +1345,10 @@ void intel_pmu_store_pebs_lbrs(struct lbr_entry *lbr);
 
 void intel_ds_init(void);
 
-void intel_pmu_lbr_swap_task_ctx(struct perf_event_context *prev,
-				 struct perf_event_context *next);
+void intel_pmu_lbr_swap_task_ctx(struct perf_event_pmu_context *prev_epc,
+				 struct perf_event_pmu_context *next_epc);
 
-void intel_pmu_lbr_sched_task(struct perf_event_context *ctx, bool sched_in);
+void intel_pmu_lbr_sched_task(struct perf_event_pmu_context *pmu_ctx, bool sched_in);
 
 u64 lbr_from_signext_quirk_wr(u64 val);
 

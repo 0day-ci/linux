@@ -4526,17 +4526,17 @@ static void intel_pmu_cpu_dead(int cpu)
 		cpumask_clear_cpu(cpu, &hybrid_pmu(cpuc->pmu)->supported_cpus);
 }
 
-static void intel_pmu_sched_task(struct perf_event_context *ctx,
+static void intel_pmu_sched_task(struct perf_event_pmu_context *pmu_ctx,
 				 bool sched_in)
 {
-	intel_pmu_pebs_sched_task(ctx, sched_in);
-	intel_pmu_lbr_sched_task(ctx, sched_in);
+	intel_pmu_pebs_sched_task(pmu_ctx, sched_in);
+	intel_pmu_lbr_sched_task(pmu_ctx, sched_in);
 }
 
-static void intel_pmu_swap_task_ctx(struct perf_event_context *prev,
-				    struct perf_event_context *next)
+static void intel_pmu_swap_task_ctx(struct perf_event_pmu_context *prev_epc,
+				    struct perf_event_pmu_context *next_epc)
 {
-	intel_pmu_lbr_swap_task_ctx(prev, next);
+	intel_pmu_lbr_swap_task_ctx(prev_epc, next_epc);
 }
 
 static int intel_pmu_check_period(struct perf_event *event, u64 value)
