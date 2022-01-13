@@ -4059,7 +4059,7 @@ out:
 	return status;
 }
 
-int nfs4_discover_trunking(struct nfs_server *server, struct nfs_fh *fhandle)
+static int nfs4_discover_trunking(struct nfs_server *server, struct nfs_fh *fhandle)
 {
 	struct nfs4_exception exception = {
 		.interruptible = true,
