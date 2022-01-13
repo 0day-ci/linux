@@ -594,7 +594,7 @@ struct transaction_s
 	 */
 	unsigned long		t_log_start;
 
-	/* 
+	/*
 	 * Number of buffers on the t_buffers list [j_list_lock, no locks
 	 * needed for jbd2 thread]
 	 */
@@ -1755,6 +1755,35 @@ static inline unsigned long jbd2_log_space_left(journal_t *journal)
                         j_committing_transaction->t_outstanding_credits);
 	}
 	return max_t(long, free, 0);
+}
+
+/*
+ * Waits for any outstanding t_updates to finish.
+ * This is called with write j_state_lock held.
+ */
+static inline void jbd2_journal_wait_updates(journal_t *journal)
+{
+	transaction_t *commit_transaction = journal->j_running_transaction;
+
+	if (!commit_transaction)
+		return;
+
+	spin_lock(&commit_transaction->t_handle_lock);
+	while (atomic_read(&commit_transaction->t_updates)) {
+		DEFINE_WAIT(wait);
+
+		prepare_to_wait(&journal->j_wait_updates, &wait,
+					TASK_UNINTERRUPTIBLE);
+		if (atomic_read(&commit_transaction->t_updates)) {
+			spin_unlock(&commit_transaction->t_handle_lock);
+			write_unlock(&journal->j_state_lock);
+			schedule();
+			write_lock(&journal->j_state_lock);
+			spin_lock(&commit_transaction->t_handle_lock);
+		}
+		finish_wait(&journal->j_wait_updates, &wait);
+	}
+	spin_unlock(&commit_transaction->t_handle_lock);
 }
 
 /*
