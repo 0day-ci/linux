@@ -39,17 +39,23 @@ struct kernfs_open_file_mutex {
 	struct mutex lock;
 } ____cacheline_aligned_in_smp;
 
+struct kernfs_iattr_rwsem {
+	struct rw_semaphore rwsem;
+} ____cacheline_aligned_in_smp;
+
 /*
  * There's one kernfs_open_file for each open file and one kernfs_open_node
  * for each kernfs_node with one or more open files.
  *
  * kernfs_node->attr.open points to kernfs_open_node.  attr.open is
- * protected by open_node_locks[i].
+ * protected by open_node_locks[i].lock.
  *
  * filp->private_data points to seq_file whose ->private points to
  * kernfs_open_file.  kernfs_open_files are chained at
- * kernfs_open_node->files, which is protected by open_file_mutex[i].
+ * kernfs_open_node->files, which is protected by open_file_mutex[i].lock.
  *
+ * kernfs_node->iattr points to kernfs_node's attributes  and is
+ * protected by iattr_rwsem[i].rwsem
  * To reduce possible contention in sysfs access, arising due to single
  * locks, use an array of locks and use kernfs_node object address as
  * hash keys to get the index of these locks.
@@ -58,6 +64,7 @@ struct kernfs_open_file_mutex {
 struct kernfs_global_locks {
 	struct kernfs_open_node_lock open_node_locks[NR_KERNFS_LOCKS];
 	struct kernfs_open_file_mutex open_file_mutex[NR_KERNFS_LOCKS];
+	struct kernfs_iattr_rwsem iattr_rwsem[NR_KERNFS_LOCKS];
 };
 
 static struct kernfs_global_locks kernfs_global_locks;
@@ -74,6 +81,13 @@ static inline struct mutex *open_file_mutex_ptr(struct kernfs_node *kn)
 	int index = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
 
 	return &kernfs_global_locks.open_file_mutex[index].lock;
+}
+
+static inline struct rw_semaphore *iattr_rwsem_ptr(struct kernfs_node *kn)
+{
+	int index = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	return &kernfs_global_locks.iattr_rwsem[index].rwsem;
 }
 
 struct kernfs_iattrs {

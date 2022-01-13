@@ -720,6 +720,7 @@ int kernfs_add_one(struct kernfs_node *kn)
 	struct kernfs_node *parent = kn->parent;
 	struct kernfs_root *root = kernfs_root(parent);
 	struct kernfs_iattrs *ps_iattr;
+	struct rw_semaphore *rwsem = NULL;
 	bool has_ns;
 	int ret;
 
@@ -748,11 +749,14 @@ int kernfs_add_one(struct kernfs_node *kn)
 		goto out_unlock;
 
 	/* Update timestamps on the parent */
+	rwsem = iattr_rwsem_ptr(parent);
+	down_write(rwsem);
 	ps_iattr = parent->iattr;
 	if (ps_iattr) {
 		ktime_get_real_ts64(&ps_iattr->ia_ctime);
 		ps_iattr->ia_mtime = ps_iattr->ia_ctime;
 	}
+	up_write(rwsem);
 
 	up_write(&root->kernfs_rwsem);
 
@@ -1326,6 +1330,7 @@ void kernfs_activate(struct kernfs_node *kn)
 static void __kernfs_remove(struct kernfs_node *kn)
 {
 	struct kernfs_node *pos;
+	struct rw_semaphore *rwsem;
 
 	lockdep_assert_held_write(&kernfs_root(kn)->kernfs_rwsem);
 
@@ -1378,8 +1383,11 @@ static void __kernfs_remove(struct kernfs_node *kn)
 
 			/* update timestamps on the parent */
 			if (ps_iattr) {
+				rwsem = iattr_rwsem_ptr(pos->parent);
+				down_write(rwsem);
 				ktime_get_real_ts64(&ps_iattr->ia_ctime);
 				ps_iattr->ia_mtime = ps_iattr->ia_ctime;
+				up_write(rwsem);
 			}
 
 			kernfs_put(pos);
