@@ -347,6 +347,7 @@ static inline unsigned long get_xmm(int n)
 }
 
 bool is_intel_cpu(void);
+bool is_amd_cpu(void);
 
 struct kvm_x86_state;
 struct kvm_x86_state *vcpu_save_state(struct kvm_vm *vm, uint32_t vcpuid);
