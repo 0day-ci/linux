@@ -560,10 +560,10 @@ static __init int stack_trace_init(void)
 		return 0;
 
 	trace_create_file("stack_max_size", TRACE_MODE_WRITE, NULL,
-			&stack_trace_max_size, &stack_max_size_fops);
+			  &stack_trace_max_size, &stack_max_size_fops);
 
 	trace_create_file("stack_trace", TRACE_MODE_READ, NULL,
-			NULL, &stack_trace_fops);
+			  NULL, &stack_trace_fops);
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 	trace_create_file("stack_trace_filter", TRACE_MODE_WRITE, NULL,

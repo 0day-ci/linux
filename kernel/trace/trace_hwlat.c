@@ -796,7 +796,7 @@ static int init_tracefs(void)
 	if (!hwlat_sample_width)
 		goto err;
 
-	hwlat_thread_mode = trace_create_file("mode", TRACE_MODE_WRITE,
+	hwlat_thread_mode = tracefs_create_file("mode", TRACE_MODE_WRITE,
 					      top_dir,
 					      NULL,
 					      &thread_mode_fops);

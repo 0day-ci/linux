@@ -1652,10 +1652,10 @@ static __init int init_uprobe_trace(void)
 		return 0;
 
 	trace_create_file("uprobe_events", TRACE_MODE_WRITE, NULL,
-				    NULL, &uprobe_events_ops);
+			  NULL, &uprobe_events_ops);
 	/* Profile interface */
 	trace_create_file("uprobe_profile", TRACE_MODE_READ, NULL,
-				    NULL, &uprobe_profile_ops);
+			  NULL, &uprobe_profile_ops);
 	return 0;
 }
 

@@ -9422,10 +9422,10 @@ init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 	int cpu;
 
 	trace_create_file("available_tracers", TRACE_MODE_READ, d_tracer,
-			tr, &show_traces_fops);
+			  tr, &show_traces_fops);
 
 	trace_create_file("current_tracer", TRACE_MODE_WRITE, d_tracer,
-			tr, &set_tracer_fops);
+			  tr, &set_tracer_fops);
 
 	trace_create_file("tracing_cpumask", TRACE_MODE_WRITE, d_tracer,
 			  tr, &tracing_cpumask_fops);
@@ -9472,7 +9472,7 @@ init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 	tr->buffer_percent = 50;
 
 	trace_create_file("buffer_percent", TRACE_MODE_READ, d_tracer,
-			tr, &buffer_percent_fops);
+			  tr, &buffer_percent_fops);
 
 	create_trace_options_dir(tr);
 
@@ -9680,19 +9680,19 @@ static __init int tracer_init_tracefs(void)
 	ftrace_init_tracefs_toplevel(&global_trace, NULL);
 
 	trace_create_file("tracing_thresh", TRACE_MODE_WRITE, NULL,
-			&global_trace, &tracing_thresh_fops);
+			  &global_trace, &tracing_thresh_fops);
 
 	trace_create_file("README", TRACE_MODE_READ, NULL,
-			NULL, &tracing_readme_fops);
+			  NULL, &tracing_readme_fops);
 
 	trace_create_file("saved_cmdlines", TRACE_MODE_READ, NULL,
-			NULL, &tracing_saved_cmdlines_fops);
+			  NULL, &tracing_saved_cmdlines_fops);
 
 	trace_create_file("saved_cmdlines_size", TRACE_MODE_WRITE, NULL,
 			  NULL, &tracing_saved_cmdlines_size_fops);
 
 	trace_create_file("saved_tgids", TRACE_MODE_READ, NULL,
-			NULL, &tracing_saved_tgids_fops);
+			  NULL, &tracing_saved_tgids_fops);
 
 	trace_eval_init();
 
@@ -9704,7 +9704,7 @@ static __init int tracer_init_tracefs(void)
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 	trace_create_file("dyn_ftrace_total_info", TRACE_MODE_READ, NULL,
-			NULL, &tracing_dyn_info_fops);
+			  NULL, &tracing_dyn_info_fops);
 #endif
 
 	create_trace_instances(NULL);

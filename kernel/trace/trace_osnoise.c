@@ -2075,7 +2075,7 @@ static int init_tracefs(void)
 	if (!tmp)
 		goto err;
 
-	tmp = trace_create_file("cpus", TRACE_MODE_WRITE, top_dir, NULL, &cpus_fops);
+	tmp = tracefs_create_file("cpus", TRACE_MODE_WRITE, top_dir, NULL, &cpus_fops);
 	if (!tmp)
 		goto err;
 
