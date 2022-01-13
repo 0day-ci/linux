@@ -154,6 +154,82 @@ struct kvm_cpuid2 *vcpu_alloc_cpuid(struct kvm_vm *vm, vm_vaddr_t *p_gva, struct
 	return guest_cpuids;
 }
 
+static inline struct kvm_cpuid_entry2 *cpuid_entry2_find(
+	struct kvm_cpuid_entry2 *entries, int nent, u32 function, u32 index)
+{
+	struct kvm_cpuid_entry2 *e;
+	int i;
+
+	for (i = 0; i < nent; i++) {
+		e = &entries[i];
+
+		if (e->function == function &&
+		    (!(e->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX) || e->index == index))
+			return e;
+	}
+
+	return NULL;
+}
+
+static void set_cpuid_after_run(struct kvm_vm *vm, struct kvm_cpuid2 *cpuid)
+{
+	struct kvm_cpuid_entry2 *ent;
+	int rc;
+	u32 eax, ebx, x;
+
+	/* Setting unmodified CPUID is allowed */
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(!rc, "Setting unmodified CPUID after KVM_RUN failed: %d", rc);
+
+	/* Changing initial APIC id is allowed */
+	ent = get_cpuid(cpuid, 0x1, 0);
+	x = ent->ebx >> 24;
+	ent->ebx = (ent->ebx & ~0xff000000u) | (x + 2) << 24;
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(!rc, "Changing initial APIC id failed: %d", rc);
+
+	/* Changing other bits in CPUID.01H is forbidden */
+	eax = ent->eax;
+	ebx = ent->ebx;
+	ent->eax++;
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(rc, "Changing CPUID.01H.EAX should fail");
+	ent->eax = eax;
+	ent->ebx++;
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(rc, "Changing lower bits of CPUID.01H.EBX should fail");
+	ent->ebx = ebx;
+
+	/* Changing x2APIC id is allowed */
+	ent = get_cpuid(cpuid, 0xb, 0);
+	ent->edx += 2;
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(!rc, "Changing x2APIC id failed: %d", rc);
+
+	/* Changing MAXPHYADDR is forbidden */
+	ent = get_cpuid(cpuid, 0x80000008, 0);
+	eax = ent->eax;
+	x = eax & 0xff;
+	ent->eax = (eax & ~0xffu) | (x - 1);
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(rc, "Changing MAXPHYADDR should fail");
+	ent->eax = eax;
+
+	/* Changing processor serial number is allowed */
+	ent = get_cpuid(cpuid, 0x3, 0);
+	ent->ecx += 1;
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(!rc, "Changing processor serial number failed: %d", rc);
+
+	/* Changing CPU features is forbidden */
+	ent = get_cpuid(cpuid, 0x7, 0);
+	ebx = ent->ebx;
+	ent->ebx--;
+	rc = __vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+	TEST_ASSERT(rc, "Changing CPU features should fail");
+	ent->ebx = ebx;
+}
+
 int main(void)
 {
 	struct kvm_cpuid2 *supp_cpuid, *cpuid2;
@@ -174,6 +250,8 @@ int main(void)
 
 	for (stage = 0; stage < 3; stage++)
 		run_vcpu(vm, VCPU_ID, stage);
+
+	set_cpuid_after_run(vm, cpuid2);
 
 	kvm_vm_free(vm);
 }
