@@ -57,6 +57,7 @@ struct arm_spe_pmu {
 	u16					pmsver;
 	u16					min_period;
 	u16					counter_sz;
+	bool					pmscr_cx;
 
 #define SPE_PMU_FEAT_FILT_EVT			(1UL << 0)
 #define SPE_PMU_FEAT_FILT_TYP			(1UL << 1)
@@ -260,6 +261,7 @@ static const struct attribute_group *arm_spe_pmu_attr_groups[] = {
 static u64 arm_spe_event_to_pmscr(struct perf_event *event)
 {
 	struct perf_event_attr *attr = &event->attr;
+	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
 	u64 reg = 0;
 
 	reg |= ATTR_CFG_GET_FLD(attr, ts_enable) << SYS_PMSCR_EL1_TS_SHIFT;
@@ -272,7 +274,7 @@ static u64 arm_spe_event_to_pmscr(struct perf_event *event)
 	if (!attr->exclude_kernel)
 		reg |= BIT(SYS_PMSCR_EL1_E1SPE_SHIFT);
 
-	if (IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR) && perfmon_capable())
+	if (IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR) && spe_pmu->pmscr_cx)
 		reg |= BIT(SYS_PMSCR_EL1_CX_SHIFT);
 
 	return reg;
@@ -709,10 +711,10 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
 	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
 		return -EOPNOTSUPP;
 
+	spe_pmu->pmscr_cx = perfmon_capable();
 	reg = arm_spe_event_to_pmscr(event);
 	if (!perfmon_capable() &&
 	    (reg & (BIT(SYS_PMSCR_EL1_PA_SHIFT) |
-		    BIT(SYS_PMSCR_EL1_CX_SHIFT) |
 		    BIT(SYS_PMSCR_EL1_PCT_SHIFT))))
 		return -EACCES;
 
