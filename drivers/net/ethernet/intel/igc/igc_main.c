@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c)  2018 Intel Corporation */
 
+#include "net/xdp.h"
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/if_vlan.h>
@@ -505,12 +506,14 @@ int igc_setup_rx_resources(struct igc_ring *rx_ring)
 	u8 index = rx_ring->queue_index;
 	int size, desc_len, res;
 
-	res = xdp_rxq_info_reg(&rx_ring->xdp_rxq, ndev, index,
-			       rx_ring->q_vector->napi.napi_id);
-	if (res < 0) {
-		netdev_err(ndev, "Failed to register xdp_rxq index %u\n",
-			   index);
-		return res;
+	if (!xdp_rxq_info_is_reg(&rx_ring->xdp_rxq)) {
+		res = xdp_rxq_info_reg(&rx_ring->xdp_rxq, ndev, index,
+				       rx_ring->q_vector->napi.napi_id);
+		if (res < 0) {
+			netdev_err(ndev, "Failed to register xdp_rxq index %u\n",
+				   index);
+			return res;
+		}
 	}
 
 	size = sizeof(struct igc_rx_buffer) * rx_ring->count;
