@@ -80,9 +80,11 @@ static inline struct kvm_cpuid_entry2 *cpuid_entry2_find(
 	return NULL;
 }
 
-static int kvm_check_cpuid(struct kvm_cpuid_entry2 *entries, int nent)
+static int kvm_check_cpuid(struct kvm_vcpu *vcpu, struct kvm_cpuid_entry2 *entries,
+			   int nent, bool is_update)
 {
-	struct kvm_cpuid_entry2 *best;
+	struct kvm_cpuid_entry2 *best, *e;
+	int i;
 
 	/*
 	 * The existing code assumes virtual address is 48-bit or 57-bit in the
@@ -94,6 +96,59 @@ static int kvm_check_cpuid(struct kvm_cpuid_entry2 *entries, int nent)
 
 		if (vaddr_bits != 48 && vaddr_bits != 57 && vaddr_bits != 0)
 			return -EINVAL;
+	}
+
+	if (!is_update)
+		return 0;
+
+	/*
+	 * KVM does not correctly handle changing guest CPUID after KVM_RUN, as
+	 * MAXPHYADDR, GBPAGES support, AMD reserved bit behavior, etc.. aren't
+	 * tracked in kvm_mmu_page_role.  As a result, KVM may miss guest page
+	 * faults due to reusing SPs/SPTEs. In practice no sane VMM mucks with
+	 * the core vCPU model on the fly. It would've been better to forbid any
+	 * KVM_SET_CPUID{,2} calls after KVM_RUN altogether but unfortunately
+	 * some VMMs (e.g. QEMU) reuse vCPU fds for CPU hotplug/unplug and they
+	 * need to set CPUID to e.g. change [x2]APIC id. Implement an allowlist
+	 * of CPUIDs which are allowed to change.
+	 */
+	for (i = 0; i < nent; i++) {
+		e = &entries[i];
+
+		best = kvm_find_cpuid_entry(vcpu, e->function, e->index);
+		if (!best)
+			return -EINVAL;
+
+		switch (e->function) {
+		case 0x1:
+			/* Only initial LAPIC id is allowed to change */
+			if (e->eax != best->eax ||
+			    (e->ebx & ~0xff000000u) != (best->ebx & ~0xff000000u) ||
+			     e->ecx != best->ecx || e->edx != best->edx)
+				return -EINVAL;
+			break;
+		case 0x3:
+			/* processor serial number */
+		case 0x4:
+			/* cache parameters */
+		case 0xb:
+		case 0x1f:
+			/* x2APIC id and CPU topology */
+		case 0x80000005:
+			/* AMD l1 cache information */
+		case 0x80000006:
+			/* l2 cache information */
+		case 0x8000001d:
+			/* AMD cache topology */
+		case 0x8000001e:
+			/* AMD processor topology */
+			break;
+		default:
+			if (e->eax != best->eax || e->ebx != best->ebx ||
+			    e->ecx != best->ecx || e->edx != best->edx)
+				return -EINVAL;
+			break;
+		}
 	}
 
 	return 0;
@@ -290,10 +345,11 @@ static int kvm_set_cpuid(struct kvm_vcpu *vcpu, struct kvm_cpuid_entry2 *e2,
                         int nent)
 {
 	int r;
+	bool is_update = vcpu->arch.last_vmentry_cpu != -1;
 
 	__kvm_update_cpuid_runtime(vcpu, e2, nent);
 
-	r = kvm_check_cpuid(e2, nent);
+	r = kvm_check_cpuid(vcpu, e2, nent, is_update);
 	if (r)
 		return r;
 
@@ -302,7 +358,13 @@ static int kvm_set_cpuid(struct kvm_vcpu *vcpu, struct kvm_cpuid_entry2 *e2,
 	vcpu->arch.cpuid_nent = nent;
 
 	kvm_update_kvm_cpuid_base(vcpu);
-	kvm_vcpu_after_set_cpuid(vcpu);
+
+	/*
+	 * KVM_SET_CPUID{,2} after KVM_RUN is not allowed to change vCPU features, see
+	 * kvm_check_cpuid().
+	 */
+	if (!is_update)
+		kvm_vcpu_after_set_cpuid(vcpu);
 
 	return 0;
 }
