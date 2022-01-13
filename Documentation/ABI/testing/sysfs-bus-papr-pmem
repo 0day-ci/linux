@@ -61,3 +61,16 @@ Description:
 		* "CchRHCnt" : Cache Read Hit Count
 		* "CchWHCnt" : Cache Write Hit Count
 		* "FastWCnt" : Fast Write Count
+
+What:		/sys/bus/nd/devices/nmemX/papr/health_bitmap_override
+Date:		Jan, 2022
+KernelVersion:	v5.17
+Contact:	linuxppc-dev <linuxppc-dev@lists.ozlabs.org>, nvdimm@lists.linux.dev,
+Description:
+		(RO) Reports the health bitmap override/mask bitmaps that are
+		applied to top bitmap received from PowerVM via the H_SCM_HEALTH
+		Hcall. Together these can be used to forcibly set/reset specific
+		bits returned from Hcall. These bitmaps are presently used to
+		simulate various health or shutdown states for an nvdimm and are
+		set by user-space tools like ndctl by issuing a PAPR DSM.
+

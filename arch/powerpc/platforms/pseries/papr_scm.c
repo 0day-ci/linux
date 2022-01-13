@@ -68,6 +68,10 @@
 #define PAPR_SCM_PERF_STATS_EYECATCHER __stringify(SCMSTATS)
 #define PAPR_SCM_PERF_STATS_VERSION 0x1
 
+/* Use bitblt method to override specific bits in the '_bitmap_' */
+#define BITBLT_BITMAP(_bitmap_, _mask_, _override_)		\
+	(((_bitmap_) & ~(_mask_)) | ((_mask_) & (_override_)))
+
 /* Struct holding a single performance metric */
 struct papr_scm_perf_stat {
 	u8 stat_id[8];
@@ -120,6 +124,12 @@ struct papr_scm_priv {
 
 	/* length of the stat buffer as expected by phyp */
 	size_t stat_buffer_len;
+
+	/* The bits which needs to be overridden */
+	u64 health_bitmap_mask;
+
+	/* The overridden values for the bits having the masks set */
+	u64 health_bitmap_override;
 };
 
 static int papr_scm_pmem_flush(struct nd_region *nd_region,
@@ -347,19 +357,28 @@ static ssize_t drc_pmem_query_stats(struct papr_scm_priv *p,
 static int __drc_pmem_query_health(struct papr_scm_priv *p)
 {
 	unsigned long ret[PLPAR_HCALL_BUFSIZE];
+	u64 bitmap = 0;
 	long rc;
 
 	/* issue the hcall */
 	rc = plpar_hcall(H_SCM_HEALTH, ret, p->drc_index);
-	if (rc != H_SUCCESS) {
+	if (rc == H_SUCCESS)
+		bitmap = ret[0] & ret[1];
+	else if (rc == H_FUNCTION)
+		dev_info_once(&p->pdev->dev,
+			      "Hcall H_SCM_HEALTH not implemented, assuming empty health bitmap");
+	else {
+
 		dev_err(&p->pdev->dev,
 			"Failed to query health information, Err:%ld\n", rc);
 		return -ENXIO;
 	}
 
 	p->lasthealth_jiffies = jiffies;
-	p->health_bitmap = ret[0] & ret[1];
-
+	/* Allow overriding specific health bits via bit blt. */
+	bitmap = BITBLT_BITMAP(bitmap, p->health_bitmap_mask,
+			       p->health_bitmap_override);
+	WRITE_ONCE(p->health_bitmap, bitmap);
 	dev_dbg(&p->pdev->dev,
 		"Queried dimm health info. Bitmap:0x%016lx Mask:0x%016lx\n",
 		ret[0], ret[1]);
@@ -669,6 +688,54 @@ out:
 	return rc;
 }
 
+/* Inject a smart error Add the dirty-shutdown-counter value to the pdsm */
+static int papr_pdsm_smart_inject(struct papr_scm_priv *p,
+				  union nd_pdsm_payload *payload)
+{
+	int rc;
+	u32 supported_flags = 0;
+	u64 mask = 0, override = 0;
+
+	/* Check for individual smart error flags and update mask and override */
+	if (payload->smart_inject.flags & PDSM_SMART_INJECT_HEALTH_FATAL) {
+		supported_flags |= PDSM_SMART_INJECT_HEALTH_FATAL;
+		mask |= PAPR_PMEM_HEALTH_FATAL;
+		override |= payload->smart_inject.fatal_enable ?
+			PAPR_PMEM_HEALTH_FATAL : 0;
+	}
+
+	if (payload->smart_inject.flags & PDSM_SMART_INJECT_BAD_SHUTDOWN) {
+		supported_flags |= PDSM_SMART_INJECT_BAD_SHUTDOWN;
+		mask |= PAPR_PMEM_SHUTDOWN_DIRTY;
+		override |= payload->smart_inject.unsafe_shutdown_enable ?
+			PAPR_PMEM_SHUTDOWN_DIRTY : 0;
+	}
+
+	dev_dbg(&p->pdev->dev, "[Smart-inject] Mask=%#llx override=%#llx\n",
+		mask, override);
+
+	/* Prevent concurrent access to dimm health bitmap related members */
+	rc = mutex_lock_interruptible(&p->health_mutex);
+	if (rc)
+		return rc;
+
+	/* Bitblt mask/override to corrosponding health_bitmap couterparts */
+	p->health_bitmap_mask = BITBLT_BITMAP(p->health_bitmap_mask,
+					      mask, override);
+	p->health_bitmap_override = BITBLT_BITMAP(p->health_bitmap_override,
+						  mask, override);
+
+	/* Invalidate cached health bitmap */
+	p->lasthealth_jiffies = 0;
+
+	mutex_unlock(&p->health_mutex);
+
+	/* Return the supported flags back to userspace */
+	payload->smart_inject.flags = supported_flags;
+
+	return sizeof(struct nd_papr_pdsm_health);
+}
+
 /*
  * 'struct pdsm_cmd_desc'
  * Identifies supported PDSMs' expected length of in/out payloads
@@ -701,6 +768,12 @@ static const struct pdsm_cmd_desc __pdsm_cmd_descriptors[] = {
 		.size_in = 0,
 		.size_out = sizeof(struct nd_papr_pdsm_health),
 		.service = papr_pdsm_health,
+	},
+
+	[PAPR_PDSM_SMART_INJECT] = {
+		.size_in = sizeof(struct nd_papr_pdsm_smart_inject),
+		.size_out = sizeof(struct nd_papr_pdsm_smart_inject),
+		.service = papr_pdsm_smart_inject,
 	},
 	/* Empty */
 	[PAPR_PDSM_MAX] = {
@@ -838,6 +911,20 @@ static int papr_scm_ndctl(struct nvdimm_bus_descriptor *nd_desc,
 	return 0;
 }
 
+static ssize_t health_bitmap_override_show(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	struct nvdimm *dimm = to_nvdimm(dev);
+	struct papr_scm_priv *p = nvdimm_provider_data(dimm);
+
+	return sprintf(buf, "mask=%#llx override=%#llx\n",
+		       READ_ONCE(p->health_bitmap_mask),
+		       READ_ONCE(p->health_bitmap_override));
+}
+
+static DEVICE_ATTR_ADMIN_RO(health_bitmap_override);
+
 static ssize_t perf_stats_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
@@ -952,6 +1039,7 @@ static struct attribute *papr_nd_attributes[] = {
 	&dev_attr_flags.attr,
 	&dev_attr_perf_stats.attr,
 	&dev_attr_dirty_shutdown.attr,
+	&dev_attr_health_bitmap_override.attr,
 	NULL,
 };
 
