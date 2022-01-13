@@ -623,8 +623,13 @@ xfs_fs_alloc_inode(
 }
 
 /*
- * Now that the generic code is guaranteed not to be accessing
- * the linux inode, we can inactivate and reclaim the inode.
+ * Now that the generic code is guaranteed not to be accessing the inode, we can
+ * inactivate and reclaim it.
+ *
+ * NOTE: ->destroy_inode() can be called (with ->s_umount held) while the
+ * filesystem is frozen. Therefore it is generally unsafe to attempt transaction
+ * allocation in this context. A transaction alloc that blocks on frozen state
+ * from a context with ->s_umount held will deadlock with unfreeze.
  */
 STATIC void
 xfs_fs_destroy_inode(
@@ -764,6 +769,16 @@ xfs_fs_sync_fs(
 	 * when the state is either SB_FREEZE_FS or SB_FREEZE_COMPLETE.
 	 */
 	if (sb->s_writers.frozen == SB_FREEZE_PAGEFAULT) {
+		struct xfs_icwalk	icw = {0};
+
+		/*
+		 * Clear out eofb and cowblocks inodes so eviction while frozen
+		 * doesn't leave them sitting in the inactivation queue where
+		 * they cannot be processed.
+		 */
+		icw.icw_flags = XFS_ICWALK_FLAG_SYNC;
+		xfs_blockgc_free_space(mp, &icw);
+
 		xfs_inodegc_stop(mp);
 		xfs_blockgc_stop(mp);
 	}
