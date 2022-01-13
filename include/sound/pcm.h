@@ -470,6 +470,7 @@ struct snd_pcm_substream {
 	/* -- assigned files -- */
 	int ref_count;
 	atomic_t mmap_count;
+	atomic_t queued_hw_free;
 	unsigned int f_flags;
 	void (*pcm_release)(struct snd_pcm_substream *);
 	struct pid *pid;

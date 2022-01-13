@@ -686,10 +686,13 @@ static int snd_pcm_hw_params(struct snd_pcm_substream *substream,
 	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_OPEN:
+		if (atomic_read(&substream->queued_hw_free))
+			goto __badfd;
 	case SNDRV_PCM_STATE_SETUP:
 	case SNDRV_PCM_STATE_PREPARED:
 		break;
 	default:
+__badfd:
 		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
 	}
@@ -829,6 +832,7 @@ static int do_hw_free(struct snd_pcm_substream *substream)
 		result = substream->ops->hw_free(substream);
 	if (substream->managed_buffer_alloc)
 		snd_pcm_lib_free_pages(substream);
+	atomic_set(&substream->queued_hw_free, 0);
 	return result;
 }
 
@@ -1454,6 +1458,8 @@ static void snd_pcm_post_stop(struct snd_pcm_substream *substream,
 	}
 	wake_up(&runtime->sleep);
 	wake_up(&runtime->tsleep);
+	if (state == SNDRV_PCM_STATE_OPEN)
+		atomic_set(&substream->queued_hw_free, 1);
 }
 
 static const struct action_ops snd_pcm_action_stop = {
@@ -1468,6 +1474,9 @@ static const struct action_ops snd_pcm_action_stop = {
  * @state: PCM state after stopping the stream
  *
  * The state of each stream is then changed to the given state unconditionally.
+ *
+ * If the requested state is OPEN, the stream is invalidated and
+ * the application must call hw_free to recover the operation.
  *
  * Return: Zero if successful, or a negative error code.
  */
@@ -2637,7 +2646,8 @@ void snd_pcm_release_substream(struct snd_pcm_substream *substream)
 
 	snd_pcm_drop(substream);
 	if (substream->hw_opened) {
-		if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN ||
+		    atomic_read(&substream->queued_hw_free))
 			do_hw_free(substream);
 		substream->ops->close(substream);
 		substream->hw_opened = 0;
