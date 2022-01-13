@@ -3,6 +3,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/clocksource.h>
+#include <linux/clockchips.h>
 #include <asm/virt.h>
 
 struct goldfish_timer {
@@ -41,7 +42,25 @@ static struct clocksource goldfish_timer = {
 	.max_idle_ns	= LONG_MAX,
 };
 
-static irqreturn_t golfish_timer_handler(int irq, void *dev_id)
+static int goldfish_timer_set_oneshot(struct clock_event_device *evt)
+{
+	gf_timer->alarm_high = 0;
+	gf_timer->alarm_low = 0;
+
+	gf_timer->irq_enabled = 1;
+
+	return 0;
+}
+
+static int goldfish_timer_shutdown(struct clock_event_device *evt)
+{
+	gf_timer->irq_enabled = 0;
+
+	return 0;
+}
+
+static int goldfish_timer_next_event(unsigned long delta,
+				     struct clock_event_device *evt)
 {
 	u64 now;
 
@@ -49,11 +68,28 @@ static irqreturn_t golfish_timer_handler(int irq, void *dev_id)
 
 	now = goldfish_timer_read(NULL);
 
-	legacy_timer_tick(1);
+	now += delta;
 
-	now += NSEC_PER_SEC / HZ;
 	gf_timer->alarm_high = upper_32_bits(now);
 	gf_timer->alarm_low = lower_32_bits(now);
+
+	return 0;
+}
+
+struct clock_event_device goldfish_timer_clockevent = {
+	.name			= "goldfish_timer",
+	.features		= CLOCK_EVT_FEAT_ONESHOT,
+	.set_state_shutdown	= goldfish_timer_shutdown,
+	.set_state_oneshot      = goldfish_timer_set_oneshot,
+	.set_next_event		= goldfish_timer_next_event,
+	.shift			= 32,
+};
+
+static irqreturn_t golfish_timer_tick(int irq, void *dev_id)
+{
+	struct clock_event_device *evt = &goldfish_timer_clockevent;
+
+	evt->event_handler(evt);
 
 	return IRQ_HANDLED;
 }
@@ -61,7 +97,6 @@ static irqreturn_t golfish_timer_handler(int irq, void *dev_id)
 void __init virt_sched_init(void)
 {
 	static struct resource sched_res;
-	u64 now;
 
 	sched_res.name  = "goldfish_timer";
 	sched_res.start = virt_bi_data.rtc.mmio;
@@ -72,19 +107,14 @@ void __init virt_sched_init(void)
 		return;
 	}
 
-	if (request_irq(virt_bi_data.rtc.irq, golfish_timer_handler, IRQF_TIMER,
+	clockevents_config_and_register(&goldfish_timer_clockevent, NSEC_PER_SEC,
+					1, 0xffffffff);
+
+	if (request_irq(virt_bi_data.rtc.irq, golfish_timer_tick, IRQF_TIMER,
 			"timer", NULL)) {
 		pr_err("Couldn't register timer interrupt\n");
 		return;
 	}
-
-	now = goldfish_timer_read(NULL);
-	now += NSEC_PER_SEC / HZ;
-
-	gf_timer->clear_interrupt = 1;
-	gf_timer->alarm_high = upper_32_bits(now);
-	gf_timer->alarm_low = lower_32_bits(now);
-	gf_timer->irq_enabled = 1;
 
 	clocksource_register_hz(&goldfish_timer, NSEC_PER_SEC);
 }
