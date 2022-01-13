@@ -318,9 +318,13 @@ int sata_link_resume(struct ata_link *link, const unsigned long *params,
 		 * debouncing. Duration can be configured with module
 		 * parameter debounce_delay_ms.
 		 */
-		if (!(link->flags & ATA_LFLAG_NO_DEBOUNCE_DELAY))
+		if (!(link->flags & ATA_LFLAG_NO_DEBOUNCE_DELAY)) {
 			ata_msleep(link->ap,
 					(libata_debounce_delay_ms < 0) ? 200 : libata_debounce_delay_ms);
+			if (libata_debounce_delay_ms < 0)
+				/* negative values are default */
+				ata_link_warn(link, "Due to historical reasons a 200 ms delay is applied in sata_link_resume(). Most controllers do not need that, so the default will change to 0 ms in Linux 5.19. Please test with lower values using libata.debounce_delay_ms and report the results <linux-ide@vger.kernel.org>.\n");
+		}
 
 		/* is SControl restored correctly? */
 		if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
