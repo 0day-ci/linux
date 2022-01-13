@@ -814,7 +814,6 @@ static int extract_key_parameters(struct tpm_key *tk)
 {
 	const void *cur = tk->blob;
 	uint32_t len = tk->blob_len;
-	const void *pub_key;
 	uint32_t sz;
 	uint32_t key_len;
 
@@ -845,14 +844,14 @@ static int extract_key_parameters(struct tpm_key *tk)
 		return -EBADMSG;
 
 	sz = get_unaligned_be32(cur + 8);
-	if (len < sz + 12)
-		return -EBADMSG;
 
 	/* Move to TPM_RSA_KEY_PARMS */
-	len -= 12;
 	cur += 12;
+	len -= 12;
 
 	/* Grab the RSA key length */
+	if (len < 4)
+		return -EBADMSG;
 	key_len = get_unaligned_be32(cur);
 
 	switch (key_len) {
@@ -866,29 +865,36 @@ static int extract_key_parameters(struct tpm_key *tk)
 	}
 
 	/* Move just past TPM_KEY_PARMS */
+	if (len < sz)
+		return -EBADMSG;
 	cur += sz;
 	len -= sz;
 
 	if (len < 4)
 		return -EBADMSG;
-
 	sz = get_unaligned_be32(cur);
-	if (len < 4 + sz)
-		return -EBADMSG;
+	cur += 4;
+	len -= 4;
 
 	/* Move to TPM_STORE_PUBKEY */
-	cur += 4 + sz;
-	len -= 4 + sz;
+	if (len < sz)
+		return -EBADMSG;
+	cur += sz;
+	len -= sz;
 
 	/* Grab the size of the public key, it should jive with the key size */
+	if (len < 4)
+		return -EBADMSG;
 	sz = get_unaligned_be32(cur);
+	cur += 4;
+	len -= 4;
 	if (sz > 256)
 		return -EINVAL;
-
-	pub_key = cur + 4;
+	if (len < sz)
+		return -EBADMSG;
 
 	tk->key_len = key_len;
-	tk->pub_key = pub_key;
+	tk->pub_key = cur;
 	tk->pub_key_len = sz;
 
 	return 0;
