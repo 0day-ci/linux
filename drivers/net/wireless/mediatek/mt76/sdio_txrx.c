@@ -223,12 +223,11 @@ static int __mt76s_xmit_queue(struct mt76_dev *dev, u8 *data, int len)
 
 static int mt76s_tx_run_queue(struct mt76_dev *dev, struct mt76_queue *q)
 {
-	int qid, err, nframes = 0, len = 0, pse_sz = 0, ple_sz = 0;
+	int err, nframes = 0, len = 0, pse_sz = 0, ple_sz = 0;
 	bool mcu = q == dev->q_mcu[MT_MCUQ_WM];
 	struct mt76_sdio *sdio = &dev->sdio;
 	u8 pad;
 
-	qid = mcu ? ARRAY_SIZE(sdio->xmit_buf) - 1 : q->qid;
 	while (q->first != q->head) {
 		struct mt76_queue_entry *e = &q->entry[q->first];
 		struct sk_buff *iter;
@@ -256,20 +255,18 @@ static int mt76s_tx_run_queue(struct mt76_dev *dev, struct mt76_queue *q)
 					&ple_sz))
 			break;
 
-		memcpy(sdio->xmit_buf[qid] + len, e->skb->data,
-		       skb_headlen(e->skb));
+		memcpy(sdio->xmit_buf + len, e->skb->data, skb_headlen(e->skb));
 		len += skb_headlen(e->skb);
 		nframes++;
 
 		skb_walk_frags(e->skb, iter) {
-			memcpy(sdio->xmit_buf[qid] + len, iter->data,
-			       iter->len);
+			memcpy(sdio->xmit_buf + len, iter->data, iter->len);
 			len += iter->len;
 			nframes++;
 		}
 
 		if (unlikely(pad)) {
-			memset(sdio->xmit_buf[qid] + len, 0, pad);
+			memset(sdio->xmit_buf + len, 0, pad);
 			len += pad;
 		}
 next:
@@ -278,8 +275,8 @@ next:
 	}
 
 	if (nframes) {
-		memset(sdio->xmit_buf[qid] + len, 0, 4);
-		err = __mt76s_xmit_queue(dev, sdio->xmit_buf[qid], len + 4);
+		memset(sdio->xmit_buf + len, 0, 4);
+		err = __mt76s_xmit_queue(dev, sdio->xmit_buf, len + 4);
 		if (err)
 			return err;
 	}

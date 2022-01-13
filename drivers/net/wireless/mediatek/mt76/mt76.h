@@ -506,7 +506,7 @@ struct mt76_sdio {
 
 	struct work_struct stat_work;
 
-	u8 *xmit_buf[IEEE80211_NUM_ACS + 2];
+	u8 *xmit_buf;
 
 	struct sdio_func *func;
 	void *intr_data;
