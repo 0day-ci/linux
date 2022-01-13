@@ -15,7 +15,9 @@ maintainers:
 
 properties:
   compatible:
-    const: allwinner,sun4i-a10-emac
+    enum:
+      - allwinner,sun4i-a10-emac
+      - allwinner,sun8i-r40-emac
 
   reg:
     maxItems: 1
@@ -29,6 +31,19 @@ properties:
   allwinner,sram:
     description: Phandle to the device SRAM
     $ref: /schemas/types.yaml#/definitions/phandle-array
+
+  resets:
+    maxItems: 1
+
+if:
+  properties:
+    compatible:
+      contains:
+        const: allwinner,sun8i-r40-emac
+
+then:
+  required:
+    - resets
 
 required:
   - compatible
