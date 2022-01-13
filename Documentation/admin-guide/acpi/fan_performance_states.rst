@@ -60,3 +60,13 @@ For example::
 
 When a given field is not populated or its value provided by the platform
 firmware is invalid, the "not-defined" string is shown instead of the value.
+
+ACPI Fan Performance Feedback
+=============================
+
+The optional _FST object provides status information for the fan device.
+This includes field to provide current fan speed in revolutions per minute
+at which the fan is rotating.
+
+This speed is presented in the sysfs using the attribute "fan_speed_rpm",
+in the same directory as performance states.
