@@ -300,3 +300,8 @@
 
 	mmc-hs400-1_8v;
 };
+
+/* Bullhead does not have SD card */
+&sdhc2 {
+	status = "disabled";
+};
