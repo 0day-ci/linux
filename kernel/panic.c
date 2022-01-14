@@ -148,10 +148,13 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 }
 EXPORT_SYMBOL(nmi_panic);
 
-static void panic_print_sys_info(void)
+static void panic_print_sys_info(bool after_kmsg_dumpers)
 {
-	if (panic_print & PANIC_PRINT_ALL_PRINTK_MSG)
-		console_flush_on_panic(CONSOLE_REPLAY_ALL);
+	if (after_kmsg_dumpers) {
+		if (panic_print & PANIC_PRINT_ALL_PRINTK_MSG)
+			console_flush_on_panic(CONSOLE_REPLAY_ALL);
+		return;
+	}
 
 	if (panic_print & PANIC_PRINT_ALL_CPU_BT)
 		trigger_all_cpu_backtrace();
@@ -249,7 +252,7 @@ void panic(const char *fmt, ...)
 	 * show some extra information on kernel log if it was set...
 	 */
 	if (kexec_crash_loaded())
-		panic_print_sys_info();
+		panic_print_sys_info(false);
 
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
@@ -283,6 +286,15 @@ void panic(const char *fmt, ...)
 	 */
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
 
+	/*
+	 * If kexec_crash_loaded() is true and we still reach this point,
+	 * kernel would double print the information from panic_print; so
+	 * let's guard against that possibility (it happens if kdump users
+	 * also set crash_kexec_post_notifiers in the command-line).
+	 */
+	if (!kexec_crash_loaded())
+		panic_print_sys_info(false);
+
 	kmsg_dump(KMSG_DUMP_PANIC);
 
 	/*
@@ -313,7 +325,7 @@ void panic(const char *fmt, ...)
 	debug_locks_off();
 	console_flush_on_panic(CONSOLE_FLUSH_PENDING);
 
-	panic_print_sys_info();
+	panic_print_sys_info(true);
 
 	if (!panic_blink)
 		panic_blink = no_blink;
