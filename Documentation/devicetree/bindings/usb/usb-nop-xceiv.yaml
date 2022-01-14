@@ -34,9 +34,9 @@ properties:
     description: Should specify the GPIO detecting a VBus insertion
     maxItems: 1
 
-  vbus-regulator:
-    description: Should specifiy the regulator supplying current drawn from
-      the VBus line.
+  vbus-supply:
+  description: regulator supplying VBUS. It will be enabled and disabled
+               dynamically in OTG mode.
     $ref: /schemas/types.yaml#/definitions/phandle
 
 required:
@@ -57,7 +57,7 @@ examples:
         vcc-supply = <&hsusb1_vcc_regulator>;
         reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
         vbus-detect-gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
-        vbus-regulator = <&vbus_regulator>;
+        vbus-supply = <&vbus_regulator>;
         #phy-cells = <0>;
     };
 
