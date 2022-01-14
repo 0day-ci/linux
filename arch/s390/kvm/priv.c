@@ -29,6 +29,7 @@
 #include <asm/ap.h>
 #include "gaccess.h"
 #include "kvm-s390.h"
+#include "pci.h"
 #include "trace.h"
 
 static int handle_ri(struct kvm_vcpu *vcpu)
@@ -332,6 +333,49 @@ retry:
 	if (rc < 0)
 		return rc;
 	kvm_s390_set_psw_cc(vcpu, rc);
+	return 0;
+}
+
+static int handle_rpcit(struct kvm_vcpu *vcpu)
+{
+	int reg1, reg2;
+	u8 status;
+	int rc;
+
+	if (vcpu->arch.sie_block->gpsw.mask & PSW_MASK_PSTATE)
+		return kvm_s390_inject_program_int(vcpu, PGM_PRIVILEGED_OP);
+
+	/* If the host doesn't support PCI, it must be an emulated device */
+	if (!IS_ENABLED(CONFIG_PCI))
+		return -EOPNOTSUPP;
+
+	kvm_s390_get_regs_rre(vcpu, &reg1, &reg2);
+
+	/* If the device has a SHM bit on, let userspace take care of this */
+	if (((vcpu->run->s.regs.gprs[reg1] >> 32) & aift->mdd) != 0)
+		return -EOPNOTSUPP;
+
+	rc = kvm_s390_pci_refresh_trans(vcpu, vcpu->run->s.regs.gprs[reg1],
+					vcpu->run->s.regs.gprs[reg2],
+					vcpu->run->s.regs.gprs[reg2+1],
+					&status);
+
+	switch (rc) {
+	case 0:
+		kvm_s390_set_psw_cc(vcpu, 0);
+		break;
+	case -EOPNOTSUPP:
+		return -EOPNOTSUPP;
+	default:
+		vcpu->run->s.regs.gprs[reg1] &= 0xffffffff00ffffffUL;
+		vcpu->run->s.regs.gprs[reg1] |= (u64) status << 24;
+		if (status != 0)
+			kvm_s390_set_psw_cc(vcpu, 1);
+		else
+			kvm_s390_set_psw_cc(vcpu, 3);
+		break;
+	}
+
 	return 0;
 }
 
@@ -1275,6 +1319,8 @@ int kvm_s390_handle_b9(struct kvm_vcpu *vcpu)
 		return handle_essa(vcpu);
 	case 0xaf:
 		return handle_pfmf(vcpu);
+	case 0xd3:
+		return handle_rpcit(vcpu);
 	default:
 		return -EOPNOTSUPP;
 	}
