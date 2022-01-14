@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * PQ3 Sec/Crypto 3.1 device tree stub [ controller @ offset 0x30000 ]
  *

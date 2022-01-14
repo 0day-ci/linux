@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * QorIQ DMA device tree stub [ controller @ offset 0x101000 ]
  *
