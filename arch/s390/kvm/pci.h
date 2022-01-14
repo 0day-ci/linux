@@ -18,6 +18,9 @@
 
 #define KVM_S390_PCI_DTSM_MASK 0x40
 
+#define KVM_S390_RPCIT_INS_RES 0x10
+#define KVM_S390_RPCIT_ERR 0x28
+
 struct zpci_gaite {
 	u32 gisa;
 	u8 gisc;
@@ -33,6 +36,7 @@ struct zpci_aift {
 	struct kvm_zdev **kzdev;
 	spinlock_t gait_lock; /* Protects the gait, used during AEN forward */
 	struct mutex lock; /* Protects the other structures in aift */
+	u32 mdd;
 };
 
 extern struct zpci_aift *aift;
@@ -47,7 +51,9 @@ static inline struct kvm *kvm_s390_pci_si_to_kvm(struct zpci_aift *aift,
 
 int kvm_s390_pci_aen_init(u8 nisc);
 void kvm_s390_pci_aen_exit(void);
-
+int kvm_s390_pci_refresh_trans(struct kvm_vcpu *vcpu, unsigned long req,
+			       unsigned long start, unsigned long end,
+			       u8 *status);
 int kvm_s390_pci_init(void);
 
 #endif /* __KVM_S390_PCI_H */

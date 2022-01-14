@@ -149,6 +149,208 @@ unlock:
 	return rc;
 }
 
+static int dma_shadow_cpu_trans(struct kvm_vcpu *vcpu, unsigned long *entry,
+				unsigned long *gentry)
+{
+	phys_addr_t gaddr = 0;
+	unsigned long idx;
+	struct page *page;
+	kvm_pfn_t pfn;
+	gpa_t addr;
+	int rc = 0;
+
+	if (pt_entry_isvalid(*gentry)) {
+		/* pin and validate */
+		addr = *gentry & ZPCI_PTE_ADDR_MASK;
+		idx = srcu_read_lock(&vcpu->kvm->srcu);
+		page = gfn_to_page(vcpu->kvm, gpa_to_gfn(addr));
+		srcu_read_unlock(&vcpu->kvm->srcu, idx);
+		if (is_error_page(page))
+			return -EIO;
+		gaddr = page_to_phys(page) + (addr & ~PAGE_MASK);
+	}
+
+	if (pt_entry_isvalid(*entry)) {
+		/* Either we are invalidating, replacing or no-op */
+		if (gaddr != 0) {
+			if ((*entry & ZPCI_PTE_ADDR_MASK) == gaddr) {
+				/* Duplicate */
+				kvm_release_pfn_dirty(*entry >> PAGE_SHIFT);
+			} else {
+				/* Replace */
+				pfn = (*entry >> PAGE_SHIFT);
+				invalidate_pt_entry(entry);
+				set_pt_pfaa(entry, gaddr);
+				validate_pt_entry(entry);
+				kvm_release_pfn_dirty(pfn);
+				rc = 1;
+			}
+		} else {
+			/* Invalidate */
+			pfn = (*entry >> PAGE_SHIFT);
+			invalidate_pt_entry(entry);
+			kvm_release_pfn_dirty(pfn);
+			rc = 1;
+		}
+	} else if (gaddr != 0) {
+		/* New Entry */
+		set_pt_pfaa(entry, gaddr);
+		validate_pt_entry(entry);
+	}
+
+	return rc;
+}
+
+static unsigned long *dma_walk_guest_cpu_trans(struct kvm_vcpu *vcpu,
+					       struct kvm_zdev_ioat *ioat,
+					       dma_addr_t dma_addr)
+{
+	unsigned long *rto, *sto, *pto;
+	unsigned int rtx, rts, sx, px, idx;
+	struct page *page;
+	gpa_t addr;
+	int i;
+
+	/* Pin guest segment table if needed */
+	rtx = calc_rtx(dma_addr);
+	rto = ioat->head[(rtx / ZPCI_TABLE_ENTRIES_PER_PAGE)];
+	rts = rtx * ZPCI_TABLE_PAGES;
+	if (!ioat->seg[rts]) {
+		if (!reg_entry_isvalid(rto[rtx % ZPCI_TABLE_ENTRIES_PER_PAGE]))
+			return NULL;
+		sto = get_rt_sto(rto[rtx % ZPCI_TABLE_ENTRIES_PER_PAGE]);
+		addr = ((u64)sto & ZPCI_RTE_ADDR_MASK);
+		idx = srcu_read_lock(&vcpu->kvm->srcu);
+		for (i = 0; i < ZPCI_TABLE_PAGES; i++) {
+			page = gfn_to_page(vcpu->kvm, gpa_to_gfn(addr));
+			if (is_error_page(page)) {
+				srcu_read_unlock(&vcpu->kvm->srcu, idx);
+				return NULL;
+			}
+			ioat->seg[rts + i] = page_to_virt(page) +
+					     (addr & ~PAGE_MASK);
+			addr += PAGE_SIZE;
+		}
+		srcu_read_unlock(&vcpu->kvm->srcu, idx);
+	}
+
+	/* Allocate pin pointers for another segment table if needed */
+	if (!ioat->pt[rtx]) {
+		ioat->pt[rtx] = kcalloc(ZPCI_TABLE_ENTRIES,
+					(sizeof(unsigned long *)), GFP_KERNEL);
+		if (!ioat->pt[rtx])
+			return NULL;
+	}
+	/* Pin guest page table if needed */
+	sx = calc_sx(dma_addr);
+	sto = ioat->seg[(rts + (sx / ZPCI_TABLE_ENTRIES_PER_PAGE))];
+	if (!ioat->pt[rtx][sx]) {
+		if (!reg_entry_isvalid(sto[sx % ZPCI_TABLE_ENTRIES_PER_PAGE]))
+			return NULL;
+		pto = get_st_pto(sto[sx % ZPCI_TABLE_ENTRIES_PER_PAGE]);
+		if (!pto)
+			return NULL;
+		addr = ((u64)pto & ZPCI_STE_ADDR_MASK);
+		idx = srcu_read_lock(&vcpu->kvm->srcu);
+		page = gfn_to_page(vcpu->kvm, gpa_to_gfn(addr));
+		srcu_read_unlock(&vcpu->kvm->srcu, idx);
+		if (is_error_page(page))
+			return NULL;
+		ioat->pt[rtx][sx] = page_to_virt(page) + (addr & ~PAGE_MASK);
+	}
+	pto = ioat->pt[rtx][sx];
+
+	/* Return guest PTE */
+	px = calc_px(dma_addr);
+	return &pto[px];
+}
+
+
+static int dma_table_shadow(struct kvm_vcpu *vcpu, struct zpci_dev *zdev,
+			    dma_addr_t dma_addr, size_t size)
+{
+	unsigned int nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	struct kvm_zdev *kzdev = zdev->kzdev;
+	unsigned long *entry, *gentry;
+	int i, rc = 0, rc2;
+
+	if (!nr_pages || !kzdev)
+		return -EINVAL;
+
+	mutex_lock(&kzdev->ioat.lock);
+	if (!zdev->dma_table || !kzdev->ioat.head[0]) {
+		rc = -EINVAL;
+		goto out_unlock;
+	}
+
+	for (i = 0; i < nr_pages; i++) {
+		gentry = dma_walk_guest_cpu_trans(vcpu, &kzdev->ioat, dma_addr);
+		if (!gentry)
+			continue;
+		entry = dma_walk_cpu_trans(zdev->dma_table, dma_addr);
+
+		if (!entry) {
+			rc = -ENOMEM;
+			goto out_unlock;
+		}
+
+		rc2 = dma_shadow_cpu_trans(vcpu, entry, gentry);
+		if (rc2 < 0) {
+			rc = -EIO;
+			goto out_unlock;
+		}
+		dma_addr += PAGE_SIZE;
+		rc += rc2;
+	}
+
+out_unlock:
+	mutex_unlock(&kzdev->ioat.lock);
+	return rc;
+}
+
+int kvm_s390_pci_refresh_trans(struct kvm_vcpu *vcpu, unsigned long req,
+			       unsigned long start, unsigned long size,
+			       u8 *status)
+{
+	struct zpci_dev *zdev;
+	u32 fh = req >> 32;
+	int rc;
+
+	/* Make sure this is a valid device associated with this guest */
+	zdev = get_zdev_by_fh(fh);
+	if (!zdev || !zdev->kzdev || zdev->kzdev->kvm != vcpu->kvm) {
+		*status = 0;
+		return -EINVAL;
+	}
+
+	/* Only proceed if the device is using the assist */
+	if (zdev->kzdev->ioat.head[0] == 0)
+		return -EOPNOTSUPP;
+
+	rc = dma_table_shadow(vcpu, zdev, start, size);
+	if (rc < 0) {
+		/*
+		 * If errors encountered during shadow operations, we must
+		 * fabricate status to present to the guest
+		 */
+		switch (rc) {
+		case -ENOMEM:
+			*status = KVM_S390_RPCIT_INS_RES;
+			break;
+		default:
+			*status = KVM_S390_RPCIT_ERR;
+			break;
+		}
+	} else if (rc > 0) {
+		/* Host RPCIT must be issued */
+		rc = zpci_refresh_trans((u64) zdev->fh << 32, start, size,
+					status);
+	}
+	zdev->kzdev->rpcit_count++;
+
+	return rc;
+}
+
 /* Modify PCI: Register floating adapter interruption forwarding */
 static int kvm_zpci_set_airq(struct zpci_dev *zdev)
 {
@@ -620,6 +822,8 @@ EXPORT_SYMBOL_GPL(kvm_s390_pci_attach_kvm);
 
 int kvm_s390_pci_init(void)
 {
+	int rc;
+
 	aift = kzalloc(sizeof(struct zpci_aift), GFP_KERNEL);
 	if (!aift)
 		return -ENOMEM;
@@ -627,5 +831,7 @@ int kvm_s390_pci_init(void)
 	spin_lock_init(&aift->gait_lock);
 	mutex_init(&aift->lock);
 
-	return 0;
+	rc = zpci_get_mdd(&aift->mdd);
+
+	return rc;
 }

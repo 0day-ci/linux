@@ -30,6 +30,7 @@ struct kvm_zdev_ioat {
 struct kvm_zdev {
 	struct zpci_dev *zdev;
 	struct kvm *kvm;
+	u64 rpcit_count;
 	struct kvm_zdev_ioat ioat;
 	struct zpci_fib fib;
 };
