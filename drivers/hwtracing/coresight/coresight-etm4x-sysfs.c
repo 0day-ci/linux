@@ -368,7 +368,7 @@ static ssize_t mode_store(struct device *dev,
 	/* start by clearing QE bits */
 	config->cfg &= ~(BIT(13) | BIT(14));
 	/* if supported, Q elements with instruction counts are enabled */
-	if ((mode & BIT(0)) && (drvdata->q_support & BIT(0)))
+	if ((mode & BIT(0)) && drvdata->q_support)
 		config->cfg |= BIT(13);
 	/*
 	 * if supported, Q elements with and without instruction
