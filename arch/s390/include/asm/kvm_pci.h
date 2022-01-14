@@ -17,6 +17,7 @@
 #include <linux/kvm.h>
 #include <linux/pci.h>
 #include <linux/mutex.h>
+#include <linux/notifier.h>
 #include <asm/pci_insn.h>
 #include <asm/pci_dma.h>
 
@@ -33,6 +34,7 @@ struct kvm_zdev {
 	u64 rpcit_count;
 	struct kvm_zdev_ioat ioat;
 	struct zpci_fib fib;
+	struct notifier_block nb;
 };
 
 int kvm_s390_pci_dev_open(struct zpci_dev *zdev);
