@@ -42,6 +42,12 @@ struct port_proxy {
 	struct device			*dev;
 };
 
+struct ctrl_msg_header {
+	__le32	ctrl_msg_id;
+	__le32	ex_msg;
+	__le32	data_length;
+};
+
 struct port_msg {
 	__le32	head_pattern;
 	__le32	info;
@@ -60,12 +66,21 @@ struct port_msg {
 #define PORT_ENUM_TAIL_PATTERN	0xa5a5a5a5
 #define PORT_ENUM_VER_MISMATCH	0x00657272
 
+/* Port operations mapping */
+extern struct port_ops ctl_port_ops;
+
 int t7xx_port_proxy_send_skb(struct t7xx_port *port, struct sk_buff *skb);
 void t7xx_port_proxy_set_seq_num(struct t7xx_port *port, struct ccci_header *ccci_h);
 int t7xx_port_proxy_node_control(struct t7xx_modem *md, struct port_msg *port_msg);
 void t7xx_port_proxy_reset(struct port_proxy *port_prox);
+void t7xx_port_proxy_send_msg_to_md(struct port_proxy *port_prox, enum port_ch ch,
+				    unsigned int msg, unsigned int ex_msg);
 void t7xx_port_proxy_uninit(struct port_proxy *port_prox);
 int t7xx_port_proxy_init(struct t7xx_modem *md);
 void t7xx_port_proxy_md_status_notify(struct port_proxy *port_prox, unsigned int state);
+void t7xx_ccci_header_init(struct ccci_header *ccci_h, unsigned int pkt_header,
+			   size_t pkt_len, enum port_ch ch, unsigned int ex_msg);
+void t7xx_ctrl_msg_header_init(struct ctrl_msg_header *ctrl_msg_h, unsigned int msg_id,
+			       unsigned int ex_msg, unsigned int len);
 
 #endif /* __T7XX_PORT_PROXY_H__ */
