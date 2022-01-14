@@ -857,6 +857,16 @@ static const struct dmi_system_id quark_pci_dmi[] = {
 	{}
 };
 
+static const struct dmi_system_id use_preset_led[] = {
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell EMC"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Edge Gateway 3200"),
+		},
+	},
+	{}
+};
+
 static int quark_default_data(struct pci_dev *pdev,
 			      struct plat_stmmacenet_data *plat)
 {
@@ -989,6 +999,7 @@ static int intel_eth_pci_probe(struct pci_dev *pdev,
 	struct intel_priv_data *intel_priv;
 	struct plat_stmmacenet_data *plat;
 	struct stmmac_resources res;
+	struct stmmac_priv *priv;
 	int ret;
 
 	intel_priv = devm_kzalloc(&pdev->dev, sizeof(*intel_priv), GFP_KERNEL);
@@ -1073,6 +1084,11 @@ static int intel_eth_pci_probe(struct pci_dev *pdev,
 	ret = stmmac_dvr_probe(&pdev->dev, plat, &res);
 	if (ret) {
 		goto err_dvr_probe;
+	}
+
+	if (dmi_check_system(use_preset_led)) {
+		priv = netdev_priv(dev_get_drvdata(&pdev->dev));
+		priv->use_preset_led = true;
 	}
 
 	return 0;

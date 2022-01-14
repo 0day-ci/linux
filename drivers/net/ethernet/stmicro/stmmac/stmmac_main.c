@@ -49,6 +49,7 @@
 #include "dwmac1000.h"
 #include "dwxgmac2.h"
 #include "hwif.h"
+#include <linux/marvell_phy.h>
 
 /* As long as the interface is active, we keep the timestamping counter enabled
  * with fine resolution and binary rollover. This avoid non-monotonic behavior
@@ -1235,6 +1236,9 @@ static int stmmac_init_phy(struct net_device *dev)
 			netdev_err(priv->dev, "no phy at addr %d\n", addr);
 			return -ENODEV;
 		}
+
+		if (priv->use_preset_led)
+			phydev->dev_flags |= MARVELL_PHY_USE_PRESET_LED;
 
 		ret = phylink_connect_phy(priv->phylink, phydev);
 	}

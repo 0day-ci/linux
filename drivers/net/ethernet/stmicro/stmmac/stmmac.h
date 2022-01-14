@@ -319,6 +319,8 @@ struct stmmac_priv {
 	/* XDP BPF Program */
 	unsigned long *af_xdp_zc_qps;
 	struct bpf_prog *xdp_prog;
+
+	bool use_preset_led;
 };
 
 enum stmmac_state {

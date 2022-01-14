@@ -304,6 +304,7 @@ struct marvell_priv {
 	u32 last;
 	u32 step;
 	s8 pair;
+	u16 led_def_config;
 };
 
 static int marvell_read_page(struct phy_device *phydev)
@@ -748,32 +749,49 @@ error:
 
 static void marvell_config_led(struct phy_device *phydev)
 {
-	u16 def_config;
+	struct marvell_priv *priv = phydev->priv;
 	int err;
 
-	switch (MARVELL_PHY_FAMILY_ID(phydev->phy_id)) {
-	/* Default PHY LED config: LED[0] .. Link, LED[1] .. Activity */
-	case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1121R):
-	case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1318S):
-		def_config = MII_88E1121_PHY_LED_DEF;
-		break;
-	/* Default PHY LED config:
-	 * LED[0] .. 1000Mbps Link
-	 * LED[1] .. 100Mbps Link
-	 * LED[2] .. Blink, Activity
-	 */
-	case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1510):
-		if (phydev->dev_flags & MARVELL_PHY_LED0_LINK_LED1_ACTIVE)
-			def_config = MII_88E1510_PHY_LED0_LINK_LED1_ACTIVE;
-		else
-			def_config = MII_88E1510_PHY_LED_DEF;
-		break;
-	default:
+	if (priv->led_def_config == -1)
 		return;
+
+	if (priv->led_def_config)
+		goto write;
+
+	if (phydev->dev_flags & MARVELL_PHY_USE_PRESET_LED) {
+		priv->led_def_config = phy_read_paged(phydev, MII_MARVELL_LED_PAGE,
+						      MII_PHY_LED_CTRL);
+		if (priv->led_def_config < 0) {
+			priv->led_def_config = -1;
+			return;
+		}
+	} else {
+		switch (MARVELL_PHY_FAMILY_ID(phydev->phy_id)) {
+		/* Default PHY LED config: LED[0] .. Link, LED[1] .. Activity */
+		case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1121R):
+		case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1318S):
+			priv->led_def_config = MII_88E1121_PHY_LED_DEF;
+			break;
+		/* Default PHY LED config:
+		 * LED[0] .. 1000Mbps Link
+		 * LED[1] .. 100Mbps Link
+		 * LED[2] .. Blink, Activity
+		 */
+		case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1510):
+			if (phydev->dev_flags & MARVELL_PHY_LED0_LINK_LED1_ACTIVE)
+				priv->led_def_config = MII_88E1510_PHY_LED0_LINK_LED1_ACTIVE;
+			else
+				priv->led_def_config = MII_88E1510_PHY_LED_DEF;
+			break;
+		default:
+			priv->led_def_config = -1;
+			return;
+		}
 	}
 
+write:
 	err = phy_write_paged(phydev, MII_MARVELL_LED_PAGE, MII_PHY_LED_CTRL,
-			      def_config);
+			      priv->led_def_config);
 	if (err < 0)
 		phydev_warn(phydev, "Fail to config marvell phy LED.\n");
 }
