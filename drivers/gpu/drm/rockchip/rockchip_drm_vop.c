@@ -1575,7 +1575,10 @@ static void vop_crtc_reset(struct drm_crtc *crtc)
 	if (crtc->state)
 		vop_crtc_destroy_state(crtc, crtc->state);
 
-	__drm_atomic_helper_crtc_reset(crtc, &crtc_state->base);
+	if (!crtc_state)
+		__drm_atomic_helper_crtc_reset(crtc, NULL);
+	else
+		__drm_atomic_helper_crtc_reset(crtc, &crtc_state->base);
 }
 
 #ifdef CONFIG_DRM_ANALOGIX_DP
