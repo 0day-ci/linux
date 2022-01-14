@@ -201,6 +201,9 @@ extern int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 int vfio_pci_zdev_feat_interp(struct vfio_pci_core_device *vdev,
 			      struct vfio_device_feature feature,
 			      unsigned long arg);
+int vfio_pci_zdev_feat_aif(struct vfio_pci_core_device *vdev,
+			   struct vfio_device_feature feature,
+			   unsigned long arg);
 void vfio_pci_zdev_open(struct vfio_pci_core_device *vdev);
 void vfio_pci_zdev_release(struct vfio_pci_core_device *vdev);
 #else
@@ -213,6 +216,13 @@ static inline int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 static inline int vfio_pci_zdev_feat_interp(struct vfio_pci_core_device *vdev,
 					    struct vfio_device_feature feature,
 					    unsigned long arg)
+{
+	return -ENOTTY;
+}
+
+static inline int vfio_pci_zdev_feat_aif(struct vfio_pci_core_device *vdev,
+					 struct vfio_device_feature feature,
+					 unsigned long arg)
 {
 	return -ENOTTY;
 }

@@ -36,6 +36,8 @@ struct kvm_zdev {
 	struct zpci_fib fib;
 	struct notifier_block nb;
 	bool interp;
+	bool aif;
+	bool fhost;
 };
 
 int kvm_s390_pci_dev_open(struct zpci_dev *zdev);
