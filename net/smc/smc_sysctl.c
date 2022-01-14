@@ -10,6 +10,8 @@
 
 static int min_sndbuf = SMC_BUF_MIN_SIZE;
 static int min_rcvbuf = SMC_BUF_MIN_SIZE;
+static int min_lgr_conns = 1;
+static int max_lgr_conns = SMC_RMBS_PER_LGR_MAX;
 
 static struct ctl_table smc_table[] = {
 	{
@@ -27,6 +29,15 @@ static struct ctl_table smc_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &min_rcvbuf,
+	},
+	{
+		.procname	= "max_lgr_conns",
+		.data		= &init_net.smc.sysctl_max_lgr_conns,
+		.maxlen		= sizeof(init_net.smc.sysctl_max_lgr_conns),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &min_lgr_conns,
+		.extra2		= &max_lgr_conns,
 	},
 	{  }
 };

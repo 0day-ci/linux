@@ -2827,6 +2827,7 @@ static __net_init int smc_net_init(struct net *net)
 					   SMC_BUF_MIN_SIZE);
 	net->smc.sysctl_rmem_default = max(net->ipv4.sysctl_tcp_rmem[1],
 					   SMC_BUF_MIN_SIZE);
+	net->smc.sysctl_max_lgr_conns = SMC_RMBS_PER_LGR_MAX;
 
 	return smc_pnet_net_init(net);
 }
