@@ -2452,6 +2452,7 @@ static void perf_event_interrupt(struct pt_regs *regs)
  * could possibly return false if only events are being counted rather than
  * samples being taken, but for now this is good enough.
  */
+#ifdef CONFIG_PPC64
 bool power_pmu_wants_prompt_pmi(void)
 {
 	struct cpu_hw_events *cpuhw;
@@ -2467,6 +2468,7 @@ bool power_pmu_wants_prompt_pmi(void)
 	cpuhw = this_cpu_ptr(&cpu_hw_events);
 	return cpuhw->n_events;
 }
+#endif
 
 static int power_pmu_prepare_cpu(unsigned int cpu)
 {
