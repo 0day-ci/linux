@@ -2766,7 +2766,7 @@ static int unpin_extent_range(struct btrfs_fs_info *fs_info,
 		spin_unlock(&cache->lock);
 		if (!readonly && return_free_space &&
 		    global_rsv->space_info == space_info) {
-			u64 to_add = len;
+			u64 to_add;
 
 			spin_lock(&global_rsv->lock);
 			if (!global_rsv->full) {
