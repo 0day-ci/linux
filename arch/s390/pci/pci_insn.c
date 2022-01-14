@@ -77,20 +77,20 @@ static inline u8 __rpcit(u64 fn, u64 addr, u64 range, u8 *status)
 	return cc;
 }
 
-int zpci_refresh_trans(u64 fn, u64 addr, u64 range)
+int zpci_refresh_trans(u64 fn, u64 addr, u64 range, u8 *status)
 {
-	u8 cc, status;
+	u8 cc;
 
 	do {
-		cc = __rpcit(fn, addr, range, &status);
+		cc = __rpcit(fn, addr, range, status);
 		if (cc == 2)
 			udelay(ZPCI_INSN_BUSY_DELAY);
 	} while (cc == 2);
 
 	if (cc)
-		zpci_err_insn(cc, status, addr, range);
+		zpci_err_insn(cc, *status, addr, range);
 
-	if (cc == 1 && (status == 4 || status == 16))
+	if (cc == 1 && (*status == 4 || *status == 16))
 		return -ENOMEM;
 
 	return (cc) ? -EIO : 0;

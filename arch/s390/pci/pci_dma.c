@@ -23,8 +23,9 @@ static u32 s390_iommu_aperture_factor = 1;
 
 static int zpci_refresh_global(struct zpci_dev *zdev)
 {
+	u8 status;
 	return zpci_refresh_trans((u64) zdev->fh << 32, zdev->start_dma,
-				  zdev->iommu_pages * PAGE_SIZE);
+				  zdev->iommu_pages * PAGE_SIZE, &status);
 }
 
 unsigned long *dma_alloc_cpu_table(void)
@@ -183,6 +184,7 @@ static int __dma_purge_tlb(struct zpci_dev *zdev, dma_addr_t dma_addr,
 			   size_t size, int flags)
 {
 	unsigned long irqflags;
+	u8 status;
 	int ret;
 
 	/*
@@ -201,7 +203,7 @@ static int __dma_purge_tlb(struct zpci_dev *zdev, dma_addr_t dma_addr,
 	}
 
 	ret = zpci_refresh_trans((u64) zdev->fh << 32, dma_addr,
-				 PAGE_ALIGN(size));
+				 PAGE_ALIGN(size), &status);
 	if (ret == -ENOMEM && !s390_iommu_strict) {
 		/* enable the hypervisor to free some resources */
 		if (zpci_refresh_global(zdev))
