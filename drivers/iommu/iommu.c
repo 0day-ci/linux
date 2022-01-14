@@ -1841,6 +1841,7 @@ static int iommu_bus_init(struct bus_type *bus, const struct iommu_ops *ops)
 		return -ENOMEM;
 
 	nb->notifier_call = iommu_bus_notifier;
+	nb->priority = IOMMU_BUS_NOTIFY_PRIORITY;
 
 	err = bus_register_notifier(bus, nb);
 	if (err)

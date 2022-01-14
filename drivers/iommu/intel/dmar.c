@@ -340,15 +340,19 @@ static inline void vf_inherit_msi_domain(struct pci_dev *pdev)
 	dev_set_msi_domain(&pdev->dev, dev_get_msi_domain(&physfn->dev));
 }
 
-static int dmar_pci_bus_notifier(struct notifier_block *nb,
+static int dmar_pci_bus_add_notifier(struct notifier_block *nb,
 				 unsigned long action, void *data)
 {
 	struct pci_dev *pdev = to_pci_dev(data);
 	struct dmar_pci_notify_info *info;
 
-	/* Only care about add/remove events for physical functions.
+	if (action != BUS_NOTIFY_ADD_DEVICE)
+		return NOTIFY_DONE;
+
+	/*
 	 * For VFs we actually do the lookup based on the corresponding
-	 * PF in device_to_iommu() anyway. */
+	 * PF in device_to_iommu() anyway.
+	 */
 	if (pdev->is_virtfn) {
 		/*
 		 * Ensure that the VF device inherits the irq domain of the
@@ -358,13 +362,34 @@ static int dmar_pci_bus_notifier(struct notifier_block *nb,
 		 * from the PF device, but that's yet another x86'sism to
 		 * inflict on everybody else.
 		 */
-		if (action == BUS_NOTIFY_ADD_DEVICE)
-			vf_inherit_msi_domain(pdev);
+		vf_inherit_msi_domain(pdev);
 		return NOTIFY_DONE;
 	}
 
-	if (action != BUS_NOTIFY_ADD_DEVICE &&
-	    action != BUS_NOTIFY_REMOVED_DEVICE)
+	info = dmar_alloc_pci_notify_info(pdev, action);
+	if (!info)
+		return NOTIFY_DONE;
+
+	down_write(&dmar_global_lock);
+	dmar_pci_bus_add_dev(info);
+	up_write(&dmar_global_lock);
+	dmar_free_pci_notify_info(info);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block dmar_pci_bus_add_nb = {
+	.notifier_call = dmar_pci_bus_add_notifier,
+	.priority = IOMMU_BUS_NOTIFY_PRIORITY + 1,
+};
+
+static int dmar_pci_bus_remove_notifier(struct notifier_block *nb,
+				 unsigned long action, void *data)
+{
+	struct pci_dev *pdev = to_pci_dev(data);
+	struct dmar_pci_notify_info *info;
+
+	if (pdev->is_virtfn || action != BUS_NOTIFY_REMOVED_DEVICE)
 		return NOTIFY_DONE;
 
 	info = dmar_alloc_pci_notify_info(pdev, action);
@@ -372,10 +397,7 @@ static int dmar_pci_bus_notifier(struct notifier_block *nb,
 		return NOTIFY_DONE;
 
 	down_write(&dmar_global_lock);
-	if (action == BUS_NOTIFY_ADD_DEVICE)
-		dmar_pci_bus_add_dev(info);
-	else if (action == BUS_NOTIFY_REMOVED_DEVICE)
-		dmar_pci_bus_del_dev(info);
+	dmar_pci_bus_del_dev(info);
 	up_write(&dmar_global_lock);
 
 	dmar_free_pci_notify_info(info);
@@ -383,11 +405,10 @@ static int dmar_pci_bus_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block dmar_pci_bus_nb = {
-	.notifier_call = dmar_pci_bus_notifier,
-	.priority = INT_MIN,
+static struct notifier_block dmar_pci_bus_remove_nb = {
+	.notifier_call = dmar_pci_bus_remove_notifier,
+	.priority = IOMMU_BUS_NOTIFY_PRIORITY - 1,
 };
-
 static struct dmar_drhd_unit *
 dmar_find_dmaru(struct acpi_dmar_hardware_unit *drhd)
 {
@@ -835,7 +856,17 @@ int __init dmar_dev_scope_init(void)
 
 void __init dmar_register_bus_notifier(void)
 {
-	bus_register_notifier(&pci_bus_type, &dmar_pci_bus_nb);
+	/*
+	 * We need two notifiers in that we need to make sure the ordering
+	 * is enforced as the following:
+	 * 1. dmar_pci_bus_add_dev()
+	 * 2. iommu_probe_device()
+	 * 3. iommu_release_device()
+	 * 4. dmar_pci_bus_remove_dev()
+	 * Notifier block priority is used to enforce the order
+	 */
+	bus_register_notifier(&pci_bus_type, &dmar_pci_bus_add_nb);
+	bus_register_notifier(&pci_bus_type, &dmar_pci_bus_remove_nb);
 }
 
 
@@ -2151,8 +2182,10 @@ static int __init dmar_free_unused_resources(void)
 	if (dmar_in_use())
 		return 0;
 
-	if (dmar_dev_scope_status != 1 && !list_empty(&dmar_drhd_units))
-		bus_unregister_notifier(&pci_bus_type, &dmar_pci_bus_nb);
+	if (dmar_dev_scope_status != 1 && !list_empty(&dmar_drhd_units)) {
+		bus_unregister_notifier(&pci_bus_type, &dmar_pci_bus_add_nb);
+		bus_unregister_notifier(&pci_bus_type, &dmar_pci_bus_remove_nb);
+	}
 
 	down_write(&dmar_global_lock);
 	list_for_each_entry_safe(dmaru, dmaru_n, &dmar_drhd_units, list) {
