@@ -1013,6 +1013,45 @@ static const struct dmi_system_id i8042_dmi_probe_defer_table[] __initconst = {
 	{ }
 };
 
+static const struct dmi_system_id i8042_dmi_noaux_table[] __initconst = {
+	/*
+	 * At least one modern Clevo barebone has the touchpad connected
+	 * both via PS/2 and i2c interface. This causes a race condition
+	 * between the psmouse and i2c-hid driver. Since the full
+	 * capability if the touchpad is available via the i2c interface
+	 * and the device has no external PS/2 port, it is save to just
+	 * ignore all ps2 mouses here to avoid this issue.
+	 * The know affected device is the
+	 * TUXEDO InfinityBook S17 Gen6 / Clevo NS70MU which comes with
+	 * one of the 4 different dmi string combinations below.
+	 */
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TUXEDO"),
+			DMI_MATCH(DMI_BOARD_NAME, "NS50MU"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TUXEDO"),
+			DMI_MATCH(DMI_BOARD_NAME, "NS50_70MU"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Notebook"),
+			DMI_MATCH(DMI_BOARD_NAME, "NS50MU"),
+		},
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Notebook"),
+			DMI_MATCH(DMI_BOARD_NAME, "NS50_70MU"),
+		},
+	},
+	{ }
+};
+
 #endif /* CONFIG_X86 */
 
 #ifdef CONFIG_PNP
@@ -1335,6 +1374,9 @@ static int __init i8042_platform_init(void)
 
 	if (dmi_check_system(i8042_dmi_probe_defer_table))
 		i8042_probe_defer = true;
+
+	if (dmi_check_system(i8042_dmi_noaux_table))
+		i8042_noaux = true;
 
 	/*
 	 * A20 was already enabled during early kernel init. But some buggy
