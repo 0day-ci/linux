@@ -176,6 +176,14 @@ bridge_to_mode(struct drm_bridge *bridge, struct drm_atomic_state *state)
 	return &crtc_state->adjusted_mode;
 }
 
+static void chipone_readb(struct chipone *icn, u8 reg, u8 *val)
+{
+	if (icn->interface_i2c)
+		*val = i2c_smbus_read_byte_data(icn->client, reg);
+	else
+		mipi_dsi_generic_read(icn->dsi, (u8[]){reg, 1}, 2, val, 1);
+}
+
 static void chipone_writeb(struct chipone *icn, u8 reg, u8 val)
 {
 	if (icn->interface_i2c)
@@ -274,7 +282,21 @@ static void chipone_atomic_enable(struct drm_bridge *bridge,
 	const struct drm_bridge_state *bridge_state;
 	u16 hfp, hbp, hsync;
 	u32 bus_flags;
-	u8 pol;
+	u8 pol, id[4];
+
+	chipone_readb(icn, VENDOR_ID, id);
+	chipone_readb(icn, DEVICE_ID_H, id + 1);
+	chipone_readb(icn, DEVICE_ID_L, id + 2);
+	chipone_readb(icn, VERSION_ID, id + 3);
+
+	dev_dbg(icn->dev,
+		"Chip IDs: Vendor=0x%02x Device=0x%02x:0x%02x Version=0x%02x\n",
+		id[0], id[1], id[2], id[3]);
+
+	if (id[0] != 0xc1 || id[1] != 0x62 || id[2] != 0x11) {
+		dev_dbg(icn->dev, "Invalid Chip IDs, aborting configuration\n");
+		return;
+	}
 
 	/* Get the DPI flags from the bridge state. */
 	bridge_state = drm_atomic_get_new_bridge_state(state, bridge);
