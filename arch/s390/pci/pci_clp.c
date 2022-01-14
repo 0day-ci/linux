@@ -328,7 +328,7 @@ int clp_disable_fh(struct zpci_dev *zdev, u32 *fh)
 }
 
 static int clp_list_pci_req(struct clp_req_rsp_list_pci *rrb,
-			    u64 *resume_token, int *nentries)
+			    u64 *resume_token, int *nentries, u32 *mdd)
 {
 	int rc;
 
@@ -354,6 +354,8 @@ static int clp_list_pci_req(struct clp_req_rsp_list_pci *rrb,
 	*nentries = (rrb->response.hdr.len - LIST_PCI_HDR_LEN) /
 		rrb->response.entry_size;
 	*resume_token = rrb->response.resume_token;
+	if (mdd)
+		*mdd = rrb->response.mdd;
 
 	return rc;
 }
@@ -365,7 +367,7 @@ static int clp_list_pci(struct clp_req_rsp_list_pci *rrb, void *data,
 	int nentries, i, rc;
 
 	do {
-		rc = clp_list_pci_req(rrb, &resume_token, &nentries);
+		rc = clp_list_pci_req(rrb, &resume_token, &nentries, NULL);
 		if (rc)
 			return rc;
 		for (i = 0; i < nentries; i++)
@@ -383,7 +385,7 @@ static int clp_find_pci(struct clp_req_rsp_list_pci *rrb, u32 fid,
 	int nentries, i, rc;
 
 	do {
-		rc = clp_list_pci_req(rrb, &resume_token, &nentries);
+		rc = clp_list_pci_req(rrb, &resume_token, &nentries, NULL);
 		if (rc)
 			return rc;
 		fh_list = rrb->response.fh_list;
@@ -467,6 +469,26 @@ int clp_get_state(u32 fid, enum zpci_state *state)
 	clp_free_block(rrb);
 	return rc;
 }
+
+int zpci_get_mdd(u32 *mdd)
+{
+	struct clp_req_rsp_list_pci *rrb;
+	u64 resume_token = 0;
+	int nentries, rc;
+
+	if (!mdd)
+		return -EINVAL;
+
+	rrb = clp_alloc_block(GFP_KERNEL);
+	if (!rrb)
+		return -ENOMEM;
+
+	rc = clp_list_pci_req(rrb, &resume_token, &nentries, mdd);
+
+	clp_free_block(rrb);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(zpci_get_mdd);
 
 static int clp_base_slpc(struct clp_req *req, struct clp_req_rsp_slpc *lpcb)
 {
