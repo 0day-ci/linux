@@ -51,7 +51,7 @@ static DEFINE_SPINLOCK(fib_info_lock);
 static struct hlist_head *fib_info_hash;
 static struct hlist_head *fib_info_laddrhash;
 static unsigned int fib_info_hash_size;
-static unsigned int fib_info_cnt;
+static atomic_t fib_info_cnt;
 
 #define DEVINDEX_HASHBITS 8
 #define DEVINDEX_HASHSIZE (1U << DEVINDEX_HASHBITS)
@@ -249,7 +249,7 @@ void free_fib_info(struct fib_info *fi)
 		pr_warn("Freeing alive fib_info %p\n", fi);
 		return;
 	}
-	fib_info_cnt--;
+	atomic_dec(&fib_info_cnt);
 
 	call_rcu(&fi->rcu, free_fib_info_rcu);
 }
@@ -1430,7 +1430,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg,
 #endif
 
 	err = -ENOBUFS;
-	if (fib_info_cnt >= fib_info_hash_size) {
+	if (atomic_read(&fib_info_cnt) >= fib_info_hash_size) {
 		unsigned int new_size = fib_info_hash_size << 1;
 		struct hlist_head *new_info_hash;
 		struct hlist_head *new_laddrhash;
@@ -1462,7 +1462,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg,
 		return ERR_PTR(err);
 	}
 
-	fib_info_cnt++;
+	atomic_inc(&fib_info_cnt);
 	fi->fib_net = net;
 	fi->fib_protocol = cfg->fc_protocol;
 	fi->fib_scope = cfg->fc_scope;
