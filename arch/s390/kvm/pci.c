@@ -13,11 +13,14 @@
 #include <asm/pci.h>
 #include <asm/pci_insn.h>
 #include <asm/pci_io.h>
+#include <asm/pci_dma.h>
 #include <asm/sclp.h>
 #include "pci.h"
 #include "kvm-s390.h"
 
 struct zpci_aift *aift;
+
+#define shadow_ioat_init zdev->kzdev->ioat.head[0]
 
 static inline int __set_irq_noiib(u16 ctl, u8 isc)
 {
@@ -344,6 +347,135 @@ out:
 }
 EXPORT_SYMBOL_GPL(kvm_s390_pci_aif_disable);
 
+int kvm_s390_pci_ioat_probe(struct zpci_dev *zdev)
+{
+	/* Must have a KVM association registered */
+	if (!zdev->kzdev || !zdev->kzdev->kvm)
+		return -EINVAL;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_ioat_probe);
+
+int kvm_s390_pci_ioat_enable(struct zpci_dev *zdev, u64 iota)
+{
+	gpa_t gpa = (gpa_t)(iota & ZPCI_RTE_ADDR_MASK);
+	struct kvm_zdev_ioat *ioat;
+	struct page *page;
+	struct kvm *kvm;
+	unsigned int idx;
+	void *iaddr;
+	int i, rc = 0;
+
+	if (shadow_ioat_init)
+		return -EINVAL;
+
+	/* Ensure supported type specified */
+	if ((iota & ZPCI_IOTA_RTTO_FLAG) != ZPCI_IOTA_RTTO_FLAG)
+		return -EINVAL;
+
+	kvm = zdev->kzdev->kvm;
+	ioat = &zdev->kzdev->ioat;
+	mutex_lock(&ioat->lock);
+	idx = srcu_read_lock(&kvm->srcu);
+	for (i = 0; i < ZPCI_TABLE_PAGES; i++) {
+		page = gfn_to_page(kvm, gpa_to_gfn(gpa));
+		if (is_error_page(page)) {
+			srcu_read_unlock(&kvm->srcu, idx);
+			rc = -EIO;
+			goto out;
+		}
+		iaddr = page_to_virt(page) + (gpa & ~PAGE_MASK);
+		ioat->head[i] = (unsigned long *)iaddr;
+		gpa += PAGE_SIZE;
+	}
+	srcu_read_unlock(&kvm->srcu, idx);
+
+	zdev->kzdev->ioat.seg = kcalloc(ZPCI_TABLE_ENTRIES_PAGES,
+					sizeof(unsigned long *), GFP_KERNEL);
+	if (!zdev->kzdev->ioat.seg)
+		goto unpin;
+	zdev->kzdev->ioat.pt = kcalloc(ZPCI_TABLE_ENTRIES,
+				       sizeof(unsigned long **), GFP_KERNEL);
+	if (!zdev->kzdev->ioat.pt)
+		goto free_seg;
+
+out:
+	mutex_unlock(&ioat->lock);
+	return rc;
+
+free_seg:
+	kfree(zdev->kzdev->ioat.seg);
+unpin:
+	for (i = 0; i < ZPCI_TABLE_PAGES; i++) {
+		kvm_release_pfn_dirty((u64)ioat->head[i] >> PAGE_SHIFT);
+		ioat->head[i] = 0;
+	}
+	mutex_unlock(&ioat->lock);
+	return -ENOMEM;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_ioat_enable);
+
+static void free_pt_entry(struct kvm_zdev_ioat *ioat, int st, int pt)
+{
+	if (!ioat->pt[st][pt])
+		return;
+
+	kvm_release_pfn_dirty((u64)ioat->pt[st][pt]);
+}
+
+static void free_seg_entry(struct kvm_zdev_ioat *ioat, int entry)
+{
+	int i, st, count = 0;
+
+	for (i = 0; i < ZPCI_TABLE_PAGES; i++) {
+		if (ioat->seg[entry + i]) {
+			kvm_release_pfn_dirty((u64)ioat->seg[entry + i]);
+			count++;
+		}
+	}
+
+	if (count == 0)
+		return;
+
+	st = entry / ZPCI_TABLE_PAGES;
+	for (i = 0; i < ZPCI_TABLE_ENTRIES; i++)
+		free_pt_entry(ioat, st, i);
+	kfree(ioat->pt[st]);
+}
+
+int kvm_s390_pci_ioat_disable(struct zpci_dev *zdev)
+{
+	struct kvm_zdev_ioat *ioat;
+	int i;
+
+	if (!shadow_ioat_init)
+		return -EINVAL;
+
+	ioat = &zdev->kzdev->ioat;
+	mutex_lock(&ioat->lock);
+	for (i = 0; i < ZPCI_TABLE_PAGES; i++) {
+		kvm_release_pfn_dirty((u64)ioat->head[i] >> PAGE_SHIFT);
+		ioat->head[i] = 0;
+	}
+
+	for (i = 0; i < ZPCI_TABLE_ENTRIES_PAGES; i += ZPCI_TABLE_PAGES)
+		free_seg_entry(ioat, i);
+
+	kfree(ioat->seg);
+	kfree(ioat->pt);
+	mutex_unlock(&ioat->lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_ioat_disable);
+
+u8 kvm_s390_pci_get_dtsm(struct zpci_dev *zdev)
+{
+	return (zdev->dtsm & KVM_S390_PCI_DTSM_MASK);
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_get_dtsm);
+
 int kvm_s390_pci_interp_probe(struct zpci_dev *zdev)
 {
 	/* Must have appropriate hardware facilities */
@@ -424,6 +556,10 @@ int kvm_s390_pci_interp_disable(struct zpci_dev *zdev)
 	if (zdev->kzdev->fib.fmt0.aibv != 0)
 		kvm_s390_pci_aif_disable(zdev);
 
+	/* If we are using the IOAT assist, disable it now */
+	if (zdev->kzdev->ioat.head[0])
+		kvm_s390_pci_ioat_disable(zdev);
+
 	/* Remove the host CLP guest designation */
 	zdev->gd = 0;
 
@@ -453,6 +589,8 @@ int kvm_s390_pci_dev_open(struct zpci_dev *zdev)
 	if (!kzdev)
 		return -ENOMEM;
 
+	mutex_init(&kzdev->ioat.lock);
+
 	kzdev->zdev = zdev;
 	zdev->kzdev = kzdev;
 
@@ -467,6 +605,7 @@ void kvm_s390_pci_dev_release(struct zpci_dev *zdev)
 	kzdev = zdev->kzdev;
 	WARN_ON(kzdev->zdev != zdev);
 	zdev->kzdev = 0;
+	mutex_destroy(&kzdev->ioat.lock);
 	kfree(kzdev);
 }
 EXPORT_SYMBOL_GPL(kvm_s390_pci_dev_release);
