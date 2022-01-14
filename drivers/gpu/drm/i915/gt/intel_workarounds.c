@@ -687,6 +687,11 @@ static void dg2_ctx_workarounds_init(struct intel_engine_cs *engine,
 	    IS_DG2_GRAPHICS_STEP(engine->i915, G11, STEP_A0, STEP_B0))
 		wa_masked_en(wal, GEN9_HALF_SLICE_CHICKEN7,
 			     DG2_DISABLE_ROUND_ENABLE_ALLOW_FOR_SSLA);
+
+	/* wa_14015023722: DG2 G11 [B0..NONE] */
+	if (IS_DG2_GRAPHICS_STEP(engine->i915, G11, STEP_B0, STEP_FOREVER))
+		wa_masked_en(wal, VF_PREEMPTION, PREEMPTION_VERTEX_4000);
+
 }
 
 static void fakewa_disable_nestedbb_mode(struct intel_engine_cs *engine,
