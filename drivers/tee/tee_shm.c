@@ -139,8 +139,7 @@ err_dev_put:
  */
 struct tee_shm *tee_shm_alloc_user_buf(struct tee_context *ctx, size_t size)
 {
-	u32 flags = TEE_SHM_MAPPED | TEE_SHM_DMA_BUF | TEE_SHM_REGISTER |
-		    TEE_SHM_POOL;
+	u32 flags = TEE_SHM_REGISTER | TEE_SHM_POOL;
 	struct tee_device *teedev = ctx->teedev;
 	struct tee_shm *shm;
 	void *ret;
@@ -186,7 +185,7 @@ EXPORT_SYMBOL_GPL(tee_shm_alloc_user_buf);
  */
 struct tee_shm *tee_shm_alloc_kernel_buf(struct tee_context *ctx, size_t size)
 {
-	u32 flags = TEE_SHM_MAPPED | TEE_SHM_REGISTER | TEE_SHM_POOL;
+	u32 flags = TEE_SHM_REGISTER | TEE_SHM_POOL;
 
 	return shm_alloc_helper(ctx, size, PAGE_SIZE, flags, -1);
 }
@@ -211,7 +210,7 @@ EXPORT_SYMBOL_GPL(tee_shm_alloc_kernel_buf);
 struct tee_shm *tee_shm_alloc_priv_kernel_buf(struct tee_context *ctx,
 					      size_t size)
 {
-	u32 flags = TEE_SHM_MAPPED | TEE_SHM_PRIV | TEE_SHM_POOL;
+	u32 flags = TEE_SHM_PRIV | TEE_SHM_POOL;
 
 	return shm_alloc_helper(ctx, size, sizeof(long) * 2, flags, -1);
 }
@@ -308,7 +307,7 @@ err_dev_put:
 struct tee_shm *tee_shm_register_user_buf(struct tee_context *ctx,
 					  unsigned long addr, size_t length)
 {
-	u32 f = TEE_SHM_DMA_BUF | TEE_SHM_USER_MAPPED | TEE_SHM_REGISTER;
+	u32 f = TEE_SHM_USER_MAPPED | TEE_SHM_REGISTER;
 	struct tee_device *teedev = ctx->teedev;
 	struct tee_shm *shm;
 	void *ret;
@@ -354,7 +353,7 @@ EXPORT_SYMBOL_GPL(tee_shm_register_user_buf);
 struct tee_shm *tee_shm_register_kernel_buf(struct tee_context *ctx,
 					    void *addr, size_t length)
 {
-	u32 f = TEE_SHM_REGISTER | TEE_SHM_KERNEL_MAPPED;
+	u32 f = TEE_SHM_REGISTER;
 
 	return register_shm_helper(ctx, (unsigned long)addr, length, f, -1);
 }
@@ -398,7 +397,7 @@ int tee_shm_get_fd(struct tee_shm *shm)
 {
 	int fd;
 
-	if (!(shm->flags & TEE_SHM_DMA_BUF))
+	if (shm->id < 0)
 		return -EINVAL;
 
 	/* matched by tee_shm_put() in tee_shm_op_release() */
@@ -428,7 +427,7 @@ EXPORT_SYMBOL_GPL(tee_shm_free);
  */
 int tee_shm_va2pa(struct tee_shm *shm, void *va, phys_addr_t *pa)
 {
-	if (!(shm->flags & TEE_SHM_MAPPED))
+	if (!shm->kaddr)
 		return -EINVAL;
 	/* Check that we're in the range of the shm */
 	if ((char *)va < (char *)shm->kaddr)
@@ -450,7 +449,7 @@ EXPORT_SYMBOL_GPL(tee_shm_va2pa);
  */
 int tee_shm_pa2va(struct tee_shm *shm, phys_addr_t pa, void **va)
 {
-	if (!(shm->flags & TEE_SHM_MAPPED))
+	if (!shm->kaddr)
 		return -EINVAL;
 	/* Check that we're in the range of the shm */
 	if (pa < shm->paddr)
@@ -478,7 +477,7 @@ EXPORT_SYMBOL_GPL(tee_shm_pa2va);
  */
 void *tee_shm_get_va(struct tee_shm *shm, size_t offs)
 {
-	if (!(shm->flags & TEE_SHM_MAPPED))
+	if (!shm->kaddr)
 		return ERR_PTR(-EINVAL);
 	if (offs >= shm->size)
 		return ERR_PTR(-EINVAL);
@@ -553,7 +552,7 @@ void tee_shm_put(struct tee_shm *shm)
 		 * the refcount_inc() in tee_shm_get_from_id() never starts
 		 * from 0.
 		 */
-		if (shm->flags & TEE_SHM_DMA_BUF)
+		if (shm->id >= 0)
 			idr_remove(&teedev->idr, shm->id);
 		do_release = true;
 	}

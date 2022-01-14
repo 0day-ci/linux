@@ -20,14 +20,10 @@
  * specific TEE driver.
  */
 
-#define TEE_SHM_MAPPED		BIT(0)	/* Memory mapped by the kernel */
-#define TEE_SHM_DMA_BUF		BIT(1)	/* Memory with dma-buf handle */
-#define TEE_SHM_EXT_DMA_BUF	BIT(2)	/* Memory with dma-buf handle */
-#define TEE_SHM_REGISTER	BIT(3)  /* Memory registered in secure world */
-#define TEE_SHM_USER_MAPPED	BIT(4)  /* Memory mapped in user space */
-#define TEE_SHM_POOL		BIT(5)  /* Memory allocated from pool */
-#define TEE_SHM_KERNEL_MAPPED	BIT(6)  /* Memory mapped in kernel space */
-#define TEE_SHM_PRIV		BIT(7)  /* Memory private to TEE driver */
+#define TEE_SHM_REGISTER	BIT(0)  /* Memory registered in secure world */
+#define TEE_SHM_USER_MAPPED	BIT(1)  /* Memory mapped in user space */
+#define TEE_SHM_POOL		BIT(2)  /* Memory allocated from pool */
+#define TEE_SHM_PRIV		BIT(3)  /* Memory private to TEE driver */
 
 struct device;
 struct tee_device;
