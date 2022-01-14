@@ -328,6 +328,9 @@ static int usb_phy_generic_remove(struct platform_device *pdev)
 
 	usb_remove_phy(&nop->phy);
 
+	if (nop->vbus_draw && nop->vbus_draw_enabled)
+		regulator_disable(nop->vbus_draw);
+
 	return 0;
 }
 
