@@ -191,6 +191,31 @@ legacy_irq:
 }
 
 /**
+ * pcie_init_platform_service_irqs - initialize platform service irqs for
+ * platform-specific System Errors
+ * @dev: PCI Express port to handle
+ * @irqs: Array of irqs to populate
+ * @mask: Bitmask of capabilities
+ *
+ * Return value: -ENODEV, in case no platform-specific IRQ is available
+ */
+static int pcie_init_platform_service_irqs(struct pci_dev *dev,
+					   int *irqs, int mask)
+{
+	struct pci_host_bridge *bridge;
+
+	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT) {
+		bridge = pci_find_host_bridge(dev->bus);
+		if (bridge && bridge->init_platform_service_irqs) {
+			return bridge->init_platform_service_irqs(dev, irqs,
+								  mask);
+		}
+	}
+
+	return -ENODEV;
+}
+
+/**
  * get_port_device_capability - discover capabilities of a PCI Express port
  * @dev: PCI Express port to examine
  *
@@ -342,7 +367,19 @@ int pcie_port_device_register(struct pci_dev *dev)
 		irq_services |= PCIE_PORT_SERVICE_DPC;
 	irq_services &= capabilities;
 
-	if (irq_services) {
+	/*
+	 * Some platforms have dedicated interrupts from root complex to
+	 * interrupt controller for PCIe platform-specific System Errors
+	 * like AER/PME etc., check if the platform registered with any such
+	 * IRQ.
+	 */
+	status = pcie_init_platform_service_irqs(dev, irqs, capabilities);
+
+	/*
+	 * Only install service irqs, when the platform-specific hook was
+	 * unsuccessful
+	 */
+	if (irq_services && status) {
 		/*
 		 * Initialize service IRQs. Don't use service devices that
 		 * require interrupts if there is no way to generate them.
