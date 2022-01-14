@@ -286,7 +286,7 @@ bool tep_is_local_bigendian(struct tep_handle *tep)
 {
 	if (tep)
 		return (tep->host_bigendian == TEP_BIG_ENDIAN);
-	return 0;
+	return false;
 }
 
 /**
