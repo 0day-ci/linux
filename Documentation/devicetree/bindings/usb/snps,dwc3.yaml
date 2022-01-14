@@ -260,6 +260,19 @@ properties:
     minimum: 1
     maximum: 0x3ff
 
+  snps,ref-clock-fladj:
+    description:
+      Value for GFLADJ_REFCLK_FLADJ field of GFLADJ register for the
+      fractional portion of the reference clock period in nanoseconds,
+      when the hardware set default does not match the actual
+      clock. Calculated via
+      ((125000/ref_clk_period_integer)-(125000/ref_clk_period)) * ref_clk_period
+      where ref_clk_period_integer is the period specified in GUCTL_REFCLKPER and
+      ref_clk_period is the period including fractional value.
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 0
+    maximum: 124999
+
   snps,rx-thr-num-pkt-prd:
     description:
       Periodic ESS RX packet threshold count (host mode only). Set this and
