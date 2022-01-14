@@ -749,26 +749,6 @@ struct path_it {
 };
 
 /**
- * list_next_or_null_rr_rcu - get next list element in round-robin fashion.
- * @head:	the head for the list.
- * @ptr:        the list head to take the next element from.
- * @type:       the type of the struct this is embedded in.
- * @memb:       the name of the list_head within the struct.
- *
- * Next element returned in round-robin fashion, i.e. head will be skipped,
- * but if list is observed as empty, NULL will be returned.
- *
- * This primitive may safely run concurrently with the _rcu list-mutation
- * primitives such as list_add_rcu() as long as it's guarded by rcu_read_lock().
- */
-#define list_next_or_null_rr_rcu(head, ptr, type, memb) \
-({ \
-	list_next_or_null_rcu(head, ptr, type, memb) ?: \
-		list_next_or_null_rcu(head, READ_ONCE((ptr)->next), \
-				      type, memb); \
-})
-
-/**
  * get_next_path_rr() - Returns path in round-robin fashion.
  * @it:	the path pointer
  *
@@ -797,10 +777,20 @@ static struct rtrs_clt_path *get_next_path_rr(struct path_it *it)
 		path = list_first_or_null_rcu(&clt->paths_list,
 					      typeof(*path), s.entry);
 	else
-		path = list_next_or_null_rr_rcu(&clt->paths_list,
-						&path->s.entry,
-						typeof(*path),
-						s.entry);
+		/*
+		 * Next element returned in round-robin fashion, i.e. head will be skipped,
+		 * but if list is observed as empty, NULL will be returned.
+		 *
+		 * This primitive may safely run concurrently with the _rcu list-mutation
+		 * primitives such as list_add_rcu() as long as it's guarded by rcu_read_lock().
+		 */
+		path = list_next_or_null_rcu(&clt->paths_list,
+					     &path->s.entry,
+					     typeof(*path),
+					     s.entry) ?:
+			list_next_or_null_rcu(&clt->paths_list,
+					      READ_ONCE((&path->s.entry)->next),
+					      typeof(*path), s.entry);
 	rcu_assign_pointer(*ppcpu_path, path);
 
 	return path;
@@ -1863,7 +1853,7 @@ static int rtrs_rdma_conn_established(struct rtrs_clt_con *con,
 		}
 		clt_path->queue_depth = queue_depth;
 		clt_path->s.signal_interval = min_not_zero(queue_depth,
-						(unsigned short) SERVICE_CON_QUEUE_DEPTH);
+						(unsigned short)SERVICE_CON_QUEUE_DEPTH);
 		clt_path->max_hdr_size = le32_to_cpu(msg->max_hdr_size);
 		clt_path->max_io_size = le32_to_cpu(msg->max_io_size);
 		clt_path->flags = le32_to_cpu(msg->flags);
@@ -2268,8 +2258,13 @@ static void rtrs_clt_remove_path_from_arr(struct rtrs_clt_path *clt_path)
 	 * removed.  If @sess is the last element, then @next is NULL.
 	 */
 	rcu_read_lock();
-	next = list_next_or_null_rr_rcu(&clt->paths_list, &clt_path->s.entry,
-					typeof(*next), s.entry);
+	next = list_next_or_null_rcu(&clt->paths_list,
+				     &clt_path->s.entry,
+				     typeof(*next),
+				     s.entry) ?:
+		list_next_or_null_rcu(&clt->paths_list,
+				      READ_ONCE((&clt_path->s.entry)->next),
+				      typeof(*next), s.entry);
 	rcu_read_unlock();
 
 	/*
