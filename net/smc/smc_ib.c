@@ -647,6 +647,38 @@ static void smc_ib_put_vector(struct smc_ib_device *smcibdev, int index)
 	smcibdev->vector_load[index]--;
 }
 
+static struct smc_ib_cq *smc_ib_get_least_used_cq(struct smc_ib_device *smcibdev,
+						  bool is_send)
+{
+	struct smc_ib_cq *smcibcq, *cq;
+	struct list_head *head;
+	int min;
+
+	if (is_send)
+		head = &smcibdev->smcibcq_send;
+	else
+		head = &smcibdev->smcibcq_recv;
+	cq = list_first_entry(head, struct smc_ib_cq, list);
+	min = cq->load;
+
+	list_for_each_entry(smcibcq, head, list) {
+		if (smcibcq->load < min) {
+			cq = smcibcq;
+			min = cq->load;
+		}
+	}
+	if (!cq)
+		cq = smcibcq;
+
+	cq->load++;
+	return cq;
+}
+
+static void smc_ib_put_cq(struct smc_ib_cq *smcibcq)
+{
+	smcibcq->load--;
+}
+
 static void smc_ib_qp_event_handler(struct ib_event *ibevent, void *priv)
 {
 	struct smc_link *lnk = (struct smc_link *)priv;
@@ -670,8 +702,11 @@ static void smc_ib_qp_event_handler(struct ib_event *ibevent, void *priv)
 
 void smc_ib_destroy_queue_pair(struct smc_link *lnk)
 {
-	if (lnk->roce_qp)
+	if (lnk->roce_qp) {
 		ib_destroy_qp(lnk->roce_qp);
+		smc_ib_put_cq(lnk->smcibcq_send);
+		smc_ib_put_cq(lnk->smcibcq_recv);
+	}
 	lnk->smcibcq_send = NULL;
 	lnk->smcibcq_recv = NULL;
 	lnk->roce_qp = NULL;
@@ -680,12 +715,16 @@ void smc_ib_destroy_queue_pair(struct smc_link *lnk)
 /* create a queue pair within the protection domain for a link */
 int smc_ib_create_queue_pair(struct smc_link *lnk)
 {
+	struct smc_ib_cq *smcibcq_send = smc_ib_get_least_used_cq(lnk->smcibdev,
+								  true);
+	struct smc_ib_cq *smcibcq_recv = smc_ib_get_least_used_cq(lnk->smcibdev,
+								  false);
 	int sges_per_buf = (lnk->lgr->smc_version == SMC_V2) ? 2 : 1;
 	struct ib_qp_init_attr qp_attr = {
 		.event_handler = smc_ib_qp_event_handler,
 		.qp_context = lnk,
-		.send_cq = lnk->smcibdev->roce_cq_send->roce_cq,
-		.recv_cq = lnk->smcibdev->roce_cq_recv->roce_cq,
+		.send_cq = smcibcq_send->roce_cq,
+		.recv_cq = smcibcq_recv->roce_cq,
 		.srq = NULL,
 		.cap = {
 				/* include unsolicited rdma_writes as well,
@@ -706,8 +745,8 @@ int smc_ib_create_queue_pair(struct smc_link *lnk)
 	if (IS_ERR(lnk->roce_qp)) {
 		lnk->roce_qp = NULL;
 	} else {
-		lnk->smcibcq_send = lnk->smcibdev->roce_cq_send;
-		lnk->smcibcq_recv = lnk->smcibdev->roce_cq_recv;
+		lnk->smcibcq_send = smcibcq_send;
+		lnk->smcibcq_recv = smcibcq_recv;
 		smc_wr_remember_qp_attr(lnk);
 	}
 	return rc;
@@ -826,6 +865,24 @@ void smc_ib_buf_unmap_sg(struct smc_link *lnk,
 	buf_slot->sgt[lnk->link_idx].sgl->dma_address = 0;
 }
 
+static void smc_ib_cleanup_cq(struct smc_ib_device *smcibdev)
+{
+	struct smc_ib_cq *smcibcq, *cq;
+
+	list_for_each_entry_safe(smcibcq, cq, &smcibdev->smcibcq_send, list) {
+		list_del(&smcibcq->list);
+		ib_destroy_cq(smcibcq->roce_cq);
+		smc_ib_put_vector(smcibdev, smcibcq->comp_vector);
+		kfree(smcibcq);
+	}
+	list_for_each_entry_safe(smcibcq, cq, &smcibdev->smcibcq_recv, list) {
+		list_del(&smcibcq->list);
+		ib_destroy_cq(smcibcq->roce_cq);
+		smc_ib_put_vector(smcibdev, smcibcq->comp_vector);
+		kfree(smcibcq);
+	}
+}
+
 long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 {
 	struct ib_cq_init_attr cqattr =	{ .cqe = SMC_MAX_CQE };
@@ -833,6 +890,7 @@ long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 	int cq_send_vector, cq_recv_vector;
 	int cqe_size_order, smc_order;
 	long rc;
+	int i;
 
 	mutex_lock(&smcibdev->mutex);
 	rc = 0;
@@ -843,53 +901,61 @@ long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 	smc_order = MAX_ORDER - cqe_size_order - 1;
 	if (SMC_MAX_CQE + 2 > (0x00000001 << smc_order) * PAGE_SIZE)
 		cqattr.cqe = (0x00000001 << smc_order) * PAGE_SIZE - 2;
-	smcibcq_send = kmalloc(sizeof(*smcibcq_send), GFP_KERNEL);
-	if (!smcibcq_send) {
-		rc = -ENOMEM;
-		goto out;
+
+	/* initialize send/recv CQs */
+	for (i = 0; i < smcibdev->ibdev->num_comp_vectors; i++) {
+		/* initialize send CQ */
+		smcibcq_send = kmalloc(sizeof(*smcibcq_send), GFP_KERNEL);
+		if (!smcibcq_send) {
+			rc = -ENOMEM;
+			goto err;
+		}
+		cq_send_vector = smc_ib_get_least_used_vector(smcibdev);
+		smcibcq_send->smcibdev = smcibdev;
+		smcibcq_send->load = 0;
+		smcibcq_send->is_send = 1;
+		smcibcq_send->comp_vector = cq_send_vector;
+		INIT_LIST_HEAD(&smcibcq_send->list);
+		cqattr.comp_vector = cq_send_vector;
+		smcibcq_send->roce_cq = ib_create_cq(smcibdev->ibdev,
+						     smc_wr_tx_cq_handler, NULL,
+						     smcibcq_send, &cqattr);
+		rc = PTR_ERR_OR_ZERO(smcibcq_send->roce_cq);
+		if (IS_ERR(smcibcq_send->roce_cq)) {
+			smcibcq_send->roce_cq = NULL;
+			goto err;
+		}
+		list_add_tail(&smcibcq_send->list, &smcibdev->smcibcq_send);
+
+		/* initialize recv CQ */
+		smcibcq_recv = kmalloc(sizeof(*smcibcq_recv), GFP_KERNEL);
+		if (!smcibcq_recv) {
+			rc = -ENOMEM;
+			goto err;
+		}
+		cq_recv_vector = smc_ib_get_least_used_vector(smcibdev);
+		smcibcq_recv->smcibdev = smcibdev;
+		smcibcq_recv->load = 0;
+		smcibcq_recv->is_send = 0;
+		smcibcq_recv->comp_vector = cq_recv_vector;
+		INIT_LIST_HEAD(&smcibcq_recv->list);
+		cqattr.comp_vector = cq_recv_vector;
+		smcibcq_recv->roce_cq = ib_create_cq(smcibdev->ibdev,
+						     smc_wr_rx_cq_handler, NULL,
+						     smcibcq_recv, &cqattr);
+		rc = PTR_ERR_OR_ZERO(smcibcq_recv->roce_cq);
+		if (IS_ERR(smcibcq_recv->roce_cq)) {
+			smcibcq_recv->roce_cq = NULL;
+			goto err;
+		}
+		list_add_tail(&smcibcq_recv->list, &smcibdev->smcibcq_recv);
 	}
-	cq_send_vector = smc_ib_get_least_used_vector(smcibdev);
-	smcibcq_send->smcibdev = smcibdev;
-	smcibcq_send->is_send = 1;
-	cqattr.comp_vector = cq_send_vector;
-	smcibcq_send->roce_cq = ib_create_cq(smcibdev->ibdev,
-					     smc_wr_tx_cq_handler, NULL,
-					     smcibcq_send, &cqattr);
-	rc = PTR_ERR_OR_ZERO(smcibdev->roce_cq_send);
-	if (IS_ERR(smcibdev->roce_cq_send)) {
-		smcibdev->roce_cq_send = NULL;
-		goto err_send;
-	}
-	smcibdev->roce_cq_send = smcibcq_send;
-	smcibcq_recv = kmalloc(sizeof(*smcibcq_recv), GFP_KERNEL);
-	if (!smcibcq_recv) {
-		rc = -ENOMEM;
-		goto err_send;
-	}
-	cq_recv_vector = smc_ib_get_least_used_vector(smcibdev);
-	smcibcq_recv->smcibdev = smcibdev;
-	smcibcq_recv->is_send = 0;
-	cqattr.comp_vector = cq_recv_vector;
-	smcibcq_recv->roce_cq = ib_create_cq(smcibdev->ibdev,
-					     smc_wr_rx_cq_handler, NULL,
-					     smcibcq_recv, &cqattr);
-	rc = PTR_ERR_OR_ZERO(smcibdev->roce_cq_recv);
-	if (IS_ERR(smcibdev->roce_cq_recv)) {
-		smcibdev->roce_cq_recv = NULL;
-		goto err_recv;
-	}
-	smcibdev->roce_cq_recv = smcibcq_recv;
 	smc_wr_add_dev(smcibdev);
 	smcibdev->initialized = 1;
 	goto out;
 
-err_recv:
-	kfree(smcibcq_recv);
-	smc_ib_put_vector(smcibdev, cq_recv_vector);
-	ib_destroy_cq(smcibcq_send->roce_cq);
-err_send:
-	kfree(smcibcq_send);
-	smc_ib_put_vector(smcibdev, cq_send_vector);
+err:
+	smc_ib_cleanup_cq(smcibdev);
 out:
 	mutex_unlock(&smcibdev->mutex);
 	return rc;
@@ -901,8 +967,7 @@ static void smc_ib_cleanup_per_ibdev(struct smc_ib_device *smcibdev)
 	if (!smcibdev->initialized)
 		goto out;
 	smcibdev->initialized = 0;
-	ib_destroy_cq(smcibdev->roce_cq_recv->roce_cq);
-	ib_destroy_cq(smcibdev->roce_cq_send->roce_cq);
+	smc_ib_cleanup_cq(smcibdev);
 	smc_wr_remove_dev(smcibdev);
 out:
 	mutex_unlock(&smcibdev->mutex);
@@ -978,6 +1043,8 @@ static int smc_ib_add_dev(struct ib_device *ibdev)
 	INIT_IB_EVENT_HANDLER(&smcibdev->event_handler, smcibdev->ibdev,
 			      smc_ib_global_event_handler);
 	ib_register_event_handler(&smcibdev->event_handler);
+	INIT_LIST_HEAD(&smcibdev->smcibcq_send);
+	INIT_LIST_HEAD(&smcibdev->smcibcq_recv);
 	/* vector's load per ib device */
 	smcibdev->vector_load = kcalloc(ibdev->num_comp_vectors,
 					sizeof(int), GFP_KERNEL);
