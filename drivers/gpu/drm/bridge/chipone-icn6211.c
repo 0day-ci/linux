@@ -135,10 +135,12 @@ struct chipone {
 	struct device *dev;
 	struct drm_bridge bridge;
 	struct drm_bridge *panel_bridge;
+	struct device_node *host_node;
 	struct gpio_desc *enable_gpio;
 	struct regulator *vdd1;
 	struct regulator *vdd2;
 	struct regulator *vdd3;
+	int dsi_lanes;
 };
 
 static inline struct chipone *bridge_to_chipone(struct drm_bridge *bridge)
@@ -235,6 +237,11 @@ static void chipone_atomic_enable(struct drm_bridge *bridge,
 	/* dsi specific sequence */
 	ICN6211_DSI(icn, SYNC_EVENT_DLY, 0x80);
 	ICN6211_DSI(icn, HFP_MIN, hfp & 0xff);
+
+	/* DSI data lane count */
+	ICN6211_DSI(icn, DSI_CTRL,
+		    DSI_CTRL_UNKNOWN | DSI_CTRL_DSI_LANES(icn->dsi_lanes - 1));
+
 	ICN6211_DSI(icn, MIPI_PD_CK_LANE, 0xa0);
 	ICN6211_DSI(icn, PLL_CTRL(12), 0xff);
 
@@ -354,6 +361,8 @@ static const struct drm_bridge_funcs chipone_bridge_funcs = {
 static int chipone_parse_dt(struct chipone *icn)
 {
 	struct device *dev = icn->dev;
+	struct drm_bridge *panel_bridge;
+	struct device_node *endpoint;
 	struct drm_panel *panel;
 	int ret;
 
@@ -390,13 +399,26 @@ static int chipone_parse_dt(struct chipone *icn)
 		return PTR_ERR(icn->enable_gpio);
 	}
 
-	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &panel, NULL);
-	if (ret)
-		return ret;
+	endpoint = of_graph_get_endpoint_by_regs(dev->of_node, 0, 0);
+	icn->dsi_lanes = of_property_count_u32_elems(endpoint, "data-lanes");
+	icn->host_node = of_graph_get_remote_port_parent(endpoint);
+	of_node_put(endpoint);
 
-	icn->panel_bridge = devm_drm_panel_bridge_add(dev, panel);
-	if (IS_ERR(icn->panel_bridge))
-		return PTR_ERR(icn->panel_bridge);
+	if (icn->dsi_lanes < 0 || icn->dsi_lanes > 4)
+		return -EINVAL;
+	if (!icn->host_node)
+		return -ENODEV;
+
+	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &panel, &panel_bridge);
+	if (ret < 0)
+		return ret;
+	if (panel) {
+		panel_bridge = devm_drm_panel_bridge_add(dev, panel);
+		if (IS_ERR(panel_bridge))
+			return PTR_ERR(panel_bridge);
+	}
+
+	icn->panel_bridge = panel_bridge;
 
 	return 0;
 }
@@ -424,7 +446,7 @@ static int chipone_probe(struct mipi_dsi_device *dsi)
 
 	drm_bridge_add(&icn->bridge);
 
-	dsi->lanes = 4;
+	dsi->lanes = icn->dsi_lanes;
 	dsi->format = MIPI_DSI_FMT_RGB888;
 	dsi->mode_flags = MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
 
@@ -443,6 +465,7 @@ static int chipone_remove(struct mipi_dsi_device *dsi)
 
 	mipi_dsi_detach(dsi);
 	drm_bridge_remove(&icn->bridge);
+	of_node_put(icn->host_node);
 
 	return 0;
 }
