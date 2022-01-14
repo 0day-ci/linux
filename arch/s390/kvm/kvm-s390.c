@@ -48,6 +48,7 @@
 #include <asm/fpu/api.h>
 #include "kvm-s390.h"
 #include "gaccess.h"
+#include "pci.h"
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -501,6 +502,14 @@ int kvm_arch_init(void *opaque)
 	if (rc) {
 		pr_err("A FLIC registration call failed with rc=%d\n", rc);
 		goto out;
+	}
+
+	if (IS_ENABLED(CONFIG_PCI)) {
+		rc = kvm_s390_pci_init();
+		if (rc) {
+			pr_err("Unable to allocate AIFT for PCI\n");
+			goto out;
+		}
 	}
 
 	rc = kvm_s390_gib_init(GAL_ISC);

@@ -32,6 +32,7 @@
 #include "kvm-s390.h"
 #include "gaccess.h"
 #include "trace-s390.h"
+#include "pci.h"
 
 #define PFAULT_INIT 0x0600
 #define PFAULT_DONE 0x0680
@@ -3278,6 +3279,11 @@ void kvm_s390_gib_destroy(void)
 {
 	if (!gib)
 		return;
+	if (IS_ENABLED(CONFIG_PCI) && sclp.has_aeni && aift) {
+		mutex_lock(&aift->lock);
+		kvm_s390_pci_aen_exit();
+		mutex_unlock(&aift->lock);
+	}
 	chsc_sgib(0);
 	unregister_adapter_interrupt(&gib_alert_irq);
 	free_page((unsigned long)gib);
@@ -3313,6 +3319,14 @@ int kvm_s390_gib_init(u8 nisc)
 		gib = NULL;
 		rc = -EIO;
 		goto out_unreg_gal;
+	}
+
+	if (IS_ENABLED(CONFIG_PCI) && sclp.has_aeni) {
+		if (kvm_s390_pci_aen_init(nisc)) {
+			pr_err("Initializing AEN for PCI failed\n");
+			rc = -EIO;
+			goto out_unreg_gal;
+		}
 	}
 
 	KVM_EVENT(3, "gib 0x%pK (nisc=%d) initialized", gib, gib->nisc);
