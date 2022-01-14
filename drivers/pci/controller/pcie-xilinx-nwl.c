@@ -24,6 +24,7 @@
 #include <linux/irqchip/chained_irq.h>
 
 #include "../pci.h"
+#include "../pcie/portdrv.h"
 
 /* Bridge core config registers */
 #define BRCFG_PCIE_RX0			0x00000000
@@ -775,6 +776,22 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
 	return 0;
 }
 
+static int nwl_init_platform_service_irqs(struct pci_dev *dev, int *irqs,
+					  int plat_mask)
+{
+	struct pci_host_bridge *bridge;
+	struct nwl_pcie *pcie;
+
+	bridge = pci_find_host_bridge(dev->bus);
+	pcie = pci_host_bridge_priv(bridge);
+	if (plat_mask & PCIE_PORT_SERVICE_AER) {
+		irqs[PCIE_PORT_SERVICE_AER_SHIFT] = pcie->irq_misc;
+		return 0; /* platform-specific service IRQ installed */
+	}
+
+	return -ENODEV; /* platform-specific service IRQ not installed */
+}
+
 static const struct of_device_id nwl_pcie_of_match[] = {
 	{ .compatible = "xlnx,nwl-pcie-2.11", },
 	{}
@@ -826,6 +843,7 @@ static int nwl_pcie_probe(struct platform_device *pdev)
 
 	bridge->sysdata = pcie;
 	bridge->ops = &nwl_pcie_ops;
+	bridge->init_platform_service_irqs = nwl_init_platform_service_irqs;
 
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
 		err = nwl_pcie_enable_msi(pcie);
