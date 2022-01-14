@@ -823,6 +823,9 @@ long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 		smcibdev->roce_cq_send = NULL;
 		goto out;
 	}
+	/* spread to different completion vector */
+	if (smcibdev->ibdev->num_comp_vectors > 1)
+		cqattr.comp_vector = 1;
 	smcibdev->roce_cq_recv = ib_create_cq(smcibdev->ibdev,
 					      smc_wr_rx_cq_handler, NULL,
 					      smcibdev, &cqattr);
