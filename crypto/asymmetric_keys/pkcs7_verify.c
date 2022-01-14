@@ -226,9 +226,6 @@ static int pkcs7_verify_sig_chain(struct pkcs7_message *pkcs7,
 			return 0;
 		}
 
-		if (x509->unsupported_key)
-			goto unsupported_crypto_in_x509;
-
 		pr_debug("- issuer %s\n", x509->issuer);
 		sig = x509->sig;
 		if (sig->auth_ids[0])
