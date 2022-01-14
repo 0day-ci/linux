@@ -16,15 +16,22 @@
 #include <linux/kvm_host.h>
 #include <linux/kvm.h>
 #include <linux/pci.h>
+#include <asm/pci_insn.h>
 
 struct kvm_zdev {
 	struct zpci_dev *zdev;
 	struct kvm *kvm;
+	struct zpci_fib fib;
 };
 
 int kvm_s390_pci_dev_open(struct zpci_dev *zdev);
 void kvm_s390_pci_dev_release(struct zpci_dev *zdev);
 void kvm_s390_pci_attach_kvm(struct zpci_dev *zdev, struct kvm *kvm);
+
+int kvm_s390_pci_aif_probe(struct zpci_dev *zdev);
+int kvm_s390_pci_aif_enable(struct zpci_dev *zdev, struct zpci_fib *fib,
+			    bool assist);
+int kvm_s390_pci_aif_disable(struct zpci_dev *zdev);
 
 int kvm_s390_pci_interp_probe(struct zpci_dev *zdev);
 int kvm_s390_pci_interp_enable(struct zpci_dev *zdev);
