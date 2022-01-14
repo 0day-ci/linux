@@ -917,8 +917,12 @@ out_no_revalidate:
 
 	generic_fillattr(&init_user_ns, inode, stat);
 	stat->ino = nfs_compat_user_ino64(NFS_FILEID(inode));
-	if (S_ISDIR(inode->i_mode))
+	if (S_ISDIR(inode->i_mode)) {
 		stat->blksize = NFS_SERVER(inode)->dtsize;
+		/* Limit userland buf size for getdents */
+		if (stat->blksize > NFS_MAX_READDIR_BLOCK)
+			stat->blksize = NFS_MAX_READDIR_BLOCK;
+	}
 out:
 	trace_nfs_getattr_exit(inode, err);
 	return err;
