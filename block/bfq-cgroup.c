@@ -730,8 +730,31 @@ static struct bfq_group *__bfq_bic_change_cgroup(struct bfq_data *bfqd,
 
 	if (sync_bfqq) {
 		entity = &sync_bfqq->entity;
-		if (entity->sched_data != &bfqg->sched_data)
+		if (entity->sched_data != &bfqg->sched_data) {
+			/*
+			 * Was the queue we use merged to a different queue?
+			 * Detach process from the queue as merge need not be
+			 * valid anymore. We cannot easily cancel the merge as
+			 * there may be other processes scheduled to this
+			 * queue.
+			 */
+			if (sync_bfqq->new_bfqq) {
+				bfq_put_cooperator(sync_bfqq);
+				bfq_release_process_ref(bfqd, sync_bfqq);
+				bic_set_bfqq(bic, NULL, 1);
+				return bfqg;
+			}
+			/*
+			 * Moving bfqq that is shared with another process?
+			 * Split the queues at the nearest occasion as the
+			 * processes can be in different cgroups now.
+			 */
+			if (bfq_bfqq_coop(sync_bfqq)) {
+				bic->stably_merged = false;
+				bfq_mark_bfqq_split_coop(sync_bfqq);
+			}
 			bfq_bfqq_move(bfqd, sync_bfqq, bfqg);
+		}
 	}
 
 	return bfqg;
