@@ -51,6 +51,7 @@
 #include "smc_close.h"
 #include "smc_stats.h"
 #include "smc_tracepoint.h"
+#include "smc_sysctl.h"
 
 static DEFINE_MUTEX(smc_server_lgr_pending);	/* serialize link group
 						 * creation on server
@@ -2741,8 +2742,8 @@ static int __smc_create(struct net *net, struct socket *sock, int protocol,
 		smc->clcsock = clcsock;
 	}
 
-	smc->sk.sk_sndbuf = max(smc->clcsock->sk->sk_sndbuf, SMC_BUF_MIN_SIZE);
-	smc->sk.sk_rcvbuf = max(smc->clcsock->sk->sk_rcvbuf, SMC_BUF_MIN_SIZE);
+	smc->sk.sk_sndbuf = sock_net(sk)->smc.sysctl_wmem_default;
+	smc->sk.sk_rcvbuf = sock_net(sk)->smc.sysctl_rmem_default;
 
 out:
 	return rc;
@@ -2822,6 +2823,11 @@ unsigned int smc_net_id;
 
 static __net_init int smc_net_init(struct net *net)
 {
+	net->smc.sysctl_wmem_default = max(net->ipv4.sysctl_tcp_wmem[1],
+					   SMC_BUF_MIN_SIZE);
+	net->smc.sysctl_rmem_default = max(net->ipv4.sysctl_tcp_rmem[1],
+					   SMC_BUF_MIN_SIZE);
+
 	return smc_pnet_net_init(net);
 }
 
@@ -2934,6 +2940,12 @@ static int __init smc_init(void)
 		goto out_sock;
 	}
 
+	rc = smc_sysctl_init();
+	if (rc) {
+		pr_err("%s: sysctl fails with %d\n", __func__, rc);
+		goto out_sock;
+	}
+
 	static_branch_enable(&tcp_have_smc);
 	return 0;
 
@@ -2975,6 +2987,7 @@ static void __exit smc_exit(void)
 	smc_clc_exit();
 	unregister_pernet_subsys(&smc_net_stat_ops);
 	unregister_pernet_subsys(&smc_net_ops);
+	smc_sysctl_exit();
 	rcu_barrier();
 }
 
