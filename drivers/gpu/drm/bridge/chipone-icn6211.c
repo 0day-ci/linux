@@ -146,9 +146,28 @@ static inline struct chipone *bridge_to_chipone(struct drm_bridge *bridge)
 	return container_of(bridge, struct chipone, bridge);
 }
 
-static struct drm_display_mode *bridge_to_mode(struct drm_bridge *bridge)
+static const struct drm_display_mode *
+bridge_to_mode(struct drm_bridge *bridge, struct drm_atomic_state *state)
 {
-	return &bridge->encoder->crtc->state->adjusted_mode;
+	const struct drm_crtc_state *crtc_state;
+	struct drm_connector *connector;
+	struct drm_crtc *crtc;
+
+	/* Try to retrieve panel mode first. */
+	connector = drm_atomic_get_new_connector_for_encoder(state,
+							     bridge->encoder);
+	if (!list_empty(&connector->modes)) {
+		return list_first_entry(&connector->modes,
+					struct drm_display_mode, head);
+	}
+
+	/*
+	 * Retrieve the CRTC adjusted mode. This requires a little dance to go
+	 * from the bridge to the encoder, to the connector and to the CRTC.
+	 */
+	crtc = drm_atomic_get_new_connector_state(state, connector)->crtc;
+	crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+	return &crtc_state->adjusted_mode;
 }
 
 static inline int chipone_dsi_write(struct chipone *icn,  const void *seq,
@@ -169,7 +188,8 @@ static void chipone_atomic_enable(struct drm_bridge *bridge,
 				  struct drm_bridge_state *old_bridge_state)
 {
 	struct chipone *icn = bridge_to_chipone(bridge);
-	struct drm_display_mode *mode = bridge_to_mode(bridge);
+	struct drm_atomic_state *state = old_bridge_state->base.state;
+	const struct drm_display_mode *mode = bridge_to_mode(bridge, state);
 	u16 hfp, hbp, hsync;
 
 	ICN6211_DSI(icn, MIPI_CFG_PW, MIPI_CFG_PW_CONFIG_DSI);
