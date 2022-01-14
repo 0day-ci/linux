@@ -1397,4 +1397,36 @@ mt76_packet_id_flush(struct mt76_dev *dev, struct mt76_wcid *wcid)
 	idr_destroy(&wcid->pktid);
 }
 
+/* Estimated summing of dbm without resorting to log(10) business */
+static inline int mt76_sum_sigs_2(int a, int b)
+{
+	int diff;
+
+	/* 0x80 means value-is-not-set */
+	if (b == 0x80)
+		return a;
+
+	if (a >= b) {
+		/* a is largest value, add to it. */
+		diff = a - b;
+		if (diff == 0)
+			return a + 3;
+		else if (diff == 1)
+			return a + 2;
+		else if (diff == 2)
+			return a + 1;
+		return a;
+	} else {
+		/* b is largest value, add to it. */
+		diff = b - a;
+		if (diff == 0)
+			return b + 3;
+		else if (diff == 1)
+			return b + 2;
+		else if (diff == 2)
+			return b + 1;
+		return b;
+	}
+}
+
 #endif
