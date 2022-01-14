@@ -86,6 +86,8 @@ struct smc_link {
 	struct ib_pd		*roce_pd;	/* IB protection domain,
 						 * unique for every RoCE QP
 						 */
+	struct smc_ib_cq	*smcibcq_recv;	/* cq for recv */
+	struct smc_ib_cq	*smcibcq_send;	/* cq for send */
 	struct ib_qp		*roce_qp;	/* IB queue pair */
 	struct ib_qp_attr	qp_attr;	/* IB queue pair attributes */
 

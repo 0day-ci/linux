@@ -133,7 +133,7 @@ int smc_ib_ready_link(struct smc_link *lnk)
 	if (rc)
 		goto out;
 	smc_wr_remember_qp_attr(lnk);
-	rc = ib_req_notify_cq(lnk->smcibdev->roce_cq_recv,
+	rc = ib_req_notify_cq(lnk->smcibcq_recv->roce_cq,
 			      IB_CQ_SOLICITED_MASK);
 	if (rc)
 		goto out;
@@ -672,6 +672,8 @@ void smc_ib_destroy_queue_pair(struct smc_link *lnk)
 {
 	if (lnk->roce_qp)
 		ib_destroy_qp(lnk->roce_qp);
+	lnk->smcibcq_send = NULL;
+	lnk->smcibcq_recv = NULL;
 	lnk->roce_qp = NULL;
 }
 
@@ -682,8 +684,8 @@ int smc_ib_create_queue_pair(struct smc_link *lnk)
 	struct ib_qp_init_attr qp_attr = {
 		.event_handler = smc_ib_qp_event_handler,
 		.qp_context = lnk,
-		.send_cq = lnk->smcibdev->roce_cq_send,
-		.recv_cq = lnk->smcibdev->roce_cq_recv,
+		.send_cq = lnk->smcibdev->roce_cq_send->roce_cq,
+		.recv_cq = lnk->smcibdev->roce_cq_recv->roce_cq,
 		.srq = NULL,
 		.cap = {
 				/* include unsolicited rdma_writes as well,
@@ -701,10 +703,13 @@ int smc_ib_create_queue_pair(struct smc_link *lnk)
 
 	lnk->roce_qp = ib_create_qp(lnk->roce_pd, &qp_attr);
 	rc = PTR_ERR_OR_ZERO(lnk->roce_qp);
-	if (IS_ERR(lnk->roce_qp))
+	if (IS_ERR(lnk->roce_qp)) {
 		lnk->roce_qp = NULL;
-	else
+	} else {
+		lnk->smcibcq_send = lnk->smcibdev->roce_cq_send;
+		lnk->smcibcq_recv = lnk->smcibdev->roce_cq_recv;
 		smc_wr_remember_qp_attr(lnk);
+	}
 	return rc;
 }
 
@@ -824,6 +829,7 @@ void smc_ib_buf_unmap_sg(struct smc_link *lnk,
 long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 {
 	struct ib_cq_init_attr cqattr =	{ .cqe = SMC_MAX_CQE };
+	struct smc_ib_cq *smcibcq_send, *smcibcq_recv;
 	int cq_send_vector, cq_recv_vector;
 	int cqe_size_order, smc_order;
 	long rc;
@@ -837,34 +843,52 @@ long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 	smc_order = MAX_ORDER - cqe_size_order - 1;
 	if (SMC_MAX_CQE + 2 > (0x00000001 << smc_order) * PAGE_SIZE)
 		cqattr.cqe = (0x00000001 << smc_order) * PAGE_SIZE - 2;
+	smcibcq_send = kmalloc(sizeof(*smcibcq_send), GFP_KERNEL);
+	if (!smcibcq_send) {
+		rc = -ENOMEM;
+		goto out;
+	}
 	cq_send_vector = smc_ib_get_least_used_vector(smcibdev);
+	smcibcq_send->smcibdev = smcibdev;
+	smcibcq_send->is_send = 1;
 	cqattr.comp_vector = cq_send_vector;
-	smcibdev->roce_cq_send = ib_create_cq(smcibdev->ibdev,
-					      smc_wr_tx_cq_handler, NULL,
-					      smcibdev, &cqattr);
+	smcibcq_send->roce_cq = ib_create_cq(smcibdev->ibdev,
+					     smc_wr_tx_cq_handler, NULL,
+					     smcibcq_send, &cqattr);
 	rc = PTR_ERR_OR_ZERO(smcibdev->roce_cq_send);
 	if (IS_ERR(smcibdev->roce_cq_send)) {
 		smcibdev->roce_cq_send = NULL;
 		goto err_send;
 	}
+	smcibdev->roce_cq_send = smcibcq_send;
+	smcibcq_recv = kmalloc(sizeof(*smcibcq_recv), GFP_KERNEL);
+	if (!smcibcq_recv) {
+		rc = -ENOMEM;
+		goto err_send;
+	}
 	cq_recv_vector = smc_ib_get_least_used_vector(smcibdev);
+	smcibcq_recv->smcibdev = smcibdev;
+	smcibcq_recv->is_send = 0;
 	cqattr.comp_vector = cq_recv_vector;
-	smcibdev->roce_cq_recv = ib_create_cq(smcibdev->ibdev,
-					      smc_wr_rx_cq_handler, NULL,
-					      smcibdev, &cqattr);
+	smcibcq_recv->roce_cq = ib_create_cq(smcibdev->ibdev,
+					     smc_wr_rx_cq_handler, NULL,
+					     smcibcq_recv, &cqattr);
 	rc = PTR_ERR_OR_ZERO(smcibdev->roce_cq_recv);
 	if (IS_ERR(smcibdev->roce_cq_recv)) {
 		smcibdev->roce_cq_recv = NULL;
 		goto err_recv;
 	}
+	smcibdev->roce_cq_recv = smcibcq_recv;
 	smc_wr_add_dev(smcibdev);
 	smcibdev->initialized = 1;
 	goto out;
 
 err_recv:
+	kfree(smcibcq_recv);
 	smc_ib_put_vector(smcibdev, cq_recv_vector);
-	ib_destroy_cq(smcibdev->roce_cq_send);
+	ib_destroy_cq(smcibcq_send->roce_cq);
 err_send:
+	kfree(smcibcq_send);
 	smc_ib_put_vector(smcibdev, cq_send_vector);
 out:
 	mutex_unlock(&smcibdev->mutex);
@@ -877,8 +901,8 @@ static void smc_ib_cleanup_per_ibdev(struct smc_ib_device *smcibdev)
 	if (!smcibdev->initialized)
 		goto out;
 	smcibdev->initialized = 0;
-	ib_destroy_cq(smcibdev->roce_cq_recv);
-	ib_destroy_cq(smcibdev->roce_cq_send);
+	ib_destroy_cq(smcibdev->roce_cq_recv->roce_cq);
+	ib_destroy_cq(smcibdev->roce_cq_send->roce_cq);
 	smc_wr_remove_dev(smcibdev);
 out:
 	mutex_unlock(&smcibdev->mutex);
