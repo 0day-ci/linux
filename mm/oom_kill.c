@@ -670,6 +670,21 @@ static void wake_oom_reaper(struct task_struct *tsk)
 	if (test_and_set_bit(MMF_OOM_REAP_QUEUED, &tsk->signal->oom_mm->flags))
 		return;
 
+#ifdef CONFIG_FUTEX
+	/*
+	 * If the ooming task's SIGKILL has not finished handling the
+	 * robust futex it is not correct to reap the mm concurrently.
+	 * Do not wake the oom reaper when the task still contains a
+	 * robust list.
+	 */
+	if (tsk->robust_list)
+		return;
+#ifdef CONFIG_COMPAT
+	if (tsk->compat_robust_list)
+		return;
+#endif
+#endif
+
 	get_task_struct(tsk);
 
 	spin_lock(&oom_reaper_lock);
