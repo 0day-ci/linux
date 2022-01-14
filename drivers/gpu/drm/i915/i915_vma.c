@@ -485,10 +485,16 @@ void __iomem *i915_vma_pin_iomap(struct i915_vma *vma)
 		 * of pages, that way we can also drop the
 		 * I915_BO_ALLOC_CONTIGUOUS when allocating the object.
 		 */
-		if (i915_gem_object_is_lmem(vma->obj))
-			ptr = i915_gem_object_lmem_io_map(vma->obj, 0,
-							  vma->obj->base.size);
-		else
+		if (i915_gem_object_is_lmem(vma->obj)) {
+			ptr = (void __iomem *)
+			       i915_gem_object_pin_map_unlocked(vma->obj,
+								I915_MAP_WC);
+			if (IS_ERR(ptr)) {
+				err = PTR_ERR(ptr);
+				goto err;
+			}
+			ptr = page_pack_bits(ptr, 1);
+		} else
 			ptr = io_mapping_map_wc(&i915_vm_to_ggtt(vma->vm)->iomap,
 						vma->node.start,
 						vma->node.size);
@@ -498,7 +504,10 @@ void __iomem *i915_vma_pin_iomap(struct i915_vma *vma)
 		}
 
 		if (unlikely(cmpxchg(&vma->iomap, NULL, ptr))) {
-			io_mapping_unmap(ptr);
+			if (page_unmask_bits(ptr))
+				__i915_gem_object_release_map(vma->obj);
+			else
+				io_mapping_unmap(ptr);
 			ptr = vma->iomap;
 		}
 	}
@@ -512,7 +521,7 @@ void __iomem *i915_vma_pin_iomap(struct i915_vma *vma)
 	i915_vma_set_ggtt_write(vma);
 
 	/* NB Access through the GTT requires the device to be awake. */
-	return ptr;
+	return page_mask_bits(ptr);
 
 err_unpin:
 	__i915_vma_unpin(vma);
@@ -1559,7 +1568,11 @@ static void __i915_vma_iounmap(struct i915_vma *vma)
 	if (vma->iomap == NULL)
 		return;
 
-	io_mapping_unmap(vma->iomap);
+	if (page_unmask_bits(vma->iomap))
+		__i915_gem_object_release_map(vma->obj);
+	else
+		io_mapping_unmap(vma->iomap);
+
 	vma->iomap = NULL;
 }
 
