@@ -632,7 +632,7 @@ acpi_db_walk_for_specific_objects(acpi_handle obj_handle,
  * PARAMETERS:  obj_type_arg        - Type of object to display
  *              display_count_arg   - Max depth to display
  *
- * RETURN:      None
+ * RETURN:      Status
  *
  * DESCRIPTION: Display objects in the namespace of the requested type
  *
@@ -651,6 +651,8 @@ acpi_status acpi_db_display_objects(char *obj_type_arg, char *display_count_arg)
 	if (!obj_type_arg) {
 		object_info =
 		    ACPI_ALLOCATE_ZEROED(sizeof(struct acpi_object_info));
+		if (!object_info)
+			return (AE_NO_MEMORY);
 
 		/* Walk the namespace from the root */
 
