@@ -625,6 +625,28 @@ int smcr_nl_get_device(struct sk_buff *skb, struct netlink_callback *cb)
 	return skb->len;
 }
 
+static int smc_ib_get_least_used_vector(struct smc_ib_device *smcibdev)
+{
+	int min = smcibdev->vector_load[0];
+	int i, index = 0;
+
+	/* use it from the beginning of vectors */
+	for (i = 0; i < smcibdev->ibdev->num_comp_vectors; i++) {
+		if (smcibdev->vector_load[i] < min) {
+			index = i;
+			min = smcibdev->vector_load[i];
+		}
+	}
+
+	smcibdev->vector_load[index]++;
+	return index;
+}
+
+static void smc_ib_put_vector(struct smc_ib_device *smcibdev, int index)
+{
+	smcibdev->vector_load[index]--;
+}
+
 static void smc_ib_qp_event_handler(struct ib_event *ibevent, void *priv)
 {
 	struct smc_link *lnk = (struct smc_link *)priv;
@@ -801,8 +823,8 @@ void smc_ib_buf_unmap_sg(struct smc_link *lnk,
 
 long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 {
-	struct ib_cq_init_attr cqattr =	{
-		.cqe = SMC_MAX_CQE, .comp_vector = 0 };
+	struct ib_cq_init_attr cqattr =	{ .cqe = SMC_MAX_CQE };
+	int cq_send_vector, cq_recv_vector;
 	int cqe_size_order, smc_order;
 	long rc;
 
@@ -815,31 +837,35 @@ long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 	smc_order = MAX_ORDER - cqe_size_order - 1;
 	if (SMC_MAX_CQE + 2 > (0x00000001 << smc_order) * PAGE_SIZE)
 		cqattr.cqe = (0x00000001 << smc_order) * PAGE_SIZE - 2;
+	cq_send_vector = smc_ib_get_least_used_vector(smcibdev);
+	cqattr.comp_vector = cq_send_vector;
 	smcibdev->roce_cq_send = ib_create_cq(smcibdev->ibdev,
 					      smc_wr_tx_cq_handler, NULL,
 					      smcibdev, &cqattr);
 	rc = PTR_ERR_OR_ZERO(smcibdev->roce_cq_send);
 	if (IS_ERR(smcibdev->roce_cq_send)) {
 		smcibdev->roce_cq_send = NULL;
-		goto out;
+		goto err_send;
 	}
-	/* spread to different completion vector */
-	if (smcibdev->ibdev->num_comp_vectors > 1)
-		cqattr.comp_vector = 1;
+	cq_recv_vector = smc_ib_get_least_used_vector(smcibdev);
+	cqattr.comp_vector = cq_recv_vector;
 	smcibdev->roce_cq_recv = ib_create_cq(smcibdev->ibdev,
 					      smc_wr_rx_cq_handler, NULL,
 					      smcibdev, &cqattr);
 	rc = PTR_ERR_OR_ZERO(smcibdev->roce_cq_recv);
 	if (IS_ERR(smcibdev->roce_cq_recv)) {
 		smcibdev->roce_cq_recv = NULL;
-		goto err;
+		goto err_recv;
 	}
 	smc_wr_add_dev(smcibdev);
 	smcibdev->initialized = 1;
 	goto out;
 
-err:
+err_recv:
+	smc_ib_put_vector(smcibdev, cq_recv_vector);
 	ib_destroy_cq(smcibdev->roce_cq_send);
+err_send:
+	smc_ib_put_vector(smcibdev, cq_send_vector);
 out:
 	mutex_unlock(&smcibdev->mutex);
 	return rc;
@@ -928,6 +954,11 @@ static int smc_ib_add_dev(struct ib_device *ibdev)
 	INIT_IB_EVENT_HANDLER(&smcibdev->event_handler, smcibdev->ibdev,
 			      smc_ib_global_event_handler);
 	ib_register_event_handler(&smcibdev->event_handler);
+	/* vector's load per ib device */
+	smcibdev->vector_load = kcalloc(ibdev->num_comp_vectors,
+					sizeof(int), GFP_KERNEL);
+	if (!smcibdev->vector_load)
+		return -ENOMEM;
 
 	/* trigger reading of the port attributes */
 	port_cnt = smcibdev->ibdev->phys_port_cnt;
@@ -968,6 +999,7 @@ static void smc_ib_remove_dev(struct ib_device *ibdev, void *client_data)
 	smc_ib_cleanup_per_ibdev(smcibdev);
 	ib_unregister_event_handler(&smcibdev->event_handler);
 	cancel_work_sync(&smcibdev->port_event_work);
+	kfree(smcibdev->vector_load);
 	kfree(smcibdev);
 }
 
