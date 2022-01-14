@@ -1172,6 +1172,8 @@ hot_reset_release:
 			mutex_unlock(&vdev->vf_token->lock);
 
 			return 0;
+		case VFIO_DEVICE_FEATURE_ZPCI_INTERP:
+			return vfio_pci_zdev_feat_interp(vdev, feature, arg);
 		default:
 			return -ENOTTY;
 		}

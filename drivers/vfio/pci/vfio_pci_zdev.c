@@ -54,6 +54,10 @@ static int zpci_group_cap(struct zpci_dev *zdev, struct vfio_info_cap *caps)
 		.version = zdev->version
 	};
 
+	/* Some values are different for interpreted devices */
+	if (zdev->kzdev && zdev->kzdev->interp)
+		cap.maxstbl = zdev->maxstbl;
+
 	return vfio_info_add_capability(caps, &cap.header, sizeof(cap));
 }
 
@@ -138,6 +142,72 @@ int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 	return ret;
 }
 
+int vfio_pci_zdev_feat_interp(struct vfio_pci_core_device *vdev,
+			      struct vfio_device_feature feature,
+			      unsigned long arg)
+{
+	struct zpci_dev *zdev = to_zpci(vdev->pdev);
+	struct vfio_device_zpci_interp *data;
+	struct vfio_device_feature *feat;
+	unsigned long minsz;
+	int size, rc;
+
+	if (!zdev || !zdev->kzdev)
+		return -EINVAL;
+
+	/* If PROBE specified, return probe results immediately */
+	if (feature.flags & VFIO_DEVICE_FEATURE_PROBE)
+		return kvm_s390_pci_interp_probe(zdev);
+
+	/* GET and SET are mutually exclusive */
+	if ((feature.flags & VFIO_DEVICE_FEATURE_GET) &&
+	    (feature.flags & VFIO_DEVICE_FEATURE_SET))
+		return -EINVAL;
+
+	size = sizeof(*feat) + sizeof(*data);
+	feat = kzalloc(size, GFP_KERNEL);
+	if (!feat)
+		return -ENOMEM;
+
+	data = (struct vfio_device_zpci_interp *)&feat->data;
+	minsz = offsetofend(struct vfio_device_feature, flags);
+
+	if (feature.argsz < minsz + sizeof(*data))
+		return -EINVAL;
+
+	/* Get the rest of the payload for GET/SET */
+	rc = copy_from_user(data, (void __user *)(arg + minsz),
+			    sizeof(*data));
+	if (rc)
+		rc = -EINVAL;
+
+	if (feature.flags & VFIO_DEVICE_FEATURE_GET) {
+		if (zdev->gd != 0)
+			data->flags = VFIO_DEVICE_ZPCI_FLAG_INTERP;
+		else
+			data->flags = 0;
+		data->fh = zdev->fh;
+		/* userspace is using host fh, give interpreted clp values */
+		zdev->kzdev->interp = true;
+
+		if (copy_to_user((void __user *)arg, feat, size))
+			rc = -EFAULT;
+	} else if (feature.flags & VFIO_DEVICE_FEATURE_SET) {
+		if (data->flags == VFIO_DEVICE_ZPCI_FLAG_INTERP)
+			rc = kvm_s390_pci_interp_enable(zdev);
+		else if (data->flags == 0)
+			rc = kvm_s390_pci_interp_disable(zdev);
+		else
+			rc = -EINVAL;
+	} else {
+		/* Neither GET nor SET were specified */
+		rc = -EINVAL;
+	}
+
+	kfree(feat);
+	return rc;
+}
+
 static int vfio_pci_zdev_group_notifier(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
@@ -164,6 +234,7 @@ void vfio_pci_zdev_open(struct vfio_pci_core_device *vdev)
 		return;
 
 	zdev->kzdev->nb.notifier_call = vfio_pci_zdev_group_notifier;
+	zdev->kzdev->interp = false;
 
 	if (vfio_register_notifier(vdev->vdev.dev, VFIO_GROUP_NOTIFY,
 				   &events, &zdev->kzdev->nb))
@@ -179,6 +250,13 @@ void vfio_pci_zdev_release(struct vfio_pci_core_device *vdev)
 
 	vfio_unregister_notifier(vdev->vdev.dev, VFIO_GROUP_NOTIFY,
 				 &zdev->kzdev->nb);
+
+	/*
+	 * If the device was using interpretation, don't trust that userspace
+	 * did the appropriate cleanup
+	 */
+	if (zdev->gd != 0)
+		kvm_s390_pci_interp_disable(zdev);
 
 	kvm_s390_pci_dev_release(zdev);
 }
