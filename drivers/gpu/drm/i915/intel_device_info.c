@@ -385,6 +385,14 @@ void intel_device_info_runtime_init(struct drm_i915_private *dev_priv)
 		memset(runtime->num_sprites, 0, sizeof(runtime->num_sprites));
 		memset(runtime->num_scalers, 0, sizeof(runtime->num_scalers));
 	}
+
+	/*
+	 * Early DG2 steppings don't have the GuC depriv feature. We can't
+	 * rely on the fuse on those platforms because the meaning of the fuse
+	 * bit is inverted on platforms that do have the feature.
+	 */
+	if (IS_DG2_GRAPHICS_STEP(dev_priv, G10, STEP_A0, STEP_A1))
+		info->has_guc_deprivilege = 0;
 }
 
 void intel_driver_caps_print(const struct intel_driver_caps *caps,
