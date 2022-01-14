@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
+#include <linux/debugfs.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/clk/clk-conf.h>
@@ -228,9 +229,64 @@ err:
 	return 0;
 }
 
+static int __maybe_unused ulpi_regs_read(struct seq_file *seq, void *data)
+{
+	struct ulpi *ulpi = seq->private;
+
+#define ulpi_print(name, reg) do { \
+	int ret = ulpi_read(ulpi, reg); \
+	if (ret < 0) \
+		return ret; \
+	seq_printf(seq, name " %.02x\n", ret); \
+} while (0)
+
+	ulpi_print("Vendor ID Low               ", ULPI_VENDOR_ID_LOW);
+	ulpi_print("Vendor ID High              ", ULPI_VENDOR_ID_HIGH);
+	ulpi_print("Product ID Low              ", ULPI_PRODUCT_ID_LOW);
+	ulpi_print("Product ID High             ", ULPI_PRODUCT_ID_HIGH);
+	ulpi_print("Function Control            ", ULPI_FUNC_CTRL);
+	ulpi_print("Interface Control           ", ULPI_IFC_CTRL);
+	ulpi_print("OTG Control                 ", ULPI_OTG_CTRL);
+	ulpi_print("USB Interrupt Enable Rising ", ULPI_USB_INT_EN_RISE);
+	ulpi_print("USB Interrupt Enable Falling", ULPI_USB_INT_EN_FALL);
+	ulpi_print("USB Interrupt Status        ", ULPI_USB_INT_STS);
+	ulpi_print("USB Interrupt Latch         ", ULPI_USB_INT_LATCH);
+	ulpi_print("Debug                       ", ULPI_DEBUG);
+	ulpi_print("Scratch Register            ", ULPI_SCRATCH);
+	ulpi_print("Carkit Control              ", ULPI_CARKIT_CTRL);
+	ulpi_print("Carkit Interrupt Delay      ", ULPI_CARKIT_INT_DELAY);
+	ulpi_print("Carkit Interrupt Enable     ", ULPI_CARKIT_INT_EN);
+	ulpi_print("Carkit Interrupt Status     ", ULPI_CARKIT_INT_STS);
+	ulpi_print("Carkit Interrupt Latch      ", ULPI_CARKIT_INT_LATCH);
+	ulpi_print("Carkit Pulse Control        ", ULPI_CARKIT_PLS_CTRL);
+	ulpi_print("Transmit Positive Width     ", ULPI_TX_POS_WIDTH);
+	ulpi_print("Transmit Negative Width     ", ULPI_TX_NEG_WIDTH);
+	ulpi_print("Receive Polarity Recovery   ", ULPI_POLARITY_RECOVERY);
+
+	return 0;
+}
+
+static int __maybe_unused ulpi_regs_open(struct inode *inode, struct file *f)
+{
+	struct ulpi *ulpi = inode->i_private;
+
+	return single_open(f, ulpi_regs_read, ulpi);
+}
+
+static const struct file_operations __maybe_unused ulpi_regs_ops = {
+	.owner = THIS_MODULE,
+	.open = ulpi_regs_open,
+	.release = single_release,
+	.read = seq_read,
+	.llseek = seq_lseek
+};
+
+static struct dentry *ulpi_root = (void *)-EPROBE_DEFER;
+
 static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 {
 	int ret;
+	struct dentry *regs;
 
 	ulpi->dev.parent = dev; /* needed early for ops */
 	ulpi->dev.bus = &ulpi_bus;
@@ -245,16 +301,39 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 
 	ret = ulpi_read_id(ulpi);
 	if (ret)
-		return ret;
+		goto err_of;
 
 	ret = device_register(&ulpi->dev);
 	if (ret)
-		return ret;
+		goto err_of;
+
+	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
+		ulpi->root = debugfs_create_dir(dev_name(dev), ulpi_root);
+		if (IS_ERR(ulpi->root)) {
+			ret = PTR_ERR(ulpi->root);
+			goto err_dev;
+		}
+
+		regs = debugfs_create_file("regs", 0444, ulpi->root, ulpi,
+					   &ulpi_regs_ops);
+		if (IS_ERR(regs)) {
+			ret = PTR_ERR(regs);
+			goto err_debugfs;
+		}
+	}
 
 	dev_dbg(&ulpi->dev, "registered ULPI PHY: vendor %04x, product %04x\n",
 		ulpi->id.vendor, ulpi->id.product);
 
 	return 0;
+
+err_debugfs:
+	debugfs_remove(ulpi->root);
+err_dev:
+	device_unregister(&ulpi->dev);
+err_of:
+	of_node_put(ulpi->dev.of_node);
+	return ret;
 }
 
 /**
@@ -296,8 +375,9 @@ EXPORT_SYMBOL_GPL(ulpi_register_interface);
  */
 void ulpi_unregister_interface(struct ulpi *ulpi)
 {
-	of_node_put(ulpi->dev.of_node);
+	debugfs_remove_recursive(ulpi->root);
 	device_unregister(&ulpi->dev);
+	of_node_put(ulpi->dev.of_node);
 }
 EXPORT_SYMBOL_GPL(ulpi_unregister_interface);
 
@@ -305,13 +385,25 @@ EXPORT_SYMBOL_GPL(ulpi_unregister_interface);
 
 static int __init ulpi_init(void)
 {
-	return bus_register(&ulpi_bus);
+	int ret;
+
+	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
+		ulpi_root = debugfs_create_dir("ulpi", NULL);
+		if (IS_ERR(ulpi_root))
+			return PTR_ERR(ulpi_root);
+	}
+
+	ret = bus_register(&ulpi_bus);
+	if (ret)
+		debugfs_remove(ulpi_root);
+	return ret;
 }
 subsys_initcall(ulpi_init);
 
 static void __exit ulpi_exit(void)
 {
 	bus_unregister(&ulpi_bus);
+	debugfs_remove(ulpi_root);
 }
 module_exit(ulpi_exit);
 

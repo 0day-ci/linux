@@ -6,6 +6,7 @@
 
 #include <linux/device.h>
 
+struct dentry;
 struct ulpi_ops;
 
 /**
@@ -13,10 +14,12 @@ struct ulpi_ops;
  * @id: vendor and product ids for ULPI device
  * @ops: I/O access
  * @dev: device interface
+ * @root: root directory for debugfs files
  */
 struct ulpi {
 	struct ulpi_device_id id;
 	const struct ulpi_ops *ops;
+	struct dentry *root;
 	struct device dev;
 };
 
