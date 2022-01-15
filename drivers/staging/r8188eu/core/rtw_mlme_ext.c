@@ -389,9 +389,9 @@ void free_mlme_ext_priv(struct mlme_ext_priv *pmlmeext)
 		return;
 
 	if (padapter->bDriverStopped) {
-		_cancel_timer_ex(&pmlmeext->survey_timer);
-		_cancel_timer_ex(&pmlmeext->link_timer);
-		/* _cancel_timer_ex(&pmlmeext->ADDBA_timer); */
+		del_timer_sync(&pmlmeext->survey_timer);
+		del_timer_sync(&pmlmeext->link_timer);
+		/* del_timer_sync(&pmlmeext->ADDBA_timer); */
 	}
 }
 
@@ -1415,7 +1415,7 @@ unsigned int OnAssocRsp(struct adapter *padapter, struct recv_frame *precv_frame
 	if (pmlmeinfo->state & WIFI_FW_ASSOC_SUCCESS)
 		return _SUCCESS;
 
-	_cancel_timer_ex(&pmlmeext->link_timer);
+	del_timer_sync(&pmlmeext->link_timer);
 
 	/* status */
 	status = le16_to_cpu(*(__le16 *)(pframe + WLAN_HDR_A3_LEN + 2));
@@ -1494,7 +1494,7 @@ unsigned int OnDeAuth(struct adapter *padapter, struct recv_frame *precv_frame)
 		return _SUCCESS;
 
 	if (pwdinfo->rx_invitereq_info.scan_op_ch_only) {
-		_cancel_timer_ex(&pwdinfo->reset_ch_sitesurvey);
+		del_timer_sync(&pwdinfo->reset_ch_sitesurvey);
 		_set_timer(&pwdinfo->reset_ch_sitesurvey, 10);
 	}
 
@@ -1569,7 +1569,7 @@ unsigned int OnDisassoc(struct adapter *padapter, struct recv_frame *precv_frame
 		return _SUCCESS;
 
 	if (pwdinfo->rx_invitereq_info.scan_op_ch_only) {
-		_cancel_timer_ex(&pwdinfo->reset_ch_sitesurvey);
+		del_timer_sync(&pwdinfo->reset_ch_sitesurvey);
 		_set_timer(&pwdinfo->reset_ch_sitesurvey, 10);
 	}
 
@@ -3750,7 +3750,7 @@ static unsigned int on_action_public_p2p(struct recv_frame *precv_frame)
 	if (rtw_action_public_decache(precv_frame, dialogToken) == _FAIL)
 		return _FAIL;
 
-	_cancel_timer_ex(&pwdinfo->reset_ch_sitesurvey);
+	del_timer_sync(&pwdinfo->reset_ch_sitesurvey);
 	/*	Do nothing if the driver doesn't enable the P2P function. */
 	if (rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE) || rtw_p2p_chk_state(pwdinfo, P2P_STATE_IDLE))
 		return _SUCCESS;
@@ -3768,7 +3768,7 @@ static unsigned int on_action_public_p2p(struct recv_frame *precv_frame)
 		if (rtw_p2p_chk_state(pwdinfo, P2P_STATE_GONEGO_FAIL)) {
 			/*	Commented by Albert 20110526 */
 			/*	In this case, this means the previous nego fail doesn't be reset yet. */
-			_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
+			del_timer_sync(&pwdinfo->restore_p2p_state_timer);
 			/*	Restore the previous p2p state */
 			rtw_p2p_set_state(pwdinfo, rtw_p2p_pre_state(pwdinfo));
 			DBG_88E("[%s] Restore the previous p2p state to %d\n", __func__, rtw_p2p_state(pwdinfo));
@@ -3797,7 +3797,7 @@ static unsigned int on_action_public_p2p(struct recv_frame *precv_frame)
 		if (rtw_p2p_chk_state(pwdinfo, P2P_STATE_GONEGO_ING)) {
 			/*	Commented by Albert 20110425 */
 			/*	The restore timer is enabled when issuing the nego request frame of rtw_p2p_connect function. */
-			_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
+			del_timer_sync(&pwdinfo->restore_p2p_state_timer);
 			pwdinfo->nego_req_info.benable = false;
 			result = process_p2p_group_negotation_resp(pwdinfo, frame_body, len);
 			issue_p2p_GO_confirm(pwdinfo->padapter, GetAddr2Ptr(pframe), result);
@@ -3948,7 +3948,7 @@ static unsigned int on_action_public_p2p(struct recv_frame *precv_frame)
 		u32	attr_contentlen = 0;
 
 		DBG_88E("[%s] Got invite response frame!\n", __func__);
-		_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
+		del_timer_sync(&pwdinfo->restore_p2p_state_timer);
 		p2p_ie = rtw_get_p2p_ie(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, NULL, &p2p_ielen);
 		if (p2p_ie) {
 			rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_STATUS, &attr_content, &attr_contentlen);
@@ -4006,7 +4006,7 @@ static unsigned int on_action_public_p2p(struct recv_frame *precv_frame)
 		DBG_88E("[%s] Got Provisioning Discovery Response Frame\n", __func__);
 		/*	Commented by Albert 20110426 */
 		/*	The restore timer is enabled when issuing the provisioing request frame in rtw_p2p_prov_disc function. */
-		_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
+		del_timer_sync(&pwdinfo->restore_p2p_state_timer);
 		rtw_p2p_set_state(pwdinfo, P2P_STATE_RX_PROVISION_DIS_RSP);
 		process_p2p_provdisc_resp(pwdinfo, pframe);
 		_set_timer(&pwdinfo->restore_p2p_state_timer, P2P_PROVISION_TIMEOUT);
@@ -5618,7 +5618,7 @@ static int _issue_deauth(struct adapter *padapter, unsigned char *da, unsigned s
 	struct wifidirect_info *pwdinfo = &padapter->wdinfo;
 
 	if (!(rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE)) && (pwdinfo->rx_invitereq_info.scan_op_ch_only)) {
-		_cancel_timer_ex(&pwdinfo->reset_ch_sitesurvey);
+		del_timer_sync(&pwdinfo->reset_ch_sitesurvey);
 		_set_timer(&pwdinfo->reset_ch_sitesurvey, 10);
 	}
 
@@ -6467,7 +6467,7 @@ void start_clnt_auth(struct adapter *padapter)
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 
-	_cancel_timer_ex(&pmlmeext->link_timer);
+	del_timer_sync(&pmlmeext->link_timer);
 
 	pmlmeinfo->state &= (~WIFI_FW_AUTH_NULL);
 	pmlmeinfo->state |= WIFI_FW_AUTH_STATE;
@@ -6496,7 +6496,7 @@ void start_clnt_assoc(struct adapter *padapter)
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 
-	_cancel_timer_ex(&pmlmeext->link_timer);
+	del_timer_sync(&pmlmeext->link_timer);
 
 	pmlmeinfo->state &= (~(WIFI_FW_AUTH_NULL | WIFI_FW_AUTH_STATE));
 	pmlmeinfo->state |= (WIFI_FW_AUTH_SUCCESS | WIFI_FW_ASSOC_STATE);
@@ -7115,7 +7115,7 @@ void mlmeext_sta_del_event_callback(struct adapter *padapter)
 		/* set MSR to no link state -> infra. mode */
 		Set_MSR(padapter, _HW_STATE_STATION_);
 
-		_cancel_timer_ex(&pmlmeext->link_timer);
+		del_timer_sync(&pmlmeext->link_timer);
 	}
 }
 
@@ -7454,7 +7454,7 @@ u8 createbss_hdl(struct adapter *padapter, u8 *pbuf)
 		Switch_DM_Func(padapter, DYNAMIC_FUNC_DISABLE, false);
 
 		/* cancel link timer */
-		_cancel_timer_ex(&pmlmeext->link_timer);
+		del_timer_sync(&pmlmeext->link_timer);
 
 		/* clear CAM */
 		flush_all_cam_entry(padapter);
@@ -7494,7 +7494,7 @@ u8 join_cmd_hdl(struct adapter *padapter, u8 *pbuf)
 		/* clear CAM */
 		flush_all_cam_entry(padapter);
 
-		_cancel_timer_ex(&pmlmeext->link_timer);
+		del_timer_sync(&pmlmeext->link_timer);
 
 		/* set MSR to nolink -> infra. mode */
 		Set_MSR(padapter, _HW_STATE_STATION_);
@@ -7579,7 +7579,7 @@ u8 join_cmd_hdl(struct adapter *padapter, u8 *pbuf)
 	SetHwReg8188EU(padapter, HW_VAR_MLME_JOIN, (u8 *)(&join_type));
 
 	/* cancel link timer */
-	_cancel_timer_ex(&pmlmeext->link_timer);
+	del_timer_sync(&pmlmeext->link_timer);
 
 	start_clnt_join(padapter);
 
@@ -7622,7 +7622,7 @@ u8 disconnect_hdl(struct adapter *padapter, unsigned char *pbuf)
 
 	flush_all_cam_entry(padapter);
 
-	_cancel_timer_ex(&pmlmeext->link_timer);
+	del_timer_sync(&pmlmeext->link_timer);
 
 	rtw_free_uc_swdec_pending_queue(padapter);
 

@@ -1947,11 +1947,11 @@ int rtw_p2p_enable(struct adapter *padapter, enum P2P_ROLE role)
 
 		/* Disable P2P function */
 		if (!rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE)) {
-			_cancel_timer_ex(&pwdinfo->find_phase_timer);
-			_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
-			_cancel_timer_ex(&pwdinfo->pre_tx_scan_timer);
-			_cancel_timer_ex(&pwdinfo->reset_ch_sitesurvey);
-			_cancel_timer_ex(&pwdinfo->reset_ch_sitesurvey2);
+			del_timer_sync(&pwdinfo->find_phase_timer);
+			del_timer_sync(&pwdinfo->restore_p2p_state_timer);
+			del_timer_sync(&pwdinfo->pre_tx_scan_timer);
+			del_timer_sync(&pwdinfo->reset_ch_sitesurvey);
+			del_timer_sync(&pwdinfo->reset_ch_sitesurvey2);
 			rtw_p2p_set_state(pwdinfo, P2P_STATE_NONE);
 			rtw_p2p_set_role(pwdinfo, P2P_ROLE_DISABLE);
 			memset(&pwdinfo->rx_prov_disc_info, 0x00, sizeof(struct rx_provdisc_req_info));
