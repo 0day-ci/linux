@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/sound/amlogic,axg-fifo.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Amlogic Audio FIFO controllers
+
+maintainers:
+  - Jerome Brunet <jbrunet@baylibre.com>
+
+allOf:
+  - $ref: name-prefix.yaml#
+
+properties:
+  $nodename:
+    pattern: "^audio-controller@.*"
+
+  "#sound-dai-cells":
+    const: 0
+
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+              - amlogic,g12a-frddr
+              - amlogic,sm1-frddr
+          - const: amlogic,axg-frddr
+      - const: amlogic,axg-frddr
+      - items:
+          - enum:
+              - amlogic,g12a-toddr
+              - amlogic,sm1-toddr
+          - const: amlogic,axg-toddr
+      - const: amlogic,axg-toddr
+
+  reg:
+    items:
+      - description: physical base address of the controller
+
+  interrupts:
+    items:
+      - description: FIFO interrupt
+
+  clocks:
+    items:
+      - description: FIFO peripheral clock provided by the audio clock controller
+
+  resets:
+    minItems: 1
+    items:
+      - description: memory ARB line
+      - description: optional device reset line
+
+  reset-names:
+    minItems: 1
+    items:
+      - const: arb
+      - const: rst
+
+  amlogic,fifo-depth:
+    description: >
+      The size of the controller's fifo in bytes. This
+      is useful for determining certain configuration such
+      as the flush threshold of the fifo
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+  sound-name-prefix: true
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - resets
+  - reset-names
+  - '#sound-dai-cells'
+  - amlogic,fifo-depth
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/axg-audio-clkc.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/reset/amlogic,meson-axg-audio-arb.h>
+
+    frddr_a: audio-controller@1c0 {
+        compatible = "amlogic,axg-frddr";
+        reg = <0x1c0 0x1c>;
+        #sound-dai-cells = <0>;
+        interrupts = <88 IRQ_TYPE_EDGE_RISING>;
+        clocks = <&clkc_audio AUD_CLKID_FRDDR_A>;
+        resets = <&arb AXG_ARB_FRDDR_A>;
+        reset-names = "arb";
+        amlogic,fifo-depth = <512>;
+    };
