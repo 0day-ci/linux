@@ -1198,10 +1198,10 @@ void vcpu_load_state(struct kvm_vm *vm, uint32_t vcpuid, struct kvm_x86_state *s
 	}
 }
 
-bool is_intel_cpu(void)
+static bool cpu_vendor_string_is(const char *vendor)
 {
+	const uint32_t *chunk = (const uint32_t *)vendor;
 	int eax, ebx, ecx, edx;
-	const uint32_t *chunk;
 	const int leaf = 0;
 
 	__asm__ __volatile__(
@@ -1210,8 +1210,12 @@ bool is_intel_cpu(void)
 		  "=c"(ecx), "=d"(edx)
 		: /* input */ "0"(leaf), "2"(0));
 
-	chunk = (const uint32_t *)("GenuineIntel");
 	return (ebx == chunk[0] && edx == chunk[1] && ecx == chunk[2]);
+}
+
+bool is_intel_cpu(void)
+{
+	return cpu_vendor_string_is("GenuineIntel");
 }
 
 uint32_t kvm_get_cpuid_max_basic(void)
