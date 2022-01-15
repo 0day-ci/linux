@@ -43,7 +43,6 @@
 #include <linux/sizes.h>
 #include <linux/module.h>
 
-#include <drm/drm_drv.h>
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
