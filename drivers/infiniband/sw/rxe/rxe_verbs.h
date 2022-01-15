@@ -232,9 +232,7 @@ struct rxe_qp {
 	struct rxe_av		pri_av;
 	struct rxe_av		alt_av;
 
-	/* list of mcast groups qp has joined (for cleanup) */
-	struct list_head	grp_list;
-	spinlock_t		grp_lock; /* guard grp_list */
+	struct list_head	mcg_list;
 
 	struct sk_buff_head	req_pkts;
 	struct sk_buff_head	resp_pkts;
@@ -353,23 +351,23 @@ struct rxe_mw {
 	u64			length;
 };
 
-struct rxe_mc_grp {
-	struct rxe_pool_elem	elem;
-	spinlock_t		mcg_lock; /* guard group */
-	struct rxe_dev		*rxe;
-	struct list_head	qp_list;
+struct rxe_mcg {
+	struct rb_node		node;
 	union ib_gid		mgid;
+	struct list_head	qp_list;
+	struct kref		ref_cnt;
+	struct rxe_dev		*rxe;
+	spinlock_t		lock; /* guard qp_list */
 	int			num_qp;
 	u32			qkey;
 	u16			pkey;
 };
 
-struct rxe_mc_elem {
-	struct rxe_pool_elem	elem;
+struct rxe_mca {
 	struct list_head	qp_list;
-	struct list_head	grp_list;
+	struct list_head	mcg_list;
 	struct rxe_qp		*qp;
-	struct rxe_mc_grp	*grp;
+	struct rxe_mcg		*mcg;
 };
 
 struct rxe_port {
@@ -400,8 +398,11 @@ struct rxe_dev {
 	struct rxe_pool		cq_pool;
 	struct rxe_pool		mr_pool;
 	struct rxe_pool		mw_pool;
-	struct rxe_pool		mc_grp_pool;
-	struct rxe_pool		mc_elem_pool;
+
+	spinlock_t		mcg_lock; /* guard mcg_tree and mcg->qp_list */
+	struct rb_root		mcg_tree;
+	int			num_mcg;
+	int			num_attach;
 
 	spinlock_t		pending_lock; /* guard pending_mmaps */
 	struct list_head	pending_mmaps;

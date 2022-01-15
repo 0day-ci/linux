@@ -233,32 +233,33 @@ static inline void rxe_rcv_pkt(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 {
 	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
-	struct rxe_mc_grp *mcg;
-	struct rxe_mc_elem *mce;
+	struct rxe_mcg *mcg;
+	struct rxe_mca *mca, *last;
 	struct rxe_qp *qp;
-	union ib_gid dgid;
+	union ib_gid mgid;
 	int err;
 
 	if (skb->protocol == htons(ETH_P_IP))
 		ipv6_addr_set_v4mapped(ip_hdr(skb)->daddr,
-				       (struct in6_addr *)&dgid);
+				       (struct in6_addr *)&mgid);
 	else if (skb->protocol == htons(ETH_P_IPV6))
-		memcpy(&dgid, &ipv6_hdr(skb)->daddr, sizeof(dgid));
+		memcpy(&mgid, &ipv6_hdr(skb)->daddr, sizeof(mgid));
 
-	/* lookup mcast group corresponding to mgid, takes a ref */
-	mcg = rxe_pool_get_key(&rxe->mc_grp_pool, &dgid);
+	mcg = rxe_lookup_mcg(rxe, &mgid);
 	if (!mcg)
 		goto drop;	/* mcast group not registered */
 
-	spin_lock_bh(&mcg->mcg_lock);
+	spin_lock_bh(&mcg->lock);
+
+	last = list_last_entry(&mcg->qp_list, typeof(*last), qp_list);
 
 	/* this is unreliable datagram service so we let
 	 * failures to deliver a multicast packet to a
 	 * single QP happen and just move on and try
 	 * the rest of them on the list
 	 */
-	list_for_each_entry(mce, &mcg->qp_list, qp_list) {
-		qp = mce->qp;
+	list_for_each_entry(mca, &mcg->qp_list, qp_list) {
+		qp = mca->qp;
 
 		/* validate qp for incoming packet */
 		err = check_type_state(rxe, pkt, qp);
@@ -273,7 +274,7 @@ static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 		 * skb and pass to the QP. Pass the original skb to
 		 * the last QP in the list.
 		 */
-		if (mce->qp_list.next != &mcg->qp_list) {
+		if (mca != last) {
 			struct sk_buff *cskb;
 			struct rxe_pkt_info *cpkt;
 
@@ -298,9 +299,8 @@ static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 		}
 	}
 
-	spin_unlock_bh(&mcg->mcg_lock);
-
-	rxe_drop_ref(mcg);	/* drop ref from rxe_pool_get_key. */
+	spin_unlock_bh(&mcg->lock);
+	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
 
 	if (likely(!skb))
 		return;
