@@ -6255,6 +6255,7 @@ static void build_zonelists(pg_data_t *pgdat)
 	prev_node = local_node;
 
 	memset(node_order, 0, sizeof(node_order));
+	memset(node_load, 0, sizeof(node_load));
 	while ((node = find_next_best_node(local_node, &used_mask)) >= 0) {
 		/*
 		 * We don't want to pressure a particular node.
@@ -6370,10 +6371,6 @@ static void __build_all_zonelists(void *data)
 	static DEFINE_SPINLOCK(lock);
 
 	spin_lock(&lock);
-
-#ifdef CONFIG_NUMA
-	memset(node_load, 0, sizeof(node_load));
-#endif
 
 	/*
 	 * This node is hotadded and no memory is yet present.   So just
