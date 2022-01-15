@@ -3274,11 +3274,13 @@ retry:
 				ab = audit_log_start(audit_context(),
 						     GFP_ATOMIC,
 						     AUDIT_SELINUX_ERR);
-				audit_log_format(ab,
-						 "op=security_sid_mls_copy invalid_context=");
-				/* don't record NUL with untrusted strings */
-				audit_log_n_untrustedstring(ab, s, len - 1);
-				audit_log_end(ab);
+				if (ab) {
+					audit_log_format(ab,
+							"op=security_sid_mls_copy invalid_context=");
+					/* don't record NUL with untrusted strings */
+					audit_log_n_untrustedstring(ab, s, len - 1);
+					audit_log_end(ab);
+				}
 				kfree(s);
 			}
 			goto out_unlock;
