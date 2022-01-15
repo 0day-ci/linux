@@ -1,0 +1,43 @@
+* HID over SPI Device-Tree bindings
+
+HID over SPI provides support for Human Interface Devices over the SPI bus. HID
+Over SPI Protocol Specification 1.0 was written by Microsoft and is available at
+https://www.microsoft.com/en-us/download/details.aspx?id=103325.
+
+If this binding is used, the kernel module spi-hid will handle the communication
+with the device and the generic hid core layer will handle the protocol.
+
+Required properties:
+- compatible: must be "hid-over-spi"
+- interrupts: interrupt line
+- vdd-supply: phandle of the regulator that provides the supply voltage
+- reset_gpio-gpios: gpio wired to the device reset line
+- post-power-on-delay-ms: time required by the device after enabling its
+regulators or powering it on, before it is ready for communication 
+- minimal-reset-delay-ms: minimum amount of time that device needs to be in
+reset state for the reset to take effect
+- input-report-header-address: this property and the rest are described in HID
+Over SPI Protocol Spec 1.0
+- input-report-body-address
+- output-report-address
+- read-opcode
+- write-opcode
+- flags
+
+Example:
+	spi-hid-dev0 {
+		compatible = "hid-over-spi";
+		reg = <0>;
+		interrupts-extended = <&tlmm 42 IRQ_TYPE_EDGE_FALLING>;
+		vdd-supply = <&pm8350c_l3>;
+		input-report-header-address = <0x1000>;
+		input-report-body-address = <0x1004>;
+		output-report-address = <0x2000>;
+		read-opcode = <0x0b>;
+		write-opcode = <0x02>;
+		flags = <0x00>;
+		reset_gpio-gpios = <&tlmm 25 GPIO_ACTIVE_LOW>;
+		post-power-on-delay-ms = <5>;
+		minimal-reset-delay-ms = <5>;
+		
+	};
