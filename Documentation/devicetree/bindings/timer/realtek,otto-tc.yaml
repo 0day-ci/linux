@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/timer/realtek,otto-tc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Realtek Otto platform timer/counter bindings
+
+description:
+  "Up-counting 28-bit timer that can operate in oneshot or repeating mode,
+  providing an interrupt at roll-over.
+
+  The timer is driven by a divided clock, derived from the bus clock. The clock
+  divisor is configurable from 2 to 65535. Divisor values of 0 and 1 disable
+  the timer clock. The timer can also be enabled or disabled independently from
+  the clock (divisor) selection.
+
+  The number of timers supported by the different SoC families is:
+  - RTL8380: 5 timers
+  - RTL8390: 5 timers
+  - RTL9300: 6 timers
+  - RTL9310: 7 timers"
+
+maintainers:
+  - Sander Vanheule <sander@svanheule.net>
+
+properties:
+  compatible:
+    const: realtek,otto-tc
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    items:
+      - description: Parent clock from peripheral bus
+
+  clock-names:
+    items:
+      - const: bus
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - clock-names
+
+examples:
+  - |
+    timer0: timer@3100 {
+      compatible = "realtek,otto-tc";
+      reg = <0x3100 0x10>;
+
+      interrupts = <29 4>;
+
+      clocks = <&lx_clk>;
+      clock-names = "bus";
+    };
