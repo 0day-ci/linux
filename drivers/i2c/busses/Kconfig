@@ -1079,6 +1079,14 @@ config I2C_TEGRA
 	  If you say yes to this option, support will be included for the
 	  I2C controller embedded in NVIDIA Tegra SOCs
 
+config I2C_TEGRA_DVC
+	bool "NVIDIA Tegra DVC I2C controller"
+	depends on I2C_TEGRA
+	default y if ARCH_TEGRA_2x_SOC
+	help
+	  If you say yes to this option, tegra-i2c will also support
+	  I2C controller that is part of DVC in Tegra20 SoCs.
+
 config I2C_TEGRA_BPMP
 	tristate "NVIDIA Tegra BPMP I2C controller"
 	depends on TEGRA_BPMP || COMPILE_TEST
