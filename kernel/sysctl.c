@@ -122,12 +122,12 @@ static unsigned long one_ul = 1;
 static unsigned long long_max = LONG_MAX;
 static int one_hundred = 100;
 static int two_hundred = 200;
-static int one_thousand = 1000;
 static int three_thousand = 3000;
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
 #ifdef CONFIG_PERF_EVENTS
+static int one_thousand = 1000;
 static int six_hundred_forty_kb = 640 * 1024;
 #endif
 
