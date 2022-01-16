@@ -12,6 +12,7 @@
 #include <linux/blk-mq.h>
 #include <linux/blk-cgroup.h>
 #include <linux/debugfs.h>
+#include <linux/fs.h>
 
 #include "blk.h"
 #include "blk-mq.h"
@@ -810,6 +811,18 @@ static void blk_release_queue(struct kobject *kobj)
 		blk_mq_debugfs_unregister(q);
 
 	bioset_exit(&q->bio_split);
+
+	/*
+	 * Free associated disk now if there is.
+	 *
+	 * Follows cases in which request queue hasn't disk:
+	 *
+	 * - not active LUN probed for scsi host
+	 *
+	 * - nvme's admin queue
+	 */
+	if (q->disk)
+		iput(q->disk->part0->bd_inode);
 
 	ida_simple_remove(&blk_queue_ida, q->id);
 	call_rcu(&q->rcu_head, blk_free_queue_rcu);

@@ -1112,9 +1112,12 @@ static void disk_release(struct device *dev)
 	disk_release_events(disk);
 	kfree(disk->random);
 	xa_destroy(&disk->part_tbl);
-	disk->queue->disk = NULL;
+
+	/*
+	 * delay freeing disk/and its bdev into request queue's release
+	 * handler, then all can be killed at the same time
+	 */
 	blk_put_queue(disk->queue);
-	iput(disk->part0->bd_inode);	/* frees the disk */
 }
 
 static int block_uevent(struct device *dev, struct kobj_uevent_env *env)
