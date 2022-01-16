@@ -212,7 +212,7 @@ static void dpcm_create_debugfs_state(struct snd_soc_dpcm *dpcm, int stream)
 {
 	char *name;
 
-	name = kasprintf(GFP_KERNEL, "%s:%s", dpcm->be->dai_link->name,
+	name = kasprintf(GFP_ATOMIC, "%s:%s", dpcm->be->dai_link->name,
 			 stream ? "capture" : "playback");
 	if (name) {
 		dpcm->debugfs_state = debugfs_create_dir(
