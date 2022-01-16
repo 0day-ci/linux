@@ -1813,7 +1813,6 @@ enum dw2102_table_entry {
 	TECHNOTREND_S2_4600,
 	TEVII_S482_1,
 	TEVII_S482_2,
-	TERRATEC_CINERGY_S2_BOX,
 	TEVII_S662
 };
 
@@ -1852,7 +1851,6 @@ static struct usb_device_id dw2102_table[] = {
 		USB_PID_TECHNOTREND_CONNECT_S2_4600)},
 	[TEVII_S482_1] = {USB_DEVICE(0x9022, 0xd483)},
 	[TEVII_S482_2] = {USB_DEVICE(0x9022, 0xd484)},
-	[TERRATEC_CINERGY_S2_BOX] = {USB_DEVICE(USB_VID_TERRATEC, 0x0105)},
 	[TEVII_S662] = {USB_DEVICE(0x9022, USB_PID_TEVII_S662)},
 	{ }
 };
@@ -2563,7 +2561,7 @@ static struct dvb_usb_device_properties tt_s2_4600_properties = {
 			{ NULL },
 		},
 		{ "Terratec Cinergy S2 USB BOX",
-			{ &dw2102_table[TERRATEC_CINERGY_S2_BOX], NULL },
+			{ &dw2102_table[TERRATEC_CINERGY_S2_R4], NULL },
 			{ NULL },
 		},
 		{ "TeVii S662",
