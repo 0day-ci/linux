@@ -180,7 +180,7 @@ retry:
 	ret = nfs42_proc_copy(file_in, pos_in, file_out, pos_out, count,
 				nss, cnrs, sync);
 out:
-	if (!nfs42_files_from_same_server(file_in, file_out))
+	if (cn_resp)
 		kfree(cn_resp);
 	if (ret == -EAGAIN)
 		goto retry;
