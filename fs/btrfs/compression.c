@@ -49,6 +49,38 @@ const char* btrfs_compress_type2str(enum btrfs_compression_type type)
 	return NULL;
 }
 
+/*
+ * convert str to combination of compression type and level
+ * ret: combination of compression type and compress level
+ * return type and level separately if caller specify type and level pointer
+ */
+unsigned int btrfs_compress_str2type_level(const char *str, unsigned int *type, unsigned int *level){
+    int i;
+    unsigned int result_type, result_level;
+    size_t len = strlen(str);
+    result_type = BTRFS_COMPRESS_NONE;
+    result_level = 0;
+    for(i = 1; i < ARRAY_SIZE(btrfs_compress_types); i ++){
+        size_t comp_len = strlen(btrfs_compress_types[i]);
+        if(len < comp_len){
+            continue;
+        }
+        if(!strncmp(btrfs_compress_types[i], str, comp_len)){
+            result_type = BTRFS_COMPRESS_NONE + i;
+            result_level = btrfs_compress_str2level(result_type, str + comp_len);
+            break;
+        }
+    }
+    if(type != NULL){
+        *type = result_type;
+    }
+    if(level != NULL){
+        *level = result_level;
+    }
+    return btrfs_compress_combine_type_level(result_type, result_level);
+}
+
+
 bool btrfs_compress_is_valid_type(const char *str, size_t len)
 {
 	int i;
@@ -1887,4 +1919,23 @@ unsigned int btrfs_compress_str2level(unsigned int type, const char *str)
 	level = btrfs_compress_set_level(type, level);
 
 	return level;
+}
+
+
+/*
+ * convert combination of compression type and level to meaningful string
+ * the caller should specify buffer and buffer size
+ */
+char *btrfs_compress_type_level2str(unsigned type, unsigned level, char *out, size_t out_len){
+	switch (type) {
+	case BTRFS_COMPRESS_ZLIB:
+	case BTRFS_COMPRESS_LZO:
+	case BTRFS_COMPRESS_ZSTD:
+	case BTRFS_COMPRESS_NONE:
+        snprintf(out, out_len, "%s:%d", btrfs_compress_types[type], btrfs_compress_set_level(type, level));
+        return out;
+	default:
+		break;
+	}
+    return NULL;
 }

@@ -76,6 +76,16 @@ static inline unsigned int btrfs_compress_level(unsigned int type_level)
 	return ((type_level & 0xF0) >> 4);
 }
 
+/*
+ * helper function combine compression type and level
+ * combine compression type and level in one byte
+ * the lower 4bit represent compression type
+ * the upper 4bit represent compression level 
+ */
+static inline unsigned int btrfs_compress_combine_type_level(unsigned int type, unsigned level){
+    return (level << 4) | type;
+}
+
 void __init btrfs_init_compress(void);
 void __cold btrfs_exit_compress(void);
 
@@ -100,6 +110,10 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 				 int mirror_num, unsigned long bio_flags);
 
 unsigned int btrfs_compress_str2level(unsigned int type, const char *str);
+
+unsigned int btrfs_compress_str2type_level(const char *str, unsigned int * type, unsigned int *level);
+
+char *btrfs_compress_type_level2str(unsigned type, unsigned level, char *out, size_t out_len);
 
 enum btrfs_compression_type {
 	BTRFS_COMPRESS_NONE  = 0,
