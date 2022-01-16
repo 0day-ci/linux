@@ -106,6 +106,35 @@ static u32 rcar_read_conf(struct rcar_pcie *pcie, int where)
 	return val >> shift;
 }
 
+void rcar_pci_write_reg_workaround(struct rcar_pcie *pcie, u32 val, unsigned int reg)
+{
+#ifdef CONFIG_ARM
+	asm volatile(
+		"	str %0, [%1]\n"
+		"	isb\n"
+	::"r"(val), "r"(pcie->base + reg):"memory");
+#else
+	rcar_pci_write_reg(pcie, val, reg);
+#endif
+}
+
+u32 rcar_pci_read_reg_workaround(struct rcar_pcie *pcie, unsigned int reg)
+{
+#ifdef CONFIG_ARM
+	u32 val;
+
+	asm volatile(
+		"rcar_pci_read_reg_workaround_start:\n"
+		"1:	ldr %0, [%1]\n"
+		"	isb\n"
+	: "=r"(val):"r"(pcie->base + reg):"memory");
+
+	return val;
+#else
+	return rcar_pci_read_reg(pcie, reg);
+#endif
+}
+
 /* Serialization is provided by 'pci_lock' in drivers/pci/access.c */
 static int rcar_pcie_config_access(struct rcar_pcie_host *host,
 		unsigned char access_type, struct pci_bus *bus,
@@ -178,9 +207,9 @@ static int rcar_pcie_config_access(struct rcar_pcie_host *host,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	if (access_type == RCAR_PCI_ACCESS_READ)
-		*data = rcar_pci_read_reg(pcie, PCIECDR);
+		*data = rcar_pci_read_reg_workaround(pcie, PCIECDR);
 	else
-		rcar_pci_write_reg(pcie, *data, PCIECDR);
+		rcar_pci_write_reg_workaround(pcie, *data, PCIECDR);
 
 	/* Disable the configuration access */
 	rcar_pci_write_reg(pcie, 0, PCIECCTLR);
@@ -1090,7 +1119,11 @@ static struct platform_driver rcar_pcie_driver = {
 static int rcar_pcie_aarch32_abort_handler(unsigned long addr,
 		unsigned int fsr, struct pt_regs *regs)
 {
+	extern u32 *rcar_pci_read_reg_workaround_start;
+	unsigned long pc = instruction_pointer(regs);
+	unsigned long instr = *(unsigned long *)pc;
 	unsigned long flags;
+	u32 reg, val;
 	int ret = 0;
 
 	spin_lock_irqsave(&pmsr_lock, flags);
@@ -1099,6 +1132,36 @@ static int rcar_pcie_aarch32_abort_handler(unsigned long addr,
 	spin_unlock_irqrestore(&pmsr_lock, flags);
 	if (ret)
 		goto unlock_exit;
+
+	/*
+	 * Test whether the faulting instruction is 'isb' and if
+	 * so, test whether it is the 'isb' instruction within
+	 * rcar_pci_read_reg_workaround() asm volatile()
+	 * implementation of read access. If it is, fix it up.
+	 */
+	instr &= ~0xf;
+	if ((instr == 0xf57ff060 || instr == 0xf3bf8f60) &&
+	    (pc == (u32)&rcar_pci_read_reg_workaround_start + 4)) {
+		/*
+		 * If the instruction being executed was a read,
+		 * make it look like it read all-ones.
+		 */
+		instr = *(unsigned long *)(pc - 4);
+		reg = (instr >> 12) & 15;
+
+		if ((instr & 0x0c100000) == 0x04100000) {
+			if (instr & 0x00400000)
+				val = 255;
+			else
+				val = -1;
+
+			regs->uregs[reg] = val;
+			regs->ARM_pc += 4;
+		} else if ((instr & 0x0e100090) == 0x00100090) {
+			regs->uregs[reg] = -1;
+			regs->ARM_pc += 4;
+		}
+	}
 
 unlock_exit:
 	spin_unlock_irqrestore(&pmsr_lock, flags);
