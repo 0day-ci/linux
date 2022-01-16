@@ -602,7 +602,8 @@ static noinline int compress_file_range(struct async_chunk *async_chunk)
 	unsigned long total_in = 0;
 	int i;
 	int will_compress;
-	int compress_type = fs_info->compress_type;
+	int compress_type = btrfs_compress_combine_type_level(
+        fs_info->compress_type, fs_info -> compress_level);
 	int compressed_extents = 0;
 	int redirty = 0;
 
@@ -683,7 +684,8 @@ again:
 		}
 
 		if (BTRFS_I(inode)->defrag_compress)
-			compress_type = BTRFS_I(inode)->defrag_compress;
+            compress_type = btrfs_compress_combine_type_level(
+                BTRFS_I(inode)->defrag_compress, fs_info->compress_level);
 		else if (BTRFS_I(inode)->prop_compress)
 			compress_type = BTRFS_I(inode)->prop_compress;
 
@@ -706,7 +708,7 @@ again:
 
 		/* Compression level is applied here and only here */
 		ret = btrfs_compress_pages(
-			compress_type | (fs_info->compress_level << 4),
+			compress_type,
 					   inode->i_mapping, start,
 					   pages,
 					   &nr_pages,
@@ -743,7 +745,7 @@ cont:
 			/* try making a compressed inline extent */
 			ret = cow_file_range_inline(BTRFS_I(inode), start, end,
 						    total_compressed,
-						    compress_type, pages);
+						    btrfs_compress_type(compress_type), pages);
 		}
 		if (ret <= 0) {
 			unsigned long clear_flags = EXTENT_DELALLOC |
@@ -808,10 +810,12 @@ cont:
 			 * The async work queues will take care of doing actual
 			 * allocation on disk for these compressed pages, and
 			 * will submit them to the elevator.
+             * It only need to record compression type, because decompress don't need
+             * to know compression level
 			 */
 			add_async_extent(async_chunk, start, total_in,
 					total_compressed, pages, nr_pages,
-					compress_type);
+					btrfs_compress_type(compress_type));
 
 			if (start + total_in < end) {
 				start += total_in;
