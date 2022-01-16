@@ -272,13 +272,16 @@ static int prop_compression_apply(struct inode *inode, const char *value,
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	int type;
+    char* clean_value;
+    int ret;
 
 	/* Reset to defaults */
 	if (len == 0) {
 		BTRFS_I(inode)->flags &= ~BTRFS_INODE_COMPRESS;
 		BTRFS_I(inode)->flags &= ~BTRFS_INODE_NOCOMPRESS;
 		BTRFS_I(inode)->prop_compress = BTRFS_COMPRESS_NONE;
-		return 0;
+		ret = 0;
+        goto out;
 	}
 
 	/* Set NOCOMPRESS flag */
@@ -287,27 +290,44 @@ static int prop_compression_apply(struct inode *inode, const char *value,
 		BTRFS_I(inode)->flags |= BTRFS_INODE_NOCOMPRESS;
 		BTRFS_I(inode)->flags &= ~BTRFS_INODE_COMPRESS;
 		BTRFS_I(inode)->prop_compress = BTRFS_COMPRESS_NONE;
-
-		return 0;
+        ret = 0;
+        goto out;
 	}
 
-	if (!strncmp("lzo", value, 3)) {
-		type = BTRFS_COMPRESS_LZO;
-		btrfs_set_fs_incompat(fs_info, COMPRESS_LZO);
-	} else if (!strncmp("zlib", value, 4)) {
-		type = BTRFS_COMPRESS_ZLIB;
-	} else if (!strncmp("zstd", value, 4)) {
-		type = BTRFS_COMPRESS_ZSTD;
-		btrfs_set_fs_incompat(fs_info, COMPRESS_ZSTD);
-	} else {
-		return -EINVAL;
-	}
+    /*
+     * The value contains gibberish at the end, we should clean it up.
+     */
+    clean_value = kzalloc(len + 1, GFP_NOFS);
+    if(!clean_value){
+        ret = -ENOMEM;
+        goto out;
+    }
+    strncpy(clean_value, value, len);
+
+    if(!btrfs_compress_is_valid_type(value, len)){
+        ret = -EINVAL;
+        goto free_clean_value;
+    }
+    type = btrfs_compress_str2type_level(clean_value, NULL, NULL);
+    switch(btrfs_compress_type(type)){
+        case BTRFS_COMPRESS_LZO:
+		    btrfs_set_fs_incompat(fs_info, COMPRESS_LZO);
+            break;
+        case BTRFS_COMPRESS_ZSTD:
+		    btrfs_set_fs_incompat(fs_info, COMPRESS_ZSTD);
+            break;
+        default:
+            break;
+    }
 
 	BTRFS_I(inode)->flags &= ~BTRFS_INODE_NOCOMPRESS;
 	BTRFS_I(inode)->flags |= BTRFS_INODE_COMPRESS;
 	BTRFS_I(inode)->prop_compress = type;
-
-	return 0;
+    ret = 0;
+free_clean_value:
+    kfree(clean_value);
+out:
+	return ret;
 }
 
 static const char *prop_compression_extract(struct inode *inode)
