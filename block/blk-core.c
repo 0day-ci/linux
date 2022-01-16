@@ -50,6 +50,7 @@
 #include "blk-mq-sched.h"
 #include "blk-pm.h"
 #include "blk-throttle.h"
+#include "blk-rq-qos.h"
 
 struct dentry *blk_debugfs_root;
 
@@ -270,8 +271,10 @@ void blk_put_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL(blk_put_queue);
 
-void blk_queue_start_drain(struct request_queue *q)
+void blk_set_queue_dying(struct request_queue *q)
 {
+	blk_queue_flag_set(QUEUE_FLAG_DYING, q);
+
 	/*
 	 * When queue DYING flag is set, we need to block new req
 	 * entering queue, so we call blk_freeze_queue_start() to
@@ -282,12 +285,6 @@ void blk_queue_start_drain(struct request_queue *q)
 		blk_mq_wake_waiters(q);
 	/* Make blk_queue_enter() reexamine the DYING flag. */
 	wake_up_all(&q->mq_freeze_wq);
-}
-
-void blk_set_queue_dying(struct request_queue *q)
-{
-	blk_queue_flag_set(QUEUE_FLAG_DYING, q);
-	blk_queue_start_drain(q);
 }
 EXPORT_SYMBOL_GPL(blk_set_queue_dying);
 
@@ -320,7 +317,12 @@ void blk_cleanup_queue(struct request_queue *q)
 	 */
 	blk_freeze_queue(q);
 
+	rq_qos_exit(q);
+
 	blk_queue_flag_set(QUEUE_FLAG_DEAD, q);
+
+	/* for synchronous bio-based driver finish in-flight integrity i/o */
+	blk_flush_integrity();
 
 	blk_sync_queue(q);
 	if (queue_is_mq(q)) {
@@ -383,10 +385,8 @@ int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 int __bio_queue_enter(struct request_queue *q, struct bio *bio)
 {
 	while (!blk_try_enter_queue(q, false)) {
-		struct gendisk *disk = bio->bi_bdev->bd_disk;
-
 		if (bio->bi_opf & REQ_NOWAIT) {
-			if (test_bit(GD_DEAD, &disk->state))
+			if (blk_queue_dying(q))
 				goto dead;
 			bio_wouldblock_error(bio);
 			return -EBUSY;
@@ -403,8 +403,8 @@ int __bio_queue_enter(struct request_queue *q, struct bio *bio)
 		wait_event(q->mq_freeze_wq,
 			   (!q->mq_freeze_depth &&
 			    blk_pm_resume_queue(false, q)) ||
-			   test_bit(GD_DEAD, &disk->state));
-		if (test_bit(GD_DEAD, &disk->state))
+			   blk_queue_dying(q));
+		if (blk_queue_dying(q))
 			goto dead;
 	}
 
