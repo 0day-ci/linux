@@ -223,7 +223,8 @@ int btrfs_fileattr_set(struct user_namespace *mnt_userns,
 	struct btrfs_trans_handle *trans;
 	unsigned int fsflags, old_fsflags;
 	int ret;
-	const char *comp = NULL;
+	const char *comp;
+    char comp_xattr_str[512];
 	u32 binode_flags;
 
 	if (btrfs_root_readonly(root))
@@ -304,13 +305,19 @@ int btrfs_fileattr_set(struct user_namespace *mnt_userns,
 	}
 
 	/*
-	 * The COMPRESS flag can only be changed by users, while the NOCOMPRESS
-	 * flag may be changed automatically if compression code won't make
-	 * things smaller.
+	 * The COMPRESS and NOCOMPRESS flag can only be changed by users, while the 
+     * BTRFS_INODE_HEURISTIC_NOCOMPRESS flag may be changed automatically if 
+     * compression code won't make things smaller.
 	 */
+    memset(comp_xattr_str, 0, sizeof(comp_xattr_str));
 	if (fsflags & FS_NOCOMP_FL) {
 		binode_flags &= ~BTRFS_INODE_COMPRESS;
 		binode_flags |= BTRFS_INODE_NOCOMPRESS;
+        /*
+         * set xattr btrfs.compression to none if user set the NOCOMPRESS flag
+         */
+        strncpy(comp_xattr_str, "none", 5);
+        comp = comp_xattr_str;
 	} else if (fsflags & FS_COMPR_FL) {
 
 		if (IS_SWAPFILE(inode))
@@ -318,10 +325,19 @@ int btrfs_fileattr_set(struct user_namespace *mnt_userns,
 
 		binode_flags |= BTRFS_INODE_COMPRESS;
 		binode_flags &= ~BTRFS_INODE_NOCOMPRESS;
-
-		comp = btrfs_compress_type2str(fs_info->compress_type);
-		if (!comp || comp[0] == 0)
-			comp = btrfs_compress_type2str(BTRFS_COMPRESS_ZLIB);
+        /*
+         * set xattr btrfs.compression to filesystem specify compression type:level
+         */
+        comp = btrfs_compress_type_level2str(fs_info->compress_type, 
+            fs_info->compress_level, comp_xattr_str, sizeof(comp_xattr_str));
+        /*
+         * filesystem doesn't specify compression method, use default compression type
+         */
+        if(!comp || comp[0] == ':') {
+            btrfs_compress_type_level2str(BTRFS_COMPRESS_ZLIB,
+                BTRFS_ZLIB_DEFAULT_LEVEL, comp_xattr_str,
+                sizeof(comp_xattr_str));
+        }
 	} else {
 		binode_flags &= ~(BTRFS_INODE_COMPRESS | BTRFS_INODE_NOCOMPRESS);
 	}
@@ -335,8 +351,8 @@ int btrfs_fileattr_set(struct user_namespace *mnt_userns,
 		return PTR_ERR(trans);
 
 	if (comp) {
-		ret = btrfs_set_prop(trans, inode, "btrfs.compression", comp,
-				     strlen(comp), 0);
+		ret = btrfs_set_prop(trans, inode, "btrfs.compression", comp_xattr_str,
+				     strlen(comp_xattr_str), 0);
 		if (ret) {
 			btrfs_abort_transaction(trans, ret);
 			goto out_end_trans;
