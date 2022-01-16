@@ -84,6 +84,14 @@ config IXP4XX_TIMER
 	help
 	  Enables support for the Intel XScale IXP4xx SoC timer.
 
+config REALTEK_OTTO_TIMER
+	bool "Realtek Otto timer driver"
+	depends on MACH_REALTEK_RTL || COMPILE_TEST
+	select TIMER_OF
+	help
+	  Enables support for the timer/counter found on Realtek's networking
+	  SoC series RTL838x, RTL839x, RTL930x, RTL931x.
+
 config ROCKCHIP_TIMER
 	bool "Rockchip timer driver" if COMPILE_TEST
 	depends on ARM || ARM64
