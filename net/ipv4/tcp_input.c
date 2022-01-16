@@ -5908,7 +5908,6 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 			} else {
 				tcp_update_wl(tp, TCP_SKB_CB(skb)->seq);
 			}
-
 			__tcp_ack_snd_check(sk, 0);
 no_ack:
 			if (eaten)
@@ -6229,9 +6228,10 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		}
 		if (fastopen_fail)
 			return -1;
-		if (sk->sk_write_pending ||
-		    icsk->icsk_accept_queue.rskq_defer_accept ||
-		    inet_csk_in_pingpong_mode(sk)) {
+
+		if ((sk->sk_write_pending ||
+		     icsk->icsk_accept_queue.rskq_defer_accept ||
+		     inet_csk_in_pingpong_mode(sk)) && !th->syn) {
 			/* Save one ACK. Data will be ready after
 			 * several ticks, if write_pending is set.
 			 *
@@ -6243,9 +6243,10 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tcp_enter_quickack_mode(sk, TCP_MAX_QUICKACKS);
 			inet_csk_reset_xmit_timer(sk, ICSK_TIME_DACK,
 						  TCP_DELACK_MAX, TCP_RTO_MAX);
-
 discard:
 			tcp_drop(sk, skb);
+			tcp_send_ack(sk);
+
 			return 0;
 		} else {
 			tcp_send_ack(sk);
@@ -6425,6 +6426,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		tcp_urg(sk, skb, th);
 		__kfree_skb(skb);
 		tcp_data_snd_check(sk);
+
 		return 0;
 	}
 
@@ -6901,7 +6903,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 			 */
 			pr_drop_req(req, ntohs(tcp_hdr(skb)->source),
 				    rsk_ops->family);
-			goto drop_and_release;
+			//goto drop_and_release;
 		}
 
 		isn = af_ops->init_seq(skb);
@@ -6954,7 +6956,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	reqsk_put(req);
 	return 0;
 
-drop_and_release:
+//drop_and_release:
 	dst_release(dst);
 drop_and_free:
 	__reqsk_free(req);

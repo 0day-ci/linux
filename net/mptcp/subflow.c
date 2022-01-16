@@ -966,6 +966,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	trace_get_mapping_status(mpext);
 
 	data_len = mpext->data_len;
+
 	if (data_len == 0) {
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
 		return MAPPING_INVALID;
@@ -1024,6 +1025,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		/* If this skb data are fully covered by the current mapping,
 		 * the new map would need caching, which is not supported
 		 */
+
 		if (skb_is_fully_mapped(ssk, skb)) {
 			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSNOMATCH);
 			return MAPPING_INVALID;
@@ -1044,6 +1046,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	subflow->map_data_csum = csum_unfold(mpext->csum);
 
 	/* Cfr RFC 8684 Section 3.3.0 */
+
 	if (unlikely(subflow->map_csum_reqd != csum_reqd))
 		return MAPPING_INVALID;
 
@@ -1180,9 +1183,19 @@ fallback:
 	}
 
 	if (subflow->mp_join || subflow->fully_established) {
+		skb = skb_peek(&ssk->sk_receive_queue);
+		subflow->map_valid = 1;
+		subflow->map_seq = READ_ONCE(msk->ack_seq);
+		subflow->map_data_len = skb->len;
+		subflow->map_subflow_seq = tcp_sk(ssk)->copied_seq - subflow->ssn_offset;
+
+		WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_DATA_AVAIL);
+		return true;
+
 		/* fatal protocol error, close the socket.
 		 * subflow_error_report() will introduce the appropriate barriers
 		 */
+		/*
 		ssk->sk_err = EBADMSG;
 		tcp_set_state(ssk, TCP_CLOSE);
 		subflow->reset_transient = 0;
@@ -1190,6 +1203,7 @@ fallback:
 		tcp_send_active_reset(ssk, GFP_ATOMIC);
 		WRITE_ONCE(subflow->data_avail, 0);
 		return false;
+		*/
 	}
 
 	__mptcp_do_fallback(msk);

@@ -501,7 +501,8 @@ struct sock *inet_csk_accept(struct sock *sk, int flags, int *err, bool kern)
 	req = reqsk_queue_remove(queue, sk);
 	newsk = req->sk;
 
-	if (sk->sk_protocol == IPPROTO_TCP &&
+	if ((sk->sk_protocol == IPPROTO_TCP ||
+	     sk->sk_protocol == IPPROTO_MPTCP) &&
 	    tcp_rsk(req)->tfo_listener) {
 		spin_lock_bh(&queue->fastopenq.lock);
 		if (tcp_rsk(req)->tfo_listener) {

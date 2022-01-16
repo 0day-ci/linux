@@ -119,15 +119,26 @@ static bool __tcp_fastopen_cookie_gen_cipher(struct request_sock *req,
 					     const siphash_key_t *key,
 					     struct tcp_fastopen_cookie *foc)
 {
+#if IS_ENABLED(CONFIG_MPTCP)
+	BUILD_BUG_ON(TCP_FASTOPEN_COOKIE_SIZE != sizeof(u32));
+#else
 	BUILD_BUG_ON(TCP_FASTOPEN_COOKIE_SIZE != sizeof(u64));
+#endif
 
 	if (req->rsk_ops->family == AF_INET) {
 		const struct iphdr *iph = ip_hdr(syn);
 
+#if IS_ENABLED(CONFIG_MPTCP)
+		foc->val[0] = cpu_to_le32(siphash(&iph->saddr,
+						  sizeof(iph->saddr) +
+						  sizeof(iph->daddr),
+						  key));
+#else
 		foc->val[0] = cpu_to_le64(siphash(&iph->saddr,
 					  sizeof(iph->saddr) +
 					  sizeof(iph->daddr),
 					  key));
+#endif
 		foc->len = TCP_FASTOPEN_COOKIE_SIZE;
 		return true;
 	}
@@ -149,6 +160,7 @@ static bool __tcp_fastopen_cookie_gen_cipher(struct request_sock *req,
 /* Generate the fastopen cookie by applying SipHash to both the source and
  * destination addresses.
  */
+/*
 static void tcp_fastopen_cookie_gen(struct sock *sk,
 				    struct request_sock *req,
 				    struct sk_buff *syn,
@@ -162,6 +174,7 @@ static void tcp_fastopen_cookie_gen(struct sock *sk,
 		__tcp_fastopen_cookie_gen_cipher(req, syn, &ctx->key[0], foc);
 	rcu_read_unlock();
 }
+*/
 
 /* If an incoming SYN or SYNACK frame contains a payload and/or FIN,
  * queue this additional data / FIN.
@@ -291,12 +304,12 @@ static struct sock *tcp_fastopen_create_child(struct sock *sk,
 	 */
 	return child;
 }
-
+/*
 static bool tcp_fastopen_queue_check(struct sock *sk)
 {
 	struct fastopen_queue *fastopenq;
 
-	/* Make sure the listener has enabled fastopen, and we don't
+	* Make sure the listener has enabled fastopen, and we don't
 	 * exceed the max # of pending TFO requests allowed before trying
 	 * to validating the cookie in order to avoid burning CPU cycles
 	 * unnecessarily.
@@ -305,7 +318,7 @@ static bool tcp_fastopen_queue_check(struct sock *sk)
 	 * processing a cookie request is that clients can't differentiate
 	 * between qlen overflow causing Fast Open to be disabled
 	 * temporarily vs a server not supporting Fast Open at all.
-	 */
+	 *
 	fastopenq = &inet_csk(sk)->icsk_accept_queue.fastopenq;
 	if (fastopenq->max_qlen == 0)
 		return false;
@@ -327,7 +340,7 @@ static bool tcp_fastopen_queue_check(struct sock *sk)
 	}
 	return true;
 }
-
+*/
 static bool tcp_fastopen_no_cookie(const struct sock *sk,
 				   const struct dst_entry *dst,
 				   int flag)
@@ -346,28 +359,43 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 			      struct tcp_fastopen_cookie *foc,
 			      const struct dst_entry *dst)
 {
+	/*
 	bool syn_data = TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq + 1;
 	int tcp_fastopen = sock_net(sk)->ipv4.sysctl_tcp_fastopen;
+	*/
 	struct tcp_fastopen_cookie valid_foc = { .len = -1 };
 	struct sock *child;
 	int ret = 0;
 
 	if (foc->len == 0) /* Client requests a cookie */
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPFASTOPENCOOKIEREQD);
-
+/*
 	if (!((tcp_fastopen & TFO_SERVER_ENABLE) &&
 	      (syn_data || foc->len >= 0) &&
 	      tcp_fastopen_queue_check(sk))) {
 		foc->len = -1;
 		return NULL;
 	}
-
+*/
 	if (tcp_fastopen_no_cookie(sk, dst, TFO_SERVER_COOKIE_NOT_REQD))
 		goto fastopen;
 
 	if (foc->len == 0) {
 		/* Client requests a cookie. */
-		tcp_fastopen_cookie_gen(sk, req, skb, &valid_foc);
+		//tcp_fastopen_cookie_gen(sk, req, skb, &valid_foc);
+
+		struct tcp_fastopen_context *ctx;
+		struct iphdr *iph = ip_hdr(skb);
+
+		tcp_fastopen_init_key_once(sock_net(sk));
+		ctx = tcp_fastopen_get_ctx(sk);
+
+		valid_foc.val[0] = cpu_to_le32(siphash(&iph->saddr,
+						       sizeof(iph->saddr) +
+						       sizeof(iph->daddr),
+						       &ctx->key[0]));
+		valid_foc.len = TCP_FASTOPEN_COOKIE_SIZE;
+
 	} else if (foc->len > 0) {
 		ret = tcp_fastopen_cookie_gen_check(sk, req, skb, foc,
 						    &valid_foc);
