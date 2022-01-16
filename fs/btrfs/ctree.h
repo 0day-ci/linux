@@ -1507,6 +1507,7 @@ do {                                                                   \
 #define BTRFS_INODE_NOATIME		(1U << 9)
 #define BTRFS_INODE_DIRSYNC		(1U << 10)
 #define BTRFS_INODE_COMPRESS		(1U << 11)
+#define BTRFS_INODE_HEURISTIC_NOCOMPRESS  (1U << 12)
 
 #define BTRFS_INODE_ROOT_ITEM_INIT	(1U << 31)
 
@@ -1523,7 +1524,17 @@ do {                                                                   \
 	 BTRFS_INODE_NOATIME |						\
 	 BTRFS_INODE_DIRSYNC |						\
 	 BTRFS_INODE_COMPRESS |						\
-	 BTRFS_INODE_ROOT_ITEM_INIT)
+	 BTRFS_INODE_ROOT_ITEM_INIT |               \
+     BTRFS_INODE_HEURISTIC_NOCOMPRESS )
+
+/*
+ * Inode only memory flags
+ */
+
+#define BTRFS_INODE_ONLY_MEM_FLAG_MASK  \
+    (BTRFS_INODE_HEURISTIC_NOCOMPRESS)
+
+
 
 #define BTRFS_INODE_RO_VERITY		(1U << 0)
 

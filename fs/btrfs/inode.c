@@ -550,7 +550,8 @@ static inline int inode_need_compress(struct btrfs_inode *inode, u64 start,
 	if (inode->defrag_compress)
 		return 1;
 	/* bad compression ratios */
-	if (inode->flags & BTRFS_INODE_NOCOMPRESS)
+	if (inode->flags & BTRFS_INODE_NOCOMPRESS ||
+        inode->flags & BTRFS_INODE_HEURISTIC_NOCOMPRESS)
 		return 0;
 	if (btrfs_test_opt(fs_info, COMPRESS) ||
 	    inode->flags & BTRFS_INODE_COMPRESS ||
@@ -838,7 +839,7 @@ cont:
 		/* flag the file so we don't compress in the future */
 		if (!btrfs_test_opt(fs_info, FORCE_COMPRESS) &&
 		    !(BTRFS_I(inode)->prop_compress)) {
-			BTRFS_I(inode)->flags |= BTRFS_INODE_NOCOMPRESS;
+			BTRFS_I(inode)->flags |= BTRFS_INODE_HEURISTIC_NOCOMPRESS;
 		}
 	}
 cleanup_and_bail_uncompressed:
@@ -3970,8 +3971,12 @@ static void fill_inode_item(struct btrfs_trans_handle *trans,
 	btrfs_set_token_inode_sequence(&token, item, inode_peek_iversion(inode));
 	btrfs_set_token_inode_transid(&token, item, trans->transid);
 	btrfs_set_token_inode_rdev(&token, item, inode->i_rdev);
-	flags = btrfs_inode_combine_flags(BTRFS_I(inode)->flags,
-					  BTRFS_I(inode)->ro_flags);
+    /*
+     * get rid of memory only flag
+     */
+	flags = btrfs_inode_combine_flags(
+                    BTRFS_I(inode)->flags & ~BTRFS_INODE_ONLY_MEM_FLAG_MASK,
+					BTRFS_I(inode)->ro_flags);
 	btrfs_set_token_inode_flags(&token, item, flags);
 	btrfs_set_token_inode_block_group(&token, item, 0);
 }

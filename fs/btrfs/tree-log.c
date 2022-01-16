@@ -4223,8 +4223,12 @@ static void fill_inode_item(struct btrfs_trans_handle *trans,
 	btrfs_set_token_inode_sequence(&token, item, inode_peek_iversion(inode));
 	btrfs_set_token_inode_transid(&token, item, trans->transid);
 	btrfs_set_token_inode_rdev(&token, item, inode->i_rdev);
-	flags = btrfs_inode_combine_flags(BTRFS_I(inode)->flags,
-					  BTRFS_I(inode)->ro_flags);
+    /*
+     * clear memory only flag
+     */
+	flags = btrfs_inode_combine_flags(
+                BTRFS_I(inode)->flags & ~BTRFS_INODE_ONLY_MEM_FLAG_MASK,
+			    BTRFS_I(inode)->ro_flags);
 	btrfs_set_token_inode_flags(&token, item, flags);
 	btrfs_set_token_inode_block_group(&token, item, 0);
 }
