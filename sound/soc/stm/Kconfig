@@ -37,6 +37,7 @@ config SND_SOC_STM32_DFSDM
 	depends on ARCH_STM32 || COMPILE_TEST
 	depends on SND_SOC
 	depends on STM32_DFSDM_ADC
+	depends on GPIOLIB
 	select SND_SOC_GENERIC_DMAENGINE_PCM
 	select SND_SOC_DMIC
 	select IIO_BUFFER_CB
