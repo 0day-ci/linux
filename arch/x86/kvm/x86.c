@@ -11091,6 +11091,7 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	struct kvm_cpuid_entry2 *cpuid_0x1;
 	unsigned long old_cr0 = kvm_read_cr0(vcpu);
 	unsigned long new_cr0;
+	bool need_update_cpuid = false;
 
 	/*
 	 * Several of the "set" flows, e.g. ->set_cr0(), read other registers
@@ -11156,6 +11157,8 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 
 		vcpu->arch.msr_misc_features_enables = 0;
 
+		if (vcpu->arch.xcr0 != XFEATURE_MASK_FP)
+			need_update_cpuid = true;
 		vcpu->arch.xcr0 = XFEATURE_MASK_FP;
 	}
 
@@ -11173,6 +11176,8 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	cpuid_0x1 = kvm_find_cpuid_entry(vcpu, 1, 0);
 	kvm_rdx_write(vcpu, cpuid_0x1 ? cpuid_0x1->eax : 0x600);
 
+	if (vcpu->arch.ia32_xss)
+		need_update_cpuid = true;
 	vcpu->arch.ia32_xss = 0;
 
 	static_call(kvm_x86_vcpu_reset)(vcpu, init_event);
@@ -11221,6 +11226,9 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	 */
 	if (init_event)
 		kvm_make_request(KVM_REQ_TLB_FLUSH_GUEST, vcpu);
+
+	if (need_update_cpuid)
+		kvm_update_cpuid_runtime(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_reset);
 
