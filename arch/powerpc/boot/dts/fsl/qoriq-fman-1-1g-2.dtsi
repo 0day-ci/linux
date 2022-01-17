@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * QorIQ FMan 1g port #2 device tree stub [ controller @ offset 0x500000 ]
  *

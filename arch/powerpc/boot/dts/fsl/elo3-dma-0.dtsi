@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * QorIQ Elo3 DMA device tree stub [ controller @ offset 0x100000 ]
  *

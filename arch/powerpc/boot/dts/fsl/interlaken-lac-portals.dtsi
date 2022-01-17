@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /* T4240 Interlaken LAC Portal device tree stub with 24 portals.
  *
  * Copyright 2012 Freescale Semiconductor Inc.

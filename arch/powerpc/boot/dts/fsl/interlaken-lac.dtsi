@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * T4 Interlaken Look-aside Controller (LAC) device tree stub
  *
