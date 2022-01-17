@@ -161,6 +161,22 @@ int mtk_clk_register_gates(struct device_node *node,
 }
 EXPORT_SYMBOL_GPL(mtk_clk_register_gates);
 
+static void mtk_clk_unregister_gates(const struct mtk_gate *clks,
+		int num, struct clk_onecell_data *clk_data)
+{
+	int i;
+	const struct mtk_gate *gate;
+	struct clk *clk;
+
+	for (i = 0; i < num; i++) {
+		gate = &clks[i];
+		clk = clk_data->clks[gate->id];
+
+		if (!IS_ERR_OR_NULL(clk))
+			clk_unregister(clk);
+	}
+}
+
 struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
 		void __iomem *base, spinlock_t *lock)
 {
@@ -320,15 +336,17 @@ int mtk_clk_simple_probe(struct platform_device *pdev)
 
 	r = mtk_clk_register_gates(node, mcd->clks, mcd->num_clks, clk_data);
 	if (r)
-		goto free_data;
+		goto err_free_data;
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 	if (r)
-		goto free_data;
+		goto err_unregister_gates;
 
 	return r;
 
-free_data:
+err_unregister_gates:
+	mtk_clk_unregister_gates(mcd->clks, mcd->num_clks, clk_data);
+err_free_data:
 	mtk_free_clk_data(clk_data);
 	return r;
 }
