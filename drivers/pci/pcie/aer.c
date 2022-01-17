@@ -1216,7 +1216,8 @@ static int set_device_error_reporting(struct pci_dev *dev, void *data)
 	if ((type == PCI_EXP_TYPE_ROOT_PORT) ||
 	    (type == PCI_EXP_TYPE_RC_EC) ||
 	    (type == PCI_EXP_TYPE_UPSTREAM) ||
-	    (type == PCI_EXP_TYPE_DOWNSTREAM)) {
+	    (type == PCI_EXP_TYPE_DOWNSTREAM) ||
+	    (type == PCI_EXP_TYPE_ENDPOINT)) {
 		if (enable)
 			pci_enable_pcie_error_reporting(dev);
 		else
