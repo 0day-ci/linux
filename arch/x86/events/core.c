@@ -693,6 +693,15 @@ void x86_pmu_disable_all(void)
 	}
 }
 
+u64 perf_get_hw_event_config(int perf_hw_id)
+{
+	if (perf_hw_id < x86_pmu.max_events)
+		return x86_pmu.event_map(perf_hw_id);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(perf_get_hw_event_config);
+
 struct perf_guest_switch_msr *perf_guest_get_msrs(int *nr)
 {
 	return static_call(x86_pmu_guest_get_msrs)(nr);
