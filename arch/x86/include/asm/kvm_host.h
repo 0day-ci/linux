@@ -501,7 +501,6 @@ struct kvm_pmc {
 struct kvm_pmu {
 	unsigned nr_arch_gp_counters;
 	unsigned nr_arch_fixed_counters;
-	unsigned available_event_types;
 	u64 fixed_ctr_ctrl;
 	u64 global_ctrl;
 	u64 global_status;
@@ -516,6 +515,7 @@ struct kvm_pmu {
 	DECLARE_BITMAP(reprogram_pmi, X86_PMC_IDX_MAX);
 	DECLARE_BITMAP(all_valid_pmc_idx, X86_PMC_IDX_MAX);
 	DECLARE_BITMAP(pmc_in_use, X86_PMC_IDX_MAX);
+	DECLARE_BITMAP(avail_perf_hw_ids, PERF_COUNT_HW_MAX);
 
 	/*
 	 * The gate to release perf_events not marked in

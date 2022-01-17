@@ -74,6 +74,7 @@ static unsigned int intel_pmc_perf_hw_id(struct kvm_pmc *pmc)
 	u8 event_select = pmc->eventsel & ARCH_PERFMON_EVENTSEL_EVENT;
 	u8 unit_mask = (pmc->eventsel & ARCH_PERFMON_EVENTSEL_UMASK) >> 8;
 	int i;
+	unsigned int event_type = PERF_COUNT_HW_MAX;
 
 	for (i = 0; i < ARRAY_SIZE(intel_arch_events); i++) {
 		if (intel_arch_events[i].eventsel != event_select ||
@@ -81,16 +82,14 @@ static unsigned int intel_pmc_perf_hw_id(struct kvm_pmc *pmc)
 			continue;
 
 		/* disable event that reported as not present by cpuid */
-		if ((i < 7) && !(pmu->available_event_types & (1 << i)))
+		event_type = intel_arch_events[i].event_type;
+		if (!test_bit(event_type, pmu->avail_perf_hw_ids))
 			return PERF_COUNT_HW_MAX + 1;
 
 		break;
 	}
 
-	if (i == ARRAY_SIZE(intel_arch_events))
-		return PERF_COUNT_HW_MAX;
-
-	return intel_arch_events[i].event_type;
+	return event_type;
 }
 
 /* check if a PMC is enabled by comparing it with globl_ctrl bits. */
@@ -469,6 +468,25 @@ static void setup_fixed_pmc_eventsel(struct kvm_pmu *pmu)
 	}
 }
 
+/* Mapping between CPUID 0x0A.EBX bit vector and enum perf_hw_id. */
+static inline int map_unavail_bit_to_perf_hw_id(int bit)
+{
+	switch (bit) {
+	case 0:
+	case 1:
+		return bit;
+	case 2:
+		return PERF_COUNT_HW_BUS_CYCLES;
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+		return --bit;
+	}
+
+	return PERF_COUNT_HW_MAX;
+}
+
 static void intel_pmu_refresh(struct kvm_vcpu *vcpu)
 {
 	struct kvm_pmu *pmu = vcpu_to_pmu(vcpu);
@@ -478,6 +496,8 @@ static void intel_pmu_refresh(struct kvm_vcpu *vcpu)
 	struct kvm_cpuid_entry2 *entry;
 	union cpuid10_eax eax;
 	union cpuid10_edx edx;
+	unsigned long available_cpuid_events;
+	int bit;
 
 	pmu->nr_arch_gp_counters = 0;
 	pmu->nr_arch_fixed_counters = 0;
@@ -503,8 +523,14 @@ static void intel_pmu_refresh(struct kvm_vcpu *vcpu)
 	eax.split.bit_width = min_t(int, eax.split.bit_width, x86_pmu.bit_width_gp);
 	pmu->counter_bitmask[KVM_PMC_GP] = ((u64)1 << eax.split.bit_width) - 1;
 	eax.split.mask_length = min_t(int, eax.split.mask_length, x86_pmu.events_mask_len);
-	pmu->available_event_types = ~entry->ebx &
-					((1ull << eax.split.mask_length) - 1);
+	/*
+	 * The number of valid EBX bits should be less than the number of valid perf_hw_ids.
+	 * Otherwise, we need to additionally determine if the event is rejected by KVM.
+	 */
+	available_cpuid_events = ~entry->ebx & ((1ull << eax.split.mask_length) - 1);
+	bitmap_fill(pmu->avail_perf_hw_ids, PERF_COUNT_HW_MAX);
+	for_each_clear_bit(bit, (unsigned long *)&available_cpuid_events, eax.split.mask_length)
+		__clear_bit(map_unavail_bit_to_perf_hw_id(bit), pmu->avail_perf_hw_ids);
 
 	if (pmu->version == 1) {
 		pmu->nr_arch_fixed_counters = 0;
