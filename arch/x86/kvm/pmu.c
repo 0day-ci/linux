@@ -22,6 +22,10 @@
 /* This is enough to filter the vast majority of currently defined events. */
 #define KVM_PMU_EVENT_FILTER_MAX_EVENTS 300
 
+/* The event_type value is invalid if event_select and unit_mask are both 0. */
+struct kvm_event_hw_type_mapping kernel_hw_events[PERF_COUNT_HW_MAX];
+EXPORT_SYMBOL_GPL(kernel_hw_events);
+
 /* NOTE:
  * - Each perf counter is defined as "struct kvm_pmc";
  * - There are two types of perf counters: general purpose (gp) and fixed.
@@ -206,7 +210,9 @@ void reprogram_gp_counter(struct kvm_pmc *pmc, u64 eventsel)
 	if (!allow_event)
 		return;
 
-	if (!(eventsel & (ARCH_PERFMON_EVENTSEL_EDGE |
+	/* Fall back to PERF_TYPE_RAW type if event_select and unit_mask are both 0. */
+	if ((pmc->eventsel & 0xFFFFULL) &&
+	    !(eventsel & (ARCH_PERFMON_EVENTSEL_EDGE |
 			  ARCH_PERFMON_EVENTSEL_INV |
 			  ARCH_PERFMON_EVENTSEL_CMASK |
 			  HSW_IN_TX |
@@ -544,6 +550,23 @@ void kvm_pmu_trigger_event(struct kvm_vcpu *vcpu, u64 perf_hw_id)
 	}
 }
 EXPORT_SYMBOL_GPL(kvm_pmu_trigger_event);
+
+/* Initialize common hardware events[] by iterating over the enum perf_hw_id. */
+void kvm_pmu_hw_events_mapping_setup(void)
+{
+	u64 config;
+	int i;
+
+	for (i = 0; i < PERF_COUNT_HW_MAX; i++) {
+		config = perf_get_hw_event_config(i) & 0xFFFFULL;
+
+		kernel_hw_events[i] = (struct kvm_event_hw_type_mapping){
+			.eventsel = config & ARCH_PERFMON_EVENTSEL_EVENT,
+			.unit_mask = (config & ARCH_PERFMON_EVENTSEL_UMASK) >> 8,
+			.event_type = i,
+		};
+	}
+}
 
 int kvm_vm_ioctl_set_pmu_event_filter(struct kvm *kvm, void __user *argp)
 {

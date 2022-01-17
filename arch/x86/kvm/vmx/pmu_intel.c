@@ -20,20 +20,14 @@
 
 #define MSR_PMC_FULL_WIDTH_BIT      (MSR_IA32_PMC0 - MSR_IA32_PERFCTR0)
 
-static struct kvm_event_hw_type_mapping intel_arch_events[] = {
-	[0] = { 0x3c, 0x00, PERF_COUNT_HW_CPU_CYCLES },
-	[1] = { 0xc0, 0x00, PERF_COUNT_HW_INSTRUCTIONS },
-	[2] = { 0x3c, 0x01, PERF_COUNT_HW_BUS_CYCLES  },
-	[3] = { 0x2e, 0x4f, PERF_COUNT_HW_CACHE_REFERENCES },
-	[4] = { 0x2e, 0x41, PERF_COUNT_HW_CACHE_MISSES },
-	[5] = { 0xc4, 0x00, PERF_COUNT_HW_BRANCH_INSTRUCTIONS },
-	[6] = { 0xc5, 0x00, PERF_COUNT_HW_BRANCH_MISSES },
-	/* The above index must match CPUID 0x0A.EBX bit vector */
-	[7] = { 0x00, 0x03, PERF_COUNT_HW_REF_CPU_CYCLES },
-};
-
-/* mapping between fixed pmc index and intel_arch_events array */
-static int fixed_pmc_events[] = {1, 0, 7};
+/*
+ * Mapping between fixed pmc index and kernel_hw_events array
+ *
+ * Fixed pmc 0 is PERF_COUNT_HW_INSTRUCTIONS,
+ * Fixed pmc 1 is PERF_COUNT_HW_CPU_CYCLES,
+ * Fixed pmc 2 is PERF_COUNT_HW_REF_CPU_CYCLES.
+ */
+static int fixed_pmc_events[] = {1, 0, 9};
 
 static void reprogram_fixed_counters(struct kvm_pmu *pmu, u64 data)
 {
@@ -76,13 +70,13 @@ static unsigned int intel_pmc_perf_hw_id(struct kvm_pmc *pmc)
 	int i;
 	unsigned int event_type = PERF_COUNT_HW_MAX;
 
-	for (i = 0; i < ARRAY_SIZE(intel_arch_events); i++) {
-		if (intel_arch_events[i].eventsel != event_select ||
-		    intel_arch_events[i].unit_mask != unit_mask)
+	for (i = 0; i < PERF_COUNT_HW_MAX; i++) {
+		if (kernel_hw_events[i].eventsel != event_select ||
+		    kernel_hw_events[i].unit_mask != unit_mask)
 			continue;
 
 		/* disable event that reported as not present by cpuid */
-		event_type = intel_arch_events[i].event_type;
+		event_type = kernel_hw_events[i].event_type;
 		if (!test_bit(event_type, pmu->avail_perf_hw_ids))
 			return PERF_COUNT_HW_MAX + 1;
 
@@ -463,8 +457,8 @@ static void setup_fixed_pmc_eventsel(struct kvm_pmu *pmu)
 	for (i = 0; i < pmu->nr_arch_fixed_counters; i++) {
 		pmc = &pmu->fixed_counters[i];
 		event = fixed_pmc_events[array_index_nospec(i, size)];
-		pmc->eventsel = (intel_arch_events[event].unit_mask << 8) |
-			intel_arch_events[event].eventsel;
+		pmc->eventsel = (kernel_hw_events[event].unit_mask << 8) |
+			kernel_hw_events[event].eventsel;
 	}
 }
 
