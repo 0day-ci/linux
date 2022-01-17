@@ -3251,6 +3251,9 @@ int btrfs_relocate_chunk(struct btrfs_fs_info *fs_info, u64 chunk_offset)
 	u64 length;
 	int ret;
 
+	/* Assert we called sb_start_write(), not to race with FS freezing */
+	lockdep_assert_held_read(fs_info->sb->s_writers.rw_sem + SB_FREEZE_WRITE - 1);
+
 	/*
 	 * Prevent races with automatic removal of unused block groups.
 	 * After we relocate and before we remove the chunk with offset
@@ -8306,6 +8309,7 @@ static int relocating_repair_kthread(void *data)
 		return -EBUSY;
 	}
 
+	sb_start_write(fs_info->sb);
 	mutex_lock(&fs_info->reclaim_bgs_lock);
 
 	/* Ensure block group still exists */
@@ -8329,6 +8333,7 @@ out:
 	if (cache)
 		btrfs_put_block_group(cache);
 	mutex_unlock(&fs_info->reclaim_bgs_lock);
+	sb_end_write(fs_info->sb);
 	btrfs_exclop_finish(fs_info);
 
 	return ret;

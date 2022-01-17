@@ -1516,11 +1516,13 @@ void btrfs_reclaim_bgs_work(struct work_struct *work)
 	if (!btrfs_exclop_start(fs_info, BTRFS_EXCLOP_BALANCE))
 		return;
 
+	sb_start_write(fs_info->sb);
 	/*
 	 * Long running balances can keep us blocked here for eternity, so
 	 * simply skip reclaim if we're unable to get the mutex.
 	 */
 	if (!mutex_trylock(&fs_info->reclaim_bgs_lock)) {
+		sb_end_write(fs_info->sb);
 		btrfs_exclop_finish(fs_info);
 		return;
 	}
@@ -1595,6 +1597,7 @@ next:
 	}
 	spin_unlock(&fs_info->unused_bgs_lock);
 	mutex_unlock(&fs_info->reclaim_bgs_lock);
+	sb_end_write(fs_info->sb);
 	btrfs_exclop_finish(fs_info);
 }
 
