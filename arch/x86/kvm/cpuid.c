@@ -661,7 +661,6 @@ static struct kvm_cpuid_entry2 *do_host_cpuid(struct kvm_cpuid_array *array,
 	case 0x17:
 	case 0x18:
 	case 0x1d:
-	case 0x1e:
 	case 0x1f:
 	case 0x8000001d:
 		entry->flags |= KVM_CPUID_FLAG_SIGNIFCANT_INDEX;
@@ -936,21 +935,26 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 		break;
 	/* Intel AMX TILE */
 	case 0x1d:
+		entry->ebx = entry->ecx = entry->edx = 0;
 		if (!kvm_cpu_cap_has(X86_FEATURE_AMX_TILE)) {
-			entry->eax = entry->ebx = entry->ecx = entry->edx = 0;
+			entry->eax = 0;
 			break;
 		}
 
+		entry->eax = min(entry->eax, 1u);
 		for (i = 1, max_idx = entry->eax; i <= max_idx; ++i) {
 			if (!do_host_cpuid(array, function, i))
 				goto out;
 		}
 		break;
-	case 0x1e: /* TMUL information */
+	/* TMUL Information */
+	case 0x1e:
+		entry->eax = entry->ecx = entry->edx = 0;
 		if (!kvm_cpu_cap_has(X86_FEATURE_AMX_TILE)) {
-			entry->eax = entry->ebx = entry->ecx = entry->edx = 0;
+			entry->ebx = 0;
 			break;
 		}
+		entry->ebx &= 0xffffffu;
 		break;
 	case KVM_CPUID_SIGNATURE: {
 		const u32 *sigptr = (const u32 *)KVM_SIGNATURE;
