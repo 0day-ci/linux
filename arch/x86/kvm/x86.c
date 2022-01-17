@@ -1019,7 +1019,11 @@ static int __kvm_set_xcr(struct kvm_vcpu *vcpu, u32 index, u64 xcr)
 
 int kvm_emulate_xsetbv(struct kvm_vcpu *vcpu)
 {
-	if (static_call(kvm_x86_get_cpl)(vcpu) != 0 ||
+	if (!guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) ||
+	    !kvm_read_cr4_bits(vcpu, X86_CR4_OSXSAVE))
+		return kvm_handle_invalid_op(vcpu);
+
+	if ((is_protmode(vcpu) && static_call(kvm_x86_get_cpl)(vcpu) != 0) ||
 	    __kvm_set_xcr(vcpu, kvm_rcx_read(vcpu), kvm_read_edx_eax(vcpu))) {
 		kvm_inject_gp(vcpu, 0);
 		return 1;
