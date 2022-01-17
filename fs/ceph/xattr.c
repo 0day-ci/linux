@@ -918,6 +918,30 @@ static inline int __get_request_mask(struct inode *in) {
 	return mask;
 }
 
+/* check if the entire cluster supports the given feature */
+static inline bool ceph_cluster_has_feature(struct inode *inode, int feature_bit)
+{
+	int64_t i;
+	struct ceph_fs_client *fsc = ceph_inode_to_client(inode);
+	struct ceph_mds_session **sessions = fsc->mdsc->sessions;
+	int64_t num_sessions = atomic_read(&fsc->mdsc->num_sessions);
+
+	if (fsc->mdsc->stopping)
+		return false;
+
+	if (!sessions)
+		return false;
+
+	for (i = 0; i < num_sessions; i++) {
+		struct ceph_mds_session *session = sessions[i];
+		if (!session)
+			return false;
+		if (!test_bit(feature_bit, &session->s_features))
+			return false;
+	}
+	return true;
+}
+
 ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 		      size_t size)
 {
@@ -926,6 +950,15 @@ ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 	struct ceph_vxattr *vxattr = NULL;
 	int req_mask;
 	ssize_t err;
+
+	if (ceph_cluster_has_feature(inode, CEPHFS_FEATURE_GETVXATTR)) {
+		err = ceph_do_getvxattr(inode, name, value, size);
+		/* if cluster doesn't support attribute, we try to service it
+		 * locally
+		 */
+		if (err != -ENODATA)
+			return err;
+	}
 
 	/* let's see if a virtual xattr was requested */
 	vxattr = ceph_match_vxattr(inode, name);
