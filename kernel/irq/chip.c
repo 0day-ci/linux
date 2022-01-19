@@ -1569,15 +1569,30 @@ int irq_chip_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
  */
 int irq_chip_pm_get(struct irq_data *data)
 {
+#if IS_ENABLED(CONFIG_PM)
+	struct device *dev = data->chip->parent_device;
 	int retval;
 
-	if (IS_ENABLED(CONFIG_PM) && data->chip->parent_device) {
-		retval = pm_runtime_get_sync(data->chip->parent_device);
+#if IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY)
+	if (data->parent_data) {
+		retval = irq_chip_pm_get(data->parent_data);
+		if (retval < 0)
+			return retval;
+	}
+#endif
+
+	if (dev) {
+		retval = pm_runtime_get_sync(dev);
 		if (retval < 0) {
-			pm_runtime_put_noidle(data->chip->parent_device);
+			pm_runtime_put_noidle(dev);
+#if IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY)
+			if (data->parent_data)
+				irq_chip_pm_put(data->parent_data);
+#endif
 			return retval;
 		}
 	}
+#endif	/* CONFIG_PM */
 
 	return 0;
 }
@@ -1594,8 +1609,24 @@ int irq_chip_pm_put(struct irq_data *data)
 {
 	int retval = 0;
 
-	if (IS_ENABLED(CONFIG_PM) && data->chip->parent_device)
-		retval = pm_runtime_put(data->chip->parent_device);
+#if IS_ENABLED(CONFIG_PM)
+	do {
+		struct device *dev = data->chip->parent_device;
+		int retval2;
 
-	return (retval < 0) ? retval : 0;
+		if (dev) {
+			retval2 = pm_runtime_put(dev);
+			if (retval == 0 && retval2 < 0)
+				retval = retval2;
+		}
+
+#if IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY)
+		data = data->parent_data;
+#else
+		data = NULL;
+#endif
+	} while (data);
+#endif	/* CONFIG_PM */
+
+	return retval;
 }
