@@ -898,7 +898,7 @@ void validate_coredump_safety(void)
 {
 	if (suid_dumpable == SUID_DUMP_ROOT &&
 	    core_pattern[0] != '/' && core_pattern[0] != '|') {
-		pr_warn(
+		pr_warn_ratelimited(
 "Unsafe core_pattern used with fs.suid_dumpable=2.\n"
 "Pipe handler or fully qualified core dump path required.\n"
 "Set kernel.core_pattern before fs.suid_dumpable.\n"
