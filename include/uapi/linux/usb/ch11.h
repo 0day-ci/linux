@@ -135,6 +135,7 @@ struct usb_port_status {
 #define USB_PORT_STAT_TEST              0x0800
 #define USB_PORT_STAT_INDICATOR         0x1000
 /* bits 13 to 15 are reserved */
+#define USB_PORT_STAT_CSC		0x20000
 
 /*
  * Additions to wPortStatus bit field from USB 3.0

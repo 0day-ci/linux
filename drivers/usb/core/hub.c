@@ -2834,10 +2834,20 @@ static bool hub_port_warm_reset_required(struct usb_hub *hub, int port1,
 		|| link_state == USB_SS_PORT_LS_COMP_MOD;
 }
 
+static void usb_hub_port_power_cycle(struct usb_device *hdev, struct usb_hub *hub, int port1)
+{
+	dev_info(&hub->ports[port1 - 1]->dev, "attempt power cycle\n");
+	usb_hub_set_port_power(hdev, hub, port1, false);
+	msleep(2 * hub_power_on_good_delay(hub));
+	usb_hub_set_port_power(hdev, hub, port1, true);
+	msleep(hub_power_on_good_delay(hub));
+}
+
 static int hub_port_wait_reset(struct usb_hub *hub, int port1,
 			struct usb_device *udev, unsigned int delay, bool warm)
 {
 	int delay_time, ret;
+	struct usb_hcd *hcd = bus_to_hcd(udev->bus);
 	u16 portstatus;
 	u16 portchange;
 	u32 ext_portstatus = 0;
@@ -2887,8 +2897,21 @@ static int hub_port_wait_reset(struct usb_hub *hub, int port1,
 		return -ENOTCONN;
 
 	/* Device went away? */
-	if (!(portstatus & USB_PORT_STAT_CONNECTION))
+	if (!(portstatus & USB_PORT_STAT_CONNECTION)) {
+		/*
+		 * When a FS device is following a suspend-reset-enumeration-data_transfer
+		 * sequence, sometimes it goes back in suspend just after reset without the
+		 * link entering L0. To fix this when CSC bit is set(because of CCS status
+		 * change) power cycle the root hub.
+		 */
+		if (udev->reset_resume && (!udev->parent && hcd->fs_suspend_reset) &&
+				(portstatus & USB_PORT_STAT_CSC)) {
+			usb_hub_port_power_cycle(hdev, hub, port1);
+			return -EAGAIN;
+		}
+
 		return -ENOTCONN;
+	}
 
 	/* Retry if connect change is set but status is still connected.
 	 * A USB 3.0 connection may bounce if multiple warm resets were issued,
@@ -5393,13 +5416,8 @@ loop:
 			break;
 
 		/* When halfway through our retry count, power-cycle the port */
-		if (i == (PORT_INIT_TRIES - 1) / 2) {
-			dev_info(&port_dev->dev, "attempt power cycle\n");
-			usb_hub_set_port_power(hdev, hub, port1, false);
-			msleep(2 * hub_power_on_good_delay(hub));
-			usb_hub_set_port_power(hdev, hub, port1, true);
-			msleep(hub_power_on_good_delay(hub));
-		}
+		if (i == (PORT_INIT_TRIES - 1) / 2)
+			usb_hub_port_power_cycle(hdev, hub, port1);
 	}
 	if (hub->hdev->parent ||
 			!hcd->driver->port_handed_over ||

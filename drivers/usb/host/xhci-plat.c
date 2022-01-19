@@ -342,6 +342,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	hcd->tpl_support = of_usb_host_tpl_support(sysdev->of_node);
 	xhci->shared_hcd->tpl_support = hcd->tpl_support;
 
+	hcd->fs_suspend_reset = of_property_read_bool(sysdev->of_node, "fs-suspend-reset");
+	xhci->shared_hcd->fs_suspend_reset = hcd->fs_suspend_reset;
+
 	if (priv) {
 		ret = xhci_priv_plat_setup(hcd);
 		if (ret)
