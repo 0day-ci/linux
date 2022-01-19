@@ -1690,7 +1690,7 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
 		goto out_workqueue;
 
 #ifdef CONFIG_PM
-	ret = pm_runtime_get_sync(gpu->dev);
+	ret = pm_runtime_resume_and_get(gpu->dev);
 #else
 	ret = etnaviv_gpu_clk_enable(gpu);
 #endif
