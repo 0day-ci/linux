@@ -326,6 +326,34 @@ static void test_not_member_allow_list(struct kvm_vm *vm)
 }
 
 /*
+ * Verify that disabling PMU using KVM_CAP_ENABLE_PMU does not allow PMU.
+ *
+ * After every change to CAP_ENABLE_PMU, SET_CPUID2 is required to refresh
+ * KVM PMU state on existing VCPU.
+ */
+static void test_cap_enable_pmu(struct kvm_vm *vm)
+{
+	int r;
+	struct kvm_cpuid2 *cpuid2;
+	struct kvm_enable_cap cap = { .cap = KVM_CAP_ENABLE_PMU };
+	bool sane;
+
+	r = kvm_check_cap(KVM_CAP_ENABLE_PMU);
+	if (!r)
+		return;
+
+	cpuid2 = vcpu_get_cpuid(vm, VCPU_ID);
+
+	cap.args[0] = 0;
+	r = vm_enable_cap(vm, &cap);
+	vcpu_set_cpuid(vm, VCPU_ID, cpuid2);
+
+	sane = sanity_check_pmu(vm);
+
+	TEST_ASSERT(!sane, "Guest should not see PMU when disabled.");
+}
+
+/*
  * Check for a non-zero PMU version, at least one general-purpose
  * counter per logical processor, an EBX bit vector of length greater
  * than 5, and EBX[5] clear.
@@ -431,6 +459,7 @@ int main(int argc, char *argv[])
 	test_member_allow_list(vm);
 	test_not_member_deny_list(vm);
 	test_not_member_allow_list(vm);
+	test_cap_enable_pmu(vm);
 
 	kvm_vm_free(vm);
 
