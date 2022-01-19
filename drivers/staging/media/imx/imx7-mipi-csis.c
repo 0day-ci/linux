@@ -780,10 +780,14 @@ static int mipi_csis_dump_regs(struct csi_state *state)
 
 	dev_info(state->dev, "--- REGISTERS ---\n");
 
+	pm_runtime_resume_and_get(state->dev);
+
 	for (i = 0; i < ARRAY_SIZE(registers); i++) {
 		cfg = mipi_csis_read(state, registers[i].offset);
 		dev_info(state->dev, "%14s: 0x%08x\n", registers[i].name, cfg);
 	}
+
+	pm_runtime_put(state->dev);
 
 	return 0;
 }
