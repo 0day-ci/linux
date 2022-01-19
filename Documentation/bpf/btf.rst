@@ -565,18 +565,15 @@ A map can be created with ``btf_fd`` and specified key/value type id.::
 In libbpf, the map can be defined with extra annotation like below:
 ::
 
-    struct bpf_map_def SEC("maps") btf_map = {
-        .type = BPF_MAP_TYPE_ARRAY,
-        .key_size = sizeof(int),
-        .value_size = sizeof(struct ipv_counts),
-        .max_entries = 4,
-    };
-    BPF_ANNOTATE_KV_PAIR(btf_map, int, struct ipv_counts);
+    struct {
+        __uint(type, BPF_MAP_TYPE_ARRAY);
+        __type(key, int);
+        __type(value, struct ipv_counts);
+        __uint(max_entries, 4);
+    } btf_map SEC(".maps");
 
-Here, the parameters for macro BPF_ANNOTATE_KV_PAIR are map name, key and
-value types for the map. During ELF parsing, libbpf is able to extract
-key/value type_id's and assign them to BPF_MAP_CREATE attributes
-automatically.
+During ELF parsing, libbpf is able to extract key/value type_id's and assign
+them to BPF_MAP_CREATE attributes automatically.
 
 .. _BPF_Prog_Load:
 
