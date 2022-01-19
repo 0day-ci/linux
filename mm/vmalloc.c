@@ -793,6 +793,9 @@ RB_DECLARE_CALLBACKS_MAX(static, free_vmap_area_rb_augment_cb,
 static void purge_vmap_area_lazy(void);
 static BLOCKING_NOTIFIER_HEAD(vmap_notify_list);
 static unsigned long lazy_max_pages(void);
+static void drain_vmap_area(struct work_struct *work);
+static DECLARE_WORK(drain_vmap_area_work, drain_vmap_area);
+static atomic_t drain_vmap_area_work_in_progress;
 
 static atomic_long_t nr_vmalloc_pages;
 
@@ -1720,18 +1723,6 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 }
 
 /*
- * Kick off a purge of the outstanding lazy areas. Don't bother if somebody
- * is already purging.
- */
-static void try_purge_vmap_area_lazy(void)
-{
-	if (mutex_trylock(&vmap_purge_lock)) {
-		__purge_vmap_area_lazy(ULONG_MAX, 0);
-		mutex_unlock(&vmap_purge_lock);
-	}
-}
-
-/*
  * Kick off a purge of the outstanding lazy areas.
  */
 static void purge_vmap_area_lazy(void)
@@ -1740,6 +1731,23 @@ static void purge_vmap_area_lazy(void)
 	purge_fragmented_blocks_allcpus();
 	__purge_vmap_area_lazy(ULONG_MAX, 0);
 	mutex_unlock(&vmap_purge_lock);
+}
+
+static void drain_vmap_area(struct work_struct *work)
+{
+	unsigned long nr_lazy;
+
+	do {
+		mutex_lock(&vmap_purge_lock);
+		__purge_vmap_area_lazy(ULONG_MAX, 0);
+		mutex_unlock(&vmap_purge_lock);
+
+		/* Recheck if further work is required. */
+		nr_lazy = atomic_long_read(&vmap_lazy_nr);
+	} while (nr_lazy > lazy_max_pages());
+
+	/* We are done at this point. */
+	atomic_set(&drain_vmap_area_work_in_progress, 0);
 }
 
 /*
@@ -1768,7 +1776,8 @@ static void free_vmap_area_noflush(struct vmap_area *va)
 
 	/* After this point, we may free va at any time */
 	if (unlikely(nr_lazy > lazy_max_pages()))
-		try_purge_vmap_area_lazy();
+		if (!atomic_xchg(&drain_vmap_area_work_in_progress, 1))
+			schedule_work(&drain_vmap_area_work);
 }
 
 /*
