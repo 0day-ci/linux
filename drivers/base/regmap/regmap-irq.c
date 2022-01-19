@@ -184,16 +184,18 @@ static void regmap_irq_sync_unlock(struct irq_data *data)
 
 			/* some chips ack by write 0 */
 			if (d->chip->ack_invert)
-				ret = regmap_write(map, reg, ~d->mask_buf[i]);
+				ret = regmap_irq_update_bits(d, reg,
+						d->mask_buf[i], 0x00);
 			else
-				ret = regmap_write(map, reg, d->mask_buf[i]);
+				ret = regmap_irq_update_bits(d, reg,
+						d->mask_buf[i], d->mask_buf[i]);
 			if (d->chip->clear_ack) {
 				if (d->chip->ack_invert && !ret)
-					ret = regmap_write(map, reg,
-							   d->mask_buf[i]);
+					ret = regmap_irq_update_bits(d, reg,
+						d->mask_buf[i], d->mask_buf[i]);
 				else if (!ret)
-					ret = regmap_write(map, reg,
-							   ~d->mask_buf[i]);
+					ret = regmap_irq_update_bits(d, reg,
+						d->mask_buf[i], 0x00);
 			}
 			if (ret != 0)
 				dev_err(d->map->dev, "Failed to ack 0x%x: %d\n",
@@ -549,18 +551,20 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 			reg = sub_irq_reg(data, data->chip->ack_base, i);
 
 			if (chip->ack_invert)
-				ret = regmap_write(map, reg,
-						~data->status_buf[i]);
+				ret = regmap_irq_update_bits(d, reg,
+						data->status_buf[i], 0x00);
 			else
-				ret = regmap_write(map, reg,
+				ret = regmap_irq_update_bits(d, reg,
+						data->status_buf[i],
 						data->status_buf[i]);
 			if (chip->clear_ack) {
 				if (chip->ack_invert && !ret)
-					ret = regmap_write(map, reg,
-							data->status_buf[i]);
+					ret = regmap_irq_update_bits(d, reg,
+						data->status_buf[i],
+						data->status_buf[i]);
 				else if (!ret)
-					ret = regmap_write(map, reg,
-							~data->status_buf[i]);
+					ret = regmap_irq_update_bits(d, reg,
+						data->status_buf[i], 0x00);
 			}
 			if (ret != 0)
 				dev_err(map->dev, "Failed to ack 0x%x: %d\n",
@@ -810,20 +814,22 @@ int regmap_add_irq_chip_fwnode(struct fwnode_handle *fwnode,
 		if (d->status_buf[i] && (chip->ack_base || chip->use_ack)) {
 			reg = sub_irq_reg(d, d->chip->ack_base, i);
 			if (chip->ack_invert)
-				ret = regmap_write(map, reg,
-					~(d->status_buf[i] & d->mask_buf[i]));
+				ret = regmap_irq_update_bits(d, reg,
+					(d->status_buf[i] & d->mask_buf[i]),
+					0x00);
 			else
-				ret = regmap_write(map, reg,
-					d->status_buf[i] & d->mask_buf[i]);
+				ret = regmap_irq_update_bits(d, reg,
+					(d->status_buf[i] & d->mask_buf[i]),
+					(d->status_buf[i] & d->mask_buf[i]));
 			if (chip->clear_ack) {
 				if (chip->ack_invert && !ret)
-					ret = regmap_write(map, reg,
-						(d->status_buf[i] &
-						 d->mask_buf[i]));
+					ret = regmap_irq_update_bits(d, reg,
+					(d->status_buf[i] & d->mask_buf[i]),
+					(d->status_buf[i] & d->mask_buf[i]));
 				else if (!ret)
-					ret = regmap_write(map, reg,
-						~(d->status_buf[i] &
-						  d->mask_buf[i]));
+					ret = regmap_irq_update_bits(d, reg,
+					(d->status_buf[i] & d->mask_buf[i]),
+					0x00);
 			}
 			if (ret != 0) {
 				dev_err(map->dev, "Failed to ack 0x%x: %d\n",
