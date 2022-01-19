@@ -2273,7 +2273,8 @@ static const struct bdb_header *get_bdb_header(const struct vbt_header *vbt)
  *
  * Returns true on valid VBT.
  */
-bool intel_bios_is_valid_vbt(const void *buf, size_t size)
+bool intel_bios_is_valid_vbt(struct drm_i915_private *dev_priv,
+			     const void *buf, size_t size)
 {
 	const struct vbt_header *vbt = buf;
 	const struct bdb_header *bdb;
@@ -2296,15 +2297,16 @@ bool intel_bios_is_valid_vbt(const void *buf, size_t size)
 		return false;
 	}
 
-	size = vbt->vbt_size;
-
 	if (range_overflows_t(size_t,
 			      vbt->bdb_offset,
 			      sizeof(struct bdb_header),
-			      size)) {
+			      vbt->vbt_size)) {
 		DRM_DEBUG_DRIVER("BDB header incomplete\n");
 		return false;
 	}
+
+	if (!(dev_priv->quirks & QUIRK_USE_FW_SIZE_AS_VBT_SIZE))
+		size = vbt->vbt_size;
 
 	bdb = get_bdb_header(vbt);
 	if (range_overflows_t(size_t, vbt->bdb_offset, bdb->bdb_size, size)) {
@@ -2359,7 +2361,7 @@ static struct vbt_header *spi_oprom_get_vbt(struct drm_i915_private *i915)
 		*(vbt + store++) = data;
 	}
 
-	if (!intel_bios_is_valid_vbt(vbt, vbt_size))
+	if (!intel_bios_is_valid_vbt(i915, vbt, vbt_size))
 		goto err_free_vbt;
 
 	drm_dbg_kms(&i915->drm, "Found valid VBT in SPI flash\n");
@@ -2416,7 +2418,7 @@ static struct vbt_header *oprom_get_vbt(struct drm_i915_private *i915)
 
 	memcpy_fromio(vbt, p, vbt_size);
 
-	if (!intel_bios_is_valid_vbt(vbt, vbt_size))
+	if (!intel_bios_is_valid_vbt(i915, vbt, vbt_size))
 		goto err_free_vbt;
 
 	pci_unmap_rom(pdev, oprom);

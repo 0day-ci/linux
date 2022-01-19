@@ -133,6 +133,36 @@ static const struct intel_dmi_quirk intel_dmi_quirks[] = {
 	},
 };
 
+static void quirk_opregion_use_fw_size_as_vbt_size(struct drm_i915_private *i915)
+{
+	i915->quirks |= QUIRK_USE_FW_SIZE_AS_VBT_SIZE;
+	drm_info(&i915->drm, "Applying FW size as VBT size quirk in OpRegion\n");
+}
+
+static int intel_dmi_opregion_use_fw_size_as_vbt_size(const struct dmi_system_id *id)
+{
+	DRM_INFO("Use FW size as VBT size on %s in OpRegion\n", id->ident);
+	return 1;
+}
+
+static const struct intel_dmi_quirk intel_dmi_opregion_quirks[] = {
+	{
+		.dmi_id_list = &(const struct dmi_system_id[]) {
+			{
+				.callback = intel_dmi_opregion_use_fw_size_as_vbt_size,
+				.ident = "LG Gram 17Z95P-K.ADE9U1",
+				.matches = {DMI_EXACT_MATCH(DMI_SYS_VENDOR, "LG Electronics"),
+					    DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "17Z95P-K.ADE9U1"),
+					    DMI_EXACT_MATCH(DMI_BIOS_VERSION, "T4ZF0040 X64"),
+					    DMI_EXACT_MATCH(DMI_BIOS_DATE, "10/06/2021"),
+				},
+			},
+			{ }
+		},
+		.hook = quirk_opregion_use_fw_size_as_vbt_size,
+	},
+};
+
 static struct intel_quirk intel_quirks[] = {
 	/* Lenovo U160 cannot use SSC on LVDS */
 	{ 0x0046, 0x17aa, 0x3920, quirk_ssc_force_disable },
@@ -211,5 +241,15 @@ void intel_init_quirks(struct drm_i915_private *i915)
 	for (i = 0; i < ARRAY_SIZE(intel_dmi_quirks); i++) {
 		if (dmi_check_system(*intel_dmi_quirks[i].dmi_id_list) != 0)
 			intel_dmi_quirks[i].hook(i915);
+	}
+}
+
+void intel_init_opregion_quirks(struct drm_i915_private *i915)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(intel_dmi_opregion_quirks); i++) {
+		if (dmi_check_system(*intel_dmi_opregion_quirks[i].dmi_id_list) != 0)
+			intel_dmi_opregion_quirks[i].hook(i915);
 	}
 }
