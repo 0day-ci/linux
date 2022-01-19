@@ -1520,7 +1520,7 @@ unsigned long vm_compute_max_gfn(struct kvm_vm *vm)
 {
 	const unsigned long num_ht_pages = 12 << (30 - vm->page_shift); /* 12 GiB */
 	unsigned long ht_gfn, max_gfn, max_pfn;
-	uint32_t eax, ebx, ecx, edx, max_ext_leaf;
+	uint32_t eax, ebx, ecx = 0, edx, max_ext_leaf;
 
 	max_gfn = (1ULL << (vm->pa_bits - vm->page_shift)) - 1;
 
