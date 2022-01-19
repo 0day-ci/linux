@@ -36,6 +36,7 @@
 #include "intel_display_types.h"
 #include "intel_opregion.h"
 #include "intel_pci_config.h"
+#include "intel_quirks.h"
 
 #define OPREGION_HEADER_OFFSET 0
 #define OPREGION_ACPI_OFFSET   0x100
@@ -817,7 +818,7 @@ static int intel_load_vbt_firmware(struct drm_i915_private *dev_priv)
 		return ret;
 	}
 
-	if (intel_bios_is_valid_vbt(fw->data, fw->size)) {
+	if (intel_bios_is_valid_vbt(dev_priv, fw->data, fw->size)) {
 		opregion->vbt_firmware = kmemdup(fw->data, fw->size, GFP_KERNEL);
 		if (opregion->vbt_firmware) {
 			drm_dbg_kms(&dev_priv->drm,
@@ -922,6 +923,8 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	if (dmi_check_system(intel_no_opregion_vbt))
 		goto out;
 
+	intel_init_opregion_quirks(dev_priv);
+
 	if (opregion->header->over.major >= 2 && opregion->asle &&
 	    opregion->asle->rvda && opregion->asle->rvds) {
 		resource_size_t rvda = opregion->asle->rvda;
@@ -944,7 +947,7 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 
 		vbt = opregion->rvda;
 		vbt_size = opregion->asle->rvds;
-		if (intel_bios_is_valid_vbt(vbt, vbt_size)) {
+		if (intel_bios_is_valid_vbt(dev_priv, vbt, vbt_size)) {
 			drm_dbg_kms(&dev_priv->drm,
 				    "Found valid VBT in ACPI OpRegion (RVDA)\n");
 			opregion->vbt = vbt;
@@ -969,7 +972,7 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	vbt_size = (mboxes & MBOX_ASLE_EXT) ?
 		OPREGION_ASLE_EXT_OFFSET : OPREGION_SIZE;
 	vbt_size -= OPREGION_VBT_OFFSET;
-	if (intel_bios_is_valid_vbt(vbt, vbt_size)) {
+	if (intel_bios_is_valid_vbt(dev_priv, vbt, vbt_size)) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "Found valid VBT in ACPI OpRegion (Mailbox #4)\n");
 		opregion->vbt = vbt;
