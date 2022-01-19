@@ -5018,6 +5018,16 @@ union bpf_attr {
  *
  *	Return
  *		The number of arguments of the traced function.
+ *
+ * long bpf_access_process_vm(void *dst, u32 size, const void *unsafe_ptr, struct task_struct *tsk, u32 flags)
+ *	Description
+ *		Read *size* bytes from user space address *unsafe_ptr* in *tsk*'s
+ *		address space, and stores the data in *dst*. *flags* is not
+ *		used yet and is provided for future extensibility. This is a
+ *		wrapper of **access_process_vm**\ ().
+ *	Return
+ *		The number of bytes written to the buffer, or a negative error
+ *		in case of failure.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5206,6 +5216,7 @@ union bpf_attr {
 	FN(get_func_arg),		\
 	FN(get_func_ret),		\
 	FN(get_func_arg_cnt),		\
+	FN(access_process_vm),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
