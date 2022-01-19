@@ -1428,7 +1428,7 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 		if (err)
 			goto err_active;
 
-		if (i915_is_ggtt(vma->vm))
+		if (i915_is_ggtt(vma->vm) && flags & PIN_MAPPABLE)
 			__i915_vma_set_map_and_fenceable(vma);
 	}
 
