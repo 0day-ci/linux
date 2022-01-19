@@ -700,8 +700,10 @@ static int pcf2127_probe(struct device *dev, struct regmap *regmap,
 	if (!(val & PCF2127_BIT_CLKOUT_OTPR)) {
 		ret = regmap_set_bits(pcf2127->regmap, PCF2127_REG_CLKOUT,
 				      PCF2127_BIT_CLKOUT_OTPR);
-		if (ret < 0)
+		if (ret < 0) {
+			dev_err(dev, "writing to CLKOUT register failed\n");
 			return ret;
+		}
 
 		msleep(100);
 	}
