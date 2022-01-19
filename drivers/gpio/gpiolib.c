@@ -1067,14 +1067,6 @@ static int gpiochip_hierarchy_irq_domain_alloc(struct irq_domain *d,
 
 	chip_dbg(gc, "allocate IRQ %d, hwirq %lu\n", irq,  hwirq);
 
-	ret = girq->child_to_parent_hwirq(gc, hwirq, type,
-					  &parent_hwirq, &parent_type);
-	if (ret) {
-		chip_err(gc, "can't look up hwirq %lu\n", hwirq);
-		return ret;
-	}
-	chip_dbg(gc, "found parent hwirq %u\n", parent_hwirq);
-
 	/*
 	 * We set handle_bad_irq because the .set_type() should
 	 * always be invoked and set the right type of handler.
@@ -1088,27 +1080,40 @@ static int gpiochip_hierarchy_irq_domain_alloc(struct irq_domain *d,
 			    NULL, NULL);
 	irq_set_probe(irq);
 
-	/* This parent only handles asserted level IRQs */
-	parent_arg = girq->populate_parent_alloc_arg(gc, parent_hwirq, parent_type);
-	if (!parent_arg)
-		return -ENOMEM;
-
-	chip_dbg(gc, "alloc_irqs_parent for %d parent hwirq %d\n",
-		  irq, parent_hwirq);
 	irq_set_lockdep_class(irq, gc->irq.lock_key, gc->irq.request_key);
-	ret = irq_domain_alloc_irqs_parent(d, irq, 1, parent_arg);
-	/*
-	 * If the parent irqdomain is msi, the interrupts have already
-	 * been allocated, so the EEXIST is good.
-	 */
-	if (irq_domain_is_msi(d->parent) && (ret == -EEXIST))
-		ret = 0;
-	if (ret)
-		chip_err(gc,
-			 "failed to allocate parent hwirq %d for hwirq %lu\n",
-			 parent_hwirq, hwirq);
 
-	kfree(parent_arg);
+	if (d->parent) {
+		ret = girq->child_to_parent_hwirq(gc, hwirq, type,
+						  &parent_hwirq, &parent_type);
+		if (ret) {
+			chip_err(gc, "can't look up hwirq %lu\n", hwirq);
+			return ret;
+		}
+		chip_dbg(gc, "found parent hwirq %u\n", parent_hwirq);
+
+		/* This parent only handles asserted level IRQs */
+		parent_arg = girq->populate_parent_alloc_arg(gc, parent_hwirq,
+							     parent_type);
+		if (!parent_arg)
+			return -ENOMEM;
+
+		chip_dbg(gc, "alloc_irqs_parent for %d parent hwirq %d\n",
+			  irq, parent_hwirq);
+		ret = irq_domain_alloc_irqs_parent(d, irq, 1, parent_arg);
+		/*
+		 * If the parent irqdomain is msi, the interrupts have already
+		 * been allocated, so the EEXIST is good.
+		 */
+		if (irq_domain_is_msi(d->parent) && (ret == -EEXIST))
+			ret = 0;
+		if (ret)
+			chip_err(gc,
+				 "failed to allocate parent hwirq %d for hwirq %lu\n",
+				 parent_hwirq, hwirq);
+
+		kfree(parent_arg);
+	}
+
 	return ret;
 }
 
@@ -1136,8 +1141,8 @@ static void gpiochip_hierarchy_setup_domain_ops(struct irq_domain_ops *ops)
 
 static int gpiochip_hierarchy_add_domain(struct gpio_chip *gc)
 {
-	if (!gc->irq.child_to_parent_hwirq ||
-	    !gc->irq.fwnode) {
+	if (gc->irq.parent_domain &&
+	    (!gc->irq.child_to_parent_hwirq || !gc->irq.fwnode)) {
 		chip_err(gc, "missing irqdomain vital data\n");
 		return -EINVAL;
 	}
@@ -1151,25 +1156,41 @@ static int gpiochip_hierarchy_add_domain(struct gpio_chip *gc)
 
 	gpiochip_hierarchy_setup_domain_ops(&gc->irq.child_irq_domain_ops);
 
-	gc->irq.domain = irq_domain_create_hierarchy(
-		gc->irq.parent_domain,
-		0,
-		gc->ngpio,
-		gc->irq.fwnode,
-		&gc->irq.child_irq_domain_ops,
-		gc);
+	if (gc->irq.parent_domain) {
+		gc->irq.domain = irq_domain_create_hierarchy(
+			gc->irq.parent_domain,
+			0,
+			gc->ngpio,
+			gc->irq.fwnode,
+			&gc->irq.child_irq_domain_ops,
+			gc);
+
+		if (gc->irq.domain)
+			gpiochip_set_hierarchical_irqchip(gc, gc->irq.chip);
+	} else {
+		gc->irq.domain = irq_domain_create_linear(
+			gc->irq.fwnode ?: dev_fwnode(&gc->gpiodev->dev),
+			gc->ngpio,
+			&gc->irq.child_irq_domain_ops,
+			gc);
+	}
 
 	if (!gc->irq.domain)
 		return -ENOMEM;
-
-	gpiochip_set_hierarchical_irqchip(gc, gc->irq.chip);
 
 	return 0;
 }
 
 static bool gpiochip_hierarchy_is_hierarchical(struct gpio_chip *gc)
 {
-	return !!gc->irq.parent_domain;
+	if (gc->irq.parent_domain)
+		return true;	/* will add to existing hierarchy */
+
+	if (!gc->irq.first && !gc->irq.domain_ops &&
+	    (gc->irq.fwnode || dev_fwnode(&gc->gpiodev->dev)))
+		return true;	/* will create hierarchy bottom */
+
+	return false;
 }
 
 void *gpiochip_populate_parent_fwspec_twocell(struct gpio_chip *gc,
