@@ -617,4 +617,22 @@ config MCHP_EIC
 	help
 	  Support for Microchip External Interrupt Controller.
 
+config IRQ_TYPE_CHANGER
+	bool "Interrupt trigger type changer"
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_HIERARCHY
+	help
+	  Interrupt trigger type changer is designed to support boards that
+	  modify (e.g. invert) signal between interrupt source and interrupt
+	  controller input. So trigger type configured by a driver for some
+	  interrupt output pin does not match trigger type that shall be used
+	  to configure interrupt controller's input where that pin is connected.
+
+	  In this case, board device tree shall add an interrupt trigger
+	  type changer node and use it as the interrupt parent for the node
+	  representing interrupt source. Then, interrupt trigger type defined
+	  in the interrupt source node will be visible for the interrupt source
+	  driver, and (different) trigger type defined inside the changer node
+	  will be used to configure the interrupt controller.
+
 endmenu
