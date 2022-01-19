@@ -101,10 +101,10 @@ Get a decent editor and don't leave whitespace at the end of lines.
 Coding style is all about readability and maintainability using commonly
 available tools.
 
-The preferred limit on the length of a single line is 80 columns.
+The preferred limit on the length of a single line is 100 columns.
 
-Statements longer than 80 columns should be broken into sensible chunks,
-unless exceeding 80 columns significantly increases readability and does
+Statements longer than 100 columns should be broken into sensible chunks,
+unless exceeding 100 columns significantly increases readability and does
 not hide information.
 
 Descendants are always substantially shorter than the parent and
