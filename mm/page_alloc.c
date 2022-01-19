@@ -9021,7 +9021,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	 * put back to page allocator so that buddy can use them.
 	 */
 
-	ret = start_isolate_page_range(pfn_max_align_down(start),
+	ret = start_isolate_page_range(start, end, pfn_max_align_down(start),
 				       pfn_max_align_up(end), migratetype, 0);
 	if (ret)
 		return ret;

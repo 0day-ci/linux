@@ -42,6 +42,7 @@ int move_freepages_block(struct zone *zone, struct page *page,
  */
 int
 start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
+			 unsigned long isolate_start, unsigned long isolate_end,
 			 unsigned migratetype, int flags);
 
 /*
