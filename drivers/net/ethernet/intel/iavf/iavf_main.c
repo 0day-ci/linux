@@ -16,6 +16,7 @@ static int iavf_setup_all_rx_resources(struct iavf_adapter *adapter);
 static int iavf_close(struct net_device *netdev);
 static void iavf_init_get_resources(struct iavf_adapter *adapter);
 static int iavf_check_reset_complete(struct iavf_hw *hw);
+static void iavf_handle_hw_reset(struct iavf_adapter *adapter);
 
 char iavf_driver_name[] = "iavf";
 static const char iavf_driver_string[] =
@@ -167,11 +168,8 @@ int iavf_lock_timeout(struct mutex *lock, unsigned int msecs)
  **/
 void iavf_schedule_reset(struct iavf_adapter *adapter)
 {
-	if (!(adapter->flags &
-	      (IAVF_FLAG_RESET_PENDING | IAVF_FLAG_RESET_NEEDED))) {
-		adapter->flags |= IAVF_FLAG_RESET_NEEDED;
-		queue_work(iavf_wq, &adapter->reset_task);
-	}
+	adapter->flags |= IAVF_FLAG_RESET_NEEDED;
+	mod_delayed_work(iavf_wq, &adapter->watchdog_task, 0);
 }
 
 /**
@@ -2457,8 +2455,11 @@ static void iavf_watchdog_task(struct work_struct *work)
 				   msecs_to_jiffies(10));
 		return;
 	case __IAVF_RESETTING:
+		iavf_handle_hw_reset(adapter);
 		mutex_unlock(&adapter->crit_lock);
-		queue_delayed_work(iavf_wq, &adapter->watchdog_task, HZ * 2);
+		queue_delayed_work(iavf_wq,
+				   &adapter->watchdog_task,
+				   msecs_to_jiffies(2));
 		return;
 	case __IAVF_DOWN:
 	case __IAVF_DOWN_PENDING:
@@ -2493,14 +2494,12 @@ static void iavf_watchdog_task(struct work_struct *work)
 	/* check for hw reset */
 	reg_val = rd32(hw, IAVF_VF_ARQLEN1) & IAVF_VF_ARQLEN1_ARQENABLE_MASK;
 	if (!reg_val) {
-		adapter->flags |= IAVF_FLAG_RESET_PENDING;
+		iavf_schedule_reset(adapter);
 		adapter->aq_required = 0;
 		adapter->current_op = VIRTCHNL_OP_UNKNOWN;
 		dev_err(&adapter->pdev->dev, "Hardware reset detected\n");
-		queue_work(iavf_wq, &adapter->reset_task);
 		mutex_unlock(&adapter->crit_lock);
-		queue_delayed_work(iavf_wq,
-				   &adapter->watchdog_task, HZ * 2);
+		queue_work(iavf_wq, &adapter->watchdog_task.work);
 		return;
 	}
 
@@ -2577,18 +2576,15 @@ static void iavf_disable_vf(struct iavf_adapter *adapter)
 }
 
 /**
- * iavf_reset_task - Call-back task to handle hardware reset
- * @work: pointer to work_struct
+ * iavf_handle_hw_reset - Handle hardware reset
+ * @adapter: pointer to iavf_adapter
  *
  * During reset we need to shut down and reinitialize the admin queue
  * before we can use it to communicate with the PF again. We also clear
  * and reinit the rings because that context is lost as well.
  **/
-static void iavf_reset_task(struct work_struct *work)
+static void iavf_handle_hw_reset(struct iavf_adapter *adapter)
 {
-	struct iavf_adapter *adapter = container_of(work,
-						      struct iavf_adapter,
-						      reset_task);
 	struct virtchnl_vf_resource *vfres = adapter->vf_res;
 	struct net_device *netdev = adapter->netdev;
 	struct iavf_hw *hw = &adapter->hw;
@@ -2598,18 +2594,9 @@ static void iavf_reset_task(struct work_struct *work)
 	int i = 0, err;
 	bool running;
 
-	/* When device is being removed it doesn't make sense to run the reset
-	 * task, just return in such a case.
-	 */
-	if (mutex_is_locked(&adapter->remove_lock))
-		return;
+	adapter->flags |= IAVF_FLAG_RESET_PENDING;
+	adapter->flags &= ~IAVF_FLAG_RESET_NEEDED;
 
-	if (iavf_lock_timeout(&adapter->crit_lock, 200)) {
-		schedule_work(&adapter->reset_task);
-		return;
-	}
-	while (!mutex_trylock(&adapter->client_lock))
-		usleep_range(500, 1000);
 	if (CLIENT_ENABLED(adapter)) {
 		adapter->flags &= ~(IAVF_FLAG_CLIENT_NEEDS_OPEN |
 				    IAVF_FLAG_CLIENT_NEEDS_CLOSE |
@@ -2618,17 +2605,14 @@ static void iavf_reset_task(struct work_struct *work)
 		cancel_delayed_work_sync(&adapter->client_task);
 		iavf_notify_client_close(&adapter->vsi, true);
 	}
+
+	/* Restart the AQ here. If we have been reset but didn't
+	 * detect it, or if the PF had to reinit, our AQ will be hosed.
+	 */
 	iavf_misc_irq_disable(adapter);
-	if (adapter->flags & IAVF_FLAG_RESET_NEEDED) {
-		adapter->flags &= ~IAVF_FLAG_RESET_NEEDED;
-		/* Restart the AQ here. If we have been reset but didn't
-		 * detect it, or if the PF had to reinit, our AQ will be hosed.
-		 */
-		iavf_shutdown_adminq(hw);
-		iavf_init_adminq(hw);
-		iavf_request_reset(adapter);
-	}
-	adapter->flags |= IAVF_FLAG_RESET_PENDING;
+	iavf_shutdown_adminq(hw);
+	iavf_init_adminq(hw);
+	iavf_request_reset(adapter);
 
 	/* poll until we see the reset actually happen */
 	for (i = 0; i < IAVF_RESET_WAIT_DETECTED_COUNT; i++) {
@@ -2757,8 +2741,6 @@ continue_reset:
 	adapter->aq_required |= IAVF_FLAG_AQ_ADD_CLOUD_FILTER;
 	iavf_misc_irq_enable(adapter);
 
-	mod_delayed_work(iavf_wq, &adapter->watchdog_task, 2);
-
 	/* We were running when the reset started, so we need to restore some
 	 * state here.
 	 */
@@ -2794,12 +2776,9 @@ continue_reset:
 		wake_up(&adapter->down_waitqueue);
 	}
 	mutex_unlock(&adapter->client_lock);
-	mutex_unlock(&adapter->crit_lock);
-
 	return;
 reset_err:
 	mutex_unlock(&adapter->client_lock);
-	mutex_unlock(&adapter->crit_lock);
 	if (running) {
 		iavf_change_state(adapter, __IAVF_RUNNING);
 		netdev->flags |= IFF_UP;
@@ -3853,8 +3832,7 @@ static int iavf_change_mtu(struct net_device *netdev, int new_mtu)
 		iavf_notify_client_l2_params(&adapter->vsi);
 		adapter->flags |= IAVF_FLAG_SERVICE_CLIENT_REQUESTED;
 	}
-	adapter->flags |= IAVF_FLAG_RESET_NEEDED;
-	queue_work(iavf_wq, &adapter->reset_task);
+	iavf_schedule_reset(adapter);
 
 	return 0;
 }
@@ -4446,7 +4424,6 @@ static int iavf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	INIT_LIST_HEAD(&adapter->fdir_list_head);
 	INIT_LIST_HEAD(&adapter->adv_rss_list_head);
 
-	INIT_WORK(&adapter->reset_task, iavf_reset_task);
 	INIT_WORK(&adapter->adminq_task, iavf_adminq_task);
 	INIT_DELAYED_WORK(&adapter->watchdog_task, iavf_watchdog_task);
 	INIT_DELAYED_WORK(&adapter->client_task, iavf_client_task);
@@ -4528,8 +4505,7 @@ static int __maybe_unused iavf_resume(struct device *dev_d)
 		return err;
 	}
 
-	queue_work(iavf_wq, &adapter->reset_task);
-
+	iavf_schedule_reset(adapter);
 	netif_device_attach(adapter->netdev);
 
 	return err;
@@ -4558,7 +4534,6 @@ static void iavf_remove(struct pci_dev *pdev)
 	int err;
 	/* Indicate we are in remove and not to run reset_task */
 	mutex_lock(&adapter->remove_lock);
-	cancel_work_sync(&adapter->reset_task);
 	cancel_delayed_work_sync(&adapter->watchdog_task);
 	cancel_delayed_work_sync(&adapter->client_task);
 	if (adapter->netdev_registered) {

@@ -1899,8 +1899,8 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 			dev_info(&adapter->pdev->dev, "Reset indication received from the PF\n");
 			if (!(adapter->flags & IAVF_FLAG_RESET_PENDING)) {
 				adapter->flags |= IAVF_FLAG_RESET_PENDING;
-				dev_info(&adapter->pdev->dev, "Scheduling reset task\n");
-				queue_work(iavf_wq, &adapter->reset_task);
+				dev_info(&adapter->pdev->dev, "Scheduling reset\n");
+				iavf_schedule_reset(adapter);
 			}
 			break;
 		default:
