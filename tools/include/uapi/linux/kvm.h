@@ -1132,6 +1132,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_ARM_MTE 205
 #define KVM_CAP_VM_MOVE_ENC_CONTEXT_FROM 206
 #define KVM_CAP_XSAVE2 207
+#define KVM_CAP_ENABLE_PMU 209
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
