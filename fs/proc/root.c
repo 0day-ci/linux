@@ -35,18 +35,22 @@ struct proc_fs_context {
 	enum proc_hidepid	hidepid;
 	int			gid;
 	enum proc_pidonly	pidonly;
+	struct proc_lookup_list	*lookup_list;
+	unsigned int		lookup_list_len;
 };
 
 enum proc_param {
 	Opt_gid,
 	Opt_hidepid,
 	Opt_subset,
+	Opt_lookup,
 };
 
 static const struct fs_parameter_spec proc_fs_parameters[] = {
 	fsparam_u32("gid",	Opt_gid),
 	fsparam_string("hidepid",	Opt_hidepid),
 	fsparam_string("subset",	Opt_subset),
+	fsparam_string("lookup",	Opt_lookup),
 	{}
 };
 
@@ -112,6 +116,65 @@ static int proc_parse_subset_param(struct fs_context *fc, char *value)
 	return 0;
 }
 
+static int proc_parse_lookup_param(struct fs_context *fc, char *str0)
+{
+	struct proc_fs_context *ctx = fc->fs_private;
+	struct proc_lookup_list *ll;
+	char *str;
+	const char *slash;
+	const char *src;
+	unsigned int len;
+	int rv;
+
+	/* Force trailing slash, simplify loops below. */
+	len = strlen(str0);
+	if (len > 0 && str0[len - 1] == '/') {
+		str = str0;
+	} else {
+		str = kmalloc(len + 2, GFP_KERNEL);
+		if (!str) {
+			rv = -ENOMEM;
+			goto out;
+		}
+		memcpy(str, str0, len);
+		str[len] = '/';
+		str[len + 1] = '\0';
+	}
+
+	len = 0;
+	for (src = str; (slash = strchr(src, '/')); src = slash + 1) {
+		if (slash - src >= 256) {
+			rv = -EINVAL;
+			goto out_free_str;
+		}
+		len += 1 + (slash - src);
+	}
+	len += 1;
+
+	ctx->lookup_list = ll = kmalloc(len, GFP_KERNEL);
+	ctx->lookup_list_len = len;
+	if (!ll) {
+		rv = -ENOMEM;
+		goto out_free_str;
+	}
+
+	for (src = str; (slash = strchr(src, '/')); src = slash + 1) {
+		ll->len = slash - src;
+		memcpy(ll->str, src, ll->len);
+		ll = lookup_list_next(ll);
+	}
+	ll->len = 0;
+
+	rv = 0;
+
+out_free_str:
+	if (str != str0) {
+		kfree(str);
+	}
+out:
+	return rv;
+}
+
 static int proc_parse_param(struct fs_context *fc, struct fs_parameter *param)
 {
 	struct proc_fs_context *ctx = fc->fs_private;
@@ -137,6 +200,11 @@ static int proc_parse_param(struct fs_context *fc, struct fs_parameter *param)
 			return -EINVAL;
 		break;
 
+	case Opt_lookup:
+		if (proc_parse_lookup_param(fc, param->string) < 0)
+			return -EINVAL;
+		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -157,6 +225,10 @@ static void proc_apply_options(struct proc_fs_info *fs_info,
 		fs_info->hide_pid = ctx->hidepid;
 	if (ctx->mask & (1 << Opt_subset))
 		fs_info->pidonly = ctx->pidonly;
+	if (ctx->mask & (1 << Opt_lookup)) {
+		fs_info->lookup_list = ctx->lookup_list;
+		ctx->lookup_list = NULL;
+	}
 }
 
 static int proc_fill_super(struct super_block *s, struct fs_context *fc)
@@ -218,6 +290,14 @@ static int proc_reconfigure(struct fs_context *fc)
 	struct super_block *sb = fc->root->d_sb;
 	struct proc_fs_info *fs_info = proc_sb_info(sb);
 
+	/*
+	 * "Hide everything" lookup filter is not a problem as only
+	 * /proc/${pid}, /proc/self and /proc/thread-self are accessible.
+	 */
+	if (fs_info->lookup_list && fs_info->lookup_list->len > 0) {
+		return invalfc(fc, "'-o remount,lookup=' is unsupported, unmount and mount instead");
+	}
+
 	sync_filesystem(sb);
 
 	proc_apply_options(fs_info, fc, current_user_ns());
@@ -234,11 +314,34 @@ static void proc_fs_context_free(struct fs_context *fc)
 	struct proc_fs_context *ctx = fc->fs_private;
 
 	put_pid_ns(ctx->pid_ns);
+	kfree(ctx->lookup_list);
 	kfree(ctx);
+}
+
+static int proc_fs_context_dup(struct fs_context *fc, struct fs_context *src_fc)
+{
+	struct proc_fs_context *src = fc->fs_private;
+	struct proc_fs_context *dst;
+
+	dst = kmemdup(src, sizeof(struct proc_fs_context), GFP_KERNEL);
+	if (!dst) {
+		return -ENOMEM;
+	}
+
+	dst->lookup_list = kmemdup(dst->lookup_list, dst->lookup_list_len, GFP_KERNEL);
+	if (!dst->lookup_list) {
+		kfree(dst);
+		return -ENOMEM;
+	}
+	get_pid_ns(dst->pid_ns);
+
+	fc->fs_private = dst;
+	return 0;
 }
 
 static const struct fs_context_operations proc_fs_context_ops = {
 	.free		= proc_fs_context_free,
+	.dup		= proc_fs_context_dup,
 	.parse_param	= proc_parse_param,
 	.get_tree	= proc_get_tree,
 	.reconfigure	= proc_reconfigure,
@@ -274,6 +377,7 @@ static void proc_kill_sb(struct super_block *sb)
 
 	kill_anon_super(sb);
 	put_pid_ns(fs_info->pid_ns);
+	kfree(fs_info->lookup_list);
 	kfree(fs_info);
 }
 
@@ -317,12 +421,33 @@ static int proc_root_getattr(struct user_namespace *mnt_userns,
 	return 0;
 }
 
+bool in_lookup_list(const struct proc_lookup_list *ll, const char *str, unsigned int len)
+{
+	if (ll) {
+		for (; ll->len > 0; ll = lookup_list_next(ll)) {
+			if (ll->len == len && strncmp(ll->str, str, len) == 0) {
+				return true;
+			}
+		}
+		return false;
+	} else {
+		return true;
+	}
+}
+
 static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentry, unsigned int flags)
 {
+	struct proc_fs_info *proc_sb = proc_sb_info(dir->i_sb);
+
 	if (!proc_pid_lookup(dentry, flags))
 		return NULL;
 
-	return proc_lookup(dir, dentry, flags);
+	if (in_lookup_list(proc_sb->lookup_list, dentry->d_name.name, dentry->d_name.len)) {
+		return proc_lookup(dir, dentry, flags);
+	} else {
+		return NULL;
+	}
+
 }
 
 static int proc_root_readdir(struct file *file, struct dir_context *ctx)

@@ -2188,6 +2188,7 @@ The following mount options are supported:
 	hidepid=	Set /proc/<pid>/ access mode.
 	gid=		Set the group authorized to learn processes information.
 	subset=		Show only the specified subset of procfs.
+        lookup=         Top-level /proc filter, independent of subset=
 	=========	========================================================
 
 hidepid=off or hidepid=0 means classic mode - everybody may access all
@@ -2219,6 +2220,13 @@ information about processes information, just add identd to this group.
 
 subset=pid hides all top level files and directories in the procfs that
 are not related to tasks.
+
+lookup= mount option makes available only listed files/directories in
+the top-level /proc directory. Individual names are separated
+by slash. Empty list is equivalent to subset=pid. lookup= filters before
+subset= if both options are supplied. lookup= doesn't affect /proc/${pid}
+directories availability as well as /proc/self and /proc/thread-self
+symlinks. More fine-grained filtering is not supported at the moment.
 
 Chapter 5: Filesystem behavior
 ==============================

@@ -10,6 +10,7 @@
 #include <linux/fs.h>
 
 struct proc_dir_entry;
+struct proc_lookup_list;
 struct seq_file;
 struct seq_operations;
 
@@ -65,6 +66,7 @@ struct proc_fs_info {
 	kgid_t pid_gid;
 	enum proc_hidepid hide_pid;
 	enum proc_pidonly pidonly;
+	const struct proc_lookup_list *lookup_list;
 };
 
 static inline struct proc_fs_info *proc_sb_info(struct super_block *sb)
