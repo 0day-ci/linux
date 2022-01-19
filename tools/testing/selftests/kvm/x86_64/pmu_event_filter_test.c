@@ -238,9 +238,7 @@ static void test_not_member_allow_list(struct kvm_vm *vm)
 static bool vcpu_supports_intel_br_retired(void)
 {
 	struct kvm_cpuid_entry2 *entry;
-	struct kvm_cpuid2 *cpuid;
 
-	cpuid = kvm_get_supported_cpuid();
 	entry = kvm_get_supported_cpuid_index(0xa, 0);
 	return entry &&
 		(entry->eax & 0xff) &&
@@ -255,9 +253,7 @@ static bool vcpu_supports_intel_br_retired(void)
 static bool vcpu_supports_amd_zen_br_retired(void)
 {
 	struct kvm_cpuid_entry2 *entry;
-	struct kvm_cpuid2 *cpuid;
 
-	cpuid = kvm_get_supported_cpuid();
 	entry = kvm_get_supported_cpuid_index(1, 0);
 	return entry &&
 		((x86_family(entry->eax) == 0x17 &&
