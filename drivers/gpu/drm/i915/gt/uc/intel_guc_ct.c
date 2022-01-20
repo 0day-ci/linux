@@ -1204,10 +1204,14 @@ void intel_guc_ct_print_info(struct intel_guc_ct *ct,
 		   ct->ctbs.send.desc->head);
 	drm_printf(p, "Tail: %u\n",
 		   ct->ctbs.send.desc->tail);
+	drm_printf(p, "Status: %u\n",
+		   ct->ctbs.send.desc->status);
 	drm_printf(p, "G2H Space: %u\n",
 		   atomic_read(&ct->ctbs.recv.space) * 4);
 	drm_printf(p, "Head: %u\n",
 		   ct->ctbs.recv.desc->head);
 	drm_printf(p, "Tail: %u\n",
 		   ct->ctbs.recv.desc->tail);
+	drm_printf(p, "Status: %u\n",
+		   ct->ctbs.recv.desc->status);
 }
