@@ -280,6 +280,37 @@ static const struct seq_operations ptype_seq_ops = {
 	.show  = ptype_seq_show,
 };
 
+static int dev_ptype_seq_show(struct seq_file *seq, void *v)
+{
+	struct net_device *dev = v;
+	struct packet_type *pt = NULL;
+	struct list_head *ptype_list = NULL;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_puts(seq, "Type Device      Function\n");
+	} else {
+		ptype_list = &dev->ptype_all;
+		list_for_each_entry_rcu(pt, ptype_list, list) {
+			if (pt->type == htons(ETH_P_ALL))
+				seq_puts(seq, "ALL ");
+			else
+				seq_printf(seq, "%04x", ntohs(pt->type));
+
+			seq_printf(seq, " %-8s %ps\n",
+				   pt->dev ? pt->dev->name : "", pt->func);
+		}
+	}
+
+	return 0;
+}
+
+static const struct seq_operations dev_ptype_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = dev_ptype_seq_show,
+};
+
 static int __net_init dev_proc_net_init(struct net *net)
 {
 	int rc = -ENOMEM;
@@ -294,11 +325,17 @@ static int __net_init dev_proc_net_init(struct net *net)
 			sizeof(struct seq_net_private)))
 		goto out_softnet;
 
-	if (wext_proc_init(net))
+	if (!proc_create_net("dev_ptype", 0444, net->proc_net, &dev_ptype_seq_ops,
+			     sizeof(struct seq_net_private)))
 		goto out_ptype;
+
+	if (wext_proc_init(net))
+		goto out_dev_ptype;
 	rc = 0;
 out:
 	return rc;
+out_dev_ptype:
+	remove_proc_entry("dev_ptype", net->proc_net);
 out_ptype:
 	remove_proc_entry("ptype", net->proc_net);
 out_softnet:
@@ -312,6 +349,7 @@ static void __net_exit dev_proc_net_exit(struct net *net)
 {
 	wext_proc_exit(net);
 
+	remove_proc_entry("dev_ptype", net->proc_net);
 	remove_proc_entry("ptype", net->proc_net);
 	remove_proc_entry("softnet_stat", net->proc_net);
 	remove_proc_entry("dev", net->proc_net);
