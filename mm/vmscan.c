@@ -2247,7 +2247,7 @@ int isolate_lru_page(struct page *page)
 
 		get_page(page);
 		lruvec = folio_lruvec_lock_irq(folio);
-		del_page_from_lru_list(page, lruvec);
+		lruvec_del_folio(lruvec, page_folio(page));
 		unlock_page_lruvec_irq(lruvec);
 		ret = 0;
 	}
@@ -4873,7 +4873,7 @@ void check_move_unevictable_pages(struct pagevec *pvec)
 
 		lruvec = folio_lruvec_relock_irq(folio, lruvec);
 		if (page_evictable(page) && PageUnevictable(page)) {
-			del_page_from_lru_list(page, lruvec);
+			lruvec_del_folio(lruvec, page_folio(page));
 			ClearPageUnevictable(page);
 			lruvec_add_folio(lruvec, page_folio(page));
 			pgrescued += nr_pages;

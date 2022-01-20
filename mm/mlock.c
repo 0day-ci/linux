@@ -280,7 +280,7 @@ static void __munlock_pagevec(struct pagevec *pvec, struct zone *zone)
 			 */
 			if (TestClearPageLRU(page)) {
 				lruvec = folio_lruvec_relock_irq(folio, lruvec);
-				del_page_from_lru_list(page, lruvec);
+				lruvec_del_folio(lruvec, page_folio(page));
 				continue;
 			} else
 				__munlock_isolation_failed(page);

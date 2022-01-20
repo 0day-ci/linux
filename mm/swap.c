@@ -85,7 +85,7 @@ static void __page_cache_release(struct page *page)
 		unsigned long flags;
 
 		lruvec = folio_lruvec_lock_irqsave(folio, &flags);
-		del_page_from_lru_list(page, lruvec);
+		lruvec_del_folio(lruvec, page_folio(page));
 		__folio_clear_lru_flags(page_folio(page));
 		unlock_page_lruvec_irqrestore(lruvec, flags);
 	}
@@ -533,7 +533,7 @@ static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec)
 	if (page_mapped(page))
 		return;
 
-	del_page_from_lru_list(page, lruvec);
+	lruvec_del_folio(lruvec, page_folio(page));
 	ClearPageActive(page);
 	ClearPageReferenced(page);
 
@@ -566,7 +566,7 @@ static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec)
 	if (PageActive(page) && !PageUnevictable(page)) {
 		int nr_pages = thp_nr_pages(page);
 
-		del_page_from_lru_list(page, lruvec);
+		lruvec_del_folio(lruvec, page_folio(page));
 		ClearPageActive(page);
 		ClearPageReferenced(page);
 		lruvec_add_folio(lruvec, page_folio(page));
@@ -583,7 +583,7 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec)
 	    !PageSwapCache(page) && !PageUnevictable(page)) {
 		int nr_pages = thp_nr_pages(page);
 
-		del_page_from_lru_list(page, lruvec);
+		lruvec_del_folio(lruvec, page_folio(page));
 		ClearPageActive(page);
 		ClearPageReferenced(page);
 		/*
@@ -965,7 +965,7 @@ void release_pages(struct page **pages, int nr)
 			if (prev_lruvec != lruvec)
 				lock_batch = 0;
 
-			del_page_from_lru_list(page, lruvec);
+			lruvec_del_folio(lruvec, page_folio(page));
 			__folio_clear_lru_flags(page_folio(page));
 		}
 
