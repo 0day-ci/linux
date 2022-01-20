@@ -936,6 +936,57 @@ void __iomem *fwnode_iomap(struct fwnode_handle *fwnode, int index)
 EXPORT_SYMBOL(fwnode_iomap);
 
 /**
+ * fwnode_irq_get_byname - Get IRQ from a fwnode using its name
+ * @fwnode:	Pointer to the firmware node
+ * @name:	IRQ name
+ *
+ * Description:
+ * Find a match to the string 'name' in the 'interrupt-names' string array
+ * in _DSD for ACPI, or of_node for device tree. Then get the Linux IRQ
+ * number of the IRQ resource corresponding to the index of the matched
+ * string.
+ *
+ * Return:
+ * Linux IRQ number on success
+ * Negative errno otherwise.
+ */
+int fwnode_irq_get_byname(const struct fwnode_handle *fwnode, const char *name)
+{
+	int index;
+
+	if (!name)
+		return -EINVAL;
+
+	index = fwnode_property_match_string(fwnode, "interrupt-names",  name);
+	if (index < 0)
+		return index;
+
+	return fwnode_irq_get(fwnode, index);
+}
+EXPORT_SYMBOL(fwnode_irq_get_byname);
+
+/**
+ * device_irq_get_byname - Get IRQ of a device using interrupt name
+ * @dev: Device to get the interrupt
+ * @name: IRQ name
+ *
+ * Description:
+ * Find a match to the string 'name' in the 'interrupt-names' string array
+ * in _DSD for ACPI, or of_node for device tree. Then get the Linux IRQ
+ * number of the IRQ resource corresponding to the index of the matched
+ * string.
+ *
+ * Return:
+ * Linux IRQ number on success
+ * Negative errno otherwise.
+ */
+int device_irq_get_byname(struct device *dev, const char *name)
+{
+	return fwnode_irq_get_byname(dev_fwnode(dev), name);
+}
+EXPORT_SYMBOL_GPL(device_irq_get_byname);
+
+/**
  * fwnode_graph_get_next_endpoint - Get next endpoint firmware node
  * @fwnode: Pointer to the parent firmware node
  * @prev: Previous endpoint node or %NULL to get the first
