@@ -74,8 +74,22 @@ struct virtio_shm_region {
  * @set_vq_affinity: set the affinity for a virtqueue (optional).
  * @get_vq_affinity: get the affinity for a virtqueue (optional).
  * @get_shm_region: get a shared memory region based on the index.
+ * @reset_vq: reset a queue individually
+ *	vdev: the device
+ *	queue_index: the queue index
+ *	callback: callback to free unused bufs
+ *	data: pass to callback
+ *	returns 0 on success or error status
+ * @enable_reset_vq: enable a reset queue
+ *	vdev: the device
+ *	queue_index: the queue index
+ *	callback: callback for the virtqueue, NULL for vq that do not need a callback
+ *	name: virtqueue names (mainly for debugging), NULL for vq unused by driver
+ *	ctx: ctx
+ *	returns vq on success or error status
  */
 typedef void vq_callback_t(struct virtqueue *);
+typedef void vq_reset_callback_t(struct virtio_device *vdev, void *buf, void *data);
 struct virtio_config_ops {
 	void (*enable_cbs)(struct virtio_device *vdev);
 	void (*get)(struct virtio_device *vdev, unsigned offset,
@@ -100,6 +114,12 @@ struct virtio_config_ops {
 			int index);
 	bool (*get_shm_region)(struct virtio_device *vdev,
 			       struct virtio_shm_region *region, u8 id);
+	int (*reset_vq)(struct virtio_device *vdev, u16 queue_index,
+			vq_reset_callback_t *callback, void *data);
+	struct virtqueue *(*enable_reset_vq)(struct virtio_device *vdev,
+					     u16 queue_index,
+					     vq_callback_t *callback,
+					     const char *name, const bool *ctx);
 };
 
 /* If driver didn't advertise the feature, it will never appear. */
