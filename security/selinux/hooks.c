@@ -677,36 +677,52 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 	 */
 	if (opts) {
 		if (opts->fscontext) {
-			rc = parse_sid(sb, opts->fscontext, &fscontext_sid);
-			if (rc)
-				goto out;
+			if (opts->preparsed & FSCONTEXT_MNT)
+				fscontext_sid = opts->fscontext_sid;
+			else {
+				rc = parse_sid(sb, opts->fscontext, &fscontext_sid);
+				if (rc)
+					goto out;
+			}
 			if (bad_option(sbsec, FSCONTEXT_MNT, sbsec->sid,
 					fscontext_sid))
 				goto out_double_mount;
 			sbsec->flags |= FSCONTEXT_MNT;
 		}
 		if (opts->context) {
-			rc = parse_sid(sb, opts->context, &context_sid);
-			if (rc)
-				goto out;
+			if (opts->preparsed & CONTEXT_MNT)
+				context_sid = opts->context_sid;
+			else {
+				rc = parse_sid(sb, opts->context, &context_sid);
+				if (rc)
+					goto out;
+			}
 			if (bad_option(sbsec, CONTEXT_MNT, sbsec->mntpoint_sid,
 					context_sid))
 				goto out_double_mount;
 			sbsec->flags |= CONTEXT_MNT;
 		}
 		if (opts->rootcontext) {
-			rc = parse_sid(sb, opts->rootcontext, &rootcontext_sid);
-			if (rc)
-				goto out;
+			if (opts->preparsed & ROOTCONTEXT_MNT)
+				rootcontext_sid = opts->rootcontext_sid;
+			else {
+				rc = parse_sid(sb, opts->rootcontext, &rootcontext_sid);
+				if (rc)
+					goto out;
+			}
 			if (bad_option(sbsec, ROOTCONTEXT_MNT, root_isec->sid,
 					rootcontext_sid))
 				goto out_double_mount;
 			sbsec->flags |= ROOTCONTEXT_MNT;
 		}
 		if (opts->defcontext) {
-			rc = parse_sid(sb, opts->defcontext, &defcontext_sid);
-			if (rc)
-				goto out;
+			if (opts->preparsed & DEFCONTEXT_MNT)
+				defcontext_sid = opts->defcontext_sid;
+			else {
+				rc = parse_sid(sb, opts->defcontext, &defcontext_sid);
+				if (rc)
+					goto out;
+			}
 			if (bad_option(sbsec, DEFCONTEXT_MNT, sbsec->def_sid,
 					defcontext_sid))
 				goto out_double_mount;
@@ -2753,32 +2769,48 @@ static int selinux_sb_remount(struct super_block *sb, void *mnt_opts)
 		return 0;
 
 	if (opts->fscontext) {
-		rc = parse_sid(sb, opts->fscontext, &sid);
-		if (rc)
-			return rc;
+		if (opts->preparsed & FSCONTEXT_MNT)
+			sid = opts->fscontext_sid;
+		else {
+			rc = parse_sid(sb, opts->fscontext, &sid);
+			if (rc)
+				return rc;
+		}
 		if (bad_option(sbsec, FSCONTEXT_MNT, sbsec->sid, sid))
 			goto out_bad_option;
 	}
 	if (opts->context) {
-		rc = parse_sid(sb, opts->context, &sid);
-		if (rc)
-			return rc;
+		if (opts->preparsed & CONTEXT_MNT)
+			sid = opts->context_sid;
+		else {
+			rc = parse_sid(sb, opts->context, &sid);
+			if (rc)
+				return rc;
+		}
 		if (bad_option(sbsec, CONTEXT_MNT, sbsec->mntpoint_sid, sid))
 			goto out_bad_option;
 	}
 	if (opts->rootcontext) {
 		struct inode_security_struct *root_isec;
 		root_isec = backing_inode_security(sb->s_root);
-		rc = parse_sid(sb, opts->rootcontext, &sid);
-		if (rc)
-			return rc;
+		if (opts->preparsed & ROOTCONTEXT_MNT)
+			sid = opts->rootcontext_sid;
+		else {
+			rc = parse_sid(sb, opts->rootcontext, &sid);
+			if (rc)
+				return rc;
+		}
 		if (bad_option(sbsec, ROOTCONTEXT_MNT, root_isec->sid, sid))
 			goto out_bad_option;
 	}
 	if (opts->defcontext) {
-		rc = parse_sid(sb, opts->defcontext, &sid);
-		if (rc)
-			return rc;
+		if (opts->preparsed & DEFCONTEXT_MNT)
+			sid = opts->defcontext_sid;
+		else {
+			rc = parse_sid(sb, opts->defcontext, &sid);
+			if (rc)
+				return rc;
+		}
 		if (bad_option(sbsec, DEFCONTEXT_MNT, sbsec->def_sid, sid))
 			goto out_bad_option;
 	}
@@ -2877,6 +2909,11 @@ static int selinux_fs_context_dup(struct fs_context *fc,
 		if (!opts->defcontext)
 			return -ENOMEM;
 	}
+	opts->fscontext_sid = src->fscontext_sid;
+	opts->context_sid = src->context_sid;
+	opts->rootcontext_sid = src->rootcontext_sid;
+	opts->defcontext_sid = src->defcontext_sid;
+	opts->preparsed = src->preparsed;
 	return 0;
 }
 
