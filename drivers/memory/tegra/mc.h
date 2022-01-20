@@ -44,6 +44,8 @@
 #define MC_TIMING_CONTROL_DBG				0xf8
 #define MC_TIMING_CONTROL				0xfc
 
+#define MC_INT_DECERR_ROUTE_SANITY			BIT(20)
+#define MC_INT_DECERR_GENERALIZED_CARVEOUT		BIT(17)
 #define MC_INT_DECERR_MTS				BIT(16)
 #define MC_INT_SECERR_SEC				BIT(13)
 #define MC_INT_DECERR_VPR				BIT(12)
@@ -64,6 +66,18 @@
 #define MC_ERR_STATUS_ADR_HI_MASK			0x3
 #define MC_ERR_STATUS_SECURITY				BIT(17)
 #define MC_ERR_STATUS_RW				BIT(16)
+
+#define MC_ERR_VPR_STATUS				0x654
+#define MC_ERR_VPR_ADR					0x658
+#define MC_ERR_SEC_STATUS				0x67c
+#define MC_ERR_SEC_ADR					0x680
+#define MC_ERR_MTS_STATUS				0x9b0
+#define MC_ERR_MTS_ADR					0x9b4
+#define MC_ERR_ROUTE_SANITY_STATUS			0x9c0
+#define MC_ERR_ROUTE_SANITY_ADR				0x9c4
+#define MC_ERR_GENERALIZED_CARVEOUT_STATUS		0xc00
+#define MC_ERR_GENERALIZED_CARVEOUT_ADR			0xc04
+#define MC_ERR_ADR_HI					0x11fc
 
 #define MC_EMEM_ADR_CFG_EMEM_NUMDEV			BIT(0)
 
@@ -147,12 +161,14 @@ extern const struct tegra_mc_soc tegra234_mc_soc;
     defined(CONFIG_ARCH_TEGRA_132_SOC) || \
     defined(CONFIG_ARCH_TEGRA_210_SOC)
 int tegra30_mc_probe(struct tegra_mc *mc);
+irqreturn_t tegra30_mc_handle_irq(int irq, void *data);
 extern const struct tegra_mc_ops tegra30_mc_ops;
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA_186_SOC) || \
     defined(CONFIG_ARCH_TEGRA_194_SOC) || \
     defined(CONFIG_ARCH_TEGRA_234_SOC)
+irqreturn_t tegra30_mc_handle_irq(int irq, void *data);
 extern const struct tegra_mc_ops tegra186_mc_ops;
 #endif
 
