@@ -344,6 +344,7 @@ at86rf230_async_error_recover_complete(void *context)
 		kfree(ctx);
 
 	ieee802154_wake_queue(lp->hw);
+	dev_kfree_skb_any(lp->tx_skb);
 }
 
 static void
