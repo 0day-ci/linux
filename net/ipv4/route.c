@@ -3051,10 +3051,25 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
+static int fnhe_daddr_check(__be32 daddr, struct net *net, u32 table_id,
+			    __be32 prefix, unsigned char prefixlen)
+{
+	struct flowi4 fl4 = { .daddr = daddr };
+	struct fib_table *tb = fib_get_table(net, table_id);
+	struct fib_result res;
+	int err = fib_table_lookup(tb, &fl4, &res, FIB_LOOKUP_NOREF);
+
+	if (!err && res.prefix == prefix && res.prefixlen == prefixlen)
+		return 1;
+
+	return 0;
+}
+
 static int fnhe_dump_bucket(struct net *net, struct sk_buff *skb,
 			    struct netlink_callback *cb, u32 table_id,
 			    struct fnhe_hash_bucket *bucket, int genid,
-			    int *fa_index, int fa_start, unsigned int flags)
+			    int *fa_index, int fa_start, unsigned int flags,
+			    __be32 prefix, unsigned char prefixlen)
 {
 	int i;
 
@@ -3067,6 +3082,9 @@ static int fnhe_dump_bucket(struct net *net, struct sk_buff *skb,
 			int err;
 
 			if (*fa_index < fa_start)
+				goto next;
+
+			if (!fnhe_daddr_check(fnhe->fnhe_daddr, net, table_id, prefix, prefixlen))
 				goto next;
 
 			if (fnhe->fnhe_genid != genid)
@@ -3098,7 +3116,8 @@ next:
 
 int fib_dump_info_fnhe(struct sk_buff *skb, struct netlink_callback *cb,
 		       u32 table_id, struct fib_info *fi,
-		       int *fa_index, int fa_start, unsigned int flags)
+		       int *fa_index, int fa_start, unsigned int flags,
+		       __be32 prefix, unsigned char prefixlen)
 {
 	struct net *net = sock_net(cb->skb->sk);
 	int nhsel, genid = fnhe_genid(net);
@@ -3117,7 +3136,7 @@ int fib_dump_info_fnhe(struct sk_buff *skb, struct netlink_callback *cb,
 		if (bucket)
 			err = fnhe_dump_bucket(net, skb, cb, table_id, bucket,
 					       genid, fa_index, fa_start,
-					       flags);
+					       flags, prefix, prefixlen);
 		rcu_read_unlock();
 		if (err)
 			return err;
