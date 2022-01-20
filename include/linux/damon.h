@@ -501,12 +501,28 @@ int damon_stop(struct damon_ctx **ctxs, int nr_ctxs);
 #ifdef CONFIG_DAMON_VADDR
 bool damon_va_target_valid(void *t);
 void damon_va_set_primitives(struct damon_ctx *ctx);
+#else
+static inline void damon_va_set_primitives(struct damon_ctx *ctx) { }
+static inline bool damon_va_target_valid(void *t)
+{
+	return false;
+}
 #endif	/* CONFIG_DAMON_VADDR */
 
 #ifdef CONFIG_DAMON_PADDR
 bool damon_pa_check(char *buf, size_t count);
 bool damon_pa_target_valid(void *t);
 void damon_pa_set_primitives(struct damon_ctx *ctx);
+#else
+static inline bool damon_pa_check(char *buf, size_t count)
+{
+	return false;
+}
+static inline void damon_pa_set_primitives(struct damon_ctx *ctx) { }
+static inline bool damon_pa_target_valid(void *t)
+{
+	return false;
+}
 #endif	/* CONFIG_DAMON_PADDR */
 
 #endif	/* _DAMON_H */
