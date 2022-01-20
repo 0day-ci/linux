@@ -11,11 +11,19 @@
 	aliases {
 		mmc3 = "/bus@0/mmc@3460000";
 		serial0 = &tcu;
+		serial1 = &uarta;
 	};
 
 	chosen {
 		bootargs = "console=ttyS0,115200n8";
 		stdout-path = "serial0:115200n8";
+	};
+
+	bus@0 {
+		serial@3100000 {
+			compatible = "nvidia,tegra194-hsuart";
+			status = "okay";
+		};
 	};
 
 	serial {
