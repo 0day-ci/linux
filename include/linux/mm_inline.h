@@ -59,11 +59,6 @@ static __always_inline void __folio_clear_lru_flags(struct folio *folio)
 	__folio_clear_unevictable(folio);
 }
 
-static __always_inline void __clear_page_lru_flags(struct page *page)
-{
-	__folio_clear_lru_flags(page_folio(page));
-}
-
 /**
  * folio_lru_list - Which LRU list should a folio be on?
  * @folio: The folio to test.

@@ -2337,7 +2337,7 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 		SetPageLRU(page);
 
 		if (unlikely(put_page_testzero(page))) {
-			__clear_page_lru_flags(page);
+			__folio_clear_lru_flags(page_folio(page));
 
 			if (unlikely(PageCompound(page))) {
 				spin_unlock_irq(&lruvec->lru_lock);

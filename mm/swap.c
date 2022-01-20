@@ -86,7 +86,7 @@ static void __page_cache_release(struct page *page)
 
 		lruvec = folio_lruvec_lock_irqsave(folio, &flags);
 		del_page_from_lru_list(page, lruvec);
-		__clear_page_lru_flags(page);
+		__folio_clear_lru_flags(page_folio(page));
 		unlock_page_lruvec_irqrestore(lruvec, flags);
 	}
 	__ClearPageWaiters(page);
@@ -966,7 +966,7 @@ void release_pages(struct page **pages, int nr)
 				lock_batch = 0;
 
 			del_page_from_lru_list(page, lruvec);
-			__clear_page_lru_flags(page);
+			__folio_clear_lru_flags(page_folio(page));
 		}
 
 		__ClearPageWaiters(page);
