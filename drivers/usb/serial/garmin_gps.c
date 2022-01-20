@@ -267,13 +267,12 @@ static int pkt_add(struct garmin_data *garmin_data_p,
 
 	/* process only packets containing data ... */
 	if (data_length) {
-		pkt = kmalloc(sizeof(struct garmin_packet)+data_length,
-								GFP_ATOMIC);
+		pkt = kmalloc(struct_size(pkt, data, data_length), GFP_ATOMIC);
 		if (!pkt)
 			return 0;
 
 		pkt->size = data_length;
-		memcpy(pkt->data, data, data_length);
+		memcpy(pkt->data, data, flex_array_size(pkt, data, pkt->size));
 
 		spin_lock_irqsave(&garmin_data_p->lock, flags);
 		garmin_data_p->flags |= FLAGS_QUEUING;
