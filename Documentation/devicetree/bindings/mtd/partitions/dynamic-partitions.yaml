@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mtd/partitions/dynamic-partitions.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Dynamic partitions
+
+description: |
+  This binding can be used on platforms which have partitions registered at
+  runtime by parsers or partition table present on the flash. Example are
+  partitions declared from smem parser or cmdlinepart. This will create an
+  of node for these dynamic partition where systems like Nvmem can get a
+  reference to register nvmem-cells.
+
+  The partition table should be a node named "dynamic-partitions".
+  Partitions are then defined as subnodes. Only the label is required
+  as any other data will be taken from the parser.
+
+maintainers:
+  - Ansuel Smith <ansuelsmth@gmail.com>
+
+properties:
+  compatible:
+    const: dynamic-partitions
+
+patternProperties:
+  "@[0-9a-f]+$":
+    $ref: "partition.yaml#"
+
+additionalProperties: true
+
+examples:
+  - |
+    partitions {
+        compatible = "qcom,smem";
+        #address-cells = <1>;
+        #size-cells = <1>;
+    };
+
+    dynamic-partitions {
+      compatible = "dynamic-partitions";
+
+      art: art {
+        label = "0:art";
+        read-only;
+        compatible = "nvmem-cells";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        macaddr_art_0: macaddr@0 {
+          reg = <0x0 0x6>;
+        };
+
+        macaddr_art_6: macaddr@6 {
+          reg = <0x6 0x6>;
+        };
+      };
+    };
