@@ -332,6 +332,9 @@ struct irdma_device {
 	struct workqueue_struct *cleanup_wq;
 	struct irdma_sc_vsi vsi;
 	struct irdma_cm_core cm_core;
+	struct list_head ah_list;
+	struct mutex ah_list_lock; /* protect AH list access */
+	u32 ah_list_cnt;
 	u32 roce_cwnd;
 	u32 roce_ackcreds;
 	u32 vendor_id;

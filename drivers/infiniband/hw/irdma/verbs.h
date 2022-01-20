@@ -7,6 +7,7 @@
 
 #define IRDMA_PKEY_TBL_SZ		1
 #define IRDMA_DEFAULT_PKEY		0xFFFF
+#define IRDMA_MAX_AH_LIST_SZ		0x20000
 
 struct irdma_ucontext {
 	struct ib_ucontext ibucontext;
@@ -43,6 +44,9 @@ struct irdma_ah {
 	struct irdma_av av;
 	u8 sgid_index;
 	union ib_gid dgid;
+	struct list_head list;
+	refcount_t refcnt;
+	struct irdma_ah *parent_ah; /* AH from cached list */
 };
 
 struct irdma_hmc_pble {
