@@ -458,7 +458,7 @@ static int dmi_system_event_log(struct dmi_sysfs_entry *entry)
 				   &entry->kobj,
 				   "system_event_log");
 	if (ret)
-		goto out_free;
+		goto out_put;
 
 	ret = sysfs_create_bin_file(entry->child, &dmi_sel_raw_attr);
 	if (ret)
@@ -468,8 +468,8 @@ static int dmi_system_event_log(struct dmi_sysfs_entry *entry)
 
 out_del:
 	kobject_del(entry->child);
-out_free:
-	kfree(entry->child);
+out_put:
+	kobject_put(entry->child);
 	return ret;
 }
 
