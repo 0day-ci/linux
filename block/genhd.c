@@ -1167,10 +1167,13 @@ static int diskstats_show(struct seq_file *seqf, void *v)
 		if (bdev_is_partition(hd) && !bdev_nr_sectors(hd))
 			continue;
 		part_stat_read_all(hd, &stat);
+		if (blk_queue_enter(gp->queue, BLK_MQ_REQ_NOWAIT))
+			continue;
 		if (queue_is_mq(gp->queue))
 			inflight = blk_mq_in_flight(gp->queue, hd);
 		else
 			inflight = part_in_flight(hd);
+		blk_queue_exit(gp->queue);
 
 		seq_printf(seqf, "%4d %7d %pg "
 			   "%lu %lu %lu %u "
