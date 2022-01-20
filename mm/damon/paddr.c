@@ -208,6 +208,14 @@ static unsigned int damon_pa_check_accesses(struct damon_ctx *ctx)
 	return max_nr_accesses;
 }
 
+bool damon_pa_check(char *buf, size_t count)
+{
+	if (!strncmp(buf, "paddr\n", count))
+		return true;
+
+	return false;
+}
+
 bool damon_pa_target_valid(void *t)
 {
 	return true;

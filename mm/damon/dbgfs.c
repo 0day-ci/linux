@@ -374,7 +374,7 @@ static ssize_t dbgfs_target_ids_write(struct file *file,
 	if (IS_ERR(kbuf))
 		return PTR_ERR(kbuf);
 
-	if (!strncmp(kbuf, "paddr\n", count)) {
+	if (damon_pa_check(kbuf, count)) {
 		id_is_pid = false;
 		/* target id is meaningless here, but we set it just for fun */
 		scnprintf(kbuf, count, "42    ");
