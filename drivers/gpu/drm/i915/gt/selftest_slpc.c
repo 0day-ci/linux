@@ -79,6 +79,29 @@ static int live_slpc_clamp_min(void *arg)
 		if (!intel_engine_can_store_dword(engine))
 			continue;
 
+		st_engine_heartbeat_disable(engine);
+
+		rq = igt_spinner_create_request(&spin,
+						engine->kernel_context,
+						MI_NOOP);
+		if (IS_ERR(rq)) {
+			err = PTR_ERR(rq);
+			st_engine_heartbeat_enable(engine);
+			break;
+		}
+
+		i915_request_add(rq);
+
+		if (!igt_wait_for_spinner(&spin, rq)) {
+			pr_err("%s: Spinner did not start\n",
+			       engine->name);
+			igt_spinner_end(&spin);
+			st_engine_heartbeat_enable(engine);
+			intel_gt_set_wedged(engine->gt);
+			err = -EIO;
+			break;
+		}
+
 		/* Go from min to max in 5 steps */
 		step = (slpc_max_freq - slpc_min_freq) / NUM_STEPS;
 		max_act_freq = slpc_min_freq;
@@ -87,29 +110,6 @@ static int live_slpc_clamp_min(void *arg)
 			err = slpc_set_min_freq(slpc, min_freq);
 			if (err)
 				break;
-
-			st_engine_heartbeat_disable(engine);
-
-			rq = igt_spinner_create_request(&spin,
-							engine->kernel_context,
-							MI_NOOP);
-			if (IS_ERR(rq)) {
-				err = PTR_ERR(rq);
-				st_engine_heartbeat_enable(engine);
-				break;
-			}
-
-			i915_request_add(rq);
-
-			if (!igt_wait_for_spinner(&spin, rq)) {
-				pr_err("%s: Spinner did not start\n",
-				       engine->name);
-				igt_spinner_end(&spin);
-				st_engine_heartbeat_enable(engine);
-				intel_gt_set_wedged(engine->gt);
-				err = -EIO;
-				break;
-			}
 
 			/* Wait for GuC to detect business and raise
 			 * requested frequency if necessary.
@@ -131,9 +131,6 @@ static int live_slpc_clamp_min(void *arg)
 			act_freq =  intel_rps_read_actual_frequency(rps);
 			if (act_freq > max_act_freq)
 				max_act_freq = act_freq;
-
-			igt_spinner_end(&spin);
-			st_engine_heartbeat_enable(engine);
 		}
 
 		pr_info("Max actual frequency for %s was %d\n",
@@ -144,6 +141,9 @@ static int live_slpc_clamp_min(void *arg)
 			pr_err("Actual freq did not rise above min\n");
 			err = -EINVAL;
 		}
+
+		igt_spinner_end(&spin);
+		st_engine_heartbeat_enable(engine);
 
 		if (err)
 			break;
@@ -210,6 +210,29 @@ static int live_slpc_clamp_max(void *arg)
 		if (!intel_engine_can_store_dword(engine))
 			continue;
 
+		st_engine_heartbeat_disable(engine);
+
+		rq = igt_spinner_create_request(&spin,
+						engine->kernel_context,
+						MI_NOOP);
+		if (IS_ERR(rq)) {
+			st_engine_heartbeat_enable(engine);
+			err = PTR_ERR(rq);
+			break;
+		}
+
+		i915_request_add(rq);
+
+		if (!igt_wait_for_spinner(&spin, rq)) {
+			pr_err("%s: SLPC spinner did not start\n",
+			       engine->name);
+			igt_spinner_end(&spin);
+			st_engine_heartbeat_enable(engine);
+			intel_gt_set_wedged(engine->gt);
+			err = -EIO;
+			break;
+		}
+
 		/* Go from max to min in 5 steps */
 		step = (slpc_max_freq - slpc_min_freq) / NUM_STEPS;
 		max_act_freq = slpc_min_freq;
@@ -218,29 +241,6 @@ static int live_slpc_clamp_max(void *arg)
 			err = slpc_set_max_freq(slpc, max_freq);
 			if (err)
 				break;
-
-			st_engine_heartbeat_disable(engine);
-
-			rq = igt_spinner_create_request(&spin,
-							engine->kernel_context,
-							MI_NOOP);
-			if (IS_ERR(rq)) {
-				st_engine_heartbeat_enable(engine);
-				err = PTR_ERR(rq);
-				break;
-			}
-
-			i915_request_add(rq);
-
-			if (!igt_wait_for_spinner(&spin, rq)) {
-				pr_err("%s: SLPC spinner did not start\n",
-				       engine->name);
-				igt_spinner_end(&spin);
-				st_engine_heartbeat_enable(engine);
-				intel_gt_set_wedged(engine->gt);
-				err = -EIO;
-				break;
-			}
 
 			delay_for_h2g();
 
@@ -261,9 +261,6 @@ static int live_slpc_clamp_max(void *arg)
 			if (act_freq > max_act_freq)
 				max_act_freq = act_freq;
 
-			st_engine_heartbeat_enable(engine);
-			igt_spinner_end(&spin);
-
 			if (err)
 				break;
 		}
@@ -276,6 +273,9 @@ static int live_slpc_clamp_max(void *arg)
 			pr_err("Actual freq did not rise above min\n");
 			err = -EINVAL;
 		}
+
+		st_engine_heartbeat_enable(engine);
+		igt_spinner_end(&spin);
 
 		if (igt_flush_test(gt->i915)) {
 			err = -EIO;
