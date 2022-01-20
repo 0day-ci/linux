@@ -115,6 +115,10 @@ int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		struct virtqueue *vqs[], vq_callback_t *callbacks[],
 		const char * const names[], const bool *ctx,
 		struct irq_affinity *desc);
+void vp_del_reset_vq(struct virtio_device *vdev, u16 queue_index);
+struct virtqueue *vp_enable_reset_vq(struct virtio_device *vdev, int queue_index,
+				     vq_callback_t *callback, const char *name,
+				     const bool ctx);
 const char *vp_bus_name(struct virtio_device *vdev);
 
 /* Setup the affinity for a virtqueue:

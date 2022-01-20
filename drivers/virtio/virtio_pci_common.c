@@ -464,6 +464,55 @@ int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 	return vp_find_vqs_intx(vdev, nvqs, vqs, callbacks, names, ctx);
 }
 
+#define VQ_IS_DELETED(vp_dev, idx) ((unsigned long)vp_dev->vqs[idx] & 1)
+#define VQ_RESET_MSIX_VEC(vp_dev, idx) ((unsigned long)vp_dev->vqs[idx] >> 2)
+#define VQ_RESET_MARK(msix_vec) ((void *)(long)((msix_vec << 2) + 1))
+
+void vp_del_reset_vq(struct virtio_device *vdev, u16 queue_index)
+{
+	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	struct virtio_pci_vq_info *info;
+	u16 msix_vec;
+
+	info = vp_dev->vqs[queue_index];
+
+	msix_vec = info->msix_vector;
+
+	/* delete vq */
+	vp_del_vq(info->vq);
+
+	/* Mark the vq has been deleted, and save the msix_vec. */
+	vp_dev->vqs[queue_index] = VQ_RESET_MARK(msix_vec);
+}
+
+struct virtqueue *vp_enable_reset_vq(struct virtio_device *vdev,
+				     int queue_index,
+				     vq_callback_t *callback,
+				     const char *name,
+				     const bool ctx)
+{
+	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	struct virtqueue *vq;
+	u16 msix_vec;
+
+	if (!VQ_IS_DELETED(vp_dev, queue_index))
+		return ERR_PTR(-EPERM);
+
+	msix_vec = VQ_RESET_MSIX_VEC(vp_dev, queue_index);
+
+	if (vp_dev->intx_enabled)
+		vq = vp_setup_vq(vdev, queue_index, callback, name, ctx,
+				 VIRTIO_MSI_NO_VECTOR);
+	else
+		vq = vp_enable_vq_msix(vdev, queue_index, callback, name, ctx,
+				       msix_vec);
+
+	if (IS_ERR(vq))
+		vp_dev->vqs[queue_index] = VQ_RESET_MARK(msix_vec);
+
+	return vq;
+}
+
 const char *vp_bus_name(struct virtio_device *vdev)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
