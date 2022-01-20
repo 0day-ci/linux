@@ -563,6 +563,51 @@ static int mtd_nvmem_add(struct mtd_info *mtd)
 	return 0;
 }
 
+struct device_node *mtd_get_of_node(struct mtd_info *mtd)
+{
+	struct device_node *dynamic_partitions, *parent_dn, *dn, *mtd_dn = NULL;
+	struct mtd_info *parent;
+	const char *mtd_name;
+	int plen;
+
+	/* Check if mtd has a device node */
+	dn = dev_of_node(&mtd->dev);
+	if (dn)
+		return dn;
+
+	/* Check if a dynamic-partitions node exist */
+	parent = mtd->parent;
+	parent_dn = dev_of_node(&parent->dev);
+	if (!parent_dn)
+		return NULL;
+
+	dynamic_partitions = of_get_compatible_child(parent_dn, "dynamic-partitions");
+	if (!dynamic_partitions)
+		goto exit_parent;
+
+	/* Search if a dynamic partition is defined with the same name */
+	for_each_child_of_node(dynamic_partitions, dn) {
+		mtd_name = of_get_property(dn, "label", &plen);
+		if (!strncmp(mtd->name, mtd_name, plen)) {
+			mtd_dn = dn;
+			break;
+		}
+	}
+
+	if (!mtd_dn)
+		goto exit_partitions;
+
+	/* Set of_node only for nvmem */
+	if (of_device_is_compatible(mtd_dn, "nvmem-cells"))
+		mtd_set_of_node(mtd, mtd_dn);
+
+exit_partitions:
+	of_node_put(dynamic_partitions);
+exit_parent:
+	of_node_put(parent_dn);
+	return mtd_dn;
+}
+
 /**
  *	add_mtd_device - register an MTD device
  *	@mtd: pointer to new MTD device info structure

@@ -464,11 +464,6 @@ static inline void mtd_set_of_node(struct mtd_info *mtd,
 		of_property_read_string(np, "label", &mtd->name);
 }
 
-static inline struct device_node *mtd_get_of_node(struct mtd_info *mtd)
-{
-	return dev_of_node(&mtd->dev);
-}
-
 static inline u32 mtd_oobavail(struct mtd_info *mtd, struct mtd_oob_ops *ops)
 {
 	return ops->mode == MTD_OPS_AUTO_OOB ? mtd->oobavail : mtd->oobsize;
@@ -489,6 +484,7 @@ static inline int mtd_max_bad_blocks(struct mtd_info *mtd,
 				       len);
 }
 
+struct device_node *mtd_get_of_node(struct mtd_info *mtd);
 int mtd_wunit_to_pairing_info(struct mtd_info *mtd, int wunit,
 			      struct mtd_pairing_info *info);
 int mtd_pairing_info_to_wunit(struct mtd_info *mtd,
