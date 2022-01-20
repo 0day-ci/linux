@@ -988,7 +988,7 @@ int nilfs_sysfs_create_device_group(struct super_block *sb)
 
 	err = nilfs_sysfs_create_mounted_snapshots_group(nilfs);
 	if (err)
-		goto cleanup_dev_kobject;
+		goto delete_dev_kobject;
 
 	err = nilfs_sysfs_create_checkpoints_group(nilfs);
 	if (err)
@@ -1019,6 +1019,9 @@ delete_checkpoints_group:
 
 delete_mounted_snapshots_group:
 	nilfs_sysfs_delete_mounted_snapshots_group(nilfs);
+
+delete_dev_kobject:
+	kobject_del(&nilfs->ns_dev_kobj);
 
 cleanup_dev_kobject:
 	kobject_put(&nilfs->ns_dev_kobj);
