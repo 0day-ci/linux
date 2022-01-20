@@ -2682,6 +2682,7 @@ static void rtrs_clt_dev_release(struct device *dev)
 	struct rtrs_clt_sess *clt = container_of(dev, struct rtrs_clt_sess,
 						 dev);
 
+	free_percpu(clt->pcpu_path);
 	kfree(clt);
 }
 
@@ -2762,8 +2763,6 @@ static struct rtrs_clt_sess *alloc_clt(const char *sessname, size_t paths_num,
 err_dev:
 	device_unregister(&clt->dev);
 err:
-	free_percpu(clt->pcpu_path);
-	kfree(clt);
 	return ERR_PTR(err);
 }
 
