@@ -762,10 +762,12 @@ extern void spi_unregister_controller(struct spi_controller *ctlr);
 
 #if IS_ENABLED(CONFIG_ACPI)
 extern struct spi_device *acpi_spi_device_alloc(struct spi_controller *ctlr,
-						struct acpi_device *adev);
+						struct acpi_device *adev,
+						int index, int irq_index);
 #else
 static inline struct spi_device *acpi_spi_device_alloc(struct spi_controller *ctlr,
-						       struct acpi_device *adev);
+						       struct acpi_device *adev,
+						       int index, int irq_index);
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
