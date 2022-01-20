@@ -344,6 +344,45 @@ int cmdq_pkt_set_event(struct cmdq_pkt *pkt, u16 event)
 }
 EXPORT_SYMBOL(cmdq_pkt_set_event);
 
+s32 cmdq_pkt_poll_addr(struct cmdq_pkt *pkt, u32 value, u32 addr, u32 mask, u8 reg_gpr)
+{
+	struct cmdq_instruction inst = { {0} };
+
+	s32 err;
+
+	if (mask != 0xffffffff) {
+		inst.op = CMDQ_CODE_MASK;
+		inst.mask = ~mask;
+		err = cmdq_pkt_append_command(pkt, inst);
+		if (err != 0)
+			return err;
+
+		addr = addr | 0x1;
+	}
+
+	/* Move extra handle APB address to GPR */
+	inst.op = CMDQ_CODE_MOVE;
+	inst.value = addr;
+	inst.sop = reg_gpr;
+	inst.dst_t = 1;
+	err = cmdq_pkt_append_command(pkt, inst);
+	if (err != 0)
+		pr_err("%s fail append command move addr to reg err:%d",
+			__func__, err);
+
+	inst.op = CMDQ_CODE_POLL;
+	inst.value = value;
+	inst.sop = reg_gpr;
+	inst.dst_t = 1;
+	err = cmdq_pkt_append_command(pkt, inst);
+	if (err != 0)
+		pr_err("%s fail append command poll err:%d",
+			__func__, err);
+
+	return err;
+}
+EXPORT_SYMBOL(cmdq_pkt_poll_addr);
+
 int cmdq_pkt_poll(struct cmdq_pkt *pkt, u8 subsys,
 		  u16 offset, u32 value)
 {
