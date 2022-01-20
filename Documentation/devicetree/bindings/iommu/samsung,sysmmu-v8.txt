@@ -1,0 +1,31 @@
+Example (Exynos850, IOMMU for DPU usage):
+
+	#include <dt-bindings/soc/samsung,sysmmu-v8.h>
+
+	/* IOMMU group info */
+	iommu_group_dpu: iommu_group_dpu {
+		compatible = "samsung,sysmmu-group";
+	};
+
+	sysmmu_dpu: sysmmu@130c0000 {
+		compatible = "samsung,sysmmu-v8";
+		reg = <0x130c0000 0x9000>;
+		interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
+		qos = <15>;
+
+		clocks = <&cmu_dpu CLK_GOUT_DPU_SMMU_CLK>;
+		clock-names = "gate";
+
+		sysmmu,secure-irq;
+		sysmmu,secure_base = <0x130d0000>;
+		sysmmu,default_tlb = <TLB_CFG(BL1, PREFETCH_PREDICTION)>;
+		sysmmu,tlb_property =
+			<1 TLB_CFG(BL1, PREFETCH_PREDICTION) (DIR_READ | (1 << 16)) SYSMMU_ID_MASK(0x2, 0xF)>,
+			<2 TLB_CFG(BL1, PREFETCH_PREDICTION) (DIR_READ | (1 << 16)) SYSMMU_ID_MASK(0x4, 0xF)>,
+			<3 TLB_CFG(BL1, PREFETCH_PREDICTION) (DIR_READ | (1 << 16)) SYSMMU_ID_MASK(0x6, 0xF)>,
+			<4 TLB_CFG(BL1, PREFETCH_PREDICTION) (DIR_READ | (1 << 16)) SYSMMU_ID_MASK(0x8, 0xF)>;
+		port-name = "DPU";
+		#iommu-cells = <0>;
+		//power-domains = <&pd_dpu>;
+	};
