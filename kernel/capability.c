@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/export.h>
 #include <linux/security.h>
+#include <linux/stringify.h>
 #include <linux/syscalls.h>
 #include <linux/pid_namespace.h>
 #include <linux/user_namespace.h>
@@ -26,6 +27,50 @@
 
 const kernel_cap_t __cap_empty_set = CAP_EMPTY_SET;
 EXPORT_SYMBOL(__cap_empty_set);
+
+const char *cap_string =
+	__stringify(CAP_CHOWN) "\tCAP_CHOWN\n"
+	__stringify(CAP_DAC_OVERRIDE) "\tCAP_DAC_OVERRIDE\n"
+	__stringify(CAP_DAC_READ_SEARCH) "\tCAP_DAC_READ_SEARCH\n"
+	__stringify(CAP_FOWNER) "\tCAP_FOWNER\n"
+	__stringify(CAP_FSETID) "\tCAP_FSETID\n"
+	__stringify(CAP_KILL) "\tCAP_KILL\n"
+	__stringify(CAP_SETGID) "\tCAP_SETGID\n"
+	__stringify(CAP_SETUID) "\tCAP_SETUID\n"
+	__stringify(CAP_SETPCAP) "\tCAP_SETPCAP\n"
+	__stringify(CAP_LINUX_IMMUTABLE) "\tCAP_LINUX_IMMUTABLE\n"
+	__stringify(CAP_NET_BIND_SERVICE) "\tCAP_NET_BIND_SERVICE\n"
+	__stringify(CAP_NET_BROADCAST) "\tCAP_NET_BROADCAST\n"
+	__stringify(CAP_NET_ADMIN) "\tCAP_NET_ADMIN\n"
+	__stringify(CAP_NET_RAW) "\tCAP_NET_RAW\n"
+	__stringify(CAP_IPC_LOCK) "\tCAP_IPC_LOCK\n"
+	__stringify(CAP_IPC_OWNER) "\tCAP_IPC_OWNER\n"
+	__stringify(CAP_SYS_MODULE) "\tCAP_SYS_MODULE\n"
+	__stringify(CAP_SYS_RAWIO) "\tCAP_SYS_RAWIO\n"
+	__stringify(CAP_SYS_CHROOT) "\tCAP_SYS_CHROOT\n"
+	__stringify(CAP_SYS_PTRACE) "\tCAP_SYS_PTRACE\n"
+	__stringify(CAP_SYS_PACCT) "\tCAP_SYS_PACCT\n"
+	__stringify(CAP_SYS_ADMIN) "\tCAP_SYS_ADMIN\n"
+	__stringify(CAP_SYS_BOOT) "\tCAP_SYS_BOOT\n"
+	__stringify(CAP_SYS_NICE) "\tCAP_SYS_NICE\n"
+	__stringify(CAP_SYS_RESOURCE) "\tCAP_SYS_RESOURCE\n"
+	__stringify(CAP_SYS_TIME) "\tCAP_SYS_TIME\n"
+	__stringify(CAP_SYS_TTY_CONFIG) "\tCAP_SYS_TTY_CONFIG\n"
+	__stringify(CAP_MKNOD) "\tCAP_MKNOD\n"
+	__stringify(CAP_LEASE) "\tCAP_LEASE\n"
+	__stringify(CAP_AUDIT_WRITE) "\tCAP_AUDIT_WRITE\n"
+	__stringify(CAP_AUDIT_CONTROL) "\tCAP_AUDIT_CONTROL\n"
+	__stringify(CAP_SETFCAP) "\tCAP_SETFCAP\n"
+	__stringify(CAP_MAC_OVERRIDE) "\tCAP_MAC_OVERRIDE\n"
+	__stringify(CAP_MAC_ADMIN) "\tCAP_MAC_ADMIN\n"
+	__stringify(CAP_SYSLOG) "\tCAP_SYSLOG\n"
+	__stringify(CAP_WAKE_ALARM) "\tCAP_WAKE_ALARM\n"
+	__stringify(CAP_BLOCK_SUSPEND) "\tCAP_BLOCK_SUSPEND\n"
+	__stringify(CAP_AUDIT_READ) "\tCAP_AUDIT_READ\n"
+	__stringify(CAP_PERFMON) "\tCAP_PERFMON\n"
+	__stringify(CAP_BPF) "\tCAP_BPF\n"
+	__stringify(CAP_CHECKPOINT_RESTORE) "\tCAP_CHECKPOINT_RESTORE\n"
+;
 
 int file_caps_enabled = 1;
 
