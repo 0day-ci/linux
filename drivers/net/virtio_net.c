@@ -2692,7 +2692,7 @@ static void virtnet_tx_timeout(struct net_device *dev, unsigned int txqueue)
 	u64_stats_update_end(&sq->stats.syncp);
 
 	netdev_err(dev, "TX timeout on queue: %u, sq: %s, vq: 0x%x, name: %s, %u usecs ago\n",
-		   txqueue, sq->name, sq->vq->index, sq->vq->name,
+		   txqueue, sq->name, txq2vq(sq - vi->sq), sq->name,
 		   jiffies_to_usecs(jiffies - READ_ONCE(txq->trans_start)));
 }
 
