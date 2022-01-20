@@ -128,6 +128,8 @@
 
 #define MSM_MMC_AUTOSUSPEND_DELAY_MS	50
 
+#define MSM_MMC_ERR_STATS_ENABLE 1
+
 /* Timeout value to avoid infinite waiting for pwr_irq */
 #define MSM_PWR_IRQ_TIMEOUT_MS 5000
 
@@ -2734,6 +2736,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	if (ret)
 		goto pm_runtime_disable;
 
+	host->mmc->err_stats_enabled = MSM_MMC_ERR_STATS_ENABLE;
 	pm_runtime_mark_last_busy(&pdev->dev);
 	pm_runtime_put_autosuspend(&pdev->dev);
 
