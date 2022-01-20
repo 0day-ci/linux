@@ -145,6 +145,30 @@ static void page_table_check_set(struct mm_struct *mm, unsigned long addr,
 	}
 }
 
+static void pte_clear_level(struct mm_struct *mm, unsigned long addr,
+			    pte_t *ptep)
+{
+	unsigned long i;
+
+	for (i = 0; i < PTRS_PER_PTE; i++) {
+		__page_table_check_pte_clear(mm, addr, *ptep);
+		addr += PAGE_SIZE;
+		ptep++;
+	}
+}
+
+static void pmd_clear_level(struct mm_struct *mm, unsigned long addr,
+			    pmd_t *pmdp)
+{
+	unsigned long i;
+
+	for (i = 0; i < PTRS_PER_PMD; i++) {
+		__page_table_check_pmd_clear(mm, addr, *pmdp);
+		addr += PMD_PAGE_SIZE;
+		pmdp++;
+	}
+}
+
 /*
  * page is on free list, or is being allocated, verify that counters are zeroes
  * crash if they are not.
@@ -186,6 +210,11 @@ void __page_table_check_pmd_clear(struct mm_struct *mm, unsigned long addr,
 	if (pmd_user_accessible_page(pmd)) {
 		page_table_check_clear(mm, addr, pmd_pfn(pmd),
 				       PMD_PAGE_SIZE >> PAGE_SHIFT);
+	} else if (!pmd_bad(pmd) && !pmd_leaf(pmd)) {
+		pte_t *ptep = pte_offset_map(&pmd, addr);
+
+		pte_clear_level(mm, addr, ptep);
+		pte_unmap(ptep);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pmd_clear);
@@ -199,6 +228,10 @@ void __page_table_check_pud_clear(struct mm_struct *mm, unsigned long addr,
 	if (pud_user_accessible_page(pud)) {
 		page_table_check_clear(mm, addr, pud_pfn(pud),
 				       PUD_PAGE_SIZE >> PAGE_SHIFT);
+	} else if (!pud_bad(pud) && !pud_leaf(pud)) {
+		pmd_t *pmdp = pmd_offset(&pud, addr);
+
+		pmd_clear_level(mm, addr, pmdp);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pud_clear);
@@ -206,17 +239,10 @@ EXPORT_SYMBOL(__page_table_check_pud_clear);
 void __page_table_check_pte_set(struct mm_struct *mm, unsigned long addr,
 				pte_t *ptep, pte_t pte)
 {
-	pte_t old_pte;
-
 	if (&init_mm == mm)
 		return;
 
-	old_pte = *ptep;
-	if (pte_user_accessible_page(old_pte)) {
-		page_table_check_clear(mm, addr, pte_pfn(old_pte),
-				       PAGE_SIZE >> PAGE_SHIFT);
-	}
-
+	__page_table_check_pte_clear(mm, addr, *ptep);
 	if (pte_user_accessible_page(pte)) {
 		page_table_check_set(mm, addr, pte_pfn(pte),
 				     PAGE_SIZE >> PAGE_SHIFT,
@@ -228,17 +254,10 @@ EXPORT_SYMBOL(__page_table_check_pte_set);
 void __page_table_check_pmd_set(struct mm_struct *mm, unsigned long addr,
 				pmd_t *pmdp, pmd_t pmd)
 {
-	pmd_t old_pmd;
-
 	if (&init_mm == mm)
 		return;
 
-	old_pmd = *pmdp;
-	if (pmd_user_accessible_page(old_pmd)) {
-		page_table_check_clear(mm, addr, pmd_pfn(old_pmd),
-				       PMD_PAGE_SIZE >> PAGE_SHIFT);
-	}
-
+	__page_table_check_pmd_clear(mm, addr, *pmdp);
 	if (pmd_user_accessible_page(pmd)) {
 		page_table_check_set(mm, addr, pmd_pfn(pmd),
 				     PMD_PAGE_SIZE >> PAGE_SHIFT,
@@ -250,17 +269,10 @@ EXPORT_SYMBOL(__page_table_check_pmd_set);
 void __page_table_check_pud_set(struct mm_struct *mm, unsigned long addr,
 				pud_t *pudp, pud_t pud)
 {
-	pud_t old_pud;
-
 	if (&init_mm == mm)
 		return;
 
-	old_pud = *pudp;
-	if (pud_user_accessible_page(old_pud)) {
-		page_table_check_clear(mm, addr, pud_pfn(old_pud),
-				       PUD_PAGE_SIZE >> PAGE_SHIFT);
-	}
-
+	__page_table_check_pud_clear(mm, addr, *pudp);
 	if (pud_user_accessible_page(pud)) {
 		page_table_check_set(mm, addr, pud_pfn(pud),
 				     PUD_PAGE_SIZE >> PAGE_SHIFT,
