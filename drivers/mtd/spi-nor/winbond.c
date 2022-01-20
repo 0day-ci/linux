@@ -52,7 +52,7 @@ static const struct flash_info winbond_parts[] = {
 			      SPI_NOR_QUAD_READ) },
 	{ "w25x32", INFO(0xef3016, 0, 64 * 1024,  64)
 		NO_SFDP_FLAGS(SECT_4K) },
-	{ "w25q16jv-im/jm", INFO(0xef7015, 0, 64 * 1024,  32)
+	{ "w25q16jvm", INFO(0xef7015, 0, 64 * 1024,  32)
 		FLAGS(SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
 		NO_SFDP_FLAGS(SECT_4K | SPI_NOR_DUAL_READ |
 			      SPI_NOR_QUAD_READ) },
