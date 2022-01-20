@@ -1512,13 +1512,13 @@ static int ti_write_byte(struct usb_serial_port *port,
 			 u8 mask, u8 byte)
 {
 	int status;
-	unsigned int size;
+	size_t size;
 	struct ti_write_data_bytes *data;
 
 	dev_dbg(&port->dev, "%s - addr 0x%08lX, mask 0x%02X, byte 0x%02X\n", __func__,
 		addr, mask, byte);
 
-	size = sizeof(struct ti_write_data_bytes) + 2;
+	size = struct_size(data, bData, 2);
 	data = kmalloc(size, GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
