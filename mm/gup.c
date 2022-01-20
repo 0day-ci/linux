@@ -1881,7 +1881,7 @@ static long check_and_migrate_movable_pages(unsigned long nr_pages,
 				list_add_tail(&head->lru, &movable_page_list);
 				mod_node_page_state(page_pgdat(head),
 						    NR_ISOLATED_ANON +
-						    page_is_file_lru(head),
+						    folio_is_file_lru(page_folio(head)),
 						    thp_nr_pages(head));
 			}
 		}

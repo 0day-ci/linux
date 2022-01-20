@@ -1066,7 +1066,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		/* Successfully isolated */
 		del_page_from_lru_list(page, lruvec);
 		mod_node_page_state(page_pgdat(page),
-				NR_ISOLATED_ANON + page_is_file_lru(page),
+				NR_ISOLATED_ANON + folio_is_file_lru(page_folio(page)),
 				thp_nr_pages(page));
 
 isolate_success:

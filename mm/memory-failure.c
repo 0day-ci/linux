@@ -2113,7 +2113,7 @@ static bool isolate_page(struct page *page, struct list_head *pagelist)
 
 	if (isolated && lru)
 		inc_node_page_state(page, NR_ISOLATED_ANON +
-				    page_is_file_lru(page));
+				    folio_is_file_lru(page_folio(page)));
 
 	/*
 	 * If we succeed to isolate the page, we grabbed another refcount on

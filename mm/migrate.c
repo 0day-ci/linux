@@ -164,7 +164,7 @@ void putback_movable_pages(struct list_head *l)
 			put_page(page);
 		} else {
 			mod_node_page_state(page_pgdat(page), NR_ISOLATED_ANON +
-					page_is_file_lru(page), -thp_nr_pages(page));
+					folio_is_file_lru(page_folio(page)), -thp_nr_pages(page));
 			putback_lru_page(page);
 		}
 	}
@@ -1145,7 +1145,7 @@ out:
 		 */
 		if (likely(!__PageMovable(page)))
 			mod_node_page_state(page_pgdat(page), NR_ISOLATED_ANON +
-					page_is_file_lru(page), -thp_nr_pages(page));
+					folio_is_file_lru(page_folio(page)), -thp_nr_pages(page));
 
 		if (reason != MR_MEMORY_FAILURE)
 			/*
@@ -1673,7 +1673,7 @@ static int add_page_for_migration(struct mm_struct *mm, unsigned long addr,
 		err = 1;
 		list_add_tail(&head->lru, pagelist);
 		mod_node_page_state(page_pgdat(head),
-			NR_ISOLATED_ANON + page_is_file_lru(head),
+			NR_ISOLATED_ANON + folio_is_file_lru(page_folio(head)),
 			thp_nr_pages(head));
 	}
 out_putpage:
@@ -2064,7 +2064,7 @@ static int numamigrate_isolate_page(pg_data_t *pgdat, struct page *page)
 	if (isolate_lru_page(page))
 		return 0;
 
-	page_lru = page_is_file_lru(page);
+	page_lru = folio_is_file_lru(page_folio(page));
 	mod_node_page_state(page_pgdat(page), NR_ISOLATED_ANON + page_lru,
 			    nr_pages);
 
@@ -2109,7 +2109,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 	 * Don't migrate file pages that are mapped in multiple processes
 	 * with execute permissions as they are probably shared libraries.
 	 */
-	if (page_mapcount(page) != 1 && page_is_file_lru(page) &&
+	if (page_mapcount(page) != 1 && folio_is_file_lru(page_folio(page)) &&
 	    (vma->vm_flags & VM_EXEC))
 		goto out;
 
@@ -2117,7 +2117,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 	 * Also do not migrate dirty pages as not all filesystems can move
 	 * dirty pages in MIGRATE_ASYNC mode which is a waste of cycles.
 	 */
-	if (page_is_file_lru(page) && PageDirty(page))
+	if (folio_is_file_lru(page_folio(page)) && PageDirty(page))
 		goto out;
 
 	isolated = numamigrate_isolate_page(pgdat, page);
@@ -2131,7 +2131,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 		if (!list_empty(&migratepages)) {
 			list_del(&page->lru);
 			mod_node_page_state(page_pgdat(page), NR_ISOLATED_ANON +
-					page_is_file_lru(page), -nr_pages);
+					folio_is_file_lru(page_folio(page)), -nr_pages);
 			putback_lru_page(page);
 		}
 		isolated = 0;
