@@ -145,6 +145,40 @@ static void page_table_check_set(struct mm_struct *mm, unsigned long addr,
 	}
 }
 
+static void pte_clear_level(struct mm_struct *mm, unsigned long addr,
+			    pte_t *ptep)
+{
+	unsigned long i;
+
+	for (i = 0; i < PTRS_PER_PTE; i++) {
+		__page_table_check_pte_clear(mm, addr, *ptep);
+		addr += PAGE_SIZE;
+		ptep++;
+	}
+}
+
+static void pmd_clear_level(struct mm_struct *mm, unsigned long addr,
+			    pmd_t *pmdp)
+{
+	unsigned long i;
+
+	for (i = 0; i < PTRS_PER_PMD; i++) {
+		pmd_t old_pmd = *pmdp;
+
+		if (pmd_user_accessible_page(old_pmd)) {
+			page_table_check_clear(mm, addr, pmd_pfn(old_pmd),
+					       PMD_PAGE_SIZE >> PAGE_SHIFT);
+		} else if (!pmd_bad(old_pmd) && !pmd_leaf(old_pmd)) {
+			pte_t *ptep = pte_offset_map(&old_pmd, addr);
+
+			pte_clear_level(mm, addr, ptep);
+			pte_unmap(ptep);
+		}
+		addr += PMD_PAGE_SIZE;
+		pmdp++;
+	}
+}
+
 /*
  * page is on free list, or is being allocated, verify that counters are zeroes
  * crash if they are not.
@@ -186,6 +220,11 @@ void __page_table_check_pmd_clear(struct mm_struct *mm, unsigned long addr,
 	if (pmd_user_accessible_page(pmd)) {
 		page_table_check_clear(mm, addr, pmd_pfn(pmd),
 				       PMD_PAGE_SIZE >> PAGE_SHIFT);
+	} else if (!pmd_bad(pmd) && !pmd_leaf(pmd)) {
+		pte_t *ptep = pte_offset_map(&pmd, addr);
+
+		pte_clear_level(mm, addr, ptep);
+		pte_unmap(ptep);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pmd_clear);
@@ -199,6 +238,10 @@ void __page_table_check_pud_clear(struct mm_struct *mm, unsigned long addr,
 	if (pud_user_accessible_page(pud)) {
 		page_table_check_clear(mm, addr, pud_pfn(pud),
 				       PUD_PAGE_SIZE >> PAGE_SHIFT);
+	} else if (!pud_bad(pud) && !pud_leaf(pud)) {
+		pmd_t *pmdp = pmd_offset(&pud, addr);
+
+		pmd_clear_level(mm, addr, pmdp);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pud_clear);
@@ -237,6 +280,11 @@ void __page_table_check_pmd_set(struct mm_struct *mm, unsigned long addr,
 	if (pmd_user_accessible_page(old_pmd)) {
 		page_table_check_clear(mm, addr, pmd_pfn(old_pmd),
 				       PMD_PAGE_SIZE >> PAGE_SHIFT);
+	} else if (!pmd_bad(old_pmd) && !pmd_leaf(old_pmd)) {
+		pte_t *ptep = pte_offset_map(&old_pmd, addr);
+
+		pte_clear_level(mm, addr, ptep);
+		pte_unmap(ptep);
 	}
 
 	if (pmd_user_accessible_page(pmd)) {
@@ -259,6 +307,10 @@ void __page_table_check_pud_set(struct mm_struct *mm, unsigned long addr,
 	if (pud_user_accessible_page(old_pud)) {
 		page_table_check_clear(mm, addr, pud_pfn(old_pud),
 				       PUD_PAGE_SIZE >> PAGE_SHIFT);
+	} else if (!pud_bad(old_pud) && !pud_leaf(old_pud)) {
+		pmd_t *pmdp = pmd_offset(&old_pud, addr);
+
+		pmd_clear_level(mm, addr, pmdp);
 	}
 
 	if (pud_user_accessible_page(pud)) {
