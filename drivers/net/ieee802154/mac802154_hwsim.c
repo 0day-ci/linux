@@ -732,7 +732,6 @@ static int hwsim_add_one(struct genl_info *info, struct device *dev,
 {
 	struct ieee802154_hw *hw;
 	struct hwsim_phy *phy;
-	struct hwsim_pib *pib;
 	int idx;
 	int err;
 
@@ -780,13 +779,8 @@ static int hwsim_add_one(struct genl_info *info, struct device *dev,
 
 	/* hwsim phy channel 13 as default */
 	hw->phy->current_channel = 13;
-	pib = kzalloc(sizeof(*pib), GFP_KERNEL);
-	if (!pib) {
-		err = -ENOMEM;
-		goto err_pib;
-	}
+	hwsim_hw_channel(hw, hw->phy->current_page, hw->phy->current_channel);
 
-	rcu_assign_pointer(phy->pib, pib);
 	phy->idx = idx;
 	INIT_LIST_HEAD(&phy->edges);
 
@@ -815,8 +809,6 @@ static int hwsim_add_one(struct genl_info *info, struct device *dev,
 err_subscribe:
 	ieee802154_unregister_hw(phy->hw);
 err_reg:
-	kfree(pib);
-err_pib:
 	ieee802154_free_hw(phy->hw);
 	return err;
 }
