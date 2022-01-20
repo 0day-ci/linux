@@ -1162,14 +1162,6 @@ static int diskstats_show(struct seq_file *seqf, void *v)
 	struct disk_stats stat;
 	unsigned long idx;
 
-	/*
-	if (&disk_to_dev(gp)->kobj.entry == block_class.devices.next)
-		seq_puts(seqf,	"major minor name"
-				"     rio rmerge rsect ruse wio wmerge "
-				"wsect wuse running use aveq"
-				"\n\n");
-	*/
-
 	rcu_read_lock();
 	xa_for_each(&gp->part_tbl, idx, hd) {
 		if (bdev_is_partition(hd) && !bdev_nr_sectors(hd))
