@@ -173,11 +173,16 @@ static inline int smc_wr_tx_get_free_slot_index(struct smc_link *link, u32 *idx)
 	*idx = link->wr_tx_cnt;
 	if (!smc_link_sendable(link))
 		return -ENOLINK;
+
+	if (!smc_wr_tx_get_credit(link))
+		return -EBUSY;
+
 	for_each_clear_bit(*idx, link->wr_tx_mask, link->wr_tx_cnt) {
 		if (!test_and_set_bit(*idx, link->wr_tx_mask))
 			return 0;
 	}
 	*idx = link->wr_tx_cnt;
+	smc_wr_tx_put_credits(link, 1, false);
 	return -EBUSY;
 }
 
@@ -283,7 +288,7 @@ int smc_wr_tx_put_slot(struct smc_link *link,
 		memset(&link->wr_tx_bufs[idx], 0,
 		       sizeof(link->wr_tx_bufs[idx]));
 		test_and_clear_bit(idx, link->wr_tx_mask);
-		wake_up(&link->wr_tx_wait);
+		smc_wr_tx_put_credits(link, 1, true);
 		return 1;
 	} else if (link->lgr->smc_version == SMC_V2 &&
 		   pend->idx == link->wr_tx_cnt) {
@@ -471,6 +476,12 @@ static inline void smc_wr_rx_process_cqes(struct ib_wc wc[], int num)
 				break;
 			}
 		}
+
+		if (smc_wr_rx_credits_need_announce(link) &&
+		    !test_bit(SMC_LINKFLAG_ANNOUNCE_PENDING, &link->flags)) {
+			set_bit(SMC_LINKFLAG_ANNOUNCE_PENDING, &link->flags);
+			schedule_work(&link->credits_announce_work);
+		}
 	}
 }
 
@@ -513,6 +524,8 @@ int smc_wr_rx_post_init(struct smc_link *link)
 
 	for (i = 0; i < link->wr_rx_cnt; i++)
 		rc = smc_wr_rx_post(link);
+	// credits have already been announced to peer
+	atomic_set(&link->local_rq_credits, 0);
 	return rc;
 }
 
@@ -547,7 +560,7 @@ void smc_wr_remember_qp_attr(struct smc_link *lnk)
 
 	lnk->wr_tx_cnt = min_t(size_t, SMC_WR_BUF_CNT,
 			       lnk->qp_attr.cap.max_send_wr);
-	lnk->wr_rx_cnt = min_t(size_t, SMC_WR_BUF_CNT * 3,
+	lnk->wr_rx_cnt = min_t(size_t, SMC_WR_BUF_CNT,
 			       lnk->qp_attr.cap.max_recv_wr);
 }
 
@@ -736,7 +749,7 @@ int smc_wr_alloc_link_mem(struct smc_link *link)
 	link->wr_tx_bufs = kcalloc(SMC_WR_BUF_CNT, SMC_WR_BUF_SIZE, GFP_KERNEL);
 	if (!link->wr_tx_bufs)
 		goto no_mem;
-	link->wr_rx_bufs = kcalloc(SMC_WR_BUF_CNT * 3, SMC_WR_BUF_SIZE,
+	link->wr_rx_bufs = kcalloc(SMC_WR_BUF_CNT, SMC_WR_BUF_SIZE,
 				   GFP_KERNEL);
 	if (!link->wr_rx_bufs)
 		goto no_mem_wr_tx_bufs;
@@ -744,7 +757,7 @@ int smc_wr_alloc_link_mem(struct smc_link *link)
 				  GFP_KERNEL);
 	if (!link->wr_tx_ibs)
 		goto no_mem_wr_rx_bufs;
-	link->wr_rx_ibs = kcalloc(SMC_WR_BUF_CNT * 3,
+	link->wr_rx_ibs = kcalloc(SMC_WR_BUF_CNT,
 				  sizeof(link->wr_rx_ibs[0]),
 				  GFP_KERNEL);
 	if (!link->wr_rx_ibs)
@@ -763,7 +776,7 @@ int smc_wr_alloc_link_mem(struct smc_link *link)
 				   GFP_KERNEL);
 	if (!link->wr_tx_sges)
 		goto no_mem_wr_tx_rdma_sges;
-	link->wr_rx_sges = kcalloc(SMC_WR_BUF_CNT * 3,
+	link->wr_rx_sges = kcalloc(SMC_WR_BUF_CNT,
 				   sizeof(link->wr_rx_sges[0]) * sges_per_buf,
 				   GFP_KERNEL);
 	if (!link->wr_rx_sges)
@@ -886,6 +899,13 @@ int smc_wr_create_link(struct smc_link *lnk)
 	atomic_set(&lnk->wr_tx_refcnt, 0);
 	init_waitqueue_head(&lnk->wr_reg_wait);
 	atomic_set(&lnk->wr_reg_refcnt, 0);
+	atomic_set(&lnk->peer_rq_credits, 0);
+	atomic_set(&lnk->local_rq_credits, 0);
+	lnk->flags = 0;
+	// set local rq credits high watermark to lnk->wr_rx_cnt / 3,
+	// if local rq credits more than high watermark, announcement is needed.
+	lnk->local_cr_watermark_high = max(lnk->wr_rx_cnt / 3, 1U);
+	lnk->peer_cr_watermark_low = 0;
 	return rc;
 
 dma_unmap:

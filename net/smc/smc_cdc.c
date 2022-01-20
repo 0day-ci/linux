@@ -101,14 +101,18 @@ int smc_cdc_msg_send(struct smc_connection *conn,
 		     struct smc_cdc_tx_pend *pend)
 {
 	struct smc_link *link = conn->lnk;
+	struct smc_cdc_msg *cdc_msg = (struct smc_cdc_msg *)wr_buf;
 	union smc_host_cursor cfed;
+	u8 saved_credits = 0;
 	int rc;
 
 	smc_cdc_add_pending_send(conn, pend);
 
 	conn->tx_cdc_seq++;
 	conn->local_tx_ctrl.seqno = conn->tx_cdc_seq;
-	smc_host_msg_to_cdc((struct smc_cdc_msg *)wr_buf, conn, &cfed);
+	smc_host_msg_to_cdc(cdc_msg, conn, &cfed);
+	saved_credits = (u8)smc_wr_rx_get_credits(link);
+	cdc_msg->credits = saved_credits;
 
 	atomic_inc(&conn->cdc_pend_tx_wr);
 	smp_mb__after_atomic(); /* Make sure cdc_pend_tx_wr added before post */
@@ -120,6 +124,7 @@ int smc_cdc_msg_send(struct smc_connection *conn,
 	} else {
 		conn->tx_cdc_seq--;
 		conn->local_tx_ctrl.seqno = conn->tx_cdc_seq;
+		smc_wr_rx_put_credits(link, saved_credits);
 		atomic_dec(&conn->cdc_pend_tx_wr);
 	}
 
@@ -429,6 +434,9 @@ static void smc_cdc_rx_handler(struct ib_wc *wc, void *buf)
 		return; /* short message */
 	if (cdc->len != SMC_WR_TX_SIZE)
 		return; /* invalid message */
+
+	if (cdc->credits)
+		smc_wr_tx_put_credits(link, cdc->credits, true);
 
 	/* lookup connection */
 	lgr = smc_get_lgr(link);

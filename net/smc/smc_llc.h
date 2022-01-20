@@ -20,6 +20,8 @@
 #define SMC_LLC_WAIT_FIRST_TIME		(5 * HZ)
 #define SMC_LLC_WAIT_TIME		(2 * HZ)
 
+#define SMC_LLC_ANNOUNCE_CR_MAX_RETRY	(1)
+
 enum smc_llc_reqresp {
 	SMC_LLC_REQ,
 	SMC_LLC_RESP
@@ -35,6 +37,7 @@ enum smc_llc_msg_type {
 	SMC_LLC_TEST_LINK		= 0x07,
 	SMC_LLC_CONFIRM_RKEY_CONT	= 0x08,
 	SMC_LLC_DELETE_RKEY		= 0x09,
+	SMC_LLC_ANNOUNCE_CREDITS	= 0X0A,
 	/* V2 types */
 	SMC_LLC_CONFIRM_LINK_V2		= 0x21,
 	SMC_LLC_ADD_LINK_V2		= 0x22,
@@ -86,6 +89,8 @@ int smc_llc_send_add_link(struct smc_link *link, u8 mac[], u8 gid[],
 int smc_llc_send_delete_link(struct smc_link *link, u8 link_del_id,
 			     enum smc_llc_reqresp reqresp, bool orderly,
 			     u32 reason);
+int smc_llc_announce_credits(struct smc_link *link,
+			     enum smc_llc_reqresp reqresp, bool force);
 void smc_llc_srv_delete_link_local(struct smc_link *link, u8 del_link_id);
 void smc_llc_lgr_init(struct smc_link_group *lgr, struct smc_sock *smc);
 void smc_llc_lgr_clear(struct smc_link_group *lgr);

@@ -1038,9 +1038,12 @@ static int smc_clc_send_confirm_accept(struct smc_sock *smc,
 		switch (clc->hdr.type) {
 		case SMC_CLC_ACCEPT:
 			clc->r0.qp_mtu = link->path_mtu;
+			clc->r0.init_credits = (u8)link->wr_rx_cnt;
 			break;
 		case SMC_CLC_CONFIRM:
 			clc->r0.qp_mtu = min(link->path_mtu, link->peer_mtu);
+			clc->r0.init_credits =
+				link->credits_enable ? (u8)link->wr_rx_cnt : 0;
 			break;
 		}
 		clc->r0.rmbe_size = conn->rmbe_size_short;

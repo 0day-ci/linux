@@ -665,10 +665,12 @@ int smc_ib_create_queue_pair(struct smc_link *lnk)
 		.srq = NULL,
 		.cap = {
 				/* include unsolicited rdma_writes as well,
-				 * there are max. 2 RDMA_WRITE per 1 WR_SEND
+				 * there are max. 2 RDMA_WRITE per 1 WR_SEND.
+				 * RDMA_WRITE consumes send queue entities,
+				 * without recv queue entities.
 				 */
 			.max_send_wr = SMC_WR_BUF_CNT * 3,
-			.max_recv_wr = SMC_WR_BUF_CNT * 3,
+			.max_recv_wr = SMC_WR_BUF_CNT,
 			.max_send_sge = SMC_IB_MAX_SEND_SGE,
 			.max_recv_sge = sges_per_buf,
 		},

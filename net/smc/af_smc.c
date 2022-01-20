@@ -531,6 +531,13 @@ static void smc_link_save_peer_info(struct smc_link *link,
 	memcpy(link->peer_mac, ini->peer_mac, sizeof(link->peer_mac));
 	link->peer_psn = ntoh24(clc->r0.psn);
 	link->peer_mtu = clc->r0.qp_mtu;
+	link->credits_enable = clc->r0.init_credits ? 1 : 0;
+	if (link->credits_enable) {
+		atomic_set(&link->peer_rq_credits, clc->r0.init_credits);
+		// set peer rq credits watermark, if less than init_credits * 2/3,
+		// then credit announcement is needed.
+		link->peer_cr_watermark_low = max(clc->r0.init_credits * 2 / 3, 1);
+	}
 }
 
 static void smc_stat_inc_fback_rsn_cnt(struct smc_sock *smc,
@@ -945,6 +952,11 @@ static int smc_connect_rdma(struct smc_sock *smc,
 			goto connect_abort;
 		}
 	} else {
+		if (smc_llc_announce_credits(link, SMC_LLC_RESP, true)) {
+			reason_code = SMC_CLC_DECL_CREDITSERR;
+			goto connect_abort;
+		}
+
 		if (smcr_lgr_reg_rmbs(link, smc->conn.rmb_desc)) {
 			reason_code = SMC_CLC_DECL_ERR_REGRMB;
 			goto connect_abort;
