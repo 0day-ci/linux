@@ -748,8 +748,8 @@ edd_init(void)
 		}
 
 		rc = edd_device_register(edev, i);
-		if (rc) {
-			kfree(edev);
+		if (rc < 0) {
+			kobject_put(&edev->kobj);
 			goto out;
 		}
 		edd_devices[i] = edev;
