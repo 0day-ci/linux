@@ -240,6 +240,49 @@ int virtio_find_vqs_ctx(struct virtio_device *vdev, unsigned nvqs,
 }
 
 /**
+ * virtio_reset_vq - reset a queue individually
+ * @vdev: the device
+ * @queue_index: the queue index
+ * @callback: callback to free unused bufs
+ * @data: pass to callback
+ *
+ * returns 0 on success or error status
+ *
+ */
+static inline
+int virtio_reset_vq(struct virtio_device *vdev, u16 queue_index,
+		    vq_reset_callback_t *callback, void *data)
+{
+	if (!vdev->config->reset_vq)
+		return -ENOENT;
+
+	return vdev->config->reset_vq(vdev, queue_index, callback, data);
+}
+
+/**
+ * virtio_enable_resetq - enable a reset queue
+ * @vdev: the device
+ * @queue_index: the queue index
+ * @callback: callback for the virtqueue, NULL for vq that do not need a callback
+ * @name: virtqueue names (mainly for debugging), NULL for vq unused by driver
+ * @ctx: ctx
+ *
+ * returns vq on success or error status
+ *
+ */
+static inline
+struct virtqueue *virtio_enable_resetq(struct virtio_device *vdev,
+				       u16 queue_index, vq_callback_t *callback,
+				       const char *name, const bool *ctx)
+{
+	if (!vdev->config->enable_reset_vq)
+		return ERR_PTR(-ENOENT);
+
+	return vdev->config->enable_reset_vq(vdev, queue_index, callback,
+					     name, ctx);
+}
+
+/**
  * virtio_device_ready - enable vq use in probe function
  * @vdev: the device
  *
