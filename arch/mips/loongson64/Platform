@@ -26,5 +26,6 @@ cflags-y += $(call cc-option,-mno-loongson-mmi)
 # Loongson Machines' Support
 #
 
-cflags-$(CONFIG_MACH_LOONGSON64) += -I$(srctree)/arch/mips/include/asm/mach-loongson64 -mno-branch-likely
+cflags-$(CONFIG_MACH_LOONGSON64) += -I$(srctree)/arch/mips/include/asm/mach-loongson64
+cflags-$(CONFIG_MACH_LOONGSON64) += $(call cc-option,-mno-branch-likely)
 load-$(CONFIG_CPU_LOONGSON64) += 0xffffffff80200000
