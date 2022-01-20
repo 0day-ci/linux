@@ -6894,6 +6894,10 @@ void set_user_nice(struct task_struct *p, long nice)
 
 	if (task_nice(p) == nice || nice < MIN_NICE || nice > MAX_NICE)
 		return;
+
+	/* Check if the task's schedule run queue is setup correctly */
+	if (!task_rq_ready(p))
+		return;
 	/*
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.

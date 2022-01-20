@@ -1394,6 +1394,12 @@ static inline struct cfs_rq *group_cfs_rq(struct sched_entity *grp)
 	return grp->my_q;
 }
 
+/* returns true if cfs run queue is set for the task */
+static inline bool task_rq_ready(struct task_struct *p)
+{
+	return !!task_cfs_rq(p);
+}
+
 #else
 
 static inline struct task_struct *task_of(struct sched_entity *se)
@@ -1418,6 +1424,11 @@ static inline struct cfs_rq *cfs_rq_of(struct sched_entity *se)
 static inline struct cfs_rq *group_cfs_rq(struct sched_entity *grp)
 {
 	return NULL;
+}
+
+static inline bool task_rq_ready(struct task_struct *p)
+{
+	return true;
 }
 #endif
 
