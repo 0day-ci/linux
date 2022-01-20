@@ -321,6 +321,10 @@ i915-y += intel_gvt.o
 include $(src)/gvt/Makefile
 endif
 
+# Architecture-specific calls
+i915-$(CONFIG_X86)   += i915_platform_x86.o
+i915-$(CONFIG_ARM64) += i915_platform_arm64.o
+
 obj-$(CONFIG_DRM_I915) += i915.o
 obj-$(CONFIG_DRM_I915_GVT_KVMGT) += gvt/kvmgt.o
 
