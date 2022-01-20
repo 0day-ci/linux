@@ -12,6 +12,7 @@
 #include <linux/acpi.h>
 #include <linux/bitmap.h>
 #include <linux/delay.h>
+#include <linux/dmi.h>
 #include <linux/errno.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
@@ -1157,6 +1158,7 @@ static int phy_poll_reset(struct phy_device *phydev)
 int phy_init_hw(struct phy_device *phydev)
 {
 	int ret = 0;
+	bool resume = phydev->suspended;
 
 	/* Deassert the reset signal */
 	phy_device_reset(phydev, 0);
@@ -1183,6 +1185,9 @@ int phy_init_hw(struct phy_device *phydev)
 		if (ret < 0)
 			return ret;
 	}
+
+	if (phydev->drv->config_led)
+		phydev->drv->config_led(phydev, resume);
 
 	if (phydev->drv->config_intr) {
 		ret = phydev->drv->config_intr(phydev);
@@ -1342,6 +1347,17 @@ int phy_sfp_probe(struct phy_device *phydev,
 }
 EXPORT_SYMBOL(phy_sfp_probe);
 
+static const struct dmi_system_id platform_flags[] = {
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell EMC"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Edge Gateway 3200"),
+		},
+		.driver_data = (void *)PHY_USE_FIRMWARE_LED,
+	},
+	{}
+};
+
 /**
  * phy_attach_direct - attach a network device to a given PHY device pointer
  * @dev: network device to attach
@@ -1363,6 +1379,7 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 	struct mii_bus *bus = phydev->mdio.bus;
 	struct device *d = &phydev->mdio.dev;
 	struct module *ndev_owner = NULL;
+	const struct dmi_system_id *dmi;
 	bool using_genphy = false;
 	int err;
 
@@ -1442,6 +1459,10 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 		if (err)
 			phydev_err(phydev, "error creating 'phy_standalone' sysfs entry\n");
 	}
+
+	dmi = dmi_first_match(platform_flags);
+	if (dmi)
+		phydev->dev_flags |= (u32)dmi->driver_data;
 
 	phydev->dev_flags |= flags;
 

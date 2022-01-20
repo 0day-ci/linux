@@ -517,6 +517,8 @@ struct phy_c45_device_ids {
 struct macsec_context;
 struct macsec_ops;
 
+#define PHY_USE_FIRMWARE_LED 0x1000000
+
 /**
  * struct phy_device - An instance of a PHY
  *
@@ -663,6 +665,7 @@ struct phy_device {
 
 	struct phy_led_trigger *led_link_trigger;
 #endif
+	int led_config;
 
 	/*
 	 * Interrupt number for this PHY
@@ -775,6 +778,12 @@ struct phy_driver {
 	 * including after a reset
 	 */
 	int (*config_init)(struct phy_device *phydev);
+
+	/**
+	 * @config_led: Called to config the PHY LED,
+	 * Use the resume flag to indicate init or resume
+	 */
+	void (*config_led)(struct phy_device *phydev, bool resume);
 
 	/**
 	 * @probe: Called during discovery.  Used to set

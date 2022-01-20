@@ -746,10 +746,14 @@ error:
 	return err;
 }
 
-static void marvell_config_led(struct phy_device *phydev)
+static int marvell_find_led_config(struct phy_device *phydev)
 {
-	u16 def_config;
-	int err;
+	int def_config;
+
+	if (phydev->dev_flags & PHY_USE_FIRMWARE_LED) {
+		def_config = phy_read_paged(phydev, MII_MARVELL_LED_PAGE, MII_PHY_LED_CTRL);
+		return def_config < 0 ? -1 : def_config;
+	}
 
 	switch (MARVELL_PHY_FAMILY_ID(phydev->phy_id)) {
 	/* Default PHY LED config: LED[0] .. Link, LED[1] .. Activity */
@@ -769,20 +773,30 @@ static void marvell_config_led(struct phy_device *phydev)
 			def_config = MII_88E1510_PHY_LED_DEF;
 		break;
 	default:
-		return;
+		return -1;
 	}
 
+	return def_config;
+}
+
+static void marvell_config_led(struct phy_device *phydev, bool resume)
+{
+	int err;
+
+	if (!resume)
+		phydev->led_config = marvell_find_led_config(phydev);
+
+	if (phydev->led_config == -1)
+		return;
+
 	err = phy_write_paged(phydev, MII_MARVELL_LED_PAGE, MII_PHY_LED_CTRL,
-			      def_config);
+			      phydev->led_config);
 	if (err < 0)
 		phydev_warn(phydev, "Fail to config marvell phy LED.\n");
 }
 
 static int marvell_config_init(struct phy_device *phydev)
 {
-	/* Set default LED */
-	marvell_config_led(phydev);
-
 	/* Set registers from marvell,reg-init DT property */
 	return marvell_of_reg_init(phydev);
 }
@@ -2845,6 +2859,7 @@ static struct phy_driver marvell_drivers[] = {
 		/* PHY_GBIT_FEATURES */
 		.probe = marvell_probe,
 		.config_init = marvell_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1101_config_aneg,
 		.config_intr = marvell_config_intr,
 		.handle_interrupt = marvell_handle_interrupt,
@@ -2944,6 +2959,7 @@ static struct phy_driver marvell_drivers[] = {
 		/* PHY_GBIT_FEATURES */
 		.probe = marvell_probe,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1121_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -2965,6 +2981,7 @@ static struct phy_driver marvell_drivers[] = {
 		/* PHY_GBIT_FEATURES */
 		.probe = marvell_probe,
 		.config_init = m88e1318_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1318_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3044,6 +3061,7 @@ static struct phy_driver marvell_drivers[] = {
 		/* PHY_GBIT_FEATURES */
 		.probe = marvell_probe,
 		.config_init = m88e1116r_config_init,
+		.config_led = marvell_config_led,
 		.config_intr = marvell_config_intr,
 		.handle_interrupt = marvell_handle_interrupt,
 		.resume = genphy_resume,
@@ -3065,6 +3083,7 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_POLL_CABLE_TEST,
 		.probe = m88e1510_probe,
 		.config_init = m88e1510_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1510_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3094,6 +3113,7 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_POLL_CABLE_TEST,
 		.probe = marvell_probe,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1510_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3120,6 +3140,7 @@ static struct phy_driver marvell_drivers[] = {
 		/* PHY_GBIT_FEATURES */
 		.flags = PHY_POLL_CABLE_TEST,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1510_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3144,6 +3165,7 @@ static struct phy_driver marvell_drivers[] = {
 		/* PHY_BASIC_FEATURES */
 		.probe = marvell_probe,
 		.config_init = m88e3016_config_init,
+		.config_led = marvell_config_led,
 		.aneg_done = marvell_aneg_done,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3165,6 +3187,7 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_POLL_CABLE_TEST,
 		.probe = marvell_probe,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e6390_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3191,6 +3214,7 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_POLL_CABLE_TEST,
 		.probe = marvell_probe,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e6390_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3217,6 +3241,7 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_POLL_CABLE_TEST,
 		.probe = marvell_probe,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1510_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3242,6 +3267,7 @@ static struct phy_driver marvell_drivers[] = {
 		.probe = marvell_probe,
 		/* PHY_GBIT_FEATURES */
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1510_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
@@ -3264,6 +3290,7 @@ static struct phy_driver marvell_drivers[] = {
 		.probe = marvell_probe,
 		.features = PHY_GBIT_FIBRE_FEATURES,
 		.config_init = marvell_1011gbe_config_init,
+		.config_led = marvell_config_led,
 		.config_aneg = m88e1510_config_aneg,
 		.read_status = marvell_read_status,
 		.config_intr = marvell_config_intr,
