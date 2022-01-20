@@ -36,24 +36,27 @@ description: |
 
 properties:
   compatible:
-    enum:
-      - qcom,gcc-apq8084
-      - qcom,gcc-ipq4019
-      - qcom,gcc-ipq6018
-      - qcom,gcc-ipq8064
-      - qcom,gcc-mdm9607
-      - qcom,gcc-msm8226
-      - qcom,gcc-msm8660
-      - qcom,gcc-msm8916
-      - qcom,gcc-msm8939
-      - qcom,gcc-msm8953
-      - qcom,gcc-msm8960
-      - qcom,gcc-msm8974
-      - qcom,gcc-msm8974pro
-      - qcom,gcc-msm8974pro-ac
-      - qcom,gcc-mdm9615
-      - qcom,gcc-sdm630
-      - qcom,gcc-sdm660
+    oneOf:
+      - enum:
+          - qcom,gcc-apq8084
+          - qcom,gcc-ipq4019
+          - qcom,gcc-ipq6018
+          - qcom,gcc-mdm9607
+          - qcom,gcc-msm8226
+          - qcom,gcc-msm8660
+          - qcom,gcc-msm8916
+          - qcom,gcc-msm8939
+          - qcom,gcc-msm8953
+          - qcom,gcc-msm8960
+          - qcom,gcc-msm8974
+          - qcom,gcc-msm8974pro
+          - qcom,gcc-msm8974pro-ac
+          - qcom,gcc-mdm9615
+          - qcom,gcc-sdm630
+          - qcom,gcc-sdm660
+      - items:
+          - const: qcom,gcc-ipq8064
+          - const: syscon
 
   '#clock-cells':
     const: 1
@@ -78,7 +81,7 @@ required:
   - '#reset-cells'
   - '#power-domain-cells'
 
-additionalProperties: false
+additionalProperties: true
 
 examples:
   # Example for GCC for MSM8960:
