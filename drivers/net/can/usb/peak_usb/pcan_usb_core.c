@@ -894,6 +894,9 @@ adap_dev_free:
 		dev->adapter->dev_free(dev);
 
 lbl_unregister_candev:
+	/* remove the dangling pointer in next_siblings */
+	if (dev->prev_siblings)
+		(dev->prev_siblings)->next_siblings = NULL;
 	unregister_candev(netdev);
 
 lbl_restore_intf_data:
