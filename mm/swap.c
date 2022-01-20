@@ -543,7 +543,7 @@ static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec)
 		 * It can make readahead confusing.  But race window
 		 * is _really_ small and  it's non-critical problem.
 		 */
-		add_page_to_lru_list(page, lruvec);
+		lruvec_add_folio(lruvec, page_folio(page));
 		SetPageReclaim(page);
 	} else {
 		/*
@@ -569,7 +569,7 @@ static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec)
 		del_page_from_lru_list(page, lruvec);
 		ClearPageActive(page);
 		ClearPageReferenced(page);
-		add_page_to_lru_list(page, lruvec);
+		lruvec_add_folio(lruvec, page_folio(page));
 
 		__count_vm_events(PGDEACTIVATE, nr_pages);
 		__count_memcg_events(lruvec_memcg(lruvec), PGDEACTIVATE,
@@ -592,7 +592,7 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec)
 		 * anonymous pages
 		 */
 		ClearPageSwapBacked(page);
-		add_page_to_lru_list(page, lruvec);
+		lruvec_add_folio(lruvec, page_folio(page));
 
 		__count_vm_events(PGLAZYFREE, nr_pages);
 		__count_memcg_events(lruvec_memcg(lruvec), PGLAZYFREE,

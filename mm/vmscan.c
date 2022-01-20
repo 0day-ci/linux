@@ -2354,7 +2354,7 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 		 * inhibits memcg migration).
 		 */
 		VM_BUG_ON_PAGE(!folio_matches_lruvec(page_folio(page), lruvec), page);
-		add_page_to_lru_list(page, lruvec);
+		lruvec_add_folio(lruvec, page_folio(page));
 		nr_pages = thp_nr_pages(page);
 		nr_moved += nr_pages;
 		if (PageActive(page))
@@ -4875,7 +4875,7 @@ void check_move_unevictable_pages(struct pagevec *pvec)
 		if (page_evictable(page) && PageUnevictable(page)) {
 			del_page_from_lru_list(page, lruvec);
 			ClearPageUnevictable(page);
-			add_page_to_lru_list(page, lruvec);
+			lruvec_add_folio(lruvec, page_folio(page));
 			pgrescued += nr_pages;
 		}
 		SetPageLRU(page);
