@@ -248,6 +248,17 @@ static void vp_del_vq(struct virtqueue *vq)
 	struct virtio_pci_vq_info *info = vp_dev->vqs[vq->index];
 	unsigned long flags;
 
+	if (vp_dev->per_vq_vectors) {
+		int v = vp_dev->vqs[vq->index]->msix_vector;
+
+		if (v != VIRTIO_MSI_NO_VECTOR) {
+			int irq = pci_irq_vector(vp_dev->pci_dev, v);
+
+			irq_set_affinity_hint(irq, NULL);
+			free_irq(irq, vq);
+		}
+	}
+
 	spin_lock_irqsave(&vp_dev->lock, flags);
 	list_del(&info->node);
 	spin_unlock_irqrestore(&vp_dev->lock, flags);
@@ -263,19 +274,9 @@ void vp_del_vqs(struct virtio_device *vdev)
 	struct virtqueue *vq, *n;
 	int i;
 
-	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
-		if (vp_dev->per_vq_vectors) {
-			int v = vp_dev->vqs[vq->index]->msix_vector;
-
-			if (v != VIRTIO_MSI_NO_VECTOR) {
-				int irq = pci_irq_vector(vp_dev->pci_dev, v);
-
-				irq_set_affinity_hint(irq, NULL);
-				free_irq(irq, vq);
-			}
-		}
+	list_for_each_entry_safe(vq, n, &vdev->vqs, list)
 		vp_del_vq(vq);
-	}
+
 	vp_dev->per_vq_vectors = false;
 
 	if (vp_dev->intx_enabled) {
