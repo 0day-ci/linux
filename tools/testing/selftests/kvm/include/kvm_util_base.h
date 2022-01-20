@@ -54,6 +54,7 @@ enum vm_guest_mode {
 	VM_MODE_P36V48_16K,
 	VM_MODE_P36V48_64K,
 	VM_MODE_P36V47_16K,
+	VM_MODE_P51V52_64K,
 	NUM_VM_MODES,
 };
 
@@ -85,6 +86,12 @@ extern enum vm_guest_mode vm_mode_default;
 
 #define VM_MODE_DEFAULT			VM_MODE_P40V48_4K
 #define MIN_PAGE_SHIFT			12U
+#define ptes_per_page(page_size)	((page_size) / 8)
+
+#elif defined(__powerpc__)
+
+#define VM_MODE_DEFAULT			VM_MODE_P51V52_64K
+#define MIN_PAGE_SHIFT			16U
 #define ptes_per_page(page_size)	((page_size) / 8)
 
 #endif

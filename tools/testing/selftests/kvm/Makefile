@@ -17,9 +17,9 @@ KSFT_KHDR_INSTALL := 1
 # LINUX_TOOL_ARCH_INCLUDE is set using ARCH variable.
 #
 # x86_64 targets are named to include x86_64 as a suffix and directories
-# for includes are in x86_64 sub-directory. s390x and aarch64 follow the
-# same convention. "uname -m" doesn't result in the correct mapping for
-# s390x and aarch64.
+# for includes are in x86_64 sub-directory. s390x, aarch64 and ppc64le
+# follow the same convention. "uname -m" doesn't result in the correct
+# mapping for s390x, aarch64 and ppc64le.
 #
 # No change necessary for x86_64
 UNAME_M := $(shell uname -m)
@@ -36,12 +36,17 @@ endif
 ifeq ($(ARCH),riscv)
 	UNAME_M := riscv
 endif
+# Set UNAME_M for ppc64le compile/install to work
+ifeq ($(ARCH),powerpc)
+	UNAME_M := ppc64le
+endif
 
 LIBKVM = lib/assert.c lib/elf.c lib/io.c lib/kvm_util.c lib/rbtree.c lib/sparsebit.c lib/test_util.c lib/guest_modes.c lib/perf_test_util.c
 LIBKVM_x86_64 = lib/x86_64/apic.c lib/x86_64/processor.c lib/x86_64/vmx.c lib/x86_64/svm.c lib/x86_64/ucall.c lib/x86_64/handlers.S
 LIBKVM_aarch64 = lib/aarch64/processor.c lib/aarch64/ucall.c lib/aarch64/handlers.S lib/aarch64/spinlock.c lib/aarch64/gic.c lib/aarch64/gic_v3.c lib/aarch64/vgic.c
 LIBKVM_s390x = lib/s390x/processor.c lib/s390x/ucall.c lib/s390x/diag318_test_handler.c
 LIBKVM_riscv = lib/riscv/processor.c lib/riscv/ucall.c
+LIBKVM_ppc64le = lib/powerpc/processor.c lib/powerpc/ucall.c lib/powerpc/hcall.S
 
 TEST_GEN_PROGS_x86_64 = x86_64/cr4_cpuid_sync_test
 TEST_GEN_PROGS_x86_64 += x86_64/get_msr_index_features
@@ -132,6 +137,9 @@ TEST_GEN_PROGS_riscv += kvm_create_max_vcpus
 TEST_GEN_PROGS_riscv += kvm_page_table_test
 TEST_GEN_PROGS_riscv += set_memory_region_test
 TEST_GEN_PROGS_riscv += kvm_binary_stats_test
+
+TEST_GEN_PROGS_ppc64le += powerpc/sample_test
+TEST_GEN_PROGS_ppc64le += kvm_page_table_test
 
 TEST_GEN_PROGS += $(TEST_GEN_PROGS_$(UNAME_M))
 LIBKVM += $(LIBKVM_$(UNAME_M))
