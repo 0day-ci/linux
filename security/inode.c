@@ -21,6 +21,7 @@
 #include <linux/security.h>
 #include <linux/lsm_hooks.h>
 #include <linux/magic.h>
+#include <linux/capability.h>
 
 static struct vfsmount *mount;
 static int mount_count;
@@ -328,6 +329,19 @@ static const struct file_operations lsm_ops = {
 };
 #endif
 
+static struct dentry *capabilities_dentry;
+static ssize_t capabilities_read(struct file *unused, char __user *buf,
+				 size_t count, loff_t *ppos)
+{
+	return simple_read_from_buffer(buf, count, ppos, cap_string,
+				       strlen(cap_string));
+}
+
+static const struct file_operations capabilities_ops = {
+	.read = capabilities_read,
+	.llseek = generic_file_llseek,
+};
+
 static int __init securityfs_init(void)
 {
 	int retval;
@@ -345,6 +359,8 @@ static int __init securityfs_init(void)
 	lsm_dentry = securityfs_create_file("lsm", 0444, NULL, NULL,
 						&lsm_ops);
 #endif
+	capabilities_dentry = securityfs("capabilities", 0444, NULL, NULL,
+					 capabilities_ops);
 	return 0;
 }
 core_initcall(securityfs_init);
