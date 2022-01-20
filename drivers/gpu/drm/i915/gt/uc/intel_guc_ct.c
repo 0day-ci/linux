@@ -398,8 +398,10 @@ static int ct_write(struct intel_guc_ct *ct,
 	u32 *cmds = ctb->cmds;
 	unsigned int i;
 
+#ifdef CONFIG_DRM_I915_DEBUG_GUC
 	if (unlikely(desc->status))
 		goto corrupted;
+#endif
 
 	GEM_BUG_ON(tail > size);
 
@@ -464,11 +466,13 @@ static int ct_write(struct intel_guc_ct *ct,
 
 	return 0;
 
+#ifdef CONFIG_DRM_I915_DEBUG_GUC
 corrupted:
 	CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
 		 desc->head, desc->tail, desc->status);
 	ctb->broken = true;
 	return -EPIPE;
+#endif
 }
 
 /**
@@ -820,8 +824,10 @@ static int ct_read(struct intel_guc_ct *ct, struct ct_incoming_msg **msg)
 	if (unlikely(ctb->broken))
 		return -EPIPE;
 
+#ifdef CONFIG_DRM_I915_DEBUG_GUC
 	if (unlikely(desc->status))
 		goto corrupted;
+#endif
 
 	GEM_BUG_ON(head > size);
 
