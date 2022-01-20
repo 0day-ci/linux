@@ -828,7 +828,7 @@ static int smc_lgr_create(struct smc_sock *smc, struct smc_init_info *ini)
 		}
 	}
 
-	lgr = kzalloc(sizeof(*lgr), GFP_KERNEL);
+	lgr = kvzalloc(sizeof(*lgr), GFP_KERNEL);
 	if (!lgr) {
 		rc = SMC_CLC_DECL_MEM;
 		goto ism_put_vlan;
@@ -914,7 +914,7 @@ static int smc_lgr_create(struct smc_sock *smc, struct smc_init_info *ini)
 free_wq:
 	destroy_workqueue(lgr->tx_wq);
 free_lgr:
-	kfree(lgr);
+	kvfree(lgr);
 ism_put_vlan:
 	if (ini->is_smcd && ini->vlan_id)
 		smc_ism_put_vlan(ini->ism_dev[ini->ism_selected], ini->vlan_id);
@@ -1317,7 +1317,7 @@ static void smc_lgr_free(struct smc_link_group *lgr)
 		if (!atomic_dec_return(&lgr_cnt))
 			wake_up(&lgrs_deleted);
 	}
-	kfree(lgr);
+	kvfree(lgr);
 }
 
 static void smc_sk_wake_ups(struct smc_sock *smc)
