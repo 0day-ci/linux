@@ -2571,6 +2571,7 @@ struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 
 		sk_set_bit(SOCKWQ_ASYNC_NOSPACE, sk);
 		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+		trace_sock_sndbuf_full(sk, timeo);
 		err = -EAGAIN;
 		if (!timeo)
 			goto failure;

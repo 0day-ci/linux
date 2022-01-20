@@ -68,6 +68,27 @@ skmem_kind_names
 #define show_skmem_kind_names(val)	\
 	__print_symbolic(val, skmem_kind_names)
 
+TRACE_EVENT(sock_sndbuf_full,
+	TP_PROTO(struct sock *sk, long timeo),
+
+	TP_ARGS(sk, timeo),
+
+	TP_STRUCT__entry(
+		__field(int, wmem_alloc)
+		__field(int, sk_sndbuf)
+		__field(long, timeo)
+	),
+
+	TP_fast_assign(
+		__entry->wmem_alloc = refcount_read(&sk->sk_wmem_alloc);
+		__entry->sk_sndbuf = READ_ONCE(sk->sk_sndbuf);
+		__entry->timeo = timeo;
+	),
+
+	TP_printk("wmem_alloc=%d sk_sndbf=%d timeo=%ld",
+		__entry->wmem_alloc, __entry->sk_sndbuf, __entry->timeo)
+);
+
 TRACE_EVENT(sock_rcvqueue_full,
 
 	TP_PROTO(struct sock *sk, struct sk_buff *skb),
