@@ -2683,8 +2683,8 @@ static int virtnet_set_features(struct net_device *dev,
 
 static void virtnet_tx_timeout(struct net_device *dev, unsigned int txqueue)
 {
-	struct virtnet_info *priv = netdev_priv(dev);
-	struct send_queue *sq = &priv->sq[txqueue];
+	struct virtnet_info *vi = netdev_priv(dev);
+	struct send_queue *sq = &vi->sq[txqueue];
 	struct netdev_queue *txq = netdev_get_tx_queue(dev, txqueue);
 
 	u64_stats_update_begin(&sq->stats.syncp);
