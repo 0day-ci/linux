@@ -2682,6 +2682,7 @@ static void rtrs_clt_dev_release(struct device *dev)
 	struct rtrs_clt_sess *clt = container_of(dev, struct rtrs_clt_sess,
 						 dev);
 
+	free_percpu(clt->pcpu_path);
 	kfree(clt);
 }
 
@@ -2731,8 +2732,11 @@ static struct rtrs_clt_sess *alloc_clt(const char *sessname, size_t paths_num,
 	clt->dev.class = rtrs_clt_dev_class;
 	clt->dev.release = rtrs_clt_dev_release;
 	err = dev_set_name(&clt->dev, "%s", sessname);
-	if (err)
+	if (err) {
+		free_percpu(clt->pcpu_path);
+		kfree(clt);
 		goto err;
+	}
 	/*
 	 * Suppress user space notification until
 	 * sysfs files are created
@@ -2762,18 +2766,17 @@ static struct rtrs_clt_sess *alloc_clt(const char *sessname, size_t paths_num,
 err_dev:
 	device_unregister(&clt->dev);
 err:
-	free_percpu(clt->pcpu_path);
-	kfree(clt);
 	return ERR_PTR(err);
 }
 
 static void free_clt(struct rtrs_clt_sess *clt)
 {
 	free_permits(clt);
-	free_percpu(clt->pcpu_path);
 	mutex_destroy(&clt->paths_ev_mutex);
 	mutex_destroy(&clt->paths_mutex);
-	/* release callback will free clt in last put */
+	/*
+	 * release callback will free clt->pcpu_path and clt in last put
+	 */
 	device_unregister(&clt->dev);
 }
 
