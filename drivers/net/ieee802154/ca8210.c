@@ -1772,6 +1772,7 @@ static int ca8210_async_xmit_complete(
 		);
 		if (status != MAC_TRANSACTION_OVERFLOW) {
 			ieee802154_wake_queue(priv->hw);
+			dev_kfree_skb_any(priv->tx_skb);
 			return 0;
 		}
 	}
