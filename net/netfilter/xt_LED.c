@@ -54,7 +54,7 @@ led_tg(struct sk_buff *skb, const struct xt_action_param *par)
 		led_trigger_blink_oneshot(&ledinternal->netfilter_led_trigger,
 					  &led_delay, &led_delay, 1);
 	else
-		led_trigger_event(&ledinternal->netfilter_led_trigger, LED_FULL);
+		led_trigger_event(&ledinternal->netfilter_led_trigger, 255);
 
 	/* If there's a positive delay, start/update the timer */
 	if (ledinfo->delay > 0) {
@@ -63,7 +63,7 @@ led_tg(struct sk_buff *skb, const struct xt_action_param *par)
 
 	/* Otherwise if there was no delay given, blink as fast as possible */
 	} else if (ledinfo->delay == 0) {
-		led_trigger_event(&ledinternal->netfilter_led_trigger, LED_OFF);
+		led_trigger_event(&ledinternal->netfilter_led_trigger, 0);
 	}
 
 	/* else the delay is negative, which means switch on and stay on */
@@ -76,7 +76,7 @@ static void led_timeout_callback(struct timer_list *t)
 	struct xt_led_info_internal *ledinternal = from_timer(ledinternal, t,
 							      timer);
 
-	led_trigger_event(&ledinternal->netfilter_led_trigger, LED_OFF);
+	led_trigger_event(&ledinternal->netfilter_led_trigger, 0);
 }
 
 static struct xt_led_info_internal *led_trigger_lookup(const char *name)
