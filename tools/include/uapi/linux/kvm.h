@@ -1133,6 +1133,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_VM_MOVE_ENC_CONTEXT_FROM 206
 #define KVM_CAP_VM_GPA_BITS 207
 #define KVM_CAP_XSAVE2 208
+#define KVM_CAP_PMU_CAPABILITY 209
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -1971,6 +1972,9 @@ struct kvm_dirty_gfn {
 
 #define KVM_BUS_LOCK_DETECTION_OFF             (1 << 0)
 #define KVM_BUS_LOCK_DETECTION_EXIT            (1 << 1)
+
+#define KVM_CAP_PMU_DISABLE                    (1 << 0)
+#define KVM_CAP_PMU_MASK                       (KVM_PMU_CONFIG_DISABLE)
 
 /**
  * struct kvm_stats_header - Header of per vm/vcpu binary statistics data.
