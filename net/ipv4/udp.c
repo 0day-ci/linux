@@ -2975,6 +2975,7 @@ static struct sock *udp_get_first(struct seq_file *seq, int start)
 				continue;
 			if (afinfo->family == AF_UNSPEC ||
 			    sk->sk_family == afinfo->family)
+				spin_unlock_bh(&hslot->lock);
 				goto found;
 		}
 		spin_unlock_bh(&hslot->lock);
