@@ -817,15 +817,19 @@ static void pci_epf_configure_bar(struct pci_epf *epf,
 {
 	struct pci_epf_bar *epf_bar;
 	bool bar_fixed_64bit;
+	bool bar_prefetch;
 	int i;
 
 	for (i = 0; i < PCI_STD_NUM_BARS; i++) {
 		epf_bar = &epf->bar[i];
 		bar_fixed_64bit = !!(epc_features->bar_fixed_64bit & (1 << i));
+		bar_prefetch = !!(epc_features->bar_prefetch & (1 << i));
 		if (bar_fixed_64bit)
 			epf_bar->flags |= PCI_BASE_ADDRESS_MEM_TYPE_64;
 		if (epc_features->bar_fixed_size[i])
 			bar_size[i] = epc_features->bar_fixed_size[i];
+		if (bar_prefetch)
+			epf_bar->flags |= PCI_BASE_ADDRESS_MEM_PREFETCH;
 	}
 }
 

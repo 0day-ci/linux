@@ -161,6 +161,7 @@ struct pci_epc {
  * @msix_capable: indicate if the endpoint function has MSI-X capability
  * @reserved_bar: bitmap to indicate reserved BAR unavailable to function driver
  * @bar_fixed_64bit: bitmap to indicate fixed 64bit BARs
+ * @bar_prefetch: bitmap to indicate prefetchable BARs
  * @bar_fixed_size: Array specifying the size supported by each BAR
  * @align: alignment size required for BAR buffer allocation
  */
@@ -171,6 +172,7 @@ struct pci_epc_features {
 	unsigned int	msix_capable : 1;
 	u8	reserved_bar;
 	u8	bar_fixed_64bit;
+	u8	bar_prefetch;
 	u64	bar_fixed_size[PCI_STD_NUM_BARS];
 	size_t	align;
 };
