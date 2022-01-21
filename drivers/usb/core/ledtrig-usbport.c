@@ -73,7 +73,7 @@ static void usbport_trig_update_count(struct usbport_trig_data *usbport_data)
 
 	usbport_data->count = 0;
 	usb_for_each_dev(usbport_data, usbport_trig_usb_dev_check);
-	led_set_brightness(led_cdev, usbport_data->count ? LED_FULL : LED_OFF);
+	led_set_brightness(led_cdev, usbport_data->count ? 255 : 0);
 }
 
 /***************************************
@@ -287,12 +287,12 @@ static int usbport_trig_notify(struct notifier_block *nb, unsigned long action,
 	case USB_DEVICE_ADD:
 		usbport_trig_add_usb_dev_ports(usb_dev, usbport_data);
 		if (observed && usbport_data->count++ == 0)
-			led_set_brightness(led_cdev, LED_FULL);
+			led_set_brightness(led_cdev, 255);
 		return NOTIFY_OK;
 	case USB_DEVICE_REMOVE:
 		usbport_trig_remove_usb_dev_ports(usbport_data, usb_dev);
 		if (observed && --usbport_data->count == 0)
-			led_set_brightness(led_cdev, LED_OFF);
+			led_set_brightness(led_cdev, 0);
 		return NOTIFY_OK;
 	}
 
