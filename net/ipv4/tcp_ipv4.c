@@ -2340,6 +2340,7 @@ static void *listening_get_first(struct seq_file *seq)
 		inet_lhash2_for_each_icsk(icsk, &ilb2->head) {
 			sk = (struct sock *)icsk;
 			if (seq_sk_match(seq, sk))
+				spin_unlock(&ilb2->lock);
 				return sk;
 		}
 		spin_unlock(&ilb2->lock);
@@ -2418,6 +2419,7 @@ static void *established_get_first(struct seq_file *seq)
 		spin_lock_bh(lock);
 		sk_nulls_for_each(sk, node, &tcp_hashinfo.ehash[st->bucket].chain) {
 			if (seq_sk_match(seq, sk))
+				spin_unlock_bh(lock);
 				return sk;
 		}
 		spin_unlock_bh(lock);
