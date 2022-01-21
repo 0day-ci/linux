@@ -37,6 +37,7 @@
 #include "smp.h"
 #include "msft.h"
 #include "eir.h"
+#include "aosp.h"
 
 #define ZERO_KEY "\x00\x00\x00\x00\x00\x00\x00\x00" \
 		 "\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -4225,6 +4226,36 @@ static void hci_num_comp_blocks_evt(struct hci_dev *hdev, void *data,
 	queue_work(hdev->workqueue, &hdev->tx_work);
 }
 
+#define QUALITY_SPEC_NA			0x0
+#define QUALITY_SPEC_INTEL_TELEMETRY	0x1
+#define QUALITY_SPEC_AOSP_BQR		0x2
+
+static bool quality_report_evt(struct hci_dev *hdev,  void *data,
+			       struct sk_buff *skb)
+{
+	if (aosp_is_quality_report_evt(skb)) {
+		if (aosp_has_quality_report(hdev) &&
+		    aosp_pull_quality_report_data(skb))
+			mgmt_quality_report(hdev, skb, QUALITY_SPEC_AOSP_BQR);
+
+		return true;
+	}
+
+	return false;
+}
+
+static void hci_vendor_evt(struct hci_dev *hdev, void *data,
+			   struct sk_buff *skb)
+{
+	/* Every distinct vendor specification must have a well-defined
+	 * condition to determine if an event meets the specification.
+	 * The skb is consumed by a specification only if the event meets
+	 * the specification.
+	 */
+	if (!quality_report_evt(hdev, data, skb))
+		msft_vendor_evt(hdev, data, skb);
+}
+
 static void hci_mode_change_evt(struct hci_dev *hdev, void *data,
 				struct sk_buff *skb)
 {
@@ -6811,7 +6842,7 @@ static const struct hci_ev {
 	HCI_EV(HCI_EV_NUM_COMP_BLOCKS, hci_num_comp_blocks_evt,
 	       sizeof(struct hci_ev_num_comp_blocks)),
 	/* [0xff = HCI_EV_VENDOR] */
-	HCI_EV(HCI_EV_VENDOR, msft_vendor_evt, 0),
+	HCI_EV(HCI_EV_VENDOR, hci_vendor_evt, 0),
 };
 
 static void hci_event_func(struct hci_dev *hdev, u8 event, struct sk_buff *skb,
