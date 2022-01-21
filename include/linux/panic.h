@@ -45,6 +45,9 @@ extern bool crash_kexec_post_notifiers;
 extern atomic_t panic_cpu;
 #define PANIC_CPU_INVALID	-1
 
+#define panic_in_progress()				\
+	unlikely(atomic_read(&panic_cpu) != PANIC_CPU_INVALID)
+
 /*
  * Only to be used by arch init code. If the user over-wrote the default
  * CONFIG_PANIC_TIMEOUT, honor it.
