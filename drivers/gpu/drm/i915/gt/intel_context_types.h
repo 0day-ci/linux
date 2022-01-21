@@ -198,6 +198,11 @@ struct intel_context {
 		 * each priority bucket
 		 */
 		u32 prio_count[GUC_CLIENT_PRIORITY_NUM];
+		/**
+		 * @preemption_timeout: preemption timeout of the context, used
+		 * to restore this value after request cancellation
+		 */
+		u32 preemption_timeout;
 	} guc_state;
 
 	struct {

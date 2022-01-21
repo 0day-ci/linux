@@ -2160,7 +2160,8 @@ static inline u32 get_children_join_value(struct intel_context *ce,
 	return __get_parent_scratch(ce)->join[child_index].semaphore;
 }
 
-static void guc_context_policy_init(struct intel_engine_cs *engine,
+static void guc_context_policy_init(struct intel_context *ce,
+				    struct intel_engine_cs *engine,
 				    struct guc_lrc_desc *desc)
 {
 	desc->policy_flags = 0;
@@ -2170,7 +2171,8 @@ static void guc_context_policy_init(struct intel_engine_cs *engine,
 
 	/* NB: For both of these, zero means disabled. */
 	desc->execution_quantum = engine->props.timeslice_duration_ms * 1000;
-	desc->preemption_timeout = engine->props.preempt_timeout_ms * 1000;
+	ce->guc_state.preemption_timeout = engine->props.preempt_timeout_ms * 1000;
+	desc->preemption_timeout = ce->guc_state.preemption_timeout;
 }
 
 static int guc_lrc_desc_pin(struct intel_context *ce, bool loop)
@@ -2206,7 +2208,7 @@ static int guc_lrc_desc_pin(struct intel_context *ce, bool loop)
 	desc->hw_context_desc = ce->lrc.lrca;
 	desc->priority = ce->guc_state.prio;
 	desc->context_flags = CONTEXT_REGISTRATION_FLAG_KMD;
-	guc_context_policy_init(engine, desc);
+	guc_context_policy_init(ce, engine, desc);
 
 	/*
 	 * If context is a parent, we need to register a process descriptor
@@ -2239,7 +2241,7 @@ static int guc_lrc_desc_pin(struct intel_context *ce, bool loop)
 			desc->hw_context_desc = child->lrc.lrca;
 			desc->priority = ce->guc_state.prio;
 			desc->context_flags = CONTEXT_REGISTRATION_FLAG_KMD;
-			guc_context_policy_init(engine, desc);
+			guc_context_policy_init(child, engine, desc);
 		}
 
 		clear_children_join_go_memory(ce);
@@ -2422,6 +2424,19 @@ static u16 prep_context_pending_disable(struct intel_context *ce)
 	return ce->guc_id.id;
 }
 
+static void __guc_context_set_preemption_timeout(struct intel_guc *guc,
+						 u16 guc_id,
+						 u32 preemption_timeout)
+{
+	u32 action[] = {
+		INTEL_GUC_ACTION_SET_CONTEXT_PREEMPTION_TIMEOUT,
+		guc_id,
+		preemption_timeout
+	};
+
+	intel_guc_send_busy_loop(guc, action, ARRAY_SIZE(action), 0, true);
+}
+
 static struct i915_sw_fence *guc_context_block(struct intel_context *ce)
 {
 	struct intel_guc *guc = ce_to_guc(ce);
@@ -2455,8 +2470,10 @@ static struct i915_sw_fence *guc_context_block(struct intel_context *ce)
 
 	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 
-	with_intel_runtime_pm(runtime_pm, wakeref)
+	with_intel_runtime_pm(runtime_pm, wakeref) {
+		__guc_context_set_preemption_timeout(guc, guc_id, 1);
 		__guc_context_sched_disable(guc, ce, guc_id);
+	}
 
 	return &ce->guc_state.blocked;
 }
@@ -2505,8 +2522,10 @@ static void guc_context_unblock(struct intel_context *ce)
 
 	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 
-	if (enable) {
-		with_intel_runtime_pm(runtime_pm, wakeref)
+	with_intel_runtime_pm(runtime_pm, wakeref) {
+		__guc_context_set_preemption_timeout(guc, ce->guc_id.id,
+						     ce->guc_state.preemption_timeout);
+		if (enable)
 			__guc_context_sched_enable(guc, ce);
 	}
 }
@@ -2538,19 +2557,6 @@ static void guc_context_cancel_request(struct intel_context *ce,
 		guc_context_unblock(block_context);
 		intel_context_put(ce);
 	}
-}
-
-static void __guc_context_set_preemption_timeout(struct intel_guc *guc,
-						 u16 guc_id,
-						 u32 preemption_timeout)
-{
-	u32 action[] = {
-		INTEL_GUC_ACTION_SET_CONTEXT_PREEMPTION_TIMEOUT,
-		guc_id,
-		preemption_timeout
-	};
-
-	intel_guc_send_busy_loop(guc, action, ARRAY_SIZE(action), 0, true);
 }
 
 static void guc_context_ban(struct intel_context *ce, struct i915_request *rq)
