@@ -45,7 +45,7 @@ nouveau_led_get_brightness(struct led_classdev *led)
 	duty = nvif_rd32(device, 0x61c884) & 0x00ffffff;
 
 	if (div > 0)
-		return duty * LED_FULL / div;
+		return duty * 255 / div;
 	else
 		return 0;
 }
@@ -62,7 +62,7 @@ nouveau_led_set_brightness(struct led_classdev *led, enum led_brightness value)
 	u32 div, duty;
 
 	div = input_clk / freq;
-	duty = value * div / LED_FULL;
+	duty = value * div / 255;
 
 	/* for now, this is safe to directly poke those registers because:
 	 *  - A: nvidia never puts the logo led to any other PWM controler
