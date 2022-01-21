@@ -54,7 +54,7 @@ static void pmu_led_set(struct led_classdev *led_cdev,
 
 	spin_lock_irqsave(&pmu_blink_lock, flags);
 	switch (brightness) {
-	case LED_OFF:
+	case 0:
 		requested_change = 0;
 		break;
 	case LED_FULL:
