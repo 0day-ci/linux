@@ -177,7 +177,7 @@ static void snd_ctl_led_set_state(struct snd_card *card, unsigned int access,
 	case MODE_FOLLOW_MUTE:	/* noop */ break;
 	}
 	if (route >= 0)
-		ledtrig_audio_set(led->trigger_type, route ? LED_OFF : LED_ON);
+		ledtrig_audio_set(led->trigger_type, route ? 0 : 1);
 }
 
 static struct snd_ctl_led_ctl *snd_ctl_led_find(struct snd_kcontrol *kctl, unsigned int ioff)
