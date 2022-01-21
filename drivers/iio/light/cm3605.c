@@ -238,7 +238,7 @@ static int cm3605_probe(struct platform_device *pdev)
 
 	/* Just name the trigger the same as the driver */
 	led_trigger_register_simple("cm3605", &cm3605->led);
-	led_trigger_event(cm3605->led, LED_FULL);
+	led_trigger_event(cm3605->led, 255);
 
 	indio_dev->info = &cm3605_info;
 	indio_dev->name = "cm3605";
@@ -255,7 +255,7 @@ static int cm3605_probe(struct platform_device *pdev)
 	return 0;
 
 out_remove_trigger:
-	led_trigger_event(cm3605->led, LED_OFF);
+	led_trigger_event(cm3605->led, 0);
 	led_trigger_unregister_simple(cm3605->led);
 out_disable_aset:
 	gpiod_set_value_cansleep(cm3605->aset, 0);
@@ -269,7 +269,7 @@ static int cm3605_remove(struct platform_device *pdev)
 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
 	struct cm3605 *cm3605 = iio_priv(indio_dev);
 
-	led_trigger_event(cm3605->led, LED_OFF);
+	led_trigger_event(cm3605->led, 0);
 	led_trigger_unregister_simple(cm3605->led);
 	gpiod_set_value_cansleep(cm3605->aset, 0);
 	iio_device_unregister(indio_dev);
@@ -283,7 +283,7 @@ static int __maybe_unused cm3605_pm_suspend(struct device *dev)
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct cm3605 *cm3605 = iio_priv(indio_dev);
 
-	led_trigger_event(cm3605->led, LED_OFF);
+	led_trigger_event(cm3605->led, 0);
 	regulator_disable(cm3605->vdd);
 
 	return 0;
@@ -298,7 +298,7 @@ static int __maybe_unused cm3605_pm_resume(struct device *dev)
 	ret = regulator_enable(cm3605->vdd);
 	if (ret)
 		dev_err(dev, "failed to enable regulator in resume path\n");
-	led_trigger_event(cm3605->led, LED_FULL);
+	led_trigger_event(cm3605->led, 255);
 
 	return 0;
 }
