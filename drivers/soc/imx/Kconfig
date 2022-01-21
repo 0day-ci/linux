@@ -27,4 +27,11 @@ config SOC_IMX8MM_BLK_CTRL
 	  If you say yes here you get support for the NXP i.MX8MM BLK CTRL
 	  support.
 
+config SOC_IMX8MN_BLK_CTRL
+	bool "i.MX8MN SoC BLK CTRL support"
+	depends on SOC_IMX8M
+	help
+	  If you say yes here you get support for the NXP i.MX8MN BLK CTRL
+	  support.
+
 endmenu
