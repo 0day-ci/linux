@@ -7,12 +7,12 @@
 
 #include <dt-bindings/power/imx8mm-power.h>
 
-#include "imx8m-blk-ctrl.h"
+#include "imx-blk-ctrl.h"
 
 static int imx8mm_vpu_power_notifier(struct notifier_block *nb,
 				     unsigned long action, void *data)
 {
-	struct imx8m_blk_ctrl *bc = container_of(nb, struct imx8m_blk_ctrl,
+	struct imx_blk_ctrl *bc = container_of(nb, struct imx_blk_ctrl,
 						 power_nb);
 
 	if (action != GENPD_NOTIFY_ON && action != GENPD_NOTIFY_PRE_OFF)
@@ -45,7 +45,7 @@ static int imx8mm_vpu_power_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-static const struct imx8m_blk_ctrl_domain_data imx8mm_vpu_blk_ctl_domain_data[] = {
+static const struct imx_blk_ctrl_domain_data imx8mm_vpu_blk_ctl_domain_data[] = {
 	[IMX8MM_VPUBLK_PD_G1] = {
 		.name = "vpublk-g1",
 		.clk_names = (const char *[]){ "g1", },
@@ -72,7 +72,7 @@ static const struct imx8m_blk_ctrl_domain_data imx8mm_vpu_blk_ctl_domain_data[] 
 	},
 };
 
-static const struct imx8m_blk_ctrl_data imx8mm_vpu_blk_ctl_dev_data = {
+static const struct imx_blk_ctrl_data imx8mm_vpu_blk_ctl_dev_data = {
 	.max_reg = 0x18,
 	.power_notifier_fn = imx8mm_vpu_power_notifier,
 	.domains = imx8mm_vpu_blk_ctl_domain_data,
@@ -82,7 +82,7 @@ static const struct imx8m_blk_ctrl_data imx8mm_vpu_blk_ctl_dev_data = {
 static int imx8mm_disp_power_notifier(struct notifier_block *nb,
 				      unsigned long action, void *data)
 {
-	struct imx8m_blk_ctrl *bc = container_of(nb, struct imx8m_blk_ctrl,
+	struct imx_blk_ctrl *bc = container_of(nb, struct imx_blk_ctrl,
 						 power_nb);
 
 	if (action != GENPD_NOTIFY_ON && action != GENPD_NOTIFY_PRE_OFF)
@@ -104,7 +104,7 @@ static int imx8mm_disp_power_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-static const struct imx8m_blk_ctrl_domain_data imx8mm_disp_blk_ctl_domain_data[] = {
+static const struct imx_blk_ctrl_domain_data imx8mm_disp_blk_ctl_domain_data[] = {
 	[IMX8MM_DISPBLK_PD_CSI_BRIDGE] = {
 		.name = "dispblk-csi-bridge",
 		.clk_names = (const char *[]){ "csi-bridge-axi", "csi-bridge-apb",
@@ -141,7 +141,7 @@ static const struct imx8m_blk_ctrl_domain_data imx8mm_disp_blk_ctl_domain_data[]
 	},
 };
 
-static const struct imx8m_blk_ctrl_data imx8mm_disp_blk_ctl_dev_data = {
+static const struct imx_blk_ctrl_data imx8mm_disp_blk_ctl_dev_data = {
 	.max_reg = 0x2c,
 	.power_notifier_fn = imx8mm_disp_power_notifier,
 	.domains = imx8mm_disp_blk_ctl_domain_data,
@@ -162,11 +162,11 @@ static const struct of_device_id imx8mm_blk_ctrl_of_match[] = {
 MODULE_DEVICE_TABLE(of, imx8mm_blk_ctrl_of_match);
 
 static struct platform_driver imx8mm_blk_ctrl_driver = {
-	.probe = imx8m_blk_ctrl_probe,
-	.remove = imx8m_blk_ctrl_remove,
+	.probe = imx_blk_ctrl_probe,
+	.remove = imx_blk_ctrl_remove,
 	.driver = {
 		.name = "imx8mm-blk-ctrl",
-		.pm = &imx8m_blk_ctrl_pm_ops,
+		.pm = &imx_blk_ctrl_pm_ops,
 		.of_match_table = imx8mm_blk_ctrl_of_match,
 	},
 };

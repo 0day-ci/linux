@@ -18,18 +18,18 @@
 #define BLK_CLK_EN	0x4
 #define BLK_MIPI_RESET_DIV	0x8 /* Mini/Nano DISPLAY_BLK_CTRL only */
 
-struct imx8m_blk_ctrl_domain;
+struct imx_blk_ctrl_domain;
 
-struct imx8m_blk_ctrl {
+struct imx_blk_ctrl {
 	struct device *dev;
 	struct notifier_block power_nb;
 	struct device *bus_power_dev;
 	struct regmap *regmap;
-	struct imx8m_blk_ctrl_domain *domains;
+	struct imx_blk_ctrl_domain *domains;
 	struct genpd_onecell_data onecell_data;
 };
 
-struct imx8m_blk_ctrl_domain_data {
+struct imx_blk_ctrl_domain_data {
 	const char *name;
 	const char * const *clk_names;
 	int num_clks;
@@ -49,24 +49,24 @@ struct imx8m_blk_ctrl_domain_data {
 
 #define DOMAIN_MAX_CLKS 3
 
-struct imx8m_blk_ctrl_domain {
+struct imx_blk_ctrl_domain {
 	struct generic_pm_domain genpd;
-	const struct imx8m_blk_ctrl_domain_data *data;
+	const struct imx_blk_ctrl_domain_data *data;
 	struct clk_bulk_data clks[DOMAIN_MAX_CLKS];
 	struct device *power_dev;
-	struct imx8m_blk_ctrl *bc;
+	struct imx_blk_ctrl *bc;
 };
 
-struct imx8m_blk_ctrl_data {
+struct imx_blk_ctrl_data {
 	int max_reg;
 	notifier_fn_t power_notifier_fn;
-	const struct imx8m_blk_ctrl_domain_data *domains;
+	const struct imx_blk_ctrl_domain_data *domains;
 	int num_domains;
 };
 
-extern const struct dev_pm_ops imx8m_blk_ctrl_pm_ops;
+extern const struct dev_pm_ops imx_blk_ctrl_pm_ops;
 
-int imx8m_blk_ctrl_remove(struct platform_device *pdev);
-int imx8m_blk_ctrl_probe(struct platform_device *pdev);
+int imx_blk_ctrl_remove(struct platform_device *pdev);
+int imx_blk_ctrl_probe(struct platform_device *pdev);
 
 #endif

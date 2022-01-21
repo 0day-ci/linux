@@ -6,19 +6,19 @@
 
 #include <linux/of_device.h>
 
-#include "imx8m-blk-ctrl.h"
+#include "imx-blk-ctrl.h"
 
-static inline struct imx8m_blk_ctrl_domain *
-to_imx8m_blk_ctrl_domain(struct generic_pm_domain *genpd)
+static inline struct imx_blk_ctrl_domain *
+to_imx_blk_ctrl_domain(struct generic_pm_domain *genpd)
 {
-	return container_of(genpd, struct imx8m_blk_ctrl_domain, genpd);
+	return container_of(genpd, struct imx_blk_ctrl_domain, genpd);
 }
 
-static int imx8m_blk_ctrl_power_on(struct generic_pm_domain *genpd)
+static int imx_blk_ctrl_power_on(struct generic_pm_domain *genpd)
 {
-	struct imx8m_blk_ctrl_domain *domain = to_imx8m_blk_ctrl_domain(genpd);
-	const struct imx8m_blk_ctrl_domain_data *data = domain->data;
-	struct imx8m_blk_ctrl *bc = domain->bc;
+	struct imx_blk_ctrl_domain *domain = to_imx_blk_ctrl_domain(genpd);
+	const struct imx_blk_ctrl_domain_data *data = domain->data;
+	struct imx_blk_ctrl *bc = domain->bc;
 	int ret;
 
 	/* make sure bus domain is awake */
@@ -70,11 +70,11 @@ bus_put:
 	return ret;
 }
 
-static int imx8m_blk_ctrl_power_off(struct generic_pm_domain *genpd)
+static int imx_blk_ctrl_power_off(struct generic_pm_domain *genpd)
 {
-	struct imx8m_blk_ctrl_domain *domain = to_imx8m_blk_ctrl_domain(genpd);
-	const struct imx8m_blk_ctrl_domain_data *data = domain->data;
-	struct imx8m_blk_ctrl *bc = domain->bc;
+	struct imx_blk_ctrl_domain *domain = to_imx_blk_ctrl_domain(genpd);
+	const struct imx_blk_ctrl_domain_data *data = domain->data;
+	struct imx_blk_ctrl *bc = domain->bc;
 
 	/* put devices into reset and disable clocks */
 	if (data->mipi_phy_rst_mask)
@@ -93,7 +93,7 @@ static int imx8m_blk_ctrl_power_off(struct generic_pm_domain *genpd)
 }
 
 static struct generic_pm_domain *
-imx8m_blk_ctrl_xlate(struct of_phandle_args *args, void *data)
+imx_blk_ctrl_xlate(struct of_phandle_args *args, void *data)
 {
 	struct genpd_onecell_data *onecell_data = data;
 	unsigned int index = args->args[0];
@@ -107,11 +107,11 @@ imx8m_blk_ctrl_xlate(struct of_phandle_args *args, void *data)
 
 static struct lock_class_key blk_ctrl_genpd_lock_class;
 
-int imx8m_blk_ctrl_probe(struct platform_device *pdev)
+int imx_blk_ctrl_probe(struct platform_device *pdev)
 {
-	const struct imx8m_blk_ctrl_data *bc_data;
+	const struct imx_blk_ctrl_data *bc_data;
 	struct device *dev = &pdev->dev;
-	struct imx8m_blk_ctrl *bc;
+	struct imx_blk_ctrl *bc;
 	void __iomem *base;
 	int i, ret;
 
@@ -140,13 +140,13 @@ int imx8m_blk_ctrl_probe(struct platform_device *pdev)
 				     "failed to init regmap\n");
 
 	bc->domains = devm_kcalloc(dev, bc_data->num_domains,
-				   sizeof(struct imx8m_blk_ctrl_domain),
+				   sizeof(struct imx_blk_ctrl_domain),
 				   GFP_KERNEL);
 	if (!bc->domains)
 		return -ENOMEM;
 
 	bc->onecell_data.num_domains = bc_data->num_domains;
-	bc->onecell_data.xlate = imx8m_blk_ctrl_xlate;
+	bc->onecell_data.xlate = imx_blk_ctrl_xlate;
 	bc->onecell_data.domains =
 		devm_kcalloc(dev, bc_data->num_domains,
 			     sizeof(struct generic_pm_domain *), GFP_KERNEL);
@@ -159,8 +159,8 @@ int imx8m_blk_ctrl_probe(struct platform_device *pdev)
 				     "failed to attach power domain\n");
 
 	for (i = 0; i < bc_data->num_domains; i++) {
-		const struct imx8m_blk_ctrl_domain_data *data = &bc_data->domains[i];
-		struct imx8m_blk_ctrl_domain *domain = &bc->domains[i];
+		const struct imx_blk_ctrl_domain_data *data = &bc_data->domains[i];
+		struct imx_blk_ctrl_domain *domain = &bc->domains[i];
 		int j;
 
 		domain->data = data;
@@ -184,8 +184,8 @@ int imx8m_blk_ctrl_probe(struct platform_device *pdev)
 		}
 
 		domain->genpd.name = data->name;
-		domain->genpd.power_on = imx8m_blk_ctrl_power_on;
-		domain->genpd.power_off = imx8m_blk_ctrl_power_off;
+		domain->genpd.power_on = imx_blk_ctrl_power_on;
+		domain->genpd.power_off = imx_blk_ctrl_power_off;
 		domain->bc = bc;
 
 		ret = pm_genpd_init(&domain->genpd, NULL, true);
@@ -241,15 +241,15 @@ cleanup_pds:
 	return ret;
 }
 
-int imx8m_blk_ctrl_remove(struct platform_device *pdev)
+int imx_blk_ctrl_remove(struct platform_device *pdev)
 {
-	struct imx8m_blk_ctrl *bc = dev_get_drvdata(&pdev->dev);
+	struct imx_blk_ctrl *bc = dev_get_drvdata(&pdev->dev);
 	int i;
 
 	of_genpd_del_provider(pdev->dev.of_node);
 
 	for (i = 0; bc->onecell_data.num_domains; i++) {
-		struct imx8m_blk_ctrl_domain *domain = &bc->domains[i];
+		struct imx_blk_ctrl_domain *domain = &bc->domains[i];
 
 		pm_genpd_remove(&domain->genpd);
 		dev_pm_domain_detach(domain->power_dev, true);
@@ -263,9 +263,9 @@ int imx8m_blk_ctrl_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int imx8m_blk_ctrl_suspend(struct device *dev)
+static int imx_blk_ctrl_suspend(struct device *dev)
 {
-	struct imx8m_blk_ctrl *bc = dev_get_drvdata(dev);
+	struct imx_blk_ctrl *bc = dev_get_drvdata(dev);
 	int ret, i;
 
 	/*
@@ -283,7 +283,7 @@ static int imx8m_blk_ctrl_suspend(struct device *dev)
 	}
 
 	for (i = 0; i < bc->onecell_data.num_domains; i++) {
-		struct imx8m_blk_ctrl_domain *domain = &bc->domains[i];
+		struct imx_blk_ctrl_domain *domain = &bc->domains[i];
 
 		ret = pm_runtime_get_sync(domain->power_dev);
 		if (ret < 0) {
@@ -303,9 +303,9 @@ out_fail:
 	return ret;
 }
 
-static int imx8m_blk_ctrl_resume(struct device *dev)
+static int imx_blk_ctrl_resume(struct device *dev)
 {
-	struct imx8m_blk_ctrl *bc = dev_get_drvdata(dev);
+	struct imx_blk_ctrl *bc = dev_get_drvdata(dev);
 	int i;
 
 	for (i = 0; i < bc->onecell_data.num_domains; i++)
@@ -317,6 +317,6 @@ static int imx8m_blk_ctrl_resume(struct device *dev)
 }
 #endif
 
-const struct dev_pm_ops imx8m_blk_ctrl_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(imx8m_blk_ctrl_suspend, imx8m_blk_ctrl_resume)
+const struct dev_pm_ops imx_blk_ctrl_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(imx_blk_ctrl_suspend, imx_blk_ctrl_resume)
 };

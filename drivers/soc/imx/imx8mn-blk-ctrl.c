@@ -7,12 +7,12 @@
 
 #include <dt-bindings/power/imx8mn-power.h>
 
-#include "imx8m-blk-ctrl.h"
+#include "imx-blk-ctrl.h"
 
 static int imx8mn_disp_power_notifier(struct notifier_block *nb,
 				      unsigned long action, void *data)
 {
-	struct imx8m_blk_ctrl *bc = container_of(nb, struct imx8m_blk_ctrl,
+	struct imx_blk_ctrl *bc = container_of(nb, struct imx_blk_ctrl,
 						 power_nb);
 
 	if (action != GENPD_NOTIFY_ON && action != GENPD_NOTIFY_PRE_OFF)
@@ -34,7 +34,7 @@ static int imx8mn_disp_power_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-static const struct imx8m_blk_ctrl_domain_data imx8mn_disp_blk_ctl_domain_data[] = {
+static const struct imx_blk_ctrl_domain_data imx8mn_disp_blk_ctl_domain_data[] = {
 	[IMX8MN_DISPBLK_PD_MIPI_DSI] = {
 		.name = "dispblk-mipi-dsi",
 		.clk_names = (const char *[]){ "dsi-pclk", "dsi-ref", },
@@ -72,7 +72,7 @@ static const struct imx8m_blk_ctrl_domain_data imx8mn_disp_blk_ctl_domain_data[]
 	},
 };
 
-static const struct imx8m_blk_ctrl_data imx8mn_disp_blk_ctl_dev_data = {
+static const struct imx_blk_ctrl_data imx8mn_disp_blk_ctl_dev_data = {
 	.max_reg = 0x84,
 	.power_notifier_fn = imx8mn_disp_power_notifier,
 	.domains = imx8mn_disp_blk_ctl_domain_data,
@@ -90,11 +90,11 @@ static const struct of_device_id imx8mn_blk_ctrl_of_match[] = {
 MODULE_DEVICE_TABLE(of, imx8mn_blk_ctrl_of_match);
 
 static struct platform_driver imx8mn_blk_ctrl_driver = {
-	.probe = imx8m_blk_ctrl_probe,
-	.remove = imx8m_blk_ctrl_remove,
+	.probe = imx_blk_ctrl_probe,
+	.remove = imx_blk_ctrl_remove,
 	.driver = {
 		.name = "imx8mn-blk-ctrl",
-		.pm = &imx8m_blk_ctrl_pm_ops,
+		.pm = &imx_blk_ctrl_pm_ops,
 		.of_match_table = imx8mn_blk_ctrl_of_match,
 	},
 };
