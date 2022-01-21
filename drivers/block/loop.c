@@ -90,6 +90,7 @@ static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 static DEFINE_MUTEX(loop_validate_mutex);
 static DEFINE_SPINLOCK(loop_delete_spinlock);
+static DECLARE_WAIT_QUEUE_HEAD(loop_rundown_wait);
 
 /**
  * loop_global_lock_killable() - take locks for safe loop_validate_file() test
@@ -1174,6 +1175,7 @@ static void __loop_clr_fd(struct loop_device *lo)
 	mutex_lock(&lo->lo_mutex);
 	lo->lo_state = Lo_unbound;
 	mutex_unlock(&lo->lo_mutex);
+	wake_up_all(&loop_rundown_wait);
 	module_put(THIS_MODULE);
 }
 
@@ -1710,6 +1712,38 @@ struct loop_release_task {
 static LIST_HEAD(release_task_spool);
 static DEFINE_SPINLOCK(release_task_spool_spinlock);
 
+/* Workaround code for racy loop device reuse logic in /bin/mount. */
+static bool open_waits_rundown_device;
+module_param(open_waits_rundown_device, bool, 0644);
+MODULE_PARM_DESC(open_waits_rundown_device, "Please report if you need to enable this option.");
+
+struct loop_open_task {
+	struct callback_head cb;
+	struct loop_device *lo;
+};
+
+static void lo_post_open(struct gendisk *disk)
+{
+	struct loop_device *lo = disk->private_data;
+
+	/* Wait for lo_post_release() to leave lo->lo_mutex section. */
+	if (mutex_lock_killable(&lo->lo_mutex) == 0)
+		mutex_unlock(&lo->lo_mutex);
+	/* Also wait for __loop_clr_fd() to complete if Lo_rundown was set. */
+	wait_event_killable(loop_rundown_wait, data_race(lo->lo_state) != Lo_rundown);
+	atomic_dec(&lo->async_pending);
+}
+
+static void loop_open_callbackfn(struct callback_head *callback)
+{
+	struct loop_open_task *lot =
+		container_of(callback, struct loop_open_task, cb);
+	struct gendisk *disk = lot->lo->lo_disk;
+
+	lo_post_open(disk);
+	kfree(lot);
+}
+
 static int lo_open(struct block_device *bdev, fmode_t mode)
 {
 	struct loop_device *lo = bdev->bd_disk->private_data;
@@ -1738,6 +1772,30 @@ static int lo_open(struct block_device *bdev, fmode_t mode)
 	spin_lock(&release_task_spool_spinlock);
 	list_add(&lrt->head, &release_task_spool);
 	spin_unlock(&release_task_spool_spinlock);
+
+	/*
+	 * Try to avoid accessing Lo_rundown loop device.
+	 *
+	 * Since the task_work list is LIFO, lo_post_release() scheduled by
+	 * lo_release() can run before lo_post_open() scheduled by lo_open()
+	 * runs when an error occurred and fput() scheduled lo_release() before
+	 * returning to user mode. This means that lo->refcnt may be already 0
+	 * when lo_post_open() runs. Therefore, use lo->async_pending in order
+	 * to prevent loop_remove() from releasing this loop device.
+	 */
+	if (open_waits_rundown_device && !(current->flags & PF_KTHREAD)) {
+		struct loop_open_task *lot =
+			kmalloc(sizeof(*lrt), GFP_KERNEL | __GFP_NOWARN);
+
+		if (!lot)
+			return 0;
+		lot->lo = lo;
+		init_task_work(&lot->cb, loop_open_callbackfn);
+		if (task_work_add(current, &lot->cb, TWA_RESUME))
+			kfree(lot);
+		else
+			atomic_inc(&lo->async_pending);
+	}
 	return 0;
 }
 
