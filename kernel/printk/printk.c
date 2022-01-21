@@ -2667,7 +2667,7 @@ again:
 
 	for (;;) {
 		size_t ext_len = 0;
-		int handover;
+		int handover, pcpu;
 		size_t len;
 
 skip:
@@ -2737,6 +2737,12 @@ skip:
 		printk_safe_exit_irqrestore(flags);
 		if (handover)
 			return;
+
+		/* Allow panic_cpu to take over the consoles safely */
+		pcpu = atomic_read(&panic_cpu);
+		if (unlikely(pcpu != PANIC_CPU_INVALID &&
+		    pcpu != raw_smp_processor_id()))
+			break;
 
 		if (do_cond_resched)
 			cond_resched();
