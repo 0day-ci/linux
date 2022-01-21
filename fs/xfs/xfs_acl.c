@@ -22,7 +22,7 @@
 
 /*
  * Locking scheme:
- *  - all ACL updates are protected by inode->i_mutex, which is taken before
+ *  - all ACL updates are protected by inode->i_rwsem, which is taken before
  *    calling into this file.
  */
 

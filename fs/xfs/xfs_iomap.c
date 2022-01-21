@@ -1117,7 +1117,7 @@ xfs_buffered_write_iomap_end(
 	 * Trim delalloc blocks if they were allocated by this write and we
 	 * didn't manage to write the whole range.
 	 *
-	 * We don't need to care about racing delalloc as we hold i_mutex
+	 * We don't need to care about racing delalloc as we hold i_rwsem
 	 * across the reserve/allocate/unreserve calls. If there are delalloc
 	 * blocks in the range, they are ours.
 	 */
