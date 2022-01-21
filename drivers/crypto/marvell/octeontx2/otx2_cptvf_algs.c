@@ -1650,7 +1650,7 @@ static inline int cpt_register_algs(void)
 
 	err = crypto_register_aeads(otx2_cpt_aeads,
 				    ARRAY_SIZE(otx2_cpt_aeads));
-	if (err) {
+	if (err && !IS_ENABLED(CONFIG_DM_CRYPT)) {
 		crypto_unregister_skciphers(otx2_cpt_skciphers,
 					    ARRAY_SIZE(otx2_cpt_skciphers));
 		return err;
@@ -1661,8 +1661,9 @@ static inline int cpt_register_algs(void)
 
 static inline void cpt_unregister_algs(void)
 {
-	crypto_unregister_skciphers(otx2_cpt_skciphers,
-				    ARRAY_SIZE(otx2_cpt_skciphers));
+	if (!IS_ENABLED(CONFIG_DM_CRYPT))
+		crypto_unregister_skciphers(otx2_cpt_skciphers,
+					    ARRAY_SIZE(otx2_cpt_skciphers));
 	crypto_unregister_aeads(otx2_cpt_aeads, ARRAY_SIZE(otx2_cpt_aeads));
 }
 
