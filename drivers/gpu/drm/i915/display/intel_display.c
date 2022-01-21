@@ -4102,6 +4102,14 @@ static u8 bigjoiner_pipes(struct drm_i915_private *i915)
 		return 0;
 }
 
+static u8 bigjoiner_master_pipes(struct drm_i915_private *i915)
+{
+	u8 pipes = bigjoiner_pipes(i915);
+
+	/* last pipe can not be master */
+	return pipes & (pipes >> 1);
+}
+
 static bool transcoder_ddi_func_is_enabled(struct drm_i915_private *dev_priv,
 					   enum transcoder cpu_transcoder)
 {
@@ -7600,6 +7608,7 @@ static int intel_atomic_check_bigjoiner(struct intel_atomic_state *state,
 					struct intel_crtc_state *old_crtc_state,
 					struct intel_crtc_state *new_crtc_state)
 {
+	struct drm_i915_private *i915 = to_i915(state->base.dev);
 	struct intel_crtc_state *slave_crtc_state, *master_crtc_state;
 	struct intel_crtc *slave_crtc, *master_crtc;
 
@@ -7614,6 +7623,13 @@ static int intel_atomic_check_bigjoiner(struct intel_atomic_state *state,
 
 	if (!new_crtc_state->bigjoiner)
 		return 0;
+
+	if ((bigjoiner_master_pipes(i915) & BIT(crtc->pipe)) == 0) {
+		drm_dbg_kms(&i915->drm,
+			    "[CRTC:%d:%s] Bigjoiner not available on this pipe\n",
+			    crtc->base.base.id, crtc->base.name);
+		return -EINVAL;
+	}
 
 	slave_crtc = intel_dsc_get_bigjoiner_secondary(crtc);
 	if (!slave_crtc) {
