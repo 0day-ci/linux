@@ -382,10 +382,10 @@ static int ibm_cffps_led_brightness_set(struct led_classdev *led_cdev,
 	u8 next_led_state;
 	struct ibm_cffps *psu = container_of(led_cdev, struct ibm_cffps, led);
 
-	if (brightness == LED_OFF) {
+	if (brightness == 0) {
 		next_led_state = CFFPS_LED_OFF;
 	} else {
-		brightness = LED_FULL;
+		brightness = 255;
 
 		if (psu->led_state != CFFPS_LED_BLINK)
 			next_led_state = CFFPS_LED_ON;
@@ -426,7 +426,7 @@ static int ibm_cffps_led_blink_set(struct led_classdev *led_cdev,
 		return rc;
 
 	psu->led_state = CFFPS_LED_BLINK;
-	led_cdev->brightness = LED_FULL;
+	led_cdev->brightness = 255;
 	*delay_on = CFFPS_BLINK_RATE_MS;
 	*delay_off = CFFPS_BLINK_RATE_MS;
 
@@ -442,7 +442,7 @@ static void ibm_cffps_create_led_class(struct ibm_cffps *psu)
 	snprintf(psu->led_name, sizeof(psu->led_name), "%s-%02x", client->name,
 		 client->addr);
 	psu->led.name = psu->led_name;
-	psu->led.max_brightness = LED_FULL;
+	psu->led.max_brightness = 255;
 	psu->led.brightness_set_blocking = ibm_cffps_led_brightness_set;
 	psu->led.blink_set = ibm_cffps_led_blink_set;
 
