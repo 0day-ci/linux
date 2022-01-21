@@ -942,8 +942,7 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 			page->mapping = NULL;
 
 		if (likely(!is_zone_device_page(newpage)))
-			flush_dcache_page(newpage);
-
+			flush_dcache_folio(page_folio(newpage));
 	}
 out:
 	return rc;
