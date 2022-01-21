@@ -332,6 +332,16 @@ properties:
     items:
       enum: [1, 4, 8, 16, 32, 64, 128, 256]
 
+  ports:
+    $ref: /schemas/graph.yaml#/properties/ports
+    description:
+      This port is to be attached to the endpoint of the Embedded USB Debugger.
+
+    properties:
+      port@0:
+        $ref: /schemas/graph.yaml#/properties/port
+        description: Connector endpoint of Embedded USB debugger.
+
 unevaluatedProperties: false
 
 required:
