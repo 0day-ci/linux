@@ -305,10 +305,22 @@ int kvmppc_emulate_mmio(struct kvm_vcpu *vcpu)
 	case EMULATE_FAIL:
 	{
 		u32 last_inst;
+		ulong store_bit = DSISR_ISSTORE;
+		ulong cause = DSISR_BADACCESS;
 
+#ifdef CONFIG_BOOKE
+		store_bit = ESR_ST;
+		cause = 0;
+#endif
 		kvmppc_get_last_inst(vcpu, INST_GENERIC, &last_inst);
 		pr_info_ratelimited("KVM: guest access to device memory using unsupported instruction (PID: %d opcode: %#08x)\n",
 				    current->pid, last_inst);
+
+		if (vcpu->mmio_is_write)
+			cause |= store_bit;
+
+		kvmppc_core_queue_data_storage(vcpu, vcpu->arch.vaddr_accessed,
+					       cause);
 		r = RESUME_GUEST;
 		break;
 	}
