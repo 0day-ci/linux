@@ -39,9 +39,9 @@ static void update_mute_led(struct snd_sof_control *scontrol,
 
 #if IS_REACHABLE(CONFIG_LEDS_TRIGGER_AUDIO)
 	if (!scontrol->led_ctl.direction)
-		ledtrig_audio_set(LED_AUDIO_MUTE, temp ? LED_OFF : LED_ON);
+		ledtrig_audio_set(LED_AUDIO_MUTE, temp ? 0 : 1);
 	else
-		ledtrig_audio_set(LED_AUDIO_MICMUTE, temp ? LED_OFF : LED_ON);
+		ledtrig_audio_set(LED_AUDIO_MICMUTE, temp ? 0 : 1);
 #endif
 }
 
