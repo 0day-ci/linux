@@ -22,7 +22,7 @@ void hci_leds_update_powered(struct hci_dev *hdev, bool enabled)
 {
 	if (hdev->power_led)
 		led_trigger_event(hdev->power_led,
-				  enabled ? LED_FULL : LED_OFF);
+				  enabled ? 255 : 0);
 
 	if (!enabled) {
 		struct hci_dev *d;
@@ -37,7 +37,7 @@ void hci_leds_update_powered(struct hci_dev *hdev, bool enabled)
 		read_unlock(&hci_dev_list_lock);
 	}
 
-	led_trigger_event(bt_power_led_trigger, enabled ? LED_FULL : LED_OFF);
+	led_trigger_event(bt_power_led_trigger, enabled ? 255 : 0);
 }
 
 static int power_activate(struct led_classdev *led_cdev)
@@ -48,7 +48,7 @@ static int power_activate(struct led_classdev *led_cdev)
 	htrig = to_hci_basic_led_trigger(led_cdev->trigger);
 	powered = test_bit(HCI_UP, &htrig->hdev->flags);
 
-	led_trigger_event(led_cdev->trigger, powered ? LED_FULL : LED_OFF);
+	led_trigger_event(led_cdev->trigger, powered ? 255 : 0);
 
 	return 0;
 }
