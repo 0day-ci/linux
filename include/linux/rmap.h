@@ -236,6 +236,15 @@ static inline void page_vma_mapped_walk_done(struct page_vma_mapped_walk *pvmw)
 bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw);
 
 /*
+ * Cleans the PTEs of shared mappings.
+ * (and since clean PTEs should also be readonly, write protects them too)
+ *
+ * returns the number of cleaned PTEs.
+ */
+int pfn_mkclean_range(unsigned long pfn, int npfn, pgoff_t pgoff_start,
+		      struct vm_area_struct *vma);
+
+/*
  * Used by swapoff to help locate where page is expected in vma.
  */
 unsigned long page_address_in_vma(struct page *, struct vm_area_struct *);
