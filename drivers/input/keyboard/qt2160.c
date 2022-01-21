@@ -78,7 +78,7 @@ static int qt2160_led_set(struct led_classdev *cdev,
 	if (value != led->brightness) {
 		drive = qt2160_read(client, QT2160_CMD_DRIVE_X);
 		pwmen = qt2160_read(client, QT2160_CMD_PWMEN_X);
-		if (value != LED_OFF) {
+		if (value != 0) {
 			drive |= BIT(led->id);
 			pwmen |= BIT(led->id);
 
@@ -93,7 +93,7 @@ static int qt2160_led_set(struct led_classdev *cdev,
 		 * Changing this register will change the brightness
 		 * of every LED in the qt2160. It's a HW limitation.
 		 */
-		if (value != LED_OFF)
+		if (value != 0)
 			qt2160_write(client, QT2160_CMD_PWM_DUTY, value);
 
 		led->brightness = value;
@@ -269,7 +269,7 @@ static int qt2160_register_leds(struct qt2160_data *qt2160)
 		snprintf(led->name, sizeof(led->name), "qt2160:x%d", i);
 		led->cdev.name = led->name;
 		led->cdev.brightness_set_blocking = qt2160_led_set;
-		led->cdev.brightness = LED_OFF;
+		led->cdev.brightness = 0;
 		led->id = i;
 		led->qt2160 = qt2160;
 

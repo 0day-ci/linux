@@ -290,7 +290,7 @@ static int cap11xx_init_leds(struct device *dev,
 		led->cdev.flags = 0;
 		led->cdev.brightness_set_blocking = cap11xx_led_set;
 		led->cdev.max_brightness = 1;
-		led->cdev.brightness = LED_OFF;
+		led->cdev.brightness = 0;
 
 		error = of_property_read_u32(child, "reg", &reg);
 		if (error != 0 || reg >= num_leds) {
