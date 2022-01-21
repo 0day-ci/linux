@@ -34,6 +34,9 @@ description: |
   - dt-bindings/reset/qcom,gcc-mdm9615.h
   - dt-bindings/clock/qcom,gcc-sdm660.h  (qcom,gcc-sdm630 and qcom,gcc-sdm660)
 
+allOf:
+  - $ref: "qcom,gcc-common.yaml#"
+
 properties:
   compatible:
     enum:
@@ -55,30 +58,10 @@ properties:
       - qcom,gcc-sdm630
       - qcom,gcc-sdm660
 
-  '#clock-cells':
-    const: 1
-
-  '#reset-cells':
-    const: 1
-
-  '#power-domain-cells':
-    const: 1
-
-  reg:
-    maxItems: 1
-
-  protected-clocks:
-    description:
-      Protected clock specifier list as per common clock binding.
-
 required:
   - compatible
-  - reg
-  - '#clock-cells'
-  - '#reset-cells'
-  - '#power-domain-cells'
 
-additionalProperties: false
+unevaluatedProperties: false
 
 examples:
   # Example for GCC for MSM8960:
