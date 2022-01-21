@@ -217,19 +217,19 @@ static void shark_led_set_red(struct led_classdev *led_cdev,
 static const struct led_classdev shark_led_templates[NO_LEDS] = {
 	[BLUE_LED] = {
 		.name		= "%s:blue:",
-		.brightness	= LED_OFF,
+		.brightness	= 0,
 		.max_brightness = 127,
 		.brightness_set = shark_led_set_blue,
 	},
 	[BLUE_PULSE_LED] = {
 		.name		= "%s:blue-pulse:",
-		.brightness	= LED_OFF,
+		.brightness	= 0,
 		.max_brightness = 255,
 		.brightness_set = shark_led_set_blue_pulse,
 	},
 	[RED_LED] = {
 		.name		= "%s:red:",
-		.brightness	= LED_OFF,
+		.brightness	= 0,
 		.max_brightness = 1,
 		.brightness_set = shark_led_set_red,
 	},
