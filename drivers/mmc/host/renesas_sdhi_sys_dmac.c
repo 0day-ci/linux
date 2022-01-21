@@ -370,7 +370,7 @@ static void renesas_sdhi_sys_dmac_request_dma(struct tmio_mmc_host *host,
 		cfg.dst_addr = res->start +
 			(CTL_SD_DATA_PORT << host->bus_shift);
 		cfg.dst_addr_width = priv->dma_priv.dma_buswidth;
-		if (!cfg.dst_addr_width)
+		if (cfg.dst_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
 			cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
 		cfg.src_addr = 0;
 		ret = dmaengine_slave_config(host->chan_tx, &cfg);
@@ -389,7 +389,7 @@ static void renesas_sdhi_sys_dmac_request_dma(struct tmio_mmc_host *host,
 		cfg.direction = DMA_DEV_TO_MEM;
 		cfg.src_addr = cfg.dst_addr + host->pdata->dma_rx_offset;
 		cfg.src_addr_width = priv->dma_priv.dma_buswidth;
-		if (!cfg.src_addr_width)
+		if (cfg.src_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
 			cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
 		cfg.dst_addr = 0;
 		ret = dmaengine_slave_config(host->chan_rx, &cfg);
