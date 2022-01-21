@@ -2902,6 +2902,7 @@ static inline struct ip_sf_list *igmp_mcf_get_first(struct seq_file *seq)
 			if (likely(psf)) {
 				state->im = im;
 				state->idev = idev;
+				spin_unlock_bh(&im->lock);
 				break;
 			}
 			spin_unlock_bh(&im->lock);
