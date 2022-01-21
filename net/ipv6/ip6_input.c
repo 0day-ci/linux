@@ -469,6 +469,7 @@ static int ip6_input_finish(struct net *net, struct sock *sk, struct sk_buff *sk
 
 int ip6_input(struct sk_buff *skb)
 {
+	skb_clear_delivery_time(skb);
 	return NF_HOOK(NFPROTO_IPV6, NF_INET_LOCAL_IN,
 		       dev_net(skb->dev), NULL, skb, skb->dev, NULL,
 		       ip6_input_finish);

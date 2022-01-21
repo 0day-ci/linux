@@ -4817,10 +4817,12 @@ void __skb_tstamp_tx(struct sk_buff *orig_skb,
 		skb_shinfo(skb)->tskey = skb_shinfo(orig_skb)->tskey;
 	}
 
-	if (hwtstamps)
+	if (hwtstamps) {
 		*skb_hwtstamps(skb) = *hwtstamps;
-	else
+	} else {
 		skb->tstamp = ktime_get_real();
+		skb->mono_delivery_time = 0;
+	}
 
 	__skb_complete_tx_timestamp(skb, sk, tstype, opt_stats);
 }

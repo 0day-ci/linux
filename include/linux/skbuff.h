@@ -3912,8 +3912,23 @@ static inline void skb_set_delivery_time(struct sk_buff *skb, ktime_t kt,
 					 bool mono)
 {
 	skb->tstamp = kt;
-	/* Setting mono_delivery_time will be enabled later */
-	/* skb->mono_delivery_time = kt && mono; */
+	skb->mono_delivery_time = kt && mono;
+}
+
+DECLARE_STATIC_KEY_FALSE(netstamp_needed_key);
+
+/* skb is delivering locally.  If needed, set it to the (rcv) timestamp.
+ * Otherwise, clear the delivery time.
+ */
+static inline void skb_clear_delivery_time(struct sk_buff *skb)
+{
+	if (unlikely(skb->mono_delivery_time)) {
+		skb->mono_delivery_time = 0;
+		if (static_branch_unlikely(&netstamp_needed_key))
+			skb->tstamp = ktime_get_real();
+		else
+			skb->tstamp = 0;
+	}
 }
 
 static inline void skb_clear_tstamp(struct sk_buff *skb)
@@ -3922,6 +3937,14 @@ static inline void skb_clear_tstamp(struct sk_buff *skb)
 		return;
 
 	skb->tstamp = 0;
+}
+
+static inline ktime_t skb_tstamp(const struct sk_buff *skb)
+{
+	if (unlikely(skb->mono_delivery_time))
+		return 0;
+
+	return skb->tstamp;
 }
 
 static inline u8 skb_metadata_len(const struct sk_buff *skb)
