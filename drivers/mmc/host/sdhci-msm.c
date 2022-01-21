@@ -285,7 +285,13 @@ struct sdhci_msm_host {
 	u32 dll_config;
 	u32 ddr_config;
 	bool vqmmc_enabled;
+	unsigned long	private[] ____cacheline_aligned;
 };
+
+static inline void *sdhci_msm_priv(struct sdhci_msm_host *msm_host)
+{
+	return (void *)msm_host->private;
+}
 
 static const struct sdhci_msm_offset *sdhci_priv_msm_offset(struct sdhci_host *host)
 {
@@ -1585,6 +1591,8 @@ static void sdhci_msm_dump_pwr_ctrl_regs(struct sdhci_host *host)
 		msm_host_readl(msm_host, host, msm_offset->core_pwrctl_mask),
 		msm_host_readl(msm_host, host, msm_offset->core_pwrctl_ctl));
 }
+/* include bayhub patch for GGC chip support */
+#include "sdhci-bayhub.c"
 
 static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
 {
@@ -1628,10 +1636,16 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
 
 	/* Handle BUS ON/OFF*/
 	if (irq_status & CORE_PWRCTL_BUS_ON) {
+		/* Bayhub patch: GGC chip power on patch */
+		if (of_find_property(msm_host->pdev->dev.of_node, "use-bayhub-bh201", NULL))
+			bht_signal_voltage_on_off(host, 1);
 		pwr_state = REQ_BUS_ON;
 		io_level = REQ_IO_HIGH;
 	}
 	if (irq_status & CORE_PWRCTL_BUS_OFF) {
+		/* Bayhub patch: GGC chip power off patch */
+		if (of_find_property(msm_host->pdev->dev.of_node, "use-bayhub-bh201", NULL))
+			bht_signal_voltage_on_off(host, 0);
 		pwr_state = REQ_BUS_OFF;
 		io_level = REQ_IO_LOW;
 	}
@@ -2497,7 +2511,12 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	const struct sdhci_msm_variant_info *var_info;
 	struct device_node *node = pdev->dev.of_node;
 
-	host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata, sizeof(*msm_host));
+	/* Bayhub patch: memory allocate for sdhci_bht_host structure */
+	if (of_find_property(node, "use-bayhub-bh201", NULL))
+		host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata,
+			sizeof(*msm_host) + sizeof(struct sdhci_bht_host));
+	else
+		host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata, sizeof(*msm_host));
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 
@@ -2510,6 +2529,15 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	ret = mmc_of_parse(host->mmc);
 	if (ret)
 		goto pltfm_free;
+
+	/* Bayhub patch: resource assign and mmc_rescan routine overload */
+	if (of_find_property(node, "use-bayhub-bh201", NULL)) {
+		struct sdhci_bht_host *bht_host;
+
+		bht_host = sdhci_msm_priv(msm_host);
+		sdhci_bht_parse(msm_host->mmc);
+		INIT_DELAYED_WORK(&host->mmc->detect, mmc_rescan_bht);
+	}
 
 	/*
 	 * Based on the compatible string, load the required msm host info from
@@ -2727,6 +2755,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	host->mmc_host_ops.start_signal_voltage_switch =
 		sdhci_msm_start_signal_voltage_switch;
 	host->mmc_host_ops.execute_tuning = sdhci_msm_execute_tuning;
+	/* Bayhub patch: overload the mmc_host_ops.execute_tuning routine */
+	if (of_find_property(node, "use-bayhub-bh201", NULL))
+		host->mmc_host_ops.execute_tuning = sdhci_bht_execute_tuning;
 	if (of_property_read_bool(node, "supports-cqe"))
 		ret = sdhci_msm_cqe_add_host(host, pdev);
 	else
@@ -2750,6 +2781,9 @@ bus_clk_disable:
 	if (!IS_ERR(msm_host->bus_clk))
 		clk_disable_unprepare(msm_host->bus_clk);
 pltfm_free:
+	/* Bayhub patch: release assigned resource */
+	if (of_find_property(node, "use-bayhub-bh201", NULL))
+		sdhci_bht_resource_free(msm_host);
 	sdhci_pltfm_free(pdev);
 	return ret;
 }
@@ -2763,6 +2797,9 @@ static int sdhci_msm_remove(struct platform_device *pdev)
 		    0xffffffff);
 
 	sdhci_remove_host(host, dead);
+	/* Bayhub patch: release assigned resource */
+	if (of_find_property(msm_host->pdev->dev.of_node, "use-bayhub-bh201", NULL))
+		sdhci_bht_resource_free(msm_host);
 
 	pm_runtime_get_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
