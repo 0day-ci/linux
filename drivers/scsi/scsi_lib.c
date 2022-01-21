@@ -148,7 +148,7 @@ static void __scsi_queue_insert(struct scsi_cmnd *cmd, int reason, bool unbusy)
 	struct scsi_device *device = cmd->device;
 
 	SCSI_LOG_MLQUEUE(1, scmd_printk(KERN_INFO, cmd,
-		"Inserting command %p into mlqueue\n", cmd));
+		"Inserting command %px into mlqueue\n", cmd));
 
 	scsi_set_blocked(cmd, reason);
 

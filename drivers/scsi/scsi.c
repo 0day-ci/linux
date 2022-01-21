@@ -106,7 +106,7 @@ void scsi_log_send(struct scsi_cmnd *cmd)
 				       SCSI_LOG_MLQUEUE_BITS);
 		if (level > 1) {
 			scmd_printk(KERN_INFO, cmd,
-				    "Send: scmd 0x%p\n", cmd);
+				    "Send: scmd 0x%px\n", cmd);
 			scsi_print_command(cmd);
 		}
 	}

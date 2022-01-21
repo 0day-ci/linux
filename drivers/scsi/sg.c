@@ -1274,7 +1274,7 @@ sg_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -ENXIO;
 	req_sz = vma->vm_end - vma->vm_start;
 	SCSI_LOG_TIMEOUT(3, sg_printk(KERN_INFO, sfp->parentdp,
-				      "sg_mmap starting, vm_start=%p, len=%d\n",
+				      "sg_mmap starting, vm_start=%px, len=%d\n",
 				      (void *) vma->vm_start, (int) req_sz));
 	if (vma->vm_pgoff)
 		return -EINVAL;	/* want no offset */
@@ -1944,7 +1944,7 @@ sg_remove_scat(Sg_fd * sfp, Sg_scatter_hold * schp)
 			for (k = 0; k < schp->k_use_sg && schp->pages[k]; k++) {
 				SCSI_LOG_TIMEOUT(5,
 					sg_printk(KERN_INFO, sfp->parentdp,
-					"sg_remove_scat: k=%d, pg=0x%p\n",
+					"sg_remove_scat: k=%d, pg=0x%px\n",
 					k, schp->pages[k]));
 				__free_pages(schp->pages[k], schp->page_order);
 			}
@@ -2156,7 +2156,7 @@ sg_add_sfp(Sg_device * sdp)
 	list_add_tail(&sfp->sfd_siblings, &sdp->sfds);
 	write_unlock_irqrestore(&sdp->sfd_lock, iflags);
 	SCSI_LOG_TIMEOUT(3, sg_printk(KERN_INFO, sdp,
-				      "sg_add_sfp: sfp=0x%p\n", sfp));
+				      "sg_add_sfp: sfp=0x%px\n", sfp));
 	if (unlikely(sg_big_buff != def_reserved_size))
 		sg_big_buff = def_reserved_size;
 
@@ -2200,7 +2200,7 @@ sg_remove_sfp_usercontext(struct work_struct *work)
 	}
 
 	SCSI_LOG_TIMEOUT(6, sg_printk(KERN_INFO, sdp,
-			"sg_remove_sfp: sfp=0x%p\n", sfp));
+			"sg_remove_sfp: sfp=0x%px\n", sfp));
 	kfree(sfp);
 
 	scsi_device_put(sdp->device);

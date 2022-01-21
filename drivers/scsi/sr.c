@@ -411,7 +411,7 @@ static blk_status_t sr_init_command(struct scsi_cmnd *SCpnt)
 		SCSI_LOG_HLQUEUE(2, scmd_printk(KERN_INFO, SCpnt,
 			"Finishing %u sectors\n", blk_rq_sectors(rq)));
 		SCSI_LOG_HLQUEUE(2, scmd_printk(KERN_INFO, SCpnt,
-			"Retry with 0x%p\n", SCpnt));
+			"Retry with 0x%px\n", SCpnt));
 		goto out;
 	}
 
