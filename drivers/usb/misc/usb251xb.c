@@ -402,6 +402,7 @@ static int usb251xb_get_ofdata(struct usb251xb *hub,
 	struct device_node *np = dev->of_node;
 	int len, err;
 	u32 property_u32 = 0;
+	u8 property_u8 = 0;
 	const char *cproperty_char;
 	char str[USB251XB_STRING_BUFSIZE / 2];
 
@@ -543,6 +544,12 @@ static int usb251xb_get_ofdata(struct usb251xb *hub,
 	if (of_property_read_u16_array(np, "language-id", &hub->lang_id, 1))
 		hub->lang_id = USB251XB_DEF_LANGUAGE_ID;
 
+	if (!of_property_read_u8(np, "boost-up", &property_u8)){
+		hub->boost_up = property_u8;
+	} else {
+		hub->boost_up = USB251XB_DEF_BOOST_UP;
+	}
+
 	cproperty_char = of_get_property(np, "manufacturer", NULL);
 	strlcpy(str, cproperty_char ? : USB251XB_DEF_MANUFACTURER_STRING,
 		sizeof(str));
@@ -584,7 +591,6 @@ static int usb251xb_get_ofdata(struct usb251xb *hub,
 	 * may be as soon as needed.
 	 */
 	hub->bat_charge_en = USB251XB_DEF_BATTERY_CHARGING_ENABLE;
-	hub->boost_up = USB251XB_DEF_BOOST_UP;
 	hub->boost_57 = USB251XB_DEF_BOOST_57;
 	hub->boost_14 = USB251XB_DEF_BOOST_14;
 	hub->port_map12 = USB251XB_DEF_PORT_MAP_12;
