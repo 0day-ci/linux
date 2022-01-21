@@ -204,7 +204,7 @@ static void rt2500pci_brightness_set(struct led_classdev *led_cdev,
 {
 	struct rt2x00_led *led =
 	    container_of(led_cdev, struct rt2x00_led, led_dev);
-	unsigned int enabled = brightness != LED_OFF;
+	unsigned int enabled = brightness != 0;
 	u32 reg;
 
 	reg = rt2x00mmio_register_read(led->rt2x00dev, LEDCSR);

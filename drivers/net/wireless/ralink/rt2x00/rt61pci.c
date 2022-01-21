@@ -242,7 +242,7 @@ static void rt61pci_brightness_set(struct led_classdev *led_cdev,
 {
 	struct rt2x00_led *led =
 	    container_of(led_cdev, struct rt2x00_led, led_dev);
-	unsigned int enabled = brightness != LED_OFF;
+	unsigned int enabled = brightness != 0;
 	unsigned int a_mode =
 	    (enabled && led->rt2x00dev->curr_band == NL80211_BAND_5GHZ);
 	unsigned int bg_mode =
@@ -271,7 +271,7 @@ static void rt61pci_brightness_set(struct led_classdev *led_cdev,
 		 * argument into the matching level within that range.
 		 */
 		rt61pci_mcu_request(led->rt2x00dev, MCU_LED_STRENGTH, 0xff,
-				    brightness / (LED_FULL / 6), 0);
+				    brightness / (255 / 6), 0);
 	}
 }
 

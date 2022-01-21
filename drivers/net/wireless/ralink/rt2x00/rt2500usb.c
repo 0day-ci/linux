@@ -267,7 +267,7 @@ static void rt2500usb_brightness_set(struct led_classdev *led_cdev,
 {
 	struct rt2x00_led *led =
 	    container_of(led_cdev, struct rt2x00_led, led_dev);
-	unsigned int enabled = brightness != LED_OFF;
+	unsigned int enabled = brightness != 0;
 	u16 reg;
 
 	reg = rt2500usb_register_read(led->rt2x00dev, MAC_CSR20);

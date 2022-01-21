@@ -52,7 +52,7 @@ void rt2x00leds_led_quality(struct rt2x00_dev *rt2x00dev, int rssi)
 	 * is going to calculate the value and might use it in a
 	 * division.
 	 */
-	brightness = ((LED_FULL / 6) * rssi) + 1;
+	brightness = ((255 / 6) * rssi) + 1;
 	if (brightness != led->led_dev.brightness) {
 		led->led_dev.brightness_set(&led->led_dev, brightness);
 		led->led_dev.brightness = brightness;
@@ -61,7 +61,7 @@ void rt2x00leds_led_quality(struct rt2x00_dev *rt2x00dev, int rssi)
 
 static void rt2x00led_led_simple(struct rt2x00_led *led, bool enabled)
 {
-	unsigned int brightness = enabled ? LED_FULL : LED_OFF;
+	unsigned int brightness = enabled ? 255 : 0;
 
 	if (!(led->flags & LED_REGISTERED))
 		return;
@@ -96,7 +96,7 @@ static int rt2x00leds_register_led(struct rt2x00_dev *rt2x00dev,
 	int retval;
 
 	led->led_dev.name = name;
-	led->led_dev.brightness = LED_OFF;
+	led->led_dev.brightness = 0;
 
 	retval = led_classdev_register(device, &led->led_dev);
 	if (retval) {
@@ -179,7 +179,7 @@ static void rt2x00leds_unregister_led(struct rt2x00_led *led)
 	 * possible yet.
 	 */
 	if (!(led->led_dev.flags & LED_SUSPENDED))
-		led->led_dev.brightness_set(&led->led_dev, LED_OFF);
+		led->led_dev.brightness_set(&led->led_dev, 0);
 
 	led->flags &= ~LED_REGISTERED;
 }
@@ -199,8 +199,8 @@ static inline void rt2x00leds_suspend_led(struct rt2x00_led *led)
 	led_classdev_suspend(&led->led_dev);
 
 	/* This shouldn't be needed, but just to be safe */
-	led->led_dev.brightness_set(&led->led_dev, LED_OFF);
-	led->led_dev.brightness = LED_OFF;
+	led->led_dev.brightness_set(&led->led_dev, 0);
+	led->led_dev.brightness = 0;
 }
 
 void rt2x00leds_suspend(struct rt2x00_dev *rt2x00dev)
@@ -218,8 +218,8 @@ static inline void rt2x00leds_resume_led(struct rt2x00_led *led)
 	led_classdev_resume(&led->led_dev);
 
 	/* Device might have enabled the LEDS during resume */
-	led->led_dev.brightness_set(&led->led_dev, LED_OFF);
-	led->led_dev.brightness = LED_OFF;
+	led->led_dev.brightness_set(&led->led_dev, 0);
+	led->led_dev.brightness = 0;
 }
 
 void rt2x00leds_resume(struct rt2x00_dev *rt2x00dev)

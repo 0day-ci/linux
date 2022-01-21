@@ -187,7 +187,7 @@ static void rt73usb_brightness_set(struct led_classdev *led_cdev,
 {
 	struct rt2x00_led *led =
 	   container_of(led_cdev, struct rt2x00_led, led_dev);
-	unsigned int enabled = brightness != LED_OFF;
+	unsigned int enabled = brightness != 0;
 	unsigned int a_mode =
 	    (enabled && led->rt2x00dev->curr_band == NL80211_BAND_5GHZ);
 	unsigned int bg_mode =
@@ -216,7 +216,7 @@ static void rt73usb_brightness_set(struct led_classdev *led_cdev,
 		 * argument into the matching level within that range.
 		 */
 		rt2x00usb_vendor_request_sw(led->rt2x00dev, USB_LED_CONTROL,
-					    brightness / (LED_FULL / 6),
+					    brightness / (255 / 6),
 					    led->rt2x00dev->led_mcu_reg,
 					    REGISTER_TIMEOUT);
 	}

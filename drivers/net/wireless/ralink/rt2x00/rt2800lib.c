@@ -1521,7 +1521,7 @@ static void rt2800_brightness_set(struct led_classdev *led_cdev,
 {
 	struct rt2x00_led *led =
 	    container_of(led_cdev, struct rt2x00_led, led_dev);
-	unsigned int enabled = brightness != LED_OFF;
+	unsigned int enabled = brightness != 0;
 	unsigned int bg_mode =
 	    (enabled && led->rt2x00dev->curr_band == NL80211_BAND_2GHZ);
 	unsigned int polarity =
@@ -1570,7 +1570,7 @@ static void rt2800_brightness_set(struct led_classdev *led_cdev,
 			 *	(1 << level) - 1
 			 */
 			rt2800_mcu_request(led->rt2x00dev, MCU_LED_STRENGTH, 0xff,
-					      (1 << brightness / (LED_FULL / 6)) - 1,
+					      (1 << brightness / (255 / 6)) - 1,
 					      polarity);
 		}
 	}
