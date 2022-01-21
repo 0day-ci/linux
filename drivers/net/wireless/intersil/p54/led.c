@@ -43,7 +43,7 @@ static void p54_update_leds(struct work_struct *work)
 			if (tmp < blink_delay)
 				blink_delay = tmp;
 
-			if (priv->leds[i].led_dev.brightness == LED_OFF)
+			if (priv->leds[i].led_dev.brightness == 0)
 				rerun = true;
 
 			priv->leds[i].toggled =
