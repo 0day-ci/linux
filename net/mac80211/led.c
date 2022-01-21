@@ -14,9 +14,9 @@ void ieee80211_led_assoc(struct ieee80211_local *local, bool associated)
 	if (!atomic_read(&local->assoc_led_active))
 		return;
 	if (associated)
-		led_trigger_event(&local->assoc_led, LED_FULL);
+		led_trigger_event(&local->assoc_led, 255);
 	else
-		led_trigger_event(&local->assoc_led, LED_OFF);
+		led_trigger_event(&local->assoc_led, 0);
 }
 
 void ieee80211_led_radio(struct ieee80211_local *local, bool enabled)
@@ -24,9 +24,9 @@ void ieee80211_led_radio(struct ieee80211_local *local, bool enabled)
 	if (!atomic_read(&local->radio_led_active))
 		return;
 	if (enabled)
-		led_trigger_event(&local->radio_led, LED_FULL);
+		led_trigger_event(&local->radio_led, 255);
 	else
-		led_trigger_event(&local->radio_led, LED_OFF);
+		led_trigger_event(&local->radio_led, 0);
 }
 
 void ieee80211_alloc_led_names(struct ieee80211_local *local)
@@ -344,7 +344,7 @@ static void ieee80211_stop_tpt_led_trig(struct ieee80211_local *local)
 	tpt_trig->running = false;
 	del_timer_sync(&tpt_trig->timer);
 
-	led_trigger_event(&local->tpt_led, LED_OFF);
+	led_trigger_event(&local->tpt_led, 0);
 }
 
 void ieee80211_mod_tpt_led_trig(struct ieee80211_local *local,
