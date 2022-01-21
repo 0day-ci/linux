@@ -842,7 +842,7 @@ static int lenovo_led_brightness_set(struct led_classdev *led_cdev,
 	if (led_cdev == &data_pointer->led_micmute)
 		led_nr = 1;
 
-	if (value == LED_OFF)
+	if (value == 0)
 		data_pointer->led_state &= ~(1 << led_nr);
 	else
 		data_pointer->led_state |= 1 << led_nr;

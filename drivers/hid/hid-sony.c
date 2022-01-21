@@ -2048,7 +2048,7 @@ static enum led_brightness sony_led_get_brightness(struct led_classdev *led)
 	drv_data = hid_get_drvdata(hdev);
 	if (!drv_data) {
 		hid_err(hdev, "No device data\n");
-		return LED_OFF;
+		return 0;
 	}
 
 	for (n = 0; n < drv_data->led_count; n++) {
@@ -2056,7 +2056,7 @@ static enum led_brightness sony_led_get_brightness(struct led_classdev *led)
 			return drv_data->led_state[n];
 	}
 
-	return LED_OFF;
+	return 0;
 }
 
 static int sony_led_blink_set(struct led_classdev *led, unsigned long *delay_on,

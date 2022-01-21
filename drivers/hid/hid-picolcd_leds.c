@@ -64,10 +64,10 @@ static void picolcd_led_set_brightness(struct led_classdev *led_cdev,
 		if (led_cdev != data->led[i])
 			continue;
 		state = (data->led_state >> i) & 1;
-		if (value == LED_OFF && state) {
+		if (value == 0 && state) {
 			data->led_state &= ~(1 << i);
 			picolcd_leds_set(data);
-		} else if (value != LED_OFF && !state) {
+		} else if (value != 0 && !state) {
 			data->led_state |= 1 << i;
 			picolcd_leds_set(data);
 		}
@@ -90,7 +90,7 @@ static enum led_brightness picolcd_led_get_brightness(struct led_classdev *led_c
 			value = (data->led_state >> i) & 1;
 			break;
 		}
-	return value ? LED_FULL : LED_OFF;
+	return value ? 255 : 0;
 }
 
 int picolcd_init_leds(struct picolcd_data *data, struct hid_report *report)

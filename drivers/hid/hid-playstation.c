@@ -873,7 +873,7 @@ static int dualsense_player_led_set_brightness(struct led_classdev *led, enum le
 	spin_lock_irqsave(&ds->base.lock, flags);
 
 	led_index = led - ds->player_leds;
-	if (value == LED_OFF)
+	if (value == 0)
 		ds->player_leds_state &= ~BIT(led_index);
 	else
 		ds->player_leds_state |= BIT(led_index);

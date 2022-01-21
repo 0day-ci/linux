@@ -267,7 +267,7 @@ static void bigben_set_led(struct led_classdev *led,
 
 	for (n = 0; n < NUM_LEDS; n++) {
 		if (led == bigben->leds[n]) {
-			if (value == LED_OFF) {
+			if (value == 0) {
 				work = (bigben->led_state & BIT(n));
 				bigben->led_state &= ~BIT(n);
 			} else {
@@ -293,15 +293,15 @@ static enum led_brightness bigben_get_led(struct led_classdev *led)
 
 	if (!bigben) {
 		hid_err(hid, "no device data\n");
-		return LED_OFF;
+		return 0;
 	}
 
 	for (n = 0; n < NUM_LEDS; n++) {
 		if (led == bigben->leds[n])
-			return (bigben->led_state & BIT(n)) ? LED_ON : LED_OFF;
+			return (bigben->led_state & BIT(n)) ? 1 : 0;
 	}
 
-	return LED_OFF;
+	return 0;
 }
 
 static void bigben_remove(struct hid_device *hid)
@@ -375,7 +375,7 @@ static int bigben_probe(struct hid_device *hid,
 			dev_name(&hid->dev), n + 1
 		);
 		led->name = name;
-		led->brightness = (n == 0) ? LED_ON : LED_OFF;
+		led->brightness = (n == 0) ? 1 : 0;
 		led->max_brightness = 1;
 		led->brightness_get = bigben_get_led;
 		led->brightness_set = bigben_set_led;

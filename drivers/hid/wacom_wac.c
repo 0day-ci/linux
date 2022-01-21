@@ -3989,7 +3989,7 @@ static void wacom_24hd_update_leds(struct wacom *wacom, int mask, int group)
 		}
 		if (!updated && mask & BIT(i)) {
 			led->held = true;
-			led_trigger_event(&led->trigger, LED_FULL);
+			led_trigger_event(&led->trigger, 255);
 		} else {
 			led->held = false;
 		}

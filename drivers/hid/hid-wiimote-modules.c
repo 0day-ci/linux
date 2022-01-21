@@ -308,7 +308,7 @@ static enum led_brightness wiimod_led_get(struct led_classdev *led_dev)
 		}
 	}
 
-	return value ? LED_FULL : LED_OFF;
+	return value ? 255 : 0;
 }
 
 static void wiimod_led_set(struct led_classdev *led_dev,
@@ -325,7 +325,7 @@ static void wiimod_led_set(struct led_classdev *led_dev,
 			flag = WIIPROTO_FLAG_LED(i + 1);
 			spin_lock_irqsave(&wdata->state.lock, flags);
 			state = wdata->state.flags;
-			if (value == LED_OFF)
+			if (value == 0)
 				wiiproto_req_leds(wdata, state & ~flag);
 			else
 				wiiproto_req_leds(wdata, state | flag);

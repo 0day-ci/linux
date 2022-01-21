@@ -1136,10 +1136,10 @@ static void lg4ff_led_set_brightness(struct led_classdev *led_cdev,
 		if (led_cdev != entry->wdata.led[i])
 			continue;
 		state = (entry->wdata.led_state >> i) & 1;
-		if (value == LED_OFF && state) {
+		if (value == 0 && state) {
 			entry->wdata.led_state &= ~(1 << i);
 			lg4ff_set_leds(hid, entry->wdata.led_state);
-		} else if (value != LED_OFF && !state) {
+		} else if (value != 0 && !state) {
 			entry->wdata.led_state |= 1 << i;
 			lg4ff_set_leds(hid, entry->wdata.led_state);
 		}
@@ -1157,14 +1157,14 @@ static enum led_brightness lg4ff_led_get_brightness(struct led_classdev *led_cde
 
 	if (!drv_data) {
 		hid_err(hid, "Device data not found.");
-		return LED_OFF;
+		return 0;
 	}
 
 	entry = drv_data->device_props;
 
 	if (!entry) {
 		hid_err(hid, "Device properties not found.");
-		return LED_OFF;
+		return 0;
 	}
 
 	for (i = 0; i < 5; i++)
@@ -1173,7 +1173,7 @@ static enum led_brightness lg4ff_led_get_brightness(struct led_classdev *led_cde
 			break;
 		}
 
-	return value ? LED_FULL : LED_OFF;
+	return value ? 255 : 0;
 }
 #endif
 

@@ -146,7 +146,7 @@ static void steelseries_srws1_led_all_set_brightness(struct led_classdev *led_cd
 		return;
 	}
 
-	if (value == LED_OFF)
+	if (value == 0)
 		drv_data->led_state = 0;
 	else
 		drv_data->led_state = (1 << (SRWS1_NUMBER_LEDS + 1)) - 1;
@@ -164,10 +164,10 @@ static enum led_brightness steelseries_srws1_led_all_get_brightness(struct led_c
 
 	if (!drv_data) {
 		hid_err(hid, "Device data not found.");
-		return LED_OFF;
+		return 0;
 	}
 
-	return (drv_data->led_state >> SRWS1_NUMBER_LEDS) ? LED_FULL : LED_OFF;
+	return (drv_data->led_state >> SRWS1_NUMBER_LEDS) ? 255 : 0;
 }
 
 static void steelseries_srws1_led_set_brightness(struct led_classdev *led_cdev,
@@ -188,10 +188,10 @@ static void steelseries_srws1_led_set_brightness(struct led_classdev *led_cdev,
 			continue;
 
 		state = (drv_data->led_state >> i) & 1;
-		if (value == LED_OFF && state) {
+		if (value == 0 && state) {
 			drv_data->led_state &= ~(1 << i);
 			steelseries_srws1_set_leds(hid, drv_data->led_state);
-		} else if (value != LED_OFF && !state) {
+		} else if (value != 0 && !state) {
 			drv_data->led_state |= 1 << i;
 			steelseries_srws1_set_leds(hid, drv_data->led_state);
 		}
@@ -210,7 +210,7 @@ static enum led_brightness steelseries_srws1_led_get_brightness(struct led_class
 
 	if (!drv_data) {
 		hid_err(hid, "Device data not found.");
-		return LED_OFF;
+		return 0;
 	}
 
 	for (i = 0; i < SRWS1_NUMBER_LEDS; i++)
@@ -219,7 +219,7 @@ static enum led_brightness steelseries_srws1_led_get_brightness(struct led_class
 			break;
 		}
 
-	return value ? LED_FULL : LED_OFF;
+	return value ? 255 : 0;
 }
 
 static int steelseries_srws1_probe(struct hid_device *hdev,

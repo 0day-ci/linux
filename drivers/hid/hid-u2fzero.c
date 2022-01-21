@@ -187,7 +187,7 @@ static int u2fzero_blink(struct led_classdev *ldev)
 static int u2fzero_brightness_set(struct led_classdev *ldev,
 				  enum led_brightness brightness)
 {
-	ldev->brightness = LED_OFF;
+	ldev->brightness = 0;
 	if (brightness)
 		return u2fzero_blink(ldev);
 	else
@@ -244,7 +244,7 @@ static int u2fzero_init_led(struct u2fzero_device *dev,
 		return -ENOMEM;
 
 	dev->ldev.name = dev->led_name;
-	dev->ldev.max_brightness = LED_ON;
+	dev->ldev.max_brightness = 1;
 	dev->ldev.flags = LED_HW_PLUGGABLE;
 	dev->ldev.brightness_set_blocking = u2fzero_brightness_set;
 

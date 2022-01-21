@@ -1304,13 +1304,13 @@ enum led_brightness wacom_leds_brightness_get(struct wacom_led *led)
 	struct wacom *wacom = led->wacom;
 
 	if (wacom->led.max_hlv)
-		return led->hlv * LED_FULL / wacom->led.max_hlv;
+		return led->hlv * 255 / wacom->led.max_hlv;
 
 	if (wacom->led.max_llv)
-		return led->llv * LED_FULL / wacom->led.max_llv;
+		return led->llv * 255 / wacom->led.max_llv;
 
 	/* device doesn't support brightness tuning */
-	return LED_FULL;
+	return 255;
 }
 
 static enum led_brightness __wacom_led_brightness_get(struct led_classdev *cdev)
@@ -1319,7 +1319,7 @@ static enum led_brightness __wacom_led_brightness_get(struct led_classdev *cdev)
 	struct wacom *wacom = led->wacom;
 
 	if (wacom->led.groups[led->group].select != led->id)
-		return LED_OFF;
+		return 0;
 
 	return wacom_leds_brightness_get(led);
 }
@@ -1333,14 +1333,14 @@ static int wacom_led_brightness_set(struct led_classdev *cdev,
 
 	mutex_lock(&wacom->lock);
 
-	if (!wacom->led.groups || (brightness == LED_OFF &&
+	if (!wacom->led.groups || (brightness == 0 &&
 	    wacom->led.groups[led->group].select != led->id)) {
 		error = 0;
 		goto out;
 	}
 
-	led->llv = wacom->led.llv = wacom->led.max_llv * brightness / LED_FULL;
-	led->hlv = wacom->led.hlv = wacom->led.max_hlv * brightness / LED_FULL;
+	led->llv = wacom->led.llv = wacom->led.max_llv * brightness / 255;
+	led->hlv = wacom->led.hlv = wacom->led.max_hlv * brightness / 255;
 
 	wacom->led.groups[led->group].select = led->id;
 
@@ -1389,7 +1389,7 @@ static int wacom_led_register_one(struct device *dev, struct wacom *wacom,
 	led->llv = wacom->led.llv;
 	led->hlv = wacom->led.hlv;
 	led->cdev.name = name;
-	led->cdev.max_brightness = LED_FULL;
+	led->cdev.max_brightness = 255;
 	led->cdev.flags = LED_HW_PLUGGABLE;
 	led->cdev.brightness_get = __wacom_led_brightness_get;
 	if (!read_only) {
