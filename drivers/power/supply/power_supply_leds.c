@@ -31,25 +31,25 @@ static void power_supply_update_bat_leds(struct power_supply *psy)
 
 	switch (status.intval) {
 	case POWER_SUPPLY_STATUS_FULL:
-		led_trigger_event(psy->charging_full_trig, LED_FULL);
-		led_trigger_event(psy->charging_trig, LED_OFF);
-		led_trigger_event(psy->full_trig, LED_FULL);
+		led_trigger_event(psy->charging_full_trig, 255);
+		led_trigger_event(psy->charging_trig, 0);
+		led_trigger_event(psy->full_trig, 255);
 		led_trigger_event(psy->charging_blink_full_solid_trig,
-			LED_FULL);
+			255);
 		break;
 	case POWER_SUPPLY_STATUS_CHARGING:
-		led_trigger_event(psy->charging_full_trig, LED_FULL);
-		led_trigger_event(psy->charging_trig, LED_FULL);
-		led_trigger_event(psy->full_trig, LED_OFF);
+		led_trigger_event(psy->charging_full_trig, 255);
+		led_trigger_event(psy->charging_trig, 255);
+		led_trigger_event(psy->full_trig, 0);
 		led_trigger_blink(psy->charging_blink_full_solid_trig,
 			&delay_on, &delay_off);
 		break;
 	default:
-		led_trigger_event(psy->charging_full_trig, LED_OFF);
-		led_trigger_event(psy->charging_trig, LED_OFF);
-		led_trigger_event(psy->full_trig, LED_OFF);
+		led_trigger_event(psy->charging_full_trig, 0);
+		led_trigger_event(psy->charging_trig, 0);
+		led_trigger_event(psy->full_trig, 0);
 		led_trigger_event(psy->charging_blink_full_solid_trig,
-			LED_OFF);
+			0);
 		break;
 	}
 }
@@ -120,9 +120,9 @@ static void power_supply_update_gen_leds(struct power_supply *psy)
 	dev_dbg(&psy->dev, "%s %d\n", __func__, online.intval);
 
 	if (online.intval)
-		led_trigger_event(psy->online_trig, LED_FULL);
+		led_trigger_event(psy->online_trig, 255);
 	else
-		led_trigger_event(psy->online_trig, LED_OFF);
+		led_trigger_event(psy->online_trig, 0);
 }
 
 static int power_supply_create_gen_triggers(struct power_supply *psy)
