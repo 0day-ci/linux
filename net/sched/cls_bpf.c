@@ -93,11 +93,7 @@ static int cls_bpf_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 		if (tc_skip_sw(prog->gen_flags)) {
 			filter_res = prog->exts_integrated ? TC_ACT_UNSPEC : 0;
 		} else if (at_ingress) {
-			/* It is safe to push/pull even if skb_shared() */
-			__skb_push(skb, skb->mac_len);
-			bpf_compute_data_pointers(skb);
-			filter_res = bpf_prog_run(prog->filter, skb);
-			__skb_pull(skb, skb->mac_len);
+			filter_res = bpf_prog_run_at_ingress(prog->filter, skb);
 		} else {
 			bpf_compute_data_pointers(skb);
 			filter_res = bpf_prog_run(prog->filter, skb);

@@ -45,10 +45,7 @@ static int tcf_bpf_act(struct sk_buff *skb, const struct tc_action *act,
 
 	filter = rcu_dereference(prog->filter);
 	if (at_ingress) {
-		__skb_push(skb, skb->mac_len);
-		bpf_compute_data_pointers(skb);
-		filter_res = bpf_prog_run(filter, skb);
-		__skb_pull(skb, skb->mac_len);
+		filter_res = bpf_prog_run_at_ingress(filter, skb);
 	} else {
 		bpf_compute_data_pointers(skb);
 		filter_res = bpf_prog_run(filter, skb);

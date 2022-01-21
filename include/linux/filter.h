@@ -572,7 +572,8 @@ struct bpf_prog {
 				has_callchain_buf:1, /* callchain buffer allocated? */
 				enforce_expected_attach_type:1, /* Enforce expected_attach_type checking at attach time */
 				call_get_stack:1, /* Do we call bpf_get_stack() or bpf_get_stackid() */
-				call_get_func_ip:1; /* Do we call get_func_ip() */
+				call_get_func_ip:1, /* Do we call get_func_ip() */
+				delivery_time_access:1; /* Accessed __sk_buff->mono_delivery_time */
 	enum bpf_prog_type	type;		/* Type of BPF program */
 	enum bpf_attach_type	expected_attach_type; /* For some prog types */
 	u32			len;		/* Number of filter blocks */
@@ -697,6 +698,34 @@ static inline void bpf_compute_data_pointers(struct sk_buff *skb)
 	BUILD_BUG_ON(sizeof(*cb) > sizeof_field(struct sk_buff, cb));
 	cb->data_meta = skb->data - skb_metadata_len(skb);
 	cb->data_end  = skb->data + skb_headlen(skb);
+}
+
+static __always_inline u32 bpf_prog_run_at_ingress(const struct bpf_prog *prog,
+						   struct sk_buff *skb)
+{
+	ktime_t tstamp, delivery_time = 0;
+	int filter_res;
+
+	if (unlikely(skb->mono_delivery_time) && !prog->delivery_time_access) {
+		delivery_time = skb->tstamp;
+		skb->mono_delivery_time = 0;
+		if (static_branch_unlikely(&netstamp_needed_key))
+			skb->tstamp = tstamp = ktime_get_real();
+		else
+			skb->tstamp = tstamp = 0;
+	}
+
+	/* It is safe to push/pull even if skb_shared() */
+	__skb_push(skb, skb->mac_len);
+	bpf_compute_data_pointers(skb);
+	filter_res = bpf_prog_run(prog, skb);
+	__skb_pull(skb, skb->mac_len);
+
+	/* __sk_buff->tstamp was not changed, restore the delivery_time */
+	if (unlikely(delivery_time) && skb_tstamp(skb) == tstamp)
+		skb_set_delivery_time(skb, delivery_time, true);
+
+	return filter_res;
 }
 
 /* Similar to bpf_compute_data_pointers(), except that save orginal

@@ -866,22 +866,23 @@ struct sk_buff {
 	__u8			vlan_present:1;	/* See PKT_VLAN_PRESENT_BIT */
 	__u8			csum_complete_sw:1;
 	__u8			csum_level:2;
-	__u8			csum_not_inet:1;
 	__u8			dst_pending_confirm:1;
+	__u8			mono_delivery_time:1;
+
+#ifdef CONFIG_NET_CLS_ACT
+	__u8			tc_skip_classify:1;
+	__u8			tc_at_ingress:1;
+#endif
 #ifdef CONFIG_IPV6_NDISC_NODETYPE
 	__u8			ndisc_nodetype:2;
 #endif
-
+	__u8			csum_not_inet:1;
 	__u8			ipvs_property:1;
 	__u8			inner_protocol_type:1;
 	__u8			remcsum_offload:1;
 #ifdef CONFIG_NET_SWITCHDEV
 	__u8			offload_fwd_mark:1;
 	__u8			offload_l3_fwd_mark:1;
-#endif
-#ifdef CONFIG_NET_CLS_ACT
-	__u8			tc_skip_classify:1;
-	__u8			tc_at_ingress:1;
 #endif
 	__u8			redirected:1;
 #ifdef CONFIG_NET_REDIRECT
@@ -894,7 +895,6 @@ struct sk_buff {
 	__u8			decrypted:1;
 #endif
 	__u8			slow_gro:1;
-	__u8			mono_delivery_time:1;
 
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
@@ -972,10 +972,16 @@ struct sk_buff {
 /* if you move pkt_vlan_present around you also must adapt these constants */
 #ifdef __BIG_ENDIAN_BITFIELD
 #define PKT_VLAN_PRESENT_BIT	7
+#define TC_AT_INGRESS_SHIFT	0
+#define SKB_MONO_DELIVERY_TIME_SHIFT 2
 #else
 #define PKT_VLAN_PRESENT_BIT	0
+#define TC_AT_INGRESS_SHIFT	7
+#define SKB_MONO_DELIVERY_TIME_SHIFT 5
 #endif
 #define PKT_VLAN_PRESENT_OFFSET	offsetof(struct sk_buff, __pkt_vlan_present_offset)
+#define TC_AT_INGRESS_OFFSET offsetof(struct sk_buff, __pkt_vlan_present_offset)
+#define SKB_MONO_DELIVERY_TIME_OFFSET offsetof(struct sk_buff, __pkt_vlan_present_offset)
 
 #ifdef __KERNEL__
 /*

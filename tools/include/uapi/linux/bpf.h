@@ -5437,6 +5437,7 @@ struct __sk_buff {
 	__u32 gso_size;
 	__u32 :32;		/* Padding, future use. */
 	__u64 hwtstamp;
+	__u64 mono_delivery_time;
 };
 
 struct bpf_tunnel_key {
