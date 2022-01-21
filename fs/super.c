@@ -520,6 +520,8 @@ struct super_block *sget_fc(struct fs_context *fc,
 	struct user_namespace *user_ns = fc->global ? &init_user_ns : fc->user_ns;
 	int err;
 
+	if (!test)
+		s = alloc_super(fc->fs_type, fc->sb_flags, user_ns);
 retry:
 	spin_lock(&sb_lock);
 	if (test) {
