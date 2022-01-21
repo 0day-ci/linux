@@ -217,6 +217,14 @@ static void __kvm_update_cpuid_runtime(struct kvm_vcpu *vcpu, struct kvm_cpuid_e
 		cpuid_entry_change(best, X86_FEATURE_OSPKE,
 				   kvm_read_cr4_bits(vcpu, X86_CR4_PKE));
 
+	best = cpuid_entry2_find(entries, nent, 0xA, 0);
+	if (best && !vcpu->kvm->arch.enable_pmu) {
+		best->eax = 0;
+		best->ebx = 0;
+		best->ecx = 0;
+		best->edx = 0;
+	}
+
 	best = cpuid_entry2_find(entries, nent, 0xD, 0);
 	if (best)
 		best->ebx = xstate_required_size(vcpu->arch.xcr0, false);
