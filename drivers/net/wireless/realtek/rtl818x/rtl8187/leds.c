@@ -109,7 +109,7 @@ static void rtl8187_led_brightness_set(struct led_classdev *led_dev,
 		return;
 	priv = hw->priv;
 	if (led->is_radio) {
-		if (brightness == LED_FULL) {
+		if (brightness == 255) {
 			ieee80211_queue_delayed_work(hw, &priv->led_on, 0);
 			radio_on = true;
 		} else if (radio_on) {
@@ -118,7 +118,7 @@ static void rtl8187_led_brightness_set(struct led_classdev *led_dev,
 			ieee80211_queue_delayed_work(hw, &priv->led_off, 0);
 		}
 	} else if (radio_on) {
-		if (brightness == LED_OFF) {
+		if (brightness == 0) {
 			ieee80211_queue_delayed_work(hw, &priv->led_off, 0);
 			/* The LED is off for 1/20 sec - it just blinks. */
 			ieee80211_queue_delayed_work(hw, &priv->led_on,
