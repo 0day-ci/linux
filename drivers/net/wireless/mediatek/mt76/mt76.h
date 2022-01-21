@@ -264,6 +264,7 @@ struct mt76_wcid {
 
 	struct list_head list;
 	struct idr pktid;
+	unsigned long last_idr_check_at; /* in jiffies */
 };
 
 struct mt76_txq {
