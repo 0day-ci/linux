@@ -175,7 +175,7 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 		mmc_should_fail_request(host, mrq);
 
 		if (!host->ongoing_mrq)
-			led_trigger_event(host->led, LED_OFF);
+			led_trigger_event(host->led, 0);
 
 		if (mrq->sbc) {
 			pr_debug("%s: req done <CMD%u>: %d: %08x %08x %08x %08x\n",
@@ -352,7 +352,7 @@ int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	if (err)
 		return err;
 
-	led_trigger_event(host->led, LED_FULL);
+	led_trigger_event(host->led, 255);
 	__mmc_start_request(host, mrq);
 
 	return 0;

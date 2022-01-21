@@ -395,7 +395,7 @@ static void sdhci_led_control(struct led_classdev *led,
 	if (host->runtime_suspended)
 		goto out;
 
-	if (brightness == LED_OFF)
+	if (brightness == 0)
 		__sdhci_led_deactivate(host);
 	else
 		__sdhci_led_activate(host);
@@ -414,7 +414,7 @@ static int sdhci_led_register(struct sdhci_host *host)
 		 "%s::", mmc_hostname(mmc));
 
 	host->led.name = host->led_name;
-	host->led.brightness = LED_OFF;
+	host->led.brightness = 0;
 	host->led.default_trigger = mmc_hostname(mmc);
 	host->led.brightness_set = sdhci_led_control;
 

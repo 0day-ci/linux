@@ -1287,7 +1287,7 @@ static void rtsx_usb_update_led(struct work_struct *work)
 	if (host->power_mode == MMC_POWER_OFF)
 		goto out;
 
-	if (host->led.brightness == LED_OFF)
+	if (host->led.brightness == 0)
 		rtsx_usb_turn_off_led(ucr);
 	else
 		rtsx_usb_turn_on_led(ucr);
@@ -1357,7 +1357,7 @@ static int rtsx_usb_sdmmc_drv_probe(struct platform_device *pdev)
 	snprintf(host->led_name, sizeof(host->led_name),
 		"%s::", mmc_hostname(mmc));
 	host->led.name = host->led_name;
-	host->led.brightness = LED_OFF;
+	host->led.brightness = 0;
 	host->led.default_trigger = mmc_hostname(mmc);
 	host->led.brightness_set = rtsx_usb_led_control;
 
