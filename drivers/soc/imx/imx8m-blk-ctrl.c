@@ -4,67 +4,11 @@
  * Copyright 2021 Pengutronix, Lucas Stach <kernel@pengutronix.de>
  */
 
-#include <linux/device.h>
-#include <linux/module.h>
 #include <linux/of_device.h>
-#include <linux/platform_device.h>
-#include <linux/pm_domain.h>
-#include <linux/pm_runtime.h>
-#include <linux/regmap.h>
-#include <linux/clk.h>
 
-#include <dt-bindings/power/imx8mm-power.h>
 #include <dt-bindings/power/imx8mn-power.h>
 
-#define BLK_SFT_RSTN	0x0
-#define BLK_CLK_EN	0x4
-#define BLK_MIPI_RESET_DIV	0x8 /* Mini/Nano DISPLAY_BLK_CTRL only */
-
-struct imx8m_blk_ctrl_domain;
-
-struct imx8m_blk_ctrl {
-	struct device *dev;
-	struct notifier_block power_nb;
-	struct device *bus_power_dev;
-	struct regmap *regmap;
-	struct imx8m_blk_ctrl_domain *domains;
-	struct genpd_onecell_data onecell_data;
-};
-
-struct imx8m_blk_ctrl_domain_data {
-	const char *name;
-	const char * const *clk_names;
-	int num_clks;
-	const char *gpc_name;
-	u32 rst_mask;
-	u32 clk_mask;
-
-	/*
-	 * i.MX8M Mini and Nano have a third DISPLAY_BLK_CTRL register
-	 * which is used to control the reset for the MIPI Phy.
-	 * Since it's only present in certain circumstances,
-	 * an if-statement should be used before setting and clearing this
-	 * register.
-	 */
-	u32 mipi_phy_rst_mask;
-};
-
-#define DOMAIN_MAX_CLKS 3
-
-struct imx8m_blk_ctrl_domain {
-	struct generic_pm_domain genpd;
-	const struct imx8m_blk_ctrl_domain_data *data;
-	struct clk_bulk_data clks[DOMAIN_MAX_CLKS];
-	struct device *power_dev;
-	struct imx8m_blk_ctrl *bc;
-};
-
-struct imx8m_blk_ctrl_data {
-	int max_reg;
-	notifier_fn_t power_notifier_fn;
-	const struct imx8m_blk_ctrl_domain_data *domains;
-	int num_domains;
-};
+#include "imx8m-blk-ctrl.h"
 
 static inline struct imx8m_blk_ctrl_domain *
 to_imx8m_blk_ctrl_domain(struct generic_pm_domain *genpd)
@@ -165,7 +109,7 @@ imx8m_blk_ctrl_xlate(struct of_phandle_args *args, void *data)
 
 static struct lock_class_key blk_ctrl_genpd_lock_class;
 
-static int imx8m_blk_ctrl_probe(struct platform_device *pdev)
+int imx8m_blk_ctrl_probe(struct platform_device *pdev)
 {
 	const struct imx8m_blk_ctrl_data *bc_data;
 	struct device *dev = &pdev->dev;
@@ -299,7 +243,7 @@ cleanup_pds:
 	return ret;
 }
 
-static int imx8m_blk_ctrl_remove(struct platform_device *pdev)
+int imx8m_blk_ctrl_remove(struct platform_device *pdev)
 {
 	struct imx8m_blk_ctrl *bc = dev_get_drvdata(&pdev->dev);
 	int i;
@@ -375,149 +319,9 @@ static int imx8m_blk_ctrl_resume(struct device *dev)
 }
 #endif
 
-static const struct dev_pm_ops imx8m_blk_ctrl_pm_ops = {
+const struct dev_pm_ops imx8m_blk_ctrl_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(imx8m_blk_ctrl_suspend, imx8m_blk_ctrl_resume)
 };
-
-static int imx8mm_vpu_power_notifier(struct notifier_block *nb,
-				     unsigned long action, void *data)
-{
-	struct imx8m_blk_ctrl *bc = container_of(nb, struct imx8m_blk_ctrl,
-						 power_nb);
-
-	if (action != GENPD_NOTIFY_ON && action != GENPD_NOTIFY_PRE_OFF)
-		return NOTIFY_OK;
-
-	/*
-	 * The ADB in the VPUMIX domain has no separate reset and clock
-	 * enable bits, but is ungated together with the VPU clocks. To
-	 * allow the handshake with the GPC to progress we put the VPUs
-	 * in reset and ungate the clocks.
-	 */
-	regmap_clear_bits(bc->regmap, BLK_SFT_RSTN, BIT(0) | BIT(1) | BIT(2));
-	regmap_set_bits(bc->regmap, BLK_CLK_EN, BIT(0) | BIT(1) | BIT(2));
-
-	if (action == GENPD_NOTIFY_ON) {
-		/*
-		 * On power up we have no software backchannel to the GPC to
-		 * wait for the ADB handshake to happen, so we just delay for a
-		 * bit. On power down the GPC driver waits for the handshake.
-		 */
-		udelay(5);
-
-		/* set "fuse" bits to enable the VPUs */
-		regmap_set_bits(bc->regmap, 0x8, 0xffffffff);
-		regmap_set_bits(bc->regmap, 0xc, 0xffffffff);
-		regmap_set_bits(bc->regmap, 0x10, 0xffffffff);
-		regmap_set_bits(bc->regmap, 0x14, 0xffffffff);
-	}
-
-	return NOTIFY_OK;
-}
-
-static const struct imx8m_blk_ctrl_domain_data imx8mm_vpu_blk_ctl_domain_data[] = {
-	[IMX8MM_VPUBLK_PD_G1] = {
-		.name = "vpublk-g1",
-		.clk_names = (const char *[]){ "g1", },
-		.num_clks = 1,
-		.gpc_name = "g1",
-		.rst_mask = BIT(1),
-		.clk_mask = BIT(1),
-	},
-	[IMX8MM_VPUBLK_PD_G2] = {
-		.name = "vpublk-g2",
-		.clk_names = (const char *[]){ "g2", },
-		.num_clks = 1,
-		.gpc_name = "g2",
-		.rst_mask = BIT(0),
-		.clk_mask = BIT(0),
-	},
-	[IMX8MM_VPUBLK_PD_H1] = {
-		.name = "vpublk-h1",
-		.clk_names = (const char *[]){ "h1", },
-		.num_clks = 1,
-		.gpc_name = "h1",
-		.rst_mask = BIT(2),
-		.clk_mask = BIT(2),
-	},
-};
-
-static const struct imx8m_blk_ctrl_data imx8mm_vpu_blk_ctl_dev_data = {
-	.max_reg = 0x18,
-	.power_notifier_fn = imx8mm_vpu_power_notifier,
-	.domains = imx8mm_vpu_blk_ctl_domain_data,
-	.num_domains = ARRAY_SIZE(imx8mm_vpu_blk_ctl_domain_data),
-};
-
-static int imx8mm_disp_power_notifier(struct notifier_block *nb,
-				      unsigned long action, void *data)
-{
-	struct imx8m_blk_ctrl *bc = container_of(nb, struct imx8m_blk_ctrl,
-						 power_nb);
-
-	if (action != GENPD_NOTIFY_ON && action != GENPD_NOTIFY_PRE_OFF)
-		return NOTIFY_OK;
-
-	/* Enable bus clock and deassert bus reset */
-	regmap_set_bits(bc->regmap, BLK_CLK_EN, BIT(12));
-	regmap_set_bits(bc->regmap, BLK_SFT_RSTN, BIT(6));
-
-	/*
-	 * On power up we have no software backchannel to the GPC to
-	 * wait for the ADB handshake to happen, so we just delay for a
-	 * bit. On power down the GPC driver waits for the handshake.
-	 */
-	if (action == GENPD_NOTIFY_ON)
-		udelay(5);
-
-
-	return NOTIFY_OK;
-}
-
-static const struct imx8m_blk_ctrl_domain_data imx8mm_disp_blk_ctl_domain_data[] = {
-	[IMX8MM_DISPBLK_PD_CSI_BRIDGE] = {
-		.name = "dispblk-csi-bridge",
-		.clk_names = (const char *[]){ "csi-bridge-axi", "csi-bridge-apb",
-					       "csi-bridge-core", },
-		.num_clks = 3,
-		.gpc_name = "csi-bridge",
-		.rst_mask = BIT(0) | BIT(1) | BIT(2),
-		.clk_mask = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5),
-	},
-	[IMX8MM_DISPBLK_PD_LCDIF] = {
-		.name = "dispblk-lcdif",
-		.clk_names = (const char *[]){ "lcdif-axi", "lcdif-apb", "lcdif-pix", },
-		.num_clks = 3,
-		.gpc_name = "lcdif",
-		.clk_mask = BIT(6) | BIT(7),
-	},
-	[IMX8MM_DISPBLK_PD_MIPI_DSI] = {
-		.name = "dispblk-mipi-dsi",
-		.clk_names = (const char *[]){ "dsi-pclk", "dsi-ref", },
-		.num_clks = 2,
-		.gpc_name = "mipi-dsi",
-		.rst_mask = BIT(5),
-		.clk_mask = BIT(8) | BIT(9),
-		.mipi_phy_rst_mask = BIT(17),
-	},
-	[IMX8MM_DISPBLK_PD_MIPI_CSI] = {
-		.name = "dispblk-mipi-csi",
-		.clk_names = (const char *[]){ "csi-aclk", "csi-pclk" },
-		.num_clks = 2,
-		.gpc_name = "mipi-csi",
-		.rst_mask = BIT(3) | BIT(4),
-		.clk_mask = BIT(10) | BIT(11),
-		.mipi_phy_rst_mask = BIT(16),
-	},
-};
-
-static const struct imx8m_blk_ctrl_data imx8mm_disp_blk_ctl_dev_data = {
-	.max_reg = 0x2c,
-	.power_notifier_fn = imx8mm_disp_power_notifier,
-	.domains = imx8mm_disp_blk_ctl_domain_data,
-	.num_domains = ARRAY_SIZE(imx8mm_disp_blk_ctl_domain_data),
-};
-
 
 static int imx8mn_disp_power_notifier(struct notifier_block *nb,
 				      unsigned long action, void *data)
@@ -591,12 +395,6 @@ static const struct imx8m_blk_ctrl_data imx8mn_disp_blk_ctl_dev_data = {
 
 static const struct of_device_id imx8m_blk_ctrl_of_match[] = {
 	{
-		.compatible = "fsl,imx8mm-vpu-blk-ctrl",
-		.data = &imx8mm_vpu_blk_ctl_dev_data
-	}, {
-		.compatible = "fsl,imx8mm-disp-blk-ctrl",
-		.data = &imx8mm_disp_blk_ctl_dev_data
-	}, {
 		.compatible = "fsl,imx8mn-disp-blk-ctrl",
 		.data = &imx8mn_disp_blk_ctl_dev_data
 	}, {
