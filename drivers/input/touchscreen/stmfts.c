@@ -608,8 +608,8 @@ static int stmfts_enable_led(struct stmfts_data *sdata)
 		return PTR_ERR(sdata->ledvdd);
 
 	sdata->led_cdev.name = STMFTS_DEV_NAME;
-	sdata->led_cdev.max_brightness = LED_ON;
-	sdata->led_cdev.brightness = LED_OFF;
+	sdata->led_cdev.max_brightness = 1;
+	sdata->led_cdev.brightness = 0;
 	sdata->led_cdev.brightness_set_blocking = stmfts_brightness_set;
 	sdata->led_cdev.brightness_get = stmfts_brightness_get;
 
