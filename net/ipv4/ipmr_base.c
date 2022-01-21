@@ -154,6 +154,7 @@ void *mr_mfc_seq_idx(struct net *net,
 	it->cache = &mrt->mfc_cache_list;
 	list_for_each_entry_rcu(mfc, &mrt->mfc_cache_list, list)
 		if (pos-- == 0)
+			rcu_read_unlock();
 			return mfc;
 	rcu_read_unlock();
 
@@ -161,6 +162,7 @@ void *mr_mfc_seq_idx(struct net *net,
 	it->cache = &mrt->mfc_unres_queue;
 	list_for_each_entry(mfc, it->cache, list)
 		if (pos-- == 0)
+			spin_unlock_bh(it->lock);
 			return mfc;
 	spin_unlock_bh(it->lock);
 
