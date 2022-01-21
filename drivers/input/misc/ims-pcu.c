@@ -986,7 +986,7 @@ ims_pcu_backlight_get_brightness(struct led_classdev *cdev)
 			 "Failed to get current brightness, error: %d\n",
 			 error);
 		/* Assume the LED is OFF */
-		brightness = LED_OFF;
+		brightness = 0;
 	} else {
 		brightness =
 			get_unaligned_le16(&pcu->cmd_buf[IMS_PCU_DATA_OFFSET]);

@@ -1039,14 +1039,14 @@ static bool bluetooth_enabled;
 static void wistron_mail_led_set(struct led_classdev *led_cdev,
 				enum led_brightness value)
 {
-	bios_set_state(MAIL_LED, (value != LED_OFF) ? 1 : 0);
+	bios_set_state(MAIL_LED, (value != 0) ? 1 : 0);
 }
 
 /* same as setting up wifi card, but for laptops on which the led is managed */
 static void wistron_wifi_led_set(struct led_classdev *led_cdev,
 				enum led_brightness value)
 {
-	bios_set_state(WIFI, (value != LED_OFF) ? 1 : 0);
+	bios_set_state(WIFI, (value != 0) ? 1 : 0);
 }
 
 static struct led_classdev wistron_mail_led = {
@@ -1064,7 +1064,7 @@ static void wistron_led_init(struct device *parent)
 	if (leds_present & FE_WIFI_LED) {
 		u16 wifi = bios_get_default_setting(WIFI);
 		if (wifi & 1) {
-			wistron_wifi_led.brightness = (wifi & 2) ? LED_FULL : LED_OFF;
+			wistron_wifi_led.brightness = (wifi & 2) ? LED_FULL : 0;
 			if (led_classdev_register(parent, &wistron_wifi_led))
 				leds_present &= ~FE_WIFI_LED;
 			else
@@ -1076,7 +1076,7 @@ static void wistron_led_init(struct device *parent)
 
 	if (leds_present & FE_MAIL_LED) {
 		/* bios_get_default_setting(MAIL) always retuns 0, so just turn the led off */
-		wistron_mail_led.brightness = LED_OFF;
+		wistron_mail_led.brightness = 0;
 		if (led_classdev_register(parent, &wistron_mail_led))
 			leds_present &= ~FE_MAIL_LED;
 		else

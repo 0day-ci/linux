@@ -115,7 +115,7 @@ static int mail_led_set(struct led_classdev *led,
 			 enum led_brightness value)
 {
 	struct apanel *ap = container_of(led, struct apanel, mail_led);
-	u16 led_bits = value != LED_OFF ? 0x8000 : 0x0000;
+	u16 led_bits = value != 0 ? 0x8000 : 0x0000;
 
 	return i2c_smbus_write_word_data(ap->client, 0x10, led_bits);
 }
@@ -189,7 +189,7 @@ static void apanel_shutdown(struct i2c_client *client)
 	struct apanel *ap = i2c_get_clientdata(client);
 
 	if (device_chip[APANEL_DEV_LED] != CHIP_NONE)
-		led_set_brightness(&ap->mail_led, LED_OFF);
+		led_set_brightness(&ap->mail_led, 0);
 }
 
 static const struct i2c_device_id apanel_id[] = {
