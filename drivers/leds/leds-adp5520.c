@@ -125,7 +125,7 @@ static int adp5520_led_probe(struct platform_device *pdev)
 		led_dat->cdev.name = cur_led->name;
 		led_dat->cdev.default_trigger = cur_led->default_trigger;
 		led_dat->cdev.brightness_set_blocking = adp5520_led_set;
-		led_dat->cdev.brightness = LED_OFF;
+		led_dat->cdev.brightness = 0;
 
 		if (cur_led->flags & ADP5520_FLAG_LED_MASK)
 			led_dat->flags = cur_led->flags;

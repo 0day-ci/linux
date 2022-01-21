@@ -58,7 +58,7 @@ static struct notifier_block led_trigger_panic_nb = {
 
 static long led_panic_blink(int state)
 {
-	led_trigger_event(trigger, state ? LED_FULL : LED_OFF);
+	led_trigger_event(trigger, state ? 255 : 0);
 	return 0;
 }
 

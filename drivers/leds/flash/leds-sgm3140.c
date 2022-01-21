@@ -101,7 +101,7 @@ static int sgm3140_brightness_set(struct led_classdev *led_cdev,
 {
 	struct led_classdev_flash *fled_cdev = lcdev_to_flcdev(led_cdev);
 	struct sgm3140 *priv = flcdev_to_sgm3140(fled_cdev);
-	bool enable = brightness == LED_ON;
+	bool enable = brightness == 1;
 	int ret;
 
 	if (priv->enabled == enable)
@@ -241,7 +241,7 @@ static int sgm3140_probe(struct platform_device *pdev)
 	fled_cdev->ops = &sgm3140_flash_ops;
 
 	led_cdev->brightness_set_blocking = sgm3140_brightness_set;
-	led_cdev->max_brightness = LED_ON;
+	led_cdev->max_brightness = 1;
 	led_cdev->flags |= LED_DEV_CAP_FLASH;
 
 	sgm3140_init_flash_timeout(priv);

@@ -206,7 +206,7 @@ static int aw2013_blink_set(struct led_classdev *cdev,
 	}
 
 	if (!led->cdev.brightness) {
-		led->cdev.brightness = LED_FULL;
+		led->cdev.brightness = 255;
 		ret = aw2013_brightness_set(&led->cdev, led->cdev.brightness);
 		if (ret)
 			return ret;
@@ -214,8 +214,8 @@ static int aw2013_blink_set(struct led_classdev *cdev,
 
 	/* Never on - just set to off */
 	if (!*delay_on) {
-		led->cdev.brightness = LED_OFF;
-		return aw2013_brightness_set(&led->cdev, LED_OFF);
+		led->cdev.brightness = 0;
+		return aw2013_brightness_set(&led->cdev, 0);
 	}
 
 	mutex_lock(&led->chip->mutex);

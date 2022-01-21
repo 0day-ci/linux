@@ -27,7 +27,7 @@ static void rb532_led_set(struct led_classdev *cdev,
 
 static enum led_brightness rb532_led_get(struct led_classdev *cdev)
 {
-	return (get_latch_u5() & LO_ULED) ? LED_FULL : LED_OFF;
+	return (get_latch_u5() & LO_ULED) ? 255 : 0;
 }
 
 static struct led_classdev rb532_uled = {

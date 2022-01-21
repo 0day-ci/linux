@@ -96,7 +96,7 @@ static int regulator_led_brightness_set(struct led_classdev *led_cdev,
 
 	mutex_lock(&led->mutex);
 
-	if (value == LED_OFF) {
+	if (value == 0) {
 		regulator_led_disable(led);
 		goto out;
 	}

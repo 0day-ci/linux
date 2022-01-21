@@ -106,7 +106,7 @@ static void ns2_led_set(struct led_classdev *led_cdev,
 	struct ns2_led *led = container_of(led_cdev, struct ns2_led, cdev);
 	enum ns2_led_modes mode;
 
-	if (value == LED_OFF)
+	if (value == 0)
 		mode = NS_V2_LED_OFF;
 	else if (led->sata)
 		mode = NS_V2_LED_SATA;
@@ -224,7 +224,7 @@ static int ns2_led_register(struct device *dev, struct fwnode_handle *node,
 
 	/* Set LED initial state. */
 	led->sata = (mode == NS_V2_LED_SATA) ? 1 : 0;
-	led->cdev.brightness = (mode == NS_V2_LED_OFF) ? LED_OFF : LED_FULL;
+	led->cdev.brightness = (mode == NS_V2_LED_OFF) ? 0 : 255;
 
 	init_data.fwnode = node;
 

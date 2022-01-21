@@ -74,13 +74,13 @@ static void set_baseline_state(struct led_netdev_data *trigger_data)
 		led_cdev->blink_brightness = led_cdev->max_brightness;
 
 	if (!test_bit(NETDEV_LED_MODE_LINKUP, &trigger_data->mode))
-		led_set_brightness(led_cdev, LED_OFF);
+		led_set_brightness(led_cdev, 0);
 	else {
 		if (test_bit(NETDEV_LED_LINK, &trigger_data->mode))
 			led_set_brightness(led_cdev,
 					   led_cdev->blink_brightness);
 		else
-			led_set_brightness(led_cdev, LED_OFF);
+			led_set_brightness(led_cdev, 0);
 
 		/* If we are looking for RX/TX start periodically
 		 * checking stats
@@ -355,7 +355,7 @@ static void netdev_trig_work(struct work_struct *work)
 
 	/* If we dont have a device, insure we are off */
 	if (!trigger_data->net_dev) {
-		led_set_brightness(trigger_data->led_cdev, LED_OFF);
+		led_set_brightness(trigger_data->led_cdev, 0);
 		return;
 	}
 

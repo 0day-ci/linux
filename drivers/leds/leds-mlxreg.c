@@ -119,7 +119,7 @@ mlxreg_led_get_hw(struct mlxreg_led_data *led_data)
 		dev_warn(led_data->led_cdev.dev, "Failed to get current brightness, error: %d\n",
 			 err);
 		/* Assume the LED is OFF */
-		return LED_OFF;
+		return 0;
 	}
 
 	regval = regval & ~data->mask;
@@ -220,20 +220,20 @@ static int mlxreg_led_config(struct mlxreg_led_priv_data *priv)
 		led_data->data_parent = priv;
 		if (strstr(data->label, "red") ||
 		    strstr(data->label, "orange")) {
-			brightness = LED_OFF;
+			brightness = 0;
 			led_data->base_color = MLXREG_LED_RED_SOLID;
 		} else if (strstr(data->label, "amber")) {
-			brightness = LED_OFF;
+			brightness = 0;
 			led_data->base_color = MLXREG_LED_AMBER_SOLID;
 		} else {
-			brightness = LED_OFF;
+			brightness = 0;
 			led_data->base_color = MLXREG_LED_GREEN_SOLID;
 		}
 		snprintf(led_data->led_cdev_name, sizeof(led_data->led_cdev_name),
 			 "mlxreg:%s", data->label);
 		led_cdev->name = led_data->led_cdev_name;
 		led_cdev->brightness = brightness;
-		led_cdev->max_brightness = LED_ON;
+		led_cdev->max_brightness = 1;
 		led_cdev->brightness_set_blocking =
 						mlxreg_led_brightness_set;
 		led_cdev->brightness_get = mlxreg_led_brightness_get;

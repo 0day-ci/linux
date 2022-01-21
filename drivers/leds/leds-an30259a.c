@@ -93,7 +93,7 @@ static int an30259a_brightness_set(struct led_classdev *cdev,
 		goto error;
 
 	switch (brightness) {
-	case LED_OFF:
+	case 0:
 		led_on &= ~AN30259A_LED_EN(led->num);
 		led_on &= ~AN30259A_LED_SLOPE(led->num);
 		led->sloping = false;
@@ -262,7 +262,7 @@ static void an30259a_init_default_state(struct an30259a_led *led)
 
 	switch (led->default_state) {
 	case STATE_ON:
-		led->cdev.brightness = LED_FULL;
+		led->cdev.brightness = 255;
 		break;
 	case STATE_KEEP:
 		err = regmap_read(chip->regmap, AN30259A_REG_LED_ON, &led_on);
@@ -270,14 +270,14 @@ static void an30259a_init_default_state(struct an30259a_led *led)
 			break;
 
 		if (!(led_on & AN30259A_LED_EN(led->num))) {
-			led->cdev.brightness = LED_OFF;
+			led->cdev.brightness = 0;
 			break;
 		}
 		regmap_read(chip->regmap, AN30259A_REG_LEDCC(led->num),
 			    &led->cdev.brightness);
 		break;
 	default:
-		led->cdev.brightness = LED_OFF;
+		led->cdev.brightness = 0;
 	}
 
 	an30259a_brightness_set(&led->cdev, led->cdev.brightness);

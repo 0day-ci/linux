@@ -62,7 +62,7 @@ menf21bmc_led_set(struct led_classdev *led_cdev, enum led_brightness value)
 	if (led_val < 0)
 		goto err_out;
 
-	if (value == LED_OFF)
+	if (value == 0)
 		led_val &= ~led->led_bit;
 	else
 		led_val |= led->led_bit;

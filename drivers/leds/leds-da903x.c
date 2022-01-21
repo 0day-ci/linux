@@ -66,7 +66,7 @@ static int da903x_led_set(struct led_classdev *led_cdev,
 	case DA9034_ID_LED_1:
 	case DA9034_ID_LED_2:
 		offset = DA9034_LED_OFFSET(led->id);
-		val = (value * 0x5f / LED_FULL) & 0x7f;
+		val = (value * 0x5f / 255) & 0x7f;
 		val |= (led->flags & DA9034_LED_RAMP) ? 0x80 : 0;
 		ret = da903x_write(led->master, DA9034_LED1_CONTROL + offset,
 				   val);
@@ -104,7 +104,7 @@ static int da903x_led_probe(struct platform_device *pdev)
 	led->cdev.name = pdata->name;
 	led->cdev.default_trigger = pdata->default_trigger;
 	led->cdev.brightness_set_blocking = da903x_led_set;
-	led->cdev.brightness = LED_OFF;
+	led->cdev.brightness = 0;
 
 	led->id = id;
 	led->flags = pdata->flags;

@@ -57,9 +57,9 @@
 #define PCA955X_LS_BLINK0	0x2	/* Blink at PWM0 rate */
 #define PCA955X_LS_BLINK1	0x3	/* Blink at PWM1 rate */
 
-#define PCA955X_GPIO_INPUT	LED_OFF
-#define PCA955X_GPIO_HIGH	LED_OFF
-#define PCA955X_GPIO_LOW	LED_FULL
+#define PCA955X_GPIO_INPUT	0
+#define PCA955X_GPIO_HIGH	0
+#define PCA955X_GPIO_LOW	255
 
 enum pca955x_type {
 	pca9550,
@@ -265,13 +265,13 @@ static enum led_brightness pca955x_led_get(struct led_classdev *led_cdev)
 	ls = (ls >> ((pca955x_led->led_num % 4) << 1)) & 0x3;
 	switch (ls) {
 	case PCA955X_LS_LED_ON:
-		ret = LED_FULL;
+		ret = 255;
 		break;
 	case PCA955X_LS_LED_OFF:
-		ret = LED_OFF;
+		ret = 0;
 		break;
 	case PCA955X_LS_BLINK0:
-		ret = LED_HALF;
+		ret = 127;
 		break;
 	case PCA955X_LS_BLINK1:
 		ret = pca955x_read_pwm(pca955x->client, 1, &pwm);
@@ -307,13 +307,13 @@ static int pca955x_led_set(struct led_classdev *led_cdev,
 		goto out;
 
 	switch (value) {
-	case LED_FULL:
+	case 255:
 		ls = pca955x_ledsel(ls, ls_led, PCA955X_LS_LED_ON);
 		break;
-	case LED_OFF:
+	case 0:
 		ls = pca955x_ledsel(ls, ls_led, PCA955X_LS_LED_OFF);
 		break;
-	case LED_HALF:
+	case 127:
 		ls = pca955x_ledsel(ls, ls_led, PCA955X_LS_BLINK0);
 		break;
 	default:
@@ -578,12 +578,12 @@ static int pca955x_probe(struct i2c_client *client)
 
 			if (pdata->leds[i].default_state ==
 			    LEDS_GPIO_DEFSTATE_OFF) {
-				err = pca955x_led_set(led, LED_OFF);
+				err = pca955x_led_set(led, 0);
 				if (err)
 					return err;
 			} else if (pdata->leds[i].default_state ==
 				   LEDS_GPIO_DEFSTATE_ON) {
-				err = pca955x_led_set(led, LED_FULL);
+				err = pca955x_led_set(led, 255);
 				if (err)
 					return err;
 			}
@@ -621,16 +621,16 @@ static int pca955x_probe(struct i2c_client *client)
 			 */
 			if (pdata->leds[i].default_state ==
 			    LEDS_GPIO_DEFSTATE_KEEP) {
-				if (led->brightness != LED_FULL &&
-				    led->brightness != LED_OFF &&
-				    led->brightness != LED_HALF)
+				if (led->brightness != 255 &&
+				    led->brightness != 0 &&
+				    led->brightness != 127)
 					keep_pwm = true;
 			}
 		}
 	}
 
 	/* PWM0 is used for half brightness or 50% duty cycle */
-	err = pca955x_write_pwm(client, 0, 255 - LED_HALF);
+	err = pca955x_write_pwm(client, 0, 255 - 127);
 	if (err)
 		return err;
 

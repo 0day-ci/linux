@@ -177,9 +177,9 @@ static int pca9532_set_brightness(struct led_classdev *led_cdev,
 	int err = 0;
 	struct pca9532_led *led = ldev_to_led(led_cdev);
 
-	if (value == LED_OFF)
+	if (value == 0)
 		led->state = PCA9532_OFF;
-	else if (value == LED_FULL)
+	else if (value == 255)
 		led->state = PCA9532_ON;
 	else {
 		led->state = PCA9532_PWM0; /* Thecus: hardcode one pwm */
@@ -386,7 +386,7 @@ static int pca9532_configure(struct i2c_client *client,
 			led->name = pled->name;
 			led->ldev.name = led->name;
 			led->ldev.default_trigger = pled->default_trigger;
-			led->ldev.brightness = LED_OFF;
+			led->ldev.brightness = 0;
 			led->ldev.brightness_set_blocking =
 						pca9532_set_brightness;
 			led->ldev.blink_set = pca9532_set_blink;

@@ -114,14 +114,14 @@ static int sc27xx_led_disable(struct sc27xx_led *leds)
 			(SC27XX_LED_RUN | SC27XX_LED_TYPE) << ctrl_shift, 0);
 }
 
-static int sc27xx_led_set(struct led_classdev *ldev, enum led_brightness value)
+static int sc27xx_led_set(struct led_classdev *ldev, unsigned int value)
 {
 	struct sc27xx_led *leds = to_sc27xx_led(ldev);
 	int err;
 
 	mutex_lock(&leds->priv->lock);
 
-	if (value == LED_OFF)
+	if (value == 0)
 		err = sc27xx_led_disable(leds);
 	else
 		err = sc27xx_led_enable(leds, value);
@@ -161,7 +161,7 @@ static int sc27xx_led_pattern_clear(struct led_classdev *ldev)
 	err = regmap_update_bits(regmap, ctrl_base,
 			(SC27XX_LED_RUN | SC27XX_LED_TYPE) << ctrl_shift, 0);
 
-	ldev->brightness = LED_OFF;
+	ldev->brightness = 0;
 
 	mutex_unlock(&leds->priv->lock);
 

@@ -161,7 +161,7 @@ static int ktd2692_led_brightness_set(struct led_classdev *led_cdev,
 
 	mutex_lock(&led->lock);
 
-	if (brightness == LED_OFF) {
+	if (brightness == 0) {
 		led->mode = KTD2692_MODE_DISABLE;
 		gpiod_direction_output(led->aux_gpio, KTD2692_LOW);
 	} else {
@@ -199,7 +199,7 @@ static int ktd2692_led_flash_strobe_set(struct led_classdev_flash *fled_cdev,
 
 	ktd2692_expresswire_write(led, led->mode | KTD2692_REG_MODE_BASE);
 
-	fled_cdev->led_cdev.brightness = LED_OFF;
+	fled_cdev->led_cdev.brightness = 0;
 	led->mode = KTD2692_MODE_DISABLE;
 
 	mutex_unlock(&led->lock);

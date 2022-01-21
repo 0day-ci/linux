@@ -47,7 +47,7 @@ static int fb_notifier_callback(struct notifier_block *p,
 
 	if ((n->old_status == UNBLANK) ^ n->invert) {
 		n->brightness = led->brightness;
-		led_set_brightness_nosleep(led, LED_OFF);
+		led_set_brightness_nosleep(led, 0);
 	} else {
 		led_set_brightness_nosleep(led, n->brightness);
 	}
@@ -84,7 +84,7 @@ static ssize_t bl_trig_invert_store(struct device *dev,
 
 	/* After inverting, we need to update the LED. */
 	if ((n->old_status == BLANK) ^ n->invert)
-		led_set_brightness_nosleep(led, LED_OFF);
+		led_set_brightness_nosleep(led, 0);
 	else
 		led_set_brightness_nosleep(led, n->brightness);
 

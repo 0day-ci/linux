@@ -90,7 +90,7 @@ static int lt3593_led_probe(struct platform_device *pdev)
 	}
 
 	led_data->cdev.brightness_set_blocking = lt3593_led_set;
-	led_data->cdev.brightness = state ? LED_FULL : LED_OFF;
+	led_data->cdev.brightness = state ? 255 : 0;
 
 	init_data.fwnode = child;
 	init_data.devicename = LED_LT3593_NAME;

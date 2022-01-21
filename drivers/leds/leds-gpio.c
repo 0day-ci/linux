@@ -38,7 +38,7 @@ static void gpio_led_set(struct led_classdev *led_cdev,
 	struct gpio_led_data *led_dat = cdev_to_gpio_led_data(led_cdev);
 	int level;
 
-	if (value == LED_OFF)
+	if (value == 0)
 		level = 0;
 	else
 		level = 1;
@@ -292,7 +292,7 @@ static void gpio_led_shutdown(struct platform_device *pdev)
 		struct gpio_led_data *led = &priv->leds[i];
 
 		if (!(led->cdev.flags & LED_RETAIN_AT_SHUTDOWN))
-			gpio_led_set(&led->cdev, LED_OFF);
+			gpio_led_set(&led->cdev, 0);
 	}
 }
 

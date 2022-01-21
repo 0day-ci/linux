@@ -108,13 +108,13 @@ static int cpcap_led_set(struct led_classdev *ledc, enum led_brightness value)
 
 	mutex_lock(&led->update_lock);
 
-	if (value > LED_OFF) {
+	if (value > 0) {
 		err = cpcap_led_set_power(led, true);
 		if (err)
 			goto exit;
 	}
 
-	if (value == LED_OFF) {
+	if (value == 0) {
 		/* Avoid HW issue by turning off current before duty cycle */
 		err = regmap_update_bits(led->regmap,
 			led->info->reg, led->info->mask, CPCAP_LED_NO_CURRENT);
@@ -123,9 +123,9 @@ static int cpcap_led_set(struct led_classdev *ledc, enum led_brightness value)
 			goto exit;
 		}
 
-		brightness = cpcap_led_val(value, LED_OFF);
+		brightness = cpcap_led_val(value, 0);
 	} else {
-		brightness = cpcap_led_val(value, LED_ON);
+		brightness = cpcap_led_val(value, 1);
 	}
 
 	err = regmap_update_bits(led->regmap, led->info->reg, led->info->mask,
@@ -135,7 +135,7 @@ static int cpcap_led_set(struct led_classdev *ledc, enum led_brightness value)
 		goto exit;
 	}
 
-	if (value == LED_OFF) {
+	if (value == 0) {
 		err = cpcap_led_set_power(led, false);
 		if (err)
 			goto exit;

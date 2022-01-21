@@ -29,7 +29,7 @@ static void qube_front_led_set(struct led_classdev *led_cdev,
 
 static struct led_classdev qube_front_led = {
 	.name			= "qube::front",
-	.brightness		= LED_FULL,
+	.brightness		= 255,
 	.brightness_set		= qube_front_led_set,
 	.default_trigger	= "default-on",
 };

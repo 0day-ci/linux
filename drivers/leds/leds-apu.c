@@ -77,9 +77,9 @@ struct apu_led_pdata {
 static struct apu_led_pdata *apu_led;
 
 static const struct apu_led_profile apu1_led_profile[] = {
-	{ "apu:green:1", LED_ON,  APU1_FCH_GPIO_BASE + 0 * APU1_IOSIZE },
-	{ "apu:green:2", LED_OFF, APU1_FCH_GPIO_BASE + 1 * APU1_IOSIZE },
-	{ "apu:green:3", LED_OFF, APU1_FCH_GPIO_BASE + 2 * APU1_IOSIZE },
+	{ "apu:green:1", 1,  APU1_FCH_GPIO_BASE + 0 * APU1_IOSIZE },
+	{ "apu:green:2", 0, APU1_FCH_GPIO_BASE + 1 * APU1_IOSIZE },
+	{ "apu:green:3", 0, APU1_FCH_GPIO_BASE + 2 * APU1_IOSIZE },
 };
 
 static const struct dmi_system_id apu_led_dmi_table[] __initconst = {

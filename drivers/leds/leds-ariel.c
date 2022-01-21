@@ -37,12 +37,12 @@ static enum led_brightness ariel_led_get(struct led_classdev *led_cdev)
 	unsigned int led_status = 0;
 
 	if (regmap_read(led->ec_ram, led->ec_index, &led_status))
-		return LED_OFF;
+		return 0;
 
 	if (led_status == EC_LED_STILL)
-		return LED_FULL;
+		return 255;
 	else
-		return LED_OFF;
+		return 0;
 }
 
 static void ariel_led_set(struct led_classdev *led_cdev,
@@ -50,7 +50,7 @@ static void ariel_led_set(struct led_classdev *led_cdev,
 {
 	struct ariel_led *led = led_cdev_to_ariel_led(led_cdev);
 
-	if (brightness == LED_OFF)
+	if (brightness == 0)
 		regmap_write(led->ec_ram, led->ec_index, EC_LED_OFF);
 	else
 		regmap_write(led->ec_ram, led->ec_index, EC_LED_STILL);

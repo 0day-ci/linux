@@ -72,7 +72,7 @@ static enum led_brightness nic78bx_brightness_get(struct led_classdev *cdev)
 	value = inb(nled->data->io_base);
 	spin_unlock_irqrestore(&nled->data->lock, flags);
 
-	return (value & nled->bit) ? 1 : LED_OFF;
+	return (value & nled->bit) ? 1 : 0;
 }
 
 static struct nic78bx_led nic78bx_leds[] = {

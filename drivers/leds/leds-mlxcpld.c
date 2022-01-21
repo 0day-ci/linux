@@ -131,7 +131,7 @@ static struct mlxcpld_led_profile mlxcpld_led_default_profile[] = {
 		"mlxcpld:fan1:green",
 	},
 	{
-		0x21, 0xf0, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x21, 0xf0, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:fan1:red",
 	},
 	{
@@ -139,7 +139,7 @@ static struct mlxcpld_led_profile mlxcpld_led_default_profile[] = {
 		"mlxcpld:fan2:green",
 	},
 	{
-		0x21, 0x0f, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x21, 0x0f, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:fan2:red",
 	},
 	{
@@ -147,7 +147,7 @@ static struct mlxcpld_led_profile mlxcpld_led_default_profile[] = {
 		"mlxcpld:fan3:green",
 	},
 	{
-		0x22, 0xf0, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x22, 0xf0, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:fan3:red",
 	},
 	{
@@ -155,7 +155,7 @@ static struct mlxcpld_led_profile mlxcpld_led_default_profile[] = {
 		"mlxcpld:fan4:green",
 	},
 	{
-		0x22, 0x0f, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x22, 0x0f, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:fan4:red",
 	},
 	{
@@ -163,7 +163,7 @@ static struct mlxcpld_led_profile mlxcpld_led_default_profile[] = {
 		"mlxcpld:psu:green",
 	},
 	{
-		0x20, 0x0f, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x20, 0x0f, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:psu:red",
 	},
 	{
@@ -171,7 +171,7 @@ static struct mlxcpld_led_profile mlxcpld_led_default_profile[] = {
 		"mlxcpld:status:green",
 	},
 	{
-		0x20, 0xf0, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x20, 0xf0, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:status:red",
 	},
 };
@@ -183,7 +183,7 @@ static struct mlxcpld_led_profile mlxcpld_led_msn2100_profile[] = {
 		"mlxcpld:fan:green",
 	},
 	{
-		0x21, 0xf0, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x21, 0xf0, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:fan:red",
 	},
 	{
@@ -191,7 +191,7 @@ static struct mlxcpld_led_profile mlxcpld_led_msn2100_profile[] = {
 		"mlxcpld:psu1:green",
 	},
 	{
-		0x23, 0xf0, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x23, 0xf0, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:psu1:red",
 	},
 	{
@@ -199,7 +199,7 @@ static struct mlxcpld_led_profile mlxcpld_led_msn2100_profile[] = {
 		"mlxcpld:psu2:green",
 	},
 	{
-		0x23, 0x0f, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x23, 0x0f, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:psu2:red",
 	},
 	{
@@ -207,11 +207,11 @@ static struct mlxcpld_led_profile mlxcpld_led_msn2100_profile[] = {
 		"mlxcpld:status:green",
 	},
 	{
-		0x20, 0xf0, MLXCPLD_LED_RED_STATIC_ON, LED_OFF,
+		0x20, 0xf0, MLXCPLD_LED_RED_STATIC_ON, 0,
 		"mlxcpld:status:red",
 	},
 	{
-		0x24, 0xf0, MLXCPLD_LED_GREEN_STATIC_ON, LED_OFF,
+		0x24, 0xf0, MLXCPLD_LED_GREEN_STATIC_ON, 0,
 		"mlxcpld:uid:blue",
 	},
 };

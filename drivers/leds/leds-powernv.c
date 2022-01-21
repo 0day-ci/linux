@@ -146,7 +146,7 @@ static enum led_brightness powernv_led_get(struct powernv_led_data *powernv_led)
 	if (rc != OPAL_SUCCESS && rc != OPAL_PARTIAL) {
 		dev_err(dev, "%s: OPAL get led call failed [rc=%d]\n",
 			__func__, rc);
-		return LED_OFF;
+		return 0;
 	}
 
 	led_mask = be64_to_cpu(mask);
@@ -156,14 +156,14 @@ static enum led_brightness powernv_led_get(struct powernv_led_data *powernv_led)
 	if (!((led_mask >> powernv_led->led_type) & OPAL_SLOT_LED_STATE_ON)) {
 		dev_err(dev, "%s: LED status not available for %s\n",
 			__func__, powernv_led->cdev.name);
-		return LED_OFF;
+		return 0;
 	}
 
 	/* LED status value */
 	if ((led_value >> powernv_led->led_type) & OPAL_SLOT_LED_STATE_ON)
-		return LED_FULL;
+		return 255;
 
-	return LED_OFF;
+	return 0;
 }
 
 /*
@@ -225,8 +225,8 @@ static int powernv_led_create(struct device *dev,
 
 	powernv_led->cdev.brightness_set_blocking = powernv_brightness_set;
 	powernv_led->cdev.brightness_get = powernv_brightness_get;
-	powernv_led->cdev.brightness = LED_OFF;
-	powernv_led->cdev.max_brightness = LED_FULL;
+	powernv_led->cdev.brightness = 0;
+	powernv_led->cdev.max_brightness = 255;
 
 	/* Register the classdev */
 	rc = devm_led_classdev_register(dev, &powernv_led->cdev);

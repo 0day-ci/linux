@@ -52,7 +52,7 @@
  * @lmu_data: Register and setting values for common code
  * @control_bank: Control bank the LED is associated to. 0 is control bank A
  *		   1 is control bank B
- * @enabled: LED brightness level (or LED_OFF)
+ * @enabled: LED brightness level (or 0)
  * @num_leds: Number of LEDs available
  */
 struct lm3697_led {
@@ -130,7 +130,7 @@ static int lm3697_brightness_set(struct led_classdev *led_cdev,
 
 	mutex_lock(&led->priv->lock);
 
-	if (brt_val == LED_OFF) {
+	if (brt_val == 0) {
 		ret = regmap_update_bits(led->priv->regmap, LM3697_CTRL_ENABLE,
 					 ctrl_en_val, ~ctrl_en_val);
 		if (ret) {
@@ -138,7 +138,7 @@ static int lm3697_brightness_set(struct led_classdev *led_cdev,
 			goto brightness_out;
 		}
 
-		led->enabled = LED_OFF;
+		led->enabled = 0;
 	} else {
 		ret = ti_lmu_common_set_brightness(&led->lmu_data, brt_val);
 		if (ret) {

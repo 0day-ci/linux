@@ -97,9 +97,9 @@ static void clevo_mail_led_set(struct led_classdev *led_cdev,
 {
 	i8042_lock_chip();
 
-	if (value == LED_OFF)
+	if (value == 0)
 		i8042_command(NULL, CLEVO_MAIL_LED_OFF);
-	else if (value <= LED_HALF)
+	else if (value <= 127)
 		i8042_command(NULL, CLEVO_MAIL_LED_BLINK_0_5HZ);
 	else
 		i8042_command(NULL, CLEVO_MAIL_LED_BLINK_1HZ);
@@ -210,7 +210,7 @@ static void __exit clevo_mail_led_exit(void)
 	platform_device_unregister(pdev);
 	platform_driver_unregister(&clevo_mail_led_driver);
 
-	clevo_mail_led_set(NULL, LED_OFF);
+	clevo_mail_led_set(NULL, 0);
 }
 
 module_init(clevo_mail_led_init);

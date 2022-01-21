@@ -522,7 +522,7 @@ static int bd2802_set_##name##_brightness(struct led_classdev *led_cdev,\
 		container_of(led_cdev, struct bd2802_led, cdev_##name);	\
 	led->led_id = id;						\
 	led->color = clr;						\
-	if (value == LED_OFF) {						\
+	if (value == 0) {						\
 		led->state = BD2802_OFF;				\
 		bd2802_turn_off(led, led->led_id, led->color);		\
 	} else {							\
@@ -557,7 +557,7 @@ static int bd2802_register_led_classdev(struct bd2802_led *led)
 	int ret;
 
 	led->cdev_led1r.name = "led1_R";
-	led->cdev_led1r.brightness = LED_OFF;
+	led->cdev_led1r.brightness = 0;
 	led->cdev_led1r.brightness_set_blocking = bd2802_set_led1r_brightness;
 	led->cdev_led1r.blink_set = bd2802_set_led1r_blink;
 
@@ -569,7 +569,7 @@ static int bd2802_register_led_classdev(struct bd2802_led *led)
 	}
 
 	led->cdev_led1g.name = "led1_G";
-	led->cdev_led1g.brightness = LED_OFF;
+	led->cdev_led1g.brightness = 0;
 	led->cdev_led1g.brightness_set_blocking = bd2802_set_led1g_brightness;
 	led->cdev_led1g.blink_set = bd2802_set_led1g_blink;
 
@@ -581,7 +581,7 @@ static int bd2802_register_led_classdev(struct bd2802_led *led)
 	}
 
 	led->cdev_led1b.name = "led1_B";
-	led->cdev_led1b.brightness = LED_OFF;
+	led->cdev_led1b.brightness = 0;
 	led->cdev_led1b.brightness_set_blocking = bd2802_set_led1b_brightness;
 	led->cdev_led1b.blink_set = bd2802_set_led1b_blink;
 
@@ -593,7 +593,7 @@ static int bd2802_register_led_classdev(struct bd2802_led *led)
 	}
 
 	led->cdev_led2r.name = "led2_R";
-	led->cdev_led2r.brightness = LED_OFF;
+	led->cdev_led2r.brightness = 0;
 	led->cdev_led2r.brightness_set_blocking = bd2802_set_led2r_brightness;
 	led->cdev_led2r.blink_set = bd2802_set_led2r_blink;
 
@@ -605,7 +605,7 @@ static int bd2802_register_led_classdev(struct bd2802_led *led)
 	}
 
 	led->cdev_led2g.name = "led2_G";
-	led->cdev_led2g.brightness = LED_OFF;
+	led->cdev_led2g.brightness = 0;
 	led->cdev_led2g.brightness_set_blocking = bd2802_set_led2g_brightness;
 	led->cdev_led2g.blink_set = bd2802_set_led2g_blink;
 
@@ -617,7 +617,7 @@ static int bd2802_register_led_classdev(struct bd2802_led *led)
 	}
 
 	led->cdev_led2b.name = "led2_B";
-	led->cdev_led2b.brightness = LED_OFF;
+	led->cdev_led2b.brightness = 0;
 	led->cdev_led2b.brightness_set_blocking = bd2802_set_led2b_brightness;
 	led->cdev_led2b.blink_set = bd2802_set_led2b_blink;
 	led->cdev_led2b.flags |= LED_CORE_SUSPENDRESUME;

@@ -150,7 +150,7 @@ static int wm8350_led_set(struct led_classdev *led_cdev,
 
 	spin_lock_irqsave(&led->value_lock, flags);
 
-	if (led->value == LED_OFF) {
+	if (led->value == 0) {
 		spin_unlock_irqrestore(&led->value_lock, flags);
 		return wm8350_led_disable(led);
 	}
@@ -160,7 +160,7 @@ static int wm8350_led_set(struct led_classdev *led_cdev,
 	 * brightness due to the non-linear current settings provided
 	 * by the hardware.
 	 */
-	uA = (led->max_uA_index * led->value) / LED_FULL;
+	uA = (led->max_uA_index * led->value) / 255;
 	spin_unlock_irqrestore(&led->value_lock, flags);
 	BUG_ON(uA >= ARRAY_SIZE(isink_cur));
 
@@ -179,7 +179,7 @@ static void wm8350_led_shutdown(struct platform_device *pdev)
 {
 	struct wm8350_led *led = platform_get_drvdata(pdev);
 
-	led->value = LED_OFF;
+	led->value = 0;
 	wm8350_led_disable(led);
 }
 
@@ -236,7 +236,7 @@ static int wm8350_led_probe(struct platform_device *pdev)
 			 pdata->max_uA);
 
 	spin_lock_init(&led->value_lock);
-	led->value = LED_OFF;
+	led->value = 0;
 	platform_set_drvdata(pdev, led);
 
 	return led_classdev_register(&pdev->dev, &led->cdev);

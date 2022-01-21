@@ -51,7 +51,7 @@
 #define SSO_LED_MAX_NUM			SZ_32
 #define MAX_FREQ_RANK			10
 #define DEF_GPTC_CLK_RATE		200000000
-#define SSO_DEF_BRIGHTNESS		LED_HALF
+#define SSO_DEF_BRIGHTNESS		127
 #define DATA_CLK_EDGE			0 /* 0-rising, 1-falling */
 
 static const u32 freq_div_tbl[] = {4000, 2000, 1000, 800};
@@ -244,7 +244,7 @@ static void sso_led_brightness_set(struct led_classdev *led_cdev,
 	desc->brightness = brightness;
 	regmap_write(priv->mmap, DUTY_CYCLE(desc->pin), brightness);
 
-	if (brightness == LED_OFF)
+	if (brightness == 0)
 		val = 0;
 	else
 		val = 1;
@@ -360,7 +360,7 @@ static int sso_create_led(struct sso_led_priv *priv, struct sso_led *led,
 	led->cdev.brightness_set = sso_led_brightness_set;
 	led->cdev.brightness_get = sso_led_brightness_get;
 	led->cdev.brightness = desc->brightness;
-	led->cdev.max_brightness = LED_FULL;
+	led->cdev.max_brightness = 255;
 
 	if (desc->retain_state_shutdown)
 		led->cdev.flags |= LED_RETAIN_AT_SHUTDOWN;
@@ -696,7 +696,7 @@ __sso_led_dt_parse(struct sso_led_priv *priv, struct fwnode_handle *fw_ssoled)
 
 		if (!fwnode_property_read_string(fwnode_child, "default-state", &tmp)) {
 			if (!strcmp(tmp, "on"))
-				desc->brightness = LED_FULL;
+				desc->brightness = 255;
 		}
 
 		ret = sso_create_led(priv, led, fwnode_child);

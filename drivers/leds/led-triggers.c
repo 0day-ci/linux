@@ -185,7 +185,7 @@ int led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 		led_cdev->trigger = NULL;
 		led_cdev->trigger_data = NULL;
 		led_cdev->activated = false;
-		led_set_brightness(led_cdev, LED_OFF);
+		led_set_brightness(led_cdev, 0);
 	}
 	if (trig) {
 		spin_lock(&trig->leddev_list_lock);
@@ -231,7 +231,7 @@ err_activate:
 	synchronize_rcu();
 	led_cdev->trigger = NULL;
 	led_cdev->trigger_data = NULL;
-	led_set_brightness(led_cdev, LED_OFF);
+	led_set_brightness(led_cdev, 0);
 	kfree(event);
 
 	return ret;

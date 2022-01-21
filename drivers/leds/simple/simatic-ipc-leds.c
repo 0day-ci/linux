@@ -73,7 +73,7 @@ static void simatic_ipc_led_set_io(struct led_classdev *led_cd,
 	spin_lock_irqsave(&reg_lock, flags);
 
 	val = inw(SIMATIC_IPC_LED_PORT_BASE);
-	if (brightness == LED_OFF)
+	if (brightness == 0)
 		outw(val | led->value, SIMATIC_IPC_LED_PORT_BASE);
 	else
 		outw(val & ~led->value, SIMATIC_IPC_LED_PORT_BASE);
@@ -85,7 +85,7 @@ static enum led_brightness simatic_ipc_led_get_io(struct led_classdev *led_cd)
 {
 	struct simatic_ipc_led *led = cdev_to_led(led_cd);
 
-	return inw(SIMATIC_IPC_LED_PORT_BASE) & led->value ? LED_OFF : led_cd->max_brightness;
+	return inw(SIMATIC_IPC_LED_PORT_BASE) & led->value ? 0 : led_cd->max_brightness;
 }
 
 static void simatic_ipc_led_set_mem(struct led_classdev *led_cd,
@@ -96,7 +96,7 @@ static void simatic_ipc_led_set_mem(struct led_classdev *led_cd,
 	u32 *p;
 
 	p = simatic_ipc_led_memory + led->value;
-	*p = (*p & ~1) | (brightness == LED_OFF);
+	*p = (*p & ~1) | (brightness == 0);
 }
 
 static enum led_brightness simatic_ipc_led_get_mem(struct led_classdev *led_cd)
@@ -106,7 +106,7 @@ static enum led_brightness simatic_ipc_led_get_mem(struct led_classdev *led_cd)
 	u32 *p;
 
 	p = simatic_ipc_led_memory + led->value;
-	return (*p & 1) ? LED_OFF : led_cd->max_brightness;
+	return (*p & 1) ? 0 : led_cd->max_brightness;
 }
 
 static int simatic_ipc_leds_probe(struct platform_device *pdev)
@@ -176,7 +176,7 @@ static int simatic_ipc_leds_probe(struct platform_device *pdev)
 			cdev->brightness_set = simatic_ipc_led_set_io;
 			cdev->brightness_get = simatic_ipc_led_get_io;
 		}
-		cdev->max_brightness = LED_ON;
+		cdev->max_brightness = 1;
 		cdev->name = ipcled->name;
 
 		err = devm_led_classdev_register(dev, cdev);

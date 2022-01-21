@@ -177,7 +177,7 @@ static void netxbig_led_set(struct led_classdev *led_cdev,
 
 	spin_lock_irqsave(&led_dat->lock, flags);
 
-	if (value == LED_OFF) {
+	if (value == 0) {
 		mode = NETXBIG_LED_OFF;
 		set_brightness = 0;
 	} else {
@@ -295,7 +295,7 @@ static int create_netxbig_led(struct platform_device *pdev,
 	 * the whole boot process (bootloader+linux).
 	 */
 	led_dat->sata = 0;
-	led_dat->cdev.brightness = LED_OFF;
+	led_dat->cdev.brightness = 0;
 	led_dat->cdev.max_brightness = template->bright_max;
 	led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
 	led_dat->mode_addr = template->mode_addr;

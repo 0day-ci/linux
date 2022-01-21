@@ -64,7 +64,7 @@ static enum led_brightness pm8058_led_get(struct led_classdev *cled)
 	ret = regmap_read(led->map, led->reg, &val);
 	if (ret) {
 		pr_err("Failed to get LED brightness\n");
-		return LED_OFF;
+		return 0;
 	}
 
 	switch (led->ledtype) {
@@ -78,7 +78,7 @@ static enum led_brightness pm8058_led_get(struct led_classdev *cled)
 		val >>= PM8058_LED_TYPE_KEYPAD_SHIFT;
 		break;
 	default:
-		val = LED_OFF;
+		val = 0;
 		break;
 	}
 
@@ -133,8 +133,8 @@ static int pm8058_led_probe(struct platform_device *pdev)
 			led->cdev.brightness = maxbright;
 			pm8058_led_set(&led->cdev, maxbright);
 		} else {
-			led->cdev.brightness = LED_OFF;
-			pm8058_led_set(&led->cdev, LED_OFF);
+			led->cdev.brightness = 0;
+			pm8058_led_set(&led->cdev, 0);
 		}
 	}
 

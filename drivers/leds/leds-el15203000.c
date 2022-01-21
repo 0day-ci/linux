@@ -133,7 +133,7 @@ static int el15203000_set_blocking(struct led_classdev *ldev,
 {
 	struct el15203000_led *led = to_el15203000_led(ldev);
 
-	return el15203000_cmd(led, brightness == LED_OFF ? EL_OFF : EL_ON);
+	return el15203000_cmd(led, brightness == 0 ? EL_OFF : EL_ON);
 }
 
 static int el15203000_pattern_set_S(struct led_classdev *ldev,
@@ -256,7 +256,7 @@ static int el15203000_probe_dt(struct el15203000 *priv)
 		}
 
 		led->priv			  = priv;
-		led->ldev.max_brightness	  = LED_ON;
+		led->ldev.max_brightness	  = 1;
 		led->ldev.brightness_set_blocking = el15203000_set_blocking;
 
 		if (led->reg == 'S') {

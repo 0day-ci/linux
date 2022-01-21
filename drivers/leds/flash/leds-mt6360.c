@@ -402,7 +402,7 @@ static int mt6360_isnk_init_default_state(struct mt6360_led *led)
 		return ret;
 
 	if (!(regval & MT6360_ISNK_ENMASK(led->led_no)))
-		level = LED_OFF;
+		level = 0;
 
 	switch (led->default_state) {
 	case STATE_ON:
@@ -412,7 +412,7 @@ static int mt6360_isnk_init_default_state(struct mt6360_led *led)
 		led->isnk.brightness = min(level, led->isnk.max_brightness);
 		break;
 	default:
-		led->isnk.brightness = LED_OFF;
+		led->isnk.brightness = 0;
 	}
 
 	return mt6360_isnk_brightness_set(&led->isnk, led->isnk.brightness);
@@ -440,7 +440,7 @@ static int mt6360_flash_init_default_state(struct mt6360_led *led)
 	if ((regval & enable_mask) == enable_mask)
 		level += 1;
 	else
-		level = LED_OFF;
+		level = 0;
 
 	switch (led->default_state) {
 	case STATE_ON:
@@ -451,7 +451,7 @@ static int mt6360_flash_init_default_state(struct mt6360_led *led)
 			min(level, flash->led_cdev.max_brightness);
 		break;
 	default:
-		flash->led_cdev.brightness = LED_OFF;
+		flash->led_cdev.brightness = 0;
 	}
 
 	return mt6360_torch_brightness_set(&flash->led_cdev,
@@ -542,7 +542,7 @@ static int mt6360_led_register(struct device *parent, struct mt6360_led *led,
 
 	switch (led->led_no) {
 	case MT6360_VIRTUAL_MULTICOLOR:
-		ret = mt6360_mc_brightness_set(&led->mc.led_cdev, LED_OFF);
+		ret = mt6360_mc_brightness_set(&led->mc.led_cdev, 0);
 		if (ret) {
 			dev_err(parent,
 				"Failed to init multicolor brightness\n");

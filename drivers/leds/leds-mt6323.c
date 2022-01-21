@@ -354,7 +354,7 @@ static int mt6323_led_set_dt_default(struct led_classdev *cdev,
 			ret =
 			mt6323_led_set_brightness(cdev, cdev->max_brightness);
 		} else  {
-			ret = mt6323_led_set_brightness(cdev, LED_OFF);
+			ret = mt6323_led_set_brightness(cdev, 0);
 		}
 	}
 

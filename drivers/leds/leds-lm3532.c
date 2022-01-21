@@ -354,7 +354,7 @@ static int lm3532_brightness_set(struct led_classdev *led_cdev,
 	mutex_lock(&led->priv->lock);
 
 	if (led->mode == LM3532_ALS_CTRL) {
-		if (brt_val > LED_OFF)
+		if (brt_val > 0)
 			ret = lm3532_led_enable(led);
 		else
 			ret = lm3532_led_disable(led);
@@ -362,7 +362,7 @@ static int lm3532_brightness_set(struct led_classdev *led_cdev,
 		goto unlock;
 	}
 
-	if (brt_val == LED_OFF) {
+	if (brt_val == 0) {
 		ret = lm3532_led_disable(led);
 		goto unlock;
 	}
@@ -459,9 +459,9 @@ static int lm3532_als_configure(struct lm3532_data *priv,
 
 	for (i = 0; i < LM3532_ALS_ZB_MAX; i++) {
 		als->zones_lo[i] = ((als_vmin + als_vstep + (i * als_vstep)) *
-				LED_FULL) / 1000;
+				255) / 1000;
 		als->zones_hi[i] = ((als_vmin + LM3532_ALS_OFFSET_mV +
-				als_vstep + (i * als_vstep)) * LED_FULL) / 1000;
+				als_vstep + (i * als_vstep)) * 255) / 1000;
 
 		zone_reg = LM3532_REG_ZN_0_HI + i * 2;
 		ret = regmap_write(priv->regmap, zone_reg, als->zones_lo[i]);

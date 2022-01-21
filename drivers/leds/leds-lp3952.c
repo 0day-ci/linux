@@ -67,7 +67,7 @@ static int lp3952_set_brightness(struct led_classdev *cdev,
 	dev_dbg(cdev->dev, "Brightness request: %d on %d\n", value,
 		led->channel);
 
-	if (value == LED_OFF) {
+	if (value == 0) {
 		lp3952_on_off(priv, led->channel, false);
 		return 0;
 	}
@@ -124,7 +124,7 @@ static int lp3952_register_led_classdev(struct lp3952_led_array *priv)
 			continue;
 
 		priv->leds[i].cdev.name = priv->leds[i].name;
-		priv->leds[i].cdev.brightness = LED_OFF;
+		priv->leds[i].cdev.brightness = 0;
 		priv->leds[i].cdev.max_brightness = LP3952_BRIGHT_MAX;
 		priv->leds[i].cdev.brightness_set_blocking =
 				lp3952_set_brightness;

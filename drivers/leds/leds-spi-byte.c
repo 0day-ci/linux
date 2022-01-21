@@ -103,7 +103,7 @@ static int spi_byte_probe(struct spi_device *spi)
 	mutex_init(&led->mutex);
 	led->cdef = device_get_match_data(dev);
 	led->ldev.name = led->name;
-	led->ldev.brightness = LED_OFF;
+	led->ldev.brightness = 0;
 	led->ldev.max_brightness = led->cdef->max_value - led->cdef->off_value;
 	led->ldev.brightness_set_blocking = spi_byte_brightness_set_blocking;
 

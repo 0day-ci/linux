@@ -220,7 +220,7 @@ static void nasgpio_led_set_brightness(struct led_classdev *led_cdev,
 				       enum led_brightness brightness)
 {
 	u32 setting = 0;
-	if (brightness >= LED_HALF)
+	if (brightness >= 127)
 		setting = 1;
 	/*
 	 * Hold the lock across both operations.  This ensures
@@ -433,12 +433,12 @@ static void set_power_light_amber_noblink(void)
 	if (!amber || !blue)
 		return;
 	/*
-	 * LED_OFF implies disabling future blinking
+	 * 0 implies disabling future blinking
 	 */
 	pr_debug("setting blue off and amber on\n");
 
-	nasgpio_led_set_brightness(&blue->led_cdev, LED_OFF);
-	nasgpio_led_set_brightness(&amber->led_cdev, LED_FULL);
+	nasgpio_led_set_brightness(&blue->led_cdev, 0);
+	nasgpio_led_set_brightness(&amber->led_cdev, 255);
 }
 
 static ssize_t blink_show(struct device *dev,
@@ -482,9 +482,9 @@ static int register_nasgpio_led(int led_nr)
 	struct led_classdev *led = get_classdev_for_led_nr(led_nr);
 
 	led->name = nas_led->name;
-	led->brightness = LED_OFF;
+	led->brightness = 0;
 	if (nasgpio_led_get_attr(led, GP_LVL))
-		led->brightness = LED_FULL;
+		led->brightness = 255;
 	led->brightness_set = nasgpio_led_set_brightness;
 	led->blink_set = nasgpio_led_set_blink;
 	led->groups = nasgpio_led_groups;

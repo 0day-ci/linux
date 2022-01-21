@@ -64,7 +64,7 @@ static void led_timer_function(struct timer_list *t)
 	unsigned long delay;
 
 	if (!led_cdev->blink_delay_on || !led_cdev->blink_delay_off) {
-		led_set_brightness_nosleep(led_cdev, LED_OFF);
+		led_set_brightness_nosleep(led_cdev, 0);
 		clear_bit(LED_BLINK_SW, &led_cdev->work_flags);
 		return;
 	}
@@ -89,7 +89,7 @@ static void led_timer_function(struct timer_list *t)
 		 * to restore it when the delay_off period is over.
 		 */
 		led_cdev->blink_brightness = brightness;
-		brightness = LED_OFF;
+		brightness = 0;
 		delay = led_cdev->blink_delay_off;
 	}
 
@@ -121,7 +121,7 @@ static void set_brightness_delayed(struct work_struct *ws)
 	int ret = 0;
 
 	if (test_and_clear_bit(LED_BLINK_DISABLE, &led_cdev->work_flags)) {
-		led_cdev->delayed_set_value = LED_OFF;
+		led_cdev->delayed_set_value = 0;
 		led_stop_software_blink(led_cdev);
 	}
 
@@ -154,7 +154,7 @@ static void led_set_software_blink(struct led_classdev *led_cdev,
 
 	/* never on - just set to off */
 	if (!delay_on) {
-		led_set_brightness_nosleep(led_cdev, LED_OFF);
+		led_set_brightness_nosleep(led_cdev, 0);
 		return;
 	}
 

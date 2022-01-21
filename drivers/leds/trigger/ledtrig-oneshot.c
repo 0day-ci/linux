@@ -58,9 +58,9 @@ static ssize_t led_invert_store(struct device *dev,
 	oneshot_data->invert = !!state;
 
 	if (oneshot_data->invert)
-		led_set_brightness_nosleep(led_cdev, LED_FULL);
+		led_set_brightness_nosleep(led_cdev, 255);
 	else
-		led_set_brightness_nosleep(led_cdev, LED_OFF);
+		led_set_brightness_nosleep(led_cdev, 0);
 
 	return size;
 }
@@ -184,7 +184,7 @@ static void oneshot_trig_deactivate(struct led_classdev *led_cdev)
 	kfree(oneshot_data);
 
 	/* Stop blinking */
-	led_set_brightness(led_cdev, LED_OFF);
+	led_set_brightness(led_cdev, 0);
 }
 
 static struct led_trigger oneshot_led_trigger = {

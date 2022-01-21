@@ -42,7 +42,7 @@ static void brightness_set(struct led_classdev *cdev,
 	u32 timebase;
 	unsigned int base;
 
-	timebase = (value == LED_OFF) ? 0 : (LED_EN|0x4);
+	timebase = (value == 0) ? 0 : (LED_EN|0x4);
 
 	base = led_n_base[cell->id];
 	asic3_write_register(asic, (base + ASIC3_LED_PeriodTime), 32);

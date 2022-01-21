@@ -423,7 +423,7 @@ static int led_prepare(struct tca6507_led *led)
 		if (best == -1) {
 			/* Best brightness is full-on */
 			set_select(tca, led->num, TCA6507_LS_LED_ON);
-			led->led_cdev.brightness = LED_FULL;
+			led->led_cdev.brightness = 255;
 			return 0;
 		}
 
@@ -577,12 +577,12 @@ static int tca6507_blink_set(struct led_classdev *led_cdev,
 	if (led->offtime == 0)
 		led->offtime = 512;
 
-	if (led->led_cdev.brightness == LED_OFF)
-		led->led_cdev.brightness = LED_FULL;
+	if (led->led_cdev.brightness == 0)
+		led->led_cdev.brightness = 255;
 	if (led_assign(led) < 0) {
 		led->ontime = 0;
 		led->offtime = 0;
-		led->led_cdev.brightness = LED_OFF;
+		led->led_cdev.brightness = 0;
 		return -EINVAL;
 	}
 	*delay_on = led->ontime;

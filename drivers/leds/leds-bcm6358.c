@@ -82,8 +82,8 @@ static void bcm6358_led_set(struct led_classdev *led_cdev,
 	spin_lock_irqsave(led->lock, flags);
 	bcm6358_led_busy(led->mem);
 	val = bcm6358_led_read(led->mem + BCM6358_REG_MODE);
-	if ((led->active_low && value == LED_OFF) ||
-	    (!led->active_low && value != LED_OFF))
+	if ((led->active_low && value == 0) ||
+	    (!led->active_low && value != 0))
 		val |= BIT(led->pin);
 	else
 		val &= ~(BIT(led->pin));
@@ -112,21 +112,21 @@ static int bcm6358_led(struct device *dev, struct device_node *nc, u32 reg,
 
 	if (!of_property_read_string(nc, "default-state", &state)) {
 		if (!strcmp(state, "on")) {
-			led->cdev.brightness = LED_FULL;
+			led->cdev.brightness = 255;
 		} else if (!strcmp(state, "keep")) {
 			unsigned long val;
 			val = bcm6358_led_read(led->mem + BCM6358_REG_MODE);
 			val &= BIT(led->pin);
 			if ((led->active_low && !val) ||
 			    (!led->active_low && val))
-				led->cdev.brightness = LED_FULL;
+				led->cdev.brightness = 255;
 			else
-				led->cdev.brightness = LED_OFF;
+				led->cdev.brightness = 0;
 		} else {
-			led->cdev.brightness = LED_OFF;
+			led->cdev.brightness = 0;
 		}
 	} else {
-		led->cdev.brightness = LED_OFF;
+		led->cdev.brightness = 0;
 	}
 
 	bcm6358_led_set(&led->cdev, led->cdev.brightness);

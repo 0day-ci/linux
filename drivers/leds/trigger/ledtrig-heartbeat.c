@@ -35,13 +35,13 @@ static void led_heartbeat_function(struct timer_list *t)
 	struct heartbeat_trig_data *heartbeat_data =
 		from_timer(heartbeat_data, t, timer);
 	struct led_classdev *led_cdev;
-	unsigned long brightness = LED_OFF;
+	unsigned long brightness = 0;
 	unsigned long delay = 0;
 
 	led_cdev = heartbeat_data->led_cdev;
 
 	if (unlikely(panic_heartbeats)) {
-		led_set_brightness_nosleep(led_cdev, LED_OFF);
+		led_set_brightness_nosleep(led_cdev, 0);
 		return;
 	}
 

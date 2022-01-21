@@ -105,7 +105,7 @@ static void ot200_led_brightness_set(struct led_classdev *led_cdev,
 	else
 		BUG();
 
-	if (value == LED_OFF)
+	if (value == 0)
 		*val &= ~led->mask;
 	else
 		*val |= led->mask;

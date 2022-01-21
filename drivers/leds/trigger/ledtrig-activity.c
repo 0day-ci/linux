@@ -129,7 +129,7 @@ static void led_activity_function(struct timer_list *t)
 		activity_data->state = !activity_data->state;
 		led_set_brightness_nosleep(led_cdev,
 			(activity_data->state ^ activity_data->invert) ?
-			led_cdev->blink_brightness : LED_OFF);
+			led_cdev->blink_brightness : 0);
 	}
 
 	target = (cpus > 1) ? (100 / cpus) : 50;

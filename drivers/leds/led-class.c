@@ -53,7 +53,7 @@ static ssize_t brightness_store(struct device *dev,
 	if (ret)
 		goto unlock;
 
-	if (state == LED_OFF)
+	if (state == 0)
 		led_trigger_remove(led_cdev);
 	led_set_brightness(led_cdev, state);
 	flush_work(&led_cdev->set_brightness_work);
@@ -405,7 +405,7 @@ int led_classdev_register_ext(struct device *parent,
 	up_write(&leds_list_lock);
 
 	if (!led_cdev->max_brightness)
-		led_cdev->max_brightness = LED_FULL;
+		led_cdev->max_brightness = 255;
 
 	led_update_brightness(led_cdev);
 
@@ -448,7 +448,7 @@ void led_classdev_unregister(struct led_classdev *led_cdev)
 	led_stop_software_blink(led_cdev);
 
 	if (!(led_cdev->flags & LED_RETAIN_AT_SHUTDOWN))
-		led_set_brightness(led_cdev, LED_OFF);
+		led_set_brightness(led_cdev, 0);
 
 	flush_work(&led_cdev->set_brightness_work);
 

@@ -140,7 +140,7 @@ static int is31fl319x_brightness_set(struct led_classdev *cdev,
 		ret = regmap_read(is31->regmap, IS31FL319X_PWM(i), &pwm_value);
 		dev_dbg(&is31->client->dev, "%s read %d: ret=%d: %d\n",
 			__func__, i, ret, pwm_value);
-		on = ret >= 0 && pwm_value > LED_OFF;
+		on = ret >= 0 && pwm_value > 0;
 
 		if (i < 3)
 			ctrl1 |= on << i;       /* 0..2 => bit 0..2 */

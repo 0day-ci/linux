@@ -95,7 +95,7 @@ static int rt8515_led_brightness_set(struct led_classdev *led,
 
 	mutex_lock(&rt->lock);
 
-	if (brightness == LED_OFF) {
+	if (brightness == 0) {
 		/* Off */
 		rt8515_gpio_led_off(rt);
 	} else if (brightness < RT8515_TORCH_MAX) {
@@ -132,7 +132,7 @@ static int rt8515_led_flash_strobe_set(struct led_classdev_flash *fled,
 		rt8515_gpio_led_off(rt);
 	}
 
-	fled->led_cdev.brightness = LED_OFF;
+	fled->led_cdev.brightness = 0;
 	/* After this the torch LED will be disabled */
 
 	mutex_unlock(&rt->lock);

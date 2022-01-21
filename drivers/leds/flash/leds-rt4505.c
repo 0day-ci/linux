@@ -59,7 +59,7 @@ static int rt4505_torch_brightness_set(struct led_classdev *lcdev,
 
 	mutex_lock(&priv->lock);
 
-	if (level != LED_OFF) {
+	if (level != 0) {
 		ret = regmap_update_bits(priv->regmap,
 					 RT4505_REG_ILED, RT4505_ITORCH_MASK,
 					 (level - 1) << RT4505_ITORCH_SHIFT);
@@ -90,19 +90,19 @@ static enum led_brightness rt4505_torch_brightness_get(
 	ret = regmap_read(priv->regmap, RT4505_REG_ENABLE, &val);
 	if (ret) {
 		dev_err(lcdev->dev, "Failed to get LED enable\n");
-		ret = LED_OFF;
+		ret = 0;
 		goto unlock;
 	}
 
 	if ((val & RT4505_ENABLE_MASK) != RT4505_TORCH_SET) {
-		ret = LED_OFF;
+		ret = 0;
 		goto unlock;
 	}
 
 	ret = regmap_read(priv->regmap, RT4505_REG_ILED, &val);
 	if (ret) {
 		dev_err(lcdev->dev, "Failed to get LED brightness\n");
-		ret = LED_OFF;
+		ret = 0;
 		goto unlock;
 	}
 

@@ -138,8 +138,8 @@ static void bcm6328_led_set(struct led_classdev *led_cdev,
 	led->blink_leds[1] &= ~BIT(led->pin);
 
 	/* Set LED on/off */
-	if ((led->active_low && value == LED_OFF) ||
-	    (!led->active_low && value != LED_OFF))
+	if ((led->active_low && value == 0) ||
+	    (!led->active_low && value != 0))
 		bcm6328_led_mode(led, BCM6328_LED_MODE_ON);
 	else
 		bcm6328_led_mode(led, BCM6328_LED_MODE_OFF);
@@ -348,7 +348,7 @@ static int bcm6328_led(struct device *dev, struct device_node *nc, u32 reg,
 
 	if (!of_property_read_string(nc, "default-state", &state)) {
 		if (!strcmp(state, "on")) {
-			led->cdev.brightness = LED_FULL;
+			led->cdev.brightness = 255;
 		} else if (!strcmp(state, "keep")) {
 			void __iomem *mode;
 			unsigned long val, shift;
@@ -364,14 +364,14 @@ static int bcm6328_led(struct device *dev, struct device_node *nc, u32 reg,
 			val &= BCM6328_LED_MODE_MASK;
 			if ((led->active_low && val == BCM6328_LED_MODE_OFF) ||
 			    (!led->active_low && val == BCM6328_LED_MODE_ON))
-				led->cdev.brightness = LED_FULL;
+				led->cdev.brightness = 255;
 			else
-				led->cdev.brightness = LED_OFF;
+				led->cdev.brightness = 0;
 		} else {
-			led->cdev.brightness = LED_OFF;
+			led->cdev.brightness = 0;
 		}
 	} else {
-		led->cdev.brightness = LED_OFF;
+		led->cdev.brightness = 0;
 	}
 
 	bcm6328_led_set(&led->cdev, led->cdev.brightness);

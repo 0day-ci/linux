@@ -185,9 +185,9 @@ static int lm3601x_brightness_set(struct led_classdev *cdev,
 	else
 		led_mode_val = LM3601X_MODE_IR_DRV;
 
-	if (brightness == LED_OFF) {
+	if (brightness == 0) {
 		ret = regmap_update_bits(led->regmap, LM3601X_ENABLE_REG,
-					led_mode_val, LED_OFF);
+					led_mode_val, 0);
 		goto out;
 	}
 
@@ -232,7 +232,7 @@ static int lm3601x_strobe_set(struct led_classdev_flash *fled_cdev,
 					LM3601X_MODE_STROBE);
 	else
 		ret = regmap_update_bits(led->regmap, LM3601X_ENABLE_REG,
-					LM3601X_MODE_STROBE, LED_OFF);
+					LM3601X_MODE_STROBE, 0);
 
 	ret = lm3601x_read_faults(led);
 out:
@@ -252,9 +252,9 @@ static int lm3601x_flash_brightness_set(struct led_classdev_flash *fled_cdev,
 	if (ret < 0)
 		goto out;
 
-	if (brightness == LED_OFF) {
+	if (brightness == 0) {
 		ret = regmap_update_bits(led->regmap, LM3601X_ENABLE_REG,
-					LM3601X_MODE_STROBE, LED_OFF);
+					LM3601X_MODE_STROBE, 0);
 		goto out;
 	}
 

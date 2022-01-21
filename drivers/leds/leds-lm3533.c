@@ -678,7 +678,7 @@ static int lm3533_led_probe(struct platform_device *pdev)
 	led->cdev.brightness_set_blocking = lm3533_led_set;
 	led->cdev.brightness_get = lm3533_led_get;
 	led->cdev.blink_set = lm3533_led_blink_set;
-	led->cdev.brightness = LED_OFF;
+	led->cdev.brightness = 0;
 	led->cdev.groups = lm3533_led_attribute_groups;
 	led->id = pdev->id;
 
@@ -738,7 +738,7 @@ static void lm3533_led_shutdown(struct platform_device *pdev)
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	lm3533_ctrlbank_disable(&led->cb);
-	lm3533_led_set(&led->cdev, LED_OFF);		/* disable blink */
+	lm3533_led_set(&led->cdev, 0);		/* disable blink */
 }
 
 static struct platform_driver lm3533_led_driver = {

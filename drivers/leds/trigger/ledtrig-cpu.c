@@ -84,11 +84,11 @@ void ledtrig_cpu(enum cpu_led_event ledevt)
 		total_cpus = num_present_cpus();
 
 		led_trigger_event(trig->_trig,
-			is_active ? LED_FULL : LED_OFF);
+			is_active ? 255 : 0);
 
 
 		led_trigger_event(trig_cpu_all,
-			DIV_ROUND_UP(LED_FULL * active_cpus, total_cpus));
+			DIV_ROUND_UP(255 * active_cpus, total_cpus));
 
 	}
 }

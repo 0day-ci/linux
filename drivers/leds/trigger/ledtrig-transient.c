@@ -79,7 +79,7 @@ static ssize_t transient_activate_store(struct device *dev,
 		transient_data->activate = state;
 		led_set_brightness_nosleep(led_cdev, transient_data->state);
 		transient_data->restore_state =
-		    (transient_data->state == LED_FULL) ? LED_OFF : LED_FULL;
+		    (transient_data->state == 255) ? 0 : 255;
 		mod_timer(&transient_data->timer,
 			  jiffies + msecs_to_jiffies(transient_data->duration));
 	}
@@ -123,7 +123,7 @@ static ssize_t transient_state_show(struct device *dev,
 		led_trigger_get_drvdata(dev);
 	int state;
 
-	state = (transient_data->state == LED_FULL) ? 1 : 0;
+	state = (transient_data->state == 255) ? 1 : 0;
 	return sprintf(buf, "%d\n", state);
 }
 
@@ -142,7 +142,7 @@ static ssize_t transient_state_store(struct device *dev,
 	if (state != 1 && state != 0)
 		return -EINVAL;
 
-	transient_data->state = (state == 1) ? LED_FULL : LED_OFF;
+	transient_data->state = (state == 1) ? 255 : 0;
 	return size;
 }
 

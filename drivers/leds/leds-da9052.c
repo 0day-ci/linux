@@ -119,7 +119,7 @@ static int da9052_led_probe(struct platform_device *pdev)
 	for (i = 0; i < pled->num_leds; i++) {
 		led[i].cdev.name = pled->leds[i].name;
 		led[i].cdev.brightness_set_blocking = da9052_led_set;
-		led[i].cdev.brightness = LED_OFF;
+		led[i].cdev.brightness = 0;
 		led[i].cdev.max_brightness = DA9052_MAX_BRIGHTNESS;
 		led[i].led_index = pled->leds[i].flags;
 		led[i].da9052 = dev_get_drvdata(pdev->dev.parent);
@@ -169,7 +169,7 @@ static int da9052_led_remove(struct platform_device *pdev)
 	pled = pdata->pled;
 
 	for (i = 0; i < pled->num_leds; i++) {
-		da9052_set_led_brightness(&led[i], LED_OFF);
+		da9052_set_led_brightness(&led[i], 0);
 		led_classdev_unregister(&led[i].cdev);
 	}
 

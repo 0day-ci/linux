@@ -440,7 +440,7 @@ static int lm3692x_probe_dt(struct lm3692x_led *led)
 	}
 
 	ret = fwnode_property_read_u32(child, "led-max-microamp", &max_cur);
-	led->led_dev.max_brightness = ret ? LED_FULL :
+	led->led_dev.max_brightness = ret ? 255 :
 		lm3692x_max_brightness(led, max_cur);
 
 	init_data.fwnode = child;

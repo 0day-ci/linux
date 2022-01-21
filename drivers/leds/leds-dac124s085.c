@@ -66,7 +66,7 @@ static int dac124s085_probe(struct spi_device *spi)
 		snprintf(led->name, sizeof(led->name), "dac124s085-%d", i);
 		mutex_init(&led->mutex);
 		led->ldev.name = led->name;
-		led->ldev.brightness = LED_OFF;
+		led->ldev.brightness = 0;
 		led->ldev.max_brightness = 0xfff;
 		led->ldev.brightness_set_blocking = dac124s085_set_brightness;
 		ret = led_classdev_register(&spi->dev, &led->ldev);

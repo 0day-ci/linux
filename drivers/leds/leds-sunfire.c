@@ -144,7 +144,7 @@ static int sunfire_led_generic_probe(struct platform_device *pdev,
 
 		p->leds[i].reg = (void __iomem *) pdev->resource[0].start;
 		lp->name = types[i].name;
-		lp->brightness = LED_FULL;
+		lp->brightness = 255;
 		lp->brightness_set = types[i].handler;
 		lp->default_trigger = types[i].default_trigger;
 

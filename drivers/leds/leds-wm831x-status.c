@@ -52,7 +52,7 @@ static void wm831x_status_set(struct wm831x_status *led)
 		led->reg_val |= led->blink_time << WM831X_LED_DUR_SHIFT;
 		led->reg_val |= led->blink_cyc;
 	} else {
-		if (led->brightness != LED_OFF)
+		if (led->brightness != 0)
 			led->reg_val |= 1 << WM831X_LED_MODE_SHIFT;
 	}
 
@@ -71,7 +71,7 @@ static int wm831x_status_brightness_set(struct led_classdev *led_cdev,
 
 	spin_lock_irqsave(&led->value_lock, flags);
 	led->brightness = value;
-	if (value == LED_OFF)
+	if (value == 0)
 		led->blink = 0;
 	spin_unlock_irqrestore(&led->value_lock, flags);
 	wm831x_status_set(led);
@@ -248,9 +248,9 @@ static int wm831x_status_probe(struct platform_device *pdev)
 	drvdata->reg_val = wm831x_reg_read(wm831x, drvdata->reg);
 
 	if (drvdata->reg_val & WM831X_LED_MODE_MASK)
-		drvdata->brightness = LED_FULL;
+		drvdata->brightness = 255;
 	else
-		drvdata->brightness = LED_OFF;
+		drvdata->brightness = 0;
 
 	/* Set a default source if configured, otherwise leave the
 	 * current hardware setting.

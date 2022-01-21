@@ -174,7 +174,7 @@ static void lm3530_als_configure(struct lm3530_platform_data *pdata,
 
 	for (i = 0; i < LM3530_ALS_ZB_MAX; i++)
 		als->zones[i] = (((als_vmin + LM3530_ALS_OFFSET_mV) +
-			als_vstep + (i * als_vstep)) * LED_FULL) / 1000;
+			als_vstep + (i * als_vstep)) * 255) / 1000;
 
 	als->config =
 		(pdata->als_avrg_time << LM3530_ALS_AVG_TIME_SHIFT) |
@@ -436,7 +436,7 @@ static int lm3530_probe(struct i2c_client *client,
 	drvdata->mode = pdata->mode;
 	drvdata->client = client;
 	drvdata->pdata = pdata;
-	drvdata->brightness = LED_OFF;
+	drvdata->brightness = 0;
 	drvdata->enable = false;
 	drvdata->led_dev.name = LM3530_LED_DEV;
 	drvdata->led_dev.brightness_set = lm3530_brightness_set;

@@ -45,14 +45,14 @@ static struct max77650_led *max77650_to_led(struct led_classdev *cdev)
 }
 
 static int max77650_led_brightness_set(struct led_classdev *cdev,
-				       enum led_brightness brightness)
+				       unsigned int brightness)
 {
 	struct max77650_led *led = max77650_to_led(cdev);
 	int val, mask;
 
 	mask = MAX77650_LED_BR_MASK | MAX77650_LED_EN_MASK;
 
-	if (brightness == LED_OFF)
+	if (brightness == 0)
 		val = MAX77650_LED_DISABLE;
 	else
 		val = MAX77650_LED_ENABLE | brightness;

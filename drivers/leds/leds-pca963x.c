@@ -128,11 +128,11 @@ static int pca963x_brightness(struct pca963x_led *led,
 	ledout = i2c_smbus_read_byte_data(client, ledout_addr);
 
 	switch (brightness) {
-	case LED_FULL:
+	case 255:
 		val = (ledout & ~mask) | (PCA963X_LED_ON << shift);
 		ret = i2c_smbus_write_byte_data(client, ledout_addr, val);
 		break;
-	case LED_OFF:
+	case 0:
 		val = ledout & ~mask;
 		ret = i2c_smbus_write_byte_data(client, ledout_addr, val);
 		break;

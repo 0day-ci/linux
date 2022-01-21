@@ -40,7 +40,7 @@ static void syscon_led_set(struct led_classdev *led_cdev,
 	u32 val;
 	int ret;
 
-	if (value == LED_OFF) {
+	if (value == 0) {
 		val = 0;
 		sled->state = false;
 	} else {
