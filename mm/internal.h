@@ -452,6 +452,23 @@ vma_address(struct page *page, struct vm_area_struct *vma)
 }
 
 /*
+ * Return the end of user virtual address at the specific offset within
+ * a vma.
+ */
+static inline unsigned long
+vma_pgoff_address_end(pgoff_t pgoff, unsigned long nr_pages,
+		      struct vm_area_struct *vma)
+{
+	unsigned long address;
+
+	address = vma->vm_start + ((pgoff + nr_pages - vma->vm_pgoff) << PAGE_SHIFT);
+	/* Check for address beyond vma (or wrapped through 0?) */
+	if (address < vma->vm_start || address > vma->vm_end)
+		address = vma->vm_end;
+	return address;
+}
+
+/*
  * Then at what user virtual address will none of the page be found in vma?
  * Assumes that vma_address() already returned a good starting address.
  * If page is a compound head, the entire compound page is considered.
@@ -459,16 +476,8 @@ vma_address(struct page *page, struct vm_area_struct *vma)
 static inline unsigned long
 vma_address_end(struct page *page, struct vm_area_struct *vma)
 {
-	pgoff_t pgoff;
-	unsigned long address;
-
 	VM_BUG_ON_PAGE(PageKsm(page), page);	/* KSM page->index unusable */
-	pgoff = page_to_pgoff(page) + compound_nr(page);
-	address = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
-	/* Check for address beyond vma (or wrapped through 0?) */
-	if (address < vma->vm_start || address > vma->vm_end)
-		address = vma->vm_end;
-	return address;
+	return vma_pgoff_address_end(page_to_pgoff(page), compound_nr(page), vma);
 }
 
 static inline struct file *maybe_unlock_mmap_for_io(struct vm_fault *vmf,
