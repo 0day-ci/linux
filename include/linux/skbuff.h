@@ -720,6 +720,10 @@ typedef unsigned char *sk_buff_data_t;
  *	@dst_pending_confirm: need to confirm neighbour
  *	@decrypted: Decrypted SKB
  *	@slow_gro: state present at GRO time, slower prepare step required
+ *	@mono_delivery_time: When set, skb->tstamap has the
+ *		delivery_time in mono clock base (i.e. EDT).  Otherwise, the
+ *		skb->tstamp has the (rcv) timestamp at ingress and
+ *		delivery_time at egress.
  *	@napi_id: id of the NAPI struct this skb came from
  *	@sender_cpu: (aka @napi_id) source CPU in XPS
  *	@secmark: security marking
@@ -890,6 +894,7 @@ struct sk_buff {
 	__u8			decrypted:1;
 #endif
 	__u8			slow_gro:1;
+	__u8			mono_delivery_time:1;
 
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
@@ -3901,6 +3906,14 @@ static inline ktime_t net_timedelta(ktime_t t)
 static inline ktime_t net_invalid_timestamp(void)
 {
 	return 0;
+}
+
+static inline void skb_set_delivery_time(struct sk_buff *skb, ktime_t kt,
+					 bool mono)
+{
+	skb->tstamp = kt;
+	/* Setting mono_delivery_time will be enabled later */
+	/* skb->mono_delivery_time = kt && mono; */
 }
 
 static inline u8 skb_metadata_len(const struct sk_buff *skb)
