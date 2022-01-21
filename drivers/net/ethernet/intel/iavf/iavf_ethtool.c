@@ -530,10 +530,8 @@ static int iavf_set_priv_flags(struct net_device *netdev, u32 flags)
 
 	/* issue a reset to force legacy-rx change to take effect */
 	if (changed_flags & IAVF_FLAG_LEGACY_RX) {
-		if (netif_running(netdev)) {
-			adapter->flags |= IAVF_FLAG_RESET_NEEDED;
-			queue_work(iavf_wq, &adapter->reset_task);
-		}
+		if (netif_running(netdev))
+			iavf_schedule_reset(adapter);
 	}
 
 	return 0;
@@ -670,10 +668,8 @@ static int iavf_set_ringparam(struct net_device *netdev,
 		adapter->rx_desc_count = new_rx_count;
 	}
 
-	if (netif_running(netdev)) {
-		adapter->flags |= IAVF_FLAG_RESET_NEEDED;
-		queue_work(iavf_wq, &adapter->reset_task);
-	}
+	if (netif_running(netdev))
+		iavf_schedule_reset(adapter);
 
 	return 0;
 }
