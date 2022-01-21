@@ -89,6 +89,7 @@
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 static DEFINE_MUTEX(loop_validate_mutex);
+static DEFINE_SPINLOCK(loop_delete_spinlock);
 
 /**
  * loop_global_lock_killable() - take locks for safe loop_validate_file() test
@@ -1717,16 +1718,15 @@ static int lo_compat_ioctl(struct block_device *bdev, fmode_t mode,
 static int lo_open(struct block_device *bdev, fmode_t mode)
 {
 	struct loop_device *lo = bdev->bd_disk->private_data;
-	int err;
+	int err = 0;
 
-	err = mutex_lock_killable(&lo->lo_mutex);
-	if (err)
-		return err;
-	if (lo->lo_state == Lo_deleting)
+	spin_lock(&loop_delete_spinlock);
+	/* lo->lo_state may be changed to any Lo_* but Lo_deleting. */
+	if (data_race(lo->lo_state) == Lo_deleting)
 		err = -ENXIO;
 	else
 		atomic_inc(&lo->lo_refcnt);
-	mutex_unlock(&lo->lo_mutex);
+	spin_unlock(&loop_delete_spinlock);
 	return err;
 }
 
@@ -2112,19 +2112,18 @@ static int loop_control_remove(int idx)
 	ret = mutex_lock_killable(&lo->lo_mutex);
 	if (ret)
 		goto mark_visible;
-	if (lo->lo_state != Lo_unbound ||
-	    atomic_read(&lo->lo_refcnt) > 0) {
-		mutex_unlock(&lo->lo_mutex);
+	spin_lock(&loop_delete_spinlock);
+	/* Mark this loop device no longer open()-able if nobody is using. */
+	if (lo->lo_state != Lo_unbound || atomic_read(&lo->lo_refcnt) > 0)
 		ret = -EBUSY;
-		goto mark_visible;
-	}
-	/* Mark this loop device no longer open()-able. */
-	lo->lo_state = Lo_deleting;
+	else
+		lo->lo_state = Lo_deleting;
+	spin_unlock(&loop_delete_spinlock);
 	mutex_unlock(&lo->lo_mutex);
-
-	loop_remove(lo);
-	return 0;
-
+	if (!ret) {
+		loop_remove(lo);
+		return 0;
+	}
 mark_visible:
 	/* Show this loop device again. */
 	mutex_lock(&loop_ctl_mutex);
