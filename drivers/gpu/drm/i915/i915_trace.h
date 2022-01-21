@@ -324,6 +324,11 @@ DEFINE_EVENT(i915_request, i915_request_add,
 );
 
 #if defined(CONFIG_DRM_I915_LOW_LEVEL_TRACEPOINTS)
+DEFINE_EVENT(i915_request, i915_request_cancel,
+	     TP_PROTO(struct i915_request *rq),
+	     TP_ARGS(rq)
+);
+
 DEFINE_EVENT(i915_request, i915_request_guc_submit,
 	     TP_PROTO(struct i915_request *rq),
 	     TP_ARGS(rq)
@@ -497,6 +502,11 @@ DEFINE_EVENT(intel_context, intel_context_do_unpin,
 
 #else
 #if !defined(TRACE_HEADER_MULTI_READ)
+static inline void
+trace_i915_request_cancel(struct i915_request *rq)
+{
+}
+
 static inline void
 trace_i915_request_guc_submit(struct i915_request *rq)
 {
