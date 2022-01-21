@@ -125,9 +125,9 @@ static void rfkill_led_trigger_event(struct rfkill *rfkill)
 	trigger = &rfkill->led_trigger;
 
 	if (rfkill->state & RFKILL_BLOCK_ANY)
-		led_trigger_event(trigger, LED_OFF);
+		led_trigger_event(trigger, 0);
 	else
-		led_trigger_event(trigger, LED_FULL);
+		led_trigger_event(trigger, 255);
 }
 
 static int rfkill_led_trigger_activate(struct led_classdev *led)
@@ -180,7 +180,7 @@ static void rfkill_global_led_trigger_worker(struct work_struct *work)
 	mutex_lock(&rfkill_global_mutex);
 	list_for_each_entry(rfkill, &rfkill_list, node) {
 		if (!(rfkill->state & RFKILL_BLOCK_ANY)) {
-			brightness = LED_FULL;
+			brightness = 255;
 			break;
 		}
 	}
@@ -188,7 +188,7 @@ static void rfkill_global_led_trigger_worker(struct work_struct *work)
 
 	led_trigger_event(&rfkill_any_led_trigger, brightness);
 	led_trigger_event(&rfkill_none_led_trigger,
-			  brightness == LED_OFF ? LED_FULL : LED_OFF);
+			  brightness == 0 ? 255 : 0);
 }
 
 static void rfkill_global_led_trigger_event(void)
