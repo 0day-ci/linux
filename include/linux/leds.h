@@ -597,7 +597,7 @@ void ledtrig_audio_set(enum led_audio type, enum led_brightness state);
 #else
 static inline enum led_brightness ledtrig_audio_get(enum led_audio type)
 {
-	return LED_OFF;
+	return 0;
 }
 static inline void ledtrig_audio_set(enum led_audio type,
 				     enum led_brightness state)
