@@ -287,10 +287,10 @@ static int adp8870_led_probe(struct i2c_client *client)
 		led_dat->cdev.name = cur_led->name;
 		led_dat->cdev.default_trigger = cur_led->default_trigger;
 		led_dat->cdev.brightness_set = adp8870_led_set;
-		led_dat->cdev.brightness = LED_OFF;
+		led_dat->cdev.brightness = 0;
 		led_dat->flags = cur_led->flags >> FLAG_OFFT_SHIFT;
 		led_dat->client = client;
-		led_dat->new_brightness = LED_OFF;
+		led_dat->new_brightness = 0;
 		INIT_WORK(&led_dat->work, adp8870_led_work);
 
 		ret = led_classdev_register(&client->dev, &led_dat->cdev);

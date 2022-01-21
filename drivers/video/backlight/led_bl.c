@@ -46,7 +46,7 @@ static void led_bl_power_off(struct led_bl_data *priv)
 		return;
 
 	for (i = 0; i < priv->nb_leds; i++)
-		led_set_brightness(priv->leds[i], LED_OFF);
+		led_set_brightness(priv->leds[i], 0);
 
 	priv->enabled = false;
 }
