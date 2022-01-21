@@ -66,7 +66,7 @@ static void b43legacy_led_brightness_set(struct led_classdev *led_dev,
 	 * whether the LED has the wrong state for a second. */
 	radio_enabled = (dev->phy.radio_on && dev->radio_hw_enable);
 
-	if (brightness == LED_OFF || !radio_enabled)
+	if (brightness == 0 || !radio_enabled)
 		b43legacy_led_turn_off(dev, led->index, led->activelow);
 	else
 		b43legacy_led_turn_on(dev, led->index, led->activelow);

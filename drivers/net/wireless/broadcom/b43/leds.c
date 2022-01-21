@@ -59,7 +59,7 @@ static void b43_led_update(struct b43_wldev *dev,
 	 * with the brightness_set handler, we will be called again soon
 	 * to fixup our state. */
 	if (radio_enabled)
-		turn_on = atomic_read(&led->state) != LED_OFF;
+		turn_on = atomic_read(&led->state) != 0;
 	else
 		turn_on = false;
 	if (turn_on == led->hw_state)
