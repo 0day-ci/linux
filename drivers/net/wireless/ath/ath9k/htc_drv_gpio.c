@@ -230,7 +230,7 @@ void ath9k_led_work(struct work_struct *work)
 						   led_work);
 
 	ath9k_hw_set_gpio(priv->ah, priv->ah->led_pin,
-			  (priv->brightness == LED_OFF));
+			  (priv->brightness == 0));
 }
 
 static void ath9k_led_brightness(struct led_classdev *led_cdev,
@@ -250,7 +250,7 @@ void ath9k_deinit_leds(struct ath9k_htc_priv *priv)
 	if (!priv->led_registered)
 		return;
 
-	ath9k_led_brightness(&priv->led_cdev, LED_OFF);
+	ath9k_led_brightness(&priv->led_cdev, 0);
 	led_classdev_unregister(&priv->led_cdev);
 	cancel_work_sync(&priv->led_work);
 
