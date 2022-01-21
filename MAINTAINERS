@@ -10636,6 +10636,7 @@ KTD20XX LED CONTROLLER DRIVER
 M:	Florian Eckert <fe@dev.tdt.de>
 L:	linux-leds@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/leds/leds-ktd20xx.yaml
 F:	drivers/leds/leds-ktd20xx.c
 
 KTEST
