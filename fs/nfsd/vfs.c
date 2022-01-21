@@ -1065,6 +1065,10 @@ __be32 nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	__be32 err;
 
 	trace_nfsd_read_start(rqstp, fhp, offset, *count);
+
+	if (unlikely(offset + *count > NFS_OFFSET_MAX))
+		*count = NFS_OFFSET_MAX - offset;
+
 	err = nfsd_file_acquire(rqstp, fhp, NFSD_MAY_READ, &nf);
 	if (err)
 		return err;
