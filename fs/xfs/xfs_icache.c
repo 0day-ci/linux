@@ -349,6 +349,16 @@ xfs_iget_recycle(
 	spin_unlock(&ip->i_flags_lock);
 	rcu_read_unlock();
 
+	/*
+	 * VFS RCU pathwalk lookups dictate the same lifecycle rules for an
+	 * inode recycle as for freeing an inode. I.e., we cannot repurpose the
+	 * inode until a grace period has elapsed from the time the previous
+	 * version of the inode was destroyed. In most cases a grace period has
+	 * already elapsed if the inode was (deferred) inactivated, but
+	 * synchronize here as a last resort to guarantee correctness.
+	 */
+	cond_synchronize_rcu(ip->i_destroy_gp);
+
 	ASSERT(!rwsem_is_locked(&inode->i_rwsem));
 	error = xfs_reinit_inode(mp, inode);
 	if (error) {
@@ -2005,6 +2015,7 @@ xfs_inodegc_queue(
 	trace_xfs_inode_set_need_inactive(ip);
 	spin_lock(&ip->i_flags_lock);
 	ip->i_flags |= XFS_NEED_INACTIVE;
+	ip->i_destroy_gp = start_poll_synchronize_rcu();
 	spin_unlock(&ip->i_flags_lock);
 
 	gc = get_cpu_ptr(mp->m_inodegc);

@@ -40,8 +40,9 @@ typedef struct xfs_inode {
 	/* Transaction and locking information. */
 	struct xfs_inode_log_item *i_itemp;	/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
-	atomic_t		i_pincount;	/* inode pin count */
 	struct llist_node	i_gclist;	/* deferred inactivation list */
+	unsigned long		i_destroy_gp;	/* destroy rcugp cookie */
+	atomic_t		i_pincount;	/* inode pin count */
 
 	/*
 	 * Bitsets of inode metadata that have been checked and/or are sick.
