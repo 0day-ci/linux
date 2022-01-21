@@ -108,9 +108,7 @@ gb_i2c_operation_create(struct gb_connection *connection,
 		else
 			data_out_size += (u32)msg->len;
 
-	request_size = sizeof(*request);
-	request_size += msg_count * sizeof(*op);
-	request_size += data_out_size;
+	request_size = struct_size(request, ops, msg_count) + data_out_size;
 
 	/* Response consists only of incoming data */
 	operation = gb_operation_create(connection, GB_I2C_TYPE_TRANSFER,
