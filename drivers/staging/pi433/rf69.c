@@ -283,7 +283,7 @@ int rf69_set_deviation(struct spi_device *spi, u32 deviation)
 
 	// calculate register settings
 	f_reg = deviation * factor;
-	do_div(f_reg, f_step);
+	div64_u64(f_reg, f_step);
 
 	msb = (f_reg & 0xff00) >> 8;
 	lsb = (f_reg & 0xff);
@@ -329,7 +329,7 @@ int rf69_set_frequency(struct spi_device *spi, u32 frequency)
 
 	// calculate reg settings
 	f_reg = frequency * factor;
-	do_div(f_reg, f_step);
+	div64_u64(f_reg, f_step);
 
 	msb = (f_reg & 0xff0000) >> 16;
 	mid = (f_reg & 0xff00)   >>  8;
