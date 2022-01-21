@@ -523,10 +523,10 @@ static void at76_ledtrig_tx_timerfunc(struct timer_list *unused)
 
 	if (tx_lastactivity != tx_activity) {
 		tx_lastactivity = tx_activity;
-		led_trigger_event(ledtrig_tx, LED_FULL);
+		led_trigger_event(ledtrig_tx, 255);
 		mod_timer(&ledtrig_tx_timer, jiffies + HZ / 4);
 	} else
-		led_trigger_event(ledtrig_tx, LED_OFF);
+		led_trigger_event(ledtrig_tx, 0);
 }
 
 static void at76_ledtrig_tx_activity(void)
