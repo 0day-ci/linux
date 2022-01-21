@@ -5421,13 +5421,13 @@ static int light_set_status(int status)
 static int light_sysfs_set(struct led_classdev *led_cdev,
 			enum led_brightness brightness)
 {
-	return light_set_status((brightness != LED_OFF) ?
+	return light_set_status((brightness != 0) ?
 				TPACPI_LED_ON : TPACPI_LED_OFF);
 }
 
 static enum led_brightness light_sysfs_get(struct led_classdev *led_cdev)
 {
-	return (light_get_status() == 1) ? LED_FULL : LED_OFF;
+	return (light_get_status() == 1) ? 255 : 0;
 }
 
 static struct tpacpi_led_classdev tpacpi_led_thinklight = {
@@ -5759,7 +5759,7 @@ static int led_sysfs_set(struct led_classdev *led_cdev,
 			     struct tpacpi_led_classdev, led_classdev);
 	enum led_status_t new_state;
 
-	if (brightness == LED_OFF)
+	if (brightness == 0)
 		new_state = TPACPI_LED_OFF;
 	else if (tpacpi_led_state_cache[data->led] != TPACPI_LED_BLINK)
 		new_state = TPACPI_LED_ON;
@@ -5796,9 +5796,9 @@ static enum led_brightness led_sysfs_get(struct led_classdev *led_cdev)
 	rc = led_get_status(data->led);
 
 	if (rc == TPACPI_LED_OFF || rc < 0)
-		rc = LED_OFF;	/* no error handling in led class :( */
+		rc = 0;	/* no error handling in led class :( */
 	else
-		rc = LED_FULL;
+		rc = 255;
 
 	return rc;
 }
@@ -9145,13 +9145,13 @@ static int tpacpi_led_set(int whichled, bool on)
 static int tpacpi_led_mute_set(struct led_classdev *led_cdev,
 			       enum led_brightness brightness)
 {
-	return tpacpi_led_set(LED_AUDIO_MUTE, brightness != LED_OFF);
+	return tpacpi_led_set(LED_AUDIO_MUTE, brightness != 0);
 }
 
 static int tpacpi_led_micmute_set(struct led_classdev *led_cdev,
 				  enum led_brightness brightness)
 {
-	return tpacpi_led_set(LED_AUDIO_MICMUTE, brightness != LED_OFF);
+	return tpacpi_led_set(LED_AUDIO_MICMUTE, brightness != 0);
 }
 
 static struct led_classdev mute_led_cdev[TPACPI_LED_MAX] = {

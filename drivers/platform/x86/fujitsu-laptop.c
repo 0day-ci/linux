@@ -584,10 +584,10 @@ static int logolamp_set(struct led_classdev *cdev,
 	int poweron = FUNC_LED_ON, always = FUNC_LED_ON;
 	int ret;
 
-	if (brightness < LED_HALF)
+	if (brightness < 127)
 		poweron = FUNC_LED_OFF;
 
-	if (brightness < LED_FULL)
+	if (brightness < 255)
 		always = FUNC_LED_OFF;
 
 	ret = call_fext_func(device, FUNC_LEDS, 0x1, LOGOLAMP_POWERON, poweron);
@@ -604,13 +604,13 @@ static enum led_brightness logolamp_get(struct led_classdev *cdev)
 
 	ret = call_fext_func(device, FUNC_LEDS, 0x2, LOGOLAMP_ALWAYS, 0x0);
 	if (ret == FUNC_LED_ON)
-		return LED_FULL;
+		return 255;
 
 	ret = call_fext_func(device, FUNC_LEDS, 0x2, LOGOLAMP_POWERON, 0x0);
 	if (ret == FUNC_LED_ON)
-		return LED_HALF;
+		return 127;
 
-	return LED_OFF;
+	return 0;
 }
 
 static int kblamps_set(struct led_classdev *cdev,
@@ -618,7 +618,7 @@ static int kblamps_set(struct led_classdev *cdev,
 {
 	struct acpi_device *device = to_acpi_device(cdev->dev->parent);
 
-	if (brightness >= LED_FULL)
+	if (brightness >= 255)
 		return call_fext_func(device, FUNC_LEDS, 0x1, KEYBOARD_LAMPS,
 				      FUNC_LED_ON);
 	else
@@ -629,11 +629,11 @@ static int kblamps_set(struct led_classdev *cdev,
 static enum led_brightness kblamps_get(struct led_classdev *cdev)
 {
 	struct acpi_device *device = to_acpi_device(cdev->dev->parent);
-	enum led_brightness brightness = LED_OFF;
+	unsigned int brightness = 0;
 
 	if (call_fext_func(device,
 			   FUNC_LEDS, 0x2, KEYBOARD_LAMPS, 0x0) == FUNC_LED_ON)
-		brightness = LED_FULL;
+		brightness = 255;
 
 	return brightness;
 }
@@ -643,7 +643,7 @@ static int radio_led_set(struct led_classdev *cdev,
 {
 	struct acpi_device *device = to_acpi_device(cdev->dev->parent);
 
-	if (brightness >= LED_FULL)
+	if (brightness >= 255)
 		return call_fext_func(device, FUNC_FLAGS, 0x5, RADIO_LED_ON,
 				      RADIO_LED_ON);
 	else
@@ -654,10 +654,10 @@ static int radio_led_set(struct led_classdev *cdev,
 static enum led_brightness radio_led_get(struct led_classdev *cdev)
 {
 	struct acpi_device *device = to_acpi_device(cdev->dev->parent);
-	enum led_brightness brightness = LED_OFF;
+	unsigned int brightness = 0;
 
 	if (call_fext_func(device, FUNC_FLAGS, 0x4, 0x0, 0x0) & RADIO_LED_ON)
-		brightness = LED_FULL;
+		brightness = 255;
 
 	return brightness;
 }
@@ -669,7 +669,7 @@ static int eco_led_set(struct led_classdev *cdev,
 	int curr;
 
 	curr = call_fext_func(device, FUNC_LEDS, 0x2, ECO_LED, 0x0);
-	if (brightness >= LED_FULL)
+	if (brightness >= 255)
 		return call_fext_func(device, FUNC_LEDS, 0x1, ECO_LED,
 				      curr | ECO_LED_ON);
 	else
@@ -680,10 +680,10 @@ static int eco_led_set(struct led_classdev *cdev,
 static enum led_brightness eco_led_get(struct led_classdev *cdev)
 {
 	struct acpi_device *device = to_acpi_device(cdev->dev->parent);
-	enum led_brightness brightness = LED_OFF;
+	unsigned int brightness = 0;
 
 	if (call_fext_func(device, FUNC_LEDS, 0x2, ECO_LED, 0x0) & ECO_LED_ON)
-		brightness = LED_FULL;
+		brightness = 255;
 
 	return brightness;
 }

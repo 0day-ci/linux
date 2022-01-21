@@ -299,7 +299,7 @@ static enum led_brightness ap_led_get(struct led_classdev *led)
 	if (value > 0)
 		return (enum led_brightness)value;
 	else
-		return LED_OFF;
+		return 0;
 }
 
 // Set the airplane mode LED brightness
@@ -308,7 +308,7 @@ static int ap_led_set(struct led_classdev *led, enum led_brightness value)
 	struct system76_data *data;
 
 	data = container_of(led, struct system76_data, ap_led);
-	return system76_set(data, "SAPL", value == LED_OFF ? 0 : 1);
+	return system76_set(data, "SAPL", value == 0 ? 0 : 1);
 }
 
 // Get the last set keyboard LED brightness

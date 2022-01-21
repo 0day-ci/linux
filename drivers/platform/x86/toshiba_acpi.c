@@ -501,19 +501,19 @@ static enum led_brightness toshiba_illumination_get(struct led_classdev *cdev)
 
 	/* First request : initialize communication. */
 	if (!sci_open(dev))
-		return LED_OFF;
+		return 0;
 
 	/* Check the illumination */
 	result = sci_read(dev, SCI_ILLUMINATION, &state);
 	sci_close(dev);
 	if (result == TOS_FAILURE) {
 		pr_err("ACPI call for illumination failed\n");
-		return LED_OFF;
+		return 0;
 	} else if (result != TOS_SUCCESS) {
-		return LED_OFF;
+		return 0;
 	}
 
-	return state ? LED_FULL : LED_OFF;
+	return state ? 255 : 0;
 }
 
 /* KBD Illumination */
@@ -602,12 +602,12 @@ static enum led_brightness toshiba_kbd_backlight_get(struct led_classdev *cdev)
 	result = hci_read(dev, HCI_KBD_ILLUMINATION, &state);
 	if (result == TOS_FAILURE) {
 		pr_err("ACPI call to get the keyboard backlight failed\n");
-		return LED_OFF;
+		return 0;
 	} else if (result != TOS_SUCCESS) {
-		return LED_OFF;
+		return 0;
 	}
 
-	return state ? LED_FULL : LED_OFF;
+	return state ? 255 : 0;
 }
 
 static void toshiba_kbd_backlight_set(struct led_classdev *cdev,
@@ -711,13 +711,13 @@ toshiba_eco_mode_get_status(struct led_classdev *cdev)
 	status = tci_raw(dev, in, out);
 	if (ACPI_FAILURE(status)) {
 		pr_err("ACPI call to get ECO led failed\n");
-		return LED_OFF;
+		return 0;
 	}
 
 	if (out[0] != TOS_SUCCESS)
-		return LED_OFF;
+		return 0;
 
-	return out[2] ? LED_FULL : LED_OFF;
+	return out[2] ? 255 : 0;
 }
 
 static void toshiba_eco_mode_set_status(struct led_classdev *cdev,
@@ -2402,7 +2402,7 @@ static void toshiba_acpi_kbd_bl_work(struct work_struct *work)
 	    toshiba_acpi->kbd_mode != SCI_KBD_MODE_AUTO)
 		led_classdev_notify_brightness_hw_changed(&toshiba_acpi->kbd_led,
 				(toshiba_acpi->kbd_mode == SCI_KBD_MODE_ON) ?
-				LED_FULL : LED_OFF);
+				255 : 0);
 
 	/* Emulate the keyboard backlight event */
 	acpi_bus_generate_netlink_event(toshiba_acpi->acpi_dev->pnp.device_class,
@@ -3225,7 +3225,7 @@ static void toshiba_acpi_notify(struct acpi_device *acpi_dev, u32 event)
 		if (dev->kbd_type == 2 && dev->kbd_mode != SCI_KBD_MODE_AUTO)
 			led_classdev_notify_brightness_hw_changed(&dev->kbd_led,
 					(dev->kbd_mode == SCI_KBD_MODE_ON) ?
-					LED_FULL : LED_OFF);
+					255 : 0);
 		break;
 	case 0x85: /* Unknown */
 	case 0x8d: /* Unknown */

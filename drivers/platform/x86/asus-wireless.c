@@ -84,8 +84,8 @@ static enum led_brightness led_state_get(struct led_classdev *led)
 	s = asus_wireless_method(acpi_device_handle(data->adev), "HSWC",
 				 data->hswc_params->status, &ret);
 	if (ACPI_SUCCESS(s) && ret == data->hswc_params->on)
-		return LED_FULL;
-	return LED_OFF;
+		return 255;
+	return 0;
 }
 
 static void led_state_update(struct work_struct *work)
@@ -103,7 +103,7 @@ static void led_state_set(struct led_classdev *led, enum led_brightness value)
 	struct asus_wireless_data *data;
 
 	data = container_of(led, struct asus_wireless_data, led);
-	data->led_state = value == LED_OFF ? data->hswc_params->off :
+	data->led_state = value == 0 ? data->hswc_params->off :
 					     data->hswc_params->on;
 	queue_work(data->wq, &data->led_work);
 }

@@ -122,7 +122,7 @@ static int led_blink(unsigned char on_eighths, unsigned char off_eighths)
 static void dell_led_set(struct led_classdev *led_cdev,
 			 enum led_brightness value)
 {
-	if (value == LED_OFF)
+	if (value == 0)
 		led_off();
 	else
 		led_on();
@@ -154,7 +154,7 @@ static int dell_led_blink(struct led_classdev *led_cdev,
 
 static struct led_classdev dell_led = {
 	.name		= "dell::lid",
-	.brightness	= LED_OFF,
+	.brightness	= 0,
 	.max_brightness = 1,
 	.brightness_set = dell_led_set,
 	.blink_set	= dell_led_blink,

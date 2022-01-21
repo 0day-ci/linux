@@ -2141,7 +2141,7 @@ static int micmute_led_set(struct led_classdev *led_cdev,
 {
 	struct calling_interface_buffer buffer;
 	struct calling_interface_token *token;
-	int state = brightness != LED_OFF;
+	int state = brightness != 0;
 
 	if (state == 0)
 		token = dell_smbios_find_token(GLOBAL_MIC_MUTE_DISABLE);

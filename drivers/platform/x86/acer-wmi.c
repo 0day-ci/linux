@@ -1597,7 +1597,7 @@ static int acer_led_init(struct device *dev)
 
 static void acer_led_exit(void)
 {
-	set_u32(LED_OFF, ACER_CAP_MAILLED);
+	set_u32(0, ACER_CAP_MAILLED);
 	led_classdev_unregister(&mail_led);
 }
 
@@ -2332,7 +2332,7 @@ static int acer_suspend(struct device *dev)
 
 	if (has_cap(ACER_CAP_MAILLED)) {
 		get_u32(&value, ACER_CAP_MAILLED);
-		set_u32(LED_OFF, ACER_CAP_MAILLED);
+		set_u32(0, ACER_CAP_MAILLED);
 		data->mailled = value;
 	}
 
@@ -2377,7 +2377,7 @@ static void acer_platform_shutdown(struct platform_device *device)
 		return;
 
 	if (has_cap(ACER_CAP_MAILLED))
-		set_u32(LED_OFF, ACER_CAP_MAILLED);
+		set_u32(0, ACER_CAP_MAILLED);
 }
 
 static struct platform_driver acer_platform_driver = {

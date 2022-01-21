@@ -71,8 +71,8 @@ static int topstar_led_set(struct led_classdev *led,
 	 * it seems to be faulty on some models like the Topstar U931
 	 * Notebook).
 	 */
-	if ((ret == 0x30001 && state == LED_OFF)
-			|| (ret == 0x30000 && state != LED_OFF)) {
+	if ((ret == 0x30001 && state == 0)
+			|| (ret == 0x30000 && state != 0)) {
 		status = acpi_execute_simple_method(topstar->device->handle,
 				"FNCX", 0x83);
 		if (ACPI_FAILURE(status))

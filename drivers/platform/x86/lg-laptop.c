@@ -547,13 +547,13 @@ static void tpad_led_set(struct led_classdev *cdev,
 {
 	union acpi_object *r;
 
-	r = lg_wmab(WM_TLED, WM_SET, brightness > LED_OFF);
+	r = lg_wmab(WM_TLED, WM_SET, brightness > 0);
 	kfree(r);
 }
 
 static enum led_brightness tpad_led_get(struct led_classdev *cdev)
 {
-	return ggov(GOV_TLED) > 0 ? LED_ON : LED_OFF;
+	return ggov(GOV_TLED) > 0 ? 1 : 0;
 }
 
 static LED_DEVICE(tpad_led, 1, 0);
@@ -565,9 +565,9 @@ static void kbd_backlight_set(struct led_classdev *cdev,
 	union acpi_object *r;
 
 	val = 0x22;
-	if (brightness <= LED_OFF)
+	if (brightness <= 0)
 		val = 0;
-	if (brightness >= LED_FULL)
+	if (brightness >= 255)
 		val = 0x24;
 	r = lg_wmab(WM_KEY_LIGHT, WM_SET, val);
 	kfree(r);
@@ -581,22 +581,22 @@ static enum led_brightness get_kbd_backlight_level(void)
 	r = lg_wmab(WM_KEY_LIGHT, WM_GET, 0);
 
 	if (!r)
-		return LED_OFF;
+		return 0;
 
 	if (r->type != ACPI_TYPE_BUFFER || r->buffer.pointer[1] != 0x05) {
 		kfree(r);
-		return LED_OFF;
+		return 0;
 	}
 
 	switch (r->buffer.pointer[0] & 0x27) {
 	case 0x24:
-		val = LED_FULL;
+		val = 255;
 		break;
 	case 0x22:
-		val = LED_HALF;
+		val = 127;
 		break;
 	default:
-		val = LED_OFF;
+		val = 0;
 	}
 
 	kfree(r);
