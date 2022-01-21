@@ -641,7 +641,7 @@ static void ir_do_keyup(struct rc_dev *dev, bool sync)
 	dev_dbg(&dev->dev, "keyup key 0x%04x\n", dev->last_keycode);
 	del_timer(&dev->timer_repeat);
 	input_report_key(dev->input_dev, dev->last_keycode, 0);
-	led_trigger_event(led_feedback, LED_OFF);
+	led_trigger_event(led_feedback, 0);
 	if (sync)
 		input_sync(dev->input_dev);
 	dev->keypressed = false;
@@ -812,7 +812,7 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_proto protocol,
 			dev->device_name, keycode, protocol, scancode);
 		input_report_key(dev->input_dev, keycode, 1);
 
-		led_trigger_event(led_feedback, LED_FULL);
+		led_trigger_event(led_feedback, 255);
 	}
 
 	/*

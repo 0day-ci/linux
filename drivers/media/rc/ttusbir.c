@@ -44,7 +44,7 @@ static enum led_brightness ttusbir_brightness_get(struct led_classdev *led_dev)
 {
 	struct ttusbir *tt = container_of(led_dev, struct ttusbir, led);
 
-	return tt->led_on ? LED_FULL : LED_OFF;
+	return tt->led_on ? 255 : 0;
 }
 
 static void ttusbir_set_led(struct ttusbir *tt)
@@ -70,7 +70,7 @@ static void ttusbir_brightness_set(struct led_classdev *led_dev, enum
 {
 	struct ttusbir *tt = container_of(led_dev, struct ttusbir, led);
 
-	tt->led_on = brightness != LED_OFF;
+	tt->led_on = brightness != 0;
 
 	ttusbir_set_led(tt);
 }

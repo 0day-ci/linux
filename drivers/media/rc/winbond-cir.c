@@ -265,7 +265,7 @@ wbcir_led_brightness_get(struct led_classdev *led_cdev)
 	if (inb(data->ebase + WBCIR_REG_ECEIR_CTS) & WBCIR_LED_ENABLE)
 		return LED_FULL;
 	else
-		return LED_OFF;
+		return 0;
 }
 
 static void
@@ -277,7 +277,7 @@ wbcir_led_brightness_set(struct led_classdev *led_cdev,
 					       led);
 
 	wbcir_set_bits(data->ebase + WBCIR_REG_ECEIR_CTS,
-		       brightness == LED_OFF ? 0x00 : WBCIR_LED_ENABLE,
+		       brightness == 0 ? 0x00 : WBCIR_LED_ENABLE,
 		       WBCIR_LED_ENABLE);
 }
 
@@ -1167,7 +1167,7 @@ wbcir_remove(struct pnp_dev *device)
 	led_classdev_unregister(&data->led);
 
 	/* This is ok since &data->led isn't actually used */
-	wbcir_led_brightness_set(&data->led, LED_OFF);
+	wbcir_led_brightness_set(&data->led, 0);
 
 	release_region(data->wbase, WAKEUP_IOMEM_LEN);
 	release_region(data->ebase, EHFUNC_IOMEM_LEN);

@@ -855,7 +855,7 @@ static void redrat3_brightness_set(struct led_classdev *led_dev, enum
 	struct redrat3_dev *rr3 = container_of(led_dev, struct redrat3_dev,
 									led);
 
-	if (brightness != LED_OFF && atomic_cmpxchg(&rr3->flash, 0, 1) == 0) {
+	if (brightness != 0 && atomic_cmpxchg(&rr3->flash, 0, 1) == 0) {
 		int ret = usb_submit_urb(rr3->flash_urb, GFP_ATOMIC);
 		if (ret != 0) {
 			dev_dbg(rr3->dev, "%s: unexpected ret of %d\n",
@@ -919,7 +919,7 @@ static void redrat3_led_complete(struct urb *urb)
 		break;
 	}
 
-	rr3->led.brightness = LED_OFF;
+	rr3->led.brightness = 0;
 	atomic_dec(&rr3->flash);
 }
 
