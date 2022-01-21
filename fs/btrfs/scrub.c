@@ -3209,7 +3209,6 @@ static noinline_for_stack int scrub_stripe(struct scrub_ctx *sctx,
 	offset = 0;
 	nstripes = div64_u64(dev_extent_len, map->stripe_len);
 	mirror_num = 1;
-	increment = map->stripe_len;
 	if (map->type & BTRFS_BLOCK_GROUP_RAID0) {
 		offset = map->stripe_len * stripe_index;
 		increment = map->stripe_len * map->num_stripes;
