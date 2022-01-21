@@ -1035,7 +1035,7 @@ static int kbd_led_trigger_activate(struct led_classdev *cdev)
 	if (ledstate != -1U)
 		led_trigger_event(&trigger->trigger,
 				  ledstate & trigger->mask ?
-					LED_FULL : LED_OFF);
+					255 : 0);
 	tasklet_enable(&keyboard_tasklet);
 
 	return 0;
@@ -1081,7 +1081,7 @@ static void kbd_propagate_led_state(unsigned int old_state,
 		if (changed & trigger->mask)
 			led_trigger_event(&trigger->trigger,
 					  new_state & trigger->mask ?
-						LED_FULL : LED_OFF);
+						255 : 0);
 	}
 }
 
