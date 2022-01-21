@@ -40,6 +40,7 @@
  * btrfs_debug_feature_attrs		/sys/fs/btrfs/debug
  * btrfs_debug_mount_attrs		/sys/fs/btrfs/<uuid>/debug
  * discard_debug_attrs			/sys/fs/btrfs/<uuid>/debug/discard
+ * io_accounting_debug_attrs		/sys/fs/btrfs/<uuid>/debug/io_accounting
  */
 
 struct btrfs_feature_attr {
@@ -614,6 +615,62 @@ static struct attribute *btrfs_debug_feature_attrs[] = {
 static const struct attribute_group btrfs_debug_feature_attr_group = {
 	.name = "debug",
 	.attrs = btrfs_debug_feature_attrs,
+};
+
+/* IO accounting */
+#define io_accounting_to_fs_info(_kobj)	to_fs_info((_kobj)->parent->parent)
+
+#define DECLARE_IO_ACCOUNTING_OPS(name)					\
+static ssize_t io_accounting_##name##_show(struct kobject *kobj,	\
+					   struct kobj_attribute *a,	\
+					   char *buf)			\
+{									\
+	struct btrfs_fs_info *fs_info = io_accounting_to_fs_info(kobj);	\
+	u64 result;							\
+									\
+	spin_lock(&fs_info->io_accounting_lock);			\
+	result = fs_info->name;						\
+	spin_unlock(&fs_info->io_accounting_lock);			\
+	return sysfs_emit(buf, "%llu\n", result);			\
+}									\
+static ssize_t io_accounting_##name##_store(struct kobject *kobj,	\
+					    struct kobj_attribute *a,	\
+					    const char *buf,		\
+					    size_t count) 		\
+{									\
+	struct btrfs_fs_info *fs_info = io_accounting_to_fs_info(kobj);	\
+	u64 value;							\
+	int ret;							\
+									\
+	ret = kstrtoull(skip_spaces(buf), 0, &value);			\
+	if (ret)							\
+		return ret;						\
+	spin_lock(&fs_info->io_accounting_lock);			\
+	fs_info->name = value;						\
+	spin_unlock(&fs_info->io_accounting_lock);			\
+	return count;							\
+}
+
+DECLARE_IO_ACCOUNTING_OPS(meta_read);
+DECLARE_IO_ACCOUNTING_OPS(meta_write);
+DECLARE_IO_ACCOUNTING_OPS(data_read);
+DECLARE_IO_ACCOUNTING_OPS(data_write);
+
+BTRFS_ATTR_RW(io_accounting, meta_read, io_accounting_meta_read_show,
+	      io_accounting_meta_read_store);
+BTRFS_ATTR_RW(io_accounting, meta_write, io_accounting_meta_write_show,
+	      io_accounting_meta_write_store);
+BTRFS_ATTR_RW(io_accounting, data_read, io_accounting_data_read_show,
+	      io_accounting_data_read_store);
+BTRFS_ATTR_RW(io_accounting, data_write, io_accounting_data_write_show,
+	      io_accounting_data_write_store);
+
+static const struct attribute *io_accounting_debug_attrs[] = {
+	BTRFS_ATTR_PTR(io_accounting, meta_read),
+	BTRFS_ATTR_PTR(io_accounting, meta_write),
+	BTRFS_ATTR_PTR(io_accounting, data_read),
+	BTRFS_ATTR_PTR(io_accounting, data_write),
+	NULL,
 };
 
 #endif
@@ -1219,6 +1276,12 @@ void btrfs_sysfs_remove_mounted(struct btrfs_fs_info *fs_info)
 		kobject_del(fs_info->discard_debug_kobj);
 		kobject_put(fs_info->discard_debug_kobj);
 	}
+	if (fs_info->io_accounting_debug_kobj) {
+		sysfs_remove_files(fs_info->io_accounting_debug_kobj,
+				   io_accounting_debug_attrs);
+		kobject_del(fs_info->io_accounting_debug_kobj);
+		kobject_put(fs_info->io_accounting_debug_kobj);
+	}
 	if (fs_info->debug_kobj) {
 		sysfs_remove_files(fs_info->debug_kobj, btrfs_debug_mount_attrs);
 		kobject_del(fs_info->debug_kobj);
@@ -1804,6 +1867,20 @@ int btrfs_sysfs_add_mounted(struct btrfs_fs_info *fs_info)
 				   discard_debug_attrs);
 	if (error)
 		goto failure;
+
+	/* io_accounting directory */
+	fs_info->io_accounting_debug_kobj =
+		kobject_create_and_add("io_accounting",fs_info->debug_kobj);
+	if (!fs_info->io_accounting_debug_kobj) {
+		error = -ENOMEM;
+		goto failure;
+	}
+
+	error = sysfs_create_files(fs_info->io_accounting_debug_kobj,
+				   io_accounting_debug_attrs);
+	if (error)
+		goto failure;
+
 #endif
 
 	error = addrm_unknown_feature_attrs(fs_info, true);

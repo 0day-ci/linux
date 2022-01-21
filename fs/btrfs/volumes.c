@@ -6775,6 +6775,29 @@ static void bioc_error(struct btrfs_io_context *bioc, struct bio *bio, u64 logic
 	}
 }
 
+static void update_io_accounting(struct btrfs_fs_info *fs_info, struct bio *bio)
+{
+	u32 length = bio->bi_iter.bi_size;
+	bool metadata = bio->bi_opf & REQ_META;
+
+#ifdef	CONFIG_BTRFS_DEBUG
+	spin_lock(&fs_info->io_accounting_lock);
+	if (bio_op(bio) == REQ_OP_READ) {
+		if (metadata)
+			fs_info->meta_read += length;
+		else
+			fs_info->data_read += length;
+	} else {
+		if (metadata)
+			fs_info->meta_write += length;
+		else
+			fs_info->data_write += length;
+	}
+	spin_unlock(&fs_info->io_accounting_lock);
+#endif
+	return;
+}
+
 blk_status_t btrfs_map_bio(struct btrfs_fs_info *fs_info, struct bio *bio,
 			   int mirror_num)
 {
@@ -6788,6 +6811,7 @@ blk_status_t btrfs_map_bio(struct btrfs_fs_info *fs_info, struct bio *bio,
 	int total_devs;
 	struct btrfs_io_context *bioc = NULL;
 
+	update_io_accounting(fs_info, bio);
 	length = bio->bi_iter.bi_size;
 	map_length = length;
 

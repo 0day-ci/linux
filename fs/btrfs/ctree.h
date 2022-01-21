@@ -1035,10 +1035,21 @@ struct btrfs_fs_info {
 #ifdef CONFIG_BTRFS_DEBUG
 	struct kobject *debug_kobj;
 	struct kobject *discard_debug_kobj;
+	struct kobject *io_accounting_debug_kobj;
 	struct list_head allocated_roots;
 
 	spinlock_t eb_leak_lock;
 	struct list_head allocated_ebs;
+
+	spinlock_t io_accounting_lock;
+	/*
+	 * The IO accounting unit are all in byte, and are in logical address
+	 * space, which is before the RAID/DUP mapping.
+	 */
+	u64 meta_read;
+	u64 meta_write;
+	u64 data_read;
+	u64 data_write;
 #endif
 };
 
