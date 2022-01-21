@@ -34,6 +34,7 @@
 #include "arm-spe-decoder/arm-spe-decoder.h"
 #include "arm-spe-decoder/arm-spe-pkt-decoder.h"
 
+#include <../../../arch/arm64/include/asm/cputype.h>
 #define MAX_TIMESTAMP (~0ULL)
 
 struct arm_spe {
@@ -45,6 +46,7 @@ struct arm_spe {
 	struct perf_session		*session;
 	struct machine			*machine;
 	u32				pmu_type;
+	u64				midr;
 
 	struct perf_tsc_conversion	tc;
 
@@ -399,9 +401,16 @@ static bool arm_spe__is_memory_event(enum arm_spe_sample_type type)
 	return false;
 }
 
-static u64 arm_spe__synth_data_source(const struct arm_spe_record *record)
+static const struct midr_range neoverse_spe[] = {
+	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N1),
+	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N2),
+	{},
+};
+
+static u64 arm_spe__synth_data_source(const struct arm_spe_record *record, u64 midr)
 {
 	union perf_mem_data_src	data_src = { 0 };
+	bool is_neoverse = is_midr_in_range(midr, neoverse_spe);
 
 	if (record->op == ARM_SPE_LD)
 		data_src.mem_op = PERF_MEM_OP_LOAD;
@@ -409,19 +418,30 @@ static u64 arm_spe__synth_data_source(const struct arm_spe_record *record)
 		data_src.mem_op = PERF_MEM_OP_STORE;
 
 	if (record->type & (ARM_SPE_LLC_ACCESS | ARM_SPE_LLC_MISS)) {
-		data_src.mem_lvl = PERF_MEM_LVL_L3;
+		if (is_neoverse && record->source == ARM_SPE_NV_DRAM) {
+			data_src.mem_lvl = PERF_MEM_LVL_LOC_RAM | PERF_MEM_LVL_HIT;
+		} else if (is_neoverse && record->source == ARM_SPE_NV_PEER_CLSTR) {
+			data_src.mem_snoop = PERF_MEM_SNOOP_HITM;
+			data_src.mem_lvl = PERF_MEM_LVL_L3 | PERF_MEM_LVL_HIT;
+		} else {
+			data_src.mem_lvl = PERF_MEM_LVL_L3;
 
-		if (record->type & ARM_SPE_LLC_MISS)
-			data_src.mem_lvl |= PERF_MEM_LVL_MISS;
-		else
-			data_src.mem_lvl |= PERF_MEM_LVL_HIT;
+			if (record->type & ARM_SPE_LLC_MISS)
+				data_src.mem_lvl |= PERF_MEM_LVL_MISS;
+			else
+				data_src.mem_lvl |= PERF_MEM_LVL_HIT;
+		}
 	} else if (record->type & (ARM_SPE_L1D_ACCESS | ARM_SPE_L1D_MISS)) {
-		data_src.mem_lvl = PERF_MEM_LVL_L1;
+		if (is_neoverse && record->source == ARM_SPE_NV_L2) {
+			data_src.mem_lvl = PERF_MEM_LVL_L2 | PERF_MEM_LVL_HIT;
+		} else {
+			data_src.mem_lvl = PERF_MEM_LVL_L1;
 
-		if (record->type & ARM_SPE_L1D_MISS)
-			data_src.mem_lvl |= PERF_MEM_LVL_MISS;
-		else
-			data_src.mem_lvl |= PERF_MEM_LVL_HIT;
+			if (record->type & ARM_SPE_L1D_MISS)
+				data_src.mem_lvl |= PERF_MEM_LVL_MISS;
+			else
+				data_src.mem_lvl |= PERF_MEM_LVL_HIT;
+		}
 	}
 
 	if (record->type & ARM_SPE_REMOTE_ACCESS)
@@ -446,7 +466,7 @@ static int arm_spe_sample(struct arm_spe_queue *speq)
 	u64 data_src;
 	int err;
 
-	data_src = arm_spe__synth_data_source(record);
+	data_src = arm_spe__synth_data_source(record, spe->midr);
 
 	if (spe->sample_flc) {
 		if (record->type & ARM_SPE_L1D_MISS) {
@@ -796,6 +816,10 @@ static int arm_spe_process_event(struct perf_session *session,
 	u64 timestamp;
 	struct arm_spe *spe = container_of(session->auxtrace,
 			struct arm_spe, auxtrace);
+	const char *cpuid = perf_env__cpuid(session->evlist->env);
+	u64 midr = strtol(cpuid, NULL, 16);
+
+	spe->midr = midr;
 
 	if (dump_trace)
 		return 0;
