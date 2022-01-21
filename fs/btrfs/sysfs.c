@@ -576,6 +576,17 @@ static ssize_t btrfs_discard_max_discard_size_store(struct kobject *kobj,
 BTRFS_ATTR_RW(discard, max_discard_size, btrfs_discard_max_discard_size_show,
 	      btrfs_discard_max_discard_size_store);
 
+static ssize_t wake_up_cleaner(struct kobject *kobj, struct kobj_attribute *a,
+			       const char *buf, size_t count)
+{
+	struct btrfs_fs_info *fs_info = to_fs_info(kobj->parent);
+
+	wake_up_process(fs_info->cleaner_kthread);
+	return count;
+}
+
+BTRFS_ATTR_RW(debug_mount, cleaner_trigger, NULL, wake_up_cleaner);
+
 /*
  * Per-filesystem debugging of discard (when mounted with discard=async).
  *
@@ -599,6 +610,7 @@ static const struct attribute *discard_debug_attrs[] = {
  * Path: /sys/fs/btrfs/UUID/debug/
  */
 static const struct attribute *btrfs_debug_mount_attrs[] = {
+	BTRFS_ATTR_PTR(debug_mount, cleaner_trigger),
 	NULL,
 };
 
