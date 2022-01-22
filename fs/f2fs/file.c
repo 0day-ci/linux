@@ -3091,9 +3091,8 @@ int f2fs_fileattr_set(struct user_namespace *mnt_userns,
 		return -EIO;
 	if (!f2fs_is_checkpoint_ready(F2FS_I_SB(inode)))
 		return -ENOSPC;
-	if (fsflags & ~F2FS_GETTABLE_FS_FL)
+	if (fsflags & ~F2FS_SETTABLE_FS_FL)
 		return -EOPNOTSUPP;
-	fsflags &= F2FS_SETTABLE_FS_FL;
 	if (!fa->flags_valid)
 		mask &= FS_COMMON_FL;
 
