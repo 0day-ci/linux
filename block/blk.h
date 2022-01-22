@@ -406,6 +406,14 @@ extern int blk_iolatency_init(struct request_queue *q);
 static inline int blk_iolatency_init(struct request_queue *q) { return 0; }
 #endif
 
+#ifdef CONFIG_BLK_CGROUP
+int blkcg_init_queue(struct request_queue *q);
+void blkcg_exit_queue(struct request_queue *q);
+#else
+static inline int blkcg_init_queue(struct request_queue *q) { return 0; }
+static inline void blkcg_exit_queue(struct request_queue *q) { }
+#endif
+
 struct bio *blk_next_bio(struct bio *bio, unsigned int nr_pages, gfp_t gfp);
 
 #ifdef CONFIG_BLK_DEV_ZONED
