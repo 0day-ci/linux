@@ -1992,13 +1992,20 @@ int perf_pmu__match(char *pattern, char *name, char *tok)
 	return 0;
 }
 
+#ifndef REFCNT_CHECKING
+#define UNWRAP_CPUMAP(x) x
+#else
+#define UNWRAP_CPUMAP(x) x->orig
+#endif
+
 int perf_pmu__cpus_match(struct perf_pmu *pmu, struct perf_cpu_map *cpus,
 			 struct perf_cpu_map **mcpus_ptr,
 			 struct perf_cpu_map **ucpus_ptr)
 {
 	struct perf_cpu_map *pmu_cpus = pmu->cpus;
 	struct perf_cpu_map *matched_cpus, *unmatched_cpus;
-	int matched_nr = 0, unmatched_nr = 0;
+	struct perf_cpu cpu;
+	int i, matched_nr = 0, unmatched_nr = 0;
 
 	matched_cpus = perf_cpu_map__default_new();
 	if (!matched_cpus)
@@ -2010,18 +2017,15 @@ int perf_pmu__cpus_match(struct perf_pmu *pmu, struct perf_cpu_map *cpus,
 		return -1;
 	}
 
-	for (int i = 0; i < cpus->nr; i++) {
-		int cpu;
-
-		cpu = perf_cpu_map__idx(pmu_cpus, cpus->map[i]);
-		if (cpu == -1)
-			unmatched_cpus->map[unmatched_nr++] = cpus->map[i];
+	perf_cpu_map__for_each_cpu(cpu, i, cpus) {
+		if (!perf_cpu_map__has(pmu_cpus, cpu))
+			UNWRAP_CPUMAP(unmatched_cpus)->map[unmatched_nr++] = cpu;
 		else
-			matched_cpus->map[matched_nr++] = cpus->map[i];
+			UNWRAP_CPUMAP(matched_cpus)->map[matched_nr++] = cpu;
 	}
 
-	unmatched_cpus->nr = unmatched_nr;
-	matched_cpus->nr = matched_nr;
+	UNWRAP_CPUMAP(unmatched_cpus)->nr = unmatched_nr;
+	UNWRAP_CPUMAP(matched_cpus)->nr = matched_nr;
 	*mcpus_ptr = matched_cpus;
 	*ucpus_ptr = unmatched_cpus;
 	return 0;

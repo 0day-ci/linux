@@ -16,7 +16,12 @@ struct perf_cpu {
  * gaps if CPU numbers were used. For events associated with a pid, rather than
  * a CPU, a single dummy map with an entry of -1 is used.
  */
-struct perf_cpu_map {
+#ifndef REFCNT_CHECKING
+struct perf_cpu_map
+#else
+struct original_perf_cpu_map
+#endif
+{
 	refcount_t	refcnt;
 	/** Length of the map array. */
 	int		nr;
@@ -24,10 +29,17 @@ struct perf_cpu_map {
 	struct perf_cpu	map[];
 };
 
+#ifdef REFCNT_CHECKING
+struct perf_cpu_map {
+	struct original_perf_cpu_map *orig;
+};
+#endif
+
 #ifndef MAX_NR_CPUS
 #define MAX_NR_CPUS	2048
 #endif
 
+struct perf_cpu_map *perf_cpu_map__alloc(int nr_cpus);
 int perf_cpu_map__idx(const struct perf_cpu_map *cpus, struct perf_cpu cpu);
 
 #endif /* __LIBPERF_INTERNAL_CPUMAP_H */
