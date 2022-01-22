@@ -3670,7 +3670,7 @@ static void scsi_disk_release(struct device *dev)
 	 * in case multiple processes open a /dev/sd... node concurrently.
 	 */
 	blk_mq_freeze_queue(q);
-	blk_mq_unfreeze_queue(q);
+	__blk_mq_unfreeze_queue(q, true);
 
 	disk->private_data = NULL;
 	put_disk(disk);
