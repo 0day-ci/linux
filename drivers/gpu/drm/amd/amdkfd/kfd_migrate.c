@@ -149,7 +149,8 @@ svm_migrate_copy_memory_gart(struct amdgpu_device *adev, dma_addr_t *sys,
 			gart_s = svm_migrate_direct_mapping_addr(adev, *vram);
 			r = svm_migrate_gart_map(ring, size, sys, &gart_d, 0);
 
-		} else if (direction == FROM_RAM_TO_VRAM) {
+		} else {
+			/* direction == FROM_RAM_TO_VRAM */
 			r = svm_migrate_gart_map(ring, size, sys, &gart_s,
 						 KFD_IOCTL_SVM_FLAG_GPU_RO);
 			gart_d = svm_migrate_direct_mapping_addr(adev, *vram);
