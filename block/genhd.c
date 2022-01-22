@@ -1085,11 +1085,48 @@ static const struct attribute_group *disk_attr_groups[] = {
 	NULL
 };
 
+/* Unconfigure the I/O scheduler and dissociate from the cgroup controller. */
+static void blk_exit_queue(struct request_queue *q)
+{
+	/*
+	 * Since the I/O scheduler exit code may access cgroup information,
+	 * perform I/O scheduler exit before disassociating from the block
+	 * cgroup controller.
+	 */
+	if (q->elevator) {
+		ioc_clear_queue(q);
+
+		mutex_lock(&q->sysfs_lock);
+		blk_mq_sched_free_rqs(q);
+		elevator_exit(q);
+		mutex_unlock(&q->sysfs_lock);
+	}
+}
+
 static void disk_release_queue(struct gendisk *disk)
 {
 	struct request_queue *q = disk->queue;
 
-	blk_mq_cancel_work_sync(q);
+	if (queue_is_mq(q)) {
+		blk_mq_cancel_work_sync(q);
+
+		/*
+		 * All FS bios have been done, however FS request may not
+		 * be freed yet since we end bio before freeing request,
+		 * meantime passthrough request replies on scheduler tags,
+		 * so queue needs to be frozen here.
+		 *
+		 * Most of drivers release disk after blk_cleanup_queue()
+		 * returns, and SCSI may release disk before calling
+		 * blk_cleanup_queue, but request queue has been in atomic
+		 * mode already, see scsi_disk_release(), so the following
+		 * queue freeze is pretty fast, and RCU grace period isn't
+		 * supposed to be involved.
+		 */
+		blk_mq_freeze_queue(q);
+		blk_exit_queue(q);
+		__blk_mq_unfreeze_queue(q, true);
+	}
 
 	/*
 	 * Remove all references to @q from the block cgroup controller before
