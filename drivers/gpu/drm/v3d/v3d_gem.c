@@ -798,6 +798,8 @@ v3d_submit_cl_ioctl(struct drm_device *dev, void *data,
 
 		if (!render->base.perfmon) {
 			ret = -ENOENT;
+			drm_gem_unlock_reservations(last_job->bo,
+				    last_job->bo_count, &acquire_ctx);
 			goto fail;
 		}
 	}
@@ -1027,6 +1029,8 @@ v3d_submit_csd_ioctl(struct drm_device *dev, void *data,
 						     args->perfmon_id);
 		if (!job->base.perfmon) {
 			ret = -ENOENT;
+			drm_gem_unlock_reservations(clean_job->bo, clean_job->bo_count,
+						    &acquire_ctx);
 			goto fail;
 		}
 	}
