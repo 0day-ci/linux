@@ -1,0 +1,16 @@
+What:		/sys/firmware/brcmstb/mon_version
+Date:		Jan 2022
+Contact:	Florian Fainelli <f.fainelli@gmail.com>
+Description:
+		Reports the ARM trusted firmware (monitor) version running on
+		the Broadcom STB platforms under the format:
+		A.B.C.D
+
+What:		/sys/firmware/brcmstb/cpu_retention
+Date:		Jan 2022
+Contact:	Florian Fainelli <f.fainelli@gmail.com>
+Description:
+		Allows the toggling of whether S2 standby should be entered
+		with (default) or without CPU retention.
+
+		Accepted values are 0 or 1.
