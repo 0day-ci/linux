@@ -440,7 +440,8 @@ static int sg_io(struct scsi_device *sdev, struct sg_io_hdr *hdr, fmode_t mode)
 
 	ret = -ENOMEM;
 	rq = scsi_alloc_request(sdev->request_queue, writing ?
-			     REQ_OP_DRV_OUT : REQ_OP_DRV_IN, 0);
+			     REQ_OP_DRV_OUT : REQ_OP_DRV_IN,
+			     BLK_MQ_REQ_USER_IO);
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 	req = scsi_req(rq);

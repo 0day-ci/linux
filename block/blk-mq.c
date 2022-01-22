@@ -336,6 +336,17 @@ void blk_rq_init(struct request_queue *q, struct request *rq)
 }
 EXPORT_SYMBOL(blk_rq_init);
 
+static inline bool blk_mq_io_may_account(struct blk_mq_alloc_data *data)
+{
+	if (!blk_op_is_passthrough(data->cmd_flags))
+		return true;
+
+	if (data->flags & BLK_MQ_REQ_USER_IO)
+		return true;
+
+	return false;
+}
+
 static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 		struct blk_mq_tags *tags, unsigned int tag, u64 alloc_time_ns)
 {
@@ -351,7 +362,7 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 
 	if (data->flags & BLK_MQ_REQ_PM)
 		data->rq_flags |= RQF_PM;
-	if (blk_queue_io_stat(q))
+	if (blk_queue_io_stat(q) && blk_mq_io_may_account(data))
 		data->rq_flags |= RQF_IO_STAT;
 	rq->rq_flags = data->rq_flags;
 

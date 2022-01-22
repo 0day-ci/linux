@@ -66,7 +66,7 @@ static int nvme_submit_user_cmd(struct request_queue *q,
 	void *meta = NULL;
 	int ret;
 
-	req = nvme_alloc_request(q, cmd, 0);
+	req = nvme_alloc_request(q, cmd, BLK_MQ_REQ_USER_IO);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 
