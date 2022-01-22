@@ -311,8 +311,6 @@ static int rvin_querycap(struct file *file, void *priv,
 
 	strscpy(cap->driver, KBUILD_MODNAME, sizeof(cap->driver));
 	strscpy(cap->card, "R_Car_VIN", sizeof(cap->card));
-	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
-		 dev_name(vin->dev));
 	return 0;
 }
 

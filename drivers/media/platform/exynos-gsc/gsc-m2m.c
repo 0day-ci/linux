@@ -290,8 +290,6 @@ static int gsc_m2m_querycap(struct file *file, void *fh,
 
 	strscpy(cap->driver, GSC_MODULE_NAME, sizeof(cap->driver));
 	strscpy(cap->card, GSC_MODULE_NAME " gscaler", sizeof(cap->card));
-	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
-		 dev_name(&gsc->pdev->dev));
 	return 0;
 }
 

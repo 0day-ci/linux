@@ -18,6 +18,7 @@
 
 #include <linux/videodev2.h>
 
+#include <media/media-device.h> /* for media_set_bus_info() */
 #include <media/v4l2-common.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-ctrls.h>
@@ -1066,6 +1067,8 @@ static int v4l_querycap(const struct v4l2_ioctl_ops *ops,
 		(vfd->device_caps | V4L2_CAP_DEVICE_CAPS));
 	cap->capabilities |= V4L2_CAP_EXT_PIX_FORMAT;
 	cap->device_caps |= V4L2_CAP_EXT_PIX_FORMAT;
+
+	media_set_bus_info(cap->bus_info, vfd->dev_parent);
 
 	return ret;
 }
