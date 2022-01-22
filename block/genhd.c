@@ -628,7 +628,6 @@ void del_gendisk(struct gendisk *disk)
 	/*
 	 * Allow using passthrough request again after the queue is torn down.
 	 */
-	blk_queue_flag_clear(QUEUE_FLAG_INIT_DONE, q);
 	__blk_mq_unfreeze_queue(q, true);
 
 }

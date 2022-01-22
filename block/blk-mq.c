@@ -215,11 +215,18 @@ void blk_mq_freeze_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_mq_freeze_queue);
 
+/*
+ * When 'force_atomic' is passed as true, this API is supposed to be
+ * called only in case that disk is removed or released.
+ */
 void __blk_mq_unfreeze_queue(struct request_queue *q, bool force_atomic)
 {
 	mutex_lock(&q->mq_freeze_lock);
-	if (force_atomic)
+	if (force_atomic) {
+		/* When new disk is added, switch to percpu mode */
+		blk_queue_flag_clear(QUEUE_FLAG_INIT_DONE, q);
 		q->q_usage_counter.data->force_atomic = true;
+	}
 	q->mq_freeze_depth--;
 	WARN_ON_ONCE(q->mq_freeze_depth < 0);
 	if (!q->mq_freeze_depth) {
@@ -228,6 +235,7 @@ void __blk_mq_unfreeze_queue(struct request_queue *q, bool force_atomic)
 	}
 	mutex_unlock(&q->mq_freeze_lock);
 }
+EXPORT_SYMBOL_GPL(__blk_mq_unfreeze_queue);
 
 void blk_mq_unfreeze_queue(struct request_queue *q)
 {
