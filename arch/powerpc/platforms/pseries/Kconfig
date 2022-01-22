@@ -152,6 +152,13 @@ config PSERIES_PKS
 	  this config to enable operating system interface to hypervisor to
 	  access this space.
 
+config PSERIES_PKS_SYSFS
+	depends on PSERIES_PKS
+	tristate "Support for sysfs interface the Platform Key Storage"
+	help
+	  Enable sysfs based user interace to add/delete/modify variables
+	  stored in Platform Keystore.
+
 config PAPR_SCM
 	depends on PPC_PSERIES && MEMORY_HOTPLUG && LIBNVDIMM
 	tristate "Support for the PAPR Storage Class Memory interface"

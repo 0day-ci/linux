@@ -1,0 +1,77 @@
+What:		/sys/firmware/pksvar
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	This directory is created if the POWER firmware supports
+		Platform Keystore (PKS). It exposes interface for reading/writing
+		variables which are persisted in PKS.
+
+What:		/sys/firmware/pksvar/config
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	This directory lists the configuration properties of Platform
+		Keystore.
+
+What:		/sys/firmware/pksvar/os
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	This directory lists all the variables owned by operating system
+		users and stored in Platform Keystore.
+
+What:		/sys/firmware/pksvar/config/version
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	A value indicating version of Firmware Platform Keystore.
+
+What:		/sys/firmware/pksvar/config/used_space
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	The value specifying amount of space used in Platform Keystore.
+
+What:		/sys/firmware/pksvar/config/total_size
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	The value specifying total size of Platform Keystore.
+
+What:		/sys/firmware/pksvar/config/supported_policies
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	The value specifying policies supported by Platform Keystore semantics.
+
+What:		/sys/firmware/pksvar/config/max_object_size
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:	The value specifies the maximum object size that can be supported.
+
+What:		/sys/firmware/pksvar/config/max_object_label_size
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:    The value specifies the maximum object label size that is supported.
+
+What:		/sys/firmware/pksvar/config/flags
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:    The value specifies the flags supported by Platform Keystore.
+
+What:		/sys/firmware/pksvar/os/<attribute_file>
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:    A read-write file indicating the variable stored in the Platform Keystore.
+		The size of the file represents the size of the actual data stored for
+		this variable in PKS.
+
+What:		/sys/firmware/pksvar/os/create_var
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:    A write only file used to create new variables. The user should write
+		formatted string containing name to this file. It creates at runtime
+		zero size read-write <variable-name>.tmp temporary attribute file. The
+		temporary variable name is not persisted to Platform Keystore until
+		data is updated to it.
+
+What:		/sys/firmware/pksvar/os/delete_var
+Date:		August 2022
+Contact:	Nayna Jain <nayna@linux.ibm.com>
+Description:    A write only file used to delete existing variable. The user should
+		write variable name to this file. If the variable is successfully
+		deleted from Platform Keystore, the corresponding attribute file is
+		also removed at runtime.
