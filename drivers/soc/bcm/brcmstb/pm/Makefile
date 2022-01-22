@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+obj-$(CONFIG_BRCMSTB_PM)	+= pm-psci.o
 ifndef CONFIG_ARM_PSCI_FW
 obj-$(CONFIG_ARM)		+= s2-arm.o pm-arm.o
 AFLAGS_s2-arm.o			:= -march=armv7-a
