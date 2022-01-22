@@ -355,7 +355,13 @@ int psci_cpu_suspend_enter(u32 state)
 
 	return ret;
 }
+#else
+int psci_cpu_suspend_enter(u32 state)
+{
+	return -EOPNOTSUPP;
+}
 #endif
+EXPORT_SYMBOL_GPL(psci_cpu_suspend_enter);
 
 static int psci_system_suspend(unsigned long unused)
 {
@@ -365,10 +371,11 @@ static int psci_system_suspend(unsigned long unused)
 			      pa_cpu_resume, 0, 0);
 }
 
-static int psci_system_suspend_enter(suspend_state_t state)
+int psci_system_suspend_enter(suspend_state_t state)
 {
 	return cpu_suspend(0, psci_system_suspend);
 }
+EXPORT_SYMBOL_GPL(psci_system_suspend_enter);
 
 static const struct platform_suspend_ops psci_suspend_ops = {
 	.valid          = suspend_valid_only_mem,
