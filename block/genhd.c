@@ -622,7 +622,6 @@ void del_gendisk(struct gendisk *disk)
 
 	blk_mq_freeze_queue_wait(q);
 
-	rq_qos_exit(q);
 	blk_sync_queue(q);
 	blk_flush_integrity();
 	/*
@@ -1125,6 +1124,7 @@ static void disk_release_queue(struct gendisk *disk)
 		 */
 		blk_mq_freeze_queue(q);
 		blk_exit_queue(q);
+		rq_qos_exit(q);
 		__blk_mq_unfreeze_queue(q, true);
 	}
 
