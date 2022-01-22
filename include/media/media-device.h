@@ -13,12 +13,13 @@
 
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/pci.h>
+#include <linux/platform_device.h>
 
 #include <media/media-devnode.h>
 #include <media/media-entity.h>
 
 struct ida;
-struct device;
 struct media_device;
 
 /**
@@ -181,8 +182,7 @@ struct media_device {
 	atomic_t request_id;
 };
 
-/* We don't need to include pci.h or usb.h here */
-struct pci_dev;
+/* We don't need to include usb.h here */
 struct usb_device;
 
 #ifdef CONFIG_MEDIA_CONTROLLER
@@ -495,5 +495,29 @@ static inline void __media_device_usb_init(struct media_device *mdev,
  */
 #define media_device_usb_init(mdev, udev, name) \
 	__media_device_usb_init(mdev, udev, name, KBUILD_MODNAME)
+
+static inline void
+__media_set_bus_info(char *bus_info, size_t bus_info_size, struct device *dev)
+{
+	if (!dev || *bus_info)
+		return;
+
+	if (dev_is_platform(dev))
+		snprintf(bus_info, bus_info_size, "platform:%s", dev_name(dev));
+	else if (dev_is_pci(dev))
+		snprintf(bus_info, bus_info_size, "PCI:%s", dev_name(dev));
+}
+
+/**
+ * media_set_bus_info() - Conditionally set bus_info
+ *
+ * @bus_info:	Variable where to write the bus info (char array)
+ * @dev:	Related struct device
+ *
+ * Sets bus information based on device conditionally, if the first character of
+ * &bus_info is not '\0' and dev is non-NULL.
+ */
+#define media_set_bus_info(bus_info, dev) \
+	__media_set_bus_info(bus_info, sizeof(bus_info), dev)
 
 #endif
