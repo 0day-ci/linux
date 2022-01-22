@@ -213,7 +213,7 @@ static void page_pool_set_pp_info(struct page_pool *pool,
 {
 	page->pp = pool;
 	page->pp_magic |= PP_SIGNATURE;
-	if (pool->p.init_callback)
+	if (pool->p && pool->p.init_callback)
 		pool->p.init_callback(page, pool->p.init_arg);
 }
 
