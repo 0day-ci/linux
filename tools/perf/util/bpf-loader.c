@@ -129,179 +129,18 @@ clear_prog_priv(struct bpf_program *prog __maybe_unused,
 }
 
 static int
-prog_config__exec(const char *value, struct perf_probe_event *pev)
-{
-	pev->uprobes = true;
-	pev->target = strdup(value);
-	if (!pev->target)
-		return -ENOMEM;
-	return 0;
-}
-
-static int
-prog_config__module(const char *value, struct perf_probe_event *pev)
-{
-	pev->uprobes = false;
-	pev->target = strdup(value);
-	if (!pev->target)
-		return -ENOMEM;
-	return 0;
-}
-
-static int
-prog_config__bool(const char *value, bool *pbool, bool invert)
+parse_prog_config(const char *config_str, bool *is_tp,
+		  struct perf_probe_event *pev)
 {
 	int err;
-	bool bool_value;
 
-	if (!pbool)
-		return -EINVAL;
-
-	err = strtobool(value, &bool_value);
-	if (err)
-		return err;
-
-	*pbool = invert ? !bool_value : bool_value;
-	return 0;
-}
-
-static int
-prog_config__inlines(const char *value,
-		     struct perf_probe_event *pev __maybe_unused)
-{
-	return prog_config__bool(value, &probe_conf.no_inlines, true);
-}
-
-static int
-prog_config__force(const char *value,
-		   struct perf_probe_event *pev __maybe_unused)
-{
-	return prog_config__bool(value, &probe_conf.force_add, false);
-}
-
-static struct {
-	const char *key;
-	const char *usage;
-	const char *desc;
-	int (*func)(const char *, struct perf_probe_event *);
-} bpf_prog_config_terms[] = {
-	{
-		.key	= "exec",
-		.usage	= "exec=<full path of file>",
-		.desc	= "Set uprobe target",
-		.func	= prog_config__exec,
-	},
-	{
-		.key	= "module",
-		.usage	= "module=<module name>    ",
-		.desc	= "Set kprobe module",
-		.func	= prog_config__module,
-	},
-	{
-		.key	= "inlines",
-		.usage	= "inlines=[yes|no]        ",
-		.desc	= "Probe at inline symbol",
-		.func	= prog_config__inlines,
-	},
-	{
-		.key	= "force",
-		.usage	= "force=[yes|no]          ",
-		.desc	= "Forcibly add events with existing name",
-		.func	= prog_config__force,
-	},
-};
-
-static int
-do_prog_config(const char *key, const char *value,
-	       struct perf_probe_event *pev)
-{
-	unsigned int i;
-
-	pr_debug("config bpf program: %s=%s\n", key, value);
-	for (i = 0; i < ARRAY_SIZE(bpf_prog_config_terms); i++)
-		if (strcmp(key, bpf_prog_config_terms[i].key) == 0)
-			return bpf_prog_config_terms[i].func(value, pev);
-
-	pr_debug("BPF: ERROR: invalid program config option: %s=%s\n",
-		 key, value);
-
-	pr_debug("\nHint: Valid options are:\n");
-	for (i = 0; i < ARRAY_SIZE(bpf_prog_config_terms); i++)
-		pr_debug("\t%s:\t%s\n", bpf_prog_config_terms[i].usage,
-			 bpf_prog_config_terms[i].desc);
-	pr_debug("\n");
-
-	return -BPF_LOADER_ERRNO__PROGCONF_TERM;
-}
-
-static const char *
-parse_prog_config_kvpair(const char *config_str, struct perf_probe_event *pev)
-{
-	char *text = strdup(config_str);
-	char *sep, *line;
-	const char *main_str = NULL;
-	int err = 0;
-
-	if (!text) {
-		pr_debug("Not enough memory: dup config_str failed\n");
-		return ERR_PTR(-ENOMEM);
-	}
-
-	line = text;
-	while ((sep = strchr(line, ';'))) {
-		char *equ;
-
-		*sep = '\0';
-		equ = strchr(line, '=');
-		if (!equ) {
-			pr_warning("WARNING: invalid config in BPF object: %s\n",
-				   line);
-			pr_warning("\tShould be 'key=value'.\n");
-			goto nextline;
-		}
-		*equ = '\0';
-
-		err = do_prog_config(line, equ + 1, pev);
-		if (err)
-			break;
-nextline:
-		line = sep + 1;
-	}
-
-	if (!err)
-		main_str = config_str + (line - text);
-	free(text);
-
-	return err ? ERR_PTR(err) : main_str;
-}
-
-static int
-parse_prog_config(const char *config_str, const char **p_main_str,
-		  bool *is_tp, struct perf_probe_event *pev)
-{
-	int err;
-	const char *main_str = parse_prog_config_kvpair(config_str, pev);
-
-	if (IS_ERR(main_str))
-		return PTR_ERR(main_str);
-
-	*p_main_str = main_str;
-	if (!strchr(main_str, '=')) {
-		/* Is a tracepoint event? */
-		const char *s = strchr(main_str, ':');
-
-		if (!s) {
-			pr_debug("bpf: '%s' is not a valid tracepoint\n",
-				 config_str);
-			return -BPF_LOADER_ERRNO__CONFIG;
-		}
-
+	if (strchr(config_str, ':')) {
 		*is_tp = true;
 		return 0;
 	}
 
 	*is_tp = false;
-	err = parse_perf_probe_command(main_str, pev);
+	err = parse_perf_probe_command(config_str, pev);
 	if (err < 0) {
 		pr_debug("bpf: '%s' is not a valid config string\n",
 			 config_str);
@@ -316,7 +155,7 @@ config_bpf_program(struct bpf_program *prog)
 {
 	struct perf_probe_event *pev = NULL;
 	struct bpf_prog_priv *priv = NULL;
-	const char *config_str, *main_str;
+	const char *config_str;
 	bool is_tp = false;
 	int err;
 
@@ -333,15 +172,15 @@ config_bpf_program(struct bpf_program *prog)
 
 	config_str = bpf_program__section_name(prog);
 	pr_debug("bpf: config program '%s'\n", config_str);
-	err = parse_prog_config(config_str, &main_str, &is_tp, pev);
+	err = parse_prog_config(config_str, &is_tp, pev);
 	if (err)
 		goto errout;
 
 	if (is_tp) {
-		char *s = strchr(main_str, ':');
+		char *s = strchr(config_str, ':');
 
 		priv->is_tp = true;
-		priv->sys_name = strndup(main_str, s - main_str);
+		priv->sys_name = strndup(config_str, s - config_str);
 		priv->evt_name = strdup(s + 1);
 		goto set_priv;
 	}
