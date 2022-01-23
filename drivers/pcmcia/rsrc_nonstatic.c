@@ -480,7 +480,7 @@ static u_long inv_probe(struct resource_map *m, struct pcmcia_socket *s)
 static int validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 {
 	struct resource_map *m, mm;
-	static unsigned char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
+	static const unsigned char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
 	unsigned long b, i, ok = 0;
 	struct socket_data *s_data = s->resource_data;
 
