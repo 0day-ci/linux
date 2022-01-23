@@ -2066,18 +2066,15 @@ static int invent_group_ids(struct mount *mnt, bool recurse)
 	return 0;
 }
 
-int count_mounts(struct mnt_namespace *ns, struct mount *mnt)
+int update_pending_mounts(struct mnt_namespace *ns, unsigned int mounts)
 {
 	unsigned int max = READ_ONCE(sysctl_mount_max);
-	unsigned int mounts = 0, old, pending, sum;
-	struct mount *p;
-
-	for (p = mnt; p; p = next_mnt(p, mnt))
-		mounts++;
+	unsigned int old, pending, sum;
 
 	old = ns->mounts;
 	pending = ns->pending_mounts;
 	sum = old + pending;
+
 	if ((old > sum) ||
 	    (pending > sum) ||
 	    (max < sum) ||
@@ -2086,6 +2083,17 @@ int count_mounts(struct mnt_namespace *ns, struct mount *mnt)
 
 	ns->pending_mounts = pending + mounts;
 	return 0;
+}
+
+unsigned int count_mounts(struct mount *mnt)
+{
+	unsigned int mounts = 0;
+	struct mount *p;
+
+	for (p = mnt; p; p = next_mnt(p, mnt))
+		mounts++;
+
+	return mounts;
 }
 
 /*
@@ -2162,6 +2170,7 @@ static int attach_recursive_mnt(struct mount *source_mnt,
 	struct mountpoint *smp;
 	struct mount *child, *p;
 	struct hlist_node *n;
+	unsigned int nr_mounts;
 	int err;
 
 	/* Preallocate a mountpoint in case the new mounts need
@@ -2171,9 +2180,10 @@ static int attach_recursive_mnt(struct mount *source_mnt,
 	if (IS_ERR(smp))
 		return PTR_ERR(smp);
 
+	nr_mounts = count_mounts(source_mnt);
 	/* Is there space to add these mounts to the mount namespace? */
 	if (!moving) {
-		err = count_mounts(ns, source_mnt);
+		err = update_pending_mounts(ns, nr_mounts);
 		if (err)
 			goto out;
 	}
@@ -2182,7 +2192,8 @@ static int attach_recursive_mnt(struct mount *source_mnt,
 		err = invent_group_ids(source_mnt, true);
 		if (err)
 			goto out;
-		err = propagate_mnt(dest_mnt, dest_mp, source_mnt, &tree_list);
+		err = propagate_mnt(dest_mnt, dest_mp, source_mnt, nr_mounts,
+				    &tree_list);
 		lock_mount_hash();
 		if (err)
 			goto out_cleanup_ids;

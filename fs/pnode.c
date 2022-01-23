@@ -222,7 +222,7 @@ static inline bool peers(struct mount *m1, struct mount *m2)
 	return m1->mnt_group_id == m2->mnt_group_id && m1->mnt_group_id;
 }
 
-static int propagate_one(struct mount *m)
+static int propagate_one(struct mount *m, unsigned int nr_mounts)
 {
 	struct mount *child;
 	int type;
@@ -269,7 +269,7 @@ static int propagate_one(struct mount *m)
 	last_dest = m;
 	last_source = child;
 	hlist_add_head(&child->mnt_hash, list);
-	return count_mounts(m->mnt_ns, child);
+	return update_pending_mounts(m->mnt_ns, nr_mounts);
 }
 
 /*
@@ -284,9 +284,11 @@ static int propagate_one(struct mount *m)
  * @dest_dentry: destination dentry.
  * @source_mnt: source mount.
  * @tree_list : list of heads of trees to be attached.
+ * @nr_mounts : the number of mounts in source_mnt
  */
 int propagate_mnt(struct mount *dest_mnt, struct mountpoint *dest_mp,
-		    struct mount *source_mnt, struct hlist_head *tree_list)
+		    struct mount *source_mnt, unsigned int nr_mounts,
+		    struct hlist_head *tree_list)
 {
 	struct mount *m, *n;
 	int ret = 0;
@@ -305,7 +307,7 @@ int propagate_mnt(struct mount *dest_mnt, struct mountpoint *dest_mp,
 
 	/* all peers of dest_mnt, except dest_mnt itself */
 	for (n = next_peer(dest_mnt); n != dest_mnt; n = next_peer(n)) {
-		ret = propagate_one(n);
+		ret = propagate_one(n, nr_mounts);
 		if (ret)
 			goto out;
 	}
@@ -316,7 +318,7 @@ int propagate_mnt(struct mount *dest_mnt, struct mountpoint *dest_mp,
 		/* everything in that slave group */
 		n = m;
 		do {
-			ret = propagate_one(n);
+			ret = propagate_one(n, nr_mounts);
 			if (ret)
 				goto out;
 			n = next_peer(n);

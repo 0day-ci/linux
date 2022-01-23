@@ -38,7 +38,7 @@ static inline void set_mnt_shared(struct mount *mnt)
 
 void change_mnt_propagation(struct mount *, int);
 int propagate_mnt(struct mount *, struct mountpoint *, struct mount *,
-		struct hlist_head *);
+		  unsigned int, struct hlist_head *);
 int propagate_umount(struct list_head *);
 int propagate_mount_busy(struct mount *, int);
 void propagate_mount_unlock(struct mount *);
@@ -52,5 +52,6 @@ void mnt_change_mountpoint(struct mount *parent, struct mountpoint *mp,
 struct mount *copy_tree(struct mount *, struct dentry *, int);
 bool is_path_reachable(struct mount *, struct dentry *,
 			 const struct path *root);
-int count_mounts(struct mnt_namespace *ns, struct mount *mnt);
+int update_pending_mounts(struct mnt_namespace *ns, unsigned int mounts);
+unsigned int count_mounts(struct mount *mnt);
 #endif /* _LINUX_PNODE_H */
