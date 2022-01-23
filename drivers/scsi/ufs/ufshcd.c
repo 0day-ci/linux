@@ -4204,6 +4204,18 @@ void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit)
 }
 EXPORT_SYMBOL_GPL(ufshcd_auto_hibern8_update);
 
+void ufshcd_auto_hibern8_disable(struct ufs_hba *hba)
+{
+	unsigned long flags;
+
+	if (!ufshcd_is_auto_hibern8_supported(hba))
+		return;
+
+	spin_lock_irqsave(hba->host->host_lock, flags);
+	ufshcd_writel(hba, 0, REG_AUTO_HIBERNATE_IDLE_TIMER);
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
+}
+
 void ufshcd_auto_hibern8_enable(struct ufs_hba *hba)
 {
 	unsigned long flags;
@@ -8925,6 +8937,7 @@ static int __ufshcd_wl_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	 * with the link off, so do not check for bkops.
 	 */
 	check_for_bkops = !ufshcd_is_ufs_dev_deepsleep(hba);
+	ufshcd_auto_hibern8_disable(hba);
 	ret = ufshcd_link_state_transition(hba, req_link_state, check_for_bkops);
 	if (ret)
 		goto set_dev_active;
