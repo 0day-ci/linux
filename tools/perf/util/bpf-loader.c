@@ -18,7 +18,6 @@
 #include "debug.h"
 #include "evlist.h"
 #include "bpf-loader.h"
-#include "bpf-prologue.h"
 #include "probe-event.h"
 #include "probe-finder.h" // for MAX_PROBES
 #include "parse-events.h"
@@ -43,10 +42,6 @@ struct bpf_prog_priv {
 	char *sys_name;
 	char *evt_name;
 	struct perf_probe_event pev;
-	bool need_prologue;
-	struct bpf_insn *insns_buf;
-	int nr_types;
-	int *type_mapping;
 };
 
 static bool libbpf_initialized;
@@ -128,8 +123,6 @@ clear_prog_priv(struct bpf_program *prog __maybe_unused,
 	struct bpf_prog_priv *priv = _priv;
 
 	cleanup_perf_probe_events(&priv->pev, 1);
-	zfree(&priv->insns_buf);
-	zfree(&priv->type_mapping);
 	zfree(&priv->sys_name);
 	zfree(&priv->evt_name);
 	free(priv);
@@ -412,220 +405,6 @@ static int bpf__prepare_probe(void)
 	return err;
 }
 
-static int
-preproc_gen_prologue(struct bpf_program *prog, int n,
-		     struct bpf_insn *orig_insns, int orig_insns_cnt,
-		     struct bpf_prog_prep_result *res)
-{
-	struct bpf_prog_priv *priv = bpf_program__priv(prog);
-	struct probe_trace_event *tev;
-	struct perf_probe_event *pev;
-	struct bpf_insn *buf;
-	size_t prologue_cnt = 0;
-	int i, err;
-
-	if (IS_ERR_OR_NULL(priv) || priv->is_tp)
-		goto errout;
-
-	pev = &priv->pev;
-
-	if (n < 0 || n >= priv->nr_types)
-		goto errout;
-
-	/* Find a tev belongs to that type */
-	for (i = 0; i < pev->ntevs; i++) {
-		if (priv->type_mapping[i] == n)
-			break;
-	}
-
-	if (i >= pev->ntevs) {
-		pr_debug("Internal error: prologue type %d not found\n", n);
-		return -BPF_LOADER_ERRNO__PROLOGUE;
-	}
-
-	tev = &pev->tevs[i];
-
-	buf = priv->insns_buf;
-	err = bpf__gen_prologue(tev->args, tev->nargs,
-				buf, &prologue_cnt,
-				BPF_MAXINSNS - orig_insns_cnt);
-	if (err) {
-		const char *title;
-
-		title = bpf_program__section_name(prog);
-		pr_debug("Failed to generate prologue for program %s\n",
-			 title);
-		return err;
-	}
-
-	memcpy(&buf[prologue_cnt], orig_insns,
-	       sizeof(struct bpf_insn) * orig_insns_cnt);
-
-	res->new_insn_ptr = buf;
-	res->new_insn_cnt = prologue_cnt + orig_insns_cnt;
-	res->pfd = NULL;
-	return 0;
-
-errout:
-	pr_debug("Internal error in preproc_gen_prologue\n");
-	return -BPF_LOADER_ERRNO__PROLOGUE;
-}
-
-/*
- * compare_tev_args is reflexive, transitive and antisymmetric.
- * I can proof it but this margin is too narrow to contain.
- */
-static int compare_tev_args(const void *ptev1, const void *ptev2)
-{
-	int i, ret;
-	const struct probe_trace_event *tev1 =
-		*(const struct probe_trace_event **)ptev1;
-	const struct probe_trace_event *tev2 =
-		*(const struct probe_trace_event **)ptev2;
-
-	ret = tev2->nargs - tev1->nargs;
-	if (ret)
-		return ret;
-
-	for (i = 0; i < tev1->nargs; i++) {
-		struct probe_trace_arg *arg1, *arg2;
-		struct probe_trace_arg_ref *ref1, *ref2;
-
-		arg1 = &tev1->args[i];
-		arg2 = &tev2->args[i];
-
-		ret = strcmp(arg1->value, arg2->value);
-		if (ret)
-			return ret;
-
-		ref1 = arg1->ref;
-		ref2 = arg2->ref;
-
-		while (ref1 && ref2) {
-			ret = ref2->offset - ref1->offset;
-			if (ret)
-				return ret;
-
-			ref1 = ref1->next;
-			ref2 = ref2->next;
-		}
-
-		if (ref1 || ref2)
-			return ref2 ? 1 : -1;
-	}
-
-	return 0;
-}
-
-/*
- * Assign a type number to each tevs in a pev.
- * mapping is an array with same slots as tevs in that pev.
- * nr_types will be set to number of types.
- */
-static int map_prologue(struct perf_probe_event *pev, int *mapping,
-			int *nr_types)
-{
-	int i, type = 0;
-	struct probe_trace_event **ptevs;
-
-	size_t array_sz = sizeof(*ptevs) * pev->ntevs;
-
-	ptevs = malloc(array_sz);
-	if (!ptevs) {
-		pr_debug("Not enough memory: alloc ptevs failed\n");
-		return -ENOMEM;
-	}
-
-	pr_debug("In map_prologue, ntevs=%d\n", pev->ntevs);
-	for (i = 0; i < pev->ntevs; i++)
-		ptevs[i] = &pev->tevs[i];
-
-	qsort(ptevs, pev->ntevs, sizeof(*ptevs),
-	      compare_tev_args);
-
-	for (i = 0; i < pev->ntevs; i++) {
-		int n;
-
-		n = ptevs[i] - pev->tevs;
-		if (i == 0) {
-			mapping[n] = type;
-			pr_debug("mapping[%d]=%d\n", n, type);
-			continue;
-		}
-
-		if (compare_tev_args(ptevs + i, ptevs + i - 1) == 0)
-			mapping[n] = type;
-		else
-			mapping[n] = ++type;
-
-		pr_debug("mapping[%d]=%d\n", n, mapping[n]);
-	}
-	free(ptevs);
-	*nr_types = type + 1;
-
-	return 0;
-}
-
-static int hook_load_preprocessor(struct bpf_program *prog)
-{
-	struct bpf_prog_priv *priv = bpf_program__priv(prog);
-	struct perf_probe_event *pev;
-	bool need_prologue = false;
-	int err, i;
-
-	if (IS_ERR_OR_NULL(priv)) {
-		pr_debug("Internal error when hook preprocessor\n");
-		return -BPF_LOADER_ERRNO__INTERNAL;
-	}
-
-	if (priv->is_tp) {
-		priv->need_prologue = false;
-		return 0;
-	}
-
-	pev = &priv->pev;
-	for (i = 0; i < pev->ntevs; i++) {
-		struct probe_trace_event *tev = &pev->tevs[i];
-
-		if (tev->nargs > 0) {
-			need_prologue = true;
-			break;
-		}
-	}
-
-	/*
-	 * Since all tevs don't have argument, we don't need generate
-	 * prologue.
-	 */
-	if (!need_prologue) {
-		priv->need_prologue = false;
-		return 0;
-	}
-
-	priv->need_prologue = true;
-	priv->insns_buf = malloc(sizeof(struct bpf_insn) * BPF_MAXINSNS);
-	if (!priv->insns_buf) {
-		pr_debug("Not enough memory: alloc insns_buf failed\n");
-		return -ENOMEM;
-	}
-
-	priv->type_mapping = malloc(sizeof(int) * pev->ntevs);
-	if (!priv->type_mapping) {
-		pr_debug("Not enough memory: alloc type_mapping failed\n");
-		return -ENOMEM;
-	}
-	memset(priv->type_mapping, -1,
-	       sizeof(int) * pev->ntevs);
-
-	err = map_prologue(pev, priv->type_mapping, &priv->nr_types);
-	if (err)
-		return err;
-
-	err = bpf_program__set_prep(prog, priv->nr_types,
-				    preproc_gen_prologue);
-	return err;
-}
-
 int bpf__probe(struct bpf_object *obj)
 {
 	int err = 0;
@@ -672,18 +451,6 @@ int bpf__probe(struct bpf_object *obj)
 			pr_debug("bpf_probe: failed to apply perf probe events\n");
 			goto out;
 		}
-
-		/*
-		 * After probing, let's consider prologue, which
-		 * adds program fetcher to BPF programs.
-		 *
-		 * hook_load_preprocessor() hooks pre-processor
-		 * to bpf_program, let it generate prologue
-		 * dynamically during loading.
-		 */
-		err = hook_load_preprocessor(prog);
-		if (err)
-			goto out;
 	}
 out:
 	return err < 0 ? err : 0;
@@ -776,14 +543,7 @@ int bpf__foreach_event(struct bpf_object *obj,
 		for (i = 0; i < pev->ntevs; i++) {
 			tev = &pev->tevs[i];
 
-			if (priv->need_prologue) {
-				int type = priv->type_mapping[i];
-
-				fd = bpf_program__nth_fd(prog, type);
-			} else {
-				fd = bpf_program__fd(prog);
-			}
-
+			fd = bpf_program__fd(prog);
 			if (fd < 0) {
 				pr_debug("bpf: failed to get file descriptor\n");
 				return fd;
