@@ -1047,23 +1047,40 @@ static struct extent_map *defrag_lookup_extent(struct inode *inode, u64 start,
 	return em;
 }
 
+/*
+ * Return if current extent @em is a good candidate for defrag.
+ *
+ * This is done by checking against the next extent after @em.
+ */
 static bool defrag_check_next_extent(struct inode *inode, struct extent_map *em,
 				     bool locked)
 {
 	struct extent_map *next;
-	bool ret = true;
+	bool ret = false;
 
 	/* this is the last extent */
 	if (em->start + em->len >= i_size_read(inode))
-		return false;
+		return ret;
 
 	next = defrag_lookup_extent(inode, em->start + em->len, locked);
+	/* No next extent or a hole, no way to merge */
 	if (!next || next->block_start >= EXTENT_MAP_LAST_BYTE)
-		ret = false;
-	else if ((em->block_start + em->block_len == next->block_start) &&
-		 (em->block_len > SZ_128K && next->block_len > SZ_128K))
-		ret = false;
+		goto out;
 
+	/* Next extent is preallocated, no sense to defrag current extent */
+	if (test_bit(EXTENT_FLAG_PREALLOC, &next->flags))
+		goto out;
+
+	/*
+	 * Next extent are not only mergable but also adjacent in their
+	 * logical address, normally an excellent candicate, but if they
+	 * are already large enough, then no need to defrag current extent.
+	 */
+	if ((em->block_start + em->block_len == next->block_start) &&
+	    (em->block_len > SZ_128K && next->block_len > SZ_128K))
+		goto out;
+	ret = true;
+out:
 	free_extent_map(next);
 	return ret;
 }
