@@ -57,7 +57,6 @@ struct emac_variant {
 };
 
 /* struct sunxi_priv_data - hold all sunxi private data
- * @tx_clk:	reference to MAC TX clock
  * @ephy_clk:	reference to the optional EPHY clock for the internal PHY
  * @regulator:	reference to the optional regulator
  * @rst_ephy:	reference to the optional EPHY reset for the internal PHY
@@ -68,7 +67,6 @@ struct emac_variant {
  * @mux_handle:	Internal pointer used by mdio-mux lib
  */
 struct sunxi_priv_data {
-	struct clk *tx_clk;
 	struct clk *ephy_clk;
 	struct regulator *regulator;
 	struct reset_control *rst_ephy;
@@ -579,22 +577,14 @@ static int sun8i_dwmac_init(struct platform_device *pdev, void *priv)
 		}
 	}
 
-	ret = clk_prepare_enable(gmac->tx_clk);
-	if (ret) {
-		dev_err(&pdev->dev, "Could not enable AHB clock\n");
-		goto err_disable_regulator;
-	}
-
 	if (gmac->use_internal_phy) {
 		ret = sun8i_dwmac_power_internal_phy(netdev_priv(ndev));
 		if (ret)
-			goto err_disable_clk;
+			goto err_disable_regulator;
 	}
 
 	return 0;
 
-err_disable_clk:
-	clk_disable_unprepare(gmac->tx_clk);
 err_disable_regulator:
 	if (gmac->regulator)
 		regulator_disable(gmac->regulator);
@@ -1043,8 +1033,6 @@ static void sun8i_dwmac_exit(struct platform_device *pdev, void *priv)
 	if (gmac->variant->soc_has_internal_phy)
 		sun8i_dwmac_unpower_internal_phy(gmac);
 
-	clk_disable_unprepare(gmac->tx_clk);
-
 	if (gmac->regulator)
 		regulator_disable(gmac->regulator);
 }
@@ -1165,12 +1153,6 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
 	if (!gmac->variant) {
 		dev_err(&pdev->dev, "Missing dwmac-sun8i variant\n");
 		return -EINVAL;
-	}
-
-	gmac->tx_clk = devm_clk_get(dev, "stmmaceth");
-	if (IS_ERR(gmac->tx_clk)) {
-		dev_err(dev, "Could not get TX clock\n");
-		return PTR_ERR(gmac->tx_clk);
 	}
 
 	/* Optional regulator for PHY */
