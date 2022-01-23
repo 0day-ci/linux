@@ -195,7 +195,7 @@ static unsigned int random_page_size_pages(unsigned long n,
 					   struct rnd_state *rnd)
 {
 	/* 4K, 64K, 2M */
-	static unsigned int page_count[] = {
+	static const unsigned int page_count[] = {
 		BIT(12) >> PAGE_SHIFT,
 		BIT(16) >> PAGE_SHIFT,
 		BIT(21) >> PAGE_SHIFT,
