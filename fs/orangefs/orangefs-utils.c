@@ -538,13 +538,13 @@ __s32 ORANGEFS_util_translate_mode(int mode)
 {
 	int ret = 0;
 	int i = 0;
-	static int modes[NUM_MODES] = {
+	static const int modes[NUM_MODES] = {
 		S_IXOTH, S_IWOTH, S_IROTH,
 		S_IXGRP, S_IWGRP, S_IRGRP,
 		S_IXUSR, S_IWUSR, S_IRUSR,
 		S_ISGID, S_ISUID
 	};
-	static int orangefs_modes[NUM_MODES] = {
+	static const int orangefs_modes[NUM_MODES] = {
 		ORANGEFS_O_EXECUTE, ORANGEFS_O_WRITE, ORANGEFS_O_READ,
 		ORANGEFS_G_EXECUTE, ORANGEFS_G_WRITE, ORANGEFS_G_READ,
 		ORANGEFS_U_EXECUTE, ORANGEFS_U_WRITE, ORANGEFS_U_READ,
