@@ -313,7 +313,7 @@ static u32 vlv_sprite_ctl_crtc(const struct intel_crtc_state *crtc_state)
 	u32 sprctl = 0;
 
 	if (crtc_state->gamma_enable)
-		sprctl |= SP_GAMMA_ENABLE;
+		sprctl |= SP_PIPE_GAMMA_ENABLE;
 
 	return sprctl;
 }
@@ -436,9 +436,9 @@ vlv_sprite_update_noarm(struct intel_plane *plane,
 	intel_de_write_fw(dev_priv, SPSTRIDE(pipe, plane_id),
 			  plane_state->view.color_plane[0].mapping_stride);
 	intel_de_write_fw(dev_priv, SPPOS(pipe, plane_id),
-			  (crtc_y << 16) | crtc_x);
+			  SP_POS_Y(crtc_y) | SP_POS_X(crtc_x));
 	intel_de_write_fw(dev_priv, SPSIZE(pipe, plane_id),
-			  ((crtc_h - 1) << 16) | (crtc_w - 1));
+			  SP_HEIGHT(crtc_h - 1) | SP_WIDTH(crtc_w - 1));
 
 	spin_unlock_irqrestore(&dev_priv->uncore.lock, irqflags);
 }
@@ -479,7 +479,8 @@ vlv_sprite_update_arm(struct intel_plane *plane,
 	intel_de_write_fw(dev_priv, SPCONSTALPHA(pipe, plane_id), 0);
 
 	intel_de_write_fw(dev_priv, SPLINOFF(pipe, plane_id), linear_offset);
-	intel_de_write_fw(dev_priv, SPTILEOFF(pipe, plane_id), (y << 16) | x);
+	intel_de_write_fw(dev_priv, SPTILEOFF(pipe, plane_id),
+			  SP_OFFSET_Y(y) | SP_OFFSET_X(x));
 
 	/*
 	 * The control register self-arms if the plane was previously
@@ -700,7 +701,7 @@ static u32 ivb_sprite_ctl_crtc(const struct intel_crtc_state *crtc_state)
 	u32 sprctl = 0;
 
 	if (crtc_state->gamma_enable)
-		sprctl |= SPRITE_GAMMA_ENABLE;
+		sprctl |= SPRITE_PIPE_GAMMA_ENABLE;
 
 	if (crtc_state->csc_enable)
 		sprctl |= SPRITE_PIPE_CSC_ENABLE;
@@ -770,7 +771,7 @@ static u32 ivb_sprite_ctl(const struct intel_crtc_state *crtc_state,
 	}
 
 	if (!ivb_need_sprite_gamma(plane_state))
-		sprctl |= SPRITE_INT_GAMMA_DISABLE;
+		sprctl |= SPRITE_PLANE_GAMMA_DISABLE;
 
 	if (plane_state->hw.color_encoding == DRM_COLOR_YCBCR_BT709)
 		sprctl |= SPRITE_YUV_TO_RGB_CSC_FORMAT_BT709;
@@ -863,14 +864,18 @@ ivb_sprite_update_noarm(struct intel_plane *plane,
 	unsigned long irqflags;
 
 	if (crtc_w != src_w || crtc_h != src_h)
-		sprscale = SPRITE_SCALE_ENABLE | ((src_w - 1) << 16) | (src_h - 1);
+		sprscale = SPRITE_SCALE_ENABLE |
+			SPRITE_SRC_WIDTH(src_w - 1) |
+			SPRITE_SRC_HEIGHT(src_h - 1);
 
 	spin_lock_irqsave(&dev_priv->uncore.lock, irqflags);
 
 	intel_de_write_fw(dev_priv, SPRSTRIDE(pipe),
 			  plane_state->view.color_plane[0].mapping_stride);
-	intel_de_write_fw(dev_priv, SPRPOS(pipe), (crtc_y << 16) | crtc_x);
-	intel_de_write_fw(dev_priv, SPRSIZE(pipe), ((crtc_h - 1) << 16) | (crtc_w - 1));
+	intel_de_write_fw(dev_priv, SPRPOS(pipe),
+			  SPRITE_POS_Y(crtc_y) | SPRITE_POS_X(crtc_x));
+	intel_de_write_fw(dev_priv, SPRSIZE(pipe),
+			  SPRITE_HEIGHT(crtc_h - 1) | SPRITE_WIDTH(crtc_w - 1));
 	if (IS_IVYBRIDGE(dev_priv))
 		intel_de_write_fw(dev_priv, SPRSCALE(pipe), sprscale);
 
@@ -907,10 +912,12 @@ ivb_sprite_update_arm(struct intel_plane *plane,
 	/* HSW consolidates SPRTILEOFF and SPRLINOFF into a single SPROFFSET
 	 * register */
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
-		intel_de_write_fw(dev_priv, SPROFFSET(pipe), (y << 16) | x);
+		intel_de_write_fw(dev_priv, SPROFFSET(pipe),
+				  SPRITE_OFFSET_Y(y) | SPRITE_OFFSET_X(x));
 	} else {
 		intel_de_write_fw(dev_priv, SPRLINOFF(pipe), linear_offset);
-		intel_de_write_fw(dev_priv, SPRTILEOFF(pipe), (y << 16) | x);
+		intel_de_write_fw(dev_priv, SPRTILEOFF(pipe),
+				  SPRITE_OFFSET_Y(y) | SPRITE_OFFSET_X(x));
 	}
 
 	/*
@@ -1047,7 +1054,7 @@ static u32 g4x_sprite_ctl_crtc(const struct intel_crtc_state *crtc_state)
 	u32 dvscntr = 0;
 
 	if (crtc_state->gamma_enable)
-		dvscntr |= DVS_GAMMA_ENABLE;
+		dvscntr |= DVS_PIPE_GAMMA_ENABLE;
 
 	if (crtc_state->csc_enable)
 		dvscntr |= DVS_PIPE_CSC_ENABLE;
@@ -1199,14 +1206,18 @@ g4x_sprite_update_noarm(struct intel_plane *plane,
 	unsigned long irqflags;
 
 	if (crtc_w != src_w || crtc_h != src_h)
-		dvsscale = DVS_SCALE_ENABLE | ((src_w - 1) << 16) | (src_h - 1);
+		dvsscale = DVS_SCALE_ENABLE |
+			DVS_SRC_WIDTH(src_w - 1) |
+			DVS_SRC_HEIGHT(src_h - 1);
 
 	spin_lock_irqsave(&dev_priv->uncore.lock, irqflags);
 
 	intel_de_write_fw(dev_priv, DVSSTRIDE(pipe),
 			  plane_state->view.color_plane[0].mapping_stride);
-	intel_de_write_fw(dev_priv, DVSPOS(pipe), (crtc_y << 16) | crtc_x);
-	intel_de_write_fw(dev_priv, DVSSIZE(pipe), ((crtc_h - 1) << 16) | (crtc_w - 1));
+	intel_de_write_fw(dev_priv, DVSPOS(pipe),
+			  DVS_POS_Y(crtc_y) | DVS_POS_X(crtc_x));
+	intel_de_write_fw(dev_priv, DVSSIZE(pipe),
+			  DVS_HEIGHT(crtc_h - 1) | DVS_WIDTH(crtc_w - 1));
 	intel_de_write_fw(dev_priv, DVSSCALE(pipe), dvsscale);
 
 	spin_unlock_irqrestore(&dev_priv->uncore.lock, irqflags);
