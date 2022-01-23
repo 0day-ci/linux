@@ -75,12 +75,6 @@ static const struct qca8k_mib_desc ar8327_mib[] = {
 	MIB_DESC(1, 0xac, "TXUnicast"),
 };
 
-/* The 32bit switch registers are accessed indirectly. To achieve this we need
- * to set the page of the register. Track the last page that was set to reduce
- * mdio writes
- */
-static u16 qca8k_current_page = 0xffff;
-
 static void
 qca8k_split_addr(u32 regaddr, u16 *r1, u16 *r2, u16 *page)
 {
@@ -134,11 +128,11 @@ qca8k_mii_write32(struct mii_bus *bus, int phy_id, u32 regnum, u32 val)
 }
 
 static int
-qca8k_set_page(struct mii_bus *bus, u16 page)
+qca8k_set_page(struct mii_bus *bus, u16 page, u16 *cached_page)
 {
 	int ret;
 
-	if (page == qca8k_current_page)
+	if (page == *cached_page)
 		return 0;
 
 	ret = bus->write(bus, 0x18, 0, page);
@@ -148,7 +142,7 @@ qca8k_set_page(struct mii_bus *bus, u16 page)
 		return ret;
 	}
 
-	qca8k_current_page = page;
+	*cached_page = page;
 	usleep_range(1000, 2000);
 	return 0;
 }
@@ -343,6 +337,7 @@ static int
 qca8k_regmap_read(void *ctx, uint32_t reg, uint32_t *val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	struct qca8k_mdio_cache *mdio_cache;
 	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	int ret;
@@ -350,11 +345,13 @@ qca8k_regmap_read(void *ctx, uint32_t reg, uint32_t *val)
 	if (priv->mgmt_master && !qca8k_read_eth(priv, reg, val))
 		return 0;
 
+	mdio_cache = &priv->mdio_cache;
+
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
 	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
 
-	ret = qca8k_set_page(bus, page);
+	ret = qca8k_set_page(bus, page, &mdio_cache->page);
 	if (ret < 0)
 		goto exit;
 
@@ -369,6 +366,7 @@ static int
 qca8k_regmap_write(void *ctx, uint32_t reg, uint32_t val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	struct qca8k_mdio_cache *mdio_cache;
 	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	int ret;
@@ -376,11 +374,13 @@ qca8k_regmap_write(void *ctx, uint32_t reg, uint32_t val)
 	if (priv->mgmt_master && !qca8k_write_eth(priv, reg, val))
 		return 0;
 
+	mdio_cache = &priv->mdio_cache;
+
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
 	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
 
-	ret = qca8k_set_page(bus, page);
+	ret = qca8k_set_page(bus, page, &mdio_cache->page);
 	if (ret < 0)
 		goto exit;
 
@@ -395,6 +395,7 @@ static int
 qca8k_regmap_update_bits(void *ctx, uint32_t reg, uint32_t mask, uint32_t write_val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	struct qca8k_mdio_cache *mdio_cache;
 	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	u32 val;
@@ -404,11 +405,13 @@ qca8k_regmap_update_bits(void *ctx, uint32_t reg, uint32_t mask, uint32_t write_
 	    !qca8k_regmap_update_bits_eth(priv, reg, mask, write_val))
 		return 0;
 
+	mdio_cache = &priv->mdio_cache;
+
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
 	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
 
-	ret = qca8k_set_page(bus, page);
+	ret = qca8k_set_page(bus, page, &mdio_cache->page);
 	if (ret < 0)
 		goto exit;
 
@@ -1046,7 +1049,8 @@ qca8k_mdio_busy_wait(struct mii_bus *bus, u32 reg, u32 mask)
 }
 
 static int
-qca8k_mdio_write(struct mii_bus *bus, int phy, int regnum, u16 data)
+qca8k_mdio_write(struct mii_bus *bus, struct qca8k_mdio_cache *cache,
+		 int phy, int regnum, u16 data)
 {
 	u16 r1, r2, page;
 	u32 val;
@@ -1064,7 +1068,7 @@ qca8k_mdio_write(struct mii_bus *bus, int phy, int regnum, u16 data)
 
 	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
 
-	ret = qca8k_set_page(bus, page);
+	ret = qca8k_set_page(bus, page, &cache->page);
 	if (ret)
 		goto exit;
 
@@ -1083,7 +1087,8 @@ exit:
 }
 
 static int
-qca8k_mdio_read(struct mii_bus *bus, int phy, int regnum)
+qca8k_mdio_read(struct mii_bus *bus, struct qca8k_mdio_cache *cache,
+		int phy, int regnum)
 {
 	u16 r1, r2, page;
 	u32 val;
@@ -1100,7 +1105,7 @@ qca8k_mdio_read(struct mii_bus *bus, int phy, int regnum)
 
 	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
 
-	ret = qca8k_set_page(bus, page);
+	ret = qca8k_set_page(bus, page, &cache->page);
 	if (ret)
 		goto exit;
 
@@ -1139,7 +1144,7 @@ qca8k_internal_mdio_write(struct mii_bus *slave_bus, int phy, int regnum, u16 da
 			return 0;
 	}
 
-	return qca8k_mdio_write(bus, phy, regnum, data);
+	return qca8k_mdio_write(bus, &priv->mdio_cache, phy, regnum, data);
 }
 
 static int
@@ -1156,7 +1161,7 @@ qca8k_internal_mdio_read(struct mii_bus *slave_bus, int phy, int regnum)
 			return ret;
 	}
 
-	return qca8k_mdio_read(bus, phy, regnum);
+	return qca8k_mdio_read(bus, &priv->mdio_cache, phy, regnum);
 }
 
 static int
@@ -1179,7 +1184,7 @@ qca8k_phy_write(struct dsa_switch *ds, int port, int regnum, u16 data)
 			return ret;
 	}
 
-	return qca8k_mdio_write(priv->bus, port, regnum, data);
+	return qca8k_mdio_write(priv->bus, &priv->mdio_cache, port, regnum, data);
 }
 
 static int
@@ -1202,7 +1207,7 @@ qca8k_phy_read(struct dsa_switch *ds, int port, int regnum)
 			return ret;
 	}
 
-	ret = qca8k_mdio_read(priv->bus, port, regnum);
+	ret = qca8k_mdio_read(priv->bus, &priv->mdio_cache, port, regnum);
 
 	if (ret < 0)
 		return 0xffff;
@@ -3000,6 +3005,8 @@ qca8k_sw_probe(struct mdio_device *mdiodev)
 		dev_err(priv->dev, "regmap initialization failed");
 		return PTR_ERR(priv->regmap);
 	}
+
+	priv->mdio_cache.page = 0xffff;
 
 	/* Check the detected switch id */
 	ret = qca8k_read_switch_id(priv);
