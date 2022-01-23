@@ -33,10 +33,6 @@ static struct {
 		.source = test_llvm__bpf_test_kbuild_prog,
 		.desc = "kbuild searching",
 	},
-	[LLVM_TESTCASE_BPF_PROLOGUE] = {
-		.source = test_llvm__bpf_test_prologue_prog,
-		.desc = "Compile source for BPF prologue generation",
-	},
 	[LLVM_TESTCASE_BPF_RELOCATION] = {
 		.source = test_llvm__bpf_test_relocation,
 		.desc = "Compile source for BPF relocation",
@@ -172,17 +168,6 @@ static int test__llvm__bpf_test_kbuild_prog(struct test_suite *test __maybe_unus
 #endif
 }
 
-static int test__llvm__bpf_test_prologue_prog(struct test_suite *test __maybe_unused,
-					      int subtest __maybe_unused)
-{
-#ifdef HAVE_LIBBPF_SUPPORT
-	return test__llvm(LLVM_TESTCASE_BPF_PROLOGUE);
-#else
-	pr_debug("Skip LLVM test because BPF support is not compiled\n");
-	return TEST_SKIP;
-#endif
-}
-
 static int test__llvm__bpf_test_relocation(struct test_suite *test __maybe_unused,
 					   int subtest __maybe_unused)
 {
@@ -199,14 +184,10 @@ static struct test_case llvm_tests[] = {
 #ifdef HAVE_LIBBPF_SUPPORT
 	TEST_CASE("Basic BPF llvm compile", llvm__bpf_base_prog),
 	TEST_CASE("kbuild searching", llvm__bpf_test_kbuild_prog),
-	TEST_CASE("Compile source for BPF prologue generation",
-		  llvm__bpf_test_prologue_prog),
 	TEST_CASE("Compile source for BPF relocation", llvm__bpf_test_relocation),
 #else
 	TEST_CASE_REASON("Basic BPF llvm compile", llvm__bpf_base_prog, "not compiled in"),
 	TEST_CASE_REASON("kbuild searching", llvm__bpf_test_kbuild_prog, "not compiled in"),
-	TEST_CASE_REASON("Compile source for BPF prologue generation",
-			llvm__bpf_test_prologue_prog, "not compiled in"),
 	TEST_CASE_REASON("Compile source for BPF relocation",
 			llvm__bpf_test_relocation, "not compiled in"),
 #endif

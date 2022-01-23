@@ -37,29 +37,6 @@ static int epoll_pwait_loop(void)
 	return 0;
 }
 
-#ifdef HAVE_BPF_PROLOGUE
-
-static int llseek_loop(void)
-{
-	int fds[2], i;
-
-	fds[0] = open("/dev/null", O_RDONLY);
-	fds[1] = open("/dev/null", O_RDWR);
-
-	if (fds[0] < 0 || fds[1] < 0)
-		return -1;
-
-	for (i = 0; i < NR_ITERS; i++) {
-		lseek(fds[i % 2], i, (i / 2) % 2 ? SEEK_CUR : SEEK_SET);
-		lseek(fds[(i + 1) % 2], i, (i / 2) % 2 ? SEEK_CUR : SEEK_SET);
-	}
-	close(fds[0]);
-	close(fds[1]);
-	return 0;
-}
-
-#endif
-
 static struct {
 	enum test_llvm__testcase prog_id;
 	const char *name;
@@ -86,16 +63,6 @@ static struct {
 		.expect_result	  = (NR_ITERS + 1) / 2,
 		.pin		  = true,
 	},
-#ifdef HAVE_BPF_PROLOGUE
-	{
-		.prog_id	  = LLVM_TESTCASE_BPF_PROLOGUE,
-		.name		  = "[bpf_prologue_test]",
-		.msg_compile_fail = "fix kbuild first",
-		.msg_load_fail	  = "check your vmlinux setting?",
-		.target_func	  = &llseek_loop,
-		.expect_result	  = (NR_ITERS + 1) / 4,
-	},
-#endif
 };
 
 static int do_test(struct bpf_object *obj, int (*func)(void),
@@ -355,31 +322,13 @@ static int test__bpf_pinning(struct test_suite *test __maybe_unused,
 #endif
 }
 
-static int test__bpf_prologue_test(struct test_suite *test __maybe_unused,
-				   int subtest __maybe_unused)
-{
-#if defined(HAVE_LIBBPF_SUPPORT) && defined(HAVE_BPF_PROLOGUE)
-	return test__bpf(2);
-#else
-	pr_debug("Skip BPF test because BPF support is not compiled\n");
-	return TEST_SKIP;
-#endif
-}
-
-
 static struct test_case bpf_tests[] = {
 #ifdef HAVE_LIBBPF_SUPPORT
 	TEST_CASE("Basic BPF filtering", basic_bpf_test),
 	TEST_CASE("BPF pinning", bpf_pinning),
-#ifdef HAVE_BPF_PROLOGUE
-	TEST_CASE("BPF prologue generation", bpf_prologue_test),
-#else
-	TEST_CASE_REASON("BPF prologue generation", bpf_prologue_test, "not compiled in"),
-#endif
 #else
 	TEST_CASE_REASON("Basic BPF filtering", basic_bpf_test, "not compiled in"),
 	TEST_CASE_REASON("BPF pinning", bpf_pinning, "not compiled in"),
-	TEST_CASE_REASON("BPF prologue generation", bpf_prologue_test, "not compiled in"),
 #endif
 	{ .name = NULL, }
 };
