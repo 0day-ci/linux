@@ -419,6 +419,11 @@ void tcp_data_ready(struct sock *sk);
 #ifdef CONFIG_MMU
 int tcp_mmap(struct file *file, struct socket *sock,
 	     struct vm_area_struct *vma);
+int zc_receive_check(struct tcp_zerocopy_receive *zc, int *lenp,
+		     char __user *optval, int __user *optlen);
+int zc_receive_update(struct sock *sk, struct tcp_zerocopy_receive *zc, int len,
+		      char __user *optval, struct scm_timestamping_internal *tss,
+		      int err);
 #endif
 void tcp_parse_options(const struct net *net, const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx,
