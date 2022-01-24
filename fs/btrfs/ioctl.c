@@ -1437,6 +1437,17 @@ static int defrag_one_cluster(struct btrfs_inode *inode,
 	if (ret < 0)
 		goto out;
 
+	if (list_empty(&target_list))
+		goto out;
+	entry = list_entry(target_list.next, struct defrag_target_range, list);
+
+	/*
+	 * To emulate the old kernel behavior, if the cluster has any hole or
+	 * other things to prevent defrag, then abort the whole cluster.
+	 */
+	if (entry->len != len)
+		goto out;
+
 	list_for_each_entry(entry, &target_list, list) {
 		u32 range_len = entry->len;
 
