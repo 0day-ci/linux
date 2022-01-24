@@ -2739,10 +2739,8 @@ static struct rtrs_clt_sess *alloc_clt(const char *sessname, size_t paths_num,
 	 */
 	dev_set_uevent_suppress(&clt->dev, true);
 	err = device_register(&clt->dev);
-	if (err) {
-		put_device(&clt->dev);
-		goto err;
-	}
+	if (err)
+		goto err_register;
 
 	clt->kobj_paths = kobject_create_and_add("paths", &clt->dev.kobj);
 	if (!clt->kobj_paths) {
@@ -2764,6 +2762,11 @@ err_dev:
 err:
 	free_percpu(clt->pcpu_path);
 	kfree(clt);
+	goto ret;
+err_register:
+	free_percpu(clt->pcpu_path);
+	put_device(&clt->dev);
+ret:
 	return ERR_PTR(err);
 }
 
