@@ -384,7 +384,7 @@ static void kvm_vfio_destroy(struct kvm_device *dev)
 
 static int kvm_vfio_create(struct kvm_device *dev, u32 type);
 
-static struct kvm_device_ops kvm_vfio_ops = {
+static const struct kvm_device_ops kvm_vfio_ops = {
 	.name = "kvm-vfio",
 	.create = kvm_vfio_create,
 	.destroy = kvm_vfio_destroy,
