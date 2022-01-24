@@ -546,7 +546,7 @@ int osnoise_top_main(int argc, char **argv)
 						    trace);
 		if (retval < 0) {
 			err_msg("Error iterating on events\n");
-			goto out_top;
+			goto out_trace;
 		}
 
 		if (!params->quiet)
@@ -569,11 +569,12 @@ int osnoise_top_main(int argc, char **argv)
 		}
 	}
 
+out_trace:
+	if (params->trace_output)
+		osnoise_destroy_tool(record);
 out_top:
 	osnoise_free_top(tool->data);
 	osnoise_destroy_tool(tool);
-	if (params->trace_output)
-		osnoise_destroy_tool(record);
 out_exit:
 	exit(return_value);
 }
