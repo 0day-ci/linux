@@ -98,6 +98,13 @@ struct arm_pmu {
 	void		(*reset)(void *);
 	int		(*map_event)(struct perf_event *event);
 	int		(*filter_match)(struct perf_event *event);
+	void		(*brbe_filter)(struct pmu_hw_events *hw_events, struct perf_event *event);
+	void		(*brbe_probe)(struct pmu_hw_events *hw_events);
+	void		(*brbe_enable)(struct pmu_hw_events *hw_events);
+	void		(*brbe_disable)(struct pmu_hw_events *hw_events);
+	void		(*brbe_read)(struct pmu_hw_events *hw_events, struct perf_event *event);
+	void		(*brbe_reset)(struct pmu_hw_events *hw_events);
+	bool		(*brbe_supported)(struct perf_event *event);
 	int		num_events;
 	bool		secure_access; /* 32-bit ARM only */
 #define ARMV8_PMUV3_MAX_COMMON_EVENTS		0x40

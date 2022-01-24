@@ -1015,6 +1015,35 @@ static int armv8pmu_filter_match(struct perf_event *event)
 	return evtype != ARMV8_PMUV3_PERFCTR_CHAIN;
 }
 
+static void armv8pmu_brbe_filter(struct pmu_hw_events *hw_event, struct perf_event *event)
+{
+}
+
+static void armv8pmu_brbe_enable(struct pmu_hw_events *hw_event)
+{
+}
+
+static void armv8pmu_brbe_disable(struct pmu_hw_events *hw_event)
+{
+}
+
+static void armv8pmu_brbe_read(struct pmu_hw_events *hw_event, struct perf_event *event)
+{
+}
+
+static void armv8pmu_brbe_probe(struct pmu_hw_events *hw_event)
+{
+}
+
+static void armv8pmu_brbe_reset(struct pmu_hw_events *hw_event)
+{
+}
+
+static bool armv8pmu_brbe_supported(struct perf_event *event)
+{
+	return false;
+}
+
 static void armv8pmu_reset(void *info)
 {
 	struct arm_pmu *cpu_pmu = (struct arm_pmu *)info;
@@ -1247,6 +1276,13 @@ static int armv8_pmu_init(struct arm_pmu *cpu_pmu, char *name,
 
 	cpu_pmu->pmu.event_idx		= armv8pmu_user_event_idx;
 
+	cpu_pmu->brbe_filter		= armv8pmu_brbe_filter;
+	cpu_pmu->brbe_enable		= armv8pmu_brbe_enable;
+	cpu_pmu->brbe_disable		= armv8pmu_brbe_disable;
+	cpu_pmu->brbe_read		= armv8pmu_brbe_read;
+	cpu_pmu->brbe_probe		= armv8pmu_brbe_probe;
+	cpu_pmu->brbe_reset		= armv8pmu_brbe_reset;
+	cpu_pmu->brbe_supported		= armv8pmu_brbe_supported;
 	cpu_pmu->name			= name;
 	cpu_pmu->map_event		= map_event;
 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] = events ?
