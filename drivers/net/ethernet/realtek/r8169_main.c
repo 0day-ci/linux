@@ -2238,21 +2238,6 @@ static void rtl_wol_enable_rx(struct rtl8169_private *tp)
 			AcceptBroadcast | AcceptMulticast | AcceptMyPhys);
 }
 
-static void rtl_prepare_power_down(struct rtl8169_private *tp)
-{
-	if (tp->dash_type != RTL_DASH_NONE)
-		return;
-
-	if (tp->mac_version == RTL_GIGA_MAC_VER_32 ||
-	    tp->mac_version == RTL_GIGA_MAC_VER_33)
-		rtl_ephy_write(tp, 0x19, 0xff64);
-
-	if (device_may_wakeup(tp_to_dev(tp))) {
-		phy_speed_down(tp->phydev, false);
-		rtl_wol_enable_rx(tp);
-	}
-}
-
 static void rtl_init_rxcfg(struct rtl8169_private *tp)
 {
 	switch (tp->mac_version) {
@@ -2650,6 +2635,34 @@ static void rtl_pcie_state_l2l3_disable(struct rtl8169_private *tp)
 	RTL_W8(tp, Config3, RTL_R8(tp, Config3) & ~Rdy_to_L23);
 }
 
+static void rtl_disable_exit_l1(struct rtl8169_private *tp)
+{
+	/* Bits control which events trigger ASPM L1 exit:
+	 * Bit 12: rxdv
+	 * Bit 11: ltr_msg
+	 * Bit 10: txdma_poll
+	 * Bit  9: xadm
+	 * Bit  8: pktavi
+	 * Bit  7: txpla
+	 */
+	switch (tp->mac_version) {
+	case RTL_GIGA_MAC_VER_34 ... RTL_GIGA_MAC_VER_36:
+		rtl_eri_clear_bits(tp, 0xd4, 0x1f00);
+		break;
+	case RTL_GIGA_MAC_VER_37 ... RTL_GIGA_MAC_VER_38:
+		rtl_eri_clear_bits(tp, 0xd4, 0x0c00);
+		break;
+	case RTL_GIGA_MAC_VER_40 ... RTL_GIGA_MAC_VER_53:
+		rtl_eri_clear_bits(tp, 0xd4, 0x1f80);
+		break;
+	case RTL_GIGA_MAC_VER_60 ... RTL_GIGA_MAC_VER_63:
+		r8168_mac_ocp_modify(tp, 0xc0ac, 0x1f80, 0);
+		break;
+	default:
+		break;
+	}
+}
+
 static void rtl_enable_exit_l1(struct rtl8169_private *tp)
 {
 	/* Bits control which events trigger ASPM L1 exit:
@@ -2690,6 +2703,33 @@ static void rtl_hw_aspm_clkreq_enable(struct rtl8169_private *tp, bool enable)
 	}
 
 	udelay(10);
+}
+
+static void rtl_hw_aspm_l12_enable(struct rtl8169_private *tp, bool enable)
+{
+	/* Don't enable L1.2 in the chip if OS can't control ASPM */
+	if (enable && tp->aspm_manageable) {
+		r8168_mac_ocp_modify(tp, 0xe094, 0xff00, 0);
+		r8168_mac_ocp_modify(tp, 0xe092, 0x00ff, BIT(2));
+	} else {
+		r8168_mac_ocp_modify(tp, 0xe092, 0x00ff, 0);
+	}
+}
+
+static void rtl_prepare_power_down(struct rtl8169_private *tp)
+{
+	if (tp->dash_type != RTL_DASH_NONE)
+		return;
+
+	if (tp->mac_version == RTL_GIGA_MAC_VER_32 ||
+	    tp->mac_version == RTL_GIGA_MAC_VER_33)
+		rtl_ephy_write(tp, 0x19, 0xff64);
+
+	if (device_may_wakeup(tp_to_dev(tp))) {
+		rtl_disable_exit_l1(tp);
+		phy_speed_down(tp->phydev, false);
+		rtl_wol_enable_rx(tp);
+	}
 }
 
 static void rtl_set_fifo_size(struct rtl8169_private *tp, u16 rx_stat,
@@ -3675,6 +3715,7 @@ static void rtl_hw_start_8125b(struct rtl8169_private *tp)
 	rtl_ephy_init(tp, e_info_8125b);
 	rtl_hw_start_8125_common(tp);
 
+	rtl_hw_aspm_l12_enable(tp, true);
 	rtl_hw_aspm_clkreq_enable(tp, true);
 }
 
@@ -5255,6 +5296,20 @@ done:
 	rtl_rar_set(tp, mac_addr);
 }
 
+/* mac ocp 0xc0b2 will help to identify if RTL8125 has been tested
+ * on L1.2 enabled platform. If it is, this register will be set to 0xf.
+ * If not, this register will be default value 0.
+ */
+static bool rtl_platform_l12_enabled(struct rtl8169_private *tp)
+{
+	switch (tp->mac_version) {
+	case RTL_GIGA_MAC_VER_60 ... RTL_GIGA_MAC_VER_63:
+		return (r8168_mac_ocp_read(tp, 0xc0b2) & 0xf) ? true : false;
+	default:
+		return false;
+	}
+}
+
 static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct rtl8169_private *tp;
@@ -5333,11 +5388,15 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * Chips from RTL8168h partially have issues with L1.2, but seem
 	 * to work fine with L1 and L1.1.
 	 */
-	if (tp->mac_version >= RTL_GIGA_MAC_VER_45)
-		rc = pci_disable_link_state(pdev, PCIE_LINK_STATE_L1_2);
-	else
-		rc = pci_disable_link_state(pdev, PCIE_LINK_STATE_L1);
-	tp->aspm_manageable = !rc;
+	if (!rtl_platform_l12_enabled(tp)) {
+		if (tp->mac_version >= RTL_GIGA_MAC_VER_45)
+			rc = pci_disable_link_state(pdev, PCIE_LINK_STATE_L1_2);
+		else
+			rc = pci_disable_link_state(pdev, PCIE_LINK_STATE_L1);
+		tp->aspm_manageable = !rc;
+	} else {
+		tp->aspm_manageable = pcie_aspm_enabled(pdev);
+	}
 
 	tp->dash_type = rtl_check_dash(tp);
 
