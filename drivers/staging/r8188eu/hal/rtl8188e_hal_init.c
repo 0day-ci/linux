@@ -19,10 +19,8 @@ static void iol_mode_enable(struct adapter *padapter, u8 enable)
 		reg_0xf0 = rtw_read8(padapter, REG_SYS_CFG);
 		rtw_write8(padapter, REG_SYS_CFG, reg_0xf0 | SW_OFFLOAD_EN);
 
-		if (!padapter->bFWReady) {
-			DBG_88E("bFWReady == false call reset 8051...\n");
+		if (!padapter->bFWReady)
 			_8051Reset88E(padapter);
-		}
 
 	} else {
 		/* disable initial offload */
@@ -77,16 +75,12 @@ efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
 	u8 u1temp = 0;
 
 	efuseTbl = kzalloc(EFUSE_MAP_LEN_88E, GFP_KERNEL);
-	if (!efuseTbl) {
-		DBG_88E("%s: alloc efuseTbl fail!\n", __func__);
+	if (!efuseTbl)
 		goto exit;
-	}
 
 	eFuseWord = rtw_malloc2d(EFUSE_MAX_SECTION_88E, EFUSE_MAX_WORD_UNIT, sizeof(u16));
-	if (!eFuseWord) {
-		DBG_88E("%s: alloc eFuseWord fail!\n", __func__);
+	if (!eFuseWord)
 		goto exit;
-	}
 
 	/*  0. Refresh efuse init map as all oxFF. */
 	for (i = 0; i < EFUSE_MAX_SECTION_88E; i++)
@@ -102,7 +96,6 @@ efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
 		efuse_utilized++;
 		eFuse_Addr++;
 	} else {
-		DBG_88E("EFUSE is empty efuse_Addr-%d efuse_data =%x\n", eFuse_Addr, rtemp8);
 		goto exit;
 	}
 
@@ -207,8 +200,6 @@ static void efuse_read_phymap_from_txpktbuf(
 	if (bcnhead < 0) /* if not valid */
 		bcnhead = rtw_read8(adapter, REG_TDECTRL + 1);
 
-	DBG_88E("%s bcnhead:%d\n", __func__, bcnhead);
-
 	rtw_write8(adapter, REG_PKT_BUFF_ACCESS_CTRL, TXPKT_BUF_SELECT);
 
 	dbg_addr = bcnhead * 128 / 8; /* 8-bytes addressing */
@@ -220,7 +211,6 @@ static void efuse_read_phymap_from_txpktbuf(
 		start = jiffies;
 		while (!(reg_0x143 = rtw_read8(adapter, REG_TXPKTBUF_DBG)) &&
 		       (passing_time = rtw_get_passing_time_ms(start)) < 1000) {
-			DBG_88E("%s polling reg_0x143:0x%02x, reg_0x106:0x%02x\n", __func__, reg_0x143, rtw_read8(adapter, 0x106));
 			rtw_usleep_os(100);
 		}
 
@@ -229,17 +219,14 @@ static void efuse_read_phymap_from_txpktbuf(
 		hi32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_H));
 
 		if (i == 0) {
-			/* Although lenc is only used in a debug statement,
-			 * do not remove it as the rtw_read16() call consumes
+			/* Do not remove this as the rtw_read16() call consumes
 			 * 2 bytes from the EEPROM source.
 			 */
-			u16 lenc = rtw_read16(adapter, REG_PKTBUF_DBG_DATA_L);
+			rtw_read16(adapter, REG_PKTBUF_DBG_DATA_L);
 
 			len = le32_to_cpu(lo32) & 0x0000ffff;
 
 			limit = (len - 2 < limit) ? len - 2 : limit;
-
-			DBG_88E("%s len:%u, lenc:%u\n", __func__, len, lenc);
 
 			memcpy(pos, ((u8 *)&lo32) + 2, (limit >= count + 2) ? 2 : limit - count);
 			count += (limit >= count + 2) ? 2 : limit - count;
@@ -261,7 +248,6 @@ static void efuse_read_phymap_from_txpktbuf(
 		i++;
 	}
 	rtw_write8(adapter, REG_PKT_BUFF_ACCESS_CTRL, DISABLE_TRXPKT_BUF_ACCESS);
-	DBG_88E("%s read count:%u\n", __func__, count);
 	*size = count;
 }
 
@@ -285,7 +271,6 @@ s32 rtl8188e_iol_efuse_patch(struct adapter *padapter)
 {
 	s32	result = _SUCCESS;
 
-	DBG_88E("==> %s\n", __func__);
 	if (rtw_IOL_applied(padapter)) {
 		iol_mode_enable(padapter, 1);
 		result = iol_execute(padapter, CMD_READ_EFUSE_MAP);
@@ -465,7 +450,6 @@ void _8051Reset88E(struct adapter *padapter)
 	u1bTmp = rtw_read8(padapter, REG_SYS_FUNC_EN + 1);
 	rtw_write8(padapter, REG_SYS_FUNC_EN + 1, u1bTmp & (~BIT(2)));
 	rtw_write8(padapter, REG_SYS_FUNC_EN + 1, u1bTmp | (BIT(2)));
-	DBG_88E("=====> _8051Reset88E(): 8051 reset success .\n");
 }
 
 static s32 _FWFreeToGo(struct adapter *padapter)
@@ -480,11 +464,8 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 			break;
 	} while (counter++ < POLLING_READY_TIMEOUT_COUNT);
 
-	if (counter >= POLLING_READY_TIMEOUT_COUNT) {
-		DBG_88E("%s: chksum report fail! REG_MCUFWDL:0x%08x\n", __func__, value32);
+	if (counter >= POLLING_READY_TIMEOUT_COUNT)
 		return _FAIL;
-	}
-	DBG_88E("%s: Checksum report OK! REG_MCUFWDL:0x%08x\n", __func__, value32);
 
 	value32 = rtw_read32(padapter, REG_MCUFWDL);
 	value32 |= MCUFWDL_RDY;
@@ -497,14 +478,11 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 	counter = 0;
 	do {
 		value32 = rtw_read32(padapter, REG_MCUFWDL);
-		if (value32 & WINTINI_RDY) {
-			DBG_88E("%s: Polling FW ready success!! REG_MCUFWDL:0x%08x\n", __func__, value32);
+		if (value32 & WINTINI_RDY)
 			return _SUCCESS;
-		}
 		udelay(5);
 	} while (counter++ < POLLING_READY_TIMEOUT_COUNT);
 
-	DBG_88E("%s: Polling FW ready fail!! REG_MCUFWDL:0x%08x\n", __func__, value32);
 	return _FAIL;
 }
 
@@ -602,22 +580,14 @@ s32 rtl8188e_FirmwareDownload(struct adapter *padapter)
 		if (rtStatus == _SUCCESS ||
 		    (rtw_get_passing_time_ms(fwdl_start_time) > 500 && writeFW_retry++ >= 3))
 			break;
-
-		DBG_88E("%s writeFW_retry:%u, time after fwdl_start_time:%ums\n",
-			__func__, writeFW_retry, rtw_get_passing_time_ms(fwdl_start_time)
-		);
 	}
 	_FWDownloadEnable(padapter, false);
-	if (_SUCCESS != rtStatus) {
-		DBG_88E("DL Firmware failed!\n");
+	if (rtStatus != _SUCCESS)
 		goto Exit;
-	}
 
 	rtStatus = _FWFreeToGo(padapter);
-	if (_SUCCESS != rtStatus) {
-		DBG_88E("DL Firmware failed!\n");
+	if (rtStatus != _SUCCESS)
 		goto Exit;
-	}
 
 Exit:
 	return rtStatus;
@@ -690,22 +660,16 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 	/*  */
 	/*  Do NOT excess total size of EFuse table. Added by Roger, 2008.11.10. */
 	/*  */
-	if ((_offset + _size_byte) > EFUSE_MAP_LEN_88E) {/*  total E-Fuse table is 512bytes */
-		DBG_88E("Hal_EfuseReadEFuse88E(): Invalid offset(%#x) with read bytes(%#x)!!\n", _offset, _size_byte);
+	if ((_offset + _size_byte) > EFUSE_MAP_LEN_88E) /*  total E-Fuse table is 512bytes */
 		goto exit;
-	}
 
 	efuseTbl = kzalloc(EFUSE_MAP_LEN_88E, GFP_KERNEL);
-	if (!efuseTbl) {
-		DBG_88E("%s: alloc efuseTbl fail!\n", __func__);
+	if (!efuseTbl)
 		goto exit;
-	}
 
 	eFuseWord = rtw_malloc2d(EFUSE_MAX_SECTION_88E, EFUSE_MAX_WORD_UNIT, sizeof(u16));
-	if (!eFuseWord) {
-		DBG_88E("%s: alloc eFuseWord fail!\n", __func__);
+	if (!eFuseWord)
 		goto exit;
-	}
 
 	/*  0. Refresh efuse init map as all oxFF. */
 	for (i = 0; i < EFUSE_MAX_SECTION_88E; i++)
@@ -721,7 +685,6 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 		efuse_utilized++;
 		eFuse_Addr++;
 	} else {
-		DBG_88E("EFUSE is empty efuse_Addr-%d efuse_data =%x\n", eFuse_Addr, *rtemp8);
 		goto exit;
 	}
 
@@ -851,24 +814,19 @@ void rtl8188e_SetHalODMVar(struct adapter *Adapter, void *pValue1, bool bSet)
 	struct sta_info *psta = (struct sta_info *)pValue1;
 
 	if (bSet) {
-		DBG_88E("### Set STA_(%d) info\n", psta->mac_id);
 		podmpriv->pODM_StaInfo[psta->mac_id] = psta;
 		ODM_RAInfo_Init(podmpriv, psta->mac_id);
 	} else {
-		DBG_88E("### Clean STA_(%d) info\n", psta->mac_id);
 		podmpriv->pODM_StaInfo[psta->mac_id] = NULL;
 	}
 }
 
 void hal_notch_filter_8188e(struct adapter *adapter, bool enable)
 {
-	if (enable) {
-		DBG_88E("Enable notch filter\n");
+	if (enable)
 		rtw_write8(adapter, rOFDM0_RxDSP + 1, rtw_read8(adapter, rOFDM0_RxDSP + 1) | BIT(1));
-	} else {
-		DBG_88E("Disable notch filter\n");
+	else
 		rtw_write8(adapter, rOFDM0_RxDSP + 1, rtw_read8(adapter, rOFDM0_RxDSP + 1) & ~BIT(1));
-	}
 }
 
 u8 GetEEPROMSize8188E(struct adapter *padapter)
@@ -1092,20 +1050,14 @@ static void hal_get_chnl_group_88e(u8 chnl, u8 *group)
 
 void Hal_ReadPowerSavingMode88E(struct adapter *padapter, u8 *hwinfo, bool AutoLoadFail)
 {
-	if (AutoLoadFail) {
+	if (AutoLoadFail)
 		padapter->pwrctrlpriv.bSupportRemoteWakeup = false;
-	} else {
+	else
 		/* hw power down mode selection , 0:rf-off / 1:power down */
 
 		/*  decide hw if support remote wakeup function */
 		/*  if hw supported, 8051 (SIE) will generate WeakUP signal(D+/D- toggle) when autoresume */
 		padapter->pwrctrlpriv.bSupportRemoteWakeup = (hwinfo[EEPROM_USB_OPTIONAL_FUNCTION0] & BIT(1)) ? true : false;
-
-		DBG_88E("%s , bSupportRemoteWakeup(%x)\n", __func__,
-			padapter->pwrctrlpriv.bSupportRemoteWakeup);
-
-		DBG_88E("### PS params =>  power_mgnt(%x), usbss_enable(%x) ###\n", padapter->registrypriv.power_mgnt, padapter->registrypriv.usbss_enable);
-	}
 }
 
 void Hal_ReadTxPowerInfo88E(struct adapter *padapter, u8 *PROMContent, bool AutoLoadFail)
@@ -1125,17 +1077,10 @@ void Hal_ReadTxPowerInfo88E(struct adapter *padapter, u8 *PROMContent, bool Auto
 			pHalData->Index24G_BW40_Base[ch] = pwrInfo24G.IndexBW40_Base[0][4];
 		else
 			pHalData->Index24G_BW40_Base[ch] = pwrInfo24G.IndexBW40_Base[0][group];
-
-		DBG_88E("======= Path 0, Channel %d =======\n", ch);
-		DBG_88E("Index24G_CCK_Base[%d] = 0x%x\n", ch, pHalData->Index24G_CCK_Base[ch]);
-		DBG_88E("Index24G_BW40_Base[%d] = 0x%x\n", ch, pHalData->Index24G_BW40_Base[ch]);
 	}
 	for (TxCount = 0; TxCount < MAX_TX_COUNT; TxCount++) {
 		pHalData->OFDM_24G_Diff[TxCount] = pwrInfo24G.OFDM_Diff[0][TxCount];
 		pHalData->BW20_24G_Diff[TxCount] = pwrInfo24G.BW20_Diff[0][TxCount];
-		DBG_88E("======= TxCount %d =======\n", TxCount);
-		DBG_88E("OFDM_24G_Diff[%d] = %d\n", TxCount, pHalData->OFDM_24G_Diff[TxCount]);
-		DBG_88E("BW20_24G_Diff[%d] = %d\n", TxCount, pHalData->BW20_24G_Diff[TxCount]);
 	}
 
 	/*  2010/10/19 MH Add Regulator recognize for CU. */
@@ -1146,7 +1091,6 @@ void Hal_ReadTxPowerInfo88E(struct adapter *padapter, u8 *PROMContent, bool Auto
 	} else {
 		pHalData->EEPROMRegulatory = 0;
 	}
-	DBG_88E("EEPROMRegulatory = 0x%x\n", pHalData->EEPROMRegulatory);
 }
 
 void Hal_EfuseParseXtal_8188E(struct adapter *pAdapter, u8 *hwinfo, bool AutoLoadFail)
@@ -1160,7 +1104,6 @@ void Hal_EfuseParseXtal_8188E(struct adapter *pAdapter, u8 *hwinfo, bool AutoLoa
 	} else {
 		pHalData->CrystalCap = EEPROM_Default_CrystalCap_88E;
 	}
-	DBG_88E("CrystalCap: 0x%2x\n", pHalData->CrystalCap);
 }
 
 void rtl8188e_EfuseParseChnlPlan(struct adapter *padapter, u8 *hwinfo, bool AutoLoadFail)
@@ -1170,8 +1113,6 @@ void rtl8188e_EfuseParseChnlPlan(struct adapter *padapter, u8 *hwinfo, bool Auto
 					  hwinfo ? hwinfo[EEPROM_ChannelPlan_88E] : 0xFF,
 					  padapter->registrypriv.channel_plan,
 					  RT_CHANNEL_DOMAIN_WORLD_WIDE_13, AutoLoadFail);
-
-	DBG_88E("mlmepriv.ChannelPlan = 0x%02x\n", padapter->mlmepriv.ChannelPlan);
 }
 
 void Hal_ReadAntennaDiversity88E(struct adapter *pAdapter, u8 *PROMContent, bool AutoLoadFail)
@@ -1203,7 +1144,6 @@ void Hal_ReadAntennaDiversity88E(struct adapter *pAdapter, u8 *PROMContent, bool
 	} else {
 		pHalData->AntDivCfg = 0;
 	}
-	DBG_88E("EEPROM : AntDivCfg = %x, TRxAntDivType = %x\n", pHalData->AntDivCfg, pHalData->TRxAntDivType);
 }
 
 void Hal_ReadThermalMeter_88E(struct adapter *Adapter, u8 *PROMContent, bool AutoloadFail)
@@ -1218,6 +1158,4 @@ void Hal_ReadThermalMeter_88E(struct adapter *Adapter, u8 *PROMContent, bool Aut
 
 	if (pHalData->EEPROMThermalMeter == 0xff || AutoloadFail)
 		pHalData->EEPROMThermalMeter = EEPROM_Default_ThermalMeter_88E;
-
-	DBG_88E("ThermalMeter = 0x%x\n", pHalData->EEPROMThermalMeter);
 }
