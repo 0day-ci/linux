@@ -2182,6 +2182,8 @@ static int setup_window_lock(struct bttv_fh *fh, struct bttv *btv,
 		struct bttv_buffer *new;
 
 		new = videobuf_sg_alloc(sizeof(*new));
+		if (!new)
+			return -ENOMEM;
 		new->crop = btv->crop[!!fh->do_crop].rect;
 		bttv_overlay_risc(btv, &fh->ov, fh->ovfmt, new);
 		retval = bttv_switch_overlay(btv,fh,new);
