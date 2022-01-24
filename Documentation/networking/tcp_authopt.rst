@@ -71,6 +71,16 @@ key used for sending. If the TCP_AUTHOPT_LOCK_RNEXTKEY flag is set in
 instead.  This can be used to implement smooth rollover: the peer will switch
 its keyid to the received rnextkeyid when it is available.
 
+Proc interface
+--------------
+
+The ``/proc/net/tcp_authopt`` file contains a tab-separated table of keys. The
+first line contains column names. The number of columns might increase in the
+future if more matching criteria are added. Here is an example of the table::
+
+	flags	send_id	recv_id	alg	addr	l3index
+	0x44	0	0	1	10.10.2.2/31	0
+
 ABI Reference
 =============
 
