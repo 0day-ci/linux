@@ -41,6 +41,12 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe,
 	if (addr & 0x03)
 		return -EINVAL;
 
+	if (ppc_inst_val(ppc_inst_read(auprobe->insn)) == PPC_RAW_SC() ||
+	    ppc_inst_val(ppc_inst_read(auprobe->insn)) == PPC_RAW_SCV()) {
+		pr_info_ratelimited("Rejecting uprobe on system call instruction\n");
+		return -EINVAL;
+	}
+
 	if (cpu_has_feature(CPU_FTR_ARCH_31) &&
 	    ppc_inst_prefixed(ppc_inst_read(auprobe->insn)) &&
 	    (addr & 0x3f) == 60) {
