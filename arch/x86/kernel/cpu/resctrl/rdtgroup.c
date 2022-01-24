@@ -660,19 +660,14 @@ static int rdtgroup_move_task(pid_t pid, struct rdtgroup *rdtgrp,
 	int ret;
 
 	rcu_read_lock();
-	if (pid) {
-		tsk = find_task_by_vpid(pid);
-		if (!tsk) {
-			rcu_read_unlock();
-			rdt_last_cmd_printf("No task %d\n", pid);
-			return -ESRCH;
-		}
-	} else {
-		tsk = current;
-	}
-
-	get_task_struct(tsk);
+	tsk = task_by_pid(pid);
+	if (tsk)
+		get_task_struct(tsk);
 	rcu_read_unlock();
+	if (!tsk) {
+		rdt_last_cmd_printf("No task %d\n", pid);
+		return -ESRCH;
+	}
 
 	ret = rdtgroup_task_write_permission(tsk, of);
 	if (!ret)

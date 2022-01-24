@@ -7174,17 +7174,6 @@ unsigned long sched_cpu_util(int cpu, unsigned long max)
 }
 #endif /* CONFIG_SMP */
 
-/**
- * find_process_by_pid - find a process with a matching PID value.
- * @pid: the pid in question.
- *
- * The task of @pid, if found. %NULL otherwise.
- */
-static struct task_struct *find_process_by_pid(pid_t pid)
-{
-	return pid ? find_task_by_vpid(pid) : current;
-}
-
 /*
  * sched_setparam() passes in -1 for its policy, to let the functions
  * it calls know not to change it.
@@ -7627,7 +7616,7 @@ do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 
 	rcu_read_lock();
 	retval = -ESRCH;
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (likely(p))
 		get_task_struct(p);
 	rcu_read_unlock();
@@ -7750,7 +7739,7 @@ SYSCALL_DEFINE3(sched_setattr, pid_t, pid, struct sched_attr __user *, uattr,
 
 	rcu_read_lock();
 	retval = -ESRCH;
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (likely(p))
 		get_task_struct(p);
 	rcu_read_unlock();
@@ -7782,7 +7771,7 @@ SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
 
 	retval = -ESRCH;
 	rcu_read_lock();
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (p) {
 		retval = security_task_getscheduler(p);
 		if (!retval)
@@ -7811,7 +7800,7 @@ SYSCALL_DEFINE2(sched_getparam, pid_t, pid, struct sched_param __user *, param)
 		return -EINVAL;
 
 	rcu_read_lock();
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	retval = -ESRCH;
 	if (!p)
 		goto out_unlock;
@@ -7894,7 +7883,7 @@ SYSCALL_DEFINE4(sched_getattr, pid_t, pid, struct sched_attr __user *, uattr,
 		return -EINVAL;
 
 	rcu_read_lock();
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	retval = -ESRCH;
 	if (!p)
 		goto out_unlock;
@@ -8003,7 +7992,7 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 
 	rcu_read_lock();
 
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (!p) {
 		rcu_read_unlock();
 		return -ESRCH;
@@ -8082,7 +8071,7 @@ long sched_getaffinity(pid_t pid, struct cpumask *mask)
 	rcu_read_lock();
 
 	retval = -ESRCH;
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (!p)
 		goto out_unlock;
 
@@ -8482,7 +8471,7 @@ static int sched_rr_get_interval(pid_t pid, struct timespec64 *t)
 
 	retval = -ESRCH;
 	rcu_read_lock();
-	p = find_process_by_pid(pid);
+	p = task_by_pid(pid);
 	if (!p)
 		goto out_unlock;
 
