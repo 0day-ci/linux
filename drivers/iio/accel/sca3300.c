@@ -37,11 +37,11 @@
 
 /* Device ID */
 #define SCA3300_REG_WHOAMI	0x10
-#define SCA3300_WHOAMI_ID	0x51
 
 /* Device return status and mask */
 #define SCA3300_VALUE_RS_ERROR	0x3
 #define SCA3300_MASK_RS_STATUS	GENMASK(1, 0)
+
 enum sca3300_op_mode_indexes {
 	OP_MOD_1 = 0,
 	OP_MOD_2,
@@ -73,6 +73,11 @@ static const struct iio_chan_spec_ext_info sca3300_ext_info[] = {
 	IIO_ENUM("op_mode", IIO_SHARED_BY_DIR, &sca3300_op_mode_enum),
 	IIO_ENUM_AVAILABLE("op_mode", &sca3300_op_mode_enum),
 	{ }
+};
+
+enum sca3300_chip_type {
+	CHIP_SCA3300 = 0,
+	CHIP_CNT
 };
 
 enum sca3300_scan_indexes {
@@ -126,13 +131,27 @@ static const struct iio_chan_spec sca3300_channels[] = {
 	IIO_CHAN_SOFT_TIMESTAMP(4)
 };
 
-static const int sca3300_lp_freq[] = {70, 70, 70, 10};
-static const int sca3300_accel_scale[][2] = {{0, 370}, {0, 741}, {0, 185}, {0, 185}};
+static const int sca3300_lp_freq[CHIP_CNT][OP_MOD_CNT] = {
+	[CHIP_SCA3300] = {70, 70, 70, 10},
+};
+
+static const int sca3300_accel_scale[CHIP_CNT][OP_MOD_CNT][2] = {
+	[CHIP_SCA3300] = {{0, 370}, {0, 741}, {0, 185}, {0, 185}},
+};
 
 static const unsigned long sca3300_scan_masks[] = {
 	BIT(SCA3300_ACC_X) | BIT(SCA3300_ACC_Y) | BIT(SCA3300_ACC_Z) |
 	BIT(SCA3300_TEMP),
 	0
+};
+
+struct sca3300_chip_info {
+	enum sca3300_chip_type chip_type;
+	const char *name;
+	u8 chip_id;
+	const struct iio_chan_spec *channels;
+	int num_channels;
+	unsigned long scan_masks;
 };
 
 /**
@@ -150,8 +169,21 @@ struct sca3300_data {
 		s16 channels[4];
 		s64 ts __aligned(sizeof(s64));
 	} scan;
+	const struct sca3300_chip_info *chip_info;
 	u8 txbuf[4] ____cacheline_aligned;
 	u8 rxbuf[4];
+
+};
+
+static const struct sca3300_chip_info sca3300_chip_info_tbl[] = {
+	[CHIP_SCA3300] = {
+		.chip_type = CHIP_SCA3300,
+		.name = "sca3300",
+		.chip_id = 0x51,
+		.channels = sca3300_channels,
+		.num_channels = ARRAY_SIZE(sca3300_channels),
+		.scan_masks = sca3300_scan_masks,
+	},
 };
 
 DECLARE_CRC8_TABLE(sca3300_crc_table);
@@ -271,23 +303,20 @@ static int sca3300_write_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
-		if (val)
-			return -EINVAL;
-
-		for (i = 0; i < ARRAY_SIZE(sca3300_accel_scale); i++) {
-			if (val2 == sca3300_accel_scale[i][1])
+		for (i = 0; i < OP_MOD_CNT; i++) {
+			if ((val == sca3300_accel_scale[data->chip_info->chip_type][0]) &&
+			    (val2 == sca3300_accel_scale[data->chip_info->chip_type][1]))
 				return sca3300_write_reg(data, SCA3300_REG_MODE, i);
 		}
 		return -EINVAL;
-
 	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
 		ret = sca3300_read_reg(data, SCA3300_REG_MODE, &reg_val);
 		if (ret)
 			return ret;
 		/* freq. change is possible only for mode 3 and 4 */
-		if (reg_val == 2 && val == sca3300_lp_freq[3])
+		if (reg_val == 2 && val == sca3300_lp_freq[data->chip_info->chip_type][3])
 			return sca3300_write_reg(data, SCA3300_REG_MODE, 3);
-		if (reg_val == 3 && val == sca3300_lp_freq[2])
+		if (reg_val == 3 && val == sca3300_lp_freq[data->chip_info->chip_type][2])
 			return sca3300_write_reg(data, SCA3300_REG_MODE, 2);
 		return -EINVAL;
 	default:
@@ -313,14 +342,18 @@ static int sca3300_read_raw(struct iio_dev *indio_dev,
 		ret = sca3300_read_reg(data, SCA3300_REG_MODE, &reg_val);
 		if (ret)
 			return ret;
-		*val = 0;
-		*val2 = sca3300_accel_scale[reg_val][1];
+		if (chan->type == IIO_ACCEL) {
+			*val = sca3300_accel_scale[data->chip_info->chip_type][reg_val][0];
+			*val2 = sca3300_accel_scale[data->chip_info->chip_type][reg_val][1];
+		} else {
+			return -EINVAL;
+		}
 		return IIO_VAL_INT_PLUS_MICRO;
 	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
 		ret = sca3300_read_reg(data, SCA3300_REG_MODE, &reg_val);
 		if (ret)
 			return ret;
-		*val = sca3300_lp_freq[reg_val];
+		*val = sca3300_lp_freq[data->chip_info->chip_type][reg_val];
 		return IIO_VAL_INT;
 	default:
 		return -EINVAL;
@@ -364,6 +397,7 @@ static int sca3300_init(struct sca3300_data *sca_data,
 {
 	int value = 0;
 	int ret;
+	int i = 0;
 
 	ret = sca3300_write_reg(sca_data, SCA3300_REG_MODE,
 				SCA3300_MODE_SW_RESET);
@@ -375,15 +409,22 @@ static int sca3300_init(struct sca3300_data *sca_data,
 	 * Wait 15ms for settling of signal paths.
 	 */
 	usleep_range(16e3, 50e3);
-
-	ret = sca3300_read_reg(sca_data, SCA3300_REG_WHOAMI, &value);
-	if (ret)
-		return ret;
-
-	if (value != SCA3300_WHOAMI_ID) {
-		dev_err(&sca_data->spi->dev,
-			"device id not expected value, %d != %u\n",
-			value, SCA3300_WHOAMI_ID);
+	for (i = 0; i < ARRAY_SIZE(sca3300_chip_info_tbl); i++) {
+		ret = sca3300_read_reg(sca_data, SCA3300_REG_WHOAMI, &value);
+		if (ret)
+			return ret;
+		if (sca3300_chip_info_tbl[i].chip_id == value) {
+			sca_data->chip_info = &sca3300_chip_info_tbl[i];
+			indio_dev->name = sca3300_chip_info_tbl[i].name;
+			indio_dev->channels = sca3300_chip_info_tbl[i].channels;
+			indio_dev->num_channels = sca3300_chip_info_tbl[i].num_channels;
+			indio_dev->modes = INDIO_DIRECT_MODE;
+			indio_dev->available_scan_masks = sca3300_chip_info_tbl[i].scan_masks;
+			break;
+		}
+	}
+	if (i == ARRAY_SIZE(sca3300_chip_info_tbl)) {
+		dev_err(&sca_data->spi->dev, "Invalid chip %x\n", value);
 		return -ENODEV;
 	}
 	return 0;
@@ -417,15 +458,21 @@ static int sca3300_read_avail(struct iio_dev *indio_dev,
 			      const int **vals, int *type, int *length,
 			      long mask)
 {
+	struct sca3300_data *data = iio_priv(indio_dev);
+
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
-		*vals = (const int *)sca3300_accel_scale;
-		*length = ARRAY_SIZE(sca3300_accel_scale) * 2 - 2;
+		if (chan->type == IIO_ACCEL) {
+			*vals = (const int *)sca3300_accel_scale[data->chip_info->chip_type];
+			*length = ARRAY_SIZE(sca3300_accel_scale[data->chip_info->chip_type]) * 2;
+		} else {
+			return -EINVAL;
+		}
 		*type = IIO_VAL_INT_PLUS_MICRO;
 		return IIO_AVAIL_LIST;
 	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
-		*vals = &sca3300_lp_freq[2];
-		*length = 2;
+		*vals = (const int *)sca3300_lp_freq[data->chip_info->chip_type];
+		*length = ARRAY_SIZE(sca3300_lp_freq[data->chip_info->chip_type]);
 		*type = IIO_VAL_INT;
 		return IIO_AVAIL_LIST;
 	default:
@@ -471,7 +518,6 @@ static int sca3300_probe(struct spi_device *spi)
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*sca_data));
 	if (!indio_dev)
 		return -ENOMEM;
-
 	sca_data = iio_priv(indio_dev);
 	mutex_init(&sca_data->lock);
 	sca_data->spi = spi;
@@ -479,11 +525,7 @@ static int sca3300_probe(struct spi_device *spi)
 	crc8_populate_msb(sca3300_crc_table, SCA3300_CRC8_POLYNOMIAL);
 
 	indio_dev->info = &sca3300_info;
-	indio_dev->name = SCA3300_ALIAS;
-	indio_dev->modes = INDIO_DIRECT_MODE;
-	indio_dev->channels = sca3300_channels;
-	indio_dev->num_channels = ARRAY_SIZE(sca3300_channels);
-	indio_dev->available_scan_masks = sca3300_scan_masks;
+
 
 	ret = sca3300_init(sca_data, indio_dev);
 	if (ret) {
