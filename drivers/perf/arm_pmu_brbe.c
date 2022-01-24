@@ -270,6 +270,25 @@ static int brbe_fetch_perf_type(u64 brbinf)
 	}
 }
 
+static int brbe_fetch_perf_priv(u64 brbinf)
+{
+	int brbe_el = brbe_fetch_el(brbinf);
+
+	switch (brbe_el) {
+	case BRBINF_EL_EL0:
+		return PERF_BR_USER;
+	case BRBINF_EL_EL1:
+		return PERF_BR_KERNEL;
+	case BRBINF_EL_EL2:
+		if (is_kernel_in_hyp_mode())
+			return PERF_BR_KERNEL;
+		return PERF_BR_HV;
+	default:
+		pr_warn("unknown branch privilege captured\n");
+		return -1;
+	}
+}
+
 static void capture_brbe_flags(struct pmu_hw_events *cpuc, struct perf_event *event,
 			       u64 brbinf, int idx)
 {
@@ -301,6 +320,15 @@ static void capture_brbe_flags(struct pmu_hw_events *cpuc, struct perf_event *ev
 			cpuc->brbe_entries[idx].predicted = !(brbinf & BRBINF_MPRED);
 			cpuc->brbe_entries[idx].in_tx = brbinf & BRBINF_TX;
 		}
+	}
+
+	if (branch_sample_priv(event)) {
+		/*
+		 * All these information (i.e branch privilege level) are not
+		 * available for source only branch records.
+		 */
+		if (type != BRBINF_VALID_SOURCE)
+			cpuc->brbe_entries[idx].priv = brbe_fetch_perf_priv(brbinf);
 	}
 }
 

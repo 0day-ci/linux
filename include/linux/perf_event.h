@@ -1667,4 +1667,9 @@ static inline bool branch_sample_hw_index(const struct perf_event *event)
 {
 	return event->attr.branch_sample_type & PERF_SAMPLE_BRANCH_HW_INDEX;
 }
+
+static inline bool branch_sample_priv(const struct perf_event *event)
+{
+	return event->attr.branch_sample_type & PERF_SAMPLE_BRANCH_PRIV_SAVE;
+}
 #endif /* _LINUX_PERF_EVENT_H */
