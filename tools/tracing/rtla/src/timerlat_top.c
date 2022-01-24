@@ -584,7 +584,7 @@ int timerlat_top_main(int argc, char *argv[])
 						    trace);
 		if (retval < 0) {
 			err_msg("Error iterating on events\n");
-			goto out_top;
+			goto out_trace;
 		}
 
 		if (!params->quiet)
@@ -606,12 +606,12 @@ int timerlat_top_main(int argc, char *argv[])
 			save_trace_to_file(record->trace.inst, params->trace_output);
 		}
 	}
-
+out_trace:
+	if (params->trace_output)
+		osnoise_destroy_tool(record);
 out_top:
 	timerlat_free_top(top->data);
 	osnoise_destroy_tool(top);
-	if (params->trace_output)
-		osnoise_destroy_tool(record);
 	free(params);
 out_exit:
 	exit(return_value);
