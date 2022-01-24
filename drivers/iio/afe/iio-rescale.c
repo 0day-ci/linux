@@ -322,7 +322,7 @@ static int rescale_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	rescale = iio_priv(indio_dev);
-
+	rescale->source = source;
 	rescale->cfg = of_device_get_match_data(dev);
 	rescale->numerator = 1;
 	rescale->denominator = 1;
@@ -337,8 +337,6 @@ static int rescale_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, indio_dev);
-
-	rescale->source = source;
 
 	indio_dev->name = dev_name(dev);
 	indio_dev->info = &rescale_info;
