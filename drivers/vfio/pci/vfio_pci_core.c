@@ -206,6 +206,14 @@ static void vfio_pci_probe_power_state(struct vfio_pci_core_device *vdev)
  * restore when returned to D0.  Saved separately from pci_saved_state for use
  * by PM capability emulation and separately from pci_dev internal saved state
  * to avoid it being overwritten and consumed around other resets.
+ *
+ * There are few cases where the PCI power state can be changed to D0
+ * without the involvement of this API. So, cache the power state locally
+ * and call this API to update the D0 state. It will help in running the
+ * logic that is needed for transitioning to the D0 state. For example,
+ * if needs_pm_restore is set, then the PCI state will be saved locally.
+ * The memory taken for saving this PCI state needs to be freed to
+ * prevent memory leak.
  */
 int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t state)
 {
@@ -214,20 +222,34 @@ int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t stat
 	int ret;
 
 	if (vdev->needs_pm_restore) {
-		if (pdev->current_state < PCI_D3hot && state >= PCI_D3hot) {
+		if (vdev->power_state < PCI_D3hot && state >= PCI_D3hot) {
 			pci_save_state(pdev);
 			needs_save = true;
 		}
 
-		if (pdev->current_state >= PCI_D3hot && state <= PCI_D0)
+		if (vdev->power_state >= PCI_D3hot && state <= PCI_D0)
 			needs_restore = true;
 	}
 
 	ret = pci_set_power_state(pdev, state);
 
 	if (!ret) {
+		vdev->power_state = pdev->current_state;
+
 		/* D3 might be unsupported via quirk, skip unless in D3 */
-		if (needs_save && pdev->current_state >= PCI_D3hot) {
+		if (needs_save && vdev->power_state >= PCI_D3hot) {
+			/*
+			 * If somehow, the vfio driver was not able to free the
+			 * memory allocated in pm_save, then free the earlier
+			 * memory first before overwriting pm_save to prevent
+			 * memory leak.
+			 */
+			if (vdev->pm_save) {
+				pci_warn(pdev,
+					 "Overwriting saved PCI state pointer so freeing the earlier memory\n");
+				kfree(vdev->pm_save);
+			}
+
 			vdev->pm_save = pci_store_saved_state(pdev);
 		} else if (needs_restore) {
 			pci_load_and_free_saved_state(pdev, &vdev->pm_save);
@@ -325,6 +347,14 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 
 	/* For needs_reset */
 	lockdep_assert_held(&vdev->vdev.dev_set->lock);
+
+	/*
+	 * If disable has been called while the power state is other than D0,
+	 * then set the power state in vfio driver to D0. It will help
+	 * in running the logic needed for D0 power state. The subsequent
+	 * runtime PM API's will put the device into the low power state again.
+	 */
+	vfio_pci_set_power_state(vdev, PCI_D0);
 
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
@@ -929,6 +959,15 @@ long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
 
 		vfio_pci_zap_and_down_write_memory_lock(vdev);
 		ret = pci_try_reset_function(vdev->pdev);
+
+		/*
+		 * If pci_try_reset_function() has been called while the power
+		 * state is other than D0, then pci_try_reset_function() will
+		 * internally set the device state to D0 without vfio driver
+		 * interaction. Update the power state in vfio driver to perform
+		 * the logic needed for D0 power state.
+		 */
+		vfio_pci_set_power_state(vdev, PCI_D0);
 		up_write(&vdev->memory_lock);
 
 		return ret;
@@ -2071,6 +2110,14 @@ static int vfio_pci_dev_set_hot_reset(struct vfio_device_set *dev_set,
 
 err_undo:
 	list_for_each_entry(cur, &dev_set->device_list, vdev.dev_set_list) {
+		/*
+		 * If pci_reset_bus() has been called while the power
+		 * state is other than D0, then pci_reset_bus() will
+		 * internally set the device state to D0 without vfio driver
+		 * interaction. Update the power state in vfio driver to perform
+		 * the logic needed for D0 power state.
+		 */
+		vfio_pci_set_power_state(cur, PCI_D0);
 		if (cur == cur_mem)
 			is_mem = false;
 		if (cur == cur_vma)
