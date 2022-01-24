@@ -50,7 +50,7 @@ struct i2c_dev {
 static LIST_HEAD(i2c_dev_list);
 static DEFINE_SPINLOCK(i2c_dev_list_lock);
 
-static struct i2c_dev *i2c_dev_get_by_minor(unsigned index)
+static struct i2c_dev *i2c_dev_get_by_minor(unsigned int index)
 {
 	struct i2c_dev *i2c_dev;
 
@@ -233,9 +233,10 @@ static int i2cdev_check_addr(struct i2c_adapter *adapter, unsigned int addr)
 }
 
 static noinline int i2cdev_ioctl_rdwr(struct i2c_client *client,
-		unsigned nmsgs, struct i2c_msg *msgs)
+		unsigned int nmsgs, struct i2c_msg *msgs)
 {
 	u8 __user **data_ptrs;
+	u16 user_len[I2C_RDWR_IOCTL_MAX_MSGS];
 	int i, res;
 
 	data_ptrs = kmalloc_array(nmsgs, sizeof(u8 __user *), GFP_KERNEL);
@@ -262,16 +263,34 @@ static noinline int i2cdev_ioctl_rdwr(struct i2c_client *client,
 		msgs[i].flags |= I2C_M_DMA_SAFE;
 
 		/*
-		 * If the message length is received from the slave (similar
-		 * to SMBus block read), we must ensure that the buffer will
-		 * be large enough to cope with a message length of
-		 * I2C_SMBUS_BLOCK_MAX as this is the maximum underlying bus
-		 * drivers allow. The first byte in the buffer must be
-		 * pre-filled with the number of extra bytes, which must be
-		 * at least one to hold the message length, but can be
-		 * greater (for example to account for a checksum byte at
-		 * the end of the message.)
+		 * If the block length is received from the slave
+		 * (similar to SMBus block read), we ensure that
+		 *
+		 *  - the user buffer is large enough to hold a
+		 *    message length of I2C_SMBUS_BLOCK_MAX (32), as
+		 *    this is what any Smbus version allows.
+		 *
+		 *  - the kernel buffer is large enough to hold a
+		 *    message length of I2C_SMBUS3_BLOCK_MAX (255),
+		 *    which is what Smbus >= 3.0 allows.
+		 *
+		 * Kernel block lengths up to I2SMBUS3_BLOCK_MAX
+		 * ensure that drivers can always return up to 255
+		 * bytes safely.
+		 *
+		 * User block lengths up to only I2C_SMBUS_BLOCK_MAX
+		 * are supported for backward compatibility. If an
+		 * Smbus 3.0 slave produces a longer message than
+		 * userspace provides for, we truncate the user copy
+		 * and return -EMSGSIZE.
+		 *
+		 * The first byte in the user buffer must be
+		 * pre-filled with the number of extra bytes, at least
+		 * one to hold the message length, but can be greater
+		 * (for example to account for a checksum byte at the
+		 * end of the message.)
 		 */
+		user_len[i] = msgs[i].len;
 		if (msgs[i].flags & I2C_M_RECV_LEN) {
 			if (!(msgs[i].flags & I2C_M_RD) ||
 			    msgs[i].len < 1 || msgs[i].buf[0] < 1 ||
@@ -282,11 +301,26 @@ static noinline int i2cdev_ioctl_rdwr(struct i2c_client *client,
 				break;
 			}
 
+			if (msgs[i].len < msgs[i].buf[0] +
+					   I2C_SMBUS3_BLOCK_MAX) {
+				u8 *buf = krealloc(msgs[i].buf,
+						 msgs[i].buf[0] +
+						 I2C_SMBUS3_BLOCK_MAX,
+						 GFP_KERNEL);
+				if (!buf) {
+					i++;
+					res = -ENOMEM;
+					break;
+				}
+				msgs[i].buf = buf;
+			}
+
 			msgs[i].len = msgs[i].buf[0];
 		}
 	}
 	if (res < 0) {
 		int j;
+
 		for (j = 0; j < i; ++j)
 			kfree(msgs[j].buf);
 		kfree(data_ptrs);
@@ -298,8 +332,10 @@ static noinline int i2cdev_ioctl_rdwr(struct i2c_client *client,
 	while (i-- > 0) {
 		if (res >= 0 && (msgs[i].flags & I2C_M_RD)) {
 			if (copy_to_user(data_ptrs[i], msgs[i].buf,
-					 msgs[i].len))
+					 min(msgs[i].len, user_len[i])))
 				res = -EFAULT;
+			if (msgs[i].len > user_len[i])
+				res = res ? : -EMSGSIZE;
 		}
 		kfree(msgs[i].buf);
 	}
@@ -313,7 +349,28 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 		union i2c_smbus_data __user *data)
 {
 	union i2c_smbus_data temp = {};
-	int datasize, res;
+	int block_max, datasize, res;
+
+	/* Limit legacy transaction types to 32 blocksize */
+	switch (size) {
+	case I2C_SMBUS2_BLOCK_DATA:
+		size = I2C_SMBUS_BLOCK_DATA;
+		block_max = I2C_SMBUS_BLOCK_MAX;
+		break;
+	case I2C_SMBUS2_BLOCK_PROC_CALL:
+		size = I2C_SMBUS_BLOCK_PROC_CALL;
+		block_max = I2C_SMBUS_BLOCK_MAX;
+		break;
+	case I2C_SMBUS2_I2C_BLOCK_DATA:
+		size = I2C_SMBUS_I2C_BLOCK_DATA;
+		block_max = I2C_SMBUS_BLOCK_MAX;
+		break;
+	case I2C_SMBUS_I2C_BLOCK_BROKEN:
+		block_max = I2C_SMBUS_BLOCK_MAX;
+		break;
+	default:
+		block_max = I2C_SMBUS3_BLOCK_MAX;
+	}
 
 	if ((size != I2C_SMBUS_BYTE) &&
 	    (size != I2C_SMBUS_QUICK) &&
@@ -362,7 +419,7 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 		 (size == I2C_SMBUS_PROC_CALL))
 		datasize = sizeof(data->word);
 	else /* size == smbus block, i2c block, or block proc. call */
-		datasize = sizeof(data->block);
+		datasize = block_max + 2;
 
 	if ((size == I2C_SMBUS_PROC_CALL) ||
 	    (size == I2C_SMBUS_BLOCK_PROC_CALL) ||
@@ -385,6 +442,8 @@ static noinline int i2cdev_ioctl_smbus(struct i2c_client *client,
 		     (read_write == I2C_SMBUS_READ))) {
 		if (copy_to_user(data, &temp, datasize))
 			return -EFAULT;
+		if (temp.block[0] > block_max)
+			return -EMSGSIZE;
 	}
 	return res;
 }
@@ -460,6 +519,7 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case I2C_SMBUS: {
 		struct i2c_smbus_ioctl_data data_arg;
+
 		if (copy_from_user(&data_arg,
 				   (struct i2c_smbus_ioctl_data __user *) arg,
 				   sizeof(struct i2c_smbus_ioctl_data)))
@@ -520,6 +580,7 @@ static long compat_i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned lo
 {
 	struct i2c_client *client = file->private_data;
 	unsigned long funcs;
+
 	switch (cmd) {
 	case I2C_FUNCS:
 		funcs = i2c_get_functionality(client->adapter);
@@ -549,6 +610,7 @@ static long compat_i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned lo
 		p = compat_ptr(rdwr_arg.msgs);
 		for (i = 0; i < rdwr_arg.nmsgs; i++) {
 			struct i2c_msg32 umsg;
+
 			if (copy_from_user(&umsg, p + i, sizeof(umsg))) {
 				kfree(rdwr_pa);
 				return -EFAULT;
@@ -565,6 +627,7 @@ static long compat_i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned lo
 	}
 	case I2C_SMBUS: {
 		struct i2c_smbus_ioctl_data32	data32;
+
 		if (copy_from_user(&data32,
 				   (void __user *) arg,
 				   sizeof(data32)))

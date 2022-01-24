@@ -159,10 +159,10 @@ union i2c_smbus_data {
 #define I2C_SMBUS_BYTE_DATA	    2
 #define I2C_SMBUS_WORD_DATA	    3
 #define I2C_SMBUS_PROC_CALL	    4
-#define I2C_SMBUS1_BLOCK_DATA	    5 /* Legacy 32 byte block limit */
+#define I2C_SMBUS2_BLOCK_DATA	    5 /* Legacy 32 byte block limit */
 #define I2C_SMBUS_I2C_BLOCK_BROKEN  6
-#define I2C_SMBUS1_BLOCK_PROC_CALL  7 /* SMBus 2.0, legacy 32 byte block limit */
-#define I2C_SMBUS1_I2C_BLOCK_DATA   8 /* Legacy 32 byte block limit */
+#define I2C_SMBUS2_BLOCK_PROC_CALL  7 /* SMBus 2.0, legacy 32 byte block limit */
+#define I2C_SMBUS2_I2C_BLOCK_DATA   8 /* Legacy 32 byte block limit */
 #define I2C_SMBUS_BLOCK_DATA        9 /* Smbus 3.0, 255 byte limit */
 #define I2C_SMBUS_BLOCK_PROC_CALL  10 /* Smbus 3.0, 255 byte limit */
 #define I2C_SMBUS_I2C_BLOCK_DATA   11 /* Smbus 3.0, 255 byte limit */
