@@ -124,6 +124,7 @@ intel_context_is_pinned(struct intel_context *ce)
 static inline void intel_context_cancel_request(struct intel_context *ce,
 						struct i915_request *rq)
 {
+	trace_i915_request_cancel(rq);
 	GEM_BUG_ON(!ce->ops->cancel_request);
 	return ce->ops->cancel_request(ce, rq);
 }
