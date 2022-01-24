@@ -520,6 +520,8 @@ struct super_block *sget_fc(struct fs_context *fc,
 	struct user_namespace *user_ns = fc->global ? &init_user_ns : fc->user_ns;
 	int err;
 
+	if (!test)
+		goto prealloc;
 retry:
 	spin_lock(&sb_lock);
 	if (test) {
@@ -530,6 +532,7 @@ retry:
 	}
 	if (!s) {
 		spin_unlock(&sb_lock);
+prealloc:
 		s = alloc_super(fc->fs_type, fc->sb_flags, user_ns);
 		if (!s)
 			return ERR_PTR(-ENOMEM);
