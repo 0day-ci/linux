@@ -81,6 +81,7 @@
 #include <linux/tracehook.h>
 #include <linux/audit.h>
 #include <linux/security.h>
+#include <net/tcp.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/io_uring.h>
@@ -581,6 +582,12 @@ struct io_sr_msg {
 	size_t				len;
 };
 
+struct io_recvzc {
+	struct file			*file;
+	char __user			*u_zc;
+	int __user			*u_len;
+};
+
 struct io_open {
 	struct file			*file;
 	int				dfd;
@@ -855,6 +862,7 @@ struct io_kiocb {
 		struct io_mkdir		mkdir;
 		struct io_symlink	symlink;
 		struct io_hardlink	hardlink;
+		struct io_recvzc	recvzc;
 	};
 
 	u8				opcode;
@@ -1105,6 +1113,12 @@ static const struct io_op_def io_op_defs[] = {
 	[IORING_OP_MKDIRAT] = {},
 	[IORING_OP_SYMLINKAT] = {},
 	[IORING_OP_LINKAT] = {},
+	[IORING_OP_RECVZC] = {
+		.needs_file		= 1,
+		.unbound_nonreg_file	= 1,
+		.pollin			= 1,
+		.audit_skip		= 1,
+	},
 };
 
 /* requests with any of those set should undergo io_disarm_next() */
@@ -5243,6 +5257,59 @@ out_free:
 	return 0;
 }
 
+static int io_recvzc_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
+{
+	struct io_recvzc *recvzc = &req->recvzc;
+
+#ifndef CONFIG_MMU
+	return -EOPNOTSUPP;
+#endif
+	if (unlikely(req->ctx->flags & IORING_SETUP_IOPOLL))
+		return -EINVAL;
+	if (sqe->ioprio || sqe->len || sqe->buf_index)
+		return -EINVAL;
+
+	recvzc->u_zc = u64_to_user_ptr(READ_ONCE(sqe->addr));
+	recvzc->u_len = u64_to_user_ptr(READ_ONCE(sqe->off));
+
+	return 0;
+}
+
+static int io_recvzc(struct io_kiocb *req, unsigned int issue_flags)
+{
+	struct scm_timestamping_internal tss;
+	struct io_recvzc *recvzc = &req->recvzc;
+	struct tcp_zerocopy_receive zc;
+	char __user *u_zc = recvzc->u_zc;
+	int __user *u_len = recvzc->u_len;
+	int len = 0;
+	struct socket *sock;
+	struct sock *sk;
+	int err;
+
+	if (!(req->flags & REQ_F_POLLED))
+		return -EAGAIN;
+
+	err = zc_receive_check(&zc, &len, u_zc, u_len);
+	if (err)
+		goto out;
+
+	sock = sock_from_file(req->file);
+	if (unlikely(!sock))
+		return -ENOTSOCK;
+
+	sk = sock->sk;
+	lock_sock(sk);
+	err = tcp_zerocopy_receive(sk, &zc, &tss);
+	release_sock(sk);
+	err = zc_receive_update(sk, &zc, len, u_zc, &tss, err);
+
+out:
+	__io_req_complete(req, issue_flags, err, 0);
+
+	return 0;
+}
+
 static int io_accept_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_accept *accept = &req->accept;
@@ -6568,6 +6635,8 @@ static int io_req_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 		return io_symlinkat_prep(req, sqe);
 	case IORING_OP_LINKAT:
 		return io_linkat_prep(req, sqe);
+	case IORING_OP_RECVZC:
+		return io_recvzc_prep(req, sqe);
 	}
 
 	printk_once(KERN_WARNING "io_uring: unhandled opcode %d\n",
@@ -6850,6 +6919,9 @@ static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
 		break;
 	case IORING_OP_LINKAT:
 		ret = io_linkat(req, issue_flags);
+		break;
+	case IORING_OP_RECVZC:
+		ret = io_recvzc(req, issue_flags);
 		break;
 	default:
 		ret = -EINVAL;
