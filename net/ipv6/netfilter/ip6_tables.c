@@ -327,9 +327,11 @@ ip6t_do_table(void *priv, struct sk_buff *skb,
 
 #if IS_ENABLED(CONFIG_NETFILTER_XT_TARGET_TRACE)
 		/* The packet is traced: log it */
-		if (unlikely(skb->nf_trace))
+		if (unlikely(skb->nf_trace)) {
 			trace_packet(state->net, skb, hook, state->in,
 				     state->out, table->name, private, e);
+			nf_reset_trace(skb);
+		}
 #endif
 		/* Standard target? */
 		if (!t->u.kernel.target->target) {
