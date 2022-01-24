@@ -918,6 +918,38 @@ static inline int __get_request_mask(struct inode *in) {
 	return mask;
 }
 
+/* check if the entire cluster supports the given feature */
+static inline bool ceph_cluster_has_feature(struct inode *inode, int feature_bit)
+{
+	int64_t i;
+	struct ceph_mds_client *mdsc = ceph_sb_to_mdsc(inode->i_sb);
+	struct ceph_mds_session **sessions = NULL;
+	int64_t num_sessions = 0;
+	bool found = false;
+
+	mutex_lock(&mdsc->mutex);
+	num_sessions = atomic_read(&mdsc->num_sessions);
+	sessions = mdsc->sessions;
+
+	if (mdsc->stopping)
+		goto unlock_out;
+
+	if (!sessions)
+		goto unlock_out;
+
+	for (i = 0; i < num_sessions; i++) {
+		struct ceph_mds_session *session = sessions[i];
+		if (!session)
+			goto unlock_out;
+		if (!test_bit(feature_bit, &session->s_features))
+			goto unlock_out;
+	}
+	found = true;
+unlock_out:
+	mutex_unlock(&mdsc->mutex);
+	return found;
+}
+
 ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 		      size_t size)
 {
@@ -978,8 +1010,15 @@ ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 
 	err = -ENODATA;  /* == ENOATTR */
 	xattr = __get_xattr(ci, name);
-	if (!xattr)
+	if (!xattr) {
+		if (!strncmp(name, XATTR_CEPH_PREFIX, XATTR_CEPH_PREFIX_LEN) &&
+		    ceph_cluster_has_feature(inode, CEPHFS_FEATURE_GETVXATTR)) {
+			spin_unlock(&ci->i_ceph_lock);
+			err = ceph_do_getvxattr(inode, name, value, size);
+			spin_lock(&ci->i_ceph_lock);
+		}
 		goto out;
+	}
 
 	err = -ERANGE;
 	if (size && size < xattr->val_len)
