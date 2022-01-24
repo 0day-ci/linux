@@ -155,7 +155,7 @@ properties:
           The list of all regulators provided by this SCMI controller.
 
         patternProperties:
-          '^regulators@[0-9a-f]+$':
+          '^regulator.+$':
             type: object
             $ref: "../regulator/regulator.yaml#"
 
@@ -164,8 +164,13 @@ properties:
                 maxItems: 1
                 description: Identifier for the voltage regulator.
 
-            required:
-              - reg
+              regulator-name: true
+
+            anyOf:
+              - required:
+                  - reg
+              - required:
+                  - regulator-name
 
 additionalProperties: false
 
