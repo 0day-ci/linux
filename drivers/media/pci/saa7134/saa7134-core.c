@@ -1202,6 +1202,11 @@ static int saa7134_initdev(struct pci_dev *pci_dev,
 		pr_info("%s: Overlay support disabled.\n", dev->name);
 
 	dev->video_dev = vdev_init(dev,&saa7134_video_template,"video");
+	if (!dev->video_dev) {
+		err = -ENOMEM;
+		goto err_unregister_video;
+	}
+
 	dev->video_dev->ctrl_handler = &dev->ctrl_handler;
 	dev->video_dev->lock = &dev->lock;
 	dev->video_dev->queue = &dev->video_vbq;
@@ -1224,6 +1229,11 @@ static int saa7134_initdev(struct pci_dev *pci_dev,
 	       dev->name, video_device_node_name(dev->video_dev));
 
 	dev->vbi_dev = vdev_init(dev, &saa7134_video_template, "vbi");
+	if (!dev->vbi_dev) {
+		err = -ENOMEM;
+		goto err_unregister_video;
+	}
+
 	dev->vbi_dev->ctrl_handler = &dev->ctrl_handler;
 	dev->vbi_dev->lock = &dev->lock;
 	dev->vbi_dev->queue = &dev->vbi_vbq;
