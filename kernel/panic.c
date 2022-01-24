@@ -148,10 +148,13 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 }
 EXPORT_SYMBOL(nmi_panic);
 
-static void panic_print_sys_info(void)
+static void panic_print_sys_info(bool console_flush)
 {
-	if (panic_print & PANIC_PRINT_ALL_PRINTK_MSG)
-		console_flush_on_panic(CONSOLE_REPLAY_ALL);
+	if (console_flush) {
+		if (panic_print & PANIC_PRINT_ALL_PRINTK_MSG)
+			console_flush_on_panic(CONSOLE_REPLAY_ALL);
+		return;
+	}
 
 	if (panic_print & PANIC_PRINT_ALL_CPU_BT)
 		trigger_all_cpu_backtrace();
@@ -245,21 +248,19 @@ void panic(const char *fmt, ...)
 	kgdb_panic(buf);
 
 	/*
-	 * If we have a kdump kernel loaded, give a chance to panic_print
-	 * show some extra information on kernel log if it was set...
-	 */
-	if (kexec_crash_loaded())
-		panic_print_sys_info();
-
-	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
-	 * everything else.
+	 * everything else. Also, give a chance to panic_print show some extra
+	 * information on kernel log if it was set...
+	 *
 	 * If we want to run this after calling panic_notifiers, pass
 	 * the "crash_kexec_post_notifiers" option to the kernel.
 	 *
 	 * Bypass the panic_cpu check and call __crash_kexec directly.
 	 */
 	if (!_crash_kexec_post_notifiers) {
+		if (kexec_crash_loaded())
+			panic_print_sys_info(false);
+
 		__crash_kexec(NULL);
 
 		/*
@@ -282,6 +283,15 @@ void panic(const char *fmt, ...)
 	 * add information to the kmsg dump output.
 	 */
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
+
+	/*
+	 * If a crash kernel is not loaded (or if it's loaded but we still
+	 * want to allow the panic notifiers), then we dump panic_print after
+	 * the notifiers - some notifiers disable watchdogs, for example, so
+	 * we reduce the risk of lockups/hangs or garbled output this way.
+	 */
+	if (_crash_kexec_post_notifiers || !kexec_crash_loaded())
+		panic_print_sys_info(false);
 
 	kmsg_dump(KMSG_DUMP_PANIC);
 
@@ -313,7 +323,7 @@ void panic(const char *fmt, ...)
 	debug_locks_off();
 	console_flush_on_panic(CONSOLE_FLUSH_PENDING);
 
-	panic_print_sys_info();
+	panic_print_sys_info(true);
 
 	if (!panic_blink)
 		panic_blink = no_blink;
