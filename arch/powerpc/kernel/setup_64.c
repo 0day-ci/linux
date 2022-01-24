@@ -197,6 +197,21 @@ static void __init configure_exceptions(void)
 
 	/* Under a PAPR hypervisor, we need hypercalls */
 	if (firmware_has_feature(FW_FEATURE_SET_MODE)) {
+		/*
+		 * PR KVM does not support AIL mode interrupts in the host, and
+		 * SCV system call interrupt vectors are only implemented for
+		 * AIL mode. Under pseries, AIL mode can only be enabled and
+		 * disabled system-wide so when PR KVM is loaded, all CPUs in
+		 * the host are set to AIL=0 mode. SCV can not be disabled
+		 * dynamically because the feature is advertised to host
+		 * userspace, so SCV support must not be enabled if PR KVM can
+		 * possibly be run.
+		 */
+		if (IS_ENABLED(CONFIG_KVM_BOOK3S_PR_POSSIBLE) && !radix_enabled()) {
+			init_task.thread.fscr &= ~FSCR_SCV;
+			cur_cpu_spec->cpu_user_features2 &= ~PPC_FEATURE2_SCV;
+		}
+
 		/* Enable AIL if possible */
 		if (!pseries_enable_reloc_on_exc()) {
 			init_task.thread.fscr &= ~FSCR_SCV;
