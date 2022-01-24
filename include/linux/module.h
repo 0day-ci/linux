@@ -422,6 +422,9 @@ struct module {
 	/* Core layout: rbtree is accessed frequently, so keep together. */
 	struct module_layout core_layout __module_layout_align;
 	struct module_layout init_layout;
+#ifdef CONFIG_ARCH_WANTS_MODULES_DATA_IN_VMALLOC
+	struct module_layout data_layout;
+#endif
 
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;
@@ -593,7 +596,12 @@ static inline bool within_module_layout(unsigned long addr,
 static inline bool within_module_core(unsigned long addr,
 				      const struct module *mod)
 {
+#ifdef CONFIG_ARCH_WANTS_MODULES_DATA_IN_VMALLOC
+	return within_module_layout(addr, &mod->core_layout) ||
+	       within_module_layout(addr, &mod->data_layout);
+#else
 	return within_module_layout(addr, &mod->core_layout);
+#endif
 }
 
 static inline bool within_module_init(unsigned long addr,
