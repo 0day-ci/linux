@@ -68,7 +68,6 @@ static const struct iio_enum sca3300_op_mode_enum = {
 	.get = sca3300_get_op_mode,
 	.set = sca3300_set_op_mode,
 };
-
 static const struct iio_chan_spec_ext_info sca3300_ext_info[] = {
 	IIO_ENUM("op_mode", IIO_SHARED_BY_DIR, &sca3300_op_mode_enum),
 	IIO_ENUM_AVAILABLE("op_mode", &sca3300_op_mode_enum),
@@ -77,6 +76,7 @@ static const struct iio_chan_spec_ext_info sca3300_ext_info[] = {
 
 enum sca3300_chip_type {
 	CHIP_SCA3300 = 0,
+	CHIP_SCL3300,
 	CHIP_CNT
 };
 
@@ -131,12 +131,23 @@ static const struct iio_chan_spec sca3300_channels[] = {
 	IIO_CHAN_SOFT_TIMESTAMP(4)
 };
 
+static const struct iio_chan_spec scl3300_channels[] = {
+	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_X, 0x1, X),
+	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_Y, 0x2, Y),
+	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_Z, 0x3, Z),
+	SCA3300_TEMP_CHANNEL(SCA3300_TEMP, 0x05),
+	IIO_CHAN_SOFT_TIMESTAMP(4),
+};
+
+
 static const int sca3300_lp_freq[CHIP_CNT][OP_MOD_CNT] = {
 	[CHIP_SCA3300] = {70, 70, 70, 10},
+	[CHIP_SCL3300] = {40, 70, 10, 10},
 };
 
 static const int sca3300_accel_scale[CHIP_CNT][OP_MOD_CNT][2] = {
 	[CHIP_SCA3300] = {{0, 370}, {0, 741}, {0, 185}, {0, 185}},
+	[CHIP_SCL3300] = {{0, 167}, {0, 333}, {0, 83}, {0, 83}}
 };
 
 static const unsigned long sca3300_scan_masks[] = {
@@ -182,6 +193,14 @@ static const struct sca3300_chip_info sca3300_chip_info_tbl[] = {
 		.chip_id = 0x51,
 		.channels = sca3300_channels,
 		.num_channels = ARRAY_SIZE(sca3300_channels),
+		.scan_masks = sca3300_scan_masks,
+	},
+	[CHIP_SCL3300] = {
+		.chip_type = CHIP_SCL3300,
+		.name = "scl3300",
+		.chip_id = 0xC1,
+		.channels = scl3300_channels,
+		.num_channels = ARRAY_SIZE(scl3300_channels),
 		.scan_masks = sca3300_scan_masks,
 	},
 };
@@ -310,10 +329,14 @@ static int sca3300_write_raw(struct iio_dev *indio_dev,
 		}
 		return -EINVAL;
 	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
+		if (data->chip_info->chip_type == CHIP_SCL3300) {
+			/*SCL3300 freq.tied to accel scale, not allowed to set separately.*/
+			return -EINVAL;
+		}
 		ret = sca3300_read_reg(data, SCA3300_REG_MODE, &reg_val);
 		if (ret)
 			return ret;
-		/* freq. change is possible only for mode 3 and 4 */
+		/* SCA330 freq. change is possible only for mode 3 and 4 */
 		if (reg_val == 2 && val == sca3300_lp_freq[data->chip_info->chip_type][3])
 			return sca3300_write_reg(data, SCA3300_REG_MODE, 3);
 		if (reg_val == 3 && val == sca3300_lp_freq[data->chip_info->chip_type][2])
@@ -459,7 +482,6 @@ static int sca3300_read_avail(struct iio_dev *indio_dev,
 			      long mask)
 {
 	struct sca3300_data *data = iio_priv(indio_dev);
-
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
 		if (chan->type == IIO_ACCEL) {
@@ -553,6 +575,7 @@ static int sca3300_probe(struct spi_device *spi)
 
 static const struct of_device_id sca3300_dt_ids[] = {
 	{ .compatible = "murata,sca3300"},
+	{ .compatible = "murata,scl3300"},
 	{}
 };
 MODULE_DEVICE_TABLE(of, sca3300_dt_ids);
