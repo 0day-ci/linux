@@ -5001,6 +5001,25 @@ skl_get_total_relative_data_rate(struct intel_atomic_state *state,
 	return total_data_rate;
 }
 
+static bool use_min_ddb(struct intel_crtc_state *crtc_state,
+			struct intel_plane *plane)
+{
+	struct drm_i915_private *i915 = to_i915(plane->base.dev);
+
+	return DISPLAY_VER(i915) >= 13 && crtc_state->uapi.async_flip &&
+	       plane->async_flip;
+}
+
+static bool use_minimal_wm0_only(const struct intel_crtc_state *crtc_state,
+				 struct intel_plane *plane)
+{
+	struct drm_i915_private *i915 = to_i915(plane->base.dev);
+
+	return DISPLAY_VER(i915) >= 13 &&
+	       crtc_state->uapi.async_flip &&
+	       plane->async_flip;
+}
+
 static u64
 icl_get_total_relative_data_rate(struct intel_atomic_state *state,
 				 struct intel_crtc *crtc)
@@ -5046,8 +5065,15 @@ icl_get_total_relative_data_rate(struct intel_atomic_state *state,
 		}
 	}
 
-	for_each_plane_id_on_crtc(crtc, plane_id)
-		total_data_rate += crtc_state->plane_data_rate[plane_id];
+	for_each_new_intel_plane_in_state(state, plane, plane_state, i) {
+		/*
+		 * We calculate extra ddb based on ratio plane rate/total data rate
+		 * in case, in some cases we should not allocate extra ddb for the plane,
+		 * so do not count its data rate, if this is the case.
+		 */
+		if (!use_min_ddb(crtc_state, plane))
+			total_data_rate += crtc_state->plane_data_rate[plane->id];
+	}
 
 	return total_data_rate;
 }
@@ -5212,6 +5238,8 @@ skl_allocate_plane_ddb(struct intel_atomic_state *state,
 	for_each_plane_id_on_crtc(crtc, plane_id) {
 		const struct skl_plane_wm *wm =
 			&crtc_state->wm.skl.optimal.planes[plane_id];
+		struct intel_plane *plane =
+			intel_crtc_get_plane(crtc, plane_id);
 		u64 rate;
 		u16 extra;
 
@@ -5226,9 +5254,14 @@ skl_allocate_plane_ddb(struct intel_atomic_state *state,
 			break;
 
 		rate = crtc_state->plane_data_rate[plane_id];
+
+		if (use_min_ddb(crtc_state, plane))
+			rate = 0;
+
 		extra = min_t(u16, alloc_size,
 			      DIV64_U64_ROUND_UP(alloc_size * rate,
 						 total_data_rate));
+
 		total[plane_id] = wm->wm[level].min_ddb_alloc + extra;
 		alloc_size -= extra;
 		total_data_rate -= rate;
@@ -5237,13 +5270,19 @@ skl_allocate_plane_ddb(struct intel_atomic_state *state,
 			break;
 
 		rate = crtc_state->uv_plane_data_rate[plane_id];
+
+		if (use_min_ddb(crtc_state, plane))
+			rate = 0;
+
 		extra = min_t(u16, alloc_size,
 			      DIV64_U64_ROUND_UP(alloc_size * rate,
 						 total_data_rate));
+
 		uv_total[plane_id] = wm->uv_wm[level].min_ddb_alloc + extra;
 		alloc_size -= extra;
 		total_data_rate -= rate;
 	}
+
 	drm_WARN_ON(&dev_priv->drm, alloc_size != 0 || total_data_rate != 0);
 
 	/* Set the actual DDB start/end points for each plane */
@@ -5508,16 +5547,6 @@ static int skl_wm_max_lines(struct drm_i915_private *dev_priv)
 		return 255;
 	else
 		return 31;
-}
-
-static bool use_minimal_wm0_only(const struct intel_crtc_state *crtc_state,
-				 struct intel_plane *plane)
-{
-	struct drm_i915_private *i915 = to_i915(plane->base.dev);
-
-	return DISPLAY_VER(i915) >= 13 &&
-	       crtc_state->uapi.async_flip &&
-	       plane->async_flip;
 }
 
 static void skl_compute_plane_wm(const struct intel_crtc_state *crtc_state,

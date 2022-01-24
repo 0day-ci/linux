@@ -23,7 +23,8 @@ unsigned int intel_adjusted_rate(const struct drm_rect *src,
 				 unsigned int rate);
 unsigned int intel_plane_pixel_rate(const struct intel_crtc_state *crtc_state,
 				    const struct intel_plane_state *plane_state);
-
+struct intel_plane *intel_crtc_get_plane(struct intel_crtc *crtc,
+					  enum plane_id plane_id);
 unsigned int intel_plane_data_rate(const struct intel_crtc_state *crtc_state,
 				   const struct intel_plane_state *plane_state);
 void intel_plane_copy_uapi_to_hw_state(struct intel_plane_state *plane_state,
