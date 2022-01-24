@@ -41,8 +41,13 @@
 static int vfio_pci_iowrite##size(struct vfio_pci_core_device *vdev,		\
 			bool test_mem, u##size val, void __iomem *io)	\
 {									\
+	down_read(&vdev->memory_lock);					\
+	if (vdev->power_state >= PCI_D3hot) {				\
+		up_read(&vdev->memory_lock);				\
+		return -EIO;						\
+	}								\
+									\
 	if (test_mem) {							\
-		down_read(&vdev->memory_lock);				\
 		if (!__vfio_pci_memory_enabled(vdev)) {			\
 			up_read(&vdev->memory_lock);			\
 			return -EIO;					\
@@ -51,8 +56,7 @@ static int vfio_pci_iowrite##size(struct vfio_pci_core_device *vdev,		\
 									\
 	vfio_iowrite##size(val, io);					\
 									\
-	if (test_mem)							\
-		up_read(&vdev->memory_lock);				\
+	up_read(&vdev->memory_lock);					\
 									\
 	return 0;							\
 }
@@ -68,8 +72,13 @@ VFIO_IOWRITE(64)
 static int vfio_pci_ioread##size(struct vfio_pci_core_device *vdev,		\
 			bool test_mem, u##size *val, void __iomem *io)	\
 {									\
+	down_read(&vdev->memory_lock);					\
+	if (vdev->power_state >= PCI_D3hot) {				\
+		up_read(&vdev->memory_lock);				\
+		return -EIO;						\
+	}								\
+									\
 	if (test_mem) {							\
-		down_read(&vdev->memory_lock);				\
 		if (!__vfio_pci_memory_enabled(vdev)) {			\
 			up_read(&vdev->memory_lock);			\
 			return -EIO;					\
@@ -78,8 +87,7 @@ static int vfio_pci_ioread##size(struct vfio_pci_core_device *vdev,		\
 									\
 	*val = vfio_ioread##size(io);					\
 									\
-	if (test_mem)							\
-		up_read(&vdev->memory_lock);				\
+	up_read(&vdev->memory_lock);					\
 									\
 	return 0;							\
 }

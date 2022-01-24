@@ -201,11 +201,12 @@ static void vfio_pci_probe_power_state(struct vfio_pci_core_device *vdev)
 }
 
 /*
- * pci_set_power_state() wrapper handling devices which perform a soft reset on
- * D3->D0 transition.  Save state prior to D0/1/2->D3, stash it on the vdev,
- * restore when returned to D0.  Saved separately from pci_saved_state for use
- * by PM capability emulation and separately from pci_dev internal saved state
- * to avoid it being overwritten and consumed around other resets.
+ * vfio_pci_set_power_state_locked() wrapper handling devices which perform a
+ * soft reset on D3->D0 transition.  Save state prior to D0/1/2->D3, stash it
+ * on the vdev, restore when returned to D0.  Saved separately from
+ * pci_saved_state for use by PM capability emulation and separately from
+ * pci_dev internal saved state to avoid it being overwritten and consumed
+ * around other resets.
  *
  * There are few cases where the PCI power state can be changed to D0
  * without the involvement of this API. So, cache the power state locally
@@ -215,7 +216,8 @@ static void vfio_pci_probe_power_state(struct vfio_pci_core_device *vdev)
  * The memory taken for saving this PCI state needs to be freed to
  * prevent memory leak.
  */
-int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t state)
+static int vfio_pci_set_power_state_locked(struct vfio_pci_core_device *vdev,
+					   pci_power_t state)
 {
 	struct pci_dev *pdev = vdev->pdev;
 	bool needs_restore = false, needs_save = false;
@@ -257,6 +259,26 @@ int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t stat
 		}
 	}
 
+	return ret;
+}
+
+/*
+ * vfio_pci_set_power_state() takes all the required locks to protect
+ * the access of power related variables and then invokes
+ * vfio_pci_set_power_state_locked().
+ */
+int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev,
+			     pci_power_t state)
+{
+	int ret;
+
+	if (state >= PCI_D3hot)
+		vfio_pci_zap_and_down_write_memory_lock(vdev);
+	else
+		down_write(&vdev->memory_lock);
+
+	ret = vfio_pci_set_power_state_locked(vdev, state);
+	up_write(&vdev->memory_lock);
 	return ret;
 }
 
@@ -354,7 +376,7 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 	 * in running the logic needed for D0 power state. The subsequent
 	 * runtime PM API's will put the device into the low power state again.
 	 */
-	vfio_pci_set_power_state(vdev, PCI_D0);
+	vfio_pci_set_power_state_locked(vdev, PCI_D0);
 
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
@@ -967,7 +989,7 @@ long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
 		 * interaction. Update the power state in vfio driver to perform
 		 * the logic needed for D0 power state.
 		 */
-		vfio_pci_set_power_state(vdev, PCI_D0);
+		vfio_pci_set_power_state_locked(vdev, PCI_D0);
 		up_write(&vdev->memory_lock);
 
 		return ret;
@@ -1453,6 +1475,11 @@ static vm_fault_t vfio_pci_mmap_fault(struct vm_fault *vmf)
 		goto up_out;
 	}
 
+	if (vdev->power_state >= PCI_D3hot) {
+		ret = VM_FAULT_SIGBUS;
+		goto up_out;
+	}
+
 	/*
 	 * We populate the whole vma on fault, so we need to test whether
 	 * the vma has already been mapped, such as for concurrent faults
@@ -1902,7 +1929,7 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 	 * be able to get to D3.  Therefore first do a D0 transition
 	 * before enabling runtime PM.
 	 */
-	vfio_pci_set_power_state(vdev, PCI_D0);
+	vfio_pci_set_power_state_locked(vdev, PCI_D0);
 	pm_runtime_allow(&pdev->dev);
 
 	if (!disable_idle_d3)
@@ -2117,7 +2144,7 @@ err_undo:
 		 * interaction. Update the power state in vfio driver to perform
 		 * the logic needed for D0 power state.
 		 */
-		vfio_pci_set_power_state(cur, PCI_D0);
+		vfio_pci_set_power_state_locked(cur, PCI_D0);
 		if (cur == cur_mem)
 			is_mem = false;
 		if (cur == cur_vma)
