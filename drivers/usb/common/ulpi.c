@@ -301,11 +301,11 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 
 	ret = ulpi_read_id(ulpi);
 	if (ret)
-		return ret;
+		goto err;
 
 	ret = device_register(&ulpi->dev);
 	if (ret)
-		return ret;
+		goto err;
 
 	root = debugfs_create_dir(dev_name(dev), ULPI_ROOT);
 	debugfs_create_file("regs", 0444, root, ulpi, &ulpi_regs_ops);
@@ -314,6 +314,10 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
 		ulpi->id.vendor, ulpi->id.product);
 
 	return 0;
+
+err:
+	of_node_put(ulpi->dev.of_node);
+	return ret;
 }
 
 /**
@@ -357,8 +361,8 @@ void ulpi_unregister_interface(struct ulpi *ulpi)
 {
 	debugfs_remove_recursive(debugfs_lookup(dev_name(&ulpi->dev),
 						ULPI_ROOT));
-	of_node_put(ulpi->dev.of_node);
 	device_unregister(&ulpi->dev);
+	of_node_put(ulpi->dev.of_node);
 }
 EXPORT_SYMBOL_GPL(ulpi_unregister_interface);
 
