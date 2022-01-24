@@ -376,6 +376,7 @@ struct tcp_authopt_key_info *__tcp_authopt_select_key(const struct sock *sk,
 
 	return tcp_authopt_lookup_send(net, addr_sk, -1);
 }
+EXPORT_SYMBOL(__tcp_authopt_select_key);
 
 static struct tcp_authopt_info *__tcp_authopt_info_get_or_create(struct sock *sk)
 {
@@ -1201,6 +1202,7 @@ fail:
 	memset(hash_location, 0, TCP_AUTHOPT_MACLEN);
 	return err;
 }
+EXPORT_SYMBOL(tcp_authopt_hash);
 
 /**
  * tcp_authopt_lookup_recv - lookup key for receive
