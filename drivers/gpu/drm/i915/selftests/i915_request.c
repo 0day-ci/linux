@@ -790,8 +790,9 @@ out_spin:
  * wait for spinner to start, create a NOP request and submit it, cancel the
  * spinner, wait for spinner to complete and verify it failed with an error,
  * finally wait for NOP request to complete verify it succeeded without an
- * error. Preemption timeout also reduced / restored so test runs in a timely
- * maner.
+ * error. Preemption timeout also set to zero to ensure cancellation works with
+ * preemption disabled and to ensure the NOP request doesn't trigger a
+ * preemption on the spinner sealing a race between a preemption and the cancel.
  */
 static int __cancel_reset(struct drm_i915_private *i915,
 			  struct intel_engine_cs *engine)
@@ -807,7 +808,7 @@ static int __cancel_reset(struct drm_i915_private *i915,
 		return 0;
 
 	preempt_timeout_ms = engine->props.preempt_timeout_ms;
-	engine->props.preempt_timeout_ms = 100;
+	engine->props.preempt_timeout_ms = 0;
 
 	if (igt_spinner_init(&spin, engine->gt))
 		goto out_restore;
