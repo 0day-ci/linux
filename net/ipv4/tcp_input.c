@@ -72,6 +72,7 @@
 #include <linux/prefetch.h>
 #include <net/dst.h>
 #include <net/tcp.h>
+#include <net/tcp_authopt.h>
 #include <net/inet_common.h>
 #include <linux/ipsec.h>
 #include <asm/unaligned.h>
@@ -4175,39 +4176,56 @@ static bool tcp_fast_parse_options(const struct net *net,
 	return true;
 }
 
-#ifdef CONFIG_TCP_MD5SIG
+#if defined(CONFIG_TCP_MD5SIG) || defined(CONFIG_TCP_AUTHOPT)
 /*
- * Parse MD5 Signature option
+ * Parse MD5 and AO options
+ *
+ * md5ptr: pointer to content of MD5 option (16-byte hash)
+ * aoptr: pointer to start of AO option (variable length)
  */
-const u8 *tcp_parse_md5sig_option(const struct tcphdr *th)
+int tcp_parse_sig_options(const struct tcphdr *th, const u8 **md5ptr, const u8 **aoptr)
 {
 	int length = (th->doff << 2) - sizeof(*th);
 	const u8 *ptr = (const u8 *)(th + 1);
 
+	*md5ptr = NULL;
+	*aoptr = NULL;
+
 	/* If not enough data remaining, we can short cut */
-	while (length >= TCPOLEN_MD5SIG) {
+	while (length >= 4) {
 		int opcode = *ptr++;
 		int opsize;
 
 		switch (opcode) {
 		case TCPOPT_EOL:
-			return NULL;
+			goto out;
 		case TCPOPT_NOP:
 			length--;
 			continue;
 		default:
 			opsize = *ptr++;
 			if (opsize < 2 || opsize > length)
-				return NULL;
-			if (opcode == TCPOPT_MD5SIG)
-				return opsize == TCPOLEN_MD5SIG ? ptr : NULL;
+				goto out;
+			if (opcode == TCPOPT_MD5SIG && opsize == TCPOLEN_MD5SIG)
+				*md5ptr = ptr;
+			if (opcode == TCPOPT_AUTHOPT)
+				*aoptr = ptr - 2;
 		}
 		ptr += opsize - 2;
 		length -= opsize;
 	}
-	return NULL;
+
+out:
+	/* RFC5925 2.2: An endpoint MUST NOT use TCP-AO for the same connection
+	 * in which TCP MD5 is used. When both options appear, TCP MUST silently
+	 * discard the segment.
+	 */
+	if (*md5ptr && *aoptr)
+		return -EINVAL;
+
+	return 0;
 }
-EXPORT_SYMBOL(tcp_parse_md5sig_option);
+EXPORT_SYMBOL(tcp_parse_sig_options);
 #endif
 
 /* Sorry, PAWS as specified is broken wrt. pure-ACKs -DaveM
@@ -5993,6 +6011,8 @@ void tcp_finish_connect(struct sock *sk, struct sk_buff *skb)
 
 	tcp_set_state(sk, TCP_ESTABLISHED);
 	icsk->icsk_ack.lrcvtime = tcp_jiffies32;
+
+	tcp_authopt_finish_connect(sk, skb);
 
 	if (skb) {
 		icsk->icsk_af_ops->sk_rx_dst_set(sk, skb);
