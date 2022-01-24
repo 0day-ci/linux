@@ -776,6 +776,10 @@ static void loop_config_discard(struct loop_device *lo)
 	} else {
 		max_discard_sectors = UINT_MAX >> 9;
 		granularity = inode->i_sb->s_blocksize;
+
+		/* Take PAGE_SIZE if the FS doesn't provide us one hint */
+		if (!granularity)
+			granularity = PAGE_SIZE;
 	}
 
 	if (max_discard_sectors) {
