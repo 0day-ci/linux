@@ -1521,6 +1521,8 @@ int cx23885_417_register(struct cx23885_dev *dev)
 	/* Allocate and initialize V4L video device */
 	dev->v4l_device = cx23885_video_dev_alloc(tsport,
 		dev->pci, &cx23885_mpeg_template, "mpeg");
+	if (!dev->v4l_device)
+		return -ENOMEM;
 	q = &dev->vb2_mpegq;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	q->io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF | VB2_READ;
