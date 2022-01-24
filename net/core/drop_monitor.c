@@ -126,6 +126,7 @@ struct net_dm_skb_cb {
 		struct devlink_trap_metadata *hw_metadata;
 		void *pc;
 	};
+	enum skb_drop_reason reason;
 };
 
 #define NET_DM_SKB_CB(__skb) ((struct net_dm_skb_cb *)&((__skb)->cb[0]))
@@ -508,6 +509,7 @@ static void net_dm_packet_trace_kfree_skb_hit(void *ignore,
 	if (!nskb)
 		return;
 
+	NET_DM_SKB_CB(nskb)->reason = reason;
 	NET_DM_SKB_CB(nskb)->pc = location;
 	/* Override the timestamp because we care about the time when the
 	 * packet was dropped.
@@ -606,6 +608,7 @@ nla_put_failure:
 static int net_dm_packet_report_fill(struct sk_buff *msg, struct sk_buff *skb,
 				     size_t payload_len)
 {
+	enum skb_drop_reason reason = NET_DM_SKB_CB(skb)->reason;
 	u64 pc = (u64)(uintptr_t) NET_DM_SKB_CB(skb)->pc;
 	char buf[NET_DM_MAX_SYMBOL_LEN];
 	struct nlattr *attr;
@@ -621,6 +624,9 @@ static int net_dm_packet_report_fill(struct sk_buff *msg, struct sk_buff *skb,
 		goto nla_put_failure;
 
 	if (nla_put_u64_64bit(msg, NET_DM_ATTR_PC, pc, NET_DM_ATTR_PAD))
+		goto nla_put_failure;
+
+	if (nla_put_u32(msg, NET_DM_ATTR_REASON, reason))
 		goto nla_put_failure;
 
 	snprintf(buf, sizeof(buf), "%pS", NET_DM_SKB_CB(skb)->pc);
