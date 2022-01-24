@@ -123,20 +123,11 @@ static int kvm_check_cpuid(struct kvm_vcpu *vcpu,
 static int kvm_cpuid_check_equal(struct kvm_vcpu *vcpu, struct kvm_cpuid_entry2 *e2,
 				 int nent)
 {
-	struct kvm_cpuid_entry2 *orig;
-	int i;
-
 	if (nent != vcpu->arch.cpuid_nent)
 		return -EINVAL;
 
-	for (i = 0; i < nent; i++) {
-		orig = &vcpu->arch.cpuid_entries[i];
-		if (e2[i].function != orig->function ||
-		    e2[i].index != orig->index ||
-		    e2[i].eax != orig->eax || e2[i].ebx != orig->ebx ||
-		    e2[i].ecx != orig->ecx || e2[i].edx != orig->edx)
-			return -EINVAL;
-	}
+	if (memcmp(e2, vcpu->arch.cpuid_entries, nent * sizeof(*e2)))
+		return -EINVAL;
 
 	return 0;
 }
