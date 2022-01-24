@@ -957,6 +957,7 @@ static int tcp_v4_authopt_get_traffic_key_noskb(struct tcp_authopt_key_info *key
 	int err;
 	struct tcp_authopt_alg_pool *pool;
 	struct tcp_v4_authopt_context_data data;
+	char traffic_key_context_header[7] = "\x01TCP-AO";
 
 	BUILD_BUG_ON(sizeof(data) != 22);
 
@@ -973,7 +974,7 @@ static int tcp_v4_authopt_get_traffic_key_noskb(struct tcp_authopt_key_info *key
 
 	// RFC5926 section 3.1.1.1
 	// Separate to keep alignment semi-sane
-	err = crypto_ahash_buf(pool->req, "\x01TCP-AO", 7);
+	err = crypto_ahash_buf(pool->req, traffic_key_context_header, 7);
 	if (err)
 		return err;
 	data.saddr = saddr;
