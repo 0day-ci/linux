@@ -42,6 +42,38 @@
 /* Device return status and mask */
 #define SCA3300_VALUE_RS_ERROR	0x3
 #define SCA3300_MASK_RS_STATUS	GENMASK(1, 0)
+enum sca3300_op_mode_indexes {
+	OP_MOD_1 = 0,
+	OP_MOD_2,
+	OP_MOD_3,
+	OP_MOD_4,
+	OP_MOD_CNT
+};
+
+static const char * const sca3300_op_modes[] = {
+	[OP_MOD_1] = "1",
+	[OP_MOD_2] = "2",
+	[OP_MOD_3] = "3",
+	[OP_MOD_4] = "4"
+};
+
+static int sca3300_get_op_mode(struct iio_dev *indio_dev,
+		const struct iio_chan_spec *chan);
+static int sca3300_set_op_mode(struct iio_dev *indio_dev,
+		const struct iio_chan_spec *chan, unsigned int mode);
+
+static const struct iio_enum sca3300_op_mode_enum = {
+	.items = sca3300_op_modes,
+	.num_items = ARRAY_SIZE(sca3300_op_modes),
+	.get = sca3300_get_op_mode,
+	.set = sca3300_set_op_mode,
+};
+
+static const struct iio_chan_spec_ext_info sca3300_ext_info[] = {
+	IIO_ENUM("op_mode", IIO_SHARED_BY_DIR, &sca3300_op_mode_enum),
+	IIO_ENUM_AVAILABLE("op_mode", &sca3300_op_mode_enum),
+	{ }
+};
 
 enum sca3300_scan_indexes {
 	SCA3300_ACC_X = 0,
@@ -70,6 +102,7 @@ enum sca3300_scan_indexes {
 		.storagebits = 16,					\
 		.endianness = IIO_CPU,					\
 	},								\
+	.ext_info = sca3300_ext_info,					\
 }
 
 #define SCA3300_TEMP_CHANNEL(index, reg) {				\
@@ -398,6 +431,28 @@ static int sca3300_read_avail(struct iio_dev *indio_dev,
 	default:
 		return -EINVAL;
 	}
+}
+
+static int sca3300_get_op_mode(struct iio_dev *indio_dev,
+		const struct iio_chan_spec *chan)
+{
+	int mode;
+	int ret;
+	struct sca3300_data *data = iio_priv(indio_dev);
+
+	ret = sca3300_read_reg(data, SCA3300_REG_MODE, &mode);
+	if (ret)
+		return ret;
+	return mode;
+
+}
+
+static int sca3300_set_op_mode(struct iio_dev *indio_dev,
+		const struct iio_chan_spec *chan, unsigned int mode)
+{
+	struct sca3300_data *data = iio_priv(indio_dev);
+
+	return sca3300_write_reg(data, SCA3300_REG_MODE, mode);
 }
 
 static const struct iio_info sca3300_info = {
