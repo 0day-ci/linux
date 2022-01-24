@@ -4237,11 +4237,6 @@ SYSCALL_DEFINE3(finit_module, int, fd, const char __user *, uargs, int, flags)
 	return load_module(&info, uargs, flags);
 }
 
-static inline int within(unsigned long addr, void *start, unsigned long size)
-{
-	return ((void *)addr >= start && (void *)addr < start + size);
-}
-
 #ifdef CONFIG_KALLSYMS
 /*
  * This ignores the intensely annoying "mapping symbols" found
@@ -4778,13 +4773,11 @@ bool is_module_text_address(unsigned long addr)
 struct module *__module_text_address(unsigned long addr)
 {
 	struct module *mod = __module_address(addr);
-	if (mod) {
-		/* Make sure it's within the text section. */
-		if (!within(addr, mod->init_layout.base, mod->init_layout.text_size)
-		    && !within(addr, mod->core_layout.base, mod->core_layout.text_size))
-			mod = NULL;
-	}
-	return mod;
+
+	if (mod && within_module_text(addr, mod))
+		return mod;
+
+	return NULL;
 }
 
 /* Don't grab lock, we're oopsing. */

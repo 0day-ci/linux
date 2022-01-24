@@ -571,6 +571,19 @@ static inline bool within_range(unsigned long addr, void *base, unsigned int siz
 	return addr >= (unsigned long)base && addr < (unsigned long)base + size;
 }
 
+static inline bool within_module_layout_text(unsigned long addr,
+					     const struct module_layout *layout)
+{
+	return within_range(addr, layout->base, layout->text_size);
+}
+
+static inline bool within_module_text(unsigned long addr,
+				      const struct module *mod)
+{
+	return within_module_layout_text(addr, &mod->core_layout) ||
+	       within_module_layout_text(addr, &mod->init_layout);
+}
+
 static inline bool within_module_layout(unsigned long addr,
 					const struct module_layout *layout)
 {
