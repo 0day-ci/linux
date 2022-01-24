@@ -318,8 +318,10 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 {
 	const struct iphdr *iph = ip_hdr(skb);
 	int (*edemux)(struct sk_buff *skb);
+	int err, drop_reason;
 	struct rtable *rt;
-	int err;
+
+	drop_reason = SKB_DROP_REASON_NOT_SPECIFIED;
 
 	if (ip_can_use_hint(skb, iph, hint)) {
 		err = ip_route_use_hint(skb, iph->daddr, iph->saddr, iph->tos,
@@ -339,8 +341,10 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 		if (ipprot && (edemux = READ_ONCE(ipprot->early_demux))) {
 			err = INDIRECT_CALL_2(edemux, tcp_v4_early_demux,
 					      udp_v4_early_demux, skb);
-			if (unlikely(err))
+			if (unlikely(err)) {
+				drop_reason = SKB_DROP_REASON_EARLY_DEMUX;
 				goto drop_error;
+			}
 			/* must reload iph, skb->head might have changed */
 			iph = ip_hdr(skb);
 		}
@@ -353,8 +357,10 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 	if (!skb_valid_dst(skb)) {
 		err = ip_route_input_noref(skb, iph->daddr, iph->saddr,
 					   iph->tos, dev);
-		if (unlikely(err))
+		if (unlikely(err)) {
+			drop_reason = SKB_DROP_REASON_IP_ROUTE_INPUT;
 			goto drop_error;
+		}
 	}
 
 #ifdef CONFIG_IP_ROUTE_CLASSID
@@ -396,19 +402,23 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 		 * so-called "hole-196" attack) so do it for both.
 		 */
 		if (in_dev &&
-		    IN_DEV_ORCONF(in_dev, DROP_UNICAST_IN_L2_MULTICAST))
+		    IN_DEV_ORCONF(in_dev, DROP_UNICAST_IN_L2_MULTICAST)) {
+			drop_reason = SKB_DROP_REASON_UNICAST_IN_L2_MULTICAST;
 			goto drop;
+		}
 	}
 
 	return NET_RX_SUCCESS;
 
 drop:
-	kfree_skb(skb);
+	kfree_skb_reason(skb, drop_reason);
 	return NET_RX_DROP;
 
 drop_error:
-	if (err == -EXDEV)
+	if (err == -EXDEV) {
+		drop_reason = SKB_DROP_REASON_IP_RPFILTER;
 		__NET_INC_STATS(net, LINUX_MIB_IPRPFILTER);
+	}
 	goto drop;
 }
 
