@@ -61,8 +61,8 @@ static size_t buffer_start_add(struct persistent_ram_zone *prz, size_t a)
 
 	old = atomic_read(&prz->buffer->start);
 	new = old + a;
-	while (unlikely(new >= prz->buffer_size))
-		new -= prz->buffer_size;
+	if (unlikely(new >= prz->buffer_size))
+		new %= prz->buffer_size;
 	atomic_set(&prz->buffer->start, new);
 
 	if (!(prz->flags & PRZ_FLAG_NO_LOCK))
