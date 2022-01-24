@@ -792,7 +792,7 @@ int timerlat_hist_main(int argc, char *argv[])
 						    trace);
 		if (retval < 0) {
 			err_msg("Error iterating on events\n");
-			goto out_hist;
+			goto out_trace;
 		}
 
 		if (!tracefs_trace_is_on(trace->inst))
@@ -811,11 +811,12 @@ int timerlat_hist_main(int argc, char *argv[])
 		}
 	}
 
+out_trace:
+	if (params->trace_output)
+		osnoise_destroy_tool(record);
 out_hist:
 	timerlat_free_histogram(tool->data);
 	osnoise_destroy_tool(tool);
-	if (params->trace_output)
-		osnoise_destroy_tool(record);
 	free(params);
 out_exit:
 	exit(return_value);
