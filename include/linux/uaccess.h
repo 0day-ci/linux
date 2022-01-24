@@ -114,6 +114,20 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 	return raw_copy_from_user(to, from, n);
 }
 
+#ifdef raw_copy_from_user_with_key
+static __always_inline __must_check unsigned long
+__copy_from_user_with_key(void *to, const void __user *from, unsigned long n,
+			  unsigned long key)
+{
+	might_fault();
+	if (should_fail_usercopy())
+		return n;
+	instrument_copy_from_user(to, from, n);
+	check_object_size(to, n, false);
+	return raw_copy_from_user_with_key(to, from, n, key);
+}
+#endif /* raw_copy_from_user_with_key */
+
 /**
  * __copy_to_user_inatomic: - Copy a block of data into user space, with less checking.
  * @to:   Destination address, in user space.
@@ -147,6 +161,20 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 	check_object_size(from, n, true);
 	return raw_copy_to_user(to, from, n);
 }
+
+#ifdef raw_copy_to_user_with_key
+static __always_inline __must_check unsigned long
+__copy_to_user_with_key(void __user *to, const void *from, unsigned long n,
+			unsigned long key)
+{
+	might_fault();
+	if (should_fail_usercopy())
+		return n;
+	instrument_copy_to_user(to, from, n);
+	check_object_size(from, n, true);
+	return raw_copy_to_user_with_key(to, from, n, key);
+}
+#endif /* raw_copy_to_user_with_key */
 
 #ifdef INLINE_COPY_FROM_USER
 static inline __must_check unsigned long
