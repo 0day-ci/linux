@@ -1588,10 +1588,8 @@ static int rtw_br_client_tx(struct adapter *padapter, struct sk_buff **pskb)
 				}
 
 				newskb = skb_copy(skb, GFP_ATOMIC);
-				if (!newskb) {
-					DEBUG_ERR("TX DROP: skb_copy fail!\n");
+				if (!newskb)
 					return -1;
-				}
 				dev_kfree_skb_any(skb);
 
 				*pskb = skb = newskb;
@@ -1603,21 +1601,15 @@ static int rtw_br_client_tx(struct adapter *padapter, struct sk_buff **pskb)
 				}
 			}
 
-			if (skb_is_nonlinear(skb))
-				DEBUG_ERR("%s(): skb_is_nonlinear!!\n", __func__);
-
 			res = skb_linearize(skb);
-			if (res < 0) {
-					DEBUG_ERR("TX DROP: skb_linearize fail!\n");
+			if (res < 0)
 					return -1;
-			}
 
 			res = nat25_db_handle(padapter, skb, NAT25_INSERT);
 			if (res < 0) {
-				if (res == -2) {
-					DEBUG_ERR("TX DROP: nat25_db_handle fail!\n");
+				if (res == -2)
 					return -1;
-				}
+
 				return 0;
 			}
 		}
@@ -1636,11 +1628,9 @@ static int rtw_br_client_tx(struct adapter *padapter, struct sk_buff **pskb)
 	}
 
 	/*  check if SA is equal to our MAC */
-	if (memcmp(skb->data + ETH_ALEN, GET_MY_HWADDR(padapter), ETH_ALEN)) {
-		DEBUG_ERR("TX DROP: untransformed frame SA:%02X%02X%02X%02X%02X%02X!\n",
-			  skb->data[6], skb->data[7], skb->data[8], skb->data[9], skb->data[10], skb->data[11]);
+	if (memcmp(skb->data + ETH_ALEN, GET_MY_HWADDR(padapter), ETH_ALEN))
 		return -1;
-	}
+
 	return 0;
 }
 
