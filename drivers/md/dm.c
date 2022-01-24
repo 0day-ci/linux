@@ -315,7 +315,10 @@ static int dm_blk_open(struct block_device *bdev, fmode_t mode)
 		goto out;
 
 	if (test_bit(DMF_FREEING, &md->flags) ||
+	    test_bit(DMF_DEFERRED_REMOVE_NO_OPEN, &md->flags) ||
 	    dm_deleting_md(md)) {
+		BUG_ON(test_bit(DMF_DEFERRED_REMOVE_NO_OPEN, &md->flags) &&
+		       !test_bit(DMF_DEFERRED_REMOVE, &md->flags));
 		md = NULL;
 		goto out;
 	}
@@ -355,7 +358,8 @@ int dm_open_count(struct mapped_device *md)
 /*
  * Guarantees nothing is using the device before it's deleted.
  */
-int dm_lock_for_deletion(struct mapped_device *md, bool mark_deferred, bool only_deferred)
+int dm_lock_for_deletion(struct mapped_device *md, bool mark_deferred,
+		bool deferred_no_open, bool only_deferred)
 {
 	int r = 0;
 
@@ -363,8 +367,12 @@ int dm_lock_for_deletion(struct mapped_device *md, bool mark_deferred, bool only
 
 	if (dm_open_count(md)) {
 		r = -EBUSY;
-		if (mark_deferred)
+		if (mark_deferred) {
 			set_bit(DMF_DEFERRED_REMOVE, &md->flags);
+
+			if (deferred_no_open)
+				set_bit(DMF_DEFERRED_REMOVE_NO_OPEN, &md->flags);
+		}
 	} else if (only_deferred && !test_bit(DMF_DEFERRED_REMOVE, &md->flags))
 		r = -EEXIST;
 	else
@@ -383,8 +391,10 @@ int dm_cancel_deferred_remove(struct mapped_device *md)
 
 	if (test_bit(DMF_DELETING, &md->flags))
 		r = -EBUSY;
-	else
+	else {
 		clear_bit(DMF_DEFERRED_REMOVE, &md->flags);
+		clear_bit(DMF_DEFERRED_REMOVE_NO_OPEN, &md->flags);
+	}
 
 	spin_unlock(&_minor_lock);
 
@@ -2777,6 +2787,11 @@ int dm_suspended_internally_md(struct mapped_device *md)
 int dm_test_deferred_remove_flag(struct mapped_device *md)
 {
 	return test_bit(DMF_DEFERRED_REMOVE, &md->flags);
+}
+
+int dm_test_deferred_remove_no_open_flag(struct mapped_device *md)
+{
+	return test_bit(DMF_DEFERRED_REMOVE_NO_OPEN, &md->flags);
 }
 
 int dm_suspended(struct dm_target *ti)

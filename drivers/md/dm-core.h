@@ -139,6 +139,7 @@ struct mapped_device {
 #define DMF_SUSPENDED_INTERNALLY 7
 #define DMF_POST_SUSPENDING 8
 #define DMF_EMULATE_ZONE_APPEND 9
+#define DMF_DEFERRED_REMOVE_NO_OPEN 10
 
 void disable_discard(struct mapped_device *md);
 void disable_write_same(struct mapped_device *md);

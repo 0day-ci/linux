@@ -163,6 +163,12 @@ void dm_internal_resume(struct mapped_device *md);
 int dm_test_deferred_remove_flag(struct mapped_device *md);
 
 /*
+ * Test if the device is scheduled for deferred remove while
+ * disallowing opens.
+ */
+int dm_test_deferred_remove_no_open_flag(struct mapped_device *md);
+
+/*
  * Try to remove devices marked for deferred removal.
  */
 void dm_deferred_remove(void);
@@ -202,7 +208,8 @@ void dm_stripe_exit(void);
 void dm_destroy(struct mapped_device *md);
 void dm_destroy_immediate(struct mapped_device *md);
 int dm_open_count(struct mapped_device *md);
-int dm_lock_for_deletion(struct mapped_device *md, bool mark_deferred, bool only_deferred);
+int dm_lock_for_deletion(struct mapped_device *md, bool mark_deferred,
+			 bool deferred_no_open, bool only_deferred);
 int dm_cancel_deferred_remove(struct mapped_device *md);
 int dm_request_based(struct mapped_device *md);
 int dm_get_table_device(struct mapped_device *md, dev_t dev, fmode_t mode,

@@ -286,9 +286,9 @@ enum {
 #define DM_DEV_SET_GEOMETRY	_IOWR(DM_IOCTL, DM_DEV_SET_GEOMETRY_CMD, struct dm_ioctl)
 
 #define DM_VERSION_MAJOR	4
-#define DM_VERSION_MINOR	45
+#define DM_VERSION_MINOR	46
 #define DM_VERSION_PATCHLEVEL	0
-#define DM_VERSION_EXTRA	"-ioctl (2021-03-22)"
+#define DM_VERSION_EXTRA	"-ioctl (2022-01-21)"
 
 /* Status bits */
 #define DM_READONLY_FLAG	(1 << 0) /* In/Out */
@@ -381,5 +381,13 @@ enum {
  * that would be measured by IMA subsystem on device state change.
  */
 #define DM_IMA_MEASUREMENT_FLAG	(1 << 19) /* In */
+
+/* If set with DF_DEFERRED_REMOVE if an immediate remove is not
+ * possible because the device is still open any new additional
+ * opens will also be rejected.
+ *
+ * It is an error to specify this flag without DM_DEFERRED_REMOVE.
+ */
+#define DM_DEFERRED_REMOVE_NO_OPEN_FLAG	(1 << 20) /* In/Out */
 
 #endif				/* _LINUX_DM_IOCTL_H */
