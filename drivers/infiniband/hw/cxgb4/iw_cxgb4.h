@@ -297,11 +297,18 @@ static inline int c4iw_ref_send_wait(struct c4iw_rdev *rdev,
 		 qpid);
 	c4iw_get_wr_wait(wr_waitp);
 	ret = c4iw_ofld_send(rdev, skb);
-	if (ret) {
-		c4iw_put_wr_wait(wr_waitp);
-		return ret;
-	}
-	return c4iw_wait_for_reply(rdev, wr_waitp, hwtid, qpid, func);
+	if (ret)
+		goto put_wait;
+
+	ret = c4iw_wait_for_reply(rdev, wr_waitp, hwtid, qpid, func);
+	if (ret)
+		goto put_wait;
+
+	return 0;
+
+put_wait:
+	c4iw_put_wr_wait(wr_waitp);
+	return ret;
 }
 
 enum db_state {
