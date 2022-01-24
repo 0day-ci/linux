@@ -2623,6 +2623,8 @@ static int bttv_s_fbuf(struct file *file, void *f,
 			struct bttv_buffer *new;
 
 			new = videobuf_sg_alloc(sizeof(*new));
+			if (!new)
+				return -ENOMEM;
 			new->crop = btv->crop[!!fh->do_crop].rect;
 			bttv_overlay_risc(btv, &fh->ov, fh->ovfmt, new);
 			retval = bttv_switch_overlay(btv, fh, new);
