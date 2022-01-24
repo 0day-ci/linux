@@ -887,12 +887,12 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 		}
 		break;
 	case 0xd: {
-		u64 guest_perm = xstate_get_guest_group_perm();
+		u64 supported_xcr0 = supported_xcr0 & xstate_get_guest_group_perm();
 
-		entry->eax &= supported_xcr0 & guest_perm;
+		entry->eax &= supported_xcr0;
 		entry->ebx = xstate_required_size(supported_xcr0, false);
 		entry->ecx = entry->ebx;
-		entry->edx &= (supported_xcr0 & guest_perm) >> 32;
+		entry->edx &= supported_xcr0 >> 32;
 		if (!supported_xcr0)
 			break;
 
