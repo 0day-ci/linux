@@ -9,6 +9,9 @@ title: Renesas R-Car CAN Controller
 maintainers:
   - Sergei Shtylyov <sergei.shtylyov@gmail.com>
 
+allOf:
+  - $ref: can-controller.yaml#
+
 properties:
   compatible:
     oneOf:
