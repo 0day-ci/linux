@@ -566,18 +566,27 @@ bool __is_module_percpu_address(unsigned long addr, unsigned long *can_addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
 
+static inline bool within_range(unsigned long addr, void *base, unsigned int size)
+{
+	return addr >= (unsigned long)base && addr < (unsigned long)base + size;
+}
+
+static inline bool within_module_layout(unsigned long addr,
+					const struct module_layout *layout)
+{
+	return within_range(addr, layout->base, layout->size);
+}
+
 static inline bool within_module_core(unsigned long addr,
 				      const struct module *mod)
 {
-	return (unsigned long)mod->core_layout.base <= addr &&
-	       addr < (unsigned long)mod->core_layout.base + mod->core_layout.size;
+	return within_module_layout(addr, &mod->core_layout);
 }
 
 static inline bool within_module_init(unsigned long addr,
 				      const struct module *mod)
 {
-	return (unsigned long)mod->init_layout.base <= addr &&
-	       addr < (unsigned long)mod->init_layout.base + mod->init_layout.size;
+	return within_module_layout(addr, &mod->init_layout);
 }
 
 static inline bool within_module(unsigned long addr, const struct module *mod)
