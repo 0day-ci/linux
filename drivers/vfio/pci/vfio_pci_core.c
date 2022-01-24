@@ -371,12 +371,23 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 	lockdep_assert_held(&vdev->vdev.dev_set->lock);
 
 	/*
-	 * If disable has been called while the power state is other than D0,
-	 * then set the power state in vfio driver to D0. It will help
-	 * in running the logic needed for D0 power state. The subsequent
-	 * runtime PM API's will put the device into the low power state again.
+	 * The vfio device user can close the device after putting the device
+	 * into runtime suspended state so wake up the device first in
+	 * this case.
 	 */
-	vfio_pci_set_power_state_locked(vdev, PCI_D0);
+	if (vdev->runtime_suspend_pending) {
+		vdev->runtime_suspend_pending = false;
+		pm_runtime_resume_and_get(&pdev->dev);
+	} else {
+		/*
+		 * If disable has been called while the power state is other
+		 * than D0, then set the power state in vfio driver to D0. It
+		 * will help in running the logic needed for D0 power state.
+		 * The subsequent runtime PM API's will put the device into
+		 * the low power state again.
+		 */
+		vfio_pci_set_power_state_locked(vdev, PCI_D0);
+	}
 
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
@@ -693,8 +704,8 @@ int vfio_pci_register_dev_region(struct vfio_pci_core_device *vdev,
 }
 EXPORT_SYMBOL_GPL(vfio_pci_register_dev_region);
 
-long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
-		unsigned long arg)
+static long vfio_pci_core_ioctl_internal(struct vfio_device *core_vdev,
+					 unsigned int cmd, unsigned long arg)
 {
 	struct vfio_pci_core_device *vdev =
 		container_of(core_vdev, struct vfio_pci_core_device, vdev);
@@ -1241,9 +1252,118 @@ hot_reset_release:
 		default:
 			return -ENOTTY;
 		}
+#ifdef CONFIG_PM
+	} else if (cmd == VFIO_DEVICE_POWER_MANAGEMENT) {
+		struct vfio_power_management vfio_pm;
+		struct pci_dev *pdev = vdev->pdev;
+		bool request_idle = false, request_resume = false;
+		int ret = 0;
+
+		if (copy_from_user(&vfio_pm, (void __user *)arg, sizeof(vfio_pm)))
+			return -EFAULT;
+
+		/*
+		 * The vdev power related fields are protected with memory_lock
+		 * semaphore.
+		 */
+		down_write(&vdev->memory_lock);
+		switch (vfio_pm.d3cold_state) {
+		case VFIO_DEVICE_D3COLD_STATE_ENTER:
+			/*
+			 * For D3cold, the device should already in D3hot
+			 * state.
+			 */
+			if (vdev->power_state < PCI_D3hot) {
+				ret = EINVAL;
+				break;
+			}
+
+			if (!vdev->runtime_suspend_pending) {
+				vdev->runtime_suspend_pending = true;
+				pm_runtime_put_noidle(&pdev->dev);
+				request_idle = true;
+			}
+
+			break;
+
+		case VFIO_DEVICE_D3COLD_STATE_EXIT:
+			/*
+			 * If the runtime resume has already been run, then
+			 * the device will be already in D0 state.
+			 */
+			if (vdev->runtime_suspend_pending) {
+				vdev->runtime_suspend_pending = false;
+				pm_runtime_get_noresume(&pdev->dev);
+				request_resume = true;
+			}
+
+			break;
+
+		default:
+			ret = EINVAL;
+			break;
+		}
+
+		up_write(&vdev->memory_lock);
+
+		/*
+		 * Call the runtime PM API's without any lock. Inside vfio driver
+		 * runtime suspend/resume, the locks can be acquired again.
+		 */
+		if (request_idle)
+			pm_request_idle(&pdev->dev);
+
+		if (request_resume)
+			pm_runtime_resume(&pdev->dev);
+
+		return ret;
+#endif
 	}
 
 	return -ENOTTY;
+}
+
+long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
+			 unsigned long arg)
+{
+#ifdef CONFIG_PM
+	struct vfio_pci_core_device *vdev =
+		container_of(core_vdev, struct vfio_pci_core_device, vdev);
+	struct device *dev = &vdev->pdev->dev;
+	bool skip_runtime_resume = false;
+	long ret;
+
+	/*
+	 * The list of commands which are safe to execute when the PCI device
+	 * is in D3cold state. In D3cold state, the PCI config or any other IO
+	 * access won't work.
+	 */
+	switch (cmd) {
+	case VFIO_DEVICE_POWER_MANAGEMENT:
+	case VFIO_DEVICE_GET_INFO:
+	case VFIO_DEVICE_FEATURE:
+		skip_runtime_resume = true;
+		break;
+
+	default:
+		break;
+	}
+
+	if (!skip_runtime_resume) {
+		ret = pm_runtime_resume_and_get(dev);
+		if (ret < 0)
+			return ret;
+	}
+
+	ret = vfio_pci_core_ioctl_internal(core_vdev, cmd, arg);
+
+	if (!skip_runtime_resume)
+		pm_runtime_put(dev);
+
+	return ret;
+#else
+	return vfio_pci_core_ioctl_internal(core_vdev, cmd, arg);
+#endif
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_ioctl);
 
@@ -1897,6 +2017,7 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 		return -EBUSY;
 	}
 
+	dev_set_drvdata(&pdev->dev, vdev);
 	if (pci_is_root_bus(pdev->bus)) {
 		ret = vfio_assign_device_set(&vdev->vdev, vdev);
 	} else if (!pci_probe_reset_slot(pdev->slot)) {
@@ -1966,6 +2087,7 @@ void vfio_pci_core_unregister_device(struct vfio_pci_core_device *vdev)
 		pm_runtime_get_noresume(&pdev->dev);
 
 	pm_runtime_forbid(&pdev->dev);
+	dev_set_drvdata(&pdev->dev, NULL);
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_unregister_device);
 
@@ -2219,11 +2341,61 @@ static void vfio_pci_dev_set_try_reset(struct vfio_device_set *dev_set)
 #ifdef CONFIG_PM
 static int vfio_pci_core_runtime_suspend(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct vfio_pci_core_device *vdev = dev_get_drvdata(dev);
+
+	down_read(&vdev->memory_lock);
+
+	/*
+	 * runtime_suspend_pending won't be set if there is no user of vfio pci
+	 * device. In that case, return early and PCI core will take care of
+	 * putting the device in the low power state.
+	 */
+	if (!vdev->runtime_suspend_pending) {
+		up_read(&vdev->memory_lock);
+		return 0;
+	}
+
+	/*
+	 * The runtime suspend will be called only if device is already at
+	 * D3hot state. Now, change the device state from D3hot to D3cold by
+	 * using platform power management. If setting of D3cold is not
+	 * supported for the PCI device, then the device state will still be
+	 * in D3hot state. The PCI core expects to save the PCI state, if
+	 * driver runtime routine handles the power state management.
+	 */
+	pci_save_state(pdev);
+	pci_platform_power_transition(pdev, PCI_D3cold);
+	up_read(&vdev->memory_lock);
+
 	return 0;
 }
 
 static int vfio_pci_core_runtime_resume(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct vfio_pci_core_device *vdev = dev_get_drvdata(dev);
+
+	down_write(&vdev->memory_lock);
+
+	/*
+	 * The PCI core will move the device to D0 state before calling the
+	 * driver runtime resume.
+	 */
+	vfio_pci_set_power_state_locked(vdev, PCI_D0);
+
+	/*
+	 * Some PCI device needs the SW involvement before going to D3cold
+	 * state again. So if there is any wake-up which is not triggered
+	 * by the guest, then increase the usage count to prevent the
+	 * second runtime suspend.
+	 */
+	if (vdev->runtime_suspend_pending) {
+		vdev->runtime_suspend_pending = false;
+		pm_runtime_get_noresume(&pdev->dev);
+	}
+
+	up_write(&vdev->memory_lock);
 	return 0;
 }
 

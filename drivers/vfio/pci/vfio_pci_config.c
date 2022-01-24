@@ -25,6 +25,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/vfio_pci_core.h>
 
@@ -1919,16 +1920,23 @@ static ssize_t vfio_config_do_rw(struct vfio_pci_core_device *vdev, char __user 
 ssize_t vfio_pci_config_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			   size_t count, loff_t *ppos, bool iswrite)
 {
+	struct device *dev = &vdev->pdev->dev;
 	size_t done = 0;
 	int ret = 0;
 	loff_t pos = *ppos;
 
 	pos &= VFIO_PCI_OFFSET_MASK;
 
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret < 0)
+		return ret;
+
 	while (count) {
 		ret = vfio_config_do_rw(vdev, buf, count, &pos, iswrite);
-		if (ret < 0)
+		if (ret < 0) {
+			pm_runtime_put(dev);
 			return ret;
+		}
 
 		count -= ret;
 		done += ret;
@@ -1936,6 +1944,7 @@ ssize_t vfio_pci_config_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 		pos += ret;
 	}
 
+	pm_runtime_put(dev);
 	*ppos += done;
 
 	return done;

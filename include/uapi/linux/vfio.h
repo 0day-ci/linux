@@ -1002,6 +1002,27 @@ struct vfio_device_feature {
  */
 #define VFIO_DEVICE_FEATURE_PCI_VF_TOKEN	(0)
 
+/**
+ * VFIO_DEVICE_POWER_MANAGEMENT - _IOW(VFIO_TYPE, VFIO_BASE + 18,
+ *			       struct vfio_power_management)
+ *
+ * Provide the support for device power management.  The native PCI power
+ * management does not support the D3cold power state.  For moving the device
+ * into D3cold state, change the PCI state to D3hot with standard
+ * configuration registers and then call this IOCTL to setting the D3cold
+ * state.  Similarly, if the device in D3cold state, then call this IOCTL
+ * to exit from D3cold state.
+ *
+ * Return 0 on success, -errno on failure.
+ */
+#define VFIO_DEVICE_POWER_MANAGEMENT		_IO(VFIO_TYPE, VFIO_BASE + 18)
+struct vfio_power_management {
+	__u32	argsz;
+#define VFIO_DEVICE_D3COLD_STATE_EXIT		0x0
+#define VFIO_DEVICE_D3COLD_STATE_ENTER		0x1
+	__u32	d3cold_state;
+};
+
 /* -------- API for Type1 VFIO IOMMU -------- */
 
 /**
