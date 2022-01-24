@@ -521,13 +521,21 @@ static void pci_device_shutdown(struct device *dev)
  */
 static int pci_restore_standard_config(struct pci_dev *pci_dev)
 {
+	int error = 0;
 	pci_update_current_state(pci_dev, PCI_UNKNOWN);
 
 	if (pci_dev->current_state != PCI_D0) {
-		int error = pci_set_power_state(pci_dev, PCI_D0);
-		if (error)
-			return error;
+		error = pci_set_power_state(pci_dev, PCI_D0);
+	} else {
+		/*
+		 * The platform power state can still be non-D0, so this is
+		 * required to change the platform power state to D0.
+		 */
+		error = pci_power_up(pci_dev);
 	}
+
+	if (error)
+		return error;
 
 	pci_restore_state(pci_dev);
 	pci_pme_restore(pci_dev);
