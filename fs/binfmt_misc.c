@@ -817,12 +817,16 @@ static struct file_system_type bm_fs_type = {
 };
 MODULE_ALIAS_FS("binfmt_misc");
 
+static struct ctl_table_header *binfmt_misc_header;
+
 static int __init init_misc_binfmt(void)
 {
 	int err = register_filesystem(&bm_fs_type);
 	if (!err)
 		insert_binfmt(&misc_format);
-	if (!register_sysctl_mount_point("fs/binfmt_misc")) {
+
+	binfmt_misc_header = register_sysctl_mount_point("fs/binfmt_misc");
+	if (!binfmt_misc_header) {
 		pr_warn("Failed to create fs/binfmt_misc sysctl mount point");
 		return -ENOMEM;
 	}
@@ -831,6 +835,7 @@ static int __init init_misc_binfmt(void)
 
 static void __exit exit_misc_binfmt(void)
 {
+	unregister_sysctl_table(binfmt_misc_header);
 	unregister_binfmt(&misc_format);
 	unregister_filesystem(&bm_fs_type);
 }
