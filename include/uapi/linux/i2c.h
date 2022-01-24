@@ -108,6 +108,7 @@ struct i2c_msg {
 #define I2C_FUNC_SMBUS_READ_I2C_BLOCK	0x04000000 /* I2C-like block xfer  */
 #define I2C_FUNC_SMBUS_WRITE_I2C_BLOCK	0x08000000 /* w/ 1-byte reg. addr. */
 #define I2C_FUNC_SMBUS_HOST_NOTIFY	0x10000000 /* SMBus 2.0 or later */
+#define I2C_FUNC_SMBUS3_BLOCKSIZE	0x20000000 /* Device supports 255 byte block */
 
 #define I2C_FUNC_SMBUS_BYTE		(I2C_FUNC_SMBUS_READ_BYTE | \
 					 I2C_FUNC_SMBUS_WRITE_BYTE)
@@ -137,11 +138,13 @@ struct i2c_msg {
 /*
  * Data for SMBus Messages
  */
-#define I2C_SMBUS_BLOCK_MAX	32	/* As specified in SMBus standard */
+#define I2C_SMBUS_BLOCK_MAX	32	/* As specified in SMBus standard < 3.0 */
+#define I2C_SMBUS3_BLOCK_MAX	255	/* As specified in SMBus 3.0 */
+
 union i2c_smbus_data {
 	__u8 byte;
 	__u16 word;
-	__u8 block[I2C_SMBUS_BLOCK_MAX + 2]; /* block[0] is used for length */
+	__u8 block[I2C_SMBUS3_BLOCK_MAX + 2]; /* block[0] is used for length */
 			       /* and one more for user-space compatibility */
 };
 
@@ -156,9 +159,12 @@ union i2c_smbus_data {
 #define I2C_SMBUS_BYTE_DATA	    2
 #define I2C_SMBUS_WORD_DATA	    3
 #define I2C_SMBUS_PROC_CALL	    4
-#define I2C_SMBUS_BLOCK_DATA	    5
+#define I2C_SMBUS1_BLOCK_DATA	    5 /* Legacy 32 byte block limit */
 #define I2C_SMBUS_I2C_BLOCK_BROKEN  6
-#define I2C_SMBUS_BLOCK_PROC_CALL   7		/* SMBus 2.0 */
-#define I2C_SMBUS_I2C_BLOCK_DATA    8
+#define I2C_SMBUS1_BLOCK_PROC_CALL  7 /* SMBus 2.0, legacy 32 byte block limit */
+#define I2C_SMBUS1_I2C_BLOCK_DATA   8 /* Legacy 32 byte block limit */
+#define I2C_SMBUS_BLOCK_DATA        9 /* Smbus 3.0, 255 byte limit */
+#define I2C_SMBUS_BLOCK_PROC_CALL  10 /* Smbus 3.0, 255 byte limit */
+#define I2C_SMBUS_I2C_BLOCK_DATA   11 /* Smbus 3.0, 255 byte limit */
 
 #endif /* _UAPI_LINUX_I2C_H */
