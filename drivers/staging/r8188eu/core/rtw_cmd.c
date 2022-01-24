@@ -252,12 +252,8 @@ int rtw_cmd_thread(void *context)
 
 _next:
 		if (padapter->bDriverStopped ||
-		    padapter->bSurpriseRemoved) {
-			netdev_dbg(padapter->pnetdev,
-				   "DriverStopped(%d) SurpriseRemoved(%d) break\n",
-				   padapter->bDriverStopped, padapter->bSurpriseRemoved);
+		    padapter->bSurpriseRemoved)
 			break;
-		}
 
 		pcmd = rtw_dequeue_cmd(pcmdpriv);
 		if (!pcmd)
@@ -573,8 +569,6 @@ u8 rtw_joinbss_cmd(struct adapter  *padapter, struct wlan_network *pnetwork)
 		padapter->pwrctrlpriv.smart_ps = 0;
 	else
 		padapter->pwrctrlpriv.smart_ps = padapter->registrypriv.smart_ps;
-
-	netdev_dbg(padapter->pnetdev, "smart_ps = %d\n", padapter->pwrctrlpriv.smart_ps);
 
 	pcmd->cmdsz = get_wlan_bssid_ex_sz(psecnetwork);/* get cmdsz before endian conversion */
 
