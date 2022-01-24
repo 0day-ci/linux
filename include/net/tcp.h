@@ -424,6 +424,9 @@ int zc_receive_check(struct tcp_zerocopy_receive *zc, int *lenp,
 int zc_receive_update(struct sock *sk, struct tcp_zerocopy_receive *zc, int len,
 		      char __user *optval, struct scm_timestamping_internal *tss,
 		      int err);
+int tcp_zerocopy_receive(struct sock *sk,
+			 struct tcp_zerocopy_receive *zc,
+			 struct scm_timestamping_internal *tss);
 #endif
 void tcp_parse_options(const struct net *net, const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx,

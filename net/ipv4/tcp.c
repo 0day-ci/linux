@@ -2066,9 +2066,9 @@ static void tcp_zc_finalize_rx_tstamp(struct sock *sk,
 }
 
 #define TCP_ZEROCOPY_PAGE_BATCH_SIZE 32
-static int tcp_zerocopy_receive(struct sock *sk,
-				struct tcp_zerocopy_receive *zc,
-				struct scm_timestamping_internal *tss)
+int tcp_zerocopy_receive(struct sock *sk,
+			 struct tcp_zerocopy_receive *zc,
+			 struct scm_timestamping_internal *tss)
 {
 	u32 length = 0, offset, vma_len, avail_len, copylen = 0;
 	unsigned long address = (unsigned long)zc->address;
