@@ -431,6 +431,8 @@ int kvm_arch_check_processor_compat(void *opaque)
 int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	struct kvmppc_ops *kvm_ops = NULL;
+	int r;
+
 	/*
 	 * if we have both HV and PR enabled, default is HV
 	 */
@@ -456,7 +458,10 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 		return -ENOENT;
 
 	kvm->arch.kvm_ops = kvm_ops;
-	return kvmppc_core_init_vm(kvm);
+	r = kvmppc_core_init_vm(kvm);
+	if (r)
+		module_put(kvm->arch.kvm_ops->owner);
+	return r;
 err_out:
 	return -EINVAL;
 }
