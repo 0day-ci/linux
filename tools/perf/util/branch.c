@@ -49,7 +49,12 @@ const char *branch_type_name(int type)
 		"SYSCALL",
 		"SYSRET",
 		"COND_CALL",
-		"COND_RET"
+		"COND_RET",
+		"EXPT_RET",
+		"IRQ",
+		"FIQ",
+		"DEBUG_HALT",
+		"DEBUG_EXIT"
 	};
 
 	if (type >= 0 && type < PERF_BR_MAX)
