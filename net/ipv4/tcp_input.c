@@ -4097,6 +4097,14 @@ void tcp_parse_options(const struct net *net,
 				 */
 				break;
 #endif
+#ifdef CONFIG_TCP_AUTHOPT
+			case TCPOPT_AUTHOPT:
+				/* Hash has already been checked.
+				 * We parse rnextkeyid here so we can match it on synack
+				 */
+				opt_rx->rnextkeyid = ptr[1];
+				break;
+#endif
 			case TCPOPT_FASTOPEN:
 				tcp_parse_fastopen_option(
 					opsize - TCPOLEN_FASTOPEN_BASE,
@@ -6892,6 +6900,10 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 
 	if (IS_ENABLED(CONFIG_SMC) && want_cookie)
 		tmp_opt.smc_ok = 0;
+
+#if IS_ENABLED(CONFIG_TCP_AUTHOPT)
+	tcp_rsk(req)->recv_rnextkeyid = tmp_opt.rnextkeyid;
+#endif
 
 	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
 	tcp_openreq_init(req, &tmp_opt, skb, sk);
