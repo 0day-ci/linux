@@ -42,6 +42,8 @@
 #define SCA3300_VALUE_RS_ERROR	0x3
 #define SCA3300_MASK_RS_STATUS	GENMASK(1, 0)
 
+#define SCA3300_REG_ANG_CTRL 0x0C
+
 enum sca3300_op_mode_indexes {
 	OP_MOD_1 = 0,
 	OP_MOD_2,
@@ -85,6 +87,9 @@ enum sca3300_scan_indexes {
 	SCA3300_ACC_Y,
 	SCA3300_ACC_Z,
 	SCA3300_TEMP,
+	SCA3300_INCLI_X,
+	SCA3300_INCLI_Y,
+	SCA3300_INCLI_Z,
 	SCA3300_TIMESTAMP,
 };
 
@@ -110,6 +115,26 @@ enum sca3300_scan_indexes {
 	.ext_info = sca3300_ext_info,					\
 }
 
+#define SCA3300_INCLI_CHANNEL(index, reg, axis) {			\
+	.type = IIO_INCLI,						\
+	.address = reg,							\
+	.modified = 1,							\
+	.channel2 = IIO_MOD_##axis,					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),			\
+	.info_mask_shared_by_type =					\
+	BIT(IIO_CHAN_INFO_SCALE) |					\
+	BIT(IIO_CHAN_INFO_ENABLE),					\
+	.info_mask_shared_by_type_available =				\
+	BIT(IIO_CHAN_INFO_SCALE),					\
+	.scan_index = index,						\
+	.scan_type = {							\
+		.sign = 's',						\
+		.realbits = 16,						\
+		.storagebits = 16,					\
+		.endianness = IIO_CPU,					\
+	},								\
+}
+
 #define SCA3300_TEMP_CHANNEL(index, reg) {				\
 		.type = IIO_TEMP,					\
 		.address = reg,						\
@@ -128,7 +153,7 @@ static const struct iio_chan_spec sca3300_channels[] = {
 	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_Y, 0x2, Y),
 	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_Z, 0x3, Z),
 	SCA3300_TEMP_CHANNEL(SCA3300_TEMP, 0x05),
-	IIO_CHAN_SOFT_TIMESTAMP(4)
+	IIO_CHAN_SOFT_TIMESTAMP(SCA3300_TIMESTAMP)
 };
 
 static const struct iio_chan_spec scl3300_channels[] = {
@@ -136,7 +161,10 @@ static const struct iio_chan_spec scl3300_channels[] = {
 	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_Y, 0x2, Y),
 	SCA3300_ACCEL_CHANNEL(SCA3300_ACC_Z, 0x3, Z),
 	SCA3300_TEMP_CHANNEL(SCA3300_TEMP, 0x05),
-	IIO_CHAN_SOFT_TIMESTAMP(4),
+	SCA3300_INCLI_CHANNEL(SCA3300_INCLI_X, 0x09, X),
+	SCA3300_INCLI_CHANNEL(SCA3300_INCLI_Y, 0x0A, Y),
+	SCA3300_INCLI_CHANNEL(SCA3300_INCLI_Z, 0x0B, Z),
+	IIO_CHAN_SOFT_TIMESTAMP(SCA3300_TIMESTAMP)
 };
 
 
@@ -150,9 +178,21 @@ static const int sca3300_accel_scale[CHIP_CNT][OP_MOD_CNT][2] = {
 	[CHIP_SCL3300] = {{0, 167}, {0, 333}, {0, 83}, {0, 83}}
 };
 
+static const int sca3300_incli_scale[CHIP_CNT][OP_MOD_CNT][2] = {
+	[CHIP_SCA3300] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}},
+	[CHIP_SCL3300] = {{0, 5495}, {0, 5495}, {0, 5495}, {0, 5495}}
+};
+
 static const unsigned long sca3300_scan_masks[] = {
 	BIT(SCA3300_ACC_X) | BIT(SCA3300_ACC_Y) | BIT(SCA3300_ACC_Z) |
 	BIT(SCA3300_TEMP),
+	0
+};
+
+static const unsigned long scl3300_scan_masks[] = {
+	BIT(SCA3300_ACC_X) | BIT(SCA3300_ACC_Y) | BIT(SCA3300_ACC_Z) |
+	BIT(SCA3300_TEMP)  |
+	BIT(SCA3300_INCLI_X) | BIT(SCA3300_INCLI_Y) | BIT(SCA3300_INCLI_Z),
 	0
 };
 
@@ -177,13 +217,12 @@ struct sca3300_data {
 	struct spi_device *spi;
 	struct mutex lock;
 	struct {
-		s16 channels[4];
+		s16 channels[SCA3300_TIMESTAMP-1];
 		s64 ts __aligned(sizeof(s64));
 	} scan;
 	const struct sca3300_chip_info *chip_info;
 	u8 txbuf[4] ____cacheline_aligned;
 	u8 rxbuf[4];
-
 };
 
 static const struct sca3300_chip_info sca3300_chip_info_tbl[] = {
@@ -201,7 +240,7 @@ static const struct sca3300_chip_info sca3300_chip_info_tbl[] = {
 		.chip_id = 0xC1,
 		.channels = scl3300_channels,
 		.num_channels = ARRAY_SIZE(scl3300_channels),
-		.scan_masks = sca3300_scan_masks,
+		.scan_masks = scl3300_scan_masks,
 	},
 };
 
@@ -322,11 +361,15 @@ static int sca3300_write_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
+		if (chan->type != IIO_ACCEL)
+			return -EINVAL;
 		for (i = 0; i < OP_MOD_CNT; i++) {
 			if ((val == sca3300_accel_scale[data->chip_info->chip_type][0]) &&
 			    (val2 == sca3300_accel_scale[data->chip_info->chip_type][1]))
 				return sca3300_write_reg(data, SCA3300_REG_MODE, i);
 		}
+		/*Inclination scale info tied to accel scale.*/
+		/*not allowed to set separately.      */
 		return -EINVAL;
 	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
 		if (data->chip_info->chip_type == CHIP_SCL3300) {
@@ -341,6 +384,17 @@ static int sca3300_write_raw(struct iio_dev *indio_dev,
 			return sca3300_write_reg(data, SCA3300_REG_MODE, 3);
 		if (reg_val == 3 && val == sca3300_lp_freq[data->chip_info->chip_type][2])
 			return sca3300_write_reg(data, SCA3300_REG_MODE, 2);
+		return -EINVAL;
+	case IIO_CHAN_INFO_ENABLE:
+		if (data->chip_info->chip_type == CHIP_SCL3300) {
+			if (chan->type == IIO_INCLI) {
+				if (val != 0)
+					reg_val = 0x1F;
+				else
+					reg_val = 0x00;
+				return sca3300_write_reg(data, SCA3300_REG_ANG_CTRL, reg_val);
+			}
+		}
 		return -EINVAL;
 	default:
 		return -EINVAL;
@@ -365,7 +419,11 @@ static int sca3300_read_raw(struct iio_dev *indio_dev,
 		ret = sca3300_read_reg(data, SCA3300_REG_MODE, &reg_val);
 		if (ret)
 			return ret;
-		if (chan->type == IIO_ACCEL) {
+
+		if (chan->type == IIO_INCLI) {
+			*val = sca3300_incli_scale[data->chip_info->chip_type][reg_val][0];
+			*val2 = sca3300_incli_scale[data->chip_info->chip_type][reg_val][1];
+		} else if (chan->type == IIO_ACCEL) {
 			*val = sca3300_accel_scale[data->chip_info->chip_type][reg_val][0];
 			*val2 = sca3300_accel_scale[data->chip_info->chip_type][reg_val][1];
 		} else {
@@ -378,6 +436,13 @@ static int sca3300_read_raw(struct iio_dev *indio_dev,
 			return ret;
 		*val = sca3300_lp_freq[data->chip_info->chip_type][reg_val];
 		return IIO_VAL_INT;
+	case IIO_CHAN_INFO_ENABLE:
+		if (chan->type == IIO_INCLI) {
+			ret = sca3300_read_reg(data, SCA3300_REG_ANG_CTRL, &reg_val);
+			*val = reg_val;
+			return IIO_VAL_INT;
+		}
+		return -EINVAL;
 	default:
 		return -EINVAL;
 	}
@@ -484,7 +549,10 @@ static int sca3300_read_avail(struct iio_dev *indio_dev,
 	struct sca3300_data *data = iio_priv(indio_dev);
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
-		if (chan->type == IIO_ACCEL) {
+		if (chan->type == IIO_INCLI) {
+			*vals = (const int *)sca3300_incli_scale[data->chip_info->chip_type];
+			*length = ARRAY_SIZE(sca3300_incli_scale[data->chip_info->chip_type]) * 2;
+		} else if (chan->type == IIO_ACCEL) {
 			*vals = (const int *)sca3300_accel_scale[data->chip_info->chip_type];
 			*length = ARRAY_SIZE(sca3300_accel_scale[data->chip_info->chip_type]) * 2;
 		} else {
