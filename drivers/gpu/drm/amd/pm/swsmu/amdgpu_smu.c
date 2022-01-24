@@ -121,11 +121,17 @@ int smu_get_dpm_freq_range(struct smu_context *smu,
 	if (!min && !max)
 		return -EINVAL;
 
-	if (smu->ppt_funcs->get_dpm_ultimate_freq)
+	if (smu->ppt_funcs->get_dpm_ultimate_freq) {
 		ret = smu->ppt_funcs->get_dpm_ultimate_freq(smu,
 							    clk_type,
 							    min,
 							    max);
+	} else {
+		if (min)
+			*min = 0;
+		if (max)
+			*max = 0;
+	}
 
 	return ret;
 }
