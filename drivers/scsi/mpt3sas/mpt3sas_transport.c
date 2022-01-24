@@ -823,6 +823,11 @@ mpt3sas_transport_port_add(struct MPT3SAS_ADAPTER *ioc, u16 handle,
 			hba_port->sas_address =
 			    mpt3sas_port->remote_identify.sas_address;
 	}
+	if (!rphy) {
+		ioc_err(ioc, "failure at %s:%d/%s()!\n",
+			__FILE__, __LINE__, __func__);
+		goto out_fail;
+	}
 
 	rphy->identify = mpt3sas_port->remote_identify;
 
