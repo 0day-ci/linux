@@ -253,12 +253,17 @@ static int brbe_fetch_perf_type(u64 brbinf)
 	case BRBINF_TYPE_DEBUG_EXIT:
 		return PERF_BR_DEBUG_EXIT;
 	case BRBINF_TYPE_SERROR:
+		return PERF_BR_SERROR;
 	case BRBINF_TYPE_INST_DEBUG:
+		return PERF_BR_DEBUG_INST;
 	case BRBINF_TYPE_DATA_DEBUG:
+		return PERF_BR_DEBUG_DATA;
 	case BRBINF_TYPE_ALGN_FAULT:
+		return PERF_BR_FAULT_ALGN;
 	case BRBINF_TYPE_INST_FAULT:
+		return PERF_BR_FAULT_INST;
 	case BRBINF_TYPE_DATA_FAULT:
-		return PERF_BR_UNKNOWN;
+		return PERF_BR_FAULT_DATA;
 	default:
 		pr_warn("unknown branch type captured\n");
 		return PERF_BR_UNKNOWN;
