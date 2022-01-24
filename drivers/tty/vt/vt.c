@@ -1878,6 +1878,31 @@ int mouse_reporting(void)
 	return vc_cons[fg_console].d->vc_report_mouse;
 }
 
+/* handle the OSC query specified by vc->vc_oscmd. we currently handle only 10
+ * and 11 (default foreground and default background, respectively).
+ */
+static void handle_osc_query(struct tty_struct *tty, const struct vc_data *vc)
+{
+	char buf[20];
+	int len, idx;
+	/* response payload conforms to XTerm: %02x/%02x/%02x for R, G, and B. */
+	switch (vc->vc_oscmd) {
+	case 10: /* get default foreground */
+		idx = vc->vc_def_color & 0x0f;
+		break;
+	case 11: /* get default background */
+		idx = (vc->vc_def_color & 0xf0) >> 4;
+		break;
+	default:
+		return;
+	}
+	/* transpose internal BGR to RGB on output */
+	len = snprintf(buf, sizeof(buf), "\x1b]%d;rgb:%02x/%02x/%02x\x1b\\",
+		vc->vc_oscmd, vc->vc_palette[idx * 3 + 2],
+		vc->vc_palette[idx * 3 + 1], vc->vc_palette[idx * 3]);
+	respond_string(buf, len, tty->port);
+}
+
 /* console_lock is held */
 static void set_mode(struct vc_data *vc, int on_off)
 {
@@ -2075,8 +2100,8 @@ static void restore_cur(struct vc_data *vc)
 }
 
 enum { ESnormal, ESesc, ESsquare, ESgetpars, ESfunckey,
-	EShash, ESsetG0, ESsetG1, ESpercent, EScsiignore, ESnonstd,
-	ESpalette, ESosc, ESapc, ESpm, ESdcs };
+	EShash, ESsetG0, ESsetG1, ESpercent, EScsiignore,
+	ESpalette, ESosc, ESoscmd, ESoscparam, ESapc, ESpm, ESdcs };
 
 /* console_lock is held (except via vc_init()) */
 static void reset_terminal(struct vc_data *vc, int do_clear)
@@ -2230,7 +2255,7 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 			vc->vc_state = ESsquare;
 			return;
 		case ']':
-			vc->vc_state = ESnonstd;
+			vc->vc_state = ESosc;
 			return;
 		case '_':
 			vc->vc_state = ESapc;
@@ -2287,7 +2312,10 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 			return;
 		}
 		return;
-	case ESnonstd:
+	case ESosc:
+		/* Operating System Commands are traditionally terminated with an ST
+		 * or a BEL, but Linux historically eschews said terminators.
+		 */
 		if (c=='P') {   /* palette escape sequence */
 			for (vc->vc_npar = 0; vc->vc_npar < NPAR; vc->vc_npar++)
 				vc->vc_par[vc->vc_npar] = 0;
@@ -2297,9 +2325,10 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 		} else if (c=='R') {   /* reset palette */
 			reset_palette(vc);
 			vc->vc_state = ESnormal;
-		} else if (c>='0' && c<='9')
-			vc->vc_state = ESosc;
-		else
+		} else if (isdigit(c)) {
+			vc->vc_oscmd = c - '0';
+			vc->vc_state = ESoscmd;
+		} else
 			vc->vc_state = ESnormal;
 		return;
 	case ESpalette:
@@ -2348,7 +2377,7 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 		if (c == ';' && vc->vc_npar < NPAR - 1) {
 			vc->vc_npar++;
 			return;
-		} else if (c>='0' && c<='9') {
+		} else if (isdigit(c)) {
 			vc->vc_par[vc->vc_npar] *= 10;
 			vc->vc_par[vc->vc_npar] += c - '0';
 			return;
@@ -2556,7 +2585,23 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 		return;
 	case ESapc:
 		return;
-	case ESosc:
+	case ESoscmd: /* extract the first OSC param, the command */
+		if (isdigit(c)) {
+			vc->vc_oscmd *= 10;
+			vc->vc_oscmd += c - '0';
+		} else if (c == ';') {
+			vc->vc_state = ESoscparam;
+		} else {
+			vc->vc_state = ESnormal;
+		}
+		return;
+	case ESoscparam: /* extract second OSC param */
+		/* All recognized numeric OSC commands take only '?', indicating a query.
+		 * See note above regarding ESosc about lack of OSC terminator ST.
+		 */
+		if (c == '?')
+			handle_osc_query(tty, vc);
+		vc->vc_state = ESnormal;
 		return;
 	case ESpm:
 		return;
@@ -3441,8 +3486,8 @@ static void con_cleanup(struct tty_struct *tty)
 }
 
 static int default_color           = 7; /* white */
-static int default_italic_color    = 2; // green (ASCII)
-static int default_underline_color = 3; // cyan (ASCII)
+static int default_italic_color    = 2; /* green */
+static int default_underline_color = 3; /* cyan */
 module_param_named(color, default_color, int, S_IRUGO | S_IWUSR);
 module_param_named(italic, default_italic_color, int, S_IRUGO | S_IWUSR);
 module_param_named(underline, default_underline_color, int, S_IRUGO | S_IWUSR);
