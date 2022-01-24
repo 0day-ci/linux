@@ -146,6 +146,26 @@ struct arm_pmu {
 	unsigned long acpi_cpuid;
 };
 
+#ifdef CONFIG_ARM_BRBE_PMU
+void arm64_pmu_brbe_filter(struct pmu_hw_events *hw_events, struct perf_event *event);
+void arm64_pmu_brbe_read(struct pmu_hw_events *cpuc, struct perf_event *event);
+void arm64_pmu_brbe_disable(struct pmu_hw_events *cpuc);
+void arm64_pmu_brbe_enable(struct pmu_hw_events *cpuc);
+void arm64_pmu_brbe_probe(struct pmu_hw_events *cpuc);
+void arm64_pmu_brbe_reset(struct pmu_hw_events *cpuc);
+bool arm64_pmu_brbe_supported(struct perf_event *event);
+#else
+static inline void arm64_pmu_brbe_filter(struct pmu_hw_events *hw_events, struct perf_event *event)
+{
+}
+static inline void arm64_pmu_brbe_read(struct pmu_hw_events *cpuc, struct perf_event *event) { }
+static inline void arm64_pmu_brbe_disable(struct pmu_hw_events *cpuc) { }
+static inline void arm64_pmu_brbe_enable(struct pmu_hw_events *cpuc) { }
+static inline void arm64_pmu_brbe_probe(struct pmu_hw_events *cpuc) { }
+static inline void arm64_pmu_brbe_reset(struct pmu_hw_events *cpuc) { }
+static inline bool arm64_pmu_brbe_supported(struct perf_event *event) {return false; }
+#endif
+
 #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
 
 u64 armpmu_event_update(struct perf_event *event);

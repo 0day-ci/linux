@@ -146,6 +146,17 @@ config MARVELL_CN10K_TAD_PMU
 	  Provides support for Last-Level cache Tag-and-data Units (LLC-TAD)
 	  performance monitors on CN10K family silicons.
 
+config ARM_BRBE_PMU
+	tristate "Enable support for Branch Record Buffer Extension (BRBE)"
+	depends on ARM64 && ARM_PMU
+	default y
+	help
+	  Enable perf support for Branch Record Buffer Extension (BRBE) which
+	  records all branches taken in an execution path. This supports some
+	  branch types and privilege based filtering. It captured additional
+	  relevant information such as cycle count, misprediction and branch
+	  type, branch privilege level etc.
+
 source "drivers/perf/hisilicon/Kconfig"
 
 endmenu

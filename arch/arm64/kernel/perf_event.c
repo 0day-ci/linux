@@ -1023,31 +1023,37 @@ static int armv8pmu_filter_match(struct perf_event *event)
 
 static void armv8pmu_brbe_filter(struct pmu_hw_events *hw_event, struct perf_event *event)
 {
+	arm64_pmu_brbe_filter(hw_event, event);
 }
 
 static void armv8pmu_brbe_enable(struct pmu_hw_events *hw_event)
 {
+	arm64_pmu_brbe_enable(hw_event);
 }
 
 static void armv8pmu_brbe_disable(struct pmu_hw_events *hw_event)
 {
+	arm64_pmu_brbe_disable(hw_event);
 }
 
 static void armv8pmu_brbe_read(struct pmu_hw_events *hw_event, struct perf_event *event)
 {
+	arm64_pmu_brbe_read(hw_event, event);
 }
 
 static void armv8pmu_brbe_probe(struct pmu_hw_events *hw_event)
 {
+	arm64_pmu_brbe_probe(hw_event);
 }
 
 static void armv8pmu_brbe_reset(struct pmu_hw_events *hw_event)
 {
+	arm64_pmu_brbe_reset(hw_event);
 }
 
 static bool armv8pmu_brbe_supported(struct perf_event *event)
 {
-	return false;
+	return arm64_pmu_brbe_supported(event);
 }
 
 static void armv8pmu_reset(void *info)
