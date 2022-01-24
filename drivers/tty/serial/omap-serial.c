@@ -1194,7 +1194,7 @@ static void omap_serial_early_out(struct uart_port *port, int offset,
 	writew(value, port->membase + offset);
 }
 
-static void omap_serial_early_putc(struct uart_port *port, int c)
+static void omap_serial_early_putc(struct uart_port *port, char c)
 {
 	unsigned int status;
 
