@@ -464,6 +464,7 @@ struct msdc_host {
 	bool hs400_tuning;	/* hs400 mode online tuning */
 	bool internal_cd;	/* Use internal card-detect logic */
 	bool cqhci;		/* support eMMC hw cmdq */
+	bool cmd_polling_mode;	/* support cmd polling mode */
 	struct msdc_save_para save_para; /* used when gate HCLK */
 	struct msdc_tune_para def_tune_para; /* default tune setting */
 	struct msdc_tune_para saved_tune_para; /* tune result of CMD21/CMD19 */
@@ -1260,6 +1261,63 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
 	return true;
 }
 
+static inline int use_cmd_polling_mode(struct msdc_host *host,
+	struct mmc_command *cmd)
+{
+	/* R1B use interrupt mode */
+	return (host->cmd_polling_mode &&
+			((mmc_from_priv(host))->caps2 & MMC_CAP2_NO_SDIO) &&
+			(mmc_resp_type(cmd) != MMC_RSP_R1B));
+}
+
+static bool msdc_command_resp_polling(struct msdc_host *host,
+	struct mmc_request *mrq, struct mmc_command *cmd,
+	unsigned long timeout)
+{
+	bool ret = false;
+	unsigned long tmo;
+	int events;
+	unsigned long flags;
+
+	if (!use_cmd_polling_mode(host, cmd))
+		goto exit;
+
+retry:
+	tmo = jiffies + timeout;
+	while (1) {
+		spin_lock_irqsave(&host->lock, flags);
+		events = readl(host->base + MSDC_INT);
+		if (events & cmd_ints_mask) {
+			/* clear all int flag */
+			events &= cmd_ints_mask;
+			writel(events, host->base + MSDC_INT);
+			spin_unlock_irqrestore(&host->lock, flags);
+			break;
+		}
+		spin_unlock_irqrestore(&host->lock, flags);
+
+		if (time_after(jiffies, tmo) &&
+			((events & cmd_ints_mask) == 0)) {
+			dev_info(host->dev, "[%s]: CMD<%d> polling_for_completion timeout ARG<0x%.8x>\n",
+				__func__, cmd->opcode, cmd->arg);
+			ret = msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+			goto exit;
+		}
+	}
+
+	if (cmd) {
+		ret = msdc_cmd_done(host, events, mrq, cmd);
+		/* if only autocmd23 done,
+		 * it needs to polling the continue read/write cmd directly.
+		 */
+		if (!ret)
+			goto retry;
+	}
+
+exit:
+	return ret;
+}
+
 static void msdc_start_command(struct msdc_host *host,
 		struct mmc_request *mrq, struct mmc_command *cmd)
 {
@@ -1283,7 +1341,10 @@ static void msdc_start_command(struct msdc_host *host,
 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
 
 	spin_lock_irqsave(&host->lock, flags);
-	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+	if (use_cmd_polling_mode(host, cmd))
+		sdr_clr_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+	else
+		sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	writel(cmd->arg, host->base + SDC_ARG);
@@ -1300,9 +1361,11 @@ static void msdc_cmd_next(struct msdc_host *host,
 	       host->hs400_tuning))) ||
 	    (mrq->sbc && mrq->sbc->error))
 		msdc_request_done(host, mrq);
-	else if (cmd == mrq->sbc)
+	else if (cmd == mrq->sbc) {
 		msdc_start_command(host, mrq, mrq->cmd);
-	else if (!cmd->data)
+		msdc_command_resp_polling(host, mrq,
+				mrq->cmd, CMD_TIMEOUT);
+	} else if (!cmd->data)
 		msdc_request_done(host, mrq);
 	else
 		msdc_start_data(host, cmd, cmd->data);
@@ -1324,10 +1387,15 @@ static void msdc_ops_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	 * use HW option,  otherwise use SW option
 	 */
 	if (mrq->sbc && (!mmc_card_mmc(mmc->card) ||
-	    (mrq->sbc->arg & 0xFFFF0000)))
+	    (mrq->sbc->arg & 0xFFFF0000))) {
 		msdc_start_command(host, mrq, mrq->sbc);
-	else
+		msdc_command_resp_polling(host, mrq,
+				mrq->sbc, CMD_TIMEOUT);
+	} else {
 		msdc_start_command(host, mrq, mrq->cmd);
+		msdc_command_resp_polling(host, mrq,
+				mrq->cmd, CMD_TIMEOUT);
+	}
 }
 
 static void msdc_pre_req(struct mmc_host *mmc, struct mmc_request *mrq)
@@ -1360,9 +1428,11 @@ static void msdc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 static void msdc_data_xfer_next(struct msdc_host *host, struct mmc_request *mrq)
 {
 	if (mmc_op_multi(mrq->cmd->opcode) && mrq->stop && !mrq->stop->error &&
-	    !mrq->sbc)
+	    !mrq->sbc) {
 		msdc_start_command(host, mrq, mrq->stop);
-	else
+		msdc_command_resp_polling(host, mrq,
+				mrq->stop, CMD_TIMEOUT);
+	} else
 		msdc_request_done(host, mrq);
 }
 
@@ -2487,11 +2557,15 @@ static void msdc_of_property_parse(struct platform_device *pdev,
 	else
 		host->hs400_cmd_resp_sel_rising = false;
 
-	if (of_property_read_bool(pdev->dev.of_node,
-				  "supports-cqe"))
+	if (of_property_read_bool(pdev->dev.of_node, "supports-cqe"))
 		host->cqhci = true;
 	else
 		host->cqhci = false;
+
+	if (of_property_read_bool(pdev->dev.of_node, "mediatek,cmd-polling-mode"))
+		host->cmd_polling_mode = true;
+	else
+		host->cmd_polling_mode = false;
 }
 
 static int msdc_of_clock_parse(struct platform_device *pdev,
