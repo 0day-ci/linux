@@ -1222,26 +1222,29 @@ static void record_preemption(struct intel_engine_execlists *execlists)
 }
 
 static unsigned long active_preempt_timeout(struct intel_engine_cs *engine,
-					    const struct i915_request *rq)
+					    const struct i915_request *rq,
+					    bool force_preempt)
 {
 	if (!rq)
 		return 0;
 
 	/* Force a fast reset for terminated contexts (ignoring sysfs!) */
-	if (unlikely(intel_context_is_banned(rq->context) || bad_request(rq)))
+	if (unlikely(intel_context_is_banned(rq->context) || bad_request(rq) ||
+		     force_preempt))
 		return 1;
 
 	return READ_ONCE(engine->props.preempt_timeout_ms);
 }
 
 static void set_preempt_timeout(struct intel_engine_cs *engine,
-				const struct i915_request *rq)
+				const struct i915_request *rq,
+				bool force_preempt)
 {
 	if (!intel_engine_has_preempt_reset(engine))
 		return;
 
 	set_timer_ms(&engine->execlists.preempt,
-		     active_preempt_timeout(engine, rq));
+		     active_preempt_timeout(engine, rq, force_preempt));
 }
 
 static bool completed(const struct i915_request *rq)
@@ -1584,12 +1587,15 @@ done:
 	    memcmp(active,
 		   execlists->pending,
 		   (port - execlists->pending) * sizeof(*port))) {
+		bool force_preempt = test_bit(I915_FENCE_FLAG_FORCE_PREEMPT,
+					      &last->fence.flags);
+
 		*port = NULL;
 		while (port-- != execlists->pending)
 			execlists_schedule_in(*port, port - execlists->pending);
 
 		WRITE_ONCE(execlists->yield, -1);
-		set_preempt_timeout(engine, *active);
+		set_preempt_timeout(engine, *active, force_preempt);
 		execlists_submit_ports(engine);
 	} else {
 		ring_set_paused(engine, 0);
@@ -2594,7 +2600,7 @@ static void execlists_context_cancel_request(struct intel_context *ce,
 
 	i915_request_active_engine(rq, &engine);
 
-	if (engine && intel_engine_pulse(engine))
+	if (engine && intel_engine_pulse_force_preempt(engine))
 		intel_gt_handle_error(engine->gt, engine->mask, 0,
 				      "request cancellation by %s",
 				      current->comm);

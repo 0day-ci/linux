@@ -170,6 +170,12 @@ enum {
 	 * fence (dma_fence_array) and i915 generated for parallel submission.
 	 */
 	I915_FENCE_FLAG_COMPOSITE,
+
+	/*
+	 * I915_FENCE_FLAG_FORCE_PREEMPT - Force preempt immediately regardless
+	 * of preempt timeout configuration
+	 */
+	I915_FENCE_FLAG_FORCE_PREEMPT,
 };
 
 /**

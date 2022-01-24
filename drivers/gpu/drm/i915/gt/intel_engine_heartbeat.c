@@ -243,7 +243,8 @@ void intel_engine_init_heartbeat(struct intel_engine_cs *engine)
 	INIT_DELAYED_WORK(&engine->heartbeat.work, heartbeat);
 }
 
-static int __intel_engine_pulse(struct intel_engine_cs *engine)
+static int __intel_engine_pulse(struct intel_engine_cs *engine,
+				bool force_preempt)
 {
 	struct i915_sched_attr attr = { .priority = I915_PRIORITY_BARRIER };
 	struct intel_context *ce = engine->kernel_context;
@@ -258,6 +259,8 @@ static int __intel_engine_pulse(struct intel_engine_cs *engine)
 		return PTR_ERR(rq);
 
 	__set_bit(I915_FENCE_FLAG_SENTINEL, &rq->fence.flags);
+	if (force_preempt)
+		__set_bit(I915_FENCE_FLAG_FORCE_PREEMPT, &rq->fence.flags);
 
 	heartbeat_commit(rq, &attr);
 	GEM_BUG_ON(rq->sched.attr.priority < I915_PRIORITY_BARRIER);
@@ -299,7 +302,7 @@ int intel_engine_set_heartbeat(struct intel_engine_cs *engine,
 
 		/* recheck current execution */
 		if (intel_engine_has_preemption(engine)) {
-			err = __intel_engine_pulse(engine);
+			err = __intel_engine_pulse(engine, false);
 			if (err)
 				set_heartbeat(engine, saved);
 		}
@@ -312,7 +315,8 @@ out_rpm:
 	return err;
 }
 
-int intel_engine_pulse(struct intel_engine_cs *engine)
+static int _intel_engine_pulse(struct intel_engine_cs *engine,
+			       bool force_preempt)
 {
 	struct intel_context *ce = engine->kernel_context;
 	int err;
@@ -325,13 +329,24 @@ int intel_engine_pulse(struct intel_engine_cs *engine)
 
 	err = -EINTR;
 	if (!mutex_lock_interruptible(&ce->timeline->mutex)) {
-		err = __intel_engine_pulse(engine);
+		err = __intel_engine_pulse(engine, force_preempt);
 		mutex_unlock(&ce->timeline->mutex);
 	}
 
 	intel_engine_flush_submission(engine);
 	intel_engine_pm_put(engine);
 	return err;
+}
+
+int intel_engine_pulse(struct intel_engine_cs *engine)
+{
+	return _intel_engine_pulse(engine, false);
+}
+
+
+int intel_engine_pulse_force_preempt(struct intel_engine_cs *engine)
+{
+	return _intel_engine_pulse(engine, true);
 }
 
 int intel_engine_flush_barriers(struct intel_engine_cs *engine)
