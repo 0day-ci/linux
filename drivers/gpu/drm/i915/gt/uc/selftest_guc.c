@@ -190,7 +190,6 @@ static int intel_guc_steal_guc_ids(void *arg)
 		ce[++context_index] = intel_context_create(engine);
 		if (IS_ERR(ce[context_index])) {
 			ret = PTR_ERR(ce[context_index--]);
-			ce[context_index] = NULL;
 			pr_err("Failed to create context: %d\n", ret);
 			goto err_spin_rq;
 		}
@@ -226,6 +225,7 @@ static int intel_guc_steal_guc_ids(void *arg)
 	/* Wait for last request */
 	ret = i915_request_wait(last, 0, HZ * 30);
 	i915_request_put(last);
+	last = NULL;
 	if (ret < 0) {
 		pr_err("Last request failed to complete: %d\n", ret);
 		goto err_spin_rq;
@@ -271,6 +271,8 @@ err_spin_rq:
 		igt_spinner_fini(&spin);
 		intel_gt_wait_for_idle(gt, HZ * 30);
 	}
+	if (last)
+		i915_request_put(last);
 err_contexts:
 	for (; context_index >= 0 && ce[context_index]; --context_index)
 		intel_context_put(ce[context_index]);
