@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/nvmem/cells/mac-address.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: NVMEM cell containing a MAC address
+
+maintainers:
+  - Rafał Miłecki <rafal@milecki.pl>
+
+properties:
+  compatible:
+    const: mac-address
+
+  format:
+    description: |
+      Some NVMEM cells contain MAC in a non-binary format.
+
+      ASCII should be specified if MAC is string formatted like:
+      - "01:23:45:67:89:AB" (30 31 3a 32 33 3a 34 35 3a 36 37 3a 38 39 3a 41 42)
+      - "01-23-45-67-89-AB"
+      - "0123456789AB"
+    enum:
+      - ascii
+
+  reversed-bytes:
+    type: boolean
+    description: |
+      MAC is stored in reversed bytes order. Example:
+      Stored value: AB 89 67 45 23 01
+      Actual MAC: 01 23 45 67 89 AB
+
+  base-address:
+    type: boolean
+    description: |
+      Marks NVMEM cell as provider of multiple addresses that are relative to
+      the one actually stored physically. Respective addresses can be requested
+      by specifying cell index of NVMEM cell.
+
+allOf:
+  - $ref: cell.yaml#
+  - if:
+      required:
+        - base-address
+    then:
+      properties:
+        "#nvmem-cell-cells":
+          const: 1
+      required:
+        - "#nvmem-cell-cells"
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        partition@f00000 {
+            compatible = "nvmem-cells";
+            label = "calibration";
+            reg = <0xf00000 0x100000>;
+            ranges = <0 0xf00000 0x100000>;
+            #address-cells = <1>;
+            #size-cells = <1>;
+
+            mac@100 {
+                compatible = "mac-address";
+                reg = <0x100 0x6>;
+            };
+
+            mac@200 {
+                compatible = "mac-address";
+                reg = <0x200 0x6>;
+                reversed-bytes;
+            };
+
+            mac@300 {
+                compatible = "mac-address";
+                reg = <0x300 0x11>;
+                format = "ascii";
+            };
+
+            mac@400 {
+                compatible = "mac-address";
+                reg = <0x400 0x6>;
+                base-address;
+                #nvmem-cell-cells = <1>;
+            };
+        };
+    };
