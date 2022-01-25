@@ -388,6 +388,10 @@ void pci_aer_init(struct pci_dev *dev)
 
 	pci_aer_clear_status(dev);
 
+	/* Enable AER if requested */
+	if (pci_aer_available())
+		pci_enable_pcie_error_reporting(dev);
+
 	/* Enable ECRC checking if enabled and configured */
 	pcie_set_ecrc_checking(dev);
 }
