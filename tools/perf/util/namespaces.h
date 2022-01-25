@@ -29,7 +29,12 @@ struct namespaces {
 struct namespaces *namespaces__new(struct perf_record_namespaces *event);
 void namespaces__free(struct namespaces *namespaces);
 
-struct nsinfo {
+#ifndef REFCNT_CHECKING
+struct nsinfo
+#else
+struct original_nsinfo
+#endif
+{
 	pid_t			pid;
 	pid_t			tgid;
 	pid_t			nstgid;
@@ -39,6 +44,12 @@ struct nsinfo {
 	refcount_t		refcnt;
 };
 
+#ifdef REFCNT_CHECKING
+struct nsinfo {
+	struct original_nsinfo *orig;
+};
+#endif
+
 struct nscookie {
 	int			oldns;
 	int			newns;
@@ -47,11 +58,17 @@ struct nscookie {
 
 int nsinfo__init(struct nsinfo *nsi);
 struct nsinfo *nsinfo__new(pid_t pid);
-struct nsinfo *nsinfo__copy(struct nsinfo *nsi);
-void nsinfo__delete(struct nsinfo *nsi);
+struct nsinfo *nsinfo__copy(const struct nsinfo *nsi);
 
 struct nsinfo *nsinfo__get(struct nsinfo *nsi);
 void nsinfo__put(struct nsinfo *nsi);
+
+bool nsinfo__need_setns(const struct nsinfo *nsi);
+void nsinfo__clear_need_setns(struct nsinfo *nsi);
+pid_t nsinfo__tgid(const struct nsinfo  *nsi);
+pid_t nsinfo__nstgid(const struct nsinfo  *nsi);
+pid_t nsinfo__pid(const struct nsinfo  *nsi);
+pid_t nsinfo__in_pidns(const struct nsinfo  *nsi);
 
 void nsinfo__mountns_enter(struct nsinfo *nsi, struct nscookie *nc);
 void nsinfo__mountns_exit(struct nscookie *nc);
