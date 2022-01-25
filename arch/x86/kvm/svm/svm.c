@@ -4348,7 +4348,7 @@ static void svm_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu, u8 vector)
 	if (!sev_es_guest(vcpu->kvm))
 		return kvm_vcpu_deliver_sipi_vector(vcpu, vector);
 
-	sev_vcpu_deliver_sipi_vector(vcpu, vector);
+	sev_vcpu_deliver_sipi_vector(vcpu);
 }
 
 static void svm_vm_destroy(struct kvm *kvm)

@@ -2925,7 +2925,7 @@ void sev_es_prepare_guest_switch(unsigned int cpu)
 	hostsa->xss = host_xss;
 }
 
-void sev_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu, u8 vector)
+void sev_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 
