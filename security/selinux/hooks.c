@@ -3723,6 +3723,11 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 		error = file_has_perm(cred, file, FILE__GETATTR);
 		break;
 
+	/* must always succeed */
+	case FIOCLEX:
+	case FIONCLEX:
+		break;
+
 	case FS_IOC_SETFLAGS:
 	case FS_IOC_SETVERSION:
 		error = file_has_perm(cred, file, FILE__SETATTR);
