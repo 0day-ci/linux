@@ -1299,6 +1299,7 @@ struct ib_qp_attr {
 enum ib_wr_opcode {
 	/* These are shared with userspace */
 	IB_WR_RDMA_WRITE = IB_UVERBS_WR_RDMA_WRITE,
+	IB_WR_RDMA_FLUSH = IB_UVERBS_WR_RDMA_FLUSH,
 	IB_WR_RDMA_WRITE_WITH_IMM = IB_UVERBS_WR_RDMA_WRITE_WITH_IMM,
 	IB_WR_SEND = IB_UVERBS_WR_SEND,
 	IB_WR_SEND_WITH_IMM = IB_UVERBS_WR_SEND_WITH_IMM,
@@ -1391,6 +1392,15 @@ struct ib_atomic_wr {
 	u64			compare_add_mask;
 	u64			swap_mask;
 	u32			rkey;
+};
+
+struct ib_flush_wr {
+	struct ib_send_wr	wr;
+	u64			remote_addr;
+	u32			length;
+	u32			rkey;
+	u8			type;
+	u8			level;
 };
 
 static inline const struct ib_atomic_wr *atomic_wr(const struct ib_send_wr *wr)

@@ -784,6 +784,7 @@ enum ib_uverbs_wr_opcode {
 	IB_UVERBS_WR_RDMA_READ_WITH_INV = 11,
 	IB_UVERBS_WR_MASKED_ATOMIC_CMP_AND_SWP = 12,
 	IB_UVERBS_WR_MASKED_ATOMIC_FETCH_AND_ADD = 13,
+	IB_UVERBS_WR_RDMA_FLUSH = 14,
 	/* Review enum ib_wr_opcode before modifying this */
 };
 
@@ -797,6 +798,13 @@ struct ib_uverbs_send_wr {
 		__u32 invalidate_rkey;
 	} ex;
 	union {
+		struct {
+			__aligned_u64 remote_addr;
+			__u32 length;
+			__u32 rkey;
+			__u8 type;
+			__u8 level;
+		} flush;
 		struct {
 			__aligned_u64 remote_addr;
 			__u32 rkey;
