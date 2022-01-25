@@ -102,8 +102,6 @@ static irqreturn_t riscv_timer_interrupt(int irq, void *dev_id)
 static int __init riscv_timer_init_dt(struct device_node *n)
 {
 	int cpuid, hartid, error;
-	struct device_node *child;
-	struct irq_domain *domain;
 
 	hartid = riscv_of_processor_hartid(n);
 	if (hartid < 0) {
@@ -121,20 +119,7 @@ static int __init riscv_timer_init_dt(struct device_node *n)
 	if (cpuid != smp_processor_id())
 		return 0;
 
-	domain = NULL;
-	child = of_get_compatible_child(n, "riscv,cpu-intc");
-	if (!child) {
-		pr_err("Failed to find INTC node [%pOF]\n", n);
-		return -ENODEV;
-	}
-	domain = irq_find_host(child);
-	of_node_put(child);
-	if (!domain) {
-		pr_err("Failed to find IRQ domain for node [%pOF]\n", n);
-		return -ENODEV;
-	}
-
-	riscv_clock_event_irq = irq_create_mapping(domain, RV_IRQ_TIMER);
+	riscv_clock_event_irq = irq_create_mapping(NULL, RV_IRQ_TIMER);
 	if (!riscv_clock_event_irq) {
 		pr_err("Failed to map timer interrupt for node [%pOF]\n", n);
 		return -ENODEV;

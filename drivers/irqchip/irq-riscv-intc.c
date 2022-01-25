@@ -125,6 +125,15 @@ static int __init riscv_intc_init(struct device_node *node,
 		return rc;
 	}
 
+	/*
+	 * Make INTC as the default domain which will allow drivers
+	 * not having dedicated DT/ACPI fwnode (such as RISC-V SBI IPI
+	 * driver, RISC-V timer driver, RISC-V PMU driver, etc) can
+	 * directly create local interrupt mapping using standardized
+	 * local interrupt numbers.
+	 */
+	irq_set_default_host(intc_domain);
+
 	cpuhp_setup_state(CPUHP_AP_IRQ_RISCV_STARTING,
 			  "irqchip/riscv/intc:starting",
 			  riscv_intc_cpu_starting,
