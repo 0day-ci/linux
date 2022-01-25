@@ -149,11 +149,11 @@ static void __init kasan_populate_pud(pgd_t *pgd,
 		set_pgd(pgd, pfn_pgd(PFN_DOWN(__pa(base_pud)), PAGE_TABLE));
 }
 
-#define kasan_early_shadow_pgd_next			(pgtable_l4_enabled ?	\
+#define kasan_early_shadow_pgd_next		(system_supports_sv48() ?	\
 				(uintptr_t)kasan_early_shadow_pud :		\
 				(uintptr_t)kasan_early_shadow_pmd)
 #define kasan_populate_pgd_next(pgdp, vaddr, next, early)			\
-		(pgtable_l4_enabled ?						\
+		(system_supports_sv48() ?					\
 			kasan_populate_pud(pgdp, vaddr, next, early) :		\
 			kasan_populate_pmd((pud_t *)pgdp, vaddr, next))
 
@@ -211,7 +211,7 @@ asmlinkage void __init kasan_early_init(void)
 				(__pa((uintptr_t)kasan_early_shadow_pte)),
 				PAGE_TABLE));
 
-	if (pgtable_l4_enabled) {
+	if (system_supports_sv48()) {
 		for (i = 0; i < PTRS_PER_PUD; ++i)
 			set_pud(kasan_early_shadow_pud + i,
 				pfn_pud(PFN_DOWN

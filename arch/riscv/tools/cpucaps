@@ -3,3 +3,4 @@
 # Internal CPU capabilities constants, keep this list sorted
 
 HAS_NO_FPU
+HAS_NO_SV48

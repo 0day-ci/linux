@@ -96,4 +96,10 @@ static inline bool system_supports_fpu(void)
 	return IS_ENABLED(CONFIG_FPU) && !cpus_have_final_cap(RISCV_HAS_NO_FPU);
 }
 
+static inline bool system_supports_sv48(void)
+{
+	return IS_ENABLED(CONFIG_64BIT) && !IS_ENABLED(CONFIG_XIP_KERNEL) &&
+		!cpus_have_const_cap(RISCV_HAS_NO_SV48);
+}
+
 #endif
