@@ -64,7 +64,7 @@ struct dioname {
 
 /* useful macro */
 #define DIONAME(x) { DIO_ID_##x, DIO_DESC_##x }
-#define DIOFBNAME(x) { DIO_ENCODE_ID( DIO_ID_FBUFFER, DIO_ID2_##x), DIO_DESC2_##x }
+#define DIOFBNAME(x) { DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_##x), DIO_DESC2_##x }
 
 static struct dioname names[] = {
 	DIONAME(DCA0), DIONAME(DCA0REM), DIONAME(DCA1), DIONAME(DCA1REM),
@@ -236,7 +236,7 @@ static int __init dio_init(void)
 			dev->id = prid;
 
 		dev->ipl = DIO_IPL(va);
-		strcpy(dev->name,dio_getname(dev->id));
+		strcpy(dev->name, dio_getname(dev->id));
 		printk(KERN_INFO "select code %3d: ipl %d: ID %02X", dev->scode, dev->ipl, prid);
 		if (DIO_NEEDSSECID(prid))
 			printk(":%02X", secid);
