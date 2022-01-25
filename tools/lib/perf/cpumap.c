@@ -10,10 +10,16 @@
 #include <ctype.h>
 #include <limits.h>
 
-static struct perf_cpu_map *perf_cpu_map__alloc(int nr_cpus)
+#ifndef REFCNT_CHECKING
+#define UNWRAP_MAP(x) x
+#else
+#define UNWRAP_MAP(x) x->orig
+#endif
+
+#ifndef REFCNT_CHECKING
+struct perf_cpu_map *perf_cpu_map__alloc(int nr_cpus)
 {
 	struct perf_cpu_map *cpus = malloc(sizeof(*cpus) + sizeof(struct perf_cpu) * nr_cpus);
-
 	if (cpus != NULL) {
 		cpus->nr = nr_cpus;
 		refcount_set(&cpus->refcnt, 1);
@@ -21,13 +27,31 @@ static struct perf_cpu_map *perf_cpu_map__alloc(int nr_cpus)
 	}
 	return cpus;
 }
+#else
+struct perf_cpu_map *perf_cpu_map__alloc(int nr_cpus)
+{
+	struct perf_cpu_map *wrapped_cpus = NULL;
+	struct original_perf_cpu_map *cpus =
+		malloc(sizeof(*cpus) + sizeof(struct perf_cpu) * nr_cpus);
+	if (cpus != NULL) {
+		cpus->nr = nr_cpus;
+		refcount_set(&cpus->refcnt, 1);
+		wrapped_cpus = malloc(sizeof(*wrapped_cpus));
+		if (wrapped_cpus != NULL)
+			wrapped_cpus->orig = cpus;
+		else
+			free(cpus);
+	}
+	return wrapped_cpus;
+}
+#endif
 
 struct perf_cpu_map *perf_cpu_map__dummy_new(void)
 {
 	struct perf_cpu_map *cpus = perf_cpu_map__alloc(1);
 
 	if (cpus)
-		cpus->map[0].cpu = -1;
+		UNWRAP_MAP(cpus)->map[0].cpu = -1;
 
 	return cpus;
 }
@@ -35,23 +59,45 @@ struct perf_cpu_map *perf_cpu_map__dummy_new(void)
 static void cpu_map__delete(struct perf_cpu_map *map)
 {
 	if (map) {
-		WARN_ONCE(refcount_read(&map->refcnt) != 0,
+		WARN_ONCE(refcount_read(&UNWRAP_MAP(map)->refcnt) != 0,
 			  "cpu_map refcnt unbalanced\n");
+#ifdef REFCNT_CHECKING
+		free(map->orig);
+		map->orig = NULL;
+#endif
 		free(map);
 	}
 }
 
 struct perf_cpu_map *perf_cpu_map__get(struct perf_cpu_map *map)
 {
-	if (map)
-		refcount_inc(&map->refcnt);
+	if (map) {
+#ifdef REFCNT_CHECKING
+		struct perf_cpu_map *new_wrapper;
+#endif
+		refcount_inc(&UNWRAP_MAP(map)->refcnt);
+#ifdef REFCNT_CHECKING
+		new_wrapper = malloc(sizeof(*new_wrapper));
+		new_wrapper->orig = map->orig;
+		map = new_wrapper;
+#endif
+	}
 	return map;
 }
 
 void perf_cpu_map__put(struct perf_cpu_map *map)
 {
-	if (map && refcount_dec_and_test(&map->refcnt))
-		cpu_map__delete(map);
+	if (map) {
+		if (refcount_dec_and_test(&UNWRAP_MAP(map)->refcnt))
+			cpu_map__delete(map);
+		else {
+#ifdef REFCNT_CHECKING
+			/* Free the wrapper object but the reference counted object remains. */
+			map->orig = NULL;
+			free(map);
+#endif
+		}
+	}
 }
 
 static struct perf_cpu_map *cpu_map__default_new(void)
@@ -68,7 +114,7 @@ static struct perf_cpu_map *cpu_map__default_new(void)
 		int i;
 
 		for (i = 0; i < nr_cpus; ++i)
-			cpus->map[i].cpu = i;
+			UNWRAP_MAP(cpus)->map[i].cpu = i;
 	}
 
 	return cpus;
@@ -94,15 +140,16 @@ static struct perf_cpu_map *cpu_map__trim_new(int nr_cpus, const struct perf_cpu
 	int i, j;
 
 	if (cpus != NULL) {
-		memcpy(cpus->map, tmp_cpus, payload_size);
-		qsort(cpus->map, nr_cpus, sizeof(struct perf_cpu), cmp_cpu);
+		memcpy(UNWRAP_MAP(cpus)->map, tmp_cpus, payload_size);
+		qsort(UNWRAP_MAP(cpus)->map, nr_cpus, sizeof(struct perf_cpu), cmp_cpu);
 		/* Remove dups */
 		j = 0;
 		for (i = 0; i < nr_cpus; i++) {
-			if (i == 0 || cpus->map[i].cpu != cpus->map[i - 1].cpu)
-				cpus->map[j++].cpu = cpus->map[i].cpu;
+			if (i == 0 ||
+			    UNWRAP_MAP(cpus)->map[i].cpu != UNWRAP_MAP(cpus)->map[i - 1].cpu)
+				UNWRAP_MAP(cpus)->map[j++].cpu = UNWRAP_MAP(cpus)->map[i].cpu;
 		}
-		cpus->nr = j;
+		UNWRAP_MAP(cpus)->nr = j;
 		assert(j <= nr_cpus);
 	}
 	return cpus;
@@ -263,20 +310,20 @@ struct perf_cpu perf_cpu_map__cpu(const struct perf_cpu_map *cpus, int idx)
 		.cpu = -1
 	};
 
-	if (cpus && idx < cpus->nr)
-		return cpus->map[idx];
+	if (cpus && idx < UNWRAP_MAP(cpus)->nr)
+		return UNWRAP_MAP(cpus)->map[idx];
 
 	return result;
 }
 
 int perf_cpu_map__nr(const struct perf_cpu_map *cpus)
 {
-	return cpus ? cpus->nr : 1;
+	return cpus ? UNWRAP_MAP(cpus)->nr : 1;
 }
 
 bool perf_cpu_map__empty(const struct perf_cpu_map *map)
 {
-	return map ? map->map[0].cpu == -1 : true;
+	return map ? UNWRAP_MAP(map)->map[0].cpu == -1 : true;
 }
 
 int perf_cpu_map__idx(const struct perf_cpu_map *cpus, struct perf_cpu cpu)
@@ -287,10 +334,10 @@ int perf_cpu_map__idx(const struct perf_cpu_map *cpus, struct perf_cpu cpu)
 		return -1;
 
 	low = 0;
-	high = cpus->nr;
+	high = UNWRAP_MAP(cpus)->nr;
 	while (low < high) {
 		int idx = (low + high) / 2;
-		struct perf_cpu cpu_at_idx = cpus->map[idx];
+		struct perf_cpu cpu_at_idx = UNWRAP_MAP(cpus)->map[idx];
 
 		if (cpu_at_idx.cpu == cpu.cpu)
 			return idx;
@@ -316,7 +363,7 @@ struct perf_cpu perf_cpu_map__max(struct perf_cpu_map *map)
 	};
 
 	// cpu_map__trim_new() qsort()s it, cpu_map__default_new() sorts it as well.
-	return map->nr > 0 ? map->map[map->nr - 1] : result;
+	return UNWRAP_MAP(map)->nr > 0 ? UNWRAP_MAP(map)->map[UNWRAP_MAP(map)->nr - 1] : result;
 }
 
 /*
@@ -337,37 +384,36 @@ struct perf_cpu_map *perf_cpu_map__merge(struct perf_cpu_map *orig,
 
 	if (!orig && !other)
 		return NULL;
-	if (!orig) {
-		perf_cpu_map__get(other);
-		return other;
-	}
+	if (!orig)
+		return perf_cpu_map__get(other);
 	if (!other)
 		return orig;
-	if (orig->nr == other->nr &&
-	    !memcmp(orig->map, other->map, orig->nr * sizeof(struct perf_cpu)))
+	if (UNWRAP_MAP(orig)->nr == UNWRAP_MAP(other)->nr &&
+	    !memcmp(UNWRAP_MAP(orig)->map, UNWRAP_MAP(other)->map,
+		    UNWRAP_MAP(orig)->nr * sizeof(struct perf_cpu)))
 		return orig;
 
-	tmp_len = orig->nr + other->nr;
+	tmp_len = UNWRAP_MAP(orig)->nr + UNWRAP_MAP(other)->nr;
 	tmp_cpus = malloc(tmp_len * sizeof(struct perf_cpu));
 	if (!tmp_cpus)
 		return NULL;
 
 	/* Standard merge algorithm from wikipedia */
 	i = j = k = 0;
-	while (i < orig->nr && j < other->nr) {
-		if (orig->map[i].cpu <= other->map[j].cpu) {
-			if (orig->map[i].cpu == other->map[j].cpu)
+	while (i < UNWRAP_MAP(orig)->nr && j < UNWRAP_MAP(other)->nr) {
+		if (UNWRAP_MAP(orig)->map[i].cpu <= UNWRAP_MAP(other)->map[j].cpu) {
+			if (UNWRAP_MAP(orig)->map[i].cpu == UNWRAP_MAP(other)->map[j].cpu)
 				j++;
-			tmp_cpus[k++] = orig->map[i++];
+			tmp_cpus[k++] = UNWRAP_MAP(orig)->map[i++];
 		} else
-			tmp_cpus[k++] = other->map[j++];
+			tmp_cpus[k++] = UNWRAP_MAP(other)->map[j++];
 	}
 
-	while (i < orig->nr)
-		tmp_cpus[k++] = orig->map[i++];
+	while (i < UNWRAP_MAP(orig)->nr)
+		tmp_cpus[k++] = UNWRAP_MAP(orig)->map[i++];
 
-	while (j < other->nr)
-		tmp_cpus[k++] = other->map[j++];
+	while (j < UNWRAP_MAP(other)->nr)
+		tmp_cpus[k++] = UNWRAP_MAP(other)->map[j++];
 	assert(k <= tmp_len);
 
 	merged = cpu_map__trim_new(k, tmp_cpus);
