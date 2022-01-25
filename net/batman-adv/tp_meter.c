@@ -905,7 +905,7 @@ static void batadv_tp_start_kthread(struct batadv_tp_vars *tp_vars)
 	u32 session_cookie;
 
 	kref_get(&tp_vars->refcount);
-	kthread = kthread_create(batadv_tp_send, tp_vars, "kbatadv_tp_meter");
+	kthread = kthread_run(batadv_tp_send, tp_vars, "kbatadv_tp_meter");
 	if (IS_ERR(kthread)) {
 		session_cookie = batadv_tp_session_cookie(tp_vars->session,
 							  tp_vars->icmp_uid);
@@ -921,8 +921,6 @@ static void batadv_tp_start_kthread(struct batadv_tp_vars *tp_vars)
 		batadv_tp_sender_cleanup(bat_priv, tp_vars);
 		return;
 	}
-
-	wake_up_process(kthread);
 }
 
 /**
