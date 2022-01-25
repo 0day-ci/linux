@@ -191,6 +191,7 @@ struct pcf21xx_config {
 	int max_register;
 	unsigned int has_nvmem:1;
 	unsigned int has_bit_wd_ctl_cd0:1;
+	unsigned int has_int_a_b:1; /* PCF2131 supports two interrupt outputs. */
 	u8 regs_td_base; /* Time/data base registers. */
 	u8 regs_alarm_base; /* Alarm function base registers. */
 	u8 reg_wd_ctl; /* Watchdog control register. */
@@ -511,6 +512,39 @@ static int pcf2127_rtc_alarm_irq_enable(struct device *dev, u32 enable)
 	struct pcf2127 *pcf2127 = dev_get_drvdata(dev);
 	int ret;
 
+	if (pcf2127->cfg->has_int_a_b) {
+		/*
+		 * The PCF2131 supports two interrupt outputs, INT_A and INT_B.
+		 * The alarm interrupt can be routed to either one or both of
+		 * them. Make sure that at least one output pin is requested.
+		 */
+		if (enable &&
+		    !device_property_read_bool(dev, "alarm-output-a") &&
+		    !device_property_read_bool(dev, "alarm-output-b")) {
+			dev_warn(dev, "no alarm interrupt output pin selected, alarm function will not work\n");
+			return -EINVAL;
+		}
+
+		if (device_property_read_bool(dev, "alarm-output-a")) {
+			ret = regmap_update_bits(pcf2127->regmap,
+						 PCF2131_REG_INT_A_MASK1,
+						 PCF2131_BIT_INT_AIE,
+						 enable ? PCF2131_BIT_INT_AIE : 0);
+			if (ret)
+				return ret;
+		}
+
+		if (device_property_read_bool(dev, "alarm-output-b")) {
+			ret = regmap_update_bits(pcf2127->regmap,
+						 PCF2131_REG_INT_B_MASK1,
+						 PCF2131_BIT_INT_AIE,
+						 enable ? PCF2131_BIT_INT_AIE : 0);
+			if (ret)
+				return ret;
+		}
+	}
+
+	/* Enable alarm interrupt. */
 	ret = regmap_update_bits(pcf2127->regmap, PCF2127_REG_CTRL2,
 				 PCF2127_BIT_CTRL2_AIE,
 				 enable ? PCF2127_BIT_CTRL2_AIE : 0);
@@ -878,6 +912,7 @@ static struct pcf21xx_config pcf21xx_cfg[] = {
 		.max_register = 0x1d,
 		.has_nvmem = 1,
 		.has_bit_wd_ctl_cd0 = 1,
+		.has_int_a_b = 0,
 		.regs_td_base = PCF2127_REG_TIME_DATE_BASE,
 		.regs_alarm_base = PCF2127_REG_ALARM_BASE,
 		.reg_wd_ctl = PCF2127_REG_WD_CTL,
@@ -901,6 +936,7 @@ static struct pcf21xx_config pcf21xx_cfg[] = {
 		.max_register = 0x19,
 		.has_nvmem = 0,
 		.has_bit_wd_ctl_cd0 = 0,
+		.has_int_a_b = 0,
 		.regs_td_base = PCF2127_REG_TIME_DATE_BASE,
 		.regs_alarm_base = PCF2127_REG_ALARM_BASE,
 		.reg_wd_ctl = PCF2127_REG_WD_CTL,
@@ -924,6 +960,7 @@ static struct pcf21xx_config pcf21xx_cfg[] = {
 		.max_register = 0x36,
 		.has_nvmem = 0,
 		.has_bit_wd_ctl_cd0 = 0,
+		.has_int_a_b = 1,
 		.regs_td_base = PCF2131_REG_TIME_DATE_BASE,
 		.regs_alarm_base = PCF2131_REG_ALARM_BASE,
 		.reg_wd_ctl = PCF2131_REG_WD_CTL,
