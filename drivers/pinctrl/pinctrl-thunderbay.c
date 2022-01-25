@@ -812,7 +812,7 @@ static int thunderbay_add_functions(struct thunderbay_pinctrl *tpc, struct funct
 				}
 			}
 
-			grp = func->group_names;
+			grp = (const char **)func->group_names;
 			while (*grp)
 				grp++;
 
