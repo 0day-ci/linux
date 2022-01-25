@@ -451,6 +451,62 @@ static const struct file_operations ima_measure_policy_ops = {
 	.llseek = generic_file_llseek,
 };
 
+static ssize_t ima_show_active(struct file *filp,
+			       char __user *buf,
+			       size_t count, loff_t *ppos)
+{
+	struct ima_namespace *ns = &init_ima_ns;
+	char tmpbuf[2];
+	ssize_t len;
+
+	len = scnprintf(tmpbuf, sizeof(tmpbuf),
+			"%d\n", atomic_read(&ns->active));
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, len);
+}
+
+static ssize_t ima_write_active(struct file *filp,
+				const char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	struct ima_namespace *ns = &init_ima_ns;
+	unsigned int active;
+	char tmpbuf[3];
+	ssize_t ret;
+
+	if (ns_is_active(ns))
+		return -EBUSY;
+
+	ret = simple_write_to_buffer(tmpbuf, sizeof(tmpbuf) - 1, ppos,
+				     buf, count);
+	if (ret < 0)
+		return ret;
+	tmpbuf[ret] = 0;
+
+	if (!kstrtouint(tmpbuf, 10, &active) && active == 1)
+		atomic_set(&ns->active, 1);
+
+	return count;
+}
+
+static const struct file_operations ima_active_ops = {
+	.read = ima_show_active,
+	.write = ima_write_active,
+};
+
+static int ima_fs_add_ns_files(struct dentry *ima_dir)
+{
+	struct dentry *active;
+
+	active =
+	    securityfs_create_file("active",
+				   S_IRUSR | S_IWUSR | S_IRGRP, ima_dir, NULL,
+				   &ima_active_ops);
+	if (IS_ERR(active))
+		return PTR_ERR(active);
+
+	return 0;
+}
+
 int ima_fs_ns_init(struct user_namespace *user_ns, struct dentry *root)
 {
 	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
@@ -515,6 +571,9 @@ int ima_fs_ns_init(struct user_namespace *user_ns, struct dentry *root)
 		if (IS_ERR(ns->ima_policy))
 			goto out;
 	}
+
+	if (ns != &init_ima_ns && ima_fs_add_ns_files(ima_dir))
+		goto out;
 
 	return 0;
 out:
