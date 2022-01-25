@@ -24,6 +24,16 @@ properties:
   interrupts:
     maxItems: 1
 
+  alarm-output-a:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Enable alarm interrupt on INT_A output pin.
+
+  alarm-output-b:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Enable alarm interrupt on INT_B output pin.
+
   start-year: true
 
   reset-source: true
@@ -31,6 +41,18 @@ properties:
 required:
   - compatible
   - reg
+
+if:
+  not:
+    properties:
+      compatible:
+        contains:
+          enum:
+            - nxp,pcf2131
+then:
+  properties:
+    alarm-output-a: false
+    alarm-output-b: false
 
 additionalProperties: false
 
@@ -62,6 +84,7 @@ examples:
             pinctrl-0 = <&rtc_nint_pins>;
             interrupts-extended = <&gpio1 16 IRQ_TYPE_LEVEL_HIGH>;
             reset-source;
+            alarm-output-b;
         };
     };
 
