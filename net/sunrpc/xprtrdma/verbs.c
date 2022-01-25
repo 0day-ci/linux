@@ -351,14 +351,14 @@ static void rpcrdma_ep_destroy(struct kref *kref)
 		ep->re_id->qp = NULL;
 	}
 
-	if (ep->re_attr.recv_cq)
+	if (ep->re_attr.recv_cq && !IS_ERR(ep->re_attr.recv_cq))
 		ib_free_cq(ep->re_attr.recv_cq);
 	ep->re_attr.recv_cq = NULL;
-	if (ep->re_attr.send_cq)
+	if (ep->re_attr.send_cq && !IS_ERR(ep->re_attr.send_cq))
 		ib_free_cq(ep->re_attr.send_cq);
 	ep->re_attr.send_cq = NULL;
 
-	if (ep->re_pd)
+	if (ep->re_pd && !IS_ERR(ep->re_pd))
 		ib_dealloc_pd(ep->re_pd);
 	ep->re_pd = NULL;
 
