@@ -927,13 +927,6 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	clk_set_parent(hws[IMX6QDL_CLK_IPU2_DI0_SEL]->clk, hws[IMX6QDL_CLK_IPU2_DI0_PRE]->clk);
 	clk_set_parent(hws[IMX6QDL_CLK_IPU2_DI1_SEL]->clk, hws[IMX6QDL_CLK_IPU2_DI1_PRE]->clk);
 
-	/*
-	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
-	 * We can not get the 100MHz from the pll2_pfd0_352m.
-	 * So choose pll2_pfd2_396m as enfc_sel's parent.
-	 */
-	clk_set_parent(hws[IMX6QDL_CLK_ENFC_SEL]->clk, hws[IMX6QDL_CLK_PLL2_PFD2_396M]->clk);
-
 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
 		clk_prepare_enable(hws[IMX6QDL_CLK_USBPHY1_GATE]->clk);
 		clk_prepare_enable(hws[IMX6QDL_CLK_USBPHY2_GATE]->clk);
@@ -975,5 +968,25 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	}
 
 	imx_register_uart_clocks(2);
+
+	/*
+	 * The gpmi needs 100MHz frequency in the EDO/Sync mode. We can not get
+	 * the 100MHz from the pll2_pfd0_352m. So choose pll2_pfd2_396m as
+	 * enfc_sel's parent.
+	 *
+	 * gpmi_io and ipt_clk_io clocks may have been enabled by the boot
+	 * loader. All children of enfc_clk_root must be gated in order to
+	 * prevent glitches during parent change. The task of re-enabling
+	 * gpio_io is left to the gpmi-nand driver.
+	 */
+	if (clk_hw_is_enabled(hws[IMX6QDL_CLK_GPMI_IO])) {
+		clk_prepare_enable(hws[IMX6QDL_CLK_GPMI_IO]->clk);
+		clk_disable_unprepare(hws[IMX6QDL_CLK_GPMI_IO]->clk);
+	}
+	if (clk_hw_is_enabled(hws[IMX6QDL_CLK_ENFC])) {
+		clk_prepare_enable(hws[IMX6QDL_CLK_ENFC]->clk);
+		clk_disable_unprepare(hws[IMX6QDL_CLK_ENFC]->clk);
+	}
+	clk_set_parent(hws[IMX6QDL_CLK_ENFC_SEL]->clk, hws[IMX6QDL_CLK_PLL2_PFD2_396M]->clk);
 }
 CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
