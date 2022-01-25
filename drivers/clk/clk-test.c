@@ -204,6 +204,50 @@ static void clk_range_test_set_range_invalid(struct kunit *test)
 }
 
 /*
+ * Test that if our clock has some boundaries and we try to round a rate
+ * lower than the minimum, the returned rate will be within range.
+ */
+static void clk_range_test_set_range_round_rate_lower(struct kunit *test)
+{
+	struct clk_dummy_context *ctx = test->priv;
+	struct clk_hw *hw = &ctx->hw;
+	struct clk *clk = hw->clk;
+	long rate;
+
+	KUNIT_ASSERT_EQ(test,
+			clk_set_rate_range(clk,
+					   DUMMY_CLOCK_RATE_1,
+					   DUMMY_CLOCK_RATE_2),
+			0);
+
+	rate = clk_round_rate(clk, DUMMY_CLOCK_RATE_1 - 1000);
+	KUNIT_ASSERT_GT(test, rate, 0);
+	KUNIT_EXPECT_EQ(test, rate, DUMMY_CLOCK_RATE_1);
+}
+
+/*
+ * Test that if our clock has some boundaries and we try to round a rate
+ * higher than the maximum, the returned rate will be within range.
+ */
+static void clk_range_test_set_range_round_rate_higher(struct kunit *test)
+{
+	struct clk_dummy_context *ctx = test->priv;
+	struct clk_hw *hw = &ctx->hw;
+	struct clk *clk = hw->clk;
+	long rate;
+
+	KUNIT_ASSERT_EQ(test,
+			clk_set_rate_range(clk,
+					   DUMMY_CLOCK_RATE_1,
+					   DUMMY_CLOCK_RATE_2),
+			0);
+
+	rate = clk_round_rate(clk, DUMMY_CLOCK_RATE_2 + 1000);
+	KUNIT_ASSERT_GT(test, rate, 0);
+	KUNIT_EXPECT_EQ(test, rate, DUMMY_CLOCK_RATE_2);
+}
+
+/*
  * Test that if our clock has a rate lower than the minimum set by a
  * call to clk_set_rate_range(), the rate will be raised to match the
  * new minimum.
@@ -266,6 +310,8 @@ static void clk_range_test_set_range_get_rate_lowered(struct kunit *test)
 static struct kunit_case clk_range_test_cases[] = {
 	KUNIT_CASE(clk_range_test_set_range),
 	KUNIT_CASE(clk_range_test_set_range_invalid),
+	KUNIT_CASE(clk_range_test_set_range_round_rate_lower),
+	KUNIT_CASE(clk_range_test_set_range_round_rate_higher),
 	KUNIT_CASE(clk_range_test_set_range_get_rate_raised),
 	KUNIT_CASE(clk_range_test_set_range_get_rate_lowered),
 	{}
