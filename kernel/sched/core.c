@@ -6919,7 +6919,7 @@ void set_user_nice(struct task_struct *p, long nice)
 		put_prev_task(rq, p);
 
 	p->static_prio = NICE_TO_PRIO(nice);
-	set_load_weight(p, true);
+	set_load_weight(p, !(READ_ONCE(p->__state) & TASK_NEW));
 	old_prio = p->prio;
 	p->prio = effective_prio(p);
 
@@ -7210,7 +7210,7 @@ static void __setscheduler_params(struct task_struct *p,
 	 */
 	p->rt_priority = attr->sched_priority;
 	p->normal_prio = normal_prio(p);
-	set_load_weight(p, true);
+	set_load_weight(p, !(READ_ONCE(p->__state) & TASK_NEW));
 }
 
 /*
