@@ -467,7 +467,7 @@ static inline bool ieee80211_is_data_qos(__le16 fc)
 static inline bool ieee80211_is_data_present(__le16 fc)
 {
 	/*
-	 * mask with 0x40 and test that that bit is clear to only return true
+	 * mask with 0x40 and test that bit is clear to only return true
 	 * for the data-containing substypes.
 	 */
 	return (fc & cpu_to_le16(IEEE80211_FCTL_FTYPE | 0x40)) ==
