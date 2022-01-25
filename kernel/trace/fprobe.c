@@ -7,12 +7,20 @@
 #include <linux/fprobe.h>
 #include <linux/kallsyms.h>
 #include <linux/kprobes.h>
+#include <linux/rethook.h>
 #include <linux/slab.h>
 #include <linux/sort.h>
+
+struct fprobe_rethook_node {
+	struct rethook_node node;
+	unsigned long entry_ip;
+};
 
 static void fprobe_handler(unsigned long ip, unsigned long parent_ip,
 			   struct ftrace_ops *ops, struct ftrace_regs *fregs)
 {
+	struct fprobe_rethook_node *fpr;
+	struct rethook_node *rh;
 	struct fprobe *fp;
 	int bit;
 
@@ -29,9 +37,36 @@ static void fprobe_handler(unsigned long ip, unsigned long parent_ip,
 	if (fp->entry_handler)
 		fp->entry_handler(fp, ip, ftrace_get_regs(fregs));
 
+	if (fp->exit_handler) {
+		rh = rethook_try_get(fp->rethook);
+		if (!rh) {
+			fp->nmissed++;
+			goto out;
+		}
+		fpr = container_of(rh, struct fprobe_rethook_node, node);
+		fpr->entry_ip = ip;
+		rethook_hook(rh, ftrace_get_regs(fregs));
+	}
+
+out:
 	ftrace_test_recursion_unlock(bit);
 }
 NOKPROBE_SYMBOL(fprobe_handler);
+
+static void fprobe_exit_handler(struct rethook_node *rh, void *data,
+				struct pt_regs *regs)
+{
+	struct fprobe *fp = (struct fprobe *)data;
+	struct fprobe_rethook_node *fpr;
+
+	if (!fp || fprobe_disabled(fp))
+		return;
+
+	fpr = container_of(rh, struct fprobe_rethook_node, node);
+
+	fp->exit_handler(fp, fpr->entry_ip, regs);
+}
+NOKPROBE_SYMBOL(fprobe_exit_handler);
 
 /* Convert ftrace location address from symbols */
 static int convert_func_addresses(struct fprobe *fp)
@@ -82,6 +117,7 @@ error:
  */
 int register_fprobe(struct fprobe *fp)
 {
+	unsigned int i, size;
 	int ret;
 
 	if (!fp || !fp->nentry || (!fp->syms && !fp->addrs) ||
@@ -96,10 +132,29 @@ int register_fprobe(struct fprobe *fp)
 	fp->ops.func = fprobe_handler;
 	fp->ops.flags = FTRACE_OPS_FL_SAVE_REGS;
 
+	/* Initialize rethook if needed */
+	if (fp->exit_handler) {
+		size = fp->nentry * num_possible_cpus() * 2;
+		fp->rethook = rethook_alloc((void *)fp, fprobe_exit_handler);
+		for (i = 0; i < size; i++) {
+			struct rethook_node *node;
+
+			node = kzalloc(sizeof(struct fprobe_rethook_node), GFP_KERNEL);
+			if (!node) {
+				rethook_free(fp->rethook);
+				ret = -ENOMEM;
+				goto out;
+			}
+			rethook_add_node(fp->rethook, node);
+		}
+	} else
+		fp->rethook = NULL;
+
 	ret = ftrace_set_filter_ips(&fp->ops, fp->addrs, fp->nentry, 0, 0);
 	if (!ret)
 		ret = register_ftrace_function(&fp->ops);
 
+out:
 	if (ret < 0 && fp->syms) {
 		kfree(fp->addrs);
 		fp->addrs = NULL;
@@ -125,8 +180,16 @@ int unregister_fprobe(struct fprobe *fp)
 		return -EINVAL;
 
 	ret = unregister_ftrace_function(&fp->ops);
+	if (ret < 0)
+		return ret;
 
-	if (!ret && fp->syms) {
+	if (fp->rethook) {
+		/* Make sure to clear rethook->data before freeing. */
+		WRITE_ONCE(fp->rethook->data, NULL);
+		barrier();
+		rethook_free(fp->rethook);
+	}
+	if (fp->syms) {
 		kfree(fp->addrs);
 		fp->addrs = NULL;
 	}
