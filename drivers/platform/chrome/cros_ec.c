@@ -182,7 +182,7 @@ static int cros_ec_ready_event(struct notifier_block *nb,
 int cros_ec_register(struct cros_ec_device *ec_dev)
 {
 	struct device *dev = ec_dev->dev;
-	int err = 0;
+	int err;
 
 	BLOCKING_INIT_NOTIFIER_HEAD(&ec_dev->event_notifier);
 
