@@ -387,7 +387,7 @@ static struct scsi_vpd *scsi_get_vpd_buf(struct scsi_device *sdev, u8 page)
 	int vpd_len = SCSI_VPD_PG_LEN, result;
 
 retry_pg:
-	vpd_buf = kmalloc(sizeof(*vpd_buf) + vpd_len, GFP_KERNEL);
+	vpd_buf = kmalloc(struct_size(vpd_buf, data, vpd_len), GFP_KERNEL);
 	if (!vpd_buf)
 		return NULL;
 
