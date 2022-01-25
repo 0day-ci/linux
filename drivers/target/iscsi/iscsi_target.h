@@ -57,4 +57,21 @@ extern struct kmem_cache *lio_r2t_cache;
 extern struct ida sess_ida;
 extern struct mutex auth_id_lock;
 
+extern cpumask_t __iscsi_allowed_cpumask;
+
+static inline void iscsit_thread_reschedule(struct iscsi_conn *conn)
+{
+	/*
+	 * If __iscsi_allowed_cpumask modified, reschedule iSCSI connection's
+	 * RX/TX threads update conn->allowed_cpumask.
+	 */
+	if (!cpumask_equal(&__iscsi_allowed_cpumask, conn->allowed_cpumask)) {
+		iscsit_thread_get_cpumask(conn);
+		conn->conn_tx_reset_cpumask = 1;
+		conn->conn_rx_reset_cpumask = 1;
+		cpumask_copy(conn->allowed_cpumask,
+			&__iscsi_allowed_cpumask);
+	}
+}
+
 #endif   /*** ISCSI_TARGET_H ***/

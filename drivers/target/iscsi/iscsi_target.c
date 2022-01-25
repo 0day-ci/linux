@@ -693,6 +693,11 @@ static int __init iscsi_target_init_module(void)
 	mutex_init(&auth_id_lock);
 	idr_init(&tiqn_idr);
 
+	/*
+	 * allow all cpus run iscsi_ttx and iscsi_trx
+	 */
+	cpumask_setall(&__iscsi_allowed_cpumask);
+
 	ret = target_register_template(&iscsi_ops);
 	if (ret)
 		goto out;
@@ -3587,6 +3592,15 @@ static int iscsit_send_reject(
 void iscsit_thread_get_cpumask(struct iscsi_conn *conn)
 {
 	int ord, cpu;
+	cpumask_t conn_allowed_cpumask;
+
+	/*
+	 * The available cpus set of iSCSI connection's RX/TX threads
+	 */
+	cpumask_and(&conn_allowed_cpumask,
+		&__iscsi_allowed_cpumask,
+		cpu_online_mask);
+
 	/*
 	 * bitmap_id is assigned from iscsit_global->ts_bitmap from
 	 * within iscsit_start_kthreads()
@@ -3595,8 +3609,9 @@ void iscsit_thread_get_cpumask(struct iscsi_conn *conn)
 	 * iSCSI connection's RX/TX threads will be scheduled to
 	 * execute upon.
 	 */
-	ord = conn->bitmap_id % cpumask_weight(cpu_online_mask);
-	for_each_online_cpu(cpu) {
+	cpumask_clear(conn->conn_cpumask);
+	ord = conn->bitmap_id % cpumask_weight(&conn_allowed_cpumask);
+	for_each_cpu(cpu, &conn_allowed_cpumask) {
 		if (ord-- == 0) {
 			cpumask_set_cpu(cpu, conn->conn_cpumask);
 			return;
@@ -3821,6 +3836,7 @@ int iscsi_target_tx_thread(void *arg)
 		 * Ensure that both TX and RX per connection kthreads
 		 * are scheduled to run on the same CPU.
 		 */
+		iscsit_thread_reschedule(conn);
 		iscsit_thread_check_cpumask(conn, current, 1);
 
 		wait_event_interruptible(conn->queues_wq,
@@ -3966,6 +3982,7 @@ static void iscsit_get_rx_pdu(struct iscsi_conn *conn)
 		 * Ensure that both TX and RX per connection kthreads
 		 * are scheduled to run on the same CPU.
 		 */
+		iscsit_thread_reschedule(conn);
 		iscsit_thread_check_cpumask(conn, current, 0);
 
 		memset(&iov, 0, sizeof(struct kvec));
