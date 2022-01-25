@@ -65,7 +65,7 @@ struct security_class_mapping secclass_map[] = {
 	    "quotaget", "watch", NULL } },
 	{ "file",
 	  { COMMON_FILE_PERMS,
-	    "execute_no_trans", "entrypoint", NULL } },
+	    "execute_no_trans", "entrypoint", "execute_sxid_no_trans", NULL } },
 	{ "dir",
 	  { COMMON_FILE_PERMS, "add_name", "remove_name",
 	    "reparent", "search", "rmdir", NULL } },

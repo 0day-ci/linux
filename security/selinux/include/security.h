@@ -219,6 +219,14 @@ static inline bool selinux_policycap_genfs_seclabel_symlinks(void)
 	return READ_ONCE(state->policycap[POLICYDB_CAPABILITY_GENFS_SECLABEL_SYMLINKS]);
 }
 
+static inline bool selinux_policycap_execute_sxid_no_trans(void)
+{
+	struct selinux_state *state = &selinux_state;
+
+	return READ_ONCE(state->policycap[POLICYDB_CAPABILITY_EXECUTE_SXID_NO_TRANS]);
+}
+
+
 struct selinux_policy_convert_data;
 
 struct selinux_load_state {

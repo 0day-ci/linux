@@ -2343,9 +2343,16 @@ static int selinux_bprm_creds_for_exec(struct linux_binprm *bprm)
 	ad.u.file = bprm->file;
 
 	if (new_tsec->sid == old_tsec->sid) {
+		u32 perm;
+
+		if (selinux_policycap_execute_sxid_no_trans() && is_sxid(inode->i_mode))
+			perm = FILE__EXECUTE_SXID_NO_TRANS;
+		else
+			perm = FILE__EXECUTE_NO_TRANS;
+
 		rc = avc_has_perm(&selinux_state,
 				  old_tsec->sid, isec->sid,
-				  SECCLASS_FILE, FILE__EXECUTE_NO_TRANS, &ad);
+				  SECCLASS_FILE, perm, &ad);
 		if (rc)
 			return rc;
 	} else {
