@@ -2013,7 +2013,7 @@ static int br_vlan_rtm_dump(struct sk_buff *skb, struct netlink_callback *cb)
 		dump_flags = nla_get_u32(dtb[BRIDGE_VLANDB_DUMP_FLAGS]);
 
 	rcu_read_lock();
-	if (bvm->ifindex) {
+	if (bvm->ifindex && !s_idx) {
 		dev = dev_get_by_index_rcu(net, bvm->ifindex);
 		if (!dev) {
 			err = -ENODEV;
@@ -2022,7 +2022,9 @@ static int br_vlan_rtm_dump(struct sk_buff *skb, struct netlink_callback *cb)
 		err = br_vlan_dump_dev(dev, skb, cb, dump_flags);
 		if (err && err != -EMSGSIZE)
 			goto out_err;
-	} else {
+		else if (!err)
+			idx++;
+	} else if (!bvm->ifindex) {
 		for_each_netdev_rcu(net, dev) {
 			if (idx < s_idx)
 				goto skip;
