@@ -2902,7 +2902,7 @@ void sev_es_vcpu_reset(struct vcpu_svm *svm)
 					    sev_enc_bit));
 }
 
-void sev_es_prepare_guest_switch(struct vcpu_svm *svm, unsigned int cpu)
+void sev_es_prepare_guest_switch(unsigned int cpu)
 {
 	struct svm_cpu_data *sd = per_cpu(svm_data, cpu);
 	struct vmcb_save_area *hostsa;

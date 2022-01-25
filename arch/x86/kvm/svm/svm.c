@@ -1276,7 +1276,7 @@ static void svm_prepare_guest_switch(struct kvm_vcpu *vcpu)
 	 * or subsequent vmload of host save area.
 	 */
 	if (sev_es_guest(vcpu->kvm)) {
-		sev_es_prepare_guest_switch(svm, vcpu->cpu);
+		sev_es_prepare_guest_switch(vcpu->cpu);
 	} else {
 		vmsave(__sme_page_pa(sd->save_area));
 	}
