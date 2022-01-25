@@ -5003,8 +5003,7 @@ static int kvm_set_guest_paused(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
-static int kvm_arch_tsc_has_attr(struct kvm_vcpu *vcpu,
-				 struct kvm_device_attr *attr)
+static int kvm_arch_tsc_has_attr(struct kvm_device_attr *attr)
 {
 	int r;
 
@@ -5099,7 +5098,7 @@ static int kvm_vcpu_ioctl_device_attr(struct kvm_vcpu *vcpu,
 
 	switch (ioctl) {
 	case KVM_HAS_DEVICE_ATTR:
-		r = kvm_arch_tsc_has_attr(vcpu, &attr);
+		r = kvm_arch_tsc_has_attr(&attr);
 		break;
 	case KVM_GET_DEVICE_ATTR:
 		r = kvm_arch_tsc_get_attr(vcpu, &attr);
