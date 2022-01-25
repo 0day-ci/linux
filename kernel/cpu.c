@@ -1227,20 +1227,24 @@ int remove_cpu(unsigned int cpu)
 }
 EXPORT_SYMBOL_GPL(remove_cpu);
 
+/* primary_cpu keeps unchanged after migrate_to_reboot_cpu() */
 void smp_shutdown_nonboot_cpus(unsigned int primary_cpu)
 {
 	unsigned int cpu;
 	int error;
 
-	cpu_maps_update_begin();
-
 	/*
-	 * Make certain the cpu I'm about to reboot on is online.
-	 *
-	 * This is inline to what migrate_to_reboot_cpu() already do.
+	 * Block other cpu hotplug event, so primary_cpu is always online if
+	 * it is not touched by us
 	 */
-	if (!cpu_online(primary_cpu))
-		primary_cpu = cpumask_first(cpu_online_mask);
+	cpu_maps_update_begin();
+	/*
+	 * migrate_to_reboot_cpu() disables CPU hotplug assuming that
+	 * no further code needs to use CPU hotplug (which is true in
+	 * the reboot case). However, the kexec path depends on using
+	 * CPU hotplug again; so re-enable it here.
+	 */
+	__cpu_hotplug_enable();
 
 	for_each_online_cpu(cpu) {
 		if (cpu == primary_cpu)
