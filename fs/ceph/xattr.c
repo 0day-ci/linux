@@ -1306,7 +1306,7 @@ int ceph_security_init_secctx(struct dentry *dentry, umode_t mode,
 			   struct ceph_acl_sec_ctx *as_ctx)
 {
 	struct ceph_pagelist *pagelist = as_ctx->pagelist;
-	const char *name;
+	const char *name = NULL;
 	size_t name_len;
 	int err;
 
@@ -1316,6 +1316,12 @@ int ceph_security_init_secctx(struct dentry *dentry, umode_t mode,
 	if (err < 0) {
 		WARN_ON_ONCE(err != -EOPNOTSUPP);
 		err = 0; /* do nothing */
+		goto out;
+	}
+
+	/* No LSM configured? Do nothing. */
+	if (!name) {
+		err = 0;
 		goto out;
 	}
 
@@ -1330,11 +1336,6 @@ int ceph_security_init_secctx(struct dentry *dentry, umode_t mode,
 		ceph_pagelist_encode_32(pagelist, 1);
 	}
 
-	/*
-	 * FIXME: Make security_dentry_init_security() generic. Currently
-	 * It only supports single security module and only selinux has
-	 * dentry_init_security hook.
-	 */
 	name_len = strlen(name);
 	err = ceph_pagelist_reserve(pagelist,
 				    4 * 2 + name_len + as_ctx->sec_ctxlen);
