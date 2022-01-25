@@ -514,6 +514,15 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
 	else if (clk_on_imx6ull())
 		clk_set_parent(hws[IMX6ULL_CLK_EPDC_PRE_SEL]->clk, hws[IMX6UL_CLK_PLL3_PFD2]->clk);
 
+	/*
+	 * gpmi_io clock may have been enabled by the boot loader. All children of
+	 * enfc_clk_root must be gated in order to prevent glitches during parent
+	 * change. The task of re-enabling is left to the gpmi-nand driver.
+	 */
+	if (clk_hw_is_enabled(hws[IMX6UL_CLK_GPMI_IO])) {
+		clk_prepare_enable(hws[IMX6UL_CLK_GPMI_IO]->clk);
+		clk_disable_unprepare(hws[IMX6UL_CLK_GPMI_IO]->clk);
+	}
 	clk_set_parent(hws[IMX6UL_CLK_ENFC_SEL]->clk, hws[IMX6UL_CLK_PLL2_PFD2]->clk);
 }
 
