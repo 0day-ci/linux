@@ -6741,7 +6741,7 @@ int register_btf_kfunc_id_set(enum bpf_prog_type prog_type,
 
 	btf = btf_get_module_btf(kset->owner);
 	if (IS_ERR_OR_NULL(btf))
-		return btf ? PTR_ERR(btf) : -ENOENT;
+		return btf ? PTR_ERR(btf) : 0;
 
 	hook = bpf_prog_type_to_kfunc_hook(prog_type);
 	ret = btf_populate_kfunc_set(btf, hook, kset);
