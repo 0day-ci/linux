@@ -258,7 +258,15 @@ int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 	set->offset = ib_umem_offset(umem);
 
 	// iova_in_pmem() must be called after set is updated
-	mr->ibmr.is_pmem = iova_in_pmem(mr, iova, length);
+	if (iova_in_pmem(mr, iova, length))
+		mr->ibmr.is_pmem = true;
+	else if (access & IB_ACCESS_FLUSH_PERSISTENT) {
+		pr_warn("Cannot register IB_ACCESS_FLUSH_PERSISTENT for non-pmem memory\n");
+		mr->state = RXE_MR_STATE_INVALID;
+		mr->umem = NULL;
+		err = -EINVAL;
+		goto err_release_umem;
+	}
 
 	return 0;
 
