@@ -5540,8 +5540,10 @@ static int ext4_fill_super(struct super_block *sb, struct fs_context *fc)
 	int ret;
 
 	sbi = ext4_alloc_sbi(sb);
-	if (!sbi)
+	if (!sbi) {
 		ret = -ENOMEM;
+		goto free_sbi;
+	}
 
 	fc->s_fs_info = sbi;
 
