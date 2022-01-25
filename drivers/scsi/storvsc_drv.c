@@ -1755,7 +1755,7 @@ static int storvsc_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *scmnd)
 	struct scatterlist *sgl;
 	struct vmscsi_request *vm_srb;
 	struct vmbus_packet_mpb_array  *payload;
-	u32 payload_sz;
+	size_t payload_sz;
 	u32 length;
 
 	if (vmstor_proto_version <= VMSTOR_PROTO_VERSION_WIN8) {
@@ -1839,8 +1839,8 @@ static int storvsc_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *scmnd)
 
 		if (hvpg_count > MAX_PAGE_BUFFER_COUNT) {
 
-			payload_sz = (hvpg_count * sizeof(u64) +
-				      sizeof(struct vmbus_packet_mpb_array));
+			payload_sz = struct_size(payload, range.pfn_array,
+						 hvpg_count);
 			payload = kzalloc(payload_sz, GFP_ATOMIC);
 			if (!payload)
 				return SCSI_MLQUEUE_DEVICE_BUSY;
