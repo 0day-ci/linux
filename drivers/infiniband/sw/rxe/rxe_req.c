@@ -401,7 +401,9 @@ static struct sk_buff *init_req_packet(struct rxe_qp *qp,
 			(pkt->mask & RXE_END_MASK) &&
 			((pkt->mask & (RXE_SEND_MASK)) ||
 			(pkt->mask & (RXE_WRITE_MASK | RXE_IMMDT_MASK)) ==
-			(RXE_WRITE_MASK | RXE_IMMDT_MASK));
+			(RXE_WRITE_MASK | RXE_IMMDT_MASK)) &&
+			/* oA19-6: always set SE to zero */
+			!(pkt->mask & RXE_FETH_MASK);
 
 	qp_num = (pkt->mask & RXE_DETH_MASK) ? ibwr->wr.ud.remote_qpn :
 					 qp->attr.dest_qp_num;
