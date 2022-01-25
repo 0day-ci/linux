@@ -31,6 +31,7 @@
 #include <linux/regulator/of_regulator.h>
 #include <linux/scmi_protocol.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/types.h>
 
 static const struct scmi_voltage_proto_ops *voltage_ops;
@@ -252,16 +253,66 @@ static int scmi_regulator_common_init(struct scmi_regulator *sreg)
 	return 0;
 }
 
+static int scmi_regulator_map_name(struct scmi_protocol_handle *ph,
+				   struct scmi_regulator_info *rinfo,
+				   const char *name)
+{
+	const struct scmi_voltage_info *vinfo;
+	int i;
+
+	for (i = 0; i < rinfo->num_doms; i++) {
+		vinfo = voltage_ops->info_get(ph, i);
+		if (!vinfo)
+			continue;
+		if (!strncmp(vinfo->name, name, sizeof(vinfo->name)))
+			return i;
+	}
+
+	return -ENODEV;
+}
+
 static int process_scmi_regulator_of_node(struct scmi_device *sdev,
 					  struct scmi_protocol_handle *ph,
 					  struct device_node *np,
 					  struct scmi_regulator_info *rinfo)
 {
 	u32 dom, ret;
+	int name_dom;
+	const char *name;
 
-	ret = of_property_read_u32(np, "reg", &dom);
-	if (ret)
-		return ret;
+	dom = rinfo->num_doms;
+	if (of_find_property(np, "reg", NULL)) {
+		ret = of_property_read_u32(np, "reg", &dom);
+		if (ret)
+			return ret;
+
+		if (dom >= rinfo->num_doms)
+			return -ENODEV;
+	}
+
+	if (of_find_property(np, "regulator-name", NULL)) {
+		ret = of_property_read_string(np, "regulator-name", &name);
+		if (ret)
+			return ret;
+
+		name_dom = scmi_regulator_map_name(ph, rinfo, name);
+		if (name_dom < 0) {
+			dev_err(&sdev->dev,
+				"No SCMI Voltage Domain found named %s. Skipping: %s\n",
+				name, np->full_name);
+			return name_dom;
+		}
+
+		if (dom >= rinfo->num_doms)
+			dom = name_dom;
+
+		if (name_dom != dom) {
+			dev_err(&sdev->dev,
+				"SCMI Voltage Domain %s ID mismatch, %u (DT) != %d (firmware). Skipping: %s\n",
+				name, dom, name_dom, np->full_name);
+			return -EINVAL;
+		}
+	}
 
 	if (dom >= rinfo->num_doms)
 		return -ENODEV;
