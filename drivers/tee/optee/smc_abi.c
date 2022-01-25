@@ -952,57 +952,34 @@ static irqreturn_t notif_irq_thread_fn(int irq, void *dev_id)
 {
 	struct optee *optee = dev_id;
 
-	optee_smc_do_bottom_half(optee->notif.ctx);
+	optee_smc_do_bottom_half(optee->ctx);
 
 	return IRQ_HANDLED;
 }
 
 static int optee_smc_notif_init_irq(struct optee *optee, u_int irq)
 {
-	struct tee_context *ctx;
 	int rc;
 
-	ctx = teedev_open(optee->teedev);
-	if (IS_ERR(ctx))
-		return PTR_ERR(ctx);
-
-	optee->notif.ctx = ctx;
 	rc = request_threaded_irq(irq, notif_irq_handler,
 				  notif_irq_thread_fn,
 				  0, "optee_notification", optee);
 	if (rc)
-		goto err_close_ctx;
+		return rc;
 
 	optee->smc.notif_irq = irq;
 
 	return 0;
-
-err_close_ctx:
-	teedev_close_context(optee->notif.ctx);
-	optee->notif.ctx = NULL;
-
-	return rc;
 }
 
 static void optee_smc_notif_uninit_irq(struct optee *optee)
 {
-	if (optee->notif.ctx) {
-		optee_smc_stop_async_notif(optee->notif.ctx);
+	if (optee->smc.sec_caps & OPTEE_SMC_SEC_CAP_ASYNC_NOTIF) {
+		optee_smc_stop_async_notif(optee->ctx);
 		if (optee->smc.notif_irq) {
 			free_irq(optee->smc.notif_irq, optee);
 			irq_dispose_mapping(optee->smc.notif_irq);
 		}
-
-		/*
-		 * The thread normally working with optee->notif.ctx was
-		 * stopped with free_irq() above.
-		 *
-		 * Note we're not using teedev_close_context() or
-		 * tee_client_close_context() since we have already called
-		 * tee_device_put() while initializing to avoid a circular
-		 * reference counting.
-		 */
-		teedev_close_context(optee->notif.ctx);
 	}
 }
 
@@ -1307,6 +1284,7 @@ static int optee_probe(struct platform_device *pdev)
 	struct optee *optee = NULL;
 	void *memremaped_shm = NULL;
 	struct tee_device *teedev;
+	struct tee_context *ctx;
 	u32 max_notif_value;
 	u32 sec_caps;
 	int rc;
@@ -1387,9 +1365,13 @@ static int optee_probe(struct platform_device *pdev)
 	optee->pool = pool;
 
 	platform_set_drvdata(pdev, optee);
+	ctx = teedev_open(optee->teedev);
+	if (IS_ERR(ctx))
+		goto err_supp_uninit;
+	optee->ctx = ctx;
 	rc = optee_notif_init(optee, max_notif_value);
 	if (rc)
-		goto err_supp_uninit;
+		goto err_close_ctx;
 
 	if (sec_caps & OPTEE_SMC_SEC_CAP_ASYNC_NOTIF) {
 		unsigned int irq;
@@ -1437,6 +1419,8 @@ err_disable_shm_cache:
 	optee_unregister_devices();
 err_notif_uninit:
 	optee_notif_uninit(optee);
+err_close_ctx:
+	teedev_close_context(ctx);
 err_supp_uninit:
 	optee_supp_uninit(&optee->supp);
 	mutex_destroy(&optee->call_queue.mutex);
