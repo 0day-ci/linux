@@ -29,6 +29,7 @@ static void destroy_ima_ns(struct ima_namespace *ns)
 	unregister_blocking_lsm_notifier(&ns->ima_lsm_policy_notifier);
 	kfree(ns->arch_policy_entry);
 	ima_free_policy_rules(ns);
+	ima_free_ns_status_tree(ns);
 }
 
 void free_ima_ns(struct user_namespace *user_ns)
