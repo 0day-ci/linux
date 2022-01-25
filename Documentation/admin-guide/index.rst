@@ -36,6 +36,7 @@ problems and bugs in particular.
 
    reporting-issues
    security-bugs
+   regressions
    bug-hunting
    bug-bisect
    tainted-kernels
