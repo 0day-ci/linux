@@ -191,6 +191,20 @@ static int arm_spe_read_record(struct arm_spe_decoder *decoder)
 					decoder->record.op = ARM_SPE_ST;
 				else
 					decoder->record.op = ARM_SPE_LD;
+				if (SPE_OP_PKT_IS_LDST_ATOMIC(payload)) {
+					if (payload & SPE_OP_PKT_AT)
+						decoder->record.op |= ARM_SPE_LDST_ATOMIC;
+					if (payload & SPE_OP_PKT_EXCL)
+						decoder->record.op |= ARM_SPE_LDST_EXCL;
+					if (payload & SPE_OP_PKT_AR)
+						decoder->record.op |= ARM_SPE_LDST_ACQREL;
+				}
+			} else if (idx == SPE_OP_PKT_HDR_CLASS_BR_ERET) {
+				decoder->record.op = ARM_SPE_BR;
+				if (payload & SPE_OP_PKT_COND)
+					decoder->record.op |= ARM_SPE_BR_COND;
+				if (SPE_OP_PKT_IS_INDIRECT_BRANCH(payload))
+					decoder->record.op |= ARM_SPE_BR_IND;
 			}
 			break;
 		case ARM_SPE_EVENTS:
@@ -218,8 +232,12 @@ static int arm_spe_read_record(struct arm_spe_decoder *decoder)
 			if (payload & BIT(EV_MISPRED))
 				decoder->record.type |= ARM_SPE_BRANCH_MISS;
 
+			if (payload & BIT(EV_NOT_TAKEN))
+				decoder->record.type |= ARM_SPE_BR_NOT_TAKEN;
+
 			break;
 		case ARM_SPE_DATA_SOURCE:
+			decoder->record.source = payload;
 			break;
 		case ARM_SPE_BAD:
 			break;

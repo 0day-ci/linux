@@ -22,11 +22,18 @@ enum arm_spe_sample_type {
 	ARM_SPE_TLB_MISS	= 1 << 5,
 	ARM_SPE_BRANCH_MISS	= 1 << 6,
 	ARM_SPE_REMOTE_ACCESS	= 1 << 7,
+	ARM_SPE_BR_NOT_TAKEN	= 1 << 8,
 };
 
 enum arm_spe_op_type {
 	ARM_SPE_LD		= 1 << 0,
 	ARM_SPE_ST		= 1 << 1,
+	ARM_SPE_LDST_EXCL	= 1 << 2,
+	ARM_SPE_LDST_ATOMIC	= 1 << 3,
+	ARM_SPE_LDST_ACQREL	= 1 << 4,
+	ARM_SPE_BR		= 1 << 5,
+	ARM_SPE_BR_COND		= 1 << 6,
+	ARM_SPE_BR_IND		= 1 << 7,
 };
 
 struct arm_spe_record {
@@ -40,6 +47,7 @@ struct arm_spe_record {
 	u64 virt_addr;
 	u64 phys_addr;
 	u64 context_id;
+	u16 source;
 };
 
 struct arm_spe_insn;
