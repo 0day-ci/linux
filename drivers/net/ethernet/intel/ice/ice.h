@@ -465,6 +465,7 @@ struct ice_q_vector {
 enum ice_pf_flags {
 	ICE_FLAG_FLTR_SYNC,
 	ICE_FLAG_RDMA_ENA,
+	ICE_FLAG_PLUG_AUX_DEV,
 	ICE_FLAG_RSS_ENA,
 	ICE_FLAG_SRIOV_ENA,
 	ICE_FLAG_SRIOV_CAPABLE,
@@ -895,7 +896,7 @@ static inline void ice_set_rdma_cap(struct ice_pf *pf)
 {
 	if (pf->hw.func_caps.common_cap.rdma && pf->num_rdma_msix) {
 		set_bit(ICE_FLAG_RDMA_ENA, pf->flags);
-		ice_plug_aux_dev(pf);
+		set_bit(ICE_FLAG_PLUG_AUX_DEV, pf->flags);
 	}
 }
 
