@@ -354,7 +354,7 @@ static inline void kvm_before_interrupt(struct kvm_vcpu *vcpu)
 	__this_cpu_write(current_vcpu, vcpu);
 }
 
-static inline void kvm_after_interrupt(struct kvm_vcpu *vcpu)
+static inline void kvm_after_interrupt(void)
 {
 	__this_cpu_write(current_vcpu, NULL);
 }

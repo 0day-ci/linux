@@ -6497,7 +6497,7 @@ static void handle_interrupt_nmi_irqoff(struct kvm_vcpu *vcpu,
 {
 	kvm_before_interrupt(vcpu);
 	vmx_do_interrupt_nmi_irqoff(entry);
-	kvm_after_interrupt(vcpu);
+	kvm_after_interrupt();
 }
 
 static void handle_nm_fault_irqoff(struct kvm_vcpu *vcpu)

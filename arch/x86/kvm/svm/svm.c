@@ -3758,7 +3758,7 @@ static __no_kcsan fastpath_t svm_vcpu_run(struct kvm_vcpu *vcpu)
 	/* Any pending NMI will happen here */
 
 	if (unlikely(svm->vmcb->control.exit_code == SVM_EXIT_NMI))
-		kvm_after_interrupt(vcpu);
+		kvm_after_interrupt();
 
 	sync_cr8_to_lapic(vcpu);
 

@@ -10166,7 +10166,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	local_irq_enable();
 	++vcpu->stat.exits;
 	local_irq_disable();
-	kvm_after_interrupt(vcpu);
+	kvm_after_interrupt();
 
 	/*
 	 * Wait until after servicing IRQs to account guest time so that any
