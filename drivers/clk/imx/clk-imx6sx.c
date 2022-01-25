@@ -546,8 +546,19 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
 	clk_set_parent(hws[IMX6SX_CLK_GPU_AXI_SEL]->clk, hws[IMX6SX_CLK_PLL3_PFD0]->clk);
 
 	clk_set_parent(hws[IMX6SX_CLK_QSPI1_SEL]->clk, hws[IMX6SX_CLK_PLL2_BUS]->clk);
-	clk_set_parent(hws[IMX6SX_CLK_QSPI2_SEL]->clk, hws[IMX6SX_CLK_PLL2_BUS]->clk);
 
 	imx_register_uart_clocks(2);
+
+	/*
+	 * gpmi_io clock may have been enabled by the boot loader. All children
+	 * of qspi2_clk_root must be gated in order to prevent glitches during
+	 * parent change. The task of re-enabling is left to the gpmi-nand
+	 * driver.
+	 */
+	if (clk_hw_is_enabled(hws[IMX6SX_CLK_GPMI_IO])) {
+		clk_prepare_enable(hws[IMX6SX_CLK_GPMI_IO]->clk);
+		clk_disable_unprepare(hws[IMX6SX_CLK_GPMI_IO]->clk);
+	}
+	clk_set_parent(hws[IMX6SX_CLK_QSPI2_SEL]->clk, hws[IMX6SX_CLK_PLL2_BUS]->clk);
 }
 CLK_OF_DECLARE(imx6sx, "fsl,imx6sx-ccm", imx6sx_clocks_init);
