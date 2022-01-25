@@ -46,6 +46,8 @@ int ima_init_namespace(struct ima_namespace *ns)
 			return rc;
 	}
 
+	atomic_set(&ns->active, 1);
+
 	return 0;
 }
 

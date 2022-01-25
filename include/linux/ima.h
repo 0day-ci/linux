@@ -11,6 +11,7 @@
 #include <linux/fs.h>
 #include <linux/security.h>
 #include <linux/kexec.h>
+#include <linux/user_namespace.h>
 #include <crypto/hash_info.h>
 struct linux_binprm;
 
@@ -67,6 +68,18 @@ static inline const char * const *arch_get_ima_policy(void)
 	return NULL;
 }
 #endif
+
+static inline struct user_namespace
+*ima_ns_to_user_ns(struct ima_namespace *ns)
+{
+	struct user_namespace *user_ns;
+
+	user_ns = current_user_ns();
+#ifdef CONFIG_IMA_NS
+	WARN_ON(user_ns->ima_ns != ns);
+#endif
+	return user_ns;
+}
 
 #else
 static inline enum hash_algo ima_get_current_hash_algo(void)
