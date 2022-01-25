@@ -674,7 +674,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 		hws[IMX6QDL_CLK_USDHC2_SEL]       = imx_clk_hw_mux("usdhc2_sel", base + 0x1c, 17, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
 		hws[IMX6QDL_CLK_USDHC3_SEL]       = imx_clk_hw_mux("usdhc3_sel", base + 0x1c, 18, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
 		hws[IMX6QDL_CLK_USDHC4_SEL]       = imx_clk_hw_mux("usdhc4_sel", base + 0x1c, 19, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels));
-		hws[IMX6QDL_CLK_ENFC_SEL]         = imx_clk_hw_mux("enfc_sel",         base + 0x2c, 15, 3, enfc_sels_2,         ARRAY_SIZE(enfc_sels_2));
+		hws[IMX6QDL_CLK_ENFC_SEL]         = imx_clk_hw_mux_flags("enfc_sel",         base + 0x2c, 15, 3, enfc_sels_2,         ARRAY_SIZE(enfc_sels_2), CLK_SET_PARENT_GATE);
 		hws[IMX6QDL_CLK_EIM_SEL]          = imx_clk_hw_mux("eim_sel",      base + 0x1c, 27, 2, eim_sels,        ARRAY_SIZE(eim_sels));
 		hws[IMX6QDL_CLK_EIM_SLOW_SEL]     = imx_clk_hw_mux("eim_slow_sel", base + 0x1c, 29, 2, eim_slow_sels,   ARRAY_SIZE(eim_slow_sels));
 		hws[IMX6QDL_CLK_PRE_AXI]	  = imx_clk_hw_mux("pre_axi",	base + 0x18, 1,  1, pre_axi_sels,    ARRAY_SIZE(pre_axi_sels));
@@ -864,7 +864,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	hws[IMX6QDL_CLK_PWM4]         = imx_clk_hw_gate2("pwm4",          "ipg_per",           base + 0x78, 22);
 	hws[IMX6QDL_CLK_GPMI_BCH_APB] = imx_clk_hw_gate2("gpmi_bch_apb",  "usdhc3",            base + 0x78, 24);
 	hws[IMX6QDL_CLK_GPMI_BCH]     = imx_clk_hw_gate2("gpmi_bch",      "usdhc4",            base + 0x78, 26);
-	hws[IMX6QDL_CLK_GPMI_IO]      = imx_clk_hw_gate2("gpmi_io",       "enfc",              base + 0x78, 28);
+	hws[IMX6QDL_CLK_GPMI_IO]      = imx_clk_hw_gate2_flags("gpmi_io",       "enfc",              base + 0x78, 28, CLK_SET_RATE_GATE);
 	hws[IMX6QDL_CLK_GPMI_APB]     = imx_clk_hw_gate2("gpmi_apb",      "usdhc3",            base + 0x78, 30);
 	hws[IMX6QDL_CLK_ROM]          = imx_clk_hw_gate2_flags("rom",     "ahb",               base + 0x7c, 0, CLK_IS_CRITICAL);
 	hws[IMX6QDL_CLK_SATA]         = imx_clk_hw_gate2("sata",          "ahb",               base + 0x7c, 4);
