@@ -336,6 +336,8 @@ static int arm_spe__synth_mem_sample(struct arm_spe_queue *speq,
 	sample.phys_addr = record->phys_addr;
 	sample.data_src = data_src;
 	sample.weight = record->latency;
+	sample.raw_size = sizeof(*record);
+	sample.raw_data = record;
 
 	return arm_spe_deliver_synth_event(spe, speq, event, &sample);
 }
@@ -354,6 +356,8 @@ static int arm_spe__synth_branch_sample(struct arm_spe_queue *speq,
 	sample.stream_id = spe_events_id;
 	sample.addr = record->to_ip;
 	sample.weight = record->latency;
+	sample.raw_size = sizeof(*record);
+	sample.raw_data = record;
 
 	return arm_spe_deliver_synth_event(spe, speq, event, &sample);
 }
@@ -383,6 +387,8 @@ static int arm_spe__synth_instruction_sample(struct arm_spe_queue *speq,
 	sample.data_src = data_src;
 	sample.period = spe->instructions_sample_period;
 	sample.weight = record->latency;
+	sample.raw_size = sizeof(*record);
+	sample.raw_data = record;
 
 	return arm_spe_deliver_synth_event(spe, speq, event, &sample);
 }
