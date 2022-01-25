@@ -2821,6 +2821,76 @@ SYM_FUNC_END(aesni_ctr_enc)
 
 #endif
 
+#ifdef __x86_64__
+/*
+ * void aesni_xctr_enc(struct crypto_aes_ctx *ctx, const u8 *dst, u8 *src,
+ *		      size_t len, u8 *iv, int byte_ctr)
+ */
+SYM_FUNC_START(aesni_xctr_enc)
+	FRAME_BEGIN
+	cmp $16, LEN
+	jb .Lxctr_ret
+	shr	$4, %arg6
+	movq %arg6, CTR
+	mov 480(KEYP), KLEN
+	movups (IVP), IV
+	cmp $64, LEN
+	jb .Lxctr_enc_loop1
+.align 4
+.Lxctr_enc_loop4:
+	movaps IV, STATE1
+	vpaddq ONE(%rip), CTR, CTR
+	vpxor CTR, STATE1, STATE1
+	movups (INP), IN1
+	movaps IV, STATE2
+	vpaddq ONE(%rip), CTR, CTR
+	vpxor CTR, STATE2, STATE2
+	movups 0x10(INP), IN2
+	movaps IV, STATE3
+	vpaddq ONE(%rip), CTR, CTR
+	vpxor CTR, STATE3, STATE3
+	movups 0x20(INP), IN3
+	movaps IV, STATE4
+	vpaddq ONE(%rip), CTR, CTR
+	vpxor CTR, STATE4, STATE4
+	movups 0x30(INP), IN4
+	call _aesni_enc4
+	pxor IN1, STATE1
+	movups STATE1, (OUTP)
+	pxor IN2, STATE2
+	movups STATE2, 0x10(OUTP)
+	pxor IN3, STATE3
+	movups STATE3, 0x20(OUTP)
+	pxor IN4, STATE4
+	movups STATE4, 0x30(OUTP)
+	sub $64, LEN
+	add $64, INP
+	add $64, OUTP
+	cmp $64, LEN
+	jge .Lxctr_enc_loop4
+	cmp $16, LEN
+	jb .Lxctr_ret
+.align 4
+.Lxctr_enc_loop1:
+	movaps IV, STATE
+	vpaddq ONE(%rip), CTR, CTR
+	vpxor CTR, STATE1, STATE1
+	movups (INP), IN
+	call _aesni_enc1
+	pxor IN, STATE
+	movups STATE, (OUTP)
+	sub $16, LEN
+	add $16, INP
+	add $16, OUTP
+	cmp $16, LEN
+	jge .Lxctr_enc_loop1
+.Lxctr_ret:
+	FRAME_END
+	RET
+SYM_FUNC_END(aesni_xctr_enc)
+
+#endif
+
 .section	.rodata.cst16.gf128mul_x_ble_mask, "aM", @progbits, 16
 .align 16
 .Lgf128mul_x_ble_mask:
