@@ -411,6 +411,31 @@ Given this version of the code, the LKMM would predict that the load
 from x could be executed after the store to y.  Thus, the memory
 model's original prediction could be invalidated by the compiler.
 
+Caution is also advised when dependencies are purely syntactic, i.e.
+not semantic.  A dependency between two marked accesses is purely
+syntactic iff the defined behavior of the second access is unaffected
+by its dependency.
+
+Compilers are aware of syntactic dependencies and are within their
+rights to remove them as part of optimizations, thereby breaking any
+guarantees of ordering.
+
+Notable cases are dependencies eliminated through constant propagation
+or those where only one value leads to defined behavior as in the
+following example:
+
+	int a[1];
+	int i;
+
+	r1 = READ_ONCE(i);
+	r2 = READ_ONCE(a[r1]);
+
+The formal LKMM is unaware of syntactic dependencies and therefore
+predicts ordering.  However, since any other value than 0 for r1 would
+result in an out-of-bounds access, which is undefined behavior, r2 is
+not affected by its dependency to r1, making the above a purely
+syntactic dependency.
+
 Another issue arises from the fact that in C, arguments to many
 operators and function calls can be evaluated in any order.  For
 example:
