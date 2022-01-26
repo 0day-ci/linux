@@ -4,6 +4,7 @@
 
 #include <linux/compiler_attributes.h>
 #include <linux/types.h>
+#include <linux/atomic.h>
 
 struct pt_regs;
 
@@ -44,6 +45,11 @@ extern bool crash_kexec_post_notifiers;
  */
 extern atomic_t panic_cpu;
 #define PANIC_CPU_INVALID	-1
+
+static inline bool panic_in_progress(void)
+{
+	return unlikely(atomic_read(&panic_cpu) != PANIC_CPU_INVALID);
+}
 
 /*
  * Only to be used by arch init code. If the user over-wrote the default
