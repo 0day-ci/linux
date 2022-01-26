@@ -90,8 +90,9 @@ static int vdso_test_time(void)
 		(vdso_time_t)vdso_sym(version, name[2]);
 
 	if (!vdso_time) {
+		/* Skip if symbol not found: consider skipped tests as passed */
 		printf("Could not find %s\n", name[2]);
-		return KSFT_SKIP;
+		return KSFT_PASS;
 	}
 
 	long ret = vdso_time(NULL);
