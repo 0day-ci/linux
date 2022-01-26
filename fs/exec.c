@@ -1898,6 +1898,10 @@ static int do_execveat_common(int fd, struct filename *filename,
 	retval = count(argv, MAX_ARG_STRINGS);
 	if (retval < 0)
 		goto out_free;
+	if (retval == 0) {
+		retval = -EFAULT;
+		goto out_free;
+	}
 	bprm->argc = retval;
 
 	retval = count(envp, MAX_ARG_STRINGS);
