@@ -94,4 +94,7 @@ config OF_DMA_DEFAULT_COHERENT
 	# arches should select this if DMA is coherent by default for OF devices
 	bool
 
+config OF_EMPTY_ROOT
+	bool
+
 endif # OF
