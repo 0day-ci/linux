@@ -318,6 +318,23 @@ static inline void dma_buf_map_memcpy_to(struct dma_buf_map *dst, const void *sr
 }
 
 /**
+ * dma_buf_map_memset - Memset into dma-buf mapping
+ * @dst:	The dma-buf mapping structure
+ * @value:	The value to set
+ * @len:	The number of bytes to set in dst
+ *
+ * Set value in dma-buf mapping. Depending on the buffer's location, the helper
+ * picks the correct method of accessing the memory.
+ */
+static inline void dma_buf_map_memset(struct dma_buf_map *dst, int value, size_t len)
+{
+	if (dst->is_iomem)
+		memset_io(dst->vaddr_iomem, value, len);
+	else
+		memset(dst->vaddr, value, len);
+}
+
+/**
  * dma_buf_map_incr - Increments the address stored in a dma-buf mapping
  * @map:	The dma-buf mapping structure
  * @incr:	The number of bytes to increment
