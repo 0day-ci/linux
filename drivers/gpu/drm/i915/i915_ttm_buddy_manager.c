@@ -19,6 +19,8 @@ struct i915_ttm_buddy_manager {
 	struct drm_buddy mm;
 	struct list_head reserved;
 	struct mutex lock;
+	unsigned long visible_size;
+	unsigned long visible_avail;
 	u64 default_page_size;
 };
 
@@ -87,6 +89,13 @@ static int i915_ttm_buddy_man_alloc(struct ttm_resource_manager *man,
 	n_pages = size >> ilog2(mm->chunk_size);
 
 	mutex_lock(&bman->lock);
+	if (place->lpfn && place->lpfn <= bman->visible_size &&
+	    n_pages > bman->visible_avail) {
+		mutex_unlock(&bman->lock);
+		err = -ENOSPC;
+		goto err_free_res;
+	}
+
 	err = drm_buddy_alloc_blocks(mm, (u64)place->fpfn << PAGE_SHIFT,
 				    (u64)lpfn << PAGE_SHIFT,
 				    (u64)n_pages << PAGE_SHIFT,
@@ -104,6 +113,30 @@ static int i915_ttm_buddy_man_alloc(struct ttm_resource_manager *man,
 		drm_buddy_block_trim(mm,
 				     original_size,
 				     &bman_res->blocks);
+		mutex_unlock(&bman->lock);
+	}
+
+	if (place->lpfn && place->lpfn <= bman->visible_size) {
+		bman_res->used_visible_size = bman_res->base.num_pages;
+	} else {
+		struct drm_buddy_block *block;
+
+		list_for_each_entry(block, &bman_res->blocks, link) {
+			unsigned long start =
+				drm_buddy_block_offset(block) >> PAGE_SHIFT;
+			unsigned long end = start +
+				(drm_buddy_block_size(mm, block) >> PAGE_SHIFT);
+
+			if (start < bman->visible_size) {
+				bman_res->used_visible_size +=
+					min(end, bman->visible_size) - start;
+			}
+		}
+	}
+
+	if (bman_res->used_visible_size) {
+		mutex_lock(&bman->lock);
+		bman->visible_avail -= bman_res->used_visible_size;
 		mutex_unlock(&bman->lock);
 	}
 
@@ -127,6 +160,7 @@ static void i915_ttm_buddy_man_free(struct ttm_resource_manager *man,
 
 	mutex_lock(&bman->lock);
 	drm_buddy_free_list(&bman->mm, &bman_res->blocks);
+	bman->visible_avail += bman_res->used_visible_size;
 	mutex_unlock(&bman->lock);
 
 	kfree(bman_res);
@@ -141,6 +175,10 @@ static void i915_ttm_buddy_man_debug(struct ttm_resource_manager *man,
 	mutex_lock(&bman->lock);
 	drm_printf(printer, "default_page_size: %lluKiB\n",
 		   bman->default_page_size >> 10);
+	drm_printf(printer, "visible_avail: %luMiB\n",
+		   bman->visible_avail << PAGE_SHIFT >> 20);
+	drm_printf(printer, "visible_size: %luMiB\n",
+		   bman->visible_size << PAGE_SHIFT >> 20);
 
 	drm_buddy_print(&bman->mm, printer);
 
@@ -162,6 +200,7 @@ static const struct ttm_resource_manager_func i915_ttm_buddy_manager_func = {
  * @type: Memory type we want to manage
  * @use_tt: Set use_tt for the manager
  * @size: The size in bytes to manage
+ * @visible_size: The CPU visible size in bytes to manage
  * @default_page_size: The default minimum page size in bytes for allocations,
  * this must be at least as large as @chunk_size, and can be overridden by
  * setting the BO page_alignment, to be larger or smaller as needed.
@@ -185,7 +224,7 @@ static const struct ttm_resource_manager_func i915_ttm_buddy_manager_func = {
  */
 int i915_ttm_buddy_man_init(struct ttm_device *bdev,
 			    unsigned int type, bool use_tt,
-			    u64 size, u64 default_page_size,
+			    u64 size, u64 visible_size, u64 default_page_size,
 			    u64 chunk_size)
 {
 	struct ttm_resource_manager *man;
@@ -204,6 +243,8 @@ int i915_ttm_buddy_man_init(struct ttm_device *bdev,
 	INIT_LIST_HEAD(&bman->reserved);
 	GEM_BUG_ON(default_page_size < chunk_size);
 	bman->default_page_size = default_page_size;
+	bman->visible_size = visible_size >> PAGE_SHIFT;
+	bman->visible_avail = bman->visible_size;
 
 	man = &bman->manager;
 	man->use_tt = use_tt;
@@ -248,6 +289,7 @@ int i915_ttm_buddy_man_fini(struct ttm_device *bdev, unsigned int type)
 	mutex_lock(&bman->lock);
 	drm_buddy_free_list(mm, &bman->reserved);
 	drm_buddy_fini(mm);
+	WARN_ON_ONCE(bman->visible_avail != bman->visible_size);
 	mutex_unlock(&bman->lock);
 
 	ttm_resource_manager_cleanup(man);
@@ -287,3 +329,14 @@ int i915_ttm_buddy_man_reserve(struct ttm_resource_manager *man,
 	return ret;
 }
 
+/**
+ * i915_ttm_buddy_man_visible_size - Return the size of the CPU visible portion
+ * in pages.
+ * @man: The buddy allocator ttm manager
+ */
+u64 i915_ttm_buddy_man_visible_size(struct ttm_resource_manager *man)
+{
+	struct i915_ttm_buddy_manager *bman = to_buddy_manager(man);
+
+	return bman->visible_size;
+}
