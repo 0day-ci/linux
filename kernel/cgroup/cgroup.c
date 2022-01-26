@@ -4570,10 +4570,12 @@ static struct css_set *css_task_iter_next_css_set(struct css_task_iter *it)
 /**
  * css_task_iter_advance_css_set - advance a task iterator to the next css_set
  * @it: the iterator to advance
+ * @cur_tasks_head: head of current tasks
  *
  * Advance @it to the next css_set to walk.
  */
-static void css_task_iter_advance_css_set(struct css_task_iter *it)
+static void css_task_iter_advance_css_set(struct css_task_iter *it,
+				struct list_head **cur_tasks_head)
 {
 	struct css_set *cset;
 
@@ -4582,13 +4584,13 @@ static void css_task_iter_advance_css_set(struct css_task_iter *it)
 	/* Advance to the next non-empty css_set and find first non-empty tasks list*/
 	while ((cset = css_task_iter_next_css_set(it))) {
 		if (!list_empty(&cset->tasks)) {
-			it->cur_tasks_head = &cset->tasks;
+			*cur_tasks_head = &cset->tasks;
 			break;
 		} else if (!list_empty(&cset->mg_tasks)) {
-			it->cur_tasks_head = &cset->mg_tasks;
+			*cur_tasks_head = &cset->mg_tasks;
 			break;
 		} else if (!list_empty(&cset->dying_tasks)) {
-			it->cur_tasks_head = &cset->dying_tasks;
+			*cur_tasks_head = &cset->dying_tasks;
 			break;
 		}
 	}
@@ -4596,7 +4598,7 @@ static void css_task_iter_advance_css_set(struct css_task_iter *it)
 		it->task_pos = NULL;
 		return;
 	}
-	it->task_pos = it->cur_tasks_head->next;
+	it->task_pos = (*cur_tasks_head)->next;
 
 	/*
 	 * We don't keep css_sets locked across iteration steps and thus
@@ -4635,6 +4637,7 @@ static void css_task_iter_skip(struct css_task_iter *it,
 
 static void css_task_iter_advance(struct css_task_iter *it)
 {
+	struct list_head *cur_tasks_head = NULL;
 	struct task_struct *task;
 
 	lockdep_assert_held(&css_set_lock);
@@ -4651,18 +4654,18 @@ repeat:
 			it->task_pos = it->task_pos->next;
 
 		if (it->task_pos == &it->cur_cset->tasks) {
-			it->cur_tasks_head = &it->cur_cset->mg_tasks;
-			it->task_pos = it->cur_tasks_head->next;
+			cur_tasks_head = &it->cur_cset->mg_tasks;
+			it->task_pos = cur_tasks_head->next;
 		}
 		if (it->task_pos == &it->cur_cset->mg_tasks) {
-			it->cur_tasks_head = &it->cur_cset->dying_tasks;
-			it->task_pos = it->cur_tasks_head->next;
+			cur_tasks_head = &it->cur_cset->dying_tasks;
+			it->task_pos = cur_tasks_head->next;
 		}
 		if (it->task_pos == &it->cur_cset->dying_tasks)
-			css_task_iter_advance_css_set(it);
+			css_task_iter_advance_css_set(it, &cur_tasks_head);
 	} else {
 		/* called from start, proceed to the first cset */
-		css_task_iter_advance_css_set(it);
+		css_task_iter_advance_css_set(it, &cur_tasks_head);
 	}
 
 	if (!it->task_pos)
@@ -4676,12 +4679,12 @@ repeat:
 			goto repeat;
 
 		/* and dying leaders w/o live member threads */
-		if (it->cur_tasks_head == &it->cur_cset->dying_tasks &&
+		if (cur_tasks_head == &it->cur_cset->dying_tasks &&
 		    !atomic_read(&task->signal->live))
 			goto repeat;
 	} else {
 		/* skip all dying ones */
-		if (it->cur_tasks_head == &it->cur_cset->dying_tasks)
+		if (cur_tasks_head == &it->cur_cset->dying_tasks)
 			goto repeat;
 	}
 }
