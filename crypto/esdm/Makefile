@@ -9,4 +9,5 @@ obj-$(CONFIG_CRYPTO_ESDM_SHA256)	+= esdm_sha256.o
 
 obj-$(CONFIG_CRYPTO_ESDM_DRNG_KCAPI)	+= esdm_drng_kcapi.o
 
+obj-$(CONFIG_CRYPTO_ESDM_KERNEL_RNG)	+= esdm_es_krng.o
 obj-$(CONFIG_CRYPTO_ESDM_JENT)		+= esdm_es_jent.o

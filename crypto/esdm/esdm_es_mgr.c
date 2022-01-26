@@ -14,6 +14,7 @@
 #include "esdm_drng_mgr.h"
 #include "esdm_es_aux.h"
 #include "esdm_es_jent.h"
+#include "esdm_es_krng.h"
 #include "esdm_es_mgr.h"
 
 struct esdm_state {
@@ -57,6 +58,9 @@ u32 esdm_write_wakeup_bits = (ESDM_WRITE_WAKEUP_ENTROPY << 3);
 struct esdm_es_cb *esdm_es[] = {
 #ifdef CONFIG_CRYPTO_ESDM_JENT
 	&esdm_es_jent,
+#endif
+#ifdef CONFIG_CRYPTO_ESDM_KERNEL_RNG
+	&esdm_es_krng,
 #endif
 	&esdm_es_aux
 };

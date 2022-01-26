@@ -17,6 +17,9 @@ enum esdm_external_es {
 #ifdef CONFIG_CRYPTO_ESDM_JENT
 	esdm_ext_es_jitter,			/* Jitter RNG */
 #endif
+#ifdef CONFIG_CRYPTO_ESDM_KERNEL_RNG
+	esdm_ext_es_krng,			/* random.c */
+#endif
 	esdm_ext_es_aux,			/* MUST BE LAST ES! */
 	esdm_ext_es_last			/* MUST be the last entry */
 };
