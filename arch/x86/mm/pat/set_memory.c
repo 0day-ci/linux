@@ -1816,7 +1816,7 @@ static inline int cpa_clear_pages_array(struct page **pages, int numpages,
 }
 
 /*
- * _set_memory_prot is an internal helper for callers that have been passed
+ * __set_memory_prot is an internal helper for callers that have been passed
  * a pgprot_t value from upper layers and a reservation has already been taken.
  * If you want to set the pgprot to a specific page protocol, use the
  * set_memory_xx() functions.
@@ -1982,6 +1982,12 @@ int set_memory_global(unsigned long addr, int numpages)
 	return change_page_attr_set(&addr, numpages,
 				    __pgprot(_PAGE_GLOBAL), 0);
 }
+
+int _set_memory_present(unsigned long addr, int numpages)
+{
+	return change_page_attr_set(&addr, numpages, __pgprot(_PAGE_PRESENT), 0);
+}
+EXPORT_SYMBOL_GPL(_set_memory_present);
 
 /*
  * __set_memory_enc_pgtable() is used for the hypervisors that get
