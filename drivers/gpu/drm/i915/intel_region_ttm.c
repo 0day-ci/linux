@@ -199,13 +199,18 @@ intel_region_ttm_resource_alloc(struct intel_memory_region *mem,
 	struct ttm_resource *res;
 	int ret;
 
+	if (flags & I915_BO_ALLOC_CONTIGUOUS)
+		place.flags |= TTM_PL_FLAG_CONTIGUOUS;
 	if (mem->io_size && mem->io_size < mem->total) {
-		place.fpfn = 0;
-		place.lpfn = mem->io_size >> PAGE_SHIFT;
+		if (flags & I915_BO_ALLOC_TOPDOWN) {
+			place.flags |= TTM_PL_FLAG_TOPDOWN;
+		} else {
+			place.fpfn = 0;
+			place.lpfn = mem->io_size >> PAGE_SHIFT;
+		}
 	}
 
 	mock_bo.base.size = size;
-	place.flags = flags;
 
 	ret = man->func->alloc(man, &mock_bo, &place, &res);
 	if (ret == -ENOSPC)
