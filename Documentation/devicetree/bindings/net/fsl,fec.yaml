@@ -121,6 +121,10 @@ properties:
 
   mac-address: true
 
+  nvmem-cells: true
+
+  nvmem-cell-names: true
+
   tx-internal-delay-ps:
     enum: [0, 2000]
 
