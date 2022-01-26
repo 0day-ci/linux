@@ -305,7 +305,8 @@ static int __maybe_unused rng_setentropy(void *private, sockptr_t entropy,
 			return PTR_ERR(kentropy);
 	}
 
-	crypto_rng_alg(pctx->drng)->set_ent(pctx->drng, kentropy, len);
+	if (crypto_rng_alg(pctx->drng)->set_ent)
+		crypto_rng_alg(pctx->drng)->set_ent(pctx->drng, kentropy, len);
 	/*
 	 * Since rng doesn't perform any memory management for the entropy
 	 * buffer, save kentropy pointer to pctx now to free it after use.
