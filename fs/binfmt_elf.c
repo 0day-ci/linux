@@ -297,7 +297,8 @@ create_elf_tables(struct linux_binprm *bprm, const struct elfhdr *exec,
 	ei_index = elf_info - (elf_addr_t *)mm->saved_auxv;
 	sp = STACK_ADD(p, ei_index);
 
-	items = (argc + 1) + (envc + 1) + 1;
+	/* Make room for extra pointer when argc == 0. See below. */
+	items = (min(argc, 1) + 1) + (envc + 1) + 1;
 	bprm->p = STACK_ROUND(sp, items);
 
 	/* Point sp at the lowest address on the stack */
@@ -326,6 +327,13 @@ create_elf_tables(struct linux_binprm *bprm, const struct elfhdr *exec,
 
 	/* Populate list of argv pointers back to argv strings. */
 	p = mm->arg_end = mm->arg_start;
+	/*
+	 * Include an extra NULL pointer in argv when argc == 0 so
+	 * that argv[1] != envp[0] to help userspace programs from
+	 * mishandling argc == 0. See fs/exec.c bprm_stack_limits().
+	 */
+	if (argc == 0 && put_user(0, sp++))
+		return -EFAULT;
 	while (argc-- > 0) {
 		size_t len;
 		if (put_user((elf_addr_t)p, sp++))

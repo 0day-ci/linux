@@ -494,8 +494,13 @@ static int bprm_stack_limits(struct linux_binprm *bprm)
 	 * the stack. They aren't stored until much later when we can't
 	 * signal to the parent that the child has run out of stack space.
 	 * Instead, calculate it here so it's possible to fail gracefully.
+	 *
+	 * In the case of argc < 1, make sure there is a NULL pointer gap
+	 * between argv and envp to ensure confused userspace programs don't
+	 * start processing from argv[1], thinking argc can never be 0,
+	 * to block them from walking envp by accident. See fs/binfmt_elf.c.
 	 */
-	ptr_size = (bprm->argc + bprm->envc) * sizeof(void *);
+	ptr_size = (min(bprm->argc, 1) + bprm->envc) * sizeof(void *);
 	if (limit <= ptr_size)
 		return -E2BIG;
 	limit -= ptr_size;
