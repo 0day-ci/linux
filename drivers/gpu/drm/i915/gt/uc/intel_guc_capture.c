@@ -739,6 +739,15 @@ int intel_guc_capture_output_min_size_est(struct intel_guc *guc)
  *                                       intel_engine_coredump struct (if the context and
  *                                       engine of the event notification matches a node
  *                                       in the link list)
+ *
+ * User Sysfs / Debugfs
+ * --------------------
+ *      --> i915_gpu_coredump_copy_to_buffer->
+ *                   L--> err_print_to_sgl --> err_print_gt
+ *                        L--> error_print_guc_captures
+ *                             L--> intel_guc_capture_print_node prints the
+ *                                  register lists values of the attached node
+ *                                  on the error-engine-dump being reported.
  */
 
 static int guc_capture_buf_cnt(struct __guc_capture_bufstate *buf)
@@ -1216,11 +1225,171 @@ static void __guc_capture_store_snapshot_work(struct intel_guc *guc)
 
 #if IS_ENABLED(CONFIG_DRM_I915_CAPTURE_ERROR)
 
+static const char *
+guc_capture_reg_to_str(const struct intel_guc *guc, u32 owner, u32 type,
+		       u32 class, u32 id, u32 offset, u32 *is_ext)
+{
+	struct __guc_mmio_reg_descr_group *reglists = guc->capture.priv->reglists;
+	struct __guc_mmio_reg_descr_group *match;
+	int num_regs, j;
+
+	*is_ext = 0;
+	if (!reglists)
+		return NULL;
+
+	match = guc_capture_get_one_list(reglists, owner, type, id);
+
+	if (match) {
+		for (num_regs = match->num_regs, j = 0; j < num_regs; ++j) {
+			if (offset == match->list[j].reg.reg)
+				return match->list[j].regname;
+		}
+	}
+	if (match->ext) {
+		for (num_regs = match->num_ext, j = 0; j < num_regs; ++j) {
+			if (offset == match->ext[j].reg.reg) {
+				*is_ext = 1;
+				return match->ext[j].regname;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+#ifdef CONFIG_DRM_I915_DEBUG_GUC
+#define guc_capt_err_print(a, b, ...) \
+	do { \
+		drm_warn(a, __VA_ARGS__); \
+		if (b) \
+			i915_error_printf(b, __VA_ARGS__); \
+	} while (0)
+#else
+#define guc_capt_err_print(a, b, ...) \
+	do { \
+		if (b) \
+			i915_error_printf(b, __VA_ARGS__); \
+	} while (0)
+#endif
+
+static struct intel_engine_cs *
+guc_capture_lookup_engine(struct intel_guc *guc, u8 guc_class, u8 instance)
+{
+	struct intel_gt *gt = guc_to_gt(guc);
+	u8 engine_class = guc_class_to_engine_class(guc_class);
+
+	/* Class index is checked in class converter */
+	GEM_BUG_ON(instance > MAX_ENGINE_INSTANCE);
+
+	return gt->engine_class[engine_class][instance];
+}
+
+#define GCAP_PRINT_INTEL_ENG_INFO(i915, ebuf, eng) \
+	do { \
+		PRINT(&(i915)->drm, (ebuf), "    i915-Eng-Name: %s command stream\n", \
+		      (eng)->name); \
+		PRINT(&(i915)->drm, (ebuf), "    i915-Eng-Inst-Class: 0x%02x\n", (eng)->class); \
+		PRINT(&(i915)->drm, (ebuf), "    i915-Eng-Inst-Id: 0x%02x\n", (eng)->instance); \
+		PRINT(&(i915)->drm, (ebuf), "    i915-Eng-LogicalMask: 0x%08x\n", \
+		      (eng)->logical_mask); \
+	} while (0)
+
+#define GCAP_PRINT_GUC_INST_INFO(i915, ebuf, node) \
+	do { \
+		PRINT(&(i915)->drm, (ebuf), "    GuC-Engine-Inst-Id: 0x%08x\n", \
+		      (node)->eng_inst); \
+		PRINT(&(i915)->drm, (ebuf), "    GuC-Context-Id: 0x%08x\n", (node)->guc_id); \
+		PRINT(&(i915)->drm, (ebuf), "    LRCA: 0x%08x\n", (node)->lrca); \
+	} while (0)
+
+#define PRINT guc_capt_err_print
+
 int intel_guc_capture_print_engine_node(struct drm_i915_error_state_buf *ebuf,
 					const struct intel_engine_coredump *ee)
 {
+	struct intel_guc_state_capture *cap;
+	struct intel_guc *guc;
+	struct drm_i915_private *i915;
+	struct __guc_capture_parsed_output *node;
+	struct guc_mmio_reg *regs;
+	const char *grptypestr[GUC_STATE_CAPTURE_GROUP_TYPE_MAX] = {"full-capture",
+								    "partial-capture"};
+	const char *datatypestr[GUC_CAPTURE_LIST_TYPE_MAX] = {"Global", "Engine-Class",
+							      "Engine-Instance"};
+	struct intel_engine_cs *eng;
+	int numregs, i, j;
+	u32 is_ext;
+	const char *str;
+	char noname[16];
+
+	if (!ebuf || !ee)
+		return -EINVAL;
+	cap = ee->capture;
+	if (!cap->priv || !ee->engine)
+		return -ENODEV;
+
+	guc = container_of(cap, struct intel_guc, capture);
+	i915 = (container_of(guc, struct intel_gt, uc.guc))->i915;
+	PRINT(&i915->drm, ebuf, "global --- GuC Error Capture on %s command stream:\n",
+	      ee->engine->name);
+
+	node = ee->guc_capture_node;
+	if (!node) {
+		PRINT(&i915->drm, ebuf, "  No matching ee-node\n");
+		return 0;
+	}
+
+	PRINT(&i915->drm, ebuf, "Coverage:  %s\n", grptypestr[node->is_partial]);
+
+	for (i = GUC_CAPTURE_LIST_TYPE_GLOBAL; i < GUC_CAPTURE_LIST_TYPE_MAX; ++i) {
+		PRINT(&i915->drm, ebuf, "  RegListType: %s\n",
+		      datatypestr[i % GUC_CAPTURE_LIST_TYPE_MAX]);
+		PRINT(&i915->drm, ebuf, "    Owner-Id: %d\n", node->reginfo[i].vfid);
+
+		switch (i) {
+		case GUC_CAPTURE_LIST_TYPE_GLOBAL:
+		default:
+			break;
+		case GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS:
+			PRINT(&i915->drm, ebuf, "    GuC-Eng-Class: %d\n", node->eng_class);
+			PRINT(&i915->drm, ebuf, "    i915-Eng-Class: %d\n",
+			      guc_class_to_engine_class(node->eng_class));
+			break;
+		case GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE:
+			eng = guc_capture_lookup_engine(guc, node->eng_class, node->eng_inst);
+			if (eng)
+				GCAP_PRINT_INTEL_ENG_INFO(i915, ebuf, eng);
+			else
+				PRINT(&i915->drm, ebuf, "    i915-Eng-Lookup Fail!\n");
+			GCAP_PRINT_GUC_INST_INFO(i915, ebuf, node);
+			break;
+		}
+
+		numregs = node->reginfo[i].num;
+		PRINT(&i915->drm, ebuf, "    NumRegs: %d\n", numregs);
+		j = 0;
+		while (numregs--) {
+			regs = node->reginfo[i].regs;
+			str = guc_capture_reg_to_str(guc, GUC_CAPTURE_LIST_INDEX_PF, i,
+						     node->eng_class, 0, regs[j].offset, &is_ext);
+			if (!str) {
+				snprintf(noname, sizeof(noname), "REG-0x%08x", regs[j].offset);
+				PRINT(&i915->drm, ebuf, "      %s", noname);
+			} else {
+				PRINT(&i915->drm, ebuf, "      %s", str);
+			}
+			if (is_ext)
+				PRINT(&i915->drm, ebuf, "[%ld][%ld]",
+				      FIELD_GET(GUC_REGSET_STEERING_GROUP, regs[j].flags),
+				      FIELD_GET(GUC_REGSET_STEERING_INSTANCE, regs[j].flags));
+			PRINT(&i915->drm, ebuf, ":  0x%08x\n", regs[j].value);
+			++j;
+		}
+	}
 	return 0;
 }
+
+#undef PRINT
 
 #endif //CONFIG_DRM_I915_DEBUG_GUC
 
