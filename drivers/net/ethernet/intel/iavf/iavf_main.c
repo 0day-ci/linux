@@ -1547,7 +1547,7 @@ static int iavf_config_rss_aq(struct iavf_adapter *adapter)
 	}
 
 	status = iavf_aq_set_rss_lut(hw, adapter->vsi.id, false,
-				  adapter->rss_lut, adapter->rss_lut_size);
+				     adapter->rss_lut, adapter->rss_lut_size);
 	if (status) {
 		dev_err(&adapter->pdev->dev, "Cannot set RSS lut, err %s aq_err %s\n",
 			iavf_stat_str(hw, status),
