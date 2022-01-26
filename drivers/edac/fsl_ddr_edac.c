@@ -586,6 +586,10 @@ int fsl_mc_err_probe(struct platform_device *op)
 
 		/* register interrupts */
 		pdata->irq = platform_get_irq(op, 0);
+		if (pdata->irq < 0) {
+			res = pdata->irq;
+			goto err2;
+		}
 		res = devm_request_irq(&op->dev, pdata->irq,
 				       fsl_mc_isr,
 				       IRQF_SHARED,
