@@ -99,6 +99,7 @@ static void *esdm_kcapi_drng_alloc(u32 sec_strength)
 	}
 
 	if (!memcmp(drng_name, "stdrng", 6) ||
+	    !memcmp(drng_name, "esdm", 4) ||
 	    !memcmp(drng_name, "jitterentropy_rng", 17)) {
 		pr_err("Refusing to load the requested random number generator\n");
 		return ERR_PTR(-EINVAL);

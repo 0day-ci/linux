@@ -4879,6 +4879,14 @@ static const struct alg_test_desc alg_test_descs[] = {
 			.akcipher = __VECS(ecrdsa_tv_template)
 		}
 	}, {
+		.alg = "esdm",
+		.test = alg_test_null,
+#ifdef CONFIG_CRYPTO_ESDM_OVERSAMPLE_ENTROPY_SOURCES
+		.fips_allowed = 1,
+#else
+		.fips_allowed = 0,
+#endif
+	}, {
 		.alg = "essiv(authenc(hmac(sha256),cbc(aes)),sha256)",
 		.test = alg_test_aead,
 		.fips_allowed = 1,

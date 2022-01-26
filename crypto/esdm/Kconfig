@@ -27,6 +27,20 @@ config CRYPTO_ESDM_SHA256
 	bool
 	default y if CRYPTO_LIB_SHA256
 
+menu "ESDM Interfaces"
+
+config CRYPTO_ESDM_KCAPI_IF
+	tristate "Interface with Kernel Crypto API"
+	depends on CRYPTO_RNG
+	help
+	  The ESDM can be registered with the kernel crypto API's
+	  random number generator framework. This offers a random
+	  number generator with the name "esdm" and a priority that
+	  is intended to be higher than the existing RNG
+	  implementations.
+
+endmenu # "ESDM Interfaces"
+
 menu "Specific DRNG seeding strategies"
 
 config CRYPTO_ESDM_OVERSAMPLE_ENTROPY_SOURCES
