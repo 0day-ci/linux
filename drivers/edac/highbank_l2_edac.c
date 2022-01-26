@@ -94,6 +94,10 @@ static int highbank_l2_err_probe(struct platform_device *pdev)
 		goto err;
 
 	drvdata->db_irq = platform_get_irq(pdev, 0);
+	if (drvdata->db_irq < 0) {
+		res = drvdata->db_irq;
+		goto err2;
+	}
 	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
 			       highbank_l2_err_handler,
 			       0, dev_name(&pdev->dev), dci);
@@ -101,6 +105,10 @@ static int highbank_l2_err_probe(struct platform_device *pdev)
 		goto err2;
 
 	drvdata->sb_irq = platform_get_irq(pdev, 1);
+	if (drvdata->sb_irq < 0) {
+		res = drvdata->sb_irq;
+		goto err2;
+	}
 	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
 			       highbank_l2_err_handler,
 			       0, dev_name(&pdev->dev), dci);
