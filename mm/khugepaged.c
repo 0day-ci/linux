@@ -16,6 +16,7 @@
 #include <linux/hashtable.h>
 #include <linux/userfaultfd_k.h>
 #include <linux/page_idle.h>
+#include <linux/page_table_check.h>
 #include <linux/swapops.h>
 #include <linux/shmem_fs.h>
 
@@ -1424,6 +1425,7 @@ static void collapse_and_free_pmd(struct mm_struct *mm, struct vm_area_struct *v
 
 	spin_unlock(ptl);
 	mm_dec_nr_ptes(mm);
+	page_table_check_pmd_clear_full(mm, addr, pmd);
 	pte_free(mm, pmd_pgtable(pmd));
 }
 
