@@ -2538,9 +2538,12 @@ static int bond_miimon_inspect(struct bonding *bond)
 				/* recovered before downdelay expired */
 				bond_propose_link_state(slave, BOND_LINK_UP);
 				slave->last_link_up = jiffies;
-				slave_info(bond->dev, slave->dev, "link status up again after %d ms\n",
-					   (bond->params.downdelay - slave->delay) *
-					   bond->params.miimon);
+				if (net_ratelimit())
+					slave_info(bond->dev, slave->dev,
+						   "link status up again after %d ms\n",
+						   (bond->params.downdelay -
+						    slave->delay) *
+						   bond->params.miimon);
 				commit++;
 				continue;
 			}
