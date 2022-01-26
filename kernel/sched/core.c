@@ -8757,6 +8757,7 @@ bool sched_smp_initialized __read_mostly;
 int migrate_task_to(struct task_struct *p, int target_cpu)
 {
 	struct migration_arg arg = { p, target_cpu };
+	uint64_t forced_migrations, migrations_cold;
 	int curr_cpu = task_cpu(p);
 
 	if (curr_cpu == target_cpu)
@@ -8765,7 +8766,14 @@ int migrate_task_to(struct task_struct *p, int target_cpu)
 	if (!cpumask_test_cpu(target_cpu, p->cpus_ptr))
 		return -EINVAL;
 
-	/* TODO: This is not properly updating schedstats */
+	if (schedstat_enabled()) {
+		forced_migrations = schedstat_val(p->stats.nr_forced_migrations);
+		migrations_cold = schedstat_val(p->stats.nr_migrations_cold);
+		memset(&p->stats, 0, sizeof(p->stats));
+		schedstat_set(p->stats.nr_forced_migrations, forced_migrations);
+		schedstat_set(p->stats.nr_migrations_cold, migrations_cold);
+		schedstat_inc(p->stats.nr_migrations_cold);
+	}
 
 	trace_sched_move_numa(p, curr_cpu, target_cpu);
 	return stop_one_cpu(curr_cpu, migration_cpu_stop, &arg);
