@@ -17,6 +17,7 @@
 #include "gt/intel_engine.h"
 #include "gt/intel_gt_types.h"
 #include "gt/uc/intel_uc_fw.h"
+#include "gt/uc/intel_guc_capture.h"
 
 #include "intel_device_info.h"
 
@@ -53,6 +54,8 @@ struct i915_request_coredump {
 	struct i915_sched_attr sched_attr;
 };
 
+struct __guc_capture_parsed_output;
+
 struct intel_engine_coredump {
 	const struct intel_engine_cs *engine;
 
@@ -83,6 +86,10 @@ struct intel_engine_coredump {
 	u64 faddr;
 	u32 rc_psmi; /* sleep state */
 	struct intel_instdone instdone;
+
+	/* GuC matched capture-lists info */
+	struct intel_guc_state_capture *capture;
+	struct __guc_capture_parsed_output *guc_capture_node;
 
 	struct i915_gem_context_coredump {
 		char comm[TASK_COMM_LEN];
@@ -124,7 +131,6 @@ struct intel_gt_coredump {
 	u32 pgtbl_er;
 	u32 ier;
 	u32 gtier[6], ngtier;
-	u32 derrmr;
 	u32 forcewake;
 	u32 error; /* gen6+ */
 	u32 err_int; /* gen7 */
@@ -137,8 +143,11 @@ struct intel_gt_coredump {
 	u32 gfx_mode;
 	u32 gtt_cache;
 	u32 aux_err; /* gen12 */
-	u32 sfc_done[GEN12_SFC_DONE_MAX]; /* gen12 */
 	u32 gam_done; /* gen12 */
+
+	/* Display related */
+	u32 derrmr;
+	u32 sfc_done[GEN12_SFC_DONE_MAX]; /* gen12 */
 
 	u32 nfence;
 	u64 fence[I915_MAX_NUM_FENCES];
@@ -149,6 +158,7 @@ struct intel_gt_coredump {
 		struct intel_uc_fw guc_fw;
 		struct intel_uc_fw huc_fw;
 		struct i915_vma_coredump *guc_log;
+		bool is_guc_capture;
 	} *uc;
 
 	struct intel_gt_coredump *next;
@@ -210,24 +220,27 @@ struct drm_i915_error_state_buf {
 	int err;
 };
 
+#define CORE_DUMP_FLAG_NONE           0x0
+#define CORE_DUMP_FLAG_IS_GUC_CAPTURE BIT(0)
+
 #if IS_ENABLED(CONFIG_DRM_I915_CAPTURE_ERROR)
 
 __printf(2, 3)
 void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...);
 
 struct i915_gpu_coredump *i915_gpu_coredump(struct intel_gt *gt,
-					    intel_engine_mask_t engine_mask);
+					    intel_engine_mask_t engine_mask, u32 dump_flags);
 void i915_capture_error_state(struct intel_gt *gt,
-			      intel_engine_mask_t engine_mask);
+			      intel_engine_mask_t engine_mask, u32 dump_flags);
 
 struct i915_gpu_coredump *
 i915_gpu_coredump_alloc(struct drm_i915_private *i915, gfp_t gfp);
 
 struct intel_gt_coredump *
-intel_gt_coredump_alloc(struct intel_gt *gt, gfp_t gfp);
+intel_gt_coredump_alloc(struct intel_gt *gt, gfp_t gfp, u32 dump_flags);
 
 struct intel_engine_coredump *
-intel_engine_coredump_alloc(struct intel_engine_cs *engine, gfp_t gfp);
+intel_engine_coredump_alloc(struct intel_engine_cs *engine, gfp_t gfp, u32 dump_flags);
 
 struct intel_engine_capture_vma *
 intel_engine_coredump_add_request(struct intel_engine_coredump *ee,
@@ -271,7 +284,7 @@ void i915_disable_error_state(struct drm_i915_private *i915, int err);
 #else
 
 static inline void
-i915_capture_error_state(struct intel_gt *gt, intel_engine_mask_t engine_mask)
+i915_capture_error_state(struct intel_gt *gt, intel_engine_mask_t engine_mask, u32 dump_flags)
 {
 }
 
@@ -282,13 +295,13 @@ i915_gpu_coredump_alloc(struct drm_i915_private *i915, gfp_t gfp)
 }
 
 static inline struct intel_gt_coredump *
-intel_gt_coredump_alloc(struct intel_gt *gt, gfp_t gfp)
+intel_gt_coredump_alloc(struct intel_gt *gt, gfp_t gfp, u32 dump_flags)
 {
 	return NULL;
 }
 
 static inline struct intel_engine_coredump *
-intel_engine_coredump_alloc(struct intel_engine_cs *engine, gfp_t gfp)
+intel_engine_coredump_alloc(struct intel_engine_cs *engine, gfp_t gfp, u32 dump_flags)
 {
 	return NULL;
 }

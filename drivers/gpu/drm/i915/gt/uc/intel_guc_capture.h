@@ -8,12 +8,21 @@
 
 #include <linux/types.h>
 
-struct intel_guc;
+struct drm_i915_error_state_buf;
 struct guc_ads;
 struct guc_gt_system_info;
+struct intel_context;
+struct intel_engine_coredump;
+struct intel_gt;
+struct intel_guc;
 
 int intel_guc_capture_prep_lists(struct intel_guc *guc, struct guc_ads *blob, u32 blob_ggtt,
 				 u32 capture_offset, struct guc_gt_system_info *sysinfo);
+int intel_guc_capture_print_engine_node(struct drm_i915_error_state_buf *m,
+					const struct intel_engine_coredump *ee);
+void intel_guc_capture_get_matching_node(struct intel_gt *gt, struct intel_engine_coredump *ee,
+					 struct intel_context *ce);
+void intel_guc_capture_free_node(struct intel_engine_coredump *ee);
 void intel_guc_capture_store_snapshot(struct intel_guc *guc);
 int intel_guc_capture_output_min_size_est(struct intel_guc *guc);
 void intel_guc_capture_destroy(struct intel_guc *guc);

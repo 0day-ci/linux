@@ -728,6 +728,17 @@ int intel_guc_capture_output_min_size_est(struct intel_guc *guc)
  *                   instance). This node id added to a linked list stored in
  *                   guc->capture->priv for matchup and printout when triggered by
  *                   i915_gpu_coredump and err_print_gt (via error capture sysfs) later.
+ *
+ * GUC --> notify context reset:
+ * -----------------------------
+ *     --> G2H CONTEXT RESET
+ *                   L--> guc_handle_context_reset --> i915_capture_error_state
+ *                          L--> i915_gpu_coredump(..IS_GUC_CAPTURE) --> gt_record_engines
+ *                               --> capture_engine(..IS_GUC_CAPTURE)
+ *                                  L--> detach C from internal linked list and add into
+ *                                       intel_engine_coredump struct (if the context and
+ *                                       engine of the event notification matches a node
+ *                                       in the link list)
  */
 
 static int guc_capture_buf_cnt(struct __guc_capture_bufstate *buf)
@@ -1201,6 +1212,73 @@ static void __guc_capture_store_snapshot_work(struct intel_guc *guc)
 	log_buf_state->flush_to_file = 0;
 
 	mutex_unlock(&guc->log_state[GUC_CAPTURE_LOG_BUFFER].lock);
+}
+
+#if IS_ENABLED(CONFIG_DRM_I915_CAPTURE_ERROR)
+
+int intel_guc_capture_print_engine_node(struct drm_i915_error_state_buf *ebuf,
+					const struct intel_engine_coredump *ee)
+{
+	return 0;
+}
+
+#endif //CONFIG_DRM_I915_DEBUG_GUC
+
+void intel_guc_capture_free_node(struct intel_engine_coredump *ee)
+{
+	int i;
+
+	if (!ee)
+		return;
+	if (!ee->guc_capture_node)
+		return;
+	for (i = GUC_CAPTURE_LIST_TYPE_GLOBAL; i < GUC_CAPTURE_LIST_TYPE_MAX; ++i) {
+		if (ee->guc_capture_node->reginfo[i].regs)
+			kfree(ee->guc_capture_node->reginfo[i].regs);
+	}
+	kfree(ee->guc_capture_node);
+	ee->guc_capture_node = NULL;
+}
+
+void intel_guc_capture_get_matching_node(struct intel_gt *gt,
+					 struct intel_engine_coredump *ee,
+					 struct intel_context *ce)
+{
+	struct intel_guc *guc;
+	struct drm_i915_private *i915;
+
+	if (!gt || !ee || !ce)
+		return;
+
+	i915 = gt->i915;
+	guc = &gt->uc.guc;
+	if (!guc->capture.priv)
+		return;
+
+	GEM_BUG_ON(ee->guc_capture_node);
+	/*
+	 * Look for a matching GuC reported error capture node from
+	 * the internal output link-list based on lrca, guc-id and engine
+	 * identification.
+	 */
+	if (!list_empty(&guc->capture.priv->outlist)) {
+		struct __guc_capture_parsed_output *n, *ntmp;
+
+		list_for_each_entry_safe(n, ntmp, &guc->capture.priv->outlist, link) {
+			if (n->eng_inst == GUC_ID_TO_ENGINE_INSTANCE(ee->engine->guc_id) &&
+			    n->eng_class == GUC_ID_TO_ENGINE_CLASS(ee->engine->guc_id) &&
+			    n->guc_id == ce->guc_id.id &&
+			    (n->lrca & CTX_GTT_ADDRESS_MASK) ==
+			    (ce->lrc.lrca & CTX_GTT_ADDRESS_MASK)) {
+				list_del(&n->link);
+				--guc->capture.priv->listcount;
+				ee->guc_capture_node = n;
+				ee->capture = &guc->capture;
+				return;
+			}
+		}
+	}
+	drm_warn(&i915->drm, "GuC capture can't match ee to node\n");
 }
 
 void intel_guc_capture_store_snapshot(struct intel_guc *guc)
