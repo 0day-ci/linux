@@ -840,7 +840,7 @@ static int ima_calc_boot_aggregate_tfm(char *digest, u16 alg_id,
 	return rc;
 }
 
-int ima_calc_boot_aggregate(struct ima_digest_data *hash)
+int ima_calc_boot_aggregate(struct ima_max_digest_data *hash)
 {
 	struct crypto_shash *tfm;
 	u16 crypto_id, alg_id;

@@ -15,6 +15,7 @@
 #include <linux/types.h>
 #include <linux/integrity.h>
 #include <crypto/sha1.h>
+#include <crypto/hash.h>
 #include <linux/key.h>
 #include <linux/audit.h>
 
@@ -108,6 +109,29 @@ struct ima_digest_data {
 		u8 data[2];
 	} xattr;
 	u8 digest[];
+} __packed;
+
+/*
+ * Instead of dynamically allocating memory for the ima_digest_data struct
+ * with space for the specific hash algo or wrapping the ima_digest_data
+ * struct inside another local structure, define ima_max_digest_data struct
+ * with the maximum digest size.
+ */
+struct ima_max_digest_data {
+	u8 algo;
+	u8 length;
+	union {
+		struct {
+			u8 unused;
+			u8 type;
+		} sha1;
+		struct {
+			u8 type;
+			u8 algo;
+		} ng;
+		u8 data[2];
+	} xattr;
+	u8 digest[HASH_MAX_DIGESTSIZE];
 } __packed;
 
 /*
