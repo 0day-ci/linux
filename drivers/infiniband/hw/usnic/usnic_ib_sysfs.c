@@ -280,6 +280,7 @@ void usnic_ib_sysfs_qpn_add(struct usnic_ib_qp_grp *qp_grp)
 			kobject_get(us_ibdev->qpn_kobj),
 			"%d", qp_grp->grp_id);
 	if (err) {
+		kobject_put(&qp_grp->kobj);
 		kobject_put(us_ibdev->qpn_kobj);
 		return;
 	}
