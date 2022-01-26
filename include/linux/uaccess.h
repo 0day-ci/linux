@@ -93,6 +93,11 @@ static inline void force_uaccess_end(mm_segment_t oldfs)
  * Biarch ones should also provide raw_copy_in_user() - similar to the above,
  * but both source and destination are __user pointers (affected by set_fs()
  * as usual) and both source and destination can trigger faults.
+ *
+ * Architectures can also provide raw_copy_{from,to}_user_key variants that take
+ * an additional key argument that can be used for additional memory protection
+ * checks. If these variants are not provided, ...copy_{from,to}_user_key are
+ * identical to their non key counterparts.
  */
 
 static __always_inline __must_check unsigned long
@@ -195,6 +200,108 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 
 static __always_inline unsigned long __must_check
 copy_to_user(void __user *to, const void *from, unsigned long n)
+{
+	if (likely(check_copy_size(from, n, true)))
+		n = _copy_to_user(to, from, n);
+	return n;
+}
+
+/*
+ * ...copy_{from,to}_user_key variants
+ * must be kept in sync with their non key counterparts.
+ */
+#ifndef raw_copy_from_user_key
+static __always_inline unsigned long __must_check
+raw_copy_from_user_key(void *to, const void __user *from, unsigned long n,
+		       unsigned long key)
+{
+	return raw_copy_from_user(to, from, n);
+}
+#endif
+static __always_inline __must_check unsigned long
+__copy_from_user_key(void *to, const void __user *from, unsigned long n,
+		     unsigned long key)
+{
+	might_fault();
+	if (should_fail_usercopy())
+		return n;
+	instrument_copy_from_user(to, from, n);
+	check_object_size(to, n, false);
+	return raw_copy_from_user_key(to, from, n, key);
+}
+
+#ifdef INLINE_COPY_FROM_USER_KEY
+static inline __must_check unsigned long
+_copy_from_user_key(void *to, const void __user *from, unsigned long n,
+		    unsigned long key)
+{
+	unsigned long res = n;
+	might_fault();
+	if (!should_fail_usercopy() && likely(access_ok(from, n))) {
+		instrument_copy_from_user(to, from, n);
+		res = raw_copy_from_user_key(to, from, n, key);
+	}
+	if (unlikely(res))
+		memset(to + (n - res), 0, res);
+	return res;
+}
+#else
+extern __must_check unsigned long
+_copy_from_user_key(void *, const void __user *, unsigned long, unsigned long);
+#endif
+
+#ifndef raw_copy_to_user_key
+static __always_inline unsigned long __must_check
+raw_copy_to_user_key(void __user *to, const void *from, unsigned long n,
+		     unsigned long key)
+{
+	return raw_copy_to_user(to, from, n);
+}
+#endif
+
+static __always_inline __must_check unsigned long
+__copy_to_user_key(void __user *to, const void *from, unsigned long n,
+		   unsigned long key)
+{
+	might_fault();
+	if (should_fail_usercopy())
+		return n;
+	instrument_copy_to_user(to, from, n);
+	check_object_size(from, n, true);
+	return raw_copy_to_user_key(to, from, n, key);
+}
+
+#ifdef INLINE_COPY_TO_USER_KEY
+static inline __must_check unsigned long
+_copy_to_user_key(void __user *to, const void *from, unsigned long n,
+		  unsigned long key)
+{
+	might_fault();
+	if (should_fail_usercopy())
+		return n;
+	if (access_ok(to, n)) {
+		instrument_copy_to_user(to, from, n);
+		n = raw_copy_to_user_key(to, from, n, key);
+	}
+	return n;
+}
+#else
+extern __must_check unsigned long
+_copy_to_user_key(void __user *, const void *, unsigned long, unsigned long);
+#endif
+
+static __always_inline unsigned long __must_check
+copy_from_user_key(void *to, const void __user *from, unsigned long n,
+		   unsigned long key)
+{
+	if (likely(check_copy_size(to, n, false)))
+		n = _copy_from_user(to, from, n);
+	return n;
+}
+
+static __always_inline unsigned long __must_check
+copy_to_user_key(void __user *to, const void *from, unsigned long n,
+		 unsigned long key)
 {
 	if (likely(check_copy_size(from, n, true)))
 		n = _copy_to_user(to, from, n);
