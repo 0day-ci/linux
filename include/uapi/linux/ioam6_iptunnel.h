@@ -30,6 +30,15 @@ enum {
 enum {
 	IOAM6_IPTUNNEL_UNSPEC,
 
+	/* Insertion frequency:
+	 * "k over n" packets (0 < k <= n)
+	 * [0.0001% ... 100%]
+	 */
+#define IOAM6_IPTUNNEL_FREQ_MIN 1
+#define IOAM6_IPTUNNEL_FREQ_MAX 1000000
+	IOAM6_IPTUNNEL_FREQ_K,		/* s32 */
+	IOAM6_IPTUNNEL_FREQ_N,		/* s32 */
+
 	/* Encap mode */
 	IOAM6_IPTUNNEL_MODE,		/* u8 */
 
