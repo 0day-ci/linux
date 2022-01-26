@@ -179,19 +179,23 @@ static struct __ext_steer_reg xelpd_extregs[] = {
 	{"GEN7_ROW_INSTDONE", GEN7_ROW_INSTDONE}
 };
 
+static struct __ext_steer_reg xehpg_extregs[] = {
+	{"XEHPG_INSTDONE_GEOM_SVG", XEHPG_INSTDONE_GEOM_SVG}
+};
+
 static void
-guc_capture_alloc_steered_list_xelpd(struct intel_guc *guc,
-				     struct __guc_mmio_reg_descr_group *lists)
+guc_capture_alloc_steered_list_xe_lpd_hpg(struct intel_guc *guc,
+					  struct __guc_mmio_reg_descr_group *lists,
+					  u32 ipver)
 {
 	struct intel_gt *gt = guc_to_gt(guc);
 	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
 	struct sseu_dev_info *sseu;
-	int slice, subslice, i, num_tot_regs = 0;
+	int slice, subslice, i, iter, num_steer_regs, num_tot_regs = 0;
 	struct __guc_mmio_reg_descr_group *list;
 	struct __guc_mmio_reg_descr *extarray;
-	int num_steer_regs = ARRAY_SIZE(xelpd_extregs);
 
-	/* In XE_LP we only care about render-class steering registers during error-capture */
+	/* In XE_LP / HPG we only have render-class steering registers during error-capture */
 	list = guc_capture_get_one_list(lists, GUC_CAPTURE_LIST_INDEX_PF,
 					GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS, GUC_RENDER_CLASS);
 	if (!list)
@@ -200,10 +204,21 @@ guc_capture_alloc_steered_list_xelpd(struct intel_guc *guc,
 	if (list->ext)
 		return; /* already populated */
 
+	num_steer_regs = ARRAY_SIZE(xelpd_extregs);
+	if (ipver >= IP_VER(12, 55))
+		num_steer_regs += ARRAY_SIZE(xehpg_extregs);
+
 	sseu = &gt->info.sseu;
-	for_each_instdone_slice_subslice(i915, sseu, slice, subslice) {
-		num_tot_regs += num_steer_regs;
+	if (ipver >= IP_VER(12, 50)) {
+		for_each_instdone_gslice_dss_xehp(i915, sseu, iter, slice, subslice) {
+			num_tot_regs += num_steer_regs;
+		}
+	} else {
+		for_each_instdone_slice_subslice(i915, sseu, slice, subslice) {
+			num_tot_regs += num_steer_regs;
+		}
 	}
+
 	if (!num_tot_regs)
 		return;
 
@@ -212,15 +227,31 @@ guc_capture_alloc_steered_list_xelpd(struct intel_guc *guc,
 		return;
 
 	extarray = list->ext;
-	for_each_instdone_slice_subslice(i915, sseu, slice, subslice) {
-		for (i = 0; i < num_steer_regs; i++) {
-			extarray->reg = xelpd_extregs[i].reg;
-			extarray->flags = FIELD_PREP(GUC_REGSET_STEERING_GROUP, slice);
-			extarray->flags |= FIELD_PREP(GUC_REGSET_STEERING_INSTANCE, subslice);
-			extarray->regname = xelpd_extregs[i].name;
-			++extarray;
+
+#define POPULATE_NEXT_EXTREG(ext, list, idx, slicenum, subslicenum) \
+	{ \
+		(ext)->reg = list[idx].reg; \
+		(ext)->flags = FIELD_PREP(GUC_REGSET_STEERING_GROUP, slicenum); \
+		(ext)->flags |= FIELD_PREP(GUC_REGSET_STEERING_INSTANCE, subslicenum); \
+		(ext)->regname = xelpd_extregs[i].name; \
+		++(ext); \
+	}
+	if (ipver >= IP_VER(12, 50)) {
+		for_each_instdone_gslice_dss_xehp(i915, sseu, iter, slice, subslice) {
+			for (i = 0; i < ARRAY_SIZE(xelpd_extregs); i++)
+				POPULATE_NEXT_EXTREG(extarray, xelpd_extregs, i, slice, subslice)
+			for (i = 0; i < ARRAY_SIZE(xehpg_extregs) && ipver >= IP_VER(12, 55);
+			     i++)
+				POPULATE_NEXT_EXTREG(extarray, xehpg_extregs, i, slice, subslice)
+		}
+	} else {
+		for_each_instdone_slice_subslice(i915, sseu, slice, subslice) {
+			for (i = 0; i < num_steer_regs; i++)
+				POPULATE_NEXT_EXTREG(extarray, xelpd_extregs, i, slice, subslice)
 		}
 	}
+#undef POPULATE_NEXT_EXTREG
+
 	list->num_ext = num_tot_regs;
 }
 
@@ -237,7 +268,10 @@ guc_capture_get_device_reglist(struct intel_guc *guc)
 		 * these at init time based on hw config add it as an extension
 		 * list at the end of the pre-populated render list.
 		 */
-		guc_capture_alloc_steered_list_xelpd(guc, xe_lpd_lists);
+		guc_capture_alloc_steered_list_xe_lpd_hpg(guc, xe_lpd_lists, IP_VER(12, 0));
+		return xe_lpd_lists;
+	} else if (IS_DG2(i915)) {
+		guc_capture_alloc_steered_list_xe_lpd_hpg(guc, xe_lpd_lists, IP_VER(12, 55));
 		return xe_lpd_lists;
 	}
 
