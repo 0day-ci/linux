@@ -59,6 +59,14 @@ struct __guc_ads_blob {
 	struct guc_mmio_reg regset[0];
 } __packed;
 
+#define ads_blob_read(guc_, field_)					\
+	dma_buf_map_read_field(&(guc_)->ads_map, struct __guc_ads_blob,	\
+			       field_)
+
+#define ads_blob_write(guc_, field_, val_)				\
+	dma_buf_map_write_field(&(guc_)->ads_map, struct __guc_ads_blob,\
+				field_, val_)
+
 static u32 guc_ads_regset_size(struct intel_guc *guc)
 {
 	GEM_BUG_ON(!guc->ads_regset_size);
