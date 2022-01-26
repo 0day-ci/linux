@@ -437,9 +437,8 @@ i915_gem_create_ext_ioctl(struct drm_device *dev, void *data,
 		if (!(ext_data.placement_mask & BIT(INTEL_REGION_SMEM)))
 			return -EINVAL;
 	} else {
-		if (!IS_DG1(i915) && (ext_data.n_placements > 1 ||
-				      ext_data.placements[0]->type !=
-				      INTEL_MEMORY_SYSTEM))
+		if (ext_data.n_placements > 1 ||
+		    ext_data.placements[0]->type != INTEL_MEMORY_SYSTEM)
 			ext_data.flags |= I915_BO_ALLOC_TOPDOWN;
 	}
 

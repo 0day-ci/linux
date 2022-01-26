@@ -211,7 +211,7 @@ static struct intel_memory_region *setup_lmem(struct intel_gt *gt)
 	lmem_size = intel_uncore_read64(uncore, GEN12_GSMBASE);
 
 	io_start = pci_resource_start(pdev, 2);
-	io_size = min(pci_resource_len(pdev, 2), lmem_size);
+	io_size = SZ_256M;
 	if (!io_size)
 		return ERR_PTR(-ENODEV);
 
