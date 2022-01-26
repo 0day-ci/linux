@@ -15,8 +15,9 @@
 #include <asm/io.h>
 #include "dwmac1000.h"
 #include "dwmac_dma.h"
+#include "dwmac1000_dma.h"
 
-static void dwmac1000_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
+void dwmac1000_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 {
 	u32 value = readl(ioaddr + DMA_AXI_BUS_MODE);
 	int i;
@@ -69,9 +70,10 @@ static void dwmac1000_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 
 	writel(value, ioaddr + DMA_AXI_BUS_MODE);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dma_axi);
 
-static void dwmac1000_dma_init(void __iomem *ioaddr,
-			       struct stmmac_dma_cfg *dma_cfg, int atds)
+void dwmac1000_dma_init(void __iomem *ioaddr,
+			struct stmmac_dma_cfg *dma_cfg, int atds)
 {
 	u32 value = readl(ioaddr + DMA_BUS_MODE);
 	int txpbl = dma_cfg->txpbl ?: dma_cfg->pbl;
@@ -109,22 +111,25 @@ static void dwmac1000_dma_init(void __iomem *ioaddr,
 	/* Mask interrupts by writing to CSR7 */
 	writel(DMA_INTR_DEFAULT_MASK, ioaddr + DMA_INTR_ENA);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dma_init);
 
-static void dwmac1000_dma_init_rx(void __iomem *ioaddr,
-				  struct stmmac_dma_cfg *dma_cfg,
-				  dma_addr_t dma_rx_phy, u32 chan)
+void dwmac1000_dma_init_rx(void __iomem *ioaddr,
+			   struct stmmac_dma_cfg *dma_cfg,
+			   dma_addr_t dma_rx_phy, u32 chan)
 {
 	/* RX descriptor base address list must be written into DMA CSR3 */
 	writel(lower_32_bits(dma_rx_phy), ioaddr + DMA_RCV_BASE_ADDR);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dma_init_rx);
 
-static void dwmac1000_dma_init_tx(void __iomem *ioaddr,
-				  struct stmmac_dma_cfg *dma_cfg,
-				  dma_addr_t dma_tx_phy, u32 chan)
+void dwmac1000_dma_init_tx(void __iomem *ioaddr,
+			   struct stmmac_dma_cfg *dma_cfg,
+			   dma_addr_t dma_tx_phy, u32 chan)
 {
 	/* TX descriptor base address list must be written into DMA CSR4 */
 	writel(lower_32_bits(dma_tx_phy), ioaddr + DMA_TX_BASE_ADDR);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dma_init_tx);
 
 static u32 dwmac1000_configure_fc(u32 csr6, int rxfifosz)
 {
@@ -147,8 +152,8 @@ static u32 dwmac1000_configure_fc(u32 csr6, int rxfifosz)
 	return csr6;
 }
 
-static void dwmac1000_dma_operation_mode_rx(void __iomem *ioaddr, int mode,
-					    u32 channel, int fifosz, u8 qmode)
+void dwmac1000_dma_operation_mode_rx(void __iomem *ioaddr, int mode,
+				     u32 channel, int fifosz, u8 qmode)
 {
 	u32 csr6 = readl(ioaddr + DMA_CONTROL);
 
@@ -174,9 +179,10 @@ static void dwmac1000_dma_operation_mode_rx(void __iomem *ioaddr, int mode,
 
 	writel(csr6, ioaddr + DMA_CONTROL);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dma_operation_mode_rx);
 
-static void dwmac1000_dma_operation_mode_tx(void __iomem *ioaddr, int mode,
-					    u32 channel, int fifosz, u8 qmode)
+void dwmac1000_dma_operation_mode_tx(void __iomem *ioaddr, int mode,
+				     u32 channel, int fifosz, u8 qmode)
 {
 	u32 csr6 = readl(ioaddr + DMA_CONTROL);
 
@@ -207,8 +213,9 @@ static void dwmac1000_dma_operation_mode_tx(void __iomem *ioaddr, int mode,
 
 	writel(csr6, ioaddr + DMA_CONTROL);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dma_operation_mode_tx);
 
-static void dwmac1000_dump_dma_regs(void __iomem *ioaddr, u32 *reg_space)
+void dwmac1000_dump_dma_regs(void __iomem *ioaddr, u32 *reg_space)
 {
 	int i;
 
@@ -217,9 +224,10 @@ static void dwmac1000_dump_dma_regs(void __iomem *ioaddr, u32 *reg_space)
 			reg_space[DMA_BUS_MODE / 4 + i] =
 				readl(ioaddr + DMA_BUS_MODE + i * 4);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_dump_dma_regs);
 
-static int dwmac1000_get_hw_feature(void __iomem *ioaddr,
-				    struct dma_features *dma_cap)
+int dwmac1000_get_hw_feature(void __iomem *ioaddr,
+			     struct dma_features *dma_cap)
 {
 	u32 hw_cap = readl(ioaddr + DMA_HW_FEATURE);
 
@@ -262,12 +270,14 @@ static int dwmac1000_get_hw_feature(void __iomem *ioaddr,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dwmac1000_get_hw_feature);
 
-static void dwmac1000_rx_watchdog(void __iomem *ioaddr, u32 riwt,
-				  u32 queue)
+void dwmac1000_rx_watchdog(void __iomem *ioaddr, u32 riwt,
+			   u32 queue)
 {
 	writel(riwt, ioaddr + DMA_RX_WATCHDOG);
 }
+EXPORT_SYMBOL_GPL(dwmac1000_rx_watchdog);
 
 const struct stmmac_dma_ops dwmac1000_dma_ops = {
 	.reset = dwmac_dma_reset,

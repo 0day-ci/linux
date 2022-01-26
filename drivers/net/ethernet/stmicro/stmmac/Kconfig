@@ -66,6 +66,17 @@ config DWMAC_ANARION
 
 	  This selects the Anarion SoC glue layer support for the stmmac driver.
 
+config DWMAC_BAIKAL
+	tristate "Baikal Electronics GMAC support"
+	default MIPS_BAIKAL_T1
+	depends on OF && (MIPS || ARM64 || COMPILE_TEST)
+	help
+	  Support for gigabit ethernet controller on Baikal Electronics SoCs.
+
+	  This selects the Baikal Electronics SoCs glue layer support for
+	  the stmmac driver. This driver is used for Baikal-T1 and Baikal-M
+	  SoCs gigabit ethernet controller.
+
 config DWMAC_INGENIC
 	tristate "Ingenic MAC support"
 	default MACH_INGENIC

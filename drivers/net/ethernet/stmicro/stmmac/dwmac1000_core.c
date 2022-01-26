@@ -563,3 +563,4 @@ int dwmac1000_setup(struct stmmac_priv *priv)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dwmac1000_setup);
