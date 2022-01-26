@@ -33,15 +33,33 @@ static inline int __range_ok(unsigned long addr, unsigned long size)
 
 #define access_ok(addr, size) __access_ok(addr, size)
 
+#define raw_copy_from_user_key raw_copy_from_user_key
 unsigned long __must_check
-raw_copy_from_user(void *to, const void __user *from, unsigned long n);
+raw_copy_from_user_key(void *to, const void __user *from, unsigned long n,
+		       unsigned long key);
 
+#define raw_copy_to_user_key raw_copy_to_user_key
 unsigned long __must_check
-raw_copy_to_user(void __user *to, const void *from, unsigned long n);
+raw_copy_to_user_key(void __user *to, const void *from, unsigned long n,
+		     unsigned long key);
+
+static __always_inline unsigned long __must_check
+raw_copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	return raw_copy_from_user_key(to, from, n, 0);
+}
+
+static __always_inline unsigned long __must_check
+raw_copy_to_user(void __user *to, const void *from, unsigned long n)
+{
+	return raw_copy_to_user_key(to, from, n, 0);
+}
 
 #ifndef CONFIG_KASAN
 #define INLINE_COPY_FROM_USER
 #define INLINE_COPY_TO_USER
+#define INLINE_COPY_FROM_USER_KEY
+#define INLINE_COPY_TO_USER_KEY
 #endif
 
 int __put_user_bad(void) __attribute__((noreturn));
