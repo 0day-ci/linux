@@ -10,6 +10,7 @@
 #include "gt/intel_lrc.h"
 #include "gt/shmem_utils.h"
 #include "intel_guc_ads.h"
+#include "intel_guc_capture.h"
 #include "intel_guc_fwif.h"
 #include "intel_uc.h"
 #include "i915_drv.h"
@@ -72,8 +73,7 @@ static u32 guc_ads_golden_ctxt_size(struct intel_guc *guc)
 
 static u32 guc_ads_capture_size(struct intel_guc *guc)
 {
-	/* FIXME: Allocate a proper capture list */
-	return PAGE_ALIGN(PAGE_SIZE);
+	return PAGE_ALIGN(guc->ads_capture_size);
 }
 
 static u32 guc_ads_private_data_size(struct intel_guc *guc)
@@ -520,26 +520,6 @@ static void guc_init_golden_context(struct intel_guc *guc)
 	GEM_BUG_ON(guc->ads_golden_ctxt_size != total_size);
 }
 
-static void guc_capture_list_init(struct intel_guc *guc, struct __guc_ads_blob *blob)
-{
-	int i, j;
-	u32 addr_ggtt, offset;
-
-	offset = guc_ads_capture_offset(guc);
-	addr_ggtt = intel_guc_ggtt_offset(guc, guc->ads_vma) + offset;
-
-	/* FIXME: Populate a proper capture list */
-
-	for (i = 0; i < GUC_CAPTURE_LIST_INDEX_MAX; i++) {
-		for (j = 0; j < GUC_MAX_ENGINE_CLASSES; j++) {
-			blob->ads.capture_instance[i][j] = addr_ggtt;
-			blob->ads.capture_class[i][j] = addr_ggtt;
-		}
-
-		blob->ads.capture_global[i] = addr_ggtt;
-	}
-}
-
 static void __guc_ads_init(struct intel_guc *guc)
 {
 	struct intel_gt *gt = guc_to_gt(guc);
@@ -573,9 +553,9 @@ static void __guc_ads_init(struct intel_guc *guc)
 
 	base = intel_guc_ggtt_offset(guc, guc->ads_vma);
 
-	/* Capture list for hang debug */
-	guc_capture_list_init(guc, blob);
-
+	/* Lists for error capture debug */
+	intel_guc_capture_prep_lists(guc, (struct guc_ads *)blob, base,
+				     guc_ads_capture_offset(guc), &blob->system_info);
 	/* ADS */
 	blob->ads.scheduler_policies = base + ptr_offset(blob, policies);
 	blob->ads.gt_system_info = base + ptr_offset(blob, system_info);
@@ -614,6 +594,12 @@ int intel_guc_ads_create(struct intel_guc *guc)
 	if (ret < 0)
 		return ret;
 	guc->ads_golden_ctxt_size = ret;
+
+	/* Likewise the capture lists: */
+	ret = intel_guc_capture_prep_lists(guc, NULL, 0, 0, NULL);
+	if (ret < 0)
+		return ret;
+	guc->ads_capture_size = ret;
 
 	/* Now the total size can be determined: */
 	size = guc_ads_blob_size(guc);
