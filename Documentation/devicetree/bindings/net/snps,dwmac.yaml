@@ -53,6 +53,7 @@ properties:
         - allwinner,sun8i-r40-gmac
         - allwinner,sun8i-v3s-emac
         - allwinner,sun50i-a64-emac
+        - baikal,dwmac
         - loongson,ls2k-dwmac
         - loongson,ls7a-dwmac
         - amlogic,meson6-dwmac
