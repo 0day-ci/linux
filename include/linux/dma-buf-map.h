@@ -6,6 +6,7 @@
 #ifndef __DMA_BUF_MAP_H__
 #define __DMA_BUF_MAP_H__
 
+#include <linux/kernel.h>
 #include <linux/io.h>
 #include <linux/string.h>
 
@@ -230,6 +231,46 @@ static inline void dma_buf_map_clear(struct dma_buf_map *map)
 }
 
 /**
+ * dma_buf_map_memcpy_to_offset - Memcpy into offset of dma-buf mapping
+ * @dst:	The dma-buf mapping structure
+ * @offset:	The offset from which to copy
+ * @src:	The source buffer
+ * @len:	The number of byte in src
+ *
+ * Copies data into a dma-buf mapping with an offset. The source buffer is in
+ * system memory. Depending on the buffer's location, the helper picks the
+ * correct method of accessing the memory.
+ */
+static inline void dma_buf_map_memcpy_to_offset(struct dma_buf_map *dst, size_t offset,
+						const void *src, size_t len)
+{
+	if (dst->is_iomem)
+		memcpy_toio(dst->vaddr_iomem + offset, src, len);
+	else
+		memcpy(dst->vaddr + offset, src, len);
+}
+
+/**
+ * dma_buf_map_memcpy_from_offset - Memcpy from offset of dma-buf mapping into system memory
+ * @dst:	Destination in system memory
+ * @src:	The dma-buf mapping structure
+ * @src:	The offset from which to copy
+ * @len:	The number of byte in src
+ *
+ * Copies data from a dma-buf mapping with an offset. The dest buffer is in
+ * system memory. Depending on the mapping location, the helper picks the
+ * correct method of accessing the memory.
+ */
+static inline void dma_buf_map_memcpy_from_offset(void *dst, const struct dma_buf_map *src,
+						  size_t offset, size_t len)
+{
+	if (src->is_iomem)
+		memcpy_fromio(dst, src->vaddr_iomem + offset, len);
+	else
+		memcpy(dst, src->vaddr + offset, len);
+}
+
+/**
  * dma_buf_map_memcpy_to - Memcpy into dma-buf mapping
  * @dst:	The dma-buf mapping structure
  * @src:	The source buffer
@@ -262,5 +303,45 @@ static inline void dma_buf_map_incr(struct dma_buf_map *map, size_t incr)
 	else
 		map->vaddr += incr;
 }
+
+/**
+ * dma_buf_map_read_field - Read struct member from dma-buf mapping with
+ * arbitrary size and handling un-aligned accesses
+ *
+ * @map__:	The dma-buf mapping structure
+ * @type__:	The struct to be used containing the field to read
+ * @field__:	Member from struct we want to read
+ *
+ * Read a value from dma-buf mapping calculating the offset and size: this assumes
+ * the dma-buf mapping is aligned with a a struct type__. A single u8, u16, u32
+ * or u64 can be read, based on the offset and size of type__.field__.
+ */
+#define dma_buf_map_read_field(map__, type__, field__) ({				\
+	type__ *t__;									\
+	typeof(t__->field__) val__;							\
+	dma_buf_map_memcpy_from_offset(&val__, map__, offsetof(type__, field__),	\
+				       sizeof(t__->field__));				\
+	val__;										\
+})
+
+/**
+ * dma_buf_map_write_field - Write struct member to the dma-buf mapping with
+ * arbitrary size and handling un-aligned accesses
+ *
+ * @map__:	The dma-buf mapping structure
+ * @type__:	The struct to be used containing the field to write
+ * @field__:	Member from struct we want to write
+ * @val__:	Value to be written
+ *
+ * Write a value to the dma-buf mapping calculating the offset and size.
+ * A single u8, u16, u32 or u64 can be written based on the offset and size of
+ * type__.field__.
+ */
+#define dma_buf_map_write_field(map__, type__, field__, val__) ({			\
+	type__ *t__;									\
+	typeof(t__->field__) val____ = val__;						\
+	dma_buf_map_memcpy_to_offset(map__, offsetof(type__, field__),			\
+				     &val____, sizeof(t__->field__));			\
+})
 
 #endif /* __DMA_BUF_MAP_H__ */
