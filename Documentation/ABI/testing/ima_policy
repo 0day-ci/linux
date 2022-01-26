@@ -51,6 +51,7 @@ Description:
 			appraise_flag:= [check_blacklist]
 			Currently, blacklist check is only for files signed with appended
 			signature.
+			digest_type:= [hash|verity]
 			keyrings:= list of keyrings
 			(eg, .builtin_trusted_keys|.ima). Only valid
 			when action is "measure" and func is KEY_CHECK.
@@ -149,3 +150,9 @@ Description:
 		security.ima xattr of a file:
 
 			appraise func=SETXATTR_CHECK appraise_algos=sha256,sha384,sha512
+
+		Example of measure rule allowing fs-verity's digests on a
+		particular filesystem with indication of type of digest.
+
+			measure func=FILE_CHECK digest_type=hash|verity \
+				fsuuid=... template=ima-ngv2
