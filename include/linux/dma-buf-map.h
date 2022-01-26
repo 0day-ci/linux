@@ -132,6 +132,35 @@ struct dma_buf_map {
 	}
 
 /**
+ * DMA_BUF_MAP_INIT_OFFSET - Initializes struct dma_buf_map from another dma_buf_map
+ * @map_:	The dma-buf mapping structure to copy from
+ * @offset:	Offset to add to the other mapping
+ *
+ * Initializes a new dma_buf_struct based on another. This is the equivalent of doing:
+ *
+ * .. code-block: c
+ *
+ *	dma_buf_map map = other_map;
+ *	dma_buf_map_incr(&map, &offset);
+ *
+ * Example usage:
+ *
+ * .. code-block: c
+ *
+ *	void foo(struct device *dev, struct dma_buf_map *base_map)
+ *	{
+ *		...
+ *		struct dma_buf_map = DMA_BUF_MAP_INIT_OFFSET(base_map, FIELD_OFFSET);
+ *		...
+ *	}
+ */
+#define DMA_BUF_MAP_INIT_OFFSET(map_, offset_)	(struct dma_buf_map)	\
+	{								\
+		.vaddr = (map_)->vaddr + (offset_),			\
+		.is_iomem = (map_)->is_iomem,				\
+	}
+
+/**
  * dma_buf_map_set_vaddr - Sets a dma-buf mapping structure to an address in system memory
  * @map:	The dma-buf mapping structure
  * @vaddr:	A system-memory address
