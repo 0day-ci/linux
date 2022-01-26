@@ -30,6 +30,9 @@ struct dax_operations {
 			sector_t, sector_t);
 	/* zero_page_range: required operation. Zero page range   */
 	int (*zero_page_range)(struct dax_device *, pgoff_t, size_t);
+	/* recovery_write: optional operation. */
+	size_t (*recovery_write)(struct dax_device *, pgoff_t, void *, size_t,
+				struct iov_iter *);
 };
 
 #if IS_ENABLED(CONFIG_DAX)
@@ -138,6 +141,9 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping, loff_t st
 dax_entry_t dax_lock_page(struct page *page);
 void dax_unlock_page(struct page *page, dax_entry_t cookie);
 int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr);
+bool dax_recovery_started(struct dax_device *dax_dev, void **kaddr);
+size_t dax_recovery_write(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
+		size_t bytes, struct iov_iter *i);
 #else
 static inline struct page *dax_layout_busy_page(struct address_space *mapping)
 {
@@ -169,6 +175,18 @@ static inline void dax_unlock_page(struct page *page, dax_entry_t cookie)
 static inline int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr)
 {
 	return -EINVAL;
+}
+
+static inline bool dax_recovery_started(struct dax_device *dax_dev,
+			void **kaddr)
+{
+	return false;
+}
+
+static size_t dax_recovery_write(struct dax_device *dax_dev, pgoff_t pgoff,
+		void *addr, size_t bytes, struct iov_iter *i)
+{
+	return 0;
 }
 #endif
 
