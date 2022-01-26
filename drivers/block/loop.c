@@ -1740,10 +1740,10 @@ static void lo_release(struct gendisk *disk, fmode_t mode)
 {
 	struct loop_device *lo = disk->private_data;
 
-	mutex_lock(&lo->lo_mutex);
-	if (atomic_dec_return(&lo->lo_refcnt))
-		goto out_unlock;
+	if (!atomic_dec_and_test(&lo->lo_refcnt))
+		return;
 
+	mutex_lock(&lo->lo_mutex);
 	if (lo->lo_flags & LO_FLAGS_AUTOCLEAR) {
 		if (lo->lo_state != Lo_bound)
 			goto out_unlock;
