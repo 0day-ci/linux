@@ -261,6 +261,38 @@ int virtio_find_vqs_ctx(struct virtio_device *vdev, unsigned nvqs,
 }
 
 /**
+ * virtio_reset_vq - reset a queue individually
+ * @param: struct virtio_reset_vq
+ *
+ * returns 0 on success or error status
+ *
+ */
+static inline
+int virtio_reset_vq(struct virtio_reset_vq *param)
+{
+	if (!param->vdev->config->reset_vq)
+		return -ENOENT;
+
+	return param->vdev->config->reset_vq(param);
+}
+
+/**
+ * virtio_enable_resetq - enable a reset queue
+ * @param: struct virtio_reset_vq
+ *
+ * returns vq on success or error status
+ *
+ */
+static inline
+struct virtqueue *virtio_enable_resetq(struct virtio_reset_vq *param)
+{
+	if (!param->vdev->config->enable_reset_vq)
+		return ERR_PTR(-ENOENT);
+
+	return param->vdev->config->enable_reset_vq(param);
+}
+
+/**
  * virtio_device_ready - enable vq use in probe function
  * @vdev: the device
  *
