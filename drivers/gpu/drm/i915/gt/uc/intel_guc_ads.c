@@ -623,6 +623,11 @@ int intel_guc_ads_create(struct intel_guc *guc)
 	if (ret)
 		return ret;
 
+	if (i915_gem_object_is_lmem(guc->ads_vma->obj))
+		dma_buf_map_set_vaddr_iomem(&guc->ads_map, (void __iomem *)guc->ads_blob);
+	else
+		dma_buf_map_set_vaddr(&guc->ads_map, guc->ads_blob);
+
 	__guc_ads_init(guc);
 
 	return 0;
@@ -644,6 +649,7 @@ void intel_guc_ads_destroy(struct intel_guc *guc)
 {
 	i915_vma_unpin_and_release(&guc->ads_vma, I915_VMA_RELEASE_MAP);
 	guc->ads_blob = NULL;
+	dma_buf_map_clear(&guc->ads_map);
 }
 
 static void guc_ads_private_data_reset(struct intel_guc *guc)
