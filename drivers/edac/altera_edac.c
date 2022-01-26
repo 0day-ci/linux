@@ -353,9 +353,6 @@ static int altr_sdram_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	/* Arria10 has a 2nd IRQ */
-	irq2 = platform_get_irq(pdev, 1);
-
 	layers[0].type = EDAC_MC_LAYER_CHIP_SELECT;
 	layers[0].size = 1;
 	layers[0].is_virt_csrow = true;
@@ -406,6 +403,12 @@ static int altr_sdram_probe(struct platform_device *pdev)
 		if (res < 0)
 			goto err2;
 
+		/* Arria10 has a 2nd IRQ */
+		irq2 = platform_get_irq(pdev, 1);
+		if (irq2 < 0) {
+			res = irq2;
+			goto err2;
+		}
 		res = devm_request_irq(&pdev->dev, irq2,
 				       altr_sdram_mc_err_handler,
 				       IRQF_SHARED, dev_name(&pdev->dev), mci);
