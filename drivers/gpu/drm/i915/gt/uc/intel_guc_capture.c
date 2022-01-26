@@ -22,7 +22,7 @@
  *       from the engine-mmio-base
  */
 #define COMMON_BASE_GLOBAL() \
-	{FORCEWAKE_MT,             0,      0, "FORCEWAKE_MT"}
+	{FORCEWAKE_MT,             0,      0, "FORCEWAKE"}
 
 #define COMMON_GEN9BASE_GLOBAL() \
 	{GEN8_FAULT_TLB_DATA0,     0,      0, "GEN8_FAULT_TLB_DATA0"}, \
@@ -34,43 +34,43 @@
 #define COMMON_GEN12BASE_GLOBAL() \
 	{GEN12_FAULT_TLB_DATA0,    0,      0, "GEN12_FAULT_TLB_DATA0"}, \
 	{GEN12_FAULT_TLB_DATA1,    0,      0, "GEN12_FAULT_TLB_DATA1"}, \
-	{GEN12_AUX_ERR_DBG,        0,      0, "GEN12_AUX_ERR_DBG"}, \
-	{GEN12_GAM_DONE,           0,      0, "GEN12_GAM_DONE"}, \
-	{GEN12_RING_FAULT_REG,     0,      0, "GEN12_RING_FAULT_REG"}
+	{GEN12_AUX_ERR_DBG,        0,      0, "AUX_ERR_DBG"}, \
+	{GEN12_GAM_DONE,           0,      0, "GAM_DONE"}, \
+	{GEN12_RING_FAULT_REG,     0,      0, "FAULT_REG"}
 
 #define COMMON_BASE_ENGINE_INSTANCE() \
-	{RING_PSMI_CTL(0),         0,      0, "RING_PSMI_CTL"}, \
-	{RING_ESR(0),              0,      0, "RING_ESR"}, \
-	{RING_DMA_FADD(0),         0,      0, "RING_DMA_FADD_LOW32"}, \
-	{RING_DMA_FADD_UDW(0),     0,      0, "RING_DMA_FADD_UP32"}, \
-	{RING_IPEIR(0),            0,      0, "RING_IPEIR"}, \
-	{RING_IPEHR(0),            0,      0, "RING_IPEHR"}, \
-	{RING_INSTPS(0),           0,      0, "RING_INSTPS"}, \
+	{RING_PSMI_CTL(0),         0,      0, "RC PSMI"}, \
+	{RING_ESR(0),              0,      0, "ESR"}, \
+	{RING_DMA_FADD(0),         0,      0, "RING_DMA_FADD_LDW"}, \
+	{RING_DMA_FADD_UDW(0),     0,      0, "RING_DMA_FADD_UDW"}, \
+	{RING_IPEIR(0),            0,      0, "IPEIR"}, \
+	{RING_IPEHR(0),            0,      0, "IPEHR"}, \
+	{RING_INSTPS(0),           0,      0, "INSTPS"}, \
 	{RING_BBADDR(0),           0,      0, "RING_BBADDR_LOW32"}, \
 	{RING_BBADDR_UDW(0),       0,      0, "RING_BBADDR_UP32"}, \
-	{RING_BBSTATE(0),          0,      0, "RING_BBSTATE"}, \
+	{RING_BBSTATE(0),          0,      0, "BB_STATE"}, \
 	{CCID(0),                  0,      0, "CCID"}, \
-	{RING_ACTHD(0),            0,      0, "RING_ACTHD_LOW32"}, \
-	{RING_ACTHD_UDW(0),        0,      0, "RING_ACTHD_UP32"}, \
-	{RING_INSTPM(0),           0,      0, "RING_INSTPM"}, \
+	{RING_ACTHD(0),            0,      0, "ACTHD_LDW"}, \
+	{RING_ACTHD_UDW(0),        0,      0, "ACTHD_UDW"}, \
+	{RING_INSTPM(0),           0,      0, "INSTPM"}, \
+	{RING_INSTDONE(0),         0,      0, "INSTDONE"}, \
 	{RING_NOPID(0),            0,      0, "RING_NOPID"}, \
-	{RING_START(0),            0,      0, "RING_START"}, \
-	{RING_HEAD(0),             0,      0, "RING_HEAD"}, \
-	{RING_TAIL(0),             0,      0, "RING_TAIL"}, \
-	{RING_CTL(0),              0,      0, "RING_CTL"}, \
-	{RING_MI_MODE(0),          0,      0, "RING_MI_MODE"}, \
+	{RING_START(0),            0,      0, "START"}, \
+	{RING_HEAD(0),             0,      0, "HEAD"}, \
+	{RING_TAIL(0),             0,      0, "TAIL"}, \
+	{RING_CTL(0),              0,      0, "CTL"}, \
+	{RING_MI_MODE(0),          0,      0, "MODE"}, \
 	{RING_CONTEXT_CONTROL(0),  0,      0, "RING_CONTEXT_CONTROL"}, \
-	{RING_INSTDONE(0),         0,      0, "RING_INSTDONE"}, \
-	{RING_HWS_PGA(0),          0,      0, "RING_HWS_PGA"}, \
-	{RING_MODE_GEN7(0),        0,      0, "RING_MODE_GEN7"}, \
-	{GEN8_RING_PDP_LDW(0, 0),  0,      0, "GEN8_RING_PDP0_LDW"}, \
-	{GEN8_RING_PDP_UDW(0, 0),  0,      0, "GEN8_RING_PDP0_UDW"}, \
-	{GEN8_RING_PDP_LDW(0, 1),  0,      0, "GEN8_RING_PDP1_LDW"}, \
-	{GEN8_RING_PDP_UDW(0, 1),  0,      0, "GEN8_RING_PDP1_UDW"}, \
-	{GEN8_RING_PDP_LDW(0, 2),  0,      0, "GEN8_RING_PDP2_LDW"}, \
-	{GEN8_RING_PDP_UDW(0, 2),  0,      0, "GEN8_RING_PDP2_UDW"}, \
-	{GEN8_RING_PDP_LDW(0, 3),  0,      0, "GEN8_RING_PDP3_LDW"}, \
-	{GEN8_RING_PDP_UDW(0, 3),  0,      0, "GEN8_RING_PDP3_UDW"}
+	{RING_HWS_PGA(0),          0,      0, "HWS"}, \
+	{RING_MODE_GEN7(0),        0,      0, "GFX_MODE"}, \
+	{GEN8_RING_PDP_LDW(0, 0),  0,      0, "PDP0_LDW"}, \
+	{GEN8_RING_PDP_UDW(0, 0),  0,      0, "PDP0_UDW"}, \
+	{GEN8_RING_PDP_LDW(0, 1),  0,      0, "PDP1_LDW"}, \
+	{GEN8_RING_PDP_UDW(0, 1),  0,      0, "PDP1_UDW"}, \
+	{GEN8_RING_PDP_LDW(0, 2),  0,      0, "PDP2_LDW"}, \
+	{GEN8_RING_PDP_UDW(0, 2),  0,      0, "PDP2_UDW"}, \
+	{GEN8_RING_PDP_LDW(0, 3),  0,      0, "PDP3_LDW"}, \
+	{GEN8_RING_PDP_UDW(0, 3),  0,      0, "PDP3_UDW"}
 
 #define COMMON_BASE_HAS_EU() \
 	{EIR,                      0,      0, "EIR"}
@@ -83,10 +83,10 @@
 	{GEN12_SC_INSTDONE_EXTRA2, 0,      0, "GEN12_SC_INSTDONE_EXTRA2"}
 
 #define COMMON_GEN12BASE_VEC() \
-	{GEN12_SFC_DONE(0),        0,      0, "GEN12_SFC_DONE0"}, \
-	{GEN12_SFC_DONE(1),        0,      0, "GEN12_SFC_DONE1"}, \
-	{GEN12_SFC_DONE(2),        0,      0, "GEN12_SFC_DONE2"}, \
-	{GEN12_SFC_DONE(3),        0,      0, "GEN12_SFC_DONE3"}
+	{GEN12_SFC_DONE(0),        0,      0, "SFC_DONE[0]"}, \
+	{GEN12_SFC_DONE(1),        0,      0, "SFC_DONE[1]"}, \
+	{GEN12_SFC_DONE(2),        0,      0, "SFC_DONE[2]"}, \
+	{GEN12_SFC_DONE(3),        0,      0, "SFC_DONE[3]"}
 
 /* XE_LPD - Global */
 static struct __guc_mmio_reg_descr xe_lpd_global_regs[] = {
