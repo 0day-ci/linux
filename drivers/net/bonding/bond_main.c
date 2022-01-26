@@ -88,6 +88,7 @@
 #if IS_ENABLED(CONFIG_TLS_DEVICE)
 #include <net/tls.h>
 #endif
+#include <net/ip6_route.h>
 
 #include "bonding_priv.h"
 
@@ -3069,6 +3070,190 @@ out_unlock:
 	return RX_HANDLER_ANOTHER;
 }
 
+static void bond_ns_send(struct slave *slave, const struct in6_addr *daddr,
+			 const struct in6_addr *saddr, struct bond_vlan_tag *tags)
+{
+	struct sk_buff *skb;
+	struct net_device *slave_dev = slave->dev;
+	struct net_device *bond_dev = slave->bond->dev;
+	struct in6_addr mcaddr;
+
+	slave_dbg(bond_dev, slave_dev, "NS on slave: dst %pI6 src %pI6\n",
+		  &daddr, &saddr);
+
+	skb = ndisc_ns_create(slave_dev, daddr, saddr, 0);
+	if (!skb) {
+		net_err_ratelimited("NS packet allocation failed\n");
+		return;
+	}
+
+	addrconf_addr_solict_mult(daddr, &mcaddr);
+	if (bond_handle_vlan(slave, tags, skb))
+		ndisc_send_skb(skb, &mcaddr, saddr);
+	return;
+}
+
+static void bond_ns_send_all(struct bonding *bond, struct slave *slave)
+{
+	struct in6_addr *targets = bond->params.ns_targets;
+	struct bond_vlan_tag *tags;
+	struct in6_addr saddr;
+	struct dst_entry *dst;
+	struct flowi6 fl6;
+	int i;
+
+	for (i = 0; i < BOND_MAX_ARP_TARGETS && !ipv6_addr_any(&targets[i]); i++) {
+		slave_dbg(bond->dev, slave->dev, "%s: target %pI6\n",
+			  __func__, &targets[i]);
+		tags = NULL;
+
+		/* Find out through which dev should the packet go */
+		memset(&fl6, 0, sizeof(struct flowi6));
+		fl6.daddr = targets[i];
+		fl6.flowi6_oif = bond->dev->ifindex;
+
+		dst = ip6_route_output(dev_net(bond->dev), NULL, &fl6);
+		if (dst->error) {
+			dst_release(dst);
+			/* there's no route to target - try to send arp
+			 * probe to generate any traffic (arp_validate=0)
+			 */
+			if (bond->params.arp_validate)
+				pr_warn_once("%s: no route to ns_ip6_target %pI6 and arp_validate is set\n",
+					     bond->dev->name,
+					     &targets[i]);
+			bond_ns_send(slave, &targets[i], &in6addr_any, tags);
+			continue;
+		}
+
+		/* bond device itself */
+		if (dst->dev == bond->dev)
+			goto found;
+
+		rcu_read_lock();
+		tags = bond_verify_device_path(bond->dev, dst->dev, 0);
+		rcu_read_unlock();
+
+		if (!IS_ERR_OR_NULL(tags))
+			goto found;
+
+		/* Not our device - skip */
+		slave_dbg(bond->dev, slave->dev, "no path to ns_ip6_target %pI6 via dst->dev %s\n",
+			   &targets[i], dst->dev ? dst->dev->name : "NULL");
+
+		dst_release(dst);
+		continue;
+
+found:
+		if (!ipv6_dev_get_saddr(dev_net(dst->dev), dst->dev, &targets[i], 0, &saddr))
+			bond_ns_send(slave, &targets[i], &saddr, tags);
+		dst_release(dst);
+		kfree(tags);
+	}
+}
+
+static int bond_confirm_addr6(struct net_device *dev,
+			       struct netdev_nested_priv *priv)
+{
+	struct in6_addr *addr = (struct in6_addr *)priv->data;
+
+	return ipv6_chk_addr(dev_net(dev), addr, dev, 0);
+}
+
+static bool bond_has_this_ip6(struct bonding *bond, struct in6_addr *addr)
+{
+	struct netdev_nested_priv priv = {
+		.data = addr,
+	};
+	int ret = false;
+
+	if (bond_confirm_addr6(bond->dev, &priv))
+		return true;
+
+	rcu_read_lock();
+	if (netdev_walk_all_upper_dev_rcu(bond->dev, bond_confirm_addr6, &priv))
+		ret = true;
+	rcu_read_unlock();
+
+	return ret;
+}
+
+static void bond_validate_ns(struct bonding *bond, struct slave *slave,
+			     struct in6_addr *saddr, struct in6_addr *daddr)
+{
+	int i;
+
+	if (ipv6_addr_any(saddr) || !bond_has_this_ip6(bond, daddr)) {
+		slave_dbg(bond->dev, slave->dev, "%s: sip %pI6 tip %pI6 not found\n",
+			   __func__, saddr, daddr);
+		return;
+	}
+
+	i = bond_get_targets_ip6(bond->params.ns_targets, saddr);
+	if (i == -1) {
+		slave_dbg(bond->dev, slave->dev, "%s: sip %pI6 not found in targets\n",
+			   __func__, saddr);
+		return;
+	}
+	slave->last_rx = jiffies;
+	slave->target_last_arp_rx[i] = jiffies;
+}
+
+int bond_na_rcv(const struct sk_buff *skb, struct bonding *bond,
+		 struct slave *slave)
+{
+	struct icmp6hdr *hdr = icmp6_hdr(skb);
+	struct slave *curr_active_slave, *curr_arp_slave;
+	struct in6_addr *saddr, *daddr;
+	bool is_ipv6 = skb->protocol == __cpu_to_be16(ETH_P_IPV6);
+
+	/* Use arp validate logic, should we add a NS one? or an alise? */
+	if (!slave_do_arp_validate(bond, slave)) {
+		if ((slave_do_arp_validate_only(bond) && is_ipv6) ||
+		    !slave_do_arp_validate_only(bond))
+			slave->last_rx = jiffies;
+		return RX_HANDLER_ANOTHER;
+	} else if (!is_ipv6) {
+		return RX_HANDLER_ANOTHER;
+	}
+
+	slave_dbg(bond->dev, slave->dev, "%s: skb->dev %s\n",
+		   __func__, skb->dev->name);
+
+	if (skb->pkt_type == PACKET_OTHERHOST ||
+	    skb->pkt_type == PACKET_LOOPBACK ||
+	    hdr->icmp6_type != NDISC_NEIGHBOUR_ADVERTISEMENT)
+		goto out;
+
+	saddr = &ipv6_hdr(skb)->saddr;
+	daddr = &ipv6_hdr(skb)->daddr;
+
+	slave_dbg(bond->dev, slave->dev, "%s: %s/%d av %d sv %d sip %pI6 tip %pI6\n",
+		  __func__, slave->dev->name, bond_slave_state(slave),
+		  bond->params.arp_validate, slave_do_arp_validate(bond, slave),
+		  saddr, daddr);
+
+	curr_active_slave = rcu_dereference(bond->curr_active_slave);
+	curr_arp_slave = rcu_dereference(bond->current_arp_slave);
+
+	/* We 'trust' the received ARP enough to validate it if:
+	 * see bond_arp_rcv().
+	 */
+	if (bond_is_active_slave(slave))
+		bond_validate_ns(bond, slave, saddr, daddr);
+	else if (curr_active_slave &&
+		 time_after(slave_last_rx(bond, curr_active_slave),
+			    curr_active_slave->last_link_up))
+		bond_validate_ns(bond, slave, saddr, daddr);
+	else if (curr_arp_slave &&
+		 bond_time_in_interval(bond,
+				       dev_trans_start(curr_arp_slave->dev), 1))
+		bond_validate_ns(bond, slave, saddr, daddr);
+
+out:
+	return RX_HANDLER_ANOTHER;
+}
+
 /* function to verify if we're in the arp_interval timeslice, returns true if
  * (last_act - arp_interval) <= jiffies <= (last_act + mod * arp_interval +
  * arp_interval/2) . the arp_interval/2 is needed for really fast networks.
@@ -3163,8 +3348,12 @@ static void bond_loadbalance_arp_mon(struct bonding *bond)
 		 * do - all replies will be rx'ed on same link causing slaves
 		 * to be unstable during low/no traffic periods
 		 */
-		if (bond_slave_is_up(slave))
-			bond_arp_send_all(bond, slave);
+		if (bond_slave_is_up(slave)) {
+			if (bond_do_ns_validate(bond))
+				bond_ns_send_all(bond, slave);
+			else
+				bond_arp_send_all(bond, slave);
+		}
 	}
 
 	rcu_read_unlock();
@@ -3378,7 +3567,10 @@ static bool bond_ab_arp_probe(struct bonding *bond)
 			    curr_active_slave->dev->name);
 
 	if (curr_active_slave) {
-		bond_arp_send_all(bond, curr_active_slave);
+		if (bond_do_ns_validate(bond))
+			bond_ns_send_all(bond, curr_active_slave);
+		else
+			bond_arp_send_all(bond, curr_active_slave);
 		return should_notify_rtnl;
 	}
 
@@ -3430,7 +3622,10 @@ static bool bond_ab_arp_probe(struct bonding *bond)
 	bond_set_slave_link_state(new_slave, BOND_LINK_BACK,
 				  BOND_SLAVE_NOTIFY_LATER);
 	bond_set_slave_active_flags(new_slave, BOND_SLAVE_NOTIFY_LATER);
-	bond_arp_send_all(bond, new_slave);
+	if (bond_do_ns_validate(bond))
+		bond_ns_send_all(bond, new_slave);
+	else
+		bond_arp_send_all(bond, new_slave);
 	new_slave->last_link_up = jiffies;
 	rcu_assign_pointer(bond->current_arp_slave, new_slave);
 
@@ -3966,7 +4161,10 @@ static int bond_open(struct net_device *bond_dev)
 
 	if (bond->params.arp_interval) {  /* arp interval, in milliseconds. */
 		queue_delayed_work(bond->wq, &bond->arp_work, 0);
-		bond->recv_probe = bond_arp_rcv;
+		if (bond_do_ns_validate(bond))
+			bond->recv_probe = bond_na_rcv;
+		else
+			bond->recv_probe = bond_arp_rcv;
 	}
 
 	if (BOND_MODE(bond) == BOND_MODE_8023AD) {
@@ -5947,6 +6145,7 @@ static int bond_check_params(struct bond_params *params)
 		strscpy_pad(params->primary, primary, sizeof(params->primary));
 
 	memcpy(params->arp_targets, arp_target, sizeof(arp_target));
+	memset(params->ns_targets, 0, sizeof(struct in6_addr) * BOND_MAX_ARP_TARGETS);
 
 	return 0;
 }
