@@ -259,13 +259,6 @@ static int alg_setsockopt(struct socket *sock, int level, int optname,
 			goto unlock;
 		err = type->setauthsize(ask->private, optlen);
 		break;
-	case ALG_SET_DRBG_ENTROPY:
-		if (sock->state == SS_CONNECTED)
-			goto unlock;
-		if (!type->setentropy)
-			goto unlock;
-
-		err = type->setentropy(ask->private, optval, optlen);
 	}
 
 unlock:

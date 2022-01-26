@@ -110,16 +110,6 @@ static int rng_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	struct sock *sk = sock->sk;
 	struct alg_sock *ask = alg_sk(sk);
 	struct rng_ctx *ctx = ask->private;
-
-	return _rng_recvmsg(ctx->drng, msg, len, NULL, 0);
-}
-
-static int rng_test_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
-			    int flags)
-{
-	struct sock *sk = sock->sk;
-	struct alg_sock *ask = alg_sk(sk);
-	struct rng_ctx *ctx = ask->private;
 	int ret;
 
 	lock_sock(sock->sk);
@@ -130,7 +120,7 @@ static int rng_test_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	return ret;
 }
 
-static int rng_test_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
+static int rng_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 {
 	int err;
 	struct alg_sock *ask = alg_sk(sock->sk);
@@ -173,30 +163,11 @@ static struct proto_ops algif_rng_ops = {
 	.mmap		=	sock_no_mmap,
 	.bind		=	sock_no_bind,
 	.accept		=	sock_no_accept,
-	.sendmsg	=	sock_no_sendmsg,
 	.sendpage	=	sock_no_sendpage,
 
 	.release	=	af_alg_release,
 	.recvmsg	=	rng_recvmsg,
-};
-
-static struct proto_ops __maybe_unused algif_rng_test_ops = {
-	.family		=	PF_ALG,
-
-	.connect	=	sock_no_connect,
-	.socketpair	=	sock_no_socketpair,
-	.getname	=	sock_no_getname,
-	.ioctl		=	sock_no_ioctl,
-	.listen		=	sock_no_listen,
-	.shutdown	=	sock_no_shutdown,
-	.mmap		=	sock_no_mmap,
-	.bind		=	sock_no_bind,
-	.accept		=	sock_no_accept,
-	.sendpage	=	sock_no_sendpage,
-
-	.release	=	af_alg_release,
-	.recvmsg	=	rng_test_recvmsg,
-	.sendmsg	=	rng_test_sendmsg,
+	.sendmsg	=	rng_sendmsg,
 };
 
 static void *rng_bind(const char *name, u32 type, u32 mask)
@@ -225,7 +196,6 @@ static void rng_release(void *private)
 	if (unlikely(!pctx))
 		return;
 	crypto_free_rng(pctx->drng);
-	kfree_sensitive(pctx->entropy);
 	kfree_sensitive(pctx);
 }
 
@@ -264,13 +234,6 @@ static int rng_accept_parent(void *private, struct sock *sk)
 	ask->private = ctx;
 	sk->sk_destruct = rng_sock_destruct;
 
-	/*
-	 * Non NULL pctx->entropy means that CAVP test has been initiated on
-	 * this socket, replace proto_ops algif_rng_ops with algif_rng_test_ops.
-	 */
-	if (IS_ENABLED(CONFIG_CRYPTO_USER_API_RNG_CAVP) && pctx->entropy)
-		sk->sk_socket->ops = &algif_rng_test_ops;
-
 	return 0;
 }
 
@@ -284,45 +247,11 @@ static int rng_setkey(void *private, const u8 *seed, unsigned int seedlen)
 	return crypto_rng_reset(pctx->drng, seed, seedlen);
 }
 
-static int __maybe_unused rng_setentropy(void *private, sockptr_t entropy,
-					 unsigned int len)
-{
-	struct rng_parent_ctx *pctx = private;
-	u8 *kentropy = NULL;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	if (pctx->entropy)
-		return -EINVAL;
-
-	if (len > MAXSIZE)
-		return -EMSGSIZE;
-
-	if (len) {
-		kentropy = memdup_sockptr(entropy, len);
-		if (IS_ERR(kentropy))
-			return PTR_ERR(kentropy);
-	}
-
-	if (crypto_rng_alg(pctx->drng)->set_ent)
-		crypto_rng_alg(pctx->drng)->set_ent(pctx->drng, kentropy, len);
-	/*
-	 * Since rng doesn't perform any memory management for the entropy
-	 * buffer, save kentropy pointer to pctx now to free it after use.
-	 */
-	pctx->entropy = kentropy;
-	return 0;
-}
-
 static const struct af_alg_type algif_type_rng = {
 	.bind		=	rng_bind,
 	.release	=	rng_release,
 	.accept		=	rng_accept_parent,
 	.setkey		=	rng_setkey,
-#ifdef CONFIG_CRYPTO_USER_API_RNG_CAVP
-	.setentropy	=	rng_setentropy,
-#endif
 	.ops		=	&algif_rng_ops,
 	.name		=	"rng",
 	.owner		=	THIS_MODULE
