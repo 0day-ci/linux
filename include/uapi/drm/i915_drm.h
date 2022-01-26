@@ -3157,7 +3157,36 @@ struct drm_i915_gem_create_ext {
 	 * Object handles are nonzero.
 	 */
 	__u32 handle;
-	/** @flags: MBZ */
+	/**
+	 * @flags: Optional flags.
+	 *
+	 * Supported values:
+	 *
+	 * I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS - Signal to the kernel that
+	 * the object will need to be accessed via the CPU.
+	 *
+	 * Only valid when placing objects in I915_MEMORY_CLASS_DEVICE, and
+	 * only strictly required on platforms where only some of the device
+	 * memory is directly visible or mappable through the CPU, like on DG2+.
+	 *
+	 * One of the placements MUST also be I915_MEMORY_CLASS_SYSTEM, to
+	 * ensure we can always spill the allocation to system memory, if we
+	 * can't place the object in the mappable part of
+	 * I915_MEMORY_CLASS_DEVICE.
+	 *
+	 * Note that buffers that need to be captured with EXEC_OBJECT_CAPTURE,
+	 * will need to enable this hint, if the object can also be placed in
+	 * I915_MEMORY_CLASS_DEVICE, starting from DG2+. The execbuf call will
+	 * throw an error otherwise. This also means that such objects will need
+	 * I915_MEMORY_CLASS_SYSTEM set as a possible placement.
+	 *
+	 * Without this hint, the kernel will assume that non-mappable
+	 * I915_MEMORY_CLASS_DEVICE is preferred for this object. Note that the
+	 * kernel can still migrate the object to the mappable part, as a last
+	 * resort, if userspace ever CPU faults this object, but this might be
+	 * expensive, and so ideally should be avoided.
+	 */
+#define I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS (1<<0)
 	__u32 flags;
 	/**
 	 * @extensions: The chain of extensions to apply to this object.
