@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/of.h>
+#include <linux/gpio/consumer.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/of_platform.h>
@@ -101,6 +102,7 @@ static int dwc3_xlnx_init_zynqmp(struct dwc3_xlnx *priv_data)
 	struct phy		*usb3_phy;
 	int			ret;
 	u32			reg;
+	struct gpio_desc        *reset_gpio;
 
 	usb3_phy = devm_phy_optional_get(dev, "usb3-phy");
 	if (IS_ERR(usb3_phy)) {
@@ -201,6 +203,22 @@ static int dwc3_xlnx_init_zynqmp(struct dwc3_xlnx *priv_data)
 	}
 
 skip_usb3_phy:
+	/* ulpi reset via gpio-modepin or gpio-framework driver */
+	reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset_gpio)) {
+		dev_err_probe(dev, PTR_ERR(reset_gpio),
+			      "Failed to bind reset gpio\n");
+		goto err;
+	}
+
+	if (reset_gpio) {
+		/* Toggle ulpi to reset the phy. */
+		gpiod_set_value(reset_gpio, 0);
+		usleep_range(5000, 10000); /* delay */
+		gpiod_set_value(reset_gpio, 1);
+		usleep_range(5000, 10000); /* delay */
+	}
+
 	/*
 	 * This routes the USB DMA traffic to go through FPD path instead
 	 * of reaching DDR directly. This traffic routing is needed to
