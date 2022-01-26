@@ -668,14 +668,15 @@ void intel_guc_ads_destroy(struct intel_guc *guc)
 
 static void guc_ads_private_data_reset(struct intel_guc *guc)
 {
+	struct dma_buf_map map =
+		DMA_BUF_MAP_INIT_OFFSET(&guc->ads_map, guc_ads_private_data_offset(guc));
 	u32 size;
 
 	size = guc_ads_private_data_size(guc);
 	if (!size)
 		return;
 
-	memset((void *)guc->ads_blob + guc_ads_private_data_offset(guc), 0,
-	       size);
+	dma_buf_map_memset(&map, 0, size);
 }
 
 /**
