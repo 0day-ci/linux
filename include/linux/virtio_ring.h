@@ -124,6 +124,11 @@ struct virtqueue *vring_new_virtqueue(unsigned int index,
  */
 void vring_del_virtqueue(struct virtqueue *vq);
 
+/*
+ * Resets a virtqueue. Just frees the ring, not free vq.
+ */
+void vring_reset_virtqueue(struct virtqueue *vq);
+
 /* Filter out transport-specific feature bits. */
 void vring_transport_features(struct virtio_device *vdev);
 
