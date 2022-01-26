@@ -1369,6 +1369,9 @@ static void virtnet_napi_enable(struct virtqueue *vq, struct napi_struct *napi)
 {
 	napi_enable(napi);
 
+	if (!vq)
+		return;
+
 	/* If all buffers were filled by other side before we napi_enabled, we
 	 * won't get another interrupt, so process any outstanding packets now.
 	 * Call local_bh_enable after to trigger softIRQ processing.
@@ -1413,6 +1416,10 @@ static void refill_work(struct work_struct *work)
 		struct receive_queue *rq = &vi->rq[i];
 
 		napi_disable(&rq->napi);
+		if (!rq->vq) {
+			virtnet_napi_enable(rq->vq, &rq->napi);
+			continue;
+		}
 		still_empty = !try_fill_recv(vi, rq, GFP_KERNEL);
 		virtnet_napi_enable(rq->vq, &rq->napi);
 
@@ -2869,6 +2876,167 @@ static unsigned int mergeable_min_buf_len(struct virtnet_info *vi, struct virtqu
 
 	return max(max(min_buf_len, hdr_len) - hdr_len,
 		   (unsigned int)GOOD_PACKET_LEN);
+}
+
+static void virtnet_rq_free_unused_buf_cb(struct virtio_reset_vq *param,
+					  void *buf)
+{
+	virtnet_rq_free_unused_buf(param->vdev->priv, param->data, buf);
+}
+
+static void virtnet_sq_free_unused_buf_cb(struct virtio_reset_vq *param,
+					  void *buf)
+{
+	virtnet_rq_free_unused_buf(param->vdev->priv, param->data, buf);
+}
+
+static int __virtnet_rx_vq_disable(struct virtnet_info *vi,
+				   struct receive_queue *rq)
+{
+	struct virtio_reset_vq param = {0};
+	int err, qnum;
+
+	qnum = rxq2vq(rq - vi->rq);
+
+	napi_disable(&rq->napi);
+
+	param.vdev = vi->vdev;
+	param.queue_index = qnum;
+	param.free_unused_cb = virtnet_rq_free_unused_buf_cb;
+	param.data = rq;
+
+	err = virtio_reset_vq(&param);
+	if (err) {
+		virtnet_napi_enable(rq->vq, &rq->napi);
+		return err;
+	}
+
+	rq->vq = NULL;
+
+	return err;
+}
+
+static int __virtnet_tx_vq_disable(struct virtnet_info *vi,
+				   struct send_queue *sq)
+{
+	struct virtio_reset_vq param = {0};
+	struct netdev_queue *txq;
+	int err, qnum;
+
+	qnum = txq2vq(sq - vi->sq);
+
+	netif_stop_subqueue(vi->dev, sq - vi->sq);
+	virtnet_napi_tx_disable(&sq->napi);
+
+	/* wait xmit done */
+	txq = netdev_get_tx_queue(vi->dev, qnum);
+	__netif_tx_lock(txq, raw_smp_processor_id());
+	__netif_tx_unlock(txq);
+
+	param.vdev = vi->vdev;
+	param.queue_index = qnum;
+	param.free_unused_cb = virtnet_sq_free_unused_buf_cb;
+	param.data = sq;
+
+	err = virtio_reset_vq(&param);
+	if (err) {
+		virtnet_napi_tx_enable(vi, sq->vq, &sq->napi);
+		netif_start_subqueue(vi->dev, sq - vi->sq);
+		return err;
+	}
+
+	sq->vq = NULL;
+
+	return err;
+}
+
+static int virtnet_pair_disable(struct virtnet_info *vi, int i)
+{
+	int err;
+
+	err = __virtnet_rx_vq_disable(vi, vi->rq + i);
+	if (err)
+		return err;
+
+	return __virtnet_tx_vq_disable(vi, vi->sq + i);
+}
+
+static int virtnet_enable_resetq(struct virtnet_info *vi,
+				 struct receive_queue *rq,
+				 struct send_queue *sq)
+{
+	struct virtio_reset_vq param = {0};
+	vq_callback_t *callback;
+	struct virtqueue *vq;
+	const char *name;
+	int vq_idx;
+	bool ctx;
+
+	if (rq) {
+		vq = rq->vq;
+		vq_idx = rxq2vq(rq - vi->rq);
+		callback = skb_recv_done;
+		name = rq->name;
+
+	} else {
+		vq = sq->vq;
+		vq_idx = txq2vq(sq - vi->sq);
+		callback = skb_xmit_done;
+		name = sq->name;
+	}
+
+	if (vq)
+		return -EBUSY;
+
+	if (!vi->big_packets || vi->mergeable_rx_bufs)
+		ctx = true;
+	else
+		ctx = false;
+
+	param.vdev = vi->vdev;
+	param.queue_index = vq_idx;
+	param.callback = callback;
+	param.name = name;
+	param.ctx = &ctx;
+	param.ring_num = 0;
+
+	vq = virtio_enable_resetq(&param);
+	if (IS_ERR(vq))
+		return PTR_ERR(vq);
+
+	if (rq)
+		rq->vq = vq;
+	else
+		sq->vq = vq;
+
+	return 0;
+}
+
+static int virtnet_pair_enable(struct virtnet_info *vi, int i)
+{
+	struct receive_queue *rq;
+	struct send_queue *sq;
+	int err;
+
+	rq = vi->rq + i;
+	sq = vi->sq + i;
+
+	/* tx */
+	err = virtnet_enable_resetq(vi, NULL, sq);
+	if (err)
+		goto err;
+	else
+		netif_start_subqueue(vi->dev, sq - vi->sq);
+
+	/* rx */
+	err = virtnet_enable_resetq(vi, rq, NULL);
+	if (err)
+		return err;
+
+err:
+	virtnet_napi_tx_enable(vi, sq->vq, &sq->napi);
+	virtnet_napi_enable(rq->vq, &rq->napi);
+	return 0;
 }
 
 static int virtnet_find_vqs(struct virtnet_info *vi)
