@@ -401,6 +401,20 @@ static ssize_t supported_sectorsizes_show(struct kobject *kobj,
 BTRFS_ATTR(static_feature, supported_sectorsizes,
 	   supported_sectorsizes_show);
 
+static ssize_t allocation_hint_show(struct kobject *kobj,
+					  struct kobj_attribute *a,
+					  char *buf)
+{
+	ssize_t ret;
+
+	/* Only sectorsize == PAGE_SIZE is now supported */
+	ret = sysfs_emit(buf, "1\n");
+
+	return ret;
+}
+BTRFS_ATTR(static_feature, allocation_hint,
+	   allocation_hint_show);
+
 /*
  * Features which only depend on kernel version.
  *
@@ -413,6 +427,7 @@ static struct attribute *btrfs_supported_static_feature_attrs[] = {
 	BTRFS_ATTR_PTR(static_feature, send_stream_version),
 	BTRFS_ATTR_PTR(static_feature, supported_rescue_options),
 	BTRFS_ATTR_PTR(static_feature, supported_sectorsizes),
+	BTRFS_ATTR_PTR(static_feature, allocation_hint),
 	NULL
 };
 
