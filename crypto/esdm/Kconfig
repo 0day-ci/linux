@@ -68,6 +68,51 @@ config CRYPTO_ESDM_SEED_BUFFER_INIT_ADD_BITS
 
 endmenu # "Specific DRNG seeding strategies"
 
+menu "Entropy Source Configuration"
+
+config CRYPTO_ESDM_RUNTIME_ES_CONFIG
+	bool "Enable runtime configuration of entropy sources"
+	help
+	  When enabling this option, the ESDM provides the mechanism
+	  allowing to alter the entropy rate of each entropy source
+	  during boot time and runtime.
+
+	  Each entropy source allows its entropy rate changed with
+	  a kernel command line option. When not providing any
+	  option, the default specified during kernel compilation
+	  is applied.
+
+comment "Jitter RNG Entropy Source"
+
+config CRYPTO_ESDM_JENT
+	bool "Enable Jitter RNG as ESDM Seed Source"
+	depends on CRYPTO
+	select CRYPTO_JITTERENTROPY
+	help
+	  The Linux RNG may use the Jitter RNG as entropy source. Enabling
+	  this option enables the use of the Jitter RNG. Its default
+	  entropy level is 16 bits of entropy per 256 data bits delivered
+	  by the Jitter RNG. This entropy level can be changed at boot
+	  time or at runtime with the esdm_base.jitterrng configuration
+	  variable.
+
+config CRYPTO_ESDM_JENT_ENTROPY_RATE
+	int "Jitter RNG Entropy Source Entropy Rate"
+	depends on CRYPTO_ESDM_JENT
+	range 0 256
+	default 16
+	help
+	  The option defines the amount of entropy the ESDM applies to 256
+	  bits of data obtained from the Jitter RNG entropy source. The
+	  ESDM enforces the limit that this value must be in the range
+	  between 0 and 256.
+
+	  When configuring this value to 0, the Jitter RNG entropy source
+	  will provide 256 bits of data without being credited to contain
+	  entropy.
+
+endmenu # "Entropy Source Configuration"
+
 config CRYPTO_ESDM_DRNG_KCAPI
 	bool
 	depends on CRYPTO
