@@ -34,6 +34,8 @@ struct intel_guc {
 	struct intel_uc_fw fw;
 	/** @log: sub-structure containing GuC log related data and objects */
 	struct intel_guc_log log;
+	/** @log_state: states and locks for each subregion of GuC's log buffer */
+	struct intel_guc_log_stats log_state[GUC_MAX_LOG_BUFFER];
 	/** @ct: the command transport communication channel */
 	struct intel_guc_ct ct;
 	/** @slpc: sub-structure containing SLPC related data and objects */
