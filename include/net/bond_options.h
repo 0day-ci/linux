@@ -79,6 +79,7 @@ struct bond_opt_value {
 	char *string;
 	u64 value;
 	u32 flags;
+	struct in6_addr ip6_addr;
 };
 
 struct bonding;
@@ -118,17 +119,20 @@ const struct bond_opt_value *bond_opt_get_val(unsigned int option, u64 val);
  * When value is ULLONG_MAX then string will be used.
  */
 static inline void __bond_opt_init(struct bond_opt_value *optval,
-				   char *string, u64 value)
+				   char *string, u64 value, struct in6_addr *addr)
 {
 	memset(optval, 0, sizeof(*optval));
 	optval->value = ULLONG_MAX;
-	if (value == ULLONG_MAX)
+	if (string)
 		optval->string = string;
+	else if (addr)
+		optval->ip6_addr = *addr;
 	else
 		optval->value = value;
 }
-#define bond_opt_initval(optval, value) __bond_opt_init(optval, NULL, value)
-#define bond_opt_initstr(optval, str) __bond_opt_init(optval, str, ULLONG_MAX)
+#define bond_opt_initval(optval, value) __bond_opt_init(optval, NULL, value, NULL)
+#define bond_opt_initstr(optval, str) __bond_opt_init(optval, str, ULLONG_MAX, NULL)
+#define bond_opt_initaddr(optval, addr) __bond_opt_init(optval, NULL, ULLONG_MAX, addr)
 
 void bond_option_arp_ip_targets_clear(struct bonding *bond);
 
