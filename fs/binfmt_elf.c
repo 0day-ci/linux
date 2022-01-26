@@ -402,19 +402,29 @@ static unsigned long elf_map(struct file *filep, unsigned long addr,
 static unsigned long total_mapping_size(const struct elf_phdr *cmds, int nr)
 {
 	int i, first_idx = -1, last_idx = -1;
+	unsigned long min_vaddr = ULONG_MAX, max_vaddr = 0;
 
 	for (i = 0; i < nr; i++) {
 		if (cmds[i].p_type == PT_LOAD) {
-			last_idx = i;
-			if (first_idx == -1)
+			/*
+			 * The PT_LOAD segments are not necessarily ordered
+			 * by vaddr. Make sure that we get the segment with
+			 * minimum vaddr (maximum vaddr respectively)
+			 */
+			if (cmds[i].p_vaddr <= min_vaddr) {
 				first_idx = i;
+				min_vaddr = cmds[i].p_vaddr;
+			}
+			if (cmds[i].p_vaddr >= max_vaddr) {
+				last_idx = i;
+				max_vaddr = cmds[i].p_vaddr;
+			}
 		}
 	}
 	if (first_idx == -1)
 		return 0;
 
-	return cmds[last_idx].p_vaddr + cmds[last_idx].p_memsz -
-				ELF_PAGESTART(cmds[first_idx].p_vaddr);
+	return max_vaddr + cmds[last_idx].p_memsz - ELF_PAGESTART(min_vaddr);
 }
 
 static int elf_read(struct file *file, void *buf, size_t len, loff_t pos)
