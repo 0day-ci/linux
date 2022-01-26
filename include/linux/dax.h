@@ -40,6 +40,8 @@ void dax_write_cache(struct dax_device *dax_dev, bool wc);
 bool dax_write_cache_enabled(struct dax_device *dax_dev);
 bool dax_synchronous(struct dax_device *dax_dev);
 void set_dax_synchronous(struct dax_device *dax_dev);
+void set_dax_recovery(struct dax_device *dax_dev);
+bool dax_recovery_capable(struct dax_device *dax_dev);
 /*
  * Check if given mapping is supported by the file / underlying device.
  */
@@ -87,6 +89,13 @@ static inline bool daxdev_mapping_supported(struct vm_area_struct *vma,
 {
 	return !(vma->vm_flags & VM_SYNC);
 }
+static inline void set_dax_recovery(struct dax_device *dax_dev);
+{
+}
+static inline bool dax_recovery_capable(struct dax_device *dax_dev)
+{
+	return false;
+}
 #endif
 
 void set_dax_nocache(struct dax_device *dax_dev);
@@ -128,6 +137,7 @@ struct page *dax_layout_busy_page(struct address_space *mapping);
 struct page *dax_layout_busy_page_range(struct address_space *mapping, loff_t start, loff_t end);
 dax_entry_t dax_lock_page(struct page *page);
 void dax_unlock_page(struct page *page, dax_entry_t cookie);
+int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr);
 #else
 static inline struct page *dax_layout_busy_page(struct address_space *mapping)
 {
@@ -154,6 +164,11 @@ static inline dax_entry_t dax_lock_page(struct page *page)
 
 static inline void dax_unlock_page(struct page *page, dax_entry_t cookie)
 {
+}
+
+static inline int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr)
+{
+	return -EINVAL;
 }
 #endif
 
