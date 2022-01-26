@@ -16,9 +16,22 @@ maintainers:
 
 properties:
   compatible:
-    enum:
-      - brcm,bcm6345-wdt
-      - brcm,bcm7038-wdt
+    items:
+      - enum:
+          - brcm,bcm4908-wdt
+          - brcm,bcm60333-wdt
+          - brcm,bcm63138-wdt
+          - brcm,bcm63148-wdt
+          - brcm,bcm63268-wdt
+          - brcm,bcm63381-wdt
+          - brcm,bcm6848-wdt
+          - brcm,bcm6858-wdt
+          - brcm,bcm68360-wdt
+          - brcm,bcm6338-wdt
+          - brcm,bcm6345-wdt
+          - brcm,bcm6348-wdt
+          - brcm,bcm7038-wdt
+      - const: brcm,bcm63xx-wdt
 
   reg:
     maxItems: 1
@@ -37,7 +50,7 @@ required:
 examples:
   - |
     watchdog@f040a7e8 {
-      compatible = "brcm,bcm7038-wdt";
+      compatible = "brcm,bcm7038-wdt", "brcm,bcm63xx-wdt";
       reg = <0xf040a7e8 0x16>;
       clocks = <&upg_fixed>;
     };
