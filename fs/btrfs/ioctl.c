@@ -1064,7 +1064,7 @@ static struct extent_map *defrag_lookup_extent(struct inode *inode, u64 start,
 }
 
 static bool defrag_check_next_extent(struct inode *inode, struct extent_map *em,
-				     bool locked)
+				     u32 extent_thresh, bool locked)
 {
 	struct extent_map *next;
 	bool ret = false;
@@ -1080,9 +1080,11 @@ static bool defrag_check_next_extent(struct inode *inode, struct extent_map *em,
 	/* Preallocated */
 	if (test_bit(EXTENT_FLAG_PREALLOC, &em->flags))
 		goto out;
-	/* Physically adjacent and large enough */
-	if ((em->block_start + em->block_len == next->block_start) &&
-	    (em->block_len > SZ_128K && next->block_len > SZ_128K))
+	/* Extent is already large enough */
+	if (next->len >= extent_thresh)
+		goto out;
+	/* Physically adjacent */
+	if ((em->block_start + em->block_len == next->block_start))
 		goto out;
 	ret = true;
 out:
@@ -1274,7 +1276,7 @@ static int defrag_collect_targets(struct btrfs_inode *inode,
 			goto next;
 
 		next_mergeable = defrag_check_next_extent(&inode->vfs_inode, em,
-							  locked);
+							  extent_thresh, locked);
 		if (!next_mergeable) {
 			struct defrag_target_range *last;
 
