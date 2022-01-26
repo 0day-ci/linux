@@ -1125,14 +1125,17 @@ __extend_last_switch(struct intel_guc *guc, u64 *prev_start, u32 new_start)
 	*prev_start = ((u64)gt_stamp_hi << 32) | new_start;
 }
 
+#define record_read(map_, field_) \
+	dma_buf_map_read_field(map_, struct guc_engine_usage_record, field_)
+
 static void guc_update_engine_gt_clks(struct intel_engine_cs *engine)
 {
-	struct guc_engine_usage_record *rec = intel_guc_engine_usage(engine);
+	struct dma_buf_map rec_map = intel_guc_engine_usage_record_map(engine);
 	struct intel_engine_guc_stats *stats = &engine->stats.guc;
 	struct intel_guc *guc = &engine->gt->uc.guc;
-	u32 last_switch = rec->last_switch_in_stamp;
-	u32 ctx_id = rec->current_context_index;
-	u32 total = rec->total_runtime;
+	u32 last_switch = record_read(&rec_map, last_switch_in_stamp);
+	u32 ctx_id = record_read(&rec_map, current_context_index);
+	u32 total = record_read(&rec_map, total_runtime);
 
 	lockdep_assert_held(&guc->timestamp.lock);
 
