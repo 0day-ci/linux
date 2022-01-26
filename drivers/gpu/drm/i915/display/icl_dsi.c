@@ -32,6 +32,7 @@
 #include "intel_atomic.h"
 #include "intel_backlight.h"
 #include "intel_combo_phy.h"
+#include "intel_combo_phy_regs.h"
 #include "intel_connector.h"
 #include "intel_crtc.h"
 #include "intel_ddi.h"
@@ -1231,8 +1232,6 @@ static void gen11_dsi_pre_enable(struct intel_atomic_state *state,
 	gen11_dsi_powerup_panel(encoder);
 
 	intel_dsc_dsi_pps_write(encoder, pipe_config);
-
-	intel_dsc_enable(pipe_config);
 
 	/* step6c: configure transcoder timings */
 	gen11_dsi_set_transcoder_timings(encoder, pipe_config);
