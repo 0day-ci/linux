@@ -24,6 +24,8 @@ struct __guc_mmio_reg_descr_group {
 	u32 owner; /* see enum guc_capture_owner */
 	u32 type; /* see enum guc_capture_type */
 	u32 engine; /* as per MAX_ENGINE_CLASS */
+	int num_ext;
+	struct __guc_mmio_reg_descr *ext;
 };
 
 struct __guc_state_capture_priv {
