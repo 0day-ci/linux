@@ -1083,9 +1083,6 @@ static bool defrag_check_next_extent(struct inode *inode, struct extent_map *em,
 	/* Extent is already large enough */
 	if (next->len >= extent_thresh)
 		goto out;
-	/* Physically adjacent */
-	if ((em->block_start + em->block_len == next->block_start))
-		goto out;
 	ret = true;
 out:
 	free_extent_map(next);
