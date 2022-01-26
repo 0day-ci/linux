@@ -147,36 +147,30 @@ static const struct {
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep2out-bulk",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-/*
 	EP_INFO("ep3in-iso",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep4out-iso",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_OUT)),
-*/
 	EP_INFO("ep5in-int",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep6in-bulk",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep7out-bulk",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-/*
 	EP_INFO("ep8in-iso",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep9out-iso",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_OUT)),
-*/
 	EP_INFO("ep10in-int",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep11in-bulk",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep12out-bulk",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK, USB_EP_CAPS_DIR_OUT)),
-/*
 	EP_INFO("ep13in-iso",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_IN)),
 	EP_INFO("ep14out-iso",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO, USB_EP_CAPS_DIR_OUT)),
-*/
 	EP_INFO("ep15in-int",
 		USB_EP_CAPS(USB_EP_CAPS_TYPE_INT, USB_EP_CAPS_DIR_IN)),
 
@@ -1386,6 +1380,7 @@ static int transfer(struct dummy_hcd *dum_hcd, struct urb *urb,
 	struct dummy		*dum = dum_hcd->dum;
 	struct dummy_request	*req;
 	int			sent = 0;
+	int			count = 0;
 
 top:
 	/* if there's no request queued, the device is NAKing; return */
@@ -1443,6 +1438,13 @@ top:
 				sent += len;
 				urb->actual_length += len;
 				req->req.actual += len;
+				if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS) {
+					if (count <= urb->number_of_packets) {
+						urb->iso_frame_desc[count].actual_length = len;
+						urb->iso_frame_desc[count].status = 0;
+						count++;
+					}
+				}
 			}
 		}
 
@@ -1511,6 +1513,17 @@ top:
 		if (rescan)
 			goto top;
 	}
+
+	if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS) {
+		int i;
+
+		for (i = count; i < urb->number_of_packets; ++i) {
+			urb->iso_frame_desc[i].actual_length = 0;
+			urb->iso_frame_desc[i].status = 0;
+		}
+		*status = 0;
+	}
+
 	return sent;
 }
 
@@ -1934,13 +1947,14 @@ restart:
 			 * here are some of the issues we'd have to face:
 			 *
 			 * Is it urb->interval since the last xfer?
-			 * Use urb->iso_frame_desc[i].
-			 * Complete whether or not ep has requests queued.
 			 * Report random errors, to debug drivers.
 			 */
 			limit = max(limit, periodic_bytes(dum, ep));
-			status = -EINVAL;	/* fail all xfers */
-			break;
+			ep->last_io = jiffies;
+			total -= transfer(dum_hcd, urb, ep, limit, &status);
+			if (status == -EINPROGRESS)
+				continue;
+			goto return_urb;
 
 		case PIPE_INTERRUPT:
 			/* FIXME is it urb->interval since the last xfer?
