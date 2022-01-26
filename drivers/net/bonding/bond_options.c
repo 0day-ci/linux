@@ -34,6 +34,12 @@ static int bond_option_arp_ip_target_add(struct bonding *bond, __be32 target);
 static int bond_option_arp_ip_target_rem(struct bonding *bond, __be32 target);
 static int bond_option_arp_ip_targets_set(struct bonding *bond,
 					  const struct bond_opt_value *newval);
+static int bond_option_ns_ip6_target_add(struct bonding *bond,
+					 struct in6_addr *target);
+static int bond_option_ns_ip6_target_rem(struct bonding *bond,
+					 struct in6_addr *target);
+static int bond_option_ns_ip6_targets_set(struct bonding *bond,
+					  const struct bond_opt_value *newval);
 static int bond_option_arp_validate_set(struct bonding *bond,
 					const struct bond_opt_value *newval);
 static int bond_option_arp_all_targets_set(struct bonding *bond,
@@ -294,6 +300,13 @@ static const struct bond_option bond_opts[BOND_OPT_LAST] = {
 		.desc = "arp targets in n.n.n.n form",
 		.flags = BOND_OPTFLAG_RAWVAL,
 		.set = bond_option_arp_ip_targets_set
+	},
+	[BOND_OPT_NS_TARGETS] = {
+		.id = BOND_OPT_NS_TARGETS,
+		.name = "ns_ip6_target",
+		.desc = "NS targets in ffff:ffff::ffff:ffff form",
+		.flags = BOND_OPTFLAG_RAWVAL,
+		.set = bond_option_ns_ip6_targets_set
 	},
 	[BOND_OPT_DOWNDELAY] = {
 		.id = BOND_OPT_DOWNDELAY,
@@ -1182,6 +1195,130 @@ static int bond_option_arp_ip_targets_set(struct bonding *bond,
 	} else {
 		target = newval->value;
 		ret = bond_option_arp_ip_target_add(bond, target);
+	}
+
+	return ret;
+}
+
+static void _bond_options_ns_ip6_target_set(struct bonding *bond, int slot,
+					    struct in6_addr *target,
+					    unsigned long last_rx)
+{
+	struct in6_addr *targets = bond->params.ns_targets;
+	struct list_head *iter;
+	struct slave *slave;
+
+	if (slot >= 0 && slot < BOND_MAX_ARP_TARGETS) {
+		bond_for_each_slave(bond, slave, iter)
+			slave->target_last_arp_rx[slot] = last_rx;
+		targets[slot] = *target;
+	}
+
+	/* Use IPv6 NS/NA monitor if NS target set */
+	if (bond_do_ns_validate(bond))
+		bond->recv_probe = bond_na_rcv;
+}
+
+void bond_option_ns_ip6_targets_clear(struct bonding *bond)
+{
+	struct in6_addr addr_any = in6addr_any;
+	int i;
+
+	for (i = 0; i < BOND_MAX_ARP_TARGETS; i++)
+		_bond_options_ns_ip6_target_set(bond, i, &addr_any, 0);
+}
+
+static int bond_option_ns_ip6_target_add(struct bonding *bond, struct in6_addr *target)
+{
+	struct in6_addr *targets = bond->params.ns_targets;
+	struct in6_addr addr_any = in6addr_any;
+	int index;
+
+	if (!bond_is_ip6_target_ok(target)) {
+		netdev_err(bond->dev, "invalid NS target %pI6 specified for addition\n",
+			   target);
+		return -EINVAL;
+	}
+
+	if (bond_get_targets_ip6(targets, target) != -1) { /* dup */
+		netdev_err(bond->dev, "NS target %pI6 is already present\n",
+			   &target);
+		return -EINVAL;
+	}
+
+	index = bond_get_targets_ip6(targets, &addr_any); /* first free slot */
+	if (index == -1) {
+		netdev_err(bond->dev, "NS target table is full!\n");
+		return -EINVAL;
+	}
+
+	netdev_dbg(bond->dev, "Adding NS target %pI6\n", &target);
+
+	_bond_options_ns_ip6_target_set(bond, index, target, jiffies);
+
+	return 0;
+}
+
+static int bond_option_ns_ip6_target_rem(struct bonding *bond, struct in6_addr *target)
+{
+	struct in6_addr *targets = bond->params.ns_targets;
+	struct list_head *iter;
+	struct slave *slave;
+	unsigned long *targets_rx;
+	int index, i;
+
+	if (!bond_is_ip6_target_ok(target)) {
+		netdev_err(bond->dev, "invalid NS target %pI6 specified for removal\n",
+			   target);
+		return -EINVAL;
+	}
+
+	index = bond_get_targets_ip6(targets, target);
+	if (index == -1) {
+		netdev_err(bond->dev, "unable to remove nonexistent NS target %pI6\n",
+			   target);
+		return -EINVAL;
+	}
+
+	if (index == 0 && ipv6_addr_any(&targets[1]) && bond->params.arp_interval)
+		netdev_warn(bond->dev, "Removing last NS target with arp_interval on\n");
+
+	netdev_dbg(bond->dev, "Removing NS target %pI6\n", target);
+
+	bond_for_each_slave(bond, slave, iter) {
+		targets_rx = slave->target_last_arp_rx;
+		for (i = index; (i < BOND_MAX_ARP_TARGETS-1) && !ipv6_addr_any(&targets[i+1]); i++)
+			targets_rx[i] = targets_rx[i+1];
+		targets_rx[i] = 0;
+	}
+	for (i = index; (i < BOND_MAX_ARP_TARGETS-1) && !ipv6_addr_any(&targets[i+1]); i++)
+		targets[i] = targets[i+1];
+	memset(&targets[i], 0, sizeof(struct in6_addr));
+
+	return 0;
+}
+
+static int bond_option_ns_ip6_targets_set(struct bonding *bond,
+					  const struct bond_opt_value *newval)
+{
+	int ret = -EPERM;
+	struct in6_addr target;
+
+	if (newval->string) {
+		if (!in6_pton(newval->string+1, -1, (u8 *)&target.s6_addr, -1, NULL)) {
+			netdev_err(bond->dev, "invalid NS target %pI6 specified\n",
+				   &target);
+			return ret;
+		}
+		if (newval->string[0] == '+')
+			ret = bond_option_ns_ip6_target_add(bond, &target);
+		else if (newval->string[0] == '-')
+			ret = bond_option_ns_ip6_target_rem(bond, &target);
+		else
+			netdev_err(bond->dev, "no command found in ns_ip6_targets file - use +<addr> or -<addr>\n");
+	} else {
+		target = newval->ip6_addr;
+		ret = bond_option_ns_ip6_target_add(bond, &target);
 	}
 
 	return ret;
