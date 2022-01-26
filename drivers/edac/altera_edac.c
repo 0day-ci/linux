@@ -776,6 +776,10 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	}
 
 	drvdata->sb_irq = platform_get_irq(pdev, 0);
+	if (drvdata->sb_irq < 0) {
+		res = drvdata->sb_irq;
+		goto fail1;
+	}
 	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
 			       altr_edac_device_handler,
 			       0, dev_name(&pdev->dev), dci);
@@ -783,6 +787,10 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 		goto fail1;
 
 	drvdata->db_irq = platform_get_irq(pdev, 1);
+	if (drvdata->db_irq < 0) {
+		res = drvdata->db_irq;
+		goto fail1;
+	}
 	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
 			       altr_edac_device_handler,
 			       0, dev_name(&pdev->dev), dci);
