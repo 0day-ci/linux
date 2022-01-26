@@ -830,14 +830,24 @@ no_mem:
 
 void smc_wr_remove_dev(struct smc_ib_device *smcibdev)
 {
-	tasklet_kill(&smcibdev->ib_cq_recv->tasklet);
-	tasklet_kill(&smcibdev->ib_cq_send->tasklet);
+	int i;
+
+	for (i = 0; i < smcibdev->num_cq_peer; i++) {
+		tasklet_kill(&smcibdev->smcibcq_send[i].tasklet);
+		tasklet_kill(&smcibdev->smcibcq_recv[i].tasklet);
+	}
 }
 
 void smc_wr_add_dev(struct smc_ib_device *smcibdev)
 {
-	tasklet_setup(&smcibdev->ib_cq_recv->tasklet, smc_wr_rx_tasklet_fn);
-	tasklet_setup(&smcibdev->ib_cq_send->tasklet, smc_wr_tx_tasklet_fn);
+	int i;
+
+	for (i = 0; i < smcibdev->num_cq_peer; i++) {
+		tasklet_setup(&smcibdev->smcibcq_send[i].tasklet,
+			      smc_wr_tx_tasklet_fn);
+		tasklet_setup(&smcibdev->smcibcq_recv[i].tasklet,
+			      smc_wr_rx_tasklet_fn);
+	}
 }
 
 int smc_wr_create_link(struct smc_link *lnk)
