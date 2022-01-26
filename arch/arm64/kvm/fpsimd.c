@@ -153,18 +153,16 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
 	 * If we have VHE then the Hyp code will reset CPACR_EL1 to
 	 * CPACR_EL1_DEFAULT and we need to reenable SME.
 	 */
-	if (has_vhe()) {
-		if (system_supports_sme()) {
-			/* Also restore EL0 state seen on entry */
-			if (vcpu->arch.flags & KVM_ARM64_HOST_SME_ENABLED)
-				sysreg_clear_set(CPACR_EL1, 0,
-						 CPACR_EL1_SMEN_EL0EN |
-						 CPACR_EL1_SMEN_EL1EN);
-			else
-				sysreg_clear_set(CPACR_EL1,
-						 CPACR_EL1_SMEN_EL0EN,
-						 CPACR_EL1_SMEN_EL1EN);
-		}
+	if (has_vhe() && system_supports_sme()) {
+		/* Also restore EL0 state seen on entry */
+		if (vcpu->arch.flags & KVM_ARM64_HOST_SME_ENABLED)
+			sysreg_clear_set(CPACR_EL1, 0,
+					 CPACR_EL1_SMEN_EL0EN |
+					 CPACR_EL1_SMEN_EL1EN);
+		else
+			sysreg_clear_set(CPACR_EL1,
+					 CPACR_EL1_SMEN_EL0EN,
+					 CPACR_EL1_SMEN_EL1EN);
 	}
 
 	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
