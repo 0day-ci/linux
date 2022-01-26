@@ -34,6 +34,9 @@ static void vp_transport_features(struct virtio_device *vdev, u64 features)
 	if ((features & BIT_ULL(VIRTIO_F_SR_IOV)) &&
 			pci_find_ext_capability(pci_dev, PCI_EXT_CAP_ID_SRIOV))
 		__virtio_set_bit(vdev, VIRTIO_F_SR_IOV);
+
+	if (features & BIT_ULL(VIRTIO_F_RING_RESET))
+		__virtio_set_bit(vdev, VIRTIO_F_RING_RESET);
 }
 
 /* virtio config->finalize_features() implementation */
@@ -176,6 +179,94 @@ static void vp_reset(struct virtio_device *vdev)
 	vp_disable_cbs(vdev);
 }
 
+static int vp_modern_reset_vq(struct virtio_reset_vq *param)
+{
+	struct virtio_pci_device *vp_dev = to_vp_device(param->vdev);
+	struct virtio_pci_modern_device *mdev = &vp_dev->mdev;
+	struct virtio_pci_vq_info *info;
+	u16 msix_vec, queue_index;
+	unsigned long flags;
+	void *buf;
+
+	if (!virtio_has_feature(param->vdev, VIRTIO_F_RING_RESET))
+		return -ENOENT;
+
+	queue_index = param->queue_index;
+
+	vp_modern_set_queue_reset(mdev, queue_index);
+
+	/* After write 1 to queue reset, the driver MUST wait for a read of
+	 * queue reset to return 1.
+	 */
+	while (vp_modern_get_queue_reset(mdev, queue_index) != 1)
+		msleep(1);
+
+	info = vp_dev->vqs[queue_index];
+	msix_vec = info->msix_vector;
+
+	/* Disable VQ callback. */
+	if (vp_dev->per_vq_vectors && msix_vec != VIRTIO_MSI_NO_VECTOR)
+		disable_irq(pci_irq_vector(vp_dev->pci_dev, msix_vec));
+
+	while ((buf = virtqueue_detach_unused_buf(info->vq)) != NULL)
+		param->free_unused_cb(param, buf);
+
+	/* delete vq */
+	spin_lock_irqsave(&vp_dev->lock, flags);
+	list_del(&info->node);
+	spin_unlock_irqrestore(&vp_dev->lock, flags);
+
+	INIT_LIST_HEAD(&info->node);
+
+	if (vp_dev->msix_enabled)
+		vp_modern_queue_vector(mdev, info->vq->index,
+				       VIRTIO_MSI_NO_VECTOR);
+
+	if (!mdev->notify_base)
+		pci_iounmap(mdev->pci_dev,
+			    (void __force __iomem *)info->vq->priv);
+
+	vring_reset_virtqueue(info->vq);
+
+	return 0;
+}
+
+static struct virtqueue *vp_modern_enable_reset_vq(struct virtio_reset_vq *param)
+{
+	struct virtio_pci_device *vp_dev = to_vp_device(param->vdev);
+	struct virtio_pci_modern_device *mdev = &vp_dev->mdev;
+	struct virtio_pci_vq_info *info;
+	u16 msix_vec, queue_index;
+	struct virtqueue *vq;
+
+	if (!virtio_has_feature(param->vdev, VIRTIO_F_RING_RESET))
+		return ERR_PTR(-ENOENT);
+
+	queue_index = param->queue_index;
+
+	info = vp_dev->vqs[queue_index];
+
+	if (!info->vq->reset)
+		return ERR_PTR(-EPERM);
+
+	/* check queue reset status */
+	if (vp_modern_get_queue_reset(mdev, queue_index) != 1)
+		return ERR_PTR(-EBUSY);
+
+	vq = vp_setup_vq(param->vdev, queue_index, param->callback, param->name,
+			 param->ctx, info->msix_vector, param->ring_num);
+	if (IS_ERR(vq))
+		return vq;
+
+	vp_modern_set_queue_enable(&vp_dev->mdev, vq->index, true);
+
+	msix_vec = vp_dev->vqs[queue_index]->msix_vector;
+	if (vp_dev->per_vq_vectors && msix_vec != VIRTIO_MSI_NO_VECTOR)
+		enable_irq(pci_irq_vector(vp_dev->pci_dev, msix_vec));
+
+	return vq;
+}
+
 static u16 vp_config_vector(struct virtio_pci_device *vp_dev, u16 vector)
 {
 	return vp_modern_config_vector(&vp_dev->mdev, vector);
@@ -283,6 +374,11 @@ static void del_vq(struct virtio_pci_vq_info *info)
 	struct virtqueue *vq = info->vq;
 	struct virtio_pci_device *vp_dev = to_vp_device(vq->vdev);
 	struct virtio_pci_modern_device *mdev = &vp_dev->mdev;
+
+	if (vq->reset) {
+		vring_del_virtqueue(vq);
+		return;
+	}
 
 	if (vp_dev->msix_enabled)
 		vp_modern_queue_vector(mdev, vq->index,
@@ -403,6 +499,8 @@ static const struct virtio_config_ops virtio_pci_config_nodev_ops = {
 	.set_vq_affinity = vp_set_vq_affinity,
 	.get_vq_affinity = vp_get_vq_affinity,
 	.get_shm_region  = vp_get_shm_region,
+	.reset_vq	 = vp_modern_reset_vq,
+	.enable_reset_vq = vp_modern_enable_reset_vq,
 };
 
 static const struct virtio_config_ops virtio_pci_config_ops = {
@@ -421,6 +519,8 @@ static const struct virtio_config_ops virtio_pci_config_ops = {
 	.set_vq_affinity = vp_set_vq_affinity,
 	.get_vq_affinity = vp_get_vq_affinity,
 	.get_shm_region  = vp_get_shm_region,
+	.reset_vq	 = vp_modern_reset_vq,
+	.enable_reset_vq = vp_modern_enable_reset_vq,
 };
 
 /* the PCI probing function */
