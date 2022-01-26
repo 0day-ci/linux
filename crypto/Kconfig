@@ -1790,6 +1790,8 @@ config CRYPTO_ZSTD
 
 comment "Random Number Generation"
 
+source "crypto/esdm/Kconfig"
+
 config CRYPTO_ANSI_CPRNG
 	tristate "Pseudo Random Number Generation for Cryptographic modules"
 	select CRYPTO_AES
