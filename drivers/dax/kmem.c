@@ -11,6 +11,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
+#include <linux/memory_hotplug.h>
 #include "dax-private.h"
 #include "bus.h"
 
@@ -48,6 +49,7 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 	struct dax_kmem_data *data;
 	int i, rc, mapped = 0;
 	int numa_node;
+	int dev_node;
 
 	/*
 	 * Ensure good NUMA information for the persistent memory.
@@ -146,6 +148,18 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 	}
 
 	dev_set_drvdata(dev, data);
+
+	/* Update spanned_pages of the device numa node */
+	dev_node = dev_to_node(dev);
+	if (dev_node != numa_node && dev_node < numa_node) {
+		struct pglist_data *pgdat = NODE_DATA(dev_node);
+		struct zone *zone = &pgdat->node_zones[ZONE_DEVICE];
+		unsigned long start_pfn = zone->zone_start_pfn;
+		unsigned long nr_pages = NODE_DATA(numa_node)->node_spanned_pages;
+
+		shrink_zone_span(zone, start_pfn, start_pfn + nr_pages);
+		update_pgdat_span(pgdat);
+	}
 
 	return 0;
 
