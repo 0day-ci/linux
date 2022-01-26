@@ -46,12 +46,34 @@ static u32 get_boot_hartid_from_fdt(void)
 	return fdt32_to_cpu(*prop);
 }
 
+static u32 get_boot_hartid_from_efi(void)
+{
+	efi_guid_t boot_protocol_guid = RISCV_EFI_BOOT_PROTOCOL_GUID;
+	efi_status_t status;
+	riscv_efi_boot_protocol_t *boot_protocol;
+	size_t boot_hart_id;
+
+	status = efi_bs_call(locate_protocol, &boot_protocol_guid, NULL,
+			     (void **)&boot_protocol);
+	if (status == EFI_SUCCESS) {
+		status = efi_call_proto(boot_protocol,
+					get_boot_hartid, &boot_hart_id);
+		if (status == EFI_SUCCESS) {
+			return (u32)boot_hart_id;
+		}
+	}
+	return U32_MAX;
+}
+
 efi_status_t check_platform_features(void)
 {
-	hartid = get_boot_hartid_from_fdt();
+	hartid = get_boot_hartid_from_efi();
 	if (hartid == U32_MAX) {
-		efi_err("/chosen/boot-hartid missing or invalid!\n");
-		return EFI_UNSUPPORTED;
+		hartid = get_boot_hartid_from_fdt();
+		if (hartid == U32_MAX) {
+			efi_err("/chosen/boot-hartid missing or invalid!\n");
+			return EFI_UNSUPPORTED;
+		}
 	}
 	return EFI_SUCCESS;
 }

@@ -720,6 +720,21 @@ union efi_tcg2_protocol {
 	} mixed_mode;
 };
 
+typedef union riscv_efi_boot_protocol riscv_efi_boot_protocol_t;
+
+union riscv_efi_boot_protocol {
+	struct {
+		u64 revision;
+		efi_status_t (__efiapi *get_boot_hartid)(
+							 riscv_efi_boot_protocol_t *,
+							 size_t *);
+	};
+	struct {
+		u32 revision;
+		u32 get_boot_hartid;
+	} mixed_mode;
+};
+
 typedef union efi_load_file_protocol efi_load_file_protocol_t;
 typedef union efi_load_file_protocol efi_load_file2_protocol_t;
 
