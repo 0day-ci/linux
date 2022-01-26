@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/hwmon/gpio-fan.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Bindings for fan connected to GPIO lines
+
+maintainers:
+  - OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>
+
+properties:
+  compatible:
+    const: gpio-fan
+
+  gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: Specifies the pins that map to bits in the control value,
+      ordered MSB-->LSB.
+
+  gpio-fan,speed-map:
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    description: A mapping of possible fan RPM speeds and the
+      control value that should be set to achieve them. This array
+      must have the RPM values in ascending order.
+
+  alarm-gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: This pin going active indicates something is wrong with
+      the fan, and a udev event will be fired.
+
+  "#cooling-cells":
+    const: 2
+    description: If used as a cooling device, must be <2>
+      Also see Documentation/devicetree/bindings/thermal/thermal-cooling-devices.yaml
+      min and max states are derived from the speed-map of the fan.
+
+anyOf:
+  - required:
+      - gpios
+  - required:
+      - alarm-gpios
+
+additionalProperties: False
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/clock/cortina,gemini-clock.h>
+    #include <dt-bindings/reset/cortina,gemini-reset.h>
+    #include <dt-bindings/gpio/gpio.h>
+    gpio1: gpio@4d000000 {
+      compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
+      reg = <0x4d000000 0x100>;
+      interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
+      resets = <&syscon GEMINI_RESET_GPIO0>;
+      clocks = <&syscon GEMINI_CLK_APB>;
+      gpio-controller;
+      #gpio-cells = <2>;
+      interrupt-controller;
+      #interrupt-cells = <2>;
+    };
+    gpio_fan {
+      compatible = "gpio-fan";
+        gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+        gpio-fan,speed-map = <0    0>,
+                             <3000 1>,
+                             <6000 2>;
+        alarm-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+    };
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/clock/cortina,gemini-clock.h>
+    #include <dt-bindings/reset/cortina,gemini-reset.h>
+    #include <dt-bindings/gpio/gpio.h>
+    gpio2: gpio@4d000000 {
+      compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
+      reg = <0x4d000000 0x100>;
+      interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
+      resets = <&syscon GEMINI_RESET_GPIO0>;
+      clocks = <&syscon GEMINI_CLK_APB>;
+      gpio-controller;
+      #gpio-cells = <2>;
+      interrupt-controller;
+      #interrupt-cells = <2>;
+    };
+    gpio_fan_cool: gpio_fan {
+      compatible = "gpio-fan";
+      gpios = <&gpio2 8 GPIO_ACTIVE_HIGH
+               &gpio2 1 GPIO_ACTIVE_HIGH>;
+      gpio-fan,speed-map = <0    0
+                           3000 1
+                           6000 2>;
+      alarm-gpios = <&gpio2 15 GPIO_ACTIVE_HIGH>;
+      #cooling-cells = <2>; /* min followed by max */
+    };
