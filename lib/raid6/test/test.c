@@ -19,7 +19,7 @@
 #define NDISKS		16	/* Including P and Q */
 
 const char raid6_empty_zero_page[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
-struct raid6_calls raid6_call;
+struct raid6_calls raid6_call2;
 
 char *dataptrs[NDISKS];
 char data[NDISKS][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
@@ -71,7 +71,7 @@ static int test_disks(int i, int j)
 		erra = errb = 0;
 	} else {
 		printf("algo=%-8s  faila=%3d(%c)  failb=%3d(%c)  %s\n",
-		       raid6_call.name,
+		       raid6_call2.name,
 		       i, disk_type(i),
 		       j, disk_type(j),
 		       (!erra && !errb) ? "OK" :
@@ -107,30 +107,30 @@ int main(int argc, char *argv[])
 			if ((*algo)->valid && !(*algo)->valid())
 				continue;
 
-			raid6_call = **algo;
+			raid6_call2 = **algo;
 
 			/* Nuke syndromes */
 			memset(data[NDISKS-2], 0xee, 2*PAGE_SIZE);
 
 			/* Generate assumed good syndrome */
-			raid6_call.gen_syndrome(NDISKS, PAGE_SIZE,
+			raid6_call2.gen_syndrome(NDISKS, PAGE_SIZE,
 						(void **)&dataptrs);
 
 			for (i = 0; i < NDISKS-1; i++)
 				for (j = i+1; j < NDISKS; j++)
 					err += test_disks(i, j);
 
-			if (!raid6_call.xor_syndrome)
+			if (!raid6_call2.xor_syndrome)
 				continue;
 
 			for (p1 = 0; p1 < NDISKS-2; p1++)
 				for (p2 = p1; p2 < NDISKS-2; p2++) {
 
 					/* Simulate rmw run */
-					raid6_call.xor_syndrome(NDISKS, p1, p2, PAGE_SIZE,
+					raid6_call2.xor_syndrome(NDISKS, p1, p2, PAGE_SIZE,
 								(void **)&dataptrs);
 					makedata(p1, p2);
-					raid6_call.xor_syndrome(NDISKS, p1, p2, PAGE_SIZE,
+					raid6_call2.xor_syndrome(NDISKS, p1, p2, PAGE_SIZE,
                                                                 (void **)&dataptrs);
 
 					for (i = 0; i < NDISKS-1; i++)
