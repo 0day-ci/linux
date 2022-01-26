@@ -683,10 +683,10 @@ static int __collapse_huge_page_isolate(struct vm_area_struct *vma,
 			goto out;
 		}
 		if (!pte_write(pteval) && PageSwapCache(page) &&
-				!reuse_swap_page(page)) {
+		    (PageKsm(page) || !try_to_free_swap(page))) {
 			/*
-			 * Page is in the swap cache and cannot be re-used.
-			 * It cannot be collapsed into a THP.
+			 * Possibly shared page cannot be removed from the
+			 * swapache. It cannot be collapsed into a THP.
 			 */
 			unlock_page(page);
 			result = SCAN_SWAP_CACHE_PAGE;
@@ -702,6 +702,16 @@ static int __collapse_huge_page_isolate(struct vm_area_struct *vma,
 			result = SCAN_DEL_PAGE_LRU;
 			goto out;
 		}
+
+		/*
+		 * We're holding the page lock and removed the page from the
+		 * LRU. Once done copying, we'll unlock and readd to the
+		 * LRU via release_pte_page(). If the page is still in the
+		 * swapcache, we're the exclusive owner. Due to the page lock
+		 * the page cannot be added to the swapcache until we're done
+		 * and consequently it cannot be faulted in from the swapcache
+		 * into another process.
+		 */
 		mod_node_page_state(page_pgdat(page),
 				NR_ISOLATED_ANON + page_is_file_lru(page),
 				compound_nr(page));
