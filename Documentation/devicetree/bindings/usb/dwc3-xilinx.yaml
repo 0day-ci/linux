@@ -59,6 +59,10 @@ properties:
       - const: usb_hibrst
       - const: usb_apbrst
 
+  reset-gpios:
+    description: Optional GPIO connected to ULPI PHY reset line.
+    maxItems: 1
+
   phys:
     minItems: 1
     maxItems: 2
