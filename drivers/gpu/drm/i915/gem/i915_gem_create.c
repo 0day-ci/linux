@@ -424,6 +424,15 @@ i915_gem_create_ext_ioctl(struct drm_device *dev, void *data,
 		ext_data.n_placements = 1;
 	}
 
+	/*
+	 * TODO: add a userspace hint to force CPU_ACCESS for the object, which
+	 * can override this.
+	 */
+	if (!IS_DG1(i915) && (ext_data.n_placements > 1 ||
+			      ext_data.placements[0]->type !=
+			      INTEL_MEMORY_SYSTEM))
+		ext_data.flags |= I915_BO_ALLOC_TOPDOWN;
+
 	obj = __i915_gem_object_create_user_ext(i915, args->size,
 						ext_data.placements,
 						ext_data.n_placements,
