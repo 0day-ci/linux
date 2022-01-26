@@ -51,7 +51,10 @@ int vgic_v3_setup(struct kvm_vm *vm, unsigned int nr_vcpus, uint32_t nr_irqs,
 			"Number of vCPUs requested (%u) doesn't match with the ones created for the VM (%u)\n",
 			nr_vcpus, nr_vcpus_created);
 
-	/* Distributor setup */
+	/* Distributor setup - test if it's possible then actually do it */
+	gic_fd = kvm_create_device(vm, KVM_DEV_TYPE_ARM_VGIC_V3, true);
+	if (gic_fd != 0)
+		return -1;
 	gic_fd = kvm_create_device(vm, KVM_DEV_TYPE_ARM_VGIC_V3, false);
 
 	kvm_device_access(gic_fd, KVM_DEV_ARM_VGIC_GRP_NR_IRQS,
