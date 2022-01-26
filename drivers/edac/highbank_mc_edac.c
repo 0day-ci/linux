@@ -230,6 +230,10 @@ static int highbank_mc_probe(struct platform_device *pdev)
 		goto err;
 
 	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		res = irq;
+		goto err;
+	}
 	res = devm_request_irq(&pdev->dev, irq, highbank_mc_err_handler,
 			       0, dev_name(&pdev->dev), mci);
 	if (res < 0) {
