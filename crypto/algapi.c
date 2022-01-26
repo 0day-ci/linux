@@ -458,6 +458,28 @@ void crypto_unregister_alg(struct crypto_alg *alg)
 	if (WARN(ret, "Algorithm %s is not registered", alg->cra_driver_name))
 		return;
 
+	/* If there is a test larval holding a reference, remove it */
+	if (!(alg->cra_flags & CRYPTO_ALG_TESTED)) {
+		struct crypto_alg *q, *n;
+
+		list_for_each_entry_safe(q, n, &crypto_alg_list, cra_list) {
+			struct crypto_larval *l;
+
+			if (!crypto_is_larval(q))
+				continue;
+
+			l = (void *)q;
+
+			if (!crypto_is_test_larval(l))
+				continue;
+
+			if (l->adult != alg)
+				continue;
+
+			crypto_larval_kill(q);
+		}
+	}
+
 	BUG_ON(refcount_read(&alg->cra_refcnt) != 1);
 	if (alg->cra_destroy)
 		alg->cra_destroy(alg);
