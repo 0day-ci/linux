@@ -388,7 +388,7 @@ static unsigned long find_biggest_section_pfn(int nid, struct zone *zone,
 	return 0;
 }
 
-static void shrink_zone_span(struct zone *zone, unsigned long start_pfn,
+void shrink_zone_span(struct zone *zone, unsigned long start_pfn,
 			     unsigned long end_pfn)
 {
 	unsigned long pfn;
@@ -427,8 +427,9 @@ static void shrink_zone_span(struct zone *zone, unsigned long start_pfn,
 		}
 	}
 }
+EXPORT_SYMBOL_GPL(shrink_zone_span);
 
-static void update_pgdat_span(struct pglist_data *pgdat)
+void update_pgdat_span(struct pglist_data *pgdat)
 {
 	unsigned long node_start_pfn = 0, node_end_pfn = 0;
 	struct zone *zone;
@@ -455,6 +456,7 @@ static void update_pgdat_span(struct pglist_data *pgdat)
 	pgdat->node_start_pfn = node_start_pfn;
 	pgdat->node_spanned_pages = node_end_pfn - node_start_pfn;
 }
+EXPORT_SYMBOL_GPL(update_pgdat_span);
 
 void __ref remove_pfn_range_from_zone(struct zone *zone,
 				      unsigned long start_pfn,
