@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR Linux-OpenIB
 /*
+ * Copyright (c) 2022 Hewlett Packard Enterprise, Inc. All rights reserved.
  * Copyright (c) 2016 Mellanox Technologies Ltd. All rights reserved.
  * Copyright (c) 2015 System Fabric Works, Inc. All rights reserved.
  */
@@ -35,7 +36,6 @@ static const struct rxe_type_info {
 		.name		= "rxe-ah",
 		.size		= sizeof(struct rxe_ah),
 		.elem_offset	= offsetof(struct rxe_ah, elem),
-		.flags		= RXE_POOL_INDEX,
 		.min_index	= RXE_MIN_AH_INDEX,
 		.max_index	= RXE_MAX_AH_INDEX,
 	},
@@ -43,7 +43,6 @@ static const struct rxe_type_info {
 		.name		= "rxe-srq",
 		.size		= sizeof(struct rxe_srq),
 		.elem_offset	= offsetof(struct rxe_srq, elem),
-		.flags		= RXE_POOL_INDEX,
 		.min_index	= RXE_MIN_SRQ_INDEX,
 		.max_index	= RXE_MAX_SRQ_INDEX,
 	},
@@ -52,7 +51,6 @@ static const struct rxe_type_info {
 		.size		= sizeof(struct rxe_qp),
 		.elem_offset	= offsetof(struct rxe_qp, elem),
 		.cleanup	= rxe_qp_cleanup,
-		.flags		= RXE_POOL_INDEX,
 		.min_index	= RXE_MIN_QP_INDEX,
 		.max_index	= RXE_MAX_QP_INDEX,
 	},
@@ -69,7 +67,7 @@ static const struct rxe_type_info {
 		.size		= sizeof(struct rxe_mr),
 		.elem_offset	= offsetof(struct rxe_mr, elem),
 		.cleanup	= rxe_mr_cleanup,
-		.flags		= RXE_POOL_INDEX | RXE_POOL_ALLOC,
+		.flags		= RXE_POOL_ALLOC,
 		.min_index	= RXE_MIN_MR_INDEX,
 		.max_index	= RXE_MAX_MR_INDEX,
 	},
@@ -77,7 +75,6 @@ static const struct rxe_type_info {
 		.name		= "rxe-mw",
 		.size		= sizeof(struct rxe_mw),
 		.elem_offset	= offsetof(struct rxe_mw, elem),
-		.flags		= RXE_POOL_INDEX,
 		.min_index	= RXE_MIN_MW_INDEX,
 		.max_index	= RXE_MAX_MW_INDEX,
 	},
@@ -100,14 +97,14 @@ void rxe_pool_init(struct rxe_dev *rxe, struct rxe_pool *pool,
 	pool->cleanup		= info->cleanup;
 
 	atomic_set(&pool->num_elem, 0);
-
-	rwlock_init(&pool->pool_lock);
+	spin_lock_init(&pool->xa.xa_lock);
 
 	xa_init_flags(&pool->xa, XA_FLAGS_ALLOC);
 	pool->limit.max = info->max_index;
 	pool->limit.min = info->min_index;
 }
 
+/* runs single threaded at driver shutdown */
 void rxe_pool_cleanup(struct rxe_pool *pool)
 {
 	struct rxe_pool_elem *elem;
@@ -204,36 +201,42 @@ err_cnt:
 void *rxe_pool_get_index(struct rxe_pool *pool, u32 index)
 {
 	struct rxe_pool_elem *elem;
-	void *obj;
+	void *obj = NULL;
 
-	read_lock_bh(&pool->pool_lock);
+	rcu_read_lock();
 	elem = xa_load(&pool->xa, index);
 	if (elem && kref_get_unless_zero(&elem->ref_cnt))
 		obj = elem->obj;
-	else
-		obj = NULL;
-	read_unlock_bh(&pool->pool_lock);
+	rcu_read_unlock();
 
 	return obj;
 }
 
-static void rxe_elem_release(struct kref *kref)
+static void rxe_obj_free_rcu(struct rcu_head *rcu)
 {
-	struct rxe_pool_elem *elem =
-		container_of(kref, struct rxe_pool_elem, ref_cnt);
+	struct rxe_pool_elem *elem = container_of(rcu, typeof(*elem), rcu);
+
+	kfree(elem->obj);
+}
+
+static void __rxe_elem_release_rcu(struct kref *kref)
+	__releases(&pool->xa.xa_lock)
+{
+	struct rxe_pool_elem *elem = container_of(kref,
+					struct rxe_pool_elem, ref_cnt);
 	struct rxe_pool *pool = elem->pool;
-	void *obj;
+
+	__xa_erase(&pool->xa, elem->index);
+
+	spin_unlock(&pool->xa.xa_lock);
 
 	if (pool->cleanup)
 		pool->cleanup(elem);
 
-	if (pool->flags & RXE_POOL_ALLOC) {
-		obj = elem->obj;
-		kfree(obj);
-	}
-
-	xa_erase(&pool->xa, elem->index);
 	atomic_dec(&pool->num_elem);
+
+	if (pool->flags & RXE_POOL_ALLOC)
+		call_rcu(&elem->rcu, rxe_obj_free_rcu);
 }
 
 int __rxe_add_ref(struct rxe_pool_elem *elem)
@@ -243,5 +246,6 @@ int __rxe_add_ref(struct rxe_pool_elem *elem)
 
 int __rxe_drop_ref(struct rxe_pool_elem *elem)
 {
-	return kref_put(&elem->ref_cnt, rxe_elem_release);
+	return kref_put_lock(&elem->ref_cnt, __rxe_elem_release_rcu,
+			&elem->pool->xa.xa_lock);
 }

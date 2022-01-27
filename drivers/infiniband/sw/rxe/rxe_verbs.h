@@ -309,6 +309,7 @@ static inline int rkey_is_mw(u32 rkey)
 struct rxe_mr {
 	struct rxe_pool_elem	elem;
 	struct ib_mr		ibmr;
+	struct rcu_head		rcu;
 
 	struct ib_umem		*umem;
 
