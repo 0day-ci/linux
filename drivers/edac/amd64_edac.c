@@ -1096,6 +1096,7 @@ struct data_fabric_ops {
 	u16	(*get_component_id_mask)(struct addr_ctx *ctx);
 	u8	(*get_die_id_shift)(struct addr_ctx *ctx);
 	u8	(*get_socket_id_shift)(struct addr_ctx *ctx);
+	u8	(*get_intlv_addr_sel)(struct addr_ctx *ctx);
 	int	(*get_intlv_mode)(struct addr_ctx *ctx);
 	int	(*get_cs_fabric_id)(struct addr_ctx *ctx);
 	int	(*get_masks)(struct addr_ctx *ctx);
@@ -1172,6 +1173,11 @@ static int get_intlv_mode_df2(struct addr_ctx *ctx)
 	return 0;
 }
 
+static u8 get_intlv_addr_sel_df2(struct addr_ctx *ctx)
+{
+	return (ctx->reg_base_addr >> 8) & 0x7;
+}
+
 static void get_intlv_num_dies_df2(struct addr_ctx *ctx)
 {
 	ctx->intlv_num_dies  = (ctx->reg_limit_addr >> 10) & 0x3;
@@ -1228,6 +1234,7 @@ static u16 get_component_id_mask_df2(struct addr_ctx *ctx)
 struct data_fabric_ops df2_ops = {
 	.get_hi_addr_offset		=	get_hi_addr_offset_df2,
 	.get_intlv_mode			=	get_intlv_mode_df2,
+	.get_intlv_addr_sel		=	get_intlv_addr_sel_df2,
 	.get_intlv_num_dies		=	get_intlv_num_dies_df2,
 	.get_intlv_num_sockets		=	get_intlv_num_sockets_df2,
 	.get_cs_fabric_id		=	get_cs_fabric_id_df2,
@@ -1294,7 +1301,7 @@ static int get_dram_addr_map(struct addr_ctx *ctx)
 
 static int get_intlv_addr_bit(struct addr_ctx *ctx)
 {
-	u8 intlv_addr_sel = (ctx->reg_base_addr >> 8) & 0x7;
+	u8 intlv_addr_sel = df_ops->get_intlv_addr_sel(ctx);
 
 	/* {0, 1, 2, 3} map to address bits {8, 9, 10, 11} respectively */
 	if (intlv_addr_sel > 3) {
