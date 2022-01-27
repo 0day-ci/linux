@@ -1077,6 +1077,7 @@ struct addr_ctx {
 	u8 map_num;
 	u8 intlv_addr_bit;
 	u8 intlv_num_chan;
+	u8 intlv_num_dies;
 	u8 cs_id;
 	int (*dehash_addr)(struct addr_ctx *ctx);
 };
@@ -1084,6 +1085,7 @@ struct addr_ctx {
 struct data_fabric_ops {
 	u64	(*get_hi_addr_offset)(struct addr_ctx *ctx);
 	int	(*get_intlv_mode)(struct addr_ctx *ctx);
+	void	(*get_intlv_num_dies)(struct addr_ctx *ctx);
 };
 
 static u64 get_hi_addr_offset_df2(struct addr_ctx *ctx)
@@ -1124,9 +1126,15 @@ static int get_intlv_mode_df2(struct addr_ctx *ctx)
 	return 0;
 }
 
+static void get_intlv_num_dies_df2(struct addr_ctx *ctx)
+{
+	ctx->intlv_num_dies  = (ctx->reg_limit_addr >> 10) & 0x3;
+}
+
 struct data_fabric_ops df2_ops = {
 	.get_hi_addr_offset		=	get_hi_addr_offset_df2,
 	.get_intlv_mode			=	get_intlv_mode_df2,
+	.get_intlv_num_dies		=	get_intlv_num_dies_df2,
 };
 
 struct data_fabric_ops *df_ops;
@@ -1218,7 +1226,7 @@ static void get_intlv_num_chan(struct addr_ctx *ctx)
 static int denormalize_addr(struct addr_ctx *ctx)
 {
 	u8 die_id_shift, die_id_mask, socket_id_shift, socket_id_mask;
-	u8 intlv_num_dies, intlv_num_sockets;
+	u8 intlv_num_sockets;
 	u8 num_intlv_bits, cs_mask = 0;
 
 	/* Return early if no interleaving. */
@@ -1229,19 +1237,12 @@ static int denormalize_addr(struct addr_ctx *ctx)
 		return -EINVAL;
 
 	intlv_num_sockets = (ctx->reg_limit_addr >> 8) & 0x1;
-	intlv_num_dies	  = (ctx->reg_limit_addr >> 10) & 0x3;
 
 	get_intlv_num_chan(ctx);
+	df_ops->get_intlv_num_dies(ctx);
 
 	num_intlv_bits = ctx->intlv_num_chan;
-
-	if (intlv_num_dies > 2) {
-		pr_err("%s: Invalid number of interleaved nodes/dies %d.\n",
-			__func__, intlv_num_dies);
-		return -EINVAL;
-	}
-
-	num_intlv_bits += intlv_num_dies;
+	num_intlv_bits += ctx->intlv_num_dies;
 
 	/* Add a bit if sockets are interleaved. */
 	num_intlv_bits += intlv_num_sockets;
@@ -1279,13 +1280,13 @@ static int denormalize_addr(struct addr_ctx *ctx)
 		sock_id_bit = die_id_bit;
 
 		/* Read D18F1x208 (SystemFabricIdMask). */
-		if (intlv_num_dies || intlv_num_sockets)
+		if (ctx->intlv_num_dies || intlv_num_sockets)
 			if (df_indirect_read_broadcast(ctx->nid, 1, 0x208, &ctx->tmp))
 				return -EINVAL;
 
 		/* If interleaved over more than 1 die. */
-		if (intlv_num_dies) {
-			sock_id_bit  = die_id_bit + intlv_num_dies;
+		if (ctx->intlv_num_dies) {
+			sock_id_bit  = die_id_bit + ctx->intlv_num_dies;
 			die_id_shift = (ctx->tmp >> 24) & 0xF;
 			die_id_mask  = (ctx->tmp >> 8) & 0xFF;
 
