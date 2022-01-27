@@ -138,6 +138,18 @@ static blk_status_t read_pmem(struct page *page, unsigned int off,
 	return BLK_STS_OK;
 }
 
+static void __pmem_mk_readwrite(struct pmem_device *pmem)
+{
+	if (pmem->pgmap.flags & PGMAP_PROTECTION)
+		__pgmap_mk_readwrite(&pmem->pgmap);
+}
+
+static void __pmem_mk_noaccess(struct pmem_device *pmem)
+{
+	if (pmem->pgmap.flags & PGMAP_PROTECTION)
+		__pgmap_mk_noaccess(&pmem->pgmap);
+}
+
 static blk_status_t pmem_do_read(struct pmem_device *pmem,
 			struct page *page, unsigned int page_off,
 			sector_t sector, unsigned int len)
@@ -149,7 +161,10 @@ static blk_status_t pmem_do_read(struct pmem_device *pmem,
 	if (unlikely(is_bad_pmem(&pmem->bb, sector, len)))
 		return BLK_STS_IOERR;
 
+	__pmem_mk_readwrite(pmem);
 	rc = read_pmem(page, page_off, pmem_addr, len);
+	__pmem_mk_noaccess(pmem);
+
 	flush_dcache_page(page);
 	return rc;
 }
@@ -181,11 +196,14 @@ static blk_status_t pmem_do_write(struct pmem_device *pmem,
 	 * after clear poison.
 	 */
 	flush_dcache_page(page);
+
+	__pmem_mk_readwrite(pmem);
 	write_pmem(pmem_addr, page, page_off, len);
 	if (unlikely(bad_pmem)) {
 		rc = pmem_clear_poison(pmem, pmem_off, len);
 		write_pmem(pmem_addr, page, page_off, len);
 	}
+	__pmem_mk_noaccess(pmem);
 
 	return rc;
 }
@@ -301,9 +319,34 @@ static long pmem_dax_direct_access(struct dax_device *dax_dev,
 	return __pmem_direct_access(pmem, pgoff, nr_pages, kaddr, pfn);
 }
 
+static bool pmem_map_protected(struct dax_device *dax_dev)
+{
+	struct pmem_device *pmem = dax_get_private(dax_dev);
+
+	return (pmem->pgmap.flags & PGMAP_PROTECTION);
+}
+
+static void pmem_mk_readwrite(struct dax_device *dax_dev)
+{
+	__pmem_mk_readwrite(dax_get_private(dax_dev));
+}
+
+static void pmem_mk_noaccess(struct dax_device *dax_dev)
+{
+	__pmem_mk_noaccess(dax_get_private(dax_dev));
+}
+
 static const struct dax_operations pmem_dax_ops = {
 	.direct_access = pmem_dax_direct_access,
 	.zero_page_range = pmem_dax_zero_page_range,
+};
+
+static const struct dax_operations pmem_protected_dax_ops = {
+	.direct_access = pmem_dax_direct_access,
+	.zero_page_range = pmem_dax_zero_page_range,
+	.map_protected = pmem_map_protected,
+	.mk_readwrite = pmem_mk_readwrite,
+	.mk_noaccess = pmem_mk_noaccess,
 };
 
 static ssize_t write_cache_show(struct device *dev,
@@ -427,6 +470,8 @@ static int pmem_attach_disk(struct device *dev,
 	pmem->pfn_flags = PFN_DEV;
 	if (is_nd_pfn(dev)) {
 		pmem->pgmap.type = MEMORY_DEVICE_FS_DAX;
+		if (pgmap_protection_available())
+			pmem->pgmap.flags |= PGMAP_PROTECTION;
 		addr = devm_memremap_pages(dev, &pmem->pgmap);
 		pfn_sb = nd_pfn->pfn_sb;
 		pmem->data_offset = le64_to_cpu(pfn_sb->dataoff);
@@ -440,6 +485,8 @@ static int pmem_attach_disk(struct device *dev,
 		pmem->pgmap.range.end = res->end;
 		pmem->pgmap.nr_range = 1;
 		pmem->pgmap.type = MEMORY_DEVICE_FS_DAX;
+		if (pgmap_protection_available())
+			pmem->pgmap.flags |= PGMAP_PROTECTION;
 		addr = devm_memremap_pages(dev, &pmem->pgmap);
 		pmem->pfn_flags |= PFN_MAP;
 		bb_range = pmem->pgmap.range;
@@ -474,7 +521,10 @@ static int pmem_attach_disk(struct device *dev,
 	nvdimm_badblocks_populate(nd_region, &pmem->bb, &bb_range);
 	disk->bb = &pmem->bb;
 
-	dax_dev = alloc_dax(pmem, &pmem_dax_ops);
+	if (pmem->pgmap.flags & PGMAP_PROTECTION)
+		dax_dev = alloc_dax(pmem, &pmem_protected_dax_ops);
+	else
+		dax_dev = alloc_dax(pmem, &pmem_dax_ops);
 	if (IS_ERR(dax_dev)) {
 		rc = PTR_ERR(dax_dev);
 		goto out;
