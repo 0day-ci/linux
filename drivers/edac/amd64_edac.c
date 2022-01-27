@@ -991,6 +991,7 @@ static int sys_addr_to_csrow(struct mem_ctl_info *mci, u64 sys_addr)
 /*
  * Glossary of acronyms used in address translation for Zen-based systems
  *
+ * CS          =       Coherent Slave
  * DF          =       Data Fabric
  */
 
@@ -1081,6 +1082,7 @@ struct addr_ctx {
 	u8 intlv_num_sockets;
 	u8 cs_id;
 	int (*dehash_addr)(struct addr_ctx *ctx);
+	void (*make_space_for_cs_id)(struct addr_ctx *ctx);
 };
 
 struct data_fabric_ops {
@@ -1089,6 +1091,29 @@ struct data_fabric_ops {
 	void	(*get_intlv_num_dies)(struct addr_ctx *ctx);
 	void	(*get_intlv_num_sockets)(struct addr_ctx *ctx);
 };
+
+static void expand_bits(u8 start_bit, u8 num_bits, u64 *value)
+{
+	u64 temp1, temp2;
+
+	if (start_bit == 0) {
+		*value <<= num_bits;
+		return;
+	}
+
+	temp1 = *value & GENMASK_ULL(start_bit - 1, 0);
+	temp2 = (*value & GENMASK_ULL(63, start_bit)) << num_bits;
+	*value = temp1 | temp2;
+}
+
+static void make_space_for_cs_id_simple(struct addr_ctx *ctx)
+{
+	u8 num_intlv_bits = ctx->intlv_num_chan;
+
+	num_intlv_bits += ctx->intlv_num_dies;
+	num_intlv_bits += ctx->intlv_num_sockets;
+	expand_bits(ctx->intlv_addr_bit, num_intlv_bits, &ctx->ret_addr);
+}
 
 static u64 get_hi_addr_offset_df2(struct addr_ctx *ctx)
 {
@@ -1119,6 +1144,8 @@ static int get_intlv_mode_df2(struct addr_ctx *ctx)
 		ctx->intlv_mode = DF2_HASH_2CH;
 		ctx->dehash_addr = dehash_addr_df2;
 	}
+
+	ctx->make_space_for_cs_id = make_space_for_cs_id_simple;
 
 	if (ctx->intlv_mode != NONE &&
 	    ctx->intlv_mode != NOHASH_2CH &&
@@ -1247,13 +1274,11 @@ static int denormalize_addr(struct addr_ctx *ctx)
 	df_ops->get_intlv_num_dies(ctx);
 	df_ops->get_intlv_num_sockets(ctx);
 
-	num_intlv_bits = ctx->intlv_num_chan;
-	num_intlv_bits += ctx->intlv_num_dies;
-	num_intlv_bits += ctx->intlv_num_sockets;
+	ctx->make_space_for_cs_id(ctx);
 
 	if (num_intlv_bits > 0) {
-		u64 temp_addr_x, temp_addr_i, temp_addr_y;
 		u8 die_id_bit, sock_id_bit, cs_fabric_id;
+		u64 temp_addr_i;
 
 		/*
 		 * Read FabricBlockInstanceInformation3_CS[BlockFabricID].
@@ -1308,11 +1333,8 @@ static int denormalize_addr(struct addr_ctx *ctx)
 		 * bits there are. "intlv_addr_bit" tells us how many "Y" bits
 		 * there are (where "I" starts).
 		 */
-		temp_addr_y = ctx->ret_addr & GENMASK_ULL(ctx->intlv_addr_bit - 1, 0);
 		temp_addr_i = (ctx->cs_id << ctx->intlv_addr_bit);
-		temp_addr_x = (ctx->ret_addr & GENMASK_ULL(63, ctx->intlv_addr_bit))
-			       << num_intlv_bits;
-		ctx->ret_addr    = temp_addr_x | temp_addr_i | temp_addr_y;
+		ctx->ret_addr |= temp_addr_i;
 	}
 
 	return 0;
