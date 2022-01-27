@@ -6,6 +6,7 @@
 #include <linux/memory_hotplug.h>
 #include <linux/mm.h>
 #include <linux/pfn_t.h>
+#include <linux/pkeys.h>
 #include <linux/swap.h>
 #include <linux/mmzone.h>
 #include <linux/swapops.h>
@@ -62,6 +63,16 @@ static void devmap_managed_enable_put(struct dev_pagemap *pgmap)
 {
 }
 #endif /* CONFIG_DEV_PAGEMAP_OPS */
+
+#ifdef CONFIG_DEVMAP_ACCESS_PROTECTION
+
+bool pgmap_protection_available(void)
+{
+	return pks_available();
+}
+EXPORT_SYMBOL_GPL(pgmap_protection_available);
+
+#endif /* CONFIG_DEVMAP_ACCESS_PROTECTION */
 
 static void pgmap_array_delete(struct range *range)
 {
