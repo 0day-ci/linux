@@ -7,6 +7,7 @@
 
 #include "rxe.h"
 
+#define RXE_POOL_TIMEOUT	(200)
 #define RXE_POOL_ALIGN		(16)
 
 static const struct rxe_type_info {
@@ -154,6 +155,7 @@ void *rxe_alloc(struct rxe_pool *pool)
 	elem->pool = pool;
 	elem->obj = obj;
 	kref_init(&elem->ref_cnt);
+	init_completion(&elem->complete);
 
 	err = xa_alloc_cyclic_bh(&pool->xa, &elem->index, elem, pool->limit,
 			&pool->next, GFP_KERNEL);
@@ -185,6 +187,7 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_elem *elem)
 	elem->pool = pool;
 	elem->obj = (u8 *)elem - pool->elem_offset;
 	kref_init(&elem->ref_cnt);
+	init_completion(&elem->complete);
 
 	err = xa_alloc_cyclic_bh(&pool->xa, &elem->index, elem, pool->limit,
 			&pool->next, GFP_KERNEL);
@@ -212,31 +215,22 @@ void *rxe_pool_get_index(struct rxe_pool *pool, u32 index)
 	return obj;
 }
 
-static void rxe_obj_free_rcu(struct rcu_head *rcu)
-{
-	struct rxe_pool_elem *elem = container_of(rcu, typeof(*elem), rcu);
-
-	kfree(elem->obj);
-}
-
 static void __rxe_elem_release_rcu(struct kref *kref)
 	__releases(&pool->xa.xa_lock)
 {
-	struct rxe_pool_elem *elem = container_of(kref,
-					struct rxe_pool_elem, ref_cnt);
+	struct rxe_pool_elem *elem = container_of(kref, typeof(*elem), ref_cnt);
 	struct rxe_pool *pool = elem->pool;
 
 	__xa_erase(&pool->xa, elem->index);
 
-	spin_unlock(&pool->xa.xa_lock);
+	spin_unlock_bh(&pool->xa.xa_lock);
 
 	if (pool->cleanup)
 		pool->cleanup(elem);
 
 	atomic_dec(&pool->num_elem);
 
-	if (pool->flags & RXE_POOL_ALLOC)
-		call_rcu(&elem->rcu, rxe_obj_free_rcu);
+	complete(&elem->complete);
 }
 
 int __rxe_add_ref(struct rxe_pool_elem *elem)
@@ -244,8 +238,67 @@ int __rxe_add_ref(struct rxe_pool_elem *elem)
 	return kref_get_unless_zero(&elem->ref_cnt);
 }
 
+static bool refcount_dec_and_lock_bh(refcount_t *r, spinlock_t *lock)
+	__acquires(lock) __releases(lock)
+{
+	if (refcount_dec_not_one(r))
+		return false;
+
+	spin_lock_bh(lock);
+	if (!refcount_dec_and_test(r)) {
+		spin_unlock_bh(lock);
+		return false;
+	}
+
+	return true;
+}
+
+static int kref_put_lock_bh(struct kref *kref,
+				void (*release)(struct kref *kref),
+				spinlock_t *lock)
+{
+	if (refcount_dec_and_lock_bh(&kref->refcount, lock)) {
+		release(kref);
+		return 1;
+	}
+	return 0;
+}
+
 int __rxe_drop_ref(struct rxe_pool_elem *elem)
 {
-	return kref_put_lock(&elem->ref_cnt, __rxe_elem_release_rcu,
+	return kref_put_lock_bh(&elem->ref_cnt, __rxe_elem_release_rcu,
 			&elem->pool->xa.xa_lock);
+}
+
+static void rxe_obj_free_rcu(struct rcu_head *rcu)
+{
+	struct rxe_pool_elem *elem = container_of(rcu, typeof(*elem), rcu);
+
+	kfree(elem->obj);
+}
+
+int __rxe_wait(struct rxe_pool_elem *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	static int timeout = RXE_POOL_TIMEOUT;
+	static int timeout_failures;
+	int ret;
+
+	if (timeout) {
+		ret = wait_for_completion_timeout(&elem->complete, timeout);
+		if (!ret) {
+			if (timeout_failures++ == 5) {
+				timeout = 0;
+				pr_warn("Exceeded max completion timeouts. Disabling wait_for_completion\n");
+			} else {
+				pr_warn_ratelimited("Timed out waiting for %s#%d to complete\n",
+					pool->name + 4, elem->index);
+			}
+		}
+	}
+
+	if (pool->flags & RXE_POOL_ALLOC)
+		call_rcu(&elem->rcu, rxe_obj_free_rcu);
+
+	return ret;
 }

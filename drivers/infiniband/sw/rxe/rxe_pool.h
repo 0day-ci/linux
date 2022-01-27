@@ -29,6 +29,7 @@ struct rxe_pool_elem {
 	struct kref		ref_cnt;
 	struct list_head	list;
 	struct rcu_head		rcu;
+	struct completion	complete;
 	u32			index;
 };
 
@@ -66,5 +67,8 @@ int __rxe_add_ref(struct rxe_pool_elem *elem);
 
 int __rxe_drop_ref(struct rxe_pool_elem *elem);
 #define rxe_drop_ref(obj) __rxe_drop_ref(&(obj)->elem)
+
+int __rxe_wait(struct rxe_pool_elem *elem);
+#define rxe_wait(obj) __rxe_wait(&(obj)->elem)
 
 #endif /* RXE_POOL_H */

@@ -116,6 +116,7 @@ static void rxe_dealloc_ucontext(struct ib_ucontext *ibuc)
 	struct rxe_ucontext *uc = to_ruc(ibuc);
 
 	rxe_drop_ref(uc);
+	rxe_wait(uc);
 }
 
 static int rxe_port_immutable(struct ib_device *dev, u32 port_num,
@@ -150,6 +151,7 @@ static int rxe_dealloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 	struct rxe_pd *pd = to_rpd(ibpd);
 
 	rxe_drop_ref(pd);
+	rxe_wait(pd);
 	return 0;
 }
 
@@ -189,6 +191,7 @@ static int rxe_create_ah(struct ib_ah *ibah,
 					 sizeof(uresp->ah_num));
 		if (err) {
 			rxe_drop_ref(ah);
+			rxe_wait(ah);
 			return -EFAULT;
 		}
 	} else if (ah->is_user) {
@@ -229,6 +232,7 @@ static int rxe_destroy_ah(struct ib_ah *ibah, u32 flags)
 	struct rxe_ah *ah = to_rah(ibah);
 
 	rxe_drop_ref(ah);
+	rxe_wait(ah);
 	return 0;
 }
 
@@ -315,6 +319,7 @@ static int rxe_create_srq(struct ib_srq *ibsrq, struct ib_srq_init_attr *init,
 err2:
 	rxe_drop_ref(pd);
 	rxe_drop_ref(srq);
+	rxe_wait(srq);
 err1:
 	return err;
 }
@@ -373,6 +378,7 @@ static int rxe_destroy_srq(struct ib_srq *ibsrq, struct ib_udata *udata)
 
 	rxe_drop_ref(srq->pd);
 	rxe_drop_ref(srq);
+	rxe_wait(srq);
 	return 0;
 }
 
@@ -442,6 +448,7 @@ static int rxe_create_qp(struct ib_qp *ibqp, struct ib_qp_init_attr *init,
 
 qp_init:
 	rxe_drop_ref(qp);
+	rxe_wait(qp);
 	return err;
 }
 
@@ -496,6 +503,7 @@ static int rxe_destroy_qp(struct ib_qp *ibqp, struct ib_udata *udata)
 
 	rxe_qp_destroy(qp);
 	rxe_drop_ref(qp);
+	rxe_wait(qp);
 	return 0;
 }
 
@@ -807,6 +815,7 @@ static int rxe_destroy_cq(struct ib_cq *ibcq, struct ib_udata *udata)
 	rxe_cq_disable(cq);
 
 	rxe_drop_ref(cq);
+	rxe_wait(cq);
 	return 0;
 }
 
@@ -932,6 +941,7 @@ static struct ib_mr *rxe_reg_user_mr(struct ib_pd *ibpd,
 err3:
 	rxe_drop_ref(pd);
 	rxe_drop_ref(mr);
+	rxe_wait(mr);
 err2:
 	return ERR_PTR(err);
 }
@@ -964,6 +974,7 @@ static struct ib_mr *rxe_alloc_mr(struct ib_pd *ibpd, enum ib_mr_type mr_type,
 err2:
 	rxe_drop_ref(pd);
 	rxe_drop_ref(mr);
+	rxe_wait(mr);
 err1:
 	return ERR_PTR(err);
 }
