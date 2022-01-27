@@ -22,3 +22,5 @@ obj-$(CONFIG_FUNCTION_ERROR_INJECTION) += error-inject.o
 obj-$(CONFIG_ARM64_MTE) += mte.o
 
 obj-$(CONFIG_KASAN_SW_TAGS) += kasan_sw_tags.o
+
+obj-$(CONFIG_TEST_INSN) += test_insn.o

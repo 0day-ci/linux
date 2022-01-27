@@ -193,6 +193,7 @@ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn)
 
 	return (insn >> shift) & mask;
 }
+EXPORT_SYMBOL_GPL(aarch64_insn_decode_immediate);
 
 u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 				  u32 insn, u64 imm)
@@ -256,6 +257,7 @@ u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
 
 	return (insn >> shift) & GENMASK(4, 0);
 }
+EXPORT_SYMBOL_GPL(aarch64_insn_decode_register);
 
 static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
 					u32 insn,
@@ -1424,6 +1426,7 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
 	return aarch64_encode_immediate(imm, variant, insn);
 }
+EXPORT_SYMBOL_GPL(aarch64_insn_gen_logical_immediate);
 
 u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
 			  enum aarch64_insn_register Rm,

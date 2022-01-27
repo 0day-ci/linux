@@ -20,4 +20,7 @@ config ARM64_RELOC_TEST
 	depends on m
 	tristate "Relocation testing module"
 
+config TEST_INSN
+	tristate "Test functions located in the aarch64 instruction encoder at runtime"
+
 source "drivers/hwtracing/coresight/Kconfig"
