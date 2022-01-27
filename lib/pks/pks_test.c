@@ -15,6 +15,8 @@
  *
  * * 0  Loop through all CPUs, report the msr, and check against the default.
  * * 1  Allocate a single key and check all 3 permissions on a page.
+ * * 2  'arm context' for context switch test
+ * * 3  Check the context armed in '2' to ensure the MSR value was preserved
  * * 8  Loop through all CPUs, report the msr, and check against the default.
  * * 9  Set up and fault on a PKS protected page.
  *
@@ -24,6 +26,11 @@
  * $ cat /sys/kernel/debug/x86/run_pks
  *
  * Will print the result of the last test.
+ *
+ * To automate context switch testing a user space program is provided in:
+ *
+ *	.../tools/testing/selftests/x86/test_pks.c
+ *
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -33,6 +40,9 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/pkeys.h>
+#include <uapi/asm-generic/mman-common.h>
+
+#include <asm/pks.h>
 
 #include <asm/pks.h>
 
@@ -40,6 +50,8 @@
 
 #define CHECK_DEFAULTS		0
 #define RUN_SINGLE		1
+#define ARM_CTX_SWITCH		2
+#define CHECK_CTX_SWITCH	3
 #define RUN_CRASH_TEST		9
 
 static struct dentry *pks_test_dentry;
@@ -309,6 +321,55 @@ static void arm_or_run_crash_test(void)
 	crash_armed = false;
 }
 
+static void arm_ctx_switch(struct file *file)
+{
+	struct pks_test_ctx *ctx;
+
+	ctx = alloc_ctx(PKS_KEY_TEST);
+	if (IS_ERR(ctx)) {
+		pr_err("Failed to allocate a context\n");
+		last_test_pass = false;
+		return;
+	}
+
+	/* Store context for later checks */
+	if (file->private_data) {
+		pr_warn("Context already armed\n");
+		free_ctx(file->private_data);
+	}
+	file->private_data = ctx;
+
+	/* Ensure a known state to test context switch */
+	pks_mk_readwrite(ctx->pkey);
+}
+
+static void check_ctx_switch(struct file *file)
+{
+	struct pks_test_ctx *ctx;
+	unsigned long reg_pkrs;
+	int access;
+
+	last_test_pass = true;
+
+	if (!file->private_data) {
+		pr_err("No Context switch configured\n");
+		last_test_pass = false;
+		return;
+	}
+
+	ctx = file->private_data;
+
+	rdmsrl(MSR_IA32_PKRS, reg_pkrs);
+
+	access = (reg_pkrs >> PKR_PKEY_SHIFT(ctx->pkey)) &
+		  PKEY_ACCESS_MASK;
+	if (access != 0) {
+		last_test_pass = false;
+		pr_err("Context switch check failed: pkey %d: 0x%x reg: 0x%lx\n",
+			ctx->pkey, access, reg_pkrs);
+	}
+}
+
 static ssize_t pks_read_file(struct file *file, char __user *user_buf,
 			     size_t count, loff_t *ppos)
 {
@@ -351,6 +412,14 @@ static ssize_t pks_write_file(struct file *file, const char __user *user_buf,
 	case RUN_SINGLE:
 		last_test_pass = run_single();
 		break;
+	case ARM_CTX_SWITCH:
+		/* start of context switch test */
+		arm_ctx_switch(file);
+		break;
+	case CHECK_CTX_SWITCH:
+		/* After context switch MSR should be restored */
+		check_ctx_switch(file);
+		break;
 	default:
 		last_test_pass = false;
 		break;
@@ -365,6 +434,11 @@ skip_arm_clearing:
 
 static int pks_release_file(struct inode *inode, struct file *file)
 {
+	struct pks_test_ctx *ctx = file->private_data;
+
+	if (ctx)
+		free_ctx(ctx);
+
 	return 0;
 }
 
