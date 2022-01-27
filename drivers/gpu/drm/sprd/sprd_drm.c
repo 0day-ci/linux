@@ -65,8 +65,9 @@ static struct drm_driver sprd_drm_drv = {
 	.minor			= DRIVER_MINOR,
 };
 
-static int sprd_drm_bind(struct device *dev)
+static int sprd_drm_aggregate_probe(struct aggregate_device *adev)
 {
+	struct device *dev = aggregate_device_parent(adev);
 	struct platform_device *pdev = to_platform_device(dev);
 	struct drm_device *drm;
 	struct sprd_drm *sprd;
@@ -118,8 +119,9 @@ err_unbind_all:
 	return ret;
 }
 
-static void sprd_drm_unbind(struct device *dev)
+static void sprd_drm_aggregate_remove(struct aggregate_device *adev)
 {
+	struct device *dev = aggregate_device_parent(adev);
 	struct drm_device *drm = dev_get_drvdata(dev);
 
 	drm_dev_unregister(drm);
@@ -129,9 +131,28 @@ static void sprd_drm_unbind(struct device *dev)
 	component_unbind_all(drm->dev, drm);
 }
 
-static const struct component_master_ops drm_component_ops = {
-	.bind = sprd_drm_bind,
-	.unbind = sprd_drm_unbind,
+static void sprd_drm_aggregate_shutdown(struct aggregate_device *adev)
+{
+	struct device *dev = aggregate_device_parent(adev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct drm_device *drm = platform_get_drvdata(pdev);
+
+	if (!drm) {
+		drm_warn(drm, "drm device is not available, no shutdown\n");
+		return;
+	}
+
+	drm_atomic_helper_shutdown(drm);
+}
+
+static struct aggregate_driver sprd_drm_aggregate_driver = {
+	.probe = sprd_drm_aggregate_probe,
+	.remove = sprd_drm_aggregate_remove,
+	.shutdown = sprd_drm_aggregate_shutdown,
+	.driver = {
+		.name = "sprd_drm",
+		.owner = THIS_MODULE,
+	},
 };
 
 static int compare_of(struct device *dev, void *data)
@@ -141,25 +162,13 @@ static int compare_of(struct device *dev, void *data)
 
 static int sprd_drm_probe(struct platform_device *pdev)
 {
-	return drm_of_component_probe(&pdev->dev, compare_of, &drm_component_ops);
+	return drm_of_aggregate_probe(&pdev->dev, compare_of, &sprd_drm_aggregate_driver);
 }
 
 static int sprd_drm_remove(struct platform_device *pdev)
 {
-	component_master_del(&pdev->dev, &drm_component_ops);
+	component_aggregate_unregister(&pdev->dev, &sprd_drm_aggregate_driver);
 	return 0;
-}
-
-static void sprd_drm_shutdown(struct platform_device *pdev)
-{
-	struct drm_device *drm = platform_get_drvdata(pdev);
-
-	if (!drm) {
-		drm_warn(drm, "drm device is not available, no shutdown\n");
-		return;
-	}
-
-	drm_atomic_helper_shutdown(drm);
 }
 
 static const struct of_device_id drm_match_table[] = {
@@ -171,7 +180,6 @@ MODULE_DEVICE_TABLE(of, drm_match_table);
 static struct platform_driver sprd_drm_driver = {
 	.probe = sprd_drm_probe,
 	.remove = sprd_drm_remove,
-	.shutdown = sprd_drm_shutdown,
 	.driver = {
 		.name = "sprd-drm-drv",
 		.of_match_table = drm_match_table,
