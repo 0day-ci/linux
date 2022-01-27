@@ -47,6 +47,18 @@ struct pks_test_ctx {
 	char data[64];
 };
 
+/*
+ * pks_test_callback() is called by the fault handler to indicate it saw a PKey
+ * fault.
+ *
+ * NOTE: The callback is responsible for clearing any condition which would
+ * cause the fault to re-trigger.
+ */
+bool pks_test_callback(void)
+{
+	return false;
+}
+
 static void *alloc_test_page(int pkey)
 {
 	return __vmalloc_node_range(PKS_TEST_MEM_SIZE, 1, VMALLOC_START, VMALLOC_END,

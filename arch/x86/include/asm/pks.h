@@ -14,4 +14,18 @@ static inline void pks_write_current(void) { }
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
+
+#ifdef CONFIG_PKS_TEST
+
+bool pks_test_callback(void);
+
+#else /* !CONFIG_PKS_TEST */
+
+static inline bool pks_test_callback(void)
+{
+	return false;
+}
+
+#endif /* CONFIG_PKS_TEST */
+
 #endif /* _ASM_X86_PKS_H */
