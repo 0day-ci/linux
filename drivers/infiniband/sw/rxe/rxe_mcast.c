@@ -36,6 +36,7 @@ static struct rxe_mcg *create_grp(struct rxe_dev *rxe,
 	grp = rxe_alloc_locked(&rxe->mc_grp_pool);
 	if (!grp)
 		return ERR_PTR(-ENOMEM);
+	rxe_add_ref(grp);
 
 	INIT_LIST_HEAD(&grp->qp_list);
 	spin_lock_init(&grp->mcg_lock);
@@ -85,12 +86,28 @@ static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 			   struct rxe_mcg *grp)
 {
 	int err;
-	struct rxe_mca *elem;
+	struct rxe_mca *mca, *new_mca;
 
-	/* check to see of the qp is already a member of the group */
+	/* check to see if the qp is already a member of the group */
 	spin_lock_bh(&grp->mcg_lock);
-	list_for_each_entry(elem, &grp->qp_list, qp_list) {
-		if (elem->qp == qp) {
+	list_for_each_entry(mca, &grp->qp_list, qp_list) {
+		if (mca->qp == qp) {
+			spin_unlock_bh(&grp->mcg_lock);
+			return 0;
+		}
+	}
+	spin_unlock_bh(&grp->mcg_lock);
+
+	/* speculative alloc new mca without using GFP_ATOMIC */
+	new_mca = kzalloc(sizeof(*mca), GFP_KERNEL);
+	if (!new_mca)
+		return -ENOMEM;
+
+	spin_lock_bh(&grp->mcg_lock);
+	/* re-check to see if someone else just attached qp */
+	list_for_each_entry(mca, &grp->qp_list, qp_list) {
+		if (mca->qp == qp) {
+			kfree(new_mca);
 			err = 0;
 			goto out;
 		}
@@ -101,20 +118,11 @@ static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 		goto out;
 	}
 
-	elem = rxe_alloc_locked(&rxe->mc_elem_pool);
-	if (!elem) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	/* each qp holds a ref on the grp */
-	rxe_add_ref(grp);
-
 	grp->num_qp++;
-	elem->qp = qp;
+	new_mca->qp = qp;
 	atomic_inc(&qp->mcg_num);
 
-	list_add(&elem->qp_list, &grp->qp_list);
+	list_add(&new_mca->qp_list, &grp->qp_list);
 
 	err = 0;
 out:
@@ -126,7 +134,7 @@ static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 				   union ib_gid *mgid)
 {
 	struct rxe_mcg *grp;
-	struct rxe_mca *elem, *tmp;
+	struct rxe_mca *mca, *tmp;
 
 	grp = rxe_pool_get_key(&rxe->mc_grp_pool, mgid);
 	if (!grp)
@@ -134,16 +142,17 @@ static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 
 	spin_lock_bh(&grp->mcg_lock);
 
-	list_for_each_entry_safe(elem, tmp, &grp->qp_list, qp_list) {
-		if (elem->qp == qp) {
-			list_del(&elem->qp_list);
+	list_for_each_entry_safe(mca, tmp, &grp->qp_list, qp_list) {
+		if (mca->qp == qp) {
+			list_del(&mca->qp_list);
 			grp->num_qp--;
+			if (grp->num_qp <= 0)
+				rxe_drop_ref(grp);
 			atomic_dec(&qp->mcg_num);
 
 			spin_unlock_bh(&grp->mcg_lock);
-			rxe_drop_ref(elem);
-			rxe_drop_ref(grp);	/* ref held by QP */
 			rxe_drop_ref(grp);	/* ref from get_key */
+			kfree(mca);
 			return 0;
 		}
 	}
