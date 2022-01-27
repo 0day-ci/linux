@@ -13733,6 +13733,13 @@ F:	drivers/nubus/
 F:	include/linux/nubus.h
 F:	include/uapi/linux/nubus.h
 
+NUCLEI RISCV CORES AND SOCS
+M:	Icenowy Zheng <icenowy@nucleisys.com>
+L:	linux-riscv@lists.infradead.org
+S:	Supported
+N:	nuclei
+K:	[^@]nuclei
+
 NVIDIA (rivafb and nvidiafb) FRAMEBUFFER DRIVER
 M:	Antonino Daplas <adaplas@gmail.com>
 L:	linux-fbdev@vger.kernel.org
