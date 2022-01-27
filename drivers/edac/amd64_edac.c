@@ -1078,6 +1078,7 @@ struct addr_ctx {
 	u8 intlv_addr_bit;
 	u8 intlv_num_chan;
 	u8 intlv_num_dies;
+	u8 intlv_num_sockets;
 	u8 cs_id;
 	int (*dehash_addr)(struct addr_ctx *ctx);
 };
@@ -1086,6 +1087,7 @@ struct data_fabric_ops {
 	u64	(*get_hi_addr_offset)(struct addr_ctx *ctx);
 	int	(*get_intlv_mode)(struct addr_ctx *ctx);
 	void	(*get_intlv_num_dies)(struct addr_ctx *ctx);
+	void	(*get_intlv_num_sockets)(struct addr_ctx *ctx);
 };
 
 static u64 get_hi_addr_offset_df2(struct addr_ctx *ctx)
@@ -1131,10 +1133,16 @@ static void get_intlv_num_dies_df2(struct addr_ctx *ctx)
 	ctx->intlv_num_dies  = (ctx->reg_limit_addr >> 10) & 0x3;
 }
 
+static void get_intlv_num_sockets_df2(struct addr_ctx *ctx)
+{
+	ctx->intlv_num_sockets = (ctx->reg_limit_addr >> 8) & 0x1;
+}
+
 struct data_fabric_ops df2_ops = {
 	.get_hi_addr_offset		=	get_hi_addr_offset_df2,
 	.get_intlv_mode			=	get_intlv_mode_df2,
 	.get_intlv_num_dies		=	get_intlv_num_dies_df2,
+	.get_intlv_num_sockets		=	get_intlv_num_sockets_df2,
 };
 
 struct data_fabric_ops *df_ops;
@@ -1226,7 +1234,6 @@ static void get_intlv_num_chan(struct addr_ctx *ctx)
 static int denormalize_addr(struct addr_ctx *ctx)
 {
 	u8 die_id_shift, die_id_mask, socket_id_shift, socket_id_mask;
-	u8 intlv_num_sockets;
 	u8 num_intlv_bits, cs_mask = 0;
 
 	/* Return early if no interleaving. */
@@ -1236,16 +1243,13 @@ static int denormalize_addr(struct addr_ctx *ctx)
 	if (get_intlv_addr_bit(ctx))
 		return -EINVAL;
 
-	intlv_num_sockets = (ctx->reg_limit_addr >> 8) & 0x1;
-
 	get_intlv_num_chan(ctx);
 	df_ops->get_intlv_num_dies(ctx);
+	df_ops->get_intlv_num_sockets(ctx);
 
 	num_intlv_bits = ctx->intlv_num_chan;
 	num_intlv_bits += ctx->intlv_num_dies;
-
-	/* Add a bit if sockets are interleaved. */
-	num_intlv_bits += intlv_num_sockets;
+	num_intlv_bits += ctx->intlv_num_sockets;
 
 	/* Assert num_intlv_bits <= 4 */
 	if (num_intlv_bits > 4) {
@@ -1280,7 +1284,7 @@ static int denormalize_addr(struct addr_ctx *ctx)
 		sock_id_bit = die_id_bit;
 
 		/* Read D18F1x208 (SystemFabricIdMask). */
-		if (ctx->intlv_num_dies || intlv_num_sockets)
+		if (ctx->intlv_num_dies || ctx->intlv_num_sockets)
 			if (df_indirect_read_broadcast(ctx->nid, 1, 0x208, &ctx->tmp))
 				return -EINVAL;
 
@@ -1295,7 +1299,7 @@ static int denormalize_addr(struct addr_ctx *ctx)
 		}
 
 		/* If interleaved over more than 1 socket. */
-		if (intlv_num_sockets) {
+		if (ctx->intlv_num_sockets) {
 			socket_id_shift	= (ctx->tmp >> 28) & 0xF;
 			socket_id_mask	= (ctx->tmp >> 16) & 0xFF;
 
