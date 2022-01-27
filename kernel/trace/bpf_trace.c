@@ -2013,7 +2013,7 @@ int bpf_probe_unregister(struct bpf_raw_event_map *btp, struct bpf_prog *prog)
 
 int bpf_get_perf_event_info(const struct perf_event *event, u32 *prog_id,
 			    u32 *fd_type, const char **buf,
-			    u64 *probe_offset, u64 *probe_addr)
+			    u64 *probe_offset, u64 *probe_addr, u64 *bpf_cookie)
 {
 	bool is_tracepoint, is_syscall_tp;
 	struct bpf_prog *prog;
@@ -2028,6 +2028,7 @@ int bpf_get_perf_event_info(const struct perf_event *event, u32 *prog_id,
 		return -EOPNOTSUPP;
 
 	*prog_id = prog->aux->id;
+	*bpf_cookie = event->bpf_cookie;
 	flags = event->tp_event->flags;
 	is_tracepoint = flags & TRACE_EVENT_FL_TRACEPOINT;
 	is_syscall_tp = is_syscall_trace_event(event->tp_event);

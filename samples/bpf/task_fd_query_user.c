@@ -92,7 +92,7 @@ static int bpf_get_retprobe_bit(const char *event_type)
 static int test_debug_fs_kprobe(int link_idx, const char *fn_name,
 				__u32 expected_fd_type)
 {
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 len, prog_id, fd_type;
 	int err, event_fd;
 	char buf[256];
@@ -101,7 +101,7 @@ static int test_debug_fs_kprobe(int link_idx, const char *fn_name,
 	event_fd = bpf_link__fd(links[link_idx]);
 	err = bpf_task_fd_query(getpid(), event_fd, 0, buf, &len,
 				&prog_id, &fd_type, &probe_offset,
-				&probe_addr);
+				&probe_addr, &bpf_cookie);
 	if (err < 0) {
 		printf("FAIL: %s, for event_fd idx %d, fn_name %s\n",
 		       __func__, link_idx, fn_name);
@@ -124,7 +124,7 @@ static int test_debug_fs_kprobe(int link_idx, const char *fn_name,
 static int test_nondebug_fs_kuprobe_common(const char *event_type,
 	const char *name, __u64 offset, __u64 addr, bool is_return,
 	char *buf, __u32 *buf_len, __u32 *prog_id, __u32 *fd_type,
-	__u64 *probe_offset, __u64 *probe_addr)
+	__u64 *probe_offset, __u64 *probe_addr, __u64 *bpf_cookie)
 {
 	int is_return_bit = bpf_get_retprobe_bit(event_type);
 	int type = bpf_find_probe_type(event_type);
@@ -163,7 +163,7 @@ static int test_nondebug_fs_kuprobe_common(const char *event_type,
 	}
 
 	CHECK_PERROR_RET(bpf_task_fd_query(getpid(), fd, 0, buf, buf_len,
-			 prog_id, fd_type, probe_offset, probe_addr) < 0);
+			 prog_id, fd_type, probe_offset, probe_addr, bpf_cookie) < 0);
 	err = 0;
 
 cleanup:
@@ -177,7 +177,7 @@ static int test_nondebug_fs_probe(const char *event_type, const char *name,
 				  __u32 expected_ret_fd_type,
 				  char *buf, __u32 buf_len)
 {
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 prog_id, fd_type;
 	int err;
 
@@ -185,7 +185,7 @@ static int test_nondebug_fs_probe(const char *event_type, const char *name,
 					      offset, addr, is_return,
 					      buf, &buf_len, &prog_id,
 					      &fd_type, &probe_offset,
-					      &probe_addr);
+					      &probe_addr, &bpf_cookie);
 	if (err < 0) {
 		printf("FAIL: %s, "
 		       "for name %s, offset 0x%llx, addr 0x%llx, is_return %d\n",
@@ -230,7 +230,7 @@ static int test_debug_fs_uprobe(char *binary_path, long offset, bool is_return)
 	char buf[256], event_alias[sizeof("test_1234567890")];
 	const char *event_type = "uprobe";
 	struct perf_event_attr attr = {};
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 len, prog_id, fd_type;
 	int err = -1, res, kfd, efd;
 	struct bpf_link *link;
@@ -280,7 +280,7 @@ static int test_debug_fs_uprobe(char *binary_path, long offset, bool is_return)
 	len = sizeof(buf);
 	err = bpf_task_fd_query(getpid(), kfd, 0, buf, &len,
 				&prog_id, &fd_type, &probe_offset,
-				&probe_addr);
+				&probe_addr, &bpf_cookie);
 	if (err < 0) {
 		printf("FAIL: %s, binary_path %s\n", __func__, binary_path);
 		perror("    :");

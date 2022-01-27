@@ -1056,7 +1056,7 @@ retry:
 
 int bpf_task_fd_query(int pid, int fd, __u32 flags, char *buf, __u32 *buf_len,
 		      __u32 *prog_id, __u32 *fd_type, __u64 *probe_offset,
-		      __u64 *probe_addr)
+		      __u64 *probe_addr, __u64 *bpf_cookie)
 {
 	union bpf_attr attr = {};
 	int err;
@@ -1074,6 +1074,7 @@ int bpf_task_fd_query(int pid, int fd, __u32 flags, char *buf, __u32 *buf_len,
 	*fd_type = attr.task_fd_query.fd_type;
 	*probe_offset = attr.task_fd_query.probe_offset;
 	*probe_addr = attr.task_fd_query.probe_addr;
+	*bpf_cookie = attr.link_create.perf_event.bpf_cookie;
 
 	return libbpf_err_errno(err);
 }

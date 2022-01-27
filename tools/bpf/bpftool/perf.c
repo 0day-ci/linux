@@ -21,7 +21,7 @@
 static int perf_query_supported;
 static bool has_perf_query_support(void)
 {
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 len, prog_id, fd_type;
 	char buf[256];
 	int fd;
@@ -42,7 +42,7 @@ static bool has_perf_query_support(void)
 	errno = 0;
 	len = sizeof(buf);
 	bpf_task_fd_query(getpid(), fd, 0, buf, &len, &prog_id,
-			  &fd_type, &probe_offset, &probe_addr);
+			  &fd_type, &probe_offset, &probe_addr, &bpf_cookie);
 
 	if (errno == 524 /* ENOTSUPP */) {
 		perf_query_supported = 1;
@@ -61,12 +61,14 @@ out:
 }
 
 static void print_perf_json(int pid, int fd, __u32 prog_id, __u32 fd_type,
-			    char *buf, __u64 probe_offset, __u64 probe_addr)
+			    char *buf, __u64 probe_offset, __u64 probe_addr,
+				__u64 bpf_cookie)
 {
 	jsonw_start_object(json_wtr);
 	jsonw_int_field(json_wtr, "pid", pid);
 	jsonw_int_field(json_wtr, "fd", fd);
 	jsonw_uint_field(json_wtr, "prog_id", prog_id);
+	jsonw_lluint_field(json_wtr, "bpf_cookie", bpf_cookie);
 	switch (fd_type) {
 	case BPF_FD_TYPE_RAW_TRACEPOINT:
 		jsonw_string_field(json_wtr, "fd_type", "raw_tracepoint");
@@ -111,9 +113,10 @@ static void print_perf_json(int pid, int fd, __u32 prog_id, __u32 fd_type,
 }
 
 static void print_perf_plain(int pid, int fd, __u32 prog_id, __u32 fd_type,
-			     char *buf, __u64 probe_offset, __u64 probe_addr)
+			     char *buf, __u64 probe_offset, __u64 probe_addr, __u64 bpf_cookie)
 {
 	printf("pid %d  fd %d: prog_id %u  ", pid, fd, prog_id);
+	printf("bpf_cookie: %llu  ", bpf_cookie);
 	switch (fd_type) {
 	case BPF_FD_TYPE_RAW_TRACEPOINT:
 		printf("raw_tracepoint  %s\n", buf);
@@ -150,7 +153,7 @@ static void print_perf_plain(int pid, int fd, __u32 prog_id, __u32 fd_type,
 static int show_proc(const char *fpath, const struct stat *sb,
 		     int tflag, struct FTW *ftwbuf)
 {
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 len, prog_id, fd_type;
 	int err, pid = 0, fd = 0;
 	const char *pch;
@@ -194,16 +197,16 @@ static int show_proc(const char *fpath, const struct stat *sb,
 	/* query (pid, fd) for potential perf events */
 	len = sizeof(buf);
 	err = bpf_task_fd_query(pid, fd, 0, buf, &len, &prog_id, &fd_type,
-				&probe_offset, &probe_addr);
+				&probe_offset, &probe_addr, &bpf_cookie);
 	if (err < 0)
 		return 0;
 
 	if (json_output)
 		print_perf_json(pid, fd, prog_id, fd_type, buf, probe_offset,
-				probe_addr);
+				probe_addr, bpf_cookie);
 	else
 		print_perf_plain(pid, fd, prog_id, fd_type, buf, probe_offset,
-				 probe_addr);
+				 probe_addr, bpf_cookie);
 
 	return 0;
 }

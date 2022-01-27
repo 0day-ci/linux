@@ -4055,7 +4055,7 @@ static int bpf_task_fd_query_copy(const union bpf_attr *attr,
 				    union bpf_attr __user *uattr,
 				    u32 prog_id, u32 fd_type,
 				    const char *buf, u64 probe_offset,
-				    u64 probe_addr)
+				    u64 probe_addr, u64 bpf_cookie)
 {
 	char __user *ubuf = u64_to_user_ptr(attr->task_fd_query.buf);
 	u32 len = buf ? strlen(buf) : 0, input_len;
@@ -4092,7 +4092,8 @@ static int bpf_task_fd_query_copy(const union bpf_attr *attr,
 	if (put_user(prog_id, &uattr->task_fd_query.prog_id) ||
 	    put_user(fd_type, &uattr->task_fd_query.fd_type) ||
 	    put_user(probe_offset, &uattr->task_fd_query.probe_offset) ||
-	    put_user(probe_addr, &uattr->task_fd_query.probe_addr))
+	    put_user(probe_addr, &uattr->task_fd_query.probe_addr) ||
+	    put_user(bpf_cookie, &uattr->link_create.perf_event.bpf_cookie))
 		return -EFAULT;
 
 	return err;
@@ -4140,7 +4141,7 @@ static int bpf_task_fd_query(const union bpf_attr *attr,
 			err = bpf_task_fd_query_copy(attr, uattr,
 						     raw_tp->link.prog->aux->id,
 						     BPF_FD_TYPE_RAW_TRACEPOINT,
-						     btp->tp->name, 0, 0);
+						     btp->tp->name, 0, 0, 0);
 			goto put_file;
 		}
 		goto out_not_supp;
@@ -4148,18 +4149,18 @@ static int bpf_task_fd_query(const union bpf_attr *attr,
 
 	event = perf_get_event(file);
 	if (!IS_ERR(event)) {
-		u64 probe_offset, probe_addr;
+		u64 probe_offset, probe_addr, bpf_cookie;
 		u32 prog_id, fd_type;
 		const char *buf;
 
 		err = bpf_get_perf_event_info(event, &prog_id, &fd_type,
 					      &buf, &probe_offset,
-					      &probe_addr);
+					      &probe_addr, &bpf_cookie);
 		if (!err)
 			err = bpf_task_fd_query_copy(attr, uattr, prog_id,
 						     fd_type, buf,
 						     probe_offset,
-						     probe_addr);
+						     probe_addr, bpf_cookie);
 		goto put_file;
 	}
 

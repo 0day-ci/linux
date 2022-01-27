@@ -4,7 +4,7 @@
 void test_task_fd_query_rawtp(void)
 {
 	const char *file = "./test_get_stack_rawtp.o";
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 len, prog_id, fd_type;
 	struct bpf_object *obj;
 	int efd, err, prog_fd;
@@ -22,7 +22,7 @@ void test_task_fd_query_rawtp(void)
 	/* query (getpid(), efd) */
 	len = sizeof(buf);
 	err = bpf_task_fd_query(getpid(), efd, 0, buf, &len, &prog_id,
-				&fd_type, &probe_offset, &probe_addr);
+				&fd_type, &probe_offset, &probe_addr, &bpf_cookie);
 	if (CHECK(err < 0, "bpf_task_fd_query", "err %d errno %d\n", err,
 		  errno))
 		goto close_prog;
@@ -36,7 +36,7 @@ void test_task_fd_query_rawtp(void)
 	/* test zero len */
 	len = 0;
 	err = bpf_task_fd_query(getpid(), efd, 0, buf, &len, &prog_id,
-				&fd_type, &probe_offset, &probe_addr);
+				&fd_type, &probe_offset, &probe_addr, &bpf_cookie);
 	if (CHECK(err < 0, "bpf_task_fd_query (len = 0)", "err %d errno %d\n",
 		  err, errno))
 		goto close_prog;
@@ -48,7 +48,7 @@ void test_task_fd_query_rawtp(void)
 	/* test empty buffer */
 	len = sizeof(buf);
 	err = bpf_task_fd_query(getpid(), efd, 0, 0, &len, &prog_id,
-				&fd_type, &probe_offset, &probe_addr);
+				&fd_type, &probe_offset, &probe_addr, &bpf_cookie);
 	if (CHECK(err < 0, "bpf_task_fd_query (buf = 0)", "err %d errno %d\n",
 		  err, errno))
 		goto close_prog;
@@ -60,7 +60,7 @@ void test_task_fd_query_rawtp(void)
 	/* test smaller buffer */
 	len = 3;
 	err = bpf_task_fd_query(getpid(), efd, 0, buf, &len, &prog_id,
-				&fd_type, &probe_offset, &probe_addr);
+				&fd_type, &probe_offset, &probe_addr, &bpf_cookie);
 	if (CHECK(err >= 0 || errno != ENOSPC, "bpf_task_fd_query (len = 3)",
 		  "err %d errno %d\n", err, errno))
 		goto close_prog;

@@ -106,6 +106,7 @@ LIBBPF_0.0.1 {
 		bpf_raw_tracepoint_open;
 		bpf_set_link_xdp_fd;
 		bpf_task_fd_query;
+		bpf_task_fd_query2;
 		bpf_verify_program;
 		btf__fd;
 		btf__find_by_name;

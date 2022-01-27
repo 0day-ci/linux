@@ -7,7 +7,7 @@ static void test_task_fd_query_tp_core(const char *probe_name,
 	const char *file = "./test_tracepoint.o";
 	int err, bytes, efd, prog_fd, pmu_fd;
 	struct perf_event_attr attr = {};
-	__u64 probe_offset, probe_addr;
+	__u64 probe_offset, probe_addr, bpf_cookie;
 	__u32 len, prog_id, fd_type;
 	struct bpf_object *obj = NULL;
 	__u32 duration = 0;
@@ -52,7 +52,7 @@ static void test_task_fd_query_tp_core(const char *probe_name,
 	/* query (getpid(), pmu_fd) */
 	len = sizeof(buf);
 	err = bpf_task_fd_query(getpid(), pmu_fd, 0, buf, &len, &prog_id,
-				&fd_type, &probe_offset, &probe_addr);
+				&fd_type, &probe_offset, &probe_addr, &bpf_cookie);
 	if (CHECK(err < 0, "bpf_task_fd_query", "err %d errno %d\n", err,
 		  errno))
 		goto close_pmu;
