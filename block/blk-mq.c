@@ -1081,6 +1081,9 @@ bool blk_mq_complete_request_remote(struct request *rq)
 		return true;
 	}
 
+	if (!in_interrupt())
+		return false;
+
 	if (rq->q->nr_hw_queues == 1) {
 		blk_mq_raise_softirq(rq);
 		return true;
