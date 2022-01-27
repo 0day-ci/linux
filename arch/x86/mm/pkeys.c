@@ -206,3 +206,19 @@ u32 pkey_update_pkval(u32 pkval, int pkey, u32 accessbits)
 	pkval &= ~(PKEY_ACCESS_MASK << shift);
 	return pkval | accessbits << shift;
 }
+
+#ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
+
+/*
+ * PKS is independent of PKU and either or both may be supported on a CPU.
+ */
+void pks_setup(void)
+{
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	wrmsrl(MSR_IA32_PKRS, 0);
+	cr4_set_bits(X86_CR4_PKS);
+}
+
+#endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
