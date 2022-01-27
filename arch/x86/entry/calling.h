@@ -63,6 +63,26 @@ For 32-bit we have the following conventions - kernel is built with
  * for assembly code:
  */
 
+
+#ifdef CONFIG_ARCH_HAS_PTREGS_AUXILIARY
+
+.macro PUSH_PTREGS_AUXILIARY
+	/* add space for pt_regs_auxiliary */
+	subq $PTREGS_AUX_SIZE, %rsp
+.endm
+
+.macro POP_PTREGS_AUXILIARY
+	/* remove space for pt_regs_auxiliary */
+	addq $PTREGS_AUX_SIZE, %rsp
+.endm
+
+#else
+
+#define PUSH_PTREGS_AUXILIARY
+#define POP_PTREGS_AUXILIARY
+
+#endif
+
 .macro PUSH_REGS rdx=%rdx rax=%rax save_ret=0
 	.if \save_ret
 	pushq	%rsi		/* pt_regs->si */
