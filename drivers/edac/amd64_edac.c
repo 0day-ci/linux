@@ -1073,6 +1073,7 @@ struct addr_ctx {
 	u32 reg_dram_offset;
 	u32 reg_base_addr;
 	u32 reg_limit_addr;
+	u16 cs_fabric_id;
 	u16 nid;
 	u8 inst_id;
 	u8 map_num;
@@ -1089,6 +1090,7 @@ struct addr_ctx {
 struct data_fabric_ops {
 	u64	(*get_hi_addr_offset)(struct addr_ctx *ctx);
 	int	(*get_intlv_mode)(struct addr_ctx *ctx);
+	int	(*get_cs_fabric_id)(struct addr_ctx *ctx);
 	void	(*get_intlv_num_dies)(struct addr_ctx *ctx);
 	void	(*get_intlv_num_sockets)(struct addr_ctx *ctx);
 };
@@ -1172,11 +1174,23 @@ static void get_intlv_num_sockets_df2(struct addr_ctx *ctx)
 	ctx->intlv_num_sockets = (ctx->reg_limit_addr >> 8) & 0x1;
 }
 
+static int get_cs_fabric_id_df2(struct addr_ctx *ctx)
+{
+	/* Read D18F0x50 (FabricBlockInstanceInformation3). */
+	if (df_indirect_read_instance(ctx->nid, 0, 0x50, ctx->inst_id, &ctx->tmp))
+		return -EINVAL;
+
+	ctx->cs_fabric_id = (ctx->tmp >> 8) & 0xFF;
+
+	return 0;
+}
+
 struct data_fabric_ops df2_ops = {
 	.get_hi_addr_offset		=	get_hi_addr_offset_df2,
 	.get_intlv_mode			=	get_intlv_mode_df2,
 	.get_intlv_num_dies		=	get_intlv_num_dies_df2,
 	.get_intlv_num_sockets		=	get_intlv_num_sockets_df2,
+	.get_cs_fabric_id		=	get_cs_fabric_id_df2,
 };
 
 struct data_fabric_ops *df_ops;
@@ -1268,20 +1282,13 @@ static void get_intlv_num_chan(struct addr_ctx *ctx)
 static int calculate_cs_id(struct addr_ctx *ctx)
 {
 	u8 die_id_shift, die_id_mask, socket_id_shift, socket_id_mask;
-	u8 die_id_bit, sock_id_bit, cs_fabric_id, cs_mask = 0;
-
-	/* Read D18F0x50 (FabricBlockInstanceInformation3). */
-	if (df_indirect_read_instance(ctx->nid, 0, 0x50, ctx->inst_id, &ctx->tmp))
-		return -EINVAL;
-
-	cs_fabric_id = (ctx->tmp >> 8) & 0xFF;
-	die_id_bit   = 0;
+	u8 die_id_bit = 0, sock_id_bit, cs_mask = 0;
 
 	/* If interleaved over more than 1 channel: */
 	if (ctx->intlv_num_chan) {
 		die_id_bit = ctx->intlv_num_chan;
 		cs_mask	   = (1 << die_id_bit) - 1;
-		ctx->cs_id = cs_fabric_id & cs_mask;
+		ctx->cs_id = ctx->cs_fabric_id & cs_mask;
 	}
 
 	sock_id_bit = die_id_bit;
@@ -1297,7 +1304,7 @@ static int calculate_cs_id(struct addr_ctx *ctx)
 		die_id_shift = (ctx->tmp >> 24) & 0xF;
 		die_id_mask  = (ctx->tmp >> 8) & 0xFF;
 
-		ctx->cs_id |= ((cs_fabric_id & die_id_mask) >> die_id_shift) << die_id_bit;
+		ctx->cs_id |= ((ctx->cs_fabric_id & die_id_mask) >> die_id_shift) << die_id_bit;
 	}
 
 	/* If interleaved over more than 1 socket: */
@@ -1305,7 +1312,8 @@ static int calculate_cs_id(struct addr_ctx *ctx)
 		socket_id_shift	= (ctx->tmp >> 28) & 0xF;
 		socket_id_mask	= (ctx->tmp >> 16) & 0xFF;
 
-		ctx->cs_id |= ((cs_fabric_id & socket_id_mask) >> socket_id_shift) << sock_id_bit;
+		ctx->cs_id |= ((ctx->cs_fabric_id & socket_id_mask)
+				>> socket_id_shift) << sock_id_bit;
 	}
 
 	return 0;
@@ -1386,6 +1394,11 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 
 	ctx.nid = nid;
 	ctx.inst_id = umc;
+
+	if (df_ops->get_cs_fabric_id(&ctx)) {
+		pr_debug("Failed to get CS Fabric ID");
+		return -EINVAL;
+	}
 
 	if (remove_dram_offset(&ctx)) {
 		pr_debug("Failed to remove DRAM offset");
