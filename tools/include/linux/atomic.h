@@ -4,6 +4,10 @@
 
 #include <asm/atomic.h>
 
+typedef atomic_t atomic_long_t;
+
+void atomic_long_set(atomic_long_t *v, long i);
+
 /* atomic_cmpxchg_relaxed */
 #ifndef atomic_cmpxchg_relaxed
 #define  atomic_cmpxchg_relaxed		atomic_cmpxchg
