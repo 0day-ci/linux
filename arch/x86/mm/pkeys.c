@@ -288,6 +288,17 @@ void pks_restore_pt_regs(struct pt_regs *regs)
 	pks_write_pkrs(current->thread.pks_saved_pkrs);
 }
 
+void pks_dump_fault_info(struct pt_regs *regs)
+{
+	struct pt_regs_auxiliary *aux_pt_regs;
+
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	aux_pt_regs = &to_extended_pt_regs(regs)->aux;
+	pr_alert("PKRS: 0x%x\n", aux_pt_regs->pks_thread_pkrs);
+}
+
 /*
  * PKS is independent of PKU and either or both may be supported on a CPU.
  *
