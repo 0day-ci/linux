@@ -418,6 +418,16 @@ static void __pks_update_protection(int pkey, u32 protection)
 	pks_write_pkrs(current->thread.pks_saved_pkrs);
 }
 
+/**
+ * pks_available() - Is PKS available on this system
+ *
+ * Return if PKS is currently supported and enabled on this system.
+ */
+bool pks_available(void)
+{
+	return cpu_feature_enabled(X86_FEATURE_PKS);
+}
+
 /*
  * Do not call this directly, see pks_mk*().
  *

@@ -55,6 +55,7 @@ static inline bool arch_pkeys_enabled(void)
 
 #include <uapi/asm-generic/mman-common.h>
 
+bool pks_available(void);
 void pks_update_protection(int pkey, u32 protection);
 void pks_update_exception(struct pt_regs *regs, int pkey, u32 protection);
 
@@ -86,6 +87,11 @@ typedef bool (*pks_key_callback)(struct pt_regs *regs, unsigned long address,
 				 bool write);
 
 #else /* !CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
+
+static inline bool pks_available(void)
+{
+	return false;
+}
 
 static inline void pks_mk_noaccess(int pkey) {}
 static inline void pks_mk_readwrite(int pkey) {}
