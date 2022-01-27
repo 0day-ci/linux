@@ -9,6 +9,10 @@
 
 #include <linux/types.h>
 
+enum nvme_ioc_flags {
+	NVME_IOVEC	= 1 << 0 /* vectored io */
+};
+
 struct nvme_user_io {
 	__u8	opcode;
 	__u8	flags;

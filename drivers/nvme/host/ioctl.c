@@ -65,6 +65,7 @@ static int nvme_submit_user_cmd(struct request_queue *q,
 	struct bio *bio = NULL;
 	void *meta = NULL;
 	int ret;
+	u8 cmd_flags = cmd->common.flags;
 
 	req = nvme_alloc_request(q, cmd, 0);
 	if (IS_ERR(req))
@@ -75,7 +76,11 @@ static int nvme_submit_user_cmd(struct request_queue *q,
 	nvme_req(req)->flags |= NVME_REQ_USERCMD;
 
 	if (ubuffer && bufflen) {
-		ret = blk_rq_map_user(q, req, NULL, ubuffer, bufflen,
+		if (!(cmd_flags & NVME_IOVEC))
+			ret = blk_rq_map_user(q, req, NULL, ubuffer, bufflen,
+				GFP_KERNEL);
+		else
+			ret = blk_rq_map_user_vec(q, req, NULL, ubuffer, bufflen,
 				GFP_KERNEL);
 		if (ret)
 			goto out;
@@ -246,8 +251,6 @@ static int nvme_user_cmd64(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 		return -EACCES;
 	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
 		return -EFAULT;
-	if (cmd.flags)
-		return -EINVAL;
 	if (!nvme_validate_passthru_nsid(ctrl, ns, cmd.nsid))
 		return -EINVAL;
 
