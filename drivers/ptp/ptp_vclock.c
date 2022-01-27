@@ -187,7 +187,8 @@ struct ptp_vclock *ptp_vclock_register(struct ptp_clock *pclock)
 		return NULL;
 	}
 
-	timecounter_init(&vclock->tc, &vclock->cc, 0);
+	timecounter_init(&vclock->tc, &vclock->cc,
+			 ktime_to_ns(ktime_get_real()));
 	ptp_schedule_worker(vclock->clock, PTP_VCLOCK_REFRESH_INTERVAL);
 
 	return vclock;
