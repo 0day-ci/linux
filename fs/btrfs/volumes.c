@@ -7400,8 +7400,8 @@ int btrfs_read_sys_array(struct btrfs_fs_info *fs_info)
 	 * that's fine, we will not go beyond system chunk array anyway.
 	 */
 	sb = alloc_dummy_extent_buffer(fs_info, BTRFS_SUPER_INFO_OFFSET);
-	if (IS_ERR(sb))
-		return PTR_ERR(sb);
+	if (!sb)
+		return -ENOMEM;
 	set_extent_buffer_uptodate(sb);
 
 	write_extent_buffer(sb, super_copy, 0, BTRFS_SUPER_INFO_SIZE);
