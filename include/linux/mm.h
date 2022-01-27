@@ -1145,6 +1145,23 @@ static inline bool is_pci_p2pdma_page(const struct page *page)
 
 #ifdef CONFIG_DEVMAP_ACCESS_PROTECTION
 
+DECLARE_STATIC_KEY_FALSE(dev_pgmap_protection_static_key);
+
+/*
+ * devmap_protected() requires a reference on the page to ensure there is no
+ * races with dev_pagemap tear down.
+ */
+static inline bool devmap_protected(struct page *page)
+{
+	if (!static_branch_unlikely(&dev_pgmap_protection_static_key))
+		return false;
+	if (!is_zone_device_page(page))
+		return false;
+	if (page->pgmap->flags & PGMAP_PROTECTION)
+		return true;
+	return false;
+}
+
 bool pgmap_protection_available(void);
 
 #else
