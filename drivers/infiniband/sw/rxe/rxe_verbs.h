@@ -353,6 +353,7 @@ struct rxe_mw {
 
 struct rxe_mcg {
 	struct rxe_pool_elem	elem;
+	struct rb_node		node;
 	struct rxe_dev		*rxe;
 	struct list_head	qp_list;
 	atomic_t		qp_num;
@@ -397,6 +398,8 @@ struct rxe_dev {
 	struct rxe_pool		mc_grp_pool;
 
 	spinlock_t		mcg_lock; /* guard multicast groups */
+	struct rb_root		mcg_tree;
+	atomic_t		mcg_num;
 
 	spinlock_t		pending_lock; /* guard pending_mmaps */
 	struct list_head	pending_mmaps;

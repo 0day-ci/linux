@@ -254,7 +254,7 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 		memcpy(&dgid, &ipv6_hdr(skb)->daddr, sizeof(dgid));
 
 	/* lookup mcast group corresponding to mgid, takes a ref */
-	mcg = rxe_pool_get_key(&rxe->mc_grp_pool, &dgid);
+	mcg = rxe_lookup_mcg(rxe, &dgid);
 	if (!mcg)
 		goto drop;	/* mcast group not registered */
 
@@ -320,7 +320,7 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 
 	kfree(qp_array);
 
-	rxe_drop_ref(mcg);	/* drop ref from rxe_pool_get_key. */
+	rxe_drop_ref(mcg);
 
 	if (likely(!skb))
 		return;
