@@ -20,6 +20,7 @@ properties:
       - enum:
           - sifive,fu540-c000-spi
           - sifive,fu740-c000-spi
+          - nuclei,demosoc-spi
       - const: sifive,spi0
 
     description:
