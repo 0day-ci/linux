@@ -117,6 +117,8 @@ enum dax_device_flags {
  * @pgoff: offset in pages from the start of the device to translate
  * @nr_pages: number of consecutive pages caller can handle relative to @pfn
  * @kaddr: output parameter that returns a virtual address mapping of pfn
+ *         Direct access through this pointer must be guarded by calls to
+ *         dax_mk_{readwrite,noaccess}()
  * @pfn: output parameter that returns an absolute pfn translation of @pgoff
  *
  * Return: negative errno if an error occurs, otherwise the number of
@@ -208,6 +210,58 @@ void dax_flush(struct dax_device *dax_dev, void *addr, size_t size)
 }
 #endif
 EXPORT_SYMBOL_GPL(dax_flush);
+
+bool dax_map_protected(struct dax_device *dax_dev)
+{
+	if (!dax_alive(dax_dev))
+		return false;
+
+	if (dax_dev->ops->map_protected)
+		return dax_dev->ops->map_protected(dax_dev);
+	return false;
+}
+EXPORT_SYMBOL_GPL(dax_map_protected);
+
+/**
+ * dax_mk_readwrite() - make protected dax devices read/write
+ * @dax_dev: the dax device representing the memory to access
+ *
+ * Any access of the kaddr memory returned from dax_direct_access() must be
+ * guarded by dax_mk_readwrite() and dax_mk_noaccess().  This ensures that any
+ * dax devices which have additional protections are allowed to relax those
+ * protections for the thread using this memory.
+ *
+ * NOTE these calls must be contained within a single thread of execution and
+ * both must be guarded by dax_read_lock()  Which is also a requirement for
+ * dax_direct_access() anyway.
+ */
+void dax_mk_readwrite(struct dax_device *dax_dev)
+{
+	if (!dax_alive(dax_dev))
+		return;
+
+	if (dax_dev->ops->mk_readwrite)
+		dax_dev->ops->mk_readwrite(dax_dev);
+}
+EXPORT_SYMBOL_GPL(dax_mk_readwrite);
+
+/**
+ * dax_mk_noaccess() - restore protection to dax devices if needed
+ * @dax_dev: the dax device representing the memory to access
+ *
+ * See dax_direct_access() and dax_mk_readwrite()
+ *
+ * NOTE Must be called prior to dax_read_unlock()
+ */
+void dax_mk_noaccess(struct dax_device *dax_dev)
+{
+	if (!dax_alive(dax_dev))
+		return;
+
+	if (dax_dev->ops->mk_noaccess)
+		dax_dev->ops->mk_noaccess(dax_dev);
+}
+EXPORT_SYMBOL_GPL(dax_mk_noaccess);
 
 void dax_write_cache(struct dax_device *dax_dev, bool wc)
 {

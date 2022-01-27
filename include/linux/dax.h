@@ -30,6 +30,10 @@ struct dax_operations {
 			sector_t, sector_t);
 	/* zero_page_range: required operation. Zero page range   */
 	int (*zero_page_range)(struct dax_device *, pgoff_t, size_t);
+
+	bool (*map_protected)(struct dax_device *dax_dev);
+	void (*mk_readwrite)(struct dax_device *dax_dev);
+	void (*mk_noaccess)(struct dax_device *dax_dev);
 };
 
 #if IS_ENABLED(CONFIG_DAX)
@@ -186,6 +190,10 @@ size_t dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 int dax_zero_page_range(struct dax_device *dax_dev, pgoff_t pgoff,
 			size_t nr_pages);
 void dax_flush(struct dax_device *dax_dev, void *addr, size_t size);
+
+bool dax_map_protected(struct dax_device *dax_dev);
+void dax_mk_readwrite(struct dax_device *dax_dev);
+void dax_mk_noaccess(struct dax_device *dax_dev);
 
 ssize_t dax_iomap_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops);
