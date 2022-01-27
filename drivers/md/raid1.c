@@ -1648,6 +1648,7 @@ static void raid1_status(struct seq_file *seq, struct mddev *mddev)
  * - if is on @rdev is removed.
  * - if is off, @rdev is not removed, but recovery from it is disabled (@rdev is
  *   very likely to fail).
+ *
  * In both cases, &MD_BROKEN will be set in &mddev->flags.
  */
 static void raid1_error(struct mddev *mddev, struct md_rdev *rdev)
