@@ -3,7 +3,8 @@ include ../../../../../../scripts/Kbuild.include
 
 all: $(TEST_GEN_PROGS) mmcr0_exceptionbits_test.c mmcr0_cc56run_test.c mmcr0_pmccext_test.c \
 			mmcr0_pmcjce_test.c mmcr0_fc56_pmc1ce_test.c mmcr0_fc56_pmc56_test.c \
-			mmcr1_comb_test.c mmcr1_sel_unit_cache_test.c mmcr2_l2l3_test.c
+			mmcr1_comb_test.c mmcr1_sel_unit_cache_test.c mmcr2_l2l3_test.c \
+			mmcr2_fcs_fch_test.c
 
 noarg:
 	$(MAKE) -C ../../
@@ -16,7 +17,8 @@ no-pie-option := $(call try-run, echo 'int main() { return 0; }' | \
 
 TEST_GEN_PROGS := mmcr0_exceptionbits_test mmcr0_cc56run_test mmcr0_pmccext_test \
 		   mmcr0_pmcjce_test mmcr0_fc56_pmc1ce_test mmcr0_fc56_pmc56_test \
-		   mmcr1_comb_test mmcr1_sel_unit_cache_test mmcr2_l2l3_test
+		   mmcr1_comb_test mmcr1_sel_unit_cache_test mmcr2_l2l3_test \
+		   mmcr2_fcs_fch_test
 
 LDFLAGS += $(no-pie-option)
 
