@@ -1164,7 +1164,7 @@ do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 		 * is running.  If so, pks_test_callback() will clear the protection
 		 * mechanism and return true to indicate the fault was handled.
 		 */
-		if (pks_test_callback())
+		if (pks_test_callback(regs))
 			return;
 	}
 

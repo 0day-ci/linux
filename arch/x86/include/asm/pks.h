@@ -6,22 +6,26 @@
 
 void pks_setup(void);
 void pks_write_current(void);
+void pks_save_pt_regs(struct pt_regs *regs);
+void pks_restore_pt_regs(struct pt_regs *regs);
 
 #else /* !CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
 static inline void pks_setup(void) { }
 static inline void pks_write_current(void) { }
+static inline void pks_save_pt_regs(struct pt_regs *regs) { }
+static inline void pks_restore_pt_regs(struct pt_regs *regs) { }
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
 
 #ifdef CONFIG_PKS_TEST
 
-bool pks_test_callback(void);
+bool pks_test_callback(struct pt_regs *regs);
 
 #else /* !CONFIG_PKS_TEST */
 
-static inline bool pks_test_callback(void)
+static inline bool pks_test_callback(struct pt_regs *regs)
 {
 	return false;
 }

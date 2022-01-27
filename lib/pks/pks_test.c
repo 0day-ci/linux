@@ -43,6 +43,7 @@
 #include <uapi/asm-generic/mman-common.h>
 
 #include <asm/pks.h>
+#include <asm/ptrace.h>       /* for struct pt_regs */
 
 #include <asm/pks.h>
 
@@ -74,12 +75,18 @@ struct pks_test_ctx {
  * NOTE: The callback is responsible for clearing any condition which would
  * cause the fault to re-trigger.
  */
-bool pks_test_callback(void)
+bool pks_test_callback(struct pt_regs *regs)
 {
+	struct pt_regs_extended *ept_regs = to_extended_pt_regs(regs);
+	struct pt_regs_auxiliary *aux_pt_regs = &ept_regs->aux;
 	bool armed = (test_armed_key != 0);
+	u32 pkrs = aux_pt_regs->pks_thread_pkrs;
 
 	if (armed) {
-		pks_mk_readwrite(test_armed_key);
+		/* Enable read and write to stop faults */
+		aux_pt_regs->pks_thread_pkrs = pkey_update_pkval(pkrs,
+								 test_armed_key,
+								 0);
 		fault_cnt++;
 	}
 
