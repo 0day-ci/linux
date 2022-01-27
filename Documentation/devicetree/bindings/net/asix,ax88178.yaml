@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/asix,ax88178.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: The device tree bindings for the USB Ethernet controllers
+
+maintainers:
+  - Oleksij Rempel <o.rempel@pengutronix.de>
+
+description: |
+  Device tree properties for hard wired USB Ethernet devices.
+
+allOf:
+  - $ref: ethernet-controller.yaml#
+
+properties:
+  compatible:
+    items:
+      - enum:
+          - usb411,3d     # Buffalo LUA-U2-KTX
+          - usb411,6e     # Buffalo LUA-U2-GT 10/100/1000
+          - usb4bb,930    # IO-DATA ETG-US2
+          - usb4f1,3008   # JVC MP-PRX1 Port Replicator
+          - usb50d,5055   # Belkin F5D5055
+          - usb557,2009   # ATEN UC210T
+          - usb5ac,1402   # Apple USB Ethernet Adapter
+          - usb66b,20f9   # USBLINK HG20F9
+          - usb77b,2226   # Linksys USB200M
+          - usb789,160    # Logitec LAN-GTJ/U2A
+          - usb7aa,17     # corega FEther USB2-TX
+          - usb7b8,420a   # Hawking UF200, TrendNet TU2-ET100
+          - usb7d1,3c05   # DLink DUB-E100 H/W Ver B1
+          - usb846,1040   # Netgear FA120
+          - usb8dd,114    # Billionton Systems, GUSB2AM-1G-B
+          - usb8dd,90ff   # Billionton Systems, USB2AR
+          - usbb95,1720   # Intellinet, ST Lab USB Ethernet
+          - usbb95,172a   # ASIX 88172a demo board
+          - usbb95,1780   # ASIX AX88178 10/100/1000
+          - usbb95,7720   # ASIX AX88772 10/100
+          - usbb95,772a   # Cables-to-Go USB Ethernet Adapter
+          - usbb95,772b   # ASIX AX88772B 10/100
+          - usbb95,7e2b   # Asus USB Ethernet Adapter
+          - usbdb0,a877   # ASIX 88772a
+          - usbdf6,56     # Sitecom LN-031
+          - usbdf6,61c    # Sitecom LN-028
+          - usb1189,893   # Surecom EP-1427X-2
+          - usb13b1,18    # Linksys USB200M Rev 2
+          - usb14ea,ab11  # ABOCOM for pci
+          - usb1557,7720  # 0Q0 cable ethernet
+          - usb1631,6200  # goodway corp usb gwusb2e
+          - usb1737,39    # Linksys USB1000
+          - usb17ef,7203  # Lenovo U2L100P 10/100
+          - usb2001,1a00  # DLink DUB-E100
+          - usb2001,1a02  # DLink DUB-E100 H/W Ver C1
+          - usb2001,3c05  # DLink DUB-E100 H/W Ver B1 Alternate
+          - usb6189,182d  # Sitecom LN-029
+
+  reg: true
+  local-mac-address: true
+  mac-address: true
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    usb@11270000 {
+        reg = <0x11270000 0x1000>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        ethernet@1 {
+            compatible = "usbdb0,a877";
+            reg = <1>;
+            local-mac-address = [00 00 00 00 00 00];
+        };
+    };
+  - |
+    usb@11270000 {
+        reg = <0x11270000 0x1000>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        usb1@1 {
+            compatible = "usb1234,5678";
+            reg = <1>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            ethernet@1 {
+               compatible = "usbdb0,a877";
+               reg = <1>;
+            };
+        };
+    };
