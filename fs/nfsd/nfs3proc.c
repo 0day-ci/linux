@@ -66,13 +66,30 @@ nfsd3_proc_setattr(struct svc_rqst *rqstp)
 {
 	struct nfsd3_sattrargs *argp = rqstp->rq_argp;
 	struct nfsd3_attrstat *resp = rqstp->rq_resp;
+	struct iattr *iap = &argp->attrs;
 
 	dprintk("nfsd: SETATTR(3)  %s\n",
 				SVCFH_fmt(&argp->fh));
 
 	fh_copy(&resp->fh, &argp->fh);
-	resp->status = nfsd_setattr(rqstp, &resp->fh, &argp->attrs,
+
+	if (iap->ia_valid & ATTR_SIZE) {
+		struct super_block *sb;
+
+		resp->status = fh_verify(rqstp, &resp->fh, S_IFREG,
+			NFSD_MAY_SATTR|NFSD_MAY_WRITE|NFSD_MAY_OWNER_OVERRIDE);
+		if (resp->status != nfs_ok)
+			goto out;
+
+		resp->status = nfserr_inval;
+		sb = resp->fh.fh_dentry->d_sb;
+		if (iap->ia_size < 0 || iap->ia_size > sb->s_maxbytes)
+			goto out;
+	}
+
+	resp->status = nfsd_setattr(rqstp, &resp->fh, iap,
 				    argp->check_guard, argp->guardtime);
+out:
 	return rpc_success;
 }
 
