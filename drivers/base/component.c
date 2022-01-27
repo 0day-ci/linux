@@ -71,6 +71,12 @@ static inline struct aggregate_device *to_aggregate_device(struct device *d)
 	return container_of(d, struct aggregate_device, dev);
 }
 
+struct device *aggregate_device_parent(const struct aggregate_device *adev)
+{
+	return adev->parent;
+}
+EXPORT_SYMBOL_GPL(aggregate_device_parent);
+
 struct component {
 	struct list_head node;
 	struct aggregate_device *adev;

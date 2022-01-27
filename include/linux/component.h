@@ -43,6 +43,7 @@ int component_bind_all(struct device *parent, void *data);
 void component_unbind_all(struct device *parent, void *data);
 
 struct aggregate_device;
+struct device *aggregate_device_parent(const struct aggregate_device *adev);
 
 /**
  * struct component_master_ops - callback for the aggregate driver
