@@ -395,7 +395,7 @@ void __irqentry_exit_cond_resched(void)
 DEFINE_STATIC_CALL(__irqentry_exit_cond_resched, __irqentry_exit_cond_resched);
 #endif
 
-void irqentry_exit_cond_resched(void)
+static void exit_cond_resched(void)
 {
 	if (IS_ENABLED(CONFIG_PREEMPTION)) {
 #ifdef CONFIG_PREEMPT_DYNAMIC
@@ -404,6 +404,11 @@ void irqentry_exit_cond_resched(void)
 		__irqentry_exit_cond_resched();
 #endif
 	}
+}
+
+void irqentry_exit_cond_resched(struct pt_regs *regs)
+{
+	exit_cond_resched();
 }
 
 noinstr void irqentry_exit(struct pt_regs *regs, irqentry_state_t state)
@@ -431,7 +436,7 @@ noinstr void irqentry_exit(struct pt_regs *regs, irqentry_state_t state)
 		}
 
 		instrumentation_begin();
-		irqentry_exit_cond_resched();
+		exit_cond_resched();
 		/* Covers both tracing and lockdep */
 		trace_hardirqs_on();
 		instrumentation_end();
