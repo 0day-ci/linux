@@ -547,15 +547,16 @@ static void free_io(struct mapped_device *md, struct dm_io *io)
 static struct bio *alloc_tio(struct clone_info *ci, struct dm_target *ti,
 		unsigned target_bio_nr, unsigned *len, gfp_t gfp_mask)
 {
+	struct block_device *bdev = ci->bio->bi_bdev;
 	struct dm_target_io *tio;
 
 	if (!ci->io->tio.io) {
 		/* the dm_target_io embedded in ci->io is available */
 		tio = &ci->io->tio;
-		if (__bio_clone_fast(&tio->clone, ci->bio, gfp_mask) < 0)
+		if (bio_init_clone(bdev, &tio->clone, ci->bio, gfp_mask) < 0)
 			return NULL;
 	} else {
-		struct bio *clone = bio_clone_fast(ci->bio, gfp_mask,
+		struct bio *clone = bio_alloc_clone(bdev, ci->bio, gfp_mask,
 						   &ci->io->md->bs);
 		if (!clone)
 			return NULL;
