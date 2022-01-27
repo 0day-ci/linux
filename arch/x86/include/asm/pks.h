@@ -24,8 +24,11 @@ static inline void pks_dump_fault_info(struct pt_regs *regs) { }
 #ifdef CONFIG_PKS_TEST
 
 bool pks_test_callback(struct pt_regs *regs);
+#define __static_or_pks_test
 
 #else /* !CONFIG_PKS_TEST */
+
+#define __static_or_pks_test static
 
 static inline bool pks_test_callback(struct pt_regs *regs)
 {

@@ -17,6 +17,8 @@
  * * 1  Allocate a single key and check all 3 permissions on a page.
  * * 2  'arm context' for context switch test
  * * 3  Check the context armed in '2' to ensure the MSR value was preserved
+ * * 4  Test that the exception thread PKRS remains independent of the
+ *      interrupted threads PKRS
  * * 8  Loop through all CPUs, report the msr, and check against the default.
  * * 9  Set up and fault on a PKS protected page.
  *
@@ -53,7 +55,10 @@
 #define RUN_SINGLE		1
 #define ARM_CTX_SWITCH		2
 #define CHECK_CTX_SWITCH	3
+#define RUN_EXCEPTION		4
 #define RUN_CRASH_TEST		9
+
+DECLARE_PER_CPU(u32, pkrs_cache);
 
 static struct dentry *pks_test_dentry;
 static bool crash_armed;
@@ -65,8 +70,71 @@ static int prev_fault_cnt;
 
 struct pks_test_ctx {
 	int pkey;
+	bool pass;
 	char data[64];
 };
+static struct pks_test_ctx *test_exception_ctx;
+
+static bool check_pkey_val(u32 pk_reg, int pkey, u32 expected)
+{
+	pk_reg = (pk_reg >> PKR_PKEY_SHIFT(pkey)) & PKEY_ACCESS_MASK;
+	return (pk_reg == expected);
+}
+
+/*
+ * Check if the register @pkey value matches @expected value
+ *
+ * Both the cached and actual MSR must match.
+ */
+static bool check_pkrs(int pkey, u32 expected)
+{
+	bool ret = true;
+	u64 pkrs;
+	u32 *tmp_cache;
+
+	tmp_cache = get_cpu_ptr(&pkrs_cache);
+	if (!check_pkey_val(*tmp_cache, pkey, expected))
+		ret = false;
+	put_cpu_ptr(tmp_cache);
+
+	rdmsrl(MSR_IA32_PKRS, pkrs);
+	if (!check_pkey_val(pkrs, pkey, expected))
+		ret = false;
+
+	return ret;
+}
+
+static void check_exception(u32 thread_pkrs)
+{
+	/* Check the thread saved state */
+	if (!check_pkey_val(thread_pkrs, test_armed_key, PKEY_DISABLE_WRITE)) {
+		pr_err("     FAIL: checking ept_regs->thread_pkrs\n");
+		test_exception_ctx->pass = false;
+	}
+
+	/* Check that the exception state has disabled access */
+	if (!check_pkrs(test_armed_key, PKEY_DISABLE_ACCESS)) {
+		pr_err("     FAIL: PKRS cache and MSR\n");
+		test_exception_ctx->pass = false;
+	}
+
+	/*
+	 * Ensure an update can occur during exception without affecting the
+	 * interrupted thread.  The interrupted thread is checked after
+	 * exception...
+	 */
+	pks_mk_readwrite(test_armed_key);
+	if (!check_pkrs(test_armed_key, 0)) {
+		pr_err("     FAIL: exception did not change register to 0\n");
+		test_exception_ctx->pass = false;
+	}
+	pks_mk_noaccess(test_armed_key);
+	if (!check_pkrs(test_armed_key, PKEY_DISABLE_ACCESS)) {
+		pr_err("     FAIL: exception did not change register to 0x%x\n",
+			PKEY_DISABLE_ACCESS);
+		test_exception_ctx->pass = false;
+	}
+}
 
 /*
  * pks_test_callback() is called by the fault handler to indicate it saw a PKey
@@ -81,6 +149,16 @@ bool pks_test_callback(struct pt_regs *regs)
 	struct pt_regs_auxiliary *aux_pt_regs = &ept_regs->aux;
 	bool armed = (test_armed_key != 0);
 	u32 pkrs = aux_pt_regs->pks_thread_pkrs;
+
+	if (test_exception_ctx) {
+		check_exception(pkrs);
+		/*
+		 * Stop this check directly within the exception because the
+		 * fault handler clean up code will call again while checking
+		 * the PMD entry and there is no need to check this again.
+		 */
+		test_exception_ctx = NULL;
+	}
 
 	if (armed) {
 		/* Enable read and write to stop faults */
@@ -240,6 +318,7 @@ static struct pks_test_ctx *alloc_ctx(u8 pkey)
 	}
 
 	ctx->pkey = pkey;
+	ctx->pass = true;
 	sprintf(ctx->data, "%s", "DEADBEEF");
 	return ctx;
 }
@@ -263,6 +342,69 @@ static bool run_single(void)
 	free_ctx(ctx);
 
 	return rc;
+}
+
+static bool run_exception_test(void)
+{
+	void *ptr = NULL;
+	bool pass = true;
+	struct pks_test_ctx *ctx;
+
+	pr_info("     ***** BEGIN: exception checking\n");
+
+	ctx = alloc_ctx(PKS_KEY_TEST);
+	if (IS_ERR(ctx)) {
+		pr_err("     FAIL: no context\n");
+		pass = false;
+		goto result;
+	}
+	ctx->pass = true;
+
+	ptr = alloc_test_page(ctx->pkey);
+	if (!ptr) {
+		pr_err("     FAIL: no vmalloc page\n");
+		pass = false;
+		goto free_context;
+	}
+
+	pks_update_protection(ctx->pkey, PKEY_DISABLE_WRITE);
+
+	WRITE_ONCE(test_exception_ctx, ctx);
+	WRITE_ONCE(test_armed_key, ctx->pkey);
+
+	memcpy(ptr, ctx->data, 8);
+
+	if (!fault_caught()) {
+		pr_err("     FAIL: did not get an exception\n");
+		pass = false;
+	}
+
+	/*
+	 * NOTE The exception code has to enable access (b00) to keep the fault
+	 * from looping forever.  Therefore full access is seen here rather
+	 * than write disabled.
+	 *
+	 * Furthermore, check_exception() disabled access during the exception
+	 * so this is testing that the thread value was restored back to the
+	 * thread value.
+	 */
+	if (!check_pkrs(test_armed_key, 0)) {
+		pr_err("     FAIL: PKRS not restored\n");
+		pass = false;
+	}
+
+	if (!ctx->pass)
+		pass = false;
+
+	WRITE_ONCE(test_armed_key, 0);
+
+	vfree(ptr);
+free_context:
+	free_ctx(ctx);
+result:
+	pr_info("     ***** END: exception checking : %s\n",
+		 pass ? "PASS" : "FAIL");
+	return pass;
 }
 
 static void crash_it(void)
@@ -426,6 +568,9 @@ static ssize_t pks_write_file(struct file *file, const char __user *user_buf,
 	case CHECK_CTX_SWITCH:
 		/* After context switch MSR should be restored */
 		check_ctx_switch(file);
+		break;
+	case RUN_EXCEPTION:
+		last_test_pass = run_exception_test();
 		break;
 	default:
 		last_test_pass = false;
