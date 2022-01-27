@@ -16,7 +16,9 @@ description: |
 
 properties:
   compatible:
-    const: kontron,sl28cpld
+    enum:
+      - fsl,ls1028a-qds-qixis-i2c
+      - kontron,sl28cpld
 
   reg:
     description:
