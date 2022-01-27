@@ -1057,8 +1057,16 @@ static int df_indirect_read_broadcast(u16 node, u8 func, u16 reg, u32 *lo)
 	return __df_indirect_read(node, func, reg, DF_BROADCAST, lo);
 }
 
+/* These are mapped 1:1 to the hardware values. Special cases are set at > 0x20. */
+enum intlv_modes {
+	NONE		= 0x00,
+	NOHASH_2CH	= 0x01,
+	DF2_HASH_2CH	= 0x21,
+};
+
 /* Use "reg_" prefix for raw register values. */
 struct addr_ctx {
+	enum intlv_modes intlv_mode;
 	u64 ret_addr;
 	u32 tmp;
 	u32 reg_dram_offset;
@@ -1067,10 +1075,12 @@ struct addr_ctx {
 	u16 nid;
 	u8 inst_id;
 	u8 map_num;
+	bool hash_enabled;
 };
 
 struct data_fabric_ops {
 	u64	(*get_hi_addr_offset)(struct addr_ctx *ctx);
+	int	(*get_intlv_mode)(struct addr_ctx *ctx);
 };
 
 static u64 get_hi_addr_offset_df2(struct addr_ctx *ctx)
@@ -1078,8 +1088,26 @@ static u64 get_hi_addr_offset_df2(struct addr_ctx *ctx)
 	return (ctx->reg_dram_offset & GENMASK_ULL(31, 20)) << 8;
 }
 
+static int get_intlv_mode_df2(struct addr_ctx *ctx)
+{
+	ctx->intlv_mode = (ctx->reg_base_addr >> 4) & 0xF;
+
+	if (ctx->intlv_mode == 8) {
+		ctx->intlv_mode = DF2_HASH_2CH;
+		ctx->hash_enabled = true;
+	}
+
+	if (ctx->intlv_mode != NONE &&
+	    ctx->intlv_mode != NOHASH_2CH &&
+	    ctx->intlv_mode != DF2_HASH_2CH)
+		return -EINVAL;
+
+	return 0;
+}
+
 struct data_fabric_ops df2_ops = {
 	.get_hi_addr_offset		=	get_hi_addr_offset_df2,
+	.get_intlv_mode			=	get_intlv_mode_df2,
 };
 
 struct data_fabric_ops *df_ops;
@@ -1146,7 +1174,6 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 	u8 num_intlv_bits, hashed_bit;
 	u8 lgcy_mmio_hole_en;
 	u8 cs_mask, cs_id = 0;
-	bool hash_enabled = false;
 
 	struct addr_ctx ctx;
 
@@ -1170,6 +1197,11 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 
 	if (get_dram_addr_map(&ctx)) {
 		pr_debug("Failed to get DRAM address map");
+		goto out_err;
+	}
+
+	if (df_ops->get_intlv_mode(&ctx)) {
+		pr_debug("Failed to get interleave mode");
 		goto out_err;
 	}
 
@@ -1200,7 +1232,6 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 	case 7:	intlv_num_chan = 4; break;
 
 	case 8: intlv_num_chan = 1;
-		hash_enabled = true;
 		break;
 	default:
 		pr_err("%s: Invalid number of interleaved channels %d.\n",
@@ -1302,7 +1333,7 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 			ctx.ret_addr += (BIT_ULL(32) - dram_hole_base);
 	}
 
-	if (hash_enabled) {
+	if (ctx.hash_enabled) {
 		/* Save some parentheses and grab ls-bit at the end. */
 		hashed_bit =	(ctx.ret_addr >> 12) ^
 				(ctx.ret_addr >> 18) ^
