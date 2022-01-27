@@ -1162,6 +1162,7 @@ static inline bool devmap_protected(struct page *page)
 	return false;
 }
 
+void __pgmap_protection_flag_invalid(struct dev_pagemap *pgmap);
 void __pgmap_mk_readwrite(struct dev_pagemap *pgmap);
 void __pgmap_mk_noaccess(struct dev_pagemap *pgmap);
 
@@ -1176,6 +1177,27 @@ static inline bool pgmap_check_pgmap_prot(struct page *page)
 	 */
 	lockdep_assert_in_irq();
 	return true;
+}
+
+/*
+ * pgmap_protection_flag_invalid - Check and flag an invalid use of a pgmap
+ *                                 protected page
+ *
+ * There are code paths which are known to not be compatible with pgmap
+ * protections.  pgmap_protection_flag_invalid() is provided as a 'relief
+ * valve' to be used in those functions which are known to be incompatible.
+ *
+ * Thus an invalid use case can be flaged with more precise data rather than
+ * just flagging a fault.  Like the fault handler code this abandons the use of
+ * the PKS key and optionally allows the calling code path to continue based on
+ * the configuration of the memremap.pks_fault_mode command line
+ * (and/or sysfs) option.
+ */
+static inline void pgmap_protection_flag_invalid(struct page *page)
+{
+	if (!pgmap_check_pgmap_prot(page))
+		return;
+	__pgmap_protection_flag_invalid(page->pgmap);
 }
 
 static inline void pgmap_mk_readwrite(struct page *page)
@@ -1200,6 +1222,7 @@ bool pgmap_pks_fault_callback(struct pt_regs *regs, unsigned long address,
 
 static inline void __pgmap_mk_readwrite(struct dev_pagemap *pgmap) { }
 static inline void __pgmap_mk_noaccess(struct dev_pagemap *pgmap) { }
+static inline void pgmap_protection_flag_invalid(struct page *page) { }
 static inline void pgmap_mk_readwrite(struct page *page) { }
 static inline void pgmap_mk_noaccess(struct page *page) { }
 
