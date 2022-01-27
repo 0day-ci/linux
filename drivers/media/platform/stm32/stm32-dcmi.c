@@ -134,6 +134,7 @@ struct stm32_dcmi {
 	struct video_device		*vdev;
 	struct v4l2_async_notifier	notifier;
 	struct v4l2_subdev		*source;
+	struct v4l2_subdev		*remote;
 	struct v4l2_format		fmt;
 	struct v4l2_rect		crop;
 	bool				do_crop;
@@ -579,9 +580,9 @@ static void dcmi_buf_queue(struct vb2_buffer *vb)
 	spin_unlock_irq(&dcmi->irqlock);
 }
 
-static struct media_entity *dcmi_find_source(struct stm32_dcmi *dcmi)
+static struct media_entity *dcmi_find_source(struct v4l2_subdev *subdev)
 {
-	struct media_entity *entity = &dcmi->vdev->entity;
+	struct media_entity *entity = &subdev->entity;
 	struct media_pad *pad;
 
 	/* Walk searching for entity having no sink */
@@ -1721,6 +1722,7 @@ static int dcmi_framesizes_init(struct stm32_dcmi *dcmi)
 static int dcmi_graph_notify_complete(struct v4l2_async_notifier *notifier)
 {
 	struct stm32_dcmi *dcmi = notifier_to_dcmi(notifier);
+	int src_pad;
 	int ret;
 
 	/*
@@ -1728,7 +1730,7 @@ static int dcmi_graph_notify_complete(struct v4l2_async_notifier *notifier)
 	 * we search for the source subdevice
 	 * in order to expose it through V4L2 interface
 	 */
-	dcmi->source = media_entity_to_v4l2_subdev(dcmi_find_source(dcmi));
+	dcmi->source = media_entity_to_v4l2_subdev(dcmi_find_source(dcmi->remote));
 	if (!dcmi->source) {
 		dev_err(dcmi->dev, "Source subdevice not found\n");
 		return -ENODEV;
@@ -1768,6 +1770,34 @@ static int dcmi_graph_notify_complete(struct v4l2_async_notifier *notifier)
 		return ret;
 	}
 
+	ret = video_register_device(dcmi->vdev, VFL_TYPE_VIDEO, -1);
+	if (ret) {
+		dev_err(dcmi->dev, "Failed to register video device\n");
+		return ret;
+	}
+
+	dev_dbg(dcmi->dev, "Device registered as %s\n",
+		video_device_node_name(dcmi->vdev));
+
+	/*
+	 * Link remote sub-device to DCMI, it could be
+	 * a parallel camera sensor or a bridge
+	 */
+	src_pad = media_entity_get_fwnode_pad(&dcmi->remote->entity,
+					      dcmi->remote->fwnode,
+					      MEDIA_PAD_FL_SOURCE);
+
+	ret = media_create_pad_link(&dcmi->remote->entity, src_pad,
+				    &dcmi->vdev->entity, 0,
+				    MEDIA_LNK_FL_IMMUTABLE |
+				    MEDIA_LNK_FL_ENABLED);
+	if (ret)
+		dev_err(dcmi->dev, "Failed to create media pad link with subdev \"%s\"\n",
+			dcmi->remote->name);
+	else
+		dev_dbg(dcmi->dev, "DCMI is now linked to \"%s\"\n",
+			dcmi->remote->name);
+
 	return 0;
 }
 
@@ -1788,31 +1818,11 @@ static int dcmi_graph_notify_bound(struct v4l2_async_notifier *notifier,
 				   struct v4l2_async_subdev *asd)
 {
 	struct stm32_dcmi *dcmi = notifier_to_dcmi(notifier);
-	unsigned int ret;
-	int src_pad;
 
 	dev_dbg(dcmi->dev, "Subdev \"%s\" bound\n", subdev->name);
+	dcmi->remote = subdev;
 
-	/*
-	 * Link this sub-device to DCMI, it could be
-	 * a parallel camera sensor or a bridge
-	 */
-	src_pad = media_entity_get_fwnode_pad(&subdev->entity,
-					      subdev->fwnode,
-					      MEDIA_PAD_FL_SOURCE);
-
-	ret = media_create_pad_link(&subdev->entity, src_pad,
-				    &dcmi->vdev->entity, 0,
-				    MEDIA_LNK_FL_IMMUTABLE |
-				    MEDIA_LNK_FL_ENABLED);
-	if (ret)
-		dev_err(dcmi->dev, "Failed to create media pad link with subdev \"%s\"\n",
-			subdev->name);
-	else
-		dev_dbg(dcmi->dev, "DCMI is now linked to \"%s\"\n",
-			subdev->name);
-
-	return ret;
+	return 0;
 }
 
 static const struct v4l2_async_notifier_operations dcmi_graph_notify_ops = {
@@ -2007,15 +2017,6 @@ static int dcmi_probe(struct platform_device *pdev)
 		goto err_device_release;
 	}
 	dcmi->vdev->entity.flags |= MEDIA_ENT_FL_DEFAULT;
-
-	ret = video_register_device(dcmi->vdev, VFL_TYPE_VIDEO, -1);
-	if (ret) {
-		dev_err(dcmi->dev, "Failed to register video device\n");
-		goto err_media_entity_cleanup;
-	}
-
-	dev_dbg(dcmi->dev, "Device registered as %s\n",
-		video_device_node_name(dcmi->vdev));
 
 	/* Buffer queue */
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
