@@ -15,6 +15,7 @@
 #define MMCR0_FC56      0x00000010UL /* freeze counters 5 and 6 */
 #define MMCR0_PMCCEXT   0x00000200UL /* PMCCEXT control */
 #define MMCR1_RSQ       0x200000000000ULL /* radix scope qual field */
+#define BHRB_DISABLE    0x2000000000ULL /* MMCRA BHRB DISABLE bit */
 
 extern int ev_mask_pmcxsel, ev_shift_pmcxsel;
 extern int ev_mask_marked, ev_shift_marked;
@@ -178,9 +179,72 @@ static inline int get_mmcr2_l2l3(u64 mmcr2, int pmc)
 	return 0;
 }
 
+static inline int get_mmcr3_src(u64 mmcr3, int pmc)
+{
+	if (pvr != POWER10)
+		return 0;
+	return ((mmcr3 >> ((49 - (15 * ((pmc) - 1))))) & 0x7fff);
+}
+
+static inline int get_mmcra_thd_cmp(u64 mmcra, int pmc)
+{
+	if (pvr == POWER10)
+		return ((mmcra >> 45) & 0x7ff);
+	return ((mmcra >> 45) & 0x3ff);
+}
+
+static inline int get_mmcra_sm(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 42) & 0x3);
+}
+
+static inline int get_mmcra_bhrb_disable(u64 mmcra, int pmc)
+{
+	if (pvr == POWER10)
+		return mmcra & BHRB_DISABLE;
+	return 0;
+}
+
+static inline int get_mmcra_ifm(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 30) & 0x3);
+}
+
+static inline int get_mmcra_thd_sel(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 16) & 0x7);
+}
+
+static inline int get_mmcra_thd_start(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 12) & 0xf);
+}
+
+static inline int get_mmcra_thd_stop(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 8) & 0xf);
+}
+
+static inline int get_mmcra_rand_samp_elig(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 4) & 0x7);
+}
+
+static inline int get_mmcra_sample_mode(u64 mmcra, int pmc)
+{
+	return ((mmcra >> 1) & 0x3);
+}
+
+static inline int get_mmcra_marked(u64 mmcra, int pmc)
+{
+	return mmcra & 0x1;
+}
+
 #define GET_MMCR0(a, b, c)        get_mmcr0_##c(a, b)
 #define GET_MMCR1(a, b, c)        get_mmcr1_##c(a, b)
 #define GET_MMCR2(a, b, c)        get_mmcr2_##c(a, b)
+#define GET_MMCR3(a, b, c)        get_mmcr3_##c(a, b)
+#define GET_MMCRA(a, b, c)        get_mmcra_##c(a, b)
 
 /*
  * Generic MMCR macro to get specific field value
