@@ -33,6 +33,7 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 /*-------------------------------------------------------------------------*/
 
@@ -1761,6 +1762,20 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		/* WWAN devices should always be named "wwan%d" */
 		if ((dev->driver_info->flags & FLAG_WWAN) != 0)
 			strscpy(net->name, "wwan%d", sizeof(net->name));
+
+		if (IS_ENABLED(CONFIG_OF)) {
+			const char *label = NULL;
+
+			/* try reading label from device tree node */
+			if (xdev->dev.of_node)
+				label = of_get_property(xdev->dev.of_node,
+							"label", NULL);
+			if (label) {
+				strscpy(net->name, label, sizeof(net->name));
+				dev_info(&udev->dev, "netdev name from dt: %s\n",
+					 net->name);
+			}
+		}
 
 		/* devices that cannot do ARP */
 		if ((dev->driver_info->flags & FLAG_NOARP) != 0)
