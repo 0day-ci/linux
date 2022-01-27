@@ -63,6 +63,7 @@ static int simple_mfd_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct of_device_id simple_mfd_i2c_of_match[] = {
+	{ .compatible = "fsl,ls1028a-qds-qixis-i2c" },
 	{ .compatible = "kontron,sl28cpld" },
 	{}
 };
