@@ -66,11 +66,38 @@ static void devmap_managed_enable_put(struct dev_pagemap *pgmap)
 
 #ifdef CONFIG_DEVMAP_ACCESS_PROTECTION
 
+/*
+ * Note; all devices which have asked for protections share the same key.  The
+ * key may, or may not, have been provided by the core.  If not, protection
+ * will be disabled.  The key acquisition is attempted when the first ZONE
+ * DEVICE requests it and freed when all zones have been unmapped.
+ *
+ * Also this must be EXPORT_SYMBOL rather than EXPORT_SYMBOL_GPL because it is
+ * intended to be used in the kmap API.
+ */
+DEFINE_STATIC_KEY_FALSE(dev_pgmap_protection_static_key);
+EXPORT_SYMBOL(dev_pgmap_protection_static_key);
+
+static void devmap_protection_enable(void)
+{
+	static_branch_inc(&dev_pgmap_protection_static_key);
+}
+
+static void devmap_protection_disable(void)
+{
+	static_branch_dec(&dev_pgmap_protection_static_key);
+}
+
 bool pgmap_protection_available(void)
 {
 	return pks_available();
 }
 EXPORT_SYMBOL_GPL(pgmap_protection_available);
+
+#else /* !CONFIG_DEVMAP_ACCESS_PROTECTION */
+
+static void devmap_protection_enable(void) { }
+static void devmap_protection_disable(void) { }
 
 #endif /* CONFIG_DEVMAP_ACCESS_PROTECTION */
 
@@ -173,6 +200,9 @@ void memunmap_pages(struct dev_pagemap *pgmap)
 
 	WARN_ONCE(pgmap->altmap.alloc, "failed to free all reserved pages\n");
 	devmap_managed_enable_put(pgmap);
+
+	if (pgmap->flags & PGMAP_PROTECTION)
+		devmap_protection_disable();
 }
 EXPORT_SYMBOL_GPL(memunmap_pages);
 
@@ -318,6 +348,12 @@ void *memremap_pages(struct dev_pagemap *pgmap, int nid)
 
 	if (WARN_ONCE(!nr_range, "nr_range must be specified\n"))
 		return ERR_PTR(-EINVAL);
+
+	if (pgmap->flags & PGMAP_PROTECTION) {
+		if (!pgmap_protection_available())
+			return ERR_PTR(-EINVAL);
+		devmap_protection_enable();
+	}
 
 	switch (pgmap->type) {
 	case MEMORY_DEVICE_PRIVATE:
