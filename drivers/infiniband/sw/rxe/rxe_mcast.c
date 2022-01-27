@@ -113,16 +113,16 @@ static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 		}
 	}
 
-	if (mcg->num_qp >= rxe->attr.max_mcast_qp_attach) {
+	if (atomic_read(&mcg->qp_num) >= rxe->attr.max_mcast_qp_attach) {
 		err = -ENOMEM;
 		goto out;
 	}
 
-	mcg->num_qp++;
+	atomic_inc(&mcg->qp_num);
 	new_mca->qp = qp;
 	atomic_inc(&qp->mcg_num);
 
-	list_add(&new_mca->qp_list, &mcg->qp_list);
+	list_add_tail(&new_mca->qp_list, &mcg->qp_list);
 
 	err = 0;
 out:
@@ -135,6 +135,7 @@ static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 {
 	struct rxe_mcg *mcg;
 	struct rxe_mca *mca, *tmp;
+	int n;
 
 	mcg = rxe_pool_get_key(&rxe->mc_grp_pool, mgid);
 	if (!mcg)
@@ -145,8 +146,8 @@ static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 	list_for_each_entry_safe(mca, tmp, &mcg->qp_list, qp_list) {
 		if (mca->qp == qp) {
 			list_del(&mca->qp_list);
-			mcg->num_qp--;
-			if (mcg->num_qp <= 0)
+			n = atomic_dec_return(&mcg->qp_num);
+			if (n <= 0)
 				rxe_drop_ref(mcg);
 			atomic_dec(&qp->mcg_num);
 
