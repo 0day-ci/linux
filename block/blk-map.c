@@ -577,6 +577,25 @@ int blk_rq_map_user(struct request_queue *q, struct request *rq,
 }
 EXPORT_SYMBOL(blk_rq_map_user);
 
+int blk_rq_map_user_vec(struct request_queue *q, struct request *rq,
+		    struct rq_map_data *map_data, void __user *uvec,
+		    unsigned long nr_vecs, gfp_t gfp_mask)
+{
+	struct iovec fast_iov[UIO_FASTIOV];
+	struct iovec *iov = fast_iov;
+	struct iov_iter iter;
+	int ret;
+
+	ret = import_iovec(rq_data_dir(rq), uvec, nr_vecs, UIO_FASTIOV, &iov, &iter);
+	if (unlikely(ret < 0))
+		return ret;
+	ret = blk_rq_map_user_iov(q, rq, NULL, &iter, gfp_mask);
+	kfree(iov);
+
+	return ret;
+}
+EXPORT_SYMBOL(blk_rq_map_user_vec);
+
 /**
  * blk_rq_unmap_user - unmap a request with user data
  * @bio:	       start of bio list
