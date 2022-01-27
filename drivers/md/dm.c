@@ -558,17 +558,13 @@ static struct bio *alloc_tio(struct clone_info *ci, struct dm_target *ti,
 			return NULL;
 		}
 	} else {
-		struct bio *clone = bio_alloc_bioset(NULL, 0, 0, gfp_mask,
-						     &ci->io->md->bs);
+		struct bio *clone = bio_clone_fast(ci->bio, gfp_mask,
+						   &ci->io->md->bs);
 		if (!clone)
 			return NULL;
 
 		tio = clone_to_tio(clone);
 		tio->inside_dm_io = false;
-		if (__bio_clone_fast(&tio->clone, ci->bio, gfp_mask) < 0) {
-			bio_put(clone);
-			return NULL;
-		}
 	}
 
 	tio->magic = DM_TIO_MAGIC;
