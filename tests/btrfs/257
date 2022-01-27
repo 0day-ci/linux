@@ -1,0 +1,79 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2022 SUSE Linux Products GmbH. All Rights Reserved.
+#
+# FS QA Test 257
+#
+# Make sure btrfs defrag ioctl won't defrag compressed extents which are already
+# at their max capacity.
+#
+. ./common/preamble
+_begin_fstest auto quick defrag
+
+# Import common functions.
+. ./common/filter
+. ./common/btrfs
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs btrfs
+_require_scratch
+
+# Needs 4K sectorsize, as larger sectorsize can change the file layout.
+_require_btrfs_support_sectorsize 4096
+
+get_extent_disk_sector()
+{
+	local file=$1
+	local offset=$2
+
+	$XFS_IO_PROG -c "fiemap $offset" "$file" | _filter_xfs_io_fiemap |\
+		head -n1 | $AWK_PROG '{print $3}'
+}
+
+_scratch_mkfs >> $seqres.full
+
+# Need datacow to show which range is defragged, and we're testing
+# autodefrag with compression
+_scratch_mount -o datacow,autodefrag,compress
+
+# Btrfs uses 128K as compressed extent max size, so this would result
+# exactly two extents, which are all at their max size
+$XFS_IO_PROG -f -c "pwrite -S 0xee 0 128k" -c sync \
+		-c "pwrite -S 0xff 128k 128k" -c sync \
+		$SCRATCH_MNT/foobar >> $seqres.full
+
+old_csum=$(_md5_checksum $SCRATCH_MNT/foobar)
+old_extent1=$(get_extent_disk_sector "$SCRATCH_MNT/foobar" 0)
+old_extent2=$(get_extent_disk_sector "$SCRATCH_MNT/foobar" 128k)
+
+echo "=== File extent layout before defrag ===" >> $seqres.full
+$XFS_IO_PROG -c "fiemap -v" "$SCRATCH_MNT/foobar" >> $seqres.full
+
+$BTRFS_UTIL_PROG filesystem defrag "$SCRATCH_MNT/foobar" >> $seqres.full
+
+new_csum=$(_md5_checksum $SCRATCH_MNT/foobar)
+new_extent1=$(get_extent_disk_sector "$SCRATCH_MNT/foobar" 0)
+new_extent2=$(get_extent_disk_sector "$SCRATCH_MNT/foobar" 128k)
+
+echo "=== File extent layout before defrag ===" >> $seqres.full
+$XFS_IO_PROG -c "fiemap -v" "$SCRATCH_MNT/foobar" >> $seqres.full
+
+if [ $new_csum != $old_csum ]; then
+	echo "file content changed"
+fi
+
+if [ $new_extent1 != $old_extent1 ]; then
+	echo "the first extent get defragged"
+fi
+
+if [ $new_extent2 != $old_extent2 ]; then
+	echo "the second extent get defragged"
+fi
+
+echo "Silence is golden"
+
+# success, all done
+status=0
+exit
