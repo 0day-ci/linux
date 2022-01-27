@@ -27,6 +27,8 @@
 
 #include <drm/drm_util.h>
 
+#include "i915_reg_defs.h"
+
 enum drm_scaling_filter;
 struct dpll;
 struct drm_connector;
@@ -553,6 +555,14 @@ intel_mode_valid_max_plane_size(struct drm_i915_private *dev_priv,
 				bool bigjoiner);
 enum phy intel_port_to_phy(struct drm_i915_private *i915, enum port port);
 bool is_trans_port_sync_mode(const struct intel_crtc_state *state);
+void intel_set_m_n(struct drm_i915_private *i915,
+		   const struct intel_link_m_n *m_n,
+		   i915_reg_t data_m_reg, i915_reg_t data_n_reg,
+		   i915_reg_t link_m_reg, i915_reg_t link_n_reg);
+void intel_get_m_n(struct drm_i915_private *i915,
+		   struct intel_link_m_n *m_n,
+		   i915_reg_t data_m_reg, i915_reg_t data_n_reg,
+		   i915_reg_t link_m_reg, i915_reg_t link_n_reg);
 void intel_cpu_transcoder_set_m1_n1(struct intel_crtc *crtc,
 				    enum transcoder cpu_transcoder,
 				    const struct intel_link_m_n *m_n);
@@ -564,10 +574,6 @@ void intel_cpu_transcoder_get_m1_n1(struct intel_crtc *crtc,
 				    struct intel_link_m_n *m_n);
 void intel_cpu_transcoder_get_m2_n2(struct intel_crtc *crtc,
 				    enum transcoder cpu_transcoder,
-				    struct intel_link_m_n *m_n);
-void intel_pch_transcoder_get_m1_n1(struct intel_crtc *crtc,
-				    struct intel_link_m_n *m_n);
-void intel_pch_transcoder_get_m2_n2(struct intel_crtc *crtc,
 				    struct intel_link_m_n *m_n);
 
 void intel_plane_destroy(struct drm_plane *plane);
