@@ -145,7 +145,7 @@ Changing permissions of individual keys
 ---------------------------------------
 
 .. kernel-doc:: include/linux/pks-keys.h
-        :identifiers: pks_mk_readwrite
+        :identifiers: pks_mk_readwrite pks_mk_noaccess
 
 MSR details
 -----------

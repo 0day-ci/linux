@@ -58,6 +58,18 @@ static inline bool arch_pkeys_enabled(void)
 void pks_update_protection(int pkey, u32 protection);
 
 /**
+ * pks_mk_noaccess() - Disable all access to the domain
+ * @pkey: the pkey for which the access should change.
+ *
+ * Disable all access to the domain specified by pkey.  This is not a global
+ * update and only affects the current running thread.
+ */
+static inline void pks_mk_noaccess(int pkey)
+{
+	pks_update_protection(pkey, PKEY_DISABLE_ACCESS);
+}
+
+/**
  * pks_mk_readwrite() - Make the domain Read/Write
  * @pkey: the pkey for which the access should change.
  *
@@ -71,6 +83,7 @@ static inline void pks_mk_readwrite(int pkey)
 
 #else /* !CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
+static inline void pks_mk_noaccess(int pkey) {}
 static inline void pks_mk_readwrite(int pkey) {}
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
