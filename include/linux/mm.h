@@ -1162,9 +1162,43 @@ static inline bool devmap_protected(struct page *page)
 	return false;
 }
 
+void __pgmap_mk_readwrite(struct dev_pagemap *pgmap);
+void __pgmap_mk_noaccess(struct dev_pagemap *pgmap);
+
+static inline bool pgmap_check_pgmap_prot(struct page *page)
+{
+	if (!devmap_protected(page))
+		return false;
+
+	/*
+	 * There is no known use case to change permissions in an irq for pgmap
+	 * pages
+	 */
+	lockdep_assert_in_irq();
+	return true;
+}
+
+static inline void pgmap_mk_readwrite(struct page *page)
+{
+	if (!pgmap_check_pgmap_prot(page))
+		return;
+	__pgmap_mk_readwrite(page->pgmap);
+}
+static inline void pgmap_mk_noaccess(struct page *page)
+{
+	if (!pgmap_check_pgmap_prot(page))
+		return;
+	__pgmap_mk_noaccess(page->pgmap);
+}
+
 bool pgmap_protection_available(void);
 
 #else
+
+static inline void __pgmap_mk_readwrite(struct dev_pagemap *pgmap) { }
+static inline void __pgmap_mk_noaccess(struct dev_pagemap *pgmap) { }
+static inline void pgmap_mk_readwrite(struct page *page) { }
+static inline void pgmap_mk_noaccess(struct page *page) { }
 
 static inline bool pgmap_protection_available(void)
 {
