@@ -155,3 +155,11 @@ text:
 	affected by PKRU register will not execute (even transiently)
 	until all prior executions of WRPKRU have completed execution
 	and updated the PKRU register.
+
+Testing
+-------
+
+Example code can be found in lib/pks/pks_test.c
+
+.. kernel-doc:: lib/pks/pks_test.c
+        :doc: PKS_TEST

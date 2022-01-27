@@ -42,10 +42,11 @@
  */
 enum pks_pkey_consumers {
 	PKS_KEY_DEFAULT		= 0, /* Must be 0 for default PTE values */
+	PKS_KEY_TEST		= 1,
 };
 
 #define PKS_INIT_VALUE (PKR_RW_KEY(PKS_KEY_DEFAULT)		| \
-			PKR_AD_KEY(1)	| \
+			PKR_AD_KEY(PKS_KEY_TEST)	| \
 			PKR_AD_KEY(2)	| PKR_AD_KEY(3)		| \
 			PKR_AD_KEY(4)	| PKR_AD_KEY(5)		| \
 			PKR_AD_KEY(6)	| PKR_AD_KEY(7)		| \
