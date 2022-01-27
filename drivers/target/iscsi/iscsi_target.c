@@ -2213,7 +2213,7 @@ iscsit_process_text_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 	/* '=' confirmed in strncmp */
 	text_ptr = strchr(text_in, '=');
 	BUG_ON(!text_ptr);
-	if (!strncmp("=All", text_ptr, 5)) {
+	if (!strcmp("=All", text_ptr)) {
 		cmd->cmd_flags |= ICF_SENDTARGETS_ALL;
 	} else if (!strncmp("=iqn.", text_ptr, 5) ||
 		   !strncmp("=eui.", text_ptr, 5)) {
