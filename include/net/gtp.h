@@ -27,6 +27,11 @@ struct gtp1_header {	/* According to 3GPP TS 29.060. */
 	__be32	tid;
 } __attribute__ ((packed));
 
+struct gtp_pdu_session_info {	/* According to 3GPP TS 38.415. */
+	u8	pdu_type;
+	u8	qfi;
+};
+
 static inline bool netif_is_gtp(const struct net_device *dev)
 {
 	return dev->rtnl_link_ops &&
