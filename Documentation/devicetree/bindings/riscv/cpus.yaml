@@ -45,6 +45,13 @@ properties:
               - sifive,u54-mc
           - const: sifive,rocket0
           - const: riscv
+      - items:
+          - enum:
+              - nuclei,ux605
+              - nuclei,ux607
+              - nuclei,ux608
+          - const: nuclei,ux600
+          - const: riscv
       - const: riscv    # Simulator only
     description:
       Identifies that the hart uses the RISC-V instruction set
