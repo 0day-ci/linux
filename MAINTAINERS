@@ -8803,6 +8803,7 @@ M:	Sami Kyöstilä <skyostil@chromium.org>
 R:	Evan Benn <evanbenn@chromium.org>
 S:	Maintained
 F:	drivers/misc/hps-i2c.c
+F:	include/uapi/linux/hps.h
 
 HSI SUBSYSTEM
 M:	Sebastian Reichel <sre@kernel.org>

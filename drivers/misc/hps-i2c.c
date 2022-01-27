@@ -17,9 +17,11 @@
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
+#include <uapi/linux/hps.h>
 
 #define HPS_ACPI_ID		"GOOG0020"
 #define HPS_MAX_DEVICES		1
+#define HPS_MAX_MSG_SIZE	8192
 
 struct hps_drvdata {
 	struct i2c_client *client;
@@ -60,6 +62,8 @@ static int hps_open(struct inode *inode, struct file *file)
 	ret = pm_runtime_get_sync(dev);
 	if (ret < 0)
 		goto pm_get_fail;
+
+	file->private_data = hps->client;
 	return 0;
 
 pm_get_fail:
@@ -84,10 +88,87 @@ pm_put_fail:
 	return ret;
 }
 
+static int hps_do_ioctl_transfer(struct i2c_client *client,
+				 struct hps_transfer_ioctl_data *args)
+{
+	int ret;
+	int nmsg = 0;
+	struct i2c_msg msgs[2] = {
+		{
+			.addr = client->addr,
+			.flags = client->flags,
+		},
+		{
+			.addr = client->addr,
+			.flags = client->flags,
+		},
+	};
+
+	if (args->isize) {
+		msgs[nmsg].len = args->isize;
+		msgs[nmsg].buf = memdup_user(args->ibuf, args->isize);
+		if (IS_ERR(msgs[nmsg].buf)) {
+			ret = PTR_ERR(msgs[nmsg].buf);
+			goto memdup_fail;
+		}
+		nmsg++;
+	}
+
+	if (args->osize) {
+		msgs[nmsg].len = args->osize;
+		msgs[nmsg].buf = memdup_user(args->obuf, args->osize);
+		msgs[nmsg].flags |= I2C_M_RD;
+		if (IS_ERR(msgs[nmsg].buf)) {
+			ret = PTR_ERR(msgs[nmsg].buf);
+			goto memdup_fail;
+		}
+		nmsg++;
+	}
+
+	ret = i2c_transfer(client->adapter, &msgs[0], nmsg);
+	if (ret > 0 && args->osize) {
+		if (copy_to_user(args->obuf, msgs[nmsg - 1].buf, ret))
+			ret = -EFAULT;
+	}
+
+memdup_fail:
+	while (nmsg > 0)
+		kfree(msgs[--nmsg].buf);
+	return ret;
+}
+
+static long hps_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct i2c_client *client = file->private_data;
+
+	switch (cmd) {
+	case HPS_IOC_TRANSFER: {
+		struct hps_transfer_ioctl_data args;
+
+		if (copy_from_user(&args,
+				   (struct hps_transfer_ioctl_data __user *)arg,
+				   sizeof(args))) {
+			return -EFAULT;
+		}
+
+		if (!args.isize && !args.osize)
+			return -EINVAL;
+		if (args.isize > HPS_MAX_MSG_SIZE || args.osize > HPS_MAX_MSG_SIZE)
+			return -EINVAL;
+
+		return hps_do_ioctl_transfer(client, &args);
+	}
+	default:
+		return -EFAULT;
+	}
+}
+
+
 const struct file_operations hps_fops = {
 	.owner = THIS_MODULE,
 	.open = hps_open,
 	.release = hps_release,
+	.unlocked_ioctl = hps_ioctl,
 };
 
 static int hps_i2c_probe(struct i2c_client *client)
