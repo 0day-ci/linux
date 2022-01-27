@@ -52,9 +52,9 @@ static ssize_t info##num##_show(struct device *dev, struct device_attribute *att
 												\
 	if (num > func->num_info)								\
 		return -ENODATA;								\
-	if (!func->info[num-1][0])								\
+	if (!func->info[num - 1][0])								\
 		return 0;									\
-	return sprintf(buf, "%s\n", func->info[num-1]);						\
+	return sysfs_emit(buf, "%s\n", func->info[num - 1]);						\
 }												\
 static DEVICE_ATTR_RO(info##num)
 
