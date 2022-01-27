@@ -1258,10 +1258,55 @@ static void get_intlv_num_chan(struct addr_ctx *ctx)
 	}
 }
 
-static int denormalize_addr(struct addr_ctx *ctx)
+static int calculate_cs_id(struct addr_ctx *ctx)
 {
 	u8 die_id_shift, die_id_mask, socket_id_shift, socket_id_mask;
-	u8 num_intlv_bits, cs_mask = 0;
+	u8 die_id_bit, sock_id_bit, cs_fabric_id, cs_mask = 0;
+
+	/* Read D18F0x50 (FabricBlockInstanceInformation3). */
+	if (df_indirect_read_instance(ctx->nid, 0, 0x50, ctx->inst_id, &ctx->tmp))
+		return -EINVAL;
+
+	cs_fabric_id = (ctx->tmp >> 8) & 0xFF;
+	die_id_bit   = 0;
+
+	/* If interleaved over more than 1 channel: */
+	if (ctx->intlv_num_chan) {
+		die_id_bit = ctx->intlv_num_chan;
+		cs_mask	   = (1 << die_id_bit) - 1;
+		ctx->cs_id = cs_fabric_id & cs_mask;
+	}
+
+	sock_id_bit = die_id_bit;
+
+	/* Read D18F1x208 (SystemFabricIdMask). */
+	if (ctx->intlv_num_dies || ctx->intlv_num_sockets)
+		if (df_indirect_read_broadcast(ctx->nid, 1, 0x208, &ctx->tmp))
+			return -EINVAL;
+
+	/* If interleaved over more than 1 die: */
+	if (ctx->intlv_num_dies) {
+		sock_id_bit  = die_id_bit + ctx->intlv_num_dies;
+		die_id_shift = (ctx->tmp >> 24) & 0xF;
+		die_id_mask  = (ctx->tmp >> 8) & 0xFF;
+
+		ctx->cs_id |= ((cs_fabric_id & die_id_mask) >> die_id_shift) << die_id_bit;
+	}
+
+	/* If interleaved over more than 1 socket: */
+	if (ctx->intlv_num_sockets) {
+		socket_id_shift	= (ctx->tmp >> 28) & 0xF;
+		socket_id_mask	= (ctx->tmp >> 16) & 0xFF;
+
+		ctx->cs_id |= ((cs_fabric_id & socket_id_mask) >> socket_id_shift) << sock_id_bit;
+	}
+
+	return 0;
+}
+
+static int denormalize_addr(struct addr_ctx *ctx)
+{
+	u8 num_intlv_bits;
 
 	/* Return early if no interleaving. */
 	if (ctx->intlv_mode == NONE)
@@ -1276,54 +1321,13 @@ static int denormalize_addr(struct addr_ctx *ctx)
 
 	ctx->make_space_for_cs_id(ctx);
 
+	if (calculate_cs_id(ctx)) {
+		pr_debug("Failed to calculate CS ID");
+		return -EINVAL;
+	}
+
 	if (num_intlv_bits > 0) {
-		u8 die_id_bit, sock_id_bit, cs_fabric_id;
 		u64 temp_addr_i;
-
-		/*
-		 * Read FabricBlockInstanceInformation3_CS[BlockFabricID].
-		 * This is the fabric id for this coherent slave. Use
-		 * umc/channel# as instance id of the coherent slave
-		 * for FICAA.
-		 */
-		if (df_indirect_read_instance(ctx->nid, 0, 0x50, ctx->inst_id, &ctx->tmp))
-			return -EINVAL;
-
-		cs_fabric_id = (ctx->tmp >> 8) & 0xFF;
-		die_id_bit   = 0;
-
-		/* If interleaved over more than 1 channel: */
-		if (ctx->intlv_num_chan) {
-			die_id_bit = ctx->intlv_num_chan;
-			cs_mask	   = (1 << die_id_bit) - 1;
-			ctx->cs_id = cs_fabric_id & cs_mask;
-		}
-
-		sock_id_bit = die_id_bit;
-
-		/* Read D18F1x208 (SystemFabricIdMask). */
-		if (ctx->intlv_num_dies || ctx->intlv_num_sockets)
-			if (df_indirect_read_broadcast(ctx->nid, 1, 0x208, &ctx->tmp))
-				return -EINVAL;
-
-		/* If interleaved over more than 1 die. */
-		if (ctx->intlv_num_dies) {
-			sock_id_bit  = die_id_bit + ctx->intlv_num_dies;
-			die_id_shift = (ctx->tmp >> 24) & 0xF;
-			die_id_mask  = (ctx->tmp >> 8) & 0xFF;
-
-			ctx->cs_id |= ((cs_fabric_id & die_id_mask)
-					>> die_id_shift) << die_id_bit;
-		}
-
-		/* If interleaved over more than 1 socket. */
-		if (ctx->intlv_num_sockets) {
-			socket_id_shift	= (ctx->tmp >> 28) & 0xF;
-			socket_id_mask	= (ctx->tmp >> 16) & 0xFF;
-
-			ctx->cs_id |= ((cs_fabric_id & socket_id_mask)
-					>> socket_id_shift) << sock_id_bit;
-		}
 
 		/*
 		 * The pre-interleaved address consists of XXXXXXIIIYYYYY
