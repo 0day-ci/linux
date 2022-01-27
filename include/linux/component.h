@@ -3,7 +3,8 @@
 #define COMPONENT_H
 
 #include <linux/stddef.h>
-
+#include <linux/device/driver.h>
+#include <linux/refcount.h>
 
 struct device;
 
@@ -82,10 +83,65 @@ struct component_master_ops {
 	void (*unbind)(struct device *master);
 };
 
+/**
+ * struct aggregate_driver - Aggregate driver (made up of other drivers)
+ * @count: driver registration refcount
+ * @driver: device driver
+ */
+struct aggregate_driver {
+	/**
+	 * @probe:
+	 *
+	 * Called when all components or the aggregate driver, as specified in
+	 * the aggregate_device's match list are
+	 * ready. Usually there are 3 steps to bind an aggregate driver:
+	 *
+	 * 1. Allocate a struct aggregate_driver.
+	 *
+	 * 2. Bind all components to the aggregate driver by calling
+	 *    component_bind_all() with the aggregate driver structure as opaque
+	 *    pointer data.
+	 *
+	 * 3. Register the aggregate driver with the subsystem to publish its
+	 *    interfaces.
+	 */
+	int (*probe)(struct aggregate_device *adev);
+	/**
+	 * @remove:
+	 *
+	 * Called when either the aggregate driver, using
+	 * component_aggregate_unregister(), or one of its components, using
+	 * component_del(), is unregistered.
+	 */
+	void (*remove)(struct aggregate_device *adev);
+	/**
+	 * @shutdown:
+	 *
+	 * Called when the system is shutting down.
+	 */
+	void (*shutdown)(struct aggregate_device *adev);
+
+	refcount_t		count;
+	struct device_driver	driver;
+};
+
+static inline struct aggregate_driver *to_aggregate_driver(struct device_driver *d)
+{
+	if (!d)
+		return NULL;
+
+	return container_of(d, struct aggregate_driver, driver);
+}
+
 void component_master_del(struct device *,
 	const struct component_master_ops *);
 
 struct component_match;
+
+int component_aggregate_register(struct device *parent,
+	struct aggregate_driver *adrv, struct component_match *match);
+void component_aggregate_unregister(struct device *parent,
+	struct aggregate_driver *adrv);
 
 int component_master_add_with_match(struct device *,
 	const struct component_master_ops *, struct component_match *);
