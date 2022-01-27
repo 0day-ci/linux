@@ -107,17 +107,15 @@ err1:
 	return -EINVAL;
 }
 
-static int check_addr(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
+static int check_addr(struct rxe_dev *rxe, struct sk_buff *skb,
 		      struct rxe_qp *qp)
 {
-	struct sk_buff *skb = PKT_TO_SKB(pkt);
-
 	if (qp_type(qp) != IB_QPT_RC && qp_type(qp) != IB_QPT_UC)
 		goto done;
 
-	if (unlikely(pkt->port_num != qp->attr.port_num)) {
+	if (unlikely(RXECB(skb)->port_num != qp->attr.port_num)) {
 		pr_warn_ratelimited("port %d != qp port %d\n",
-				    pkt->port_num, qp->attr.port_num);
+				    RXECB(skb)->port_num, qp->attr.port_num);
 		goto err1;
 	}
 
@@ -167,8 +165,9 @@ err1:
 	return -EINVAL;
 }
 
-static int hdr_check(struct rxe_pkt_info *pkt)
+static int hdr_check(struct sk_buff *skb)
 {
+	struct rxe_pkt_info *pkt = RXECB(skb);
 	struct rxe_dev *rxe = pkt->rxe;
 	struct rxe_port *port = &rxe->port;
 	struct rxe_qp *qp = NULL;
@@ -199,7 +198,7 @@ static int hdr_check(struct rxe_pkt_info *pkt)
 		if (unlikely(err))
 			goto err2;
 
-		err = check_addr(rxe, pkt, qp);
+		err = check_addr(rxe, skb, qp);
 		if (unlikely(err))
 			goto err2;
 
@@ -222,17 +221,19 @@ err1:
 	return -EINVAL;
 }
 
-static inline void rxe_rcv_pkt(struct rxe_pkt_info *pkt, struct sk_buff *skb)
+static inline void rxe_rcv_pkt(struct sk_buff *skb)
 {
-	if (pkt->mask & RXE_REQ_MASK)
-		rxe_resp_queue_pkt(pkt->qp, skb);
+	if (RXECB(skb)->mask & RXE_REQ_MASK)
+		rxe_resp_queue_pkt(RXECB(skb)->qp, skb);
 	else
-		rxe_comp_queue_pkt(pkt->qp, skb);
+		rxe_comp_queue_pkt(RXECB(skb)->qp, skb);
 }
 
-static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
+static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 {
-	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
+	struct sk_buff *s;
+	struct rxe_pkt_info *pkt = RXECB(skb);
+	struct rxe_dev *rxe = pkt->rxe;
 	struct rxe_mcg *mcg;
 	struct rxe_mca *mca;
 	struct rxe_qp *qp;
@@ -274,26 +275,22 @@ static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 		 * the last QP in the list.
 		 */
 		if (mca->qp_list.next != &mcg->qp_list) {
-			struct sk_buff *cskb;
-			struct rxe_pkt_info *cpkt;
-
-			cskb = skb_clone(skb, GFP_ATOMIC);
-			if (unlikely(!cskb))
+			s = skb_clone(skb, GFP_ATOMIC);
+			if (unlikely(!s))
 				continue;
 
 			if (WARN_ON(!ib_device_try_get(&rxe->ib_dev))) {
-				kfree_skb(cskb);
+				kfree_skb(s);
 				break;
 			}
 
-			cpkt = SKB_TO_PKT(cskb);
-			cpkt->qp = qp;
+			RXECB(s)->qp = qp;
 			rxe_add_ref(qp);
-			rxe_rcv_pkt(cpkt, cskb);
+			rxe_rcv_pkt(s);
 		} else {
-			pkt->qp = qp;
+			RXECB(skb)->qp = qp;
 			rxe_add_ref(qp);
-			rxe_rcv_pkt(pkt, skb);
+			rxe_rcv_pkt(skb);
 			skb = NULL;	/* mark consumed */
 		}
 	}
@@ -326,7 +323,7 @@ drop:
  */
 static int rxe_chk_dgid(struct rxe_dev *rxe, struct sk_buff *skb)
 {
-	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
+	struct rxe_pkt_info *pkt = RXECB(skb);
 	const struct ib_gid_attr *gid_attr;
 	union ib_gid dgid;
 	union ib_gid *pdgid;
@@ -359,7 +356,7 @@ static int rxe_chk_dgid(struct rxe_dev *rxe, struct sk_buff *skb)
 void rxe_rcv(struct sk_buff *skb)
 {
 	int err;
-	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
+	struct rxe_pkt_info *pkt = RXECB(skb);
 	struct rxe_dev *rxe = pkt->rxe;
 
 	if (unlikely(skb->len < RXE_BTH_BYTES))
@@ -378,7 +375,7 @@ void rxe_rcv(struct sk_buff *skb)
 	if (unlikely(skb->len < header_size(pkt)))
 		goto drop;
 
-	err = hdr_check(pkt);
+	err = hdr_check(skb);
 	if (unlikely(err))
 		goto drop;
 
@@ -389,9 +386,9 @@ void rxe_rcv(struct sk_buff *skb)
 	rxe_counter_inc(rxe, RXE_CNT_RCVD_PKTS);
 
 	if (unlikely(bth_qpn(pkt) == IB_MULTICAST_QPN))
-		rxe_rcv_mcast_pkt(rxe, skb);
+		rxe_rcv_mcast_pkt(skb);
 	else
-		rxe_rcv_pkt(pkt, skb);
+		rxe_rcv_pkt(skb);
 
 	return;
 
