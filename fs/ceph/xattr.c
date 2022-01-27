@@ -924,6 +924,7 @@ ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 	struct ceph_inode_info *ci = ceph_inode(inode);
 	struct ceph_inode_xattr *xattr;
 	struct ceph_vxattr *vxattr = NULL;
+	struct ceph_mds_session *session = NULL;
 	int req_mask;
 	ssize_t err;
 
@@ -945,6 +946,22 @@ ssize_t __ceph_getxattr(struct inode *inode, const char *name, void *value,
 				err = -ERANGE;
 		}
 		return err;
+	} else {
+		err = -ENODATA;
+		spin_lock(&ci->i_ceph_lock);
+		if (strncmp(name, XATTR_CEPH_PREFIX, XATTR_CEPH_PREFIX_LEN))
+			goto out;
+		/* check if the auth mds supports the getvxattr feature */
+		session = ci->i_auth_cap->session;
+		if (!session)
+			goto out;
+
+		if (test_bit(CEPHFS_FEATURE_GETVXATTR, &session->s_features)) {
+			spin_unlock(&ci->i_ceph_lock);
+			err = ceph_do_getvxattr(inode, name, value, size);
+			spin_lock(&ci->i_ceph_lock);
+		}
+		goto out;
 	}
 
 	req_mask = __get_request_mask(inode);
