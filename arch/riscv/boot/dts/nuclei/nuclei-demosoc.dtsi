@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/* Copyright (c) 2022 Nuclei System Technology */
+
+/ {
+	/*
+	 * Nuclei DemoSoC is a 32-bit design even if 64-bit CPU core is
+	 * integrated into it.
+	 */
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	clocks {
+		/* For most of the SoC */
+		hfclk: hfclk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <16000000>;
+		};
+
+		/* For always-on zone */
+		lfclk: lfclk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <32768>;
+		};
+	};
+
+	/*
+	 * The interrupt controller and all peripherals' interrupt parent
+	 * are to be defined in individual CPU cores' DemoSoC DT.
+	 */
+	ppi: ppi {
+		compatible = "simple-bus";
+		ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		uart0: serial@10010000 {
+			compatible = "nuclei,demosoc-uart", "sifive,uart0";
+			reg = <0x10013000 0x1000>;
+			clocks = <&hfclk>;
+			interrupts = <33>;
+			status = "disabled";
+		};
+
+		qspi0: spi@10014000 {
+			compatible = "nuclei,demosoc-spi", "sifive,spi0";
+			reg = <0x10014000 0x1000>,
+			      <0x20000000 0x20000000>;
+			interrupts = <35>;
+			clocks = <&hfclk>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+
+		qspi2: spi@10034000 {
+			compatible = "nuclei,demosoc-spi", "sifive,spi0";
+			reg = <0x10034000 0x1000>;
+			interrupts = <37>;
+			clocks = <&hfclk>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+	};
+};

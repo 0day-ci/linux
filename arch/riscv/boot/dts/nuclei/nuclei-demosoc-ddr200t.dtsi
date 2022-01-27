@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/* Copyright (c) 2022 Nuclei System Technology */
+
+/ {
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@a0000000 {
+		device_type = "memory";
+		reg = <0xa0000000 0xe000000>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&qspi0 {
+	status = "okay";
+
+	spi_nor: flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+	};
+};
+
+&qspi2 {
+	status = "okay";
+
+	spi_mmc: mmc@0 {
+		compatible = "mmc-spi-slot";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+	};
+};

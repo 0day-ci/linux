@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/* Copyright (c) 2022 Nuclei System Technology */
+
+/dts-v1/;
+
+#include "nuclei-demosoc-ux600.dtsi"
+#include "nuclei-demosoc-ddr200t.dtsi"
+
+/ {
+	model = "Nuclei DemoSoC with UX600 on DDR200T";
+	compatible = "nuclei,demosoc-ux600-ddr200t",
+		     "nuclei,demosoc-ux600", "nuclei,demosoc";
+};
