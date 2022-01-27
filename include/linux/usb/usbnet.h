@@ -23,6 +23,10 @@
 #ifndef	__LINUX_USB_USBNET_H
 #define	__LINUX_USB_USBNET_H
 
+#include <linux/mii.h>
+#include <linux/usb.h>
+#include <net/devlink.h>
+
 /* interface from usbnet core to each USB networking link we handle */
 struct usbnet {
 	/* housekeeping */
@@ -84,6 +88,17 @@ struct usbnet {
 #		define EVENT_LINK_CHANGE	11
 #		define EVENT_SET_RX_MODE	12
 #		define EVENT_NO_IP_ALIGN	13
+
+	struct devlink *devlink;
+};
+
+struct usbnet_devlink_priv {
+	struct devlink_port devlink_port;
+	struct usbnet *usbnet;
+	struct devlink_health_reporter *usb_rx_fault_reporter;
+	struct devlink_health_reporter *usb_tx_fault_reporter;
+	struct devlink_health_reporter *usb_ctrl_fault_reporter;
+	struct devlink_health_reporter *usb_intr_fault_reporter;
 };
 
 static inline struct usb_driver *driver_of(struct usb_interface *intf)
@@ -288,5 +303,14 @@ extern int usbnet_status_start(struct usbnet *dev, gfp_t mem_flags);
 extern void usbnet_status_stop(struct usbnet *dev);
 
 extern void usbnet_update_max_qlen(struct usbnet *dev);
+
+int usbnet_devlink_alloc(struct usbnet *dev);
+void usbnet_devlink_free(struct usbnet *dev);
+void usbnet_devlink_register(struct usbnet *dev);
+void usbnet_devlink_unregister(struct usbnet *dev);
+int usbnet_usb_tx_health_report(struct usbnet *dev, char *str, int err);
+int usbnet_usb_rx_health_report(struct usbnet *dev, char *str, int err);
+int usbnet_usb_ctrl_health_report(struct usbnet *dev, char *str, int err);
+int usbnet_usb_intr_health_report(struct usbnet *dev, char *str, int err);
 
 #endif /* __LINUX_USB_USBNET_H */

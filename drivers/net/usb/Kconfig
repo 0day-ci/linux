@@ -133,6 +133,7 @@ config USB_LAN78XX
 config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
 	select MII
+	select NET_DEVLINK
 	help
 	  This driver supports several kinds of network links over USB,
 	  with "minidrivers" built around a common network driver core
