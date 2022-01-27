@@ -319,6 +319,15 @@ void pks_setup(void)
 	cr4_set_bits(X86_CR4_PKS);
 }
 
+static void __pks_update_protection(int pkey, u32 protection)
+{
+	u32 pkrs = current->thread.pks_saved_pkrs;
+
+	current->thread.pks_saved_pkrs = pkey_update_pkval(pkrs, pkey,
+							   protection);
+	pks_write_pkrs(current->thread.pks_saved_pkrs);
+}
+
 /*
  * Do not call this directly, see pks_mk*().
  *
@@ -332,18 +341,46 @@ void pks_setup(void)
  */
 void pks_update_protection(int pkey, u32 protection)
 {
-	u32 pkrs;
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	preempt_disable();
+	__pks_update_protection(pkey, protection);
+	preempt_enable();
+}
+EXPORT_SYMBOL_GPL(pks_update_protection);
+
+/**
+ * pks_update_exception() - Update the protections of a faulted thread
+ *
+ * @regs: Faulting thread registers
+ * @pkey: pkey to update
+ * @protection: protection bits to use.
+ *
+ * CONTEXT: Exception
+ *
+ * pks_update_protection() updates the protection of the current running
+ * context.  It will not work to change the protections of a thread which has
+ * been interrupted.  If a PKS fault callback fires it may want to update the
+ * faulted threads protections in addition to it's own.
+ *
+ * Use pks_update_exception() to update the faulted threads protections
+ * in addition to the current context.
+ */
+void pks_update_exception(struct pt_regs *regs, int pkey, u32 protection)
+{
+	struct pt_regs_extended *ept_regs;
+	u32 old;
 
 	if (!cpu_feature_enabled(X86_FEATURE_PKS))
 		return;
 
-	pkrs = current->thread.pks_saved_pkrs;
-	current->thread.pks_saved_pkrs = pkey_update_pkval(pkrs, pkey,
-							   protection);
-	preempt_disable();
-	pks_write_pkrs(current->thread.pks_saved_pkrs);
-	preempt_enable();
+	__pks_update_protection(pkey, protection);
+
+	ept_regs = to_extended_pt_regs(regs);
+	old = ept_regs->aux.pks_thread_pkrs;
+	ept_regs->aux.pks_thread_pkrs = pkey_update_pkval(old, pkey, protection);
 }
-EXPORT_SYMBOL_GPL(pks_update_protection);
+EXPORT_SYMBOL_GPL(pks_update_exception);
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */

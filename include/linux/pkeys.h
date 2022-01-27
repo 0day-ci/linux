@@ -56,6 +56,7 @@ static inline bool arch_pkeys_enabled(void)
 #include <uapi/asm-generic/mman-common.h>
 
 void pks_update_protection(int pkey, u32 protection);
+void pks_update_exception(struct pt_regs *regs, int pkey, u32 protection);
 
 /**
  * pks_mk_noaccess() - Disable all access to the domain
@@ -85,6 +86,10 @@ static inline void pks_mk_readwrite(int pkey)
 
 static inline void pks_mk_noaccess(int pkey) {}
 static inline void pks_mk_readwrite(int pkey) {}
+static inline void pks_update_exception(struct pt_regs *regs,
+					int pkey,
+					u32 protection)
+{ }
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
