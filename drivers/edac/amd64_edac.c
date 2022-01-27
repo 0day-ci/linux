@@ -1357,44 +1357,41 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 
 	if (remove_dram_offset(&ctx)) {
 		pr_debug("Failed to remove DRAM offset");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	if (get_dram_addr_map(&ctx)) {
 		pr_debug("Failed to get DRAM address map");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	if (df_ops->get_intlv_mode(&ctx)) {
 		pr_debug("Failed to get interleave mode");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	if (denormalize_addr(&ctx)) {
 		pr_debug("Failed to denormalize address");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	if (add_base_and_hole(&ctx)) {
 		pr_debug("Failed to add DRAM base address and hole");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	if (ctx.dehash_addr && ctx.dehash_addr(&ctx)) {
 		pr_debug("Failed to dehash address");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	if (addr_over_limit(&ctx)) {
 		pr_debug("Calculated address is over limit");
-		goto out_err;
+		return -EINVAL;
 	}
 
 	*sys_addr = ctx.ret_addr;
 	return 0;
-
-out_err:
-	return -EINVAL;
 }
 
 static int get_channel_from_ecc_syndrome(struct mem_ctl_info *, u16);
