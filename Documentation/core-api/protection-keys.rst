@@ -115,7 +115,8 @@ Overview
 
 Similar to user space pkeys, supervisor pkeys allow additional protections to
 be defined for a supervisor mappings.  Unlike user space pkeys, violations of
-these protections result in a kernel oops.
+these protections result in a kernel oops unless a PKS fault handler is
+provided which handles the fault.
 
 Supervisor Memory Protection Keys (PKS) is a feature which is found on Intel's
 Sapphire Rapids (and later) "Scalable Processor" Server CPUs.  It will also be
@@ -149,6 +150,12 @@ Changing permissions of individual keys
 
 .. kernel-doc:: arch/x86/mm/pkeys.c
         :identifiers: pks_update_exception
+
+Overriding Default Fault Behavior
+---------------------------------
+
+.. kernel-doc:: arch/x86/mm/pkeys.c
+        :doc: DEFINE_PKS_FAULT_CALLBACK
 
 MSR details
 -----------

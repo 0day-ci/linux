@@ -27,6 +27,7 @@
  *	{
  *		PKS_KEY_DEFAULT         = 0,
  *		PKS_KEY_MY_FEATURE      = 1,
+ *		PKS_KEY_NR_CONSUMERS    = 2,
  *	}
  *
  *	#define PKS_INIT_VALUE (PKR_RW_KEY(PKS_KEY_DEFAULT)		|
@@ -43,6 +44,7 @@
 enum pks_pkey_consumers {
 	PKS_KEY_DEFAULT		= 0, /* Must be 0 for default PTE values */
 	PKS_KEY_TEST		= 1,
+	PKS_KEY_NR_CONSUMERS	= 2,
 };
 
 #define PKS_INIT_VALUE (PKR_RW_KEY(PKS_KEY_DEFAULT)		| \
