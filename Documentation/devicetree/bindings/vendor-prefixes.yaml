@@ -842,6 +842,8 @@ patternProperties:
     description: Nordic Semiconductor
   "^novtech,.*":
     description: NovTech, Inc.
+  "^nuclei,.*":
+    description: Nuclei System Technology
   "^nutsboard,.*":
     description: NutsBoard
   "^nuvoton,.*":
