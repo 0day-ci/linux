@@ -79,11 +79,6 @@
 			gpios = <&gpio ASPEED_GPIO(AA, 5) GPIO_ACTIVE_LOW>;
 		};
 	};
-
-	beeper {
-		compatible = "pwm-beeper";
-		pwms = <&timer 5 1000000 0>;
-	};
 };
 
 &fmc {
@@ -163,14 +158,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd2_default>;
 	disable-wp;
-};
-
-&timer {
-	fttmr010,pwm-outputs = <5>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_timer5_default>;
-	#pwm-cells = <3>;
-	status = "okay";
 };
 
 &uart1 {
