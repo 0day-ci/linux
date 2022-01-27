@@ -1101,11 +1101,11 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages,
 	spin_unlock_irqrestore(&zone->lock, flags);
 
 	/*
-	 * If this zone is not populated, then it is not in zonelist.
+	 * If this zone is not managed, then it is not in zonelist.
 	 * This means the page allocator ignores this zone.
 	 * So, zonelist must be updated after online.
 	 */
-	if (!populated_zone(zone)) {
+	if (!managed_zone(zone)) {
 		need_zonelists_rebuild = 1;
 		setup_zone_pageset(zone);
 	}
@@ -1990,7 +1990,7 @@ int __ref offline_pages(unsigned long start_pfn, unsigned long nr_pages,
 	/* reinitialise watermarks and update pcp limits */
 	init_per_zone_wmark_min();
 
-	if (!populated_zone(zone)) {
+	if (!managed_zone(zone)) {
 		zone_pcp_reset(zone);
 		build_all_zonelists(NULL);
 	}
