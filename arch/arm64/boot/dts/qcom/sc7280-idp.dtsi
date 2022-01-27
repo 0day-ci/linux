@@ -598,3 +598,7 @@
 		bias-pull-up;
 	};
 };
+
+&remoteproc_wpss {
+	status = "okay";
+};
