@@ -365,6 +365,7 @@ struct rxe_mcg {
 struct rxe_mca {
 	struct list_head	qp_list;
 	struct rxe_qp		*qp;
+	struct rcu_head		rcu;
 };
 
 struct rxe_port {

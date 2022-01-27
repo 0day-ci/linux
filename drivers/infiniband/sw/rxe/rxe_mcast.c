@@ -27,7 +27,8 @@
  * the mcg is created and an extra kref_put when the qp count decreases
  * to zero.
  *
- * The qp list and the red-black tree are protected by a single
+ * The qp list is protected for read operations by RCU and the qp list and
+ * the red-black tree are protected for write operations by a single
  * rxe->mcg_lock per device.
  */
 
@@ -270,7 +271,7 @@ void rxe_cleanup_mcg(struct kref *kref)
 }
 
 /**
- * __rxe_init_mca - initialize a new mca holding lock
+ * __rxe_init_mca_rcu - initialize a new mca holding lock
  * @qp: qp object
  * @mcg: mcg object
  * @mca: empty space for new mca
@@ -280,7 +281,7 @@ void rxe_cleanup_mcg(struct kref *kref)
  *
  * Returns: 0 on success else an error
  */
-static int __rxe_init_mca(struct rxe_qp *qp, struct rxe_mcg *mcg,
+static int __rxe_init_mca_rcu(struct rxe_qp *qp, struct rxe_mcg *mcg,
 			  struct rxe_mca *mca)
 {
 	struct rxe_dev *rxe = to_rdev(qp->ibqp.device);
@@ -304,7 +305,7 @@ static int __rxe_init_mca(struct rxe_qp *qp, struct rxe_mcg *mcg,
 	rxe_add_ref(qp);
 	mca->qp = qp;
 
-	list_add_tail(&mca->qp_list, &mcg->qp_list);
+	list_add_tail_rcu(&mca->qp_list, &mcg->qp_list);
 
 	return 0;
 }
@@ -324,14 +325,14 @@ static int rxe_attach_mcg(struct rxe_mcg *mcg, struct rxe_qp *qp)
 	int err;
 
 	/* check to see if the qp is already a member of the group */
-	spin_lock_bh(&rxe->mcg_lock);
-	list_for_each_entry(mca, &mcg->qp_list, qp_list) {
+	rcu_read_lock();
+	list_for_each_entry_rcu(mca, &mcg->qp_list, qp_list) {
 		if (mca->qp == qp) {
-			spin_unlock_bh(&rxe->mcg_lock);
+			rcu_read_unlock();
 			return 0;
 		}
 	}
-	spin_unlock_bh(&rxe->mcg_lock);
+	rcu_read_unlock();
 
 	/* speculative alloc new mca without using GFP_ATOMIC */
 	new_mca = kzalloc(sizeof(*mca), GFP_KERNEL);
@@ -340,16 +341,19 @@ static int rxe_attach_mcg(struct rxe_mcg *mcg, struct rxe_qp *qp)
 
 	spin_lock_bh(&rxe->mcg_lock);
 	/* re-check to see if someone else just attached qp */
-	list_for_each_entry(mca, &mcg->qp_list, qp_list) {
+	rcu_read_lock();
+	list_for_each_entry_rcu(mca, &mcg->qp_list, qp_list) {
 		if (mca->qp == qp) {
+			rcu_read_unlock();
 			kfree(new_mca);
 			err = 0;
 			goto done;
 		}
 	}
+	rcu_read_unlock();
 
 	mca = new_mca;
-	err = __rxe_init_mca(qp, mcg, mca);
+	err = __rxe_init_mca_rcu(qp, mcg, mca);
 	if (err)
 		kfree(mca);
 done:
@@ -359,21 +363,23 @@ done:
 }
 
 /**
- * __rxe_cleanup_mca - cleanup mca object holding lock
+ * __rxe_cleanup_mca_rcu - cleanup mca object holding lock
  * @mca: mca object
  * @mcg: mcg object
  *
  * Context: caller must hold a reference to mcg and rxe->mcg_lock
  */
-static void __rxe_cleanup_mca(struct rxe_mca *mca, struct rxe_mcg *mcg)
+static void __rxe_cleanup_mca_rcu(struct rxe_mca *mca, struct rxe_mcg *mcg)
 {
-	list_del(&mca->qp_list);
+	list_del_rcu(&mca->qp_list);
 
 	atomic_dec(&mcg->qp_num);
 	atomic_dec(&mcg->rxe->mcg_attach);
 	atomic_dec(&mca->qp->mcg_num);
 
 	rxe_drop_ref(mca->qp);
+
+	kfree_rcu(mca, rcu);
 }
 
 /**
@@ -386,22 +392,29 @@ static void __rxe_cleanup_mca(struct rxe_mca *mca, struct rxe_mcg *mcg)
 static int rxe_detach_mcg(struct rxe_mcg *mcg, struct rxe_qp *qp)
 {
 	struct rxe_dev *rxe = mcg->rxe;
-	struct rxe_mca *mca, *tmp;
+	struct rxe_mca *mca;
+	int ret;
 
 	spin_lock_bh(&rxe->mcg_lock);
-	list_for_each_entry_safe(mca, tmp, &mcg->qp_list, qp_list) {
+	rcu_read_lock();
+	list_for_each_entry_rcu(mca, &mcg->qp_list, qp_list) {
 		if (mca->qp == qp) {
-			__rxe_cleanup_mca(mca, mcg);
-			if (atomic_read(&mcg->qp_num) <= 0)
-				kref_put(&mcg->ref_cnt, __rxe_cleanup_mcg);
-			spin_unlock_bh(&rxe->mcg_lock);
-			kfree(mca);
-			return 0;
+			rcu_read_unlock();
+			goto found;
 		}
 	}
+	rcu_read_unlock();
+	ret = -EINVAL;
+	goto done;
+found:
+	__rxe_cleanup_mca_rcu(mca, mcg);
+	if (atomic_read(&mcg->qp_num) <= 0)
+		kref_put(&mcg->ref_cnt, __rxe_cleanup_mcg);
+	ret = 0;
+done:
 	spin_unlock_bh(&rxe->mcg_lock);
 
-	return -EINVAL;
+	return ret;
 }
 
 /**
