@@ -19,6 +19,7 @@
  * * 3  Check the context armed in '2' to ensure the MSR value was preserved
  * * 4  Test that the exception thread PKRS remains independent of the
  *      interrupted threads PKRS
+ * * 5  Test setting a key to RD/WR in a fault callback to abandon a key
  * * 8  Loop through all CPUs, report the msr, and check against the default.
  * * 9  Set up and fault on a PKS protected page.
  *
@@ -56,6 +57,7 @@
 #define ARM_CTX_SWITCH		2
 #define CHECK_CTX_SWITCH	3
 #define RUN_EXCEPTION		4
+#define RUN_FAULT_ABANDON	5
 #define RUN_CRASH_TEST		9
 
 DECLARE_PER_CPU(u32, pkrs_cache);
@@ -519,6 +521,75 @@ static void check_ctx_switch(struct file *file)
 	}
 }
 
+struct {
+	struct pks_test_ctx *ctx;
+	void *test_page;
+	bool armed;
+	bool callback_seen;
+} fault_callback_ctx;
+
+bool pks_test_fault_callback(struct pt_regs *regs, unsigned long address,
+			     bool write)
+{
+	if (!fault_callback_ctx.armed)
+		return false;
+
+	fault_callback_ctx.armed = false;
+	fault_callback_ctx.callback_seen = true;
+
+	pks_update_exception(regs, fault_callback_ctx.ctx->pkey, 0);
+
+	return true;
+}
+
+static bool run_fault_clear_test(void)
+{
+	struct pks_test_ctx *ctx;
+	void *test_page;
+	bool rc = true;
+
+	ctx = alloc_ctx(PKS_KEY_TEST);
+	if (IS_ERR(ctx))
+		return false;
+
+	test_page = alloc_test_page(ctx->pkey);
+	if (!test_page) {
+		pr_err("Failed to vmalloc page???\n");
+		free_ctx(ctx);
+		return false;
+	}
+
+	test_armed_key = PKS_KEY_TEST;
+	fault_callback_ctx.ctx = ctx;
+	fault_callback_ctx.test_page = test_page;
+	fault_callback_ctx.armed = true;
+	fault_callback_ctx.callback_seen = false;
+
+	pks_mk_noaccess(test_armed_key);
+
+	/* fault */
+	memcpy(test_page, ctx->data, 8);
+
+	if (!fault_callback_ctx.callback_seen) {
+		pr_err("Failed to see the callback\n");
+		rc = false;
+		goto done;
+	}
+
+	/* no fault */
+	fault_callback_ctx.callback_seen = false;
+	memcpy(test_page, ctx->data, 8);
+
+	if (fault_caught() || fault_callback_ctx.callback_seen) {
+		pr_err("The key failed to be set RD/WR in the callback\n");
+		return false;
+	}
+
+done:
+	free_ctx(ctx);
+	return rc;
+}
+
 static ssize_t pks_read_file(struct file *file, char __user *user_buf,
 			     size_t count, loff_t *ppos)
 {
@@ -571,6 +642,9 @@ static ssize_t pks_write_file(struct file *file, const char __user *user_buf,
 		break;
 	case RUN_EXCEPTION:
 		last_test_pass = run_exception_test();
+		break;
+	case RUN_FAULT_ABANDON:
+		last_test_pass = run_fault_clear_test();
 		break;
 	default:
 		last_test_pass = false;
