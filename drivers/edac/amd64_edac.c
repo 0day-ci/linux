@@ -1073,7 +1073,10 @@ struct addr_ctx {
 	u32 reg_dram_offset;
 	u32 reg_base_addr;
 	u32 reg_limit_addr;
+	u32 reg_fab_id_mask0;
 	u16 cs_fabric_id;
+	u16 die_id_mask;
+	u16 socket_id_mask;
 	u16 nid;
 	u8 inst_id;
 	u8 map_num;
@@ -1089,8 +1092,11 @@ struct addr_ctx {
 
 struct data_fabric_ops {
 	u64	(*get_hi_addr_offset)(struct addr_ctx *ctx);
+	u8	(*get_die_id_shift)(struct addr_ctx *ctx);
+	u8	(*get_socket_id_shift)(struct addr_ctx *ctx);
 	int	(*get_intlv_mode)(struct addr_ctx *ctx);
 	int	(*get_cs_fabric_id)(struct addr_ctx *ctx);
+	int	(*get_masks)(struct addr_ctx *ctx);
 	void	(*get_intlv_num_dies)(struct addr_ctx *ctx);
 	void	(*get_intlv_num_sockets)(struct addr_ctx *ctx);
 };
@@ -1185,12 +1191,37 @@ static int get_cs_fabric_id_df2(struct addr_ctx *ctx)
 	return 0;
 }
 
+static int get_masks_df2(struct addr_ctx *ctx)
+{
+	/* Read D18F1x208 (SystemFabricIdMask). */
+	if (df_indirect_read_broadcast(ctx->nid, 1, 0x208, &ctx->reg_fab_id_mask0))
+		return -EINVAL;
+
+	ctx->die_id_mask    = (ctx->reg_fab_id_mask0 >> 8) & 0xFF;
+	ctx->socket_id_mask = (ctx->reg_fab_id_mask0 >> 16) & 0xFF;
+
+	return 0;
+}
+
+static u8 get_die_id_shift_df2(struct addr_ctx *ctx)
+{
+	return (ctx->reg_fab_id_mask0 >> 24) & 0xF;
+}
+
+static u8 get_socket_id_shift_df2(struct addr_ctx *ctx)
+{
+	return (ctx->reg_fab_id_mask0 >> 28) & 0xF;
+}
+
 struct data_fabric_ops df2_ops = {
 	.get_hi_addr_offset		=	get_hi_addr_offset_df2,
 	.get_intlv_mode			=	get_intlv_mode_df2,
 	.get_intlv_num_dies		=	get_intlv_num_dies_df2,
 	.get_intlv_num_sockets		=	get_intlv_num_sockets_df2,
 	.get_cs_fabric_id		=	get_cs_fabric_id_df2,
+	.get_masks			=	get_masks_df2,
+	.get_die_id_shift		=	get_die_id_shift_df2,
+	.get_socket_id_shift		=	get_socket_id_shift_df2,
 };
 
 struct data_fabric_ops *df_ops;
@@ -1281,7 +1312,6 @@ static void get_intlv_num_chan(struct addr_ctx *ctx)
 
 static int calculate_cs_id(struct addr_ctx *ctx)
 {
-	u8 die_id_shift, die_id_mask, socket_id_shift, socket_id_mask;
 	u8 die_id_bit = 0, sock_id_bit, cs_mask = 0;
 
 	/* If interleaved over more than 1 channel: */
@@ -1291,28 +1321,26 @@ static int calculate_cs_id(struct addr_ctx *ctx)
 		ctx->cs_id = ctx->cs_fabric_id & cs_mask;
 	}
 
-	sock_id_bit = die_id_bit;
+	/* Return early if no die interleaving and no socket interleaving. */
+	if (!(ctx->intlv_num_dies || ctx->intlv_num_sockets))
+		return 0;
 
-	/* Read D18F1x208 (SystemFabricIdMask). */
-	if (ctx->intlv_num_dies || ctx->intlv_num_sockets)
-		if (df_indirect_read_broadcast(ctx->nid, 1, 0x208, &ctx->tmp))
-			return -EINVAL;
+	sock_id_bit = die_id_bit;
 
 	/* If interleaved over more than 1 die: */
 	if (ctx->intlv_num_dies) {
-		sock_id_bit  = die_id_bit + ctx->intlv_num_dies;
-		die_id_shift = (ctx->tmp >> 24) & 0xF;
-		die_id_mask  = (ctx->tmp >> 8) & 0xFF;
+		u8 die_id_shift = df_ops->get_die_id_shift(ctx);
 
-		ctx->cs_id |= ((ctx->cs_fabric_id & die_id_mask) >> die_id_shift) << die_id_bit;
+		sock_id_bit  = die_id_bit + ctx->intlv_num_dies;
+		ctx->cs_id |= ((ctx->cs_fabric_id & ctx->die_id_mask)
+				>> die_id_shift) << die_id_bit;
 	}
 
 	/* If interleaved over more than 1 socket: */
 	if (ctx->intlv_num_sockets) {
-		socket_id_shift	= (ctx->tmp >> 28) & 0xF;
-		socket_id_mask	= (ctx->tmp >> 16) & 0xFF;
+		u8 socket_id_shift = df_ops->get_socket_id_shift(ctx);
 
-		ctx->cs_id |= ((ctx->cs_fabric_id & socket_id_mask)
+		ctx->cs_id |= ((ctx->cs_fabric_id & ctx->socket_id_mask)
 				>> socket_id_shift) << sock_id_bit;
 	}
 
@@ -1394,6 +1422,11 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 
 	ctx.nid = nid;
 	ctx.inst_id = umc;
+
+	if (df_ops->get_masks(&ctx)) {
+		pr_debug("Failed to get masks");
+		return -EINVAL;
+	}
 
 	if (df_ops->get_cs_fabric_id(&ctx)) {
 		pr_debug("Failed to get CS Fabric ID");
