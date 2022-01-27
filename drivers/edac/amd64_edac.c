@@ -988,6 +988,12 @@ static int sys_addr_to_csrow(struct mem_ctl_info *mci, u64 sys_addr)
 	return csrow;
 }
 
+/*
+ * Glossary of acronyms used in address translation for Zen-based systems
+ *
+ * DF          =       Data Fabric
+ */
+
 /* Protect the PCI config register pairs used for DF indirect access. */
 static DEFINE_MUTEX(df_indirect_mutex);
 
@@ -1058,6 +1064,14 @@ struct addr_ctx {
 	u8 inst_id;
 };
 
+struct data_fabric_ops {
+};
+
+struct data_fabric_ops df2_ops = {
+};
+
+struct data_fabric_ops *df_ops;
+
 static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr)
 {
 	u64 dram_base_addr, dram_limit_addr, dram_hole_base;
@@ -1071,6 +1085,11 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 	bool hash_enabled = false;
 
 	struct addr_ctx ctx;
+
+	if (!df_ops) {
+		pr_debug("Data Fabric Operations not set");
+		return -EINVAL;
+	}
 
 	memset(&ctx, 0, sizeof(ctx));
 
@@ -3958,6 +3977,7 @@ static struct amd64_family_type *per_family_init(struct amd64_pvt *pvt)
 		if (pvt->model >= 0x10 && pvt->model <= 0x2f) {
 			fam_type = &family_types[F17_M10H_CPUS];
 			pvt->ops = &family_types[F17_M10H_CPUS].ops;
+			df_ops	 = &df2_ops;
 			break;
 		} else if (pvt->model >= 0x30 && pvt->model <= 0x3f) {
 			fam_type = &family_types[F17_M30H_CPUS];
@@ -3976,6 +3996,7 @@ static struct amd64_family_type *per_family_init(struct amd64_pvt *pvt)
 	case 0x18:
 		fam_type	= &family_types[F17_CPUS];
 		pvt->ops	= &family_types[F17_CPUS].ops;
+		df_ops		= &df2_ops;
 
 		if (pvt->fam == 0x18)
 			family_types[F17_CPUS].ctl_name = "F18h";
