@@ -809,7 +809,8 @@ static int __cancel_reset(struct drm_i915_private *i915,
 	preempt_timeout_ms = engine->props.preempt_timeout_ms;
 	engine->props.preempt_timeout_ms = 100;
 
-	if (igt_spinner_init(&spin, engine->gt))
+	err = igt_spinner_init(&spin, engine->gt);
+	if (err)
 		goto out_restore;
 
 	ce = intel_context_create(engine);
@@ -838,8 +839,10 @@ static int __cancel_reset(struct drm_i915_private *i915,
 	}
 
 	nop = intel_context_create_request(ce);
-	if (IS_ERR(nop))
+	if (IS_ERR(nop)) {
+		err = PTR_ERR(nop);
 		goto out_rq;
+	}
 	i915_request_get(nop);
 	i915_request_add(nop);
 
