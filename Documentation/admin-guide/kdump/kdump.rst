@@ -335,6 +335,19 @@ crashkernel syntax
 
             crashkernel=0,low
 
+4) crashkernel=auto
+
+   You can use crashkernel=auto if you have enough memory. The threshold
+   is 1G on x86_64 and s390x, 2G on arm64, ppc64 and ppc64le. If your system
+   memory is less than the threshold crashkernel=auto will not reserve memory.
+
+   The automatically reserved memory size varies based on architecture.
+   The size changes according to system memory size like below:
+       x86_64: 1G-4G:160M,4G-64G:192M,64G-1T:256M,1T-:512M
+       s390x:  1G-4G:160M,4G-64G:192M,64G-1T:256M,1T-:512M
+       arm64:  2G-:448M
+       ppc64:  2G-4G:384M,4G-16G:512M,16G-64G:1G,64G-128G:2G,128G-:4G
+
 Boot into System Kernel
 -----------------------
 1) Update the boot loader (such as grub, yaboot, or lilo) configuration

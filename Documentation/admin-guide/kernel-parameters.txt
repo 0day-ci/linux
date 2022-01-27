@@ -783,6 +783,11 @@
 			Format:
 			<first_slot>,<last_slot>,<port>,<enum_bit>[,<debug>]
 
+	crashkernel=auto
+			[KNL] Set the reserved memory automatically for the crash kernel
+			based on architecture.
+			See Documentation/admin-guide/kdump/kdump.rst for further details.
+
 	crashkernel=size[KMG][@offset[KMG]]
 			[KNL] Using kexec, Linux can switch to a 'crash kernel'
 			upon panic. This parameter reserves the physical
