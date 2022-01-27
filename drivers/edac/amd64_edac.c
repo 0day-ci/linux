@@ -1288,12 +1288,32 @@ static int denormalize_addr(struct addr_ctx *ctx)
 	return 0;
 }
 
+static int add_base_and_hole(struct addr_ctx *ctx)
+{
+	u64 dram_base_addr = (ctx->reg_base_addr & GENMASK_ULL(31, 12)) << 16;
+
+	/* Add dram base address */
+	ctx->ret_addr += dram_base_addr;
+
+	/* If legacy MMIO hole enabled */
+	if (ctx->reg_base_addr & BIT(1)) {
+		u32 dram_hole_base;
+
+		if (df_indirect_read_broadcast(ctx->nid, 0, 0x104, &dram_hole_base))
+			return -EINVAL;
+
+		dram_hole_base &= GENMASK(31, 24);
+		if (ctx->ret_addr >= dram_hole_base)
+			ctx->ret_addr += (BIT_ULL(32) - dram_hole_base);
+	}
+
+	return 0;
+}
+
 static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr)
 {
-	u64 dram_base_addr, dram_limit_addr, dram_hole_base;
-
+	u64 dram_limit_addr;
 	u8 hashed_bit;
-	u8 lgcy_mmio_hole_en;
 
 	struct addr_ctx ctx;
 
@@ -1330,22 +1350,11 @@ static int umc_normaddr_to_sysaddr(u64 norm_addr, u16 nid, u8 umc, u64 *sys_addr
 		goto out_err;
 	}
 
-	lgcy_mmio_hole_en = ctx.reg_base_addr & BIT(1);
-	dram_base_addr	  = (ctx.reg_base_addr & GENMASK_ULL(31, 12)) << 16;
-
 	dram_limit_addr	  = ((ctx.reg_limit_addr & GENMASK_ULL(31, 12)) << 16) | GENMASK_ULL(27, 0);
 
-	/* Add dram base address */
-	ctx.ret_addr += dram_base_addr;
-
-	/* If legacy MMIO hole enabled */
-	if (lgcy_mmio_hole_en) {
-		if (df_indirect_read_broadcast(nid, 0, 0x104, &ctx.tmp))
-			goto out_err;
-
-		dram_hole_base = ctx.tmp & GENMASK(31, 24);
-		if (ctx.ret_addr >= dram_hole_base)
-			ctx.ret_addr += (BIT_ULL(32) - dram_hole_base);
+	if (add_base_and_hole(&ctx)) {
+		pr_debug("Failed to add DRAM base address and hole");
+		goto out_err;
 	}
 
 	if (ctx.hash_enabled) {
