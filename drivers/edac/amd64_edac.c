@@ -1203,6 +1203,10 @@ static int denormalize_addr(struct addr_ctx *ctx)
 	u8 intlv_num_dies, intlv_num_chan, intlv_num_sockets;
 	u8 num_intlv_bits, cs_mask = 0;
 
+	/* Return early if no interleaving. */
+	if (ctx->intlv_mode == NONE)
+		return 0;
+
 	if (get_intlv_addr_bit(ctx))
 		return -EINVAL;
 
