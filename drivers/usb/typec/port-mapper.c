@@ -11,19 +11,27 @@
 
 #include "class.h"
 
-static int typec_aggregate_bind(struct device *dev)
+static int typec_aggregate_probe(struct aggregate_device *adev)
 {
+	struct device *dev = aggregate_device_parent(adev);
+
 	return component_bind_all(dev, NULL);
 }
 
-static void typec_aggregate_unbind(struct device *dev)
+static void typec_aggregate_remove(struct aggregate_device *adev)
 {
+	struct device *dev = aggregate_device_parent(adev);
+
 	component_unbind_all(dev, NULL);
 }
 
-static const struct component_master_ops typec_aggregate_ops = {
-	.bind = typec_aggregate_bind,
-	.unbind = typec_aggregate_unbind,
+static struct aggregate_driver typec_aggregate_driver = {
+	.probe = typec_aggregate_probe,
+	.remove = typec_aggregate_remove,
+	.driver = {
+		.name = "typec_aggregate",
+		.owner = THIS_MODULE,
+	},
 };
 
 struct each_port_arg {
@@ -69,10 +77,10 @@ int typec_link_ports(struct typec_port *con)
 	 * improvements to the component framework. Right now you can only have
 	 * one master per device.
 	 */
-	return component_master_add_with_match(&con->dev, &typec_aggregate_ops, arg.match);
+	return component_aggregate_register(&con->dev, &typec_aggregate_driver, arg.match);
 }
 
 void typec_unlink_ports(struct typec_port *con)
 {
-	component_master_del(&con->dev, &typec_aggregate_ops);
+	component_aggregate_unregister(&con->dev, &typec_aggregate_driver);
 }
