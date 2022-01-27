@@ -48,4 +48,6 @@ static inline bool arch_pkeys_enabled(void)
 
 #endif /* ! CONFIG_ARCH_HAS_PKEYS */
 
+#include <linux/pks-keys.h>
+
 #endif /* _LINUX_PKEYS_H */

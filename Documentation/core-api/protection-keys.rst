@@ -129,6 +129,10 @@ Kernel users intending to use PKS support should depend on
 ARCH_HAS_SUPERVISOR_PKEYS, and select ARCH_ENABLE_SUPERVISOR_PKEYS to turn on
 this support within the core.
 
+PKS Key Allocation
+------------------
+.. kernel-doc:: include/linux/pks-keys.h
+        :doc: PKS_KEY_ALLOCATION
 
 MSR details
 -----------

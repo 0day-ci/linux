@@ -217,7 +217,7 @@ void pks_setup(void)
 	if (!cpu_feature_enabled(X86_FEATURE_PKS))
 		return;
 
-	wrmsrl(MSR_IA32_PKRS, 0);
+	wrmsrl(MSR_IA32_PKRS, PKS_INIT_VALUE);
 	cr4_set_bits(X86_CR4_PKS);
 }
 
