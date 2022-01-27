@@ -59,6 +59,7 @@
 /* Not included via unistd.h */
 #include <asm/unistd_32_ia32.h>
 #endif
+#include <asm/pks.h>
 
 #include "process.h"
 
@@ -656,6 +657,8 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 	/* Load the Intel cache allocation PQR MSR. */
 	resctrl_sched_in();
+
+	pks_write_current();
 
 	return prev_p;
 }

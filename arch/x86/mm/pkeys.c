@@ -242,6 +242,19 @@ static inline void pks_write_pkrs(u32 new_pkrs)
 	}
 }
 
+/**
+ * pks_write_current() - Write the current thread's saved PKRS value
+ *
+ * Context: must be called with preemption disabled
+ */
+void pks_write_current(void)
+{
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	pks_write_pkrs(current->thread.pks_saved_pkrs);
+}
+
 /*
  * PKS is independent of PKU and either or both may be supported on a CPU.
  *
