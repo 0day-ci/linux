@@ -456,6 +456,50 @@ void dax_unlock_page(struct page *page, dax_entry_t cookie)
 }
 
 /*
+ * dax_load_page - Load the page corresponding to a (mapping,offset)
+ * @mapping: the file's mapping whose entry we want to load
+ * @index:   the offset within this file
+ * @page:    output the dax page corresponding to this dax entry
+ *
+ * Return: error if it isn't a dax mapping, otherwise 0.
+ */
+int dax_load_page(struct address_space *mapping, pgoff_t index,
+		struct page **page)
+{
+	XA_STATE(xas, &mapping->i_pages, 0);
+	void *entry;
+
+	if (!dax_mapping(mapping))
+		return -EBUSY;
+
+	rcu_read_lock();
+	for (;;) {
+		entry = NULL;
+		xas_lock_irq(&xas);
+		xas_set(&xas, index);
+		entry = xas_load(&xas);
+		if (dax_is_locked(entry)) {
+			rcu_read_unlock();
+			wait_entry_unlocked(&xas, entry);
+			rcu_read_lock();
+			continue;
+		}
+		if (entry &&
+		    !dax_is_zero_entry(entry) && !dax_is_empty_entry(entry)) {
+			/*
+			 * Output the page if the dax entry exists and isn't
+			 * a zero or empty entry.
+			 */
+			*page = pfn_to_page(dax_to_pfn(entry));
+		}
+		xas_unlock_irq(&xas);
+		break;
+	}
+	rcu_read_unlock();
+	return 0;
+}
+
+/*
  * Find page cache entry at given index. If it is a DAX entry, return it
  * with the entry locked. If the page cache doesn't contain an entry at
  * that index, add a locked empty entry.
