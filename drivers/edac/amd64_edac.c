@@ -1142,7 +1142,7 @@ static int dehash_addr_df2(struct addr_ctx *ctx)
 			(ctx->ret_addr >> 18) ^
 			(ctx->ret_addr >> 21) ^
 			(ctx->ret_addr >> 30) ^
-			ctx->cs_id;
+			(ctx->ret_addr >> ctx->intlv_addr_bit);
 
 	hashed_bit &= BIT(0);
 
