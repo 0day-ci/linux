@@ -3205,7 +3205,7 @@ out:
 
 static int init_cmd_table(struct intel_gvt *gvt)
 {
-	unsigned int gen_type = intel_gvt_get_device_type(gvt);
+	unsigned int gen_type = intel_gvt_get_device_type(gvt->gt->i915);
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(cmd_info); i++) {

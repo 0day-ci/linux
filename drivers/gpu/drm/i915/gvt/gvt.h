@@ -40,6 +40,7 @@
 #include "debug.h"
 #include "hypercall.h"
 #include "mmio.h"
+#include "mmio_table.h"
 #include "reg.h"
 #include "interrupt.h"
 #include "gtt.h"
@@ -64,20 +65,6 @@ struct intel_gvt_host {
 };
 
 extern struct intel_gvt_host intel_gvt_host;
-
-/* Describe per-platform limitations. */
-struct intel_gvt_device_info {
-	u32 max_support_vgpus;
-	u32 cfg_space_size;
-	u32 mmio_size;
-	u32 mmio_bar;
-	unsigned long msi_cap_offset;
-	u32 gtt_start_offset;
-	u32 gtt_entry_size;
-	u32 gtt_entry_size_shift;
-	int gmadr_bytes_in_cmd;
-	u32 max_surface_size;
-};
 
 /* GM resources owned by a vGPU */
 struct intel_vgpu_gm {
@@ -239,9 +226,9 @@ struct intel_gvt_fence {
 };
 
 /* Special MMIO blocks. */
-struct gvt_mmio_block {
+struct intel_gvt_mmio_block {
 	unsigned int device;
-	i915_reg_t   offset;
+	u32 offset;
 	unsigned int size;
 	gvt_mmio_func read;
 	gvt_mmio_func write;
@@ -272,7 +259,7 @@ struct intel_gvt_mmio {
 /* Value of command write of this reg needs to be patched */
 #define F_CMD_WRITE_PATCH	(1 << 8)
 
-	const struct gvt_mmio_block *mmio_block;
+	struct intel_gvt_mmio_block *mmio_block;
 	unsigned int num_mmio_block;
 
 	DECLARE_HASHTABLE(mmio_info_table, INTEL_GVT_MMIO_HASH_BITS);
