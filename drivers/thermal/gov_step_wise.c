@@ -168,6 +168,31 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
 }
 
 /**
+ * step_wise_unbind() - unbind the step_wise governor to a thermal zone
+ * @tz:	thermal zone to unbind it to
+ *
+ * Clear all previous throttling and reset passive counter.
+ *
+ */
+static void step_wise_unbind(struct thermal_zone_device *tz)
+{
+	struct thermal_instance *instance;
+
+	dev_dbg(&tz->device, "Unbinding from thermal zone %d\n", tz->id);
+
+	mutex_lock(&tz->lock);
+	tz->passive = 0;
+	list_for_each_entry(instance, &tz->thermal_instances, tz_node) {
+		instance->initialized = false;
+		instance->target = THERMAL_NO_TARGET;
+		mutex_lock(&instance->cdev->lock);
+		__thermal_cdev_update(instance->cdev);
+		mutex_unlock(&instance->cdev->lock);
+	}
+	mutex_unlock(&tz->lock);
+}
+
+/**
  * step_wise_throttle - throttles devices associated with the given zone
  * @tz: thermal_zone_device
  * @trip: trip point index
@@ -196,6 +221,7 @@ static int step_wise_throttle(struct thermal_zone_device *tz, int trip)
 
 static struct thermal_governor thermal_gov_step_wise = {
 	.name		= "step_wise",
+	.unbind_from_tz	= step_wise_unbind,
 	.throttle	= step_wise_throttle,
 };
 THERMAL_GOVERNOR_DECLARE(thermal_gov_step_wise);

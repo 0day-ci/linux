@@ -274,6 +274,26 @@ static int __init thermal_register_governors(void)
 	return ret;
 }
 
+static void thermal_governor_attach(struct thermal_zone_device *tz)
+{
+	mutex_lock(&thermal_governor_lock);
+	if (tz->governor && tz->governor->bind_to_tz) {
+		if (tz->governor->bind_to_tz(tz))
+			dev_err(&tz->device,
+				"governor %s failed to bind to thermal zone %s\n",
+				tz->governor->name, tz->type);
+	}
+	mutex_unlock(&thermal_governor_lock);
+}
+
+static void thermal_governor_detach(struct thermal_zone_device *tz)
+{
+	mutex_lock(&thermal_governor_lock);
+	if (tz->governor && tz->governor->unbind_from_tz)
+		tz->governor->unbind_from_tz(tz);
+	mutex_unlock(&thermal_governor_lock);
+}
+
 /*
  * Zone update section: main control loop applied to each zone while monitoring
  *
@@ -449,12 +469,15 @@ static int thermal_zone_device_set_mode(struct thermal_zone_device *tz,
 
 	mutex_unlock(&tz->lock);
 
-	thermal_zone_device_update(tz, THERMAL_EVENT_UNSPECIFIED);
-
-	if (mode == THERMAL_DEVICE_ENABLED)
+	if (mode == THERMAL_DEVICE_ENABLED) {
+		thermal_governor_attach(tz);
+		thermal_zone_device_init(tz);
+		thermal_zone_device_update(tz, THERMAL_EVENT_UNSPECIFIED);
 		thermal_notify_tz_enable(tz->id);
-	else
+	} else {
+		thermal_governor_detach(tz);
 		thermal_notify_tz_disable(tz->id);
+	}
 
 	return ret;
 }
