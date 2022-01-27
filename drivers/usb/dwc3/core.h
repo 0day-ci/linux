@@ -988,7 +988,8 @@ struct dwc3_scratchpad_array {
  * @regs: base address for our registers
  * @regs_size: address space size
  * @fladj: frame length adjustment
- * @ref_clk_per: reference clock period configuration
+ * @ref_clk_per: reference clock period; deprecated in favor of @ref_clk_freq
+ * @ref_clk_freq: reference clock frequency to use if @ref_clk is missing
  * @irq_gadget: peripheral controller's IRQ number
  * @otg_irq: IRQ number for OTG IRQs
  * @current_otg_role: current role of operation while using the OTG block
@@ -1171,6 +1172,7 @@ struct dwc3 {
 
 	u32			fladj;
 	u32			ref_clk_per;
+	u32			ref_clk_freq;
 	u32			irq_gadget;
 	u32			otg_irq;
 	u32			current_otg_role;
