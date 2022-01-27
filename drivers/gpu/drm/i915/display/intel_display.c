@@ -1815,6 +1815,7 @@ static void ilk_configure_cpu_transcoder(const struct intel_crtc_state *crtc_sta
 
 	if (crtc_state->has_pch_encoder) {
 		intel_cpu_transcoder_set_m1_n1(crtc, cpu_transcoder, &crtc_state->fdi_m_n);
+		intel_cpu_transcoder_set_m2_n2(crtc, cpu_transcoder, &crtc_state->fdi_m2_n2);
 	} else if (intel_crtc_has_dp_encoder(crtc_state)) {
 		intel_cpu_transcoder_set_m1_n1(crtc, cpu_transcoder, &crtc_state->dp_m_n);
 		intel_cpu_transcoder_set_m2_n2(crtc, cpu_transcoder, &crtc_state->dp_m2_n2);
@@ -3143,8 +3144,8 @@ void intel_set_m_n(struct drm_i915_private *i915,
 	intel_de_write(i915, link_n_reg, m_n->link_n);
 }
 
-static bool transcoder_has_m2_n2(struct drm_i915_private *dev_priv,
-				 enum transcoder cpu_transcoder)
+bool intel_cpu_transcoder_has_m2_n2(struct drm_i915_private *dev_priv,
+				    enum transcoder cpu_transcoder)
 {
 	if (IS_HASWELL(dev_priv))
 		return cpu_transcoder == TRANSCODER_EDP;
@@ -3175,7 +3176,7 @@ void intel_cpu_transcoder_set_m2_n2(struct intel_crtc *crtc,
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 
-	if (!transcoder_has_m2_n2(dev_priv, cpu_transcoder))
+	if (!intel_cpu_transcoder_has_m2_n2(dev_priv, cpu_transcoder))
 		return;
 
 	intel_set_m_n(dev_priv, m_n,
@@ -3873,7 +3874,7 @@ void intel_cpu_transcoder_get_m2_n2(struct intel_crtc *crtc,
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 
-	if (!transcoder_has_m2_n2(dev_priv, cpu_transcoder))
+	if (!intel_cpu_transcoder_has_m2_n2(dev_priv, cpu_transcoder))
 		return;
 
 	intel_get_m_n(dev_priv, m_n,
@@ -5612,10 +5613,14 @@ static void intel_dump_pipe_config(const struct intel_crtc_state *pipe_config,
 		    pipe_config->splitter.link_count,
 		    pipe_config->splitter.pixel_overlap);
 
-	if (pipe_config->has_pch_encoder)
-		intel_dump_m_n_config(pipe_config, "fdi",
+	if (pipe_config->has_pch_encoder) {
+		intel_dump_m_n_config(pipe_config, "fdi m_n",
 				      pipe_config->fdi_lanes,
 				      &pipe_config->fdi_m_n);
+		intel_dump_m_n_config(pipe_config, "fdi m2_n2",
+				      pipe_config->fdi_lanes,
+				      &pipe_config->fdi_m2_n2);
+	}
 
 	if (intel_crtc_has_dp_encoder(pipe_config)) {
 		intel_dump_m_n_config(pipe_config, "dp m_n",
@@ -6467,6 +6472,7 @@ intel_pipe_config_compare(const struct intel_crtc_state *current_config,
 	PIPE_CONF_CHECK_BOOL(has_pch_encoder);
 	PIPE_CONF_CHECK_I(fdi_lanes);
 	PIPE_CONF_CHECK_M_N(fdi_m_n);
+	PIPE_CONF_CHECK_M_N(fdi_m2_n2);
 
 	PIPE_CONF_CHECK_I(lane_count);
 	PIPE_CONF_CHECK_X(lane_lat_optim_mask);
@@ -7375,6 +7381,7 @@ static void intel_crtc_copy_fastset(const struct intel_crtc_state *old_crtc_stat
 	 * FIXME: should really copy more fuzzy state here
 	 */
 	new_crtc_state->fdi_m_n = old_crtc_state->fdi_m_n;
+	new_crtc_state->fdi_m2_n2 = old_crtc_state->fdi_m2_n2;
 	new_crtc_state->dp_m_n = old_crtc_state->dp_m_n;
 	new_crtc_state->dp_m2_n2 = old_crtc_state->dp_m2_n2;
 	new_crtc_state->has_drrs = old_crtc_state->has_drrs;

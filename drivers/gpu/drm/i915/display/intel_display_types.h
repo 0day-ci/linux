@@ -1124,7 +1124,7 @@ struct intel_crtc_state {
 
 	/* FDI configuration, only valid if has_pch_encoder is set. */
 	int fdi_lanes;
-	struct intel_link_m_n fdi_m_n;
+	struct intel_link_m_n fdi_m_n, fdi_m2_n2;
 
 	bool ips_enabled;
 

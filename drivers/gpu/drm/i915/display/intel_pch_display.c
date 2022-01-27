@@ -436,6 +436,8 @@ void ilk_pch_get_config(struct intel_crtc_state *crtc_state)
 
 	intel_cpu_transcoder_get_m1_n1(crtc, crtc_state->cpu_transcoder,
 				       &crtc_state->fdi_m_n);
+	intel_cpu_transcoder_get_m2_n2(crtc, crtc_state->cpu_transcoder,
+				       &crtc_state->fdi_m2_n2);
 
 	if (HAS_PCH_IBX(dev_priv)) {
 		/*

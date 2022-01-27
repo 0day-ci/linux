@@ -251,6 +251,9 @@ retry:
 	intel_link_compute_m_n(pipe_config->pipe_bpp, lane, fdi_dotclock,
 			       link_bw, &pipe_config->fdi_m_n, false, false);
 
+	if (intel_cpu_transcoder_has_m2_n2(i915, pipe_config->cpu_transcoder))
+		pipe_config->fdi_m2_n2 = pipe_config->fdi_m_n;
+
 	ret = ilk_check_fdi_lanes(dev, crtc->pipe, pipe_config);
 	if (ret == -EDEADLK)
 		return ret;
