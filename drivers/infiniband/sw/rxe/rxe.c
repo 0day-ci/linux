@@ -198,6 +198,8 @@ static int rxe_init(struct rxe_dev *rxe)
 	if (err)
 		return err;
 
+	spin_lock_init(&rxe->mcg_lock);
+
 	/* init pending mmap list */
 	spin_lock_init(&rxe->mmap_offset_lock);
 	spin_lock_init(&rxe->pending_lock);
