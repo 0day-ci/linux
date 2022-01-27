@@ -178,7 +178,7 @@ static int rxe_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
 		       struct rxe_mcg **mcgp)
 {
 	struct rxe_mcg *mcg, *tmp;
-	int ret;
+	int err;
 
 	if (rxe->attr.max_mcast_grp == 0)
 		return -EINVAL;
@@ -206,12 +206,12 @@ static int rxe_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
 	}
 
 	if (atomic_inc_return(&rxe->mcg_num) > rxe->attr.max_mcast_grp) {
-		ret = -ENOMEM;
+		err = -ENOMEM;
 		goto err_dec;
 	}
 
-	ret = rxe_mcast_add(rxe, mgid);
-	if (ret)
+	err = rxe_mcast_add(rxe, mgid);
+	if (err)
 		goto err_dec;
 
 	kref_init(&mcg->ref_cnt);
@@ -230,7 +230,7 @@ err_dec:
 	atomic_dec(&rxe->mcg_num);
 	spin_unlock_bh(&rxe->mcg_lock);
 	kfree(mcg);
-	return ret;
+	return err;
 }
 
 /**
@@ -269,11 +269,59 @@ void rxe_cleanup_mcg(struct kref *kref)
 	spin_unlock_bh(&rxe->mcg_lock);
 }
 
-static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
-			   struct rxe_mcg *mcg)
+/**
+ * __rxe_init_mca - initialize a new mca holding lock
+ * @qp: qp object
+ * @mcg: mcg object
+ * @mca: empty space for new mca
+ *
+ * Context: caller must hold references on qp and mcg, rxe->mcg_lock
+ * and pass memory for new mca
+ *
+ * Returns: 0 on success else an error
+ */
+static int __rxe_init_mca(struct rxe_qp *qp, struct rxe_mcg *mcg,
+			  struct rxe_mca *mca)
 {
-	int err;
+	struct rxe_dev *rxe = to_rdev(qp->ibqp.device);
+	int n;
+
+	n = atomic_inc_return(&rxe->mcg_attach);
+	if (n > rxe->attr.max_total_mcast_qp_attach) {
+		atomic_dec(&rxe->mcg_attach);
+		return -ENOMEM;
+	}
+
+	n = atomic_inc_return(&mcg->qp_num);
+	if (n > rxe->attr.max_mcast_qp_attach) {
+		atomic_dec(&mcg->qp_num);
+		atomic_dec(&rxe->mcg_attach);
+		return -ENOMEM;
+	}
+
+	atomic_inc(&qp->mcg_num);
+
+	rxe_add_ref(qp);
+	mca->qp = qp;
+
+	list_add_tail(&mca->qp_list, &mcg->qp_list);
+
+	return 0;
+}
+
+/**
+ * rxe_attach_mcg - attach qp to mcg if not already attached
+ * @mcg: mcg object
+ * @qp: qp object
+ *
+ * Context: caller must hold reference on qp and mcg.
+ * Returns: 0 on success else an error
+ */
+static int rxe_attach_mcg(struct rxe_mcg *mcg, struct rxe_qp *qp)
+{
+	struct rxe_dev *rxe = mcg->rxe;
 	struct rxe_mca *mca, *new_mca;
+	int err;
 
 	/* check to see if the qp is already a member of the group */
 	spin_lock_bh(&rxe->mcg_lock);
@@ -296,61 +344,74 @@ static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 		if (mca->qp == qp) {
 			kfree(new_mca);
 			err = 0;
-			goto out;
+			goto done;
 		}
 	}
 
-	if (atomic_read(&mcg->qp_num) >= rxe->attr.max_mcast_qp_attach) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	atomic_inc(&mcg->qp_num);
-	new_mca->qp = qp;
-	atomic_inc(&qp->mcg_num);
-
-	list_add_tail(&new_mca->qp_list, &mcg->qp_list);
-
-	err = 0;
-out:
+	mca = new_mca;
+	err = __rxe_init_mca(qp, mcg, mca);
+	if (err)
+		kfree(mca);
+done:
 	spin_unlock_bh(&rxe->mcg_lock);
+
 	return err;
 }
 
-static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
-				   union ib_gid *mgid)
+/**
+ * __rxe_cleanup_mca - cleanup mca object holding lock
+ * @mca: mca object
+ * @mcg: mcg object
+ *
+ * Context: caller must hold a reference to mcg and rxe->mcg_lock
+ */
+static void __rxe_cleanup_mca(struct rxe_mca *mca, struct rxe_mcg *mcg)
 {
-	struct rxe_mcg *mcg;
-	struct rxe_mca *mca, *tmp;
-	int n;
+	list_del(&mca->qp_list);
 
-	mcg = rxe_lookup_mcg(rxe, mgid);
-	if (!mcg)
-		goto err1;
+	atomic_dec(&mcg->qp_num);
+	atomic_dec(&mcg->rxe->mcg_attach);
+	atomic_dec(&mca->qp->mcg_num);
+
+	rxe_drop_ref(mca->qp);
+}
+
+/**
+ * rxe_detach_mcg - detach qp from mcg
+ * @mcg: mcg object
+ * @qp: qp object
+ *
+ * Returns: 0 on success else an error if qp is not attached.
+ */
+static int rxe_detach_mcg(struct rxe_mcg *mcg, struct rxe_qp *qp)
+{
+	struct rxe_dev *rxe = mcg->rxe;
+	struct rxe_mca *mca, *tmp;
 
 	spin_lock_bh(&rxe->mcg_lock);
-
 	list_for_each_entry_safe(mca, tmp, &mcg->qp_list, qp_list) {
 		if (mca->qp == qp) {
-			list_del(&mca->qp_list);
-			n = atomic_dec_return(&mcg->qp_num);
-			if (n <= 0)
+			__rxe_cleanup_mca(mca, mcg);
+			if (atomic_read(&mcg->qp_num) <= 0)
 				kref_put(&mcg->ref_cnt, __rxe_cleanup_mcg);
-			atomic_dec(&qp->mcg_num);
-
 			spin_unlock_bh(&rxe->mcg_lock);
-			kref_put(&mcg->ref_cnt, __rxe_cleanup_mcg);
 			kfree(mca);
 			return 0;
 		}
 	}
-
 	spin_unlock_bh(&rxe->mcg_lock);
-	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
-err1:
+
 	return -EINVAL;
 }
 
+/**
+ * rxe_attach_mcast - attach qp to multicast group (see IBA-11.3.1)
+ * @ibqp: (IB) qp object
+ * @mgid: multicast IP address
+ * @mlid: multicast LID, ignored for RoCEv2 (see IBA-A17.5.6)
+ *
+ * Returns: 0 on success else an errno
+ */
 int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 {
 	int err;
@@ -363,18 +424,35 @@ int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 	if (err)
 		return err;
 
-	err = rxe_mcast_add_grp_elem(rxe, qp, mcg);
-
+	err = rxe_attach_mcg(mcg, qp);
 	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
+
 	return err;
 }
 
+/**
+ * rxe_detach_mcast - detach qp from multicast group (see IBA-11.3.2)
+ * @ibqp: address of (IB) qp object
+ * @mgid: multicast IP address
+ * @mlid: multicast LID, ignored for RoCEv2 (see IBA-A17.5.6)
+ *
+ * Returns: 0 on success else an errno
+ */
 int rxe_detach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 {
 	struct rxe_dev *rxe = to_rdev(ibqp->device);
 	struct rxe_qp *qp = to_rqp(ibqp);
+	struct rxe_mcg *mcg;
+	int err;
 
-	return rxe_mcast_drop_grp_elem(rxe, qp, mgid);
+	mcg = rxe_lookup_mcg(rxe, mgid);
+	if (!mcg)
+		return -EINVAL;
+
+	err = rxe_detach_mcg(mcg, qp);
+	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
+
+	return err;
 }
 
 /**
