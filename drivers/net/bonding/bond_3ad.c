@@ -1024,6 +1024,8 @@ static void ad_mux_machine(struct port *port, bool *update_slave_arr)
 
 					__enable_port(port);
 				}
+				/* Slave array needs update */
+				*update_slave_arr = true;
 			}
 			break;
 		default:
@@ -1779,6 +1781,8 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 			     port = port->next_port_in_aggregator) {
 				__enable_port(port);
 			}
+			/* Slave array needs update. */
+			*update_slave_arr = true;
 		}
 	}
 
