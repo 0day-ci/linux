@@ -13,7 +13,7 @@ description: |
   Device tree properties for hard wired USB Ethernet devices.
 
 allOf:
-  - $ref: ethernet-controller.yaml#
+  - $ref: usbnet.yaml#
 
 properties:
   compatible:
@@ -58,6 +58,7 @@ properties:
           - usb6189,182d  # Sitecom LN-029
 
   reg: true
+  label: true
   local-mac-address: true
   mac-address: true
 
@@ -77,6 +78,7 @@ examples:
         ethernet@1 {
             compatible = "usbdb0,a877";
             reg = <1>;
+            label = "LAN0";
             local-mac-address = [00 00 00 00 00 00];
         };
     };

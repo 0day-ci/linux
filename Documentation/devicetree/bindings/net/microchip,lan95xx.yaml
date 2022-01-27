@@ -14,7 +14,7 @@ description: |
   controller.
 
 allOf:
-  - $ref: ethernet-controller.yaml#
+  - $ref: usbnet.yaml#
 
 properties:
   compatible:
@@ -40,6 +40,7 @@ properties:
           - usb424,ec00   # SMSC9512/9514 USB Hub & Ethernet Device
 
   reg: true
+  label: true
   local-mac-address: true
   mac-address: true
 
@@ -59,6 +60,7 @@ examples:
         ethernet@1 {
             compatible = "usb424,ec00";
             reg = <1>;
+            label = "LAN0";
             local-mac-address = [00 00 00 00 00 00];
         };
     };
