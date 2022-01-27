@@ -1083,6 +1083,7 @@ struct addr_ctx {
 	u8 cs_id;
 	int (*dehash_addr)(struct addr_ctx *ctx);
 	void (*make_space_for_cs_id)(struct addr_ctx *ctx);
+	void (*insert_cs_id)(struct addr_ctx *ctx);
 };
 
 struct data_fabric_ops {
@@ -1113,6 +1114,11 @@ static void make_space_for_cs_id_simple(struct addr_ctx *ctx)
 	num_intlv_bits += ctx->intlv_num_dies;
 	num_intlv_bits += ctx->intlv_num_sockets;
 	expand_bits(ctx->intlv_addr_bit, num_intlv_bits, &ctx->ret_addr);
+}
+
+static void insert_cs_id_simple(struct addr_ctx *ctx)
+{
+	ctx->ret_addr |= (ctx->cs_id << ctx->intlv_addr_bit);
 }
 
 static u64 get_hi_addr_offset_df2(struct addr_ctx *ctx)
@@ -1146,6 +1152,7 @@ static int get_intlv_mode_df2(struct addr_ctx *ctx)
 	}
 
 	ctx->make_space_for_cs_id = make_space_for_cs_id_simple;
+	ctx->insert_cs_id = insert_cs_id_simple;
 
 	if (ctx->intlv_mode != NONE &&
 	    ctx->intlv_mode != NOHASH_2CH &&
@@ -1306,8 +1313,6 @@ static int calculate_cs_id(struct addr_ctx *ctx)
 
 static int denormalize_addr(struct addr_ctx *ctx)
 {
-	u8 num_intlv_bits;
-
 	/* Return early if no interleaving. */
 	if (ctx->intlv_mode == NONE)
 		return 0;
@@ -1326,20 +1331,7 @@ static int denormalize_addr(struct addr_ctx *ctx)
 		return -EINVAL;
 	}
 
-	if (num_intlv_bits > 0) {
-		u64 temp_addr_i;
-
-		/*
-		 * The pre-interleaved address consists of XXXXXXIIIYYYYY
-		 * where III is the ID for this CS, and XXXXXXYYYYY are the
-		 * address bits from the post-interleaved address.
-		 * "num_intlv_bits" has been calculated to tell us how many "I"
-		 * bits there are. "intlv_addr_bit" tells us how many "Y" bits
-		 * there are (where "I" starts).
-		 */
-		temp_addr_i = (ctx->cs_id << ctx->intlv_addr_bit);
-		ctx->ret_addr |= temp_addr_i;
-	}
+	ctx->insert_cs_id(ctx);
 
 	return 0;
 }
