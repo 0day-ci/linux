@@ -511,7 +511,6 @@ struct xfrm_user_offload {
 	int				ifindex;
 	__u8				flags;
 };
-#define XFRM_OFFLOAD_IPV6	1
 #define XFRM_OFFLOAD_INBOUND	2
 
 struct xfrm_userpolicy_default {
