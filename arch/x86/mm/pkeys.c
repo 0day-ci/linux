@@ -10,6 +10,7 @@
 
 #include <asm/cpufeature.h>             /* boot_cpu_has, ...            */
 #include <asm/mmu_context.h>            /* vma_pkey()                   */
+#include <asm/pks.h>
 
 int __execute_only_pkey(struct mm_struct *mm)
 {
@@ -274,5 +275,32 @@ void pks_setup(void)
 	pks_write_pkrs(PKS_INIT_VALUE);
 	cr4_set_bits(X86_CR4_PKS);
 }
+
+/*
+ * Do not call this directly, see pks_mk*().
+ *
+ * @pkey: Key for the domain to change
+ * @protection: protection bits to be used
+ *
+ * Protection utilizes the same protection bits specified for User pkeys
+ *     PKEY_DISABLE_ACCESS
+ *     PKEY_DISABLE_WRITE
+ *
+ */
+void pks_update_protection(int pkey, u32 protection)
+{
+	u32 pkrs;
+
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	pkrs = current->thread.pks_saved_pkrs;
+	current->thread.pks_saved_pkrs = pkey_update_pkval(pkrs, pkey,
+							   protection);
+	preempt_disable();
+	pks_write_pkrs(current->thread.pks_saved_pkrs);
+	preempt_enable();
+}
+EXPORT_SYMBOL_GPL(pks_update_protection);
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */

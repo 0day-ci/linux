@@ -141,11 +141,18 @@ Adding Pages to a PKey protected domain
         :doc: PKS_KEY_ASSIGNMENT
 
 
+Changing permissions of individual keys
+---------------------------------------
+
+.. kernel-doc:: include/linux/pks-keys.h
+        :identifiers: pks_mk_readwrite
+
 MSR details
 -----------
 
 It should be noted that the underlying WRMSR(MSR_IA32_PKRS) is not serializing
-but still maintains ordering properties similar to WRPKRU.
+but still maintains ordering properties similar to WRPKRU.  Thus it is safe to
+immediately use a mapping when the pks_mk*() functions return.
 
 Older versions of the SDM on PKRS may be wrong with regard to this
 serialization.  The text should be the same as that of WRPKRU.  From the WRPKRU
