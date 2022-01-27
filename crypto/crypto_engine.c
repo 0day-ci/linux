@@ -7,6 +7,7 @@
  * Author: Baolin Wang <baolin.wang@linaro.org>
  */
 
+#include <linux/bottom_half.h>
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -53,7 +54,9 @@ static void crypto_finalize_request(struct crypto_engine *engine,
 				dev_err(engine->dev, "failed to unprepare request\n");
 		}
 	}
+	local_bh_disable();
 	req->complete(req, err);
+	local_bh_enable();
 
 	kthread_queue_work(engine->kworker, &engine->pump_requests);
 }
