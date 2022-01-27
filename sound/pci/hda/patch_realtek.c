@@ -6547,25 +6547,31 @@ static int find_comp_by_dev_name(struct alc_spec *spec, const char *name)
 	return -ENODEV;
 }
 
-static int comp_bind(struct device *dev)
+static int realtek_aggregate_probe(struct aggregate_device *adev)
 {
+	struct device *dev = aggregate_device_parent(adev);
 	struct hda_codec *cdc = dev_to_hda_codec(dev);
 	struct alc_spec *spec = cdc->spec;
 
 	return component_bind_all(dev, spec->comps);
 }
 
-static void comp_unbind(struct device *dev)
+static void realtek_aggregate_remove(struct aggregate_device *adev)
 {
+	struct device *dev = aggregate_device_parent(adev);
 	struct hda_codec *cdc = dev_to_hda_codec(dev);
 	struct alc_spec *spec = cdc->spec;
 
 	component_unbind_all(dev, spec->comps);
 }
 
-static const struct component_master_ops comp_master_ops = {
-	.bind = comp_bind,
-	.unbind = comp_unbind,
+static struct aggregate_driver realtek_aggregate_driver = {
+	.probe = realtek_aggregate_probe,
+	.remove = realtek_aggregate_remove,
+	.driver = {
+		.name = "realtek_aggregate",
+		.owner = THIS_MODULE,
+	},
 };
 
 static void comp_generic_playback_hook(struct hda_pcm_stream *hinfo, struct hda_codec *cdc,
@@ -6597,7 +6603,7 @@ static void cs35l41_generic_fixup(struct hda_codec *cdc, int action, const char 
 				return;
 			component_match_add(dev, &spec->match, comp_match_dev_name, name);
 		}
-		ret = component_master_add_with_match(dev, &comp_master_ops, spec->match);
+		ret = component_aggregate_register(dev, &realtek_aggregate_driver, spec->match);
 		if (ret)
 			codec_err(cdc, "Fail to register component aggregator %d\n", ret);
 		else
@@ -6648,7 +6654,7 @@ static void alc287_fixup_legion_16achg6_speakers(struct hda_codec *cdc, const st
 				    "i2c-CLSA0100:00-cs35l41-hda.0");
 		component_match_add(dev, &spec->match, comp_match_dev_name,
 				    "i2c-CLSA0100:00-cs35l41-hda.1");
-		ret = component_master_add_with_match(dev, &comp_master_ops, spec->match);
+		ret = component_aggregate_register(dev, &realtek_aggregate_driver, spec->match);
 		if (ret)
 			codec_err(cdc, "Fail to register component aggregator %d\n", ret);
 		else
