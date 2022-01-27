@@ -595,7 +595,7 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 
 	dev->kcov_handle = kcov_common_handle();
 	if (dev->use_worker) {
-		worker = kthread_create(vhost_worker, dev,
+		worker = kthread_run(vhost_worker, dev,
 					"vhost-%d", current->pid);
 		if (IS_ERR(worker)) {
 			err = PTR_ERR(worker);
@@ -603,7 +603,6 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 		}
 
 		dev->worker = worker;
-		wake_up_process(worker); /* avoid contributing to loadavg */
 
 		err = vhost_attach_cgroups(dev);
 		if (err)
