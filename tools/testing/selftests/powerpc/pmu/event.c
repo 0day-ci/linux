@@ -20,7 +20,8 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu,
 			   group_fd, flags);
 }
 
-void event_init_opts(struct event *e, u64 config, int type, char *name)
+static void  __event_init_opts(struct event *e, u64 config,
+			       int type, char *name, int sampling)
 {
 	memset(e, 0, sizeof(*e));
 
@@ -32,6 +33,16 @@ void event_init_opts(struct event *e, u64 config, int type, char *name)
 	/* This has to match the structure layout in the header */
 	e->attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED | \
 				  PERF_FORMAT_TOTAL_TIME_RUNNING;
+	if (sampling) {
+		e->attr.sample_period = 1000;
+		e->attr.sample_type = PERF_SAMPLE_REGS_INTR;
+		e->attr.disabled = 1;
+	}
+}
+
+void event_init_opts(struct event *e, u64 config, int type, char *name)
+{
+	__event_init_opts(e, config, type, name, 0);
 }
 
 void event_init_named(struct event *e, u64 config, char *name)
@@ -42,6 +53,11 @@ void event_init_named(struct event *e, u64 config, char *name)
 void event_init(struct event *e, u64 config)
 {
 	event_init_opts(e, config, PERF_TYPE_RAW, "event");
+}
+
+void event_init_sampling(struct event *e, u64 config)
+{
+	__event_init_opts(e, config, PERF_TYPE_RAW, "event", 1);
 }
 
 #define PERF_CURRENT_PID	0
