@@ -353,8 +353,8 @@ static void dwc3_ref_clk_period(struct dwc3 *dwc)
 	unsigned long rate;
 	u32 reg;
 
-	if (dwc->ref_clk) {
-		rate = clk_get_rate(dwc->ref_clk);
+	if (dwc->ref_clk || dwc->ref_clk_freq) {
+		rate = clk_get_rate(dwc->ref_clk) ?: dwc->ref_clk_freq;
 		if (!rate)
 			return;
 		period = NSEC_PER_SEC / rate;
@@ -1497,6 +1497,8 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				 &dwc->fladj);
 	device_property_read_u32(dev, "snps,ref-clock-period-ns",
 				 &dwc->ref_clk_per);
+	device_property_read_u32(dev, "snps,ref-clock-frequency-hz",
+				 &dwc->ref_clk_freq);
 
 	dwc->dis_metastability_quirk = device_property_read_bool(dev,
 				"snps,dis_metastability_quirk");
