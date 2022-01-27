@@ -98,7 +98,7 @@ static struct rxe_mcg *__rxe_lookup_mcg(struct rxe_dev *rxe,
 	}
 
 	if (node) {
-		rxe_add_ref(mcg);
+		kref_get(&mcg->ref_cnt);
 		return mcg;
 	}
 
@@ -139,7 +139,6 @@ static int rxe_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
 {
 	struct rxe_mcg *mcg, *tmp;
 	int ret;
-	struct rxe_pool *pool = &rxe->mc_grp_pool;
 
 	if (rxe->attr.max_mcast_grp == 0)
 		return -EINVAL;
@@ -152,7 +151,7 @@ static int rxe_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
 	}
 
 	/* speculative alloc of mcg without using GFP_ATOMIC */
-	mcg = rxe_alloc(pool);
+	mcg = kzalloc(sizeof(*mcg), GFP_KERNEL);
 	if (!mcg)
 		return -ENOMEM;
 
@@ -161,19 +160,22 @@ static int rxe_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
 	tmp = __rxe_lookup_mcg(rxe, mgid);
 	if (tmp) {
 		spin_unlock_bh(&rxe->mcg_lock);
-		rxe_drop_ref(mcg);
+		kfree(mcg);
 		mcg = tmp;
 		goto out;
 	}
 
-	if (atomic_inc_return(&rxe->mcg_num) > rxe->attr.max_mcast_grp)
+	if (atomic_inc_return(&rxe->mcg_num) > rxe->attr.max_mcast_grp) {
+		ret = -ENOMEM;
 		goto err_dec;
+	}
 
 	ret = rxe_mcast_add(rxe, mgid);
 	if (ret)
-		goto err_out;
+		goto err_dec;
 
-	rxe_add_ref(mcg);
+	kref_init(&mcg->ref_cnt);
+	kref_get(&mcg->ref_cnt);
 	mcg->rxe = rxe;
 	memcpy(&mcg->mgid, mgid, sizeof(*mgid));
 	INIT_LIST_HEAD(&mcg->qp_list);
@@ -186,11 +188,45 @@ out:
 
 err_dec:
 	atomic_dec(&rxe->mcg_num);
-	ret = -ENOMEM;
-err_out:
 	spin_unlock_bh(&rxe->mcg_lock);
-	rxe_drop_ref(mcg);
+	kfree(mcg);
 	return ret;
+}
+
+/**
+ * __rxe_cleanup_mcg - cleanup mcg object holding lock
+ * @kref: kref embedded in mcg object
+ *
+ * Context: caller has put all references to mcg
+ * caller should hold rxe->mcg_lock
+ */
+static void __rxe_cleanup_mcg(struct kref *kref)
+{
+	struct rxe_mcg *mcg = container_of(kref, typeof(*mcg), ref_cnt);
+	struct rxe_dev *rxe = mcg->rxe;
+
+	__rxe_remove_mcg(mcg);
+	rxe_mcast_delete(rxe, &mcg->mgid);
+	atomic_dec(&rxe->mcg_num);
+
+	kfree(mcg);
+}
+
+/**
+ * rxe_cleanup_mcg - cleanup mcg object
+ * @kref: kref embedded in mcg object
+ *
+ * Context: caller has put all references to mcg and no one should be
+ * able to get another one
+ */
+void rxe_cleanup_mcg(struct kref *kref)
+{
+	struct rxe_mcg *mcg = container_of(kref, typeof(*mcg), ref_cnt);
+	struct rxe_dev *rxe = mcg->rxe;
+
+	spin_lock_bh(&rxe->mcg_lock);
+	__rxe_cleanup_mcg(kref);
+	spin_unlock_bh(&rxe->mcg_lock);
 }
 
 static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
@@ -259,32 +295,20 @@ static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 			list_del(&mca->qp_list);
 			n = atomic_dec_return(&mcg->qp_num);
 			if (n <= 0)
-				rxe_drop_ref(mcg);
+				kref_put(&mcg->ref_cnt, __rxe_cleanup_mcg);
 			atomic_dec(&qp->mcg_num);
 
 			spin_unlock_bh(&rxe->mcg_lock);
-			rxe_drop_ref(mcg);
+			kref_put(&mcg->ref_cnt, __rxe_cleanup_mcg);
 			kfree(mca);
 			return 0;
 		}
 	}
 
 	spin_unlock_bh(&rxe->mcg_lock);
-	rxe_drop_ref(mcg);
+	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
 err1:
 	return -EINVAL;
-}
-
-void rxe_mc_cleanup(struct rxe_pool_elem *elem)
-{
-	struct rxe_mcg *mcg = container_of(elem, typeof(*mcg), elem);
-	struct rxe_dev *rxe = mcg->rxe;
-
-	spin_lock_bh(&rxe->mcg_lock);
-	__rxe_remove_mcg(mcg);
-	spin_unlock_bh(&rxe->mcg_lock);
-
-	rxe_mcast_delete(rxe, &mcg->mgid);
 }
 
 int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
@@ -301,7 +325,7 @@ int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 
 	err = rxe_mcast_add_grp_elem(rxe, qp, mcg);
 
-	rxe_drop_ref(mcg);
+	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
 	return err;
 }
 
