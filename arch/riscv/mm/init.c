@@ -28,6 +28,8 @@
 #include <asm/io.h>
 #include <asm/ptdump.h>
 #include <asm/numa.h>
+#include <asm/sbi.h>
+#include <asm/vendorid_list.h>
 
 #include "../kernel/head.h"
 
@@ -590,6 +592,21 @@ static __init void set_satp_mode(void)
 {
 	u64 identity_satp, hw_satp;
 	uintptr_t set_satp_mode_pmd;
+
+	if (sbi_get_mvendorid() == NUCLEI_OLD_VENDOR_ID) {
+		/*
+		 * Old Nuclei UX600 processor releases have broken
+		 * implementation of SATP register which prevents
+		 * proper runtime detection of Sv48 existence. In
+		 * addition these processor releases have an old
+		 * vendor id instead of proper JEDEC ID.
+		 *
+		 * As these releases do not support Sv48 at all,
+		 * force Sv39 on them.
+		 */
+		disable_pgtable_l4();
+		return;
+	}
 
 	set_satp_mode_pmd = ((unsigned long)set_satp_mode) & PMD_MASK;
 	create_pgd_mapping(early_pg_dir,
