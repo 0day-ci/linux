@@ -848,6 +848,10 @@ static char *ptr_to_id(char *buf, char *end, const void *ptr,
 	return pointer_string(buf, end, (const void *)hashval, spec);
 }
 
+/* Disable pointer hashing if requested */
+bool no_hash_pointers __ro_after_init;
+EXPORT_SYMBOL_GPL(no_hash_pointers);
+
 int kptr_restrict __read_mostly;
 
 static noinline_for_stack
@@ -857,6 +861,8 @@ char *restricted_pointer(char *buf, char *end, const void *ptr,
 	switch (kptr_restrict) {
 	case 0:
 		/* Handle as %p, hash and do _not_ leak addresses. */
+		if (unlikely(no_hash_pointers))
+			break;
 		return ptr_to_id(buf, end, ptr, spec);
 	case 1: {
 		const struct cred *cred;
@@ -2222,10 +2228,6 @@ char *fwnode_string(char *buf, char *end, struct fwnode_handle *fwnode,
 
 	return widen_string(buf, buf - buf_start, end, spec);
 }
-
-/* Disable pointer hashing if requested */
-bool no_hash_pointers __ro_after_init;
-EXPORT_SYMBOL_GPL(no_hash_pointers);
 
 int __init no_hash_pointers_enable(char *str)
 {
