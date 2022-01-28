@@ -139,6 +139,17 @@ static char *IMM_MODE_STRING[] =
 #define w_ctr(x,y)      outb(y, (x)+2)
 #endif
 
+struct imm_cmd_priv {
+	struct scsi_pointer scsi_pointer;
+};
+
+static inline struct scsi_pointer *imm_scsi_pointer(struct scsi_cmnd *cmd)
+{
+	struct imm_cmd_priv *icmd = scsi_cmd_priv(cmd);
+
+	return &icmd->scsi_pointer;
+}
+
 static int imm_engine(imm_struct *, struct scsi_cmnd *);
 
 #endif				/* _IMM_H */
