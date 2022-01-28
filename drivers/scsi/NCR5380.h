@@ -227,8 +227,16 @@ struct NCR5380_hostdata {
 };
 
 struct NCR5380_cmd {
+	struct scsi_pointer scsi_pointer;
 	struct list_head list;
 };
+
+static inline struct scsi_pointer *NCR5380_scsi_pointer(struct scsi_cmnd *cmd)
+{
+	struct NCR5380_cmd *ncmd = scsi_cmd_priv(cmd);
+
+	return &ncmd->scsi_pointer;
+}
 
 #define NCR5380_PIO_CHUNK_SIZE		256
 

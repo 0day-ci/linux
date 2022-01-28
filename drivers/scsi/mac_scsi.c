@@ -404,11 +404,13 @@ out:
 static int macscsi_dma_xfer_len(struct NCR5380_hostdata *hostdata,
                                 struct scsi_cmnd *cmd)
 {
+	struct scsi_pointer *scsi_pointer = NCR5380_scsi_pointer(cmd);
+
 	if (hostdata->flags & FLAG_NO_PSEUDO_DMA ||
-	    cmd->SCp.this_residual < setup_use_pdma)
+	    scsi_pointer->this_residual < setup_use_pdma)
 		return 0;
 
-	return cmd->SCp.this_residual;
+	return scsi_pointer->this_residual;
 }
 
 static int macscsi_dma_residual(struct NCR5380_hostdata *hostdata)
