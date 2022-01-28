@@ -1647,8 +1647,8 @@ cancel_port_requests(struct intel_engine_execlists * const execlists,
 
 static void invalidate_csb_entries(const u64 *first, const u64 *last)
 {
-	clflush((void *)first);
-	clflush((void *)last);
+	drm_clflush_virt_range((void *)first, sizeof(*first));
+	drm_clflush_virt_range((void *)last, sizeof(*last));
 }
 
 /*
