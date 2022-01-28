@@ -432,6 +432,74 @@ struct iecm_channel_config {
 	u8 num_tc;
 };
 
+enum iecm_adv_rss_flow_seg_hdr {
+	IECM_ADV_RSS_FLOW_SEG_HDR_NONE	= 0x00000000,
+	IECM_ADV_RSS_FLOW_SEG_HDR_IPV4	= 0x00000001,
+	IECM_ADV_RSS_FLOW_SEG_HDR_IPV6	= 0x00000002,
+	IECM_ADV_RSS_FLOW_SEG_HDR_TCP	= 0x00000004,
+	IECM_ADV_RSS_FLOW_SEG_HDR_UDP	= 0x00000008,
+	IECM_ADV_RSS_FLOW_SEG_HDR_SCTP	= 0x00000010,
+};
+
+#define IECM_ADV_RSS_FLOW_SEG_HDR_L3		\
+	(IECM_ADV_RSS_FLOW_SEG_HDR_IPV4	|	\
+	 IECM_ADV_RSS_FLOW_SEG_HDR_IPV6)
+
+#define IECM_ADV_RSS_FLOW_SEG_HDR_L4		\
+	(IECM_ADV_RSS_FLOW_SEG_HDR_TCP |	\
+	 IECM_ADV_RSS_FLOW_SEG_HDR_UDP |	\
+	 IECM_ADV_RSS_FLOW_SEG_HDR_SCTP)
+
+enum iecm_adv_rss_flow_field {
+	/* L3 */
+	IECM_ADV_RSS_FLOW_FIELD_IDX_IPV4_SA,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_IPV4_DA,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_IPV6_SA,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_IPV6_DA,
+	/* L4 */
+	IECM_ADV_RSS_FLOW_FIELD_IDX_TCP_SRC_PORT,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_TCP_DST_PORT,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_UDP_SRC_PORT,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_UDP_DST_PORT,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_SCTP_SRC_PORT,
+	IECM_ADV_RSS_FLOW_FIELD_IDX_SCTP_DST_PORT,
+
+	/* The total number of enums must not exceed 64 */
+	IECM_ADV_RSS_FLOW_FIELD_IDX_MAX
+};
+
+#define IECM_ADV_RSS_HASH_INVALID	0
+#define IECM_ADV_RSS_HASH_FLD_IPV4_SA	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_IPV4_SA)
+#define IECM_ADV_RSS_HASH_FLD_IPV6_SA	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_IPV6_SA)
+#define IECM_ADV_RSS_HASH_FLD_IPV4_DA	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_IPV4_DA)
+#define IECM_ADV_RSS_HASH_FLD_IPV6_DA	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_IPV6_DA)
+#define IECM_ADV_RSS_HASH_FLD_TCP_SRC_PORT	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_TCP_SRC_PORT)
+#define IECM_ADV_RSS_HASH_FLD_TCP_DST_PORT	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_TCP_DST_PORT)
+#define IECM_ADV_RSS_HASH_FLD_UDP_SRC_PORT	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_UDP_SRC_PORT)
+#define IECM_ADV_RSS_HASH_FLD_UDP_DST_PORT	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_UDP_DST_PORT)
+#define IECM_ADV_RSS_HASH_FLD_SCTP_SRC_PORT	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_SCTP_SRC_PORT)
+#define IECM_ADV_RSS_HASH_FLD_SCTP_DST_PORT	\
+	BIT_ULL(IECM_ADV_RSS_FLOW_FIELD_IDX_SCTP_DST_PORT)
+
+/* bookkeeping of advanced RSS configuration */
+struct iecm_adv_rss {
+	struct list_head list;
+	u32 packet_hdrs;
+	u64 hash_flds;
+	struct virtchnl_rss_cfg cfg_msg;
+	bool remove;	/* RSS filter needs to be deleted */
+	bool add;	/* RSS filter needs to be added */
+};
+
 enum iecm_fdir_flow_type {
 	/* NONE - used for undef/error */
 	IECM_FDIR_FLOW_NONE = 0,
@@ -878,6 +946,11 @@ void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
 void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async);
 int iecm_set_promiscuous(struct iecm_adapter *adapter);
 int iecm_send_add_del_cloud_filter_msg(struct iecm_vport *vport, bool add);
+int iecm_send_add_del_adv_rss_cfg_msg(struct iecm_vport *vport, bool add);
+int iecm_set_adv_rss_hash_opt(struct iecm_vport *vport,
+			      struct ethtool_rxnfc *cmd);
+int iecm_get_adv_rss_hash_opt(struct iecm_vport *vport,
+			      struct ethtool_rxnfc *cmd);
 int iecm_send_add_fdir_filter_msg(struct iecm_vport *vport);
 int iecm_send_del_fdir_filter_msg(struct iecm_vport *vport);
 int iecm_get_fdir_fltr_entry(struct iecm_vport *vport,

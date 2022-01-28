@@ -2800,6 +2800,77 @@ error:
 }
 
 /**
+ * iecm_send_add_del_adv_rss_cfg_msg: Send add/del RSS configuration message
+ * @vport: vport structure
+ * @add: True to add, false to delete RSS configuration
+ *
+ * Request the CP/PF to add/del RSS configuration as specified by the user via
+ * ethtool
+ *
+ * Return 0 on success, negative on failure
+ **/
+int iecm_send_add_del_adv_rss_cfg_msg(struct iecm_vport *vport, bool add)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct virtchnl_rss_cfg *rss_cfg;
+	struct iecm_adv_rss *rss;
+	int len, err = -ENXIO;
+
+	len = sizeof(struct virtchnl_rss_cfg);
+	rss_cfg = kzalloc(len, GFP_KERNEL);
+	if (!rss_cfg)
+		return -ENOMEM;
+
+	while (true) {
+		bool process_rss = false;
+
+		spin_lock_bh(&adapter->adv_rss_list_lock);
+		list_for_each_entry(rss, &adapter->config_data.adv_rss_list, list) {
+			if (add && rss->add) {
+				/* Only add needs print the RSS information */
+				process_rss = true;
+				rss->add = false;
+				memcpy(rss_cfg, &rss->cfg_msg, len);
+				break;
+			} else if (!add && rss->remove) {
+				process_rss = true;
+				rss->remove = false;
+				memcpy(rss_cfg, &rss->cfg_msg, len);
+				break;
+			}
+		}
+		spin_unlock_bh(&adapter->adv_rss_list_lock);
+
+		/* Don't send mailbox message when there are no RSS to add/del */
+		if (!process_rss)
+			break;
+
+		if (add) {
+			err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_ADD_RSS_CFG,
+					       len, (u8 *)rss_cfg);
+			if (err)
+				break;
+
+			err = iecm_wait_for_event(adapter, IECM_VC_ADD_RSS_CFG,
+						  IECM_VC_ADD_RSS_CFG_ERR);
+		} else {
+			err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_DEL_RSS_CFG,
+					       len, (u8 *)rss_cfg);
+			if (err)
+				break;
+
+			err = iecm_min_wait_for_event(adapter, IECM_VC_DEL_RSS_CFG,
+						      IECM_VC_DEL_RSS_CFG_ERR);
+		}
+		if (err)
+			break;
+	}
+
+	kfree(rss_cfg);
+	return err;
+}
+
+/**
  * iecm_send_add_fdir_filter_msg: Send add Flow Director filter message
  * @vport: vport structure
  *

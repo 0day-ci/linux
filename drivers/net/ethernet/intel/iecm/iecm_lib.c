@@ -1014,6 +1014,52 @@ static void iecm_remove_vlan_filters(struct iecm_vport *vport)
 }
 
 /**
+ * iecm_remove_adv_rss_cfgs - Remove all RSS configuration
+ * @vport: vport structure
+ */
+static void iecm_remove_adv_rss_cfgs(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+
+	if (!iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_ADV_RSS))
+		return;
+
+	if (!list_empty(&adapter->config_data.adv_rss_list)) {
+		struct iecm_adv_rss *rss;
+
+		spin_lock_bh(&adapter->adv_rss_list_lock);
+		list_for_each_entry(rss, &adapter->config_data.adv_rss_list,
+				    list) {
+			rss->remove = true;
+		}
+		spin_unlock_bh(&adapter->adv_rss_list_lock);
+		iecm_send_add_del_adv_rss_cfg_msg(vport, false);
+	}
+}
+
+/**
+ * iecm_del_all_adv_rss_cfgs - delete all RSS configuration
+ * @vport: vport structure
+ *
+ * This function will loop through the list of RSS configuration and deletes
+ * them.
+ **/
+static void iecm_del_all_adv_rss_cfgs(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_adv_rss *rss, *rss_tmp;
+
+	spin_lock_bh(&adapter->adv_rss_list_lock);
+	list_for_each_entry_safe(rss, rss_tmp,
+				 &adapter->config_data.adv_rss_list,
+				 list) {
+		list_del(&rss->list);
+		kfree(rss);
+	}
+	spin_unlock_bh(&adapter->adv_rss_list_lock);
+}
+
+/**
  * iecm_remove_fdir_filters - Remove all Flow Director filters
  * @vport: vport structure
  */
@@ -1099,6 +1145,7 @@ static void iecm_vport_stop(struct iecm_vport *vport)
 		iecm_remove_vlan_filters(vport);
 	}
 
+	iecm_remove_adv_rss_cfgs(vport);
 	iecm_remove_fdir_filters(vport);
 
 	adapter->link_up = false;
@@ -1333,6 +1380,27 @@ static void iecm_restore_cloud_filters(struct iecm_vport *vport)
 }
 
 /**
+ * iecm_restore_adv_rss_cfgs - Restore all RSS configuration
+ * @vport: vport structure
+ */
+static void iecm_restore_adv_rss_cfgs(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+
+	if (!list_empty(&adapter->config_data.adv_rss_list)) {
+		struct iecm_adv_rss *rss;
+
+		spin_lock_bh(&adapter->adv_rss_list_lock);
+		list_for_each_entry(rss, &adapter->config_data.adv_rss_list,
+				    list) {
+			rss->add = true;
+		}
+		spin_unlock_bh(&adapter->adv_rss_list_lock);
+		iecm_send_add_del_adv_rss_cfg_msg(vport, true);
+	}
+}
+
+/**
  * iecm_restore_fdir_filters - Restore all Flow Director filters
  * @vport: vport structure
  */
@@ -1379,6 +1447,9 @@ static void iecm_restore_features(struct iecm_vport *vport)
 	/* Restore cloud filters if ADQ is enabled */
 	if (iecm_is_feature_ena(vport, NETIF_F_HW_TC))
 		iecm_restore_cloud_filters(vport);
+
+	if (iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_ADV_RSS))
+		iecm_restore_adv_rss_cfgs(vport);
 
 	if (iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_FDIR))
 		iecm_restore_fdir_filters(vport);
@@ -2219,6 +2290,7 @@ static void iecm_del_user_cfg_data(struct iecm_adapter *adapter)
 		if (!adapter->vports[i])
 			continue;
 
+		iecm_del_all_adv_rss_cfgs(adapter->vports[i]);
 		iecm_del_all_fdir_filters(adapter->vports[i]);
 	}
 }
@@ -3631,6 +3703,481 @@ static int iecm_setup_tc(struct net_device *netdev, enum tc_setup_type type,
 	}
 
 	return err;
+}
+
+/**
+ * iecm_fill_adv_rss_ip4_hdr - fill the IPv4 RSS protocol header
+ * @hdr: the virtchnl message protocol header data structure
+ * @hash_flds: the RSS configuration protocol hash fields
+ */
+static void
+iecm_fill_adv_rss_ip4_hdr(struct virtchnl_proto_hdr *hdr, u64 hash_flds)
+{
+	VIRTCHNL_SET_PROTO_HDR_TYPE(hdr, IPV4);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_IPV4_SA)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, IPV4, SRC);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_IPV4_DA)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, IPV4, DST);
+}
+
+/**
+ * iecm_fill_adv_rss_ip6_hdr - fill the IPv6 RSS protocol header
+ * @hdr: the virtchnl message protocol header data structure
+ * @hash_flds: the RSS configuration protocol hash fields
+ */
+static void
+iecm_fill_adv_rss_ip6_hdr(struct virtchnl_proto_hdr *hdr, u64 hash_flds)
+{
+	VIRTCHNL_SET_PROTO_HDR_TYPE(hdr, IPV6);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_IPV6_SA)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, IPV6, SRC);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_IPV6_DA)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, IPV6, DST);
+}
+
+/**
+ * iecm_fill_adv_rss_tcp_hdr - fill the TCP RSS protocol header
+ * @hdr: the virtchnl message protocol header data structure
+ * @hash_flds: the RSS configuration protocol hash fields
+ */
+static void
+iecm_fill_adv_rss_tcp_hdr(struct virtchnl_proto_hdr *hdr, u64 hash_flds)
+{
+	VIRTCHNL_SET_PROTO_HDR_TYPE(hdr, TCP);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_TCP_SRC_PORT)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, TCP, SRC_PORT);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_TCP_DST_PORT)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, TCP, DST_PORT);
+}
+
+/**
+ * iecm_fill_adv_rss_udp_hdr - fill the UDP RSS protocol header
+ * @hdr: the virtchnl message protocol header data structure
+ * @hash_flds: the RSS configuration protocol hash fields
+ */
+static void
+iecm_fill_adv_rss_udp_hdr(struct virtchnl_proto_hdr *hdr, u64 hash_flds)
+{
+	VIRTCHNL_SET_PROTO_HDR_TYPE(hdr, UDP);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_UDP_SRC_PORT)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, UDP, SRC_PORT);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_UDP_DST_PORT)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, UDP, DST_PORT);
+}
+
+/**
+ * iecm_fill_adv_rss_sctp_hdr - fill the SCTP RSS protocol header
+ * @hdr: the virtchnl message protocol header data structure
+ * @hash_flds: the RSS configuration protocol hash fields
+ */
+static void
+iecm_fill_adv_rss_sctp_hdr(struct virtchnl_proto_hdr *hdr, s64 hash_flds)
+{
+	VIRTCHNL_SET_PROTO_HDR_TYPE(hdr, SCTP);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_SCTP_SRC_PORT)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, SCTP, SRC_PORT);
+
+	if (hash_flds & IECM_ADV_RSS_HASH_FLD_SCTP_DST_PORT)
+		VIRTCHNL_ADD_PROTO_HDR_FIELD_BIT(hdr, SCTP, DST_PORT);
+}
+
+/**
+ * iecm_fill_adv_rss_cfg_msg - fill the RSS configuration into virtchnl message
+ * @rss_cfg: the virtchnl message to be filled with RSS configuration setting
+ * @packet_hdrs: the RSS configuration protocol header types
+ * @hash_flds: the RSS configuration protocol hash fields
+ *
+ * Returns 0 if the RSS configuration virtchnl message is filled successfully
+ */
+static int
+iecm_fill_adv_rss_cfg_msg(struct virtchnl_rss_cfg *rss_cfg,
+			  u32 packet_hdrs, u64 hash_flds)
+{
+	struct virtchnl_proto_hdrs *proto_hdrs = &rss_cfg->proto_hdrs;
+	struct virtchnl_proto_hdr *hdr;
+
+	rss_cfg->rss_algorithm = VIRTCHNL_RSS_ALG_TOEPLITZ_ASYMMETRIC;
+
+	proto_hdrs->tunnel_level = 0;	/* always outer layer */
+
+	hdr = &proto_hdrs->proto_hdr[proto_hdrs->count++];
+	switch (packet_hdrs & IECM_ADV_RSS_FLOW_SEG_HDR_L3) {
+	case IECM_ADV_RSS_FLOW_SEG_HDR_IPV4:
+		iecm_fill_adv_rss_ip4_hdr(hdr, hash_flds);
+		break;
+	case IECM_ADV_RSS_FLOW_SEG_HDR_IPV6:
+		iecm_fill_adv_rss_ip6_hdr(hdr, hash_flds);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	hdr = &proto_hdrs->proto_hdr[proto_hdrs->count++];
+	switch (packet_hdrs & IECM_ADV_RSS_FLOW_SEG_HDR_L4) {
+	case IECM_ADV_RSS_FLOW_SEG_HDR_TCP:
+		iecm_fill_adv_rss_tcp_hdr(hdr, hash_flds);
+		break;
+	case IECM_ADV_RSS_FLOW_SEG_HDR_UDP:
+		iecm_fill_adv_rss_udp_hdr(hdr, hash_flds);
+		break;
+	case IECM_ADV_RSS_FLOW_SEG_HDR_SCTP:
+		iecm_fill_adv_rss_sctp_hdr(hdr, hash_flds);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * iecm_find_adv_rss_cfg_by_hdrs - find RSS configuration with header type
+ * @vport: vport structure
+ * @packet_hdrs: protocol header type to find.
+ *
+ * Returns pointer to advance RSS configuration if found or null
+ */
+static struct iecm_adv_rss *
+iecm_find_adv_rss_cfg_by_hdrs(struct iecm_vport *vport, u32 packet_hdrs)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_adv_rss *rss;
+
+	list_for_each_entry(rss, &adapter->config_data.adv_rss_list, list)
+		if (rss->packet_hdrs == packet_hdrs)
+			return rss;
+
+	return NULL;
+}
+
+/**
+ * iecm_dump_adv_rss_cfg_info
+ * @vport: vport structure
+ * @packet_hdrs: The protocol headers for RSS configuration
+ * @hash_flds: The protocol hash fields for RSS configuration
+ * @prefix: the prefix string description to dump the RSS
+ * @postfix: the postfix string description to dump the RSS
+ *
+ * Dump the advance RSS configuration
+ **/
+static void
+iecm_dump_adv_rss_cfg_info(struct iecm_vport *vport,
+			   u32 packet_hdrs, u64 hash_flds,
+			   const char *prefix, const char *postfix)
+{
+	static char hash_opt[300];
+	const char *proto;
+
+	if (packet_hdrs & IECM_ADV_RSS_FLOW_SEG_HDR_TCP)
+		proto = "TCP";
+	else if (packet_hdrs & IECM_ADV_RSS_FLOW_SEG_HDR_UDP)
+		proto = "UDP";
+	else if (packet_hdrs & IECM_ADV_RSS_FLOW_SEG_HDR_SCTP)
+		proto = "SCTP";
+	else
+		return;
+
+	memset(hash_opt, 0, sizeof(hash_opt));
+
+	strcat(hash_opt, proto);
+	if (packet_hdrs & IECM_ADV_RSS_FLOW_SEG_HDR_IPV4)
+		strcat(hash_opt, "v4 ");
+	else
+		strcat(hash_opt, "v6 ");
+
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_IPV4_SA |
+			 IECM_ADV_RSS_HASH_FLD_IPV6_SA))
+		strcat(hash_opt, "[IP SA] ");
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_IPV4_DA |
+			 IECM_ADV_RSS_HASH_FLD_IPV6_DA))
+		strcat(hash_opt, "[IP DA] ");
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_TCP_SRC_PORT |
+			 IECM_ADV_RSS_HASH_FLD_UDP_SRC_PORT |
+			 IECM_ADV_RSS_HASH_FLD_SCTP_SRC_PORT))
+		strcat(hash_opt, "[src port] ");
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_TCP_DST_PORT |
+			 IECM_ADV_RSS_HASH_FLD_UDP_DST_PORT |
+			 IECM_ADV_RSS_HASH_FLD_SCTP_DST_PORT))
+		strcat(hash_opt, "[dst port] ");
+
+	if (!prefix)
+		prefix = "";
+
+	if (!postfix)
+		postfix = "";
+
+	dev_info(&vport->adapter->pdev->dev, "%s %s %s\n",
+		 prefix, hash_opt, postfix);
+}
+
+/**
+ * iecm_adv_rss_parse_hdrs - parses headers from RSS hash input
+ * @cmd: ethtool rxnfc command
+ *
+ * This function parses the rxnfc command and returns intended
+ * header types for RSS configuration
+ */
+static u32 iecm_adv_rss_parse_hdrs(struct ethtool_rxnfc *cmd)
+{
+	u32 hdrs = IECM_ADV_RSS_FLOW_SEG_HDR_NONE;
+
+	switch (cmd->flow_type) {
+	case TCP_V4_FLOW:
+		hdrs |= IECM_ADV_RSS_FLOW_SEG_HDR_TCP |
+			IECM_ADV_RSS_FLOW_SEG_HDR_IPV4;
+		break;
+	case UDP_V4_FLOW:
+		hdrs |= IECM_ADV_RSS_FLOW_SEG_HDR_UDP |
+			IECM_ADV_RSS_FLOW_SEG_HDR_IPV4;
+		break;
+	case SCTP_V4_FLOW:
+		hdrs |= IECM_ADV_RSS_FLOW_SEG_HDR_SCTP |
+			IECM_ADV_RSS_FLOW_SEG_HDR_IPV4;
+		break;
+	case TCP_V6_FLOW:
+		hdrs |= IECM_ADV_RSS_FLOW_SEG_HDR_TCP |
+			IECM_ADV_RSS_FLOW_SEG_HDR_IPV6;
+		break;
+	case UDP_V6_FLOW:
+		hdrs |= IECM_ADV_RSS_FLOW_SEG_HDR_UDP |
+			IECM_ADV_RSS_FLOW_SEG_HDR_IPV6;
+		break;
+	case SCTP_V6_FLOW:
+		hdrs |= IECM_ADV_RSS_FLOW_SEG_HDR_SCTP |
+			IECM_ADV_RSS_FLOW_SEG_HDR_IPV6;
+		break;
+	default:
+		break;
+	}
+
+	return hdrs;
+}
+
+/**
+ * iecm_adv_rss_parse_hash_flds - parses hash fields from RSS hash input
+ * @cmd: ethtool rxnfc command
+ *
+ * This function parses the rxnfc command and returns intended hash fields for
+ * RSS configuration
+ */
+static u64 iecm_adv_rss_parse_hash_flds(struct ethtool_rxnfc *cmd)
+{
+	u64 hfld = IECM_ADV_RSS_HASH_INVALID;
+
+	if (cmd->data & RXH_IP_SRC || cmd->data & RXH_IP_DST) {
+		switch (cmd->flow_type) {
+		case TCP_V4_FLOW:
+		case UDP_V4_FLOW:
+		case SCTP_V4_FLOW:
+			if (cmd->data & RXH_IP_SRC)
+				hfld |= IECM_ADV_RSS_HASH_FLD_IPV4_SA;
+			if (cmd->data & RXH_IP_DST)
+				hfld |= IECM_ADV_RSS_HASH_FLD_IPV4_DA;
+			break;
+		case TCP_V6_FLOW:
+		case UDP_V6_FLOW:
+		case SCTP_V6_FLOW:
+			if (cmd->data & RXH_IP_SRC)
+				hfld |= IECM_ADV_RSS_HASH_FLD_IPV6_SA;
+			if (cmd->data & RXH_IP_DST)
+				hfld |= IECM_ADV_RSS_HASH_FLD_IPV6_DA;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (cmd->data & RXH_L4_B_0_1 || cmd->data & RXH_L4_B_2_3) {
+		switch (cmd->flow_type) {
+		case TCP_V4_FLOW:
+		case TCP_V6_FLOW:
+			if (cmd->data & RXH_L4_B_0_1)
+				hfld |= IECM_ADV_RSS_HASH_FLD_TCP_SRC_PORT;
+			if (cmd->data & RXH_L4_B_2_3)
+				hfld |= IECM_ADV_RSS_HASH_FLD_TCP_DST_PORT;
+			break;
+		case UDP_V4_FLOW:
+		case UDP_V6_FLOW:
+			if (cmd->data & RXH_L4_B_0_1)
+				hfld |= IECM_ADV_RSS_HASH_FLD_UDP_SRC_PORT;
+			if (cmd->data & RXH_L4_B_2_3)
+				hfld |= IECM_ADV_RSS_HASH_FLD_UDP_DST_PORT;
+			break;
+		case SCTP_V4_FLOW:
+		case SCTP_V6_FLOW:
+			if (cmd->data & RXH_L4_B_0_1)
+				hfld |= IECM_ADV_RSS_HASH_FLD_SCTP_SRC_PORT;
+			if (cmd->data & RXH_L4_B_2_3)
+				hfld |= IECM_ADV_RSS_HASH_FLD_SCTP_DST_PORT;
+			break;
+		default:
+			break;
+		}
+	}
+
+	return hfld;
+}
+
+/**
+ * iecm_set_adv_rss_hash_opt - Enable/Disable flow types for RSS hash
+ * @vport: vport structure
+ * @cmd: ethtool rxnfc command
+ *
+ * Returns Success if the flow input set is supported.
+ */
+int
+iecm_set_adv_rss_hash_opt(struct iecm_vport *vport, struct ethtool_rxnfc *cmd)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_adv_rss *rss, *rss_new;
+	u64 hash_flds;
+	u32 hdrs;
+	int err;
+
+	if (adapter->state != __IECM_UP)
+		return -EIO;
+
+	if (!iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_ADV_RSS))
+		return -EOPNOTSUPP;
+
+	hdrs = iecm_adv_rss_parse_hdrs(cmd);
+	if (hdrs == IECM_ADV_RSS_FLOW_SEG_HDR_NONE)
+		return -EINVAL;
+
+	hash_flds = iecm_adv_rss_parse_hash_flds(cmd);
+	if (hash_flds == IECM_ADV_RSS_HASH_INVALID)
+		return -EINVAL;
+
+	rss_new = kzalloc(sizeof(*rss_new), GFP_KERNEL);
+	if (!rss_new)
+		return -ENOMEM;
+
+	/* Since this can fail, do it now to avoid dirtying the list, we'll
+	 * copy it from rss_new if it turns out we're updating an existing
+	 * filter instead of adding a new one.
+	 */
+	if (iecm_fill_adv_rss_cfg_msg(&rss_new->cfg_msg, hdrs, hash_flds)) {
+		kfree(rss_new);
+		return -EINVAL;
+	}
+
+	iecm_dump_adv_rss_cfg_info(vport, hdrs, hash_flds,
+				   "Input set change for", "is pending");
+
+	spin_lock_bh(&adapter->adv_rss_list_lock);
+	rss = iecm_find_adv_rss_cfg_by_hdrs(vport, hdrs);
+	if (rss) {
+		if (rss->hash_flds != hash_flds) {
+			rss->remove = false;
+			memcpy(&rss->cfg_msg, &rss_new->cfg_msg,
+			       sizeof(rss_new->cfg_msg));
+			kfree(rss_new);
+		} else {
+			kfree(rss_new);
+			spin_unlock_bh(&adapter->adv_rss_list_lock);
+			return -EEXIST;
+		}
+	} else {
+		rss = rss_new;
+		rss->packet_hdrs = hdrs;
+		list_add_tail(&rss->list, &adapter->config_data.adv_rss_list);
+	}
+	rss->add = true;
+	rss->hash_flds = hash_flds;
+	spin_unlock_bh(&adapter->adv_rss_list_lock);
+
+	err = iecm_send_add_del_adv_rss_cfg_msg(vport, true);
+	if (err) {
+		spin_lock_bh(&adapter->adv_rss_list_lock);
+		/* We have to find it again to make sure another thread hasn't
+		 * already deleted and kfreed it.
+		 */
+		rss = iecm_find_adv_rss_cfg_by_hdrs(vport, hdrs);
+		if (rss) {
+			list_del(&rss->list);
+			kfree(rss);
+		}
+		spin_unlock_bh(&adapter->adv_rss_list_lock);
+	}
+
+	if (!err)
+		iecm_dump_adv_rss_cfg_info(vport, hdrs, hash_flds,
+					   "Input set change for",
+					   "successful");
+	else
+		iecm_dump_adv_rss_cfg_info(vport, hdrs, hash_flds,
+					   "Failed to change the input set for",
+					   NULL);
+
+	return err;
+}
+
+/**
+ * iecm_get_adv_rss_hash_opt - Retrieve hash fields for a given flow-type
+ * @vport: vport structure
+ * @cmd: ethtool rxnfc command
+ *
+ * Returns Success if the flow input set is supported.
+ */
+int
+iecm_get_adv_rss_hash_opt(struct iecm_vport *vport, struct ethtool_rxnfc *cmd)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_adv_rss *rss;
+	u64 hash_flds;
+	u32 hdrs;
+
+	if (adapter->state != __IECM_UP)
+		return -EIO;
+
+	if (!iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_ADV_RSS))
+		return -EOPNOTSUPP;
+
+	cmd->data = 0;
+
+	hdrs = iecm_adv_rss_parse_hdrs(cmd);
+	if (hdrs == IECM_ADV_RSS_FLOW_SEG_HDR_NONE)
+		return -EINVAL;
+
+	spin_lock_bh(&adapter->adv_rss_list_lock);
+	rss = iecm_find_adv_rss_cfg_by_hdrs(vport, hdrs);
+	if (rss)
+		hash_flds = rss->hash_flds;
+	else
+		hash_flds = IECM_ADV_RSS_HASH_INVALID;
+	spin_unlock_bh(&adapter->adv_rss_list_lock);
+
+	if (hash_flds == IECM_ADV_RSS_HASH_INVALID)
+		return -EINVAL;
+
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_IPV4_SA |
+			 IECM_ADV_RSS_HASH_FLD_IPV6_SA))
+		cmd->data |= (u64)RXH_IP_SRC;
+
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_IPV4_DA |
+			 IECM_ADV_RSS_HASH_FLD_IPV6_DA))
+		cmd->data |= (u64)RXH_IP_DST;
+
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_TCP_SRC_PORT |
+			 IECM_ADV_RSS_HASH_FLD_UDP_SRC_PORT |
+			 IECM_ADV_RSS_HASH_FLD_SCTP_SRC_PORT))
+		cmd->data |= (u64)RXH_L4_B_0_1;
+
+	if (hash_flds & (IECM_ADV_RSS_HASH_FLD_TCP_DST_PORT |
+			 IECM_ADV_RSS_HASH_FLD_UDP_DST_PORT |
+			 IECM_ADV_RSS_HASH_FLD_SCTP_DST_PORT))
+		cmd->data |= (u64)RXH_L4_B_2_3;
+
+	return 0;
 }
 
 /**
