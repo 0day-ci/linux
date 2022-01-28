@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: (GPL-2.0 OR MIT) */
+/* Copyright (c) 2018-2022, NVIDIA CORPORATION. All rights reserved. */
 
 #ifndef DT_BINDINGS_MEMORY_TEGRA234_MC_H
 #define DT_BINDINGS_MEMORY_TEGRA234_MC_H
@@ -7,6 +8,8 @@
 #define TEGRA234_SID_INVALID		0x00
 #define TEGRA234_SID_PASSTHROUGH	0x7f
 
+/* NISO0 stream IDs */
+#define TEGRA234_SID_APE	0x02
 
 /* NISO1 stream IDs */
 #define TEGRA234_SID_SDMMC4	0x02
@@ -20,6 +23,10 @@
 #define TEGRA234_MEMORY_CLIENT_SDMMCRAB 0x63
 /* sdmmcd memory write client */
 #define TEGRA234_MEMORY_CLIENT_SDMMCWAB 0x67
+/* Audio Processing (APE) engine read clients */
+#define TEGRA234_MEMORY_CLIENT_APER 0x7a
+/* Audio Processing (APE) engine write clients */
+#define TEGRA234_MEMORY_CLIENT_APEW 0x7b
 /* BPMP read client */
 #define TEGRA234_MEMORY_CLIENT_BPMPR 0x93
 /* BPMP write client */
