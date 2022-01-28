@@ -312,6 +312,7 @@ typedef struct {
 
 /* driver-private data per SCSI command. */
 struct fas216_cmd_priv {
+	struct scsi_pointer scsi_pointer; /* must be the first member */
 	void (*scsi_done)(struct scsi_cmnd *cmd);
 };
 
