@@ -3533,7 +3533,6 @@ static noinline_for_stack int scrub_stripe(struct scrub_ctx *sctx,
 	u64 offset;	/* Offset inside the chunk */
 	u64 stripe_logical;
 	u64 stripe_end;
-	int stop_loop = 0;
 
 	path = btrfs_alloc_path();
 	if (!path)
@@ -3652,14 +3651,8 @@ next:
 		logical += increment;
 		physical += map->stripe_len;
 		spin_lock(&sctx->stat_lock);
-		if (stop_loop)
-			sctx->stat.last_physical = map->stripes[stripe_index].physical +
-						   dev_extent_len;
-		else
-			sctx->stat.last_physical = physical;
+		sctx->stat.last_physical = physical;
 		spin_unlock(&sctx->stat_lock);
-		if (stop_loop)
-			break;
 	}
 out:
 	/* push queued extents */
