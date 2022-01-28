@@ -10,6 +10,7 @@
 #include <linux/migrate.h>
 #include <linux/stackdepot.h>
 #include <linux/seq_file.h>
+#include <linux/memcontrol.h>
 #include <linux/sched/clock.h>
 
 #include "internal.h"
@@ -339,6 +340,7 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 		depot_stack_handle_t handle)
 {
 	int ret = 0, pageblock_mt, page_mt;
+	unsigned long __maybe_unused memcg_data;
 	char *kbuf;
 
 	count = min_t(size_t, count, PAGE_SIZE);
@@ -370,6 +372,32 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 		SNPRINTF(kbuf, count, ret, err,
 			"Page has been migrated, last migrate reason: %s\n",
 			migrate_reason_names[page_owner->last_migrate_reason]);
+
+#ifdef CONFIG_MEMCG
+	/*
+	 * Look for memcg information and print it out
+	 */
+	memcg_data = READ_ONCE(page->memcg_data);
+	if (memcg_data) {
+		struct mem_cgroup *memcg = page_memcg_check(page);
+		bool onlined;
+		char name[80];
+
+		if (memcg_data & MEMCG_DATA_OBJCGS)
+			SNPRINTF(kbuf, count, ret, err, "Slab cache page\n");
+
+		if (!memcg)
+			goto copy_out;
+
+		onlined = (memcg->css.flags & CSS_ONLINE);
+		cgroup_name(memcg->css.cgroup, name, sizeof(name) - 1);
+		SNPRINTF(kbuf, count, ret, err, "Charged %sto %smemcg %s\n",
+			PageMemcgKmem(page) ? "(via objcg) " : "",
+			onlined ? "" : "offlined ", name);
+	}
+
+copy_out:
+#endif
 
 	SNPRINTF(kbuf, count, ret, err, "\n");
 
