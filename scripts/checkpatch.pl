@@ -65,6 +65,7 @@ my $codespell = 0;
 my $codespellfile = "/usr/share/codespell/dictionary.txt";
 my $user_codespellfile = "";
 my $conststructsfile = "$D/const_structs.checkpatch";
+my $u_boot = 0;
 my $docsfile = "$D/../Documentation/dev-tools/checkpatch.rst";
 my $typedefsfile;
 my $color = "auto";
@@ -136,6 +137,7 @@ Options:
   --typedefsfile             Read additional types from this file
   --color[=WHEN]             Use colors 'always', 'never', or only when output
                              is a terminal ('auto'). Default is 'auto'.
+  --u-boot                   Run additional checks for U-Boot
   --kconfig-prefix=WORD      use WORD as a prefix for Kconfig symbols (default
                              ${CONFIG_})
   -h, --help, --version      display this help and exit
@@ -320,6 +322,7 @@ GetOptions(
 	'codespell!'	=> \$codespell,
 	'codespellfile=s'	=> \$user_codespellfile,
 	'typedefsfile=s'	=> \$typedefsfile,
+	'u-boot'	=> \$u_boot,
 	'color=s'	=> \$color,
 	'no-color'	=> \$color,	#keep old behaviors of -nocolor
 	'nocolor'	=> \$color,	#keep old behaviors of -nocolor
@@ -2572,6 +2575,111 @@ sub get_raw_comment {
 	return $comment;
 }
 
+# Checks specific to U-Boot
+# Args:
+#   line: Patch line to check
+#   auto: Auto variable name, e.g. "per_child_auto"
+#   suffix: Suffix to expect on member, e.g. "_priv"
+#   warning: Warning name, e.g. "PRIV_AUTO"
+sub u_boot_struct_name {
+	my ($line, $auto, $suffix, $warning, $herecurr) = @_;
+
+	# Use _priv as a suffix for the device-private data struct
+	if ($line =~ /^\+\s*\.${auto}\s*=\s*sizeof\(struct\((\w+)\).*/) {
+		my $struct_name = $1;
+		if ($struct_name !~ /^\w+${suffix}/) {
+			WARN($warning,
+				 "struct \'$struct_name\' should have a ${suffix} suffix\n"
+				 . $herecurr);
+		}
+	}
+}
+
+sub u_boot_line {
+	my ($realfile, $line, $rawline, $herecurr) = @_;
+
+	# ask for a test if a new uclass ID is added
+	if ($realfile =~ /uclass-id.h/ && $line =~ /^\+/) {
+		WARN("NEW_UCLASS",
+		     "Possible new uclass - make sure to add a sandbox driver, plus a test in test/dm/<name>.c\n" . $herecurr);
+	}
+
+	# try to get people to use the livetree API
+	if ($line =~ /^\+.*fdtdec_/) {
+		WARN("LIVETREE",
+		     "Use the livetree API (dev_read_...)\n" . $herecurr);
+	}
+
+	# add tests for new commands
+	if ($line =~ /^\+.*do_($Ident)\(struct cmd_tbl.*/) {
+		WARN("CMD_TEST",
+		     "Possible new command - make sure you add a test\n" . $herecurr);
+	}
+
+	# use if instead of #if
+	if ($realfile =~ /\.c$/ && $line =~ /^\+#if.*CONFIG.*/) {
+		WARN("PREFER_IF",
+		     "Use 'if (IS_ENABLED(CONFIG...))' instead of '#if or #ifdef' where possible\n" . $herecurr);
+	}
+
+	# prefer strl(cpy|cat) over strn(cpy|cat)
+	if ($line =~ /\bstrn(cpy|cat)\s*\(/) {
+		WARN("STRL",
+		     "strl$1 is preferred over strn$1 because it always produces a nul-terminated string\n" . $herecurr);
+	}
+
+	# use defconfig to manage CONFIG_CMD options
+	if ($line =~ /\+\s*#\s*(define|undef)\s+(CONFIG_CMD\w*)\b/) {
+		ERROR("DEFINE_CONFIG_CMD",
+		      "All commands are managed by Kconfig\n" . $herecurr);
+	}
+
+	# Don't put common.h and dm.h in header files
+	if ($realfile =~ /\.h$/ && $rawline =~ /^\+#include\s*<(common|dm)\.h>*/) {
+		ERROR("BARRED_INCLUDE_IN_HDR",
+		      "Avoid including common.h and dm.h in header files\n" . $herecurr);
+	}
+
+	# Do not disable fdt / initrd relocation
+	if ($rawline =~ /^\+.*(fdt|initrd)_high=0xffffffff/) {
+		ERROR("DISABLE_FDT_OR_INITRD_RELOC",
+		     "fdt or initrd relocation disabled at boot time\n" . $herecurr);
+	}
+
+	# make sure 'skip_board_fixup' is not
+	if ($rawline =~ /.*skip_board_fixup.*/) {
+		ERROR("SKIP_BOARD_FIXUP",
+		     "Avoid setting skip_board_fixup env variable\n" . $herecurr);
+	}
+
+	# Do not use CONFIG_ prefix in CONFIG_IS_ENABLED() calls
+	if ($line =~ /^\+.*CONFIG_IS_ENABLED\(CONFIG_\w*\).*/) {
+		ERROR("CONFIG_IS_ENABLED_CONFIG",
+		      "CONFIG_IS_ENABLED() takes values without the CONFIG_ prefix\n" . $herecurr);
+	}
+
+	# Use _priv as a suffix for the device-private data struct
+	if ($line =~ /^\+\s*\.priv_auto\s*=\s*sizeof\(struct\((\w+)\).*/) {
+		my $struct_name = $1;
+		if ($struct_name !~ /^\w+_priv/) {
+			WARN("PRIV_AUTO", "struct \'$struct_name\' should have a _priv suffix");
+		}
+	}
+
+	# Check struct names for the 'auto' members of struct driver
+	u_boot_struct_name($line, "priv_auto", "_priv", "PRIV_AUTO", $herecurr);
+	u_boot_struct_name($line, "plat_auto", "_plat", "PLAT_AUTO", $herecurr);
+	u_boot_struct_name($line, "per_child_auto", "_priv", "CHILD_PRIV_AUTO", $herecurr);
+	u_boot_struct_name($line, "per_child_plat_auto", "_plat",
+		"CHILD_PLAT_AUTO", $herecurr);
+
+	# Now the ones for struct uclass, skipping those in common with above
+	u_boot_struct_name($line, "per_device_auto", "_priv",
+		"DEVICE_PRIV_AUTO", $herecurr);
+	u_boot_struct_name($line, "per_device_plat_auto", "_plat",
+		"DEVICE_PLAT_AUTO", $herecurr);
+}
+
 sub exclude_global_initialisers {
 	my ($realfile) = @_;
 
@@ -3751,6 +3859,10 @@ sub process {
 		    $line =~ /^\+\s*(?:[A-Z]+_)?SYM_[A-Z]+_(?:START|END)(?:_[A-Z_]+)?\s*\(\s*\.L/) {
 			WARN("AVOID_L_PREFIX",
 			     "Avoid using '.L' prefixed local symbol names for denoting a range of code via 'SYM_*_START/END' annotations; see Documentation/asm-annotations.rst\n" . $herecurr);
+		}
+
+		if ($u_boot) {
+			u_boot_line($realfile, $line, $rawline, $herecurr);
 		}
 
 # check we are in a valid source file C or perl if not then ignore this hunk
