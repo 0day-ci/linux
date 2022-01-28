@@ -745,6 +745,7 @@ int iecm_recv_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 		     void *msg, int msg_size);
 int iecm_send_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 		     u16 msg_size, u8 *msg);
+void iecm_set_ethtool_ops(struct net_device *netdev);
 void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
 void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async);
 int iecm_set_promiscuous(struct iecm_adapter *adapter);

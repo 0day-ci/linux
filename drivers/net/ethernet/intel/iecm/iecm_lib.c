@@ -871,6 +871,7 @@ static int iecm_cfg_netdev(struct iecm_vport *vport)
 	netdev->hw_features |= dflt_features | offloads;
 	netdev->hw_enc_features |= dflt_features | offloads;
 
+	iecm_set_ethtool_ops(netdev);
 	SET_NETDEV_DEV(netdev, &adapter->pdev->dev);
 
 	/* carrier off on init to avoid Tx hangs */
@@ -1150,7 +1151,15 @@ unlock_adapter:
  */
 static void iecm_statistics_task(struct work_struct *work)
 {
-	/* stub */
+	struct iecm_adapter *adapter = container_of(work,
+						    struct iecm_adapter,
+						    stats_task.work);
+	if (test_bit(__IECM_MB_STATS_PENDING, adapter->flags) &&
+	    !test_bit(__IECM_HR_RESET_IN_PROG, adapter->flags))
+		adapter->dev_ops.vc_ops.get_stats_msg(adapter->vports[0]);
+
+	queue_delayed_work(adapter->stats_wq, &adapter->stats_task,
+			   msecs_to_jiffies(1000));
 }
 
 /**
