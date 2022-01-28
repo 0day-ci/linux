@@ -5,6 +5,11 @@
 
 #include "iecm.h"
 
+const char * const iecm_vport_vc_state_str[] = {
+	IECM_FOREACH_VPORT_VC_STATE(IECM_GEN_STRING)
+};
+EXPORT_SYMBOL(iecm_vport_vc_state_str);
+
 /**
  * iecm_cfg_hw - Initialize HW struct
  * @adapter: adapter to setup hw struct for
@@ -22,6 +27,113 @@ static int iecm_cfg_hw(struct iecm_adapter *adapter)
 	hw->back = adapter;
 
 	return 0;
+}
+
+/**
+ * iecm_get_free_slot - get the next non-NULL location index in array
+ * @array: array to search
+ * @size: size of the array
+ * @curr: last known occupied index to be used as a search hint
+ *
+ * void * is being used to keep the functionality generic. This lets us use this
+ * function on any array of pointers.
+ */
+static int iecm_get_free_slot(void *array, int size, int curr)
+{
+	int **tmp_array = (int **)array;
+	int next;
+
+	if (curr < (size - 1) && !tmp_array[curr + 1]) {
+		next = curr + 1;
+	} else {
+		int i = 0;
+
+		while ((i < size) && (tmp_array[i]))
+			i++;
+		if (i == size)
+			next = IECM_NO_FREE_SLOT;
+		else
+			next = i;
+	}
+	return next;
+}
+
+/**
+ * iecm_vport_rel - Delete a vport and free its resources
+ * @vport: the vport being removed
+ */
+static void iecm_vport_rel(struct iecm_vport *vport)
+{
+	mutex_destroy(&vport->stop_mutex);
+	kfree(vport);
+}
+
+/**
+ * iecm_vport_rel_all - Delete all vports
+ * @adapter: adapter from which all vports are being removed
+ */
+static void iecm_vport_rel_all(struct iecm_adapter *adapter)
+{
+	int i;
+
+	if (!adapter->vports)
+		return;
+
+	for (i = 0; i < adapter->num_alloc_vport; i++) {
+		if (!adapter->vports[i])
+			continue;
+
+		iecm_vport_rel(adapter->vports[i]);
+		adapter->vports[i] = NULL;
+		adapter->next_vport = 0;
+	}
+	adapter->num_alloc_vport = 0;
+}
+
+/**
+ * iecm_vport_alloc - Allocates the next available struct vport in the adapter
+ * @adapter: board private structure
+ * @vport_id: vport identifier
+ *
+ * returns a pointer to a vport on success, NULL on failure.
+ */
+static struct iecm_vport *
+iecm_vport_alloc(struct iecm_adapter *adapter, int vport_id)
+{
+	struct iecm_vport *vport = NULL;
+
+	if (adapter->next_vport == IECM_NO_FREE_SLOT)
+		return vport;
+
+	/* Need to protect the allocation of the vports at the adapter level */
+	mutex_lock(&adapter->sw_mutex);
+
+	vport = kzalloc(sizeof(*vport), GFP_KERNEL);
+	if (!vport)
+		goto unlock_adapter;
+
+	vport->adapter = adapter;
+	vport->idx = adapter->next_vport;
+	vport->compln_clean_budget = IECM_TX_COMPLQ_CLEAN_BUDGET;
+	adapter->num_alloc_vport++;
+
+	/* Setup default MSIX irq handler for the vport */
+	vport->irq_q_handler = iecm_vport_intr_clean_queues;
+	vport->q_vector_base = IECM_NONQ_VEC;
+
+	mutex_init(&vport->stop_mutex);
+
+	/* fill vport slot in the adapter struct */
+	adapter->vports[adapter->next_vport] = vport;
+
+	/* prepare adapter->next_vport for next use */
+	adapter->next_vport = iecm_get_free_slot(adapter->vports,
+						 adapter->num_alloc_vport,
+						 adapter->next_vport);
+
+unlock_adapter:
+	mutex_unlock(&adapter->sw_mutex);
+	return vport;
 }
 
 /**
@@ -55,7 +167,25 @@ static void iecm_service_task(struct work_struct *work)
  */
 static void iecm_init_task(struct work_struct *work)
 {
-	/* stub */
+	struct iecm_adapter *adapter = container_of(work,
+						    struct iecm_adapter,
+						    init_task.work);
+	struct iecm_vport *vport;
+	struct pci_dev *pdev;
+	int vport_id, err;
+
+	err = adapter->dev_ops.vc_ops.core_init(adapter, &vport_id);
+	if (err)
+		return;
+
+	pdev = adapter->pdev;
+	vport = iecm_vport_alloc(adapter, vport_id);
+	if (!vport) {
+		err = -EFAULT;
+		dev_err(&pdev->dev, "failed to allocate vport: %d\n",
+			err);
+		return;
+	}
 }
 
 /**
@@ -81,6 +211,31 @@ static int iecm_api_init(struct iecm_adapter *adapter)
 		return -EINVAL;
 	}
 
+	if (adapter->dev_ops.vc_ops_init) {
+		struct iecm_virtchnl_ops *vc_ops;
+
+		adapter->dev_ops.vc_ops_init(adapter);
+		vc_ops = &adapter->dev_ops.vc_ops;
+		if (!(vc_ops->core_init &&
+		      vc_ops->vport_init &&
+		      vc_ops->vport_queue_ids_init &&
+		      vc_ops->get_caps &&
+		      vc_ops->config_queues &&
+		      vc_ops->enable_queues &&
+		      vc_ops->disable_queues &&
+		      vc_ops->irq_map_unmap &&
+		      vc_ops->get_set_rss_lut &&
+		      vc_ops->get_set_rss_hash &&
+		      vc_ops->adjust_qs &&
+		      vc_ops->get_ptype &&
+		      vc_ops->init_max_queues)) {
+			dev_err(&pdev->dev, "Invalid device, missing one or more virtchnl functions\n");
+			return -EINVAL;
+		}
+	} else {
+		iecm_vc_ops_init(adapter);
+	}
+
 	return 0;
 }
 
@@ -93,7 +248,15 @@ static int iecm_api_init(struct iecm_adapter *adapter)
  */
 static void iecm_deinit_task(struct iecm_adapter *adapter)
 {
-	/* stub */
+	set_bit(__IECM_REL_RES_IN_PROG, adapter->flags);
+	/* Wait until the init_task is done else this thread might release
+	 * the resources first and the other thread might end up in a bad state
+	 */
+	cancel_delayed_work_sync(&adapter->init_task);
+	iecm_vport_rel_all(adapter);
+
+	cancel_delayed_work_sync(&adapter->serv_task);
+	cancel_delayed_work_sync(&adapter->stats_task);
 }
 
 /**

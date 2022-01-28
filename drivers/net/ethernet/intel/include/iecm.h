@@ -7,10 +7,13 @@
 #include <linux/aer.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/ethtool.h>
+#include <net/tcp.h>
 #include <linux/version.h>
 #include <linux/dim.h>
 
+#include "virtchnl_2.h"
 #include "iecm_txrx.h"
 #include "iecm_controlq.h"
 
@@ -35,9 +38,33 @@
 /* available message levels */
 #define IECM_AVAIL_NETIF_M (NETIF_MSG_DRV | NETIF_MSG_PROBE | NETIF_MSG_LINK)
 
+#define IECM_VIRTCHNL_VERSION_MAJOR VIRTCHNL_VERSION_MAJOR_2
+#define IECM_VIRTCHNL_VERSION_MINOR VIRTCHNL_VERSION_MINOR_0
+
 /* Forward declaration */
 struct iecm_adapter;
 struct iecm_vport;
+
+struct iecm_mac_filter {
+	struct list_head list;
+	u8 macaddr[ETH_ALEN];
+	bool remove;		/* filter needs to be removed */
+	bool add;		/* filter needs to be added */
+};
+
+#define IECM_VLAN(vid, tpid) ((struct iecm_vlan){ vid, tpid })
+
+struct iecm_vlan {
+	u16 vid;
+	u16 tpid;
+};
+
+struct iecm_vlan_filter {
+	struct list_head list;
+	struct iecm_vlan vlan;
+	bool remove;		/* filter needs to be removed */
+	bool add;		/* filter needs to be added */
+};
 
 enum iecm_state {
 	__IECM_STARTUP,
@@ -90,6 +117,24 @@ enum iecm_flags {
 	__IECM_FLAGS_NBITS,
 };
 
+/* enum used to distinquish which capability field to check */
+enum iecm_cap_field {
+	IECM_BASE_CAPS		= -1,
+	IECM_CSUM_CAPS		= offsetof(struct virtchnl2_get_capabilities,
+					   csum_caps),
+	IECM_SEG_CAPS		= offsetof(struct virtchnl2_get_capabilities,
+					   seg_caps),
+	IECM_RSS_CAPS		= offsetof(struct virtchnl2_get_capabilities,
+					   rss_caps),
+	IECM_HSPLIT_CAPS	= offsetof(struct virtchnl2_get_capabilities,
+					   hsplit_caps),
+	IECM_RSC_CAPS		= offsetof(struct virtchnl2_get_capabilities,
+					   rsc_caps),
+	IECM_OTHER_CAPS		= offsetof(struct virtchnl2_get_capabilities,
+					   other_caps),
+	IECM_CAP_FIELD_LAST,
+};
+
 struct iecm_reset_reg {
 	u32 rstat;
 	u32 rstat_m;
@@ -105,14 +150,229 @@ struct iecm_reg_ops {
 			      enum iecm_flags trig_cause);
 };
 
-struct iecm_dev_ops {
-	void (*reg_ops_init)(struct iecm_adapter *adapter);
-	void (*crc_enable)(u64 *td_cmd);
-	struct iecm_reg_ops reg_ops;
+struct iecm_virtchnl_ops {
+	int (*core_init)(struct iecm_adapter *adapter, int *vport_id);
+	void (*vport_init)(struct iecm_vport *vport, int vport_id);
+	int (*vport_queue_ids_init)(struct iecm_vport *vport);
+	int (*get_caps)(struct iecm_adapter *adapter);
+	int (*config_queues)(struct iecm_vport *vport);
+	int (*enable_queues)(struct iecm_vport *vport);
+	int (*disable_queues)(struct iecm_vport *vport);
+	int (*add_queues)(struct iecm_vport *vport, u16 num_tx_q,
+			  u16 num_complq, u16 num_rx_q,
+			  u16 num_rx_bufq);
+	int (*delete_queues)(struct iecm_vport *vport);
+	int (*irq_map_unmap)(struct iecm_vport *vport, bool map);
+	int (*enable_vport)(struct iecm_vport *vport);
+	int (*disable_vport)(struct iecm_vport *vport);
+	int (*destroy_vport)(struct iecm_vport *vport);
+	int (*get_ptype)(struct iecm_vport *vport);
+	int (*get_set_rss_key)(struct iecm_vport *vport, bool get);
+	int (*get_set_rss_lut)(struct iecm_vport *vport, bool get);
+	int (*get_set_rss_hash)(struct iecm_vport *vport, bool get);
+	void (*adjust_qs)(struct iecm_vport *vport);
+	int (*recv_mbx_msg)(struct iecm_adapter *adapter,
+			    void *msg, int msg_size,
+			    struct iecm_ctlq_msg *ctlq_msg, bool *work_done);
+	bool (*is_cap_ena)(struct iecm_adapter *adapter, bool all,
+			   enum iecm_cap_field field, u64 flag);
+	u16 (*get_reserved_vecs)(struct iecm_adapter *adapter);
+	void (*add_del_vlans)(struct iecm_vport *vport, bool add);
+	int (*strip_vlan_msg)(struct iecm_vport *vport, bool ena);
+	int (*insert_vlan_msg)(struct iecm_vport *vport, bool ena);
+	void (*init_max_queues)(struct iecm_adapter *adapter);
+	unsigned int (*get_max_tx_bufs)(struct iecm_adapter *adapter);
+	int (*vportq_reg_init)(struct iecm_vport *vport);
+	int (*alloc_vectors)(struct iecm_adapter *adapter, u16 num_vectors);
+	int (*dealloc_vectors)(struct iecm_adapter *adapter);
+	int (*get_supported_desc_ids)(struct iecm_vport *vport);
+	int (*get_stats_msg)(struct iecm_vport *vport);
 };
 
-/* stub */
+struct iecm_dev_ops {
+	void (*reg_ops_init)(struct iecm_adapter *adapter);
+	void (*vc_ops_init)(struct iecm_adapter *adapter);
+	void (*crc_enable)(u64 *td_cmd);
+	struct iecm_reg_ops reg_ops;
+	struct iecm_virtchnl_ops vc_ops;
+};
+
+/* These macros allow us to generate an enum and a matching char * array of
+ * stringified enums that are always in sync. Checkpatch issues a bogus warning
+ * about this being a complex macro; but it's wrong, these are never used as a
+ * statement and instead only used to define the enum and array.
+ */
+#define IECM_FOREACH_VPORT_VC_STATE(STATE)	\
+	STATE(IECM_VC_ENA_VPORT)		\
+	STATE(IECM_VC_ENA_VPORT_ERR)		\
+	STATE(IECM_VC_DIS_VPORT)		\
+	STATE(IECM_VC_DIS_VPORT_ERR)		\
+	STATE(IECM_VC_DESTROY_VPORT)		\
+	STATE(IECM_VC_DESTROY_VPORT_ERR)	\
+	STATE(IECM_VC_CONFIG_TXQ)		\
+	STATE(IECM_VC_CONFIG_TXQ_ERR)		\
+	STATE(IECM_VC_CONFIG_RXQ)		\
+	STATE(IECM_VC_CONFIG_RXQ_ERR)		\
+	STATE(IECM_VC_CONFIG_Q)			\
+	STATE(IECM_VC_CONFIG_Q_ERR)		\
+	STATE(IECM_VC_ENA_QUEUES)		\
+	STATE(IECM_VC_ENA_QUEUES_ERR)		\
+	STATE(IECM_VC_DIS_QUEUES)		\
+	STATE(IECM_VC_DIS_QUEUES_ERR)		\
+	STATE(IECM_VC_ENA_CHANNELS)		\
+	STATE(IECM_VC_ENA_CHANNELS_ERR)		\
+	STATE(IECM_VC_DIS_CHANNELS)		\
+	STATE(IECM_VC_DIS_CHANNELS_ERR)		\
+	STATE(IECM_VC_MAP_IRQ)			\
+	STATE(IECM_VC_MAP_IRQ_ERR)		\
+	STATE(IECM_VC_UNMAP_IRQ)		\
+	STATE(IECM_VC_UNMAP_IRQ_ERR)		\
+	STATE(IECM_VC_ADD_QUEUES)		\
+	STATE(IECM_VC_ADD_QUEUES_ERR)		\
+	STATE(IECM_VC_DEL_QUEUES)		\
+	STATE(IECM_VC_REQUEST_QUEUES)		\
+	STATE(IECM_VC_REQUEST_QUEUES_ERR)	\
+	STATE(IECM_VC_DEL_QUEUES_ERR)		\
+	STATE(IECM_VC_ALLOC_VECTORS)		\
+	STATE(IECM_VC_ALLOC_VECTORS_ERR)	\
+	STATE(IECM_VC_DEALLOC_VECTORS)		\
+	STATE(IECM_VC_DEALLOC_VECTORS_ERR)	\
+	STATE(IECM_VC_SET_SRIOV_VFS)		\
+	STATE(IECM_VC_SET_SRIOV_VFS_ERR)	\
+	STATE(IECM_VC_GET_RSS_HASH)		\
+	STATE(IECM_VC_GET_RSS_HASH_ERR)		\
+	STATE(IECM_VC_SET_RSS_HASH)		\
+	STATE(IECM_VC_SET_RSS_HASH_ERR)		\
+	STATE(IECM_VC_GET_RSS_LUT)		\
+	STATE(IECM_VC_GET_RSS_LUT_ERR)		\
+	STATE(IECM_VC_SET_RSS_LUT)		\
+	STATE(IECM_VC_SET_RSS_LUT_ERR)		\
+	STATE(IECM_VC_GET_RSS_KEY)		\
+	STATE(IECM_VC_GET_RSS_KEY_ERR)		\
+	STATE(IECM_VC_SET_RSS_KEY)		\
+	STATE(IECM_VC_SET_RSS_KEY_ERR)		\
+	STATE(IECM_VC_GET_STATS)		\
+	STATE(IECM_VC_GET_STATS_ERR)		\
+	STATE(IECM_VC_ENA_STRIP_VLAN_TAG)	\
+	STATE(IECM_VC_ENA_STRIP_VLAN_TAG_ERR)	\
+	STATE(IECM_VC_DIS_STRIP_VLAN_TAG)	\
+	STATE(IECM_VC_DIS_STRIP_VLAN_TAG_ERR)	\
+	STATE(IECM_VC_IWARP_IRQ_MAP)		\
+	STATE(IECM_VC_IWARP_IRQ_MAP_ERR)	\
+	STATE(IECM_VC_ADD_ETH_ADDR)		\
+	STATE(IECM_VC_ADD_ETH_ADDR_ERR)		\
+	STATE(IECM_VC_DEL_ETH_ADDR)		\
+	STATE(IECM_VC_DEL_ETH_ADDR_ERR)		\
+	STATE(IECM_VC_PROMISC)			\
+	STATE(IECM_VC_ADD_CLOUD_FILTER)		\
+	STATE(IECM_VC_ADD_CLOUD_FILTER_ERR)	\
+	STATE(IECM_VC_DEL_CLOUD_FILTER)		\
+	STATE(IECM_VC_DEL_CLOUD_FILTER_ERR)	\
+	STATE(IECM_VC_ADD_RSS_CFG)		\
+	STATE(IECM_VC_ADD_RSS_CFG_ERR)		\
+	STATE(IECM_VC_DEL_RSS_CFG)		\
+	STATE(IECM_VC_DEL_RSS_CFG_ERR)		\
+	STATE(IECM_VC_ADD_FDIR_FILTER)		\
+	STATE(IECM_VC_ADD_FDIR_FILTER_ERR)	\
+	STATE(IECM_VC_DEL_FDIR_FILTER)		\
+	STATE(IECM_VC_DEL_FDIR_FILTER_ERR)	\
+	STATE(IECM_VC_OFFLOAD_VLAN_V2_CAPS)	\
+	STATE(IECM_VC_OFFLOAD_VLAN_V2_CAPS_ERR)	\
+	STATE(IECM_VC_INSERTION_ENA_VLAN_V2)	\
+	STATE(IECM_VC_INSERTION_ENA_VLAN_V2_ERR)\
+	STATE(IECM_VC_INSERTION_DIS_VLAN_V2)	\
+	STATE(IECM_VC_INSERTION_DIS_VLAN_V2_ERR)\
+	STATE(IECM_VC_STRIPPING_ENA_VLAN_V2)	\
+	STATE(IECM_VC_STRIPPING_ENA_VLAN_V2_ERR)\
+	STATE(IECM_VC_STRIPPING_DIS_VLAN_V2)	\
+	STATE(IECM_VC_STRIPPING_DIS_VLAN_V2_ERR)\
+	STATE(IECM_VC_GET_SUPPORTED_RXDIDS)	\
+	STATE(IECM_VC_GET_SUPPORTED_RXDIDS_ERR)	\
+	STATE(IECM_VC_GET_PTYPE_INFO)		\
+	STATE(IECM_VC_GET_PTYPE_INFO_ERR)	\
+	STATE(IECM_VC_NBITS)
+
+#define IECM_GEN_ENUM(ENUM) ENUM,
+#define IECM_GEN_STRING(STRING) #STRING,
+
+enum iecm_vport_vc_state {
+	IECM_FOREACH_VPORT_VC_STATE(IECM_GEN_ENUM)
+};
+
+extern const char * const iecm_vport_vc_state_str[];
+
+enum iecm_vport_flags {
+	__IECM_VPORT_INIT_PROMISC,
+	__IECM_VPORT_FLAGS_NBITS,
+};
+
+struct iecm_port_stats {
+	struct u64_stats_sync stats_sync;
+	u64 rx_hw_csum_err;
+	u64 rx_hsplit;
+	u64 rx_hsplit_hbo;
+	u64 tx_linearize;
+	u64 rx_bad_descs;
+	struct virtchnl2_vport_stats vport_stats;
+	struct virtchnl_eth_stats eth_stats;
+};
+
 struct iecm_vport {
+	/* TX */
+	int num_txq;
+	int num_complq;
+	/* It makes more sense for descriptor count to be part of only idpf
+	 * queue structure. But when user changes the count via ethtool, driver
+	 * has to store that value somewhere other than queue structure as the
+	 * queues will be freed and allocated again.
+	 */
+	int txq_desc_count;
+	int complq_desc_count;
+	int compln_clean_budget;
+	int num_txq_grp;
+	struct iecm_txq_group *txq_grps;
+	u32 txq_model;
+	/* Used only in hotpath to get to the right queue very fast */
+	struct iecm_queue **txqs;
+	DECLARE_BITMAP(flags, __IECM_VPORT_FLAGS_NBITS);
+
+	/* RX */
+	int num_rxq;
+	int num_bufq;
+	int rxq_desc_count;
+	u8 num_bufqs_per_qgrp;
+	int bufq_desc_count[IECM_MAX_BUFQS_PER_RXQ_GRP];
+	u32 bufq_size[IECM_MAX_BUFQS_PER_RXQ_GRP];
+	int num_rxq_grp;
+	struct iecm_rxq_group *rxq_grps;
+	u32 rxq_model;
+
+	struct iecm_adapter *adapter;
+	struct net_device *netdev;
+	u16 vport_type;
+	u16 vport_id;
+	u16 idx;		 /* software index in adapter vports struct */
+	bool base_rxd;
+
+	/* handler for hard interrupt */
+	irqreturn_t (*irq_q_handler)(int irq, void *data);
+	struct iecm_q_vector *q_vectors;	/* q vector array */
+	u16 num_q_vectors;
+	u16 q_vector_base;
+	u16 max_mtu;
+	u8 default_mac_addr[ETH_ALEN];
+	u16 qset_handle;
+	/* ITR profiles for the DIM algorithm */
+#define IECM_DIM_PROFILE_SLOTS	5
+	u16 rx_itr_profile[IECM_DIM_PROFILE_SLOTS];
+	u16 tx_itr_profile[IECM_DIM_PROFILE_SLOTS];
+	struct rtnl_link_stats64 netstats;
+	struct iecm_port_stats port_stats;
+
+	/* lock to protect against multiple stop threads, which can happen when
+	 * the driver is in a namespace in a system that is being shutdown
+	 */
+	struct mutex stop_mutex;
 };
 
 enum iecm_user_flags {
@@ -164,6 +424,7 @@ struct iecm_adapter {
 	u16 num_msix_entries;
 	struct msix_entry *msix_entries;
 	struct virtchnl2_alloc_vectors *req_vec_chunks;
+	struct iecm_q_vector mb_vector;
 
 	/* vport structs */
 	struct iecm_vport **vports;	/* vports created by the driver */
@@ -190,6 +451,8 @@ struct iecm_adapter {
 
 	wait_queue_head_t vchnl_wq;
 	wait_queue_head_t sw_marker_wq;
+	DECLARE_BITMAP(vc_state, IECM_VC_NBITS);
+	char vc_msg[IECM_DFLT_MBX_BUF_SIZE];
 	struct iecm_rss_data rss_data;
 	struct iecm_dev_ops dev_ops;
 	s32 link_speed;
@@ -216,6 +479,38 @@ struct iecm_adapter {
 };
 
 /**
+ * iecm_is_queue_model_split - check if queue model is split
+ * @q_model: queue model single or split
+ *
+ * Returns true if queue model is split else false
+ */
+static inline int iecm_is_queue_model_split(u16 q_model)
+{
+	return (q_model == VIRTCHNL2_QUEUE_MODEL_SPLIT);
+}
+
+#define iecm_is_cap_ena(adapter, field, flag) \
+	__iecm_is_cap_ena(adapter, false, field, flag)
+#define iecm_is_cap_ena_all(adapter, field, flag) \
+	__iecm_is_cap_ena(adapter, true, field, flag)
+/**
+ * __iecm_is_cap_ena - Determine if HW capability is supported
+ * @adapter: private data struct
+ * @all: all or one flag
+ * @field: cap field to check
+ * @flag: Feature flag to check
+ *
+ * iecm_is_cap_ena_all is used to check if all the capability bits are set
+ * ('AND' operation) where as iecm_is_cap_ena is used to check if
+ * any one of the capability bits is set ('OR' operation)
+ */
+static inline bool __iecm_is_cap_ena(struct iecm_adapter *adapter, bool all,
+				     enum iecm_cap_field field, u64 flag)
+{
+	return adapter->dev_ops.vc_ops.is_cap_ena(adapter, all, field, flag);
+}
+
+/**
  * iecm_is_reset_detected - check if we were reset at some point
  * @adapter: driver specific private structure
  *
@@ -233,6 +528,25 @@ int iecm_probe(struct pci_dev *pdev,
 void iecm_remove(struct pci_dev *pdev);
 int iecm_init_dflt_mbx(struct iecm_adapter *adapter);
 void iecm_deinit_dflt_mbx(struct iecm_adapter *adapter);
+void iecm_vc_ops_init(struct iecm_adapter *adapter);
+int iecm_vc_core_init(struct iecm_adapter *adapter, int *vport_id);
+int iecm_wait_for_event(struct iecm_adapter *adapter,
+			enum iecm_vport_vc_state state,
+			enum iecm_vport_vc_state err_check);
+int iecm_min_wait_for_event(struct iecm_adapter *adapter,
+			    enum iecm_vport_vc_state state,
+			    enum iecm_vport_vc_state err_check);
+int iecm_send_get_caps_msg(struct iecm_adapter *adapter);
 int iecm_vport_params_buf_alloc(struct iecm_adapter *adapter);
 void iecm_vport_params_buf_rel(struct iecm_adapter *adapter);
+int iecm_get_vec_ids(struct iecm_adapter *adapter,
+		     u16 *vecids, int num_vecids,
+		     struct virtchnl2_vector_chunks *chunks);
+int iecm_recv_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
+		     void *msg, int msg_size);
+int iecm_send_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
+		     u16 msg_size, u8 *msg);
+int iecm_set_msg_pending(struct iecm_adapter *adapter,
+			 struct iecm_ctlq_msg *ctlq_msg,
+			 enum iecm_vport_vc_state err_enum);
 #endif /* !_IECM_H_ */

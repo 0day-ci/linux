@@ -7,11 +7,13 @@
 
 obj-$(CONFIG_IECM) += iecm.o
 
-ccflags-y += -I$(srctree)/drivers/net/ethernet/intel/include
+ccflags-y += -I$(srctree)/drivers/net/ethernet/intel/include \
+	     -I$(srctree)/include/linux/avf
 
 iecm-y := \
 	iecm_lib.o \
 	iecm_virtchnl.o \
+	iecm_txrx.o \
 	iecm_controlq.o \
 	iecm_controlq_setup.o \
 	iecm_main.o
