@@ -40,6 +40,9 @@ void dax_write_cache(struct dax_device *dax_dev, bool wc);
 bool dax_write_cache_enabled(struct dax_device *dax_dev);
 bool dax_synchronous(struct dax_device *dax_dev);
 void set_dax_synchronous(struct dax_device *dax_dev);
+void set_dax_recovery(struct dax_device *dax_dev);
+bool dax_recovery_capable(struct dax_device *dax_dev);
+int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr);
 /*
  * Check if given mapping is supported by the file / underlying device.
  */
@@ -86,6 +89,17 @@ static inline bool daxdev_mapping_supported(struct vm_area_struct *vma,
 				struct dax_device *dax_dev)
 {
 	return !(vma->vm_flags & VM_SYNC);
+}
+static inline void set_dax_recovery(struct dax_device *dax_dev)
+{
+}
+static inline bool dax_recovery_capable(struct dax_device *dax_dev)
+{
+	return false;
+}
+static inline int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr)
+{
+	return -EINVAL;
 }
 #endif
 
