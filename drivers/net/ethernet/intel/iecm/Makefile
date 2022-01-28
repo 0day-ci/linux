@@ -10,4 +10,5 @@ obj-$(CONFIG_IECM) += iecm.o
 ccflags-y += -I$(srctree)/drivers/net/ethernet/intel/include
 
 iecm-y := \
+	iecm_lib.o \
 	iecm_main.o
