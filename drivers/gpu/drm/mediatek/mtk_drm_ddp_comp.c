@@ -199,31 +199,6 @@ static void mtk_od_start(struct device *dev)
 	writel(1, priv->regs + DISP_REG_OD_EN);
 }
 
-static void mtk_postmask_config(struct device *dev, unsigned int w,
-				unsigned int h, unsigned int vrefresh,
-				unsigned int bpc, struct cmdq_pkt *cmdq_pkt)
-{
-	struct mtk_ddp_comp_dev *priv = dev_get_drvdata(dev);
-
-	mtk_ddp_write(cmdq_pkt, w << 16 | h, &priv->cmdq_reg, priv->regs,
-		      DISP_REG_POSTMASK_SIZE);
-	mtk_ddp_write(cmdq_pkt, POSTMASK_RELAY_MODE, &priv->cmdq_reg,
-		      priv->regs, DISP_REG_POSTMASK_CFG);
-}
-
-static void mtk_postmask_start(struct device *dev)
-{
-	struct mtk_ddp_comp_dev *priv = dev_get_drvdata(dev);
-
-	writel(POSTMASK_EN, priv->regs + DISP_REG_POSTMASK_EN);
-}
-
-static void mtk_postmask_stop(struct device *dev)
-{
-	struct mtk_ddp_comp_dev *priv = dev_get_drvdata(dev);
-
-	writel_relaxed(0x0, priv->regs + DISP_REG_POSTMASK_EN);
-}
 
 static void mtk_ufoe_start(struct device *dev)
 {
@@ -308,8 +283,8 @@ static const struct mtk_ddp_comp_funcs ddp_ovl = {
 };
 
 static const struct mtk_ddp_comp_funcs ddp_postmask = {
-	.clk_enable = mtk_ddp_clk_enable,
-	.clk_disable = mtk_ddp_clk_disable,
+	.clk_enable = mtk_postmask_clk_enable,
+	.clk_disable = mtk_postmask_clk_disable,
 	.config = mtk_postmask_config,
 	.start = mtk_postmask_start,
 	.stop = mtk_postmask_stop,
@@ -510,6 +485,7 @@ int mtk_ddp_comp_init(struct device_node *node, struct mtk_ddp_comp *comp,
 	    type == MTK_DISP_GAMMA ||
 	    type == MTK_DISP_OVL ||
 	    type == MTK_DISP_OVL_2L ||
+	    type == MTK_DISP_POSTMASK ||
 	    type == MTK_DISP_PWM ||
 	    type == MTK_DISP_RDMA ||
 	    type == MTK_DPI ||
