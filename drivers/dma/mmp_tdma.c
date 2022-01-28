@@ -681,6 +681,8 @@ static int mmp_tdma_probe(struct platform_device *pdev)
 
 	if (irq_num != chan_num) {
 		irq = platform_get_irq(pdev, 0);
+		if (irq < 0)
+			return irq;
 		ret = devm_request_irq(&pdev->dev, irq,
 			mmp_tdma_int_handler, IRQF_SHARED, "tdma", tdev);
 		if (ret)
