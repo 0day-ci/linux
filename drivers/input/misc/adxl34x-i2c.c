@@ -155,11 +155,18 @@ static const struct of_device_id adxl34x_of_id[] = {
 
 MODULE_DEVICE_TABLE(of, adxl34x_of_id);
 
+static const struct acpi_device_id adxl34x_acpi_match[] = {
+	{ "ADS0345" },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, adxl34x_acpi_match);
+
 static struct i2c_driver adxl34x_driver = {
 	.driver = {
 		.name = "adxl34x",
 		.pm = &adxl34x_i2c_pm,
 		.of_match_table = adxl34x_of_id,
+		.acpi_match_table = adxl34x_acpi_match,
 	},
 	.probe    = adxl34x_i2c_probe,
 	.remove   = adxl34x_i2c_remove,
