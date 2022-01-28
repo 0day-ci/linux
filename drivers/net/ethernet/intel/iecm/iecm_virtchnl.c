@@ -2732,6 +2732,74 @@ static int iecm_send_insert_vlan_msg(struct iecm_vport *vport, bool ena)
 }
 
 /**
+ * iecm_send_add_del_cloud_filter_msg: Send add/del cloud filter message
+ * @vport: vport structure
+ * @add: True to add, false to delete cloud filter
+ *
+ * Request the CP/PF to add/del cloud filters as specified by the user via
+ * tc tool
+ *
+ * Return 0 on success, negative on failure
+ **/
+int iecm_send_add_del_cloud_filter_msg(struct iecm_vport *vport, bool add)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_cloud_filter_config *cf_config;
+	struct iecm_cloud_filter *cf;
+	struct virtchnl_filter f;
+	int len = 0, err = 0;
+
+	cf_config = &adapter->config_data.cf_config;
+
+	while (true) {
+		bool process_fltr = false;
+
+		spin_lock_bh(&adapter->cloud_filter_list_lock);
+		list_for_each_entry(cf, &cf_config->cloud_filter_list, list) {
+			if (add && cf->add) {
+				process_fltr = true;
+				cf->add = false;
+				f = cf->f;
+				break;
+			} else if (!add && cf->remove) {
+				process_fltr = true;
+				cf->remove = false;
+				f = cf->f;
+				break;
+			}
+		}
+		spin_unlock_bh(&adapter->cloud_filter_list_lock);
+
+		/* Don't send mailbox message when there are no filters to add/del */
+		if (!process_fltr)
+			goto error;
+
+		if (add) {
+			err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_ADD_CLOUD_FILTER,
+					       len, (u8 *)&f);
+			if (err)
+				goto error;
+
+			err = iecm_wait_for_event(adapter, IECM_VC_ADD_CLOUD_FILTER,
+						  IECM_VC_ADD_CLOUD_FILTER_ERR);
+		} else {
+			err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_DEL_CLOUD_FILTER,
+					       len, (u8 *)&f);
+			if (err)
+				goto error;
+
+			err =
+			iecm_min_wait_for_event(adapter, IECM_VC_DEL_CLOUD_FILTER,
+						IECM_VC_DEL_CLOUD_FILTER_ERR);
+		}
+		if (err)
+			break;
+	}
+error:
+	return err;
+}
+
+/**
  * iecm_send_add_fdir_filter_msg: Send add Flow Director filter message
  * @vport: vport structure
  *

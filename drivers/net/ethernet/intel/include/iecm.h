@@ -403,6 +403,28 @@ enum iecm_user_flags {
 	__IECM_USER_FLAGS_NBITS,
 };
 
+#define IECM_CLOUD_FIELD_OMAC		BIT(0)
+#define IECM_CLOUD_FIELD_IMAC		BIT(1)
+#define IECM_CLOUD_FIELD_IVLAN		BIT(2)
+#define IECM_CLOUD_FIELD_TEN_ID		BIT(3)
+#define IECM_CLOUD_FIELD_IIP		BIT(4)
+
+#define IECM_START_CHNL_TC		1
+
+struct iecm_cloud_filter {
+	struct list_head list;
+	struct virtchnl_filter f;
+	unsigned long cookie;
+	bool remove;		/* filter needs to be deleted */
+	bool add;		/* filter needs to be added */
+};
+
+struct iecm_cloud_filter_config {
+	struct list_head block_cb_list;		/* need to pass this to stack */
+	struct list_head cloud_filter_list;
+	u16 num_cloud_filters;
+};
+
 struct iecm_channel_config {
 	struct virtchnl_channel_info ch_info[VIRTCHNL_MAX_ADQ_V2_CHANNELS];
 	bool tc_running;
@@ -536,6 +558,7 @@ struct iecm_ptype_state {
 	bool outer_frag;
 	u8 tunnel_state;
 };
+
 /* User defined configuration values */
 struct iecm_user_config_data {
 	u32 num_req_tx_qs; /* user requested TX queues through ethtool */
@@ -550,6 +573,7 @@ struct iecm_user_config_data {
 	struct list_head vlan_filter_list;
 	struct list_head adv_rss_list;
 	struct iecm_fdir_fltr_config fdir_config;
+	struct iecm_cloud_filter_config cf_config;
 	struct iecm_channel_config ch_config;
 };
 
@@ -853,6 +877,7 @@ void iecm_set_ethtool_ops(struct net_device *netdev);
 void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
 void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async);
 int iecm_set_promiscuous(struct iecm_adapter *adapter);
+int iecm_send_add_del_cloud_filter_msg(struct iecm_vport *vport, bool add);
 int iecm_send_add_fdir_filter_msg(struct iecm_vport *vport);
 int iecm_send_del_fdir_filter_msg(struct iecm_vport *vport);
 int iecm_get_fdir_fltr_entry(struct iecm_vport *vport,
