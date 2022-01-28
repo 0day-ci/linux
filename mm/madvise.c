@@ -796,8 +796,28 @@ static int madvise_free_single_vma(struct vm_area_struct *vma,
 static long madvise_dontneed_single_vma(struct vm_area_struct *vma,
 					unsigned long start, unsigned long end)
 {
+	/*
+	 * start and size (end - start) must be huge page size aligned
+	 * for hugetlb vmas.
+	 */
+	if (vma->vm_flags & VM_HUGETLB) {
+		struct hstate *h = hstate_vma(vma);
+
+		start = ALIGN_DOWN(start, huge_page_size(h));
+		end = ALIGN(end, huge_page_size(h));
+	}
+
 	zap_page_range(vma, start, end - start);
 	return 0;
+}
+
+static bool madvise_dontneed_free_valid_vma(struct vm_area_struct *vma,
+						int behavior)
+{
+	if (vma->vm_flags & VM_HUGETLB)
+		return behavior == MADV_DONTNEED;
+	else
+		return can_madv_lru_vma(vma);
 }
 
 static long madvise_dontneed_free(struct vm_area_struct *vma,
@@ -808,7 +828,7 @@ static long madvise_dontneed_free(struct vm_area_struct *vma,
 	struct mm_struct *mm = vma->vm_mm;
 
 	*prev = vma;
-	if (!can_madv_lru_vma(vma))
+	if (!madvise_dontneed_free_valid_vma(vma, behavior))
 		return -EINVAL;
 
 	if (!userfaultfd_remove(vma, start, end)) {
@@ -830,7 +850,7 @@ static long madvise_dontneed_free(struct vm_area_struct *vma,
 			 */
 			return -ENOMEM;
 		}
-		if (!can_madv_lru_vma(vma))
+		if (!madvise_dontneed_free_valid_vma(vma, behavior))
 			return -EINVAL;
 		if (end > vma->vm_end) {
 			/*
