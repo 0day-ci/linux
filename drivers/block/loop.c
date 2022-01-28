@@ -1725,13 +1725,20 @@ static int lo_open(struct block_device *bdev, fmode_t mode)
 	struct loop_device *lo = bdev->bd_disk->private_data;
 	int err;
 
+	/*
+	 * Note: this requires disk->open_mutex to protect against races
+	 * with lo_release.
+	 */
+	if (atomic_inc_return(&lo->lo_refcnt) > 1)
+		return 0;
+
 	err = mutex_lock_killable(&lo->lo_mutex);
 	if (err)
 		return err;
-	if (lo->lo_state == Lo_deleting)
+	if (lo->lo_state == Lo_deleting) {
+		atomic_dec(&lo->lo_refcnt);
 		err = -ENXIO;
-	else
-		atomic_inc(&lo->lo_refcnt);
+	}
 	mutex_unlock(&lo->lo_mutex);
 	return err;
 }
