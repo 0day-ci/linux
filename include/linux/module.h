@@ -668,8 +668,19 @@ static inline bool is_livepatch_module(struct module *mod)
 {
 	return mod->klp;
 }
+
+static inline bool set_livepatch_module(struct module *mod)
+{
+	mod->klp = true;
+	return true;
+}
 #else /* !CONFIG_LIVEPATCH */
 static inline bool is_livepatch_module(struct module *mod)
+{
+	return false;
+}
+
+static inline bool set_livepatch_module(struct module *mod)
 {
 	return false;
 }
