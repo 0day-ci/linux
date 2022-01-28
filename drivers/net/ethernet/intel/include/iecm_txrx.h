@@ -198,6 +198,11 @@ struct iecm_page_info {
 	u16 pagecnt_bias;
 };
 
+struct iecm_rx_hdr_buf_pages {
+	u32 nr_pages;
+	struct iecm_page_info *pages;
+};
+
 struct iecm_rx_buf {
 #define IECM_RX_BUF_MAX_PAGES 2
 	struct iecm_page_info page_info[IECM_RX_BUF_MAX_PAGES];
@@ -498,6 +503,8 @@ struct iecm_queue {
 					 * with scatter-gather
 					 */
 	DECLARE_HASHTABLE(sched_buf_hash, 12);
+
+	struct iecm_rx_hdr_buf_pages hbuf_pages;
 } ____cacheline_internodealigned_in_smp;
 
 /* Software queues are used in splitq mode to manage buffers between rxq
