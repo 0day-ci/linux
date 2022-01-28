@@ -108,7 +108,7 @@ static void __confirm_options(struct intel_uc *uc)
 			 "Incompatible option enable_guc=%d - %s\n",
 			 i915->params.enable_guc, "GuC submission is N/A");
 
-	if (i915->params.enable_guc & ~ENABLE_GUC_MASK)
+	if (i915->params.enable_guc & ~(ENABLE_GUC_MASK | ENABLE_GUC_DO_NOT_LOAD_GUC))
 		drm_info(&i915->drm,
 			 "Incompatible option enable_guc=%d - %s\n",
 			 i915->params.enable_guc, "undocumented flag");
@@ -416,8 +416,21 @@ static bool uc_is_wopcm_locked(struct intel_uc *uc)
 	       (intel_uncore_read(uncore, DMA_GUC_WOPCM_OFFSET) & GUC_WOPCM_OFFSET_VALID);
 }
 
+static inline bool skip_lock_check(struct drm_i915_private *i915)
+{
+	/*
+	 * For platforms with GuC deprivilege, if a user *really* wants
+	 * to run without GuC, let that happen by setting enable_guc=0x80.
+	 */
+	return (HAS_GUC_DEPRIVILEGE(i915) &&
+		(i915->params.enable_guc & ENABLE_GUC_DO_NOT_LOAD_GUC) &&
+		!(i915->params.enable_guc & ~ENABLE_GUC_DO_NOT_LOAD_GUC));
+}
+
 static int __uc_check_hw(struct intel_uc *uc)
 {
+	struct drm_i915_private *i915 = uc_to_gt(uc)->i915;
+
 	if (!intel_uc_supports_guc(uc))
 		return 0;
 
@@ -426,7 +439,7 @@ static int __uc_check_hw(struct intel_uc *uc)
 	 * before on this system after reboot, otherwise we risk GPU hangs.
 	 * To check if GuC was loaded before we look at WOPCM registers.
 	 */
-	if (uc_is_wopcm_locked(uc))
+	if (uc_is_wopcm_locked(uc) && likely(!skip_lock_check(i915)))
 		return -EIO;
 
 	return 0;

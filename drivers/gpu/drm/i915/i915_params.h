@@ -32,6 +32,7 @@ struct drm_printer;
 
 #define ENABLE_GUC_SUBMISSION		BIT(0)
 #define ENABLE_GUC_LOAD_HUC		BIT(1)
+#define ENABLE_GUC_DO_NOT_LOAD_GUC	BIT(7)
 #define ENABLE_GUC_MASK			GENMASK(1, 0)
 
 /*
