@@ -310,8 +310,9 @@ int snd_soc_put_volsw(struct snd_kcontrol *kcontrol,
 	unsigned int invert = mc->invert;
 	int err;
 	bool type_2r = false;
-	unsigned int val2 = 0;
-	unsigned int val, val_mask;
+	unsigned int val_mask;
+	int val2 = 0;
+	int val;
 
 	if (sign_bit)
 		mask = BIT(sign_bit + 1) - 1;
