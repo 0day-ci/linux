@@ -2073,7 +2073,6 @@ struct batched_entropy {
 		u32 entropy_u32[CHACHA_BLOCK_SIZE / sizeof(u32)];
 	};
 	unsigned int position;
-	spinlock_t batch_lock;
 };
 
 /*
@@ -2085,7 +2084,7 @@ struct batched_entropy {
  * point prior.
  */
 static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u64) = {
-	.batch_lock = __SPIN_LOCK_UNLOCKED(batched_entropy_u64.lock),
+	.position = ARRAY_SIZE(((struct batched_entropy *)0)->entropy_u64)
 };
 
 u64 get_random_u64(void)
@@ -2093,42 +2092,55 @@ u64 get_random_u64(void)
 	u64 ret;
 	unsigned long flags;
 	struct batched_entropy *batch;
+	size_t position;
 	static void *previous;
 
 	warn_unseeded_randomness(&previous);
 
-	batch = raw_cpu_ptr(&batched_entropy_u64);
-	spin_lock_irqsave(&batch->batch_lock, flags);
-	if (batch->position % ARRAY_SIZE(batch->entropy_u64) == 0) {
+	local_irq_save(flags);
+	batch = this_cpu_ptr(&batched_entropy_u64);
+	position = READ_ONCE(batch->position);
+	/* NB: position can change to ARRAY_SIZE(batch->entropy_u64) out
+	 * from under us -- see invalidate_batched_entropy().  If this,
+	 * happens it's okay if we still return the data in the batch. */
+	if (unlikely(position + 1 > ARRAY_SIZE(batch->entropy_u64))) {
 		extract_crng((u8 *)batch->entropy_u64);
-		batch->position = 0;
+		position = 0;
 	}
-	ret = batch->entropy_u64[batch->position++];
-	spin_unlock_irqrestore(&batch->batch_lock, flags);
+	ret = batch->entropy_u64[position++];
+	WRITE_ONCE(batch->position, position);
+	local_irq_restore(flags);
 	return ret;
 }
 EXPORT_SYMBOL(get_random_u64);
 
 static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u32) = {
-	.batch_lock = __SPIN_LOCK_UNLOCKED(batched_entropy_u32.lock),
+	.position = ARRAY_SIZE(((struct batched_entropy *)0)->entropy_u32)
 };
+
 u32 get_random_u32(void)
 {
 	u32 ret;
 	unsigned long flags;
 	struct batched_entropy *batch;
+	size_t position;
 	static void *previous;
 
 	warn_unseeded_randomness(&previous);
 
-	batch = raw_cpu_ptr(&batched_entropy_u32);
-	spin_lock_irqsave(&batch->batch_lock, flags);
-	if (batch->position % ARRAY_SIZE(batch->entropy_u32) == 0) {
+	local_irq_save(flags);
+	batch = this_cpu_ptr(&batched_entropy_u32);
+	position = READ_ONCE(batch->position);
+	/* NB: position can change to ARRAY_SIZE(batch->entropy_u32) out
+	 * from under us -- see invalidate_batched_entropy().  If this,
+	 * happens it's okay if we still return the data in the batch. */
+	if (unlikely(position + 1 > ARRAY_SIZE(batch->entropy_u32))) {
 		extract_crng((u8 *)batch->entropy_u32);
-		batch->position = 0;
+		position = 0;
 	}
-	ret = batch->entropy_u32[batch->position++];
-	spin_unlock_irqrestore(&batch->batch_lock, flags);
+	ret = batch->entropy_u64[position++];
+	WRITE_ONCE(batch->position, position);
+	local_irq_restore(flags);
 	return ret;
 }
 EXPORT_SYMBOL(get_random_u32);
@@ -2140,20 +2152,15 @@ EXPORT_SYMBOL(get_random_u32);
 static void invalidate_batched_entropy(void)
 {
 	int cpu;
-	unsigned long flags;
 
 	for_each_possible_cpu(cpu) {
-		struct batched_entropy *batched_entropy;
+		struct batched_entropy *batch;
 
-		batched_entropy = per_cpu_ptr(&batched_entropy_u32, cpu);
-		spin_lock_irqsave(&batched_entropy->batch_lock, flags);
-		batched_entropy->position = 0;
-		spin_unlock(&batched_entropy->batch_lock);
+		batch = per_cpu_ptr(&batched_entropy_u32, cpu);
+		WRITE_ONCE(batch->position, ARRAY_SIZE(batch->entropy_u32));
 
-		batched_entropy = per_cpu_ptr(&batched_entropy_u64, cpu);
-		spin_lock(&batched_entropy->batch_lock);
-		batched_entropy->position = 0;
-		spin_unlock_irqrestore(&batched_entropy->batch_lock, flags);
+		batch = per_cpu_ptr(&batched_entropy_u64, cpu);
+		WRITE_ONCE(batch->position, ARRAY_SIZE(batch->entropy_u64));
 	}
 }
 
