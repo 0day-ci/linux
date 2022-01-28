@@ -1737,7 +1737,13 @@ static void init_numa_topology_type(void)
 	}
 
 	for_each_online_node(a) {
+		if (!node_state(a, N_CPU))
+			continue;
+
 		for_each_online_node(b) {
+			if (!node_state(b, N_CPU))
+				continue;
+
 			/* Find two nodes furthest removed from each other. */
 			if (node_distance(a, b) < n)
 				continue;
