@@ -11,6 +11,25 @@ const char * const iecm_vport_vc_state_str[] = {
 EXPORT_SYMBOL(iecm_vport_vc_state_str);
 
 /**
+ * iecm_is_feature_ena - Determine if a particular feature is enabled
+ * @vport: vport to check
+ * @feature: netdev flag to check
+ *
+ * Returns true or false if a particular feature is enabled.
+ */
+bool iecm_is_feature_ena(struct iecm_vport *vport, netdev_features_t feature)
+{
+	bool ena;
+
+	switch (feature) {
+	default:
+		ena = vport->netdev->features & feature;
+		break;
+	}
+	return ena;
+}
+
+/**
  * iecm_cfg_hw - Initialize HW struct
  * @adapter: adapter to setup hw struct for
  *
@@ -132,7 +151,7 @@ iecm_vport_alloc(struct iecm_adapter *adapter, int vport_id)
 	adapter->num_alloc_vport++;
 
 	/* Setup default MSIX irq handler for the vport */
-	vport->irq_q_handler = iecm_vport_intr_clean_queues;
+	vport->irq_q_handler = NULL;
 	vport->q_vector_base = IECM_NONQ_VEC;
 
 	mutex_init(&vport->stop_mutex);

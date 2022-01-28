@@ -346,6 +346,7 @@ struct iecm_vport {
 	int num_rxq_grp;
 	struct iecm_rxq_group *rxq_grps;
 	u32 rxq_model;
+	struct iecm_rx_ptype_decoded rx_ptype_lkup[IECM_RX_MAX_PTYPE];
 
 	struct iecm_adapter *adapter;
 	struct net_device *netdev;
@@ -382,6 +383,30 @@ enum iecm_user_flags {
 	__IECM_USER_FLAGS_NBITS,
 };
 
+#define IECM_GET_PTYPE_SIZE(p) \
+	(sizeof(struct virtchnl2_ptype) + \
+	(((p)->proto_id_count ? ((p)->proto_id_count - 1) : 0) * sizeof(u16)))
+
+#define IECM_TUN_IP_GRE (\
+	IECM_PTYPE_TUNNEL_IP |\
+	IECM_PTYPE_TUNNEL_IP_GRENAT)
+
+#define IECM_TUN_IP_GRE_MAC (\
+	IECM_TUN_IP_GRE |\
+	IECM_PTYPE_TUNNEL_IP_GRENAT_MAC)
+
+enum iecm_tunnel_state {
+	IECM_PTYPE_TUNNEL_IP                    = BIT(0),
+	IECM_PTYPE_TUNNEL_IP_GRENAT             = BIT(1),
+	IECM_PTYPE_TUNNEL_IP_GRENAT_MAC         = BIT(2),
+	IECM_PTYPE_TUNNEL_IP_GRENAT_MAC_VLAN    = BIT(3),
+};
+
+struct iecm_ptype_state {
+	bool outer_ip;
+	bool outer_frag;
+	u8 tunnel_state;
+};
 /* User defined configuration values */
 struct iecm_user_config_data {
 	u32 num_req_tx_qs; /* user requested TX queues through ethtool */
@@ -534,6 +559,7 @@ int iecm_probe(struct pci_dev *pdev,
 	       const struct pci_device_id __always_unused *ent,
 	       struct iecm_adapter *adapter);
 void iecm_remove(struct pci_dev *pdev);
+void iecm_vport_adjust_qs(struct iecm_vport *vport);
 int iecm_init_dflt_mbx(struct iecm_adapter *adapter);
 void iecm_deinit_dflt_mbx(struct iecm_adapter *adapter);
 void iecm_vc_ops_init(struct iecm_adapter *adapter);
@@ -555,8 +581,15 @@ int iecm_send_config_rx_queues_msg(struct iecm_vport *vport);
 int iecm_send_enable_vport_msg(struct iecm_vport *vport);
 int iecm_send_disable_vport_msg(struct iecm_vport *vport);
 int iecm_send_destroy_vport_msg(struct iecm_vport *vport);
+int iecm_send_get_rx_ptype_msg(struct iecm_vport *vport);
+int iecm_send_get_set_rss_key_msg(struct iecm_vport *vport, bool get);
+int iecm_send_get_set_rss_lut_msg(struct iecm_vport *vport, bool get);
+int iecm_send_get_set_rss_hash_msg(struct iecm_vport *vport, bool get);
+int iecm_send_dealloc_vectors_msg(struct iecm_adapter *adapter);
+int iecm_send_alloc_vectors_msg(struct iecm_adapter *adapter, u16 num_vectors);
 int iecm_vport_params_buf_alloc(struct iecm_adapter *adapter);
 void iecm_vport_params_buf_rel(struct iecm_adapter *adapter);
+int iecm_send_get_stats_msg(struct iecm_vport *vport);
 int iecm_get_vec_ids(struct iecm_adapter *adapter,
 		     u16 *vecids, int num_vecids,
 		     struct virtchnl2_vector_chunks *chunks);
@@ -567,6 +600,9 @@ int iecm_send_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
 int iecm_send_enable_channels_msg(struct iecm_vport *vport);
 int iecm_send_disable_channels_msg(struct iecm_vport *vport);
+bool iecm_is_feature_ena(struct iecm_vport *vport, netdev_features_t feature);
+int iecm_check_descs(struct iecm_vport *vport, u64 rx_desc_ids,
+		     u64 tx_desc_ids, u16 rxq_model, u16 txq_model);
 int iecm_set_msg_pending(struct iecm_adapter *adapter,
 			 struct iecm_ctlq_msg *ctlq_msg,
 			 enum iecm_vport_vc_state err_enum);

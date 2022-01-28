@@ -4,6 +4,9 @@
 #ifndef _IECM_TXRX_H_
 #define _IECM_TXRX_H_
 
+#include "virtchnl_lan_desc.h"
+#include <linux/indirect_call_wrapper.h>
+
 #define IECM_LARGE_MAX_Q			256
 #define IECM_MAX_Q				16
 /* Mailbox Queue */
@@ -77,9 +80,200 @@
 #define IECM_MAX_RXBUFFER			9728
 #define IECM_MAX_MTU		\
 	(IECM_MAX_RXBUFFER - IECM_PACKET_HDR_PAD)
-#define IECM_INT_NAME_STR_LEN	(IFNAMSIZ + 16)
+
+#define MAKEMASK(m, s)	((m) << (s))
+
+/* Checksum offload bits decoded from the receive descriptor. */
+struct iecm_rx_csum_decoded {
+	u8 l3l4p : 1;
+	u8 ipe : 1;
+	u8 eipe : 1;
+	u8 eudpe : 1;
+	u8 ipv6exadd : 1;
+	u8 l4e : 1;
+	u8 pprs : 1;
+	u8 nat : 1;
+	u8 rsc : 1;
+	u8 raw_csum_inv : 1;
+	u16 raw_csum;
+};
+
+struct iecm_rx_extracted {
+	unsigned int size;
+	u16 vlan_tag;
+	u16 rx_ptype;
+};
 
 #define IECM_TX_COMPLQ_CLEAN_BUDGET	256
+#define IECM_TX_MIN_LEN			17
+#define IECM_TX_DESCS_FOR_SKB_DATA_PTR	1
+#define IECM_TX_MAX_BUF			8
+#define IECM_TX_DESCS_PER_CACHE_LINE	4
+#define IECM_TX_DESCS_FOR_CTX		1
+/* TX descriptors needed, worst case */
+#define IECM_TX_DESC_NEEDED (MAX_SKB_FRAGS + IECM_TX_DESCS_FOR_CTX + \
+			     IECM_TX_DESCS_PER_CACHE_LINE + \
+			     IECM_TX_DESCS_FOR_SKB_DATA_PTR)
+
+/* The size limit for a transmit buffer in a descriptor is (16K - 1).
+ * In order to align with the read requests we will align the value to
+ * the nearest 4K which represents our maximum read request size.
+ */
+#define IECM_TX_MAX_READ_REQ_SIZE	4096
+#define IECM_TX_MAX_DESC_DATA		(16 * 1024 - 1)
+#define IECM_TX_MAX_DESC_DATA_ALIGNED \
+	(~(IECM_TX_MAX_READ_REQ_SIZE - 1) & IECM_TX_MAX_DESC_DATA)
+
+#define IECM_RX_DMA_ATTR \
+	(DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING)
+#define IECM_RX_DESC(R, i)	\
+	(&(((union virtchnl2_rx_desc *)((R)->desc_ring))[i]))
+
+struct iecm_page_info {
+	dma_addr_t dma;
+	struct page *page;
+	unsigned int page_offset;
+	u16 pagecnt_bias;
+};
+
+struct iecm_rx_buf {
+#define IECM_RX_BUF_MAX_PAGES 2
+	struct iecm_page_info page_info[IECM_RX_BUF_MAX_PAGES];
+	u8 page_indx;
+	u16 buf_id;
+	u16 buf_size;
+	struct sk_buff *skb;
+};
+
+/* Packet type non-ip values */
+enum iecm_rx_ptype_l2 {
+	IECM_RX_PTYPE_L2_RESERVED	= 0,
+	IECM_RX_PTYPE_L2_MAC_PAY2	= 1,
+	IECM_RX_PTYPE_L2_TIMESYNC_PAY2	= 2,
+	IECM_RX_PTYPE_L2_FIP_PAY2	= 3,
+	IECM_RX_PTYPE_L2_OUI_PAY2	= 4,
+	IECM_RX_PTYPE_L2_MACCNTRL_PAY2	= 5,
+	IECM_RX_PTYPE_L2_LLDP_PAY2	= 6,
+	IECM_RX_PTYPE_L2_ECP_PAY2	= 7,
+	IECM_RX_PTYPE_L2_EVB_PAY2	= 8,
+	IECM_RX_PTYPE_L2_QCN_PAY2	= 9,
+	IECM_RX_PTYPE_L2_EAPOL_PAY2	= 10,
+	IECM_RX_PTYPE_L2_ARP		= 11,
+};
+
+enum iecm_rx_ptype_outer_ip {
+	IECM_RX_PTYPE_OUTER_L2	= 0,
+	IECM_RX_PTYPE_OUTER_IP	= 1,
+};
+
+enum iecm_rx_ptype_outer_ip_ver {
+	IECM_RX_PTYPE_OUTER_NONE	= 0,
+	IECM_RX_PTYPE_OUTER_IPV4	= 1,
+	IECM_RX_PTYPE_OUTER_IPV6	= 2,
+};
+
+enum iecm_rx_ptype_outer_fragmented {
+	IECM_RX_PTYPE_NOT_FRAG	= 0,
+	IECM_RX_PTYPE_FRAG	= 1,
+};
+
+enum iecm_rx_ptype_tunnel_type {
+	IECM_RX_PTYPE_TUNNEL_NONE		= 0,
+	IECM_RX_PTYPE_TUNNEL_IP_IP		= 1,
+	IECM_RX_PTYPE_TUNNEL_IP_GRENAT		= 2,
+	IECM_RX_PTYPE_TUNNEL_IP_GRENAT_MAC	= 3,
+	IECM_RX_PTYPE_TUNNEL_IP_GRENAT_MAC_VLAN	= 4,
+};
+
+enum iecm_rx_ptype_tunnel_end_prot {
+	IECM_RX_PTYPE_TUNNEL_END_NONE	= 0,
+	IECM_RX_PTYPE_TUNNEL_END_IPV4	= 1,
+	IECM_RX_PTYPE_TUNNEL_END_IPV6	= 2,
+};
+
+enum iecm_rx_ptype_inner_prot {
+	IECM_RX_PTYPE_INNER_PROT_NONE		= 0,
+	IECM_RX_PTYPE_INNER_PROT_UDP		= 1,
+	IECM_RX_PTYPE_INNER_PROT_TCP		= 2,
+	IECM_RX_PTYPE_INNER_PROT_SCTP		= 3,
+	IECM_RX_PTYPE_INNER_PROT_ICMP		= 4,
+	IECM_RX_PTYPE_INNER_PROT_TIMESYNC	= 5,
+};
+
+enum iecm_rx_ptype_payload_layer {
+	IECM_RX_PTYPE_PAYLOAD_LAYER_NONE	= 0,
+	IECM_RX_PTYPE_PAYLOAD_LAYER_PAY2	= 1,
+	IECM_RX_PTYPE_PAYLOAD_LAYER_PAY3	= 2,
+	IECM_RX_PTYPE_PAYLOAD_LAYER_PAY4	= 3,
+};
+
+struct iecm_rx_ptype_decoded {
+	u32 ptype:10;
+	u32 known:1;
+	u32 outer_ip:1;
+	u32 outer_ip_ver:2;
+	u32 outer_frag:1;
+	u32 tunnel_type:3;
+	u32 tunnel_end_prot:2;
+	u32 tunnel_end_frag:1;
+	u32 inner_prot:4;
+	u32 payload_layer:3;
+};
+
+enum iecm_rx_hsplit {
+	IECM_RX_NO_HDR_SPLIT = 0,
+	IECM_RX_HDR_SPLIT = 1,
+};
+
+/* The iecm_ptype_lkup table is used to convert from the 10-bit ptype in the
+ * hardware to a bit-field that can be used by SW to more easily determine the
+ * packet type.
+ *
+ * Macros are used to shorten the table lines and make this table human
+ * readable.
+ *
+ * We store the PTYPE in the top byte of the bit field - this is just so that
+ * we can check that the table doesn't have a row missing, as the index into
+ * the table should be the PTYPE.
+ *
+ * Typical work flow:
+ *
+ * IF NOT iecm_ptype_lkup[ptype].known
+ * THEN
+ *      Packet is unknown
+ * ELSE IF iecm_ptype_lkup[ptype].outer_ip == IECM_RX_PTYPE_OUTER_IP
+ *      Use the rest of the fields to look at the tunnels, inner protocols, etc
+ * ELSE
+ *      Use the enum iecm_rx_ptype_l2 to decode the packet type
+ * ENDIF
+ */
+/* macro to make the table lines short */
+#define IECM_PTT(PTYPE, OUTER_IP, OUTER_IP_VER, OUTER_FRAG, T, TE, TEF, I, PL)\
+	{	PTYPE, \
+		1, \
+		IECM_RX_PTYPE_OUTER_##OUTER_IP, \
+		IECM_RX_PTYPE_OUTER_##OUTER_IP_VER, \
+		IECM_RX_PTYPE_##OUTER_FRAG, \
+		IECM_RX_PTYPE_TUNNEL_##T, \
+		IECM_RX_PTYPE_TUNNEL_END_##TE, \
+		IECM_RX_PTYPE_##TEF, \
+		IECM_RX_PTYPE_INNER_PROT_##I, \
+		IECM_RX_PTYPE_PAYLOAD_LAYER_##PL }
+
+#define IECM_PTT_UNUSED_ENTRY(PTYPE) { PTYPE, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+
+/* shorter macros makes the table fit but are terse */
+#define IECM_RX_PTYPE_NOF		IECM_RX_PTYPE_NOT_FRAG
+#define IECM_RX_PTYPE_FRG		IECM_RX_PTYPE_FRAG
+#define IECM_RX_PTYPE_INNER_PROT_TS	IECM_RX_PTYPE_INNER_PROT_TIMESYNC
+#define IECM_RX_SUPP_PTYPE		18
+#define IECM_RX_MAX_PTYPE		1024
+#define IECM_RX_MAX_BASE_PTYPE		256
+
+#define IECM_INT_NAME_STR_LEN	(IFNAMSIZ + 16)
+
+/* Lookup table mapping the HW PTYPE to the bit field for decoding */
+extern const struct iecm_rx_ptype_decoded iecm_ptype_lookup[IECM_RX_MAX_PTYPE];
 
 enum iecm_queue_flags_t {
 	__IECM_Q_GEN_CHK,
@@ -318,6 +512,4 @@ void iecm_vport_calc_total_qs(struct iecm_adapter *adapter,
 			      struct virtchnl2_create_vport *vport_msg);
 void iecm_vport_calc_num_q_groups(struct iecm_vport *vport);
 void iecm_vport_calc_num_q_vec(struct iecm_vport *vport);
-irqreturn_t
-iecm_vport_intr_clean_queues(int __always_unused irq, void *data);
 #endif /* !_IECM_TXRX_H_ */
