@@ -387,4 +387,20 @@ config IECM
       To compile this as a module, choose M here. The module will be called
       iecm.
 
+config IDPF
+	tristate "Intel(R) Data Plane Function Support"
+	default n
+	depends on IECM
+	help
+	  For more information on how to identify your adapter, go
+	  to the Adapter & Driver ID Guide that can be located at:
+
+	  <http://support.intel.com>
+
+	  More specific information on configuring the driver is in
+	  <file:Documentation/networking/device_drivers/ethernet/intel/idpf.rst>.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called idpf.
+
 endif # NET_VENDOR_INTEL
