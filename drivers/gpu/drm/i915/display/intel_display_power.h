@@ -141,7 +141,7 @@ enum intel_display_power_domain {
  * wells must be assigned DISP_PW_ID_NONE.
  */
 enum i915_power_well_id {
-	DISP_PW_ID_NONE,
+	DISP_PW_ID_NONE = 0,		/* must be kept zero */
 
 	VLV_DISP_PW_DISP2D,
 	BXT_DISP_PW_DPIO_CMN_A,

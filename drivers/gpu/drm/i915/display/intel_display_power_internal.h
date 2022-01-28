@@ -13,31 +13,12 @@
 
 struct i915_power_well_regs;
 
-/* Power well structure for haswell */
-struct i915_power_well_desc {
+struct i915_power_well_instance {
 	const char *name;
 	const struct i915_power_domain_list {
 		const enum intel_display_power_domain *list;
 		u8 count;
 	} *domain_list;
-	/* Mask of pipes whose IRQ logic is backed by the pw */
-	u16 irq_pipe_mask:4;
-	u16 always_on:1;
-	/*
-	 * Instead of waiting for the status bit to ack enables,
-	 * just wait a specific amount of time and then consider
-	 * the well enabled.
-	 */
-	u16 fixed_enable_delay:1;
-	/* The pw is backing the VGA functionality */
-	u16 has_vga:1;
-	u16 has_fuses:1;
-	/*
-	 * The pw is for an ICL+ TypeC PHY port in
-	 * Thunderbolt mode.
-	 */
-	u16 is_tc_tbt:1;
-
 	/* unique identifier for this power well */
 	enum i915_power_well_id id;
 	/*
@@ -63,7 +44,32 @@ struct i915_power_well_desc {
 			u8 idx;
 		} hsw;
 	};
+};
+
+struct i915_power_well_desc {
 	const struct i915_power_well_ops *ops;
+	const struct i915_power_well_instance_list {
+		const struct i915_power_well_instance *list;
+		u8 count;
+	} *instances;
+
+	/* Mask of pipes whose IRQ logic is backed by the pw */
+	u16 irq_pipe_mask:4;
+	u16 always_on:1;
+	/*
+	 * Instead of waiting for the status bit to ack enables,
+	 * just wait a specific amount of time and then consider
+	 * the well enabled.
+	 */
+	u16 fixed_enable_delay:1;
+	/* The pw is backing the VGA functionality */
+	u16 has_vga:1;
+	u16 has_fuses:1;
+	/*
+	 * The pw is for an ICL+ TypeC PHY port in
+	 * Thunderbolt mode.
+	 */
+	u16 is_tc_tbt:1;
 };
 
 struct i915_power_well {
@@ -73,6 +79,8 @@ struct i915_power_well {
 	int count;
 	/* cached hw enabled state */
 	bool hw_enabled;
+	/* index into desc->instances->list */
+	u8 instance_idx;
 };
 
 /* intel_display_power.c */
