@@ -398,6 +398,25 @@ static int pcan_usb_get_user_devid(struct peak_usb_device *dev, u32 *device_id)
 	return err;
 }
 
+/* set a new user device id in the flash memory of the device */
+static int pcan_usb_set_user_devid(struct peak_usb_device *dev, u32 devid)
+{
+	u8 args[PCAN_USB_CMD_ARGS_LEN];
+
+	/* this kind of device supports 8-bit values only */
+	if (devid > 255)
+		return -EINVAL;
+
+	/* during the flash process the device disconnects during ~1.25 s.:
+	 * prohibit access when interface is UP
+	 */
+	if (dev->netdev->flags & IFF_UP)
+		return -EBUSY;
+
+	args[0] = (u8)devid;
+	return pcan_usb_send_cmd(dev, PCAN_USB_CMD_DEVID, PCAN_USB_SET, args);
+}
+
 /*
  * update current time ref with received timestamp
  */
@@ -1016,6 +1035,7 @@ const struct peak_usb_adapter pcan_usb = {
 	.dev_set_bus = pcan_usb_write_mode,
 	.dev_set_bittiming = pcan_usb_set_bittiming,
 	.dev_get_user_devid = pcan_usb_get_user_devid,
+	.dev_set_user_devid = pcan_usb_set_user_devid,
 	.dev_decode_buf = pcan_usb_decode_buf,
 	.dev_encode_msg = pcan_usb_encode_msg,
 	.dev_start = pcan_usb_start,
