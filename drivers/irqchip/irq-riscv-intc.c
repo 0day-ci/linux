@@ -112,8 +112,16 @@ static int __init riscv_intc_init(struct device_node *node,
 	if (riscv_hartid_to_cpuid(hartid) != smp_processor_id())
 		return 0;
 
-	intc_domain = irq_domain_add_linear(node, BITS_PER_LONG,
-					    &riscv_intc_domain_ops, NULL);
+	/*
+	 * Create INTC domain using a synthetic fwnode which will allow
+	 * drivers (such as RISC-V SBI IPI driver, RISC-V timer driver,
+	 * RISC-V PMU driver, etc) not having dedicated DT/ACPI node to
+	 * directly create interrupt mapping for standard local interrupt
+	 * numbers defined by the RISC-V privileged specification.
+	 */
+	intc_domain = irq_domain_create_linear(riscv_intc_fwnode(),
+					       BITS_PER_LONG,
+					       &riscv_intc_domain_ops, NULL);
 	if (!intc_domain) {
 		pr_err("unable to add IRQ domain\n");
 		return -ENXIO;

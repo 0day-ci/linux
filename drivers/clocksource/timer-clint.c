@@ -149,6 +149,7 @@ static int __init clint_timer_init_dt(struct device_node *np)
 	int rc;
 	u32 i, nr_irqs;
 	void __iomem *base;
+	struct irq_domain *domain;
 	struct of_phandle_args oirq;
 
 	/*
@@ -169,13 +170,13 @@ static int __init clint_timer_init_dt(struct device_node *np)
 			       np, i, oirq.args[0]);
 			return -ENODEV;
 		}
-
-		/* Find parent irq domain and map timer irq */
-		if (!clint_timer_irq &&
-		    oirq.args[0] == RV_IRQ_TIMER &&
-		    irq_find_host(oirq.np))
-			clint_timer_irq = irq_of_parse_and_map(np, i);
 	}
+
+	/* Find parent irq domain and map timer irq */
+	domain = irq_find_matching_fwnode(riscv_intc_fwnode(),
+					  DOMAIN_BUS_ANY);
+	if (!clint_timer_irq && domain)
+		clint_timer_irq = irq_create_mapping(domain, RV_IRQ_TIMER);
 
 	/* If CLINT timer irq not found then fail */
 	if (!clint_timer_irq) {

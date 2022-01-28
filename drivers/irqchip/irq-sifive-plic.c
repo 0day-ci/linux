@@ -284,6 +284,7 @@ static int __init plic_init(struct device_node *node,
 	u32 nr_irqs;
 	struct plic_priv *priv;
 	struct plic_handler *handler;
+	struct irq_domain *domain;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -339,14 +340,6 @@ static int __init plic_init(struct device_node *node,
 			continue;
 		}
 
-		/* Find parent domain and register chained handler */
-		if (!plic_parent_irq && irq_find_host(parent.np)) {
-			plic_parent_irq = irq_of_parse_and_map(node, i);
-			if (plic_parent_irq)
-				irq_set_chained_handler(plic_parent_irq,
-							plic_handle_irq);
-		}
-
 		/*
 		 * When running in M-mode we need to ignore the S-mode handler.
 		 * Here we assume it always comes later, but that might be a
@@ -371,6 +364,16 @@ done:
 		for (hwirq = 1; hwirq <= nr_irqs; hwirq++)
 			plic_toggle(handler, hwirq, 0);
 		nr_handlers++;
+	}
+
+	/* Find parent domain and register chained handler */
+	domain = irq_find_matching_fwnode(riscv_intc_fwnode(),
+					  DOMAIN_BUS_ANY);
+	if (!plic_parent_irq && domain) {
+		plic_parent_irq = irq_create_mapping(domain, RV_IRQ_EXT);
+		if (plic_parent_irq)
+			irq_set_chained_handler(plic_parent_irq,
+						plic_handle_irq);
 	}
 
 	/*

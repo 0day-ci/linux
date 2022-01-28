@@ -7,8 +7,21 @@
 
 #include <linux/interrupt.h>
 #include <linux/irqchip.h>
+#include <linux/irqdomain.h>
+#include <linux/module.h>
 #include <linux/seq_file.h>
 #include <asm/smp.h>
+
+static struct fwnode_handle *intc_fwnode;
+
+struct fwnode_handle *riscv_intc_fwnode(void)
+{
+	if (!intc_fwnode)
+		intc_fwnode = irq_domain_alloc_named_fwnode("RISCV-INTC");
+
+	return intc_fwnode;
+}
+EXPORT_SYMBOL_GPL(riscv_intc_fwnode);
 
 int arch_show_interrupts(struct seq_file *p, int prec)
 {

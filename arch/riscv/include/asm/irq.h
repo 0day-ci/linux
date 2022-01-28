@@ -12,6 +12,8 @@
 
 #include <asm-generic/irq.h>
 
+extern struct fwnode_handle *riscv_intc_fwnode(void);
+
 extern void __init init_IRQ(void);
 
 #endif /* _ASM_RISCV_IRQ_H */
