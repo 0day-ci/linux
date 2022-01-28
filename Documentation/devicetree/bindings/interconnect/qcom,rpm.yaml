@@ -79,8 +79,6 @@ allOf:
               - qcom,msm8916-snoc
               - qcom,msm8939-bimc
               - qcom,msm8939-pcnoc
-              - qcom,msm8939-snoc
-              - qcom,msm8939-snoc-mm
               - qcom,msm8996-a1noc
               - qcom,msm8996-a2noc
               - qcom,msm8996-bimc
@@ -181,6 +179,29 @@ allOf:
             - description: Aggregate2 UFS AXI Clock.
             - description: Aggregate2 USB3 AXI Clock.
             - description: Config NoC USB2 AXI Clock.
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - qcom,msm8939-snoc
+
+    then:
+      properties:
+        clock-names:
+          items:
+            - const: bus
+            - const: bus_a
+            - const: bus_mm
+            - const: bus_a_mm
+
+        clocks:
+          items:
+            - description: Bus Clock.
+            - description: Bus A Clock.
+            - description: Bus Clock MultiMedia.
+            - description: Bus A Clock MultiMedia.
 
 examples:
   - |
