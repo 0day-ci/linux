@@ -93,6 +93,7 @@
  * These fields are locked by the hashed io_req_lock.
  */
 struct fnic_cmd_priv {
+	struct libfc_cmd_priv libfc_data; /* must be the first member */
 	struct fnic_io_req *io_req;
 	enum fnic_ioreq_state state;
 	u32 flags;
