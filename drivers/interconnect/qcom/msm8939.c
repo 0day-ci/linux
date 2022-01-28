@@ -1271,6 +1271,15 @@ static struct qcom_icc_node *msm8939_snoc_nodes[] = {
 	[SNOC_INT_BIMC] = &snoc_int_bimc,
 	[SNOC_PCNOC_MAS] = &snoc_pcnoc_mas,
 	[SNOC_QDSS_INT] = &qdss_int,
+	[MASTER_VIDEO_P0] = &mas_video,
+	[MASTER_JPEG] = &mas_jpeg,
+	[MASTER_VFE] = &mas_vfe,
+	[MASTER_MDP_PORT0] = &mas_mdp0,
+	[MASTER_MDP_PORT1] = &mas_mdp1,
+	[MASTER_CPP] = &mas_cpp,
+	[SNOC_MM_INT_0] = &mm_int_0,
+	[SNOC_MM_INT_1] = &mm_int_1,
+	[SNOC_MM_INT_2] = &mm_int_2,
 };
 
 static const struct regmap_config msm8939_snoc_regmap_config = {
@@ -1286,34 +1295,6 @@ static struct qcom_icc_desc msm8939_snoc = {
 	.nodes = msm8939_snoc_nodes,
 	.num_nodes = ARRAY_SIZE(msm8939_snoc_nodes),
 	.regmap_cfg = &msm8939_snoc_regmap_config,
-	.qos_offset = 0x7000,
-};
-
-static struct qcom_icc_node *msm8939_snoc_mm_nodes[] = {
-	[MASTER_VIDEO_P0] = &mas_video,
-	[MASTER_JPEG] = &mas_jpeg,
-	[MASTER_VFE] = &mas_vfe,
-	[MASTER_MDP_PORT0] = &mas_mdp0,
-	[MASTER_MDP_PORT1] = &mas_mdp1,
-	[MASTER_CPP] = &mas_cpp,
-	[SNOC_MM_INT_0] = &mm_int_0,
-	[SNOC_MM_INT_1] = &mm_int_1,
-	[SNOC_MM_INT_2] = &mm_int_2,
-};
-
-static const struct regmap_config msm8939_snoc_mm_regmap_config = {
-	.reg_bits	= 32,
-	.reg_stride	= 4,
-	.val_bits	= 32,
-	.max_register	= 0x14080,
-	.fast_io	= true,
-};
-
-static struct qcom_icc_desc msm8939_snoc_mm = {
-	.type = QCOM_ICC_NOC,
-	.nodes = msm8939_snoc_mm_nodes,
-	.num_nodes = ARRAY_SIZE(msm8939_snoc_mm_nodes),
-	.regmap_cfg = &msm8939_snoc_mm_regmap_config,
 	.qos_offset = 0x7000,
 };
 
@@ -1420,7 +1401,6 @@ static const struct of_device_id msm8939_noc_of_match[] = {
 	{ .compatible = "qcom,msm8939-bimc", .data = &msm8939_bimc },
 	{ .compatible = "qcom,msm8939-pcnoc", .data = &msm8939_pcnoc },
 	{ .compatible = "qcom,msm8939-snoc", .data = &msm8939_snoc },
-	{ .compatible = "qcom,msm8939-snoc-mm", .data = &msm8939_snoc_mm },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, msm8939_noc_of_match);
