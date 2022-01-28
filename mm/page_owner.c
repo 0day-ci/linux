@@ -325,12 +325,20 @@ void pagetypeinfo_showmixedcount_print(struct seq_file *m,
 	seq_putc(m, '\n');
 }
 
+#define SNPRINTF(_buf, _size, _len, _err, _fmt, ...)			\
+	do {								\
+		_len += snprintf(_buf + _len, _size - _len, _fmt,	\
+				 ##__VA_ARGS__);			\
+		if (_len >= _size)					\
+			goto _err;					\
+	} while (0)
+
 static ssize_t
 print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 		struct page *page, struct page_owner *page_owner,
 		depot_stack_handle_t handle)
 {
-	int ret, pageblock_mt, page_mt;
+	int ret = 0, pageblock_mt, page_mt;
 	char *kbuf;
 
 	count = min_t(size_t, count, PAGE_SIZE);
@@ -338,44 +346,32 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 	if (!kbuf)
 		return -ENOMEM;
 
-	ret = snprintf(kbuf, count,
-			"Page allocated via order %u, mask %#x(%pGg), pid %d, ts %llu ns, free_ts %llu ns\n",
-			page_owner->order, page_owner->gfp_mask,
-			&page_owner->gfp_mask, page_owner->pid,
-			page_owner->ts_nsec, page_owner->free_ts_nsec);
-
-	if (ret >= count)
-		goto err;
+	SNPRINTF(kbuf, count, ret, err,
+		"Page allocated via order %u, mask %#x(%pGg), pid %d, ts %llu ns, free_ts %llu ns\n",
+		page_owner->order, page_owner->gfp_mask,
+		&page_owner->gfp_mask, page_owner->pid,
+		page_owner->ts_nsec, page_owner->free_ts_nsec);
 
 	/* Print information relevant to grouping pages by mobility */
 	pageblock_mt = get_pageblock_migratetype(page);
 	page_mt  = gfp_migratetype(page_owner->gfp_mask);
-	ret += snprintf(kbuf + ret, count - ret,
-			"PFN %lu type %s Block %lu type %s Flags %pGp\n",
-			pfn,
-			migratetype_names[page_mt],
-			pfn >> pageblock_order,
-			migratetype_names[pageblock_mt],
-			&page->flags);
-
-	if (ret >= count)
-		goto err;
+	SNPRINTF(kbuf, count, ret, err,
+		"PFN %lu type %s Block %lu type %s Flags %pGp\n",
+		pfn, migratetype_names[page_mt],
+		pfn >> pageblock_order,
+		migratetype_names[pageblock_mt],
+		&page->flags);
 
 	ret += stack_depot_snprint(handle, kbuf + ret, count - ret, 0);
 	if (ret >= count)
 		goto err;
 
-	if (page_owner->last_migrate_reason != -1) {
-		ret += snprintf(kbuf + ret, count - ret,
+	if (page_owner->last_migrate_reason != -1)
+		SNPRINTF(kbuf, count, ret, err,
 			"Page has been migrated, last migrate reason: %s\n",
 			migrate_reason_names[page_owner->last_migrate_reason]);
-		if (ret >= count)
-			goto err;
-	}
 
-	ret += snprintf(kbuf + ret, count - ret, "\n");
-	if (ret >= count)
-		goto err;
+	SNPRINTF(kbuf, count, ret, err, "\n");
 
 	if (copy_to_user(buf, kbuf, ret))
 		ret = -EFAULT;
