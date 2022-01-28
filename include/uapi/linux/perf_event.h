@@ -256,6 +256,12 @@ enum {
 	PERF_BR_FIQ		= 13,	/* fiq */
 	PERF_BR_DEBUG_HALT	= 14,	/* debug halt */
 	PERF_BR_DEBUG_EXIT	= 15,	/* debug exit */
+	PERF_BR_DEBUG_INST	= 16,	/* instruciton debug */
+	PERF_BR_DEBUG_DATA	= 17,	/* data debug */
+	PERF_BR_FAULT_ALGN	= 18,	/* alignment fault */
+	PERF_BR_FAULT_DATA	= 19,	/* data fault */
+	PERF_BR_FAULT_INST	= 20,	/* instruction fault */
+	PERF_BR_SERROR		= 21,	/* system error */
 	PERF_BR_MAX,
 };
 
@@ -1370,8 +1376,8 @@ struct perf_branch_entry {
 		in_tx:1,    /* in transaction */
 		abort:1,    /* transaction abort */
 		cycles:16,  /* cycle count to last branch */
-		type:4,     /* branch type */
-		reserved:40;
+		type:6,     /* branch type */
+		reserved:38;
 };
 
 union perf_sample_weight {

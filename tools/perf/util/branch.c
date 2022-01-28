@@ -54,7 +54,13 @@ const char *branch_type_name(int type)
 		"IRQ",
 		"FIQ",
 		"DEBUG_HALT",
-		"DEBUG_EXIT"
+		"DEBUG_EXIT",
+		"DEBUG_INST",
+		"DEBUG_DATA",
+		"FAULT_ALGN",
+		"FAULT_DATA",
+		"FAULT_INST",
+		"SERROR"
 	};
 
 	if (type >= 0 && type < PERF_BR_MAX)
