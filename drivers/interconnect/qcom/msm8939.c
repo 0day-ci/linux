@@ -1290,10 +1290,19 @@ static const struct regmap_config msm8939_snoc_regmap_config = {
 	.fast_io	= true,
 };
 
+static const char * const snoc_clocks[] = {
+	"bus",
+	"bus_a",
+	"bus_mm",
+	"bus_a_mm",
+};
+
 static struct qcom_icc_desc msm8939_snoc = {
 	.type = QCOM_ICC_NOC,
 	.nodes = msm8939_snoc_nodes,
 	.num_nodes = ARRAY_SIZE(msm8939_snoc_nodes),
+	.clocks = snoc_clocks,
+	.num_clocks = ARRAY_SIZE(snoc_clocks),
 	.regmap_cfg = &msm8939_snoc_regmap_config,
 	.qos_offset = 0x7000,
 };
