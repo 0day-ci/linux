@@ -777,7 +777,7 @@ static struct fw_request *allocate_request(struct fw_card *card,
 		return NULL;
 	}
 
-	request = kmalloc(sizeof(*request) + length, GFP_ATOMIC);
+	request = kmalloc(struct_size(*request, data, length), GFP_ATOMIC);
 	if (request == NULL)
 		return NULL;
 
