@@ -2099,6 +2099,20 @@ static void numa_group_count_active_nodes(struct numa_group *numa_group)
 	numa_group->active_nodes = active_nodes;
 }
 
+/**********************************************/
+/*  Process-based Adaptive NUMA (PAN) Design  */
+/**********************************************/
+/*
+ * Updates mm->numa_scan_period under mm->pan_numa_lock.
+ *
+ * Returns p->numa_scan_period now but updated to return
+ * p->mm->numa_scan_period in a later patch.
+ */
+static unsigned long pan_get_scan_period(struct task_struct *p)
+{
+	return p->numa_scan_period;
+}
+
 /*
  * When adapting the scan rate, the period is divided into NUMA_PERIOD_SLOTS
  * increments. The more local the fault statistics are, the higher the scan
@@ -2616,6 +2630,9 @@ void task_numa_fault(int last_cpupid, int mem_node, int pages, int flags)
 			task_numa_group(p, last_cpupid, flags, &priv);
 	}
 
+	atomic_long_add(pages, &(p->mm->faults_locality[local]));
+	atomic_long_add(pages, &(p->mm->faults_shared[priv]));
+
 	/*
 	 * If a workload spans multiple NUMA nodes, a shared fault that
 	 * occurs wholly within the set of nodes that the workload is
@@ -2702,12 +2719,20 @@ static void task_numa_work(struct callback_head *work)
 	if (time_before(now, migrate))
 		return;
 
-	if (p->numa_scan_period == 0) {
+	if (p->mm->numa_scan_period == 0) {
+		p->numa_scan_period_max = task_scan_max(p);
+		p->numa_scan_period = task_scan_start(p);
+		mm->numa_scan_period = p->numa_scan_period;
+	} else if (p->numa_scan_period == 0) {
 		p->numa_scan_period_max = task_scan_max(p);
 		p->numa_scan_period = task_scan_start(p);
 	}
 
-	next_scan = now + msecs_to_jiffies(p->numa_scan_period);
+	if (!spin_trylock(&p->mm->pan_numa_lock))
+		return;
+	next_scan = now + msecs_to_jiffies(pan_get_scan_period(p));
+	spin_unlock(&p->mm->pan_numa_lock);
+
 	if (cmpxchg(&mm->numa_next_scan, migrate, next_scan) != migrate)
 		return;
 
@@ -2807,6 +2832,16 @@ out:
 	}
 }
 
+/* Init Process-based Adaptive NUMA */
+static void pan_init_numa(struct task_struct *p)
+{
+	struct mm_struct *mm = p->mm;
+
+	spin_lock_init(&mm->pan_numa_lock);
+	mm->numa_scan_period = sysctl_numa_balancing_scan_delay;
+
+}
+
 void init_numa_balancing(unsigned long clone_flags, struct task_struct *p)
 {
 	int mm_users = 0;
@@ -2817,6 +2852,7 @@ void init_numa_balancing(unsigned long clone_flags, struct task_struct *p)
 		if (mm_users == 1) {
 			mm->numa_next_scan = jiffies + msecs_to_jiffies(sysctl_numa_balancing_scan_delay);
 			mm->numa_scan_seq = 0;
+			pan_init_numa(p);
 		}
 	}
 	p->node_stamp			= 0;

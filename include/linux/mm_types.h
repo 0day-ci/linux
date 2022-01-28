@@ -612,6 +612,13 @@ struct mm_struct {
 
 		/* numa_scan_seq prevents two threads setting pte_numa */
 		int numa_scan_seq;
+
+		/* Process-based Adaptive NUMA */
+		atomic_long_t faults_locality[2];
+		atomic_long_t faults_shared[2];
+
+		spinlock_t pan_numa_lock;
+		unsigned int numa_scan_period;
 #endif
 		/*
 		 * An operation with batched TLB flushing is going on. Anything
