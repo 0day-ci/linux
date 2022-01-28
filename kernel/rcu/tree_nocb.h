@@ -201,6 +201,8 @@ static void rcu_lockdep_assert_cblist_protected(struct rcu_data *rdp)
  */
 static void rcu_nocb_gp_cleanup(struct swait_queue_head *sq)
 {
+	if (rcu_nocb_poll)
+		return;
 	swake_up_all(sq);
 }
 
