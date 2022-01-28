@@ -1160,6 +1160,11 @@ static int owl_dma_probe(struct platform_device *pdev)
 	 * simplification.
 	 */
 	od->irq = platform_get_irq(pdev, 0);
+	if (od->irq < 0) {
+		dev_err(&pdev->dev, "unable to get IRQ\n");
+		return od->irq;
+	}
+
 	ret = devm_request_irq(&pdev->dev, od->irq, owl_dma_interrupt, 0,
 			       dev_name(&pdev->dev), od);
 	if (ret) {
