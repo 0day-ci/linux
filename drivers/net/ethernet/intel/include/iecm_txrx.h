@@ -638,6 +638,7 @@ void iecm_vport_calc_total_qs(struct iecm_adapter *adapter,
 			      struct virtchnl2_create_vport *vport_msg);
 void iecm_vport_calc_num_q_groups(struct iecm_vport *vport);
 int iecm_vport_queues_alloc(struct iecm_vport *vport);
+void iecm_rx_post_buf_refill(struct iecm_sw_queue *refillq, u16 buf_id);
 void iecm_vport_queues_rel(struct iecm_vport *vport);
 void iecm_vport_calc_num_q_vec(struct iecm_vport *vport);
 void iecm_vport_intr_rel(struct iecm_vport *vport);
@@ -650,14 +651,33 @@ int iecm_vport_intr_init(struct iecm_vport *vport);
 irqreturn_t
 iecm_vport_intr_clean_queues(int __always_unused irq, void *data);
 void iecm_vport_intr_ena_irq_all(struct iecm_vport *vport);
+enum
+pkt_hash_types iecm_ptype_to_htype(struct iecm_rx_ptype_decoded *decoded);
 int iecm_config_rss(struct iecm_vport *vport);
 void iecm_fill_dflt_rss_lut(struct iecm_vport *vport);
 int iecm_init_rss(struct iecm_vport *vport);
 void iecm_deinit_rss(struct iecm_vport *vport);
+bool iecm_rx_can_reuse_page(struct iecm_rx_buf *rx_buf);
+void iecm_rx_buf_adjust_pg(struct iecm_rx_buf *rx_buf, unsigned int size);
+void iecm_rx_add_frag(struct iecm_rx_buf *rx_buf, struct sk_buff *skb,
+		      unsigned int size);
+struct sk_buff *iecm_rx_construct_skb(struct iecm_queue *rxq,
+				      struct iecm_rx_buf *rx_buf,
+				      unsigned int size);
+void iecm_rx_skb(struct iecm_queue *rxq, struct sk_buff *skb, u16 vlan_tag);
 bool iecm_init_rx_buf_hw_alloc(struct iecm_queue *rxq, struct iecm_rx_buf *buf);
 void iecm_rx_buf_hw_update(struct iecm_queue *rxq, u32 val);
 void iecm_tx_buf_hw_update(struct iecm_queue *tx_q, u32 val,
 			   bool xmit_more);
+void iecm_rx_splitq_put_bufs(struct iecm_queue *rx_bufq,
+			     struct iecm_rx_buf *hdr_buf,
+			     struct iecm_rx_buf *rx_buf);
+bool iecm_rx_splitq_test_staterr(u8 stat_err_field, const u8 stat_err_bits);
+int iecm_rx_process_skb_fields(struct iecm_queue *rxq, struct sk_buff *skb,
+			       struct virtchnl2_rx_flex_desc_adv_nic_3 *rx_desc);
+bool iecm_rx_splitq_extract_vlan_tag(struct virtchnl2_rx_flex_desc_adv_nic_3 *desc,
+				     struct iecm_queue *rxq, u16 *vlan_tag);
+void iecm_rx_bump_ntc(struct iecm_queue *q);
 void iecm_tx_buf_rel(struct iecm_queue *tx_q, struct iecm_tx_buf *tx_buf);
 unsigned int iecm_size_to_txd_count(unsigned int size);
 unsigned int iecm_tx_desc_count_required(struct sk_buff *skb);

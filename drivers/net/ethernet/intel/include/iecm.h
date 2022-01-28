@@ -12,6 +12,10 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <net/tcp.h>
+#include <net/ip6_checksum.h>
+#include <net/ipv6.h>
+#include <net/sch_generic.h>
+#include <net/gro.h>
 #include <linux/version.h>
 #include <linux/dim.h>
 
