@@ -91,6 +91,20 @@ static void iecm_vport_rel_all(struct iecm_adapter *adapter)
 }
 
 /**
+ * iecm_vport_set_hsplit - enable or disable header split on a given vport
+ * @vport: virtual port
+ * @ena: flag controlling header split, On (true) or Off (false)
+ */
+void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena)
+{
+	if (iecm_is_cap_ena_all(vport->adapter, IECM_HSPLIT_CAPS,
+				IECM_CAP_HSPLIT) &&
+	    iecm_is_queue_model_split(vport->rxq_model))
+		set_bit(__IECM_PRIV_FLAGS_HDR_SPLIT,
+			vport->adapter->config_data.user_flags);
+}
+
+/**
  * iecm_vport_alloc - Allocates the next available struct vport in the adapter
  * @adapter: board private structure
  * @vport_id: vport identifier

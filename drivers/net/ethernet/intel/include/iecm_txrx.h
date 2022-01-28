@@ -81,6 +81,22 @@
 
 #define IECM_TX_COMPLQ_CLEAN_BUDGET	256
 
+enum iecm_queue_flags_t {
+	__IECM_Q_GEN_CHK,
+	__IECM_RFLQ_GEN_CHK,
+	__IECM_Q_FLOW_SCH_EN,
+	__IECM_Q_ETF_EN,
+	__IECM_Q_SW_MARKER,
+	__IECM_Q_VLAN_TAG_LOC_L2TAG1,
+	__IECM_Q_VLAN_TAG_LOC_L2TAG2,
+	__IECM_Q_FLAGS_NBITS,
+};
+
+struct iecm_vec_regs {
+	u32 dyn_ctl_reg;
+	u32 itrn_reg;
+};
+
 struct iecm_intr_reg {
 	u32 dyn_ctl;
 	u32 dyn_ctl_intena_m;
@@ -122,6 +138,186 @@ struct iecm_q_vector {
 	char name[IECM_INT_NAME_STR_LEN];
 };
 
+struct iecm_rx_queue_stats {
+	u64 packets;
+	u64 bytes;
+	u64 rsc_pkts;
+};
+
+struct iecm_tx_queue_stats {
+	u64 packets;
+	u64 bytes;
+	u64 lso_pkts;
+};
+
+union iecm_queue_stats {
+	struct iecm_rx_queue_stats rx;
+	struct iecm_tx_queue_stats tx;
+};
+
+/* queue associated with a vport */
+struct iecm_queue {
+	struct device *dev;		/* Used for DMA mapping */
+	struct iecm_vport *vport;	/* Backreference to associated vport */
+	union {
+		struct iecm_txq_group *txq_grp;
+		struct iecm_rxq_group *rxq_grp;
+	};
+	/* bufq: Used as group id, either 0 or 1, on clean Buf Q uses this
+	 *       index to determine which group of refill queues to clean.
+	 *       Bufqs are use in splitq only.
+	 * txq: Index to map between Tx Q group and hot path Tx ptrs stored in
+	 *      vport.  Used in both single Q/split Q
+	 * rxq: Index to total rxq across groups, used for skb reporting
+	 */
+	u16 idx;
+	/* Used for both Q models single and split. In split Q model relevant
+	 * only to Tx Q and Rx Q
+	 */
+	u8 __iomem *tail;
+	/* Used in both single and split Q.  In single Q, Tx Q uses tx_buf and
+	 * Rx Q uses rx_buf.  In split Q, Tx Q uses tx_buf, Rx Q uses skb, and
+	 * Buf Q uses rx_buf.
+	 */
+	union {
+		struct iecm_tx_buf *tx_buf;
+		struct {
+			struct iecm_rx_buf *buf;
+			struct iecm_dma_mem **hdr_buf;
+		} rx_buf;
+		struct sk_buff *skb;
+	};
+	u16 q_type;
+	/* Queue id(Tx/Tx compl/Rx/Bufq) */
+	u32 q_id;
+	u16 desc_count;		/* Number of descriptors */
+
+	/* Relevant in both split & single Tx Q & Buf Q*/
+	u16 next_to_use;
+	/* In split q model only relevant for Tx Compl Q and Rx Q */
+	u16 next_to_clean;	/* used in interrupt processing */
+	/* Used only for Rx. In split Q model only relevant to Rx Q */
+	u16 next_to_alloc;
+	/* Generation bit check stored, as HW flips the bit at Queue end */
+	DECLARE_BITMAP(flags, __IECM_Q_FLAGS_NBITS);
+
+	union iecm_queue_stats q_stats;
+	struct u64_stats_sync stats_sync;
+
+	bool rx_hsplit_en;
+
+	u16 rx_hbuf_size;	/* Header buffer size */
+	u16 rx_buf_size;
+	u16 rx_max_pkt_size;
+	u16 rx_buf_stride;
+	u8 rx_buffer_low_watermark;
+	u64 rxdids;
+	/* Used for both Q models single and split. In split Q model relavant
+	 * only to Tx compl Q and Rx compl Q
+	 */
+	struct iecm_q_vector *q_vector;	/* Backreference to associated vector */
+	unsigned int size;		/* length of descriptor ring in bytes */
+	dma_addr_t dma;			/* physical address of ring */
+	void *desc_ring;		/* Descriptor ring memory */
+
+	u16 tx_buf_key;			/* 16 bit unique "identifier" (index)
+					 * to be used as the completion tag when
+					 * queue is using flow based scheduling
+					 */
+	u16 tx_max_bufs;		/* Max buffers that can be transmitted
+					 * with scatter-gather
+					 */
+	DECLARE_HASHTABLE(sched_buf_hash, 12);
+} ____cacheline_internodealigned_in_smp;
+
+/* Software queues are used in splitq mode to manage buffers between rxq
+ * producer and the bufq consumer.  These are required in order to maintain a
+ * lockless buffer management system and are strictly software only constructs.
+ */
+struct iecm_sw_queue {
+	u16 next_to_clean ____cacheline_aligned_in_smp;
+	u16 next_to_alloc ____cacheline_aligned_in_smp;
+	u16 next_to_use ____cacheline_aligned_in_smp;
+	DECLARE_BITMAP(flags, __IECM_Q_FLAGS_NBITS)
+		____cacheline_aligned_in_smp;
+	u16 *ring ____cacheline_aligned_in_smp;
+	u16 desc_count;
+	u16 buf_size;
+	struct device *dev;
+} ____cacheline_internodealigned_in_smp;
+
+/* Splitq only.  iecm_rxq_set associates an rxq with at an array of refillqs.
+ * Each rxq needs a refillq to return used buffers back to the respective bufq.
+ * Bufqs then clean these refillqs for buffers to give to hardware.
+ */
+struct iecm_rxq_set {
+	struct iecm_queue rxq;
+	/* refillqs assoc with bufqX mapped to this rxq */
+	struct iecm_sw_queue *refillq0;
+	struct iecm_sw_queue *refillq1;
+};
+
+/* Splitq only.  iecm_bufq_set associates a bufq to an array of refillqs.
+ * In this bufq_set, there will be one refillq for each rxq in this rxq_group.
+ * Used buffers received by rxqs will be put on refillqs which bufqs will
+ * clean to return new buffers back to hardware.
+ *
+ * Buffers needed by some number of rxqs associated in this rxq_group are
+ * managed by at most two bufqs (depending on performance configuration).
+ */
+struct iecm_bufq_set {
+	struct iecm_queue bufq;
+	/* This is always equal to num_rxq_sets in iecm_rxq_group */
+	int num_refillqs;
+	struct iecm_sw_queue *refillqs;
+};
+
+/* In singleq mode, an rxq_group is simply an array of rxqs.  In splitq, a
+ * rxq_group contains all the rxqs, bufqs and refillqs needed to
+ * manage buffers in splitq mode.
+ */
+struct iecm_rxq_group {
+	struct iecm_vport *vport; /* back pointer */
+
+	union {
+		struct {
+			int num_rxq;
+			/* store queue pointers */
+			struct iecm_queue *rxqs[IECM_LARGE_MAX_Q];
+		} singleq;
+		struct {
+			int num_rxq_sets;
+			/* store queue pointers */
+			struct iecm_rxq_set *rxq_sets[IECM_LARGE_MAX_Q];
+			struct iecm_bufq_set *bufq_sets;
+		} splitq;
+	};
+};
+
+/* Between singleq and splitq, a txq_group is largely the same except for the
+ * complq.  In splitq a single complq is responsible for handling completions
+ * for some number of txqs associated in this txq_group.
+ */
+struct iecm_txq_group {
+	struct iecm_vport *vport; /* back pointer */
+
+	int num_txq;
+	/* store queue pointers */
+	struct iecm_queue *txqs[IECM_LARGE_MAX_Q];
+
+	/* splitq only */
+	struct iecm_queue *complq;
+};
+
+struct iecm_adapter;
+
+void iecm_vport_init_num_qs(struct iecm_vport *vport,
+			    struct virtchnl2_create_vport *vport_msg);
+void iecm_vport_calc_num_q_desc(struct iecm_vport *vport);
+void iecm_vport_calc_total_qs(struct iecm_adapter *adapter,
+			      struct virtchnl2_create_vport *vport_msg);
+void iecm_vport_calc_num_q_groups(struct iecm_vport *vport);
+void iecm_vport_calc_num_q_vec(struct iecm_vport *vport);
 irqreturn_t
 iecm_vport_intr_clean_queues(int __always_unused irq, void *data);
 #endif /* !_IECM_TXRX_H_ */

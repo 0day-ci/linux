@@ -432,6 +432,8 @@ struct iecm_adapter {
 	u16 num_alloc_vport;
 	u16 next_vport;		/* Next free slot in pf->vport[] - 0-based! */
 
+	u16 max_queue_limit;	/* Max number of queues user can request */
+
 	struct delayed_work init_task; /* delayed init task */
 	struct workqueue_struct *init_wq;
 	u32 mb_wait_count;
@@ -510,6 +512,12 @@ static inline bool __iecm_is_cap_ena(struct iecm_adapter *adapter, bool all,
 	return adapter->dev_ops.vc_ops.is_cap_ena(adapter, all, field, flag);
 }
 
+#define IECM_CAP_HSPLIT (\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L2   |\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L3   |\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L4V4 |\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L4V6)
+
 /**
  * iecm_is_reset_detected - check if we were reset at some point
  * @adapter: driver specific private structure
@@ -530,6 +538,8 @@ int iecm_init_dflt_mbx(struct iecm_adapter *adapter);
 void iecm_deinit_dflt_mbx(struct iecm_adapter *adapter);
 void iecm_vc_ops_init(struct iecm_adapter *adapter);
 int iecm_vc_core_init(struct iecm_adapter *adapter, int *vport_id);
+int iecm_get_reg_intr_vecs(struct iecm_vport *vport,
+			   struct iecm_vec_regs *reg_vals, int num_vecs);
 int iecm_wait_for_event(struct iecm_adapter *adapter,
 			enum iecm_vport_vc_state state,
 			enum iecm_vport_vc_state err_check);
@@ -537,6 +547,14 @@ int iecm_min_wait_for_event(struct iecm_adapter *adapter,
 			    enum iecm_vport_vc_state state,
 			    enum iecm_vport_vc_state err_check);
 int iecm_send_get_caps_msg(struct iecm_adapter *adapter);
+int iecm_send_delete_queues_msg(struct iecm_vport *vport);
+int iecm_send_add_queues_msg(struct iecm_vport *vport, u16 num_tx_q,
+			     u16 num_complq, u16 num_rx_q, u16 num_rx_bufq);
+int iecm_send_config_tx_queues_msg(struct iecm_vport *vport);
+int iecm_send_config_rx_queues_msg(struct iecm_vport *vport);
+int iecm_send_enable_vport_msg(struct iecm_vport *vport);
+int iecm_send_disable_vport_msg(struct iecm_vport *vport);
+int iecm_send_destroy_vport_msg(struct iecm_vport *vport);
 int iecm_vport_params_buf_alloc(struct iecm_adapter *adapter);
 void iecm_vport_params_buf_rel(struct iecm_adapter *adapter);
 int iecm_get_vec_ids(struct iecm_adapter *adapter,
@@ -546,7 +564,11 @@ int iecm_recv_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 		     void *msg, int msg_size);
 int iecm_send_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 		     u16 msg_size, u8 *msg);
+void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
+int iecm_send_enable_channels_msg(struct iecm_vport *vport);
+int iecm_send_disable_channels_msg(struct iecm_vport *vport);
 int iecm_set_msg_pending(struct iecm_adapter *adapter,
 			 struct iecm_ctlq_msg *ctlq_msg,
 			 enum iecm_vport_vc_state err_enum);
+int iecm_send_map_unmap_queue_vector_msg(struct iecm_vport *vport, bool map);
 #endif /* !_IECM_H_ */
