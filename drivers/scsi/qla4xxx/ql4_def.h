@@ -216,11 +216,18 @@
 #define IDC_COMP_TOV			5
 #define LINK_UP_COMP_TOV		30
 
-#define CMD_SP(Cmnd)			((Cmnd)->SCp.ptr)
+struct qla4xxx_cmd_priv {
+	struct iscsi_cmd iscsi_data; /* must be the first member */
+	struct srb *srb;
+};
+
+static inline struct qla4xxx_cmd_priv *qla4xxx_cmd_priv(struct scsi_cmnd *cmd)
+{
+	return scsi_cmd_priv(cmd);
+}
 
 /*
- * SCSI Request Block structure	 (srb)	that is placed
- * on cmd->SCp location of every I/O	 [We have 22 bytes available]
+ * SCSI Request Block structure (srb) that is associated with each scsi_cmnd.
  */
 struct srb {
 	struct list_head list;	/* (8)	 */
