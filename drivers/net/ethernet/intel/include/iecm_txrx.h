@@ -81,7 +81,69 @@
 #define IECM_MAX_MTU		\
 	(IECM_MAX_RXBUFFER - IECM_PACKET_HDR_PAD)
 
+#define IECM_RX_BI_BUFID_S		0
+#define IECM_RX_BI_BUFID_M		MAKEMASK(0x7FFF, IECM_RX_BI_BUFID_S)
+#define IECM_RX_BI_GEN_S		15
+#define IECM_RX_BI_GEN_M		BIT(IECM_RX_BI_GEN_S)
+
+#define IECM_SINGLEQ_RX_BUF_DESC(R, i)	\
+	(&(((struct virtchnl2_singleq_rx_buf_desc *)((R)->desc_ring))[i]))
+#define IECM_SPLITQ_RX_BUF_DESC(R, i)	\
+	(&(((struct virtchnl2_splitq_rx_buf_desc *)((R)->desc_ring))[i]))
+#define IECM_SPLITQ_RX_BI_DESC(R, i)	\
+	(&(((u16 *)((R)->ring))[i]))
+
+#define IECM_BASE_TX_DESC(R, i)	\
+	(&(((struct iecm_base_tx_desc *)((R)->desc_ring))[i]))
+#define IECM_BASE_TX_CTX_DESC(R, i) \
+	(&(((struct iecm_base_tx_ctx_desc *)((R)->desc_ring))[i]))
+#define IECM_SPLITQ_TX_COMPLQ_DESC(R, i)	\
+	(&(((struct iecm_splitq_tx_compl_desc *)((R)->desc_ring))[i]))
+
+#define IECM_FLEX_TX_DESC(R, i)	\
+	(&(((union iecm_tx_flex_desc *)((R)->desc_ring))[i]))
+#define IECM_FLEX_TX_CTX_DESC(R, i)	\
+	(&(((union iecm_flex_tx_ctx_desc *)((R)->desc_ring))[i]))
+
+#define IECM_DESC_UNUSED(R)	\
+	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->desc_count) + \
+	(R)->next_to_clean - (R)->next_to_use - 1)
+
+#define IECM_TX_BUF_UNUSED(R)	((R)->buf_stack.top)
+
+#define IECM_TXD_LAST_DESC_CMD (IECM_TX_DESC_CMD_EOP | IECM_TX_DESC_CMD_RS)
+
 #define MAKEMASK(m, s)	((m) << (s))
+
+struct iecm_tx_buf {
+	struct hlist_node hlist;
+	void *next_to_watch;
+	union {
+		struct sk_buff *skb;
+		struct xdp_frame *xdpf;
+	};
+	unsigned int bytecount;
+	unsigned short gso_segs;
+#define IECM_TX_FLAGS_TSO			BIT(0)
+#define IECM_TX_FLAGS_VLAN_TAG			BIT(1)
+#define IECM_TX_FLAGS_HW_VLAN			BIT(2)
+#define IECM_TX_FLAGS_HW_OUTER_SINGLE_VLAN	BIT(3)
+#define IECM_TX_FLAGS_VLAN_SHIFT		16
+#define IECM_TX_FLAGS_VLAN_MASK			0xFFFF0000
+	u32 tx_flags;
+	DEFINE_DMA_UNMAP_ADDR(dma);
+	DEFINE_DMA_UNMAP_LEN(len);
+	u16 compl_tag;		/* Unique identifier for buffer; used to
+				 * compare with completion tag returned
+				 * in buffer completion event
+				 */
+};
+
+struct iecm_buf_lifo {
+	u16 top;
+	u16 size;
+	struct iecm_tx_buf **bufs;
+};
 
 /* Checksum offload bits decoded from the receive descriptor. */
 struct iecm_rx_csum_decoded {
@@ -349,6 +411,16 @@ union iecm_queue_stats {
 	struct iecm_tx_queue_stats tx;
 };
 
+#define IECM_ITR_DYNAMIC	1
+#define IECM_ITR_MAX		0x1FE0
+#define IECM_ITR_20K		0x0032
+#define IECM_ITR_GRAN_S		1	/* Assume ITR granularity is 2us */
+#define IECM_ITR_MASK		0x1FFE	/* ITR register value alignment mask */
+#define ITR_REG_ALIGN(setting)	((setting) & IECM_ITR_MASK)
+#define IECM_ITR_IS_DYNAMIC(itr_mode) (itr_mode)
+#define IECM_ITR_TX_DEF		IECM_ITR_20K
+#define IECM_ITR_RX_DEF		IECM_ITR_20K
+
 /* queue associated with a vport */
 struct iecm_queue {
 	struct device *dev;		/* Used for DMA mapping */
@@ -414,6 +486,10 @@ struct iecm_queue {
 	dma_addr_t dma;			/* physical address of ring */
 	void *desc_ring;		/* Descriptor ring memory */
 
+	struct iecm_buf_lifo buf_stack; /* Stack of empty buffers to store
+					 * buffer info for out of order
+					 * buffer completions
+					 */
 	u16 tx_buf_key;			/* 16 bit unique "identifier" (index)
 					 * to be used as the completion tag when
 					 * queue is using flow based scheduling
@@ -505,13 +581,33 @@ struct iecm_txq_group {
 
 struct iecm_adapter;
 
+int iecm_vport_singleq_napi_poll(struct napi_struct *napi, int budget);
 void iecm_vport_init_num_qs(struct iecm_vport *vport,
 			    struct virtchnl2_create_vport *vport_msg);
 void iecm_vport_calc_num_q_desc(struct iecm_vport *vport);
 void iecm_vport_calc_total_qs(struct iecm_adapter *adapter,
 			      struct virtchnl2_create_vport *vport_msg);
 void iecm_vport_calc_num_q_groups(struct iecm_vport *vport);
+int iecm_vport_queues_alloc(struct iecm_vport *vport);
+void iecm_vport_queues_rel(struct iecm_vport *vport);
 void iecm_vport_calc_num_q_vec(struct iecm_vport *vport);
+void iecm_vport_intr_rel(struct iecm_vport *vport);
+int iecm_vport_intr_alloc(struct iecm_vport *vport);
+void iecm_vport_intr_dis_irq_all(struct iecm_vport *vport);
+void iecm_vport_intr_clear_dflt_itr(struct iecm_vport *vport);
+void iecm_vport_intr_update_itr_ena_irq(struct iecm_q_vector *q_vector);
+void iecm_vport_intr_deinit(struct iecm_vport *vport);
+int iecm_vport_intr_init(struct iecm_vport *vport);
 irqreturn_t
 iecm_vport_intr_clean_queues(int __always_unused irq, void *data);
+void iecm_vport_intr_ena_irq_all(struct iecm_vport *vport);
+int iecm_config_rss(struct iecm_vport *vport);
+void iecm_fill_dflt_rss_lut(struct iecm_vport *vport);
+int iecm_init_rss(struct iecm_vport *vport);
+void iecm_deinit_rss(struct iecm_vport *vport);
+bool iecm_init_rx_buf_hw_alloc(struct iecm_queue *rxq, struct iecm_rx_buf *buf);
+void iecm_rx_buf_hw_update(struct iecm_queue *rxq, u32 val);
+void iecm_tx_buf_rel(struct iecm_queue *tx_q, struct iecm_tx_buf *tx_buf);
+bool iecm_rx_singleq_buf_hw_alloc_all(struct iecm_queue *rxq,
+				      u16 cleaned_count);
 #endif /* !_IECM_TXRX_H_ */

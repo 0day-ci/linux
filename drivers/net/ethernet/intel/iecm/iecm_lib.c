@@ -481,6 +481,54 @@ static struct iecm_mac_filter *iecm_add_mac_filter(struct iecm_vport *vport,
 }
 
 /**
+ * iecm_set_all_filters - Re-add all MAC filters in list
+ * @vport: main vport struct
+ *
+ * Takes mac_filter_list_lock spinlock.  Sets add field to true for filters to
+ * resync filters back to HW.
+ */
+static void iecm_set_all_filters(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_mac_filter *f;
+
+	spin_lock_bh(&adapter->mac_filter_list_lock);
+	list_for_each_entry(f, &adapter->config_data.mac_filter_list, list) {
+		if (!f->remove)
+			f->add = true;
+	}
+	spin_unlock_bh(&adapter->mac_filter_list_lock);
+
+	iecm_add_del_ether_addrs(vport, true, false);
+}
+
+/**
+ * iecm_set_all_vlans - Re-add all VLANs in list
+ * @vport: main vport struct
+ *
+ * Takes vlan_list_lock spinlock.  Sets add field to true for vlan filters and
+ * resyncs vlans back to HW.
+ */
+static void iecm_set_all_vlans(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_vlan_filter *f;
+
+	spin_lock_bh(&adapter->vlan_list_lock);
+	list_for_each_entry(f, &adapter->config_data.vlan_filter_list, list) {
+		if (!f->remove)
+			f->add = true;
+	}
+	spin_unlock_bh(&adapter->vlan_list_lock);
+
+	/* Do both add and remove to make sure list is in sync in the case
+	 * filters were added and removed before up.
+	 */
+	adapter->dev_ops.vc_ops.add_del_vlans(vport, false);
+	adapter->dev_ops.vc_ops.add_del_vlans(vport, true);
+}
+
+/**
  * iecm_init_mac_addr - initialize mac address for vport
  * @vport: main vport structure
  * @netdev: pointer to netdev struct associated with this vport
@@ -691,6 +739,63 @@ static int iecm_get_free_slot(void *array, int size, int curr)
 }
 
 /**
+ * iecm_vport_stop - Disable a vport
+ * @vport: vport to disable
+ */
+static void iecm_vport_stop(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+
+	mutex_lock(&vport->stop_mutex);
+	if (adapter->state <= __IECM_DOWN)
+		goto stop_unlock;
+
+	netif_tx_stop_all_queues(vport->netdev);
+	netif_carrier_off(vport->netdev);
+	netif_tx_disable(vport->netdev);
+
+	if (adapter->dev_ops.vc_ops.disable_vport)
+		adapter->dev_ops.vc_ops.disable_vport(vport);
+	adapter->dev_ops.vc_ops.disable_queues(vport);
+	adapter->dev_ops.vc_ops.irq_map_unmap(vport, false);
+	/* Normally we ask for queues in create_vport, but if we're changing
+	 * number of requested queues we do a delete then add instead of
+	 * deleting and reallocating the vport.
+	 */
+	if (test_and_clear_bit(__IECM_DEL_QUEUES,
+			       vport->adapter->flags))
+		iecm_send_delete_queues_msg(vport);
+
+	adapter->link_up = false;
+	iecm_vport_intr_deinit(vport);
+	iecm_vport_intr_rel(vport);
+	iecm_vport_queues_rel(vport);
+	adapter->state = __IECM_DOWN;
+
+stop_unlock:
+	mutex_unlock(&vport->stop_mutex);
+}
+
+/**
+ * iecm_stop - Disables a network interface
+ * @netdev: network interface device structure
+ *
+ * The stop entry point is called when an interface is de-activated by the OS,
+ * and the netdevice enters the DOWN state.  The hardware is still under the
+ * driver's control, but the netdev interface is disabled.
+ *
+ * Returns success only - not allowed to fail
+ */
+static int iecm_stop(struct net_device *netdev)
+{
+	struct iecm_netdev_priv *np = netdev_priv(netdev);
+
+	iecm_vport_stop(np->vport);
+
+	return 0;
+}
+
+/**
  * iecm_decfg_netdev - Unregister the netdev
  * @vport: vport for which netdev to be unregistred
  */
@@ -714,6 +819,11 @@ static void iecm_decfg_netdev(struct iecm_vport *vport)
  */
 static void iecm_vport_rel(struct iecm_vport *vport)
 {
+	struct iecm_adapter *adapter = vport->adapter;
+
+	iecm_deinit_rss(vport);
+	if (adapter->dev_ops.vc_ops.destroy_vport)
+		adapter->dev_ops.vc_ops.destroy_vport(vport);
 	mutex_destroy(&vport->stop_mutex);
 	kfree(vport);
 }
@@ -733,6 +843,7 @@ static void iecm_vport_rel_all(struct iecm_adapter *adapter)
 		if (!adapter->vports[i])
 			continue;
 
+		iecm_vport_stop(adapter->vports[i]);
 		if (!test_bit(__IECM_HR_RESET_IN_PROG, adapter->flags))
 			iecm_decfg_netdev(adapter->vports[i]);
 		iecm_vport_rel(adapter->vports[i]);
@@ -782,6 +893,7 @@ iecm_vport_alloc(struct iecm_adapter *adapter, int vport_id)
 	vport->idx = adapter->next_vport;
 	vport->compln_clean_budget = IECM_TX_COMPLQ_CLEAN_BUDGET;
 	adapter->num_alloc_vport++;
+	adapter->dev_ops.vc_ops.vport_init(vport, vport_id);
 
 	/* Setup default MSIX irq handler for the vport */
 	vport->irq_q_handler = iecm_vport_intr_clean_queues;
@@ -845,6 +957,117 @@ static void iecm_service_task(struct work_struct *work)
 			   msecs_to_jiffies(300));
 }
 
+/**
+ * iecm_restore_vlans - Restore vlan filters/vlan stripping/insert config
+ * @vport: virtual port structure
+ */
+static void iecm_restore_vlans(struct iecm_vport *vport)
+{
+	if (iecm_is_feature_ena(vport, NETIF_F_HW_VLAN_CTAG_FILTER))
+		iecm_set_all_vlans(vport);
+}
+
+/**
+ * iecm_restore_features - Restore feature configs
+ * @vport: virtual port structure
+ */
+static void iecm_restore_features(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+
+	if (iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_MACFILTER))
+		iecm_set_all_filters(vport);
+
+	if (iecm_is_cap_ena(adapter, IECM_BASE_CAPS, VIRTCHNL2_CAP_VLAN) ||
+	    iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_VLAN))
+		iecm_restore_vlans(vport);
+
+	if ((iecm_is_user_flag_ena(adapter, __IECM_PROMISC_UC) ||
+	     iecm_is_user_flag_ena(adapter, __IECM_PROMISC_MC)) &&
+	    test_and_clear_bit(__IECM_VPORT_INIT_PROMISC, vport->flags)) {
+		if (iecm_set_promiscuous(adapter))
+			dev_info(&adapter->pdev->dev, "Failed to restore promiscuous settings\n");
+	}
+}
+
+/**
+ * iecm_set_real_num_queues - set number of queues for netdev
+ * @vport: virtual port structure
+ *
+ * Returns 0 on success, negative on failure.
+ */
+static int iecm_set_real_num_queues(struct iecm_vport *vport)
+{
+	int err;
+
+	/* If we're in normal up path, the stack already takes the rtnl_lock
+	 * for us, however, if we're doing up as a part of a hard reset, we'll
+	 * need to take the lock ourself before touching the netdev.
+	 */
+	if (test_bit(__IECM_HR_RESET_IN_PROG, vport->adapter->flags))
+		rtnl_lock();
+	err = netif_set_real_num_rx_queues(vport->netdev, vport->num_rxq);
+	if (err)
+		goto error;
+	err = netif_set_real_num_tx_queues(vport->netdev, vport->num_txq);
+error:
+	if (test_bit(__IECM_HR_RESET_IN_PROG, vport->adapter->flags))
+		rtnl_unlock();
+	return err;
+}
+
+/**
+ * iecm_up_complete - Complete interface up sequence
+ * @vport: virtual port strucutre
+ *
+ * Returns 0 on success, negative on failure.
+ */
+static int iecm_up_complete(struct iecm_vport *vport)
+{
+	int err;
+
+	err = iecm_set_real_num_queues(vport);
+	if (err)
+		return err;
+
+	if (vport->adapter->link_up && !netif_carrier_ok(vport->netdev)) {
+		netif_carrier_on(vport->netdev);
+		netif_tx_start_all_queues(vport->netdev);
+	}
+
+	vport->adapter->state = __IECM_UP;
+	return 0;
+}
+
+/**
+ * iecm_rx_init_buf_tail - Write initial buffer ring tail value
+ * @vport: virtual port struct
+ */
+static void iecm_rx_init_buf_tail(struct iecm_vport *vport)
+{
+	int i, j;
+
+	for (i = 0; i < vport->num_rxq_grp; i++) {
+		struct iecm_rxq_group *grp = &vport->rxq_grps[i];
+
+		if (iecm_is_queue_model_split(vport->rxq_model)) {
+			for (j = 0; j < vport->num_bufqs_per_qgrp; j++) {
+				struct iecm_queue *q =
+					&grp->splitq.bufq_sets[j].bufq;
+
+				writel(q->next_to_alloc, q->tail);
+			}
+		} else {
+			for (j = 0; j < grp->singleq.num_rxq; j++) {
+				struct iecm_queue *q =
+					grp->singleq.rxqs[j];
+
+				writel(q->next_to_alloc, q->tail);
+			}
+		}
+	}
+}
+
 /* iecm_set_vlan_offload_features - set vlan offload features
  * @netdev: netdev structure
  * @prev_features: previously set features
@@ -903,8 +1126,110 @@ iecm_set_vlan_offload_features(struct net_device *netdev,
  */
 static int iecm_vport_open(struct iecm_vport *vport, bool alloc_res)
 {
-	/* stub */
+	struct iecm_adapter *adapter = vport->adapter;
+	int err;
+
+	if (vport->adapter->state != __IECM_DOWN)
+		return -EBUSY;
+
+	/* we do not allow interface up just yet */
+	netif_carrier_off(vport->netdev);
+
+	if (alloc_res) {
+		err = iecm_vport_queues_alloc(vport);
+		if (err)
+			return err;
+	}
+
+	err = iecm_vport_intr_alloc(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Call to interrupt alloc returned %d\n",
+			err);
+		goto unroll_queues_alloc;
+	}
+
+	err = adapter->dev_ops.vc_ops.vport_queue_ids_init(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Call to queue ids init returned %d\n",
+			err);
+		goto unroll_intr_alloc;
+	}
+
+	err = adapter->dev_ops.vc_ops.vportq_reg_init(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Call to queue reg init returned %d\n",
+			err);
+		goto unroll_intr_alloc;
+	}
+	iecm_rx_init_buf_tail(vport);
+
+	err = iecm_vport_intr_init(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Call to vport interrupt init returned %d\n",
+			err);
+		goto unroll_intr_alloc;
+	}
+	err = adapter->dev_ops.vc_ops.config_queues(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Failed to config queues\n");
+		goto unroll_config_queues;
+	}
+	err = adapter->dev_ops.vc_ops.irq_map_unmap(vport, true);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Call to irq_map_unmap returned %d\n",
+			err);
+		goto unroll_config_queues;
+	}
+	err = adapter->dev_ops.vc_ops.enable_queues(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Failed to enable queues\n");
+		goto unroll_enable_queues;
+	}
+
+	if (adapter->dev_ops.vc_ops.enable_vport) {
+		err = adapter->dev_ops.vc_ops.enable_vport(vport);
+		if (err) {
+			dev_err(&adapter->pdev->dev, "Failed to enable vport\n");
+			err = -EAGAIN;
+			goto unroll_vport_enable;
+		}
+	}
+
+	iecm_restore_features(vport);
+
+	if (adapter->rss_data.rss_lut)
+		err = iecm_config_rss(vport);
+	else
+		err = iecm_init_rss(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Failed to init RSS\n");
+		goto unroll_init_rss;
+	}
+	err = iecm_up_complete(vport);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Failed to complete up\n");
+		goto unroll_up_comp;
+	}
+
 	return 0;
+
+unroll_up_comp:
+	iecm_deinit_rss(vport);
+unroll_init_rss:
+	adapter->dev_ops.vc_ops.disable_vport(vport);
+unroll_vport_enable:
+	adapter->dev_ops.vc_ops.disable_queues(vport);
+unroll_enable_queues:
+	adapter->dev_ops.vc_ops.irq_map_unmap(vport, false);
+unroll_config_queues:
+	iecm_vport_intr_deinit(vport);
+unroll_intr_alloc:
+	iecm_vport_intr_rel(vport);
+unroll_queues_alloc:
+	if (alloc_res)
+		iecm_vport_queues_rel(vport);
+
+	return err;
 }
 
 /**
@@ -1060,6 +1385,8 @@ static int iecm_api_init(struct iecm_adapter *adapter)
  */
 static void iecm_deinit_task(struct iecm_adapter *adapter)
 {
+	int i;
+
 	set_bit(__IECM_REL_RES_IN_PROG, adapter->flags);
 	/* Wait until the init_task is done else this thread might release
 	 * the resources first and the other thread might end up in a bad state
@@ -1067,8 +1394,21 @@ static void iecm_deinit_task(struct iecm_adapter *adapter)
 	cancel_delayed_work_sync(&adapter->init_task);
 	iecm_vport_rel_all(adapter);
 
+	/* Set all bits as we dont know on which vc_state the vhnl_wq is
+	 * waiting on and wakeup the virtchnl workqueue even if it is waiting
+	 * for the response as we are going down
+	 */
+	for (i = 0; i < IECM_VC_NBITS; i++)
+		set_bit(i, adapter->vc_state);
+	wake_up(&adapter->vchnl_wq);
+
 	cancel_delayed_work_sync(&adapter->serv_task);
 	cancel_delayed_work_sync(&adapter->stats_task);
+	iecm_intr_rel(adapter);
+	/* Clear all the bits */
+	for (i = 0; i < IECM_VC_NBITS; i++)
+		clear_bit(i, adapter->vc_state);
+	clear_bit(__IECM_REL_RES_IN_PROG, adapter->flags);
 }
 
 /**
@@ -1371,6 +1711,25 @@ void iecm_remove(struct pci_dev *pdev)
 }
 EXPORT_SYMBOL(iecm_remove);
 
+/**
+ * iecm_open - Called when a network interface becomes active
+ * @netdev: network interface device structure
+ *
+ * The open entry point is called when a network interface is made
+ * active by the system (IFF_UP).  At this point all resources needed
+ * for transmit and receive operations are allocated, the interrupt
+ * handler is registered with the OS, the netdev watchdog is enabled,
+ * and the stack is notified that the interface is ready.
+ *
+ * Returns 0 on success, negative value on failure
+ */
+static int iecm_open(struct net_device *netdev)
+{
+	struct iecm_netdev_priv *np = netdev_priv(netdev);
+
+	return iecm_vport_open(np->vport, true);
+}
+
 void *iecm_alloc_dma_mem(struct iecm_hw *hw, struct iecm_dma_mem *mem, u64 size)
 {
 	struct iecm_adapter *adapter = (struct iecm_adapter *)hw->back;
@@ -1395,8 +1754,8 @@ void iecm_free_dma_mem(struct iecm_hw *hw, struct iecm_dma_mem *mem)
 }
 
 static const struct net_device_ops iecm_netdev_ops_splitq = {
-	.ndo_open = NULL,
-	.ndo_stop = NULL,
+	.ndo_open = iecm_open,
+	.ndo_stop = iecm_stop,
 	.ndo_start_xmit = NULL,
 	.ndo_set_rx_mode = NULL,
 	.ndo_validate_addr = eth_validate_addr,
@@ -1411,8 +1770,8 @@ static const struct net_device_ops iecm_netdev_ops_splitq = {
 };
 
 static const struct net_device_ops iecm_netdev_ops_singleq = {
-	.ndo_open = NULL,
-	.ndo_stop = NULL,
+	.ndo_open = iecm_open,
+	.ndo_stop = iecm_stop,
 	.ndo_start_xmit = NULL,
 	.ndo_set_rx_mode = NULL,
 	.ndo_validate_addr = eth_validate_addr,

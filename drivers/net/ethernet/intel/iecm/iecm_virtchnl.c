@@ -3746,6 +3746,35 @@ error:
 }
 
 /**
+ * iecm_set_promiscuous - set promiscuous and send message to mailbox
+ * @adapter: Driver specific private structure
+ *
+ * Request that the PF enable promiscuous mode for our VSI.  Message is sent
+ * asynchronously and won't wait for response.  Returns 0 on success, negative
+ * on failure;
+ */
+int iecm_set_promiscuous(struct iecm_adapter *adapter)
+{
+	struct iecm_vport *vport = adapter->vports[0];
+	struct virtchnl_promisc_info vpi;
+	u16 flags = 0;
+	int err = 0;
+
+	if (test_bit(__IECM_PROMISC_UC, adapter->config_data.user_flags))
+		flags |= FLAG_VF_UNICAST_PROMISC;
+	if (test_bit(__IECM_PROMISC_MC,
+		     adapter->config_data.user_flags))
+		flags |= FLAG_VF_MULTICAST_PROMISC;
+
+	vpi.vsi_id = vport->vport_id;
+	vpi.flags = flags;
+	err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE,
+			       sizeof(struct virtchnl_promisc_info),
+			       (u8 *)&vpi);
+	return err;
+}
+
+/**
  * iecm_add_del_vlans - Add or delete vlan filter
  * @vport: vport structure
  * @add: add or delete

@@ -13,6 +13,7 @@
 #include <linux/version.h>
 #include <linux/dim.h>
 
+#include "iecm_lan_txrx.h"
 #include "virtchnl_2.h"
 #include "iecm_txrx.h"
 #include "iecm_controlq.h"
@@ -622,6 +623,17 @@ enum iecm_vlan_caps {
 	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_SCTP)
 
 /**
+ * iecm_restore_features - Restore feature configs
+ * @adapter: driver specific private structure
+ * @flag: User settings flag to check
+ */
+static inline bool iecm_is_user_flag_ena(struct iecm_adapter *adapter,
+					 enum iecm_user_flags flag)
+{
+	return test_bit(flag, adapter->config_data.user_flags);
+}
+
+/**
  * iecm_get_reserved_vecs - Get reserved vectors
  * @adapter: private data struct
  */
@@ -654,6 +666,19 @@ static inline bool iecm_is_reset_in_prog(struct iecm_adapter *adapter)
 		test_bit(__IECM_HR_FUNC_RESET, adapter->flags) ||
 		test_bit(__IECM_HR_CORE_RESET, adapter->flags) ||
 		test_bit(__IECM_HR_DRV_LOAD, adapter->flags));
+}
+
+/**
+ * iecm_rx_offset - Return expected offset into page to access data
+ * @rx_q: queue we are requesting offset of
+ *
+ * Returns the offset value for queue into the data buffer.
+ */
+static inline unsigned int
+iecm_rx_offset(struct iecm_queue __maybe_unused *rx_q)
+{
+	/* could be non-zero if xdp is enabled */
+	return 0;
 }
 
 int iecm_probe(struct pci_dev *pdev,
@@ -702,6 +727,7 @@ int iecm_send_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 		     u16 msg_size, u8 *msg);
 void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
 void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async);
+int iecm_set_promiscuous(struct iecm_adapter *adapter);
 int iecm_send_enable_channels_msg(struct iecm_vport *vport);
 int iecm_send_disable_channels_msg(struct iecm_vport *vport);
 bool iecm_is_feature_ena(struct iecm_vport *vport, netdev_features_t feature);
@@ -710,5 +736,7 @@ int iecm_check_descs(struct iecm_vport *vport, u64 rx_desc_ids,
 int iecm_set_msg_pending(struct iecm_adapter *adapter,
 			 struct iecm_ctlq_msg *ctlq_msg,
 			 enum iecm_vport_vc_state err_enum);
+void iecm_vport_intr_write_itr(struct iecm_q_vector *q_vector,
+			       u16 itr, bool tx);
 int iecm_send_map_unmap_queue_vector_msg(struct iecm_vport *vport, bool map);
 #endif /* !_IECM_H_ */

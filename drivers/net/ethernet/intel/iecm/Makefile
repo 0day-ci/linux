@@ -14,6 +14,7 @@ iecm-y := \
 	iecm_lib.o \
 	iecm_virtchnl.o \
 	iecm_txrx.o \
+	iecm_singleq_txrx.o \
 	iecm_controlq.o \
 	iecm_controlq_setup.o \
 	iecm_main.o
