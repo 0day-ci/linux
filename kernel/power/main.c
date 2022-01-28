@@ -16,6 +16,7 @@
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
 #include <linux/pm_runtime.h>
+#include <linux/wakeup_reason.h>
 
 #include "power.h"
 
@@ -739,6 +740,15 @@ static ssize_t wakeup_count_store(struct kobject *kobj,
 
 power_attr(wakeup_count);
 
+static ssize_t last_wakeup_reason_show(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				char *buf)
+{
+	return last_wakeup_reason_get(buf, PAGE_SIZE);
+}
+
+power_attr_ro(last_wakeup_reason);
+
 #ifdef CONFIG_PM_AUTOSLEEP
 static ssize_t autosleep_show(struct kobject *kobj,
 			      struct kobj_attribute *attr,
@@ -892,6 +902,7 @@ static struct attribute * g[] = {
 #ifdef CONFIG_PM_SLEEP
 	&pm_async_attr.attr,
 	&wakeup_count_attr.attr,
+	&last_wakeup_reason_attr.attr,
 #ifdef CONFIG_SUSPEND
 	&mem_sleep_attr.attr,
 	&sync_on_suspend_attr.attr,

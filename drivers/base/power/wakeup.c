@@ -15,6 +15,7 @@
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
 #include <linux/pm_wakeirq.h>
+#include <linux/wakeup_reason.h>
 #include <trace/events/power.h>
 
 #include "power.h"
@@ -924,6 +925,7 @@ bool pm_wakeup_pending(void)
 
 	if (ret) {
 		pm_pr_dbg("Wakeup pending, aborting suspend\n");
+		log_ws_wakeup_reason();
 		pm_print_active_wakeup_sources();
 	}
 
@@ -947,11 +949,15 @@ void pm_wakeup_clear(bool reset)
 	pm_wakeup_irq = 0;
 	if (reset)
 		atomic_set(&pm_abort_suspend, 0);
+
+	clear_wakeup_reason();
 }
 
 void pm_system_irq_wakeup(unsigned int irq_number)
 {
 	if (pm_wakeup_irq == 0) {
+		log_irq_wakeup_reason(irq_number);
+
 		pm_wakeup_irq = irq_number;
 		pm_system_wakeup();
 	}

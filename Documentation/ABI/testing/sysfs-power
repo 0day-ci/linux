@@ -182,6 +182,15 @@ Description:
 		to a sleep state if any wakeup events are reported after the
 		write has returned.
 
+What:		/sys/power/last_wakeup_reason
+Date:		Jan 2022
+Contact:	Zichar Zhang <zichar.zhang@linaro.org>
+Description:
+		The /sys/power/last_wakeup_reason file shows the last reason
+		causing system "wake up" from suspend state. It could be an
+		interrupt signal, a kernel "wakeup_source" or just some other
+		reason logged into this file, and shows as a string.
+
 What:		/sys/power/reserved_size
 Date:		May 2011
 Contact:	Rafael J. Wysocki <rjw@rjwysocki.net>
