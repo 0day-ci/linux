@@ -151,6 +151,8 @@ static void cond_list_destroy(struct policydb *p)
 
 	for (i = 0; i < p->cond_list_len; i++)
 		cond_node_destroy(&p->cond_list[i]);
+	p->cond_list_len = 0;
+
 	kfree(p->cond_list);
 	p->cond_list = NULL;
 }
