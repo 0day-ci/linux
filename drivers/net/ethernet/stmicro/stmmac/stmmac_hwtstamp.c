@@ -145,12 +145,15 @@ static int adjust_systime(void __iomem *ioaddr, u32 sec, u32 nsec,
 
 static void get_systime(void __iomem *ioaddr, u64 *systime)
 {
+	unsigned long flags;
 	u64 ns;
 
+	local_irq_save(flags);
 	/* Get the TSSS value */
 	ns = readl(ioaddr + PTP_STNSR);
 	/* Get the TSS and convert sec time value to nanosecond */
 	ns += readl(ioaddr + PTP_STSR) * 1000000000ULL;
+	local_irq_restore(flags);
 
 	if (systime)
 		*systime = ns;
@@ -158,10 +161,13 @@ static void get_systime(void __iomem *ioaddr, u64 *systime)
 
 static void get_ptptime(void __iomem *ptpaddr, u64 *ptp_time)
 {
+	unsigned long flags;
 	u64 ns;
 
+	local_irq_save(flags);
 	ns = readl(ptpaddr + PTP_ATNR);
 	ns += readl(ptpaddr + PTP_ATSR) * NSEC_PER_SEC;
+	local_irq_restore(flags);
 
 	*ptp_time = ns;
 }
@@ -191,9 +197,9 @@ static void timestamp_interrupt(struct stmmac_priv *priv)
 		       GMAC_TIMESTAMP_ATSNS_SHIFT;
 
 	for (i = 0; i < num_snapshot; i++) {
-		spin_lock_irqsave(&priv->ptp_lock, flags);
+		read_lock_irqsave(&priv->ptp_lock, flags);
 		get_ptptime(priv->ptpaddr, &ptp_time);
-		spin_unlock_irqrestore(&priv->ptp_lock, flags);
+		read_unlock_irqrestore(&priv->ptp_lock, flags);
 		event.type = PTP_CLOCK_EXTTS;
 		event.index = 0;
 		event.timestamp = ptp_time;
