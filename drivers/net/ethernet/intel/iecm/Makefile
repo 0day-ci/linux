@@ -11,4 +11,7 @@ ccflags-y += -I$(srctree)/drivers/net/ethernet/intel/include
 
 iecm-y := \
 	iecm_lib.o \
+	iecm_virtchnl.o \
+	iecm_controlq.o \
+	iecm_controlq_setup.o \
 	iecm_main.o

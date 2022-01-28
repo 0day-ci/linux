@@ -12,14 +12,32 @@
 #include <linux/dim.h>
 
 #include "iecm_txrx.h"
+#include "iecm_controlq.h"
 
 #define IECM_BAR0			0
 #define IECM_NO_FREE_SLOT		0xffff
+
+/* Default Mailbox settings */
+#define IECM_DFLT_MBX_BUF_SIZE		(4 * 1024)
+#define IECM_NUM_QCTX_PER_MSG		3
+#define IECM_NUM_FILTERS_PER_MSG	20
+#define IECM_VLANS_PER_MSG \
+	((IECM_DFLT_MBX_BUF_SIZE - sizeof(struct virtchnl_vlan_filter_list)) \
+	 / sizeof(u16))
+#define IECM_DFLT_MBX_Q_LEN		64
+#define IECM_DFLT_MBX_ID		-1
+/* maximum number of times to try before resetting mailbox */
+#define IECM_MB_MAX_ERR			20
+#define IECM_NUM_CHUNKS_PER_MSG(a, b)	((IECM_DFLT_MBX_BUF_SIZE - (a)) / (b))
 
 #define IECM_MAX_NUM_VPORTS		1
 
 /* available message levels */
 #define IECM_AVAIL_NETIF_M (NETIF_MSG_DRV | NETIF_MSG_PROBE | NETIF_MSG_LINK)
+
+/* Forward declaration */
+struct iecm_adapter;
+struct iecm_vport;
 
 enum iecm_state {
 	__IECM_STARTUP,
@@ -77,6 +95,22 @@ struct iecm_reset_reg {
 	u32 rstat_m;
 };
 
+/* product specific register API */
+struct iecm_reg_ops {
+	void (*ctlq_reg_init)(struct iecm_ctlq_create_info *cq);
+	int (*intr_reg_init)(struct iecm_vport *vport);
+	void (*mb_intr_reg_init)(struct iecm_adapter *adapter);
+	void (*reset_reg_init)(struct iecm_reset_reg *reset_reg);
+	void (*trigger_reset)(struct iecm_adapter *adapter,
+			      enum iecm_flags trig_cause);
+};
+
+struct iecm_dev_ops {
+	void (*reg_ops_init)(struct iecm_adapter *adapter);
+	void (*crc_enable)(u64 *td_cmd);
+	struct iecm_reg_ops reg_ops;
+};
+
 /* stub */
 struct iecm_vport {
 };
@@ -124,6 +158,7 @@ struct iecm_adapter {
 	DECLARE_BITMAP(flags, __IECM_FLAGS_NBITS);
 	struct mutex reset_lock; /* lock to protect reset flows */
 	struct iecm_reset_reg reset_reg;
+	struct iecm_hw hw;
 
 	u16 num_req_msix;
 	u16 num_msix_entries;
@@ -156,6 +191,7 @@ struct iecm_adapter {
 	wait_queue_head_t vchnl_wq;
 	wait_queue_head_t sw_marker_wq;
 	struct iecm_rss_data rss_data;
+	struct iecm_dev_ops dev_ops;
 	s32 link_speed;
 	/* This is only populated if the VIRTCHNL_VF_CAP_ADV_LINK_SPEED is set
 	 * in vf_res->vf_cap_flags. This field should be used going forward and
@@ -179,8 +215,24 @@ struct iecm_adapter {
 	spinlock_t fdir_fltr_list_lock;
 };
 
+/**
+ * iecm_is_reset_detected - check if we were reset at some point
+ * @adapter: driver specific private structure
+ *
+ * Returns true if we are either in reset currently or were previously reset.
+ */
+static inline bool iecm_is_reset_detected(struct iecm_adapter *adapter)
+{
+	return !(rd32(&adapter->hw, adapter->hw.arq->reg.len) &
+		 adapter->hw.arq->reg.len_ena_mask);
+}
+
 int iecm_probe(struct pci_dev *pdev,
 	       const struct pci_device_id __always_unused *ent,
 	       struct iecm_adapter *adapter);
 void iecm_remove(struct pci_dev *pdev);
+int iecm_init_dflt_mbx(struct iecm_adapter *adapter);
+void iecm_deinit_dflt_mbx(struct iecm_adapter *adapter);
+int iecm_vport_params_buf_alloc(struct iecm_adapter *adapter);
+void iecm_vport_params_buf_rel(struct iecm_adapter *adapter);
 #endif /* !_IECM_H_ */

@@ -6,6 +6,25 @@
 #include "iecm.h"
 
 /**
+ * iecm_cfg_hw - Initialize HW struct
+ * @adapter: adapter to setup hw struct for
+ *
+ * Returns 0 on success, negative on failure
+ */
+static int iecm_cfg_hw(struct iecm_adapter *adapter)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	struct iecm_hw *hw = &adapter->hw;
+
+	hw->hw_addr = pcim_iomap_table(pdev)[IECM_BAR0];
+	if (!hw->hw_addr)
+		return -EIO;
+	hw->back = adapter;
+
+	return 0;
+}
+
+/**
  * iecm_statistics_task - Delayed task to get statistics over mailbox
  * @work: work_struct handle to our data
  */
@@ -40,6 +59,32 @@ static void iecm_init_task(struct work_struct *work)
 }
 
 /**
+ * iecm_api_init - Initialize and verify device API
+ * @adapter: driver specific private structure
+ *
+ * Returns 0 on success, negative on failure
+ */
+static int iecm_api_init(struct iecm_adapter *adapter)
+{
+	struct iecm_reg_ops *reg_ops = &adapter->dev_ops.reg_ops;
+	struct pci_dev *pdev = adapter->pdev;
+
+	if (!adapter->dev_ops.reg_ops_init) {
+		dev_err(&pdev->dev, "Invalid device, register API init not defined\n");
+		return -EINVAL;
+	}
+	adapter->dev_ops.reg_ops_init(adapter);
+	if (!(reg_ops->ctlq_reg_init && reg_ops->intr_reg_init &&
+	      reg_ops->mb_intr_reg_init && reg_ops->reset_reg_init &&
+	      reg_ops->trigger_reset)) {
+		dev_err(&pdev->dev, "Invalid device, missing one or more register functions\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * iecm_deinit_task - Device deinit routine
  * @adapter: Driver specific private structue
  *
@@ -52,12 +97,107 @@ static void iecm_deinit_task(struct iecm_adapter *adapter)
 }
 
 /**
+ * iecm_check_reset_complete - check that reset is complete
+ * @hw: pointer to hw struct
+ * @reset_reg: struct with reset registers
+ *
+ * Returns 0 if device is ready to use, or -EBUSY if it's in reset.
+ **/
+static int iecm_check_reset_complete(struct iecm_hw *hw,
+				     struct iecm_reset_reg *reset_reg)
+{
+	struct iecm_adapter *adapter = (struct iecm_adapter *)hw->back;
+	int i;
+
+	for (i = 0; i < 2000; i++) {
+		u32 reg_val = rd32(hw, reset_reg->rstat);
+
+		/* 0xFFFFFFFF might be read if other side hasn't cleared the
+		 * register for us yet and 0xFFFFFFFF is not a valid value for
+		 * the register, so treat that as invalid.
+		 */
+		if (reg_val != 0xFFFFFFFF && (reg_val & reset_reg->rstat_m))
+			return 0;
+		usleep_range(5000, 10000);
+	}
+
+	dev_warn(&adapter->pdev->dev, "Device reset timeout!\n");
+	return -EBUSY;
+}
+
+/**
+ * iecm_init_hard_reset - Initiate a hardware reset
+ * @adapter: Driver specific private structure
+ *
+ * Deallocate the vports and all the resources associated with them and
+ * reallocate. Also reinitialize the mailbox. Return 0 on success,
+ * negative on failure.
+ */
+static int iecm_init_hard_reset(struct iecm_adapter *adapter)
+{
+	int err = 0;
+
+	mutex_lock(&adapter->reset_lock);
+
+	/* Prepare for reset */
+	if (test_and_clear_bit(__IECM_HR_DRV_LOAD, adapter->flags)) {
+		adapter->dev_ops.reg_ops.trigger_reset(adapter,
+						       __IECM_HR_DRV_LOAD);
+	} else if (test_and_clear_bit(__IECM_HR_FUNC_RESET, adapter->flags)) {
+		bool is_reset = iecm_is_reset_detected(adapter);
+
+		if (adapter->state == __IECM_UP)
+			set_bit(__IECM_UP_REQUESTED, adapter->flags);
+		iecm_deinit_task(adapter);
+		if (!is_reset)
+			adapter->dev_ops.reg_ops.trigger_reset(adapter,
+							       __IECM_HR_FUNC_RESET);
+		iecm_deinit_dflt_mbx(adapter);
+	} else if (test_and_clear_bit(__IECM_HR_CORE_RESET, adapter->flags)) {
+		if (adapter->state == __IECM_UP)
+			set_bit(__IECM_UP_REQUESTED, adapter->flags);
+		iecm_deinit_task(adapter);
+	} else {
+		dev_err(&adapter->pdev->dev, "Unhandled hard reset cause\n");
+		err = -EBADRQC;
+		goto handle_err;
+	}
+
+	/* Wait for reset to complete */
+	err = iecm_check_reset_complete(&adapter->hw, &adapter->reset_reg);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "The driver was unable to contact the device's firmware.  Check that the FW is running. Driver state=%u\n",
+			adapter->state);
+		goto handle_err;
+	}
+
+	/* Reset is complete and so start building the driver resources again */
+	err = iecm_init_dflt_mbx(adapter);
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Failed to initialize default mailbox: %d\n",
+			err);
+	}
+handle_err:
+	mutex_unlock(&adapter->reset_lock);
+	return err;
+}
+
+/**
  * iecm_vc_event_task - Handle virtchannel event logic
  * @work: work queue struct
  */
 static void iecm_vc_event_task(struct work_struct *work)
 {
-	/* stub */
+	struct iecm_adapter *adapter = container_of(work,
+						    struct iecm_adapter,
+						    vc_event_task.work);
+
+	if (test_bit(__IECM_HR_CORE_RESET, adapter->flags) ||
+	    test_bit(__IECM_HR_FUNC_RESET, adapter->flags) ||
+	    test_bit(__IECM_HR_DRV_LOAD, adapter->flags)) {
+		set_bit(__IECM_HR_RESET_IN_PROG, adapter->flags);
+		iecm_init_hard_reset(adapter);
+	}
 }
 
 /**
@@ -75,6 +215,11 @@ int iecm_probe(struct pci_dev *pdev,
 	int err;
 
 	adapter->pdev = pdev;
+	err = iecm_api_init(adapter);
+	if (err) {
+		dev_err(&pdev->dev, "Device API is incorrectly configured\n");
+		return err;
+	}
 
 	err = pcim_enable_device(pdev);
 	if (err)
@@ -147,6 +292,20 @@ int iecm_probe(struct pci_dev *pdev,
 		goto err_netdev_alloc;
 	}
 
+	err = iecm_vport_params_buf_alloc(adapter);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to alloc vport params buffer: %d\n",
+			err);
+		goto err_mb_res;
+	}
+
+	err = iecm_cfg_hw(adapter);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to configure HW structure for adapter: %d\n",
+			err);
+		goto err_cfg_hw;
+	}
+
 	mutex_init(&adapter->sw_mutex);
 	mutex_init(&adapter->reset_lock);
 	init_waitqueue_head(&adapter->vchnl_wq);
@@ -166,11 +325,16 @@ int iecm_probe(struct pci_dev *pdev,
 	INIT_DELAYED_WORK(&adapter->init_task, iecm_init_task);
 	INIT_DELAYED_WORK(&adapter->vc_event_task, iecm_vc_event_task);
 
+	adapter->dev_ops.reg_ops.reset_reg_init(&adapter->reset_reg);
 	set_bit(__IECM_HR_DRV_LOAD, adapter->flags);
 	queue_delayed_work(adapter->vc_event_wq, &adapter->vc_event_task,
 			   msecs_to_jiffies(10 * (pdev->devfn & 0x07)));
 
 	return 0;
+err_cfg_hw:
+	iecm_vport_params_buf_rel(adapter);
+err_mb_res:
+	kfree(adapter->netdevs);
 err_netdev_alloc:
 	kfree(adapter->vports);
 err_vport_alloc:
@@ -214,6 +378,7 @@ void iecm_remove(struct pci_dev *pdev)
 	cancel_delayed_work_sync(&adapter->vc_event_task);
 	iecm_deinit_task(adapter);
 	iecm_del_user_cfg_data(adapter);
+	iecm_deinit_dflt_mbx(adapter);
 	msleep(20);
 	destroy_workqueue(adapter->serv_wq);
 	destroy_workqueue(adapter->vc_event_wq);
@@ -222,6 +387,7 @@ void iecm_remove(struct pci_dev *pdev)
 	kfree(adapter->vports);
 	kfree(adapter->netdevs);
 	kfree(adapter->vlan_caps);
+	iecm_vport_params_buf_rel(adapter);
 	mutex_destroy(&adapter->sw_mutex);
 	mutex_destroy(&adapter->reset_lock);
 	pci_disable_pcie_error_reporting(pdev);
@@ -229,3 +395,26 @@ void iecm_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 EXPORT_SYMBOL(iecm_remove);
+
+void *iecm_alloc_dma_mem(struct iecm_hw *hw, struct iecm_dma_mem *mem, u64 size)
+{
+	struct iecm_adapter *adapter = (struct iecm_adapter *)hw->back;
+	size_t sz = ALIGN(size, 4096);
+
+	mem->va = dma_alloc_coherent(&adapter->pdev->dev, sz,
+				     &mem->pa, GFP_KERNEL | __GFP_ZERO);
+	mem->size = size;
+
+	return mem->va;
+}
+
+void iecm_free_dma_mem(struct iecm_hw *hw, struct iecm_dma_mem *mem)
+{
+	struct iecm_adapter *adapter = (struct iecm_adapter *)hw->back;
+
+	dma_free_coherent(&adapter->pdev->dev, mem->size,
+			  mem->va, mem->pa);
+	mem->size = 0;
+	mem->va = NULL;
+	mem->pa = 0;
+}
