@@ -20,8 +20,8 @@ static bool __cachefiles_mark_inode_in_use(struct cachefiles_object *object,
 	struct inode *inode = d_backing_inode(dentry);
 	bool can_use = false;
 
-	if (!(inode->i_flags & S_KERNEL_FILE)) {
-		inode->i_flags |= S_KERNEL_FILE;
+	if (!(inode->i_flags & S_CACHEFILE)) {
+		inode->i_flags |= S_CACHEFILE;
 		trace_cachefiles_mark_active(object, inode);
 		can_use = true;
 	} else {
@@ -51,7 +51,7 @@ static void __cachefiles_unmark_inode_in_use(struct cachefiles_object *object,
 {
 	struct inode *inode = d_backing_inode(dentry);
 
-	inode->i_flags &= ~S_KERNEL_FILE;
+	inode->i_flags &= ~S_CACHEFILE;
 	trace_cachefiles_mark_inactive(object, inode);
 }
 
@@ -742,7 +742,7 @@ static struct dentry *cachefiles_lookup_for_cull(struct cachefiles_cache *cache,
 		goto lookup_error;
 	if (d_is_negative(victim))
 		goto lookup_put;
-	if (d_inode(victim)->i_flags & S_KERNEL_FILE)
+	if (d_inode(victim)->i_flags & S_CACHEFILE)
 		goto lookup_busy;
 	return victim;
 
@@ -789,11 +789,11 @@ int cachefiles_cull(struct cachefiles_cache *cache, struct dentry *dir,
 	/* check to see if someone is using this object */
 	inode = d_inode(victim);
 	inode_lock(inode);
-	if (inode->i_flags & S_KERNEL_FILE) {
+	if (inode->i_flags & S_CACHEFILE) {
 		ret = -EBUSY;
 	} else {
 		/* Stop the cache from picking it back up */
-		inode->i_flags |= S_KERNEL_FILE;
+		inode->i_flags |= S_CACHEFILE;
 		ret = 0;
 	}
 	inode_unlock(inode);

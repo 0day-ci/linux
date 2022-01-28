@@ -3959,7 +3959,7 @@ int vfs_rmdir(struct user_namespace *mnt_userns, struct inode *dir,
 
 	error = -EBUSY;
 	if (is_local_mountpoint(dentry) ||
-	    (dentry->d_inode->i_flags & S_KERNEL_FILE))
+	    (dentry->d_inode->i_flags & S_CACHEFILE))
 		goto out;
 
 	error = security_inode_rmdir(dir, dentry);
