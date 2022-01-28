@@ -616,6 +616,8 @@ struct mm_struct {
 		/* Process-based Adaptive NUMA */
 		atomic_long_t faults_locality[2];
 		atomic_long_t faults_shared[2];
+		unsigned long faults_locality_history[2];
+		unsigned long faults_shared_history[2];
 
 		spinlock_t pan_numa_lock;
 		unsigned int numa_scan_period;

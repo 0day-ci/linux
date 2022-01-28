@@ -2103,13 +2103,55 @@ static void numa_group_count_active_nodes(struct numa_group *numa_group)
 /*  Process-based Adaptive NUMA (PAN) Design  */
 /**********************************************/
 /*
+ * Update the cumulative history of local/remote and private/shared
+ * statistics. If the numbers are too small worthy of updating,
+ * return FALSE, otherwise return TRUE.
+ */
+static bool pan_update_history(struct task_struct *p)
+{
+	unsigned long local, remote, shared, private;
+	long diff;
+	int i;
+
+	remote = atomic_long_read(&p->mm->faults_locality[0]);
+	local = atomic_long_read(&p->mm->faults_locality[1]);
+	shared = atomic_long_read(&p->mm->faults_shared[0]);
+	private = atomic_long_read(&p->mm->faults_shared[1]);
+
+	/* skip if the activities in this window are too small */
+	if (local + remote < 100)
+		return false;
+
+	/* decay over the time window by 1/4 */
+	diff = local - (long)(p->mm->faults_locality_history[1] / 4);
+	p->mm->faults_locality_history[1] += diff;
+	diff = remote - (long)(p->mm->faults_locality_history[0] / 4);
+	p->mm->faults_locality_history[0] += diff;
+
+	/* decay over the time window by 1/2 */
+	diff = shared - (long)(p->mm->faults_shared_history[0] / 2);
+	p->mm->faults_shared_history[0] += diff;
+	diff = private - (long)(p->mm->faults_shared_history[1] / 2);
+	p->mm->faults_shared_history[1] += diff;
+
+	/* clear the statistics for the next window */
+	for (i = 0; i < 2; i++) {
+		atomic_long_set(&(p->mm->faults_locality[i]), 0);
+		atomic_long_set(&(p->mm->faults_shared[i]), 0);
+	}
+
+	return true;
+}
+
+/*
  * Updates mm->numa_scan_period under mm->pan_numa_lock.
- *
  * Returns p->numa_scan_period now but updated to return
  * p->mm->numa_scan_period in a later patch.
  */
 static unsigned long pan_get_scan_period(struct task_struct *p)
 {
+	pan_update_history(p);
+
 	return p->numa_scan_period;
 }
 
@@ -2836,10 +2878,15 @@ out:
 static void pan_init_numa(struct task_struct *p)
 {
 	struct mm_struct *mm = p->mm;
+	int i;
 
 	spin_lock_init(&mm->pan_numa_lock);
 	mm->numa_scan_period = sysctl_numa_balancing_scan_delay;
 
+	for (i = 0; i < 2; i++) {
+		mm->faults_locality_history[i] = 0;
+		mm->faults_shared_history[i] = 0;
+	}
 }
 
 void init_numa_balancing(unsigned long clone_flags, struct task_struct *p)
