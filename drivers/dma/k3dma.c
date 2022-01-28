@@ -878,6 +878,8 @@ static int k3_dma_probe(struct platform_device *op)
 	}
 
 	irq = platform_get_irq(op, 0);
+	if (irq < 0)
+		return irq;
 	ret = devm_request_irq(&op->dev, irq,
 			k3_dma_int_handler, 0, DRIVER_NAME, d);
 	if (ret)
