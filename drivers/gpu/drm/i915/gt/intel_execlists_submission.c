@@ -2912,6 +2912,8 @@ reset_csb(struct intel_engine_cs *engine, struct i915_request **inactive)
 
 	mb(); /* paranoia: read the CSB pointers from after the reset */
 	clflush(execlists->csb_write);
+	drm_clflush_virt_range(execlists->csb_write,
+			sizeof(execlists->csb_write));
 	mb();
 
 	inactive = process_csb(engine, inactive); /* drain preemption events */
