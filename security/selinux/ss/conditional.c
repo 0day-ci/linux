@@ -432,19 +432,16 @@ int cond_read_list(struct policydb *p, void *fp)
 
 	rc = avtab_alloc(&(p->te_cond_avtab), p->te_avtab.nel);
 	if (rc)
-		goto err;
+		return rc;
 
 	p->cond_list_len = len;
 
 	for (i = 0; i < len; i++) {
 		rc = cond_read_node(p, &p->cond_list[i], fp);
 		if (rc)
-			goto err;
+			return rc;
 	}
 	return 0;
-err:
-	cond_list_destroy(p);
-	return rc;
 }
 
 int cond_write_bool(void *vkey, void *datum, void *ptr)
@@ -643,7 +640,7 @@ static int duplicate_policydb_cond_list(struct policydb *newp,
 				sizeof(*newp->cond_list),
 				GFP_KERNEL);
 	if (!newp->cond_list)
-		goto error;
+		return -ENOMEM;
 
 	for (i = 0; i < origp->cond_list_len; i++) {
 		struct cond_node *newn = &newp->cond_list[i];
@@ -656,27 +653,22 @@ static int duplicate_policydb_cond_list(struct policydb *newp,
 				orign->expr.len * sizeof(*orign->expr.nodes),
 				GFP_KERNEL);
 		if (!newn->expr.nodes)
-			goto error;
+			return -ENOMEM;
 
 		newn->expr.len = orign->expr.len;
 
 		rc = cond_dup_av_list(&newn->true_list, &orign->true_list,
 				&newp->te_cond_avtab);
 		if (rc)
-			goto error;
+			return rc;
 
 		rc = cond_dup_av_list(&newn->false_list, &orign->false_list,
 				&newp->te_cond_avtab);
 		if (rc)
-			goto error;
+			return rc;
 	}
 
 	return 0;
-
-error:
-	avtab_destroy(&newp->te_cond_avtab);
-	cond_list_destroy(newp);
-	return -ENOMEM;
 }
 
 static int cond_bools_destroy(void *key, void *datum, void *args)
