@@ -147,13 +147,9 @@ int visconti_clk_register_gates(struct visconti_clk_provider *ctx,
 		if (!dev_name)
 			return -ENOMEM;
 
-		if (clks[i].rs_id >= 0) {
-			rson_offset = reset[clks[i].rs_id].rson_offset;
-			rsoff_offset = reset[clks[i].rs_id].rsoff_offset;
-			rs_idx = reset[clks[i].rs_id].rs_idx;
-		} else {
-			rson_offset = rsoff_offset = rs_idx = -1;
-		}
+		rson_offset = reset[clks[i].rs_id].rson_offset;
+		rsoff_offset = reset[clks[i].rs_id].rsoff_offset;
+		rs_idx = reset[clks[i].rs_id].rs_idx;
 
 		div_clk = devm_clk_hw_register_fixed_factor(dev,
 							    dev_name,
