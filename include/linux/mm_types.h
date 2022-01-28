@@ -621,6 +621,11 @@ struct mm_struct {
 
 		spinlock_t pan_numa_lock;
 		unsigned int numa_scan_period;
+		int remote_fault_rates[2]; /* histogram of remote fault rate */
+		long scanned_pages;
+		bool trend;
+		int slope;
+		u8 hist_trend;
 #endif
 		/*
 		 * An operation with batched TLB flushing is going on. Anything
