@@ -164,6 +164,8 @@ enum i915_power_well_id {
 	((tran) == TRANSCODER_EDP ? POWER_DOMAIN_TRANSCODER_EDP : \
 	 (tran) + POWER_DOMAIN_TRANSCODER_A)
 
+typedef struct { DECLARE_BITMAP(bits, POWER_DOMAIN_NUM); } intel_power_domain_mask_t;
+
 struct i915_power_domains {
 	/*
 	 * Power wells needed for initialization at driver init and suspend
@@ -181,21 +183,21 @@ struct i915_power_domains {
 
 	struct delayed_work async_put_work;
 	intel_wakeref_t async_put_wakeref;
-	u64 async_put_domains[2];
+	intel_power_domain_mask_t async_put_domains[2];
 
 	struct i915_power_well *power_wells;
 };
 
 struct intel_display_power_domain_set {
-	u64 mask;
+	intel_power_domain_mask_t mask;
 #ifdef CONFIG_DRM_I915_DEBUG_RUNTIME_PM
 	intel_wakeref_t wakerefs[POWER_DOMAIN_NUM];
 #endif
 };
 
-#define for_each_power_domain(domain, mask)				\
-	for ((domain) = 0; (domain) < POWER_DOMAIN_NUM; (domain)++)	\
-		for_each_if(BIT_ULL(domain) & (mask))
+#define for_each_power_domain(__domain, __mask)				\
+	for ((__domain) = 0; (__domain) < POWER_DOMAIN_NUM; (__domain)++)	\
+		for_each_if(test_bit((__domain), (__mask)->bits))
 
 /* intel_display_power.c */
 int intel_power_domains_init(struct drm_i915_private *dev_priv);
@@ -278,13 +280,13 @@ intel_display_power_get_in_set_if_enabled(struct drm_i915_private *i915,
 void
 intel_display_power_put_mask_in_set(struct drm_i915_private *i915,
 				    struct intel_display_power_domain_set *power_domain_set,
-				    u64 mask);
+				    intel_power_domain_mask_t *mask);
 
 static inline void
 intel_display_power_put_all_in_set(struct drm_i915_private *i915,
 				   struct intel_display_power_domain_set *power_domain_set)
 {
-	intel_display_power_put_mask_in_set(i915, power_domain_set, power_domain_set->mask);
+	intel_display_power_put_mask_in_set(i915, power_domain_set, &power_domain_set->mask);
 }
 
 void intel_display_power_debug(struct drm_i915_private *i915, struct seq_file *m);

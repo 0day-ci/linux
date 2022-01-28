@@ -68,7 +68,7 @@ struct i915_power_well_desc {
 
 struct i915_power_well {
 	const struct i915_power_well_desc *desc;
-	u64 domains;
+	intel_power_domain_mask_t domains;
 	/* power well enable/disable usage count */
 	int count;
 	/* cached hw enabled state */
