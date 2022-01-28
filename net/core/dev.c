@@ -9949,8 +9949,18 @@ void netdev_run_todo(void)
 
 		netdev_wait_allrefs(dev);
 
+		/* Drop the netdev refcount (which should be 1 at this point)
+		 * to zero. If we're using the generic refcount code, this will
+		 * tell it that any dev_hold() after this point is a bug.
+		 */
+#ifdef CONFIG_PCPU_DEV_REFCNT
+		this_cpu_dec(*dev->pcpu_refcnt);
+		BUG_ON(netdev_refcnt_read(dev) != 0);
+#else
+		BUG_ON(!refcount_dec_and_test(&dev->dev_refcnt));
+#endif
+
 		/* paranoia */
-		BUG_ON(netdev_refcnt_read(dev) != 1);
 		BUG_ON(!list_empty(&dev->ptype_all));
 		BUG_ON(!list_empty(&dev->ptype_specific));
 		WARN_ON(rcu_access_pointer(dev->ip_ptr));
@@ -10292,6 +10302,12 @@ void free_netdev(struct net_device *dev)
 #endif
 	free_percpu(dev->xdp_bulkq);
 	dev->xdp_bulkq = NULL;
+
+	/* Recheck in case someone called dev_hold() between
+	 * netdev_wait_allrefs() and here.
+	 */
+	if (WARN_ON(netdev_refcnt_read(dev) != 0))
+		return; /* leak memory, otherwise we might get UAF */
 
 	/*  Compatibility with error handling in drivers */
 	if (dev->reg_state == NETREG_UNINITIALIZED) {
