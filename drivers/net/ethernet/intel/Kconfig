@@ -372,4 +372,19 @@ config IGC
 	  To compile this driver as a module, choose M here. The module
 	  will be called igc.
 
+config IECM
+	tristate "Intel(R) Ethernet Common Module Support"
+	default n
+	depends on PCI_MSI
+	select DIMLIB
+	help
+      This supplies needed functions to device specific device drivers
+      implementing common module.
+
+	  More specific information on configuring the driver is in
+	  <file:Documentation/networking/device_drivers/ethernet/intel/iecm.rst>.
+
+      To compile this as a module, choose M here. The module will be called
+      iecm.
+
 endif # NET_VENDOR_INTEL
