@@ -342,6 +342,7 @@ cifs_parse_smb_version(struct fs_context *fc, char *value, struct smb3_fs_contex
 	switch (match_token(value, cifs_smb_version_tokens, args)) {
 #ifdef CONFIG_CIFS_ALLOW_INSECURE_LEGACY
 	case Smb_1:
+		cifs_errorf(fc, "WARNING: SMB1 is deprecated and will be removed from CIFS.KO in 2023. Please migrate to SMB2 or later.\n");
 		if (disable_legacy_dialects) {
 			cifs_errorf(fc, "mount with legacy dialect disabled\n");
 			return 1;
