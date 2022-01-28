@@ -115,6 +115,11 @@
 
 #define MAKEMASK(m, s)	((m) << (s))
 
+union iecm_tx_flex_desc {
+	struct iecm_flex_tx_desc q; /* queue based scheduling */
+	struct iecm_flex_tx_sched_desc flow; /* flow based scheduling */
+};
+
 struct iecm_tx_buf {
 	struct hlist_node hlist;
 	void *next_to_watch;
@@ -143,6 +148,37 @@ struct iecm_buf_lifo {
 	u16 top;
 	u16 size;
 	struct iecm_tx_buf **bufs;
+};
+
+struct iecm_tx_offload_params {
+	u16 td_cmd;	/* command field to be inserted into descriptor */
+	u32 tso_len;	/* total length of payload to segment */
+	u16 mss;
+	u8 tso_hdr_len;	/* length of headers to be duplicated */
+
+	/* Flow scheduling offload timestamp, formatting as hw expects it */
+	/* timestamp = bits[0:22], overflow = bit[23] */
+	u8 desc_ts[3];
+
+	/* For legacy offloads */
+	u32 hdr_offsets;
+};
+
+struct iecm_tx_splitq_params {
+	/* Descriptor build function pointer */
+	void (*splitq_build_ctb)(union iecm_tx_flex_desc *desc,
+				 struct iecm_tx_splitq_params *params,
+				 u16 td_cmd, u16 size);
+
+	/* General descriptor info */
+	enum iecm_tx_desc_dtype_value dtype;
+	u16 eop_cmd;
+	union {
+		u16 compl_tag; /* only relevant for flow scheduling */
+		u16 td_tag; /* only relevant for queue scheduling */
+	};
+
+	struct iecm_tx_offload_params offload;
 };
 
 /* Checksum offload bits decoded from the receive descriptor. */
@@ -588,6 +624,12 @@ struct iecm_txq_group {
 
 struct iecm_adapter;
 
+void iecm_tx_splitq_build_ctb(union iecm_tx_flex_desc *desc,
+			      struct iecm_tx_splitq_params *parms,
+			      u16 td_cmd, u16 size);
+void iecm_tx_splitq_build_flow_desc(union iecm_tx_flex_desc *desc,
+				    struct iecm_tx_splitq_params *parms,
+				    u16 td_cmd, u16 size);
 int iecm_vport_singleq_napi_poll(struct napi_struct *napi, int budget);
 void iecm_vport_init_num_qs(struct iecm_vport *vport,
 			    struct virtchnl2_create_vport *vport_msg);
@@ -614,7 +656,25 @@ int iecm_init_rss(struct iecm_vport *vport);
 void iecm_deinit_rss(struct iecm_vport *vport);
 bool iecm_init_rx_buf_hw_alloc(struct iecm_queue *rxq, struct iecm_rx_buf *buf);
 void iecm_rx_buf_hw_update(struct iecm_queue *rxq, u32 val);
+void iecm_tx_buf_hw_update(struct iecm_queue *tx_q, u32 val,
+			   bool xmit_more);
 void iecm_tx_buf_rel(struct iecm_queue *tx_q, struct iecm_tx_buf *tx_buf);
+unsigned int iecm_size_to_txd_count(unsigned int size);
+unsigned int iecm_tx_desc_count_required(struct sk_buff *skb);
+bool iecm_chk_linearize(struct sk_buff *skb, unsigned int max_bufs,
+			unsigned int count);
+int iecm_tx_maybe_stop(struct iecm_queue *tx_q, unsigned int size);
+void iecm_tx_timeout(struct net_device *netdev,
+		     unsigned int __always_unused txqueue);
+netdev_tx_t iecm_tx_splitq_start(struct sk_buff *skb,
+				 struct net_device *netdev);
+netdev_tx_t iecm_tx_singleq_start(struct sk_buff *skb,
+				  struct net_device *netdev);
 bool iecm_rx_singleq_buf_hw_alloc_all(struct iecm_queue *rxq,
 				      u16 cleaned_count);
+int iecm_tso(struct iecm_tx_buf *first, struct iecm_tx_offload_params *off);
+void iecm_tx_prepare_vlan_flags(struct iecm_queue *tx_q,
+				struct iecm_tx_buf *first,
+				struct sk_buff *skb);
+
 #endif /* !_IECM_TXRX_H_ */

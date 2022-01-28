@@ -142,6 +142,17 @@ struct iecm_vport *iecm_netdev_to_vport(struct net_device *netdev)
 }
 
 /**
+ * iecm_netdev_to_adapter - get an adapter handle from a netdev
+ * @netdev: network interface device structure
+ */
+struct iecm_adapter *iecm_netdev_to_adapter(struct net_device *netdev)
+{
+	struct iecm_netdev_priv *np = netdev_priv(netdev);
+
+	return np->vport->adapter;
+}
+
+/**
  * iecm_mb_intr_rel_irq - Free the IRQ association with the OS
  * @adapter: adapter structure
  */
@@ -415,6 +426,61 @@ iecm_mac_filter *iecm_find_mac_filter(struct iecm_vport *vport,
 			return f;
 	}
 	return NULL;
+}
+
+/**
+ * __iecm_del_mac_filter - Delete MAC filter helper
+ * @vport: main vport struct
+ * @macaddr: address to delete
+ *
+ * Takes mac_filter_list_lock spinlock to set remove field for filter in list.
+ */
+static struct
+iecm_mac_filter *__iecm_del_mac_filter(struct iecm_vport *vport,
+				       const u8 *macaddr)
+{
+	struct iecm_mac_filter *f;
+
+	spin_lock_bh(&vport->adapter->mac_filter_list_lock);
+	f = iecm_find_mac_filter(vport, macaddr);
+	if (f) {
+		/* If filter was never synced to HW we can just delete it here,
+		 * otherwise mark for removal.
+		 */
+		if (f->add) {
+			list_del(&f->list);
+			kfree(f);
+			f = NULL;
+		} else {
+			f->remove = true;
+		}
+	}
+	spin_unlock_bh(&vport->adapter->mac_filter_list_lock);
+
+	return f;
+}
+
+/**
+ * iecm_del_mac_filter - Delete a MAC filter from the filter list
+ * @vport: main vport structure
+ * @macaddr: the MAC address
+ *
+ * Removes filter from list and if interface is up, tells hardware about the
+ * removed filter.
+ **/
+static void iecm_del_mac_filter(struct iecm_vport *vport, const u8 *macaddr)
+{
+	struct iecm_mac_filter *f;
+
+	if (!macaddr)
+		return;
+
+	f = __iecm_del_mac_filter(vport, macaddr);
+	if (!f)
+		return;
+
+	if (vport->adapter->state == __IECM_UP)
+		iecm_add_del_ether_addrs(vport, false, false);
 }
 
 /**
@@ -1712,6 +1778,134 @@ void iecm_remove(struct pci_dev *pdev)
 EXPORT_SYMBOL(iecm_remove);
 
 /**
+ * iecm_addr_sync - Callback for dev_(mc|uc)_sync to add address
+ * @netdev: the netdevice
+ * @addr: address to add
+ *
+ * Called by __dev_(mc|uc)_sync when an address needs to be added. We call
+ * __dev_(uc|mc)_sync from .set_rx_mode. Kernel takes addr_list_lock spinlock
+ * meaning we cannot sleep in this context. Due to this, we have to add the
+ * filter and send the virtchnl message asynchronously without waiting for the
+ * response from the other side. We won't know whether or not the operation
+ * actually succeeded until we get the message back.  Returns 0 on success,
+ * negative on failure.
+ */
+static int iecm_addr_sync(struct net_device *netdev, const u8 *addr)
+{
+	struct iecm_vport *vport = iecm_netdev_to_vport(netdev);
+
+	if (__iecm_add_mac_filter(vport, addr)) {
+		if (vport->adapter->state == __IECM_UP) {
+			set_bit(__IECM_ADD_ETH_REQ, vport->adapter->flags);
+			iecm_add_del_ether_addrs(vport, true, true);
+		}
+		return 0;
+	}
+
+	return -ENOMEM;
+}
+
+/**
+ * iecm_addr_unsync - Callback for dev_(mc|uc)_sync to remove address
+ * @netdev: the netdevice
+ * @addr: address to add
+ *
+ * Called by __dev_(mc|uc)_sync when an address needs to be added. We call
+ * __dev_(uc|mc)_sync from .set_rx_mode. Kernel takes addr_list_lock spinlock
+ * meaning we cannot sleep in this context. Due to this we have to delete the
+ * filter and send the virtchnl message asychronously without waiting for the
+ * return from the other side.  We won't know whether or not the operation
+ * actually succeeded until we get the message back. Returns 0 on success,
+ * negative on failure.
+ */
+static int iecm_addr_unsync(struct net_device *netdev, const u8 *addr)
+{
+	struct iecm_vport *vport = iecm_netdev_to_vport(netdev);
+
+	/* Under some circumstances, we might receive a request to delete
+	 * our own device address from our uc list. Because we store the
+	 * device address in the VSI's MAC/VLAN filter list, we need to ignore
+	 * such requests and not delete our device address from this list.
+	 */
+	if (ether_addr_equal(addr, netdev->dev_addr))
+		return 0;
+
+	if (__iecm_del_mac_filter(vport, addr)) {
+		if (vport->adapter->state == __IECM_UP) {
+			set_bit(__IECM_DEL_ETH_REQ, vport->adapter->flags);
+			iecm_add_del_ether_addrs(vport, false, true);
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * iecm_set_rx_mode - NDO callback to set the netdev filters
+ * @netdev: network interface device structure
+ *
+ * Stack takes addr_list_lock spinlock before calling our .set_rx_mode.  We
+ * cannot sleep in this context.
+ */
+static void iecm_set_rx_mode(struct net_device *netdev)
+{
+	struct iecm_adapter *adapter = iecm_netdev_to_adapter(netdev);
+
+	if (iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_MACFILTER)) {
+		__dev_uc_sync(netdev, iecm_addr_sync, iecm_addr_unsync);
+		__dev_mc_sync(netdev, iecm_addr_sync, iecm_addr_unsync);
+	}
+
+	if (iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_PROMISC)) {
+		bool changed = false;
+
+		/* IFF_PROMISC enables both unicast and multicast promiscuous,
+		 * while IFF_ALLMULTI only enables multicast such that:
+		 *
+		 * promisc  + allmulti		= unicast | multicast
+		 * promisc  + !allmulti		= unicast | multicast
+		 * !promisc + allmulti		= multicast
+		 */
+		if ((netdev->flags & IFF_PROMISC) &&
+		    !test_and_set_bit(__IECM_PROMISC_UC,
+				      adapter->config_data.user_flags)) {
+			changed = true;
+			dev_info(&adapter->pdev->dev, "Entering promiscuous mode\n");
+			if (!test_and_set_bit(__IECM_PROMISC_MC,
+					      adapter->flags))
+				dev_info(&adapter->pdev->dev, "Entering multicast promiscuous mode\n");
+		}
+		if (!(netdev->flags & IFF_PROMISC) &&
+		    test_and_clear_bit(__IECM_PROMISC_UC,
+				       adapter->config_data.user_flags)) {
+			changed = true;
+			dev_info(&adapter->pdev->dev, "Leaving promiscuous mode\n");
+		}
+		if (netdev->flags & IFF_ALLMULTI &&
+		    !test_and_set_bit(__IECM_PROMISC_MC,
+				      adapter->config_data.user_flags)) {
+			changed = true;
+			dev_info(&adapter->pdev->dev, "Entering multicast promiscuous mode\n");
+		}
+		if (!(netdev->flags & (IFF_ALLMULTI | IFF_PROMISC)) &&
+		    test_and_clear_bit(__IECM_PROMISC_MC,
+				       adapter->config_data.user_flags)) {
+			changed = true;
+			dev_info(&adapter->pdev->dev, "Leaving multicast promiscuous mode\n");
+		}
+
+		if (changed) {
+			int err = iecm_set_promiscuous(adapter);
+
+			if (err) {
+				dev_info(&adapter->pdev->dev, "Failed to set promiscuous mode: %d\n",
+					 err);
+			}
+		}
+	}
+}
+
+/**
  * iecm_open - Called when a network interface becomes active
  * @netdev: network interface device structure
  *
@@ -1728,6 +1922,49 @@ static int iecm_open(struct net_device *netdev)
 	struct iecm_netdev_priv *np = netdev_priv(netdev);
 
 	return iecm_vport_open(np->vport, true);
+}
+
+/**
+ * iecm_set_mac - NDO callback to set port mac address
+ * @netdev: network interface device structure
+ * @p: pointer to an address structure
+ *
+ * Returns 0 on success, negative on failure
+ **/
+static int iecm_set_mac(struct net_device *netdev, void *p)
+{
+	struct iecm_vport *vport = iecm_netdev_to_vport(netdev);
+	struct iecm_mac_filter *f;
+	struct sockaddr *addr = p;
+
+	if (!iecm_is_cap_ena(vport->adapter, IECM_OTHER_CAPS,
+			     VIRTCHNL2_CAP_MACFILTER)) {
+		dev_info(&vport->adapter->pdev->dev, "Setting MAC address is not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (!is_valid_ether_addr(addr->sa_data)) {
+		dev_info(&vport->adapter->pdev->dev, "Invalid MAC address: %pM\n",
+			 addr->sa_data);
+		return -EADDRNOTAVAIL;
+	}
+
+	if (ether_addr_equal(netdev->dev_addr, addr->sa_data))
+		return 0;
+
+	/* Delete the current filter */
+	if (is_valid_ether_addr(vport->default_mac_addr))
+		iecm_del_mac_filter(vport, vport->default_mac_addr);
+
+	/* Add new filter */
+	f = iecm_add_mac_filter(vport, addr->sa_data);
+
+	if (f) {
+		ether_addr_copy(vport->default_mac_addr, addr->sa_data);
+		dev_addr_mod(netdev, 0, addr->sa_data, ETH_ALEN);
+	}
+
+	return f ? 0 : -ENOMEM;
 }
 
 void *iecm_alloc_dma_mem(struct iecm_hw *hw, struct iecm_dma_mem *mem, u64 size)
@@ -1756,10 +1993,10 @@ void iecm_free_dma_mem(struct iecm_hw *hw, struct iecm_dma_mem *mem)
 static const struct net_device_ops iecm_netdev_ops_splitq = {
 	.ndo_open = iecm_open,
 	.ndo_stop = iecm_stop,
-	.ndo_start_xmit = NULL,
-	.ndo_set_rx_mode = NULL,
+	.ndo_start_xmit = iecm_tx_splitq_start,
+	.ndo_set_rx_mode = iecm_set_rx_mode,
 	.ndo_validate_addr = eth_validate_addr,
-	.ndo_set_mac_address = NULL,
+	.ndo_set_mac_address = iecm_set_mac,
 	.ndo_change_mtu = NULL,
 	.ndo_get_stats64 = NULL,
 	.ndo_fix_features = NULL,
@@ -1773,9 +2010,9 @@ static const struct net_device_ops iecm_netdev_ops_singleq = {
 	.ndo_open = iecm_open,
 	.ndo_stop = iecm_stop,
 	.ndo_start_xmit = NULL,
-	.ndo_set_rx_mode = NULL,
+	.ndo_set_rx_mode = iecm_set_rx_mode,
 	.ndo_validate_addr = eth_validate_addr,
-	.ndo_set_mac_address = NULL,
+	.ndo_set_mac_address = iecm_set_mac,
 	.ndo_change_mtu = NULL,
 	.ndo_get_stats64 = NULL,
 	.ndo_fix_features = NULL,

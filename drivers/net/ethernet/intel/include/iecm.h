@@ -717,6 +717,7 @@ int iecm_send_alloc_vectors_msg(struct iecm_adapter *adapter, u16 num_vectors);
 int iecm_vport_params_buf_alloc(struct iecm_adapter *adapter);
 void iecm_vport_params_buf_rel(struct iecm_adapter *adapter);
 struct iecm_vport *iecm_netdev_to_vport(struct net_device *netdev);
+struct iecm_adapter *iecm_netdev_to_adapter(struct net_device *netdev);
 int iecm_send_get_stats_msg(struct iecm_vport *vport);
 int iecm_get_vec_ids(struct iecm_adapter *adapter,
 		     u16 *vecids, int num_vecids,
