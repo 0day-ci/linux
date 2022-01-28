@@ -12,6 +12,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
+#include <linux/l2tp.h>
 #include <net/tcp.h>
 #include <net/ip6_checksum.h>
 #include <net/ipv6.h>
@@ -409,6 +410,108 @@ struct iecm_channel_config {
 	u8 num_tc;
 };
 
+enum iecm_fdir_flow_type {
+	/* NONE - used for undef/error */
+	IECM_FDIR_FLOW_NONE = 0,
+	IECM_FDIR_FLOW_IPV4_TCP,
+	IECM_FDIR_FLOW_IPV4_UDP,
+	IECM_FDIR_FLOW_IPV4_SCTP,
+	IECM_FDIR_FLOW_IPV4_AH,
+	IECM_FDIR_FLOW_IPV4_ESP,
+	IECM_FDIR_FLOW_IPV4_OTHER,
+	IECM_FDIR_FLOW_IPV6_TCP,
+	IECM_FDIR_FLOW_IPV6_UDP,
+	IECM_FDIR_FLOW_IPV6_SCTP,
+	IECM_FDIR_FLOW_IPV6_AH,
+	IECM_FDIR_FLOW_IPV6_ESP,
+	IECM_FDIR_FLOW_IPV6_OTHER,
+	IECM_FDIR_FLOW_NON_IP_L2,
+	/* MAX - this must be last and add anything new just above it */
+	IECM_FDIR_FLOW_PTYPE_MAX,
+};
+
+/* Must not exceed the array element number of '__be32 data[2]' in the ethtool
+ * 'struct ethtool_rx_flow_spec.m_ext.data[2]' to express the flex-byte (word).
+ */
+#define IECM_FLEX_WORD_NUM	2
+
+struct iecm_flex_word {
+	u16 offset;
+	u16 word;
+};
+
+struct iecm_ipv4_addrs {
+	__be32 src_ip;
+	__be32 dst_ip;
+};
+
+struct iecm_ipv6_addrs {
+	struct in6_addr src_ip;
+	struct in6_addr dst_ip;
+};
+
+struct iecm_fdir_eth {
+	__be16 etype;
+};
+
+struct iecm_fdir_ip {
+	union {
+		struct iecm_ipv4_addrs v4_addrs;
+		struct iecm_ipv6_addrs v6_addrs;
+	};
+	__be16 src_port;
+	__be16 dst_port;
+	__be32 l4_header;	/* first 4 bytes of the layer 4 header */
+	__be32 spi;		/* security parameter index for AH/ESP */
+	union {
+		u8 tos;
+		u8 tclass;
+	};
+	u8 proto;
+};
+
+struct iecm_fdir_extra {
+	u32 usr_def[IECM_FLEX_WORD_NUM];
+};
+
+/* bookkeeping of Flow Director filters */
+struct iecm_fdir_fltr {
+	struct list_head list;
+
+	enum iecm_fdir_flow_type flow_type;
+
+	struct iecm_fdir_eth eth_data;
+	struct iecm_fdir_eth eth_mask;
+
+	struct iecm_fdir_ip ip_data;
+	struct iecm_fdir_ip ip_mask;
+
+	struct iecm_fdir_extra ext_data;
+	struct iecm_fdir_extra ext_mask;
+
+	enum virtchnl_action action;
+
+	/* flex byte filter data */
+	u8 ip_ver; /* used to adjust the flex offset, 4 : IPv4, 6 : IPv6 */
+	u8 flex_cnt;
+	struct iecm_flex_word flex_words[IECM_FLEX_WORD_NUM];
+
+	u32 flow_id;
+
+	u32 loc;	/* Rule location inside the flow table */
+	u32 q_index;
+
+	struct virtchnl_fdir_add vc_add_msg;
+	bool remove;	/* Flow Director filter needs to be deleted */
+	bool add;	/* Flow Director filter needs to be added */
+};
+
+struct iecm_fdir_fltr_config {
+	struct list_head fdir_fltr_list;
+#define IECM_MAX_FDIR_FILTERS	128	/* max allowed Flow Director filters */
+	u16 num_active_filters;
+};
+
 #define IECM_GET_PTYPE_SIZE(p) \
 	(sizeof(struct virtchnl2_ptype) + \
 	(((p)->proto_id_count ? ((p)->proto_id_count - 1) : 0) * sizeof(u16)))
@@ -446,6 +549,7 @@ struct iecm_user_config_data {
 	struct list_head mac_filter_list;
 	struct list_head vlan_filter_list;
 	struct list_head adv_rss_list;
+	struct iecm_fdir_fltr_config fdir_config;
 	struct iecm_channel_config ch_config;
 };
 
@@ -749,6 +853,14 @@ void iecm_set_ethtool_ops(struct net_device *netdev);
 void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
 void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async);
 int iecm_set_promiscuous(struct iecm_adapter *adapter);
+int iecm_send_add_fdir_filter_msg(struct iecm_vport *vport);
+int iecm_send_del_fdir_filter_msg(struct iecm_vport *vport);
+int iecm_get_fdir_fltr_entry(struct iecm_vport *vport,
+			     struct ethtool_rxnfc *cmd);
+int iecm_get_fdir_fltr_ids(struct iecm_vport *vport, struct ethtool_rxnfc *cmd,
+			   u32 *rule_locs);
+int iecm_add_fdir_fltr(struct iecm_vport *vport, struct ethtool_rxnfc *cmd);
+int iecm_del_fdir_fltr(struct iecm_vport *vport, struct ethtool_rxnfc *cmd);
 int iecm_send_enable_channels_msg(struct iecm_vport *vport);
 int iecm_send_disable_channels_msg(struct iecm_vport *vport);
 bool iecm_is_feature_ena(struct iecm_vport *vport, netdev_features_t feature);

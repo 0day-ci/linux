@@ -2732,6 +2732,125 @@ static int iecm_send_insert_vlan_msg(struct iecm_vport *vport, bool ena)
 }
 
 /**
+ * iecm_send_add_fdir_filter_msg: Send add Flow Director filter message
+ * @vport: vport structure
+ *
+ * Request the CP/PF to add Flow Director as specified by the user via
+ * ethtool
+ *
+ * Return 0 on success, negative on failure
+ **/
+int iecm_send_add_fdir_filter_msg(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_fdir_fltr_config *fdir_config;
+	struct iecm_fdir_fltr *fdir;
+	struct virtchnl_fdir_add *f;
+	int len, err = 0;
+
+	fdir_config = &adapter->config_data.fdir_config;
+	len = sizeof(struct virtchnl_fdir_add);
+	/* kzalloc required because otherwise stack is over 2k */
+	f = kzalloc(len, GFP_KERNEL);
+	if (!f)
+		return -ENOMEM;
+
+	while (true) {
+		bool process_fltr = false;
+
+		/* Only add a single Flow Director per call */
+		spin_lock_bh(&adapter->fdir_fltr_list_lock);
+		list_for_each_entry(fdir, &fdir_config->fdir_fltr_list, list) {
+			if (fdir->add) {
+				fdir->add = false;
+				process_fltr = true;
+				memcpy(f, &fdir->vc_add_msg, len);
+				break;
+			}
+		}
+		spin_unlock_bh(&adapter->fdir_fltr_list_lock);
+
+		if (!process_fltr)
+			break;
+
+		err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_ADD_FDIR_FILTER,
+				       len, (u8 *)f);
+		if (err)
+			break;
+
+		err = iecm_wait_for_event(adapter, IECM_VC_ADD_FDIR_FILTER,
+					  IECM_VC_ADD_FDIR_FILTER_ERR);
+		if (err)
+			break;
+
+		memcpy(f, adapter->vc_msg, len);
+		if (f->status == VIRTCHNL_FDIR_SUCCESS) {
+			fdir->flow_id = f->flow_id;
+		} else {
+			err = -EIO;
+			break;
+		}
+		clear_bit(__IECM_VC_MSG_PENDING, adapter->flags);
+	}
+
+	clear_bit(__IECM_VC_MSG_PENDING, adapter->flags);
+	kfree(f);
+	return err;
+}
+
+/**
+ * iecm_send_del_fdir_filter_msg: Send del Flow Director filter message
+ * @vport: vport structure
+ *
+ * Request the CP/PF to del Flow Director as specified by the user via
+ * ethtool
+ *
+ * Return 0 on success, negative on failure
+ **/
+int iecm_send_del_fdir_filter_msg(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_fdir_fltr_config *fdir_config;
+	struct iecm_fdir_fltr *fdir;
+	struct virtchnl_fdir_del f;
+	int err = 0;
+
+	fdir_config = &adapter->config_data.fdir_config;
+
+	while (true) {
+		bool process_fltr = false;
+
+		/* Only del a single Flow Director filter per call */
+		spin_lock_bh(&adapter->fdir_fltr_list_lock);
+		list_for_each_entry(fdir, &fdir_config->fdir_fltr_list, list) {
+			if (fdir->remove) {
+				process_fltr = true;
+				fdir->remove = false;
+				f.vsi_id = fdir->vc_add_msg.vsi_id;
+				f.flow_id = fdir->flow_id;
+				break;
+			}
+		}
+		spin_unlock_bh(&adapter->fdir_fltr_list_lock);
+
+		if (!process_fltr)
+			break;
+
+		err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_DEL_FDIR_FILTER,
+				       sizeof(struct virtchnl_fdir_del), (u8 *)&f);
+		if (err)
+			break;
+
+		err = iecm_wait_for_event(adapter, IECM_VC_DEL_FDIR_FILTER,
+					  IECM_VC_DEL_FDIR_FILTER_ERR);
+		clear_bit(__IECM_VC_MSG_PENDING, adapter->flags);
+	}
+
+	clear_bit(__IECM_VC_MSG_PENDING, adapter->flags);
+	return err;
+}
+
+/**
  * iecm_send_enable_channels_msg - Send enable channels message
  * @vport: vport structure
  *

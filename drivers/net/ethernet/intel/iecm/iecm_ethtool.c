@@ -15,6 +15,7 @@ static int iecm_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 			  u32 __always_unused *rule_locs)
 {
 	struct iecm_vport *vport = iecm_netdev_to_vport(netdev);
+	struct iecm_adapter *adapter = vport->adapter;
 	int ret = -EOPNOTSUPP;
 
 	switch (cmd->cmd) {
@@ -23,14 +24,19 @@ static int iecm_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 		ret = 0;
 		break;
 	case ETHTOOL_GRXCLSRLCNT:
-		/* stub */
+		if (!iecm_is_cap_ena(adapter, IECM_OTHER_CAPS,
+				     VIRTCHNL2_CAP_FDIR))
+			break;
+		cmd->rule_cnt =
+			adapter->config_data.fdir_config.num_active_filters;
+		cmd->data = IECM_MAX_FDIR_FILTERS;
 		ret = 0;
 		break;
 	case ETHTOOL_GRXCLSRULE:
-		/* stub */
+		ret = iecm_get_fdir_fltr_entry(vport, cmd);
 		break;
 	case ETHTOOL_GRXCLSRLALL:
-		/* stub */
+		ret = iecm_get_fdir_fltr_ids(vport, cmd, (u32 *)rule_locs);
 		break;
 	case ETHTOOL_GRXFH:
 		/* stub */
@@ -51,14 +57,15 @@ static int iecm_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
  */
 static int iecm_set_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd)
 {
+	struct iecm_vport *vport = iecm_netdev_to_vport(netdev);
 	int ret = -EOPNOTSUPP;
 
 	switch (cmd->cmd) {
 	case ETHTOOL_SRXCLSRLINS:
-		/* stub */
+		ret = iecm_add_fdir_fltr(vport, cmd);
 		break;
 	case ETHTOOL_SRXCLSRLDEL:
-		/* stub */
+		ret = iecm_del_fdir_fltr(vport, cmd);
 		break;
 	case ETHTOOL_SRXFH:
 		/* stub */
