@@ -219,6 +219,23 @@ const struct iecm_rx_ptype_decoded iecm_ptype_lookup[IECM_RX_MAX_PTYPE] = {
 EXPORT_SYMBOL(iecm_ptype_lookup);
 
 /**
+ * iecm_vport_intr_clean_queues - MSIX mode Interrupt Handler
+ * @irq: interrupt number
+ * @data: pointer to a q_vector
+ *
+ */
+irqreturn_t
+iecm_vport_intr_clean_queues(int __always_unused irq, void *data)
+{
+	struct iecm_q_vector *q_vector = (struct iecm_q_vector *)data;
+
+	q_vector->total_events++;
+	napi_schedule(&q_vector->napi);
+
+	return IRQ_HANDLED;
+}
+
+/**
  * iecm_vport_init_num_qs - Initialize number of queues
  * @vport: vport to initialize queues
  * @vport_msg: data to be filled into vport

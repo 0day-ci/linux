@@ -2732,6 +2732,45 @@ static int iecm_send_insert_vlan_msg(struct iecm_vport *vport, bool ena)
 }
 
 /**
+ * iecm_send_vlan_v2_caps_msg - send virtchnl get offload VLAN V2 caps message
+ * @adapter: adapter info struct
+ *
+ * Returns 0 on success and if VLAN V1 capability is set`, negative on failure.
+ */
+int iecm_send_vlan_v2_caps_msg(struct iecm_adapter *adapter)
+{
+	int err = 0;
+
+	if (!iecm_is_cap_ena(adapter, IECM_OTHER_CAPS, VIRTCHNL2_CAP_VLAN))
+		return err;
+
+	err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_GET_OFFLOAD_VLAN_V2_CAPS,
+			       0, NULL);
+	if (err)
+		return err;
+
+	err = iecm_min_wait_for_event(adapter, IECM_VC_OFFLOAD_VLAN_V2_CAPS,
+				      IECM_VC_OFFLOAD_VLAN_V2_CAPS_ERR);
+
+	if (err) {
+		dev_err(&adapter->pdev->dev, "Failed to recv get caps");
+		return err;
+	}
+
+	if (!adapter->vlan_caps) {
+		adapter->vlan_caps =
+		  kzalloc(sizeof(*adapter->vlan_caps), GFP_KERNEL);
+		if (!adapter->vlan_caps)
+			return -ENOMEM;
+	}
+
+	memcpy(adapter->vlan_caps,
+	       adapter->vc_msg, sizeof(*adapter->vlan_caps));
+
+	return err;
+}
+
+/**
  * iecm_fill_ptype_lookup - Fill L3 specific fields in ptype lookup table
  * @ptype: ptype lookup table
  * @pstate: state machine for ptype lookup table
@@ -3578,6 +3617,132 @@ static u16 iecm_get_reserved_vectors(struct iecm_adapter *adapter)
 static unsigned int iecm_get_max_tx_bufs(struct iecm_adapter *adapter)
 {
 	return ((struct virtchnl2_get_capabilities *)adapter->caps)->max_sg_bufs_per_tx_pkt;
+}
+
+/**
+ * iecm_add_del_ether_addrs
+ * @vport: virtual port data structure
+ * @add: Add or delete flag
+ * @async: Don't wait for return message
+ *
+ * Request that the PF add or delete one or more addresses to our filters.
+ **/
+void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct virtchnl_ether_addr_list *veal = NULL;
+	int num_entries, num_msgs, total_filters = 0;
+	struct pci_dev *pdev = adapter->pdev;
+	enum iecm_vport_vc_state vc, vc_err;
+	struct virtchnl_ether_addr *eal;
+	struct iecm_mac_filter *f, *tmp;
+	int i = 0, k = 0, err = 0;
+	enum virtchnl_ops vop;
+
+	spin_lock_bh(&adapter->mac_filter_list_lock);
+
+	/* Find the number of newly added filters */
+	list_for_each_entry(f, &adapter->config_data.mac_filter_list, list) {
+		if (add && f->add)
+			total_filters++;
+		else if (!add && f->remove)
+			total_filters++;
+	}
+	if (!total_filters) {
+		spin_unlock_bh(&adapter->mac_filter_list_lock);
+		goto error;
+	}
+
+	/* Fill all the new filters into virtchannel message */
+	eal = kcalloc(total_filters, sizeof(struct virtchnl_ether_addr),
+		      GFP_ATOMIC);
+	if (!eal) {
+		err = -ENOMEM;
+		spin_unlock_bh(&adapter->mac_filter_list_lock);
+		goto error;
+	}
+	list_for_each_entry_safe(f, tmp, &adapter->config_data.mac_filter_list,
+				 list) {
+		if (add && f->add) {
+			ether_addr_copy(eal[i].addr, f->macaddr);
+			i++;
+			f->add = false;
+			if (i == total_filters)
+				break;
+		}
+		if (!add && f->remove) {
+			ether_addr_copy(eal[i].addr, f->macaddr);
+			i++;
+			list_del(&f->list);
+			kfree(f);
+			if (i == total_filters)
+				break;
+		}
+	}
+
+	spin_unlock_bh(&adapter->mac_filter_list_lock);
+
+	/* Chunk up the filters into multiple messages to avoid
+	 * sending a control queue message buffer that is too large
+	 */
+	if (total_filters < IECM_NUM_FILTERS_PER_MSG)
+		num_entries = total_filters;
+	else
+		num_entries = IECM_NUM_FILTERS_PER_MSG;
+
+	num_msgs = DIV_ROUND_UP(total_filters, IECM_NUM_FILTERS_PER_MSG);
+
+	for (i = 0, k = 0; i < num_msgs || num_entries; i++) {
+		int buf_size = sizeof(struct virtchnl_ether_addr_list) +
+			(sizeof(struct virtchnl_ether_addr) * num_entries);
+		if (!veal || num_entries != IECM_NUM_FILTERS_PER_MSG) {
+			kfree(veal);
+			veal = kzalloc(buf_size, GFP_KERNEL);
+			if (!veal) {
+				err = -ENOMEM;
+				goto list_prep_error;
+			}
+		} else {
+			memset(veal, 0, buf_size);
+		}
+
+		veal->vsi_id = vport->vport_id;
+		veal->num_elements = num_entries;
+		memcpy(veal->list, &eal[k],
+		       sizeof(struct virtchnl_ether_addr) * num_entries);
+
+		if (add) {
+			vop = VIRTCHNL_OP_ADD_ETH_ADDR;
+			vc = IECM_VC_ADD_ETH_ADDR;
+			vc_err = IECM_VC_ADD_ETH_ADDR_ERR;
+		} else  {
+			vop = VIRTCHNL_OP_DEL_ETH_ADDR;
+			vc = IECM_VC_DEL_ETH_ADDR;
+			vc_err = IECM_VC_DEL_ETH_ADDR_ERR;
+		}
+		err = iecm_send_mb_msg(vport->adapter, vop, buf_size,
+				       (u8 *)veal);
+		if (err)
+			goto mbx_error;
+
+		if (!async) {
+			err = iecm_wait_for_event(vport->adapter, vc, vc_err);
+			if (err)
+				goto mbx_error;
+		}
+
+		k += num_entries;
+		total_filters -= num_entries;
+		if (total_filters < IECM_NUM_FILTERS_PER_MSG)
+			num_entries = total_filters;
+	}
+mbx_error:
+	kfree(veal);
+list_prep_error:
+	kfree(eal);
+error:
+	if (err)
+		dev_err(&pdev->dev, "Failed to add or del mac filters %d", err);
 }
 
 /**

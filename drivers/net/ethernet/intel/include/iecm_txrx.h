@@ -512,4 +512,6 @@ void iecm_vport_calc_total_qs(struct iecm_adapter *adapter,
 			      struct virtchnl2_create_vport *vport_msg);
 void iecm_vport_calc_num_q_groups(struct iecm_vport *vport);
 void iecm_vport_calc_num_q_vec(struct iecm_vport *vport);
+irqreturn_t
+iecm_vport_intr_clean_queues(int __always_unused irq, void *data);
 #endif /* !_IECM_TXRX_H_ */

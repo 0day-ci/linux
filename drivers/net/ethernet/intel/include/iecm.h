@@ -33,6 +33,11 @@
 #define IECM_MB_MAX_ERR			20
 #define IECM_NUM_CHUNKS_PER_MSG(a, b)	((IECM_DFLT_MBX_BUF_SIZE - (a)) / (b))
 
+/* 2K is the real maximum, but the driver should not be using more than the
+ * below limit
+ */
+#define IECM_MAX_VECIDS			256
+
 #define IECM_MAX_NUM_VPORTS		1
 
 /* available message levels */
@@ -133,6 +138,10 @@ enum iecm_cap_field {
 	IECM_OTHER_CAPS		= offsetof(struct virtchnl2_get_capabilities,
 					   other_caps),
 	IECM_CAP_FIELD_LAST,
+};
+
+struct iecm_netdev_priv {
+	struct iecm_vport *vport;
 };
 
 struct iecm_reset_reg {
@@ -450,6 +459,8 @@ struct iecm_adapter {
 	struct msix_entry *msix_entries;
 	struct virtchnl2_alloc_vectors *req_vec_chunks;
 	struct iecm_q_vector mb_vector;
+	/* handler for hard interrupt for mailbox*/
+	irqreturn_t (*irq_mb_handler)(int irq, void *data);
 
 	/* vport structs */
 	struct iecm_vport **vports;	/* vports created by the driver */
@@ -537,11 +548,87 @@ static inline bool __iecm_is_cap_ena(struct iecm_adapter *adapter, bool all,
 	return adapter->dev_ops.vc_ops.is_cap_ena(adapter, all, field, flag);
 }
 
-#define IECM_CAP_HSPLIT (\
-	VIRTCHNL2_CAP_RX_HSPLIT_AT_L2   |\
-	VIRTCHNL2_CAP_RX_HSPLIT_AT_L3   |\
-	VIRTCHNL2_CAP_RX_HSPLIT_AT_L4V4 |\
+/* enum used to distinguish vlan capabilities */
+enum iecm_vlan_caps {
+	IECM_CAP_VLAN_CTAG_INSERT,
+	IECM_CAP_VLAN_STAG_INSERT,
+	IECM_CAP_VLAN_CTAG_STRIP,
+	IECM_CAP_VLAN_STAG_STRIP,
+	IECM_CAP_VLAN_CTAG_ADD_DEL,
+	IECM_CAP_VLAN_STAG_ADD_DEL,
+	IECM_CAP_VLAN_LAST,
+};
+
+#define IECM_VLAN_8100 (VIRTCHNL_VLAN_TOGGLE | VIRTCHNL_VLAN_ETHERTYPE_8100)
+#define IECM_VLAN_88A8 (VIRTCHNL_VLAN_TOGGLE | VIRTCHNL_VLAN_ETHERTYPE_88A8)
+
+#define IECM_F_HW_VLAN_CTAG_TX NETIF_F_HW_VLAN_CTAG_TX
+
+#define IECM_F_HW_VLAN_CTAG_RX NETIF_F_HW_VLAN_CTAG_RX
+
+#define IECM_F_HW_VLAN_CTAG_FILTER NETIF_F_HW_VLAN_CTAG_FILTER
+
+#define IECM_CAP_RSS (\
+	VIRTCHNL2_CAP_RSS_IPV4_TCP	|\
+	VIRTCHNL2_CAP_RSS_IPV4_TCP	|\
+	VIRTCHNL2_CAP_RSS_IPV4_UDP	|\
+	VIRTCHNL2_CAP_RSS_IPV4_SCTP	|\
+	VIRTCHNL2_CAP_RSS_IPV4_OTHER	|\
+	VIRTCHNL2_CAP_RSS_IPV4_AH	|\
+	VIRTCHNL2_CAP_RSS_IPV4_ESP	|\
+	VIRTCHNL2_CAP_RSS_IPV4_AH_ESP	|\
+	VIRTCHNL2_CAP_RSS_IPV6_TCP	|\
+	VIRTCHNL2_CAP_RSS_IPV6_TCP	|\
+	VIRTCHNL2_CAP_RSS_IPV6_UDP	|\
+	VIRTCHNL2_CAP_RSS_IPV6_SCTP	|\
+	VIRTCHNL2_CAP_RSS_IPV6_OTHER	|\
+	VIRTCHNL2_CAP_RSS_IPV6_AH	|\
+	VIRTCHNL2_CAP_RSS_IPV6_ESP	|\
+	VIRTCHNL2_CAP_RSS_IPV6_AH_ESP)
+
+#define IECM_CAP_RSC (\
+	VIRTCHNL2_CAP_RSC_IPV4_TCP	|\
+	VIRTCHNL2_CAP_RSC_IPV4_SCTP	|\
+	VIRTCHNL2_CAP_RSC_IPV6_TCP	|\
+	VIRTCHNL2_CAP_RSC_IPV6_SCTP)
+
+#define IECM_CAP_HSPLIT	(\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L2	|\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L3	|\
+	VIRTCHNL2_CAP_RX_HSPLIT_AT_L4V4	|\
 	VIRTCHNL2_CAP_RX_HSPLIT_AT_L4V6)
+
+#define IECM_CAP_RX_CSUM_L4V4 (\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV4_TCP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV4_UDP)
+
+#define IECM_CAP_RX_CSUM_L4V6 (\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_TCP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_UDP)
+
+#define IECM_CAP_RX_CSUM (\
+	VIRTCHNL2_CAP_RX_CSUM_L3_IPV4		|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV4_TCP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV4_UDP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV4_SCTP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_TCP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_UDP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_SCTP)
+
+#define IECM_CAP_SCTP_CSUM (\
+	VIRTCHNL2_CAP_TX_CSUM_L4_IPV4_SCTP	|\
+	VIRTCHNL2_CAP_TX_CSUM_L4_IPV6_SCTP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV4_SCTP	|\
+	VIRTCHNL2_CAP_RX_CSUM_L4_IPV6_SCTP)
+
+/**
+ * iecm_get_reserved_vecs - Get reserved vectors
+ * @adapter: private data struct
+ */
+static inline u16 iecm_get_reserved_vecs(struct iecm_adapter *adapter)
+{
+	return adapter->dev_ops.vc_ops.get_reserved_vecs(adapter);
+}
 
 /**
  * iecm_is_reset_detected - check if we were reset at some point
@@ -553,6 +640,20 @@ static inline bool iecm_is_reset_detected(struct iecm_adapter *adapter)
 {
 	return !(rd32(&adapter->hw, adapter->hw.arq->reg.len) &
 		 adapter->hw.arq->reg.len_ena_mask);
+}
+
+/**
+ * iecm_is_reset_in_prog - check if reset is in progress
+ * @adapter: driver specific private structure
+ *
+ * Returns true if hard reset is in progress, false otherwise
+ */
+static inline bool iecm_is_reset_in_prog(struct iecm_adapter *adapter)
+{
+	return (test_bit(__IECM_HR_RESET_IN_PROG, adapter->flags) ||
+		test_bit(__IECM_HR_FUNC_RESET, adapter->flags) ||
+		test_bit(__IECM_HR_CORE_RESET, adapter->flags) ||
+		test_bit(__IECM_HR_DRV_LOAD, adapter->flags));
 }
 
 int iecm_probe(struct pci_dev *pdev,
@@ -576,6 +677,7 @@ int iecm_send_get_caps_msg(struct iecm_adapter *adapter);
 int iecm_send_delete_queues_msg(struct iecm_vport *vport);
 int iecm_send_add_queues_msg(struct iecm_vport *vport, u16 num_tx_q,
 			     u16 num_complq, u16 num_rx_q, u16 num_rx_bufq);
+int iecm_send_vlan_v2_caps_msg(struct iecm_adapter *adapter);
 int iecm_send_config_tx_queues_msg(struct iecm_vport *vport);
 int iecm_send_config_rx_queues_msg(struct iecm_vport *vport);
 int iecm_send_enable_vport_msg(struct iecm_vport *vport);
@@ -589,6 +691,7 @@ int iecm_send_dealloc_vectors_msg(struct iecm_adapter *adapter);
 int iecm_send_alloc_vectors_msg(struct iecm_adapter *adapter, u16 num_vectors);
 int iecm_vport_params_buf_alloc(struct iecm_adapter *adapter);
 void iecm_vport_params_buf_rel(struct iecm_adapter *adapter);
+struct iecm_vport *iecm_netdev_to_vport(struct net_device *netdev);
 int iecm_send_get_stats_msg(struct iecm_vport *vport);
 int iecm_get_vec_ids(struct iecm_adapter *adapter,
 		     u16 *vecids, int num_vecids,
@@ -598,6 +701,7 @@ int iecm_recv_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 int iecm_send_mb_msg(struct iecm_adapter *adapter, enum virtchnl_ops op,
 		     u16 msg_size, u8 *msg);
 void iecm_vport_set_hsplit(struct iecm_vport *vport, bool ena);
+void iecm_add_del_ether_addrs(struct iecm_vport *vport, bool add, bool async);
 int iecm_send_enable_channels_msg(struct iecm_vport *vport);
 int iecm_send_disable_channels_msg(struct iecm_vport *vport);
 bool iecm_is_feature_ena(struct iecm_vport *vport, netdev_features_t feature);
