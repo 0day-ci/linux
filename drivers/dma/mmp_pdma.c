@@ -1067,6 +1067,8 @@ static int mmp_pdma_probe(struct platform_device *op)
 	if (irq_num != dma_channels) {
 		/* all chan share one irq, demux inside */
 		irq = platform_get_irq(op, 0);
+		if (irq < 0)
+			return irq;
 		ret = devm_request_irq(pdev->dev, irq, mmp_pdma_int_handler,
 				       IRQF_SHARED, "pdma", pdev);
 		if (ret)
