@@ -8,6 +8,7 @@
 #include <net/pkt_cls.h>
 #include <linux/aer.h>
 #include <linux/pci.h>
+#include <linux/sctp.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>

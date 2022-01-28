@@ -624,6 +624,26 @@ struct iecm_txq_group {
 
 struct iecm_adapter;
 
+/**
+ * iecm_tx_singleq_build_ctob - populate command tag offset and size
+ * @td_cmd: Command to be filled in desc
+ * @td_offset: Offset to be filled in desc
+ * @size: Size of the buffer
+ * @td_tag: vlan tag to be filled
+ *
+ * Returns the 64 bit value populated with the input parameters
+ */
+static inline __le64
+iecm_tx_singleq_build_ctob(u64 td_cmd, u64 td_offset, unsigned int size,
+			   u64 td_tag)
+{
+	return cpu_to_le64(IECM_TX_DESC_DTYPE_DATA |
+			   (td_cmd    << IECM_TXD_QW1_CMD_S) |
+			   (td_offset << IECM_TXD_QW1_OFFSET_S) |
+			   ((u64)size << IECM_TXD_QW1_TX_BUF_SZ_S) |
+			   (td_tag    << IECM_TXD_QW1_L2TAG1_S));
+}
+
 void iecm_tx_splitq_build_ctb(union iecm_tx_flex_desc *desc,
 			      struct iecm_tx_splitq_params *parms,
 			      u16 td_cmd, u16 size);
@@ -673,8 +693,19 @@ void iecm_rx_splitq_put_bufs(struct iecm_queue *rx_bufq,
 			     struct iecm_rx_buf *hdr_buf,
 			     struct iecm_rx_buf *rx_buf);
 bool iecm_rx_splitq_test_staterr(u8 stat_err_field, const u8 stat_err_bits);
+bool iecm_rx_singleq_test_staterr(union virtchnl2_rx_desc *rx_desc,
+				  const u64 stat_err_bits);
 int iecm_rx_process_skb_fields(struct iecm_queue *rxq, struct sk_buff *skb,
 			       struct virtchnl2_rx_flex_desc_adv_nic_3 *rx_desc);
+void iecm_rx_singleq_process_skb_fields(struct iecm_queue *rx_q, struct sk_buff *skb,
+					union virtchnl2_rx_desc *rx_desc, u16 ptype);
+void iecm_rx_singleq_extract_fields(struct iecm_queue *rx_q,
+				    union virtchnl2_rx_desc *rx_desc,
+				    struct iecm_rx_extracted *fields);
+void iecm_rx_singleq_bump_ntc(struct iecm_queue *q);
+bool iecm_rx_singleq_is_non_eop(struct iecm_queue *rxq,
+				union virtchnl2_rx_desc *rx_desc,
+				struct sk_buff *skb);
 bool iecm_rx_splitq_extract_vlan_tag(struct virtchnl2_rx_flex_desc_adv_nic_3 *desc,
 				     struct iecm_queue *rxq, u16 *vlan_tag);
 void iecm_rx_bump_ntc(struct iecm_queue *q);
