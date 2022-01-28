@@ -1907,8 +1907,10 @@ static int ab8500_chargalg_sysfs_init(struct ab8500_chargalg *di)
 	ret = kobject_init_and_add(&di->chargalg_kobject,
 		&ab8500_chargalg_ktype,
 		NULL, "ab8500_chargalg");
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(di->dev, "failed to create sysfs entry\n");
+		kobject_put(&di->chargalg_kobject);
+	}
 
 	return ret;
 }
