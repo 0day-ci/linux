@@ -117,5 +117,6 @@ KVM_X86_OP(enable_direct_tlbflush)
 KVM_X86_OP(migrate_timers)
 KVM_X86_OP(msr_filter_changed)
 KVM_X86_OP(complete_emulated_msr)
+KVM_X86_OP(vcpu_deliver_sipi_vector)
 
 #undef KVM_X86_OP
