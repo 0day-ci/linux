@@ -62,6 +62,7 @@ extern unsigned long kernel_symbol_value(const struct kernel_symbol *sym);
 extern int cmp_name(const void *name, const void *sym);
 extern long get_offset(struct module *mod, unsigned int *size, Elf_Shdr *sechdr,
 		       unsigned int section);
+extern char *module_flags(struct module *mod, char *buf);
 
 #ifdef CONFIG_LIVEPATCH
 extern int copy_module_elf(struct module *mod, struct load_info *info);
