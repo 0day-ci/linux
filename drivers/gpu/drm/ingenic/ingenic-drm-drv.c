@@ -1322,11 +1322,6 @@ static int ingenic_drm_bind_with_components(struct device *dev)
 	return ingenic_drm_bind(dev, true);
 }
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static void ingenic_drm_unbind(struct device *dev)
 {
 	struct ingenic_drm *priv = dev_get_drvdata(dev);

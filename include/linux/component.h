@@ -2,6 +2,8 @@
 #ifndef COMPONENT_H
 #define COMPONENT_H
 
+#include <linux/device.h>
+#include <linux/of.h>
 #include <linux/stddef.h>
 
 
@@ -81,6 +83,22 @@ struct component_master_ops {
 	 */
 	void (*unbind)(struct device *master);
 };
+
+/* A set common helpers for compare/release functions */
+static inline int compare_of(struct device *dev, void *data)
+{
+	return dev->of_node == data;
+}
+
+static inline void release_of(struct device *dev, void *data)
+{
+	of_node_put(data);
+}
+
+static inline int compare_dev(struct device *dev, void *data)
+{
+	return dev == data;
+}
 
 void component_master_del(struct device *,
 	const struct component_master_ops *);

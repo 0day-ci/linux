@@ -144,11 +144,6 @@ static const struct drm_driver sti_driver = {
 	.minor = DRIVER_MINOR,
 };
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
 static int sti_init(struct drm_device *ddev)
 {
 	struct sti_private *private;

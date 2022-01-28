@@ -1174,15 +1174,6 @@ static const struct dev_pm_ops msm_pm_ops = {
  */
 
 /*
- * NOTE: duplication of the same code as exynos or imx (or probably any other).
- * so probably some room for some helpers
- */
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
-/*
  * Identify what components need to be added by parsing what remote-endpoints
  * our MDP output ports are connected to. In the case of LVDS on MDP4, there
  * is no external component that we need to add since LVDS is within MDP4
