@@ -273,7 +273,7 @@ static struct mrp_attr *mrp_attr_create(struct mrp_applicant *app,
 			return attr;
 		}
 	}
-	attr = kmalloc(sizeof(*attr) + len, GFP_ATOMIC);
+	attr = kmalloc(struct_size(*attr, value, len), GFP_ATOMIC);
 	if (!attr)
 		return attr;
 	attr->state = MRP_APPLICANT_VO;

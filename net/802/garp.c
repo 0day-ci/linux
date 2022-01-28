@@ -184,7 +184,7 @@ static struct garp_attr *garp_attr_create(struct garp_applicant *app,
 			return attr;
 		}
 	}
-	attr = kmalloc(sizeof(*attr) + len, GFP_ATOMIC);
+	attr = kmalloc(struct_size(*attr, data, len), GFP_ATOMIC);
 	if (!attr)
 		return attr;
 	attr->state = GARP_APPLICANT_VO;
