@@ -30,6 +30,9 @@ struct dax_operations {
 			sector_t, sector_t);
 	/* zero_page_range: required operation. Zero page range   */
 	int (*zero_page_range)(struct dax_device *, pgoff_t, size_t);
+	/* recovery_write: optional operation. */
+	size_t (*recovery_write)(struct dax_device *, pgoff_t, void *, size_t,
+				struct iov_iter *);
 };
 
 #if IS_ENABLED(CONFIG_DAX)
@@ -43,6 +46,9 @@ void set_dax_synchronous(struct dax_device *dax_dev);
 void set_dax_recovery(struct dax_device *dax_dev);
 bool dax_recovery_capable(struct dax_device *dax_dev);
 int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr);
+bool dax_recovery_started(struct dax_device *dax_dev, void **kaddr);
+size_t dax_recovery_write(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
+		size_t bytes, struct iov_iter *i);
 /*
  * Check if given mapping is supported by the file / underlying device.
  */
@@ -100,6 +106,16 @@ static inline bool dax_recovery_capable(struct dax_device *dax_dev)
 static inline int dax_prep_recovery(struct dax_device *dax_dev, void **kaddr)
 {
 	return -EINVAL;
+}
+static inline bool dax_recovery_started(struct dax_device *dax_dev,
+			void **kaddr)
+{
+	return false;
+}
+static inline size_t dax_recovery_write(struct dax_device *dax_dev,
+		pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i)
+{
+	return 0;
 }
 #endif
 
