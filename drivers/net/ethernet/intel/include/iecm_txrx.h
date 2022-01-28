@@ -672,6 +672,8 @@ netdev_tx_t iecm_tx_singleq_start(struct sk_buff *skb,
 				  struct net_device *netdev);
 bool iecm_rx_singleq_buf_hw_alloc_all(struct iecm_queue *rxq,
 				      u16 cleaned_count);
+void iecm_get_stats64(struct net_device *netdev,
+		      struct rtnl_link_stats64 *stats);
 int iecm_tso(struct iecm_tx_buf *first, struct iecm_tx_offload_params *off);
 void iecm_tx_prepare_vlan_flags(struct iecm_queue *tx_q,
 				struct iecm_tx_buf *first,

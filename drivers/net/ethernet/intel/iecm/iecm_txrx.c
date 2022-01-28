@@ -219,6 +219,21 @@ const struct iecm_rx_ptype_decoded iecm_ptype_lookup[IECM_RX_MAX_PTYPE] = {
 EXPORT_SYMBOL(iecm_ptype_lookup);
 
 /**
+ * iecm_get_stats64 - get statistics for network device structure
+ * @netdev: network interface device structure
+ * @stats: main device statistics structure
+ */
+void iecm_get_stats64(struct net_device *netdev,
+		      struct rtnl_link_stats64 *stats)
+{
+	struct iecm_vport *vport = iecm_netdev_to_vport(netdev);
+
+	set_bit(__IECM_MB_STATS_PENDING, vport->adapter->flags);
+
+	*stats = vport->netstats;
+}
+
+/**
  * iecm_tx_buf_rel - Release a Tx buffer
  * @tx_q: the queue that owns the buffer
  * @tx_buf: the buffer to free

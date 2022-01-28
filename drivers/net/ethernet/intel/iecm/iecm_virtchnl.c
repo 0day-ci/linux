@@ -2732,6 +2732,69 @@ static int iecm_send_insert_vlan_msg(struct iecm_vport *vport, bool ena)
 }
 
 /**
+ * iecm_send_enable_channels_msg - Send enable channels message
+ * @vport: vport structure
+ *
+ * Request the PF/CP to enable channels as specified by the user via tc tool.
+ * Returns 0 on success, negative on failure.
+ **/
+int iecm_send_enable_channels_msg(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	struct iecm_channel_config *ch_config;
+	struct virtchnl_tc_info *vti = NULL;
+	int i, err;
+	u16 len;
+
+	ch_config = &adapter->config_data.ch_config;
+	len = ((ch_config->num_tc - 1) * sizeof(struct virtchnl_channel_info)) +
+		sizeof(struct virtchnl_tc_info);
+
+	vti = kzalloc(len, GFP_KERNEL);
+	if (!vti)
+		return -ENOMEM;
+	vti->num_tc = ch_config->num_tc;
+	for (i = 0; i < vti->num_tc; i++) {
+		vti->list[i].count = ch_config->ch_info[i].count;
+		vti->list[i].offset = ch_config->ch_info[i].offset;
+		vti->list[i].pad = 0;
+		vti->list[i].max_tx_rate = ch_config->ch_info[i].max_tx_rate;
+	}
+
+	err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_ENABLE_CHANNELS, len,
+			       (u8 *)vti);
+	if (err)
+		goto error;
+
+	err = iecm_wait_for_event(adapter, IECM_VC_ENA_CHANNELS,
+				  IECM_VC_ENA_CHANNELS_ERR);
+error:
+	kfree(vti);
+	return err;
+}
+
+/**
+ * iecm_send_disable_channels_msg - Send disable channels message
+ * @vport: vport structure to disable channels on
+ *
+ * Returns 0 on success, negative on failure.
+ */
+int iecm_send_disable_channels_msg(struct iecm_vport *vport)
+{
+	struct iecm_adapter *adapter = vport->adapter;
+	int err;
+
+	err = iecm_send_mb_msg(adapter, VIRTCHNL_OP_DISABLE_CHANNELS,
+			       0, NULL);
+	if (err)
+		return err;
+
+	err = iecm_min_wait_for_event(adapter, IECM_VC_DIS_CHANNELS,
+				      IECM_VC_DIS_CHANNELS_ERR);
+	return err;
+}
+
+/**
  * iecm_send_vlan_v2_caps_msg - send virtchnl get offload VLAN V2 caps message
  * @adapter: adapter info struct
  *

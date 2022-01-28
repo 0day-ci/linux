@@ -4,6 +4,8 @@
 #ifndef _IECM_H_
 #define _IECM_H_
 
+#include <net/pkt_sched.h>
+#include <net/pkt_cls.h>
 #include <linux/aer.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
@@ -43,6 +45,8 @@
 
 /* available message levels */
 #define IECM_AVAIL_NETIF_M (NETIF_MSG_DRV | NETIF_MSG_PROBE | NETIF_MSG_LINK)
+
+#define IECM_MBPS_DIVISOR		125000 /* divisor to convert to Mbps */
 
 #define IECM_VIRTCHNL_VERSION_MAJOR VIRTCHNL_VERSION_MAJOR_2
 #define IECM_VIRTCHNL_VERSION_MINOR VIRTCHNL_VERSION_MINOR_0
@@ -393,6 +397,13 @@ enum iecm_user_flags {
 	__IECM_USER_FLAGS_NBITS,
 };
 
+struct iecm_channel_config {
+	struct virtchnl_channel_info ch_info[VIRTCHNL_MAX_ADQ_V2_CHANNELS];
+	bool tc_running;
+	u8 total_qs;
+	u8 num_tc;
+};
+
 #define IECM_GET_PTYPE_SIZE(p) \
 	(sizeof(struct virtchnl2_ptype) + \
 	(((p)->proto_id_count ? ((p)->proto_id_count - 1) : 0) * sizeof(u16)))
@@ -430,6 +441,7 @@ struct iecm_user_config_data {
 	struct list_head mac_filter_list;
 	struct list_head vlan_filter_list;
 	struct list_head adv_rss_list;
+	struct iecm_channel_config ch_config;
 };
 
 struct iecm_rss_data {
@@ -703,6 +715,8 @@ int iecm_send_delete_queues_msg(struct iecm_vport *vport);
 int iecm_send_add_queues_msg(struct iecm_vport *vport, u16 num_tx_q,
 			     u16 num_complq, u16 num_rx_q, u16 num_rx_bufq);
 int iecm_send_vlan_v2_caps_msg(struct iecm_adapter *adapter);
+int iecm_initiate_soft_reset(struct iecm_vport *vport,
+			     enum iecm_flags reset_cause);
 int iecm_send_config_tx_queues_msg(struct iecm_vport *vport);
 int iecm_send_config_rx_queues_msg(struct iecm_vport *vport);
 int iecm_send_enable_vport_msg(struct iecm_vport *vport);
