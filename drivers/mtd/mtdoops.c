@@ -16,6 +16,7 @@
 #include <linux/wait.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/timekeeping.h>
 #include <linux/mtd/mtd.h>
 #include <linux/kmsg_dump.h>
 
@@ -23,7 +24,7 @@
 #define MTDOOPS_MAX_MTD_SIZE (8 * 1024 * 1024)
 
 #define MTDOOPS_KERNMSG_MAGIC 0x5d005d00
-#define MTDOOPS_HEADER_SIZE   8
+#define MTDOOPS_HEADER_SIZE   16
 
 static unsigned long record_size = 4096;
 module_param(record_size, ulong, 0400);
@@ -180,6 +181,7 @@ static void mtdoops_write(struct mtdoops_context *cxt, int panic)
 	size_t retlen;
 	u32 *hdr;
 	int ret;
+	ktime_t ktime = ktime_get_real();
 
 	if (test_and_set_bit(0, &cxt->oops_buf_busy))
 		return;
@@ -188,6 +190,8 @@ static void mtdoops_write(struct mtdoops_context *cxt, int panic)
 	hdr = cxt->oops_buf;
 	hdr[0] = cxt->nextcount;
 	hdr[1] = MTDOOPS_KERNMSG_MAGIC;
+	hdr[2] = (u32) (ktime >> 32);
+	hdr[3] = (u32) (ktime & 0xffffffff);
 
 	if (panic) {
 		ret = mtd_panic_write(mtd, cxt->nextpage * record_size,
