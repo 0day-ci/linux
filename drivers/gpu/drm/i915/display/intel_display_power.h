@@ -9,8 +9,10 @@
 #include "intel_runtime_pm.h"
 #include "i915_reg.h"
 
+enum aux_ch;
 enum dpio_channel;
 enum dpio_phy;
+enum port;
 struct drm_i915_private;
 struct i915_power_well;
 struct intel_encoder;
@@ -131,6 +133,7 @@ enum intel_display_power_domain {
 	POWER_DOMAIN_INIT,
 
 	POWER_DOMAIN_NUM,
+	POWER_DOMAIN_INVALID = POWER_DOMAIN_NUM,
 };
 
 /*
@@ -322,5 +325,14 @@ bool chv_phy_powergate_ch(struct drm_i915_private *dev_priv, enum dpio_phy phy,
 /* intel_display_power_map.c */
 const char *
 intel_display_power_domain_str(enum intel_display_power_domain domain);
+
+enum intel_display_power_domain
+intel_ddi_lanes_power_domain(struct drm_i915_private *i915, enum port port);
+enum intel_display_power_domain
+intel_ddi_io_power_domain(struct drm_i915_private *i915, enum port port);
+enum intel_display_power_domain
+intel_legacy_aux_power_domain(struct drm_i915_private *i915, enum aux_ch aux_ch);
+enum intel_display_power_domain
+intel_tbt_aux_power_domain(struct drm_i915_private *i915, enum aux_ch aux_ch);
 
 #endif /* __INTEL_DISPLAY_POWER_H__ */
