@@ -11806,24 +11806,36 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *slot)
 
 int memslot_rmap_alloc(struct kvm_memory_slot *slot, unsigned long npages)
 {
-	const int sz = sizeof(*slot->arch.rmap[0]);
+	const size_t sz = sizeof(*slot->arch.rmap[0]);
 	int i;
 
 	for (i = 0; i < KVM_NR_PAGE_SIZES; ++i) {
 		int level = i + 1;
-		int lpages = __kvm_mmu_slot_lpages(slot, npages, level);
+		size_t lpages = __kvm_mmu_slot_lpages(slot, npages, level);
+		size_t rmap_size;
 
 		if (slot->arch.rmap[i])
 			continue;
 
-		slot->arch.rmap[i] = kvcalloc(lpages, sz, GFP_KERNEL_ACCOUNT);
-		if (!slot->arch.rmap[i]) {
-			memslot_rmap_free(slot);
-			return -ENOMEM;
-		}
+		if (unlikely(check_mul_overflow(lpages, sz, &rmap_size)))
+			goto ret_fail;
+
+		/* kvzalloc() only allows sizes up to INT_MAX */
+		if (unlikely(rmap_size > INT_MAX))
+			slot->arch.rmap[i] = __vmalloc(rmap_size,
+						       GFP_KERNEL_ACCOUNT | __GFP_ZERO);
+		else
+			slot->arch.rmap[i] = kvzalloc(rmap_size, GFP_KERNEL_ACCOUNT);
+
+		if (!slot->arch.rmap[i])
+			goto ret_fail;
 	}
 
 	return 0;
+
+ret_fail:
+	memslot_rmap_free(slot);
+	return -ENOMEM;
 }
 
 static int kvm_alloc_memslot_metadata(struct kvm *kvm,
