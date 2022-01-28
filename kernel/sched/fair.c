@@ -2390,6 +2390,10 @@ static void task_numa_placement(struct task_struct *p)
 			}
 		}
 
+		/* Cannot migrate task to CPU-less node */
+		if (!node_state(nid, N_CPU))
+			continue;
+
 		if (!ng) {
 			if (faults > max_faults) {
 				max_faults = faults;
