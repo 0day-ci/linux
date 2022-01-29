@@ -185,6 +185,7 @@ static struct page *__page_pool_get_cached(struct page_pool *pool)
 		page_pool_stat_alloc_inc(fast);
 	} else {
 		page = page_pool_refill_alloc_cache(pool);
+		page_pool_stat_alloc_inc(refill);
 	}
 
 	return page;

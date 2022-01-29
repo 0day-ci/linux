@@ -149,6 +149,7 @@ struct page_pool_stats {
 		u64 empty; /* failed refills due to empty ptr ring, forcing
 			    * slow path allocation
 			    */
+		u64 refill; /* allocations via successful refill */
 	} alloc;
 };
 
