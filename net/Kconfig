@@ -434,6 +434,18 @@ config NET_DEVLINK
 config PAGE_POOL
 	bool
 
+config PAGE_POOL_STATS
+	default n
+	bool "Page pool stats"
+	depends on PAGE_POOL
+	help
+	  Enable page pool statistics to track allocations. Stats are exported
+	  to the file /proc/net/page_pool_stat. Users can examine these
+	  stats to better understand how their drivers and the kernel's
+	  page allocator, and the page pool interact with each other.
+
+	  If unsure, say N.
+
 config FAILOVER
 	tristate "Generic failover module"
 	help
