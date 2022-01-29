@@ -1116,7 +1116,7 @@ int hmm_bo_bind(struct hmm_buffer_object *bo)
 				page_to_phys(bo->page_obj[i].page), 1);
 		if (ret)
 			goto map_err;
-		virt += (1 << PAGE_SHIFT);
+		virt += BIT(PAGE_SHIFT);
 	}
 
 	/*

@@ -548,7 +548,7 @@ static long __ov5693_set_exposure(struct v4l2_subdev *sd, int coarse_itg,
 	 * The way is to write coarse_itg/2 to the reg, meanwhile write 2*hts
 	 * to the reg.
 	 */
-	if (coarse_itg > (1 << 15)) {
+	if (coarse_itg > BIT(15)) {
 		hts = hts * 2;
 		coarse_itg = (int)coarse_itg / 2;
 	}

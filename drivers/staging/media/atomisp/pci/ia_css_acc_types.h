@@ -466,7 +466,7 @@ struct ia_css_acc_fw {
 
 enum ia_css_sp_sleep_mode {
 	SP_DISABLE_SLEEP_MODE = 0,
-	SP_SLEEP_AFTER_FRAME = 1 << 0,
-	SP_SLEEP_AFTER_IRQ = 1 << 1
+	SP_SLEEP_AFTER_FRAME  = BIT(0),
+	SP_SLEEP_AFTER_IRQ    = BIT(1)
 };
 #endif /* _IA_CSS_ACC_TYPES_H */
