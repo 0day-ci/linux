@@ -1706,41 +1706,25 @@ static int lo_compat_ioctl(struct block_device *bdev, fmode_t mode,
 static int lo_open(struct block_device *bdev, fmode_t mode)
 {
 	struct loop_device *lo = bdev->bd_disk->private_data;
-	int err;
 
-	err = mutex_lock_killable(&lo->lo_mutex);
-	if (err)
-		return err;
-	if (lo->lo_state == Lo_deleting)
-		err = -ENXIO;
-	else
-		atomic_inc(&lo->lo_refcnt);
-	mutex_unlock(&lo->lo_mutex);
-	return err;
+	return atomic_inc_unless_negative(&lo->lo_refcnt) ? 0 : -ENXIO;
 }
 
 static void lo_release(struct gendisk *disk, fmode_t mode)
 {
 	struct loop_device *lo = disk->private_data;
 
-	mutex_lock(&lo->lo_mutex);
-	if (atomic_dec_return(&lo->lo_refcnt))
-		goto out_unlock;
-
-	if (lo->lo_flags & LO_FLAGS_AUTOCLEAR) {
-		if (lo->lo_state != Lo_bound)
-			goto out_unlock;
-		lo->lo_state = Lo_rundown;
-		mutex_unlock(&lo->lo_mutex);
-		__loop_clr_fd(lo, true);
-		mutex_lock(&lo->lo_mutex);
-		lo->lo_state = Lo_unbound;
-		mutex_unlock(&lo->lo_mutex);
+	/*
+	 * Since lo_open() and lo_release() are serialized by disk->open_mutex,
+	 * and lo->refcnt == 0 means nobody is using this device, we can access
+	 * lo->lo_state and lo->lo_flags without holding lo->lo_mutex.
+	 */
+	if (atomic_dec_return(&lo->lo_refcnt) ||
+	    lo->lo_state != Lo_bound || !(lo->lo_flags & LO_FLAGS_AUTOCLEAR))
 		return;
-	}
-
-out_unlock:
-	mutex_unlock(&lo->lo_mutex);
+	lo->lo_state = Lo_rundown;
+	__loop_clr_fd(lo, true);
+	lo->lo_state = Lo_unbound;
 }
 
 static const struct block_device_operations lo_fops = {
@@ -2077,42 +2061,28 @@ static int loop_control_remove(int idx)
 		pr_warn_once("deleting an unspecified loop device is not supported.\n");
 		return -EINVAL;
 	}
-		
-	/* Hide this loop device for serialization. */
+
 	ret = mutex_lock_killable(&loop_ctl_mutex);
 	if (ret)
 		return ret;
 	lo = idr_find(&loop_index_idr, idx);
+	/* Fail if loop_add() or loop_remove() are in progress. */
 	if (!lo || !lo->idr_visible)
 		ret = -ENODEV;
-	else
-		lo->idr_visible = false;
-	mutex_unlock(&loop_ctl_mutex);
-	if (ret)
-		return ret;
-
-	/* Check whether this loop device can be removed. */
-	ret = mutex_lock_killable(&lo->lo_mutex);
-	if (ret)
-		goto mark_visible;
-	if (lo->lo_state != Lo_unbound ||
-	    atomic_read(&lo->lo_refcnt) > 0) {
-		mutex_unlock(&lo->lo_mutex);
+	/* Fail if somebody is using this loop device. */
+	else if (data_race(lo->lo_state) != Lo_unbound ||
+		 atomic_read(&lo->lo_refcnt) > 0)
 		ret = -EBUSY;
-		goto mark_visible;
+	/* Fail if somebody started using this loop device. */
+	else if (atomic_dec_return(&lo->lo_refcnt) == -1)
+		lo->idr_visible = false;
+	else {
+		atomic_inc(&lo->lo_refcnt);
+		ret = -EBUSY;
 	}
-	/* Mark this loop device no longer open()-able. */
-	lo->lo_state = Lo_deleting;
-	mutex_unlock(&lo->lo_mutex);
-
-	loop_remove(lo);
-	return 0;
-
-mark_visible:
-	/* Show this loop device again. */
-	mutex_lock(&loop_ctl_mutex);
-	lo->idr_visible = true;
 	mutex_unlock(&loop_ctl_mutex);
+	if (!ret)
+		loop_remove(lo);
 	return ret;
 }
 
