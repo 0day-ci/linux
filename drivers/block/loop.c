@@ -1003,7 +1003,8 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	    !file->f_op->write_iter)
 		lo->lo_flags |= LO_FLAGS_READ_ONLY;
 
-	lo->workqueue = alloc_workqueue("loop%d",
+	if (!lo->workqueue)
+		lo->workqueue = alloc_workqueue("loop%d",
 					WQ_UNBOUND | WQ_FREEZABLE,
 					0,
 					lo->lo_number);
@@ -1108,10 +1109,11 @@ static void __loop_clr_fd(struct loop_device *lo, bool release)
 		blk_queue_write_cache(lo->lo_queue, false, false);
 
 	/* freeze request queue during the transition */
-	if (!release)
+	if (!release) {
 		blk_mq_freeze_queue(lo->lo_queue);
-
-	destroy_workqueue(lo->workqueue);
+		destroy_workqueue(lo->workqueue);
+		lo->workqueue = NULL;
+	}
 	spin_lock_irq(&lo->lo_work_lock);
 	list_for_each_entry_safe(worker, pos, &lo->idle_worker_list,
 				idle_list) {
@@ -2050,6 +2052,8 @@ static void loop_remove(struct loop_device *lo)
 	mutex_lock(&loop_ctl_mutex);
 	idr_remove(&loop_index_idr, lo->lo_number);
 	mutex_unlock(&loop_ctl_mutex);
+	if (lo->workqueue)
+		destroy_workqueue(lo->workqueue);
 	/* There is no route which can find this loop device. */
 	mutex_destroy(&lo->lo_mutex);
 	kfree(lo);
