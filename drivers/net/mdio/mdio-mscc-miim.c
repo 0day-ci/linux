@@ -188,7 +188,8 @@ static const struct regmap_config mscc_miim_regmap_config = {
 };
 
 int mscc_miim_setup(struct device *dev, struct mii_bus **pbus, const char *name,
-		    struct regmap *mii_regmap, int status_offset)
+		    struct regmap *mii_regmap, int status_offset,
+		    struct regmap *phy_regmap, int phy_offset)
 {
 	struct mscc_miim_dev *miim;
 	struct mii_bus *bus;
@@ -210,6 +211,8 @@ int mscc_miim_setup(struct device *dev, struct mii_bus **pbus, const char *name,
 
 	miim->regs = mii_regmap;
 	miim->mii_status_offset = status_offset;
+	miim->phy_regs = phy_regmap;
+	miim->phy_reset_offset = phy_offset;
 
 	*pbus = bus;
 
@@ -257,15 +260,14 @@ static int mscc_miim_probe(struct platform_device *pdev)
 		}
 	}
 
-	ret = mscc_miim_setup(dev, &bus, "mscc_miim", mii_regmap, 0);
+	ret = mscc_miim_setup(&pdev->dev, &bus, "mscc_miim", mii_regmap, 0,
+			      phy_regmap, 0);
 	if (ret < 0) {
 		dev_err(dev, "Unable to setup the MDIO bus\n");
 		return ret;
 	}
 
 	miim = bus->priv;
-	miim->phy_regs = phy_regmap;
-	miim->phy_reset_offset = 0;
 
 	ret = of_mdiobus_register(bus, dev->of_node);
 	if (ret < 0) {
