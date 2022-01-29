@@ -1108,7 +1108,8 @@ static void __loop_clr_fd(struct loop_device *lo, bool release)
 		blk_queue_write_cache(lo->lo_queue, false, false);
 
 	/* freeze request queue during the transition */
-	blk_mq_freeze_queue(lo->lo_queue);
+	if (!release)
+		blk_mq_freeze_queue(lo->lo_queue);
 
 	destroy_workqueue(lo->workqueue);
 	spin_lock_irq(&lo->lo_work_lock);
@@ -1139,7 +1140,8 @@ static void __loop_clr_fd(struct loop_device *lo, bool release)
 	/* let user-space know about this change */
 	kobject_uevent(&disk_to_dev(lo->lo_disk)->kobj, KOBJ_CHANGE);
 	mapping_set_gfp_mask(filp->f_mapping, gfp);
-	blk_mq_unfreeze_queue(lo->lo_queue);
+	if (!release)
+		blk_mq_unfreeze_queue(lo->lo_queue);
 
 	disk_force_media_change(lo->lo_disk, DISK_EVENT_MEDIA_CHANGE);
 
@@ -1728,22 +1730,11 @@ static void lo_release(struct gendisk *disk, fmode_t mode)
 			goto out_unlock;
 		lo->lo_state = Lo_rundown;
 		mutex_unlock(&lo->lo_mutex);
-		/*
-		 * In autoclear mode, stop the loop thread
-		 * and remove configuration after last close.
-		 */
 		__loop_clr_fd(lo, true);
 		mutex_lock(&lo->lo_mutex);
 		lo->lo_state = Lo_unbound;
 		mutex_unlock(&lo->lo_mutex);
 		return;
-	} else if (lo->lo_state == Lo_bound) {
-		/*
-		 * Otherwise keep thread (if running) and config,
-		 * but flush possible ongoing bios in thread.
-		 */
-		blk_mq_freeze_queue(lo->lo_queue);
-		blk_mq_unfreeze_queue(lo->lo_queue);
 	}
 
 out_unlock:
