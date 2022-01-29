@@ -122,6 +122,10 @@ static const struct mfd_cell vsc7512_devs[] = {
 		.num_resources = ARRAY_SIZE(vsc7512_miim1_resources),
 		.resources = vsc7512_miim1_resources,
 	},
+	{
+		.name = "ocelot-ext-switch",
+		.of_compatible = "mscc,vsc7512-ext-switch",
+	},
 };
 
 int ocelot_core_init(struct ocelot_core *core)
