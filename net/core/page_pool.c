@@ -29,6 +29,15 @@
 #ifdef CONFIG_PAGE_POOL_STATS
 DEFINE_PER_CPU_ALIGNED(struct page_pool_stats, page_pool_stats);
 EXPORT_PER_CPU_SYMBOL(page_pool_stats);
+
+#define page_pool_stat_alloc_inc(__stat)					\
+	do {									\
+		struct page_pool_stats *pps = this_cpu_ptr(&page_pool_stats);	\
+		pps->alloc.__stat++;						\
+	} while (0)
+
+#else
+#define page_pool_stat_alloc_inc(stat)
 #endif
 
 static int page_pool_init(struct page_pool *pool,
