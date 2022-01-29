@@ -11,11 +11,13 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/mdio/mdio-mscc-miim.h>
+#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/of_mdio.h>
 #include <linux/phy.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <soc/mscc/ocelot.h>
 
 #define MSCC_MIIM_REG_STATUS		0x0
 #define		MSCC_MIIM_STATUS_STAT_PENDING	BIT(2)
@@ -230,13 +232,20 @@ static int mscc_miim_probe(struct platform_device *pdev)
 	struct mii_bus *bus;
 	int ret;
 
-	regs = devm_platform_get_and_ioremap_resource(pdev, 0, NULL);
-	if (IS_ERR(regs)) {
-		dev_err(dev, "Unable to map MIIM registers\n");
-		return PTR_ERR(regs);
-	}
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-	mii_regmap = devm_regmap_init_mmio(dev, regs, &mscc_miim_regmap_config);
+	if (!device_is_mfd(pdev)) {
+		regs = devm_ioremap_resource(dev, res);
+		if (IS_ERR(regs)) {
+			dev_err(dev, "Unable to map MIIM registers\n");
+			return PTR_ERR(regs);
+		}
+
+		mii_regmap = devm_regmap_init_mmio(dev, regs,
+						   &mscc_miim_regmap_config);
+	} else {
+		mii_regmap = ocelot_get_regmap_from_resource(dev->parent, res);
+	}
 
 	if (IS_ERR(mii_regmap)) {
 		dev_err(dev, "Unable to create MIIM regmap\n");

@@ -12,6 +12,7 @@
 #include <linux/clk.h>
 #include <linux/gpio/driver.h>
 #include <linux/io.h>
+#include <linux/mfd/core.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/pinctrl/pinmux.h>
@@ -19,6 +20,7 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/reset.h>
+#include <soc/mscc/ocelot.h>
 
 #include "core.h"
 #include "pinconf.h"
@@ -137,7 +139,9 @@ static inline int sgpio_addr_to_pin(struct sgpio_priv *priv, int port, int bit)
 
 static inline u32 sgpio_get_addr(struct sgpio_priv *priv, u32 rno, u32 off)
 {
-	return priv->properties->regoff[rno] + off;
+	int stride = regmap_get_reg_stride(priv->regs);
+
+	return (priv->properties->regoff[rno] + off) * stride;
 }
 
 static u32 sgpio_readl(struct sgpio_priv *priv, u32 rno, u32 off)
@@ -818,6 +822,7 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 	struct fwnode_handle *fwnode;
 	struct reset_control *reset;
 	struct sgpio_priv *priv;
+	struct resource *res;
 	struct clk *clk;
 	u32 __iomem *regs;
 	u32 val;
@@ -850,11 +855,18 @@ static int microchip_sgpio_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	regs = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(regs))
-		return PTR_ERR(regs);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-	priv->regs = devm_regmap_init_mmio(dev, regs, &regmap_config);
+	if (!device_is_mfd(pdev)) {
+		regs = devm_ioremap_resource(dev, res);
+		if (IS_ERR(regs))
+			return PTR_ERR(regs);
+
+		priv->regs = devm_regmap_init_mmio(dev, regs, &regmap_config);
+	} else {
+		priv->regs = ocelot_get_regmap_from_resource(dev->parent, res);
+	}
+
 	if (IS_ERR(priv->regs))
 		return PTR_ERR(priv->regs);
 

@@ -948,6 +948,25 @@ config MFD_MENF21BMC
 	  This driver can also be built as a module. If so the module
 	  will be called menf21bmc.
 
+config MFD_OCELOT
+	tristate "Microsemi Ocelot External Control Support"
+	select MFD_CORE
+	help
+	  Say yes here to add support for Ocelot chips (VSC7511, VSC7512,
+	  VSC7513, VSC7514) controlled externally.
+
+	  All four of these chips can be controlled internally (MMIO) or
+	  externally via SPI, I2C, PCIe. This enables control of these chips
+	  over one or more of these buses.
+
+config MFD_OCELOT_SPI
+	tristate "Microsemi Ocelot SPI interface"
+	depends on MFD_OCELOT
+	depends on SPI_MASTER
+	select REGMAP_SPI
+	help
+	  Say yes here to add control to the MFD_OCELOT chips via SPI.
+
 config EZX_PCAP
 	bool "Motorola EZXPCAP Support"
 	depends on SPI_MASTER
