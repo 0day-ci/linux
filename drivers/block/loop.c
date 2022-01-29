@@ -1003,11 +1003,20 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	    !file->f_op->write_iter)
 		lo->lo_flags |= LO_FLAGS_READ_ONLY;
 
+	/*
+	 * Allocate a WQ for this loop device. We can't use a global WQ because
+	 * an I/O request will hung when number of active work hits concurrency
+	 * limit due to stacked loop devices. Also, specify WQ_MEM_RECLAIM in
+	 * order to guarantee that loop_process_work() can start processing an
+	 * I/O request even under memory pressure. As a result, this allocation
+	 * sounds a sort of resource wasting prepared for the worst condition.
+	 * We hope that people utilize ioctl(LOOP_CTL_GET_FREE) in order to
+	 * create only minimal number of loop devices.
+	 */
 	if (!lo->workqueue)
-		lo->workqueue = alloc_workqueue("loop%d",
-					WQ_UNBOUND | WQ_FREEZABLE,
-					0,
-					lo->lo_number);
+		lo->workqueue = alloc_workqueue("loop%d", WQ_MEM_RECLAIM |
+						WQ_UNBOUND | WQ_FREEZABLE,
+						0, lo->lo_number);
 	if (!lo->workqueue) {
 		error = -ENOMEM;
 		goto out_unlock;
