@@ -145,6 +145,7 @@ struct page_pool_stats {
 	struct {
 		u64 fast; /* fast path allocations */
 		u64 slow; /* slow-path order-0 allocations */
+		u64 slow_high_order; /* slow-path high order allocations */
 	} alloc;
 };
 
