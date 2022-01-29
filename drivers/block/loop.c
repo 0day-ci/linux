@@ -1100,11 +1100,9 @@ static void __loop_clr_fd(struct loop_device *lo, bool release)
 	/*
 	 * Since this function is called upon "ioctl(LOOP_CLR_FD)" xor "close()
 	 * after ioctl(LOOP_CLR_FD)", it is a sign of something going wrong if
-	 * lo->lo_state has changed while waiting for lo->lo_mutex.
+	 * lo->lo_state has changed.
 	 */
-	mutex_lock(&lo->lo_mutex);
 	BUG_ON(lo->lo_state != Lo_rundown);
-	mutex_unlock(&lo->lo_mutex);
 
 	if (test_bit(QUEUE_FLAG_WC, &lo->lo_queue->queue_flags))
 		blk_queue_write_cache(lo->lo_queue, false, false);
@@ -1167,18 +1165,9 @@ static void __loop_clr_fd(struct loop_device *lo, bool release)
 		/* Device is gone, no point in returning error */
 	}
 
-	/*
-	 * lo->lo_state is set to Lo_unbound here after above partscan has
-	 * finished. There cannot be anybody else entering __loop_clr_fd() as
-	 * Lo_rundown state protects us from all the other places trying to
-	 * change the 'lo' device.
-	 */
 	lo->lo_flags = 0;
 	if (!part_shift)
 		lo->lo_disk->flags |= GENHD_FL_NO_PART;
-	mutex_lock(&lo->lo_mutex);
-	lo->lo_state = Lo_unbound;
-	mutex_unlock(&lo->lo_mutex);
 
 	/* Release backing file and unblock loop_exit(). */
 	fput(filp);
@@ -1215,6 +1204,10 @@ static int loop_clr_fd(struct loop_device *lo)
 	mutex_unlock(&lo->lo_mutex);
 
 	__loop_clr_fd(lo, false);
+	/* Allow loop_configure() to reuse this device. */
+	mutex_lock(&lo->lo_mutex);
+	lo->lo_state = Lo_unbound;
+	mutex_unlock(&lo->lo_mutex);
 	return 0;
 }
 
@@ -1740,6 +1733,9 @@ static void lo_release(struct gendisk *disk, fmode_t mode)
 		 * and remove configuration after last close.
 		 */
 		__loop_clr_fd(lo, true);
+		mutex_lock(&lo->lo_mutex);
+		lo->lo_state = Lo_unbound;
+		mutex_unlock(&lo->lo_mutex);
 		return;
 	} else if (lo->lo_state == Lo_bound) {
 		/*
