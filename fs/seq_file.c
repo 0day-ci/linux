@@ -556,7 +556,7 @@ EXPORT_SYMBOL(seq_dentry);
 
 static void *single_start(struct seq_file *p, loff_t *pos)
 {
-	return NULL + (*pos == 0);
+	return *pos ? NULL : (void *) 1;
 }
 
 static void *single_next(struct seq_file *p, void *v, loff_t *pos)
