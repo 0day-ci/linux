@@ -56,6 +56,8 @@ struct vfio_device {
  *         match, -errno for abort (ex. match with insufficient or incorrect
  *         additional args)
  * @device_feature: Fill in the VFIO_DEVICE_FEATURE ioctl
+ * @migration_set_state: Optional callback to change the migration
+ *         state for devices that support migration.
  */
 struct vfio_device_ops {
 	char	*name;
@@ -72,6 +74,10 @@ struct vfio_device_ops {
 	int	(*match)(struct vfio_device *vdev, char *buf);
 	int	(*device_feature)(struct vfio_device *device, u32 flags,
 				  void __user *arg, size_t argsz);
+	struct file *(*migration_set_state)(
+		struct vfio_device *device,
+		enum vfio_device_mig_state new_state,
+		enum vfio_device_mig_state *final_state);
 };
 
 /**
@@ -113,6 +119,10 @@ extern struct vfio_device *vfio_device_get_from_dev(struct device *dev);
 extern void vfio_device_put(struct vfio_device *device);
 
 int vfio_assign_device_set(struct vfio_device *device, void *set_id);
+
+u32 vfio_mig_get_next_state(struct vfio_device *device,
+			    enum vfio_device_mig_state cur_fsm,
+			    enum vfio_device_mig_state new_fsm);
 
 /*
  * External user API

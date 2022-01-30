@@ -1557,6 +1557,184 @@ static int vfio_device_fops_release(struct inode *inode, struct file *filep)
 	return 0;
 }
 
+/*
+ * vfio_mig_get_next_state - Compute the next step in the FSM
+ * @cur_fsm - The current state the device is in
+ * @new_fsm - The target state to reach
+ *
+ * Return the next step in the state progression between cur_fsm and new_fsm.
+ * This breaks down requests for combination transitions into smaller steps and
+ * returns the next step to get to new_fsm. The function may need to be called
+ * multiple times before reaching new_fsm.
+ *
+ * VFIO_DEVICE_STATE_ERROR is returned if the state transition is not allowed.
+ */
+u32 vfio_mig_get_next_state(struct vfio_device *device,
+			    enum vfio_device_mig_state cur_fsm,
+			    enum vfio_device_mig_state new_fsm)
+{
+	enum { VFIO_DEVICE_NUM_STATES = VFIO_DEVICE_STATE_RESUMING + 1 };
+	/*
+	 * The coding in this table requires the driver to implement 6
+	 * FSM arcs:
+	 *         RESUMING -> STOP
+	 *         RUNNING -> STOP
+	 *         STOP -> RESUMING
+	 *         STOP -> RUNNING
+	 *         STOP -> STOP_COPY
+	 *         STOP_COPY -> STOP
+	 *
+	 * The coding will step through multiple states for these combination
+	 * transitions:
+	 *         RESUMING -> STOP -> RUNNING
+	 *         RESUMING -> STOP -> STOP_COPY
+	 *         RUNNING -> STOP -> RESUMING
+	 *         RUNNING -> STOP -> STOP_COPY
+	 *         STOP_COPY -> STOP -> RESUMING
+	 *         STOP_COPY -> STOP -> RUNNING
+	 */
+	static const u8 vfio_from_fsm_table[VFIO_DEVICE_NUM_STATES][VFIO_DEVICE_NUM_STATES] = {
+		[VFIO_DEVICE_STATE_STOP] = {
+			[VFIO_DEVICE_STATE_STOP] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_RUNNING] = VFIO_DEVICE_STATE_RUNNING,
+			[VFIO_DEVICE_STATE_STOP_COPY] = VFIO_DEVICE_STATE_STOP_COPY,
+			[VFIO_DEVICE_STATE_RESUMING] = VFIO_DEVICE_STATE_RESUMING,
+			[VFIO_DEVICE_STATE_ERROR] = VFIO_DEVICE_STATE_ERROR,
+		},
+		[VFIO_DEVICE_STATE_RUNNING] = {
+			[VFIO_DEVICE_STATE_STOP] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_RUNNING] = VFIO_DEVICE_STATE_RUNNING,
+			[VFIO_DEVICE_STATE_STOP_COPY] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_RESUMING] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_ERROR] = VFIO_DEVICE_STATE_ERROR,
+		},
+		[VFIO_DEVICE_STATE_STOP_COPY] = {
+			[VFIO_DEVICE_STATE_STOP] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_RUNNING] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_STOP_COPY] = VFIO_DEVICE_STATE_STOP_COPY,
+			[VFIO_DEVICE_STATE_RESUMING] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_ERROR] = VFIO_DEVICE_STATE_ERROR,
+		},
+		[VFIO_DEVICE_STATE_RESUMING] = {
+			[VFIO_DEVICE_STATE_STOP] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_RUNNING] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_STOP_COPY] = VFIO_DEVICE_STATE_STOP,
+			[VFIO_DEVICE_STATE_RESUMING] = VFIO_DEVICE_STATE_RESUMING,
+			[VFIO_DEVICE_STATE_ERROR] = VFIO_DEVICE_STATE_ERROR,
+		},
+		[VFIO_DEVICE_STATE_ERROR] = {
+			[VFIO_DEVICE_STATE_STOP] = VFIO_DEVICE_STATE_ERROR,
+			[VFIO_DEVICE_STATE_RUNNING] = VFIO_DEVICE_STATE_ERROR,
+			[VFIO_DEVICE_STATE_STOP_COPY] = VFIO_DEVICE_STATE_ERROR,
+			[VFIO_DEVICE_STATE_RESUMING] = VFIO_DEVICE_STATE_ERROR,
+			[VFIO_DEVICE_STATE_ERROR] = VFIO_DEVICE_STATE_ERROR,
+		},
+	};
+	if (cur_fsm >= ARRAY_SIZE(vfio_from_fsm_table) ||
+	    new_fsm >= ARRAY_SIZE(vfio_from_fsm_table))
+		return VFIO_DEVICE_STATE_ERROR;
+
+	return vfio_from_fsm_table[cur_fsm][new_fsm];
+}
+EXPORT_SYMBOL_GPL(vfio_mig_get_next_state);
+
+/*
+ * Convert the drivers's struct file into a FD number and return it to userspace
+ */
+static int vfio_ioct_mig_return_fd(struct file *filp, void __user *arg,
+				   struct vfio_device_mig_set_state *set_state)
+{
+	int ret;
+	int fd;
+
+	fd = get_unused_fd_flags(O_CLOEXEC);
+	if (fd < 0) {
+		ret = fd;
+		goto out_fput;
+	}
+
+	set_state->data_fd = fd;
+	if (copy_to_user(arg, set_state, sizeof(*set_state))) {
+		ret = -EFAULT;
+		goto out_put_unused;
+	}
+	fd_install(fd, filp);
+	return 0;
+
+out_put_unused:
+	put_unused_fd(fd);
+out_fput:
+	fput(filp);
+	return ret;
+}
+
+static int vfio_ioctl_mig_set_state(struct vfio_device *device,
+				    void __user *arg)
+{
+	size_t minsz =
+		offsetofend(struct vfio_device_mig_set_state, flags);
+	enum vfio_device_mig_state final_state = VFIO_DEVICE_STATE_ERROR;
+	struct vfio_device_mig_set_state set_state;
+	struct file *filp;
+
+	if (!device->ops->migration_set_state)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&set_state, arg, minsz))
+		return -EFAULT;
+
+	if (set_state.argsz < minsz || set_state.flags)
+		return -EOPNOTSUPP;
+
+	/*
+	 * It is tempting to try to validate set_state.device_state here, but
+	 * then we can't return final_state. The validation is done in
+	 * vfio_mig_get_next_state().
+	 */
+	filp = device->ops->migration_set_state(device, set_state.device_state,
+						&final_state);
+	set_state.device_state = final_state;
+	if (IS_ERR(filp)) {
+		if (WARN_ON(PTR_ERR(filp) == -EOPNOTSUPP ||
+			    PTR_ERR(filp) == -ENOTTY ||
+			    PTR_ERR(filp) == -EFAULT))
+			filp = ERR_PTR(-EINVAL);
+		goto out_copy;
+	}
+
+	if (!filp)
+		goto out_copy;
+	return vfio_ioct_mig_return_fd(filp, arg, &set_state);
+out_copy:
+	set_state.data_fd = -1;
+	if (copy_to_user(arg, &set_state, sizeof(set_state)))
+		return -EFAULT;
+	if (IS_ERR(filp))
+		return PTR_ERR(filp);
+	return 0;
+}
+
+static int vfio_ioctl_device_feature_migration(struct vfio_device *device,
+					       u32 flags, void __user *arg,
+					       size_t argsz)
+{
+	struct vfio_device_feature_migration mig = {
+		.flags = VFIO_MIGRATION_STOP_COPY,
+	};
+	int ret;
+
+	if (!device->ops->migration_set_state)
+		return -ENOTTY;
+
+	ret = vfio_check_feature(flags, argsz, VFIO_DEVICE_FEATURE_GET,
+				 sizeof(mig));
+	if (ret != 1)
+		return ret;
+	if (copy_to_user(arg, &mig, sizeof(mig)))
+		return -EFAULT;
+	return 0;
+}
+
 static int vfio_ioctl_device_feature(struct vfio_device *device,
 				     struct vfio_device_feature __user *arg)
 {
@@ -1582,6 +1760,10 @@ static int vfio_ioctl_device_feature(struct vfio_device *device,
 		return -EINVAL;
 
 	switch (feature.flags & VFIO_DEVICE_FEATURE_MASK) {
+	case VFIO_DEVICE_FEATURE_MIGRATION:
+		return vfio_ioctl_device_feature_migration(
+			device, feature.flags, arg->data,
+			feature.argsz - minsz);
 	default:
 		if (unlikely(!device->ops->device_feature))
 			return -EINVAL;
@@ -1597,6 +1779,8 @@ static long vfio_device_fops_unl_ioctl(struct file *filep,
 	struct vfio_device *device = filep->private_data;
 
 	switch (cmd) {
+	case VFIO_DEVICE_MIG_SET_STATE:
+		return vfio_ioctl_mig_set_state(device, (void __user *)arg);
 	case VFIO_DEVICE_FEATURE:
 		return vfio_ioctl_device_feature(device, (void __user *)arg);
 	default:
