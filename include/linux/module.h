@@ -663,17 +663,23 @@ static inline bool module_requested_async_probing(struct module *module)
 	return module && module->async_probe_requested;
 }
 
-#ifdef CONFIG_LIVEPATCH
 static inline bool is_livepatch_module(struct module *mod)
 {
-	return mod->klp;
-}
-#else /* !CONFIG_LIVEPATCH */
-static inline bool is_livepatch_module(struct module *mod)
-{
+	if (IS_ENABLED(CONFIG_LIVEPATCH)) {
+		if (mod->klp)
+			return true;
+	}
 	return false;
 }
-#endif /* CONFIG_LIVEPATCH */
+
+static inline bool set_livepatch_module(struct module *mod)
+{
+	if (IS_ENABLED(CONFIG_LIVEPATCH)) {
+		mod->klp = true;
+		return true;
+	}
+	return false;
+}
 
 bool is_module_sig_enforced(void);
 void set_module_sig_enforced(void);
