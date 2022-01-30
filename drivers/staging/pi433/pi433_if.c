@@ -122,13 +122,13 @@ static irqreturn_t DIO0_irq_handler(int irq, void *dev_id)
 
 	if (device->irq_state[DIO0] == DIO_PACKET_SENT) {
 		device->free_in_fifo = FIFO_SIZE;
-		dev_dbg(device->dev, "DIO0 irq: Packet sent\n");
+		dev_dbg(device->dev, "DIO0 irq: Packet sent");
 		wake_up_interruptible(&device->fifo_wait_queue);
 	} else if (device->irq_state[DIO0] == DIO_RSSI_DIO0) {
-		dev_dbg(device->dev, "DIO0 irq: RSSI level over threshold\n");
+		dev_dbg(device->dev, "DIO0 irq: RSSI level over threshold");
 		wake_up_interruptible(&device->rx_wait_queue);
 	} else if (device->irq_state[DIO0] == DIO_PAYLOAD_READY) {
-		dev_dbg(device->dev, "DIO0 irq: Payload ready\n");
+		dev_dbg(device->dev, "DIO0 irq: Payload ready");
 		device->free_in_fifo = 0;
 		wake_up_interruptible(&device->fifo_wait_queue);
 	}
@@ -149,7 +149,7 @@ static irqreturn_t DIO1_irq_handler(int irq, void *dev_id)
 			device->free_in_fifo = FIFO_SIZE - FIFO_THRESHOLD - 1;
 	}
 	dev_dbg(device->dev,
-		"DIO1 irq: %d bytes free in fifo\n", device->free_in_fifo);
+		"DIO1 irq: %d bytes free in fifo", device->free_in_fifo);
 	wake_up_interruptible(&device->fifo_wait_queue);
 
 	return IRQ_HANDLED;
@@ -727,7 +727,7 @@ pi433_tx_thread(void *data)
 			retval = wait_event_interruptible(device->fifo_wait_queue,
 							  device->free_in_fifo > 0);
 			if (retval) {
-				dev_dbg(device->dev, "ABORT\n");
+				dev_dbg(device->dev, "ABORT");
 				goto abort;
 			}
 		}
@@ -1119,7 +1119,7 @@ static int pi433_probe(struct spi_device *spi)
 
 	retval = spi_setup(spi);
 	if (retval) {
-		dev_dbg(&spi->dev, "configuration of SPI interface failed!\n");
+		dev_dbg(&spi->dev, "configuration of SPI interface failed!");
 		return retval;
 	}
 
@@ -1222,7 +1222,7 @@ static int pi433_probe(struct spi_device *spi)
 		goto device_create_failed;
 	} else {
 		dev_dbg(device->dev,
-			"created device for major %d, minor %d\n",
+			"created device for major %d, minor %d",
 			MAJOR(pi433_dev),
 			device->minor);
 	}

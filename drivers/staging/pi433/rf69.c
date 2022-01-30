@@ -37,9 +37,9 @@ static u8 rf69_read_reg(struct spi_device *spi, u8 addr)
 		 * that module is connected. Therefore no error
 		 * handling, just an optional error message...
 		 */
-		dev_dbg(&spi->dev, "read 0x%x FAILED\n", addr);
+		dev_dbg(&spi->dev, "read 0x%x FAILED", addr);
 	else
-		dev_dbg(&spi->dev, "read 0x%x from reg 0x%x\n", retval, addr);
+		dev_dbg(&spi->dev, "read 0x%x from reg 0x%x", retval, addr);
 #endif
 
 	return retval;
@@ -62,9 +62,9 @@ static int rf69_write_reg(struct spi_device *spi, u8 addr, u8 value)
 		 * that module is connected. Therefore no error
 		 * handling, just an optional error message...
 		 */
-		dev_dbg(&spi->dev, "write 0x%x to 0x%x FAILED\n", value, addr);
+		dev_dbg(&spi->dev, "write 0x%x to 0x%x FAILED", value, addr);
 	else
-		dev_dbg(&spi->dev, "wrote 0x%x to reg 0x%x\n", value, addr);
+		dev_dbg(&spi->dev, "wrote 0x%x to reg 0x%x", value, addr);
 #endif
 
 	return retval;
@@ -869,7 +869,7 @@ int rf69_read_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 
 	if (size > FIFO_SIZE) {
 		dev_dbg(&spi->dev,
-			"read fifo: passed in buffer bigger then internal buffer\n");
+			"read fifo: passed in buffer bigger then internal buffer");
 		return -EMSGSIZE;
 	}
 
@@ -884,7 +884,7 @@ int rf69_read_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 
 #ifdef DEBUG_FIFO_ACCESS
 	for (i = 0; i < size; i++)
-		dev_dbg(&spi->dev, "%d - 0x%x\n", i, local_buffer[i + 1]);
+		dev_dbg(&spi->dev, "%d - 0x%x", i, local_buffer[i + 1]);
 #endif
 
 	memcpy(buffer, &local_buffer[1], size);
@@ -901,7 +901,7 @@ int rf69_write_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 
 	if (size > FIFO_SIZE) {
 		dev_dbg(&spi->dev,
-			"read fifo: passed in buffer bigger then internal buffer\n");
+			"read fifo: passed in buffer bigger then internal buffer");
 		return -EMSGSIZE;
 	}
 
@@ -910,7 +910,7 @@ int rf69_write_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 
 #ifdef DEBUG_FIFO_ACCESS
 	for (i = 0; i < size; i++)
-		dev_dbg(&spi->dev, "0x%x\n", buffer[i]);
+		dev_dbg(&spi->dev, "0x%x", buffer[i]);
 #endif
 
 	return spi_write(spi, local_buffer, size + 1);
