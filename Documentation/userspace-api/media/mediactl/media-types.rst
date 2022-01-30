@@ -413,7 +413,7 @@ must be set for every pad.
 
     *  -  ``MEDIA_LNK_FL_LINK_TYPE``
        -  This is a bitmask that defines the type of the link. Currently,
-	  two types of links are supported:
+	  three types of links are supported:
 
 	  .. _MEDIA-LNK-FL-DATA-LINK:
 
@@ -423,3 +423,10 @@ must be set for every pad.
 
 	  ``MEDIA_LNK_FL_INTERFACE_LINK`` if the link is between an
 	  interface and an entity
+
+	  .. _MEDIA-LNK-FL-ANCILLARY-LINK:
+
+	  ``MEDIA_LNK_FL_ANCILLARY_LINK`` if the link is between two
+	  different entities. This at present implies both MEDIA_LNK_FL_ENABLED
+	  and MEDIA_LNK_FL_IMMUTABLE, however applications should not rely on
+	  that being the case in the future.
