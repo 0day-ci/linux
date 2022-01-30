@@ -2116,9 +2116,10 @@ out:
 	return rc;
 }
 
-static struct smc_buf_desc *smcr_new_buf_create(struct smc_link_group *lgr,
+static struct smc_buf_desc *smcr_new_buf_create(struct smc_connection *conn,
 						bool is_rmb, int bufsize)
 {
+	int node = ibdev_to_node(conn->lnk->smcibdev->ibdev);
 	struct smc_buf_desc *buf_desc;
 
 	/* try to alloc a new buffer */
@@ -2127,10 +2128,10 @@ static struct smc_buf_desc *smcr_new_buf_create(struct smc_link_group *lgr,
 		return ERR_PTR(-ENOMEM);
 
 	buf_desc->order = get_order(bufsize);
-	buf_desc->pages = alloc_pages(GFP_KERNEL | __GFP_NOWARN |
-				      __GFP_NOMEMALLOC | __GFP_COMP |
-				      __GFP_NORETRY | __GFP_ZERO,
-				      buf_desc->order);
+	buf_desc->pages = alloc_pages_node(node, GFP_KERNEL | __GFP_NOWARN |
+					   __GFP_NOMEMALLOC | __GFP_COMP |
+					   __GFP_NORETRY | __GFP_ZERO,
+					   buf_desc->order);
 	if (!buf_desc->pages) {
 		kfree(buf_desc);
 		return ERR_PTR(-EAGAIN);
@@ -2241,7 +2242,7 @@ static int __smc_buf_create(struct smc_sock *smc, bool is_smcd, bool is_rmb)
 		if (is_smcd)
 			buf_desc = smcd_new_buf_create(lgr, is_rmb, bufsize);
 		else
-			buf_desc = smcr_new_buf_create(lgr, is_rmb, bufsize);
+			buf_desc = smcr_new_buf_create(conn, is_rmb, bufsize);
 
 		if (PTR_ERR(buf_desc) == -ENOMEM)
 			break;
