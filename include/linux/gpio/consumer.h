@@ -9,7 +9,7 @@
 
 struct device;
 
-/**
+/*
  * Opaque descriptor for a GPIO. These are obtained using gpiod_get() and are
  * preferable to the old integer-based handles.
  *
@@ -18,7 +18,7 @@ struct device;
  */
 struct gpio_desc;
 
-/**
+/*
  * Opaque descriptor for a structure of GPIO array attributes.  This structure
  * is attached to struct gpiod_descs obtained from gpiod_get_array() and can be
  * passed back to get/set array functions in order to activate fast processing
@@ -26,7 +26,7 @@ struct gpio_desc;
  */
 struct gpio_array;
 
-/**
+/*
  * Struct containing an array of descriptors that can be obtained using
  * gpiod_get_array().
  */
@@ -42,7 +42,7 @@ struct gpio_descs {
 #define GPIOD_FLAGS_BIT_OPEN_DRAIN	BIT(3)
 #define GPIOD_FLAGS_BIT_NONEXCLUSIVE	BIT(4)
 
-/**
+/*
  * Optional flags that can be passed to one of gpiod_* to configure direction
  * and output value. These values cannot be OR'd.
  */
