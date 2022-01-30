@@ -207,7 +207,7 @@ int pt_core_init(struct pt_device *pt)
 	if (!cmd_q->qbase) {
 		dev_err(dev, "unable to allocate command queue\n");
 		ret = -ENOMEM;
-		goto e_dma_alloc;
+		goto e_pool;
 	}
 
 	cmd_q->qidx = 0;
@@ -230,7 +230,7 @@ int pt_core_init(struct pt_device *pt)
 	/* Request an irq */
 	ret = request_irq(pt->pt_irq, pt_core_irq_handler, 0, dev_name(pt->dev), pt);
 	if (ret)
-		goto e_pool;
+		goto e_dma_alloc;
 
 	/* Update the device registers with queue information. */
 	cmd_q->qcontrol &= ~CMD_Q_SIZE;
