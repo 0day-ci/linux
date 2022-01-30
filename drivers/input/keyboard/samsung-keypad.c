@@ -451,8 +451,6 @@ static int samsung_keypad_remove(struct platform_device *pdev)
 
 	pm_runtime_disable(&pdev->dev);
 
-	input_unregister_device(keypad->input_dev);
-
 	clk_unprepare(keypad->clk);
 
 	return 0;
