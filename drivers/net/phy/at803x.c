@@ -1691,7 +1691,7 @@ static int qca808x_read_status(struct phy_device *phydev)
 	if (phydev->link && phydev->speed == SPEED_2500)
 		phydev->interface = PHY_INTERFACE_MODE_2500BASEX;
 	else
-		phydev->interface = PHY_INTERFACE_MODE_SMII;
+		phydev->interface = PHY_INTERFACE_MODE_SGMII;
 
 	/* generate seed as a lower random value to make PHY linked as SLAVE easily,
 	 * except for master/slave configuration fault detected.
