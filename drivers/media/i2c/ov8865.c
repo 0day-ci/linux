@@ -2327,30 +2327,28 @@ static int ov8865_sensor_power(struct ov8865_sensor *sensor, bool on)
 		gpiod_set_value_cansleep(sensor->powerdown, 1);
 
 		ret = regulator_enable(sensor->dovdd);
-		if (ret) {
-			dev_err(sensor->dev,
-				"failed to enable DOVDD regulator\n");
-			goto disable;
-		}
+		if (ret)
+			return dev_err_probe(sensor->dev, ret,
+					     "failed to enable DOVDD\n");
 
 		ret = regulator_enable(sensor->avdd);
 		if (ret) {
 			dev_err(sensor->dev,
 				"failed to enable AVDD regulator\n");
-			goto disable;
+			goto err_disable_dovdd;
 		}
 
 		ret = regulator_enable(sensor->dvdd);
 		if (ret) {
 			dev_err(sensor->dev,
 				"failed to enable DVDD regulator\n");
-			goto disable;
+			goto err_disable_avdd;
 		}
 
 		ret = clk_prepare_enable(sensor->extclk);
 		if (ret) {
 			dev_err(sensor->dev, "failed to enable EXTCLK clock\n");
-			goto disable;
+			goto err_disable_dvdd;
 		}
 
 		gpiod_set_value_cansleep(sensor->reset, 0);
@@ -2359,7 +2357,6 @@ static int ov8865_sensor_power(struct ov8865_sensor *sensor, bool on)
 		/* Time to enter streaming mode according to power timings. */
 		usleep_range(10000, 12000);
 	} else {
-disable:
 		gpiod_set_value_cansleep(sensor->powerdown, 1);
 		gpiod_set_value_cansleep(sensor->reset, 1);
 
@@ -2369,6 +2366,15 @@ disable:
 		regulator_disable(sensor->avdd);
 		regulator_disable(sensor->dovdd);
 	}
+
+	return ret;
+
+err_disable_dvdd:
+	regulator_disable(sensor->dvdd);
+err_disable_avdd:
+	regulator_disable(sensor->avdd);
+err_disable_dovdd:
+	regulator_disable(sensor->dovdd);
 
 	return ret;
 }
