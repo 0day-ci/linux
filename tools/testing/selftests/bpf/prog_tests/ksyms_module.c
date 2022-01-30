@@ -6,7 +6,7 @@
 #include "test_ksyms_module.lskel.h"
 #include "test_ksyms_module.skel.h"
 
-void test_ksyms_module_lskel(void)
+static void test_ksyms_module_lskel(void)
 {
 	struct test_ksyms_module_lskel *skel;
 	int retval;
@@ -30,7 +30,7 @@ cleanup:
 	test_ksyms_module_lskel__destroy(skel);
 }
 
-void test_ksyms_module_libbpf(void)
+static void test_ksyms_module_libbpf(void)
 {
 	struct test_ksyms_module *skel;
 	int retval, err;

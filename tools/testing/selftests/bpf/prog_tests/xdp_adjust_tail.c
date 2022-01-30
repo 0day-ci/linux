@@ -118,7 +118,7 @@ static void test_xdp_adjust_tail_grow2(void)
 	bpf_object__close(obj);
 }
 
-void test_xdp_adjust_frags_tail_shrink(void)
+static void test_xdp_adjust_frags_tail_shrink(void)
 {
 	const char *file = "./test_xdp_adjust_tail_shrink.o";
 	__u32 duration, retval, size, exp_size;
@@ -180,7 +180,7 @@ out:
 	bpf_object__close(obj);
 }
 
-void test_xdp_adjust_frags_tail_grow(void)
+static void test_xdp_adjust_frags_tail_grow(void)
 {
 	const char *file = "./test_xdp_adjust_tail_grow.o";
 	__u32 duration, retval, size, exp_size;
