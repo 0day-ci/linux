@@ -3079,6 +3079,18 @@ int f2fs_fileattr_get(struct dentry *dentry, struct fileattr *fa)
 	return 0;
 }
 
+static bool f2fs_contains_unsettable_flags_not_already_set(struct dentry *dentry, u32 fsflags)
+{
+	struct fileattr old;
+
+	/* Get current file attribute flags */
+	f2fs_fileattr_get(dentry, &old);
+	/* Mask away flags that are already set */
+	fsflags &= ~old.flags;
+	/* Return true if any of the remaining flags are unsettable */
+	return (fsflags & ~F2FS_SETTABLE_FS_FL);
+}
+
 int f2fs_fileattr_set(struct user_namespace *mnt_userns,
 		      struct dentry *dentry, struct fileattr *fa)
 {
@@ -3092,6 +3104,8 @@ int f2fs_fileattr_set(struct user_namespace *mnt_userns,
 	if (!f2fs_is_checkpoint_ready(F2FS_I_SB(inode)))
 		return -ENOSPC;
 	if (fsflags & ~F2FS_GETTABLE_FS_FL)
+		return -EOPNOTSUPP;
+	if (f2fs_contains_unsettable_flags_not_already_set(dentry, fsflags))
 		return -EOPNOTSUPP;
 	fsflags &= F2FS_SETTABLE_FS_FL;
 	if (!fa->flags_valid)
