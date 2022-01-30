@@ -24,3 +24,9 @@
 	pinctrl-0 = <&uart0_pe_pins>;
 	status = "okay";
 };
+
+&mmc0 {
+	bus-width = <4>;
+	broken-cd;
+	status = "okay";
+};
