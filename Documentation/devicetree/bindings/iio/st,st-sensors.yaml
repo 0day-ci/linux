@@ -24,6 +24,7 @@ properties:
     oneOf:
       - description: STMicroelectronics Accelerometers
         enum:
+          - silan,sc7a20
           - st,h3lis331dl-accel
           - st,lis2de12
           - st,lis2dw12
