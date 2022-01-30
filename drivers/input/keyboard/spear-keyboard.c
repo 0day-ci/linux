@@ -278,7 +278,6 @@ static int spear_kbd_remove(struct platform_device *pdev)
 {
 	struct spear_kbd *kbd = platform_get_drvdata(pdev);
 
-	input_unregister_device(kbd->input);
 	clk_unprepare(kbd->clk);
 
 	return 0;
