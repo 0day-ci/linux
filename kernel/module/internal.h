@@ -57,6 +57,11 @@ struct load_info {
 };
 
 extern int mod_verify_sig(const void *mod, struct load_info *info);
+extern struct module *find_module_all(const char *name, size_t len, bool even_unformed);
+extern unsigned long kernel_symbol_value(const struct kernel_symbol *sym);
+extern int cmp_name(const void *name, const void *sym);
+extern long get_offset(struct module *mod, unsigned int *size, Elf_Shdr *sechdr,
+		       unsigned int section);
 
 #ifdef CONFIG_LIVEPATCH
 extern int copy_module_elf(struct module *mod, struct load_info *info);
@@ -131,3 +136,25 @@ extern void kmemleak_load_module(const struct module *mod, const struct load_inf
 static inline void __maybe_unused kmemleak_load_module(const struct module *mod,
 						       const struct load_info *info) { }
 #endif /* CONFIG_DEBUG_KMEMLEAK */
+
+#ifdef CONFIG_KALLSYMS
+#ifdef CONFIG_STACKTRACE_BUILD_ID
+extern void init_build_id(struct module *mod, const struct load_info *info);
+#else /* !CONFIG_STACKTRACE_BUILD_ID */
+static inline void init_build_id(struct module *mod, const struct load_info *info) { }
+
+#endif
+extern void layout_symtab(struct module *mod, struct load_info *info);
+extern void add_kallsyms(struct module *mod, const struct load_info *info);
+extern bool sect_empty(const Elf_Shdr *sect);
+extern const char *find_kallsyms_symbol(struct module *mod, unsigned long addr,
+					unsigned long *size, unsigned long *offset);
+#else /* !CONFIG_KALLSYMS */
+static inline void layout_symtab(struct module *mod, struct load_info *info) { }
+static inline void add_kallsyms(struct module *mod, const struct load_info *info) { }
+static inline char *find_kallsyms_symbol(struct module *mod, unsigned long addr,
+					 unsigned long *size, unsigned long *offset)
+{
+	return NULL;
+}
+#endif /* CONFIG_KALLSYMS */
