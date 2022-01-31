@@ -78,6 +78,17 @@ config FRAMEBUFFER_CONSOLE
 	help
 	  Low-level framebuffer-based console driver.
 
+config FRAMEBUFFER_CONSOLE_LEGACY_ACCELERATION
+       bool "Enable legacy fbcon code for hw acceleration"
+       depends on FRAMEBUFFER_CONSOLE
+       default n
+	help
+	 Only enable this options if you are in full control of machine since
+	 the fbcon acceleration code is essentially unmaintained and known
+	 problematic.
+
+	 If unsure, select n.
+
 config FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
        bool "Map the console to the primary display device"
        depends on FRAMEBUFFER_CONSOLE

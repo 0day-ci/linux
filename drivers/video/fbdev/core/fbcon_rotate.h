@@ -11,6 +11,27 @@
 #ifndef _FBCON_ROTATE_H
 #define _FBCON_ROTATE_H
 
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE_LEGACY_ACCELERATION
+#define GETVYRES(s,i) ({                           \
+        (s == SCROLL_REDRAW || s == SCROLL_MOVE) ? \
+        (i)->var.yres : (i)->var.yres_virtual; })
+
+#define GETVXRES(s,i) ({                           \
+        (s == SCROLL_REDRAW || s == SCROLL_MOVE || !(i)->fix.xpanstep) ? \
+        (i)->var.xres : (i)->var.xres_virtual; })
+#else
+static inline u32 GETVYRES(int s, struct fb_info *i)
+{
+	return i->var.yres;
+}
+
+static inline u32 GETVXRES(int s, struct fb_info *i)
+{
+	return i->var.xres;
+}
+#endif
+
+
 static inline int pattern_test_bit(u32 x, u32 y, u32 pitch, const char *pat)
 {
 	u32 tmp = (y * pitch) + x, index = tmp / 8,  bit = tmp % 8;
