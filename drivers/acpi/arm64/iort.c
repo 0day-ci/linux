@@ -1344,16 +1344,17 @@ static int __init arm_smmu_v3_pmcg_count_resources(struct acpi_iort_node *node)
 	pmcg = (struct acpi_iort_pmcg *)node->node_data;
 
 	/*
-	 * There are always 2 memory resources.
-	 * If the overflow_gsiv is present then add that for a total of 3.
+	 * There should normally be 2 memory resources, but apparently the
+	 * oversight from IORT rev. C managed to escape into the wild.
 	 */
-	return pmcg->overflow_gsiv ? 3 : 2;
+	return 1 + (node->revision > 0) + (pmcg->overflow_gsiv != 0);
 }
 
 static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
 						   struct acpi_iort_node *node)
 {
 	struct acpi_iort_pmcg *pmcg;
+	int n = 1;
 
 	/* Retrieve PMCG specific data */
 	pmcg = (struct acpi_iort_pmcg *)node->node_data;
@@ -1361,13 +1362,15 @@ static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
 	res[0].start = pmcg->page0_base_address;
 	res[0].end = pmcg->page0_base_address + SZ_4K - 1;
 	res[0].flags = IORESOURCE_MEM;
-	res[1].start = pmcg->page1_base_address;
-	res[1].end = pmcg->page1_base_address + SZ_4K - 1;
-	res[1].flags = IORESOURCE_MEM;
+	if (node->revision > 0) {
+		res[n].start = pmcg->page1_base_address;
+		res[n].end = pmcg->page1_base_address + SZ_4K - 1;
+		res[n++].flags = IORESOURCE_MEM;
+	}
 
 	if (pmcg->overflow_gsiv)
 		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
-				       ACPI_EDGE_SENSITIVE, &res[2]);
+				       ACPI_EDGE_SENSITIVE, &res[n]);
 }
 
 static struct acpi_platform_list pmcg_plat_info[] __initdata = {
