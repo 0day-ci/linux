@@ -361,3 +361,34 @@ int ext4_check_blockref(const char *function, unsigned int line,
 	return 0;
 }
 
+/*
+ * ext4_group_block_valid - This checks if any of FS metadata blocks of a
+ * given group (@bg) lies in the given range [block, block + count - 1]
+ * or not.
+ *
+ * Return -
+ * - false if it does
+ * - else true
+ */
+bool ext4_group_block_valid(struct super_block *sb, ext4_group_t bg,
+			    ext4_fsblk_t block, unsigned int count)
+{
+	struct ext4_group_desc *gdp;
+	bool ret = true;
+
+	gdp = ext4_get_group_desc(sb, bg, NULL);
+	if (!gdp) {
+		ret = false;
+		goto out;
+	}
+
+	if (in_range(ext4_block_bitmap(sb, gdp), block, count) ||
+	    in_range(ext4_inode_bitmap(sb, gdp), block, count) ||
+	    in_range(block, ext4_inode_table(sb, gdp),
+		    EXT4_SB(sb)->s_itb_per_group) ||
+	    in_range(block + count - 1, ext4_inode_table(sb, gdp),
+		    EXT4_SB(sb)->s_itb_per_group))
+		ret = false;
+out:
+	return ret;
+}

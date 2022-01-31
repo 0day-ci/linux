@@ -3706,6 +3706,9 @@ extern int ext4_inode_block_valid(struct inode *inode,
 				  unsigned int count);
 extern int ext4_check_blockref(const char *, unsigned int,
 			       struct inode *, __le32 *, unsigned int);
+extern bool ext4_group_block_valid(struct super_block *sb, ext4_group_t bg,
+				   ext4_fsblk_t block, unsigned int count);
+
 
 /* extents.c */
 struct ext4_ext_path;
