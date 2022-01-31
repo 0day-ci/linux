@@ -352,12 +352,13 @@ struct rxe_mw {
 };
 
 struct rxe_mcg {
-	struct rxe_pool_elem	elem;
 	struct rb_node		node;
+	struct kref		ref_cnt;
 	struct rxe_dev		*rxe;
 	struct list_head	qp_list;
 	atomic_t		qp_num;
 	union ib_gid		mgid;
+	unsigned int		index;
 	u32			qkey;
 	u16			pkey;
 };
@@ -400,6 +401,7 @@ struct rxe_dev {
 	spinlock_t		mcg_lock; /* guard multicast groups */
 	struct rb_root		mcg_tree;
 	atomic_t		mcg_num;
+	unsigned int		mcg_next;
 
 	spinlock_t		pending_lock; /* guard pending_mmaps */
 	struct list_head	pending_mmaps;

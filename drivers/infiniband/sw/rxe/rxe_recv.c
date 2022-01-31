@@ -275,6 +275,8 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 			break;
 	}
 	spin_unlock_bh(&rxe->mcg_lock);
+	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
+
 	nmax = n;
 
 	/* this is unreliable datagram service so we let
@@ -319,8 +321,6 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 	}
 
 	kfree(qp_array);
-
-	rxe_drop_ref(mcg);
 
 	if (likely(!skb))
 		return;
