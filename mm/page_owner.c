@@ -10,6 +10,7 @@
 #include <linux/migrate.h>
 #include <linux/stackdepot.h>
 #include <linux/seq_file.h>
+#include <linux/memcontrol.h>
 #include <linux/sched/clock.h>
 
 #include "internal.h"
@@ -325,6 +326,42 @@ void pagetypeinfo_showmixedcount_print(struct seq_file *m,
 	seq_putc(m, '\n');
 }
 
+#ifdef CONFIG_MEMCG
+/*
+ * Looking for memcg information and print it out
+ */
+static inline void print_page_owner_memcg(char *kbuf, size_t count, int *pret,
+					  struct page *page)
+{
+	unsigned long memcg_data = READ_ONCE(page->memcg_data);
+	struct mem_cgroup *memcg;
+	bool onlined;
+	char name[80];
+
+	if (!memcg_data)
+		return;
+
+	if (memcg_data & MEMCG_DATA_OBJCGS)
+		*pret += scnprintf(kbuf + *pret, count - *pret,
+				"Slab cache page\n");
+
+	memcg = page_memcg_check(page);
+	if (!memcg)
+		return;
+
+	onlined = (memcg->css.flags & CSS_ONLINE);
+	cgroup_name(memcg->css.cgroup, name, sizeof(name));
+	*pret += scnprintf(kbuf + *pret, count - *pret,
+			"Charged %sto %smemcg %s\n",
+			PageMemcgKmem(page) ? "(via objcg) " : "",
+			onlined ? "" : "offlined ",
+			name);
+}
+#else /* CONFIG_MEMCG */
+static inline void print_page_owner_memcg(char *kbuf, size_t count, int *pret,
+					  struct page *page) { }
+#endif /* CONFIG_MEMCG */
+
 static ssize_t
 print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 		struct page *page, struct page_owner *page_owner,
@@ -364,6 +401,8 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 			"Page has been migrated, last migrate reason: %s\n",
 			migrate_reason_names[page_owner->last_migrate_reason]);
 	}
+
+	print_page_owner_memcg(kbuf, count, &ret, page);
 
 	ret += snprintf(kbuf + ret, count - ret, "\n");
 	if (ret >= count)
