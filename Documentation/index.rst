@@ -155,6 +155,16 @@ Architecture-specific documentation
 
    arch
 
+Linux kernel Tools documentation
+--------------------------------
+
+This is a collection user doucmentation for kernel tools that reside under
+the *tools* directory.
+
+.. toctree::
+   :maxdepth: 2
+
+   tools/index
 
 Other documentation
 -------------------
