@@ -869,6 +869,9 @@ xfs_alloc_file_space(
 		if (error)
 			goto error;
 
+		ip->i_diflags |= XFS_DIFLAG_PREALLOC;
+                xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+
 		/*
 		 * Complete the transaction
 		 */
