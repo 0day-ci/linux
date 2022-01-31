@@ -25,68 +25,189 @@ static int rxe_mcast_delete(struct rxe_dev *rxe, union ib_gid *mgid)
 	return dev_mc_del(rxe->ndev, ll_addr);
 }
 
-/* caller should hold rxe->mcg_lock */
-static int __rxe_create_mcg(struct rxe_dev *rxe, struct rxe_pool *pool,
-			    union ib_gid *mgid, struct rxe_mcg **mcg_p)
+/**
+ * __rxe_insert_mcg - insert an mcg into red-black tree (rxe->mcg_tree)
+ * @mcg: mcg object with an embedded red-black tree node
+ *
+ * Context: caller must hold a reference to mcg and rxe->mcg_lock and
+ * is responsible to avoid adding the same mcg twice to the tree.
+ */
+static void __rxe_insert_mcg(struct rxe_mcg *mcg)
 {
-	int err;
-	struct rxe_mcg *mcg;
+	struct rb_root *tree = &mcg->rxe->mcg_tree;
+	struct rb_node **link = &tree->rb_node;
+	struct rb_node *node = NULL;
+	struct rxe_mcg *tmp;
+	int cmp;
 
-	mcg = rxe_alloc_locked(&rxe->mc_grp_pool);
-	if (!mcg)
-		return -ENOMEM;
+	while (*link) {
+		node = *link;
+		tmp = rb_entry(node, struct rxe_mcg, node);
 
-	err = rxe_mcast_add(rxe, mgid);
-	if (unlikely(err)) {
-		rxe_drop_ref(mcg);
-		return err;
+		cmp = memcmp(&tmp->mgid, &mcg->mgid, sizeof(mcg->mgid));
+		if (cmp > 0)
+			link = &(*link)->rb_left;
+		else
+			link = &(*link)->rb_right;
 	}
 
+	rb_link_node(&mcg->node, node, link);
+	rb_insert_color(&mcg->node, tree);
+}
+
+/**
+ * __rxe_remove_mcg - remove an mcg from red-black tree holding lock
+ * @mcg: mcast group object with an embedded red-black tree node
+ *
+ * Context: caller must hold a reference to mcg and rxe->mcg_lock
+ */
+static void __rxe_remove_mcg(struct rxe_mcg *mcg)
+{
+	rb_erase(&mcg->node, &mcg->rxe->mcg_tree);
+}
+
+/**
+ * __rxe_lookup_mcg - lookup mcg in rxe->mcg_tree while holding lock
+ * @rxe: rxe device object
+ * @mgid: multicast IP address
+ *
+ * Context: caller must hold rxe->mcg_lock
+ * Returns: mcg on success and takes a ref to mcg else NULL
+ */
+static struct rxe_mcg *__rxe_lookup_mcg(struct rxe_dev *rxe,
+					union ib_gid *mgid)
+{
+	struct rb_root *tree = &rxe->mcg_tree;
+	struct rxe_mcg *mcg;
+	struct rb_node *node;
+	int cmp;
+
+	node = tree->rb_node;
+
+	while (node) {
+		mcg = rb_entry(node, struct rxe_mcg, node);
+
+		cmp = memcmp(&mcg->mgid, mgid, sizeof(*mgid));
+
+		if (cmp > 0)
+			node = node->rb_left;
+		else if (cmp < 0)
+			node = node->rb_right;
+		else
+			break;
+	}
+
+	if (node) {
+		rxe_add_ref(mcg);
+		return mcg;
+	}
+
+	return NULL;
+}
+
+/**
+ * rxe_lookup_mcg - lookup up mcg in red-back tree
+ * @rxe: rxe device object
+ * @mgid: multicast IP address
+ *
+ * Returns: mcg if found else NULL
+ */
+struct rxe_mcg *rxe_lookup_mcg(struct rxe_dev *rxe, union ib_gid *mgid)
+{
+	struct rxe_mcg *mcg;
+
+	spin_lock_bh(&rxe->mcg_lock);
+	mcg = __rxe_lookup_mcg(rxe, mgid);
+	spin_unlock_bh(&rxe->mcg_lock);
+
+	return mcg;
+}
+
+/**
+ * __rxe_init_mcg - initialize a new mcg
+ * @rxe: rxe device
+ * @mgid: multicast address as a gid
+ * @mcg: new mcg object
+ *
+ * Context: caller should hold rxe->mcg lock
+ * Returns: 0 on success else an error
+ */
+static int __rxe_init_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
+			  struct rxe_mcg *mcg)
+{
+	int err;
+
+	err = rxe_mcast_add(rxe, mgid);
+	if (unlikely(err))
+		return err;
+
+	memcpy(&mcg->mgid, mgid, sizeof(mcg->mgid));
 	INIT_LIST_HEAD(&mcg->qp_list);
 	mcg->rxe = rxe;
 
 	rxe_add_ref(mcg);
-	rxe_add_key_locked(mcg, mgid);
+	__rxe_insert_mcg(mcg);
 
-	*mcg_p = mcg;
+
 	return 0;
 }
 
-/* caller is holding a ref from lookup and mcg->mcg_lock*/
-void __rxe_destroy_mcg(struct rxe_mcg *mcg)
+/**
+ * rxe_get_mcg - lookup or allocate a mcg
+ * @rxe: rxe device object
+ * @mgid: multicast IP address
+ * @mcgp: address of returned mcg value
+ *
+ * Returns: 0 and sets *mcgp to mcg on success else an error
+ */
+static int rxe_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
+		       struct rxe_mcg **mcgp)
 {
-	rxe_drop_key(mcg);
-	rxe_drop_ref(mcg);
-
-	rxe_mcast_delete(mcg->rxe, &mcg->mgid);
-}
-
-static int rxe_mcast_get_mcg(struct rxe_dev *rxe, union ib_gid *mgid,
-			     struct rxe_mcg **mcg_p)
-{
-	int err;
-	struct rxe_mcg *mcg;
 	struct rxe_pool *pool = &rxe->mc_grp_pool;
+	struct rxe_mcg *mcg, *tmp;
+	int err;
 
-	if (rxe->attr.max_mcast_qp_attach == 0)
+	if (rxe->attr.max_mcast_grp == 0)
 		return -EINVAL;
 
-	spin_lock_bh(&rxe->mcg_lock);
-
-	mcg = rxe_pool_get_key_locked(pool, mgid);
-	if (mcg)
-		goto done;
-
-	err = __rxe_create_mcg(rxe, pool, mgid, &mcg);
-	if (err) {
-		spin_unlock_bh(&rxe->mcg_lock);
-		return err;
+	/* check to see if mcg already exists */
+	mcg = rxe_lookup_mcg(rxe, mgid);
+	if (mcg) {
+		*mcgp = mcg;
+		return 0;
 	}
 
-done:
+	/* speculative alloc of mcg */
+	mcg = rxe_alloc(pool);
+	if (!mcg)
+		return -ENOMEM;
+
+	spin_lock_bh(&rxe->mcg_lock);
+	/* re-check to see if someone else just added it */
+	tmp = __rxe_lookup_mcg(rxe, mgid);
+	if (tmp) {
+		rxe_drop_ref(mcg);
+		mcg = tmp;
+		goto out;
+	}
+
+	if (atomic_inc_return(&rxe->mcg_num) > rxe->attr.max_mcast_grp) {
+		err = -ENOMEM;
+		goto err_dec;
+	}
+
+	err = __rxe_init_mcg(rxe, mgid, mcg);
+	if (err)
+		goto err_dec;
+out:
 	spin_unlock_bh(&rxe->mcg_lock);
-	*mcg_p = mcg;
+	*mcgp = mcg;
 	return 0;
+err_dec:
+	atomic_dec(&rxe->mcg_num);
+	spin_unlock_bh(&rxe->mcg_lock);
+	rxe_drop_ref(mcg);
+	return err;
 }
 
 static int rxe_mcast_add_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
@@ -138,13 +259,42 @@ out:
 	return err;
 }
 
+/**
+ * __rxe_destroy_mcg - destroy mcg object holding rxe->mcg_lock
+ * @mcg: the mcg object
+ *
+ * Context: caller is holding rxe->mcg_lock, all refs to mcg are dropped
+ * no qp's are attached to mcg
+ */
+void __rxe_destroy_mcg(struct rxe_mcg *mcg)
+{
+	__rxe_remove_mcg(mcg);
+
+	rxe_drop_ref(mcg);
+
+	rxe_mcast_delete(mcg->rxe, &mcg->mgid);
+}
+
+/**
+ * rxe_destroy_mcg - destroy mcg object
+ * @mcg: the mcg object
+ *
+ * Context: all refs to mcg are dropped, no qp's are attached to mcg
+ */
+static void rxe_destroy_mcg(struct rxe_mcg *mcg)
+{
+	spin_lock_bh(&mcg->rxe->mcg_lock);
+	__rxe_destroy_mcg(mcg);
+	spin_unlock_bh(&mcg->rxe->mcg_lock);
+}
+
 static int rxe_mcast_drop_grp_elem(struct rxe_dev *rxe, struct rxe_qp *qp,
 				   union ib_gid *mgid)
 {
 	struct rxe_mcg *mcg;
 	struct rxe_mca *mca, *tmp;
 
-	mcg = rxe_pool_get_key(&rxe->mc_grp_pool, mgid);
+	mcg = rxe_lookup_mcg(rxe, mgid);
 	if (!mcg)
 		goto err1;
 
@@ -170,11 +320,6 @@ err1:
 	return -EINVAL;
 }
 
-void rxe_mc_cleanup(struct rxe_pool_elem *elem)
-{
-	/* nothing left to do */
-}
-
 int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 {
 	int err;
@@ -182,14 +327,14 @@ int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 	struct rxe_qp *qp = to_rqp(ibqp);
 	struct rxe_mcg *mcg;
 
-	err = rxe_mcast_get_mcg(rxe, mgid, &mcg);
+	err = rxe_get_mcg(rxe, mgid, &mcg);
 	if (err)
 		return err;
 
 	err = rxe_mcast_add_grp_elem(rxe, qp, mcg);
 
 	if (atomic_read(&mcg->qp_num) == 0)
-		__rxe_destroy_mcg(mcg);
+		rxe_destroy_mcg(mcg);
 
 	rxe_drop_ref(mcg);
 	return err;

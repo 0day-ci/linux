@@ -199,6 +199,7 @@ static int rxe_init(struct rxe_dev *rxe)
 		return err;
 
 	spin_lock_init(&rxe->mcg_lock);
+	rxe->mcg_tree = RB_ROOT;
 
 	/* init pending mmap list */
 	spin_lock_init(&rxe->mmap_offset_lock);

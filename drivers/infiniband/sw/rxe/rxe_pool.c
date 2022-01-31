@@ -82,13 +82,9 @@ static const struct rxe_type_info {
 		.max_index	= RXE_MAX_MW_INDEX,
 	},
 	[RXE_TYPE_MC_GRP] = {
-		.name		= "rxe-mc_grp",
+		.name		= "rxe-mcg",
 		.size		= sizeof(struct rxe_mcg),
 		.elem_offset	= offsetof(struct rxe_mcg, elem),
-		.cleanup	= rxe_mc_cleanup,
-		.flags		= RXE_POOL_KEY,
-		.key_offset	= offsetof(struct rxe_mcg, mgid),
-		.key_size	= sizeof(union ib_gid),
 	},
 };
 
