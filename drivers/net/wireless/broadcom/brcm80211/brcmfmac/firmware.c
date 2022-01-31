@@ -599,6 +599,9 @@ static char *brcm_alt_fw_path(const char *path, const char *board_type)
 	char alt_path[BRCMF_FW_NAME_LEN];
 	char suffix[5];
 
+	if (!board_type)
+		return NULL;
+
 	strscpy(alt_path, path, BRCMF_FW_NAME_LEN);
 	/* At least one character + suffix */
 	if (strlen(alt_path) < 5)
