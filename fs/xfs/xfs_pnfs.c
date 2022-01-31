@@ -71,6 +71,49 @@ xfs_fs_get_uuid(
 }
 
 /*
+ * We cannot use file based VFS helpers such as file_modified() to update inode
+ * state as PNFS doesn't provide us with an open file context that the VFS
+ * helpers require. Hence we open code a best effort timestamp update and
+ * SUID/SGID stripping here, knowing that server side security in PNFS settings
+ * is largely non-existent as clients have storage level remote write access.
+ * Hence clients have the capability to overwrite filesystem metadata, and so
+ * the filesystem trust domain extends to untrusted, uncontrollable remote
+ * clients.  Hence server side enforced filesystem "security" in filesystem
+ * based PNFS block layout settings is pure theatre: friends don't let friends
+ * host executables on PNFS exported XFS volumes, let alone SUID executables.
+ *
+ * We also need to set the inode prealloc flag to ensure that the extents we
+ * allocate beyond the existing EOF and hand to the PNFS client are not removed
+ * by background blockgc scanning, ENOSPC mitigations or inode reclaim before
+ * the PNFS client calls xfs_fs_block_commit() to indicate that data has been
+ * written and the file size can be extended.
+ */
+static int
+xfs_fs_map_update_inode(
+	struct xfs_inode	*ip)
+{
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = xfs_trans_alloc(ip->i_mount, &M_RES(ip->i_mount)->tr_writeid,
+			0, 0, 0, &tp);
+	if (error)
+		return error;
+
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+
+	VFS_I(ip)->i_mode &= ~S_ISUID;
+	if (VFS_I(ip)->i_mode & S_IXGRP)
+		VFS_I(ip)->i_mode &= ~S_ISGID;
+	xfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+	ip->i_diflags |= XFS_DIFLAG_PREALLOC;
+
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	return xfs_trans_commit(tp);
+}
+
+/*
  * Get a layout for the pNFS client.
  */
 int
@@ -164,7 +207,7 @@ xfs_fs_map_blocks(
 		 * that the blocks allocated and handed out to the client are
 		 * guaranteed to be present even after a server crash.
 		 */
-		error = xfs_update_prealloc_flags(ip, XFS_PREALLOC_SET);
+		error = xfs_fs_map_update_inode(ip);
 		if (!error)
 			error = xfs_log_force_inode(ip);
 		if (error)
@@ -257,7 +300,7 @@ xfs_fs_commit_blocks(
 		length = end - start;
 		if (!length)
 			continue;
-	
+
 		/*
 		 * Make sure reads through the pagecache see the new data.
 		 */
