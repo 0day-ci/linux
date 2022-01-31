@@ -135,7 +135,7 @@ struct page *try_grab_compound_head(struct page *page,
 		 * right zone, so fail and let the caller fall back to the slow
 		 * path.
 		 */
-		if (unlikely((flags & FOLL_LONGTERM) &&
+		if (refs > 1 && unlikely((flags & FOLL_LONGTERM) &&
 			     !is_pinnable_page(page)))
 			return NULL;
 
