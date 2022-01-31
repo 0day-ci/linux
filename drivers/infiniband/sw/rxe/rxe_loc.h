@@ -44,6 +44,7 @@ struct rxe_mcg *rxe_lookup_mcg(struct rxe_dev *rxe, union ib_gid *mgid);
 int rxe_attach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid);
 int rxe_detach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid);
 void rxe_cleanup_mcg(struct kref *kref);
+void rxe_cleanup_mcast(struct rxe_dev *rxe);
 
 /* rxe_mmap.c */
 struct rxe_mmap_info {
