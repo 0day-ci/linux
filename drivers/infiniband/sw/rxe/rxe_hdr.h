@@ -36,6 +36,9 @@ static inline struct sk_buff *PKT_TO_SKB(struct rxe_pkt_info *pkt)
 	return container_of((void *)pkt, struct sk_buff, cb);
 }
 
+/* alternative to access a single element of rxe_pkt_info from skb */
+#define RXECB(skb) ((struct rxe_pkt_info *)((skb)->cb))
+
 /*
  * IBA header types and methods
  *
