@@ -1,0 +1,103 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2022 IBM Corporation.  All Rights Reserved.
+#
+# FS QA Test 056
+#
+# regression testing to test kernel crash with fast_commit feature.
+# (based on example from tests/generic/468)
+# commit: https://patchwork.ozlabs.org/patch/1586856
+#
+
+. ./common/preamble
+_begin_fstest auto quick log
+
+# Override the default cleanup function.
+ _cleanup()
+ {
+	cd /
+	rm -r -f $tmp.*
+	_scratch_unmount > /dev/null 2>&1
+ }
+
+# Import common functions.
+ . ./common/filter
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs ext4
+_require_scratch
+_require_scratch_shutdown
+_require_scratch_ext4_feature "fast_commit"
+
+testfile1=$SCRATCH_MNT/testfile1
+testfile2=$SCRATCH_MNT/testfile2
+blocksize=4096
+
+$MKFS_EXT4_PROG -F -b $blocksize -O fast_commit $SCRATCH_DEV 5G >> $seqres.full 2>&1
+_scratch_mount >> $seqres.full 2>&1
+
+if [ $? -ne 0 ]; then
+	_notrun "requires ext4 fast_commit"
+fi
+
+check_stat_before_after()
+{
+	before="$1"
+	after="$2"
+
+	if [ "$before" != "$after" ]; then
+		echo "Before: $before"
+		echo "After : $after"
+	fi
+	echo "Before: $before" >> $seqres.full
+	echo "After : $after" >> $seqres.full
+}
+
+#
+# Idea is to create a file of 5M & write 5M of data followed by fsync.
+# Then falloc extra blocks (with -k) such that the blocks extend the block group
+# boundary considerably, followed by fsync, followed by shutdown.
+# This will trigger fast_commit recovery and will help test kernel crash w/o
+# fix.
+#
+fact=10
+echo "Test-1: fsync shutdown recovery test"
+$XFS_IO_PROG -f -c "truncate $((5*1024*1024))" \
+			-c "pwrite 0 $((5*1024*1024))" \
+			-c "fsync"  \
+			-c "falloc -k $((5*1024*1024)) $((32768*$blocksize*$fact))" \
+			$testfile1 >> $seqres.full 2>&1
+
+stat_opt='-c "b: %b s: %s a: %x m: %y c: %z"'
+before=$(stat "$stat_opt" "$testfile1")
+
+$XFS_IO_PROG -c "fsync" $testfile1
+_scratch_shutdown -v >> $seqres.full 2>&1
+_scratch_cycle_mount >> $seqres.full 2>&1
+
+after=$(stat "$stat_opt" $testfile1)
+
+check_stat_before_after "$before" "$after"
+
+echo "Test-2: fdatasync shutdown recovery test"
+$XFS_IO_PROG -f -c "truncate $((5*1024*1024))" \
+			-c "pwrite 0 $((5*1024*1024))" \
+			-c "fsync"  \
+			-c "falloc -k $((5*1024*1024)) $((32768*$blocksize*$fact))" \
+			$testfile2 >> $seqres.full 2>&1
+
+stat_opt='-c "b: %b s: %s"'
+before=$(stat "$stat_opt" $testfile2)
+
+$XFS_IO_PROG -c "fdatasync" $testfile2
+_scratch_shutdown -v >> $seqres.full 2>&1
+_scratch_cycle_mount >> $seqres.full 2>&1
+
+after=$(stat "$stat_opt" "$testfile2")
+check_stat_before_after "$before" "$after"
+
+# success, all done
+status=0
+exit
