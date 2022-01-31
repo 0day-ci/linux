@@ -228,6 +228,13 @@ int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t stat
 	if (!ret) {
 		/* D3 might be unsupported via quirk, skip unless in D3 */
 		if (needs_save && pdev->current_state >= PCI_D3hot) {
+			/*
+			 * If somehow, the vfio driver was not able to free the
+			 * memory allocated in pm_save, then free the earlier
+			 * memory first before overwriting pm_save to prevent
+			 * memory leak.
+			 */
+			kfree(vdev->pm_save);
 			vdev->pm_save = pci_store_saved_state(pdev);
 		} else if (needs_restore) {
 			pci_load_and_free_saved_state(pdev, &vdev->pm_save);
@@ -321,6 +328,12 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 
 	/* For needs_reset */
 	lockdep_assert_held(&vdev->vdev.dev_set->lock);
+
+	/*
+	 * This function can be invoked while the power state is non-D0,
+	 * Change the device power state to D0 first.
+	 */
+	vfio_pci_set_power_state(vdev, PCI_D0);
 
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
@@ -921,6 +934,13 @@ long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
 			return -EINVAL;
 
 		vfio_pci_zap_and_down_write_memory_lock(vdev);
+
+		/*
+		 * This function can be invoked while the power state is non-D0,
+		 * Change the device power state to D0 before doing reset.
+		 */
+		vfio_pci_set_power_state(vdev, PCI_D0);
+
 		ret = pci_try_reset_function(vdev->pdev);
 		up_write(&vdev->memory_lock);
 
@@ -2054,6 +2074,13 @@ static int vfio_pci_dev_set_hot_reset(struct vfio_device_set *dev_set,
 		mutex_unlock(&cur_mem->vma_lock);
 	}
 	cur_mem = NULL;
+
+	/*
+	 * This function can be invoked while the power state is non-D0.
+	 * Change power state of all devices to D0 before doing reset.
+	 */
+	list_for_each_entry(cur, &dev_set->device_list, vdev.dev_set_list)
+		vfio_pci_set_power_state(cur, PCI_D0);
 
 	ret = pci_reset_bus(pdev);
 
