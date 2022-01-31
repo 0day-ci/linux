@@ -73,6 +73,10 @@ nfsd3_proc_setattr(struct svc_rqst *rqstp)
 	fh_copy(&resp->fh, &argp->fh);
 	resp->status = nfsd_setattr(rqstp, &resp->fh, &argp->attrs,
 				    argp->check_guard, argp->guardtime);
+
+	if (resp->status == nfserr_fbig)
+		resp->status = nfserr_inval;
+
 	return rpc_success;
 }
 
@@ -245,6 +249,11 @@ nfsd3_proc_create(struct svc_rqst *rqstp)
 	resp->status = do_nfsd_create(rqstp, dirfhp, argp->name, argp->len,
 				      attr, newfhp, argp->createmode,
 				      (u32 *)argp->verf, NULL, NULL);
+
+	/* CREATE must not return NFS3ERR_FBIG */
+	if (resp->status == nfserr_fbig)
+		resp->status = nfserr_io;
+
 	return rpc_success;
 }
 
