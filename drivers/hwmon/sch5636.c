@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/jiffies.h>
@@ -500,6 +501,14 @@ error:
 	sch5636_remove(pdev);
 	return err;
 }
+
+static const struct platform_device_id sch5636_device_ids[] __initconst = {
+	{
+		.name = "sch5636",
+	},
+	{ }
+};
+MODULE_DEVICE_TABLE(platform, sch5636_device_ids);
 
 static struct platform_driver sch5636_driver = {
 	.driver = {
