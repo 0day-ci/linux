@@ -834,6 +834,7 @@ static int iommu_ga_log_enable(struct amd_iommu *iommu)
 		status = readl(iommu->mmio_base + MMIO_STATUS_OFFSET);
 		if (status & (MMIO_STATUS_GALOG_RUN_MASK))
 			break;
+		udelay(1);
 	}
 
 	if (WARN_ON(i >= LOOP_TIMEOUT))
