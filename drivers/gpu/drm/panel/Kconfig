@@ -104,6 +104,7 @@ config DRM_PANEL_EDP
 	depends on OF
 	depends on BACKLIGHT_CLASS_DEVICE
 	depends on PM
+	depends on DRM_KMS_HELPER
 	select VIDEOMODE_HELPERS
 	select DRM_DP_AUX_BUS
 	help
