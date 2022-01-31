@@ -401,6 +401,7 @@ struct rxe_dev {
 	spinlock_t		mcg_lock; /* guard multicast groups */
 	struct rb_root		mcg_tree;
 	atomic_t		mcg_num;
+	atomic_t		mcg_attach;
 	unsigned int		mcg_next;
 
 	spinlock_t		pending_lock; /* guard pending_mmaps */
