@@ -52,6 +52,26 @@
 #define SECBIT_NO_CAP_AMBIENT_RAISE_LOCKED \
 			(issecure_mask(SECURE_NO_CAP_AMBIENT_RAISE_LOCKED))
 
+/* One character for each bit pair summarizing the bit's state in the
+   /proc/<PID>/status file. If you add another bit pair, assign it a
+   lower case letter at the end of this string to have it show up in
+   the "SecBits:" line. Example, "SecBits:\t239\t(RS_A)" (aka PURE1E
+   mode).
+
+   Key (lower case if unlocked, upper case if locked):
+
+      r = noRoot
+      s = no_Setuid_fixup
+      k = Keep_caps
+      a = no_cap_Ambient_raise
+
+   else:
+
+      _ = locked-not-set
+      . = unlocked-not-set
+ */
+#define SECBIT_FLAGS    "rska"
+
 #define SECURE_ALL_BITS		(issecure_mask(SECURE_NOROOT) | \
 				 issecure_mask(SECURE_NO_SETUID_FIXUP) | \
 				 issecure_mask(SECURE_KEEP_CAPS) | \

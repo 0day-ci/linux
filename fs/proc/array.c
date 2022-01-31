@@ -60,6 +60,7 @@
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
 #include <linux/tty.h>
+#include <linux/ctype.h>
 #include <linux/string.h>
 #include <linux/mman.h>
 #include <linux/sched/mm.h>
@@ -93,6 +94,7 @@
 #include <linux/user_namespace.h>
 #include <linux/fs_struct.h>
 #include <linux/kthread.h>
+#include <linux/securebits.h>
 
 #include <asm/processor.h>
 #include "internal.h"
@@ -308,11 +310,33 @@ static void render_cap_t(struct seq_file *m, const char *header,
 	seq_putc(m, '\n');
 }
 
+static const char secbit_flags[] = SECBIT_FLAGS;
+
+static void render_secbits(struct seq_file *m, unsigned securebits)
+{
+	int i;
+	char c;
+
+	seq_put_decimal_ull(m, "SecBits:\t", securebits);
+	seq_puts(m, "\t(");
+	for (i=0; (c = secbit_flags[i]); i++) {
+		int combo = (securebits >> (2*i)) & 0x3;
+		if (!(combo & 1)) {
+			c = ".?_"[combo];
+		} else if (combo & 2) {
+			c = __toupper(c);
+		}
+		seq_putc(m, c);
+	}
+	seq_puts(m, ")\n");
+}
+
 static inline void task_cap(struct seq_file *m, struct task_struct *p)
 {
 	const struct cred *cred;
 	kernel_cap_t cap_inheritable, cap_permitted, cap_effective,
 			cap_bset, cap_ambient;
+	unsigned securebits;
 
 	rcu_read_lock();
 	cred = __task_cred(p);
@@ -321,6 +345,7 @@ static inline void task_cap(struct seq_file *m, struct task_struct *p)
 	cap_effective	= cred->cap_effective;
 	cap_bset	= cred->cap_bset;
 	cap_ambient	= cred->cap_ambient;
+	securebits	= cred->securebits;
 	rcu_read_unlock();
 
 	render_cap_t(m, "CapInh:\t", &cap_inheritable);
@@ -328,6 +353,7 @@ static inline void task_cap(struct seq_file *m, struct task_struct *p)
 	render_cap_t(m, "CapEff:\t", &cap_effective);
 	render_cap_t(m, "CapBnd:\t", &cap_bset);
 	render_cap_t(m, "CapAmb:\t", &cap_ambient);
+	render_secbits(m, securebits);
 }
 
 static inline void task_seccomp(struct seq_file *m, struct task_struct *p)
