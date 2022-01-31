@@ -207,6 +207,15 @@ static int spi_mem_check_op(const struct spi_mem_op *op)
 	    !spi_mem_buswidth_is_valid(op->data.buswidth))
 		return -EINVAL;
 
+	/* Buffers must be DMA-able. */
+	if (op->data.dir == SPI_MEM_DATA_IN &&
+	    object_is_on_stack(op->data.buf.in))
+		return -EINVAL;
+
+	if (op->data.dir == SPI_MEM_DATA_OUT &&
+	    object_is_on_stack(op->data.buf.out))
+		return -EINVAL;
+
 	return 0;
 }
 
