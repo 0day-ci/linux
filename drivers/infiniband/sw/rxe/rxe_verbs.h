@@ -358,7 +358,7 @@ struct rxe_mcg {
 	struct list_head	qp_list;
 	atomic_t		qp_num;
 	union ib_gid		mgid;
-	unsigned int		index;
+	unsigned int		index; /* debugging help */
 	u32			qkey;
 	u16			pkey;
 };
