@@ -781,6 +781,9 @@ static int fuse_dax_writepages(struct address_space *mapping,
 	struct inode *inode = mapping->host;
 	struct fuse_conn *fc = get_fuse_conn(inode);
 
+	if (wbc->sync_mode == WB_SYNC_NONE &&
+	    fc->num_background >= fc->congestion_threshold)
+		return 0;
 	return dax_writeback_mapping_range(mapping, fc->dax->dev, wbc);
 }
 

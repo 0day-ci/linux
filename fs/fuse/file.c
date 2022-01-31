@@ -958,6 +958,8 @@ static void fuse_readahead(struct readahead_control *rac)
 
 	if (fuse_is_bad(inode))
 		return;
+	if (fc->num_background >= fc->congestion_threshold)
+		return;
 
 	max_pages = min_t(unsigned int, fc->max_pages,
 			fc->max_read / PAGE_SIZE);
@@ -1958,6 +1960,7 @@ err:
 
 static int fuse_writepage(struct page *page, struct writeback_control *wbc)
 {
+	struct fuse_conn *fc = get_fuse_conn(page->mapping->host);
 	int err;
 
 	if (fuse_page_is_writeback(page->mapping->host, page->index)) {
@@ -1972,6 +1975,10 @@ static int fuse_writepage(struct page *page, struct writeback_control *wbc)
 		unlock_page(page);
 		return 0;
 	}
+
+	if (wbc->sync_mode == WB_SYNC_NONE &&
+	    fc->num_background >= fc->congestion_threshold)
+		return AOP_WRITEPAGE_ACTIVATE;
 
 	err = fuse_writepage_locked(page);
 	unlock_page(page);
@@ -2225,6 +2232,10 @@ static int fuse_writepages(struct address_space *mapping,
 	err = -EIO;
 	if (fuse_is_bad(inode))
 		goto out;
+
+	if (wbc->sync_mode == WB_SYNC_NONE &&
+	    fc->num_background >= fc->congestion_threshold)
+		return AOP_WRITEPAGE_ACTIVATE;
 
 	data.inode = inode;
 	data.wpa = NULL;
