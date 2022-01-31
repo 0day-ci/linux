@@ -3920,6 +3920,13 @@ again:
 		len -= overflow;
 	}
 
+	if (!ext4_group_block_valid(sb, group, block, len)) {
+		ext4_error(sb, "Marking blocks in system zone - "
+			   "Block = %llu, len = %d", block, len);
+		bitmap_bh = NULL;
+		goto out_err;
+	}
+
 	clen = EXT4_NUM_B2C(sbi, len);
 
 	bitmap_bh = ext4_read_block_bitmap(sb, group);
