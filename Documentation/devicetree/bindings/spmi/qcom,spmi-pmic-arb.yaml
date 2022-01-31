@@ -67,6 +67,13 @@ properties:
       PMIC Arb which provides channels to use for accesses. Valid values 0 to 5
     $ref: /schemas/types.yaml#/definitions/uint32-array
 
+  qcom,bus-id:
+    description: |
+      SPMI bus instance. only applicable to PMIC arbiter version 7 and beyond.
+      Supported values, 0 = primary bus, 1 = secondary bus
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+
+
 required:
   - compatible
   - reg
@@ -105,6 +112,8 @@ examples:
 
         qcom,ee = <0>;
         qcom,channel = <0>;
+
+        qcom,bus-id = <0>;
 
         pmic@0 {
           reg = <0 0>;
