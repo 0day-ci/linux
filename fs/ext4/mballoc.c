@@ -3899,12 +3899,29 @@ void ext4_mb_mark_bb(struct super_block *sb, ext4_fsblk_t block,
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	ext4_group_t group;
 	ext4_grpblk_t blkoff;
-	int i, clen, err;
+	int i, err;
 	int already;
+	unsigned int clen, overflow;
 
-	clen = EXT4_B2C(sbi, len);
-
+again:
+	overflow = 0;
 	ext4_get_group_no_and_offset(sb, block, &group, &blkoff);
+
+	/*
+	 * Check to see if we are freeing blocks across a group
+	 * boundary.
+	 * In case of flex_bg, this can happen that (block, len) may span across
+	 * more than one group. In that case we need to get the corresponding
+	 * group metadata to work with. For this we have goto again loop.
+	 */
+	if (EXT4_C2B(sbi, blkoff) + len > EXT4_BLOCKS_PER_GROUP(sb)) {
+		overflow = EXT4_C2B(sbi, blkoff) + len -
+			EXT4_BLOCKS_PER_GROUP(sb);
+		len -= overflow;
+	}
+
+	clen = EXT4_NUM_B2C(sbi, len);
+
 	bitmap_bh = ext4_read_block_bitmap(sb, group);
 	if (IS_ERR(bitmap_bh)) {
 		err = PTR_ERR(bitmap_bh);
@@ -3959,6 +3976,13 @@ void ext4_mb_mark_bb(struct super_block *sb, ext4_fsblk_t block,
 	sync_dirty_buffer(bitmap_bh);
 	err = ext4_handle_dirty_metadata(NULL, NULL, gdp_bh);
 	sync_dirty_buffer(gdp_bh);
+
+	if (overflow && !err) {
+		block += len;
+		len = overflow;
+		put_bh(bitmap_bh);
+		goto again;
+	}
 
 out_err:
 	brelse(bitmap_bh);
