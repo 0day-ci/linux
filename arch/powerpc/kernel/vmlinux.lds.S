@@ -281,9 +281,7 @@ SECTIONS
 	. = ALIGN(8);
 	.dynsym : AT(ADDR(.dynsym) - LOAD_OFFSET)
 	{
-#ifdef CONFIG_PPC32
 		__dynamic_symtab = .;
-#endif
 		*(.dynsym)
 	}
 	.dynstr : AT(ADDR(.dynstr) - LOAD_OFFSET) { *(.dynstr) }
@@ -299,6 +297,7 @@ SECTIONS
 	{
 		__rela_dyn_start = .;
 		*(.rela*)
+		__rela_dyn_end = .;
 	}
 #endif
 	/* .exit.data is discarded at runtime, not link time,
