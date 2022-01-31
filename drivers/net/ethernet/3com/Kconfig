@@ -5,7 +5,6 @@
 
 config NET_VENDOR_3COM
 	bool "3Com devices"
-	default y
 	depends on ISA || EISA || PCI || PCMCIA
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.

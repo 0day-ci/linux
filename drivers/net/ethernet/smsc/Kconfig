@@ -5,7 +5,6 @@
 
 config NET_VENDOR_SMSC
 	bool "SMC (SMSC)/Western Digital devices"
-	default y
 	depends on ARM || ARM64 || ATARI_ETHERNAT || COLDFIRE || \
 		   ISA || MAC || MIPS || NIOS2 || PCI || \
 		   PCMCIA || SUPERH || XTENSA || H8300 || COMPILE_TEST

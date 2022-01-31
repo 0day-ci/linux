@@ -5,7 +5,6 @@
 
 config NET_VENDOR_TUNDRA
 	bool "Tundra devices"
-	default y
 	depends on TSI108_BRIDGE
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.

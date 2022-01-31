@@ -4,7 +4,6 @@
 
 config NET_VENDOR_LITEX
 	bool "LiteX devices"
-	default y
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 

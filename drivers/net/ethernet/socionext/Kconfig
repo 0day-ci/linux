@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 config NET_VENDOR_SOCIONEXT
 	bool "Socionext ethernet drivers"
-	default y
 	help
 	  Option to select ethernet drivers for Socionext platforms.
 

@@ -4,7 +4,6 @@
 
 config NET_VENDOR_ASIX
 	bool "Asix devices"
-	default y
 	help
 	  If you have a network (Ethernet, non-USB, not NE2000 compatible)
 	  interface based on a chip from ASIX, say Y.

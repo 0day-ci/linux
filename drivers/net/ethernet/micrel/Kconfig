@@ -5,7 +5,6 @@
 
 config NET_VENDOR_MICREL
 	bool "Micrel devices"
-	default y
 	depends on (HAS_IOMEM && DMA_ENGINE) || SPI || PCI || HAS_IOMEM
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.

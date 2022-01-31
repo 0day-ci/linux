@@ -5,7 +5,6 @@
 
 config NET_VENDOR_NI
 	bool "National Instruments Devices"
-	default y
 	help
 	  If you have a network (Ethernet) device belonging to this class, say Y.
 

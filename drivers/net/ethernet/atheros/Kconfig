@@ -5,7 +5,6 @@
 
 config NET_VENDOR_ATHEROS
 	bool "Atheros devices"
-	default y
 	depends on (PCI || ATH79)
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.

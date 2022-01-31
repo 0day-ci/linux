@@ -5,7 +5,6 @@
 
 config NET_VENDOR_SAMSUNG
 	bool "Samsung Ethernet devices"
-	default y
 	help
 	  If you have a network (Ethernet) chipset belonging to this class,
 	  say Y.

@@ -5,7 +5,6 @@
 
 config NET_VENDOR_AQUANTIA
 	bool "aQuantia devices"
-	default y
 	help
 	  Set this to y if you have an Ethernet network cards that uses the aQuantia
 	  AQC107/AQC108 chipset.

@@ -6,7 +6,6 @@
 
 config NET_VENDOR_PENSANDO
 	bool "Pensando devices"
-	default y
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 

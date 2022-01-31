@@ -5,7 +5,6 @@
 
 config NET_VENDOR_CAVIUM
 	bool "Cavium ethernet drivers"
-	default y
 	help
 	  Select this option if you want enable Cavium network support.
 

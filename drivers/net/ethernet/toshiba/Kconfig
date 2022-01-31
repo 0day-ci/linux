@@ -5,7 +5,6 @@
 
 config NET_VENDOR_TOSHIBA
 	bool "Toshiba devices"
-	default y
 	depends on PCI && (PPC_IBM_CELL_BLADE || MIPS) || PPC_PS3
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.

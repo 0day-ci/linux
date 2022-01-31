@@ -5,7 +5,6 @@
 
 config NET_VENDOR_STMICRO
 	bool "STMicroelectronics devices"
-	default y
 	depends on HAS_IOMEM
 	help
 	  If you have a network (Ethernet) card based on Synopsys Ethernet IP

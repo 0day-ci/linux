@@ -5,7 +5,6 @@
 
 config NET_VENDOR_NETRONOME
 	bool "Netronome(R) devices"
-	default y
 	help
 	  If you have a Netronome(R) network (Ethernet) card or device, say Y.
 
