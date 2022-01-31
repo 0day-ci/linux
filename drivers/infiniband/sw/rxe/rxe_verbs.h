@@ -356,8 +356,8 @@ struct rxe_mcg {
 	spinlock_t		mcg_lock; /* guard group */
 	struct rxe_dev		*rxe;
 	struct list_head	qp_list;
+	atomic_t		qp_num;
 	union ib_gid		mgid;
-	int			num_qp;
 	u32			qkey;
 	u16			pkey;
 };

@@ -229,6 +229,11 @@ static inline void rxe_rcv_pkt(struct sk_buff *skb)
 		rxe_comp_queue_pkt(RXECB(skb)->qp, skb);
 }
 
+/* split processing of the qp list into two stages.
+ * first just make a simple linear array from the
+ * current list while holding the lock and then
+ * process each qp without holding the lock.
+ */
 static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 {
 	struct sk_buff *s;
@@ -237,7 +242,9 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 	struct rxe_mcg *mcg;
 	struct rxe_mca *mca;
 	struct rxe_qp *qp;
+	struct rxe_qp **qp_array;
 	union ib_gid dgid;
+	int n, nmax;
 	int err;
 
 	if (skb->protocol == htons(ETH_P_IP))
@@ -251,15 +258,32 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 	if (!mcg)
 		goto drop;	/* mcast group not registered */
 
+	/* this is the current number of qp's attached to mcg plus a
+	 * little room in case new qp's are attached. It isn't wrong
+	 * to miss some qp's since it is just a matter of precisely
+	 * when the packet is assumed to be received.
+	 */
+	nmax = atomic_read(&mcg->qp_num) + 2;
+	qp_array = kmalloc_array(nmax, sizeof(qp), GFP_KERNEL);
+
+	n = 0;
 	spin_lock_bh(&mcg->mcg_lock);
+	list_for_each_entry(mca, &mcg->qp_list, qp_list) {
+		rxe_add_ref(mca->qp);
+		qp_array[n++] = mca->qp;
+		if (n == nmax)
+			break;
+	}
+	spin_unlock_bh(&mcg->mcg_lock);
+	nmax = n;
 
 	/* this is unreliable datagram service so we let
 	 * failures to deliver a multicast packet to a
 	 * single QP happen and just move on and try
 	 * the rest of them on the list
 	 */
-	list_for_each_entry(mca, &mcg->qp_list, qp_list) {
-		qp = mca->qp;
+	for (n = 0; n < nmax; n++) {
+		qp = qp_array[n];
 
 		/* validate qp for incoming packet */
 		err = check_type_state(rxe, pkt, qp);
@@ -274,28 +298,27 @@ static void rxe_rcv_mcast_pkt(struct sk_buff *skb)
 		 * skb and pass to the QP. Pass the original skb to
 		 * the last QP in the list.
 		 */
-		if (mca->qp_list.next != &mcg->qp_list) {
-			s = skb_clone(skb, GFP_ATOMIC);
+		if (n < nmax - 1) {
+			s = skb_clone(skb, GFP_KERNEL);
 			if (unlikely(!s))
 				continue;
 
+			RXECB(s)->qp = qp;
 			if (WARN_ON(!ib_device_try_get(&rxe->ib_dev))) {
+				rxe_drop_ref(RXECB(s)->qp);
 				kfree_skb(s);
-				break;
+				continue;
 			}
 
-			RXECB(s)->qp = qp;
-			rxe_add_ref(qp);
 			rxe_rcv_pkt(s);
 		} else {
 			RXECB(skb)->qp = qp;
-			rxe_add_ref(qp);
 			rxe_rcv_pkt(skb);
 			skb = NULL;	/* mark consumed */
 		}
 	}
 
-	spin_unlock_bh(&mcg->mcg_lock);
+	kfree(qp_array);
 
 	rxe_drop_ref(mcg);	/* drop ref from rxe_pool_get_key. */
 
