@@ -35,6 +35,7 @@ problems and bugs in particular.
    :maxdepth: 1
 
    reporting-issues
+   regressions-users
    security-bugs
    bug-hunting
    bug-bisect
