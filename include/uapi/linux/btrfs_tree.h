@@ -958,14 +958,20 @@ static inline __u16 btrfs_qgroup_level(__u64 qgroupid)
 	return (__u16)(qgroupid >> BTRFS_QGROUP_LEVEL_SHIFT);
 }
 
+enum {
+	  BTRFS_QGROUP_STATUS_FLAG_NUM_ON,
+	  BTRFS_QGROUP_STATUS_FLAG_NUM_RESCAN,
+	  BTRFS_QGROUP_STATUS_FLAG_NUM_INCONSISTENT,
+};
+
 /*
  * is subvolume quota turned on?
  */
-#define BTRFS_QGROUP_STATUS_FLAG_ON		(1ULL << 0)
+#define BTRFS_QGROUP_STATUS_FLAG_ON		(1ULL << BTRFS_QGROUP_STATUS_FLAG_NUM_ON)
 /*
  * RESCAN is set during the initialization phase
  */
-#define BTRFS_QGROUP_STATUS_FLAG_RESCAN		(1ULL << 1)
+#define BTRFS_QGROUP_STATUS_FLAG_RESCAN		(1ULL << BTRFS_QGROUP_STATUS_FLAG_NUM_RESCAN)
 /*
  * Some qgroup entries are known to be out of date,
  * either because the configuration has changed in a way that
@@ -973,7 +979,7 @@ static inline __u16 btrfs_qgroup_level(__u64 qgroupid)
  * with a non-qgroup-aware version.
  * Turning qouta off and on again makes it inconsistent, too.
  */
-#define BTRFS_QGROUP_STATUS_FLAG_INCONSISTENT	(1ULL << 2)
+#define BTRFS_QGROUP_STATUS_FLAG_INCONSISTENT	(1ULL << BTRFS_QGROUP_STATUS_FLAG_NUM_INCONSISTENT)
 
 #define BTRFS_QGROUP_STATUS_VERSION        1
 
