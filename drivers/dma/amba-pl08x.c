@@ -1544,7 +1544,6 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_interrupt(
 }
 
 /*
- * Code accessing dma_async_is_complete() in a tight loop may give problems.
  * If slaves are relying on interrupts to signal completion this function
  * must not be called with interrupts disabled.
  */
