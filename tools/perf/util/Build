@@ -193,7 +193,6 @@ perf-$(CONFIG_LIBCAP) += cap.o
 
 perf-y += demangle-ocaml.o
 perf-y += demangle-java.o
-perf-y += demangle-rust.o
 
 ifdef CONFIG_JITDUMP
 perf-$(CONFIG_LIBELF) += jitdump.o

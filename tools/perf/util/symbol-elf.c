@@ -14,7 +14,6 @@
 #include "symsrc.h"
 #include "demangle-ocaml.h"
 #include "demangle-java.h"
-#include "demangle-rust.h"
 #include "machine.h"
 #include "vdso.h"
 #include "debug.h"
@@ -258,12 +257,6 @@ static char *demangle_sym(struct dso *dso, int kmodule, const char *elf_name)
 			demangled = java_demangle_sym(elf_name, JAVA_DEMANGLE_NORET);
 		}
 	}
-	else if (rust_is_mangled(demangled))
-		/*
-		    * Input to Rust demangling is the BFD-demangled
-		    * name which it Rust-demangles in place.
-		    */
-		rust_demangle_sym(demangled);
 
 	return demangled;
 }
