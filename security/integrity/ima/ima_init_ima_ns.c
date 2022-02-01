@@ -17,6 +17,10 @@ static int ima_init_namespace(struct ima_namespace *ns)
 	ns->ima_policy_flag = 0;
 	ns->arch_policy_entry = NULL;
 
+	atomic_long_set(&ns->ima_htable.len, 0);
+	atomic_long_set(&ns->ima_htable.violations, 0);
+	memset(&ns->ima_htable.queue, 0, sizeof(ns->ima_htable.queue));
+
 	return 0;
 }
 
