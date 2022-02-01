@@ -1405,11 +1405,11 @@ static int acpi_get_mac_address(struct device *dev, struct acpi_device *adev,
 static acpi_status bgx_acpi_register_phy(acpi_handle handle,
 					 u32 lvl, void *context, void **rv)
 {
-	struct bgx *bgx = context;
+	struct acpi_device *adev = acpi_fetch_acpi_dev(handle);
 	struct device *dev = &bgx->pdev->dev;
-	struct acpi_device *adev;
+	struct bgx *bgx = context;
 
-	if (acpi_bus_get_device(handle, &adev))
+	if (!adev)
 		goto out;
 
 	acpi_get_mac_address(dev, adev, bgx->lmac[bgx->acpi_lmac_idx].mac);

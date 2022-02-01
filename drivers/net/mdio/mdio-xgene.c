@@ -279,16 +279,14 @@ EXPORT_SYMBOL(xgene_enet_phy_register);
 static acpi_status acpi_register_phy(acpi_handle handle, u32 lvl,
 				     void *context, void **ret)
 {
+	struct acpi_device *adev = acpi_fetch_acpi_dev(handle);
 	struct mii_bus *mdio = context;
-	struct acpi_device *adev;
-	struct phy_device *phy_dev;
 	const union acpi_object *obj;
+	struct phy_device *phy_dev;
 	u32 phy_addr;
 
-	if (acpi_bus_get_device(handle, &adev))
-		return AE_OK;
-
-	if (acpi_dev_get_property(adev, "phy-channel", ACPI_TYPE_INTEGER, &obj))
+	if (!adev ||
+	    acpi_dev_get_property(adev, "phy-channel", ACPI_TYPE_INTEGER, &obj))
 		return AE_OK;
 	phy_addr = obj->integer.value;
 
