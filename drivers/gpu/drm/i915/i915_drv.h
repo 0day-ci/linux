@@ -1273,6 +1273,8 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 #define IS_COFFEELAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_COFFEELAKE)
 #define IS_COMETLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_COMETLAKE)
 #define IS_ICELAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_ICELAKE)
+#define IS_JASPERLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_JASPERLAKE)
+#define IS_ELKHARTLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_ELKHARTLAKE)
 #define IS_JSL_EHL(dev_priv)	(IS_IGP_PLATFORM(dev_priv, INTEL_JASPERLAKE) || \
 				IS_IGP_PLATFORM(dev_priv, INTEL_ELKHARTLAKE))
 #define IS_TIGERLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_TIGERLAKE)
