@@ -781,12 +781,7 @@ static int kirin_pcie_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	phy_type = (long)of_device_get_match_data(dev);
-	if (!phy_type) {
-		dev_err(dev, "OF data missing\n");
-		return -EINVAL;
-	}
-
+	phy_type = (enum pcie_kirin_phy_type)of_device_get_match_data(dev);
 
 	kirin_pcie = devm_kzalloc(dev, sizeof(struct kirin_pcie), GFP_KERNEL);
 	if (!kirin_pcie)
