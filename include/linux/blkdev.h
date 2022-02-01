@@ -253,6 +253,7 @@ struct queue_limits {
 	unsigned int		discard_granularity;
 	unsigned int		discard_alignment;
 	unsigned int		zone_write_granularity;
+	unsigned int		max_copy_sectors;
 
 	unsigned short		max_segments;
 	unsigned short		max_integrity_segments;
@@ -968,6 +969,7 @@ extern void blk_queue_max_zone_append_sectors(struct request_queue *q,
 extern void blk_queue_physical_block_size(struct request_queue *, unsigned int);
 void blk_queue_zone_write_granularity(struct request_queue *q,
 				      unsigned int size);
+void blk_queue_max_copy_sectors(struct request_queue *q, unsigned int size);
 extern void blk_queue_alignment_offset(struct request_queue *q,
 				       unsigned int alignment);
 void disk_update_readahead(struct gendisk *disk);
@@ -1124,6 +1126,10 @@ extern int __blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
 extern int blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
 		sector_t nr_sects, gfp_t gfp_mask, unsigned flags);
 
+extern int blkdev_issue_copy(struct block_device *bdev1, sector_t sector1,
+		      struct block_device *bdev2, sector_t sector2,
+		      sector_t nr_sects, sector_t *copied, gfp_t gfp_mask);
+
 static inline int sb_issue_discard(struct super_block *sb, sector_t block,
 		sector_t nr_blocks, gfp_t gfp_mask, unsigned long flags)
 {
@@ -1261,6 +1267,18 @@ static inline unsigned int
 bdev_zone_write_granularity(struct block_device *bdev)
 {
 	return queue_zone_write_granularity(bdev_get_queue(bdev));
+}
+
+static inline unsigned int
+queue_max_copy_sectors(const struct request_queue *q)
+{
+	return q->limits.max_copy_sectors;
+}
+
+static inline unsigned int
+bdev_max_copy_sectors(struct block_device *bdev)
+{
+	return queue_max_copy_sectors(bdev_get_queue(bdev));
 }
 
 static inline int queue_alignment_offset(const struct request_queue *q)

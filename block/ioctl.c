@@ -165,6 +165,60 @@ fail:
 	return err;
 }
 
+static int blk_ioctl_copy(struct block_device *bdev, fmode_t mode,
+		unsigned long arg)
+{
+	uint64_t range[4];
+	uint64_t start1, start2, end1, end2, len;
+	sector_t copied = 0;
+	struct inode *inode = bdev->bd_inode;
+	int err;
+
+	if (!(mode & FMODE_WRITE)) {
+		err = -EBADF;
+		goto fail1;
+	}
+
+	if (copy_from_user(range, (void __user *)arg, 24)) {
+		err = -EFAULT;
+		goto fail1;
+	}
+
+	start1 = range[0];
+	start2 = range[1];
+	len = range[2];
+	end1 = start1 + len - 1;
+	end2 = start2 + len - 1;
+
+	if ((start1 | start2 | len) & 511)
+		return -EINVAL;
+	if (end1 >= (uint64_t)bdev_nr_bytes(bdev))
+		return -EINVAL;
+	if (end2 >= (uint64_t)bdev_nr_bytes(bdev))
+		return -EINVAL;
+	if (end1 < start1)
+		return -EINVAL;
+	if (end2 < start2)
+		return -EINVAL;
+
+	filemap_invalidate_lock(inode->i_mapping);
+	err = truncate_bdev_range(bdev, mode, start2, end2);
+	if (err)
+		goto fail2;
+
+	err = blkdev_issue_copy(bdev, start1 >> 9, bdev, start2 >> 9, len >> 9, &copied, GFP_KERNEL);
+
+fail2:
+	filemap_invalidate_unlock(inode->i_mapping);
+
+fail1:
+	range[3] = (uint64_t)copied << 9;
+	if (copy_to_user((void __user *)(arg + 24), &range[3], 8))
+		err = -EFAULT;
+
+	return err;
+}
+
 static int put_ushort(unsigned short __user *argp, unsigned short val)
 {
 	return put_user(val, argp);
@@ -459,6 +513,8 @@ static int blkdev_common_ioctl(struct block_device *bdev, fmode_t mode,
 		return blk_ioctl_zeroout(bdev, mode, arg);
 	case BLKGETDISKSEQ:
 		return put_u64(argp, bdev->bd_disk->diskseq);
+	case BLKCOPY:
+		return blk_ioctl_copy(bdev, mode, arg);
 	case BLKREPORTZONE:
 		return blkdev_report_zones_ioctl(bdev, mode, cmd, arg);
 	case BLKRESETZONE:

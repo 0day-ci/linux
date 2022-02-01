@@ -418,3 +418,92 @@ retry:
 	return ret;
 }
 EXPORT_SYMBOL(blkdev_issue_zeroout);
+
+static void bio_wake_completion(struct bio *bio)
+{
+	struct completion *comp = bio->bi_private;
+	complete(comp);
+}
+
+int blkdev_issue_copy(struct block_device *bdev1, sector_t sector1,
+		      struct block_device *bdev2, sector_t sector2,
+		      sector_t nr_sects, sector_t *copied, gfp_t gfp_mask)
+{
+	struct page *token;
+	sector_t m;
+	int r = 0;
+	struct completion comp;
+
+	*copied = 0;
+
+	m = min(bdev_max_copy_sectors(bdev1), bdev_max_copy_sectors(bdev2));
+	if (!m)
+		return -EOPNOTSUPP;
+	m = min(m, (sector_t)round_down(UINT_MAX, PAGE_SIZE) >> 9);
+
+	if (unlikely(bdev_read_only(bdev2)))
+		return -EPERM;
+
+	token = alloc_page(gfp_mask);
+	if (unlikely(!token))
+		return -ENOMEM;
+
+	while (nr_sects) {
+		struct bio *read_bio, *write_bio;
+		sector_t this_step = min(nr_sects, m);
+
+		read_bio = bio_alloc(gfp_mask, 1);
+		if (unlikely(!read_bio)) {
+			r = -ENOMEM;
+			break;
+		}
+		bio_set_op_attrs(read_bio, REQ_OP_COPY_READ_TOKEN, REQ_NOMERGE);
+		bio_set_dev(read_bio, bdev1);
+		__bio_add_page(read_bio, token, PAGE_SIZE, 0);
+		read_bio->bi_iter.bi_sector = sector1;
+		read_bio->bi_iter.bi_size = this_step << 9;
+		read_bio->bi_private = &comp;
+		read_bio->bi_end_io = bio_wake_completion;
+		init_completion(&comp);
+		submit_bio(read_bio);
+		wait_for_completion(&comp);
+		if (unlikely(read_bio->bi_status != BLK_STS_OK)) {
+			r = blk_status_to_errno(read_bio->bi_status);
+			bio_put(read_bio);
+			break;
+		}
+		bio_put(read_bio);
+
+		write_bio = bio_alloc(gfp_mask, 1);
+		if (unlikely(!write_bio)) {
+			r = -ENOMEM;
+			break;
+		}
+		bio_set_op_attrs(write_bio, REQ_OP_COPY_WRITE_TOKEN, REQ_NOMERGE);
+		bio_set_dev(write_bio, bdev2);
+		__bio_add_page(write_bio, token, PAGE_SIZE, 0);
+		write_bio->bi_iter.bi_sector = sector2;
+		write_bio->bi_iter.bi_size = this_step << 9;
+		write_bio->bi_private = &comp;
+		write_bio->bi_end_io = bio_wake_completion;
+		reinit_completion(&comp);
+		submit_bio(write_bio);
+		wait_for_completion(&comp);
+		if (unlikely(write_bio->bi_status != BLK_STS_OK)) {
+			r = blk_status_to_errno(write_bio->bi_status);
+			bio_put(write_bio);
+			break;
+		}
+		bio_put(write_bio);
+
+		sector1 += this_step;
+		sector2 += this_step;
+		nr_sects -= this_step;
+		*copied += this_step;
+	}
+
+	__free_page(token);
+
+	return r;
+}
+EXPORT_SYMBOL(blkdev_issue_copy);

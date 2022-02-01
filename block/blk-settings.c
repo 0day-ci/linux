@@ -57,6 +57,7 @@ void blk_set_default_limits(struct queue_limits *lim)
 	lim->misaligned = 0;
 	lim->zoned = BLK_ZONED_NONE;
 	lim->zone_write_granularity = 0;
+	lim->max_copy_sectors = 0;
 }
 EXPORT_SYMBOL(blk_set_default_limits);
 
@@ -363,6 +364,17 @@ void blk_queue_zone_write_granularity(struct request_queue *q,
 		q->limits.zone_write_granularity = q->limits.logical_block_size;
 }
 EXPORT_SYMBOL_GPL(blk_queue_zone_write_granularity);
+
+/**
+ * blk_queue_max_copy_sectors - set maximum copy offload sectors for the queue
+ * @q:  the request queue for the device
+ * @size:  the maximum copy offload sectors
+ */
+void blk_queue_max_copy_sectors(struct request_queue *q, unsigned int size)
+{
+	q->limits.max_copy_sectors = size;
+}
+EXPORT_SYMBOL_GPL(blk_queue_max_copy_sectors);
 
 /**
  * blk_queue_alignment_offset - set physical block alignment offset

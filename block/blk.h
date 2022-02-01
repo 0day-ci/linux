@@ -288,6 +288,9 @@ static inline bool blk_may_split(struct request_queue *q, struct bio *bio)
 	case REQ_OP_WRITE_ZEROES:
 	case REQ_OP_WRITE_SAME:
 		return true; /* non-trivial splitting decisions */
+	case REQ_OP_COPY_READ_TOKEN:
+	case REQ_OP_COPY_WRITE_TOKEN:
+		return false;
 	default:
 		break;
 	}

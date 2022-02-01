@@ -124,6 +124,8 @@ static const char *const blk_op_name[] = {
 	REQ_OP_NAME(ZONE_APPEND),
 	REQ_OP_NAME(WRITE_SAME),
 	REQ_OP_NAME(WRITE_ZEROES),
+	REQ_OP_NAME(COPY_READ_TOKEN),
+	REQ_OP_NAME(COPY_WRITE_TOKEN),
 	REQ_OP_NAME(DRV_IN),
 	REQ_OP_NAME(DRV_OUT),
 };
@@ -756,6 +758,11 @@ noinline_for_stack bool submit_bio_checks(struct bio *bio)
 		break;
 	case REQ_OP_WRITE_ZEROES:
 		if (!q->limits.max_write_zeroes_sectors)
+			goto not_supported;
+		break;
+	case REQ_OP_COPY_READ_TOKEN:
+	case REQ_OP_COPY_WRITE_TOKEN:
+		if (!q->limits.max_copy_sectors)
 			goto not_supported;
 		break;
 	default:

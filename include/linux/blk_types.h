@@ -371,6 +371,10 @@ enum req_opf {
 	/* reset all the zone present on the device */
 	REQ_OP_ZONE_RESET_ALL	= 17,
 
+	/* copy offload bios */
+	REQ_OP_COPY_READ_TOKEN	= 18,
+	REQ_OP_COPY_WRITE_TOKEN	= 19,
+
 	/* Driver private requests */
 	REQ_OP_DRV_IN		= 34,
 	REQ_OP_DRV_OUT		= 35,
