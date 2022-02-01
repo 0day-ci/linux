@@ -14,6 +14,7 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/nospec.h>
 
 static u32 hl_debug_struct_size[HL_DEBUG_OP_TIMESTAMP + 1] = {
 	[HL_DEBUG_OP_ETR] = sizeof(struct hl_debug_params_etr),
@@ -849,6 +850,7 @@ long hl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	}
 
 	if ((nr >= HL_COMMAND_START) && (nr < HL_COMMAND_END)) {
+		nr = array_index_nospec(nr, HL_COMMAND_END-1);
 		ioctl = &hl_ioctls[nr];
 	} else {
 		dev_err(hdev->dev, "invalid ioctl: pid=%d, nr=0x%02x\n",
@@ -872,6 +874,7 @@ long hl_ioctl_control(struct file *filep, unsigned int cmd, unsigned long arg)
 	}
 
 	if (nr == _IOC_NR(HL_IOCTL_INFO)) {
+		nr = array_index_nospec(nr, _IOC_NR(HL_IOCTL_INFO));
 		ioctl = &hl_ioctls_control[nr];
 	} else {
 		dev_err(hdev->dev_ctrl, "invalid ioctl: pid=%d, nr=0x%02x\n",
