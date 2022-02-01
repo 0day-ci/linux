@@ -83,3 +83,16 @@ config NVME_TCP
 	  from https://github.com/linux-nvme/nvme-cli.
 
 	  If unsure, say N.
+
+config NVME_DEBUG
+	tristate "NVM Express debug"
+	depends on INET
+	depends on BLOCK
+	select NVME_CORE
+	select NVME_FABRICS
+	select CRYPTO
+	select CRYPTO_CRC32C
+	help
+	  This pseudo driver simulates a NVMe adapter.
+
+	  If unsure, say N.
