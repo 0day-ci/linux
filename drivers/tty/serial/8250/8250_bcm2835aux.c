@@ -12,6 +12,7 @@
  * simultaneously to rs485.
  */
 
+#include <linux/acpi.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -42,6 +43,10 @@ struct bcm2835aux_data {
 	struct clk *clk;
 	int line;
 	u32 cntl;
+};
+
+struct bcm2835_aux_serial_acpi_driver_data {
+	resource_size_t offset;
 };
 
 static void bcm2835aux_rs485_start_tx(struct uart_8250_port *up)
@@ -82,8 +87,12 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
 {
 	struct uart_8250_port up = { };
 	struct bcm2835aux_data *data;
+	struct bcm2835_aux_serial_acpi_driver_data *acpi_data;
 	struct resource *res;
 	int ret;
+	resource_size_t mapbase;
+	resource_size_t mapsize;
+	unsigned int uartclk;
 
 	/* allocate the custom structure */
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
@@ -108,10 +117,12 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, data);
 
-	/* get the clock - this also enables the HW */
-	data->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(data->clk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(data->clk), "could not get clk\n");
+	if (dev_of_node(&pdev->dev)) {
+		/* get the clock - this also enables the HW */
+		data->clk = devm_clk_get(&pdev->dev, NULL);
+		if (IS_ERR(data->clk))
+			return dev_err_probe(&pdev->dev, PTR_ERR(data->clk), "could not get clk\n");
+	}
 
 	/* get the interrupt */
 	ret = platform_get_irq(pdev, 0);
@@ -125,20 +136,59 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "memory resource not found");
 		return -EINVAL;
 	}
-	up.port.mapbase = res->start;
-	up.port.mapsize = resource_size(res);
 
-	/* Check for a fixed line number */
-	ret = of_alias_get_id(pdev->dev.of_node, "serial");
-	if (ret >= 0)
-		up.port.line = ret;
+	mapbase = res->start;
+	mapsize = resource_size(res);
 
-	/* enable the clock as a last step */
-	ret = clk_prepare_enable(data->clk);
-	if (ret) {
-		dev_err(&pdev->dev, "unable to enable uart clock - %d\n",
-			ret);
-		return ret;
+	if (has_acpi_companion(&pdev->dev)) {
+		const struct acpi_device_id *match;
+
+		match = acpi_match_device(pdev->dev.driver->acpi_match_table, &pdev->dev);
+		if (!match)
+			return -ENODEV;
+
+		acpi_data = (struct bcm2835_aux_serial_acpi_driver_data *)match->driver_data;
+
+		/* Some UEFI implementations (e.g. tianocore/edk2 for the Raspberry Pi)
+		 * describe the miniuart with a base address that encompasses the auxiliary
+		 * registers shared between the miniuart and spi.
+		 *
+		 * This is due to historical reasons, see discussion here :
+		 * https://edk2.groups.io/g/devel/topic/87501357#84349
+		 *
+		 * We need to add the offset between the miniuart and auxiliary
+		 * registers to get the real miniuart base address.
+		 */
+		up.port.mapbase = mapbase + acpi_data->offset;
+		up.port.mapsize = mapsize - acpi_data->offset;
+	} else {
+		up.port.mapbase = mapbase;
+		up.port.mapsize = mapsize;
+	}
+
+	if (dev_of_node(&pdev->dev)) {
+		/* Check for a fixed line number */
+		ret = of_alias_get_id(pdev->dev.of_node, "serial");
+		if (ret >= 0)
+			up.port.line = ret;
+
+		/* enable the clock as a last step */
+		ret = clk_prepare_enable(data->clk);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable uart clock - %d\n",
+				ret);
+			return ret;
+		}
+
+		uartclk = clk_get_rate(data->clk);
+
+
+	} else {
+		ret = device_property_read_u32(&pdev->dev, "clock-frequency", &uartclk);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to get clock frequency\n");
+			return ret;
+		}
 	}
 
 	/* the HW-clock divider for bcm2835aux is 8,
@@ -146,7 +196,7 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
 	 * so we have to multiply the actual clock by 2
 	 * to get identical baudrates.
 	 */
-	up.port.uartclk = clk_get_rate(data->clk) * 2;
+	up.port.uartclk = uartclk * 2;
 
 	/* register the port */
 	ret = serial8250_register_8250_port(&up);
@@ -159,7 +209,9 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
 	return 0;
 
 dis_clk:
-	clk_disable_unprepare(data->clk);
+	if (dev_of_node(&pdev->dev))
+		clk_disable_unprepare(data->clk);
+
 	return ret;
 }
 
@@ -173,16 +225,27 @@ static int bcm2835aux_serial_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct bcm2835_aux_serial_acpi_driver_data bcm2835_acpi_data = {
+	.offset = 0x40
+};
+
 static const struct of_device_id bcm2835aux_serial_match[] = {
 	{ .compatible = "brcm,bcm2835-aux-uart" },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, bcm2835aux_serial_match);
 
+static const struct acpi_device_id bcm2835aux_serial_acpi_match[] = {
+	{ "BCM2836", (kernel_ulong_t)&bcm2835_acpi_data },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, bcm2835aux_serial_acpi_match);
+
 static struct platform_driver bcm2835aux_serial_driver = {
 	.driver = {
 		.name = "bcm2835-aux-uart",
 		.of_match_table = bcm2835aux_serial_match,
+		.acpi_match_table = bcm2835aux_serial_acpi_match,
 	},
 	.probe  = bcm2835aux_serial_probe,
 	.remove = bcm2835aux_serial_remove,
