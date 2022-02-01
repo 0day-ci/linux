@@ -1049,8 +1049,17 @@ static void pxa_camera_dma_irq(struct pxa_camera_dev *pcdev,
 	last_buf = list_entry(pcdev->capture.prev,
 			      struct pxa_buffer, queue);
 	last_status = dma_async_is_tx_complete(pcdev->dma_chans[chan],
-					       last_buf->cookie[chan],
-					       NULL, &last_issued);
+					       last_buf->cookie[chan]);
+	/*
+	 * Peek into the channel and read the last cookie that was issued.
+	 * This is a layering violation - the dmaengine API does not officially
+	 * provide this information. Since this camera driver is tightly coupled
+	 * with a specific DMA device we know exactly how this cookie value will
+	 * behave. Otherwise, this wouldn't be safe.
+	 */
+	last_issued = pcdev->dma_chans[chan]->cookie;
+	barrier();
+
 	if (camera_status & overrun &&
 	    last_status != DMA_COMPLETE) {
 		dev_dbg(pcdev_to_dev(pcdev), "FIFO overrun! CISR: %x\n",

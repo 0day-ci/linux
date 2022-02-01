@@ -289,7 +289,7 @@ int omap_vout_prepare_vrfb(struct omap_vout_device *vout,
 					 vout->vrfb_dma_tx.tx_status == 1,
 					 VRFB_TX_TIMEOUT);
 
-	status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+	status = dma_async_is_tx_complete(chan, cookie);
 
 	if (vout->vrfb_dma_tx.tx_status == 0) {
 		pr_err("%s: Timeout while waiting for DMA\n", __func__);

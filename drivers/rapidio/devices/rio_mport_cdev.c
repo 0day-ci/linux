@@ -597,8 +597,7 @@ static void dma_xfer_callback(void *param)
 	struct mport_dma_req *req = (struct mport_dma_req *)param;
 	struct mport_cdev_priv *priv = req->priv;
 
-	req->status = dma_async_is_tx_complete(priv->dmach, req->cookie,
-					       NULL, NULL);
+	req->status = dma_async_is_tx_complete(priv->dmach, req->cookie);
 	complete(&req->req_comp);
 	kref_put(&req->refcount, dma_req_free);
 }
