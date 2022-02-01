@@ -74,8 +74,6 @@ static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
 	complete = chan->completed_cookie;
 	barrier();
 	if (state) {
-		state->last = complete;
-		state->used = used;
 		state->residue = 0;
 		state->in_flight_bytes = 0;
 	}
@@ -96,8 +94,6 @@ static inline void dma_set_tx_state(struct dma_tx_state *st,
 	if (!st)
 		return;
 
-	st->last = last;
-	st->used = used;
 	st->residue = residue;
 }
 
