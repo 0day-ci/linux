@@ -143,6 +143,11 @@ config DRM_I915_PXP
 	  protected session and manage the status of the alive software session,
 	  as well as its life cycle.
 
+menu "Platform support"
+depends on DRM_I915
+source "drivers/gpu/drm/i915/Kconfig.platforms"
+endmenu
+
 menu "drm/i915 Debugging"
 depends on DRM_I915
 depends on EXPERT

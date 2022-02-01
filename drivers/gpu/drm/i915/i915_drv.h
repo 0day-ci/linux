@@ -1120,8 +1120,26 @@ static inline struct intel_gt *to_gt(struct drm_i915_private *i915)
 #define GRAPHICS_VER(i915)		(INTEL_INFO(i915)->graphics.ver)
 #define GRAPHICS_VER_FULL(i915)		IP_VER(INTEL_INFO(i915)->graphics.ver, \
 					       INTEL_INFO(i915)->graphics.rel)
+
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 #define IS_GRAPHICS_VER(i915, from, until) \
 	(GRAPHICS_VER(i915) >= (from) && GRAPHICS_VER(i915) <= (until))
+#else
+#define IS_GRAPHICS_VER(i915, from, until) \
+({ \
+	const unsigned int s_ = 12; \
+	const unsigned int e_ = UINT_MAX; \
+	unsigned int res_; \
+ \
+	if ((s_ > (from) ? (s_): (from)) <= ((e_) < (until)? (e_): (until))) \
+		res_ = GRAPHICS_VER(i915) >= (from) && \
+		       GRAPHICS_VER(i915) <= (until); \
+	else \
+		res_ = 0; \
+ \
+	(res_); \
+})
+#endif
 
 #define MEDIA_VER(i915)			(INTEL_INFO(i915)->media.ver)
 #define MEDIA_VER_FULL(i915)		IP_VER(INTEL_INFO(i915)->media.arch, \
@@ -1215,49 +1233,53 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 	return ((mask << (msb - pb)) & (mask << (msb - s))) & BIT(msb);
 }
 
+#define IS_IGP_PLATFORM(dev_priv, p) \
+	(IS_ENABLED(CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT) && \
+	 IS_PLATFORM(dev_priv, p))
+
 #define IS_MOBILE(dev_priv)	(INTEL_INFO(dev_priv)->is_mobile)
 #define IS_DGFX(dev_priv)   (INTEL_INFO(dev_priv)->is_dgfx)
 
-#define IS_I830(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I830)
-#define IS_I845G(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I845G)
-#define IS_I85X(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I85X)
-#define IS_I865G(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I865G)
-#define IS_I915G(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I915G)
-#define IS_I915GM(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I915GM)
-#define IS_I945G(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I945G)
-#define IS_I945GM(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I945GM)
-#define IS_I965G(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I965G)
-#define IS_I965GM(dev_priv)	IS_PLATFORM(dev_priv, INTEL_I965GM)
-#define IS_G45(dev_priv)	IS_PLATFORM(dev_priv, INTEL_G45)
-#define IS_GM45(dev_priv)	IS_PLATFORM(dev_priv, INTEL_GM45)
+#define IS_I830(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I830)
+#define IS_I845G(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I845G)
+#define IS_I85X(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I85X)
+#define IS_I865G(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I865G)
+#define IS_I915G(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I915G)
+#define IS_I915GM(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I915GM)
+#define IS_I945G(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I945G)
+#define IS_I945GM(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I945GM)
+#define IS_I965G(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I965G)
+#define IS_I965GM(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_I965GM)
+#define IS_G45(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_G45)
+#define IS_GM45(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_GM45)
 #define IS_G4X(dev_priv)	(IS_G45(dev_priv) || IS_GM45(dev_priv))
-#define IS_PINEVIEW(dev_priv)	IS_PLATFORM(dev_priv, INTEL_PINEVIEW)
-#define IS_G33(dev_priv)	IS_PLATFORM(dev_priv, INTEL_G33)
-#define IS_IRONLAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_IRONLAKE)
+#define IS_PINEVIEW(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_PINEVIEW)
+#define IS_G33(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_G33)
+#define IS_IRONLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_IRONLAKE)
 #define IS_IRONLAKE_M(dev_priv) \
-	(IS_PLATFORM(dev_priv, INTEL_IRONLAKE) && IS_MOBILE(dev_priv))
-#define IS_SANDYBRIDGE(dev_priv) IS_PLATFORM(dev_priv, INTEL_SANDYBRIDGE)
-#define IS_IVYBRIDGE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_IVYBRIDGE)
+	(IS_IGP_PLATFORM(dev_priv, INTEL_IRONLAKE) && IS_MOBILE(dev_priv))
+#define IS_SANDYBRIDGE(dev_priv) IS_IGP_PLATFORM(dev_priv, INTEL_SANDYBRIDGE)
+#define IS_IVYBRIDGE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_IVYBRIDGE)
 #define IS_IVB_GT1(dev_priv)	(IS_IVYBRIDGE(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 1)
-#define IS_VALLEYVIEW(dev_priv)	IS_PLATFORM(dev_priv, INTEL_VALLEYVIEW)
-#define IS_CHERRYVIEW(dev_priv)	IS_PLATFORM(dev_priv, INTEL_CHERRYVIEW)
-#define IS_HASWELL(dev_priv)	IS_PLATFORM(dev_priv, INTEL_HASWELL)
-#define IS_BROADWELL(dev_priv)	IS_PLATFORM(dev_priv, INTEL_BROADWELL)
-#define IS_SKYLAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_SKYLAKE)
-#define IS_BROXTON(dev_priv)	IS_PLATFORM(dev_priv, INTEL_BROXTON)
-#define IS_KABYLAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_KABYLAKE)
-#define IS_GEMINILAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_GEMINILAKE)
-#define IS_COFFEELAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_COFFEELAKE)
-#define IS_COMETLAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_COMETLAKE)
-#define IS_ICELAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_ICELAKE)
-#define IS_JSL_EHL(dev_priv)	(IS_PLATFORM(dev_priv, INTEL_JASPERLAKE) || \
-				IS_PLATFORM(dev_priv, INTEL_ELKHARTLAKE))
-#define IS_TIGERLAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_TIGERLAKE)
-#define IS_ROCKETLAKE(dev_priv)	IS_PLATFORM(dev_priv, INTEL_ROCKETLAKE)
+#define IS_VALLEYVIEW(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_VALLEYVIEW)
+#define IS_CHERRYVIEW(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_CHERRYVIEW)
+#define IS_HASWELL(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_HASWELL)
+#define IS_BROADWELL(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_BROADWELL)
+#define IS_SKYLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_SKYLAKE)
+#define IS_BROXTON(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_BROXTON)
+#define IS_KABYLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_KABYLAKE)
+#define IS_GEMINILAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_GEMINILAKE)
+#define IS_COFFEELAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_COFFEELAKE)
+#define IS_COMETLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_COMETLAKE)
+#define IS_ICELAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_ICELAKE)
+#define IS_JSL_EHL(dev_priv)	(IS_IGP_PLATFORM(dev_priv, INTEL_JASPERLAKE) || \
+				IS_IGP_PLATFORM(dev_priv, INTEL_ELKHARTLAKE))
+#define IS_TIGERLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_TIGERLAKE)
+#define IS_ROCKETLAKE(dev_priv)	IS_IGP_PLATFORM(dev_priv, INTEL_ROCKETLAKE)
 #define IS_DG1(dev_priv)        IS_PLATFORM(dev_priv, INTEL_DG1)
-#define IS_ALDERLAKE_S(dev_priv) IS_PLATFORM(dev_priv, INTEL_ALDERLAKE_S)
-#define IS_ALDERLAKE_P(dev_priv) IS_PLATFORM(dev_priv, INTEL_ALDERLAKE_P)
+#define IS_ALDERLAKE_S(dev_priv) IS_IGP_PLATFORM(dev_priv, INTEL_ALDERLAKE_S)
+#define IS_ALDERLAKE_P(dev_priv) IS_IGP_PLATFORM(dev_priv, INTEL_ALDERLAKE_P)
 #define IS_XEHPSDV(dev_priv) IS_PLATFORM(dev_priv, INTEL_XEHPSDV)
 #define IS_DG2(dev_priv)	IS_PLATFORM(dev_priv, INTEL_DG2)
 #define IS_DG2_G10(dev_priv) \
@@ -1265,34 +1287,34 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 #define IS_DG2_G11(dev_priv) \
 	IS_SUBPLATFORM(dev_priv, INTEL_DG2, INTEL_SUBPLATFORM_G11)
 #define IS_ADLS_RPLS(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_ALDERLAKE_S, INTEL_SUBPLATFORM_RPL_S)
+	(IS_ALDERLAKE_S(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_ALDERLAKE_S, INTEL_SUBPLATFORM_RPL_S))
 #define IS_ADLP_N(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_ALDERLAKE_P, INTEL_SUBPLATFORM_N)
+	(IS_ALDERLAKE_P(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_ALDERLAKE_P, INTEL_SUBPLATFORM_N))
 #define IS_HSW_EARLY_SDV(dev_priv) (IS_HASWELL(dev_priv) && \
 				    (INTEL_DEVID(dev_priv) & 0xFF00) == 0x0C00)
 #define IS_BDW_ULT(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_BROADWELL, INTEL_SUBPLATFORM_ULT)
+	(IS_BROADWELL(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_BROADWELL, INTEL_SUBPLATFORM_ULT))
 #define IS_BDW_ULX(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_BROADWELL, INTEL_SUBPLATFORM_ULX)
+	(IS_BROADWELL(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_BROADWELL, INTEL_SUBPLATFORM_ULX))
 #define IS_BDW_GT3(dev_priv)	(IS_BROADWELL(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 3)
 #define IS_HSW_ULT(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_HASWELL, INTEL_SUBPLATFORM_ULT)
+	(IS_HASWELL(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_HASWELL, INTEL_SUBPLATFORM_ULT))
 #define IS_HSW_GT3(dev_priv)	(IS_HASWELL(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 3)
 #define IS_HSW_GT1(dev_priv)	(IS_HASWELL(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 1)
 /* ULX machines are also considered ULT. */
 #define IS_HSW_ULX(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_HASWELL, INTEL_SUBPLATFORM_ULX)
+	(IS_HASWELL(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_HASWELL, INTEL_SUBPLATFORM_ULX))
 #define IS_SKL_ULT(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_SKYLAKE, INTEL_SUBPLATFORM_ULT)
+	(IS_SKYLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_SKYLAKE, INTEL_SUBPLATFORM_ULT))
 #define IS_SKL_ULX(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_SKYLAKE, INTEL_SUBPLATFORM_ULX)
+	(IS_SKYLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_SKYLAKE, INTEL_SUBPLATFORM_ULX))
 #define IS_KBL_ULT(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_KABYLAKE, INTEL_SUBPLATFORM_ULT)
+	(IS_KABYLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_KABYLAKE, INTEL_SUBPLATFORM_ULT))
 #define IS_KBL_ULX(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_KABYLAKE, INTEL_SUBPLATFORM_ULX)
+	(IS_KABYLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_KABYLAKE, INTEL_SUBPLATFORM_ULX))
 #define IS_SKL_GT2(dev_priv)	(IS_SKYLAKE(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 2)
 #define IS_SKL_GT3(dev_priv)	(IS_SKYLAKE(dev_priv) && \
@@ -1304,29 +1326,29 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 #define IS_KBL_GT3(dev_priv)	(IS_KABYLAKE(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 3)
 #define IS_CFL_ULT(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_COFFEELAKE, INTEL_SUBPLATFORM_ULT)
+	(IS_COFFEELAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_COFFEELAKE, INTEL_SUBPLATFORM_ULT))
 #define IS_CFL_ULX(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_COFFEELAKE, INTEL_SUBPLATFORM_ULX)
+	(IS_COFFEELAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_COFFEELAKE, INTEL_SUBPLATFORM_ULX))
 #define IS_CFL_GT2(dev_priv)	(IS_COFFEELAKE(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 2)
 #define IS_CFL_GT3(dev_priv)	(IS_COFFEELAKE(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 3)
 
 #define IS_CML_ULT(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_COMETLAKE, INTEL_SUBPLATFORM_ULT)
+	(IS_COMETLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_COMETLAKE, INTEL_SUBPLATFORM_ULT))
 #define IS_CML_ULX(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_COMETLAKE, INTEL_SUBPLATFORM_ULX)
+	(IS_COMETLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_COMETLAKE, INTEL_SUBPLATFORM_ULX))
 #define IS_CML_GT2(dev_priv)	(IS_COMETLAKE(dev_priv) && \
 				 INTEL_INFO(dev_priv)->gt == 2)
 
 #define IS_ICL_WITH_PORT_F(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_ICELAKE, INTEL_SUBPLATFORM_PORTF)
+	(IS_ICELAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_ICELAKE, INTEL_SUBPLATFORM_PORTF))
 
 #define IS_TGL_U(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_TIGERLAKE, INTEL_SUBPLATFORM_ULT)
+	(IS_TIGERLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_TIGERLAKE, INTEL_SUBPLATFORM_ULT))
 
 #define IS_TGL_Y(dev_priv) \
-	IS_SUBPLATFORM(dev_priv, INTEL_TIGERLAKE, INTEL_SUBPLATFORM_ULX)
+	(IS_TIGERLAKE(dev_priv) && IS_SUBPLATFORM(dev_priv, INTEL_TIGERLAKE, INTEL_SUBPLATFORM_ULX))
 
 #define IS_SKL_GRAPHICS_STEP(p, since, until) (IS_SKYLAKE(p) && IS_GRAPHICS_STEP(p, since, until))
 

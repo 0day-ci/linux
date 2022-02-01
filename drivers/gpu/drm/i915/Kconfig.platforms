@@ -1,0 +1,7 @@
+config DRM_I915_INTEGRATED_GPU_SUPPORT
+	bool "Support integrated GPUs"
+	default y
+	depends on DRM_I915
+	help
+	  Include support for integrated GPUs.
+

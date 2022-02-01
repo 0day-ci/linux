@@ -201,6 +201,7 @@
 	GEN_DEFAULT_PAGE_SIZES, \
 	GEN_DEFAULT_REGIONS
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info i830_info = {
 	I830_FEATURES,
 	PLATFORM(INTEL_I830),
@@ -222,6 +223,7 @@ static const struct intel_device_info i865g_info = {
 	PLATFORM(INTEL_I865G),
 	.display.fbc_mask = BIT(INTEL_FBC_A),
 };
+#endif
 
 #define GEN3_FEATURES \
 	GEN(3), \
@@ -239,6 +241,7 @@ static const struct intel_device_info i865g_info = {
 	GEN_DEFAULT_PAGE_SIZES, \
 	GEN_DEFAULT_REGIONS
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info i915g_info = {
 	GEN3_FEATURES,
 	PLATFORM(INTEL_I915G),
@@ -312,6 +315,7 @@ static const struct intel_device_info pnv_m_info = {
 	.display.has_overlay = 1,
 	.dma_mask_size = 36,
 };
+#endif
 
 #define GEN4_FEATURES \
 	GEN(4), \
@@ -330,6 +334,7 @@ static const struct intel_device_info pnv_m_info = {
 	GEN_DEFAULT_PAGE_SIZES, \
 	GEN_DEFAULT_REGIONS
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info i965g_info = {
 	GEN4_FEATURES,
 	PLATFORM(INTEL_I965G),
@@ -365,6 +370,7 @@ static const struct intel_device_info gm45_info = {
 	.platform_engine_mask = BIT(RCS0) | BIT(VCS0),
 	.gpu_reset_clobbers_display = false,
 };
+#endif
 
 #define GEN5_FEATURES \
 	GEN(5), \
@@ -383,6 +389,7 @@ static const struct intel_device_info gm45_info = {
 	GEN_DEFAULT_PAGE_SIZES, \
 	GEN_DEFAULT_REGIONS
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info ilk_d_info = {
 	GEN5_FEATURES,
 	PLATFORM(INTEL_IRONLAKE),
@@ -395,6 +402,7 @@ static const struct intel_device_info ilk_m_info = {
 	.has_rps = true,
 	.display.fbc_mask = BIT(INTEL_FBC_A),
 };
+#endif
 
 #define GEN6_FEATURES \
 	GEN(6), \
@@ -421,6 +429,7 @@ static const struct intel_device_info ilk_m_info = {
 	GEN6_FEATURES, \
 	PLATFORM(INTEL_SANDYBRIDGE)
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info snb_d_gt1_info = {
 	SNB_D_PLATFORM,
 	.gt = 1,
@@ -430,6 +439,7 @@ static const struct intel_device_info snb_d_gt2_info = {
 	SNB_D_PLATFORM,
 	.gt = 2,
 };
+#endif
 
 #define SNB_M_PLATFORM \
 	GEN6_FEATURES, \
@@ -437,6 +447,7 @@ static const struct intel_device_info snb_d_gt2_info = {
 	.is_mobile = 1
 
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info snb_m_gt1_info = {
 	SNB_M_PLATFORM,
 	.gt = 1,
@@ -446,6 +457,7 @@ static const struct intel_device_info snb_m_gt2_info = {
 	SNB_M_PLATFORM,
 	.gt = 2,
 };
+#endif
 
 #define GEN7_FEATURES  \
 	GEN(7), \
@@ -474,6 +486,7 @@ static const struct intel_device_info snb_m_gt2_info = {
 	PLATFORM(INTEL_IVYBRIDGE), \
 	.has_l3_dpf = 1
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info ivb_d_gt1_info = {
 	IVB_D_PLATFORM,
 	.gt = 1,
@@ -483,6 +496,7 @@ static const struct intel_device_info ivb_d_gt2_info = {
 	IVB_D_PLATFORM,
 	.gt = 2,
 };
+#endif
 
 #define IVB_M_PLATFORM \
 	GEN7_FEATURES, \
@@ -490,6 +504,7 @@ static const struct intel_device_info ivb_d_gt2_info = {
 	.is_mobile = 1, \
 	.has_l3_dpf = 1
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info ivb_m_gt1_info = {
 	IVB_M_PLATFORM,
 	.gt = 1,
@@ -534,6 +549,7 @@ static const struct intel_device_info vlv_info = {
 	GEN_DEFAULT_PAGE_SIZES,
 	GEN_DEFAULT_REGIONS,
 };
+#endif
 
 #define G75_FEATURES  \
 	GEN7_FEATURES, \
@@ -552,6 +568,7 @@ static const struct intel_device_info vlv_info = {
 	PLATFORM(INTEL_HASWELL), \
 	.has_l3_dpf = 1
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info hsw_gt1_info = {
 	HSW_PLATFORM,
 	.gt = 1,
@@ -566,6 +583,7 @@ static const struct intel_device_info hsw_gt3_info = {
 	HSW_PLATFORM,
 	.gt = 3,
 };
+#endif
 
 #define GEN8_FEATURES \
 	G75_FEATURES, \
@@ -580,6 +598,7 @@ static const struct intel_device_info hsw_gt3_info = {
 	GEN8_FEATURES, \
 	PLATFORM(INTEL_BROADWELL)
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info bdw_gt1_info = {
 	BDW_PLATFORM,
 	.gt = 1,
@@ -632,6 +651,7 @@ static const struct intel_device_info chv_info = {
 	GEN_DEFAULT_PAGE_SIZES,
 	GEN_DEFAULT_REGIONS,
 };
+#endif
 
 #define GEN9_DEFAULT_PAGE_SIZES \
 	.page_sizes = I915_GTT_PAGE_SIZE_4K | \
@@ -654,6 +674,7 @@ static const struct intel_device_info chv_info = {
 	GEN9_FEATURES, \
 	PLATFORM(INTEL_SKYLAKE)
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info skl_gt1_info = {
 	SKL_PLATFORM,
 	.gt = 1,
@@ -663,6 +684,7 @@ static const struct intel_device_info skl_gt2_info = {
 	SKL_PLATFORM,
 	.gt = 2,
 };
+#endif
 
 #define SKL_GT3_PLUS_PLATFORM \
 	SKL_PLATFORM, \
@@ -670,6 +692,7 @@ static const struct intel_device_info skl_gt2_info = {
 		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1)
 
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info skl_gt3_info = {
 	SKL_GT3_PLUS_PLATFORM,
 	.gt = 3,
@@ -679,6 +702,7 @@ static const struct intel_device_info skl_gt4_info = {
 	SKL_GT3_PLUS_PLATFORM,
 	.gt = 4,
 };
+#endif
 
 #define GEN9_LP_FEATURES \
 	GEN(9), \
@@ -717,6 +741,7 @@ static const struct intel_device_info skl_gt4_info = {
 	GEN9_DEFAULT_PAGE_SIZES, \
 	GEN_DEFAULT_REGIONS
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info bxt_info = {
 	GEN9_LP_FEATURES,
 	PLATFORM(INTEL_BROXTON),
@@ -730,11 +755,13 @@ static const struct intel_device_info glk_info = {
 	.dbuf.size = 1024 - 4, /* 4 blocks for bypass path allocation */
 	GLK_COLORS,
 };
+#endif
 
 #define KBL_PLATFORM \
 	GEN9_FEATURES, \
 	PLATFORM(INTEL_KABYLAKE)
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info kbl_gt1_info = {
 	KBL_PLATFORM,
 	.gt = 1,
@@ -751,11 +778,13 @@ static const struct intel_device_info kbl_gt3_info = {
 	.platform_engine_mask =
 		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1),
 };
+#endif
 
 #define CFL_PLATFORM \
 	GEN9_FEATURES, \
 	PLATFORM(INTEL_COFFEELAKE)
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info cfl_gt1_info = {
 	CFL_PLATFORM,
 	.gt = 1,
@@ -772,11 +801,13 @@ static const struct intel_device_info cfl_gt3_info = {
 	.platform_engine_mask =
 		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1),
 };
+#endif
 
 #define CML_PLATFORM \
 	GEN9_FEATURES, \
 	PLATFORM(INTEL_COMETLAKE)
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info cml_gt1_info = {
 	CML_PLATFORM,
 	.gt = 1,
@@ -786,6 +817,7 @@ static const struct intel_device_info cml_gt2_info = {
 	CML_PLATFORM,
 	.gt = 2,
 };
+#endif
 
 #define GEN11_DEFAULT_PAGE_SIZES \
 	.page_sizes = I915_GTT_PAGE_SIZE_4K | \
@@ -823,6 +855,7 @@ static const struct intel_device_info cml_gt2_info = {
 	.has_coherent_ggtt = false, \
 	.has_logical_ring_elsq = 1
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info icl_info = {
 	GEN11_FEATURES,
 	PLATFORM(INTEL_ICELAKE),
@@ -843,6 +876,7 @@ static const struct intel_device_info jsl_info = {
 	.platform_engine_mask = BIT(RCS0) | BIT(BCS0) | BIT(VCS0) | BIT(VECS0),
 	.ppgtt_size = 36,
 };
+#endif
 
 #define GEN12_FEATURES \
 	GEN11_FEATURES, \
@@ -873,6 +907,7 @@ static const struct intel_device_info jsl_info = {
 	.has_pxp = 1, \
 	.display.has_dsb = 0 /* FIXME: LUT load is broken with DSB */
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info tgl_info = {
 	GEN12_FEATURES,
 	PLATFORM(INTEL_TIGERLAKE),
@@ -893,6 +928,7 @@ static const struct intel_device_info rkl_info = {
 	.platform_engine_mask =
 		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0),
 };
+#endif
 
 #define DGFX_FEATURES \
 	.memory_regions = REGION_SMEM | REGION_LMEM | REGION_STOLEN_LMEM, \
@@ -915,6 +951,7 @@ static const struct intel_device_info dg1_info = {
 	.ppgtt_size = 47,
 };
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info adl_s_info = {
 	GEN12_FEATURES,
 	PLATFORM(INTEL_ALDERLAKE_S),
@@ -925,6 +962,7 @@ static const struct intel_device_info adl_s_info = {
 		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0) | BIT(VCS2),
 	.dma_mask_size = 39,
 };
+#endif
 
 #define XE_LPD_CURSOR_OFFSETS \
 	.cursor_offsets = { \
@@ -974,6 +1012,7 @@ static const struct intel_device_info adl_s_info = {
 	},									\
 	XE_LPD_CURSOR_OFFSETS
 
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 static const struct intel_device_info adl_p_info = {
 	GEN12_FEATURES,
 	XE_LPD_FEATURES,
@@ -989,6 +1028,7 @@ static const struct intel_device_info adl_p_info = {
 	.ppgtt_size = 48,
 	.dma_mask_size = 39,
 };
+#endif
 
 #undef GEN
 
@@ -1064,6 +1104,7 @@ static const struct intel_device_info dg2_info = {
  * PCI ID matches, otherwise we'll use the wrong info struct above.
  */
 static const struct pci_device_id pciidlist[] = {
+#ifdef CONFIG_DRM_I915_INTEGRATED_GPU_SUPPORT
 	INTEL_I830_IDS(&i830_info),
 	INTEL_I845G_IDS(&i845g_info),
 	INTEL_I85X_IDS(&i85x_info),
@@ -1132,8 +1173,9 @@ static const struct pci_device_id pciidlist[] = {
 	INTEL_ADLS_IDS(&adl_s_info),
 	INTEL_ADLP_IDS(&adl_p_info),
 	INTEL_ADLN_IDS(&adl_p_info),
-	INTEL_DG1_IDS(&dg1_info),
 	INTEL_RPLS_IDS(&adl_s_info),
+#endif
+	INTEL_DG1_IDS(&dg1_info),
 	{0, 0, 0}
 };
 MODULE_DEVICE_TABLE(pci, pciidlist);
