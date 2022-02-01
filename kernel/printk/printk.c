@@ -1762,6 +1762,11 @@ static DEFINE_RAW_SPINLOCK(console_owner_lock);
 static struct task_struct *console_owner;
 static bool console_waiter;
 
+static bool panic_in_progress(void)
+{
+	return unlikely(atomic_read(&panic_cpu) != PANIC_CPU_INVALID);
+}
+
 /**
  * console_lock_spinning_enable - mark beginning of code where another
  *	thread might safely busy wait
