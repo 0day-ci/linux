@@ -24,8 +24,14 @@
 #include <sys/mount.h>
 #include <unistd.h>
 
+#define FILENAME "/tmp/1"
+#define HASHBANG "#!" FILENAME "\n"
+
 int main(void)
 {
+	char * const argv[] = { FILENAME, NULL };
+	int rv;
+
 	if (unshare(CLONE_NEWNS) == -1) {
 		if (errno == ENOSYS || errno == EPERM) {
 			fprintf(stderr, "error: unshare, errno %d\n", errno);
@@ -44,21 +50,19 @@ int main(void)
 		return 1;
 	}
 
-#define FILENAME "/tmp/1"
 
 	int fd = creat(FILENAME, 0700);
 	if (fd == -1) {
 		fprintf(stderr, "error: creat, errno %d\n", errno);
 		return 1;
 	}
-#define S "#!" FILENAME "\n"
-	if (write(fd, S, strlen(S)) != strlen(S)) {
+	if (write(fd, HASHBANG, strlen(HASHBANG)) != strlen(HASHBANG)) {
 		fprintf(stderr, "error: write, errno %d\n", errno);
 		return 1;
 	}
 	close(fd);
 
-	int rv = execve(FILENAME, NULL, NULL);
+	rv = execve(FILENAME, argv, NULL);
 	if (rv == -1 && errno == ELOOP) {
 		return 0;
 	}
