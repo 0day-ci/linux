@@ -22,6 +22,7 @@ struct intel_hdmi;
 struct drm_connector_state;
 union hdmi_infoframe;
 enum port;
+enum intel_output_format;
 
 void intel_hdmi_init_connector(struct intel_digital_port *dig_port,
 			       struct intel_connector *intel_connector);
@@ -49,8 +50,8 @@ bool intel_hdmi_limited_color_range(const struct intel_crtc_state *crtc_state,
 bool intel_hdmi_bpc_possible(const struct intel_crtc_state *crtc_state,
 			     int bpc, bool has_hdmi_sink, bool ycbcr420_output);
 int intel_hdmi_dsc_get_bpp(int src_fractional_bpp, int slice_width,
-			   int num_slices, int output_format, bool hdmi_all_bpp,
-			   int hdmi_max_chunk_bytes);
+			   int num_slices, enum intel_output_format output_format,
+			   bool hdmi_all_bpp, int hdmi_max_chunk_bytes);
 int intel_hdmi_dsc_get_num_slices(const struct intel_crtc_state *crtc_state,
 				  int src_max_slices, int src_max_slice_width,
 				  int hdmi_max_slices, int hdmi_throughput);
