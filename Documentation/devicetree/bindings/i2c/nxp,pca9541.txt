@@ -6,6 +6,14 @@ Required Properties:
 
   - reg: The I2C address of the device.
 
+Optional Properties:
+
+ - release-delay-us: the number of microseconds to delay before
+   releasing the bus after a transaction.  If unspecified the default
+   is zero (the bus is released immediately).  Non-zero values can
+   reduce arbitration overhead for back-to-back transactions, at the
+   cost of delaying the other master's access to the bus.
+
   The following required properties are defined externally:
 
   - I2C arbitration bus node. See i2c-arb.txt in this directory.
@@ -16,6 +24,7 @@ Example:
 	i2c-arbitrator@74 {
 		compatible = "nxp,pca9541";
 		reg = <0x74>;
+		release-delay-us = <20000>;
 
 		i2c-arb {
 			#address-cells = <1>;
