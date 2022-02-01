@@ -14,3 +14,6 @@ config EFI_SECRET
 
 	  To compile this driver as a module, choose M here.
 	  The module will be called efi_secret.
+
+	  The module is loaded automatically by the EFI driver if the EFI
+	  secret area is populated.
