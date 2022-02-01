@@ -474,7 +474,8 @@ int ima_lsm_policy_change(struct notifier_block *nb, unsigned long event,
 		return NOTIFY_DONE;
 
 	ns = container_of(nb, struct ima_namespace, ima_lsm_policy_notifier);
-	ima_lsm_update_rules(ns);
+	if (ns_is_active(ns))
+		ima_lsm_update_rules(ns);
 
 	return NOTIFY_OK;
 }
@@ -844,11 +845,12 @@ static void add_rules(struct ima_namespace *ns,
 	}
 }
 
-static int ima_parse_rule(struct ima_namespace *ns,
+static int ima_parse_rule(struct user_namespace *user_ns,
 			  char *rule, struct ima_rule_entry *entry);
 
-static int __init ima_init_arch_policy(struct ima_namespace *ns)
+static int __init ima_init_arch_policy(struct user_namespace *user_ns)
 {
+	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
 	const char * const *arch_rules;
 	const char * const *rules;
 	int arch_entries = 0;
@@ -876,7 +878,7 @@ static int __init ima_init_arch_policy(struct ima_namespace *ns)
 		result = strscpy(rule, *rules, sizeof(rule));
 
 		INIT_LIST_HEAD(&ns->arch_policy_entry[i].list);
-		result = ima_parse_rule(ns, rule, &ns->arch_policy_entry[i]);
+		result = ima_parse_rule(user_ns, rule, &ns->arch_policy_entry[i]);
 		if (result) {
 			pr_warn("Skipping unknown architecture policy rule: %s\n",
 				rule);
@@ -891,11 +893,12 @@ static int __init ima_init_arch_policy(struct ima_namespace *ns)
 
 /**
  * ima_init_policy - initialize the default measure rules.
- * @ns: IMA namespace to which the policy belongs to
+ * @user_ns: User namespace pointig to IMA namespace to which the policy belongs
  * ima_rules points to either the ima_default_rules or the new ima_policy_rules.
  */
-void __init ima_init_policy(struct ima_namespace *ns)
+void __init ima_init_policy(struct user_namespace *user_ns)
 {
+	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
 	int build_appraise_entries, arch_entries;
 
 	/* if !ima_policy, we load NO default rules */
@@ -925,7 +928,7 @@ void __init ima_init_policy(struct ima_namespace *ns)
 	 * and custom policies, prior to other appraise rules.
 	 * (Highest priority)
 	 */
-	arch_entries = ima_init_arch_policy(ns);
+	arch_entries = ima_init_arch_policy(user_ns);
 	if (!arch_entries)
 		pr_info("No architecture policies found\n");
 	else
@@ -1346,9 +1349,10 @@ static unsigned int ima_parse_appraise_algos(char *arg)
 	return res;
 }
 
-static int ima_parse_rule(struct ima_namespace *ns,
+static int ima_parse_rule(struct user_namespace *user_ns,
 			  char *rule, struct ima_rule_entry *entry)
 {
+	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
 	struct audit_buffer *ab;
 	char *from;
 	char *p;
@@ -1598,7 +1602,7 @@ static int ima_parse_rule(struct ima_namespace *ns,
 
 			result = kstrtoul(args[0].from, 10, &lnum);
 			if (!result) {
-				entry->uid = make_kuid(current_user_ns(),
+				entry->uid = make_kuid(user_ns,
 						       (uid_t) lnum);
 				if (!uid_valid(entry->uid) ||
 				    (uid_t)lnum != lnum)
@@ -1633,7 +1637,7 @@ static int ima_parse_rule(struct ima_namespace *ns,
 
 			result = kstrtoul(args[0].from, 10, &lnum);
 			if (!result) {
-				entry->gid = make_kgid(current_user_ns(),
+				entry->gid = make_kgid(user_ns,
 						       (gid_t)lnum);
 				if (!gid_valid(entry->gid) ||
 				    (((gid_t)lnum) != lnum))
@@ -1660,7 +1664,7 @@ static int ima_parse_rule(struct ima_namespace *ns,
 
 			result = kstrtoul(args[0].from, 10, &lnum);
 			if (!result) {
-				entry->fowner = make_kuid(current_user_ns(),
+				entry->fowner = make_kuid(user_ns,
 							  (uid_t)lnum);
 				if (!uid_valid(entry->fowner) ||
 				    (((uid_t)lnum) != lnum))
@@ -1686,7 +1690,7 @@ static int ima_parse_rule(struct ima_namespace *ns,
 
 			result = kstrtoul(args[0].from, 10, &lnum);
 			if (!result) {
-				entry->fgroup = make_kgid(current_user_ns(),
+				entry->fgroup = make_kgid(user_ns,
 							  (gid_t)lnum);
 				if (!gid_valid(entry->fgroup) ||
 				    (((gid_t)lnum) != lnum))
@@ -1840,14 +1844,15 @@ err_audit:
 
 /**
  * ima_parse_add_rule - add a rule to ima_policy_rules
- * @ns: IMA namespace that has the policy
+ * @user_ns: User namespace referencing the IMA namespace that has the policy
  * @rule - ima measurement policy rule
  *
  * Avoid locking by allowing just one writer at a time in ima_write_policy()
  * Returns the length of the rule parsed, an error code on failure
  */
-ssize_t ima_parse_add_rule(struct ima_namespace *ns, char *rule)
+ssize_t ima_parse_add_rule(struct user_namespace *user_ns, char *rule)
 {
+	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
 	static const char op[] = "update_policy";
 	char *p;
 	struct ima_rule_entry *entry;
@@ -1870,7 +1875,7 @@ ssize_t ima_parse_add_rule(struct ima_namespace *ns, char *rule)
 
 	INIT_LIST_HEAD(&entry->list);
 
-	result = ima_parse_rule(ns, p, entry);
+	result = ima_parse_rule(user_ns, p, entry);
 	if (result) {
 		ima_free_rule(entry);
 		integrity_audit_msg(AUDIT_INTEGRITY_STATUS, NULL,
@@ -1895,7 +1900,9 @@ void ima_delete_rules(struct ima_namespace *ns)
 {
 	struct ima_rule_entry *entry, *tmp;
 
-	temp_ima_appraise = 0;
+	if (ns == &init_ima_ns)
+		temp_ima_appraise = 0;
+
 	list_for_each_entry_safe(entry, tmp, &ns->ima_temp_rules, list) {
 		list_del(&entry->list);
 		ima_free_rule(entry);
@@ -1936,7 +1943,7 @@ static const char *const mask_tokens[] = {
 
 void *ima_policy_start(struct seq_file *m, loff_t *pos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(m->file);
 	loff_t l = *pos;
 	struct ima_rule_entry *entry;
 	struct list_head *ima_rules_tmp;
@@ -1955,7 +1962,7 @@ void *ima_policy_start(struct seq_file *m, loff_t *pos)
 
 void *ima_policy_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(m->file);
 	struct ima_rule_entry *entry = v;
 
 	rcu_read_lock();

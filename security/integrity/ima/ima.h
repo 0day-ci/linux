@@ -337,10 +337,10 @@ int ima_match_policy(struct ima_namespace *ns,
 		     int mask, int flags, int *pcr,
 		     struct ima_template_desc **template_desc,
 		     const char *func_data, unsigned int *allowed_algos);
-void ima_init_policy(struct ima_namespace *ns);
+void ima_init_policy(struct user_namespace *user_ns);
 void ima_update_policy(struct ima_namespace *ns);
 void ima_update_policy_flags(struct ima_namespace *ns);
-ssize_t ima_parse_add_rule(struct ima_namespace *ns, char *rule);
+ssize_t ima_parse_add_rule(struct user_namespace *user_ns, char *rule);
 void ima_delete_rules(struct ima_namespace *ns);
 int ima_check_policy(struct ima_namespace *ns);
 void ima_free_policy_rules(struct ima_namespace *ns);
@@ -538,6 +538,44 @@ struct user_namespace *ima_user_ns_from_file(const struct file *filp)
 	return file_inode(filp)->i_sb->s_user_ns;
 }
 
+#ifdef CONFIG_IMA_NS
+
+static inline struct ima_namespace
+*ima_ns_from_user_ns(struct user_namespace *user_ns)
+{
+	/* Pairs with smp_store_releases() in user_ns_set_ima_ns(). */
+	return smp_load_acquire(&user_ns->ima_ns);
+}
+
+static inline void user_ns_set_ima_ns(struct user_namespace *user_ns,
+				      struct ima_namespace *ns)
+{
+	/* Pairs with smp_load_acquire() in ima_ns_from_user_ns() */
+	smp_store_release(&user_ns->ima_ns, ns);
+}
+
+static inline struct ima_namespace *get_current_ns(void)
+{
+	return ima_ns_from_user_ns(current_user_ns());
+}
+
+struct ima_namespace *create_ima_ns(void);
+
+void ima_free_ima_ns(struct ima_namespace *ns);
+
+struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+				    struct inode *inode,
+				    struct integrity_iint_cache *iint);
+
+void ima_free_ns_status_tree(struct ima_namespace *ns);
+
+static inline struct ima_namespace *ima_ns_from_file(const struct file *filp)
+{
+	return ima_user_ns_from_file(filp)->ima_ns;
+}
+
+#else
+
 static inline struct ima_namespace
 *ima_ns_from_user_ns(struct user_namespace *user_ns)
 {
@@ -546,23 +584,23 @@ static inline struct ima_namespace
 	return NULL;
 }
 
-#ifdef CONFIG_IMA_NS
+static inline void user_ns_set_ima_ns(struct user_namespace *user_ns,
+				      struct ima_namespace *ns)
+{
+}
 
-struct ima_namespace *create_ima_ns(void);
-
-struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
-				    struct inode *inode,
-				    struct integrity_iint_cache *iint);
-
-void ima_free_ns_status_tree(struct ima_namespace *ns);
-
-#else
+static inline struct ima_namespace *get_current_ns(void)
+{
+	return &init_ima_ns;
+}
 
 static inline struct ima_namespace *create_ima_ns(void)
 {
 	WARN(1, "Cannot create an IMA namespace\n");
 	return ERR_PTR(-EFAULT);
 }
+
+static inline void ima_free_ima_ns(struct ima_namespace *ns) {}
 
 static inline struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
 						  struct inode *inode,
@@ -576,6 +614,11 @@ static inline struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
 	}
 
 	return ns_status;
+}
+
+static inline struct ima_namespace *ima_ns_from_file(const struct file *filp)
+{
+	return &init_ima_ns;
 }
 
 #endif /* CONFIG_IMA_NS */

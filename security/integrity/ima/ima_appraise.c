@@ -74,6 +74,9 @@ int ima_must_appraise(struct ima_namespace *ns,
 {
 	u32 secid;
 
+	if (ns != &init_ima_ns)
+		return 0;
+
 	if (!ima_appraise)
 		return 0;
 

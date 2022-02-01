@@ -49,7 +49,10 @@ static ssize_t ima_show_htable_violations(struct file *filp,
 					  char __user *buf,
 					  size_t count, loff_t *ppos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(filp);
+
+	if (!ns_is_active(ns))
+		return -EACCES;
 
 	return ima_show_htable_value(buf, count, ppos,
 				     &ns->ima_htable.violations);
@@ -64,7 +67,10 @@ static ssize_t ima_show_measurements_count(struct file *filp,
 					   char __user *buf,
 					   size_t count, loff_t *ppos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(filp);
+
+	if (!ns_is_active(ns))
+		return -EACCES;
 
 	return ima_show_htable_value(buf, count, ppos, &ns->ima_htable.len);
 }
@@ -77,7 +83,7 @@ static const struct file_operations ima_measurements_count_ops = {
 /* returns pointer to hlist_node */
 static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(m->file);
 	loff_t l = *pos;
 	struct ima_queue_entry *qe;
 
@@ -95,7 +101,7 @@ static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
 
 static void *ima_measurements_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(m->file);
 	struct ima_queue_entry *qe = v;
 
 	/* lock protects when reading beyond last element
@@ -198,6 +204,11 @@ static const struct seq_operations ima_measurments_seqops = {
 
 static int ima_measurements_open(struct inode *inode, struct file *file)
 {
+	struct ima_namespace *ns = ima_ns_from_file(file);
+
+	if (!ns_is_active(ns))
+		return -EACCES;
+
 	return seq_open(file, &ima_measurments_seqops);
 }
 
@@ -264,6 +275,11 @@ static const struct seq_operations ima_ascii_measurements_seqops = {
 
 static int ima_ascii_measurements_open(struct inode *inode, struct file *file)
 {
+	struct ima_namespace *ns = ima_ns_from_file(file);
+
+	if (!ns_is_active(ns))
+		return -EACCES;
+
 	return seq_open(file, &ima_ascii_measurements_seqops);
 }
 
@@ -274,7 +290,7 @@ static const struct file_operations ima_ascii_measurements_ops = {
 	.release = seq_release,
 };
 
-static ssize_t ima_read_policy(struct ima_namespace *ns, char *path)
+static ssize_t ima_read_policy(struct user_namespace *user_ns, char *path)
 {
 	void *data = NULL;
 	char *datap;
@@ -299,7 +315,7 @@ static ssize_t ima_read_policy(struct ima_namespace *ns, char *path)
 	datap = data;
 	while (size > 0 && (p = strsep(&datap, "\n"))) {
 		pr_debug("rule: %s\n", p);
-		rc = ima_parse_add_rule(ns, p);
+		rc = ima_parse_add_rule(user_ns, p);
 		if (rc < 0)
 			break;
 		size -= rc;
@@ -317,9 +333,13 @@ static ssize_t ima_read_policy(struct ima_namespace *ns, char *path)
 static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 				size_t datalen, loff_t *ppos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct user_namespace *user_ns = ima_user_ns_from_file(file);
+	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
 	char *data;
 	ssize_t result;
+
+	if (!ns_is_active(ns))
+		return -EACCES;
 
 	if (datalen >= PAGE_SIZE)
 		datalen = PAGE_SIZE - 1;
@@ -340,15 +360,16 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 		goto out_free;
 
 	if (data[0] == '/') {
-		result = ima_read_policy(ns, data);
-	} else if (ima_appraise & IMA_APPRAISE_POLICY) {
+		result = ima_read_policy(user_ns, data);
+	} else if (ns == &init_ima_ns &&
+		   (ima_appraise & IMA_APPRAISE_POLICY)) {
 		pr_err("signed policy file (specified as an absolute pathname) required\n");
 		integrity_audit_msg(AUDIT_INTEGRITY_STATUS, NULL, NULL,
 				    "policy_update", "signed policy required",
 				    1, 0);
 		result = -EACCES;
 	} else {
-		result = ima_parse_add_rule(ns, data);
+		result = ima_parse_add_rule(user_ns, data);
 	}
 	mutex_unlock(&ns->ima_write_mutex);
 out_free:
@@ -381,7 +402,10 @@ static int ima_open_policy(struct inode *inode, struct file *filp)
 #ifdef CONFIG_IMA_READ_POLICY
 	struct user_namespace *user_ns = ima_user_ns_from_file(filp);
 #endif
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(filp);
+
+	if (!ns_is_active(ns))
+		return -EACCES;
 
 	if (!(filp->f_flags & O_WRONLY)) {
 #ifndef	CONFIG_IMA_READ_POLICY
@@ -408,7 +432,7 @@ static int ima_open_policy(struct inode *inode, struct file *filp)
  */
 static int ima_release_policy(struct inode *inode, struct file *file)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(file);
 	const char *cause = ns->valid_policy ? "completed" : "failed";
 	int err = 0;
 
@@ -426,7 +450,8 @@ static int ima_release_policy(struct inode *inode, struct file *file)
 		}
 	}
 
-	pr_info("policy update %s\n", cause);
+	if (ns == &init_ima_ns)
+		pr_info("policy update %s\n", cause);
 	integrity_audit_message(AUDIT_INTEGRITY_STATUS, NULL, NULL,
 				"policy_update", cause, !ns->valid_policy, 0,
 				-err);
@@ -463,7 +488,7 @@ static ssize_t ima_show_active(struct file *filp,
 			       char __user *buf,
 			       size_t count, loff_t *ppos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(filp);
 	char tmpbuf[2];
 	ssize_t len;
 
@@ -476,7 +501,7 @@ static ssize_t ima_write_active(struct file *filp,
 				const char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = ima_ns_from_file(filp);
 	unsigned int active;
 	char *kbuf;
 	int err;
@@ -500,7 +525,9 @@ static ssize_t ima_write_active(struct file *filp,
 	if (active != 1)
 		return -EINVAL;
 
-	atomic_set(&ns->active, 1);
+	err = ima_init_namespace(ns);
+	if (err)
+		return -EINVAL;
 
 	return count;
 }
@@ -536,11 +563,28 @@ int ima_fs_ns_init(struct user_namespace *user_ns, struct dentry *root)
 	struct dentry *violations = NULL;
 	int ret;
 
+	/*
+	 * While multiple superblocks can exist they are keyed by userns in
+	 * s_fs_info for securityfs. The first time a userns mounts a
+	 * securityfs instance we lazily allocate the ima_namespace for the
+	 * userns since that's the only way a userns can meaningfully use ima.
+	 * The vfs ensures we're the only one to call fill_super() and hence
+	 * ima_fs_ns_init(), so we don't need any memory barriers here, i.e.
+	 * user_ns->ima_ns can't change while we're in here.
+	 */
+	if (!ns) {
+		ns = create_ima_ns();
+		if (IS_ERR(ns))
+			return PTR_ERR(ns);
+	}
+
 	/* FIXME: update when evm and integrity are namespaced */
 	if (user_ns != &init_user_ns) {
 		int_dir = securityfs_create_dir("integrity", root);
-		if (IS_ERR(int_dir))
-			return PTR_ERR(int_dir);
+		if (IS_ERR(int_dir)) {
+			ret = PTR_ERR(int_dir);
+			goto free_ns;
+		}
 	} else {
 		int_dir = integrity_dir;
 	}
@@ -610,6 +654,9 @@ int ima_fs_ns_init(struct user_namespace *user_ns, struct dentry *root)
 			goto out;
 	}
 
+	if (!ima_ns_from_user_ns(user_ns))
+		user_ns_set_ima_ns(user_ns, ns);
+
 	return 0;
 out:
 	securityfs_remove(ns->ima_policy);
@@ -621,6 +668,10 @@ out:
 	securityfs_remove(ima_dir);
 	if (user_ns != &init_user_ns)
 		securityfs_remove(int_dir);
+
+free_ns:
+	if (!ima_ns_from_user_ns(user_ns))
+		ima_free_ima_ns(ns);
 
 	return ret;
 }
