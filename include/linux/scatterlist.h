@@ -380,6 +380,14 @@ size_t sgl_copy_sgl(struct scatterlist *d_sgl, unsigned int d_nents, off_t d_ski
 		    struct scatterlist *s_sgl, unsigned int s_nents, off_t s_skip,
 		    size_t n_bytes);
 
+bool sgl_equal_sgl(struct scatterlist *x_sgl, unsigned int x_nents, off_t x_skip,
+		   struct scatterlist *y_sgl, unsigned int y_nents, off_t y_skip,
+		   size_t n_bytes);
+
+bool sgl_equal_sgl_idx(struct scatterlist *x_sgl, unsigned int x_nents, off_t x_skip,
+		       struct scatterlist *y_sgl, unsigned int y_nents, off_t y_skip,
+		       size_t n_bytes, size_t *miscompare_idx);
+
 /*
  * Maximum number of entries that will be allocated in one piece, if
  * a list larger than this is required then chaining will be utilized.
