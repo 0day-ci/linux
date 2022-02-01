@@ -664,8 +664,7 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
 		residue -= bar;
 	}
 
-	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
-			residue);
+	dma_set_residue(txstate, residue);
 
 	return mxs_chan->status;
 }

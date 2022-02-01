@@ -1734,8 +1734,7 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
 
 	spin_unlock_irqrestore(&sdmac->vc.lock, flags);
 
-	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
-			 residue);
+	dma_set_residue(txstate, residue);
 
 	return sdmac->status;
 }
