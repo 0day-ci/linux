@@ -585,13 +585,16 @@ EXPORT_SYMBOL(sg_alloc_table_from_pages_segment);
 #ifdef CONFIG_SGL_ALLOC
 
 /**
- * sgl_alloc_order - allocate a scatterlist and its pages
+ * sgl_alloc_order - allocate a scatterlist with equally sized elements each
+ *		     of which has 2^@order continuous pages
  * @length: Length in bytes of the scatterlist. Must be at least one
- * @order: Second argument for alloc_pages()
+ * @order:  Second argument for alloc_pages(). Each sgl element size will
+ *	    be (PAGE_SIZE*2^@order) bytes. @order must not exceed 16.
  * @chainable: Whether or not to allocate an extra element in the scatterlist
- *	for scatterlist chaining purposes
+ *	       for scatterlist chaining purposes
  * @gfp: Memory allocation flags
- * @nent_p: [out] Number of entries in the scatterlist that have pages
+ * @nent_p: [out] Number of entries in the scatterlist that have pages.
+ *		  Ignored if @nent_p is NULL.
  *
  * Returns: A pointer to an initialized scatterlist or %NULL upon failure.
  */
@@ -604,16 +607,15 @@ struct scatterlist *sgl_alloc_order(unsigned long long length,
 	unsigned int nent, nalloc;
 	u32 elem_len;
 
-	nent = round_up(length, PAGE_SIZE << order) >> (PAGE_SHIFT + order);
-	/* Check for integer overflow */
-	if (length > (nent << (PAGE_SHIFT + order)))
+	if (length >> (PAGE_SHIFT + order) >= UINT_MAX)
 		return NULL;
-	nalloc = nent;
+	nent = DIV_ROUND_UP(length, PAGE_SIZE << order);
+
 	if (chainable) {
-		/* Check for integer overflow */
-		if (nalloc + 1 < nalloc)
+		if (check_add_overflow(nent, 1U, &nalloc))
 			return NULL;
-		nalloc++;
+	} else {
+		nalloc = nent;
 	}
 	sgl = kmalloc_array(nalloc, sizeof(struct scatterlist),
 			    gfp & ~GFP_DMA);
