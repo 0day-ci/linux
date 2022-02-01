@@ -225,9 +225,16 @@ static inline bool ima_appraise_signature(enum kernel_read_file_id func)
 
 void free_ima_ns(struct user_namespace *ns);
 
+void ima_free_ns_status_list(struct list_head *head, rwlock_t *ns_list_lock);
+
 #else
 
 static inline void free_ima_ns(struct user_namespace *user_ns)
+{
+}
+
+static inline void ima_free_ns_status_list(struct list_head *head,
+					   rwlock_t *ns_list_lock)
 {
 }
 

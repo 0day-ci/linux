@@ -123,6 +123,10 @@ struct ima_h_table {
 };
 
 struct ima_namespace {
+	struct rb_root ns_status_tree;
+	rwlock_t ns_tree_lock;
+	struct kmem_cache *ns_status_cache;
+
 	/* policy rules */
 	struct list_head ima_default_rules;
 	struct list_head ima_policy_rules;
@@ -507,12 +511,25 @@ static inline struct ima_namespace
 
 struct ima_namespace *create_ima_ns(void);
 
+struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+				    struct inode *inode,
+				    struct integrity_iint_cache *iint);
+
+void ima_free_ns_status_tree(struct ima_namespace *ns);
+
 #else
 
 static inline struct ima_namespace *create_ima_ns(void)
 {
 	WARN(1, "Cannot create an IMA namespace\n");
 	return ERR_PTR(-EFAULT);
+}
+
+static inline struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+						  struct inode *inode,
+						  struct integrity_iint_cache *iint)
+{
+	return NULL;
 }
 
 #endif /* CONFIG_IMA_NS */
