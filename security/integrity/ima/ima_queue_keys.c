@@ -10,6 +10,7 @@
 
 #include <linux/user_namespace.h>
 #include <linux/workqueue.h>
+#include <linux/ima.h>
 #include <keys/asymmetric-type.h>
 #include "ima.h"
 
@@ -42,7 +43,7 @@ static bool timer_expired;
 static void ima_keys_handler(struct work_struct *work)
 {
 	timer_expired = true;
-	ima_process_queued_keys();
+	ima_process_queued_keys(&init_ima_ns);
 }
 
 /*
@@ -130,10 +131,14 @@ bool ima_queue_key(struct key *keyring, const void *payload,
  * This function sets ima_process_keys to true and processes queued keys.
  * From here on keys will be processed right away (not queued).
  */
-void ima_process_queued_keys(void)
+void ima_process_queued_keys(struct ima_namespace *ns)
 {
 	struct ima_key_entry *entry, *tmp;
 	bool process = false;
+
+	/* only applies to init_ima_ns */
+	if (ns != &init_ima_ns)
+		return;
 
 	if (ima_process_keys)
 		return;
@@ -159,7 +164,7 @@ void ima_process_queued_keys(void)
 
 	list_for_each_entry_safe(entry, tmp, &ima_keys, list) {
 		if (!timer_expired)
-			process_buffer_measurement(&init_user_ns, NULL,
+			process_buffer_measurement(ns, &init_user_ns, NULL,
 						   entry->payload,
 						   entry->payload_len,
 						   entry->keyring_name,
