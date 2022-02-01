@@ -123,6 +123,8 @@ struct ima_h_table {
 };
 
 struct ima_namespace {
+	atomic_t active;		/* whether namespace is active */
+
 	struct rb_root ns_status_tree;
 	rwlock_t ns_tree_lock;
 	struct kmem_cache *ns_status_cache;
@@ -153,6 +155,11 @@ struct ima_namespace {
 	struct notifier_block ima_lsm_policy_notifier;
 } __randomize_layout;
 extern struct ima_namespace init_ima_ns;
+
+static inline bool ns_is_active(struct ima_namespace *ns)
+{
+	return (ns && atomic_read(&ns->active));
+}
 
 extern const int read_idmap[];
 

@@ -58,5 +58,6 @@ struct ima_namespace init_ima_ns = {
 	.ima_lsm_policy_notifier = {
 		.notifier_call = ima_lsm_policy_change,
 	},
+	.active = ATOMIC_INIT(1),
 };
 EXPORT_SYMBOL(init_ima_ns);
