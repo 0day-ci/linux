@@ -335,6 +335,8 @@ enum {
 	NVME_CTRL_ONCS_WRITE_ZEROES		= 1 << 3,
 	NVME_CTRL_ONCS_RESERVATIONS		= 1 << 5,
 	NVME_CTRL_ONCS_TIMESTAMP		= 1 << 6,
+	NVME_CTRL_ONCS_VERIFY			= 1 << 7,
+	NVME_CTRL_ONCS_COPY			= 1 << 8,
 	NVME_CTRL_VWC_PRESENT			= 1 << 0,
 	NVME_CTRL_OACS_SEC_SUPP                 = 1 << 0,
 	NVME_CTRL_OACS_DIRECTIVES		= 1 << 5,
@@ -704,6 +706,7 @@ enum nvme_opcode {
 	nvme_cmd_resv_report	= 0x0e,
 	nvme_cmd_resv_acquire	= 0x11,
 	nvme_cmd_resv_release	= 0x15,
+	nvme_cmd_copy		= 0x19,
 	nvme_cmd_zone_mgmt_send	= 0x79,
 	nvme_cmd_zone_mgmt_recv	= 0x7a,
 	nvme_cmd_zone_append	= 0x7d,
@@ -870,6 +873,35 @@ enum {
 	NVME_RW_PRINFO_PRCHK_GUARD	= 1 << 12,
 	NVME_RW_PRINFO_PRACT		= 1 << 13,
 	NVME_RW_DTYPE_STREAMS		= 1 << 4,
+};
+
+struct nvme_copy_command {
+	__u8			opcode;
+	__u8			flags;
+	__u16			command_id;
+	__le32			nsid;
+	__u64			rsvd2;
+	__le64			metadata;
+	union nvme_data_ptr	dptr;
+	__le64			sdlba;
+	__u8			length;
+	__u8			control2;
+	__le16			control;
+	__le32			dspec;
+	__le32			reftag;
+	__le16			apptag;
+	__le16			appmask;
+};
+
+struct nvme_copy_desc {
+	__u64			rsvd;
+	__le64			slba;
+	__le16			length;
+	__u16			rsvd2;
+	__u32			rsvd3;
+	__le32			reftag;
+	__le16			apptag;
+	__le16			appmask;
 };
 
 struct nvme_dsm_cmd {
@@ -1441,6 +1473,7 @@ struct nvme_command {
 	union {
 		struct nvme_common_command common;
 		struct nvme_rw_command rw;
+		struct nvme_copy_command copy;
 		struct nvme_identify identify;
 		struct nvme_features features;
 		struct nvme_create_cq create_cq;

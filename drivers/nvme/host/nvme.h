@@ -277,6 +277,7 @@ struct nvme_ctrl {
 #ifdef CONFIG_BLK_DEV_ZONED
 	u32 max_zone_append;
 #endif
+	u32 max_copy_sectors;
 	u16 crdt[3];
 	u16 oncs;
 	u16 oacs;

@@ -138,6 +138,11 @@ static blk_status_t nvme_loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 	bool queue_ready = test_bit(NVME_LOOP_Q_LIVE, &queue->flags);
 	blk_status_t ret;
 
+	if (unlikely((req->cmd_flags & REQ_OP_MASK) == REQ_OP_COPY_READ_TOKEN)) {
+		blk_mq_end_request(req, BLK_STS_OK);
+		return BLK_STS_OK;
+	}
+
 	if (!nvme_check_ready(&queue->ctrl->ctrl, req, queue_ready))
 		return nvme_fail_nonready_command(&queue->ctrl->ctrl, req);
 

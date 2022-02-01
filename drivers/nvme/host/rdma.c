@@ -2048,6 +2048,11 @@ static blk_status_t nvme_rdma_queue_rq(struct blk_mq_hw_ctx *hctx,
 	blk_status_t ret;
 	int err;
 
+	if (unlikely((rq->cmd_flags & REQ_OP_MASK) == REQ_OP_COPY_READ_TOKEN)) {
+		blk_mq_end_request(rq, BLK_STS_OK);
+		return BLK_STS_OK;
+	}
+
 	WARN_ON_ONCE(rq->tag < 0);
 
 	if (!nvme_check_ready(&queue->ctrl->ctrl, rq, queue_ready))

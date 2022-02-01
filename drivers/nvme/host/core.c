@@ -975,6 +975,85 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 	return 0;
 }
 
+struct nvme_copy_token {
+	char subsys[4];
+	struct nvme_ns *ns;
+	u64 src_sector;
+	u64 sectors;
+};
+
+static inline blk_status_t nvme_setup_read_token(struct nvme_ns *ns, struct request *req)
+{
+	struct bio *bio = req->bio;
+	struct nvme_copy_token *token = page_to_virt(bio->bi_io_vec[0].bv_page) + bio->bi_io_vec[0].bv_offset;
+	memcpy(token->subsys, "nvme", 4);
+	token->ns = ns;
+	token->src_sector = bio->bi_iter.bi_sector;
+	token->sectors = bio->bi_iter.bi_size >> 9;
+	return 0;
+}
+
+static inline blk_status_t nvme_setup_write_token(struct nvme_ns *ns,
+		struct request *req, struct nvme_command *cmnd)
+{
+	sector_t src_sector, dst_sector, n_sectors;
+	u64 src_lba, dst_lba, n_lba;
+
+	unsigned n_descriptors, i;
+	struct nvme_copy_desc *descriptors;
+
+	struct bio *bio = req->bio;
+	struct nvme_copy_token *token = page_to_virt(bio->bi_io_vec[0].bv_page) + bio->bi_io_vec[0].bv_offset;
+	if (unlikely(memcmp(token->subsys, "nvme", 4)))
+		return BLK_STS_NOTSUPP;
+	if (unlikely(token->ns != ns))
+		return BLK_STS_NOTSUPP;
+
+	src_sector = token->src_sector;
+	dst_sector = bio->bi_iter.bi_sector;
+	n_sectors = token->sectors;
+	if (WARN_ON(n_sectors != bio->bi_iter.bi_size >> 9))
+		return BLK_STS_NOTSUPP;
+
+	src_lba = nvme_sect_to_lba(ns, src_sector);
+	dst_lba = nvme_sect_to_lba(ns, dst_sector);
+	n_lba = nvme_sect_to_lba(ns, n_sectors);
+
+	if (unlikely(nvme_lba_to_sect(ns, src_lba) != src_sector) ||
+	    unlikely(nvme_lba_to_sect(ns, dst_lba) != dst_sector) ||
+	    unlikely(nvme_lba_to_sect(ns, n_lba) != n_sectors))
+		return BLK_STS_NOTSUPP;
+
+	if (WARN_ON(!n_lba))
+		return BLK_STS_NOTSUPP;
+
+	n_descriptors = (n_lba + 0xffff) / 0x10000;
+	descriptors = kzalloc(n_descriptors * sizeof(struct nvme_copy_desc), GFP_ATOMIC | __GFP_NOWARN);
+	if (unlikely(!descriptors))
+		return BLK_STS_RESOURCE;
+
+	memset(cmnd, 0, sizeof(*cmnd));
+	cmnd->copy.opcode = nvme_cmd_copy;
+	cmnd->copy.nsid = cpu_to_le32(ns->head->ns_id);
+	cmnd->copy.sdlba = cpu_to_le64(dst_lba);
+	cmnd->copy.length = n_descriptors - 1;
+
+	for (i = 0; i < n_descriptors; i++) {
+		u64 this_step = min(n_lba, (u64)0x10000);
+		descriptors[i].slba = cpu_to_le64(src_lba);
+		descriptors[i].length = cpu_to_le16(this_step - 1);
+		src_lba += this_step;
+		n_lba -= this_step;
+	}
+
+	req->special_vec.bv_page = virt_to_page(descriptors);
+	req->special_vec.bv_offset = offset_in_page(descriptors);
+	req->special_vec.bv_len = n_descriptors * sizeof(struct nvme_copy_desc);
+	req->rq_flags |= RQF_SPECIAL_PAYLOAD;
+
+	return 0;
+}
+
 void nvme_cleanup_cmd(struct request *req)
 {
 	if (req->rq_flags & RQF_SPECIAL_PAYLOAD) {
@@ -1031,6 +1110,12 @@ blk_status_t nvme_setup_cmd(struct nvme_ns *ns, struct request *req)
 		break;
 	case REQ_OP_ZONE_APPEND:
 		ret = nvme_setup_rw(ns, req, cmd, nvme_cmd_zone_append);
+		break;
+	case REQ_OP_COPY_READ_TOKEN:
+		ret = nvme_setup_read_token(ns, req);
+		break;
+	case REQ_OP_COPY_WRITE_TOKEN:
+		ret = nvme_setup_write_token(ns, req, cmd);
 		break;
 	default:
 		WARN_ON_ONCE(1);
@@ -1864,6 +1949,8 @@ static void nvme_update_disk_info(struct gendisk *disk,
 	nvme_config_discard(disk, ns);
 	blk_queue_max_write_zeroes_sectors(disk->queue,
 					   ns->ctrl->max_zeroes_sectors);
+
+	blk_queue_max_copy_sectors(disk->queue, ns->ctrl->max_copy_sectors);
 
 	set_disk_ro(disk, (id->nsattr & NVME_NS_ATTR_RO) ||
 		test_bit(NVME_NS_FORCE_RO, &ns->flags));
@@ -2890,6 +2977,12 @@ static int nvme_init_non_mdts_limits(struct nvme_ctrl *ctrl)
 		ctrl->max_zeroes_sectors = ctrl->max_hw_sectors;
 	else
 		ctrl->max_zeroes_sectors = 0;
+
+	if (ctrl->oncs & NVME_CTRL_ONCS_COPY) {
+		ctrl->max_copy_sectors = 1U << 24;
+	} else {
+		ctrl->max_copy_sectors = 0;
+	}
 
 	if (nvme_ctrl_limited_cns(ctrl))
 		return 0;
@@ -4716,6 +4809,7 @@ static inline void _nvme_check_size(void)
 {
 	BUILD_BUG_ON(sizeof(struct nvme_common_command) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_rw_command) != 64);
+	BUILD_BUG_ON(sizeof(struct nvme_copy_command) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_identify) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_features) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_download_firmware) != 64);
