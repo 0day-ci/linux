@@ -764,6 +764,8 @@ bool acpi_s2idle_wake(void)
 			return true;
 		}
 
+		pm_pr_dbg("Rearming ACPI SCI for wakeup\n");
+
 		rearm_wake_irq(acpi_sci_irq);
 	}
 
