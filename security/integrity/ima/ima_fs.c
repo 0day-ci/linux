@@ -410,24 +410,32 @@ static int ima_release_policy(struct inode *inode, struct file *file)
 {
 	struct ima_namespace *ns = &init_ima_ns;
 	const char *cause = ns->valid_policy ? "completed" : "failed";
+	int err = 0;
 
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 		return seq_release(inode, file);
 
-	if (ns->valid_policy && ima_check_policy(ns) < 0) {
-		cause = "failed";
-		ns->valid_policy = 0;
+	if (ns->valid_policy) {
+		err = ima_check_policy(ns);
+		if (err < 0) {
+			if (err == -ENOSPC)
+				cause = "too-many-rules";
+			else
+				cause = "failed";
+			ns->valid_policy = 0;
+		}
 	}
 
 	pr_info("policy update %s\n", cause);
-	integrity_audit_msg(AUDIT_INTEGRITY_STATUS, NULL, NULL,
-			    "policy_update", cause, !ns->valid_policy, 0);
+	integrity_audit_message(AUDIT_INTEGRITY_STATUS, NULL, NULL,
+				"policy_update", cause, !ns->valid_policy, 0,
+				-err);
 
 	if (!ns->valid_policy) {
 		ima_delete_rules(ns);
 		ns->valid_policy = 1;
 		clear_bit(IMA_FS_BUSY, &ns->ima_fs_flags);
-		return 0;
+		return err;
 	}
 
 	ima_update_policy(ns);
