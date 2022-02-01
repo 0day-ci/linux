@@ -19,6 +19,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/devm-helpers.h>
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
 #include <linux/jiffies.h>
@@ -75,6 +76,8 @@ struct pca9541 {
 	struct i2c_client *client;
 	unsigned long select_timeout;
 	unsigned long arb_timeout;
+	unsigned long release_delay;
+	struct delayed_work release_work;
 };
 
 static const struct i2c_device_id pca9541_id[] = {
@@ -127,8 +130,11 @@ static int pca9541_reg_read(struct i2c_client *client, u8 command)
  * Arbitration management functions
  */
 
-/* Release bus. Also reset NTESTON and BUSINIT if it was set. */
-static void pca9541_release_bus(struct i2c_client *client)
+/*
+ * Release bus. Also reset NTESTON and BUSINIT if it was set.
+ * client->adapter must already be locked.
+ */
+static void __pca9541_release_bus(struct i2c_client *client)
 {
 	int reg;
 
@@ -136,6 +142,13 @@ static void pca9541_release_bus(struct i2c_client *client)
 	if (reg >= 0 && !busoff(reg) && mybus(reg))
 		pca9541_reg_write(client, PCA9541_CONTROL,
 				  (reg & PCA9541_CTL_NBUSON) >> 1);
+}
+
+static void pca9541_release_bus(struct i2c_client *client)
+{
+	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+	__pca9541_release_bus(client);
+	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
 }
 
 /*
@@ -254,6 +267,9 @@ static int pca9541_select_chan(struct i2c_mux_core *muxc, u32 chan)
 	unsigned long timeout = jiffies + ARB2_TIMEOUT;
 		/* give up after this time */
 
+	if (data->release_delay)
+		cancel_delayed_work_sync(&data->release_work);
+
 	data->arb_timeout = jiffies + ARB_TIMEOUT;
 		/* force bus ownership after this time */
 
@@ -276,8 +292,19 @@ static int pca9541_release_chan(struct i2c_mux_core *muxc, u32 chan)
 	struct pca9541 *data = i2c_mux_priv(muxc);
 	struct i2c_client *client = data->client;
 
-	pca9541_release_bus(client);
+	if (data->release_delay)
+		schedule_delayed_work(&data->release_work, data->release_delay);
+	else
+		__pca9541_release_bus(client);
+
 	return 0;
+}
+
+static void pca9541_release_workfn(struct work_struct *work)
+{
+	struct pca9541 *data = container_of(work, struct pca9541, release_work.work);
+
+	pca9541_release_bus(data->client);
 }
 
 /*
@@ -289,18 +316,13 @@ static int pca9541_probe(struct i2c_client *client,
 	struct i2c_adapter *adap = client->adapter;
 	struct i2c_mux_core *muxc;
 	struct pca9541 *data;
+	u32 release_delay_us;
 	int ret;
 
 	if (!i2c_check_functionality(adap, I2C_FUNC_SMBUS_BYTE_DATA))
 		return -ENODEV;
 
-	/*
-	 * I2C accesses are unprotected here.
-	 * We have to lock the I2C segment before releasing the bus.
-	 */
-	i2c_lock_bus(adap, I2C_LOCK_SEGMENT);
 	pca9541_release_bus(client);
-	i2c_unlock_bus(adap, I2C_LOCK_SEGMENT);
 
 	/* Create mux adapter */
 
@@ -312,6 +334,14 @@ static int pca9541_probe(struct i2c_client *client,
 
 	data = i2c_mux_priv(muxc);
 	data->client = client;
+
+	if (!device_property_read_u32(&client->dev, "release-delay-us", &release_delay_us)) {
+		data->release_delay = usecs_to_jiffies(release_delay_us);
+		ret = devm_delayed_work_autocancel(&client->dev, &data->release_work,
+						   pca9541_release_workfn);
+		if (ret)
+			return ret;
+	}
 
 	i2c_set_clientdata(client, muxc);
 
@@ -328,6 +358,14 @@ static int pca9541_probe(struct i2c_client *client,
 static int pca9541_remove(struct i2c_client *client)
 {
 	struct i2c_mux_core *muxc = i2c_get_clientdata(client);
+	struct pca9541 *data = i2c_mux_priv(muxc);
+
+	/*
+	 * Ensure the bus is released (in case the device gets destroyed
+	 * before release_work runs).
+	 */
+	if (data->release_delay)
+		pca9541_release_bus(client);
 
 	i2c_mux_del_adapters(muxc);
 	return 0;
