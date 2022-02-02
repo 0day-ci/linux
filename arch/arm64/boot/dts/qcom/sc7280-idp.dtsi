@@ -243,9 +243,6 @@
 	perst-gpio = <&tlmm 2 GPIO_ACTIVE_LOW>;
 
 	vddpe-3v3-supply = <&nvme_3v3_regulator>;
-
-	pinctrl-names = "default";
-	pinctrl-0 = <&pcie1_reset_n>, <&pcie1_wake_n>;
 };
 
 &pcie1_phy {
@@ -360,6 +357,21 @@
 
 /* PINCTRL - additions to nodes defined in sc7280.dtsi */
 
+&pcie1_reset_n {
+	pins = "gpio2";
+
+	drive-strength = <16>;
+	output-low;
+	bias-disable;
+};
+
+&pcie1_wake_n {
+	pins = "gpio3";
+
+	drive-strength = <2>;
+	bias-pull-up;
+};
+
 &pm7325_gpios {
 	key_vol_up_default: key-vol-up-default {
 		pins = "gpio6";
@@ -434,23 +446,6 @@
 
 	nvme_pwren: nvme-pwren {
 		function = "gpio";
-	};
-
-	pcie1_reset_n: pcie1-reset-n {
-		pins = "gpio2";
-		function = "gpio";
-
-		drive-strength = <16>;
-		output-low;
-		bias-disable;
-	};
-
-	pcie1_wake_n: pcie1-wake-n {
-		pins = "gpio3";
-		function = "gpio";
-
-		drive-strength = <2>;
-		bias-pull-up;
 	};
 
 	qup_uart7_sleep_cts: qup-uart7-sleep-cts {
