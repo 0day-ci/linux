@@ -581,6 +581,15 @@ static int vmci_guest_probe_device(struct pci_dev *pdev,
 	/* Let the host know which capabilities we intend to use. */
 	vmci_write_reg(vmci_dev, caps_in_use, VMCI_CAPS_ADDR);
 
+	if (caps_in_use & VMCI_CAPS_DMA_DATAGRAM) {
+		uint32_t page_shift;
+
+		/* Let the device know the size for pages passed down. */
+		vmci_write_reg(vmci_dev, PAGE_SHIFT, VMCI_GUEST_PAGE_SHIFT);
+		page_shift = vmci_read_reg(vmci_dev, VMCI_GUEST_PAGE_SHIFT);
+		dev_info(&pdev->dev, "Using page shift %d\n", page_shift);
+	}
+
 	/* Set up global device so that we can start sending datagrams */
 	spin_lock_irq(&vmci_dev_spinlock);
 	vmci_dev_g = vmci_dev;
