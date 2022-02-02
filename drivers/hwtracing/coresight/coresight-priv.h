@@ -36,6 +36,7 @@
 
 #define TIMEOUT_US		100
 #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
+#define REG_VAL(val, name)	((val & (name##_MASK << name##_SHIFT)) >> name##_SHIFT)
 
 #define ETM_MODE_EXCL_KERN	BIT(30)
 #define ETM_MODE_EXCL_USER	BIT(31)
