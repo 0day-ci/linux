@@ -151,6 +151,10 @@ struct vc4_txp {
 
 	struct platform_device *pdev;
 
+	struct drm_connector drm_conn;
+
+	struct drm_encoder drm_enc;
+
 	struct drm_writeback_connector connector;
 
 	void __iomem *regs;
@@ -159,12 +163,12 @@ struct vc4_txp {
 
 static inline struct vc4_txp *encoder_to_vc4_txp(struct drm_encoder *encoder)
 {
-	return container_of(encoder, struct vc4_txp, connector.encoder);
+	return container_of(encoder, struct vc4_txp, drm_enc);
 }
 
 static inline struct vc4_txp *connector_to_vc4_txp(struct drm_connector *conn)
 {
-	return container_of(conn, struct vc4_txp, connector.base);
+	return container_of(conn, struct vc4_txp, drm_conn);
 }
 
 static const struct debugfs_reg32 txp_regs[] = {
@@ -467,6 +471,7 @@ static int vc4_txp_bind(struct device *dev, struct device *master, void *data)
 	struct vc4_txp *txp;
 	struct drm_crtc *crtc;
 	struct drm_encoder *encoder;
+	struct drm_writeback_connector *wb_conn;
 	int ret, irq;
 
 	irq = platform_get_irq(pdev, 0);
@@ -491,10 +496,13 @@ static int vc4_txp_bind(struct device *dev, struct device *master, void *data)
 	txp->regset.base = txp->regs;
 	txp->regset.regs = txp_regs;
 	txp->regset.nregs = ARRAY_SIZE(txp_regs);
+	wb_conn = &txp->connector;
+	wb_conn->base = &txp->drm_conn;
+	wb_conn->encoder = &txp->drm_enc;
 
-	drm_connector_helper_add(&txp->connector.base,
+	drm_connector_helper_add(wb_conn->base,
 				 &vc4_txp_connector_helper_funcs);
-	ret = drm_writeback_connector_init(drm, &txp->connector,
+	ret = drm_writeback_connector_init(drm, wb_conn,
 					   &vc4_txp_connector_funcs,
 					   &vc4_txp_encoder_helper_funcs,
 					   drm_fmts, ARRAY_SIZE(drm_fmts));
@@ -506,7 +514,7 @@ static int vc4_txp_bind(struct device *dev, struct device *master, void *data)
 	if (ret)
 		return ret;
 
-	encoder = &txp->connector.encoder;
+	encoder = txp->connector.encoder;
 	encoder->possible_crtcs = drm_crtc_mask(crtc);
 
 	ret = devm_request_irq(dev, irq, vc4_txp_interrupt, 0,
@@ -529,7 +537,7 @@ static void vc4_txp_unbind(struct device *dev, struct device *master,
 	struct vc4_dev *vc4 = to_vc4_dev(drm);
 	struct vc4_txp *txp = dev_get_drvdata(dev);
 
-	vc4_txp_connector_destroy(&txp->connector.base);
+	vc4_txp_connector_destroy(txp->connector.base);
 
 	vc4->txp = NULL;
 }
