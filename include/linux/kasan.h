@@ -28,6 +28,7 @@ struct kunit_kasan_expectation {
 #ifdef CONFIG_KASAN_SOFTWARE
 
 #include <linux/pgtable.h>
+#include <linux/mm.h>
 
 /* Software KASAN implementations use shadow memory. */
 
@@ -80,6 +81,62 @@ static inline void kasan_enable_current(void) {}
 static inline void kasan_disable_current(void) {}
 
 #endif /* CONFIG_KASAN_SOFTWARE */
+
+#if defined(CONFIG_KASAN_SOFTWARE) && CONFIG_PGTABLE_LEVELS > 4
+static inline bool kasan_p4d_table(pgd_t pgd)
+{
+	return pgd_page(pgd) == virt_to_page(lm_alias(kasan_early_shadow_p4d));
+}
+#else
+static inline bool kasan_p4d_table(pgd_t pgd)
+{
+	return false;
+}
+#endif
+#if defined(CONFIG_KASAN_SOFTWARE) && CONFIG_PGTABLE_LEVELS > 3
+static inline bool kasan_pud_table(p4d_t p4d)
+{
+	return p4d_page(p4d) == virt_to_page(lm_alias(kasan_early_shadow_pud));
+}
+#else
+static inline bool kasan_pud_table(p4d_t p4d)
+{
+	return false;
+}
+#endif
+#if defined(CONFIG_KASAN_SOFTWARE) && CONFIG_PGTABLE_LEVELS > 2
+static inline bool kasan_pmd_table(pud_t pud)
+{
+	return pud_page(pud) == virt_to_page(lm_alias(kasan_early_shadow_pmd));
+}
+#else
+static inline bool kasan_pmd_table(pud_t pud)
+{
+	return false;
+}
+#endif
+
+#ifdef CONFIG_KASAN_SOFTWARE
+static inline bool kasan_pte_table(pmd_t pmd)
+{
+	return pmd_page(pmd) == virt_to_page(lm_alias(kasan_early_shadow_pte));
+}
+
+static inline bool kasan_early_shadow_page_entry(pte_t pte)
+{
+	return pte_page(pte) == virt_to_page(lm_alias(kasan_early_shadow_page));
+}
+#else
+static inline bool kasan_pte_table(pmd_t pmd)
+{
+	return false;
+}
+
+static inline bool kasan_early_shadow_page_entry(pte_t pte)
+{
+	return false;
+}
+#endif
 
 #ifdef CONFIG_KASAN_HW_TAGS
 

@@ -30,52 +30,15 @@ unsigned char kasan_early_shadow_page[PAGE_SIZE] __page_aligned_bss;
 
 #if CONFIG_PGTABLE_LEVELS > 4
 p4d_t kasan_early_shadow_p4d[MAX_PTRS_PER_P4D] __page_aligned_bss;
-static inline bool kasan_p4d_table(pgd_t pgd)
-{
-	return pgd_page(pgd) == virt_to_page(lm_alias(kasan_early_shadow_p4d));
-}
-#else
-static inline bool kasan_p4d_table(pgd_t pgd)
-{
-	return false;
-}
 #endif
 #if CONFIG_PGTABLE_LEVELS > 3
 pud_t kasan_early_shadow_pud[MAX_PTRS_PER_PUD] __page_aligned_bss;
-static inline bool kasan_pud_table(p4d_t p4d)
-{
-	return p4d_page(p4d) == virt_to_page(lm_alias(kasan_early_shadow_pud));
-}
-#else
-static inline bool kasan_pud_table(p4d_t p4d)
-{
-	return false;
-}
 #endif
 #if CONFIG_PGTABLE_LEVELS > 2
 pmd_t kasan_early_shadow_pmd[MAX_PTRS_PER_PMD] __page_aligned_bss;
-static inline bool kasan_pmd_table(pud_t pud)
-{
-	return pud_page(pud) == virt_to_page(lm_alias(kasan_early_shadow_pmd));
-}
-#else
-static inline bool kasan_pmd_table(pud_t pud)
-{
-	return false;
-}
 #endif
 pte_t kasan_early_shadow_pte[MAX_PTRS_PER_PTE + PTE_HWTABLE_PTRS]
 	__page_aligned_bss;
-
-static inline bool kasan_pte_table(pmd_t pmd)
-{
-	return pmd_page(pmd) == virt_to_page(lm_alias(kasan_early_shadow_pte));
-}
-
-static inline bool kasan_early_shadow_page_entry(pte_t pte)
-{
-	return pte_page(pte) == virt_to_page(lm_alias(kasan_early_shadow_page));
-}
 
 static __init void *early_alloc(size_t size, int node)
 {

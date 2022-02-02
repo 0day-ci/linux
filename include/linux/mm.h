@@ -31,7 +31,6 @@
 #include <linux/sizes.h>
 #include <linux/sched.h>
 #include <linux/pgtable.h>
-#include <linux/kasan.h>
 
 struct mempolicy;
 struct anon_vma;
@@ -120,6 +119,8 @@ extern int mmap_rnd_compat_bits __read_mostly;
 #ifndef lm_alias
 #define lm_alias(x)	__va(__pa_symbol(x))
 #endif
+
+#include <linux/kasan.h>
 
 /*
  * To prevent common memory management code establishing
