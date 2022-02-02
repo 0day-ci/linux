@@ -143,8 +143,19 @@ static int software_key_query(const struct kernel_pkey_params *params,
 
 	len = crypto_akcipher_maxsize(tfm);
 	info->key_size = len * 8;
-	info->max_data_size = len;
-	info->max_sig_size = len;
+	if (strcmp(alg_name, "ecrdsa") == 0 ||
+	    strncmp(alg_name, "ecdsa-", 6) == 0) {
+		/*
+		 * For these algos sig size is twice key size.
+		 * keyctl uses max_sig_size as minimum input size, and
+		 * max_data_size as minimum output size for a signature.
+		 */
+		info->max_data_size = len * 2;
+		info->max_sig_size = len * 2;
+	} else {
+		info->max_data_size = len;
+		info->max_sig_size = len;
+	}
 	info->max_enc_size = len;
 	info->max_dec_size = len;
 	info->supported_ops = (KEYCTL_SUPPORTS_ENCRYPT |
