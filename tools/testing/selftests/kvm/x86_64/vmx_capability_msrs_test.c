@@ -67,6 +67,42 @@ static void load_perf_global_ctrl_test(struct kvm_vm *vm)
 		    "\"load IA32_PERF_GLOBAL_CTRL\" VM-Exit bit set");
 }
 
+/*
+ * Test to assert that clearing the "load IA32_BNDCFGS" and "clear IA32_BNDCFGS"
+ * control capability bits is preserved across a KVM_SET_CPUID2.
+ */
+static void bndcfgs_ctrl_test(struct kvm_vm *vm)
+{
+	uint32_t entry_low, entry_high, exit_low, exit_high;
+	struct kvm_cpuid2 *cpuid;
+
+	get_vmx_capability_msr(vm, MSR_IA32_VMX_TRUE_ENTRY_CTLS, &entry_low, &entry_high);
+	get_vmx_capability_msr(vm, MSR_IA32_VMX_TRUE_EXIT_CTLS, &exit_low, &exit_high);
+
+	if (!(entry_high & VM_ENTRY_LOAD_BNDCFGS) || !(exit_high & VM_EXIT_CLEAR_BNDCFGS)) {
+		print_skip("\"{load,clear} IA32_BNDCFGS\" controls not supported");
+		return;
+	}
+
+	entry_high &= ~VM_ENTRY_LOAD_BNDCFGS;
+	exit_high &= ~VM_EXIT_CLEAR_BNDCFGS;
+
+	set_vmx_capability_msr(vm, MSR_IA32_VMX_TRUE_ENTRY_CTLS, entry_low, entry_high);
+	set_vmx_capability_msr(vm, MSR_IA32_VMX_TRUE_EXIT_CTLS, exit_low, exit_high);
+
+	cpuid = kvm_get_supported_cpuid();
+	vcpu_set_cpuid(vm, VCPU_ID, cpuid);
+
+	get_vmx_capability_msr(vm, MSR_IA32_VMX_TRUE_ENTRY_CTLS, &entry_low, &entry_high);
+	get_vmx_capability_msr(vm, MSR_IA32_VMX_TRUE_EXIT_CTLS, &exit_low, &exit_high);
+
+	TEST_ASSERT(!(entry_high & VM_ENTRY_LOAD_BNDCFGS),
+		    "\"load IA32_BNDCFGS\" VM-Entry bit set");
+	TEST_ASSERT(!(exit_high & VM_EXIT_CLEAR_BNDCFGS),
+		    "\"clear IA32_BNDCFGS\" VM-Exit bit set");
+}
+
+
 int main(void)
 {
 	struct kvm_vm *vm;
@@ -77,6 +113,7 @@ int main(void)
 	vm = vm_create_default(VCPU_ID, 0, NULL);
 
 	load_perf_global_ctrl_test(vm);
+	bndcfgs_ctrl_test(vm);
 
 	kvm_vm_free(vm);
 }
