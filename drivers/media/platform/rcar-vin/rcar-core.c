@@ -826,11 +826,6 @@ static int rvin_csi2_link_notify(struct media_link *link, u32 flags,
 	vin = container_of(vdev, struct rvin_dev, vdev);
 	master_id = rvin_group_id_to_master(vin->id);
 
-	if (WARN_ON(!group->vin[master_id])) {
-		ret = -ENODEV;
-		goto out;
-	}
-
 	/* Build a mask for already enabled links. */
 	for (i = master_id; i < master_id + 4; i++) {
 		if (!group->vin[i])
@@ -874,6 +869,11 @@ static int rvin_csi2_link_notify(struct media_link *link, u32 flags,
 
 		vin_err(vin, "Subdevice %s not registered to any VIN\n",
 			link->source->entity->name);
+		ret = -ENODEV;
+		goto out;
+	}
+
+	if (WARN_ON(!group->vin[master_id])) {
 		ret = -ENODEV;
 		goto out;
 	}
