@@ -913,6 +913,74 @@ out:
 	return err;
 }
 
+static int igt_vma_lifetime(void *arg)
+{
+	struct i915_ggtt *ggtt = arg;
+	struct drm_i915_private *i915 = ggtt->vm.i915;
+	struct drm_i915_gem_object *obj;
+	struct i915_vma *vma;
+	struct i915_ppgtt *ppgtt = mock_ppgtt(i915, "refcount");
+	struct i915_address_space *vm;
+	bool refctd = 0;
+	int err = 0;
+
+	if (!ppgtt)
+		return -ENOMEM;
+
+	vm = &ppgtt->vm;
+	obj = i915_gem_object_create_internal(i915, PAGE_SIZE);
+	if (IS_ERR(obj)) {
+		err = PTR_ERR(obj);
+		goto out_obj;
+	}
+
+	vma = i915_vma_instance(obj, vm, NULL);
+	if (IS_ERR(vma)) {
+		err = PTR_ERR(vma);
+		goto out_vma;
+	}
+
+	atomic_set(&vma->open_count, 1);
+	err = i915_vma_pin(vma, 0, 0, PIN_USER);
+
+	__i915_vma_get(vma);
+	refctd = true;
+
+	/*
+	 * Now run vma close, vm close and obj unref, all wanting to
+	 * destroy the vma. The vma should survive until we put it
+	 * without any refcount underflow warning. Moving forward we might
+	 * be using object lock instead of the vma refcount, but then we'd
+	 * have to put the vma before object put ofc.
+	 */
+
+	pr_info("Refcount = %d. Now closing vm.\n", kref_read(&vma->ref));
+	__i915_vm_close(vm);
+	pr_info("Refcount = %d. Now closing vma.\n", kref_read(&vma->ref));
+	i915_vma_close(vma);
+	i915_vma_parked(vma->vm->gt);
+
+	/* Did i915_vma_parked forget to remove the vma from the list? */
+	if (i915_vma_is_closed(vma)) {
+		pr_err("i915_vma_close() caused list corruption.\n");
+		list_del_init(&vma->closed_link);
+		err = -EINVAL;
+	}
+
+	pr_info("Refcount = %d. Now freeing obj.\n", kref_read(&vma->ref));
+out_vma:
+	i915_gem_object_put(obj);
+	i915_gem_flush_free_objects(i915);
+	if (refctd) {
+		pr_info("Refcount = %d. Now freeing vma.\n", kref_read(&vma->ref));
+		__i915_vma_put(vma);
+	}
+out_obj:
+	i915_vm_put(vm);
+
+	return err;
+}
+
 int i915_vma_mock_selftests(void)
 {
 	static const struct i915_subtest tests[] = {
@@ -920,6 +988,7 @@ int i915_vma_mock_selftests(void)
 		SUBTEST(igt_vma_pin1),
 		SUBTEST(igt_vma_rotate_remap),
 		SUBTEST(igt_vma_partial),
+		SUBTEST(igt_vma_lifetime),
 	};
 	struct drm_i915_private *i915;
 	struct intel_gt *gt;
