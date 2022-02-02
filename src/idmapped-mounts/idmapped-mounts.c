@@ -695,11 +695,14 @@ static int fd_to_fd(int from, int to)
 	return 0;
 }
 
-static int sys_execveat(int fd, const char *path, char **argv, char **envp,
-			int flags)
+static int do_execveat(int fd, const char *path, char **envp)
 {
 #ifdef __NR_execveat
-	return syscall(__NR_execveat, fd, path, argv, envp, flags);
+	static char *argv_empty[] = {
+		"",
+		NULL,
+	};
+	return syscall(__NR_execveat, fd, path, argv_empty, envp, 0);
 #else
 	errno = ENOSYS;
 	return -1;
@@ -3597,15 +3600,12 @@ static int setid_binaries(void)
 			"EXPECTED_EGID=5000",
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		if (!expected_uid_gid(t_dir1_fd, FILE1, 0, 5000, 5000))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(t_dir1_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(t_dir1_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -3725,15 +3725,12 @@ static int setid_binaries_idmapped_mounts(void)
 			"EXPECTED_EGID=15000",
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, 15000, 15000))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -3864,9 +3861,6 @@ static int setid_binaries_idmapped_mounts_in_userns(void)
 			"EXPECTED_EGID=5000",
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		if (!switch_userns(attr.userns_fd, 0, 0, false))
 			die("failure: switch_userns");
@@ -3874,8 +3868,8 @@ static int setid_binaries_idmapped_mounts_in_userns(void)
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, 5000, 5000))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -3923,9 +3917,6 @@ static int setid_binaries_idmapped_mounts_in_userns(void)
 			"EXPECTED_EGID=0",
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		if (!caps_supported()) {
 			log_debug("skip: capability library not installed");
@@ -3938,8 +3929,8 @@ static int setid_binaries_idmapped_mounts_in_userns(void)
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, 0, 0))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -3991,9 +3982,6 @@ static int setid_binaries_idmapped_mounts_in_userns(void)
 			NULL,
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		if (!switch_userns(attr.userns_fd, 0, 0, false))
 			die("failure: switch_userns");
@@ -4007,8 +3995,8 @@ static int setid_binaries_idmapped_mounts_in_userns(void)
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, t_overflowuid, t_overflowgid))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -4149,9 +4137,6 @@ static int setid_binaries_idmapped_mounts_in_userns_separate_userns(void)
 			"EXPECTED_EGID=5000",
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		userns_fd = get_userns_fd(0, 10000, 10000);
 		if (userns_fd < 0)
@@ -4163,8 +4148,8 @@ static int setid_binaries_idmapped_mounts_in_userns_separate_userns(void)
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, 5000, 5000))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -4213,9 +4198,6 @@ static int setid_binaries_idmapped_mounts_in_userns_separate_userns(void)
 			"EXPECTED_EGID=0",
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		userns_fd = get_userns_fd(0, 10000, 10000);
 		if (userns_fd < 0)
@@ -4232,8 +4214,8 @@ static int setid_binaries_idmapped_mounts_in_userns_separate_userns(void)
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, 0, 0))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
@@ -4285,9 +4267,6 @@ static int setid_binaries_idmapped_mounts_in_userns_separate_userns(void)
 			NULL,
 			NULL,
 		};
-		static char *argv[] = {
-			NULL,
-		};
 
 		userns_fd = get_userns_fd(0, 10000, 10000);
 		if (userns_fd < 0)
@@ -4305,8 +4284,8 @@ static int setid_binaries_idmapped_mounts_in_userns_separate_userns(void)
 		if (!expected_uid_gid(open_tree_fd, FILE1, 0, t_overflowuid, t_overflowgid))
 			die("failure: expected_uid_gid");
 
-		sys_execveat(open_tree_fd, FILE1, argv, envp, 0);
-		die("failure: sys_execveat");
+		do_execveat(open_tree_fd, FILE1, envp);
+		die("failure: do_execveat");
 
 		exit(EXIT_FAILURE);
 	}
