@@ -855,8 +855,9 @@ repeat:
 
 	root = kernfs_root(kn);
 	/* kick fsnotify */
-	down_write(&root->kernfs_rwsem);
+	down_write_kernfs_rwsem(kn, LOCK_SELF, 0);
 
+	down_write(&root->supers_rwsem);
 	list_for_each_entry(info, &kernfs_root(kn)->supers, node) {
 		struct kernfs_node *parent;
 		struct inode *p_inode = NULL;
@@ -892,8 +893,9 @@ repeat:
 
 		iput(inode);
 	}
+	up_write(&root->supers_rwsem);
 
-	up_write(&root->kernfs_rwsem);
+	up_write_kernfs_rwsem(kn);
 	kernfs_put(kn);
 	goto repeat;
 }

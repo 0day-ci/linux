@@ -19,6 +19,9 @@
 #include <linux/kernfs.h>
 #include <linux/fs_context.h>
 
+#define LOCK_SELF 0
+#define LOCK_SELF_AND_PARENT 1
+
 struct kernfs_iattrs {
 	kuid_t			ia_uid;
 	kgid_t			ia_gid;
@@ -100,6 +103,115 @@ static inline bool kernfs_dir_changed(struct kernfs_node *parent,
 	if (parent->dir.rev != dentry->d_time)
 		return true;
 	return false;
+}
+
+/*
+ * If both node and it's parent need locking,
+ * lock child first so that kernfs_rename_ns
+ * does not change the parent, leaving us
+ * with old parent here.
+ */
+static inline void down_write_kernfs_rwsem(struct kernfs_node *kn,
+					   u8 lock_parent,
+					   u8 nesting)
+{
+	int idx, p_idx;
+	struct kernfs_root *root;
+
+	idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+	root = kernfs_root(kn);
+
+	down_write_nested(&root->kernfs_rwsem[idx], nesting);
+
+	kernfs_get(kn);
+
+	if (kn->parent)
+		p_idx = hash_ptr(kn->parent, NR_KERNFS_LOCK_BITS);
+
+	if (kn->parent && lock_parent && p_idx != idx) {
+		/*
+		 * Node and parent hash to different locks.
+		 * node's lock has already been taken.
+		 * Take parent's lock and update token.
+		 */
+		down_write_nested(&root->kernfs_rwsem[p_idx],
+				  nesting + 1);
+
+		kernfs_get(kn->parent);
+		kn->unlock_parent = 1;
+	}
+}
+
+static inline void up_write_kernfs_rwsem(struct kernfs_node *kn)
+{
+	int p_idx, idx;
+	struct kernfs_root *root;
+
+	/* node lock is already taken in down_xxx so kn->parent is safe */
+	p_idx = hash_ptr(kn->parent, NR_KERNFS_LOCK_BITS);
+	idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+	root = kernfs_root(kn);
+
+	if (kn->unlock_parent) {
+		kn->unlock_parent = 0;
+		up_write(&root->kernfs_rwsem[p_idx]);
+		kernfs_put(kn->parent);
+	}
+
+	up_write(&root->kernfs_rwsem[idx]);
+	kernfs_put(kn);
+}
+
+static inline void down_read_kernfs_rwsem(struct kernfs_node *kn,
+					  u8 lock_parent,
+					  u8 nesting)
+{
+	int idx, p_idx;
+	struct kernfs_root *root;
+
+	idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+	root = kernfs_root(kn);
+
+	down_read_nested(&root->kernfs_rwsem[idx], nesting);
+
+	kernfs_get(kn);
+
+	if (kn->parent)
+		p_idx = hash_ptr(kn->parent, NR_KERNFS_LOCK_BITS);
+
+	if (kn->parent && lock_parent && p_idx != idx) {
+		/*
+		 * Node and parent hash to different locks.
+		 * node's lock has already been taken.
+		 * Take parent's lock and update token.
+		 */
+		down_read_nested(&root->kernfs_rwsem[p_idx],
+				 nesting + 1);
+
+		kernfs_get(kn->parent);
+
+		kn->unlock_parent = 1;
+	}
+}
+
+static inline void up_read_kernfs_rwsem(struct kernfs_node *kn)
+{
+	int p_idx, idx;
+	struct kernfs_root *root;
+
+	/* node lock is already taken in down_xxx so kn->parent is safe */
+	p_idx = hash_ptr(kn->parent, NR_KERNFS_LOCK_BITS);
+	idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+	root = kernfs_root(kn);
+
+	if (kn->unlock_parent) {
+		kn->unlock_parent = 0;
+		up_read(&root->kernfs_rwsem[p_idx]);
+		kernfs_put(kn->parent);
+	}
+
+	up_read(&root->kernfs_rwsem[idx]);
+	kernfs_put(kn);
 }
 
 extern const struct super_operations kernfs_sops;
