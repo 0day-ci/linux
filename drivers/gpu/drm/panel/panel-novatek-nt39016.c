@@ -346,6 +346,13 @@ static const struct of_device_id nt39016_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, nt39016_of_match);
 
+static const struct spi_device_id nt39016_spi_ids[] = {
+	{ .name = "kd035g6-54nt", .driver_data = (uintptr_t)&kd035g6_info },
+	{ .name = "nt39016", .driver_data = 0 },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(spi, nt39016_spi_ids);
+
 static struct spi_driver nt39016_driver = {
 	.driver = {
 		.name = "nt39016",
@@ -353,6 +360,7 @@ static struct spi_driver nt39016_driver = {
 	},
 	.probe = nt39016_probe,
 	.remove = nt39016_remove,
+	.id_table = nt39016_spi_ids,
 };
 
 module_spi_driver(nt39016_driver);
