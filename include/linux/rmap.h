@@ -202,9 +202,18 @@ int make_device_exclusive_range(struct mm_struct *mm, unsigned long start,
 #define PVMW_SYNC		(1 << 0)
 /* Look for migarion entries rather than present PTEs */
 #define PVMW_MIGRATION		(1 << 1)
+/* Walk the page table by checking the pfn instead of a struct page */
+#define PVMW_PFN_WALK		(1 << 2)
 
 struct page_vma_mapped_walk {
-	struct page *page;
+	union {
+		struct page *page;
+		struct {
+			unsigned long pfn;
+			unsigned int nr;
+			pgoff_t index;
+		};
+	};
 	struct vm_area_struct *vma;
 	unsigned long address;
 	pmd_t *pmd;
@@ -216,7 +225,8 @@ struct page_vma_mapped_walk {
 static inline void page_vma_mapped_walk_done(struct page_vma_mapped_walk *pvmw)
 {
 	/* HugeTLB pte is set to the relevant page table entry without pte_mapped. */
-	if (pvmw->pte && !PageHuge(pvmw->page))
+	if (pvmw->pte && (pvmw->flags & PVMW_PFN_WALK ||
+			  !PageHuge(pvmw->page)))
 		pte_unmap(pvmw->pte);
 	if (pvmw->ptl)
 		spin_unlock(pvmw->ptl);

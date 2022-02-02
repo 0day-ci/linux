@@ -247,17 +247,22 @@ static inline int is_writable_migration_entry(swp_entry_t entry)
 
 #endif
 
-static inline struct page *pfn_swap_entry_to_page(swp_entry_t entry)
+static inline unsigned long pfn_swap_entry_to_pfn(swp_entry_t entry)
 {
-	struct page *p = pfn_to_page(swp_offset(entry));
+	unsigned long pfn = swp_offset(entry);
 
 	/*
 	 * Any use of migration entries may only occur while the
 	 * corresponding page is locked
 	 */
-	BUG_ON(is_migration_entry(entry) && !PageLocked(p));
+	BUG_ON(is_migration_entry(entry) && !PageLocked(pfn_to_page(pfn)));
 
-	return p;
+	return pfn;
+}
+
+static inline struct page *pfn_swap_entry_to_page(swp_entry_t entry)
+{
+	return pfn_to_page(pfn_swap_entry_to_pfn(entry));
 }
 
 /*

@@ -53,10 +53,17 @@ static bool map_pte(struct page_vma_mapped_walk *pvmw)
 	return true;
 }
 
-static inline bool pfn_is_match(struct page *page, unsigned long pfn)
+static inline bool pfn_is_match(struct page_vma_mapped_walk *pvmw,
+				unsigned long pfn)
 {
-	unsigned long page_pfn = page_to_pfn(page);
+	struct page *page;
+	unsigned long page_pfn;
 
+	if (pvmw->flags & PVMW_PFN_WALK)
+		return pfn >= pvmw->pfn && pfn - pvmw->pfn < pvmw->nr;
+
+	page = pvmw->page;
+	page_pfn = page_to_pfn(page);
 	/* normal page and hugetlbfs page */
 	if (!PageTransCompound(page) || PageHuge(page))
 		return page_pfn == pfn;
@@ -116,7 +123,7 @@ static bool check_pte(struct page_vma_mapped_walk *pvmw)
 		pfn = pte_pfn(*pvmw->pte);
 	}
 
-	return pfn_is_match(pvmw->page, pfn);
+	return pfn_is_match(pvmw, pfn);
 }
 
 static void step_forward(struct page_vma_mapped_walk *pvmw, unsigned long size)
@@ -127,24 +134,24 @@ static void step_forward(struct page_vma_mapped_walk *pvmw, unsigned long size)
 }
 
 /**
- * page_vma_mapped_walk - check if @pvmw->page is mapped in @pvmw->vma at
- * @pvmw->address
- * @pvmw: pointer to struct page_vma_mapped_walk. page, vma, address and flags
- * must be set. pmd, pte and ptl must be NULL.
+ * page_vma_mapped_walk - check if @pvmw->page or @pvmw->pfn is mapped in
+ * @pvmw->vma at @pvmw->address
+ * @pvmw: pointer to struct page_vma_mapped_walk. page (or pfn and nr and
+ * index), vma, address and flags must be set. pmd, pte and ptl must be NULL.
  *
- * Returns true if the page is mapped in the vma. @pvmw->pmd and @pvmw->pte point
- * to relevant page table entries. @pvmw->ptl is locked. @pvmw->address is
- * adjusted if needed (for PTE-mapped THPs).
+ * Returns true if the page or pfn is mapped in the vma. @pvmw->pmd and
+ * @pvmw->pte point to relevant page table entries. @pvmw->ptl is locked.
+ * @pvmw->address is adjusted if needed (for PTE-mapped THPs).
  *
  * If @pvmw->pmd is set but @pvmw->pte is not, you have found PMD-mapped page
- * (usually THP). For PTE-mapped THP, you should run page_vma_mapped_walk() in
- * a loop to find all PTEs that map the THP.
+ * (usually THP or Huge DEVMAP). For PMD-mapped page, you should run
+ * page_vma_mapped_walk() in a loop to find all PTEs that map the huge page.
  *
  * For HugeTLB pages, @pvmw->pte is set to the relevant page table entry
  * regardless of which page table level the page is mapped at. @pvmw->pmd is
  * NULL.
  *
- * Returns false if there are no more page table entries for the page in
+ * Returns false if there are no more page table entries for the page or pfn in
  * the vma. @pvmw->ptl is unlocked and @pvmw->pte is unmapped.
  *
  * If you need to stop the walk before page_vma_mapped_walk() returned false,
@@ -153,8 +160,9 @@ static void step_forward(struct page_vma_mapped_walk *pvmw, unsigned long size)
 bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw)
 {
 	struct mm_struct *mm = pvmw->vma->vm_mm;
-	struct page *page = pvmw->page;
+	struct page *page = NULL;
 	unsigned long end;
+	unsigned long pfn;
 	pgd_t *pgd;
 	p4d_t *p4d;
 	pud_t *pud;
@@ -164,7 +172,11 @@ bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw)
 	if (pvmw->pmd && !pvmw->pte)
 		return not_found(pvmw);
 
-	if (unlikely(PageHuge(page))) {
+	if (!(pvmw->flags & PVMW_PFN_WALK))
+		page = pvmw->page;
+	pfn = page ? page_to_pfn(page) : pvmw->pfn;
+
+	if (unlikely(page && PageHuge(page))) {
 		/* The only possible mapping was handled on last iteration */
 		if (pvmw->pte)
 			return not_found(pvmw);
@@ -187,9 +199,13 @@ bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw)
 	 * any PageKsm page: whose page->index misleads vma_address()
 	 * and vma_address_end() to disaster.
 	 */
-	end = PageTransCompound(page) ?
-		vma_address_end(page, pvmw->vma) :
-		pvmw->address + PAGE_SIZE;
+	if (page)
+		end = PageTransCompound(page) ?
+		      vma_address_end(page, pvmw->vma) :
+		      pvmw->address + PAGE_SIZE;
+	else
+		end = vma_pgoff_address_end(pvmw->index, pvmw->nr, pvmw->vma);
+
 	if (pvmw->pte)
 		goto next_pte;
 restart:
@@ -217,14 +233,14 @@ restart:
 		 * subsequent update.
 		 */
 		pmde = READ_ONCE(*pvmw->pmd);
-
-		if (pmd_trans_huge(pmde) || is_pmd_migration_entry(pmde)) {
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+		if (pmd_leaf(pmde) || is_pmd_migration_entry(pmde)) {
 			pvmw->ptl = pmd_lock(mm, pvmw->pmd);
 			pmde = *pvmw->pmd;
-			if (likely(pmd_trans_huge(pmde))) {
+			if (likely(pmd_leaf(pmde))) {
 				if (pvmw->flags & PVMW_MIGRATION)
 					return not_found(pvmw);
-				if (pmd_page(pmde) != page)
+				if (pmd_pfn(pmde) != pfn)
 					return not_found(pvmw);
 				return true;
 			}
@@ -236,20 +252,22 @@ restart:
 					return not_found(pvmw);
 				entry = pmd_to_swp_entry(pmde);
 				if (!is_migration_entry(entry) ||
-				    pfn_swap_entry_to_page(entry) != page)
+				    pfn_swap_entry_to_pfn(entry) != pfn)
 					return not_found(pvmw);
 				return true;
 			}
 			/* THP pmd was split under us: handle on pte level */
 			spin_unlock(pvmw->ptl);
 			pvmw->ptl = NULL;
-		} else if (!pmd_present(pmde)) {
+		} else
+#endif
+		if (!pmd_present(pmde)) {
 			/*
 			 * If PVMW_SYNC, take and drop THP pmd lock so that we
 			 * cannot return prematurely, while zap_huge_pmd() has
 			 * cleared *pmd but not decremented compound_mapcount().
 			 */
-			if ((pvmw->flags & PVMW_SYNC) &&
+			if ((pvmw->flags & PVMW_SYNC) && page &&
 			    PageTransCompound(page)) {
 				spinlock_t *ptl = pmd_lock(mm, pvmw->pmd);
 
