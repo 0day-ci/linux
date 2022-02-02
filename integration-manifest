@@ -1,0 +1,28 @@
+drm drm-fixes 26291c54e111ff6ba87a164d85d4a4e134b7315c
+	Linux 5.17-rc2
+drm-misc drm-misc-fixes a3f781a9d6114c1d1e01defb7aa234dec45d2a5f
+	fbcon: Add option to enable legacy hardware acceleration
+drm-intel drm-intel-fixes 7d73c602154df56802a9e75ac212505fc1e9a2b6
+	drm/i915/pmu: Fix KMD and GuC race on accessing busyness
+drm drm-next 53dbee4926d3706ca9e03f3928fa85b5ec3bc0cc
+	Merge tag 'drm-misc-next-2022-01-27' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes d3cbc6e323c9299d10c8d2e4127c77c7d05d07b1
+	drm: panel-orientation-quirks: Add quirk for the 1Netbook OneXPlayer
+drm-intel drm-intel-next-fixes e26602be4869c74dd8a0f66f718b8a0ce120edb4
+	drm/i915/display/adlp: Implement new step in the TC voltage swing prog sequence
+drm-misc drm-misc-next 3f1a31ff8e3f6654d2b03a34095ca1658e4cfd77
+	drm/vmwgfx: remove vmw_wait_dma_fence
+drm-intel drm-intel-next 22ba60f617bd1cfbfae72f73c93ef9507a305c59
+	drm/i915: Move [more] GT registers to their own header file
+drm-intel drm-intel-gt-next 86df4141869350edaa53fb994b3db2c2cca5065d
+	drm/i915: Introduce G12 subplatform of DG2
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
