@@ -25,6 +25,16 @@ config OF_UNITTEST
 
 	  If unsure, say N here, but this option is safe to enable.
 
+config OF_UNITTEST_SHOW_PASS
+	bool "Device Tree runtime unit tests, report each pass"
+	depends on OF_UNITTEST
+	help
+	  The messages reporting an individual test pass are normally
+	  printed at loglevel KERN_DEBUG.  Enable this option to print
+	  the PASS messages at the same loglevel as the FAIL messages.
+
+	  If unsure, say N here, but this option is safe to enable.
+
 config OF_ALL_DTBS
 	bool "Build all Device Tree Blobs"
 	depends on COMPILE_TEST

@@ -44,7 +44,10 @@ static struct unittest_results {
 		pr_err("FAIL %s():%i " fmt, __func__, __LINE__, ##__VA_ARGS__); \
 	} else { \
 		unittest_results.passed++; \
-		pr_debug("pass %s():%i\n", __func__, __LINE__); \
+		if (IS_ENABLED(CONFIG_OF_UNITTEST_SHOW_PASS)) \
+			pr_err("pass %s():%i\n", __func__, __LINE__); \
+		else \
+			pr_debug("pass %s():%i\n", __func__, __LINE__); \
 	} \
 	failed; \
 })
