@@ -70,6 +70,7 @@ static inline pte_t arch_make_huge_pte(pte_t entry, unsigned int shift, vm_flags
 {
 	size_t size = 1UL << shift;
 
+	entry = pte_mkhuge(entry);
 	if (size == SZ_16K)
 		return __pte(pte_val(entry) & ~_PAGE_HUGE);
 	else
