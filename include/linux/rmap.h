@@ -239,6 +239,9 @@ bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw);
  */
 unsigned long page_address_in_vma(struct page *, struct vm_area_struct *);
 
+int pfn_mkclean_range(unsigned long pfn, int npfn, pgoff_t pgoff,
+		      struct vm_area_struct *vma);
+
 /*
  * Cleans the PTEs of shared mappings.
  * (and since clean PTEs should also be readonly, write protects them too)

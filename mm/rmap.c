@@ -928,34 +928,33 @@ int page_referenced(struct page *page,
 	return pra.referenced;
 }
 
-static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
-			    unsigned long address, void *arg)
+static int page_vma_mkclean_one(struct page_vma_mapped_walk *pvmw)
 {
-	struct page_vma_mapped_walk pvmw = {
-		.page = page,
-		.vma = vma,
-		.address = address,
-		.flags = PVMW_SYNC,
-	};
+	int cleaned = 0;
+	struct vm_area_struct *vma = pvmw->vma;
 	struct mmu_notifier_range range;
-	int *cleaned = arg;
+	unsigned long end;
+
+	if (pvmw->flags & PVMW_PFN_WALK)
+		end = vma_pgoff_address_end(pvmw->index, pvmw->nr, vma);
+	else
+		end = vma_address_end(pvmw->page, vma);
 
 	/*
 	 * We have to assume the worse case ie pmd for invalidation. Note that
 	 * the page can not be free from this function.
 	 */
-	mmu_notifier_range_init(&range, MMU_NOTIFY_PROTECTION_PAGE,
-				0, vma, vma->vm_mm, address,
-				vma_address_end(page, vma));
+	mmu_notifier_range_init(&range, MMU_NOTIFY_PROTECTION_PAGE, 0, vma,
+				vma->vm_mm, pvmw->address, end);
 	mmu_notifier_invalidate_range_start(&range);
 
-	while (page_vma_mapped_walk(&pvmw)) {
+	while (page_vma_mapped_walk(pvmw)) {
 		int ret = 0;
+		unsigned long address = pvmw->address;
 
-		address = pvmw.address;
-		if (pvmw.pte) {
+		if (pvmw->pte) {
 			pte_t entry;
-			pte_t *pte = pvmw.pte;
+			pte_t *pte = pvmw->pte;
 
 			if (!pte_dirty(*pte) && !pte_write(*pte))
 				continue;
@@ -968,7 +967,7 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 			ret = 1;
 		} else {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-			pmd_t *pmd = pvmw.pmd;
+			pmd_t *pmd = pvmw->pmd;
 			pmd_t entry;
 
 			if (!pmd_dirty(*pmd) && !pmd_write(*pmd))
@@ -995,10 +994,26 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 		 * See Documentation/vm/mmu_notifier.rst
 		 */
 		if (ret)
-			(*cleaned)++;
+			cleaned++;
 	}
 
 	mmu_notifier_invalidate_range_end(&range);
+
+	return cleaned;
+}
+
+static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
+			    unsigned long address, void *arg)
+{
+	struct page_vma_mapped_walk pvmw = {
+		.page		= page,
+		.vma		= vma,
+		.address	= address,
+		.flags		= PVMW_SYNC,
+	};
+	int *cleaned = arg;
+
+	*cleaned += page_vma_mkclean_one(&pvmw);
 
 	return true;
 }
@@ -1035,6 +1050,39 @@ int folio_mkclean(struct folio *folio)
 	return cleaned;
 }
 EXPORT_SYMBOL_GPL(folio_mkclean);
+
+/**
+ * pfn_mkclean_range - Cleans the PTEs (including PMDs) mapped with range of
+ *                     [@pfn, @pfn + @npfn) at the specific offset (@pgoff)
+ *                     within the @vma of shared mappings. And since clean PTEs
+ *                     should also be readonly, write protects them too.
+ * @pfn: start pfn.
+ * @npfn: number of physically contiguous pfns srarting with @pfn.
+ * @pgoff: page offset that the @pfn mapped with.
+ * @vma: vma that @pfn mapped within.
+ *
+ * Returns the number of cleaned PTEs (including PMDs).
+ */
+int pfn_mkclean_range(unsigned long pfn, int npfn, pgoff_t pgoff,
+		      struct vm_area_struct *vma)
+{
+	unsigned long address = vma_pgoff_address(pgoff, npfn, vma);
+	struct page_vma_mapped_walk pvmw = {
+		.pfn		= pfn,
+		.nr		= npfn,
+		.index		= pgoff,
+		.vma		= vma,
+		.address	= address,
+		.flags		= PVMW_SYNC | PVMW_PFN_WALK,
+	};
+
+	if (invalid_mkclean_vma(vma, NULL))
+		return 0;
+
+	VM_BUG_ON_VMA(address == -EFAULT, vma);
+
+	return page_vma_mkclean_one(&pvmw);
+}
 
 /**
  * page_move_anon_rmap - move a page to our anon_vma
