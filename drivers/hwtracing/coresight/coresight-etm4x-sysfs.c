@@ -707,10 +707,11 @@ static ssize_t bb_ctrl_store(struct device *dev,
 	 * individual range comparators. If include then at least 1
 	 * range must be selected.
 	 */
-	if ((val & BIT(8)) && (BMVAL(val, 0, 7) == 0))
+	if ((val & TRCBBCTLR_MODE) && (REG_VAL(val, TRCBBCTLR_RANGE) == 0))
 		return -EINVAL;
 
-	config->bb_ctrl = val & GENMASK(8, 0);
+	config->bb_ctrl = val & (TRCBBCTLR_MODE |
+				 (TRCBBCTLR_RANGE_MASK << TRCBBCTLR_RANGE_SHIFT));
 	return size;
 }
 static DEVICE_ATTR_RW(bb_ctrl);
