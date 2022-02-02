@@ -148,7 +148,11 @@ static int intel_lpss_acpi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	info->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	info->irq = platform_get_irq(pdev, 0);
+	ret = platform_get_irq(pdev, 0);
+	if (ret < 0)
+		return ret;
+
+	info->irq = ret;
 
 	ret = intel_lpss_probe(&pdev->dev, info);
 	if (ret)
