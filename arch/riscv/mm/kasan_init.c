@@ -61,13 +61,10 @@ static void __init kasan_populate_pmd(pud_t *pud, unsigned long vaddr, unsigned 
 	pmd_t *pmdp, *base_pmd;
 	unsigned long next;
 
-	if (pud_none(*pud)) {
+	if (pud_none(*pud) || kasan_pmd_table(*pud))
 		base_pmd = memblock_alloc(PTRS_PER_PMD * sizeof(pmd_t), PAGE_SIZE);
-	} else {
+	else
 		base_pmd = (pmd_t *)pud_pgtable(*pud);
-		if (base_pmd == lm_alias(kasan_early_shadow_pmd))
-			base_pmd = memblock_alloc(PTRS_PER_PMD * sizeof(pmd_t), PAGE_SIZE);
-	}
 
 	pmdp = base_pmd + pmd_index(vaddr);
 
@@ -112,9 +109,10 @@ static void __init kasan_populate_pud(pgd_t *pgd,
 		 */
 		base_pud = pt_ops.get_pud_virt(pfn_to_phys(_pgd_pfn(*pgd)));
 	} else {
-		base_pud = (pud_t *)pgd_page_vaddr(*pgd);
-		if (base_pud == lm_alias(kasan_early_shadow_pud))
+		if (kasan_pud_table(*pgd))
 			base_pud = memblock_alloc(PTRS_PER_PUD * sizeof(pud_t), PAGE_SIZE);
+		else
+			base_pud = (pud_t *)pgd_page_vaddr(*pgd);
 	}
 
 	pudp = base_pud + pud_index(vaddr);
@@ -157,6 +155,11 @@ static void __init kasan_populate_pud(pgd_t *pgd,
 			kasan_populate_pud(pgdp, vaddr, next, early) :		\
 			kasan_populate_pmd((pud_t *)pgdp, vaddr, next))
 
+static inline bool kasan_pgd_next_table(pgd_t pgd)
+{
+	return pgd_page(pgd) == virt_to_page(lm_alias(kasan_early_shadow_pgd_next));
+}
+
 static void __init kasan_populate_pgd(pgd_t *pgdp,
 				      unsigned long vaddr, unsigned long end,
 				      bool early)
@@ -172,8 +175,7 @@ static void __init kasan_populate_pgd(pgd_t *pgdp,
 				phys_addr = __pa((uintptr_t)kasan_early_shadow_pgd_next);
 				set_pgd(pgdp, pfn_pgd(PFN_DOWN(phys_addr), PAGE_TABLE));
 				continue;
-			} else if (pgd_page_vaddr(*pgdp) ==
-				   (unsigned long)lm_alias(kasan_early_shadow_pgd_next)) {
+			} else if (kasan_pgd_next_table(*pgdp)) {
 				/*
 				 * pgdp can't be none since kasan_early_init
 				 * initialized all KASAN shadow region with
@@ -251,7 +253,6 @@ static void __init kasan_shallow_populate_pud(pgd_t *pgdp,
 	unsigned long next;
 	pud_t *pudp, *base_pud;
 	pmd_t *base_pmd;
-	bool is_kasan_pmd;
 
 	base_pud = (pud_t *)pgd_page_vaddr(*pgdp);
 	pudp = base_pud + pud_index(vaddr);
@@ -262,9 +263,8 @@ static void __init kasan_shallow_populate_pud(pgd_t *pgdp,
 
 	do {
 		next = pud_addr_end(vaddr, end);
-		is_kasan_pmd = (pud_pgtable(*pudp) == lm_alias(kasan_early_shadow_pmd));
 
-		if (is_kasan_pmd) {
+		if (kasan_pmd_table(*pudp)) {
 			base_pmd = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
 			set_pud(pudp, pfn_pud(PFN_DOWN(__pa(base_pmd)), PAGE_TABLE));
 		}
@@ -280,8 +280,7 @@ static void __init kasan_shallow_populate_pgd(unsigned long vaddr, unsigned long
 
 	do {
 		next = pgd_addr_end(vaddr, end);
-		is_kasan_pgd_next = (pgd_page_vaddr(*pgd_k) ==
-				     (unsigned long)lm_alias(kasan_early_shadow_pgd_next));
+		is_kasan_pgd_next = kasan_pgd_next_table(*pgd_k);
 
 		if (is_kasan_pgd_next) {
 			p = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
