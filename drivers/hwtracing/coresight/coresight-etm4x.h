@@ -246,6 +246,11 @@
 #define TRCACATRn_CONTEXT_MASK			GENMASK(2, 0)
 #define TRCACATRn_EXLEVEL_SHIFT			8
 #define TRCACATRn_EXLEVEL_MASK			GENMASK(6, 0)
+
+#define TRCSSCSRn_STATUS			BIT(31)
+#define TRCSSCCRn_SAC_ARC_RST_SHIFT		0
+#define TRCSSCCRn_SAC_ARC_RST_MASK		GENMASK(24, 0)
+
 /*
  * System instructions to access ETM registers.
  * See ETMv4.4 spec ARM IHI0064F section 4.3.6 System instructions
