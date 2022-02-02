@@ -24,6 +24,8 @@ void pci_set_of_node(struct pci_dev *dev)
 						    dev->devfn);
 	if (dev->dev.of_node)
 		dev->dev.fwnode = &dev->dev.of_node->fwnode;
+
+	pci_set_untrusted(dev);
 }
 
 void pci_release_of_node(struct pci_dev *dev)

@@ -761,4 +761,6 @@ static inline pci_power_t mid_pci_get_power_state(struct pci_dev *pdev)
 }
 #endif
 
+void pci_set_untrusted(struct pci_dev *pdev);
+
 #endif /* DRIVERS_PCI_H */

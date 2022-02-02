@@ -6869,3 +6869,12 @@ static int __init pci_realloc_setup_params(void)
 	return 0;
 }
 pure_initcall(pci_realloc_setup_params);
+
+void pci_set_untrusted(struct pci_dev *pdev)
+{
+	u8 val;
+
+	if (!device_property_read_u8(&pdev->dev, "UntrustedDevice", &val)
+	    && val)
+		pdev->untrusted = 1;
+}
