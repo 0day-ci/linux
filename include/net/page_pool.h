@@ -142,6 +142,9 @@ struct page_pool {
  * stats for tracking page_pool events.
  */
 struct page_pool_stats {
+	struct {
+		u64 fast; /* fast path allocations */
+	} alloc;
 };
 
 DECLARE_PER_CPU_ALIGNED(struct page_pool_stats, page_pool_stats);
