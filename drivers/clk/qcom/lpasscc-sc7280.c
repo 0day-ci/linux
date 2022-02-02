@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/clk-provider.h>
@@ -23,7 +23,7 @@ static struct clk_branch lpass_q6ss_ahbm_clk = {
 	.clkr = {
 		.enable_reg = 0x1c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "lpass_q6ss_ahbm_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -36,7 +36,7 @@ static struct clk_branch lpass_q6ss_ahbs_clk = {
 	.clkr = {
 		.enable_reg = 0x20,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "lpass_q6ss_ahbs_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -49,7 +49,7 @@ static struct clk_branch lpass_top_cc_lpi_q6_axim_hs_clk = {
 	.clkr = {
 		.enable_reg = 0x0,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "lpass_top_cc_lpi_q6_axim_hs_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -63,7 +63,7 @@ static struct clk_branch lpass_qdsp6ss_core_clk = {
 	.clkr = {
 		.enable_reg = 0x20,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "lpass_qdsp6ss_core_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -77,7 +77,7 @@ static struct clk_branch lpass_qdsp6ss_xo_clk = {
 	.clkr = {
 		.enable_reg = 0x38,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "lpass_qdsp6ss_xo_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -91,7 +91,7 @@ static struct clk_branch lpass_qdsp6ss_sleep_clk = {
 	.clkr = {
 		.enable_reg = 0x3c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "lpass_qdsp6ss_sleep_clk",
 			.ops = &clk_branch2_ops,
 		},

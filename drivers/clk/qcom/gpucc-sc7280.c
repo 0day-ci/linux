@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/clk-provider.h>
@@ -36,10 +36,10 @@ static struct clk_alpha_pll gpu_cc_pll0 = {
 	.num_vco = ARRAY_SIZE(lucid_vco),
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_LUCID],
 	.clkr = {
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_pll0",
 			.parent_data = &(const struct clk_parent_data){
-				.fw_name = "bi_tcxo",
+				.index = 0,
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_lucid_ops,
@@ -65,10 +65,10 @@ static struct clk_alpha_pll gpu_cc_pll1 = {
 	.num_vco = ARRAY_SIZE(lucid_vco),
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_LUCID],
 	.clkr = {
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_pll1",
 			.parent_data = &(const struct clk_parent_data){
-				.fw_name = "bi_tcxo",
+				.index = 0,
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_lucid_ops,
@@ -85,11 +85,11 @@ static const struct parent_map gpu_cc_parent_map_0[] = {
 };
 
 static const struct clk_parent_data gpu_cc_parent_data_0[] = {
-	{ .fw_name = "bi_tcxo" },
+	{ .index = 0 },
 	{ .hw = &gpu_cc_pll0.clkr.hw },
 	{ .hw = &gpu_cc_pll1.clkr.hw },
-	{ .fw_name = "gcc_gpu_gpll0_clk_src" },
-	{ .fw_name = "gcc_gpu_gpll0_div_clk_src" },
+	{ .index = 1 }, /* gcc_gpu_gpll0_clk_src */
+	{ .index = 2 }, /* gcc_gpu_gpll0_div_clk_src */
 };
 
 static const struct parent_map gpu_cc_parent_map_1[] = {
@@ -100,10 +100,10 @@ static const struct parent_map gpu_cc_parent_map_1[] = {
 };
 
 static const struct clk_parent_data gpu_cc_parent_data_1[] = {
-	{ .fw_name = "bi_tcxo", },
+	{ .index = 0, },
 	{ .hw = &gpu_cc_pll1.clkr.hw },
-	{ .fw_name = "gcc_gpu_gpll0_clk_src", },
-	{ .fw_name = "gcc_gpu_gpll0_div_clk_src", },
+	{ .index = 1 }, /* gcc_gpu_gpll0_clk_src */
+	{ .index = 2 }, /* gcc_gpu_gpll0_div_clk_src */
 };
 
 static const struct freq_tbl ftbl_gpu_cc_gmu_clk_src[] = {
@@ -119,7 +119,7 @@ static struct clk_rcg2 gpu_cc_gmu_clk_src = {
 	.hid_width = 5,
 	.parent_map = gpu_cc_parent_map_0,
 	.freq_tbl = ftbl_gpu_cc_gmu_clk_src,
-	.clkr.hw.init = &(struct clk_init_data){
+	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "gpu_cc_gmu_clk_src",
 		.parent_data = gpu_cc_parent_data_0,
 		.num_parents = ARRAY_SIZE(gpu_cc_parent_data_0),
@@ -140,7 +140,7 @@ static struct clk_rcg2 gpu_cc_hub_clk_src = {
 	.hid_width = 5,
 	.parent_map = gpu_cc_parent_map_1,
 	.freq_tbl = ftbl_gpu_cc_hub_clk_src,
-	.clkr.hw.init = &(struct clk_init_data){
+	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "gpu_cc_hub_clk_src",
 		.parent_data = gpu_cc_parent_data_1,
 		.num_parents = ARRAY_SIZE(gpu_cc_parent_data_1),
@@ -152,7 +152,7 @@ static struct clk_regmap_div gpu_cc_hub_ahb_div_clk_src = {
 	.reg = 0x11c0,
 	.shift = 0,
 	.width = 4,
-	.clkr.hw.init = &(struct clk_init_data) {
+	.clkr.hw.init = &(const struct clk_init_data) {
 		.name = "gpu_cc_hub_ahb_div_clk_src",
 		.parent_hws = (const struct clk_hw*[]){
 			&gpu_cc_hub_clk_src.clkr.hw,
@@ -167,7 +167,7 @@ static struct clk_regmap_div gpu_cc_hub_cx_int_div_clk_src = {
 	.reg = 0x11bc,
 	.shift = 0,
 	.width = 4,
-	.clkr.hw.init = &(struct clk_init_data) {
+	.clkr.hw.init = &(const struct clk_init_data) {
 		.name = "gpu_cc_hub_cx_int_div_clk_src",
 		.parent_hws = (const struct clk_hw*[]){
 			&gpu_cc_hub_clk_src.clkr.hw,
@@ -184,7 +184,7 @@ static struct clk_branch gpu_cc_ahb_clk = {
 	.clkr = {
 		.enable_reg = 0x1078,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_ahb_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&gpu_cc_hub_ahb_div_clk_src.clkr.hw,
@@ -202,7 +202,7 @@ static struct clk_branch gpu_cc_crc_ahb_clk = {
 	.clkr = {
 		.enable_reg = 0x107c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_crc_ahb_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&gpu_cc_hub_ahb_div_clk_src.clkr.hw,
@@ -220,7 +220,7 @@ static struct clk_branch gpu_cc_cx_gmu_clk = {
 	.clkr = {
 		.enable_reg = 0x1098,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_cx_gmu_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&gpu_cc_gmu_clk_src.clkr.hw,
@@ -238,7 +238,7 @@ static struct clk_branch gpu_cc_cx_snoc_dvm_clk = {
 	.clkr = {
 		.enable_reg = 0x108c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_cx_snoc_dvm_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -251,7 +251,7 @@ static struct clk_branch gpu_cc_cxo_aon_clk = {
 	.clkr = {
 		.enable_reg = 0x1004,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_cxo_aon_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -264,7 +264,7 @@ static struct clk_branch gpu_cc_cxo_clk = {
 	.clkr = {
 		.enable_reg = 0x109c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_cxo_clk",
 			.ops = &clk_branch2_aon_ops,
 		},
@@ -277,7 +277,7 @@ static struct clk_branch gpu_cc_gx_gmu_clk = {
 	.clkr = {
 		.enable_reg = 0x1064,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_gx_gmu_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&gpu_cc_gmu_clk_src.clkr.hw,
@@ -295,7 +295,7 @@ static struct clk_branch gpu_cc_hlos1_vote_gpu_smmu_clk = {
 	.clkr = {
 		.enable_reg = 0x5000,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_hlos1_vote_gpu_smmu_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -308,7 +308,7 @@ static struct clk_branch gpu_cc_hub_aon_clk = {
 	.clkr = {
 		.enable_reg = 0x1178,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_hub_aon_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&gpu_cc_hub_clk_src.clkr.hw,
@@ -326,7 +326,7 @@ static struct clk_branch gpu_cc_hub_cx_int_clk = {
 	.clkr = {
 		.enable_reg = 0x1204,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_hub_cx_int_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&gpu_cc_hub_cx_int_div_clk_src.clkr.hw,
@@ -344,7 +344,7 @@ static struct clk_branch gpu_cc_mnd1x_0_gfx3d_clk = {
 	.clkr = {
 		.enable_reg = 0x802c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_mnd1x_0_gfx3d_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -357,7 +357,7 @@ static struct clk_branch gpu_cc_mnd1x_1_gfx3d_clk = {
 	.clkr = {
 		.enable_reg = 0x8030,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_mnd1x_1_gfx3d_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -370,7 +370,7 @@ static struct clk_branch gpu_cc_sleep_clk = {
 	.clkr = {
 		.enable_reg = 0x1090,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "gpu_cc_sleep_clk",
 			.ops = &clk_branch2_ops,
 		},

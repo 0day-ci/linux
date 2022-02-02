@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/clk-provider.h>
@@ -45,10 +45,10 @@ static struct clk_alpha_pll video_pll0 = {
 	.num_vco = ARRAY_SIZE(lucid_vco),
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_LUCID],
 	.clkr = {
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_pll0",
 			.parent_data = &(const struct clk_parent_data){
-				.fw_name = "bi_tcxo",
+				.index = 0,
 			},
 			.num_parents = 1,
 			.ops = &clk_alpha_pll_lucid_ops,
@@ -62,7 +62,7 @@ static const struct parent_map video_cc_parent_map_0[] = {
 };
 
 static const struct clk_parent_data video_cc_parent_data_0[] = {
-	{ .fw_name = "bi_tcxo" },
+	{ .index = 0 },
 	{ .hw = &video_pll0.clkr.hw },
 };
 
@@ -89,7 +89,7 @@ static struct clk_rcg2 video_cc_iris_clk_src = {
 	.hid_width = 5,
 	.parent_map = video_cc_parent_map_0,
 	.freq_tbl = ftbl_video_cc_iris_clk_src,
-	.clkr.hw.init = &(struct clk_init_data){
+	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "video_cc_iris_clk_src",
 		.parent_data = video_cc_parent_data_0,
 		.num_parents = ARRAY_SIZE(video_cc_parent_data_0),
@@ -109,7 +109,7 @@ static struct clk_rcg2 video_cc_sleep_clk_src = {
 	.hid_width = 5,
 	.parent_map = video_cc_parent_map_1,
 	.freq_tbl = ftbl_video_cc_sleep_clk_src,
-	.clkr.hw.init = &(struct clk_init_data){
+	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "video_cc_sleep_clk_src",
 		.parent_data = video_cc_parent_data_1,
 		.num_parents = ARRAY_SIZE(video_cc_parent_data_1),
@@ -123,7 +123,7 @@ static struct clk_branch video_cc_iris_ahb_clk = {
 	.clkr = {
 		.enable_reg = 0x5004,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_iris_ahb_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&video_cc_iris_clk_src.clkr.hw,
@@ -141,7 +141,7 @@ static struct clk_branch video_cc_mvs0_axi_clk = {
 	.clkr = {
 		.enable_reg = 0x800c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_mvs0_axi_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -156,7 +156,7 @@ static struct clk_branch video_cc_mvs0_core_clk = {
 	.clkr = {
 		.enable_reg = 0x3010,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_mvs0_core_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&video_cc_iris_clk_src.clkr.hw,
@@ -174,7 +174,7 @@ static struct clk_branch video_cc_mvsc_core_clk = {
 	.clkr = {
 		.enable_reg = 0x2014,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_mvsc_core_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&video_cc_iris_clk_src.clkr.hw,
@@ -192,7 +192,7 @@ static struct clk_branch video_cc_mvsc_ctl_axi_clk = {
 	.clkr = {
 		.enable_reg = 0x8004,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_mvsc_ctl_axi_clk",
 			.ops = &clk_branch2_ops,
 		},
@@ -205,7 +205,7 @@ static struct clk_branch video_cc_sleep_clk = {
 	.clkr = {
 		.enable_reg = 0x7034,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_sleep_clk",
 			.parent_hws = (const struct clk_hw*[]){
 				&video_cc_sleep_clk_src.clkr.hw,
@@ -223,7 +223,7 @@ static struct clk_branch video_cc_venus_ahb_clk = {
 	.clkr = {
 		.enable_reg = 0x801c,
 		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data){
+		.hw.init = &(const struct clk_init_data){
 			.name = "video_cc_venus_ahb_clk",
 			.ops = &clk_branch2_ops,
 		},
