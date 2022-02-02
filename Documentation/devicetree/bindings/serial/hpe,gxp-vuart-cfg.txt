@@ -1,0 +1,17 @@
+*HPE Virtual UART Controller CONFIGURATION
+
+This controller is used to forward host serial to BMC chip
+
+Required properties:
+
+- compatible : Must contain "hpe,gxp-vuarta_cfg", "simple-mfd", "syscon".
+- reg : Specifies base physical address and size of the configuration register.
+- reg-io-width: io register width in bytes, must be 1.
+
+Example:
+
+	vuart_a_cfg: vuarta_cfg@80fc0230 {
+		compatible = "hpe,gxp-vuarta_cfg", "simple-mfd", "syscon";
+		reg = <0x80fc0230 0x100>;
+		reg-io-width = <1>;
+	};

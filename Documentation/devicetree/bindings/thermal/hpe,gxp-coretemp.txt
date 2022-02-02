@@ -1,0 +1,14 @@
+* HPE GXP CORETEMP INTERFACE
+
+Required parent device properties:
+- compatible : Should be "hpe,gxp-coretemp".
+- reg : Specifies base physical address and size of the control register.
+
+Example:
+
+	coretemp: coretemp@c0000130 {
+		compatible = "hpe,gxp-coretemp";
+		reg = <0xc0000130 0x8>;
+	};
+
+

@@ -1,0 +1,76 @@
+* HPE GXP SPI FLASH INTERFACE
+
+Required properties:
+  - compatible : Must contain: "hpe,gxp-spifi"
+  - reg : the first contains the control register location and length,
+          the second contains the memory window mapping address and length,
+		  the third contains the configuration register location and length
+  - interrupts: The interrupt number.
+  - #address-cells : must be 1 corresponding to chip select child binding
+  - #size-cells : must be 0 corresponding to chip select child binding
+
+The child nodes are the SPI flash modules which must have a compatible
+property as specified in bindings/mtd/jedec,spi-nor.txt
+
+Example:
+	spifi0: spifi@c0000200 {
+		compatible = "hpe,gxp-spifi";
+		reg = <0xc0000200 0x80>, <0xc000c000 0x100>, <0xf8000000 0x8000000>;
+		interrupts = <20>;
+		interrupt-parent = <&vic0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		flash@0 {
+			compatible = "jedec,spi-nor";
+			reg = <0>;
+			partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				u-boot@0 {
+					label = "u-boot";
+					reg = <0x0 0x60000>;
+				};
+				u-boot-env@60000 {
+					label = "u-boot-env";
+					reg = <0x60000 0x20000>;
+				};
+				kernel@80000 {
+					label = "kernel";
+					reg = <0x80000 0x4c0000>;
+				};
+				rofs@540000 {
+					label = "rofs";
+					reg = <0x540000 0x1740000>;
+				};
+				rwfs@1c80000 {
+					label = "rwfs";
+					reg = <0x1c80000 0x250000>;
+				};
+				section@1edf000{
+					label = "section";
+					reg = <0x1ed0000 0x130000>;
+				};
+			};
+		};
+
+		flash@1 {
+			compatible = "jedec,spi-nor";
+			reg = <1>;
+			partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				host-prime@0 {
+					label = "host-prime";
+					reg = <0x0 0x02000000>;
+				};
+				host-second@2000000 {
+					label = "host-second";
+					reg = <0x02000000 0x02000000>;
+				};
+			};
+		};
+	};

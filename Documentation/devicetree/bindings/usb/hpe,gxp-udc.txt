@@ -1,0 +1,21 @@
+* HPE USB Device Port Controller
+
+Required properties:
+- compatible: Must be "hpe,gxp-udc".
+- reg: Specifies base physical address and size of the registers.
+- interrupts: The interrupt number.
+- vdevnum: The particular usb device controller port.
+- fepnum: The particular usb device controller options.
+- udcg-handle: The usb device controller hub.
+
+Example:
+
+	udc0: udc@80401000 {
+		compatible = "hpe,gxp-udc";
+		reg = <0x80401000 0x1000>;
+		interrupts = <13>;
+		interrupt-parent = <&vic1>;
+		vdevnum = <0>;
+		fepnum = <7>;
+		udcg-handle = <&udcg>;
+	};

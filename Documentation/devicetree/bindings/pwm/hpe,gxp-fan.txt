@@ -1,0 +1,15 @@
+* HPE GXP Fan Controller
+
+Required properties:
+- compatible: Must contain "hpe,gxp-fan-ctrl".
+- reg: Physical base address and length of the controller's registers.
+- xreg_handle: Phandle to the xregister controller for fan control.
+- fn2_handle: Phandle to the FN2 interface.
+
+Example:
+	fanctrl: fanctrl@c1000c00 {
+			compatible = "hpe,gxp-fan-ctrl";
+			reg = <0xc1000c00 0x200>;
+			xreg_handle = <&xreg>;
+			fn2_handle = <&fn2>;
+	};

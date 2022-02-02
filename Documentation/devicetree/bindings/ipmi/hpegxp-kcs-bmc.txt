@@ -1,0 +1,21 @@
+* HPE GXP KCS IPMI DRIVER
+
+Required properties:
+- compatible : Must contain "hpe,gxp-kcs-bmc".
+- interrupts : The interrupt number.
+- reg : Specifies base physical address and size of the control registers.
+- kcs_chan : The KCS channel number in the controller.
+- status: The status signal from the controller.
+- kcs-bmc-cfg = Phandle to the KCS Configuration registers.
+
+Example:
+
+	kcs_reg: kcs_reg@80fd0400 {
+		compatible = "hpe,gxp-kcs-bmc";
+		reg = <0x80fd0400 0x8>;
+		interrupts = <6>;
+		interrupt-parent = <&vic1>;
+		kcs_chan = <1>;
+		status = "okay";
+		kcs-bmc-cfg = <&kcs_conf>;
+	};

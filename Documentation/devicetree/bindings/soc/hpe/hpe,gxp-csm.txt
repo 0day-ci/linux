@@ -1,0 +1,14 @@
+* HPE GXP PCI CSM INTERFACE
+
+Required parent device properties:
+- compatible : Should be "hpe,gxp-csm", "simple-mfd", "syscon".
+- reg : Specifies base physical address and size of control registers.
+
+Example:
+
+	csm: csm@8000005c {
+		compatible = "hpe,gxp-csm", "simple-mfd", "syscon";
+		reg = <0x8000005c 0x2>, <0x800000de 0x1>, <0x800000e7 0x1>;
+	};
+
+

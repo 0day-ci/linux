@@ -1,0 +1,21 @@
+* HPE GXP UMAC MDIO Interface Controller
+
+Required properties:
+- compatible: Must contain "hpe,gxp-umac-mdio".
+- reg:  Specifies base physical address and size of the registers.
+- interrupts: The interrupt number.
+- Cells which are configuring the external phy interfaces. Numbered through relative addressing each phy is compatible with a standard ethernet-phy-ieee802.3 phy.
+
+Example:
+
+	mdio0: mdio@c0004080 {
+		compatible = "hpe,gxp-umac-mdio";
+		reg = <0xc0004080 0x10>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		ext_phy0: ethernt-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			phy-mode = "sgmii";
+			reg = <0>;
+		};
+	};

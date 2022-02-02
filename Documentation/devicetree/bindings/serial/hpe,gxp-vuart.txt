@@ -1,0 +1,23 @@
+*HPE VUART Controller port
+
+Required properties:
+
+- compatible :  Must contain "hpe,gxp-vuart".
+- reg        :  Specifies base physical address and size of the registers.
+- interrupts :  The interrupt number.
+- clock-frequency: The frequency of the clock input to the UART in Hz.
+- status: The status signal from the controller.
+
+Example:
+
+	vuart_a: vuart_a@80fd0200 {
+		compatible = "hpe,gxp-vuart";
+		reg = <0x80fd0200 0x100>;
+		interrupts = <2>;
+		interrupt-parent = <&vic1>;
+		clock-frequency = <1846153>;
+		reg-shift = <0>;
+		status = "okay";
+		serial-line = <3>;
+		vuart_cfg = <&vuart_a_cfg>;
+	};

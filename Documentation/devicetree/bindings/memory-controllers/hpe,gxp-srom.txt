@@ -1,0 +1,13 @@
+* HPE GXP SROM CONTROLLER
+
+Required properties:
+
+- compatible: Must be one of "hpe,gxp-srom", "simple-mfd", "syscon".
+- reg: Specifies base physical address and size of the control registers.
+
+Example:
+
+	srom@80fc0000 {
+		compatible = "hpe,gxp-srom", "simple-mfd", "syscon";
+		reg = <0x80fc0000 0x100>;
+	};

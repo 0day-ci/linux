@@ -1,0 +1,19 @@
+* HPE GXP I2C Interface
+
+Required Properties:
+
+  - compatible: Must be "hpe,gxp-i2c"
+  - reg: The I2C address of the device.
+  - interrupts: The interrupt number.
+  - interrupt-parent: Interrupt controller to which the I2C bus is reporting
+  - i2cg-handle: I2C Global interrupt status register handler
+
+Example:
+
+	i2c0: i2c@c0002000 {
+		compatible = "hpe,gxp-i2c";
+		reg = <0xc0002000 0x70>;
+		interrupts = <9>;
+		interrupt-parent = <&vic0>;
+		i2cg-handle = <&i2cg>;
+	};

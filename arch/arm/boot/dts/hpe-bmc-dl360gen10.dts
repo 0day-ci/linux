@@ -1,0 +1,207 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device Tree file for HPE DL360Gen10
+ */
+
+/include/ "hpe-gxp.dtsi"
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	compatible = "hpe,gxp";
+	model = "Hewlett Packard Enterprise ProLiant dl360 Gen10";
+
+	chosen {
+		bootargs = "earlyprintk console=ttyS0,115200 user_debug=31";
+	};
+
+	aliases {
+		ethernet0 = &umac0;
+		ethernet1 = &umac1;
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0x40000000 0x20000000>;
+	};
+
+	ahb {
+		umac0: umac@c0004000 {
+			mac-address = [94 18 82 16 04 d8];
+		};
+
+		umac1: umac@c0005000 {
+			mac-address = [94 18 82 16 04 d9];
+		};
+
+		udc0: udc@80401000 {
+			compatible = "hpe,gxp-udc";
+			reg = <0x80401000 0x1000>;
+			interrupts = <13>;
+			interrupt-parent = <&vic1>;
+			vdevnum = <0>;
+			fepnum = <7>;
+			udcg-handle = <&udcg>;
+		};
+
+		udc1: udc@80402000 {
+			compatible = "hpe,gxp-udc";
+			reg = <0x80402000 0x1000>;
+			interrupts = <13>;
+			interrupt-parent = <&vic1>;
+			vdevnum = <1>;
+			fepnum = <7>;
+			udcg-handle = <&udcg>;
+		};
+
+		udc2: udc@80403000 {
+			compatible = "hpe,gxp-udc";
+			reg = <0x80403000 0x1000>;
+			interrupts = <13>;
+			interrupt-parent = <&vic1>;
+			vdevnum = <2>;
+			fepnum = <4>;
+			udcg-handle = <&udcg>;
+		};
+
+		fn2: fn2@80200000 {
+			gpio-line-names =
+				"POWER_OUT", "PS_PWROK", "PCIERST", "POST_COMPLETE", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "",
+				"", "", "", "";
+		};
+
+		xreg: xreg@d1000300 {
+			gpio-line-names =
+				"", "", "", "", "", "", "POWER", "HEARTBEAT", "FAN1_INST",
+				"FAN2_INST","FAN3_INST", "FAN4_INST", "FAN5_INST",
+				"FAN6_INST", "FAN7_INST", "FAN8_INST", "FAN9_INST",
+				"FAN10_INST", "FAN11_INST", "FAN12_INST","FAN13_INST",
+				"FAN14_INST", "FAN15_INST", "FAN16_INST", "FAN1_FAIL",
+				"FAN2_FAIL", "FAN3_FAIL", "FAN4_FAIL", "FAN5_FAIL",
+				"FAN6_FAIL", "FAN7_FAIL", "FAN8_FAIL", "FAN9_FAIL",
+				"FAN10_FAIL", "FAN11_FAIL", "FAN12_FAIL", "FAN13_FAIL",
+				"FAN14_FAIL", "FAN15_FAIL", "FAN16_FAIL","", "", "", "",
+				"", "", "", "", "", "", "", "", "", "", "", "", "IDENTIFY",
+				"HEALTH_RED", "HEALTH_AMBER", "POWER_BUTTON", "",
+				"SIO_POWER_GOOD", "NMI_BUTTON", "RESET_BUTTON", "SIO_S5",
+				"SIO_ONCONTROL", "", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "", "", "", "", "",
+				"", "", "", "", "", "", "", "", "", "";
+		};
+
+		i2c2: i2c@c0002200 {
+			24c02@50 {
+				compatible = "atmel,24c02";
+				pagesize = <8>;
+				reg = <0x50>;
+			};
+		};
+	};
+
+	vuhc: vuhc {
+		compatible = "gpio-keys-polled";
+		poll-interval = <100>;
+
+		PortOwner0 {
+			label = "Port Owner";
+			linux,code = <200>;
+			gpios = <&gpio 250 1>;
+		};
+
+		PortOwner1 {
+			label = "Port Owner";
+			linux,code = <201>;
+			gpios = <&gpio 251 1>;
+		};
+
+		PortOwner2 {
+			label = "Port Owner";
+			linux,code = <202>;
+			gpios = <&gpio 252 1>;
+		};
+	};
+
+	gpio: gpio {
+		gpio-line-names =
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "RESET_OUT", "NMI_OUT", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "", "";
+	};
+
+	xreg_keys: xreg_keys {
+		compatible = "gpio-keys-polled";
+		poll-interval = <100>;
+
+		IdButton {
+			label = "ID Button";
+			linux,code = <200>;
+			gpios = <&xreg 60 1>;
+		};
+	};
+
+	leds: leds {
+		compatible = "gpio-leds";
+
+		power {
+			gpios = <&xreg 6 0>;
+			default-state = "off";
+		};
+
+		heartbeat {
+			gpios = <&xreg 7 0>;
+			default-state = "off";
+		};
+
+		identify {
+			gpios = <&xreg 56 0>;
+			default-state = "off";
+		};
+
+		health_red {
+			gpios = <&xreg 57 0>;
+			default-state = "off";
+		};
+
+		health_amber {
+			gpios = <&xreg 58 0>;
+			default-state = "off";
+		};
+	};
+
+};

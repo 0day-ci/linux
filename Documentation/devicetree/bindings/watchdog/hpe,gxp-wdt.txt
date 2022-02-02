@@ -1,0 +1,11 @@
+* HPE GXP Controlled Watchdog
+
+Required Properties:
+- compatible: Should contain "hpe,gxp-wdt".
+- reg: The GXP Watchdog Control Registers (Addresses + size) tuples list.
+
+Example:
+	watchdog: watchdog@c0000090 {
+		compatible = "hpe,gxp-wdt";
+		reg = <0xc0000090 0x02>, <0xc0000096 0x01>;
+	};

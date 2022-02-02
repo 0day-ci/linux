@@ -1,0 +1,20 @@
+* HPE GXP UMAC Controller
+
+Required properties:
+- compatible: Must contain "hpe,gxp-umac".
+- reg:  Specifies base physical address and size of the registers.
+- interrupts: The interrupt number.
+- interrupt-parent: specify main interrupt controller handler
+- phy-handle: Phandle to a PHY on the MDIO bus.
+- int-phy-handle: Phandle to PHY interrupt handler.
+
+Example:
+
+	umac0: umac@c0004000 {
+		compatible = "hpe,gxp-umac";
+		reg = <0xc0004000 0x80>;
+		interrupts = <10>;
+		interrupt-parent = <&vic0>;
+		phy-handle = <&ext_phy0>;
+		int-phy-handle = <&int_phy0>;
+	};

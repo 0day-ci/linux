@@ -1,0 +1,16 @@
+*HPE GXP GPIO INTERFACE
+
+Required properties:
+- compatible: Must be "hpe,gxp-gpio".
+- #gpio-cells: The number of cells to describe a GPIO, this should be 2.
+- csm: Phandle to the GXP PCI CSM Controller.
+- vuch0_handle:	Phandle to the Virtual USB Hub Controller (VUHC).
+
+Example of gpio-controller nodes for a MPC8347 SoC:
+
+	gpio: gpio {
+		compatible = "hpe,gxp-gpio";
+		#gpio-cells = <2>;
+		csm_handle = <&csm>;
+		vuhc0_handle = <&vuhc0>;
+	};

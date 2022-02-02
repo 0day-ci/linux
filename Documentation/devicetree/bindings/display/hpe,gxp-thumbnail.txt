@@ -1,0 +1,21 @@
+* GXP HPE VIDEO THUMBNAIL DRIVER
+
+Required properties:
+- compatible: Must be "hpe,gxp-thumbnail".
+- reg       : Physical base address and length of the controller's registers.
+- clocks    : phandle + clock specifier pair of the FB reference clock.
+- bits-per-pixel: Bits per pixel, must be 32.
+- width: Width in pixels, must be 800.
+- height: Height in pixels, must be 600.
+
+Optional properties:
+- lcd-supply: Regulator for LCD supply voltage.
+
+Example:
+	thumbnail: thumbnail@c0000500 {
+		compatible = "hpe,gxp-thumbnail";
+		reg = <0xc0000500 0x20>;
+		bits-per-pixel = <32>;
+		width = <800>;
+		height = <600>;
+	};

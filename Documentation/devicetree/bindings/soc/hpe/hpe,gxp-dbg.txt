@@ -1,0 +1,18 @@
+* HPE GXP DBG INTERFACE
+
+Specify host debug interface. Used presently to report ROM POST code during host initialization phases
+
+Required parent device properties:
+- compatible : Should be "hpe,gxp-dbg".
+- reg : Specifies base physical address and size of the control/data registers.
+- interrupts: The interrupt number.
+- interrupt-parent: The interrupt controller to which the interface is wired to
+
+Example:
+
+	post@800000a0 {
+		compatible = "hpe,gxp-dbg";
+		reg = <0x800000a0 0x20>;
+		interrupts = <10>;
+		interrupt-parent = <&vic1>;
+	};

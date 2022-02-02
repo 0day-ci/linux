@@ -1,0 +1,16 @@
+* HPE GXP CHIF INTERFACE
+
+Define the basic CHannel InterFace (CHIF) communication path between BMC and Host through PCI.
+Interrupts are handled through PCI function 2
+
+Required parent device properties:
+- compatible : Should be "hpe,gxp-chif".
+- interrupts : The interrupt number.
+
+Example:
+
+	chif {
+			compatible = "hpe,gxp-chif";
+			interrupts = <12>;
+		};
+	};

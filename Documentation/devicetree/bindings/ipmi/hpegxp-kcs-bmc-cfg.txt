@@ -1,0 +1,13 @@
+* HPE GXP KCS IPMI DRIVER
+
+Required properties:
+- compatible : Must contain "hpe,gxp-kcs-bmc-cfg", "simple-mfd", "syscon".
+- reg : Specifies base physical address and size of the configuration registers.
+
+Example:
+
+	kcs_conf: kcs_conf@80fc0430 {
+			compatible = "hpe,gxp-kcs-bmc-cfg", "simple-mfd", "syscon";
+			reg = <0x80fc0430 0x100>;
+	};
+

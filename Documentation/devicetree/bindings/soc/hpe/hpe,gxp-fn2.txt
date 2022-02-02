@@ -1,0 +1,20 @@
+* HPE GXP PCI FN2 INTERFACE CONTROLLER
+
+Required parent device properties:
+- compatible : Should be "hpe,gxp-fn2", "simple-mfd", "syscon".
+- reg : Specifies base physical address and size of the control/data/memory mapped registers.
+- xreg_handle : Phandle to the xregister controller interface.
+- #gpio-cells : The number of cells to describe a GPIO, this should be 2.
+- interrupts : interrupt number to which PCI FN2 is connected to
+- interrupt-parets : interrupt controller to which PCI FN2 is connected to
+
+Example:
+
+	fn2: fn2@80200000 {
+		compatible = "hpe,gxp-fn2", "simple-mfd", "syscon";
+		reg = <0x80200000 0x100000>;
+		xreg_handle = <&xreg>;
+		interrupts = <0>;
+		interrupt-parent = <&vic1>;
+		#gpio-cells = <2>;
+	};

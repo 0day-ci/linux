@@ -1,0 +1,16 @@
+
+* HPE GXP BMC
+
+HPE GXP SoC definition
+
+Required properties:
+  - compatible : Must contain: "HPE,GXP"
+
+Example:
+/ {
+	model = "Hewlett Packard Enterprise GXP BMC";
+	compatible = "HPE,GXP";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+}

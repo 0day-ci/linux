@@ -1,0 +1,18 @@
+*HPE GXP TIMER
+
+Required properties:
+
+- compatible : Must be "hpe,gxp-timer"
+- reg : The GXP Timer Control Registers (Addresses + size) tuples list.
+- interrupts : The interrupt number.
+- clock-frequency : The frequency of the clock that drives the counter, in Hz.
+
+Example:
+
+	timer0: timer@c0000080 {
+		compatible = "hpe,gxp-timer";
+		reg = <0xc0000080 0x1>, <0xc0000094 0x01>, <0xc0000088 0x08>;
+		interrupts = <0>;
+		interrupt-parent = <&vic0>;
+		clock-frequency = <400000000>;
+	};
