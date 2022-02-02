@@ -191,15 +191,25 @@ static struct audit_ctl_mutex {
  * should be at least that large. */
 #define AUDIT_BUFSIZ 1024
 
+/* The audit_context_entry contains data required to create an
+ * auxiliary record.
+ */
+struct audit_context_entry {
+	struct list_head	list;
+	int			type;	/* Audit record type */
+};
+
 /* The audit_buffer is used when formatting an audit record.  The caller
  * locks briefly to get the record off the freelist or to allocate the
  * buffer, and locks briefly to send the buffer to the netlink layer or
  * to place it on a transmit queue.  Multiple audit_buffers can be in
  * use simultaneously. */
 struct audit_buffer {
-	struct sk_buff       *skb;	/* formatted skb ready to send */
-	struct audit_context *ctx;	/* NULL or associated context */
-	gfp_t		     gfp_mask;
+	struct sk_buff		*skb;	/* formatted skb ready to send */
+	struct audit_context	*ctx;	/* NULL or associated context */
+	struct list_head	aux_records;	/* aux record data */
+	struct audit_stamp	stamp;	/* event stamp */
+	gfp_t			gfp_mask;
 };
 
 struct audit_reply {
@@ -1765,6 +1775,7 @@ static struct audit_buffer *audit_buffer_alloc(struct audit_context *ctx,
 
 	ab->ctx = ctx;
 	ab->gfp_mask = gfp_mask;
+	INIT_LIST_HEAD(&ab->aux_records);
 
 	return ab;
 
@@ -1825,7 +1836,6 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 				     int type)
 {
 	struct audit_buffer *ab;
-	struct audit_stamp stamp;
 
 	if (audit_initialized != AUDIT_INITIALIZED)
 		return NULL;
@@ -1880,14 +1890,14 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 		return NULL;
 	}
 
-	audit_get_stamp(ab->ctx, &stamp);
+	audit_get_stamp(ab->ctx, &ab->stamp);
 	/* cancel dummy context to enable supporting records */
 	if (ctx)
 		ctx->dummy = 0;
 	audit_log_format(ab, "audit(%llu.%03lu:%u): ",
-			 (unsigned long long)stamp.ctime.tv_sec,
-			 stamp.ctime.tv_nsec/1000000,
-			 stamp.serial);
+			 (unsigned long long)ab->stamp.ctime.tv_sec,
+			 ab->stamp.ctime.tv_nsec/1000000,
+			 ab->stamp.serial);
 
 	return ab;
 }
@@ -2378,7 +2388,7 @@ int audit_signal_info(int sig, struct task_struct *t)
 }
 
 /**
- * audit_log_end - end one audit record
+ * __audit_log_end - end one audit record
  * @ab: the audit_buffer
  *
  * We can not do a netlink send inside an irq context because it blocks (last
@@ -2386,7 +2396,7 @@ int audit_signal_info(int sig, struct task_struct *t)
  * queue and a kthread is scheduled to remove them from the queue outside the
  * irq context.  May be called in any context.
  */
-void audit_log_end(struct audit_buffer *ab)
+void __audit_log_end(struct audit_buffer *ab)
 {
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh;
@@ -2408,6 +2418,60 @@ void audit_log_end(struct audit_buffer *ab)
 		wake_up_interruptible(&kauditd_wait);
 	} else
 		audit_log_lost("rate limit exceeded");
+}
+
+/**
+ * audit_log_end - end one audit record
+ * @ab: the audit_buffer
+ *
+ * Let __audit_log_end() handle the message while the buffer housekeeping
+ * is done here.
+ * If there are other records that have been deferred for the event
+ * create them here.
+ */
+void audit_log_end(struct audit_buffer *ab)
+{
+	struct audit_context_entry *entry;
+	struct audit_context mcontext;
+	struct audit_context *mctx;
+	struct audit_buffer *mab;
+	struct list_head *l;
+	struct list_head *n;
+
+	if (!ab)
+		return;
+
+	__audit_log_end(ab);
+
+	if (list_empty(&ab->aux_records)) {
+		audit_buffer_free(ab);
+		return;
+	}
+
+	if (ab->ctx == NULL) {
+		mcontext.stamp = ab->stamp;
+		mctx = &mcontext;
+	} else
+		mctx = ab->ctx;
+
+	list_for_each_safe(l, n, &ab->aux_records) {
+		entry = list_entry(l, struct audit_context_entry, list);
+		mab = audit_log_start(mctx, ab->gfp_mask, entry->type);
+		if (!mab) {
+			audit_panic("alloc error in audit_log_end");
+			continue;
+		}
+		switch (entry->type) {
+		/* Don't know of any quite yet. */
+		default:
+			audit_panic("Unknown type in audit_log_end");
+			break;
+		}
+		__audit_log_end(mab);
+		audit_buffer_free(mab);
+		list_del(&entry->list);
+		kfree(entry);
+	}
 
 	audit_buffer_free(ab);
 }
