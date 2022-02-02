@@ -427,7 +427,7 @@ ifneq ($(LLVM),)
 HOSTCC	= clang
 HOSTCXX	= clang++
 else
-HOSTCC	= gcc
+HOSTCC	:= $(shell cc --version >/dev/null 2>&1 && echo cc || echo gcc)
 HOSTCXX	= g++
 endif
 
@@ -452,7 +452,8 @@ OBJDUMP		= llvm-objdump
 READELF		= llvm-readelf
 STRIP		= llvm-strip
 else
-CC		= $(CROSS_COMPILE)gcc
+CC		:= $(CROSS_COMPILE)$(shell $(CROSS_COMPILE)cc --version \
+			>/dev/null 2>&1 && echo cc || echo gcc)
 LD		= $(CROSS_COMPILE)ld
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
