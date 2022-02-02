@@ -137,6 +137,16 @@ struct page_pool {
 	u64 destroy_cnt;
 };
 
+#ifdef CONFIG_PAGE_POOL_STATS
+/*
+ * stats for tracking page_pool events.
+ */
+struct page_pool_stats {
+};
+
+DECLARE_PER_CPU_ALIGNED(struct page_pool_stats, page_pool_stats);
+#endif
+
 struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp);
 
 static inline struct page *page_pool_dev_alloc_pages(struct page_pool *pool)
