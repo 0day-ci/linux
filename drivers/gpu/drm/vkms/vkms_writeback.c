@@ -114,7 +114,7 @@ static void vkms_wb_atomic_commit(struct drm_connector *conn,
 	struct vkms_device *vkmsdev = drm_device_to_vkms_device(conn->dev);
 	struct vkms_output *output = &vkmsdev->output;
 	struct drm_writeback_connector *wb_conn = &output->wb_connector;
-	struct drm_connector_state *conn_state = wb_conn->base.state;
+	struct drm_connector_state *conn_state = wb_conn->base->state;
 	struct vkms_crtc_state *crtc_state = output->composer_state;
 
 	if (!conn_state)
@@ -139,9 +139,12 @@ static const struct drm_connector_helper_funcs vkms_wb_conn_helper_funcs = {
 int vkms_enable_writeback_connector(struct vkms_device *vkmsdev)
 {
 	struct drm_writeback_connector *wb = &vkmsdev->output.wb_connector;
+	struct vkms_output *output = &vkmsdev->output;
 
-	vkmsdev->output.wb_connector.encoder.possible_crtcs = 1;
-	drm_connector_helper_add(&wb->base, &vkms_wb_conn_helper_funcs);
+	wb->base = &output->connector;
+	wb->encoder = &output->encoder;
+	output->wb_connector.encoder->possible_crtcs = 1;
+	drm_connector_helper_add(wb->base, &vkms_wb_conn_helper_funcs);
 
 	return drm_writeback_connector_init(&vkmsdev->drm, wb,
 					    &vkms_wb_connector_funcs,
