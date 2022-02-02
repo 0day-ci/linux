@@ -733,6 +733,7 @@ config SND_SOC_CS4349
 
 config SND_SOC_CS47L15
 	tristate
+	select REGMAP_IRQ
 
 config SND_SOC_CS47L24
 	tristate
