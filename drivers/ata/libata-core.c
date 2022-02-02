@@ -4073,6 +4073,13 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "WDC WD3000JD-*",		NULL,	ATA_HORKAGE_WD_BROKEN_LPM },
 	{ "WDC WD3200JD-*",		NULL,	ATA_HORKAGE_WD_BROKEN_LPM },
 
+	/*
+	 * This sata dom goes on a walkabout when it sees the
+	 * ATA_LOG_DIRECTORY read request so ensure we don't issue such a
+	 * request to these devices.
+	 */
+	{ "SATADOM-ML 3ME",		NULL,	ATA_HORKAGE_NO_ID_DEV_LOG },
+
 	/* End Marker */
 	{ }
 };
