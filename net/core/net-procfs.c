@@ -4,6 +4,10 @@
 #include <linux/seq_file.h>
 #include <net/wext.h>
 
+#ifdef CONFIG_PAGE_POOL_STATS
+#include <net/page_pool.h>
+#endif
+
 #define BUCKET_SPACE (32 - NETDEV_HASHBITS - 1)
 
 #define get_bucket(x) ((x) >> BUCKET_SPACE)
@@ -310,6 +314,57 @@ static const struct seq_operations ptype_seq_ops = {
 	.show  = ptype_seq_show,
 };
 
+#ifdef CONFIG_PAGE_POOL_STATS
+static struct page_pool_stats *page_pool_stat_get_online(loff_t *pos)
+{
+	struct page_pool_stats *pp_stat = NULL;
+
+	while (*pos < nr_cpu_ids) {
+		if (cpu_online(*pos)) {
+			pp_stat = per_cpu_ptr(&page_pool_stats, *pos);
+			break;
+		}
+
+		++*pos;
+	}
+
+	return pp_stat;
+}
+
+static void *page_pool_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return page_pool_stat_get_online(pos);
+}
+
+static void *page_pool_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	return page_pool_stat_get_online(pos);
+}
+
+static void page_pool_seq_stop(struct seq_file *seq, void *v)
+{
+}
+
+static int page_pool_seq_show(struct seq_file *seq, void *v)
+{
+	struct page_pool_stats *pp_stat = v;
+
+	seq_printf(seq, "%08llx %08llx %08llx %08llx %08llx %08llx %08llx\n",
+		   seq->index, pp_stat->alloc.fast,
+		   pp_stat->alloc.slow, pp_stat->alloc.slow_high_order,
+		   pp_stat->alloc.empty, pp_stat->alloc.refill, pp_stat->alloc.waive);
+	return 0;
+}
+
+static const struct seq_operations page_pool_seq_ops = {
+	.start = page_pool_seq_start,
+	.next = page_pool_seq_next,
+	.stop = page_pool_seq_stop,
+	.show = page_pool_seq_show,
+};
+#endif
+
 static int __net_init dev_proc_net_init(struct net *net)
 {
 	int rc = -ENOMEM;
@@ -326,6 +381,15 @@ static int __net_init dev_proc_net_init(struct net *net)
 
 	if (wext_proc_init(net))
 		goto out_ptype;
+
+#ifdef CONFIG_PAGE_POOL_STATS
+	if (!proc_create_seq("page_pool_stat", 0444, net->proc_net,
+			     &page_pool_seq_ops)) {
+		wext_proc_exit(net);
+		goto out_ptype;
+	}
+#endif
+
 	rc = 0;
 out:
 	return rc;
@@ -342,6 +406,9 @@ static void __net_exit dev_proc_net_exit(struct net *net)
 {
 	wext_proc_exit(net);
 
+#ifdef CONFIG_PAGE_POOL_STATS
+	remove_proc_entry("page_pool_stat", net->proc_net);
+#endif
 	remove_proc_entry("ptype", net->proc_net);
 	remove_proc_entry("softnet_stat", net->proc_net);
 	remove_proc_entry("dev", net->proc_net);
