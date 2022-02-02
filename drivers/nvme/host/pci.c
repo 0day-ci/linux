@@ -27,6 +27,8 @@
 #include <linux/io-64-nonatomic-hi-lo.h>
 #include <linux/sed-opal.h>
 #include <linux/pci-p2pdma.h>
+#include <linux/auxiliary_bus.h>
+#include <linux/pcie_em.h>
 
 #include "trace.h"
 #include "nvme.h"
@@ -159,6 +161,9 @@ struct nvme_dev {
 	unsigned int nr_poll_queues;
 
 	bool attrs_added;
+
+	/* auxiliary_device for pcie_em driver (LEDs) */
+	struct auxiliary_device *pcie_em_auxdev;
 };
 
 static int io_queue_depth_set(const char *val, const struct kernel_param *kp)
@@ -2904,6 +2909,11 @@ static void nvme_reset_work(struct work_struct *work)
 	}
 
 	/*
+	 * register auxiliary device if this supports PCIe enclosure management
+	 */
+	dev->pcie_em_auxdev = register_pcie_em_auxdev(dev->dev, dev->ctrl.instance);
+
+	/*
 	 * If only admin queue live, keep it to do further investigation or
 	 * recovery.
 	 */
@@ -3200,6 +3210,7 @@ static void nvme_remove(struct pci_dev *pdev)
 	nvme_free_queues(dev, 0);
 	nvme_release_prp_pools(dev);
 	nvme_dev_unmap(dev);
+	unregister_pcie_em_auxdev(dev->pcie_em_auxdev);
 	nvme_uninit_ctrl(&dev->ctrl);
 }
 
