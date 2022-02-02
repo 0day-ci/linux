@@ -429,6 +429,7 @@ static unsigned int stackleak_cleanup_execute(void)
 	return 0;
 }
 
+/* Do not instrument anything found in special sections. */
 static bool stackleak_gate(void)
 {
 	tree section;
@@ -445,6 +446,8 @@ static bool stackleak_gate(void)
 		if (!strncmp(TREE_STRING_POINTER(section), ".cpuinit.text", 13))
 			return false;
 		if (!strncmp(TREE_STRING_POINTER(section), ".meminit.text", 13))
+			return false;
+		if (!strncmp(TREE_STRING_POINTER(section), ".noinstr.text", 13))
 			return false;
 	}
 
