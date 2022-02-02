@@ -1209,7 +1209,7 @@ static inline u32 etm4_get_victlr_access_type(struct etmv4_config *config)
 /* Set ELx trace filter access in the TRCVICTLR register */
 static void etm4_set_victlr_access(struct etmv4_config *config)
 {
-	config->vinst_ctrl &= ~TRCVICTLR_EXLEVEL_MASK;
+	config->vinst_ctrl &= ~(TRCVICTLR_EXLEVEL_MASK << TRCVICTLR_EXLEVEL_SHIFT);
 	config->vinst_ctrl |= etm4_get_victlr_access_type(config);
 }
 
@@ -1229,7 +1229,7 @@ static void etm4_set_default_config(struct etmv4_config *config)
 	config->ts_ctrl = 0x0;
 
 	/* TRCVICTLR::EVENT = 0x01, select the always on logic */
-	config->vinst_ctrl = BIT(0);
+	config->vinst_ctrl = (0x01 & TRCVICTLR_EVENT_MASK) << TRCVICTLR_EVENT_SHIFT;
 
 	/* TRCVICTLR::EXLEVEL_NS:EXLEVELS: Set kernel / user filtering */
 	etm4_set_victlr_access(config);
@@ -1338,7 +1338,7 @@ static void etm4_set_default_filter(struct etmv4_config *config)
 	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
 	 * in the started state
 	 */
-	config->vinst_ctrl |= BIT(9);
+	config->vinst_ctrl |= TRCVICTLR_SSSTATUS;
 	config->mode |= ETM_MODE_VIEWINST_STARTSTOP;
 
 	/* No start-stop filtering for ViewInst */
@@ -1442,7 +1442,7 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
 			 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
 			 * in the started state
 			 */
-			config->vinst_ctrl |= BIT(9);
+			config->vinst_ctrl |= TRCVICTLR_SSSTATUS;
 
 			/* No start-stop filtering for ViewInst */
 			config->vissctlr = 0x0;
@@ -1470,7 +1470,7 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
 			 * etm4_disable_perf().
 			 */
 			if (filters->ssstatus)
-				config->vinst_ctrl |= BIT(9);
+				config->vinst_ctrl |= TRCVICTLR_SSSTATUS;
 
 			/* No include/exclude filtering for ViewInst */
 			config->viiectlr = 0x0;
