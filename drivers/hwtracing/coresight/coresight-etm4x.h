@@ -147,6 +147,13 @@
 #define TRCIDR0_TSSIZE_SHIFT			24
 #define TRCIDR0_TSSIZE_MASK			GENMASK(4, 0)
 
+#define TRCIDR2_CIDSIZE_SHIFT			5
+#define TRCIDR2_CIDSIZE_MASK			GENMASK(4, 0)
+#define TRCIDR2_VMIDSIZE_SHIFT			10
+#define TRCIDR2_VMIDSIZE_MASK			GENMASK(4, 0)
+#define TRCIDR2_CCSIZE_SHIFT			25
+#define TRCIDR2_CCSIZE_MASK			GENMASK(3, 0)
+
 /*
  * System instructions to access ETM registers.
  * See ETMv4.4 spec ARM IHI0064F section 4.3.6 System instructions
