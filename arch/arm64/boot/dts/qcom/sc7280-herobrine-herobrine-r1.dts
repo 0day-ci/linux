@@ -11,7 +11,7 @@
 
 / {
 	model = "Google Herobrine (rev1+)";
-	compatible = "google,herobrine", "qcom,sc7280";
+	compatible = "google,herobrine";
 };
 
 /* ADDITIONS TO NODES DEFINED IN PARENT DEVICE TREE FILES */
