@@ -160,7 +160,7 @@
 				interrupt-parent = <&pic>;
 			};
 
-			dc@6,1 {
+			lsdc: dc@6,1 {
 				compatible = "pci0014,7a06.0",
 						   "pci0014,7a06",
 						   "pciclass030000",
