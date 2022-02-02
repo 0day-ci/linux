@@ -82,3 +82,38 @@ pcie@10000000 {
 		external-facing;
 	};
 };
+
+PCI Device Properties
+---------------------
+Following optional properties may be present for any PCI device:
+
+- UntrustedDevice:
+   When present, this property is an indicator that this PCI device (and
+   any downstream devices) are to be treated as untrusted by the kernel.
+   The kernel can, for example, use this information to isolate such
+   devices using a strict DMA protection via the IOMMU.
+
+   Example device tree node:
+	pcie@0008 {
+		/* PCI device 00:01.0 is an untrusted device */
+		reg = <0x00000800 0 0 0 0>;
+		UntrustedDevice = <1>;
+	};
+
+   Example ACPI node:
+	Scope (\_SB.PCI0.WFA3)
+	    {
+	        Name (_DSD, Package (0x02)  // _DSD: Device-Specific Data
+	        {
+	            ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301") /* Device
+	Properties for _DSD */,
+	            Package (0x01)
+	            {
+	                Package (0x02)
+	                {
+	                    "UntrustedDevice",
+	                    One
+	                }
+	            }
+	        })
+	    }
