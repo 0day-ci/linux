@@ -344,6 +344,9 @@ struct amd64_umc {
 	u32 sdp_ctrl;		/* SDP Control reg */
 	u32 ecc_ctrl;		/* DRAM ECC Control reg */
 	u32 umc_cap_hi;		/* Capabilities High reg */
+
+	/* cache the dram_type */
+	enum mem_type dram_type;
 };
 
 struct amd64_pvt {
