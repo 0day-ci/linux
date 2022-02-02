@@ -72,6 +72,8 @@ struct rcar_du_crtc {
 	const char *const *sources;
 	unsigned int sources_count;
 
+	struct drm_connector connector;
+	struct drm_encoder encoder;
 	struct drm_writeback_connector writeback;
 };
 

@@ -200,8 +200,10 @@ int rcar_du_writeback_init(struct rcar_du_device *rcdu,
 {
 	struct drm_writeback_connector *wb_conn = &rcrtc->writeback;
 
-	wb_conn->encoder.possible_crtcs = 1 << drm_crtc_index(&rcrtc->crtc);
-	drm_connector_helper_add(&wb_conn->base,
+	wb_conn->base = &rcrtc->connector;
+	wb_conn->encoder = &rcrtc->encoder;
+	wb_conn->encoder->possible_crtcs = 1 << drm_crtc_index(&rcrtc->crtc);
+	drm_connector_helper_add(wb_conn->base,
 				 &rcar_du_wb_conn_helper_funcs);
 
 	return drm_writeback_connector_init(&rcdu->ddev, wb_conn,
@@ -220,7 +222,7 @@ void rcar_du_writeback_setup(struct rcar_du_crtc *rcrtc,
 	struct drm_framebuffer *fb;
 	unsigned int i;
 
-	state = rcrtc->writeback.base.state;
+	state = rcrtc->writeback.base->state;
 	if (!state || !state->writeback_job)
 		return;
 
