@@ -150,6 +150,7 @@ struct page_pool_stats {
 			    * slow path allocation
 			    */
 		u64 refill; /* allocations via successful refill */
+		u64 waive;  /* failed refills due to numa zone mismatch */
 	} alloc;
 };
 
