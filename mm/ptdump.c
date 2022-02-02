@@ -4,7 +4,6 @@
 #include <linux/ptdump.h>
 #include <linux/kasan.h>
 
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
 /*
  * This is an optimization for KASAN=y case. Since all kasan page tables
  * eventually point to the kasan_early_shadow_page we could call note_page()
@@ -15,15 +14,16 @@
 static inline int note_kasan_page_table(struct mm_walk *walk,
 					unsigned long addr)
 {
+#ifdef CONFIG_KASAN_SOFTWARE
 	struct ptdump_state *st = walk->private;
 
 	st->note_page(st, addr, 4, pte_val(kasan_early_shadow_pte[0]));
 
 	walk->action = ACTION_CONTINUE;
+#endif
 
 	return 0;
 }
-#endif
 
 static int ptdump_pgd_entry(pgd_t *pgd, unsigned long addr,
 			    unsigned long next, struct mm_walk *walk)
@@ -31,11 +31,8 @@ static int ptdump_pgd_entry(pgd_t *pgd, unsigned long addr,
 	struct ptdump_state *st = walk->private;
 	pgd_t val = READ_ONCE(*pgd);
 
-#if CONFIG_PGTABLE_LEVELS > 4 && \
-		(defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS))
-	if (pgd_page(val) == virt_to_page(lm_alias(kasan_early_shadow_p4d)))
+	if (kasan_p4d_table(val))
 		return note_kasan_page_table(walk, addr);
-#endif
 
 	if (st->effective_prot)
 		st->effective_prot(st, 0, pgd_val(val));
@@ -52,11 +49,8 @@ static int ptdump_p4d_entry(p4d_t *p4d, unsigned long addr,
 	struct ptdump_state *st = walk->private;
 	p4d_t val = READ_ONCE(*p4d);
 
-#if CONFIG_PGTABLE_LEVELS > 3 && \
-		(defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS))
-	if (p4d_page(val) == virt_to_page(lm_alias(kasan_early_shadow_pud)))
+	if (kasan_pud_table(val))
 		return note_kasan_page_table(walk, addr);
-#endif
 
 	if (st->effective_prot)
 		st->effective_prot(st, 1, p4d_val(val));
@@ -73,11 +67,8 @@ static int ptdump_pud_entry(pud_t *pud, unsigned long addr,
 	struct ptdump_state *st = walk->private;
 	pud_t val = READ_ONCE(*pud);
 
-#if CONFIG_PGTABLE_LEVELS > 2 && \
-		(defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS))
-	if (pud_page(val) == virt_to_page(lm_alias(kasan_early_shadow_pmd)))
+	if (kasan_pmd_table(val))
 		return note_kasan_page_table(walk, addr);
-#endif
 
 	if (st->effective_prot)
 		st->effective_prot(st, 2, pud_val(val));
@@ -94,10 +85,8 @@ static int ptdump_pmd_entry(pmd_t *pmd, unsigned long addr,
 	struct ptdump_state *st = walk->private;
 	pmd_t val = READ_ONCE(*pmd);
 
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
-	if (pmd_page(val) == virt_to_page(lm_alias(kasan_early_shadow_pte)))
+	if (kasan_pte_table(val))
 		return note_kasan_page_table(walk, addr);
-#endif
 
 	if (st->effective_prot)
 		st->effective_prot(st, 3, pmd_val(val));
