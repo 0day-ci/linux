@@ -935,6 +935,19 @@ static const struct of_device_id ili9322_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, ili9322_of_match);
 
+static const struct spi_device_id ili9322_spi_ids[] = {
+	{
+		.name = "dir-685-panel",
+		.driver_data = (kernel_ulong_t)&ili9322_dir_685,
+	},
+	{
+		.name = "ili9322",
+		.driver_data = 0,
+	},
+	{ }
+};
+MODULE_DEVICE_TABLE(spi, ili9322_spi_ids);
+
 static struct spi_driver ili9322_driver = {
 	.probe = ili9322_probe,
 	.remove = ili9322_remove,
@@ -942,6 +955,7 @@ static struct spi_driver ili9322_driver = {
 		.name = "panel-ilitek-ili9322",
 		.of_match_table = ili9322_of_match,
 	},
+	.id_table = ili9322_spi_ids,
 };
 module_spi_driver(ili9322_driver);
 
