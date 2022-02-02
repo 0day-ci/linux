@@ -25,7 +25,7 @@ struct kunit_kasan_expectation {
 
 #endif
 
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
+#ifdef CONFIG_KASAN_SOFTWARE
 
 #include <linux/pgtable.h>
 
@@ -66,7 +66,7 @@ extern void kasan_enable_current(void);
 /* Disable reporting bugs for current task */
 extern void kasan_disable_current(void);
 
-#else /* CONFIG_KASAN_GENERIC || CONFIG_KASAN_SW_TAGS */
+#else /* CONFIG_KASAN_SOFTWARE */
 
 static inline int kasan_add_zero_shadow(void *start, unsigned long size)
 {
@@ -79,7 +79,7 @@ static inline void kasan_remove_zero_shadow(void *start,
 static inline void kasan_enable_current(void) {}
 static inline void kasan_disable_current(void) {}
 
-#endif /* CONFIG_KASAN_GENERIC || CONFIG_KASAN_SW_TAGS */
+#endif /* CONFIG_KASAN_SOFTWARE */
 
 #ifdef CONFIG_KASAN_HW_TAGS
 
@@ -467,8 +467,7 @@ static inline void kasan_populate_early_vm_area_shadow(void *start,
 
 #endif /* CONFIG_KASAN_VMALLOC */
 
-#if (defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)) && \
-		!defined(CONFIG_KASAN_VMALLOC)
+#if defined(CONFIG_KASAN_SOFTWARE) && !defined(CONFIG_KASAN_VMALLOC)
 
 /*
  * These functions provide a special case to support backing module
@@ -478,12 +477,12 @@ static inline void kasan_populate_early_vm_area_shadow(void *start,
 int kasan_module_alloc(void *addr, size_t size, gfp_t gfp_mask);
 void kasan_free_shadow(const struct vm_struct *vm);
 
-#else /* (CONFIG_KASAN_GENERIC || CONFIG_KASAN_SW_TAGS) && !CONFIG_KASAN_VMALLOC */
+#else /* CONFIG_KASAN_SOFTWARE && !CONFIG_KASAN_VMALLOC */
 
 static inline int kasan_module_alloc(void *addr, size_t size, gfp_t gfp_mask) { return 0; }
 static inline void kasan_free_shadow(const struct vm_struct *vm) {}
 
-#endif /* (CONFIG_KASAN_GENERIC || CONFIG_KASAN_SW_TAGS) && !CONFIG_KASAN_VMALLOC */
+#endif /* CONFIG_KASAN_SOFTWARE && !CONFIG_KASAN_VMALLOC */
 
 #ifdef CONFIG_KASAN_INLINE
 void kasan_non_canonical_hook(unsigned long addr);

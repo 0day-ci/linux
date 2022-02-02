@@ -177,7 +177,7 @@ struct task_struct init_task
 	.numa_group	= NULL,
 	.numa_faults	= NULL,
 #endif
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
+#ifdef CONFIG_KASAN_SOFTWARE
 	.kasan_depth	= 1,
 #endif
 #ifdef CONFIG_KCSAN

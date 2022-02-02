@@ -334,7 +334,7 @@ static void print_memory_metadata(const void *addr)
 
 static bool report_enabled(void)
 {
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
+#ifdef CONFIG_KASAN_SOFTWARE
 	if (current->kasan_depth)
 		return false;
 #endif

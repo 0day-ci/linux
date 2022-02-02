@@ -55,7 +55,7 @@ static inline bool kasan_sync_fault_possible(void)
 
 #endif
 
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
+#ifdef CONFIG_KASAN_SOFTWARE
 #define KASAN_GRANULE_SIZE	(1UL << KASAN_SHADOW_SCALE_SHIFT)
 #else
 #include <asm/mte-kasan.h>
@@ -211,7 +211,7 @@ struct kasan_free_meta *kasan_get_free_meta(struct kmem_cache *cache,
 						const void *object);
 #endif
 
-#if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
+#ifdef CONFIG_KASAN_SOFTWARE
 
 static inline const void *kasan_shadow_to_mem(const void *shadow_addr)
 {
@@ -235,14 +235,14 @@ static inline bool addr_has_metadata(const void *addr)
 bool kasan_check_range(unsigned long addr, size_t size, bool write,
 				unsigned long ret_ip);
 
-#else /* CONFIG_KASAN_GENERIC || CONFIG_KASAN_SW_TAGS */
+#else /* CONFIG_KASAN_SOFTWARE */
 
 static inline bool addr_has_metadata(const void *addr)
 {
 	return (is_vmalloc_addr(addr) || virt_addr_valid(addr));
 }
 
-#endif /* CONFIG_KASAN_GENERIC || CONFIG_KASAN_SW_TAGS */
+#endif /* CONFIG_KASAN_SOFTWARE */
 
 #if defined(CONFIG_KASAN_SW_TAGS) || defined(CONFIG_KASAN_HW_TAGS)
 void kasan_print_tags(u8 addr_tag, const void *addr);
