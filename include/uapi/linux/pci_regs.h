@@ -736,7 +736,8 @@
 #define PCI_EXT_CAP_ID_DVSEC	0x23	/* Designated Vendor-Specific */
 #define PCI_EXT_CAP_ID_DLF	0x25	/* Data Link Feature */
 #define PCI_EXT_CAP_ID_PL_16GT	0x26	/* Physical Layer 16.0 GT/s */
-#define PCI_EXT_CAP_ID_MAX	PCI_EXT_CAP_ID_PL_16GT
+#define PCI_EXT_CAP_ID_NPEM	0x29	/* Native PCIe Enclosure Management */
+#define PCI_EXT_CAP_ID_MAX	PCI_EXT_CAP_ID_NPEM
 
 #define PCI_EXT_CAP_DSN_SIZEOF	12
 #define PCI_EXT_CAP_MCAST_ENDPOINT_SIZEOF 40
@@ -1101,5 +1102,13 @@
 #define  PCI_PL_16GT_LE_CTRL_DSP_TX_PRESET_MASK		0x0000000F
 #define  PCI_PL_16GT_LE_CTRL_USP_TX_PRESET_MASK		0x000000F0
 #define  PCI_PL_16GT_LE_CTRL_USP_TX_PRESET_SHIFT	4
+
+/* NPEM */
+#define PCI_NPEM_CAP		0x04
+#define  PCI_NPEM_CAP_NPEM_CAP		0x00000001  /* dev is NPEM capable */
+#define PCI_NPEM_CTRL		0x08
+#define  PCI_NPEM_CTRL_EN		0x00000001  /* Enable NPEM */
+#define PCI_NPEM_STATUS		0x0c
+#define  PCI_NPEM_STATUS_CC		0x00000001  /* NPEM command completed */
 
 #endif /* LINUX_PCI_REGS_H */
