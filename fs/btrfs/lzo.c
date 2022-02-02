@@ -383,6 +383,13 @@ int lzo_decompress_bio(struct list_head *ws, struct compressed_bio *cb)
 		kunmap(cur_page);
 		cur_in += LZO_LEN;
 
+		if (seg_len > WORKSPACE_CBUF_LENGTH) {
+			// seg_len shouldn't be larger than we have allocated for workspace->cbuf
+			btrfs_err(fs_info, "unexpectedly large lzo segment len %u", seg_len);
+			ret = -EUCLEAN;
+			goto out;
+		}
+
 		/* Copy the compressed segment payload into workspace */
 		copy_compressed_segment(cb, workspace->cbuf, seg_len, &cur_in);
 
