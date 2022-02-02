@@ -473,30 +473,6 @@ static const char *const enclosure_type[] = {
 	[ENCLOSURE_COMPONENT_ARRAY_DEVICE] = "array device",
 };
 
-static ssize_t get_component_fault(struct device *cdev,
-				   struct device_attribute *attr, char *buf)
-{
-	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
-	struct enclosure_component *ecomp = to_enclosure_component(cdev);
-
-	if (edev->cb->get_fault)
-		edev->cb->get_fault(edev, ecomp);
-	return sysfs_emit(buf, "%d\n", ecomp->fault);
-}
-
-static ssize_t set_component_fault(struct device *cdev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t count)
-{
-	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
-	struct enclosure_component *ecomp = to_enclosure_component(cdev);
-	int val = simple_strtoul(buf, NULL, 0);
-
-	if (edev->cb->set_fault)
-		edev->cb->set_fault(edev, ecomp, val);
-	return count;
-}
-
 static ssize_t get_component_status(struct device *cdev,
 				    struct device_attribute *attr,char *buf)
 {
@@ -529,54 +505,6 @@ static ssize_t set_component_status(struct device *cdev,
 		return count;
 	} else
 		return -EINVAL;
-}
-
-static ssize_t get_component_active(struct device *cdev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
-	struct enclosure_component *ecomp = to_enclosure_component(cdev);
-
-	if (edev->cb->get_active)
-		edev->cb->get_active(edev, ecomp);
-	return sysfs_emit(buf, "%d\n", ecomp->active);
-}
-
-static ssize_t set_component_active(struct device *cdev,
-				    struct device_attribute *attr,
-				    const char *buf, size_t count)
-{
-	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
-	struct enclosure_component *ecomp = to_enclosure_component(cdev);
-	int val = simple_strtoul(buf, NULL, 0);
-
-	if (edev->cb->set_active)
-		edev->cb->set_active(edev, ecomp, val);
-	return count;
-}
-
-static ssize_t get_component_locate(struct device *cdev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
-	struct enclosure_component *ecomp = to_enclosure_component(cdev);
-
-	if (edev->cb->get_locate)
-		edev->cb->get_locate(edev, ecomp);
-	return sysfs_emit(buf, "%d\n", ecomp->locate);
-}
-
-static ssize_t set_component_locate(struct device *cdev,
-				    struct device_attribute *attr,
-				    const char *buf, size_t count)
-{
-	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
-	struct enclosure_component *ecomp = to_enclosure_component(cdev);
-	int val = simple_strtoul(buf, NULL, 0);
-
-	if (edev->cb->set_locate)
-		edev->cb->set_locate(edev, ecomp, val);
-	return count;
 }
 
 static ssize_t get_component_power_status(struct device *cdev,
@@ -641,29 +569,136 @@ static ssize_t get_component_slot(struct device *cdev,
 	return sysfs_emit(buf, "%d\n", slot);
 }
 
-static DEVICE_ATTR(fault, S_IRUGO | S_IWUSR, get_component_fault,
-		    set_component_fault);
+/*
+ * callbacks for attrs using enum enclosure_component_setting (LEDs)
+ */
+static ssize_t led_show(struct device *cdev,
+			enum enclosure_component_led led,
+			char *buf)
+{
+	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
+	struct enclosure_component *ecomp = to_enclosure_component(cdev);
+
+	if (edev->cb->get_led)
+		edev->cb->get_led(edev, ecomp, led);
+	else
+		/*
+		 * support old callbacks for fault/active/locate
+		 */
+		switch (led) {
+		case ENCLOSURE_LED_FAULT:
+			if (edev->cb->get_fault) {
+				edev->cb->get_fault(edev, ecomp);
+				ecomp->led[led] = ecomp->fault;
+			}
+			break;
+		case ENCLOSURE_LED_ACTIVE:
+			if (edev->cb->get_active) {
+				edev->cb->get_active(edev, ecomp);
+				ecomp->led[led] = ecomp->active;
+			}
+			break;
+		case ENCLOSURE_LED_LOCATE:
+			if (edev->cb->get_locate) {
+				edev->cb->get_locate(edev, ecomp);
+				ecomp->led[led] = ecomp->locate;
+			}
+			break;
+		default:
+			break;
+		}
+
+	return sysfs_emit(buf, "%d\n", ecomp->led[led]);
+}
+
+static ssize_t led_set(struct device *cdev,
+		       enum enclosure_component_led led,
+		       const char *buf, size_t count)
+{
+	struct enclosure_device *edev = to_enclosure_device(cdev->parent);
+	struct enclosure_component *ecomp = to_enclosure_component(cdev);
+	int err, val;
+
+	err = kstrtoint(buf, 0, &val);
+	if (err)
+		return err;
+
+	if (edev->cb->set_led)
+		edev->cb->set_led(edev, ecomp, led, val);
+	else
+		/*
+		 * support old callbacks for fault/active/locate
+		 */
+		switch (led) {
+		case ENCLOSURE_LED_FAULT:
+			if (edev->cb->set_fault)
+				edev->cb->set_fault(edev, ecomp, val);
+			break;
+		case ENCLOSURE_LED_ACTIVE:
+			if (edev->cb->set_active)
+				edev->cb->set_active(edev, ecomp, val);
+			break;
+		case ENCLOSURE_LED_LOCATE:
+			if (edev->cb->set_locate)
+				edev->cb->set_locate(edev, ecomp, val);
+			break;
+		default:
+			break;
+		}
+
+	return count;
+}
+
+#define LED_ATTR_RW(led_attr, led)					\
+static ssize_t led_attr##_show(struct device *cdev,			\
+			       struct device_attribute *attr,		\
+			       char *buf)				\
+{									\
+	return led_show(cdev, led, buf);				\
+}									\
+static ssize_t led_attr##_store(struct device *cdev,			\
+				struct device_attribute *attr,		\
+				const char *buf, size_t count)		\
+{									\
+	return led_set(cdev, led, buf, count);				\
+}									\
+static DEVICE_ATTR_RW(led_attr)
+
 static DEVICE_ATTR(status, S_IRUGO | S_IWUSR, get_component_status,
 		   set_component_status);
-static DEVICE_ATTR(active, S_IRUGO | S_IWUSR, get_component_active,
-		   set_component_active);
-static DEVICE_ATTR(locate, S_IRUGO | S_IWUSR, get_component_locate,
-		   set_component_locate);
 static DEVICE_ATTR(power_status, S_IRUGO | S_IWUSR, get_component_power_status,
 		   set_component_power_status);
 static DEVICE_ATTR(type, S_IRUGO, get_component_type, NULL);
 static DEVICE_ATTR(slot, S_IRUGO, get_component_slot, NULL);
+LED_ATTR_RW(fault, ENCLOSURE_LED_FAULT);
+LED_ATTR_RW(active, ENCLOSURE_LED_ACTIVE);
+LED_ATTR_RW(locate, ENCLOSURE_LED_LOCATE);
+LED_ATTR_RW(ok, ENCLOSURE_LED_OK);
+LED_ATTR_RW(rebuild, ENCLOSURE_LED_REBUILD);
+LED_ATTR_RW(prdfail, ENCLOSURE_LED_PRDFAIL);
+LED_ATTR_RW(hotspare, ENCLOSURE_LED_HOTSPARE);
+LED_ATTR_RW(ica, ENCLOSURE_LED_ICA);
+LED_ATTR_RW(ifa, ENCLOSURE_LED_IFA);
+LED_ATTR_RW(disabled, ENCLOSURE_LED_DISABLED);
 
 static struct attribute *enclosure_component_attrs[] = {
 	&dev_attr_fault.attr,
 	&dev_attr_status.attr,
 	&dev_attr_active.attr,
 	&dev_attr_locate.attr,
+	&dev_attr_ok.attr,
+	&dev_attr_rebuild.attr,
+	&dev_attr_prdfail.attr,
+	&dev_attr_hotspare.attr,
+	&dev_attr_ica.attr,
+	&dev_attr_ifa.attr,
+	&dev_attr_disabled.attr,
 	&dev_attr_power_status.attr,
 	&dev_attr_type.attr,
 	&dev_attr_slot.attr,
 	NULL
 };
+
 ATTRIBUTE_GROUPS(enclosure_component);
 
 static int __init enclosure_init(void)

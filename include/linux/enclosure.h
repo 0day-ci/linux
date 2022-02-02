@@ -49,6 +49,20 @@ enum enclosure_component_setting {
 	ENCLOSURE_SETTING_BLINK_B_OFF_ON = 7,
 };
 
+enum enclosure_component_led {
+	ENCLOSURE_LED_FAULT,
+	ENCLOSURE_LED_ACTIVE,
+	ENCLOSURE_LED_LOCATE,
+	ENCLOSURE_LED_OK,
+	ENCLOSURE_LED_REBUILD,
+	ENCLOSURE_LED_PRDFAIL,
+	ENCLOSURE_LED_HOTSPARE,
+	ENCLOSURE_LED_ICA,
+	ENCLOSURE_LED_IFA,
+	ENCLOSURE_LED_DISABLED,
+	ENCLOSURE_LED_MAX,
+};
+
 struct enclosure_device;
 struct enclosure_component;
 struct enclosure_component_callbacks {
@@ -72,6 +86,13 @@ struct enclosure_component_callbacks {
 	int (*set_locate)(struct enclosure_device *,
 			  struct enclosure_component *,
 			  enum enclosure_component_setting);
+	void (*get_led)(struct enclosure_device *edev,
+			struct enclosure_component *ecomp,
+			enum enclosure_component_led);
+	int (*set_led)(struct enclosure_device *edev,
+		       struct enclosure_component *ecomp,
+		       enum enclosure_component_led,
+		       enum enclosure_component_setting);
 	void (*get_power_status)(struct enclosure_device *,
 				 struct enclosure_component *);
 	int (*set_power_status)(struct enclosure_device *,
@@ -90,6 +111,7 @@ struct enclosure_component {
 	int fault;
 	int active;
 	int locate;
+	int led[ENCLOSURE_LED_MAX];
 	int slot;
 	enum enclosure_status status;
 	int power_status;

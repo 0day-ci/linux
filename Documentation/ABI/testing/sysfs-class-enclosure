@@ -1,0 +1,14 @@
+What:		/sys/class/enclosure/<enclosure>/<component>/rebuild
+What:		/sys/class/enclosure/<enclosure>/<component>/disabled
+What:		/sys/class/enclosure/<enclosure>/<component>/hotspare
+What:		/sys/class/enclosure/<enclosure>/<component>/ica
+What:		/sys/class/enclosure/<enclosure>/<component>/ifa
+What:		/sys/class/enclosure/<enclosure>/<component>/ok
+What:		/sys/class/enclosure/<enclosure>/<component>/prdfail
+Date:		February 2022
+Contact:	Stuart Hayes <stuart.w.hayes@gmail.com>
+Description:
+		(RW) Get or set the indicator (1 is on, 0 is off) that
+		corresponds to the attribute name, for a component in an
+		enclosure. The "ica" and "ifa" states are "in critical
+		array" and "in failed array".
