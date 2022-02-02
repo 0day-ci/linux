@@ -16,6 +16,7 @@
 #include <dt-bindings/input/linux-event-codes.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/pinctrl/samsung.h>
+#include <dt-bindings/power/summit,smb347-charger.h>
 
 / {
 	compatible = "samsung,p4note", "samsung,exynos4412", "samsung,exynos4";
@@ -182,6 +183,27 @@
 			};
 		};
 	};
+
+	i2c-gpio-4 {
+		compatible = "i2c-gpio";
+		sda-gpios = <&gpm2 0 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&gpm2 1 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+
+		i2c-gpio,delay-us = <2>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		charger@6 {
+			compatible = "summit,smb347";
+			reg = <0x6>;
+			summit,enable-usb-charging;
+			summit,enable-charge-control = <SMB3XX_CHG_ENABLE_SW>;
+			summit,fast-voltage-threshold-microvolt = <2600000>;
+			summit,chip-temperature-threshold-celsius = <130>;
+			summit,usb-current-limit-microamp = <1800000>;
+		};
+	};
+
 };
 
 &adc {
