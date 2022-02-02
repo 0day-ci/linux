@@ -367,7 +367,7 @@
 };
 
 &pcie1_clkreq_n {
-	bias-pull-up;
+	bias-disable;
 	drive-strength = <2>;
 };
 
