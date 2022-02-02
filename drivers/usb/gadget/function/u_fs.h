@@ -278,6 +278,10 @@ struct ffs_data {
 	struct eventfd_ctx *ffs_eventfd;
 	struct workqueue_struct *io_completion_wq;
 	bool no_disconnect;
+	/* Limit on the total amount of memory we can allocate via mmap */
+	u32  mmap_memory_mb;
+	/* Total memory currently allocated for mmap */
+	atomic64_t mmap_mem_usage;
 	struct work_struct reset_work;
 
 	/*
