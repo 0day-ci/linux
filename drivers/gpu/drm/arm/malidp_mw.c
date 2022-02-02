@@ -206,21 +206,25 @@ static u32 *get_writeback_formats(struct malidp_drm *malidp, int *n_formats)
 int malidp_mw_connector_init(struct drm_device *drm)
 {
 	struct malidp_drm *malidp = drm->dev_private;
+	struct drm_writeback_connector *wb_conn;
 	u32 *formats;
 	int ret, n_formats;
 
 	if (!malidp->dev->hw->enable_memwrite)
 		return 0;
 
-	malidp->mw_connector.encoder.possible_crtcs = 1 << drm_crtc_index(&malidp->crtc);
-	drm_connector_helper_add(&malidp->mw_connector.base,
+	wb_conn = &malidp->mw_connector;
+	wb_conn->base = &malidp->connector;
+	wb_conn->encoder = &malidp->encoder;
+	malidp->mw_connector.encoder->possible_crtcs = 1 << drm_crtc_index(&malidp->crtc);
+	drm_connector_helper_add(wb_conn->base,
 				 &malidp_mw_connector_helper_funcs);
 
 	formats = get_writeback_formats(malidp, &n_formats);
 	if (!formats)
 		return -ENOMEM;
 
-	ret = drm_writeback_connector_init(drm, &malidp->mw_connector,
+	ret = drm_writeback_connector_init(drm, wb_conn,
 					   &malidp_mw_connector_funcs,
 					   &malidp_mw_encoder_helper_funcs,
 					   formats, n_formats);
@@ -236,7 +240,7 @@ void malidp_mw_atomic_commit(struct drm_device *drm,
 {
 	struct malidp_drm *malidp = drm->dev_private;
 	struct drm_writeback_connector *mw_conn = &malidp->mw_connector;
-	struct drm_connector_state *conn_state = mw_conn->base.state;
+	struct drm_connector_state *conn_state = mw_conn->base->state;
 	struct malidp_hw_device *hwdev = malidp->dev;
 	struct malidp_mw_connector_state *mw_state;
 
