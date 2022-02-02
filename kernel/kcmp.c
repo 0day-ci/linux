@@ -63,6 +63,9 @@ get_file_raw_ptr(struct task_struct *task, unsigned int idx)
 {
 	struct file *file;
 
+	/* This RCU locking is only present to silence warnings.  The pointer
+	 * value is only used for comparison and not dereferenced, so it is
+	 * acceptable. */
 	rcu_read_lock();
 	file = task_lookup_fd_rcu(task, idx);
 	rcu_read_unlock();
