@@ -1,0 +1,229 @@
+// SPDX-License-Identifier: GPL-2.0
+
+#include <linux/firmware.h>
+#include <linux/module.h>
+#include <linux/slab.h>
+
+#include "fw_sysfs.h"
+#include "fw_upload.h"
+
+/*
+ * Support for user-space to initiate a firmware upload to a device.
+ */
+
+static void fw_upload_update_progress(struct fw_upload_priv *fwlp,
+				      u32 new_progress)
+{
+	mutex_lock(&fwlp->lock);
+	fwlp->progress = new_progress;
+	mutex_unlock(&fwlp->lock);
+}
+
+static void fw_upload_set_error(struct fw_upload_priv *fwlp, u32 err_code)
+{
+	mutex_lock(&fwlp->lock);
+	fwlp->err_progress = fwlp->progress;
+	fwlp->err_code = err_code;
+	mutex_unlock(&fwlp->lock);
+}
+
+static void fw_upload_prog_complete(struct fw_upload_priv *fwlp)
+{
+	mutex_lock(&fwlp->lock);
+	fwlp->progress = FW_UPLOAD_PROG_IDLE;
+	mutex_unlock(&fwlp->lock);
+}
+
+static void fw_upload_main(struct work_struct *work)
+{
+	struct fw_upload_priv *fwlp;
+	struct fw_sysfs *fw_sysfs;
+	struct fw_upload *fwl;
+	s32 ret, offset = 0;
+
+	fwlp = container_of(work, struct fw_upload_priv, work);
+	fwl = fwlp->fw_upload;
+	fw_sysfs = (struct fw_sysfs *)fwl->priv;
+
+	get_device(&fw_sysfs->dev);
+	if (!try_module_get(fw_sysfs->dev.parent->driver->owner)) {
+		fw_upload_set_error(fwlp, FW_UPLOAD_ERR_BUSY);
+		goto putdev_exit;
+	}
+
+	fw_upload_update_progress(fwlp, FW_UPLOAD_PROG_PREPARING);
+	ret = fwlp->ops->prepare(fwl, fwlp->data, fwlp->remaining_size);
+	if (ret) {
+		fw_upload_set_error(fwlp, ret);
+		goto modput_exit;
+	}
+
+	fw_upload_update_progress(fwlp, FW_UPLOAD_PROG_TRANSFERRING);
+	while (fwlp->remaining_size) {
+		ret = fwlp->ops->write(fwl, fwlp->data, offset,
+					fwlp->remaining_size);
+		if (ret <= 0) {
+			if (!ret) {
+				dev_warn(&fw_sysfs->dev,
+					 "write-op wrote zero data\n");
+				ret = -FW_UPLOAD_ERR_RW_ERROR;
+			}
+			fw_upload_set_error(fwlp, -ret);
+			goto done;
+		}
+
+		fwlp->remaining_size -= ret;
+		offset += ret;
+	}
+
+	fw_upload_update_progress(fwlp, FW_UPLOAD_PROG_PROGRAMMING);
+	ret = fwlp->ops->poll_complete(fwl);
+	if (ret)
+		fw_upload_set_error(fwlp, ret);
+
+done:
+	if (fwlp->ops->cleanup)
+		fwlp->ops->cleanup(fwl);
+
+modput_exit:
+	module_put(fw_sysfs->dev.parent->driver->owner);
+
+putdev_exit:
+	put_device(&fw_sysfs->dev);
+
+	/*
+	 * Note: fwlp->remaining_size is left unmodified here to provide
+	 * additional information on errors. It will be reinitialized when
+	 * the next firmeware upload begins.
+	 */
+	mutex_lock(&fw_lock);
+	fw_free_paged_buf(fw_sysfs->fw_priv);
+	fw_state_init(fw_sysfs->fw_priv);
+	mutex_unlock(&fw_lock);
+	fwlp->data = NULL;
+	fw_upload_prog_complete(fwlp);
+}
+
+/**
+ * fw_upload_register() - register for the firmware upload sysfs API
+ * @parent: parent device instantiating firmware upload
+ * @name: firmware name to be associated with this device
+ * @ops: pointer to structure of firmware upload ops
+ * @dd_handle: pointer to parent driver private data
+ *
+ *	@name must be unique among all users of firmware upload. The firmware
+ *	sysfs files for this device will be found at /sys/class/firmware/@name.
+ *
+ *	Return: struct fw_upload pointer or ERR_PTR()
+ *
+ **/
+struct fw_upload *
+fw_upload_register(struct device *parent, const char *name,
+		   const struct fw_upload_ops *ops, void *dd_handle)
+{
+	u32 opt_flags = FW_OPT_NOCACHE;
+	struct fw_upload *fw_upload;
+	struct fw_upload_priv *fw_upload_priv;
+	struct fw_sysfs *fw_sysfs;
+	struct fw_priv *fw_priv;
+	struct device *f_dev;
+	int ret;
+
+	__module_get(THIS_MODULE);
+
+	if (!name || name[0] == '\0')
+		return ERR_PTR(-EINVAL);
+
+	if (!ops || !ops->cancel || !ops->prepare ||
+	    !ops->write || !ops->poll_complete) {
+		dev_err(parent, "Attempt to register without all required ops\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	fw_upload = kzalloc(sizeof(*fw_upload), GFP_KERNEL);
+	if (!fw_upload)
+		return ERR_PTR(-ENOMEM);
+
+	fw_upload_priv = kzalloc(sizeof(*fw_upload_priv), GFP_KERNEL);
+	if (!fw_upload_priv) {
+		ret = -ENOMEM;
+		goto free_fw_upload;
+	}
+
+	fw_upload_priv->fw_upload = fw_upload;
+	fw_upload_priv->ops = ops;
+	mutex_init(&fw_upload_priv->lock);
+	fw_upload_priv->name = name;
+	fw_upload_priv->err_code = 0;
+	fw_upload_priv->progress = FW_UPLOAD_PROG_IDLE;
+	INIT_WORK(&fw_upload_priv->work, fw_upload_main);
+	fw_upload->dd_handle = dd_handle;
+
+	fw_sysfs = fw_create_instance(NULL, name, parent, opt_flags);
+	if (IS_ERR(fw_sysfs)) {
+		ret = PTR_ERR(fw_sysfs);
+		goto free_fw_upload_priv;
+	}
+	fw_upload->priv = fw_sysfs;
+	fw_sysfs->fw_upload_priv = fw_upload_priv;
+	f_dev = &fw_sysfs->dev;
+
+	ret = alloc_lookup_fw_priv(name, &fw_cache, &fw_priv,  NULL, 0, 0,
+				   FW_OPT_NOCACHE);
+	if (ret != 0) {
+		if (ret > 0)
+			ret = -EINVAL;
+		goto free_fw_sysfs;
+	}
+	fw_sysfs->fw_priv = fw_priv;
+
+	ret = device_add(f_dev);
+	if (ret) {
+		dev_err(f_dev, "%s: device_register failed\n", __func__);
+		put_device(f_dev);
+		module_put(THIS_MODULE);
+		return ERR_PTR(ret);
+	}
+
+	return fw_upload;
+
+free_fw_sysfs:
+	kfree(fw_sysfs);
+
+free_fw_upload_priv:
+	kfree(fw_upload_priv);
+
+free_fw_upload:
+	kfree(fw_upload);
+
+	module_put(THIS_MODULE);
+	return ERR_PTR(ret);
+}
+EXPORT_SYMBOL_GPL(fw_upload_register);
+
+/**
+ * fw_upload_unregister() - Unregister firmware upload interface
+ * @fw_upload: pointer to struct fw_upload
+ **/
+void fw_upload_unregister(struct fw_upload *fw_upload)
+{
+	struct fw_sysfs *fw_sysfs = fw_upload->priv;
+	struct fw_upload_priv *fw_upload_priv = fw_sysfs->fw_upload_priv;
+
+	mutex_lock(&fw_upload_priv->lock);
+	if (fw_upload_priv->progress == FW_UPLOAD_PROG_IDLE) {
+		mutex_unlock(&fw_upload_priv->lock);
+		goto unregister;
+	}
+
+	fw_upload_priv->ops->cancel(fw_upload);
+	mutex_unlock(&fw_upload_priv->lock);
+
+	/* Ensure lower-level device-driver is finished */
+	flush_work(&fw_upload_priv->work);
+
+unregister:
+	device_unregister(&fw_sysfs->dev);
+	module_put(THIS_MODULE);
+}
+EXPORT_SYMBOL_GPL(fw_upload_unregister);

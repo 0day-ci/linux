@@ -6,8 +6,8 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
-#include "firmware.h"
 #include "fw_sysfs.h"
+#include "fw_upload.h"
 
 /*
  * sysfs support for firmware loader
@@ -80,6 +80,10 @@ static void fw_dev_release(struct device *dev)
 {
 	struct fw_sysfs *fw_sysfs = to_fw_sysfs(dev);
 
+	if (fw_sysfs->fw_upload_priv) {
+		free_fw_priv(fw_sysfs->fw_priv);
+		kfree(fw_sysfs->fw_upload_priv);
+	}
 	kfree(fw_sysfs);
 }
 
@@ -165,6 +169,9 @@ static ssize_t firmware_loading_store(struct device *dev,
 				      const char *buf, size_t count)
 {
 	struct fw_sysfs *fw_sysfs = to_fw_sysfs(dev);
+#ifdef CONFIG_FW_UPLOAD
+	struct fw_upload_priv *fwlp;
+#endif
 	struct fw_priv *fw_priv;
 	ssize_t written = count;
 	int loading = simple_strtol(buf, NULL, 10);
@@ -211,6 +218,42 @@ static ssize_t firmware_loading_store(struct device *dev,
 				written = rc;
 			} else {
 				fw_state_done(fw_priv);
+
+#ifdef CONFIG_FW_UPLOAD
+				/*
+				 * For fw_uploads, start a worker thread to upload
+				 * data to the parent driver.
+				 */
+				if (!fw_sysfs->fw_upload_priv)
+					break;
+
+				if (!fw_priv->size) {
+					fw_free_paged_buf(fw_priv);
+					fw_state_init(fw_sysfs->fw_priv);
+					break;
+				}
+
+				fwlp = fw_sysfs->fw_upload_priv;
+				mutex_lock(&fwlp->lock);
+
+				/* Do not interfere an on-going fw_upload */
+				if (fwlp->progress != FW_UPLOAD_PROG_IDLE) {
+					mutex_unlock(&fwlp->lock);
+					written = -EBUSY;
+					goto out;
+				}
+
+				fwlp->progress = FW_UPLOAD_PROG_RECEIVING;
+				fwlp->err_code = 0;
+				fwlp->remaining_size = fw_priv->size;
+				fwlp->data = fw_priv->data;
+				pr_debug("%s: fw-%s fw_priv=%p data=%p size=%u\n",
+					 __func__, fw_priv->fw_name,
+					 fw_priv, fw_priv->data,
+					 (unsigned int)fw_priv->size);
+				queue_work(system_long_wq, &fwlp->work);
+				mutex_unlock(&fwlp->lock);
+#endif
 			}
 			break;
 		}
@@ -220,6 +263,9 @@ static ssize_t firmware_loading_store(struct device *dev,
 		fallthrough;
 	case -1:
 		fw_load_abort(fw_sysfs);
+		if (fw_sysfs->fw_upload_priv)
+			fw_state_init(fw_sysfs->fw_priv);
+
 		break;
 	}
 out:
@@ -227,7 +273,7 @@ out:
 	return written;
 }
 
-static DEVICE_ATTR(loading, 0644, firmware_loading_show, firmware_loading_store);
+DEVICE_ATTR(loading, 0644, firmware_loading_show, firmware_loading_store);
 
 static void firmware_rw_data(struct fw_priv *fw_priv, char *buffer,
 			     loff_t offset, size_t count, bool read)
