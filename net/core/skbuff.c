@@ -3959,8 +3959,9 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	skb_frag_t *frag = skb_shinfo(head_skb)->frags;
 	unsigned int mss = skb_shinfo(head_skb)->gso_size;
 	unsigned int doffset = head_skb->data - skb_mac_header(head_skb);
+	int hophdr_len = sizeof(struct hop_jumbo_hdr);
 	struct sk_buff *frag_skb = head_skb;
-	unsigned int offset = doffset;
+	unsigned int offset;
 	unsigned int tnl_hlen = skb_tnl_header_len(head_skb);
 	unsigned int partial_segs = 0;
 	unsigned int headroom;
@@ -3968,6 +3969,7 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	__be16 proto;
 	bool csum, sg;
 	int nfrags = skb_shinfo(head_skb)->nr_frags;
+	struct ipv6hdr *h6;
 	int err = -ENOMEM;
 	int i = 0;
 	int pos;
@@ -3992,6 +3994,23 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	}
 
 	__skb_push(head_skb, doffset);
+
+	if (ipv6_has_hopopt_jumbo(head_skb)) {
+		/* remove the HBH header.
+		 * Layout: [Ethernet header][IPv6 header][HBH][TCP header]
+		 */
+		memmove(head_skb->data + hophdr_len,
+			head_skb->data,
+			ETH_HLEN + sizeof(struct ipv6hdr));
+		head_skb->data += hophdr_len;
+		head_skb->len -= hophdr_len;
+		head_skb->network_header += hophdr_len;
+		head_skb->mac_header += hophdr_len;
+		doffset -= hophdr_len;
+		h6 = (struct ipv6hdr *)(head_skb->data + ETH_HLEN);
+		h6->nexthdr = IPPROTO_TCP;
+	}
+	offset = doffset;
 	proto = skb_network_protocol(head_skb, NULL);
 	if (unlikely(!proto))
 		return ERR_PTR(-EINVAL);
