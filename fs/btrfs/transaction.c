@@ -591,6 +591,9 @@ start_transaction(struct btrfs_root *root, unsigned int num_items,
 	if (BTRFS_FS_ERROR(fs_info))
 		return ERR_PTR(-EROFS);
 
+	if (test_bit(BTRFS_FS_SETGET_COMPLAINS, &fs_info->flags))
+		return ERR_PTR(-EROFS);
+
 	if (current->journal_info) {
 		WARN_ON(type & TRANS_EXTWRITERS);
 		h = current->journal_info;
@@ -924,6 +927,9 @@ static bool should_end_transaction(struct btrfs_trans_handle *trans)
 {
 	struct btrfs_fs_info *fs_info = trans->fs_info;
 
+	if (test_bit(BTRFS_FS_SETGET_COMPLAINS, &fs_info->flags))
+		return true;
+
 	if (btrfs_check_space_for_delayed_refs(fs_info))
 		return true;
 
@@ -968,6 +974,11 @@ static int __btrfs_end_transaction(struct btrfs_trans_handle *trans,
 	struct btrfs_fs_info *info = trans->fs_info;
 	struct btrfs_transaction *cur_trans = trans->transaction;
 	int err = 0;
+
+	/* If a serious error was detected abort the transaction early */
+	if (!TRANS_ABORTED(trans) &&
+	    test_bit(BTRFS_FS_SETGET_COMPLAINS, &info->flags))
+		btrfs_abort_transaction(trans, -EIO);
 
 	if (refcount_read(&trans->use_count) > 1) {
 		refcount_dec(&trans->use_count);
