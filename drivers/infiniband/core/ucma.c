@@ -1229,7 +1229,7 @@ static ssize_t ucma_init_qp_attr(struct ucma_file *file,
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 
-	resp.qp_attr_mask = 0;
+	memset(&resp, 0, sizeof(resp));
 	memset(&qp_attr, 0, sizeof qp_attr);
 	qp_attr.qp_state = cmd.qp_state;
 	mutex_lock(&ctx->mutex);
