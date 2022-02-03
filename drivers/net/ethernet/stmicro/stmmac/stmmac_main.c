@@ -3406,8 +3406,8 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
 	/* For common interrupt */
 	int_name = priv->int_name_mac;
 	sprintf(int_name, "%s:%s", dev->name, "mac");
-	ret = request_irq(dev->irq, stmmac_mac_interrupt,
-			  0, int_name, dev);
+	ret = request_threaded_irq(dev->irq, NULL, stmmac_mac_interrupt,
+				   IRQF_ONESHOT, int_name, dev);
 	if (unlikely(ret < 0)) {
 		netdev_err(priv->dev,
 			   "%s: alloc mac MSI %d (error: %d)\n",
@@ -3422,9 +3422,9 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
 	if (priv->wol_irq > 0 && priv->wol_irq != dev->irq) {
 		int_name = priv->int_name_wol;
 		sprintf(int_name, "%s:%s", dev->name, "wol");
-		ret = request_irq(priv->wol_irq,
-				  stmmac_mac_interrupt,
-				  0, int_name, dev);
+		ret = request_threaded_irq(priv->wol_irq,
+					   NULL, stmmac_mac_interrupt,
+					   IRQF_ONESHOT, int_name, dev);
 		if (unlikely(ret < 0)) {
 			netdev_err(priv->dev,
 				   "%s: alloc wol MSI %d (error: %d)\n",
@@ -3440,9 +3440,9 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
 	if (priv->lpi_irq > 0 && priv->lpi_irq != dev->irq) {
 		int_name = priv->int_name_lpi;
 		sprintf(int_name, "%s:%s", dev->name, "lpi");
-		ret = request_irq(priv->lpi_irq,
-				  stmmac_mac_interrupt,
-				  0, int_name, dev);
+		ret = request_threaded_irq(priv->lpi_irq,
+					   NULL, stmmac_mac_interrupt,
+					   IRQF_ONESHOT, int_name, dev);
 		if (unlikely(ret < 0)) {
 			netdev_err(priv->dev,
 				   "%s: alloc lpi MSI %d (error: %d)\n",
@@ -3551,8 +3551,8 @@ static int stmmac_request_irq_single(struct net_device *dev)
 	enum request_irq_err irq_err;
 	int ret;
 
-	ret = request_irq(dev->irq, stmmac_interrupt,
-			  IRQF_SHARED, dev->name, dev);
+	ret = request_threaded_irq(dev->irq, NULL, stmmac_interrupt,
+				   IRQF_SHARED | IRQF_ONESHOT, dev->name, dev);
 	if (unlikely(ret < 0)) {
 		netdev_err(priv->dev,
 			   "%s: ERROR: allocating the IRQ %d (error: %d)\n",
@@ -3565,8 +3565,8 @@ static int stmmac_request_irq_single(struct net_device *dev)
 	 * is used for WoL
 	 */
 	if (priv->wol_irq > 0 && priv->wol_irq != dev->irq) {
-		ret = request_irq(priv->wol_irq, stmmac_interrupt,
-				  IRQF_SHARED, dev->name, dev);
+		ret = request_threaded_irq(priv->wol_irq, NULL, stmmac_interrupt,
+					   IRQF_SHARED | IRQF_ONESHOT, dev->name, dev);
 		if (unlikely(ret < 0)) {
 			netdev_err(priv->dev,
 				   "%s: ERROR: allocating the WoL IRQ %d (%d)\n",
@@ -3578,8 +3578,8 @@ static int stmmac_request_irq_single(struct net_device *dev)
 
 	/* Request the IRQ lines */
 	if (priv->lpi_irq > 0 && priv->lpi_irq != dev->irq) {
-		ret = request_irq(priv->lpi_irq, stmmac_interrupt,
-				  IRQF_SHARED, dev->name, dev);
+		ret = request_threaded_irq(priv->lpi_irq, NULL, stmmac_interrupt,
+					   IRQF_SHARED | IRQF_ONESHOT, dev->name, dev);
 		if (unlikely(ret < 0)) {
 			netdev_err(priv->dev,
 				   "%s: ERROR: allocating the LPI IRQ %d (%d)\n",
