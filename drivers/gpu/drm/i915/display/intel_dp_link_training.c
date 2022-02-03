@@ -1288,6 +1288,9 @@ intel_dp_128b132b_lane_cds(struct intel_dp *intel_dp,
 	/* Time budget for the LANEx_CDS_DONE Sequence */
 	deadline = jiffies + msecs_to_jiffies((lttpr_count + 1) * 20);
 
+	/* FIXME: Give some slack for CDS. */
+	deadline += msecs_to_jiffies(500);
+
 	for (;;) {
 		usleep_range(2000, 3000);
 
