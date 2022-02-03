@@ -11,6 +11,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/regulator/consumer.h>
 
 #define CCI_HW_VERSION				0x0
 #define CCI_RESET_CMD				0x004
@@ -480,6 +481,20 @@ static void cci_disable_clocks(struct cci *cci)
 static int __maybe_unused cci_suspend_runtime(struct device *dev)
 {
 	struct cci *cci = dev_get_drvdata(dev);
+	struct regulator *bus_regulator;
+	unsigned int i;
+
+	for (i = 0; i < cci->data->num_masters; i++) {
+		if (!cci->master[i].cci)
+			continue;
+
+		bus_regulator = cci->master[i].adap.bus_regulator;
+		if (!bus_regulator)
+			continue;
+
+		if (regulator_is_enabled(bus_regulator) > 0)
+			regulator_disable(bus_regulator);
+	}
 
 	cci_disable_clocks(cci);
 	return 0;
@@ -488,11 +503,29 @@ static int __maybe_unused cci_suspend_runtime(struct device *dev)
 static int __maybe_unused cci_resume_runtime(struct device *dev)
 {
 	struct cci *cci = dev_get_drvdata(dev);
+	struct regulator *bus_regulator;
+	unsigned int i;
 	int ret;
 
 	ret = cci_enable_clocks(cci);
 	if (ret)
 		return ret;
+
+	for (i = 0; i < cci->data->num_masters; i++) {
+		if (!cci->master[i].cci)
+			continue;
+
+		bus_regulator = cci->master[i].adap.bus_regulator;
+		if (!bus_regulator)
+			continue;
+
+		if (!regulator_is_enabled(bus_regulator)) {
+			ret = regulator_enable(bus_regulator);
+			if (ret)
+				dev_err(dev, "failed to enable regulator: %d\n",
+					ret);
+		}
+	}
 
 	cci_init(cci);
 	return 0;
@@ -593,6 +626,7 @@ static int cci_probe(struct platform_device *pdev)
 	dev_dbg(dev, "CCI HW version = 0x%08x", val);
 
 	for_each_available_child_of_node(dev->of_node, child) {
+		struct regulator *bus_regulator;
 		struct cci_master *master;
 		u32 idx;
 
@@ -637,6 +671,21 @@ static int cci_probe(struct platform_device *pdev)
 			master->cci = NULL;
 			goto error_i2c;
 		}
+
+		/*
+		 * It might be possible to find an optional vbus supply, but
+		 * it requires to pass the registration of an I2C adapter
+		 * device and its association with a bus device tree node.
+		 */
+		bus_regulator = devm_regulator_get_optional(&master->adap.dev,
+							    "vbus");
+		if (IS_ERR(bus_regulator)) {
+			ret = PTR_ERR(bus_regulator);
+			if (ret == -EPROBE_DEFER)
+				goto error_i2c;
+			bus_regulator = NULL;
+		}
+		master->adap.bus_regulator = bus_regulator;
 	}
 
 	ret = cci_reset(cci);
