@@ -1,0 +1,273 @@
+What:		/sys/devices/.../usb_power_delivery
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing details about the USB Power Delivery
+		support of given device.
+
+		When representing the USB Power Delivery Messages, if the
+		message can contain multiple objects (like the capabilities
+		messages - Source_Capabilities and Sink_Capabilities), each
+		message will have its own sub-directory and that sub-directory
+		will then have a separate folder for each object.
+
+			usb_power_delivery/<message>/<object>/<attributes>
+
+		Otherwise the sub-directory will be for the object itself (for
+		example the Battery Status Message can only contain a single
+		Battery Status Data Object).
+
+			usb_power_delivery/<object>/<attributes>
+
+What:		/sys/devices/.../usb_power_delivery/revision
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		File showing the USB Power Delivery Specification Revision used
+		in communication.
+
+What:		/sys/devices/.../usb_power_delivery/version
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This is an optional attribute file showing the version of the
+		specific revision of the USB Power Delivery Specification that
+		the device supports. In most cases the specification version is
+		not known and the file is not available.
+
+What:		/sys/devices/.../usb_power_delivery/source_capabilities<index>
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing the source capabilities for a given USB
+		Power Delivery capable device. Ports on a system can have
+		multiple sets of source capabilities defined for them. The first
+		directory is always named "source_capabilities" (index 0), but
+		starting from the second capabilities set the index number is
+		added to the directory name ("source_capabilities",
+		"source-capabillities1", ...).
+
+		The source capabilities message "Source_Capabilities" contains a
+		set of Power Data Objects (PDO), each representing a type of
+		power supply the device supports. The order of the PDO objects
+		is defined in USB Power Delivery Specification. Each object in
+		this directory will have the object position number as the first
+		character followed by the object type name (":" as delimiter).
+
+			/sys/devices/.../usb_power_delivery/<capability>/<position>:<type>
+
+What:		/sys/devices/.../usb_power_delivery/sink_capabilities<index>
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing the sink capabilities of a given USB Power
+		Delivery capable device. Ports on a system can have multiple
+		sets of sink capabilities defined for them. The first directory
+		is always named "sink_capabilities" (index 0), but starting from
+		the second set the index number is added to the directory name
+		("sink_capabilities", "sink_capabilities1", ...).
+
+		The sink capability message "Sink_Capabilities" contains a set
+		of Power Data Objects (PDO) just like with source capabilities,
+		but instead of describing the power capabilities, these objects
+		describe the power requirements the device has for each type of
+		object.
+
+		The order of the objects in the sink capability message is the
+		same as it's in the source capabilities message.
+
+Fixed Supply Data Objects
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:fixed_supply
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing the attributes (the bit fields) defined for
+		Fixed Supply PDO.
+
+		The directory "1:fixed_supply" is special. USB Power Delivery
+		Specification dictates that the first PDO (at object position
+		1), and the only mandatory PDO, is always the vSafe5V Fixed
+		Supply Object. vSafe5V Object has additional fields defined for
+		it that the other Fixed Supply Objects do not have and that are
+		related to the USB capabilities rather than power capabilities.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/1:fixed_supply/dual_role_power
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file contains boolean value that tells does the device
+		support both source and sink power roles.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/1:fixed_supply/usb_suspend_supported
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file shows the value of the USB Suspend Supported bit in
+		vSafe5V Fixed Supply Object. If the bit is set then the device
+		will follow the USB 2.0 and USB 3.2 rules for suspend and
+		resume.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/1:fixed_supply/unconstrained_power
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file shows the value of the Unconstrained Power bit in
+		vSafe5V Fixed Supply Object. The bit is set when an external
+		source of power, powerful enough to power the entire system on
+		its own, is available for the device.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/1:fixed_supply/usb_communication_capable
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file shows the value of the USB Communication Capable bit in
+		vSafe5V Fixed Supply Object.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/1:fixed_supply/dual_role_data
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file shows the value of the Dual-Role Data bit in vSafe5V
+		Fixed Supply Object. Dual role data means ability act as both
+		USB host and USB device.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/1:fixed_supply/unchunked_extended_messages_supported
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file shows the value of the Unchunked Extended Messages
+		Supported bit in vSafe5V Fixed Supply Object.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:fixed_supply/voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The voltage the supply supports in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/source_capabilities/<position>:fixed_supply/maximum_current
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Maximum current of the fixed source supply in milliamperes.
+
+What:		/sys/devices/.../usb_power_delivery/sink_capabilities/<position>:fixed_supply/operational_current
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Operational current of the sink in milliamperes.
+
+What:		/sys/devices/.../usb_power_delivery/sink_capabilities/<position>:fixed_supply/fast_role_swap_current
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file contains the value of the "Fast Role Swap USB Type-C
+		Current" field that tells the current level the sink requires
+		after a Fast Role Swap.
+		0 - Fast Swap not supported"
+		1 - Default USB Power"
+		2 - 1.5A@5V"
+		3 - 3.0A@5V"
+
+Variable Supply Data Objects
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:variable_supply
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing the attributes (the bit fields) defined for
+		Variable Supply PDO.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:variable_supply/maximum_voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Maximum Voltage in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:variable_supply/minimum_voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Minimum Voltage in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/source_capabilities/<position>:variable_supply/maximum_current
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The maximum current in milliamperes that the source can supply
+		at the given Voltage range.
+
+What:		/sys/devices/.../usb_power_delivery/sink_capabilities/<position>:variable_supply/operational_current
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The operational current in milliamperes that the sink requires
+		at the given Voltage range.
+
+Battery Supply Data Objects
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:battery
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing the attributes (the bit fields) defined for
+		Battery PDO.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:battery/maximum_voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Maximum Voltage in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:battery/minimum_voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Minimum Voltage in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/source_capabilities/<position>:battery/maximum_power
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Maximum allowable Power in milliwatts.
+
+What:		/sys/devices/.../usb_power_delivery/sink_capabilities/<position>:battery/operational_power
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The operational power that the sink requires at the given
+		voltage range.
+
+Standard Power Range (SPR) Programmable Power Supply Objects
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:programmable_supply
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Directory containing the attributes (the bit fields) defined for
+		Programmable Power Supply (PPS) Augmented PDO (APDO).
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:programmable_supply/maximum_voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Maximum Voltage in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:programmable_supply/minimum_voltage
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Minimum Voltage in millivolts.
+
+What:		/sys/devices/.../usb_power_delivery/<capability>/<position>:programmable_supply/maximum_current
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		Maximum Current in milliamperes.
+
+What:		/sys/devices/.../usb_power_delivery/source_capabilities/<position>:programmable_supply/pps_power_limited
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		The PPS Power Limited bit indicates whether or not the source
+		supply will exceed the rated output power if requested.

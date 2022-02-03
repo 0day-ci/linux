@@ -495,4 +495,34 @@ static inline unsigned int rdo_max_power(u32 rdo)
 
 #define PD_P_SNK_STDBY_MW	2500	/* 2500 mW */
 
+#if IS_ENABLED(CONFIG_TYPEC)
+
+/**
+ * pd_desc - USB Power Delivery Descriptor
+ * @revision: USB Power Delivery Specification Revision
+ * @version: USB Power Delivery Specicication Version - optional
+ */
+struct pd_desc {
+	u16 revision;
+	u16 version;
+};
+
+/**
+ * pd_caps_desc - Description of USB Power Delivery Capabilities Message
+ * @pdo: The Power Data Objects in the Capability Message
+ * @role: Power role of the capabilities
+ */
+struct pd_caps_desc {
+	u32 pdo[PDO_MAX_OBJECTS];
+	enum typec_role role;
+};
+
+struct pd_capabilities *pd_register_capabilities(struct pd *pd, struct pd_caps_desc *desc);
+void pd_unregister_capabilities(struct pd_capabilities *cap);
+
+struct pd *pd_register(struct device *dev, struct pd_desc *desc);
+void pd_unregister(struct pd *pd);
+
+#endif /* CONFIG_TYPEC */
+
 #endif /* __LINUX_USB_PD_H */
