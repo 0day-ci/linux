@@ -677,7 +677,7 @@ static int FNAME(fetch)(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault,
 		gfn_t table_gfn;
 
 		clear_sp_write_flooding_count(it.sptep);
-		drop_large_spte(vcpu, it.sptep);
+		drop_large_spte(vcpu->kvm, it.sptep, true);
 
 		sp = NULL;
 		if (!is_shadow_present_pte(*it.sptep)) {
@@ -739,7 +739,7 @@ static int FNAME(fetch)(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault,
 
 		validate_direct_spte(vcpu, it.sptep, direct_access);
 
-		drop_large_spte(vcpu, it.sptep);
+		drop_large_spte(vcpu->kvm, it.sptep, true);
 
 		if (!is_shadow_present_pte(*it.sptep)) {
 			sp = kvm_mmu_get_child_sp(vcpu, it.sptep, base_gfn,
