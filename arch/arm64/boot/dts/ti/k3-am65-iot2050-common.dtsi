@@ -362,15 +362,13 @@
 &main_uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_uart1_pins_default>;
-};
-
-&main_uart2 {
-	status = "disabled";
+	status = "okay";
 };
 
 &mcu_uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&arduino_uart_pins_default>;
+	status = "okay";
 };
 
 &main_gpio0 {
@@ -416,12 +414,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&wkup_i2c0_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 };
 
 &mcu_i2c0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcu_i2c0_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 
 	psu: regulator@60 {
 		compatible = "ti,tps62363";
@@ -481,6 +481,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_i2c0_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 
 	rtc: rtc8564@51 {
 		compatible = "nxp,pcf8563";
@@ -498,12 +499,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_i2c1_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 };
 
 &main_i2c2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&main_i2c2_pins_default>;
 	clock-frequency = <400000>;
+	status = "okay";
 };
 
 &main_i2c3 {
@@ -513,6 +516,8 @@
 
 	#address-cells = <1>;
 	#size-cells = <0>;
+
+	status = "okay";
 
 	edp-bridge@f {
 		compatible = "toshiba,tc358767";
@@ -541,13 +546,10 @@
 	};
 };
 
-&mcu_cpsw {
-	status = "disabled";
-};
-
 &ecap0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&ecap0_pins_default>;
+	status = "okay";
 };
 
 &sdhci1 {
@@ -555,7 +557,13 @@
 	pinctrl-0 = <&main_mmc1_pins_default>;
 	ti,driver-strength-ohm = <50>;
 	disable-wp;
+	status = "okay";
 };
+
+&dwc3_0 {
+	status = "okay";
+};
+
 
 &usb0 {
 	pinctrl-names = "default";
@@ -563,10 +571,22 @@
 	dr_mode = "host";
 };
 
+&usb0_phy {
+	status = "okay";
+};
+
+&dwc3_1 {
+	status = "okay";
+};
+
 &usb1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&usb1_pins_default>;
 	dr_mode = "host";
+};
+
+&usb1_phy {
+	status = "okay";
 };
 
 &mcu_spi0 {
@@ -576,13 +596,12 @@
 	#address-cells = <1>;
 	#size-cells= <0>;
 	ti,pindir-d0-out-d1-in;
-};
-
-&tscadc0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &tscadc1 {
+	status = "okay";
+
 	adc {
 		ti,adc-channels = <0 1 2 3 4 5>;
 	};
@@ -591,6 +610,7 @@
 &ospi0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcu_fss0_ospi0_pins_default>;
+	status = "okay";
 
 	flash@0 {
 		compatible = "jedec,spi-nor";
@@ -611,6 +631,7 @@
 &dss {
 	pinctrl-names = "default";
 	pinctrl-0 = <&dss_vout1_pins_default>;
+	status = "okay";
 
 	assigned-clocks = <&k3_clks 67 2>;
 	assigned-clock-parents = <&k3_clks 67 5>;
@@ -628,17 +649,14 @@
 	};
 };
 
-&pcie0_rc {
-	status = "disabled";
-};
-
-&pcie0_ep {
-	status = "disabled";
+&serdes1 {
+	status = "okay";
 };
 
 &pcie1_rc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&minipcie_pins_default>;
+	status = "okay";
 
 	num-lanes = <1>;
 	phys = <&serdes1 PHY_TYPE_PCIE 0>;
@@ -646,20 +664,9 @@
 	reset-gpios = <&wkup_gpio0 27 GPIO_ACTIVE_HIGH>;
 };
 
-&m_can0 {
-	status = "disabled";
-};
-
-&m_can1 {
-	status = "disabled";
-};
-
-&pcie1_ep {
-	status = "disabled";
-};
-
 &mailbox0_cluster0 {
 	interrupts = <436>;
+	status = "okay";
 
 	mbox_mcu_r5fss0_core0: mbox-mcu-r5fss0-core0 {
 		ti,mbox-tx = <1 0 0>;
@@ -669,51 +676,12 @@
 
 &mailbox0_cluster1 {
 	interrupts = <432>;
+	status = "okay";
 
 	mbox_mcu_r5fss0_core1: mbox-mcu-r5fss0-core1 {
 		ti,mbox-tx = <1 0 0>;
 		ti,mbox-rx = <0 0 0>;
 	};
-};
-
-&mailbox0_cluster2 {
-	status = "disabled";
-};
-
-&mailbox0_cluster3 {
-	status = "disabled";
-};
-
-&mailbox0_cluster4 {
-	status = "disabled";
-};
-
-&mailbox0_cluster5 {
-	status = "disabled";
-};
-
-&mailbox0_cluster6 {
-	status = "disabled";
-};
-
-&mailbox0_cluster7 {
-	status = "disabled";
-};
-
-&mailbox0_cluster8 {
-	status = "disabled";
-};
-
-&mailbox0_cluster9 {
-	status = "disabled";
-};
-
-&mailbox0_cluster10 {
-	status = "disabled";
-};
-
-&mailbox0_cluster11 {
-	status = "disabled";
 };
 
 &mcu_r5fss0_core0 {
@@ -726,28 +694,4 @@
 	memory-region = <&mcu_r5fss0_core1_dma_memory_region>,
 			<&mcu_r5fss0_core1_memory_region>;
 	mboxes = <&mailbox0_cluster1 &mbox_mcu_r5fss0_core1>;
-};
-
-&icssg0_mdio {
-	status = "disabled";
-};
-
-&icssg1_mdio {
-	status = "disabled";
-};
-
-&icssg2_mdio {
-	status = "disabled";
-};
-
-&mcasp0 {
-	status = "disabled";
-};
-
-&mcasp1 {
-	status = "disabled";
-};
-
-&mcasp2 {
-	status = "disabled";
 };

@@ -13,10 +13,6 @@
 	assigned-clock-parents = <&k3_clks 67 5>;
 };
 
-&serdes0 {
-	status = "disabled";
-};
-
 &sdhci1 {
 	no-1-8-v;
 };

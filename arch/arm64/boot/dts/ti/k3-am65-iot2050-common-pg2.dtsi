@@ -35,6 +35,7 @@
 &serdes0 {
 	assigned-clocks = <&k3_clks 153 4>, <&serdes0 AM654_SERDES_CMU_REFCLK>;
 	assigned-clock-parents = <&k3_clks 153 7>, <&k3_clks 153 4>;
+	status = "okay";
 };
 
 &dwc3_0 {
@@ -42,10 +43,16 @@
 				 <&k3_clks 151 8>;  /* set PIPE3_TXB_CLK to WIZ8B2M4VSB */
 	phys = <&serdes0 PHY_TYPE_USB3 0>;
 	phy-names = "usb3-phy";
+	status = "okay";
 };
 
 &usb0 {
 	maximum-speed = "super-speed";
 	snps,dis-u1-entry-quirk;
 	snps,dis-u2-entry-quirk;
+	status = "okay";
+};
+
+&usb0_phy {
+	status = "okay";
 };
