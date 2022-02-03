@@ -18,6 +18,11 @@ struct fw_upload_priv {
 	bool driver_unload;
 };
 
+extern struct device_attribute dev_attr_status;
+extern struct device_attribute dev_attr_error;
+extern struct device_attribute dev_attr_cancel;
+extern struct device_attribute dev_attr_remaining_size;
+
 umode_t
 fw_upload_is_visible(struct kobject *kobj, struct attribute *attr, int n);
 

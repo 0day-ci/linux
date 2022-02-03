@@ -9,7 +9,8 @@ persistent sysfs nodes to enable users to initiate firmware updates for
 that device.  It is the responsibility of the device driver and/or the
 device itself to perform any validation on the data received. Firmware
 upload uses the same *loading* and *data* sysfs files described in the
-documentation for firmware fallback.
+documentation for firmware fallback. It also adds additional sysfs files
+to provide status on the transfer of the firmware image to the device.
 
 Register for firmware upload
 ============================
@@ -84,3 +85,19 @@ fw_upload_unregister
 --------------------
 .. kernel-doc:: drivers/base/firmware_loader/fw_upload.c
    :functions: fw_upload_unregister
+
+Sysfs Attributes
+================
+
+In addition to the *loading* and *data* sysfs files, there are additional
+sysfs files to monitor the status of the data transfer to the target
+device and to determine the final pass/fail status of the transfer.
+Depending on the device and the size of the firmware image, a firmware
+update could take milliseconds or minutes.
+
+The additional sysfs files are:
+
+* status - provides an indication of the progress of a firmware update
+* error - provides error information for a failed firmware update
+* remaining_size - tracks the data transfer portion of an update
+* cancel - echo 1 to this file to cancel the update
