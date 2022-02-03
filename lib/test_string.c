@@ -179,6 +179,38 @@ static __init int strnchr_selftest(void)
 	return 0;
 }
 
+/*
+ * Unlike many other string functions, strlen() can be used in
+ * static initializers when string lengths are known at compile
+ * time. (i.e. Under these conditions, strlen() is a constant
+ * expression.) Make sure it can be used this way.
+ */
+static const int strlen_ce = strlen("tada, a constant expression");
+
+static __init int strlen_selftest(void)
+{
+	/* String length ruler:         123456789012345 */
+	static const char normal[]   = "I am normal";
+	static const char *ptr       = "where do I go?";
+	static const char trailing[] = "hidden NULLs\0\0\0";
+	static const char leading[]  = "\0\0hidden text";
+
+	if (strlen(normal) != 11)
+		return 0x100001;
+	if (strlen(ptr++) != 14)
+		return 0x100002;
+	if (strlen(ptr++) != 13)
+		return 0x100003;
+	if (strlen(trailing) != 12)
+		return 0x100004;
+	if (strlen(leading) != 0)
+		return 0x100005;
+	if (strlen_ce != 27)
+		return 0x100006;
+
+	return 0;
+}
+
 static __exit void string_selftest_remove(void)
 {
 }
@@ -209,6 +241,11 @@ static __init int string_selftest_init(void)
 
 	test = 5;
 	subtest = strnchr_selftest();
+	if (subtest)
+		goto fail;
+
+	test = 5;
+	subtest = strlen_selftest();
 	if (subtest)
 		goto fail;
 

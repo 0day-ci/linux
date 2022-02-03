@@ -3,6 +3,7 @@
  * Copyright © 2019 Intel Corporation
  */
 
+#include <drm/drm_managed.h>
 #include <drm/intel-gtt.h>
 
 #include "intel_gt_debugfs.h"
@@ -10,6 +11,7 @@
 #include "gem/i915_gem_lmem.h"
 #include "i915_drv.h"
 #include "intel_context.h"
+#include "intel_engine_regs.h"
 #include "intel_gt.h"
 #include "intel_gt_buffer_pool.h"
 #include "intel_gt_clock_utils.h"
@@ -87,9 +89,11 @@ int intel_gt_probe_lmem(struct intel_gt *gt)
 	return 0;
 }
 
-void intel_gt_init_hw_early(struct intel_gt *gt, struct i915_ggtt *ggtt)
+int intel_gt_assign_ggtt(struct intel_gt *gt)
 {
-	gt->ggtt = ggtt;
+	gt->ggtt = drmm_kzalloc(&gt->i915->drm, sizeof(*gt->ggtt), GFP_KERNEL);
+
+	return gt->ggtt ? 0 : -ENOMEM;
 }
 
 static const struct intel_mmio_range icl_l3bank_steering_table[] = {

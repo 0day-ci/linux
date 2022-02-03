@@ -2495,10 +2495,10 @@ static int ice_xdp_alloc_setup_rings(struct ice_vsi *vsi)
 		xdp_ring->reg_idx = vsi->txq_map[xdp_q_idx];
 		xdp_ring->vsi = vsi;
 		xdp_ring->netdev = NULL;
-		xdp_ring->next_dd = ICE_TX_THRESH - 1;
-		xdp_ring->next_rs = ICE_TX_THRESH - 1;
 		xdp_ring->dev = dev;
 		xdp_ring->count = vsi->num_tx_desc;
+		xdp_ring->next_dd = ICE_RING_QUARTER(xdp_ring) - 1;
+		xdp_ring->next_rs = ICE_RING_QUARTER(xdp_ring) - 1;
 		WRITE_ONCE(vsi->xdp_rings[i], xdp_ring);
 		if (ice_setup_tx_ring(xdp_ring))
 			goto free_xdp_rings;
@@ -4459,8 +4459,6 @@ ice_probe(struct pci_dev *pdev, const struct pci_device_id __always_unused *ent)
 
 	/* set up for high or low DMA */
 	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
-	if (err)
-		err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
 	if (err) {
 		dev_err(dev, "DMA configuration failed: 0x%x\n", err);
 		return err;

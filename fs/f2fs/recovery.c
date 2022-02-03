@@ -46,15 +46,18 @@
 
 static struct kmem_cache *fsync_entry_slab;
 
-#ifdef CONFIG_UNICODE
+#if IS_ENABLED(CONFIG_UNICODE)
 extern struct kmem_cache *f2fs_cf_name_slab;
 #endif
 
 bool f2fs_space_for_roll_forward(struct f2fs_sb_info *sbi)
 {
 	s64 nalloc = percpu_counter_sum_positive(&sbi->alloc_valid_block_count);
+	u32 rf_node = percpu_counter_sum_positive(&sbi->rf_node_block_count);
 
 	if (sbi->last_valid_block_count + nalloc > sbi->user_block_count)
+		return false;
+	if (rf_node >= NM_I(sbi)->max_rf_node_blocks)
 		return false;
 	return true;
 }
@@ -149,7 +152,7 @@ static int init_recovered_filename(const struct inode *dir,
 		if (err)
 			return err;
 		f2fs_hash_filename(dir, fname);
-#ifdef CONFIG_UNICODE
+#if IS_ENABLED(CONFIG_UNICODE)
 		/* Case-sensitive match is fine for recovery */
 		kmem_cache_free(f2fs_cf_name_slab, fname->cf_name.name);
 		fname->cf_name.name = NULL;
@@ -796,7 +799,7 @@ int f2fs_recover_fsync_data(struct f2fs_sb_info *sbi, bool check_only)
 	INIT_LIST_HEAD(&dir_list);
 
 	/* prevent checkpoint */
-	down_write(&sbi->cp_global_sem);
+	f2fs_down_write(&sbi->cp_global_sem);
 
 	/* step #1: find fsynced inode numbers */
 	err = find_fsync_dnodes(sbi, &inode_list, check_only);
@@ -845,7 +848,7 @@ skip:
 	if (!err)
 		clear_sbi_flag(sbi, SBI_POR_DOING);
 
-	up_write(&sbi->cp_global_sem);
+	f2fs_up_write(&sbi->cp_global_sem);
 
 	/* let's drop all the directory inodes for clean checkpoint */
 	destroy_fsync_dnodes(&dir_list, err);

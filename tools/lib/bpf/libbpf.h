@@ -180,9 +180,11 @@ bpf_object__open_mem(const void *obj_buf, size_t obj_buf_sz,
 		     const struct bpf_object_open_opts *opts);
 
 /* deprecated bpf_object__open variants */
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_object__open_mem() instead")
 LIBBPF_API struct bpf_object *
 bpf_object__open_buffer(const void *obj_buf, size_t obj_buf_sz,
 			const char *name);
+LIBBPF_DEPRECATED_SINCE(0, 7, "use bpf_object__open_file() instead")
 LIBBPF_API struct bpf_object *
 bpf_object__open_xattr(struct bpf_object_open_attr *attr);
 
@@ -591,26 +593,39 @@ LIBBPF_API int bpf_program__nth_fd(const struct bpf_program *prog, int n);
 /*
  * Adjust type of BPF program. Default is kprobe.
  */
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_socket_filter(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_tracepoint(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_raw_tracepoint(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_kprobe(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_lsm(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_sched_cls(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_sched_act(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_xdp(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_perf_event(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_tracing(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_struct_ops(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_extension(struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__set_type() instead")
 LIBBPF_API int bpf_program__set_sk_lookup(struct bpf_program *prog);
 
-LIBBPF_API enum bpf_prog_type bpf_program__get_type(const struct bpf_program *prog);
+LIBBPF_API enum bpf_prog_type bpf_program__type(const struct bpf_program *prog);
 LIBBPF_API void bpf_program__set_type(struct bpf_program *prog,
 				      enum bpf_prog_type type);
 
 LIBBPF_API enum bpf_attach_type
-bpf_program__get_expected_attach_type(const struct bpf_program *prog);
+bpf_program__expected_attach_type(const struct bpf_program *prog);
 LIBBPF_API void
 bpf_program__set_expected_attach_type(struct bpf_program *prog,
 				      enum bpf_attach_type type);
@@ -631,18 +646,31 @@ LIBBPF_API int
 bpf_program__set_attach_target(struct bpf_program *prog, int attach_prog_fd,
 			       const char *attach_func_name);
 
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_socket_filter(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_tracepoint(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_raw_tracepoint(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_kprobe(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_lsm(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_sched_cls(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_sched_act(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_xdp(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_perf_event(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_tracing(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_struct_ops(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_extension(const struct bpf_program *prog);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_program__type() instead")
 LIBBPF_API bool bpf_program__is_sk_lookup(const struct bpf_program *prog);
 
 /*
@@ -706,7 +734,8 @@ bpf_object__prev_map(const struct bpf_object *obj, const struct bpf_map *map);
 LIBBPF_API int bpf_map__fd(const struct bpf_map *map);
 LIBBPF_API int bpf_map__reuse_fd(struct bpf_map *map, int fd);
 /* get map definition */
-LIBBPF_API const struct bpf_map_def *bpf_map__def(const struct bpf_map *map);
+LIBBPF_API LIBBPF_DEPRECATED_SINCE(0, 8, "use appropriate getters or setters instead")
+const struct bpf_map_def *bpf_map__def(const struct bpf_map *map);
 /* get map name */
 LIBBPF_API const char *bpf_map__name(const struct bpf_map *map);
 /* get/set map type */
@@ -715,6 +744,7 @@ LIBBPF_API int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type);
 /* get/set map size (max_entries) */
 LIBBPF_API __u32 bpf_map__max_entries(const struct bpf_map *map);
 LIBBPF_API int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_map__set_max_entries() instead")
 LIBBPF_API int bpf_map__resize(struct bpf_map *map, __u32 max_entries);
 /* get/set map flags */
 LIBBPF_API __u32 bpf_map__map_flags(const struct bpf_map *map);
@@ -757,7 +787,6 @@ LIBBPF_API bool bpf_map__is_offload_neutral(const struct bpf_map *map);
  */
 LIBBPF_API bool bpf_map__is_internal(const struct bpf_map *map);
 LIBBPF_API int bpf_map__set_pin_path(struct bpf_map *map, const char *path);
-LIBBPF_API const char *bpf_map__get_pin_path(const struct bpf_map *map);
 LIBBPF_API const char *bpf_map__pin_path(const struct bpf_map *map);
 LIBBPF_API bool bpf_map__is_pinned(const struct bpf_map *map);
 LIBBPF_API int bpf_map__pin(struct bpf_map *map, const char *path);
@@ -832,12 +861,41 @@ struct bpf_xdp_set_link_opts {
 };
 #define bpf_xdp_set_link_opts__last_field old_fd
 
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_xdp_attach() instead")
 LIBBPF_API int bpf_set_link_xdp_fd(int ifindex, int fd, __u32 flags);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_xdp_attach() instead")
 LIBBPF_API int bpf_set_link_xdp_fd_opts(int ifindex, int fd, __u32 flags,
 					const struct bpf_xdp_set_link_opts *opts);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_xdp_query_id() instead")
 LIBBPF_API int bpf_get_link_xdp_id(int ifindex, __u32 *prog_id, __u32 flags);
+LIBBPF_DEPRECATED_SINCE(0, 8, "use bpf_xdp_query() instead")
 LIBBPF_API int bpf_get_link_xdp_info(int ifindex, struct xdp_link_info *info,
 				     size_t info_size, __u32 flags);
+
+struct bpf_xdp_attach_opts {
+	size_t sz;
+	int old_prog_fd;
+	size_t :0;
+};
+#define bpf_xdp_attach_opts__last_field old_prog_fd
+
+struct bpf_xdp_query_opts {
+	size_t sz;
+	__u32 prog_id;		/* output */
+	__u32 drv_prog_id;	/* output */
+	__u32 hw_prog_id;	/* output */
+	__u32 skb_prog_id;	/* output */
+	__u8 attach_mode;	/* output */
+	size_t :0;
+};
+#define bpf_xdp_query_opts__last_field attach_mode
+
+LIBBPF_API int bpf_xdp_attach(int ifindex, int prog_fd, __u32 flags,
+			      const struct bpf_xdp_attach_opts *opts);
+LIBBPF_API int bpf_xdp_detach(int ifindex, __u32 flags,
+			      const struct bpf_xdp_attach_opts *opts);
+LIBBPF_API int bpf_xdp_query(int ifindex, int flags, struct bpf_xdp_query_opts *opts);
+LIBBPF_API int bpf_xdp_query_id(int ifindex, int flags, __u32 *prog_id);
 
 /* TC related API */
 enum bpf_tc_attach_point {
