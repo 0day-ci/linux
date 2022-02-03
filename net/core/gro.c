@@ -10,9 +10,20 @@
 #define GRO_MAX_HEAD (MAX_HEADER + 128)
 
 static DEFINE_SPINLOCK(offload_lock);
-static struct list_head offload_base __read_mostly = LIST_HEAD_INIT(offload_base);
+static struct list_head gro_offload_base __read_mostly = LIST_HEAD_INIT(gro_offload_base);
+static struct list_head gso_offload_base __read_mostly = LIST_HEAD_INIT(gso_offload_base);
 /* Maximum number of GRO_NORMAL skbs to batch up for list-RX */
 int gro_normal_batch __read_mostly = 8;
+
+#define offload_list_insert(head, poff, list)		\
+({							\
+	struct packet_offload *elem;			\
+	list_for_each_entry(elem, head, list) {		\
+		if ((poff)->priority < elem->priority)	\
+			break;				\
+	}						\
+	list_add_rcu(&(poff)->list, elem->list.prev);	\
+})
 
 /**
  *	dev_add_offload - register offload handlers
@@ -28,17 +39,32 @@ int gro_normal_batch __read_mostly = 8;
  */
 void dev_add_offload(struct packet_offload *po)
 {
-	struct packet_offload *elem;
-
 	spin_lock(&offload_lock);
-	list_for_each_entry(elem, &offload_base, list) {
-		if (po->priority < elem->priority)
-			break;
-	}
-	list_add_rcu(&po->list, elem->list.prev);
+	if (po->callbacks.gro_receive && po->callbacks.gro_complete)
+		offload_list_insert(&gro_offload_base, po, gro_list);
+	else if (po->callbacks.gro_complete)
+		pr_warn("missing gro_receive callback");
+	else if (po->callbacks.gro_receive)
+		pr_warn("missing gro_complete callback");
+
+	if (po->callbacks.gso_segment)
+		offload_list_insert(&gso_offload_base, po, gso_list);
 	spin_unlock(&offload_lock);
 }
 EXPORT_SYMBOL(dev_add_offload);
+
+#define offload_list_remove(type, head, poff, list)	\
+({							\
+	struct packet_offload *elem;			\
+	list_for_each_entry(elem, head, list) {		\
+		if ((poff) == elem) {			\
+			list_del_rcu(&(poff)->list);	\
+			break;				\
+		}					\
+	}						\
+	if (elem != (poff))				\
+		pr_warn("dev_remove_offload: %p not found in %s list\n", (poff), type); \
+})
 
 /**
  *	__dev_remove_offload	 - remove offload handler
@@ -55,20 +81,12 @@ EXPORT_SYMBOL(dev_add_offload);
  */
 static void __dev_remove_offload(struct packet_offload *po)
 {
-	struct list_head *head = &offload_base;
-	struct packet_offload *po1;
-
 	spin_lock(&offload_lock);
+	if (po->callbacks.gro_receive)
+		offload_list_remove("gro", &gro_offload_base, po, gso_list);
 
-	list_for_each_entry(po1, head, list) {
-		if (po == po1) {
-			list_del_rcu(&po->list);
-			goto out;
-		}
-	}
-
-	pr_warn("dev_remove_offload: %p not found\n", po);
-out:
+	if (po->callbacks.gso_segment)
+		offload_list_remove("gso", &gso_offload_base, po, gro_list);
 	spin_unlock(&offload_lock);
 }
 
@@ -111,8 +129,8 @@ struct sk_buff *skb_mac_gso_segment(struct sk_buff *skb,
 	__skb_pull(skb, vlan_depth);
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(ptype, &offload_base, list) {
-		if (ptype->type == type && ptype->callbacks.gso_segment) {
+	list_for_each_entry_rcu(ptype, &gso_offload_base, gso_list) {
+		if (ptype->type == type) {
 			segs = ptype->callbacks.gso_segment(skb, features);
 			break;
 		}
@@ -250,7 +268,7 @@ static void napi_gro_complete(struct napi_struct *napi, struct sk_buff *skb)
 {
 	struct packet_offload *ptype;
 	__be16 type = skb->protocol;
-	struct list_head *head = &offload_base;
+	struct list_head *head = &gro_offload_base;
 	int err = -ENOENT;
 
 	BUILD_BUG_ON(sizeof(struct napi_gro_cb) > sizeof(skb->cb));
@@ -261,8 +279,8 @@ static void napi_gro_complete(struct napi_struct *napi, struct sk_buff *skb)
 	}
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(ptype, head, list) {
-		if (ptype->type != type || !ptype->callbacks.gro_complete)
+	list_for_each_entry_rcu(ptype, head, gro_list) {
+		if (ptype->type != type)
 			continue;
 
 		err = INDIRECT_CALL_INET(ptype->callbacks.gro_complete,
@@ -273,7 +291,7 @@ static void napi_gro_complete(struct napi_struct *napi, struct sk_buff *skb)
 	rcu_read_unlock();
 
 	if (err) {
-		WARN_ON(&ptype->list == head);
+		WARN_ON(&ptype->gro_list == head);
 		kfree_skb(skb);
 		return;
 	}
@@ -442,7 +460,7 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 {
 	u32 bucket = skb_get_hash_raw(skb) & (GRO_HASH_BUCKETS - 1);
 	struct gro_list *gro_list = &napi->gro_hash[bucket];
-	struct list_head *head = &offload_base;
+	struct list_head *head = &gro_offload_base;
 	struct packet_offload *ptype;
 	__be16 type = skb->protocol;
 	struct sk_buff *pp = NULL;
@@ -456,8 +474,8 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	gro_list_prepare(&gro_list->list, skb);
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(ptype, head, list) {
-		if (ptype->type != type || !ptype->callbacks.gro_receive)
+	list_for_each_entry_rcu(ptype, head, gro_list) {
+		if (ptype->type != type)
 			continue;
 
 		skb_set_network_header(skb, skb_gro_offset(skb));
@@ -487,7 +505,7 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	}
 	rcu_read_unlock();
 
-	if (&ptype->list == head)
+	if (&ptype->gro_list == head)
 		goto normal;
 
 	if (PTR_ERR(pp) == -EINPROGRESS) {
@@ -543,11 +561,11 @@ normal:
 
 struct packet_offload *gro_find_receive_by_type(__be16 type)
 {
-	struct list_head *offload_head = &offload_base;
+	struct list_head *offload_head = &gro_offload_base;
 	struct packet_offload *ptype;
 
-	list_for_each_entry_rcu(ptype, offload_head, list) {
-		if (ptype->type != type || !ptype->callbacks.gro_receive)
+	list_for_each_entry_rcu(ptype, offload_head, gro_list) {
+		if (ptype->type != type)
 			continue;
 		return ptype;
 	}
@@ -557,11 +575,11 @@ EXPORT_SYMBOL(gro_find_receive_by_type);
 
 struct packet_offload *gro_find_complete_by_type(__be16 type)
 {
-	struct list_head *offload_head = &offload_base;
+	struct list_head *offload_head = &gro_offload_base;
 	struct packet_offload *ptype;
 
-	list_for_each_entry_rcu(ptype, offload_head, list) {
-		if (ptype->type != type || !ptype->callbacks.gro_complete)
+	list_for_each_entry_rcu(ptype, offload_head, gro_list) {
+		if (ptype->type != type)
 			continue;
 		return ptype;
 	}

@@ -2565,7 +2565,8 @@ struct packet_offload {
 	__be16			 type;	/* This is really htons(ether_type). */
 	u16			 priority;
 	struct offload_callbacks callbacks;
-	struct list_head	 list;
+	struct list_head	 gro_list;
+	struct list_head	 gso_list;
 };
 
 /* often modified stats are per-CPU, other are shared (netdev->stats) */
