@@ -630,14 +630,6 @@ static int cci_probe(struct platform_device *pdev)
 	val = readl(cci->base + CCI_HW_VERSION);
 	dev_dbg(dev, "CCI HW version = 0x%08x", val);
 
-	ret = cci_reset(cci);
-	if (ret < 0)
-		goto error;
-
-	ret = cci_init(cci);
-	if (ret < 0)
-		goto error;
-
 	for (i = 0; i < cci->data->num_masters; i++) {
 		if (!cci->master[i].cci)
 			continue;
@@ -648,6 +640,14 @@ static int cci_probe(struct platform_device *pdev)
 			goto error_i2c;
 		}
 	}
+
+	ret = cci_reset(cci);
+	if (ret < 0)
+		goto error_i2c;
+
+	ret = cci_init(cci);
+	if (ret < 0)
+		goto error_i2c;
 
 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
 	pm_runtime_use_autosuspend(dev);
@@ -663,7 +663,6 @@ error_i2c:
 			of_node_put(cci->master[i].adap.dev.of_node);
 		}
 	}
-error:
 	disable_irq(cci->irq);
 disable_clocks:
 	cci_disable_clocks(cci);
