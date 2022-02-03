@@ -2,14 +2,15 @@
 #ifndef TYPECHECK_H_INCLUDED
 #define TYPECHECK_H_INCLUDED
 
+#include <linux/compiler_types.h>
+#include <linux/build_bug.h>
+
 /*
  * Check at compile time that something is of a particular type.
  * Always evaluates to 1 so you may use it easily in comparisons.
  */
 #define typecheck(type,x) \
-({	type __dummy; \
-	typeof(x) __dummy2; \
-	(void)(&__dummy == &__dummy2); \
+({	BUILD_BUG_ON(!__same_type(type, (x))); \
 	1; \
 })
 
