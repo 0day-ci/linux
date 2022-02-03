@@ -805,7 +805,7 @@ void kvm_mmu_gfn_allow_lpage(const struct kvm_memory_slot *slot, gfn_t gfn)
 }
 
 static void account_shadowed(struct kvm *kvm,
-			     struct kvm_memory_slot *slot,
+			     const struct kvm_memory_slot *slot,
 			     struct kvm_mmu_page *sp)
 {
 	gfn_t gfn;
@@ -1384,7 +1384,7 @@ int kvm_cpu_dirty_log_size(void)
 }
 
 bool kvm_mmu_slot_gfn_write_protect(struct kvm *kvm,
-				    struct kvm_memory_slot *slot, u64 gfn,
+				    const struct kvm_memory_slot *slot, u64 gfn,
 				    int min_level)
 {
 	struct kvm_rmap_head *rmap_head;
@@ -2158,9 +2158,8 @@ out:
 	return sp;
 }
 
-
 static void kvm_mmu_init_sp(struct kvm *kvm, struct kvm_mmu_page *sp,
-			    struct kvm_memory_slot *slot, gfn_t gfn,
+			    const struct kvm_memory_slot *slot, gfn_t gfn,
 			    union kvm_mmu_page_role role)
 {
 	struct hlist_head *sp_list;
