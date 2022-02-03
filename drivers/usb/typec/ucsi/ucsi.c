@@ -568,8 +568,8 @@ static void ucsi_unregister_altmodes(struct ucsi_connector *con, u8 recipient)
 	}
 }
 
-static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
-			 u32 *pdos, int offset, int num_pdos)
+static int ucsi_read_pdos(struct ucsi_connector *con, enum typec_role role, int is_partner,
+			  u32 *pdos, int offset, int num_pdos)
 {
 	struct ucsi *ucsi = con->ucsi;
 	u64 command;
@@ -579,7 +579,7 @@ static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
 	command |= UCSI_GET_PDOS_PARTNER_PDO(is_partner);
 	command |= UCSI_GET_PDOS_PDO_OFFSET(offset);
 	command |= UCSI_GET_PDOS_NUM_PDOS(num_pdos - 1);
-	command |= UCSI_GET_PDOS_SRC_PDOS;
+	command |= is_source(role) ? UCSI_GET_PDOS_SRC_PDOS : 0;
 	ret = ucsi_send_command(ucsi, command, pdos + offset,
 				num_pdos * sizeof(u32));
 	if (ret < 0 && ret != -ETIMEDOUT)
@@ -590,26 +590,39 @@ static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
 	return ret;
 }
 
+static int ucsi_get_pdos(struct ucsi_connector *con, enum typec_role role,
+			 int is_partner, u32 *pdos)
+{
+	u8 num_pdos;
+	int ret;
+
+	/* UCSI max payload means only getting at most 4 PDOs at a time */
+	ret = ucsi_read_pdos(con, role, is_partner, pdos, 0, UCSI_MAX_PDOS);
+	if (ret < 0)
+		return ret;
+
+	num_pdos = ret / sizeof(u32); /* number of bytes to 32-bit PDOs */
+	if (num_pdos < UCSI_MAX_PDOS)
+		return num_pdos;
+
+	/* get the remaining PDOs, if any */
+	ret = ucsi_read_pdos(con, role, is_partner, pdos, UCSI_MAX_PDOS,
+			     PDO_MAX_OBJECTS - UCSI_MAX_PDOS);
+	if (ret < 0)
+		return ret;
+
+	return ret / sizeof(u32) + num_pdos;
+}
+
 static int ucsi_get_src_pdos(struct ucsi_connector *con)
 {
 	int ret;
 
-	/* UCSI max payload means only getting at most 4 PDOs at a time */
-	ret = ucsi_get_pdos(con, 1, con->src_pdos, 0, UCSI_MAX_PDOS);
+	ret = ucsi_get_pdos(con, TYPEC_SOURCE, 1, con->src_pdos);
 	if (ret < 0)
 		return ret;
 
-	con->num_pdos = ret / sizeof(u32); /* number of bytes to 32-bit PDOs */
-	if (con->num_pdos < UCSI_MAX_PDOS)
-		return 0;
-
-	/* get the remaining PDOs, if any */
-	ret = ucsi_get_pdos(con, 1, con->src_pdos, UCSI_MAX_PDOS,
-			    PDO_MAX_OBJECTS - UCSI_MAX_PDOS);
-	if (ret < 0)
-		return ret;
-
-	con->num_pdos += ret / sizeof(u32);
+	con->num_pdos += ret;
 
 	ucsi_port_psy_changed(con);
 
@@ -638,6 +651,60 @@ static int ucsi_check_altmodes(struct ucsi_connector *con)
 	return ret;
 }
 
+static int ucsi_register_partner_pdos(struct ucsi_connector *con)
+{
+	struct pd_desc desc = { con->ucsi->cap.pd_version };
+	struct pd_capabilities *cap;
+	struct pd_caps_desc caps;
+	int ret;
+
+	con->partner_pd = typec_partner_register_pd(con->partner, &desc);
+	if (IS_ERR(con->partner_pd))
+		return PTR_ERR(con->partner_pd);
+
+	ret = ucsi_get_pdos(con, TYPEC_SOURCE, 1, caps.pdo);
+	if (ret < 0)
+		return ret;
+
+	if (ret < PDO_MAX_OBJECTS)
+		caps.pdo[ret] = 0;
+	caps.role = TYPEC_SOURCE;
+
+	cap = pd_register_capabilities(con->partner_pd, &caps);
+	if (IS_ERR(cap))
+		return PTR_ERR(cap);
+
+	ret = typec_partner_set_pd_capabilities(con->partner, cap);
+	if (ret) {
+		pd_unregister_capabilities(cap);
+		return ret;
+	}
+
+	con->partner_source_caps = cap;
+
+	ret = ucsi_get_pdos(con, TYPEC_SINK, 1, caps.pdo);
+	if (ret <= 0)
+		return ret;
+
+	if (ret < PDO_MAX_OBJECTS)
+		caps.pdo[ret] = 0;
+	caps.role = TYPEC_SINK;
+
+	cap = pd_register_capabilities(con->partner_pd, &caps);
+	if (IS_ERR(cap))
+		return PTR_ERR(cap);
+
+	ret = typec_partner_set_pd_capabilities(con->partner, cap);
+	if (ret) {
+		pd_unregister_capabilities(cap);
+		return ret;
+	}
+
+	con->partner_sink_caps = cap;
+
+	return 0;
+}
+
 static void ucsi_pwr_opmode_change(struct ucsi_connector *con)
 {
 	switch (UCSI_CONSTAT_PWR_OPMODE(con->status.flags)) {
@@ -646,6 +713,7 @@ static void ucsi_pwr_opmode_change(struct ucsi_connector *con)
 		typec_set_pwr_opmode(con->port, TYPEC_PWR_MODE_PD);
 		ucsi_partner_task(con, ucsi_get_src_pdos, 30, 0);
 		ucsi_partner_task(con, ucsi_check_altmodes, 30, 0);
+		ucsi_partner_task(con, ucsi_register_partner_pdos, 1, HZ);
 		break;
 	case UCSI_CONSTAT_PWR_OPMODE_TYPEC1_5:
 		con->rdo = 0;
@@ -703,6 +771,17 @@ static void ucsi_unregister_partner(struct ucsi_connector *con)
 {
 	if (!con->partner)
 		return;
+
+	typec_partner_unset_pd_capabilities(con->partner, TYPEC_SINK);
+	pd_unregister_capabilities(con->partner_sink_caps);
+	con->partner_sink_caps = NULL;
+
+	typec_partner_unset_pd_capabilities(con->partner, TYPEC_SOURCE);
+	pd_unregister_capabilities(con->partner_source_caps);
+	con->partner_source_caps = NULL;
+
+	typec_partner_unregister_pd(con->partner);
+	con->partner_pd = NULL;
 
 	ucsi_unregister_altmodes(con, UCSI_RECIPIENT_SOP);
 	typec_unregister_partner(con->partner);
@@ -1037,6 +1116,8 @@ static int ucsi_register_port(struct ucsi *ucsi, int index)
 	u64 command;
 	char *name;
 	int ret;
+	struct pd_desc desc = { ucsi->cap.pd_version };
+	struct pd_caps_desc caps;
 
 	name = kasprintf(GFP_KERNEL, "%s-con%d", dev_name(ucsi->dev), con->num);
 	if (!name)
@@ -1101,6 +1182,24 @@ static int ucsi_register_port(struct ucsi *ucsi, int index)
 	if (IS_ERR(con->port)) {
 		ret = PTR_ERR(con->port);
 		goto out;
+	}
+
+	con->pd = typec_port_register_pd(con->port, &desc);
+
+	ret = ucsi_get_pdos(con, TYPEC_SOURCE, 0, caps.pdo);
+	if (ret > 0) {
+		caps.pdo[ret] = 0;
+		caps.role = TYPEC_SOURCE;
+		con->source_caps = pd_register_capabilities(con->pd, &caps);
+		typec_port_set_pd_capabilities(con->port, con->source_caps);
+	}
+
+	ret = ucsi_get_pdos(con, TYPEC_SINK, 0, caps.pdo);
+	if (ret > 0) {
+		caps.pdo[ret] = 0;
+		caps.role = TYPEC_SINK;
+		con->sink_caps = pd_register_capabilities(con->pd, &caps);
+		typec_port_set_pd_capabilities(con->port, con->sink_caps);
 	}
 
 	/* Alternate modes */
@@ -1169,6 +1268,7 @@ static int ucsi_register_port(struct ucsi *ucsi, int index)
 	    UCSI_CONSTAT_PWR_OPMODE_PD) {
 		ucsi_get_src_pdos(con);
 		ucsi_check_altmodes(con);
+		ucsi_register_partner_pdos(con);
 	}
 
 	trace_ucsi_register_port(con->num, &con->status);
@@ -1379,6 +1479,12 @@ void ucsi_unregister(struct ucsi *ucsi)
 		ucsi_unregister_port_psy(&ucsi->connector[i]);
 		if (ucsi->connector[i].wq)
 			destroy_workqueue(ucsi->connector[i].wq);
+		typec_port_unset_pd_capabilities(ucsi->connector[i].port,
+						 ucsi->connector[i].source_caps);
+		pd_unregister_capabilities(ucsi->connector[i].source_caps);
+		typec_port_unset_pd_capabilities(ucsi->connector[i].port,
+						 ucsi->connector[i].sink_caps);
+		pd_unregister_capabilities(ucsi->connector[i].sink_caps);
 		typec_unregister_port(ucsi->connector[i].port);
 	}
 

@@ -335,6 +335,14 @@ struct ucsi_connector {
 	int num_pdos;
 
 	struct usb_role_switch *usb_role_sw;
+
+	struct pd *pd;
+	struct pd_capabilities *source_caps;
+	struct pd_capabilities *sink_caps;
+
+	struct pd *partner_pd;
+	struct pd_capabilities *partner_source_caps;
+	struct pd_capabilities *partner_sink_caps;
 };
 
 int ucsi_send_command(struct ucsi *ucsi, u64 command,
