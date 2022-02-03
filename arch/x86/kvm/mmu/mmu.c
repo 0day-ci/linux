@@ -6056,7 +6056,8 @@ static int min_descs_for_split(const struct kvm_memory_slot *slot, u64 *huge_spt
 		gfn += KVM_PAGES_PER_HPAGE(split_level);
 	}
 
-	return min;
+	/* Plus 1 to extend the parent_ptes rmap of the lower level SP. */
+	return min + 1;
 }
 
 static int topup_huge_page_split_desc_cache(struct kvm *kvm, int min, gfp_t gfp)
@@ -6126,6 +6127,7 @@ static struct kvm_mmu_page *kvm_mmu_get_sp_for_split(struct kvm *kvm,
 	struct kvm_mmu_page *huge_sp = sptep_to_sp(huge_sptep);
 	struct kvm_mmu_page *split_sp;
 	union kvm_mmu_page_role role;
+	bool created = false;
 	unsigned int access;
 	gfn_t gfn;
 
@@ -6138,25 +6140,21 @@ static struct kvm_mmu_page *kvm_mmu_get_sp_for_split(struct kvm *kvm,
 	 */
 	role = kvm_mmu_child_role(huge_sp, true, access);
 	split_sp = kvm_mmu_get_existing_direct_sp(kvm, gfn, role);
-
-	/*
-	 * Opt not to split if the lower-level SP already exists. This requires
-	 * more complex handling as the SP may be already partially filled in
-	 * and may need extra pte_list_desc structs to update parent_ptes.
-	 */
 	if (split_sp)
-		return NULL;
+		goto out;
 
+	created = true;
 	swap(split_sp, *spp);
 	kvm_mmu_init_sp(kvm, split_sp, slot, gfn, role);
-	trace_kvm_mmu_get_page(split_sp, true);
 
+out:
+	trace_kvm_mmu_get_page(split_sp, created);
 	return split_sp;
 }
 
-static int kvm_mmu_split_huge_page(struct kvm *kvm,
-				   const struct kvm_memory_slot *slot,
-				   u64 *huge_sptep, struct kvm_mmu_page **spp)
+static void kvm_mmu_split_huge_page(struct kvm *kvm,
+				    const struct kvm_memory_slot *slot,
+				    u64 *huge_sptep, struct kvm_mmu_page **spp)
 
 {
 	struct kvm_mmu_memory_cache *cache;
@@ -6164,22 +6162,11 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 	u64 huge_spte, split_spte;
 	int split_level, index;
 	unsigned int access;
+	bool flush = false;
 	u64 *split_sptep;
 	gfn_t split_gfn;
 
 	split_sp = kvm_mmu_get_sp_for_split(kvm, slot, huge_sptep, spp);
-	if (!split_sp)
-		return -EOPNOTSUPP;
-
-	/*
-	 * We did not allocate an extra pte_list_desc struct to add huge_sptep
-	 * to split_sp->parent_ptes. An extra pte_list_desc struct should never
-	 * be necessary in practice though since split_sp is brand new.
-	 *
-	 * Note, this makes it safe to pass NULL to __link_shadow_page() below.
-	 */
-	if (WARN_ON_ONCE(pte_list_need_new_desc(&split_sp->parent_ptes)))
-		return -EINVAL;
 
 	huge_spte = READ_ONCE(*huge_sptep);
 
@@ -6191,7 +6178,20 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 		split_sptep = &split_sp->spt[index];
 		split_gfn = kvm_mmu_page_get_gfn(split_sp, index);
 
-		BUG_ON(is_shadow_present_pte(*split_sptep));
+		/*
+		 * split_sp may have populated page table entries if this huge
+		 * page is aliased in multiple shadow page table entries. We
+		 * know the existing SP will be mapping the same GFN->PFN
+		 * translation since this is a direct SP. However, the SPTE may
+		 * point to an even lower level page table that may only be
+		 * partially filled in (e.g. for NX huge pages). In other words,
+		 * we may be unmapping a portion of the huge page, which
+		 * requires a TLB flush.
+		 */
+		if (is_shadow_present_pte(*split_sptep)) {
+			flush |= !is_last_spte(*split_sptep, split_level);
+			continue;
+		}
 
 		split_spte = make_huge_page_split_spte(
 				huge_spte, split_level + 1, index, access);
@@ -6202,16 +6202,12 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 
 	/*
 	 * Replace the huge spte with a pointer to the populated lower level
-	 * page table. Since we are making this change without a TLB flush vCPUs
-	 * will see a mix of the split mappings and the original huge mapping,
-	 * depending on what's currently in their TLB. This is fine from a
-	 * correctness standpoint since the translation will be the same either
-	 * way.
+	 * page table. If the lower-level page table indentically maps the huge
+	 * page, there's no need for a TLB flush. Otherwise, flush TLBs after
+	 * dropping the huge page and before installing the shadow page table.
 	 */
-	drop_large_spte(kvm, huge_sptep, false);
-	__link_shadow_page(NULL, huge_sptep, split_sp);
-
-	return 0;
+	drop_large_spte(kvm, huge_sptep, flush);
+	__link_shadow_page(cache, huge_sptep, split_sp);
 }
 
 static bool should_split_huge_page(u64 *huge_sptep)
@@ -6266,16 +6262,13 @@ restart:
 		if (dropped_lock)
 			goto restart;
 
-		r = kvm_mmu_split_huge_page(kvm, slot, huge_sptep, &sp);
-
-		trace_kvm_mmu_split_huge_page(gfn, spte, level, r);
-
 		/*
-		 * If splitting is successful we must restart the iterator
-		 * because huge_sptep has just been removed from it.
+		 * After splitting we must restart the iterator because
+		 * huge_sptep has just been removed from it.
 		 */
-		if (!r)
-			goto restart;
+		kvm_mmu_split_huge_page(kvm, slot, huge_sptep, &sp);
+		trace_kvm_mmu_split_huge_page(gfn, spte, level, 0);
+		goto restart;
 	}
 
 	if (sp)
