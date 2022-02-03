@@ -152,6 +152,7 @@ struct in_ifaddr {
 	unsigned char		ifa_prefixlen;
 	__u32			ifa_flags;
 	char			ifa_label[IFNAMSIZ];
+	unsigned char		ifa_proto;
 
 	/* In seconds, relative to tstamp. Expiry is at tstamp + HZ * lft. */
 	__u32			ifa_valid_lft;

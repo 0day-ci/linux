@@ -73,6 +73,8 @@ struct inet6_ifaddr {
 
 	struct rcu_head		rcu;
 	struct in6_addr		peer_addr;
+
+	__u8			ifa_proto;
 };
 
 struct ip6_sf_socklist {

@@ -71,6 +71,7 @@ struct ifa6_config {
 	u32			preferred_lft;
 	u32			valid_lft;
 	u16			scope;
+	u8			ifa_proto;
 };
 
 int addrconf_init(void);
