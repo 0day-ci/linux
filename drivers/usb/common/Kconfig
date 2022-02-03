@@ -14,6 +14,16 @@ config USB_LED_TRIG
 	  LEDs and you want to use them as activity indicators for USB host or
 	  gadget.
 
+config USB_QCOM_EUD
+	tristate "QCOM Embedded USB Debugger(EUD) Driver"
+	select USB_ROLE_SWITCH
+	help
+	  This module enables support for Qualcomm Technologies, Inc.
+	  Embedded USB Debugger (EUD). The EUD is a control peripheral
+	  which reports VBUS attach/detach events and has USB-based
+	  debug and trace capabilities. On selecting m, the module name
+	  that is built is qcom_eud.ko
+
 config USB_ULPI_BUS
 	tristate "USB ULPI PHY interface support"
 	select USB_COMMON
