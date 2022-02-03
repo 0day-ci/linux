@@ -7,16 +7,24 @@
 
 #include "ctree.h"
 
-static bool check_setget_bounds(const struct extent_buffer *eb,
-				const void *ptr, unsigned off, int size)
+static void report_setget_bounds(const struct extent_buffer *eb,
+				 const void *ptr, unsigned off, int size)
+{
+	const unsigned long member_offset = (unsigned long)ptr + off;
+
+	btrfs_err_rl(eb->fs_info,
+		"bad eb member %s: ptr 0x%lx start %llu member offset %lu size %d",
+		(member_offset > eb->len ? "start" : "end"),
+		(unsigned long)ptr, eb->start, member_offset, size);
+}
+
+static inline bool check_setget_bounds(const struct extent_buffer *eb,
+				       const void *ptr, unsigned off, int size)
 {
 	const unsigned long member_offset = (unsigned long)ptr + off;
 
 	if (unlikely(member_offset + size > eb->len)) {
-		btrfs_warn(eb->fs_info,
-		"bad eb member %s: ptr 0x%lx start %llu member offset %lu size %d",
-			(member_offset > eb->len ? "start" : "end"),
-			(unsigned long)ptr, eb->start, member_offset, size);
+		report_setget_bounds(eb, ptr, off, size);
 		return false;
 	}
 
