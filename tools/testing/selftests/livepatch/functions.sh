@@ -78,6 +78,12 @@ function set_ftrace_enabled() {
 	result=$(sysctl -q kernel.ftrace_enabled="$1" 2>&1 && \
 		 sysctl kernel.ftrace_enabled 2>&1)
 	echo "livepatch: $result" > /dev/kmsg
+	# Skip the test if ftrace is busy.  This can happen under normal system
+	# conditions if a trace is marked as permament.
+	if [[ "$result" == *"Device or resource busy"* ]]; then
+		skip "failed to set kernel.ftrace_enabled=$1"
+	fi
+
 }
 
 function cleanup() {
