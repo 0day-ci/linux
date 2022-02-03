@@ -63,6 +63,11 @@ get_file_raw_ptr(struct task_struct *task, unsigned int idx)
 {
 	struct file *file;
 
+	/*
+	 * Fetch file pointers inside RCU read-lock section, but
+	 * skip additional locking for speed.  The pointer values
+	 * will be used as integers and must not be dereferenced.
+	 */
 	rcu_read_lock();
 	file = task_lookup_fd_rcu(task, idx);
 	rcu_read_unlock();
