@@ -2969,11 +2969,12 @@ static int happy_meal_pci_probe(struct pci_dev *pdev,
 		strcpy(prom_name, "SUNW,hme");
 #endif
 
-	err = -ENODEV;
+	err = pci_enable_device(pdev);
 
-	if (pci_enable_device(pdev))
+	if (err)
 		goto err_out;
 	pci_set_master(pdev);
+	err = -ENODEV;
 
 	if (!strcmp(prom_name, "SUNW,qfe") || !strcmp(prom_name, "qfe")) {
 		qp = quattro_pci_find(pdev);
