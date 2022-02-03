@@ -1224,10 +1224,12 @@ static int ast_get_modes(struct drm_connector *connector)
 			return -ENOMEM;
 
 		flags = ast_dp501_read_edid(connector->dev, (u8 *)edid);
-		if (flags)
+		if (flags) {
 			ast->dp501_maxclk = ast_get_dp501_max_clk(connector->dev);
-		else
+		} else {
 			kfree(edid);
+			edid = NULL;
+		}
 	}
 	if (!flags && ast_connector->i2c)
 		edid = drm_get_edid(connector, &ast_connector->i2c->adapter);
