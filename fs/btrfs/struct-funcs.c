@@ -81,7 +81,8 @@ u##bits btrfs_get_token_##bits(struct btrfs_map_token *token,		\
 									\
 	ASSERT(token);							\
 	ASSERT(token->kaddr);						\
-	ASSERT(check_setget_bounds(token->eb, ptr, off, size));		\
+	if (check_setget_bounds(token->eb, ptr, off, size))		\
+		return 0;						\
 	if (token->offset <= member_offset &&				\
 	    member_offset + size <= token->offset + PAGE_SIZE) {	\
 		return get_unaligned_le##bits(token->kaddr + oip);	\
@@ -108,7 +109,8 @@ u##bits btrfs_get_##bits(const struct extent_buffer *eb,		\
 	const int part = PAGE_SIZE - oip;				\
 	u8 lebytes[sizeof(u##bits)];					\
 									\
-	ASSERT(check_setget_bounds(eb, ptr, off, size));		\
+	if (check_setget_bounds(eb, ptr, off, size))			\
+		return 0;						\
 	if (INLINE_EXTENT_BUFFER_PAGES == 1 || oip + size <= PAGE_SIZE)	\
 		return get_unaligned_le##bits(kaddr + oip);		\
 									\
@@ -131,7 +133,8 @@ void btrfs_set_token_##bits(struct btrfs_map_token *token,		\
 									\
 	ASSERT(token);							\
 	ASSERT(token->kaddr);						\
-	ASSERT(check_setget_bounds(token->eb, ptr, off, size));		\
+	if (check_setget_bounds(token->eb, ptr, off, size))		\
+		return;							\
 	if (token->offset <= member_offset &&				\
 	    member_offset + size <= token->offset + PAGE_SIZE) {	\
 		put_unaligned_le##bits(val, token->kaddr + oip);	\
@@ -160,7 +163,8 @@ void btrfs_set_##bits(const struct extent_buffer *eb, void *ptr,	\
 	const int part = PAGE_SIZE - oip;				\
 	u8 lebytes[sizeof(u##bits)];					\
 									\
-	ASSERT(check_setget_bounds(eb, ptr, off, size));		\
+	if (check_setget_bounds(eb, ptr, off, size))			\
+		return;							\
 	if (INLINE_EXTENT_BUFFER_PAGES == 1 || oip + size <= PAGE_SIZE) { \
 		put_unaligned_le##bits(val, kaddr + oip);		\
 		return;							\
