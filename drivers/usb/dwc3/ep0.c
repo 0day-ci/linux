@@ -197,7 +197,7 @@ int dwc3_gadget_ep0_queue(struct usb_ep *ep, struct usb_request *request,
 	int				ret;
 
 	spin_lock_irqsave(&dwc->lock, flags);
-	if (!dep->endpoint.desc || !dwc->pullups_connected) {
+	if (!dep->endpoint.desc || !dwc->pullups_connected || !dwc->connected) {
 		dev_err(dwc->dev, "%s: can't queue to disabled endpoint\n",
 				dep->name);
 		ret = -ESHUTDOWN;
@@ -218,19 +218,21 @@ out:
 	return ret;
 }
 
-static void dwc3_ep0_stall_and_restart(struct dwc3 *dwc)
+void dwc3_ep0_stall_and_restart(struct dwc3 *dwc)
 {
 	struct dwc3_ep		*dep;
 
 	/* reinitialize physical ep1 */
 	dep = dwc->eps[1];
 	dep->flags = DWC3_EP_ENABLED;
+	dep->trb_enqueue = 0;
 
 	/* stall is always issued on EP0 */
 	dep = dwc->eps[0];
 	__dwc3_gadget_ep_set_halt(dep, 1, false);
 	dep->flags = DWC3_EP_ENABLED;
 	dwc->delayed_status = false;
+	dep->trb_enqueue = 0;
 
 	if (!list_empty(&dep->pending_list)) {
 		struct dwc3_request	*req;
@@ -240,7 +242,9 @@ static void dwc3_ep0_stall_and_restart(struct dwc3 *dwc)
 	}
 
 	dwc->ep0state = EP0_SETUP_PHASE;
-	dwc3_ep0_out_start(dwc);
+	complete(&dwc->ep0_in_setup);
+	if (dwc->softconnect)
+		dwc3_ep0_out_start(dwc);
 }
 
 int __dwc3_gadget_ep0_set_halt(struct usb_ep *ep, int value)
@@ -271,8 +275,6 @@ void dwc3_ep0_out_start(struct dwc3 *dwc)
 {
 	struct dwc3_ep			*dep;
 	int				ret;
-
-	complete(&dwc->ep0_in_setup);
 
 	dep = dwc->eps[0];
 	dwc3_ep0_prepare_one_trb(dep, dwc->ep0_trb_addr, 8,
@@ -922,7 +924,9 @@ static void dwc3_ep0_complete_status(struct dwc3 *dwc,
 		dwc->setup_packet_pending = true;
 
 	dwc->ep0state = EP0_SETUP_PHASE;
-	dwc3_ep0_out_start(dwc);
+	complete(&dwc->ep0_in_setup);
+	if (dwc->softconnect)
+		dwc3_ep0_out_start(dwc);
 }
 
 static void dwc3_ep0_xfer_complete(struct dwc3 *dwc,
@@ -1073,7 +1077,7 @@ void dwc3_ep0_send_delayed_status(struct dwc3 *dwc)
 	__dwc3_ep0_do_control_status(dwc, dwc->eps[direction]);
 }
 
-static void dwc3_ep0_end_control_data(struct dwc3 *dwc, struct dwc3_ep *dep)
+void dwc3_ep0_end_control_data(struct dwc3 *dwc, struct dwc3_ep *dep)
 {
 	struct dwc3_gadget_ep_cmd_params params;
 	u32			cmd;
@@ -1083,7 +1087,8 @@ static void dwc3_ep0_end_control_data(struct dwc3 *dwc, struct dwc3_ep *dep)
 		return;
 
 	cmd = DWC3_DEPCMD_ENDTRANSFER;
-	cmd |= DWC3_DEPCMD_CMDIOC;
+	cmd |= dwc->connected ? 0 : DWC3_DEPCMD_HIPRI_FORCERM;
+	cmd |= dwc->connected ? DWC3_DEPCMD_CMDIOC : 0;
 	cmd |= DWC3_DEPCMD_PARAM(dep->resource_index);
 	memset(&params, 0, sizeof(params));
 	ret = dwc3_send_gadget_ep_cmd(dep, cmd, &params);

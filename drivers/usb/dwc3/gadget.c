@@ -885,12 +885,13 @@ static int __dwc3_gadget_ep_enable(struct dwc3_ep *dep, unsigned int action)
 		reg |= DWC3_DALEPENA_EP(dep->number);
 		dwc3_writel(dwc->regs, DWC3_DALEPENA, reg);
 
-		if (usb_endpoint_xfer_control(desc))
-			goto out;
-
 		/* Initialize the TRB ring */
 		dep->trb_dequeue = 0;
 		dep->trb_enqueue = 0;
+
+		if (usb_endpoint_xfer_control(desc))
+			goto out;
+
 		memset(dep->trb_pool, 0,
 		       sizeof(struct dwc3_trb) * DWC3_TRB_NUM);
 
@@ -2463,7 +2464,8 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 	 * Per databook, when we want to stop the gadget, if a control transfer
 	 * is still in process, complete it and get the core into setup phase.
 	 */
-	if (!is_on && dwc->ep0state != EP0_SETUP_PHASE) {
+	if ((!is_on && (dwc->ep0state != EP0_SETUP_PHASE ||
+	     dwc->ep0_next_event != DWC3_EP0_COMPLETE))) {
 		reinit_completion(&dwc->ep0_in_setup);
 
 		ret = wait_for_completion_timeout(&dwc->ep0_in_setup,
@@ -2506,6 +2508,17 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 		u32 count;
 
 		dwc->connected = false;
+
+		/*
+		 * Ensure no pending data/setup stages, and disable ep0 to
+		 * block further EP0 transactions before stopping pending
+		 * transfers.
+		 */
+		dwc3_ep0_end_control_data(dwc, dwc->eps[1]);
+		dwc3_ep0_stall_and_restart(dwc);
+		__dwc3_gadget_ep_disable(dwc->eps[0]);
+		__dwc3_gadget_ep_disable(dwc->eps[1]);
+
 		/*
 		 * In the Synopsis DesignWare Cores USB3 Databook Rev. 3.30a
 		 * Section 4.1.8 Table 4-7, it states that for a device-initiated
@@ -3587,8 +3600,10 @@ static void dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
 	bool interrupt)
 {
 	struct dwc3_gadget_ep_cmd_params params;
+	struct dwc3 *dwc = dep->dwc;
 	u32 cmd;
 	int ret;
+	int retries = 1;
 
 	if (!(dep->flags & DWC3_EP_TRANSFER_STARTED) ||
 	    (dep->flags & DWC3_EP_END_TRANSFER_PENDING))
@@ -3620,7 +3635,7 @@ static void dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
 	 *
 	 * This mode is NOT available on the DWC_usb31 IP.
 	 */
-
+retry:
 	cmd = DWC3_DEPCMD_ENDTRANSFER;
 	cmd |= force ? DWC3_DEPCMD_HIPRI_FORCERM : 0;
 	cmd |= interrupt ? DWC3_DEPCMD_CMDIOC : 0;
@@ -3628,6 +3643,23 @@ static void dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
 	memset(&params, 0, sizeof(params));
 	ret = dwc3_send_gadget_ep_cmd(dep, cmd, &params);
 	WARN_ON_ONCE(ret);
+	if (ret == -ETIMEDOUT) {
+		if (!dwc->connected) {
+			/*
+			 * While the controller is in an active setup/control
+			 * transfer, the HW is unable to service other eps
+			 * potentially leading to an endxfer command timeout.
+			 * It was recommended to ensure that there are no
+			 * pending/cached setup packets stored in internal
+			 * memory.  Only way to achieve this is to issue another
+			 * start transfer, and retry.
+			 */
+			if (retries--) {
+				dwc3_ep0_out_start(dwc);
+				goto retry;
+			}
+		}
+	}
 	dep->resource_index = 0;
 
 	if (!interrupt)
