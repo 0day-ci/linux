@@ -22,6 +22,10 @@ struct typec_altmode_ops;
 struct fwnode_handle;
 struct device;
 
+struct pd_capabilities;
+struct pd_desc;
+struct pd;
+
 enum typec_port_type {
 	TYPEC_PORT_SRC,
 	TYPEC_PORT_SNK,
@@ -231,6 +235,7 @@ struct typec_operations {
 	int (*vconn_set)(struct typec_port *port, enum typec_role role);
 	int (*port_type_set)(struct typec_port *port,
 			     enum typec_port_type type);
+	int (*capabilities_set)(struct typec_port *port, struct pd_capabilities *cap);
 };
 
 enum usb_pd_svdm_ver {
@@ -314,5 +319,15 @@ int typec_find_port_data_role(const char *name);
 void typec_partner_set_svdm_version(struct typec_partner *partner,
 				    enum usb_pd_svdm_ver svdm_version);
 int typec_get_negotiated_svdm_version(struct typec_port *port);
+
+struct pd *typec_partner_register_pd(struct typec_partner *partner, struct pd_desc *desc);
+void typec_partner_unregister_pd(struct typec_partner *partner);
+int typec_partner_set_pd_capabilities(struct typec_partner *partner, struct pd_capabilities *cap);
+void typec_partner_unset_pd_capabilities(struct typec_partner *partner, enum typec_role role);
+
+struct pd *typec_port_register_pd(struct typec_port *port, struct pd_desc *desc);
+void typec_port_unregister_pd(struct typec_port *port);
+int typec_port_set_pd_capabilities(struct typec_port *port, struct pd_capabilities *cap);
+int typec_port_unset_pd_capabilities(struct typec_port *port, struct pd_capabilities *cap);
 
 #endif /* __LINUX_USB_TYPEC_H */

@@ -15,6 +15,7 @@
 
 #include "bus.h"
 #include "class.h"
+#include "pd.h"
 
 static DEFINE_IDA(typec_index_ida);
 
@@ -25,6 +26,11 @@ struct class typec_class = {
 
 /* ------------------------------------------------------------------------- */
 /* Common attributes */
+
+static const char * const cap_name[] = {
+	[TYPEC_SINK]		= "sink_capabilities",
+	[TYPEC_SOURCE]		= "source_capabilities",
+};
 
 static const char * const typec_accessory_modes[] = {
 	[TYPEC_ACCESSORY_NONE]		= "none",
@@ -588,6 +594,100 @@ EXPORT_SYMBOL_GPL(typec_unregister_altmode);
 
 /* ------------------------------------------------------------------------- */
 /* Type-C Partners */
+
+/**
+ * typec_partner_set_pd_capabilities - Create link to the USB PD capabilities
+ * @partner: USB Type-C partner
+ * @cap: USB Power Delivery capabilities
+ *
+ * The link will be named "source_capabilities" or "sink_capabilities" depending
+ * on the role of @cap.
+ */
+int typec_partner_set_pd_capabilities(struct typec_partner *partner, struct pd_capabilities *cap)
+{
+	int ret;
+
+	if (!cap)
+		return -EINVAL;
+
+	if ((is_source(cap->role) && partner->source_caps) || partner->sink_caps)
+		return -EEXIST;
+
+	ret = sysfs_create_link(&partner->dev.kobj, &cap->kobj, cap_name[cap->role]);
+	if (ret)
+		return ret;
+
+	if (is_source(cap->role))
+		partner->source_caps = cap;
+	else
+		partner->sink_caps = cap;
+
+	kobject_get(&cap->kobj);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(typec_partner_set_pd_capabilities);
+
+/**
+ * typec_partner_unset_pd_capabilities - Remove link to the USB PD capabilities
+ * @port: USB Type-C partner
+ * @cap: USB Power Delivery capabilities
+ */
+void typec_partner_unset_pd_capabilities(struct typec_partner *partner, enum typec_role role)
+{
+	struct pd_capabilities *cap;
+
+	if (is_source(role)) {
+		cap = partner->source_caps;
+		partner->source_caps = NULL;
+	} else {
+		cap = partner->sink_caps;
+		partner->sink_caps = NULL;
+	}
+
+	if (!cap)
+		return;
+
+	sysfs_remove_link(&partner->dev.kobj, cap_name[role]);
+	kobject_put(&cap->kobj);
+}
+EXPORT_SYMBOL_GPL(typec_partner_unset_pd_capabilities);
+
+/**
+ * typec_partner_register_pd - Register USB Power Delivery support
+ * @partner: The partner device that support USB Power Delivery
+ * @desc: Description of the USB Power Delivery support
+ *
+ * The function returns pointer to struct pd, or errno on failure.
+ */
+struct pd *typec_partner_register_pd(struct typec_partner *partner, struct pd_desc *desc)
+{
+	struct pd *pd;
+
+	if (partner->pd)
+		return ERR_PTR(-EEXIST);
+
+	pd = pd_register(&partner->dev, desc);
+	if (!IS_ERR(pd))
+		partner->pd = pd;
+
+	return pd;
+}
+EXPORT_SYMBOL_GPL(typec_partner_register_pd);
+
+/**
+ * typec_partner_unregister_pd - Unregister USB Power Delivery sysfs directory
+ * @partner: The partner device
+ */
+void typec_partner_unregister_pd(struct typec_partner *partner)
+{
+	if (!partner->pd)
+		return;
+
+	pd_unregister(partner->pd);
+	partner->pd = NULL;
+}
+EXPORT_SYMBOL_GPL(typec_partner_unregister_pd);
 
 static ssize_t accessory_mode_show(struct device *dev,
 				   struct device_attribute *attr,
@@ -1169,6 +1269,234 @@ EXPORT_SYMBOL_GPL(typec_unregister_cable);
 
 /* ------------------------------------------------------------------------- */
 /* USB Type-C ports */
+
+/**
+ * typec_port_set_pd_capabilities - Create link to the USB PD capabilities
+ * @port: USB Type-C port
+ * @cap: Active USB Power Delivery capabilities
+ *
+ * Creates a link to the currently active capabilities @cap for @port, i.e.
+ * capabilities that are advertised to the partner. Both roles have their own
+ * active capabilities, so the link will be "source_capabilities" or
+ * "sink_capabilities" depending on the role of @cap.
+ */
+int typec_port_set_pd_capabilities(struct typec_port *port, struct pd_capabilities *cap)
+{
+	int ret;
+
+	if (!cap)
+		return -EINVAL;
+
+	if (is_source(cap->role) && port->source_caps)
+		kobject_put(&port->source_caps->kobj);
+	else if (port->sink_caps)
+		kobject_put(&port->sink_caps->kobj);
+
+	sysfs_remove_link(&port->dev.kobj, cap_name[cap->role]);
+
+	ret = sysfs_create_link(&port->dev.kobj, &cap->kobj, cap_name[cap->role]);
+	if (ret)
+		return ret;
+
+	if (is_source(cap->role))
+		port->source_caps = cap;
+	else
+		port->sink_caps = cap;
+
+	kobject_get(&cap->kobj);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(typec_port_set_pd_capabilities);
+
+/**
+ * typec_port_unset_pd_capabilities - Remove link to the USB PD capabilities
+ * @port: USB Type-C port
+ * @cap: Active USB Power Delivery capabilities
+ */
+int typec_port_unset_pd_capabilities(struct typec_port *port, struct pd_capabilities *cap)
+{
+	if (is_source(cap->role)) {
+		if (port->source_caps != cap)
+			return -EINVAL;
+		port->source_caps = NULL;
+	} else {
+		if (port->sink_caps != cap)
+			return -EINVAL;
+		port->sink_caps = NULL;
+	}
+
+	sysfs_remove_link(&port->dev.kobj, cap_name[cap->role]);
+	kobject_put(&cap->kobj);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(typec_port_unset_pd_capabilities);
+
+static ssize_t select_source_capabilities_store(struct device *dev,
+						struct device_attribute *attr,
+						const char *buf, size_t size)
+{
+	struct typec_port *port = to_typec_port(dev);
+	struct pd_capabilities *cap;
+	int ret;
+	int i;
+
+	if (!port->ops || !port->ops->capabilities_set)
+		return -EOPNOTSUPP;
+
+	if (sscanf(buf, "source_capabilities%d", &i) != 1)
+		return -EINVAL;
+
+	list_for_each_entry(cap, &port->pd->source_capabilities, node) {
+		if (cap->id == i) {
+			ret = port->ops->capabilities_set(port, cap);
+			if (ret)
+				return ret;
+			return size;
+		}
+	}
+
+	return -EINVAL;
+}
+
+static ssize_t select_source_capabilities_show(struct device *dev,
+					       struct device_attribute *attr, char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+	const char *name = cap_name[TYPEC_SOURCE];
+	struct pd_capabilities *cap;
+	ssize_t ret = 0;
+
+	list_for_each_entry(cap, &port->pd->source_capabilities, node) {
+		if (cap == port->source_caps)
+			ret += sysfs_emit(buf + ret, "[%s%d] ", name, cap->id);
+		else
+			ret += sysfs_emit(buf + ret, "%s%d ", name, cap->id);
+	}
+
+	buf[ret - 1] = '\n';
+
+	return ret;
+}
+static DEVICE_ATTR_RW(select_source_capabilities);
+
+static ssize_t select_sink_capabilities_store(struct device *dev,
+					      struct device_attribute *attr,
+					      const char *buf, size_t size)
+{
+	struct typec_port *port = to_typec_port(dev);
+	struct pd_capabilities *cap;
+	int ret;
+	int i;
+
+	if (!port->ops || !port->ops->capabilities_set)
+		return -EOPNOTSUPP;
+
+	if (sscanf(buf, "sink_capabilities%d", &i) != 1)
+		return -EINVAL;
+
+	list_for_each_entry(cap, &port->pd->sink_capabilities, node) {
+		if (cap->id == i) {
+			ret = port->ops->capabilities_set(port, cap);
+			if (ret)
+				return ret;
+			return size;
+		}
+	}
+
+	return -EINVAL;
+}
+
+static ssize_t select_sink_capabilities_show(struct device *dev,
+					     struct device_attribute *attr, char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+	const char *name = cap_name[TYPEC_SINK];
+	struct pd_capabilities *cap;
+	ssize_t ret = 0;
+
+	list_for_each_entry(cap, &port->pd->sink_capabilities, node) {
+		if (cap == port->sink_caps)
+			ret += sysfs_emit(buf + ret, "[%s%d] ", name, cap->id);
+		else
+			ret += sysfs_emit(buf + ret, "%s%d ", name, cap->id);
+	}
+
+	buf[ret - 1] = '\n';
+
+	return ret;
+}
+static DEVICE_ATTR_RW(select_sink_capabilities);
+
+static struct attribute *port_attrs[] = {
+	&dev_attr_select_source_capabilities.attr,
+	&dev_attr_select_sink_capabilities.attr,
+	NULL
+};
+
+static umode_t port_attr_is_visible(struct kobject *kobj, struct attribute *attr, int n)
+{
+	struct typec_port *port = to_typec_port(kobj_to_dev(kobj));
+
+	if (!port->ops || !port->ops->capabilities_set)
+		return 0;
+
+	return attr->mode;
+}
+
+static const struct attribute_group port_group = {
+	.is_visible = port_attr_is_visible,
+	.attrs = port_attrs,
+};
+
+/**
+ * typec_port_register_pd - Register USB Power Delivery support
+ * @port: The port that support USB Power Delivery
+ * @desc: Description of the USB Power Delivery support
+ *
+ * This directory will house all the USB Power Delivery objects of @port that
+ * the operating system can access. The function returns pointer to struct
+ * pd, or errno on failure.
+ */
+struct pd *typec_port_register_pd(struct typec_port *port, struct pd_desc *desc)
+{
+	struct pd *pd;
+	int ret;
+
+	if (port->pd)
+		return ERR_PTR(-EEXIST);
+
+	pd = pd_register(&port->dev, desc);
+	if (IS_ERR(pd))
+		return pd;
+
+	port->pd = pd;
+
+	ret = sysfs_create_group(&port->dev.kobj, &port_group);
+	if (ret) {
+		pd_unregister(pd);
+		return ERR_PTR(ret);
+	}
+
+	return pd;
+}
+EXPORT_SYMBOL_GPL(typec_port_register_pd);
+
+/**
+ * typec_port_unregister_pd - Unregister USB Power Delivery sysfs directory
+ * @port: The port device
+ */
+void typec_port_unregister_pd(struct typec_port *port)
+{
+	if (!port->pd)
+		return;
+
+	sysfs_remove_group(&port->dev.kobj, &port_group);
+	pd_unregister(port->pd);
+	port->pd = NULL;
+}
+EXPORT_SYMBOL_GPL(typec_port_unregister_pd);
 
 static const char * const typec_orientations[] = {
 	[TYPEC_ORIENTATION_NONE]	= "unknown",

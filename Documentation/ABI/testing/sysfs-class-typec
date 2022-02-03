@@ -141,6 +141,28 @@ Description:
 		- "reverse": CC2 orientation
 		- "unknown": Orientation cannot be determined.
 
+What:		/sys/class/typec/<port>/select_sink_capabilities
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file lists the available USB Power Delivery
+		Sink_Capabilities Messages, the same that can be read from the
+		"usb_power_delivery" sub-directory under the port device's sysfs
+		directory. The active message, the one that is advertised to the
+		partner, is in brackets. The active message can be changed by
+		writing to this file.
+
+What:		/sys/class/typec/<port>/select_source_capabilities
+Date:		February 2022
+Contact:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Description:
+		This file lists the available USB Power Delivery
+		Source_Capabilities Messages, the same that can be read from the
+		"usb_power_delivery" sub-directory under the port device's sysfs
+		directory. The active message, the one that is advertised to the
+		partner, is in brackets. The active message can be changed by
+		writing to this file.
+
 USB Type-C partner devices (eg. /sys/class/typec/port0-partner/)
 
 What:		/sys/class/typec/<port>-partner/accessory_mode
