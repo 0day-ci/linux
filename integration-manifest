@@ -1,0 +1,28 @@
+drm drm-fixes 26291c54e111ff6ba87a164d85d4a4e134b7315c
+	Linux 5.17-rc2
+drm-misc drm-misc-fixes 622c9a3a7868e1eeca39c55305ca3ebec4742b64
+	drm: mxsfb: Fix NULL pointer dereference
+drm-intel drm-intel-fixes 7d73c602154df56802a9e75ac212505fc1e9a2b6
+	drm/i915/pmu: Fix KMD and GuC race on accessing busyness
+drm drm-next 53dbee4926d3706ca9e03f3928fa85b5ec3bc0cc
+	Merge tag 'drm-misc-next-2022-01-27' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes d3cbc6e323c9299d10c8d2e4127c77c7d05d07b1
+	drm: panel-orientation-quirks: Add quirk for the 1Netbook OneXPlayer
+drm-intel drm-intel-next-fixes e26602be4869c74dd8a0f66f718b8a0ce120edb4
+	drm/i915/display/adlp: Implement new step in the TC voltage swing prog sequence
+drm-misc drm-misc-next c5e804ba38b5a3aa230e2a0ae9ed8058235f52d4
+	drm: mxsfb: Use dev_err_probe() helper
+drm-intel drm-intel-next d946bc44aa0bf03ff5c2888e8c3be8646e14467a
+	drm/i915: Disable unused power wells left enabled by BIOS
+drm-intel drm-intel-gt-next 876f7a438e4247a948268ad77b67c494f709cc30
+	Merge drm/drm-next into drm-intel-gt-next
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
