@@ -1,0 +1,59 @@
+The synchro-test.ko module can be used for testing and benchmarking mutexes,
+semaphores and R/W semaphores.
+
+The module is compiled by setting CONFIG_DEBUG_SYNCHRO_TEST to "m" when
+configuring the kernel.
+
+Using it is simple:
+
+	insmod synchro-test.ko <args>
+
+It will exit with error ENOANO after running the tests and printing the
+results to the kernel console log.
+
+The available arguments are:
+
+ (*) mx=N
+
+	Start up to N mutex thrashing threads, where N is at most 20. All will
+	try and thrash the same mutex.
+
+ (*) sm=N
+
+	Start up to N counting semaphore thrashing threads, where N is at most
+	20. All will try and thrash the same semaphore.
+
+ (*) ism=M
+
+	Initialise the counting semaphore with M, where M is any positive
+	integer greater than zero. The default is 4.
+
+ (*) rd=N
+ (*) wr=O
+ (*) dg=P
+
+	Start up to N reader thrashing threads, O writer thrashing threads and
+	P downgrader thrashing threads, where N, O and P are at most 20
+	apiece. All will try and thrash the same read/write semaphore.
+
+ (*) elapse=N
+
+	Run the tests for N seconds. The default is 5.
+
+ (*) load=N
+
+	Each thread delays for N uS whilst holding the lock. The default is 2.
+
+ (*) interval=N
+
+	Each thread delays for N uS whilst not holding the lock. The default
+	is 2.
+
+ (*) do_sched=1
+
+	Each thread will call schedule if required after each iteration.
+
+ (*) v=1
+
+	Print more verbose information, including a thread iteration
+	distribution list.
