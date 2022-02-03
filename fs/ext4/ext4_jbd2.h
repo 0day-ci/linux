@@ -302,6 +302,10 @@ static inline int ext4_trans_default_revoke_credits(struct super_block *sb)
 	return ext4_free_metadata_revoke_credits(sb, 8);
 }
 
+handle_t *__ext4_journal_start(struct inode *inode, unsigned int line,
+			       int type, int blocks, int rsv_blocks,
+			       int revoke_creds);
+
 #define ext4_journal_start_sb(sb, type, nblocks)			\
 	__ext4_journal_start_sb((sb), __LINE__, (type), (nblocks), 0,	\
 				ext4_trans_default_revoke_credits(sb))
@@ -317,15 +321,6 @@ static inline int ext4_trans_default_revoke_credits(struct super_block *sb)
 #define ext4_journal_start_with_revoke(inode, type, blocks, revoke_creds) \
 	__ext4_journal_start((inode), __LINE__, (type), (blocks), 0,	\
 			     (revoke_creds))
-
-static inline handle_t *__ext4_journal_start(struct inode *inode,
-					     unsigned int line, int type,
-					     int blocks, int rsv_blocks,
-					     int revoke_creds)
-{
-	return __ext4_journal_start_sb(inode->i_sb, line, type, blocks,
-				       rsv_blocks, revoke_creds);
-}
 
 #define ext4_journal_stop(handle) \
 	__ext4_journal_stop(__func__, __LINE__, (handle))

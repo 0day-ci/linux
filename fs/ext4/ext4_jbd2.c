@@ -106,6 +106,61 @@ handle_t *__ext4_journal_start_sb(struct super_block *sb, unsigned int line,
 				   GFP_NOFS, type, line);
 }
 
+handle_t *__ext4_journal_start(struct inode *inode, unsigned int line,
+				  int type, int blocks, int rsv_blocks,
+				  int revoke_creds)
+{
+	handle_t *handle;
+	journal_t *journal;
+	int err;
+
+	trace_ext4_journal_start(inode->i_sb, blocks, rsv_blocks, revoke_creds,
+				 _RET_IP_);
+	err = ext4_journal_check_start(inode->i_sb);
+	if (err < 0)
+		return ERR_PTR(err);
+
+	journal = EXT4_SB(inode->i_sb)->s_journal;
+	if (!journal || (EXT4_SB(inode->i_sb)->s_mount_state & EXT4_FC_REPLAY))
+		return ext4_get_nojournal();
+
+	handle = jbd2__journal_start(journal, blocks, rsv_blocks, revoke_creds,
+				     GFP_NOFS, type, line);
+
+	if (test_opt2(inode->i_sb, JOURNAL_FAST_COMMIT)
+	    && !IS_ERR(handle)
+	    && !ext4_test_mount_flag(inode->i_sb, EXT4_MF_FC_INELIGIBLE)) {
+		if (handle->h_ref == 1) {
+			WARN_ON(handle->h_priv != NULL);
+			ext4_fc_start_update(handle, inode);
+			handle->h_priv = inode;
+			return handle;
+		}
+		/*
+		 * Check if this is a nested transaction that modifies multiple
+		 * inodes. Such a transaction is fast commit ineligible.
+		 */
+		if (handle->h_priv != inode)
+			ext4_fc_mark_ineligible(inode->i_sb,
+						EXT4_FC_REASON_TOO_MANY_INODES,
+						handle);
+	}
+
+	return handle;
+}
+
+/* Stop fast commit update on the inode in this handle, if any. */
+static void ext4_fc_journal_stop(handle_t *handle)
+{
+	if (!handle->h_priv || handle->h_ref > 1)
+		return;
+	/*
+	 * We have an inode and this is the top level __ext4_journal_stop call.
+	 */
+	ext4_fc_stop_update(handle);
+	handle->h_priv = NULL;
+}
+
 int __ext4_journal_stop(const char *where, unsigned int line, handle_t *handle)
 {
 	struct super_block *sb;
@@ -119,11 +174,13 @@ int __ext4_journal_stop(const char *where, unsigned int line, handle_t *handle)
 
 	err = handle->h_err;
 	if (!handle->h_transaction) {
+		ext4_fc_journal_stop(handle);
 		rc = jbd2_journal_stop(handle);
 		return err ? err : rc;
 	}
 
 	sb = handle->h_transaction->t_journal->j_private;
+	ext4_fc_journal_stop(handle);
 	rc = jbd2_journal_stop(handle);
 
 	if (!err)

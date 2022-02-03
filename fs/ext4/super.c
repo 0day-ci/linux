@@ -1428,7 +1428,6 @@ static void destroy_inodecache(void)
 
 void ext4_clear_inode(struct inode *inode)
 {
-	ext4_fc_del(inode);
 	invalidate_inode_buffers(inode);
 	clear_inode(inode);
 	ext4_discard_preallocations(inode, 0);

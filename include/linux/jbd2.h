@@ -478,6 +478,9 @@ struct jbd2_revoke_table_s;
  * @h_requested_credits: Holds @h_total_credits after handle is started.
  * @h_revoke_credits_requested: Holds @h_revoke_credits after handle is started.
  * @saved_alloc_context: Saved context while transaction is open.
+ * @h_priv: private pointer for the client file system to store anything it
+ *      wants. Currently, ext4 uses it to store the inode on which this
+ *      transaction is happening. This is needed for fast commits.
  **/
 
 /* Docbook can't yet cope with the bit fields, but will leave the documentation
@@ -511,6 +514,7 @@ struct jbd2_journal_handle
 	unsigned int		h_requested_credits;
 
 	unsigned int		saved_alloc_context;
+	void		*h_priv;
 };
 
 

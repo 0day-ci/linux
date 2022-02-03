@@ -274,6 +274,7 @@ void ext4_free_inode(handle_t *handle, struct inode *inode)
 
 	is_directory = S_ISDIR(inode->i_mode);
 
+	ext4_fc_del(handle, inode);
 	/* Do this BEFORE marking the inode not in use or returning an error */
 	ext4_clear_inode(inode);
 

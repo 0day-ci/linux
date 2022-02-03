@@ -156,13 +156,7 @@
  *    fast commit recovery even if that area is invalidated by later full
  *    commits.
  *
- * 1) Fast commit's commit path locks the entire file system during fast
- *    commit. This has significant performance penalty. Instead of that, we
- *    should use ext4_fc_start/stop_update functions to start inode level
- *    updates from ext4_journal_start/stop. Once we do that we can drop file
- *    system locking during commit path.
- *
- * 2) Handle more ineligible cases.
+ * 1) Handle more ineligible cases.
  */
 
 #include <trace/events/ext4.h>
@@ -235,7 +229,7 @@ __releases(&EXT4_SB(inode->i_sb)->s_fc_lock)
  * performing any inode update. This function blocks if there's an ongoing
  * fast commit on the inode in question.
  */
-void ext4_fc_start_update(struct inode *inode)
+void ext4_fc_start_update(handle_t *handle, struct inode *inode)
 {
 	struct ext4_inode_info *ei = EXT4_I(inode);
 
@@ -255,13 +249,15 @@ restart:
 out:
 	atomic_inc(&ei->i_fc_updates);
 	spin_unlock(&EXT4_SB(inode->i_sb)->s_fc_lock);
+	ext4_fc_track_inode(handle, inode);
 }
 
 /*
  * Stop inode update and wake up waiting fast commits if any.
  */
-void ext4_fc_stop_update(struct inode *inode)
+void ext4_fc_stop_update(handle_t *handle)
 {
+	struct inode *inode = handle->h_priv;
 	struct ext4_inode_info *ei = EXT4_I(inode);
 
 	if (!test_opt2(inode->i_sb, JOURNAL_FAST_COMMIT) ||
@@ -276,7 +272,7 @@ void ext4_fc_stop_update(struct inode *inode)
  * Remove inode from fast commit list. If the inode is being committed
  * we wait until inode commit is done.
  */
-void ext4_fc_del(struct inode *inode)
+void ext4_fc_del(handle_t *handle, struct inode *inode)
 {
 	struct ext4_inode_info *ei = EXT4_I(inode);
 
@@ -292,7 +288,18 @@ restart:
 	}
 
 	if (ext4_test_inode_state(inode, EXT4_STATE_FC_COMMITTING)) {
+		/*
+		 * This inode is being committed using fast commit. We need to
+		 * temporarily pause the handle in order to let the commit
+		 * finish. When we reach here, inode->i_size has been set to 0,
+		 * so if we crash after the fast commit completes, the replay
+		 * code will ensure that the inode gets properly truncated and
+		 * removed. So, it is safe to stop the fast commit transaction
+		 * now and let the fast commit go through.
+		 */
+		ext4_fc_stop_update(handle);
 		ext4_fc_wait_committing_inode(inode);
+		ext4_fc_start_update(handle, inode);
 		goto restart;
 	}
 	list_del_init(&ei->i_fc_list);
@@ -2140,7 +2147,8 @@ static const char *fc_ineligible_reasons[] = {
 	"Dir renamed",
 	"Falloc range op",
 	"Data journalling",
-	"FC Commit Failed"
+	"FC Commit Failed",
+	"Too many inodes in a transaction",
 };
 
 int ext4_fc_info_show(struct seq_file *seq, void *v)
