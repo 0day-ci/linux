@@ -125,4 +125,7 @@ struct drm_hdmi_frl_dfm {
 
 bool drm_frl_dfm_nondsc_requirement_met(struct drm_hdmi_frl_dfm *frl_dfm);
 
+bool
+drm_frl_dfm_dsc_requirement_met(struct drm_hdmi_frl_dfm *frl_dfm);
+
 #endif
