@@ -156,13 +156,13 @@ static int __replace_page(struct vm_area_struct *vma, unsigned long addr,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page_vma_mapped_walk pvmw = {
-		.page = compound_head(old_page),
 		.vma = vma,
 		.address = addr,
 	};
 	int err;
 	struct mmu_notifier_range range;
 
+	pvmw_set_page(&pvmw, compound_head(old_page));
 	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, vma, mm, addr,
 				addr + PAGE_SIZE);
 

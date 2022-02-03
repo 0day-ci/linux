@@ -20,11 +20,11 @@ static bool __damon_pa_mkold(struct page *page, struct vm_area_struct *vma,
 		unsigned long addr, void *arg)
 {
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = addr,
 	};
 
+	pvmw_set_page(&pvmw, page);
 	while (page_vma_mapped_walk(&pvmw)) {
 		addr = pvmw.address;
 		if (pvmw.pte)
@@ -94,11 +94,11 @@ static bool __damon_pa_young(struct page *page, struct vm_area_struct *vma,
 {
 	struct damon_pa_access_chk_result *result = arg;
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = addr,
 	};
 
+	pvmw_set_page(&pvmw, page);
 	result->accessed = false;
 	result->page_sz = PAGE_SIZE;
 	while (page_vma_mapped_walk(&pvmw)) {

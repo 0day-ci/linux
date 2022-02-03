@@ -177,7 +177,6 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 				 unsigned long addr, void *old)
 {
 	struct page_vma_mapped_walk pvmw = {
-		.page = old,
 		.vma = vma,
 		.address = addr,
 		.flags = PVMW_SYNC | PVMW_MIGRATION,
@@ -187,6 +186,7 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 	swp_entry_t entry;
 
 	VM_BUG_ON_PAGE(PageTail(page), page);
+	pvmw_set_page(&pvmw, old);
 	while (page_vma_mapped_walk(&pvmw)) {
 		if (PageKsm(page))
 			new = page;

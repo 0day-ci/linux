@@ -803,12 +803,12 @@ static bool page_referenced_one(struct page *page, struct vm_area_struct *vma,
 {
 	struct page_referenced_arg *pra = arg;
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = address,
 	};
 	int referenced = 0;
 
+	pvmw_set_page(&pvmw, page);
 	while (page_vma_mapped_walk(&pvmw)) {
 		address = pvmw.address;
 
@@ -932,7 +932,6 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 			    unsigned long address, void *arg)
 {
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = address,
 		.flags = PVMW_SYNC,
@@ -940,6 +939,7 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 	struct mmu_notifier_range range;
 	int *cleaned = arg;
 
+	pvmw_set_page(&pvmw, page);
 	/*
 	 * We have to assume the worse case ie pmd for invalidation. Note that
 	 * the page can not be free from this function.
@@ -1424,7 +1424,6 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = address,
 	};
@@ -1434,6 +1433,7 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 	struct mmu_notifier_range range;
 	enum ttu_flags flags = (enum ttu_flags)(long)arg;
 
+	pvmw_set_page(&pvmw, page);
 	/*
 	 * When racing against e.g. zap_pte_range() on another cpu,
 	 * in between its ptep_get_and_clear_full() and page_remove_rmap(),
@@ -1724,7 +1724,6 @@ static bool try_to_migrate_one(struct page *page, struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = address,
 	};
@@ -1734,6 +1733,7 @@ static bool try_to_migrate_one(struct page *page, struct vm_area_struct *vma,
 	struct mmu_notifier_range range;
 	enum ttu_flags flags = (enum ttu_flags)(long)arg;
 
+	pvmw_set_page(&pvmw, page);
 	/*
 	 * When racing against e.g. zap_pte_range() on another cpu,
 	 * in between its ptep_get_and_clear_full() and page_remove_rmap(),
@@ -2004,11 +2004,11 @@ static bool page_mlock_one(struct page *page, struct vm_area_struct *vma,
 				 unsigned long address, void *unused)
 {
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = address,
 	};
 
+	pvmw_set_page(&pvmw, page);
 	/* An un-locked vma doesn't have any pages to lock, continue the scan */
 	if (!(vma->vm_flags & VM_LOCKED))
 		return true;
@@ -2079,7 +2079,6 @@ static bool page_make_device_exclusive_one(struct page *page,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = address,
 	};
@@ -2091,6 +2090,7 @@ static bool page_make_device_exclusive_one(struct page *page,
 	swp_entry_t entry;
 	pte_t swp_pte;
 
+	pvmw_set_page(&pvmw, page);
 	mmu_notifier_range_init_owner(&range, MMU_NOTIFY_EXCLUSIVE, 0, vma,
 				      vma->vm_mm, address, min(vma->vm_end,
 				      address + page_size(page)), args->owner);

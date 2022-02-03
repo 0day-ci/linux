@@ -213,6 +213,12 @@ struct page_vma_mapped_walk {
 	unsigned int flags;
 };
 
+static inline void pvmw_set_page(struct page_vma_mapped_walk *pvmw,
+		struct page *page)
+{
+	pvmw->page = page;
+}
+
 static inline void page_vma_mapped_walk_done(struct page_vma_mapped_walk *pvmw)
 {
 	/* HugeTLB pte is set to the relevant page table entry without pte_mapped. */

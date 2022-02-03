@@ -1035,13 +1035,13 @@ static int write_protect_page(struct vm_area_struct *vma, struct page *page,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 	};
 	int swapped;
 	int err = -EFAULT;
 	struct mmu_notifier_range range;
 
+	pvmw_set_page(&pvmw, page);
 	pvmw.address = page_address_in_vma(page, vma);
 	if (pvmw.address == -EFAULT)
 		goto out;

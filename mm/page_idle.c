@@ -49,12 +49,12 @@ static bool page_idle_clear_pte_refs_one(struct page *page,
 					unsigned long addr, void *arg)
 {
 	struct page_vma_mapped_walk pvmw = {
-		.page = page,
 		.vma = vma,
 		.address = addr,
 	};
 	bool referenced = false;
 
+	pvmw_set_page(&pvmw, page);
 	while (page_vma_mapped_walk(&pvmw)) {
 		addr = pvmw.address;
 		if (pvmw.pte) {
