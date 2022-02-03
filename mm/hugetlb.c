@@ -5804,6 +5804,8 @@ int hugetlb_mcopy_atomic_pte(struct mm_struct *dst_mm,
 			goto out;
 		}
 	} else {
+		int i, nr;
+
 		if (vm_shared &&
 		    hugetlbfs_pagecache_present(h, dst_vma, dst_addr)) {
 			put_page(*pagep);
@@ -5819,6 +5821,9 @@ int hugetlb_mcopy_atomic_pte(struct mm_struct *dst_mm,
 			goto out;
 		}
 		folio_copy(page_folio(page), page_folio(*pagep));
+		nr = compound_nr(page);
+		for (i = 0; i < nr; i++)
+			flush_dcache_page(page + i);
 		put_page(*pagep);
 		*pagep = NULL;
 	}
