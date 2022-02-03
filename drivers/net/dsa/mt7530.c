@@ -2523,9 +2523,6 @@ static void mt7531_sgmii_validate(struct mt7530_priv *priv, int port,
 	 */
 	switch (port) {
 	case 5:
-		if (mt7531_is_rgmii_port(priv, port))
-			break;
-		fallthrough;
 	case 6:
 		if (interface == PHY_INTERFACE_MODE_2500BASEX) {
 			phylink_set(supported, 2500baseX_Full);
