@@ -166,6 +166,8 @@ static bool damos_action_valid(int action)
 	case DAMOS_PAGEOUT:
 	case DAMOS_HUGEPAGE:
 	case DAMOS_NOHUGEPAGE:
+	case DAMOS_MERGEABLE:
+	case DAMOS_UNMERGEABLE:
 	case DAMOS_STAT:
 		return true;
 	default:
@@ -474,6 +476,66 @@ out:
 	return len;
 }
 
+static ssize_t dbgfs_counter_type_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
+{
+	struct damon_ctx *ctx = file->private_data;
+	char *kbuf;
+	ssize_t ret;
+
+	mutex_lock(&ctx->kdamond_lock);
+	if (ctx->kdamond) {
+		mutex_unlock(&ctx->kdamond_lock);
+		ret = -EBUSY;
+		goto out;
+	}
+	ret = count;
+	kbuf = user_input_str(buf, count, ppos);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
+
+	if (!strncmp(kbuf, "writes\n", count))
+		ctx->counter_type = DAMOS_NUMBER_WRITES;
+	else
+		ctx->counter_type = DAMOS_NUMBER_ACCESSES;
+
+	mutex_unlock(&ctx->kdamond_lock);
+out:
+	kfree(kbuf);
+	return ret;
+}
+
+static ssize_t dbgfs_counter_type_read(struct file *file, char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	struct damon_ctx *ctx = file->private_data;
+	char *kbuf;
+	ssize_t len;
+
+	kbuf = kmalloc(count, GFP_KERNEL | __GFP_NOWARN);
+	if (!kbuf)
+		return -ENOMEM;
+
+	mutex_lock(&ctx->kdamond_lock);
+	if (ctx->kdamond) {
+		mutex_unlock(&ctx->kdamond_lock);
+		len = -EBUSY;
+		goto out;
+	}
+
+	if (ctx->counter_type == DAMOS_NUMBER_WRITES)
+		len = scnprintf(kbuf, count, "writes");
+	else
+		len = scnprintf(kbuf, count, "accesses");
+	mutex_unlock(&ctx->kdamond_lock);
+	len = simple_read_from_buffer(buf, count, ppos, kbuf, len);
+
+out:
+	kfree(kbuf);
+	return len;
+}
+
+
 static int add_init_region(struct damon_ctx *c,
 			 unsigned long target_id, struct damon_addr_range *ar)
 {
@@ -633,12 +695,18 @@ static const struct file_operations kdamond_pid_fops = {
 	.read = dbgfs_kdamond_pid_read,
 };
 
+static const struct file_operations counter_type_fops = {
+	.open = damon_dbgfs_open,
+	.read = dbgfs_counter_type_read,
+	.write = dbgfs_counter_type_write,
+};
+
 static void dbgfs_fill_ctx_dir(struct dentry *dir, struct damon_ctx *ctx)
 {
 	const char * const file_names[] = {"attrs", "schemes", "target_ids",
-		"init_regions", "kdamond_pid"};
+		"init_regions", "kdamond_pid", "counter_type"};
 	const struct file_operations *fops[] = {&attrs_fops, &schemes_fops,
-		&target_ids_fops, &init_regions_fops, &kdamond_pid_fops};
+		&target_ids_fops, &init_regions_fops, &kdamond_pid_fops, &counter_type_fops};
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(file_names); i++)

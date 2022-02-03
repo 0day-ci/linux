@@ -367,6 +367,44 @@ void damon_va_update(struct damon_ctx *ctx)
 	}
 }
 
+static int damon_clean_soft_dirty_pmd_entry(pmd_t *pmd, unsigned long addr,
+		unsigned long next, struct mm_walk *walk)
+{
+	pte_t *pte;
+	spinlock_t *ptl;
+
+	if (pmd_huge(*pmd)) {
+		ptl = pmd_lock(walk->mm, pmd);
+		if (pmd_huge(*pmd)) {
+			damon_pmd_clean_soft_dirty(walk->vma, addr, pmd);
+			spin_unlock(ptl);
+			return 0;
+		}
+		spin_unlock(ptl);
+	}
+
+	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
+		return 0;
+	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+	if (!pte_present(*pte))
+		goto out;
+	damon_ptep_clean_soft_dirty(walk->vma, addr, pte);
+out:
+	pte_unmap_unlock(pte, ptl);
+	return 0;
+}
+
+static const struct mm_walk_ops damon_clean_soft_dirty_ops = {
+	.pmd_entry = damon_clean_soft_dirty_pmd_entry,
+};
+
+static void damon_va_clean_soft_dirty(struct mm_struct *mm, unsigned long addr)
+{
+	mmap_read_lock(mm);
+	walk_page_range(mm, addr, addr + 1, &damon_clean_soft_dirty_ops, NULL);
+	mmap_read_unlock(mm);
+}
+
 static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 		unsigned long next, struct mm_walk *walk)
 {
@@ -414,7 +452,10 @@ static void damon_va_prepare_access_check(struct damon_ctx *ctx,
 {
 	r->sampling_addr = damon_rand(r->ar.start, r->ar.end);
 
-	damon_va_mkold(mm, r->sampling_addr);
+	if (ctx->counter_type == DAMOS_NUMBER_WRITES)
+		damon_va_clean_soft_dirty(mm, r->sampling_addr);
+	else
+		damon_va_mkold(mm, r->sampling_addr);
 }
 
 void damon_va_prepare_access_checks(struct damon_ctx *ctx)
@@ -436,6 +477,7 @@ void damon_va_prepare_access_checks(struct damon_ctx *ctx)
 struct damon_young_walk_private {
 	unsigned long *page_sz;
 	bool young;
+	bool dirty;
 };
 
 static int damon_young_pmd_entry(pmd_t *pmd, unsigned long addr,
@@ -462,6 +504,10 @@ static int damon_young_pmd_entry(pmd_t *pmd, unsigned long addr,
 			*priv->page_sz = ((1UL) << HPAGE_PMD_SHIFT);
 			priv->young = true;
 		}
+		if (pmd_soft_dirty(*pmd)) {
+			*priv->page_sz = ((1UL) << HPAGE_PMD_SHIFT);
+			priv->dirty = true;
+		}
 		put_page(page);
 huge_out:
 		spin_unlock(ptl);
@@ -484,6 +530,10 @@ regular_page:
 		*priv->page_sz = PAGE_SIZE;
 		priv->young = true;
 	}
+	if (pte_soft_dirty(*pte)) {
+		*priv->page_sz = PAGE_SIZE;
+		priv->dirty = true;
+	}
 	put_page(page);
 out:
 	pte_unmap_unlock(pte, ptl);
@@ -495,16 +545,19 @@ static const struct mm_walk_ops damon_young_ops = {
 };
 
 static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
-		unsigned long *page_sz)
+		unsigned long *page_sz, bool *dirty)
 {
 	struct damon_young_walk_private arg = {
 		.page_sz = page_sz,
 		.young = false,
+		.dirty = false,
 	};
 
 	mmap_read_lock(mm);
 	walk_page_range(mm, addr, addr + 1, &damon_young_ops, &arg);
 	mmap_read_unlock(mm);
+
+	*dirty = arg.dirty;
 	return arg.young;
 }
 
@@ -521,18 +574,23 @@ static void damon_va_check_access(struct damon_ctx *ctx,
 	static unsigned long last_addr;
 	static unsigned long last_page_sz = PAGE_SIZE;
 	static bool last_accessed;
+	static bool last_written;
 
 	/* If the region is in the last checked page, reuse the result */
 	if (mm == last_mm && (ALIGN_DOWN(last_addr, last_page_sz) ==
 				ALIGN_DOWN(r->sampling_addr, last_page_sz))) {
 		if (last_accessed)
 			r->nr_accesses++;
+		if (last_written)
+			r->nr_writes++;
 		return;
 	}
 
-	last_accessed = damon_va_young(mm, r->sampling_addr, &last_page_sz);
+	last_accessed = damon_va_young(mm, r->sampling_addr, &last_page_sz, &last_written);
 	if (last_accessed)
 		r->nr_accesses++;
+	if (last_written)
+		r->nr_writes++;
 
 	last_mm = mm;
 	last_addr = r->sampling_addr;
@@ -543,7 +601,7 @@ unsigned int damon_va_check_accesses(struct damon_ctx *ctx)
 	struct damon_target *t;
 	struct mm_struct *mm;
 	struct damon_region *r;
-	unsigned int max_nr_accesses = 0;
+	unsigned int max_nr = 0;
 
 	damon_for_each_target(t, ctx) {
 		mm = damon_get_mm(t);
@@ -551,12 +609,15 @@ unsigned int damon_va_check_accesses(struct damon_ctx *ctx)
 			continue;
 		damon_for_each_region(r, t) {
 			damon_va_check_access(ctx, mm, r);
-			max_nr_accesses = max(r->nr_accesses, max_nr_accesses);
+			if (ctx->counter_type == DAMOS_NUMBER_WRITES)
+				max_nr = max(r->nr_writes, max_nr);
+			else
+				max_nr = max(r->nr_accesses, max_nr);
 		}
 		mmput(mm);
 	}
 
-	return max_nr_accesses;
+	return max_nr;
 }
 
 /*
@@ -596,6 +657,7 @@ static int damos_madvise(struct damon_target *target, struct damon_region *r,
 
 	ret = do_madvise(mm, PAGE_ALIGN(r->ar.start),
 			PAGE_ALIGN(r->ar.end - r->ar.start), behavior);
+
 	mmput(mm);
 out:
 	return ret;
@@ -622,6 +684,12 @@ int damon_va_apply_scheme(struct damon_ctx *ctx, struct damon_target *t,
 		break;
 	case DAMOS_NOHUGEPAGE:
 		madv_action = MADV_NOHUGEPAGE;
+		break;
+	case DAMOS_MERGEABLE:
+		madv_action = MADV_MERGEABLE;
+		break;
+	case DAMOS_UNMERGEABLE:
+		madv_action = MADV_UNMERGEABLE;
 		break;
 	case DAMOS_STAT:
 		return 0;

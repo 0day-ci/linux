@@ -44,11 +44,13 @@ struct damon_region {
 	struct damon_addr_range ar;
 	unsigned long sampling_addr;
 	unsigned int nr_accesses;
+	unsigned int nr_writes;
 	struct list_head list;
 
 	unsigned int age;
 /* private: Internal value for age calculation. */
 	unsigned int last_nr_accesses;
+	unsigned int last_nr_writes;
 };
 
 /**
@@ -88,6 +90,8 @@ enum damos_action {
 	DAMOS_PAGEOUT,
 	DAMOS_HUGEPAGE,
 	DAMOS_NOHUGEPAGE,
+	DAMOS_MERGEABLE,
+	DAMOS_UNMERGEABLE,
 	DAMOS_STAT,		/* Do nothing but only record the stat */
 };
 
@@ -185,6 +189,11 @@ struct damos_watermarks {
 	bool activated;
 };
 
+enum damos_counter_type {
+	DAMOS_NUMBER_ACCESSES,
+	DAMOS_NUMBER_WRITES,
+};
+
 /**
  * struct damos - Represents a Data Access Monitoring-based Operation Scheme.
  * @min_sz_region:	Minimum size of target regions.
@@ -223,6 +232,9 @@ struct damos {
 	unsigned long max_sz_region;
 	unsigned int min_nr_accesses;
 	unsigned int max_nr_accesses;
+	unsigned int min_nr_writes;
+	unsigned int max_nr_writes;
+	enum damos_counter_type counter_type;
 	unsigned int min_age_region;
 	unsigned int max_age_region;
 	enum damos_action action;
@@ -386,6 +398,7 @@ struct damon_ctx {
 	struct damon_primitive primitive;
 	struct damon_callback callback;
 
+	enum damos_counter_type counter_type;
 	unsigned long min_nr_regions;
 	unsigned long max_nr_regions;
 	struct list_head adaptive_targets;

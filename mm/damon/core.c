@@ -45,10 +45,12 @@ struct damon_region *damon_new_region(unsigned long start, unsigned long end)
 	region->ar.start = start;
 	region->ar.end = end;
 	region->nr_accesses = 0;
+	region->nr_writes = 0;
 	INIT_LIST_HEAD(&region->list);
 
 	region->age = 0;
 	region->last_nr_accesses = 0;
+	region->last_nr_writes = 0;
 
 	return region;
 }
@@ -89,7 +91,7 @@ void damon_destroy_region(struct damon_region *r, struct damon_target *t)
 
 struct damos *damon_new_scheme(
 		unsigned long min_sz_region, unsigned long max_sz_region,
-		unsigned int min_nr_accesses, unsigned int max_nr_accesses,
+		unsigned int min_nr, unsigned int max_nr,
 		unsigned int min_age_region, unsigned int max_age_region,
 		enum damos_action action, struct damos_quota *quota,
 		struct damos_watermarks *wmarks)
@@ -101,8 +103,10 @@ struct damos *damon_new_scheme(
 		return NULL;
 	scheme->min_sz_region = min_sz_region;
 	scheme->max_sz_region = max_sz_region;
-	scheme->min_nr_accesses = min_nr_accesses;
-	scheme->max_nr_accesses = max_nr_accesses;
+	scheme->max_nr_writes = max_nr;
+	scheme->min_nr_writes = min_nr;
+	scheme->min_nr_accesses = min_nr;
+	scheme->max_nr_accesses = max_nr;
 	scheme->min_age_region = min_age_region;
 	scheme->max_age_region = max_age_region;
 	scheme->action = action;
@@ -221,6 +225,7 @@ struct damon_ctx *damon_new_ctx(void)
 	ctx->sample_interval = 5 * 1000;
 	ctx->aggr_interval = 100 * 1000;
 	ctx->primitive_update_interval = 60 * 1000 * 1000;
+	ctx->counter_type = DAMOS_NUMBER_ACCESSES;
 
 	ktime_get_coarse_ts64(&ctx->last_aggregation);
 	ctx->last_primitive_update = ctx->last_aggregation;
@@ -542,9 +547,11 @@ static void kdamond_reset_aggregated(struct damon_ctx *c)
 		struct damon_region *r;
 
 		damon_for_each_region(r, t) {
-			trace_damon_aggregated(t, r, damon_nr_regions(t));
+			trace_damon_aggregated(c, t, r, damon_nr_regions(t));
 			r->last_nr_accesses = r->nr_accesses;
 			r->nr_accesses = 0;
+			r->last_nr_writes = r->nr_writes;
+			r->nr_writes = 0;
 		}
 	}
 }
@@ -553,21 +560,27 @@ static void damon_split_region_at(struct damon_ctx *ctx,
 		struct damon_target *t, struct damon_region *r,
 		unsigned long sz_r);
 
-static bool __damos_valid_target(struct damon_region *r, struct damos *s)
+static bool __damos_valid_target(struct damon_ctx *ctx, struct damon_region *r, struct damos *s)
 {
 	unsigned long sz;
-
 	sz = r->ar.end - r->ar.start;
-	return s->min_sz_region <= sz && sz <= s->max_sz_region &&
-		s->min_nr_accesses <= r->nr_accesses &&
-		r->nr_accesses <= s->max_nr_accesses &&
-		s->min_age_region <= r->age && r->age <= s->max_age_region;
+
+	if (ctx->counter_type == DAMOS_NUMBER_WRITES)
+		return s->min_sz_region <= sz && sz <= s->max_sz_region &&
+			s->min_nr_writes <= r->nr_writes &&
+			r->nr_writes <= s->max_nr_writes &&
+			s->min_age_region <= r->age && r->age <= s->max_age_region;
+	else
+		return s->min_sz_region <= sz && sz <= s->max_sz_region &&
+			s->min_nr_accesses <= r->nr_accesses &&
+			r->nr_accesses <= s->max_nr_accesses &&
+			s->min_age_region <= r->age && r->age <= s->max_age_region;
 }
 
 static bool damos_valid_target(struct damon_ctx *c, struct damon_target *t,
 		struct damon_region *r, struct damos *s)
 {
-	bool ret = __damos_valid_target(r, s);
+	bool ret = __damos_valid_target(c, r, s);
 
 	if (!ret || !s->quota.esz || !c->primitive.get_scheme_score)
 		return ret;
@@ -714,7 +727,7 @@ static void kdamond_apply_schemes(struct damon_ctx *c)
 		memset(quota->histogram, 0, sizeof(quota->histogram));
 		damon_for_each_target(t, c) {
 			damon_for_each_region(r, t) {
-				if (!__damos_valid_target(r, s))
+				if (!__damos_valid_target(c, r, s))
 					continue;
 				score = c->primitive.get_scheme_score(
 						c, t, r, s);
@@ -745,13 +758,18 @@ static void kdamond_apply_schemes(struct damon_ctx *c)
 /*
  * Merge two adjacent regions into one region
  */
-static void damon_merge_two_regions(struct damon_target *t,
+static void damon_merge_two_regions(struct damon_ctx *c, struct damon_target *t,
 		struct damon_region *l, struct damon_region *r)
 {
 	unsigned long sz_l = sz_damon_region(l), sz_r = sz_damon_region(r);
 
-	l->nr_accesses = (l->nr_accesses * sz_l + r->nr_accesses * sz_r) /
+	if (c->counter_type == DAMOS_NUMBER_WRITES)
+		l->nr_writes = (l->nr_writes * sz_l + r->nr_writes * sz_r) /
 			(sz_l + sz_r);
+	else
+		l->nr_accesses = (l->nr_accesses * sz_l + r->nr_accesses * sz_r) /
+				(sz_l + sz_r);
+
 	l->age = (l->age * sz_l + r->age * sz_r) / (sz_l + sz_r);
 	l->ar.end = r->ar.end;
 	damon_destroy_region(r, t);
@@ -766,23 +784,39 @@ static void damon_merge_two_regions(struct damon_target *t,
  * thres	'->nr_accesses' diff threshold for the merge
  * sz_limit	size upper limit of each region
  */
-static void damon_merge_regions_of(struct damon_target *t, unsigned int thres,
+static void damon_merge_regions_of(struct damon_ctx *c, struct damon_target *t, unsigned int thres,
 				   unsigned long sz_limit)
 {
 	struct damon_region *r, *prev = NULL, *next;
 
-	damon_for_each_region_safe(r, next, t) {
-		if (diff_of(r->nr_accesses, r->last_nr_accesses) > thres)
-			r->age = 0;
-		else
-			r->age++;
+	if (c->counter_type == DAMOS_NUMBER_WRITES) {
+		damon_for_each_region_safe(r, next, t) {
+			if (diff_of(r->nr_writes, r->last_nr_writes) > thres)
+				r->age = 0;
+			else
+				r->age++;
 
-		if (prev && prev->ar.end == r->ar.start &&
-		    diff_of(prev->nr_accesses, r->nr_accesses) <= thres &&
-		    sz_damon_region(prev) + sz_damon_region(r) <= sz_limit)
-			damon_merge_two_regions(t, prev, r);
-		else
-			prev = r;
+			if (prev && prev->ar.end == r->ar.start &&
+				diff_of(prev->nr_writes, r->nr_writes) <= thres &&
+				sz_damon_region(prev) + sz_damon_region(r) <= sz_limit)
+				damon_merge_two_regions(c, t, prev, r);
+			else
+				prev = r;
+		}
+	} else {
+		damon_for_each_region_safe(r, next, t) {
+			if (diff_of(r->nr_accesses, r->last_nr_accesses) > thres)
+				r->age = 0;
+			else
+				r->age++;
+
+			if (prev && prev->ar.end == r->ar.start &&
+				diff_of(prev->nr_accesses, r->nr_accesses) <= thres &&
+				sz_damon_region(prev) + sz_damon_region(r) <= sz_limit)
+				damon_merge_two_regions(c, t, prev, r);
+			else
+				prev = r;
+		}
 	}
 }
 
@@ -803,7 +837,7 @@ static void kdamond_merge_regions(struct damon_ctx *c, unsigned int threshold,
 	struct damon_target *t;
 
 	damon_for_each_target(t, c)
-		damon_merge_regions_of(t, threshold, sz_limit);
+		damon_merge_regions_of(c, t, threshold, sz_limit);
 }
 
 /*
@@ -826,6 +860,7 @@ static void damon_split_region_at(struct damon_ctx *ctx,
 
 	new->age = r->age;
 	new->last_nr_accesses = r->last_nr_accesses;
+	new->last_nr_writes = r->last_nr_writes;
 
 	damon_insert_region(new, r, damon_next_region(r), t);
 }

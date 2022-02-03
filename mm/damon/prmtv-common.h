@@ -13,6 +13,11 @@
 
 struct page *damon_get_page(unsigned long pfn);
 
+void damon_ptep_clean_soft_dirty(struct vm_area_struct *vma, unsigned long addr,
+		pte_t *pte);
+void damon_pmd_clean_soft_dirty(struct vm_area_struct *vma, unsigned long addr,
+		pmd_t *pmd);
+
 void damon_ptep_mkold(pte_t *pte, struct mm_struct *mm, unsigned long addr);
 void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm, unsigned long addr);
 

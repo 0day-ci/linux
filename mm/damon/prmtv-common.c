@@ -9,6 +9,8 @@
 #include <linux/page_idle.h>
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
+#include <linux/swap.h>
+#include <linux/swapops.h>
 
 #include "prmtv-common.h"
 
@@ -56,6 +58,92 @@ void damon_ptep_mkold(pte_t *pte, struct mm_struct *mm, unsigned long addr)
 
 	set_page_idle(page);
 	put_page(page);
+}
+
+static inline bool pte_is_pinned(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+{
+	struct page *page;
+
+	if (!pte_write(pte))
+		return false;
+	if (!is_cow_mapping(vma->vm_flags))
+		return false;
+	if (likely(!test_bit(MMF_HAS_PINNED, &vma->vm_mm->flags)))
+		return false;
+	page = vm_normal_page(vma, addr, pte);
+	if (!page)
+		return false;
+	return page_maybe_dma_pinned(page);
+}
+
+static inline void clear_soft_dirty_pmd(struct vm_area_struct *vma,
+		unsigned long addr, pmd_t *pmdp)
+{
+	pmd_t old, pmd = *pmdp;
+
+	if (pmd_present(pmd)) {
+		/* See comment in change_huge_pmd() */
+		old = pmdp_invalidate(vma, addr, pmdp);
+		if (pmd_dirty(old))
+			pmd = pmd_mkdirty(pmd);
+		if (pmd_young(old))
+			pmd = pmd_mkyoung(pmd);
+
+		pmd = pmd_wrprotect(pmd);
+		pmd = pmd_clear_soft_dirty(pmd);
+
+		set_pmd_at(vma->vm_mm, addr, pmdp, pmd);
+	} else if (is_migration_entry(pmd_to_swp_entry(pmd))) {
+		pmd = pmd_swp_clear_soft_dirty(pmd);
+		set_pmd_at(vma->vm_mm, addr, pmdp, pmd);
+	}
+}
+
+static inline void clear_soft_dirty(struct vm_area_struct *vma,
+		unsigned long addr, pte_t *pte)
+{
+	/*
+	 * The soft-dirty tracker uses #PF-s to catch writes
+	 * to pages, so write-protect the pte as well. See the
+	 * Documentation/admin-guide/mm/soft-dirty.rst for full description
+	 * of how soft-dirty works.
+	 */
+	pte_t ptent = *pte;
+
+	if (pte_present(ptent)) {
+		pte_t old_pte;
+
+		if (pte_is_pinned(vma, addr, ptent))
+			return;
+		old_pte = ptep_modify_prot_start(vma, addr, pte);
+		ptent = pte_wrprotect(old_pte);
+		ptent = pte_clear_soft_dirty(ptent);
+		ptep_modify_prot_commit(vma, addr, pte, old_pte, ptent);
+	} else if (is_swap_pte(ptent)) {
+		ptent = pte_swp_clear_soft_dirty(ptent);
+		set_pte_at(vma->vm_mm, addr, pte, ptent);
+	}
+}
+
+void damon_pmd_clean_soft_dirty(struct vm_area_struct *vma, unsigned long addr,
+		pmd_t *pmd)
+{
+	vma->vm_flags &= ~VM_SOFTDIRTY;
+	vma_set_page_prot(vma);
+
+	if (pmd_soft_dirty(*pmd))
+		clear_soft_dirty_pmd(vma, addr, pmd);
+
+}
+
+void damon_ptep_clean_soft_dirty(struct vm_area_struct *vma, unsigned long addr,
+		pte_t *pte)
+{
+	vma->vm_flags &= ~VM_SOFTDIRTY;
+	vma_set_page_prot(vma);
+
+	if (pte_soft_dirty(*pte))
+		clear_soft_dirty(vma, addr, pte);
 }
 
 void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm, unsigned long addr)

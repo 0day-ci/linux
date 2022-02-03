@@ -11,17 +11,17 @@
 
 TRACE_EVENT(damon_aggregated,
 
-	TP_PROTO(struct damon_target *t, struct damon_region *r,
+	TP_PROTO(struct damon_ctx *c, struct damon_target *t, struct damon_region *r,
 		unsigned int nr_regions),
 
-	TP_ARGS(t, r, nr_regions),
+	TP_ARGS(c, t, r, nr_regions),
 
 	TP_STRUCT__entry(
 		__field(unsigned long, target_id)
 		__field(unsigned int, nr_regions)
 		__field(unsigned long, start)
 		__field(unsigned long, end)
-		__field(unsigned int, nr_accesses)
+		__field(unsigned int, nr)
 	),
 
 	TP_fast_assign(
@@ -29,12 +29,12 @@ TRACE_EVENT(damon_aggregated,
 		__entry->nr_regions = nr_regions;
 		__entry->start = r->ar.start;
 		__entry->end = r->ar.end;
-		__entry->nr_accesses = r->nr_accesses;
+		__entry->nr = c->counter_type == DAMOS_NUMBER_WRITES ? r->nr_writes : r->nr_accesses;
 	),
 
 	TP_printk("target_id=%lu nr_regions=%u %lu-%lu: %u",
 			__entry->target_id, __entry->nr_regions,
-			__entry->start, __entry->end, __entry->nr_accesses)
+			__entry->start, __entry->end, __entry->nr)
 );
 
 #endif /* _TRACE_DAMON_H */
