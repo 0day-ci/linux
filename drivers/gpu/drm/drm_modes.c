@@ -1139,10 +1139,8 @@ EXPORT_SYMBOL(drm_mode_validate_driver);
  * @maxX: maximum width
  * @maxY: maximum height
  *
- * This function is a helper which can be used to validate modes against size
- * limitations of the DRM device/connector. If a mode is too big its status
- * member is updated with the appropriate validation failure code. The list
- * itself is not changed.
+ * This function is a helper which can be used to validate
+ * modes against size limitations of the DRM device/connector.
  *
  * Returns:
  * The mode status
