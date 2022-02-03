@@ -33,11 +33,34 @@ static inline int __range_ok(unsigned long addr, unsigned long size)
 
 #define access_ok(addr, size) __access_ok(addr, size)
 
-unsigned long __must_check
-raw_copy_from_user(void *to, const void __user *from, unsigned long n);
+#define uaccess_opaque uaccess_opaque
+struct uaccess_opaque {
+	u8 key;
+};
 
 unsigned long __must_check
-raw_copy_to_user(void __user *to, const void *from, unsigned long n);
+raw_copy_from_user_opaque(void *to, const void __user *from, unsigned long n,
+			  struct uaccess_opaque opaque);
+
+unsigned long __must_check
+raw_copy_to_user_opaque(void __user *to, const void *from, unsigned long n,
+			struct uaccess_opaque opaque);
+
+static __always_inline unsigned long __must_check
+raw_copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	struct uaccess_opaque opaque = { .key = 0};
+
+	return raw_copy_from_user_opaque(to, from, n, opaque);
+}
+
+static __always_inline unsigned long __must_check
+raw_copy_to_user(void __user *to, const void *from, unsigned long n)
+{
+	struct uaccess_opaque opaque = { .key = 0};
+
+	return raw_copy_to_user_opaque(to, from, n, opaque);
+}
 
 #ifndef CONFIG_KASAN
 #define INLINE_COPY_FROM_USER
