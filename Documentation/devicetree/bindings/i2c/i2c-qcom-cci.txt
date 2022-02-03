@@ -60,6 +60,11 @@ PROPERTIES:
 	Definition: Desired I2C bus clock frequency in Hz, defaults to 100
 		    kHz if omitted.
 
+- vbus-supply:
+	Usage: optional
+	Value type: phandle
+	Definition: Regulator that provides power to SCL/SDA lines
+
 Example:
 
 	cci@a0c000 {
