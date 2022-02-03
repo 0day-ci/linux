@@ -5997,6 +5997,10 @@
 			Note that genuine overcurrent events won't be
 			reported either.
 
+	unittest.hide_pass
+			Disable printing individual drivers/of/unittest test
+			pass messages.
+
 	unknown_nmi_panic
 			[X86] Cause panic on unknown NMI.
 

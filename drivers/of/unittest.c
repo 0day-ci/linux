@@ -12,6 +12,7 @@
 #include <linux/errno.h>
 #include <linux/hashtable.h>
 #include <linux/libfdt.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_fdt.h>
@@ -32,6 +33,19 @@
 
 #include "of_private.h"
 
+MODULE_LICENSE("GPL v2");
+static bool hide_pass;
+
+static int __init hide_pass_setup(char *str)
+{
+	hide_pass = true;
+	return 0;
+}
+
+early_param("hide_pass", hide_pass_setup);
+module_param(hide_pass, bool, 0);
+MODULE_PARM_DESC(hide_pass, "Disable printing individual of unittest pass messages");
+
 static struct unittest_results {
 	int passed;
 	int failed;
@@ -44,7 +58,8 @@ static struct unittest_results {
 		pr_err("FAIL %s():%i " fmt, __func__, __LINE__, ##__VA_ARGS__); \
 	} else { \
 		unittest_results.passed++; \
-		pr_debug("pass %s():%i\n", __func__, __LINE__); \
+		if (!hide_pass) \
+			pr_err("pass %s():%i\n", __func__, __LINE__); \
 	} \
 	failed; \
 })
