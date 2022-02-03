@@ -654,7 +654,7 @@ static int dwc3_gadget_set_ep_config(struct dwc3_ep *dep, unsigned int action)
 	return dwc3_send_gadget_ep_cmd(dep, DWC3_DEPCMD_SETEPCONFIG, &params);
 }
 
-static void dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
+static int dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
 		bool interrupt);
 
 /**
@@ -1078,6 +1078,31 @@ static int dwc3_gadget_ep_enable(struct usb_ep *ep,
 	ret = __dwc3_gadget_ep_enable(dep, DWC3_DEPCFG_ACTION_INIT);
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
+	return ret;
+}
+
+int dwc3_gadget_check_ep_dequeue(struct dwc3 *dwc)
+{
+	struct dwc3_ep *dep;
+	int ret = 0;
+	int i;
+
+	if (!dwc->ep_dequeue_pending)
+		return 0;
+
+	for (i = 0; i < dwc->num_eps; i++) {
+		dep = dwc->eps[i];
+		if (dep->flags & DWC3_EP_PENDING_DEQUEUE) {
+			ret = dwc3_stop_active_transfer(dep, false, true);
+			if (ret)
+				goto exit;
+
+			dep->flags &= ~DWC3_EP_PENDING_DEQUEUE;
+		}
+	}
+
+	dwc->ep_dequeue_pending = 0;
+exit:
 	return ret;
 }
 
@@ -2020,10 +2045,6 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 	list_for_each_entry(r, &dep->started_list, list) {
 		if (r == req) {
 			struct dwc3_request *t;
-
-			/* wait until it is processed */
-			dwc3_stop_active_transfer(dep, true, true);
-
 			/*
 			 * Remove any started request if the transfer is
 			 * cancelled.
@@ -2031,6 +2052,12 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 			list_for_each_entry_safe(r, t, &dep->started_list, list)
 				dwc3_gadget_move_cancelled_request(r,
 						DWC3_REQUEST_STATUS_DEQUEUED);
+
+			ret = dwc3_stop_active_transfer(dep, false, true);
+			if (ret == -ETIMEDOUT) {
+				dep->flags |= DWC3_EP_PENDING_DEQUEUE;
+				dwc->ep_dequeue_pending = 1;
+			}
 
 			dep->flags &= ~DWC3_EP_WAIT_TRANSFER_COMPLETE;
 
@@ -2306,6 +2333,7 @@ static void dwc3_stop_active_transfers(struct dwc3 *dwc)
 			continue;
 
 		dwc3_remove_requests(dwc, dep);
+		dep->flags &= ~DWC3_EP_PENDING_DEQUEUE;
 	}
 }
 
@@ -2702,6 +2730,7 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 	dwc->ep0state = EP0_SETUP_PHASE;
 	dwc->link_state = DWC3_LINK_STATE_SS_DIS;
 	dwc->delayed_status = false;
+	dwc->ep_dequeue_pending = 0;
 	dwc3_ep0_out_start(dwc);
 
 	dwc3_gadget_enable_irq(dwc);
@@ -3420,6 +3449,7 @@ static void dwc3_gadget_endpoint_command_complete(struct dwc3_ep *dep,
 	if (dep->stream_capable)
 		dep->flags |= DWC3_EP_IGNORE_NEXT_NOSTREAM;
 
+	dep->flags &= ~DWC3_EP_PENDING_DEQUEUE;
 	dep->flags &= ~DWC3_EP_END_TRANSFER_PENDING;
 	dep->flags &= ~DWC3_EP_TRANSFER_STARTED;
 	dwc3_gadget_ep_cleanup_cancelled_requests(dep);
@@ -3596,7 +3626,7 @@ static void dwc3_reset_gadget(struct dwc3 *dwc)
 	}
 }
 
-static void dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
+static int dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
 	bool interrupt)
 {
 	struct dwc3_gadget_ep_cmd_params params;
@@ -3607,7 +3637,7 @@ static void dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force,
 
 	if (!(dep->flags & DWC3_EP_TRANSFER_STARTED) ||
 	    (dep->flags & DWC3_EP_END_TRANSFER_PENDING))
-		return;
+		return 0;
 
 	/*
 	 * NOTICE: We are violating what the Databook says about the
@@ -3658,6 +3688,8 @@ retry:
 				dwc3_ep0_out_start(dwc);
 				goto retry;
 			}
+		} else {
+			return ret;
 		}
 	}
 	dep->resource_index = 0;
@@ -3666,6 +3698,7 @@ retry:
 		dep->flags &= ~DWC3_EP_TRANSFER_STARTED;
 	else
 		dep->flags |= DWC3_EP_END_TRANSFER_PENDING;
+	return ret;
 }
 
 static void dwc3_clear_stall_all_ep(struct dwc3 *dwc)

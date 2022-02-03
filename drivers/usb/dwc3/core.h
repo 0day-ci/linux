@@ -733,6 +733,7 @@ struct dwc3_ep {
 #define DWC3_EP_FIRST_STREAM_PRIMED	BIT(10)
 #define DWC3_EP_PENDING_CLEAR_STALL	BIT(11)
 #define DWC3_EP_TXFIFO_RESIZED		BIT(12)
+#define DWC3_EP_PENDING_DEQUEUE		BIT(13)
 
 	/* This last one is specific to EP0 */
 #define DWC3_EP0_DIR_IN			BIT(31)
@@ -1267,6 +1268,7 @@ struct dwc3 {
 	unsigned		delayed_status:1;
 	unsigned		ep0_bounced:1;
 	unsigned		ep0_expect_in:1;
+	unsigned		ep_dequeue_pending:1;
 	unsigned		has_hibernation:1;
 	unsigned		sysdev_is_parent:1;
 	unsigned		has_lpm_erratum:1;
@@ -1548,6 +1550,7 @@ int dwc3_send_gadget_generic_command(struct dwc3 *dwc, unsigned int cmd,
 void dwc3_gadget_clear_tx_fifos(struct dwc3 *dwc);
 void dwc3_ep0_stall_and_restart(struct dwc3 *dwc);
 void dwc3_ep0_end_control_data(struct dwc3 *dwc, struct dwc3_ep *dep);
+int dwc3_gadget_check_ep_dequeue(struct dwc3 *dwc);
 #else
 static inline int dwc3_gadget_init(struct dwc3 *dwc)
 { return 0; }
@@ -1574,6 +1577,8 @@ static inline void dwc3_ep0_stall_and_restart(struct dwc3 *dwc)
 static inline void dwc3_ep0_end_control_data(struct dwc3 *dwc,
 					     struct dwc3_ep *dep)
 { }
+static inline int dwc3_gadget_check_ep_dequeue(struct dwc3 *dwc)
+{ return 0; }
 #endif
 
 #if IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
