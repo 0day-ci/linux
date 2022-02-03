@@ -1949,6 +1949,7 @@ enum netdev_ml_priv_type {
  *	@linkwatch_dev_tracker:	refcount tracker used by linkwatch.
  *	@watchdog_dev_tracker:	refcount tracker used by watchdog.
  *	@tso_ipv6_max_size:	Maximum size of IPv6 TSO packets (driver/NIC limit)
+ *	@gso_ipv6_max_size:	Maximum size of IPv6 GSO packets (user/admin limit)
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
@@ -2284,6 +2285,7 @@ struct net_device {
 	netdevice_tracker	linkwatch_dev_tracker;
 	netdevice_tracker	watchdog_dev_tracker;
 	unsigned int		tso_ipv6_max_size;
+	unsigned int		gso_ipv6_max_size;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
@@ -4804,6 +4806,10 @@ static inline void netif_set_gso_max_size(struct net_device *dev,
 {
 	/* dev->gso_max_size is read locklessly from sk_setup_caps() */
 	WRITE_ONCE(dev->gso_max_size, size);
+
+	/* legacy drivers want to lower gso_max_size, regardless of family. */
+	size = min(size, dev->gso_ipv6_max_size);
+	WRITE_ONCE(dev->gso_ipv6_max_size, size);
 }
 
 static inline void netif_set_gso_max_segs(struct net_device *dev,
@@ -4827,6 +4833,12 @@ static inline void netif_set_tso_ipv6_max_size(struct net_device *dev,
 	dev->tso_ipv6_max_size = size;
 }
 
+static inline void netif_set_gso_ipv6_max_size(struct net_device *dev,
+					       unsigned int size)
+{
+	size = min(size, dev->tso_ipv6_max_size);
+	WRITE_ONCE(dev->gso_ipv6_max_size, size);
+}
 
 static inline void skb_gso_error_unwind(struct sk_buff *skb, __be16 protocol,
 					int pulled_hlen, u16 mac_offset,
