@@ -761,17 +761,20 @@ EXPORT_SYMBOL(__kfree_skb);
 /**
  *	kfree_skb_reason - free an sk_buff with special reason
  *	@skb: buffer to free
+ *	@func: the function where this skb is dropped
  *	@line: the line where this skb is dropped
  *
  *	Drop a reference to the buffer and free it if the usage count has
- *	hit zero. Meanwhile, pass the drop line to 'kfree_skb' tracepoint.
+ *	hit zero. Meanwhile, pass the drop function and line to 'kfree_skb'
+ *	tracepoint.
  */
-void kfree_skb_reason(struct sk_buff *skb, unsigned int line)
+void kfree_skb_reason(struct sk_buff *skb, const char *func,
+		      unsigned int line)
 {
 	if (!skb_unref(skb))
 		return;
 
-	trace_kfree_skb(skb, __builtin_return_address(0), line);
+	trace_kfree_skb(skb, __builtin_return_address(0), func, line);
 	__kfree_skb(skb);
 }
 EXPORT_SYMBOL(kfree_skb_reason);

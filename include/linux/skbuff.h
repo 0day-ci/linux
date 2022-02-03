@@ -309,6 +309,8 @@ struct sk_buff;
 
 #define SKB_DROP_LINE_NONE	0
 #define SKB_DROP_LINE		__LINE__
+#define SKB_DROP_FUNC_NONE	"none"
+#define SKB_DROP_FUNC		__func__
 
 /* To allow 64K frame to be packed as single skb without frag_list we
  * require 64K/PAGE_SIZE pages plus 1 additional page to allow for
@@ -1090,7 +1092,8 @@ static inline bool skb_unref(struct sk_buff *skb)
 	return true;
 }
 
-void kfree_skb_reason(struct sk_buff *skb, unsigned int line);
+void kfree_skb_reason(struct sk_buff *skb, const char *func,
+		      unsigned int line);
 
 /**
  *	kfree_skb - free an sk_buff with 'NOT_SPECIFIED' reason
@@ -1098,7 +1101,7 @@ void kfree_skb_reason(struct sk_buff *skb, unsigned int line);
  */
 static inline void kfree_skb(struct sk_buff *skb)
 {
-	kfree_skb_reason(skb, SKB_DROP_LINE_NONE);
+	kfree_skb_reason(skb, SKB_DROP_FUNC_NONE, SKB_DROP_LINE_NONE);
 }
 
 void skb_release_head_state(struct sk_buff *skb);

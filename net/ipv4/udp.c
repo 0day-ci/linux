@@ -2477,7 +2477,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	 * Hmm.  We got an UDP packet to a port to which we
 	 * don't wanna listen.  Ignore it.
 	 */
-	kfree_skb_reason(skb, drop_line);
+	kfree_skb_reason(skb, SKB_DROP_FUNC, drop_line);
 	return 0;
 
 short_packet:
@@ -2502,7 +2502,7 @@ csum_error:
 	__UDP_INC_STATS(net, UDP_MIB_CSUMERRORS, proto == IPPROTO_UDPLITE);
 drop:
 	__UDP_INC_STATS(net, UDP_MIB_INERRORS, proto == IPPROTO_UDPLITE);
-	kfree_skb_reason(skb, drop_line);
+	kfree_skb_reason(skb, SKB_DROP_FUNC, drop_line);
 	return 0;
 }
 

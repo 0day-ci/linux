@@ -2149,7 +2149,7 @@ bad_packet:
 
 discard_it:
 	/* Discard frame. */
-	kfree_skb_reason(skb, drop_line);
+	kfree_skb_reason(skb, SKB_DROP_FUNC, drop_line);
 	return 0;
 
 discard_and_relse:

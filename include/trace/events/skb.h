@@ -15,14 +15,15 @@
 TRACE_EVENT(kfree_skb,
 
 	TP_PROTO(struct sk_buff *skb, void *location,
-		 unsigned int line),
+		 const char *function, unsigned int line),
 
-	TP_ARGS(skb, location, line),
+	TP_ARGS(skb, location, function, line),
 
 	TP_STRUCT__entry(
 		__field(void *,		skbaddr)
 		__field(void *,		location)
 		__field(unsigned short,	protocol)
+		__string(function, function)
 		__field(unsigned int,	line)
 	),
 
@@ -30,12 +31,13 @@ TRACE_EVENT(kfree_skb,
 		__entry->skbaddr = skb;
 		__entry->location = location;
 		__entry->protocol = ntohs(skb->protocol);
+		__assign_str(function, function);
 		__entry->line = line;
 	),
 
-	TP_printk("skbaddr=%p protocol=%u location=%p line: %u",
+	TP_printk("skbaddr=%p protocol=%u location=%p function=%s line=%u",
 		  __entry->skbaddr, __entry->protocol, __entry->location,
-		  __entry->line)
+		  __get_str(function), __entry->line)
 );
 
 TRACE_EVENT(consume_skb,
