@@ -402,6 +402,43 @@ double expr_id_data__source_count(const struct expr_id_data *data)
 	return data->val.source_count;
 }
 
+/*
+ * Derive the TSC frequency in Hz from the /proc/cpuinfo, for example:
+ * ...
+ * model name      : Intel(R) Xeon(R) Gold 6154 CPU @ 3.00GHz
+ * ...
+ * will return 3000000000.
+ */
+static double system_tsc_freq(void)
+{
+	double result = NAN;
+	FILE *cpuinfo;
+	char *line = NULL;
+	size_t len = 0;
+
+	cpuinfo = fopen("/proc/cpuinfo", "r");
+	if (!cpuinfo)
+		return NAN;
+
+	while (getline(&line, &len, cpuinfo) > 0) {
+		if (!strncmp(line, "model name", 10)) {
+			char *pos = line + 11;
+
+			while (*pos != '@')
+				pos++;
+			if (sscanf(pos, " %lfGHz", &result) == 1) {
+				result *= 1000000000;
+				goto out;
+			}
+		}
+	}
+
+out:
+	free(line);
+	fclose(cpuinfo);
+	return result;
+}
+
 double expr__get_literal(const char *literal)
 {
 	static struct cpu_topology *topology;
@@ -414,6 +451,11 @@ double expr__get_literal(const char *literal)
 
 	if (!strcmp("#num_cpus", literal)) {
 		result = cpu__max_present_cpu().cpu;
+		goto out;
+	}
+
+	if (!strcasecmp("#system_tsc_freq", literal)) {
+		result = system_tsc_freq();
 		goto out;
 	}
 
