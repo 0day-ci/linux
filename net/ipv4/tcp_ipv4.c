@@ -1971,10 +1971,10 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	const struct tcphdr *th;
 	bool refcounted;
 	struct sock *sk;
-	int drop_reason;
+	unsigned int drop_line;
 	int ret;
 
-	drop_reason = SKB_DROP_REASON_NOT_SPECIFIED;
+	drop_line = SKB_DROP_LINE_NONE;
 	if (skb->pkt_type != PACKET_HOST)
 		goto discard_it;
 
@@ -1987,7 +1987,7 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	th = (const struct tcphdr *)skb->data;
 
 	if (unlikely(th->doff < sizeof(struct tcphdr) / 4)) {
-		drop_reason = SKB_DROP_REASON_PKT_TOO_SMALL;
+		drop_line = SKB_DROP_LINE;
 		goto bad_packet;
 	}
 	if (!pskb_may_pull(skb, th->doff * 4))
@@ -2095,7 +2095,7 @@ process:
 	nf_reset_ct(skb);
 
 	if (tcp_filter(sk, skb)) {
-		drop_reason = SKB_DROP_REASON_SOCKET_FILTER;
+		drop_line = SKB_DROP_LINE;
 		goto discard_and_relse;
 	}
 	th = (const struct tcphdr *)skb->data;
@@ -2130,7 +2130,7 @@ put_and_return:
 	return ret;
 
 no_tcp_socket:
-	drop_reason = SKB_DROP_REASON_NO_SOCKET;
+	drop_line = SKB_DROP_LINE;
 	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto discard_it;
 
@@ -2138,7 +2138,7 @@ no_tcp_socket:
 
 	if (tcp_checksum_complete(skb)) {
 csum_error:
-		drop_reason = SKB_DROP_REASON_TCP_CSUM;
+		drop_line = SKB_DROP_LINE;
 		trace_tcp_bad_csum(skb);
 		__TCP_INC_STATS(net, TCP_MIB_CSUMERRORS);
 bad_packet:
@@ -2149,7 +2149,7 @@ bad_packet:
 
 discard_it:
 	/* Discard frame. */
-	kfree_skb_reason(skb, drop_reason);
+	kfree_skb_reason(skb, drop_line);
 	return 0;
 
 discard_and_relse:

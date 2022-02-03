@@ -307,21 +307,8 @@ struct sk_buff_head {
 
 struct sk_buff;
 
-/* The reason of skb drop, which is used in kfree_skb_reason().
- * en...maybe they should be splited by group?
- *
- * Each item here should also be in 'TRACE_SKB_DROP_REASON', which is
- * used to translate the reason to string.
- */
-enum skb_drop_reason {
-	SKB_DROP_REASON_NOT_SPECIFIED,
-	SKB_DROP_REASON_NO_SOCKET,
-	SKB_DROP_REASON_PKT_TOO_SMALL,
-	SKB_DROP_REASON_TCP_CSUM,
-	SKB_DROP_REASON_SOCKET_FILTER,
-	SKB_DROP_REASON_UDP_CSUM,
-	SKB_DROP_REASON_MAX,
-};
+#define SKB_DROP_LINE_NONE	0
+#define SKB_DROP_LINE		__LINE__
 
 /* To allow 64K frame to be packed as single skb without frag_list we
  * require 64K/PAGE_SIZE pages plus 1 additional page to allow for
@@ -1103,7 +1090,7 @@ static inline bool skb_unref(struct sk_buff *skb)
 	return true;
 }
 
-void kfree_skb_reason(struct sk_buff *skb, enum skb_drop_reason reason);
+void kfree_skb_reason(struct sk_buff *skb, unsigned int line);
 
 /**
  *	kfree_skb - free an sk_buff with 'NOT_SPECIFIED' reason
@@ -1111,7 +1098,7 @@ void kfree_skb_reason(struct sk_buff *skb, enum skb_drop_reason reason);
  */
 static inline void kfree_skb(struct sk_buff *skb)
 {
-	kfree_skb_reason(skb, SKB_DROP_REASON_NOT_SPECIFIED);
+	kfree_skb_reason(skb, SKB_DROP_LINE_NONE);
 }
 
 void skb_release_head_state(struct sk_buff *skb);
