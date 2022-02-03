@@ -418,10 +418,25 @@ static const struct uniphier_pcie_ep_soc_data uniphier_pro5_data = {
 	},
 };
 
+static const struct uniphier_pcie_ep_soc_data uniphier_nx1_data = {
+	.is_legacy = false,
+	.features = {
+		.linkup_notifier = false,
+		.msi_capable = true,
+		.msix_capable = false,
+		.align = 1 << 12,
+		.bar_fixed_64bit = BIT(BAR_0) | BIT(BAR_2) | BIT(BAR_4),
+	},
+};
+
 static const struct of_device_id uniphier_pcie_ep_match[] = {
 	{
 		.compatible = "socionext,uniphier-pro5-pcie-ep",
 		.data = &uniphier_pro5_data,
+	},
+	{
+		.compatible = "socionext,uniphier-nx1-pcie-ep",
+		.data = &uniphier_nx1_data,
 	},
 	{ /* sentinel */ },
 };
