@@ -3417,6 +3417,9 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	dev->min_mtu = ETH_MIN_MTU;
 	dev->max_mtu = priv->max_mtu;
 
+	/* supports LSOv2 packets, 512KB limit has been tested. */
+	netif_set_tso_ipv6_max_size(dev, 512 * 1024);
+
 	mdev->pndev[port] = dev;
 	mdev->upper[port] = NULL;
 
