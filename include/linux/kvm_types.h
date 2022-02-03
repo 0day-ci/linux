@@ -78,14 +78,34 @@ struct gfn_to_pfn_cache {
  * MMU flows is problematic, as is triggering reclaim, I/O, etc... while
  * holding MMU locks.  Note, these caches act more like prefetch buffers than
  * classical caches, i.e. objects are not returned to the cache on being freed.
+ *
+ * The storage for the cache objects is laid out after the struct to allow
+ * different declarations to choose different capacities. If the capacity field
+ * is 0, the capacity is assumed to be KVM_ARCH_NR_OBJS_PER_MEMORY_CACHE.
  */
 struct kvm_mmu_memory_cache {
 	int nobjs;
+	int capacity;
 	gfp_t gfp_zero;
 	struct kmem_cache *kmem_cache;
-	void *objects[KVM_ARCH_NR_OBJS_PER_MEMORY_CACHE];
+	void *objects[0];
 };
-#endif
+
+/*
+ * Note, if defining a memory cache with a non-default capacity, you must
+ * initialize the capacity field at runtime.
+ */
+#define __DEFINE_KVM_MMU_MEMORY_CACHE(_name, _capacity)	\
+	struct {						\
+		struct kvm_mmu_memory_cache _name;		\
+		void *_name##_objects[_capacity];		\
+	}
+
+/* Define a memory cache with the default capacity. */
+#define DEFINE_KVM_MMU_MEMORY_CACHE(_name) \
+	__DEFINE_KVM_MMU_MEMORY_CACHE(_name, KVM_ARCH_NR_OBJS_PER_MEMORY_CACHE)
+
+#endif /* KVM_ARCH_NR_OBJS_PER_MEMORY_CACHE */
 
 #define HALT_POLL_HIST_COUNT			32
 
