@@ -11,11 +11,23 @@ static void report_setget_bounds(const struct extent_buffer *eb,
 				 const void *ptr, unsigned off, int size)
 {
 	const unsigned long member_offset = (unsigned long)ptr + off;
+	struct btrfs_fs_info *fs_info;
 
 	btrfs_err_rl(eb->fs_info,
 		"bad eb member %s: ptr 0x%lx start %llu member offset %lu size %d",
 		(member_offset > eb->len ? "start" : "end"),
 		(unsigned long)ptr, eb->start, member_offset, size);
+
+	/* Count events and record more details about the first one */
+	fs_info = eb->fs_info;
+	atomic_inc(&fs_info->setget_failures);
+	if (test_and_set_bit(BTRFS_FS_SETGET_COMPLAINS, &eb->fs_info->flags))
+		return;
+
+	fs_info->setget_eb_start = eb->start;
+	fs_info->setget_ptr = ptr;
+	fs_info->setget_off = member_offset;
+	fs_info->setget_size = size;
 }
 
 static inline bool check_setget_bounds(const struct extent_buffer *eb,

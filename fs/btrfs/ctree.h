@@ -127,6 +127,13 @@ static inline unsigned long btrfs_chunk_item_size(int num_stripes)
 enum {
 	/* Global indicator of serious filesystem errors */
 	BTRFS_FS_STATE_ERROR,
+	/* Track if a transaction abort has been reported on this filesystem */
+	BTRFS_FS_STATE_TRANS_ABORTED,
+	/*
+	 * There was a failed bounds check in check_setget_bounds, set this on
+	 * first event.
+	 */
+	BTRFS_FS_SETGET_COMPLAINS,
 	/*
 	 * Filesystem is being remounted, allow to skip some operations, like
 	 * defrag
@@ -134,8 +141,6 @@ enum {
 	BTRFS_FS_STATE_REMOUNTING,
 	/* Filesystem in RO mode */
 	BTRFS_FS_STATE_RO,
-	/* Track if a transaction abort has been reported on this filesystem */
-	BTRFS_FS_STATE_TRANS_ABORTED,
 	/*
 	 * Bio operations should be blocked on this filesystem because a source
 	 * or target device is being destroyed as part of a device replace
@@ -1059,6 +1064,13 @@ struct btrfs_fs_info {
 
 	spinlock_t zone_active_bgs_lock;
 	struct list_head zone_active_bgs;
+
+	/* Store details about the first bounds check failure in report_setget_bounds */
+	u64 setget_eb_start;
+	const void *setget_ptr;
+	unsigned setget_off;
+	int setget_size;
+	atomic_t setget_failures;
 
 #ifdef CONFIG_BTRFS_FS_REF_VERIFY
 	spinlock_t ref_verify_lock;
