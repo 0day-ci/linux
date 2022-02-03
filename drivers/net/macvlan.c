@@ -902,6 +902,7 @@ static int macvlan_init(struct net_device *dev)
 	dev->hw_enc_features    |= dev->features;
 	netif_set_gso_max_size(dev, lowerdev->gso_max_size);
 	netif_set_gso_max_segs(dev, lowerdev->gso_max_segs);
+	netif_set_tso_ipv6_max_size(dev, lowerdev->tso_ipv6_max_size);
 	dev->hard_header_len	= lowerdev->hard_header_len;
 	macvlan_set_lockdep_class(dev);
 
