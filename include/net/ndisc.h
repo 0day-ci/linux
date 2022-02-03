@@ -71,7 +71,6 @@ do {								\
 
 struct ctl_table;
 struct inet6_dev;
-struct net_device;
 struct net_proto_family;
 struct sk_buff;
 struct prefix_info;
