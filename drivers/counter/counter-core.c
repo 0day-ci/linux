@@ -96,6 +96,8 @@ struct counter_device *counter_alloc(size_t sizeof_priv)
 	counter = &ch->counter;
 	dev = &counter->dev;
 
+	dev_set_drvdata(dev, counter);
+
 	/* Acquire unique ID */
 	err = ida_alloc(&counter_ida, GFP_KERNEL);
 	if (err < 0)
