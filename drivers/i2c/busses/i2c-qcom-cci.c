@@ -540,44 +540,6 @@ static int cci_probe(struct platform_device *pdev)
 	if (!cci->data)
 		return -ENOENT;
 
-	for_each_available_child_of_node(dev->of_node, child) {
-		u32 idx;
-
-		ret = of_property_read_u32(child, "reg", &idx);
-		if (ret) {
-			dev_err(dev, "%pOF invalid 'reg' property", child);
-			continue;
-		}
-
-		if (idx >= cci->data->num_masters) {
-			dev_err(dev, "%pOF invalid 'reg' value: %u (max is %u)",
-				child, idx, cci->data->num_masters - 1);
-			continue;
-		}
-
-		cci->master[idx].adap.quirks = &cci->data->quirks;
-		cci->master[idx].adap.algo = &cci_algo;
-		cci->master[idx].adap.dev.parent = dev;
-		cci->master[idx].adap.dev.of_node = of_node_get(child);
-		cci->master[idx].master = idx;
-		cci->master[idx].cci = cci;
-
-		i2c_set_adapdata(&cci->master[idx].adap, &cci->master[idx]);
-		snprintf(cci->master[idx].adap.name,
-			 sizeof(cci->master[idx].adap.name), "Qualcomm-CCI");
-
-		cci->master[idx].mode = I2C_MODE_STANDARD;
-		ret = of_property_read_u32(child, "clock-frequency", &val);
-		if (!ret) {
-			if (val == I2C_MAX_FAST_MODE_FREQ)
-				cci->master[idx].mode = I2C_MODE_FAST;
-			else if (val == I2C_MAX_FAST_MODE_PLUS_FREQ)
-				cci->master[idx].mode = I2C_MODE_FAST_PLUS;
-		}
-
-		init_completion(&cci->master[idx].irq_complete);
-	}
-
 	/* Memory */
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -630,13 +592,47 @@ static int cci_probe(struct platform_device *pdev)
 	val = readl(cci->base + CCI_HW_VERSION);
 	dev_dbg(dev, "CCI HW version = 0x%08x", val);
 
-	for (i = 0; i < cci->data->num_masters; i++) {
-		if (!cci->master[i].cci)
-			continue;
+	for_each_available_child_of_node(dev->of_node, child) {
+		u32 idx;
 
-		ret = i2c_add_adapter(&cci->master[i].adap);
+		ret = of_property_read_u32(child, "reg", &idx);
+		if (ret) {
+			dev_err(dev, "%pOF invalid 'reg' property", child);
+			continue;
+		}
+
+		if (idx >= cci->data->num_masters) {
+			dev_err(dev, "%pOF invalid 'reg' value: %u (max is %u)",
+				child, idx, cci->data->num_masters - 1);
+			continue;
+		}
+
+		cci->master[idx].adap.quirks = &cci->data->quirks;
+		cci->master[idx].adap.algo = &cci_algo;
+		cci->master[idx].adap.dev.parent = dev;
+		cci->master[idx].adap.dev.of_node = of_node_get(child);
+		cci->master[idx].master = idx;
+		cci->master[idx].cci = cci;
+
+		i2c_set_adapdata(&cci->master[idx].adap, &cci->master[idx]);
+		snprintf(cci->master[idx].adap.name,
+			 sizeof(cci->master[idx].adap.name), "Qualcomm-CCI");
+
+		cci->master[idx].mode = I2C_MODE_STANDARD;
+		ret = of_property_read_u32(child, "clock-frequency", &val);
+		if (!ret) {
+			if (val == I2C_MAX_FAST_MODE_FREQ)
+				cci->master[idx].mode = I2C_MODE_FAST;
+			else if (val == I2C_MAX_FAST_MODE_PLUS_FREQ)
+				cci->master[idx].mode = I2C_MODE_FAST_PLUS;
+		}
+
+		init_completion(&cci->master[idx].irq_complete);
+
+		ret = i2c_add_adapter(&cci->master[idx].adap);
 		if (ret < 0) {
-			of_node_put(cci->master[i].adap.dev.of_node);
+			of_node_put(child);
+			cci->master[idx].cci = NULL;
 			goto error_i2c;
 		}
 	}
@@ -657,7 +653,7 @@ static int cci_probe(struct platform_device *pdev)
 	return 0;
 
 error_i2c:
-	for (--i ; i >= 0; i--) {
+	for (i = 0; i < cci->data->num_masters; i++) {
 		if (cci->master[i].cci) {
 			i2c_del_adapter(&cci->master[i].adap);
 			of_node_put(cci->master[i].adap.dev.of_node);
