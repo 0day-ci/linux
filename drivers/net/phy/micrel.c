@@ -1822,7 +1822,7 @@ static struct phy_driver ksphy_driver[] = {
 }, {
 	.phy_id		= PHY_ID_KSZ8081,
 	.name		= "Micrel KSZ8081 or KSZ8091",
-	.phy_id_mask	= MICREL_PHY_ID_MASK,
+	.phy_id_mask	= 0x00ffffff,
 	.flags		= PHY_POLL_CABLE_TEST,
 	/* PHY_BASIC_FEATURES */
 	.driver_data	= &ksz8081_type,
@@ -1968,6 +1968,16 @@ static struct phy_driver ksphy_driver[] = {
 	.config_init	= kszphy_config_init,
 	.suspend	= genphy_suspend,
 	.resume		= genphy_resume,
+}, {
+	.phy_id		= PHY_ID_KSZ9897,
+	.phy_id_mask	= 0x00ffffff,
+	.name		= "Microchip KSZ9897",
+	/* PHY_BASIC_FEATURES */
+	.config_init	= kszphy_config_init,
+	.config_aneg	= ksz8873mll_config_aneg,
+	.read_status	= ksz8873mll_read_status,
+	.suspend	= genphy_suspend,
+	.resume		= genphy_resume,
 } };
 
 module_phy_driver(ksphy_driver);
@@ -1987,11 +1997,12 @@ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
 	{ PHY_ID_KSZ8041, MICREL_PHY_ID_MASK },
 	{ PHY_ID_KSZ8051, MICREL_PHY_ID_MASK },
 	{ PHY_ID_KSZ8061, MICREL_PHY_ID_MASK },
-	{ PHY_ID_KSZ8081, MICREL_PHY_ID_MASK },
+	{ PHY_ID_KSZ8081, 0x00ffffff },
 	{ PHY_ID_KSZ8873MLL, MICREL_PHY_ID_MASK },
 	{ PHY_ID_KSZ886X, MICREL_PHY_ID_MASK },
 	{ PHY_ID_LAN8814, MICREL_PHY_ID_MASK },
 	{ PHY_ID_LAN8804, MICREL_PHY_ID_MASK },
+	{ PHY_ID_KSZ9897, 0x00ffffff },
 	{ }
 };
 

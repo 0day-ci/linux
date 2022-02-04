@@ -36,6 +36,7 @@
 #define PHY_ID_KSZ87XX		0x00221550
 
 #define	PHY_ID_KSZ9477		0x00221631
+#define	PHY_ID_KSZ9897		0x00221561
 
 /* struct phy_device dev_flags definitions */
 #define MICREL_PHY_50MHZ_CLK	0x00000001
