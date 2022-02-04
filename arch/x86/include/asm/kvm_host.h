@@ -342,8 +342,7 @@ union kvm_mmu_page_role {
  * kvm_mmu_extended_role complements kvm_mmu_page_role, tracking properties
  * relevant to the current MMU configuration.   When loading CR0, CR4, or EFER,
  * including on nested transitions, if nothing in the full role changes then
- * MMU re-configuration can be skipped. @valid bit is set on first usage so we
- * don't treat all-zero structure as valid data.
+ * MMU re-configuration can be skipped.
  *
  * The properties that are tracked in the extended role but not the page role
  * are for things that either (a) do not affect the validity of the shadow page
@@ -360,7 +359,6 @@ union kvm_mmu_page_role {
 union kvm_mmu_extended_role {
 	u32 word;
 	struct {
-		unsigned int valid:1;
 		unsigned int execonly:1;
 		unsigned int cr0_pg:1;
 		unsigned int cr4_pae:1;

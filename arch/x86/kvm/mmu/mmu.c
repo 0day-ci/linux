@@ -4683,8 +4683,6 @@ static union kvm_mmu_extended_role kvm_calc_mmu_role_ext(struct kvm_vcpu *vcpu,
 		ext.efer_lma = ____is_efer_lma(regs);
 	}
 
-	ext.valid = 1;
-
 	return ext;
 }
 
@@ -4891,7 +4889,6 @@ kvm_calc_shadow_ept_root_page_role(struct kvm_vcpu *vcpu, bool accessed_dirty,
 	/* EPT, and thus nested EPT, does not consume CR0, CR4, nor EFER. */
 	role.ext.word = 0;
 	role.ext.execonly = execonly;
-	role.ext.valid = 1;
 
 	return role;
 }
@@ -5039,9 +5036,9 @@ void kvm_mmu_after_set_cpuid(struct kvm_vcpu *vcpu)
 	 * problem is swept under the rug; KVM's CPUID API is horrific and
 	 * it's all but impossible to solve it without introducing a new API.
 	 */
-	vcpu->arch.root_mmu.mmu_role.ext.valid = 0;
-	vcpu->arch.guest_mmu.mmu_role.ext.valid = 0;
-	vcpu->arch.nested_mmu.mmu_role.ext.valid = 0;
+	vcpu->arch.root_mmu.mmu_role.base.level = 0;
+	vcpu->arch.guest_mmu.mmu_role.base.level = 0;
+	vcpu->arch.nested_mmu.mmu_role.base.level = 0;
 	kvm_mmu_reset_context(vcpu);
 
 	/*
