@@ -4398,13 +4398,13 @@ static inline u64 reserved_hpa_bits(void)
  * follow the features in guest.
  */
 static void reset_shadow_zero_bits_mask(struct kvm_vcpu *vcpu,
-					struct kvm_mmu *context,
-					bool uses_nx)
+					struct kvm_mmu *context)
 {
 	/* @amd adds a check on bit of SPTEs, which KVM shouldn't use anyways. */
 	bool is_amd = true;
 	/* KVM doesn't use 2-level page tables for the shadow MMU. */
 	bool is_pse = false;
+	bool uses_nx = context->mmu_role.efer_nx;
 	struct rsvd_bits_validate *shadow_zero_check;
 	int i;
 
@@ -4810,7 +4810,7 @@ static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
 	 * NX can be used by any non-nested shadow MMU to avoid having to reset
 	 * MMU contexts.  Note, KVM forces EFER.NX=1 when TDP is disabled.
 	 */
-	reset_shadow_zero_bits_mask(vcpu, context, true);
+	reset_shadow_zero_bits_mask(vcpu, context);
 }
 
 static union kvm_mmu_page_role
@@ -4834,7 +4834,7 @@ void kvm_init_shadow_npt_mmu(struct kvm_vcpu *vcpu, unsigned long cr0,
 	union kvm_mmu_page_role mmu_role = kvm_calc_shadow_npt_root_page_role(vcpu, cpu_role);
 
 	shadow_mmu_init_context(vcpu, context, cpu_role, mmu_role);
-	reset_shadow_zero_bits_mask(vcpu, context, is_efer_nx(context));
+	reset_shadow_zero_bits_mask(vcpu, context);
 	kvm_mmu_new_pgd(vcpu, nested_cr3);
 }
 EXPORT_SYMBOL_GPL(kvm_init_shadow_npt_mmu);
