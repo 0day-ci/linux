@@ -19,14 +19,34 @@ static atomic_t num_traced_obj;
 static int exit_trace_object(void);
 static int init_trace_object(void);
 
+/*
+ * get the offset from the special object and
+ * the type size of the value
+ */
 static struct object_instance {
 	void *obj;
+	int obj_offset;
+	int obj_value_type_size;
 } traced_obj[MAX_TRACED_OBJECT];
 
 /* objtrace private data */
 struct objtrace_trigger_data {
 	struct ftrace_event_field *field;
 	char objtrace_cmd[OBJTRACE_CMD_LEN];
+	int obj_offset;
+	int obj_value_type_size;
+};
+
+/* get the type size for the special object */
+struct objtrace_fetch_type {
+	char *name;
+	int type_size;
+};
+
+enum objattr {
+	OBJ_OFFSET,
+	OBJ_VAL_TYPE_SIZE,
+	MAX_OBJ_ATTR
 };
 
 static bool object_exist(void *obj)
@@ -42,13 +62,37 @@ static bool object_exist(void *obj)
 	return false;
 }
 
+static int get_object_attr(void *obj, int objattr, int *result)
+{
+	int i, max;
+
+	max = atomic_read(&num_traced_obj);
+	smp_rmb();
+	for (i = 0; i < max; i++) {
+		if (traced_obj[i].obj == obj) {
+			switch (objattr) {
+			case OBJ_OFFSET:
+				*result =  traced_obj[i].obj_offset;
+				return 0;
+			case OBJ_VAL_TYPE_SIZE:
+				*result = traced_obj[i].obj_value_type_size;
+				return 0;
+			default:
+				return -EINVAL;
+			}
+		}
+	}
+	return -EINVAL;
+}
+
 static bool object_empty(void)
 {
 	return !atomic_read(&num_traced_obj);
 }
 
-static void set_trace_object(void *obj)
+static void set_trace_object(void *obj, int obj_offset, int obj_value_type_size)
 {
+	unsigned int traced_objs;
 	unsigned long flags;
 
 	if (in_nmi())
@@ -62,11 +106,14 @@ static void set_trace_object(void *obj)
 
 	/* only this place has write operations */
 	raw_spin_lock_irqsave(&trace_obj_lock, flags);
-	if (atomic_read(&num_traced_obj) == MAX_TRACED_OBJECT) {
+	traced_objs = atomic_read(&num_traced_obj);
+	if (traced_objs == MAX_TRACED_OBJECT) {
 		trace_printk("object_pool is full, can't trace object:0x%px\n", obj);
 		goto out;
 	}
-	traced_obj[atomic_read(&num_traced_obj)].obj = obj;
+	traced_obj[traced_objs].obj = obj;
+	traced_obj[traced_objs].obj_value_type_size = obj_value_type_size;
+	traced_obj[traced_objs].obj_offset = obj_offset;
 	/* make sure the num_traced_obj update always appears after traced_obj update */
 	smp_wmb();
 	atomic_inc(&num_traced_obj);
@@ -75,7 +122,7 @@ out:
 }
 
 static void submit_trace_object(unsigned long ip, unsigned long parent_ip,
-				 unsigned long object)
+				 unsigned long object, unsigned long value)
 {
 
 	struct trace_buffer *buffer;
@@ -92,9 +139,42 @@ static void submit_trace_object(unsigned long ip, unsigned long parent_ip,
 	entry->ip                       = ip;
 	entry->parent_ip                = parent_ip;
 	entry->object			= object;
+	entry->value			= value;
 
 	event_trigger_unlock_commit(&event_trace_file, buffer, event,
 		entry, pc);
+}
+
+static inline long get_object_value(unsigned long *val, void *obj, int type_size)
+{
+	char tmp[sizeof(u64)];
+	long ret = 0;
+
+	ret = copy_from_kernel_nofault(tmp, obj, sizeof(tmp));
+	if (ret)
+		return ret;
+	switch (type_size) {
+	case 1: {
+		*val = (unsigned long)*(u8 *)tmp;
+		break;
+	}
+	case 2: {
+		*val = (unsigned long)*(u16 *)tmp;
+		break;
+	}
+	case 4: {
+		*val = (unsigned long)*(u32 *)tmp;
+		break;
+	}
+	case 8: {
+		*val = (unsigned long)*(u64 *)tmp;
+		break;
+	}
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static void
@@ -102,9 +182,9 @@ trace_object_events_call(unsigned long ip, unsigned long parent_ip,
 		struct ftrace_ops *op, struct ftrace_regs *fregs)
 {
 	struct pt_regs *pt_regs = ftrace_get_regs(fregs);
-	unsigned long obj;
+	int n, ret, val_type_size, obj_offset;
+	unsigned long obj, val;
 	unsigned int disabled;
-	int n;
 
 	preempt_disable_notrace();
 
@@ -117,8 +197,19 @@ trace_object_events_call(unsigned long ip, unsigned long parent_ip,
 
 	for (n = 0; n < max_args_num; n++) {
 		obj = regs_get_kernel_argument(pt_regs, n);
-		if (object_exist((void *)obj))
-			submit_trace_object(ip, parent_ip, obj);
+		if (object_exist((void *)obj)) {
+			ret =  get_object_attr((void *)obj, OBJ_OFFSET, &obj_offset);
+			if (unlikely(ret) < 0)
+				goto out;
+
+			get_object_attr((void *)obj, OBJ_VAL_TYPE_SIZE, &val_type_size);
+			if (unlikely(ret) < 0)
+				goto out;
+
+			if (get_object_value(&val, (void *)(obj + obj_offset), val_type_size))
+				continue;
+			submit_trace_object(ip, parent_ip, obj, val);
+		}
 	/* The parameters of a function may match multiple objects */
 	}
 out:
@@ -138,11 +229,12 @@ trace_object_trigger(struct event_trigger_data *data,
 {
 	struct objtrace_trigger_data *obj_data = data->private_data;
 	struct ftrace_event_field *field;
-	void *obj = NULL;
+	void *obj;
 
 	field = obj_data->field;
 	memcpy(&obj, rec + field->offset, sizeof(obj));
-	set_trace_object(obj);
+	/* set the offset from the special object and the type size of the value*/
+	set_trace_object(obj, obj_data->obj_offset, obj_data->obj_value_type_size);
 }
 
 static void
@@ -180,18 +272,45 @@ static int event_object_trigger_init(struct event_trigger_ops *ops,
 	return 0;
 }
 
+static const struct objtrace_fetch_type objtrace_fetch_types[] = {
+	{"u8", 1},
+	{"s8", 1},
+	{"x8", 1},
+	{"u16", 2},
+	{"s16", 2},
+	{"x16", 2},
+	{"u32", 4},
+	{"s32", 4},
+	{"x32", 4},
+	{"u64", 8},
+	{"s64", 8},
+	{"x64", 8},
+	{}
+};
+
 static int
 event_trigger_print(const char *name, struct seq_file *m,
-		void *data, char *filter_str, void *objtrace_data)
+		    void *data, char *filter_str, void *objtrace_data)
 {
+	int i;
 	long count = (long)data;
 	struct objtrace_trigger_data *obj_data = objtrace_data;
+	const char *value_type_name;
 
 	seq_puts(m, name);
 
 	seq_printf(m, ":%s", obj_data->objtrace_cmd);
 	seq_printf(m, ":%s", obj_data->field->name);
+	if (obj_data->obj_offset)
+		seq_printf(m, ",0x%x", obj_data->obj_offset);
 
+	for (i = 0; objtrace_fetch_types[i].name; i++) {
+		if (objtrace_fetch_types[i].type_size == obj_data->obj_value_type_size) {
+			value_type_name = objtrace_fetch_types[i].name;
+			break;
+		}
+	}
+	seq_printf(m, ":%s", value_type_name);
 	if (count == -1)
 		seq_puts(m, ":unlimited");
 	else
@@ -325,18 +444,20 @@ event_object_trigger_parse(struct event_command *cmd_ops,
 	struct objtrace_trigger_data *obj_data;
 	struct trace_event_call *call;
 	struct ftrace_event_field *field;
-	char *objtrace_cmd;
-	char *trigger = NULL;
-	char *arg;
-	char *number;
-	int ret;
+	char *type, *tr, *obj, *tmp, *trigger = NULL;
+	char *number, *objtrace_cmd;
+	int ret, i, def_type_size, obj_value_type_size = 0;
+	long offset = 0;
 	bool remove = false;
 
 	ret = -EINVAL;
 	if (!param)
 		goto out;
 
-	/* separate the trigger from the filter (c:a:n [if filter]) */
+	/*
+	 * separate the trigger from the filter:
+	 * objtrace:add:OBJ[,OFFS][:TYPE][:COUNT] [if filter]
+	 */
 	trigger = strsep(&param, " \t");
 	if (!trigger)
 		goto out;
@@ -345,16 +466,27 @@ event_object_trigger_parse(struct event_command *cmd_ops,
 		if (!*param)
 			param = NULL;
 	}
-
 	objtrace_cmd = strsep(&trigger, ":");
 	if (!objtrace_cmd || strcmp(objtrace_cmd, "add"))
 		goto out;
 
-	arg = strsep(&trigger, ":");
-	if (!arg)
+	obj = strsep(&trigger, ":");
+	if (!obj)
 		goto out;
+
+	tr = strchr(obj, ',');
+	if (!tr)
+		offset = 0;
+	else {
+		*tr++ = '\0';
+		ret = kstrtol(tr, 0, &offset);
+		if (ret)
+			goto out;
+	}
+
+	ret = -EINVAL;
 	call = file->event_call;
-	field = trace_find_event_field(call, arg);
+	field = trace_find_event_field(call, obj);
 	if (!field)
 		goto out;
 
@@ -365,35 +497,64 @@ event_object_trigger_parse(struct event_command *cmd_ops,
 		remove = true;
 
 	if (remove && !field_exist(file, cmd_ops, field->name))
-	goto out;
-	trigger_ops = cmd_ops->get_trigger_ops(cmd, trigger);
+		goto out;
 	ret = -ENOMEM;
-	obj_data = kzalloc(sizeof(*obj_data), GFP_KERNEL);
-	if (!obj_data)
-		goto out;
-	obj_data->field = field;
-	snprintf(obj_data->objtrace_cmd, OBJTRACE_CMD_LEN, objtrace_cmd);
-
 	trigger_data = kzalloc(sizeof(*trigger_data), GFP_KERNEL);
-	if (!trigger_data) {
-		kfree(obj_data);
+	if (!trigger_data)
 		goto out;
-	}
 
 	trigger_data->count = -1;
-	trigger_data->ops = trigger_ops;
 	trigger_data->cmd_ops = cmd_ops;
-	trigger_data->private_data = obj_data;
 	INIT_LIST_HEAD(&trigger_data->list);
 	INIT_LIST_HEAD(&trigger_data->named_list);
 
 	if (remove) {
 		cmd_ops->unreg(glob+1, trigger_data, file);
-		kfree(obj_data);
 		kfree(trigger_data);
 		ret = 0;
 		goto out;
 	}
+
+	ret = -EINVAL;
+	def_type_size = sizeof(void *);
+	if (!trigger) {
+		obj_value_type_size = def_type_size;
+		goto skip_get_type;
+	}
+
+	tmp = trigger;
+	type = strsep(&trigger, ":");
+	if (!type)
+		obj_value_type_size = def_type_size;
+	else if (isdigit(type[0])) {
+		obj_value_type_size = def_type_size;
+		trigger = tmp;
+	} else {
+		for (i = 0; objtrace_fetch_types[i].name; i++) {
+			if (strcmp(objtrace_fetch_types[i].name, type) == 0) {
+				obj_value_type_size = objtrace_fetch_types[i].type_size;
+				break;
+			}
+		}
+	}
+	if (!obj_value_type_size)
+		goto out;
+skip_get_type:
+	trigger_ops = cmd_ops->get_trigger_ops(cmd, trigger);
+	trigger_data->ops = trigger_ops;
+
+	ret = -ENOMEM;
+	obj_data = kzalloc(sizeof(*obj_data), GFP_KERNEL);
+	if (!obj_data) {
+		kfree(trigger_data);
+		goto out;
+	}
+
+	obj_data->field = field;
+	obj_data->obj_offset = offset;
+	obj_data->obj_value_type_size = obj_value_type_size;
+	snprintf(obj_data->objtrace_cmd, OBJTRACE_CMD_LEN, objtrace_cmd);
+	trigger_data->private_data = obj_data;
 
 	if (trigger) {
 		number = strsep(&trigger, ":");
