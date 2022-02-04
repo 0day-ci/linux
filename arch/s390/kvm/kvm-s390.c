@@ -2273,6 +2273,9 @@ static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 		if (r)
 			break;
 
+		if (!test_bit_inv(BIT_UV_FEAT_AIV, &uv_info.uv_feature_indications))
+			kvm_s390_gisa_disable(kvm);
+
 		r = kvm_s390_pv_init_vm(kvm, &cmd->rc, &cmd->rrc);
 		if (r)
 			break;
@@ -2299,6 +2302,9 @@ static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 		if (r)
 			break;
 		r = kvm_s390_pv_deinit_vm(kvm, &cmd->rc, &cmd->rrc);
+
+		if (use_gisa)
+			kvm_s390_gisa_enable(kvm);
 
 		/* no need to block service interrupts any more */
 		clear_bit(IRQ_PEND_EXT_SERVICE, &kvm->arch.float_int.masked_irqs);
@@ -3309,9 +3315,7 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.sie_block->icpua = vcpu->vcpu_id;
 	spin_lock_init(&vcpu->arch.local_int.lock);
-	vcpu->arch.sie_block->gd = (u32)(u64)vcpu->kvm->arch.gisa_int.origin;
-	if (vcpu->arch.sie_block->gd && sclp.has_gisaf)
-		vcpu->arch.sie_block->gd |= GISA_FORMAT1;
+	vcpu->arch.sie_block->gd = kvm_s390_get_gisa_desc(vcpu->kvm);
 	seqcount_init(&vcpu->arch.cputm_seqcount);
 
 	vcpu->arch.pfault_token = KVM_S390_PFAULT_TOKEN_INVALID;
