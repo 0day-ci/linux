@@ -432,6 +432,7 @@ struct kvm_mmu {
 	void (*invlpg)(struct kvm_vcpu *vcpu, gva_t gva, hpa_t root_hpa);
 	hpa_t root_hpa;
 	gpa_t root_pgd;
+	union kvm_mmu_role cpu_role;
 	union kvm_mmu_role mmu_role;
 	u8 root_level;
 	u8 shadow_root_level;
