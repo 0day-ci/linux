@@ -154,7 +154,6 @@
 			- "bus_slave"	Slave AXI clock
 			- "slave_q2a"	Slave Q2A clock
 			- "tbu"		PCIe TBU clock
-			- "pipe"	PIPE clock
 
 - clock-names:
 	Usage: required for sc8180x and sm8250
@@ -167,7 +166,6 @@
 			- "slave_q2a"	Slave Q2A clock
 			- "tbu"		PCIe TBU clock
 			- "ddrss_sf_tbu" PCIe SF TBU clock
-			- "pipe"	PIPE clock
 
 - resets:
 	Usage: required
