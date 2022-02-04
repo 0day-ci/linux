@@ -26,6 +26,19 @@
 
 #define BIAS_MAX	LONG_MAX
 
+#ifdef CONFIG_PAGE_POOL_STATS
+/*
+ * this_cpu_inc_alloc_stat is intended to be used in softirq context
+ */
+#define this_cpu_inc_alloc_stat(pool, __stat)				\
+	do {								\
+		struct page_pool_stats __percpu *s = pool->stats;	\
+		__this_cpu_inc(s->alloc.__stat);			\
+	} while (0)
+#else
+#define this_cpu_inc_alloc_stat(pool, __stat)
+#endif
+
 static int page_pool_init(struct page_pool *pool,
 			  const struct page_pool_params *params)
 {
