@@ -12,7 +12,9 @@
 #include <asm/kvm_pci.h>
 #include <asm/pci.h>
 #include <asm/pci_insn.h>
+#include <asm/sclp.h>
 #include "pci.h"
+#include "kvm-s390.h"
 
 struct zpci_aift *aift;
 
@@ -152,6 +154,106 @@ unlock:
 	mutex_unlock(&aift->aift_lock);
 	return rc;
 }
+
+int kvm_s390_pci_interp_probe(struct zpci_dev *zdev)
+{
+	/* Must have appropriate hardware facilities */
+	if (!sclp.has_zpci_lsi || !sclp.has_aisii || !sclp.has_aeni ||
+	    !sclp.has_aisi || !test_facility(69) || !test_facility(70) ||
+	    !test_facility(71) || !test_facility(72)) {
+		return -EINVAL;
+	}
+
+	/* Must have a KVM association registered */
+	if (!zdev->kzdev || !zdev->kzdev->kvm)
+		return -EINVAL;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_interp_probe);
+
+int kvm_s390_pci_interp_enable(struct zpci_dev *zdev)
+{
+	u32 gisa;
+	int rc;
+
+	if (!zdev->kzdev || !zdev->kzdev->kvm)
+		return -EINVAL;
+
+	/*
+	 * If this is the first request to use an interpreted device, make the
+	 * necessary vcpu changes
+	 */
+	if (!zdev->kzdev->kvm->arch.use_zpci_interp)
+		kvm_s390_vcpu_pci_enable_interp(zdev->kzdev->kvm);
+
+	/*
+	 * In the event of a system reset in userspace, the GISA designation
+	 * may still be assigned because the device is still enabled.
+	 * Verify it's the same guest before proceeding.
+	 */
+	gisa = (u32)virt_to_phys(&zdev->kzdev->kvm->arch.sie_page2->gisa);
+	if (zdev->gisa != 0 && zdev->gisa != gisa)
+		return -EPERM;
+
+	if (zdev_enabled(zdev)) {
+		zdev->gisa = 0;
+		rc = zpci_disable_device(zdev);
+		if (rc)
+			return rc;
+	}
+
+	/*
+	 * Store information about the identity of the kvm guest allowed to
+	 * access this device via interpretation to be used by host CLP
+	 */
+	zdev->gisa = gisa;
+
+	rc = zpci_enable_device(zdev);
+	if (rc)
+		goto err;
+
+	/* Re-register the IOMMU that was already created */
+	rc = zpci_register_ioat(zdev, 0, zdev->start_dma, zdev->end_dma,
+				virt_to_phys(zdev->dma_table));
+	if (rc)
+		goto err;
+
+	return rc;
+
+err:
+	zdev->gisa = 0;
+	return rc;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_interp_enable);
+
+int kvm_s390_pci_interp_disable(struct zpci_dev *zdev)
+{
+	int rc;
+
+	if (zdev->gisa == 0)
+		return -EINVAL;
+
+	/* Remove the host CLP guest designation */
+	zdev->gisa = 0;
+
+	if (zdev_enabled(zdev)) {
+		rc = zpci_disable_device(zdev);
+		if (rc)
+			return rc;
+	}
+
+	rc = zpci_enable_device(zdev);
+	if (rc)
+		return rc;
+
+	/* Re-register the IOMMU that was already created */
+	rc = zpci_register_ioat(zdev, 0, zdev->start_dma, zdev->end_dma,
+				virt_to_phys(zdev->dma_table));
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL(kvm_s390_pci_interp_disable);
 
 int kvm_s390_pci_dev_open(struct zpci_dev *zdev)
 {
