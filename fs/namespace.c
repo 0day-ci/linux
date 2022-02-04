@@ -39,6 +39,10 @@
 /* Maximum number of mounts in a mount namespace */
 static unsigned int sysctl_mount_max __read_mostly = 100000;
 
+/* Whether idmapped mounts are allowed. */
+static int sysctl_idmap_mounts __read_mostly =
+	IS_ENABLED(CONFIG_IDMAP_MOUNTS_DEFAULT_OFF) ? 0 : 1;
+
 static unsigned int m_hash_mask __read_mostly;
 static unsigned int m_hash_shift __read_mostly;
 static unsigned int mp_hash_mask __read_mostly;
@@ -3965,7 +3969,13 @@ static int can_idmap_mount(const struct mount_kattr *kattr, struct mount *mnt)
 	if (!is_anon_ns(mnt->mnt_ns))
 		return -EINVAL;
 
-	return 0;
+	/* So far, there are concerns about the safety of idmaps. */
+	if (!sysctl_idmap_mounts) {
+		pr_warn_once("VFS: idmapped mounts are not allowed.\n");
+		return -EPERM;
+	} else {
+		return 0;
+	}
 }
 
 static struct mount *mount_setattr_prepare(struct mount_kattr *kattr,
@@ -4630,6 +4640,15 @@ static struct ctl_table fs_namespace_sysctls[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= SYSCTL_ONE,
+	},
+	{
+		.procname       = "idmap_mounts",
+		.data           = &sysctl_idmap_mounts,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = SYSCTL_ZERO,
+		.extra2         = SYSCTL_ONE,
 	},
 	{ }
 };

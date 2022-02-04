@@ -105,6 +105,18 @@ you have some awesome number of simultaneous system users,
 you might want to raise the limit.
 
 
+idmap_mounts
+------------
+
+Idmapped mounts may have security implications.
+This knob controls whether creation of idmapped mounts is allowed.
+When set to "1", creation of idmapped mounts is allowed.
+When set to "0", creation of idmapped mounts is not allowed.
+
+The default value is
+* 0, if ``IDMAP_MOUNTS_DEFAULT_OFF`` is enabled in the kernel configuration;
+* 1, otherwise.
+
 file-max & file-nr
 ------------------
 
