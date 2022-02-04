@@ -214,6 +214,7 @@ static int s390_iommu_update_trans(struct s390_domain *s390_domain,
 	unsigned long irq_flags, nr_pages, i;
 	unsigned long *entry;
 	int rc = 0;
+	u8 status;
 
 	if (dma_addr < s390_domain->domain.geometry.aperture_start ||
 	    dma_addr + size > s390_domain->domain.geometry.aperture_end)
@@ -238,7 +239,8 @@ static int s390_iommu_update_trans(struct s390_domain *s390_domain,
 	spin_lock(&s390_domain->list_lock);
 	list_for_each_entry(domain_device, &s390_domain->devices, list) {
 		rc = zpci_refresh_trans((u64) domain_device->zdev->fh << 32,
-					start_dma_addr, nr_pages * PAGE_SIZE);
+					start_dma_addr, nr_pages * PAGE_SIZE,
+					&status);
 		if (rc)
 			break;
 	}
