@@ -343,18 +343,21 @@ unwind:
 	return 0;
 }
 
-bool is_ucounts_overlimit(struct ucounts *ucounts, enum ucount_type type, unsigned long rlimit)
+long ucounts_limit_cmp(struct ucounts *ucounts, enum ucount_type type, unsigned long rlimit)
 {
 	struct ucounts *iter;
 	long max = rlimit;
+	long excess = LONG_MIN;
 	if (rlimit > LONG_MAX)
 		max = LONG_MAX;
 	for (iter = ucounts; iter; iter = iter->ns->ucounts) {
-		if (get_ucounts_value(iter, type) > max)
-			return true;
+		/* we already WARN_ON negative ucounts, the subtraction result fits */
+		excess = max_t(long, excess, get_ucounts_value(iter, type) - max);
+		if (excess > 0)
+			return excess;
 		max = READ_ONCE(iter->ns->ucount_max[type]);
 	}
-	return false;
+	return excess;
 }
 
 static __init int user_namespace_sysctl_init(void)
