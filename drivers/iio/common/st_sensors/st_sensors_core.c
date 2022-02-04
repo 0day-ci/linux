@@ -378,6 +378,8 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
 	if (err < 0)
 		return err;
 
+	sdata->always_on = false;
+
 	/* Disable DRDY, this might be still be enabled after reboot. */
 	err = st_sensors_set_dataready_irq(indio_dev, false);
 	if (err < 0)
@@ -554,18 +556,21 @@ int st_sensors_read_info_raw(struct iio_dev *indio_dev,
 		err = -EBUSY;
 		goto out;
 	} else {
-		err = st_sensors_set_enable(indio_dev, true);
-		if (err < 0)
-			goto out;
+		if (!sdata->enabled) {
+			err = st_sensors_set_enable(indio_dev, true);
+			if (err < 0)
+				goto out;
 
-		msleep((sdata->sensor_settings->bootime * 1000) / sdata->odr);
+			msleep((sdata->sensor_settings->bootime * 1000) / sdata->odr);
+		}
 		err = st_sensors_read_axis_data(indio_dev, ch, val);
 		if (err < 0)
 			goto out;
 
 		*val = *val >> ch->scan_type.shift;
 
-		err = st_sensors_set_enable(indio_dev, false);
+		if (!sdata->always_on)
+			err = st_sensors_set_enable(indio_dev, false);
 	}
 out:
 	mutex_unlock(&indio_dev->mlock);
@@ -679,6 +684,76 @@ ssize_t st_sensors_sysfs_scale_avail(struct device *dev,
 	return len;
 }
 EXPORT_SYMBOL(st_sensors_sysfs_scale_avail);
+
+/*
+ * st_sensors_sysfs_show_always_on() - get the value of the always_on flag.
+ *
+ * @dev: device reference.
+ * @attr: device attribute.
+ * @buf: sysfs buffer.
+ *
+ * Return: Number of bytes printed into the buffer
+ */
+ssize_t st_sensors_sysfs_show_always_on(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct st_sensor_data *sdata = iio_priv(indio_dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", sdata->always_on);
+}
+EXPORT_SYMBOL(st_sensors_sysfs_show_always_on);
+
+/*
+ * st_sensors_sysfs_store_always_on() - set/unset always_on flag.
+ *				       Accepted values are:
+ *				       - 1: to set the flag and keep the
+ *					    device always enabled.
+ *				       - 0: to unset the flag and enable the
+ *					    device just during data access.
+ *
+ * @dev: device reference.
+ * @attr: device attribute.
+ * @buf: sysfs buffer.
+ * @count: number of bytes used from the buffer.
+ *
+ * Return: Either the number of bytes used from the buffer or an error code.
+ */
+ssize_t st_sensors_sysfs_store_always_on(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t count)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct st_sensor_data *sdata = iio_priv(indio_dev);
+	unsigned int val;
+	int ret;
+
+	ret = kstrtouint(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val != 0 && val != 1)
+		return -EINVAL;
+
+	if (!!val == sdata->always_on)
+		return count;
+
+	sdata->always_on = !!val;
+	if (sdata->always_on)
+		ret = st_sensors_set_enable(indio_dev, true);
+	else
+		ret = st_sensors_set_enable(indio_dev, false);
+
+	if (ret < 0)
+		return ret;
+
+	if (sdata->always_on)
+		msleep((sdata->sensor_settings->bootime * 1000) / sdata->odr);
+
+	return count;
+}
+EXPORT_SYMBOL(st_sensors_sysfs_store_always_on);
 
 MODULE_AUTHOR("Denis Ciocca <denis.ciocca@st.com>");
 MODULE_DESCRIPTION("STMicroelectronics ST-sensors core");
