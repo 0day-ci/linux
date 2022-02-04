@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _DPU_HW_CTL_H
@@ -43,6 +44,7 @@ struct dpu_hw_stage_cfg {
  */
 struct dpu_hw_intf_cfg {
 	enum dpu_intf intf;
+	enum dpu_wb wb;
 	enum dpu_3d_blend_mode mode_3d;
 	enum dpu_merge_3d merge_3d;
 	enum dpu_ctl_mode_sel intf_mode_sel;
@@ -93,6 +95,15 @@ struct dpu_hw_ctl_ops {
 		u32 flushbits);
 
 	/**
+	 * OR in the given flushbits to the cached pending_(wb_)flush_mask
+	 * No effect on hardware
+	 * @ctx       : ctl path ctx pointer
+	 * @blk       : writeback block index
+	 */
+	void (*update_pending_flush_wb)(struct dpu_hw_ctl *ctx,
+		enum dpu_wb blk);
+
+	/**
 	 * OR in the given flushbits to the cached pending_(intf_)flush_mask
 	 * No effect on hardware
 	 * @ctx       : ctl path ctx pointer
@@ -127,9 +138,19 @@ struct dpu_hw_ctl_ops {
 	 * Setup ctl_path interface config
 	 * @ctx
 	 * @cfg    : interface config structure pointer
+	 * @is_wb  : to indicate wb mode for programming the ctl path
 	 */
 	void (*setup_intf_cfg)(struct dpu_hw_ctl *ctx,
-		struct dpu_hw_intf_cfg *cfg);
+		struct dpu_hw_intf_cfg *cfg, bool is_wb);
+
+	/**
+	 * reset ctl_path interface config
+	 * @ctx
+	 * @cfg    : interface config structure pointer
+	 * @is_wb  : to indicate wb mode for programming the ctl path
+	 */
+	void (*reset_intf_cfg)(struct dpu_hw_ctl *ctx,
+		struct dpu_hw_intf_cfg *cfg, bool is_wb);
 
 	int (*reset)(struct dpu_hw_ctl *c);
 
@@ -182,6 +203,7 @@ struct dpu_hw_ctl_ops {
  * @mixer_hw_caps: mixer hardware capabilities
  * @pending_flush_mask: storage for pending ctl_flush managed via ops
  * @pending_intf_flush_mask: pending INTF flush
+ * @pending_wb_flush_mask: pending WB flush
  * @ops: operation list
  */
 struct dpu_hw_ctl {
@@ -195,6 +217,7 @@ struct dpu_hw_ctl {
 	const struct dpu_lm_cfg *mixer_hw_caps;
 	u32 pending_flush_mask;
 	u32 pending_intf_flush_mask;
+	u32 pending_wb_flush_mask;
 	u32 pending_merge_3d_flush_mask;
 
 	/* ops */
