@@ -47,6 +47,7 @@ struct capture_priv {
 	struct v4l2_ctrl_handler ctrl_hdlr;	/* Controls inherited from subdevs */
 
 	bool legacy_api;			/* Use the legacy (pre-MC) API */
+	bool is_imx56;				/* Hardware is i.MX5/i.MX6 */
 };
 
 #define to_capture_priv(v) container_of(v, struct capture_priv, vdev)
@@ -957,7 +958,8 @@ EXPORT_SYMBOL_GPL(imx_media_capture_device_unregister);
 
 struct imx_media_video_dev *
 imx_media_capture_device_init(struct device *dev, struct v4l2_subdev *src_sd,
-			      int pad, bool legacy_api)
+			      int pad, bool legacy_api,
+			      bool is_imx56)
 {
 	struct capture_priv *priv;
 	struct video_device *vfd;
@@ -972,6 +974,7 @@ imx_media_capture_device_init(struct device *dev, struct v4l2_subdev *src_sd,
 	priv->src_sd_pad = pad;
 	priv->dev = dev;
 	priv->legacy_api = legacy_api;
+	priv->is_imx56 = is_imx56;
 
 	mutex_init(&priv->mutex);
 	INIT_LIST_HEAD(&priv->ready_q);
