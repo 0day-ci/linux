@@ -178,14 +178,14 @@ i2c_smbus_write_word_swapped(const struct i2c_client *client,
 s32 i2c_smbus_read_block_data(const struct i2c_client *client,
 			      u8 command, u8 *values);
 s32 i2c_smbus_write_block_data(const struct i2c_client *client,
-			       u8 command, u8 length, const u8 *values);
+			       u8 command, size_t length, const u8 *values);
 /* Returns the number of read bytes */
 s32 i2c_smbus_read_i2c_block_data(const struct i2c_client *client,
-				  u8 command, u8 length, u8 *values);
+				  u8 command, size_t length, u8 *values);
 s32 i2c_smbus_write_i2c_block_data(const struct i2c_client *client,
-				   u8 command, u8 length, const u8 *values);
+				   u8 command, size_t length, const u8 *values);
 s32 i2c_smbus_read_i2c_block_data_or_emulated(const struct i2c_client *client,
-					      u8 command, u8 length,
+					      u8 command, size_t length,
 					      u8 *values);
 int i2c_get_device_id(const struct i2c_client *client,
 		      struct i2c_device_identity *id);
