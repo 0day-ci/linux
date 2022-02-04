@@ -185,6 +185,7 @@ static struct page *__page_pool_get_cached(struct page_pool *pool)
 	if (likely(pool->alloc.count)) {
 		/* Fast-path */
 		page = pool->alloc.cache[--pool->alloc.count];
+		this_cpu_inc_alloc_stat(pool, fast);
 	} else {
 		page = page_pool_refill_alloc_cache(pool);
 	}

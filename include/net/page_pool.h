@@ -142,6 +142,9 @@ struct page_pool {
 
 #ifdef CONFIG_PAGE_POOL_STATS
 struct page_pool_stats {
+	struct {
+		u64 fast; /* fast path allocations */
+	} alloc;
 };
 #endif
 
