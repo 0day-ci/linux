@@ -7231,6 +7231,9 @@ void nested_vmx_entry_exit_ctls_update(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 
+	if (!kvm_check_has_quirk(vcpu->kvm, KVM_X86_QUIRK_TWEAK_VMX_CTRL_MSRS))
+		return;
+
 	if (kvm_mpx_supported()) {
 		bool mpx_enabled = guest_cpuid_has(vcpu, X86_FEATURE_MPX);
 
