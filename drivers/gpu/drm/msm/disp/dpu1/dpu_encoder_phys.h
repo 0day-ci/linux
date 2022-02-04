@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2018 The Linux Foundation. All rights reserved.
  */
 
@@ -10,6 +11,7 @@
 
 #include "dpu_kms.h"
 #include "dpu_hw_intf.h"
+#include "dpu_hw_wb.h"
 #include "dpu_hw_pingpong.h"
 #include "dpu_hw_ctl.h"
 #include "dpu_hw_top.h"
@@ -189,6 +191,7 @@ struct dpu_encoder_irq {
  * @hw_ctl:		Hardware interface to the ctl registers
  * @hw_pp:		Hardware interface to the ping pong registers
  * @hw_intf:		Hardware interface to the intf registers
+ * @hw_wb:             Hardware interface to the wb registers
  * @dpu_kms:		Pointer to the dpu_kms top level
  * @cached_mode:	DRM mode cached at mode_set time, acted on in enable
  * @enabled:		Whether the encoder has enabled and running a mode
@@ -218,6 +221,7 @@ struct dpu_encoder_phys {
 	struct dpu_hw_ctl *hw_ctl;
 	struct dpu_hw_pingpong *hw_pp;
 	struct dpu_hw_intf *hw_intf;
+	struct dpu_hw_wb *hw_wb;
 	struct dpu_kms *dpu_kms;
 	struct drm_display_mode cached_mode;
 	enum dpu_enc_split_role split_role;
@@ -381,5 +385,11 @@ int dpu_encoder_helper_register_irq(struct dpu_encoder_phys *phys_enc,
  */
 int dpu_encoder_helper_unregister_irq(struct dpu_encoder_phys *phys_enc,
 		enum dpu_intr_idx intr_idx);
+
+/**
+ * dpu_encoder_helper_phys_cleanup - helper to cleanup dpu pipeline
+ * @phys_enc: Pointer to physical encoder structure
+ */
+void dpu_encoder_helper_phys_cleanup(struct dpu_encoder_phys *phys_enc);
 
 #endif /* __dpu_encoder_phys_H__ */
