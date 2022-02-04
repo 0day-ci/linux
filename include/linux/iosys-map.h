@@ -6,6 +6,7 @@
 #ifndef __IOSYS_MAP_H__
 #define __IOSYS_MAP_H__
 
+#include <linux/kernel.h>
 #include <linux/io.h>
 #include <linux/string.h>
 
@@ -134,6 +135,45 @@ static inline void iosys_map_set_vaddr(struct iosys_map *map, void *vaddr)
 }
 
 /**
+ * IOSYS_MAP_INIT_OFFSET - Initializes struct iosys_map from another iosys_map
+ * @map_:	The dma-buf mapping structure to copy from
+ * @offset_:	Offset to add to the other mapping
+ *
+ * Initializes a new iosys_map struct based on another passed as argument. It
+ * does a shallow copy of the struct so it's possible to update the back storage
+ * without changing where the original map points to. It is the equivalent of
+ * doing:
+ *
+ * .. code-block: c
+ *
+ *	iosys_map map = other_map;
+ *	iosys_map_incr(&map, &offset);
+ *
+ * Example usage:
+ *
+ * .. code-block: c
+ *
+ *	void foo(struct device *dev, struct iosys_map *base_map)
+ *	{
+ *		...
+ *		struct iosys_map map = IOSYS_MAP_INIT_OFFSET(base_map, FIELD_OFFSET);
+ *		...
+ *	}
+ *
+ * The advantage of using the initializer over just increasing the offset with
+ * ``iosys_map_incr()`` like above is that the new map will always point to the
+ * right place of the buffer during  its scope. It reduces the risk of updating
+ * the wrong part of the buffer and having no compiler warning about that. If
+ * the assignment to IOSYS_MAP_INIT_OFFSET() is forgotten, the compiler can warn
+ * using a uninitialized variable.
+ */
+#define IOSYS_MAP_INIT_OFFSET(map_, offset_)	(struct iosys_map)	\
+	{								\
+		.vaddr = (map_)->vaddr + (offset_),			\
+		.is_iomem = (map_)->is_iomem,				\
+	}
+
+/**
  * iosys_map_set_vaddr_iomem - Sets a iosys mapping structure to an address in I/O memory
  * @map:		The iosys_map structure
  * @vaddr_iomem:	An I/O-memory address
@@ -220,7 +260,7 @@ static inline void iosys_map_clear(struct iosys_map *map)
 }
 
 /**
- * iosys_map_memcpy_to_offset - Memcpy into offset of iosys_map
+ * iosys_map_memcpy_to - Memcpy into iosys_map
  * @dst:	The iosys_map structure
  * @dst_offset:	The offset from which to copy
  * @src:	The source buffer
@@ -240,6 +280,26 @@ static inline void iosys_map_memcpy_to(struct iosys_map *dst, size_t dst_offset,
 }
 
 /**
+ * iosys_map_memcpy_from - Memcpy from iosys_map into system memory
+ * @dst:	Destination in system memory
+ * @src:	The iosys_map structure
+ * @src_offset:	The offset from which to copy
+ * @len:	The number of byte in src
+ *
+ * Copies data from a iosys_map with an offset. The dest buffer is in
+ * system memory. Depending on the mapping location, the helper picks the
+ * correct method of accessing the memory.
+ */
+static inline void iosys_map_memcpy_from(void *dst, const struct iosys_map *src,
+					 size_t src_offset, size_t len)
+{
+	if (src->is_iomem)
+		memcpy_fromio(dst, src->vaddr_iomem + src_offset, len);
+	else
+		memcpy(dst, src->vaddr + src_offset, len);
+}
+
+/**
  * iosys_map_incr - Increments the address stored in a iosys mapping
  * @map:	The iosys_map structure
  * @incr:	The number of bytes to increment
@@ -254,5 +314,97 @@ static inline void iosys_map_incr(struct iosys_map *map, size_t incr)
 	else
 		map->vaddr += incr;
 }
+
+/**
+ * iosys_map_memset - Memset iosys_map
+ * @dst:	The iosys_map structure
+ * @offset:	Offset from dst where to start setting value
+ * @value:	The value to set
+ * @len:	The number of bytes to set in dst
+ *
+ * Set value in iosys_map. Depending on the buffer's location, the helper
+ * picks the correct method of accessing the memory.
+ */
+static inline void iosys_map_memset(struct iosys_map *dst, size_t offset,
+				    int value, size_t len)
+{
+	if (dst->is_iomem)
+		memset_io(dst->vaddr_iomem + offset, value, len);
+	else
+		memset(dst->vaddr + offset, value, len);
+}
+
+/**
+ * iosys_map_rd - Read a C-type value from the iosys_map
+ *
+ * @map__:	The iosys_map structure
+ * @offset__:	The offset from which to read
+ * @type__:	Type of the value being read
+ *
+ * Read a C type value from iosys_map, handling possible un-aligned accesses to
+ * the mapping.
+ *
+ * Returns:
+ * The value read from the mapping.
+ */
+#define iosys_map_rd(map__, offset__, type__) ({			\
+	type__ val;							\
+	iosys_map_memcpy_from(&val, map__, offset__, sizeof(val));	\
+	val;								\
+})
+
+/**
+ * iosys_map_wr - Write a C-type value to the iosys_map
+ *
+ * @map__:	The iosys_map structure
+ * @offset__:	The offset from the mapping to write to
+ * @type__:	Type of the value being written
+ * @val__:	Value to write
+ *
+ * Write a C-type value to the iosys_map, handling possible un-aligned accesses
+ * to the mapping.
+ */
+#define iosys_map_wr(map__, offset__, type__, val__) ({			\
+	type__ val = (val__);						\
+	iosys_map_memcpy_to(map__, offset__, &val, sizeof(val));	\
+})
+
+/**
+ * iosys_map_rd_field - Read a member from a struct in the iosys_map
+ *
+ * @map__:		The iosys_map structure
+ * @struct_type__:	The struct describing the layout of the mapping
+ * @field__:		Member of the struct to read
+ *
+ * Read a value from iosys_map assuming its layout is described by a struct,
+ * passed as argument. The offset and size to the struct member is calculated
+ * and possible un-aligned accesses to the mapping handled.
+ *
+ * Returns:
+ * The value read from the mapping.
+ */
+#define iosys_map_rd_field(map__, struct_type__, field__) ({			\
+	struct_type__ *s;							\
+	iosys_map_rd(map__, offsetof(struct_type__, field__),			\
+		     typeof(s->field__));					\
+})
+
+/**
+ * iosys_map_wr_field - Write to a member of a struct in the iosys_map
+ *
+ * @map__:		The iosys_map structure
+ * @struct_type__:	The struct describing the layout of the mapping
+ * @field__:		Member of the struct to read
+ * @val__:		Value to write
+ *
+ * Write a value to the iosys_map assuming its layout is described by a struct,
+ * passed as argument. The offset and size to the struct member is calculated
+ * and possible un-aligned accesses to the mapping handled.
+ */
+#define iosys_map_wr_field(map__, struct_type__, field__, val__) ({		\
+	struct_type__ *s;							\
+	iosys_map_wr(map__, offsetof(struct_type__, field__),			\
+		     typeof(s->field__), val__);				\
+})
 
 #endif /* __IOSYS_MAP_H__ */
