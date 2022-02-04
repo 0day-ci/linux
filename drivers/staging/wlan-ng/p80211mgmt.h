@@ -229,14 +229,14 @@ struct wlan_ie {
 struct wlan_ie_ssid {
 	u8 eid;
 	u8 len;
-	u8 ssid[1];		/* may be zero, ptrs may overlap */
+	u8 ssid[];		/* may be zero, ptrs may overlap */
 } __packed;
 
 /*-- Supported Rates  -----------------------------*/
 struct wlan_ie_supp_rates {
 	u8 eid;
 	u8 len;
-	u8 rates[1];		/* had better be at LEAST one! */
+	u8 rates[];		/* had better be at LEAST one! */
 } __packed;
 
 /*-- FH Parameter Set  ----------------------------*/
@@ -274,7 +274,7 @@ struct wlan_ie_tim {
 	u8 dtim_cnt;
 	u8 dtim_period;
 	u8 bitmap_ctl;
-	u8 virt_bm[1];
+	u8 virt_bm[];
 } __packed;
 
 /*-- IBSS Parameter Set ---------------------------*/
@@ -288,7 +288,7 @@ struct wlan_ie_ibss_parms {
 struct wlan_ie_challenge {
 	u8 eid;
 	u8 len;
-	u8 challenge[1];
+	u8 challenge[];
 } __packed;
 
 /*-------------------------------------------------*/

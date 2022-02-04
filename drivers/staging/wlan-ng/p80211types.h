@@ -234,7 +234,7 @@ struct p80211pstr32 {
 /* MAC address array */
 struct p80211macarray {
 	u32 cnt;
-	u8 data[1][MAXLEN_PSTR6];
+	u8 data[][MAXLEN_PSTR6];
 } __packed;
 
 /* prototype template */
