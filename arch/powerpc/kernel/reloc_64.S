@@ -8,8 +8,10 @@
 #include <asm/ppc_asm.h>
 
 RELA = 7
-RELACOUNT = 0x6ffffff9
+RELASZ = 8
+RELAENT = 9
 R_PPC64_RELATIVE = 22
+R_PPC64_UADDR64 = 43
 
 /*
  * r3 = desired final address of kernel
@@ -25,29 +27,36 @@ _GLOBAL(relocate)
 	add	r9,r9,r12	/* r9 has runtime addr of .rela.dyn section */
 	ld	r10,(p_st - 0b)(r12)
 	add	r10,r10,r12	/* r10 has runtime addr of _stext */
+	ld	r13,(p_sym - 0b)(r12)
+	add	r13,r13,r12	/* r13 has runtime addr of .dynsym */
 
 	/*
-	 * Scan the dynamic section for the RELA and RELACOUNT entries.
+	 * Scan the dynamic section for the RELA, RELASZ and RELAENT entries.
 	 */
 	li	r7,0
 	li	r8,0
 1:	ld	r6,0(r11)	/* get tag */
 	cmpdi	r6,0
-	beq	4f		/* end of list */
+	beq	5f		/* end of list */
 	cmpdi	r6,RELA
 	bne	2f
 	ld	r7,8(r11)	/* get RELA pointer in r7 */
-	b	3f
-2:	addis	r6,r6,(-RELACOUNT)@ha
-	cmpdi	r6,RELACOUNT@l
+	b	4f
+2:	cmpdi	r6,RELASZ
 	bne	3f
-	ld	r8,8(r11)	/* get RELACOUNT value in r8 */
-3:	addi	r11,r11,16
+	ld	r8,8(r11)	/* get RELASZ value in r8 */
+	b	4f
+3:	cmpdi	r6,RELAENT
+	bne	4f
+	ld	r12,8(r11)	/* get RELAENT value in r12 */
+4:	addi	r11,r11,16
 	b	1b
-4:	cmpdi	r7,0		/* check we have both RELA and RELACOUNT */
+5:	cmpdi	r7,0		/* check we have RELA, RELASZ, RELAENT */
 	cmpdi	cr1,r8,0
-	beq	6f
-	beq	cr1,6f
+	beq	10f
+	beq	cr1,10f
+	cmpdi	r12,0
+	beq	10f
 
 	/*
 	 * Work out linktime address of _stext and hence the
@@ -62,23 +71,34 @@ _GLOBAL(relocate)
 
 	/*
 	 * Run through the list of relocations and process the
-	 * R_PPC64_RELATIVE ones.
+	 * R_PPC64_RELATIVE and R_PPC64_UADDR64 ones.
 	 */
+	divd	r8,r8,r12	/* RELASZ / RELAENT */
 	mtctr	r8
-5:	ld	r0,8(9)		/* ELF64_R_TYPE(reloc->r_info) */
+5:	lwa	r0,8(r9)	/* ELF64_R_TYPE(reloc->r_info) */
 	cmpdi	r0,R_PPC64_RELATIVE
-	bne	6f
+	bne	7f
 	ld	r6,0(r9)	/* reloc->r_offset */
 	ld	r0,16(r9)	/* reloc->r_addend */
-	add	r0,r0,r3
+	b	8f
+7:	cmpdi	r0,R_PPC64_UADDR64
+	bne	9f
+	ld	r6,0(r9)
+	ld	r0,16(r9)
+	lwa	r14,12(r9) 	/* ELF64_R_SYM(reloc->r_info) */
+	mulli	r14,r14,24	/* 24 == sizeof(elf64_sym) */
+	add	r14,r14,r13	/* elf64_sym[ELF64_R_SYM] */
+	ld	r14,8(r14)
+	add	r0,r0,r14
+8:	add	r0,r0,r3
 	stdx	r0,r7,r6
-	addi	r9,r9,24
+9:	add	r9,r9,r12
 	bdnz	5b
-
-6:	blr
+10:	blr
 
 .balign 8
 p_dyn:	.8byte	__dynamic_start - 0b
 p_rela:	.8byte	__rela_dyn_start - 0b
+p_sym:		.8byte __dynamic_symtab - 0b
 p_st:	.8byte	_stext - 0b
 
