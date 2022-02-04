@@ -462,12 +462,6 @@ static void _mix_pool_bytes(const void *in, int nbytes)
 	blake2s_update(&input_pool.hash, in, nbytes);
 }
 
-static void __mix_pool_bytes(const void *in, int nbytes)
-{
-	trace_mix_pool_bytes_nolock(nbytes, _RET_IP_);
-	_mix_pool_bytes(in, nbytes);
-}
-
 static void mix_pool_bytes(const void *in, int nbytes)
 {
 	unsigned long flags;
@@ -479,11 +473,13 @@ static void mix_pool_bytes(const void *in, int nbytes)
 }
 
 struct fast_pool {
-	u32 pool[4];
+	struct work_struct mix;
 	unsigned long last;
+	u32 pool[4];
+	atomic_t count;
 	u16 reg_idx;
-	u8 count;
 };
+#define FAST_POOL_MIX_INFLIGHT (1U << 31)
 
 /*
  * This is a fast mixing routine used by the interrupt randomness
@@ -513,7 +509,6 @@ static void fast_mix(struct fast_pool *f)
 
 	f->pool[0] = a;  f->pool[1] = b;
 	f->pool[2] = c;  f->pool[3] = d;
-	f->count++;
 }
 
 static void process_random_ready_list(void)
@@ -1119,12 +1114,37 @@ static u32 get_reg(struct fast_pool *f, struct pt_regs *regs)
 	return *ptr;
 }
 
+static void mix_interrupt_randomness(struct work_struct *work)
+{
+	struct fast_pool *fast_pool = container_of(work, struct fast_pool, mix);
+
+	fast_pool->last = jiffies;
+
+	/* Since this is the result of a trip through the scheduler, xor in
+	 * a cycle counter. It can't hurt, and might help.
+	 */
+	fast_pool->pool[3] ^= random_get_entropy();
+
+	if (unlikely(crng_init == 0)) {
+		if (crng_fast_load((u8 *)&fast_pool->pool, sizeof(fast_pool->pool)) > 0)
+			atomic_set(&fast_pool->count, 0);
+		else
+			atomic_and(~FAST_POOL_MIX_INFLIGHT, &fast_pool->count);
+		return;
+	}
+
+	mix_pool_bytes(&fast_pool->pool, sizeof(fast_pool->pool));
+	atomic_set(&fast_pool->count, 0);
+	credit_entropy_bits(1);
+}
+
 void add_interrupt_randomness(int irq)
 {
 	struct fast_pool *fast_pool = this_cpu_ptr(&irq_randomness);
 	struct pt_regs *regs = get_irq_regs();
 	unsigned long now = jiffies;
 	cycles_t cycles = random_get_entropy();
+	unsigned int new_count;
 	u32 c_high, j_high;
 	u64 ip;
 
@@ -1142,29 +1162,14 @@ void add_interrupt_randomness(int irq)
 	fast_mix(fast_pool);
 	add_interrupt_bench(cycles);
 
-	if (unlikely(crng_init == 0)) {
-		if ((fast_pool->count >= 64) &&
-		    crng_fast_load((u8 *)fast_pool->pool, sizeof(fast_pool->pool)) > 0) {
-			fast_pool->count = 0;
-			fast_pool->last = now;
-		}
-		return;
+	new_count = (unsigned int)atomic_inc_return(&fast_pool->count);
+	if (new_count >= 64 && new_count < FAST_POOL_MIX_INFLIGHT &&
+	    (time_after(now, fast_pool->last + HZ) || unlikely(crng_init == 0))) {
+		if (unlikely(!fast_pool->mix.func))
+			INIT_WORK(&fast_pool->mix, mix_interrupt_randomness);
+		atomic_or(FAST_POOL_MIX_INFLIGHT, &fast_pool->count);
+		schedule_work(&fast_pool->mix);
 	}
-
-	if ((fast_pool->count < 64) && !time_after(now, fast_pool->last + HZ))
-		return;
-
-	if (!spin_trylock(&input_pool.lock))
-		return;
-
-	fast_pool->last = now;
-	__mix_pool_bytes(&fast_pool->pool, sizeof(fast_pool->pool));
-	spin_unlock(&input_pool.lock);
-
-	fast_pool->count = 0;
-
-	/* award one bit for the contents of the fast pool */
-	credit_entropy_bits(1);
 }
 EXPORT_SYMBOL_GPL(add_interrupt_randomness);
 
