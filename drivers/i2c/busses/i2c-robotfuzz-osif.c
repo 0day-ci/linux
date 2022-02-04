@@ -128,6 +128,7 @@ MODULE_DEVICE_TABLE(usb, osif_table);
 static int osif_probe(struct usb_interface *interface,
 			     const struct usb_device_id *id)
 {
+	struct device *dev = &interface->dev;
 	int ret;
 	struct osif_priv *priv;
 	u16 version;
@@ -145,6 +146,7 @@ static int osif_probe(struct usb_interface *interface,
 	priv->adapter.class = I2C_CLASS_HWMON;
 	priv->adapter.algo = &osif_algorithm;
 	priv->adapter.algo_data = priv;
+	priv->adapter.dev.parent = dev;
 	snprintf(priv->adapter.name, sizeof(priv->adapter.name),
 		 "OSIF at bus %03d device %03d",
 		 priv->usb_dev->bus->busnum, priv->usb_dev->devnum);
