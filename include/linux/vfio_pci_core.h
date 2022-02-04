@@ -198,11 +198,21 @@ static inline int vfio_pci_igd_init(struct vfio_pci_core_device *vdev)
 #ifdef CONFIG_VFIO_PCI_ZDEV
 extern int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 				       struct vfio_info_cap *caps);
+void vfio_pci_zdev_open(struct vfio_pci_core_device *vdev);
+void vfio_pci_zdev_release(struct vfio_pci_core_device *vdev);
 #else
 static inline int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 					      struct vfio_info_cap *caps)
 {
 	return -ENODEV;
+}
+
+static inline void vfio_pci_zdev_open(struct vfio_pci_core_device *vdev)
+{
+}
+
+static inline void vfio_pci_zdev_release(struct vfio_pci_core_device *vdev)
+{
 }
 #endif
 
