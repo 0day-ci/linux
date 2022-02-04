@@ -35,6 +35,31 @@
 		struct page_pool_stats __percpu *s = pool->stats;	\
 		__this_cpu_inc(s->alloc.__stat);			\
 	} while (0)
+
+struct page_pool_stats *page_pool_get_stats(struct page_pool *pool,
+					    struct page_pool_stats *stats)
+{
+	int cpu = 0;
+
+	if (!stats)
+		return NULL;
+
+	for_each_possible_cpu(cpu) {
+		const struct page_pool_stats *pcpu =
+			per_cpu_ptr(pool->stats, cpu);
+
+		stats->alloc.fast += pcpu->alloc.fast;
+		stats->alloc.slow += pcpu->alloc.slow;
+		stats->alloc.slow_high_order +=
+			pcpu->alloc.slow_high_order;
+		stats->alloc.empty += pcpu->alloc.empty;
+		stats->alloc.refill += pcpu->alloc.refill;
+		stats->alloc.waive += pcpu->alloc.waive;
+	}
+
+	return stats;
+}
+EXPORT_SYMBOL(page_pool_get_stats);
 #else
 #define this_cpu_inc_alloc_stat(pool, __stat)
 #endif
