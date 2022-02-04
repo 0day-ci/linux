@@ -13,6 +13,7 @@
 #include <linux/vfio_zdev.h>
 #include <asm/pci_clp.h>
 #include <asm/pci_io.h>
+#include <asm/pci_insn.h>
 #include <asm/kvm_pci.h>
 
 #include <linux/vfio_pci_core.h>
@@ -203,6 +204,94 @@ int vfio_pci_zdev_feat_interp(struct vfio_pci_core_device *vdev,
 	return rc;
 }
 
+int vfio_pci_zdev_feat_aif(struct vfio_pci_core_device *vdev,
+			   struct vfio_device_feature feature,
+			   unsigned long arg)
+{
+	struct zpci_dev *zdev = to_zpci(vdev->pdev);
+	struct vfio_device_zpci_aif *data;
+	struct vfio_device_feature *feat;
+	unsigned long minsz;
+	int size, rc = 0;
+
+	if (!zdev || !zdev->kzdev)
+		return -EINVAL;
+
+	/* If PROBE specified, return probe results immediately */
+	if (feature.flags & VFIO_DEVICE_FEATURE_PROBE)
+		return kvm_s390_pci_aif_probe(zdev);
+
+	size = sizeof(*feat) + sizeof(*data);
+	feat = kzalloc(size, GFP_KERNEL);
+	if (!feat)
+		return -ENOMEM;
+
+	data = (struct vfio_device_zpci_aif *)&feat->data;
+	minsz = offsetofend(struct vfio_device_feature, flags);
+
+	if (feature.argsz < minsz + sizeof(*data))
+		return -EINVAL;
+
+	/* Get the rest of the payload for GET/SET */
+	rc = copy_from_user(data, (void __user *)(arg + minsz),
+			    sizeof(*data));
+	if (rc)
+		rc = -EINVAL;
+
+	if (feature.flags & VFIO_DEVICE_FEATURE_GET) {
+		if (zdev->kzdev->aif_float)
+			data->flags = VFIO_DEVICE_ZPCI_FLAG_AIF_FLOAT;
+		if (zdev->kzdev->aif_host)
+			data->flags |= VFIO_DEVICE_ZPCI_FLAG_AIF_HOST;
+
+		if (copy_to_user((void __user *)arg, feat, size))
+			rc = -EFAULT;
+	} else if (feature.flags & VFIO_DEVICE_FEATURE_SET) {
+		if (data->flags & VFIO_DEVICE_ZPCI_FLAG_AIF_FLOAT) {
+			/* create a guest fib */
+			struct zpci_fib fib;
+
+			fib.fmt0.aibv = data->ibv;
+			fib.fmt0.isc = data->isc;
+			fib.fmt0.noi = data->noi;
+			if (data->sb != 0) {
+				fib.fmt0.aisb = data->sb;
+				fib.fmt0.aisbo = data->sbo;
+				fib.fmt0.sum = 1;
+			} else {
+				fib.fmt0.aisb = 0;
+				fib.fmt0.aisbo = 0;
+				fib.fmt0.sum = 0;
+			}
+			if (data->flags & VFIO_DEVICE_ZPCI_FLAG_AIF_HOST) {
+				rc = kvm_s390_pci_aif_enable(zdev, &fib, false);
+				if (!rc) {
+					zdev->kzdev->aif_float = true;
+					zdev->kzdev->aif_host = true;
+				}
+			} else {
+				rc = kvm_s390_pci_aif_enable(zdev, &fib, true);
+				if (!rc)
+					zdev->kzdev->aif_float = true;
+			}
+		} else if (data->flags == 0) {
+			rc = kvm_s390_pci_aif_disable(zdev, false);
+			if (!rc) {
+				zdev->kzdev->aif_float = false;
+				zdev->kzdev->aif_host = false;
+			}
+		} else {
+			rc = -EINVAL;
+		}
+	} else {
+		/* Neither GET nor SET were specified */
+		rc = -EINVAL;
+	}
+
+	kfree(feat);
+	return rc;
+}
+
 static int vfio_pci_zdev_group_notifier(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
@@ -250,8 +339,10 @@ void vfio_pci_zdev_release(struct vfio_pci_core_device *vdev)
 	 * If the device was using interpretation, don't trust that userspace
 	 * did the appropriate cleanup
 	 */
-	if (zdev->gisa != 0)
+	if (zdev->gisa != 0) {
+		kvm_s390_pci_aif_disable(zdev, true);
 		kvm_s390_pci_interp_disable(zdev, true);
+	}
 
 	kvm_s390_pci_dev_release(zdev);
 }

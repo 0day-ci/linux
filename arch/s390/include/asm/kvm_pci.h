@@ -35,6 +35,8 @@ struct kvm_zdev {
 	struct zpci_fib fib;
 	struct notifier_block nb;
 	bool interpretation;
+	bool aif_float; /* Enabled for floating interrupt assist */
+	bool aif_host; /* Require host delivery */
 };
 
 int kvm_s390_pci_dev_open(struct zpci_dev *zdev);
