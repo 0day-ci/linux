@@ -46,6 +46,14 @@ properties:
       - const: rx
       - const: tx
 
+  nvidia,cmb-xfer:
+    description:
+      Enable combined sequence transfers for read and program sequence
+      if supported by hardware. Tegra194 and later chips support this
+      feature. Default is non combined sequence. SPI message should
+      contain CMD-ADDR-DATA transfers to combine and send to hardware.
+    type: boolean
+
 patternProperties:
   "@[0-9a-f]+":
     type: object
