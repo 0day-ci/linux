@@ -45,6 +45,7 @@
 #define TIMEOUT_US		500
 
 #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
+#define domain_to_pipe_clk_gdsc(domain) container_of(domain, struct pipe_clk_gdsc, base.pd)
 
 enum gdsc_status {
 	GDSC_OFF,
@@ -549,3 +550,43 @@ int gdsc_gx_do_nothing_enable(struct generic_pm_domain *domain)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(gdsc_gx_do_nothing_enable);
+
+/*
+ * Special operations for GDSCs with attached pipe clocks.
+ * The clock should be parked to safe source (tcxo) before turning off the GDSC
+ * and can be switched on as soon as the GDSC is on.
+ *
+ * We remove respective clock sources from clocks map and handle them manually.
+ */
+int gdsc_pipe_enable(struct generic_pm_domain *domain)
+{
+	struct pipe_clk_gdsc *sc = domain_to_pipe_clk_gdsc(domain);
+	int i, ret;
+
+	ret = gdsc_enable(domain);
+	if (ret)
+		return ret;
+
+	for (i = 0; i< sc->num_clocks; i++)
+		regmap_update_bits(sc->base.regmap, sc->clocks[i].reg,
+				BIT(sc->clocks[i].shift + sc->clocks[i].width) - BIT(sc->clocks[i].shift),
+				sc->clocks[i].on_value << sc->clocks[i].shift);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(gdsc_pipe_enable);
+
+int gdsc_pipe_disable(struct generic_pm_domain *domain)
+{
+	struct pipe_clk_gdsc *sc = domain_to_pipe_clk_gdsc(domain);
+	int i;
+
+	for (i = sc->num_clocks - 1; i >= 0; i--)
+		regmap_update_bits(sc->base.regmap, sc->clocks[i].reg,
+				BIT(sc->clocks[i].shift + sc->clocks[i].width) - BIT(sc->clocks[i].shift),
+				sc->clocks[i].off_value << sc->clocks[i].shift);
+
+	/* In case of an error do not try turning the clocks again. We can not be sure about the GDSC state. */
+	return gdsc_disable(domain);
+}
+EXPORT_SYMBOL_GPL(gdsc_pipe_disable);
