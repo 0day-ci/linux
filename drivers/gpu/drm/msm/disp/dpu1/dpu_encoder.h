@@ -187,4 +187,10 @@ void dpu_encoder_prepare_wb_job(struct drm_encoder *drm_enc,
 void dpu_encoder_cleanup_wb_job(struct drm_encoder *drm_enc,
 		struct drm_writeback_job *job);
 
+/**
+ * dpu_encoder_has_valid_fb - cleanup writeback job for the encoder.
+ * @drm_enc:    Pointer to drm encoder structure
+ */
+bool dpu_encoder_has_valid_fb(struct drm_encoder *drm_enc);
+
 #endif /* __DPU_ENCODER_H__ */
