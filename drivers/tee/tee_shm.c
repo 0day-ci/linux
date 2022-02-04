@@ -195,6 +195,20 @@ struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
 	if (flags & TEE_SHM_USER_MAPPED) {
 		rc = pin_user_pages_fast(start, num_pages, FOLL_WRITE,
 					 shm->pages);
+	} else if (is_vmalloc_addr((void *)start)) {
+		struct page *page;
+		int i;
+
+		for (i = 0; i < num_pages; i++) {
+			page = vmalloc_to_page((void *)(start + PAGE_SIZE * i));
+			if (!page) {
+				ret = ERR_PTR(-ENOMEM);
+				goto err;
+			}
+			get_page(page);
+			shm->pages[i] = page;
+		}
+		rc = num_pages;
 	} else {
 		struct kvec *kiov;
 		int i;
