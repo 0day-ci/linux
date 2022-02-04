@@ -96,6 +96,58 @@ static void load_perf_global_ctrl_test(struct kvm_vm *vm)
 			     VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL,
 			     0,
 			     VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL);
+
+	/* cleanup, enable the quirk again */
+	cap.args[0] = 0;
+	vm_enable_cap(vm, &cap);
+}
+
+static void bndcfgs_test(struct kvm_vm *vm)
+{
+	uint32_t entry_low, entry_high, exit_low, exit_high;
+	struct kvm_enable_cap cap = {0};
+
+	get_vmx_control_msr(vm, MSR_IA32_VMX_TRUE_ENTRY_CTLS, &entry_low, &entry_high);
+	get_vmx_control_msr(vm, MSR_IA32_VMX_TRUE_EXIT_CTLS, &exit_low, &exit_high);
+
+	if (!(entry_high & VM_ENTRY_LOAD_BNDCFGS) ||
+	    !(exit_high & VM_EXIT_CLEAR_BNDCFGS)) {
+		print_skip("\"load/clear IA32_BNDCFGS\" VM-{Entry,Exit} controls not supported");
+		return;
+	}
+
+	/*
+	 * Test that KVM will set these bits regardless of userspace if the
+	 * guest CPUID exposes MPX.
+	 */
+	test_vmx_control_msr(vm, MSR_IA32_VMX_TRUE_ENTRY_CTLS, 0,
+			     VM_ENTRY_LOAD_BNDCFGS,
+			     VM_ENTRY_LOAD_BNDCFGS,
+			     0);
+	test_vmx_control_msr(vm, MSR_IA32_VMX_TRUE_EXIT_CTLS, 0,
+			     VM_EXIT_CLEAR_BNDCFGS,
+			     VM_EXIT_CLEAR_BNDCFGS,
+			     0);
+
+	/*
+	 * Disable the quirk, giving userspace control of the VMX capability
+	 * MSRs.
+	 */
+	cap.cap = KVM_CAP_DISABLE_QUIRKS;
+	cap.args[0] = KVM_X86_QUIRK_TWEAK_VMX_CTRL_MSRS;
+	vm_enable_cap(vm, &cap);
+
+	/*
+	 * Test that userspace can clear these bits, even if it exposes MPX.
+	 */
+	test_vmx_control_msr(vm, MSR_IA32_VMX_TRUE_ENTRY_CTLS, 0,
+			     VM_ENTRY_LOAD_BNDCFGS,
+			     0,
+			     VM_ENTRY_LOAD_BNDCFGS);
+	test_vmx_control_msr(vm, MSR_IA32_VMX_TRUE_EXIT_CTLS, 0,
+			     VM_EXIT_CLEAR_BNDCFGS,
+			     0,
+			     VM_EXIT_CLEAR_BNDCFGS);
 }
 
 int main(void)
@@ -108,6 +160,7 @@ int main(void)
 	vm = vm_create_default(VCPU_ID, 0, NULL);
 
 	load_perf_global_ctrl_test(vm);
+	bndcfgs_test(vm);
 
 	kvm_vm_free(vm);
 }
