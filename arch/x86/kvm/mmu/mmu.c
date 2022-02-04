@@ -4410,18 +4410,9 @@ static inline u64 reserved_hpa_bits(void)
  * follow the features in guest.
  */
 static void reset_shadow_zero_bits_mask(struct kvm_vcpu *vcpu,
-					struct kvm_mmu *context)
+					struct kvm_mmu *context,
+					bool uses_nx)
 {
-	/*
-	 * KVM uses NX when TDP is disabled to handle a variety of scenarios,
-	 * notably for huge SPTEs if iTLB multi-hit mitigation is enabled and
-	 * to generate correct permissions for CR0.WP=0/CR4.SMEP=1/EFER.NX=0.
-	 * The iTLB multi-hit workaround can be toggled at any time, so assume
-	 * NX can be used by any non-nested shadow MMU to avoid having to reset
-	 * MMU contexts.  Note, KVM forces EFER.NX=1 when TDP is disabled.
-	 */
-	bool uses_nx = is_efer_nx(context) || !tdp_enabled;
-
 	/* @amd adds a check on bit of SPTEs, which KVM shouldn't use anyways. */
 	bool is_amd = true;
 	/* KVM doesn't use 2-level page tables for the shadow MMU. */
@@ -4829,8 +4820,6 @@ static void shadow_mmu_init_context(struct kvm_vcpu *vcpu, struct kvm_mmu *conte
 
 	reset_guest_paging_metadata(vcpu, context);
 	context->shadow_root_level = new_role.base.level;
-
-	reset_shadow_zero_bits_mask(vcpu, context);
 }
 
 static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
@@ -4841,6 +4830,16 @@ static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
 		kvm_calc_shadow_mmu_root_page_role(vcpu, regs, false);
 
 	shadow_mmu_init_context(vcpu, context, regs, new_role);
+
+	/*
+	 * KVM uses NX when TDP is disabled to handle a variety of scenarios,
+	 * notably for huge SPTEs if iTLB multi-hit mitigation is enabled and
+	 * to generate correct permissions for CR0.WP=0/CR4.SMEP=1/EFER.NX=0.
+	 * The iTLB multi-hit workaround can be toggled at any time, so assume
+	 * NX can be used by any non-nested shadow MMU to avoid having to reset
+	 * MMU contexts.  Note, KVM forces EFER.NX=1 when TDP is disabled.
+	 */
+	reset_shadow_zero_bits_mask(vcpu, context, true);
 }
 
 static union kvm_mmu_role
@@ -4872,6 +4871,7 @@ void kvm_init_shadow_npt_mmu(struct kvm_vcpu *vcpu, unsigned long cr0,
 	__kvm_mmu_new_pgd(vcpu, nested_cr3, new_role.base);
 
 	shadow_mmu_init_context(vcpu, context, &regs, new_role);
+	reset_shadow_zero_bits_mask(vcpu, context, is_efer_nx(context));
 }
 EXPORT_SYMBOL_GPL(kvm_init_shadow_npt_mmu);
 
