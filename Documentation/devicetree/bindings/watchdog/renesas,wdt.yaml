@@ -20,6 +20,9 @@ properties:
           - const: renesas,rza-wdt       # RZ/A
 
       - items:
+          - const: renesas,rzn1-wdt # RZ/N1
+
+      - items:
           - enum:
               - renesas,r9a07g044-wdt    # RZ/G2{L,LC}
           - const: renesas,rzg2l-wdt     # RZ/G2L
@@ -89,6 +92,7 @@ allOf:
             contains:
               enum:
                 - renesas,rza-wdt
+                - renesas,rzn1-wdt
     then:
       required:
         - power-domains
