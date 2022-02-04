@@ -23,6 +23,11 @@
 	};
 };
 
+&wdt0 {
+	timeout-sec = <10>;
+	status = "okay";
+};
+
 &uart0 {
 	status = "okay";
 };
