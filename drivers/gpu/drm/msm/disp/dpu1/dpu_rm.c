@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  */
 
@@ -9,6 +10,7 @@
 #include "dpu_hw_ctl.h"
 #include "dpu_hw_pingpong.h"
 #include "dpu_hw_intf.h"
+#include "dpu_hw_wb.h"
 #include "dpu_hw_dspp.h"
 #include "dpu_hw_merge3d.h"
 #include "dpu_encoder.h"
@@ -73,6 +75,14 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 		if (rm->intf_blks[i]) {
 			hw = to_dpu_hw_intf(rm->intf_blks[i]);
 			dpu_hw_intf_destroy(hw);
+		}
+	}
+	for (i = 0; i < ARRAY_SIZE(rm->wb_blks); i++) {
+		struct dpu_hw_wb *hw;
+
+		if (rm->wb_blks[i]) {
+			hw = to_dpu_hw_wb(rm->wb_blks[i]);
+			dpu_hw_wb_destroy(hw);
 		}
 	}
 
@@ -185,6 +195,24 @@ int dpu_rm_init(struct dpu_rm *rm,
 			goto fail;
 		}
 		rm->intf_blks[intf->id - INTF_0] = &hw->base;
+	}
+
+	for (i = 0; i < cat->wb_count; i++) {
+		struct dpu_hw_wb *hw;
+		const struct dpu_wb_cfg *wb = &cat->wb[i];
+
+		if (wb->id < WB_0 || wb->id >= WB_MAX) {
+			DPU_ERROR("skip intf %d with invalid id\n", wb->id);
+			continue;
+		}
+
+		hw = dpu_hw_wb_init(wb->id, mmio, cat);
+		if (IS_ERR_OR_NULL(hw)) {
+			rc = PTR_ERR(hw);
+			DPU_ERROR("failed wb object creation: err %d\n", rc);
+			goto fail;
+		}
+		rm->wb_blks[wb->id - WB_0] = &hw->base;
 	}
 
 	for (i = 0; i < cat->ctl_count; i++) {
@@ -479,6 +507,33 @@ static int _dpu_rm_reserve_intf(
 	return 0;
 }
 
+static int _dpu_rm_reserve_wb(
+		struct dpu_rm *rm,
+		struct dpu_global_state *global_state,
+		uint32_t enc_id,
+		uint32_t id)
+{
+	int idx = id - WB_0;
+
+	if (idx < 0 || idx >= ARRAY_SIZE(rm->wb_blks)) {
+		DPU_ERROR("invalid intf id: %d", id);
+		return -EINVAL;
+	}
+
+	if (!rm->wb_blks[idx]) {
+		DPU_ERROR("couldn't find wb id %d\n", id);
+		return -EINVAL;
+	}
+
+	if (reserved_by_other(global_state->wb_to_enc_id, idx, enc_id)) {
+		DPU_ERROR("intf id %d already reserved\n", id);
+		return -ENAVAIL;
+	}
+
+	global_state->wb_to_enc_id[idx] = enc_id;
+	return 0;
+}
+
 static int _dpu_rm_reserve_intf_related_hw(
 		struct dpu_rm *rm,
 		struct dpu_global_state *global_state,
@@ -493,6 +548,15 @@ static int _dpu_rm_reserve_intf_related_hw(
 			continue;
 		id = i + INTF_0;
 		ret = _dpu_rm_reserve_intf(rm, global_state, enc_id, id);
+		if (ret)
+			return ret;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(hw_res->wbs); i++) {
+		if (hw_res->wbs[i] == INTF_MODE_NONE)
+			continue;
+		id = i + WB_0;
+		ret = _dpu_rm_reserve_wb(rm, global_state, enc_id, id);
 		if (ret)
 			return ret;
 	}
@@ -567,6 +631,8 @@ void dpu_rm_release(struct dpu_global_state *global_state,
 		ARRAY_SIZE(global_state->ctl_to_enc_id), enc->base.id);
 	_dpu_rm_clear_mapping(global_state->intf_to_enc_id,
 		ARRAY_SIZE(global_state->intf_to_enc_id), enc->base.id);
+	_dpu_rm_clear_mapping(global_state->wb_to_enc_id,
+		ARRAY_SIZE(global_state->wb_to_enc_id), enc->base.id);
 }
 
 int dpu_rm_reserve(
@@ -634,6 +700,11 @@ int dpu_rm_get_assigned_resources(struct dpu_rm *rm,
 		hw_blks = rm->intf_blks;
 		hw_to_enc_id = global_state->intf_to_enc_id;
 		max_blks = ARRAY_SIZE(rm->intf_blks);
+		break;
+	case DPU_HW_BLK_WB:
+		hw_blks = rm->wb_blks;
+		hw_to_enc_id = global_state->wb_to_enc_id;
+		max_blks = ARRAY_SIZE(rm->wb_blks);
 		break;
 	case DPU_HW_BLK_DSPP:
 		hw_blks = rm->dspp_blks;
