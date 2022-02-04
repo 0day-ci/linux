@@ -1581,9 +1581,9 @@ static void set_pcie_thunderbolt(struct pci_dev *dev)
 {
 	u16 vsec;
 
-	/* Is the device part of a Thunderbolt controller? */
+	/* Is the device part of a Thunderbolt or USB4 controller? */
 	vsec = pci_find_vsec_capability(dev, PCI_VENDOR_ID_INTEL, PCI_VSEC_ID_INTEL_TBT);
-	if (vsec)
+	if (vsec || dev->class == PCI_CLASS_SERIAL_USB_USB4)
 		dev->is_thunderbolt = 1;
 }
 
