@@ -7,7 +7,12 @@
 #define GTP0_PORT	3386
 #define GTP1U_PORT	2152
 
+/* GTP messages types */
+#define GTP_ECHO_REQ	1	/* Echo Request */
+#define GTP_ECHO_RSP	2	/* Echo Response */
 #define GTP_TPDU	255
+
+#define GTPIE_RECOVERY	14
 
 struct gtp0_header {	/* According to GSM TS 09.60. */
 	__u8	flags;
@@ -27,10 +32,36 @@ struct gtp1_header {	/* According to 3GPP TS 29.060. */
 	__be32	tid;
 } __attribute__ ((packed));
 
+struct gtp1_header_long {	/* According to 3GPP TS 29.060. */
+	__u8	flags;
+	__u8	type;
+	__be16	length;
+	__be32	tid;
+	__be16	seq;
+	__u8	npdu;
+	__u8	next;
+} __packed;
+
 struct gtp_pdu_session_info {	/* According to 3GPP TS 38.415. */
 	u8	pdu_type;
 	u8	qfi;
 };
+
+/* GTP Information Element */
+struct gtp_ie {
+	__u8	tag;
+	__u8	val;
+} __packed;
+
+struct gtp0_packet {
+	struct gtp0_header gtp0_h;
+	struct gtp_ie ie;
+} __packed;
+
+struct gtp1u_packet {
+	struct gtp1_header_long gtp1u_h;
+	struct gtp_ie ie;
+} __packed;
 
 static inline bool netif_is_gtp(const struct net_device *dev)
 {
