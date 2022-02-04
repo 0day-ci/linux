@@ -5,4 +5,16 @@
 config GS_FPGABOOT
 	tristate "Xilinx FPGA firmware download module"
 	help
-	  Xilinx FPGA firmware download module
+	  Xilinx FPGA firmware download module.
+
+choice
+	prompt "Support Board"
+	depends on GS_FPGABOOT
+
+config GS_FPGABOOT_BOARD_B4860G100
+	bool "B4860G100"
+	depends on PPC_85xx
+	help
+	  Select this to support B4860G100 board
+
+endchoice
