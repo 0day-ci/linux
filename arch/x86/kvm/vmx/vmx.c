@@ -7243,7 +7243,13 @@ void nested_vmx_entry_exit_ctls_update(struct kvm_vcpu *vcpu)
 		}
 	}
 
-	nested_vmx_pmu_entry_exit_ctls_update(vcpu);
+	if (kvm_pmu_is_valid_msr(vcpu, MSR_CORE_PERF_GLOBAL_CTRL)) {
+		vmx->nested.msrs.entry_ctls_high |= VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL;
+		vmx->nested.msrs.exit_ctls_high |= VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL;
+	} else {
+		vmx->nested.msrs.entry_ctls_high &= ~VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL;
+		vmx->nested.msrs.exit_ctls_high &= ~VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL;
+	}
 }
 
 static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
