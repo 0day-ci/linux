@@ -1512,7 +1512,7 @@ void srcutorture_get_gp_data(enum rcutorture_type test_type,
 }
 EXPORT_SYMBOL_GPL(srcutorture_get_gp_data);
 
-const char * const srcu_size_state_name[] =
+static const char * const srcu_size_state_name[] =
 {
 	"SRCU_SIZE_SMALL",
 	"SRCU_SIZE_ALLOC",
