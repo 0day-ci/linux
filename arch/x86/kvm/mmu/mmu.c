@@ -4755,20 +4755,6 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu,
 	reset_tdp_shadow_zero_bits_mask(context);
 }
 
-static union kvm_mmu_page_role
-kvm_calc_shadow_mmu_root_page_role(struct kvm_vcpu *vcpu,
-				   union kvm_mmu_role role)
-{
-	if (!role.ext.efer_lma)
-		role.base.level = PT32E_ROOT_LEVEL;
-	else if (role.ext.cr4_la57)
-		role.base.level = PT64_ROOT_5LEVEL;
-	else
-		role.base.level = PT64_ROOT_4LEVEL;
-
-	return role.base;
-}
-
 static void shadow_mmu_init_context(struct kvm_vcpu *vcpu, struct kvm_mmu *context,
 				    union kvm_mmu_role cpu_role,
 				    union kvm_mmu_page_role mmu_role)
@@ -4797,9 +4783,10 @@ static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
 {
 	struct kvm_mmu *context = &vcpu->arch.root_mmu;
 	union kvm_mmu_role cpu_role = kvm_calc_cpu_role(vcpu, regs);
-	union kvm_mmu_page_role mmu_role =
-		kvm_calc_shadow_mmu_root_page_role(vcpu, cpu_role);
+	union kvm_mmu_page_role mmu_role;
 
+	mmu_role = cpu_role.base;
+	mmu_role.level = max_t(u32, mmu_role.level, PT32E_ROOT_LEVEL);
 	shadow_mmu_init_context(vcpu, context, cpu_role, mmu_role);
 
 	/*
@@ -4813,14 +4800,6 @@ static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
 	reset_shadow_zero_bits_mask(vcpu, context);
 }
 
-static union kvm_mmu_page_role
-kvm_calc_shadow_npt_root_page_role(struct kvm_vcpu *vcpu,
-				   union kvm_mmu_role role)
-{
-	role.base.level = kvm_mmu_get_tdp_level(vcpu);
-	return role.base;
-}
-
 void kvm_init_shadow_npt_mmu(struct kvm_vcpu *vcpu, unsigned long cr0,
 			     unsigned long cr4, u64 efer, gpa_t nested_cr3)
 {
@@ -4831,7 +4810,10 @@ void kvm_init_shadow_npt_mmu(struct kvm_vcpu *vcpu, unsigned long cr0,
 		.efer = efer,
 	};
 	union kvm_mmu_role cpu_role = kvm_calc_cpu_role(vcpu, &regs);
-	union kvm_mmu_page_role mmu_role = kvm_calc_shadow_npt_root_page_role(vcpu, cpu_role);
+	union kvm_mmu_page_role mmu_role;
+
+	mmu_role = cpu_role.base;
+	mmu_role.level = kvm_mmu_get_tdp_level(vcpu);
 
 	shadow_mmu_init_context(vcpu, context, cpu_role, mmu_role);
 	reset_shadow_zero_bits_mask(vcpu, context);
