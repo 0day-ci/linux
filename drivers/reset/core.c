@@ -12,6 +12,7 @@
 #include <linux/kref.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/acpi.h>
 #include <linux/reset.h>
 #include <linux/reset-controller.h>
 #include <linux/slab.h>
@@ -1106,6 +1107,11 @@ int __device_reset(struct device *dev, bool optional)
 {
 	struct reset_control *rstc;
 	int ret;
+
+	acpi_handle handle = ACPI_HANDLE(dev);
+
+	if (handle)
+		return acpi_evaluate_object(handle, "_RST", NULL, NULL);
 
 	rstc = __reset_control_get(dev, NULL, 0, 0, optional, true);
 	if (IS_ERR(rstc))
