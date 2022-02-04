@@ -432,7 +432,6 @@ struct kvm_mmu {
 	gpa_t root_pgd;
 	union kvm_mmu_role cpu_role;
 	union kvm_mmu_page_role mmu_role;
-	bool direct_map;
 	struct kvm_mmu_root_info prev_roots[KVM_MMU_NUM_PREV_ROOTS];
 
 	/*
