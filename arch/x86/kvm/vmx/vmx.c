@@ -7242,6 +7242,8 @@ void nested_vmx_entry_exit_ctls_update(struct kvm_vcpu *vcpu)
 			vmx->nested.msrs.exit_ctls_high &= ~VM_EXIT_CLEAR_BNDCFGS;
 		}
 	}
+
+	nested_vmx_pmu_entry_exit_ctls_update(vcpu);
 }
 
 static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
