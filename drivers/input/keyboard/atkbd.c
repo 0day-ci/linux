@@ -19,6 +19,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/input/vivaldi-keymap.h>
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 #include <linux/libps2.h>
@@ -237,8 +238,7 @@ struct atkbd {
 	/* Serializes reconnect(), attr->set() and event work */
 	struct mutex mutex;
 
-	u16 function_row_physmap[MAX_FUNCTION_ROW_KEYS];
-	int num_function_row_keys;
+	struct vivaldi_data vdata;
 };
 
 /*
@@ -308,17 +308,9 @@ static struct attribute *atkbd_attributes[] = {
 
 static ssize_t atkbd_show_function_row_physmap(struct atkbd *atkbd, char *buf)
 {
-	ssize_t size = 0;
-	int i;
+	const struct vivaldi_data *data = &atkbd->vdata;
 
-	if (!atkbd->num_function_row_keys)
-		return 0;
-
-	for (i = 0; i < atkbd->num_function_row_keys; i++)
-		size += scnprintf(buf + size, PAGE_SIZE - size, "%02X ",
-				  atkbd->function_row_physmap[i]);
-	size += scnprintf(buf + size, PAGE_SIZE - size, "\n");
-	return size;
+	return vivaldi_function_row_physmap_show(data, buf);
 }
 
 static umode_t atkbd_attr_is_visible(struct kobject *kobj,
@@ -329,7 +321,7 @@ static umode_t atkbd_attr_is_visible(struct kobject *kobj,
 	struct atkbd *atkbd = serio_get_drvdata(serio);
 
 	if (attr == &atkbd_attr_function_row_physmap.attr &&
-	    !atkbd->num_function_row_keys)
+	    !atkbd->vdata.num_function_row_keys)
 		return 0;
 
 	return attr->mode;
@@ -1210,9 +1202,9 @@ static void atkbd_parse_fwnode_data(struct serio *serio)
 	if (n > 0 && n <= MAX_FUNCTION_ROW_KEYS &&
 	    !device_property_read_u32_array(dev, "function-row-physmap",
 					    physmap, n)) {
-		atkbd->num_function_row_keys = n;
+		atkbd->vdata.num_function_row_keys = n;
 		for (i = 0; i < n; i++)
-			atkbd->function_row_physmap[i] = physmap[i];
+			atkbd->vdata.function_row_physmap[i] = physmap[i];
 		dev_dbg(dev, "FW reported %d function-row key locations\n", n);
 	}
 }
