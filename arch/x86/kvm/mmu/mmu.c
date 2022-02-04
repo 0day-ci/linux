@@ -4751,13 +4751,11 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu,
 
 static union kvm_mmu_role
 kvm_calc_shadow_mmu_root_page_role(struct kvm_vcpu *vcpu,
-				   const struct kvm_mmu_role_regs *regs)
+				   union kvm_mmu_role role)
 {
-	union kvm_mmu_role role = kvm_calc_cpu_role(vcpu, regs);
-
-	if (!____is_efer_lma(regs))
+	if (!role.ext.efer_lma)
 		role.base.level = PT32E_ROOT_LEVEL;
-	else if (____is_cr4_la57(regs))
+	else if (role.ext.cr4_la57)
 		role.base.level = PT64_ROOT_5LEVEL;
 	else
 		role.base.level = PT64_ROOT_4LEVEL;
@@ -4794,7 +4792,7 @@ static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
 	struct kvm_mmu *context = &vcpu->arch.root_mmu;
 	union kvm_mmu_role cpu_role = kvm_calc_cpu_role(vcpu, regs);
 	union kvm_mmu_role mmu_role =
-		kvm_calc_shadow_mmu_root_page_role(vcpu, regs);
+		kvm_calc_shadow_mmu_root_page_role(vcpu, cpu_role);
 
 	shadow_mmu_init_context(vcpu, context, cpu_role, mmu_role);
 
@@ -4811,11 +4809,8 @@ static void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu,
 
 static union kvm_mmu_role
 kvm_calc_shadow_npt_root_page_role(struct kvm_vcpu *vcpu,
-				   const struct kvm_mmu_role_regs *regs)
+				   union kvm_mmu_role role)
 {
-	union kvm_mmu_role role =
-               kvm_calc_cpu_role(vcpu, regs);
-
 	role.base.level = kvm_mmu_get_tdp_level(vcpu);
 
 	return role;
@@ -4831,7 +4826,7 @@ void kvm_init_shadow_npt_mmu(struct kvm_vcpu *vcpu, unsigned long cr0,
 		.efer = efer,
 	};
 	union kvm_mmu_role cpu_role = kvm_calc_cpu_role(vcpu, &regs);
-	union kvm_mmu_role mmu_role = kvm_calc_shadow_npt_root_page_role(vcpu, &regs);;
+	union kvm_mmu_role mmu_role = kvm_calc_shadow_npt_root_page_role(vcpu, cpu_role);
 
 	shadow_mmu_init_context(vcpu, context, cpu_role, mmu_role);
 	reset_shadow_zero_bits_mask(vcpu, context, is_efer_nx(context));
