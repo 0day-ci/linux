@@ -135,7 +135,15 @@ struct page_pool {
 	refcount_t user_cnt;
 
 	u64 destroy_cnt;
+#ifdef CONFIG_PAGE_POOL_STATS
+	struct page_pool_stats __percpu *stats;
+#endif
 };
+
+#ifdef CONFIG_PAGE_POOL_STATS
+struct page_pool_stats {
+};
+#endif
 
 struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp);
 
