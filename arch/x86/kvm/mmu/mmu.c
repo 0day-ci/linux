@@ -4773,26 +4773,10 @@ static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu,
 }
 
 static union kvm_mmu_role
-kvm_calc_shadow_root_page_role_common(struct kvm_vcpu *vcpu,
-				      const struct kvm_mmu_role_regs *regs)
-{
-	union kvm_mmu_role role = kvm_calc_mmu_role_common(vcpu, regs);
-
-	role.base.smep_andnot_wp = role.ext.cr4_smep && !____is_cr0_wp(regs);
-	role.base.smap_andnot_wp = role.ext.cr4_smap && !____is_cr0_wp(regs);
-	role.base.has_4_byte_gpte = ____is_cr0_pg(regs) && !____is_cr4_pae(regs);
-
-	return role;
-}
-
-static union kvm_mmu_role
 kvm_calc_shadow_mmu_root_page_role(struct kvm_vcpu *vcpu,
 				   const struct kvm_mmu_role_regs *regs)
 {
-	union kvm_mmu_role role =
-		kvm_calc_shadow_root_page_role_common(vcpu, regs);
-
-	role.base.direct = !____is_cr0_pg(regs);
+	union kvm_mmu_role role = kvm_calc_cpu_role(vcpu, regs);
 
 	if (!____is_efer_lma(regs))
 		role.base.level = PT32E_ROOT_LEVEL;
@@ -4853,9 +4837,8 @@ kvm_calc_shadow_npt_root_page_role(struct kvm_vcpu *vcpu,
 				   const struct kvm_mmu_role_regs *regs)
 {
 	union kvm_mmu_role role =
-		kvm_calc_shadow_root_page_role_common(vcpu, regs);
+               kvm_calc_cpu_role(vcpu, regs);
 
-	role.base.direct = false;
 	role.base.level = kvm_mmu_get_tdp_level(vcpu);
 
 	return role;
