@@ -360,8 +360,6 @@ union kvm_mmu_extended_role {
 	u32 word;
 	struct {
 		unsigned int execonly:1;
-		unsigned int cr0_pg:1;
-		unsigned int cr4_pae:1;
 		unsigned int cr4_pse:1;
 		unsigned int cr4_pke:1;
 		unsigned int cr4_smap:1;
