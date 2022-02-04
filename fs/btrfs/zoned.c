@@ -655,7 +655,6 @@ int btrfs_check_zoned_mode(struct btrfs_fs_info *fs_info)
 			struct btrfs_zoned_device_info *zone_info =
 				device->zone_info;
 
-			zone_info = device->zone_info;
 			zoned_devices++;
 			if (!zone_size) {
 				zone_size = zone_info->zone_size;
