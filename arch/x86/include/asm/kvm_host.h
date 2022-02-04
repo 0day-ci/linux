@@ -433,7 +433,7 @@ struct kvm_mmu {
 	hpa_t root_hpa;
 	gpa_t root_pgd;
 	union kvm_mmu_role cpu_role;
-	union kvm_mmu_role mmu_role;
+	union kvm_mmu_page_role mmu_role;
 	u8 root_level;
 	u8 shadow_root_level;
 	bool direct_map;

@@ -1025,7 +1025,7 @@ static gpa_t FNAME(gva_to_gpa)(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
  */
 static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
 {
-	union kvm_mmu_page_role mmu_role = vcpu->arch.mmu->mmu_role.base;
+	union kvm_mmu_page_role mmu_role = vcpu->arch.mmu->mmu_role;
 	int i;
 	bool host_writable;
 	gpa_t first_pte_gpa;
