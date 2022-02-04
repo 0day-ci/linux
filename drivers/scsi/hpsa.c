@@ -231,6 +231,7 @@ static struct board_type products[] = {
 	{0x007D1590, "HP Storage P1228 Array Controller", &SA5_access},
 	{0x00881590, "HP Storage P1228e Array Controller", &SA5_access},
 	{0x333f103c, "HP StorageWorks 1210m Array Controller", &SA5_access},
+	{0x00e41590, "Smart Array S100i SR Gen10", NULL},
 	{0xFFFF103C, "Unknown Smart Array", &SA5_access},
 };
 
@@ -7554,6 +7555,10 @@ static int hpsa_lookup_board_id(struct pci_dev *pdev, u32 *board_id,
 		*legacy_board = false;
 	for (i = 0; i < ARRAY_SIZE(products); i++)
 		if (*board_id == products[i].board_id) {
+			if (!products[i].access) {
+				dev_info(&pdev->dev, "This is a SW RAID controller for windows only\n");
+				return -ENODEV;
+			}
 			if (products[i].access != &SA5A_access &&
 			    products[i].access != &SA5B_access)
 				return i;
@@ -8676,7 +8681,8 @@ static int hpsa_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	rc = hpsa_lookup_board_id(pdev, &board_id, NULL);
 	if (rc < 0) {
-		dev_warn(&pdev->dev, "Board ID not found\n");
+		if (rc != -ENODEV)
+			dev_warn(&pdev->dev, "Board ID not found\n");
 		return rc;
 	}
 
