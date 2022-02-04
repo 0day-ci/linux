@@ -135,9 +135,9 @@ static int __nf_conntrack_eventmask_report(struct nf_conntrack_ecache *e,
 					   const unsigned long missed,
 					   const struct nf_ct_event *item)
 {
-	struct nf_conn *ct = item->ct;
 	struct net *net = nf_ct_net(item->ct);
 	struct nf_ct_event_notifier *notify;
+	unsigned long old, want;
 	int ret;
 
 	if (!((events | missed) & e->ctmask))
@@ -157,12 +157,13 @@ static int __nf_conntrack_eventmask_report(struct nf_conntrack_ecache *e,
 	if (likely(ret >= 0 && missed == 0))
 		return 0;
 
-	spin_lock_bh(&ct->lock);
-	if (ret < 0)
-		e->missed |= events;
-	else
-		e->missed &= ~missed;
-	spin_unlock_bh(&ct->lock);
+	do {
+		old = READ_ONCE(e->missed);
+		if (ret < 0)
+			want = old | events;
+		else
+			want = old & ~missed;
+	} while (cmpxchg(&e->missed, old, want) != old);
 
 	return ret;
 }
