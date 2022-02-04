@@ -292,7 +292,7 @@ typedef struct {
  * the in-kernel pt_regs structure to user space.
  */
 typedef struct {
-	unsigned long args[1];
+	unsigned long orig_gpr2;
 	psw_t psw;
 	unsigned long gprs[NUM_GPRS];
 } user_pt_regs;

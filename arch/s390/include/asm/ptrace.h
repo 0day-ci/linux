@@ -80,12 +80,11 @@ struct pt_regs {
 	union {
 		user_pt_regs user_regs;
 		struct {
-			unsigned long args[1];
+			unsigned long orig_gpr2;
 			psw_t psw;
 			unsigned long gprs[NUM_GPRS];
 		};
 	};
-	unsigned long orig_gpr2;
 	union {
 		struct {
 			unsigned int int_code;
