@@ -172,8 +172,10 @@ static struct page *page_pool_refill_alloc_cache(struct page_pool *pool)
 	} while (pool->alloc.count < PP_ALLOC_CACHE_REFILL);
 
 	/* Return last page */
-	if (likely(pool->alloc.count > 0))
+	if (likely(pool->alloc.count > 0)) {
 		page = pool->alloc.cache[--pool->alloc.count];
+		this_cpu_inc_alloc_stat(pool, refill);
+	}
 
 	return page;
 }
