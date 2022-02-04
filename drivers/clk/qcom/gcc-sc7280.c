@@ -255,26 +255,6 @@ static const struct clk_parent_data gcc_parent_data_5[] = {
 	{ .hw = &gcc_gpll0_out_even.clkr.hw },
 };
 
-static const struct parent_map gcc_parent_map_6[] = {
-	{ P_PCIE_0_PIPE_CLK, 0 },
-	{ P_BI_TCXO, 2 },
-};
-
-static const struct clk_parent_data gcc_parent_data_6[] = {
-	{ .fw_name = "pcie_0_pipe_clk", .name = "pcie_0_pipe_clk" },
-	{ .fw_name = "bi_tcxo" },
-};
-
-static const struct parent_map gcc_parent_map_7[] = {
-	{ P_PCIE_1_PIPE_CLK, 0 },
-	{ P_BI_TCXO, 2 },
-};
-
-static const struct clk_parent_data gcc_parent_data_7[] = {
-	{ .fw_name = "pcie_1_pipe_clk", .name = "pcie_1_pipe_clk" },
-	{ .fw_name = "bi_tcxo" },
-};
-
 static const struct parent_map gcc_parent_map_8[] = {
 	{ P_BI_TCXO, 0 },
 	{ P_GCC_GPLL0_OUT_MAIN, 1 },
@@ -367,36 +347,6 @@ static const struct parent_map gcc_parent_map_15[] = {
 static const struct clk_parent_data gcc_parent_data_15[] = {
 	{ .fw_name = "bi_tcxo" },
 	{ .hw = &gcc_mss_gpll0_main_div_clk_src.clkr.hw },
-};
-
-static struct clk_regmap_mux gcc_pcie_0_pipe_clk_src = {
-	.reg = 0x6b054,
-	.shift = 0,
-	.width = 2,
-	.parent_map = gcc_parent_map_6,
-	.clkr = {
-		.hw.init = &(struct clk_init_data){
-			.name = "gcc_pcie_0_pipe_clk_src",
-			.parent_data = gcc_parent_data_6,
-			.num_parents = ARRAY_SIZE(gcc_parent_data_6),
-			.ops = &clk_regmap_mux_closest_ops,
-		},
-	},
-};
-
-static struct clk_regmap_mux gcc_pcie_1_pipe_clk_src = {
-	.reg = 0x8d054,
-	.shift = 0,
-	.width = 2,
-	.parent_map = gcc_parent_map_7,
-	.clkr = {
-		.hw.init = &(struct clk_init_data){
-			.name = "gcc_pcie_1_pipe_clk_src",
-			.parent_data = gcc_parent_data_7,
-			.num_parents = ARRAY_SIZE(gcc_parent_data_7),
-			.ops = &clk_regmap_mux_closest_ops,
-		},
-	},
 };
 
 static struct clk_regmap_mux gcc_ufs_phy_rx_symbol_0_clk_src = {
@@ -1757,10 +1707,6 @@ static struct clk_branch gcc_pcie_0_pipe_clk = {
 		.enable_mask = BIT(4),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_pcie_0_pipe_clk",
-			.parent_hws = (const struct clk_hw*[]){
-				&gcc_pcie_0_pipe_clk_src.clkr.hw,
-			},
-			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
 			.ops = &clk_branch2_ops,
 		},
@@ -1847,10 +1793,6 @@ static struct clk_branch gcc_pcie_1_pipe_clk = {
 		.enable_mask = BIT(30),
 		.hw.init = &(struct clk_init_data){
 			.name = "gcc_pcie_1_pipe_clk",
-			.parent_hws = (const struct clk_hw*[]){
-				&gcc_pcie_1_pipe_clk_src.clkr.hw,
-			},
-			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
 			.ops = &clk_branch2_ops,
 		},
@@ -3113,22 +3055,48 @@ static struct clk_branch gcc_wpss_rscp_clk = {
 	},
 };
 
-static struct gdsc gcc_pcie_0_gdsc = {
-	.gdscr = 0x6b004,
-	.pd = {
-		.name = "gcc_pcie_0_gdsc",
+static struct pipe_clk_gdsc gcc_pcie_0_gdsc = {
+	.base = {
+		.gdscr = 0x6b004,
+		.pd = {
+			.name = "gcc_pcie_0_gdsc",
+		},
+		.pwrsts = PWRSTS_OFF_ON,
+		.flags = VOTABLE,
 	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = VOTABLE,
+	.num_clocks = 1,
+	.clocks = {
+		{
+			/* gcc_pcie_0_pipe_clk_src */
+			.reg = 0x6b054,
+			.shift = 0,
+			.width = 2,
+			.on_value = 0,
+			.off_value = 2,
+		},
+	},
 };
 
-static struct gdsc gcc_pcie_1_gdsc = {
-	.gdscr = 0x8d004,
-	.pd = {
-		.name = "gcc_pcie_1_gdsc",
+static struct pipe_clk_gdsc gcc_pcie_1_gdsc = {
+	.base = {
+		.gdscr = 0x8d004,
+		.pd = {
+			.name = "gcc_pcie_1_gdsc",
+		},
+		.pwrsts = PWRSTS_OFF_ON,
+		.flags = VOTABLE,
 	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = VOTABLE,
+	.num_clocks = 1,
+	.clocks = {
+		{
+			/* gcc_pcie_1_pipe_clk_src */
+			.reg = 0x8d054,
+			.shift = 0,
+			.width = 2,
+			.on_value = 0,
+			.off_value = 2,
+		},
+	},
 };
 
 static struct gdsc gcc_ufs_phy_gdsc = {
@@ -3244,7 +3212,6 @@ static struct clk_regmap *gcc_sc7280_clocks[] = {
 	[GCC_PCIE_0_MSTR_AXI_CLK] = &gcc_pcie_0_mstr_axi_clk.clkr,
 	[GCC_PCIE_0_PHY_RCHNG_CLK_SRC] = &gcc_pcie_0_phy_rchng_clk_src.clkr,
 	[GCC_PCIE_0_PIPE_CLK] = &gcc_pcie_0_pipe_clk.clkr,
-	[GCC_PCIE_0_PIPE_CLK_SRC] = &gcc_pcie_0_pipe_clk_src.clkr,
 	[GCC_PCIE_0_SLV_AXI_CLK] = &gcc_pcie_0_slv_axi_clk.clkr,
 	[GCC_PCIE_0_SLV_Q2A_AXI_CLK] = &gcc_pcie_0_slv_q2a_axi_clk.clkr,
 	[GCC_PCIE_1_AUX_CLK] = &gcc_pcie_1_aux_clk.clkr,
@@ -3253,7 +3220,6 @@ static struct clk_regmap *gcc_sc7280_clocks[] = {
 	[GCC_PCIE_1_MSTR_AXI_CLK] = &gcc_pcie_1_mstr_axi_clk.clkr,
 	[GCC_PCIE_1_PHY_RCHNG_CLK_SRC] = &gcc_pcie_1_phy_rchng_clk_src.clkr,
 	[GCC_PCIE_1_PIPE_CLK] = &gcc_pcie_1_pipe_clk.clkr,
-	[GCC_PCIE_1_PIPE_CLK_SRC] = &gcc_pcie_1_pipe_clk_src.clkr,
 	[GCC_PCIE_1_SLV_AXI_CLK] = &gcc_pcie_1_slv_axi_clk.clkr,
 	[GCC_PCIE_1_SLV_Q2A_AXI_CLK] = &gcc_pcie_1_slv_q2a_axi_clk.clkr,
 	[GCC_PCIE_THROTTLE_CORE_CLK] = &gcc_pcie_throttle_core_clk.clkr,
@@ -3391,8 +3357,8 @@ static struct clk_regmap *gcc_sc7280_clocks[] = {
 };
 
 static struct gdsc *gcc_sc7280_gdscs[] = {
-	[GCC_PCIE_0_GDSC] = &gcc_pcie_0_gdsc,
-	[GCC_PCIE_1_GDSC] = &gcc_pcie_1_gdsc,
+	[GCC_PCIE_0_GDSC] = &gcc_pcie_0_gdsc.base,
+	[GCC_PCIE_1_GDSC] = &gcc_pcie_1_gdsc.base,
 	[GCC_UFS_PHY_GDSC] = &gcc_ufs_phy_gdsc,
 	[GCC_USB30_PRIM_GDSC] = &gcc_usb30_prim_gdsc,
 	[GCC_USB30_SEC_GDSC] = &gcc_usb30_sec_gdsc,
