@@ -132,7 +132,8 @@ GLOBAL_SYM_COUNT = $(shell readelf -s --wide $(BPF_IN_SHARED) | \
 VERSIONED_SYM_COUNT = $(shell readelf --dyn-syms --wide $(OUTPUT)libbpf.so | \
 			      sed 's/\[.*\]//' | \
 			      awk '/GLOBAL/ && /DEFAULT/ && !/UND/ {print $$NF}' | \
-			      grep -Eo '[^ ]+@LIBBPF_' | cut -d@ -f1 | sort -u | wc -l)
+			      grep -Eo '[^ ]+@LIBBPF_' | grep -Ev '^LIBBPF_' | \
+			      cut -d@ -f1 | sort -u | wc -l)
 
 CMD_TARGETS = $(LIB_TARGET) $(PC_FILE)
 
@@ -195,7 +196,8 @@ check_abi: $(OUTPUT)libbpf.so $(VERSION_SCRIPT)
 		readelf --dyn-syms --wide $(OUTPUT)libbpf.so |		 \
 		    sed 's/\[.*\]//' |					 \
 		    awk '/GLOBAL/ && /DEFAULT/ && !/UND/ {print $$NF}'|  \
-		    grep -Eo '[^ ]+@LIBBPF_' | cut -d@ -f1 |		 \
+		    grep -Eo '[^ ]+@LIBBPF_' | grep -Ev '^LIBBPF_' |	 \
+		    cut -d@ -f1 |					 \
 		    sort -u > $(OUTPUT)libbpf_versioned_syms.tmp; 	 \
 		diff -u $(OUTPUT)libbpf_global_syms.tmp			 \
 		     $(OUTPUT)libbpf_versioned_syms.tmp;		 \
