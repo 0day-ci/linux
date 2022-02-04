@@ -1211,9 +1211,9 @@ static ssize_t ucma_init_qp_attr(struct ucma_file *file,
 				 int in_len, int out_len)
 {
 	struct rdma_ucm_init_qp_attr cmd;
-	struct ib_uverbs_qp_attr resp;
+	struct ib_uverbs_qp_attr resp = {};
 	struct ucma_context *ctx;
-	struct ib_qp_attr qp_attr;
+	struct ib_qp_attr qp_attr = {};
 	int ret;
 
 	if (out_len < sizeof(resp))
@@ -1229,8 +1229,6 @@ static ssize_t ucma_init_qp_attr(struct ucma_file *file,
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 
-	resp.qp_attr_mask = 0;
-	memset(&qp_attr, 0, sizeof qp_attr);
 	qp_attr.qp_state = cmd.qp_state;
 	mutex_lock(&ctx->mutex);
 	ret = rdma_init_qp_attr(ctx->cm_id, &qp_attr, &resp.qp_attr_mask);
