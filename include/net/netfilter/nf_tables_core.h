@@ -35,8 +35,8 @@ struct nft_bitwise_fast_expr {
 };
 
 struct nft_cmp_fast_expr {
-	u32			data;
-	u32			mask;
+	struct nft_data		data;
+	struct nft_data		mask;
 	u8			sreg;
 	u8			len;
 	bool			inv;
