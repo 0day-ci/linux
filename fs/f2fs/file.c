@@ -4381,6 +4381,16 @@ static int f2fs_preallocate_blocks(struct kiocb *iocb, struct iov_iter *iter,
 	int flag;
 	int ret;
 
+	/*
+	 * It tries to check whether block addresses are all allocated,
+	 * it's rough because blocks can be allocated beyond i_size,
+	 * however, we can afford skipping block preallocation since
+	 * it's not necessary all the time.
+	 */
+	if (F2FS_BLK_ALIGN(i_size_read(inode)) ==
+			SECTOR_TO_BLOCK(inode->i_blocks))
+		return 0;
+
 	/* If it will be an out-of-place direct write, don't bother. */
 	if (dio && f2fs_lfs_mode(sbi))
 		return 0;
