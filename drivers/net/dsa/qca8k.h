@@ -345,6 +345,7 @@ struct qca8k_mgmt_eth_data {
 	bool ack;
 	u32 seq;
 	u32 data[4];
+	u8 *mgmt_pkt;
 };
 
 struct qca8k_mib_eth_data {
