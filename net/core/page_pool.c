@@ -166,6 +166,7 @@ static struct page *page_pool_refill_alloc_cache(struct page_pool *pool)
 			 * This limit stress on page buddy alloactor.
 			 */
 			page_pool_return_page(pool, page);
+			this_cpu_inc_alloc_stat(pool, waive);
 			page = NULL;
 			break;
 		}
