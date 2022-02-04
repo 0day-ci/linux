@@ -156,6 +156,12 @@ int of_dma_configure_id(struct device *dev, struct device_node *np,
 			kfree(map);
 			return -EINVAL;
 		}
+
+		/*
+		 * Since we are about to set a new range map we should make sure we
+		 * do not overwrite any existing one without having freed it first.
+		 */
+		kfree(dev->dma_range_map);
 	}
 
 	/*
