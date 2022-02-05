@@ -1685,6 +1685,25 @@ static int vsc8574_config_host_serdes(struct phy_device *phydev)
 			   PROC_CMD_RST_CONF_PORT | PROC_CMD_FIBER_1000BASE_X);
 }
 
+static int vsc85xx_config_inband_aneg(struct phy_device *phydev, bool enabled)
+{
+	int rc;
+	u16 reg_val = 0;
+
+	if (enabled)
+		reg_val = MSCC_PHY_SERDES_ANEG;
+
+	mutex_lock(&phydev->lock);
+
+	rc = phy_modify_paged(phydev, MSCC_PHY_PAGE_EXTENDED_3,
+			      MSCC_PHY_SERDES_PCS_CTRL, MSCC_PHY_SERDES_ANEG,
+			      reg_val);
+
+	mutex_unlock(&phydev->lock);
+
+	return rc;
+}
+
 static int vsc8584_config_init(struct phy_device *phydev)
 {
 	struct vsc8531_private *vsc8531 = phydev->priv;
@@ -1770,6 +1789,11 @@ static int vsc8584_config_init(struct phy_device *phydev)
 		ret = vsc85xx_rgmii_set_skews(phydev, VSC8572_RGMII_CNTL,
 					      VSC8572_RGMII_RX_DELAY_MASK,
 					      VSC8572_RGMII_TX_DELAY_MASK);
+		if (ret)
+			return ret;
+	} else {
+		/* Enable clause 37 */
+		ret = vsc85xx_config_inband_aneg(phydev, true);
 		if (ret)
 			return ret;
 	}
