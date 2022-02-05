@@ -1827,7 +1827,9 @@ xfs_fs_reconfigure(
 	if (error)
 		return error;
 
-	sync_filesystem(mp->m_super);
+	error = sync_filesystem(mp->m_super);
+	if (error)
+		return error;
 
 	/* inode32 -> inode64 */
 	if (xfs_has_small_inums(mp) && !xfs_has_small_inums(new_mp)) {
