@@ -101,6 +101,24 @@ drop:
 	return NULL;
 }
 
+#if IS_ENABLED(CONFIG_SMC_AUTO_FALLBACK)
+static bool smc_is_in_limited(const struct sock *sk)
+{
+	const struct smc_sock *smc;
+
+	smc = (const struct smc_sock *)
+		((uintptr_t)sk->sk_user_data & ~SK_USER_DATA_NOCOPY);
+
+	if (!smc)
+		return true;
+
+	if (workqueue_congested(WORK_CPU_UNBOUND, smc_hs_wq))
+		return true;
+
+	return false;
+}
+#endif
+
 static struct smc_hashinfo smc_v4_hashinfo = {
 	.lock = __RW_LOCK_UNLOCKED(smc_v4_hashinfo.lock),
 };
@@ -2308,6 +2326,10 @@ static int smc_listen(struct socket *sock, int backlog)
 	smc->af_ops.syn_recv_sock = smc_tcp_syn_recv_sock;
 
 	inet_csk(smc->clcsock->sk)->icsk_af_ops = &smc->af_ops;
+
+#if IS_ENABLED(CONFIG_SMC_AUTO_FALLBACK)
+	tcp_sk(smc->clcsock->sk)->smc_in_limited = smc_is_in_limited;
+#endif
 
 	rc = kernel_listen(smc->clcsock, backlog);
 	if (rc) {
