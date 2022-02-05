@@ -2980,7 +2980,8 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 	/* Protects use of hba->reserved_slot. */
 	lockdep_assert_held(&hba->dev_cmd.lock);
 
-	down_read(&hba->clk_scaling_lock);
+	if (ufshcd_is_clkscaling_supported(hba))
+		down_read(&hba->clk_scaling_lock);
 
 	lrbp = &hba->lrb[tag];
 	WARN_ON(lrbp->cmd);
@@ -2998,7 +2999,8 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 				    (struct utp_upiu_req *)lrbp->ucd_rsp_ptr);
 
 out:
-	up_read(&hba->clk_scaling_lock);
+	if (ufshcd_is_clkscaling_supported(hba))
+		up_read(&hba->clk_scaling_lock);
 	return err;
 }
 
@@ -6014,7 +6016,8 @@ static void ufshcd_err_handling_prepare(struct ufs_hba *hba)
 		if (ufshcd_is_clkscaling_supported(hba) &&
 		    hba->clk_scaling.is_enabled)
 			ufshcd_suspend_clkscaling(hba);
-		ufshcd_clk_scaling_allow(hba, false);
+		if (ufshcd_is_clkscaling_supported(hba))
+			ufshcd_clk_scaling_allow(hba, false);
 	}
 	ufshcd_scsi_block_requests(hba);
 	/* Drain ufshcd_queuecommand() */
@@ -6247,7 +6250,8 @@ lock_skip_pending_xfer_clear:
 		 * Hold the scaling lock just in case dev cmds
 		 * are sent via bsg and/or sysfs.
 		 */
-		down_write(&hba->clk_scaling_lock);
+		if (ufshcd_is_clkscaling_supported(hba))
+			down_write(&hba->clk_scaling_lock);
 		hba->force_pmc = true;
 		pmc_err = ufshcd_config_pwr_mode(hba, &(hba->pwr_info));
 		if (pmc_err) {
@@ -6257,7 +6261,8 @@ lock_skip_pending_xfer_clear:
 		}
 		hba->force_pmc = false;
 		ufshcd_print_pwr_info(hba);
-		up_write(&hba->clk_scaling_lock);
+		if (ufshcd_is_clkscaling_supported(hba))
+			up_write(&hba->clk_scaling_lock);
 		spin_lock_irqsave(hba->host->host_lock, flags);
 	}
 
@@ -6753,7 +6758,8 @@ static int ufshcd_issue_devman_upiu_cmd(struct ufs_hba *hba,
 	/* Protects use of hba->reserved_slot. */
 	lockdep_assert_held(&hba->dev_cmd.lock);
 
-	down_read(&hba->clk_scaling_lock);
+	if (ufshcd_is_clkscaling_supported(hba))
+		down_read(&hba->clk_scaling_lock);
 
 	lrbp = &hba->lrb[tag];
 	WARN_ON(lrbp->cmd);
@@ -6822,7 +6828,8 @@ static int ufshcd_issue_devman_upiu_cmd(struct ufs_hba *hba,
 	ufshcd_add_query_upiu_trace(hba, err ? UFS_QUERY_ERR : UFS_QUERY_COMP,
 				    (struct utp_upiu_req *)lrbp->ucd_rsp_ptr);
 
-	up_read(&hba->clk_scaling_lock);
+	if (ufshcd_is_clkscaling_supported(hba))
+		up_read(&hba->clk_scaling_lock);
 	return err;
 }
 
