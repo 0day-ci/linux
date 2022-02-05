@@ -897,13 +897,13 @@ bool radeon_get_atom_connector_info_from_supported_devices_table(struct
 	union atom_supported_devices *supported_devices;
 	int i, j, max_device;
 	struct bios_connector *bios_connectors;
-	size_t bc_size = sizeof(*bios_connectors) * ATOM_MAX_SUPPORTED_DEVICE;
 	struct radeon_router router;
 
 	router.ddc_valid = false;
 	router.cd_valid = false;
 
-	bios_connectors = kzalloc(bc_size, GFP_KERNEL);
+	bios_connectors = kcalloc(ATOM_MAX_SUPPORTED_DEVICE,
+				  sizeof(*bios_connectors), GFP_KERNEL);
 	if (!bios_connectors)
 		return false;
 
