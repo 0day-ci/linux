@@ -2507,7 +2507,7 @@ static inline bool rq_order_less(struct rq *rq1, struct rq *rq2)
 {
 #ifdef CONFIG_SCHED_CORE
 	/*
-	 * In order to not have {0,2},{1,3} turn into into an AB-BA,
+	 * In order to not have {0,2},{1,3} turn into an AB-BA,
 	 * order by core-id first and cpu-id second.
 	 *
 	 * Notably:
