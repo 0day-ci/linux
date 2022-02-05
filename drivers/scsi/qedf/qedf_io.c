@@ -302,16 +302,12 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 	struct qedf_ioreq *io_req = NULL;
 	struct io_bdt *bd_tbl;
 	u16 xid;
-	uint32_t free_sqes;
 	int i;
 	unsigned long flags;
 
-	free_sqes = atomic_read(&fcport->free_sqes);
-
-	if (!free_sqes) {
+	if (atomic_dec_if_positive(&fcport->free_sqes) < 0) {
 		QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_IO,
-		    "Returning NULL, free_sqes=%d.\n ",
-		    free_sqes);
+		    "Returning NULL, no free_sqes.\n ");
 		goto out_failed;
 	}
 
@@ -321,7 +317,7 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 		QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_IO,
 		    "Returning NULL, num_active_ios=%d.\n",
 		    atomic_read(&fcport->num_active_ios));
-		goto out_failed;
+		goto out_inc;
 	}
 
 	/* Limit global TIDs certain tasks */
@@ -329,7 +325,7 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 		QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_IO,
 		    "Returning NULL, free_list_cnt=%d.\n",
 		    atomic_read(&cmd_mgr->free_list_cnt));
-		goto out_failed;
+		goto out_inc;
 	}
 
 	spin_lock_irqsave(&cmd_mgr->lock, flags);
@@ -346,7 +342,7 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 
 	if (i == FCOE_PARAMS_NUM_TASKS) {
 		spin_unlock_irqrestore(&cmd_mgr->lock, flags);
-		goto out_failed;
+		goto out_inc;
 	}
 
 	if (test_bit(QEDF_CMD_DIRTY, &io_req->flags))
@@ -360,7 +356,6 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 	spin_unlock_irqrestore(&cmd_mgr->lock, flags);
 
 	atomic_inc(&fcport->num_active_ios);
-	atomic_dec(&fcport->free_sqes);
 	xid = io_req->xid;
 	atomic_dec(&cmd_mgr->free_list_cnt);
 
@@ -381,7 +376,7 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 	if (bd_tbl == NULL) {
 		QEDF_ERR(&(qedf->dbg_ctx), "bd_tbl is NULL, xid=%x.\n", xid);
 		kref_put(&io_req->refcount, qedf_release_cmd);
-		goto out_failed;
+		goto out_inc;
 	}
 	bd_tbl->io_req = io_req;
 	io_req->cmd_type = cmd_type;
@@ -394,6 +389,8 @@ struct qedf_ioreq *qedf_alloc_cmd(struct qedf_rport *fcport, u8 cmd_type)
 
 	return io_req;
 
+out_inc:
+	atomic_inc(&fcport->free_sqes);
 out_failed:
 	/* Record failure for stats and return NULL to caller */
 	qedf->alloc_failures++;
