@@ -795,7 +795,6 @@ static void tasklet_action_common(struct softirq_action *a,
 		t->next = NULL;
 		*tl_head->tail = t;
 		tl_head->tail = &t->next;
-		__raise_softirq_irqoff(softirq_nr);
 		local_irq_enable();
 	}
 }
