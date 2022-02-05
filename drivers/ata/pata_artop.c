@@ -28,7 +28,7 @@
 #include <linux/ata.h>
 
 #define DRV_NAME	"pata_artop"
-#define DRV_VERSION	"0.4.6"
+#define DRV_VERSION	"0.4.7"
 
 /*
  *	The ARTOP has 33 Mhz and "over clocked" timing tables. Until we
@@ -398,11 +398,9 @@ static int artop_init_one (struct pci_dev *pdev, const struct pci_device_id *id)
 		ppi[0] = &info_6210;
 	else if (id->driver_data == 1)	/* 6260 */
 		ppi[0] = &info_626x;
-	else if (id->driver_data == 2)	{ /* 6280 or 6280 + fast */
-		unsigned long io = pci_resource_start(pdev, 4);
-
+	else if (id->driver_data == 2) { /* 6280 or 6280 + fast */
 		ppi[0] = &info_628x;
-		if (inb(io) & 0x10)
+		if (inb(pci_resource_start(pdev, 4)) & 0x10)
 			ppi[0] = &info_628x_fast;
 	}
 
