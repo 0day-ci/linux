@@ -192,13 +192,12 @@ properties:
 
 patternProperties:
   "^timings@[0-9a-f]+$":
-    type: object
+    $ref: jedec,lpddr3-timings.yaml
     description: |
       The lpddr3 node may have one or more child nodes with timings.
       Each timing node provides AC timing parameters of the device for a given
       speed-bin. The user may provide the timings for as many speed-bins as is
-      required. For more information please see::
-      Documentation/devicetree/bindings/memory-controllers/ddr/lpddr3-timings.txt
+      required.
 
 required:
   - compatible
