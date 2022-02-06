@@ -765,8 +765,11 @@
 			};
 
 			epdc: epdc@20f4000 {
+				compatible = "fsl,imx6sl-epdc";
 				reg = <0x020f4000 0x4000>;
 				interrupts = <0 97 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clks IMX6SL_CLK_EPDC_AXI>, <&clks IMX6SL_CLK_EPDC_PIX>;
+				clock-names = "axi", "pix";
 			};
 
 			lcdif: lcdif@20f8000 {
