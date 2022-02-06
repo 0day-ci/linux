@@ -1062,6 +1062,14 @@ struct lock_manager_operations {
 	int (*lm_change)(struct file_lock *, int, struct list_head *);
 	void (*lm_setup)(struct file_lock *, void **);
 	bool (*lm_breaker_owns_lease)(struct file_lock *);
+	/*
+	 * This callback function is called after a lock conflict is
+	 * detected. This allows the lock manager of the lock that
+	 * causes the conflict to see if the conflict can be resolved
+	 * somehow. If it can then this callback returns false; the
+	 * conflict was resolved, else returns true.
+	 */
+	bool (*lm_lock_conflict)(struct file_lock *cfl);
 };
 
 struct lock_manager {
