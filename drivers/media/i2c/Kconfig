@@ -492,6 +492,16 @@ config VIDEO_DS90UB954
 	  To compile this driver as a module, choose M here: the
 	  module will be called ds90ub954.
 
+config VIDEO_DS90UB953
+	tristate "TI DS90UB953-Q1 serializer"
+	help
+	  Device driver for the Texas Instruments "DS90UB953-Q1
+	  FPD-Link III 4.16-Gbps Serializer With CSI-2 Interface for
+	  2.3MP/60fps Cameras, RADAR, and Other Sensors".
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ds90ub953.
+
 comment "Video and audio decoders"
 
 config VIDEO_SAA717X

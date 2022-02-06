@@ -19080,6 +19080,7 @@ M:	Luca Ceresoli <luca@lucaceresoli.net>
 L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/media/i2c/ti,ds90ub953-q1.yaml
+F:	drivers/media/i2c/ds90ub953.c
 F:	include/dt-bindings/media/ds90ub953.h
 
 TEXAS INSTRUMENTS DS90UB954 VIDEO DESERIALIZER DRIVER
