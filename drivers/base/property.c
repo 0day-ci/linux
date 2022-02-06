@@ -911,10 +911,7 @@ EXPORT_SYMBOL(fwnode_irq_get);
  */
 void __iomem *fwnode_iomap(struct fwnode_handle *fwnode, int index)
 {
-	if (IS_ENABLED(CONFIG_OF_ADDRESS) && is_of_node(fwnode))
-		return of_iomap(to_of_node(fwnode), index);
-
-	return NULL;
+	return fwnode_call_ptr_op(fwnode, iomap, index);
 }
 EXPORT_SYMBOL(fwnode_iomap);
 
