@@ -31,6 +31,7 @@ struct kernfs_iattrs {
 	atomic_t		user_xattr_size;
 };
 
+
 /* +1 to avoid triggering overflow warning when negating it */
 #define KN_DEACTIVATED_BIAS		(INT_MIN + 1)
 
@@ -146,5 +147,55 @@ void kernfs_drain_open_files(struct kernfs_node *kn);
  * symlink.c
  */
 extern const struct inode_operations kernfs_symlink_iops;
+
+static inline spinlock_t *kernfs_open_node_lock_ptr(struct kernfs_node *kn)
+{
+	struct kernfs_root *root;
+	int idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	root = kernfs_root(kn);
+
+	return &root->open_node_locks[idx].lock;
+}
+
+static inline spinlock_t *kernfs_open_node_lock(struct kernfs_node *kn)
+{
+	struct kernfs_root *root;
+	spinlock_t *lock;
+	int idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	root = kernfs_root(kn);
+
+	lock = &root->open_node_locks[idx].lock;
+
+	spin_lock_irq(lock);
+
+	return lock;
+}
+
+static inline struct mutex *kernfs_open_file_mutex_ptr(struct kernfs_node *kn)
+{
+	struct kernfs_root *root;
+	int idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	root = kernfs_root(kn);
+
+	return &root->open_file_mutex[idx].lock;
+}
+
+static inline struct mutex *kernfs_open_file_mutex_lock(struct kernfs_node *kn)
+{
+	struct kernfs_root *root;
+	struct mutex *lock;
+	int idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	root = kernfs_root(kn);
+
+	lock = &root->open_file_mutex[idx].lock;
+
+	mutex_lock(lock);
+
+	return lock;
+}
 
 #endif	/* __KERNFS_INTERNAL_H */

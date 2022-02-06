@@ -18,6 +18,8 @@
 #include <linux/uidgid.h>
 #include <linux/wait.h>
 #include <linux/rwsem.h>
+#include <linux/spinlock.h>
+#include <linux/cache.h>
 
 struct file;
 struct dentry;
@@ -33,6 +35,40 @@ struct fs_context;
 struct kernfs_fs_context;
 struct kernfs_open_node;
 struct kernfs_iattrs;
+
+/*
+ * NR_KERNFS_LOCK_BITS determines size (NR_KERNFS_LOCKS) of hash
+ * table of locks.
+ * Having a small hash table would impact scalability, since
+ * more and more kernfs_node objects will end up using same lock
+ * and having a very large hash table would waste memory.
+ *
+ * At the moment size of hash table of locks is being set based on
+ * the number of CPUs as follows:
+ *
+ * NR_CPU      NR_KERNFS_LOCK_BITS      NR_KERNFS_LOCKS
+ *   1                  1                       2
+ *  2-3                 2                       4
+ *  4-7                 4                       16
+ *  8-15                6                       64
+ *  16-31               8                       256
+ *  32 and more         10                      1024
+ */
+#ifdef CONFIG_SMP
+#define NR_KERNFS_LOCK_BITS (2 * (ilog2(NR_CPUS < 32 ? NR_CPUS : 32)))
+#else
+#define NR_KERNFS_LOCK_BITS     1
+#endif
+
+#define NR_KERNFS_LOCKS     (1 << NR_KERNFS_LOCK_BITS)
+
+struct kernfs_open_node_lock {
+	spinlock_t lock;
+} ____cacheline_aligned_in_smp;
+
+struct kernfs_open_file_mutex {
+	struct mutex lock;
+} ____cacheline_aligned_in_smp;
 
 enum kernfs_node_type {
 	KERNFS_DIR		= 0x0001,
@@ -89,6 +125,7 @@ enum kernfs_root_flag {
 	 */
 	KERNFS_ROOT_SUPPORT_USER_XATTR		= 0x0008,
 };
+
 
 /* type-specific structures for kernfs_node union members */
 struct kernfs_elem_dir {
@@ -201,6 +238,8 @@ struct kernfs_root {
 
 	wait_queue_head_t	deactivate_waitq;
 	struct rw_semaphore	kernfs_rwsem;
+	struct kernfs_open_node_lock open_node_locks[NR_KERNFS_LOCKS];
+	struct kernfs_open_file_mutex open_file_mutex[NR_KERNFS_LOCKS];
 };
 
 struct kernfs_open_file {

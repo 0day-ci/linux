@@ -909,6 +909,7 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 {
 	struct kernfs_root *root;
 	struct kernfs_node *kn;
+	int lock_count;
 
 	root = kzalloc(sizeof(*root), GFP_KERNEL);
 	if (!root)
@@ -916,6 +917,10 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 
 	idr_init(&root->ino_idr);
 	init_rwsem(&root->kernfs_rwsem);
+	for (lock_count = 0; lock_count < NR_KERNFS_LOCKS; lock_count++) {
+		spin_lock_init(&root->open_node_locks[lock_count].lock);
+		mutex_init(&root->open_file_mutex[lock_count].lock);
+	}
 	INIT_LIST_HEAD(&root->supers);
 
 	/*
