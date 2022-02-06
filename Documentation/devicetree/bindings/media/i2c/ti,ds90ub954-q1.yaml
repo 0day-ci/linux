@@ -1,0 +1,235 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) 2019 Renesas Electronics Corp.
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/media/i2c/ti,ds90ub954-q1.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Texas Instruments DS90UB954-Q1 dual video deserializer
+
+maintainers:
+  - Luca Ceresoli <luca@lucaceresoli.net>
+
+description: |
+  The TI DS90UB954-Q1 is a MIPI CSI-2 video deserializer that forwards
+  video streams from up to two FPD-Link 3 connections to a MIPI CSI-2
+  output. It also allows access to remote I2C and GPIO.
+
+properties:
+  compatible:
+    const: ti,ds90ub954-q1
+
+  reg:
+    description: |
+      main I2C slave address; optionally aliases for RX port registers and
+      remote serializers. The main address is mandatory and must be the
+      first, others are optional and fall back to defaults if not
+      specified. See "reg-names".
+
+  reg-names:
+    description: |
+      Names of I2C address used to communicate with the chip, must match
+      the "reg" values; mandatory if there are 2 or more addresses.
+      "main" is the main I2C address, used to access shared registers.
+      "rxport0" and "rxport1" are the I2C alias to access FPD-link RX
+      port specific registers; must not be used by other slaves on the
+      same bus. "ser0" and "ser1" are the I2C alias to access the remote
+      serializer connected on each FPD-link RX port; must not be used by
+      other slaves on the same bus.
+    minItems: 1
+    maxItems: 5
+    items:
+      - const: main
+      - const: rxport0
+      - const: rxport1
+      - const: ser0
+      - const: ser1
+
+  clocks:
+    description: provider of the clock on the XIN/REFCLK pin
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  reset-gpios:
+    description: chip reset GPIO connected to PDB pin (active low)
+
+  i2c-alias-pool:
+    description: |
+      list of I2C addresses that are known to be available on the "local"
+      (SoC-to-deser) I2C bus; they will be picked at runtime and used as
+      aliases to reach remote I2C chips
+
+  '#clock-cells':
+    description: |
+      the DS90UB954 provides the FPD line rate clock to the serializer
+    const: 0
+
+  ports:
+    $ref: /schemas/graph.yaml#/properties/ports
+
+    patternProperties:
+      '^port@[01]$':
+        $ref: /schemas/graph.yaml#/$defs/port-base
+        description: FPD-Link RX port 0 (RIN0+/RIN0- pins)
+
+        properties:
+          endpoint:
+            $ref: /schemas/media/video-interfaces.yaml#
+            unevaluatedProperties: false
+
+      '^port@2$':
+        $ref: /schemas/graph.yaml#/properties/port
+        description: MIPI-CSI2 TX port
+
+  remote-chips:
+    type: object
+
+    properties:
+      '#address-cells':
+        const: 1
+      '#size-cells':
+        const: 0
+
+    patternProperties:
+      '^remote-chip@([01]+)$':
+        type: object
+        $ref: /schemas/media/i2c/ti,ds90ub953-q1.yaml#
+
+    required:
+      - '#address-cells'
+      - '#size-cells'
+
+    additionalProperties: false
+
+  i2c-atr:
+    description: |
+      Each child describes the I2C bus on the remote side of an RX port
+    type: object
+
+    properties:
+      '#address-cells':
+        const: 1
+      '#size-cells':
+        const: 0
+
+    patternProperties:
+      '^i2c@([01]+)$':
+        type: object
+
+        properties:
+          reg:
+            maxItems: 1
+          '#address-cells':
+            const: 1
+          '#size-cells':
+            const: 0
+          clock-frequency:
+            minimum: 1
+            maximum: 1000000
+
+    additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - ports
+  - remote-chips
+  - i2c-atr
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/media/ds90ub953.h>
+
+    i2c@0 {
+      reg = <0x0 0x100>;
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      deser: deser@3d {
+        compatible = "ti,ds90ub954-q1";
+        reg-names = "main", "rxport0", "rxport1", "ser0", "ser1";
+        reg       = <0x3d>,  <0x40>,    <0x41>,   <0x44>, <0x45>;
+        clocks = <&clk_25M>;
+        interrupt-parent = <&gic>;
+        interrupts = <3 1 IRQ_TYPE_LEVEL_LOW>;
+        reset-gpios = <&gpio 4 GPIO_ACTIVE_LOW>;
+
+        #clock-cells = <0>;
+
+        i2c-alias-pool = /bits/ 16 <0x4a 0x4b 0x4c 0x4d 0x4e 0x4f>;
+
+        ports {
+          #address-cells = <1>;
+          #size-cells = <0>;
+
+          port@0 {
+            reg = <0>;
+            ds90ub954_fpd3_in0: endpoint {
+              remote-endpoint = <&sensor_0_out>;
+            };
+          };
+
+          port@2 {
+            reg = <2>;
+            ds90ub954_mipi_out0: endpoint {
+                    data-lanes = <1 2 3 4>;
+                    link-frequencies = /bits/ 64 <400000000>;
+                    remote-endpoint = <&csirx_0_in>;
+            };
+          };
+        };
+
+        remote-chips {
+          #address-cells = <1>;
+          #size-cells = <0>;
+
+          des0_ser0: remote-chip@0 {
+            reg = <0>;
+            compatible = "ti,ds90ub953-q1";
+            clocks = <&deser>;
+            ti,gpio-functions =
+              <DS90_GPIO_FUNC_UNUSED
+              DS90_GPIO_FUNC_OUTPUT_REMOTE
+              DS90_GPIO_FUNC_UNUSED
+              DS90_GPIO_FUNC_UNUSED>;
+
+            gpio-controller;
+            #gpio-cells = <2>;
+            #clock-cells = <0>;
+          };
+        };
+
+        i2c-atr {
+          #address-cells = <1>;
+          #size-cells = <0>;
+
+          remote_i2c0: i2c@0 {
+            reg = <0>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            sensor_0@1a {
+              compatible = "sony,imx274";
+              reg = <0x1a>;
+
+              reset-gpios = <&des0_ser0 1 GPIO_ACTIVE_LOW>;
+
+              port {
+                sensor_0_out: endpoint {
+                  remote-endpoint = <&ds90ub954_fpd3_in0>;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+
+...

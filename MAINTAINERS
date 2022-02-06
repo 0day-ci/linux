@@ -19082,6 +19082,12 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/media/i2c/ti,ds90ub953-q1.yaml
 F:	include/dt-bindings/media/ds90ub953.h
 
+TEXAS INSTRUMENTS DS90UB954 VIDEO DESERIALIZER DRIVER
+M:	Luca Ceresoli <luca@lucaceresoli.net>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/media/i2c/ti,ds90ub954-q1.yaml
+
 TEXAS INSTRUMENTS' SYSTEM CONTROL INTERFACE (TISCI) PROTOCOL DRIVER
 M:	Nishanth Menon <nm@ti.com>
 M:	Tero Kristo <kristo@kernel.org>
