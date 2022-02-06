@@ -1792,23 +1792,18 @@ static void cvmx_usb_start_channel(struct octeon_hcd *usb, int channel,
 	case CVMX_USB_TRANSFER_INTERRUPT:
 		break;
 	case CVMX_USB_TRANSFER_ISOCHRONOUS:
-		if (!cvmx_usb_pipe_needs_split(usb, pipe)) {
+		if (!cvmx_usb_pipe_needs_split(usb, pipe) &&
+		    pipe->transfer_dir == CVMX_USB_DIRECTION_OUT) {
 			/*
 			 * ISO transactions require different PIDs depending on
 			 * direction and how many packets are needed
 			 */
-			if (pipe->transfer_dir == CVMX_USB_DIRECTION_OUT) {
-				if (pipe->multi_count < 2) /* Need DATA0 */
-					USB_SET_FIELD32(
-						CVMX_USBCX_HCTSIZX(channel,
-								   usb->index),
+			if (pipe->multi_count < 2) /* Need DATA0 */
+				USB_SET_FIELD32(CVMX_USBCX_HCTSIZX(channel, usb->index),
 						cvmx_usbcx_hctsizx, pid, 0);
-				else /* Need MDATA */
-					USB_SET_FIELD32(
-						CVMX_USBCX_HCTSIZX(channel,
-								   usb->index),
+			else /* Need MDATA */
+				USB_SET_FIELD32(CVMX_USBCX_HCTSIZX(channel, usb->index),
 						cvmx_usbcx_hctsizx, pid, 3);
-			}
 		}
 		break;
 	}
@@ -2121,17 +2116,17 @@ static void cvmx_usb_complete(struct octeon_hcd *usb,
  *
  * Returns: Transaction or NULL on failure.
  */
-static struct cvmx_usb_transaction *cvmx_usb_submit_transaction(
-				struct octeon_hcd *usb,
-				struct cvmx_usb_pipe *pipe,
-				enum cvmx_usb_transfer type,
-				u64 buffer,
-				int buffer_length,
-				u64 control_header,
-				int iso_start_frame,
-				int iso_number_packets,
-				struct cvmx_usb_iso_packet *iso_packets,
-				struct urb *urb)
+static struct cvmx_usb_transaction *cvmx_usb_submit_transaction(struct octeon_hcd *usb,
+								struct cvmx_usb_pipe *pipe,
+								enum cvmx_usb_transfer type,
+								u64 buffer,
+								int buffer_length,
+								u64 control_header,
+								int iso_start_frame,
+								int iso_number_packets,
+								struct cvmx_usb_iso_packet
+									*iso_packets,
+								struct urb *urb)
 {
 	struct cvmx_usb_transaction *transaction;
 
@@ -2182,10 +2177,9 @@ static struct cvmx_usb_transaction *cvmx_usb_submit_transaction(
  *
  * Returns: A submitted transaction or NULL on failure.
  */
-static struct cvmx_usb_transaction *cvmx_usb_submit_bulk(
-						struct octeon_hcd *usb,
-						struct cvmx_usb_pipe *pipe,
-						struct urb *urb)
+static struct cvmx_usb_transaction *cvmx_usb_submit_bulk(struct octeon_hcd *usb,
+							 struct cvmx_usb_pipe *pipe,
+							 struct urb *urb)
 {
 	return cvmx_usb_submit_transaction(usb, pipe, CVMX_USB_TRANSFER_BULK,
 					   urb->transfer_dma,
@@ -2206,10 +2200,9 @@ static struct cvmx_usb_transaction *cvmx_usb_submit_bulk(
  *
  * Returns: A submitted transaction or NULL on failure.
  */
-static struct cvmx_usb_transaction *cvmx_usb_submit_interrupt(
-						struct octeon_hcd *usb,
-						struct cvmx_usb_pipe *pipe,
-						struct urb *urb)
+static struct cvmx_usb_transaction *cvmx_usb_submit_interrupt(struct octeon_hcd *usb,
+							      struct cvmx_usb_pipe *pipe,
+							      struct urb *urb)
 {
 	return cvmx_usb_submit_transaction(usb, pipe,
 					   CVMX_USB_TRANSFER_INTERRUPT,
@@ -2231,10 +2224,9 @@ static struct cvmx_usb_transaction *cvmx_usb_submit_interrupt(
  *
  * Returns: A submitted transaction or NULL on failure.
  */
-static struct cvmx_usb_transaction *cvmx_usb_submit_control(
-						struct octeon_hcd *usb,
-						struct cvmx_usb_pipe *pipe,
-						struct urb *urb)
+static struct cvmx_usb_transaction *cvmx_usb_submit_control(struct octeon_hcd *usb,
+							    struct cvmx_usb_pipe *pipe,
+							    struct urb *urb)
 {
 	int buffer_length = urb->transfer_buffer_length;
 	u64 control_header = urb->setup_dma;
@@ -2262,10 +2254,9 @@ static struct cvmx_usb_transaction *cvmx_usb_submit_control(
  *
  * Returns: A submitted transaction or NULL on failure.
  */
-static struct cvmx_usb_transaction *cvmx_usb_submit_isochronous(
-						struct octeon_hcd *usb,
-						struct cvmx_usb_pipe *pipe,
-						struct urb *urb)
+static struct cvmx_usb_transaction *cvmx_usb_submit_isochronous(struct octeon_hcd *usb,
+								struct cvmx_usb_pipe *pipe,
+								struct urb *urb)
 {
 	struct cvmx_usb_iso_packet *packets;
 
