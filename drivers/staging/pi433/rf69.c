@@ -118,7 +118,7 @@ int rf69_set_mode(struct spi_device *spi, enum mode mode)
 	};
 
 	if (unlikely(mode >= ARRAY_SIZE(mode_map))) {
-		dev_dbg(&spi->dev, "set: illegal mode %u", mode);
+		dev_dbg(&spi->dev, "set: illegal mode %u\n", mode);
 		return -EINVAL;
 	}
 
@@ -148,7 +148,7 @@ int rf69_set_modulation(struct spi_device *spi, enum modulation modulation)
 	};
 
 	if (unlikely(modulation >= ARRAY_SIZE(modulation_map))) {
-		dev_dbg(&spi->dev, "set: illegal modulation %u", modulation);
+		dev_dbg(&spi->dev, "set: illegal modulation %u\n", modulation);
 		return -EINVAL;
 	}
 
@@ -196,7 +196,7 @@ int rf69_set_modulation_shaping(struct spi_device *spi,
 						   MASK_DATAMODUL_MODULATION_SHAPE,
 						   DATAMODUL_MODULATION_SHAPE_0_3);
 		default:
-			dev_dbg(&spi->dev, "set: illegal mod shaping for FSK %u", mod_shaping);
+			dev_dbg(&spi->dev, "set: illegal mod shaping for FSK %u\n", mod_shaping);
 			return -EINVAL;
 		}
 	case OOK:
@@ -214,11 +214,11 @@ int rf69_set_modulation_shaping(struct spi_device *spi,
 						   MASK_DATAMODUL_MODULATION_SHAPE,
 						   DATAMODUL_MODULATION_SHAPE_2BR);
 		default:
-			dev_dbg(&spi->dev, "set: illegal mod shaping for OOK %u", mod_shaping);
+			dev_dbg(&spi->dev, "set: illegal mod shaping for OOK %u\n", mod_shaping);
 			return -EINVAL;
 		}
 	default:
-		dev_dbg(&spi->dev, "set: modulation undefined");
+		dev_dbg(&spi->dev, "set: modulation undefined\n");
 		return -EINVAL;
 	}
 }
@@ -234,13 +234,13 @@ int rf69_set_bit_rate(struct spi_device *spi, u16 bit_rate)
 	// check if modulation is configured
 	mod = rf69_get_modulation(spi);
 	if (mod == UNDEF) {
-		dev_dbg(&spi->dev, "setBitRate: modulation is undefined");
+		dev_dbg(&spi->dev, "setBitRate: modulation is undefined\n");
 		return -EINVAL;
 	}
 
 	// check input value
 	if (bit_rate < 1200 || (mod == OOK && bit_rate > 32768)) {
-		dev_dbg(&spi->dev, "setBitRate: illegal input param");
+		dev_dbg(&spi->dev, "setBitRate: illegal input param\n");
 		return -EINVAL;
 	}
 
@@ -284,7 +284,7 @@ int rf69_set_deviation(struct spi_device *spi, u32 deviation)
 	 */
 	if (deviation < 600 || (deviation + (bit_rate / 2)) > 500000) {
 		dev_dbg(&spi->dev,
-			"set_deviation: illegal input param: %u", deviation);
+			"set_deviation: illegal input param: %u\n", deviation);
 		return -EINVAL;
 	}
 
@@ -301,7 +301,7 @@ int rf69_set_deviation(struct spi_device *spi, u32 deviation)
 
 	// check msb
 	if (msb & ~FDEVMASB_MASK) {
-		dev_dbg(&spi->dev, "set_deviation: err in calc of msb");
+		dev_dbg(&spi->dev, "set_deviation: err in calc of msb\n");
 		return -EINVAL;
 	}
 
@@ -334,7 +334,7 @@ int rf69_set_frequency(struct spi_device *spi, u32 frequency)
 	// check input value
 	f_max = div_u64(f_step * 8388608, factor);
 	if (frequency > f_max) {
-		dev_dbg(&spi->dev, "setFrequency: illegal input param");
+		dev_dbg(&spi->dev, "setFrequency: illegal input param\n");
 		return -EINVAL;
 	}
 
@@ -415,7 +415,7 @@ int rf69_set_output_power_level(struct spi_device *spi, u8 power_level)
 	return rf69_read_mod_write(spi, REG_PALEVEL, MASK_PALEVEL_OUTPUT_POWER,
 				   power_level);
 failed:
-	dev_dbg(&spi->dev, "set: illegal power level %u", power_level);
+	dev_dbg(&spi->dev, "set: illegal power level %u\n", power_level);
 	return -EINVAL;
 }
 
@@ -440,7 +440,7 @@ int rf69_set_pa_ramp(struct spi_device *spi, enum pa_ramp pa_ramp)
 	};
 
 	if (unlikely(pa_ramp >= ARRAY_SIZE(pa_ramp_map))) {
-		dev_dbg(&spi->dev, "set: illegal pa_ramp %u", pa_ramp);
+		dev_dbg(&spi->dev, "set: illegal pa_ramp %u\n", pa_ramp);
 		return -EINVAL;
 	}
 
@@ -456,7 +456,7 @@ int rf69_set_antenna_impedance(struct spi_device *spi,
 	case two_hundred_ohm:
 		return rf69_set_bit(spi, REG_LNA, MASK_LNA_ZIN);
 	default:
-		dev_dbg(&spi->dev, "set: illegal antenna impedance %u", antenna_impedance);
+		dev_dbg(&spi->dev, "set: illegal antenna impedance %u\n", antenna_impedance);
 		return -EINVAL;
 	}
 }
@@ -474,7 +474,7 @@ int rf69_set_lna_gain(struct spi_device *spi, enum lna_gain lna_gain)
 	};
 
 	if (unlikely(lna_gain >= ARRAY_SIZE(lna_gain_map))) {
-		dev_dbg(&spi->dev, "set: illegal lna gain %u", lna_gain);
+		dev_dbg(&spi->dev, "set: illegal lna gain %u\n", lna_gain);
 		return -EINVAL;
 	}
 
@@ -489,14 +489,14 @@ static int rf69_set_bandwidth_intern(struct spi_device *spi, u8 reg,
 
 	// check value for mantisse and exponent
 	if (exponent > 7) {
-		dev_dbg(&spi->dev, "set: illegal bandwidth exponent %u", exponent);
+		dev_dbg(&spi->dev, "set: illegal bandwidth exponent %u\n", exponent);
 		return -EINVAL;
 	}
 
 	if (mantisse != mantisse16 &&
 	    mantisse != mantisse20 &&
 	    mantisse != mantisse24) {
-		dev_dbg(&spi->dev, "set: illegal bandwidth mantisse %u", mantisse);
+		dev_dbg(&spi->dev, "set: illegal bandwidth mantisse %u\n", mantisse);
 		return -EINVAL;
 	}
 
@@ -554,7 +554,8 @@ int rf69_set_ook_threshold_dec(struct spi_device *spi,
 	};
 
 	if (unlikely(threshold_decrement >= ARRAY_SIZE(td_map))) {
-		dev_dbg(&spi->dev, "set: illegal OOK threshold decrement %u", threshold_decrement);
+		dev_dbg(&spi->dev, "set: illegal OOK threshold decrement %u\n",
+			threshold_decrement);
 		return -EINVAL;
 	}
 
@@ -601,7 +602,7 @@ int rf69_set_dio_mapping(struct spi_device *spi, u8 dio_number, u8 value)
 		dio_addr = REG_DIOMAPPING2;
 		break;
 	default:
-		dev_dbg(&spi->dev, "set: illegal dio number %u", dio_number);
+		dev_dbg(&spi->dev, "set: illegal dio number %u\n", dio_number);
 		return -EINVAL;
 	}
 
@@ -705,7 +706,7 @@ int rf69_set_fifo_fill_condition(struct spi_device *spi,
 		return rf69_clear_bit(spi, REG_SYNC_CONFIG,
 				      MASK_SYNC_CONFIG_FIFO_FILL_CONDITION);
 	default:
-		dev_dbg(&spi->dev, "set: illegal fifo fill condition %u", fifo_fill_condition);
+		dev_dbg(&spi->dev, "set: illegal fifo fill condition %u\n", fifo_fill_condition);
 		return -EINVAL;
 	}
 }
@@ -714,7 +715,7 @@ int rf69_set_sync_size(struct spi_device *spi, u8 sync_size)
 {
 	// check input value
 	if (sync_size > 0x07) {
-		dev_dbg(&spi->dev, "set: illegal sync size %u", sync_size);
+		dev_dbg(&spi->dev, "set: illegal sync size %u\n", sync_size);
 		return -EINVAL;
 	}
 
@@ -751,7 +752,7 @@ int rf69_set_packet_format(struct spi_device *spi,
 		return rf69_clear_bit(spi, REG_PACKETCONFIG1,
 				      MASK_PACKETCONFIG1_PACKET_FORMAT_VARIABLE);
 	default:
-		dev_dbg(&spi->dev, "set: illegal packet format %u", packet_format);
+		dev_dbg(&spi->dev, "set: illegal packet format %u\n", packet_format);
 		return -EINVAL;
 	}
 }
@@ -777,7 +778,7 @@ int rf69_set_address_filtering(struct spi_device *spi,
 	};
 
 	if (unlikely(address_filtering >= ARRAY_SIZE(af_map))) {
-		dev_dbg(&spi->dev, "set: illegal address filtering %u", address_filtering);
+		dev_dbg(&spi->dev, "set: illegal address filtering %u\n", address_filtering);
 		return -EINVAL;
 	}
 
@@ -812,7 +813,7 @@ int rf69_set_tx_start_condition(struct spi_device *spi,
 		return rf69_set_bit(spi, REG_FIFO_THRESH,
 				    MASK_FIFO_THRESH_TXSTART);
 	default:
-		dev_dbg(&spi->dev, "set: illegal tx start condition %u", tx_start_condition);
+		dev_dbg(&spi->dev, "set: illegal tx start condition %u\n", tx_start_condition);
 		return -EINVAL;
 	}
 }
@@ -823,7 +824,7 @@ int rf69_set_fifo_threshold(struct spi_device *spi, u8 threshold)
 
 	/* check input value */
 	if (threshold & 0x80) {
-		dev_dbg(&spi->dev, "set: illegal fifo threshold %u", threshold);
+		dev_dbg(&spi->dev, "set: illegal fifo threshold %u\n", threshold);
 		return -EINVAL;
 	}
 
@@ -850,7 +851,7 @@ int rf69_set_dagc(struct spi_device *spi, enum dagc dagc)
 	};
 
 	if (unlikely(dagc >= ARRAY_SIZE(dagc_map))) {
-		dev_dbg(&spi->dev, "set: illegal dagc %u", dagc);
+		dev_dbg(&spi->dev, "set: illegal dagc %u\n", dagc);
 		return -EINVAL;
 	}
 
