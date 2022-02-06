@@ -238,6 +238,45 @@ static int get_key_knc1(struct IR_i2c *ir, enum rc_proto *protocol,
 	return 1;
 }
 
+static int get_key_geniatech(struct IR_i2c *ir, enum rc_proto *protocol,
+			     u32 *scancode, u8 *ptoggle)
+{
+	unsigned char b;
+	int code, i, rc, toggle;
+
+	/* poll IR chip */
+	for (i = 0; i < 4; i++) {
+		rc = i2c_master_recv(ir->c, &b, 1);
+		if (rc == 1)
+			break;
+		msleep(1);
+	}
+	if (rc != 1) {
+		dev_dbg(&ir->rc->dev, "read error\n");
+		if (rc < 0)
+			return rc;
+		return -EIO;
+	}
+
+	toggle = b >> 7;
+
+	/* don't repeat the key */
+	if (ir->old == toggle)
+		return 0;
+	ir->old = toggle;
+
+	/* decode to RC5 */
+	code = b & 0x7f;
+	code = (code - 1) / 2;
+
+	dev_dbg(&ir->rc->dev, "key %02x\n", code);
+
+	*protocol = RC_PROTO_RC5;
+	*scancode = code;
+	*ptoggle = toggle;
+	return 1;
+}
+
 static int get_key_avermedia_cardbus(struct IR_i2c *ir, enum rc_proto *protocol,
 				     u32 *scancode, u8 *toggle)
 {
@@ -766,6 +805,13 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		rc_proto    = RC_PROTO_BIT_OTHER;
 		ir_codes    = RC_MAP_EMPTY;
 		break;
+	case 0x33:
+		name        = "Geniatech";
+		ir->get_key = get_key_geniatech;
+		rc_proto    = RC_PROTO_BIT_RC5;
+		ir_codes    = RC_MAP_TOTAL_MEDIA_IN_HAND_02;
+		ir->old     = 1;
+		break;
 	case 0x6b:
 		name        = "FusionHDTV";
 		ir->get_key = get_key_fusionhdtv;
@@ -824,6 +870,9 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			break;
 		case IR_KBD_GET_KEY_KNC1:
 			ir->get_key = get_key_knc1;
+			break;
+		case IR_KBD_GET_KEY_GENIATECH:
+			ir->get_key = get_key_geniatech;
 			break;
 		case IR_KBD_GET_KEY_FUSIONHDTV:
 			ir->get_key = get_key_fusionhdtv;
