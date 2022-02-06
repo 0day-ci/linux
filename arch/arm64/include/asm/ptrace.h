@@ -178,6 +178,7 @@ static inline unsigned long pstate_to_compat_psr(const unsigned long pstate)
 struct pt_regs {
 	union {
 		struct user_pt_regs user_regs;
+		struct user_pt_regs_v2 user_regs_v2;
 		struct {
 			u64 regs[31];
 			u64 sp;
