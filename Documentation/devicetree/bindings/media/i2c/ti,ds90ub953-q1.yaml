@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) 2019 Renesas Electronics Corp.
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/media/i2c/ti,ds90ub953-q1.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Texas Instruments DS90UB953-Q1 video serializer
+
+maintainers:
+  - Luca Ceresoli <luca@lucaceresoli.net>
+
+description: |
+  The TI DS90UB953-Q1 is a MIPI CSI-2 video serializer that forwards a MIPI
+  CSI-2 input video stream over an FPD Link 3 connection to a remote
+  deserializer. It also allows access to I2C and GPIO from the deserializer.
+
+  The DT definitions can be found in include/dt-bindings/media/ds90ub953.h
+
+  When used as a the remote counterpart of a deserializer (e.g. the
+  DS90UB954-Q1), the serializer is described in the
+  "deserializer/remote-chips/remote-chip@[01]" node.
+
+properties:
+  compatible:
+    const: ti,ds90ub953-q1
+
+  reg:
+    description: |
+      Index of the remote (serializer) RX port that this serializer is
+      connected to.
+    maxItems: 1
+
+  clocks:
+    description: FPD-Link line rate (provided by the deserializer)
+    maxItems: 1
+
+  gpio-controller: true
+
+  '#gpio-cells':
+    const: 2
+
+  '#clock-cells':
+    const: 0
+
+  ti,gpio-functions:
+    description: |
+      A list of 4 values defining how the 4 GPIO pins are connected in
+      hardware; possible values are:
+      - DS90_GPIO_FUNC_UNUSED (0): the GPIO is not unused
+      - DS90_GPIO_FUNC_INPUT (1): the GPIO is an input to the ds90ub953,
+        the remote chip (deserializer) can read its value
+      - DS90_GPIO_FUNC_OUTPUT_REMOTE (2): the GPIO is an output from the
+        ds90ub953, the remote chip (deserializer) can set its value
+      For unspecified values the GPIO is assumed to be unused.
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    maxItems: 4
+
+patternProperties:
+  '^ti,ds90ub953-q1-(clk|d[0-3])-inv-pol-quirk$':
+    description: |
+      The MIPI CSI-2 input clock lane or any of the data lanes has inverted
+      polarity in hardware
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - gpio-controller
+  - '#gpio-cells'
+  - '#clock-cells'
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/media/ds90ub953.h>
+    remote-chips {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      remote-chip@0 {
+        reg = <0>;
+        compatible = "ti,ds90ub953-q1";
+        clocks = <&deser>;
+        ti,gpio-functions =
+          <DS90_GPIO_FUNC_UNUSED
+          DS90_GPIO_FUNC_OUTPUT_REMOTE
+          DS90_GPIO_FUNC_UNUSED
+          DS90_GPIO_FUNC_UNUSED>;
+
+        gpio-controller;
+        #gpio-cells = <2>;
+        #clock-cells = <0>;
+      };
+    };
