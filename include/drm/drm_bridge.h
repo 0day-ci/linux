@@ -935,4 +935,16 @@ static inline struct drm_bridge *devm_drm_of_get_bridge(struct device *dev,
 }
 #endif
 
+/**
+ * DRM_BRIDGE_STATE_OPS - Default drm_bridge state funcs
+ *
+ * Bridge driver that do not subclass &drm_bridge_state can use the helpers
+ * for reset, duplicate, and destroy. This macro provides a shortcut for
+ * setting the helpers in the &drm_bridge_funcs structure.
+ */
+#define DRM_BRIDGE_STATE_OPS \
+	.atomic_reset = drm_atomic_helper_bridge_reset,				\
+	.atomic_duplicate_state = drm_atomic_helper_bridge_duplicate_state,	\
+	.atomic_destroy_state = drm_atomic_helper_bridge_destroy_state
+
 #endif
