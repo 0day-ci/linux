@@ -231,4 +231,11 @@ drm_atomic_helper_bridge_propagate_bus_fmt(struct drm_bridge *bridge,
 					u32 output_fmt,
 					unsigned int *num_input_fmts);
 
+u32 *
+drm_atomic_helper_bridge_dsi_input_bus_fmt(struct drm_bridge *bridge,
+					   struct drm_bridge_state *bridge_state,
+					   struct drm_crtc_state *crtc_state,
+					   struct drm_connector_state *conn_state,
+					   u32 output_fmt,
+					   unsigned int *num_input_fmts);
 #endif /* DRM_ATOMIC_HELPER_H_ */
