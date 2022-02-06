@@ -13,6 +13,7 @@
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic_state_helper.h>
 #include <drm/drm_bridge.h>
 #include <drm/dp/drm_dp_aux_bus.h>
@@ -538,6 +539,7 @@ static const struct drm_bridge_funcs ps8640_bridge_funcs = {
 	.get_edid = ps8640_bridge_get_edid,
 	.atomic_post_disable = ps8640_atomic_post_disable,
 	.atomic_pre_enable = ps8640_atomic_pre_enable,
+	.atomic_get_input_bus_fmts = drm_atomic_helper_bridge_dsi_input_bus_fmt,
 	DRM_BRIDGE_STATE_OPS,
 };
 
