@@ -135,6 +135,8 @@ enum intel_ppgtt_type {
 	func(has_reset_engine); \
 	func(has_global_mocs); \
 	func(has_gt_uc); \
+	func(has_heci_pxp); \
+	func(has_heci_gscfi); \
 	func(has_guc_deprivilege); \
 	func(has_l3_dpf); \
 	func(has_llc); \
