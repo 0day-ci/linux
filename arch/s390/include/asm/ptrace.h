@@ -79,6 +79,7 @@ enum {
 struct pt_regs {
 	union {
 		user_pt_regs user_regs;
+		user_pt_regs_v2 user_regs_v2;
 		struct {
 			unsigned long args[1];
 			psw_t psw;

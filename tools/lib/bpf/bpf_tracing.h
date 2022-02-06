@@ -114,8 +114,8 @@
 
 #elif defined(bpf_target_s390)
 
-/* s390 provides user_pt_regs instead of struct pt_regs to userspace */
-#define __PT_REGS_CAST(x) ((const user_pt_regs *)(x))
+/* s390 provides user_pt_regs_v2 instead of struct pt_regs to userspace */
+#define __PT_REGS_CAST(x) ((const user_pt_regs_v2 *)(x))
 #define __PT_PARM1_REG gprs[2]
 #define __PT_PARM1_REG_SYSCALL orig_gpr2
 #define __PT_PARM2_REG gprs[3]

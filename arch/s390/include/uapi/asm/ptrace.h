@@ -288,15 +288,21 @@ typedef struct {
 } s390_regs;
 
 /*
- * The user_pt_regs structure exports the beginning of
+ * The user_pt_regs and user_pt_regs_v2 structures export the beginning of
  * the in-kernel pt_regs structure to user space.
  */
 typedef struct {
 	unsigned long args[1];
 	psw_t psw;
 	unsigned long gprs[NUM_GPRS];
-	unsigned long orig_gpr2;
 } user_pt_regs;
+
+typedef struct {
+	unsigned long args[1];
+	psw_t psw;
+	unsigned long gprs[NUM_GPRS];
+	unsigned long orig_gpr2;
+} user_pt_regs_v2;
 
 /*
  * Now for the user space program event recording (trace) definitions.
