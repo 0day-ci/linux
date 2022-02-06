@@ -412,7 +412,8 @@ static int jdi_panel_add(struct jdi_panel *jdi)
 	jdi->enable_gpio = devm_gpiod_get(dev, "enable", GPIOD_OUT_LOW);
 	if (IS_ERR(jdi->enable_gpio)) {
 		ret = PTR_ERR(jdi->enable_gpio);
-		dev_err(dev, "cannot get enable-gpio %d\n", ret);
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "cannot get enable-gpio %d\n", ret);
 		return ret;
 	}
 
