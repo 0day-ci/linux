@@ -48,7 +48,7 @@ void rtl8188eu_interface_configure(struct adapter *adapt)
 	struct hal_data_8188e *haldata = &adapt->haldata;
 	struct dvobj_priv	*pdvobjpriv = adapter_to_dvobj(adapt);
 
-	if (pdvobjpriv->ishighspeed)
+	if (pdvobjpriv->pusbdev->speed == USB_SPEED_HIGH)
 		haldata->UsbBulkOutSize = USB_HIGH_SPEED_BULK_SIZE;/* 512 bytes */
 	else
 		haldata->UsbBulkOutSize = USB_FULL_SPEED_BULK_SIZE;/* 64 bytes */
@@ -105,7 +105,7 @@ static void _InitInterrupt(struct adapter *Adapter)
 	/*  1; Use bulk endpoint to upload interrupt pkt, */
 	usb_opt = rtw_read8(Adapter, REG_USB_SPECIAL_OPTION);
 
-	if (!adapter_to_dvobj(Adapter)->ishighspeed)
+	if (!(adapter_to_dvobj(Adapter)->pusbdev->speed == USB_SPEED_HIGH))
 		usb_opt = usb_opt & (~INT_BULK_SEL);
 	else
 		usb_opt = usb_opt | (INT_BULK_SEL);

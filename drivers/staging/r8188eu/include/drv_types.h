@@ -139,7 +139,6 @@ struct dvobj_priv {
 
 /*-------- below is for USB INTERFACE --------*/
 
-	u8	ishighspeed;
 	u8	RtNumOutPipes;
 
 	struct usb_interface *pusbintf;
