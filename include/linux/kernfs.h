@@ -179,6 +179,7 @@ struct kernfs_node {
 	 */
 	struct kernfs_node	*parent;
 	const char		*name;
+	u8			unlock_parent; /* release parent's rwsem */
 
 	struct rb_node		rb;
 
@@ -237,9 +238,10 @@ struct kernfs_root {
 	struct list_head	supers;
 
 	wait_queue_head_t	deactivate_waitq;
-	struct rw_semaphore	kernfs_rwsem;
 	struct kernfs_open_node_lock open_node_locks[NR_KERNFS_LOCKS];
 	struct kernfs_open_file_mutex open_file_mutex[NR_KERNFS_LOCKS];
+	struct rw_semaphore	supers_rwsem;
+	struct rw_semaphore	kernfs_rwsem[NR_KERNFS_LOCKS];
 };
 
 struct kernfs_open_file {
@@ -619,5 +621,4 @@ static inline int kernfs_rename(struct kernfs_node *kn,
 {
 	return kernfs_rename_ns(kn, new_parent, new_name, NULL);
 }
-
 #endif	/* __LINUX_KERNFS_H */
