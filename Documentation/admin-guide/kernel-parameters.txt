@@ -1044,6 +1044,15 @@
 			pass the driver to filter for as the parameter.
 			The filter can be disabled or changed to another
 			driver later using sysfs.
+	
+	dmi_<name>=<value>	[DMIID]
+			Used to override SMBIOS/DMI system identification
+			information provided by your device vendor that is
+			exposed to userspace through /sys/class/dmi/id/.
+			<name> hereby represents the name of the id being
+			exposed (i.e. product_name, chassis_vendor or
+			sys_vendor) and <value> being the string replacing
+			the vendor provided value.
 
 	driver_async_probe=  [KNL]
 			List of driver names to be probed asynchronously.

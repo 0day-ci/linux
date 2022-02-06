@@ -12,6 +12,31 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 
+static char* dmi_override[DMI_STRING_MAX] = { NULL };
+
+core_param(dmi_bios_vendor, dmi_override[DMI_BIOS_VENDOR], charp, 0440);
+core_param(dmi_bios_version, dmi_override[DMI_BIOS_VERSION], charp, 0440);
+core_param(dmi_bios_date, dmi_override[DMI_BIOS_DATE], charp, 0440);
+core_param(dmi_sys_vendor, dmi_override[DMI_SYS_VENDOR], charp, 0440);
+core_param(dmi_bios_release, dmi_override[DMI_BIOS_RELEASE], charp, 0440);
+core_param(dmi_ec_firmware_release, dmi_override[DMI_EC_FIRMWARE_RELEASE], charp, 0440);
+core_param(dmi_product_name, dmi_override[DMI_PRODUCT_NAME], charp, 0440);
+core_param(dmi_product_version, dmi_override[DMI_PRODUCT_VERSION], charp, 0440);
+core_param(dmi_product_serial, dmi_override[DMI_PRODUCT_SERIAL], charp, 0440);
+core_param(dmi_product_uuid, dmi_override[DMI_PRODUCT_UUID], charp, 0440);
+core_param(dmi_product_sku, dmi_override[DMI_PRODUCT_SKU], charp, 0440);
+core_param(dmi_product_family, dmi_override[DMI_PRODUCT_FAMILY], charp, 0440);
+core_param(dmi_board_vendor, dmi_override[DMI_BOARD_VENDOR], charp, 0440);
+core_param(dmi_board_name, dmi_override[DMI_BOARD_NAME], charp, 0440);
+core_param(dmi_board_version, dmi_override[DMI_BOARD_VERSION], charp, 0440);
+core_param(dmi_board_serial, dmi_override[DMI_BOARD_SERIAL], charp, 0440);
+core_param(dmi_board_asset_tag, dmi_override[DMI_BOARD_ASSET_TAG], charp, 0440);
+core_param(dmi_chassis_vendor, dmi_override[DMI_CHASSIS_VENDOR], charp, 0440);
+core_param(dmi_chassis_type, dmi_override[DMI_CHASSIS_TYPE], charp, 0440);
+core_param(dmi_chassis_version, dmi_override[DMI_CHASSIS_VERSION], charp, 0440);
+core_param(dmi_chassis_serial, dmi_override[DMI_CHASSIS_SERIAL], charp, 0440);
+core_param(dmi_chassis_asset_tag, dmi_override[DMI_CHASSIS_ASSET_TAG], charp, 0440);
+
 struct dmi_device_attribute{
 	struct device_attribute dev_attr;
 	int field;
@@ -23,9 +48,15 @@ static ssize_t sys_dmi_field_show(struct device *dev,
 				  struct device_attribute *attr,
 				  char *page)
 {
-	int field = to_dmi_dev_attr(attr)->field;
+	const char* value;
 	ssize_t len;
-	len = scnprintf(page, PAGE_SIZE, "%s\n", dmi_get_system_info(field));
+
+	int field = to_dmi_dev_attr(attr)->field;
+	if (dmi_override[field])
+		value = dmi_override[field];
+	else
+		value = dmi_get_system_info(field);
+	len = scnprintf(page, PAGE_SIZE, "%s\n", value);
 	page[len-1] = '\n';
 	return len;
 }
