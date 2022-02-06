@@ -9,6 +9,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/crc32.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -314,6 +315,37 @@ static void mxsfb_unload(struct drm_device *drm)
 	pm_runtime_disable(drm->dev);
 }
 
+static ssize_t mxsfb_frame_checksum_show(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+	u32 hwcrc = readl(mxsfb->base, LCDC_V4_CRC_STAT);
+	u32 swcrc = 0xffffffff;
+	int i;
+
+	if (mxsfb->gem_vaddr) {
+		for (i = 0; i < mxsfb->gem_size / 4; i++) {
+			u32 data = bitrev32(((u32 *)mxsfb->gem_vaddr)[i]);
+			swcrc = crc32(swcrc, &data, 4);
+		}
+		swcrc = bitrev32(swcrc);
+	}
+
+	return sysfs_emit(buf, "HW:%08x,SW:%08x,OK:%d\n", hwcrc, swcrc, hwcrc == swcrc);
+}
+static DEVICE_ATTR(frame_checksum, 0444, mxsfb_frame_checksum_show, NULL);
+
+static struct attribute *mxsfb_attributes[] = {
+	&dev_attr_frame_checksum.attr,
+	NULL,
+};
+
+static const struct attribute_group mxsfb_attr_group = {
+	.attrs = mxsfb_attributes,
+};
+
 DEFINE_DRM_GEM_CMA_FOPS(fops);
 
 static const struct drm_driver mxsfb_driver = {
@@ -357,10 +389,16 @@ static int mxsfb_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_unload;
 
+	ret = devm_device_add_group(drm->dev, &mxsfb_attr_group);
+	if (ret)
+		goto err_attr;
+
 	drm_fbdev_generic_setup(drm, 32);
 
 	return 0;
 
+err_attr:
+	drm_dev_unregister(drm);
 err_unload:
 	mxsfb_unload(drm);
 err_free:

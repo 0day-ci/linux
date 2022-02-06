@@ -44,6 +44,9 @@ struct mxsfb_drm_private {
 	struct drm_encoder		encoder;
 	struct drm_connector		*connector;
 	struct drm_bridge		*bridge;
+
+	void				*gem_vaddr;
+	size_t				gem_size;
 };
 
 static inline struct mxsfb_drm_private *

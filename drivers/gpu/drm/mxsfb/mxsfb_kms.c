@@ -204,7 +204,7 @@ static int mxsfb_reset_block(struct mxsfb_drm_private *mxsfb)
 	return clear_poll_bit(mxsfb->base + LCDC_CTRL, CTRL_CLKGATE);
 }
 
-static dma_addr_t mxsfb_get_fb_paddr(struct drm_plane *plane)
+static dma_addr_t mxsfb_get_fb_paddr(struct mxsfb_drm_private *mxsfb, struct drm_plane *plane)
 {
 	struct drm_framebuffer *fb = plane->state->fb;
 	struct drm_gem_cma_object *gem;
@@ -215,6 +215,9 @@ static dma_addr_t mxsfb_get_fb_paddr(struct drm_plane *plane)
 	gem = drm_fb_cma_get_gem_obj(fb, 0);
 	if (!gem)
 		return 0;
+
+	mxsfb->gem_vaddr = gem->vaddr;
+	mxsfb->gem_size = gem->base.size;
 
 	return gem->paddr;
 }
@@ -381,7 +384,7 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	mxsfb_crtc_mode_set_nofb(mxsfb, bus_format);
 
 	/* Write cur_buf as well to avoid an initial corrupt frame */
-	paddr = mxsfb_get_fb_paddr(crtc->primary);
+	paddr = mxsfb_get_fb_paddr(mxsfb, crtc->primary);
 	if (paddr) {
 		writel(paddr, mxsfb->base + mxsfb->devdata->cur_buf);
 		writel(paddr, mxsfb->base + mxsfb->devdata->next_buf);
@@ -486,7 +489,7 @@ static void mxsfb_plane_primary_atomic_update(struct drm_plane *plane,
 	struct mxsfb_drm_private *mxsfb = to_mxsfb_drm_private(plane->dev);
 	dma_addr_t paddr;
 
-	paddr = mxsfb_get_fb_paddr(plane);
+	paddr = mxsfb_get_fb_paddr(mxsfb, plane);
 	if (paddr)
 		writel(paddr, mxsfb->base + mxsfb->devdata->next_buf);
 }
@@ -502,7 +505,7 @@ static void mxsfb_plane_overlay_atomic_update(struct drm_plane *plane,
 	dma_addr_t paddr;
 	u32 ctrl;
 
-	paddr = mxsfb_get_fb_paddr(plane);
+	paddr = mxsfb_get_fb_paddr(mxsfb, plane);
 	if (!paddr) {
 		writel(0, mxsfb->base + LCDC_AS_CTRL);
 		return;
