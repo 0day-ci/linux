@@ -66,7 +66,7 @@ static inline int pciehp_request_irq(struct controller *ctrl)
 	}
 
 	/* Installs the interrupt handler */
-	retval = request_threaded_irq(irq, pciehp_isr, pciehp_ist,
+	retval = devm_request_threaded_irq(irq, pciehp_isr, pciehp_ist,
 				      IRQF_SHARED, "pciehp", ctrl);
 	if (retval)
 		ctrl_err(ctrl, "Cannot get irq %d for the hotplug controller\n",
@@ -78,8 +78,6 @@ static inline void pciehp_free_irq(struct controller *ctrl)
 {
 	if (pciehp_poll_mode)
 		kthread_stop(ctrl->poll_thread);
-	else
-		free_irq(ctrl->pcie->irq, ctrl);
 }
 
 static int pcie_poll_cmd(struct controller *ctrl, int timeout)
