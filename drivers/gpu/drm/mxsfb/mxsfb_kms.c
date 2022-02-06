@@ -100,10 +100,6 @@ static void mxsfb_enable_controller(struct mxsfb_drm_private *mxsfb)
 {
 	u32 reg;
 
-	if (mxsfb->clk_disp_axi)
-		clk_prepare_enable(mxsfb->clk_disp_axi);
-	clk_prepare_enable(mxsfb->clk);
-
 	/* Increase number of outstanding requests on all supported IPs */
 	if (mxsfb->devdata->has_ctrl2) {
 		reg = readl(mxsfb->base + LCDC_V4_CTRL2);
@@ -168,10 +164,6 @@ static void mxsfb_disable_controller(struct mxsfb_drm_private *mxsfb)
 	reg = readl(mxsfb->base + LCDC_VDCTRL4);
 	reg &= ~VDCTRL4_SYNC_SIGNALS_ON;
 	writel(reg, mxsfb->base + LCDC_VDCTRL4);
-
-	clk_disable_unprepare(mxsfb->clk);
-	if (mxsfb->clk_disp_axi)
-		clk_disable_unprepare(mxsfb->clk_disp_axi);
 }
 
 /*
@@ -352,9 +344,6 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	dma_addr_t paddr;
 
 	pm_runtime_get_sync(drm->dev);
-	mxsfb_enable_axi_clk(mxsfb);
-
-	drm_crtc_vblank_on(crtc);
 
 	/* If there is a bridge attached to the LCDIF, use its bus format */
 	if (mxsfb->bridge) {
@@ -388,6 +377,8 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	}
 
 	mxsfb_enable_controller(mxsfb);
+
+	drm_crtc_vblank_on(crtc);
 }
 
 static void mxsfb_crtc_atomic_disable(struct drm_crtc *crtc,
@@ -396,6 +387,8 @@ static void mxsfb_crtc_atomic_disable(struct drm_crtc *crtc,
 	struct mxsfb_drm_private *mxsfb = to_mxsfb_drm_private(crtc->dev);
 	struct drm_device *drm = mxsfb->drm;
 	struct drm_pending_vblank_event *event;
+
+	drm_crtc_vblank_off(crtc);
 
 	mxsfb_disable_controller(mxsfb);
 
@@ -407,9 +400,6 @@ static void mxsfb_crtc_atomic_disable(struct drm_crtc *crtc,
 	}
 	spin_unlock_irq(&drm->event_lock);
 
-	drm_crtc_vblank_off(crtc);
-
-	mxsfb_disable_axi_clk(mxsfb);
 	pm_runtime_put_sync(drm->dev);
 }
 
