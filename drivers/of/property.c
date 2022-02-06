@@ -1471,6 +1471,12 @@ static void __iomem *of_fwnode_iomap(struct fwnode_handle *fwnode, int index)
 		of_iomap(to_of_node(fwnode), index) : NULL;
 }
 
+static int of_fwnode_irq_get(const struct fwnode_handle *fwnode,
+			     unsigned int index)
+{
+	return of_irq_get(to_of_node(fwnode), index);
+}
+
 static int of_fwnode_add_links(struct fwnode_handle *fwnode)
 {
 	struct property *p;
@@ -1509,6 +1515,7 @@ const struct fwnode_operations of_fwnode_ops = {
 	.graph_get_port_parent = of_fwnode_graph_get_port_parent,
 	.graph_parse_endpoint = of_fwnode_graph_parse_endpoint,
 	.iomap = of_fwnode_iomap,
+	.irq_get = of_fwnode_irq_get,
 	.add_links = of_fwnode_add_links,
 };
 EXPORT_SYMBOL_GPL(of_fwnode_ops);
