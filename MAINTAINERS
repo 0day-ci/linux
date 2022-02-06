@@ -19087,6 +19087,7 @@ M:	Luca Ceresoli <luca@lucaceresoli.net>
 L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/media/i2c/ti,ds90ub954-q1.yaml
+F:	drivers/media/i2c/ds90ub954.c
 
 TEXAS INSTRUMENTS' SYSTEM CONTROL INTERFACE (TISCI) PROTOCOL DRIVER
 M:	Nishanth Menon <nm@ti.com>
