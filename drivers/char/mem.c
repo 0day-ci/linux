@@ -775,7 +775,7 @@ static int __init chr_dev_init(void)
 			      NULL, devlist[minor].name);
 	}
 
-	return tty_init();
+	return 0;
 }
 
 fs_initcall(chr_dev_init);
