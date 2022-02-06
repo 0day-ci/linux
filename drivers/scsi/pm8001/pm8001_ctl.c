@@ -755,36 +755,41 @@ static int pm8001_update_flash(struct pm8001_hba_info *pm8001_ha)
 			fwControl->retcode = 0;/* OUT */
 			fwControl->offset = loopNumber * IOCTL_BUF_SIZE;/*OUT */
 
-		/* for the last chunk of data in case file size is not even with
-		4k, load only the rest*/
-		if (((loopcount-loopNumber) == 1) &&
-			((partitionSize + HEADER_LEN) % IOCTL_BUF_SIZE)) {
-			fwControl->len =
-				(partitionSize + HEADER_LEN) % IOCTL_BUF_SIZE;
-			memcpy((u8 *)fwControl->buffer,
-				(u8 *)pm8001_ha->fw_image->data + sizeRead,
-				(partitionSize + HEADER_LEN) % IOCTL_BUF_SIZE);
-			sizeRead +=
-				(partitionSize + HEADER_LEN) % IOCTL_BUF_SIZE;
-		} else {
-			memcpy((u8 *)fwControl->buffer,
-				(u8 *)pm8001_ha->fw_image->data + sizeRead,
-				IOCTL_BUF_SIZE);
-			sizeRead += IOCTL_BUF_SIZE;
-		}
+			/* for the last chunk of data in case file
+			 * size is not even with 4k, load only the rest
+			 */
+			if (((loopcount-loopNumber) == 1) &&
+				((partitionSize + HEADER_LEN) % IOCTL_BUF_SIZE)) {
+				fwControl->len =
+					(partitionSize + HEADER_LEN) %
+					IOCTL_BUF_SIZE;
+				memcpy((u8 *)fwControl->buffer,
+					(u8 *)pm8001_ha->fw_image->data + sizeRead,
+					(partitionSize + HEADER_LEN) %
+					IOCTL_BUF_SIZE);
+				sizeRead +=
+					(partitionSize + HEADER_LEN) %
+					IOCTL_BUF_SIZE;
+			} else {
+				memcpy((u8 *)fwControl->buffer,
+					(u8 *)pm8001_ha->fw_image->data + sizeRead,
+					IOCTL_BUF_SIZE);
+				sizeRead += IOCTL_BUF_SIZE;
+			}
 
-		pm8001_ha->nvmd_completion = &completion;
-		ret = PM8001_CHIP_DISP->fw_flash_update_req(pm8001_ha, payload);
-		if (ret) {
-			pm8001_ha->fw_status = FAIL_OUT_MEMORY;
-			goto out;
-		}
-		wait_for_completion(&completion);
-		if (fwControl->retcode > FLASH_UPDATE_IN_PROGRESS) {
-			pm8001_ha->fw_status = fwControl->retcode;
-			ret = -EFAULT;
-			goto out;
-		}
+			pm8001_ha->nvmd_completion = &completion;
+			ret = PM8001_CHIP_DISP->fw_flash_update_req(pm8001_ha,
+				payload);
+			if (ret) {
+				pm8001_ha->fw_status = FAIL_OUT_MEMORY;
+				goto out;
+			}
+			wait_for_completion(&completion);
+			if (fwControl->retcode > FLASH_UPDATE_IN_PROGRESS) {
+				pm8001_ha->fw_status = fwControl->retcode;
+				ret = -EFAULT;
+				goto out;
+			}
 		}
 	}
 out:
