@@ -12,6 +12,7 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_damage_helper.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_fb_helper.h>
@@ -26,6 +27,7 @@
 #include <drm/drm_probe_helper.h>
 #include "mxc_epdc.h"
 #include "epdc_hw.h"
+#include "epdc_update.h"
 #include "epdc_waveform.h"
 
 #define DRIVER_NAME "mxc_epdc"
@@ -211,6 +213,7 @@ static void mxc_epdc_pipe_disable(struct drm_simple_display_pipe *pipe)
 	struct mxc_epdc *priv = drm_pipe_to_mxc_epdc(pipe);
 
 	dev_dbg(priv->drm.dev, "pipe disable\n");
+	mxc_epdc_flush_updates(priv);
 
 	if (priv->epdc_mem_virt) {
 		dma_free_wc(priv->drm.dev, priv->epdc_mem_width * priv->epdc_mem_height,
@@ -227,11 +230,35 @@ static void mxc_epdc_pipe_disable(struct drm_simple_display_pipe *pipe)
 }
 
 static void mxc_epdc_pipe_update(struct drm_simple_display_pipe *pipe,
-				   struct drm_plane_state *plane_state)
+				   struct drm_plane_state *old_state)
 {
 	struct mxc_epdc *priv = drm_pipe_to_mxc_epdc(pipe);
+	struct drm_gem_cma_object *gem;
+	struct drm_atomic_helper_damage_iter iter;
+	struct drm_rect clip;
+
 
 	dev_dbg(priv->drm.dev, "pipe update\n");
+	if (!old_state->fb) {
+		dev_dbg(priv->drm.dev, "no fb, nothing to update\n");
+		return;
+	}
+
+	if (priv->epdc_mem_virt == NULL)
+		return;
+
+	gem = drm_fb_cma_get_gem_obj(old_state->fb, 0);
+	drm_atomic_helper_damage_iter_init(&iter, old_state, pipe->plane.state);
+	drm_atomic_for_each_plane_damage(&iter, &clip) {
+
+		dev_dbg(priv->drm.dev, "damaged: %d,%d-%d,%d\n",
+			clip.x1, clip.y1, clip.x2, clip.y2);
+
+		mxc_epdc_send_single_update(&clip, old_state->fb->pitches[0],
+					    gem->vaddr, priv);
+	}
+
+	return;
 }
 
 static const struct drm_simple_display_pipe_funcs mxc_epdc_funcs = {
@@ -277,6 +304,10 @@ static int mxc_epdc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, priv);
 
 	ret = mxc_epdc_init_hw(priv);
+	if (ret)
+		return ret;
+
+	ret = mxc_epdc_init_update(priv);
 	if (ret)
 		return ret;
 
