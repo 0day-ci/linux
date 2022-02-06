@@ -129,3 +129,5 @@ obj-$(CONFIG_PMC_ATOM)			+= pmc_atom.o
 
 # Siemens Simatic Industrial PCs
 obj-$(CONFIG_SIEMENS_SIMATIC_IPC)	+= simatic-ipc.o
+
+obj-$(CONFIG_STEAMDECK)			+= steamdeck.o
