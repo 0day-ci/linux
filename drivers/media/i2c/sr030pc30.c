@@ -541,7 +541,7 @@ static int sr030pc30_set_fmt(struct v4l2_subdev *sd,
 
 	fmt = try_fmt(sd, mf);
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		sd_state->pads->try_fmt = *mf;
+		sd_state->pads->fmt = *mf;
 		return 0;
 	}
 

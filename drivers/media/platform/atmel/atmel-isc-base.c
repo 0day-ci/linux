@@ -835,11 +835,11 @@ static void isc_try_fse(struct isc_device *isc,
 	 * just use the maximum ISC can receive.
 	 */
 	if (ret) {
-		sd_state->pads->try_crop.width = isc->max_width;
-		sd_state->pads->try_crop.height = isc->max_height;
+		sd_state->pads->crop.width = isc->max_width;
+		sd_state->pads->crop.height = isc->max_height;
 	} else {
-		sd_state->pads->try_crop.width = fse.max_width;
-		sd_state->pads->try_crop.height = fse.max_height;
+		sd_state->pads->crop.width = fse.max_width;
+		sd_state->pads->crop.height = fse.max_height;
 	}
 }
 

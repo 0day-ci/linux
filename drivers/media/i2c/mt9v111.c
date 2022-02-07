@@ -800,7 +800,7 @@ static struct v4l2_mbus_framefmt *__mt9v111_get_pad_format(
 #if IS_ENABLED(CONFIG_VIDEO_V4L2_SUBDEV_API)
 		return v4l2_subdev_get_try_format(&mt9v111->sd, sd_state, pad);
 #else
-		return &sd_state->pads->try_fmt;
+		return &sd_state->pads->fmt;
 #endif
 	case V4L2_SUBDEV_FORMAT_ACTIVE:
 		return &mt9v111->fmt;
@@ -957,7 +957,7 @@ done:
 static int mt9v111_init_cfg(struct v4l2_subdev *subdev,
 			    struct v4l2_subdev_state *sd_state)
 {
-	sd_state->pads->try_fmt = mt9v111_def_fmt;
+	sd_state->pads->fmt = mt9v111_def_fmt;
 
 	return 0;
 }

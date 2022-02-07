@@ -595,7 +595,7 @@ static int saa6752hs_set_fmt(struct v4l2_subdev *sd,
 	f->colorspace = V4L2_COLORSPACE_SMPTE170M;
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		sd_state->pads->try_fmt = *f;
+		sd_state->pads->fmt = *f;
 		return 0;
 	}
 

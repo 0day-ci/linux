@@ -1020,8 +1020,8 @@ static int __imx274_change_compose(struct stimx274 *imx274,
 	int best_goodness = INT_MIN;
 
 	if (which == V4L2_SUBDEV_FORMAT_TRY) {
-		cur_crop = &sd_state->pads->try_crop;
-		tgt_fmt = &sd_state->pads->try_fmt;
+		cur_crop = &sd_state->pads->crop;
+		tgt_fmt = &sd_state->pads->fmt;
 	} else {
 		cur_crop = &imx274->crop;
 		tgt_fmt = &imx274->format;
@@ -1114,7 +1114,7 @@ static int imx274_set_fmt(struct v4l2_subdev *sd,
 	 */
 	fmt->field = V4L2_FIELD_NONE;
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY)
-		sd_state->pads->try_fmt = *fmt;
+		sd_state->pads->fmt = *fmt;
 	else
 		imx274->format = *fmt;
 
@@ -1145,8 +1145,8 @@ static int imx274_get_selection(struct v4l2_subdev *sd,
 	}
 
 	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
-		src_crop = &sd_state->pads->try_crop;
-		src_fmt = &sd_state->pads->try_fmt;
+		src_crop = &sd_state->pads->crop;
+		src_fmt = &sd_state->pads->fmt;
 	} else {
 		src_crop = &imx274->crop;
 		src_fmt = &imx274->format;
@@ -1217,7 +1217,7 @@ static int imx274_set_selection_crop(struct stimx274 *imx274,
 	sel->r = new_crop;
 
 	if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
-		tgt_crop = &sd_state->pads->try_crop;
+		tgt_crop = &sd_state->pads->crop;
 	else
 		tgt_crop = &imx274->crop;
 

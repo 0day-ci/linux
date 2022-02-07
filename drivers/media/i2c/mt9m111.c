@@ -678,7 +678,7 @@ static int mt9m111_set_fmt(struct v4l2_subdev *sd,
 	mf->xfer_func	= V4L2_XFER_FUNC_DEFAULT;
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		sd_state->pads->try_fmt = *mf;
+		sd_state->pads->fmt = *mf;
 		return 0;
 	}
 

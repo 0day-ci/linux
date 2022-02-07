@@ -587,7 +587,7 @@ static int vs6624_set_fmt(struct v4l2_subdev *sd,
 	fmt->colorspace = vs6624_formats[index].colorspace;
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		sd_state->pads->try_fmt = *fmt;
+		sd_state->pads->fmt = *fmt;
 		return 0;
 	}
 

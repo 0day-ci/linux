@@ -1009,7 +1009,7 @@ static int rj54n1_set_fmt(struct v4l2_subdev *sd,
 			      &mf->height, 84, RJ54N1_MAX_HEIGHT, align, 0);
 
 	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
-		sd_state->pads->try_fmt = *mf;
+		sd_state->pads->fmt = *mf;
 		return 0;
 	}
 

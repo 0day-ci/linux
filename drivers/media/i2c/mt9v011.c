@@ -358,7 +358,7 @@ static int mt9v011_set_fmt(struct v4l2_subdev *sd,
 
 		set_res(sd);
 	} else {
-		sd_state->pads->try_fmt = *fmt;
+		sd_state->pads->fmt = *fmt;
 	}
 
 	return 0;

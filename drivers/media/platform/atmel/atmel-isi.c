@@ -572,11 +572,11 @@ static void isi_try_fse(struct atmel_isi *isi, const struct isi_format *isi_fmt,
 	 * just use the maximum ISI can receive.
 	 */
 	if (ret) {
-		sd_state->pads->try_crop.width = MAX_SUPPORT_WIDTH;
-		sd_state->pads->try_crop.height = MAX_SUPPORT_HEIGHT;
+		sd_state->pads->crop.width = MAX_SUPPORT_WIDTH;
+		sd_state->pads->crop.height = MAX_SUPPORT_HEIGHT;
 	} else {
-		sd_state->pads->try_crop.width = fse.max_width;
-		sd_state->pads->try_crop.height = fse.max_height;
+		sd_state->pads->crop.width = fse.max_width;
+		sd_state->pads->crop.height = fse.max_height;
 	}
 }
 
