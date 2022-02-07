@@ -82,6 +82,10 @@
 		IIO_DEVICE_ATTR(name, S_IRUGO, \
 			st_sensors_sysfs_scale_avail, NULL , 0);
 
+#define ST_SENSORS_DEV_ATTR_ALWAYS_ON() \
+		IIO_DEVICE_ATTR(always_on, 0644, st_sensors_sysfs_show_always_on, \
+				st_sensors_sysfs_store_always_on, 0)
+
 struct st_sensor_odr_avl {
 	unsigned int hz;
 	u8 value;
@@ -228,6 +232,7 @@ struct st_sensor_settings {
  * @vdd_io: Pointer to sensor's Vdd-IO power supply
  * @regmap: Pointer to specific sensor regmap configuration.
  * @enabled: Status of the sensor (false->off, true->on).
+ * @always_on: Flag to keep the sensor always enabled (false->off, true->on).
  * @odr: Output data rate of the sensor [Hz].
  * num_data_channels: Number of data channels used in buffer.
  * @drdy_int_pin: Redirect DRDY on pin 1 (1) or pin 2 (2).
@@ -248,6 +253,7 @@ struct st_sensor_data {
 	struct regmap *regmap;
 
 	bool enabled;
+	bool always_on;
 
 	unsigned int odr;
 	unsigned int num_data_channels;
@@ -317,6 +323,14 @@ ssize_t st_sensors_sysfs_scale_avail(struct device *dev,
 				struct device_attribute *attr, char *buf);
 
 void st_sensors_dev_name_probe(struct device *dev, char *name, int len);
+
+ssize_t st_sensors_sysfs_show_always_on(struct device *dev,
+					struct device_attribute *attr,
+					char *buf);
+
+ssize_t st_sensors_sysfs_store_always_on(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t count);
 
 /* Accelerometer */
 const struct st_sensor_settings *st_accel_get_settings(const char *name);
