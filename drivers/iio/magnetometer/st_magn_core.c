@@ -563,9 +563,11 @@ static int st_magn_write_raw(struct iio_dev *indio_dev,
 static ST_SENSORS_DEV_ATTR_SAMP_FREQ_AVAIL();
 static ST_SENSORS_DEV_ATTR_SCALE_AVAIL(in_magn_scale_available);
 
+static ST_SENSORS_DEV_ATTR_ALWAYS_ON();
 static struct attribute *st_magn_attributes[] = {
 	&iio_dev_attr_sampling_frequency_available.dev_attr.attr,
 	&iio_dev_attr_in_magn_scale_available.dev_attr.attr,
+	&iio_dev_attr_always_on.dev_attr.attr,
 	NULL,
 };
 
