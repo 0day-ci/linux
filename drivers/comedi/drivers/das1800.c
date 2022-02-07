@@ -1297,13 +1297,12 @@ static int das1800_attach(struct comedi_device *dev,
 			outb(DAC(i), dev->iobase + DAS1800_SELECT);
 			outw(0, dev->iobase + DAS1800_DAC);
 		}
-	} else if (board->id == DAS1800_ID_AO) {
+	} else {
 		/*
+		 * the branch includes (board->id == DAS1800_ID_AO).
 		 * 'ao' boards have waveform analog outputs that are not
 		 * currently supported.
 		 */
-		s->type		= COMEDI_SUBD_UNUSED;
-	} else {
 		s->type		= COMEDI_SUBD_UNUSED;
 	}
 
