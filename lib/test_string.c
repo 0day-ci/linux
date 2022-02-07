@@ -11,7 +11,7 @@ static __init int memset16_selftest(void)
 
 	p = kmalloc(256 * 2 * 2, GFP_KERNEL);
 	if (!p)
-		return -1;
+		return -ENOMEM;
 
 	for (i = 0; i < 256; i++) {
 		for (j = 0; j < 256; j++) {
