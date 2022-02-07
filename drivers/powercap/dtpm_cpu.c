@@ -188,7 +188,7 @@ static int cpuhp_dtpm_cpu_online(unsigned int cpu)
 		return 0;
 
 	pd = em_cpu_get(cpu);
-	if (!pd)
+	if (!pd || !(pd->flags & EM_PERF_DOMAIN_MILLIWATTS))
 		return -EINVAL;
 
 	dtpm_cpu = per_cpu(dtpm_per_cpu, cpu);
