@@ -66,7 +66,7 @@ struct stackframe {
 extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk,
 			   const char *loglvl);
 
-DECLARE_PER_CPU(unsigned long *, irq_stack_ptr);
+DECLARE_PER_CPU_READ_MOSTLY(unsigned long *, irq_stack_ptr);
 
 static inline bool on_stack(unsigned long sp, unsigned long size,
 			    unsigned long low, unsigned long high,
