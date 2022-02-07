@@ -29,7 +29,6 @@
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
-#include <asm/hardware/dec21285.h>
 
 static int dc21285_get_irq(void)
 {
