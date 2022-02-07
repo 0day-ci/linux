@@ -122,7 +122,6 @@ static void exynos_plane_mode_set(struct exynos_drm_plane_state *exynos_state)
 
 static void exynos_drm_plane_reset(struct drm_plane *plane)
 {
-	struct exynos_drm_plane *exynos_plane = to_exynos_plane(plane);
 	struct exynos_drm_plane_state *exynos_state;
 
 	if (plane->state) {
@@ -133,10 +132,8 @@ static void exynos_drm_plane_reset(struct drm_plane *plane)
 	}
 
 	exynos_state = kzalloc(sizeof(*exynos_state), GFP_KERNEL);
-	if (exynos_state) {
+	if (exynos_state)
 		__drm_atomic_helper_plane_reset(plane, &exynos_state->base);
-		plane->state->zpos = exynos_plane->config->zpos;
-	}
 }
 
 static struct drm_plane_state *
