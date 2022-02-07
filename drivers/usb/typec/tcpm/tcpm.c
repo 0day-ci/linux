@@ -475,6 +475,15 @@ struct tcpm_port {
 	 * SNK_READY for non-pd link.
 	 */
 	bool slow_charger_loop;
+
+	/*
+	 * Max current published in vSafe5V fixed pdo when limit_src_current_enabled
+	 * is active.
+	 */
+	u32 limit_src_current_ma;
+	/* True when source current limiting is enabled */
+	bool limit_src_current_enabled;
+
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dentry;
 	struct mutex logbuffer_lock;	/* log buffer access lock */
@@ -5907,12 +5916,99 @@ port_unlock:
 	return 0;
 }
 
+int tcpm_update_source_capabilities_locked(struct tcpm_port *port)
+{
+	int ret = 0;
+
+	switch (port->state) {
+	case SRC_UNATTACHED:
+	case SRC_ATTACH_WAIT:
+	case SRC_TRYWAIT:
+		tcpm_set_cc(port, tcpm_rp_cc(port));
+		break;
+	case SRC_SEND_CAPABILITIES:
+	case SRC_NEGOTIATE_CAPABILITIES:
+	case SRC_READY:
+	case SRC_WAIT_NEW_CAPABILITIES:
+		port->upcoming_state = SRC_SEND_CAPABILITIES;
+		ret = tcpm_ams_start(port, POWER_NEGOTIATION);
+		if (ret == -EAGAIN) {
+			port->upcoming_state = INVALID_STATE;
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+	return ret;
+}
+
+static int tcpm_fw_get_src_pdo(struct tcpm_port *port, struct fwnode_handle *fwnode, u32 *src_pdo,
+			       unsigned int *nr_src_pdo)
+{
+	int ret;
+
+	ret = fwnode_property_count_u32(fwnode, "source-pdos");
+	if (ret == 0)
+		return -EINVAL;
+	else if (ret < 0)
+		return ret;
+
+	*nr_src_pdo = min(ret, PDO_MAX_OBJECTS);
+	ret = fwnode_property_read_u32_array(fwnode, "source-pdos", src_pdo, *nr_src_pdo);
+
+	return ret;
+}
+
+static int tcpm_limit_src_current_set(struct typec_port *p, u32 limit_src_current_ma, bool enable)
+{
+	struct tcpm_port *port = typec_get_drvdata(p);
+	int ret = 0;
+
+	mutex_lock(&port->lock);
+	if (limit_src_current_ma == port->limit_src_current_ma &&
+	    enable == port->limit_src_current_enabled)
+		goto port_unlock;
+
+	ret = tcpm_fw_get_src_pdo(port, port->tcpc->fwnode, port->src_pdo, &port->nr_src_pdo);
+	if (ret)
+		return ret;
+
+	if (enable) {
+		u32 current_vSafe5V_max_current_ma =
+			((port->src_pdo[0] & (PDO_CURR_MASK << PDO_FIXED_CURR_SHIFT)) >>
+			 PDO_FIXED_CURR_SHIFT) * 10;
+		/*
+		 * Check to see if limited source current does not exceed the
+		 * max current published in default source cap.
+		 */
+		if (limit_src_current_ma > current_vSafe5V_max_current_ma) {
+			ret = -EINVAL;
+			goto port_unlock;
+		}
+		port->src_pdo[0] &= ~(PDO_CURR_MASK << PDO_FIXED_CURR_SHIFT);
+		port->src_pdo[0] |= PDO_FIXED_CURR(limit_src_current_ma);
+		port->nr_src_pdo = 1;
+	}
+
+	ret = tcpm_update_source_capabilities_locked(port);
+	if (!ret) {
+		port->limit_src_current_ma = limit_src_current_ma;
+		port->limit_src_current_enabled = enable;
+	}
+
+port_unlock:
+	mutex_unlock(&port->lock);
+	return ret;
+}
+
 static const struct typec_operations tcpm_ops = {
 	.try_role = tcpm_try_role,
 	.dr_set = tcpm_dr_set,
 	.pr_set = tcpm_pr_set,
 	.vconn_set = tcpm_vconn_set,
-	.port_type_set = tcpm_port_type_set
+	.port_type_set = tcpm_port_type_set,
+	.limit_src_current_set = tcpm_limit_src_current_set
 };
 
 void tcpm_tcpc_reset(struct tcpm_port *port)
@@ -5970,15 +6066,7 @@ static int tcpm_fw_get_caps(struct tcpm_port *port,
 
 	/* Get Source PDOs for the PD port or Source Rp value for the non-PD port */
 	if (port->pd_supported) {
-		ret = fwnode_property_count_u32(fwnode, "source-pdos");
-		if (ret == 0)
-			return -EINVAL;
-		else if (ret < 0)
-			return ret;
-
-		port->nr_src_pdo = min(ret, PDO_MAX_OBJECTS);
-		ret = fwnode_property_read_u32_array(fwnode, "source-pdos",
-						     port->src_pdo, port->nr_src_pdo);
+		ret = tcpm_fw_get_src_pdo(port, fwnode, port->src_pdo, &port->nr_src_pdo);
 		if (ret)
 			return ret;
 		ret = tcpm_validate_caps(port, port->src_pdo, port->nr_src_pdo);
