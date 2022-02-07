@@ -5720,7 +5720,7 @@ static int btrfs_log_inode(struct btrfs_trans_handle *trans,
 	 */
 	ret = inode_logged(trans, inode, path);
 	if (ret < 0)
-		goto out;
+		goto out_unlock;
 	ctx->logged_before = (ret == 1);
 	ret = 0;
 
