@@ -6275,11 +6275,16 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 	int i, cpu, idle_cpu = -1, nr = INT_MAX;
 	struct rq *this_rq = this_rq();
 	int this = smp_processor_id();
+	struct sched_domain_shared *sd_share;
 	struct sched_domain *this_sd;
 	u64 time = 0;
 
 	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
 	if (!this_sd)
+		return -1;
+
+	sd_share = rcu_dereference(per_cpu(sd_llc_shared, target));
+	if (sd_share && READ_ONCE(sd_share->overloaded))
 		return -1;
 
 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
@@ -9214,6 +9219,7 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 	struct sg_lb_stats *local = &sds->local_stat;
 	struct sg_lb_stats tmp_sgs;
 	int sg_status = 0;
+	unsigned long sum_util = 0;
 
 	do {
 		struct sg_lb_stats *sgs = &tmp_sgs;
@@ -9244,6 +9250,7 @@ next_group:
 		/* Now, start updating sd_lb_stats */
 		sds->total_load += sgs->group_load;
 		sds->total_capacity += sgs->group_capacity;
+		sum_util += sgs->group_util;
 
 		sg = sg->next;
 	} while (sg != env->sd->groups);
@@ -9269,6 +9276,29 @@ next_group:
 
 		WRITE_ONCE(rd->overutilized, SG_OVERUTILIZED);
 		trace_sched_overutilized_tp(rd, SG_OVERUTILIZED);
+	}
+
+	/*
+	 * Check if the LLC domain is overloaded. The overload hint
+	 * could be used to skip the LLC domain idle cpu search in
+	 * select_idle_cpu(). The update of this hint occurs during
+	 * periodic load balancing, rather than frequent newidle balance.
+	 */
+	if (env->idle != CPU_NEWLY_IDLE &&
+	    env->sd->span_weight == per_cpu(sd_llc_size, env->dst_cpu)) {
+		struct sched_domain_shared *sd_share =
+			rcu_dereference(per_cpu(sd_llc_shared, env->dst_cpu));
+
+		if (!sd_share)
+			return;
+
+		/*
+		 * Derived from group_is_overloaded(). The default imbalance_pct
+		 * is 117 on LLC domain, which means the threshold of average
+		 * utilization is 85%.
+		 */
+		WRITE_ONCE(sd_share->overloaded, (sds->total_capacity * 100) <
+			   (sum_util * env->sd->imbalance_pct));
 	}
 }
 
