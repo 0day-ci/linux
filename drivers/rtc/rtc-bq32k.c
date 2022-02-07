@@ -108,8 +108,20 @@ static int bq32k_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	tm->tm_mday = bcd2bin(regs.date);
 	tm->tm_wday = bcd2bin(regs.day) - 1;
 	tm->tm_mon = bcd2bin(regs.month) - 1;
-	tm->tm_year = bcd2bin(regs.years) +
-				((regs.cent_hours & BQ32K_CENT) ? 100 : 0);
+	/*
+	 * tm_year is number of years since 1900. Need to increase the years by
+	 * 100 always assuming we are on 20YY and not 19YY.
+	 */
+	tm->tm_year = bcd2bin(regs.years) + 100;
+
+	/*
+	 * If the century enable bit (BQ32K_CENT_EN) is set, and century bit
+	 * (BQ32K_CENT) is cleared, that means we are on the next century, which
+	 * required to increase by 100.
+	 */
+	if ((regs.cent_hours & BQ32K_CENT_EN) &&
+	    !(regs.cent_hours & BQ32K_CENT))
+		tm->tm_year += 100;
 
 	return 0;
 }
@@ -117,6 +129,7 @@ static int bq32k_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int bq32k_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct bq32k_regs regs;
+	int year;
 
 	regs.seconds = bin2bcd(tm->tm_sec);
 	regs.minutes = bin2bcd(tm->tm_min);
@@ -125,11 +138,15 @@ static int bq32k_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	regs.date = bin2bcd(tm->tm_mday);
 	regs.month = bin2bcd(tm->tm_mon + 1);
 
-	if (tm->tm_year >= 100) {
+	/* Assume we are on 20YY and not 19YY */
+	year = tm->tm_year - 100;
+
+	if (year < 100) {
 		regs.cent_hours |= BQ32K_CENT;
-		regs.years = bin2bcd(tm->tm_year - 100);
-	} else
-		regs.years = bin2bcd(tm->tm_year);
+		regs.years = bin2bcd(year);
+	} else {
+		regs.years = bin2bcd(year - 100);
+	}
 
 	return bq32k_write(dev, &regs, 0, sizeof(regs));
 }
