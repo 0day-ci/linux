@@ -5682,89 +5682,106 @@ static void release_stripe_plug(struct mddev *mddev,
 static void make_discard_request(struct mddev *mddev, struct bio *bi)
 {
 	struct r5conf *conf = mddev->private;
-	sector_t logical_sector, last_sector;
-	struct stripe_head *sh;
+	sector_t bio_start, bio_end;
+	unsigned int start_disk_index, end_disk_index;
+	sector_t start_disk_offset, end_disk_offset;
+	sector_t first_stripe_index, last_stripe_index;
+	sector_t split_size;
+	struct bio *split;
+	unsigned int remainder;
+	int d;
 	int stripe_sectors;
 
 	/* We need to handle this when io_uring supports discard/trim */
 	if (WARN_ON_ONCE(bi->bi_opf & REQ_NOWAIT))
 		return;
 
-	if (mddev->reshape_position != MaxSector)
-		/* Skip discard while reshape is happening */
+	/* Skip discard while reshape or resync is happening */
+	if ((mddev->reshape_position != MaxSector) ||
+	    test_bit(MD_RECOVERY_SYNC, &mddev->recovery)) {
 		return;
-
-	logical_sector = bi->bi_iter.bi_sector & ~((sector_t)RAID5_STRIPE_SECTORS(conf)-1);
-	last_sector = bio_end_sector(bi);
-
-	bi->bi_next = NULL;
+	}
 
 	stripe_sectors = conf->chunk_sectors *
 		(conf->raid_disks - conf->max_degraded);
-	logical_sector = DIV_ROUND_UP_SECTOR_T(logical_sector,
-					       stripe_sectors);
-	sector_div(last_sector, stripe_sectors);
 
-	logical_sector *= conf->chunk_sectors;
-	last_sector *= conf->chunk_sectors;
+	if (bio_sectors(bi) < stripe_sectors * 2)
+		return;
 
-	for (; logical_sector < last_sector;
-	     logical_sector += RAID5_STRIPE_SECTORS(conf)) {
-		DEFINE_WAIT(w);
-		int d;
-	again:
-		sh = raid5_get_active_stripe(conf, logical_sector, 0, 0, 0);
-		prepare_to_wait(&conf->wait_for_overlap, &w,
-				TASK_UNINTERRUPTIBLE);
-		set_bit(R5_Overlap, &sh->dev[sh->pd_idx].flags);
-		if (test_bit(STRIPE_SYNCING, &sh->state)) {
-			raid5_release_stripe(sh);
-			schedule();
-			goto again;
-		}
-		clear_bit(R5_Overlap, &sh->dev[sh->pd_idx].flags);
-		spin_lock_irq(&sh->stripe_lock);
-		for (d = 0; d < conf->raid_disks; d++) {
-			if (d == sh->pd_idx || d == sh->qd_idx)
-				continue;
-			if (sh->dev[d].towrite || sh->dev[d].toread) {
-				set_bit(R5_Overlap, &sh->dev[d].flags);
-				spin_unlock_irq(&sh->stripe_lock);
-				raid5_release_stripe(sh);
-				schedule();
-				goto again;
-			}
-		}
-		set_bit(STRIPE_DISCARD, &sh->state);
-		finish_wait(&conf->wait_for_overlap, &w);
-		sh->overwrite_disks = 0;
-		for (d = 0; d < conf->raid_disks; d++) {
-			if (d == sh->pd_idx || d == sh->qd_idx)
-				continue;
-			sh->dev[d].towrite = bi;
-			set_bit(R5_OVERWRITE, &sh->dev[d].flags);
-			bio_inc_remaining(bi);
-			md_write_inc(mddev, bi);
-			sh->overwrite_disks++;
-		}
-		spin_unlock_irq(&sh->stripe_lock);
-		if (conf->mddev->bitmap) {
-			for (d = 0;
-			     d < conf->raid_disks - conf->max_degraded;
-			     d++)
-				md_bitmap_startwrite(mddev->bitmap,
-						     sh->sector,
-						     RAID5_STRIPE_SECTORS(conf),
-						     0);
-			sh->bm_seq = conf->seq_flush + 1;
-			set_bit(STRIPE_BIT_DELAY, &sh->state);
-		}
+	bio_start = bi->bi_iter.bi_sector & ~((sector_t)RAID5_STRIPE_SECTORS(conf)-1);
+	bio_end = bio_end_sector(bi);
 
-		set_bit(STRIPE_HANDLE, &sh->state);
-		clear_bit(STRIPE_DELAYED, &sh->state);
-		if (!test_and_set_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
-			atomic_inc(&conf->preread_active_stripes);
-		release_stripe_plug(mddev, sh);
+	/*
+	 * Keep bio aligned with strip size.
+	 */
+	div_u64_rem(bio_start, stripe_sectors, &remainder);
+	if (remainder) {
+		split_size = stripe_sectors - remainder;
+		split = bio_split(bi, split_size, GFP_NOIO, &conf->bio_split);
+		bio_chain(split, bi);
+		/* Resend the fist split part */
+		submit_bio_noacct(split);
+	}
+	div_u64_rem(bio_end-bio_start, stripe_sectors, &remainder);
+	if (remainder) {
+		split_size = bio_sectors(bi) - remainder;
+		split = bio_split(bi, split_size, GFP_NOIO, &conf->bio_split);
+		bio_chain(split, bi);
+		/* Resend the second split part */
+		submit_bio_noacct(bi);
+		bi = split;
+	}
+
+	bio_start = bi->bi_iter.bi_sector & ~((sector_t)RAID5_STRIPE_SECTORS(conf)-1);
+	bio_end = bio_end_sector(bi);
+
+	bi->bi_next = NULL;
+
+	first_stripe_index = bio_start;
+	sector_div(first_stripe_index, stripe_sectors);
+
+	last_stripe_index = bio_end;
+	sector_div(last_stripe_index, stripe_sectors);
+
+	start_disk_index = (int)(bio_start - first_stripe_index * stripe_sectors) /
+		conf->chunk_sectors;
+	start_disk_offset = ((int)(bio_start - first_stripe_index * stripe_sectors) %
+		conf->chunk_sectors) +
+		first_stripe_index * conf->chunk_sectors;
+	end_disk_index = (int)(bio_end - last_stripe_index * stripe_sectors) /
+		conf->chunk_sectors;
+	end_disk_offset = ((int)(bio_end - last_stripe_index * stripe_sectors) %
+		conf->chunk_sectors) +
+		last_stripe_index * conf->chunk_sectors;
+
+	for (d = 0; d < conf->raid_disks; d++) {
+		sector_t dev_start, dev_end;
+		struct md_rdev *rdev = READ_ONCE(conf->disks[d].rdev);
+
+		dev_start = bio_start;
+		dev_end = bio_end;
+
+		if (d < start_disk_index)
+			dev_start = (first_stripe_index + 1) *
+				conf->chunk_sectors;
+		else if (d > start_disk_index)
+			dev_start = first_stripe_index * conf->chunk_sectors;
+		else
+			dev_start = start_disk_offset;
+
+		if (d < end_disk_index)
+			dev_end = (last_stripe_index + 1) * conf->chunk_sectors;
+		else if (d > end_disk_index)
+			dev_end = last_stripe_index * conf->chunk_sectors;
+		else
+			dev_end = end_disk_offset;
+
+		if (dev_end <= dev_start)
+			continue;
+
+		md_submit_discard_bio(mddev, rdev, bi,
+					dev_start + rdev->data_offset,
+					dev_end - dev_start);
 	}
 
 	bio_endio(bi);
