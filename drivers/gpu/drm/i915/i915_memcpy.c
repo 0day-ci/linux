@@ -24,14 +24,9 @@
 
 #include <linux/kernel.h>
 #include <asm/fpu/api.h>
+#include <linux/io.h>
 
 #include "i915_memcpy.h"
-
-#if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-#define CI_BUG_ON(expr) BUG_ON(expr)
-#else
-#define CI_BUG_ON(expr) BUILD_BUG_ON_INVALID(expr)
-#endif
 
 static DEFINE_STATIC_KEY_FALSE(has_movntdqa);
 
@@ -93,6 +88,26 @@ static void __memcpy_ntdqu(void *dst, const void *src, unsigned long len)
 	kernel_fpu_end();
 }
 
+/* The movntdqa instructions used for memcpy-from-wc require 16-byte alignment,
+ * as well as SSE4.1 support. To check beforehand, pass in the parameters to
+ * i915_can_memcpy_from_wc() - since we only care about the low 4 bits,
+ * you only need to pass in the minor offsets, page-aligned pointers are
+ * always valid.
+ *
+ * For just checking for SSE4.1, in the foreknowledge that the future use
+ * will be correctly aligned, just use i915_has_memcpy_from_wc().
+ */
+bool i915_can_memcpy_from_wc(void *dst, const void *src, unsigned long len)
+{
+	if (unlikely(((unsigned long)dst | (unsigned long)src | len) & 15))
+		return false;
+
+	if (static_branch_likely(&has_movntdqa))
+		return true;
+
+	return false;
+}
+
 /**
  * i915_memcpy_from_wc: perform an accelerated *aligned* read from WC
  * @dst: destination pointer
@@ -104,24 +119,18 @@ static void __memcpy_ntdqu(void *dst, const void *src, unsigned long len)
  * (@src, @dst) must be aligned to 16 bytes and @len must be a multiple
  * of 16.
  *
- * To test whether accelerated reads from WC are supported, use
- * i915_memcpy_from_wc(NULL, NULL, 0);
- *
- * Returns true if the copy was successful, false if the preconditions
- * are not met.
+ * If the acccelerated read from WC is not possible fallback to memcpy
  */
-bool i915_memcpy_from_wc(void *dst, const void *src, unsigned long len)
+void i915_memcpy_from_wc(void *dst, const void *src, unsigned long len)
 {
-	if (unlikely(((unsigned long)dst | (unsigned long)src | len) & 15))
-		return false;
-
-	if (static_branch_likely(&has_movntdqa)) {
+	if (i915_can_memcpy_from_wc(dst, src, len)) {
 		if (likely(len))
 			__memcpy_ntdqa(dst, src, len >> 4);
-		return true;
+		return;
 	}
 
-	return false;
+	/* Fallback */
+	memcpy(dst, src, len);
 }
 
 /**
@@ -134,12 +143,15 @@ bool i915_memcpy_from_wc(void *dst, const void *src, unsigned long len)
  * @src to @dst using * non-temporal instructions where available, but
  * accepts that its arguments may not be aligned, but are valid for the
  * potential 16-byte read past the end.
+ *
+ * Fallback to memcpy if accelerated read is not supported
  */
 void i915_unaligned_memcpy_from_wc(void *dst, const void *src, unsigned long len)
 {
 	unsigned long addr;
 
-	CI_BUG_ON(!i915_has_memcpy_from_wc());
+	if (!i915_has_memcpy_from_wc())
+		goto fallback;
 
 	addr = (unsigned long)src;
 	if (!IS_ALIGNED(addr, 16)) {
@@ -154,6 +166,34 @@ void i915_unaligned_memcpy_from_wc(void *dst, const void *src, unsigned long len
 
 	if (likely(len))
 		__memcpy_ntdqu(dst, src, DIV_ROUND_UP(len, 16));
+
+	return;
+
+fallback:
+	memcpy(dst, src, len);
+}
+
+/**
+ * i915_io_memcpy_from_wc: perform an accelerated *aligned* read from WC
+ * @dst: destination pointer
+ * @src: source pointer
+ * @len: how many bytes to copy
+ *
+ * To be used when the when copying from io memory.
+ *
+ * memcpy_fromio() is used as fallback otherewise no difference to
+ * i915_memcpy_from_wc()
+ */
+void i915_io_memcpy_from_wc(void *dst, const void __iomem *src, unsigned long len)
+{
+	if (i915_can_memcpy_from_wc(dst, (const void __force *)src, len)) {
+		if (likely(len))
+			__memcpy_ntdqa(dst, (const void __force *)src, len >> 4);
+		return;
+	}
+
+	/* Fallback */
+	memcpy_fromio(dst, src, len);
 }
 
 void i915_memcpy_init_early(struct drm_i915_private *dev_priv)

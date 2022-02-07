@@ -298,8 +298,10 @@ static int compress_page(struct i915_vma_compress *c,
 	struct z_stream_s *zstream = &c->zstream;
 
 	zstream->next_in = src;
-	if (wc && c->tmp && i915_memcpy_from_wc(c->tmp, src, PAGE_SIZE))
+	if (wc && c->tmp && i915_can_memcpy_from_wc(c->tmp, src, PAGE_SIZE)) {
+		i915_io_memcpy_from_wc(c->tmp, (const void __iomem *)src, PAGE_SIZE);
 		zstream->next_in = c->tmp;
+	}
 	zstream->avail_in = PAGE_SIZE;
 
 	do {
@@ -398,8 +400,11 @@ static int compress_page(struct i915_vma_compress *c,
 	if (!ptr)
 		return -ENOMEM;
 
-	if (!(wc && i915_memcpy_from_wc(ptr, src, PAGE_SIZE)))
+	if (wc)
+		i915_io_memcpy_from_wc(ptr, src, PAGE_SIZE);
+	else
 		memcpy(ptr, src, PAGE_SIZE);
+
 	list_add_tail(&virt_to_page(ptr)->lru, &dst->page_list);
 	cond_resched();
 

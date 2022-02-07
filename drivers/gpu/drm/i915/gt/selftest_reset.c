@@ -99,8 +99,10 @@ __igt_reset_stolen(struct intel_gt *gt,
 			memset_io(s, STACK_MAGIC, PAGE_SIZE);
 
 		in = (void __force *)s;
-		if (i915_memcpy_from_wc(tmp, in, PAGE_SIZE))
+		if (i915_can_memcpy_from_wc(tmp, in, PAGE_SIZE)) {
+			i915_io_memcpy_from_wc(tmp, in, PAGE_SIZE);
 			in = tmp;
+		}
 		crc[page] = crc32_le(0, in, PAGE_SIZE);
 
 		io_mapping_unmap(s);
@@ -135,8 +137,10 @@ __igt_reset_stolen(struct intel_gt *gt,
 				      PAGE_SIZE);
 
 		in = (void __force *)s;
-		if (i915_memcpy_from_wc(tmp, in, PAGE_SIZE))
+		if (i915_can_memcpy_from_wc(tmp, in, PAGE_SIZE)) {
+			i915_io_memcpy_from_wc(tmp, in, PAGE_SIZE);
 			in = tmp;
+		}
 		x = crc32_le(0, in, PAGE_SIZE);
 
 		if (x != crc[page] &&
