@@ -80,6 +80,28 @@ static bool __init efi_virtmap_init(void)
 	return true;
 }
 
+static int efi_restart(struct notifier_block *nb, unsigned long action,
+		       void *data)
+{
+	/*
+	 * UpdateCapsule() depends on the system being reset via
+	 * ResetSystem().
+	 */
+	efi_reboot(reboot_mode, NULL);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block efi_restart_nb = {
+	.notifier_call = efi_restart,
+	/**
+	 * If you are running UEFI based system, you most certainly should let
+	 * efi_reboot() do a reset for you. If you think you know better, we
+	 * leave you a window of opportunity here by not using maximal priority.
+	 */
+	.priority = 251,
+};
+
 /*
  * Enable the UEFI Runtime Services if all prerequisites are in place, i.e.,
  * non-early mapping of the UEFI system table and virtual mappings for all
@@ -147,6 +169,9 @@ static int __init arm_enable_runtime_services(void)
 	/* Set up runtime services function pointers */
 	efi_native_runtime_setup();
 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+
+	if (IS_ENABLED(CONFIG_ARM64))
+		register_restart_handler(&efi_restart_nb);
 
 	return 0;
 }
