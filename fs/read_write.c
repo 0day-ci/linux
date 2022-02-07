@@ -1432,7 +1432,8 @@ static int generic_copy_file_checks(struct file *file_in, loff_t pos_in,
 		return -ETXTBSY;
 
 	/* Ensure offsets don't wrap. */
-	if (pos_in + count < pos_in || pos_out + count < pos_out)
+	if ((loff_t)(pos_in + count) < pos_in ||
+			(loff_t)(pos_out + count) < pos_out)
 		return -EOVERFLOW;
 
 	/* Shorten the copy to EOF */
