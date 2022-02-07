@@ -7,6 +7,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/s32g2-clock.h>
 
 / {
 	compatible = "nxp,s32g2";
@@ -132,6 +133,19 @@
 				     "fsl,s32v234-linflexuart";
 			reg = <0x402bc000 0x3000>;
 			interrupts = <GIC_SPI 84 IRQ_TYPE_EDGE_RISING>;
+			status = "disabled";
+		};
+
+		usdhc0: mmc@402f0000 {
+			compatible = "nxp,s32g2-usdhc";
+			reg = <0x402f0000 0x1000>;
+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+			bus-width = <8>;
+			clocks = <&scmi_clks S32G2_SCMI_CLK_USDHC_MODULE>,
+				 <&scmi_clks S32G2_SCMI_CLK_USDHC_AHB>,
+				 <&scmi_clks S32G2_SCMI_CLK_USDHC_CORE>;
+			clock-names = "ipg", "ahb", "per";
+			no-1-8-v;
 			status = "disabled";
 		};
 
