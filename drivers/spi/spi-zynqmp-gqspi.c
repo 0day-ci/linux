@@ -1420,6 +1420,7 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
 					   &rx_bus_width);
 		if (!ret) {
 			xqspi->rx_bus_width = rx_bus_width;
+			of_node_put(nc);
 			break;
 		}
 	}
@@ -1432,6 +1433,7 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
 					   &tx_bus_width);
 		if (!ret) {
 			xqspi->tx_bus_width = tx_bus_width;
+			of_node_put(nc);
 			break;
 		}
 	}
