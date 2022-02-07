@@ -5,7 +5,9 @@ config QLGE
 	depends on ETHERNET && PCI
 	select NET_DEVLINK
 	help
-	This driver supports QLogic ISP8XXX 10Gb Ethernet cards.
+		This driver supports QLogic ISP8XXX 10Gb Ethernet cards.
 
-	To compile this driver as a module, choose M here. The module will be
-	called qlge.
+		Say Y here to enable support for QLogic ISP8XXX 10Gb Ethernet cards.
+
+		To compile this driver as a module, choose M here. The module will be
+		called qlge.

@@ -935,13 +935,12 @@ static int qlge_idc_wait(struct qlge_adapter *qdev)
 			netif_err(qdev, drv, qdev->ndev, "IDC Success.\n");
 			status = 0;
 			break;
-		} else {
-			netif_err(qdev, drv, qdev->ndev,
-				  "IDC: Invalid State 0x%.04x.\n",
-				  mbcp->mbox_out[0]);
-			status = -EIO;
-			break;
 		}
+		netif_err(qdev, drv, qdev->ndev,
+			  "IDC: Invalid State 0x%.04x.\n",
+			  mbcp->mbox_out[0]);
+		status = -EIO;
+		break;
 	}
 
 	return status;

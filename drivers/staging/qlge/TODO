@@ -30,4 +30,3 @@
 * fix weird line wrapping (all over, ex. the ql_set_routing_reg() calls in
   qlge_set_multicast_list()).
 * fix weird indentation (all over, ex. the for loops in qlge_get_stats())
-* fix checkpatch issues

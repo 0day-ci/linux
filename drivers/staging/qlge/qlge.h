@@ -45,9 +45,8 @@
 /* Calculate the number of (4k) pages required to
  * contain a buffer queue of the given length.
  */
-#define MAX_DB_PAGES_PER_BQ(x) \
-		(((x * sizeof(u64)) / DB_PAGE_SIZE) + \
-		(((x * sizeof(u64)) % DB_PAGE_SIZE) ? 1 : 0))
+#define MAX_DB_PAGES_PER_BQ(x) ((((x) * sizeof(u64)) / DB_PAGE_SIZE) + \
+		((((x) * sizeof(u64)) % DB_PAGE_SIZE) ? 1 : 0))
 
 #define RX_RING_SHADOW_SPACE	(sizeof(u64) + \
 		MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN) * sizeof(u64) + \
@@ -1273,7 +1272,7 @@ struct qlge_net_req_iocb {
  */
 struct wqicb {
 	__le16 len;
-#define Q_LEN_V		(1 << 4)
+#define Q_LEN_V		BIT(4)
 #define Q_LEN_CPP_CONT	0x0000
 #define Q_LEN_CPP_16	0x0001
 #define Q_LEN_CPP_32	0x0002
@@ -1308,7 +1307,7 @@ struct cqicb {
 #define FLAGS_LI	0x40
 #define FLAGS_LC	0x80
 	__le16 len;
-#define LEN_V		(1 << 4)
+#define LEN_V		BIT(4)
 #define LEN_CPP_CONT	0x0000
 #define LEN_CPP_32	0x0001
 #define LEN_CPP_64	0x0002
@@ -1365,7 +1364,7 @@ struct tx_ring_desc {
 	struct tx_ring_desc *next;
 };
 
-#define QL_TXQ_IDX(qdev, skb) (smp_processor_id() % (qdev->tx_ring_count))
+#define QL_TXQ_IDX(qdev, skb) (smp_processor_id() % ((qdev)->tx_ring_count))
 
 struct tx_ring {
 	/*
@@ -2030,9 +2029,9 @@ enum {
 	STS_PAUSE_STD = 0x00000040,
 	STS_PAUSE_PRI = 0x00000080,
 	STS_SPEED_MASK = 0x00000038,
-	STS_SPEED_100Mb = 0x00000000,
-	STS_SPEED_1Gb = 0x00000008,
-	STS_SPEED_10Gb = 0x00000010,
+	STS_SPEED_100MB = 0x00000000,
+	STS_SPEED_1GB = 0x00000008,
+	STS_SPEED_10GB = 0x00000010,
 	STS_LINK_TYPE_MASK = 0x00000007,
 	STS_LINK_TYPE_XFI = 0x00000001,
 	STS_LINK_TYPE_XAUI = 0x00000002,
@@ -2072,6 +2071,7 @@ struct qlge_adapter *netdev_to_qdev(struct net_device *ndev)
 
 	return ndev_priv->qdev;
 }
+
 /*
  * The main Adapter structure definition.
  * This structure has all fields relevant to the hardware.
@@ -2097,8 +2097,8 @@ struct qlge_adapter {
 	u32 alt_func;		/* PCI function for alternate adapter */
 	u32 port;		/* Port number this adapter */
 
-	spinlock_t adapter_lock;
-	spinlock_t stats_lock;
+	spinlock_t adapter_lock; /* Spinlock for adapter */
+	spinlock_t stats_lock; /* Spinlock for stats */
 
 	/* PCI Bus Relative Register Addresses */
 	void __iomem *reg_base;
@@ -2116,7 +2116,7 @@ struct qlge_adapter {
 	u32 mailbox_in;
 	u32 mailbox_out;
 	struct mbox_params idc_mbc;
-	struct mutex	mpi_mutex;
+	struct mutex	mpi_mutex; /* Mutex for mpi */
 
 	int tx_ring_size;
 	int rx_ring_size;
