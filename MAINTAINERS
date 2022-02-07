@@ -18490,6 +18490,14 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/ethernet/dlink/sundance.c
 
+SUNPLUS CPUIDLE DRIVER
+M:	Edwin Chiu <edwinchiu0505tw@gmail.com>
+S:	Maintained
+F:	drivers/cpuidle/Kconfig.arm
+F:	drivers/cpuidle/Makefile
+F:	drivers/cpuidle/cpuidle-sunplus.c
+F:	include/linux/platform_data/cpuidle-sunplus.h
+
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
 M:	Rich Felker <dalias@libc.org>
