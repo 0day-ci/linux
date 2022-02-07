@@ -336,6 +336,14 @@ static int devfreq_cooling_gen_tables(struct devfreq_cooling_device *dfc,
 	return 0;
 }
 
+static inline bool em_is_sane(struct em_perf_domain *em)
+{
+	if (!em || !(em->flags & EM_PERF_DOMAIN_MILLIWATTS))
+		return false;
+	else
+		return true;
+}
+
 /**
  * of_devfreq_cooling_register_power() - Register devfreq cooling device,
  *                                      with OF and power information.
@@ -358,6 +366,7 @@ of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
 	struct thermal_cooling_device *cdev;
 	struct device *dev = df->dev.parent;
 	struct devfreq_cooling_device *dfc;
+	struct em_perf_domain *em;
 	char *name;
 	int err, num_opps;
 
@@ -367,8 +376,9 @@ of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
 
 	dfc->devfreq = df;
 
-	dfc->em_pd = em_pd_get(dev);
-	if (dfc->em_pd) {
+	em = em_pd_get(dev);
+	if (em_is_sane(em)) {
+		dfc->em_pd = em;
 		devfreq_cooling_ops.get_requested_power =
 			devfreq_cooling_get_requested_power;
 		devfreq_cooling_ops.state2power = devfreq_cooling_state2power;
@@ -379,7 +389,7 @@ of_devfreq_cooling_register_power(struct device_node *np, struct devfreq *df,
 		num_opps = em_pd_nr_perf_states(dfc->em_pd);
 	} else {
 		/* Backward compatibility for drivers which do not use IPA */
-		dev_dbg(dev, "missing EM for cooling device\n");
+		dev_dbg(dev, "missing proper EM for cooling device\n");
 
 		num_opps = dev_pm_opp_get_opp_count(dev);
 
