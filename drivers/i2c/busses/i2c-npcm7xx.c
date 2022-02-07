@@ -91,7 +91,11 @@ enum i2c_addr {
 
 /* init register and default value required to enable module */
 #define NPCM_I2CSEGCTL			0xE4
+#ifdef CONFIG_ARCH_NPCM7XX
 #define NPCM_I2CSEGCTL_INIT_VAL		0x0333F000
+#else
+#define NPCM_I2CSEGCTL_INIT_VAL		0x9333F000
+#endif
 
 /* Common regs */
 #define NPCM_I2CSDA			0x00
@@ -229,7 +233,11 @@ static const int npcm_i2caddr[I2C_NUM_OWN_ADDR] = {
 #define NPCM_I2CFIF_CTS_SLVRSTR		BIT(7)
 
 /* NPCM_I2CTXF_CTL reg fields */
+#ifdef CONFIG_ARCH_NPCM7XX
 #define NPCM_I2CTXF_CTL_TX_THR		GENMASK(4, 0)
+#else
+#define NPCM_I2CTXF_CTL_TX_THR		GENMASK(5, 0)
+#endif /*CONFIG_ARCH_NPCM7XX*/
 #define NPCM_I2CTXF_CTL_THR_TXIE	BIT(6)
 
 /* NPCM_I2CT_OUT reg fields */
@@ -238,22 +246,42 @@ static const int npcm_i2caddr[I2C_NUM_OWN_ADDR] = {
 #define NPCM_I2CT_OUT_T_OUTST		BIT(7)
 
 /* NPCM_I2CTXF_STS reg fields */
+#ifdef CONFIG_ARCH_NPCM7XX
 #define NPCM_I2CTXF_STS_TX_BYTES	GENMASK(4, 0)
+#else
+#define NPCM_I2CTXF_STS_TX_BYTES	GENMASK(5, 0)
+#endif /*CONFIG_ARCH_NPCM7XX*/
 #define NPCM_I2CTXF_STS_TX_THST		BIT(6)
 
 /* NPCM_I2CRXF_STS reg fields */
+#ifdef CONFIG_ARCH_NPCM7XX
 #define NPCM_I2CRXF_STS_RX_BYTES	GENMASK(4, 0)
+#else
+#define NPCM_I2CRXF_STS_RX_BYTES	GENMASK(5, 0)
+#endif /*CONFIG_ARCH_NPCM7XX*/
 #define NPCM_I2CRXF_STS_RX_THST		BIT(6)
 
 /* NPCM_I2CFIF_CTL reg fields */
 #define NPCM_I2CFIF_CTL_FIFO_EN		BIT(4)
 
 /* NPCM_I2CRXF_CTL reg fields */
+#ifdef CONFIG_ARCH_NPCM7XX
 #define NPCM_I2CRXF_CTL_RX_THR		GENMASK(4, 0)
+#else
+#define NPCM_I2CRXF_CTL_RX_THR		GENMASK(5, 0)
+#endif /*CONFIG_ARCH_NPCM7XX*/
+#ifdef CONFIG_ARCH_NPCM7XX
 #define NPCM_I2CRXF_CTL_LAST_PEC	BIT(5)
+#else
+#define NPCM_I2CRXF_CTL_LAST_PEC	BIT(7)
+#endif /*CONFIG_ARCH_NPCM7XX*/
 #define NPCM_I2CRXF_CTL_THR_RXIE	BIT(6)
 
+#ifdef CONFIG_ARCH_NPCM7XX
 #define I2C_HW_FIFO_SIZE		16
+#else
+#define I2C_HW_FIFO_SIZE		32
+#endif /* CONFIG_ARCH_NPCM7XX */
 
 /* I2C_VER reg fields */
 #define I2C_VER_VERSION			GENMASK(6, 0)
@@ -2356,6 +2384,7 @@ static int npcm_i2c_remove_bus(struct platform_device *pdev)
 
 static const struct of_device_id npcm_i2c_bus_of_table[] = {
 	{ .compatible = "nuvoton,npcm750-i2c", },
+	{ .compatible = "nuvoton,npcm845-i2c", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, npcm_i2c_bus_of_table);
