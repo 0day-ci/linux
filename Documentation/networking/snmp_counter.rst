@@ -214,6 +214,11 @@ wrong. Kernel verifies the checksum after updating the IcmpInMsgs and
 before updating IcmpMsgInType[N]. If a packet has bad checksum, the
 IcmpInMsgs would be updated but none of IcmpMsgInType[N] would be updated.
 
+* IcmpInDropOtherhost
+
+This counter indicates that the packet was dropped because the destination
+MAC address was incorrect.
+
 * IcmpInErrors and IcmpOutErrors
 
 Defined by `RFC1213 icmpInErrors`_ and `RFC1213 icmpOutErrors`_
