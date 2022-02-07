@@ -19,3 +19,15 @@ config SMC_DIAG
 	  smcss.
 
 	  if unsure, say Y.
+
+if SMC
+
+config SMC_AUTO_FALLBACK
+	bool "SMC: automatic fallback to TCP"
+	default y
+	help
+	  Allow automatic fallback to TCP accroding to the pressure of SMC-R
+	  handshake process.
+
+	  If that's not what you except or unsure, say N.
+endif
