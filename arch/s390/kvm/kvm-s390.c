@@ -32,6 +32,7 @@
 #include <linux/sched/signal.h>
 #include <linux/string.h>
 #include <linux/pgtable.h>
+#include <linux/bitfield.h>
 
 #include <asm/asm-offsets.h>
 #include <asm/lowcore.h>
@@ -2357,6 +2358,11 @@ static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 		r = -ENOTTY;
 	}
 	return r;
+}
+
+static bool access_key_invalid(u8 access_key)
+{
+	return access_key > 0xf;
 }
 
 long kvm_arch_vm_ioctl(struct file *filp,
@@ -4687,34 +4693,54 @@ static long kvm_s390_guest_mem_op(struct kvm_vcpu *vcpu,
 				  struct kvm_s390_mem_op *mop)
 {
 	void __user *uaddr = (void __user *)mop->buf;
+	u8 access_key = 0, ar = 0;
 	void *tmpbuf = NULL;
+	bool check_reserved;
 	int r = 0;
 	const u64 supported_flags = KVM_S390_MEMOP_F_INJECT_EXCEPTION
-				    | KVM_S390_MEMOP_F_CHECK_ONLY;
+				    | KVM_S390_MEMOP_F_CHECK_ONLY
+				    | KVM_S390_MEMOP_F_SKEY_PROTECTION;
 
-	if (mop->flags & ~supported_flags || mop->ar >= NUM_ACRS || !mop->size)
+	if (mop->flags & ~supported_flags || !mop->size)
 		return -EINVAL;
-
 	if (mop->size > MEM_OP_MAX_SIZE)
 		return -E2BIG;
-
 	if (kvm_s390_pv_cpu_is_protected(vcpu))
 		return -EINVAL;
-
 	if (!(mop->flags & KVM_S390_MEMOP_F_CHECK_ONLY)) {
 		tmpbuf = vmalloc(mop->size);
 		if (!tmpbuf)
 			return -ENOMEM;
 	}
+	ar = mop->ar;
+	mop->ar = 0;
+	if (ar >= NUM_ACRS)
+		return -EINVAL;
+	if (mop->flags & KVM_S390_MEMOP_F_SKEY_PROTECTION) {
+		access_key = mop->key;
+		mop->key = 0;
+		if (access_key_invalid(access_key))
+			return -EINVAL;
+	}
+	/*
+	 * Check that reserved/unused == 0, but only for extensions,
+	 * so we stay backward compatible.
+	 * This gives us more design flexibility for future extensions, i.e.
+	 * we can add functionality without adding a flag.
+	 */
+	check_reserved = mop->flags & KVM_S390_MEMOP_F_SKEY_PROTECTION;
+	if (check_reserved && memchr_inv(&mop->reserved, 0, sizeof(mop->reserved)))
+		return -EINVAL;
 
 	switch (mop->op) {
 	case KVM_S390_MEMOP_LOGICAL_READ:
 		if (mop->flags & KVM_S390_MEMOP_F_CHECK_ONLY) {
-			r = check_gva_range(vcpu, mop->gaddr, mop->ar,
-					    mop->size, GACC_FETCH, 0);
+			r = check_gva_range(vcpu, mop->gaddr, ar, mop->size,
+					    GACC_FETCH, access_key);
 			break;
 		}
-		r = read_guest(vcpu, mop->gaddr, mop->ar, tmpbuf, mop->size);
+		r = read_guest_with_key(vcpu, mop->gaddr, ar, tmpbuf,
+					mop->size, access_key);
 		if (r == 0) {
 			if (copy_to_user(uaddr, tmpbuf, mop->size))
 				r = -EFAULT;
@@ -4722,15 +4748,16 @@ static long kvm_s390_guest_mem_op(struct kvm_vcpu *vcpu,
 		break;
 	case KVM_S390_MEMOP_LOGICAL_WRITE:
 		if (mop->flags & KVM_S390_MEMOP_F_CHECK_ONLY) {
-			r = check_gva_range(vcpu, mop->gaddr, mop->ar,
-					    mop->size, GACC_STORE, 0);
+			r = check_gva_range(vcpu, mop->gaddr, ar, mop->size,
+					    GACC_STORE, access_key);
 			break;
 		}
 		if (copy_from_user(tmpbuf, uaddr, mop->size)) {
 			r = -EFAULT;
 			break;
 		}
-		r = write_guest(vcpu, mop->gaddr, mop->ar, tmpbuf, mop->size);
+		r = write_guest_with_key(vcpu, mop->gaddr, ar, tmpbuf,
+					 mop->size, access_key);
 		break;
 	}
 
