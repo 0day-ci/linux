@@ -351,6 +351,8 @@ static const struct snd_kcontrol_new nau8822_snd_controls[] = {
 		NAU8822_REG_LHP_VOLUME,
 		NAU8822_REG_RHP_VOLUME,	0, 63, 0, spk_tlv),
 
+	SOC_SINGLE("Speaker RInversion Switch",
+		NAU8822_REG_RIGHT_SPEAKER_CONTROL, 4, 1, 0),
 	SOC_DOUBLE_R("Speaker ZC Switch",
 		NAU8822_REG_LSPKOUT_VOLUME,
 		NAU8822_REG_RSPKOUT_VOLUME, 7, 1, 0),
