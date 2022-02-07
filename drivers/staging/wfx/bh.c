@@ -305,7 +305,7 @@ void wfx_bh_poll_irq(struct wfx_dev *wdev)
 			dev_err(wdev->dev, "time out while polling control register\n");
 			return;
 		}
-		udelay(200);
+		usleep_range(200, 200);
 	}
 	wfx_bh_request_rx(wdev);
 }
