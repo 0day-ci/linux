@@ -10,8 +10,11 @@
 #define __SOUND_SOC_INTEL_AVS_H
 
 #include <linux/device.h>
+#include <linux/firmware.h>
 #include <sound/hda_codec.h>
+#include <sound/hda_register.h>
 #include "messages.h"
+#include "registers.h"
 
 struct avs_dev;
 
@@ -22,6 +25,10 @@ struct avs_dsp_ops {
 	irqreturn_t (* const irq_handler)(int, void *);
 	irqreturn_t (* const irq_thread)(int, void *);
 	void (* const int_control)(struct avs_dev *, bool);
+	int (* const load_basefw)(struct avs_dev *, struct firmware *);
+	int (* const load_lib)(struct avs_dev *, struct firmware *, u32);
+	int (* const transfer_mods)(struct avs_dev *, bool,
+				    struct avs_module_entry *, u32);
 };
 
 #define avs_dsp_op(adev, op, ...) \
@@ -35,6 +42,7 @@ struct avs_spec {
 	const char *name;
 
 	const struct avs_dsp_ops *const dops;
+	struct avs_fw_version min_fw_version; /* anything below is rejected */
 
 	const u32 core_init_mask;	/* used during DSP boot */
 	const u64 attributes;		/* bitmask of AVS_PLATATTR_* */
@@ -75,6 +83,7 @@ struct avs_dev {
 	struct ida ppl_ida;
 	struct list_head fw_list;
 	int *core_refs;
+	char **lib_names;
 
 	struct completion fw_ready;
 };
@@ -192,5 +201,14 @@ void avs_dsp_delete_module(struct avs_dev *adev, u16 module_id, u16 instance_id,
 int avs_dsp_create_pipeline(struct avs_dev *adev, u16 req_size, u8 priority,
 			    bool lp, u16 attributes, u8 *instance_id);
 int avs_dsp_delete_pipeline(struct avs_dev *adev, u8 instance_id);
+
+/* Firmware loading */
+
+void avs_hda_clock_gating_enable(struct avs_dev *adev, bool enable);
+void avs_hda_power_gating_enable(struct avs_dev *adev, bool enable);
+void avs_hda_l1sen_enable(struct avs_dev *adev, bool enable);
+
+int avs_dsp_boot_firmware(struct avs_dev *adev, bool purge);
+int avs_dsp_first_boot_firmware(struct avs_dev *adev);
 
 #endif /* __SOUND_SOC_INTEL_AVS_H */
