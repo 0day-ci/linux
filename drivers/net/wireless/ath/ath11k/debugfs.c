@@ -1107,6 +1107,160 @@ static const struct file_operations fops_simulate_radar = {
 	.open = simple_open
 };
 
+static const char *ath11k_memtype2string(u32 mem_type)
+{
+	const char * const mem_type_str[] = {
+		[QMI_ALLOCRAM_HRAM_ARENA] = "hram",
+		[QMI_ALLOCRAM_HCRAM_ARENA] = "hcram",
+		[QMI_ALLOCRAM_HREMOTE_ARENA] = "hremote",
+		[QMI_ALLOCRAM_HCREMOTE_ARENA] = "hcremote",
+		[QMI_ALLOCRAM_REMOTE_ARENA] = "remote",
+		[QMI_ALLOCRAM_SRAM_ARENA] = "sram",
+		[QMI_ALLOCRAM_SRAM_AUX_ARENA] = "sram_aux",
+		[QMI_ALLOCRAM_PAGEABLE_ARENA] = "pageable",
+		[QMI_ALLOCRAM_CMEM_ARENA] = "cmem",
+		[QMI_ALLOCRAM_TRAM_ARENA] = "tram",
+		[QMI_ALLOCRAM_HWIO_ARENA] = "hwio",
+		[QMI_ALLOCRAM_CALDB_ARENA] = "caldb",
+		[QMI_ALLOCRAM_M3_ARENA] = "m3_arena",
+		[QMI_ALLOCRAM_ETMREMOTE_ARENA] = "etm_remote",
+		[QMI_ALLOCRAM_EMUPHY_ARENA] = "emu_phy",
+	};
+
+	if (mem_type < ARRAY_SIZE(mem_type_str))
+		return mem_type_str[mem_type];
+
+	return NULL;
+}
+
+static ssize_t ath11k_read_reg_addr(struct file *file,
+				    char __user *user_buf,
+				    size_t count, loff_t *ppos)
+{
+	struct ath11k *ar = file->private_data;
+	u8 buf[64];
+	size_t len = 0;
+	u32 mem_type, mem_offset;
+
+	mutex_lock(&ar->conf_mutex);
+	mem_type = ar->debug.mem_type;
+	mem_offset = ar->debug.mem_offset;
+	mutex_unlock(&ar->conf_mutex);
+
+	len += scnprintf(buf + len, sizeof(buf) - len, "0x%x 0x%x\n",
+			 mem_type, mem_offset);
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t ath11k_write_reg_addr(struct file *file,
+				     const char __user *user_buf,
+				     size_t count, loff_t *ppos)
+{
+	struct ath11k *ar = file->private_data;
+	struct ath11k_base *ab = ar->ab;
+	char buf[64] = {0};
+	ssize_t ret;
+	int rc;
+	u32 mem_type, mem_offset;
+	char sep[] = " ";
+	char *token, *cur;
+	const char *mem_type_str;
+
+	if (*ppos != 0 || count >= sizeof(buf) || count == 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, user_buf, count);
+	if (ret < 0)
+		goto out;
+
+	/* drop the possible '\n' from the end */
+	if (buf[*ppos - 1] == '\n')
+		buf[*ppos - 1] = '\0';
+
+	ath11k_dbg(ab, ATH11K_DBG_QMI, "%s: %s\n", __func__, buf);
+	ret = count;
+	cur = buf;
+
+	token = strsep(&cur, sep);
+	rc = kstrtou32(token, 0, &mem_type);
+	if (rc) {
+		ath11k_warn(ab, "%s convert error: mem_type %s\n", __func__, token);
+		ret = -EFAULT;
+		goto out;
+	}
+
+	mem_type_str = ath11k_memtype2string(mem_type);
+	if (!mem_type_str) {
+		ath11k_warn(ab, "%s invalid mem type value %d\n", __func__, mem_type);
+		ret = -EINVAL;
+		goto out;
+	}
+	ath11k_dbg(ab, ATH11K_DBG_QMI, "%s mem_type %d %s\n",
+		   __func__, mem_type, mem_type_str);
+
+	token = strim(cur);
+	rc = kstrtou32(token, 0, &mem_offset);
+	if (rc) {
+		ath11k_warn(ab, "%s convert error: mem_offset %s\n", __func__, token);
+		ret = -EFAULT;
+		goto out;
+	}
+
+	mutex_lock(&ar->conf_mutex);
+	ar->debug.mem_type = mem_type;
+	ar->debug.mem_offset = mem_offset;
+	mutex_unlock(&ar->conf_mutex);
+
+out:
+	return ret;
+}
+
+static const struct file_operations fops_reg_addr = {
+	.read = ath11k_read_reg_addr,
+	.write = ath11k_write_reg_addr,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+static ssize_t ath11k_read_reg_value(struct file *file,
+				     char __user *user_buf,
+				     size_t count, loff_t *ppos)
+{
+	struct ath11k *ar = file->private_data;
+	struct ath11k_base *ab = ar->ab;
+	u8 buf[64];
+	size_t len = 0;
+	int ret_read;
+	u32 reg_value;
+
+	if (ar->debug.mem_type >= QMI_ALLOCRAM_ARENA_MAX) {
+		ath11k_warn(ab, "%s mem type error %d\n", __func__, ar->debug.mem_type);
+		return -EINVAL;
+	}
+
+	ret_read = ath11k_qmi_wlanfw_athdiag_read_send(ab, ar->debug.mem_type,
+						       ar->debug.mem_offset, &reg_value);
+	if (ret_read < 0)
+		len += scnprintf(buf + len, sizeof(buf) - len,
+				 "failed to read reg, err=%d\n", ret_read);
+	else
+		len += scnprintf(buf + len, sizeof(buf) - len, "0x%x\n", reg_value);
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static const struct file_operations fops_reg_value = {
+	.read = ath11k_read_reg_value,
+	.write = NULL,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 int ath11k_debugfs_register(struct ath11k *ar)
 {
 	struct ath11k_base *ab = ar->ab;
@@ -1144,6 +1298,21 @@ int ath11k_debugfs_register(struct ath11k *ar)
 		debugfs_create_bool("dfs_block_radar_events", 0200,
 				    ar->debug.debugfs_pdev,
 				    &ar->dfs_block_radar_events);
+	}
+
+	switch (ab->hw_rev) {
+	case ATH11K_HW_WCN6855_HW20:
+		debugfs_create_file("reg_addr", 0600,
+				    ar->debug.debugfs_pdev, ar,
+				    &fops_reg_addr);
+		debugfs_create_file("reg_value", 0400,
+				    ar->debug.debugfs_pdev, ar,
+				    &fops_reg_value);
+		break;
+	default:
+		ath11k_warn(ab, "reg_addr debugfs not support hardware: %d\n",
+			    ab->hw_rev);
+		break;
 	}
 
 	return 0;

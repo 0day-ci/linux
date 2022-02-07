@@ -454,6 +454,8 @@ struct ath11k_debug {
 	u32 pktlog_peer_valid;
 	u8 pktlog_peer_addr[ETH_ALEN];
 	u32 rx_filter;
+	enum qmi_allocram_arena mem_type;
+	u32 mem_offset;
 };
 
 struct ath11k_per_peer_tx_stats {

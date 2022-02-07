@@ -181,6 +181,43 @@ struct qmi_wlanfw_host_cap_resp_msg_v01 {
 	struct qmi_response_type_v01 resp;
 };
 
+#define QMI_WLANFW_MAX_ATHDIAG_DATA_SIZE_V01	512
+#define QMI_WLANFW_ATHDIAG_READ_REQ_V01	0x0030
+#define QMI_WLANFW_ATHDIAG_READ_RESP_V01	0x0030
+#define QMI_WLANFW_ATHDIAG_READ_REQ_MSG_V01_MAX_LEN	21
+
+enum qmi_allocram_arena {
+	QMI_ALLOCRAM_HRAM_ARENA,
+	QMI_ALLOCRAM_HCRAM_ARENA,
+	QMI_ALLOCRAM_HREMOTE_ARENA,
+	QMI_ALLOCRAM_HCREMOTE_ARENA,
+	QMI_ALLOCRAM_REMOTE_ARENA,
+	QMI_ALLOCRAM_SRAM_ARENA,
+	QMI_ALLOCRAM_SRAM_AUX_ARENA,
+	QMI_ALLOCRAM_PAGEABLE_ARENA,
+	QMI_ALLOCRAM_CMEM_ARENA,
+	QMI_ALLOCRAM_TRAM_ARENA,
+	QMI_ALLOCRAM_HWIO_ARENA,
+	QMI_ALLOCRAM_CALDB_ARENA,
+	QMI_ALLOCRAM_M3_ARENA,
+	QMI_ALLOCRAM_ETMREMOTE_ARENA,
+	QMI_ALLOCRAM_EMUPHY_ARENA,
+	QMI_ALLOCRAM_ARENA_MAX,
+};
+
+struct qmi_wlanfw_athdiag_read_req_msg_v01 {
+	u32 mem_offset;
+	u32 mem_type;
+	u32 data_len;
+};
+
+struct qmi_wlanfw_athdiag_read_resp_msg_v01 {
+	struct qmi_response_type_v01 resp;
+	u8 data_valid;
+	u32 data_len;
+	u8 data[QMI_WLANFW_MAX_ATHDIAG_DATA_SIZE_V01];
+};
+
 #define QMI_WLANFW_IND_REGISTER_REQ_MSG_V01_MAX_LEN		54
 #define QMI_WLANFW_IND_REGISTER_REQ_V01				0x0020
 #define QMI_WLANFW_IND_REGISTER_RESP_MSG_V01_MAX_LEN		18
@@ -492,5 +529,7 @@ void ath11k_qmi_event_work(struct work_struct *work);
 void ath11k_qmi_msg_recv_work(struct work_struct *work);
 void ath11k_qmi_deinit_service(struct ath11k_base *ab);
 int ath11k_qmi_init_service(struct ath11k_base *ab);
+int ath11k_qmi_wlanfw_athdiag_read_send(struct ath11k_base *ab, u32 mem_type,
+					u32 offset, u32 *out);
 
 #endif
