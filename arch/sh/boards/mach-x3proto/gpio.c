@@ -91,7 +91,7 @@ static int x3proto_gpio_irq_map(struct irq_domain *domain, unsigned int virq,
 	return 0;
 }
 
-static struct irq_domain_ops x3proto_gpio_irq_ops = {
+static const struct irq_domain_ops x3proto_gpio_irq_ops = {
 	.map	= x3proto_gpio_irq_map,
 	.xlate	= irq_domain_xlate_twocell,
 };
