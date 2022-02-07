@@ -3276,6 +3276,30 @@ struct drm_i915_gem_create_ext_protected_content {
 	__u32 flags;
 };
 
+/**
+ * DOC: GuC HWCONFIG blob uAPI
+ *
+ * The GuC produces a blob with information about the current device.
+ * i915 reads this blob from GuC and makes it available via this uAPI.
+ *
+ * The returned blob is an array of items described by struct
+ * drm_i915_query_hwconfig_blob_item. The
+ * drm_i915_query_hwconfig_blob_item length field gives the length of
+ * the drm_i915_query_hwconfig_blob_item data[] array for the item.
+ *
+ * The length of the query data returned by
+ * DRM_I915_QUERY_HWCONFIG_BLOB will align with the end at the final
+ * drm_i915_query_hwconfig_blob_item entry.
+ *
+ * The meaning of the key field and the data values are documented in
+ * the Programmer's Reference Manual.
+ */
+struct drm_i915_query_hwconfig_blob_item {
+	u32 key;
+	u32 length;
+	u32 data[];
+};
+
 /* ID of the protected content session managed by i915 when PXP is active */
 #define I915_PROTECTED_CONTENT_DEFAULT_SESSION 0xf
 
