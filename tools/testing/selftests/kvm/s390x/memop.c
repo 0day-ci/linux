@@ -306,6 +306,7 @@ int main(int argc, char *argv[])
 	struct kvm_vm *vm;
 	struct kvm_run *run;
 	struct kvm_s390_mem_op ksmo;
+	bool has_skey_ext;
 	vm_vaddr_t guest_mem1;
 	vm_vaddr_t guest_mem2;
 	vm_paddr_t guest_mem1_abs;
@@ -320,6 +321,9 @@ int main(int argc, char *argv[])
 	}
 	if (maxsize > sizeof(mem1))
 		maxsize = sizeof(mem1);
+	has_skey_ext = kvm_check_cap(KVM_CAP_S390_MEM_OP_EXTENSION);
+	if (!has_skey_ext)
+		print_skip("Storage key extension not supported");
 
 	/* Create VM */
 	vm = vm_create_default(VCPU_ID, 0, guest_code);
@@ -340,7 +344,7 @@ int main(int argc, char *argv[])
 	TEST_ASSERT(!memcmp(mem1, mem2, maxsize),
 		    "Memory contents do not match!");
 
-	{
+	if (has_skey_ext) {
 		vm_vaddr_t guest_0_page = vm_vaddr_alloc(vm, PAGE_SIZE, 0);
 		vm_vaddr_t guest_last_page = vm_vaddr_alloc(vm, PAGE_SIZE, last_page_addr);
 		vm_paddr_t guest_mem2_abs = addr_gva2gpa(vm, guest_mem2);
@@ -513,6 +517,14 @@ int main(int argc, char *argv[])
 		TEST_ASSERT(rv != 0, "Fetch should result in exception");
 		rv = _vm_read_guest_key(vm, mem2, addr_gva2gpa(vm, 0), 2048, 2);
 		TEST_ASSERT(rv == 4, "Fetch should result in protection exception");
+	} else {
+		struct ucall uc;
+
+		do {
+			vcpu_run(vm, VCPU_ID);
+			get_ucall(vm, VCPU_ID, &uc);
+			ASSERT_EQ(uc.cmd, UCALL_SYNC);
+		} while (uc.args[1] < 100);
 	}
 
 	/* Check error conditions */
