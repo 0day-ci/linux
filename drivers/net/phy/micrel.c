@@ -535,6 +535,34 @@ static int ksz8081_read_status(struct phy_device *phydev)
 	return genphy_read_status(phydev);
 }
 
+static int ksz8081_ksz9897_match_phy_device(struct phy_device *phydev,
+					    const bool ksz_8081)
+{
+	int ret;
+
+	if ((phydev->phy_id & MICREL_PHY_ID_MASK) != PHY_ID_KSZ8081)
+		return 0;
+
+	ret = phy_read(phydev, MICREL_KSZ8081_CTRL2);
+	if (ret < 0)
+		return ret;
+
+	/* KSZ8081A3/KSZ8091R1 PHY and KSZ9897 switch share the same
+	 * exact PHY ID. However, they can be told apart by the default value
+	 * of the LED mode. It is 0 for the PHY, and 1 for the switch.
+	 */
+	ret &= (MICREL_KSZ8081_CTRL2_LED_MODE0 | MICREL_KSZ8081_CTRL2_LED_MODE1);
+	if (!ksz_8081)
+		return ret;
+	else
+		return !ret;
+}
+
+static int ksz8081_match_phy_device(struct phy_device *phydev)
+{
+	return ksz8081_ksz9897_match_phy_device(phydev, true);
+}
+
 static int ksz8061_config_init(struct phy_device *phydev)
 {
 	int ret;
@@ -1574,6 +1602,11 @@ static int ksz886x_cable_test_get_status(struct phy_device *phydev,
 	return ret;
 }
 
+static int ksz9897_match_phy_device(struct phy_device *phydev)
+{
+	return ksz8081_ksz9897_match_phy_device(phydev, false);
+}
+
 #define LAN_EXT_PAGE_ACCESS_CONTROL			0x16
 #define LAN_EXT_PAGE_ACCESS_ADDRESS_DATA		0x17
 #define LAN_EXT_PAGE_ACCESS_CTRL_EP_FUNC		0x4000
@@ -1830,6 +1863,7 @@ static struct phy_driver ksphy_driver[] = {
 	.config_init	= ksz8081_config_init,
 	.soft_reset	= genphy_soft_reset,
 	.config_aneg	= ksz8081_config_aneg,
+	.match_phy_device = ksz8081_match_phy_device,
 	.read_status	= ksz8081_read_status,
 	.config_intr	= kszphy_config_intr,
 	.handle_interrupt = kszphy_handle_interrupt,
@@ -1966,6 +2000,17 @@ static struct phy_driver ksphy_driver[] = {
 	.name		= "Microchip KSZ9477",
 	/* PHY_GBIT_FEATURES */
 	.config_init	= kszphy_config_init,
+	.suspend	= genphy_suspend,
+	.resume		= genphy_resume,
+}, {
+	.phy_id		= PHY_ID_KSZ9897,
+	.phy_id_mask	= 0x00ffffff,
+	.name		= "Microchip KSZ9897",
+	/* PHY_BASIC_FEATURES */
+	.config_init	= kszphy_config_init,
+	.config_aneg	= ksz8873mll_config_aneg,
+	.match_phy_device = ksz9897_match_phy_device,
+	.read_status	= ksz8873mll_read_status,
 	.suspend	= genphy_suspend,
 	.resume		= genphy_resume,
 } };

@@ -36,6 +36,7 @@
 #define PHY_ID_KSZ87XX		0x00221550
 
 #define	PHY_ID_KSZ9477		0x00221631
+#define	PHY_ID_KSZ9897		0x00221561
 
 /* struct phy_device dev_flags definitions */
 #define MICREL_PHY_50MHZ_CLK	0x00000001
@@ -61,5 +62,9 @@
 #define KSZ886X_BMCR_DISABLE_LED		BIT(0)
 
 #define KSZ886X_CTRL_MDIX_STAT			BIT(4)
+
+#define MICREL_KSZ8081_CTRL2	0x1F
+#define MICREL_KSZ8081_CTRL2_LED_MODE0	BIT(4)
+#define MICREL_KSZ8081_CTRL2_LED_MODE1	BIT(5)
 
 #endif /* _MICREL_PHY_H */
