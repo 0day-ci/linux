@@ -72,11 +72,37 @@
 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
 	};
 
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		scmi_shmem: memory@d0000000 {
+			compatible = "arm,scmi-shmem";
+			reg = <0 0xd0000000 0 0x400000>; /* 4 MiB */
+			no-map;
+		};
+	};
+
 	firmware {
 		psci {
 			compatible = "arm,psci-1.0";
 			method = "smc";
 		};
+
+		scmi {
+			compatible = "arm,scmi-smc";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			shmem = <&scmi_shmem>;
+			arm,smc-id = <0xc20000fe>;
+
+			scmi_clks: protocol@14 {
+				reg = <0x14>;
+				#clock-cells = <1>;
+			};
+		};
+
 	};
 
 	soc {
