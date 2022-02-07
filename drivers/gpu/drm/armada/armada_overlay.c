@@ -325,8 +325,6 @@ static void armada_overlay_reset(struct drm_plane *plane)
 		state->contrast = DEFAULT_CONTRAST;
 		state->saturation = DEFAULT_SATURATION;
 		__drm_atomic_helper_plane_reset(plane, &state->base.base);
-		state->base.base.color_encoding = DEFAULT_ENCODING;
-		state->base.base.color_range = DRM_COLOR_YCBCR_LIMITED_RANGE;
 	}
 }
 
