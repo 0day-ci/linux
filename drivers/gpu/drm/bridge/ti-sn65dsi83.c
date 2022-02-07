@@ -644,8 +644,7 @@ static int sn65dsi83_host_attach(struct sn65dsi83 *ctx)
 
 	host = of_find_mipi_dsi_host_by_node(ctx->host_node);
 	if (!host) {
-		dev_err(dev, "failed to find dsi host\n");
-		return -EPROBE_DEFER;
+		return dev_err_probe(dev, -EPROBE_DEFER, "failed to find dsi host\n");
 	}
 
 	dsi = devm_mipi_dsi_device_register_full(dev, host, &info);
