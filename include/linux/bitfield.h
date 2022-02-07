@@ -19,6 +19,9 @@
  *
  * Example:
  *
+ *  #include <bitfield.h>
+ *  #include <bits.h>
+ *
  *  #define REG_FIELD_A  GENMASK(6, 0)
  *  #define REG_FIELD_B  BIT(7)
  *  #define REG_FIELD_C  GENMASK(15, 8)
