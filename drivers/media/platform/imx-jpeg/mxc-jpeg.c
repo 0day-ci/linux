@@ -948,7 +948,6 @@ static void mxc_jpeg_device_run(void *priv)
 
 	jpeg_src_buf = vb2_to_mxc_buf(&src_buf->vb2_buf);
 	if (jpeg_src_buf->jpeg_parse_error) {
-		jpeg->slot_data[ctx->slot].used = false;
 		v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
 		v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
 		v4l2_m2m_buf_done(src_buf, VB2_BUF_STATE_ERROR);
