@@ -141,6 +141,31 @@ Description:
 		- "reverse": CC2 orientation
 		- "unknown": Orientation cannot be determined.
 
+What:		/sys/class/typec/<port>/limit_src_current_active
+Date:		February 2022
+Contact:	Badhri Jagan Sridharan <badhri@google.com>
+Description:
+		This attribute can be used to make the port only publish
+		vSafe5V fixed pdo with Maximum current limited to the
+		current limit set by limit_src_current_ma when the port
+		is acting as source.
+		Valid values:
+		- write(2) "1" limits source capabilities to vSafe5V
+		  with max current specified by limit_src_current_ma
+		- write(2) "0" publishes the default source capabilities
+		  of the port.
+
+What:		/sys/class/typec/<port>/limit_src_current_ma
+Date:		February 2022
+Contact:	Badhri Jagan Sridharan <badhri@google.com>
+Description:
+		This attribute allows write(2) to set the Maximum
+		current published when limit_src_current_active is set
+		to 1. When limit_src_current_active is already set
+		to 1, if the port is already acting as source with
+		explicit contract in place, write(2) will make the port
+		renegotiate the pd contract.
+
 USB Type-C partner devices (eg. /sys/class/typec/port0-partner/)
 
 What:		/sys/class/typec/<port>-partner/accessory_mode

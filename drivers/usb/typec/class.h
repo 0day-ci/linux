@@ -54,6 +54,11 @@ struct typec_port {
 
 	const struct typec_capability	*cap;
 	const struct typec_operations   *ops;
+
+	/* lock to protect limit_src_current_*_store operation */
+	struct mutex			limit_src_current_lock;
+	u32				limit_src_current_ma;
+	bool				limit_src_current_active;
 };
 
 #define to_typec_port(_dev_) container_of(_dev_, struct typec_port, dev)

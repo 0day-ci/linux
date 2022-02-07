@@ -213,6 +213,8 @@ struct typec_partner_desc {
  * @pr_set: Set Power Role
  * @vconn_set: Source VCONN
  * @port_type_set: Set port type
+ * @limit_src_current_set: Used to limit source current advertisement while
+ *                         acting as source
  */
 struct typec_operations {
 	int (*try_role)(struct typec_port *port, int role);
@@ -221,6 +223,8 @@ struct typec_operations {
 	int (*vconn_set)(struct typec_port *port, enum typec_role role);
 	int (*port_type_set)(struct typec_port *port,
 			     enum typec_port_type type);
+	int (*limit_src_current_set)(struct typec_port *port, u32 limit_src_current_ma,
+				     bool enable);
 };
 
 enum usb_pd_svdm_ver {

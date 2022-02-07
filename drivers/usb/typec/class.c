@@ -1403,6 +1403,102 @@ port_type_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(port_type);
 
+static ssize_t
+limit_src_current_active_store(struct device *dev, struct device_attribute *attr, const char *buf,
+			       size_t size)
+{
+	struct typec_port *port = to_typec_port(dev);
+	int ret;
+	u8 active;
+
+	if (port->cap->type == TYPEC_PORT_SNK || !port->ops || !port->ops->limit_src_current_set ||
+	    !port->cap->pd_revision) {
+		dev_dbg(dev, "Limiting source current not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (kstrtou8(buf, 0, &active))
+		return -EINVAL;
+
+	if (active != 1 && active != 0)
+		return -EINVAL;
+
+	mutex_lock(&port->limit_src_current_lock);
+
+	if (port->limit_src_current_active == (bool)active) {
+		ret = size;
+		goto unlock_and_ret;
+	}
+
+	ret = port->ops->limit_src_current_set(port, port->limit_src_current_ma, active);
+	if (ret)
+		goto unlock_and_ret;
+
+	port->limit_src_current_active = active;
+	ret = size;
+
+unlock_and_ret:
+	mutex_unlock(&port->limit_src_current_lock);
+	return ret;
+}
+
+static ssize_t
+limit_src_current_active_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	return sysfs_emit(buf, "%d\n", port->limit_src_current_active ? 1 : 0);
+}
+static DEVICE_ATTR_RW(limit_src_current_active);
+
+static ssize_t
+limit_src_current_ma_store(struct device *dev, struct device_attribute *attr, const char *buf,
+			   size_t size)
+{
+	struct typec_port *port = to_typec_port(dev);
+	int ret;
+	u32 src_current_ma;
+
+	if (port->cap->type == TYPEC_PORT_SNK || !port->ops || !port->ops->limit_src_current_set ||
+	    !port->cap->pd_revision) {
+		dev_dbg(dev, "Limiting source current not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (kstrtou32(buf, 0, &src_current_ma))
+		return -EINVAL;
+
+	mutex_lock(&port->limit_src_current_lock);
+
+	if (port->limit_src_current_ma == src_current_ma) {
+		ret = size;
+		goto unlock_and_ret;
+	}
+
+	if (port->limit_src_current_active) {
+		ret = port->ops->limit_src_current_set(port, src_current_ma,
+						       port->limit_src_current_active);
+		if (ret)
+			goto unlock_and_ret;
+	}
+
+	port->limit_src_current_ma = src_current_ma;
+	ret = size;
+
+unlock_and_ret:
+	mutex_unlock(&port->limit_src_current_lock);
+	return ret;
+}
+
+static ssize_t
+limit_src_current_ma_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	return sysfs_emit(buf, "%u\n", port->limit_src_current_ma);
+}
+static DEVICE_ATTR_RW(limit_src_current_ma);
+
 static const char * const typec_pwr_opmodes[] = {
 	[TYPEC_PWR_MODE_USB]	= "default",
 	[TYPEC_PWR_MODE_1_5A]	= "1.5A",
@@ -1536,6 +1632,8 @@ static struct attribute *typec_attrs[] = {
 	&dev_attr_vconn_source.attr,
 	&dev_attr_port_type.attr,
 	&dev_attr_orientation.attr,
+	&dev_attr_limit_src_current_active.attr,
+	&dev_attr_limit_src_current_ma.attr,
 	NULL,
 };
 
@@ -2039,6 +2137,7 @@ struct typec_port *typec_register_port(struct device *parent,
 
 	ida_init(&port->mode_ids);
 	mutex_init(&port->port_type_lock);
+	mutex_init(&port->limit_src_current_lock);
 
 	port->id = id;
 	port->ops = cap->ops;
