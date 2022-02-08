@@ -1625,25 +1625,47 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 	return scsi_cmd_to_driver(cmd)->init_command(cmd);
 }
 
-void scsi_done(struct scsi_cmnd *cmd)
+static bool __scsi_done(struct scsi_cmnd *cmd)
 {
 	switch (cmd->submitter) {
 	case SUBMITTED_BY_BLOCK_LAYER:
-		break;
+		return false;
 	case SUBMITTED_BY_SCSI_ERROR_HANDLER:
-		return scsi_eh_done(cmd);
+		scsi_eh_done(cmd);
+		return true;
 	case SUBMITTED_BY_SCSI_RESET_IOCTL:
-		return;
+		return true;
 	}
 
 	if (unlikely(blk_should_fake_timeout(scsi_cmd_to_rq(cmd)->q)))
-		return;
+		return true;
 	if (unlikely(test_and_set_bit(SCMD_STATE_COMPLETE, &cmd->state)))
+		return true;
+	return false;
+}
+
+void scsi_done(struct scsi_cmnd *cmd)
+{
+	if (__scsi_done(cmd))
 		return;
+
 	trace_scsi_dispatch_cmd_done(cmd);
 	blk_mq_complete_request(scsi_cmd_to_rq(cmd));
 }
 EXPORT_SYMBOL(scsi_done);
+
+/* Complete cmds directly, useful in preemptible instead of an interrupt. */
+void scsi_done_direct(struct scsi_cmnd *cmd)
+{
+	struct request *rq = scsi_cmd_to_rq(cmd);
+
+	if (__scsi_done(cmd))
+		return;
+
+	trace_scsi_dispatch_cmd_done(cmd);
+	blk_mq_complete_request_direct(rq, rq->q->mq_ops->complete);
+}
+EXPORT_SYMBOL(scsi_done_direct);
 
 static void scsi_mq_put_budget(struct request_queue *q, int budget_token)
 {
