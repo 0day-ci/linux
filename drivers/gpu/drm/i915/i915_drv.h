@@ -532,6 +532,7 @@ struct intel_vbt_data {
 	int lvds_ssc_freq;
 	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
 	enum drm_panel_orientation orientation;
+	bool override_afc_startup_bit;
 
 	enum drrs_support_type drrs_type;
 

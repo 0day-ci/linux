@@ -218,7 +218,11 @@ struct intel_dpll_hw_state {
 	u32 mg_refclkin_ctl;
 	u32 mg_clktop2_coreclkctl1;
 	u32 mg_clktop2_hsclkctl;
-	u32 mg_pll_div0;
+	/* tgl+ */
+	union {
+		u32 div0;
+		u32 mg_pll_div0;
+	};
 	u32 mg_pll_div1;
 	u32 mg_pll_lf;
 	u32 mg_pll_frac_lock;
