@@ -267,7 +267,8 @@ static int cert_sig_digest_update(const struct public_key_signature *sig,
 	if (ret)
 		return ret;
 
-	tfm = crypto_alloc_shash(sig->hash_algo, 0, 0);
+	/* SM2 signatures always use the SM3 hash algorithm */
+	tfm = crypto_alloc_shash("sm3", 0, 0);
 	if (IS_ERR(tfm))
 		return PTR_ERR(tfm);
 
@@ -358,8 +359,7 @@ int public_key_verify_signature(const struct public_key *pkey,
 	if (ret)
 		goto error_free_key;
 
-	if (sig->pkey_algo && strcmp(sig->pkey_algo, "sm2") == 0 &&
-	    sig->data_size) {
+	if (strcmp(pkey->pkey_algo, "sm2") == 0 && sig->data_size) {
 		ret = cert_sig_digest_update(sig, tfm);
 		if (ret)
 			goto error_free_key;
