@@ -262,6 +262,16 @@ struct WD33C93_hostdata {
 #endif
     };
 
+struct WD33C93_cmd {
+	struct scsi_pointer scsi_pointer;
+};
+
+static inline struct scsi_pointer *WD33C93_scsi_pointer(struct scsi_cmnd *cmd)
+{
+	struct WD33C93_cmd *wcmd = scsi_cmd_priv(cmd);
+
+	return &wcmd->scsi_pointer;
+}
 
 /* defines for hostdata->chip */
 
