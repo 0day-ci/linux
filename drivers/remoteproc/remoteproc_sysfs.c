@@ -241,7 +241,7 @@ static ssize_t kick_store(struct device *dev,
 	size_t cpy_len;
 
 	(void)attr;
-	cpy_len = count <= sizeof(id) ? count : sizeof(id);
+	cpy_len = min(count, sizeof(id));
 	memcpy((char *)(&id), buf, cpy_len);
 
 	if (rproc->ops->kick)
