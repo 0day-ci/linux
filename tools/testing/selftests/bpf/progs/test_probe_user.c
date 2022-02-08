@@ -14,18 +14,12 @@ static struct sockaddr_in old;
 SEC("kprobe/" SYS_PREFIX "sys_connect")
 int BPF_KPROBE(handle_sys_connect)
 {
-#if SYSCALL_WRAPPER == 1
 	struct pt_regs *real_regs;
-#endif
 	struct sockaddr_in new;
 	void *ptr;
 
-#if SYSCALL_WRAPPER == 0
-	ptr = (void *)PT_REGS_PARM2(ctx);
-#else
-	real_regs = (struct pt_regs *)PT_REGS_PARM1(ctx);
+	real_regs = PT_REGS_SYSCALL_REGS(ctx);
 	bpf_probe_read_kernel(&ptr, sizeof(ptr), &PT_REGS_PARM2(real_regs));
-#endif
 
 	bpf_probe_read_user(&old, sizeof(old), ptr);
 	__builtin_memset(&new, 0xab, sizeof(new));
