@@ -333,8 +333,10 @@ drm_buddy_alloc_blocks(struct drm_buddy *mm, unsigned int order)
 	return block;
 
 out_free:
-	if (i != order)
+	if (i != order) {
+		list_del(&block->link);
 		__drm_buddy_free(mm, block);
+	}
 	return ERR_PTR(err);
 }
 EXPORT_SYMBOL(drm_buddy_alloc_blocks);
@@ -452,8 +454,10 @@ err_undo:
 	buddy = get_buddy(block);
 	if (buddy &&
 	    (drm_buddy_block_is_free(block) &&
-	     drm_buddy_block_is_free(buddy)))
+	     drm_buddy_block_is_free(buddy))) {
+		list_del(&block->link);
 		__drm_buddy_free(mm, block);
+	}
 
 err_free:
 	drm_buddy_free_list(mm, &allocated);
