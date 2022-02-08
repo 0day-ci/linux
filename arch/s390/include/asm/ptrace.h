@@ -85,6 +85,10 @@ struct pt_regs {
 			unsigned long gprs[NUM_GPRS];
 		};
 	};
+	/*
+	 * orig_gpr2 is not exposed via user_pt_regs, but its location is
+	 * assumed by libbpf's tracing macros, so it should not be moved.
+	 */
 	unsigned long orig_gpr2;
 	union {
 		struct {
