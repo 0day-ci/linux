@@ -185,6 +185,10 @@ struct pt_regs {
 			u64 pstate;
 		};
 	};
+	/*
+	 * orig_x0 is not exposed via struct user_pt_regs, but its location is
+	 * assumed by libbpf's tracing macros, so it should not be moved.
+	 */
 	u64 orig_x0;
 #ifdef __AARCH64EB__
 	u32 unused2;
