@@ -114,6 +114,9 @@ enum tcpm_transmit_type {
  *              Optional; The USB Communications Capable bit indicates if port
  *              partner is capable of communication over the USB data lines
  *              (e.g. D+/- or SS Tx/Rx). Called to notify the status of the bit.
+ * @supported_pd_rev:
+ *              Optional; TCPM call this function to get supported PD revesion
+ *              from lower level driver.
  */
 struct tcpc_dev {
 	struct fwnode_handle *fwnode;
@@ -148,6 +151,7 @@ struct tcpc_dev {
 						 bool pps_active, u32 requested_vbus_voltage);
 	bool (*is_vbus_vsafe0v)(struct tcpc_dev *dev);
 	void (*set_partner_usb_comm_capable)(struct tcpc_dev *dev, bool enable);
+	u32 (*supported_pd_rev)(struct tcpc_dev *dev);
 };
 
 struct tcpm_port;
