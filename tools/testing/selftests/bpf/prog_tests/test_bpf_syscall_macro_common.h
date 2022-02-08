@@ -2,7 +2,6 @@
 /* Copyright 2022 Sony Group Corporation */
 #include <sys/prctl.h>
 #include <test_progs.h>
-#include "bpf_syscall_macro.skel.h"
 
 void test_bpf_syscall_macro(void)
 {
@@ -46,7 +45,13 @@ void test_bpf_syscall_macro(void)
 	ASSERT_EQ(skel->bss->arg5, exp_arg5, "syscall_arg5");
 
 	/* check whether args of syscall are copied correctly for CORE variants */
+#if defined(__BPF_SYSCALL_MACRO_KERNEL_SKEL_H__) || \
+		(!defined(__s390__) && !defined(__aarch64__) && \
+		 !defined(__i386__) && !defined(__x86_64__))
 	ASSERT_EQ(skel->bss->arg1_core, exp_arg1, "syscall_arg1_core_variant");
+#endif
+#if defined(__BPF_SYSCALL_MACRO_KERNEL_SKEL_H__) || \
+		(!defined(__i386__) && !defined(__x86_64__))
 	ASSERT_EQ(skel->bss->arg2_core, exp_arg2, "syscall_arg2_core_variant");
 	ASSERT_EQ(skel->bss->arg3_core, exp_arg3, "syscall_arg3_core_variant");
 	/* it cannot copy arg4 when uses PT_REGS_PARM4_CORE on x86_64 */
@@ -57,6 +62,7 @@ void test_bpf_syscall_macro(void)
 #endif
 	ASSERT_EQ(skel->bss->arg4_core, exp_arg4, "syscall_arg4_core_variant");
 	ASSERT_EQ(skel->bss->arg5_core, exp_arg5, "syscall_arg5_core_variant");
+#endif
 
 cleanup:
 	bpf_syscall_macro__destroy(skel);
