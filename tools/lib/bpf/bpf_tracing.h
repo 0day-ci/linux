@@ -213,8 +213,11 @@
 
 #elif defined(bpf_target_riscv)
 
-#if !defined(__KERNEL__) && !defined(__VMLINUX_H__)
+#if defined(__KERNEL__) || defined(__VMLINUX_H__)
+#define __PT_IP_REG epc
+#else
 #define __PT_REGS_CAST(x) ((const struct user_regs_struct *)(x))
+#define __PT_IP_REG pc
 #endif
 
 #define __PT_PARM1_REG a0
@@ -223,10 +226,9 @@
 #define __PT_PARM4_REG a3
 #define __PT_PARM5_REG a4
 #define __PT_RET_REG ra
-#define __PT_FP_REG fp
+#define __PT_FP_REG s0
 #define __PT_RC_REG a5
 #define __PT_SP_REG sp
-#define __PT_IP_REG epc
 
 #endif
 
