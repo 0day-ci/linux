@@ -861,6 +861,30 @@ static int dprc_remove(struct fsl_mc_device *mc_dev)
 	return 0;
 }
 
+/**
+ * dprc_shutdown - callback invoked when a DPRC should be quiesced
+ *
+ * @mc_dev: Pointer to fsl-mc device representing the DPRC
+ *
+ * Closes the DPRC device in the MC.
+ * It tears down the interrupts that were configured for the DPRC device.
+ * It destroys the interrupt pool associated with this MC bus.
+ */
+static void dprc_shutdown(struct fsl_mc_device *mc_dev)
+{
+	struct fsl_mc_bus *mc_bus = to_fsl_mc_bus(mc_dev);
+
+	if (!is_fsl_mc_bus_dprc(mc_dev))
+		return;
+
+	if (!mc_bus->irq_resources)
+		return;
+
+	dprc_cleanup(mc_dev);
+
+	dev_info(&mc_dev->dev, "DPRC device shutdown");
+}
+
 static const struct fsl_mc_device_id match_id_table[] = {
 	{
 	 .vendor = FSL_MC_VENDOR_FREESCALE,
@@ -877,6 +901,7 @@ static struct fsl_mc_driver dprc_driver = {
 	.match_id_table = match_id_table,
 	.probe = dprc_probe,
 	.remove = dprc_remove,
+	.shutdown = dprc_shutdown,
 };
 
 int __init dprc_driver_init(void)
