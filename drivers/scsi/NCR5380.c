@@ -145,40 +145,44 @@ static void bus_reset_cleanup(struct Scsi_Host *);
 
 static inline void initialize_SCp(struct scsi_cmnd *cmd)
 {
+	struct scsi_pointer *scsi_pointer = NCR5380_scsi_pointer(cmd);
+
 	/*
 	 * Initialize the Scsi Pointer field so that all of the commands in the
 	 * various queues are valid.
 	 */
 
 	if (scsi_bufflen(cmd)) {
-		cmd->SCp.buffer = scsi_sglist(cmd);
-		cmd->SCp.ptr = sg_virt(cmd->SCp.buffer);
-		cmd->SCp.this_residual = cmd->SCp.buffer->length;
+		scsi_pointer->buffer = scsi_sglist(cmd);
+		scsi_pointer->ptr = sg_virt(scsi_pointer->buffer);
+		scsi_pointer->this_residual = scsi_pointer->buffer->length;
 	} else {
-		cmd->SCp.buffer = NULL;
-		cmd->SCp.ptr = NULL;
-		cmd->SCp.this_residual = 0;
+		scsi_pointer->buffer = NULL;
+		scsi_pointer->ptr = NULL;
+		scsi_pointer->this_residual = 0;
 	}
 
-	cmd->SCp.Status = 0;
-	cmd->SCp.Message = 0;
+	scsi_pointer->Status = 0;
+	scsi_pointer->Message = 0;
 }
 
 static inline void advance_sg_buffer(struct scsi_cmnd *cmd)
 {
-	struct scatterlist *s = cmd->SCp.buffer;
+	struct scsi_pointer *scsi_pointer = NCR5380_scsi_pointer(cmd);
+	struct scatterlist *s = scsi_pointer->buffer;
 
-	if (!cmd->SCp.this_residual && s && !sg_is_last(s)) {
-		cmd->SCp.buffer = sg_next(s);
-		cmd->SCp.ptr = sg_virt(cmd->SCp.buffer);
-		cmd->SCp.this_residual = cmd->SCp.buffer->length;
+	if (!scsi_pointer->this_residual && s && !sg_is_last(s)) {
+		scsi_pointer->buffer = sg_next(s);
+		scsi_pointer->ptr = sg_virt(scsi_pointer->buffer);
+		scsi_pointer->this_residual = scsi_pointer->buffer->length;
 	}
 }
 
 static inline void set_resid_from_SCp(struct scsi_cmnd *cmd)
 {
-	int resid = cmd->SCp.this_residual;
-	struct scatterlist *s = cmd->SCp.buffer;
+	struct scsi_pointer *scsi_pointer = NCR5380_scsi_pointer(cmd);
+	int resid = scsi_pointer->this_residual;
+	struct scatterlist *s = scsi_pointer->buffer;
 
 	if (s)
 		while (!sg_is_last(s)) {
@@ -757,6 +761,7 @@ static void NCR5380_main(struct work_struct *work)
 static void NCR5380_dma_complete(struct Scsi_Host *instance)
 {
 	struct NCR5380_hostdata *hostdata = shost_priv(instance);
+	struct scsi_pointer *scsi_pointer;
 	int transferred;
 	unsigned char **data;
 	int *count;
@@ -764,7 +769,10 @@ static void NCR5380_dma_complete(struct Scsi_Host *instance)
 	unsigned char p;
 
 	if (hostdata->read_overruns) {
-		p = hostdata->connected->SCp.phase;
+		struct scsi_pointer *scsi_pointer =
+			NCR5380_scsi_pointer(hostdata->connected);
+
+		p = scsi_pointer->phase;
 		if (p & SR_IO) {
 			udelay(10);
 			if ((NCR5380_read(BUS_AND_STATUS_REG) &
@@ -801,8 +809,9 @@ static void NCR5380_dma_complete(struct Scsi_Host *instance)
 	transferred = hostdata->dma_len - NCR5380_dma_residual(hostdata);
 	hostdata->dma_len = 0;
 
-	data = (unsigned char **)&hostdata->connected->SCp.ptr;
-	count = &hostdata->connected->SCp.this_residual;
+	scsi_pointer = NCR5380_scsi_pointer(hostdata->connected);
+	data = (unsigned char **)&scsi_pointer->ptr;
+	count = &scsi_pointer->this_residual;
 	*data += transferred;
 	*count -= transferred;
 
@@ -1487,6 +1496,8 @@ static int NCR5380_transfer_dma(struct Scsi_Host *instance,
 				unsigned char **data)
 {
 	struct NCR5380_hostdata *hostdata = shost_priv(instance);
+	struct scsi_pointer *scsi_pointer =
+		NCR5380_scsi_pointer(hostdata->connected);
 	int c = *count;
 	unsigned char p = *phase;
 	unsigned char *d = *data;
@@ -1498,7 +1509,7 @@ static int NCR5380_transfer_dma(struct Scsi_Host *instance,
 		return -1;
 	}
 
-	hostdata->connected->SCp.phase = p;
+	scsi_pointer->phase = p;
 
 	if (p & SR_IO) {
 		if (hostdata->read_overruns)
@@ -1691,6 +1702,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 
 	while ((cmd = hostdata->connected)) {
 		struct NCR5380_cmd *ncmd = scsi_cmd_priv(cmd);
+		struct scsi_pointer *scsi_pointer = &ncmd->scsi_pointer;
 
 		tmp = NCR5380_read(STATUS_REG);
 		/* We only have a valid SCSI phase when REQ is asserted */
@@ -1712,10 +1724,10 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				if (count > 0) {
 					if (cmd->sc_data_direction == DMA_TO_DEVICE)
 						sun3scsi_dma_send_setup(hostdata,
-						                        cmd->SCp.ptr, count);
+						                        scsi_pointer->ptr, count);
 					else
 						sun3scsi_dma_recv_setup(hostdata,
-						                        cmd->SCp.ptr, count);
+						                        scsi_pointer->ptr, count);
 					sun3_dma_setup_done = cmd;
 				}
 #ifdef SUN3_SCSI_VME
@@ -1758,8 +1770,8 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				advance_sg_buffer(cmd);
 				dsprintk(NDEBUG_INFORMATION, instance,
 					"this residual %d, sg ents %d\n",
-					cmd->SCp.this_residual,
-					sg_nents(cmd->SCp.buffer));
+					scsi_pointer->this_residual,
+					sg_nents(scsi_pointer->buffer));
 
 				/*
 				 * The preferred transfer method is going to be
@@ -1778,7 +1790,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				if (transfersize > 0) {
 					len = transfersize;
 					if (NCR5380_transfer_dma(instance, &phase,
-					    &len, (unsigned char **)&cmd->SCp.ptr)) {
+					    &len, (unsigned char **)&scsi_pointer->ptr)) {
 						/*
 						 * If the watchdog timer fires, all future
 						 * accesses to this device will use the
@@ -1794,13 +1806,13 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 					/* Transfer a small chunk so that the
 					 * irq mode lock is not held too long.
 					 */
-					transfersize = min(cmd->SCp.this_residual,
+					transfersize = min(scsi_pointer->this_residual,
 							   NCR5380_PIO_CHUNK_SIZE);
 					len = transfersize;
 					NCR5380_transfer_pio(instance, &phase, &len,
-					                     (unsigned char **)&cmd->SCp.ptr,
+					                     (unsigned char **)&scsi_pointer->ptr,
 							     0);
-					cmd->SCp.this_residual -= transfersize - len;
+					scsi_pointer->this_residual -= transfersize - len;
 				}
 #ifdef CONFIG_SUN3
 				if (sun3_dma_setup_done == cmd)
@@ -1811,7 +1823,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				len = 1;
 				data = &tmp;
 				NCR5380_transfer_pio(instance, &phase, &len, &data, 0);
-				cmd->SCp.Message = tmp;
+				scsi_pointer->Message = tmp;
 
 				switch (tmp) {
 				case ABORT:
@@ -1828,15 +1840,15 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 					hostdata->connected = NULL;
 					hostdata->busy[scmd_id(cmd)] &= ~(1 << cmd->device->lun);
 
-					set_status_byte(cmd, cmd->SCp.Status);
+					set_status_byte(cmd, scsi_pointer->Status);
 
 					set_resid_from_SCp(cmd);
 
 					if (cmd->cmnd[0] == REQUEST_SENSE)
 						complete_cmd(instance, cmd);
 					else {
-						if (cmd->SCp.Status == SAM_STAT_CHECK_CONDITION ||
-						    cmd->SCp.Status == SAM_STAT_COMMAND_TERMINATED) {
+						if (scsi_pointer->Status == SAM_STAT_CHECK_CONDITION ||
+						    scsi_pointer->Status == SAM_STAT_COMMAND_TERMINATED) {
 							dsprintk(NDEBUG_QUEUES, instance, "autosense: adding cmd %p to tail of autosense queue\n",
 							         cmd);
 							list_add_tail(&ncmd->list,
@@ -2000,7 +2012,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				len = 1;
 				data = &tmp;
 				NCR5380_transfer_pio(instance, &phase, &len, &data, 0);
-				cmd->SCp.Status = tmp;
+				scsi_pointer->Status = tmp;
 				break;
 			default:
 				shost_printk(KERN_ERR, instance, "unknown phase\n");
@@ -2151,6 +2163,7 @@ static void NCR5380_reselect(struct Scsi_Host *instance)
 
 #ifdef CONFIG_SUN3
 	if (sun3_dma_setup_done != tmp) {
+		struct scsi_pointer *scsi_pointer = NCR5380_scsi_pointer(tmp);
 		int count;
 
 		advance_sg_buffer(tmp);
@@ -2160,10 +2173,12 @@ static void NCR5380_reselect(struct Scsi_Host *instance)
 		if (count > 0) {
 			if (tmp->sc_data_direction == DMA_TO_DEVICE)
 				sun3scsi_dma_send_setup(hostdata,
-				                        tmp->SCp.ptr, count);
+				                        scsi_pointer->ptr,
+							count);
 			else
 				sun3scsi_dma_recv_setup(hostdata,
-				                        tmp->SCp.ptr, count);
+				                        scsi_pointer->ptr,
+							count);
 			sun3_dma_setup_done = tmp;
 		}
 	}
