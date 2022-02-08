@@ -14,14 +14,14 @@
 
 #include "gem/i915_gem_lmem.h"
 
-#include "intel_gt.h"
-#include "intel_gt_regs.h"
+#include "gen8_ppgtt.h"
 #include "i915_drv.h"
 #include "i915_scatterlist.h"
 #include "i915_vgpu.h"
-
+#include "intel_gt.h"
+#include "intel_gt_regs.h"
 #include "intel_gtt.h"
-#include "gen8_ppgtt.h"
+#include "intel_vtd.h"
 
 static void i915_ggtt_color_adjust(const struct drm_mm_node *node,
 				   unsigned long color,
