@@ -2071,7 +2071,7 @@ SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 		nr = ctx->nr_events;
 
 	if (nr > AIO_PLUG_THRESHOLD)
-		blk_start_plug(&plug);
+		blk_start_plug_nr_ios(&plug, nr);
 	for (i = 0; i < nr; i++) {
 		struct iocb __user *user_iocb;
 
