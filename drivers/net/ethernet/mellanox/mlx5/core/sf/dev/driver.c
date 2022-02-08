@@ -28,6 +28,9 @@ static int mlx5_sf_dev_probe(struct auxiliary_device *adev, const struct auxilia
 	mdev->priv.adev_idx = adev->id;
 	sf_dev->mdev = mdev;
 
+	if (sf_dev->parent_mdev->priv.sfs_light_probe)
+		mlx5_dev_mark_unregistered(mdev);
+
 	err = mlx5_mdev_init(mdev, MLX5_DEFAULT_PROF);
 	if (err) {
 		mlx5_core_warn(mdev, "mlx5_mdev_init on err=%d\n", err);
@@ -41,7 +44,10 @@ static int mlx5_sf_dev_probe(struct auxiliary_device *adev, const struct auxilia
 		goto remap_err;
 	}
 
-	err = mlx5_init_one(mdev);
+	if (sf_dev->parent_mdev->priv.sfs_light_probe)
+		err = mlx5_init_one_light(mdev);
+	else
+		err = mlx5_init_one(mdev);
 	if (err) {
 		mlx5_core_warn(mdev, "mlx5_init_one err=%d\n", err);
 		goto init_one_err;
@@ -64,7 +70,10 @@ static void mlx5_sf_dev_remove(struct auxiliary_device *adev)
 	struct devlink *devlink = priv_to_devlink(sf_dev->mdev);
 
 	devlink_unregister(devlink);
-	mlx5_uninit_one(sf_dev->mdev);
+	if (mlx5_dev_is_unregistered(sf_dev->mdev))
+		mlx5_uninit_one_light(sf_dev->mdev);
+	else
+		mlx5_uninit_one(sf_dev->mdev);
 	iounmap(sf_dev->mdev->iseg);
 	mlx5_mdev_uninit(sf_dev->mdev);
 	mlx5_devlink_free(devlink);

@@ -10,6 +10,7 @@
 #include "ecpf.h"
 #define CREATE_TRACE_POINTS
 #include "diag/sf_tracepoint.h"
+#include "devlink.h"
 
 struct mlx5_sf {
 	struct devlink_port dl_port;
@@ -456,6 +457,44 @@ sf_err:
 	return 0;
 }
 
+static int mlx5_devlink_sfs_light_probe_get(struct devlink *devlink, u32 id,
+					    struct devlink_param_gset_ctx *ctx)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+
+	ctx->val.vbool = !dev->priv.sfs_light_probe;
+	return 0;
+}
+
+static int mlx5_devlink_sfs_light_probe_set(struct devlink *devlink, u32 id,
+					    struct devlink_param_gset_ctx *ctx)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+
+	dev->priv.sfs_light_probe = !ctx->val.vbool;
+	return 0;
+}
+
+static const struct devlink_param sfs_light_probe_param =
+	DEVLINK_PARAM_GENERIC(ENABLE_SFS_AUX_DEVS, BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			      mlx5_devlink_sfs_light_probe_get,
+			      mlx5_devlink_sfs_light_probe_set, NULL);
+
+int mlx5_devlink_sfs_light_probe_param_register(struct devlink *devlink)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+
+	if (!mlx5_core_is_pf(dev) || !mlx5_sf_max_functions(dev))
+		return 0;
+
+	return devlink_param_register(devlink, &sfs_light_probe_param);
+}
+
+void mlx5_devlink_sfs_light_probe_param_unregister(struct devlink *devlink)
+{
+	devlink_param_unregister(devlink, &sfs_light_probe_param);
+}
+
 static void mlx5_sf_table_enable(struct mlx5_sf_table *table)
 {
 	init_completion(&table->disable_complete);
@@ -533,6 +572,7 @@ int mlx5_sf_table_init(struct mlx5_core_dev *dev)
 	table->dev = dev;
 	xa_init(&table->port_indices);
 	dev->priv.sf_table = table;
+	dev->priv.sfs_light_probe = false;
 	refcount_set(&table->refcount, 0);
 	table->esw_nb.notifier_call = mlx5_sf_esw_event;
 	err = mlx5_esw_event_notifier_register(dev->priv.eswitch, &table->esw_nb);

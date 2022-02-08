@@ -139,6 +139,13 @@ static int mlx5_devlink_reload_down(struct devlink *devlink, bool netns_change,
 	struct pci_dev *pdev = dev->pdev;
 	bool sf_dev_allocated;
 
+	if (mlx5_dev_is_unregistered(dev)) {
+		if (action != DEVLINK_RELOAD_ACTION_DRIVER_REINIT)
+			return -EOPNOTSUPP;
+		mlx5_unload_one_light(dev);
+		return 0;
+	}
+
 	sf_dev_allocated = mlx5_sf_dev_allocated(dev);
 	if (sf_dev_allocated) {
 		/* Reload results in deleting SF device which further results in
@@ -182,6 +189,10 @@ static int mlx5_devlink_reload_up(struct devlink *devlink, enum devlink_reload_a
 	*actions_performed = BIT(action);
 	switch (action) {
 	case DEVLINK_RELOAD_ACTION_DRIVER_REINIT:
+		if (mlx5_dev_is_unregistered(dev)) {
+			mlx5_fw_reporters_create(dev);
+			return mlx5_init_one(dev);
+		}
 		return mlx5_load_one(dev);
 	case DEVLINK_RELOAD_ACTION_FW_ACTIVATE:
 		if (limit == DEVLINK_RELOAD_LIMIT_NO_RESET)
@@ -257,6 +268,9 @@ static int mlx5_devlink_trap_action_set(struct devlink *devlink,
 	enum devlink_trap_action action_orig;
 	struct mlx5_devlink_trap *dl_trap;
 	int err = 0;
+
+	if (mlx5_dev_is_unregistered(dev))
+		return -EOPNOTSUPP;
 
 	if (is_mdev_switchdev_mode(dev)) {
 		NL_SET_ERR_MSG_MOD(extack, "Devlink traps can't be set in switchdev mode");
@@ -440,6 +454,9 @@ static int mlx5_devlink_fs_mode_get(struct devlink *devlink, u32 id,
 {
 	struct mlx5_core_dev *dev = devlink_priv(devlink);
 
+	if (mlx5_dev_is_unregistered(dev))
+		return -EOPNOTSUPP;
+
 	if (dev->priv.steering->mode == MLX5_FLOW_STEERING_MODE_SMFS)
 		strcpy(ctx->val.vstr, "smfs");
 	else
@@ -499,6 +516,9 @@ static int mlx5_devlink_esw_port_metadata_get(struct devlink *devlink, u32 id,
 {
 	struct mlx5_core_dev *dev = devlink_priv(devlink);
 
+	if (mlx5_dev_is_unregistered(dev))
+		return -EOPNOTSUPP;
+
 	if (!MLX5_ESWITCH_MANAGER(dev))
 		return -EOPNOTSUPP;
 
@@ -541,6 +561,9 @@ static int mlx5_devlink_enable_remote_dev_reset_get(struct devlink *devlink, u32
 						    struct devlink_param_gset_ctx *ctx)
 {
 	struct mlx5_core_dev *dev = devlink_priv(devlink);
+
+	if (mlx5_dev_is_unregistered(dev))
+		return -EOPNOTSUPP;
 
 	ctx->val.vbool = mlx5_fw_reset_enable_remote_dev_reset_get(dev);
 	return 0;
@@ -588,7 +611,7 @@ static void mlx5_devlink_set_params_init_values(struct devlink *devlink)
 	struct mlx5_core_dev *dev = devlink_priv(devlink);
 	union devlink_param_value value;
 
-	value.vbool = MLX5_CAP_GEN(dev, roce);
+	value.vbool = MLX5_CAP_GEN(dev, roce) && !mlx5_dev_is_unregistered(dev);
 	devlink_param_driverinit_value_set(devlink,
 					   DEVLINK_PARAM_GENERIC_ID_ENABLE_ROCE,
 					   value);
@@ -628,7 +651,7 @@ static int mlx5_devlink_eth_param_register(struct devlink *devlink)
 	if (err)
 		return err;
 
-	value.vbool = true;
+	value.vbool = !mlx5_dev_is_unregistered(dev);
 	devlink_param_driverinit_value_set(devlink,
 					   DEVLINK_PARAM_GENERIC_ID_ENABLE_ETH,
 					   value);
@@ -673,7 +696,7 @@ static int mlx5_devlink_rdma_param_register(struct devlink *devlink)
 	if (err)
 		return err;
 
-	value.vbool = true;
+	value.vbool = !mlx5_dev_is_unregistered(devlink_priv(devlink));
 	devlink_param_driverinit_value_set(devlink,
 					   DEVLINK_PARAM_GENERIC_ID_ENABLE_RDMA,
 					   value);
@@ -705,7 +728,7 @@ static int mlx5_devlink_vnet_param_register(struct devlink *devlink)
 	if (err)
 		return err;
 
-	value.vbool = true;
+	value.vbool = !mlx5_dev_is_unregistered(dev);
 	devlink_param_driverinit_value_set(devlink,
 					   DEVLINK_PARAM_GENERIC_ID_ENABLE_VNET,
 					   value);

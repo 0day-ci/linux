@@ -700,7 +700,7 @@ static const struct devlink_health_reporter_ops mlx5_fw_fatal_reporter_ops = {
 };
 
 #define MLX5_REPORTER_FW_GRACEFUL_PERIOD 1200000
-static void mlx5_fw_reporters_create(struct mlx5_core_dev *dev)
+void mlx5_fw_reporters_create(struct mlx5_core_dev *dev)
 {
 	struct mlx5_core_health *health = &dev->priv.health;
 	struct devlink *devlink = priv_to_devlink(dev);
@@ -893,7 +893,8 @@ int mlx5_health_init(struct mlx5_core_dev *dev)
 	struct mlx5_core_health *health;
 	char *name;
 
-	mlx5_fw_reporters_create(dev);
+	if (!mlx5_dev_is_unregistered(dev))
+		mlx5_fw_reporters_create(dev);
 
 	health = &dev->priv.health;
 	name = kmalloc(64, GFP_KERNEL);

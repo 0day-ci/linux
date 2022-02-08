@@ -283,9 +283,15 @@ int mlx5_sf_hw_table_init(struct mlx5_core_dev *dev)
 	if (err)
 		goto ext_err;
 
+	err = mlx5_devlink_sfs_light_probe_param_register(priv_to_devlink(dev));
+	if (err)
+		goto sfs_reg_err;
+
 	mlx5_core_dbg(dev, "SF HW table: max sfs = %d, ext sfs = %d\n", max_fn, max_ext_fn);
 	return 0;
 
+sfs_reg_err:
+	mlx5_sf_hw_table_hwc_cleanup(&table->hwc[MLX5_SF_HWC_EXTERNAL]);
 ext_err:
 	mlx5_sf_hw_table_hwc_cleanup(&table->hwc[MLX5_SF_HWC_LOCAL]);
 table_err:
@@ -301,6 +307,7 @@ void mlx5_sf_hw_table_cleanup(struct mlx5_core_dev *dev)
 	if (!table)
 		return;
 
+	mlx5_devlink_sfs_light_probe_param_unregister(priv_to_devlink(dev));
 	mutex_destroy(&table->table_lock);
 	mlx5_sf_hw_table_hwc_cleanup(&table->hwc[MLX5_SF_HWC_EXTERNAL]);
 	mlx5_sf_hw_table_hwc_cleanup(&table->hwc[MLX5_SF_HWC_LOCAL]);

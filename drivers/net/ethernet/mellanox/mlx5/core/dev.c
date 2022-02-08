@@ -333,6 +333,18 @@ static void del_adev(struct auxiliary_device *adev)
 	auxiliary_device_uninit(adev);
 }
 
+void mlx5_dev_mark_unregistered(struct mlx5_core_dev *dev)
+{
+	mutex_lock(&mlx5_intf_mutex);
+	dev->priv.flags |= MLX5_PRIV_FLAGS_DISABLE_ALL_ADEV;
+	mutex_unlock(&mlx5_intf_mutex);
+}
+
+bool mlx5_dev_is_unregistered(struct mlx5_core_dev *dev)
+{
+	return dev->priv.flags & MLX5_PRIV_FLAGS_DISABLE_ALL_ADEV;
+}
+
 int mlx5_attach_device(struct mlx5_core_dev *dev)
 {
 	struct mlx5_priv *priv = &dev->priv;
@@ -471,6 +483,10 @@ static int add_drivers(struct mlx5_core_dev *dev)
 			is_supported = mlx5_adev_devices[i].is_supported(dev);
 
 		if (!is_supported)
+			continue;
+
+		if (mlx5_adev_devices[i].is_enabled &&
+		    !(mlx5_adev_devices[i].is_enabled(dev)))
 			continue;
 
 		priv->adev[i] = add_adev(dev, i);
