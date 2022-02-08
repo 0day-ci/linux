@@ -109,6 +109,9 @@ struct fusb302_chip {
 	enum typec_cc_status cc2;
 	u32 snk_pdo[PDO_MAX_OBJECTS];
 
+	/* supported pd rev */
+	u32 supported_pd_rev;
+
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dentry;
 	/* lock for log buffer access */
@@ -1056,6 +1059,13 @@ static int tcpm_pd_transmit(struct tcpc_dev *dev, enum tcpm_transmit_type type,
 	return ret;
 }
 
+static u32 tcpm_supported_pd_rev(struct tcpc_dev *dev)
+{
+	struct fusb302_chip *chip = container_of(dev, struct fusb302_chip,
+						 tcpc_dev);
+	return chip->supported_pd_rev;
+}
+
 static enum typec_cc_status fusb302_bc_lvl_to_cc(u8 bc_lvl)
 {
 	if (bc_lvl == FUSB_REG_STATUS0_BC_LVL_1230_MAX)
@@ -1129,6 +1139,7 @@ static void init_tcpc_dev(struct tcpc_dev *fusb302_tcpc_dev)
 	fusb302_tcpc_dev->set_roles = tcpm_set_roles;
 	fusb302_tcpc_dev->start_toggling = tcpm_start_toggling;
 	fusb302_tcpc_dev->pd_transmit = tcpm_pd_transmit;
+	fusb302_tcpc_dev->supported_pd_rev = tcpm_supported_pd_rev;
 }
 
 static const char * const cc_polarity_name[] = {
@@ -1683,6 +1694,7 @@ static int fusb302_probe(struct i2c_client *client,
 	struct fusb302_chip *chip;
 	struct i2c_adapter *adapter = client->adapter;
 	struct device *dev = &client->dev;
+	struct device_node *np = dev->of_node;
 	const char *name;
 	int ret = 0;
 
@@ -1756,6 +1768,14 @@ static int fusb302_probe(struct i2c_client *client,
 		dev_err(dev, "cannot request IRQ for GPIO Int_N, ret=%d", ret);
 		goto tcpm_unregister_port;
 	}
+
+	if (of_property_read_u32(np, "supported-pd-rev",
+				&chip->supported_pd_rev) < 0) {
+		chip->supported_pd_rev = PD_MAX_REV;
+	} else if (chip->supported_pd_rev > PD_MAX_REV) {
+		chip->supported_pd_rev = PD_MAX_REV;
+	}
+
 	enable_irq_wake(chip->gpio_int_n_irq);
 	i2c_set_clientdata(client, chip);
 
