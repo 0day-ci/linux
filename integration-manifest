@@ -1,0 +1,28 @@
+drm drm-fixes dfd42facf1e4ada021b939b4e19c935dcdd55566
+	Linux 5.17-rc3
+drm-misc drm-misc-fixes 200e8e3e43c4da4bd5ca83722523754ddb14ca02
+	drm/privacy-screen: Fix sphinx warning
+drm-intel drm-intel-fixes 4e6f55120c7eccf6f9323bb681632e23cbcb3f3c
+	drm/i915: Workaround broken BIOS DBUF configuration on TGL/RKL
+drm drm-next 53dbee4926d3706ca9e03f3928fa85b5ec3bc0cc
+	Merge tag 'drm-misc-next-2022-01-27' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes d3cbc6e323c9299d10c8d2e4127c77c7d05d07b1
+	drm: panel-orientation-quirks: Add quirk for the 1Netbook OneXPlayer
+drm-intel drm-intel-next-fixes e26602be4869c74dd8a0f66f718b8a0ce120edb4
+	drm/i915/display/adlp: Implement new step in the TC voltage swing prog sequence
+drm-misc drm-misc-next ea181a3494699f48e80687e3d467d443883ae0e9
+	tomoyo: Use str_yes_no()
+drm-intel drm-intel-next 7938f4218168ae9fc4bdddb15976f9ebbae41999
+	dma-buf-map: Rename to iosys-map
+drm-intel drm-intel-gt-next 876f7a438e4247a948268ad77b67c494f709cc30
+	Merge drm/drm-next into drm-intel-gt-next
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
