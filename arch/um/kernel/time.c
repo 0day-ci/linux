@@ -20,6 +20,7 @@
 #include <kern_util.h>
 #include <os.h>
 #include <linux/time-internal.h>
+#include <linux/timekeeping.h>
 #include <linux/um_timetravel.h>
 #include <shared/init.h>
 

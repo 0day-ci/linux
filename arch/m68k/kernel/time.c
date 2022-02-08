@@ -28,6 +28,7 @@
 #include <asm/irq_regs.h>
 
 #include <linux/time.h>
+#include <linux/timekeeping.h>
 #include <linux/timex.h>
 #include <linux/profile.h>
 
