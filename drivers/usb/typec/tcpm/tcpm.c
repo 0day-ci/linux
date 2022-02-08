@@ -571,6 +571,16 @@ static bool tcpm_port_is_disconnected(struct tcpm_port *port)
 				    port->cc2 == TYPEC_CC_OPEN)));
 }
 
+static u32 tcpm_pd_supported_rev(struct tcpm_port *port)
+{
+	u32 rev = PD_MAX_REV;
+
+	if (port->tcpc->supported_pd_rev)
+		rev = port->tcpc->supported_pd_rev(port->tcpc);
+
+	return (rev > PD_MAX_REV) ? PD_MAX_REV : rev;
+}
+
 /*
  * Logging
  */
@@ -3932,7 +3942,7 @@ static void run_state_machine(struct tcpm_port *port)
 		typec_set_pwr_opmode(port->typec_port, opmode);
 		port->pwr_opmode = TYPEC_PWR_MODE_USB;
 		port->caps_count = 0;
-		port->negotiated_rev = PD_MAX_REV;
+		port->negotiated_rev = tcpm_pd_supported_rev(port);
 		port->message_id = 0;
 		port->rx_msgid = -1;
 		port->explicit_contract = false;
@@ -4167,7 +4177,7 @@ static void run_state_machine(struct tcpm_port *port)
 					      port->cc2 : port->cc1);
 		typec_set_pwr_opmode(port->typec_port, opmode);
 		port->pwr_opmode = TYPEC_PWR_MODE_USB;
-		port->negotiated_rev = PD_MAX_REV;
+		port->negotiated_rev = tcpm_pd_supported_rev(port);
 		port->message_id = 0;
 		port->rx_msgid = -1;
 		port->explicit_contract = false;
