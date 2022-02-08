@@ -7,13 +7,20 @@ srctree := $(patsubst %/,%,$(dir $(srctree)))
 srctree := $(patsubst %/,%,$(dir $(srctree)))
 endif
 
+BPF_DIR = $(srctree)/tools/lib/bpf
+
+# bpftool's version is libbpf's with a fixed offset for the major version.
+# This is because bpftool's version was higher than libbpf's when we adopted
+# this scheme.
+BPFTOOL_MAJOR_OFFSET := 6
+LIBBPF_VERSION := $(shell make -r --no-print-directory -sC $(BPF_DIR) libbpfversion)
+BPFTOOL_VERSION ?= $(shell lv="$(LIBBPF_VERSION)"; echo "$$((${lv%%.*} + $(BPFTOOL_MAJOR_OFFSET))).$${lv#*.}")
+
 ifeq ($(V),1)
   Q =
 else
   Q = @
 endif
-
-BPF_DIR = $(srctree)/tools/lib/bpf
 
 ifneq ($(OUTPUT),)
   _OUTPUT := $(OUTPUT)
@@ -38,10 +45,6 @@ LIBBPF_BOOTSTRAP := $(LIBBPF_BOOTSTRAP_OUTPUT)libbpf.a
 # libbpf, but still required by bpftool.
 LIBBPF_INTERNAL_HDRS := $(addprefix $(LIBBPF_HDRS_DIR)/,hashmap.h nlattr.h)
 LIBBPF_BOOTSTRAP_INTERNAL_HDRS := $(addprefix $(LIBBPF_BOOTSTRAP_HDRS_DIR)/,hashmap.h)
-
-ifeq ($(BPFTOOL_VERSION),)
-BPFTOOL_VERSION := $(shell make -rR --no-print-directory -sC ../../.. kernelversion)
-endif
 
 $(LIBBPF_OUTPUT) $(BOOTSTRAP_OUTPUT) $(LIBBPF_BOOTSTRAP_OUTPUT) $(LIBBPF_HDRS_DIR) $(LIBBPF_BOOTSTRAP_HDRS_DIR):
 	$(QUIET_MKDIR)mkdir -p $@
