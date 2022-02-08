@@ -719,6 +719,7 @@ struct key_type *key_type_lookup(const char *type)
 found_kernel_type:
 	return ktype;
 }
+EXPORT_SYMBOL(key_type_lookup);
 
 void key_set_timeout(struct key *key, unsigned timeout)
 {
@@ -744,6 +745,7 @@ void key_type_put(struct key_type *ktype)
 {
 	up_read(&key_types_sem);
 }
+EXPORT_SYMBOL(key_type_put);
 
 /*
  * Attempt to update an existing key.
