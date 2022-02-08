@@ -25,6 +25,8 @@
 static char exfat_default_iocharset[] = CONFIG_EXFAT_DEFAULT_IOCHARSET;
 static struct kmem_cache *exfat_inode_cachep;
 
+static int __exfat_clear_volume_dirty(struct super_block *sb);
+
 static void exfat_free_iocharset(struct exfat_sb_info *sbi)
 {
 	if (sbi->options.iocharset != exfat_default_iocharset)
@@ -64,7 +66,7 @@ static int exfat_sync_fs(struct super_block *sb, int wait)
 	/* If there are some dirty buffers in the bdev inode */
 	mutex_lock(&sbi->s_lock);
 	sync_blockdev(sb->s_bdev);
-	if (exfat_clear_volume_dirty(sb))
+	if (__exfat_clear_volume_dirty(sb))
 		err = -EIO;
 	mutex_unlock(&sbi->s_lock);
 	return err;
@@ -139,11 +141,19 @@ int exfat_set_volume_dirty(struct super_block *sb)
 	return exfat_set_vol_flags(sb, sbi->vol_flags | VOLUME_DIRTY);
 }
 
-int exfat_clear_volume_dirty(struct super_block *sb)
+static int __exfat_clear_volume_dirty(struct super_block *sb)
 {
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
 
 	return exfat_set_vol_flags(sb, sbi->vol_flags & ~VOLUME_DIRTY);
+}
+
+int exfat_clear_volume_dirty(struct super_block *sb)
+{
+	if (sb->s_flags & (SB_SYNCHRONOUS | SB_DIRSYNC))
+		return __exfat_clear_volume_dirty(sb);
+
+	return 0;
 }
 
 static int exfat_show_options(struct seq_file *m, struct dentry *root)
