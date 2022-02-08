@@ -58,6 +58,9 @@ extern int finish_clean_context(struct fs_context *fc);
  */
 extern int filename_lookup(int dfd, struct filename *name, unsigned flags,
 			   struct path *path, struct path *root);
+int vfs_path_parent_lookup(struct dentry *dentry, struct vfsmount *mnt,
+			   struct filename *filename, unsigned int flags,
+			   struct path *parent, struct qstr *last, int *type);
 extern int vfs_path_lookup(struct dentry *, struct vfsmount *,
 			   const char *, unsigned int, struct path *);
 int do_rmdir(int dfd, struct filename *name);
