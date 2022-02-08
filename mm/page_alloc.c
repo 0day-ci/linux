@@ -1449,13 +1449,12 @@ static inline void prefetch_buddy(struct page *page)
  * count is the number of pages to free.
  */
 static void free_pcppages_bulk(struct zone *zone, int count,
-					struct per_cpu_pages *pcp)
+			       int batch, struct pcplists *lp)
 {
 	int pindex = 0;
 	int batch_free = 0;
 	int nr_freed = 0;
 	unsigned int order;
-	int prefetch_nr = READ_ONCE(pcp->batch);
 	bool isolated_pageblocks;
 	struct page *page, *tmp;
 	LIST_HEAD(head);
@@ -1464,7 +1463,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 	 * Ensure proper count is passed which otherwise would stuck in the
 	 * below while (list_empty(list)) loop.
 	 */
-	count = min(pcp->count, count);
+	count = min(lp->count, count);
 	while (count > 0) {
 		struct list_head *list;
 
@@ -1479,7 +1478,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 			batch_free++;
 			if (++pindex == NR_PCP_LISTS)
 				pindex = 0;
-			list = &pcp->lists[pindex];
+			list = &lp->lists[pindex];
 		} while (list_empty(list));
 
 		/* This is the only non-empty list. Free them all. */
@@ -1513,13 +1512,13 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 			 * avoid excessive prefetching due to large count, only
 			 * prefetch buddy for the first pcp->batch nr of pages.
 			 */
-			if (prefetch_nr) {
+			if (batch) {
 				prefetch_buddy(page);
-				prefetch_nr--;
+				batch--;
 			}
 		} while (count > 0 && --batch_free && !list_empty(list));
 	}
-	pcp->count -= nr_freed;
+	lp->count -= nr_freed;
 
 	/*
 	 * local_lock_irq held so equivalent to spin_lock_irqsave for
@@ -3130,14 +3129,16 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
  */
 void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 {
+	struct pcplists *lp;
 	unsigned long flags;
 	int to_drain, batch;
 
 	local_lock_irqsave(&pagesets.lock, flags);
 	batch = READ_ONCE(pcp->batch);
-	to_drain = min(pcp->count, batch);
+	lp = pcp->lp;
+	to_drain = min(lp->count, batch);
 	if (to_drain > 0)
-		free_pcppages_bulk(zone, to_drain, pcp);
+		free_pcppages_bulk(zone, to_drain, batch, lp);
 	local_unlock_irqrestore(&pagesets.lock, flags);
 }
 #endif
@@ -3153,12 +3154,14 @@ static void drain_pages_zone(unsigned int cpu, struct zone *zone)
 {
 	unsigned long flags;
 	struct per_cpu_pages *pcp;
+	struct pcplists *lp;
 
 	local_lock_irqsave(&pagesets.lock, flags);
 
 	pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
-	if (pcp->count)
-		free_pcppages_bulk(zone, pcp->count, pcp);
+	lp = pcp->lp;
+	if (lp->count)
+		free_pcppages_bulk(zone, lp->count, READ_ONCE(pcp->batch), lp);
 
 	local_unlock_irqrestore(&pagesets.lock, flags);
 }
@@ -3219,7 +3222,7 @@ static void drain_local_pages_wq(struct work_struct *work)
  *
  * drain_all_pages() is optimized to only execute on cpus where pcplists are
  * not empty. The check for non-emptiness can however race with a free to
- * pcplist that has not yet increased the pcp->count from 0 to 1. Callers
+ * pcplist that has not yet increased the lp->count from 0 to 1. Callers
  * that need the guarantee that every CPU has drained can disable the
  * optimizing racy check.
  */
@@ -3258,24 +3261,24 @@ static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
 	 * disables preemption as part of its processing
 	 */
 	for_each_online_cpu(cpu) {
-		struct per_cpu_pages *pcp;
 		struct zone *z;
 		bool has_pcps = false;
+		struct pcplists *lp;
 
 		if (force_all_cpus) {
 			/*
-			 * The pcp.count check is racy, some callers need a
+			 * The lp->count check is racy, some callers need a
 			 * guarantee that no cpu is missed.
 			 */
 			has_pcps = true;
 		} else if (zone) {
-			pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
-			if (pcp->count)
+			lp = per_cpu_ptr(zone->per_cpu_pageset, cpu)->lp;
+			if (lp->count)
 				has_pcps = true;
 		} else {
 			for_each_populated_zone(z) {
-				pcp = per_cpu_ptr(z->per_cpu_pageset, cpu);
-				if (pcp->count) {
+				lp = per_cpu_ptr(z->per_cpu_pageset, cpu)->lp;
+				if (lp->count) {
 					has_pcps = true;
 					break;
 				}
@@ -3427,19 +3430,21 @@ static void free_unref_page_commit(struct page *page, int migratetype,
 {
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
+	struct pcplists *lp;
 	int high;
 	int pindex;
 
 	__count_vm_event(PGFREE);
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
+	lp = pcp->lp;
 	pindex = order_to_pindex(migratetype, order);
-	list_add(&page->lru, &pcp->lists[pindex]);
-	pcp->count += 1 << order;
+	list_add(&page->lru, &lp->lists[pindex]);
+	lp->count += 1 << order;
 	high = nr_pcp_high(pcp, zone);
-	if (pcp->count >= high) {
+	if (lp->count >= high) {
 		int batch = READ_ONCE(pcp->batch);
 
-		free_pcppages_bulk(zone, nr_pcp_free(pcp, high, batch), pcp);
+		free_pcppages_bulk(zone, nr_pcp_free(pcp, high, batch), batch, lp);
 	}
 }
 
@@ -3660,7 +3665,8 @@ struct page *__rmqueue_pcplist(struct zone *zone, unsigned int order,
 			int migratetype,
 			unsigned int alloc_flags,
 			struct per_cpu_pages *pcp,
-			struct list_head *list)
+			struct list_head *list,
+			int *count)
 {
 	struct page *page;
 
@@ -3682,14 +3688,14 @@ struct page *__rmqueue_pcplist(struct zone *zone, unsigned int order,
 					batch, list,
 					migratetype, alloc_flags);
 
-			pcp->count += alloced << order;
+			*count += alloced << order;
 			if (unlikely(list_empty(list)))
 				return NULL;
 		}
 
 		page = list_first_entry(list, struct page, lru);
 		list_del(&page->lru);
-		pcp->count -= 1 << order;
+		*count -= 1 << order;
 	} while (check_new_pcp(page));
 
 	return page;
@@ -3703,8 +3709,10 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 {
 	struct per_cpu_pages *pcp;
 	struct list_head *list;
+	struct pcplists *lp;
 	struct page *page;
 	unsigned long flags;
+	int *count;
 
 	local_lock_irqsave(&pagesets.lock, flags);
 
@@ -3715,8 +3723,11 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 	 */
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
 	pcp->free_factor >>= 1;
-	list = &pcp->lists[order_to_pindex(migratetype, order)];
-	page = __rmqueue_pcplist(zone, order, migratetype, alloc_flags, pcp, list);
+	lp = pcp->lp;
+	list = &lp->lists[order_to_pindex(migratetype, order)];
+	count = &lp->count;
+	page = __rmqueue_pcplist(zone, order, migratetype, alloc_flags,
+				 pcp, list, count);
 	local_unlock_irqrestore(&pagesets.lock, flags);
 	if (page) {
 		__count_zid_vm_events(PGALLOC, page_zonenum(page), 1);
@@ -5255,9 +5266,11 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	struct per_cpu_pages *pcp;
 	struct list_head *pcp_list;
 	struct alloc_context ac;
+	struct pcplists *lp;
 	gfp_t alloc_gfp;
 	unsigned int alloc_flags = ALLOC_WMARK_LOW;
 	int nr_populated = 0, nr_account = 0;
+	int *count;
 
 	/*
 	 * Skip populated array elements to determine if any pages need
@@ -5333,7 +5346,9 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	/* Attempt the batch allocation */
 	local_lock_irqsave(&pagesets.lock, flags);
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
-	pcp_list = &pcp->lists[order_to_pindex(ac.migratetype, 0)];
+	lp = pcp->lp;
+	pcp_list = &lp->lists[order_to_pindex(ac.migratetype, 0)];
+	count = &lp->count;
 
 	while (nr_populated < nr_pages) {
 
@@ -5344,7 +5359,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 		}
 
 		page = __rmqueue_pcplist(zone, 0, ac.migratetype, alloc_flags,
-								pcp, pcp_list);
+					 pcp, pcp_list, count);
 		if (unlikely(!page)) {
 			/* Try and get at least one page */
 			if (!nr_populated)
@@ -5947,7 +5962,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			continue;
 
 		for_each_online_cpu(cpu)
-			free_pcp += per_cpu_ptr(zone->per_cpu_pageset, cpu)->count;
+			free_pcp += per_cpu_ptr(zone->per_cpu_pageset, cpu)->lp->count;
 	}
 
 	printk("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
@@ -6041,7 +6056,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 
 		free_pcp = 0;
 		for_each_online_cpu(cpu)
-			free_pcp += per_cpu_ptr(zone->per_cpu_pageset, cpu)->count;
+			free_pcp += per_cpu_ptr(zone->per_cpu_pageset, cpu)->lp->count;
 
 		show_node(zone);
 		printk(KERN_CONT
@@ -6084,7 +6099,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			K(zone_page_state(zone, NR_MLOCK)),
 			K(zone_page_state(zone, NR_BOUNCE)),
 			K(free_pcp),
-			K(this_cpu_read(zone->per_cpu_pageset->count)),
+			K(raw_cpu_ptr(zone->per_cpu_pageset)->lp->count),
 			K(zone_page_state(zone, NR_FREE_CMA_PAGES)));
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
@@ -6971,7 +6986,7 @@ static int zone_highsize(struct zone *zone, int batch, int cpu_online)
 
 /*
  * pcp->high and pcp->batch values are related and generally batch is lower
- * than high. They are also related to pcp->count such that count is lower
+ * than high. They are also related to pcp->lp->count such that count is lower
  * than high, and as soon as it reaches high, the pcplist is flushed.
  *
  * However, guaranteeing these relations at all times would require e.g. write
@@ -6979,7 +6994,7 @@ static int zone_highsize(struct zone *zone, int batch, int cpu_online)
  * thus be prone to error and bad for performance. Thus the update only prevents
  * store tearing. Any new users of pcp->batch and pcp->high should ensure they
  * can cope with those fields changing asynchronously, and fully trust only the
- * pcp->count field on the local CPU with interrupts disabled.
+ * pcp->lp->count field on the local CPU with interrupts disabled.
  *
  * mutex_is_locked(&pcp_batch_high_lock) required when calling this function
  * outside of boot time (or some other assurance that no concurrent updaters
@@ -6999,8 +7014,10 @@ static void per_cpu_pages_init(struct per_cpu_pages *pcp, struct per_cpu_zonesta
 	memset(pcp, 0, sizeof(*pcp));
 	memset(pzstats, 0, sizeof(*pzstats));
 
+	pcp->lp = &pcp->__pcplists;
+
 	for (pindex = 0; pindex < NR_PCP_LISTS; pindex++)
-		INIT_LIST_HEAD(&pcp->lists[pindex]);
+		INIT_LIST_HEAD(&pcp->lp->lists[pindex]);
 
 	/*
 	 * Set batch and high values safe for a boot pageset. A true percpu
