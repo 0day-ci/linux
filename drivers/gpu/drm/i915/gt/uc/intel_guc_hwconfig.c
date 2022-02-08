@@ -71,6 +71,29 @@ static int guc_hwconfig_discover_size(struct intel_guc_hwconfig *hwconfig)
 	return 0;
 }
 
+static int verify_hwconfig_blob(const struct intel_guc_hwconfig *hwconfig)
+{
+	struct drm_i915_query_hwconfig_blob_item *pos;
+	u32 remaining;
+
+	if (hwconfig->size % 4 != 0 || hwconfig->ptr == NULL)
+		return -EINVAL;
+
+	pos = hwconfig->ptr;
+	remaining = (hwconfig->size / 4);
+	while (remaining > 0) {
+		if (remaining < 2)
+			return -EINVAL;
+		if (pos->length > remaining - 2)
+			return -EINVAL;
+		remaining -= 2 + pos->length;
+		pos = (void *)&pos->data[pos->length];
+	}
+
+	DRM_INFO("hwconfig blob format appears valid\n");
+	return 0;
+}
+
 static int guc_hwconfig_fill_buffer(struct intel_guc_hwconfig *hwconfig)
 {
 	struct intel_guc *guc = hwconfig_to_guc(hwconfig);
@@ -90,6 +113,12 @@ static int guc_hwconfig_fill_buffer(struct intel_guc_hwconfig *hwconfig)
 	ret = __guc_action_get_hwconfig(hwconfig, ggtt_offset, hwconfig->size);
 	if (ret >= 0)
 		memcpy(hwconfig->ptr, vaddr, hwconfig->size);
+
+	if (verify_hwconfig_blob(hwconfig)) {
+		DRM_ERROR("Ignoring invalid hwconfig blob received from "
+			  "GuC!\n");
+		return -EINVAL;
+	}
 
 	i915_vma_unpin_and_release(&vma, I915_VMA_RELEASE_MAP);
 
