@@ -232,11 +232,15 @@ static inline void rxe_rcv_pkt(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 
 static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 {
+	struct sk_buff *skb_copy;
 	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
+	struct rxe_pkt_info *pkt_copy;
 	struct rxe_mcg *mcg;
 	struct rxe_mca *mca;
 	struct rxe_qp *qp;
+	struct rxe_qp **qp_array;
 	union ib_gid dgid;
+	int n, nmax;
 	int err;
 
 	if (skb->protocol == htons(ETH_P_IP))
@@ -248,68 +252,89 @@ static void rxe_rcv_mcast_pkt(struct rxe_dev *rxe, struct sk_buff *skb)
 	/* lookup mcast group corresponding to mgid, takes a ref */
 	mcg = rxe_lookup_mcg(rxe, &dgid);
 	if (!mcg)
-		goto drop;	/* mcast group not registered */
+		goto err_drop;	/* mcast group not registered */
+
+	/* this is the current number of qp's attached to mcg plus a
+	 * little room in case new qp's are attached between here
+	 * and when we finish walking the qp list. If someone can
+	 * attach more than 4 new qp's we will miss forwarding
+	 * packets to those qp's. This is actually OK since UD is
+	 * a unreliable service.
+	 */
+	nmax = atomic_read(&mcg->qp_num) + 4;
+	qp_array = kmalloc_array(nmax, sizeof(qp), GFP_KERNEL);
+	n = 0;
 
 	spin_lock_bh(&rxe->mcg_lock);
-
-	/* this is unreliable datagram service so we let
-	 * failures to deliver a multicast packet to a
-	 * single QP happen and just move on and try
-	 * the rest of them on the list
-	 */
 	list_for_each_entry(mca, &mcg->qp_list, qp_list) {
-		qp = mca->qp;
+		/* protect the qp pointers in the list */
+		rxe_add_ref(mca->qp);
+		qp_array[n++] = mca->qp;
+		if (n == nmax)
+			break;
+	}
+	spin_unlock_bh(&rxe->mcg_lock);
+	nmax = n;
+	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
 
-		/* validate qp for incoming packet */
+	for (n = 0; n < nmax; n++) {
+		qp = qp_array[n];
+
+		/* since this is an unreliable transport if
+		 * one of the qp's fails to pass these checks
+		 * just don't forward a packet and continue
+		 * on to the other qp's. If there aren't any
+		 * drop the skb
+		 */
 		err = check_type_state(rxe, pkt, qp);
-		if (err)
+		if (err) {
+			rxe_drop_ref(qp);
+			if (n == nmax - 1)
+				goto err_free;
 			continue;
+		}
 
 		err = check_keys(rxe, pkt, bth_qpn(pkt), qp);
-		if (err)
+		if (err) {
+			rxe_drop_ref(qp);
+			if (n == nmax - 1)
+				goto err_free;
 			continue;
+		}
 
-		/* for all but the last QP create a new clone of the
-		 * skb and pass to the QP. Pass the original skb to
-		 * the last QP in the list.
+		/* for all but the last qp create a new copy(clone)
+		 * of the skb and pass to the qp. Pass the original
+		 * skb to the last qp in the list unless it failed
+		 * checks above
 		 */
-		if (mca->qp_list.next != &mcg->qp_list) {
-			struct sk_buff *cskb;
-			struct rxe_pkt_info *cpkt;
-
-			cskb = skb_clone(skb, GFP_ATOMIC);
-			if (unlikely(!cskb))
+		if (n < nmax - 1) {
+			skb_copy = skb_clone(skb, GFP_KERNEL);
+			if (unlikely(!skb_copy)) {
+				rxe_drop_ref(qp);
 				continue;
-
-			if (WARN_ON(!ib_device_try_get(&rxe->ib_dev))) {
-				kfree_skb(cskb);
-				break;
 			}
 
-			cpkt = SKB_TO_PKT(cskb);
-			cpkt->qp = qp;
-			rxe_add_ref(qp);
-			rxe_rcv_pkt(cpkt, cskb);
+			if (WARN_ON(!ib_device_try_get(&rxe->ib_dev))) {
+				kfree_skb(skb_copy);
+				rxe_drop_ref(qp);
+				continue;
+			}
+
+			pkt_copy = SKB_TO_PKT(skb_copy);
+			pkt_copy->qp = qp;
+			rxe_rcv_pkt(pkt_copy, skb_copy);
 		} else {
 			pkt->qp = qp;
-			rxe_add_ref(qp);
 			rxe_rcv_pkt(pkt, skb);
-			skb = NULL;	/* mark consumed */
 		}
 	}
 
-	spin_unlock_bh(&rxe->mcg_lock);
+	kfree(qp_array);
+	return;
 
-	kref_put(&mcg->ref_cnt, rxe_cleanup_mcg);
-
-	if (likely(!skb))
-		return;
-
-	/* This only occurs if one of the checks fails on the last
-	 * QP in the list above
-	 */
-
-drop:
+err_free:
+	kfree(qp_array);
+err_drop:
 	kfree_skb(skb);
 	ib_device_put(&rxe->ib_dev);
 }
