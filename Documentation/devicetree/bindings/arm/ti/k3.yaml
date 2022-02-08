@@ -53,6 +53,12 @@ properties:
               - ti,am642-sk
           - const: ti,am642
 
+      - description: K3 AM625 SoC
+        items:
+          - enum:
+              - ti,am625-sk
+          - const: ti,am625
+
       - description: K3 J721s2 SoC
         items:
           - enum:
