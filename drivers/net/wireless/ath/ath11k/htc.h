@@ -13,6 +13,7 @@
 #include <linux/timer.h>
 
 struct ath11k_base;
+struct ath11k;
 
 #define HTC_HDR_ENDPOINTID                       GENMASK(7, 0)
 #define HTC_HDR_FLAGS                            GENMASK(15, 8)
