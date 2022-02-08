@@ -1424,7 +1424,6 @@ void rtw_survey_cmd_callback(struct adapter *padapter,  struct cmd_obj *pcmd)
 
 	/*  free cmd */
 	rtw_free_cmd_obj(pcmd);
-
 }
 void rtw_disassoc_cmd_callback(struct adapter *padapter, struct cmd_obj *pcmd)
 {
@@ -1483,7 +1482,6 @@ void rtw_createbss_cmd_callback(struct adapter *padapter, struct cmd_obj *pcmd)
 
 		rtw_indicate_connect(padapter);
 	} else {
-
 		pwlan = _rtw_alloc_network(pmlmepriv);
 		spin_lock_bh(&pmlmepriv->scanned_queue.lock);
 		if (!pwlan) {
@@ -1513,7 +1511,6 @@ createbss_cmd_fail:
 	spin_unlock_bh(&pmlmepriv->lock);
 
 	rtw_free_cmd_obj(pcmd);
-
 }
 
 void rtw_setstaKey_cmdrsp_callback(struct adapter *padapter,  struct cmd_obj *pcmd)
@@ -1526,7 +1523,6 @@ void rtw_setstaKey_cmdrsp_callback(struct adapter *padapter,  struct cmd_obj *pc
 		goto exit;
 exit:
 	rtw_free_cmd_obj(pcmd);
-
 }
 
 void rtw_setassocsta_cmdrsp_callback(struct adapter *padapter,  struct cmd_obj *pcmd)
@@ -1553,5 +1549,4 @@ void rtw_setassocsta_cmdrsp_callback(struct adapter *padapter,  struct cmd_obj *
 
 exit:
 	rtw_free_cmd_obj(pcmd);
-
 }
