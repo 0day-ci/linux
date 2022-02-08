@@ -51,11 +51,16 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 		}
 		fallthrough;
 	case IIO_VAL_FRACTIONAL_LOG2:
-		tmp = (s64)*val * 1000000000LL;
+		/*
+		 * GIGA is used here as an arbitrarily large multiplier to avoid
+		 * precision loss in the division. It doesn't have any physical
+		 * meaning attached to it.
+		 */
+		tmp = (s64)*val * GIGA;
 		tmp = div_s64(tmp, rescale->denominator);
 		tmp *= rescale->numerator;
 
-		tmp = div_s64_rem(tmp, 1000000000LL, &rem);
+		tmp = div_s64_rem(tmp, GIGA, &rem);
 		*val = tmp;
 
 		if (!rem)
@@ -71,7 +76,7 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 
 		*val2 = rem / (int)tmp;
 		if (rem2)
-			*val2 += div_s64((s64)rem2 * 1000000000LL, tmp);
+			*val2 += div_s64((s64)rem2 * GIGA, tmp);
 
 		return IIO_VAL_INT_PLUS_NANO;
 	case IIO_VAL_INT_PLUS_NANO:
@@ -332,8 +337,8 @@ static int rescale_current_sense_amplifier_props(struct device *dev,
 	 * gain_div / (gain_mult * sense), while trying to keep the
 	 * numerator/denominator from overflowing.
 	 */
-	factor = gcd(sense, 1000000);
-	rescale->numerator = 1000000 / factor;
+	factor = gcd(sense, MEGA);
+	rescale->numerator = MEGA / factor;
 	rescale->denominator = sense / factor;
 
 	factor = gcd(rescale->numerator, gain_mult);
@@ -361,8 +366,8 @@ static int rescale_current_sense_shunt_props(struct device *dev,
 		return ret;
 	}
 
-	factor = gcd(shunt, 1000000);
-	rescale->numerator = 1000000 / factor;
+	factor = gcd(shunt, MEGA);
+	rescale->numerator = MEGA / factor;
 	rescale->denominator = shunt / factor;
 
 	return 0;
