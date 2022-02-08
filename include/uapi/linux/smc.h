@@ -284,4 +284,8 @@ enum {
 	__SMC_NLA_SEID_TABLE_MAX,
 	SMC_NLA_SEID_TABLE_MAX = __SMC_NLA_SEID_TABLE_MAX - 1
 };
+
+/* SMC socket options */
+#define SMC_AUTO_FALLBACK 1	/* allow auto fallback to TCP */
+
 #endif /* _UAPI_LINUX_SMC_H */
