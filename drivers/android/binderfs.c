@@ -93,7 +93,7 @@ bool is_binderfs_device(const struct inode *inode)
 /**
  * binderfs_binder_device_create - allocate inode from super block of a
  *                                 binderfs mount
- * @ref_inode: inode from wich the super block will be taken
+ * @ref_inode: inode from which the super block will be taken
  * @userp:     buffer to copy information about new device for userspace to
  * @req:       struct binderfs_device as copied from userspace
  *
@@ -159,7 +159,7 @@ static int binderfs_binder_device_create(struct inode *ref_inode,
 	inode->i_uid = info->root_uid;
 	inode->i_gid = info->root_gid;
 
-	req->name[BINDERFS_MAX_NAME] = '\0'; /* NUL-terminate */
+	req->name[BINDERFS_MAX_NAME] = '\0'; /* NULL-terminate */
 	name_len = strlen(req->name);
 	/* Make sure to include terminating NUL byte */
 	name = kmemdup(req->name, name_len + 1, GFP_KERNEL);
