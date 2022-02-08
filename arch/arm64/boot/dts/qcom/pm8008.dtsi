@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2021, The Linux Foundation. All rights reserved.
+
+pm8008_infra: pm8008@8 {
+	compatible = "qcom,pm8008";
+	reg = <0x8>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+};
+
+pm8008_regulators: pm8008@9 {
+	compatible = "qcom,pm8008-regulators";
+	reg = <0x9>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	regulators {
+		pm8008_l1: LDO1 {
+			regulator-name = "pm8008_l1";
+		};
+
+		pm8008_l2: LDO2 {
+			regulator-name = "pm8008_l2";
+		};
+
+		pm8008_l3: LDO3 {
+			regulator-name = "pm8008_l3";
+		};
+
+		pm8008_l4: LDO4 {
+			regulator-name = "pm8008_l4";
+		};
+
+		pm8008_l5: LDO5 {
+			regulator-name = "pm8008_l5";
+		};
+
+		pm8008_l6: LDO6 {
+			regulator-name = "pm8008_l6";
+		};
+
+		pm8008_l7: LDO7 {
+			regulator-name = "pm8008_l7";
+		};
+	};
+};
