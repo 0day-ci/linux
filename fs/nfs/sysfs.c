@@ -168,6 +168,18 @@ static struct nfs_netns_client *nfs_netns_client_alloc(struct kobject *parent,
 	return NULL;
 }
 
+static void assign_unique_clientid(struct nfs_netns_client *clp)
+{
+	unsigned char client_uuid[16];
+	char *uuid_str = kmalloc(UUID_STRING_LEN + 1, GFP_KERNEL);
+
+	if (uuid_str) {
+		generate_random_uuid(client_uuid);
+		sprintf(uuid_str, "%pU", client_uuid);
+		rcu_assign_pointer(clp->identifier, uuid_str);
+	}
+}
+
 void nfs_netns_sysfs_setup(struct nfs_net *netns, struct net *net)
 {
 	struct nfs_netns_client *clp;
@@ -175,6 +187,8 @@ void nfs_netns_sysfs_setup(struct nfs_net *netns, struct net *net)
 	clp = nfs_netns_client_alloc(nfs_client_kobj, net);
 	if (clp) {
 		netns->nfs_client = clp;
+		if (net != &init_net)
+			assign_unique_clientid(clp);
 		kobject_uevent(&clp->kobject, KOBJ_ADD);
 	}
 }
