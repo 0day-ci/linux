@@ -1,0 +1,64 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2022 SUSE Linux Products GmbH. All Rights Reserved.
+#
+# FS QA Test 259
+#
+# Make sure autodefrag can still defrag the file even their extent maps are
+# read from disk
+#
+. ./common/preamble
+_begin_fstest auto quick defrag
+
+# Override the default cleanup function.
+# _cleanup()
+# {
+# 	cd /
+# 	rm -r -f $tmp.*
+# }
+
+# Import common functions.
+# . ./common/filter
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs btrfs
+_require_scratch
+
+# Need 4K sectorsize, as the autodefrag threshold is only 64K,
+# thus 64K sectorsize will not work.
+_require_btrfs_support_sectorsize 4096
+_scratch_mkfs -s 4k >> $seqres.full
+_scratch_mount -o datacow,autodefrag
+
+# Create fragmented write
+$XFS_IO_PROG -f -s -c "pwrite 24k 8k" -c "pwrite 16k 8k" \
+		-c "pwrite 8k 8k" -c "pwrite 0 8k" \
+		"$SCRATCH_MNT/foobar" >> $seqres.full
+sync
+
+echo "=== Before autodefrag ===" >> $seqres.full
+$XFS_IO_PROG -c "fiemap -v" "$SCRATCH_MNT/foobar" >> $tmp.before
+cat $tmp.before >> $seqres.full
+
+# Drop the cache (including extent map cache per-inode)
+echo 3 > /proc/sys/vm/drop_caches
+
+# Now trigger autodefrag
+_scratch_remount commit=1
+sleep 3
+sync
+
+echo "=== After autodefrag ===" >> $seqres.full
+$XFS_IO_PROG -c "fiemap -v" "$SCRATCH_MNT/foobar" >> $tmp.after
+cat $tmp.after >> $seqres.full
+
+# The layout should differ if autodefrag is working
+diff $tmp.before $tmp.after > /dev/null && echo "autodefrag didn't defrag the file"
+
+echo "Silence is golden"
+
+# success, all done
+status=0
+exit
