@@ -64,6 +64,8 @@
 
 #if defined(bpf_target_x86)
 
+#define __BPF_ARCH_HAS_SYSCALL_WRAPPER
+
 #if defined(__KERNEL__) || defined(__VMLINUX_H__)
 
 #define __PT_PARM1_REG di
@@ -114,6 +116,8 @@
 
 #elif defined(bpf_target_s390)
 
+#define __BPF_ARCH_HAS_SYSCALL_WRAPPER
+
 /* s390 provides user_pt_regs instead of struct pt_regs to userspace */
 #define __PT_REGS_CAST(x) ((const user_pt_regs *)(x))
 #define __PT_PARM1_REG gprs[2]
@@ -141,6 +145,8 @@
 #define __PT_IP_REG uregs[12]
 
 #elif defined(bpf_target_arm64)
+
+#define __BPF_ARCH_HAS_SYSCALL_WRAPPER
 
 /* arm64 provides struct user_pt_regs instead of struct pt_regs to userspace */
 #define __PT_REGS_CAST(x) ((const struct user_pt_regs *)(x))
@@ -343,6 +349,17 @@ struct pt_regs;
 #define PT_REGS_PARM5_CORE_SYSCALL(x) ({ _Pragma(__BPF_TARGET_MISSING); 0l; })
 
 #endif /* defined(bpf_target_defined) */
+
+/*
+ * When invoked from a syscall handler BPF_KPROBE, returns a pointer to a
+ * struct pt_regs containing syscall arguments, that is suitable for passing to
+ * PT_REGS_PARMn_SYSCALL() and PT_REGS_PARMn_CORE_SYSCALL().
+ */
+#ifdef __BPF_ARCH_HAS_SYSCALL_WRAPPER
+#define PT_REGS_SYSCALL_REGS(ctx) ((struct pt_regs *)PT_REGS_PARM1(ctx))
+#else
+#define PT_REGS_SYSCALL_REGS(ctx) ctx
+#endif
 
 #ifndef ___bpf_concat
 #define ___bpf_concat(a, b) a ## b
