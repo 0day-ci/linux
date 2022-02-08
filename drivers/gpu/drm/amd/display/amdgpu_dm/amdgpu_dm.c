@@ -8168,6 +8168,7 @@ static void amdgpu_set_panel_orientation(struct drm_connector *connector)
 	if (native_mode->hdisplay == 0 || native_mode->vdisplay == 0)
 		return;
 
+	drm_connector_init_panel_orientation_property(connector);
 	drm_connector_set_panel_orientation_with_quirk(connector,
 						       DRM_MODE_PANEL_ORIENTATION_UNKNOWN,
 						       native_mode->hdisplay,
