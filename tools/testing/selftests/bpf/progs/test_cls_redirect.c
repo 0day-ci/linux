@@ -28,8 +28,10 @@
 #define INLINING __always_inline
 #endif
 
+#ifndef offsetofend
 #define offsetofend(TYPE, MEMBER) \
 	(offsetof(TYPE, MEMBER) + sizeof((((TYPE *)0)->MEMBER)))
+#endif
 
 #define IP_OFFSET_MASK (0x1FFF)
 #define IP_MF (0x2000)
