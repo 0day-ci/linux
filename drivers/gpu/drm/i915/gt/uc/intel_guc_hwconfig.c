@@ -71,7 +71,52 @@ static int guc_hwconfig_discover_size(struct intel_guc_hwconfig *hwconfig)
 	return 0;
 }
 
-static int guc_hwconfig_fill_buffer(struct intel_guc_hwconfig *hwconfig)
+static int verify_hwconfig_blob(struct drm_device *drm,
+				const struct intel_guc_hwconfig *hwconfig)
+{
+	struct drm_i915_query_hwconfig_blob_item *pos;
+	u32 remaining;
+
+	if (hwconfig->size % 4 != 0 || hwconfig->ptr == NULL)
+		return -EINVAL;
+
+	pos = hwconfig->ptr;
+	/* The number of dwords in the blob to validate. Each loop
+	 * pass will process at least 2 dwords corresponding to the
+	 * key and length fields of the item. In addition, the length
+	 * field of the item indicates the length of the data array,
+	 * and that number of dwords will be processed (skipped) as
+	 * well.
+	 */
+	remaining = hwconfig->size / 4;
+
+	while (remaining > 0) {
+		/* Each item requires at least 2 dwords for the key
+		 * and length fields. If the length field is 0, then
+		 * the data array would be of length 0.
+		 */
+		if (remaining < 2)
+			return -EINVAL;
+		/* remaining >= 2, so subtracting 2 is ok, whereas
+		 * adding 2 to pos->length could overflow.
+		 */
+		if (pos->length > remaining - 2)
+			return -EINVAL;
+		/* The length check above ensures that the adjustment
+		 * of the remaining variable will not underflow, and
+		 * that the adjustment of the pos variable will not
+		 * pass the end of the blob data.
+		 */
+		remaining -= 2 + pos->length;
+		pos = (void *)&pos->data[pos->length];
+	}
+
+	drm_dbg(drm, "hwconfig blob format is valid\n");
+	return 0;
+}
+
+static int guc_hwconfig_fill_buffer(struct drm_device *drm,
+				    struct intel_guc_hwconfig *hwconfig)
 {
 	struct intel_guc *guc = hwconfig_to_guc(hwconfig);
 	struct i915_vma *vma;
@@ -88,8 +133,13 @@ static int guc_hwconfig_fill_buffer(struct intel_guc_hwconfig *hwconfig)
 	ggtt_offset = intel_guc_ggtt_offset(guc, vma);
 
 	ret = __guc_action_get_hwconfig(hwconfig, ggtt_offset, hwconfig->size);
-	if (ret >= 0)
+	if (ret >= 0) {
 		memcpy(hwconfig->ptr, vaddr, hwconfig->size);
+		if (verify_hwconfig_blob(drm, hwconfig)) {
+			drm_err(drm, "Ignoring invalid hwconfig blob received from GuC!\n");
+			ret = -EINVAL;
+		}
+	}
 
 	i915_vma_unpin_and_release(&vma, I915_VMA_RELEASE_MAP);
 
@@ -141,7 +191,7 @@ int intel_guc_hwconfig_init(struct intel_guc_hwconfig *hwconfig)
 		return -ENOMEM;
 	}
 
-	ret = guc_hwconfig_fill_buffer(hwconfig);
+	ret = guc_hwconfig_fill_buffer(&i915->drm, hwconfig);
 	if (ret < 0) {
 		intel_guc_hwconfig_fini(hwconfig);
 		return ret;
