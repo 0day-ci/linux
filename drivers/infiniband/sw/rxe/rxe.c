@@ -29,6 +29,8 @@ void rxe_dealloc(struct ib_device *ib_dev)
 	rxe_pool_cleanup(&rxe->mr_pool);
 	rxe_pool_cleanup(&rxe->mw_pool);
 
+	rxe_cleanup_mcast(rxe);
+
 	if (rxe->tfm)
 		crypto_free_shash(rxe->tfm);
 }

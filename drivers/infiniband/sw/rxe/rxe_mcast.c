@@ -382,3 +382,34 @@ int rxe_detach_mcast(struct ib_qp *ibqp, union ib_gid *mgid, u16 mlid)
 
 	return rxe_detach_mcg(rxe, qp, mgid);
 }
+
+/**
+ * rxe_cleanup_mcast - cleanup all resources held by mcast
+ * @rxe: rxe object
+ *
+ * Called when rxe device is unloaded. Walk red-black tree to
+ * find all mcg's and then walk mcg->qp_list to find all mca's and
+ * free them. These should have been freed already if apps are
+ * well behaved.
+ */
+void rxe_cleanup_mcast(struct rxe_dev *rxe)
+{
+	struct rb_root *root = &rxe->mcg_tree;
+	struct rb_node *node, *next;
+	struct rxe_mcg *mcg;
+	struct rxe_mca *mca, *tmp;
+
+	for (node = rb_first(root); node; node = next) {
+		next = rb_next(node);
+		mcg = rb_entry(node, typeof(*mcg), node);
+
+		spin_lock_bh(&rxe->mcg_lock);
+		list_for_each_entry_safe(mca, tmp, &mcg->qp_list, qp_list)
+			kfree(mca);
+
+		__rxe_remove_mcg(mcg);
+		spin_unlock_bh(&rxe->mcg_lock);
+
+		kfree(mcg);
+	}
+}
