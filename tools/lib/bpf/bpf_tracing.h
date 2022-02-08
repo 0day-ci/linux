@@ -219,7 +219,7 @@
 
 struct pt_regs;
 
-/* allow some architecutres to override `struct pt_regs` */
+/* allow some architectures to override `struct pt_regs` */
 #ifndef __PT_REGS_CAST
 #define __PT_REGS_CAST(x) (x)
 #endif
