@@ -12,6 +12,8 @@
 #include <linux/hrtimer.h>
 #include <linux/dma-mapping.h>
 #include <linux/spinlock.h>
+#include <linux/bits.h>
+#include <linux/bitfield.h>
 #include <xen/xen.h>
 
 #ifdef DEBUG
@@ -66,6 +68,34 @@
 #define LAST_ADD_TIME_INVALID(vq)
 #endif
 
+/*
+ * The provided last_used_idx, as returned by virtqueue_enable_cb_prepare(),
+ * is an opaque value representing the queue state and it is built as follows:
+ *
+ *	---------------------------------------------------------
+ *	|	vq->wraps	|	vq->last_used_idx	|
+ *	31------------------------------------------------------0
+ *
+ * The MSB 16bits embedding the wraps counter for the underlying virtqueue
+ * is stripped out, using these macros, before reaching into the lower layer
+ * helpers.
+ *
+ * This structure of the opaque value mitigates the scenario in which, when
+ * exactly 2**16 messages are marked as used between two successive calls to
+ * virtqueue_poll(), the caller is fooled into thinking nothing new has arrived
+ * since the pure last_used_idx is exactly the same.
+ */
+#define VRING_IDX_MASK					GENMASK(15, 0)
+#define VRING_POLL_GET_IDX(opaque)				\
+	((u16)FIELD_GET(VRING_IDX_MASK, (opaque)))
+
+#define VRING_WRAPS_MASK				GENMASK(31, 16)
+#define VRING_POLL_GET_WRAPS(opaque)				\
+	((u16)FIELD_GET(VRING_WRAPS_MASK, (opaque)))
+
+#define VRING_POLL_BUILD_OPAQUE(idx, wraps)			\
+	(FIELD_PREP(VRING_WRAPS_MASK, (wraps)) | ((idx) & VRING_IDX_MASK))
+
 struct vring_desc_state_split {
 	void *data;			/* Data for callback. */
 	struct vring_desc *indir_desc;	/* Indirect descriptor, if any. */
@@ -113,6 +143,11 @@ struct vring_virtqueue {
 
 	/* Last used index we've seen. */
 	u16 last_used_idx;
+
+	/* Should we count wraparounds? */
+	bool use_wrap_counter;
+	/* Number of wraparounds */
+	u16 wraps;
 
 	/* Hint for event idx: already triggered no need to disable. */
 	bool event_triggered;
@@ -789,6 +824,8 @@ static void *virtqueue_get_buf_ctx_split(struct virtqueue *_vq,
 	ret = vq->split.desc_state[i].data;
 	detach_buf_split(vq, i, ctx);
 	vq->last_used_idx++;
+	if (unlikely(vq->use_wrap_counter))
+		vq->wraps += !vq->last_used_idx;
 	/* If we expect an interrupt for the next entry, tell host
 	 * by writing event index and flush out the write before
 	 * the read in the next get_buf call. */
@@ -1474,6 +1511,8 @@ static void *virtqueue_get_buf_ctx_packed(struct virtqueue *_vq,
 	if (unlikely(vq->last_used_idx >= vq->packed.vring.num)) {
 		vq->last_used_idx -= vq->packed.vring.num;
 		vq->packed.used_wrap_counter ^= 1;
+		if (unlikely(vq->use_wrap_counter))
+			vq->wraps++;
 	}
 
 	/*
@@ -1709,6 +1748,8 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	vq->weak_barriers = weak_barriers;
 	vq->broken = false;
 	vq->last_used_idx = 0;
+	vq->use_wrap_counter = false;
+	vq->wraps = 0;
 	vq->event_triggered = false;
 	vq->num_added = 0;
 	vq->packed_ring = true;
@@ -2046,15 +2087,48 @@ EXPORT_SYMBOL_GPL(virtqueue_disable_cb);
  */
 unsigned virtqueue_enable_cb_prepare(struct virtqueue *_vq)
 {
+	unsigned int last_used_idx;
 	struct vring_virtqueue *vq = to_vvq(_vq);
 
 	if (vq->event_triggered)
 		vq->event_triggered = false;
 
-	return vq->packed_ring ? virtqueue_enable_cb_prepare_packed(_vq) :
-				 virtqueue_enable_cb_prepare_split(_vq);
+	last_used_idx = vq->packed_ring ?
+			virtqueue_enable_cb_prepare_packed(_vq) :
+			virtqueue_enable_cb_prepare_split(_vq);
+
+	return VRING_POLL_BUILD_OPAQUE(last_used_idx, vq->wraps);
 }
 EXPORT_SYMBOL_GPL(virtqueue_enable_cb_prepare);
+
+/**
+ * virtqueue_use_wrap_counter  - Enable the virtqueue use_wrap_counter flag
+ * @_vq: the struct virtqueue we're talking about.
+ *
+ * After calling this the core will keep track of virtqueues last_used_idx
+ * in a dedicated wraps counter and such value will be reported embedded in the
+ * MSB 16bit of the opaque value returned by virtqueue_enable_cb_prepare.
+ *
+ * Return: 0 on Success
+ */
+int virtqueue_use_wrap_counter(struct virtqueue *_vq)
+{
+	u8 status;
+	struct vring_virtqueue *vq = to_vvq(_vq);
+
+	if (unlikely(vq->broken))
+		return -EINVAL;
+
+	status = _vq->vdev->config->get_status(_vq->vdev);
+	if (!status || status >= VIRTIO_CONFIG_S_DRIVER_OK)
+		return -EBUSY;
+
+	vq->use_wrap_counter = true;
+	virtio_mb(vq->weak_barriers);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(virtqueue_use_wrap_counter);
 
 /**
  * virtqueue_poll - query pending used buffers
@@ -2072,9 +2146,13 @@ bool virtqueue_poll(struct virtqueue *_vq, unsigned last_used_idx)
 	if (unlikely(vq->broken))
 		return false;
 
+	if (unlikely(vq->wraps != VRING_POLL_GET_WRAPS(last_used_idx)))
+		return true;
+
 	virtio_mb(vq->weak_barriers);
-	return vq->packed_ring ? virtqueue_poll_packed(_vq, last_used_idx) :
-				 virtqueue_poll_split(_vq, last_used_idx);
+	return vq->packed_ring ?
+		virtqueue_poll_packed(_vq, VRING_POLL_GET_IDX(last_used_idx)) :
+		   virtqueue_poll_split(_vq, VRING_POLL_GET_IDX(last_used_idx));
 }
 EXPORT_SYMBOL_GPL(virtqueue_poll);
 
@@ -2198,6 +2276,8 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 	vq->weak_barriers = weak_barriers;
 	vq->broken = false;
 	vq->last_used_idx = 0;
+	vq->use_wrap_counter = false;
+	vq->wraps = 0;
 	vq->event_triggered = false;
 	vq->num_added = 0;
 	vq->use_dma_api = vring_use_dma_api(vdev);
