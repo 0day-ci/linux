@@ -168,8 +168,6 @@ static char *usb_dump_endpoint_descriptor(int speed, char *start, char *end,
 	case USB_ENDPOINT_XFER_INT:
 		type = "Int.";
 		break;
-	default:	/* "can't happen" */
-		return start;
 	}
 
 	interval = usb_decode_interval(desc, speed);
