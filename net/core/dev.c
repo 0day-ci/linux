@@ -392,6 +392,24 @@ static void unlist_netdevice(struct net_device *dev)
 	dev_base_seq_inc(dev_net(dev));
 }
 
+void netdev_drop_inc(struct net_device *dev, enum netdev_drop drop)
+{
+	switch (drop) {
+	case NETDEV_RX_DROPPED:
+		atomic_long_inc(&dev->rx_dropped);
+		break;
+	case NETDEV_TX_DROPPED:
+		atomic_long_inc(&dev->tx_dropped);
+		break;
+	case NETDEV_RX_NOHANDLER:
+		atomic_long_inc(&dev->rx_nohandler);
+		break;
+	default:
+		break;
+	}
+	trace_netdev_drop(dev, __builtin_return_address(0));
+}
+EXPORT_SYMBOL(netdev_drop_inc);
 /*
  *	Our notifier list
  */
@@ -3586,7 +3604,7 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 out_kfree_skb:
 	kfree_skb(skb);
 out_null:
-	atomic_long_inc(&dev->tx_dropped);
+	netdev_drop_inc(dev, NETDEV_TX_DROPPED);
 	return NULL;
 }
 
@@ -4136,7 +4154,7 @@ recursion_alert:
 	rc = -ENETDOWN;
 	rcu_read_unlock_bh();
 
-	atomic_long_inc(&dev->tx_dropped);
+	netdev_drop_inc(dev, NETDEV_TX_DROPPED);
 	kfree_skb_list(skb);
 	return rc;
 out:
@@ -4188,7 +4206,7 @@ int __dev_direct_xmit(struct sk_buff *skb, u16 queue_id)
 	local_bh_enable();
 	return ret;
 drop:
-	atomic_long_inc(&dev->tx_dropped);
+	netdev_drop_inc(dev, NETDEV_TX_DROPPED);
 	kfree_skb_list(skb);
 	return NET_XMIT_DROP;
 }
@@ -4557,7 +4575,7 @@ drop:
 
 	local_irq_restore(flags);
 
-	atomic_long_inc(&skb->dev->rx_dropped);
+	netdev_drop_inc(skb->dev, NETDEV_RX_DROPPED);
 	kfree_skb(skb);
 	return NET_RX_DROP;
 }
@@ -5319,9 +5337,9 @@ check_vlan_id:
 	} else {
 drop:
 		if (!deliver_exact)
-			atomic_long_inc(&skb->dev->rx_dropped);
+			netdev_drop_inc(skb->dev, NETDEV_RX_DROPPED);
 		else
-			atomic_long_inc(&skb->dev->rx_nohandler);
+			netdev_drop_inc(skb->dev, NETDEV_RX_NOHANDLER);
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)

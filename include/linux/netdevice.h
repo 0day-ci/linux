@@ -2285,6 +2285,13 @@ struct net_device {
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
+enum netdev_drop {
+	NETDEV_RX_DROPPED,
+	NETDEV_TX_DROPPED,
+	NETDEV_RX_NOHANDLER,
+};
+void netdev_drop_inc(struct net_device *dev, enum netdev_drop drop);
+
 static inline bool netif_elide_gro(const struct net_device *dev)
 {
 	if (!(dev->features & NETIF_F_GRO) || dev->xdp_prog)

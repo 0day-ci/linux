@@ -118,6 +118,33 @@ TRACE_EVENT(net_dev_xmit_timeout,
 		__get_str(name), __get_str(driver), __entry->queue_index)
 );
 
+TRACE_EVENT(netdev_drop,
+
+	TP_PROTO(struct net_device *dev, void *location),
+
+	TP_ARGS(dev, location),
+
+	TP_STRUCT__entry(
+		__string(name,          dev->name)
+		__field(void *,         location)
+		__field(unsigned long,  rx_dropped)
+		__field(unsigned long,  tx_dropped)
+		__field(unsigned long,  rx_nohandler)
+	),
+
+	TP_fast_assign(
+		__assign_str(name, dev->name);
+		__entry->location     = location;
+		__entry->rx_dropped   = (unsigned long)atomic_long_read(&dev->rx_dropped);
+		__entry->tx_dropped   = (unsigned long)atomic_long_read(&dev->tx_dropped);
+		__entry->rx_nohandler = (unsigned long)atomic_long_read(&dev->rx_nohandler);
+	),
+
+	TP_printk("dev=%s rx_dropped=%lu tx_dropped=%lu rx_nohandler=%lu location=%p",
+		  __get_str(name), __entry->rx_dropped, __entry->tx_dropped, __entry->rx_nohandler,
+		  __entry->location)
+);
+
 DECLARE_EVENT_CLASS(net_dev_template,
 
 	TP_PROTO(struct sk_buff *skb),
