@@ -70,8 +70,12 @@ static void tcm_loop_release_cmd(struct se_cmd *se_cmd)
 
 	if (se_cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)
 		kmem_cache_free(tcm_loop_cmd_cache, tl_cmd);
-	else
-		scsi_done(sc);
+	else {
+		if (unlikely(in_interrupt()))
+			scsi_done(sc);
+		else
+			scsi_done_direct(sc);
+	}
 }
 
 static int tcm_loop_show_info(struct seq_file *m, struct Scsi_Host *host)
