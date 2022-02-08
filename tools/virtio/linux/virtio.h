@@ -5,6 +5,8 @@
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
 
+#define VIRTIO_CONFIG_S_DRIVER	2
+
 typedef struct pm_message {
 	int event;
 } pm_message_t;
@@ -48,9 +50,12 @@ struct device {
 	struct device_driver *driver;
 };
 
+struct virtio_config_ops;
+
 struct virtio_device {
 	struct device dev;
 	u64 features;
+	const struct virtio_config_ops *config;
 	struct list_head vqs;
 	spinlock_t vqs_list_lock;
 };
@@ -63,6 +68,32 @@ struct virtqueue {
         unsigned int index;
         unsigned int num_free;
 	void *priv;
+};
+
+struct virtio_config_ops {
+	void (*enable_cbs)(struct virtio_device *vdev);
+	void (*get)(struct virtio_device *vdev, unsigned int offset,
+		    void *buf, unsigned int len);
+	void (*set)(struct virtio_device *vdev, unsigned int offset,
+		    const void *buf, unsigned int len);
+	u32 (*generation)(struct virtio_device *vdev);
+	u8 (*get_status)(struct virtio_device *vdev);
+	void (*set_status)(struct virtio_device *vdev, u8 status);
+	void (*reset)(struct virtio_device *vdev);
+	int (*find_vqs)(struct virtio_device *vdev, unsigned int nvqs,
+			struct virtqueue *vqs[], void *callbacks[],
+			const char * const names[], const bool *ctx,
+			void *desc);
+	void (*del_vqs)(struct virtio_device *vdev);
+	u64 (*get_features)(struct virtio_device *vdev);
+	int (*finalize_features)(struct virtio_device *vdev);
+	const char *(*bus_name)(struct virtio_device *vdev);
+	int (*set_vq_affinity)(struct virtqueue *vq,
+			       const void *cpu_mask);
+	const void *(*get_vq_affinity)(struct virtio_device *vdev,
+			int index);
+	bool (*get_shm_region)(struct virtio_device *vdev,
+			       void *region, u8 id);
 };
 
 struct virtio_driver {
@@ -110,6 +141,8 @@ void virtqueue_disable_cb(struct virtqueue *vq);
 
 bool virtqueue_enable_cb(struct virtqueue *vq);
 bool virtqueue_enable_cb_delayed(struct virtqueue *vq);
+
+int virtqueue_use_wrap_counter(struct virtqueue *vq);
 
 void *virtqueue_detach_unused_buf(struct virtqueue *vq);
 struct virtqueue *vring_new_virtqueue(unsigned int index,

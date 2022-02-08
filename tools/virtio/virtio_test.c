@@ -21,6 +21,8 @@
 
 #define RANDOM_BATCH -1
 
+static u8 virtio_test_device_status;
+
 /* Unused */
 void *__kmalloc_fake, *__kfree_ignore_start, *__kfree_ignore_end;
 
@@ -109,7 +111,7 @@ static void vq_reset(struct vq_info *info, int num, struct virtio_device *vdev)
 	info->vq->priv = info;
 }
 
-static void vq_info_add(struct vdev_info *dev, int num)
+static void vq_info_add(struct vdev_info *dev, int num, bool use_wrap_counters)
 {
 	struct vq_info *info = &dev->vqs[dev->nvqs];
 	int r;
@@ -119,11 +121,24 @@ static void vq_info_add(struct vdev_info *dev, int num)
 	r = posix_memalign(&info->ring, 4096, vring_size(num, 4096));
 	assert(r >= 0);
 	vq_reset(info, num, &dev->vdev);
+	if (use_wrap_counters) {
+		r = virtqueue_use_wrap_counter(info->vq);
+		assert(r == 0);
+	}
 	vhost_vq_setup(dev, info);
 	dev->fds[info->idx].fd = info->call;
 	dev->fds[info->idx].events = POLLIN;
 	dev->nvqs++;
 }
+
+static u8 virtio_test_get_status(struct virtio_device *vdev)
+{
+	return virtio_test_device_status;
+}
+
+struct virtio_config_ops virtio_config_ops = {
+	.get_status = virtio_test_get_status,
+};
 
 static void vdev_info_init(struct vdev_info* dev, unsigned long long features)
 {
@@ -132,6 +147,8 @@ static void vdev_info_init(struct vdev_info* dev, unsigned long long features)
 	dev->vdriver.suppress_used_validation = false;
 	dev->vdev.dev.driver = &dev->vdriver.driver;
 	dev->vdev.features = features;
+	virtio_test_device_status = VIRTIO_CONFIG_S_DRIVER;
+	dev->vdev.config = &virtio_config_ops;
 	INIT_LIST_HEAD(&dev->vdev.vqs);
 	spin_lock_init(&dev->vdev.vqs_list_lock);
 	dev->buf_size = 1024;
@@ -317,6 +334,14 @@ const struct option longopts[] = {
 		.val = 'd',
 	},
 	{
+		.name = "wrap-counters",
+		.val = 'W',
+	},
+	{
+		.name = "no-wrap-counters",
+		.val = 'w',
+	},
+	{
 		.name = "batch",
 		.val = 'b',
 		.has_arg = required_argument,
@@ -337,6 +362,7 @@ static void help(void)
 		" [--no-event-idx]"
 		" [--no-virtio-1]"
 		" [--delayed-interrupt]"
+		" [--wrap-counters]"
 		" [--batch=random/N]"
 		" [--reset=N]"
 		"\n");
@@ -349,7 +375,7 @@ int main(int argc, char **argv)
 		(1ULL << VIRTIO_RING_F_EVENT_IDX) | (1ULL << VIRTIO_F_VERSION_1);
 	long batch = 1, reset = 0;
 	int o;
-	bool delayed = false;
+	bool delayed = false, use_wrap_counters = false;
 
 	for (;;) {
 		o = getopt_long(argc, argv, optstring, longopts, NULL);
@@ -373,6 +399,9 @@ int main(int argc, char **argv)
 			break;
 		case 'D':
 			delayed = true;
+			break;
+		case 'W':
+			use_wrap_counters = true;
 			break;
 		case 'b':
 			if (0 == strcmp(optarg, "random")) {
@@ -400,7 +429,7 @@ int main(int argc, char **argv)
 
 done:
 	vdev_info_init(&dev, features);
-	vq_info_add(&dev, 256);
+	vq_info_add(&dev, 256, use_wrap_counters);
 	run_test(&dev, &dev.vqs[0], delayed, batch, reset, 0x100000);
 	return 0;
 }
