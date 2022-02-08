@@ -2,6 +2,7 @@
 #ifndef __BPF_HELPERS__
 #define __BPF_HELPERS__
 
+#include "bpf_common_helpers.h"
 /*
  * Note that bpf programs need to include either
  * vmlinux.h (auto-generated from BTF) or linux/types.h
@@ -59,20 +60,6 @@
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
-#endif
-
-/*
- * Helper macros to manipulate data structures
- */
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER)	((unsigned long)&((TYPE *)0)->MEMBER)
-#endif
-#ifndef container_of
-#define container_of(ptr, type, member)				\
-	({							\
-		void *__mptr = (void *)(ptr);			\
-		((type *)(__mptr - offsetof(type, member)));	\
-	})
 #endif
 
 /*
