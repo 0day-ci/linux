@@ -8,6 +8,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
@@ -27,12 +28,54 @@
 #define INT_EN_CLR_OFFSET		0x16
 #define INT_LATCHED_STS_OFFSET		0x18
 
+static const struct mfd_cell pm8008_regulator_devs[] = {
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 0,
+	},
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 1,
+	},
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 2,
+	},
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 3,
+	},
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 4,
+	},
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 5,
+	},
+	{
+		.name = "qcom,pm8008-regulators",
+		.id = 6,
+	},
+};
+
 enum {
 	PM8008_MISC,
 	PM8008_TEMP_ALARM,
 	PM8008_GPIO1,
 	PM8008_GPIO2,
 	PM8008_NUM_PERIPHS,
+};
+
+enum {
+	PM8008_INFRA,
+	PM8008_REGULATORS,
+};
+
+static const struct of_device_id pm8008_match[] = {
+	{ .compatible = "qcom,pm8008", .data = (void *)PM8008_INFRA},
+	{ .compatible = "qcom,pm8008-regulators", .data = (void *)PM8008_REGULATORS},
+	{ },
 };
 
 #define PM8008_PERIPH_0_BASE	0x900
@@ -221,6 +264,7 @@ static int pm8008_probe(struct i2c_client *client)
 {
 	int rc;
 	struct pm8008_data *chip;
+	const struct of_device_id *id;
 
 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
@@ -239,13 +283,18 @@ static int pm8008_probe(struct i2c_client *client)
 			dev_err(chip->dev, "Failed to probe irq periphs: %d\n", rc);
 	}
 
+	id = of_match_node(pm8008_match, chip->dev->of_node);
+	if (id->data == (void *)PM8008_REGULATORS) {
+		rc = mfd_add_devices(chip->dev, 0, pm8008_regulator_devs,
+				ARRAY_SIZE(pm8008_regulator_devs), NULL, 0, NULL);
+		if (rc) {
+			dev_err(chip->dev, "Failed to add children: %d\n", rc);
+			return rc;
+		}
+	}
+
 	return devm_of_platform_populate(chip->dev);
 }
-
-static const struct of_device_id pm8008_match[] = {
-	{ .compatible = "qcom,pm8008", },
-	{ },
-};
 
 static struct i2c_driver pm8008_mfd_driver = {
 	.driver = {
