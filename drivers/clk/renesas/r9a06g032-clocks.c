@@ -129,6 +129,11 @@ enum { K_GATE = 0, K_FFC, K_DIV, K_BITSEL, K_DUALGATE };
 
 #define R9A06G032_CLOCK_COUNT		(R9A06G032_UART_GROUP_34567 + 1)
 
+#define R9A06G032_SYSCTRL_REG_RSTEN		0x120
+#define WDA7RST1	BIT(2)
+#define WDA7RST0	BIT(1)
+#define MRESET		BIT(0)
+
 static const struct r9a06g032_clkdesc r9a06g032_clocks[] = {
 	D_ROOT(CLKOUT, "clkout", 25, 1),
 	D_ROOT(CLK_PLL_USB, "clk_pll_usb", 12, 10),
@@ -893,6 +898,19 @@ static void r9a06g032_clocks_del_clk_provider(void *data)
 	of_clk_del_provider(data);
 }
 
+static void r9a06g032_reset_sources(struct r9a06g032_priv *clocks,
+			uint32_t mask, uint32_t value)
+{
+	uint32_t rsten;
+	unsigned long flags;
+
+	spin_lock_irqsave(&clocks->lock, flags);
+	rsten = readl(clocks->reg);
+	rsten = (rsten & ~mask) | (value & mask);
+	writel(rsten, clocks->reg + R9A06G032_SYSCTRL_REG_RSTEN);
+	spin_unlock_irqrestore(&clocks->lock, flags);
+}
+
 static int __init r9a06g032_clocks_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -909,6 +927,8 @@ static int __init r9a06g032_clocks_probe(struct platform_device *pdev)
 			    GFP_KERNEL);
 	if (!clocks || !clks)
 		return -ENOMEM;
+
+	platform_set_drvdata(pdev, clocks);
 
 	spin_lock_init(&clocks->lock);
 
@@ -963,7 +983,16 @@ static int __init r9a06g032_clocks_probe(struct platform_device *pdev)
 	if (error)
 		return error;
 
+
 	return r9a06g032_add_clk_domain(dev);
+}
+
+static void r9a06g032_clocks_shutdown(struct platform_device *pdev)
+{
+	struct r9a06g032_priv *clocks = platform_get_drvdata(pdev);
+
+	/* Disable the watchdog reset sources */
+	r9a06g032_reset_sources(clocks, WDA7RST0 | WDA7RST1, 0);
 }
 
 static const struct of_device_id r9a06g032_match[] = {
@@ -976,6 +1005,7 @@ static struct platform_driver r9a06g032_clock_driver = {
 		.name	= "renesas,r9a06g032-sysctrl",
 		.of_match_table = r9a06g032_match,
 	},
+	.shutdown = r9a06g032_clocks_shutdown,
 };
 
 static int __init r9a06g032_clocks_init(void)
