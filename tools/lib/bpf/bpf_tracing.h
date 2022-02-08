@@ -118,8 +118,11 @@
 
 #define __BPF_ARCH_HAS_SYSCALL_WRAPPER
 
+#if !defined(__KERNEL__) && !defined(__VMLINUX_H__)
 /* s390 provides user_pt_regs instead of struct pt_regs to userspace */
 #define __PT_REGS_CAST(x) ((const user_pt_regs *)(x))
+#endif
+
 #define __PT_PARM1_REG gprs[2]
 #define __PT_PARM2_REG gprs[3]
 #define __PT_PARM3_REG gprs[4]
@@ -148,8 +151,11 @@
 
 #define __BPF_ARCH_HAS_SYSCALL_WRAPPER
 
+#if !defined(__KERNEL__) && !defined(__VMLINUX_H__)
 /* arm64 provides struct user_pt_regs instead of struct pt_regs to userspace */
 #define __PT_REGS_CAST(x) ((const struct user_pt_regs *)(x))
+#endif
+
 #define __PT_PARM1_REG regs[0]
 #define __PT_PARM2_REG regs[1]
 #define __PT_PARM3_REG regs[2]
@@ -207,7 +213,10 @@
 
 #elif defined(bpf_target_riscv)
 
+#if !defined(__KERNEL__) && !defined(__VMLINUX_H__)
 #define __PT_REGS_CAST(x) ((const struct user_regs_struct *)(x))
+#endif
+
 #define __PT_PARM1_REG a0
 #define __PT_PARM2_REG a1
 #define __PT_PARM3_REG a2
