@@ -388,13 +388,31 @@ struct per_cpu_pages {
 	short expire;		/* When 0, remote pagesets are drained */
 #endif
 
-	struct pcplists *lp;
+	/*
+	 * As a rule of thumb, any access to struct per_cpu_pages's 'lp' has
+	 * happen with the pagesets local_lock held and using
+	 * rcu_dereference_check(). If there is a need to modify both
+	 * 'lp->count' and 'lp->lists' in the same critical section 'pcp->lp'
+	 * can only be derefrenced once. See for example:
+	 *
+	 *     local_lock_irqsave(&pagesets.lock, flags);
+	 *     lp = rcu_dereference_check(pcp->lp, ...);
+	 *     list_add(&page->lru, &lp->lists[pindex]);
+	 *     lp->count += 1 << order;
+	 *     local_unlock_irqrestore(&pagesets.lock, flags);
+	 *
+	 * vmstat code only needs to check the page count and can deal with
+	 * outdated data. In that case rcu_access_pointer() is good enough and
+	 * the locking is not needed.
+	 */
+	struct pcplists __rcu *lp;
+	struct pcplists *drain;
 	struct pcplists {
 		/* Number of pages in the pcplists */
 		int count;
 		/* Lists of pages, one per migrate type stored on the pcp-lists */
 		struct list_head lists[NR_PCP_LISTS];
-	} __pcplists; /* Do not access directly */
+	} __pcplists[2]; /* Do not access directly */
 };
 
 struct per_cpu_zonestat {

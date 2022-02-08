@@ -150,13 +150,7 @@ DEFINE_PER_CPU(int, _numa_mem_);		/* Kernel "local memory" node */
 EXPORT_PER_CPU_SYMBOL(_numa_mem_);
 #endif
 
-/* work_structs for global per-cpu drains */
-struct pcpu_drain {
-	struct zone *zone;
-	struct work_struct work;
-};
 static DEFINE_MUTEX(pcpu_drain_mutex);
-static DEFINE_PER_CPU(struct pcpu_drain, pcpu_drain);
 
 #ifdef CONFIG_GCC_PLUGIN_LATENT_ENTROPY
 volatile unsigned long latent_entropy __latent_entropy;
@@ -3135,7 +3129,7 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
 
 	local_lock_irqsave(&pagesets.lock, flags);
 	batch = READ_ONCE(pcp->batch);
-	lp = pcp->lp;
+	lp = rcu_dereference_check(pcp->lp, lockdep_is_held(this_cpu_ptr(&pagesets.lock)));
 	to_drain = min(lp->count, batch);
 	if (to_drain > 0)
 		free_pcppages_bulk(zone, to_drain, batch, lp);
@@ -3159,7 +3153,7 @@ static void drain_pages_zone(unsigned int cpu, struct zone *zone)
 	local_lock_irqsave(&pagesets.lock, flags);
 
 	pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
-	lp = pcp->lp;
+	lp = rcu_dereference_check(pcp->lp, lockdep_is_held(this_cpu_ptr(&pagesets.lock)));
 	if (lp->count)
 		free_pcppages_bulk(zone, lp->count, READ_ONCE(pcp->batch), lp);
 
@@ -3198,36 +3192,48 @@ void drain_local_pages(struct zone *zone)
 		drain_pages(cpu);
 }
 
-static void drain_local_pages_wq(struct work_struct *work)
-{
-	struct pcpu_drain *drain;
-
-	drain = container_of(work, struct pcpu_drain, work);
-
-	/*
-	 * drain_all_pages doesn't use proper cpu hotplug protection so
-	 * we can race with cpu offline when the WQ can move this from
-	 * a cpu pinned worker to an unbound one. We can operate on a different
-	 * cpu which is alright but we also have to make sure to not move to
-	 * a different one.
-	 */
-	migrate_disable();
-	drain_local_pages(drain->zone);
-	migrate_enable();
-}
-
 /*
  * The implementation of drain_all_pages(), exposing an extra parameter to
  * drain on all cpus.
  *
- * drain_all_pages() is optimized to only execute on cpus where pcplists are
- * not empty. The check for non-emptiness can however race with a free to
- * pcplist that has not yet increased the lp->count from 0 to 1. Callers
- * that need the guarantee that every CPU has drained can disable the
- * optimizing racy check.
+ * drain_all_pages() is optimized to only affect cpus where pcplists are not
+ * empty. The check for non-emptiness can however race with a free to pcplist
+ * that has not yet increased the lp->count from 0 to 1. Callers that need the
+ * guarantee that every CPU has drained can disable the optimizing racy check.
+ *
+ * The drain mechanism does the following:
+ *
+ *  - Each CPU has two pcplists pointers: one that points to a pcplists
+ *    instance that is in-use, 'pcp->lp', another that points to an idle
+ *    and empty instance, 'pcp->drain'. CPUs atomically dereference their local
+ *    pcplists through 'pcp->lp' while holding the pagesets local_lock.
+ *
+ *  - When a CPU decides it needs to empty some remote pcplists, it'll
+ *    atomically exchange the remote CPU's 'pcp->lp' and 'pcp->drain' pointers.
+ *    A remote CPU racing with this will either have:
+ *
+ *      - An old 'pcp->lp' reference, it'll soon be emptied by the drain
+ *        process, we just have to wait for it to finish using it.
+ *
+ *      - The new 'pcp->lp' reference, that is, an empty pcplists instance.
+ *        rcu_replace_pointer()'s release semantics ensures any prior changes
+ *        will be visible by the remote CPU, for example changes to 'pcp->high'
+ *        and 'pcp->batch' when disabling the pcplists.
+ *
+ *  - The CPU that started the drain can now wait for an RCU grace period to
+ *    make sure the remote CPU is done using the old pcplists.
+ *    synchronize_rcu() counts as a full memory barrier, so any changes the
+ *    local CPU makes to the soon to be drained pcplists will be visible to the
+ *    draining CPU once it returns.
+ *
+ *  - Then the CPU can safely free the old pcplists. Nobody else holds a
+ *    reference to it. Note that concurrent write access to remote pcplists
+ *    pointers is protected by the 'pcpu_drain_mutex'.
  */
 static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
 {
+	struct per_cpu_pages *pcp;
+	struct zone *z;
 	int cpu;
 
 	/*
@@ -3235,13 +3241,6 @@ static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
 	 * direct reclaim path for CONFIG_CPUMASK_OFFSTACK=y
 	 */
 	static cpumask_t cpus_with_pcps;
-
-	/*
-	 * Make sure nobody triggers this path before mm_percpu_wq is fully
-	 * initialized.
-	 */
-	if (WARN_ON_ONCE(!mm_percpu_wq))
-		return;
 
 	/*
 	 * Do not drain if one is already in progress unless it's specific to
@@ -3261,6 +3260,7 @@ static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
 	 * disables preemption as part of its processing
 	 */
 	for_each_online_cpu(cpu) {
+		struct per_cpu_pages *pcp;
 		struct zone *z;
 		bool has_pcps = false;
 		struct pcplists *lp;
@@ -3272,12 +3272,16 @@ static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
 			 */
 			has_pcps = true;
 		} else if (zone) {
-			lp = per_cpu_ptr(zone->per_cpu_pageset, cpu)->lp;
+			pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
+			lp = rcu_dereference_protected(pcp->lp,
+					  mutex_is_locked(&pcpu_drain_mutex));
 			if (lp->count)
 				has_pcps = true;
 		} else {
 			for_each_populated_zone(z) {
-				lp = per_cpu_ptr(z->per_cpu_pageset, cpu)->lp;
+				pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
+				lp = rcu_dereference_protected(pcp->lp,
+						mutex_is_locked(&pcpu_drain_mutex));
 				if (lp->count) {
 					has_pcps = true;
 					break;
@@ -3291,16 +3295,40 @@ static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
 			cpumask_clear_cpu(cpu, &cpus_with_pcps);
 	}
 
+	if (cpumask_empty(&cpus_with_pcps))
+		goto exit;
+
 	for_each_cpu(cpu, &cpus_with_pcps) {
-		struct pcpu_drain *drain = per_cpu_ptr(&pcpu_drain, cpu);
+		for_each_populated_zone(z) {
+			if (zone && zone != z)
+				continue;
 
-		drain->zone = zone;
-		INIT_WORK(&drain->work, drain_local_pages_wq);
-		queue_work_on(cpu, mm_percpu_wq, &drain->work);
+			pcp = per_cpu_ptr(z->per_cpu_pageset, cpu);
+			WARN_ON(pcp->drain->count);
+			pcp->drain = rcu_replace_pointer(pcp->lp, pcp->drain,
+					mutex_is_locked(&pcpu_drain_mutex));
+		}
 	}
-	for_each_cpu(cpu, &cpus_with_pcps)
-		flush_work(&per_cpu_ptr(&pcpu_drain, cpu)->work);
 
+	synchronize_rcu();
+
+	for_each_cpu(cpu, &cpus_with_pcps) {
+		for_each_populated_zone(z) {
+			unsigned long flags;
+			int count;
+
+			pcp = per_cpu_ptr(z->per_cpu_pageset, cpu);
+			count = pcp->drain->count;
+			if (!count)
+			       continue;
+
+			local_irq_save(flags);
+			free_pcppages_bulk(z, count, READ_ONCE(pcp->batch), pcp->drain);
+			local_irq_restore(flags);
+		}
+	}
+
+exit:
 	mutex_unlock(&pcpu_drain_mutex);
 }
 
@@ -3309,7 +3337,7 @@ static void __drain_all_pages(struct zone *zone, bool force_all_cpus)
  *
  * When zone parameter is non-NULL, spill just the single zone's pages.
  *
- * Note that this can be extremely slow as the draining happens in a workqueue.
+ * Note that this can be extremely slow.
  */
 void drain_all_pages(struct zone *zone)
 {
@@ -3436,7 +3464,7 @@ static void free_unref_page_commit(struct page *page, int migratetype,
 
 	__count_vm_event(PGFREE);
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
-	lp = pcp->lp;
+	lp = rcu_dereference_check(pcp->lp, lockdep_is_held(this_cpu_ptr(&pagesets.lock)));
 	pindex = order_to_pindex(migratetype, order);
 	list_add(&page->lru, &lp->lists[pindex]);
 	lp->count += 1 << order;
@@ -3723,7 +3751,7 @@ static struct page *rmqueue_pcplist(struct zone *preferred_zone,
 	 */
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
 	pcp->free_factor >>= 1;
-	lp = pcp->lp;
+	lp = rcu_dereference_check(pcp->lp, lockdep_is_held(this_cpu_ptr(&pagesets.lock)));
 	list = &lp->lists[order_to_pindex(migratetype, order)];
 	count = &lp->count;
 	page = __rmqueue_pcplist(zone, order, migratetype, alloc_flags,
@@ -5346,7 +5374,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	/* Attempt the batch allocation */
 	local_lock_irqsave(&pagesets.lock, flags);
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
-	lp = pcp->lp;
+	lp = rcu_dereference_check(pcp->lp, lockdep_is_held(this_cpu_ptr(&pagesets.lock)));
 	pcp_list = &lp->lists[order_to_pindex(ac.migratetype, 0)];
 	count = &lp->count;
 
@@ -5961,8 +5989,12 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 		if (show_mem_node_skip(filter, zone_to_nid(zone), nodemask))
 			continue;
 
-		for_each_online_cpu(cpu)
-			free_pcp += per_cpu_ptr(zone->per_cpu_pageset, cpu)->lp->count;
+		for_each_online_cpu(cpu) {
+			struct per_cpu_pages *pcp;
+
+			pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
+			free_pcp += rcu_access_pointer(pcp->lp)->count;
+		}
 	}
 
 	printk("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
@@ -6055,8 +6087,12 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			continue;
 
 		free_pcp = 0;
-		for_each_online_cpu(cpu)
-			free_pcp += per_cpu_ptr(zone->per_cpu_pageset, cpu)->lp->count;
+		for_each_online_cpu(cpu) {
+			struct per_cpu_pages *pcp;
+
+			pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
+			free_pcp += rcu_access_pointer(pcp->lp)->count;
+		}
 
 		show_node(zone);
 		printk(KERN_CONT
@@ -6099,7 +6135,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			K(zone_page_state(zone, NR_MLOCK)),
 			K(zone_page_state(zone, NR_BOUNCE)),
 			K(free_pcp),
-			K(raw_cpu_ptr(zone->per_cpu_pageset)->lp->count),
+			K(rcu_access_pointer(raw_cpu_ptr(zone->per_cpu_pageset)->lp)->count),
 			K(zone_page_state(zone, NR_FREE_CMA_PAGES)));
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
@@ -7014,10 +7050,13 @@ static void per_cpu_pages_init(struct per_cpu_pages *pcp, struct per_cpu_zonesta
 	memset(pcp, 0, sizeof(*pcp));
 	memset(pzstats, 0, sizeof(*pzstats));
 
-	pcp->lp = &pcp->__pcplists;
+	pcp->lp = RCU_INITIALIZER(&pcp->__pcplists[0]);
+	pcp->drain = &pcp->__pcplists[1];
 
-	for (pindex = 0; pindex < NR_PCP_LISTS; pindex++)
-		INIT_LIST_HEAD(&pcp->lp->lists[pindex]);
+	for (pindex = 0; pindex < NR_PCP_LISTS; pindex++) {
+		INIT_LIST_HEAD(&rcu_access_pointer(pcp->lp)->lists[pindex]);
+		INIT_LIST_HEAD(&pcp->drain->lists[pindex]);
+	}
 
 	/*
 	 * Set batch and high values safe for a boot pageset. A true percpu
