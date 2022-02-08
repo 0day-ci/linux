@@ -2,6 +2,8 @@
 #ifndef __BPF_TRACING_H__
 #define __BPF_TRACING_H__
 
+#include <bpf/bpf_common_helpers.h>
+
 /* Scan the ARCH passed in from ARCH env variable (see Makefile) */
 #if defined(__TARGET_ARCH_x86)
 	#define bpf_target_x86
@@ -118,9 +120,20 @@
 
 #define __BPF_ARCH_HAS_SYSCALL_WRAPPER
 
-#if !defined(__KERNEL__) && !defined(__VMLINUX_H__)
+#if defined(__KERNEL__) || defined(__VMLINUX_H__)
+#define __PT_PARM1_REG_SYSCALL orig_gpr2
+#else
 /* s390 provides user_pt_regs instead of struct pt_regs to userspace */
 #define __PT_REGS_CAST(x) ((const user_pt_regs *)(x))
+/*
+ * struct pt_regs.orig_gpr2 is not exposed through user_pt_regs, and the ABI
+ * prohibits extending user_pt_regs. In non-CO-RE case, make use of the fact
+ * that orig_gpr2 comes right after gprs in struct pt_regs. CO-RE does not
+ * allow such hacks, so there is no way to access orig_gpr2.
+ */
+#define PT_REGS_PARM1_SYSCALL(x) \
+	(*(unsigned long *)(((char *)(x) + offsetofend(user_pt_regs, gprs))))
+#define __PT_PARM1_REG_SYSCALL __unsupported__
 #endif
 
 #define __PT_PARM1_REG gprs[2]
