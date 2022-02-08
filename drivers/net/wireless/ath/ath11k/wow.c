@@ -13,6 +13,7 @@
 #include "debug.h"
 #include "wmi.h"
 #include "wow.h"
+#include "dp_rx.h"
 
 static const struct wiphy_wowlan_support ath11k_wowlan_support = {
 	.flags = WIPHY_WOWLAN_DISCONNECT |
@@ -562,6 +563,14 @@ int ath11k_wow_op_suspend(struct ieee80211_hw *hw,
 
 	mutex_lock(&ar->conf_mutex);
 
+	ret = ath11k_dp_rx_pktlog_stop(ar->ab, true);
+	if (ret) {
+		ath11k_warn(ar->ab,
+			    "failed to stop dp rx (and timer) pktlog during wow suspend: %d\n",
+			    ret);
+		goto exit;
+	}
+
 	ret =  ath11k_wow_cleanup(ar);
 	if (ret) {
 		ath11k_warn(ar->ab, "failed to clear wow wakeup events: %d\n",
@@ -592,6 +601,14 @@ int ath11k_wow_op_suspend(struct ieee80211_hw *hw,
 	ret = ath11k_wow_enable(ar->ab);
 	if (ret) {
 		ath11k_warn(ar->ab, "failed to start wow: %d\n", ret);
+		goto cleanup;
+	}
+
+	ret = ath11k_dp_rx_pktlog_stop(ar->ab, false);
+	if (ret) {
+		ath11k_warn(ar->ab,
+			    "failed to stop dp rx pktlog during wow suspend: %d\n",
+			    ret);
 		goto cleanup;
 	}
 
@@ -644,6 +661,12 @@ int ath11k_wow_op_resume(struct ieee80211_hw *hw)
 
 	ath11k_hif_ce_irq_enable(ar->ab);
 	ath11k_hif_irq_enable(ar->ab);
+
+	ret = ath11k_dp_rx_pktlog_start(ar->ab);
+	if (ret) {
+		ath11k_warn(ar->ab, "failed to start rx pktlog from wow: %d\n", ret);
+		return ret;
+	}
 
 	ret = ath11k_wow_wakeup(ar->ab);
 	if (ret) {

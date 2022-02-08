@@ -5573,7 +5573,6 @@ int ath11k_dp_rx_pktlog_start(struct ath11k_base *ab)
 	/* start reap timer */
 	mod_timer(&ab->mon_reap_timer,
 		  jiffies + msecs_to_jiffies(ATH11K_MON_TIMER_INTERVAL));
-
 	return 0;
 }
 

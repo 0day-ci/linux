@@ -521,8 +521,7 @@ int ath11k_core_resume(struct ath11k_base *ab)
 
 	ret = ath11k_dp_rx_pktlog_start(ab);
 	if (ret) {
-		ath11k_warn(ab, "failed to start rx pktlog during resume: %d\n",
-			    ret);
+		ath11k_warn(ab, "failed to start rx pktlog during resume: %d\n", ret);
 		return ret;
 	}
 
