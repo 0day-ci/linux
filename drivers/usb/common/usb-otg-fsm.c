@@ -440,8 +440,6 @@ int otg_statemachine(struct otg_fsm *fsm)
 		if (fsm->id || fsm->a_bus_drop || fsm->a_clr_err)
 			otg_set_state(fsm, OTG_STATE_A_WAIT_VFALL);
 		break;
-	default:
-		break;
 	}
 	mutex_unlock(&fsm->lock);
 
