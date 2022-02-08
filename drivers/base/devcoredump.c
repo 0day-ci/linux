@@ -18,8 +18,8 @@ static struct class devcd_class;
 /* global disable flag, for security purposes */
 static bool devcd_disabled;
 
-/* if data isn't read by userspace after 5 minutes then delete it */
-#define DEVCD_TIMEOUT	(HZ * 60 * 5)
+/* if data isn't read by userspace after 10 minutes then delete it */
+#define DEVCD_TIMEOUT	(HZ * 60 * 10)
 
 struct devcd_entry {
 	struct device devcd_dev;
