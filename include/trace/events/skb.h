@@ -9,6 +9,11 @@
 #include <linux/netdevice.h>
 #include <linux/tracepoint.h>
 
+/* max string length of drop reason. We use 'SKB_DR_' as the prefix to
+ * make it distinct from 'enum skb_drop_reason'
+ */
+#define SKB_DR_MAX_LEN	32
+
 #define TRACE_SKB_DROP_REASON					\
 	EM(SKB_DROP_REASON_NOT_SPECIFIED, NOT_SPECIFIED)	\
 	EM(SKB_DROP_REASON_NO_SOCKET, NO_SOCKET)		\
