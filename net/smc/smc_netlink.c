@@ -111,6 +111,16 @@ static const struct genl_ops smc_gen_nl_ops[] = {
 		.flags = GENL_ADMIN_PERM,
 		.doit = smc_nl_disable_seid,
 	},
+	{
+		.cmd = SMC_NETLINK_ENABLE_AUTO_FALLBACK,
+		.flags = GENL_ADMIN_PERM,
+		.doit = smc_enable_auto_fallback,
+	},
+	{
+		.cmd = SMC_NETLINK_DISABLE_AUTO_FALLBACK,
+		.flags = GENL_ADMIN_PERM,
+		.doit = smc_disable_auto_fallback,
+	},
 };
 
 static const struct nla_policy smc_gen_nl_policy[2] = {

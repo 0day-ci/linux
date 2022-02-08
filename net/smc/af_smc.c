@@ -59,12 +59,26 @@ static DEFINE_MUTEX(smc_client_lgr_pending);	/* serialize link group
 						 * creation on client
 						 */
 
+bool smc_auto_fallback;	/* default behavior for auto fallback, disable by default */
+
 static struct workqueue_struct	*smc_tcp_ls_wq;	/* wq for tcp listen work */
 struct workqueue_struct	*smc_hs_wq;	/* wq for handshake work */
 struct workqueue_struct	*smc_close_wq;	/* wq for close work */
 
 static void smc_tcp_listen_work(struct work_struct *);
 static void smc_connect_work(struct work_struct *);
+
+int smc_enable_auto_fallback(struct sk_buff *skb, struct genl_info *info)
+{
+	WRITE_ONCE(smc_auto_fallback, true);
+	return 0;
+}
+
+int smc_disable_auto_fallback(struct sk_buff *skb, struct genl_info *info)
+{
+	WRITE_ONCE(smc_auto_fallback, false);
+	return 0;
+}
 
 static void smc_set_keepalive(struct sock *sk, int val)
 {
@@ -3005,6 +3019,9 @@ static int __smc_create(struct net *net, struct socket *sock, int protocol,
 	smc = smc_sk(sk);
 	smc->use_fallback = false; /* assume rdma capability first */
 	smc->fallback_rsn = 0;
+
+	/* default behavior from smc_auto_fallback */
+	smc->auto_fallback = READ_ONCE(smc_auto_fallback);
 
 	rc = 0;
 	if (!clcsock) {
