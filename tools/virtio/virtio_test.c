@@ -36,6 +36,7 @@ struct vq_info {
 };
 
 struct vdev_info {
+	struct virtio_driver vdriver;
 	struct virtio_device vdev;
 	int control;
 	struct pollfd fds[1];
@@ -128,6 +129,8 @@ static void vdev_info_init(struct vdev_info* dev, unsigned long long features)
 {
 	int r;
 	memset(dev, 0, sizeof *dev);
+	dev->vdriver.suppress_used_validation = false;
+	dev->vdev.dev.driver = &dev->vdriver.driver;
 	dev->vdev.features = features;
 	INIT_LIST_HEAD(&dev->vdev.vqs);
 	dev->buf_size = 1024;

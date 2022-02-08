@@ -437,6 +437,7 @@ static int parallel_test(u64 features,
 
 int main(int argc, char *argv[])
 {
+	struct virtio_driver vdriver;
 	struct virtio_device vdev;
 	struct virtqueue *vq;
 	struct vringh vrh;
@@ -453,6 +454,8 @@ int main(int argc, char *argv[])
 	bool fast_vringh = false, parallel = false;
 
 	getrange = getrange_iov;
+	vdriver.suppress_used_validation = false;
+	vdev.dev.driver = &vdriver.driver;
 	vdev.features = 0;
 	INIT_LIST_HEAD(&vdev.vqs);
 

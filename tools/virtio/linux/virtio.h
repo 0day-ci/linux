@@ -5,8 +5,47 @@
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
 
+typedef struct pm_message {
+	int event;
+} pm_message_t;
+
+enum probe_type {
+	PROBE_DEFAULT_STRATEGY,
+	PROBE_PREFER_ASYNCHRONOUS,
+	PROBE_FORCE_SYNCHRONOUS,
+};
+
+struct device_driver {
+	const char	*name;
+	void		*bus;
+
+	void		*owner;
+	const char	*mod_name;	/* used for built-in modules */
+
+	bool suppress_bind_attrs;	/* disables bind/unbind via sysfs */
+	enum probe_type probe_type;
+
+	const void	*of_match_table;
+	const void	*acpi_match_table;
+
+	int (*probe)(void *dev);
+	void (*sync_state)(void *dev);
+	int (*remove)(void *dev);
+	void (*shutdown)(void *dev);
+	int (*suspend)(void *dev, pm_message_t state);
+	int (*resume)(void *dev);
+	const void	**groups;
+	const void	**dev_groups;
+
+	const void	*pm;
+	void (*coredump)(void *dev);
+
+	struct driver_private *p;
+};
+
 struct device {
 	void *parent;
+	struct device_driver *driver;
 };
 
 struct virtio_device {
@@ -24,6 +63,25 @@ struct virtqueue {
         unsigned int index;
         unsigned int num_free;
 	void *priv;
+};
+
+struct virtio_driver {
+	struct device_driver driver;
+	const struct virtio_device_id *id_table;
+	const unsigned int *feature_table;
+	unsigned int feature_table_size;
+	const unsigned int *feature_table_legacy;
+	unsigned int feature_table_size_legacy;
+	bool suppress_used_validation;
+	int (*validate)(struct virtio_device *dev);
+	int (*probe)(struct virtio_device *dev);
+	void (*scan)(struct virtio_device *dev);
+	void (*remove)(struct virtio_device *dev);
+	void (*config_changed)(struct virtio_device *dev);
+#ifdef CONFIG_PM
+	int (*freeze)(struct virtio_device *dev);
+	int (*restore)(struct virtio_device *dev);
+#endif
 };
 
 /* Interfaces exported by virtio_ring. */
@@ -65,5 +123,10 @@ struct virtqueue *vring_new_virtqueue(unsigned int index,
 				      void (*callback)(struct virtqueue *vq),
 				      const char *name);
 void vring_del_virtqueue(struct virtqueue *vq);
+
+static inline struct virtio_driver *drv_to_virtio(struct device_driver *drv)
+{
+	return container_of(drv, struct virtio_driver, driver);
+}
 
 #endif
