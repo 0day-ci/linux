@@ -2153,6 +2153,8 @@ static int __guc_action_register_context(struct intel_guc *guc,
 					     0, loop);
 }
 
+static void prepare_context_registration_info(struct intel_context *ce);
+
 static int register_context(struct intel_context *ce, bool loop)
 {
 	struct intel_guc *guc = ce_to_guc(ce);
@@ -2162,6 +2164,8 @@ static int register_context(struct intel_context *ce, bool loop)
 
 	GEM_BUG_ON(intel_context_is_child(ce));
 	trace_intel_context_register(ce);
+
+	prepare_context_registration_info(ce);
 
 	if (intel_context_is_parent(ce))
 		ret = __guc_action_register_multi_lrc(guc, ce, ce->guc_id.id,
@@ -2246,7 +2250,6 @@ static void prepare_context_registration_info(struct intel_context *ce)
 	struct intel_context *child;
 
 	GEM_BUG_ON(!engine->mask);
-	GEM_BUG_ON(!sched_state_is_init(ce));
 
 	/*
 	 * Ensure LRC + CT vmas are is same region as write barrier is done
@@ -2314,9 +2317,13 @@ static int try_context_registration(struct intel_context *ce, bool loop)
 	bool context_registered;
 	int ret = 0;
 
+	GEM_BUG_ON(!sched_state_is_init(ce));
+
 	context_registered = ctx_registered(guc, desc_idx);
 
-	prepare_context_registration_info(ce);
+	if (context_registered)
+		clr_ctx_registered(guc, desc_idx);
+	set_ctx_registered(guc, desc_idx, ce);
 
 	/*
 	 * The context_lookup xarray is used to determine if the hardware
