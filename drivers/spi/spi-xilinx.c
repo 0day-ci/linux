@@ -693,13 +693,16 @@ static int xilinx_spi_probe(struct platform_device *pdev)
 		if (startup_block) {
 			ret = of_property_read_u32(nc, "reg",
 						   &cs_num);
-			if (ret < 0)
+			if (ret < 0) {
+				of_node_put(nc);
 				return -EINVAL;
+			}
 		}
 		ret = of_property_read_u32(nc, "spi-rx-bus-width",
 					   &rx_bus_width);
 		if (!ret) {
 			xspi->rx_bus_width = rx_bus_width;
+			of_node_put(nc);
 			break;
 		}
 	}
