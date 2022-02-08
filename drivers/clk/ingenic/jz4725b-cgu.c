@@ -87,6 +87,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_CCLK] = {
 		"cclk", CGU_CLK_DIV,
+		.flags = CLK_IS_CRITICAL,
 		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
 		.div = {
 			CGU_REG_CPCCR, 0, 1, 4, 22, -1, -1, 0,
@@ -114,6 +115,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_MCLK] = {
 		"mclk", CGU_CLK_DIV,
+		.flags = CLK_IS_CRITICAL,
 		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
 		.div = {
 			CGU_REG_CPCCR, 12, 1, 4, 22, -1, -1, 0,

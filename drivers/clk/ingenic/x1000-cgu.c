@@ -251,6 +251,7 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_CPU] = {
 		"cpu", CGU_CLK_DIV | CGU_CLK_GATE,
+		.flags = CLK_IS_CRITICAL,
 		.parents = { X1000_CLK_CPUMUX, -1, -1, -1 },
 		.div = { CGU_REG_CPCCR, 0, 1, 4, 22, -1, -1 },
 		.gate = { CGU_REG_CLKGR, 30 },
@@ -258,6 +259,7 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_L2CACHE] = {
 		"l2cache", CGU_CLK_DIV,
+		.flags = CLK_IS_CRITICAL,
 		.parents = { X1000_CLK_CPUMUX, -1, -1, -1 },
 		.div = { CGU_REG_CPCCR, 4, 1, 4, 22, -1, -1 },
 	},
@@ -290,6 +292,7 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_DDR] = {
 		"ddr", CGU_CLK_MUX | CGU_CLK_DIV | CGU_CLK_GATE,
+		.flags = CLK_IS_CRITICAL,
 		.parents = { -1, X1000_CLK_SCLKA, X1000_CLK_MPLL, -1 },
 		.mux = { CGU_REG_DDRCDR, 30, 2 },
 		.div = { CGU_REG_DDRCDR, 0, 1, 4, 29, 28, 27 },

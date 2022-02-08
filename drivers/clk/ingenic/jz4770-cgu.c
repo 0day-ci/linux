@@ -149,6 +149,7 @@ static const struct ingenic_cgu_clk_info jz4770_cgu_clocks[] = {
 
 	[JZ4770_CLK_CCLK] = {
 		"cclk", CGU_CLK_DIV,
+		.flags = CLK_IS_CRITICAL,
 		.parents = { JZ4770_CLK_PLL0, },
 		.div = {
 			CGU_REG_CPCCR, 0, 1, 4, 22, -1, -1, 0,
