@@ -164,9 +164,21 @@
 
 #define __BPF_ARCH_HAS_SYSCALL_WRAPPER
 
-#if !defined(__KERNEL__) && !defined(__VMLINUX_H__)
+#if defined(__KERNEL__) || defined(__VMLINUX_H__)
+#define __PT_PARM1_REG_SYSCALL orig_x0
+#else
 /* arm64 provides struct user_pt_regs instead of struct pt_regs to userspace */
 #define __PT_REGS_CAST(x) ((const struct user_pt_regs *)(x))
+/*
+ * struct pt_regs.orig_x0 is not exposed through struct user_pt_regs, and the
+ * ABI prohibits extending struct user_pt_regs. In non-CO-RE case, make use of
+ * the fact that orig_x0 comes right after pstate in struct pt_regs. CO-RE does
+ * not allow such hacks, so there is no way to access orig_x0.
+ */
+#define PT_REGS_PARM1_SYSCALL(x) \
+	(*(unsigned long *)(((char *)(x) + \
+			     offsetofend(struct user_pt_regs, pstate))))
+#define __PT_PARM1_REG_SYSCALL __unsupported__
 #endif
 
 #define __PT_PARM1_REG regs[0]
