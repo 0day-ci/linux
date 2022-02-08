@@ -1190,6 +1190,8 @@ static int block_operations(struct f2fs_sb_info *sbi)
 		.for_reclaim = 0,
 	};
 	int err = 0, cnt = 0;
+	bool sync_lockless = true;
+	unsigned int retry_cnt = 3;
 
 	/*
 	 * Let's flush inline_data in dirty node pages.
@@ -1249,15 +1251,25 @@ retry_flush_nodes:
 
 	if (get_pages(sbi, F2FS_DIRTY_NODES)) {
 		f2fs_up_write(&sbi->node_write);
+		if (!retry_cnt--)
+			sync_lockless = false;
+		if (sync_lockless) {
+			f2fs_up_write(&sbi->node_change);
+			f2fs_unlock_all(sbi);
+		}
 		atomic_inc(&sbi->wb_sync_req[NODE]);
 		err = f2fs_sync_node_pages(sbi, &wbc, false, FS_CP_NODE_IO);
 		atomic_dec(&sbi->wb_sync_req[NODE]);
 		if (err) {
-			f2fs_up_write(&sbi->node_change);
-			f2fs_unlock_all(sbi);
+			if (!sync_lockless) {
+				f2fs_up_write(&sbi->node_change);
+				f2fs_unlock_all(sbi);
+			}
 			return err;
 		}
 		cond_resched();
+		if (sync_lockless)
+			goto retry_flush_quotas;
 		goto retry_flush_nodes;
 	}
 
