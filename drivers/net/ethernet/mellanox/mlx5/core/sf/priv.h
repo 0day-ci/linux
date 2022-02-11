@@ -19,4 +19,6 @@ void mlx5_sf_hw_table_sf_free(struct mlx5_core_dev *dev, u32 controller, u16 id)
 void mlx5_sf_hw_table_sf_deferred_free(struct mlx5_core_dev *dev, u32 controller, u16 id);
 bool mlx5_sf_hw_table_supported(const struct mlx5_core_dev *dev);
 
+int mlx5_devlink_sfs_light_probe_param_register(struct devlink *devlink);
+void mlx5_devlink_sfs_light_probe_param_unregister(struct devlink *devlink);
 #endif
