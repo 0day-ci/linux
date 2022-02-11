@@ -17,6 +17,7 @@
 #include <linux/proc_ns.h>
 #include <linux/security.h>
 #include <linux/btf_ids.h>
+#include <linux/btf.h>
 
 #include "../../lib/kstrtox.h"
 
@@ -1109,6 +1110,7 @@ static enum hrtimer_restart bpf_timer_cb(struct hrtimer *hrtimer)
 	void *key;
 	u32 idx;
 
+	BTF_TYPE_EMIT(struct bpf_timer);
 	callback_fn = rcu_dereference_check(t->callback_fn, rcu_read_lock_bh_held());
 	if (!callback_fn)
 		goto out;
