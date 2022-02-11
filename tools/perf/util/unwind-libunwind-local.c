@@ -381,20 +381,20 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
 	int ret = -EINVAL;
 
 	map = find_map(ip, ui);
-	if (!map || !map->dso)
+	if (!map || !map__dso(map))
 		return -EINVAL;
 
-	pr_debug("unwind: find_proc_info dso %s\n", map->dso->name);
+	pr_debug("unwind: %s dso %s\n", __func__, map__dso(map)->name);
 
 	/* Check the .eh_frame section for unwinding info */
-	if (!read_unwind_spec_eh_frame(map->dso, ui->machine,
+	if (!read_unwind_spec_eh_frame(map__dso(map), ui->machine,
 				       &table_data, &segbase, &fde_count)) {
 		memset(&di, 0, sizeof(di));
 		di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
-		di.start_ip = map->start;
-		di.end_ip   = map->end;
-		di.u.rti.segbase    = map->start + segbase - map->pgoff;
-		di.u.rti.table_data = map->start + table_data - map->pgoff;
+		di.start_ip = map__start(map);
+		di.end_ip   = map__end(map);
+		di.u.rti.segbase    = map__start(map) + segbase - map__pgoff(map);
+		di.u.rti.table_data = map__start(map) + table_data - map__pgoff(map);
 		di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
 				      / sizeof(unw_word_t);
 		ret = dwarf_search_unwind_table(as, ip, &di, pi,
@@ -404,20 +404,20 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
 #ifndef NO_LIBUNWIND_DEBUG_FRAME
 	/* Check the .debug_frame section for unwinding info */
 	if (ret < 0 &&
-	    !read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
-		int fd = dso__data_get_fd(map->dso, ui->machine);
-		int is_exec = elf_is_exec(fd, map->dso->name);
-		unw_word_t base = is_exec ? 0 : map->start;
+	    !read_unwind_spec_debug_frame(map__dso(map), ui->machine, &segbase)) {
+		int fd = dso__data_get_fd(map__dso(map), ui->machine);
+		int is_exec = elf_is_exec(fd, map__dso(map)->name);
+		unw_word_t base = is_exec ? 0 : map__start(map);
 		const char *symfile;
 
 		if (fd >= 0)
-			dso__data_put_fd(map->dso);
+			dso__data_put_fd(map__dso(map));
 
-		symfile = map->dso->symsrc_filename ?: map->dso->name;
+		symfile = map__dso(map)->symsrc_filename ?: map__dso(map)->name;
 
 		memset(&di, 0, sizeof(di));
 		if (dwarf_find_debug_frame(0, &di, ip, base, symfile,
-					   map->start, map->end))
+					   map__start(map), map__end(map)))
 			return dwarf_search_unwind_table(as, ip, &di, pi,
 							 need_unwind_info, arg);
 	}
@@ -473,10 +473,10 @@ static int access_dso_mem(struct unwind_info *ui, unw_word_t addr,
 		return -1;
 	}
 
-	if (!map->dso)
+	if (!map__dso(map))
 		return -1;
 
-	size = dso__data_read_addr(map->dso, map, ui->machine,
+	size = dso__data_read_addr(map__dso(map), map, ui->machine,
 				   addr, (u8 *) data, sizeof(*data));
 
 	return !(size == sizeof(*data));
@@ -583,7 +583,7 @@ static int entry(u64 ip, struct thread *thread,
 	pr_debug("unwind: %s:ip = 0x%" PRIx64 " (0x%" PRIx64 ")\n",
 		 al.sym ? al.sym->name : "''",
 		 ip,
-		 al.map ? al.map->map_ip(al.map, ip) : (u64) 0);
+		 al.map ? map__map_ip(al.map, ip) : (u64) 0);
 
 	return cb(&e, arg);
 }

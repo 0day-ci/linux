@@ -36,8 +36,10 @@ static int __cmd_kallsyms(int argc, const char **argv)
 		}
 
 		printf("%s: %s %s %#" PRIx64 "-%#" PRIx64 " (%#" PRIx64 "-%#" PRIx64")\n",
-			symbol->name, map->dso->short_name, map->dso->long_name,
-			map->unmap_ip(map, symbol->start), map->unmap_ip(map, symbol->end),
+			symbol->name, map__dso(map)->short_name,
+			map__dso(map)->long_name,
+			map__unmap_ip(map, symbol->start),
+			map__unmap_ip(map, symbol->end),
 			symbol->start, symbol->end);
 	}
 

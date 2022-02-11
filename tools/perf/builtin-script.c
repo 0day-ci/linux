@@ -972,12 +972,12 @@ static int perf_sample__fprintf_brstackoff(struct perf_sample *sample,
 		to   = entries[i].to;
 
 		if (thread__find_map_fb(thread, sample->cpumode, from, &alf) &&
-		    !alf.map->dso->adjust_symbols)
-			from = map__map_ip(alf.map, from);
+		    !map__dso(alf.map)->adjust_symbols)
+			from = map__dso_map_ip(alf.map, from);
 
 		if (thread__find_map_fb(thread, sample->cpumode, to, &alt) &&
-		    !alt.map->dso->adjust_symbols)
-			to = map__map_ip(alt.map, to);
+		    !map__dso(alt.map)->adjust_symbols)
+			to = map__dso_map_ip(alt.map, to);
 
 		printed += fprintf(fp, " 0x%"PRIx64, from);
 		if (PRINT_FIELD(DSO)) {
@@ -1039,11 +1039,11 @@ static int grab_bb(u8 *buffer, u64 start, u64 end,
 		return 0;
 	}
 
-	if (!thread__find_map(thread, *cpumode, start, &al) || !al.map->dso) {
+	if (!thread__find_map(thread, *cpumode, start, &al) || !map__dso(al.map)) {
 		pr_debug("\tcannot resolve %" PRIx64 "-%" PRIx64 "\n", start, end);
 		return 0;
 	}
-	if (al.map->dso->data.status == DSO_DATA_STATUS_ERROR) {
+	if (map__dso(al.map)->data.status == DSO_DATA_STATUS_ERROR) {
 		pr_debug("\tcannot resolve %" PRIx64 "-%" PRIx64 "\n", start, end);
 		return 0;
 	}
@@ -1051,11 +1051,11 @@ static int grab_bb(u8 *buffer, u64 start, u64 end,
 	/* Load maps to ensure dso->is_64_bit has been updated */
 	map__load(al.map);
 
-	offset = al.map->map_ip(al.map, start);
-	len = dso__data_read_offset(al.map->dso, machine, offset, (u8 *)buffer,
-				    end - start + MAXINSN);
+	offset = map__map_ip(al.map, start);
+	len = dso__data_read_offset(map__dso(al.map), machine, offset,
+				    (u8 *)buffer, end - start + MAXINSN);
 
-	*is64bit = al.map->dso->is_64_bit;
+	*is64bit = map__dso(al.map)->is_64_bit;
 	if (len <= 0)
 		pr_debug("\tcannot fetch code for block at %" PRIx64 "-%" PRIx64 "\n",
 			start, end);
@@ -1070,9 +1070,9 @@ static int map__fprintf_srccode(struct map *map, u64 addr, FILE *fp, struct srcc
 	int len;
 	char *srccode;
 
-	if (!map || !map->dso)
+	if (!map || !map__dso(map))
 		return 0;
-	srcfile = get_srcline_split(map->dso,
+	srcfile = get_srcline_split(map__dso(map),
 				    map__rip_2objdump(map, addr),
 				    &line);
 	if (!srcfile)
@@ -1164,7 +1164,7 @@ static int ip__fprintf_sym(uint64_t addr, struct thread *thread,
 	if (al.addr < al.sym->end)
 		off = al.addr - al.sym->start;
 	else
-		off = al.addr - al.map->start - al.sym->start;
+		off = al.addr - map__start(al.map) - al.sym->start;
 	printed += fprintf(fp, "\t%s", al.sym->name);
 	if (off)
 		printed += fprintf(fp, "%+d", off);

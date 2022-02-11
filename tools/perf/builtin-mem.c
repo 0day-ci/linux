@@ -200,7 +200,7 @@ dump_raw_samples(struct perf_tool *tool,
 		goto out_put;
 
 	if (al.map != NULL)
-		al.map->dso->hit = 1;
+		map__dso(al.map)->hit = 1;
 
 	field_sep = symbol_conf.field_sep;
 	if (field_sep) {
@@ -241,7 +241,7 @@ dump_raw_samples(struct perf_tool *tool,
 		symbol_conf.field_sep,
 		sample->data_src,
 		symbol_conf.field_sep,
-		al.map ? (al.map->dso ? al.map->dso->long_name : "???") : "???",
+		al.map && map__dso(al.map) ? map__dso(al.map)->long_name : "???",
 		al.sym ? al.sym->name : "???");
 out_put:
 	addr_location__put(&al);

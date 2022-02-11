@@ -382,11 +382,11 @@ static const char *get_dsoname(struct map *map)
 {
 	const char *dsoname = "[unknown]";
 
-	if (map && map->dso) {
-		if (symbol_conf.show_kernel_path && map->dso->long_name)
-			dsoname = map->dso->long_name;
+	if (map && map__dso(map)) {
+		if (symbol_conf.show_kernel_path && map__dso(map)->long_name)
+			dsoname = map__dso(map)->long_name;
 		else
-			dsoname = map->dso->name;
+			dsoname = map__dso(map)->name;
 	}
 
 	return dsoname;
@@ -527,7 +527,7 @@ static unsigned long get_offset(struct symbol *sym, struct addr_location *al)
 	if (al->addr < sym->end)
 		offset = al->addr - sym->start;
 	else
-		offset = al->addr - al->map->start - sym->start;
+		offset = al->addr - map__start(al->map) - sym->start;
 
 	return offset;
 }
@@ -741,7 +741,7 @@ static void set_sym_in_dict(PyObject *dict, struct addr_location *al,
 {
 	if (al->map) {
 		pydict_set_item_string_decref(dict, dso_field,
-			_PyUnicode_FromString(al->map->dso->name));
+			_PyUnicode_FromString(map__dso(al->map)->name));
 	}
 	if (al->sym) {
 		pydict_set_item_string_decref(dict, sym_field,

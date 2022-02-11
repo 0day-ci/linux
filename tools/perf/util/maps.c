@@ -30,24 +30,24 @@ static void __maps__free_maps_by_name(struct maps *maps)
 	maps->nr_maps_allocated = 0;
 }
 
-static int __maps__insert(struct maps *maps, struct map *map)
+static struct map *__maps__insert(struct maps *maps, struct map *map)
 {
 	struct rb_node **p = &maps__entries(maps)->rb_node;
 	struct rb_node *parent = NULL;
-	const u64 ip = map->start;
+	const u64 ip = map__start(map);
 	struct map_rb_node *m, *new_rb_node;
 
 	new_rb_node = malloc(sizeof(*new_rb_node));
 	if (!new_rb_node)
-		return -ENOMEM;
+		return NULL;
 
 	RB_CLEAR_NODE(&new_rb_node->rb_node);
-	new_rb_node->map = map;
+	new_rb_node->map = map__get(map);
 
 	while (*p != NULL) {
 		parent = *p;
 		m = rb_entry(parent, struct map_rb_node, rb_node);
-		if (ip < m->map->start)
+		if (ip < map__start(m->map))
 			p = &(*p)->rb_left;
 		else
 			p = &(*p)->rb_right;
@@ -55,22 +55,23 @@ static int __maps__insert(struct maps *maps, struct map *map)
 
 	rb_link_node(&new_rb_node->rb_node, parent, p);
 	rb_insert_color(&new_rb_node->rb_node, maps__entries(maps));
-	map__get(map);
-	return 0;
+	return new_rb_node->map;
 }
 
 int maps__insert(struct maps *maps, struct map *map)
 {
-	int err;
+	int err = 0;
 
 	down_write(maps__lock(maps));
-	err = __maps__insert(maps, map);
-	if (err)
+	map = __maps__insert(maps, map);
+	if (!map) {
+		err = -ENOMEM;
 		goto out;
+	}
 
 	++maps->nr_maps;
 
-	if (map->dso && map->dso->kernel) {
+	if (map__dso(map) && map__dso(map)->kernel) {
 		struct kmap *kmap = map__kmap(map);
 
 		if (kmap)
@@ -193,7 +194,7 @@ struct symbol *maps__find_symbol(struct maps *maps, u64 addr, struct map **mapp)
 	if (map != NULL && map__load(map) >= 0) {
 		if (mapp != NULL)
 			*mapp = map;
-		return map__find_symbol(map, map->map_ip(map, addr));
+		return map__find_symbol(map, map__map_ip(map, addr));
 	}
 
 	return NULL;
@@ -228,7 +229,8 @@ out:
 
 int maps__find_ams(struct maps *maps, struct addr_map_symbol *ams)
 {
-	if (ams->addr < ams->ms.map->start || ams->addr >= ams->ms.map->end) {
+	if (ams->addr < map__start(ams->ms.map) ||
+	    ams->addr >= map__end(ams->ms.map)) {
 		if (maps == NULL)
 			return -1;
 		ams->ms.map = maps__find(maps, ams->addr);
@@ -236,7 +238,7 @@ int maps__find_ams(struct maps *maps, struct addr_map_symbol *ams)
 			return -1;
 	}
 
-	ams->al_addr = ams->ms.map->map_ip(ams->ms.map, ams->addr);
+	ams->al_addr = map__map_ip(ams->ms.map, ams->addr);
 	ams->ms.sym = map__find_symbol(ams->ms.map, ams->al_addr);
 
 	return ams->ms.sym ? 0 : -1;
@@ -253,7 +255,7 @@ size_t maps__fprintf(struct maps *maps, FILE *fp)
 		printed += fprintf(fp, "Map:");
 		printed += map__fprintf(pos->map, fp);
 		if (verbose > 2) {
-			printed += dso__fprintf(pos->map->dso, fp);
+			printed += dso__fprintf(map__dso(pos->map), fp);
 			printed += fprintf(fp, "--\n");
 		}
 	}
@@ -282,9 +284,9 @@ int maps__fixup_overlappings(struct maps *maps, struct map *map, FILE *fp)
 	while (next) {
 		struct map_rb_node *pos = rb_entry(next, struct map_rb_node, rb_node);
 
-		if (pos->map->end > map->start) {
+		if (map__end(pos->map) > map__start(map)) {
 			first = next;
-			if (pos->map->start <= map->start)
+			if (map__start(pos->map) <= map__start(map))
 				break;
 			next = next->rb_left;
 		} else
@@ -300,14 +302,14 @@ int maps__fixup_overlappings(struct maps *maps, struct map *map, FILE *fp)
 		 * Stop if current map starts after map->end.
 		 * Maps are ordered by start: next will not overlap for sure.
 		 */
-		if (pos->map->start >= map->end)
+		if (map__start(pos->map) >= map__end(map))
 			break;
 
 		if (verbose >= 2) {
 
 			if (use_browser) {
 				pr_debug("overlapping maps in %s (disable tui for more info)\n",
-					   map->dso->name);
+					   map__dso(map)->name);
 			} else {
 				fputs("overlapping maps:\n", fp);
 				map__fprintf(map, fp);
@@ -320,7 +322,7 @@ int maps__fixup_overlappings(struct maps *maps, struct map *map, FILE *fp)
 		 * Now check if we need to create new maps for areas not
 		 * overlapped by the new map:
 		 */
-		if (map->start > pos->map->start) {
+		if (map__start(map) > map__start(pos->map)) {
 			struct map *before = map__clone(pos->map);
 
 			if (before == NULL) {
@@ -328,17 +330,19 @@ int maps__fixup_overlappings(struct maps *maps, struct map *map, FILE *fp)
 				goto put_map;
 			}
 
-			before->end = map->start;
-			err = __maps__insert(maps, before);
-			if (err)
+			before->end = map__start(map);
+			if (!__maps__insert(maps, before)) {
+				map__put(before);
+				err = -ENOMEM;
 				goto put_map;
+			}
 
 			if (verbose >= 2 && !use_browser)
 				map__fprintf(before, fp);
 			map__put(before);
 		}
 
-		if (map->end < pos->map->end) {
+		if (map__end(map) < map__end(pos->map)) {
 			struct map *after = map__clone(pos->map);
 
 			if (after == NULL) {
@@ -346,14 +350,15 @@ int maps__fixup_overlappings(struct maps *maps, struct map *map, FILE *fp)
 				goto put_map;
 			}
 
-			after->start = map->end;
-			after->pgoff += map->end - pos->map->start;
-			assert(pos->map->map_ip(pos->map, map->end) ==
-				after->map_ip(after, map->end));
-			err = __maps__insert(maps, after);
-			if (err)
+			after->start = map__end(map);
+			after->pgoff += map__end(map) - map__start(pos->map);
+			assert(map__map_ip(pos->map, map__end(map)) ==
+				map__map_ip(after, map__end(map)));
+			if (!__maps__insert(maps, after)) {
+				map__put(after);
+				err = -ENOMEM;
 				goto put_map;
-
+			}
 			if (verbose >= 2 && !use_browser)
 				map__fprintf(after, fp);
 			map__put(after);
@@ -377,7 +382,7 @@ out:
 int maps__clone(struct thread *thread, struct maps *parent)
 {
 	struct maps *maps = thread->maps;
-	int err;
+	int err = 0;
 	struct map_rb_node *rb_node;
 
 	down_read(maps__lock(parent));
@@ -391,17 +396,13 @@ int maps__clone(struct thread *thread, struct maps *parent)
 		}
 
 		err = unwind__prepare_access(maps, new, NULL);
-		if (err)
-			goto out_unlock;
-
-		err = maps__insert(maps, new);
-		if (err)
-			goto out_unlock;
+		if (!err)
+			err = maps__insert(maps, new);
 
 		map__put(new);
+		if (err)
+			goto out_unlock;
 	}
-
-	err = 0;
 out_unlock:
 	up_read(maps__lock(parent));
 	return err;
@@ -428,9 +429,9 @@ struct map *maps__find(struct maps *maps, u64 ip)
 	p = maps__entries(maps)->rb_node;
 	while (p != NULL) {
 		m = rb_entry(p, struct map_rb_node, rb_node);
-		if (ip < m->map->start)
+		if (ip < map__start(m->map))
 			p = p->rb_left;
-		else if (ip >= m->map->end)
+		else if (ip >= map__end(m->map))
 			p = p->rb_right;
 		else
 			goto out;

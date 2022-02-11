@@ -970,7 +970,7 @@ void __weak arch__sym_update(struct symbol *s __maybe_unused,
 static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 				      GElf_Sym *sym, GElf_Shdr *shdr,
 				      struct maps *kmaps, struct kmap *kmap,
-				      struct dso **curr_dsop, struct map **curr_mapp,
+				      struct dso **curr_dsop,
 				      const char *section_name,
 				      bool adjust_kernel_syms, bool kmodule, bool *remap_kernel)
 {
@@ -994,18 +994,18 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 		if (*remap_kernel && dso->kernel && !kmodule) {
 			*remap_kernel = false;
 			map->start = shdr->sh_addr + ref_reloc(kmap);
-			map->end = map->start + shdr->sh_size;
+			map->end = map__start(map) + shdr->sh_size;
 			map->pgoff = shdr->sh_offset;
-			map->map_ip = map__map_ip;
-			map->unmap_ip = map__unmap_ip;
+			map->map_ip = map__dso_map_ip;
+			map->unmap_ip = map__dso_unmap_ip;
 			/* Ensure maps are correctly ordered */
 			if (kmaps) {
 				int err;
+				struct map *updated = map__get(map);
 
-				map__get(map);
 				maps__remove(kmaps, map);
-				err = maps__insert(kmaps, map);
-				map__put(map);
+				err = maps__insert(kmaps, updated);
+				map__put(updated);
 				if (err)
 					return err;
 			}
@@ -1021,7 +1021,6 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 			map->pgoff = shdr->sh_offset;
 		}
 
-		*curr_mapp = map;
 		*curr_dsop = dso;
 		return 0;
 	}
@@ -1036,7 +1035,7 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 		u64 start = sym->st_value;
 
 		if (kmodule)
-			start += map->start + shdr->sh_offset;
+			start += map__start(map) + shdr->sh_offset;
 
 		curr_dso = dso__new(dso_name);
 		if (curr_dso == NULL)
@@ -1054,10 +1053,11 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 
 		if (adjust_kernel_syms) {
 			curr_map->start  = shdr->sh_addr + ref_reloc(kmap);
-			curr_map->end	 = curr_map->start + shdr->sh_size;
-			curr_map->pgoff	 = shdr->sh_offset;
+			curr_map->end	= map__start(curr_map) + shdr->sh_size;
+			curr_map->pgoff	= shdr->sh_offset;
 		} else {
-			curr_map->map_ip = curr_map->unmap_ip = identity__map_ip;
+			curr_map->map_ip = map__identity_ip;
+			curr_map->unmap_ip = map__identity_ip;
 		}
 		curr_dso->symtab_type = dso->symtab_type;
 		if (maps__insert(kmaps, curr_map))
@@ -1068,13 +1068,11 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 		 * *curr_map->dso.
 		 */
 		dsos__add(&maps__machine(kmaps)->dsos, curr_dso);
-		/* kmaps already got it */
-		map__put(curr_map);
 		dso__set_loaded(curr_dso);
-		*curr_mapp = curr_map;
 		*curr_dsop = curr_dso;
+		map__put(curr_map);
 	} else
-		*curr_dsop = curr_map->dso;
+		*curr_dsop = map__dso(curr_map);
 
 	return 0;
 }
@@ -1085,7 +1083,6 @@ dso__load_sym_internal(struct dso *dso, struct map *map, struct symsrc *syms_ss,
 {
 	struct kmap *kmap = dso->kernel ? map__kmap(map) : NULL;
 	struct maps *kmaps = kmap ? map__kmaps(map) : NULL;
-	struct map *curr_map = map;
 	struct dso *curr_dso = dso;
 	Elf_Data *symstrs, *secstrs, *secstrs_run, *secstrs_sym;
 	uint32_t nr_syms;
@@ -1175,7 +1172,7 @@ dso__load_sym_internal(struct dso *dso, struct map *map, struct symsrc *syms_ss,
 	 * attempted to prelink vdso to its virtual address.
 	 */
 	if (dso__is_vdso(dso))
-		map->reloc = map->start - dso->text_offset;
+		map->reloc = map__start(map) - dso->text_offset;
 
 	dso->adjust_symbols = runtime_ss->adjust_symbols || ref_reloc(kmap);
 	/*
@@ -1262,8 +1259,10 @@ dso__load_sym_internal(struct dso *dso, struct map *map, struct symsrc *syms_ss,
 			--sym.st_value;
 
 		if (dso->kernel) {
-			if (dso__process_kernel_symbol(dso, map, &sym, &shdr, kmaps, kmap, &curr_dso, &curr_map,
-						       section_name, adjust_kernel_syms, kmodule, &remap_kernel))
+			if (dso__process_kernel_symbol(dso, map, &sym, &shdr,
+						       kmaps, kmap, &curr_dso,
+						       section_name, adjust_kernel_syms,
+						       kmodule, &remap_kernel))
 				goto out_elf_end;
 		} else if ((used_opd && runtime_ss->adjust_symbols) ||
 			   (!used_opd && syms_ss->adjust_symbols)) {

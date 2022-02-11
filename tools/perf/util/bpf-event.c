@@ -95,10 +95,10 @@ static int machine__process_bpf_event_load(struct machine *machine,
 		struct map *map = maps__find(machine__kernel_maps(machine), addr);
 
 		if (map) {
-			map->dso->binary_type = DSO_BINARY_TYPE__BPF_PROG_INFO;
-			map->dso->bpf_prog.id = id;
-			map->dso->bpf_prog.sub_id = i;
-			map->dso->bpf_prog.env = env;
+			map__dso(map)->binary_type = DSO_BINARY_TYPE__BPF_PROG_INFO;
+			map__dso(map)->bpf_prog.id = id;
+			map__dso(map)->bpf_prog.sub_id = i;
+			map__dso(map)->bpf_prog.env = env;
 		}
 	}
 	return 0;

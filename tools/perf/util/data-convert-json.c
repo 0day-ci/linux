@@ -127,8 +127,8 @@ static void output_sample_callchain_entry(struct perf_tool *tool,
 		fputc(',', out);
 		output_json_key_string(out, false, 5, "symbol", al->sym->name);
 
-		if (al->map && al->map->dso) {
-			const char *dso = al->map->dso->short_name;
+		if (al->map && map__dso(al->map)) {
+			const char *dso = map__dso(al->map)->short_name;
 
 			if (dso && strlen(dso) > 0) {
 				fputc(',', out);

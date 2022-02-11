@@ -30,7 +30,7 @@ int unwind__prepare_access(struct maps *maps, struct map *map, bool *initialized
 
 	if (maps__addr_space(maps)) {
 		pr_debug("unwind: thread map already set, dso=%s\n",
-			 map->dso->name);
+			 map__dso(map)->name);
 		if (initialized)
 			*initialized = true;
 		return 0;
@@ -41,7 +41,7 @@ int unwind__prepare_access(struct maps *maps, struct map *map, bool *initialized
 	if (!machine->env || !machine->env->arch)
 		goto out_register;
 
-	dso_type = dso__type(map->dso, machine);
+	dso_type = dso__type(map__dso(map), machine);
 	if (dso_type == DSO__TYPE_UNKNOWN)
 		return 0;
 

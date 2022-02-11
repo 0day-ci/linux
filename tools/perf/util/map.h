@@ -41,15 +41,65 @@ struct kmap *map__kmap(struct map *map);
 struct maps *map__kmaps(struct map *map);
 
 /* ip -> dso rip */
-u64 map__map_ip(const struct map *map, u64 ip);
+u64 map__dso_map_ip(const struct map *map, u64 ip);
 /* dso rip -> ip */
-u64 map__unmap_ip(const struct map *map, u64 ip);
+u64 map__dso_unmap_ip(const struct map *map, u64 ip);
 /* Returns ip */
-u64 identity__map_ip(const struct map *map __maybe_unused, u64 ip);
+u64 map__identity_ip(const struct map *map __maybe_unused, u64 ip);
+
+static inline struct dso *map__dso(const struct map *map)
+{
+	return map->dso;
+}
+
+static inline u64 map__map_ip(const struct map *map, u64 ip)
+{
+	return map->map_ip(map, ip);
+}
+
+static inline u64 map__unmap_ip(const struct map *map, u64 ip)
+{
+	return map->unmap_ip(map, ip);
+}
+
+static inline u64 map__start(const struct map *map)
+{
+	return map->start;
+}
+
+static inline u64 map__end(const struct map *map)
+{
+	return map->end;
+}
+
+static inline u64 map__pgoff(const struct map *map)
+{
+	return map->pgoff;
+}
+
+static inline u64 map__reloc(const struct map *map)
+{
+	return map->reloc;
+}
+
+static inline u32 map__flags(const struct map *map)
+{
+	return map->flags;
+}
+
+static inline u32 map__prot(const struct map *map)
+{
+	return map->prot;
+}
+
+static inline bool map__priv(const struct map *map)
+{
+	return map->priv;
+}
 
 static inline size_t map__size(const struct map *map)
 {
-	return map->end - map->start;
+	return map__end(map) - map__start(map);
 }
 
 /* rip/ip <-> addr suitable for passing to `objdump --start-address=` */

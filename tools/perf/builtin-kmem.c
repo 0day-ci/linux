@@ -410,7 +410,7 @@ static u64 find_callsite(struct evsel *evsel, struct perf_sample *sample)
 		if (!caller) {
 			/* found */
 			if (node->ms.map)
-				addr = map__unmap_ip(node->ms.map, node->ip);
+				addr = map__dso_unmap_ip(node->ms.map, node->ip);
 			else
 				addr = node->ip;
 
@@ -1012,7 +1012,7 @@ static void __print_slab_result(struct rb_root *root,
 
 		if (sym != NULL)
 			snprintf(buf, sizeof(buf), "%s+%" PRIx64 "", sym->name,
-				 addr - map->unmap_ip(map, sym->start));
+				 addr - map__unmap_ip(map, sym->start));
 		else
 			snprintf(buf, sizeof(buf), "%#" PRIx64 "", addr);
 		printf(" %-34s |", buf);

@@ -181,7 +181,7 @@ void print_hists_in(struct hists *hists)
 		if (!he->filtered) {
 			pr_info("%2d: entry: %-8s [%-8s] %20s: period = %"PRIu64"\n",
 				i, thread__comm_str(he->thread),
-				he->ms.map->dso->short_name,
+				map__dso(he->ms.map)->short_name,
 				he->ms.sym->name, he->stat.period);
 		}
 
@@ -208,7 +208,7 @@ void print_hists_out(struct hists *hists)
 		if (!he->filtered) {
 			pr_info("%2d: entry: %8s:%5d [%-8s] %20s: period = %"PRIu64"/%"PRIu64"\n",
 				i, thread__comm_str(he->thread), he->thread->tid,
-				he->ms.map->dso->short_name,
+				map__dso(he->ms.map)->short_name,
 				he->ms.sym->name, he->stat.period,
 				he->stat_acc ? he->stat_acc->period : 0);
 		}

@@ -152,9 +152,10 @@ static PyObject *perf_sample_src(PyObject *obj, PyObject *args, bool get_srccode
 	map = c->al->map;
 	addr = c->al->addr;
 
-	if (map && map->dso)
-		srcfile = get_srcline_split(map->dso, map__rip_2objdump(map, addr), &line);
-
+	if (map && map__dso(map)) {
+		srcfile = get_srcline_split(map__dso(map),
+					    map__rip_2objdump(map, addr), &line);
+	}
 	if (get_srccode) {
 		if (srcfile)
 			srccode = find_sourceline(srcfile, line, &len);

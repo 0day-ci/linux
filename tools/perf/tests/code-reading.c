@@ -240,7 +240,7 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 
 	pr_debug("Reading object code for memory address: %#"PRIx64"\n", addr);
 
-	if (!thread__find_map(thread, cpumode, addr, &al) || !al.map->dso) {
+	if (!thread__find_map(thread, cpumode, addr, &al) || !map__dso(al.map)) {
 		if (cpumode == PERF_RECORD_MISC_HYPERVISOR) {
 			pr_debug("Hypervisor address can not be resolved - skipping\n");
 			return 0;
@@ -250,10 +250,10 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 		return -1;
 	}
 
-	pr_debug("File is: %s\n", al.map->dso->long_name);
+	pr_debug("File is: %s\n", map__dso(al.map)->long_name);
 
-	if (al.map->dso->symtab_type == DSO_BINARY_TYPE__KALLSYMS &&
-	    !dso__is_kcore(al.map->dso)) {
+	if (map__dso(al.map)->symtab_type == DSO_BINARY_TYPE__KALLSYMS &&
+	    !dso__is_kcore(map__dso(al.map))) {
 		pr_debug("Unexpected kernel address - skipping\n");
 		return 0;
 	}
@@ -264,11 +264,11 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 		len = BUFSZ;
 
 	/* Do not go off the map */
-	if (addr + len > al.map->end)
-		len = al.map->end - addr;
+	if (addr + len > map__end(al.map))
+		len = map__end(al.map) - addr;
 
 	/* Read the object code using perf */
-	ret_len = dso__data_read_offset(al.map->dso, maps__machine(thread->maps),
+	ret_len = dso__data_read_offset(map__dso(al.map), maps__machine(thread->maps),
 					al.addr, buf1, len);
 	if (ret_len != len) {
 		pr_debug("dso__data_read_offset failed\n");
@@ -283,11 +283,11 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 		return -1;
 
 	/* objdump struggles with kcore - try each map only once */
-	if (dso__is_kcore(al.map->dso)) {
+	if (dso__is_kcore(map__dso(al.map))) {
 		size_t d;
 
 		for (d = 0; d < state->done_cnt; d++) {
-			if (state->done[d] == al.map->start) {
+			if (state->done[d] == map__start(al.map)) {
 				pr_debug("kcore map tested already");
 				pr_debug(" - skipping\n");
 				return 0;
@@ -297,12 +297,12 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 			pr_debug("Too many kcore maps - skipping\n");
 			return 0;
 		}
-		state->done[state->done_cnt++] = al.map->start;
+		state->done[state->done_cnt++] = map__start(al.map);
 	}
 
-	objdump_name = al.map->dso->long_name;
-	if (dso__needs_decompress(al.map->dso)) {
-		if (dso__decompress_kmodule_path(al.map->dso, objdump_name,
+	objdump_name = map__dso(al.map)->long_name;
+	if (dso__needs_decompress(map__dso(al.map))) {
+		if (dso__decompress_kmodule_path(map__dso(al.map), objdump_name,
 						 decomp_name,
 						 sizeof(decomp_name)) < 0) {
 			pr_debug("decompression failed\n");
@@ -330,7 +330,7 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 			len -= ret;
 			if (len) {
 				pr_debug("Reducing len to %zu\n", len);
-			} else if (dso__is_kcore(al.map->dso)) {
+			} else if (dso__is_kcore(map__dso(al.map))) {
 				/*
 				 * objdump cannot handle very large segments
 				 * that may be found in kcore.
@@ -588,8 +588,8 @@ static int do_test_code_reading(bool try_kcore)
 		pr_debug("map__load failed\n");
 		goto out_err;
 	}
-	have_vmlinux = dso__is_vmlinux(map->dso);
-	have_kcore = dso__is_kcore(map->dso);
+	have_vmlinux = dso__is_vmlinux(map__dso(map));
+	have_kcore = dso__is_kcore(map__dso(map));
 
 	/* 2nd time through we just try kcore */
 	if (try_kcore && !have_kcore)
