@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause-Clear
 /*
  * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights
  */
 
 #include "core.h"
@@ -35,9 +36,10 @@ static void ath11k_dbring_fill_magic_value(struct ath11k *ar,
 		*temp++ = ATH11K_DB_MAGIC_VALUE;
 }
 
-static int ath11k_dbring_bufs_replenish(struct ath11k *ar,
-					struct ath11k_dbring *ring,
-					struct ath11k_dbring_element *buff)
+int ath11k_dbring_bufs_replenish(struct ath11k *ar,
+				 struct ath11k_dbring *ring,
+				 struct ath11k_dbring_element *buff,
+				 enum wmi_direct_buffer_module id)
 {
 	struct ath11k_base *ab = ar->ab;
 	struct hal_srng *srng;
@@ -77,6 +79,9 @@ static int ath11k_dbring_bufs_replenish(struct ath11k *ar,
 		goto err_idr_remove;
 	}
 
+	if (id == WMI_DIRECT_BUF_CFR)
+		ath11k_cfr_lut_update_paddr(ar, paddr, buf_id);
+
 	buff->paddr = paddr;
 
 	cookie = FIELD_PREP(DP_RXDMA_BUF_COOKIE_PDEV_ID, ar->pdev_idx) |
@@ -101,7 +106,8 @@ err:
 }
 
 static int ath11k_dbring_fill_bufs(struct ath11k *ar,
-				   struct ath11k_dbring *ring)
+				   struct ath11k_dbring *ring,
+				   enum wmi_direct_buffer_module id)
 {
 	struct ath11k_dbring_element *buff;
 	struct hal_srng *srng;
@@ -129,7 +135,7 @@ static int ath11k_dbring_fill_bufs(struct ath11k *ar,
 			kfree(buff);
 			break;
 		}
-		ret = ath11k_dbring_bufs_replenish(ar, ring, buff);
+		ret = ath11k_dbring_bufs_replenish(ar, ring, buff, id);
 		if (ret) {
 			ath11k_warn(ar->ab, "failed to replenish db ring num_remain %d req_ent %d\n",
 				    num_remain, req_entries);
@@ -210,7 +216,7 @@ int ath11k_dbring_buf_setup(struct ath11k *ar,
 	ring->hp_addr = ath11k_hal_srng_get_hp_addr(ar->ab, srng);
 	ring->tp_addr = ath11k_hal_srng_get_tp_addr(ar->ab, srng);
 
-	ret = ath11k_dbring_fill_bufs(ar, ring);
+	ret = ath11k_dbring_fill_bufs(ar, ring, db_cap->id);
 
 	return ret;
 }
@@ -270,7 +276,7 @@ int ath11k_dbring_buffer_release_event(struct ath11k_base *ab,
 	struct ath11k_buffer_addr desc;
 	u8 *vaddr_unalign;
 	u32 num_entry, num_buff_reaped;
-	u8 pdev_idx, rbm;
+	u8 pdev_idx, rbm, module_id;
 	u32 cookie;
 	int buf_id;
 	int size;
@@ -278,6 +284,7 @@ int ath11k_dbring_buffer_release_event(struct ath11k_base *ab,
 	int ret = 0;
 
 	pdev_idx = ev->fixed.pdev_id;
+	module_id = ev->fixed.module_id;
 
 	if (pdev_idx >= ab->num_radios) {
 		ath11k_warn(ab, "Invalid pdev id %d\n", pdev_idx);
@@ -357,7 +364,7 @@ int ath11k_dbring_buffer_release_event(struct ath11k_base *ab,
 
 		buff->paddr = 0;
 		memset(buff->payload, 0, size);
-		ath11k_dbring_bufs_replenish(ar, ring, buff);
+		ath11k_dbring_bufs_replenish(ar, ring, buff, module_id);
 	}
 
 	spin_unlock_bh(&srng->lock);
