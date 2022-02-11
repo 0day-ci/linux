@@ -381,54 +381,53 @@ static int pm8001_task_exec(struct sas_task *task,
 	struct pm8001_device *pm8001_dev;
 	struct pm8001_port *port = NULL;
 	struct sas_task *t = task;
+	struct task_status_struct *ts = &t->task_status;
 	struct pm8001_ccb_info *ccb;
 	u32 tag = 0xdeadbeef, rc = 0, n_elem = 0;
 	unsigned long flags = 0;
 	enum sas_protocol task_proto = t->task_proto;
 
 	if (!dev->port) {
-		struct task_status_struct *tsm = &t->task_status;
-		tsm->resp = SAS_TASK_UNDELIVERED;
-		tsm->stat = SAS_PHY_DOWN;
+		ts->resp = SAS_TASK_UNDELIVERED;
+		ts->stat = SAS_PHY_DOWN;
 		if (dev->dev_type != SAS_SATA_DEV)
 			t->task_done(t);
 		return 0;
 	}
+
 	pm8001_ha = pm8001_find_ha_by_dev(task->dev);
 	if (pm8001_ha->controller_fatal_error) {
-		struct task_status_struct *ts = &t->task_status;
-
 		ts->resp = SAS_TASK_UNDELIVERED;
 		t->task_done(t);
 		return 0;
 	}
+
 	pm8001_dbg(pm8001_ha, IO, "pm8001_task_exec device\n");
+
 	spin_lock_irqsave(&pm8001_ha->lock, flags);
+
 	do {
 		dev = t->dev;
 		pm8001_dev = dev->lldd_dev;
 		port = &pm8001_ha->port[sas_find_local_port_id(dev)];
-		if (DEV_IS_GONE(pm8001_dev) || !port->port_attached) {
-			if (sas_protocol_ata(task_proto)) {
-				struct task_status_struct *ts = &t->task_status;
-				ts->resp = SAS_TASK_UNDELIVERED;
-				ts->stat = SAS_PHY_DOWN;
 
+		if (DEV_IS_GONE(pm8001_dev) || !port->port_attached) {
+			ts->resp = SAS_TASK_UNDELIVERED;
+			ts->stat = SAS_PHY_DOWN;
+			if (sas_protocol_ata(task_proto)) {
 				spin_unlock_irqrestore(&pm8001_ha->lock, flags);
 				t->task_done(t);
 				spin_lock_irqsave(&pm8001_ha->lock, flags);
-				continue;
 			} else {
-				struct task_status_struct *ts = &t->task_status;
-				ts->resp = SAS_TASK_UNDELIVERED;
-				ts->stat = SAS_PHY_DOWN;
 				t->task_done(t);
-				continue;
 			}
+			continue;
 		}
+
 		rc = pm8001_tag_alloc(pm8001_ha, &tag);
 		if (rc)
 			goto err_out;
+
 		ccb = &pm8001_ha->ccb_info[tag];
 
 		if (!sas_protocol_ata(task_proto)) {
