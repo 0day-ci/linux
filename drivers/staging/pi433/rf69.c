@@ -822,9 +822,37 @@ int rf69_set_dagc(struct spi_device *spi, enum dagc dagc)
 
 /*-------------------------------------------------------------------------*/
 
+static void rf69_dbg_hex(struct spi_device *spi, u8 *buf, unsigned int size,
+			 const char *fmt, ...)
+{
+	va_list args;
+	char textbuf[512] = {};
+	char *text = textbuf;
+	int text_pos;
+
+	int rowsize = 16;
+	int i, linelen, remaining = size;
+
+	va_start(args, fmt);
+	text_pos = vscnprintf(text, sizeof(textbuf), fmt, args);
+	text += text_pos;
+	va_end(args);
+
+	for (i = 0; i < size; i += rowsize) {
+		linelen = min(remaining, rowsize);
+		remaining -= rowsize;
+
+		hex_dump_to_buffer(buf + i, linelen, rowsize, 1,
+				   text, sizeof(textbuf) - text_pos, false);
+
+		dev_dbg(&spi->dev, "%s\n", textbuf);
+
+		memset(text, 0, sizeof(textbuf) - text_pos);
+	}
+}
+
 int rf69_read_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 {
-	int i;
 	struct spi_transfer transfer;
 	u8 local_buffer[FIFO_SIZE + 1];
 	int retval;
@@ -844,9 +872,7 @@ int rf69_read_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 
 	retval = spi_sync_transfer(spi, &transfer, 1);
 
-	/* print content read from fifo for debugging purposes */
-	for (i = 0; i < size; i++)
-		dev_dbg(&spi->dev, "%d - 0x%x\n", i, local_buffer[i + 1]);
+	rf69_dbg_hex(spi, local_buffer + 1, size, "%s - ", __func__);
 
 	memcpy(buffer, &local_buffer[1], size);
 
@@ -855,7 +881,6 @@ int rf69_read_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 
 int rf69_write_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 {
-	int i;
 	u8 local_buffer[FIFO_SIZE + 1];
 
 	if (size > FIFO_SIZE) {
@@ -867,9 +892,7 @@ int rf69_write_fifo(struct spi_device *spi, u8 *buffer, unsigned int size)
 	local_buffer[0] = REG_FIFO | WRITE_BIT;
 	memcpy(&local_buffer[1], buffer, size);
 
-	/* print content written from fifo for debugging purposes */
-	for (i = 0; i < size; i++)
-		dev_dbg(&spi->dev, "0x%x\n", buffer[i]);
+	rf69_dbg_hex(spi, local_buffer + 1, size, "%s - ", __func__);
 
 	return spi_write(spi, local_buffer, size + 1);
 }
