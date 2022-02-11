@@ -253,7 +253,7 @@ void maps__fixup_end(struct maps *maps)
 
 	maps__for_each_entry(maps, curr) {
 		if (prev != NULL && !map__end(prev->map))
-			prev->map->end = map__start(curr->map);
+			RC_CHK_ACCESS(prev->map)->end = map__start(curr->map);
 
 		prev = curr;
 	}
@@ -263,7 +263,7 @@ void maps__fixup_end(struct maps *maps)
 	 * last map final address.
 	 */
 	if (curr && !map__end(curr->map))
-		curr->map->end = ~0ULL;
+		RC_CHK_ACCESS(curr->map)->end = ~0ULL;
 
 	up_write(maps__lock(maps));
 }
@@ -831,7 +831,7 @@ static int maps__split_kallsyms(struct maps *kmaps, struct dso *dso, u64 delta,
 			*module++ = '\0';
 
 			if (strcmp(map__dso(curr_map)->short_name, module)) {
-				if (curr_map != initial_map &&
+				if (RC_CHK_ACCESS(curr_map) != RC_CHK_ACCESS(initial_map) &&
 				    dso->kernel == DSO_SPACE__KERNEL_GUEST &&
 				    machine__is_default_guest(machine)) {
 					/*
@@ -910,8 +910,8 @@ static int maps__split_kallsyms(struct maps *kmaps, struct dso *dso, u64 delta,
 				return -1;
 			}
 
-			curr_map->map_ip = map__identity_ip;
-			curr_map->unmap_ip = map__identity_ip;
+			RC_CHK_ACCESS(curr_map)->map_ip = map__identity_ip;
+			RC_CHK_ACCESS(curr_map)->unmap_ip = map__identity_ip;
 			if (maps__insert(kmaps, curr_map)) {
 				dso__put(ndso);
 				return -1;
@@ -1215,8 +1215,8 @@ static int kcore_mapfn(u64 start, u64 len, u64 pgoff, void *data)
 		return -ENOMEM;
 	}
 
-	list_node->map->end = map__start(list_node->map) + len;
-	list_node->map->pgoff = pgoff;
+	list_node->RC_CHK_ACCESS(map)->end = map__start(list_node->map) + len;
+	list_node->RC_CHK_ACCESS(map)->pgoff = pgoff;
 
 	list_add(&list_node->node, &md->maps);
 
@@ -1251,7 +1251,7 @@ int maps__merge_in(struct maps *kmaps, struct map *new_map)
 				 * |new......|     -> |new..|
 				 *       |old....| ->       |old....|
 				 */
-				new_map->end = map__start(old_map);
+				RC_CHK_ACCESS(new_map)->end = map__start(old_map);
 			} else {
 				/*
 				 * |new.............| -> |new..|       |new..|
@@ -1272,11 +1272,12 @@ int maps__merge_in(struct maps *kmaps, struct map *new_map)
 					goto out;
 				}
 
-				m->map->end = map__start(old_map);
+
+				RC_CHK_ACCESS(m->map)->end = map__start(old_map);
 				list_add_tail(&m->node, &merged);
-				new_map->pgoff +=
+				RC_CHK_ACCESS(new_map)->pgoff +=
 					map__end(old_map) - map__start(new_map);
-				new_map->start = map__end(old_map);
+				RC_CHK_ACCESS(new_map)->start = map__end(old_map);
 			}
 		} else {
 			/*
@@ -1296,9 +1297,10 @@ int maps__merge_in(struct maps *kmaps, struct map *new_map)
 				 *      |new......| ->         |new...|
 				 * |old....|        -> |old....|
 				 */
-				new_map->pgoff +=
+
+				RC_CHK_ACCESS(new_map)->pgoff +=
 					map__end(old_map) - map__start(new_map);
-				new_map->start = map__end(old_map);
+				RC_CHK_ACCESS(new_map)->start = map__end(old_map);
 			}
 		}
 	}
@@ -1411,14 +1413,14 @@ static int dso__load_kcore(struct dso *dso, struct map *map,
 
 		new_node = list_entry(md.maps.next, struct map_list_node, node);
 		list_del_init(&new_node->node);
-		if (new_node->map == replacement_map) {
+		if (RC_CHK_ACCESS(new_node->map) == RC_CHK_ACCESS(replacement_map)) {
 			struct  map *updated;
 
-			map->start = map__start(new_node->map);
-			map->end   = map__end(new_node->map);
-			map->pgoff = map__pgoff(new_node->map);
-			map->map_ip = new_node->map->map_ip;
-			map->unmap_ip = new_node->map->unmap_ip;
+			RC_CHK_ACCESS(map)->start = map__start(new_node->map);
+			RC_CHK_ACCESS(map)->end   = map__end(new_node->map);
+			RC_CHK_ACCESS(map)->pgoff = map__pgoff(new_node->map);
+			RC_CHK_ACCESS(map)->map_ip = RC_CHK_ACCESS(new_node->map)->map_ip;
+			RC_CHK_ACCESS(map)->unmap_ip = RC_CHK_ACCESS(new_node->map)->unmap_ip;
 			/* Ensure maps are correctly ordered */
 			updated = map__get(map);
 			maps__remove(kmaps, map);
@@ -2058,7 +2060,7 @@ struct map *maps__find_by_name(struct maps *maps, const char *name)
 	down_read(maps__lock(maps));
 
 	if (RC_CHK_ACCESS(maps)->last_search_by_name &&
-	    strcmp(map__dso(maps->last_search_by_name)->short_name, name) == 0) {
+	    strcmp(map__dso(RC_CHK_ACCESS(maps)->last_search_by_name)->short_name, name) == 0) {
 		map = RC_CHK_ACCESS(maps)->last_search_by_name;
 		goto out_unlock;
 	}

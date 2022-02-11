@@ -40,7 +40,7 @@ static int s390_call__parse(struct arch *arch, struct ins_operands *ops,
 
 	if (maps__find_ams(ms->maps, &target) == 0 &&
 	    map__rip_2objdump(target.ms.map,
-			      map->map_ip(target.ms.map, target.addr)
+			      RC_CHK_ACCESS(map)->map_ip(target.ms.map, target.addr)
 			     ) == ops->target.addr)
 		ops->target.sym = target.ms.sym;
 

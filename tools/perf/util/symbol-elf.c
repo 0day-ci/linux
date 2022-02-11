@@ -993,11 +993,11 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 		 */
 		if (*remap_kernel && dso->kernel && !kmodule) {
 			*remap_kernel = false;
-			map->start = shdr->sh_addr + ref_reloc(kmap);
-			map->end = map__start(map) + shdr->sh_size;
-			map->pgoff = shdr->sh_offset;
-			map->map_ip = map__dso_map_ip;
-			map->unmap_ip = map__dso_unmap_ip;
+			RC_CHK_ACCESS(map)->start = shdr->sh_addr + ref_reloc(kmap);
+			RC_CHK_ACCESS(map)->end = map__start(map) + shdr->sh_size;
+			RC_CHK_ACCESS(map)->pgoff = shdr->sh_offset;
+			RC_CHK_ACCESS(map)->map_ip = map__dso_map_ip;
+			RC_CHK_ACCESS(map)->unmap_ip = map__dso_unmap_ip;
 			/* Ensure maps are correctly ordered */
 			if (kmaps) {
 				int err;
@@ -1018,7 +1018,7 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 		 */
 		if (*remap_kernel && kmodule) {
 			*remap_kernel = false;
-			map->pgoff = shdr->sh_offset;
+			RC_CHK_ACCESS(map)->pgoff = shdr->sh_offset;
 		}
 
 		*curr_dsop = dso;
@@ -1052,12 +1052,13 @@ static int dso__process_kernel_symbol(struct dso *dso, struct map *map,
 			map__kmap(curr_map)->kmaps = kmaps;
 
 		if (adjust_kernel_syms) {
-			curr_map->start  = shdr->sh_addr + ref_reloc(kmap);
-			curr_map->end	= map__start(curr_map) + shdr->sh_size;
-			curr_map->pgoff	= shdr->sh_offset;
+			RC_CHK_ACCESS(curr_map)->start  = shdr->sh_addr + ref_reloc(kmap);
+			RC_CHK_ACCESS(curr_map)->end	= map__start(curr_map) +
+							  shdr->sh_size;
+			RC_CHK_ACCESS(curr_map)->pgoff	= shdr->sh_offset;
 		} else {
-			curr_map->map_ip = map__identity_ip;
-			curr_map->unmap_ip = map__identity_ip;
+			RC_CHK_ACCESS(curr_map)->map_ip = map__identity_ip;
+			RC_CHK_ACCESS(curr_map)->unmap_ip = map__identity_ip;
 		}
 		curr_dso->symtab_type = dso->symtab_type;
 		if (maps__insert(kmaps, curr_map))
@@ -1161,7 +1162,7 @@ dso__load_sym_internal(struct dso *dso, struct map *map, struct symsrc *syms_ss,
 			if (strcmp(elf_name, kmap->ref_reloc_sym->name))
 				continue;
 			kmap->ref_reloc_sym->unrelocated_addr = sym.st_value;
-			map->reloc = kmap->ref_reloc_sym->addr -
+			RC_CHK_ACCESS(map)->reloc = kmap->ref_reloc_sym->addr -
 				     kmap->ref_reloc_sym->unrelocated_addr;
 			break;
 		}
@@ -1172,7 +1173,7 @@ dso__load_sym_internal(struct dso *dso, struct map *map, struct symsrc *syms_ss,
 	 * attempted to prelink vdso to its virtual address.
 	 */
 	if (dso__is_vdso(dso))
-		map->reloc = map__start(map) - dso->text_offset;
+		RC_CHK_ACCESS(map)->reloc = map__start(map) - dso->text_offset;
 
 	dso->adjust_symbols = runtime_ss->adjust_symbols || ref_reloc(kmap);
 	/*

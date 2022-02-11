@@ -812,8 +812,8 @@ static int machine__process_ksymbol_register(struct machine *machine,
 			dso__set_loaded(map__dso(map));
 		}
 
-		map->start = event->ksymbol.addr;
-		map->end = map__start(map) + event->ksymbol.len;
+		RC_CHK_ACCESS(map)->start = event->ksymbol.addr;
+		RC_CHK_ACCESS(map)->end = map__start(map) + event->ksymbol.len;
 		err = maps__insert(machine__kernel_maps(machine), map);
 		if (err) {
 			err = -ENOMEM;
@@ -853,7 +853,7 @@ static int machine__process_ksymbol_unregister(struct machine *machine,
 	if (!map)
 		return 0;
 
-	if (map != machine->vmlinux_map)
+	if (RC_CHK_ACCESS(map) != RC_CHK_ACCESS(machine->vmlinux_map))
 		maps__remove(machine__kernel_maps(machine), map);
 	else {
 		sym = dso__find_symbol(map__dso(map),
@@ -1120,8 +1120,8 @@ int machine__create_extra_kernel_map(struct machine *machine,
 	if (!map)
 		return -ENOMEM;
 
-	map->end   = xm->end;
-	map->pgoff = xm->pgoff;
+	RC_CHK_ACCESS(map)->end   = xm->end;
+	RC_CHK_ACCESS(map)->pgoff = xm->pgoff;
 
 	kmap = map__kmap(map);
 
@@ -1193,7 +1193,7 @@ int machine__map_x86_64_entry_trampolines(struct machine *machine,
 
 		dest_map = maps__find(kmaps, map__pgoff(map));
 		if (dest_map != map)
-			map->pgoff = map__map_ip(dest_map, map__pgoff(map));
+			RC_CHK_ACCESS(map)->pgoff = map__map_ip(dest_map, map__pgoff(map));
 		found = true;
 	}
 	if (found || machine->trampolines_mapped)
@@ -1244,8 +1244,8 @@ __machine__create_kernel_maps(struct machine *machine, struct dso *kernel)
 	if (machine->vmlinux_map == NULL)
 		return -ENOMEM;
 
-	machine->vmlinux_map->map_ip = map__identity_ip;
-	machine->vmlinux_map->unmap_ip = map__identity_ip;
+	RC_CHK_ACCESS(machine->vmlinux_map)->map_ip = map__identity_ip;
+	RC_CHK_ACCESS(machine->vmlinux_map)->unmap_ip = map__identity_ip;
 	return maps__insert(machine__kernel_maps(machine), machine->vmlinux_map);
 }
 
@@ -1522,7 +1522,7 @@ static int machine__create_module(void *arg, const char *name, u64 start,
 	map = machine__addnew_module_map(machine, start, name);
 	if (map == NULL)
 		return -1;
-	map->end = start + size;
+	RC_CHK_ACCESS(map)->end = start + size;
 
 	dso__kernel_module_get_build_id(map__dso(map), machine->root_dir);
 	map__put(map);
@@ -1558,14 +1558,14 @@ static int machine__create_modules(struct machine *machine)
 static void machine__set_kernel_mmap(struct machine *machine,
 				     u64 start, u64 end)
 {
-	machine->vmlinux_map->start = start;
-	machine->vmlinux_map->end   = end;
+	RC_CHK_ACCESS(machine->vmlinux_map)->start = start;
+	RC_CHK_ACCESS(machine->vmlinux_map)->end   = end;
 	/*
 	 * Be a bit paranoid here, some perf.data file came with
 	 * a zero sized synthesized MMAP event for the kernel.
 	 */
 	if (start == 0 && end == 0)
-		machine->vmlinux_map->end = ~0ULL;
+		RC_CHK_ACCESS(machine->vmlinux_map)->end = ~0ULL;
 }
 
 static int machine__update_kernel_mmap(struct machine *machine,
@@ -1700,7 +1700,7 @@ static int machine__process_kernel_mmap_event(struct machine *machine,
 		if (map == NULL)
 			goto out_problem;
 
-		map->end = map__start(map) + xm->end - xm->start;
+		RC_CHK_ACCESS(map)->end = map__start(map) + xm->end - xm->start;
 
 		if (build_id__is_defined(bid))
 			dso__set_build_id(map__dso(map), bid);

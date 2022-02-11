@@ -104,15 +104,15 @@ static inline bool replace_android_lib(const char *filename, char *newfilename)
 
 void map__init(struct map *map, u64 start, u64 end, u64 pgoff, struct dso *dso)
 {
-	map->start    = start;
-	map->end      = end;
-	map->pgoff    = pgoff;
-	map->reloc    = 0;
-	map->dso      = dso__get(dso);
-	map->map_ip   = map__dso_map_ip;
-	map->unmap_ip = map__dso_unmap_ip;
-	map->erange_warned = false;
-	refcount_set(&map->refcnt, 1);
+	RC_CHK_ACCESS(map)->start    = start;
+	RC_CHK_ACCESS(map)->end      = end;
+	RC_CHK_ACCESS(map)->pgoff    = pgoff;
+	RC_CHK_ACCESS(map)->reloc    = 0;
+	RC_CHK_ACCESS(map)->dso      = dso__get(dso);
+	RC_CHK_ACCESS(map)->map_ip   = map__dso_map_ip;
+	RC_CHK_ACCESS(map)->unmap_ip = map__dso_unmap_ip;
+	RC_CHK_ACCESS(map)->erange_warned = false;
+	refcount_set(&RC_CHK_ACCESS(map)->refcnt, 1);
 }
 
 struct map *map__new(struct machine *machine, u64 start, u64 len,
@@ -120,12 +120,13 @@ struct map *map__new(struct machine *machine, u64 start, u64 len,
 		     u32 prot, u32 flags, struct build_id *bid,
 		     char *filename, struct thread *thread)
 {
-	struct map *map;
+	struct map *res;
+	RC_STRUCT(map) *map;
 	struct nsinfo *nsi = NULL;
 	struct nsinfo *nnsi;
 
 	map = malloc(sizeof(*map));
-	if (map != NULL) {
+	if (ADD_RC_CHK(res, map)) {
 		char newfilename[PATH_MAX];
 		struct dso *dso;
 		int anon, no_dso, vdso, android;
@@ -168,7 +169,7 @@ struct map *map__new(struct machine *machine, u64 start, u64 len,
 		if (dso == NULL)
 			goto out_delete;
 
-		map__init(map, start, start + len, pgoff, dso);
+		map__init(res, start, start + len, pgoff, dso);
 
 		if (anon || no_dso) {
 			map->map_ip = map->unmap_ip = map__identity_ip;
@@ -191,10 +192,10 @@ struct map *map__new(struct machine *machine, u64 start, u64 len,
 
 		dso__put(dso);
 	}
-	return map;
+	return res;
 out_delete:
 	nsinfo__put(nsi);
-	free(map);
+	RC_CHK_FREE(res);
 	return NULL;
 }
 
@@ -205,17 +206,18 @@ out_delete:
  */
 struct map *map__new2(u64 start, struct dso *dso)
 {
-	struct map *map;
+	struct map *res;
+	RC_STRUCT(map) *map;
 
 	map = calloc(1, sizeof(*map) + (dso->kernel ? sizeof(struct kmap) : 0));
-	if (map != NULL) {
+	if (ADD_RC_CHK(res, map)) {
 		/*
 		 * ->end will be filled after we load all the symbols
 		 */
-		map__init(map, start, 0, 0, dso);
+		map__init(res, start, 0, 0, dso);
 	}
 
-	return map;
+	return res;
 }
 
 bool __map__is_kernel(const struct map *map)
@@ -277,20 +279,22 @@ bool map__has_symbols(const struct map *map)
 
 static void map__exit(struct map *map)
 {
-	BUG_ON(refcount_read(&map->refcnt) != 0);
-	dso__zput(map->dso);
+	BUG_ON(refcount_read(&RC_CHK_ACCESS(map)->refcnt) != 0);
+	dso__zput(RC_CHK_ACCESS(map)->dso);
 }
 
 void map__delete(struct map *map)
 {
 	map__exit(map);
-	free(map);
+	RC_CHK_FREE(map);
 }
 
 void map__put(struct map *map)
 {
-	if (map && refcount_dec_and_test(&map->refcnt))
+	if (map && refcount_dec_and_test(&RC_CHK_ACCESS(map)->refcnt))
 		map__delete(map);
+	else
+		RC_CHK_PUT(map);
 }
 
 void map__fixup_start(struct map *map)
@@ -299,7 +303,7 @@ void map__fixup_start(struct map *map)
 	struct rb_node *nd = rb_first_cached(symbols);
 	if (nd != NULL) {
 		struct symbol *sym = rb_entry(nd, struct symbol, rb_node);
-		map->start = sym->start;
+		RC_CHK_ACCESS(map)->start = sym->start;
 	}
 }
 
@@ -309,7 +313,7 @@ void map__fixup_end(struct map *map)
 	struct rb_node *nd = rb_last(&symbols->rb_root);
 	if (nd != NULL) {
 		struct symbol *sym = rb_entry(nd, struct symbol, rb_node);
-		map->end = sym->end;
+		RC_CHK_ACCESS(map)->end = sym->end;
 	}
 }
 
@@ -376,19 +380,20 @@ struct symbol *map__find_symbol_by_name(struct map *map, const char *name)
 
 struct map *map__clone(struct map *from)
 {
-	struct map *map;
-	size_t size = sizeof(struct map);
+	struct map *res;
+	RC_STRUCT(map) *map;
+	size_t size = sizeof(RC_STRUCT(map));
 
 	if (map__dso(from) && map__dso(from)->kernel)
 		size += sizeof(struct kmap);
 
-	map = memdup(from, size);
-	if (map != NULL) {
+	map = memdup(RC_CHK_ACCESS(from), size);
+	if (ADD_RC_CHK(res, map)) {
 		refcount_set(&map->refcnt, 1);
 		map->dso = dso__get(map->dso);
 	}
 
-	return map;
+	return res;
 }
 
 size_t map__fprintf(struct map *map, FILE *fp)
@@ -534,7 +539,7 @@ struct kmap *__map__kmap(struct map *map)
 {
 	if (!map__dso(map) || !map__dso(map)->kernel)
 		return NULL;
-	return (struct kmap *)(&map[1]);
+	return (struct kmap *)(&RC_CHK_ACCESS(map)[1]);
 }
 
 struct kmap *map__kmap(struct map *map)

@@ -10,12 +10,13 @@
 #include <string.h>
 #include <stdbool.h>
 #include <linux/types.h>
+#include <internal/rc_check.h>
 
 struct dso;
 struct maps;
 struct machine;
 
-struct map {
+DECLARE_RC_STRUCT(map) {
 	u64			start;
 	u64			end;
 	bool			erange_warned:1;
@@ -49,52 +50,52 @@ u64 map__identity_ip(const struct map *map __maybe_unused, u64 ip);
 
 static inline struct dso *map__dso(const struct map *map)
 {
-	return map->dso;
+	return RC_CHK_ACCESS(map)->dso;
 }
 
 static inline u64 map__map_ip(const struct map *map, u64 ip)
 {
-	return map->map_ip(map, ip);
+	return RC_CHK_ACCESS(map)->map_ip(map, ip);
 }
 
 static inline u64 map__unmap_ip(const struct map *map, u64 ip)
 {
-	return map->unmap_ip(map, ip);
+	return RC_CHK_ACCESS(map)->unmap_ip(map, ip);
 }
 
 static inline u64 map__start(const struct map *map)
 {
-	return map->start;
+	return RC_CHK_ACCESS(map)->start;
 }
 
 static inline u64 map__end(const struct map *map)
 {
-	return map->end;
+	return RC_CHK_ACCESS(map)->end;
 }
 
 static inline u64 map__pgoff(const struct map *map)
 {
-	return map->pgoff;
+	return RC_CHK_ACCESS(map)->pgoff;
 }
 
 static inline u64 map__reloc(const struct map *map)
 {
-	return map->reloc;
+	return RC_CHK_ACCESS(map)->reloc;
 }
 
 static inline u32 map__flags(const struct map *map)
 {
-	return map->flags;
+	return RC_CHK_ACCESS(map)->flags;
 }
 
 static inline u32 map__prot(const struct map *map)
 {
-	return map->prot;
+	return RC_CHK_ACCESS(map)->prot;
 }
 
 static inline bool map__priv(const struct map *map)
 {
-	return map->priv;
+	return RC_CHK_ACCESS(map)->priv;
 }
 
 static inline size_t map__size(const struct map *map)
@@ -119,7 +120,7 @@ struct thread;
  * Note: caller must ensure map->dso is not NULL (map is loaded).
  */
 #define map__for_each_symbol(map, pos, n)	\
-	dso__for_each_symbol(map->dso, pos, n)
+	dso__for_each_symbol(map__dso(map), pos, n)
 
 /* map__for_each_symbol_with_name - iterate over the symbols in the given map
  *                                  that have the given name
@@ -153,9 +154,12 @@ struct map *map__clone(struct map *map);
 
 static inline struct map *map__get(struct map *map)
 {
-	if (map)
-		refcount_inc(&map->refcnt);
-	return map;
+	struct map *result;
+
+	if (RC_CHK_GET(result, map))
+		refcount_inc(&RC_CHK_ACCESS(map)->refcnt);
+
+	return result;
 }
 
 void map__put(struct map *map);

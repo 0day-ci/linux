@@ -30,7 +30,7 @@ static int check_maps(struct map_def *merged, unsigned int size, struct maps *ma
 			if (map__start(map) != merged[i].start ||
 			    map__end(map) != merged[i].end ||
 			    strcmp(map__dso(map)->name, merged[i].name) ||
-			    refcount_read(&map->refcnt) != 1) {
+			    refcount_read(&RC_CHK_ACCESS(map)->refcnt) != 1) {
 				failed = true;
 			}
 			i++;
@@ -50,7 +50,7 @@ static int check_maps(struct map_def *merged, unsigned int size, struct maps *ma
 				map__start(map),
 				map__end(map),
 				map__dso(map)->name,
-				refcount_read(&map->refcnt));
+				refcount_read(&RC_CHK_ACCESS(map)->refcnt));
 		}
 	}
 	return failed ? TEST_FAIL : TEST_OK;
@@ -95,8 +95,8 @@ static int test__maps__merge_in(struct test_suite *t __maybe_unused, int subtest
 		map = dso__new_map(bpf_progs[i].name);
 		TEST_ASSERT_VAL("failed to create map", map);
 
-		map->start = bpf_progs[i].start;
-		map->end   = bpf_progs[i].end;
+		RC_CHK_ACCESS(map)->start = bpf_progs[i].start;
+		RC_CHK_ACCESS(map)->end   = bpf_progs[i].end;
 		TEST_ASSERT_VAL("failed to insert map", maps__insert(maps, map) == 0);
 		map__put(map);
 	}
@@ -111,16 +111,16 @@ static int test__maps__merge_in(struct test_suite *t __maybe_unused, int subtest
 	TEST_ASSERT_VAL("failed to create map", map_kcore3);
 
 	/* kcore1 map overlaps over all bpf maps */
-	map_kcore1->start = 100;
-	map_kcore1->end   = 1000;
+	RC_CHK_ACCESS(map_kcore1)->start = 100;
+	RC_CHK_ACCESS(map_kcore1)->end   = 1000;
 
 	/* kcore2 map hides behind bpf_prog_2 */
-	map_kcore2->start = 550;
-	map_kcore2->end   = 570;
+	RC_CHK_ACCESS(map_kcore2)->start = 550;
+	RC_CHK_ACCESS(map_kcore2)->end   = 570;
 
 	/* kcore3 map hides behind bpf_prog_3, kcore1 and adds new map */
-	map_kcore3->start = 880;
-	map_kcore3->end   = 1100;
+	RC_CHK_ACCESS(map_kcore3)->start = 880;
+	RC_CHK_ACCESS(map_kcore3)->end   = 1100;
 
 	ret = maps__merge_in(maps, map_kcore1);
 	TEST_ASSERT_VAL("failed to merge map", !ret);

@@ -299,7 +299,7 @@ next_pair:
 						? map__dso(map)->short_name
 						: map__dso(map)->name);
 		if (pair) {
-			pair->priv = 1;
+			RC_CHK_ACCESS(pair)->priv = 1;
 		} else {
 			if (!header_printed) {
 				pr_info("WARN: Maps only in vmlinux:\n");
@@ -335,7 +335,7 @@ next_pair:
 					map__start(pair), map__end(pair),
 					map__pgoff(pair));
 			pr_info(" %s\n", map__dso(pair)->name);
-			pair->priv = 1;
+			RC_CHK_ACCESS(pair)->priv = 1;
 		}
 	}
 
