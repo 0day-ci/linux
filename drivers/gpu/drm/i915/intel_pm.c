@@ -7432,17 +7432,6 @@ static void cpt_init_clock_gating(struct drm_i915_private *dev_priv)
 	}
 }
 
-static void gen6_check_mch_setup(struct drm_i915_private *dev_priv)
-{
-	u32 tmp;
-
-	tmp = intel_uncore_read(&dev_priv->uncore, MCH_SSKPD);
-	if ((tmp & MCH_SSKPD_WM0_MASK) != MCH_SSKPD_WM0_VAL)
-		drm_dbg_kms(&dev_priv->drm,
-			    "Wrong MCH_SSKPD value: 0x%08x This can cause underruns.\n",
-			    tmp);
-}
-
 static void gen6_init_clock_gating(struct drm_i915_private *dev_priv)
 {
 	u32 dspclk_gate = ILK_VRHUNIT_CLOCK_GATE_DISABLE;
@@ -7500,8 +7489,6 @@ static void gen6_init_clock_gating(struct drm_i915_private *dev_priv)
 	g4x_disable_trickle_feed(dev_priv);
 
 	cpt_init_clock_gating(dev_priv);
-
-	gen6_check_mch_setup(dev_priv);
 }
 
 static void lpt_init_clock_gating(struct drm_i915_private *dev_priv)
@@ -7853,8 +7840,6 @@ static void ivb_init_clock_gating(struct drm_i915_private *dev_priv)
 
 	if (!HAS_PCH_NOP(dev_priv))
 		cpt_init_clock_gating(dev_priv);
-
-	gen6_check_mch_setup(dev_priv);
 }
 
 static void vlv_init_clock_gating(struct drm_i915_private *dev_priv)
