@@ -137,3 +137,8 @@ own name.
    * - ``event_eq_size``
      - u32
      - Control the size of asynchronous control events EQ.
+   * - ``enable_sfs_aux_devs``
+     - Boolean
+     - When enabled, the device driver will instantiate all auxiliary devices of
+       SFs of the devlink device. When clear, the SFs of the devlink device will
+       not instantiate any auxiliary devices.
