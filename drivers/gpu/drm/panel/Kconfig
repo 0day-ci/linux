@@ -274,6 +274,19 @@ config DRM_PANEL_LG_LG4573
 	  Say Y here if you want to enable support for LG4573 RGB panel.
 	  To compile this driver as a module, choose M here.
 
+config DRM_PANEL_MIPI_DBI
+	tristate "MIPI DBI compatible panel"
+	depends on SPI
+	depends on BACKLIGHT_CLASS_DEVICE
+	depends on DRM_KMS_HELPER
+	select DRM_KMS_CMA_HELPER
+	select DRM_MIPI_DBI
+	help
+	  Say Y here if you want to enable support for MIPI DBI compatible
+	  panels. The controller command setup can be provided using a
+	  firmware file.
+	  To compile this driver as a module, choose M here.
+
 config DRM_PANEL_NEC_NL8048HL11
 	tristate "NEC NL8048HL11 RGB panel"
 	depends on GPIOLIB && OF && SPI
