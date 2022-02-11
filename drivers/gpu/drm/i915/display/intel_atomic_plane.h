@@ -46,10 +46,8 @@ void intel_plane_destroy_state(struct drm_plane *plane,
 			       struct drm_plane_state *state);
 void intel_update_planes_on_crtc(struct intel_atomic_state *state,
 				 struct intel_crtc *crtc);
-void skl_arm_planes_on_crtc(struct intel_atomic_state *state,
-			    struct intel_crtc *crtc);
-void i9xx_arm_planes_on_crtc(struct intel_atomic_state *state,
-			     struct intel_crtc *crtc);
+void intel_arm_planes_on_crtc(struct intel_atomic_state *state,
+			      struct intel_crtc *crtc);
 int intel_plane_atomic_check_with_state(const struct intel_crtc_state *old_crtc_state,
 					struct intel_crtc_state *crtc_state,
 					const struct intel_plane_state *old_plane_state,

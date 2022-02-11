@@ -716,8 +716,8 @@ void intel_update_planes_on_crtc(struct intel_atomic_state *state,
 	}
 }
 
-void skl_arm_planes_on_crtc(struct intel_atomic_state *state,
-			    struct intel_crtc *crtc)
+static void skl_arm_planes_on_crtc(struct intel_atomic_state *state,
+				   struct intel_crtc *crtc)
 {
 	struct intel_crtc_state *old_crtc_state =
 		intel_atomic_get_old_crtc_state(state, crtc);
@@ -751,8 +751,8 @@ void skl_arm_planes_on_crtc(struct intel_atomic_state *state,
 	}
 }
 
-void i9xx_arm_planes_on_crtc(struct intel_atomic_state *state,
-			     struct intel_crtc *crtc)
+static void i9xx_arm_planes_on_crtc(struct intel_atomic_state *state,
+				    struct intel_crtc *crtc)
 {
 	struct intel_crtc_state *new_crtc_state =
 		intel_atomic_get_new_crtc_state(state, crtc);
@@ -775,6 +775,17 @@ void i9xx_arm_planes_on_crtc(struct intel_atomic_state *state,
 		else
 			intel_plane_disable_arm(plane, new_crtc_state);
 	}
+}
+
+void intel_arm_planes_on_crtc(struct intel_atomic_state *state,
+			      struct intel_crtc *crtc)
+{
+	struct drm_i915_private *i915 = to_i915(state->base.dev);
+
+	if (DISPLAY_VER(i915) >= 9)
+		skl_arm_planes_on_crtc(state, crtc);
+	else
+		i9xx_arm_planes_on_crtc(state, crtc);
 }
 
 int intel_atomic_plane_check_clipping(struct intel_plane_state *plane_state,

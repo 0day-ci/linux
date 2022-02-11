@@ -7796,7 +7796,6 @@ static void intel_enable_crtc(struct intel_atomic_state *state,
 static void intel_update_crtc(struct intel_atomic_state *state,
 			      struct intel_crtc *crtc)
 {
-	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
 	const struct intel_crtc_state *old_crtc_state =
 		intel_atomic_get_old_crtc_state(state, crtc);
 	struct intel_crtc_state *new_crtc_state =
@@ -7824,10 +7823,7 @@ static void intel_update_crtc(struct intel_atomic_state *state,
 
 	commit_pipe_pre_planes(state, crtc);
 
-	if (DISPLAY_VER(dev_priv) >= 9)
-		skl_arm_planes_on_crtc(state, crtc);
-	else
-		i9xx_arm_planes_on_crtc(state, crtc);
+	intel_arm_planes_on_crtc(state, crtc);
 
 	commit_pipe_post_planes(state, crtc);
 
