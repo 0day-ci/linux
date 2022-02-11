@@ -2441,8 +2441,19 @@ static enum hrtimer_restart apic_timer_fn(struct hrtimer *data)
 	apic_timer_expired(apic, true);
 
 	if (lapic_is_periodic(apic)) {
+		ktime_t now, expires, leftlimit;
+
 		advance_periodic_target_expiration(apic);
 		hrtimer_add_expires_ns(&ktimer->timer, ktimer->period);
+
+               /* Advance timer if its far behind */
+		now = ktime_get();
+		expires = hrtimer_get_expires(&ktimer->timer);
+		leftlimit = ktime_sub_ns(now, ktimer->period);
+
+		if (ktimer->period > 0 && ktime_before(expires, leftlimit))
+			hrtimer_set_expires(&ktimer->timer, leftlimit);
+
 		return HRTIMER_RESTART;
 	} else
 		return HRTIMER_NORESTART;
