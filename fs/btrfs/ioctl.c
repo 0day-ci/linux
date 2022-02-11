@@ -1490,6 +1490,8 @@ static int defrag_one_range(struct btrfs_inode *inode,
 					       &cached_state);
 		if (ret < 0)
 			break;
+		ctrl->sectors_defragged += entry->len >>
+					   inode->root->fs_info->sectorsize_bits;
 	}
 
 	list_for_each_entry_safe(entry, tmp, &target_list, list) {
@@ -1554,17 +1556,9 @@ static int defrag_one_cluster(struct btrfs_inode *inode,
 				ra, NULL, entry->start >> PAGE_SHIFT,
 				((entry->start + range_len - 1) >> PAGE_SHIFT) -
 				(entry->start >> PAGE_SHIFT) + 1);
-		/*
-		 * Here we may not defrag any range if holes are punched before
-		 * we locked the pages.
-		 * But that's fine, it only affects the @sectors_defragged
-		 * accounting.
-		 */
 		ret = defrag_one_range(inode, ctrl, entry->start, range_len);
 		if (ret < 0)
 			break;
-		ctrl->sectors_defragged += range_len >>
-					   inode->root->fs_info->sectorsize_bits;
 	}
 out:
 	list_for_each_entry_safe(entry, tmp, &target_list, list) {
