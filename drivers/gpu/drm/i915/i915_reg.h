@@ -1896,10 +1896,17 @@
 #define   MAD_DIMM_A_SIZE_SHIFT		0
 #define   MAD_DIMM_A_SIZE_MASK		(0xff << MAD_DIMM_A_SIZE_SHIFT)
 
-/* snb MCH registers for priority tuning */
 #define MCH_SSKPD			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5d10)
-#define   MCH_SSKPD_WM0_MASK		0x3f
-#define   MCH_SSKPD_WM0_VAL		0xc
+#define   SSKPD_NEW_WM0_MASK_HSW	REG_GENMASK64(63, 56)
+#define   SSKPD_WM4_MASK_HSW		REG_GENMASK64(40, 32)
+#define   SSKPD_WM3_MASK_HSW		REG_GENMASK64(28, 20)
+#define   SSKPD_WM2_MASK_HSW		REG_GENMASK64(19, 12)
+#define   SSKPD_WM1_MASK_HSW		REG_GENMASK64(11, 4)
+#define   SSKPD_OLD_WM0_MASK_HSW	REG_GENMASK64(3, 0)
+#define   SSKPD_WM3_MASK_SNB		REG_GENMASK(29, 24)
+#define   SSKPD_WM2_MASK_SNB		REG_GENMASK(21, 16)
+#define   SSKPD_WM1_MASK_SNB		REG_GENMASK(13, 8)
+#define   SSKPD_WM0_MASK_SNB		REG_GENMASK(5, 0)
 
 /* Clocking configuration register */
 #define CLKCFG			_MMIO(MCHBAR_MIRROR_BASE + 0xc00)
@@ -4321,19 +4328,9 @@
 
 /* Memory latency timer register */
 #define MLTR_ILK		_MMIO(0x11222)
-#define  MLTR_WM1_SHIFT		0
-#define  MLTR_WM2_SHIFT		8
 /* the unit of memory self-refresh latency time is 0.5us */
-#define  ILK_SRLT_MASK		0x3f
-
-
-/* the address where we get all kinds of latency value */
-#define SSKPD			_MMIO(0x5d10)
-#define SSKPD_WM_MASK		0x3f
-#define SSKPD_WM0_SHIFT		0
-#define SSKPD_WM1_SHIFT		8
-#define SSKPD_WM2_SHIFT		16
-#define SSKPD_WM3_SHIFT		24
+#define  MLTR_WM2_MASK		REG_GENMASK(13, 8)
+#define  MLTR_WM1_MASK		REG_GENMASK(5, 0)
 
 /*
  * The two pipe frame counter registers are not synchronized, so
