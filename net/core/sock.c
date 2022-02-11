@@ -2058,6 +2058,20 @@ static void __sk_destruct(struct rcu_head *head)
 	sk_prot_free(sk->sk_prot_creator, sk);
 }
 
+void __sk_defer_free_flush(struct sock *sk)
+{
+	struct llist_node *head;
+	struct sk_buff *skb, *n;
+
+	head = llist_del_all(&sk->defer_list);
+	llist_for_each_entry_safe(skb, n, head, ll_node) {
+		prefetch(n);
+		skb_mark_not_on_list(skb);
+		__kfree_skb(skb);
+	}
+}
+EXPORT_SYMBOL(__sk_defer_free_flush);
+
 void sk_destruct(struct sock *sk)
 {
 	bool use_call_rcu = sock_flag(sk, SOCK_RCU_FREE);
