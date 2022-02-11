@@ -1064,7 +1064,13 @@ static inline bool platform_pci_bridge_d3(struct pci_dev *dev)
 	if (pci_use_mid_pm())
 		return false;
 
-	return acpi_pci_bridge_d3(dev);
+	if (acpi_pci_bridge_d3(dev))
+		return true;
+
+	if (device_property_read_bool(&dev->dev, "HotPlugSupportInD3"))
+		return true;
+
+	return false;
 }
 
 /**
@@ -2952,10 +2958,6 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 			return false;
 
 		if (pci_bridge_d3_force)
-			return true;
-
-		/* Even the oldest 2010 Thunderbolt controller supports D3. */
-		if (bridge->is_thunderbolt)
 			return true;
 
 		/* Platform might know better if the bridge supports D3 */
