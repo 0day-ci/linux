@@ -141,8 +141,30 @@ int __weak arch_asym_cpu_priority(int cpu)
  *
  * (default: 5 msec, units: microseconds)
  */
-unsigned int sysctl_sched_cfs_bandwidth_slice		= 5000UL;
-#endif
+static unsigned int sysctl_sched_cfs_bandwidth_slice		= 5000UL;
+#ifdef CONFIG_SYSCTL
+static struct ctl_table sched_cfs_bandwidth_sysctls[] = {
+	{
+		.procname       = "sched_cfs_bandwidth_slice_us",
+		.data           = &sysctl_sched_cfs_bandwidth_slice,
+		.maxlen         = sizeof(unsigned int),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = SYSCTL_ONE,
+	},
+	{}
+};
+
+static void __init sched_cfs_bandwidth_sysctl_init(void)
+{
+	register_sysctl_init("kernel", sched_cfs_bandwidth_sysctls);
+}
+#else /* !CONFIG_SYSCTL */
+#define sched_cfs_bandwidth_sysctl_init() do { } while (0)
+#endif /* CONFIG_SYSCTL */
+#else /* !CONFIG_CFS_BANDWIDTH */
+#define sched_cfs_bandwidth_sysctl_init() do { } while (0)
+#endif /* CONFIG_CFS_BANDWIDTH */
 
 static inline void update_load_add(struct load_weight *lw, unsigned long inc)
 {
@@ -207,6 +229,7 @@ static void update_sysctl(void)
 void __init sched_init_granularity(void)
 {
 	update_sysctl();
+	sched_cfs_bandwidth_sysctl_init();
 }
 
 #define WMULT_CONST	(~0U)
