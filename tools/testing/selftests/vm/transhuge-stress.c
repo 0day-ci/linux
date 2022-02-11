@@ -16,7 +16,14 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#define PAGE_SHIFT 12
+#ifdef __powerpc64__
+#define PAGE_SHIFT	16
+#else
+#define PAGE_SHIFT	12
+#endif
+/*
+ * On ppc64 this will only work with radix 2M hugepage size
+ */
 #define HPAGE_SHIFT 21
 
 #define PAGE_SIZE (1 << PAGE_SHIFT)
