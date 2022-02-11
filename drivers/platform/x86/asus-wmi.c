@@ -193,6 +193,12 @@ struct fan_curve_data {
 	u8 percents[FAN_CURVE_POINTS];
 };
 
+struct asus_kbd_rgb {
+	u8 red;
+	u8 green;
+	u8 blue;
+};
+
 struct asus_wmi {
 	int dsts_id;
 	int spec;
@@ -217,6 +223,8 @@ struct asus_wmi {
 	struct led_classdev_mc kbd_led_mc;
 	int kbd_led_wk;
 	struct mc_subled subled_info[ASUS_KBD_SUBLED_COUNT];
+	struct asus_kbd_rgb kbd_rgb;
+	bool kbd_rgb_available;
 
 	struct asus_rfkill wlan;
 	struct asus_rfkill bluetooth;
@@ -914,6 +922,114 @@ static void kbd_led_brightness_wmi_write(struct asus_wmi *asus, int value)
 	asus_wmi_set_devstate(ASUS_WMI_DEVID_KBD_BACKLIGHT, ctrl_param, NULL);
 }
 
+static int kbd_led_rgb_wmi_write(struct asus_wmi *asus)
+{
+	int err;
+	u32 retval;
+	u8 red;
+	u8 green;
+	u8 blue;
+	u8 speed_byte;
+	u8 mode_byte;
+	u8 speed;
+	u8 mode;
+	u8 flags;
+	u8 persistent;
+
+	speed = 0; // Sane default
+	switch (speed) {
+	case 0:
+	default:
+		speed_byte = 0xe1; // slow
+		speed = 0;
+		break;
+	case 1:
+		speed_byte = 0xeb; // medium
+		break;
+	case 2:
+		speed_byte = 0xf5; // fast
+		break;
+	}
+
+	mode = 0; // Sane default
+	switch (mode) {
+	case 0:
+	default:
+		mode_byte = 0x00; // static color
+		mode = 0;
+		break;
+	case 1:
+		mode_byte = 0x01; // breathing
+		break;
+	case 2:
+		mode_byte = 0x02; // color cycle
+		break;
+	case 3:
+		mode_byte = 0x0a; // strobing
+		break;
+	}
+
+	red = clamp_val(asus->kbd_led_mc.subled_info[0].intensity, 0, 255);
+	green = clamp_val(asus->kbd_led_mc.subled_info[1].intensity, 0, 255);
+	blue = clamp_val(asus->kbd_led_mc.subled_info[2].intensity, 0, 255);
+
+	/*
+	 * 00 - Reset on boot
+	 * 01 - Persist across boot
+	 */
+	persistent = 1; // Sane defaults
+
+	err = asus_wmi_evaluate_method3(ASUS_WMI_METHODID_DEVS,
+		ASUS_WMI_DEVID_KBD_RGB,
+		(persistent ? 0xb4 : 0xb3) |
+		(mode_byte << 8) |
+		(red << 16) |
+		(green << 24),
+		(blue) |
+		(speed_byte << 8), &retval);
+	if (err) {
+		pr_warn("RGB keyboard device 1, write error: %d\n", err);
+		return err;
+	}
+
+	if (retval != 1) {
+		pr_warn("RGB keyboard device 1, write error (retval): %x\n",
+				retval);
+		return -EIO;
+	}
+
+	/*
+	 * Enable: 02 - on boot (until module load) | 08 - awake | 20 - sleep
+	 * (2a or ff to enable everything)
+	 *
+	 * Logically 80 would be shutdown, but no visible effects of this option
+	 * were observed so far
+	 */
+	flags = 0xff;
+
+	err = asus_wmi_evaluate_method3(ASUS_WMI_METHODID_DEVS,
+		ASUS_WMI_DEVID_KBD_RGB2,
+		(0xbd) |
+		(flags << 16) |
+		(persistent ? 0x0100 : 0x0000), 0, &retval);
+	if (err) {
+		pr_warn("RGB keyboard device 2, write error: %d\n", err);
+		return err;
+	}
+
+	if (retval != 1) {
+		pr_warn("RGB keyboard device 2, write error (retval): %x\n",
+				retval);
+		return -EIO;
+	}
+
+	asus->kbd_rgb.red = red;
+	asus->kbd_rgb.green = green;
+	asus->kbd_rgb.blue = blue;
+
+	return 0;
+}
+
 static void kbd_led_brightness_set(struct led_classdev *led_cdev,
 		enum led_brightness value)
 {
@@ -928,6 +1044,18 @@ static void kbd_led_brightness_set(struct led_classdev *led_cdev,
 	asus = container_of(led_cdev_mc, struct asus_wmi, kbd_led_mc);
 
 	kbd_led_brightness_wmi_write(asus, value);
+
+	/* Check and set if rgb available */
+	if (!asus->kbd_rgb_available)
+		return;
+
+	if (asus->kbd_rgb.red == asus->subled_info[LED_COLOR_ID_RED].intensity &&
+			asus->kbd_rgb.green == asus->subled_info[LED_COLOR_ID_GREEN].intensity &&
+			asus->kbd_rgb.blue == asus->subled_info[LED_COLOR_ID_BLUE].intensity) {
+		return;
+	}
+
+	kbd_led_rgb_wmi_write(asus);
 }
 
 static void kbd_led_set_brightness_by_hw(struct asus_wmi *asus,
@@ -959,12 +1087,21 @@ int kbd_led_classdev_init(struct asus_wmi *asus, int brightness)
 {
 	int rv;
 
+	asus->kbd_rgb_available = true;
 	asus->kbd_led_wk = brightness;
 	asus->kbd_led_mc.led_cdev.name = "asus::kbd_backlight";
 	asus->kbd_led_mc.led_cdev.flags = LED_BRIGHT_HW_CHANGED;
 	asus->kbd_led_mc.led_cdev.brightness_set = kbd_led_brightness_set;
 	asus->kbd_led_mc.led_cdev.brightness_get = kbd_led_brightness_get;
 	asus->kbd_led_mc.led_cdev.max_brightness = 3;
+
+	asus->subled_info[0].color_index = LED_COLOR_ID_RED;
+	asus->subled_info[0].channel = 0;
+	asus->subled_info[1].color_index = LED_COLOR_ID_GREEN;
+	asus->subled_info[1].channel = 1;
+	asus->subled_info[2].color_index = LED_COLOR_ID_BLUE;
+	asus->subled_info[2].channel = 2;
+	asus->kbd_led_mc.subled_info = asus->subled_info;
 
 	asus->kbd_led_mc.num_colors = ASUS_KBD_SUBLED_COUNT;
 
