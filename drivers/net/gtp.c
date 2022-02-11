@@ -66,8 +66,10 @@ struct gtp_dev {
 
 	struct sock		*sk0;
 	struct sock		*sk1u;
+	u8			sk_created;
 
 	struct net_device	*dev;
+	struct net		*net;
 
 	unsigned int		role;
 	unsigned int		hash_size;
@@ -320,8 +322,16 @@ static void gtp_encap_disable_sock(struct sock *sk)
 
 static void gtp_encap_disable(struct gtp_dev *gtp)
 {
-	gtp_encap_disable_sock(gtp->sk0);
-	gtp_encap_disable_sock(gtp->sk1u);
+	if (gtp->sk_created) {
+		udp_tunnel_sock_release(gtp->sk0->sk_socket);
+		udp_tunnel_sock_release(gtp->sk1u->sk_socket);
+		gtp->sk_created = false;
+		gtp->sk0 = NULL;
+		gtp->sk1u = NULL;
+	} else {
+		gtp_encap_disable_sock(gtp->sk0);
+		gtp_encap_disable_sock(gtp->sk1u);
+	}
 }
 
 /* UDP encapsulation receive handler. See net/ipv4/udp.c.
@@ -645,132 +655,6 @@ static void gtp_link_setup(struct net_device *dev)
 	dev->needed_headroom	= LL_MAX_HEADER + max_gtp_header_len;
 }
 
-static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize);
-static int gtp_encap_enable(struct gtp_dev *gtp, struct nlattr *data[]);
-
-static void gtp_destructor(struct net_device *dev)
-{
-	struct gtp_dev *gtp = netdev_priv(dev);
-
-	kfree(gtp->addr_hash);
-	kfree(gtp->tid_hash);
-}
-
-static int gtp_newlink(struct net *src_net, struct net_device *dev,
-		       struct nlattr *tb[], struct nlattr *data[],
-		       struct netlink_ext_ack *extack)
-{
-	struct gtp_dev *gtp;
-	struct gtp_net *gn;
-	int hashsize, err;
-
-	if (!data[IFLA_GTP_FD0] && !data[IFLA_GTP_FD1])
-		return -EINVAL;
-
-	gtp = netdev_priv(dev);
-
-	if (!data[IFLA_GTP_PDP_HASHSIZE]) {
-		hashsize = 1024;
-	} else {
-		hashsize = nla_get_u32(data[IFLA_GTP_PDP_HASHSIZE]);
-		if (!hashsize)
-			hashsize = 1024;
-	}
-
-	err = gtp_hashtable_new(gtp, hashsize);
-	if (err < 0)
-		return err;
-
-	err = gtp_encap_enable(gtp, data);
-	if (err < 0)
-		goto out_hashtable;
-
-	err = register_netdevice(dev);
-	if (err < 0) {
-		netdev_dbg(dev, "failed to register new netdev %d\n", err);
-		goto out_encap;
-	}
-
-	gn = net_generic(dev_net(dev), gtp_net_id);
-	list_add_rcu(&gtp->list, &gn->gtp_dev_list);
-	dev->priv_destructor = gtp_destructor;
-
-	netdev_dbg(dev, "registered new GTP interface\n");
-
-	return 0;
-
-out_encap:
-	gtp_encap_disable(gtp);
-out_hashtable:
-	kfree(gtp->addr_hash);
-	kfree(gtp->tid_hash);
-	return err;
-}
-
-static void gtp_dellink(struct net_device *dev, struct list_head *head)
-{
-	struct gtp_dev *gtp = netdev_priv(dev);
-	struct pdp_ctx *pctx;
-	int i;
-
-	for (i = 0; i < gtp->hash_size; i++)
-		hlist_for_each_entry_rcu(pctx, &gtp->tid_hash[i], hlist_tid)
-			pdp_context_delete(pctx);
-
-	list_del_rcu(&gtp->list);
-	unregister_netdevice_queue(dev, head);
-}
-
-static const struct nla_policy gtp_policy[IFLA_GTP_MAX + 1] = {
-	[IFLA_GTP_FD0]			= { .type = NLA_U32 },
-	[IFLA_GTP_FD1]			= { .type = NLA_U32 },
-	[IFLA_GTP_PDP_HASHSIZE]		= { .type = NLA_U32 },
-	[IFLA_GTP_ROLE]			= { .type = NLA_U32 },
-};
-
-static int gtp_validate(struct nlattr *tb[], struct nlattr *data[],
-			struct netlink_ext_ack *extack)
-{
-	if (!data)
-		return -EINVAL;
-
-	return 0;
-}
-
-static size_t gtp_get_size(const struct net_device *dev)
-{
-	return nla_total_size(sizeof(__u32)) + /* IFLA_GTP_PDP_HASHSIZE */
-		nla_total_size(sizeof(__u32)); /* IFLA_GTP_ROLE */
-}
-
-static int gtp_fill_info(struct sk_buff *skb, const struct net_device *dev)
-{
-	struct gtp_dev *gtp = netdev_priv(dev);
-
-	if (nla_put_u32(skb, IFLA_GTP_PDP_HASHSIZE, gtp->hash_size))
-		goto nla_put_failure;
-	if (nla_put_u32(skb, IFLA_GTP_ROLE, gtp->role))
-		goto nla_put_failure;
-
-	return 0;
-
-nla_put_failure:
-	return -EMSGSIZE;
-}
-
-static struct rtnl_link_ops gtp_link_ops __read_mostly = {
-	.kind		= "gtp",
-	.maxtype	= IFLA_GTP_MAX,
-	.policy		= gtp_policy,
-	.priv_size	= sizeof(struct gtp_dev),
-	.setup		= gtp_link_setup,
-	.validate	= gtp_validate,
-	.newlink	= gtp_newlink,
-	.dellink	= gtp_dellink,
-	.get_size	= gtp_get_size,
-	.fill_info	= gtp_fill_info,
-};
-
 static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize)
 {
 	int i;
@@ -848,7 +732,9 @@ static int gtp_encap_enable(struct gtp_dev *gtp, struct nlattr *data[])
 {
 	struct sock *sk1u = NULL;
 	struct sock *sk0 = NULL;
-	unsigned int role = GTP_ROLE_GGSN;
+
+	if (!data[IFLA_GTP_FD0] && !data[IFLA_GTP_FD1])
+		return -EINVAL;
 
 	if (data[IFLA_GTP_FD0]) {
 		u32 fd0 = nla_get_u32(data[IFLA_GTP_FD0]);
@@ -868,21 +754,199 @@ static int gtp_encap_enable(struct gtp_dev *gtp, struct nlattr *data[])
 		}
 	}
 
-	if (data[IFLA_GTP_ROLE]) {
-		role = nla_get_u32(data[IFLA_GTP_ROLE]);
-		if (role > GTP_ROLE_SGSN) {
-			gtp_encap_disable_sock(sk0);
-			gtp_encap_disable_sock(sk1u);
-			return -EINVAL;
-		}
-	}
-
 	gtp->sk0 = sk0;
 	gtp->sk1u = sk1u;
-	gtp->role = role;
 
 	return 0;
 }
+
+static struct sock *gtp_create_sock(int type, struct gtp_dev *gtp)
+{
+	struct udp_tunnel_sock_cfg tuncfg = {};
+	struct udp_port_cfg udp_conf = {
+		.local_ip.s_addr	= htonl(INADDR_ANY),
+		.family			= AF_INET,
+	};
+	struct net *net = gtp->net;
+	struct socket *sock;
+	int err;
+
+	if (type == UDP_ENCAP_GTP0)
+		udp_conf.local_udp_port = htons(GTP0_PORT);
+	else if (type == UDP_ENCAP_GTP1U)
+		udp_conf.local_udp_port = htons(GTP1U_PORT);
+	else
+		return ERR_PTR(-EINVAL);
+
+	err = udp_sock_create(net, &udp_conf, &sock);
+	if (err)
+		return ERR_PTR(err);
+
+	tuncfg.sk_user_data = gtp;
+	tuncfg.encap_type = type;
+	tuncfg.encap_rcv = gtp_encap_recv;
+	tuncfg.encap_destroy = NULL;
+
+	setup_udp_tunnel_sock(net, sock, &tuncfg);
+
+	return sock->sk;
+}
+
+static int gtp_create_sockets(struct gtp_dev *gtp, struct nlattr *data[])
+{
+	struct sock *sk1u = NULL;
+	struct sock *sk0 = NULL;
+
+	sk0 = gtp_create_sock(UDP_ENCAP_GTP0, gtp);
+	if (IS_ERR(sk0))
+		return PTR_ERR(sk0);
+
+	sk1u = gtp_create_sock(UDP_ENCAP_GTP1U, gtp);
+	if (IS_ERR(sk1u)) {
+		udp_tunnel_sock_release(sk0->sk_socket);
+		return PTR_ERR(sk1u);
+	}
+
+	gtp->sk_created = true;
+	gtp->sk0 = sk0;
+	gtp->sk1u = sk1u;
+
+	return 0;
+}
+
+static void gtp_destructor(struct net_device *dev)
+{
+	struct gtp_dev *gtp = netdev_priv(dev);
+
+	kfree(gtp->addr_hash);
+	kfree(gtp->tid_hash);
+}
+
+static int gtp_newlink(struct net *src_net, struct net_device *dev,
+		       struct nlattr *tb[], struct nlattr *data[],
+		       struct netlink_ext_ack *extack)
+{
+	unsigned int role = GTP_ROLE_GGSN;
+	struct gtp_dev *gtp;
+	struct gtp_net *gn;
+	int hashsize, err;
+
+	gtp = netdev_priv(dev);
+
+	if (!data[IFLA_GTP_PDP_HASHSIZE]) {
+		hashsize = 1024;
+	} else {
+		hashsize = nla_get_u32(data[IFLA_GTP_PDP_HASHSIZE]);
+		if (!hashsize)
+			hashsize = 1024;
+	}
+
+	if (data[IFLA_GTP_ROLE]) {
+		role = nla_get_u32(data[IFLA_GTP_ROLE]);
+		if (role > GTP_ROLE_SGSN)
+			return -EINVAL;
+	}
+	gtp->role = role;
+
+	gtp->net = src_net;
+
+	err = gtp_hashtable_new(gtp, hashsize);
+	if (err < 0)
+		return err;
+
+	if (data[IFLA_GTP_CREATE_SOCKETS])
+		err = gtp_create_sockets(gtp, data);
+	else
+		err = gtp_encap_enable(gtp, data);
+	if (err < 0)
+		goto out_hashtable;
+
+	err = register_netdevice(dev);
+	if (err < 0) {
+		netdev_dbg(dev, "failed to register new netdev %d\n", err);
+		goto out_encap;
+	}
+
+	gn = net_generic(dev_net(dev), gtp_net_id);
+	list_add_rcu(&gtp->list, &gn->gtp_dev_list);
+	dev->priv_destructor = gtp_destructor;
+
+	netdev_dbg(dev, "registered new GTP interface\n");
+
+	return 0;
+
+out_encap:
+	gtp_encap_disable(gtp);
+out_hashtable:
+	kfree(gtp->addr_hash);
+	kfree(gtp->tid_hash);
+	return err;
+}
+
+static void gtp_dellink(struct net_device *dev, struct list_head *head)
+{
+	struct gtp_dev *gtp = netdev_priv(dev);
+	struct pdp_ctx *pctx;
+	int i;
+
+	for (i = 0; i < gtp->hash_size; i++)
+		hlist_for_each_entry_rcu(pctx, &gtp->tid_hash[i], hlist_tid)
+			pdp_context_delete(pctx);
+
+	list_del_rcu(&gtp->list);
+	unregister_netdevice_queue(dev, head);
+}
+
+static const struct nla_policy gtp_policy[IFLA_GTP_MAX + 1] = {
+	[IFLA_GTP_FD0]			= { .type = NLA_U32 },
+	[IFLA_GTP_FD1]			= { .type = NLA_U32 },
+	[IFLA_GTP_PDP_HASHSIZE]		= { .type = NLA_U32 },
+	[IFLA_GTP_ROLE]			= { .type = NLA_U32 },
+	[IFLA_GTP_CREATE_SOCKETS]	= { .type = NLA_U8 },
+};
+
+static int gtp_validate(struct nlattr *tb[], struct nlattr *data[],
+			struct netlink_ext_ack *extack)
+{
+	if (!data)
+		return -EINVAL;
+
+	return 0;
+}
+
+static size_t gtp_get_size(const struct net_device *dev)
+{
+	return nla_total_size(sizeof(__u32)) + /* IFLA_GTP_PDP_HASHSIZE */
+		nla_total_size(sizeof(__u32)); /* IFLA_GTP_ROLE */
+}
+
+static int gtp_fill_info(struct sk_buff *skb, const struct net_device *dev)
+{
+	struct gtp_dev *gtp = netdev_priv(dev);
+
+	if (nla_put_u32(skb, IFLA_GTP_PDP_HASHSIZE, gtp->hash_size))
+		goto nla_put_failure;
+	if (nla_put_u32(skb, IFLA_GTP_ROLE, gtp->role))
+		goto nla_put_failure;
+
+	return 0;
+
+nla_put_failure:
+	return -EMSGSIZE;
+}
+
+static struct rtnl_link_ops gtp_link_ops __read_mostly = {
+	.kind		= "gtp",
+	.maxtype	= IFLA_GTP_MAX,
+	.policy		= gtp_policy,
+	.priv_size	= sizeof(struct gtp_dev),
+	.setup		= gtp_link_setup,
+	.validate	= gtp_validate,
+	.newlink	= gtp_newlink,
+	.dellink	= gtp_dellink,
+	.get_size	= gtp_get_size,
+	.fill_info	= gtp_fill_info,
+};
 
 static struct gtp_dev *gtp_find_dev(struct net *src_net, struct nlattr *nla[])
 {
