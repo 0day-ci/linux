@@ -19,6 +19,7 @@
 #include <linux/of.h>
 #include <linux/jiffies.h>
 #include <linux/delay.h>
+#include <linux/timekeeping.h>
 
 #define DRIVER_NAME		"ps2-gpio"
 
@@ -44,6 +45,29 @@
 
 #define PS2_CMD_RESEND		0xfe
 
+/* The PS2 protocol specifies a clock frequency between 10kHz and 16.7kHz,
+ * therefore the maximal interrupt interval should be 100us and the minimum
+ * interrupt interval should be ~60us. Let's allow +/- 20us for frequency
+ * deviations and interrupt latency.
+ *
+ * The data line must be samples after ~30us to 50us after the falling edge,
+ * since the device updates the data line at the rising edge.
+ *
+ * ___            ______            ______            ______            ___
+ *    \          /      \          /      \          /      \          /
+ *     \        /        \        /        \        /        \        /
+ *      \______/          \______/          \______/          \______/
+ *
+ *     |-----------------|                 |--------|
+ *          60us/100us                      30us/50us
+ */
+#define PS2_CLK_FREQ_MIN_HZ		10000
+#define PS2_CLK_FREQ_MAX_HZ		16700
+#define PS2_CLK_MIN_INTERVAL_US		((1000 * 1000) / PS2_CLK_FREQ_MAX_HZ)
+#define PS2_CLK_MAX_INTERVAL_US		((1000 * 1000) / PS2_CLK_FREQ_MIN_HZ)
+#define PS2_IRQ_MIN_INTERVAL_US		(PS2_CLK_MIN_INTERVAL_US - 20)
+#define PS2_IRQ_MAX_INTERVAL_US		(PS2_CLK_MAX_INTERVAL_US + 20)
+
 struct ps2_gpio_data {
 	struct device *dev;
 	struct serio *serio;
@@ -59,6 +83,8 @@ struct ps2_gpio_data {
 	struct completion tx_done;
 	struct mutex tx_mutex;
 	struct delayed_work tx_work;
+	ktime_t tx_start;
+	ktime_t tx_end;
 };
 
 static int ps2_gpio_open(struct serio *serio)
@@ -118,6 +144,7 @@ static void ps2_gpio_tx_work_fn(struct work_struct *work)
 						    struct ps2_gpio_data,
 						    tx_work);
 
+	drvdata->tx_start = ktime_get();
 	enable_irq(drvdata->irq);
 	gpiod_direction_output(drvdata->gpio_data, 0);
 	gpiod_direction_input(drvdata->gpio_clk);
@@ -128,20 +155,33 @@ static irqreturn_t ps2_gpio_irq_rx(struct ps2_gpio_data *drvdata)
 	unsigned char byte, cnt;
 	int data;
 	int rxflags = 0;
-	static unsigned long old_jiffies;
+	static ktime_t t_last, t_now;
+	s64 us_delta;
 
 	byte = drvdata->rx_byte;
 	cnt = drvdata->rx_cnt;
 
-	if (old_jiffies == 0)
-		old_jiffies = jiffies;
+	t_now = ktime_get();
+	if (t_last == 0)
+		t_last = t_now;
 
-	if ((jiffies - old_jiffies) > usecs_to_jiffies(100)) {
+	/* We need to consider spurious interrupts happening right after a TX xfer
+	 * finished.
+	 */
+	if (unlikely(ktime_us_delta(t_now, drvdata->tx_end) <
+		     PS2_IRQ_MIN_INTERVAL_US))
+		goto end;
+
+	us_delta = ktime_us_delta(t_now, t_last);
+	if (us_delta > PS2_IRQ_MAX_INTERVAL_US && cnt) {
 		dev_err(drvdata->dev,
 			"RX: timeout, probably we missed an interrupt\n");
 		goto err;
+	} else if (us_delta < PS2_IRQ_MIN_INTERVAL_US && t_now != t_last) {
+		/* Ignore spurious IRQs. */
+		goto end;
 	}
-	old_jiffies = jiffies;
+	t_last = t_now;
 
 	data = gpiod_get_value(drvdata->gpio_data);
 	if (unlikely(data < 0)) {
@@ -205,7 +245,7 @@ static irqreturn_t ps2_gpio_irq_rx(struct ps2_gpio_data *drvdata)
 			goto err;
 		}
 		cnt = byte = 0;
-		old_jiffies = 0;
+
 		goto end; /* success */
 	default:
 		dev_err(drvdata->dev, "RX: got out of sync with the device\n");
@@ -217,7 +257,6 @@ static irqreturn_t ps2_gpio_irq_rx(struct ps2_gpio_data *drvdata)
 
 err:
 	cnt = byte = 0;
-	old_jiffies = 0;
 	__ps2_gpio_write(drvdata->serio, PS2_CMD_RESEND);
 end:
 	drvdata->rx_cnt = cnt;
@@ -229,20 +268,34 @@ static irqreturn_t ps2_gpio_irq_tx(struct ps2_gpio_data *drvdata)
 {
 	unsigned char byte, cnt;
 	int data;
-	static unsigned long old_jiffies;
+	static ktime_t t_last, t_now;
+	s64 us_delta;
 
 	cnt = drvdata->tx_cnt;
 	byte = drvdata->tx_byte;
 
-	if (old_jiffies == 0)
-		old_jiffies = jiffies;
+	t_now = ktime_get();
+	if (t_last == 0)
+		t_last = t_now;
 
-	if ((jiffies - old_jiffies) > usecs_to_jiffies(100)) {
+	/* There might be pending IRQs since we disabled IRQs in __ps2_gpio_write().
+	 * We can expect at least one clock period until the device generates the
+	 * first falling edge after releasing the clock line.
+	 */
+	if (unlikely(ktime_us_delta(t_now, drvdata->tx_start) <
+		     PS2_CLK_MIN_INTERVAL_US))
+		goto end;
+
+	us_delta = ktime_us_delta(t_now, t_last);
+	if (us_delta > PS2_IRQ_MAX_INTERVAL_US && cnt > 1) {
 		dev_err(drvdata->dev,
 			"TX: timeout, probably we missed an interrupt\n");
 		goto err;
+	} else if (us_delta < PS2_IRQ_MIN_INTERVAL_US && t_now != t_last) {
+		/* Ignore spurious IRQs. */
+		goto end;
 	}
-	old_jiffies = jiffies;
+	t_last = t_now;
 
 	switch (cnt) {
 	case PS2_START_BIT:
@@ -283,11 +336,11 @@ static irqreturn_t ps2_gpio_irq_tx(struct ps2_gpio_data *drvdata)
 			goto err;
 		}
 
+		drvdata->tx_end = ktime_get();
 		drvdata->mode = PS2_MODE_RX;
 		complete(&drvdata->tx_done);
 
 		cnt = 1;
-		old_jiffies = 0;
 		goto end; /* success */
 	default:
 		/* Probably we missed the stop bit. Therefore we release data
@@ -303,7 +356,6 @@ static irqreturn_t ps2_gpio_irq_tx(struct ps2_gpio_data *drvdata)
 
 err:
 	cnt = 1;
-	old_jiffies = 0;
 	gpiod_direction_input(drvdata->gpio_data);
 	__ps2_gpio_write(drvdata->serio, drvdata->tx_byte);
 end:
@@ -399,6 +451,7 @@ static int ps2_gpio_probe(struct platform_device *pdev)
 	drvdata->serio = serio;
 	drvdata->dev = dev;
 	drvdata->mode = PS2_MODE_RX;
+	drvdata->tx_end = 0;
 
 	/* Tx count always starts at 1, as the start bit is sent implicitly by
 	 * host-to-device communication initialization.
