@@ -1835,6 +1835,11 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 	/* mount_subvol() will free subvol_name and mnt_root */
 	root = mount_subvol(subvol_name, subvol_objectid, mnt_root);
 
+	if (!IS_ERR(root) && !(flags & SB_RDONLY)) {
+		struct btrfs_fs_info *fs_info = btrfs_sb(mnt_root->mnt_sb);
+		fs_info->rw_mounts++;
+	}
+
 out:
 	return root;
 }
@@ -1958,6 +1963,11 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 		goto out;
 
 	if (*flags & SB_RDONLY) {
+
+		if (--fs_info->rw_mounts > 0) {
+			*flags &= ~SB_RDONLY;
+			goto out;
+		}
 		/*
 		 * this also happens on 'umount -rf' or on shutdown, when
 		 * the filesystem is busy.
@@ -2056,6 +2066,8 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 		ret = btrfs_start_pre_rw_mount(fs_info);
 		if (ret)
 			goto restore;
+
+		fs_info->rw_mounts++;
 
 		btrfs_clear_sb_rdonly(sb);
 
