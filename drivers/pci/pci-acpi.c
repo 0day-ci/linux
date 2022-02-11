@@ -1391,6 +1391,16 @@ void pci_acpi_cleanup(struct device *dev, struct acpi_device *adev)
 	}
 }
 
+bool pci_acpi_is_usb4(struct pci_dev *dev)
+{
+	struct acpi_device *adev = ACPI_COMPANION(&dev->dev);
+
+	if (!adev)
+		return false;
+	return fwnode_property_present(acpi_fwnode_handle(adev),
+				       "usb4-host-interface");
+}
+
 static struct fwnode_handle *(*pci_msi_get_fwnode_cb)(struct device *dev);
 
 /**

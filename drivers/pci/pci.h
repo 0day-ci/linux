@@ -695,6 +695,7 @@ void acpi_pci_refresh_power_state(struct pci_dev *dev);
 int acpi_pci_wakeup(struct pci_dev *dev, bool enable);
 bool acpi_pci_need_resume(struct pci_dev *dev);
 pci_power_t acpi_pci_choose_state(struct pci_dev *pdev);
+bool pci_acpi_is_usb4(struct pci_dev *dev);
 #else
 static inline int pci_dev_acpi_reset(struct pci_dev *dev, bool probe)
 {
@@ -733,6 +734,10 @@ static inline bool acpi_pci_need_resume(struct pci_dev *dev)
 static inline pci_power_t acpi_pci_choose_state(struct pci_dev *pdev)
 {
 	return PCI_POWER_ERROR;
+}
+static inline bool pci_acpi_is_usb4(struct pci_dev *dev)
+{
+	return false;
 }
 #endif
 

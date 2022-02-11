@@ -1610,6 +1610,7 @@ static void pci_set_removable(struct pci_dev *dev)
 	 * exposed as "removable" to userspace.
 	 */
 	if (vsec ||
+	    pci_acpi_is_usb4(dev) ||
 	    (parent &&
 	    (parent->external_facing || dev_is_removable(&parent->dev))))
 		dev_set_removable(&dev->dev, DEVICE_REMOVABLE);
