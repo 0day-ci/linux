@@ -442,7 +442,6 @@ struct pci_dev {
 	unsigned int	is_virtfn:1;
 	unsigned int	is_hotplug_bridge:1;
 	unsigned int	shpc_managed:1;		/* SHPC owned by shpchp */
-	unsigned int	is_thunderbolt:1;	/* Thunderbolt controller */
 	unsigned int	no_cmd_complete:1;	/* Lies about command completed events */
 
 	/*
@@ -2447,11 +2446,11 @@ static inline bool pci_is_thunderbolt_attached(struct pci_dev *pdev)
 {
 	struct pci_dev *parent = pdev;
 
-	if (pdev->is_thunderbolt)
+	if (dev_is_removable(&pdev->dev))
 		return true;
 
 	while ((parent = pci_upstream_bridge(parent)))
-		if (parent->is_thunderbolt)
+		if (dev_is_removable(&parent->dev))
 			return true;
 
 	return false;

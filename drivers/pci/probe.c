@@ -1577,16 +1577,6 @@ void set_pcie_hotplug_bridge(struct pci_dev *pdev)
 		pdev->is_hotplug_bridge = 1;
 }
 
-static void set_pcie_thunderbolt(struct pci_dev *dev)
-{
-	u16 vsec;
-
-	/* Is the device part of a Thunderbolt controller? */
-	vsec = pci_find_vsec_capability(dev, PCI_VENDOR_ID_INTEL, PCI_VSEC_ID_INTEL_TBT);
-	if (vsec)
-		dev->is_thunderbolt = 1;
-}
-
 static void set_pcie_untrusted(struct pci_dev *dev)
 {
 	struct pci_dev *parent;
@@ -1603,6 +1593,10 @@ static void set_pcie_untrusted(struct pci_dev *dev)
 static void pci_set_removable(struct pci_dev *dev)
 {
 	struct pci_dev *parent = pci_upstream_bridge(dev);
+	u16 vsec;
+
+	/* Is the device a Thunderbolt controller? */
+	vsec = pci_find_vsec_capability(dev, PCI_VENDOR_ID_INTEL, PCI_VSEC_ID_INTEL_TBT);
 
 	/*
 	 * We (only) consider everything downstream from an external_facing
@@ -1615,8 +1609,9 @@ static void pci_set_removable(struct pci_dev *dev)
 	 * accessible to user / may not be removed by end user, and thus not
 	 * exposed as "removable" to userspace.
 	 */
-	if (parent &&
-	    (parent->external_facing || dev_is_removable(&parent->dev)))
+	if (vsec ||
+	    (parent &&
+	    (parent->external_facing || dev_is_removable(&parent->dev))))
 		dev_set_removable(&dev->dev, DEVICE_REMOVABLE);
 }
 
@@ -1860,7 +1855,6 @@ int pci_setup_device(struct pci_dev *dev)
 	dev->cfg_size = pci_cfg_space_size(dev);
 
 	/* Need to have dev->cfg_size ready */
-	set_pcie_thunderbolt(dev);
 
 	set_pcie_untrusted(dev);
 
