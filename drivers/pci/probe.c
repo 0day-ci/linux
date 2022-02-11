@@ -25,6 +25,8 @@
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
 
+#define PCI_DVSEC_ID_USB4	0x23
+
 static struct resource busn_resource = {
 	.name	= "PCI busn",
 	.start	= 0,
@@ -1590,6 +1592,36 @@ static void set_pcie_untrusted(struct pci_dev *dev)
 		dev->untrusted = true;
 }
 
+static bool pci_is_discrete_usb4(struct pci_dev *dev)
+{
+	int dvsec_val = 0, pos;
+	u32 hdr;
+
+	/* USB4 spec says vendors can use either */
+	pos = pci_find_dvsec_capability(dev,
+					PCI_VENDOR_ID_INTEL,
+					PCI_DVSEC_ID_USB4);
+	if (pos) {
+		dvsec_val = 0x06;
+	} else {
+		pos = pci_find_dvsec_capability(dev,
+						PCI_VENDOR_ID_USB_IF,
+						PCI_DVSEC_ID_USB4);
+		if (pos)
+			dvsec_val = 0x01;
+	}
+	if (!dvsec_val)
+		return false;
+
+	pci_read_config_dword(dev, pos + PCI_DVSEC_HEADER2, &hdr);
+	if ((hdr & GENMASK(15, 0)) != dvsec_val)
+		return false;
+	/* this port is used for either NHI/PCIe tunnel/USB tunnel */
+	if (hdr & GENMASK(18, 16))
+		return true;
+	return false;
+}
+
 static void pci_set_removable(struct pci_dev *dev)
 {
 	struct pci_dev *parent = pci_upstream_bridge(dev);
@@ -1612,6 +1644,7 @@ static void pci_set_removable(struct pci_dev *dev)
 	if (vsec ||
 	    dev->class == PCI_CLASS_SERIAL_USB_USB4 ||
 	    pci_acpi_is_usb4(dev) ||
+	    pci_is_discrete_usb4(dev) ||
 	    (parent &&
 	    (parent->external_facing || dev_is_removable(&parent->dev))))
 		dev_set_removable(&dev->dev, DEVICE_REMOVABLE);

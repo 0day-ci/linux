@@ -3097,4 +3097,6 @@
 
 #define PCI_VENDOR_ID_NCUBE		0x10ff
 
+#define PCI_VENDOR_ID_USB_IF		0x1EC0
+
 #endif /* _LINUX_PCI_IDS_H */
