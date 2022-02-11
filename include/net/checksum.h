@@ -83,9 +83,7 @@ static inline __sum16 csum16_sub(__sum16 csum, __be16 addend)
 static inline __wsum csum_shift(__wsum sum, int offset)
 {
 	/* rotate sum to align it with a 16b boundary */
-	if (offset & 1)
-		return (__force __wsum)ror32((__force u32)sum, 8);
-	return sum;
+	return (__force __wsum)rol32((__force u32)sum, (offset & 1) << 3);
 }
 
 static inline __wsum
