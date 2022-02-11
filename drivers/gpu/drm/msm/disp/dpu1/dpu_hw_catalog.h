@@ -338,6 +338,7 @@ struct dpu_caps {
 	bool has_dim_layer;
 	bool has_idle_pc;
 	bool has_3d_merge;
+	bool has_audio_select;
 	/* SSPP limits */
 	u32 max_linewidth;
 	u32 pixel_ram_size;
