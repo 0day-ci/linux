@@ -62,10 +62,12 @@ static inline __wsum csum_add(__wsum csum, __wsum addend)
 }
 #endif
 
+#ifndef HAVE_ARCH_CSUM_SUB
 static inline __wsum csum_sub(__wsum csum, __wsum addend)
 {
 	return csum_add(csum, ~addend);
 }
+#endif
 
 static inline __sum16 csum16_add(__sum16 csum, __be16 addend)
 {
