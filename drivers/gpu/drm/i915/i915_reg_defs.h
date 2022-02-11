@@ -22,6 +22,14 @@
 	       BUILD_BUG_ON_ZERO(__is_constexpr(__n) &&		\
 				 ((__n) < 0 || (__n) > 31))))
 
+#define _REG_GENMASK(__type, __high, __low)				\
+	((__type)(GENMASK(__high, __low) +				\
+	       BUILD_BUG_ON_ZERO(__is_constexpr(__high) &&		\
+				 __is_constexpr(__low) &&		\
+				 ((__low) < 0 ||			\
+				  (__high) >= BITS_PER_TYPE(__type) ||	\
+				  (__low) > (__high)))))
+
 /**
  * REG_GENMASK() - Prepare a continuous u32 bitmask
  * @__high: 0-based high bit
@@ -31,11 +39,18 @@
  *
  * @return: Continuous bitmask from @__high to @__low, inclusive.
  */
-#define REG_GENMASK(__high, __low)					\
-	((u32)(GENMASK(__high, __low) +					\
-	       BUILD_BUG_ON_ZERO(__is_constexpr(__high) &&	\
-				 __is_constexpr(__low) &&		\
-				 ((__low) < 0 || (__high) > 31 || (__low) > (__high)))))
+#define REG_GENMASK(__high, __low) _REG_GENMASK(u32, __high, __low)
+
+/**
+ * REG_GENMASK64() - Prepare a continuous u64 bitmask
+ * @__high: 0-based high bit
+ * @__low: 0-based low bit
+ *
+ * Local wrapper for GENMASK() to force u32, with compile time checks.
+ *
+ * @return: Continuous bitmask from @__high to @__low, inclusive.
+ */
+#define REG_GENMASK64(__high, __low) _REG_GENMASK(u64, __high, __low)
 
 /*
  * Local integer constant expression version of is_power_of_2().
@@ -59,6 +74,8 @@
 	       BUILD_BUG_ON_ZERO(!IS_POWER_OF_2((__mask) + (1ULL << __bf_shf(__mask)))) + \
 	       BUILD_BUG_ON_ZERO(__builtin_choose_expr(__is_constexpr(__val), (~((__mask) >> __bf_shf(__mask)) & (__val)), 0))))
 
+#define _REG_FIELD_GET(__type, __mask, __val)	((__type)FIELD_GET(__mask, __val))
+
 /**
  * REG_FIELD_GET() - Extract a u32 bitfield value
  * @__mask: shifted mask defining the field's length and position
@@ -69,7 +86,19 @@
  *
  * @return: Masked and shifted value of the field defined by @__mask in @__val.
  */
-#define REG_FIELD_GET(__mask, __val)	((u32)FIELD_GET(__mask, __val))
+#define REG_FIELD_GET(__mask, __val)	_REG_FIELD_GET(u32, __mask, __val)
+
+/**
+ * REG_FIELD_GET64() - Extract a u64 bitfield value
+ * @__mask: shifted mask defining the field's length and position
+ * @__val: value to extract the bitfield value from
+ *
+ * Local wrapper for FIELD_GET() to force u64 and for consistency with
+ * REG_GENMASK64().
+ *
+ * @return: Masked and shifted value of the field defined by @__mask in @__val.
+ */
+#define REG_FIELD_GET64(__mask, __val)	_REG_FIELD_GET(u64, __mask, __val)
 
 typedef struct {
 	u32 reg;
