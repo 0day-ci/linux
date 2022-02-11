@@ -46,6 +46,7 @@ struct ath11k_cfr {
 	struct ath11k_dbring rx_ring;
 	/* Protects cfr data */
 	spinlock_t lock;
+	struct rchan *rfs_cfr_capture;
 	struct ath11k_look_up_table *lut;
 	u32 lut_num;
 	u32 dbr_buf_size;
