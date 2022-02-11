@@ -112,6 +112,22 @@ static __always_inline __wsum csum_add(__wsum csum, __wsum addend)
 #endif
 }
 
+#ifdef CONFIG_PPC32
+#define HAVE_ARCH_CSUM_SUB
+static __always_inline __wsum csum_sub(__wsum csum, __wsum addend)
+{
+	if (__builtin_constant_p(csum) && (csum == 0 || csum == ~0))
+		return ~addend;
+	if (__builtin_constant_p(addend) && (addend == 0 || addend == ~0))
+		return csum;
+
+	asm("subc %0,%0,%1;"
+	    "addme %0,%0;"
+	    : "+r" (csum) : "r" (addend) : "xer");
+	return csum;
+}
+#endif
+
 /*
  * This is a version of ip_compute_csum() optimized for IP headers,
  * which always checksum on 4 octet boundaries.  ihl is the number
