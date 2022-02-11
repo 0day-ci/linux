@@ -767,7 +767,7 @@ static int acpi_dev_consumes_res(struct acpi_device *adev, struct resource *res)
 {
 	struct list_head resource_list;
 	struct resource_entry *rentry;
-	int ret, found = 0;
+	int ret;
 
 	INIT_LIST_HEAD(&resource_list);
 	ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
@@ -775,15 +775,12 @@ static int acpi_dev_consumes_res(struct acpi_device *adev, struct resource *res)
 		return 0;
 
 	list_for_each_entry(rentry, &resource_list, node) {
-		if (resource_contains(rentry->res, res)) {
-			found = 1;
+		if (resource_contains(rentry->res, res))
 			break;
-		}
-
 	}
 
 	acpi_dev_free_resource_list(&resource_list);
-	return found;
+	return !list_entry_is_head(rentry, &resource_list, node);
 }
 
 static acpi_status acpi_res_consumer_cb(acpi_handle handle, u32 depth,

@@ -1076,8 +1076,8 @@ static void nfit_mem_init_bdw(struct acpi_nfit_desc *acpi_desc,
 static int __nfit_mem_init(struct acpi_nfit_desc *acpi_desc,
 		struct acpi_nfit_system_address *spa)
 {
-	struct nfit_mem *nfit_mem, *found;
 	struct nfit_memdev *nfit_memdev;
+	struct nfit_mem *nfit_mem;
 	int type = spa ? nfit_spa_type(spa) : 0;
 
 	switch (type) {
@@ -1106,19 +1106,13 @@ static int __nfit_mem_init(struct acpi_nfit_desc *acpi_desc,
 			continue;
 		if (!spa && nfit_memdev->memdev->range_index)
 			continue;
-		found = NULL;
 		dcr = nfit_memdev->memdev->region_index;
 		device_handle = nfit_memdev->memdev->device_handle;
 		list_for_each_entry(nfit_mem, &acpi_desc->dimms, list)
-			if (__to_nfit_memdev(nfit_mem)->device_handle
-					== device_handle) {
-				found = nfit_mem;
+			if (__to_nfit_memdev(nfit_mem)->device_handle == device_handle)
 				break;
-			}
 
-		if (found)
-			nfit_mem = found;
-		else {
+		if (list_entry_is_head(nfit_mem, &acpi_desc->dimms, list)) {
 			nfit_mem = devm_kzalloc(acpi_desc->dev,
 					sizeof(*nfit_mem), GFP_KERNEL);
 			if (!nfit_mem)

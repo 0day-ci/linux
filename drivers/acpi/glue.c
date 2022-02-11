@@ -61,17 +61,15 @@ EXPORT_SYMBOL_GPL(unregister_acpi_bus_type);
 
 static struct acpi_bus_type *acpi_get_bus_type(struct device *dev)
 {
-	struct acpi_bus_type *tmp, *ret = NULL;
+	struct acpi_bus_type *tmp;
 
 	down_read(&bus_type_sem);
 	list_for_each_entry(tmp, &bus_type_list, list) {
-		if (tmp->match(dev)) {
-			ret = tmp;
+		if (tmp->match(dev))
 			break;
-		}
 	}
 	up_read(&bus_type_sem);
-	return ret;
+	return list_entry_is_head(tmp, &bus_type_list, list) ? NULL : tmp;
 }
 
 #define FIND_CHILD_MIN_SCORE	1

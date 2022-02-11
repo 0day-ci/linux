@@ -354,27 +354,26 @@ static void ipmi_cancel_tx_msg(struct acpi_ipmi_device *ipmi,
 			       struct acpi_ipmi_msg *msg)
 {
 	struct acpi_ipmi_msg *tx_msg, *temp;
-	bool msg_found = false;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ipmi->tx_msg_lock, flags);
 	list_for_each_entry_safe(tx_msg, temp, &ipmi->tx_msg_list, head) {
 		if (msg == tx_msg) {
-			msg_found = true;
 			list_del(&tx_msg->head);
 			break;
 		}
 	}
 	spin_unlock_irqrestore(&ipmi->tx_msg_lock, flags);
 
-	if (msg_found)
-		acpi_ipmi_msg_put(tx_msg);
+	if (list_entry_is_head(tx_msg, &ipmi->tx_msg_list, head)
+		return;
+
+	acpi_ipmi_msg_put(tx_msg);
 }
 
 static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
 {
 	struct acpi_ipmi_device *ipmi_device = user_msg_data;
-	bool msg_found = false;
 	struct acpi_ipmi_msg *tx_msg, *temp;
 	struct device *dev = ipmi_device->dev;
 	unsigned long flags;
@@ -389,14 +388,13 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
 	spin_lock_irqsave(&ipmi_device->tx_msg_lock, flags);
 	list_for_each_entry_safe(tx_msg, temp, &ipmi_device->tx_msg_list, head) {
 		if (msg->msgid == tx_msg->tx_msgid) {
-			msg_found = true;
 			list_del(&tx_msg->head);
 			break;
 		}
 	}
 	spin_unlock_irqrestore(&ipmi_device->tx_msg_lock, flags);
 
-	if (!msg_found) {
+	if (list_entry_is_head(tx_msg, &ipmi_device->tx_msg_list, head)) {
 		dev_warn(dev,
 			 "Unexpected response (msg id %ld) is returned.\n",
 			 msg->msgid);
@@ -483,13 +481,11 @@ err_ref:
 static void ipmi_bmc_gone(int iface)
 {
 	struct acpi_ipmi_device *ipmi_device, *temp;
-	bool dev_found = false;
 
 	mutex_lock(&driver_data.ipmi_lock);
 	list_for_each_entry_safe(ipmi_device, temp,
 				 &driver_data.ipmi_devices, head) {
 		if (ipmi_device->ipmi_ifnum != iface) {
-			dev_found = true;
 			__ipmi_dev_kill(ipmi_device);
 			break;
 		}
@@ -500,7 +496,7 @@ static void ipmi_bmc_gone(int iface)
 					struct acpi_ipmi_device, head);
 	mutex_unlock(&driver_data.ipmi_lock);
 
-	if (dev_found) {
+	if (!list_entry_is_head(ipmi_device, &driver_data.ipmi_devices, head)) {
 		ipmi_flush_tx_msg(ipmi_device);
 		acpi_ipmi_dev_put(ipmi_device);
 	}

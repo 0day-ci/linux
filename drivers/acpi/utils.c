@@ -771,17 +771,14 @@ EXPORT_SYMBOL(acpi_dev_hid_uid_match);
 bool acpi_dev_found(const char *hid)
 {
 	struct acpi_device_bus_id *acpi_device_bus_id;
-	bool found = false;
 
 	mutex_lock(&acpi_device_lock);
 	list_for_each_entry(acpi_device_bus_id, &acpi_bus_id_list, node)
-		if (!strcmp(acpi_device_bus_id->bus_id, hid)) {
-			found = true;
+		if (!strcmp(acpi_device_bus_id->bus_id, hid))
 			break;
-		}
 	mutex_unlock(&acpi_device_lock);
 
-	return found;
+	return !list_entry_is_head(acpi_device_bus_id, &acpi_bus_id_list, node);
 }
 EXPORT_SYMBOL(acpi_dev_found);
 
