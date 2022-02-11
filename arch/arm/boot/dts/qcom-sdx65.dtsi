@@ -17,6 +17,10 @@
 	qcom,msm-id = <458 0x10000>, <483 0x10000>, <509 0x10000>;
 	interrupt-parent = <&intc>;
 
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
 	memory {
 		device_type = "memory";
 		reg = <0 0>;

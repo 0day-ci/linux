@@ -14,10 +14,6 @@
 	aliases {
 		serial0 = &blsp1_uart3;
 	};
-
-	chosen {
-		stdout-path = "serial0:115200n8";
-	};
 };
 
 &blsp1_uart3 {
