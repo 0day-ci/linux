@@ -2025,8 +2025,8 @@ static int map__groups__sort_by_name_from_rbtree(struct maps *maps)
 	if (maps_by_name == NULL)
 		return -1;
 
-	maps->maps_by_name = maps_by_name;
-	maps->nr_maps_allocated = maps__nr_maps(maps);
+	RC_CHK_ACCESS(maps)->maps_by_name = maps_by_name;
+	RC_CHK_ACCESS(maps)->nr_maps_allocated = maps__nr_maps(maps);
 
 	maps__for_each_entry(maps, rb_node)
 		maps_by_name[i++] = rb_node->map;
@@ -2057,9 +2057,9 @@ struct map *maps__find_by_name(struct maps *maps, const char *name)
 
 	down_read(maps__lock(maps));
 
-	if (maps->last_search_by_name &&
+	if (RC_CHK_ACCESS(maps)->last_search_by_name &&
 	    strcmp(map__dso(maps->last_search_by_name)->short_name, name) == 0) {
-		map = maps->last_search_by_name;
+		map = RC_CHK_ACCESS(maps)->last_search_by_name;
 		goto out_unlock;
 	}
 	/*
@@ -2075,7 +2075,7 @@ struct map *maps__find_by_name(struct maps *maps, const char *name)
 	maps__for_each_entry(maps, rb_node) {
 		map = rb_node->map;
 		if (strcmp(map__dso(map)->short_name, name) == 0) {
-			maps->last_search_by_name = map;
+			RC_CHK_ACCESS(maps)->last_search_by_name = map;
 			goto out_unlock;
 		}
 	}
