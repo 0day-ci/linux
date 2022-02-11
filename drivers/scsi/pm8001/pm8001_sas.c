@@ -74,7 +74,7 @@ void pm8001_tag_free(struct pm8001_hba_info *pm8001_ha, u32 tag)
   * @pm8001_ha: our hba struct
   * @tag_out: the found empty tag .
   */
-inline int pm8001_tag_alloc(struct pm8001_hba_info *pm8001_ha, u32 *tag_out)
+int pm8001_tag_alloc(struct pm8001_hba_info *pm8001_ha, u32 *tag_out)
 {
 	unsigned int tag;
 	void *bitmap = pm8001_ha->tags;
@@ -383,7 +383,7 @@ static int pm8001_task_exec(struct sas_task *task,
 	struct sas_task *t = task;
 	struct task_status_struct *ts = &t->task_status;
 	struct pm8001_ccb_info *ccb;
-	u32 tag = 0xdeadbeef, rc = 0, n_elem;
+	u32 rc = 0, n_elem;
 	unsigned long flags = 0;
 	enum sas_protocol task_proto = t->task_proto;
 
@@ -424,11 +424,11 @@ static int pm8001_task_exec(struct sas_task *task,
 			continue;
 		}
 
-		rc = pm8001_tag_alloc(pm8001_ha, &tag);
-		if (rc)
+		ccb = pm8001_ccb_alloc(pm8001_ha, pm8001_dev, t);
+		if (!ccb) {
+			rc = -EBUSY;
 			goto err_out;
-
-		ccb = &pm8001_ha->ccb_info[tag];
+		}
 
 		if (!sas_protocol_ata(task_proto)) {
 			if (t->num_scatter) {
@@ -438,7 +438,7 @@ static int pm8001_task_exec(struct sas_task *task,
 					t->data_dir);
 				if (!n_elem) {
 					rc = -ENOMEM;
-					goto err_out_tag;
+					goto err_out_ccb;
 				}
 			} else {
 				n_elem = 0;
@@ -449,9 +449,7 @@ static int pm8001_task_exec(struct sas_task *task,
 
 		t->lldd_task = ccb;
 		ccb->n_elem = n_elem;
-		ccb->ccb_tag = tag;
-		ccb->task = t;
-		ccb->device = pm8001_dev;
+
 		switch (task_proto) {
 		case SAS_PROTOCOL_SMP:
 			atomic_inc(&pm8001_dev->running_req);
@@ -480,7 +478,7 @@ static int pm8001_task_exec(struct sas_task *task,
 		if (rc) {
 			pm8001_dbg(pm8001_ha, IO, "rc is %x\n", rc);
 			atomic_dec(&pm8001_dev->running_req);
-			goto err_out_tag;
+			goto err_out_ccb;
 		}
 		/* TODO: select normal or high priority */
 		spin_lock(&t->task_state_lock);
@@ -490,8 +488,8 @@ static int pm8001_task_exec(struct sas_task *task,
 	rc = 0;
 	goto out_done;
 
-err_out_tag:
-	pm8001_tag_free(pm8001_ha, tag);
+err_out_ccb:
+	pm8001_ccb_free(pm8001_ha, ccb);
 err_out:
 	dev_printk(KERN_ERR, pm8001_ha->dev, "pm8001 exec failed[%d]!\n", rc);
 	if (!sas_protocol_ata(task_proto))
@@ -816,7 +814,6 @@ pm8001_exec_internal_task_abort(struct pm8001_hba_info *pm8001_ha,
 	u32 task_tag)
 {
 	int res, retry;
-	u32 ccb_tag;
 	struct pm8001_ccb_info *ccb;
 	struct sas_task *task = NULL;
 
@@ -832,18 +829,12 @@ pm8001_exec_internal_task_abort(struct pm8001_hba_info *pm8001_ha,
 		task->slow_task->timer.expires = jiffies + PM8001_TASK_TIMEOUT * HZ;
 		add_timer(&task->slow_task->timer);
 
-		res = pm8001_tag_alloc(pm8001_ha, &ccb_tag);
-		if (res)
+		ccb = pm8001_ccb_alloc(pm8001_ha, pm8001_dev, task);
+		if (!ccb)
 			goto ex_err;
-		ccb = &pm8001_ha->ccb_info[ccb_tag];
-		ccb->device = pm8001_dev;
-		ccb->ccb_tag = ccb_tag;
-		ccb->task = task;
-		ccb->n_elem = 0;
 
 		res = PM8001_CHIP_DISP->task_abort(pm8001_ha,
-			pm8001_dev, flag, task_tag, ccb_tag);
-
+			pm8001_dev, flag, task_tag, ccb->ccb_tag);
 		if (res) {
 			del_timer(&task->slow_task->timer);
 			pm8001_dbg(pm8001_ha, FAIL, "Executing internal task failed\n");

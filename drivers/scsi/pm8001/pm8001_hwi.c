@@ -1757,8 +1757,6 @@ int pm8001_handle_event(struct pm8001_hba_info *pm8001_ha, void *data,
 static void pm8001_send_abort_all(struct pm8001_hba_info *pm8001_ha,
 		struct pm8001_device *pm8001_ha_dev)
 {
-	int res;
-	u32 ccb_tag;
 	struct pm8001_ccb_info *ccb;
 	struct sas_task *task = NULL;
 	struct task_abort_req task_abort;
@@ -1780,28 +1778,26 @@ static void pm8001_send_abort_all(struct pm8001_hba_info *pm8001_ha,
 
 	task->task_done = pm8001_task_done;
 
-	res = pm8001_tag_alloc(pm8001_ha, &ccb_tag);
-	if (res)
+	ccb = pm8001_ccb_alloc(pm8001_ha, pm8001_ha_dev, task);
+	if (!ccb) {
+		pm8001_dbg(pm8001_ha, FAIL, "cannot allocate tag !!!\n");
+		sas_free_task(task);
 		return;
-
-	ccb = &pm8001_ha->ccb_info[ccb_tag];
-	ccb->device = pm8001_ha_dev;
-	ccb->ccb_tag = ccb_tag;
-	ccb->task = task;
-	ccb->n_elem = 0;
+	}
 
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
 
 	memset(&task_abort, 0, sizeof(task_abort));
 	task_abort.abort_all = cpu_to_le32(1);
 	task_abort.device_id = cpu_to_le32(pm8001_ha_dev->device_id);
-	task_abort.tag = cpu_to_le32(ccb_tag);
+	task_abort.tag = cpu_to_le32(ccb->ccb_tag);
 
 	ret = pm8001_mpi_build_cmd(pm8001_ha, circularQ, opc, &task_abort,
 			sizeof(task_abort), 0);
-	if (ret)
-		pm8001_tag_free(pm8001_ha, ccb_tag);
-
+	if (ret) {
+		sas_free_task(task);
+		pm8001_ccb_free(pm8001_ha, ccb);
+	}
 }
 
 static void pm8001_send_read_log(struct pm8001_hba_info *pm8001_ha,
@@ -1809,7 +1805,6 @@ static void pm8001_send_read_log(struct pm8001_hba_info *pm8001_ha,
 {
 	struct sata_start_req sata_cmd;
 	int res;
-	u32 ccb_tag;
 	struct pm8001_ccb_info *ccb;
 	struct sas_task *task = NULL;
 	struct host_to_dev_fis fis;
@@ -1825,20 +1820,13 @@ static void pm8001_send_read_log(struct pm8001_hba_info *pm8001_ha,
 	}
 	task->task_done = pm8001_task_done;
 
-	res = pm8001_tag_alloc(pm8001_ha, &ccb_tag);
-	if (res) {
-		sas_free_task(task);
-		pm8001_dbg(pm8001_ha, FAIL, "cannot allocate tag !!!\n");
-		return;
-	}
-
-	/* allocate domain device by ourselves as libsas
-	 * is not going to provide any
-	*/
+	/*
+	 * Allocate domain device by ourselves as libsas is not going to
+	 * provide any.
+	 */
 	dev = kzalloc(sizeof(struct domain_device), GFP_ATOMIC);
 	if (!dev) {
 		sas_free_task(task);
-		pm8001_tag_free(pm8001_ha, ccb_tag);
 		pm8001_dbg(pm8001_ha, FAIL,
 			   "Domain device cannot be allocated\n");
 		return;
@@ -1846,11 +1834,14 @@ static void pm8001_send_read_log(struct pm8001_hba_info *pm8001_ha,
 	task->dev = dev;
 	task->dev->lldd_dev = pm8001_ha_dev;
 
-	ccb = &pm8001_ha->ccb_info[ccb_tag];
-	ccb->device = pm8001_ha_dev;
-	ccb->ccb_tag = ccb_tag;
-	ccb->task = task;
-	ccb->n_elem = 0;
+	ccb = pm8001_ccb_alloc(pm8001_ha, pm8001_ha_dev, task);
+	if (!ccb) {
+		pm8001_dbg(pm8001_ha, FAIL, "cannot allocate tag !!!\n");
+		sas_free_task(task);
+		kfree(dev);
+		return;
+	}
+
 	pm8001_ha_dev->id |= NCQ_READ_LOG_FLAG;
 	pm8001_ha_dev->id |= NCQ_2ND_RLE_FLAG;
 
@@ -1865,7 +1856,7 @@ static void pm8001_send_read_log(struct pm8001_hba_info *pm8001_ha,
 	fis.lbal = 0x10;
 	fis.sector_count = 0x1;
 
-	sata_cmd.tag = cpu_to_le32(ccb_tag);
+	sata_cmd.tag = cpu_to_le32(ccb->ccb_tag);
 	sata_cmd.device_id = cpu_to_le32(pm8001_ha_dev->device_id);
 	sata_cmd.ncqtag_atap_dir_m = cpu_to_le32((0x1 << 7) | (0x5 << 9));
 	memcpy(&sata_cmd.sata_fis, &fis, sizeof(struct host_to_dev_fis));
@@ -1874,7 +1865,7 @@ static void pm8001_send_read_log(struct pm8001_hba_info *pm8001_ha,
 			sizeof(sata_cmd), 0);
 	if (res) {
 		sas_free_task(task);
-		pm8001_tag_free(pm8001_ha, ccb_tag);
+		pm8001_ccb_free(pm8001_ha, ccb);
 		kfree(dev);
 	}
 }
@@ -4433,7 +4424,7 @@ static int pm8001_chip_reg_dev_req(struct pm8001_hba_info *pm8001_ha,
 	u32 stp_sspsmp_sata = 0x4;
 	struct inbound_queue_table *circularQ;
 	u32 linkrate, phy_id;
-	int rc, tag = 0xdeadbeef;
+	int rc;
 	struct pm8001_ccb_info *ccb;
 	u8 retryFlag = 0x1;
 	u16 firstBurstSize = 0;
@@ -4444,13 +4435,11 @@ static int pm8001_chip_reg_dev_req(struct pm8001_hba_info *pm8001_ha,
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
 
 	memset(&payload, 0, sizeof(payload));
-	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc)
-		return rc;
-	ccb = &pm8001_ha->ccb_info[tag];
-	ccb->device = pm8001_dev;
-	ccb->ccb_tag = tag;
-	payload.tag = cpu_to_le32(tag);
+	ccb = pm8001_ccb_alloc(pm8001_ha, pm8001_dev, NULL);
+	if (!ccb)
+		return SAS_QUEUE_FULL;
+
+	payload.tag = cpu_to_le32(ccb->ccb_tag);
 	if (flag == 1)
 		stp_sspsmp_sata = 0x02; /*direct attached sata */
 	else {
@@ -4642,7 +4631,6 @@ int pm8001_chip_get_nvmd_req(struct pm8001_hba_info *pm8001_ha,
 	u32 opc = OPC_INB_GET_NVMD_DATA;
 	u32 nvmd_type;
 	int rc;
-	u32 tag;
 	struct pm8001_ccb_info *ccb;
 	struct inbound_queue_table *circularQ;
 	struct get_nvm_data_req nvmd_req;
@@ -4657,15 +4645,15 @@ int pm8001_chip_get_nvmd_req(struct pm8001_hba_info *pm8001_ha,
 	fw_control_context->len = ioctl_payload->rd_length;
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
 	memset(&nvmd_req, 0, sizeof(nvmd_req));
-	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc) {
+
+	ccb = pm8001_ccb_alloc(pm8001_ha, NULL, NULL);
+	if (!ccb) {
 		kfree(fw_control_context);
-		return rc;
+		return -EBUSY;
 	}
-	ccb = &pm8001_ha->ccb_info[tag];
-	ccb->ccb_tag = tag;
 	ccb->fw_control_context = fw_control_context;
-	nvmd_req.tag = cpu_to_le32(tag);
+
+	nvmd_req.tag = cpu_to_le32(ccb->ccb_tag);
 
 	switch (nvmd_type) {
 	case TWI_DEVICE: {
@@ -4726,7 +4714,7 @@ int pm8001_chip_get_nvmd_req(struct pm8001_hba_info *pm8001_ha,
 			sizeof(nvmd_req), 0);
 	if (rc) {
 		kfree(fw_control_context);
-		pm8001_tag_free(pm8001_ha, tag);
+		pm8001_ccb_free(pm8001_ha, ccb);
 	}
 	return rc;
 }
@@ -4737,7 +4725,6 @@ int pm8001_chip_set_nvmd_req(struct pm8001_hba_info *pm8001_ha,
 	u32 opc = OPC_INB_SET_NVMD_DATA;
 	u32 nvmd_type;
 	int rc;
-	u32 tag;
 	struct pm8001_ccb_info *ccb;
 	struct inbound_queue_table *circularQ;
 	struct set_nvm_data_req nvmd_req;
@@ -4753,15 +4740,15 @@ int pm8001_chip_set_nvmd_req(struct pm8001_hba_info *pm8001_ha,
 		&ioctl_payload->func_specific,
 		ioctl_payload->wr_length);
 	memset(&nvmd_req, 0, sizeof(nvmd_req));
-	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc) {
+
+	ccb = pm8001_ccb_alloc(pm8001_ha, NULL, NULL);
+	if (!ccb) {
 		kfree(fw_control_context);
 		return -EBUSY;
 	}
-	ccb = &pm8001_ha->ccb_info[tag];
 	ccb->fw_control_context = fw_control_context;
-	ccb->ccb_tag = tag;
-	nvmd_req.tag = cpu_to_le32(tag);
+
+	nvmd_req.tag = cpu_to_le32(ccb->ccb_tag);
 	switch (nvmd_type) {
 	case TWI_DEVICE: {
 		u32 twi_addr, twi_page_size;
@@ -4811,7 +4798,7 @@ int pm8001_chip_set_nvmd_req(struct pm8001_hba_info *pm8001_ha,
 			sizeof(nvmd_req), 0);
 	if (rc) {
 		kfree(fw_control_context);
-		pm8001_tag_free(pm8001_ha, tag);
+		pm8001_ccb_free(pm8001_ha, ccb);
 	}
 	return rc;
 }
@@ -4856,8 +4843,6 @@ pm8001_chip_fw_flash_update_req(struct pm8001_hba_info *pm8001_ha,
 	struct fw_flash_updata_info flash_update_info;
 	struct fw_control_info *fw_control;
 	struct fw_control_ex *fw_control_context;
-	int rc;
-	u32 tag;
 	struct pm8001_ccb_info *ccb;
 	void *buffer = pm8001_ha->memoryMap.region[FW_FLASH].virt_ptr;
 	dma_addr_t phys_addr = pm8001_ha->memoryMap.region[FW_FLASH].phys_addr;
@@ -4881,17 +4866,16 @@ pm8001_chip_fw_flash_update_req(struct pm8001_hba_info *pm8001_ha,
 	fw_control_context->virtAddr = buffer;
 	fw_control_context->phys_addr = phys_addr;
 	fw_control_context->len = fw_control->len;
-	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc) {
+
+	ccb = pm8001_ccb_alloc(pm8001_ha, NULL, NULL);
+	if (!ccb) {
 		kfree(fw_control_context);
 		return -EBUSY;
 	}
-	ccb = &pm8001_ha->ccb_info[tag];
 	ccb->fw_control_context = fw_control_context;
-	ccb->ccb_tag = tag;
-	rc = pm8001_chip_fw_flash_update_build(pm8001_ha, &flash_update_info,
-		tag);
-	return rc;
+
+	return pm8001_chip_fw_flash_update_build(pm8001_ha, &flash_update_info,
+						 ccb->ccb_tag);
 }
 
 ssize_t
@@ -4979,24 +4963,21 @@ pm8001_chip_set_dev_state_req(struct pm8001_hba_info *pm8001_ha,
 	struct set_dev_state_req payload;
 	struct inbound_queue_table *circularQ;
 	struct pm8001_ccb_info *ccb;
-	int rc;
-	u32 tag;
 	u32 opc = OPC_INB_SET_DEVICE_STATE;
+
 	memset(&payload, 0, sizeof(payload));
-	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc)
+
+	ccb = pm8001_ccb_alloc(pm8001_ha, pm8001_dev, NULL);
+	if (!ccb)
 		return -1;
-	ccb = &pm8001_ha->ccb_info[tag];
-	ccb->ccb_tag = tag;
-	ccb->device = pm8001_dev;
+
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
-	payload.tag = cpu_to_le32(tag);
+	payload.tag = cpu_to_le32(ccb->ccb_tag);
 	payload.device_id = cpu_to_le32(pm8001_dev->device_id);
 	payload.nds = cpu_to_le32(state);
-	rc = pm8001_mpi_build_cmd(pm8001_ha, circularQ, opc, &payload,
-			sizeof(payload), 0);
-	return rc;
 
+	return pm8001_mpi_build_cmd(pm8001_ha, circularQ, opc, &payload,
+				    sizeof(payload), 0);
 }
 
 static int
@@ -5006,25 +4987,27 @@ pm8001_chip_sas_re_initialization(struct pm8001_hba_info *pm8001_ha)
 	struct inbound_queue_table *circularQ;
 	struct pm8001_ccb_info *ccb;
 	int rc;
-	u32 tag;
 	u32 opc = OPC_INB_SAS_RE_INITIALIZE;
+
 	memset(&payload, 0, sizeof(payload));
-	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc)
+
+	ccb = pm8001_ccb_alloc(pm8001_ha, NULL, NULL);
+	if (!ccb)
 		return -ENOMEM;
-	ccb = &pm8001_ha->ccb_info[tag];
-	ccb->ccb_tag = tag;
+
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
-	payload.tag = cpu_to_le32(tag);
+
+	payload.tag = cpu_to_le32(ccb->ccb_tag);
 	payload.SSAHOLT = cpu_to_le32(0xd << 25);
 	payload.sata_hol_tmo = cpu_to_le32(80);
 	payload.open_reject_cmdretries_data_retries = cpu_to_le32(0xff00ff);
-	rc = pm8001_mpi_build_cmd(pm8001_ha, circularQ, opc, &payload,
-			sizeof(payload), 0);
-	if (rc)
-		pm8001_tag_free(pm8001_ha, tag);
-	return rc;
 
+	rc = pm8001_mpi_build_cmd(pm8001_ha, circularQ, opc, &payload,
+				  sizeof(payload), 0);
+	if (rc)
+		pm8001_ccb_free(pm8001_ha, ccb);
+
+	return rc;
 }
 
 const struct pm8001_dispatch pm8001_8001_dispatch = {
