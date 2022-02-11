@@ -338,6 +338,10 @@ static inline void set_kuap(unsigned long value)
 	 * before and after the move to AMR. See table 6 on page 1134.
 	 */
 	isync();
+
+	if (__builtin_constant_p(value) && value == 0xfcffffffffffffff)
+		asm("li %0, %1 ; rotldi %0, %0, 48" : "=r"(value) : "i"(0xfffffffffffffcff));
+
 	mtspr(SPRN_AMR, value);
 	isync();
 }
