@@ -6631,8 +6631,9 @@ static void mvpp2_acpi_start(struct mvpp2_port *port)
 	mvpp2_mac_prepare(&port->phylink_config, MLO_AN_INBAND,
 			  port->phy_interface);
 	mvpp2_mac_config(&port->phylink_config, MLO_AN_INBAND, &state);
-	pcs->ops->pcs_config(pcs, MLO_AN_INBAND, port->phy_interface,
-			     state.advertising, false);
+	if (pcs && pcs->ops)
+		pcs->ops->pcs_config(pcs, MLO_AN_INBAND, port->phy_interface,
+				     state.advertising, false);
 	mvpp2_mac_finish(&port->phylink_config, MLO_AN_INBAND,
 			 port->phy_interface);
 	mvpp2_mac_link_up(&port->phylink_config, NULL,
