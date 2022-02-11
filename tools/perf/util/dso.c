@@ -784,7 +784,7 @@ dso_cache__free(struct dso *dso)
 	struct rb_root *root = &dso->data.cache;
 	struct rb_node *next = rb_first(root);
 
-	pthread_mutex_lock(&dso->lock);
+	BUG_ON(pthread_mutex_lock(&dso->lock) != 0);
 	while (next) {
 		struct dso_cache *cache;
 
@@ -830,7 +830,7 @@ dso_cache__insert(struct dso *dso, struct dso_cache *new)
 	struct dso_cache *cache;
 	u64 offset = new->offset;
 
-	pthread_mutex_lock(&dso->lock);
+	BUG_ON(pthread_mutex_lock(&dso->lock) != 0);
 	while (*p != NULL) {
 		u64 end;
 
@@ -1259,6 +1259,8 @@ struct dso *dso__new_id(const char *name, struct dso_id *id)
 	struct dso *dso = calloc(1, sizeof(*dso) + strlen(name) + 1);
 
 	if (dso != NULL) {
+		pthread_mutexattr_t lock_attr;
+
 		strcpy(dso->name, name);
 		if (id)
 			dso->id = *id;
@@ -1286,8 +1288,12 @@ struct dso *dso__new_id(const char *name, struct dso_id *id)
 		dso->root = NULL;
 		INIT_LIST_HEAD(&dso->node);
 		INIT_LIST_HEAD(&dso->data.open_entry);
-		pthread_mutex_init(&dso->lock, NULL);
+		pthread_mutexattr_init(&lock_attr);
+		pthread_mutexattr_settype(&lock_attr, PTHREAD_MUTEX_ERRORCHECK);
+		pthread_mutex_init(&dso->lock, &lock_attr);
+		pthread_mutexattr_destroy(&lock_attr);
 		refcount_set(&dso->refcnt, 1);
+
 	}
 
 	return dso;
