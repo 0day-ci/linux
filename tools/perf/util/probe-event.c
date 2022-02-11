@@ -180,8 +180,10 @@ struct map *get_target_map(const char *target, struct nsinfo *nsi, bool user)
 
 		map = dso__new_map(target);
 		if (map && map->dso) {
+			BUG_ON(pthread_mutex_lock(&map->dso->lock) != 0);
 			nsinfo__put(map->dso->nsinfo);
 			map->dso->nsinfo = nsinfo__get(nsi);
+			pthread_mutex_unlock(&map->dso->lock);
 		}
 		return map;
 	} else {
