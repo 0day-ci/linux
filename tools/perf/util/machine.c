@@ -783,33 +783,42 @@ static int machine__process_ksymbol_register(struct machine *machine,
 {
 	struct symbol *sym;
 	struct map *map = maps__find(machine__kernel_maps(machine), event->ksymbol.addr);
+	bool put_map = false;
+	int err = 0;
 
 	if (!map) {
 		struct dso *dso = dso__new(event->ksymbol.name);
-		int err;
 
-		if (dso) {
-			dso->kernel = DSO_SPACE__KERNEL;
-			map = map__new2(0, dso);
-			dso__put(dso);
+		if (!dso) {
+			err = -ENOMEM;
+			goto out;
 		}
-
-		if (!dso || !map) {
-			return -ENOMEM;
+		dso->kernel = DSO_SPACE__KERNEL;
+		map = map__new2(0, dso);
+		dso__put(dso);
+		if (!map) {
+			err = -ENOMEM;
+			goto out;
 		}
-
+		/*
+		 * The inserted map has a get on it, we need to put to release
+		 * the reference count here, but do it after all accesses are
+		 * done.
+		 */
+		put_map = true;
 		if (event->ksymbol.ksym_type == PERF_RECORD_KSYMBOL_TYPE_OOL) {
-			map->dso->binary_type = DSO_BINARY_TYPE__OOL;
-			map->dso->data.file_size = event->ksymbol.len;
-			dso__set_loaded(map->dso);
+			map__dso(map)->binary_type = DSO_BINARY_TYPE__OOL;
+			map__dso(map)->data.file_size = event->ksymbol.len;
+			dso__set_loaded(map__dso(map));
 		}
 
 		map->start = event->ksymbol.addr;
-		map->end = map->start + event->ksymbol.len;
+		map->end = map__start(map) + event->ksymbol.len;
 		err = maps__insert(machine__kernel_maps(machine), map);
-		map__put(map);
-		if (err)
-			return err;
+		if (err) {
+			err = -ENOMEM;
+			goto out;
+		}
 
 		dso__set_loaded(dso);
 
@@ -819,13 +828,18 @@ static int machine__process_ksymbol_register(struct machine *machine,
 		}
 	}
 
-	sym = symbol__new(map->map_ip(map, map->start),
+	sym = symbol__new(map__map_ip(map, map__start(map)),
 			  event->ksymbol.len,
 			  0, 0, event->ksymbol.name);
-	if (!sym)
-		return -ENOMEM;
-	dso__insert_symbol(map->dso, sym);
-	return 0;
+	if (!sym) {
+		err = -ENOMEM;
+		goto out;
+	}
+	dso__insert_symbol(map__dso(map), sym);
+out:
+	if (put_map)
+		map__put(map);
+	return err;
 }
 
 static int machine__process_ksymbol_unregister(struct machine *machine,
@@ -925,14 +939,11 @@ static struct map *machine__addnew_module_map(struct machine *machine, u64 start
 		goto out;
 
 	err = maps__insert(machine__kernel_maps(machine), map);
-
-	/* Put the map here because maps__insert already got it */
-	map__put(map);
-
 	/* If maps__insert failed, return NULL. */
-	if (err)
+	if (err) {
+		map__put(map);
 		map = NULL;
-
+	}
 out:
 	/* put the dso here, corresponding to  machine__findnew_module_dso */
 	dso__put(dso);
@@ -1228,6 +1239,7 @@ __machine__create_kernel_maps(struct machine *machine, struct dso *kernel)
 	/* In case of renewal the kernel map, destroy previous one */
 	machine__destroy_kernel_maps(machine);
 
+	map__put(machine->vmlinux_map);
 	machine->vmlinux_map = map__new2(0, kernel);
 	if (machine->vmlinux_map == NULL)
 		return -ENOMEM;
@@ -1513,6 +1525,7 @@ static int machine__create_module(void *arg, const char *name, u64 start,
 	map->end = start + size;
 
 	dso__kernel_module_get_build_id(map__dso(map), machine->root_dir);
+	map__put(map);
 	return 0;
 }
 
@@ -1558,16 +1571,18 @@ static void machine__set_kernel_mmap(struct machine *machine,
 static int machine__update_kernel_mmap(struct machine *machine,
 				     u64 start, u64 end)
 {
-	struct map *map = machine__kernel_map(machine);
+	struct map *orig, *updated;
 	int err;
 
-	map__get(map);
-	maps__remove(machine__kernel_maps(machine), map);
+	orig = machine->vmlinux_map;
+	updated = map__get(orig);
 
+	machine->vmlinux_map = updated;
 	machine__set_kernel_mmap(machine, start, end);
+	maps__remove(machine__kernel_maps(machine), orig);
+	err = maps__insert(machine__kernel_maps(machine), updated);
+	map__put(orig);
 
-	err = maps__insert(machine__kernel_maps(machine), map);
-	map__put(map);
 	return err;
 }
 
@@ -2246,6 +2261,7 @@ static int add_callchain_ip(struct thread *thread,
 	err = callchain_cursor_append(cursor, ip, &ms,
 				      branch, flags, nr_loop_iter,
 				      iter_cycles, branch_from, srcline);
+	map__put(al.map);
 	return err;
 }
 
