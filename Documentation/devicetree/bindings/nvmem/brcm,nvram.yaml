@@ -27,11 +27,23 @@ properties:
   reg:
     maxItems: 1
 
+patternProperties:
+  ".*":
+    description: |
+      Each child node represents one NVRAM entry (variable). Node name has to
+      match variable name as internally defined in the NVRAM.
+
+      Some of common NVRAM variables are: "board_id", "boardflags", "boot_wait",
+      "clkfreq", "et0macaddr", "sdram_config", "wait_time".
+
 unevaluatedProperties: false
 
 examples:
   - |
     nvram@1eff0000 {
-            compatible = "brcm,nvram";
-            reg = <0x1eff0000 0x10000>;
+        compatible = "brcm,nvram";
+        reg = <0x1eff0000 0x10000>;
+
+        mac: et0macaddr {
+        };
     };
