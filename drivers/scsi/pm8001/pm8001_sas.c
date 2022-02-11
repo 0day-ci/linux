@@ -383,7 +383,7 @@ static int pm8001_task_exec(struct sas_task *task,
 	struct sas_task *t = task;
 	struct task_status_struct *ts = &t->task_status;
 	struct pm8001_ccb_info *ccb;
-	u32 tag = 0xdeadbeef, rc = 0, n_elem = 0;
+	u32 tag = 0xdeadbeef, rc = 0, n_elem;
 	unsigned long flags = 0;
 	enum sas_protocol task_proto = t->task_proto;
 
@@ -440,6 +440,8 @@ static int pm8001_task_exec(struct sas_task *task,
 					rc = -ENOMEM;
 					goto err_out_tag;
 				}
+			} else {
+				n_elem = 0;
 			}
 		} else {
 			n_elem = t->num_scatter;
