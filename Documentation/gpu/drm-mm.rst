@@ -266,13 +266,13 @@ argument.
 The GEM core provides a helper method drm_gem_mmap() to
 handle object mapping. The method can be set directly as the mmap file
 operation handler. It will look up the GEM object based on the offset
-value and set the VMA operations to the :c:type:`struct drm_driver
-<drm_driver>` gem_vm_ops field. Note that drm_gem_mmap() doesn't map memory to
+value and set the VMA operations to the :c:type:`struct drm_gem_object_funcs
+<drm_gem_object_funcs>` vm_ops field. Note that drm_gem_mmap() doesn't map memory to
 userspace, but relies on the driver-provided fault handler to map pages
 individually.
 
-To use drm_gem_mmap(), drivers must fill the struct :c:type:`struct drm_driver
-<drm_driver>` gem_vm_ops field with a pointer to VM operations.
+To use drm_gem_mmap(), drivers must fill the struct :c:type:`struct drm_gem_object_funcs
+<drm_gem_object_funcs>` vm_ops field with a pointer to VM operations.
 
 The VM operations is a :c:type:`struct vm_operations_struct <vm_operations_struct>`
 made up of several fields, the more interesting ones being:

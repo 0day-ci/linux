@@ -46,7 +46,7 @@ struct sg_table;
 /**
  * enum drm_driver_feature - feature flags
  *
- * See &drm_driver.driver_features, drm_device.driver_features and
+ * See &drm_driver.driver_features, &drm_device.driver_features and
  * drm_core_check_feature().
  */
 enum drm_driver_feature {
@@ -229,8 +229,8 @@ struct drm_driver {
 	 *
 	 * All legacy drivers use this callback to de-initialize the hardware.
 	 * This is purely because of the shadow-attach model, where the DRM
-	 * kernel driver does not really own the hardware. Instead ownershipe is
-	 * handled with the help of userspace through an inheritedly racy dance
+	 * kernel driver does not really own the hardware. Instead ownership is
+	 * handled with the help of userspace through an inherited racy dance
 	 * to set/unset the VT into raw mode.
 	 *
 	 * Legacy drivers initialize the hardware in the @firstopen callback,

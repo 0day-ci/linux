@@ -453,7 +453,7 @@ EXPORT_SYMBOL(ttm_pool_alloc);
  * @pool: Pool to give pages back to.
  * @tt: ttm_tt object to unpopulate
  *
- * Give the packing pages back to a pool or free them
+ * Give the backing pages back to a pool or free them
  */
 void ttm_pool_free(struct ttm_pool *pool, struct ttm_tt *tt)
 {

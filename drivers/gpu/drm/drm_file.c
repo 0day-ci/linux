@@ -553,8 +553,8 @@ EXPORT_SYMBOL(drm_release_noglobal);
  * means all modern display drivers must use it.
  *
  * @offset is ignored, DRM events are read like a pipe. Therefore drivers also
- * must set the &file_operation.llseek to no_llseek(). Polling support is
- * provided by drm_poll().
+ * must set the &file_operation.llseek to no_llseek() or noop_llseek().
+ * Polling support is provided by drm_poll().
  *
  * This function will only ever read a full event. Therefore userspace must
  * supply a big enough buffer to fit any event to ensure forward progress. Since
@@ -640,7 +640,7 @@ EXPORT_SYMBOL(drm_read);
  * @filp: file pointer
  * @wait: poll waiter table
  *
- * This function must be used by drivers as their &file_operations.read method
+ * This function must be used by drivers as their &file_operations.poll method
  * if they use DRM events for asynchronous signalling to userspace.  Since
  * events are used by the KMS API for vblank and page flip completion this means
  * all modern display drivers must use it.
@@ -674,7 +674,7 @@ EXPORT_SYMBOL(drm_poll);
  *
  * This function prepares the passed in event for eventual delivery. If the event
  * doesn't get delivered (because the IOCTL fails later on, before queuing up
- * anything) then the even must be cancelled and freed using
+ * anything) then the event must be cancelled and freed using
  * drm_event_cancel_free(). Successfully initialized events should be sent out
  * using drm_send_event() or drm_send_event_locked() to signal completion of the
  * asynchronous event to userspace.
@@ -716,7 +716,7 @@ EXPORT_SYMBOL(drm_event_reserve_init_locked);
  *
  * This function prepares the passed in event for eventual delivery. If the event
  * doesn't get delivered (because the IOCTL fails later on, before queuing up
- * anything) then the even must be cancelled and freed using
+ * anything) then the event must be cancelled and freed using
  * drm_event_cancel_free(). Successfully initialized events should be sent out
  * using drm_send_event() or drm_send_event_locked() to signal completion of the
  * asynchronous event to userspace.

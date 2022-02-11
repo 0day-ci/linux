@@ -160,7 +160,7 @@ drm_gem_cma_prime_import_sg_table(struct drm_device *dev,
  * &drm_driver structure.
  *
  * This macro is a variant of DRM_GEM_CMA_DRIVER_OPS for drivers that
- * override the default implementation of &struct rm_driver.dumb_create. Use
+ * override the default implementation of &struct drm_driver.dumb_create. Use
  * DRM_GEM_CMA_DRIVER_OPS if possible. Drivers that require a virtual address
  * on imported buffers should use
  * DRM_GEM_CMA_DRIVER_OPS_VMAP_WITH_DUMB_CREATE() instead.

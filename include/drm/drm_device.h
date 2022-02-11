@@ -135,7 +135,9 @@ struct drm_device {
 	/**
 	 * @struct_mutex:
 	 *
-	 * Lock for others (not &drm_minor.master and &drm_file.is_master)
+	 * Lock for others (not &drm_file.was_master, &drm_file.is_master,
+	 * &drm_file.master, &drm_device.master, &drm_master.unique,
+	 * &drm_master.unique_len and &drm_master.magic_map)
 	 *
 	 * WARNING:
 	 * Only drivers annotated with DRIVER_LEGACY should be using this.
@@ -145,7 +147,9 @@ struct drm_device {
 	/**
 	 * @master_mutex:
 	 *
-	 * Lock for &drm_minor.master and &drm_file.is_master
+	 * Lock for &drm_file.was_master, &drm_file.is_master, &drm_file.master,
+	 * &drm_device.master, &drm_master.unique, &drm_master.unique_len and
+	 * &drm_master.magic_map
 	 */
 	struct mutex master_mutex;
 
