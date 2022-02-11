@@ -249,7 +249,7 @@ void maps__fixup_end(struct maps *maps)
 {
 	struct map_rb_node *prev = NULL, *curr;
 
-	down_write(&maps->lock);
+	down_write(maps__lock(maps));
 
 	maps__for_each_entry(maps, curr) {
 		if (prev != NULL && !prev->map->end)
@@ -265,7 +265,7 @@ void maps__fixup_end(struct maps *maps)
 	if (curr && !curr->map->end)
 		curr->map->end = ~0ULL;
 
-	up_write(&maps->lock);
+	up_write(maps__lock(maps));
 }
 
 struct symbol *symbol__new(u64 start, u64 len, u8 binding, u8 type, const char *name)
@@ -813,7 +813,7 @@ static int maps__split_kallsyms(struct maps *kmaps, struct dso *dso, u64 delta,
 	if (!kmaps)
 		return -1;
 
-	machine = kmaps->machine;
+	machine = maps__machine(kmaps);
 
 	x86_64 = machine__is(machine, "x86_64");
 
@@ -937,7 +937,7 @@ discard_symbol:
 
 	if (curr_map != initial_map &&
 	    dso->kernel == DSO_SPACE__KERNEL_GUEST &&
-	    machine__is_default_guest(kmaps->machine)) {
+	    machine__is_default_guest(maps__machine(kmaps))) {
 		dso__set_loaded(curr_map->dso);
 	}
 
@@ -1336,7 +1336,7 @@ static int dso__load_kcore(struct dso *dso, struct map *map,
 	if (!kmaps)
 		return -EINVAL;
 
-	machine = kmaps->machine;
+	machine = maps__machine(kmaps);
 
 	/* This function requires that the map is the kernel map */
 	if (!__map__is_kernel(map))
@@ -1851,7 +1851,7 @@ int dso__load(struct dso *dso, struct map *map)
 		else if (dso->kernel == DSO_SPACE__KERNEL_GUEST)
 			ret = dso__load_guest_kernel_sym(dso, map);
 
-		machine = map__kmaps(map)->machine;
+		machine = maps__machine(map__kmaps(map));
 		if (machine__is(machine, "x86_64"))
 			machine__map_x86_64_entry_trampolines(machine, dso);
 		goto out;
@@ -2006,21 +2006,21 @@ static int map__strcmp_name(const void *name, const void *b)
 
 void __maps__sort_by_name(struct maps *maps)
 {
-	qsort(maps->maps_by_name, maps->nr_maps, sizeof(struct map *), map__strcmp);
+	qsort(maps__maps_by_name(maps), maps__nr_maps(maps), sizeof(struct map *), map__strcmp);
 }
 
 static int map__groups__sort_by_name_from_rbtree(struct maps *maps)
 {
 	struct map_rb_node *rb_node;
-	struct map **maps_by_name = realloc(maps->maps_by_name,
-					    maps->nr_maps * sizeof(struct map *));
+	struct map **maps_by_name = realloc(maps__maps_by_name(maps),
+					    maps__nr_maps(maps) * sizeof(struct map *));
 	int i = 0;
 
 	if (maps_by_name == NULL)
 		return -1;
 
 	maps->maps_by_name = maps_by_name;
-	maps->nr_maps_allocated = maps->nr_maps;
+	maps->nr_maps_allocated = maps__nr_maps(maps);
 
 	maps__for_each_entry(maps, rb_node)
 		maps_by_name[i++] = rb_node->map;
@@ -2033,11 +2033,12 @@ static struct map *__maps__find_by_name(struct maps *maps, const char *name)
 {
 	struct map **mapp;
 
-	if (maps->maps_by_name == NULL &&
+	if (maps__maps_by_name(maps) == NULL &&
 	    map__groups__sort_by_name_from_rbtree(maps))
 		return NULL;
 
-	mapp = bsearch(name, maps->maps_by_name, maps->nr_maps, sizeof(*mapp), map__strcmp_name);
+	mapp = bsearch(name, maps__maps_by_name(maps), maps__nr_maps(maps),
+		       sizeof(*mapp), map__strcmp_name);
 	if (mapp)
 		return *mapp;
 	return NULL;
@@ -2048,9 +2049,10 @@ struct map *maps__find_by_name(struct maps *maps, const char *name)
 	struct map_rb_node *rb_node;
 	struct map *map;
 
-	down_read(&maps->lock);
+	down_read(maps__lock(maps));
 
-	if (maps->last_search_by_name && strcmp(maps->last_search_by_name->dso->short_name, name) == 0) {
+	if (maps->last_search_by_name &&
+	    strcmp(maps->last_search_by_name->dso->short_name, name) == 0) {
 		map = maps->last_search_by_name;
 		goto out_unlock;
 	}
@@ -2060,7 +2062,7 @@ struct map *maps__find_by_name(struct maps *maps, const char *name)
 	 * made.
 	 */
 	map = __maps__find_by_name(maps, name);
-	if (map || maps->maps_by_name != NULL)
+	if (map || maps__maps_by_name(maps) != NULL)
 		goto out_unlock;
 
 	/* Fallback to traversing the rbtree... */
@@ -2074,7 +2076,7 @@ struct map *maps__find_by_name(struct maps *maps, const char *name)
 	map = NULL;
 
 out_unlock:
-	up_read(&maps->lock);
+	up_read(maps__lock(maps));
 	return map;
 }
 
@@ -2326,7 +2328,7 @@ static int dso__load_guest_kernel_sym(struct dso *dso, struct map *map)
 {
 	int err;
 	const char *kallsyms_filename = NULL;
-	struct machine *machine = map__kmaps(map)->machine;
+	struct machine *machine = maps__machine(map__kmaps(map));
 	char path[PATH_MAX];
 
 	if (machine__is_default_guest(machine)) {
