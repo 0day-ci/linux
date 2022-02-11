@@ -4972,8 +4972,11 @@ static void mpi_set_phy_profile_req(struct pm8001_hba_info *pm8001_ha,
 
 	memset(&payload, 0, sizeof(payload));
 	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc)
+	if (rc) {
 		pm8001_dbg(pm8001_ha, FAIL, "Invalid tag\n");
+		return;
+	}
+
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
 	payload.tag = cpu_to_le32(tag);
 	payload.ppc_phyid =
@@ -5015,8 +5018,10 @@ void pm8001_set_phy_profile_single(struct pm8001_hba_info *pm8001_ha,
 	memset(&payload, 0, sizeof(payload));
 
 	rc = pm8001_tag_alloc(pm8001_ha, &tag);
-	if (rc)
+	if (rc) {
 		pm8001_dbg(pm8001_ha, INIT, "Invalid tag\n");
+		return;
+	}
 
 	circularQ = &pm8001_ha->inbnd_q_tbl[0];
 	opc = OPC_INB_SET_PHY_PROFILE;
