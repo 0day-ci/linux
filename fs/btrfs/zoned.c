@@ -15,6 +15,7 @@
 #include "transaction.h"
 #include "dev-replace.h"
 #include "space-info.h"
+#include "misc.h"
 
 /* Maximum number of zones to report per blkdev_report_zones() call */
 #define BTRFS_REPORT_NR_ZONES   4096
@@ -2081,4 +2082,32 @@ void btrfs_free_zone_cache(struct btrfs_fs_info *fs_info)
 		}
 	}
 	mutex_unlock(&fs_devices->device_list_mutex);
+}
+
+bool btrfs_zoned_should_reclaim(struct btrfs_fs_info *fs_info)
+{
+	struct btrfs_fs_devices *fs_devices = fs_info->fs_devices;
+	struct btrfs_device *device;
+	u64 nr_free = 0;
+	u64 nr_zones = 0;
+	u64 factor;
+
+	if (!btrfs_is_zoned(fs_info))
+		return false;
+
+	if (!fs_info->bg_reclaim_threshold)
+		return false;
+
+	mutex_lock(&fs_devices->device_list_mutex);
+	list_for_each_entry(device, &fs_devices->devices, dev_list) {
+		struct btrfs_zoned_device_info *zone_info = device->zone_info;
+
+		nr_zones += zone_info->nr_zones;
+		nr_free += bitmap_weight(zone_info->empty_zones,
+					 zone_info->nr_zones);
+	}
+	mutex_unlock(&fs_devices->device_list_mutex);
+
+	factor = div_factor_fine(nr_free, nr_zones);
+	return factor >= fs_info->bg_reclaim_threshold;
 }
