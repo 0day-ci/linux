@@ -47,7 +47,7 @@ Description:
 			fgroup:= decimal value
 		  lsm:  are LSM specific
 		  option:
-			appraise_type:= [imasig] [imasig|modsig]
+			appraise_type:= [imasig] | [imasig|modsig] | [sigv3]
 			appraise_flag:= [check_blacklist]
 			Currently, blacklist check is only for files signed with appended
 			signature.
@@ -153,9 +153,27 @@ Description:
 
 			appraise func=SETXATTR_CHECK appraise_algos=sha256,sha384,sha512
 
-		Example of 'measure' rule requiring fs-verity's digests on a
-		particular filesystem with indication of type of digest in
-		the measurement list.
+		Example of a 'measure' rule requiring fs-verity's digests
+		with indication of type of digest in the measurement list.
 
 			measure func=FILE_CHECK digest_type=verity \
-				fsuuid=... template=ima-ngv2
+				template=ima-ngv2
+
+		Example of 'measure' and 'appraise' rules requiring fs-verity
+		signatures (version 3) stored in security.ima xattr.
+
+		The 'measure' rule specifies the 'ima-sig' template option,
+		which includes the file signature in the measurement list.
+
+			measure func=BPRM_CHECK digest_type=verity \
+				template=ima-sig
+
+		The 'appraise' rule specifies the type and signature version
+		(sigv3) required.
+
+			appraise func=BPRM_CHECK digest_type=verity \
+				appraise_type=sigv3
+
+		All of these policy rules could, for example, be constrained
+		either based on a filesystem's UUID (fsuuid) or based on LSM
+		labels.

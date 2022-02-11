@@ -1311,6 +1311,12 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 	    !(entry->flags & IMA_MODSIG_ALLOWED))
 		return false;
 
+	/* Ensure APPRAISE verity file implies a v3 signature */
+	if (entry->action == APPRAISE &&
+	    (entry->flags & IMA_VERITY_REQUIRED) &&
+	    !(entry->flags & IMA_DIGSIG_REQUIRED))
+		return false;
+
 	return true;
 }
 
@@ -1735,14 +1741,24 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 			break;
 		case Opt_appraise_type:
 			ima_log_string(ab, "appraise_type", args[0].from);
-			if ((strcmp(args[0].from, "imasig")) == 0)
+			if ((strcmp(args[0].from, "imasig")) == 0) {
 				entry->flags |= IMA_DIGSIG_REQUIRED;
-			else if (IS_ENABLED(CONFIG_IMA_APPRAISE_MODSIG) &&
-				 strcmp(args[0].from, "imasig|modsig") == 0)
+			} else if (strcmp(args[0].from, "sigv3") == 0) {
+				/*
+				 * Only fsverity supports sigv3 for now.
+				 * No need to define a new flag.
+				 */
+				if (entry->flags & IMA_VERITY_REQUIRED)
+					entry->flags |= IMA_DIGSIG_REQUIRED;
+				else
+					result = -EINVAL;
+			} else if (IS_ENABLED(CONFIG_IMA_APPRAISE_MODSIG) &&
+				 strcmp(args[0].from, "imasig|modsig") == 0) {
 				entry->flags |= IMA_DIGSIG_REQUIRED |
 						IMA_MODSIG_ALLOWED;
-			else
+			} else {
 				result = -EINVAL;
+			}
 			break;
 		case Opt_appraise_flag:
 			ima_log_string(ab, "appraise_flag", args[0].from);
@@ -2186,6 +2202,8 @@ int ima_policy_show(struct seq_file *m, void *v)
 	if (entry->flags & IMA_DIGSIG_REQUIRED) {
 		if (entry->flags & IMA_MODSIG_ALLOWED)
 			seq_puts(m, "appraise_type=imasig|modsig ");
+		else if (entry->flags & IMA_VERITY_REQUIRED)
+			seq_puts(m, "appraise_type=sigv3 ");
 		else
 			seq_puts(m, "appraise_type=imasig ");
 	}

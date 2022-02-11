@@ -80,6 +80,7 @@ enum evm_ima_xattr_type {
 	EVM_IMA_XATTR_DIGSIG,
 	IMA_XATTR_DIGEST_NG,
 	EVM_XATTR_PORTABLE_DIGSIG,
+	IMA_VERITY_DIGSIG,
 	IMA_XATTR_LAST
 };
 
@@ -140,7 +141,9 @@ struct signature_v2_hdr {
 
 /*
  * IMA signature version 3 disambiguates the data that is signed, by
- * indirectly signing the hash of the ima_file_id structure data.
+ * indirectly signing the hash of the ima_file_id structure data,
+ * containing either the fsverity_descriptor struct digest or, in the
+ * future, the regular IMA file hash.
  *
  * (The hash of the ima_file_id structure is only of the portion used.)
  */
