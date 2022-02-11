@@ -6664,7 +6664,6 @@ int read_extent_buffer_pages(struct extent_buffer *eb, int wait, int mirror_num)
 				 * i.e unlock page/set error bit.
 				 */
 				ret = err;
-				SetPageError(page);
 				unlock_page(page);
 				atomic_dec(&eb->io_pages);
 			}
