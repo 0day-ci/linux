@@ -178,9 +178,9 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	SYSCALL_TRACE_EXIT_EVENT(sname);			\
 	static struct syscall_metadata __used			\
 	  __syscall_meta_##sname = {				\
-		.name 		= "sys"#sname,			\
+		.name		= "sys"#sname,			\
 		.syscall_nr	= -1,	/* Filled in at boot */	\
-		.nb_args 	= nb,				\
+		.nb_args	= nb,				\
 		.types		= nb ? types_##sname : NULL,	\
 		.args		= nb ? args_##sname : NULL,	\
 		.enter_event	= &event_enter_##sname,		\
@@ -1060,6 +1060,9 @@ asmlinkage long sys_memfd_secret(unsigned int flags);
 asmlinkage long sys_set_mempolicy_home_node(unsigned long start, unsigned long len,
 					    unsigned long home_node,
 					    unsigned long flags);
+asmlinkage long sys_umcg_wait(u64 flags, pid_t next_tid, u64 abs_timeout,
+			      u64 __user *workers, u64 worker_id_or_sz);
+asmlinkage long sys_umcg_kick(u32 flags, pid_t tid);
 
 /*
  * Architecture-specific system calls

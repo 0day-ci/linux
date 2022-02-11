@@ -275,6 +275,10 @@ COND_SYSCALL(landlock_restrict_self);
 
 /* arch/example/kernel/sys_example.c */
 
+/* kernel/sched/umcg.c */
+COND_SYSCALL(umcg_wait);
+COND_SYSCALL(umcg_kick);
+
 /* mm/fadvise.c */
 COND_SYSCALL(fadvise64_64);
 
