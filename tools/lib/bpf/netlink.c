@@ -87,22 +87,70 @@ enum {
 	NL_DONE,
 };
 
+static int __libbpf_netlink_recvmsg(int sock, struct msghdr *mhdr, int flags)
+{
+	int len;
+
+	do {
+		len = recvmsg(sock, mhdr, flags);
+	} while (len < 0 && (errno == EINTR || errno == EAGAIN));
+
+	if (len < 0)
+		return -errno;
+	return len;
+}
+
+static int libbpf_netlink_recvmsg(int sock, struct msghdr *mhdr, char **buf)
+{
+	struct iovec *iov = mhdr->msg_iov;
+	void *nbuf;
+	int len;
+
+	len = __libbpf_netlink_recvmsg(sock, mhdr, MSG_PEEK | MSG_TRUNC);
+	if (len < 0)
+		return len;
+
+	if (len < 4096)
+		len = 4096;
+
+	if (len > iov->iov_len) {
+		nbuf = realloc(iov->iov_base, len);
+		if (!nbuf) {
+			free(iov->iov_base);
+			return -ENOMEM;
+		}
+		iov->iov_base = nbuf;
+		iov->iov_len = len;
+	}
+
+	len = __libbpf_netlink_recvmsg(sock, mhdr, 0);
+	if (len > 0)
+		*buf = iov->iov_base;
+	return len;
+}
+
 static int libbpf_netlink_recv(int sock, __u32 nl_pid, int seq,
 			       __dump_nlmsg_t _fn, libbpf_dump_nlmsg_t fn,
 			       void *cookie)
 {
+	struct iovec iov = {};
+	struct msghdr mhdr = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
 	bool multipart = true;
 	struct nlmsgerr *err;
 	struct nlmsghdr *nh;
-	char buf[4096];
 	int len, ret;
+	char *buf;
+
 
 	while (multipart) {
 start:
 		multipart = false;
-		len = recv(sock, buf, sizeof(buf), 0);
+		len = libbpf_netlink_recvmsg(sock, &mhdr, &buf);
 		if (len < 0) {
-			ret = -errno;
+			ret = len;
 			goto done;
 		}
 
@@ -151,6 +199,7 @@ start:
 	}
 	ret = 0;
 done:
+	free(iov.iov_base);
 	return ret;
 }
 
