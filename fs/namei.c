@@ -2642,7 +2642,7 @@ static int lookup_one_common(struct user_namespace *mnt_userns,
  * Note that this routine is purely a helper for filesystem usage and should
  * not be called by generic code.
  *
- * The caller must hold base->i_mutex.
+ * The caller must hold base->d_inode->i_rwsem.
  */
 struct dentry *try_lookup_one_len(const char *name, struct dentry *base, int len)
 {
