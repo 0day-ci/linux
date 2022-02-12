@@ -1182,6 +1182,7 @@ struct task_struct {
 #endif
 	/* Ptrace state: */
 	unsigned long			ptrace_message;
+	kernel_siginfo_t		death_siginfo;
 	kernel_siginfo_t		*last_siginfo;
 
 	struct task_io_accounting	ioac;

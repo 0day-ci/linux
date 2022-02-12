@@ -2824,6 +2824,10 @@ relock:
 		}
 
 	fatal:
+		/* Allow siginfo to be queried until reaped. */
+		copy_siginfo(&current->death_siginfo, &ksig->info);
+		current->last_siginfo = &current->death_siginfo;
+
 		spin_unlock_irq(&sighand->siglock);
 		if (unlikely(cgroup_task_frozen(current)))
 			cgroup_leave_frozen(true);

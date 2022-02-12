@@ -268,6 +268,10 @@ struct seccomp_notif_addfd_big {
 #define SECCOMP_FILTER_FLAG_TSYNC_ESRCH (1UL << 4)
 #endif
 
+#ifndef SYS_SECCOMP
+#define SYS_SECCOMP	1
+#endif
+
 #ifndef seccomp
 int seccomp(unsigned int op, unsigned int flags, void *args)
 {
@@ -763,6 +767,121 @@ TEST_SIGNAL(KILL_one_arg_six, SIGSYS)
 	munmap(map1, page_size);
 	munmap(map2, page_size);
 	close(fd);
+}
+
+FIXTURE(SIGINFO) {
+	pid_t child_pid;
+};
+
+FIXTURE_SETUP(SIGINFO)
+{
+	self->child_pid = 0;
+}
+
+FIXTURE_TEARDOWN(SIGINFO)
+{
+	if (self->child_pid > 0)
+		waitpid(self->child_pid, NULL, WNOHANG);
+}
+
+TEST_F(SIGINFO, child)
+{
+	int status;
+	siginfo_t info = { };
+	/* Kill only when calling __NR_prctl. */
+	struct sock_filter filter[] = {
+		BPF_STMT(BPF_LD|BPF_W|BPF_ABS,
+			offsetof(struct seccomp_data, nr)),
+		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, __NR_prctl, 0, 1),
+		BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_KILL_PROCESS | 0xBA),
+		BPF_STMT(BPF_RET|BPF_K, SECCOMP_RET_ALLOW),
+	};
+	struct sock_fprog prog = {
+		.len = (unsigned short)ARRAY_SIZE(filter),
+		.filter = filter,
+	};
+
+	self->child_pid = fork();
+	ASSERT_LE(0, self->child_pid);
+	if (self->child_pid == 0) {
+		ASSERT_EQ(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
+			TH_LOG("Kernel does not support PR_SET_NO_NEW_PRIVS!");
+		}
+		ASSERT_EQ(0, seccomp(SECCOMP_SET_MODE_FILTER, 0, &prog));
+		prctl(PR_GET_SECCOMP, 0, 0, 0, 0);
+		/* Should have died now. */
+		_exit(37);
+	}
+
+	/* Check siginfo_t contents. */
+	EXPECT_EQ(waitid(P_PID, self->child_pid, &info, WEXITED | WNOWAIT), 0);
+#if 0
+	struct {
+	        int si_signo;
+	        int si_code;
+	        int si_errno;
+	        union __sifields _sifields;
+	}
+
+	/* SIGCHLD */
+	struct {
+		__kernel_pid_t _pid;	/* which child */
+		__kernel_uid32_t _uid;	/* sender's uid */
+		int _status;		/* exit code */
+		__ARCH_SI_CLOCK_T _utime;
+		__ARCH_SI_CLOCK_T _stime;
+	} _sigchld;
+#endif
+	ASSERT_EQ(info.si_signo, SIGCHLD);
+	EXPECT_TRUE(info.si_code == CLD_KILLED || info.si_code == CLD_DUMPED);
+	EXPECT_TRUE(info.si_errno == 0);
+	EXPECT_EQ(info.si_pid, self->child_pid);
+
+	ASSERT_TRUE(WIFSIGNALED(info.si_status));
+	/* TODO: why doesn't this WCOREDUMP() agree with below? */
+	/* EXPECT_TRUE(WCOREDUMP(status)); */
+	EXPECT_EQ(WTERMSIG(info.si_status), SIGSYS);
+
+	memset(&info, 0, sizeof(info));
+	ASSERT_EQ(ptrace(PTRACE_GETSIGINFO, self->child_pid, NULL, &info), 0);
+#if 0
+	/* SIGSYS */
+	struct {
+		void __user *_call_addr;/* calling user insn */
+		int _syscall;		/* triggering system call number */
+		unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
+	} _sigsys;
+
+	info.si_signo = SIGSYS;
+	info.si_code = SYS_SECCOMP;
+	info.si_call_addr = (void __user *)KSTK_EIP(current);
+	info.si_errno = reason;
+	info.si_arch = syscall_get_arch(current);
+	info.si_syscall = syscall;
+
+#endif
+	ASSERT_EQ(info.si_signo, SIGSYS);
+	EXPECT_EQ(info.si_code, SYS_SECCOMP);
+	/*
+	 * The syscall will have happened somewhere near the libc
+	 * prctl implementation.
+	 */
+	EXPECT_TRUE(info.si_call_addr >= (void *)prctl &&
+		    info.si_call_addr <= (void *)prctl + PAGE_SIZE) {
+		TH_LOG("info.si_call_addr: %p", info.si_call_addr);
+		TH_LOG("prctl            : %p", prctl);
+	}
+	EXPECT_EQ(info.si_errno, 0xBA);
+	/* EXPECT_EQ(info.si_arch, ...native arch...); */
+	EXPECT_EQ(info.si_syscall, __NR_prctl);
+
+	/* Check status contents. */
+	ASSERT_EQ(waitpid(self->child_pid, &status, 0), self->child_pid);
+	ASSERT_TRUE(WIFSIGNALED(status));
+	/* TODO: why doesn't this WCOREDUMP() agree with above? */
+	/* EXPECT_TRUE(WCOREDUMP(status)); */
+	EXPECT_EQ(WTERMSIG(status), SIGSYS);
+	self->child_pid = 0;
 }
 
 /* This is a thread task to die via seccomp filter violation. */

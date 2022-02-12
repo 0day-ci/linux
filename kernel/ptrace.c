@@ -1304,8 +1304,16 @@ SYSCALL_DEFINE4(ptrace, long, request, long, pid, unsigned long, addr,
 
 	ret = ptrace_check_attach(child, request == PTRACE_KILL ||
 				  request == PTRACE_INTERRUPT);
-	if (ret < 0)
-		goto out_put_task_struct;
+	if (ret < 0) {
+		/*
+		 * Allow PTRACE_GETSIGINFO if process is dead
+		 * and we could otherwise ptrace it.
+		 */
+		if (request != PTRACE_GETSIGINFO ||
+		    !child->exit_state ||
+		    !ptrace_may_access(child, PTRACE_MODE_READ_REALCREDS))
+			goto out_put_task_struct;
+	}
 
 	ret = arch_ptrace(child, request, addr, data);
 	if (ret || request != PTRACE_DETACH)
