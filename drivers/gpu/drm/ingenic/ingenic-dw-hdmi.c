@@ -55,6 +55,8 @@ ingenic_dw_hdmi_mode_valid(struct dw_hdmi *hdmi, void *data,
 	if (mode->clock > 216000)
 		return MODE_CLOCK_HIGH;
 
+	dw_hdmi_enable_poll(hdmi, true);
+
 	return MODE_OK;
 }
 
