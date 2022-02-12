@@ -363,6 +363,11 @@ struct net_bridge_port {
 	unsigned char			config_pending;
 	port_id				port_id;
 	port_id				designated_port;
+	/*
+	 * designated_root and designated_bridge must NOT be at the end of the
+	 * structure because ether_addr_equal_64bits() requires 2 bytes of
+	 * padding.
+	 */
 	bridge_id			designated_root;
 	bridge_id			designated_bridge;
 	u32				path_cost;

@@ -221,9 +221,11 @@ int br_stp_set_enabled(struct net_bridge *br, unsigned long val,
 /* called under bridge lock */
 void br_stp_change_bridge_id(struct net_bridge *br, const unsigned char *addr)
 {
-	/* should be aligned on 2 bytes for ether_addr_equal() */
-	unsigned short oldaddr_aligned[ETH_ALEN >> 1];
-	unsigned char *oldaddr = (unsigned char *)oldaddr_aligned;
+	/*
+	 * should be aligned on 2 bytes and have 2 bytes of padding for
+	 * ether_addr_equal_64bits()
+	 */
+	unsigned char oldaddr[ETH_ALEN + 2] __aligned(2);
 	struct net_bridge_port *p;
 	int wasroot;
 
@@ -236,10 +238,10 @@ void br_stp_change_bridge_id(struct net_bridge *br, const unsigned char *addr)
 	eth_hw_addr_set(br->dev, addr);
 
 	list_for_each_entry(p, &br->port_list, list) {
-		if (ether_addr_equal(p->designated_bridge.addr, oldaddr))
+		if (ether_addr_equal_64bits(p->designated_bridge.addr, oldaddr))
 			memcpy(p->designated_bridge.addr, addr, ETH_ALEN);
 
-		if (ether_addr_equal(p->designated_root.addr, oldaddr))
+		if (ether_addr_equal_64bits(p->designated_root.addr, oldaddr))
 			memcpy(p->designated_root.addr, addr, ETH_ALEN);
 	}
 
