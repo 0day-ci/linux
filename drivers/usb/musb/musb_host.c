@@ -563,7 +563,7 @@ musb_rx_reinit(struct musb *musb, struct musb_qh *qh, u8 epnum)
 	ep->rx_reinit = 0;
 }
 
-static void musb_tx_dma_set_mode_mentor(struct musb_hw_ep *hw_ep, 
+static void musb_tx_dma_set_mode_mentor(struct musb_hw_ep *hw_ep,
 					struct musb_qh *qh,
 					u32 *length, u8 *mode)
 {
