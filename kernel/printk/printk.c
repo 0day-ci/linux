@@ -2716,7 +2716,11 @@ skip:
 		if (handover)
 			return;
 
+#ifndef CONFIG_PREEMPTION
+		if (do_cond_resched || need_resched())
+#else
 		if (do_cond_resched)
+#endif
 			cond_resched();
 	}
 
