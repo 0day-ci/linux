@@ -1403,7 +1403,7 @@ static int cp210x_tiocmget(struct tty_struct *tty)
 		|((control & CONTROL_RTS) ? TIOCM_RTS : 0)
 		|((control & CONTROL_CTS) ? TIOCM_CTS : 0)
 		|((control & CONTROL_DSR) ? TIOCM_DSR : 0)
-		|((control & CONTROL_RING)? TIOCM_RI  : 0)
+		|((control & CONTROL_RING) ? TIOCM_RI  : 0)
 		|((control & CONTROL_DCD) ? TIOCM_CD  : 0);
 
 	dev_dbg(&port->dev, "%s - control = 0x%02x\n", __func__, control);
