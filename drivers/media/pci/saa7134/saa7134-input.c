@@ -812,7 +812,8 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	rc->map_name = ir_codes;
 	rc->driver_name = MODULE_NAME;
 	rc->min_timeout = 1;
-	rc->timeout = IR_DEFAULT_TIMEOUT;
+	rc->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	rc->keyup_delay = IR_DEFAULT_TIMEOUT;
 	rc->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 
 	err = rc_register_device(rc);

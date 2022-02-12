@@ -489,7 +489,8 @@ static int irtoy_probe(struct usb_interface *intf,
 	rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
 	rc->map_name = RC_MAP_RC6_MCE;
 	rc->rx_resolution = UNIT_US;
-	rc->timeout = IR_DEFAULT_TIMEOUT;
+	rc->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	rc->keyup_delay = IR_DEFAULT_TIMEOUT;
 
 	/*
 	 * end of transmission is detected by absence of a usb packet

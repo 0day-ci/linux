@@ -123,9 +123,11 @@ struct lirc_fh {
  * @last_protocol: protocol of last keypress
  * @last_scancode: scancode of last keypress
  * @last_toggle: toggle value of last command
- * @timeout: optional time after which device stops sending data
- * @min_timeout: minimum timeout supported by device
- * @max_timeout: maximum timeout supported by device
+ * @rawir_timeout: length space to convert into IR timeout
+ * @keyup_delay: timeout before keyup event. This should be the maximum
+ *	delay between reading IR events.
+ * @min_timeout: minimum rawir timeout supported by device
+ * @max_timeout: maximum rawir timeout supported by device
  * @rx_resolution : resolution (in us) of input sampler
  * @tx_resolution: resolution (in us) of output sampler
  * @lirc_dev: lirc device
@@ -190,7 +192,8 @@ struct rc_dev {
 	enum rc_proto			last_protocol;
 	u64				last_scancode;
 	u8				last_toggle;
-	u32				timeout;
+	u32				rawir_timeout;
+	u32				keyup_delay;
 	u32				min_timeout;
 	u32				max_timeout;
 	u32				rx_resolution;

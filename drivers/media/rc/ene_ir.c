@@ -454,10 +454,10 @@ select_timeout:
 	if (dev->hw_learning_and_tx_capable)
 		dev->rdev->tx_resolution = sample_period;
 
-	if (dev->rdev->timeout > dev->rdev->max_timeout)
-		dev->rdev->timeout = dev->rdev->max_timeout;
-	if (dev->rdev->timeout < dev->rdev->min_timeout)
-		dev->rdev->timeout = dev->rdev->min_timeout;
+	if (dev->rdev->rawir_timeout > dev->rdev->max_timeout)
+		dev->rdev->rawir_timeout = dev->rdev->max_timeout;
+	if (dev->rdev->rawir_timeout < dev->rdev->min_timeout)
+		dev->rdev->rawir_timeout = dev->rdev->min_timeout;
 }
 
 /* Enable the device for receive */
@@ -818,7 +818,8 @@ static void ene_setup_default_settings(struct ene_device *dev)
 	dev->learning_mode_enabled = learning_mode_force;
 
 	/* Set reasonable default timeout */
-	dev->rdev->timeout = MS_TO_US(150);
+	dev->rdev->rawir_timeout = MS_TO_US(150);
+	dev->rdev->keyup_delay = MS_TO_US(150);
 }
 
 /* Upload all hardware settings at once. Used at load and resume time */

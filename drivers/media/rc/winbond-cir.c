@@ -1071,7 +1071,8 @@ wbcir_probe(struct pnp_dev *device, const struct pnp_device_id *dev_id)
 	data->dev->priv = data;
 	data->dev->dev.parent = &device->dev;
 	data->dev->min_timeout = 1;
-	data->dev->timeout = IR_DEFAULT_TIMEOUT;
+	data->dev->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	data->dev->keyup_delay = IR_DEFAULT_TIMEOUT;
 	data->dev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 	data->dev->rx_resolution = 2;
 	data->dev->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;

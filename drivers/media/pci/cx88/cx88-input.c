@@ -479,7 +479,8 @@ int cx88_ir_init(struct cx88_core *core, struct pci_dev *pci)
 	dev->scancode_mask = hardware_mask;
 
 	if (ir->sampling) {
-		dev->timeout = MS_TO_US(10); /* 10 ms */
+		dev->rawir_timeout = MS_TO_US(10); /* 10 ms */
+		dev->keyup_delay = MS_TO_US(10); /* 10 ms */
 	} else {
 		dev->driver_type = RC_DRIVER_SCANCODE;
 		dev->allowed_protocols = rc_proto;

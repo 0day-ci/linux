@@ -310,7 +310,8 @@ static int hix5hd2_ir_probe(struct platform_device *pdev)
 	rdev->input_id.product = 0x0001;
 	rdev->input_id.version = 0x0100;
 	rdev->rx_resolution = 10;
-	rdev->timeout = IR_CFG_SYMBOL_MAXWIDTH * 10;
+	rdev->rawir_timeout = IR_CFG_SYMBOL_MAXWIDTH * 10;
+	rdev->keyup_delay = IR_CFG_SYMBOL_MAXWIDTH * 10;
 
 	ret = rc_register_device(rdev);
 	if (ret < 0)

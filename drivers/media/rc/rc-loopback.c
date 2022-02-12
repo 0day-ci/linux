@@ -125,7 +125,7 @@ static int loop_tx_ir(struct rc_dev *dev, unsigned *txbuf, unsigned count)
 
 	/* Fake a silence long enough to cause us to go idle */
 	rawir.pulse = false;
-	rawir.duration = dev->timeout;
+	rawir.duration = dev->rawir_timeout;
 	ir_raw_event_store_with_filter(dev, &rawir);
 
 	ir_raw_event_handle(dev);
@@ -222,7 +222,8 @@ static int __init loop_init(void)
 	rc->allowed_protocols	= RC_PROTO_BIT_ALL_IR_DECODER;
 	rc->allowed_wakeup_protocols = RC_PROTO_BIT_ALL_IR_ENCODER;
 	rc->encode_wakeup	= true;
-	rc->timeout		= IR_DEFAULT_TIMEOUT;
+	rc->rawir_timeout	= IR_DEFAULT_TIMEOUT;
+	rc->keyup_delay		= IR_DEFAULT_TIMEOUT;
 	rc->min_timeout		= 1;
 	rc->max_timeout		= IR_MAX_TIMEOUT;
 	rc->rx_resolution	= 1;

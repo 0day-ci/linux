@@ -385,7 +385,7 @@ static irqreturn_t serial_ir_irq_handler(int i, void *blah)
 	} while (!(sinp(UART_IIR) & UART_IIR_NO_INT)); /* still pending ? */
 
 	mod_timer(&serial_ir.timeout_timer,
-		  jiffies + usecs_to_jiffies(serial_ir.rcdev->timeout));
+		  jiffies + usecs_to_jiffies(serial_ir.rcdev->rawir_timeout));
 
 	ir_raw_event_handle(serial_ir.rcdev);
 
@@ -466,7 +466,7 @@ static void serial_ir_timeout(struct timer_list *unused)
 {
 	struct ir_raw_event ev = {
 		.timeout = true,
-		.duration = serial_ir.rcdev->timeout
+		.duration = serial_ir.rcdev->rawir_timeout
 	};
 	ir_raw_event_store_with_filter(serial_ir.rcdev, &ev);
 	ir_raw_event_handle(serial_ir.rcdev);
@@ -526,7 +526,8 @@ static int serial_ir_probe(struct platform_device *dev)
 	rcdev->driver_name = KBUILD_MODNAME;
 	rcdev->map_name = RC_MAP_RC6_MCE;
 	rcdev->min_timeout = 1;
-	rcdev->timeout = IR_DEFAULT_TIMEOUT;
+	rcdev->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	rcdev->keyup_delay = IR_DEFAULT_TIMEOUT;
 	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 	rcdev->rx_resolution = 250;
 

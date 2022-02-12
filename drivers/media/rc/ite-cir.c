@@ -1377,7 +1377,8 @@ static int ite_probe(struct pnp_dev *pdev, const struct pnp_device_id
 	/* FIFO threshold is 17 bytes, so 17 * 8 samples minimum */
 	rdev->min_timeout = 17 * 8 * ITE_BAUDRATE_DIVISOR *
 			    sample_period / 1000;
-	rdev->timeout = IR_DEFAULT_TIMEOUT;
+	rdev->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	rdev->keyup_delay = IR_DEFAULT_TIMEOUT;
 	rdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 	rdev->rx_resolution = ITE_BAUDRATE_DIVISOR * sample_period / 1000;
 	rdev->tx_resolution = ITE_BAUDRATE_DIVISOR * sample_period / 1000;

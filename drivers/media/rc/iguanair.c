@@ -461,7 +461,7 @@ static int iguanair_probe(struct usb_interface *intf,
 	rc->driver_name = KBUILD_MODNAME;
 	rc->map_name = RC_MAP_RC6_MCE;
 	rc->min_timeout = 1;
-	rc->timeout = IR_DEFAULT_TIMEOUT;
+	rc->rawir_timeout = IR_DEFAULT_TIMEOUT;
 	rc->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 	rc->rx_resolution = RX_RESOLUTION;
 

@@ -114,7 +114,8 @@ int picolcd_init_cir(struct picolcd_data *data, struct hid_report *report)
 	rdev->dev.parent       = &data->hdev->dev;
 	rdev->driver_name      = PICOLCD_NAME;
 	rdev->map_name         = RC_MAP_RC6_MCE;
-	rdev->timeout          = MS_TO_US(100);
+	rdev->rawir_timeout    = MS_TO_US(100);
+	rdev->keyup_delay      = MS_TO_US(100);
 	rdev->rx_resolution    = 1;
 
 	ret = rc_register_device(rdev);

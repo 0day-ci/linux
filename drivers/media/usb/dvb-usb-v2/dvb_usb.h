@@ -132,7 +132,8 @@ struct dvb_usb_rc {
 	unsigned int interval;
 	enum rc_driver_type driver_type;
 	bool bulk_mode;
-	int timeout;
+	u32 rawir_timeout;
+	u32 keyup_delay;
 };
 
 /**

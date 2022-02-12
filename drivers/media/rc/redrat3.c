@@ -381,7 +381,7 @@ static void redrat3_process_ir_data(struct redrat3_dev *rr3)
 	/* add a trailing space */
 	rawir.pulse = false;
 	rawir.timeout = true;
-	rawir.duration = rr3->rc->timeout;
+	rawir.duration = rr3->rc->rawir_timeout;
 	dev_dbg(dev, "storing trailing timeout with duration %d\n",
 							rawir.duration);
 	ir_raw_event_store_with_filter(rr3->rc, &rawir);
@@ -948,7 +948,8 @@ static struct rc_dev *redrat3_init_rc_dev(struct redrat3_dev *rr3)
 	rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
 	rc->min_timeout = MS_TO_US(RR3_RX_MIN_TIMEOUT);
 	rc->max_timeout = MS_TO_US(RR3_RX_MAX_TIMEOUT);
-	rc->timeout = redrat3_get_timeout(rr3);
+	rc->rawir_timeout = redrat3_get_timeout(rr3);
+	rc->keyup_delay = rc->rawir_timeout;
 	rc->s_timeout = redrat3_set_timeout;
 	rc->tx_ir = redrat3_transmit_ir;
 	rc->s_tx_carrier = redrat3_set_tx_carrier;

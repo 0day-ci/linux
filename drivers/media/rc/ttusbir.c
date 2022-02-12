@@ -307,7 +307,8 @@ static int ttusbir_probe(struct usb_interface *intf,
 	rc->driver_name = DRIVER_NAME;
 	rc->map_name = RC_MAP_TT_1500;
 	rc->min_timeout = 1;
-	rc->timeout = IR_DEFAULT_TIMEOUT;
+	rc->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	rc->keyup_delay = IR_DEFAULT_TIMEOUT;
 	rc->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 
 	/*

@@ -81,7 +81,7 @@ static void igorplugusb_irdata(struct igorplugusb *ir, unsigned len)
 		} while (i != start);
 
 		/* add a trailing space */
-		rawir.duration = ir->rc->timeout;
+		rawir.duration = ir->rc->rawir_timeout;
 		rawir.pulse = false;
 		ir_raw_event_store_with_filter(ir->rc, &rawir);
 
@@ -204,7 +204,8 @@ static int igorplugusb_probe(struct usb_interface *intf,
 	rc->priv = ir;
 	rc->driver_name = DRIVER_NAME;
 	rc->map_name = RC_MAP_HAUPPAUGE;
-	rc->timeout = MS_TO_US(100);
+	rc->rawir_timeout = MS_TO_US(100);
+	rc->keyup_delay = MS_TO_US(100);
 	rc->rx_resolution = 85;
 
 	ir->rc = rc;

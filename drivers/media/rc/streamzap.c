@@ -198,7 +198,7 @@ static void streamzap_callback(struct urb *urb)
 			if (sz->buf_in[i] == SZ_TIMEOUT) {
 				struct ir_raw_event rawir = {
 					.pulse = false,
-					.duration = sz->rdev->timeout
+					.duration = sz->rdev->rawir_timeout
 				};
 				sz_push(sz, rawir);
 			} else {
@@ -334,7 +334,8 @@ static int streamzap_probe(struct usb_interface *intf,
 
 	sz->decoder_state = PulseSpace;
 	/* FIXME: don't yet have a way to set this */
-	sz->rdev->timeout = SZ_TIMEOUT * SZ_RESOLUTION;
+	sz->rdev->rawir_timeout = SZ_TIMEOUT * SZ_RESOLUTION;
+	sz->rdev->keyup_delay = SZ_TIMEOUT * SZ_RESOLUTION;
 	#if 0
 	/* not yet supported, depends on patches from maxim */
 	/* see also: LIRC_GET_REC_RESOLUTION and LIRC_SET_REC_TIMEOUT */

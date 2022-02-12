@@ -1809,7 +1809,8 @@ static int rtl2832u_get_rc_config(struct dvb_usb_device *d,
 	rc->query = rtl2832u_rc_query;
 	rc->interval = 200;
 	/* we program idle len to 0xc0, set timeout to one less */
-	rc->timeout = 0xbf * 51;
+	rc->rawir_timeout = 0xbf * 51;
+	rc->keyup_delay = MS_TO_US(210);
 
 	return 0;
 }

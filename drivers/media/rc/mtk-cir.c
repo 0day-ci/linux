@@ -343,7 +343,8 @@ static int mtk_ir_probe(struct platform_device *pdev)
 	ir->rc->driver_name = MTK_IR_DEV;
 	ir->rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
 	ir->rc->rx_resolution = MTK_IR_SAMPLE;
-	ir->rc->timeout = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
+	ir->rc->rawir_timeout = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
+	ir->rc->keyup_delay = MTK_MAX_SAMPLES * (MTK_IR_SAMPLE + 1);
 
 	ret = devm_rc_register_device(dev, ir->rc);
 	if (ret) {

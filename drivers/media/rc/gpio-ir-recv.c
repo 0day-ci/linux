@@ -99,7 +99,8 @@ static int gpio_ir_recv_probe(struct platform_device *pdev)
 	rcdev->dev.parent = dev;
 	rcdev->driver_name = KBUILD_MODNAME;
 	rcdev->min_timeout = 1;
-	rcdev->timeout = IR_DEFAULT_TIMEOUT;
+	rcdev->rawir_timeout = IR_DEFAULT_TIMEOUT;
+	rcdev->keyup_delay = MS_TO_US(40);
 	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
 	rcdev->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
 	rcdev->map_name = of_get_property(np, "linux,rc-map-name", NULL);

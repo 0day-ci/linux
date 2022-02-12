@@ -737,7 +737,7 @@ static unsigned int repeat_period(int protocol)
 void rc_repeat(struct rc_dev *dev)
 {
 	unsigned long flags;
-	unsigned int timeout = usecs_to_jiffies(dev->timeout) +
+	unsigned int timeout = usecs_to_jiffies(dev->keyup_delay) +
 		msecs_to_jiffies(repeat_period(dev->last_protocol));
 	struct lirc_scancode sc = {
 		.scancode = dev->last_scancode, .rc_proto = dev->last_protocol,
@@ -855,7 +855,8 @@ void rc_keydown(struct rc_dev *dev, enum rc_proto protocol, u64 scancode,
 	ir_do_keydown(dev, protocol, scancode, keycode, toggle);
 
 	if (dev->keypressed) {
-		dev->keyup_jiffies = jiffies + usecs_to_jiffies(dev->timeout) +
+		dev->keyup_jiffies = jiffies +
+			usecs_to_jiffies(dev->keyup_delay) +
 			msecs_to_jiffies(repeat_period(protocol));
 		mod_timer(&dev->timer_keyup, dev->keyup_jiffies);
 	}
@@ -1715,7 +1716,8 @@ struct rc_dev *rc_allocate_device(enum rc_driver_type type)
 		dev->input_dev->setkeycode = ir_setkeycode;
 		input_set_drvdata(dev->input_dev, dev);
 
-		dev->timeout = IR_DEFAULT_TIMEOUT;
+		dev->rawir_timeout = IR_DEFAULT_TIMEOUT;
+		dev->keyup_delay = IR_DEFAULT_TIMEOUT;
 		timer_setup(&dev->timer_keyup, ir_timer_keyup, 0);
 		timer_setup(&dev->timer_repeat, ir_timer_repeat, 0);
 

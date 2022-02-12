@@ -187,8 +187,8 @@ int ir_raw_event_store_with_filter(struct rc_dev *dev, struct ir_raw_event *ev)
 	}
 
 	/* Enter idle mode if necessary */
-	if (!ev->pulse && dev->timeout &&
-	    dev->raw->this_ev.duration >= dev->timeout)
+	if (!ev->pulse && dev->rawir_timeout &&
+	    dev->raw->this_ev.duration >= dev->rawir_timeout)
 		ir_raw_event_set_idle(dev, true);
 
 	return 1;
@@ -285,7 +285,7 @@ static int change_protocol(struct rc_dev *dev, u64 *rc_proto)
 	if (dev->s_timeout)
 		dev->s_timeout(dev, timeout);
 	else
-		dev->timeout = timeout;
+		dev->rawir_timeout = timeout;
 
 	return 0;
 }
@@ -561,7 +561,7 @@ static void ir_raw_edge_handle(struct timer_list *t)
 
 	spin_lock_irqsave(&dev->raw->edge_spinlock, flags);
 	interval = ktime_sub(ktime_get(), dev->raw->last_event);
-	if (ktime_to_us(interval) >= dev->timeout) {
+	if (ktime_to_us(interval) >= dev->rawir_timeout) {
 		struct ir_raw_event ev = {
 			.timeout = true,
 			.duration = ktime_to_us(interval)
@@ -570,7 +570,7 @@ static void ir_raw_edge_handle(struct timer_list *t)
 		ir_raw_event_store(dev, &ev);
 	} else {
 		mod_timer(&dev->raw->edge_handle,
-			  jiffies + usecs_to_jiffies(dev->timeout -
+			  jiffies + usecs_to_jiffies(dev->rawir_timeout -
 						     ktime_to_us(interval)));
 	}
 	spin_unlock_irqrestore(&dev->raw->edge_spinlock, flags);

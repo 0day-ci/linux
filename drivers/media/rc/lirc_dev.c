@@ -546,15 +546,15 @@ static long lirc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			else if (dev->s_timeout)
 				ret = dev->s_timeout(dev, val);
 			else
-				dev->timeout = val;
+				dev->rawir_timeout = val;
 		}
 		break;
 
 	case LIRC_GET_REC_TIMEOUT:
-		if (!dev->timeout)
+		if (!dev->rawir_timeout)
 			ret = -ENOTTY;
 		else
-			val = dev->timeout;
+			val = dev->rawir_timeout;
 		break;
 
 	case LIRC_SET_REC_TIMEOUT_REPORTS:

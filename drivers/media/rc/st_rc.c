@@ -63,7 +63,10 @@ struct st_rc_device {
 
 static void st_rc_send_lirc_timeout(struct rc_dev *rdev)
 {
-	struct ir_raw_event ev = { .timeout = true, .duration = rdev->timeout };
+	struct ir_raw_event ev = {
+		.timeout = true,
+		.duration = rdev->rawir_timeout
+	};
 	ir_raw_event_store(rdev, &ev);
 }
 
@@ -299,7 +302,8 @@ static int st_rc_probe(struct platform_device *pdev)
 	rdev->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
 	/* rx sampling rate is 10Mhz */
 	rdev->rx_resolution = 100;
-	rdev->timeout = MAX_SYMB_TIME;
+	rdev->rawir_timeout = MAX_SYMB_TIME;
+	rdev->keyup_delay = MAX_SYMB_TIME;
 	rdev->priv = rc_dev;
 	rdev->open = st_rc_open;
 	rdev->close = st_rc_close;

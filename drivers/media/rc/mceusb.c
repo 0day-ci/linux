@@ -1203,7 +1203,7 @@ static void mceusb_handle_command(struct mceusb_dev *ir, u8 *buf_in)
 	switch (subcmd) {
 	/* 2-byte return value commands */
 	case MCE_RSP_EQIRTIMEOUT:
-		ir->rc->timeout = (*hi << 8 | *lo) * MCE_TIME_UNIT;
+		ir->rc->rawir_timeout = (*hi << 8 | *lo) * MCE_TIME_UNIT;
 		break;
 	case MCE_RSP_EQIRNUMPORTS:
 		ir->num_txports = *hi;
@@ -1335,7 +1335,7 @@ static void mceusb_process_ir_data(struct mceusb_dev *ir, int buf_len)
 			} else {
 				struct ir_raw_event ev = {
 					.timeout = 1,
-					.duration = ir->rc->timeout
+					.duration = ir->rc->rawir_timeout
 				};
 
 				if (ir_raw_event_store_with_filter(ir->rc,
@@ -1615,7 +1615,8 @@ static struct rc_dev *mceusb_init_rc_dev(struct mceusb_dev *ir)
 	rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
 	rc->rx_resolution = MCE_TIME_UNIT;
 	rc->min_timeout = MCE_TIME_UNIT;
-	rc->timeout = MS_TO_US(100);
+	rc->rawir_timeout = MS_TO_US(100);
+	rc->keyup_delay = MS_TO_US(100);
 	if (!mceusb_model[ir->model].broken_irtimeout) {
 		rc->s_timeout = mceusb_set_timeout;
 		rc->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
@@ -1624,7 +1625,7 @@ static struct rc_dev *mceusb_init_rc_dev(struct mceusb_dev *ir)
 		 * If we can't set the timeout using CMD_SETIRTIMEOUT, we can
 		 * rely on software timeouts for timeouts < 100ms.
 		 */
-		rc->max_timeout = rc->timeout;
+		rc->max_timeout = rc->rawir_timeout;
 	}
 	if (!ir->flags.no_tx) {
 		rc->s_tx_mask = mceusb_set_tx_mask;
