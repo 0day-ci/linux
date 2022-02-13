@@ -18,6 +18,7 @@ properties:
     enum:
       - brcm,7268-v3d
       - brcm,7278-v3d
+      - brcm,bcm2711-v3d
 
   reg:
     items:
