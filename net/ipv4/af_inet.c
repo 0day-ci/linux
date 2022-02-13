@@ -1425,10 +1425,18 @@ out:
 static struct sk_buff *ipip_gso_segment(struct sk_buff *skb,
 					netdev_features_t features)
 {
+	struct sk_buff *segs;
+	int nhoff;
+
 	if (!(skb_shinfo(skb)->gso_type & SKB_GSO_IPXIP4))
 		return ERR_PTR(-EINVAL);
 
-	return inet_gso_segment(skb, features);
+	nhoff = skb_network_header(skb) - skb_mac_header(skb);
+	segs = inet_gso_segment(skb, features);
+	if (!segs)
+		skb->network_header = skb_mac_header(skb) + nhoff - skb->head;
+
+	return segs;
 }
 
 struct sk_buff *inet_gro_receive(struct list_head *head, struct sk_buff *skb)
