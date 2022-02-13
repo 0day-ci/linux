@@ -6,6 +6,7 @@
  * the WDT and power drivers.
  */
 
+#include <linux/bits.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/mfd/bcm2835-pm.h>
@@ -16,6 +17,9 @@
 #include <linux/platform_device.h>
 #include <linux/types.h>
 #include <linux/watchdog.h>
+
+#define BCM2835		BIT(1)
+#define BCM2711		BIT(2)
 
 static const struct mfd_cell bcm2835_pm_devs[] = {
 	{ .name = "bcm2835-wdt" },
@@ -28,6 +32,8 @@ static const struct mfd_cell bcm2835_power_devs[] = {
 static int bcm2835_pm_get_pdata(struct platform_device *pdev,
 				struct bcm2835_pm *pm)
 {
+	bool is_bcm2711 = (uintptr_t)device_get_match_data(pm->dev) & BCM2711;
+
 	/* If no 'reg-names' property is found we can assume we're using old
 	 * firmware.
 	 */
@@ -41,6 +47,10 @@ static int bcm2835_pm_get_pdata(struct platform_device *pdev,
 		pm->asb = devm_platform_ioremap_resource(pdev, 1);
 		if (IS_ERR(pm->asb))
 			pm->asb = NULL;
+
+		pm->rpivid_asb = devm_platform_ioremap_resource(pdev, 2);
+		if (IS_ERR(pm->rpivid_asb))
+			pm->rpivid_asb = NULL;
 	} else {
 		pm->base = devm_platform_ioremap_resource_byname(pdev, "pm");
 		if (IS_ERR(pm->base))
@@ -49,6 +59,16 @@ static int bcm2835_pm_get_pdata(struct platform_device *pdev,
 		pm->asb = devm_platform_ioremap_resource_byname(pdev, "asb");
 		if (IS_ERR(pm->base))
 			pm->asb = NULL;
+
+		pm->rpivid_asb = devm_platform_ioremap_resource_byname(pdev,
+								      "rpivid_asb");
+		if (IS_ERR(pm->base))
+			pm->rpivid_asb = NULL;
+
+		if (pm->rpivid_asb && !is_bcm2711) {
+			dev_err(pm->dev, "RPiVid ASB support only present in BCM2711\n");
+			return -EINVAL;
+		}
 	}
 
 	return 0;
@@ -89,8 +109,9 @@ static int bcm2835_pm_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id bcm2835_pm_of_match[] = {
-	{ .compatible = "brcm,bcm2835-pm-wdt", },
-	{ .compatible = "brcm,bcm2835-pm", },
+	{ .compatible = "brcm,bcm2835-pm-wdt", .data = (void *)BCM2835},
+	{ .compatible = "brcm,bcm2835-pm", .data = (void *)BCM2835},
+	{ .compatible = "brcm,bcm2711-pm", .data = (void *)BCM2711},
 	{},
 };
 MODULE_DEVICE_TABLE(of, bcm2835_pm_of_match);
