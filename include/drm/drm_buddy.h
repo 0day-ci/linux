@@ -22,6 +22,8 @@
 	start__ >= max__ || size__ > max__ - start__; \
 })
 
+#define DRM_BUDDY_TOPDOWN_ALLOCATION (1 << 0)
+
 struct drm_buddy_block {
 #define DRM_BUDDY_HEADER_OFFSET GENMASK_ULL(63, 12)
 #define DRM_BUDDY_HEADER_STATE  GENMASK_ULL(11, 10)
