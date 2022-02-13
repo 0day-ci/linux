@@ -5270,7 +5270,7 @@ static void drm_parse_vesa_mso_data(struct drm_connector *connector,
 	if (oui(vesa->oui[0], vesa->oui[1], vesa->oui[2]) != VESA_IEEE_OUI)
 		return;
 
-	if (sizeof(*vesa) != sizeof(*block) + block->num_bytes) {
+	if (block->num_bytes < 5) {
 		drm_dbg_kms(connector->dev, "Unexpected VESA vendor block size\n");
 		return;
 	}
@@ -5290,20 +5290,29 @@ static void drm_parse_vesa_mso_data(struct drm_connector *connector,
 		break;
 	}
 
-	if (!info->mso_stream_count) {
-		info->mso_pixel_overlap = 0;
+	info->mso_pixel_overlap = 0;
+
+	if (info->mso_stream_count) {
+		info->mso_pixel_overlap = FIELD_GET(DISPLAYID_VESA_MSO_OVERLAP, vesa->mso);
+		if (info->mso_pixel_overlap > 8) {
+			drm_dbg_kms(connector->dev, "Reserved MSO pixel overlap value %u\n",
+				info->mso_pixel_overlap);
+			info->mso_pixel_overlap = 8;
+		}
+
+		drm_dbg_kms(connector->dev, "MSO stream count %u, pixel overlap %u\n",
+			info->mso_stream_count, info->mso_pixel_overlap);
+	}
+
+	if (block->num_bytes < 7) {
+		/* DSC bpp is optional */
 		return;
 	}
 
-	info->mso_pixel_overlap = FIELD_GET(DISPLAYID_VESA_MSO_OVERLAP, vesa->mso);
-	if (info->mso_pixel_overlap > 8) {
-		drm_dbg_kms(connector->dev, "Reserved MSO pixel overlap value %u\n",
-			    info->mso_pixel_overlap);
-		info->mso_pixel_overlap = 8;
-	}
+	info->dp_dsc_bpp = FIELD_GET(DISPLAYID_VESA_DSC_BPP_INT, vesa->dsc_bpp_int) * 16 +
+		FIELD_GET(DISPLAYID_VESA_DSC_BPP_FRACT, vesa->dsc_bpp_fract);
 
-	drm_dbg_kms(connector->dev, "MSO stream count %u, pixel overlap %u\n",
-		    info->mso_stream_count, info->mso_pixel_overlap);
+	drm_dbg_kms(connector->dev, "DSC bits per pixel %u\n", info->dp_dsc_bpp);
 }
 
 static void drm_update_mso(struct drm_connector *connector, const struct edid *edid)
