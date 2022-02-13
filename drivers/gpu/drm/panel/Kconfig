@@ -178,6 +178,15 @@ config DRM_PANEL_INNOLUX_EJ030NA
           320x480 3.0" panel as found in the RS97 V2.1, RG300(non-ips)
           and LDK handheld gaming consoles.
 
+config DRM_PANEL_INNOLUX_HIMAX8279D
+	tristate "INX 2081101qfh032011-53g 1200x1920 video panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to support for inx 2081101qfh032011-53g
+	  1200x1920 video panel.
+
 config DRM_PANEL_INNOLUX_P079ZCA
 	tristate "Innolux P079ZCA panel"
 	depends on OF
