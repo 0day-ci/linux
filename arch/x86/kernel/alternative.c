@@ -35,7 +35,7 @@ int __read_mostly alternatives_patched;
 
 EXPORT_SYMBOL_GPL(alternatives_patched);
 
-#define MAX_PATCH_LEN (255-1)
+#define MAX_PATCH_LEN 255
 
 static int __initdata_or_module debug_alternative;
 
