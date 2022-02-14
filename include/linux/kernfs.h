@@ -96,6 +96,7 @@ struct kernfs_open_node_lock {
 struct kernfs_global_locks {
 	struct kernfs_open_file_mutex open_file_mutex[NR_KERNFS_LOCKS];
 	struct kernfs_open_node_lock open_node_locks[NR_KERNFS_LOCKS];
+	struct rw_semaphore kernfs_rwsem[NR_KERNFS_LOCKS];
 };
 
 enum kernfs_node_type {
@@ -206,6 +207,7 @@ struct kernfs_node {
 	 */
 	struct kernfs_node	*parent;
 	const char		*name;
+	u8			unlock_parent; /* release parent's rwsem */
 
 	struct rb_node		rb;
 

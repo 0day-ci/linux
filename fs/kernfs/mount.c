@@ -398,6 +398,7 @@ void __init kernfs_lock_init(void)
 	for (count = 0; count < NR_KERNFS_LOCKS; count++) {
 		mutex_init(&kernfs_locks->open_file_mutex[count].lock);
 		spin_lock_init(&kernfs_locks->open_node_locks[count].lock);
+		init_rwsem(&kernfs_locks->kernfs_rwsem[count]);
 	}
 }
 

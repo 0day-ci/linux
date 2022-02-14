@@ -19,6 +19,17 @@
 #include <linux/kernfs.h>
 #include <linux/fs_context.h>
 
+/*
+ * kernfs_rwsem locking pattern:
+ *
+ * KERNFS_RWSEM_LOCK_SELF: lock kernfs_node only.
+ * KERNFS_RWSEM_LOCK_SELF_AND_PARENT: lock kernfs_node and its parent.
+ */
+enum kernfs_rwsem_lock_pattern {
+	KERNFS_RWSEM_LOCK_SELF,
+	KERNFS_RWSEM_LOCK_SELF_AND_PARENT
+};
+
 struct kernfs_iattrs {
 	kuid_t			ia_uid;
 	kgid_t			ia_gid;
@@ -188,6 +199,555 @@ kernfs_open_node_spinlock(struct kernfs_node *kn)
 	spin_lock_irq(lock);
 
 	return lock;
+}
+
+static inline struct rw_semaphore *kernfs_rwsem_ptr(struct kernfs_node *kn)
+{
+	int idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	return &kernfs_locks->kernfs_rwsem[idx];
+}
+
+static inline void kernfs_rwsem_assert_held(struct kernfs_node *kn)
+{
+	lockdep_assert_held(kernfs_rwsem_ptr(kn));
+}
+
+static inline void kernfs_rwsem_assert_held_write(struct kernfs_node *kn)
+{
+	lockdep_assert_held_write(kernfs_rwsem_ptr(kn));
+}
+
+static inline void kernfs_rwsem_assert_held_read(struct kernfs_node *kn)
+{
+	lockdep_assert_held_read(kernfs_rwsem_ptr(kn));
+}
+
+/**
+ * down_write_kernfs_rwsem_for_two_nodes() - Acquire hashed rwsem for 2 nodes
+ *
+ * @kn1: kernfs_node for which hashed rwsem needs to be taken
+ * @kn2: kernfs_node for which hashed rwsem needs to be taken
+ *
+ * In certain cases we need to acquire hashed rwsem for 2 nodes that don't have a
+ * parent child relationship. This is one of the cases of nested locking involving
+ * hashed rwsem and rwsem with lower address is acquired first.
+ */
+static inline void down_write_kernfs_rwsem_for_two_nodes(struct kernfs_node *kn1,
+							 struct kernfs_node *kn2)
+{
+	struct rw_semaphore *rwsem1 = kernfs_rwsem_ptr(kn1);
+	struct rw_semaphore *rwsem2 = kernfs_rwsem_ptr(kn2);
+
+	if (rwsem1 == rwsem2)
+		down_write_nested(rwsem1, 0);
+	else {
+		if (rwsem1 < rwsem2) {
+			down_write_nested(rwsem1, 0);
+			down_write_nested(rwsem2, 1);
+		} else {
+			down_write_nested(rwsem2, 0);
+			down_write_nested(rwsem1, 1);
+		}
+	}
+	kernfs_get(kn1);
+	kernfs_get(kn2);
+}
+
+/**
+ * up_write_kernfs_rwsem_for_two_nodes() - Release hashed rwsem for 2 nodes
+ *
+ * @kn1: kernfs_node for which hashed rwsem needs to be released
+ * @kn2: kernfs_node for which hashed rwsem needs to be released
+ *
+ * In case of nested locking, rwsem with higher address is released first.
+ */
+static inline void up_write_kernfs_rwsem_for_two_nodes(struct kernfs_node *kn1,
+						       struct kernfs_node *kn2)
+{
+	struct rw_semaphore *rwsem1 = kernfs_rwsem_ptr(kn1);
+	struct rw_semaphore *rwsem2 = kernfs_rwsem_ptr(kn2);
+
+	if (rwsem1 == rwsem2)
+		up_write(rwsem1);
+	else {
+		if (rwsem1 > rwsem2) {
+			up_write(rwsem1);
+			up_write(rwsem2);
+		} else {
+			up_write(rwsem2);
+			up_write(rwsem1);
+		}
+	}
+
+	kernfs_put(kn1);
+	kernfs_put(kn2);
+}
+
+/**
+ * down_read_kernfs_rwsem_for_two_nodes() - Acquire hashed rwsem for 2 nodes
+ *
+ * @kn1: kernfs_node for which hashed rwsem needs to be taken
+ * @kn2: kernfs_node for which hashed rwsem needs to be taken
+ *
+ * In certain cases we need to acquire hashed rwsem for 2 nodes that don't have a
+ * parent child relationship. This is one of the cases of nested locking involving
+ * hashed rwsem and rwsem with lower address is acquired first.
+ */
+static inline void down_read_kernfs_rwsem_for_two_nodes(struct kernfs_node *kn1,
+							struct kernfs_node *kn2)
+{
+	struct rw_semaphore *rwsem1 = kernfs_rwsem_ptr(kn1);
+	struct rw_semaphore *rwsem2 = kernfs_rwsem_ptr(kn2);
+
+	if (rwsem1 == rwsem2)
+		down_read_nested(rwsem1, 0);
+	else {
+		if (rwsem1 < rwsem2) {
+			down_read_nested(rwsem1, 0);
+			down_read_nested(rwsem2, 1);
+		} else {
+			down_read_nested(rwsem2, 0);
+			down_read_nested(rwsem1, 1);
+		}
+	}
+	kernfs_get(kn1);
+	kernfs_get(kn2);
+}
+
+/**
+ * up_read_kernfs_rwsem_for_two_nodes() - Release hashed rwsem for 2 nodes
+ *
+ * @kn1: kernfs_node for which hashed rwsem needs to be released
+ * @kn2: kernfs_node for which hashed rwsem needs to be released
+ *
+ * In case of nested locking, rwsem with higher address is released first.
+ */
+static inline void up_read_kernfs_rwsem_for_two_nodes(struct kernfs_node *kn1,
+						       struct kernfs_node *kn2)
+{
+	struct rw_semaphore *rwsem1 = kernfs_rwsem_ptr(kn1);
+	struct rw_semaphore *rwsem2 = kernfs_rwsem_ptr(kn2);
+
+	if (rwsem1 == rwsem2)
+		up_read(rwsem1);
+	else {
+		if (rwsem1 > rwsem2) {
+			up_read(rwsem1);
+			up_read(rwsem2);
+		} else {
+			up_read(rwsem2);
+			up_read(rwsem1);
+		}
+	}
+
+	kernfs_put(kn1);
+	kernfs_put(kn2);
+}
+
+/**
+ * down_write_kernfs_rwsem() - Acquire hashed rwsem
+ *
+ * @kn: kernfs_node for which hashed rwsem needs to be taken
+ * @ptrn: locking pattern i.e whether to lock only given node or to lock
+ *	  node and its parent as well
+ *
+ * In case of nested locking, rwsem with lower address is acquired first.
+ *
+ * Return: void
+ */
+static inline void down_write_kernfs_rwsem(struct kernfs_node *kn,
+				      enum kernfs_rwsem_lock_pattern ptrn)
+{
+	struct rw_semaphore *p_rwsem = NULL;
+	struct rw_semaphore *rwsem = kernfs_rwsem_ptr(kn);
+	int lock_parent = 0;
+
+	if (ptrn == KERNFS_RWSEM_LOCK_SELF_AND_PARENT && kn->parent)
+		lock_parent = 1;
+
+	if (lock_parent)
+		p_rwsem = kernfs_rwsem_ptr(kn->parent);
+
+	if (!lock_parent || rwsem == p_rwsem) {
+		down_write_nested(rwsem, 0);
+		kernfs_get(kn);
+		kn->unlock_parent = 0;
+	} else {
+		/**
+		 * In case of nested locking, locks are taken in order of their
+		 * addresses. lock with lower address is taken first, followed
+		 * by lock with higher address.
+		 */
+		if (rwsem < p_rwsem) {
+			down_write_nested(rwsem, 0);
+			down_write_nested(p_rwsem, 1);
+		} else {
+			down_write_nested(p_rwsem, 0);
+			down_write_nested(rwsem, 1);
+		}
+		kernfs_get(kn);
+		kernfs_get(kn->parent);
+		kn->unlock_parent = 1;
+	}
+}
+
+/**
+ * up_write_kernfs_rwsem() - Release hashed rwsem
+ *
+ * @kn: kernfs_node for which hashed rwsem was taken
+ *
+ * In case of nested locking, rwsem with higher address is released first.
+ *
+ * Return: void
+ */
+static inline void up_write_kernfs_rwsem(struct kernfs_node *kn)
+{
+	struct rw_semaphore *p_rwsem = NULL;
+	struct rw_semaphore *rwsem = kernfs_rwsem_ptr(kn);
+
+	if (kn->unlock_parent) {
+		kn->unlock_parent = 0;
+		p_rwsem = kernfs_rwsem_ptr(kn->parent);
+		if (rwsem > p_rwsem) {
+			up_write(rwsem);
+			up_write(p_rwsem);
+		} else {
+			up_write(p_rwsem);
+			up_write(rwsem);
+		}
+		kernfs_put(kn->parent);
+	} else
+		up_write(rwsem);
+
+	kernfs_put(kn);
+}
+
+/**
+ * down_read_kernfs_rwsem() - Acquire hashed rwsem
+ *
+ * @kn: kernfs_node for which hashed rwsem needs to be taken
+ * @ptrn: locking pattern i.e whether to lock only given node or to lock
+ *	  node and its parent as well
+ *
+ * In case of nested locking, rwsem with lower address is acquired first.
+ *
+ * Return: void
+ */
+static inline void down_read_kernfs_rwsem(struct kernfs_node *kn,
+				      enum kernfs_rwsem_lock_pattern ptrn)
+{
+	struct rw_semaphore *p_rwsem = NULL;
+	struct rw_semaphore *rwsem = kernfs_rwsem_ptr(kn);
+	int lock_parent = 0;
+
+	if (ptrn == KERNFS_RWSEM_LOCK_SELF_AND_PARENT && kn->parent)
+		lock_parent = 1;
+
+	if (lock_parent)
+		p_rwsem = kernfs_rwsem_ptr(kn->parent);
+
+	if (!lock_parent || rwsem == p_rwsem) {
+		down_read_nested(rwsem, 0);
+		kernfs_get(kn);
+		kn->unlock_parent = 0;
+	} else {
+		/**
+		 * In case of nested locking, locks are taken in order of their
+		 * addresses. lock with lower address is taken first, followed
+		 * by lock with higher address.
+		 */
+		if (rwsem < p_rwsem) {
+			down_read_nested(rwsem, 0);
+			down_read_nested(p_rwsem, 1);
+		} else {
+			down_read_nested(p_rwsem, 0);
+			down_read_nested(rwsem, 1);
+		}
+		kernfs_get(kn);
+		kernfs_get(kn->parent);
+		kn->unlock_parent = 1;
+	}
+}
+
+/**
+ * up_read_kernfs_rwsem() - Release hashed rwsem
+ *
+ * @kn: kernfs_node for which hashed rwsem was taken
+ *
+ * In case of nested locking, rwsem with higher address is released first.
+ *
+ * Return: void
+ */
+static inline void up_read_kernfs_rwsem(struct kernfs_node *kn)
+{
+	struct rw_semaphore *p_rwsem = NULL;
+	struct rw_semaphore *rwsem = kernfs_rwsem_ptr(kn);
+
+	if (kn->unlock_parent) {
+		kn->unlock_parent = 0;
+		p_rwsem = kernfs_rwsem_ptr(kn->parent);
+		if (rwsem > p_rwsem) {
+			up_read(rwsem);
+			up_read(p_rwsem);
+		} else {
+			up_read(p_rwsem);
+			up_read(rwsem);
+		}
+		kernfs_put(kn->parent);
+	} else
+		up_read(rwsem);
+
+	kernfs_put(kn);
+}
+
+static inline void kernfs_swap_rwsems(struct rw_semaphore **array, int i, int j)
+{
+	struct rw_semaphore *tmp;
+
+	tmp = array[i];
+	array[i] = array[j];
+	array[j] = tmp;
+}
+
+static inline void kernfs_sort_rwsems(struct rw_semaphore **array)
+{
+	if (array[0] > array[1])
+		kernfs_swap_rwsems(array, 0, 1);
+
+	if (array[0] > array[2])
+		kernfs_swap_rwsems(array, 0, 2);
+
+	if (array[1] > array[2])
+		kernfs_swap_rwsems(array, 1, 2);
+}
+
+/**
+ * down_write_kernfs_rwsem_rename_ns() - take hashed rwsem during
+ * rename or similar operations.
+ *
+ * @kn: kernfs_node of interest
+ * @current_parent: current parent of kernfs_node of interest
+ * @new_parent: about to become new parent of kernfs_node
+ *
+ * During rename or similar operations the parent of a node changes,
+ * and this means we will see different parents of a kernfs_node at
+ * the time of taking and releasing its or its parent's hashed rwsem.
+ * This function separately takes locks corresponding to node, and
+ * corresponding to its current and future parents (if needed).
+ *
+ * Return: void
+ */
+static inline void down_write_kernfs_rwsem_rename_ns(struct kernfs_node *kn,
+					struct kernfs_node *current_parent,
+					struct kernfs_node *new_parent)
+{
+	struct rw_semaphore *array[3];
+
+	array[0] = kernfs_rwsem_ptr(kn);
+	array[1] = kernfs_rwsem_ptr(current_parent);
+	array[2] = kernfs_rwsem_ptr(new_parent);
+
+	if (array[0] == array[1] && array[0] == array[2]) {
+		/* All 3 nodes hash to same rwsem */
+		down_write_nested(array[0], 0);
+	} else {
+		/**
+		 * All 3 nodes are not hashing to the same rwsem, so sort the
+		 * array.
+		 */
+		kernfs_sort_rwsems(array);
+
+		if (array[0] == array[1] || array[1] == array[2]) {
+			/**
+			 * Two nodes hash to same rwsem, and these
+			 * will occupy consecutive places in array after
+			 * sorting.
+			 */
+			down_write_nested(array[0], 0);
+			down_write_nested(array[2], 1);
+		} else {
+			/* All 3 nodes hashe to different rwsems */
+			down_write_nested(array[0], 0);
+			down_write_nested(array[1], 1);
+			down_write_nested(array[2], 2);
+		}
+	}
+
+	kernfs_get(kn);
+	kernfs_get(current_parent);
+	kernfs_get(new_parent);
+}
+
+/**
+ * up_write_kernfs_rwsem_rename_ns() - release hashed rwsem during
+ * rename or similar operations.
+ *
+ * @kn: kernfs_node of interest
+ * @current_parent: current parent of kernfs_node of interest
+ * @old_parent: old parent of kernfs_node
+ *
+ * During rename or similar operations the parent of a node changes,
+ * and this means we will see different parents of a kernfs_node at
+ * the time of taking and releasing its or its parent's hashed rwsem.
+ * This function separately releases locks corresponding to node, and
+ * corresponding to its current and old parents (if needed).
+ *
+ * Return: void
+ */
+static inline void up_write_kernfs_rwsem_rename_ns(struct kernfs_node *kn,
+					struct kernfs_node *current_parent,
+					struct kernfs_node *old_parent)
+{
+	struct rw_semaphore *array[3];
+
+	array[0] = kernfs_rwsem_ptr(kn);
+	array[1] = kernfs_rwsem_ptr(current_parent);
+	array[2] = kernfs_rwsem_ptr(old_parent);
+
+	if (array[0] == array[1] && array[0] == array[2]) {
+		/* All 3 nodes hash to same rwsem */
+		up_write(array[0]);
+	} else {
+		/**
+		 * All 3 nodes are not hashing to the same rwsem, so sort the
+		 * array.
+		 */
+		kernfs_sort_rwsems(array);
+
+		if (array[0] == array[1] || array[1] == array[2]) {
+			/**
+			 * Two nodes hash to same rwsem, and these
+			 * will occupy consecutive places in array after
+			 * sorting.
+			 */
+			up_write(array[2]);
+			up_write(array[0]);
+		} else {
+			/* All 3 nodes hashe to different rwsems */
+			up_write(array[2]);
+			up_write(array[1]);
+			up_write(array[0]);
+		}
+	}
+
+	kernfs_put(old_parent);
+	kernfs_put(current_parent);
+	kernfs_put(kn);
+}
+
+/**
+ * down_read_kernfs_rwsem_rename_ns() - take hashed rwsem during
+ * rename or similar operations.
+ *
+ * @kn: kernfs_node of interest
+ * @current_parent: current parent of kernfs_node of interest
+ * @new_parent: about to become new parent of kernfs_node
+ *
+ * During rename or similar operations the parent of a node changes,
+ * and this means we will see different parents of a kernfs_node at
+ * the time of taking and releasing its or its parent's hashed rwsem.
+ * This function separately takes locks corresponding to node, and
+ * corresponding to its current and future parents (if needed).
+ *
+ * Return: void
+ */
+static inline void down_read_kernfs_rwsem_rename_ns(struct kernfs_node *kn,
+					struct kernfs_node *current_parent,
+					struct kernfs_node *new_parent)
+{
+	struct rw_semaphore *array[3];
+
+	array[0] = kernfs_rwsem_ptr(kn);
+	array[1] = kernfs_rwsem_ptr(current_parent);
+	array[2] = kernfs_rwsem_ptr(new_parent);
+
+	if (array[0] == array[1] && array[0] == array[2]) {
+		/* All 3 nodes hash to same rwsem */
+		down_read_nested(array[0], 0);
+	} else {
+		/**
+		 * All 3 nodes are not hashing to the same rwsem, so sort the
+		 * array.
+		 */
+		kernfs_sort_rwsems(array);
+
+		if (array[0] == array[1] || array[1] == array[2]) {
+			/**
+			 * Two nodes hash to same rwsem, and these
+			 * will occupy consecutive places in array after
+			 * sorting.
+			 */
+			down_read_nested(array[0], 0);
+			down_read_nested(array[2], 1);
+		} else {
+			/* All 3 nodes hashe to different rwsems */
+			down_read_nested(array[0], 0);
+			down_read_nested(array[1], 1);
+			down_read_nested(array[2], 2);
+		}
+	}
+
+	kernfs_get(kn);
+	kernfs_get(current_parent);
+	kernfs_get(new_parent);
+}
+
+/**
+ * up_read_kernfs_rwsem_rename_ns() - release hashed rwsem during
+ * rename or similar operations.
+ *
+ * @kn: kernfs_node of interest
+ * @current_parent: current parent of kernfs_node of interest
+ * @old_parent: old parent of kernfs_node
+ *
+ * During rename or similar operations the parent of a node changes,
+ * and this means we will see different parents of a kernfs_node at
+ * the time of taking and releasing its or its parent's hashed rwsem.
+ * This function separately releases locks corresponding to node, and
+ * corresponding to its current and old parents (if needed).
+ *
+ * Return: void
+ */
+static inline void up_read_kernfs_rwsem_rename_ns(struct kernfs_node *kn,
+					struct kernfs_node *current_parent,
+					struct kernfs_node *old_parent)
+{
+	struct rw_semaphore *array[3];
+
+	array[0] = kernfs_rwsem_ptr(kn);
+	array[1] = kernfs_rwsem_ptr(current_parent);
+	array[2] = kernfs_rwsem_ptr(old_parent);
+
+	if (array[0] == array[1] && array[0] == array[2]) {
+		/* All 3 nodes hash to same rwsem */
+		up_read(array[0]);
+	} else {
+		/**
+		 * All 3 nodes are not hashing to the same rwsem, so sort the
+		 * array.
+		 */
+		kernfs_sort_rwsems(array);
+
+		if (array[0] == array[1] || array[1] == array[2]) {
+			/**
+			 * Two nodes hash to same rwsem, and these
+			 * will occupy consecutive places in array after
+			 * sorting.
+			 */
+			up_read(array[2]);
+			up_read(array[0]);
+		} else {
+			/* All 3 nodes hashe to different rwsems */
+			up_read(array[2]);
+			up_read(array[1]);
+			up_read(array[0]);
+		}
+	}
+
+	kernfs_put(old_parent);
+	kernfs_put(current_parent);
+	kernfs_put(kn);
 }
 
 #endif	/* __KERNFS_INTERNAL_H */
