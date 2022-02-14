@@ -1225,6 +1225,15 @@ int random_offline_cpu(unsigned int cpu)
 	 * since the MIX_INFLIGHT flag will be cleared.
 	 */
 	per_cpu_ptr(&irq_randomness, cpu)->count = 0;
+
+	/*
+	 * We also want to invalidate per-cpu crngs and batches,
+	 * so that if the CPU does come back online, it uses
+	 * fresh entropy.
+	 */
+	per_cpu_ptr(&crngs, cpu)->generation = ULONG_MAX;
+	per_cpu_ptr(&batched_entropy_u32, cpu)->position = UINT_MAX;
+	per_cpu_ptr(&batched_entropy_u64, cpu)->position = UINT_MAX;
 	return 0;
 }
 
