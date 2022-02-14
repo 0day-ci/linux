@@ -1263,6 +1263,7 @@ static unsigned long score_nearby_nodes(struct task_struct *p, int nid,
 {
 	unsigned long score = 0;
 	int node;
+	int sys_max_dist;
 
 	/*
 	 * All nodes are directly connected, and the same distance
@@ -1271,6 +1272,8 @@ static unsigned long score_nearby_nodes(struct task_struct *p, int nid,
 	if (sched_numa_topology_type == NUMA_DIRECT)
 		return 0;
 
+	/* sched_max_numa_distance may be changed in parallel. */
+	sys_max_dist = READ_ONCE(sched_max_numa_distance);
 	/*
 	 * This code is called for each node, introducing N^2 complexity,
 	 * which should be ok given the number of nodes rarely exceeds 8.
@@ -1283,7 +1286,7 @@ static unsigned long score_nearby_nodes(struct task_struct *p, int nid,
 		 * The furthest away nodes in the system are not interesting
 		 * for placement; nid was already counted.
 		 */
-		if (dist == sched_max_numa_distance || node == nid)
+		if (dist >= sys_max_dist || node == nid)
 			continue;
 
 		/*
@@ -1312,8 +1315,8 @@ static unsigned long score_nearby_nodes(struct task_struct *p, int nid,
 		 * This seems to result in good task placement.
 		 */
 		if (sched_numa_topology_type == NUMA_GLUELESS_MESH) {
-			faults *= (sched_max_numa_distance - dist);
-			faults /= (sched_max_numa_distance - LOCAL_DISTANCE);
+			faults *= (sys_max_dist - dist);
+			faults /= (sys_max_dist - LOCAL_DISTANCE);
 		}
 
 		score += faults;
