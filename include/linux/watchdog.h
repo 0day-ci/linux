@@ -139,12 +139,7 @@ static inline bool watchdog_hw_running(struct watchdog_device *wdd)
 	return test_bit(WDOG_HW_RUNNING, &wdd->status);
 }
 
-/* Use the following function to set the nowayout feature */
-static inline void watchdog_set_nowayout(struct watchdog_device *wdd, bool nowayout)
-{
-	if (nowayout)
-		set_bit(WDOG_NO_WAY_OUT, &wdd->status);
-}
+void watchdog_set_nowayout(struct watchdog_device *wdd, bool nowayout);
 
 /* Use the following function to stop the watchdog on reboot */
 static inline void watchdog_stop_on_reboot(struct watchdog_device *wdd)

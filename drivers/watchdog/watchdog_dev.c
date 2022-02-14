@@ -44,6 +44,9 @@
 #include <linux/watchdog.h>	/* For watchdog specific items */
 #include <linux/uaccess.h>	/* For copy_to_user/put_user/... */
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/watchdog.h>
+
 #include "watchdog_core.h"
 #include "watchdog_pretimeout.h"
 
@@ -130,9 +133,11 @@ static inline void watchdog_update_worker(struct watchdog_device *wdd)
 	if (watchdog_need_worker(wdd)) {
 		ktime_t t = watchdog_next_keepalive(wdd);
 
-		if (t > 0)
+		if (t > 0) {
 			hrtimer_start(&wd_data->timer, t,
 				      HRTIMER_MODE_REL_HARD);
+			trace_watchdog_set_keep_alive(wdd, ktime_to_ms(t));
+		}
 	} else {
 		hrtimer_cancel(&wd_data->timer);
 	}
@@ -149,14 +154,16 @@ static int __watchdog_ping(struct watchdog_device *wdd)
 	now = ktime_get();
 
 	if (ktime_after(earliest_keepalive, now)) {
-		hrtimer_start(&wd_data->timer,
-			      ktime_sub(earliest_keepalive, now),
+		ktime_t t = ktime_sub(earliest_keepalive, now);
+		hrtimer_start(&wd_data->timer, t,
 			      HRTIMER_MODE_REL_HARD);
+		trace_watchdog_set_keep_alive(wdd, ktime_to_ms(t));
 		return 0;
 	}
 
 	wd_data->last_hw_keepalive = now;
 
+	trace_watchdog_ping(wdd);
 	if (wdd->ops->ping)
 		err = wdd->ops->ping(wdd);  /* ping the watchdog */
 	else
@@ -215,6 +222,7 @@ static void watchdog_ping_work(struct kthread_work *work)
 	wd_data = container_of(work, struct watchdog_core_data, work);
 
 	mutex_lock(&wd_data->lock);
+	trace_watchdog_keep_alive(wd_data->wdd);
 	if (watchdog_worker_should_ping(wd_data))
 		__watchdog_ping(wd_data->wdd);
 	mutex_unlock(&wd_data->lock);
@@ -251,6 +259,8 @@ static int watchdog_start(struct watchdog_device *wdd)
 		return 0;
 
 	set_bit(_WDOG_KEEPALIVE, &wd_data->status);
+
+	trace_watchdog_start(wdd);
 
 	started_at = ktime_get();
 	if (watchdog_hw_running(wdd) && wdd->ops->ping) {
@@ -298,6 +308,7 @@ static int watchdog_stop(struct watchdog_device *wdd)
 		return -EBUSY;
 	}
 
+	trace_watchdog_stop(wdd);
 	if (wdd->ops->stop) {
 		clear_bit(WDOG_HW_RUNNING, &wdd->status);
 		err = wdd->ops->stop(wdd);
@@ -370,6 +381,7 @@ static int watchdog_set_timeout(struct watchdog_device *wdd,
 	if (watchdog_timeout_invalid(wdd, timeout))
 		return -EINVAL;
 
+	trace_watchdog_set_timeout(wdd, timeout);
 	if (wdd->ops->set_timeout) {
 		err = wdd->ops->set_timeout(wdd, timeout);
 	} else {
@@ -432,6 +444,23 @@ static int watchdog_get_timeleft(struct watchdog_device *wdd,
 	return 0;
 }
 
+/*
+ * watchdog_set_nowayout - set nowaout bit
+ * @wdd:	The watchdog device to set nowayoutbit
+ * @nowayout	A boolean on/off switcher
+ *
+ * If nowayout boolean is true, the nowayout option is set. No action is
+ * taken if nowayout is false.
+ */
+void watchdog_set_nowayout(struct watchdog_device *wdd, bool nowayout)
+{
+	if (nowayout) {
+		set_bit(WDOG_NO_WAY_OUT, &wdd->status);
+		trace_watchdog_nowayout(wdd);
+	}
+}
+EXPORT_SYMBOL(watchdog_set_nowayout);
+
 #ifdef CONFIG_WATCHDOG_SYSFS
 static ssize_t nowayout_show(struct device *dev, struct device_attribute *attr,
 				char *buf)
@@ -457,6 +486,7 @@ static ssize_t nowayout_store(struct device *dev, struct device_attribute *attr,
 	/* nowayout cannot be disabled once set */
 	if (test_bit(WDOG_NO_WAY_OUT, &wdd->status) && !value)
 		return -EPERM;
+
 	watchdog_set_nowayout(wdd, value);
 	return len;
 }
@@ -858,6 +888,8 @@ static int watchdog_open(struct inode *inode, struct file *file)
 		goto out_clear;
 	}
 
+	trace_watchdog_open(wdd);
+
 	err = watchdog_start(wdd);
 	if (err < 0)
 		goto out_mod;
@@ -880,6 +912,7 @@ static int watchdog_open(struct inode *inode, struct file *file)
 	return stream_open(inode, file);
 
 out_mod:
+	trace_watchdog_close(wdd);
 	module_put(wd_data->wdd->ops->owner);
 out_clear:
 	clear_bit(_WDOG_DEV_OPEN, &wd_data->status);
@@ -940,6 +973,7 @@ static int watchdog_release(struct inode *inode, struct file *file)
 	/* make sure that /dev/watchdog can be re-opened */
 	clear_bit(_WDOG_DEV_OPEN, &wd_data->status);
 
+	trace_watchdog_close(wdd);
 done:
 	running = wdd && watchdog_hw_running(wdd);
 	mutex_unlock(&wd_data->lock);
@@ -952,6 +986,7 @@ done:
 		module_put(wd_data->cdev.owner);
 		put_device(&wd_data->dev);
 	}
+
 	return 0;
 }
 
