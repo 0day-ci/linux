@@ -2010,4 +2010,6 @@ struct trace_min_max_param {
 
 extern const struct file_operations trace_min_max_fops;
 
+extern int rv_init_interface(void);
+
 #endif /* _LINUX_KERNEL_TRACE_H */

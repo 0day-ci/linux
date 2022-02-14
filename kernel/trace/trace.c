@@ -9711,6 +9711,10 @@ static __init int tracer_init_tracefs(void)
 
 	update_tracer_options(&global_trace);
 
+#ifdef CONFIG_RV
+	rv_init_interface();
+#endif
+
 	return 0;
 }
 
