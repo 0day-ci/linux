@@ -142,6 +142,12 @@ config CROS_KBD_LED_BACKLIGHT_ACPI
 	help
 	  ChromeOS keyboard backlight ACPI backend.
 
+config CROS_KBD_LED_BACKLIGHT_EC_PWM
+	tristate "ChromeOS keyboard backlight EC PWM backend"
+	depends on CROS_EC && CROS_KBD_LED_BACKLIGHT
+	help
+	  ChromeOS keyboard backlight EC PWM backend.
+
 config CROS_EC_CHARDEV
 	tristate "ChromeOS EC miscdevice"
 	depends on MFD_CROS_EC_DEV
