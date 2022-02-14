@@ -33,39 +33,34 @@ DECLARE_DA_MON_PER_TASK(wwnr, char);
  *
  */
 
-void handle_switch_in(void *data, /* XXX: fill header */)
+static void handle_switch(void *data, bool preempt, struct task_struct *p, struct task_struct *n)
 {
-	pid_t pid = /* XXX how do I get the pid? */;
-	da_handle_event_wwnr(pid, switch_in);
+	int ppid = p->pid;
+	int npid = n->pid;
+
+	if (ppid && ppid < MAX_PID)
+		da_handle_init_event_wwnr(ppid, switch_out);
+
+	if (npid && npid < MAX_PID)
+		da_handle_event_wwnr(npid, switch_in);
 }
 
-void handle_switch_out(void *data, /* XXX: fill header */)
+static void handle_wakeup(void *data, struct task_struct *p)
 {
-	pid_t pid = /* XXX how do I get the pid? */;
-	da_handle_event_wwnr(pid, switch_out);
+	if (p->pid && p->pid < MAX_PID)
+		da_handle_event_wwnr(p->pid, wakeup);
 }
 
-void handle_wakeup(void *data, /* XXX: fill header */)
-{
-	pid_t pid = /* XXX how do I get the pid? */;
-	da_handle_event_wwnr(pid, wakeup);
-}
-
-#define NR_TP   3
+#define NR_TP	2
 static struct tracepoint_hook_helper tracepoints_to_hook[NR_TP] = {
 	{
-		.probe = handle_switch_in,
-		.name = /* XXX: tracepoint name here */,
-		.registered = 0
-	},
-	{
-		.probe = handle_switch_out,
-		.name = /* XXX: tracepoint name here */,
+		.probe = handle_switch,
+		.name = "sched_switch",
 		.registered = 0
 	},
 	{
 		.probe = handle_wakeup,
-		.name = /* XXX: tracepoint name here */,
+		.name = "sched_wakeup",
 		.registered = 0
 	},
 };

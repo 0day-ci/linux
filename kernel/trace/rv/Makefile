@@ -3,3 +3,4 @@
 obj-$(CONFIG_RV) += rv.o
 obj-$(CONFIG_RV_REACTORS) += rv_reactors.o
 obj-$(CONFIG_RV_MON_WIP) += monitor_wip/wip.o
+obj-$(CONFIG_RV_MON_WWNR) += monitor_wwnr/wwnr.o

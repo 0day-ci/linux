@@ -65,6 +65,6 @@ TRACE_EVENT(error_wwnr,
 
 /* This part ust be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH .
+#define TRACE_INCLUDE_PATH ../kernel/trace/rv/monitor_wwnr/
 #define TRACE_INCLUDE_FILE wwnr
 #include <trace/define_trace.h>
