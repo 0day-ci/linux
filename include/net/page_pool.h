@@ -153,6 +153,15 @@ struct page_pool_stats {
 		u64 waive;  /* failed refills due to numa zone mismatch */
 	} alloc;
 };
+
+/*
+ * Drivers that wish to harvest page pool stats and report them to users
+ * (perhaps via ethtool, debugfs, or another mechanism) can allocate a
+ * struct page_pool_stats and call page_pool_get_stats to get the batched pcpu
+ * stats.
+ */
+bool page_pool_get_stats(struct page_pool *pool,
+			 struct page_pool_stats *stats);
 #endif
 
 struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp);
