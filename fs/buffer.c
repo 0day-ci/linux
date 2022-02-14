@@ -1970,7 +1970,8 @@ iomap_to_bh(struct inode *inode, sector_t block, struct buffer_head *bh,
 }
 
 int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
-		get_block_t *get_block, const struct iomap *iomap)
+			get_block_t *get_block, const struct iomap *iomap,
+			unsigned int flags)
 {
 	unsigned from = pos & (PAGE_SIZE - 1);
 	unsigned to = from + len;
@@ -2058,7 +2059,7 @@ int __block_write_begin(struct page *page, loff_t pos, unsigned len,
 		get_block_t *get_block)
 {
 	return __block_write_begin_int(page_folio(page), pos, len, get_block,
-				       NULL);
+				       NULL, 0);
 }
 EXPORT_SYMBOL(__block_write_begin);
 
@@ -2118,7 +2119,7 @@ int block_write_begin(struct address_space *mapping, loff_t pos, unsigned len,
 	if (!page)
 		return -ENOMEM;
 
-	status = __block_write_begin(page, pos, len, get_block);
+	status = __block_write_begin_int(page_folio(page), pos, len, get_block, NULL, flags);
 	if (unlikely(status)) {
 		unlock_page(page);
 		put_page(page);
