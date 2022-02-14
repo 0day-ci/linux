@@ -258,6 +258,21 @@ static int ocelot_setup_tc_cls_matchall(struct ocelot_port_private *priv,
 			return -EEXIST;
 		}
 
+		if ((action->police.notexceed.act_id != FLOW_ACTION_ACCEPT &&
+		     action->police.notexceed.act_id != FLOW_ACTION_PIPE) ||
+		    action->police.exceed.act_id != FLOW_ACTION_DROP) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police action is not supported when conform-exceed is not drop/pipe or drop/ok");
+			return -EOPNOTSUPP;
+		}
+
+		if (action->police.peakrate_bytes_ps ||
+		    action->police.avrate || action->police.overhead) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police action is not supported when peakrate/avrate/overhead is configured");
+			return -EOPNOTSUPP;
+		}
+
 		if (action->police.rate_pkt_ps) {
 			NL_SET_ERR_MSG_MOD(extack,
 					   "QoS offload not support packets per second");

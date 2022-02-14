@@ -1177,6 +1177,23 @@ static int enetc_psfp_parse_clsflower(struct enetc_ndev_priv *priv,
 
 	/* Flow meter and max frame size */
 	if (entryp) {
+		if ((entryp->police.notexceed.act_id != FLOW_ACTION_ACCEPT &&
+		     entryp->police.notexceed.act_id != FLOW_ACTION_PIPE) ||
+		    entryp->police.exceed.act_id != FLOW_ACTION_DROP) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police action is not supported when conform-exceed is not drop/pipe or drop/ok");
+			err = -EOPNOTSUPP;
+			goto free_sfi;
+		}
+
+		if (entryp->police.peakrate_bytes_ps ||
+		    entryp->police.avrate || entryp->police.overhead) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police action is not supported when peakrate/avrate/overhead is configured");
+			err = -EOPNOTSUPP;
+			goto free_sfi;
+		}
+
 		if (entryp->police.rate_pkt_ps) {
 			NL_SET_ERR_MSG_MOD(extack, "QoS offload not support packets per second");
 			err = -EOPNOTSUPP;

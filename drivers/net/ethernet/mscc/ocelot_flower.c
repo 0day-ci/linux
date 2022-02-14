@@ -296,6 +296,22 @@ static int ocelot_flower_parse_action(struct ocelot *ocelot, int port,
 						   "Last action must be GOTO");
 				return -EOPNOTSUPP;
 			}
+
+			if ((a->police.notexceed.act_id != FLOW_ACTION_ACCEPT &&
+			     a->police.notexceed.act_id != FLOW_ACTION_PIPE) ||
+			    a->police.exceed.act_id != FLOW_ACTION_DROP) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police action is not supported when conform-exceed is not drop/pipe or drop/ok");
+				return -EOPNOTSUPP;
+			}
+
+			if (a->police.peakrate_bytes_ps ||
+			    a->police.avrate || a->police.overhead) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police action is not supported when peakrate/avrate/overhead is configured");
+				return -EOPNOTSUPP;
+			}
+
 			if (a->police.rate_pkt_ps) {
 				NL_SET_ERR_MSG_MOD(extack,
 						   "QoS offload not support packets per second");
