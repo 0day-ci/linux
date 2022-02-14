@@ -1522,8 +1522,6 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		default:
 			goto error;
 		}
-		/* unblock any posted writes */
-		temp = readl(ports[wIndex]->addr);
 		break;
 	case ClearPortFeature:
 		if (!wIndex || wIndex > max_ports)
