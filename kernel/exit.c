@@ -953,6 +953,7 @@ struct waitid_info {
 	uid_t uid;
 	int status;
 	int cause;
+	kernel_siginfo_t siginfo;
 };
 
 struct wait_opts {
@@ -964,7 +965,7 @@ struct wait_opts {
 	int			wo_stat;
 	struct rusage		*wo_rusage;
 
-	wait_queue_entry_t		child_wait;
+	wait_queue_entry_t	child_wait;
 	int			notask_error;
 };
 
@@ -1012,11 +1013,16 @@ static int wait_task_zombie(struct wait_opts *wo, struct task_struct *p)
 	int state, status;
 	pid_t pid = task_pid_vnr(p);
 	uid_t uid = from_kuid_munged(current_user_ns(), task_uid(p));
-	struct waitid_info *infop;
+	struct waitid_info *infop = wo->wo_info;
 
 	if (!likely(wo->wo_flags & WEXITED))
 		return 0;
 
+	/* Before WNOWAIT so a copy can be extracted without reaping. */
+	if (unlikely(wo->wo_flags & __WCHILDSIGINFO)) {
+		if (infop && p->last_siginfo)
+			copy_siginfo(&infop->siginfo, p->last_siginfo);
+	}
 	if (unlikely(wo->wo_flags & WNOWAIT)) {
 		status = (p->signal->flags & SIGNAL_GROUP_EXIT)
 			? p->signal->group_exit_code : p->exit_code;
@@ -1121,7 +1127,6 @@ static int wait_task_zombie(struct wait_opts *wo, struct task_struct *p)
 		release_task(p);
 
 out_info:
-	infop = wo->wo_info;
 	if (infop) {
 		if ((status & 0x7f) == 0) {
 			infop->cause = CLD_EXITED;
@@ -1564,7 +1569,7 @@ static long kernel_waitid(int which, pid_t upid, struct waitid_info *infop,
 	unsigned int f_flags = 0;
 
 	if (options & ~(WNOHANG|WNOWAIT|WEXITED|WSTOPPED|WCONTINUED|
-			__WNOTHREAD|__WCLONE|__WALL))
+			__WNOTHREAD|__WCLONE|__WALL|__WCHILDSIGINFO))
 		return -EINVAL;
 	if (!(options & (WEXITED|WSTOPPED|WCONTINUED)))
 		return -EINVAL;
@@ -1636,6 +1641,10 @@ SYSCALL_DEFINE5(waitid, int, which, pid_t, upid, struct siginfo __user *,
 	}
 	if (!infop)
 		return err;
+
+	/* __WCHILDSIGINFO */
+	if (info.siginfo.si_signo)
+		return copy_siginfo_to_user(infop, &info.siginfo);
 
 	if (!user_write_access_begin(infop, sizeof(*infop)))
 		return -EFAULT;
@@ -1779,6 +1788,12 @@ COMPAT_SYSCALL_DEFINE5(waitid,
 
 	if (!infop)
 		return err;
+
+	/* __WCHILDSIGINFO */
+	if (info.siginfo.si_signo)
+		return copy_siginfo_to_user32(
+				(struct compat_siginfo __user *)infop,
+				&info.siginfo);
 
 	if (!user_write_access_begin(infop, sizeof(*infop)))
 		return -EFAULT;
