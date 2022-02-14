@@ -35,6 +35,8 @@ module_param(napi_tx, bool, 0644);
 #define GOOD_PACKET_LEN (ETH_HLEN + VLAN_HLEN + ETH_DATA_LEN)
 #define GOOD_COPY_LEN	128
 
+#define VIRTNET_DEFAULT_MAX_RING_NUM 1024
+
 #define VIRTNET_RX_PAD (NET_IP_ALIGN + NET_SKB_PAD)
 
 /* Amount of XDP headroom to prepend to packets for use by xdp_adjust_head */
@@ -3042,6 +3044,8 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 		if (ctx)
 			ctx[rxq2vq(i)] = true;
 	}
+
+	virtio_set_max_ring_num(vi->vdev, VIRTNET_DEFAULT_MAX_RING_NUM);
 
 	ret = virtio_find_vqs_ctx(vi->vdev, total_vqs, vqs, callbacks,
 				  names, ctx, NULL);
