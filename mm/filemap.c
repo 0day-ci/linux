@@ -2591,10 +2591,15 @@ retry:
 		filemap_get_read_batch(mapping, index, last_index, fbatch);
 	}
 	if (!folio_batch_count(fbatch)) {
+		unsigned int pflags;
+
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
-			return -EAGAIN;
+			pflags = memalloc_noio_save();
 		err = filemap_create_folio(filp, mapping,
 				iocb->ki_pos >> PAGE_SHIFT, fbatch);
+		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
+			memalloc_noio_restore(pflags);
+
 		if (err == AOP_TRUNCATED_PAGE)
 			goto retry;
 		return err;
