@@ -116,9 +116,14 @@ int of_dma_configure_id(struct device *dev, struct device_node *np,
 	u64 dma_start = 0;
 	u64 mask, end, size = 0;
 	bool coherent;
-	int ret;
+	int ret = 0;
 
-	ret = of_dma_get_range(np, &map);
+	/* Don't get a new DMA range map if we already have one */
+	if (dev->dma_range_map)
+		map = dev->dma_range_map;
+	else
+		ret = of_dma_get_range(np, &map);
+
 	if (ret < 0) {
 		/*
 		 * For legacy reasons, we have to assume some devices need
