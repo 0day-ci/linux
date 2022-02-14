@@ -1723,6 +1723,7 @@ static struct virtqueue *vring_create_virtqueue_packed(
 
 		vq->vq.callback = callback;
 		vq->vq.name = name;
+		vq->vq.priv = NULL;
 		vq->indirect = virtio_has_feature(vdev, VIRTIO_RING_F_INDIRECT_DESC) &&
 			!context;
 	}
@@ -2211,6 +2212,7 @@ static int __vring_init_virtqueue(struct virtqueue *_vq,
 	if (!reset) {
 		vq->vq.callback = callback;
 		vq->vq.name = name;
+		vq->vq.priv = NULL;
 		vq->indirect = virtio_has_feature(vdev, VIRTIO_RING_F_INDIRECT_DESC) &&
 			!context;
 	}

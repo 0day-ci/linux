@@ -224,10 +224,12 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 				virtqueue_get_avail_addr(vq),
 				virtqueue_get_used_addr(vq));
 
-	vq->priv = (void __force *)vp_modern_map_vq_notify(mdev, index, NULL);
 	if (!vq->priv) {
-		err = -ENOMEM;
-		goto err_map_notify;
+		vq->priv = (void __force *)vp_modern_map_vq_notify(mdev, index, NULL);
+		if (!vq->priv) {
+			err = -ENOMEM;
+			goto err_map_notify;
+		}
 	}
 
 	if (msix_vec != VIRTIO_MSI_NO_VECTOR) {
