@@ -19,9 +19,6 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 	unsigned int op;
 	sector_t bs_mask, part_offset = 0;
 
-	if (!q)
-		return -ENXIO;
-
 	if (bdev_read_only(bdev))
 		return -EPERM;
 
