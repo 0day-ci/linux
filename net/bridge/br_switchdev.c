@@ -160,6 +160,7 @@ br_switchdev_fdb_notify(struct net_bridge *br,
 }
 
 int br_switchdev_port_vlan_add(struct net_device *dev, u16 vid, u16 flags,
+			       bool changed, u16 old_flags,
 			       struct netlink_ext_ack *extack)
 {
 	struct switchdev_obj_port_vlan v = {
@@ -167,6 +168,8 @@ int br_switchdev_port_vlan_add(struct net_device *dev, u16 vid, u16 flags,
 		.obj.id = SWITCHDEV_OBJ_ID_PORT_VLAN,
 		.flags = flags,
 		.vid = vid,
+		.changed = changed,
+		.old_flags = old_flags,
 	};
 
 	return switchdev_port_obj_add(dev, &v.obj, extack);

@@ -79,8 +79,14 @@ struct switchdev_obj {
 /* SWITCHDEV_OBJ_ID_PORT_VLAN */
 struct switchdev_obj_port_vlan {
 	struct switchdev_obj obj;
+	/* Valid only if @changed is set */
+	u16 old_flags;
 	u16 flags;
 	u16 vid;
+	/* If set, the notifier signifies a change of flags for
+	 * a VLAN that already exists.
+	 */
+	bool changed;
 };
 
 #define SWITCHDEV_OBJ_PORT_VLAN(OBJ) \
