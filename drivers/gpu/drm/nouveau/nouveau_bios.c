@@ -1977,6 +1977,13 @@ static int load_nv17_hw_sequencer_ucode(struct drm_device *dev,
 	if (!hwsq_offset)
 		return 0;
 
+#ifdef __powerpc__
+	/* HWSQ entry 0 fails on PowerBook G4 867 12" (Al) */
+	if (of_machine_is_compatible("PowerBook6,1"))
+		return load_nv17_hwsq_ucode_entry(dev, bios,
+						  hwsq_offset + sz, 1);
+#endif
+
 	/* always use entry 0? */
 	return load_nv17_hwsq_ucode_entry(dev, bios, hwsq_offset + sz, 0);
 }
