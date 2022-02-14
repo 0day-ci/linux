@@ -2069,6 +2069,10 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 			*wait_bh++=bh;
 		}
 	}
+
+	/* No wait specified, don't wait for reads to complete. */
+	if (!err && wait_bh > wait && (flags & AOP_FLAGS_NOWAIT))
+		return -EAGAIN;
 	/*
 	 * If we issued read requests - let them complete.
 	 */
@@ -2143,8 +2147,11 @@ int block_write_begin(struct address_space *mapping, loff_t pos, unsigned len,
 	int status;
 
 	page = grab_cache_page_write_begin(mapping, index, flags);
-	if (!page)
+	if (!page) {
+		if (flags & AOP_FLAGS_NOWAIT)
+			return -EAGAIN;
 		return -ENOMEM;
+	}
 
 	status = __block_write_begin_int(page_folio(page), pos, len, get_block, NULL, flags);
 	if (unlikely(status)) {
