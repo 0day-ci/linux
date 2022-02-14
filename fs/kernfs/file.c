@@ -857,7 +857,7 @@ repeat:
 
 	root = kernfs_root(kn);
 	/* kick fsnotify */
-	down_write(&root->kernfs_rwsem);
+	down_write_kernfs_rwsem(kn, KERNFS_RWSEM_LOCK_SELF);
 
 	down_write(&root->supers_rwsem);
 	list_for_each_entry(info, &kernfs_root(kn)->supers, node) {
@@ -897,7 +897,7 @@ repeat:
 	}
 	up_write(&root->supers_rwsem);
 
-	up_write(&root->kernfs_rwsem);
+	up_write_kernfs_rwsem(kn);
 	kernfs_put(kn);
 	goto repeat;
 }

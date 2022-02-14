@@ -113,12 +113,11 @@ static int kernfs_getlink(struct inode *inode, char *path)
 	struct kernfs_node *kn = inode->i_private;
 	struct kernfs_node *parent = kn->parent;
 	struct kernfs_node *target = kn->symlink.target_kn;
-	struct kernfs_root *root = kernfs_root(parent);
 	int error;
 
-	down_read(&root->kernfs_rwsem);
+	down_read_kernfs_rwsem(parent, KERNFS_RWSEM_LOCK_SELF);
 	error = kernfs_get_target_path(parent, target, path);
-	up_read(&root->kernfs_rwsem);
+	up_read_kernfs_rwsem(parent);
 
 	return error;
 }
