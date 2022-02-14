@@ -108,6 +108,10 @@ struct lock_class {
 	 */
 	struct list_head		locks_after, locks_before;
 
+	/*
+	 * All the fields that require re-initialization after being zapped
+	 * must be put after "key".
+	 */
 	const struct lockdep_subclass_key *key;
 	unsigned int			subclass;
 	unsigned int			dep_gen_id;

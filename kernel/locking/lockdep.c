@@ -6011,13 +6011,15 @@ static void zap_class(struct pending_free *pf, struct lock_class *class)
 
 static void reinit_class(struct lock_class *class)
 {
+	const unsigned int key_offset = offsetof(struct lock_class, key);
+
 	WARN_ON_ONCE(!class->lock_entry.next);
 	WARN_ON_ONCE(!list_empty(&class->locks_after));
 	WARN_ON_ONCE(!list_empty(&class->locks_before));
+	BUILD_BUG_ON(offsetof(struct lock_class, lock_entry) > key_offset);
+	BUILD_BUG_ON(offsetof(struct lock_class, locks_after) > key_offset);
+	BUILD_BUG_ON(offsetof(struct lock_class, locks_before) > key_offset);
 	memset_startat(class, 0, key);
-	WARN_ON_ONCE(!class->lock_entry.next);
-	WARN_ON_ONCE(!list_empty(&class->locks_after));
-	WARN_ON_ONCE(!list_empty(&class->locks_before));
 }
 
 static inline int within(const void *addr, void *start, unsigned long size)
