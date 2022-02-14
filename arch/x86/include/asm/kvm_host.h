@@ -971,10 +971,10 @@ enum hv_tsc_page_status {
 	HV_TSC_PAGE_GUEST_CHANGED,
 	/* TSC page MSR was written by KVM userspace, update pending */
 	HV_TSC_PAGE_HOST_CHANGED,
+	/* TSC page needs to be updated due to internal KVM changes */
+	HV_TSC_PAGE_KVM_CHANGED,
 	/* TSC page was properly set up and is currently active  */
 	HV_TSC_PAGE_SET,
-	/* TSC page is currently being updated and therefore is inactive */
-	HV_TSC_PAGE_UPDATING,
 	/* TSC page was set up with an inaccessible GPA */
 	HV_TSC_PAGE_BROKEN,
 };
