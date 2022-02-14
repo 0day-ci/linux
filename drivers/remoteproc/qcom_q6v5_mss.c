@@ -12,6 +12,7 @@
 #include <linux/devcoredump.h>
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
+#include <linux/interconnect.h>
 #include <linux/kernel.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
@@ -125,6 +126,18 @@
 #define QDSP6SS_BOOT_CMD                0x404
 #define BOOT_FSM_TIMEOUT                10000
 
+struct interconnect_info {
+	struct icc_path *path;
+	u32 average_bandwidth;
+	u32 peak_bandwidth;
+};
+
+struct qcom_mss_icc_res {
+	const char *name;
+	u32 average_bandwidth;
+	u32 peak_bandwidth;
+};
+
 struct reg_info {
 	struct regulator *reg;
 	int uV;
@@ -142,6 +155,7 @@ struct rproc_hexagon_res {
 	struct qcom_mss_reg_res *proxy_supply;
 	struct qcom_mss_reg_res *fallback_proxy_supply;
 	struct qcom_mss_reg_res *active_supply;
+	struct qcom_mss_icc_res *proxy_path;
 	char **proxy_clk_names;
 	char **reset_clk_names;
 	char **active_clk_names;
@@ -201,6 +215,9 @@ struct q6v5 {
 	int active_reg_count;
 	int proxy_reg_count;
 	int fallback_proxy_reg_count;
+
+	struct interconnect_info interconnect[1];
+	int proxy_path_count;
 
 	bool dump_mba_loaded;
 	size_t current_dump_size;
@@ -262,6 +279,29 @@ static int q6v5_regulator_init(struct device *dev, struct reg_info *regs,
 
 		regs[i].uV = reg_res[i].uV;
 		regs[i].uA = reg_res[i].uA;
+	}
+
+	return i;
+}
+
+static int q6v5_interconnect_init(struct device *dev, struct interconnect_info *interconnect,
+				  const struct qcom_mss_icc_res *icc_res)
+{
+	struct icc_path *path;
+	int i;
+
+	for (i = 0; icc_res[i].name; i++) {
+		path = devm_of_icc_get(dev, icc_res[i].name);
+		if (IS_ERR(path)) {
+			int ret = PTR_ERR(path);
+
+			dev_err_probe(dev, ret, "Failed to get %s interconnect\n", icc_res[i].name);
+			return ret;
+		}
+
+		interconnect[i].path = path;
+		interconnect[i].average_bandwidth = icc_res[i].average_bandwidth;
+		interconnect[i].peak_bandwidth = icc_res[i].peak_bandwidth;
 	}
 
 	return i;
@@ -362,6 +402,36 @@ static void q6v5_clk_disable(struct device *dev,
 
 	for (i = 0; i < count; i++)
 		clk_disable_unprepare(clks[i]);
+}
+
+static int q6v5_icc_enable(struct device *dev, struct interconnect_info *interconnect, int count)
+{
+	int ret;
+	int i;
+
+	for (i = 0; i < count; i++) {
+		ret = icc_set_bw(interconnect[i].path, interconnect[i].average_bandwidth,
+				 interconnect[i].peak_bandwidth);
+		if (ret)
+			dev_err(dev, "Failed enabling %s interconnect\n",
+				icc_get_name(interconnect[i].path));
+		goto err;
+	}
+
+	return 0;
+err:
+	for (i--; i >= 0; i--)
+		icc_set_bw(interconnect[i].path, 0, 0);
+
+	return ret;
+}
+
+static void q6v5_icc_disable(struct device *dev, struct interconnect_info *interconnect, int count)
+{
+	int i;
+
+	for (i = 0; i < count; i++)
+		icc_set_bw(interconnect[i].path, 0, 0);
 }
 
 static int q6v5_pds_enable(struct q6v5 *qproc, struct device **pds,
@@ -1011,10 +1081,14 @@ static int q6v5_mba_load(struct q6v5 *qproc)
 	if (ret)
 		return ret;
 
+	ret = q6v5_icc_enable(qproc->dev, qproc->interconnect, qproc->proxy_path_count);
+	if (ret)
+		goto disable_irqs;
+
 	ret = q6v5_pds_enable(qproc, qproc->proxy_pds, qproc->proxy_pd_count);
 	if (ret < 0) {
 		dev_err(qproc->dev, "failed to enable proxy power domains\n");
-		goto disable_irqs;
+		goto disable_path;
 	}
 
 	ret = q6v5_regulator_enable(qproc, qproc->fallback_proxy_regs,
@@ -1158,6 +1232,8 @@ disable_fallback_proxy_reg:
 			       qproc->fallback_proxy_reg_count);
 disable_proxy_pds:
 	q6v5_pds_disable(qproc, qproc->proxy_pds, qproc->proxy_pd_count);
+disable_path:
+	q6v5_icc_disable(qproc->dev, qproc->interconnect, qproc->proxy_path_count);
 disable_irqs:
 	qcom_q6v5_unprepare(&qproc->q6v5);
 
@@ -1232,6 +1308,7 @@ static void q6v5_mba_reclaim(struct q6v5 *qproc)
 				       qproc->fallback_proxy_reg_count);
 		q6v5_regulator_disable(qproc, qproc->proxy_regs,
 				       qproc->proxy_reg_count);
+		q6v5_icc_disable(qproc->dev, qproc->interconnect, qproc->proxy_path_count);
 	}
 }
 
@@ -1611,6 +1688,7 @@ static void qcom_msa_handover(struct qcom_q6v5 *q6v5)
 	q6v5_regulator_disable(qproc, qproc->fallback_proxy_regs,
 			       qproc->fallback_proxy_reg_count);
 	q6v5_pds_disable(qproc, qproc->proxy_pds, qproc->proxy_pd_count);
+	q6v5_icc_disable(qproc->dev, qproc->interconnect, qproc->proxy_path_count);
 }
 
 static int q6v5_init_mem(struct q6v5 *qproc, struct platform_device *pdev)
@@ -1942,6 +2020,13 @@ static int q6v5_probe(struct platform_device *pdev)
 	}
 	qproc->active_reg_count = ret;
 
+	ret = q6v5_interconnect_init(&pdev->dev, qproc->interconnect, desc->proxy_path);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to get proxy interconnects.\n");
+		goto free_rproc;
+	}
+	qproc->proxy_path_count = ret;
+
 	ret = q6v5_pds_attach(&pdev->dev, qproc->proxy_pds,
 			      desc->proxy_pd_names);
 	/* Fallback to regulators for old device trees */
@@ -2076,6 +2161,14 @@ static const struct rproc_hexagon_res sc7280_mss = {
 		"cx",
 		"mss",
 		NULL
+	},
+	.proxy_path = (struct qcom_mss_icc_res[]) {
+		{
+			.name = "imem",
+			.average_bandwidth = 0,
+			.peak_bandwidth = 8532000,
+		},
+		{}
 	},
 	.need_mem_protection = true,
 	.has_alt_reset = false,
