@@ -84,6 +84,7 @@ static int qcom_a7pll_probe(struct platform_device *pdev)
 
 static const struct of_device_id qcom_a7pll_match_table[] = {
 	{ .compatible = "qcom,sdx55-a7pll" },
+	{ .compatible = "qcom,sdx65-a7pll" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, qcom_a7pll_match_table);
