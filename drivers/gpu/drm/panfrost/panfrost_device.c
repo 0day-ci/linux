@@ -126,7 +126,10 @@ static void panfrost_pm_domain_fini(struct panfrost_device *pfdev)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(pfdev->pm_domain_devs); i++) {
+	if (!pfdev->pm_domain_devs || !pfdev->pm_domain_links)
+		return;
+
+	for (i = 0; i < pfdev->comp->num_pm_domains; i++) {
 		if (!pfdev->pm_domain_devs[i])
 			break;
 
@@ -160,9 +163,12 @@ static int panfrost_pm_domain_init(struct panfrost_device *pfdev)
 		return -EINVAL;
 	}
 
-	if (WARN(num_domains > ARRAY_SIZE(pfdev->pm_domain_devs),
-			"Too many supplies in compatible structure.\n"))
-		return -EINVAL;
+	pfdev->pm_domain_devs = devm_kcalloc(pfdev->dev, num_domains,
+					     sizeof(*pfdev->pm_domain_devs),
+					     GFP_KERNEL);
+	pfdev->pm_domain_links = devm_kcalloc(pfdev->dev, num_domains,
+					      sizeof(*pfdev->pm_domain_links),
+					      GFP_KERNEL);
 
 	for (i = 0; i < num_domains; i++) {
 		pfdev->pm_domain_devs[i] =

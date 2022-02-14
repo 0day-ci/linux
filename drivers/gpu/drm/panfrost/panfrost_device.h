@@ -22,7 +22,6 @@ struct panfrost_job;
 struct panfrost_perfcnt;
 
 #define NUM_JOB_SLOTS 3
-#define MAX_PM_DOMAINS 3
 
 struct panfrost_features {
 	u16 id;
@@ -87,8 +86,8 @@ struct panfrost_device {
 	struct regulator_bulk_data *regulators;
 	struct reset_control *rstc;
 	/* pm_domains for devices with more than one. */
-	struct device *pm_domain_devs[MAX_PM_DOMAINS];
-	struct device_link *pm_domain_links[MAX_PM_DOMAINS];
+	struct device **pm_domain_devs;
+	struct device_link **pm_domain_links;
 	bool coherent;
 
 	struct panfrost_features features;
