@@ -37,4 +37,12 @@ config RV_REACTORS
 	  tracing reactions, printing the monitor output via tracepoints,
 	  but other reactions can be added (on-demand) via this interface.
 
+config RV_REACT_PRINTK
+	tristate "Printk reactor"
+	depends on RV_REACTORS
+	default y if RV_REACTORS
+	help
+	  Enables the printk reactor. The printk reactor emmits a printk()
+	  message if an exception is found.
+
 endif # RV
