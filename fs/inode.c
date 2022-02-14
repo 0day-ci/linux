@@ -1588,17 +1588,9 @@ EXPORT_SYMBOL(find_inode_rcu);
  * @sb:		Super block of file system to search
  * @ino:	The inode number to match
  *
- * Search for the inode specified by @hashval and @data in the inode cache,
- * where the helper function @test will return 0 if the inode does not match
- * and 1 if it does.  The @test function must be responsible for taking the
- * i_lock spin_lock and checking i_state for an inode being freed or being
- * initialized.
+ * Search for the inode specified by @ino in the inode cache.
  *
- * If successful, this will return the inode for which the @test function
- * returned 1 and NULL otherwise.
- *
- * The @test function is not permitted to take a ref on any inode presented.
- * It is also not permitted to sleep.
+ * If successful, this will return the inode, NULL otherwise.
  *
  * The caller must hold the RCU read lock.
  */
