@@ -42,6 +42,7 @@
 #include <linux/ramfs.h>
 #include <linux/page_idle.h>
 #include <linux/migrate.h>
+#include <linux/sched/mm.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include "internal.h"
@@ -1986,6 +1987,10 @@ no_page:
 			gfp |= __GFP_WRITE;
 		if (fgp_flags & FGP_NOFS)
 			gfp &= ~__GFP_FS;
+		if (fgp_flags & FGP_NOWAIT) {
+			gfp |= GFP_ATOMIC;
+			gfp &= ~__GFP_DIRECT_RECLAIM;
+		}
 
 		folio = filemap_alloc_folio(gfp, 0);
 		if (!folio)
