@@ -183,6 +183,29 @@ For the compatible string below the following supplies are required:
 	qcom,sdm845-mss-pil:
 		    must be "cx", "mx", "mss"
 
+- interconnects:
+	Usage: required
+	Value type: <phandle>
+	Definition: reference to the source and destination nodes of the interconnect paths
+		    that match the interconnect-names. See also interconnect/interconnect.txt
+
+- interconnect-names:
+	Usage: required
+	Value type: <stringlist>
+	Definition: The interconnects needed depend on the compatible string:
+	qcom,ipq8074-wcss-pil:
+	qcom,qcs404-wcss-pil:
+	qcom,q6v5-pil:
+	qcom,msm8916-mss-pil:
+	qcom,msm8974-mss-pil:
+	qcom,msm8996-mss-pil:
+	qcom,msm8998-mss-pil:
+	qcom,sc7180-mss-pil:
+	qcom,sdm845-mss-pil:
+		    no interconnect names required
+	qcom,sc7280-mss-pil:
+		    must be "imem"
+
 - qcom,qmp:
 	Usage: optional
 	Value type: <phandle>
