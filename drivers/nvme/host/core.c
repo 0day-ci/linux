@@ -4573,6 +4573,8 @@ static void nvme_set_queue_dying(struct nvme_ns *ns)
 	if (test_and_set_bit(NVME_NS_DEAD, &ns->flags))
 		return;
 
+	set_bit(GD_DEAD, &ns->disk->state);
+
 	blk_set_queue_dying(ns->queue);
 	nvme_start_ns_queue(ns);
 
