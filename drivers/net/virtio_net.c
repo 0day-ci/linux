@@ -2306,6 +2306,55 @@ static void virtnet_get_ringparam(struct net_device *dev,
 	ring->tx_pending = virtqueue_get_vring_size(vi->sq[0].vq);
 }
 
+static int virtnet_set_ringparam(struct net_device *dev,
+				 struct ethtool_ringparam *ring,
+				 struct kernel_ethtool_ringparam *kernel_ring,
+				 struct netlink_ext_ack *extack)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	u32 rx_pending, tx_pending;
+	int i, err;
+
+	if (ring->rx_mini_pending || ring->rx_jumbo_pending)
+		return -EINVAL;
+
+	rx_pending = virtqueue_get_vring_size(vi->rq[0].vq);
+	tx_pending = virtqueue_get_vring_size(vi->sq[0].vq);
+
+	if (ring->rx_pending == rx_pending &&
+	    ring->tx_pending == tx_pending)
+		return 0;
+
+	if (ring->rx_pending > virtqueue_get_vring_max_size(vi->rq[0].vq))
+		return -EINVAL;
+
+	if (ring->tx_pending > virtqueue_get_vring_max_size(vi->sq[0].vq))
+		return -EINVAL;
+
+	if (!is_power_of_2(ring->rx_pending))
+		return -EINVAL;
+
+	if (!is_power_of_2(ring->tx_pending))
+		return -EINVAL;
+
+	for (i = 0; i < vi->max_queue_pairs; i++) {
+		if (ring->tx_pending != tx_pending) {
+			virtio_set_max_ring_num(vi->vdev, ring->tx_pending);
+			err = virtnet_tx_vq_reset(vi, i);
+			if (err)
+				return err;
+		}
+
+		if (ring->rx_pending != rx_pending) {
+			virtio_set_max_ring_num(vi->vdev, ring->rx_pending);
+			err = virtnet_rx_vq_reset(vi, i);
+			if (err)
+				return err;
+		}
+	}
+
+	return 0;
+}
 
 static void virtnet_get_drvinfo(struct net_device *dev,
 				struct ethtool_drvinfo *info)
@@ -2539,6 +2588,7 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.get_drvinfo = virtnet_get_drvinfo,
 	.get_link = ethtool_op_get_link,
 	.get_ringparam = virtnet_get_ringparam,
+	.set_ringparam = virtnet_set_ringparam,
 	.get_strings = virtnet_get_strings,
 	.get_sset_count = virtnet_get_sset_count,
 	.get_ethtool_stats = virtnet_get_ethtool_stats,
