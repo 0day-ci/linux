@@ -1682,13 +1682,27 @@ static inline int block_size_bits(unsigned int blocksize)
 	return ilog2(blocksize);
 }
 
-static struct buffer_head *create_page_buffers(struct page *page, struct inode *inode, unsigned int b_state)
+static struct buffer_head *create_page_buffers(struct page *page,
+					struct inode *inode,
+					unsigned int b_state,
+					unsigned int aop_flags)
 {
 	BUG_ON(!PageLocked(page));
 
-	if (!page_has_buffers(page))
-		create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
-				     b_state);
+	if (!page_has_buffers(page)) {
+		gfp_t gfp = GFP_NOFS | __GFP_ACCOUNT;
+
+		if (aop_flags & AOP_FLAGS_NOWAIT) {
+			gfp |= GFP_ATOMIC | __GFP_NOWARN;
+			gfp &= ~__GFP_DIRECT_RECLAIM;
+		} else {
+			gfp |= __GFP_NOFAIL;
+		}
+
+		__create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
+				     b_state, gfp);
+	}
+
 	return page_buffers(page);
 }
 
@@ -1734,7 +1748,7 @@ int __block_write_full_page(struct inode *inode, struct page *page,
 	int write_flags = wbc_to_write_flags(wbc);
 
 	head = create_page_buffers(page, inode,
-					(1 << BH_Dirty)|(1 << BH_Uptodate));
+					(1 << BH_Dirty)|(1 << BH_Uptodate), 0);
 
 	/*
 	 * Be very careful.  We have no exclusion from __set_page_dirty_buffers
@@ -2000,7 +2014,7 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 	BUG_ON(to > PAGE_SIZE);
 	BUG_ON(from > to);
 
-	head = create_page_buffers(&folio->page, inode, 0);
+	head = create_page_buffers(&folio->page, inode, 0, flags);
 	blocksize = head->b_size;
 	bbits = block_size_bits(blocksize);
 
@@ -2280,7 +2294,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	int nr, i;
 	int fully_mapped = 1;
 
-	head = create_page_buffers(page, inode, 0);
+	head = create_page_buffers(page, inode, 0, 0);
 	blocksize = head->b_size;
 	bbits = block_size_bits(blocksize);
 
