@@ -243,6 +243,7 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 		v = readq(base + FME_HDR_CAP);
 		port_num = FIELD_GET(FME_CAP_NUM_PORTS, v);
 
+		dev_info(&pcidev->dev, "port_num = %d\n", port_num);
 		WARN_ON(port_num > MAX_DFL_FPGA_PORT_NUM);
 
 		for (i = 0; i < port_num; i++) {
@@ -258,6 +259,13 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 			 */
 			bar = FIELD_GET(FME_PORT_OFST_BAR_ID, v);
 			offset = FIELD_GET(FME_PORT_OFST_DFH_OFST, v);
+			if (bar >= PCI_STD_NUM_BARS) {
+				dev_info(&pcidev->dev, "skipping port without local BAR space %d\n",
+					 bar);
+				continue;
+			} else {
+				dev_info(&pcidev->dev, "BAR %d offset %u\n", bar, offset);
+			}
 			start = pci_resource_start(pcidev, bar) + offset;
 			len = pci_resource_len(pcidev, bar) - offset;
 
