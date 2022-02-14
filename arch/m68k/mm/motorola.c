@@ -400,12 +400,9 @@ void __init paging_init(void)
 
 	/* Fix the cache mode in the page descriptors for the 680[46]0.  */
 	if (CPU_IS_040_OR_060) {
-		int i;
 #ifndef mm_cachebits
 		mm_cachebits = _PAGE_CACHE040;
 #endif
-		for (i = 0; i < 16; i++)
-			pgprot_val(protection_map[i]) |= _PAGE_CACHE040;
 	}
 
 	min_addr = m68k_memory[0].addr;
@@ -483,3 +480,48 @@ void __init paging_init(void)
 	max_zone_pfn[ZONE_DMA] = memblock_end_of_DRAM();
 	free_area_init(max_zone_pfn);
 }
+
+/*
+ * The m68k can't do page protection for execute, and considers that
+ * the same are read. Also, write permissions imply read permissions.
+ * This is the closest we can get..
+ */
+pgprot_t vm_get_page_prot(unsigned long vm_flags)
+{
+	unsigned long cachebits = 0;
+
+	if (CPU_IS_040_OR_060)
+		cachebits = _PAGE_CACHE040;
+
+	switch (vm_flags & (VM_READ | VM_WRITE | VM_EXEC | VM_SHARED)) {
+	case VM_NONE:
+		return __pgprot(pgprot_val(PAGE_NONE_C) | cachebits);
+	case VM_READ:
+		return __pgprot(pgprot_val(PAGE_READONLY_C) | cachebits);
+	case VM_WRITE:
+	case VM_WRITE | VM_READ:
+		return __pgprot(pgprot_val(PAGE_COPY_C) | cachebits);
+	case VM_EXEC:
+	case VM_EXEC | VM_READ:
+		return __pgprot(pgprot_val(PAGE_READONLY_C) | cachebits);
+	case VM_EXEC | VM_WRITE:
+	case VM_EXEC | VM_WRITE | VM_READ:
+		return __pgprot(pgprot_val(PAGE_COPY_C) | cachebits);
+	case VM_SHARED:
+		return __pgprot(pgprot_val(PAGE_NONE_C) | cachebits);
+	case VM_SHARED | VM_READ:
+		return __pgprot(pgprot_val(PAGE_READONLY_C) | cachebits);
+	case VM_SHARED | VM_WRITE:
+	case VM_SHARED | VM_WRITE | VM_READ:
+		return __pgprot(pgprot_val(PAGE_SHARED_C) | cachebits);
+	case VM_SHARED | VM_EXEC:
+	case VM_SHARED | VM_EXEC | VM_READ:
+		return __pgprot(pgprot_val(PAGE_READONLY_C) | cachebits);
+	case VM_SHARED | VM_EXEC | VM_WRITE:
+	case VM_SHARED | VM_EXEC | VM_WRITE | VM_READ:
+		return __pgprot(pgprot_val(PAGE_SHARED_C) | cachebits);
+	default:
+		BUILD_BUG();
+	}
+}
+EXPORT_SYMBOL(vm_get_page_prot);

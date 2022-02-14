@@ -128,3 +128,107 @@ void __init mem_init(void)
 	memblock_free_all();
 	init_pointer_tables();
 }
+
+#ifdef CONFIG_COLDFIRE
+/*
+ * Page protections for initialising protection_map. See mm/mmap.c
+ * for use. In general, the bit positions are xwr, and P-items are
+ * private, the S-items are shared.
+ */
+pgprot_t vm_get_page_prot(unsigned long vm_flags)
+{
+	switch (vm_flags & (VM_READ | VM_WRITE | VM_EXEC | VM_SHARED)) {
+	case VM_NONE:
+		return PAGE_NONE;
+	case VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE);
+	case VM_WRITE:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_WRITABLE);
+	case VM_WRITE | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE | CF_PAGE_WRITABLE);
+	case VM_EXEC:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_EXEC);
+	case VM_EXEC | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE | CF_PAGE_EXEC);
+	case VM_EXEC | VM_WRITE:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_WRITABLE | CF_PAGE_EXEC);
+	case VM_EXEC | VM_WRITE | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE | CF_PAGE_WRITABLE |
+				CF_PAGE_EXEC);
+	case VM_SHARED:
+		return PAGE_NONE;
+	case VM_SHARED | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE);
+	case VM_SHARED | VM_WRITE:
+		return PAGE_SHARED;
+	case VM_SHARED | VM_WRITE | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE | CF_PAGE_SHARED);
+	case VM_SHARED | VM_EXEC:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_EXEC);
+	case VM_SHARED | VM_EXEC | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE | CF_PAGE_EXEC);
+	case VM_SHARED | VM_EXEC | VM_WRITE:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_SHARED | CF_PAGE_EXEC);
+	case VM_SHARED | VM_EXEC | VM_WRITE | VM_READ:
+		return __pgprot(CF_PAGE_VALID | CF_PAGE_ACCESSED |
+				CF_PAGE_READABLE | CF_PAGE_SHARED |
+				CF_PAGE_EXEC);
+	default:
+		BUILD_BUG();
+	}
+}
+#endif
+
+#ifdef CONFIG_SUN3
+/*
+ * Page protections for initialising protection_map. The sun3 has only two
+ * protection settings, valid (implying read and execute) and writeable. These
+ * are as close as we can get...
+ */
+pgprot_t vm_get_page_prot(unsigned long vm_flags)
+{
+	switch (vm_flags & (VM_READ | VM_WRITE | VM_EXEC | VM_SHARED)) {
+	case VM_NONE:
+		return PAGE_NONE;
+	case VM_READ:
+		return PAGE_READONLY;
+	case VM_WRITE:
+	case VM_WRITE | VM_READ:
+		return PAGE_COPY;
+	case VM_EXEC:
+	case VM_EXEC | VM_READ:
+		return PAGE_READONLY;
+	case VM_EXEC | VM_WRITE:
+	case VM_EXEC | VM_WRITE | VM_READ:
+		return PAGE_COPY;
+	case VM_SHARED:
+		return PAGE_NONE;
+	case VM_SHARED | VM_READ:
+		return PAGE_READONLY;
+	case VM_SHARED | VM_WRITE:
+	case VM_SHARED | VM_WRITE | VM_READ:
+		return PAGE_SHARED;
+	case VM_SHARED | VM_EXEC:
+	case VM_SHARED | VM_EXEC | VM_READ:
+		return PAGE_READONLY;
+	case VM_SHARED | VM_EXEC | VM_WRITE:
+	case VM_SHARED | VM_EXEC | VM_WRITE | VM_READ:
+		return PAGE_SHARED;
+	default:
+		BUILD_BUG();
+	}
+}
+#endif
+EXPORT_SYMBOL(vm_get_page_prot);
