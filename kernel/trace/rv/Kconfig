@@ -30,6 +30,15 @@ config RV_MON_WWNR
 	  illustrates the usage of per-task monitor. The model is
 	  broken on purpose: it serves to test reactors.
 
+config RV_MON_SAFE_WTD
+	tristate "Safety watchdog"
+	help
+	  Enable safe_wtd, this monitor observes the interaction
+	  between a user-space safety monitor and a watchdog device.
+
+	  For futher information see:
+	    Documentation/trace/rv/safety-monitor.rst
+
 config RV_REACTORS
 	bool "Runtime verification reactors"
 	default y if RV
