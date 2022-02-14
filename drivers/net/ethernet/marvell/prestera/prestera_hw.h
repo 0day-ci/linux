@@ -5,6 +5,7 @@
 #define _PRESTERA_HW_H_
 
 #include <linux/types.h>
+#include "prestera.h"
 #include "prestera_acl.h"
 
 enum prestera_accept_frm_type {
