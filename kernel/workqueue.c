@@ -2787,6 +2787,37 @@ static bool flush_workqueue_prep_pwqs(struct workqueue_struct *wq,
 	return wait;
 }
 
+static void warn_if_flushing_global_workqueue(struct workqueue_struct *wq)
+{
+#ifdef CONFIG_PROVE_LOCKING
+	static DEFINE_RATELIMIT_STATE(flush_warn_rs, 600 * HZ, 1);
+	const char *name;
+
+	if (wq == system_wq)
+		name = "system_wq";
+	else if (wq == system_highpri_wq)
+		name = "system_highpri_wq";
+	else if (wq == system_long_wq)
+		name = "system_long_wq";
+	else if (wq == system_unbound_wq)
+		name = "system_unbound_wq";
+	else if (wq == system_freezable_wq)
+		name = "system_freezable_wq";
+	else if (wq == system_power_efficient_wq)
+		name = "system_power_efficient_wq";
+	else if (wq == system_freezable_power_efficient_wq)
+		name = "system_freezable_power_efficient_wq";
+	else
+		return;
+	ratelimit_set_flags(&flush_warn_rs, RATELIMIT_MSG_ON_RELEASE);
+	if (!__ratelimit(&flush_warn_rs))
+		return;
+	pr_warn("Since system-wide WQ is shared, flushing system-wide WQ can introduce unexpected locking dependency. Please replace %s usage in your code with your local WQ.\n",
+		name);
+	dump_stack();
+#endif
+}
+
 /**
  * flush_workqueue - ensure that any scheduled work has run to completion.
  * @wq: workqueue to flush
@@ -2805,6 +2836,8 @@ void flush_workqueue(struct workqueue_struct *wq)
 
 	if (WARN_ON(!wq_online))
 		return;
+
+	warn_if_flushing_global_workqueue(wq);
 
 	lock_map_acquire(&wq->lockdep_map);
 	lock_map_release(&wq->lockdep_map);
