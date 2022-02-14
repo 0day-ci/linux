@@ -63,6 +63,15 @@ config QCOM_CLK_APCS_SDX55
 	  Say Y if you want to support CPU frequency scaling on devices
 	  such as SDX55.
 
+config QCOM_CLK_APCS_SDX65
+        tristate "SDX65 APCS Clock Controller"
+        depends on QCOM_APCS_IPC || COMPILE_TEST
+        help
+          Support for the APCS Clock Controller on SDX65 platform. The
+          APCS is managing the mux and divider which feeds the CPUs.
+          Say Y if you want to support CPU frequency scaling on devices
+          such as SDX65.
+
 config QCOM_CLK_RPM
 	tristate "RPM based Clock Controller"
 	depends on MFD_QCOM_RPM
