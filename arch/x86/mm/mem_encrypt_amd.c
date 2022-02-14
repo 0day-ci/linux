@@ -188,10 +188,6 @@ void __init sme_early_init(void)
 
 	__supported_pte_mask = __sme_set(__supported_pte_mask);
 
-	/* Update the protection map with memory encryption mask */
-	for (i = 0; i < ARRAY_SIZE(protection_map); i++)
-		protection_map[i] = pgprot_encrypted(protection_map[i]);
-
 	if (cc_platform_has(CC_ATTR_GUEST_MEM_ENCRYPT))
 		swiotlb_force = SWIOTLB_FORCE;
 }
