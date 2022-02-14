@@ -245,7 +245,7 @@ static int psp_acquire_i2c_bus(void)
 	if (psp_i2c_access_count) {
 		psp_i2c_access_count++;
 		goto cleanup;
-	};
+	}
 
 	status = psp_send_i2c_req(PSP_I2C_REQ_ACQUIRE);
 	if (status) {
