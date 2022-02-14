@@ -18494,6 +18494,7 @@ SUNPLUS USB EHCI DRIVER
 M:	Vincent Shih <vincent.sunplus@gmail.com>
 L:	linux-usb@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/nvmem/sunplus,sp7021-ocotp.yaml
 F:	drivers/usb/host/ehci-sunplus.c
 
 SUPERH

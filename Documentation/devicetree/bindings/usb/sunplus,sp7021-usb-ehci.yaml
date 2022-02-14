@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/sunplus,sp7021-usb-ehci.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sunplus SP7021 EHCI Device Tree bindings for ehci0/ehci1
+
+maintainers:
+  - Vincent Shih <vincent.sunplus@gmail.com>
+
+allOf:
+  - $ref: usb-hcd.yaml#
+
+properties:
+  compatible:
+    enum:
+      - sunplus,sp7021-usb-ehci0
+      - sunplus,sp7021-usb-ehci1
+
+  clocks:
+    maxItems: 2
+
+  clock-names:
+    items:
+      - const: USB2_USBC0
+      - const: USB2_UPHY0
+
+  reg:
+    maxItems: 4
+
+  interrupts:
+    maxItems: 1
+
+  nvmem-cell-names:
+    description: names corresponding to the nvmem cells of disconnect voltage
+    const: disc_vol
+
+  nvmem-cells:
+    description: nvmem cell address of disconnect voltage
+    maxItems: 1
+
+required:
+  - compatible
+  - clocks
+  - reg
+  - interrupts
+  - nvmem-cell-names
+  - nvmem-cells
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    sp_ehci0: usb@9c102100 {
+      compatible = "sunplus,sp7021-usb-ehci0";
+      clocks = <&clkc 0x3a>, <&clkc 0x3d>;
+      clock-names = "USB2_USBC0", "USB2_UPHY0";
+      reg = <0x9c102100 0x68>, <0x9c004a80 0x80>,
+               <0x9c000000 0x80>, <0x9c000200 0x80>;
+      interrupt-parent = <&intc>;
+      interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;
+      nvmem-cell-names = "disc_vol";
+      nvmem-cells = <&disc_vol>;
+    };
+...
