@@ -251,6 +251,11 @@ struct padded_vnet_hdr {
 	char padding[4];
 };
 
+static void virtnet_sq_free_unused_bufs(struct virtnet_info *vi,
+					struct send_queue *sq);
+static void virtnet_rq_free_unused_bufs(struct virtnet_info *vi,
+					struct receive_queue *rq);
+
 static bool is_xdp_frame(void *ptr)
 {
 	return (unsigned long)ptr & VIRTIO_XDP_FLAG;
@@ -1369,6 +1374,9 @@ static void virtnet_napi_enable(struct virtqueue *vq, struct napi_struct *napi)
 {
 	napi_enable(napi);
 
+	if (vq->reset)
+		return;
+
 	/* If all buffers were filled by other side before we napi_enabled, we
 	 * won't get another interrupt, so process any outstanding packets now.
 	 * Call local_bh_enable after to trigger softIRQ processing.
@@ -1413,6 +1421,10 @@ static void refill_work(struct work_struct *work)
 		struct receive_queue *rq = &vi->rq[i];
 
 		napi_disable(&rq->napi);
+		if (rq->vq->reset) {
+			virtnet_napi_enable(rq->vq, &rq->napi);
+			continue;
+		}
 		still_empty = !try_fill_recv(vi, rq, GFP_KERNEL);
 		virtnet_napi_enable(rq->vq, &rq->napi);
 
@@ -1521,6 +1533,9 @@ static void virtnet_poll_cleantx(struct receive_queue *rq)
 	struct netdev_queue *txq = netdev_get_tx_queue(vi->dev, index);
 
 	if (!sq->napi.weight || is_xdp_raw_buffer_queue(vi, index))
+		return;
+
+	if (sq->vq->reset)
 		return;
 
 	if (__netif_tx_trylock(txq)) {
@@ -1767,6 +1782,114 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	return NETDEV_TX_OK;
+}
+
+static int virtnet_rx_vq_disable(struct virtnet_info *vi,
+				 struct receive_queue *rq)
+{
+	int err;
+
+	napi_disable(&rq->napi);
+
+	err = virtio_reset_vq(rq->vq);
+	if (err)
+		goto err;
+
+	virtnet_rq_free_unused_bufs(vi, rq);
+
+	vring_release_virtqueue(rq->vq);
+
+	return 0;
+
+err:
+	virtnet_napi_enable(rq->vq, &rq->napi);
+	return err;
+}
+
+static int virtnet_tx_vq_disable(struct virtnet_info *vi,
+				 struct send_queue *sq)
+{
+	struct netdev_queue *txq;
+	int err, qindex;
+
+	qindex = sq - vi->sq;
+
+	txq = netdev_get_tx_queue(vi->dev, qindex);
+	__netif_tx_lock_bh(txq);
+
+	netif_stop_subqueue(vi->dev, qindex);
+	virtnet_napi_tx_disable(&sq->napi);
+
+	err = virtio_reset_vq(sq->vq);
+	if (err) {
+		virtnet_napi_tx_enable(vi, sq->vq, &sq->napi);
+		netif_start_subqueue(vi->dev, qindex);
+
+		__netif_tx_unlock_bh(txq);
+		return err;
+	}
+	__netif_tx_unlock_bh(txq);
+
+	virtnet_sq_free_unused_bufs(vi, sq);
+
+	vring_release_virtqueue(sq->vq);
+
+	return 0;
+}
+
+static int virtnet_tx_vq_enable(struct virtnet_info *vi, struct send_queue *sq)
+{
+	int err;
+
+	err = virtio_enable_resetq(sq->vq);
+	if (!err)
+		netif_start_subqueue(vi->dev, sq - vi->sq);
+
+	virtnet_napi_tx_enable(vi, sq->vq, &sq->napi);
+
+	return err;
+}
+
+static int virtnet_rx_vq_enable(struct virtnet_info *vi,
+				struct receive_queue *rq)
+{
+	int err;
+
+	err = virtio_enable_resetq(rq->vq);
+
+	virtnet_napi_enable(rq->vq, &rq->napi);
+
+	return err;
+}
+
+static int virtnet_rx_vq_reset(struct virtnet_info *vi, int i)
+{
+	int err;
+
+	err = virtnet_rx_vq_disable(vi, vi->rq + i);
+	if (err)
+		return err;
+
+	err = virtnet_rx_vq_enable(vi, vi->rq + i);
+	if (err)
+		netdev_err(vi->dev,
+			   "enable rx reset vq fail: rx queue index: %d err: %d\n", i, err);
+	return err;
+}
+
+static int virtnet_tx_vq_reset(struct virtnet_info *vi, int i)
+{
+	int err;
+
+	err = virtnet_tx_vq_disable(vi, vi->sq + i);
+	if (err)
+		return err;
+
+	err = virtnet_tx_vq_enable(vi, vi->sq + i);
+	if (err)
+		netdev_err(vi->dev,
+			   "enable tx reset vq fail: tx queue index: %d err: %d\n", i, err);
+	return err;
 }
 
 /*
