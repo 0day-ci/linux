@@ -10,6 +10,12 @@
 #include <linux/mod_devicetable.h>
 #include <linux/gfp.h>
 
+enum virtqueue_reset_stage {
+	VIRTQUEUE_RESET_STAGE_NONE,
+	VIRTQUEUE_RESET_STAGE_DEVICE,
+	VIRTQUEUE_RESET_STAGE_RELEASE,
+};
+
 /**
  * virtqueue - a queue to register buffers for sending or receiving.
  * @list: the chain of virtqueues for this device
@@ -32,6 +38,7 @@ struct virtqueue {
 	unsigned int index;
 	unsigned int num_free;
 	void *priv;
+	enum virtqueue_reset_stage reset;
 };
 
 int virtqueue_add_outbuf(struct virtqueue *vq,
@@ -195,4 +202,9 @@ void unregister_virtio_driver(struct virtio_driver *drv);
 #define module_virtio_driver(__virtio_driver) \
 	module_driver(__virtio_driver, register_virtio_driver, \
 			unregister_virtio_driver)
+/*
+ * Resets a virtqueue. Just frees the ring, not free vq.
+ * This function must be called after reset_vq().
+ */
+void vring_release_virtqueue(struct virtqueue *vq);
 #endif /* _LINUX_VIRTIO_H */

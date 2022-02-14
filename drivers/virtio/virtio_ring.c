@@ -1730,6 +1730,7 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	vq->vq.vdev = vdev;
 	vq->vq.num_free = num;
 	vq->vq.index = index;
+	vq->vq.reset = VIRTQUEUE_RESET_STAGE_NONE;
 	vq->we_own_ring = true;
 	vq->notify = notify;
 	vq->weak_barriers = weak_barriers;
@@ -2218,6 +2219,7 @@ static int __vring_init_virtqueue(struct virtqueue *_vq,
 	vq->vq.vdev = vdev;
 	vq->vq.num_free = vring.num;
 	vq->vq.index = index;
+	vq->vq.reset = VIRTQUEUE_RESET_STAGE_NONE;
 	vq->we_own_ring = false;
 	vq->notify = notify;
 	vq->weak_barriers = weak_barriers;
@@ -2397,10 +2399,24 @@ void vring_del_virtqueue(struct virtqueue *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
 
-	__vring_del_virtqueue(vq);
+	if (_vq->reset != VIRTQUEUE_RESET_STAGE_RELEASE)
+		__vring_del_virtqueue(vq);
 	kfree(vq);
 }
 EXPORT_SYMBOL_GPL(vring_del_virtqueue);
+
+void vring_release_virtqueue(struct virtqueue *_vq)
+{
+	struct vring_virtqueue *vq = to_vvq(_vq);
+
+	if (_vq->reset != VIRTQUEUE_RESET_STAGE_DEVICE)
+		return;
+
+	__vring_del_virtqueue(vq);
+
+	_vq->reset = VIRTQUEUE_RESET_STAGE_RELEASE;
+}
+EXPORT_SYMBOL_GPL(vring_release_virtqueue);
 
 /* Manipulates transport-specific feature bits. */
 void vring_transport_features(struct virtio_device *vdev)
