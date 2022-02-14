@@ -91,6 +91,7 @@ allOf:
         compatible:
           enum:
             - qcom,sdx55-apcs-gcc
+            - qcom,sdx65-apcs-gcc
     then:
       properties:
         clocks:
