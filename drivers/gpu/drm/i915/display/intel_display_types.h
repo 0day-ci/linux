@@ -634,9 +634,6 @@ struct intel_plane_state {
 
 	struct intel_fb_view view;
 
-	/* Indicates if async flip is required */
-	bool do_async_flip;
-
 	/* Plane pxp decryption state */
 	bool decrypt;
 
@@ -971,6 +968,9 @@ struct intel_crtc_state {
 	bool fifo_changed; /* FIFO split is changed */
 	bool preload_luts;
 	bool inherited; /* state inherited from BIOS? */
+
+	/* Ask the hardware to actually async flip? */
+	bool do_async_flip;
 
 	/* Pipe source size (ie. panel fitter input size)
 	 * All planes will be positioned inside this space,
