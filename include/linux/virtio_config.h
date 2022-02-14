@@ -201,6 +201,36 @@ static inline bool virtio_has_dma_quirk(const struct virtio_device *vdev)
 	return !virtio_has_feature(vdev, VIRTIO_F_ACCESS_PLATFORM);
 }
 
+/**
+ * virtio_set_max_ring_num - set max ring num
+ * @vdev: the device
+ * @num: max ring num. Zero clear the limit.
+ *
+ * When creating a virtqueue, use this value as the upper limit of ring num.
+ *
+ * Returns 0 on success or error status
+ */
+static inline
+int virtio_set_max_ring_num(struct virtio_device *vdev, u16 num)
+{
+	if (!num) {
+		vdev->max_ring_num = num;
+		return 0;
+	}
+
+	if (!virtio_has_feature(vdev, VIRTIO_F_RING_PACKED)) {
+		if (!is_power_of_2(num)) {
+			num = __rounddown_pow_of_two(num);
+
+			if (!num)
+				return -EINVAL;
+		}
+	}
+
+	vdev->max_ring_num = num;
+	return 0;
+}
+
 static inline
 struct virtqueue *virtio_find_single_vq(struct virtio_device *vdev,
 					vq_callback_t *c, const char *n)

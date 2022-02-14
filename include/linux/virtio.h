@@ -127,6 +127,7 @@ struct virtio_device {
 	struct list_head vqs;
 	u64 features;
 	void *priv;
+	u16 max_ring_num;
 };
 
 static inline struct virtio_device *dev_to_virtio(struct device *_dev)

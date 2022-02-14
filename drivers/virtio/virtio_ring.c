@@ -943,6 +943,9 @@ static struct virtqueue *vring_create_virtqueue_split(
 	size_t queue_size_in_bytes;
 	struct vring vring;
 
+	if (vdev->max_ring_num && num > vdev->max_ring_num)
+		num = vdev->max_ring_num;
+
 	/* We assume num is a power of 2. */
 	if (num & (num - 1)) {
 		dev_warn(&vdev->dev, "Bad virtqueue length %u\n", num);
@@ -1691,6 +1694,9 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	struct vring_packed_desc_event *driver, *device;
 	dma_addr_t ring_dma_addr, driver_event_dma_addr, device_event_dma_addr;
 	size_t ring_size_in_bytes, event_size_in_bytes;
+
+	if (vdev->max_ring_num && num > vdev->max_ring_num)
+		num = vdev->max_ring_num;
 
 	ring_size_in_bytes = num * sizeof(struct vring_packed_desc);
 
