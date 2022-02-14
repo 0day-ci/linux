@@ -878,6 +878,54 @@ static int virtio_balloon_register_shrinker(struct virtio_balloon *vb)
 	return register_shrinker(&vb->shrinker);
 }
 
+static ssize_t balloon_size_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct virtio_device *vdev = container_of(dev, struct virtio_device, dev);
+	u32 num_pages;
+
+	/*
+	 * Read the size directly from the balloon's configuration.
+	 * The caller expects the balloon size enforced by the host,
+	 * not the actual balloon size
+	 */
+	virtio_cread(vdev, struct virtio_balloon_config, num_pages,
+		     &num_pages);
+
+	return sprintf(buf, "0x%x", num_pages);
+}
+
+static ssize_t balloon_size_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct virtio_device *vdev = container_of(dev, struct virtio_device, dev);
+	u32 num_pages;
+	int err;
+
+	err = kstrtou32(buf, 0, &num_pages);
+
+	if (err < 0) {
+		dev_err(dev, "Failed to read balloon size from file\n");
+		return err;
+	}
+
+	/*
+	 * Write num_pages back to the balloon's config section
+	 */
+	virtio_cwrite_le(vdev, struct virtio_balloon_config, num_pages,
+		      &num_pages);
+
+	/*
+	 * Signal to the balloon that the configuration has changed.
+	 * This triggers any necessary resizing actions
+	 */
+	virtballoon_changed(vdev);
+
+	return count;
+}
+static DEVICE_ATTR_RW(balloon_size);
+
 static int virtballoon_probe(struct virtio_device *vdev)
 {
 	struct virtio_balloon *vb;
@@ -1015,12 +1063,19 @@ static int virtballoon_probe(struct virtio_device *vdev)
 			goto out_unregister_oom;
 	}
 
+	err = device_create_file(&vb->vdev->dev, &dev_attr_balloon_size);
+	if (err)
+		goto out_unregister_page_reporting;
+
 	virtio_device_ready(vdev);
 
 	if (towards_target(vb))
 		virtballoon_changed(vdev);
 	return 0;
 
+out_unregister_page_reporting:
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_REPORTING))
+		page_reporting_unregister(&vb->pr_dev_info);
 out_unregister_oom:
 	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_DEFLATE_ON_OOM))
 		unregister_oom_notifier(&vb->oom_nb);
