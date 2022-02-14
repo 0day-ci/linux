@@ -58,7 +58,10 @@ interface to FPGA, e.g. the FPGA Management Engine (FME) and Port (more
 descriptions on FME and Port in later sections).
 
 Accelerated Function Unit (AFU) represents an FPGA programmable region and
-always connects to a FIU (e.g. a Port) as its child as illustrated above.
+always connects to a FIU (e.g. a Port) as its child as illustrated above, but
+on IOFS design, it introducing Port Gasket which contains AFUs. For DFL perspective,
+the Next_AFU pointer on FIU feature header can point to NULL so the AFU is not
+connects to a FIU(more descriptions on IOFS in later section).
 
 Private Features represent sub features of the FIU and AFU. They could be
 various function blocks with different IDs, but all private features which
@@ -134,6 +137,9 @@ reconfigurable region containing an AFU. It controls the communication from SW
 to the accelerator and exposes features such as reset and debug. Each FPGA
 device may have more than one port, but always one AFU per port.
 
+On IOFS, it introducing a new hardware unit, Port Gasket, which contains all
+the PR specific modules and regions (more descriptions on IOFS in later section).
+
 
 AFU
 ===
@@ -142,6 +148,9 @@ used for accelerator-specific control registers.
 
 User-space applications can acquire exclusive access to an AFU attached to a
 port by using open() on the port device node and release it using close().
+
+On IOFS, the AFU is embedded in a Port Gasket. The AFU resource can expose via
+VFs with SRIOV support (more descriptions on IOFS in later section).
 
 The following functions are exposed through ioctls:
 
@@ -284,7 +293,8 @@ FME is always accessed through the physical function (PF).
 
 Ports (and related AFUs) are accessed via PF by default, but could be exposed
 through virtual function (VF) devices via PCIe SRIOV. Each VF only contains
-1 Port and 1 AFU for isolation. Users could assign individual VFs (accelerators)
+1 Port (On IOFS design, the VF is designs without Port) and 1 AFU for isolation.
+Users could assign individual VFs (accelerators)
 created via PCIe SRIOV interface, to virtual machines.
 
 The driver organization in virtualization case is illustrated below:
@@ -389,6 +399,91 @@ The device nodes used for ioctl() or mmap() can be referenced through::
 	/sys/class/fpga_region/<regionX>/<dfl-fme.n>/dev
 	/sys/class/fpga_region/<regionX>/<dfl-port.n>/dev
 
+Intel Open FPGA stack
+=====================
+Intel Open FPGA stack aka IOFS, Intel's version of a common core set of
+RTL to allow customers to easily interface to logic and IP on the FPGA.
+IOFS leverage the DFL for the implementation of the FPGA RTL design.
+
+IOFS designs allow for the arrangement of software interfaces across multiple
+PCIe endpoints. Some of these interfaces may be PFs defined in the static region
+that connect to interfaces in an IP that is loaded via Partial Reconfiguration (PR).
+And some of these interfaces may be VFs defined in the PR region that can be
+reconfigured by the end-user. Furthermore, these PFs/VFs may also be arranged
+using a DFL such that features may be discovered and accessed in user space
+(with the aid of a generic kernel driver like vfio-pci). The diagram below depicts
+an example design with two PFs and two VFs. In this example, PF1 implements its
+MMIO space such that it is compatible with the VirtIO framework. The other functions,
+VF0 and VF1, leverage VFIO to export the MMIO space to an application or a hypervisor.
+
+     +-----------------+  +--------------+  +-------------+  +------------+
+     | FPGA Managerment|  |   VirtIO     |  |  User App   |  | Virtual    |
+     |      App        |  |     App      |  |             |  | Machine    |
+     +--------+--------+  +------+-------+  +------+------+  +-----+------+
+              |                  |                 |               |
+              |                  |                 |               |
+     +--------+--------+  +------+-------+  +------+------+        |
+     |     DFL Driver  |  |VirtIO driver |  |    VFIO     |        |
+     +--------+--------+  +------+-------+  +------+------+        |
+              |                  |                 |               |
+              |                  |                 |               |
+     +--------+--------+  +------+-------+  +------+------+   +----+------+
+     |     PF0         |  |     PF1      |  |   PF0_VF0   |   |  PF0_VF1  |
+     +-----------------+  +--------------+  +-------------+   +-----------+
+
+On IOFS, it introducing some enhancements compared with original DFL design.
+1. It introducing Port Gasket in PF0 which is responsible for FPGA management,
+like FME and Port management. The Port Gasket contains all the PR specific modules
+and logic, e.g., PR slot reset/freeze control, user clock, remote STP etc.
+Architecturally, a Port Gasket can have multiple PR slots where user workload can
+be programmed into.
+2. To expend the scalable of FPGA, it can support multiple FPs in static region
+which contain some static functions like VirtIO, diagnostic test, and access over
+VFIO or assigned to VMs easily. Those PFs will not have a Port Unit which without
+PR region (AFU) connected to those PFs, and the end-user cannot partial reconfigurate
+those PFs.
+3. In our previous DFL design, it can only create one VF based in an AFU. To raise
+the efficiency usage of AFU, it can create more than one VFs in an AFU via PCIe
+SRIOV, so those VFs share the PR region and resource.
+
+There is one reference architecture design for IOFS as illustrated below:
+
+                              +----------------------+
+                              |   PF/VF mux/demux    |
+                              +--+--+-----+------+-+-+
+                                 |  |     |      | |
+        +------------------------+  |     |      | |
+  PF0   |                 +---------+   +-+      | |
+    +---+---+             |         +---+----+   | |
+    |  DFH  |             |         |   DFH  |   | |
+    +-------+       +-----+----+    +--------+   | |
+    |  FME  |       |  VirtIO  |    |  Test  |   | |
+    +-------+       +----------+    +--------+   | |
+    | Port  |            PF1            PF2      | |
+    +---+---+                                    | |
+        |                             +----------+ |
+        |                             |           ++
+        |                             |           |
+        |                             | PF0_VF0   | PF0_VF1
+        |           +-----------------+-----------+------------+
+        |           |           +-----+-----------+--------+   |
+        |           |           |     |           |        |   |
+        |           | +------+  |  +--+ -+     +--+---+    |   |
+        |           | | CSR  |  |  | DFH |     |  DFH |    |   |
+        +-----------+ +------+  |  +-----+     +------+    |   |
+                    |           |  | DEV |     |  DEV |    |   |
+                    |           |  +-----+     +------+    |   |
+                    |           |            PR Slot       |   |
+                    |           +--------------------------+   |
+                    | Port Gasket                              |
+                    +------------------------------------------+
+
+Here are the major changes about DFL structures on IOFS implementation design:
+1. The Port Gasket connects to FIU Port in DFL, but the Next_AFU pointer in
+FIU feature header can point to NULL so that it is no AFU connects to a FIU
+Port.
+2. The VF which include in PR region can start with AFU feature header without
+a FIU Port feature header.
 
 Performance Counters
 ====================
