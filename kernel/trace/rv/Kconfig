@@ -45,4 +45,12 @@ config RV_REACT_PRINTK
 	  Enables the printk reactor. The printk reactor emmits a printk()
 	  message if an exception is found.
 
+config RV_REACT_PANIC
+	tristate "Panic reactor"
+	depends on RV_REACTORS
+	default y if RV_REACTORS
+	help
+	  Enables the panic reactor. The panic reactor emmits a printk()
+	  message if an exception is found and panic()s the system.
+
 endif # RV
