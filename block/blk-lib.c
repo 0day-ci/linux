@@ -153,9 +153,6 @@ static int __blkdev_issue_write_same(struct block_device *bdev, sector_t sector,
 	struct bio *bio = *biop;
 	sector_t bs_mask;
 
-	if (!q)
-		return -ENXIO;
-
 	if (bdev_read_only(bdev))
 		return -EPERM;
 
