@@ -18,15 +18,6 @@
 
 #include "kernfs-internal.h"
 
-/*
- * kernfs_node->attr.open points to kernfs_open_node.  attr.open is
- * protected by kernfs_open_node_lock.
- *
- * filp->private_data points to seq_file whose ->private points to
- * kernfs_open_file.
- */
-static DEFINE_SPINLOCK(kernfs_open_node_lock);
-
 struct kernfs_open_node {
 	atomic_t		refcnt;
 	atomic_t		event;
@@ -520,10 +511,11 @@ static int kernfs_get_open_node(struct kernfs_node *kn,
 {
 	struct kernfs_open_node *on, *new_on = NULL;
 	struct mutex *mutex = NULL;
+	spinlock_t *lock = NULL;
 
  retry:
 	mutex = kernfs_open_file_mutex_lock(kn);
-	spin_lock_irq(&kernfs_open_node_lock);
+	lock = kernfs_open_node_spinlock(kn);
 
 	if (!kn->attr.open && new_on) {
 		kn->attr.open = new_on;
@@ -536,7 +528,7 @@ static int kernfs_get_open_node(struct kernfs_node *kn,
 		list_add_tail(&of->list, &on->files);
 	}
 
-	spin_unlock_irq(&kernfs_open_node_lock);
+	spin_unlock_irq(lock);
 	mutex_unlock(mutex);
 
 	if (on) {
@@ -572,10 +564,13 @@ static void kernfs_put_open_node(struct kernfs_node *kn,
 {
 	struct kernfs_open_node *on = kn->attr.open;
 	struct mutex *mutex = NULL;
+	spinlock_t *lock = NULL;
 	unsigned long flags;
 
 	mutex = kernfs_open_file_mutex_lock(kn);
-	spin_lock_irqsave(&kernfs_open_node_lock, flags);
+	lock = kernfs_open_node_spinlock_ptr(kn);
+
+	spin_lock_irqsave(lock, flags);
 
 	if (of)
 		list_del(&of->list);
@@ -585,7 +580,7 @@ static void kernfs_put_open_node(struct kernfs_node *kn,
 	else
 		on = NULL;
 
-	spin_unlock_irqrestore(&kernfs_open_node_lock, flags);
+	spin_unlock_irqrestore(lock, flags);
 	mutex_unlock(mutex);
 
 	kfree(on);
@@ -768,15 +763,16 @@ void kernfs_drain_open_files(struct kernfs_node *kn)
 	struct kernfs_open_node *on;
 	struct kernfs_open_file *of;
 	struct mutex *mutex = NULL;
+	spinlock_t *lock = NULL;
 
 	if (!(kn->flags & (KERNFS_HAS_MMAP | KERNFS_HAS_RELEASE)))
 		return;
 
-	spin_lock_irq(&kernfs_open_node_lock);
+	lock = kernfs_open_node_spinlock(kn);
 	on = kn->attr.open;
 	if (on)
 		atomic_inc(&on->refcnt);
-	spin_unlock_irq(&kernfs_open_node_lock);
+	spin_unlock_irq(lock);
 	if (!on)
 		return;
 
@@ -921,13 +917,13 @@ void kernfs_notify(struct kernfs_node *kn)
 		return;
 
 	/* kick poll immediately */
-	spin_lock_irqsave(&kernfs_open_node_lock, flags);
+	spin_lock_irqsave(kernfs_open_node_spinlock_ptr(kn), flags);
 	on = kn->attr.open;
 	if (on) {
 		atomic_inc(&on->event);
 		wake_up_interruptible(&on->poll);
 	}
-	spin_unlock_irqrestore(&kernfs_open_node_lock, flags);
+	spin_unlock_irqrestore(kernfs_open_node_spinlock_ptr(kn), flags);
 
 	/* schedule work to kick fsnotify */
 	spin_lock_irqsave(&kernfs_notify_lock, flags);
