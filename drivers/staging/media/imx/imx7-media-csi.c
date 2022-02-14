@@ -162,6 +162,7 @@
 enum imx_csi_model {
 	IMX7_CSI_IMX7 = 0,
 	IMX7_CSI_IMX8MQ,
+	IMX7_CSI_IMX8MM,
 };
 
 struct imx7_csi {
@@ -1277,6 +1278,7 @@ static int imx7_csi_remove(struct platform_device *pdev)
 
 static const struct of_device_id imx7_csi_of_match[] = {
 	{ .compatible = "fsl,imx8mq-csi", .data = (void *)IMX7_CSI_IMX8MQ },
+	{ .compatible = "fsl,imx8mm-csi", .data = (void *)IMX7_CSI_IMX8MM },
 	{ .compatible = "fsl,imx7-csi", .data = (void *)IMX7_CSI_IMX7 },
 	{ .compatible = "fsl,imx6ul-csi", .data = (void *)IMX7_CSI_IMX7 },
 	{ },

@@ -21,6 +21,7 @@ properties:
           - fsl,imx7-csi
           - fsl,imx6ul-csi
       - items:
+          - const: fsl,imx8mq-csi
           - const: fsl,imx8mm-csi
           - const: fsl,imx7-csi
 
