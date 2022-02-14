@@ -132,7 +132,6 @@ static int aspeed_gfx_load(struct drm_device *drm)
 	struct aspeed_gfx *priv = to_aspeed_gfx(drm);
 	struct device_node *np = pdev->dev.of_node;
 	const struct aspeed_gfx_config *config;
-	const struct of_device_id *match;
 	struct resource *res;
 	int ret;
 
@@ -141,10 +140,7 @@ static int aspeed_gfx_load(struct drm_device *drm)
 	if (IS_ERR(priv->base))
 		return PTR_ERR(priv->base);
 
-	match = of_match_device(aspeed_gfx_match, &pdev->dev);
-	if (!match)
-		return -EINVAL;
-	config = match->data;
+	config = of_device_get_match_data(&pdev->dev);
 
 	priv->dac_reg = config->dac_reg;
 	priv->vga_scratch_reg = config->vga_scratch_reg;
