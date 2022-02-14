@@ -312,8 +312,13 @@ static int create_monitor_dir(struct rv_monitor_def *mdef)
 		retval = -ENOMEM;
 		goto out_remove_root;
 	}
+#ifdef CONFIG_RV_REACTORS
+	retval = reactor_create_monitor_files(mdef);
+	if (retval)
+		goto out_remove_root;
+#endif
 
-	return retval;
+	return 0;
 
 out_remove_root:
 	rv_remove(mdef->root_d);
@@ -621,7 +626,11 @@ int rv_register_monitor(struct rv_monitor *monitor)
 
 	r->monitor = monitor;
 
-	create_monitor_dir(r);
+	retval = create_monitor_dir(r);
+	if (retval) {
+		kfree(r);
+		goto out_unlock;
+	}
 
 	list_add_tail(&r->list, &rv_monitors_list);
 
@@ -681,6 +690,10 @@ int __init rv_init_interface(void)
 	rv_create_file("monitoring_on", 0600, rv_root.root_dir, NULL,
 		       &monitoring_on_fops);
 
+#ifdef CONFIG_RV_REACTORS
+	init_rv_reactors(rv_root.root_dir);
+	reacting_on=true;
+#endif
 	monitoring_on=true;
 
 	return 0;
