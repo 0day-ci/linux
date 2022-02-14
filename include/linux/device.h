@@ -14,6 +14,7 @@
 
 #include <linux/dev_printk.h>
 #include <linux/energy_model.h>
+#include <linux/err.h>
 #include <linux/ioport.h>
 #include <linux/kobject.h>
 #include <linux/klist.h>
@@ -981,6 +982,13 @@ void device_links_supplier_sync_state_resume(void);
 
 extern __printf(3, 4)
 int dev_err_probe(const struct device *dev, int err, const char *fmt, ...);
+
+/* As above, but returns error pointer */
+static inline __printf(3, 0)
+void *dev_err_probe_ptr(const struct device *dev, int err, const char *fmt, va_list args)
+{
+	return ERR_PTR(dev_err_probe(dev, err, fmt, args));
+}
 
 /* Create alias, so I can be autoloaded. */
 #define MODULE_ALIAS_CHARDEV(major,minor) \
