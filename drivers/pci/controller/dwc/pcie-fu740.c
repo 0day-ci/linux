@@ -177,10 +177,29 @@ static void fu740_pcie_init_phy(struct fu740_pcie *afp)
 	fu740_phyregwrite(1, PCIEX8MGMT_PHY_LANE3_BASE, PCIEX8MGMT_PHY_INIT_VAL, afp);
 }
 
+/* This is copied from u-boot. Force system to gen1 otherwise nothing probes
+ * as found on the SiFive Unmatched board.
+ */
+static void fu740_pcie_force_gen1(struct dw_pcie *dw, struct fu740_pcie *afp )
+{
+	unsigned val;
+
+	dw_pcie_dbi_ro_wr_en(dw);
+
+	val = dw_pcie_readl_dbi(dw, 0x70 + PCI_EXP_LNKCAP);
+	pr_info("%s: link-cap was %08x\n", __func__, val);
+	dw_pcie_writel_dbi(dw, 0x70 + PCI_EXP_LNKCAP, val | 0xf);
+
+	dw_pcie_dbi_ro_wr_dis(dw);
+}
+
 static int fu740_pcie_start_link(struct dw_pcie *pci)
 {
 	struct device *dev = pci->dev;
 	struct fu740_pcie *afp = dev_get_drvdata(dev);
+
+	/* Force PCIe gen1 otherwise Unmatched board does not probe */
+	fu740_pcie_force_gen1(pci, afp);
 
 	/* Enable LTSSM */
 	writel_relaxed(0x1, afp->mgmt_base + PCIEX8MGMT_APP_LTSSM_ENABLE);
