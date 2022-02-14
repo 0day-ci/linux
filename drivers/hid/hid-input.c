@@ -1450,6 +1450,17 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	    (!test_bit(usage->code, input->key)) == value)
 		input_event(input, EV_MSC, MSC_SCAN, usage->hid);
 
+	if (usage->type == EV_KEY &&
+	    (field->flags & HID_MAIN_ITEM_VARIABLE) &&
+	   !(field->flags & HID_MAIN_ITEM_RELATIVE) &&
+	   field->logical_minimum == 0 &&
+	   field->logical_maximum == 1) {
+		input_event(input, EV_KEY, usage->code, 1);
+		input_sync(input);
+		input_event(input, EV_KEY, usage->code, 0);
+		return;
+	}
+
 	input_event(input, usage->type, usage->code, value);
 
 	if ((field->flags & HID_MAIN_ITEM_RELATIVE) &&
