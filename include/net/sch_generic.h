@@ -19,6 +19,7 @@
 #include <net/gen_stats.h>
 #include <net/rtnetlink.h>
 #include <net/flow_offload.h>
+#include <net/ip.h>
 
 struct Qdisc_ops;
 struct qdisc_walker;
@@ -440,6 +441,12 @@ struct tcf_proto {
 };
 
 struct qdisc_skb_cb {
+	union {
+		struct inet_skb_parm	h4;
+#if IS_ENABLED(CONFIG_IPV6)
+		struct inet6_skb_parm	h6;
+#endif
+	} header;
 	struct {
 		unsigned int		pkt_len;
 		u16			slave_dev_queue_mapping;
