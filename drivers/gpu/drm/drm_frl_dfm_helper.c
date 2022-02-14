@@ -555,3 +555,300 @@ drm_frl_dfm_nondsc_requirement_met(struct drm_hdmi_frl_dfm *frl_dfm)
 	return false;
 }
 EXPORT_SYMBOL(drm_frl_dfm_nondsc_requirement_met);
+
+/* DSC DFM functions */
+/* Get FRL Available characters */
+static unsigned int
+drm_get_frl_available_chars(unsigned int overhead_max, unsigned int cfrl_line)
+{
+	unsigned int frl_char_avlb = ((EFFICIENCY_MULTIPLIER - overhead_max) * cfrl_line);
+
+	return frl_char_avlb / EFFICIENCY_MULTIPLIER;
+}
+
+/* Get required no. of tribytes during HCActive */
+static unsigned int
+drm_get_frl_hcactive_tb_target(unsigned int dsc_bpp_x16, unsigned int slice_width, unsigned int num_slices)
+{
+	unsigned int bytes_target;
+
+	bytes_target = num_slices * DIV_ROUND_UP(dsc_bpp_x16 * slice_width,
+						 8 * BPP_MULTIPLIER);
+
+	return DIV_ROUND_UP(bytes_target, 3);
+}
+
+/* Get required no. of tribytes (estimate1) during HCBlank */
+static unsigned int
+drm_get_frl_hcblank_tb_est1_target(unsigned int hcactive_target_tb,
+				   unsigned int hactive, unsigned int hblank)
+{
+	return DIV_ROUND_UP(hcactive_target_tb * hblank, hactive);
+}
+
+/* Get required no. of tribytes during HCBlank */
+static unsigned int
+drm_get_frl_hcblank_tb_target(unsigned int hcactive_target_tb, unsigned int hactive, unsigned int hblank,
+			      unsigned int hcblank_audio_min, unsigned int cfrl_available)
+{
+	unsigned int hcblank_target_tb1 = drm_get_frl_hcblank_tb_est1_target(hcactive_target_tb,
+								    hactive, hblank);
+	unsigned int hcblank_target_tb2 = max(hcblank_target_tb1, hcblank_audio_min);
+
+	return 4 * (min(hcblank_target_tb2,
+			(2 * cfrl_available - 3 * hcactive_target_tb) / 2) / 4);
+}
+
+/* Get the avg no of tribytes sent per sec (Kbps) */
+static unsigned int
+drm_frl_dsc_get_ftb_avg(unsigned int hcactive_target_tb, unsigned int hcblank_target_tb,
+			unsigned int hactive, unsigned int hblank,
+			unsigned int fpixelclock_max_khz)
+{
+	return (hcactive_target_tb + hcblank_target_tb) * (fpixelclock_max_khz / (hactive + hblank));
+}
+
+/* Time to send Active tribytes in nanoseconds */
+static unsigned int
+drm_frl_dsc_get_tactive_ref_ns(unsigned int line_time_ns, unsigned int hactive, unsigned int hblank)
+{
+	return (line_time_ns * hactive) / (hactive + hblank);
+}
+
+/* Time to send Blanking tribytes in nanoseconds  */
+static unsigned int
+drm_frl_dsc_get_tblank_ref_ns(unsigned int line_time_ns, unsigned int hactive, unsigned int hblank)
+{
+	return (line_time_ns * hblank) / (hactive + hblank);
+}
+
+/* Get time to send all tribytes in hcactive region in nsec*/
+static unsigned int
+drm_frl_dsc_tactive_target_ns(unsigned int frl_lanes, unsigned int hcactive_target_tb, unsigned int ftb_avg_k,
+			      unsigned int min_frl_char_rate_k, unsigned int overhead_max)
+{
+	unsigned int avg_tribyte_time_ns, tribyte_time_ns;
+	unsigned int num_chars_hcactive;
+	unsigned int frl_char_rate_k;
+
+	/* Avg time to transmit all active region tribytes */
+	avg_tribyte_time_ns = (hcactive_target_tb * FRL_TIMING_NS_MULTIPLIER) /
+			      (ftb_avg_k * 1000);
+
+	/*
+	 * 2 bytes in active region = 1 FRL characters
+	 * 1 Tribyte in active region = 3/2 FRL characters
+	 */
+
+	num_chars_hcactive = (hcactive_target_tb * 3) / 2;
+
+	/*
+	 * FRL rate = lanes * frl character rate
+	 * But actual bandwidth wil be less, due to FRL limitations so account
+	 * for the overhead involved.
+	 * FRL rate with overhead = FRL rate * (100 - overhead %) / 100
+	 */
+	frl_char_rate_k = frl_lanes * min_frl_char_rate_k;
+	frl_char_rate_k = (frl_char_rate_k * (EFFICIENCY_MULTIPLIER - overhead_max)) /
+			  EFFICIENCY_MULTIPLIER;
+
+	/* Time to transmit all characters with FRL limitations */
+	tribyte_time_ns = (num_chars_hcactive * FRL_TIMING_NS_MULTIPLIER) /
+			  frl_char_rate_k * 1000;
+
+	return max(avg_tribyte_time_ns, tribyte_time_ns);
+}
+
+/* Get no. of tri bytes borrowed with DSC enabled */
+static unsigned int
+drm_frl_get_dsc_tri_bytes_borrowed(unsigned int tactive_target_ns, unsigned int ftb_avg_k,
+				   unsigned int hcactive_target_tb)
+{
+	return (tactive_target_ns * FRL_TIMING_NS_MULTIPLIER * ftb_avg_k * 1000) -
+		hcactive_target_tb;
+}
+
+/* Get TBdelta */
+static unsigned int
+drm_frl_get_dsc_tri_bytes_delta(unsigned int tactive_target_ns, unsigned int tactive_ref_ns,
+				unsigned int hcactive_target_tb, unsigned int ftb_avg_k,
+				unsigned int hactive, unsigned int hblank, unsigned int line_time_ns)
+{
+	unsigned int tb_delta_limit;
+	unsigned int tblank_target_ns = line_time_ns - tactive_target_ns;
+	unsigned int tblank_ref_ns = line_time_ns - tactive_ref_ns;
+	unsigned int hcblank_target_tb1 = drm_get_frl_hcblank_tb_est1_target(hcactive_target_tb,
+								    hactive, hblank);
+
+	if (tblank_ref_ns < tblank_target_ns) {
+		tb_delta_limit = (((tactive_ref_ns * FRL_TIMING_NS_MULTIPLIER) - (hcactive_target_tb / (ftb_avg_k * 1000))) *
+				 (hcactive_target_tb + hcblank_target_tb1)) /
+				 (line_time_ns * FRL_TIMING_NS_MULTIPLIER);
+	} else {
+		unsigned int _tb_delta_ns;
+
+		if (tactive_target_ns > tactive_ref_ns)
+			_tb_delta_ns = tactive_target_ns - tactive_ref_ns;
+		else
+			_tb_delta_ns = tactive_ref_ns - tactive_target_ns;
+		tb_delta_limit = (_tb_delta_ns * (hcactive_target_tb + hcblank_target_tb1)) / line_time_ns;
+	}
+
+	return tb_delta_limit;
+}
+
+/* Compute hcactive and hcblank tribytes for given dsc bpp setting */
+static void
+drm_frl_dfm_dsc_compute_tribytes(struct drm_hdmi_frl_dfm *frl_dfm)
+{
+	unsigned int hcactive_target_tb;
+	unsigned int hcblank_target_tb;
+	unsigned int cfrl_available;
+	unsigned int num_slices;
+
+	/* Assert for slice width ?*/
+	if (!frl_dfm->config.slice_width)
+		return;
+
+	num_slices = DIV_ROUND_UP(frl_dfm->config.hactive, frl_dfm->config.slice_width);
+
+	hcactive_target_tb = drm_get_frl_hcactive_tb_target(frl_dfm->config.target_bpp_16,
+							    frl_dfm->config.slice_width,
+							    num_slices);
+
+	cfrl_available =
+		drm_get_frl_available_chars(frl_dfm->params.overhead_max,
+					    frl_dfm->params.cfrl_line);
+
+	hcblank_target_tb =
+		drm_get_frl_hcblank_tb_target(hcactive_target_tb,
+					      frl_dfm->config.hactive,
+					      frl_dfm->config.hblank,
+					      frl_dfm->params.hblank_audio_min,
+					      cfrl_available);
+
+	frl_dfm->params.hcactive_target = hcactive_target_tb;
+	frl_dfm->params.hcblank_target = hcblank_target_tb;
+}
+
+/* Check if audio supported with given dsc bpp and frl bandwidth */
+static bool
+drm_frl_dfm_dsc_audio_supported(struct drm_hdmi_frl_dfm *frl_dfm)
+{
+	return frl_dfm->params.hcblank_target < frl_dfm->params.hblank_audio_min;
+}
+
+/* Is DFM timing requirement is met with DSC */
+static
+bool drm_frl_dfm_dsc_is_timing_req_met(struct drm_hdmi_frl_dfm *frl_dfm)
+{
+	unsigned int ftb_avg_k;
+	unsigned int tactive_ref_ns, tblank_ref_ns, tactive_target_ns, tblank_target_ns;
+	unsigned int tb_borrowed, tb_delta, tb_worst;
+
+	ftb_avg_k = drm_frl_dsc_get_ftb_avg(frl_dfm->params.hcactive_target,
+					    frl_dfm->params.hcblank_target,
+					    frl_dfm->config.hactive,
+					    frl_dfm->config.hblank,
+					    frl_dfm->params.pixel_clock_max_khz);
+
+	tactive_ref_ns = drm_frl_dsc_get_tactive_ref_ns(frl_dfm->params.line_time_ns,
+							frl_dfm->config.hactive,
+							frl_dfm->config.hblank);
+
+	tblank_ref_ns = drm_frl_dsc_get_tblank_ref_ns(frl_dfm->params.line_time_ns,
+						      frl_dfm->config.hactive,
+						      frl_dfm->config.hblank);
+
+	tactive_target_ns = drm_frl_dsc_tactive_target_ns(frl_dfm->config.lanes,
+							  frl_dfm->params.hcactive_target,
+							  ftb_avg_k,
+							  frl_dfm->params.char_rate_min_kbps,
+							  frl_dfm->params.overhead_max);
+
+	tblank_target_ns = frl_dfm->params.line_time_ns - tactive_target_ns;
+
+	tb_borrowed = drm_frl_get_dsc_tri_bytes_borrowed(tactive_target_ns,
+							 ftb_avg_k,
+							 frl_dfm->params.hcactive_target);
+
+	tb_delta = drm_frl_get_dsc_tri_bytes_delta(tactive_target_ns,
+						   tactive_ref_ns,
+						   frl_dfm->params.hcactive_target,
+						   ftb_avg_k,
+						   frl_dfm->config.hactive,
+						   frl_dfm->config.hblank,
+						   frl_dfm->params.line_time_ns);
+
+	tb_worst = max(tb_borrowed, tb_delta);
+	if (tb_worst > TB_BORROWED_MAX)
+		return false;
+
+	frl_dfm->params.ftb_avg_k = ftb_avg_k;
+	frl_dfm->params.tb_borrowed = tb_borrowed;
+
+	return true;
+}
+
+/* Check Utilization constraint with DSC */
+static bool
+drm_frl_dsc_check_utilization(struct drm_hdmi_frl_dfm *frl_dfm)
+{
+	unsigned int hcactive_target_tb = frl_dfm->params.hcactive_target;
+	unsigned int hcblank_target_tb = frl_dfm->params.hcblank_target;
+	unsigned int frl_char_per_line = frl_dfm->params.cfrl_line;
+	unsigned int overhead_max = frl_dfm->params.overhead_max;
+	unsigned int actual_frl_char_payload;
+	unsigned int utilization;
+	unsigned int utilization_with_overhead;
+
+	/* Note:
+	 * 1 FRL characters per 2 bytes in active period
+	 * 1 FRL char per byte in Blanking period
+	 */
+	actual_frl_char_payload = DIV_ROUND_UP(3 * hcactive_target_tb, 2) +
+				  hcblank_target_tb;
+
+	utilization = (actual_frl_char_payload * EFFICIENCY_MULTIPLIER) /
+		      frl_char_per_line;
+
+	/*
+	 * Utilization with overhead = utlization% +overhead %
+	 * should be less than 100%
+	 */
+	utilization_with_overhead = utilization + overhead_max;
+	if (utilization_with_overhead  > EFFICIENCY_MULTIPLIER)
+		return false;
+
+	return false;
+}
+
+/*
+ * drm_frl_fm_dsc_requirement_met : Check if FRL DFM requirements are met with
+ * the given bpp.
+ * @frl_dfm: dfm structure
+ *
+ * Returns true if the frl dfm requirements are met, else returns false.
+ */
+bool drm_frl_dfm_dsc_requirement_met(struct drm_hdmi_frl_dfm *frl_dfm)
+{
+	if (!frl_dfm->config.slice_width || !frl_dfm->config.target_bpp_16)
+		return false;
+
+	drm_frl_dfm_compute_max_frl_link_overhead(frl_dfm);
+	drm_frl_dfm_compute_link_characteristics(frl_dfm);
+	drm_frl_dfm_compute_audio_hblank_min(frl_dfm);
+	drm_frl_dfm_dsc_compute_tribytes(frl_dfm);
+
+	if (!drm_frl_dfm_dsc_audio_supported(frl_dfm))
+		return false;
+
+	if (!drm_frl_dfm_dsc_is_timing_req_met(frl_dfm))
+		return false;
+
+	if (!drm_frl_dsc_check_utilization(frl_dfm))
+		return false;
+
+	return true;
+}
+EXPORT_SYMBOL(drm_frl_dfm_dsc_requirement_met);
