@@ -3202,8 +3202,7 @@ static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
 
 	rstc = devm_reset_control_get_optional_exclusive(&pdev->dev, NULL);
 	if (IS_ERR(rstc))
-		return ERR_PTR(dev_err_probe(&pdev->dev, PTR_ERR(rstc),
-					     "failed to get reset ctrl\n"));
+		return dev_err_probe_ptr(&pdev->dev, PTR_ERR(rstc), "failed to get reset ctrl\n");
 
 	ret = reset_control_deassert(rstc);
 	if (ret) {
