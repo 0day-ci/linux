@@ -27,12 +27,13 @@ enum ds1803_type {
 
 struct ds1803_cfg {
 	int kohms;
+	int avail[3];
 };
 
 static const struct ds1803_cfg ds1803_cfg[] = {
-	[DS1803_010] = { .kohms =  10, },
-	[DS1803_050] = { .kohms =  50, },
-	[DS1803_100] = { .kohms = 100, },
+	[DS1803_010] = { .avail = { 0, 1, 255 }, .kohms =  10, },
+	[DS1803_050] = { .avail = { 0, 1, 255 }, .kohms =  50, },
+	[DS1803_100] = { .avail = { 0, 1, 255 }, .kohms = 100, },
 };
 
 struct ds1803_data {
@@ -40,13 +41,14 @@ struct ds1803_data {
 	const struct ds1803_cfg *cfg;
 };
 
-#define DS1803_CHANNEL(ch) {					\
-	.type = IIO_RESISTANCE,					\
-	.indexed = 1,						\
-	.output = 1,						\
-	.channel = (ch),					\
-	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+#define DS1803_CHANNEL(ch) {						\
+	.type = IIO_RESISTANCE,						\
+	.indexed = 1,							\
+	.output = 1,							\
+	.channel = (ch),						\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),			\
+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),		\
+	.info_mask_shared_by_type_available = BIT(IIO_CHAN_INFO_RAW),   \
 }
 
 static const struct iio_chan_spec ds1803_channels[] = {
@@ -104,9 +106,25 @@ static int ds1803_write_raw(struct iio_dev *indio_dev,
 	return i2c_smbus_write_byte_data(data->client, DS1803_WRITE(pot), val);
 }
 
+static int ds1803_read_avail(struct iio_dev *indio_dev, struct iio_chan_spec const *chan,
+			     const int **vals, int *type, int *length, long mask)
+{
+	struct ds1803_data *data = iio_priv(indio_dev);
+
+	switch (mask) {
+	case IIO_CHAN_INFO_RAW:
+		*vals = data->cfg->avail;
+		*length = ARRAY_SIZE(data->cfg->avail);
+		*type = IIO_VAL_INT;
+		return IIO_AVAIL_RANGE;
+	}
+	return -EINVAL;
+}
+
 static const struct iio_info ds1803_info = {
 	.read_raw = ds1803_read_raw,
 	.write_raw = ds1803_write_raw,
+	.read_avail = ds1803_read_avail,
 };
 
 static int ds1803_probe(struct i2c_client *client,
