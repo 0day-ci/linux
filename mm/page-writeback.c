@@ -1558,7 +1558,7 @@ static inline void wb_dirty_limits(struct dirty_throttle_control *dtc)
  * perform some writeout.
  */
 static void balance_dirty_pages(struct bdi_writeback *wb,
-				unsigned long pages_dirtied)
+				unsigned long pages_dirtied, bool is_async)
 {
 	struct dirty_throttle_control gdtc_stor = { GDTC_INIT(wb) };
 	struct dirty_throttle_control mdtc_stor = { MDTC_INIT(wb, &gdtc_stor) };
@@ -1792,6 +1792,14 @@ pause:
 					  period,
 					  pause,
 					  start_time);
+		if (is_async) {
+			if (current->bdp_nr_dirtied_pause == -1) {
+				current->bdp_pause = now + pause;
+				current->bdp_nr_dirtied_pause = nr_dirtied_pause;
+			}
+			break;
+		}
+
 		__set_current_state(TASK_KILLABLE);
 		wb->dirty_sleep = now;
 		io_schedule_timeout(pause);
@@ -1799,6 +1807,8 @@ pause:
 		current->dirty_paused_when = now + pause;
 		current->nr_dirtied = 0;
 		current->nr_dirtied_pause = nr_dirtied_pause;
+		current->bdp_nr_dirtied_pause = -1;
+		current->bdp_pause = 0;
 
 		/*
 		 * This is typically equal to (dirty < thresh) and can also
@@ -1863,19 +1873,7 @@ static DEFINE_PER_CPU(int, bdp_ratelimits);
  */
 DEFINE_PER_CPU(int, dirty_throttle_leaks) = 0;
 
-/**
- * balance_dirty_pages_ratelimited - balance dirty memory state
- * @mapping: address_space which was dirtied
- *
- * Processes which are dirtying memory should call in here once for each page
- * which was newly dirtied.  The function will periodically check the system's
- * dirty state and will initiate writeback if needed.
- *
- * Once we're over the dirty memory limit we decrease the ratelimiting
- * by a lot, to prevent individual processes from overshooting the limit
- * by (ratelimit_pages) each.
- */
-void balance_dirty_pages_ratelimited(struct address_space *mapping)
+void balance_dirty_pages_ratelimited_flags(struct address_space *mapping, bool is_async)
 {
 	struct inode *inode = mapping->host;
 	struct backing_dev_info *bdi = inode_to_bdi(inode);
@@ -1885,6 +1883,15 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 
 	if (!(bdi->capabilities & BDI_CAP_WRITEBACK))
 		return;
+
+	if (current->bdp_nr_dirtied_pause != -1 && time_after(jiffies, current->bdp_pause)) {
+		current->dirty_paused_when = current->bdp_pause;
+		current->nr_dirtied = 0;
+		current->nr_dirtied_pause = current->bdp_nr_dirtied_pause;
+
+		current->bdp_nr_dirtied_pause = -1;
+		current->bdp_pause = 0;
+	}
 
 	if (inode_cgwb_enabled(inode))
 		wb = wb_get_create_current(bdi, GFP_KERNEL);
@@ -1924,9 +1931,26 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	preempt_enable();
 
 	if (unlikely(current->nr_dirtied >= ratelimit))
-		balance_dirty_pages(wb, current->nr_dirtied);
+		balance_dirty_pages(wb, current->nr_dirtied, is_async);
 
 	wb_put(wb);
+}
+
+/**
+ * balance_dirty_pages_ratelimited - balance dirty memory state
+ * @mapping: address_space which was dirtied
+ *
+ * Processes which are dirtying memory should call in here once for each page
+ * which was newly dirtied.  The function will periodically check the system's
+ * dirty state and will initiate writeback if needed.
+ *
+ * Once we're over the dirty memory limit we decrease the ratelimiting
+ * by a lot, to prevent individual processes from overshooting the limit
+ * by (ratelimit_pages) each.
+ */
+void balance_dirty_pages_ratelimited(struct address_space *mapping)
+{
+	balance_dirty_pages_ratelimited_flags(mapping, false);
 }
 EXPORT_SYMBOL(balance_dirty_pages_ratelimited);
 
