@@ -47,6 +47,9 @@
 
 #include "internal.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/dns_resolver.h>
+
 /**
  * dns_query - Query the DNS
  * @net: The network namespace to operate in.
@@ -85,6 +88,8 @@ int dns_query(struct net *net,
 
 	kenter("%s,%*.*s,%zu,%s",
 	       type, (int)namelen, (int)namelen, name, namelen, options);
+
+	trace_dns_query(type, name, namelen, options);
 
 	if (!name || namelen == 0)
 		return -EINVAL;
