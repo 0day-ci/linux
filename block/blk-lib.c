@@ -274,13 +274,9 @@ static int __blkdev_issue_zero_pages(struct block_device *bdev,
 		sector_t sector, sector_t nr_sects, gfp_t gfp_mask,
 		struct bio **biop)
 {
-	struct request_queue *q = bdev_get_queue(bdev);
 	struct bio *bio = *biop;
 	int bi_size = 0;
 	unsigned int sz;
-
-	if (!q)
-		return -ENXIO;
 
 	if (bdev_read_only(bdev))
 		return -EPERM;
