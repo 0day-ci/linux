@@ -19,6 +19,7 @@
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 #include <linux/cache.h>
+#include <linux/spinlock.h>
 
 struct file;
 struct dentry;
@@ -75,10 +76,16 @@ struct kernfs_iattrs;
  * kernfs_open_file.
  * kernfs_open_files are chained at kernfs_open_node->files, which is
  * protected by kernfs_open_file_mutex.lock.
+ *
+ * kernfs_node->attr.open points to kernfs_open_node.  attr.open is
+ * protected by kernfs_open_node_lock.lock.
  */
-
 struct kernfs_open_file_mutex {
 	struct mutex lock;
+} ____cacheline_aligned_in_smp;
+
+struct kernfs_open_node_lock {
+	spinlock_t lock;
 } ____cacheline_aligned_in_smp;
 
 /*
@@ -86,9 +93,9 @@ struct kernfs_open_file_mutex {
  * locks, use an array of locks and use kernfs_node object address as
  * hash keys to get the index of these locks.
  */
-
 struct kernfs_global_locks {
 	struct kernfs_open_file_mutex open_file_mutex[NR_KERNFS_LOCKS];
+	struct kernfs_open_node_lock open_node_locks[NR_KERNFS_LOCKS];
 };
 
 enum kernfs_node_type {

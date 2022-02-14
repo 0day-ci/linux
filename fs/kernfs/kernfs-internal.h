@@ -170,4 +170,24 @@ static inline struct mutex *kernfs_open_file_mutex_lock(struct kernfs_node *kn)
 	return lock;
 }
 
+static inline spinlock_t *
+kernfs_open_node_spinlock_ptr(struct kernfs_node *kn)
+{
+	int idx = hash_ptr(kn, NR_KERNFS_LOCK_BITS);
+
+	return &kernfs_locks->open_node_locks[idx].lock;
+}
+
+static inline spinlock_t *
+kernfs_open_node_spinlock(struct kernfs_node *kn)
+{
+	spinlock_t *lock;
+
+	lock = kernfs_open_node_spinlock_ptr(kn);
+
+	spin_lock_irq(lock);
+
+	return lock;
+}
+
 #endif	/* __KERNFS_INTERNAL_H */

@@ -395,8 +395,10 @@ void __init kernfs_lock_init(void)
 	kernfs_locks = kmalloc(sizeof(struct kernfs_global_locks), GFP_KERNEL);
 	WARN_ON(!kernfs_locks);
 
-	for (count = 0; count < NR_KERNFS_LOCKS; count++)
+	for (count = 0; count < NR_KERNFS_LOCKS; count++) {
 		mutex_init(&kernfs_locks->open_file_mutex[count].lock);
+		spin_lock_init(&kernfs_locks->open_node_locks[count].lock);
+	}
 }
 
 void __init kernfs_init(void)
