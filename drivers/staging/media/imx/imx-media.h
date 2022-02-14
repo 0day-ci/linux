@@ -19,6 +19,16 @@
 #define IMX_MEDIA_DEF_PIX_HEIGHT	480
 
 /*
+ * Enumeration of the SoC models the peripheral is integrated in.
+ */
+enum soc_id {
+	IMX6UL,
+	IMX7,
+	IMX8MM,
+	IMX8MQ,
+};
+
+/*
  * Enumeration of the IPU internal sub-devices
  */
 enum {
@@ -141,9 +151,43 @@ struct imx_media_pad_vdev {
 	struct list_head list;
 };
 
+/*
+ * enum sample_mode_id - Define the CSI Rx queue sample size
+ *
+ * The pixel sampling mode defines the possible sampling methods from the
+ * CSI Rx queue to the next processing block of the capture pipeline.
+ *
+ * The supported methods depends on the SoC model and on synthesis time
+ * configurations.
+ *
+ * @MODE_SINGLE: Single pixel mode sampling
+ * @MODE_DUAL: Double pixel mode sampling
+ * @MODE_QUAD: Quad pixel mode sampling
+ */
+enum sample_mode_id {
+	MODE_SINGLE = BIT(0),
+	MODE_DUAL = BIT(1),
+	MODE_QUAD = BIT(2),
+};
+
+/*
+ * Information and configurations dependent on the SoC the peripheral is
+ * integrated in.
+ *
+ * @soc_id: The SoC identifier. See &enum soc_id.
+ * @sample_modes: Mask of supported pixel modes. See &enum sample_mode_id.
+ */
+struct imx_media_info {
+	enum soc_id soc_id;
+	u8 sample_modes;
+};
+
 struct imx_media_dev {
 	struct media_device md;
 	struct v4l2_device  v4l2_dev;
+
+	/* Per-model information. */
+	const struct imx_media_info *info;
 
 	/* the pipeline object */
 	struct media_pipeline pipe;

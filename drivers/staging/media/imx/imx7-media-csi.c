@@ -159,12 +159,6 @@
 #define CSI_CSICR18			0x48
 #define CSI_CSICR19			0x4c
 
-enum imx_csi_model {
-	IMX7_CSI_IMX7 = 0,
-	IMX7_CSI_IMX8MQ,
-	IMX7_CSI_IMX8MM,
-};
-
 struct imx7_csi {
 	struct device *dev;
 	struct v4l2_subdev sd;
@@ -200,8 +194,6 @@ struct imx7_csi {
 	bool is_csi2;
 
 	struct completion last_eof_completion;
-
-	enum imx_csi_model model;
 };
 
 static struct imx7_csi *
@@ -562,6 +554,8 @@ static void imx7_csi_baseaddr_switch_on_second_frame(struct imx7_csi *csi)
 
 static void imx7_csi_enable(struct imx7_csi *csi)
 {
+	struct imx_media_dev *imxmd = csi->imxmd;
+
 	/* Clear the Rx FIFO and reflash the DMA controller. */
 	imx7_csi_rx_fifo_clear(csi);
 	imx7_csi_dma_reflash(csi);
@@ -576,7 +570,7 @@ static void imx7_csi_enable(struct imx7_csi *csi)
 	imx7_csi_dmareq_rff_enable(csi);
 	imx7_csi_hw_enable(csi);
 
-	if (csi->model == IMX7_CSI_IMX8MQ)
+	if (imxmd->info->soc_id == IMX8MQ)
 		imx7_csi_baseaddr_switch_on_second_frame(csi);
 }
 
@@ -1181,8 +1175,6 @@ static int imx7_csi_probe(struct platform_device *pdev)
 	if (IS_ERR(csi->regbase))
 		return PTR_ERR(csi->regbase);
 
-	csi->model = (enum imx_csi_model)(uintptr_t)of_device_get_match_data(&pdev->dev);
-
 	spin_lock_init(&csi->irqlock);
 	mutex_init(&csi->lock);
 
@@ -1201,6 +1193,8 @@ static int imx7_csi_probe(struct platform_device *pdev)
 		goto destroy_mutex;
 	}
 	platform_set_drvdata(pdev, &csi->sd);
+
+	imxmd->info = of_device_get_match_data(dev);
 
 	ret = imx_media_of_add_csi(imxmd, node);
 	if (ret < 0 && ret != -ENODEV && ret != -EEXIST)
@@ -1276,11 +1270,31 @@ static int imx7_csi_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct imx_media_info imx8mq_info = {
+	.soc_id = IMX8MQ,
+	.sample_modes = MODE_SINGLE,
+};
+
+static const struct imx_media_info imx8mm_info = {
+	.soc_id = IMX8MM,
+	.sample_modes = MODE_SINGLE | MODE_DUAL,
+};
+
+static const struct imx_media_info imx7_info = {
+	.soc_id = IMX7,
+	.sample_modes = MODE_SINGLE,
+};
+
+static const struct imx_media_info imx6ul_info = {
+	.soc_id = IMX6UL,
+	.sample_modes = MODE_SINGLE,
+};
+
 static const struct of_device_id imx7_csi_of_match[] = {
-	{ .compatible = "fsl,imx8mq-csi", .data = (void *)IMX7_CSI_IMX8MQ },
-	{ .compatible = "fsl,imx8mm-csi", .data = (void *)IMX7_CSI_IMX8MM },
-	{ .compatible = "fsl,imx7-csi", .data = (void *)IMX7_CSI_IMX7 },
-	{ .compatible = "fsl,imx6ul-csi", .data = (void *)IMX7_CSI_IMX7 },
+	{ .compatible = "fsl,imx8mq-csi", .data = &imx8mq_info },
+	{ .compatible = "fsl,imx8mm-csi", .data = &imx8mm_info },
+	{ .compatible = "fsl,imx7-csi", .data = &imx7_info },
+	{ .compatible = "fsl,imx6ul-csi", .data = &imx6ul_info },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, imx7_csi_of_match);
