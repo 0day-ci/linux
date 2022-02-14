@@ -2033,8 +2033,11 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 
 			/* If ep cmd fails, then force to giveback cancelled requests here */
 			if (!(dep->flags & DWC3_EP_END_TRANSFER_PENDING)) {
-				dep->flags &= ~DWC3_EP_TRANSFER_STARTED;
+				dep->flags |= DWC3_EP_END_TRANSFER_PENDING;
 				dwc3_gadget_ep_cleanup_cancelled_requests(dep);
+
+				dep->flags &= ~DWC3_EP_TRANSFER_STARTED;
+				dep->flags &= ~DWC3_EP_END_TRANSFER_PENDING;
 			}
 
 			dep->flags &= ~DWC3_EP_WAIT_TRANSFER_COMPLETE;
@@ -3413,9 +3416,12 @@ static void dwc3_gadget_endpoint_command_complete(struct dwc3_ep *dep,
 	if (dep->stream_capable)
 		dep->flags |= DWC3_EP_IGNORE_NEXT_NOSTREAM;
 
+	if (!(dep->flags & DWC3_EP_END_TRANSFER_PENDING)) {
+		dwc3_gadget_ep_cleanup_cancelled_requests(dep);
+	}
+
 	dep->flags &= ~DWC3_EP_END_TRANSFER_PENDING;
 	dep->flags &= ~DWC3_EP_TRANSFER_STARTED;
-	dwc3_gadget_ep_cleanup_cancelled_requests(dep);
 
 	if (dep->flags & DWC3_EP_PENDING_CLEAR_STALL) {
 		struct dwc3 *dwc = dep->dwc;
