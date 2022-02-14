@@ -128,13 +128,19 @@ config CROS_EC_PROTO
 
 config CROS_KBD_LED_BACKLIGHT
 	tristate "Backlight LED support for Chrome OS keyboards"
-	depends on LEDS_CLASS && ACPI
+	depends on LEDS_CLASS
 	help
 	  This option enables support for the keyboard backlight LEDs on
 	  select Chrome OS systems.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called cros_kbd_led_backlight.
+
+config CROS_KBD_LED_BACKLIGHT_ACPI
+	bool "ChromeOS keyboard backlight ACPI backend"
+	depends on ACPI && CROS_KBD_LED_BACKLIGHT
+	help
+	  ChromeOS keyboard backlight ACPI backend.
 
 config CROS_EC_CHARDEV
 	tristate "ChromeOS EC miscdevice"
