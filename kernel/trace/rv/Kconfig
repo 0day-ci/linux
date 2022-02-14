@@ -13,6 +13,13 @@ menuconfig RV
 
 if RV
 
+config RV_MON_WIP
+	depends on PREEMPTIRQ_TRACEPOINTS
+	tristate "WIP monitor"
+	help
+	  Enable WIP sample monitor, this is a sample monitor that
+	  illustrates the usage of per-cpu monitors.
+
 config RV_REACTORS
 	bool "Runtime verification reactors"
 	default y if RV

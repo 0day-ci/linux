@@ -59,6 +59,6 @@ TRACE_EVENT(error_wip,
 
 /* This part ust be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH .
+#define TRACE_INCLUDE_PATH ../kernel/trace/rv/monitor_wip/
 #define TRACE_INCLUDE_FILE wip
 #include <trace/define_trace.h>

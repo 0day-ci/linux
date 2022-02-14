@@ -33,36 +33,36 @@ DECLARE_DA_MON_PER_CPU(wip, char);
  *
  */
 
-void handle_preempt_disable(void *data, /* XXX: fill header */)
+void handle_preempt_disable(void *data, unsigned long ip, unsigned long parent_ip)
 {
 	da_handle_event_wip(preempt_disable);
 }
 
-void handle_preempt_enable(void *data, /* XXX: fill header */)
+void handle_preempt_enable(void *data, unsigned long ip, unsigned long parent_ip)
 {
-	da_handle_event_wip(preempt_enable);
+	da_handle_init_event_wip(preempt_enable);
 }
 
-void handle_sched_waking(void *data, /* XXX: fill header */)
+void handle_sched_waking(void *data, struct task_struct *task)
 {
 	da_handle_event_wip(sched_waking);
 }
 
-#define NR_TP   3
+#define NR_TP	3
 static struct tracepoint_hook_helper tracepoints_to_hook[NR_TP] = {
 	{
 		.probe = handle_preempt_disable,
-		.name = /* XXX: tracepoint name here */,
+		.name = "preempt_disable",
 		.registered = 0
 	},
 	{
 		.probe = handle_preempt_enable,
-		.name = /* XXX: tracepoint name here */,
+		.name = "preempt_enable",
 		.registered = 0
 	},
 	{
 		.probe = handle_sched_waking,
-		.name = /* XXX: tracepoint name here */,
+		.name = "sched_wakeup",
 		.registered = 0
 	},
 };
