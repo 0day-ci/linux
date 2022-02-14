@@ -66,13 +66,10 @@ do {									\
 	if (unlikely(debug_alternative)) {				\
 		int j;							\
 									\
-		if (!(len))						\
-			break;						\
-									\
 		printk(KERN_DEBUG pr_fmt(fmt), ##args);			\
-		for (j = 0; j < (len) - 1; j++)				\
-			printk(KERN_CONT "%02hhx ", buf[j]);		\
-		printk(KERN_CONT "%02hhx\n", buf[j]);			\
+		for (j = 0; j < (len); j++)				\
+			printk(KERN_CONT " %02hhx", buf[j]);		\
+		printk(KERN_CONT "\n");					\
 	}								\
 } while (0)
 
@@ -214,7 +211,7 @@ static __always_inline int optimize_nops_range(u8 *instr, u8 instrlen, int off)
 	add_nops(instr + off, nnops);
 	local_irq_restore(flags);
 
-	DUMP_BYTES(instr, instrlen, "%px: [%d:%d) optimized NOPs: ", instr, off, i);
+	DUMP_BYTES(instr, instrlen, "%px: [%d:%d) optimized NOPs:", instr, off, i);
 
 	return nnops;
 }
@@ -303,8 +300,8 @@ void __init_or_module noinline apply_alternatives(struct alt_instr *start,
 			instr, instr, a->instrlen,
 			replacement, a->replacementlen);
 
-		DUMP_BYTES(instr, a->instrlen, "%px:   old_insn: ", instr);
-		DUMP_BYTES(replacement, a->replacementlen, "%px:   rpl_insn: ", replacement);
+		DUMP_BYTES(instr, a->instrlen, "%px:   old_insn:", instr);
+		DUMP_BYTES(replacement, a->replacementlen, "%px:   rpl_insn:", replacement);
 
 		memcpy(insn_buff, replacement, a->replacementlen);
 		insn_buff_sz = a->replacementlen;
@@ -328,7 +325,7 @@ void __init_or_module noinline apply_alternatives(struct alt_instr *start,
 		for (; insn_buff_sz < a->instrlen; insn_buff_sz++)
 			insn_buff[insn_buff_sz] = 0x90;
 
-		DUMP_BYTES(insn_buff, insn_buff_sz, "%px: final_insn: ", instr);
+		DUMP_BYTES(insn_buff, insn_buff_sz, "%px: final_insn:", instr);
 
 		text_poke_early(instr, insn_buff, insn_buff_sz);
 
@@ -499,8 +496,8 @@ void __init_or_module noinline apply_retpolines(s32 *start, s32 *end)
 		len = patch_retpoline(addr, &insn, bytes);
 		if (len == insn.length) {
 			optimize_nops(bytes, len);
-			DUMP_BYTES(((u8*)addr),  len, "%px: orig: ", addr);
-			DUMP_BYTES(((u8*)bytes), len, "%px: repl: ", addr);
+			DUMP_BYTES(((u8*)addr),  len, "%px: orig:", addr);
+			DUMP_BYTES(((u8*)bytes), len, "%px: repl:", addr);
 			text_poke_early(addr, bytes, len);
 		}
 	}
