@@ -1082,7 +1082,7 @@ EXPORT_SYMBOL_GPL(devm_regmap_add_irq_chip);
 /**
  * devm_regmap_del_irq_chip() - Resource managed regmap_del_irq_chip()
  *
- * @dev: Device for which which resource was allocated.
+ * @dev: Device for which the resource was allocated.
  * @irq: Primary IRQ for the device.
  * @data: &regmap_irq_chip_data allocated by regmap_add_irq_chip().
  *
