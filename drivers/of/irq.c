@@ -60,7 +60,8 @@ struct device_node *of_irq_find_parent(struct device_node *child)
 		return NULL;
 
 	do {
-		if (of_property_read_u32(child, "interrupt-parent", &parent)) {
+		if (of_property_read_u32(child, "interrupt-parent", &parent) &&
+		    of_property_read_u32(child, "interrupts-extended", &parent)) {
 			p = of_get_parent(child);
 		} else	{
 			if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
