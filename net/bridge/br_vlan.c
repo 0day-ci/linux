@@ -34,36 +34,29 @@ static struct net_bridge_vlan *br_vlan_lookup(struct rhashtable *tbl, u16 vid)
 	return rhashtable_lookup_fast(tbl, &vid, br_vlan_rht_params);
 }
 
-static bool __vlan_add_pvid(struct net_bridge_vlan_group *vg,
+static void __vlan_add_pvid(struct net_bridge_vlan_group *vg,
 			    const struct net_bridge_vlan *v)
 {
 	if (vg->pvid == v->vid)
-		return false;
+		return;
 
 	smp_wmb();
 	br_vlan_set_pvid_state(vg, v->state);
 	vg->pvid = v->vid;
-
-	return true;
 }
 
-static bool __vlan_delete_pvid(struct net_bridge_vlan_group *vg, u16 vid)
+static void __vlan_delete_pvid(struct net_bridge_vlan_group *vg, u16 vid)
 {
 	if (vg->pvid != vid)
-		return false;
+		return;
 
 	smp_wmb();
 	vg->pvid = 0;
-
-	return true;
 }
 
-/* return true if anything changed, false otherwise */
-static bool __vlan_add_flags(struct net_bridge_vlan *v, u16 flags)
+static void __vlan_add_flags(struct net_bridge_vlan *v, u16 flags)
 {
 	struct net_bridge_vlan_group *vg;
-	u16 old_flags = v->flags;
-	bool ret;
 
 	if (br_vlan_is_master(v))
 		vg = br_vlan_group(v->br);
@@ -71,16 +64,36 @@ static bool __vlan_add_flags(struct net_bridge_vlan *v, u16 flags)
 		vg = nbp_vlan_group(v->port);
 
 	if (flags & BRIDGE_VLAN_INFO_PVID)
-		ret = __vlan_add_pvid(vg, v);
+		__vlan_add_pvid(vg, v);
 	else
-		ret = __vlan_delete_pvid(vg, v->vid);
+		__vlan_delete_pvid(vg, v->vid);
 
 	if (flags & BRIDGE_VLAN_INFO_UNTAGGED)
 		v->flags |= BRIDGE_VLAN_INFO_UNTAGGED;
 	else
 		v->flags &= ~BRIDGE_VLAN_INFO_UNTAGGED;
+}
 
-	return ret || !!(old_flags ^ v->flags);
+/* return true if anything will change as a result of __vlan_add_flags,
+ * false otherwise
+ */
+static bool __vlan_flags_would_change(struct net_bridge_vlan *v, u16 flags)
+{
+	struct net_bridge_vlan_group *vg;
+	u16 old_flags = v->flags;
+	bool pvid_changed;
+
+	if (br_vlan_is_master(v))
+		vg = br_vlan_group(v->br);
+	else
+		vg = nbp_vlan_group(v->port);
+
+	if (flags & BRIDGE_VLAN_INFO_PVID)
+		pvid_changed = (vg->pvid == v->vid);
+	else
+		pvid_changed = (vg->pvid != v->vid);
+
+	return pvid_changed || !!(old_flags ^ v->flags);
 }
 
 static int __vlan_vid_add(struct net_device *dev, struct net_bridge *br,
@@ -672,9 +685,13 @@ static int br_vlan_add_existing(struct net_bridge *br,
 {
 	int err;
 
-	err = br_switchdev_port_vlan_add(br->dev, vlan->vid, flags, extack);
-	if (err && err != -EOPNOTSUPP)
-		return err;
+	*changed = __vlan_flags_would_change(vlan, flags);
+	if (*changed) {
+		err = br_switchdev_port_vlan_add(br->dev, vlan->vid, flags,
+						 extack);
+		if (err && err != -EOPNOTSUPP)
+			return err;
+	}
 
 	if (!br_vlan_is_brentry(vlan)) {
 		/* Trying to change flags of non-existent bridge vlan */
@@ -696,8 +713,7 @@ static int br_vlan_add_existing(struct net_bridge *br,
 		br_multicast_toggle_one_vlan(vlan, true);
 	}
 
-	if (__vlan_add_flags(vlan, flags))
-		*changed = true;
+	__vlan_add_flags(vlan, flags);
 
 	return 0;
 
@@ -1247,11 +1263,16 @@ int nbp_vlan_add(struct net_bridge_port *port, u16 vid, u16 flags,
 	*changed = false;
 	vlan = br_vlan_find(nbp_vlan_group(port), vid);
 	if (vlan) {
-		/* Pass the flags to the hardware bridge */
-		ret = br_switchdev_port_vlan_add(port->dev, vid, flags, extack);
-		if (ret && ret != -EOPNOTSUPP)
-			return ret;
-		*changed = __vlan_add_flags(vlan, flags);
+		*changed = __vlan_flags_would_change(vlan, flags);
+		if (*changed) {
+			/* Pass the flags to the hardware bridge */
+			ret = br_switchdev_port_vlan_add(port->dev, vid,
+							 flags, extack);
+			if (ret && ret != -EOPNOTSUPP)
+				return ret;
+		}
+
+		__vlan_add_flags(vlan, flags);
 
 		return 0;
 	}
