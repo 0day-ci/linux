@@ -68,36 +68,6 @@ intel_pmt_read(struct file *filp, struct kobject *kobj,
 	return count;
 }
 
-static int
-intel_pmt_mmap(struct file *filp, struct kobject *kobj,
-		struct bin_attribute *attr, struct vm_area_struct *vma)
-{
-	struct intel_pmt_entry *entry = container_of(attr,
-						     struct intel_pmt_entry,
-						     pmt_bin_attr);
-	unsigned long vsize = vma->vm_end - vma->vm_start;
-	struct device *dev = kobj_to_dev(kobj);
-	unsigned long phys = entry->base_addr;
-	unsigned long pfn = PFN_DOWN(phys);
-	unsigned long psize;
-
-	if (vma->vm_flags & (VM_WRITE | VM_MAYWRITE))
-		return -EROFS;
-
-	psize = (PFN_UP(entry->base_addr + entry->size) - pfn) * PAGE_SIZE;
-	if (vsize > psize) {
-		dev_err(dev, "Requested mmap size is too large\n");
-		return -EINVAL;
-	}
-
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	if (io_remap_pfn_range(vma, vma->vm_start, pfn,
-		vsize, vma->vm_page_prot))
-		return -EAGAIN;
-
-	return 0;
-}
-
 static ssize_t
 guid_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -263,7 +233,6 @@ static int intel_pmt_dev_register(struct intel_pmt_entry *entry,
 	sysfs_bin_attr_init(&entry->pmt_bin_attr);
 	entry->pmt_bin_attr.attr.name = ns->name;
 	entry->pmt_bin_attr.attr.mode = 0440;
-	entry->pmt_bin_attr.mmap = intel_pmt_mmap;
 	entry->pmt_bin_attr.read = intel_pmt_read;
 	entry->pmt_bin_attr.size = entry->size;
 
