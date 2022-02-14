@@ -426,6 +426,7 @@ static void imx7_csi_configure(struct imx7_csi *csi)
 {
 	struct imx_media_video_dev *vdev = csi->vdev;
 	struct v4l2_pix_format *out_pix = &vdev->fmt;
+	struct imx_media_dev *imxmd = csi->imxmd;
 	int width = out_pix->width;
 	u32 stride = 0;
 	u32 cr3 = BIT_FRMCNT_RST;
@@ -436,7 +437,7 @@ static void imx7_csi_configure(struct imx7_csi *csi)
 	cr18 &= ~(BIT_CSI_HW_ENABLE | BIT_MIPI_DATA_FORMAT_MASK |
 		  BIT_DATA_FROM_MIPI | BIT_BASEADDR_CHG_ERR_EN |
 		  BIT_BASEADDR_SWITCH_EN | BIT_BASEADDR_SWITCH_SEL |
-		  BIT_DEINTERLACE_EN);
+		  BIT_DEINTERLACE_EN | BIT_MIPI_DOUBLE_CMPNT);
 
 	if (out_pix->field == V4L2_FIELD_INTERLACED) {
 		cr18 |= BIT_DEINTERLACE_EN;
@@ -500,6 +501,13 @@ static void imx7_csi_configure(struct imx7_csi *csi)
 		case MEDIA_BUS_FMT_YUYV8_2X8:
 		case MEDIA_BUS_FMT_YUYV8_1X16:
 			cr18 |= BIT_MIPI_DATA_FORMAT_YUV422_8B;
+
+			/* If dual mode is supported use it. */
+			if (imxmd->info->sample_modes & MODE_DUAL) {
+				cr18 |= BIT_MIPI_DOUBLE_CMPNT;
+				cr3 |= BIT_TWO_8BIT_SENSOR;
+			}
+
 			break;
 		}
 	}
