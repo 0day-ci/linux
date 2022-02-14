@@ -39,6 +39,16 @@ config RV_MON_SAFE_WTD
 	  For futher information see:
 	    Documentation/trace/rv/safety-monitor.rst
 
+config RV_MON_SAFE_WTD_NWO
+	tristate "Safety watchdog nowayout"
+	help
+	  Enable safe_wtd_nwo, this monitor observes the interaction
+	  between a user-space safety monitor and a watchdog device. It
+	  enforces the usage of watchdog's nowayout config.
+
+	  For futher information see:
+	    Documentation/trace/rv/safety-monitor.rst
+
 config RV_REACTORS
 	bool "Runtime verification reactors"
 	default y if RV
