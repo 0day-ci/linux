@@ -1840,6 +1840,9 @@ static void i40e_vsi_setup_queue_map(struct i40e_vsi *vsi,
 			vsi->num_queue_pairs = vsi->req_queue_pairs;
 		else if (pf->flags & I40E_FLAG_MSIX_ENABLED)
 			vsi->num_queue_pairs = pf->num_lan_msix;
+		else
+			/* We need at least one queue pair for the interface to be usable */
+			vsi->num_queue_pairs = 1;
 	}
 
 	/* Number of queues per enabled TC */
