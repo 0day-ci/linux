@@ -1084,10 +1084,10 @@ static int aqc111_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 	if (!skb)
 		goto err;
 
-	if (skb->len == 0)
+	skb_len = skb->len;
+	if (skb_len < sizeof(desc_hdr))
 		goto err;
 
-	skb_len = skb->len;
 	/* RX Descriptor Header */
 	skb_trim(skb, skb->len - sizeof(desc_hdr));
 	desc_hdr = le64_to_cpup((u64 *)skb_tail_pointer(skb));
