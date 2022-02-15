@@ -51,6 +51,12 @@
 #define USB2_SUSPEND_N				BIT(2)
 #define USB2_SUSPEND_N_SEL			BIT(3)
 
+#define USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X0		(0x6c)
+#define USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X1		(0x70)
+#define USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X2		(0x74)
+#define USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X3		(0x78)
+#define PARAM_OVRD_MASK			0xFF
+
 #define USB2_PHY_USB_PHY_CFG0			(0x94)
 #define UTMI_PHY_DATAPATH_CTRL_OVERRIDE_EN	BIT(0)
 #define UTMI_PHY_CMN_CTRL_OVERRIDE_EN		BIT(1)
@@ -90,6 +96,11 @@ struct qcom_snps_hsphy {
 
 	bool phy_initialized;
 	enum phy_mode mode;
+
+	u8 override_x0;
+	u8 override_x1;
+	u8 override_x2;
+	u8 override_x3;
 };
 
 static inline void qcom_snps_hsphy_write_mask(void __iomem *base, u32 offset,
@@ -222,6 +233,19 @@ static int qcom_snps_hsphy_init(struct phy *phy)
 	qcom_snps_hsphy_write_mask(hsphy->base, USB2_PHY_USB_PHY_HS_PHY_CTRL1,
 					VBUSVLDEXT0, VBUSVLDEXT0);
 
+	if (hsphy->override_x0)
+		qcom_snps_hsphy_write_mask(hsphy->base, USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X0,
+					PARAM_OVRD_MASK, hsphy->override_x0);
+	if (hsphy->override_x1)
+		qcom_snps_hsphy_write_mask(hsphy->base, USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X1,
+					PARAM_OVRD_MASK, hsphy->override_x1);
+	if (hsphy->override_x2)
+		qcom_snps_hsphy_write_mask(hsphy->base, USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X2,
+					PARAM_OVRD_MASK, hsphy->override_x2);
+	if (hsphy->override_x3)
+		qcom_snps_hsphy_write_mask(hsphy->base, USB2_PHY_USB_PHY_HS_PHY_OVERRIDE_X3,
+					PARAM_OVRD_MASK, hsphy->override_x3);
+
 	qcom_snps_hsphy_write_mask(hsphy->base,
 					USB2_PHY_USB_PHY_HS_PHY_CTRL_COMMON2,
 					VREGBYPASS, VREGBYPASS);
@@ -294,6 +318,7 @@ static int qcom_snps_hsphy_probe(struct platform_device *pdev)
 	struct phy *generic_phy;
 	int ret, i;
 	int num;
+	u32 value;
 
 	hsphy = devm_kzalloc(dev, sizeof(*hsphy), GFP_KERNEL);
 	if (!hsphy)
@@ -327,6 +352,26 @@ static int qcom_snps_hsphy_probe(struct platform_device *pdev)
 			dev_err(dev, "failed to get regulator supplies: %d\n",
 				ret);
 		return ret;
+	}
+
+	if (!of_property_read_u32(dev->of_node, "qcom,override_x0",
+				  &value)) {
+		hsphy->override_x0 = (u8)value;
+	}
+
+	if (!of_property_read_u32(dev->of_node, "qcom,override_x1",
+				  &value)) {
+		hsphy->override_x1 = (u8)value;
+	}
+
+	if (!of_property_read_u32(dev->of_node, "qcom,override_x2",
+				  &value)) {
+		hsphy->override_x2  = (u8)value;
+	}
+
+	if (!of_property_read_u32(dev->of_node, "qcom,override_x3",
+				  &value)) {
+		hsphy->override_x3 = (u8)value;
 	}
 
 	pm_runtime_set_active(dev);
