@@ -4105,7 +4105,14 @@ EXPORT_SYMBOL_GPL(kvm_set_xsave_msr);
  */
 static bool is_xsaves_msr(u32 index)
 {
-	return false;
+	bool xsaves_msr = (index >= MSR_ARCH_LBR_FROM_0 &&
+			   index <= MSR_ARCH_LBR_FROM_0 + 31) ||
+			  (index >= MSR_ARCH_LBR_TO_0 &&
+			   index <= MSR_ARCH_LBR_TO_0 + 31) ||
+			  (index >= MSR_ARCH_LBR_INFO_0 &&
+			   index <= MSR_ARCH_LBR_INFO_0 + 31);
+
+	return xsaves_msr;
 }
 
 /*
