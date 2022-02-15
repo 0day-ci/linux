@@ -8,13 +8,6 @@
 
 #include "i915_reg_defs.h"
 
-#define ILK_GDSR _MMIO(MCHBAR_MIRROR_BASE + 0x2ca4)
-#define  ILK_GRDOM_FULL		(0 << 1)
-#define  ILK_GRDOM_RENDER	(1 << 1)
-#define  ILK_GRDOM_MEDIA	(3 << 1)
-#define  ILK_GRDOM_MASK		(3 << 1)
-#define  ILK_GRDOM_RESET_ENABLE (1 << 0)
-
 #define GEN6_MBCUNIT_SNPCR	_MMIO(0x900c) /* for LLC config */
 #define   GEN6_MBC_SNPCR_SHIFT	21
 #define   GEN6_MBC_SNPCR_MASK	(3 << 21)
