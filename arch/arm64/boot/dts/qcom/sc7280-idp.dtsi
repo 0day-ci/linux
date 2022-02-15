@@ -389,6 +389,10 @@
 	vdda-pll-supply = <&vreg_l10c_0p8>;
 	vdda33-supply = <&vreg_l2b_3p0>;
 	vdda18-supply = <&vreg_l1c_1p8>;
+	qcom,override_x0 = <0xe6>;
+	qcom,override_x1 = <0x8b>;
+	qcom,override_x2 = <0x16>;
+	qcom,override_x3 = <0x03>;
 };
 
 &usb_1_qmpphy {
