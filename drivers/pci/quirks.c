@@ -3757,6 +3757,73 @@ DECLARE_PCI_FIXUP_SUSPEND_LATE(PCI_VENDOR_ID_INTEL,
 #endif
 
 /*
+ * The first machines supporting Intel Thunderbolt were released by Apple, and
+ * supported a software based connection manager including D3 support, as far
+ * back as 2010. These machines don't have ACPI companions to declare D3
+ * support.
+ *
+ * Other manufacturers introduced Thunderbolt shortly after but notably did not
+ * support:
+ * - Software based connection manager
+ * - Runtime power management
+ * Power management was handled via the BIOS when nothing was plugged in.
+ * Runtime D3 was later introduced in ~2015 and Microsoft declared when the
+ * `HotPlugSupportInD3` _DSD was present that they would support D3.
+ *
+ * This list is expected to be complete and not grow in the future as Apple
+ * has stopped producing new x86 models with Intel Thunderbolt controllers.
+ */
+static void quirk_apple_d3_thunderbolt(struct pci_dev *dev)
+{
+	struct property_entry properties[] = {
+		PROPERTY_ENTRY_BOOL("HotPlugSupportInD3"),
+		{},
+	};
+
+	if (!x86_apple_machine)
+		return;
+
+	if (device_create_managed_software_node(&dev->dev, properties, NULL))
+		pci_warn(dev, "could not add HotPlugSupportInD3 property");
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_LIGHT_RIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_EAGLE_RIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_LIGHT_PEAK,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_CACTUS_RIDGE_4C,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_CACTUS_RIDGE_2C,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_PORT_RIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_REDWOOD_RIDGE_2C_NHI,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_REDWOOD_RIDGE_2C_BRIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_REDWOOD_RIDGE_4C_NHI,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_REDWOOD_RIDGE_4C_BRIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_FALCON_RIDGE_2C_NHI,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_FALCON_RIDGE_2C_BRIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_FALCON_RIDGE_4C_NHI,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_FALCON_RIDGE_4C_BRIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ALPINE_RIDGE_2C_NHI,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ALPINE_RIDGE_2C_BRIDGE,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ALPINE_RIDGE_4C_NHI,
+			quirk_apple_d3_thunderbolt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ALPINE_RIDGE_4C_BRIDGE,
+			quirk_apple_d3_thunderbolt);
+
+/*
  * Following are device-specific reset methods which can be used to
  * reset a single function if other methods (e.g. FLR, PM D0->D3) are
  * not available.
