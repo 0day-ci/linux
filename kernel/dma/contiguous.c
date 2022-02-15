@@ -416,6 +416,13 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 	    of_get_flat_dt_prop(node, "no-map", NULL))
 		return -EINVAL;
 
+#ifdef CONFIG_DMA_RESTRICTED_POOL
+	if (of_flat_dt_is_compatible(node, "restricted-dma-pool")) {
+		pr_warn("Giving up %pa for restricted DMA pool\n", &rmem->base);
+		return -ENOENT;
+	}
+#endif
+
 	if ((rmem->base & mask) || (rmem->size & mask)) {
 		pr_err("Reserved memory: incorrect alignment of CMA region\n");
 		return -EINVAL;
