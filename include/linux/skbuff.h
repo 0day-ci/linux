@@ -415,6 +415,11 @@ enum skb_drop_reason {
 					 * failed (maybe an eBPF program
 					 * is tricking?)
 					 */
+	SKB_DROP_REASON_PTYPE_ABSENT,	/* no packet_type found to handle
+					 * the skb. For an etner packet,
+					 * this means that L3 protocol is
+					 * not supported
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
