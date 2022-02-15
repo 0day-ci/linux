@@ -374,6 +374,19 @@ enum skb_drop_reason {
 	SKB_DROP_REASON_TCP_OFOMERGE,	/* the data of skb is already in
 					 * the ofo queue.
 					 */
+	SKB_DROP_REASON_IP_OUTNOROUTES,	/* route lookup failed during
+					 * packet outputting
+					 */
+	SKB_DROP_REASON_BPF_CGROUP_EGRESS,	/* dropped by eBPF program
+						 * with type of BPF_PROG_TYPE_CGROUP_SKB
+						 * and attach type of
+						 * BPF_CGROUP_INET_EGRESS
+						 * during packet sending
+						 */
+	SKB_DROP_REASON_IPV6DSIABLED,	/* IPv6 is disabled on the device,
+					 * see the doc for disable_ipv6
+					 * in ip-sysctl.rst for detail
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
