@@ -387,6 +387,15 @@ enum skb_drop_reason {
 					 * see the doc for disable_ipv6
 					 * in ip-sysctl.rst for detail
 					 */
+	SKB_DROP_REASON_NEIGH_FAILED,	/* dropped as the state of
+					 * neighbour is NUD_FAILED
+					 */
+	SKB_DROP_REASON_NEIGH_QUEUEFULL,	/* the skbs that waiting
+						 * for sending on the queue
+						 * of neigh->arp_queue is
+						 * full, and the skbs on the
+						 * tail will be dropped
+						 */
 	SKB_DROP_REASON_MAX,
 };
 
