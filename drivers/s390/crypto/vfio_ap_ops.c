@@ -1523,73 +1523,163 @@ void vfio_ap_mdev_unregister(void)
 	mdev_unregister_driver(&vfio_ap_matrix_driver);
 }
 
-/*
- * vfio_ap_queue_link_mdev
+
+
+/**
+ * vfio_ap_mdev_get_qlocks_4_probe: acquire all of the locks required to probe
+ *				    a queue device.
  *
- * @q: The queue to link with the matrix mdev.
+ * @apqn: the APQN of the queue device being probed
  *
- * Links @q with the matrix mdev to which the queue's APQN is assigned.
+ * Return: the matrix mdev to which @apqn is assigned.
  */
-static void vfio_ap_queue_link_mdev(struct vfio_ap_queue *q)
+static struct ap_matrix_mdev *vfio_ap_mdev_get_qlocks_4_probe(int apqn)
 {
-	unsigned long apid = AP_QID_CARD(q->apqn);
-	unsigned long apqi = AP_QID_QUEUE(q->apqn);
 	struct ap_matrix_mdev *matrix_mdev;
+	unsigned long apid = AP_QID_CARD(apqn);
+	unsigned long apqi = AP_QID_QUEUE(apqn);
+
+	/*
+	 * Lock the mutex required to access the list of mdevs under the control
+	 * of the vfio_ap device driver and access the KVM guest's state
+	 */
+	mutex_lock(&matrix_dev->guests_lock);
 
 	list_for_each_entry(matrix_mdev, &matrix_dev->mdev_list, node) {
 		if (test_bit_inv(apid, matrix_mdev->matrix.apm) &&
 		    test_bit_inv(apqi, matrix_mdev->matrix.aqm)) {
-			vfio_ap_mdev_link_queue(matrix_mdev, q);
-			break;
+			/*
+			 * If the KVM guest is running, lock the mutex required
+			 * to plug/unplug AP devices passed through to the
+			 * guest.
+			 */
+			if (matrix_mdev->kvm)
+				mutex_lock(&matrix_mdev->kvm->lock);
+
+			/*
+			 * Lock the mutex required to access the mdev's state.
+			 */
+			mutex_lock(&matrix_dev->mdevs_lock);
+
+			return matrix_mdev;
 		}
 	}
+
+	return NULL;
+}
+
+/**
+ * vfio_ap_mdev_put_qlocks - unlock all of the locks acquired for probing or
+ *			     removing a queue device.
+ *
+ * @matrix_mdev: the mdev to which the queue being probed/removed is assigned.
+ */
+static void vfio_ap_mdev_put_qlocks(struct ap_matrix_mdev *matrix_mdev)
+{
+	if (matrix_mdev) {
+		/*
+		 * Unlock the queue required for accessing the state of
+		 * matrix_mdev
+		 */
+		mutex_unlock(&matrix_dev->mdevs_lock);
+
+		/*
+		 * If a KVM guest is currently running, unlock the mutex
+		 * required to plug/unplug AP devices passed through to the
+		 * guest.
+		 */
+		if (matrix_mdev && matrix_mdev->kvm)
+			mutex_unlock(&matrix_mdev->kvm->lock);
+	}
+
+	/* Unlock the mutex required to access the KVM guest's state */
+	mutex_unlock(&matrix_dev->guests_lock);
 }
 
 int vfio_ap_mdev_probe_queue(struct ap_device *apdev)
 {
 	struct vfio_ap_queue *q;
 	DECLARE_BITMAP(apm, AP_DEVICES);
+	struct ap_matrix_mdev *matrix_mdev;
 
 	q = kzalloc(sizeof(*q), GFP_KERNEL);
 	if (!q)
 		return -ENOMEM;
 
-	mutex_lock(&matrix_dev->guests_lock);
-	mutex_lock(&matrix_dev->mdevs_lock);
 	q->apqn = to_ap_queue(&apdev->device)->qid;
 	q->saved_isc = VFIO_AP_ISC_INVALID;
-	vfio_ap_queue_link_mdev(q);
-	if (q->matrix_mdev) {
+	matrix_mdev = vfio_ap_mdev_get_qlocks_4_probe(q->apqn);
+	if (matrix_mdev) {
+		vfio_ap_mdev_link_queue(matrix_mdev, q);
 		memset(apm, 0, sizeof(apm));
 		set_bit_inv(AP_QID_CARD(q->apqn), apm);
-		vfio_ap_mdev_filter_matrix(apm, q->matrix_mdev->matrix.aqm,
-					   q->matrix_mdev);
+		if (vfio_ap_mdev_filter_matrix(apm, q->matrix_mdev->matrix.aqm,
+					       q->matrix_mdev))
+			vfio_ap_mdev_hotplug_apcb(q->matrix_mdev);
 	}
 	dev_set_drvdata(&apdev->device, q);
-	mutex_unlock(&matrix_dev->mdevs_lock);
-	mutex_unlock(&matrix_dev->guests_lock);
+	vfio_ap_mdev_put_qlocks(matrix_mdev);
 
 	return 0;
 }
 
-void vfio_ap_mdev_remove_queue(struct ap_device *apdev)
+/**
+ * vfio_ap_get_qlocks_4_rem: acquire all of the locks required to remove a
+ *			     queue device.
+ *
+ * @matrix_mdev: the device to which the APQN of the queue device being removed is
+ *		 assigned.
+ */
+static struct vfio_ap_queue *vfio_ap_get_qlocks_4_rem(struct ap_device *apdev)
 {
-	unsigned long apid;
 	struct vfio_ap_queue *q;
 
-	mutex_lock(&matrix_dev->mdevs_lock);
+	/* Lock the mutex required to access the KVM guest's state */
+	mutex_lock(&matrix_dev->guests_lock);
+
 	q = dev_get_drvdata(&apdev->device);
 
+	/*
+	 * If the queue is assigned to a mediated device and a KVM guest is
+	 * currently running, lock the mutex required to plug/unplug AP devices
+	 * passed through to the guest.
+	 */
 	if (q->matrix_mdev) {
+		if (q->matrix_mdev->kvm)
+			mutex_lock(&q->matrix_mdev->kvm->lock);
+		/*
+		 * Lock the mutex required to access the state of the
+		 * matrix_mdev
+		 */
+		mutex_lock(&matrix_dev->mdevs_lock);
+	}
+
+	return q;
+}
+
+void vfio_ap_mdev_remove_queue(struct ap_device *apdev)
+{
+	unsigned long apid, apqi;
+	struct vfio_ap_queue *q;
+	struct ap_matrix_mdev *matrix_mdev;
+
+	q = vfio_ap_get_qlocks_4_rem(apdev);
+	matrix_mdev = q->matrix_mdev;
+
+	if (matrix_mdev) {
 		vfio_ap_unlink_queue_fr_mdev(q);
 
 		apid = AP_QID_CARD(q->apqn);
-		if (test_bit_inv(apid, q->matrix_mdev->shadow_apcb.apm))
-			clear_bit_inv(apid, q->matrix_mdev->shadow_apcb.apm);
+		apqi = AP_QID_QUEUE(q->apqn);
+		if (test_bit_inv(apid, matrix_mdev->shadow_apcb.apm) &&
+		    test_bit_inv(apqi, matrix_mdev->shadow_apcb.aqm)) {
+			clear_bit_inv(apid, matrix_mdev->shadow_apcb.apm);
+			vfio_ap_mdev_hotplug_apcb(matrix_mdev);
+		}
 	}
 
 	vfio_ap_mdev_reset_queue(q, 1);
 	dev_set_drvdata(&apdev->device, NULL);
 	kfree(q);
-	mutex_unlock(&matrix_dev->mdevs_lock);
+	vfio_ap_mdev_put_qlocks(matrix_mdev);
 }
