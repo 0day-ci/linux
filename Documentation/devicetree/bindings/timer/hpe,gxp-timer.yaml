@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/timer/hpe,gxp-timer.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: HPE GXP TIMER
+
+maintainers:
+  - Nick Hawkins <nick.hawkins@hpe.com>
+  - Jean-Marie Verdun <verdun@hpe.com>
+
+properties:
+  compatible:
+    const: hpe,gxp-timer
+
+  reg:
+    items:
+      - description: T0CNT register
+      - description: T0CS register
+      - description: TIMELO register
+
+  interrupts:
+    maxItems: 1
+
+  clock-frequency:
+    description: The frequency of the clock that drives the counter, in Hz.
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clock-frequency
+
+additionalProperties: false
+
+examples:
+  - |
+    timer@10003000 {
+        compatible = "hpe,gxp-timer";
+        reg = <0xc0000080 0x1>, <0xc0000094 0x01>, <0xc0000088 0x08>;
+        interrupts = <0>;
+        interrupt-parent = <&vic0>;
+        clock-frequency = <400000000>;
+    };
