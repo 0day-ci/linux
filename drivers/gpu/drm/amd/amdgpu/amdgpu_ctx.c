@@ -258,12 +258,13 @@ static void amdgpu_ctx_fini_entity(struct amdgpu_ctx_entity *entity)
 static int amdgpu_ctx_get_stable_pstate(struct amdgpu_ctx *ctx,
 					u32 *stable_pstate)
 {
-	struct amdgpu_device *adev = ctx->adev;
+	struct amdgpu_device *adev;
 	enum amd_dpm_forced_level current_level;
 
 	if (!ctx)
 		return -EINVAL;
 
+	adev = ctx->adev;
 	current_level = amdgpu_dpm_get_performance_level(adev);
 
 	switch (current_level) {
@@ -289,13 +290,14 @@ static int amdgpu_ctx_get_stable_pstate(struct amdgpu_ctx *ctx,
 static int amdgpu_ctx_set_stable_pstate(struct amdgpu_ctx *ctx,
 					u32 stable_pstate)
 {
-	struct amdgpu_device *adev = ctx->adev;
+	struct amdgpu_device *adev;
 	enum amd_dpm_forced_level level;
 	int r;
 
 	if (!ctx)
 		return -EINVAL;
 
+	adev = ctx->adev;
 	mutex_lock(&adev->pm.stable_pstate_ctx_lock);
 	if (adev->pm.stable_pstate_ctx && adev->pm.stable_pstate_ctx != ctx) {
 		r = -EBUSY;
