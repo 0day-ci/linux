@@ -209,7 +209,7 @@ static void qrk_serial_setup_dma(struct lpss8250 *lpss, struct uart_port *port)
 	chip->dev = &pdev->dev;
 	chip->id = pdev->devfn;
 	chip->irq = pci_irq_vector(pdev, 0);
-	chip->regs = pci_ioremap_bar(pdev, 1);
+	chip->regs = pcim_iomap(pdev, 1, 0);
 	if (!chip->regs)
 		return;
 
@@ -241,8 +241,6 @@ static void qrk_serial_exit_dma(struct lpss8250 *lpss)
 		return;
 
 	dw_dma_remove(chip);
-
-	pci_iounmap(to_pci_dev(chip->dev), chip->regs);
 }
 #else	/* CONFIG_SERIAL_8250_DMA */
 static void qrk_serial_setup_dma(struct lpss8250 *lpss, struct uart_port *port) {}
