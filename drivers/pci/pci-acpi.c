@@ -1335,12 +1335,21 @@ static void pci_acpi_optimize_delay(struct pci_dev *pdev,
 
 static void pci_acpi_set_external_facing(struct pci_dev *dev)
 {
-	u8 val;
+	u8 val = 0;
 
 	if (pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT)
 		return;
-	if (device_property_read_u8(&dev->dev, "ExternalFacingPort", &val))
-		return;
+	device_property_read_u8(&dev->dev, "ExternalFacingPort", &val);
+
+	/* check for root port for PCIe tunnels on integrated controllers */
+	if (!val) {
+		struct acpi_device *adev = ACPI_COMPANION(&dev->dev);
+
+		if (!adev)
+			return;
+		val = fwnode_property_present(acpi_fwnode_handle(adev),
+					      "usb4-host-interface");
+	}
 
 	/*
 	 * These root ports expose PCIe (including DMA) outside of the
