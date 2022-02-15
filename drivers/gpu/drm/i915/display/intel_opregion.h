@@ -52,6 +52,7 @@ struct intel_opregion {
 	void *rvda;
 	void *vbt_firmware;
 	const void *vbt;
+	const void *dgfx_oprom_opreg;
 	u32 vbt_size;
 	u32 *lid_state;
 	struct work_struct asle_work;
