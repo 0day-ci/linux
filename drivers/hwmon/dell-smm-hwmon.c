@@ -111,6 +111,10 @@ static uint fan_max;
 module_param(fan_max, uint, 0);
 MODULE_PARM_DESC(fan_max, "Maximum configurable fan speed (default: autodetect)");
 
+static uint fan_mode_method;
+module_param_unsafe(fan_mode_method, uint, 0);
+MODULE_PARM_DESC(fan_mode_method, "Method to use for changing fan mode (default: from whitelist)");
+
 struct smm_regs {
 	unsigned int eax;
 	unsigned int ebx;
@@ -677,7 +681,7 @@ static umode_t dell_smm_is_visible(const void *drvdata, enum hwmon_sensor_types 
 
 			break;
 		case hwmon_pwm_enable:
-			if (data->auto_fan)
+			if (data->auto_fan && data->manual_fan)
 				/*
 				 * There is no command for retrieve the current status
 				 * from BIOS, and userspace/firmware itself can change
@@ -1282,14 +1286,21 @@ static int __init dell_smm_probe(struct platform_device *pdev)
 	data->i8k_fan_max = fan_max ? : I8K_FAN_HIGH;	/* Must not be 0 */
 	data->i8k_pwm_mult = DIV_ROUND_UP(255, data->i8k_fan_max);
 
-	fan_control = dmi_first_match(i8k_whitelist_fan_control);
-	if (fan_control && fan_control->driver_data) {
-		const struct i8k_fan_control_data *control = fan_control->driver_data;
+	/* value specified via module param overrides whitelist */
+	if (fan_mode_method > 0 && fan_mode_method <= ARRAY_SIZE(i8k_fan_control_data)) {
+		data->manual_fan = i8k_fan_control_data[fan_mode_method - 1].manual_fan;
+		data->auto_fan = i8k_fan_control_data[fan_mode_method - 1].auto_fan;
+	} else {
+		fan_control = dmi_first_match(i8k_whitelist_fan_control);
+		if (fan_control && fan_control->driver_data) {
+			const struct i8k_fan_control_data *control = fan_control->driver_data;
 
-		data->manual_fan = control->manual_fan;
-		data->auto_fan = control->auto_fan;
-		dev_info(&pdev->dev, "enabling support for setting automatic/manual fan control\n");
+			data->manual_fan = control->manual_fan;
+			data->auto_fan = control->auto_fan;
+		}
 	}
+	if (data->manual_fan && data->auto_fan)
+		dev_info(&pdev->dev, "enabling support for setting automatic/manual fan control\n");
 
 	if (!fan_mult) {
 		/*
