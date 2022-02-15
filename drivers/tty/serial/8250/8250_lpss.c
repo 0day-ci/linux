@@ -149,6 +149,8 @@ static int byt_serial_setup(struct lpss8250 *lpss, struct uart_port *port)
 	/* Disable TX counter interrupts */
 	writel(BYT_TX_OVF_INT_MASK, port->membase + BYT_TX_OVF_INT);
 
+	pci_dev_put(dma_dev);
+
 	return 0;
 }
 
