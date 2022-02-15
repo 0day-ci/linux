@@ -83,7 +83,7 @@ void __init riscv_fill_hwcap(void)
 
 	for_each_of_cpu_node(node) {
 		unsigned long this_hwcap = 0;
-		unsigned long this_isa = 0;
+		uint64_t this_isa = 0;
 
 		if (riscv_of_processor_hartid(node) < 0)
 			continue;
@@ -167,12 +167,22 @@ void __init riscv_fill_hwcap(void)
 			if (*isa != '_')
 				--isa;
 
+#define SET_ISA_EXT_MAP(name, bit)						\
+			do {							\
+				if ((ext_end - ext == sizeof(name) - 1) &&	\
+				     !memcmp(ext, name, sizeof(name) - 1)) {    \
+					this_isa |= (1UL << bit);		\
+					pr_info("Found ISA extension %s", name);\
+				}						\
+			} while (false)						\
+
 			if (unlikely(ext_err))
 				continue;
 			if (!ext_long) {
 				this_hwcap |= isa2hwcap[(unsigned char)(*ext)];
 				this_isa |= (1UL << (*ext - 'a'));
 			}
+#undef SET_ISA_EXT_MAP
 		}
 
 		/*
@@ -185,10 +195,21 @@ void __init riscv_fill_hwcap(void)
 		else
 			elf_hwcap = this_hwcap;
 
-		if (riscv_isa[0])
+		if (riscv_isa[0]) {
+#if IS_ENABLED(CONFIG_32BIT)
+			riscv_isa[0] &= this_isa & 0xFFFFFFFF;
+			riscv_isa[1] &= this_isa >> 32;
+#else
 			riscv_isa[0] &= this_isa;
-		else
+#endif
+		} else {
+#if IS_ENABLED(CONFIG_32BIT)
+			riscv_isa[0] = this_isa & 0xFFFFFFFF;
+			riscv_isa[1] = this_isa >> 32;
+#else
 			riscv_isa[0] = this_isa;
+#endif
+		}
 	}
 
 	/* We don't support systems with F but without D, so mask those out
