@@ -2966,8 +2966,8 @@ enum v4l2_mpeg_video_hevc_size_of_length_field -
     :widths:       1 1 2
 
     * - __u32
-      - ``data_bit_offset``
-      - Offset (in bits) to the video data in the current slice data.
+      - ``data_byte_offset``
+      - Offset (in byte) to the video data in the current slice data.
     * - __u8
       - ``nal_unit_type``
       -
