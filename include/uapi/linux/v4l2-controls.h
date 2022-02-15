@@ -2457,7 +2457,6 @@ struct v4l2_hevc_pred_weight_table {
 #define V4L2_HEVC_SLICE_PARAMS_FLAG_DEPENDENT_SLICE_SEGMENT	(1ULL << 9)
 
 struct v4l2_ctrl_hevc_slice_params {
-	__u32	bit_size;
 	__u32	data_bit_offset;
 
 	/* ISO/IEC 23008-2, ITU-T Rec. H.265: NAL unit header */
@@ -2484,7 +2483,7 @@ struct v4l2_ctrl_hevc_slice_params {
 	/* ISO/IEC 23008-2, ITU-T Rec. H.265: Picture timing SEI message */
 	__u8	pic_struct;
 
-	__u8	reserved;
+	__u8	reserved[5];
 
 	/* ISO/IEC 23008-2, ITU-T Rec. H.265: General slice segment header */
 	__u32	slice_segment_addr;
