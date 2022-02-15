@@ -104,6 +104,9 @@ extern "C" {
 #define DRM_FORMAT_C4		fourcc_code('C', '4', ' ', ' ') /* [3:0] C */
 #define DRM_FORMAT_C8		fourcc_code('C', '8', ' ', ' ') /* [7:0] C */
 
+/* 1 bpp Darkness */
+#define DRM_FORMAT_D1		fourcc_code('D', '1', ' ', ' ') /* [0] D */
+
 /* 1 bpp Red */
 #define DRM_FORMAT_R1		fourcc_code('R', '1', ' ', ' ') /* [0] R */
 
