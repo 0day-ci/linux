@@ -185,7 +185,7 @@ struct mlx5_ifc_fpga_access_reg_bits {
 
 	u8         address[0x40];
 
-	u8         data[0][0x8];
+	u8         data[][0x8];
 };
 
 enum mlx5_ifc_fpga_qp_state {
