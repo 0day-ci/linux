@@ -411,6 +411,10 @@ enum skb_drop_reason {
 					 * net.rst) or RPS flow limit
 					 */
 	SKB_DROP_REASON_XDP,		/* dropped by XDP in input path */
+	SKB_DROP_REASON_QDISC_INGRESS,	/* qdisc of type ingress check
+					 * failed (maybe an eBPF program
+					 * is tricking?)
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
