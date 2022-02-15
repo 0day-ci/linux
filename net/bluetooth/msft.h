@@ -27,6 +27,8 @@ int msft_set_filter_enable(struct hci_dev *hdev, bool enable);
 int msft_suspend_sync(struct hci_dev *hdev);
 int msft_resume_sync(struct hci_dev *hdev);
 bool msft_curve_validity(struct hci_dev *hdev);
+__u8 *get_msft_evt_prefix(struct hci_dev *hdev);
+__u8 get_msft_evt_prefix_len(struct hci_dev *hdev);
 
 #else
 
@@ -75,6 +77,16 @@ static inline int msft_resume_sync(struct hci_dev *hdev)
 static inline bool msft_curve_validity(struct hci_dev *hdev)
 {
 	return false;
+}
+
+static inline __u8 *get_msft_evt_prefix(struct hci_dev *hdev)
+{
+	return NULL;
+}
+
+static inline __u8 get_msft_evt_prefix_len(struct hci_dev *hdev)
+{
+	return 0;
 }
 
 #endif

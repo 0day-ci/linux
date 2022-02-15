@@ -37,6 +37,7 @@
 #include "smp.h"
 #include "msft.h"
 #include "eir.h"
+#include "aosp.h"
 
 #define ZERO_KEY "\x00\x00\x00\x00\x00\x00\x00\x00" \
 		 "\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -4241,6 +4242,87 @@ static void hci_num_comp_blocks_evt(struct hci_dev *hdev, void *data,
 	queue_work(hdev->workqueue, &hdev->tx_work);
 }
 
+/* Define the fixed vendor event prefixes below.
+ * Note: AOSP HCI Requirements use 0x54 and up as sub-event codes without
+ *       actually defining a vendor prefix. Refer to
+ *       https://source.android.com/devices/bluetooth/hci_requirements
+ *       Hence, the other vendor event prefixes should not use the same
+ *       space to avoid collision.
+ */
+static unsigned char AOSP_BQR_PREFIX[] = { 0x58 };
+
+/* Some vendor prefixes are fixed values and lengths. */
+#define FIXED_EVT_PREFIX(_prefix, _vendor_func)				\
+{									\
+	.prefix = _prefix,						\
+	.prefix_len = sizeof(_prefix),					\
+	.vendor_func = _vendor_func,					\
+	.get_prefix = NULL,						\
+	.get_prefix_len = NULL,						\
+}
+
+/* Some vendor prefixes are only available at run time. The
+ * values and lengths are variable.
+ */
+#define DYNAMIC_EVT_PREFIX(_prefix_func, _prefix_len_func, _vendor_func)\
+{									\
+	.prefix = NULL,							\
+	.prefix_len = 0,						\
+	.vendor_func = _vendor_func,					\
+	.get_prefix = _prefix_func,					\
+	.get_prefix_len = _prefix_len_func,				\
+}
+
+/* Every distinct vendor specification must have a well-defined vendor
+ * event prefix to determine if a vendor event meets the specification.
+ * If an event prefix is fixed, it should be delcared with FIXED_EVT_PREFIX.
+ * Otherwise, DYNAMIC_EVT_PREFIX should be used for variable prefixes.
+ */
+struct vendor_event_prefix {
+	__u8 *prefix;
+	__u8 prefix_len;
+	void (*vendor_func)(struct hci_dev *hdev, void *data,
+			    struct sk_buff *skb);
+	__u8 *(*get_prefix)(struct hci_dev *hdev);
+	__u8 (*get_prefix_len)(struct hci_dev *hdev);
+} evt_prefixes[] = {
+	FIXED_EVT_PREFIX(AOSP_BQR_PREFIX, aosp_quality_report_evt),
+	DYNAMIC_EVT_PREFIX(get_msft_evt_prefix, get_msft_evt_prefix_len,
+			   msft_vendor_evt),
+
+	/* end with a null entry */
+	{},
+};
+
+static void hci_vendor_evt(struct hci_dev *hdev, void *data,
+			   struct sk_buff *skb)
+{
+	int i;
+	__u8 *prefix;
+	__u8 prefix_len;
+
+	for (i = 0; evt_prefixes[i].vendor_func; i++) {
+		if (evt_prefixes[i].get_prefix)
+			prefix = evt_prefixes[i].get_prefix(hdev);
+		else
+			prefix = evt_prefixes[i].prefix;
+
+		if (evt_prefixes[i].get_prefix_len)
+			prefix_len = evt_prefixes[i].get_prefix_len(hdev);
+		else
+			prefix_len = evt_prefixes[i].prefix_len;
+
+		if (!prefix || prefix_len == 0)
+			continue;
+
+		/* Compare the raw prefix data directly. */
+		if (!memcmp(prefix, skb->data, prefix_len)) {
+			evt_prefixes[i].vendor_func(hdev, data, skb);
+			break;
+		}
+	}
+}
+
 static void hci_mode_change_evt(struct hci_dev *hdev, void *data,
 				struct sk_buff *skb)
 {
@@ -6844,7 +6926,7 @@ static const struct hci_ev {
 	HCI_EV(HCI_EV_NUM_COMP_BLOCKS, hci_num_comp_blocks_evt,
 	       sizeof(struct hci_ev_num_comp_blocks)),
 	/* [0xff = HCI_EV_VENDOR] */
-	HCI_EV_VL(HCI_EV_VENDOR, msft_vendor_evt, 0, HCI_MAX_EVENT_SIZE),
+	HCI_EV_VL(HCI_EV_VENDOR, hci_vendor_evt, 0, HCI_MAX_EVENT_SIZE),
 };
 
 static void hci_event_func(struct hci_dev *hdev, u8 event, struct sk_buff *skb,

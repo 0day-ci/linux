@@ -1864,6 +1864,8 @@ int mgmt_add_adv_patterns_monitor_complete(struct hci_dev *hdev, u8 status);
 int mgmt_remove_adv_monitor_complete(struct hci_dev *hdev, u8 status);
 void mgmt_adv_monitor_device_lost(struct hci_dev *hdev, u16 handle,
 				  bdaddr_t *bdaddr, u8 addr_type);
+int mgmt_quality_report(struct hci_dev *hdev, void *data, u32 data_len,
+			u8 quality_spec);
 
 u8 hci_le_conn_update(struct hci_conn *conn, u16 min, u16 max, u16 latency,
 		      u16 to_multiplier);
@@ -1881,5 +1883,8 @@ void hci_copy_identity_address(struct hci_dev *hdev, bdaddr_t *bdaddr,
 #define LOCAL_CODEC_SCO_MASK	BIT(1)
 
 #define TRANSPORT_TYPE_MAX	0x04
+
+#define QUALITY_SPEC_AOSP_BQR		0x0
+#define QUALITY_SPEC_INTEL_TELEMETRY	0x1
 
 #endif /* __HCI_CORE_H */

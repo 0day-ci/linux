@@ -4389,6 +4389,26 @@ static int set_exp_feature(struct sock *sk, struct hci_dev *hdev,
 			       MGMT_STATUS_NOT_SUPPORTED);
 }
 
+int mgmt_quality_report(struct hci_dev *hdev, void *data, u32 data_len,
+			u8 quality_spec)
+{
+	struct mgmt_ev_quality_report *ev;
+	struct sk_buff *skb;
+
+	skb = mgmt_alloc_skb(hdev, MGMT_EV_QUALITY_REPORT,
+			     sizeof(*ev) + data_len);
+	if (!skb)
+		return -ENOMEM;
+
+	ev = skb_put(skb, sizeof(*ev));
+	ev->quality_spec = quality_spec;
+	ev->data_len = data_len;
+	skb_put_data(skb, data, data_len);
+
+	return mgmt_event_skb(skb, NULL);
+}
+EXPORT_SYMBOL(mgmt_quality_report);
+
 static int get_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
 			    u16 data_len)
 {

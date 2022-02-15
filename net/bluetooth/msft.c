@@ -731,6 +731,20 @@ static void msft_monitor_device_evt(struct hci_dev *hdev, struct sk_buff *skb)
 				 handle_data->mgmt_handle);
 }
 
+__u8 *get_msft_evt_prefix(struct hci_dev *hdev)
+{
+	struct msft_data *msft = hdev->msft_data;
+
+	return msft->evt_prefix;
+}
+
+__u8 get_msft_evt_prefix_len(struct hci_dev *hdev)
+{
+	struct msft_data *msft = hdev->msft_data;
+
+	return msft->evt_prefix_len;
+}
+
 void msft_vendor_evt(struct hci_dev *hdev, void *data, struct sk_buff *skb)
 {
 	struct msft_data *msft = hdev->msft_data;

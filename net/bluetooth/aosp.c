@@ -199,3 +199,30 @@ int aosp_set_quality_report(struct hci_dev *hdev, bool enable)
 	else
 		return disable_quality_report(hdev);
 }
+
+#define BLUETOOTH_QUALITY_REPORT_EV		0x58
+
+/* The following LEN = 1-byte Sub-event code + 48-byte Sub-event Parameters */
+#define BLUETOOTH_QUALITY_REPORT_LEN		49
+
+bool aosp_check_quality_report_len(struct sk_buff *skb)
+{
+	/* skb->len is allowed to be larger than BLUETOOTH_QUALITY_REPORT_LEN
+	 * to accommodate an additional Vendor Specific Parameter (vsp) field.
+	 */
+	if (skb->len < BLUETOOTH_QUALITY_REPORT_LEN) {
+		BT_ERR("AOSP evt data len %d too short (%u expected)",
+		       skb->len, BLUETOOTH_QUALITY_REPORT_LEN);
+		return false;
+	}
+
+	return true;
+}
+
+void aosp_quality_report_evt(struct hci_dev *hdev,  void *data,
+			     struct sk_buff *skb)
+{
+	if (aosp_has_quality_report(hdev) && aosp_check_quality_report_len(skb))
+		mgmt_quality_report(hdev, skb->data, skb->len,
+				    QUALITY_SPEC_AOSP_BQR);
+}
