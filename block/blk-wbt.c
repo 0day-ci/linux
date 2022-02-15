@@ -628,9 +628,13 @@ static void wbt_requeue(struct rq_qos *rqos, struct request *rq)
 
 void wbt_set_write_cache(struct request_queue *q, bool write_cache_on)
 {
-	struct rq_qos *rqos = wbt_rq_qos(q);
+	struct rq_qos *rqos;
+
+	spin_lock_irq(&q->queue_lock);
+	rqos = wbt_rq_qos(q);
 	if (rqos)
 		RQWB(rqos)->wc = write_cache_on;
+	spin_unlock_irq(&q->queue_lock);
 }
 
 /*

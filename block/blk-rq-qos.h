@@ -26,7 +26,10 @@ struct rq_wait {
 };
 
 struct rq_qos {
-	struct rq_qos_ops *ops;
+	refcount_t ref;
+	wait_queue_head_t waitq;
+	bool dying;
+	const struct rq_qos_ops *ops;
 	struct request_queue *q;
 	enum rq_qos_id id;
 	struct rq_qos *next;
@@ -35,7 +38,17 @@ struct rq_qos {
 #endif
 };
 
+enum {
+	RQOS_FLAG_CGRP_POL = 1 << 0,
+	RQOS_FLAG_RQ_ALLOC_TIME = 1 << 1
+};
+
 struct rq_qos_ops {
+	struct list_head node;
+	struct module *owner;
+	const char *name;
+	int flags;
+	int id;
 	void (*throttle)(struct rq_qos *, struct bio *);
 	void (*track)(struct rq_qos *, struct request *, struct bio *);
 	void (*merge)(struct rq_qos *, struct request *, struct bio *);
@@ -46,6 +59,7 @@ struct rq_qos_ops {
 	void (*cleanup)(struct rq_qos *, struct bio *);
 	void (*queue_depth_changed)(struct rq_qos *);
 	void (*exit)(struct rq_qos *);
+	int (*init)(struct request_queue *);
 	const struct blk_mq_debugfs_attr *debugfs_attrs;
 };
 
@@ -59,10 +73,12 @@ struct rq_depth {
 	unsigned int default_depth;
 };
 
-static inline struct rq_qos *rq_qos_id(struct request_queue *q,
-				       enum rq_qos_id id)
+static inline struct rq_qos *rq_qos_by_id(struct request_queue *q, int id)
 {
 	struct rq_qos *rqos;
+
+	WARN_ON(!mutex_is_locked(&q->sysfs_lock) && !spin_is_locked(&q->queue_lock));
+
 	for (rqos = q->rq_qos; rqos; rqos = rqos->next) {
 		if (rqos->id == id)
 			break;
@@ -72,12 +88,12 @@ static inline struct rq_qos *rq_qos_id(struct request_queue *q,
 
 static inline struct rq_qos *wbt_rq_qos(struct request_queue *q)
 {
-	return rq_qos_id(q, RQ_QOS_WBT);
+	return rq_qos_by_id(q, RQ_QOS_WBT);
 }
 
 static inline struct rq_qos *blkcg_rq_qos(struct request_queue *q)
 {
-	return rq_qos_id(q, RQ_QOS_LATENCY);
+	return rq_qos_by_id(q, RQ_QOS_LATENCY);
 }
 
 static inline void rq_wait_init(struct rq_wait *rq_wait)
@@ -130,6 +146,35 @@ static inline void rq_qos_del(struct request_queue *q, struct rq_qos *rqos)
 	blk_mq_unfreeze_queue(q);
 
 	blk_mq_debugfs_unregister_rqos(rqos);
+}
+
+int rq_qos_register(struct rq_qos_ops *ops);
+void rq_qos_unregister(struct rq_qos_ops *ops);
+void rq_qos_activate(struct request_queue *q,
+		struct rq_qos *rqos, const struct rq_qos_ops *ops);
+void rq_qos_deactivate(struct rq_qos *rqos);
+ssize_t queue_qos_show(struct request_queue *q, char *buf);
+ssize_t queue_qos_store(struct request_queue *q, const char *page,
+			  size_t count);
+struct rq_qos *rq_qos_get(struct request_queue *q, int id);
+void rq_qos_put(struct rq_qos *rqos);
+
+static inline struct rq_qos *rq_qos_by_name(struct request_queue *q,
+		const char *name)
+{
+	struct rq_qos *rqos;
+
+	WARN_ON(!mutex_is_locked(&q->sysfs_lock));
+
+	for (rqos = q->rq_qos; rqos; rqos = rqos->next) {
+		if (!rqos->ops->name)
+			continue;
+
+		if (!strncmp(rqos->ops->name, name,
+					strlen(rqos->ops->name)))
+			return rqos;
+	}
+	return NULL;
 }
 
 typedef bool (acquire_inflight_cb_t)(struct rq_wait *rqw, void *private_data);

@@ -621,8 +621,6 @@ void del_gendisk(struct gendisk *disk)
 	device_del(disk_to_dev(disk));
 
 	blk_mq_freeze_queue_wait(q);
-
-	rq_qos_exit(q);
 	blk_sync_queue(q);
 	blk_flush_integrity();
 	/*
