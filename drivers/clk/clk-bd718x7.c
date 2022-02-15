@@ -70,10 +70,16 @@ static int bd71837_clk_is_enabled(struct clk_hw *hw)
 	return enabled & c->mask;
 }
 
+static int bd71837_match_clkspec(struct clk_hw *hw, struct of_phandle_args *clkspec)
+{
+	return 0;
+}
+
 static const struct clk_ops bd71837_clk_ops = {
 	.prepare = &bd71837_clk_enable,
 	.unprepare = &bd71837_clk_disable,
 	.is_prepared = &bd71837_clk_is_enabled,
+	.match_clkspec = &bd71837_match_clkspec,
 };
 
 static int bd71837_clk_probe(struct platform_device *pdev)
