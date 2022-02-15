@@ -41,6 +41,7 @@ static int adxl345_i2c_probe(struct i2c_client *client,
 static const struct i2c_device_id adxl345_i2c_id[] = {
 	{ "adxl345", ADXL345 },
 	{ "adxl375", ADXL375 },
+	{ "ADS0345:00", ADXL345 },
 	{ }
 };
 
@@ -54,10 +55,17 @@ static const struct of_device_id adxl345_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, adxl345_of_match);
 
+static const struct acpi_device_id adxl345_acpi_match[] = {
+	{ "ADS0345" },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, adxl345_acpi_match);
+
 static struct i2c_driver adxl345_i2c_driver = {
 	.driver = {
 		.name	= "adxl345_i2c",
 		.of_match_table = adxl345_of_match,
+		.acpi_match_table = adxl345_acpi_match,
 	},
 	.probe		= adxl345_i2c_probe,
 	.id_table	= adxl345_i2c_id,
