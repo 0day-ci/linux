@@ -37,6 +37,7 @@ struct opregion_acpi;
 struct opregion_swsci;
 struct opregion_asle;
 struct opregion_asle_ext;
+struct i915_opregion_func;
 
 struct intel_opregion {
 	struct opregion_header *header;
@@ -46,6 +47,8 @@ struct intel_opregion {
 	u32 swsci_sbcb_sub_functions;
 	struct opregion_asle *asle;
 	struct opregion_asle_ext *asle_ext;
+	const struct i915_opregion_func *opregion_func;
+	resource_size_t asls;
 	void *rvda;
 	void *vbt_firmware;
 	const void *vbt;

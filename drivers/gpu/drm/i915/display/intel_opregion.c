@@ -138,6 +138,13 @@ struct opregion_asle_ext {
 	u8 rsvd[764];
 } __packed;
 
+struct i915_opregion_func {
+	void *(*alloc_opregion)(struct drm_i915_private *i915);
+	void *(*alloc_rvda)(struct drm_i915_private *i915);
+	void (*free_rvda)(struct drm_i915_private *i915);
+	void (*free_opregion)(struct drm_i915_private *i915);
+};
+
 /* Driver readiness indicator */
 #define ASLE_ARDY_READY		(1 << 0)
 #define ASLE_ARDY_NOT_READY	(0 << 0)
@@ -876,10 +883,7 @@ static int intel_load_vbt_firmware(struct drm_i915_private *dev_priv)
 static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 {
 	struct intel_opregion *opregion = &dev_priv->opregion;
-	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
-	u32 asls, mboxes;
-	char buf[sizeof(OPREGION_SIGNATURE)];
-	int err = 0;
+	u32 mboxes;
 	void *base;
 	const void *vbt;
 	u32 vbt_size;
@@ -890,27 +894,12 @@ static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	BUILD_BUG_ON(sizeof(struct opregion_asle) != 0x100);
 	BUILD_BUG_ON(sizeof(struct opregion_asle_ext) != 0x400);
 
-	pci_read_config_dword(pdev, ASLS, &asls);
-	drm_dbg(&dev_priv->drm, "graphic opregion physical addr: 0x%x\n",
-		asls);
-	if (asls == 0) {
-		drm_dbg(&dev_priv->drm, "ACPI OpRegion not supported!\n");
-		return -ENOTSUPP;
-	}
-
 	INIT_WORK(&opregion->asle_work, asle_work);
 
-	base = memremap(asls, OPREGION_SIZE, MEMREMAP_WB);
-	if (!base)
-		return -ENOMEM;
+	base = opregion->opregion_func->alloc_opregion(dev_priv);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
 
-	memcpy(buf, base, sizeof(buf));
-
-	if (memcmp(buf, OPREGION_SIGNATURE, 16)) {
-		drm_dbg(&dev_priv->drm, "opregion signature mismatch\n");
-		err = -EINVAL;
-		goto err_out;
-	}
 	opregion->header = base;
 	opregion->lid_state = base + ACPI_CLID;
 
@@ -970,23 +959,10 @@ static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 
 	if (opregion->header->over.major >= 2 && opregion->asle &&
 	    opregion->asle->rvda && opregion->asle->rvds) {
-		resource_size_t rvda = opregion->asle->rvda;
 
-		/*
-		 * opregion 2.0: rvda is the physical VBT address.
-		 *
-		 * opregion 2.1+: rvda is unsigned, relative offset from
-		 * opregion base, and should never point within opregion.
-		 */
-		if (opregion->header->over.major > 2 ||
-		    opregion->header->over.minor >= 1) {
-			drm_WARN_ON(&dev_priv->drm, rvda < OPREGION_SIZE);
-
-			rvda += asls;
-		}
-
-		opregion->rvda = memremap(rvda, opregion->asle->rvds,
-					  MEMREMAP_WB);
+		opregion->rvda = opregion->opregion_func->alloc_rvda(dev_priv);
+		if (IS_ERR(opregion->rvda))
+			goto mbox4_vbt;
 
 		vbt = opregion->rvda;
 		vbt_size = opregion->asle->rvds;
@@ -999,10 +975,11 @@ static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 		} else {
 			drm_dbg_kms(&dev_priv->drm,
 				    "Invalid VBT in ACPI OpRegion (RVDA)\n");
-			memunmap(opregion->rvda);
-			opregion->rvda = NULL;
+			opregion->opregion_func->free_rvda(dev_priv);
 		}
 	}
+
+mbox4_vbt:
 
 	vbt = base + OPREGION_VBT_OFFSET;
 	/*
@@ -1028,9 +1005,6 @@ static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 out:
 	return 0;
 
-err_out:
-	memunmap(base);
-	return err;
 }
 
 static int intel_use_opregion_panel_type_callback(const struct dmi_system_id *id)
@@ -1215,11 +1189,9 @@ void intel_opregion_unregister(struct drm_i915_private *i915)
 	}
 
 	/* just clear all opregion memory pointers now */
-	memunmap(opregion->header);
-	if (opregion->rvda) {
-		memunmap(opregion->rvda);
-		opregion->rvda = NULL;
-	}
+	opregion->opregion_func->free_rvda(i915);
+	opregion->opregion_func->free_opregion(i915);
+
 	if (opregion->vbt_firmware) {
 		kfree(opregion->vbt_firmware);
 		opregion->vbt_firmware = NULL;
@@ -1233,6 +1205,113 @@ void intel_opregion_unregister(struct drm_i915_private *i915)
 	opregion->lid_state = NULL;
 }
 
+static int
+intel_opregion_get_asls(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = &i915->opregion;
+	struct pci_dev *pdev = to_pci_dev(i915->drm.dev);
+	u32 asls;
+
+	pci_read_config_dword(pdev, ASLS, &asls);
+	drm_dbg(&i915->drm, "graphic opregion physical addr: 0x%x\n",
+		asls);
+	if (asls == 0) {
+		drm_dbg(&i915->drm, "ACPI OpRegion not supported!\n");
+		return -EINVAL;
+	}
+
+	opregion->asls = asls;
+
+	return 0;
+}
+
+static void *intel_igfx_alloc_opregion(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = &i915->opregion;
+	char buf[sizeof(OPREGION_SIGNATURE)];
+	int err = 0;
+	void *base;
+
+	err = intel_opregion_get_asls(i915);
+	if (err)
+		return ERR_PTR(err);
+
+	base = memremap(opregion->asls, OPREGION_SIZE, MEMREMAP_WB);
+	if (!base)
+		return ERR_PTR(-ENOMEM);
+
+	memcpy(buf, base, sizeof(buf));
+
+	if (memcmp(buf, OPREGION_SIGNATURE, 16)) {
+		drm_dbg(&i915->drm, "opregion signature mismatch\n");
+		err = -EINVAL;
+		goto err_out;
+	}
+
+	return base;
+
+err_out:
+	memunmap(base);
+
+	return ERR_PTR(err);
+}
+
+static void *intel_igfx_alloc_rvda(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = &i915->opregion;
+	resource_size_t rvda;
+	void *opreg_rvda;
+
+	if(drm_WARN_ON(&i915->drm, !opregion->asls || !opregion->header))
+		return ERR_PTR(-ENODEV);
+
+	rvda = opregion->asle->rvda;
+
+	/*
+	 * opregion 2.0: rvda is the physical VBT address.
+	 *
+	 * opregion 2.1+: rvda is unsigned, relative offset from
+	 * opregion base, and should never point within opregion.
+	 */
+	if (opregion->header->over.major > 2 ||
+	    opregion->header->over.minor >= 1) {
+		drm_WARN_ON(&i915->drm, rvda < OPREGION_SIZE);
+
+		rvda += opregion->asls;
+	}
+
+	opreg_rvda = memremap(rvda, opregion->asle->rvds, MEMREMAP_WB);
+	if (!opreg_rvda)
+		return ERR_PTR(-ENOMEM);
+
+	return opreg_rvda;
+}
+
+static void intel_igfx_free_rvda(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = &i915->opregion;
+
+	if (opregion->rvda) {
+		memunmap(opregion->rvda);
+		opregion->rvda = NULL;
+	}
+}
+
+static void intel_igfx_free_opregion(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = &i915->opregion;
+
+	if (opregion->header)
+		memunmap(opregion->header);
+}
+
+static const struct i915_opregion_func igfx_opregion_func = {
+	.alloc_opregion = intel_igfx_alloc_opregion,
+	.alloc_rvda = intel_igfx_alloc_rvda,
+	.free_rvda = intel_igfx_free_rvda,
+	.free_opregion = intel_igfx_free_opregion,
+};
+
 /**
  * intel_opregion_init() - Init ACPI opregion.
  * @i915 i915 device priv data.
@@ -1240,5 +1319,9 @@ void intel_opregion_unregister(struct drm_i915_private *i915)
  */
 int intel_opregion_init(struct drm_i915_private *i915)
 {
+	struct intel_opregion *opregion = &i915->opregion;
+
+	opregion->opregion_func = &igfx_opregion_func;
+
 	return intel_opregion_setup(i915);
 }
