@@ -21,9 +21,6 @@
 #include "hw.h"
 #include "ar9003_phy.h"
 
-#define ATH9K_RNG_BUF_SIZE	320
-#define ATH9K_RNG_ENTROPY(x)	(((x) * 8 * 10) >> 5) /* quality: 10/32 */
-
 static DECLARE_WAIT_QUEUE_HEAD(rng_queue);
 
 static int ath9k_rng_data_read(struct ath_softc *sc, u32 *buf, u32 buf_size)
@@ -71,61 +68,46 @@ static u32 ath9k_rng_delay_get(u32 fail_stats)
 	return delay;
 }
 
-static int ath9k_rng_kthread(void *data)
+static int ath9k_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 {
+	struct ath_softc *sc = container_of(rng, struct ath_softc, rng_ops);
 	int bytes_read;
-	struct ath_softc *sc = data;
-	u32 *rng_buf;
-	u32 delay, fail_stats = 0;
+	u32 fail_stats = 0;
 
-	rng_buf = kmalloc_array(ATH9K_RNG_BUF_SIZE, sizeof(u32), GFP_KERNEL);
-	if (!rng_buf)
-		goto out;
-
-	while (!kthread_should_stop()) {
-		bytes_read = ath9k_rng_data_read(sc, rng_buf,
-						 ATH9K_RNG_BUF_SIZE);
-		if (unlikely(!bytes_read)) {
-			delay = ath9k_rng_delay_get(++fail_stats);
-			wait_event_interruptible_timeout(rng_queue,
-							 kthread_should_stop(),
-							 msecs_to_jiffies(delay));
-			continue;
-		}
-
-		fail_stats = 0;
-
-		/* sleep until entropy bits under write_wakeup_threshold */
-		add_hwgenerator_randomness((void *)rng_buf, bytes_read,
-					   ATH9K_RNG_ENTROPY(bytes_read));
+retry:
+	bytes_read = ath9k_rng_data_read(sc, buf, max);
+	if (unlikely(!bytes_read) && wait) {
+		msleep(ath9k_rng_delay_get(++fail_stats));
+		goto retry;
 	}
 
-	kfree(rng_buf);
-out:
-	sc->rng_task = NULL;
-
-	return 0;
+	return bytes_read;
 }
 
 void ath9k_rng_start(struct ath_softc *sc)
 {
 	struct ath_hw *ah = sc->sc_ah;
+	int ret;
 
-	if (sc->rng_task)
+	if (sc->rng_ops.read)
 		return;
 
 	if (!AR_SREV_9300_20_OR_LATER(ah))
 		return;
 
-	sc->rng_task = kthread_run(ath9k_rng_kthread, sc, "ath9k-hwrng");
-	if (IS_ERR(sc->rng_task))
-		sc->rng_task = NULL;
+	sc->rng_ops.name = "ath9k";
+	sc->rng_ops.read = ath9k_rng_read;
+	sc->rng_ops.quality = 320;
+
+	ret = devm_hwrng_register(sc->dev, &sc->rng_ops);
+	if (ret)
+		sc->rng_ops.read = NULL;
 }
 
 void ath9k_rng_stop(struct ath_softc *sc)
 {
-	if (sc->rng_task) {
-		kthread_stop(sc->rng_task);
-		sc->rng_task = NULL;
+	if (sc->rng_ops.read) {
+		devm_hwrng_unregister(sc->dev, &sc->rng_ops);
+		sc->rng_ops.read = NULL;
 	}
 }

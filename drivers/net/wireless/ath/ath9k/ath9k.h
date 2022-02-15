@@ -1072,7 +1072,7 @@ struct ath_softc {
 
 #ifdef CONFIG_ATH9K_HWRNG
 	u32 rng_last;
-	struct task_struct *rng_task;
+	struct hwrng rng_ops;
 #endif
 };
 
