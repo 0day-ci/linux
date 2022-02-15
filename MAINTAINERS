@@ -9210,7 +9210,7 @@ L:	target-devel@vger.kernel.org
 S:	Supported
 F:	drivers/scsi/ibmvscsi_tgt/
 
-IBM Power VMX Cryptographic instructions
+IBM Power VMX Cryptographic Acceleration Instructions Driver
 M:	Breno Leitão <leitao@debian.org>
 M:	Nayna Jain <nayna@linux.ibm.com>
 M:	Paulo Flabiano Smorigo <pfsmorigo@gmail.com>
