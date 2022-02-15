@@ -1062,9 +1062,9 @@ static void srp_remove_target(struct srp_target_port *target)
 	kfree(target->ch);
 	target->ch = NULL;
 
-	spin_lock(&target->srp_host->target_lock);
+	mutex_lock(&target->srp_host->target_mutex);
 	list_del(&target->list);
-	spin_unlock(&target->srp_host->target_lock);
+	mutex_unlock(&target->srp_host->target_mutex);
 
 	scsi_host_put(target->scsi_host);
 }
@@ -3146,9 +3146,9 @@ static int srp_add_target(struct srp_host *host, struct srp_target_port *target)
 	rport->lld_data = target;
 	target->rport = rport;
 
-	spin_lock(&host->target_lock);
+	mutex_lock(&host->target_mutex);
 	list_add_tail(&target->list, &host->target_list);
-	spin_unlock(&host->target_lock);
+	mutex_unlock(&host->target_mutex);
 
 	scsi_scan_target(&target->scsi_host->shost_gendev,
 			 0, target->scsi_id, SCAN_WILD_CARD, SCSI_SCAN_INITIAL);
@@ -3203,7 +3203,7 @@ static bool srp_conn_unique(struct srp_host *host,
 
 	ret = true;
 
-	spin_lock(&host->target_lock);
+	mutex_lock(&host->target_mutex);
 	list_for_each_entry(t, &host->target_list, list) {
 		if (t != target &&
 		    target->id_ext == t->id_ext &&
@@ -3213,7 +3213,7 @@ static bool srp_conn_unique(struct srp_host *host,
 			break;
 		}
 	}
-	spin_unlock(&host->target_lock);
+	mutex_unlock(&host->target_mutex);
 
 out:
 	return ret;
@@ -3898,7 +3898,7 @@ static struct srp_host *srp_add_port(struct srp_device *device, u8 port)
 		return NULL;
 
 	INIT_LIST_HEAD(&host->target_list);
-	spin_lock_init(&host->target_lock);
+	mutex_init(&host->target_mutex);
 	init_completion(&host->released);
 	mutex_init(&host->add_target_mutex);
 	host->srp_dev = device;
@@ -4041,10 +4041,10 @@ static void srp_remove_one(struct ib_device *device, void *client_data)
 		/*
 		 * Remove all target ports.
 		 */
-		spin_lock(&host->target_lock);
+		mutex_lock(&host->target_mutex);
 		list_for_each_entry(target, &host->target_list, list)
 			srp_queue_remove_work(target);
-		spin_unlock(&host->target_lock);
+		mutex_unlock(&host->target_mutex);
 
 		/*
 		 * Wait for tl_err and target port removal tasks.

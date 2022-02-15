@@ -116,14 +116,14 @@ struct srp_device {
  * One port of an RDMA adapter in the initiator system.
  *
  * @target_list: List of connected target ports (struct srp_target_port).
- * @target_lock: Protects @target_list.
+ * @target_mutex: Protects @target_list.
  */
 struct srp_host {
 	struct srp_device      *srp_dev;
 	u8			port;
 	struct device		dev;
 	struct list_head	target_list;
-	spinlock_t		target_lock;
+	struct mutex		target_mutex;
 	struct completion	released;
 	struct list_head	list;
 	struct mutex		add_target_mutex;
