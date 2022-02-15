@@ -733,10 +733,7 @@ static int dmirror_exclusive(struct dmirror *dmirror,
 		unsigned long mapped;
 		int i;
 
-		if (end < addr + (ARRAY_SIZE(pages) << PAGE_SHIFT))
-			next = end;
-		else
-			next = addr + (ARRAY_SIZE(pages) << PAGE_SHIFT);
+		next = min(end, addr + (ARRAY_SIZE(pages) << PAGE_SHIFT));
 
 		ret = make_device_exclusive_range(mm, addr, next, pages, NULL);
 		mapped = dmirror_atomic_map(addr, next, pages, dmirror);
