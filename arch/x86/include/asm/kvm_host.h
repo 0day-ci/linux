@@ -1731,6 +1731,9 @@ int kvm_emulate_xsetbv(struct kvm_vcpu *vcpu);
 int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr);
 int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr);
 
+void kvm_get_xsave_msr(struct msr_data *msr_info);
+void kvm_set_xsave_msr(struct msr_data *msr_info);
+
 unsigned long kvm_get_rflags(struct kvm_vcpu *vcpu);
 void kvm_set_rflags(struct kvm_vcpu *vcpu, unsigned long rflags);
 int kvm_emulate_rdpmc(struct kvm_vcpu *vcpu);
