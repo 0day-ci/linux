@@ -400,6 +400,10 @@ enum skb_drop_reason {
 					 * failed (maybe an eBPF program
 					 * is tricking?)
 					 */
+	SKB_DROP_REASON_QDISC_DROP,	/* dropped by qdisc when packet
+					 * outputting (failed to enqueue to
+					 * current qdisc)
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
