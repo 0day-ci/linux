@@ -25,6 +25,8 @@
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
 
+#define PCI_DVSEC_ID_USB4	0x23
+
 static struct resource busn_resource = {
 	.name	= "PCI busn",
 	.start	= 0,
@@ -1600,6 +1602,52 @@ static void set_pcie_untrusted(struct pci_dev *dev)
 		dev->untrusted = true;
 }
 
+/*
+ * Use the fields from the USB4 Designated Vendor Specific Extended Capability
+ * (DVSEC) for Power Management 1.0 to identify PCIe root ports that are for
+ * XHCI and PCIe tunneling
+ */
+static void pci_set_usb4_external(struct pci_dev *dev)
+{
+	int dvsec_val = 0, pos;
+	u32 hdr;
+
+	/*
+	 * Table 3-1 "USB4 DVSEC Header fields" says vendors can use
+	 * either the Intel or USB IF vendor ID but should look for
+	 * the appropriate DVSEC ID.
+	 */
+	pos = pci_find_dvsec_capability(dev,
+					PCI_VENDOR_ID_INTEL,
+					PCI_DVSEC_ID_USB4);
+	if (pos) {
+		dvsec_val = 0x06;
+	} else {
+		pos = pci_find_dvsec_capability(dev,
+						PCI_VENDOR_ID_USB_IF,
+						PCI_DVSEC_ID_USB4);
+		if (pos)
+			dvsec_val = 0x01;
+	}
+	if (!dvsec_val)
+		return;
+
+	pci_read_config_dword(dev, pos + PCI_DVSEC_HEADER2, &hdr);
+	if ((hdr & GENMASK(15, 0)) != dvsec_val)
+		return;
+	/*
+	 * Look at the port type field for the expected bits for PCIe tunneling
+	 * and XHCI tunneling
+	 *
+	 * 0x0 - Native Host Interface
+	 * 0x1 - PCIe Tunneled Port
+	 * 0x2 - USB Tunneled Port
+	 * 0x3-0x7 - Reserved
+	 */
+	if (hdr & GENMASK(17, 16))
+		dev->external_facing = true;
+}
+
 static void pci_set_removable(struct pci_dev *dev)
 {
 	struct pci_dev *parent = pci_upstream_bridge(dev);
@@ -1869,6 +1917,8 @@ int pci_setup_device(struct pci_dev *dev)
 
 	/* Early fixups, before probing the BARs */
 	pci_fixup_device(pci_fixup_early, dev);
+
+	pci_set_usb4_external(dev);
 
 	pci_set_removable(dev);
 
