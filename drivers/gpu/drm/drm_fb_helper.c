@@ -436,11 +436,11 @@ static void drm_fb_helper_damage_work(struct work_struct *work)
 	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&helper->damage_lock, flags);
+	raw_spin_lock_irqsave(&helper->damage_lock, flags);
 	clip_copy = *clip;
 	clip->x1 = clip->y1 = ~0;
 	clip->x2 = clip->y2 = 0;
-	spin_unlock_irqrestore(&helper->damage_lock, flags);
+	raw_spin_unlock_irqrestore(&helper->damage_lock, flags);
 
 	/* Call damage handlers only if necessary */
 	if (!(clip_copy.x1 < clip_copy.x2 && clip_copy.y1 < clip_copy.y2))
@@ -465,12 +465,12 @@ err:
 	 * Restore damage clip rectangle on errors. The next run
 	 * of the damage worker will perform the update.
 	 */
-	spin_lock_irqsave(&helper->damage_lock, flags);
+	raw_spin_lock_irqsave(&helper->damage_lock, flags);
 	clip->x1 = min_t(u32, clip->x1, clip_copy.x1);
 	clip->y1 = min_t(u32, clip->y1, clip_copy.y1);
 	clip->x2 = max_t(u32, clip->x2, clip_copy.x2);
 	clip->y2 = max_t(u32, clip->y2, clip_copy.y2);
-	spin_unlock_irqrestore(&helper->damage_lock, flags);
+	raw_spin_unlock_irqrestore(&helper->damage_lock, flags);
 }
 
 /**
@@ -486,7 +486,7 @@ void drm_fb_helper_prepare(struct drm_device *dev, struct drm_fb_helper *helper,
 			   const struct drm_fb_helper_funcs *funcs)
 {
 	INIT_LIST_HEAD(&helper->kernel_fb_list);
-	spin_lock_init(&helper->damage_lock);
+	raw_spin_lock_init(&helper->damage_lock);
 	INIT_WORK(&helper->resume_work, drm_fb_helper_resume_worker);
 	INIT_WORK(&helper->damage_work, drm_fb_helper_damage_work);
 	helper->damage_clip.x1 = helper->damage_clip.y1 = ~0;
@@ -670,12 +670,12 @@ static void drm_fb_helper_damage(struct fb_info *info, u32 x, u32 y,
 	if (!drm_fbdev_use_shadow_fb(helper))
 		return;
 
-	spin_lock_irqsave(&helper->damage_lock, flags);
+	raw_spin_lock_irqsave(&helper->damage_lock, flags);
 	clip->x1 = min_t(u32, clip->x1, x);
 	clip->y1 = min_t(u32, clip->y1, y);
 	clip->x2 = max_t(u32, clip->x2, x + width);
 	clip->y2 = max_t(u32, clip->y2, y + height);
-	spin_unlock_irqrestore(&helper->damage_lock, flags);
+	raw_spin_unlock_irqrestore(&helper->damage_lock, flags);
 
 	schedule_work(&helper->damage_work);
 }

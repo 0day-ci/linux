@@ -131,7 +131,7 @@ struct drm_fb_helper {
 	struct fb_info *fbdev;
 	u32 pseudo_palette[17];
 	struct drm_clip_rect damage_clip;
-	spinlock_t damage_lock;
+	raw_spinlock_t damage_lock;
 	struct work_struct damage_work;
 	struct work_struct resume_work;
 
