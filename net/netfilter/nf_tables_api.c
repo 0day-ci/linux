@@ -1072,6 +1072,33 @@ static int nft_objname_hash_cmp(struct rhashtable_compare_arg *arg,
 	return strcmp(obj->key.name, k->name);
 }
 
+static bool nft_supported_family(int family)
+{
+	switch (family) {
+#ifdef CONFIG_NF_TABLES_INET
+	case NFPROTO_INET:
+#endif
+#ifdef CONFIG_NF_TABLES_IPV4
+	case NFPROTO_IPV4:
+#endif
+#ifdef CONFIG_NF_TABLES_ARP
+	case NFPROTO_ARP:
+#endif
+#ifdef CONFIG_NF_TABLES_NETDEV
+	case NFPROTO_NETDEV:
+#endif
+#if IS_ENABLED(CONIFG_NF_TABLES_BRIDGE)
+	case NFPROTO_BRIDGE:
+#endif
+#ifdef CONFIG_NF_TABLES_IPV6
+	case NFPROTO_IPV6:
+#endif
+		return true;
+	default:
+		return false;
+	}
+}
+
 static int nf_tables_newtable(struct sk_buff *skb, const struct nfnl_info *info,
 			      const struct nlattr * const nla[])
 {
@@ -1085,6 +1112,9 @@ static int nf_tables_newtable(struct sk_buff *skb, const struct nfnl_info *info,
 	struct nft_ctx ctx;
 	u32 flags = 0;
 	int err;
+
+	if (!nft_supported_family(family))
+		return -EOPNOTSUPP;
 
 	lockdep_assert_held(&nft_net->commit_mutex);
 	attr = nla[NFTA_TABLE_NAME];
