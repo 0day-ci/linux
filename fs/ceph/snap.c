@@ -477,19 +477,21 @@ static bool has_new_snaps(struct ceph_snap_context *o,
 static void ceph_queue_cap_snap(struct ceph_inode_info *ci)
 {
 	struct inode *inode = &ci->vfs_inode;
-	struct ceph_cap_snap *capsnap;
+	struct ceph_cap_snap *capsnap = NULL;
 	struct ceph_snap_context *old_snapc, *new_snapc;
 	struct ceph_buffer *old_blob = NULL;
 	int used, dirty;
+	bool need_flush = false;
+	bool atomic_alloc_mem_failed = false;
 
-	capsnap = kmem_cache_alloc(ceph_cap_snap_cachep, GFP_NOFS);
-	if (!capsnap) {
-		pr_err("ENOMEM allocating ceph_cap_snap on %p\n", inode);
-		return;
+retry:
+	if (unlikely(atomic_alloc_mem_failed)) {
+	        capsnap = kmem_cache_alloc(ceph_cap_snap_cachep, GFP_NOFS);
+		if (!capsnap) {
+			pr_err("ENOMEM allocating ceph_cap_snap on %p\n", inode);
+			return;
+		}
 	}
-	capsnap->cap_flush.is_capsnap = true;
-	INIT_LIST_HEAD(&capsnap->cap_flush.i_list);
-	INIT_LIST_HEAD(&capsnap->cap_flush.g_list);
 
 	spin_lock(&ci->i_ceph_lock);
 	used = __ceph_caps_used(ci);
@@ -532,7 +534,7 @@ static void ceph_queue_cap_snap(struct ceph_inode_info *ci)
 	 */
 	if (has_new_snaps(old_snapc, new_snapc)) {
 		if (dirty & (CEPH_CAP_ANY_EXCL|CEPH_CAP_FILE_WR))
-			capsnap->need_flush = true;
+			need_flush = true;
 	} else {
 		if (!(used & CEPH_CAP_FILE_WR) &&
 		    ci->i_wrbuffer_ref_head == 0) {
@@ -541,6 +543,21 @@ static void ceph_queue_cap_snap(struct ceph_inode_info *ci)
 			goto update_snapc;
 		}
 	}
+
+	if (!capsnap) {
+	        capsnap = kmem_cache_alloc(ceph_cap_snap_cachep, GFP_ATOMIC);
+		if (unlikely(!capsnap)) {
+			pr_err("ENOMEM atomic allocating ceph_cap_snap on %p\n",
+			       inode);
+			spin_unlock(&ci->i_ceph_lock);
+			atomic_alloc_mem_failed = true;
+			goto retry;
+		}
+	}
+	capsnap->need_flush = need_flush;
+	capsnap->cap_flush.is_capsnap = true;
+	INIT_LIST_HEAD(&capsnap->cap_flush.i_list);
+	INIT_LIST_HEAD(&capsnap->cap_flush.g_list);
 
 	dout("queue_cap_snap %p cap_snap %p queuing under %p %s %s\n",
 	     inode, capsnap, old_snapc, ceph_cap_string(dirty),
