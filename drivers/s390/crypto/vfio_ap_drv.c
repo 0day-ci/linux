@@ -100,64 +100,9 @@ static const struct attribute_group vfio_queue_attr_group = {
 	.attrs = vfio_queue_attrs,
 };
 
-/**
- * vfio_ap_queue_dev_probe: Allocate a vfio_ap_queue structure and associate it
- *			    with the device as driver_data.
- *
- * @apdev: the AP device being probed
- *
- * Return: returns 0 if the probe succeeded; otherwise, returns an error if
- *	   storage could not be allocated for a vfio_ap_queue object or the
- *	   sysfs 'status' attribute could not be created for the queue device.
- */
-static int vfio_ap_queue_dev_probe(struct ap_device *apdev)
-{
-	int ret;
-	struct vfio_ap_queue *q;
-
-	q = kzalloc(sizeof(*q), GFP_KERNEL);
-	if (!q)
-		return -ENOMEM;
-
-	mutex_lock(&matrix_dev->lock);
-	dev_set_drvdata(&apdev->device, q);
-	q->apqn = to_ap_queue(&apdev->device)->qid;
-	q->saved_isc = VFIO_AP_ISC_INVALID;
-
-	ret = sysfs_create_group(&apdev->device.kobj, &vfio_queue_attr_group);
-	if (ret) {
-		dev_set_drvdata(&apdev->device, NULL);
-		kfree(q);
-	}
-
-	mutex_unlock(&matrix_dev->lock);
-
-	return ret;
-}
-
-/**
- * vfio_ap_queue_dev_remove: Free the associated vfio_ap_queue structure.
- *
- * @apdev: the AP device being removed
- *
- * Takes the matrix lock to avoid actions on this device while doing the remove.
- */
-static void vfio_ap_queue_dev_remove(struct ap_device *apdev)
-{
-	struct vfio_ap_queue *q;
-
-	mutex_lock(&matrix_dev->lock);
-	sysfs_remove_group(&apdev->device.kobj, &vfio_queue_attr_group);
-	q = dev_get_drvdata(&apdev->device);
-	vfio_ap_mdev_reset_queue(q, 1);
-	dev_set_drvdata(&apdev->device, NULL);
-	kfree(q);
-	mutex_unlock(&matrix_dev->lock);
-}
-
 static struct ap_driver vfio_ap_drv = {
-	.probe = vfio_ap_queue_dev_probe,
-	.remove = vfio_ap_queue_dev_remove,
+	.probe = vfio_ap_mdev_probe_queue,
+	.remove = vfio_ap_mdev_remove_queue,
 	.ids = ap_queue_ids,
 };
 
