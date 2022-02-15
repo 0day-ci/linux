@@ -68,14 +68,15 @@ laptops actually work for yours as well, or that you have to discover
 new codes.
 
 As a first step, you can load the module with the module parameter
-``fan_mode_method`` set to 1 to test if your hardware works with
-an already know method for disabling automatic BIOS fan control.
+``fan_mode_method`` set to 1 or 2 to test if your hardware works with
+already know methods for disabling automatic BIOS fan control.
 If ``pwm1_enable`` is now present and works (i.e., you can
 manually control the fan speed), then please submit your finding
 as a kernel patch, so that other users can benefit from it.
 Just add your model to the list ``i8k_whitelist_fan_control`` in
 file ``drivers/hwmon/dell-smm-hwmon.c`` in the kernel tree and use
-the already known code pair.
+the already known code pairs (number of method equals the number of
+entry in ``i8k_fan_controls``).
 Please read
 :ref:`Documentation/process/submitting-patches.rst <submittingpatches>`
 for information on submitting patches.

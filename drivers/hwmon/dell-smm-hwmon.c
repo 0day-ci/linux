@@ -1182,10 +1182,15 @@ struct i8k_fan_control_data {
 };
 
 enum i8k_fan_controls {
+	I8K_FAN_30A3_31A3,
 	I8K_FAN_34A3_35A3,
 };
 
 static const struct i8k_fan_control_data i8k_fan_control_data[] __initconst = {
+	[I8K_FAN_30A3_31A3] = {
+		.manual_fan = 0x30a3,
+		.auto_fan = 0x31a3,
+	},
 	[I8K_FAN_34A3_35A3] = {
 		.manual_fan = 0x34a3,
 		.auto_fan = 0x35a3,
