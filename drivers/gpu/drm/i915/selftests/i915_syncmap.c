@@ -36,10 +36,10 @@ __sync_print(struct i915_syncmap *p,
 	unsigned int i, X;
 
 	if (depth) {
-		unsigned int d;
+		unsigned int d = depth;
 
-		for (d = 0; d < depth - 1; d++) {
-			if (last & BIT(depth - d - 1))
+		while (d--) {
+			if (last & BIT(d))
 				len = scnprintf(buf, *sz, "|   ");
 			else
 				len = scnprintf(buf, *sz, "    ");
