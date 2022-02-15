@@ -2401,8 +2401,11 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 	set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &hdev->quirks);
 	set_bit(HCI_QUIRK_NON_PERSISTENT_DIAG, &hdev->quirks);
 
-	/* Set up the quality report callback for Intel devices */
+	/* Set up the quality report callbacks for Intel devices */
 	hdev->set_quality_report = btintel_set_quality_report;
+
+	/* Set up the vendor specific callback for Intel devices */
+	hdev->vendor_evt = btintel_vendor_evt;
 
 	/* For Legacy device, check the HW platform value and size */
 	if (skb->len == sizeof(ver) && skb->data[1] == 0x37) {
@@ -2649,6 +2652,38 @@ void btintel_secure_send_result(struct hci_dev *hdev,
 		btintel_wake_up_flag(hdev, INTEL_DOWNLOADING);
 }
 EXPORT_SYMBOL_GPL(btintel_secure_send_result);
+
+#define INTEL_PREFIX		0x8087
+#define TELEMETRY_CODE		0x03
+
+struct intel_prefix_evt_data {
+	__le16 vendor_prefix;
+	__u8 code;
+	__u8 data[];   /* a number of struct intel_tlv subevents */
+} __packed;
+
+static bool is_quality_report_evt(struct sk_buff *skb)
+{
+	struct intel_prefix_evt_data *ev;
+	u16 vendor_prefix;
+
+	if (skb->len < sizeof(struct intel_prefix_evt_data))
+		return false;
+
+	ev = (struct intel_prefix_evt_data *)skb->data;
+	vendor_prefix = __le16_to_cpu(ev->vendor_prefix);
+
+	return vendor_prefix == INTEL_PREFIX && ev->code == TELEMETRY_CODE;
+}
+
+void btintel_vendor_evt(struct hci_dev *hdev,  void *data, struct sk_buff *skb)
+{
+	/* Only interested in the telemetry event for now. */
+	if (hdev->set_quality_report && is_quality_report_evt(skb))
+		mgmt_quality_report(hdev, skb->data, skb->len,
+				    QUALITY_SPEC_INTEL_TELEMETRY);
+}
+EXPORT_SYMBOL_GPL(btintel_vendor_evt);
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth support for Intel devices ver " VERSION);

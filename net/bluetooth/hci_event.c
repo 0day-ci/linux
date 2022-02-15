@@ -4250,6 +4250,7 @@ static void hci_num_comp_blocks_evt(struct hci_dev *hdev, void *data,
  *       space to avoid collision.
  */
 static unsigned char AOSP_BQR_PREFIX[] = { 0x58 };
+static unsigned char INTEL_PREFIX[] = { 0x87, 0x80 };
 
 /* Some vendor prefixes are fixed values and lengths. */
 #define FIXED_EVT_PREFIX(_prefix, _vendor_func)				\
@@ -4273,6 +4274,16 @@ static unsigned char AOSP_BQR_PREFIX[] = { 0x58 };
 	.get_prefix_len = _prefix_len_func,				\
 }
 
+/* Every vendor that handles particular vendor events in its driver should
+ * 1. set up the vendor_evt callback in its driver and
+ * 2. add an entry in struct vendor_event_prefix.
+ */
+static void vendor_evt(struct hci_dev *hdev,  void *data, struct sk_buff *skb)
+{
+	if (hdev->vendor_evt)
+		hdev->vendor_evt(hdev, data, skb);
+}
+
 /* Every distinct vendor specification must have a well-defined vendor
  * event prefix to determine if a vendor event meets the specification.
  * If an event prefix is fixed, it should be delcared with FIXED_EVT_PREFIX.
@@ -4287,6 +4298,7 @@ struct vendor_event_prefix {
 	__u8 (*get_prefix_len)(struct hci_dev *hdev);
 } evt_prefixes[] = {
 	FIXED_EVT_PREFIX(AOSP_BQR_PREFIX, aosp_quality_report_evt),
+	FIXED_EVT_PREFIX(INTEL_PREFIX, vendor_evt),
 	DYNAMIC_EVT_PREFIX(get_msft_evt_prefix, get_msft_evt_prefix_len,
 			   msft_vendor_evt),
 
