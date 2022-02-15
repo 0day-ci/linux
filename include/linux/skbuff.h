@@ -371,6 +371,9 @@ enum skb_drop_reason {
 					 * the right edges of receive
 					 * window
 					 */
+	SKB_DROP_REASON_TCP_OFOMERGE,	/* the data of skb is already in
+					 * the ofo queue.
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
