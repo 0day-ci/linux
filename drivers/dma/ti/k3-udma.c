@@ -3922,7 +3922,7 @@ static void udma_synchronize(struct dma_chan *chan)
 
 	vchan_synchronize(&uc->vc);
 
-	if (uc->state == UDMA_CHAN_IS_TERMINATING) {
+	if (uc->state == UDMA_CHAN_IS_TERMINATING && !uc->cyclic) {
 		timeout = wait_for_completion_timeout(&uc->teardown_completed,
 						      timeout);
 		if (!timeout) {
