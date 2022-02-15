@@ -102,6 +102,8 @@ static int lpss_spi_setup(struct pci_dev *dev, struct pxa_spi_info *c)
 	}
 
 	c->dma_filter = lpss_dma_filter;
+	pci_dev_put(dma_dev);
+
 	return 0;
 }
 
