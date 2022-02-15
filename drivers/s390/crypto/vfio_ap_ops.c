@@ -617,10 +617,32 @@ static int vfio_ap_mdev_verify_no_sharing(unsigned long *mdev_apm,
 	return 0;
 }
 
+/**
+ * vfio_ap_mdev_validate_masks - verify that the APQNs assigned to the mdev are
+ *				 not reserved for the default zcrypt driver and
+ *				 are not assigned to another mdev.
+ *
+ * @matrix_mdev: the mdev to which the APQNs being validated are assigned.
+ *
+ * Return: One of the following values:
+ * o the error returned from the ap_apqn_in_matrix_owned_by_def_drv() function,
+ *   most likely -EBUSY indicating the ap_perms_mutex lock is already held.
+ * o EADDRNOTAVAIL if an APQN assigned to @matrix_mdev is reserved for the
+ *		   zcrypt default driver.
+ * o EADDRINUSE if an APQN assigned to @matrix_mdev is assigned to another mdev
+ * o A zero indicating validation succeeded.
+ */
 static int vfio_ap_mdev_validate_masks(struct ap_matrix_mdev *matrix_mdev)
 {
-	if (ap_apqn_in_matrix_owned_by_def_drv(matrix_mdev->matrix.apm,
-					       matrix_mdev->matrix.aqm))
+	int ret;
+
+	ret = ap_apqn_in_matrix_owned_by_def_drv(matrix_mdev->matrix.apm,
+						 matrix_mdev->matrix.aqm);
+
+	if (ret < 0)
+		return ret;
+
+	if (ret == 1)
 		return -EADDRNOTAVAIL;
 
 	return vfio_ap_mdev_verify_no_sharing(matrix_mdev->matrix.apm,
@@ -711,6 +733,10 @@ static void vfio_ap_mdev_put_locks(struct ap_matrix_mdev *matrix_mdev)
  *	   An APQN derived from the cross product of the APID being assigned
  *	   and the APQIs previously assigned is being used by another mediated
  *	   matrix device
+ *
+ *	5. -EAGAIN
+ *	   A lock required to validate the mdev's AP configuration could not
+ *	   be obtained.
  */
 static ssize_t assign_adapter_store(struct device *dev,
 				    struct device_attribute *attr,
@@ -897,6 +923,10 @@ static void vfio_ap_mdev_link_domain(struct ap_matrix_mdev *matrix_mdev,
  *	   An APQN derived from the cross product of the APQI being assigned
  *	   and the APIDs previously assigned is being used by another mediated
  *	   matrix device
+ *
+ *	5. -EAGAIN
+ *	   The lock required to validate the mdev's AP configuration could not
+ *	   be obtained.
  */
 static ssize_t assign_domain_store(struct device *dev,
 				   struct device_attribute *attr,
@@ -1740,4 +1770,51 @@ void vfio_ap_mdev_remove_queue(struct ap_device *apdev)
 	dev_set_drvdata(&apdev->device, NULL);
 	kfree(q);
 	vfio_ap_mdev_put_qlocks(matrix_mdev);
+}
+
+/**
+ * vfio_ap_mdev_resource_in_use: check whether any of a set of APQNs is
+ *				 assigned to a mediated device under the control
+ *				 of the vfio_ap device driver.
+ *
+ * @apm: a bitmap specifying a set of APIDs comprising the APQNs to check.
+ * @aqm: a bitmap specifying a set of APQIs comprising the APQNs to check.
+ *
+ * This function is invoked by the AP bus when changes to the apmask/aqmask
+ * attributes will result in giving control of the queue devices specified via
+ * @apm and @aqm to the default zcrypt device driver. Prior to calling this
+ * function, the AP bus locks the ap_perms_mutex. If this function is called
+ * while an adapter or domain is being assigned to a mediated device, the
+ * assignment operations will take the matrix_dev->guests_lock and
+ * matrix_dev->mdevs_lock then call the ap_apqn_in_matrix_owned_by_def_drv
+ * function, which also locks the ap_perms_mutex. This could result in a
+ * deadlock.
+ *
+ * To avoid a deadlock, this function will verify that the
+ * matrix_dev->guests_lock and matrix_dev->mdevs_lock are not currently held and
+ * will return -EBUSY if the locks can not be obtained.
+ *
+ * Return:
+ *	* -EBUSY if the locks required by this function are already locked.
+ *	* -EADDRINUSE if one or more of the APQNs specified via @apm/@aqm are
+ *	  assigned to a mediated device under the control of the vfio_ap
+ *	  device driver.
+ */
+int vfio_ap_mdev_resource_in_use(unsigned long *apm, unsigned long *aqm)
+{
+	int ret;
+
+	if (!mutex_trylock(&matrix_dev->guests_lock))
+		return -EBUSY;
+
+	if (!mutex_trylock(&matrix_dev->mdevs_lock)) {
+		mutex_unlock(&matrix_dev->guests_lock);
+		return -EBUSY;
+	}
+
+	ret = vfio_ap_mdev_verify_no_sharing(apm, aqm);
+	mutex_unlock(&matrix_dev->mdevs_lock);
+	mutex_unlock(&matrix_dev->guests_lock);
+
+	return ret;
 }
