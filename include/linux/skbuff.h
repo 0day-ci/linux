@@ -396,6 +396,10 @@ enum skb_drop_reason {
 						 * full, and the skbs on the
 						 * tail will be dropped
 						 */
+	SKB_DROP_REASON_QDISC_EGRESS,	/* qdisc of type egress check
+					 * failed (maybe an eBPF program
+					 * is tricking?)
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
