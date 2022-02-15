@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
+#include <linux/bitmap.h>
 #include <linux/workqueue.h>
 
 #include "nitrox_csr.h"
@@ -122,6 +123,7 @@ void nitrox_pf2vf_mbox_handler(struct nitrox_device *ndev)
 {
 	struct nitrox_vfdev *vfdev;
 	struct pf2vf_work *pfwork;
+	DEFINE_BITMAP(csr, 64);
 	u64 value, reg_addr;
 	u32 i;
 	int vfno;
@@ -129,7 +131,8 @@ void nitrox_pf2vf_mbox_handler(struct nitrox_device *ndev)
 	/* loop for VF(0..63) */
 	reg_addr = NPS_PKT_MBOX_INT_LO;
 	value = nitrox_read_csr(ndev, reg_addr);
-	for_each_set_bit(i, (const unsigned long *)&value, BITS_PER_LONG) {
+	bitmap_from_u64(csr, value);
+	for_each_set_bit(i, csr, BITS_PER_TYPE(csr)) {
 		/* get the vfno from ring */
 		vfno = RING_TO_VFNO(i, ndev->iov.max_vf_queues);
 		vfdev = ndev->iov.vfdev + vfno;
@@ -151,7 +154,8 @@ void nitrox_pf2vf_mbox_handler(struct nitrox_device *ndev)
 	/* loop for VF(64..127) */
 	reg_addr = NPS_PKT_MBOX_INT_HI;
 	value = nitrox_read_csr(ndev, reg_addr);
-	for_each_set_bit(i, (const unsigned long *)&value, BITS_PER_LONG) {
+	bitmap_from_u64(csr, value);
+	for_each_set_bit(i, csr, BITS_PER_TYPE(csr)) {
 		/* get the vfno from ring */
 		vfno = RING_TO_VFNO(i + 64, ndev->iov.max_vf_queues);
 		vfdev = ndev->iov.vfdev + vfno;
