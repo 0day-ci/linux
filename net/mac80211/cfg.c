@@ -997,6 +997,9 @@ static int ieee80211_assign_beacon(struct ieee80211_sub_if_data *sdata,
 	struct beacon_data *new, *old;
 	int new_head_len, new_tail_len;
 	int size, err;
+	const struct element *cap;
+	struct ieee80211_he_operation *he_oper;
+	const struct ieee80211_he_6ghz_oper *he_6ghz_oper;
 	u32 changed = BSS_CHANGED_BEACON;
 
 	old = sdata_dereference(sdata->u.ap.beacon, sdata);
@@ -1082,6 +1085,20 @@ static int ieee80211_assign_beacon(struct ieee80211_sub_if_data *sdata,
 		}
 
 		changed |= BSS_CHANGED_FTM_RESPONDER;
+	}
+
+	cap = cfg80211_find_ext_elem(WLAN_EID_EXT_HE_OPERATION,
+				     params->tail, params->tail_len);
+	if (cap && cap->datalen >= sizeof(*he_oper) + 1) {
+		he_oper = (void *)(cap->data + 1);
+		he_6ghz_oper = ieee80211_he_6ghz_oper(he_oper);
+		if (he_6ghz_oper) {
+			sdata->vif.bss_conf.he_6g_nonht_dup_beacon_set = false;
+			if (u8_get_bits(he_6ghz_oper->control,
+					IEEE80211_HE_6GHZ_OPER_CTRL_DUP_BEACON)) {
+				sdata->vif.bss_conf.he_6g_nonht_dup_beacon_set = true;
+			}
+		}
 	}
 
 	rcu_assign_pointer(sdata->u.ap.beacon, new);
