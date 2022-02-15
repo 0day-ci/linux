@@ -12,8 +12,3 @@ The Hantro video decoder driver implements the following driver-specific control
     to before syntax element "slice_temporal_mvp_enabled_flag".
     If IDR, the skipped bits are just "pic_output_flag"
     (separate_colour_plane_flag is not supported).
-
-.. note::
-
-        This control is not yet part of the public kernel API and
-        it is expected to change.
