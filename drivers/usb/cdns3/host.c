@@ -15,8 +15,8 @@
 #include "drd.h"
 #include "host-export.h"
 #include <linux/usb/hcd.h>
+#include <linux/usb/xhci-plat.h>
 #include "../host/xhci.h"
-#include "../host/xhci-plat.h"
 
 #define XECP_PORT_CAP_REG	0x8000
 #define XECP_AUX_CTRL_REG1	0x8120
