@@ -341,14 +341,16 @@ static int build_snap_context(struct ceph_snap_realm *realm,
 		num += parent->cached_context->num_snaps;
 	}
 
-	/* do i actually need to update?  not if my context seq
-	   matches realm seq, and my parents' does to.  (this works
-	   because we rebuild_snap_realms() works _downward_ in
-	   hierarchy after each update.) */
+	/* do i actually need to update? No need when any of the following
+	 * two cases:
+	 * #1: if my context seq matches realm's seq and realm has no parent.
+	 * #2: if my context seq equals or is larger than my parent's, this
+	 *     works because we rebuild_snap_realms() works _downward_ in
+	 *     hierarchy after each update.
+	 */
 	if (realm->cached_context &&
-	    realm->cached_context->seq == realm->seq &&
-	    (!parent ||
-	     realm->cached_context->seq >= parent->cached_context->seq)) {
+	    ((realm->cached_context->seq == realm->seq && !parent) ||
+	     (parent && realm->cached_context->seq >= parent->cached_context->seq))) {
 		dout("build_snap_context %llx %p: %p seq %lld (%u snaps)"
 		     " (unchanged)\n",
 		     realm->ino, realm, realm->cached_context,
