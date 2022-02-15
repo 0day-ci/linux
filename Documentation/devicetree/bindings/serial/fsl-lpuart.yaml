@@ -24,6 +24,8 @@ properties:
           - fsl,imxrt1050-lpuart
       - items:
           - enum:
+              - fsl,imx93-lpuart
+              - fsl,imx93-lpuart-v2
               - fsl,imx8qxp-lpuart
               - fsl,imx8ulp-lpuart
           - const: fsl,imx7ulp-lpuart
