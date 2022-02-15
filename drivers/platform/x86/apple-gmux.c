@@ -596,7 +596,7 @@ static int gmux_resume(struct device *dev)
 
 static int is_thunderbolt(struct device *dev, void *data)
 {
-	return to_pci_dev(dev)->is_thunderbolt;
+	return to_pci_dev(dev)->external_facing;
 }
 
 static int gmux_probe(struct pnp_dev *pnp, const struct pnp_device_id *id)

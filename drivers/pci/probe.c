@@ -1586,7 +1586,7 @@ static void set_pcie_thunderbolt(struct pci_dev *dev)
 	/* Is the device part of a Thunderbolt controller? */
 	vsec = pci_find_vsec_capability(dev, PCI_VENDOR_ID_INTEL, PCI_VSEC_ID_INTEL_TBT);
 	if (vsec)
-		dev->is_thunderbolt = 1;
+		dev->external_facing = true;
 }
 
 static void set_pcie_untrusted(struct pci_dev *dev)
