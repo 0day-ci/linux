@@ -2125,6 +2125,14 @@ enum {
 /* preablbe short */
 #define WMI_VDEV_PREAMBLE_SHORT         0x2
 
+/** 6GHZ params **/
+/* Control to enable/disable beacon tx in non-HT duplicate */
+#define WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_BEACON		BIT(0)
+/* Control to enable/disable broadcast probe response tx in non-HT duplicate */
+#define WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_BCAST_PROBE_RSP	BIT(1)
+/* Control to enable/disable FILS discovery frame tx in non-HT duplicate */
+#define WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_FD_FRAME		BIT(2)
+
 enum wmi_peer_smps_state {
 	WMI_PEER_SMPS_PS_NONE = 0x0,
 	WMI_PEER_SMPS_STATIC  = 0x1,

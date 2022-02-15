@@ -2923,6 +2923,33 @@ static int ath11k_mac_fils_discovery(struct ath11k_vif *arvif,
 	return ret;
 }
 
+static int ath11k_mac_set_6g_nonht_dup_conf(struct ath11k_vif *arvif,
+					    const struct cfg80211_chan_def *chandef)
+{
+	struct ath11k *ar = arvif->ar;
+	int ret = 0;
+	bool is_nontx_ap = arvif->vif->bss_conf.nontransmitted;
+	enum wmi_phy_mode mode = ath11k_phymodes[chandef->chan->band][chandef->width];
+	bool dup_bcn_enable = arvif->vif->bss_conf.he_6g_nonht_dup_beacon_set;
+
+	if ((arvif->vdev_type == WMI_VDEV_TYPE_AP) && !is_nontx_ap &&
+	    (chandef->chan->band == NL80211_BAND_6GHZ)) {
+		u32 param_id = WMI_VDEV_PARAM_6GHZ_PARAMS;
+		u32 value = 0;
+
+		if (mode > MODE_11AX_HE20 && dup_bcn_enable) {
+			value |= WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_BEACON;
+			value |= WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_BCAST_PROBE_RSP;
+			value |= WMI_VDEV_6GHZ_BITMAP_NON_HT_DUPLICATE_FD_FRAME;
+		}
+		ath11k_dbg(ar->ab, ATH11K_DBG_MAC, "Set 6GHz non-ht dup params for "
+			   "vdev %pM vdev_id %d param %d value %d\n", arvif->vif->addr,
+			   arvif->vdev_id, param_id, value);
+		ret = ath11k_wmi_vdev_set_param_cmd(ar, arvif->vdev_id, param_id, value);
+	}
+	return ret;
+}
+
 static int ath11k_mac_config_obss_pd(struct ath11k *ar,
 				     struct ieee80211_he_obss_pd *he_obss_pd)
 {
@@ -3136,6 +3163,17 @@ static void ath11k_mac_op_bss_info_changed(struct ieee80211_hw *hw,
 			arvif->do_not_send_tmpl = true;
 		else
 			arvif->do_not_send_tmpl = false;
+
+		if (vif->type == NL80211_IFTYPE_AP && vif->bss_conf.he_support) {
+			if (!ath11k_mac_vif_chan(arvif->vif, &def)) {
+				ret = ath11k_mac_set_6g_nonht_dup_conf(arvif, &def);
+				if (ret) {
+					ath11k_warn(ar->ab, "failed to set 6G non-ht dup"
+						    " conf for vdev %d: %d\n",
+						    arvif->vdev_id, ret);
+				}
+			}
+		}
 	}
 
 	if (changed & (BSS_CHANGED_BEACON_INFO | BSS_CHANGED_BEACON)) {
