@@ -4044,12 +4044,10 @@ static void srp_remove_one(struct ib_device *device, void *client_data)
 		mutex_lock(&host->target_mutex);
 		list_for_each_entry(target, &host->target_list, list)
 			srp_queue_remove_work(target);
+		list_for_each_entry(target, &host->target_list, list)
+			flush_work(&target->tl_err_work);
 		mutex_unlock(&host->target_mutex);
 
-		/*
-		 * Wait for tl_err and target port removal tasks.
-		 */
-		flush_workqueue(system_long_wq);
 		flush_workqueue(srp_remove_wq);
 
 		kfree(host);
