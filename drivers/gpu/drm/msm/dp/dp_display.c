@@ -115,6 +115,8 @@ struct dp_display_private {
 	struct dp_event event_list[DP_EVENT_Q_MAX];
 	spinlock_t event_lock;
 
+	bool wide_bus_en;
+
 	struct dp_audio *audio;
 };
 
@@ -848,6 +850,8 @@ static int dp_display_enable(struct dp_display_private *dp, u32 data)
 		return 0;
 	}
 
+	dp->ctrl->wide_bus_en = dp->wide_bus_en;
+
 	rc = dp_ctrl_on_stream(dp->ctrl);
 	if (!rc)
 		dp_display->power_on = true;
@@ -972,6 +976,7 @@ int dp_display_get_modes(struct msm_dp *dp,
 		dp->connector, dp_mode);
 	if (dp_mode->drm_mode.clock)
 		dp->max_pclk_khz = dp_mode->drm_mode.clock;
+
 	return ret;
 }
 
@@ -1437,6 +1442,28 @@ void msm_dp_irq_postinstall(struct msm_dp *dp_display)
 	dp_add_event(dp, EV_HPD_INIT_SETUP, 0, 100);
 }
 
+bool msm_dp_wide_bus_enable(struct msm_dp *dp_display)
+{
+	struct dp_display_private *dp;
+	u32 revision, major, minor;
+
+	dp = container_of(dp_display, struct dp_display_private, dp_display);
+
+	/* for the time being widebus only support on DP */
+	if (dp_display->connector_type  == DRM_MODE_CONNECTOR_DisplayPort) {
+		revision = dp_catalog_hw_revision(dp->catalog);
+		major = ((revision >> 28) & 0x0ff);
+		minor = ((revision >> 16) & 0x0fff);
+
+		DRM_DEBUG_DP("id=%d major=%d minor=%d\n", dp->id, major, minor);
+
+		if (major >= 1 && minor >= 2)
+			return true;
+	}
+
+	return false;
+}
+
 void msm_dp_debugfs_init(struct msm_dp *dp_display, struct drm_minor *minor)
 {
 	struct dp_display_private *dp;
@@ -1460,6 +1487,7 @@ int msm_dp_modeset_init(struct msm_dp *dp_display, struct drm_device *dev,
 			struct drm_encoder *encoder)
 {
 	struct msm_drm_private *priv;
+	struct dp_display_private *dp_priv;
 	int ret;
 
 	if (WARN_ON(!encoder) || WARN_ON(!dp_display) || WARN_ON(!dev))
@@ -1467,6 +1495,8 @@ int msm_dp_modeset_init(struct msm_dp *dp_display, struct drm_device *dev,
 
 	priv = dev->dev_private;
 	dp_display->drm_dev = dev;
+
+	dp_priv = container_of(dp_display, struct dp_display_private, dp_display);
 
 	ret = dp_display_request_irq(dp_display);
 	if (ret) {
@@ -1497,6 +1527,8 @@ int msm_dp_modeset_init(struct msm_dp *dp_display, struct drm_device *dev,
 	}
 
 	priv->bridges[priv->num_bridges++] = dp_display->bridge;
+
+	dp_priv->wide_bus_en = msm_dp_wide_bus_enable(dp_display);
 
 	return 0;
 }
