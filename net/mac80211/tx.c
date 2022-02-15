@@ -580,6 +580,7 @@ ieee80211_tx_h_check_control_port_protocol(struct ieee80211_tx_data *tx)
 static ieee80211_tx_result debug_noinline
 ieee80211_tx_h_select_key(struct ieee80211_tx_data *tx)
 {
+	int ret;
 	struct ieee80211_key *key;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(tx->skb);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)tx->skb->data;
@@ -588,6 +589,8 @@ ieee80211_tx_h_select_key(struct ieee80211_tx_data *tx)
 		tx->key = NULL;
 		return TX_CONTINUE;
 	}
+
+	rcu_read_lock();
 
 	if (tx->sta &&
 	    (key = rcu_dereference(tx->sta->ptk[tx->sta->ptk_idx])))
@@ -645,18 +648,23 @@ ieee80211_tx_h_select_key(struct ieee80211_tx_data *tx)
 		}
 
 		if (unlikely(tx->key && tx->key->flags & KEY_FLAG_TAINTED &&
-			     !ieee80211_is_deauth(hdr->frame_control)))
-			return TX_DROP;
+			     !ieee80211_is_deauth(hdr->frame_control))) {
+			ret = TX_DROP;
+			goto out;
+		}
 
 		if (!skip_hw && tx->key &&
 		    tx->key->flags & KEY_FLAG_UPLOADED_TO_HARDWARE)
 			info->control.hw_key = &tx->key->conf;
 	} else if (ieee80211_is_data_present(hdr->frame_control) && tx->sta &&
 		   test_sta_flag(tx->sta, WLAN_STA_USES_ENCRYPTION)) {
-		return TX_DROP;
+		ret = TX_DROP;
+		goto out;
 	}
-
-	return TX_CONTINUE;
+	ret = TX_CONTINUE;
+out:
+	rcu_read_unlock();
+	return ret;
 }
 
 static ieee80211_tx_result debug_noinline
