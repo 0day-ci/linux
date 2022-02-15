@@ -33,20 +33,25 @@
  * @available_instances: number of mediated matrix devices that can be created
  * @info:	the struct containing the output from the PQAP(QCI) instruction
  * @mdev_list:	the list of mediated matrix devices created
- * @lock:	mutex for locking the AP matrix device. This lock will be
- *		taken every time we fiddle with state managed by the vfio_ap
- *		driver, be it using @mdev_list or writing the state of a
- *		single ap_matrix_mdev device. It's quite coarse but we don't
- *		expect much contention.
+ * @mdevs_lock:	mutex for locking the ap_matrix_mdev devices under the control
+ *		of the vfio_ap device driver. This lock will be taken every time
+ *		we fiddle with state of an ap_matrix_mdev device. It's quite
+ *		coarse but we don't expect much contention.
  * @vfio_ap_drv: the vfio_ap device driver
+ * @guests_lock: mutex for controlling access to a guest that is using AP
+ *		 devices passed through by the vfio_ap device driver. This lock
+ *		 will be taken when the AP devices are plugged into or unplugged
+ *		 from a guest, and when an ap_matrix_mdev device is added to or
+ *		 removed from @mdev_list or the list is iterated.
  */
 struct ap_matrix_dev {
 	struct device device;
 	atomic_t available_instances;
 	struct ap_config_info info;
 	struct list_head mdev_list;
-	struct mutex lock;
+	struct mutex mdevs_lock;
 	struct ap_driver  *vfio_ap_drv;
+	struct mutex guests_lock;
 };
 
 extern struct ap_matrix_dev *matrix_dev;
