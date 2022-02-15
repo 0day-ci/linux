@@ -375,7 +375,7 @@ static const struct gpio_chip bcm2835_gpio_chip = {
 };
 
 static const struct gpio_chip bcm2711_gpio_chip = {
-	.label = "pinctrl-bcm2711",
+	.label = MODULE_NAME,
 	.owner = THIS_MODULE,
 	.request = gpiochip_generic_request,
 	.free = gpiochip_generic_free,
@@ -1134,7 +1134,7 @@ static const struct pinctrl_desc bcm2835_pinctrl_desc = {
 };
 
 static const struct pinctrl_desc bcm2711_pinctrl_desc = {
-	.name = "pinctrl-bcm2711",
+	.name = MODULE_NAME,
 	.pins = bcm2835_gpio_pins,
 	.npins = BCM2711_NUM_GPIOS,
 	.pctlops = &bcm2835_pctl_ops,
@@ -1149,7 +1149,7 @@ static const struct pinctrl_gpio_range bcm2835_pinctrl_gpio_range = {
 };
 
 static const struct pinctrl_gpio_range bcm2711_pinctrl_gpio_range = {
-	.name = "pinctrl-bcm2711",
+	.name = MODULE_NAME,
 	.npins = BCM2711_NUM_GPIOS,
 };
 
