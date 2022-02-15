@@ -398,7 +398,7 @@ static int noinline __leaf_switch_none(int path, bool fill)
 		 * This is intentionally unreachable. To silence the
 		 * warning, build with -Wno-switch-unreachable
 		 */
-		uint64_t var;
+		uint64_t var[10];
 
 	case 1:
 		target_start = &var;
@@ -423,8 +423,8 @@ static int noinline __leaf_switch_none(int path, bool fill)
 		memcpy(check_buf, target_start, target_size);
 		break;
 	default:
-		var = 5;
-		return var & forced_mask;
+		var[1] = 5;
+		return var[1] & forced_mask;
 	}
 	return 0;
 }
