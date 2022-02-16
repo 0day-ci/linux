@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device Tree file for HPE GXP
+ */
+
+/dts-v1/;
+/ {
+	model = "Hewlett Packard Enterprise GXP BMC";
+	compatible = "hpe,gxp";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			compatible = "arm,armv7";
+			device_type = "cpu";
+			reg = <0>;
+		};
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0x40000000 0x20000000>;
+	};
+
+	ahb {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		device_type = "soc";
+		ranges;
+
+		vic0: interrupt-controller@ceff0000 {
+			compatible = "arm,pl192-vic";
+			#address-cells = <1>;
+			interrupt-controller;
+			reg = <0xceff0000 0x1000>;
+			#interrupt-cells = <1>;
+		};
+
+		vic1: vic@80f00000 {
+			compatible = "arm,pl192-vic";
+			#address-cells = <1>;
+			interrupt-controller;
+			reg = <0x80f00000 0x1000>;
+			#interrupt-cells = <1>;
+		};
+
+		timer0: timer@c0000080 {
+			compatible = "hpe,gxp-timer";
+			reg = <0xc0000080 0x1>, <0xc0000094 0x01>, <0xc0000088 0x08>;
+			interrupts = <0>;
+			interrupt-parent = <&vic0>;
+			clock-frequency = <400000000>;
+		};
+
+		watchdog: watchdog@c0000090 {
+			compatible = "hpe,gxp-wdt";
+			reg = <0xc0000090 0x02>, <0xc0000096 0x01>;
+		};
+
+		uarta: serial@c00000e0 {
+			compatible = "ns16550a";
+			reg = <0xc00000e0 0x8>;
+			interrupts = <17>;
+			interrupt-parent = <&vic0>;
+			clock-frequency = <1846153>;
+			reg-shift = <0>;
+		};
+
+		uartb: serial@c00000e8 {
+			compatible = "ns16550a";
+			reg = <0xc00000e8 0x8>;
+			interrupts = <18>;
+			interrupt-parent = <&vic0>;
+			clock-frequency = <1846153>;
+			reg-shift = <0>;
+		};
+
+		uartc: serial@c00000f0 {
+			compatible = "ns16550a";
+			reg = <0xc00000f0 0x8>;
+			interrupts = <19>;
+			interrupt-parent = <&vic0>;
+			clock-frequency = <1846153>;
+			reg-shift = <0>;
+		};
+
+		usb0: ehci@cefe0000 {
+			compatible = "generic-ehci";
+			reg = <0xcefe0000 0x100>;
+			interrupts = <7>;
+			interrupt-parent = <&vic0>;
+		};
+
+		usb1: ohci@cefe0100 {
+			compatible = "generic-ohci";
+			reg = <0xcefe0100 0x110>;
+			interrupts = <6>;
+			interrupt-parent = <&vic0>;
+		};
+
+		sram@d0000000 {
+			compatible = "mtd-ram";
+			reg = <0xd0000000 0x80000>;
+			bank-width = <1>;
+			erase-size =<1>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			partition@0 {
+				label = "host-reserved";
+				reg = <0x0 0x10000>;
+			};
+			partition@10000 {
+				label = "nvram";
+				reg = <0x10000 0x70000>;
+			};
+		};
+
+		vrom@58000000 {
+			compatible = "mtd-ram";
+			bank-width = <4>;
+			reg = <0x58000000 0x4000000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			partition@0 {
+				label = "vrom-prime";
+				reg = <0x0 0x2000000>;
+			};
+			partition@2000000 {
+				label = "vrom-second";
+				reg = <0x2000000 0x2000000>;
+			};
+		};
+
+		i2cg: i2cg@c00000f8 {
+			compatible = "syscon";
+			reg = <0xc00000f8 0x08>;
+		};
+	};
+
+	clocks {
+		osc: osc {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-output-names = "osc";
+			clock-frequency = <33333333>;
+		};
+
+		iopclk: iopclk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clocks = <&osc>;
+			clock-out-put-names = "iopclk";
+			clock-frequency = <400000000>;
+		};
+
+		memclk: memclk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clocks = <&osc>;
+			clock-out-put-names = "memclk";
+			clock-frequency = <800000000>;
+		};
+	};
+};

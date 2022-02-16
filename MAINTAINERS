@@ -8390,6 +8390,13 @@ L:	linux-efi@vger.kernel.org
 S:	Maintained
 F:	block/partitions/efi.*
 
+GXP ARM ARCHITECTURE
+M:	Nick Hawkins <nick.hawkins@hpe.com>
+M:	Jean-Marie <verdun@hpe.com>
+S:	Maintained
+F:	arch/arm/boot/dts/hpe-bmc-dl360gen10.dts
+F:	arch/arm/boot/dts/hpe-gxp.dtsi
+
 H8/300 ARCHITECTURE
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
 L:	uclinux-h8-devel@lists.sourceforge.jp (moderated for non-subscribers)
