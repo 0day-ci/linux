@@ -846,6 +846,13 @@ int intel_bw_atomic_check(struct intel_atomic_state *state)
 	if (num_psf_gv_points > 0)
 		mask |= REG_GENMASK(num_psf_gv_points - 1, 0) << ADLS_PSF_PT_SHIFT;
 
+	/*
+	 * If we already have the bw state then recompute everything
+	 * even if pipe data_rate / active_planes didn't change.
+	 * Other things (such as SAGV) may have changed.
+	 */
+	new_bw_state = intel_atomic_get_new_bw_state(state);
+
 	for_each_oldnew_intel_crtc_in_state(state, crtc, old_crtc_state,
 					    new_crtc_state, i) {
 		unsigned int old_data_rate =
