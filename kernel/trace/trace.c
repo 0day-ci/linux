@@ -1118,7 +1118,7 @@ void tracing_snapshot_instance(struct trace_array *tr)
 	tracing_snapshot_instance_cond(tr, NULL);
 }
 
-/**
+/*
  * tracing_snapshot - take a snapshot of the current buffer.
  *
  * This causes a swap between the snapshot buffer and the current live
@@ -1140,7 +1140,7 @@ void tracing_snapshot(void)
 }
 EXPORT_SYMBOL_GPL(tracing_snapshot);
 
-/**
+/*
  * tracing_snapshot_cond - conditionally take a snapshot of the current buffer.
  * @tr:		The tracing instance to snapshot
  * @cond_data:	The data to be tested conditionally, and possibly saved
@@ -1159,8 +1159,8 @@ void tracing_snapshot_cond(struct trace_array *tr, void *cond_data)
 }
 EXPORT_SYMBOL_GPL(tracing_snapshot_cond);
 
-/**
- * tracing_snapshot_cond_data - get the user data associated with a snapshot
+/*
+ * tracing_cond_snapshot_data - get the user data associated with a snapshot
  * @tr:		The tracing instance
  *
  * When the user enables a conditional snapshot using
