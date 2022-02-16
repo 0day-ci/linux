@@ -76,6 +76,7 @@ Module.markers
 Module.symvers
 PENDING
 SCCS
+symbols.klp
 System.map*
 TAGS
 aconf

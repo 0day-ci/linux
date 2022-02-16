@@ -61,6 +61,7 @@ modules.order
 /vmlinux.symvers
 /vmlinux-gdb.py
 /vmlinuz
+/symbols.klp
 /System.map
 /Module.markers
 /modules.builtin
