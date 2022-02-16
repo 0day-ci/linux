@@ -243,7 +243,7 @@ Description:	Uncompressed format descriptors
 What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/uncompressed/name
 Date:		Dec 2014
 KernelVersion:	4.0
-Description:	Specific uncompressed format descriptors
+Description:	Specific uncompressed/framebased format descriptors
 
 		==================	=======================================
 		bFormatIndex		unique id for this format descriptor;
@@ -264,12 +264,15 @@ Description:	Specific uncompressed format descriptors
 					frame
 		guidFormat		globally unique id used to identify
 					stream-encoding format
+		bVariableSize		whether the data within the frame is of
+					variable length from frame to frame (
+					only for framebased format)
 		==================	=======================================
 
 What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/uncompressed/name/name
 Date:		Dec 2014
 KernelVersion:	4.0
-Description:	Specific uncompressed frame descriptors
+Description:	Specific uncompressed/framebased frame descriptors
 
 		=========================  =====================================
 		bFrameIndex		   unique id for this framedescriptor;
@@ -283,7 +286,11 @@ Description:	Specific uncompressed frame descriptors
 					   like to use as default
 		dwMaxVideoFrameBufferSize  the maximum number of bytes the
 					   compressor will produce for a video
-					   frame or still image
+					   frame or still image (only for
+					   uncompressed frame)
+		dwBytesPerLine		   the per-line bytes of the framebased
+					   frame, e.g. H264 or HEVC (only for
+					   framebased frame)
 		dwMaxBitRate		   the maximum bit rate at the shortest
 					   frame interval in bps
 		dwMinBitRate		   the minimum bit rate at the longest

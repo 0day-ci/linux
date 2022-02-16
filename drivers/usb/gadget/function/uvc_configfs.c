@@ -11,6 +11,7 @@
  */
 
 #include <linux/sort.h>
+#include <linux/videodev2.h>
 
 #include "u_uvc.h"
 #include "uvc_configfs.h"
@@ -782,6 +783,8 @@ struct uvcg_format {
 	__u8			bmaControls[UVCG_STREAMING_CONTROL_SIZE];
 };
 
+static u8 uvcg_uncompressed_subtype(struct uvcg_format *fmt);
+
 static struct uvcg_format *to_uvcg_format(struct config_item *item)
 {
 	return container_of(to_config_group(item), struct uvcg_format, group);
@@ -1072,7 +1075,23 @@ struct uvcg_frame {
 		u16	w_height;
 		u32	dw_min_bit_rate;
 		u32	dw_max_bit_rate;
-		u32	dw_max_video_frame_buffer_size;
+
+		/*
+		 * The layout of last three members of framebased frame
+		 * is different from uncompressed frame.
+		 *   Last three members of uncompressed frame are:
+		 *     u32	dw_max_video_frame_buffer_size;
+		 *     u32	dw_default_frame_interval;
+		 *     u8	b_frame_interval_type;
+		 *   Last three members of framebased frame are:
+		 *     u32	dw_default_frame_interval;
+		 *     u8	b_frame_interval_type;
+		 *     u32	dw_bytes_perline;
+		 */
+		union {
+			u32	dw_max_video_frame_buffer_size;
+			u32	dw_bytes_perline;
+		};
 		u32	dw_default_frame_interval;
 		u8	b_frame_interval_type;
 	} __attribute__((packed)) frame;
@@ -1185,6 +1204,7 @@ UVCG_FRAME_ATTR(dw_min_bit_rate, dwMinBitRate, 32);
 UVCG_FRAME_ATTR(dw_max_bit_rate, dwMaxBitRate, 32);
 UVCG_FRAME_ATTR(dw_max_video_frame_buffer_size, dwMaxVideoFrameBufferSize, 32);
 UVCG_FRAME_ATTR(dw_default_frame_interval, dwDefaultFrameInterval, 32);
+UVCG_FRAME_ATTR(dw_bytes_perline, dwBytesPerLine, 32);
 
 #undef UVCG_FRAME_ATTR
 
@@ -1329,6 +1349,7 @@ static struct configfs_attribute *uvcg_frame_attrs[] = {
 	&uvcg_frame_attr_dw_max_video_frame_buffer_size,
 	&uvcg_frame_attr_dw_default_frame_interval,
 	&uvcg_frame_attr_dw_frame_interval,
+	&uvcg_frame_attr_dw_bytes_perline,
 	NULL,
 };
 
@@ -1365,7 +1386,12 @@ static struct config_item *uvcg_frame_make(struct config_group *group,
 	mutex_lock(&opts->lock);
 	fmt = to_uvcg_format(&group->cg_item);
 	if (fmt->type == UVCG_UNCOMPRESSED) {
-		h->frame.b_descriptor_subtype = UVC_VS_FRAME_UNCOMPRESSED;
+		if (uvcg_uncompressed_subtype(fmt) == UVC_VS_FORMAT_UNCOMPRESSED) {
+			h->frame.b_descriptor_subtype = UVC_VS_FRAME_UNCOMPRESSED;
+		} else {
+			h->frame.b_descriptor_subtype = UVC_VS_FRAME_FRAME_BASED;
+			h->frame.dw_bytes_perline = 0;
+		}
 		h->fmt_type = UVCG_UNCOMPRESSED;
 	} else if (fmt->type == UVCG_MJPEG) {
 		h->frame.b_descriptor_subtype = UVC_VS_FRAME_MJPEG;
@@ -1425,6 +1451,14 @@ struct uvcg_uncompressed {
 	struct uvc_format_uncompressed	desc;
 };
 
+static u8 uvcg_uncompressed_subtype(struct uvcg_format *fmt)
+{
+	struct uvcg_uncompressed *ch = container_of(fmt,
+					struct uvcg_uncompressed, fmt);
+
+	return ch->desc.bDescriptorSubType;
+}
+
 static struct uvcg_uncompressed *to_uvcg_uncompressed(struct config_item *item)
 {
 	return container_of(
@@ -1466,6 +1500,7 @@ static ssize_t uvcg_uncompressed_guid_format_store(struct config_item *item,
 	struct f_uvc_opts *opts;
 	struct config_item *opts_item;
 	struct mutex *su_mutex = &ch->fmt.group.cg_subsys->su_mutex;
+	u32 fcc = 0;
 	int ret;
 
 	mutex_lock(su_mutex); /* for navigating configfs hierarchy */
@@ -1481,7 +1516,17 @@ static ssize_t uvcg_uncompressed_guid_format_store(struct config_item *item,
 
 	memcpy(ch->desc.guidFormat, page,
 	       min(sizeof(ch->desc.guidFormat), len));
-	ret = sizeof(ch->desc.guidFormat);
+	ret = len;
+
+	fcc = v4l2_fourcc(ch->desc.guidFormat[0], ch->desc.guidFormat[1],
+		ch->desc.guidFormat[2], ch->desc.guidFormat[3]);
+	if (fcc == V4L2_PIX_FMT_H264 || fcc == V4L2_PIX_FMT_HEVC) {
+		ch->desc.bLength		= UVC_DT_FORMAT_FRAMEBASED_SIZE;
+		ch->desc.bDescriptorSubType	= UVC_VS_FORMAT_FRAME_BASED;
+	} else {
+		ch->desc.bLength		= UVC_DT_FORMAT_UNCOMPRESSED_SIZE;
+		ch->desc.bDescriptorSubType	= UVC_VS_FORMAT_UNCOMPRESSED;
+	}
 
 end:
 	mutex_unlock(&opts->lock);
@@ -1581,6 +1626,7 @@ UVCG_UNCOMPRESSED_ATTR(b_default_frame_index, bDefaultFrameIndex, 8);
 UVCG_UNCOMPRESSED_ATTR_RO(b_aspect_ratio_x, bAspectRatioX, 8);
 UVCG_UNCOMPRESSED_ATTR_RO(b_aspect_ratio_y, bAspectRatioY, 8);
 UVCG_UNCOMPRESSED_ATTR_RO(bm_interface_flags, bmInterfaceFlags, 8);
+UVCG_UNCOMPRESSED_ATTR(b_variable_size, bVariableSize, 8);
 
 #undef UVCG_UNCOMPRESSED_ATTR
 #undef UVCG_UNCOMPRESSED_ATTR_RO
@@ -1611,6 +1657,7 @@ static struct configfs_attribute *uvcg_uncompressed_attrs[] = {
 	&uvcg_uncompressed_attr_b_aspect_ratio_y,
 	&uvcg_uncompressed_attr_bm_interface_flags,
 	&uvcg_uncompressed_attr_bma_controls,
+	&uvcg_uncompressed_attr_b_variable_size,
 	NULL,
 };
 
@@ -1644,6 +1691,7 @@ static struct config_group *uvcg_uncompressed_make(struct config_group *group,
 	h->desc.bAspectRatioY		= 0;
 	h->desc.bmInterfaceFlags	= 0;
 	h->desc.bCopyProtect		= 0;
+	h->desc.bVariableSize		= 0;
 
 	h->fmt.type = UVCG_UNCOMPRESSED;
 	config_group_init_type_name(&h->fmt.group, name,
@@ -2038,7 +2086,7 @@ static int __uvcg_cnt_strm(void *priv1, void *priv2, void *priv3, int n,
 				container_of(fmt, struct uvcg_uncompressed,
 					     fmt);
 
-			*size += sizeof(u->desc);
+			*size += u->desc.bLength;
 		} else if (fmt->type == UVCG_MJPEG) {
 			struct uvcg_mjpeg *m =
 				container_of(fmt, struct uvcg_mjpeg, fmt);
@@ -2108,8 +2156,8 @@ static int __uvcg_fill_strm(void *priv1, void *priv2, void *priv3, int n,
 
 			u->desc.bFormatIndex = n + 1;
 			u->desc.bNumFrameDescriptors = fmt->num_frames;
-			memcpy(*dest, &u->desc, sizeof(u->desc));
-			*dest += sizeof(u->desc);
+			memcpy(*dest, &u->desc, u->desc.bLength);
+			*dest += u->desc.bLength;
 		} else if (fmt->type == UVCG_MJPEG) {
 			struct uvcg_mjpeg *m =
 				container_of(fmt, struct uvcg_mjpeg, fmt);
@@ -2129,6 +2177,18 @@ static int __uvcg_fill_strm(void *priv1, void *priv2, void *priv3, int n,
 
 		sz = sizeof(frm->frame);
 		memcpy(*dest, &frm->frame, sz);
+		/*
+		 * Reorder the frame struct layout due to the difference
+		 * between uncompressed frame and framebased frame.
+		 */
+		if (frm->frame.b_descriptor_subtype == UVC_VS_FRAME_FRAME_BASED) {
+			u8 *data = (u8 *)*dest;
+
+			memcpy(data + 17, &frm->frame.dw_default_frame_interval, 4);
+			memcpy(data + 21, &frm->frame.b_frame_interval_type, 1);
+			memcpy(data + 22, &frm->frame.dw_bytes_perline, 4);
+		}
+
 		*dest += sz;
 		sz = frm->frame.b_frame_interval_type *
 			sizeof(*frm->dw_frame_interval);

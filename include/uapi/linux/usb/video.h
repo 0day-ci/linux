@@ -468,9 +468,12 @@ struct uvc_format_uncompressed {
 	__u8  bAspectRatioY;
 	__u8  bmInterfaceFlags;
 	__u8  bCopyProtect;
+	/* bVariableSize is only for framebased format. */
+	__u8  bVariableSize;
 } __attribute__((__packed__));
 
 #define UVC_DT_FORMAT_UNCOMPRESSED_SIZE			27
+#define UVC_DT_FORMAT_FRAMEBASED_SIZE			28
 
 /* Uncompressed Payload - 3.1.2. Uncompressed Video Frame Descriptor */
 struct uvc_frame_uncompressed {
