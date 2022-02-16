@@ -33,12 +33,13 @@
 
 /* fill a qtd, returning how much of the buffer we were able to queue up */
 
-static int
+static u16
 qtd_fill(struct ehci_hcd *ehci, struct ehci_qtd *qtd, dma_addr_t buf,
 		  size_t len, int token, int maxpacket)
 {
-	int	i, count;
 	u64	addr = buf;
+	u16	count;
+	int	i;
 
 	/* one buffer entry per 4K ... first might be short or unaligned */
 	qtd->hw_buf[0] = cpu_to_hc32(ehci, (u32)addr);
