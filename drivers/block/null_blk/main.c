@@ -720,7 +720,7 @@ static struct nullb_cmd *__alloc_cmd(struct nullb_queue *nq)
 	return NULL;
 }
 
-static struct nullb_cmd *alloc_cmd(struct nullb_queue *nq)
+static struct nullb_cmd *alloc_cmd(struct nullb_queue *nq, struct bio *bio)
 {
 	struct nullb_cmd *cmd;
 	DEFINE_WAIT(wait);
@@ -731,8 +731,10 @@ static struct nullb_cmd *alloc_cmd(struct nullb_queue *nq)
 		 * __alloc_cmd() and a fast path call to prepare_to_wait().
 		 */
 		cmd = __alloc_cmd(nq);
-		if (cmd)
+		if (cmd) {
+			cmd->bio = bio;
 			return cmd;
+		}
 		prepare_to_wait(&nq->wait, &wait, TASK_UNINTERRUPTIBLE);
 		io_schedule();
 		finish_wait(&nq->wait, &wait);
@@ -1474,12 +1476,8 @@ static void null_submit_bio(struct bio *bio)
 	sector_t nr_sectors = bio_sectors(bio);
 	struct nullb *nullb = bio->bi_bdev->bd_disk->private_data;
 	struct nullb_queue *nq = nullb_to_queue(nullb);
-	struct nullb_cmd *cmd;
 
-	cmd = alloc_cmd(nq);
-	cmd->bio = bio;
-
-	null_handle_cmd(cmd, sector, nr_sectors, bio_op(bio));
+	null_handle_cmd(alloc_cmd(nq, bio), sector, nr_sectors, bio_op(bio));
 }
 
 static bool should_timeout_request(struct request *rq)
