@@ -30,14 +30,16 @@ static bool __damon_pa_mk_set(struct page *page, struct vm_area_struct *vma,
 		addr = pvmw.address;
 		if (pvmw.pte) {
 			damon_ptep_mkold(pvmw.pte, vma->vm_mm, addr);
-			if (nr_online_nodes > 1) {
+			if (static_branch_unlikely(&numa_stat_enabled_key) &&
+					nr_online_nodes > 1) {
 				result = damon_ptep_mknone(pvmw.pte, vma, addr);
 				if (result)
 					flush_tlb_page(vma, addr);
 			}
 		} else {
 			damon_pmdp_mkold(pvmw.pmd, vma->vm_mm, addr);
-			if (nr_online_nodes > 1) {
+			if (static_branch_unlikely(&numa_stat_enabled_key) &&
+					nr_online_nodes > 1) {
 				result = damon_pmdp_mknone(pvmw.pmd, vma, addr);
 				if (result) {
 					unsigned long haddr = addr & HPAGE_PMD_MASK;

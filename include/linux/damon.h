@@ -19,6 +19,9 @@
 /* Max priority score for DAMON-based operation schemes */
 #define DAMOS_MAX_SCORE		(99)
 
+/* Switch for NUMA fault */
+DECLARE_STATIC_KEY_FALSE(numa_stat_enabled_key);
+
 extern struct damon_ctx **dbgfs_ctxs;
 extern int dbgfs_nr_ctxs;
 
