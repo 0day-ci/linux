@@ -34,4 +34,12 @@ extern int static_const_local_large[4];
 extern int static_ro_after_init;
 extern int static_read_mostly;
 
+/* klp-convert symbols - vmlinux */
+extern struct static_key_false tracepoint_printk_key;
+
+/* klp-convert symbols - test_klp_keys_mod.ko */
+extern struct static_key_true test_klp_true_key;
+extern struct static_key_false test_klp_false_key;
+
+
 #endif
