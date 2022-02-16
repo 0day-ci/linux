@@ -266,9 +266,8 @@ xfs_reflink_convert_cow_locked(
 			continue;
 
 		got.br_state = XFS_EXT_NORM;
-		error = xfs_bmap_add_extent_unwritten_real(NULL, ip,
-				XFS_COW_FORK, &icur, &dummy_cur, &got,
-				&dummy_logflags);
+		error = xfs_bmap_update_extent_real(NULL, ip, XFS_COW_FORK,
+				&icur, &dummy_cur, &got, &dummy_logflags, true);
 		if (error)
 			return error;
 	} while (xfs_iext_next_extent(ip->i_cowfp, &icur, &got));

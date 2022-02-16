@@ -1930,22 +1930,26 @@ done:
 }
 
 /*
- * Convert an unwritten allocation to a real allocation or vice versa.
+ * Update a real allocated extent (including converting an unwritten
+ * allocation to a real allocation or vice versa.)
  */
 int					/* error */
-xfs_bmap_add_extent_unwritten_real(
+xfs_bmap_update_extent_real(
 	struct xfs_trans	*tp,
 	struct xfs_inode	*ip,	/* incore inode pointer */
 	int			whichfork,
 	struct xfs_iext_cursor	*icur,
 	struct xfs_btree_cur	**curp,	/* if *curp is null, not a btree */
 	struct xfs_bmbt_irec	*new,	/* new data to add to file extents */
-	int			*logflagsp) /* inode logging flags */
+	int			*logflagsp, /* inode logging flags */
+	bool			convert)
 {
 	struct xfs_btree_cur	*cur;	/* btree cursor */
 	int			error;	/* error return value */
 	int			i;	/* temp state */
 	struct xfs_ifork	*ifp;	/* inode fork pointer */
+	xfs_fileoff_t		del_startoff;	/* start offset of del entry */
+	xfs_exntst_t		del_state;
 	xfs_fileoff_t		new_endoff;	/* end offset of new entry */
 	struct xfs_bmbt_irec	left, right;	/* neighbor extent entries */
 	struct xfs_bmbt_irec	prev;		/* previous old extent */
@@ -1953,6 +1957,7 @@ xfs_bmap_add_extent_unwritten_real(
 	int			state = xfs_bmap_fork_to_state(whichfork);
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_bmbt_irec	old;
+	int			tmp_logflags = 0;
 
 	*logflagsp = 0;
 
@@ -1968,8 +1973,11 @@ xfs_bmap_add_extent_unwritten_real(
 	 */
 	error = 0;
 	xfs_iext_get_extent(ifp, icur, &prev);
-	ASSERT(new->br_state != prev.br_state);
+	ASSERT(!convert || new->br_state != prev.br_state);
 	new_endoff = new->br_startoff + new->br_blockcount;
+	del_startoff = prev.br_startblock +
+		new->br_startoff - prev.br_startoff;
+	del_state = prev.br_state;
 	ASSERT(prev.br_startoff <= new->br_startoff);
 	ASSERT(prev.br_startoff + prev.br_blockcount >= new_endoff);
 
@@ -2129,6 +2137,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 */
 		prev.br_blockcount += right.br_blockcount;
 		prev.br_state = new->br_state;
+		prev.br_startblock = new->br_startblock;
 
 		xfs_iext_next(ifp, icur);
 		xfs_iext_remove(ip, icur, state);
@@ -2171,6 +2180,7 @@ xfs_bmap_add_extent_unwritten_real(
 		 * Neither the left nor right neighbors are contiguous with
 		 * the new one.
 		 */
+		prev.br_startblock = new->br_startblock;
 		prev.br_state = new->br_state;
 		xfs_iext_update_extent(ip, state, icur, &prev);
 
@@ -2362,7 +2372,8 @@ xfs_bmap_add_extent_unwritten_real(
 		right.br_startoff = new_endoff;
 		right.br_blockcount =
 			old.br_startoff + old.br_blockcount - new_endoff;
-		right.br_startblock = new->br_startblock + new->br_blockcount;
+		right.br_startblock = old.br_startblock + prev.br_blockcount +
+			new->br_blockcount;
 		right.br_state = prev.br_state;
 
 		xfs_iext_update_extent(ip, state, icur, &prev);
@@ -2430,19 +2441,29 @@ xfs_bmap_add_extent_unwritten_real(
 	}
 
 	/* update reverse mappings */
-	xfs_rmap_convert_extent(mp, tp, ip, whichfork, new);
+	if (!convert) {
+		old = *new;
+		old.br_startblock = del_startoff;
+		old.br_state = del_state;
+		xfs_rmap_unmap_extent(tp, ip, whichfork, &old);
+		xfs_rmap_map_extent(tp, ip, whichfork, new);
+	} else {
+		xfs_rmap_convert_extent(mp, tp, ip, whichfork, new);
+	}
 
-	/* convert to a btree if necessary */
+	/* convert to a btree or extents if necessary */
 	if (xfs_bmap_needs_btree(ip, whichfork)) {
-		int	tmp_logflags;	/* partial log flag return val */
-
 		ASSERT(cur == NULL);
 		error = xfs_bmap_extents_to_btree(tp, ip, &cur, 0,
 				&tmp_logflags, whichfork);
-		*logflagsp |= tmp_logflags;
-		if (error)
-			goto done;
+	} else if (!convert) {
+		error = xfs_bmap_btree_to_extents(tp, ip, cur,
+				&tmp_logflags, whichfork);
 	}
+
+	*logflagsp |= tmp_logflags;
+	if (error)
+		goto done;
 
 	/* clear out the allocated field, done with it now in any case. */
 	if (cur) {
@@ -4216,8 +4237,8 @@ xfs_bmapi_convert_unwritten(
 			return error;
 	}
 
-	error = xfs_bmap_add_extent_unwritten_real(bma->tp, bma->ip, whichfork,
-			&bma->icur, &bma->cur, mval, &tmp_logflags);
+	error = xfs_bmap_update_extent_real(bma->tp, bma->ip, whichfork,
+			&bma->icur, &bma->cur, mval, &tmp_logflags, true);
 	/*
 	 * Log the inode core unconditionally in the unwritten extent conversion
 	 * path because the conversion might not have done so (e.g., if the
@@ -5444,9 +5465,9 @@ __xfs_bunmapi(
 				del.br_blockcount = mod;
 			}
 			del.br_state = XFS_EXT_UNWRITTEN;
-			error = xfs_bmap_add_extent_unwritten_real(tp, ip,
+			error = xfs_bmap_update_extent_real(tp, ip,
 					whichfork, &icur, &cur, &del,
-					&logflags);
+					&logflags, true);
 			if (error)
 				goto error0;
 			goto nodelete;
@@ -5503,18 +5524,18 @@ __xfs_bunmapi(
 				prev.br_startblock += mod;
 				prev.br_blockcount -= mod;
 				prev.br_state = XFS_EXT_UNWRITTEN;
-				error = xfs_bmap_add_extent_unwritten_real(tp,
-						ip, whichfork, &icur, &cur,
-						&prev, &logflags);
+				error = xfs_bmap_update_extent_real(tp, ip,
+						whichfork, &icur, &cur, &prev,
+						&logflags, true);
 				if (error)
 					goto error0;
 				goto nodelete;
 			} else {
 				ASSERT(del.br_state == XFS_EXT_NORM);
 				del.br_state = XFS_EXT_UNWRITTEN;
-				error = xfs_bmap_add_extent_unwritten_real(tp,
-						ip, whichfork, &icur, &cur,
-						&del, &logflags);
+				error = xfs_bmap_update_extent_real(tp, ip,
+						whichfork, &icur, &cur, &del,
+						&logflags, true);
 				if (error)
 					goto error0;
 				goto nodelete;

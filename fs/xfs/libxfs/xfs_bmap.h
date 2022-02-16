@@ -216,10 +216,10 @@ int	xfs_bmapi_reserve_delalloc(struct xfs_inode *ip, int whichfork,
 		int eof);
 int	xfs_bmapi_convert_delalloc(struct xfs_inode *ip, int whichfork,
 		xfs_off_t offset, struct iomap *iomap, unsigned int *seq);
-int	xfs_bmap_add_extent_unwritten_real(struct xfs_trans *tp,
+int	xfs_bmap_update_extent_real(struct xfs_trans *tp,
 		struct xfs_inode *ip, int whichfork,
 		struct xfs_iext_cursor *icur, struct xfs_btree_cur **curp,
-		struct xfs_bmbt_irec *new, int *logflagsp);
+		struct xfs_bmbt_irec *new, int *logflagsp, bool convert);
 
 enum xfs_bmap_intent_type {
 	XFS_BMAP_MAP = 1,
