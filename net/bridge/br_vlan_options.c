@@ -5,6 +5,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/slab.h>
 #include <net/ip_tunnels.h>
+#include <net/switchdev.h>
 
 #include "br_private.h"
 #include "br_private_tunnel.h"
@@ -80,7 +81,16 @@ static int br_vlan_modify_state(struct net_bridge_vlan_group *vg,
 				bool *changed,
 				struct netlink_ext_ack *extack)
 {
+	struct switchdev_attr attr = {
+		.id = SWITCHDEV_ATTR_ID_PORT_MST_STATE,
+		.flags = SWITCHDEV_F_DEFER,
+		.u.mst_state = {
+			.mstid = br_vlan_mstid_get(v),
+			.state = state,
+		},
+	};
 	struct net_bridge *br;
+	int err;
 
 	ASSERT_RTNL();
 
@@ -89,10 +99,12 @@ static int br_vlan_modify_state(struct net_bridge_vlan_group *vg,
 		return -EINVAL;
 	}
 
-	if (br_vlan_is_brentry(v))
+	if (br_vlan_is_brentry(v)) {
 		br = v->br;
-	else
+	} else {
 		br = v->port->br;
+		attr.orig_dev = v->port->dev;
+	}
 
 	if (br->stp_enabled == BR_KERNEL_STP) {
 		NL_SET_ERR_MSG_MOD(extack, "Can't modify vlan state when using kernel STP");
@@ -101,6 +113,12 @@ static int br_vlan_modify_state(struct net_bridge_vlan_group *vg,
 
 	if (br_vlan_get_state_rtnl(v) == state)
 		return 0;
+
+	if (attr.orig_dev) {
+		err = switchdev_port_attr_set(attr.orig_dev, &attr, NULL);
+		if (err && err != -EOPNOTSUPP)
+			return err;
+	}
 
 	if (v->vid == br_get_pvid(vg))
 		br_vlan_set_pvid_state(vg, state);
