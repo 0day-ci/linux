@@ -4674,48 +4674,53 @@ static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
 
 static int mvpp2_irqs_init(struct mvpp2_port *port)
 {
-	int err, i;
+	struct irq_affinity affd = {
+		/* No pre/post-vectors, single set */
+	};
+	int err, i, nvec, *irqs;
+
+	for (i = nvec = 0; i < port->nqvecs; i++) {
+		struct mvpp2_queue_vector *qv = port->qvecs + i;
+
+		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE)
+			nvec++;
+	}
+
+	irqs = kmalloc(sizeof(*irqs) * nvec, GFP_KERNEL);
+	if (!irqs)
+		return -ENOMEM;
 
 	for (i = 0; i < port->nqvecs; i++) {
 		struct mvpp2_queue_vector *qv = port->qvecs + i;
 
-		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE) {
-			qv->mask = kzalloc(cpumask_size(), GFP_KERNEL);
-			if (!qv->mask) {
-				err = -ENOMEM;
-				goto err;
-			}
+		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE)
+			irqs[i] = qv->irq;
+	}
 
-			irq_set_status_flags(qv->irq, IRQ_NO_BALANCING);
-		}
+	err = irq_set_affinity_masks(&affd, irqs, nvec);
+	if (err)
+		goto err;
+
+	for (i = 0; i < port->nqvecs; i++) {
+		struct mvpp2_queue_vector *qv = port->qvecs + i;
 
 		err = request_irq(qv->irq, mvpp2_isr, 0, port->dev->name, qv);
-		if (err)
-			goto err;
-
-		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE) {
-			unsigned int cpu;
-
-			for_each_present_cpu(cpu) {
-				if (mvpp2_cpu_to_thread(port->priv, cpu) ==
-				    qv->sw_thread_id)
-					cpumask_set_cpu(cpu, qv->mask);
-			}
-
-			irq_set_affinity_hint(qv->irq, qv->mask);
+		if (err) {
+			nvec = i;
+			break;
 		}
 	}
 
-	return 0;
-err:
-	for (i = 0; i < port->nqvecs; i++) {
-		struct mvpp2_queue_vector *qv = port->qvecs + i;
+	if (err) {
+		for (i = 0; i < nvec; i++) {
+			struct mvpp2_queue_vector *qv = port->qvecs + i;
 
-		irq_set_affinity_hint(qv->irq, NULL);
-		kfree(qv->mask);
-		qv->mask = NULL;
-		free_irq(qv->irq, qv);
+			free_irq(qv->irq, qv);
+		}
 	}
+
+err:
+	kfree(irqs);
 
 	return err;
 }
@@ -4727,10 +4732,6 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 	for (i = 0; i < port->nqvecs; i++) {
 		struct mvpp2_queue_vector *qv = port->qvecs + i;
 
-		irq_set_affinity_hint(qv->irq, NULL);
-		kfree(qv->mask);
-		qv->mask = NULL;
-		irq_clear_status_flags(qv->irq, IRQ_NO_BALANCING);
 		free_irq(qv->irq, qv);
 	}
 }
