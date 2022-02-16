@@ -41,10 +41,8 @@ static void br_vlan_mst_rcu_free(struct rcu_head *rcu)
 	kfree(mst);
 }
 
-static void br_vlan_mst_put(struct net_bridge_vlan *v)
+static void br_vlan_mst_put(struct br_vlan_mst *mst)
 {
-	struct br_vlan_mst *mst = rtnl_dereference(v->mst);
-
 	if (refcount_dec_and_test(&mst->refcnt))
 		call_rcu(&mst->rcu, br_vlan_mst_rcu_free);
 }
@@ -153,13 +151,17 @@ static struct br_vlan_mst *br_vlan_group_mst_get(struct net_bridge_vlan_group *v
 
 static int br_vlan_mst_migrate(struct net_bridge_vlan *v, u16 mstid)
 {
+	struct br_vlan_mst *mst, *old_mst;
 	struct net_bridge_vlan_group *vg;
-	struct br_vlan_mst *mst;
+	struct net_bridge *br;
 
-	if (br_vlan_is_master(v))
-		vg = br_vlan_group(v->br);
-	else
+	if (br_vlan_is_master(v)) {
+		br = v->br;
+		vg = br_vlan_group(br);
+	} else {
+		br = v->port->br;
 		vg = nbp_vlan_group(v->port);
+	}
 
 	mst = br_vlan_group_mst_get(vg, mstid);
 	if (!mst) {
@@ -168,10 +170,37 @@ static int br_vlan_mst_migrate(struct net_bridge_vlan *v, u16 mstid)
 			return -ENOMEM;
 	}
 
-	if (rtnl_dereference(v->mst))
-		br_vlan_mst_put(v);
-
+	old_mst = rtnl_dereference(v->mst);
 	rcu_assign_pointer(v->mst, mst);
+
+	if (old_mst)
+		br_vlan_mst_put(old_mst);
+
+	return 0;
+}
+
+int br_vlan_mstid_set(struct net_bridge_vlan *v, u16 mstid)
+{
+	struct net_bridge *br = v->br;
+	struct net_bridge_port *p;
+	int err;
+
+	err = br_vlan_mst_migrate(v, mstid);
+	if (err)
+		return err;
+
+	list_for_each_entry(p, &br->port_list, list) {
+		struct net_bridge_vlan_group *vg = nbp_vlan_group(p);
+		struct net_bridge_vlan *portv;
+
+		portv = br_vlan_lookup(&vg->vlan_hash, v->vid);
+		if (!portv)
+			continue;
+
+		err = br_vlan_mst_migrate(portv, mstid);
+		if (err)
+			return err;
+	}
 	return 0;
 }
 
@@ -501,7 +530,7 @@ out:
 	return err;
 
 out_mst_init:
-	br_vlan_mst_put(v);
+	br_vlan_mst_put(rtnl_dereference(v->mst));
 
 out_fdb_insert:
 	if (br_vlan_should_use(v)) {
@@ -570,7 +599,7 @@ static int __vlan_del(struct net_bridge_vlan *v)
 		call_rcu(&v->rcu, nbp_vlan_rcu_free);
 	}
 
-	br_vlan_mst_put(v);
+	br_vlan_mst_put(rtnl_dereference(v->mst));
 	br_vlan_put_master(masterv);
 out:
 	return err;

@@ -1759,6 +1759,9 @@ static inline void br_vlan_set_state(struct net_bridge_vlan *v, u8 state)
 	mst->state = state;
 }
 
+u16 br_vlan_mstid_get(const struct net_bridge_vlan *v);
+int br_vlan_mstid_set(struct net_bridge_vlan *v, u16 mstid);
+
 static inline u8 br_vlan_get_pvid_state(const struct net_bridge_vlan_group *vg)
 {
 	return READ_ONCE(vg->pvid_state);

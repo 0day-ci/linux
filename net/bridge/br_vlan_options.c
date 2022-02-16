@@ -380,6 +380,9 @@ bool br_vlan_global_opts_fill(struct sk_buff *skb, u16 vid, u16 vid_range,
 #endif
 #endif
 
+	if (nla_put_u16(skb, BRIDGE_VLANDB_GOPTS_MSTID, br_vlan_mstid_get(v_opts)))
+		goto out_err;
+
 	nla_nest_end(skb, nest);
 
 	return true;
@@ -411,7 +414,9 @@ static size_t rtnl_vlan_global_opts_nlmsg_size(const struct net_bridge_vlan *v)
 		+ nla_total_size(0) /* BRIDGE_VLANDB_GOPTS_MCAST_ROUTER_PORTS */
 		+ br_rports_size(&v->br_mcast_ctx) /* BRIDGE_VLANDB_GOPTS_MCAST_ROUTER_PORTS */
 #endif
-		+ nla_total_size(sizeof(u16)); /* BRIDGE_VLANDB_GOPTS_RANGE */
+		+ nla_total_size(sizeof(u16)) /* BRIDGE_VLANDB_GOPTS_RANGE */
+		+ nla_total_size(sizeof(u16)) /* BRIDGE_VLANDB_GOPTS_MSTID */
+		+ 0;
 }
 
 static void br_vlan_global_opts_notify(const struct net_bridge *br,
@@ -560,6 +565,15 @@ static int br_vlan_process_global_one_opts(const struct net_bridge *br,
 	}
 #endif
 #endif
+	if (tb[BRIDGE_VLANDB_GOPTS_MSTID]) {
+		u16 mstid;
+
+		mstid = nla_get_u16(tb[BRIDGE_VLANDB_GOPTS_MSTID]);
+		err = br_vlan_mstid_set(v, mstid);
+		if (err)
+			return err;
+		*changed = true;
+	}
 
 	return 0;
 }
@@ -579,6 +593,7 @@ static const struct nla_policy br_vlan_db_gpol[BRIDGE_VLANDB_GOPTS_MAX + 1] = {
 	[BRIDGE_VLANDB_GOPTS_MCAST_QUERIER_INTVL]	= { .type = NLA_U64 },
 	[BRIDGE_VLANDB_GOPTS_MCAST_STARTUP_QUERY_INTVL]	= { .type = NLA_U64 },
 	[BRIDGE_VLANDB_GOPTS_MCAST_QUERY_RESPONSE_INTVL] = { .type = NLA_U64 },
+	[BRIDGE_VLANDB_GOPTS_MSTID] = NLA_POLICY_RANGE(NLA_U16, 1, 4094),
 };
 
 int br_vlan_rtm_process_global_options(struct net_device *dev,
