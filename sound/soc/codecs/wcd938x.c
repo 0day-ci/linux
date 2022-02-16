@@ -4207,7 +4207,7 @@ static bool wcd938x_swap_gnd_mic(struct snd_soc_component *component, bool activ
 	struct wcd938x_priv *wcd938x;
 
 	if (!component) {
-		dev_err(component->dev, "%s component is NULL\n", __func__);
+		pr_err("The snd_soc_component is NULL\n");
 		return false;
 	}
 
