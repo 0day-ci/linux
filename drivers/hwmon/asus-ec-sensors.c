@@ -589,31 +589,40 @@ get_board_sensors(const struct device *dev)
 	return (unsigned long)dmi_entry->driver_data;
 }
 
-static int __init configure_sensor_setup(struct device *dev)
+static int __init asus_ec_probe(struct platform_device *pdev)
 {
-	struct ec_sensors_data *ec_data = dev_get_drvdata(dev);
-	int nr_count[hwmon_max] = { 0 }, nr_types = 0;
-	struct device *hwdev;
-	struct hwmon_channel_info *asus_ec_hwmon_chan;
 	const struct hwmon_channel_info **ptr_asus_ec_ci;
+	int nr_count[hwmon_max] = { 0 }, nr_types = 0;
+	struct hwmon_channel_info *asus_ec_hwmon_chan;
 	const struct hwmon_chip_info *chip_info;
 	const struct ec_sensor_info *si;
+	struct ec_sensors_data *ec_data;
 	enum hwmon_sensor_types type;
+	unsigned long board_sensors;
+	struct device *hwdev;
 	unsigned int i;
 
-	ec_data->board_sensors = get_board_sensors(dev);
-	if (!ec_data->board_sensors) {
+	board_sensors = get_board_sensors(&pdev->dev);
+	if (!board_sensors) {
 		return -ENODEV;
 	}
 
+	ec_data = devm_kzalloc(&pdev->dev, sizeof(struct ec_sensors_data),
+			     GFP_KERNEL);
+	if (!ec_data) {
+		return -ENOMEM;
+	}
+
+	dev_set_drvdata(&pdev->dev, ec_data);
+	ec_data->board_sensors = board_sensors;
 	ec_data->nr_sensors = board_sensors_count(ec_data->board_sensors);
-	ec_data->sensors = devm_kcalloc(dev, ec_data->nr_sensors,
+	ec_data->sensors = devm_kcalloc(&pdev->dev, ec_data->nr_sensors,
 					sizeof(struct ec_sensor), GFP_KERNEL);
 
 	setup_sensor_data(ec_data);
-	ec_data->registers = devm_kcalloc(dev, ec_data->nr_registers,
+	ec_data->registers = devm_kcalloc(&pdev->dev, ec_data->nr_registers,
 					  sizeof(u16), GFP_KERNEL);
-	ec_data->read_buffer = devm_kcalloc(dev, ec_data->nr_registers,
+	ec_data->read_buffer = devm_kcalloc(&pdev->dev, ec_data->nr_registers,
 					    sizeof(u8), GFP_KERNEL);
 
 	if (!ec_data->registers || !ec_data->read_buffer) {
@@ -622,7 +631,7 @@ static int __init configure_sensor_setup(struct device *dev)
 
 	fill_ec_registers(ec_data);
 
-	ec_data->aml_mutex = asus_hw_access_mutex(dev);
+	ec_data->aml_mutex = asus_hw_access_mutex(&pdev->dev);
 
 	for (i = 0; i < ec_data->nr_sensors; ++i) {
 		si = get_sensor_info(ec_data, i);
@@ -635,11 +644,11 @@ static int __init configure_sensor_setup(struct device *dev)
 		nr_count[hwmon_chip]++, nr_types++;
 
 	asus_ec_hwmon_chan = devm_kcalloc(
-		dev, nr_types, sizeof(*asus_ec_hwmon_chan), GFP_KERNEL);
+		&pdev->dev, nr_types, sizeof(*asus_ec_hwmon_chan), GFP_KERNEL);
 	if (!asus_ec_hwmon_chan)
 		return -ENOMEM;
 
-	ptr_asus_ec_ci = devm_kcalloc(dev, nr_types + 1,
+	ptr_asus_ec_ci = devm_kcalloc(&pdev->dev, nr_types + 1,
 				       sizeof(*ptr_asus_ec_ci), GFP_KERNEL);
 	if (!ptr_asus_ec_ci)
 		return -ENOMEM;
@@ -651,37 +660,21 @@ static int __init configure_sensor_setup(struct device *dev)
 		if (!nr_count[type])
 			continue;
 
-		asus_ec_hwmon_add_chan_info(asus_ec_hwmon_chan, dev,
+		asus_ec_hwmon_add_chan_info(asus_ec_hwmon_chan, &pdev->dev,
 					     nr_count[type], type,
 					     hwmon_attributes[type]);
 		*ptr_asus_ec_ci++ = asus_ec_hwmon_chan++;
 	}
 
-	dev_info(dev, "board has %d EC sensors that span %d registers",
+	dev_info(&pdev->dev, "board has %d EC sensors that span %d registers",
 		 ec_data->nr_sensors, ec_data->nr_registers);
 
-	hwdev = devm_hwmon_device_register_with_info(dev, "asusec",
+	hwdev = devm_hwmon_device_register_with_info(&pdev->dev, "asusec",
 						     ec_data, chip_info, NULL);
 
 	return PTR_ERR_OR_ZERO(hwdev);
 }
 
-static int __init asus_ec_probe(struct platform_device *pdev)
-{
-	struct ec_sensors_data *state;
-	int status = 0;
-
-	state = devm_kzalloc(&pdev->dev, sizeof(struct ec_sensors_data),
-			     GFP_KERNEL);
-
-	if (!state) {
-		return -ENOMEM;
-	}
-
-	dev_set_drvdata(&pdev->dev, state);
-	status = configure_sensor_setup(&pdev->dev);
-	return status;
-}
 
 static const struct acpi_device_id acpi_ec_ids[] = {
 	/* Embedded Controller Device */
