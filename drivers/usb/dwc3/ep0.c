@@ -243,6 +243,7 @@ void dwc3_ep0_stall_and_restart(struct dwc3 *dwc)
 
 	dwc->ep0state = EP0_SETUP_PHASE;
 	complete(&dwc->ep0_in_setup);
+	dwc3_gadget_check_ep_dequeue(dwc);
 	if (dwc->softconnect)
 		dwc3_ep0_out_start(dwc);
 }
@@ -925,6 +926,7 @@ static void dwc3_ep0_complete_status(struct dwc3 *dwc,
 
 	dwc->ep0state = EP0_SETUP_PHASE;
 	complete(&dwc->ep0_in_setup);
+	dwc3_gadget_check_ep_dequeue(dwc);
 	if (dwc->softconnect)
 		dwc3_ep0_out_start(dwc);
 }
