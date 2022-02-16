@@ -3395,7 +3395,7 @@ int btrfs_start_pre_rw_mount(struct btrfs_fs_info *fs_info)
 	while (btrfs_clean_one_deleted_snapshot(fs_info))
 		cond_resched();
 
-	ret = btrfs_recover_relocation(fs_info->tree_root);
+	ret = btrfs_recover_relocation(fs_info);
 	mutex_unlock(&fs_info->cleaner_mutex);
 	if (ret < 0) {
 		btrfs_warn(fs_info, "failed to recover relocation: %d", ret);
