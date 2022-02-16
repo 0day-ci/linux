@@ -1,0 +1,28 @@
+drm drm-fixes 754e0b0e35608ed5206d6a67a791563c631cec07
+	Linux 5.17-rc4
+drm-misc drm-misc-fixes 439cf34c8e0a8a33d8c15a31be1b7423426bc765
+	drm/atomic: Don't pollute crtc_state->mode_blob with error pointers
+drm-intel drm-intel-fixes 26ace8793aaefbcd0d6bb664573ded35c69cd6ef
+	drm/i915/fbc: Fix the plane end Y offset check
+drm drm-next b9c7babe2c2e37a50aa42401b38d597ea78f506e
+	Backmerge tag 'v5.17-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux into drm-next
+drm-misc drm-misc-next-fixes d3cbc6e323c9299d10c8d2e4127c77c7d05d07b1
+	drm: panel-orientation-quirks: Add quirk for the 1Netbook OneXPlayer
+drm-intel drm-intel-next-fixes e26602be4869c74dd8a0f66f718b8a0ce120edb4
+	drm/i915/display/adlp: Implement new step in the TC voltage swing prog sequence
+drm-misc drm-misc-next 21d26b3972532069f9315f73c0f3128a49d2e014
+	dt-bindings: display: ssd1307fb: Add myself as binding co-maintainer
+drm-intel drm-intel-next a19c1d00b0d350fb7b75c6c4da91887f66114a7d
+	drm/i915: Unconfuse pre-icl vs. icl+ intel_sagv_{pre,post}_plane_update()
+drm-intel drm-intel-gt-next 154cfae6158141b18d65abb0db679bb51a8294e7
+	drm/i915/dg2: Add Wa_22011100796
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 4c82fd0506b4cc196a375d1200361fb0c5439acd
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
