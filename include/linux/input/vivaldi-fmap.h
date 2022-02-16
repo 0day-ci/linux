@@ -4,6 +4,10 @@
 
 #include <linux/types.h>
 
+struct hid_device;
+struct hid_field;
+struct hid_usage;
+
 #define VIVALDI_MIN_FN_ROW_KEY	1
 #define VIVALDI_MAX_FN_ROW_KEY	24
 
@@ -24,5 +28,10 @@ struct vivaldi_data {
 
 ssize_t vivaldi_function_row_physmap_show(const struct vivaldi_data *data,
 					  char *buf);
+
+void vivaldi_hid_feature_mapping(struct vivaldi_data *data,
+				 struct hid_device *hdev,
+				 struct hid_field *field,
+				 struct hid_usage *usage);
 
 #endif /* _VIVALDI_KEYMAP_H */
