@@ -519,7 +519,7 @@ static int dm9051_map_init(struct spi_device *spi, struct board_info *db)
 static int dm9051_map_chipid(struct board_info *db)
 {
 	struct device *dev = &db->spidev->dev;
-	unsigned int ret;
+	int ret;
 	unsigned short wid;
 	u8 buff[6];
 
