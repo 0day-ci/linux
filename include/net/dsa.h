@@ -901,6 +901,9 @@ struct dsa_switch_ops {
 				 struct netlink_ext_ack *extack);
 	int	(*port_vlan_del)(struct dsa_switch *ds, int port,
 				 const struct switchdev_obj_port_vlan *vlan);
+	int	(*vlan_mstid_set)(struct dsa_switch *ds,
+				  const struct switchdev_attr *attr);
+
 	/*
 	 * Forwarding database
 	 */

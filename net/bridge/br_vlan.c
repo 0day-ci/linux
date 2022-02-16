@@ -173,7 +173,7 @@ static int br_vlan_mst_migrate(struct net_bridge_vlan *v, u16 mstid)
 	old_mst = rtnl_dereference(v->mst);
 	rcu_assign_pointer(v->mst, mst);
 
-	if (br_vlan_is_master(v)) {
+	if (!old_mst || br_vlan_is_master(v)) {
 		struct switchdev_attr attr = {
 			.id = SWITCHDEV_ATTR_ID_VLAN_MSTID,
 			.flags = SWITCHDEV_F_DEFER,
