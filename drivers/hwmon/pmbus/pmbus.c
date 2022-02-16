@@ -18,9 +18,11 @@
 struct pmbus_device_info {
 	int pages;
 	u32 flags;
+	u32 func[PMBUS_PAGES];
 };
 
 static const struct i2c_device_id pmbus_id[];
+static const struct pmbus_device_info pmbus_info_zero;
 
 /*
  * Find sensor groups and status registers on each page.
@@ -156,13 +158,18 @@ static int pmbus_identify(struct i2c_client *client,
 	}
 
 	/* Try to find sensor groups  */
-	pmbus_find_sensor_groups(client, info);
+	if (info->func[0] == 0)
+		pmbus_find_sensor_groups(client, info);
+
 abort:
 	return ret;
 }
 
 static int pmbus_probe(struct i2c_client *client)
 {
+	int ret, i;
+	u8 mfr_model[I2C_SMBUS_BLOCK_MAX + 1];
+	const struct i2c_device_id *device_id = NULL;
 	struct pmbus_driver_info *info;
 	struct pmbus_platform_data *pdata = NULL;
 	struct device *dev = &client->dev;
@@ -173,6 +180,30 @@ static int pmbus_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	device_info = (struct pmbus_device_info *)i2c_match_id(pmbus_id, client)->driver_data;
+	if (!device_info) {
+		if (!i2c_check_functionality(client->adapter,
+					     I2C_FUNC_SMBUS_BLOCK_DATA))
+			return -ENODEV;
+
+		ret = i2c_smbus_read_block_data(client, PMBUS_MFR_MODEL, mfr_model);
+		if (ret < 0)
+			return ret;
+
+		for (device_id = pmbus_id; device_id->name[0]; device_id++) {
+			if (device_id->driver_data &&
+			    !strncasecmp(device_id->name, mfr_model, strlen(device_id->name)))
+				break;
+		}
+
+		if (device_id->name[0])
+			device_info = (struct pmbus_device_info *)device_id->driver_data;
+		else
+			device_info = (struct pmbus_device_info *)&pmbus_info_zero;
+
+		dev_info(dev, "Use pmbus device id: %s\n",
+			 device_id->name[0] ? device_id->name : "pmbus");
+	}
+
 	if (device_info->flags) {
 		pdata = devm_kzalloc(dev, sizeof(struct pmbus_platform_data),
 				     GFP_KERNEL);
@@ -183,6 +214,8 @@ static int pmbus_probe(struct i2c_client *client)
 	}
 
 	info->pages = device_info->pages;
+	for (i = 0; i < info->pages; i++)
+		info->func[i] = device_info->func[i];
 	info->identify = pmbus_identify;
 	dev->platform_data = pdata;
 
@@ -204,9 +237,16 @@ static const struct pmbus_device_info pmbus_info_one_skip = {
 	.flags = PMBUS_SKIP_STATUS_CHECK
 };
 
-static const struct pmbus_device_info pmbus_info_one_status = {
+static const struct pmbus_device_info pmbus_info_bmr458 = {
 	.pages = 1,
-	.flags = PMBUS_READ_STATUS_AFTER_FAILED_CHECK
+	.flags = PMBUS_READ_STATUS_AFTER_FAILED_CHECK,
+	.func = {
+			PMBUS_HAVE_VIN | PMBUS_HAVE_STATUS_INPUT
+		      | PMBUS_HAVE_VOUT | PMBUS_HAVE_STATUS_VOUT
+		      | PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT
+		      | PMBUS_HAVE_TEMP | PMBUS_HAVE_TEMP2
+		      | PMBUS_HAVE_STATUS_TEMP
+		}
 };
 
 /*
@@ -214,15 +254,15 @@ static const struct pmbus_device_info pmbus_info_one_status = {
  */
 static const struct i2c_device_id pmbus_id[] = {
 	{"adp4000", (kernel_ulong_t)&pmbus_info_one},
-	{"bmr310", (kernel_ulong_t)&pmbus_info_one_status},
+	{"bmr310", (kernel_ulong_t)&pmbus_info_bmr458},
 	{"bmr453", (kernel_ulong_t)&pmbus_info_one},
 	{"bmr454", (kernel_ulong_t)&pmbus_info_one},
 	{"bmr456", (kernel_ulong_t)&pmbus_info_one},
 	{"bmr457", (kernel_ulong_t)&pmbus_info_one},
-	{"bmr458", (kernel_ulong_t)&pmbus_info_one_status},
-	{"bmr480", (kernel_ulong_t)&pmbus_info_one_status},
-	{"bmr490", (kernel_ulong_t)&pmbus_info_one_status},
-	{"bmr491", (kernel_ulong_t)&pmbus_info_one_status},
+	{"bmr458", (kernel_ulong_t)&pmbus_info_bmr458},
+	{"bmr480", (kernel_ulong_t)&pmbus_info_bmr458},
+	{"bmr490", (kernel_ulong_t)&pmbus_info_bmr458},
+	{"bmr491", (kernel_ulong_t)&pmbus_info_bmr458},
 	{"bmr492", (kernel_ulong_t)&pmbus_info_one},
 	{"dps460", (kernel_ulong_t)&pmbus_info_one_skip},
 	{"dps650ab", (kernel_ulong_t)&pmbus_info_one_skip},
@@ -235,6 +275,7 @@ static const struct i2c_device_id pmbus_id[] = {
 	{"pdt006", (kernel_ulong_t)&pmbus_info_one},
 	{"pdt012", (kernel_ulong_t)&pmbus_info_one},
 	{"pmbus", (kernel_ulong_t)&pmbus_info_zero},
+	{"pmbus_match_model", (kernel_ulong_t)0},
 	{"sgd009", (kernel_ulong_t)&pmbus_info_one_skip},
 	{"tps40400", (kernel_ulong_t)&pmbus_info_one},
 	{"tps544b20", (kernel_ulong_t)&pmbus_info_one},
