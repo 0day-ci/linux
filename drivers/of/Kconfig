@@ -94,4 +94,9 @@ config OF_DMA_DEFAULT_COHERENT
 	# arches should select this if DMA is coherent by default for OF devices
 	bool
 
+config OF_EMPTY_ROOT
+	# driver which requires at least the empty base device tree to
+	# overlay its own device nodes should select this.
+	bool
+
 endif # OF
