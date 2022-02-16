@@ -2252,9 +2252,21 @@ static void acpi_bus_attach(struct acpi_device *device, bool first_pass)
 		device->handler->hotplug.notify_online(device);
 }
 
-static int acpi_dev_get_first_consumer_dev_cb(struct acpi_dep_data *dep, void *data)
+static int acpi_dev_get_next_consumer_dev_cb(struct acpi_dep_data *dep, void *data)
 {
-	struct acpi_device *adev;
+	struct acpi_device *adev = *(struct acpi_device **)data;
+
+	/*
+	 * If we're passed a 'previous' consumer device then we need to skip
+	 * any consumers until we meet the previous one, and then NULL @data
+	 * so the next one can be returned.
+	 */
+	if (adev) {
+		if (dep->consumer == adev->handle)
+			*(struct acpi_device **)data = NULL;
+
+		return 0;
+	}
 
 	adev = acpi_bus_get_acpi_device(dep->consumer);
 	if (adev) {
@@ -2385,6 +2397,30 @@ bool acpi_dev_ready_for_enumeration(const struct acpi_device *device)
 EXPORT_SYMBOL_GPL(acpi_dev_ready_for_enumeration);
 
 /**
+ * acpi_dev_get_next_consumer_dev - Return the next adev dependent on @supplier
+ * @supplier: Pointer to the dependee device
+ * @start: Pointer to the current dependent device
+ *
+ * Returns the next &struct acpi_device which declares itself dependent on
+ * @supplier via the _DEP buffer, parsed from the acpi_dep_list.
+ *
+ * The caller is responsible for putting the reference to adev when it is no
+ * longer needed.
+ */
+struct acpi_device *acpi_dev_get_next_consumer_dev(struct acpi_device *supplier,
+						   struct acpi_device *start)
+{
+	struct acpi_device *adev = start;
+
+	acpi_walk_dep_device_list(supplier->handle,
+				  acpi_dev_get_next_consumer_dev_cb, &adev);
+
+	acpi_dev_put(start);
+	return adev == start ? NULL : adev;
+}
+EXPORT_SYMBOL_GPL(acpi_dev_get_next_consumer_dev);
+
+/**
  * acpi_dev_get_first_consumer_dev - Return ACPI device dependent on @supplier
  * @supplier: Pointer to the dependee device
  *
@@ -2396,12 +2432,7 @@ EXPORT_SYMBOL_GPL(acpi_dev_ready_for_enumeration);
  */
 struct acpi_device *acpi_dev_get_first_consumer_dev(struct acpi_device *supplier)
 {
-	struct acpi_device *adev = NULL;
-
-	acpi_walk_dep_device_list(supplier->handle,
-				  acpi_dev_get_first_consumer_dev_cb, &adev);
-
-	return adev;
+	return acpi_dev_get_next_consumer_dev(supplier, NULL);
 }
 EXPORT_SYMBOL_GPL(acpi_dev_get_first_consumer_dev);
 
