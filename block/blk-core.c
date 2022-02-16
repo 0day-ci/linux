@@ -50,6 +50,7 @@
 #include "blk-mq-sched.h"
 #include "blk-pm.h"
 #include "blk-throttle.h"
+#include "blk-rq-qos.h"
 
 struct dentry *blk_debugfs_root;
 
@@ -321,6 +322,8 @@ void blk_cleanup_queue(struct request_queue *q)
 	blk_freeze_queue(q);
 
 	blk_queue_flag_set(QUEUE_FLAG_DEAD, q);
+
+	rq_qos_exit(q);
 
 	blk_sync_queue(q);
 	if (queue_is_mq(q)) {
