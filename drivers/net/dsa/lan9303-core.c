@@ -1084,9 +1084,15 @@ static int lan9303_port_enable(struct dsa_switch *ds, int port,
 			       struct phy_device *phy)
 {
 	struct lan9303 *chip = ds->priv;
+	struct dsa_port *cpu_dp;
 
 	if (!dsa_is_user_port(ds, port))
 		return 0;
+
+	dsa_switch_for_each_cpu_port(cpu_dp, ds)
+		break;
+
+	vlan_vid_add(cpu_dp->master, htons(ETH_P_8021Q), port);
 
 	return lan9303_enable_processing_port(chip, port);
 }
@@ -1094,9 +1100,15 @@ static int lan9303_port_enable(struct dsa_switch *ds, int port,
 static void lan9303_port_disable(struct dsa_switch *ds, int port)
 {
 	struct lan9303 *chip = ds->priv;
+	struct dsa_port *cpu_dp;
 
 	if (!dsa_is_user_port(ds, port))
 		return;
+
+	dsa_switch_for_each_cpu_port(cpu_dp, ds)
+		break;
+
+	vlan_vid_del(cpu_dp->master, htons(ETH_P_8021Q), port);
 
 	lan9303_disable_processing_port(chip, port);
 	lan9303_phy_write(ds, chip->phy_addr_base + port, MII_BMCR, BMCR_PDOWN);
