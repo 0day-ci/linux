@@ -34,6 +34,7 @@
 #include <linux/oom.h>
 #include <linux/numa.h>
 #include <linux/page_owner.h>
+#include <linux/damon.h>
 
 #include <asm/tlb.h>
 #include <asm/pgalloc.h>
@@ -1450,6 +1451,10 @@ vm_fault_t do_huge_pmd_numa_page(struct vm_fault *vmf)
 		flags |= TNF_NO_GROUP;
 
 	page_nid = page_to_nid(page);
+
+	/* Get the NUMA accesses of monitored processes by DAMON */
+	damon_numa_fault(page_nid, numa_node_id(), vmf);
+
 	last_cpupid = page_cpupid_last(page);
 	target_nid = numa_migrate_prep(page, vma, haddr, page_nid,
 				       &flags);

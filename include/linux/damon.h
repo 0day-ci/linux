@@ -12,11 +12,15 @@
 #include <linux/time64.h>
 #include <linux/types.h>
 #include <linux/random.h>
+#include <linux/mm.h>
 
 /* Minimal region size.  Every damon_region is aligned by this. */
 #define DAMON_MIN_REGION	PAGE_SIZE
 /* Max priority score for DAMON-based operation schemes */
 #define DAMOS_MAX_SCORE		(99)
+
+extern struct damon_ctx **dbgfs_ctxs;
+extern int dbgfs_nr_ctxs;
 
 /* Get a random number in [l, r) */
 static inline unsigned long damon_rand(unsigned long l, unsigned long r)
@@ -68,6 +72,7 @@ struct damon_region {
  * @nr_regions:		Number of monitoring target regions of this target.
  * @regions_list:	Head of the monitoring target regions of this target.
  * @list:		List head for siblings.
+ * @target_lock:  Use damon_region lock to avoid race.
  *
  * Each monitoring context could have multiple targets.  For example, a context
  * for virtual memory address spaces could have multiple target processes.  The
@@ -80,6 +85,7 @@ struct damon_target {
 	unsigned int nr_regions;
 	struct list_head regions_list;
 	struct list_head list;
+	spinlock_t target_lock;
 };
 
 /**
@@ -503,8 +509,20 @@ int damon_stop(struct damon_ctx **ctxs, int nr_ctxs);
 #endif	/* CONFIG_DAMON */
 
 #ifdef CONFIG_DAMON_VADDR
+
+/*
+ * 't->id' should be the pointer to the relevant 'struct pid' having reference
+ * count.  Caller must put the returned task, unless it is NULL.
+ */
+static inline struct task_struct *damon_get_task_struct(struct damon_target *t)
+{
+	return get_pid_task((struct pid *)t->id, PIDTYPE_PID);
+}
 bool damon_va_target_valid(void *t);
 void damon_va_set_primitives(struct damon_ctx *ctx);
+void damon_numa_fault(int page_nid, int node_id, struct vm_fault *vmf);
+#else
+static inline void damon_numa_fault(int page_nid, int node_id, struct vm_fault *vmf) { }
 #endif	/* CONFIG_DAMON_VADDR */
 
 #ifdef CONFIG_DAMON_PADDR
