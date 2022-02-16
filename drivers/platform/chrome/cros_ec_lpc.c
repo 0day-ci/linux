@@ -550,6 +550,9 @@ static int __init cros_ec_lpc_init(void)
 	int ret;
 	acpi_status status;
 
+	if (acpi_disable)
+		return -ENODEV;
+
 	status = acpi_get_devices(ACPI_DRV_NAME, cros_ec_lpc_parse_device,
 				  &cros_ec_lpc_acpi_device_found, NULL);
 	if (ACPI_FAILURE(status))
