@@ -37,6 +37,7 @@ struct psci_cpuidle_data {
 static DEFINE_PER_CPU_READ_MOSTLY(struct psci_cpuidle_data, psci_cpuidle_data);
 static DEFINE_PER_CPU(u32, domain_state);
 static bool psci_cpuidle_use_cpuhp;
+static atomic_t cpus_in_idle;
 
 void psci_set_domain_state(u32 state)
 {
@@ -67,6 +68,14 @@ static int __psci_enter_domain_idle_state(struct cpuidle_device *dev,
 	if (ret)
 		return -1;
 
+	if (atomic_inc_return(&cpus_in_idle) == num_online_cpus()) {
+		ret = cpu_cluster_pm_enter();
+		if (ret) {
+			ret = -1;
+			goto dec_atomic;
+		}
+	}
+
 	/* Do runtime PM to manage a hierarchical CPU toplogy. */
 	rcu_irq_enter_irqson();
 	if (s2idle)
@@ -88,6 +97,10 @@ static int __psci_enter_domain_idle_state(struct cpuidle_device *dev,
 		pm_runtime_get_sync(pd_dev);
 	rcu_irq_exit_irqson();
 
+	if (atomic_read(&cpus_in_idle) == num_online_cpus())
+		cpu_cluster_pm_exit();
+dec_atomic:
+	atomic_dec(&cpus_in_idle);
 	cpu_pm_exit();
 
 	/* Clear the domain state to start fresh when back from idle. */
