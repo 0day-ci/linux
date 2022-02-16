@@ -872,7 +872,6 @@ static bool iommu_is_dummy(struct intel_iommu *iommu, struct device *dev)
 
 	return false;
 }
-
 struct intel_iommu *device_to_iommu(struct device *dev, u8 *bus, u8 *devfn)
 {
 	struct dmar_drhd_unit *drhd = NULL;
@@ -2684,7 +2683,7 @@ static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 
 		if (ecap_dev_iotlb_support(iommu->ecap) &&
 		    pci_ats_supported(pdev) &&
-		    dmar_find_matched_atsr_unit(pdev))
+		    dmar_ats_supported(pdev, iommu))
 			info->ats_supported = 1;
 
 		if (sm_supported(iommu)) {
@@ -4020,7 +4019,42 @@ static void intel_iommu_free_dmars(void)
 	}
 }
 
-int dmar_find_matched_atsr_unit(struct pci_dev *dev)
+/* dev_satc_state - Find if dev is in a DMAR SATC table
+ *
+ * return value:
+ *    1: dev is in STAC table and ATS is required
+ *    0: dev is in SATC table and ATS is optional
+ *    -1: dev isn't in SATC table
+ */
+static int dev_satc_state(struct pci_dev *dev)
+{
+	int i, ret = -1;
+	struct device *tmp;
+	struct dmar_satc_unit *satcu;
+	struct acpi_dmar_satc *satc;
+
+	dev = pci_physfn(dev);
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(satcu, &dmar_satc_units, list) {
+		satc = container_of(satcu->hdr, struct acpi_dmar_satc, header);
+		if (satc->segment != pci_domain_nr(dev->bus))
+			continue;
+		for_each_dev_scope(satcu->devices, satcu->devices_cnt, i, tmp)
+			if (to_pci_dev(tmp) == dev) {
+				if (satc->flags)
+					ret = 1;
+				else
+					ret = 0;
+				goto out;
+			}
+	}
+out:
+	rcu_read_unlock();
+	return ret;
+}
+
+int dmar_ats_supported(struct pci_dev *dev, struct intel_iommu *iommu)
 {
 	int i, ret = 1;
 	struct pci_bus *bus;
@@ -4030,6 +4064,19 @@ int dmar_find_matched_atsr_unit(struct pci_dev *dev)
 	struct dmar_atsr_unit *atsru;
 
 	dev = pci_physfn(dev);
+	i = dev_satc_state(dev);
+	if (i >= 0) {
+		/* This dev supports ATS as it is in SATC table!
+		 * When IOMMU is in legacy mode, enabling ATS is done
+		 * automatically by HW for the device that requires
+		 * ATS, hence OS should not enable this device ATS
+		 * to avoid duplicated TLB invalidation
+		 */
+		if (i && !sm_supported(iommu))
+			ret = 0;
+		return ret;
+	}
+
 	for (bus = dev->bus; bus; bus = bus->parent) {
 		bridge = bus->self;
 		/* If it's an integrated device, allow ATS */
