@@ -12,9 +12,43 @@ Allocation test on Intel RDT hardware. More tests will be added in the future.
 And the test suit can be extended to cover AMD QoS and ARM MPAM hardware
 as well.
 
+resctrl_tests can be run with or without kselftest framework.
+
+USE KSELFTEST FRAMEWORK
+-----------------------
+
 BUILD
 -----
 
+Execute the following command in top level directory of the kernel source.
+
+Build resctrl:
+ $ make -C tools/testing/selftests TARGETS=resctrl
+
+Build all self tests:
+ $ make -C tools/testing/selftests
+
+RUN
+---
+
+Run resctrl:
+ $ make -C tools/testing/selftests TARGETS=resctrl run_tests
+
+Run all self tests:
+ $ make -C tools/testing/selftests run_tests
+
+Using kselftest framework, the ./resctrl_tests will be run without any parameters.
+
+More details about kselftest framework as follow.
+Documentation/dev-tools/kselftest.rst
+
+NOT USE KSELFTEST FRAMEWORK
+---------------------------
+
+BUILD
+-----
+
+Execute the following command in this directory(tools/testing/selftests/resctrl/).
 Run "make" to build executable file "resctrl_tests".
 
 RUN
