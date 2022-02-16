@@ -171,6 +171,13 @@ acpi_ns_walk_namespace(acpi_object_type type,
 		start_node = acpi_gbl_root_node;
 	}
 
+	/* acpi_gbl_root_node is NULL when acpi=off is provided.
+	 * We proactively check nulliness here and return an error if user call
+	 * this function without checking acpi_disabled
+	 */
+	if (start_node == NULL)
+		return_ACPI_STATUS(AE_ERROR);
+
 	/* Null child means "get first node" */
 
 	parent_node = start_node;
