@@ -3265,11 +3265,17 @@ static int hci_le_set_event_mask_sync(struct hci_dev *hdev)
 	if (hdev->le_features[0] & HCI_LE_DATA_LEN_EXT)
 		events[0] |= 0x40;	/* LE Data Length Change */
 
-	/* If the controller supports LL Privacy feature, enable
-	 * the corresponding event.
+	/* If the controller supports LL Privacy feature or LE Extended
+	 * Create Connection, enable the corresponding event.
 	 */
-	if (hdev->le_features[0] & HCI_LE_LL_PRIVACY)
+	if (ll_privacy_capable(hdev) || hdev->commands[37] & 0x80) {
 		events[1] |= 0x02;	/* LE Enhanced Connection Complete */
+	} else if (hdev->commands[26] & 0x10) {
+		/* If the controller supports the LE Create Connection
+		 * command, enable the corresponding event.
+		 */
+		events[0] |= 0x01;	/* LE Connection Complete */
+	}
 
 	/* If the controller supports Extended Scanner Filter
 	 * Policies, enable the corresponding event.
@@ -3288,12 +3294,6 @@ static int hci_le_set_event_mask_sync(struct hci_dev *hdev)
 	 */
 	if (hdev->commands[26] & 0x08)
 		events[0] |= 0x02;	/* LE Advertising Report */
-
-	/* If the controller supports the LE Create Connection
-	 * command, enable the corresponding event.
-	 */
-	if (hdev->commands[26] & 0x10)
-		events[0] |= 0x01;	/* LE Connection Complete */
 
 	/* If the controller supports the LE Connection Update
 	 * command, enable the corresponding event.
@@ -5188,7 +5188,7 @@ static int hci_le_ext_create_conn_sync(struct hci_dev *hdev,
 	return __hci_cmd_sync_status_sk(hdev, HCI_OP_LE_EXT_CREATE_CONN,
 					plen, data,
 					HCI_EV_LE_ENHANCED_CONN_COMPLETE,
-					HCI_CMD_TIMEOUT, NULL);
+					conn->conn_timeout, NULL);
 }
 
 int hci_le_create_conn_sync(struct hci_dev *hdev, struct hci_conn *conn)
@@ -5274,8 +5274,11 @@ int hci_le_create_conn_sync(struct hci_dev *hdev, struct hci_conn *conn)
 	cp.max_ce_len = cpu_to_le16(0x0000);
 
 	err = __hci_cmd_sync_status_sk(hdev, HCI_OP_LE_CREATE_CONN,
-				       sizeof(cp), &cp, HCI_EV_LE_CONN_COMPLETE,
-				       HCI_CMD_TIMEOUT, NULL);
+				       sizeof(cp), &cp,
+				       ll_privacy_capable(hdev) ?
+				       HCI_EV_LE_ENHANCED_CONN_COMPLETE :
+				       HCI_EV_LE_CONN_COMPLETE,
+				       conn->conn_timeout, NULL);
 
 done:
 	/* Re-enable advertising after the connection attempt is finished. */
