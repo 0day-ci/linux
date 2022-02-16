@@ -51,6 +51,7 @@ properties:
       be any memory reserved for the purpose of this communication between the
       processors.
     minItems: 1
+    maxItems: 2
 
   power-controller:
     type: object
