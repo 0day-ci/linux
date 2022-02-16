@@ -14,6 +14,32 @@ static int ath11k_cfr_process_data(struct ath11k *ar,
 	return 0;
 }
 
+static struct dentry *create_buf_file_handler(const char *filename,
+					      struct dentry *parent,
+					      umode_t mode,
+					      struct rchan_buf *buf,
+					      int *is_global)
+{
+	struct dentry *buf_file;
+
+	buf_file = debugfs_create_file(filename, mode, parent, buf,
+				       &relay_file_operations);
+	*is_global = 1;
+	return buf_file;
+}
+
+static int remove_buf_file_handler(struct dentry *dentry)
+{
+	debugfs_remove(dentry);
+
+	return 0;
+}
+
+static const struct rchan_callbacks rfs_cfr_capture_cb = {
+	.create_buf_file = create_buf_file_handler,
+	.remove_buf_file = remove_buf_file_handler,
+};
+
 void ath11k_cfr_lut_update_paddr(struct ath11k *ar, dma_addr_t paddr,
 				 u32 buf_id)
 {
@@ -87,6 +113,11 @@ void ath11k_cfr_deinit(struct ath11k_base *ab)
 		ar = ab->pdevs[i].ar;
 		cfr = &ar->cfr;
 
+		if (ar->cfr.rfs_cfr_capture) {
+			relay_close(ar->cfr.rfs_cfr_capture);
+			ar->cfr.rfs_cfr_capture = NULL;
+		}
+
 		ath11k_cfr_ring_free(ar);
 
 		spin_lock_bh(&cfr->lut_lock);
@@ -151,6 +182,18 @@ int ath11k_cfr_init(struct ath11k_base *ab)
 		}
 
 		ar->cfr_enabled = true;
+
+		ar->cfr.rfs_cfr_capture =
+				relay_open("cfr_capture",
+					   ar->debug.debugfs_pdev,
+					   ar->ab->hw_params.cfr_stream_buf_size,
+					   ar->ab->hw_params.cfr_num_stream_bufs,
+					   &rfs_cfr_capture_cb, NULL);
+		if (!ar->cfr.rfs_cfr_capture) {
+			ath11k_warn(ar->ab, "failed to open relay for cfr in pdev %d\n",
+				    ar->pdev_idx);
+			return -EINVAL;
+		}
 	}
 
 	return 0;
