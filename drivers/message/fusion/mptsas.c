@@ -5113,7 +5113,7 @@ mptsas_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *reply)
 
 	event_data_sz = ((reply->MsgLength * 4) -
 	    offsetof(EventNotificationReply_t, Data));
-	fw_event = kzalloc(sizeof(*fw_event) + event_data_sz, GFP_ATOMIC);
+	fw_event = kzalloc(struct_size(fw_event, event_data, event_data_sz), GFP_ATOMIC);
 	if (!fw_event) {
 		printk(MYIOC_s_WARN_FMT "%s: failed at (line=%d)\n", ioc->name,
 		 __func__, __LINE__);
