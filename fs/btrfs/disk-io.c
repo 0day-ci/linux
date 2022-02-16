@@ -3383,6 +3383,19 @@ int btrfs_start_pre_rw_mount(struct btrfs_fs_info *fs_info)
 	up_read(&fs_info->cleanup_work_sem);
 
 	mutex_lock(&fs_info->cleaner_mutex);
+	/*
+	 * If there are any DEAD_TREE's we must recover them here, otherwise we
+	 * could re-start relocation and attempt to relocate blocks that are
+	 * within a half-deleted snapshot.  Under normal operations we can't run
+	 * relocation and snapshot delete at the same time, however if we had a
+	 * snapshot deletion happening prior to this mount there's no way to
+	 * guarantee that the deletion will start before we re-start (or a user
+	 * starts) the relocation.  So do the cleanup here in order to prevent
+	 * problems.
+	 */
+	while (btrfs_clean_one_deleted_snapshot(fs_info->tree_root))
+		cond_resched();
+
 	ret = btrfs_recover_relocation(fs_info->tree_root);
 	mutex_unlock(&fs_info->cleaner_mutex);
 	if (ret < 0) {
