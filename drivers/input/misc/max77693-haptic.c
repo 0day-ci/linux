@@ -325,11 +325,9 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 
 	/* Get pwm and regulatot for haptic device */
 	haptic->pwm_dev = devm_pwm_get(&pdev->dev, NULL);
-	if (IS_ERR(haptic->pwm_dev)) {
-		dev_err(&pdev->dev, "failed to get pwm device\n");
-		return PTR_ERR(haptic->pwm_dev);
-	}
-
+	if (IS_ERR(haptic->pwm_dev))
+		return dev_err_probe(&pdev->dev, PTR_ERR(haptic->pwm_dev),
+				"failed to get pwm device\n");
 	/*
 	 * FIXME: pwm_apply_args() should be removed when switching to the
 	 * atomic PWM API.
