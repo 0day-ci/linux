@@ -57,6 +57,10 @@ static inline int user_path_at(int dfd, const char __user *name, unsigned flags,
 	return user_path_at_empty(dfd, name, flags, path, NULL);
 }
 
+struct dentry *__lookup_hash(const struct qstr *name, struct dentry *base,
+			     unsigned int flags);
+int filename_parentat(int dfd, struct filename *name, unsigned int flags,
+		      struct path *parent, struct qstr *last, int *type);
 extern int kern_path(const char *, unsigned, struct path *);
 
 extern struct dentry *kern_path_create(int, const char *, struct path *, unsigned int);

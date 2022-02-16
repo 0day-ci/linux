@@ -99,6 +99,7 @@ struct ksmbd_file {
 	/* if ls is happening on directory, below is valid*/
 	struct ksmbd_readdir_data	readdir_data;
 	int				dot_dotdot[2];
+	struct rw_semaphore		filename_lock;
 };
 
 static inline void set_ctx_actor(struct dir_context *ctx,

@@ -252,6 +252,7 @@ getname_kernel(const char * filename)
 
 	return result;
 }
+EXPORT_SYMBOL(getname_kernel);
 
 void putname(struct filename *name)
 {
@@ -269,6 +270,7 @@ void putname(struct filename *name)
 	} else
 		__putname(name);
 }
+EXPORT_SYMBOL(putname);
 
 /**
  * check_acl - perform ACL permission checking
@@ -1587,8 +1589,8 @@ static struct dentry *lookup_dcache(const struct qstr *name,
  * when directory is guaranteed to have no in-lookup children
  * at all.
  */
-static struct dentry *__lookup_hash(const struct qstr *name,
-		struct dentry *base, unsigned int flags)
+struct dentry *__lookup_hash(const struct qstr *name, struct dentry *base,
+			     unsigned int flags)
 {
 	struct dentry *dentry = lookup_dcache(name, base, flags);
 	struct dentry *old;
@@ -1612,6 +1614,7 @@ static struct dentry *__lookup_hash(const struct qstr *name,
 	}
 	return dentry;
 }
+EXPORT_SYMBOL(__lookup_hash);
 
 static struct dentry *lookup_fast(struct nameidata *nd,
 				  struct inode **inode,
@@ -2556,16 +2559,16 @@ static int path_parentat(struct nameidata *nd, unsigned flags,
 }
 
 /* Note: this does not consume "name" */
-static int filename_parentat(int dfd, struct filename *name,
-			     unsigned int flags, struct path *parent,
-			     struct qstr *last, int *type)
+static int __filename_parentat(int dfd, struct filename *name,
+			       unsigned int flags, struct path *parent,
+			       struct qstr *last, int *type, struct path *root)
 {
 	int retval;
 	struct nameidata nd;
 
 	if (IS_ERR(name))
 		return PTR_ERR(name);
-	set_nameidata(&nd, dfd, name, NULL);
+	set_nameidata(&nd, dfd, name, root);
 	retval = path_parentat(&nd, flags | LOOKUP_RCU, parent);
 	if (unlikely(retval == -ECHILD))
 		retval = path_parentat(&nd, flags, parent);
@@ -2579,6 +2582,13 @@ static int filename_parentat(int dfd, struct filename *name,
 	restore_nameidata();
 	return retval;
 }
+
+int filename_parentat(int dfd, struct filename *name, unsigned int flags,
+		      struct path *parent, struct qstr *last, int *type)
+{
+	return __filename_parentat(dfd, name, flags, parent, last, type, NULL);
+}
+EXPORT_SYMBOL(filename_parentat);
 
 /* does lookup, returns the object with parent locked */
 static struct dentry *__kern_path_locked(struct filename *name, struct path *path)
@@ -2622,6 +2632,27 @@ int kern_path(const char *name, unsigned int flags, struct path *path)
 
 }
 EXPORT_SYMBOL(kern_path);
+
+/**
+ * vfs_path_parent_lookup - lookup a parent path relative to a dentry-vfsmount pair
+ * @dentry:  pointer to dentry of the base directory
+ * @mnt: pointer to vfs mount of the base directory
+ * @filename: filename structure
+ * @flags: lookup flags
+ * @parent: pointer to struct path to fill
+ * @last: last component
+ * @type: type of the last component
+ */
+int vfs_path_parent_lookup(struct dentry *dentry, struct vfsmount *mnt,
+			   struct filename *filename, unsigned int flags,
+			   struct path *parent, struct qstr *last, int *type)
+{
+	struct path root = {.mnt = mnt, .dentry = dentry};
+
+	return  __filename_parentat(AT_FDCWD, filename, flags, parent, last,
+				    type, &root);
+}
+EXPORT_SYMBOL(vfs_path_parent_lookup);
 
 /**
  * vfs_path_lookup - lookup a file path relative to a dentry-vfsmount pair

@@ -2803,11 +2803,9 @@ int smb2_open(struct ksmbd_work *work)
 		if (!file_present) {
 			daccess = cpu_to_le32(GENERIC_ALL_FLAGS);
 		} else {
-			rc = ksmbd_vfs_query_maximal_access(user_ns,
-							    path.dentry,
-							    &daccess);
-			if (rc)
-				goto err_out;
+			ksmbd_vfs_query_maximal_access(share, user_ns,
+						       path.dentry, name,
+						       &daccess);
 			already_permitted = true;
 		}
 		maximal_access = daccess;
@@ -2869,8 +2867,7 @@ int smb2_open(struct ksmbd_work *work)
 
 			if ((daccess & FILE_DELETE_LE) ||
 			    (req->CreateOptions & FILE_DELETE_ON_CLOSE_LE)) {
-				rc = ksmbd_vfs_may_delete(user_ns,
-							  path.dentry);
+				rc = ksmbd_vfs_may_delete(share, name);
 				if (rc)
 					goto err_out;
 			}
@@ -3187,8 +3184,8 @@ int smb2_open(struct ksmbd_work *work)
 		struct create_context *mxac_ccontext;
 
 		if (maximal_access == 0)
-			ksmbd_vfs_query_maximal_access(user_ns,
-						       path.dentry,
+			ksmbd_vfs_query_maximal_access(share, user_ns,
+						       path.dentry, name,
 						       &maximal_access);
 		mxac_ccontext = (struct create_context *)(rsp->Buffer +
 				le32_to_cpu(rsp->CreateContextsLength));
@@ -3901,7 +3898,9 @@ int smb2_query_dir(struct ksmbd_work *work)
 		ksmbd_debug(SMB, "Search pattern is %s\n", srch_ptr);
 	}
 
+	down_read(&dir_fp->filename_lock);
 	ksmbd_debug(SMB, "Directory name is %s\n", dir_fp->filename);
+	up_read(&dir_fp->filename_lock);
 
 	if (srch_flag & SMB2_REOPEN || srch_flag & SMB2_RESTART_SCANS) {
 		ksmbd_debug(SMB, "Restart directory scan\n");
@@ -4396,7 +4395,9 @@ static int get_file_all_info(struct ksmbd_work *work,
 		return -EACCES;
 	}
 
+	down_read(&fp->filename_lock);
 	filename = convert_to_nt_pathname(fp->filename);
+	up_read(&fp->filename_lock);
 	if (!filename)
 		return -ENOMEM;
 
@@ -5369,44 +5370,19 @@ int smb2_echo(struct ksmbd_work *work)
 
 static int smb2_rename(struct ksmbd_work *work,
 		       struct ksmbd_file *fp,
-		       struct user_namespace *user_ns,
 		       struct smb2_file_rename_info *file_info,
 		       struct nls_table *local_nls)
 {
 	struct ksmbd_share_config *share = fp->tcon->share_conf;
-	char *new_name = NULL, *abs_oldname = NULL, *old_name = NULL;
-	char *pathname = NULL;
-	struct path path;
-	bool file_present = true;
-	int rc;
+	char *new_name = NULL;
+	int rc, flags = 0;
 
 	ksmbd_debug(SMB, "setting FILE_RENAME_INFO\n");
-	pathname = kmalloc(PATH_MAX, GFP_KERNEL);
-	if (!pathname)
-		return -ENOMEM;
-
-	abs_oldname = d_path(&fp->filp->f_path, pathname, PATH_MAX);
-	if (IS_ERR(abs_oldname)) {
-		rc = -EINVAL;
-		goto out;
-	}
-	old_name = strrchr(abs_oldname, '/');
-	if (old_name && old_name[1] != '\0') {
-		old_name++;
-	} else {
-		ksmbd_debug(SMB, "can't get last component in path %s\n",
-			    abs_oldname);
-		rc = -ENOENT;
-		goto out;
-	}
-
 	new_name = smb2_get_name(file_info->FileName,
 				 le32_to_cpu(file_info->FileNameLength),
 				 local_nls);
-	if (IS_ERR(new_name)) {
-		rc = PTR_ERR(new_name);
-		goto out;
-	}
+	if (IS_ERR(new_name))
+		return PTR_ERR(new_name);
 
 	if (strchr(new_name, ':')) {
 		int s_type;
@@ -5432,7 +5408,7 @@ static int smb2_rename(struct ksmbd_work *work,
 		if (rc)
 			goto out;
 
-		rc = ksmbd_vfs_setxattr(user_ns,
+		rc = ksmbd_vfs_setxattr(file_mnt_user_ns(fp->filp),
 					fp->filp->f_path.dentry,
 					xattr_stream_name,
 					NULL, 0, 0);
@@ -5447,47 +5423,25 @@ static int smb2_rename(struct ksmbd_work *work,
 	}
 
 	ksmbd_debug(SMB, "new name %s\n", new_name);
-	rc = ksmbd_vfs_kern_path(work, new_name, LOOKUP_NO_SYMLINKS, &path, 1);
-	if (rc) {
-		if (rc != -ENOENT)
-			goto out;
-		file_present = false;
-	} else {
-		path_put(&path);
-	}
-
 	if (ksmbd_share_veto_filename(share, new_name)) {
 		rc = -ENOENT;
 		ksmbd_debug(SMB, "Can't rename vetoed file: %s\n", new_name);
 		goto out;
 	}
 
-	if (file_info->ReplaceIfExists) {
-		if (file_present) {
-			rc = ksmbd_vfs_remove_file(work, new_name);
-			if (rc) {
-				if (rc != -ENOTEMPTY)
-					rc = -EINVAL;
-				ksmbd_debug(SMB, "cannot delete %s, rc %d\n",
-					    new_name, rc);
-				goto out;
-			}
-		}
-	} else {
-		if (file_present &&
-		    strncmp(old_name, path.dentry->d_name.name, strlen(old_name))) {
-			rc = -EEXIST;
-			ksmbd_debug(SMB,
-				    "cannot rename already existing file\n");
-			goto out;
-		}
-	}
+	if (!file_info->ReplaceIfExists)
+		flags = RENAME_NOREPLACE;
 
-	rc = ksmbd_vfs_fp_rename(work, fp, new_name);
+	rc = ksmbd_vfs_rename(work, &fp->filp->f_path, new_name, flags);
 out:
-	kfree(pathname);
-	if (!IS_ERR(new_name))
+	if (rc) {
 		kfree(new_name);
+	} else {
+		down_write(&fp->filename_lock);
+		kfree(fp->filename);
+		fp->filename = new_name;
+		up_write(&fp->filename_lock);
+	}
 	return rc;
 }
 
@@ -5538,7 +5492,8 @@ static int smb2_create_link(struct ksmbd_work *work,
 
 	if (file_info->ReplaceIfExists) {
 		if (file_present) {
-			rc = ksmbd_vfs_remove_file(work, link_name);
+			rc = ksmbd_vfs_unlink(work->tcon->share_conf,
+					      link_name);
 			if (rc) {
 				rc = -EINVAL;
 				ksmbd_debug(SMB, "cannot delete %s\n",
@@ -5689,8 +5644,10 @@ static int set_file_allocation_info(struct ksmbd_work *work,
 		size = i_size_read(inode);
 		rc = ksmbd_vfs_truncate(work, fp, alloc_blks * 512);
 		if (rc) {
+			down_read(&fp->filename_lock);
 			pr_err("truncate failed! filename : %s, err %d\n",
 			       fp->filename, rc);
+			up_read(&fp->filename_lock);
 			return rc;
 		}
 		if (size < alloc_blks * 512)
@@ -5720,12 +5677,16 @@ static int set_end_of_file_info(struct ksmbd_work *work, struct ksmbd_file *fp,
 	 * truncated range.
 	 */
 	if (inode->i_sb->s_magic != MSDOS_SUPER_MAGIC) {
+		down_read(&fp->filename_lock);
 		ksmbd_debug(SMB, "filename : %s truncated to newsize %lld\n",
 			    fp->filename, newsize);
+		up_read(&fp->filename_lock);
 		rc = ksmbd_vfs_truncate(work, fp, newsize);
 		if (rc) {
+			down_read(&fp->filename_lock);
 			ksmbd_debug(SMB, "truncate failed! filename : %s err %d\n",
 				    fp->filename, rc);
+			up_read(&fp->filename_lock);
 			if (rc != -EAGAIN)
 				rc = -EBADF;
 			return rc;
@@ -5738,12 +5699,6 @@ static int set_rename_info(struct ksmbd_work *work, struct ksmbd_file *fp,
 			   struct smb2_file_rename_info *rename_info,
 			   unsigned int buf_len)
 {
-	struct user_namespace *user_ns;
-	struct ksmbd_file *parent_fp;
-	struct dentry *parent;
-	struct dentry *dentry = fp->filp->f_path.dentry;
-	int ret;
-
 	if (!(fp->daccess & FILE_DELETE_LE)) {
 		pr_err("no right to delete : 0x%x\n", fp->daccess);
 		return -EACCES;
@@ -5753,30 +5708,7 @@ static int set_rename_info(struct ksmbd_work *work, struct ksmbd_file *fp,
 			le32_to_cpu(rename_info->FileNameLength))
 		return -EINVAL;
 
-	user_ns = file_mnt_user_ns(fp->filp);
-	if (ksmbd_stream_fd(fp))
-		goto next;
-
-	parent = dget_parent(dentry);
-	ret = ksmbd_vfs_lock_parent(user_ns, parent, dentry);
-	if (ret) {
-		dput(parent);
-		return ret;
-	}
-
-	parent_fp = ksmbd_lookup_fd_inode(d_inode(parent));
-	inode_unlock(d_inode(parent));
-	dput(parent);
-
-	if (parent_fp) {
-		if (parent_fp->daccess & FILE_DELETE_LE) {
-			pr_err("parent dir is opened with delete access\n");
-			return -ESHARE;
-		}
-	}
-next:
-	return smb2_rename(work, fp, user_ns, rename_info,
-			   work->sess->conn->local_nls);
+	return smb2_rename(work, fp, rename_info, work->sess->conn->local_nls);
 }
 
 static int set_file_disposition_info(struct ksmbd_file *fp,

@@ -1713,11 +1713,14 @@ int smb2_check_durable_oplock(struct ksmbd_file *fp,
 			ret = -EBADF;
 			goto out;
 		}
+		down_read(&fp->filename_lock);
 		if (name && strcmp(fp->filename, name)) {
+			up_read(&fp->filename_lock);
 			pr_err("invalid name reconnect %s\n", name);
 			ret = -EINVAL;
 			goto out;
 		}
+		up_read(&fp->filename_lock);
 	}
 out:
 	if (opinfo)
