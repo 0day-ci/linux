@@ -7,6 +7,9 @@
 
 #include <linux/damon.h>
 
+bool damon_ptep_mknone(pte_t *pte, struct vm_area_struct *vma, unsigned long addr);
+bool damon_pmdp_mknone(pmd_t *pmd, struct vm_area_struct *vma, unsigned long addr);
+
 struct page *damon_get_page(unsigned long pfn);
 
 void damon_ptep_mkold(pte_t *pte, struct mm_struct *mm, unsigned long addr);

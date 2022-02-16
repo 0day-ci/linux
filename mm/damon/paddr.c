@@ -16,9 +16,10 @@
 #include "../internal.h"
 #include "prmtv-common.h"
 
-static bool __damon_pa_mkold(struct page *page, struct vm_area_struct *vma,
+static bool __damon_pa_mk_set(struct page *page, struct vm_area_struct *vma,
 		unsigned long addr, void *arg)
 {
+	bool result = false;
 	struct page_vma_mapped_walk pvmw = {
 		.page = page,
 		.vma = vma,
@@ -27,10 +28,24 @@ static bool __damon_pa_mkold(struct page *page, struct vm_area_struct *vma,
 
 	while (page_vma_mapped_walk(&pvmw)) {
 		addr = pvmw.address;
-		if (pvmw.pte)
+		if (pvmw.pte) {
 			damon_ptep_mkold(pvmw.pte, vma->vm_mm, addr);
-		else
+			if (nr_online_nodes > 1) {
+				result = damon_ptep_mknone(pvmw.pte, vma, addr);
+				if (result)
+					flush_tlb_page(vma, addr);
+			}
+		} else {
 			damon_pmdp_mkold(pvmw.pmd, vma->vm_mm, addr);
+			if (nr_online_nodes > 1) {
+				result = damon_pmdp_mknone(pvmw.pmd, vma, addr);
+				if (result) {
+					unsigned long haddr = addr & HPAGE_PMD_MASK;
+
+					flush_tlb_range(vma, haddr, haddr + HPAGE_PMD_SIZE);
+				}
+			}
+		}
 	}
 	return true;
 }
@@ -39,7 +54,7 @@ static void damon_pa_mkold(unsigned long paddr)
 {
 	struct page *page = damon_get_page(PHYS_PFN(paddr));
 	struct rmap_walk_control rwc = {
-		.rmap_one = __damon_pa_mkold,
+		.rmap_one = __damon_pa_mk_set,
 		.anon_lock = page_lock_anon_vma_read,
 	};
 	bool need_lock;

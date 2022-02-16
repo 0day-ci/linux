@@ -367,9 +367,10 @@ static void damon_va_update(struct damon_ctx *ctx)
 	}
 }
 
-static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
+static int damon_va_pmd_entry(pmd_t *pmd, unsigned long addr,
 		unsigned long next, struct mm_walk *walk)
 {
+	bool result = false;
 	pte_t *pte;
 	spinlock_t *ptl;
 
@@ -377,7 +378,14 @@ static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 		ptl = pmd_lock(walk->mm, pmd);
 		if (pmd_huge(*pmd)) {
 			damon_pmdp_mkold(pmd, walk->mm, addr);
+			if (nr_online_nodes > 1)
+				result = damon_pmdp_mknone(pmd, walk->vma, addr);
 			spin_unlock(ptl);
+			if (result) {
+				unsigned long haddr = addr & HPAGE_PMD_MASK;
+
+				flush_tlb_range(walk->vma, haddr, haddr + HPAGE_PMD_SIZE);
+			}
 			return 0;
 		}
 		spin_unlock(ptl);
@@ -386,11 +394,17 @@ static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
 		return 0;
 	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
-	if (!pte_present(*pte))
-		goto out;
+	if (!pte_present(*pte)) {
+		pte_unmap_unlock(pte, ptl);
+		return 0;
+	}
 	damon_ptep_mkold(pte, walk->mm, addr);
-out:
+	if (nr_online_nodes > 1)
+		result = damon_ptep_mknone(pte, walk->vma, addr);
 	pte_unmap_unlock(pte, ptl);
+	if (result)
+		flush_tlb_page(walk->vma, addr);
+
 	return 0;
 }
 
@@ -450,15 +464,15 @@ out:
 #define damon_mkold_hugetlb_entry NULL
 #endif /* CONFIG_HUGETLB_PAGE */
 
-static const struct mm_walk_ops damon_mkold_ops = {
-	.pmd_entry = damon_mkold_pmd_entry,
+static const struct mm_walk_ops damon_va_ops = {
+	.pmd_entry = damon_va_pmd_entry,
 	.hugetlb_entry = damon_mkold_hugetlb_entry,
 };
 
-static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
+static void damon_va_check(struct mm_struct *mm, unsigned long addr)
 {
 	mmap_read_lock(mm);
-	walk_page_range(mm, addr, addr + 1, &damon_mkold_ops, NULL);
+	walk_page_range(mm, addr, addr + 1, &damon_va_ops, NULL);
 	mmap_read_unlock(mm);
 }
 
@@ -471,7 +485,7 @@ static void __damon_va_prepare_access_check(struct damon_ctx *ctx,
 {
 	r->sampling_addr = damon_rand(r->ar.start, r->ar.end);
 
-	damon_va_mkold(mm, r->sampling_addr);
+	damon_va_check(mm, r->sampling_addr);
 }
 
 static void damon_va_prepare_access_checks(struct damon_ctx *ctx)

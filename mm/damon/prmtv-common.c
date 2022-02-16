@@ -12,6 +12,50 @@
 
 #include "prmtv-common.h"
 
+bool damon_ptep_mknone(pte_t *pte, struct vm_area_struct *vma, unsigned long addr)
+{
+	pte_t oldpte, ptent;
+	bool preserve_write;
+
+	oldpte = *pte;
+	if (pte_protnone(oldpte))
+		return false;
+
+	if (pte_present(oldpte)) {
+		preserve_write = pte_write(oldpte);
+		oldpte = ptep_modify_prot_start(vma, addr, pte);
+		ptent = pte_modify(oldpte, PAGE_NONE);
+
+		if (preserve_write)
+			ptent = pte_mk_savedwrite(ptent);
+
+		ptep_modify_prot_commit(vma, addr, pte, oldpte, ptent);
+		return true;
+	}
+	return false;
+}
+
+bool damon_pmdp_mknone(pmd_t *pmd, struct vm_area_struct *vma, unsigned long addr)
+{
+	bool preserve_write;
+	pmd_t entry = *pmd;
+
+	if (is_huge_zero_pmd(entry) || pmd_protnone(entry))
+		return false;
+
+	if (pmd_present(entry)) {
+		preserve_write = pmd_write(entry);
+		entry = pmdp_invalidate(vma, addr, pmd);
+		entry = pmd_modify(entry, PAGE_NONE);
+		if (preserve_write)
+			entry = pmd_mk_savedwrite(entry);
+
+		set_pmd_at(vma->vm_mm, addr, pmd, entry);
+		return true;
+	}
+	return false;
+}
+
 /*
  * Get an online page for a pfn if it's in the LRU list.  Otherwise, returns
  * NULL.
