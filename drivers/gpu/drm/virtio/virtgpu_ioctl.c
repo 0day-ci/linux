@@ -268,7 +268,8 @@ static int virtio_gpu_getparam_ioctl(struct drm_device *dev, void *data,
 {
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 	struct drm_virtgpu_getparam *param = data;
-	int value;
+	int value, ret, sz = sizeof(int);
+	uint64_t value64;
 
 	switch (param->param) {
 	case VIRTGPU_PARAM_3D_FEATURES:
@@ -290,13 +291,20 @@ static int virtio_gpu_getparam_ioctl(struct drm_device *dev, void *data,
 		value = vgdev->has_context_init ? 1 : 0;
 		break;
 	case VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs:
-		value = vgdev->capset_id_mask;
+		value64 = vgdev->capset_id_mask;
+		sz = sizeof(value64);
 		break;
 	default:
 		return -EINVAL;
 	}
-	if (copy_to_user(u64_to_user_ptr(param->value), &value, sizeof(int)))
-		return -EFAULT;
+
+	if (sz == sizeof(int)) {
+		if (copy_to_user(u64_to_user_ptr(param->value), &value, sz))
+			return -EFAULT;
+	} else {
+		if (copy_to_user(u64_to_user_ptr(param->value), &value64, sz))
+			return -EFAULT;
+	}
 
 	return 0;
 }
