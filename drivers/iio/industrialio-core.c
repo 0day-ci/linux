@@ -1895,6 +1895,7 @@ int __iio_device_register(struct iio_dev *indio_dev, struct module *this_mod)
 {
 	struct iio_dev_opaque *iio_dev_opaque = to_iio_dev_opaque(indio_dev);
 	const char *label;
+	const char *node_name;
 	int ret;
 
 	if (!indio_dev->info)
@@ -1906,8 +1907,13 @@ int __iio_device_register(struct iio_dev *indio_dev, struct module *this_mod)
 		indio_dev->dev.of_node = indio_dev->dev.parent->of_node;
 
 	label = of_get_property(indio_dev->dev.of_node, "label", NULL);
-	if (label)
+	if (label) {
 		indio_dev->label = label;
+	} else {
+		node_name = of_node_full_name(indio_dev->dev.of_node);
+		if (node_name)
+			indio_dev->label = node_name;
+	}
 
 	ret = iio_check_unique_scan_index(indio_dev);
 	if (ret < 0)
