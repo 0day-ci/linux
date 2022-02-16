@@ -29,13 +29,20 @@
  * Returns:
  *	NOT_STACK: not at all on the stack
  *	GOOD_FRAME: fully within a valid stack frame
- *	GOOD_STACK: fully on the stack (when can't do frame-checking)
+ *	GOOD_STACK: within the current stack (when can't frame-check exactly)
  *	BAD_STACK: error condition (invalid stack position or bad stack frame)
  */
 static noinline int check_stack_object(const void *obj, unsigned long len)
 {
 	const void * const stack = task_stack_page(current);
 	const void * const stackend = stack + THREAD_SIZE;
+#ifndef CONFIG_STACK_GROWSUP
+	const void * const high = stackend;
+	const void * const low = (void *)current_stack_pointer;
+#else
+	const void * const high = (void *)current_stack_pointer;
+	const void * const low = stack;
+#endif
 	int ret;
 
 	/* Object is not on the stack at all. */
@@ -54,6 +61,12 @@ static noinline int check_stack_object(const void *obj, unsigned long len)
 	ret = arch_within_stack_frames(stack, stackend, obj, len);
 	if (ret)
 		return ret;
+
+	/*
+	 * Reject: object not within current stack depth.
+	 */
+	if (obj < low || high < obj + len)
+		return BAD_STACK;
 
 	return GOOD_STACK;
 }
@@ -269,7 +282,13 @@ void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 		 */
 		return;
 	default:
-		usercopy_abort("process stack", NULL, to_user, 0, n);
+		usercopy_abort("process stack", NULL, to_user,
+#ifndef CONFIG_STACK_GROWSUP
+				(void *)current_stack_pointer - ptr,
+#else
+				ptr - (void *)current_stack_pointer,
+#endif
+				n);
 	}
 
 	/* Check for bad heap object. */
