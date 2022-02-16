@@ -1168,6 +1168,7 @@ struct intel_crtc_state {
 
 	/* bitmask of actually visible planes (enum plane_id) */
 	u8 active_planes;
+	u8 scaled_planes;
 	u8 nv12_planes;
 	u8 c8_planes;
 
@@ -1202,11 +1203,8 @@ struct intel_crtc_state {
 	/* enable pipe big joiner? */
 	bool bigjoiner;
 
-	/* big joiner slave crtc? */
-	bool bigjoiner_slave;
-
-	/* linked crtc for bigjoiner, either slave or master */
-	struct intel_crtc *bigjoiner_linked_crtc;
+	/* big joiner pipe bitmask */
+	u8 bigjoiner_pipes;
 
 	/* Display Stream compression state */
 	struct {
