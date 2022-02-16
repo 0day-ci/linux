@@ -3377,7 +3377,7 @@ struct wmi_peer_cfr_capture_cmd_fixed_param {
 #define WMI_PEER_CFR_CAPTURE_DISABLE  0
 
 /*periodicity in ms */
-#define WMI_PEER_CFR_PERIODICITY_MAX  (10 * 60 * 1000)
+#define WMI_PEER_CFR_PERIODICITY_MAX  600000
 
 struct wmi_start_scan_arg {
 	u32 scan_id;
