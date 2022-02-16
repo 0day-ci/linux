@@ -200,6 +200,8 @@ $MOD_KLP_CONVERT1: driver_name, 0: $MOD_KLP_CONVERT_MOD
 $MOD_KLP_CONVERT1: test_klp_get_driver_name(), 0: $MOD_KLP_CONVERT_MOD
 $MOD_KLP_CONVERT1: homonym_string, 1: homonym string A
 $MOD_KLP_CONVERT1: get_homonym_string(), 1: homonym string A
+test_klp_convert1: klp_string.12345 = lib/livepatch/test_klp_convert_mod_a.c static string
+test_klp_convert1: klp_string.67890 = lib/livepatch/test_klp_convert_mod_b.c static string
 % echo 0 > /sys/kernel/livepatch/$MOD_KLP_CONVERT1/enabled
 livepatch: '$MOD_KLP_CONVERT1': initializing unpatching transition
 livepatch: '$MOD_KLP_CONVERT1': starting unpatching transition
@@ -265,6 +267,8 @@ $MOD_KLP_CONVERT1: driver_name, 0: $MOD_KLP_CONVERT_MOD
 $MOD_KLP_CONVERT1: test_klp_get_driver_name(), 0: $MOD_KLP_CONVERT_MOD
 $MOD_KLP_CONVERT1: homonym_string, 1: homonym string A
 $MOD_KLP_CONVERT1: get_homonym_string(), 1: homonym string A
+test_klp_convert1: klp_string.12345 = lib/livepatch/test_klp_convert_mod_a.c static string
+test_klp_convert1: klp_string.67890 = lib/livepatch/test_klp_convert_mod_b.c static string
 % echo 0 > /sys/kernel/livepatch/$MOD_KLP_CONVERT1/enabled
 livepatch: '$MOD_KLP_CONVERT1': initializing unpatching transition
 livepatch: '$MOD_KLP_CONVERT1': starting unpatching transition

@@ -11,3 +11,9 @@ __used static const char *get_homonym_string(void)
 {
 	return homonym_string;
 }
+
+__used static void static_string_function(void)
+{
+	__used static char klp_string[] __asm__("klp_string.67890") =
+		__FILE__ " static string";
+}

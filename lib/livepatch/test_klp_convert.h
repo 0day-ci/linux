@@ -10,5 +10,7 @@ extern char driver_name[];
 extern char homonym_string[];
 extern const char *get_homonym_string(void);
 extern const char *test_klp_get_driver_name(void);
+extern char klp_string_a[] __asm__("klp_string.12345");
+extern char klp_string_b[] __asm__("klp_string.67890");
 
 #endif

@@ -20,6 +20,12 @@ __used static const char *get_homonym_string(void)
 	return homonym_string;
 }
 
+__used static void static_string_function(void)
+{
+	__used static char klp_string[] __asm__("klp_string.12345") =
+		__FILE__ " static string";
+}
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Joe Lawrence <joe.lawrence@redhat.com>");
 MODULE_DESCRIPTION("Livepatch test: klp-convert module");
