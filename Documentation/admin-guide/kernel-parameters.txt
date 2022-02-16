@@ -4817,6 +4817,12 @@
 	rcupdate.rcu_cpu_stall_timeout= [KNL]
 			Set timeout for RCU CPU stall warning messages.
 
+	rcupdate.rcu_exp_cpu_stall_timeout= [KNL]
+			Set timeout for expedited RCU CPU stall warning messages.
+			The value is in milliseconds and a maximum allowed parameter
+			is 21000 milliseconds. Please note, a set value is adjusted
+			to an arch timer tick resolution.
+
 	rcupdate.rcu_expedited= [KNL]
 			Use expedited grace-period primitives, for
 			example, synchronize_rcu_expedited() instead
