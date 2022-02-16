@@ -141,7 +141,8 @@ static void sp_xmit_on_air(struct timer_list *t)
 	struct sixpack *sp = from_timer(sp, t, tx_t);
 	int actual, when = sp->slottime;
 	static unsigned char random;
-
+	if (sp->dev->reg_state !=  NETREG_REGISTERED)
+		return;
 	random = random * 17 + 41;
 
 	if (((sp->status1 & SIXP_DCD_MASK) == 0) && (random < sp->persistence)) {
