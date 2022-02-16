@@ -230,6 +230,11 @@ struct NCR5380_cmd {
 	struct list_head list;
 };
 
+static inline struct NCR5380_cmd *NCR5380_cmd_priv(struct scsi_cmnd *cmd)
+{
+	return scsi_cmd_priv(cmd);
+}
+
 #define NCR5380_PIO_CHUNK_SIZE		256
 
 /* Time limit (ms) to poll registers when IRQs are disabled, e.g. during PDMA */
