@@ -512,3 +512,30 @@ unsigned int irq_calc_affinity_vectors(unsigned int minvec, unsigned int maxvec,
 
 	return resv + min(set_vecs, maxvec - resv);
 }
+
+/*
+ * irq_set_affinity_masks - Set the affinity masks of a number of interrupts
+ *                          for multiqueue spreading
+ * @affd:	Description of the affinity requirements
+ * @irqs:	An array of interrupt numbers
+ * @nvec:	The total number of interrupts
+ */
+int irq_set_affinity_masks(struct irq_affinity *affd, int *irqs, int nvec)
+{
+	struct irq_affinity_desc *desc;
+	int i, err = 0;
+
+	desc = irq_create_affinity_masks(nvec, affd);
+	if (!desc)
+		return -ENOMEM;
+
+	for (i = 0; i < nvec; i++) {
+		err = irq_update_affinity_desc(irqs[i], desc + i);
+		if (err)
+			break;
+	}
+
+	kfree(desc);
+	return err;
+}
+EXPORT_SYMBOL_GPL(irq_set_affinity_masks);

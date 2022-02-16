@@ -335,7 +335,6 @@ int devm_platform_get_irqs_affinity(struct platform_device *dev,
 				    int **irqs)
 {
 	struct irq_affinity_devres *ptr;
-	struct irq_affinity_desc *desc;
 	size_t size;
 	int i, ret, nvec;
 
@@ -376,31 +375,18 @@ int devm_platform_get_irqs_affinity(struct platform_device *dev,
 		ptr->irq[i] = irq;
 	}
 
-	desc = irq_create_affinity_masks(nvec, affd);
-	if (!desc) {
-		ret = -ENOMEM;
+	ret = irq_set_affinity_masks(affd, ptr->irq, nvec);
+	if (ret) {
+		dev_err(&dev->dev, "failed to update affinity descriptors (%d)\n", ret);
 		goto err_free_devres;
 	}
 
-	for (i = 0; i < nvec; i++) {
-		ret = irq_update_affinity_desc(ptr->irq[i], &desc[i]);
-		if (ret) {
-			dev_err(&dev->dev, "failed to update irq%d affinity descriptor (%d)\n",
-				ptr->irq[i], ret);
-			goto err_free_desc;
-		}
-	}
-
 	devres_add(&dev->dev, ptr);
-
-	kfree(desc);
 
 	*irqs = ptr->irq;
 
 	return nvec;
 
-err_free_desc:
-	kfree(desc);
 err_free_devres:
 	devres_free(ptr);
 	return ret;
