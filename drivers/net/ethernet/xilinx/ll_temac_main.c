@@ -1427,6 +1427,11 @@ static int temac_probe(struct platform_device *pdev)
 		lp->indirect_lock = devm_kmalloc(&pdev->dev,
 						 sizeof(*lp->indirect_lock),
 						 GFP_KERNEL);
+		if (!lp->indirect_lock) {
+			dev_err(&pdev->dev,
+				"indirect register lock allocation failed\n");
+			return -ENOMEM;
+		}
 		spin_lock_init(lp->indirect_lock);
 	}
 
