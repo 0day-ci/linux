@@ -25,6 +25,7 @@
 #include <linux/nsproxy.h>
 
 #include <net/bonding.h>
+#include <net/ipv6.h>
 
 #define to_bond(cd)	((struct bonding *)(netdev_priv(to_net_dev(cd))))
 
@@ -314,6 +315,28 @@ static ssize_t bonding_show_missed_max(struct device *d,
 }
 static DEVICE_ATTR(arp_missed_max, 0644,
 		   bonding_show_missed_max, bonding_sysfs_store_option);
+
+#if IS_ENABLED(CONFIG_IPV6)
+static ssize_t bonding_show_ns_targets(struct device *d,
+				       struct device_attribute *attr,
+				       char *buf)
+{
+	struct bonding *bond = to_bond(d);
+	int i, res = 0;
+
+	for (i = 0; i < BOND_MAX_NS_TARGETS; i++) {
+		if (!ipv6_addr_any(&bond->params.ns_targets[i]))
+			res += sprintf(buf + res, "%pI6c ",
+				       &bond->params.ns_targets[i]);
+	}
+	if (res)
+		buf[res-1] = '\n'; /* eat the leftover space */
+
+	return res;
+}
+static DEVICE_ATTR(ns_ip6_target, 0644,
+		   bonding_show_ns_targets, bonding_sysfs_store_option);
+#endif
 
 /* Show the up and down delays. */
 static ssize_t bonding_show_downdelay(struct device *d,
@@ -761,6 +784,9 @@ static struct attribute *per_bond_attrs[] = {
 	&dev_attr_arp_all_targets.attr,
 	&dev_attr_arp_interval.attr,
 	&dev_attr_arp_ip_target.attr,
+#if IS_ENABLED(CONFIG_IPV6)
+	&dev_attr_ns_ip6_target.attr,
+#endif
 	&dev_attr_downdelay.attr,
 	&dev_attr_updelay.attr,
 	&dev_attr_peer_notif_delay.attr,
