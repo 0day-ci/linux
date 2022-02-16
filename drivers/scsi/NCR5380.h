@@ -227,6 +227,7 @@ struct NCR5380_hostdata {
 };
 
 struct NCR5380_cmd {
+	struct scsi_pointer scsi_pointer;
 	struct list_head list;
 };
 
