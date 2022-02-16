@@ -152,6 +152,44 @@
  * situation when probing.
  */
 
+/**
+ * DOC: dsi bridge operations
+ *
+ * DSI host interfaces are expected to be implemented as bridges rather than
+ * encoders, however there are a few aspects of their operation that need to
+ * be defined in order to provide a consistent interface.
+ *
+ * A DSI host should keep the PHY powered down until the pre_enable op is
+ * called. All lanes should be in an idle state (not LP-11) up to this point.
+ * pre_enable should initialise the PHY, set the data lanes to LP-11, and the
+ * clock lane to either LP-11 or HS dependent on the mode_flag
+ * MIPI_DSI_CLOCK_NON_CONTINUOUS.
+ *
+ * Ordinarily the downstream bridge DSI peripheral pre_enable will have been
+ * called before the DSI host. If the DSI peripheral requires LP-11 and/or
+ * the clock lane to be in HS mode prior to pre_enable, then it can set the
+ * DRM_BRIDGE_OP_UPSTREAM_FIRST flag to request the pre_enable (and
+ * post_disable) order to be altered to enable the DSI host first.
+ *
+ * Either the CRTC being enabled, or the DSI host enable op should switch the
+ * host to actively transmitting video on the data lanes.
+ *
+ * The reverse also applies. The DSI host disable op or stopping the CRTC should
+ * stop transmitting video, and the data lanes should return to the LP-11 state.
+ * The DSI host post_disable op should disable the PHY.
+ * If the DRM_BRIDGE_OP_UPSTREAM_FIRST flag is set, then the DSI peripheral's
+ * bridge post_disable will be called before the DSI host's post_disable.
+ *
+ * Whilst it is valid to call host_transfer prior to pre_enable or after
+ * post_disable, the exact state of the lanes is undefined at this point. The
+ * DSI host should initialise the interface, transmit the data, and then disable
+ * the interface again.
+ *
+ * Ultra Low Power State (ULPS) is not explicitly supported by DRM. If
+ * implemented, it therefore needs to be either handled entirely within the DSI
+ * Host driver.
+ */
+
 static DEFINE_MUTEX(bridge_lock);
 static LIST_HEAD(bridge_list);
 
