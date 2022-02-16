@@ -293,4 +293,47 @@ livepatch: '$MOD_KLP_CONVERT2': unpatching complete
 % rmmod $MOD_KLP_CONVERT2
 % rmmod $MOD_KLP_CONVERT_MOD"
 
+
+# TEST: klp-convert symbols across ELF sections
+# - load a livepatch that references symbols that require klp-convert
+#   and reference the same symbol from multiple ELF sections
+# - verify correct behavior
+# - unload the livepatch
+
+start_test "klp-convert symbols across ELF sections"
+
+saved_cmdline=$(cat /proc/cmdline)
+
+load_mod $MOD_KLP_CONVERT_MOD
+load_lp $MOD_KLP_CONVERT_SECTIONS
+echo 1 > /sys/module/$MOD_KLP_CONVERT_SECTIONS/parameters/print_debug
+disable_lp $MOD_KLP_CONVERT_SECTIONS
+unload_lp $MOD_KLP_CONVERT_SECTIONS
+unload_mod $MOD_KLP_CONVERT_MOD
+
+check_result "% modprobe $MOD_KLP_CONVERT_MOD
+% modprobe $MOD_KLP_CONVERT_SECTIONS
+livepatch: enabling patch '$MOD_KLP_CONVERT_SECTIONS'
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': initializing patching transition
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': starting patching transition
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': completing patching transition
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': patching complete
+$MOD_KLP_CONVERT_SECTIONS: saved_command_line (1): $saved_cmdline
+$MOD_KLP_CONVERT_SECTIONS: saved_command_line (1): $saved_cmdline
+$MOD_KLP_CONVERT_SECTIONS: saved_command_line (2): $saved_cmdline
+$MOD_KLP_CONVERT_SECTIONS: saved_command_line (1): $saved_cmdline
+$MOD_KLP_CONVERT_SECTIONS: saved_command_line (2): $saved_cmdline
+$MOD_KLP_CONVERT_SECTIONS: saved_command_line (3): $saved_cmdline
+$MOD_KLP_CONVERT_SECTIONS: test_klp_get_driver_name(): $MOD_KLP_CONVERT_MOD
+$MOD_KLP_CONVERT_SECTIONS: p_test_klp_get_driver_name(): $MOD_KLP_CONVERT_MOD
+$MOD_KLP_CONVERT_SECTIONS: get_homonym_string(): homonym string A
+$MOD_KLP_CONVERT_SECTIONS: p_get_homonym_string(): homonym string A
+% echo 0 > /sys/kernel/livepatch/$MOD_KLP_CONVERT_SECTIONS/enabled
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': initializing unpatching transition
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': starting unpatching transition
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': completing unpatching transition
+livepatch: '$MOD_KLP_CONVERT_SECTIONS': unpatching complete
+% rmmod $MOD_KLP_CONVERT_SECTIONS
+% rmmod $MOD_KLP_CONVERT_MOD"
+
 exit 0
