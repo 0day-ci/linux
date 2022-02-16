@@ -2,7 +2,8 @@
 Livepatch module Elf format
 ===========================
 
-This document outlines the Elf format requirements that livepatch modules must follow.
+This document outlines the Elf format requirements that livepatch modules must
+follow.
 
 
 .. Table of Contents
@@ -259,7 +260,8 @@ Livepatch symbol names must conform to the following format::
   The position of the symbol in the object (as according to kallsyms)
   This is used to differentiate duplicate symbols within the same
   object. The symbol position is expressed numerically (0, 1, 2...).
-  The symbol position of a unique symbol is 0.
+  The symbol position of a unique symbol is 0.  The symbol position of
+  the first non-unique symbol is 1, the second is 2, etc.
 
 Examples:
 ---------
@@ -291,7 +293,41 @@ Examples:
   Note that the 'Ndx' (Section index) for these symbols is SHN_LIVEPATCH (0xff20).
   "OS" means OS-specific.
 
-5. Symbol table and Elf section access
+5. Automatic conversion of unresolved relocations
+=================================================
+Sometimes livepatches may operate on symbols which are not self-contained nor
+exported. When this happens, these symbols remain unresolved in the elf object
+and will trigger an error during the livepatch instantiation.
+
+Whenever possible, the kernel building infrastructure solves this problem
+automatically. First, a symbol database containing information on all compiled
+objects is built. Second, this database - a file named symbols.klp, placed in
+the kernel source root directory - is used to identify targets for unresolved
+relocations, converting them in the livepatch elf accordingly to the
+specifications above-described. While the first stage is fully handled by the
+building system, the second is done by a tool called klp-convert, which can be
+found in "scripts/livepatch".
+
+When an unresolved relocation has as target a symbol whose name is also used by
+different symbols throughout the kernel, the relocation cannot be resolved
+automatically. In these cases, the livepatch developer must add annotations to
+the livepatch, making it possible for the system to identify which is the
+correct target amongst multiple homonymous symbols. Such annotations must be
+done through a data structure as follows:::
+
+	struct KLP_MODULE_RELOC(object) data_structure_name[] = {
+		KLP_SYMPOS(symbol, pos)
+	};
+
+In the above example, object refers to the object file which contains the
+symbol, being vmlinux or a module; symbol refers to the symbol name that will
+be relocated and pos is its position in the object.
+
+When a data structure like this is added to the livepatch, the resulting elf
+will hold symbols that will be identified by klp-convert and used to solve name
+ambiguities.
+
+6. Symbol table and Elf section access
 ======================================
 A livepatch module's symbol table is accessible through module->symtab.
 

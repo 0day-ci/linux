@@ -261,6 +261,9 @@ into three levels:
     absolute position in the database, but rather the order it has been found
     only for a particular object ( vmlinux or a kernel module ). Note that
     kallsyms allows for searching symbols according to the object name.
+    Uniquely named symbols may use a symbol position of 0.  Non-unique
+    symbols need to specify their object / kallsyms position, starting
+    at position 1.
 
   - struct klp_object defines an array of patched functions (struct
     klp_func) in the same object. Where the object is either vmlinux
