@@ -587,7 +587,14 @@ void del_gendisk(struct gendisk *disk)
 	blk_drop_partitions(disk);
 	mutex_unlock(&disk->open_mutex);
 
-	fsync_bdev(disk->part0);
+	/*
+	 * If this is not a surprise removal see if there is a file system
+	 * mounted on this device and sync it (although this won't work for
+	 * partitions).  For surprise removals that have already marked the
+	 * disk dead skip this call as no I/O is possible anyway.
+	 */
+	if (!test_bit(GD_DEAD, &disk->state))
+		fsync_bdev(disk->part0);
 	__invalidate_device(disk->part0, true);
 
 	/*
