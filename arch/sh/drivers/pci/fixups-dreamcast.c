@@ -9,7 +9,7 @@
  *
  * This file originally bore the message (with enclosed-$):
  *	Id: pci.c,v 1.3 2003/05/04 19:29:46 lethal Exp
- *	Dreamcast PCI: Supports SEGA Broadband Adaptor only.
+ *	Dreamcast PCI: Supports SEGA Broadband Adapter only.
  */
 
 #include <linux/sched.h>

@@ -170,7 +170,7 @@ static int __init sh7751_pci_init(void)
 	pci_fixup_pcic(chan);
 
 	/* SH7751 init done, set central function init complete */
-	/* use round robin mode to stop a device starving/overruning */
+	/* use round robin mode to stop a device starving/overrunning */
 	word = SH4_PCICR_PREFIX | SH4_PCICR_CFIN | SH4_PCICR_ARBM;
 	pci_write_reg(chan, word, SH4_PCICR);
 

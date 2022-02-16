@@ -261,7 +261,7 @@ static inline int dmaor_reset(int no)
 {
 	unsigned long dmaor = dmaor_read_reg(no);
 
-	/* Try to clear the error flags first, incase they are set */
+	/* Try to clear the error flags first, in case they are set */
 	dmaor &= ~(DMAOR_NMIF | DMAOR_AE);
 	dmaor_write_reg(no, dmaor);
 
