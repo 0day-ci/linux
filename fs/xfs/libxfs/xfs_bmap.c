@@ -5880,6 +5880,113 @@ del_cursor:
 	return error;
 }
 
+/* Deferred mapping is only for real extents in the data fork. */
+static bool
+xfs_bmap_is_update_needed(
+	struct xfs_bmbt_irec	*bmap)
+{
+	return  bmap->br_startblock != HOLESTARTBLOCK &&
+		bmap->br_startblock != DELAYSTARTBLOCK;
+}
+
+/* del is an extent from COW fork */
+int
+xfs_bremapi_from_cowfork(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip,
+	struct xfs_bmbt_irec	*icow)
+{
+	int			error;
+	xfs_filblks_t		rlen;
+
+	if (xfs_bmap_is_update_needed(icow)) {
+		xfs_fileoff_t		start, end, max_len;
+		struct xfs_bmbt_irec	got;
+		struct xfs_iext_cursor	icur;
+		struct xfs_btree_cur	*cur = NULL;
+		struct xfs_ifork	*ifp = XFS_IFORK_PTR(ip, XFS_DATA_FORK);
+		int			logflags = 0;
+
+		error = xfs_iread_extents(tp, ip, XFS_DATA_FORK);
+		if (error)
+			return error;
+
+		max_len = xfs_refcount_max_unmap(tp->t_log_res);
+		if (max_len < icow->br_blockcount) {
+			icow->br_startoff += icow->br_blockcount - max_len;
+			icow->br_startblock += icow->br_blockcount - max_len;
+			icow->br_blockcount = max_len;
+		}
+
+		end = icow->br_startoff + icow->br_blockcount;
+		if (!xfs_iext_count(ifp) || !xfs_iext_lookup_extent_before(ip,
+				ifp, &end, &icur, &got) ||
+		    isnullstartblock(got.br_startblock) ||
+		    icow->br_startoff + icow->br_blockcount > got.br_startoff +
+				got.br_blockcount) {
+			error = -EAGAIN;
+		} else {
+			end = icow->br_startoff + icow->br_blockcount;
+			start = XFS_FILEOFF_MAX(icow->br_startoff,
+						got.br_startoff);
+			ASSERT(start < end);
+
+			/* Trim the extent to what we need */
+			xfs_trim_extent(icow, start, end - start);
+			xfs_trim_extent(&got, start, end - start);
+
+			if (ifp->if_format == XFS_DINODE_FMT_BTREE) {
+				cur = xfs_bmbt_init_cursor(tp->t_mountp, tp, ip,
+							   XFS_DATA_FORK);
+				cur->bc_ino.flags = 0;
+			}
+
+			/*
+			 * Free the CoW orphan record (it should be done here
+			 * before updating extent due to rmapbt update)
+			 */
+			xfs_refcount_free_cow_extent(tp, icow->br_startblock,
+						     icow->br_blockcount);
+
+			xfs_bmap_update_extent_real(tp, ip, XFS_DATA_FORK,
+					&icur, &cur, icow, &logflags, false);
+
+			/* Free previous referenced space */
+			xfs_refcount_decrease_extent(tp, &got);
+
+			trace_xfs_reflink_cow_remap(ip, icow);
+			error = 0;
+		}
+		if (cur)
+			xfs_btree_del_cursor(cur, 0);
+		if (logflags)
+			xfs_trans_log_inode(tp, ip, logflags);
+		if (!error)
+			return 0;
+	}
+
+	rlen = icow->br_blockcount;
+	error = __xfs_bunmapi(tp, ip, icow->br_startoff, &rlen, 0, 1);
+	if (error)
+		return error;
+
+	/* Trim the extent to whatever got unmapped. */
+	xfs_trim_extent(icow, icow->br_startoff + rlen,
+			icow->br_blockcount - rlen);
+	/* Free the CoW orphan record. */
+	xfs_refcount_free_cow_extent(tp, icow->br_startblock,
+				     icow->br_blockcount);
+
+	/* Map the new blocks into the data fork. */
+	xfs_bmap_map_extent(tp, ip, icow);
+
+	/* Charge this new data fork mapping to the on-disk quota. */
+	xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_DELBCOUNT,
+			(long)icow->br_blockcount);
+	trace_xfs_reflink_cow_remap(ip, icow);
+	return 0;
+}
+
 /* Make sure we won't be right-shifting an extent past the maximum bound. */
 int
 xfs_bmap_can_insert_extents(
@@ -6121,15 +6228,6 @@ del_cursor:
 	if (logflags)
 		xfs_trans_log_inode(tp, ip, logflags);
 	return error;
-}
-
-/* Deferred mapping is only for real extents in the data fork. */
-static bool
-xfs_bmap_is_update_needed(
-	struct xfs_bmbt_irec	*bmap)
-{
-	return  bmap->br_startblock != HOLESTARTBLOCK &&
-		bmap->br_startblock != DELAYSTARTBLOCK;
 }
 
 /* Record a bmap intent. */

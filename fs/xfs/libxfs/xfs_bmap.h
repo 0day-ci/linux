@@ -220,6 +220,9 @@ int	xfs_bmap_update_extent_real(struct xfs_trans *tp,
 		struct xfs_inode *ip, int whichfork,
 		struct xfs_iext_cursor *icur, struct xfs_btree_cur **curp,
 		struct xfs_bmbt_irec *new, int *logflagsp, bool convert);
+int
+xfs_bremapi_from_cowfork(struct xfs_trans *tp, struct xfs_inode *ip,
+		struct xfs_bmbt_irec *icow);
 
 enum xfs_bmap_intent_type {
 	XFS_BMAP_MAP = 1,
