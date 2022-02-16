@@ -8,19 +8,13 @@
 
 #include <linux/device.h>
 #include <linux/hid.h>
+#include <linux/input/vivaldi-fmap.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/sysfs.h>
 
-#define MIN_FN_ROW_KEY	1
-#define MAX_FN_ROW_KEY	24
 #define HID_VD_FN_ROW_PHYSMAP 0x00000001
 #define HID_USAGE_FN_ROW_PHYSMAP (HID_UP_GOOGLEVENDOR | HID_VD_FN_ROW_PHYSMAP)
-
-struct vivaldi_data {
-	u32 function_row_physmap[MAX_FN_ROW_KEY - MIN_FN_ROW_KEY + 1];
-	int max_function_row_key;
-};
 
 static ssize_t function_row_physmap_show(struct device *dev,
 					 struct device_attribute *attr,
@@ -28,17 +22,8 @@ static ssize_t function_row_physmap_show(struct device *dev,
 {
 	struct hid_device *hdev = to_hid_device(dev);
 	struct vivaldi_data *drvdata = hid_get_drvdata(hdev);
-	ssize_t size = 0;
-	int i;
 
-	if (!drvdata->max_function_row_key)
-		return 0;
-
-	for (i = 0; i < drvdata->max_function_row_key; i++)
-		size += sprintf(buf + size, "%02X ",
-				drvdata->function_row_physmap[i]);
-	size += sprintf(buf + size, "\n");
-	return size;
+	return vivaldi_function_row_physmap_show(drvdata, buf);
 }
 
 static DEVICE_ATTR_RO(function_row_physmap);
@@ -86,10 +71,10 @@ static void vivaldi_feature_mapping(struct hid_device *hdev,
 		return;
 
 	fn_key = (usage->hid & HID_USAGE);
-	if (fn_key < MIN_FN_ROW_KEY || fn_key > MAX_FN_ROW_KEY)
+	if (fn_key < VIVALDI_MIN_FN_ROW_KEY || fn_key > VIVALDI_MAX_FN_ROW_KEY)
 		return;
-	if (fn_key > drvdata->max_function_row_key)
-		drvdata->max_function_row_key = fn_key;
+	if (fn_key > drvdata->num_function_row_keys)
+		drvdata->num_function_row_keys = fn_key;
 
 	report_data = buf = hid_alloc_report_buf(report, GFP_KERNEL);
 	if (!report_data)
@@ -134,7 +119,7 @@ static void vivaldi_feature_mapping(struct hid_device *hdev,
 		goto out;
 	}
 
-	drvdata->function_row_physmap[fn_key - MIN_FN_ROW_KEY] =
+	drvdata->function_row_physmap[fn_key - VIVALDI_MIN_FN_ROW_KEY] =
 	    field->value[usage->usage_index];
 
 out:
