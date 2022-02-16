@@ -12,6 +12,14 @@ struct prestera_flower_template {
 	u32 chain_index;
 };
 
+static void
+prestera_flower_template_free(struct prestera_flower_template *template)
+{
+	prestera_acl_ruleset_put(template->ruleset);
+	list_del(&template->list);
+	kfree(template);
+}
+
 void prestera_flower_template_cleanup(struct prestera_flow_block *block)
 {
 	struct prestera_flower_template *template;
@@ -20,9 +28,7 @@ void prestera_flower_template_cleanup(struct prestera_flow_block *block)
 	/* put the reference to all rulesets kept in tmpl create */
 	list_for_each_safe(pos, n, &block->template_list) {
 		template = list_entry(pos, typeof(*template), list);
-		prestera_acl_ruleset_put(template->ruleset);
-		list_del(&template->list);
-		kfree(template);
+		prestera_flower_template_free(template);
 	}
 }
 
@@ -423,7 +429,17 @@ err_malloc:
 void prestera_flower_tmplt_destroy(struct prestera_flow_block *block,
 				   struct flow_cls_offload *f)
 {
-	prestera_flower_template_cleanup(block);
+	struct prestera_flower_template *template;
+	struct list_head *pos, *n;
+
+	list_for_each_safe(pos, n, &block->template_list) {
+		template = list_entry(pos, typeof(*template), list);
+		if (template->chain_index == f->common.chain_index) {
+			/* put the reference to the ruleset kept in create */
+			prestera_flower_template_free(template);
+			return;
+		}
+	}
 }
 
 int prestera_flower_stats(struct prestera_flow_block *block,
