@@ -673,12 +673,12 @@ struct drm_mode_fb_cmd2 {
 	/*
 	 * In case of planar formats, this ioctl allows up to 4
 	 * buffer objects with offsets and pitches per plane.
-	 * The pitch and offset order is dictated by the fourcc,
+	 * The pitch and offset order are dictated by the fourcc,
 	 * e.g. NV12 (https://fourcc.org/yuv.php#NV12) is described as:
 	 *
-	 *   YUV 4:2:0 image with a plane of 8 bit Y samples
+	 *   YUV 4:2:0 image with a plane of 8-bit Y samples
 	 *   followed by an interleaved U/V plane containing
-	 *   8 bit 2x2 subsampled colour difference samples.
+	 *   8-bit 2x2 subsampled colour difference samples.
 	 *
 	 * So it would consist of Y as offsets[0] and UV as
 	 * offsets[1].  Note that offsets[0] will generally
