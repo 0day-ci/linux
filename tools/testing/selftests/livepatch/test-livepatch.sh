@@ -9,6 +9,7 @@ MOD_REPLACE=test_klp_atomic_replace
 MOD_KLP_CONVERT_MOD=test_klp_convert_mod
 MOD_KLP_CONVERT1=test_klp_convert1
 MOD_KLP_CONVERT2=test_klp_convert2
+MOD_KLP_CONVERT_DATA=test_klp_convert_data
 MOD_KLP_CONVERT_SECTIONS=test_klp_convert_sections
 
 setup_config
@@ -339,5 +340,101 @@ livepatch: '$MOD_KLP_CONVERT_SECTIONS': completing unpatching transition
 livepatch: '$MOD_KLP_CONVERT_SECTIONS': unpatching complete
 % rmmod $MOD_KLP_CONVERT_SECTIONS
 % rmmod $MOD_KLP_CONVERT_MOD"
+
+
+# TEST: klp-convert data relocations
+
+start_test "klp-convert data relocations"
+
+load_mod $MOD_KLP_CONVERT_MOD
+load_lp $MOD_KLP_CONVERT_DATA
+
+echo 1 > /sys/module/$MOD_KLP_CONVERT_DATA/parameters/print_debug
+
+disable_lp $MOD_KLP_CONVERT_DATA
+unload_lp $MOD_KLP_CONVERT_DATA
+unload_mod $MOD_KLP_CONVERT_MOD
+
+check_result "% modprobe $MOD_KLP_CONVERT_MOD
+% modprobe $MOD_KLP_CONVERT_DATA
+livepatch: enabling patch '$MOD_KLP_CONVERT_DATA'
+livepatch: '$MOD_KLP_CONVERT_DATA': initializing patching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': starting patching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': completing patching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': patching complete
+$MOD_KLP_CONVERT_DATA: local_small: 1111
+$MOD_KLP_CONVERT_DATA: const_local_small: 2222
+$MOD_KLP_CONVERT_DATA: static_local_small: 3333
+$MOD_KLP_CONVERT_DATA: static_const_local_small: 4444
+$MOD_KLP_CONVERT_DATA: local_large[0..3]: 1111 2222 3333 4444
+$MOD_KLP_CONVERT_DATA: const_local_large[0..3]: 5555 6666 7777 8888
+$MOD_KLP_CONVERT_DATA: static_local_large[0..3]: 9999 aaaa bbbb cccc
+$MOD_KLP_CONVERT_DATA: static_const_local_large[0..3]: dddd eeee ffff 0
+$MOD_KLP_CONVERT_DATA: global_small: 1111
+$MOD_KLP_CONVERT_DATA: const_global_small: 2222
+$MOD_KLP_CONVERT_DATA: static_small: 3333
+$MOD_KLP_CONVERT_DATA: static_const_small: 4444
+$MOD_KLP_CONVERT_DATA: global_large[0..3]: 1111 2222 3333 4444
+$MOD_KLP_CONVERT_DATA: const_global_large[0..3]: 5555 6666 7777 8888
+$MOD_KLP_CONVERT_DATA: static_large[0..3]: 9999 aaaa bbbb cccc
+$MOD_KLP_CONVERT_DATA: static_const_large[0..3]: dddd eeee ffff 0
+$MOD_KLP_CONVERT_DATA: static_ro_after_init: 1111
+$MOD_KLP_CONVERT_DATA: static_read_mostly: 2222
+% echo 0 > /sys/kernel/livepatch/$MOD_KLP_CONVERT_DATA/enabled
+livepatch: '$MOD_KLP_CONVERT_DATA': initializing unpatching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': starting unpatching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': completing unpatching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': unpatching complete
+% rmmod $MOD_KLP_CONVERT_DATA
+% rmmod $MOD_KLP_CONVERT_MOD"
+
+
+# TEST: klp-convert data relocations (late module patching)
+
+start_test "klp-convert data relocations (late module patching)"
+
+load_lp $MOD_KLP_CONVERT_DATA
+load_mod $MOD_KLP_CONVERT_MOD
+
+echo 1 > /sys/module/$MOD_KLP_CONVERT_DATA/parameters/print_debug
+
+disable_lp $MOD_KLP_CONVERT_DATA
+unload_lp $MOD_KLP_CONVERT_DATA
+unload_mod $MOD_KLP_CONVERT_MOD
+
+check_result "% modprobe $MOD_KLP_CONVERT_DATA
+livepatch: enabling patch '$MOD_KLP_CONVERT_DATA'
+livepatch: '$MOD_KLP_CONVERT_DATA': initializing patching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': starting patching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': completing patching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': patching complete
+% modprobe $MOD_KLP_CONVERT_MOD
+livepatch: applying patch '$MOD_KLP_CONVERT_DATA' to loading module '$MOD_KLP_CONVERT_MOD'
+$MOD_KLP_CONVERT_DATA: local_small: 1111
+$MOD_KLP_CONVERT_DATA: const_local_small: 2222
+$MOD_KLP_CONVERT_DATA: static_local_small: 3333
+$MOD_KLP_CONVERT_DATA: static_const_local_small: 4444
+$MOD_KLP_CONVERT_DATA: local_large[0..3]: 1111 2222 3333 4444
+$MOD_KLP_CONVERT_DATA: const_local_large[0..3]: 5555 6666 7777 8888
+$MOD_KLP_CONVERT_DATA: static_local_large[0..3]: 9999 aaaa bbbb cccc
+$MOD_KLP_CONVERT_DATA: static_const_local_large[0..3]: dddd eeee ffff 0
+$MOD_KLP_CONVERT_DATA: global_small: 1111
+$MOD_KLP_CONVERT_DATA: const_global_small: 2222
+$MOD_KLP_CONVERT_DATA: static_small: 3333
+$MOD_KLP_CONVERT_DATA: static_const_small: 4444
+$MOD_KLP_CONVERT_DATA: global_large[0..3]: 1111 2222 3333 4444
+$MOD_KLP_CONVERT_DATA: const_global_large[0..3]: 5555 6666 7777 8888
+$MOD_KLP_CONVERT_DATA: static_large[0..3]: 9999 aaaa bbbb cccc
+$MOD_KLP_CONVERT_DATA: static_const_large[0..3]: dddd eeee ffff 0
+$MOD_KLP_CONVERT_DATA: static_ro_after_init: 1111
+$MOD_KLP_CONVERT_DATA: static_read_mostly: 2222
+% echo 0 > /sys/kernel/livepatch/$MOD_KLP_CONVERT_DATA/enabled
+livepatch: '$MOD_KLP_CONVERT_DATA': initializing unpatching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': starting unpatching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': completing unpatching transition
+livepatch: '$MOD_KLP_CONVERT_DATA': unpatching complete
+% rmmod $MOD_KLP_CONVERT_DATA
+% rmmod $MOD_KLP_CONVERT_MOD"
+
 
 exit 0

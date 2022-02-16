@@ -12,5 +12,26 @@ extern const char *get_homonym_string(void);
 extern const char *test_klp_get_driver_name(void);
 extern char klp_string_a[] __asm__("klp_string.12345");
 extern char klp_string_b[] __asm__("klp_string.67890");
+extern int global_small;
+// .rela.data.rel.ro, .rela.rodata supported ???:
+extern int const_global_small;
+extern int static_small;
+extern int static_const_small;
+extern int global_large[];
+// .rela.data.rel.ro, .rela.rodata supported ???:
+extern int const_global_large[];
+extern int static_large[];
+extern int static_const_large[];
+extern int local_small;
+extern int const_local_small;
+extern int static_local_small;
+extern int static_const_local_small;
+extern int local_large[4];
+extern int const_local_large[4];
+extern int static_local_large[4];
+extern int static_const_local_large[4];
+// .rela.data..ro_after_init supported ???:
+extern int static_ro_after_init;
+extern int static_read_mostly;
 
 #endif

@@ -9,6 +9,7 @@ obj-$(CONFIG_TEST_LIVEPATCH) += test_klp_atomic_replace.o \
 				test_klp_callbacks_mod.o \
 				test_klp_convert1.o \
 				test_klp_convert2.o \
+				test_klp_convert_data.o \
 				test_klp_convert_sections.o \
 				test_klp_convert_mod.o \
 				test_klp_livepatch.o \
@@ -19,4 +20,5 @@ obj-$(CONFIG_TEST_LIVEPATCH) += test_klp_atomic_replace.o \
 
 test_klp_convert_mod-y := \
 	test_klp_convert_mod_a.o \
-	test_klp_convert_mod_b.o
+	test_klp_convert_mod_b.o \
+	test_klp_convert_mod_c.o
