@@ -34,6 +34,187 @@ static struct net_bridge_vlan *br_vlan_lookup(struct rhashtable *tbl, u16 vid)
 	return rhashtable_lookup_fast(tbl, &vid, br_vlan_rht_params);
 }
 
+static void br_vlan_mst_rcu_free(struct rcu_head *rcu)
+{
+	struct br_vlan_mst *mst = container_of(rcu, struct br_vlan_mst, rcu);
+
+	kfree(mst);
+}
+
+static void br_vlan_mst_put(struct net_bridge_vlan *v)
+{
+	struct br_vlan_mst *mst = rtnl_dereference(v->mst);
+
+	if (refcount_dec_and_test(&mst->refcnt))
+		call_rcu(&mst->rcu, br_vlan_mst_rcu_free);
+}
+
+static struct br_vlan_mst *br_vlan_mst_new(u16 id)
+{
+	struct br_vlan_mst *mst;
+
+	mst = kzalloc(sizeof(*mst), GFP_KERNEL);
+	if (!mst)
+		return NULL;
+
+	refcount_set(&mst->refcnt, 1);
+	mst->id = id;
+	mst->state = BR_STATE_FORWARDING;
+	return mst;
+}
+
+static int br_vlan_mstid_get_free(struct net_bridge *br)
+{
+	const struct net_bridge_vlan *v;
+	struct rhashtable_iter iter;
+	struct br_vlan_mst *mst;
+	unsigned long *busy;
+	int err = 0;
+	u16 id;
+
+	busy = bitmap_zalloc(VLAN_N_VID, GFP_KERNEL);
+	if (!busy)
+		return -ENOMEM;
+
+	/* MSTID 0 is reserved for the CIST */
+	set_bit(0, busy);
+
+	rhashtable_walk_enter(&br_vlan_group(br)->vlan_hash, &iter);
+	rhashtable_walk_start(&iter);
+
+	while ((v = rhashtable_walk_next(&iter))) {
+		if (IS_ERR(v)) {
+			err = PTR_ERR(v);
+			goto out_free;
+		}
+
+		mst = rtnl_dereference(v->mst);
+		set_bit(mst->id, busy);
+	}
+
+	rhashtable_walk_stop(&iter);
+
+	id = find_first_zero_bit(busy, VLAN_N_VID);
+	if (id >= VLAN_N_VID)
+		err = -ENOSPC;
+
+out_free:
+	kfree(busy);
+	return err ? : id;
+}
+
+u16 br_vlan_mstid_get(const struct net_bridge_vlan *v)
+{
+	const struct net_bridge_vlan *masterv;
+	const struct br_vlan_mst *mst;
+	const struct net_bridge *br;
+
+	if (br_vlan_is_master(v))
+		br = v->br;
+	else
+		br = v->port->br;
+
+	masterv = br_vlan_lookup(&br_vlan_group(br)->vlan_hash, v->vid);
+
+	mst = rtnl_dereference(masterv->mst);
+
+	return mst->id;
+}
+
+int br_vlan_get_mstid(const struct net_device *dev, u16 vid, u16 *mstid)
+{
+	struct net_bridge *br = netdev_priv(dev);
+	struct net_bridge_vlan *v;
+
+	v = br_vlan_lookup(&br_vlan_group(br)->vlan_hash, vid);
+	if (!v)
+		return -ENOENT;
+
+	*mstid = br_vlan_mstid_get(v);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(br_vlan_get_mstid);
+
+static struct br_vlan_mst *br_vlan_group_mst_get(struct net_bridge_vlan_group *vg, u16 mstid)
+{
+	struct net_bridge_vlan *v;
+	struct br_vlan_mst *mst;
+
+	list_for_each_entry(v, &vg->vlan_list, vlist) {
+		mst = rtnl_dereference(v->mst);
+		if (mst->id == mstid) {
+			refcount_inc(&mst->refcnt);
+			return mst;
+		}
+	}
+
+	return NULL;
+}
+
+static int br_vlan_mst_migrate(struct net_bridge_vlan *v, u16 mstid)
+{
+	struct net_bridge_vlan_group *vg;
+	struct br_vlan_mst *mst;
+
+	if (br_vlan_is_master(v))
+		vg = br_vlan_group(v->br);
+	else
+		vg = nbp_vlan_group(v->port);
+
+	mst = br_vlan_group_mst_get(vg, mstid);
+	if (!mst) {
+		mst = br_vlan_mst_new(mstid);
+		if (!mst)
+			return -ENOMEM;
+	}
+
+	if (rtnl_dereference(v->mst))
+		br_vlan_mst_put(v);
+
+	rcu_assign_pointer(v->mst, mst);
+	return 0;
+}
+
+static int br_vlan_mst_init_master(struct net_bridge_vlan *v)
+{
+	struct net_bridge *br = v->br;
+	struct br_vlan_mst *mst;
+	int mstid;
+
+	/* The bridge VLAN is always added first, either as context or
+	 * as a proper entry. Since the bridge default is a 1:1 map
+	 * from VID to MST, we always need to allocate a new ID in
+	 * this case.
+	 */
+	mstid = br_vlan_mstid_get_free(br);
+	if (mstid < 0)
+		return mstid;
+
+	mst = br_vlan_mst_new(mstid);
+	if (!mst)
+		return -ENOMEM;
+
+	rcu_assign_pointer(v->mst, mst);
+	return 0;
+}
+
+static int br_vlan_mst_init_port(struct net_bridge_vlan *v)
+{
+	u16 mstid;
+
+	mstid = br_vlan_mstid_get(v);
+
+	return br_vlan_mst_migrate(v, mstid);
+}
+
+static int br_vlan_mst_init(struct net_bridge_vlan *v)
+{
+	if (br_vlan_is_master(v))
+		return br_vlan_mst_init_master(v);
+	else
+		return br_vlan_mst_init_port(v);
+}
+
 static bool __vlan_add_pvid(struct net_bridge_vlan_group *vg,
 			    const struct net_bridge_vlan *v)
 {
@@ -41,7 +222,7 @@ static bool __vlan_add_pvid(struct net_bridge_vlan_group *vg,
 		return false;
 
 	smp_wmb();
-	br_vlan_set_pvid_state(vg, v->state);
+	br_vlan_set_pvid_state(vg, br_vlan_get_state_rtnl(v));
 	vg->pvid = v->vid;
 
 	return true;
@@ -301,13 +482,14 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags,
 		vg->num_vlans++;
 	}
 
-	/* set the state before publishing */
-	v->state = BR_STATE_FORWARDING;
+	err = br_vlan_mst_init(v);
+	if (err)
+		goto out_fdb_insert;
 
 	err = rhashtable_lookup_insert_fast(&vg->vlan_hash, &v->vnode,
 					    br_vlan_rht_params);
 	if (err)
-		goto out_fdb_insert;
+		goto out_mst_init;
 
 	__vlan_add_list(v);
 	__vlan_add_flags(v, flags);
@@ -317,6 +499,9 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags,
 		nbp_vlan_set_vlan_dev_state(p, v->vid);
 out:
 	return err;
+
+out_mst_init:
+	br_vlan_mst_put(v);
 
 out_fdb_insert:
 	if (br_vlan_should_use(v)) {
@@ -385,6 +570,7 @@ static int __vlan_del(struct net_bridge_vlan *v)
 		call_rcu(&v->rcu, nbp_vlan_rcu_free);
 	}
 
+	br_vlan_mst_put(v);
 	br_vlan_put_master(masterv);
 out:
 	return err;
@@ -578,7 +764,7 @@ static bool __allowed_ingress(const struct net_bridge *br,
 		goto drop;
 
 	if (*state == BR_STATE_FORWARDING) {
-		*state = br_vlan_get_state(v);
+		*state = br_vlan_get_state_rcu(v);
 		if (!br_vlan_state_allowed(*state, true))
 			goto drop;
 	}
@@ -631,7 +817,7 @@ bool br_allowed_egress(struct net_bridge_vlan_group *vg,
 	br_vlan_get_tag(skb, &vid);
 	v = br_vlan_find(vg, vid);
 	if (v && br_vlan_should_use(v) &&
-	    br_vlan_state_allowed(br_vlan_get_state(v), false))
+	    br_vlan_state_allowed(br_vlan_get_state_rcu(v), false))
 		return true;
 
 	return false;
@@ -665,7 +851,7 @@ bool br_should_learn(struct net_bridge_port *p, struct sk_buff *skb, u16 *vid)
 	}
 
 	v = br_vlan_find(vg, *vid);
-	if (v && br_vlan_state_allowed(br_vlan_get_state(v), true))
+	if (v && br_vlan_state_allowed(br_vlan_get_state_rcu(v), true))
 		return true;
 
 	return false;

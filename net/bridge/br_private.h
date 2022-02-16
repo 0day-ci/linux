@@ -153,6 +153,14 @@ struct br_tunnel_info {
 	struct metadata_dst __rcu	*tunnel_dst;
 };
 
+struct br_vlan_mst {
+	refcount_t refcnt;
+	u16 id;
+	u8 state;
+
+	struct rcu_head rcu;
+};
+
 /* private vlan flags */
 enum {
 	BR_VLFLAG_PER_PORT_STATS = BIT(0),
@@ -168,7 +176,8 @@ enum {
  * @vid: VLAN id
  * @flags: bridge vlan flags
  * @priv_flags: private (in-kernel) bridge vlan flags
- * @state: STP state (e.g. blocking, learning, forwarding)
+ * @mst: the port's STP state (e.g. blocking, learning, forwarding) in the MST
+ *       associated with this VLAN
  * @stats: per-cpu VLAN statistics
  * @br: if MASTER flag set, this points to a bridge struct
  * @port: if MASTER flag unset, this points to a port struct
@@ -192,7 +201,7 @@ struct net_bridge_vlan {
 	u16				vid;
 	u16				flags;
 	u16				priv_flags;
-	u8				state;
+	struct br_vlan_mst		__rcu *mst;
 	struct pcpu_sw_netstats __percpu *stats;
 	union {
 		struct net_bridge	*br;
@@ -214,6 +223,20 @@ struct net_bridge_vlan {
 
 	struct rcu_head			rcu;
 };
+
+static inline u8 br_vlan_get_state_rcu(const struct net_bridge_vlan *v)
+{
+	const struct br_vlan_mst *mst = rcu_dereference(v->mst);
+
+	return mst->state;
+}
+
+static inline u8 br_vlan_get_state_rtnl(const struct net_bridge_vlan *v)
+{
+	const struct br_vlan_mst *mst = rtnl_dereference(v->mst);
+
+	return mst->state;
+}
 
 /**
  * struct net_bridge_vlan_group
@@ -1179,7 +1202,7 @@ br_multicast_port_ctx_state_disabled(const struct net_bridge_mcast_port *pmctx)
 	return pmctx->port->state == BR_STATE_DISABLED ||
 	       (br_multicast_port_ctx_is_vlan(pmctx) &&
 		(br_multicast_port_ctx_vlan_disabled(pmctx) ||
-		 pmctx->vlan->state == BR_STATE_DISABLED));
+		 br_vlan_get_state_rcu(pmctx->vlan) == BR_STATE_DISABLED));
 }
 
 static inline bool
@@ -1188,7 +1211,7 @@ br_multicast_port_ctx_state_stopped(const struct net_bridge_mcast_port *pmctx)
 	return br_multicast_port_ctx_state_disabled(pmctx) ||
 	       pmctx->port->state == BR_STATE_BLOCKING ||
 	       (br_multicast_port_ctx_is_vlan(pmctx) &&
-		pmctx->vlan->state == BR_STATE_BLOCKING);
+		br_vlan_get_state_rcu(pmctx->vlan) == BR_STATE_BLOCKING);
 }
 
 static inline bool
@@ -1729,15 +1752,11 @@ bool br_vlan_global_opts_can_enter_range(const struct net_bridge_vlan *v_curr,
 bool br_vlan_global_opts_fill(struct sk_buff *skb, u16 vid, u16 vid_range,
 			      const struct net_bridge_vlan *v_opts);
 
-/* vlan state manipulation helpers using *_ONCE to annotate lock-free access */
-static inline u8 br_vlan_get_state(const struct net_bridge_vlan *v)
-{
-	return READ_ONCE(v->state);
-}
-
 static inline void br_vlan_set_state(struct net_bridge_vlan *v, u8 state)
 {
-	WRITE_ONCE(v->state, state);
+	struct br_vlan_mst *mst = rtnl_dereference(v->mst);
+
+	mst->state = state;
 }
 
 static inline u8 br_vlan_get_pvid_state(const struct net_bridge_vlan_group *vg)

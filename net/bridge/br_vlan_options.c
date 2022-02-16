@@ -43,14 +43,14 @@ bool br_vlan_opts_eq_range(const struct net_bridge_vlan *v_curr,
 	u8 range_mc_rtr = br_vlan_multicast_router(range_end);
 	u8 curr_mc_rtr = br_vlan_multicast_router(v_curr);
 
-	return v_curr->state == range_end->state &&
+	return br_vlan_get_state_rtnl(v_curr) == br_vlan_get_state_rtnl(range_end) &&
 	       __vlan_tun_can_enter_range(v_curr, range_end) &&
 	       curr_mc_rtr == range_mc_rtr;
 }
 
 bool br_vlan_opts_fill(struct sk_buff *skb, const struct net_bridge_vlan *v)
 {
-	if (nla_put_u8(skb, BRIDGE_VLANDB_ENTRY_STATE, br_vlan_get_state(v)) ||
+	if (nla_put_u8(skb, BRIDGE_VLANDB_ENTRY_STATE, br_vlan_get_state_rtnl(v)) ||
 	    !__vlan_tun_put(skb, v))
 		return false;
 
@@ -99,7 +99,7 @@ static int br_vlan_modify_state(struct net_bridge_vlan_group *vg,
 		return -EBUSY;
 	}
 
-	if (v->state == state)
+	if (br_vlan_get_state_rtnl(v) == state)
 		return 0;
 
 	if (v->vid == br_get_pvid(vg))
@@ -294,7 +294,8 @@ bool br_vlan_global_opts_can_enter_range(const struct net_bridge_vlan *v_curr,
 	       ((v_curr->priv_flags ^ r_end->priv_flags) &
 		BR_VLFLAG_GLOBAL_MCAST_ENABLED) == 0 &&
 		br_multicast_ctx_options_equal(&v_curr->br_mcast_ctx,
-					       &r_end->br_mcast_ctx);
+					       &r_end->br_mcast_ctx) &&
+		br_vlan_mstid_get(v_curr) == br_vlan_mstid_get(r_end);
 }
 
 bool br_vlan_global_opts_fill(struct sk_buff *skb, u16 vid, u16 vid_range,
