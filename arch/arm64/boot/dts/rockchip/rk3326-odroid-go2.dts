@@ -296,7 +296,7 @@
 		reg = <0x20>;
 		interrupt-parent = <&gpio0>;
 		interrupts = <RK_PB2 IRQ_TYPE_LEVEL_LOW>;
-		clock-output-names = "rk808-clkout1", "xin32k";
+		clock-output-names = "rk808-clkout1";
 		clock-names = "mclk";
 		clocks = <&cru SCLK_I2S1_OUT>;
 		pinctrl-names = "default";
