@@ -403,10 +403,11 @@ int intel_plane_atomic_check(struct intel_atomic_state *state,
 	struct intel_crtc_state *new_crtc_state =
 		intel_atomic_get_new_crtc_state(state, crtc);
 
-	if (new_crtc_state && new_crtc_state->bigjoiner_slave) {
+	if (new_crtc_state && intel_crtc_is_bigjoiner_slave(new_crtc_state)) {
+		struct intel_crtc *master_crtc =
+			intel_master_crtc(new_crtc_state);
 		struct intel_plane *master_plane =
-			intel_crtc_get_plane(new_crtc_state->bigjoiner_linked_crtc,
-					     plane->id);
+			intel_crtc_get_plane(master_crtc, plane->id);
 
 		new_master_plane_state =
 			intel_atomic_get_new_plane_state(state, master_plane);
@@ -633,7 +634,7 @@ int intel_atomic_plane_check_clipping(struct intel_plane_state *plane_state,
 	}
 
 	/* right side of the image is on the slave crtc, adjust dst to match */
-	if (crtc_state->bigjoiner_slave)
+	if (intel_crtc_is_bigjoiner_slave(crtc_state))
 		drm_rect_translate(dst, -crtc_state->pipe_src_w, 0);
 
 	/*
