@@ -917,13 +917,14 @@ void sock_set_keepalive(struct sock *sk)
 }
 EXPORT_SYMBOL(sock_set_keepalive);
 
-static void __sock_set_rcvbuf(struct sock *sk, int val)
+static void __sock_set_rcvbuf(struct sock *sk, int val, bool is_set)
 {
 	/* Ensure val * 2 fits into an int, to prevent max_t() from treating it
 	 * as a negative value.
 	 */
 	val = min_t(int, val, INT_MAX / 2);
-	sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
+	if (is_set)
+		sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
 
 	/* We double it on the way in to account for "struct sk_buff" etc.
 	 * overhead.   Applications assume that the SO_RCVBUF setting they make
@@ -941,7 +942,7 @@ static void __sock_set_rcvbuf(struct sock *sk, int val)
 void sock_set_rcvbuf(struct sock *sk, int val)
 {
 	lock_sock(sk);
-	__sock_set_rcvbuf(sk, val);
+	__sock_set_rcvbuf(sk, val, true);
 	release_sock(sk);
 }
 EXPORT_SYMBOL(sock_set_rcvbuf);
@@ -1106,7 +1107,7 @@ set_sndbuf:
 		 * play 'guess the biggest size' games. RCVBUF/SNDBUF
 		 * are treated in BSD as hints
 		 */
-		__sock_set_rcvbuf(sk, min_t(u32, val, sysctl_rmem_max));
+		__sock_set_rcvbuf(sk, min_t(u32, val, sysctl_rmem_max), true);
 		break;
 
 	case SO_RCVBUFFORCE:
@@ -1118,7 +1119,14 @@ set_sndbuf:
 		/* No negative values (to prevent underflow, as val will be
 		 * multiplied by 2).
 		 */
-		__sock_set_rcvbuf(sk, max(val, 0));
+		__sock_set_rcvbuf(sk, max(val, 0), true);
+		break;
+
+	case SO_RCVBUFAUTO:
+		/* Though similar to SO_RCVBUF, we do not use userlocks in
+		 * order to let the receive buffer tune automatically.
+		 */
+		__sock_set_rcvbuf(sk, min_t(u32, val, sysctl_rmem_max), false);
 		break;
 
 	case SO_KEEPALIVE:
