@@ -128,6 +128,9 @@ struct serial_rs485 {
 							   (if supported) */
 	__u32	delay_rts_before_send;	/* Delay before send (milliseconds) */
 	__u32	delay_rts_after_send;	/* Delay after send (milliseconds) */
+#define SER_RS485_MAX_RTS_DELAY		100		/* Max time with active
+							   RTS before/after
+							   data sent (msecs) */
 	__u32	padding[5];		/* Memory is cheap, new structs
 					   are a royal PITA .. */
 };
