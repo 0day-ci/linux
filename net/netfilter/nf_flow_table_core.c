@@ -254,8 +254,14 @@ static u32 flow_offload_hash_obj(const void *data, u32 len, u32 seed)
 static int flow_offload_hash_cmp(struct rhashtable_compare_arg *arg,
 					const void *ptr)
 {
+	const struct nf_flowtable *flow_table = container_of(arg->ht, struct nf_flowtable,
+							     rhashtable);
 	const struct flow_offload_tuple *tuple = arg->key;
 	const struct flow_offload_tuple_rhash *x = ptr;
+
+	if (!(flow_table->flags & NF_FLOWTABLE_NO_IFINDEX_FILTERING) &&
+	    x->tuple.iifidx != tuple->iifidx)
+		return 1;
 
 	if (memcmp(&x->tuple, tuple, offsetof(struct flow_offload_tuple, __hash)))
 		return 1;

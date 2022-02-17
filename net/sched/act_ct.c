@@ -305,7 +305,8 @@ static int tcf_ct_flow_table_get(struct tcf_ct_params *params)
 
 	ct_ft->nf_ft.type = &flowtable_ct;
 	ct_ft->nf_ft.flags |= NF_FLOWTABLE_HW_OFFLOAD |
-			      NF_FLOWTABLE_COUNTER;
+			      NF_FLOWTABLE_COUNTER |
+			      NF_FLOWTABLE_NO_IFINDEX_FILTERING;
 	err = nf_flow_table_init(&ct_ft->nf_ft);
 	if (err)
 		goto err_init;
