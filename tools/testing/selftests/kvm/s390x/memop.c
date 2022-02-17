@@ -13,169 +13,360 @@
 #include "test_util.h"
 #include "kvm_util.h"
 
+enum mop_target {
+	LOGICAL,
+	SIDA,
+	ABSOLUTE,
+	INVALID,
+};
+
+enum mop_access_mode {
+	READ,
+	WRITE,
+};
+
+struct mop_desc {
+	uintptr_t gaddr;
+	uintptr_t gaddr_v;
+	uint64_t set_flags;
+	unsigned int f_check : 1;
+	unsigned int f_inject : 1;
+	unsigned int f_key : 1;
+	unsigned int _gaddr_v : 1;
+	unsigned int _set_flags : 1;
+	unsigned int _sida_offset : 1;
+	unsigned int _ar : 1;
+	uint32_t size;
+	enum mop_target target;
+	enum mop_access_mode mode;
+	void *buf;
+	uint32_t sida_offset;
+	uint8_t ar;
+	uint8_t key;
+};
+
+static struct kvm_s390_mem_op ksmo_from_desc(struct mop_desc desc)
+{
+	struct kvm_s390_mem_op ksmo = {
+		.gaddr = (uintptr_t)desc.gaddr,
+		.size = desc.size,
+		.buf = ((uintptr_t)desc.buf),
+		.reserved = "ignored_ignored_ignored_ignored"
+	};
+
+	switch (desc.target) {
+	case LOGICAL:
+		if (desc.mode == READ)
+			ksmo.op = KVM_S390_MEMOP_LOGICAL_READ;
+		if (desc.mode == WRITE)
+			ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
+		break;
+	case SIDA:
+		if (desc.mode == READ)
+			ksmo.op = KVM_S390_MEMOP_SIDA_READ;
+		if (desc.mode == WRITE)
+			ksmo.op = KVM_S390_MEMOP_SIDA_WRITE;
+		break;
+	case ABSOLUTE:
+		if (desc.mode == READ)
+			ksmo.op = KVM_S390_MEMOP_ABSOLUTE_READ;
+		if (desc.mode == WRITE)
+			ksmo.op = KVM_S390_MEMOP_ABSOLUTE_WRITE;
+		break;
+	case INVALID:
+		ksmo.op = -1;
+	}
+	if (desc.f_check)
+		ksmo.flags |= KVM_S390_MEMOP_F_CHECK_ONLY;
+	if (desc.f_inject)
+		ksmo.flags |= KVM_S390_MEMOP_F_INJECT_EXCEPTION;
+	if (desc._set_flags)
+		ksmo.flags = desc.set_flags;
+	if (desc.f_key) {
+		ksmo.flags |= KVM_S390_MEMOP_F_SKEY_PROTECTION;
+		ksmo.key = desc.key;
+	}
+	if (desc._ar)
+		ksmo.ar = desc.ar;
+	else
+		ksmo.ar = 0;
+	if (desc._sida_offset)
+		ksmo.sida_offset = desc.sida_offset;
+
+	return ksmo;
+}
+
+/* vcpu dummy id signifying that vm instead of vcpu ioctl is to occur */
+const uint32_t VM_VCPU_ID = (uint32_t)-1;
+
+struct test_vcpu {
+	struct kvm_vm *vm;
+	uint32_t id;
+};
+
+#define PRINT_MEMOP false
+static void print_memop(uint32_t vcpu_id, const struct kvm_s390_mem_op *ksmo)
+{
+	if (!PRINT_MEMOP)
+		return;
+
+	if (vcpu_id == VM_VCPU_ID)
+		printf("vm memop(");
+	else
+		printf("vcpu memop(");
+	switch (ksmo->op) {
+	case KVM_S390_MEMOP_LOGICAL_READ:
+		printf("LOGICAL, READ, ");
+		break;
+	case KVM_S390_MEMOP_LOGICAL_WRITE:
+		printf("LOGICAL, WRITE, ");
+		break;
+	case KVM_S390_MEMOP_SIDA_READ:
+		printf("SIDA, READ, ");
+		break;
+	case KVM_S390_MEMOP_SIDA_WRITE:
+		printf("SIDA, WRITE, ");
+		break;
+	case KVM_S390_MEMOP_ABSOLUTE_READ:
+		printf("ABSOLUTE, READ, ");
+		break;
+	case KVM_S390_MEMOP_ABSOLUTE_WRITE:
+		printf("ABSOLUTE, WRITE, ");
+		break;
+	}
+	printf("gaddr=%llu, size=%u, buf=%llu, ar=%u, key=%u",
+	       ksmo->gaddr, ksmo->size, ksmo->buf, ksmo->ar, ksmo->key);
+	if (ksmo->flags & KVM_S390_MEMOP_F_CHECK_ONLY)
+		printf(", CHECK_ONLY");
+	if (ksmo->flags & KVM_S390_MEMOP_F_INJECT_EXCEPTION)
+		printf(", INJECT_EXCEPTION");
+	if (ksmo->flags & KVM_S390_MEMOP_F_SKEY_PROTECTION)
+		printf(", SKEY_PROTECTION");
+	puts(")");
+}
+
+static void memop_ioctl(struct test_vcpu vcpu, struct kvm_s390_mem_op *ksmo)
+{
+	if (vcpu.id == VM_VCPU_ID)
+		vm_ioctl(vcpu.vm, KVM_S390_MEM_OP, ksmo);
+	else
+		vcpu_ioctl(vcpu.vm, vcpu.id, KVM_S390_MEM_OP, ksmo);
+}
+
+static int err_memop_ioctl(struct test_vcpu vcpu, struct kvm_s390_mem_op *ksmo)
+{
+	if (vcpu.id == VM_VCPU_ID)
+		return _vm_ioctl(vcpu.vm, KVM_S390_MEM_OP, ksmo);
+	else
+		return _vcpu_ioctl(vcpu.vm, vcpu.id, KVM_S390_MEM_OP, ksmo);
+}
+
+#define MEMOP(err, vcpu_p, mop_target_p, access_mode_p, buf_p, size_p, ...)	\
+({										\
+	struct test_vcpu __vcpu = (vcpu_p);					\
+	struct mop_desc __desc = {						\
+		.target = (mop_target_p),					\
+		.mode = (access_mode_p),					\
+		.buf = (buf_p),							\
+		.size = (size_p),						\
+		__VA_ARGS__							\
+	};									\
+	struct kvm_s390_mem_op __ksmo;						\
+										\
+	if (__desc._gaddr_v) {							\
+		if (__desc.target == ABSOLUTE)					\
+			__desc.gaddr = addr_gva2gpa(__vcpu.vm, __desc.gaddr_v);	\
+		else								\
+			__desc.gaddr = __desc.gaddr_v;				\
+	}									\
+	__ksmo = ksmo_from_desc(__desc);					\
+	print_memop(__vcpu.id, &__ksmo);					\
+	err##memop_ioctl(__vcpu, &__ksmo);					\
+})
+
+#define MOP(...) MEMOP(, __VA_ARGS__)
+#define ERR_MOP(...) MEMOP(err_, __VA_ARGS__)
+
+#define GADDR(a) .gaddr = ((uintptr_t)a)
+#define GADDR_V(v) ._gaddr_v = 1, .gaddr_v = ((uintptr_t)v)
+#define CHECK_ONLY .f_check = 1
+#define SET_FLAGS(f) ._set_flags = 1, .set_flags = (f)
+#define SIDA_OFFSET(o) ._sida_offset = 1, .sida_offset = (o)
+#define AR(a) ._ar = 1, .ar = (a)
+#define KEY(a) .f_key = 1, .key = (a)
+
+#define CHECK_N_DO(f, ...) ({ f(__VA_ARGS__, CHECK_ONLY); f(__VA_ARGS__); })
+
 #define VCPU_ID 1
+#define PAGE_SHIFT 12
+#define PAGE_SIZE (1ULL << PAGE_SHIFT)
+#define PAGE_MASK (~(PAGE_SIZE - 1))
+
+#define ASSERT_MEM_EQ(p1, p2, size) \
+	TEST_ASSERT(!memcmp(p1, p2, size), "Memory contents do not match!")
 
 static uint8_t mem1[65536];
 static uint8_t mem2[65536];
 
-static void guest_code(void)
+static void prepare_mem12(void)
 {
 	int i;
 
-	for (;;) {
-		for (i = 0; i < sizeof(mem2); i++)
-			mem2[i] = mem1[i];
-		GUEST_SYNC(0);
-	}
+	for (i = 0; i < sizeof(mem1); i++)
+		mem1[i] = rand();
+	memset(mem2, 0xaa, sizeof(mem2));
 }
 
-int main(int argc, char *argv[])
-{
-	struct kvm_vm *vm;
+struct test_default {
+	struct test_vcpu vm;
+	struct test_vcpu vcpu;
 	struct kvm_run *run;
-	struct kvm_s390_mem_op ksmo;
-	int rv, i, maxsize;
+	int size;
+};
 
-	setbuf(stdout, NULL);	/* Tell stdout not to buffer its content */
+static struct test_default test_default_init(void *guest_code)
+{
+	struct test_default t;
 
-	maxsize = kvm_check_cap(KVM_CAP_S390_MEM_OP);
-	if (!maxsize) {
-		print_skip("CAP_S390_MEM_OP not supported");
-		exit(KSFT_SKIP);
-	}
-	if (maxsize > sizeof(mem1))
-		maxsize = sizeof(mem1);
+	t.size = min((size_t)kvm_check_cap(KVM_CAP_S390_MEM_OP), sizeof(mem1));
+	t.vm = (struct test_vcpu) { vm_create_default(VCPU_ID, 0, guest_code), VM_VCPU_ID };
+	t.vcpu = (struct test_vcpu) { t.vm.vm, VCPU_ID };
+	t.run = vcpu_state(t.vm.vm, VCPU_ID);
+	return t;
+}
 
-	/* Create VM */
-	vm = vm_create_default(VCPU_ID, 0, guest_code);
-	run = vcpu_state(vm, VCPU_ID);
+static void test_vm_free(struct test_vcpu vm)
+{
+	kvm_vm_free(vm.vm);
+}
 
-	for (i = 0; i < sizeof(mem1); i++)
-		mem1[i] = i * i + i;
+#define HOST_SYNC(vcpu_p, stage)					\
+({									\
+	struct test_vcpu __vcpu = (vcpu_p);				\
+	struct ucall uc;						\
+	int __stage = (stage);						\
+									\
+	vcpu_run(__vcpu.vm, __vcpu.id);					\
+	get_ucall(__vcpu.vm, __vcpu.id, &uc);				\
+	ASSERT_EQ(uc.cmd, UCALL_SYNC);					\
+	ASSERT_EQ(uc.args[1], __stage);					\
+})									\
 
-	/* Set the first array */
-	ksmo.gaddr = addr_gva2gpa(vm, (uintptr_t)mem1);
-	ksmo.flags = 0;
-	ksmo.size = maxsize;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 0;
-	vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+enum stage {
+	/* Synced state set by host, e.g. DAT */
+	STAGE_INITED,
+	/* Guest did nothing */
+	STAGE_IDLED,
+	/* Guest copied memory (locations up to test case) */
+	STAGE_COPIED,
+};
 
-	/* Let the guest code copy the first array to the second */
-	vcpu_run(vm, VCPU_ID);
-	TEST_ASSERT(run->exit_reason == KVM_EXIT_S390_SIEIC,
-		    "Unexpected exit reason: %u (%s)\n",
-		    run->exit_reason,
-		    exit_reason_str(run->exit_reason));
+#define DEFAULT_WRITE_READ(copy_cpu, mop_cpu, mop_target_p, size, ...)		\
+({										\
+	struct test_vcpu __copy_cpu = (copy_cpu), __mop_cpu = (mop_cpu);	\
+	enum mop_target __target = (mop_target_p);				\
+	uint32_t __size = (size);						\
+										\
+	prepare_mem12();							\
+	CHECK_N_DO(MOP, __mop_cpu, __target, WRITE, mem1, __size,		\
+			GADDR_V(mem1), ##__VA_ARGS__);				\
+	HOST_SYNC(__copy_cpu, STAGE_COPIED);					\
+	CHECK_N_DO(MOP, __mop_cpu, __target, READ, mem2, __size,		\
+			GADDR_V(mem2), ##__VA_ARGS__);				\
+	ASSERT_MEM_EQ(mem1, mem2, __size);					\
+})
 
-	memset(mem2, 0xaa, sizeof(mem2));
+static void guest_copy(void)
+{
+	GUEST_SYNC(STAGE_INITED);
+	memcpy(&mem2, &mem1, sizeof(mem2));
+	GUEST_SYNC(STAGE_COPIED);
+}
 
-	/* Get the second array */
-	ksmo.gaddr = (uintptr_t)mem2;
-	ksmo.flags = 0;
-	ksmo.size = maxsize;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_READ;
-	ksmo.buf = (uintptr_t)mem2;
-	ksmo.ar = 0;
-	vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+static void test_copy(void)
+{
+	struct test_default t = test_default_init(guest_copy);
 
-	TEST_ASSERT(!memcmp(mem1, mem2, maxsize),
-		    "Memory contents do not match!");
+	HOST_SYNC(t.vcpu, STAGE_INITED);
 
-	/* Check error conditions - first bad size: */
-	ksmo.gaddr = (uintptr_t)mem1;
-	ksmo.flags = 0;
-	ksmo.size = -1;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	DEFAULT_WRITE_READ(t.vcpu, t.vcpu, LOGICAL, t.size);
+
+	test_vm_free(t.vm);
+}
+
+static void guest_idle(void)
+{
+	GUEST_SYNC(STAGE_INITED);
+	for (;;)
+		GUEST_SYNC(STAGE_IDLED);
+}
+
+static void test_errors(void)
+{
+	struct test_default t = test_default_init(guest_idle);
+	int rv;
+
+	HOST_SYNC(t.vcpu, STAGE_INITED);
+
+	rv = ERR_MOP(t.vcpu, LOGICAL, WRITE, mem1, -1, GADDR_V(mem1));
 	TEST_ASSERT(rv == -1 && errno == E2BIG, "ioctl allows insane sizes");
 
 	/* Zero size: */
-	ksmo.gaddr = (uintptr_t)mem1;
-	ksmo.flags = 0;
-	ksmo.size = 0;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, LOGICAL, WRITE, mem1, 0, GADDR_V(mem1));
 	TEST_ASSERT(rv == -1 && (errno == EINVAL || errno == ENOMEM),
 		    "ioctl allows 0 as size");
 
 	/* Bad flags: */
-	ksmo.gaddr = (uintptr_t)mem1;
-	ksmo.flags = -1;
-	ksmo.size = maxsize;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, LOGICAL, WRITE, mem1, t.size, GADDR_V(mem1), SET_FLAGS(-1));
 	TEST_ASSERT(rv == -1 && errno == EINVAL, "ioctl allows all flags");
 
 	/* Bad operation: */
-	ksmo.gaddr = (uintptr_t)mem1;
-	ksmo.flags = 0;
-	ksmo.size = maxsize;
-	ksmo.op = -1;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, INVALID, WRITE, mem1, t.size, GADDR_V(mem1));
 	TEST_ASSERT(rv == -1 && errno == EINVAL, "ioctl allows bad operations");
 
 	/* Bad guest address: */
-	ksmo.gaddr = ~0xfffUL;
-	ksmo.flags = KVM_S390_MEMOP_F_CHECK_ONLY;
-	ksmo.size = maxsize;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, LOGICAL, WRITE, mem1, t.size, GADDR((void *)~0xfffUL), CHECK_ONLY);
 	TEST_ASSERT(rv > 0, "ioctl does not report bad guest memory access");
 
 	/* Bad host address: */
-	ksmo.gaddr = (uintptr_t)mem1;
-	ksmo.flags = 0;
-	ksmo.size = maxsize;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = 0;
-	ksmo.ar = 0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, LOGICAL, WRITE, 0, t.size, GADDR_V(mem1));
 	TEST_ASSERT(rv == -1 && errno == EFAULT,
 		    "ioctl does not report bad host memory address");
 
 	/* Bad access register: */
-	run->psw_mask &= ~(3UL << (63 - 17));
-	run->psw_mask |= 1UL << (63 - 17);  /* Enable AR mode */
-	vcpu_run(vm, VCPU_ID);              /* To sync new state to SIE block */
-	ksmo.gaddr = (uintptr_t)mem1;
-	ksmo.flags = 0;
-	ksmo.size = maxsize;
-	ksmo.op = KVM_S390_MEMOP_LOGICAL_WRITE;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.ar = 17;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	t.run->psw_mask &= ~(3UL << (63 - 17));
+	t.run->psw_mask |= 1UL << (63 - 17);  /* Enable AR mode */
+	HOST_SYNC(t.vcpu, STAGE_IDLED);
+	rv = ERR_MOP(t.vcpu, LOGICAL, WRITE, mem1, t.size, GADDR(mem1), AR(17));
 	TEST_ASSERT(rv == -1 && errno == EINVAL, "ioctl allows ARs > 15");
-	run->psw_mask &= ~(3UL << (63 - 17));   /* Disable AR mode */
-	vcpu_run(vm, VCPU_ID);                  /* Run to sync new state */
+	t.run->psw_mask &= ~(3UL << (63 - 17));   /* Disable AR mode */
+	HOST_SYNC(t.vcpu, STAGE_IDLED);
 
 	/* Check that the SIDA calls are rejected for non-protected guests */
-	ksmo.gaddr = 0;
-	ksmo.flags = 0;
-	ksmo.size = 8;
-	ksmo.op = KVM_S390_MEMOP_SIDA_READ;
-	ksmo.buf = (uintptr_t)mem1;
-	ksmo.sida_offset = 0x1c0;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, SIDA, READ, mem1, 8, GADDR(0), SIDA_OFFSET(0x1c0));
 	TEST_ASSERT(rv == -1 && errno == EINVAL,
 		    "ioctl does not reject SIDA_READ in non-protected mode");
-	ksmo.op = KVM_S390_MEMOP_SIDA_WRITE;
-	rv = _vcpu_ioctl(vm, VCPU_ID, KVM_S390_MEM_OP, &ksmo);
+	rv = ERR_MOP(t.vcpu, SIDA, WRITE, mem1, 8, GADDR(0), SIDA_OFFSET(0x1c0));
 	TEST_ASSERT(rv == -1 && errno == EINVAL,
 		    "ioctl does not reject SIDA_WRITE in non-protected mode");
 
-	kvm_vm_free(vm);
+	test_vm_free(t.vm);
+}
+
+int main(int argc, char *argv[])
+{
+	int memop_cap;
+
+	setbuf(stdout, NULL);	/* Tell stdout not to buffer its content */
+
+	memop_cap = kvm_check_cap(KVM_CAP_S390_MEM_OP);
+	if (!memop_cap) {
+		print_skip("CAP_S390_MEM_OP not supported");
+		exit(KSFT_SKIP);
+	}
+
+	test_copy();
+	test_errors();
 
 	return 0;
 }
