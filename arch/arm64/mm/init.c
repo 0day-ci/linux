@@ -62,7 +62,11 @@ EXPORT_SYMBOL(memstart_addr);
  * In such case, ZONE_DMA32 covers the rest of the 32-bit addressable memory,
  * otherwise it is empty.
  */
-phys_addr_t arm64_dma_phys_limit __ro_after_init;
+#if !defined(CONFIG_ZONE_DMA) && !defined(CONFIG_ZONE_DMA32)
+phys_addr_t __ro_after_init arm64_dma_phys_limit = PHYS_MASK + 1;
+#else
+phys_addr_t __ro_after_init arm64_dma_phys_limit;
+#endif
 
 #ifdef CONFIG_KEXEC_CORE
 /*
@@ -153,8 +157,6 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
 	if (!arm64_dma_phys_limit)
 		arm64_dma_phys_limit = dma32_phys_limit;
 #endif
-	if (!arm64_dma_phys_limit)
-		arm64_dma_phys_limit = PHYS_MASK + 1;
 	max_zone_pfns[ZONE_NORMAL] = max;
 
 	free_area_init(max_zone_pfns);
@@ -315,6 +317,10 @@ void __init arm64_memblock_init(void)
 
 	early_init_fdt_scan_reserved_mem();
 
+#if !defined(CONFIG_ZONE_DMA) && !defined(CONFIG_ZONE_DMA32)
+	reserve_crashkernel();
+#endif
+
 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
 }
 
@@ -357,11 +363,13 @@ void __init bootmem_init(void)
 	 */
 	dma_contiguous_reserve(arm64_dma_phys_limit);
 
+#if defined(CONFIG_ZONE_DMA) || defined(CONFIG_ZONE_DMA32)
 	/*
 	 * request_standard_resources() depends on crashkernel's memory being
 	 * reserved, so do it here.
 	 */
 	reserve_crashkernel();
+#endif
 
 	memblock_dump_all();
 }
