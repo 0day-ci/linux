@@ -7,6 +7,7 @@
 #include <linux/netdevice.h>
 #include <linux/prefetch.h>
 #include <linux/bpf_trace.h>
+#include <net/busy_poll.h>
 #include <net/dsfield.h>
 #include <net/xdp.h>
 #include "ice_txrx_lib.h"
@@ -1093,6 +1094,165 @@ ice_is_non_eop(struct ice_rx_ring *rx_ring, union ice_32b_rx_flex_desc *rx_desc)
 }
 
 /**
+ * ice_detect_dis_inline_fd_usage  - detect and disable usage of inline-fd
+ * @ch_vsi : ptr to channel VSI
+ *
+ * This function to detect FD table full condition and if so,
+ * return true otherwise false
+ */
+static bool
+ice_detect_dis_inline_fd_usage(struct ice_vsi *ch_vsi)
+{
+	int total_fd_allowed = ch_vsi->num_gfltr + ch_vsi->num_bfltr;
+	struct ice_channel *ch = ch_vsi->ch;
+	int inline_fd_active;
+
+	/* detect if transitioned to RSS mode, if so return true */
+	if (ch->switch_fd_to_rss)
+		return true;
+
+	/* for some reason if channel VSI doesn't have any FD resources
+	 * reserved (from guaranteed or best effort pool), stay in RSS
+	 */
+	if (!total_fd_allowed) {
+		ch->switch_fd_to_rss = 1;
+		return true;
+	}
+
+	/* inline_fd_active_cnt is decremented from ice_chnl_inline_fd
+	 * function when evicting FD entry upon FIN/RST transmit
+	 */
+	inline_fd_active = atomic_inc_return(&ch_vsi->inline_fd_active_cnt) - 1;
+	if (inline_fd_active >= total_fd_allowed) {
+		ch->switch_fd_to_rss = 1;
+		return true;
+	}
+
+	return false;
+}
+
+/* Rx desc:flexi_flags are bits 15:10 applicable when RXDID=2 as defined
+ * by package
+ */
+#define ICE_RX_FLEXI_FLAGS_ACK	BIT(2)
+#define ICE_RX_FLEXI_FLAGS_FIN	BIT(3)
+#define ICE_RX_FLEXI_FLAGS_SYN	BIT(4)
+#define ICE_RX_FLEXI_FLAGS_RST	BIT(5)
+
+/* Rx desc:flexi_flags2, applicable when RXDID=2 */
+#define ICE_RX_FLEXI_FLAGS2_TNL_0 BIT(5)
+#define ICE_RX_FLEXI_FLAGS2_TNL_1 BIT(6)
+#define ICE_RX_SUPPORTED_TNL_FLEXI_FLAGS (ICE_RX_FLEXI_FLAGS2_TNL_0 | \
+					  ICE_RX_FLEXI_FLAGS2_TNL_1)
+
+/**
+ * ice_is_tcp_syn_pkt - determine if given packet is SYN but not SYN+ACK
+ * @rx_desc: ptr to Rx descriptor
+ * @ptype: packet type
+ *
+ * Function returns true if the corresponding descriptor is for TCP SYN
+ * but not SYN+ACK.
+ */
+static bool
+ice_is_tcp_syn_pkt(const union ice_32b_rx_flex_desc *rx_desc,
+		   const u16 ptype)
+{
+	const struct ice_32b_rx_flex_desc_nic *nic_mdid;
+	struct ice_rx_ptype_decoded decoded;
+	u16 flags;
+
+	/* RXDID must be set to FLEX, otherwise no guarantee that
+	 * "flags" will be available in Rx desc.flexi_flags0
+	 */
+	if (rx_desc->wb.rxdid != ICE_RXDID_FLEX_NIC)
+		return false;
+
+	/* process PTYPE from Rx desc */
+	decoded = ice_decode_rx_desc_ptype(ptype);
+	if (!decoded.known)
+		return false;
+
+	/* Make sure packet is L4 and L4 proto (inner most) is TCP */
+	if (!(decoded.payload_layer == ICE_RX_PTYPE_PAYLOAD_LAYER_PAY4 &&
+	      decoded.inner_prot == ICE_RX_PTYPE_INNER_PROT_TCP))
+		return false;
+
+	nic_mdid = (struct ice_32b_rx_flex_desc_nic *)rx_desc;
+	flags = le16_get_bits(nic_mdid->ptype_flexi_flags0,
+			      ICE_RX_FLEX_DESC_FLEXI_FLAGS0_M);
+
+	/* Compare if SYN is set and not ACK */
+	if (!((flags & (ICE_RX_FLEXI_FLAGS_ACK | ICE_RX_FLEXI_FLAGS_SYN)) ==
+	      ICE_RX_FLEXI_FLAGS_SYN))
+		return false;
+
+	/* if reached here, means packet has only SYN bit set */
+	return true;
+}
+
+/**
+ * ice_rx_queue_override - override Rx queue if needed and update skb
+ * @skb: receive buffer
+ * @rx_ring: ptr to Rx ring
+ * @rx_desc: pointer to Rx descriptor
+ * @rx_ptype: the packet type decoded by hardware
+ *
+ * Override Rx queue if packet being processed is SYN only and records
+ * new Rx queue in skb. This is applicable only for TCP/IPv4[6].
+ */
+static void
+ice_rx_queue_override(struct sk_buff *skb, struct ice_rx_ring *rx_ring,
+		      union ice_32b_rx_flex_desc *rx_desc, u16 rx_ptype)
+{
+	struct ice_channel *ch = rx_ring->ch;
+	struct ice_vsi *vsi = rx_ring->vsi;
+	struct ice_rx_ring *ring;
+	int queue_to_use;
+
+	if (!ice_rxring_ch_enabled(rx_ring))
+		return;
+
+	if (!ice_is_tcp_syn_pkt(rx_desc, rx_ptype))
+		return;
+
+	/* make sure channel VSI is FD capable and enabled for
+	 * inline flow-director usage
+	 */
+	if (!ch->fd_enabled || !ch->inline_fd)
+		return;
+
+	/* Detection logic to check if HW table is about to get full,
+	 * if so, switch to RSS mode, means don't change Rx queue
+	 */
+	if (ice_detect_dis_inline_fd_usage(ch->ch_vsi))
+		return;
+
+	/* Pick the Rx queue based on round-robin policy for the
+	 * connection, limited to queue region of specific channel
+	 */
+	queue_to_use = (atomic_inc_return(&ch->fd_queue) - 1) % ch->num_rxq;
+
+	/* adjust the queue based on channel's base_queue, so that
+	 * correct Rx queue number is recorded in skb
+	 */
+	queue_to_use += ch->base_q;
+
+	/* Get the selected ring ptr */
+	ring = vsi->rx_rings[queue_to_use];
+	if (!ring || !ring->q_vector)
+		return;
+
+	/* re-record selected queue as Rx queue in SKB */
+	skb_record_rx_queue(skb, queue_to_use);
+
+	/* mark selected queue vector for inline filter usage by
+	 * incrementing atomic variable, it can't be flag because
+	 * during ATR eviction, this needs to be decremented
+	 */
+	atomic_inc(&ring->q_vector->inline_fd_cnt);
+}
+
+/**
  * ice_clean_rx_irq - Clean completed descriptors from Rx ring - bounce buf
  * @rx_ring: Rx descriptor ring to transact packets on
  * @budget: Total limit on number of packets to process
@@ -1254,6 +1414,8 @@ construct_skb:
 			ICE_RX_FLEX_DESC_PTYPE_M;
 
 		ice_process_skb_fields(rx_ring, rx_desc, skb, rx_ptype);
+
+		ice_rx_queue_override(skb, rx_ring, rx_desc, rx_ptype);
 
 		ice_trace(clean_rx_irq_indicate, rx_ring, rx_desc, skb);
 		/* send completed skb up the stack */
@@ -2250,6 +2412,136 @@ ice_tstamp(struct ice_tx_ring *tx_ring, struct sk_buff *skb,
 }
 
 /**
+ * ice_chnl_inline_fd - Add a Flow director ATR filter
+ * @tx_ring: ring to add programming descriptor
+ * @skb: send buffer
+ * @tx_flags: Tx flags
+ */
+static void
+ice_chnl_inline_fd(struct ice_tx_ring *tx_ring, const struct sk_buff *skb,
+		   const u32 tx_flags)
+{
+	struct ice_q_vector *qv = tx_ring->q_vector;
+	struct ice_fd_fltr_desc_ctx fd_ctx = { };
+	struct ice_channel *ch = tx_ring->ch;
+	struct ice_fltr_desc *fdir_desc;
+	union {
+		unsigned char *network;
+		struct iphdr *ipv4;
+	} hdr;
+	struct tcphdr *th;
+	unsigned int hlen;
+	u16 q_index = 0;
+	u8 l4_proto = 0;
+	u16 i, vsi_num;
+
+	if (!ice_txring_ch_enabled(tx_ring))
+		return;
+
+	/* Currently only IPv4/IPv6 with TCP is supported */
+	if (!(tx_flags & (ICE_TX_FLAGS_IPV4 | ICE_TX_FLAGS_IPV6)))
+		return;
+
+	/* make sure channel VSI is valid and vector is channel enabled */
+	if (!ch->ch_vsi || !qv->ch)
+		return;
+
+	/* do not support inline-FD usage for queues which are
+	 * not in range of channel's queue region.
+	 */
+	if (tx_ring->q_index < ch->base_q)
+		return;
+
+	/* make sure channel VSI is FD capable and enabled for
+	 * inline flow-director usage
+	 */
+	if (!ch->fd_enabled || !ch->inline_fd)
+		return;
+
+	/* snag network header to get L4 type and address */
+	hdr.network = (tx_flags & ICE_TX_FLAGS_TUNNEL) ?
+		      skb_inner_network_header(skb) : skb_network_header(skb);
+
+	if (tx_flags & ICE_TX_FLAGS_IPV4) {
+		/* access ihl as u8 to avoid unaligned access on ia64 */
+		hlen = (hdr.network[0] & 0x0F) << 2;
+		hdr.ipv4 = ip_hdr(skb);
+		l4_proto = hdr.ipv4->protocol;
+	} else if (tx_flags & ICE_TX_FLAGS_IPV6) {
+		/* find the start of the innermost ipv6 header */
+		unsigned int inner_hlen = hdr.network - skb->data;
+		unsigned int h_offset = inner_hlen;
+
+		/* this function updates h_offset to the end of the header */
+		l4_proto = ipv6_find_hdr(skb, &h_offset, IPPROTO_TCP, NULL,
+					 NULL);
+		hlen = h_offset - inner_hlen;
+	}
+
+	/* Currently ATR is supported only for TCP */
+	if (l4_proto != IPPROTO_TCP)
+		return;
+
+	th = (struct tcphdr *)(hdr.network + hlen);
+
+	/* proceed only for SYN, SYN+ACK, RST, FIN packets */
+	if (!th->syn && !th->rst && !th->fin)
+		return;
+
+	/* update queue as needed using channel's base_q, this queue number
+	 * gets programmed in filter descriptor while adding inline-FD entry
+	 */
+	if (th->ack || th->fin || th->rst)  {
+		/* server side connection setup || connection_termination */
+		q_index = tx_ring->q_index - ch->base_q;
+	} else if (th->syn) {
+		/* just SYN, client side connection establishment.
+		 * since channel's num_txq and num_rxq has to be same,
+		 * using either num_rxq or num_txq is OK, but for readability
+		 * perspective, using 'num_txq' since this is transmit flow
+		 */
+		q_index = (atomic_inc_return(&ch->fd_queue) - 1) % ch->num_txq;
+	} else {
+		/* dont proceed */
+		return;
+	}
+
+	/* use channel specific HW VSI number */
+	vsi_num = ch->ch_vsi->vsi_num;
+
+	if (th->syn && th->ack &&
+	    atomic_dec_if_positive(&qv->inline_fd_cnt) < 0)
+		return;
+
+	/* grab the next descriptor */
+	i = tx_ring->next_to_use;
+	fdir_desc = ICE_TX_FDIRDESC(tx_ring, i);
+
+	i++;
+	tx_ring->next_to_use = i < tx_ring->count ? i : 0;
+
+	ice_set_dflt_val_fd_desc(&fd_ctx);
+
+	/* set report completion to NONE, means flow-director programming
+	 * status won't be informed to SW.
+	 */
+	fd_ctx.comp_report = ICE_FXD_FLTR_QW0_COMP_REPORT_NONE;
+
+	/* Do not want auto-eviction of filter due to FIN/RST, eviction
+	 * is managed by SW, to avoid possible problems with TCP half-close
+	 * OR TCP simultaneous close from both side.
+	 */
+	fd_ctx.evict_ena = ICE_FXD_FLTR_QW0_EVICT_ENA_FALSE;
+	fd_ctx.qindex = q_index;
+	fd_ctx.cnt_index = tx_ring->ch_inline_fd_cnt_index;
+	fd_ctx.cnt_ena = ICE_FXD_FLTR_QW0_STAT_ENA_PKTS;
+	fd_ctx.pcmd = (th->fin || th->rst) ?
+		       ICE_FXD_FLTR_QW1_PCMD_REMOVE : ICE_FXD_FLTR_QW1_PCMD_ADD;
+	fd_ctx.fd_vsi = vsi_num;
+	ice_set_fd_desc_val(&fd_ctx, fdir_desc);
+}
+
+/**
  * ice_xmit_frame_ring - Sends buffer on Tx ring
  * @skb: send buffer
  * @tx_ring: ring to send buffer on
@@ -2349,6 +2641,8 @@ ice_xmit_frame_ring(struct sk_buff *skb, struct ice_tx_ring *tx_ring)
 		cdesc->rsvd = cpu_to_le16(0);
 		cdesc->qw1 = cpu_to_le64(offload.cd_qw1);
 	}
+
+	ice_chnl_inline_fd(tx_ring, skb, first->tx_flags);
 
 	ice_tx_map(tx_ring, first, &offload);
 	return NETDEV_TX_OK;
