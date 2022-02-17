@@ -32,6 +32,9 @@ static inline void ref_tracker_dir_init(struct ref_tracker_dir *dir,
 
 void ref_tracker_dir_exit(struct ref_tracker_dir *dir);
 
+void __ref_tracker_dir_print(struct ref_tracker_dir *dir,
+			   unsigned int display_limit);
+
 void ref_tracker_dir_print(struct ref_tracker_dir *dir,
 			   unsigned int display_limit);
 
@@ -49,6 +52,11 @@ static inline void ref_tracker_dir_init(struct ref_tracker_dir *dir,
 }
 
 static inline void ref_tracker_dir_exit(struct ref_tracker_dir *dir)
+{
+}
+
+static inline void __ref_tracker_dir_print(struct ref_tracker_dir *dir,
+					   unsigned int display_limit)
 {
 }
 
