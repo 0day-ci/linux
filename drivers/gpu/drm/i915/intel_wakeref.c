@@ -62,6 +62,9 @@ static void ____intel_wakeref_put_last(struct intel_wakeref *wf)
 	if (likely(!wf->ops->put(wf))) {
 		rpm_put(wf);
 		wake_up_var(&wf->wakeref);
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG_WAKEREF)
+		ref_tracker_dir_exit(&wf->debug);
+#endif
 	}
 
 unlock:
@@ -96,7 +99,8 @@ static void __intel_wakeref_put_work(struct work_struct *wrk)
 void __intel_wakeref_init(struct intel_wakeref *wf,
 			  struct intel_runtime_pm *rpm,
 			  const struct intel_wakeref_ops *ops,
-			  struct intel_wakeref_lockclass *key)
+			  struct intel_wakeref_lockclass *key,
+			  const char *name)
 {
 	wf->rpm = rpm;
 	wf->ops = ops;
@@ -110,7 +114,7 @@ void __intel_wakeref_init(struct intel_wakeref *wf,
 			 "wakeref.work", &key->work, 0);
 
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG_WAKEREF)
-	intel_wakeref_tracker_init(&wf->debug);
+	ref_tracker_dir_init(&wf->debug, INTEL_REFTRACK_DEAD_COUNT, name);
 #endif
 }
 

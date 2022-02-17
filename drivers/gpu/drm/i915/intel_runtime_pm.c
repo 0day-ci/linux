@@ -54,7 +54,7 @@
 
 static void init_intel_runtime_pm_wakeref(struct intel_runtime_pm *rpm)
 {
-	intel_wakeref_tracker_init(&rpm->debug);
+	ref_tracker_dir_init(&rpm->debug, INTEL_REFTRACK_DEAD_COUNT, dev_name(rpm->kdev));
 }
 
 static intel_wakeref_t
@@ -63,26 +63,26 @@ track_intel_runtime_pm_wakeref(struct intel_runtime_pm *rpm)
 	if (!rpm->available)
 		return -1;
 
-	return intel_wakeref_tracker_add(&rpm->debug);
+	return intel_ref_tracker_alloc(&rpm->debug);
 }
 
 static void untrack_intel_runtime_pm_wakeref(struct intel_runtime_pm *rpm,
 					     intel_wakeref_t wakeref)
 {
-	intel_wakeref_tracker_remove(&rpm->debug, wakeref);
+	if (!rpm->available)
+		return;
+
+	intel_ref_tracker_free(&rpm->debug, wakeref);
 }
 
 static void untrack_all_intel_runtime_pm_wakerefs(struct intel_runtime_pm *rpm)
 {
-	struct drm_printer p = drm_debug_printer("i915");
-
-	intel_wakeref_tracker_reset(&rpm->debug, &p);
+	ref_tracker_dir_exit(&rpm->debug);
 }
 
 static noinline void
 __intel_wakeref_dec_and_check_tracking(struct intel_runtime_pm *rpm)
 {
-	struct intel_wakeref_tracker saved;
 	unsigned long flags;
 
 	if (!atomic_dec_and_lock_irqsave(&rpm->wakeref_count,
@@ -90,15 +90,8 @@ __intel_wakeref_dec_and_check_tracking(struct intel_runtime_pm *rpm)
 					 flags))
 		return;
 
-	saved = __intel_wakeref_tracker_reset(&rpm->debug);
+	__ref_tracker_dir_print(&rpm->debug, INTEL_REFTRACK_PRINT_LIMIT);
 	spin_unlock_irqrestore(&rpm->debug.lock, flags);
-
-	if (saved.count) {
-		struct drm_printer p = drm_debug_printer("i915");
-
-		__intel_wakeref_tracker_show(&saved, &p);
-		intel_wakeref_tracker_fini(&saved);
-	}
 }
 
 void print_intel_runtime_pm_wakeref(struct intel_runtime_pm *rpm,
