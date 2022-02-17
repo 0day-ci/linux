@@ -10330,8 +10330,10 @@ static void sched_idle_balance(struct rq *dst_rq)
 		if (cpu == dst_cpu)
 			continue;
 
-		if (!cfs_rq_overloaded(rq))
+		if (!cfs_rq_overloaded(rq)) {
+			schedstat_inc(sd->sib_peeked);
 			continue;
+		}
 
 		rq_lock_irqsave(rq, &rf);
 
@@ -10375,10 +10377,12 @@ static void sched_idle_balance(struct rq *dst_rq)
 		if (p) {
 			attach_one_task(dst_rq, p);
 			local_irq_restore(rf.flags);
+			schedstat_inc(sd->sib_pulled);
 			return;
 		}
 
 		local_irq_restore(rf.flags);
+		schedstat_inc(sd->sib_failed);
 	}
 }
 

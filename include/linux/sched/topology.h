@@ -150,6 +150,11 @@ struct sched_domain {
 	unsigned int ttwu_wake_remote;
 	unsigned int ttwu_move_affine;
 	unsigned int ttwu_move_balance;
+
+	/* sched-idle balancing */
+	unsigned int sib_peeked;
+	unsigned int sib_pulled;
+	unsigned int sib_failed;
 #endif
 #ifdef CONFIG_SCHED_DEBUG
 	char *name;
