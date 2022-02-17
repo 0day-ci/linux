@@ -15,6 +15,7 @@
 #include <linux/bitops.h>
 #include <linux/hardirq.h> /* for in_interrupt() */
 #include <linux/hugetlb_inline.h>
+#include <linux/dept_page.h>
 
 struct folio_batch;
 
@@ -761,7 +762,11 @@ void folio_unlock(struct folio *folio);
 
 static inline bool folio_trylock(struct folio *folio)
 {
-	return likely(!test_and_set_bit_lock(PG_locked, folio_flags(folio, 0)));
+	int ret = test_and_set_bit_lock(PG_locked, folio_flags(folio, 0));
+
+	if (likely(!ret))
+		dept_pglocked_set_bit(folio);
+	return likely(!ret);
 }
 
 /*

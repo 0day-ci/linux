@@ -411,7 +411,6 @@ static inline int TestClearPage##uname(struct page *page) { return 0; }
 #define TESTSCFLAG_FALSE(uname, lname)					\
 	TESTSETFLAG_FALSE(uname, lname) TESTCLEARFLAG_FALSE(uname, lname)
 
-__PAGEFLAG(Locked, locked, PF_NO_TAIL)
 PAGEFLAG(Waiters, waiters, PF_ONLY_HEAD) __CLEARPAGEFLAG(Waiters, waiters, PF_ONLY_HEAD)
 PAGEFLAG(Error, error, PF_NO_TAIL) TESTCLEARFLAG(Error, error, PF_NO_TAIL)
 PAGEFLAG(Referenced, referenced, PF_HEAD)
@@ -459,7 +458,6 @@ PAGEFLAG(OwnerPriv1, owner_priv_1, PF_ANY)
  * risky: they bypass page accounting.
  */
 TESTPAGEFLAG(Writeback, writeback, PF_NO_TAIL)
-	TESTSCFLAG(Writeback, writeback, PF_NO_TAIL)
 PAGEFLAG(MappedToDisk, mappedtodisk, PF_NO_TAIL)
 
 /* PG_readahead is only used for reads; PG_reclaim is only for writes */
@@ -540,6 +538,49 @@ PAGEFLAG(Idle, idle, PF_ANY)
 PAGEFLAG(SkipKASanPoison, skip_kasan_poison, PF_HEAD)
 #else
 PAGEFLAG_FALSE(SkipKASanPoison, skip_kasan_poison)
+#endif
+
+#ifdef CONFIG_DEPT
+TESTPAGEFLAG(Locked, locked, PF_NO_TAIL)
+__CLEARPAGEFLAG(Locked, locked, PF_NO_TAIL)
+TESTCLEARFLAG(Writeback, writeback, PF_NO_TAIL)
+
+#include <linux/dept_page.h>
+
+static __always_inline
+void __folio_set_locked(struct folio *folio)
+{
+	dept_pglocked_set_bit(folio);
+	__set_bit(PG_locked, folio_flags(folio, FOLIO_PF_NO_TAIL));
+}
+
+static __always_inline void __SetPageLocked(struct page *page)
+{
+	dept_pglocked_set_bit(page_folio(page));
+	__set_bit(PG_locked, &PF_NO_TAIL(page, 1)->flags);
+}
+
+static __always_inline
+bool folio_test_set_writeback(struct folio *folio)
+{
+	bool ret = test_and_set_bit(PG_writeback, folio_flags(folio, FOLIO_PF_NO_TAIL));
+
+	if (!ret)
+		dept_pgwriteback_set_bit(folio);
+	return ret;
+}
+
+static __always_inline int TestSetPageWriteback(struct page *page)
+{
+	int ret = test_and_set_bit(PG_writeback, &PF_NO_TAIL(page, 1)->flags);
+
+	if (!ret)
+		dept_pgwriteback_set_bit(page_folio(page));
+	return ret;
+}
+#else
+__PAGEFLAG(Locked, locked, PF_NO_TAIL)
+TESTSCFLAG(Writeback, writeback, PF_NO_TAIL)
 #endif
 
 /*
