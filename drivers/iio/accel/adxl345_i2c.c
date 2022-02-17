@@ -22,20 +22,32 @@ static const struct regmap_config adxl345_i2c_regmap_config = {
 static int adxl345_i2c_probe(struct i2c_client *client,
 			     const struct i2c_device_id *id)
 {
+	struct device *dev = &client->dev;
+	const struct acpi_device_id *acpi_id;
+	enum adxl345_device_type type;
+	const char *name;
 	struct regmap *regmap;
 
-	if (!id)
-		return -ENODEV;
+	if (id) {
+		type = id->driver_data;
+		name = id->name;
+	} else {
+		acpi_id = acpi_match_device(dev->driver->acpi_match_table, dev);
+		if (acpi_id) {
+			type = acpi_id->driver_data;
+			name = acpi_id->id;
+		} else
+			return -ENODEV;
+	}
 
 	regmap = devm_regmap_init_i2c(client, &adxl345_i2c_regmap_config);
 	if (IS_ERR(regmap)) {
-		dev_err(&client->dev, "Error initializing i2c regmap: %ld\n",
+		dev_err(dev, "Error initializing i2c regmap: %ld\n",
 			PTR_ERR(regmap));
 		return PTR_ERR(regmap);
 	}
 
-	return adxl345_core_probe(&client->dev, regmap, id->driver_data,
-				  id->name);
+	return adxl345_core_probe(&client->dev, regmap, type, name);
 }
 
 static const struct i2c_device_id adxl345_i2c_id[] = {
@@ -54,10 +66,17 @@ static const struct of_device_id adxl345_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, adxl345_of_match);
 
+static const struct acpi_device_id adxl345_acpi_match[] = {
+	{ "ADS0345", ADXL345 },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, adxl345_acpi_match);
+
 static struct i2c_driver adxl345_i2c_driver = {
 	.driver = {
 		.name	= "adxl345_i2c",
 		.of_match_table = adxl345_of_match,
+		.acpi_match_table = adxl345_acpi_match,
 	},
 	.probe		= adxl345_i2c_probe,
 	.id_table	= adxl345_i2c_id,
