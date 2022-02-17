@@ -466,6 +466,8 @@ operation table looks like the following::
 		int (*query_occupancy)(struct netfs_cache_resources *cres,
 				       loff_t start, size_t len, size_t granularity,
 				       loff_t *_data_start, size_t *_data_len);
+		int (*ondemand_read)(struct netfs_cache_resources *cres,
+				     loff_t start_pos, size_t len);
 	};
 
 With a termination handler function pointer::
@@ -551,6 +553,21 @@ The methods defined in the table are:
 
    It returns 0 if some data was found, -ENODATA if there was no usable data
    within the region or -ENOBUFS if there is no caching on this file.
+
+ * ``ondemand_read()``
+
+   [Optional] Called to prepare cache for the requested data. It shall be called
+   only when on-demand read semantics is required. It will be called when a cache
+   miss is encountered. The function will make the backend prepare the data
+   regarding to @start_pos/@len of the cache file. It may get blocked until the
+   backend finishes getting the requested data or returns errors.
+
+   Once it returns with 0, it is guaranteed that the requested data has been
+   ready in the cache file. In this case, users can get the data with another
+   read request.
+
+   It returns 0 if data has been ready in the cache file, or other error code
+   from the cache, such as -ENOMEM.
 
 Note that these methods are passed a pointer to the cache resource structure,
 not the read request structure as they could be used in other situations where
