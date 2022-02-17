@@ -203,7 +203,7 @@ void mptcp_token_accept(struct mptcp_subflow_request_sock *req,
 	spin_unlock_bh(&bucket->lock);
 }
 
-bool mptcp_token_exists(u32 token)
+bool mptcp_token_exists(const struct net *net, u32 token)
 {
 	struct hlist_nulls_node *pos;
 	struct token_bucket *bucket;
@@ -216,7 +216,8 @@ bool mptcp_token_exists(u32 token)
 again:
 	sk_nulls_for_each_rcu(sk, pos, &bucket->msk_chain) {
 		msk = mptcp_sk(sk);
-		if (READ_ONCE(msk->token) == token)
+		if (READ_ONCE(msk->token) == token &&
+		    net_eq(sock_net(sk), net))
 			goto found;
 	}
 	if (get_nulls_value(pos) != (token & token_mask))

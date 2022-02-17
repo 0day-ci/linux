@@ -176,10 +176,12 @@ again:
 		} while (subflow_req->local_key == 0);
 
 		if (unlikely(req->syncookie)) {
+			const struct net *net = read_pnet(&inet_rsk(req)->ireq_net);
+
 			mptcp_crypto_key_sha(subflow_req->local_key,
 					     &subflow_req->token,
 					     &subflow_req->idsn);
-			if (mptcp_token_exists(subflow_req->token)) {
+			if (mptcp_token_exists(net, subflow_req->token)) {
 				if (retries-- > 0)
 					goto again;
 				SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_TOKENFALLBACKINIT);
