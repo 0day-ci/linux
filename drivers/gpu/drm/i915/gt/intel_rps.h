@@ -47,6 +47,16 @@ u32 intel_rps_read_punit_req_frequency(struct intel_rps *rps);
 u32 intel_rps_read_state_cap(struct intel_rps *rps);
 void intel_rps_raise_unslice(struct intel_rps *rps);
 void intel_rps_lower_unslice(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_status(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_pl1(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_pl2(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_pl4(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_thermal(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_prochot(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_ratl(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_vr_thermalert(struct intel_rps *rps);
+u32 intel_rps_read_throttle_reason_vr_tdc(struct intel_rps *rps);
 
 void gen5_rps_irq_handler(struct intel_rps *rps);
 void gen6_rps_irq_handler(struct intel_rps *rps, u32 pm_iir);

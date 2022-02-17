@@ -2286,6 +2286,89 @@ void intel_rps_lower_unslice(struct intel_rps *rps)
 	mutex_unlock(&rps->lock);
 }
 
+static u32 __rps_read_mmio(struct intel_gt *gt, i915_reg_t reg32)
+{
+	intel_wakeref_t wakeref;
+	u32 val;
+
+	with_intel_runtime_pm(gt->uncore->rpm, wakeref)
+		val = intel_uncore_read(gt->uncore, reg32);
+
+	return val;
+}
+
+u32 intel_rps_read_throttle_reason_status(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 status = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & GT0_PERF_LIMIT_REASONS_MASK;
+
+	return status;
+}
+
+u32 intel_rps_read_throttle_reason_pl1(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 pl1 = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & POWER_LIMIT_1_MASK;
+
+	return pl1;
+}
+
+u32 intel_rps_read_throttle_reason_pl2(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 pl2 = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & POWER_LIMIT_2_MASK;
+
+	return pl2;
+}
+
+u32 intel_rps_read_throttle_reason_pl4(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 pl4 = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & POWER_LIMIT_4_MASK;
+
+	return pl4;
+}
+
+u32 intel_rps_read_throttle_reason_thermal(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 thermal = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & THERMAL_LIMIT_MASK;
+
+	return thermal;
+}
+
+u32 intel_rps_read_throttle_reason_prochot(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 prochot = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & PROCHOT_MASK;
+
+	return prochot;
+}
+
+u32 intel_rps_read_throttle_reason_ratl(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 ratl = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & RATL_MASK;
+
+	return ratl;
+}
+
+u32 intel_rps_read_throttle_reason_vr_thermalert(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 thermalert = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & VR_THERMALERT_MASK;
+
+	return thermalert;
+}
+
+u32 intel_rps_read_throttle_reason_vr_tdc(struct intel_rps *rps)
+{
+	struct intel_gt *gt = rps_to_gt(rps);
+	u32 tdc = __rps_read_mmio(gt, GT0_PERF_LIMIT_REASONS) & VR_TDC_MASK;
+
+	return tdc;
+}
+
 /* External interface for intel_ips.ko */
 
 static struct drm_i915_private __rcu *ips_mchdev;
