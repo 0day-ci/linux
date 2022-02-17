@@ -433,6 +433,27 @@ static void dump_common_audit_data(struct audit_buffer *ab,
 		audit_log_format(ab, " lockdown_reason=\"%s\"",
 				 lockdown_reasons[a->u.reason]);
 		break;
+	case LSM_AUDIT_DATA_ANONINODE: {
+		struct dentry *dentry;
+		struct inode *inode;
+
+		rcu_read_lock();
+		inode = a->u.anoninode_struct.inode;
+		dentry = d_find_alias_rcu(inode);
+		if (dentry) {
+			audit_log_format(ab, " name=");
+			spin_lock(&dentry->d_lock);
+			audit_log_untrustedstring(ab, dentry->d_name.name);
+			spin_unlock(&dentry->d_lock);
+		}
+		audit_log_format(ab, " anonclass=");
+		audit_log_untrustedstring(ab, a->u.anoninode_struct.anonclass);
+		audit_log_format(ab, " dev=");
+		audit_log_untrustedstring(ab, inode->i_sb->s_id);
+		audit_log_format(ab, " ino=%lu", inode->i_ino);
+		rcu_read_unlock();
+		break;
+	}
 	} /* switch (a->type) */
 }
 

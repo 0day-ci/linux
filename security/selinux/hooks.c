@@ -2932,6 +2932,8 @@ static int selinux_inode_init_security_anon(struct inode *inode,
 	if (unlikely(!selinux_initialized(&selinux_state)))
 		return 0;
 
+	WARN_ON(!name);
+
 	isec = selinux_inode(inode);
 
 	/*
@@ -2965,8 +2967,9 @@ static int selinux_inode_init_security_anon(struct inode *inode,
 	 * allowed to actually create this type of anonymous inode.
 	 */
 
-	ad.type = LSM_AUDIT_DATA_INODE;
-	ad.u.inode = inode;
+	ad.type = LSM_AUDIT_DATA_ANONINODE;
+	ad.u.anoninode_struct.inode = inode;
+	ad.u.anoninode_struct.anonclass = name ? (const char *)name->name : "unknown(null)";
 
 	return avc_has_perm(&selinux_state,
 			    tsec->sid,
