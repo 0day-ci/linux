@@ -6193,6 +6193,9 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	local_irq_disable();
 	rcu_note_context_switch(!!sched_mode);
 
+	if (sched_mode == SM_NONE)
+		dept_ask_event_wait_commit();
+
 	/*
 	 * Make sure that signal_pending_state()->signal_pending() below
 	 * can't be reordered with __set_current_state(TASK_INTERRUPTIBLE)
