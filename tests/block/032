@@ -1,0 +1,62 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0+
+# Copyright (C) 2022 Wang Jianchao
+#
+# Threads doing IO to a device, while we switch rqos
+
+. tests/block/rc
+
+DESCRIPTION="switch rqos while doing IO"
+TIMED=1
+CAN_BE_ZONED=1
+
+requires() {
+	_have_fio
+}
+
+test_device() {
+	echo "Running ${TEST_NAME}"
+
+	local rqos=("blk-wbt" "blk-iolat" "blk-iocost" "blk-ioprio")
+
+	if _test_dev_is_rotational; then
+		size="32m"
+	else
+		size="1g"
+	fi
+
+	# start fio job
+	_run_fio_rand_io --filename="$TEST_DEV" --size="$size" &
+
+	start_time=$(date +%s)
+	timeout=${TIMEOUT:=900}
+	while kill -0 $! 2>/dev/null; do
+		idx=$((RANDOM % ${#rqos[@]}))
+		pol=${rqos[$idx]}
+		cat ${TEST_DEV_SYSFS}/queue/qos | grep "\[$pol\]" > /dev/null
+		if [ $? -eq 0 ];then
+			echo "-$pol" > ${TEST_DEV_SYSFS}/queue/qos
+			if [ $? -ne 0 ];then
+				echo "$pol"
+				cat ${TEST_DEV_SYSFS}/queue/qos
+			fi
+		else
+			echo "+$pol" > ${TEST_DEV_SYSFS}/queue/qos
+			if [ $? -ne 0 ];then
+				echo "$pol"
+				cat ${TEST_DEV_SYSFS}/queue/qos
+			fi
+		fi
+		sleep .2
+		end_time=$(date +%s)
+		if (( end_time - start_time > timeout + 15 )); then
+			echo "fio did not finish after $timeout seconds!"
+			break
+		fi
+	done
+
+	FIO_PERF_FIELDS=("read iops")
+	_fio_perf_report
+
+	echo "Test complete"
+}
