@@ -6007,6 +6007,7 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p, int this_cpu);
 static int
 find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 {
+	bool ignore_si = task_h_idle(p);
 	unsigned long load, min_load = ULONG_MAX;
 	unsigned int min_exit_latency = UINT_MAX;
 	u64 latest_idle_timestamp = 0;
@@ -6025,7 +6026,13 @@ find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this
 		if (!sched_core_cookie_match(rq, p))
 			continue;
 
-		if (sched_idle_cpu(i))
+		/*
+		 * The idle tasks prefer cpu capacity rather than
+		 * latency. Spreading out idle tasks also good for
+		 * latency of normal tasks since they won't suffer
+		 * high cpu wakeup delay.
+		 */
+		if (!ignore_si && sched_idle_cpu(i))
 			return i;
 
 		if (available_idle_cpu(i)) {
