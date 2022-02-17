@@ -7066,6 +7066,11 @@ S:	Orphan
 W:	http://aeschi.ch.eu.org/efs/
 F:	fs/efs/
 
+POWER EFUSE DRIVER
+M:	Zev Weiss <zev@bewilderbeest.net>
+S:	Maintained
+F:	drivers/misc/power-efuse.c
+
 EHEA (IBM pSeries eHEA 10Gb ethernet adapter) DRIVER
 M:	Douglas Miller <dougmill@linux.ibm.com>
 L:	netdev@vger.kernel.org

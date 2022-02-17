@@ -470,6 +470,21 @@ config HISI_HIKEY_USB
 	  switching between the dual-role USB-C port and the USB-A host ports
 	  using only one USB controller.
 
+config POWER_EFUSE
+	tristate "Power efuse driver support"
+	depends on OF && REGULATOR
+	help
+	  This driver supports a regulator device functioning as a
+	  power efuse, with status bits and an on/off switch available
+	  via sysfs.
+
+	  A typical use for this would be for an efuse controlling a
+	  generic power output for supplying power to devices external
+	  to the system running this driver (such as in the management
+	  controller of a "smart" PDU or similar), allowing the
+	  operator to manually turn the output on and off, check if
+	  the efuse has tripped due to overload, etc.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
