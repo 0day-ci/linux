@@ -27,6 +27,9 @@ static int xdpe122_read_word_data(struct i2c_client *client, int page,
 	s32 mantissa;
 	int ret;
 
+	if (info->format[PSC_VOLTAGE_OUT] == linear)
+		return -ENODATA;
+
 	switch (reg) {
 	case PMBUS_VOUT_OV_FAULT_LIMIT:
 	case PMBUS_VOUT_UV_FAULT_LIMIT:
@@ -75,8 +78,18 @@ static int xdpe122_read_word_data(struct i2c_client *client, int page,
 static int xdpe122_identify(struct i2c_client *client,
 			    struct pmbus_driver_info *info)
 {
-	u8 vout_params;
+	u8 vout_mode, vout_params;
 	int i, ret;
+
+	ret = pmbus_read_byte_data(client, 0, PMBUS_VOUT_MODE);
+	if (ret < 0)
+		return ret;
+
+	vout_mode = ret >> 5;
+	if (vout_mode == 0) {
+		info->format[PSC_VOLTAGE_OUT] = linear;
+		return 0;
+	}
 
 	for (i = 0; i < XDPE122_PAGE_NUM; i++) {
 		/* Read the register with VOUT scaling value.*/
@@ -140,6 +153,7 @@ static int xdpe122_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id xdpe122_id[] = {
+	{"xdpe11280", 0},
 	{"xdpe12254", 0},
 	{"xdpe12284", 0},
 	{}
@@ -148,6 +162,7 @@ static const struct i2c_device_id xdpe122_id[] = {
 MODULE_DEVICE_TABLE(i2c, xdpe122_id);
 
 static const struct of_device_id __maybe_unused xdpe122_of_match[] = {
+	{.compatible = "infineon,xdpe11280"},
 	{.compatible = "infineon,xdpe12254"},
 	{.compatible = "infineon,xdpe12284"},
 	{}
