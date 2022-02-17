@@ -39,7 +39,7 @@
 #include "i915_sysfs.h"
 #include "intel_pm.h"
 
-static inline struct drm_i915_private *kdev_minor_to_i915(struct device *kdev)
+struct drm_i915_private *kdev_minor_to_i915(struct device *kdev)
 {
 	struct drm_minor *minor = dev_get_drvdata(kdev);
 	return to_i915(minor->dev);
@@ -487,6 +487,11 @@ static void i915_setup_error_capture(struct device *kdev) {}
 static void i915_teardown_error_capture(struct device *kdev) {}
 #endif
 
+static struct kobject *i915_setup_gt_sysfs(struct kobject *parent)
+{
+	return kobject_create_and_add("gt", parent);
+}
+
 void i915_setup_sysfs(struct drm_i915_private *dev_priv)
 {
 	struct device *kdev = dev_priv->drm.primary->kdev;
@@ -537,6 +542,11 @@ void i915_setup_sysfs(struct drm_i915_private *dev_priv)
 		ret = sysfs_create_files(&kdev->kobj, gen6_attrs);
 	if (ret)
 		drm_err(&dev_priv->drm, "RPS sysfs setup failed\n");
+
+	dev_priv->sysfs_gt = i915_setup_gt_sysfs(&kdev->kobj);
+	if (!dev_priv->sysfs_gt)
+		drm_warn(&dev_priv->drm,
+			 "failed to register GT sysfs directory\n");
 
 	i915_setup_error_capture(kdev);
 
