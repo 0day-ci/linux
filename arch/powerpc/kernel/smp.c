@@ -1781,4 +1781,14 @@ void arch_cpu_idle_dead(void)
 	start_secondary_resume();
 }
 
+bool topology_smt_supported(void)
+{
+	return cpu_has_feature(CPU_FTR_SMT);
+}
+
+bool topology_is_primary_thread(unsigned int cpu)
+{
+	return cpu_thread_in_core(cpu) == 0;
+}
+
 #endif
