@@ -2183,7 +2183,8 @@ static int smsc75xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 	if (skb->len < dev->net->hard_header_len)
 		return 0;
 
-	while (skb->len > 0) {
+	/* at least two u32 must be left to go on */
+	while (skb->len > 4 + 4) {
 		u32 rx_cmd_a, rx_cmd_b, align_count, size;
 		struct sk_buff *ax_skb;
 		unsigned char *packet;
