@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Energy meter drivers
+#
+# When adding new entries keep the list in alphabetical order
+
+menu "Active energy metering"
+
+endmenu
