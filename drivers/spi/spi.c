@@ -936,13 +936,13 @@ static void spi_set_cs(struct spi_device *spi, bool enable, bool force)
 	 * Avoid calling into the driver (or doing delays) if the chip select
 	 * isn't actually changing from the last time this was called.
 	 */
-	if (!force && (spi->controller->last_cs_enable == enable) &&
+	if (!force && (spi->controller->last_cs == spi->chip_select) &&
 	    (spi->controller->last_cs_mode_high == (spi->mode & SPI_CS_HIGH)))
 		return;
 
 	trace_spi_set_cs(spi, activate);
 
-	spi->controller->last_cs_enable = enable;
+	spi->controller->last_cs = enable ? spi->chip_select : -1;
 	spi->controller->last_cs_mode_high = spi->mode & SPI_CS_HIGH;
 
 	if ((spi->cs_gpiod || gpio_is_valid(spi->cs_gpio) ||
