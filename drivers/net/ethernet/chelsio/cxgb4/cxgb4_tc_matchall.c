@@ -48,6 +48,33 @@ static int cxgb4_matchall_egress_validate(struct net_device *dev,
 	flow_action_for_each(i, entry, actions) {
 		switch (entry->id) {
 		case FLOW_ACTION_POLICE:
+			if (entry->police.exceed.act_id != FLOW_ACTION_DROP) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when the exceed action is not drop");
+				return -EOPNOTSUPP;
+			}
+
+			if (entry->police.notexceed.act_id != FLOW_ACTION_PIPE &&
+			    entry->police.notexceed.act_id != FLOW_ACTION_ACCEPT) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when the conform action is not pipe or ok");
+				return -EOPNOTSUPP;
+			}
+
+			if (entry->police.notexceed.act_id == FLOW_ACTION_ACCEPT &&
+			    !flow_action_is_last_entry(actions, entry)) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when the conform action is ok, but police action is not last");
+				return -EOPNOTSUPP;
+			}
+
+			if (entry->police.peakrate_bytes_ps ||
+			    entry->police.avrate || entry->police.overhead) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when peakrate/avrate/overhead is configured");
+				return -EOPNOTSUPP;
+			}
+
 			if (entry->police.rate_pkt_ps) {
 				NL_SET_ERR_MSG_MOD(extack,
 						   "QoS offload not support packets per second");
@@ -150,6 +177,34 @@ static int cxgb4_matchall_alloc_tc(struct net_device *dev,
 	flow_action_for_each(i, entry, &cls->rule->action)
 		if (entry->id == FLOW_ACTION_POLICE)
 			break;
+
+	if (entry->police.exceed.act_id != FLOW_ACTION_DROP) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Police offload is not supported when the exceed action is not drop");
+		return -EOPNOTSUPP;
+	}
+
+	if (entry->police.notexceed.act_id != FLOW_ACTION_PIPE &&
+	    entry->police.notexceed.act_id != FLOW_ACTION_ACCEPT) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Police offload is not supported when the conform action is not pipe or ok");
+		return -EOPNOTSUPP;
+	}
+
+	if (entry->police.notexceed.act_id == FLOW_ACTION_ACCEPT &&
+	    !flow_action_is_last_entry(&cls->rule->action, entry)) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Police offload is not supported when the conform action is ok, but police action is not last");
+		return -EOPNOTSUPP;
+	}
+
+	if (entry->police.peakrate_bytes_ps ||
+	    entry->police.avrate || entry->police.overhead) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Police offload is not supported when peakrate/avrate/overhead is configured");
+		return -EOPNOTSUPP;
+	}
+
 	if (entry->police.rate_pkt_ps) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "QoS offload not support packets per second");

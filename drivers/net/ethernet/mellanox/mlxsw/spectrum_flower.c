@@ -191,6 +191,33 @@ static int mlxsw_sp_flower_parse_actions(struct mlxsw_sp *mlxsw_sp,
 				return -EOPNOTSUPP;
 			}
 
+			if (act->police.exceed.act_id != FLOW_ACTION_DROP) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when the exceed action is not drop");
+				return -EOPNOTSUPP;
+			}
+
+			if (act->police.notexceed.act_id != FLOW_ACTION_PIPE &&
+			    act->police.notexceed.act_id != FLOW_ACTION_ACCEPT) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when the conform action is not pipe or ok");
+				return -EOPNOTSUPP;
+			}
+
+			if (act->police.notexceed.act_id == FLOW_ACTION_ACCEPT &&
+			    !flow_action_is_last_entry(flow_action, act)) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when the conform action is ok, but police action is not last");
+				return -EOPNOTSUPP;
+			}
+
+			if (act->police.peakrate_bytes_ps ||
+			    act->police.avrate || act->police.overhead) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "Police offload is not supported when peakrate/avrate/overhead is configured");
+				return -EOPNOTSUPP;
+			}
+
 			if (act->police.rate_pkt_ps) {
 				NL_SET_ERR_MSG_MOD(extack, "QoS offload not support packets per second");
 				return -EOPNOTSUPP;

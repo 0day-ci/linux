@@ -132,6 +132,34 @@ nfp_flower_install_rate_limiter(struct nfp_app *app, struct net_device *netdev,
 					   "unsupported offload: qos rate limit offload requires police action");
 			return -EOPNOTSUPP;
 		}
+
+		if (action->police.exceed.act_id != FLOW_ACTION_DROP) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when the exceed action is not drop");
+			return -EOPNOTSUPP;
+		}
+
+		if (action->police.notexceed.act_id != FLOW_ACTION_PIPE &&
+		    action->police.notexceed.act_id != FLOW_ACTION_ACCEPT) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when the conform action is not pipe or ok");
+			return -EOPNOTSUPP;
+		}
+
+		if (action->police.notexceed.act_id == FLOW_ACTION_ACCEPT &&
+		    !flow_action_is_last_entry(&flow->rule->action, action)) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when the conform action is ok, but police action is not last");
+			return -EOPNOTSUPP;
+		}
+
+		if (action->police.peakrate_bytes_ps ||
+		    action->police.avrate || action->police.overhead) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when peakrate/avrate/overhead is configured");
+			return -EOPNOTSUPP;
+		}
+
 		if (action->police.rate_bytes_ps > 0) {
 			if (bps_num++) {
 				NL_SET_ERR_MSG_MOD(extack,

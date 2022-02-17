@@ -1177,6 +1177,37 @@ static int enetc_psfp_parse_clsflower(struct enetc_ndev_priv *priv,
 
 	/* Flow meter and max frame size */
 	if (entryp) {
+		if (entryp->police.exceed.act_id != FLOW_ACTION_DROP) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when the exceed action is not drop");
+			err = -EOPNOTSUPP;
+			goto free_sfi;
+		}
+
+		if (entryp->police.notexceed.act_id != FLOW_ACTION_PIPE &&
+		    entryp->police.notexceed.act_id != FLOW_ACTION_ACCEPT) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when the conform action is not pipe or ok");
+			err = -EOPNOTSUPP;
+			goto free_sfi;
+		}
+
+		if (entryp->police.notexceed.act_id == FLOW_ACTION_ACCEPT &&
+		    !flow_action_is_last_entry(&rule->action, entryp)) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when the conform action is ok, but police action is not last");
+			err = -EOPNOTSUPP;
+			goto free_sfi;
+		}
+
+		if (entryp->police.peakrate_bytes_ps ||
+		    entryp->police.avrate || entryp->police.overhead) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Police offload is not supported when peakrate/avrate/overhead is configured");
+			err = -EOPNOTSUPP;
+			goto free_sfi;
+		}
+
 		if (entryp->police.rate_pkt_ps) {
 			NL_SET_ERR_MSG_MOD(extack, "QoS offload not support packets per second");
 			err = -EOPNOTSUPP;
