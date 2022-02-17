@@ -3720,6 +3720,14 @@ static noinline_for_stack int scrub_chunk(struct scrub_ctx *sctx,
 		goto out;
 
 	map = em->map_lookup;
+
+	/*
+	 * Due to the delayed modification of device tree, this chunk
+	 * may not own this dev extent.
+	 *
+	 * So we need to iterate through all stripes, and only scrub
+	 * the stripe which matches both device and physical offset.
+	 */
 	for (i = 0; i < map->num_stripes; ++i) {
 		if (map->stripes[i].dev->bdev == scrub_dev->bdev &&
 		    map->stripes[i].physical == dev_offset) {
@@ -3840,6 +3848,18 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 		 * continue scrubbing */
 		if (!cache)
 			goto skip;
+
+		/*
+		 * Since dev extents modification is delayed, it's possible
+		 * we got a bg which doesn't really own this dev extent.
+		 *
+		 * Here just do a quick skip, scrub_chunk() has a more
+		 * comprehensive check in it.
+		 */
+		if (cache->start != chunk_offset) {
+			btrfs_put_block_group(cache);
+			goto skip;
+		}
 
 		if (sctx->is_dev_replace && btrfs_is_zoned(fs_info)) {
 			spin_lock(&cache->lock);
@@ -3964,7 +3984,6 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 		dev_replace->item_needs_writeback = 1;
 		up_write(&dev_replace->rwsem);
 
-		ASSERT(cache->start == chunk_offset);
 		ret = scrub_chunk(sctx, cache, scrub_dev, found_key.offset,
 				  dev_extent_len);
 
