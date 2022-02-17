@@ -456,6 +456,21 @@ static int se_is_idle(struct sched_entity *se)
 	return cfs_rq_is_idle(group_cfs_rq(se));
 }
 
+/* Is task idle from the top hierarchy POV */
+static int task_h_idle(struct task_struct *p)
+{
+	struct sched_entity *se = &p->se;
+
+	if (task_has_idle_policy(p))
+		return 1;
+
+	for_each_sched_entity(se)
+		if (cfs_rq_is_idle(cfs_rq_of(se)))
+			return 1;
+
+	return 0;
+}
+
 #else	/* !CONFIG_FAIR_GROUP_SCHED */
 
 #define for_each_sched_entity(se) \
@@ -506,6 +521,11 @@ static int cfs_rq_is_idle(struct cfs_rq *cfs_rq)
 static int se_is_idle(struct sched_entity *se)
 {
 	return 0;
+}
+
+static inline int task_h_idle(struct task_struct *p)
+{
+	return task_has_idle_policy(p);
 }
 
 #endif	/* CONFIG_FAIR_GROUP_SCHED */
@@ -6974,6 +6994,11 @@ static inline int cfs_rq_overloaded(struct rq *rq)
 	return rq->cfs.h_nr_running - rq->cfs.idle_h_nr_running > 1;
 }
 
+static inline bool need_pull_cfs_task(struct rq *rq)
+{
+	return rq->cfs.h_nr_running == rq->cfs.idle_h_nr_running;
+}
+
 /* Must be called with rq locked */
 static void update_overload_status(struct rq *rq)
 {
@@ -7765,6 +7790,22 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 
 	/* Disregard pcpu kthreads; they are where they need to be. */
 	if (kthread_is_per_cpu(p))
+		return 0;
+
+	/*
+	 * Disregard hierarchically idle tasks during sched-idle
+	 * load balancing.
+	 */
+	if (env->idle == CPU_SCHED_IDLE && task_h_idle(p))
+		return 0;
+
+	/*
+	 * Skip p if it is the last non-idle task in src_rq. This
+	 * protects latency and throughput for non-idle tasks at
+	 * the cost of temporary load imbalance (which will probably
+	 * be fixed soon).
+	 */
+	if (!cfs_rq_overloaded(env->src_rq) && !task_h_idle(p))
 		return 0;
 
 	if (!cpumask_test_cpu(env->dst_cpu, p->cpus_ptr)) {
@@ -10265,6 +10306,83 @@ static inline bool update_newidle_cost(struct sched_domain *sd, u64 cost)
 }
 
 /*
+ * The sched-idle balancing tries to eliminate overloaded cfs rqs
+ * by spreading out non-idle tasks prior to normal load balancing.
+ */
+static void sched_idle_balance(struct rq *dst_rq)
+{
+	struct sched_domain *sd;
+	struct task_struct *p;
+	int dst_cpu = cpu_of(dst_rq), cpu;
+
+	sd = rcu_dereference(per_cpu(sd_llc, dst_cpu));
+	if (unlikely(!sd))
+		return;
+
+	if (!atomic_read(&sd->shared->nr_overloaded))
+		return;
+
+	for_each_cpu_wrap(cpu, sdo_mask(sd->shared), dst_cpu + 1) {
+		struct rq *rq = cpu_rq(cpu);
+		struct rq_flags rf;
+		struct lb_env env;
+
+		if (cpu == dst_cpu)
+			continue;
+
+		if (!cfs_rq_overloaded(rq))
+			continue;
+
+		rq_lock_irqsave(rq, &rf);
+
+		/*
+		 * Check again to ensure there are pullable tasks.
+		 * This is necessary because multiple rqs can pull
+		 * tasks at the same time. IOW contention on this
+		 * rq is heavy, so it would be better clear this
+		 * cpu from overloaded mask.
+		 */
+		if (unlikely(!cfs_rq_overloaded(rq))) {
+			update_overload_status(rq);
+			rq_unlock_irqrestore(rq, &rf);
+			continue;
+		}
+
+		env = (struct lb_env) {
+			.sd		= sd,
+			.dst_cpu	= dst_cpu,
+			.dst_rq		= dst_rq,
+			.src_cpu	= cpu,
+			.src_rq		= rq,
+			.idle		= CPU_SCHED_IDLE, /* non-idle only */
+			.flags		= LBF_DST_PINNED, /* pin dst_cpu */
+		};
+
+		update_rq_clock(rq);
+		p = detach_one_task(&env);
+
+		/*
+		 * Lazy updating overloaded mask here. If the rq is
+		 * still overloaded then we are just wasting cycles.
+		 * And it's OK even if the rq becomes un-overloaded
+		 * since the cost of peeking rq's data without lock
+		 * won't be much in next loops (during which the rq
+		 * can even be overloaded again).
+		 */
+
+		rq_unlock(rq, &rf);
+
+		if (p) {
+			attach_one_task(dst_rq, p);
+			local_irq_restore(rf.flags);
+			return;
+		}
+
+		local_irq_restore(rf.flags);
+	}
+}
+
+/*
  * It checks each scheduling domain to see if it is due to be balanced,
  * and initiates a balancing operation if so.
  *
@@ -10284,6 +10402,10 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 	u64 max_cost = 0;
 
 	rcu_read_lock();
+
+	if (need_pull_cfs_task(rq))
+		sched_idle_balance(rq);
+
 	for_each_domain(cpu, sd) {
 		/*
 		 * Decay the newidle max times here because this is a regular
@@ -10913,6 +11035,12 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	update_blocked_averages(this_cpu);
 
 	rcu_read_lock();
+
+	sched_idle_balance(this_rq);
+	t1 = sched_clock_cpu(this_cpu);
+	curr_cost += t1 - t0;
+	t0 = t1;
+
 	for_each_domain(this_cpu, sd) {
 		int continue_balancing = 1;
 		u64 domain_cost;
