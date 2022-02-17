@@ -461,6 +461,12 @@ static bool cfg80211_bss_expire_oldest(struct cfg80211_registered_device *rdev)
 
 	lockdep_assert_held(&rdev->bss_lock);
 
+	/* If the user has set cfg80211 option bss_entries_limit to 1,
+	 * there cannot be an oldest BSS. Skip the scan.
+	 */
+	if (unlikely(rdev->bss_entries == 1))
+		return false;
+
 	list_for_each_entry(bss, &rdev->bss_list, list) {
 		if (atomic_read(&bss->hold))
 			continue;
@@ -474,7 +480,7 @@ static bool cfg80211_bss_expire_oldest(struct cfg80211_registered_device *rdev)
 		oldest = bss;
 	}
 
-	if (WARN_ON(!oldest))
+	if (WARN_ON_ONCE(!oldest))
 		return false;
 
 	/*
