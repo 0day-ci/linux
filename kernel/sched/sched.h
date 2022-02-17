@@ -1012,6 +1012,7 @@ struct rq {
 
 	unsigned char		nohz_idle_balance;
 	unsigned char		idle_balance;
+	unsigned char		overloaded;
 
 	unsigned long		misfit_task_load;
 
@@ -1760,6 +1761,11 @@ static inline struct sched_domain *lowest_flag_domain(int cpu, int flag)
 	}
 
 	return sd;
+}
+
+static inline struct cpumask *sdo_mask(struct sched_domain_shared *sds)
+{
+	return to_cpumask(sds->overloaded);
 }
 
 DECLARE_PER_CPU(struct sched_domain __rcu *, sd_llc);

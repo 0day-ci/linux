@@ -6968,6 +6968,46 @@ balance_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 
 	return newidle_balance(rq, rf) != 0;
 }
+
+static inline int cfs_rq_overloaded(struct rq *rq)
+{
+	return rq->cfs.h_nr_running - rq->cfs.idle_h_nr_running > 1;
+}
+
+/* Must be called with rq locked */
+static void update_overload_status(struct rq *rq)
+{
+	struct sched_domain_shared *sds;
+	int overloaded = cfs_rq_overloaded(rq);
+	int cpu = cpu_of(rq);
+
+	lockdep_assert_rq_held(rq);
+
+	if (rq->overloaded == overloaded)
+		return;
+
+	rcu_read_lock();
+	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
+	if (unlikely(!sds))
+		goto unlock;
+
+	if (overloaded) {
+		cpumask_set_cpu(cpu, sdo_mask(sds));
+		atomic_inc(&sds->nr_overloaded);
+	} else {
+		cpumask_clear_cpu(cpu, sdo_mask(sds));
+		atomic_dec(&sds->nr_overloaded);
+	}
+
+	rq->overloaded = overloaded;
+unlock:
+	rcu_read_unlock();
+}
+
+#else
+
+static inline void update_overload_status(struct rq *rq) { }
+
 #endif /* CONFIG_SMP */
 
 static unsigned long wakeup_gran(struct sched_entity *se)
@@ -7314,6 +7354,8 @@ idle:
 
 	if (new_tasks > 0)
 		goto again;
+
+	update_overload_status(rq);
 
 	/*
 	 * rq is about to be idle, check if we need to update the
@@ -11131,6 +11173,7 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	if (static_branch_unlikely(&sched_numa_balancing))
 		task_tick_numa(rq, curr);
 
+	update_overload_status(rq);
 	update_misfit_status(curr, rq);
 	update_overutilized_status(task_rq(curr));
 

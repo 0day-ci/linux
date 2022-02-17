@@ -81,6 +81,16 @@ struct sched_domain_shared {
 	atomic_t	ref;
 	atomic_t	nr_busy_cpus;
 	int		has_idle_cores;
+
+	/*
+	 * The above varibles are used in idle path and
+	 * select_task_rq, and the following two are
+	 * mainly updated in tick. They are all hot but
+	 * for different usage, so start a new cacheline
+	 * to avoid false sharing.
+	 */
+	atomic_t	nr_overloaded	____cacheline_aligned;
+	unsigned long	overloaded[];	/* Must be last */
 };
 
 struct sched_domain {
