@@ -117,6 +117,26 @@ PROPERTIES
 		erratum A050385 which indicates that DMA transactions that are
 		split can result in a FMan lock.
 
+- fsl,max-frm-sz
+		Usage: optional
+		Value type: <u32>
+		Definition: Max frame size, across all interfaces.
+ 		Must be large enough to accommodate the network MTU, but small enough
+ 		to avoid wasting skb memory.
+		1522 by default.
+
+- fsl,rx-extra-headroom
+		Usage: optional
+		Value type: <u32>
+		Definition: Extra headroom for Rx buffers.
+ 		FMan is instructed to allocate, on the Rx path, this amount of
+		space at the beginning of a data buffer, beside the DPA private
+		data area and the IC fields.
+		Does not impact Tx buffer layout.
+		64 by default, it's needed on
+		particular forwarding scenarios that add extra headers to the
+		forwarded frame.
+
 =============================================================================
 FMan MURAM Node
 
