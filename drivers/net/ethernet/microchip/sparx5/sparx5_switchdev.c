@@ -22,8 +22,15 @@ struct sparx5_switchdev_event_work {
 static void sparx5_port_attr_bridge_flags(struct sparx5_port *port,
 					  struct switchdev_brport_flags flags)
 {
+	int pgid;
+
 	if (flags.mask & BR_MCAST_FLOOD)
-		sparx5_pgid_update_mask(port, PGID_MC_FLOOD, true);
+		for (pgid = PGID_MC_FLOOD; pgid <= PGID_IPV6_MC_CTRL; pgid++)
+			sparx5_pgid_update_mask(port, pgid, !!(flags.val & BR_MCAST_FLOOD));
+	if (flags.mask & BR_FLOOD)
+		sparx5_pgid_update_mask(port, PGID_UC_FLOOD, !!(flags.val & BR_FLOOD));
+	if (flags.mask & BR_BCAST_FLOOD)
+		sparx5_pgid_update_mask(port, PGID_BCAST, !!(flags.val & BR_BCAST_FLOOD));
 }
 
 static void sparx5_attr_stp_state_set(struct sparx5_port *port,
