@@ -762,12 +762,13 @@ config CRYPTO_DEV_QCOM_RNG
 	  module will be called qcom-rng. If unsure, say N.
 
 config CRYPTO_DEV_VMX
-	bool "Support for VMX cryptographic acceleration instructions"
+	tristate "Power VMX cryptographic acceleration instructions driver"
 	depends on PPC64 && VSX
+	select CRYPTO_GHASH
 	help
-	  Support for VMX cryptographic acceleration instructions.
-
-source "drivers/crypto/vmx/Kconfig"
+	  Support for VMX cryptographic acceleration instructions on Power8 CPU.
+	  This module supports acceleration for AES and GHASH in hardware. If you
+	  choose 'M' here, this module will be called vmx-crypto.
 
 config CRYPTO_DEV_IMGTEC_HASH
 	tristate "Imagination Technologies hardware hash accelerator"
