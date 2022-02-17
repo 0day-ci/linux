@@ -2,3 +2,13 @@
 
 config BOSCH_BNO055_IIO
 	tristate
+
+config BOSCH_BNO055_SERIAL
+	tristate "Bosch BNO055 attached via serial bus"
+	depends on SERIAL_DEV_BUS
+	select BOSCH_BNO055_IIO
+	help
+	  Enable this to support Bosch BNO055 IMUs attached via serial bus.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called bno055_sl.
