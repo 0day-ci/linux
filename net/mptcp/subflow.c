@@ -116,6 +116,9 @@ static void subflow_init_req(struct request_sock *req, const struct sock *sk_lis
 
 static bool subflow_use_different_sport(struct mptcp_sock *msk, const struct sock *sk)
 {
+	if (inet_sk(sk)->inet_sport == 0)
+		return true;
+
 	return inet_sk(sk)->inet_sport != inet_sk((struct sock *)msk)->inet_sport;
 }
 
