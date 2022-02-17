@@ -6273,6 +6273,9 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 
 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
 
+	if (atomic_read(&sd->shared->nr_overloaded))
+		cpumask_andnot(cpus, cpus, sdo_mask(sd->shared));
+
 	if (sched_feat(SIS_PROP) && !has_idle_core) {
 		u64 avg_cost, avg_idle, span_avg;
 		unsigned long now = jiffies;
