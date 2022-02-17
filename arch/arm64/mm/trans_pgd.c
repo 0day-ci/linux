@@ -232,7 +232,7 @@ int trans_pgd_idmap_page(struct trans_pgd_info *info, phys_addr_t *trans_ttbr0,
 {
 	phys_addr_t dst_addr = virt_to_phys(page);
 	unsigned long pfn = __phys_to_pfn(dst_addr);
-	int max_msb = (dst_addr & GENMASK(52, 48)) ? 51 : 47;
+	int max_msb = VA_BITS - 1;
 	int bits_mapped = PAGE_SHIFT - 4;
 	unsigned long level_mask, prev_level_entry, *levels[4];
 	int this_level, index, level_lsb, level_msb;
