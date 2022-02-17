@@ -86,8 +86,7 @@ enum irdma_status_code irdma_sc_access_ah(struct irdma_sc_cqp *cqp,
  * irdma_create_mg_ctx() - create a mcg context
  * @info: multicast group context info
  */
-static enum irdma_status_code
-irdma_create_mg_ctx(struct irdma_mcast_grp_info *info)
+static void irdma_create_mg_ctx(struct irdma_mcast_grp_info *info)
 {
 	struct irdma_mcast_grp_ctx_entry_info *entry_info = NULL;
 	u8 idx = 0; /* index in the array */
@@ -106,8 +105,6 @@ irdma_create_mg_ctx(struct irdma_mcast_grp_info *info)
 			ctx_idx++;
 		}
 	}
-
-	return 0;
 }
 
 /**
@@ -135,9 +132,7 @@ enum irdma_status_code irdma_access_mcast_grp(struct irdma_sc_cqp *cqp,
 		return IRDMA_ERR_RING_FULL;
 	}
 
-	ret_code = irdma_create_mg_ctx(info);
-	if (ret_code)
-		return ret_code;
+	irdma_create_mg_ctx(info);
 
 	set_64bit_val(wqe, 32, info->dma_mem_mc.pa);
 	set_64bit_val(wqe, 16,
