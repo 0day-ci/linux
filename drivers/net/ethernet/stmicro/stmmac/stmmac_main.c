@@ -3755,11 +3755,12 @@ static int stmmac_open(struct net_device *dev)
 	/* We may have called phylink_speed_down before */
 	phylink_speed_up(priv->phylink);
 
+	stmmac_enable_all_queues(priv);
+
 	ret = stmmac_request_irq(dev);
 	if (ret)
 		goto irq_error;
 
-	stmmac_enable_all_queues(priv);
 	netif_tx_start_all_queues(priv->dev);
 
 	return 0;
@@ -3770,6 +3771,7 @@ irq_error:
 	for (chan = 0; chan < priv->plat->tx_queues_to_use; chan++)
 		hrtimer_cancel(&priv->tx_queue[chan].txtimer);
 
+	stmmac_disable_all_queues(priv);
 	stmmac_hw_teardown(dev);
 init_error:
 	free_dma_desc_resources(priv);
@@ -6564,12 +6566,13 @@ int stmmac_xdp_open(struct net_device *dev)
 	/* Start Rx & Tx DMA Channels */
 	stmmac_start_all_dma(priv);
 
+	/* Enable NAPI process*/
+	stmmac_enable_all_queues(priv);
+
 	ret = stmmac_request_irq(dev);
 	if (ret)
 		goto irq_error;
 
-	/* Enable NAPI process*/
-	stmmac_enable_all_queues(priv);
 	netif_carrier_on(dev);
 	netif_tx_start_all_queues(dev);
 
@@ -6579,6 +6582,7 @@ irq_error:
 	for (chan = 0; chan < priv->plat->tx_queues_to_use; chan++)
 		hrtimer_cancel(&priv->tx_queue[chan].txtimer);
 
+	stmmac_disable_all_queues(priv);
 	stmmac_hw_teardown(dev);
 init_error:
 	free_dma_desc_resources(priv);
