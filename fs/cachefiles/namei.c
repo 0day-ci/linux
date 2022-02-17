@@ -510,15 +510,69 @@ out:
 	return file;
 }
 
+#ifdef CONFIG_CACHEFILES_ONDEMAND
+static inline bool cachefiles_can_create_file(struct cachefiles_cache *cache)
+{
+	/*
+	 * On-demand read mode requires that backing files have been prepared
+	 * with correct file size under corresponding directory in the very
+	 * first begginning. We can get here when the backing file doesn't exist
+	 * under corresponding directory, or the file size is unexpected 0.
+	 */
+	return !test_bit(CACHEFILES_ONDEMAND_MODE, &cache->flags);
+
+}
+
+/*
+ * Fs using fscache for on-demand reading may have no idea of the file size of
+ * backing files. Thus the on-demand read mode requires that backing files shall
+ * be prepared with correct file size under corresponding directory by the user
+ * daemon in the first beginning. Then the backend is responsible for taking the
+ * file size of the backing file as the object size at runtime.
+ */
+static int cachefiles_recheck_size(struct cachefiles_object *object,
+				   struct file *file)
+{
+	loff_t size;
+	struct cachefiles_cache *cache = object->volume->cache;
+
+	if (!test_bit(CACHEFILES_ONDEMAND_MODE, &cache->flags))
+		return 0;
+
+	size = i_size_read(file_inode(file));
+	if (!size)
+		return -EINVAL;
+
+	object->cookie->object_size = size;
+	return 0;
+}
+#else
+static inline bool cachefiles_can_create_file(struct cachefiles_cache *cache)
+{
+	return true;
+}
+
+static inline int cachefiles_recheck_size(struct cachefiles_object *object,
+					  struct file *file)
+{
+	return 0;
+}
+#endif
+
+
 /*
  * Create a new file.
  */
 static bool cachefiles_create_file(struct cachefiles_object *object)
 {
+	struct cachefiles_cache *cache = object->volume->cache;
 	struct file *file;
 	int ret;
 
-	ret = cachefiles_has_space(object->volume->cache, 1, 0,
+	if (!cachefiles_can_create_file(cache))
+		return false;
+
+	ret = cachefiles_has_space(cache, 1, 0,
 				   cachefiles_has_space_for_create);
 	if (ret < 0)
 		return false;
@@ -572,6 +626,10 @@ static bool cachefiles_open_file(struct cachefiles_object *object,
 		goto error_fput;
 	}
 	_debug("file -> %pd positive", dentry);
+
+	ret = cachefiles_recheck_size(object, file);
+	if (ret < 0)
+		goto check_failed;
 
 	ret = cachefiles_check_auxdata(object, file);
 	if (ret < 0)

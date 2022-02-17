@@ -26,3 +26,16 @@ config CACHEFILES_ERROR_INJECTION
 	help
 	  This permits error injection to be enabled in cachefiles whilst a
 	  cache is in service.
+
+config CACHEFILES_ONDEMAND
+	bool "Support for on-demand reading"
+	depends on CACHEFILES
+	default n
+	help
+	  This permits on-demand read mode of cachefiles. In this mode, when
+	  cache miss, the cachefiles backend instead of the upper fs using
+	  fscache is responsible for fetching data, e.g. through user daemon.
+	  Then after the data's ready, upper fs can reinitiate a read from the
+	  cache.
+
+	  If unsure, say N.
