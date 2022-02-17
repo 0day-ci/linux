@@ -341,6 +341,7 @@ struct ice_tx_ring {
 	u8 flags;
 	u8 dcb_tc;			/* Traffic class of ring */
 	u8 ptp_tx;
+	u32 ch_inline_fd_cnt_index;
 } ____cacheline_internodealigned_in_smp;
 
 static inline bool ice_ring_uses_build_skb(struct ice_rx_ring *ring)
@@ -358,7 +359,12 @@ static inline void ice_clear_ring_build_skb_ena(struct ice_rx_ring *ring)
 	ring->flags &= ~ICE_RX_FLAGS_RING_BUILD_SKB;
 }
 
-static inline bool ice_ring_ch_enabled(struct ice_tx_ring *ring)
+static inline bool ice_txring_ch_enabled(const struct ice_tx_ring *ring)
+{
+	return !!ring->ch;
+}
+
+static inline bool ice_rxring_ch_enabled(const struct ice_rx_ring *ring)
 {
 	return !!ring->ch;
 }

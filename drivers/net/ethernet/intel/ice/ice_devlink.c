@@ -1030,3 +1030,136 @@ void ice_devlink_destroy_regions(struct ice_pf *pf)
 	if (pf->devcaps_region)
 		devlink_region_destroy(pf->devcaps_region);
 }
+
+#define ICE_DEVLINK_PARAM_ID_TC_INLINE_FD	100
+
+/**
+ * ice_devlink_tc_inline_fd_get - Get inline FD settings of configured TC's
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to get
+ * @ctx: context to return the parameter value
+ *
+ * Returns: zero on success, or an error code on failure.
+ */
+static int
+ice_devlink_tc_inline_fd_get(struct devlink *devlink, u32 id,
+			     struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct ice_vsi *ch_vsi;
+	struct ice_vsi *vsi;
+	u8 tc_num;
+
+	vsi = ice_get_main_vsi(pf);
+	if (!(vsi && id == ICE_DEVLINK_PARAM_ID_TC_INLINE_FD))
+		return -EINVAL;
+
+	ctx->val.vu16 = 0;
+	for (tc_num = 1; tc_num < vsi->all_numtc; tc_num++) {
+		ch_vsi = vsi->tc_map_vsi[tc_num];
+		if (!ch_vsi || !ch_vsi->ch)
+			return -EINVAL;
+
+		if (ch_vsi->ch->inline_fd)
+			ctx->val.vu16 |= (1U << tc_num);
+	}
+
+	return 0;
+}
+
+/**
+ * ice_devlink_tc_inline_fd_validate - Validate inline_fd setting
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to validate
+ * @val: value to be validated
+ * @extack: netlink extended ACK structure
+ *
+ * Validate inline fd
+ * Returns: zero on success, or an error code on failure and extack with a
+ * reason for failure.
+ */
+static int
+ice_devlink_tc_inline_fd_validate(struct devlink *devlink, u32 id,
+				  union devlink_param_value val,
+				  struct netlink_ext_ack *extack)
+{
+	if (id != ICE_DEVLINK_PARAM_ID_TC_INLINE_FD) {
+		NL_SET_ERR_MSG_MOD(extack, "Invalid TC param");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_devlink_tc_inline_fd_set - Enable/Disable inline flow director
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to set
+ * @ctx: context to return the parameter value
+ *
+ * Returns: zero on success, or an error code on failure.
+ */
+static int
+ice_devlink_tc_inline_fd_set(struct devlink *devlink, u32 id,
+			     struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct ice_vsi *ch_vsi;
+	struct ice_vsi *vsi;
+	u8 tc_num;
+
+	vsi = ice_get_main_vsi(pf);
+	if (!(vsi && id == ICE_DEVLINK_PARAM_ID_TC_INLINE_FD))
+		return -EINVAL;
+
+	for (tc_num = 1; tc_num < vsi->all_numtc; tc_num++) {
+		ch_vsi = vsi->tc_map_vsi[tc_num];
+		if (!ch_vsi || !ch_vsi->ch)
+			return -EINVAL;
+
+		if (ctx->val.vu16 & (1U << tc_num))
+			ch_vsi->ch->inline_fd = 1;
+		else
+			ch_vsi->ch->inline_fd = 0;
+	}
+
+	return 0;
+}
+
+static const struct devlink_param ice_devlink_inline_fd_params[] = {
+	DEVLINK_PARAM_DRIVER(ICE_DEVLINK_PARAM_ID_TC_INLINE_FD,
+			     "tc_inline_fd",
+			     DEVLINK_PARAM_TYPE_U16,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     ice_devlink_tc_inline_fd_get,
+			     ice_devlink_tc_inline_fd_set,
+			     ice_devlink_tc_inline_fd_validate),
+};
+
+int ice_devlink_tc_params_register(struct ice_vsi *vsi)
+{
+	struct devlink *devlink = priv_to_devlink(vsi->back);
+	struct device *dev = ice_pf_to_dev(vsi->back);
+	int err;
+
+	if (vsi->all_numtc <= 1)
+		return 0;
+
+	err = devlink_params_register(devlink,
+				      ice_devlink_inline_fd_params,
+				      ARRAY_SIZE(ice_devlink_inline_fd_params));
+	if (err)
+		dev_err(dev, "devlink inline_fd params registration failed %d",
+			err);
+
+	return err;
+}
+
+void ice_devlink_tc_params_unregister(struct ice_vsi *vsi)
+{
+	struct devlink *devlink = priv_to_devlink(vsi->back);
+
+	devlink_params_unregister(devlink,
+				  ice_devlink_inline_fd_params,
+				  ARRAY_SIZE(ice_devlink_inline_fd_params));
+}
