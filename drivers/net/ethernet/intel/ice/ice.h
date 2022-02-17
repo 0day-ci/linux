@@ -26,6 +26,7 @@
 #include <linux/timer.h>
 #include <linux/delay.h>
 #include <linux/bitmap.h>
+#include <linux/bitfield.h>
 #include <linux/log2.h>
 #include <linux/ip.h>
 #include <linux/sctp.h>
@@ -39,6 +40,8 @@
 #include <linux/avf/virtchnl.h>
 #include <linux/cpu_rmap.h>
 #include <linux/dim.h>
+#include <linux/atomic.h>
+#include <linux/jiffies.h>
 #include <net/pkt_cls.h>
 #include <net/tc_act/tc_mirred.h>
 #include <net/tc_act/tc_gact.h>
@@ -218,6 +221,15 @@ struct ice_channel {
 	u64 max_tx_rate;
 	u64 min_tx_rate;
 	atomic_t num_sb_fltr;
+	/* counter index when side-band FD is used */
+	u32 fd_cnt_index;
+	/* queue used to setup inline-FD */
+	atomic_t fd_queue;
+	/* packets services thru' inline-FD filter */
+	u64 fd_pkt_cnt;
+	u8 inline_fd:1;
+	u8 fd_enabled:1;
+	u8 switch_fd_to_rss:1;
 	struct ice_vsi *ch_vsi;
 };
 
@@ -427,6 +439,19 @@ struct ice_vsi {
 	 * they were before
 	 */
 	u16 orig_rss_size;
+#define ICE_TBL_FULL_TIMES	5
+	/* how many times HW table is flushed */
+	u64 cnt_table_flushed;
+	/* keeps track of how many times SW detected that HW table remain full
+	 * once SW state is switches back to RSS.
+	 */
+	int cnt_tbl_full;
+
+	/* SW based counter which keeps track of active
+	 * inline-FD filter entries in table
+	 */
+	atomic_t inline_fd_active_cnt;
+
 	/* this keeps tracks of all enabled TC with and without DCB
 	 * and inclusive of ADQ, vsi->mqprio_opt keeps track of queue
 	 * information
@@ -439,6 +464,7 @@ struct ice_vsi {
 	u16 old_ena_tc;
 
 	struct ice_channel *ch;
+	u8 num_tc_devlink_params;
 
 	/* setup back reference, to which aggregator node this VSI
 	 * corresponds to
@@ -473,6 +499,8 @@ struct ice_q_vector {
 	char name[ICE_INT_NAME_STR_LEN];
 
 	u16 total_events;	/* net_dim(): number of interrupts processed */
+
+	atomic_t inline_fd_cnt;
 } ____cacheline_internodealigned_in_smp;
 
 enum ice_pf_flags {
@@ -760,6 +788,30 @@ static inline struct ice_vsi *ice_get_netdev_priv_vsi(struct ice_netdev_priv *np
 }
 
 /**
+ * ice_get_current_fd_cnt - Get total FD filters programmed for this VSI
+ * @vsi: ptr to VSI
+ */
+static inline u32 ice_get_current_fd_cnt(struct ice_vsi *vsi)
+{
+	u32 val = rd32(&vsi->back->hw, VSIQF_FD_CNT(vsi->vsi_num));
+
+	return FIELD_GET(VSIQF_FD_CNT_FD_GCNT_M, val) +
+	       FIELD_GET(VSIQF_FD_CNT_FD_BCNT_M, val);
+}
+
+/**
+ * ice_fd_read_cntr - read counter value using counter_index
+ * @pf: ptr to PF
+ * @counter_index: index of counter to be read
+ */
+static inline u64 ice_fd_read_cntr(struct ice_pf *pf, u32 counter_index)
+{
+	/* Read the HW counter based on counter_index */
+	return ((u64)rd32(&pf->hw, GLSTAT_FD_CNT0H(counter_index)) << 32) |
+		rd32(&pf->hw, GLSTAT_FD_CNT0L(counter_index));
+}
+
+/**
  * ice_get_ctrl_vsi - Get the control VSI
  * @pf: PF instance
  */
@@ -773,6 +825,24 @@ static inline struct ice_vsi *ice_get_ctrl_vsi(struct ice_pf *pf)
 }
 
 /**
+ * ice_is_vsi_fd_table_full - VSI specific FD table is full or not
+ * @vsi: ptr to VSI
+ * @cnt: fd count, specific to VSI
+ *
+ * Retutn true if HW FD table specific to VSI is full, otherwise false
+ */
+static inline bool ice_is_vsi_fd_table_full(struct ice_vsi *vsi, u32 cnt)
+{
+	if (!cnt || !(vsi->num_gfltr || vsi->num_bfltr))
+		return false;
+
+	/* determine if 'cnt' reached max_allowed for specified VSI,
+	 * if so, return HW table full for that specific VSI
+	 */
+	return cnt >= vsi->num_gfltr + vsi->num_bfltr - 1;
+}
+
+/**
  * ice_is_switchdev_running - check if switchdev is configured
  * @pf: pointer to PF structure
  *
@@ -782,6 +852,18 @@ static inline struct ice_vsi *ice_get_ctrl_vsi(struct ice_pf *pf)
 static inline bool ice_is_switchdev_running(struct ice_pf *pf)
 {
 	return pf->switchdev.is_running;
+}
+
+/**
+ * ice_fd_clear_cntr - initialize counter to zero
+ * @pf: ptr to PF
+ * @counter_index: index of counter to be initialized
+ */
+static inline void ice_fd_clear_cntr(struct ice_pf *pf, u32 counter_index)
+{
+	/* Clear the HW counter based on counter_index */
+	wr32(&pf->hw, GLSTAT_FD_CNT0H(counter_index), 0);
+	wr32(&pf->hw, GLSTAT_FD_CNT0L(counter_index), 0);
 }
 
 /**
