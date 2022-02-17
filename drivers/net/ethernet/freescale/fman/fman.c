@@ -2862,6 +2862,32 @@ static struct fman *read_dts_node(struct platform_device *of_dev)
 		of_property_read_bool(fm_node, "fsl,erratum-a050385");
 #endif
 
+	/* Get Max Frame Size */
+	err = of_property_read_u32(fm_node, "fsl,max-frm-sz", &val);
+	if (!err) {
+		if (val > FSL_FM_MAX_POSSIBLE_FRAME_SIZE)
+			fsl_fm_max_frm = FSL_FM_MAX_POSSIBLE_FRAME_SIZE;
+		else if (val < FSL_FM_MIN_POSSIBLE_FRAME_SIZE)
+			fsl_fm_max_frm = FSL_FM_MIN_POSSIBLE_FRAME_SIZE;
+		else
+			fsl_fm_max_frm = (int)val;
+	}
+	dev_dbg(&of_dev->dev, "Configured Max Frame Size: %d\n",
+		fsl_fm_max_frm);
+
+	/* Get RX Extra Headroom Value */
+	err = of_property_read_u32(fm_node, "fsl,rx-extra-headroom", &val);
+	if (!err) {
+		if (val > FSL_FM_RX_EXTRA_HEADROOM_MAX)
+			fsl_fm_rx_extra_headroom = FSL_FM_RX_EXTRA_HEADROOM_MAX;
+		else if (val < FSL_FM_RX_EXTRA_HEADROOM_MIN)
+			fsl_fm_rx_extra_headroom = FSL_FM_RX_EXTRA_HEADROOM_MIN;
+		else
+			fsl_fm_rx_extra_headroom = (int)val;
+	}
+	dev_dbg(&of_dev->dev, "Configured RX Extra Headroom: %d\n",
+		fsl_fm_rx_extra_headroom);
+
 	return fman;
 
 fman_node_put:
