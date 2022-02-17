@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mtd/partitions/ubi.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: UBI (Unsorted Block Images) device
+
+description: |
+  UBI is a layer providing logical volumes (consisting of logical blocks) on top
+  of raw flash devices. It deals with low-level flash issues (bit-flips, bad
+  physical eraseblocks, wearing) providing a reliable data storage.
+
+  UBI device is built and stored in a single flash partition.
+
+  Some (usually embedded) devices use UBI volumes of specific names or indexes
+  to store setup / configuration data. This binding allows describing such
+  volumes so they can be identified and referenced by consumers.
+
+maintainers:
+  - Rafał Miłecki <rafal@milecki.pl>
+
+allOf:
+  - $ref: partition.yaml#
+
+properties:
+  compatible:
+    const: ubi
+
+patternProperties:
+  "^volume-[0-9a-f]+$":
+    type: object
+    description: UBI volume
+    properties:
+      volume-name:
+        $ref: /schemas/types.yaml#/definitions/string
+      volume-id:
+        $ref: /schemas/types.yaml#/definitions/uint32
+    anyOf:
+      - required:
+          - volume-name
+      - required:
+          - volume-id
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        partition@0 {
+            compatible = "ubi";
+            reg = <0x0000000 0x1000000>;
+            label = "filesystem";
+
+            env: volume-0 {
+                volume-name = "u-boot-env";
+            };
+
+            calibration: volume-1 {
+                volume-id = <99>;
+            };
+        };
+    };
