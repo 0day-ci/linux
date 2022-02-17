@@ -71,4 +71,11 @@ patternProperties:
         description: CPU to Codec rate channels.
         $ref: /schemas/types.yaml#/definitions/uint32
 
+      dai-tdm-slot-width-map:
+        description: Mapping of sample widths to slot widths. For hardware that
+          cannot support a fixed slot width or a slot width equal to sample
+          width. An array containing one or more pairs of values. Each pair
+          of values is a sample_width and the corresponding slot_width.
+        $ref: /schemas/types.yaml#/definitions/uint32-array
+
 additionalProperties: true
