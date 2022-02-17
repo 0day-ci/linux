@@ -150,21 +150,6 @@ static int dp_power_clk_deinit(struct dp_power_private *power)
 	return 0;
 }
 
-static int dp_power_clk_set_rate(struct dp_power_private *power,
-		enum dp_pm_type module, bool enable)
-{
-	int rc = 0;
-	struct dss_module_power *mp = &power->parser->mp[module];
-
-	rc = msm_dss_enable_clk(mp->clk_config, mp->num_clk, enable);
-	if (rc) {
-		DRM_ERROR("failed to %d clks, err: %d\n", enable, rc);
-		return rc;
-	}
-
-	return 0;
-}
-
 int dp_power_clk_status(struct dp_power *dp_power, enum dp_pm_type pm_type)
 {
 	DRM_DEBUG_DP("core_clk_on=%d link_clk_on=%d stream_clk_on=%d\n",
@@ -187,6 +172,7 @@ int dp_power_clk_enable(struct dp_power *dp_power,
 {
 	int rc = 0;
 	struct dp_power_private *power;
+	struct dss_module_power *mp;
 
 	power = container_of(dp_power, struct dp_power_private, dp_power);
 
@@ -214,9 +200,11 @@ int dp_power_clk_enable(struct dp_power *dp_power,
 		}
 
 		if ((pm_type == DP_CTRL_PM) && (!dp_power->core_clks_on)) {
+			mp = &power->parser->mp[DP_CORE_PM];
+
 			DRM_DEBUG_DP("Enable core clks before link clks\n");
 
-			rc = dp_power_clk_set_rate(power, DP_CORE_PM, enable);
+			rc = msm_dss_enable_clk(mp->clk_config, mp->num_clk, enable);
 			if (rc) {
 				DRM_ERROR("fail to enable clks: %s. err=%d\n",
 					dp_parser_pm_name(DP_CORE_PM), rc);
@@ -226,7 +214,8 @@ int dp_power_clk_enable(struct dp_power *dp_power,
 		}
 	}
 
-	rc = dp_power_clk_set_rate(power, pm_type, enable);
+	mp = &power->parser->mp[pm_type];
+	rc = msm_dss_enable_clk(mp->clk_config, mp->num_clk, enable);
 	if (rc) {
 		DRM_ERROR("failed to '%s' clks for: %s. err=%d\n",
 			enable ? "enable" : "disable",
