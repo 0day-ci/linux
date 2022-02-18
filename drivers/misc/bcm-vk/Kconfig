@@ -16,6 +16,16 @@ config BCM_VK
 
 	  If unsure, say N.
 
+config BCM_VK_VIPER
+	bool "VK driver for VIPER"
+	depends on BCM_VK
+	help
+	  Turn on to enable using the vk driver for the viper variant.
+	  Used for development environments where viper uses VK driver
+	  and VK firmware rather than an alternate firmware and driver.
+
+	  If unsure, say N.
+
 config BCM_VK_TTY
 	bool "Enable tty ports on a Broadcom VK Accelerator device"
 	depends on TTY
