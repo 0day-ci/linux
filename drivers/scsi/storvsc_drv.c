@@ -399,6 +399,7 @@ static void storvsc_on_channel_callback(void *context);
 #define STORVSC_MAX_LUNS_PER_TARGET			255
 #define STORVSC_MAX_TARGETS				2
 #define STORVSC_MAX_CHANNELS				8
+#define STORVSC_MAX_DEVICES_PER_CONTROLLER		64
 
 #define STORVSC_FC_MAX_LUNS_PER_TARGET			255
 #define STORVSC_FC_MAX_TARGETS				128
@@ -429,6 +430,14 @@ struct storvsc_cmd_request {
 	u32 payload_sz;
 
 	struct vstor_packet vstor_packet;
+};
+
+union storvsc_scsi_device_tag {
+	u64 as_uint64;
+	struct {
+		u32 tag;
+		u32 idx;
+	} __packed;
 };
 
 
@@ -502,6 +511,7 @@ struct hv_host_device {
 	struct workqueue_struct *handle_error_wq;
 	struct work_struct host_scan_work;
 	struct Scsi_Host *host;
+	struct blk_mq_tag_set *device_tag_sets[STORVSC_MAX_DEVICES_PER_CONTROLLER];
 };
 
 struct storvsc_scan_work {
@@ -700,6 +710,7 @@ old_is_alloced:
 
 static u64 storvsc_next_request_id(struct vmbus_channel *channel, u64 rqst_addr)
 {
+	union storvsc_scsi_device_tag tag;
 	struct storvsc_cmd_request *request =
 		(struct storvsc_cmd_request *)(unsigned long)rqst_addr;
 
@@ -708,11 +719,15 @@ static u64 storvsc_next_request_id(struct vmbus_channel *channel, u64 rqst_addr)
 	if (rqst_addr == VMBUS_RQST_RESET)
 		return VMBUS_RQST_RESET;
 
+	tag.tag = blk_mq_unique_tag(scsi_cmd_to_rq(request->cmd));
+
 	/*
 	 * Cannot return an ID of 0, which is reserved for an unsolicited
 	 * message from Hyper-V.
 	 */
-	return (u64)blk_mq_unique_tag(scsi_cmd_to_rq(request->cmd)) + 1;
+	tag.tag++;
+	tag.idx = (u64) request->cmd->device->hostdata;
+	return tag.as_uint64;
 }
 
 static void handle_sc_creation(struct vmbus_channel *new_sc)
@@ -1272,6 +1287,7 @@ static void storvsc_on_channel_callback(void *context)
 	struct hv_device *device;
 	struct storvsc_device *stor_device;
 	struct Scsi_Host *shost;
+	struct hv_host_device *host_dev;
 
 	if (channel->primary_channel != NULL)
 		device = channel->primary_channel->device_obj;
@@ -1283,6 +1299,7 @@ static void storvsc_on_channel_callback(void *context)
 		return;
 
 	shost = stor_device->host;
+	host_dev = shost_priv(shost);
 
 	foreach_vmbus_pkt(desc, channel) {
 		struct vstor_packet *packet = hv_pkt_data(desc);
@@ -1330,13 +1347,34 @@ static void storvsc_on_channel_callback(void *context)
 				}
 			} else {
 				struct scsi_cmnd *scmnd;
+				union storvsc_scsi_device_tag tag;
+				struct blk_mq_tag_set *tag_set;
 
 				/* Transaction 'rqst_id' corresponds to tag 'rqst_id - 1' */
-				scmnd = scsi_host_find_tag(shost, rqst_id - 1);
-				if (scmnd == NULL) {
+				tag.as_uint64 = rqst_id;
+				tag.tag--;
+
+				if (tag.idx >= STORVSC_MAX_DEVICES_PER_CONTROLLER) {
+					dev_err(&device->device,
+						"SCSI Device Tag Set index %d is invalid.\n",
+						tag.idx);
+					continue;
+				}
+
+				tag_set = READ_ONCE(host_dev->device_tag_sets[tag.idx]);
+				if (!tag_set) {
+					dev_err(&device->device,
+						"No SCSI Device Tag Set found at idx %d.\n",
+						tag.idx);
+					continue;
+				}
+
+				scmnd = scsi_find_tag(tag_set, tag.tag);
+				if (!scmnd) {
 					dev_err(&device->device, "Incorrect transaction ID\n");
 					continue;
 				}
+
 				request = (struct storvsc_cmd_request *)scsi_cmd_priv(scmnd);
 				scsi_dma_unmap(scmnd);
 			}
@@ -1596,6 +1634,10 @@ found_channel:
 
 static int storvsc_device_alloc(struct scsi_device *sdevice)
 {
+	u64 i;
+	struct hv_host_device *host_dev = shost_priv(sdevice->host);
+	struct hv_device *dev = host_dev->dev;
+
 	/*
 	 * Set blist flag to permit the reading of the VPD pages even when
 	 * the target may claim SPC-2 compliance. MSFT targets currently
@@ -1607,7 +1649,31 @@ static int storvsc_device_alloc(struct scsi_device *sdevice)
 	 */
 	sdevice->sdev_bflags = BLIST_REPORTLUN2 | BLIST_TRY_VPD_PAGES;
 
-	return 0;
+	if (!sdevice->tag_set)
+		return -EINVAL;
+	/*
+	 * Find an open spot in the array to save the pointer to the
+	 * blk_mq_tag_set allocated in scsi_alloc_sdev, then save that spot's
+	 * index. The index comprises part of the tag that is eventually
+	 * assigned to a dispatched SCSI command.
+	 *
+	 * This can be done without a lock because scanning is serialized with
+	 * the Scsi_Host->scan_mutex.
+	 */
+	for (i = 0; i < STORVSC_MAX_DEVICES_PER_CONTROLLER; i++) {
+		if (READ_ONCE(host_dev->device_tag_sets[i]))
+			continue;
+
+		WRITE_ONCE(host_dev->device_tag_sets[i], sdevice->tag_set);
+
+		sdevice->hostdata = (void *) i;
+		return 0;
+	}
+
+	dev_err(&dev->device,
+		"The storvsc SCSI Device Tag Set array is full. No additional tag sets can be allocated.");
+
+	return -EINVAL;
 }
 
 static int storvsc_device_configure(struct scsi_device *sdevice)
@@ -1634,6 +1700,15 @@ static int storvsc_device_configure(struct scsi_device *sdevice)
 	}
 
 	return 0;
+}
+
+static void storvsc_device_destroy(struct scsi_device *sdevice)
+{
+	struct Scsi_Host *host = sdevice->host;
+	struct hv_host_device *host_dev = shost_priv(host);
+	u64 idx = (u64) sdevice->hostdata;
+
+	WRITE_ONCE(host_dev->device_tag_sets[idx], NULL);
 }
 
 static int storvsc_get_chs(struct scsi_device *sdev, struct block_device * bdev,
@@ -1912,6 +1987,7 @@ static struct scsi_host_template scsi_driver = {
 	.proc_name =		"storvsc_host",
 	.eh_timed_out =		storvsc_eh_timed_out,
 	.slave_alloc =		storvsc_device_alloc,
+	.slave_destroy =	storvsc_device_destroy,
 	.slave_configure =	storvsc_device_configure,
 	.cmd_per_lun =		2048,
 	.this_id =		-1,
@@ -1920,6 +1996,7 @@ static struct scsi_host_template scsi_driver = {
 	.no_write_same =	1,
 	.track_queue_depth =	1,
 	.change_queue_depth =	storvsc_change_queue_depth,
+	.per_device_tag_set =	1,
 };
 
 enum {
