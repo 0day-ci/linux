@@ -315,6 +315,27 @@ struct r9a06g032_priv {
 	void __iomem *reg;
 };
 
+/* Exported helper to access the DMAMUX register */
+static struct r9a06g032_priv *syscon_priv;
+int r9a06g032_syscon_set_dmamux(u32 mask, u32 val)
+{
+	u32 dmamux;
+
+	if (!syscon_priv)
+		return -EPROBE_DEFER;
+
+	spin_lock(&syscon_priv->lock);
+
+	dmamux = readl(syscon_priv->reg + R9A06G032_SYSCON_DMAMUX);
+	dmamux &= ~mask;
+	dmamux |= val & mask;
+	writel(dmamux, syscon_priv->reg + R9A06G032_SYSCON_DMAMUX);
+
+	spin_unlock(&syscon_priv->lock);
+
+	return 0;
+}
+
 /* register/bit pairs are encoded as an uint16_t */
 static void
 clk_rdesc_set(struct r9a06g032_priv *clocks,
@@ -922,6 +943,12 @@ static int __init r9a06g032_clocks_probe(struct platform_device *pdev)
 	clocks->reg = of_iomap(np, 0);
 	if (WARN_ON(!clocks->reg))
 		return -ENOMEM;
+
+	if (syscon_priv)
+		return -EBUSY;
+
+	syscon_priv = clocks;
+
 	for (i = 0; i < ARRAY_SIZE(r9a06g032_clocks); ++i) {
 		const struct r9a06g032_clkdesc *d = &r9a06g032_clocks[i];
 		const char *parent_name = d->source ?
