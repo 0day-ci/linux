@@ -7614,7 +7614,7 @@ static int sdebug_driver_probe(struct device *dev)
 	 */
 	hpnt->nr_hw_queues = submit_queues;
 	if (sdebug_host_max_queue)
-		hpnt->host_tagset = 1;
+		hpnt->hctx_share_tags = 1;
 
 	/* poll queues are possible for nr_hw_queues > 1 */
 	if (hpnt->nr_hw_queues == 1 || (poll_queues < 1)) {

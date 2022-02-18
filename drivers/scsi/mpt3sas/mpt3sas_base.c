@@ -3414,12 +3414,12 @@ _base_enable_msix(struct MPT3SAS_ADAPTER *ioc)
 		ioc->smp_affinity_enable = 0;
 
 	if (!ioc->smp_affinity_enable || ioc->reply_queue_count <= 1)
-		ioc->shost->host_tagset = 0;
+		ioc->shost->hctx_share_tags = 0;
 
 	/*
-	 * Enable io uring poll queues only if host_tagset is enabled.
+	 * Enable io uring poll queues only if hctx_share_tags is enabled.
 	 */
-	if (ioc->shost->host_tagset)
+	if (ioc->shost->hctx_share_tags)
 		iopoll_q_count = poll_queues;
 
 	if (iopoll_q_count) {

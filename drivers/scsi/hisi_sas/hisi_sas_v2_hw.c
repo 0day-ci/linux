@@ -3584,7 +3584,7 @@ static struct scsi_host_template sht_v2_hw = {
 	.shost_groups		= host_v2_hw_groups,
 	.host_reset		= hisi_sas_host_reset,
 	.map_queues		= map_queues_v2_hw,
-	.host_tagset		= 1,
+	.hctx_share_tags	= 1,
 };
 
 static const struct hisi_sas_hw hisi_sas_v2_hw = {

@@ -6950,14 +6950,14 @@ static int megasas_io_attach(struct megasas_instance *instance)
 	 * Single msix_vectors in kdump, so shared host tag is also disabled.
 	 */
 
-	host->host_tagset = 0;
+	host->hctx_share_tags = 0;
 	host->nr_hw_queues = 1;
 
 	if ((instance->adapter_type != MFI_SERIES) &&
 		(instance->msix_vectors > instance->low_latency_index_start) &&
 		host_tagset_enable &&
 		instance->smp_affinity_enable) {
-		host->host_tagset = 1;
+		host->hctx_share_tags = 1;
 		host->nr_hw_queues = instance->msix_vectors -
 			instance->low_latency_index_start + instance->iopoll_q_count;
 		if (instance->iopoll_q_count)

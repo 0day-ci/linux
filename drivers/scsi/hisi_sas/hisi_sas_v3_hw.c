@@ -3172,7 +3172,7 @@ static struct scsi_host_template sht_v3_hw = {
 	.shost_groups		= host_v3_hw_groups,
 	.tag_alloc_policy	= BLK_TAG_ALLOC_RR,
 	.host_reset             = hisi_sas_host_reset,
-	.host_tagset		= 1,
+	.hctx_share_tags	= 1,
 };
 
 static const struct hisi_sas_hw hisi_sas_v3_hw = {

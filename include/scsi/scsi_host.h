@@ -456,8 +456,7 @@ struct scsi_host_template {
 	/* True if the controller does not support WRITE SAME */
 	unsigned no_write_same:1;
 
-	/* True if the host uses host-wide tagspace */
-	unsigned host_tagset:1;
+	unsigned hctx_share_tags:1;
 
 	/*
 	 * Countdown for host blocking with no commands outstanding.
@@ -617,8 +616,8 @@ struct Scsi_Host {
 	 * In scsi-mq mode, the number of hardware queues supported by the LLD.
 	 *
 	 * Note: it is assumed that each hardware queue has a queue depth of
-	 * can_queue. In other words, the total queue depth per host
-	 * is nr_hw_queues * can_queue. However, for when host_tagset is set,
+	 * can_queue. In other words, the total queue depth per host is
+	 * nr_hw_queues * can_queue. However, when hctx_share_tags is set,
 	 * the total queue depth is can_queue.
 	 */
 	unsigned nr_hw_queues;
@@ -650,8 +649,7 @@ struct Scsi_Host {
 	/* The controller does not support WRITE SAME */
 	unsigned no_write_same:1;
 
-	/* True if the host uses host-wide tagspace */
-	unsigned host_tagset:1;
+	unsigned hctx_share_tags:1;
 
 	/* Host responded with short (<36 bytes) INQUIRY result */
 	unsigned short_inquiry:1;

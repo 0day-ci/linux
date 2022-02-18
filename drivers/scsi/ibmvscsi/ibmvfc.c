@@ -3625,7 +3625,7 @@ static struct scsi_host_template driver_template = {
 	.max_sectors = IBMVFC_MAX_SECTORS,
 	.shost_groups = ibmvfc_host_groups,
 	.track_queue_depth = 1,
-	.host_tagset = 1,
+	.hctx_share_tags = 1,
 };
 
 /**
