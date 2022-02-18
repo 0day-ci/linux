@@ -2062,6 +2062,7 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 			*wait_bh++=bh;
 		}
 	}
+
 	/*
 	 * If we issued read requests - let them complete.
 	 */
@@ -2141,8 +2142,11 @@ int block_write_begin(struct address_space *mapping, loff_t pos, unsigned len,
 		gfp = GFP_ATOMIC | __GFP_NOWARN;
 
 	page = grab_cache_page_write_begin(mapping, index, flags);
-	if (!page)
+	if (!page) {
+		if (no_wait)
+			return -EAGAIN;
 		return -ENOMEM;
+	}
 
 	status = __block_write_begin_int(page_folio(page), pos, len, get_block, NULL, gfp);
 	if (unlikely(status)) {
