@@ -27,3 +27,29 @@
 - i.MX7: all of the above, since it uses the imx media core
 
 - i.MX7: use Frame Interval Monitor
+
+- imx7-media-csi: Restrict the supported formats list to the SoC version.
+
+  The imx7 CSI bridge can be configured to sample pixel components from the Rx
+  queue in single  (8bpp) or double (16bpp) modes. Image format variations with
+  different sample sizes (ie YUYV_2X8 vs YUYV_1X16) determine the sampling size
+  (see imx7_csi_configure()).
+
+  As the imx7 CSI bridge can be interfaced with different IP blocks depending on
+  the SoC model it is integrated on, the Rx queue sampling size should match
+  the size of samples transferred by the transmitting IP block.
+
+  To avoid mis-configurations of the capture pipeline, the enumeration of the
+  supported formats should be restricted to match the pixel source
+  transmitting mode.
+
+  Examples: i.MX8MM SoC integrates the CSI bridge with the Samsung CSIS CSI-2
+  receiver which operates in dual pixel sampling mode. The CSI bridge should
+  only expose the 1X16 formats variant which instructs it to operate in dual
+  pixel sampling mode. When the CSI bridge is instead integrated on an i.MX8MQ
+  SoC, which features a CSI-2 receiver that operates in single sampling mode, it
+  should only expose the 2X8 formats variant which instruct it to operate in
+  single sampling mode.
+
+  This currently only applies to YUYV formats, but other formats might need
+  to be treated in the same way.

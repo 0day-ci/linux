@@ -503,10 +503,14 @@ static void imx7_csi_configure(struct imx7_csi *csi)
 		 * all of them comply. Support both variants.
 		 */
 		case MEDIA_BUS_FMT_UYVY8_2X8:
-		case MEDIA_BUS_FMT_UYVY8_1X16:
 		case MEDIA_BUS_FMT_YUYV8_2X8:
-		case MEDIA_BUS_FMT_YUYV8_1X16:
 			cr18 |= BIT_MIPI_DATA_FORMAT_YUV422_8B;
+			break;
+		case MEDIA_BUS_FMT_UYVY8_1X16:
+		case MEDIA_BUS_FMT_YUYV8_1X16:
+			cr3 |= BIT_TWO_8BIT_SENSOR;
+			cr18 |= BIT_MIPI_DATA_FORMAT_YUV422_8B |
+				BIT_MIPI_DOUBLE_CMPNT;
 			break;
 		}
 	}
