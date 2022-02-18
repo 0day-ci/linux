@@ -36,7 +36,8 @@
 
 #define VIRTGPU_BLOB_FLAG_USE_MASK (VIRTGPU_BLOB_FLAG_USE_MAPPABLE | \
 				    VIRTGPU_BLOB_FLAG_USE_SHAREABLE | \
-				    VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE)
+				    VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE | \
+				    VIRTGPU_BLOB_FLAG_USE_INTERNAL)
 
 static int virtio_gpu_fence_event_create(struct drm_device *dev,
 					 struct drm_file *file,
@@ -654,6 +655,10 @@ static int verify_blob(struct virtio_gpu_device *vgdev,
 	params->size = rc_blob->size;
 	params->blob = true;
 	params->blob_flags = rc_blob->blob_flags;
+
+	/* USE_INTERNAL is local to guest kernel, don't past to host: */
+	params->blob_flags &= ~VIRTGPU_BLOB_FLAG_USE_INTERNAL;
+
 	return 0;
 }
 
