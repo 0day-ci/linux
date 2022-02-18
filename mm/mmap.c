@@ -3197,6 +3197,91 @@ int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 	return 0;
 }
 
+bool rbst_no_children(struct anon_vma *av, struct rb_node *node)
+{
+	struct anon_vma_chain *model;
+	struct anon_vma_chain *avc;
+
+	if (node == NULL) /* leaf node */
+		return true;
+	avc = container_of(node, typeof(*(model)), rb);
+	if (avc->vma->anon_vma != av)
+		/*
+		 * Inequality implies avc belongs
+		 * to a VMA of a child process
+		 */
+		return false;
+	return (rbst_no_children(av, node->rb_left) &&
+	rbst_no_children(av, node->rb_right));
+}
+
+/*
+ * Check if none of the VMAs connected to the given
+ * anon_vma via anon_vma_chain are in child relationship
+ */
+bool rbt_no_children(struct anon_vma *av)
+{
+	struct rb_node *root_node;
+
+	if (av == NULL || av->degree <= 1) /* Higher degree might not necessarily imply children */
+		return true;
+	root_node = av->rb_root.rb_root.rb_node;
+	return rbst_no_children(av, root_node);
+}
+
+/**
+ * update_faulted_pgoff() - Update faulted pages of a vma
+ * @vma: VMA being moved
+ * @addr: new virtual address
+ * @pgoff: pointer to pgoff which is updated
+ * If the vma and its pages are not shared with another process, update
+ * the new pgoff and also update index parameter (copy of the pgoff) in
+ * all faulted pages.
+ */
+bool update_faulted_pgoff(struct vm_area_struct *vma, unsigned long addr, pgoff_t *pgoff)
+{
+	unsigned long pg_iter = 0;
+	unsigned long pg_iters = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+
+	/* 1.] Check vma is not shared with other processes */
+	if (vma->anon_vma->root != vma->anon_vma || !rbt_no_children(vma->anon_vma))
+		return false;
+
+	/* 2.] Check all pages are not shared */
+	for (; pg_iter < pg_iters; ++pg_iter) {
+		bool pages_not_shared = true;
+		unsigned long shift = pg_iter << PAGE_SHIFT;
+		struct page *phys_page = follow_page(vma, vma->vm_start + shift, FOLL_GET);
+
+		if (phys_page == NULL)
+			continue;
+
+		/* Check page is not shared with other processes */
+		if (page_mapcount(phys_page) > 1)
+			pages_not_shared = false;
+		put_page(phys_page);
+		if (!pages_not_shared)
+			return false;
+	}
+
+	/* 3.] Update index in all pages to this new pgoff */
+	pg_iter = 0;
+	*pgoff = addr >> PAGE_SHIFT;
+
+	for (; pg_iter < pg_iters; ++pg_iter) {
+		unsigned long shift = pg_iter << PAGE_SHIFT;
+		struct page *phys_page = follow_page(vma, vma->vm_start + shift, FOLL_GET);
+
+		if (phys_page == NULL)
+			continue;
+		lock_page(phys_page);
+		phys_page->index = *pgoff + pg_iter;
+		unlock_page(phys_page);
+		put_page(phys_page);
+	}
+	return true;
+}
+
 /*
  * Copy the vma structure to a new location in the same mm,
  * prior to moving page table entries, to effect an mremap move.
@@ -3210,15 +3295,19 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 	struct mm_struct *mm = vma->vm_mm;
 	struct vm_area_struct *new_vma, *prev;
 	struct rb_node **rb_link, *rb_parent;
-	bool faulted_in_anon_vma = true;
+	bool anon_pgoff_updated = false;
 
 	/*
-	 * If anonymous vma has not yet been faulted, update new pgoff
+	 * Try to update new pgoff for anonymous vma
 	 * to match new location, to increase its chance of merging.
 	 */
-	if (unlikely(vma_is_anonymous(vma) && !vma->anon_vma)) {
-		pgoff = addr >> PAGE_SHIFT;
-		faulted_in_anon_vma = false;
+	if (unlikely(vma_is_anonymous(vma))) {
+		if (!vma->anon_vma) {
+			pgoff = addr >> PAGE_SHIFT;
+			anon_pgoff_updated = true;
+		} else {
+			anon_pgoff_updated = update_faulted_pgoff(vma, addr, &pgoff);
+		}
 	}
 
 	if (find_vma_links(mm, addr, addr + len, &prev, &rb_link, &rb_parent))
@@ -3244,7 +3333,7 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 			 * safe. It is only safe to keep the vm_pgoff
 			 * linear if there are no pages mapped yet.
 			 */
-			VM_BUG_ON_VMA(faulted_in_anon_vma, new_vma);
+			VM_BUG_ON_VMA(!anon_pgoff_updated, new_vma);
 			*vmap = vma = new_vma;
 		}
 		*need_rmap_locks = (new_vma->vm_pgoff <= vma->vm_pgoff);
