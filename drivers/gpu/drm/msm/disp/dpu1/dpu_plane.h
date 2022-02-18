@@ -25,6 +25,7 @@
  * @pending:	whether the current update is still pending
  * @plane_fetch_bw: calculated BW per plane
  * @plane_clk: calculated clk per plane
+ * @rotation: simplified drm rotation hint
  */
 struct dpu_plane_state {
 	struct drm_plane_state base;
@@ -37,6 +38,7 @@ struct dpu_plane_state {
 
 	u64 plane_fetch_bw;
 	u64 plane_clk;
+	unsigned int rotation;
 };
 
 /**
