@@ -276,6 +276,7 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	unsigned int depth;
 	struct scsi_device *sdev;
 	struct request_queue *q;
+	struct blk_mq_tag_set *tag_set;
 	int display_failure_msg = 1, ret;
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 
@@ -324,16 +325,27 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	 * doesn't
 	 */
 	sdev->borken = 1;
+	if (shost->per_device_tag_set) {
+		tag_set = kzalloc(sizeof(struct blk_mq_tag_set), GFP_KERNEL);
+		sdev->tag_set = tag_set;
+		if (!tag_set)
+			goto out;
+		if (scsi_mq_setup_tags(shost, tag_set))
+			goto out_free_tag_set;
+	} else {
+		tag_set = &shost->tag_set;
+		sdev->tag_set = NULL;
+	}
 
 	sdev->sg_reserved_size = INT_MAX;
 
-	q = blk_mq_init_queue(&sdev->host->tag_set);
+	q = blk_mq_init_queue(tag_set);
 	if (IS_ERR(q)) {
 		/* release fn is set up in scsi_sysfs_device_initialise, so
 		 * have to free and put manually here */
 		put_device(&starget->dev);
 		kfree(sdev);
-		goto out;
+		goto out_free_tag_set;
 	}
 	sdev->request_queue = q;
 	q->queuedata = sdev;
@@ -351,7 +363,7 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	if (scsi_realloc_sdev_budget_map(sdev, depth)) {
 		put_device(&starget->dev);
 		kfree(sdev);
-		goto out;
+		goto out_free_tag_set;
 	}
 
 	scsi_change_queue_depth(sdev, depth);
@@ -367,14 +379,20 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 			 */
 			if (ret == -ENXIO)
 				display_failure_msg = 0;
-			goto out_device_destroy;
+			__scsi_remove_device(sdev);
+			/*
+			 * __scsi_remove_device() will free the tag_set, so go
+			 * to "out" label.
+			 */
+			goto out;
 		}
 	}
 
 	return sdev;
 
-out_device_destroy:
-	__scsi_remove_device(sdev);
+out_free_tag_set:
+	if (shost->per_device_tag_set)
+		kfree(tag_set);
 out:
 	if (display_failure_msg)
 		printk(ALLOC_FAILURE_MSG, __func__);

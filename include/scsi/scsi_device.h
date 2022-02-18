@@ -103,6 +103,7 @@ struct scsi_vpd {
 struct scsi_device {
 	struct Scsi_Host *host;
 	struct request_queue *request_queue;
+	struct blk_mq_tag_set *tag_set;
 
 	/* the next two are protected by the host->host_lock */
 	struct list_head    siblings;   /* list of all devices on this host */

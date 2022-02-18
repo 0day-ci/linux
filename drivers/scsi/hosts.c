@@ -229,9 +229,11 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 	if (error)
 		goto fail;
 
-	error = scsi_mq_setup_tags(shost);
-	if (error)
-		goto fail;
+	if (!shost->per_device_tag_set) {
+		error = scsi_mq_setup_tags(shost, &shost->tag_set);
+		if (error)
+			goto fail;
+	}
 
 	if (!shost->shost_gendev.parent)
 		shost->shost_gendev.parent = dev ? dev : &platform_bus;
@@ -345,7 +347,7 @@ static void scsi_host_dev_release(struct device *dev)
 		kfree(dev_name(&shost->shost_dev));
 	}
 
-	if (shost->tag_set.tags)
+	if (!shost->per_device_tag_set && shost->tag_set.tags)
 		scsi_mq_destroy_tags(shost);
 
 	kfree(shost->shost_data);
@@ -427,6 +429,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->cmd_per_lun = sht->cmd_per_lun;
 	shost->no_write_same = sht->no_write_same;
 	shost->hctx_share_tags = sht->hctx_share_tags;
+	shost->per_device_tag_set = sht->per_device_tag_set;
 
 	if (shost_eh_deadline == -1 || !sht->eh_host_reset_handler)
 		shost->eh_deadline = -1;
@@ -566,7 +569,7 @@ struct Scsi_Host *scsi_host_get(struct Scsi_Host *shost)
 }
 EXPORT_SYMBOL(scsi_host_get);
 
-static bool scsi_host_check_in_flight(struct request *rq, void *data,
+bool scsi_check_in_flight(struct request *rq, void *data,
 				      bool reserved)
 {
 	int *count = data;
@@ -585,9 +588,17 @@ static bool scsi_host_check_in_flight(struct request *rq, void *data,
 int scsi_host_busy(struct Scsi_Host *shost)
 {
 	int cnt = 0;
+	if (shost->per_device_tag_set) {
 
-	blk_mq_tagset_busy_iter(&shost->tag_set,
-				scsi_host_check_in_flight, &cnt);
+		struct scsi_device *sdev;
+
+		shost_for_each_device(sdev, shost) {
+			blk_mq_tagset_busy_iter(sdev->request_queue->tag_set,
+						scsi_check_in_flight, &cnt);
+		}
+	} else
+		blk_mq_tagset_busy_iter(&shost->tag_set, scsi_check_in_flight,
+					&cnt);
 	return cnt;
 }
 EXPORT_SYMBOL(scsi_host_busy);
@@ -687,6 +698,8 @@ static bool complete_all_cmds_iter(struct request *rq, void *data, bool rsvd)
 void scsi_host_complete_all_commands(struct Scsi_Host *shost,
 				     enum scsi_host_status status)
 {
+	if (shost->per_device_tag_set)
+		return;
 	blk_mq_tagset_busy_iter(&shost->tag_set, complete_all_cmds_iter,
 				&status);
 }
@@ -723,6 +736,9 @@ void scsi_host_busy_iter(struct Scsi_Host *shost,
 		.fn = fn,
 		.priv = priv,
 	};
+
+	if (shost->per_device_tag_set)
+		return;
 
 	blk_mq_tagset_busy_iter(&shost->tag_set, __scsi_host_busy_iter_fn,
 				&iter_data);

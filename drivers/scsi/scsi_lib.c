@@ -1369,6 +1369,17 @@ out_dec:
 	return 0;
 }
 
+static int scsi_tag_set_busy(struct scsi_device *sdevice)
+{
+	struct blk_mq_tag_set *tag_set = sdevice->request_queue->tag_set;
+
+	int cnt = 0;
+
+	blk_mq_tagset_busy_iter(tag_set,
+				scsi_check_in_flight, &cnt);
+	return cnt;
+}
+
 /*
  * scsi_host_queue_ready: if we can send requests to shost, return 1 else
  * return 0. We must end up running the queue again whenever 0 is
@@ -1383,9 +1394,11 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 		return 0;
 
 	if (atomic_read(&shost->host_blocked) > 0) {
-		if (scsi_host_busy(shost) > 0)
+		if (shost->per_device_tag_set) {
+			if (scsi_tag_set_busy(sdev) > 0)
+				goto starved;
+		} else if (scsi_host_busy(shost) > 0)
 			goto starved;
-
 		/*
 		 * unblock after host_blocked iterates to zero
 		 */
@@ -1961,11 +1974,9 @@ static const struct blk_mq_ops scsi_mq_ops = {
 	.get_rq_budget_token = scsi_mq_get_rq_budget_token,
 };
 
-int scsi_mq_setup_tags(struct Scsi_Host *shost)
+int scsi_mq_setup_tags(struct Scsi_Host *shost, struct blk_mq_tag_set *tag_set)
 {
 	unsigned int cmd_size, sgl_size;
-	struct blk_mq_tag_set *tag_set = &shost->tag_set;
-
 	sgl_size = max_t(unsigned int, sizeof(struct scatterlist),
 				scsi_mq_inline_sgl_size(shost));
 	cmd_size = sizeof(struct scsi_cmnd) + shost->hostt->cmd_size + sgl_size;
@@ -2955,7 +2966,8 @@ scsi_host_block(struct Scsi_Host *shost)
 	 * SCSI never enables blk-mq's BLK_MQ_F_BLOCKING flag so
 	 * calling synchronize_rcu() once is enough.
 	 */
-	WARN_ON_ONCE(shost->tag_set.flags & BLK_MQ_F_BLOCKING);
+	if (!shost->per_device_tag_set)
+		WARN_ON_ONCE(shost->tag_set.flags & BLK_MQ_F_BLOCKING);
 
 	if (!ret)
 		synchronize_rcu();

@@ -399,7 +399,10 @@ show_nr_hw_queues(struct device *dev, struct device_attribute *attr, char *buf)
 	struct Scsi_Host *shost = class_to_shost(dev);
 	struct blk_mq_tag_set *tag_set = &shost->tag_set;
 
-	return snprintf(buf, 20, "%d\n", tag_set->nr_hw_queues);
+	if (shost->per_device_tag_set)
+		return 0;
+	else
+		return snprintf(buf, 20, "%d\n", tag_set->nr_hw_queues);
 }
 static DEVICE_ATTR(nr_hw_queues, S_IRUGO, show_nr_hw_queues, NULL);
 
@@ -1466,6 +1469,12 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
 	transport_destroy_device(dev);
+
+	if (sdev->host->per_device_tag_set) {
+		blk_mq_free_tag_set(sdev->tag_set);
+		kfree(sdev->tag_set);
+		sdev->tag_set = NULL;
+	}
 
 	/*
 	 * Paired with the kref_get() in scsi_sysfs_initialize().  We have

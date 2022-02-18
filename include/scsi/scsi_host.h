@@ -456,7 +456,39 @@ struct scsi_host_template {
 	/* True if the controller does not support WRITE SAME */
 	unsigned no_write_same:1;
 
+	/*
+	 * True if hardware queues will share blk_mq_tags
+	 * (BLK_MQ_F_TAG_HCTX_SHARED will be set)
+	 */
 	unsigned hctx_share_tags:1;
+	/*
+	 * True if the LLD will create blk_mq_tag_sets for each scsi_device
+	 * If False, request_queues will share the single blk_mq_tag_set in the
+	 * Scsi_Host.
+	 *
+	 * If per_device_tag_set is False and hctx_share_tags is True, all
+	 * devices on the Scsi_Host share a single blk_mq_tag_set referenced
+	 * through the host and all hardware queues share a blk_mq_tags.
+	 *
+	 * If per_device_tag_set is True and hctx_share_tags is True, all
+	 * devices on the Scsi_Host have their own blk_mq_tag_set, allocated and
+	 * maintained by the LLD, and all hardware queues on a given device
+	 * share one blk_mq_tags.
+	 *
+	 * If per_device_tag_set is False and hctx_share_tags is False, all
+	 * devices on the Scsi_Host share a single blk_mq_tag_set referenced
+	 * through the host and hardware queues have their own blk_mq_tags. That
+	 * is, hardware context 1 from device 1 and hardware context 1 from
+	 * device 2 will share the same blk_mq_tags in the host blk_mq_tag_set
+	 * but, hardware context 2 from device 1 and hardware context 2 from
+	 * device 2 will share another blk_mq_tags in the host blk_mq_tag_set.
+	 *
+	 * If per_device_tag_set is True and hctx_share_tags is False, all
+	 * devices on the Scsi_Host will have their own blk_mq_tag_set and all
+	 * hardware queues will have their own blk_mq_tags.
+	 */
+	unsigned per_device_tag_set:1;
+
 
 	/*
 	 * Countdown for host blocking with no commands outstanding.
@@ -649,7 +681,13 @@ struct Scsi_Host {
 	/* The controller does not support WRITE SAME */
 	unsigned no_write_same:1;
 
+	/*
+	 * See comment in struct scsi_host_template for details on how
+	 * hctx_share_tags and per_device_tag_set interact.
+	 */
 	unsigned hctx_share_tags:1;
+
+	unsigned per_device_tag_set:1;
 
 	/* Host responded with short (<36 bytes) INQUIRY result */
 	unsigned short_inquiry:1;
@@ -754,6 +792,9 @@ extern void scsi_rescan_device(struct device *);
 extern void scsi_remove_host(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_get(struct Scsi_Host *);
 extern int scsi_host_busy(struct Scsi_Host *shost);
+// TODO: does this belong in another file?
+extern bool scsi_check_in_flight(struct request *rq, void *data,
+				      bool reserved);
 extern void scsi_host_put(struct Scsi_Host *t);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 extern const char *scsi_host_state_name(enum scsi_host_state);
