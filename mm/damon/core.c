@@ -466,6 +466,31 @@ int damon_start(struct damon_ctx **ctxs, int nr_ctxs)
 	return err;
 }
 
+/**
+ * damon_start_one() - Starts the monitorings for one context.
+ * @ctx:	monitoring context
+ *
+ * This function starts one monitoring thread for only one monitoring context
+ * handling damon_lock.
+ *
+ * Return: 0 on success, negative error code otherwise.
+ */
+int damon_start_one(struct damon_ctx *ctx)
+{
+	int err = 0;
+
+	mutex_lock(&damon_lock);
+	err = __damon_start(ctx);
+	if (err) {
+		mutex_unlock(&damon_lock);
+		return err;
+	}
+	nr_running_ctxs++;
+	mutex_unlock(&damon_lock);
+
+	return err;
+}
+
 /*
  * __damon_stop() - Stops monitoring of given context.
  * @ctx:	monitoring context
