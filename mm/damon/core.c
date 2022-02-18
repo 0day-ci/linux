@@ -179,6 +179,7 @@ struct damos *damon_new_scheme(
 	scheme->wmarks.high = wmarks->high;
 	scheme->wmarks.mid = wmarks->mid;
 	scheme->wmarks.low = wmarks->low;
+	scheme->wmarks.node = wmarks->node;
 	scheme->wmarks.activated = true;
 
 	return scheme;
@@ -951,14 +952,15 @@ static bool kdamond_need_stop(struct damon_ctx *ctx)
 	return true;
 }
 
-static unsigned long damos_wmark_metric_value(enum damos_wmark_metric metric)
+static unsigned long damos_wmark_metric_value(struct damos_watermarks wmarks)
 {
-	struct sysinfo i;
+	unsigned long nr_total, nr_free;
 
-	switch (metric) {
+	switch (wmarks.metric) {
 	case DAMOS_WMARK_FREE_MEM_RATE:
-		si_meminfo(&i);
-		return i.freeram * 1000 / i.totalram;
+		nr_total = node_present_pages(wmarks.node);
+		nr_free = sum_zone_node_page_state(wmarks.node, NR_FREE_PAGES);
+		return nr_free * 1000 / nr_total;
 	default:
 		break;
 	}
@@ -976,7 +978,7 @@ static unsigned long damos_wmark_wait_us(struct damos *scheme)
 	if (scheme->wmarks.metric == DAMOS_WMARK_NONE)
 		return 0;
 
-	metric = damos_wmark_metric_value(scheme->wmarks.metric);
+	metric = damos_wmark_metric_value(scheme->wmarks);
 	/* higher than high watermark or lower than low watermark */
 	if (metric > scheme->wmarks.high || scheme->wmarks.low > metric) {
 		if (scheme->wmarks.activated)
