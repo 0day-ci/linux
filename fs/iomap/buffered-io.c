@@ -646,7 +646,7 @@ static int iomap_write_begin(const struct iomap_iter *iter, loff_t pos,
 	if (srcmap->type == IOMAP_INLINE)
 		status = iomap_write_begin_inline(iter, folio);
 	else if (srcmap->flags & IOMAP_F_BUFFER_HEAD)
-		status = __block_write_begin_int(folio, pos, len, NULL, srcmap);
+		status = __block_write_begin_int(folio, pos, len, NULL, srcmap, 0);
 	else
 		status = __iomap_write_begin(iter, pos, len, folio);
 
@@ -979,7 +979,7 @@ static loff_t iomap_folio_mkwrite_iter(struct iomap_iter *iter,
 
 	if (iter->iomap.flags & IOMAP_F_BUFFER_HEAD) {
 		ret = __block_write_begin_int(folio, iter->pos, length, NULL,
-					      &iter->iomap);
+					      &iter->iomap, 0);
 		if (ret)
 			return ret;
 		block_commit_write(&folio->page, 0, length);
