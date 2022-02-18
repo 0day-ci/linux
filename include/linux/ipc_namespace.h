@@ -67,8 +67,6 @@ struct ipc_namespace {
 	struct user_namespace *user_ns;
 	struct ucounts *ucounts;
 
-	struct llist_node mnt_llist;
-
 	struct ns_common ns;
 } __randomize_layout;
 
