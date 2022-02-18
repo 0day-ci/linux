@@ -121,6 +121,8 @@
 #include "xgbe.h"
 #include "xgbe-common.h"
 
+#define XGBE_DIR_PREFIX	"amd-xgbe-"
+
 static ssize_t xgbe_common_read(char __user *buffer, size_t count,
 				loff_t *ppos, unsigned int value)
 {
@@ -438,15 +440,17 @@ static const struct file_operations xi2c_reg_value_fops = {
 
 void xgbe_debugfs_init(struct xgbe_prv_data *pdata)
 {
-	char *buf;
+	char buf[sizeof(XGBE_DIR_PREFIX) + sizeof(pdata->netdev->name)];
+	int ret;
 
 	/* Set defaults */
 	pdata->debugfs_xgmac_reg = 0;
 	pdata->debugfs_xpcs_mmd = 1;
 	pdata->debugfs_xpcs_reg = 0;
 
-	buf = kasprintf(GFP_KERNEL, "amd-xgbe-%s", pdata->netdev->name);
-	if (!buf)
+	ret = snprintf(buf, sizeof(buf), "%s%s", XGBE_DIR_PREFIX,
+		       pdata->netdev->name);
+	if (ret >= sizeof(buf))
 		return;
 
 	pdata->xgbe_debugfs = debugfs_create_dir(buf, NULL);
@@ -493,8 +497,6 @@ void xgbe_debugfs_init(struct xgbe_prv_data *pdata)
 				    pdata->xgbe_debugfs,
 				    &pdata->debugfs_an_cdr_track_early);
 	}
-
-	kfree(buf);
 }
 
 void xgbe_debugfs_exit(struct xgbe_prv_data *pdata)
@@ -505,21 +507,20 @@ void xgbe_debugfs_exit(struct xgbe_prv_data *pdata)
 
 void xgbe_debugfs_rename(struct xgbe_prv_data *pdata)
 {
-	char *buf;
+	char buf[sizeof(XGBE_DIR_PREFIX) + sizeof(pdata->netdev->name)];
+	int ret;
 
 	if (!pdata->xgbe_debugfs)
 		return;
 
-	buf = kasprintf(GFP_KERNEL, "amd-xgbe-%s", pdata->netdev->name);
-	if (!buf)
+	ret = snprintf(buf, sizeof(buf), "%s%s", XGBE_DIR_PREFIX,
+		       pdata->netdev->name);
+	if (ret >= sizeof(buf))
 		return;
 
 	if (!strcmp(pdata->xgbe_debugfs->d_name.name, buf))
-		goto out;
+		return;
 
 	debugfs_rename(pdata->xgbe_debugfs->d_parent, pdata->xgbe_debugfs,
 		       pdata->xgbe_debugfs->d_parent, buf);
-
-out:
-	kfree(buf);
 }
