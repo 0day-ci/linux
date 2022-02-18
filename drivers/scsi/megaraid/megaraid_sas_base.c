@@ -3168,12 +3168,14 @@ megasas_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 	return 0;
 }
 
-static int megasas_map_queues(struct Scsi_Host *shost)
+static int megasas_map_queues(struct blk_mq_tag_set *set)
 {
+	struct Scsi_Host *shost;
 	struct megasas_instance *instance;
 	int qoff = 0, offset;
 	struct blk_mq_queue_map *map;
 
+	shost = set->driver_data;
 	instance = (struct megasas_instance *)shost->hostdata;
 
 	if (shost->nr_hw_queues == 1)

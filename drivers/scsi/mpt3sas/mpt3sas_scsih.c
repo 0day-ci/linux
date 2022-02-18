@@ -11868,8 +11868,9 @@ out:
  * scsih_map_queues - map reply queues with request queues
  * @shost: SCSI host pointer
  */
-static int scsih_map_queues(struct Scsi_Host *shost)
+static int scsih_map_queues(struct blk_mq_tag_set *set)
 {
+	struct Scsi_Host *shost = set->driver_data;
 	struct MPT3SAS_ADAPTER *ioc =
 	    (struct MPT3SAS_ADAPTER *)shost->hostdata;
 	struct blk_mq_queue_map *map;

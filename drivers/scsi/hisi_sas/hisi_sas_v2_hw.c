@@ -3538,10 +3538,11 @@ static struct attribute *host_v2_hw_attrs[] = {
 
 ATTRIBUTE_GROUPS(host_v2_hw);
 
-static int map_queues_v2_hw(struct Scsi_Host *shost)
+static int map_queues_v2_hw(struct blk_mq_tag_set *set)
 {
+	struct Scsi_Host *shost = set->driver_data;
 	struct hisi_hba *hisi_hba = shost_priv(shost);
-	struct blk_mq_queue_map *qmap = &shost->tag_set.map[HCTX_TYPE_DEFAULT];
+	struct blk_mq_queue_map *qmap = &set->map[HCTX_TYPE_DEFAULT];
 	const struct cpumask *mask;
 	unsigned int queue, cpu;
 

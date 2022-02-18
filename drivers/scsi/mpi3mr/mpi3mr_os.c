@@ -3167,8 +3167,9 @@ static int mpi3mr_bios_param(struct scsi_device *sdev,
  *
  * Return: return zero.
  */
-static int mpi3mr_map_queues(struct Scsi_Host *shost)
+static int mpi3mr_map_queues(struct blk_mq_tag_set *set)
 {
+	struct Scsi_Host *shost = set->driver_data;
 	struct mpi3mr_ioc *mrioc = shost_priv(shost);
 	int i, qoff, offset;
 	struct blk_mq_queue_map *map = NULL;
@@ -3205,7 +3206,6 @@ static int mpi3mr_map_queues(struct Scsi_Host *shost)
 	}
 
 	return 0;
-
 }
 
 /**

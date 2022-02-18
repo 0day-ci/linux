@@ -1864,10 +1864,10 @@ static int scsi_init_hctx(struct blk_mq_hw_ctx *hctx, void *data,
 
 static int scsi_map_queues(struct blk_mq_tag_set *set)
 {
-	struct Scsi_Host *shost = container_of(set, struct Scsi_Host, tag_set);
+	struct Scsi_Host *shost = set->driver_data;
 
 	if (shost->hostt->map_queues)
-		return shost->hostt->map_queues(shost);
+		return shost->hostt->map_queues(set);
 	return blk_mq_map_queues(&set->map[HCTX_TYPE_DEFAULT]);
 }
 

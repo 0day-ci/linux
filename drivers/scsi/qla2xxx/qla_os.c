@@ -335,7 +335,7 @@ MODULE_PARM_DESC(ql2xabts_wait_nvme,
 
 static void qla2x00_clear_drv_active(struct qla_hw_data *);
 static void qla2x00_free_device(scsi_qla_host_t *);
-static int qla2xxx_map_queues(struct Scsi_Host *shost);
+static int qla2xxx_map_queues(struct blk_mq_tag_set *tag_set);
 static void qla2x00_destroy_deferred_work(struct qla_hw_data *);
 
 
@@ -7881,11 +7881,12 @@ qla_pci_reset_done(struct pci_dev *pdev)
 	clear_bit(ABORT_ISP_ACTIVE, &base_vha->dpc_flags);
 }
 
-static int qla2xxx_map_queues(struct Scsi_Host *shost)
+static int qla2xxx_map_queues(struct blk_mq_tag_set *set)
 {
 	int rc;
+	struct Scsi_Host *shost = set->driver_data;
 	scsi_qla_host_t *vha = (scsi_qla_host_t *)shost->hostdata;
-	struct blk_mq_queue_map *qmap = &shost->tag_set.map[HCTX_TYPE_DEFAULT];
+	struct blk_mq_queue_map *qmap = &set->map[HCTX_TYPE_DEFAULT];
 
 	if (USER_CTRL_IRQ(vha->hw) || !vha->hw->mqiobase)
 		rc = blk_mq_map_queues(qmap);
