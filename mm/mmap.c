@@ -1064,21 +1064,21 @@ static inline int is_mergeable_anon_vma(struct anon_vma *anon_vma1,
 	 */
 	if ((!anon_vma1 || !anon_vma2) && (!vma ||
 		list_is_singular(&vma->anon_vma_chain)))
-		return 1;
+		return AV_MERGE_SAME;
 	if (anon_vma1 == anon_vma2)
-		return 1;
+		return AV_MERGE_SAME;
 	/*
 	 * Different anon_vma but not shared by several processes
 	 */
 	else if ((anon_vma1 && anon_vma2) &&
 			(anon_vma1 == anon_vma1->root)
 			&& (rbt_no_children(anon_vma1)))
-		return 1;
+		return AV_MERGE_DIFFERENT;
 	/*
 	 * Different anon_vma and shared -> unmergeable
 	 */
 	else
-		return 0;
+		return AV_MERGE_FAILED;
 }
 
 /*
@@ -1099,12 +1099,10 @@ can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
 		     struct vm_userfaultfd_ctx vm_userfaultfd_ctx,
 		     const char *anon_name)
 {
-	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx, anon_name) &&
-	    is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma)) {
+	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx, anon_name))
 		if (vma->vm_pgoff == vm_pgoff)
-			return 1;
-	}
-	return 0;
+			return is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma);
+	return MERGE_FAILED;
 }
 
 /*
@@ -1121,14 +1119,13 @@ can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
 		    struct vm_userfaultfd_ctx vm_userfaultfd_ctx,
 		    const char *anon_name)
 {
-	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx, anon_name) &&
-	    is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma)) {
+	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx, anon_name)) {
 		pgoff_t vm_pglen;
 		vm_pglen = vma_pages(vma);
 		if (vma->vm_pgoff + vm_pglen == vm_pgoff)
-			return 1;
+			return is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma);
 	}
-	return 0;
+	return MERGE_FAILED;
 }
 
 /*
@@ -1185,9 +1182,14 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	pgoff_t pglen = (end - addr) >> PAGE_SHIFT;
 	struct vm_area_struct *area, *next;
 	int err;
-	int merge_prev = 0;
-	int merge_both = 0;
-	int merge_next = 0;
+	/*
+	 * Following three variables are used to store values
+	 * indicating wheather this VMA and its anon_vma can
+	 * be merged and also the type of failure or success.
+	 */
+	enum vma_merge_res merge_prev = MERGE_FAILED;
+	enum vma_merge_res merge_both = MERGE_FAILED;
+	enum vma_merge_res merge_next = MERGE_FAILED;
 
 	/*
 	 * We later require that vma->vm_flags == vm_flags,
@@ -1210,38 +1212,39 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	 * Can we merge predecessor?
 	 */
 	if (prev && prev->vm_end == addr &&
-			mpol_equal(vma_policy(prev), policy) &&
-			can_vma_merge_after(prev, vm_flags,
+			mpol_equal(vma_policy(prev), policy)) {
+		merge_prev = can_vma_merge_after(prev, vm_flags,
 					    anon_vma, file, pgoff,
-					    vm_userfaultfd_ctx, anon_name)) {
-		merge_prev = true;
+					    vm_userfaultfd_ctx, anon_name);
 	}
+
 	/*
 	 * Can we merge successor?
 	 */
 	if (next && end == next->vm_start &&
-			mpol_equal(policy, vma_policy(next)) &&
-			can_vma_merge_before(next, vm_flags,
+			mpol_equal(policy, vma_policy(next))) {
+		merge_next = can_vma_merge_before(next, vm_flags,
 					anon_vma, file, pgoff+pglen,
-					vm_userfaultfd_ctx, anon_name)) {
-		merge_next = true;
+					vm_userfaultfd_ctx, anon_name);
 	}
+
 	/*
 	 * Can we merge both predecessor and successor?
 	 */
-	if (merge_prev && merge_next)
+	if (merge_prev >= MERGE_OK && merge_next >= MERGE_OK) {
 		merge_both = is_mergeable_anon_vma(prev->anon_vma, next->anon_vma, NULL);
+	}
 
-	if (merge_both) {	 /* cases 1, 6 */
+	if (merge_both >= MERGE_OK) {	 /* cases 1, 6 */
 		err = __vma_adjust(prev, prev->vm_start,
 					next->vm_end, prev->vm_pgoff, NULL,
 					prev);
 		area = prev;
-	} else if (merge_prev) {			/* cases 2, 5, 7 */
+	} else if (merge_prev >= MERGE_OK) {			/* cases 2, 5, 7 */
 		err = __vma_adjust(prev, prev->vm_start,
 					end, prev->vm_pgoff, NULL, prev);
 		area = prev;
-	} else if (merge_next) {
+	} else if (merge_next >= MERGE_OK) {
 		if (prev && addr < prev->vm_end)	/* case 4 */
 			err = __vma_adjust(prev, prev->vm_start,
 					addr, prev->vm_pgoff, NULL, next);
@@ -1252,7 +1255,7 @@ struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	} else {
 		err = -1;
 	}
-
+	trace_vm_av_merge(err, merge_prev, merge_next, merge_both);
 	/*
 	 * Cannot merge with predecessor or successor or error in __vma_adjust?
 	 */
@@ -3332,6 +3335,8 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 		/*
 		 * Source vma may have been merged into new_vma
 		 */
+		trace_vm_pgoff_merge(vma, anon_pgoff_updated);
+
 		if (unlikely(vma_start >= new_vma->vm_start &&
 			     vma_start < new_vma->vm_end)) {
 			/*

@@ -6,6 +6,7 @@
 #define _TRACE_MMAP_H
 
 #include <linux/tracepoint.h>
+#include <../mm/internal.h>
 
 TRACE_EVENT(vm_unmapped_area,
 
@@ -41,6 +42,60 @@ TRACE_EVENT(vm_unmapped_area,
 		__entry->total_vm, __entry->flags, __entry->length,
 		__entry->low_limit, __entry->high_limit, __entry->align_mask,
 		__entry->align_offset)
+);
+
+TRACE_EVENT(vm_av_merge,
+
+	TP_PROTO(int merged, enum vma_merge_res merge_prev, enum vma_merge_res merge_next, enum vma_merge_res merge_both),
+
+	TP_ARGS(merged, merge_prev, merge_next, merge_both),
+
+	TP_STRUCT__entry(
+		__field(int,			merged)
+		__field(enum vma_merge_res,	predecessor_different_av)
+		__field(enum vma_merge_res,	successor_different_av)
+		__field(enum vma_merge_res,	predecessor_with_successor_different_av)
+		__field(int,			diff_count)
+		__field(int,			failed_count)
+	),
+
+	TP_fast_assign(
+		__entry->merged = merged == 0;
+		__entry->predecessor_different_av = merge_prev;
+		__entry->successor_different_av = merge_next;
+		__entry->predecessor_with_successor_different_av = merge_both;
+		__entry->diff_count = (merge_prev == AV_MERGE_DIFFERENT)
+		+ (merge_next == AV_MERGE_DIFFERENT) + (merge_both == AV_MERGE_DIFFERENT);
+		__entry->failed_count = (merge_prev == AV_MERGE_FAILED)
+		+ (merge_next == AV_MERGE_FAILED) + (merge_both == AV_MERGE_FAILED);
+	),
+
+	TP_printk("merged=%d predecessor=%d successor=%d predecessor_with_successor=%d diff_count=%d failed_count=%d\n",
+		__entry->merged,
+		__entry->predecessor_different_av, __entry->successor_different_av,
+		__entry->predecessor_with_successor_different_av,
+		__entry->diff_count, __entry->failed_count)
+
+);
+
+TRACE_EVENT(vm_pgoff_merge,
+
+	TP_PROTO(struct vm_area_struct *vma, bool anon_pgoff_updated),
+
+	TP_ARGS(vma, anon_pgoff_updated),
+
+	TP_STRUCT__entry(
+		__field(bool,	faulted)
+		__field(bool,	updated)
+	),
+
+	TP_fast_assign(
+		__entry->faulted = vma->anon_vma;
+		__entry->updated = anon_pgoff_updated;
+	),
+
+	TP_printk("faulted=%d updated=%d\n",
+		__entry->faulted, __entry->updated)
 );
 #endif
 

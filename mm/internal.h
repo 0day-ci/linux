@@ -34,6 +34,17 @@ struct folio_batch;
 /* Do not use these with a slab allocator */
 #define GFP_SLAB_BUG_MASK (__GFP_DMA32|__GFP_HIGHMEM|~__GFP_BITS_MASK)
 
+/*
+ * Following values indicate reason for merge success or failure.
+ */
+enum vma_merge_res {
+	MERGE_FAILED,
+	AV_MERGE_FAILED,
+	AV_MERGE_SAME,
+	MERGE_OK = AV_MERGE_SAME,
+	AV_MERGE_DIFFERENT,
+};
+
 void page_writeback_init(void);
 
 static inline void *folio_raw_mapping(struct folio *folio)
