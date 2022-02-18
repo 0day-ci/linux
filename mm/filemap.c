@@ -3796,7 +3796,7 @@ again:
 		pos += status;
 		written += status;
 
-		balance_dirty_pages_ratelimited(mapping);
+		balance_dirty_pages_ratelimited_flags(mapping, flags & AOP_FLAG_NOWAIT);
 	} while (iov_iter_count(i));
 
 	return written ? written : status;
