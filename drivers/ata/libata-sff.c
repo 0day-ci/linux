@@ -1644,13 +1644,14 @@ void ata_sff_lost_interrupt(struct ata_port *ap)
 		return;
 	/* See if the controller thinks it is still busy - if so the command
 	   isn't a lost IRQ but is still in progress */
-	if (ata_sff_altstatus(ap, &status) && (status & ATA_BUSY))
+	if (WARN_ON_ONCE(!ata_sff_altstatus(ap, &status)))
+		return;
+	if (status & ATA_BUSY)
 		return;
 
 	/* There was a command running, we are no longer busy and we have
 	   no interrupt. */
-	ata_port_warn(ap, "lost interrupt (Status 0x%x)\n",
-								status);
+	ata_port_warn(ap, "lost interrupt (Status 0x%x)\n", status);
 	/* Run the host interrupt logic as if the interrupt had not been
 	   lost */
 	ata_sff_port_intr(ap, qc);
