@@ -133,11 +133,19 @@ struct page *grab_cache_page_write_begin(struct address_space *mapping,
 					pgoff_t index, unsigned flags)
 {
 	unsigned fgp_flags = FGP_LOCK | FGP_WRITE | FGP_CREAT | FGP_STABLE;
+	gfp_t gfp = mapping_gfp_mask(mapping);
 
 	if (flags & AOP_FLAG_NOFS)
 		fgp_flags |= FGP_NOFS;
-	return pagecache_get_page(mapping, index, fgp_flags,
-			mapping_gfp_mask(mapping));
+
+	if (flags & AOP_FLAG_NOWAIT) {
+		fgp_flags |= FGP_NOWAIT;
+
+		gfp |= GFP_ATOMIC;
+		gfp &= ~__GFP_DIRECT_RECLAIM;
+	}
+
+	return pagecache_get_page(mapping, index, fgp_flags, gfp);
 }
 EXPORT_SYMBOL(grab_cache_page_write_begin);
 
