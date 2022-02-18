@@ -1682,13 +1682,20 @@ static inline int block_size_bits(unsigned int blocksize)
 	return ilog2(blocksize);
 }
 
-static struct buffer_head *create_page_buffers(struct page *page, struct inode *inode, unsigned int b_state)
+static struct buffer_head *create_page_buffers(struct page *page,
+					struct inode *inode,
+					unsigned int b_state,
+					gfp_t flags)
 {
 	BUG_ON(!PageLocked(page));
 
-	if (!page_has_buffers(page))
-		create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
-				     b_state);
+	if (!page_has_buffers(page)) {
+		gfp_t gfp = GFP_NOFS | __GFP_ACCOUNT | flags;
+
+		__create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
+				     b_state, gfp);
+	}
+
 	return page_buffers(page);
 }
 
@@ -1734,7 +1741,7 @@ int __block_write_full_page(struct inode *inode, struct page *page,
 	int write_flags = wbc_to_write_flags(wbc);
 
 	head = create_page_buffers(page, inode,
-					(1 << BH_Dirty)|(1 << BH_Uptodate));
+					(1 << BH_Dirty)|(1 << BH_Uptodate), __GFP_NOFAIL);
 
 	/*
 	 * Be very careful.  We have no exclusion from __set_page_dirty_buffers
@@ -2000,7 +2007,7 @@ int __block_write_begin_int(struct folio *folio, loff_t pos, unsigned len,
 	BUG_ON(to > PAGE_SIZE);
 	BUG_ON(from > to);
 
-	head = create_page_buffers(&folio->page, inode, 0);
+	head = create_page_buffers(&folio->page, inode, 0, flags);
 	blocksize = head->b_size;
 	bbits = block_size_bits(blocksize);
 
@@ -2127,12 +2134,17 @@ int block_write_begin(struct address_space *mapping, loff_t pos, unsigned len,
 	pgoff_t index = pos >> PAGE_SHIFT;
 	struct page *page;
 	int status;
+	gfp_t gfp = 0;
+	bool no_wait = (flags & AOP_FLAG_NOWAIT);
+
+	if (no_wait)
+		gfp = GFP_ATOMIC | __GFP_NOWARN;
 
 	page = grab_cache_page_write_begin(mapping, index, flags);
 	if (!page)
 		return -ENOMEM;
 
-	status = __block_write_begin_int(page_folio(page), pos, len, get_block, NULL, flags);
+	status = __block_write_begin_int(page_folio(page), pos, len, get_block, NULL, gfp);
 	if (unlikely(status)) {
 		unlock_page(page);
 		put_page(page);
@@ -2280,7 +2292,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	int nr, i;
 	int fully_mapped = 1;
 
-	head = create_page_buffers(page, inode, 0);
+	head = create_page_buffers(page, inode, 0, __GFP_NOFAIL);
 	blocksize = head->b_size;
 	bbits = block_size_bits(blocksize);
 
