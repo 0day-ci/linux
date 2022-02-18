@@ -1554,17 +1554,12 @@ out:
 EXPORT_SYMBOL(block_invalidatepage);
 
 
-/*
- * We attach and possibly dirty the buffers atomically wrt
- * __set_page_dirty_buffers() via private_lock.  try_to_free_buffers
- * is already excluded via the page lock.
- */
-void create_empty_buffers(struct page *page,
-			unsigned long blocksize, unsigned long b_state)
+static void __create_empty_buffers(struct page *page, unsigned long blocksize,
+				unsigned long b_state, gfp_t gfp)
 {
 	struct buffer_head *bh, *head, *tail;
 
-	head = alloc_page_buffers(page, blocksize, true);
+	head = __alloc_page_buffers(page, blocksize, gfp);
 	bh = head;
 	do {
 		bh->b_state |= b_state;
@@ -1586,6 +1581,17 @@ void create_empty_buffers(struct page *page,
 	}
 	attach_page_private(page, head);
 	spin_unlock(&page->mapping->private_lock);
+}
+/*
+ * We attach and possibly dirty the buffers atomically wrt
+ * __set_page_dirty_buffers() via private_lock.  try_to_free_buffers
+ * is already excluded via the page lock.
+ */
+void create_empty_buffers(struct page *page,
+			unsigned long blocksize, unsigned long b_state)
+{
+	return __create_empty_buffers(page, blocksize, b_state,
+				GFP_NOFS | __GFP_ACCOUNT | __GFP_NOFAIL);
 }
 EXPORT_SYMBOL(create_empty_buffers);
 
