@@ -4384,13 +4384,20 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 }
 EXPORT_SYMBOL_GPL(kern_mount);
 
+static void mntput_rcu_work(struct work_struct *work)
+{
+	struct vfsmount *mnt = container_of(to_rcu_work(work),
+			       struct vfsmount, free_rwork);
+	mntput(mnt);
+}
+
 void kern_unmount(struct vfsmount *mnt)
 {
 	/* release long term mount so mount point can be released */
 	if (!IS_ERR_OR_NULL(mnt)) {
 		real_mount(mnt)->mnt_ns = NULL;
-		synchronize_rcu();	/* yecchhh... */
-		mntput(mnt);
+		INIT_RCU_WORK(&mnt->free_rwork, mntput_rcu_work);
+		queue_rcu_work(system_wq, &mnt->free_rwork);
 	}
 }
 EXPORT_SYMBOL(kern_unmount);
