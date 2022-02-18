@@ -4919,7 +4919,7 @@ out:
 	return ret;
 }
 
-/**
+/*
  * Walk the list of dirty pages of the given address space and write all of them.
  *
  * @mapping: address space structure to write

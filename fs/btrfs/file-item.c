@@ -621,7 +621,7 @@ fail:
 	return ret;
 }
 
-/**
+/*
  * Calculate checksums of the data contained inside a bio
  *
  * @inode:	 Owner of the data inside the bio

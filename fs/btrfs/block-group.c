@@ -1739,7 +1739,7 @@ static void set_avail_alloc_bits(struct btrfs_fs_info *fs_info, u64 flags)
 	write_sequnlock(&fs_info->profiles_lock);
 }
 
-/**
+/*
  * Map a physical disk address to a list of logical addresses
  *
  * @fs_info:       the filesystem

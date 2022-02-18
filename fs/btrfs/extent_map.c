@@ -386,7 +386,7 @@ static void extent_map_device_clear_bits(struct extent_map *em, unsigned bits)
 	}
 }
 
-/**
+/*
  * Add new extent map to the extent tree
  *
  * @tree:	tree to insert new map in

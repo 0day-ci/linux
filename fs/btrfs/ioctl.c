@@ -1785,7 +1785,7 @@ int btrfs_defrag_ioctl_args_to_ctrl(struct btrfs_fs_info *fs_info,
 	return 0;
 }
 
-/**
+/*
  * Entry point to file defragmentation.
  *
  * @inode:	   inode to be defragged
