@@ -31,6 +31,7 @@ struct osnoise_top_params {
 	int			quiet;
 	int			set_sched;
 	struct sched_attr	sched_param;
+	struct trace_events	*events;
 };
 
 struct osnoise_top_cpu {
@@ -286,6 +287,7 @@ void osnoise_top_usage(char *usage)
 struct osnoise_top_params *osnoise_top_parse_args(int argc, char **argv)
 {
 	struct osnoise_top_params *params;
+	struct trace_events *tevent;
 	int retval;
 	int c;
 
@@ -299,6 +301,7 @@ struct osnoise_top_params *osnoise_top_parse_args(int argc, char **argv)
 			{"cpus",		required_argument,	0, 'c'},
 			{"debug",		no_argument,		0, 'D'},
 			{"duration",		required_argument,	0, 'd'},
+			{"event",		required_argument,	0, 'e'},
 			{"help",		no_argument,		0, 'h'},
 			{"period",		required_argument,	0, 'p'},
 			{"priority",		required_argument,	0, 'P'},
@@ -314,7 +317,7 @@ struct osnoise_top_params *osnoise_top_parse_args(int argc, char **argv)
 		/* getopt_long stores the option index here. */
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "a:c:d:Dhp:P:qr:s:S:t::T:",
+		c = getopt_long(argc, argv, "a:c:d:De:hp:P:qr:s:S:t::T:",
 				 long_options, &option_index);
 
 		/* Detect the end of the options. */
@@ -346,6 +349,21 @@ struct osnoise_top_params *osnoise_top_parse_args(int argc, char **argv)
 			params->duration = parse_seconds_duration(optarg);
 			if (!params->duration)
 				osnoise_top_usage("Invalid -D duration\n");
+			break;
+		case 'e':
+			tevent = alloc_trace_event(optarg);
+			if (!tevent) {
+				err_msg("error alloc trace event");
+				exit(EXIT_FAILURE);
+			}
+
+			if (params->events)
+				tevent->next = params->events;
+			params->events = tevent;
+
+			/* if -e && !-t -> -t */
+			if (!params->trace_output)
+				params->trace_output = "osnoise_trace.txt";
 			break;
 		case 'h':
 		case '?':
@@ -556,6 +574,13 @@ int osnoise_top_main(int argc, char **argv)
 			err_msg("Failed to enable the trace instance\n");
 			goto out_top;
 		}
+
+		if (params->events) {
+			retval = enable_trace_events(&record->trace, params->events);
+			if (retval)
+				goto out_top;
+		}
+
 		trace_instance_start(&record->trace);
 	}
 
@@ -597,6 +622,8 @@ int osnoise_top_main(int argc, char **argv)
 	}
 
 out_top:
+	destroy_trace_events(&record->trace, params->events);
+	params->events = NULL;
 	osnoise_free_top(tool->data);
 	osnoise_destroy_tool(record);
 	osnoise_destroy_tool(tool);
