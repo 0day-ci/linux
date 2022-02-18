@@ -177,13 +177,27 @@ static unsigned long monitor_region_end __read_mostly;
 module_param(monitor_region_end, ulong, 0600);
 
 /*
- * PID of the DAMON thread
+ * Enable monitoring memory regions per NUMA node.
  *
- * If DAMON_RECLAIM is enabled, this becomes the PID of the worker thread.
+ * By default, watermarks consist of based on total system memory.
+ */
+static bool per_node __read_mostly;
+module_param(per_node, bool, 0600);
+
+/*
+ * Number of currently running DAMON worker threads
+ */
+static unsigned long nr_kdamond __read_mostly;
+module_param(nr_kdamond, ulong, 0400);
+
+/*
+ * First PID of the DAMON threads
+ *
+ * If DAMON_RECLAIM is enabled, this becomes the first PID of the worker threads.
  * Else, -1.
  */
-static int kdamond_pid __read_mostly = -1;
-module_param(kdamond_pid, int, 0400);
+static int kdamond_start_pid __read_mostly = -1;
+module_param(kdamond_start_pid, int, 0400);
 
 /*
  * Number of memory regions that tried to be reclaimed.
@@ -215,8 +229,8 @@ module_param(bytes_reclaimed_regions, ulong, 0400);
 static unsigned long nr_quota_exceeds __read_mostly;
 module_param(nr_quota_exceeds, ulong, 0400);
 
-static struct damon_ctx *ctx;
-static struct damon_target *target;
+static struct damon_ctx *ctxs[MAX_NUMNODES];
+static struct damon_target *targets[MAX_NUMNODES];
 
 struct damon_reclaim_ram_walk_arg {
 	unsigned long start;
@@ -251,7 +265,7 @@ static bool get_monitoring_region(unsigned long *start, unsigned long *end)
 	return true;
 }
 
-static struct damos *damon_reclaim_new_scheme(void)
+static struct damos *damon_reclaim_new_scheme(int node)
 {
 	struct damos_watermarks wmarks = {
 		.metric = DAMOS_WMARK_FREE_MEM_RATE,
@@ -259,6 +273,7 @@ static struct damos *damon_reclaim_new_scheme(void)
 		.high = wmarks_high,
 		.mid = wmarks_mid,
 		.low = wmarks_low,
+		.node = node,
 	};
 	struct damos_quota quota = {
 		/*
@@ -290,56 +305,99 @@ static struct damos *damon_reclaim_new_scheme(void)
 	return scheme;
 }
 
-static int damon_reclaim_turn(bool on)
+static int damon_reclaim_start(int nid)
 {
 	struct damon_region *region;
 	struct damos *scheme;
 	int err;
+	unsigned long start, end;
 
-	if (!on) {
-		err = damon_stop(&ctx, 1);
-		if (!err)
-			kdamond_pid = -1;
-		return err;
-	}
-
-	err = damon_set_attrs(ctx, sample_interval, aggr_interval, 0,
+	err = damon_set_attrs(ctxs[nid], sample_interval, aggr_interval, 0,
 			min_nr_regions, max_nr_regions);
 	if (err)
 		return err;
 
-	if (monitor_region_start > monitor_region_end)
-		return -EINVAL;
-	if (!monitor_region_start && !monitor_region_end &&
-			!get_monitoring_region(&monitor_region_start,
-				&monitor_region_end))
-		return -EINVAL;
+	if (per_node) {
+		monitor_region_start = monitor_region_end = 0;
+
+		start = PFN_PHYS(node_start_pfn(nid));
+		end = PFN_PHYS(node_start_pfn(nid) + node_present_pages(nid) - 1);
+		if (end <= start)
+			return -EINVAL;
+	} else {
+		if (!monitor_region_start && !monitor_region_end &&
+				!get_monitoring_region(&monitor_region_start,
+					&monitor_region_end))
+			return -EINVAL;
+		start = monitor_region_start;
+		end = monitor_region_end;
+	}
+
 	/* DAMON will free this on its own when finish monitoring */
-	region = damon_new_region(monitor_region_start, monitor_region_end);
+	region = damon_new_region(start, end);
 	if (!region)
 		return -ENOMEM;
-	damon_add_region(region, target);
+	damon_add_region(region, targets[nid]);
 
 	/* Will be freed by 'damon_set_schemes()' below */
-	scheme = damon_reclaim_new_scheme();
+	scheme = damon_reclaim_new_scheme(nid);
 	if (!scheme) {
 		err = -ENOMEM;
 		goto free_region_out;
 	}
-	err = damon_set_schemes(ctx, &scheme, 1);
+
+	err = damon_set_schemes(ctxs[nid], &scheme, 1);
 	if (err)
 		goto free_scheme_out;
 
-	err = damon_start(&ctx, 1);
+	err = damon_start_one(ctxs[nid]);
 	if (!err) {
-		kdamond_pid = ctx->kdamond->pid;
+		if (kdamond_start_pid == -1)
+			kdamond_start_pid = ctxs[nid]->kdamond->pid;
+		nr_kdamond++;
 		return 0;
 	}
 
 free_scheme_out:
 	damon_destroy_scheme(scheme);
 free_region_out:
-	damon_destroy_region(region, target);
+	damon_destroy_region(region, targets[nid]);
+
+	return err;
+}
+
+static int damon_reclaim_start_all(void)
+{
+	int nid, err;
+
+	if (!per_node)
+		return damon_reclaim_start(0);
+
+	for_each_online_node(nid) {
+		err = damon_reclaim_start(nid);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
+static int damon_reclaim_turn(bool on)
+{
+	int err;
+
+	if (!on) {
+		err = damon_stop(ctxs, nr_kdamond);
+		if (!err) {
+			kdamond_start_pid = -1;
+			nr_kdamond = 0;
+			monitor_region_start = 0;
+			monitor_region_end = 0;
+		}
+		return err;
+	}
+
+	err = damon_reclaim_start_all();
 	return err;
 }
 
@@ -380,21 +438,24 @@ static int damon_reclaim_after_aggregation(struct damon_ctx *c)
 
 static int __init damon_reclaim_init(void)
 {
-	ctx = damon_new_ctx();
-	if (!ctx)
-		return -ENOMEM;
+	int nid;
 
-	if (damon_select_ops(ctx, DAMON_OPS_PADDR))
-		return -EINVAL;
+	for_each_node(nid) {
+		ctxs[nid] = damon_new_ctx();
+		if (!ctxs[nid])
+			return -ENOMEM;
 
-	ctx->callback.after_aggregation = damon_reclaim_after_aggregation;
+		if (damon_select_ops(ctxs[nid], DAMON_OPS_PADDR))
+			return -EINVAL;
+		ctxs[nid]->callback.after_aggregation = damon_reclaim_after_aggregation;
 
-	target = damon_new_target();
-	if (!target) {
-		damon_destroy_ctx(ctx);
-		return -ENOMEM;
+		targets[nid] = damon_new_target();
+		if (!targets[nid]) {
+			damon_destroy_ctx(ctxs[nid]);
+			return -ENOMEM;
+		}
+		damon_add_target(ctxs[nid], targets[nid]);
 	}
-	damon_add_target(ctx, target);
 
 	schedule_delayed_work(&damon_reclaim_timer, 0);
 	return 0;
