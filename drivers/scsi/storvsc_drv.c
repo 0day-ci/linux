@@ -1997,6 +1997,7 @@ static struct scsi_host_template scsi_driver = {
 	.track_queue_depth =	1,
 	.change_queue_depth =	storvsc_change_queue_depth,
 	.per_device_tag_set =	1,
+	.hctx_share_tags = 1,
 };
 
 enum {
