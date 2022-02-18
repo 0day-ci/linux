@@ -850,13 +850,13 @@ static int dm9051_loop_tx(struct board_info *db)
 		if (skb) {
 			ntx++;
 			ret = dm9051_single_tx(db, skb->data, skb->len);
+			ndev->stats.tx_bytes += skb->len;
+			ndev->stats.tx_packets++;
 			dev_kfree_skb(skb);
 			if (ret < 0) {
 				db->bc.tx_err_counter++;
 				return 0;
 			}
-			ndev->stats.tx_bytes += skb->len;
-			ndev->stats.tx_packets++;
 		}
 
 		if (netif_queue_stopped(ndev) &&
