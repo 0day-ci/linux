@@ -5838,6 +5838,13 @@ out_free:
 	btrfs_free_path(path);
 out:
 	/*
+	 * We were an unfinished drop root, check to see if there are any
+	 * pending, and if not clear and wake up any waiters.
+	 */
+	if (!err && test_bit(BTRFS_ROOT_UNFINISHED_DROP, &root->state))
+		btrfs_maybe_wake_unfinished_drop(fs_info);
+
+	/*
 	 * So if we need to stop dropping the snapshot for whatever reason we
 	 * need to make sure to add it back to the dead root list so that we
 	 * keep trying to do the work later.  This also cleans up roots if we
