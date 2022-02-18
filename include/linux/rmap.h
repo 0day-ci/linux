@@ -139,9 +139,12 @@ static inline void anon_vma_unlock_read(struct anon_vma *anon_vma)
  */
 void anon_vma_init(void);	/* create anon_vma_cachep */
 int  __anon_vma_prepare(struct vm_area_struct *);
+void reconnect_pages(struct vm_area_struct *vma, struct vm_area_struct *next);
 void unlink_anon_vmas(struct vm_area_struct *);
 int anon_vma_clone(struct vm_area_struct *, struct vm_area_struct *);
 int anon_vma_fork(struct vm_area_struct *, struct vm_area_struct *);
+
+bool rbt_no_children(struct anon_vma *av);
 
 static inline int anon_vma_prepare(struct vm_area_struct *vma)
 {
@@ -151,10 +154,22 @@ static inline int anon_vma_prepare(struct vm_area_struct *vma)
 	return __anon_vma_prepare(vma);
 }
 
+/**
+ * anon_vma_merge() - Merge anon_vmas of the given VMAs
+ * @vma: VMA being merged to
+ * @next: VMA being merged
+ */
 static inline void anon_vma_merge(struct vm_area_struct *vma,
 				  struct vm_area_struct *next)
 {
-	VM_BUG_ON_VMA(vma->anon_vma != next->anon_vma, vma);
+	struct anon_vma *anon_vma1 = vma->anon_vma;
+	struct anon_vma *anon_vma2 = next->anon_vma;
+
+	VM_BUG_ON_VMA(anon_vma1 && anon_vma2 && anon_vma1 != anon_vma2 &&
+			((anon_vma2 != anon_vma2->root)
+			|| !rbt_no_children(anon_vma2)), vma);
+
+	reconnect_pages(vma, next);
 	unlink_anon_vmas(next);
 }
 

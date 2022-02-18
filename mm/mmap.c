@@ -1065,7 +1065,20 @@ static inline int is_mergeable_anon_vma(struct anon_vma *anon_vma1,
 	if ((!anon_vma1 || !anon_vma2) && (!vma ||
 		list_is_singular(&vma->anon_vma_chain)))
 		return 1;
-	return anon_vma1 == anon_vma2;
+	if (anon_vma1 == anon_vma2)
+		return 1;
+	/*
+	 * Different anon_vma but not shared by several processes
+	 */
+	else if ((anon_vma1 && anon_vma2) &&
+			(anon_vma1 == anon_vma1->root)
+			&& (rbt_no_children(anon_vma1)))
+		return 1;
+	/*
+	 * Different anon_vma and shared -> unmergeable
+	 */
+	else
+		return 0;
 }
 
 /*

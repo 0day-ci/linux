@@ -389,6 +389,46 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	return -ENOMEM;
 }
 
+/**
+ * reconnect_pages() - Reconnect physical pages from old to vma
+ * @vma: VMA to newly contain all physical pages of old
+ * @old: old VMA being merged to vma
+ */
+void reconnect_pages(struct vm_area_struct *vma, struct vm_area_struct *old)
+{
+	struct anon_vma *anon_vma1 = vma->anon_vma;
+	struct anon_vma *anon_vma2 = old->anon_vma;
+	unsigned long pg_iter;
+	int pg_iters;
+
+	if (anon_vma1 == anon_vma2 || anon_vma1 == NULL || anon_vma2 == NULL)
+		return; /* Nothing to do */
+
+	/* Modify page->mapping for all pages in old */
+	pg_iter = 0;
+	pg_iters = (old->vm_end - old->vm_start) >> PAGE_SHIFT;
+
+	for (; pg_iter < pg_iters; ++pg_iter) {
+		/* Get the physical page */
+		unsigned long shift = pg_iter << PAGE_SHIFT;
+		struct page *phys_page = follow_page(old, old->vm_start + shift, FOLL_GET);
+		struct anon_vma *page_anon_vma;
+
+		/* Do some checks and lock the page */
+		if (phys_page == NULL)
+			continue; /* Virtual memory page is not mapped */
+		lock_page(phys_page);
+		page_anon_vma = page_get_anon_vma(phys_page);
+		if (page_anon_vma != NULL) { /* NULL in case of ZERO_PAGE */
+			VM_BUG_ON_VMA(page_anon_vma != old->anon_vma, old);
+			/* Update physical page's mapping */
+			page_move_anon_rmap(phys_page, vma);
+		}
+		unlock_page(phys_page);
+		put_page(phys_page);
+	}
+}
+
 void unlink_anon_vmas(struct vm_area_struct *vma)
 {
 	struct anon_vma_chain *avc, *next;
