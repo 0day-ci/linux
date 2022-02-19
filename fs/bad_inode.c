@@ -160,6 +160,17 @@ static int bad_inode_set_acl(struct user_namespace *mnt_userns,
 	return -EIO;
 }
 
+static int bad_inode_fileattr_set(struct user_namespace *mnt_userns,
+			struct dentry *dentry, struct fileattr *fa)
+{
+	return -EIO;
+}
+
+static int bad_inode_fileattr_get(struct dentry *dentry, struct fileattr *fa)
+{
+	return -EIO;
+}
+
 static const struct inode_operations bad_inode_ops =
 {
 	.create		= bad_inode_create,
@@ -183,6 +194,8 @@ static const struct inode_operations bad_inode_ops =
 	.atomic_open	= bad_inode_atomic_open,
 	.tmpfile	= bad_inode_tmpfile,
 	.set_acl	= bad_inode_set_acl,
+	.fileattr_set	= bad_inode_fileattr_set,
+	.fileattr_get	= bad_inode_fileattr_get,
 };
 
 
