@@ -13,7 +13,7 @@
 #include <linux/dept.h>
 
 #ifdef CONFIG_DEPT
-#define DEPT_SDT_MAP_INIT(dname)	{ .name = #dname }
+#define DEPT_SDT_MAP_INIT(dname)	{ .name = #dname, .skip_cnt = ATOMIC_INIT(0) }
 
 /*
  * SDT(Single-event Dependency Tracker) APIs
