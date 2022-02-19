@@ -102,14 +102,12 @@ static void query_ist(void)
  */
 static void set_bios_mode(void)
 {
-#ifdef CONFIG_X86_64
 	struct biosregs ireg;
 
 	initregs(&ireg);
 	ireg.ax = 0xec00;
 	ireg.bx = 2;
 	intcall(0x15, &ireg, NULL);
-#endif
 }
 
 static void init_heap(void)
@@ -152,7 +150,9 @@ void main(void)
 	}
 
 	/* Tell the BIOS what CPU mode we intend to run in. */
+#ifdef CONFIG_X86_64
 	set_bios_mode();
+#endif
 
 	/* Detect memory layout */
 	detect_memory();
