@@ -35,6 +35,7 @@
 #include <linux/seqlock.h>
 #include <linux/kcsan.h>
 #include <asm/kmap_size.h>
+#include <linux/dept.h>
 
 /* task_struct member predeclarations (sorted alphabetically): */
 struct audit_context;
@@ -201,12 +202,16 @@ struct task_group;
  */
 #define __set_current_state(state_value)				\
 	do {								\
+		if (state_value == TASK_RUNNING)			\
+			dept_clean_stage();				\
 		debug_normal_state_change((state_value));		\
 		WRITE_ONCE(current->__state, (state_value));		\
 	} while (0)
 
 #define set_current_state(state_value)					\
 	do {								\
+		if (state_value == TASK_RUNNING)			\
+			dept_clean_stage();				\
 		debug_normal_state_change((state_value));		\
 		smp_store_mb(current->__state, (state_value));		\
 	} while (0)
@@ -1156,6 +1161,8 @@ struct task_struct {
 	unsigned int			lockdep_recursion;
 	struct held_lock		held_locks[MAX_LOCK_DEPTH];
 #endif
+
+	struct dept_task		dept_task;
 
 #if defined(CONFIG_UBSAN) && !defined(CONFIG_UBSAN_TRAP)
 	unsigned int			in_ubsan;
