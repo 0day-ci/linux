@@ -990,15 +990,14 @@
 				<&gcc GCC_UFS_TX_SYMBOL_0_CLK>,
 				<&gcc GCC_UFS_RX_SYMBOL_0_CLK>,
 				<&gcc GCC_UFS_RX_SYMBOL_1_CLK>;
-			freq-table-hz =
-				<50000000 200000000>,
-				<0 0>,
-				<0 0>,
-				<37500000 150000000>,
-				<0 0>,
-				<0 0>,
-				<0 0>,
-				<0 0>;
+			freq-table = <50000000 200000000
+				      0 0
+				      0 0
+				      37500000 150000000
+				      0 0
+				      0 0
+				      0 0
+				      0 0>;
 
 			resets = <&gcc GCC_UFS_BCR>;
 			reset-names = "rst";

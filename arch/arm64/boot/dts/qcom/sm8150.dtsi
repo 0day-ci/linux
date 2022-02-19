@@ -1782,16 +1782,15 @@
 				<&gcc GCC_UFS_PHY_RX_SYMBOL_0_CLK>,
 				<&gcc GCC_UFS_PHY_RX_SYMBOL_1_CLK>,
 				<&gcc GCC_UFS_PHY_ICE_CORE_CLK>;
-			freq-table-hz =
-				<37500000 300000000>,
-				<0 0>,
-				<0 0>,
-				<37500000 300000000>,
-				<0 0>,
-				<0 0>,
-				<0 0>,
-				<0 0>,
-				<0 300000000>;
+			freq-table = <37500000 300000000
+				      0 0
+				      0 0
+				      37500000 300000000
+				      0 0
+				      0 0
+				      0 0
+				      0 0
+				      0 300000000>;
 
 			status = "disabled";
 		};
