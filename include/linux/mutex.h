@@ -20,11 +20,18 @@
 #include <linux/osq_lock.h>
 #include <linux/debug_locks.h>
 
+#ifdef CONFIG_DEPT
+# define DMAP_MUTEX_INIT(lockname)	.dmap = { .name = #lockname, .skip_cnt = ATOMIC_INIT(0) },
+#else
+# define DMAP_MUTEX_INIT(lockname)
+#endif
+
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 # define __DEP_MAP_MUTEX_INITIALIZER(lockname)			\
 		, .dep_map = {					\
 			.name = #lockname,			\
 			.wait_type_inner = LD_WAIT_SLEEP,	\
+			DMAP_MUTEX_INIT(lockname)		\
 		}
 #else
 # define __DEP_MAP_MUTEX_INITIALIZER(lockname)
@@ -74,6 +81,32 @@ struct mutex {
 	struct lockdep_map	dep_map;
 #endif
 };
+
+#ifdef CONFIG_DEPT
+#define dept_mutex_lock(m, ne, t, n, e_fn, ip)				\
+do {									\
+	if (t) {							\
+		dept_ecxt_enter(m, 1UL, ip, __func__, e_fn, ne);	\
+		dept_ask_event(m);					\
+	} else if (n) {							\
+		dept_skip(m);						\
+	} else {							\
+		dept_wait(m, 1UL, ip, __func__, ne);			\
+		dept_ecxt_enter(m, 1UL, ip, __func__, e_fn, ne);	\
+		dept_ask_event(m);					\
+	}								\
+} while (0)
+#define dept_mutex_unlock(m, ip)					\
+do {									\
+	if (!dept_unskip_if_skipped(m)) {				\
+		dept_event(m, 1UL, ip, __func__);			\
+		dept_ecxt_exit(m, ip);					\
+	}								\
+} while (0)
+#else
+#define dept_mutex_lock(m, ne, t, n, e_fn, ip)	do { } while (0)
+#define dept_mutex_unlock(m, ip)		do { } while (0)
+#endif
 
 #ifdef CONFIG_DEBUG_MUTEXES
 
