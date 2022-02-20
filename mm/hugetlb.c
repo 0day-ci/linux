@@ -4359,7 +4359,7 @@ out:
 	return ret;
 }
 
-int hugetlb_sysctl_handler(struct ctl_table *table, int write,
+static int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 			  void *buffer, size_t *length, loff_t *ppos)
 {
 
@@ -4368,7 +4368,7 @@ int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 }
 
 #ifdef CONFIG_NUMA
-int hugetlb_mempolicy_sysctl_handler(struct ctl_table *table, int write,
+static int hugetlb_mempolicy_sysctl_handler(struct ctl_table *table, int write,
 			  void *buffer, size_t *length, loff_t *ppos)
 {
 	return hugetlb_sysctl_handler_common(true, table, write,
@@ -4376,7 +4376,7 @@ int hugetlb_mempolicy_sysctl_handler(struct ctl_table *table, int write,
 }
 #endif /* CONFIG_NUMA */
 
-int hugetlb_overcommit_handler(struct ctl_table *table, int write,
+static int hugetlb_overcommit_handler(struct ctl_table *table, int write,
 		void *buffer, size_t *length, loff_t *ppos)
 {
 	struct hstate *h = &default_hstate;
@@ -7027,3 +7027,41 @@ void __init hugetlb_cma_check(void)
 }
 
 #endif /* CONFIG_CMA */
+
+#ifdef CONFIG_SYSCTL
+static struct ctl_table vm_mm_hugetlb_table[] = {
+#ifdef CONFIG_HUGETLB_PAGE
+	{
+		.procname       = "nr_hugepages",
+		.data           = NULL,
+		.maxlen         = sizeof(unsigned long),
+		.mode           = 0644,
+		.proc_handler   = hugetlb_sysctl_handler,
+	},
+#ifdef CONFIG_NUMA
+	{
+		.procname       = "nr_hugepages_mempolicy",
+		.data           = NULL,
+		.maxlen         = sizeof(unsigned long),
+		.mode           = 0644,
+		.proc_handler   = &hugetlb_mempolicy_sysctl_handler,
+	},
+#endif
+	{
+		.procname       = "nr_overcommit_hugepages",
+		.data           = NULL,
+		.maxlen         = sizeof(unsigned long),
+		.mode           = 0644,
+		.proc_handler   = hugetlb_overcommit_handler,
+	},
+#endif
+	{ }
+};
+
+static __init int vm_mm_hugetlb_sysctls_init(void)
+{
+	register_sysctl_init("vm", vm_mm_hugetlb_table);
+	return 0;
+}
+late_initcall(vm_mm_hugetlb_sysctls_init);
+#endif
