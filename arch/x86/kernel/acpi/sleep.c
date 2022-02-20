@@ -20,7 +20,26 @@
 #include "../../realmode/rm/wakeup.h"
 #include "sleep.h"
 
-unsigned long acpi_realmode_flags;
+static unsigned long acpi_realmode_flags;
+#ifdef CONFIG_SYSCTL
+static struct ctl_table kern_acpi_table[] = {
+	{
+		.procname       = "acpi_video_flags",
+		.data           = &acpi_realmode_flags,
+		.maxlen         = sizeof(unsigned long),
+		.mode           = 0644,
+		.proc_handler   = proc_doulongvec_minmax,
+	},
+	{ }
+};
+
+static __init int kernel_acpi_sysctls_init(void)
+{
+	register_sysctl_init("kernel", kern_acpi_table);
+	return 0;
+}
+late_initcall(kernel_acpi_sysctls_init);
+#endif /* CONFIG_SYSCTL */
 
 #if defined(CONFIG_SMP) && defined(CONFIG_64BIT)
 static char temp_stack[4096];
