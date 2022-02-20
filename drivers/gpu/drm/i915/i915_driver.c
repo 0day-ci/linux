@@ -635,7 +635,7 @@ static int i915_driver_hw_probe(struct drm_i915_private *dev_priv)
 	if (ret)
 		goto err_msi;
 
-	intel_opregion_setup(dev_priv);
+	intel_opregion_init(dev_priv);
 
 	ret = intel_pcode_init(dev_priv);
 	if (ret)

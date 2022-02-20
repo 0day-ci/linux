@@ -873,7 +873,7 @@ static int intel_load_vbt_firmware(struct drm_i915_private *dev_priv)
 	return ret;
 }
 
-int intel_opregion_setup(struct drm_i915_private *dev_priv)
+static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 {
 	struct intel_opregion *opregion = &dev_priv->opregion;
 	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
@@ -1231,4 +1231,14 @@ void intel_opregion_unregister(struct drm_i915_private *i915)
 	opregion->asle_ext = NULL;
 	opregion->vbt = NULL;
 	opregion->lid_state = NULL;
+}
+
+/**
+ * intel_opregion_init() - Init ACPI opregion.
+ * @i915 i915 device priv data.
+ * opregion init wrapper function, which encapsulate intel_opregion_setup.
+ */
+int intel_opregion_init(struct drm_i915_private *i915)
+{
+	return intel_opregion_setup(i915);
 }
