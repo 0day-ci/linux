@@ -32,7 +32,7 @@ static arch_spinlock_t stack_trace_max_lock =
 DEFINE_PER_CPU(int, disable_stack_tracer);
 static DEFINE_MUTEX(stack_sysctl_mutex);
 
-int stack_tracer_enabled;
+static int stack_tracer_enabled;
 
 static void print_max_stack(void)
 {
@@ -513,7 +513,8 @@ static const struct file_operations stack_trace_filter_fops = {
 
 #endif /* CONFIG_DYNAMIC_FTRACE */
 
-int
+#ifdef CONFIG_SYSCTL
+static int
 stack_trace_sysctl(struct ctl_table *table, int write, void *buffer,
 		   size_t *lenp, loff_t *ppos)
 {
@@ -536,6 +537,25 @@ stack_trace_sysctl(struct ctl_table *table, int write, void *buffer,
 	mutex_unlock(&stack_sysctl_mutex);
 	return ret;
 }
+
+static struct ctl_table kern_trace_stack_table[] = {
+	{
+		.procname       = "stack_tracer_enabled",
+		.data           = &stack_tracer_enabled,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = stack_trace_sysctl,
+	},
+	{ }
+};
+
+static void __init kernel_trace_stack_sysctls_init(void)
+{
+	register_sysctl_init("kernel", kern_trace_stack_table);
+}
+#else
+#define kernel_trace_stack_sysctls_init() do { } while (0)
+#endif /* CONFIG_SYSCTL */
 
 static char stack_trace_filter_buf[COMMAND_LINE_SIZE+1] __initdata;
 
@@ -575,6 +595,8 @@ static __init int stack_trace_init(void)
 
 	if (stack_tracer_enabled)
 		register_ftrace_function(&trace_ops);
+
+	kernel_trace_stack_sysctls_init();
 
 	return 0;
 }
