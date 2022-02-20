@@ -591,10 +591,13 @@
 #define  PCI_EXP_SLTCAP_HPS	0x00000020 /* Hot-Plug Surprise */
 #define  PCI_EXP_SLTCAP_HPC	0x00000040 /* Hot-Plug Capable */
 #define  PCI_EXP_SLTCAP_SPLV	0x00007f80 /* Slot Power Limit Value */
+#define  PCI_EXP_SLTCAP_SPLV_SHIFT	7  /* Slot Power Limit Value shift */
 #define  PCI_EXP_SLTCAP_SPLS	0x00018000 /* Slot Power Limit Scale */
+#define  PCI_EXP_SLTCAP_SPLS_SHIFT	15 /* Slot Power Limit Scale shift */
 #define  PCI_EXP_SLTCAP_EIP	0x00020000 /* Electromechanical Interlock Present */
 #define  PCI_EXP_SLTCAP_NCCS	0x00040000 /* No Command Completed Support */
 #define  PCI_EXP_SLTCAP_PSN	0xfff80000 /* Physical Slot Number */
+#define  PCI_EXP_SLTCAP_PSN_SHIFT	19 /* Physical Slot Number shift */
 #define PCI_EXP_SLTCTL		0x18	/* Slot Control */
 #define  PCI_EXP_SLTCTL_ABPE	0x0001	/* Attention Button Pressed Enable */
 #define  PCI_EXP_SLTCTL_PFDE	0x0002	/* Power Fault Detected Enable */
