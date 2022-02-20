@@ -633,3 +633,67 @@ int of_pci_get_max_link_speed(struct device_node *node)
 	return max_link_speed;
 }
 EXPORT_SYMBOL_GPL(of_pci_get_max_link_speed);
+
+/**
+ * of_pci_get_slot_power_limit - Parses the "slot-power-limit-milliwatt"
+ *				 property.
+ *
+ * @node: device tree node with the slot power limit information
+ * @slot_power_limit_value: pointer where the value should be stored in PCIe
+ *			    Slot Capabilities Register format
+ * @slot_power_limit_scale: pointer where the scale should be stored in PCIe
+ *			    Slot Capabilities Register format
+ *
+ * Returns the slot power limit in milliwatts and if @slot_power_limit_value
+ * and @slot_power_limit_scale pointers are non-NULL, fills in the value and
+ * scale in format used by PCIe Slot Capabilities Register.
+ *
+ * If the property is not found or is invalid, returns 0.
+ */
+u32 of_pci_get_slot_power_limit(struct device_node *node,
+				u8 *slot_power_limit_value,
+				u8 *slot_power_limit_scale)
+{
+	u32 slot_power_limit;
+	u8 value, scale;
+
+	if (of_property_read_u32(node, "slot-power-limit-milliwatt",
+				 &slot_power_limit))
+		slot_power_limit = 0;
+
+	/* Calculate Slot Power Limit Value and Slot Power Limit Scale */
+	if (slot_power_limit == 0) {
+		value = 0x00;
+		scale = 0;
+	} else if (slot_power_limit <= 255) {
+		value = slot_power_limit;
+		scale = 3;
+	} else if (slot_power_limit <= 255*10) {
+		value = slot_power_limit / 10;
+		scale = 2;
+	} else if (slot_power_limit <= 255*100) {
+		value = slot_power_limit / 100;
+		scale = 1;
+	} else if (slot_power_limit <= 239*1000) {
+		value = slot_power_limit / 1000;
+		scale = 0;
+	} else if (slot_power_limit <= 250*1000) {
+		value = 0xF0;
+		scale = 0;
+	} else if (slot_power_limit <= 275*1000) {
+		value = 0xF1;
+		scale = 0;
+	} else {
+		value = 0xF2;
+		scale = 0;
+	}
+
+	if (slot_power_limit_value)
+		*slot_power_limit_value = value;
+
+	if (slot_power_limit_scale)
+		*slot_power_limit_scale = scale;
+
+	return slot_power_limit;
+}
+EXPORT_SYMBOL_GPL(of_pci_get_slot_power_limit);
