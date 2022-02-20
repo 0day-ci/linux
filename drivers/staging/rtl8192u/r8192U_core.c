@@ -4825,6 +4825,11 @@ static int __init rtl8192_usb_module_init(void)
 static void __exit rtl8192_usb_module_exit(void)
 {
 	usb_deregister(&rtl8192_usb_driver);
+	remove_proc_entry(RTL819XU_MODULE_NAME, init_net.proc_net);
+
+#ifdef CONFIG_IEEE80211_DEBUG
+	ieee80211_debug_exit();
+#endif
 
 	RT_TRACE(COMP_DOWN, "Exiting");
 }
