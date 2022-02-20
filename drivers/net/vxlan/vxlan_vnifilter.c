@@ -186,9 +186,48 @@ static size_t vxlan_vnifilter_entry_nlmsg_size(void)
 		+ nla_total_size(sizeof(struct in6_addr));/* VXLAN_VNIFILTER_ENTRY_GROUP{6} */
 }
 
+static int __vnifilter_entry_fill_stats(struct sk_buff *skb,
+					const struct vxlan_vni_node *vbegin)
+{
+	struct vxlan_vni_stats vstats;
+	struct nlattr *vstats_attr;
+
+	vstats_attr = nla_nest_start(skb, VXLAN_VNIFILTER_ENTRY_STATS);
+	if (!vstats_attr)
+		goto out_stats_err;
+
+	vxlan_vnifilter_stats_get(vbegin, &vstats);
+	if (nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_RX_BYTES,
+			      vstats.rx_bytes, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_RX_PKTS,
+			      vstats.rx_packets, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_RX_DROPS,
+			      vstats.rx_drops, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_RX_ERRORS,
+			      vstats.rx_errors, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_TX_BYTES,
+			      vstats.tx_bytes, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_TX_PKTS,
+			      vstats.tx_packets, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_TX_DROPS,
+			      vstats.tx_drops, VNIFILTER_ENTRY_STATS_PAD) ||
+	    nla_put_u64_64bit(skb, VNIFILTER_ENTRY_STATS_TX_ERRORS,
+			      vstats.tx_errors, VNIFILTER_ENTRY_STATS_PAD))
+		goto out_stats_err;
+
+	nla_nest_end(skb, vstats_attr);
+
+	return 0;
+
+out_stats_err:
+	nla_nest_cancel(skb, vstats_attr);
+	return -EMSGSIZE;
+}
+
 static bool vxlan_fill_vni_filter_entry(struct sk_buff *skb,
 					struct vxlan_vni_node *vbegin,
-					struct vxlan_vni_node *vend)
+					struct vxlan_vni_node *vend,
+					bool fill_stats)
 {
 	struct nlattr *ventry;
 	u32 vs = be32_to_cpu(vbegin->vni);
@@ -220,6 +259,9 @@ static bool vxlan_fill_vni_filter_entry(struct sk_buff *skb,
 #endif
 		}
 	}
+
+	if (fill_stats && __vnifilter_entry_fill_stats(skb, vbegin))
+		goto out_err;
 
 	nla_nest_end(skb, ventry);
 
@@ -253,7 +295,7 @@ static void vxlan_vnifilter_notify(const struct vxlan_dev *vxlan,
 	tmsg->family = AF_BRIDGE;
 	tmsg->ifindex = vxlan->dev->ifindex;
 
-	if (!vxlan_fill_vni_filter_entry(skb, vninode, vninode))
+	if (!vxlan_fill_vni_filter_entry(skb, vninode, vninode, false))
 		goto out_err;
 
 	nlmsg_end(skb, nlh);
@@ -277,6 +319,7 @@ static int vxlan_vnifilter_dump_dev(const struct net_device *dev,
 	int idx = 0, s_idx = cb->args[1];
 	struct vxlan_vni_group *vg;
 	struct nlmsghdr *nlh;
+	bool dump_stats;
 	int err = 0;
 
 	if (!(vxlan->cfg.flags & VXLAN_F_VNIFILTER))
@@ -288,6 +331,7 @@ static int vxlan_vnifilter_dump_dev(const struct net_device *dev,
 		return 0;
 
 	tmsg = nlmsg_data(cb->nlh);
+	dump_stats = !!(tmsg->flags & TUNNEL_MSG_FLAG_STATS);
 
 	nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			RTM_NEWTUNNEL, sizeof(*new_tmsg), NLM_F_MULTI);
@@ -308,11 +352,12 @@ static int vxlan_vnifilter_dump_dev(const struct net_device *dev,
 			vend = v;
 			continue;
 		}
-		if (vnirange(vend, v) == 1 &&
+		if (!dump_stats && vnirange(vend, v) == 1 &&
 		    vxlan_addr_equal(&v->remote_ip, &vend->remote_ip)) {
 			goto update_end;
 		} else {
-			if (!vxlan_fill_vni_filter_entry(skb, vbegin, vend)) {
+			if (!vxlan_fill_vni_filter_entry(skb, vbegin, vend,
+							 dump_stats)) {
 				err = -EMSGSIZE;
 				break;
 			}
@@ -324,7 +369,7 @@ update_end:
 	}
 
 	if (!err && vbegin) {
-		if (!vxlan_fill_vni_filter_entry(skb, vbegin, vend))
+		if (!vxlan_fill_vni_filter_entry(skb, vbegin, vend, dump_stats))
 			err = -EMSGSIZE;
 	}
 
