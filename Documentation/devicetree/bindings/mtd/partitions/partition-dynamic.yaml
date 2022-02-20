@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mtd/partitions/partition-dynamic.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Dynamic Partition
+
+description: |
+  This binding describes a single flash partition that is dynamically allocated
+  by a dedicated parser that is not a fixed-partition parser. To declare a
+  partition the label is required. This can be used to give a dynamic partition
+  an OF node so that subsystems like NVMEM can work and provide NVMEM Cells to
+  the system. An example is declaring the partition label and all the NVMEM
+  cells in it. The parser will detect the correct reg and offset and the NVMEM
+  will register the cells in it based on the data extracted by the parser.
+
+maintainers:
+  - Ansuel Smith <ansuelsmth@gmail.com>
+
+properties:
+  label:
+    description: The label / name for the partition assigned by the parser at
+      runtime. This is needed for sybsystem like NVMEM to define cells and
+      register with this OF node.
+
+required:
+  - label
+
+additionalProperties: true
+
+examples:
+  - |
+    partitions {
+      compatible = "qcom,smem-part";
+      #address-cells = <1>;
+      #size-cells = <1>;
+
+      art {
+        compatible = "nvmem-cells";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        label = "0:art";
+
+        macaddr_art_0: macaddr@0 {
+          reg = <0x0 0x6>;
+        };
+
+        macaddr_art_6: macaddr@6 {
+          reg = <0x6 0x6>;
+        };
+      };
+    };
