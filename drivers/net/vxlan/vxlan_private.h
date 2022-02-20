@@ -154,6 +154,8 @@ void vxlan_vnigroup_uninit(struct vxlan_dev *vxlan);
 
 void vxlan_vnifilter_init(void);
 void vxlan_vnifilter_uninit(void);
+void vxlan_vnifilter_count(struct vxlan_dev *vxlan, __be32 vni,
+			   int type, unsigned int len);
 
 void vxlan_vs_add_vnigrp(struct vxlan_dev *vxlan,
 			 struct vxlan_sock *vs,
@@ -163,7 +165,6 @@ int vxlan_vnilist_update_group(struct vxlan_dev *vxlan,
 			       union vxlan_addr *old_remote_ip,
 			       union vxlan_addr *new_remote_ip,
 			       struct netlink_ext_ack *extack);
-
 
 /* vxlan_multicast.c */
 int vxlan_multicast_join(struct vxlan_dev *vxlan);
