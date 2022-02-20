@@ -35,8 +35,6 @@ struct anon_vma_chain;
 struct user_struct;
 struct pt_regs;
 
-extern int sysctl_page_lock_unfairness;
-
 void init_mm_internals(void);
 
 #ifndef CONFIG_NUMA		/* Don't use mapnrs, do it properly */

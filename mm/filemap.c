@@ -1235,7 +1235,29 @@ static inline bool folio_trylock_flag(struct folio *folio, int bit_nr,
 }
 
 /* How many times do we accept lock stealing from under a waiter? */
-int sysctl_page_lock_unfairness = 5;
+static int sysctl_page_lock_unfairness = 5;
+
+#ifdef CONFIG_SYSCTL
+static struct ctl_table vm_filemap_table[] = {
+	{
+
+		.procname       = "page_lock_unfairness",
+		.data           = &sysctl_page_lock_unfairness,
+		.maxlen         = sizeof(sysctl_page_lock_unfairness),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = SYSCTL_ZERO,
+	},
+	{ }
+};
+
+static __init int vm_filemap_sysctls_init(void)
+{
+	register_sysctl_init("vm", vm_filemap_table);
+	return 0;
+}
+late_initcall(vm_filemap_sysctls_init);
+#endif /* CONFIG_SYSCTL */
 
 static inline int folio_wait_bit_common(struct folio *folio, int bit_nr,
 		int state, enum behavior behavior)
