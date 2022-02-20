@@ -193,6 +193,26 @@ static struct notifier_block parisc_panic_block = {
 	.priority	= INT_MAX,
 };
 
+static int pwrsw_enabled;
+#ifdef CONFIG_SYSCTL
+static struct ctl_table kern_parisc_power_table[] = {
+	{
+		.procname       = "soft-power",
+		.data           = &pwrsw_enabled,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec,
+	},
+	{ }
+};
+
+static void __init kernel_parisc_power_sysctls_init(void)
+{
+	register_sysctl_init("kernel", kern_parisc_power_table);
+}
+#else
+#define kernel_parisc_power_sysctls_init() do { } while (0)
+#endif /* CONFIG_SYSCTL */
 
 static int __init power_init(void)
 {
@@ -232,6 +252,8 @@ static int __init power_init(void)
 	/* Register a call for panic conditions. */
 	atomic_notifier_chain_register(&panic_notifier_list,
 			&parisc_panic_block);
+
+	kernel_parisc_power_sysctls_init();
 
 	return 0;
 }
