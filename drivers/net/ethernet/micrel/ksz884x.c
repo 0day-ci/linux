@@ -5428,7 +5428,7 @@ static int netdev_open(struct net_device *dev)
 		if (rc)
 			return rc;
 		for (i = 0; i < hw->mib_port_cnt; i++) {
-			if (next_jiffies < jiffies)
+			if (time_before(next_jiffies, jiffies))
 				next_jiffies = jiffies + HZ * 2;
 			else
 				next_jiffies += HZ * 1;
