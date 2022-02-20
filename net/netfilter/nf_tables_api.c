@@ -6909,6 +6909,15 @@ err_fill_obj_info:
 	return err;
 }
 
+/* nf_tables_updobj does not increment module refcount */
+static void nft_newobj_destroy(const struct nft_ctx *ctx, struct nft_object *obj)
+{
+	if (obj->ops->destroy)
+		obj->ops->destroy(ctx, obj);
+
+	kfree(obj);
+}
+
 static void nft_obj_destroy(const struct nft_ctx *ctx, struct nft_object *obj)
 {
 	if (obj->ops->destroy)
@@ -8185,7 +8194,7 @@ static void nft_obj_commit_update(struct nft_trans *trans)
 	if (obj->ops->update)
 		obj->ops->update(obj, newobj);
 
-	kfree(newobj);
+	nft_newobj_destroy(&trans->ctx, newobj);
 }
 
 static void nft_commit_release(struct nft_trans *trans)
@@ -8976,7 +8985,7 @@ static int __nf_tables_abort(struct net *net, enum nfnl_abort_action action)
 			break;
 		case NFT_MSG_NEWOBJ:
 			if (nft_trans_obj_update(trans)) {
-				kfree(nft_trans_obj_newobj(trans));
+				nft_newobj_destroy(&trans->ctx, nft_trans_obj_newobj(trans));
 				nft_trans_destroy(trans);
 			} else {
 				trans->ctx.table->use--;
