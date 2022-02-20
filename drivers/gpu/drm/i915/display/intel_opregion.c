@@ -894,6 +894,9 @@ static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	BUILD_BUG_ON(sizeof(struct opregion_asle) != 0x100);
 	BUILD_BUG_ON(sizeof(struct opregion_asle_ext) != 0x400);
 
+	if (!opregion->opregion_func)
+		return 0;
+
 	INIT_WORK(&opregion->asle_work, asle_work);
 
 	base = opregion->opregion_func->alloc_opregion(dev_priv);
@@ -1348,9 +1351,9 @@ int intel_opregion_init(struct drm_i915_private *i915)
 {
 	struct intel_opregion *opregion = &i915->opregion;
 
-	if (IS_DGFX(i915))
+	if (IS_DGFX(i915) && HAS_DISPLAY(i915))
 		opregion->opregion_func = &dgfx_opregion_func;
-	else
+	else if (!IS_DGFX(i915))
 		opregion->opregion_func = &igfx_opregion_func;
 
 	return intel_opregion_setup(i915);
