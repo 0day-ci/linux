@@ -1830,117 +1830,8 @@
 					    _PALETTE_B, _CHV_PALETTE_C) + \
 				      (i) * 4)
 
-/* MCH MMIO space */
-
-/*
- * MCHBAR mirror.
- *
- * This mirrors the MCHBAR MMIO space whose location is determined by
- * device 0 function 0's pci config register 0x44 or 0x48 and matches it in
- * every way.  It is not accessible from the CP register read instructions.
- *
- * Starting from Haswell, you can't write registers using the MCHBAR mirror,
- * just read.
- */
-#define MCHBAR_MIRROR_BASE	0x10000
-
-#define MCHBAR_MIRROR_BASE_SNB	0x140000
-
-#define CTG_STOLEN_RESERVED		_MMIO(MCHBAR_MIRROR_BASE + 0x34)
-#define ELK_STOLEN_RESERVED		_MMIO(MCHBAR_MIRROR_BASE + 0x48)
-#define G4X_STOLEN_RESERVED_ADDR1_MASK	(0xFFFF << 16)
-#define G4X_STOLEN_RESERVED_ADDR2_MASK	(0xFFF << 4)
-#define G4X_STOLEN_RESERVED_ENABLE	(1 << 0)
-
-/* Memory controller frequency in MCHBAR for Haswell (possible SNB+) */
-#define DCLK _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5e04)
-
-/* 915-945 and GM965 MCH register controlling DRAM channel access */
-#define DCC			_MMIO(MCHBAR_MIRROR_BASE + 0x200)
-#define DCC_ADDRESSING_MODE_SINGLE_CHANNEL		(0 << 0)
-#define DCC_ADDRESSING_MODE_DUAL_CHANNEL_ASYMMETRIC	(1 << 0)
-#define DCC_ADDRESSING_MODE_DUAL_CHANNEL_INTERLEAVED	(2 << 0)
-#define DCC_ADDRESSING_MODE_MASK			(3 << 0)
-#define DCC_CHANNEL_XOR_DISABLE				(1 << 10)
-#define DCC_CHANNEL_XOR_BIT_17				(1 << 9)
-#define DCC2			_MMIO(MCHBAR_MIRROR_BASE + 0x204)
-#define DCC2_MODIFIED_ENHANCED_DISABLE			(1 << 20)
-
-/* Pineview MCH register contains DDR3 setting */
-#define CSHRDDR3CTL            _MMIO(MCHBAR_MIRROR_BASE + 0x1a8)
-#define CSHRDDR3CTL_DDR3       (1 << 2)
-
-/* 965 MCH register controlling DRAM channel configuration */
-#define C0DRB3_BW		_MMIO(MCHBAR_MIRROR_BASE + 0x206)
-#define C1DRB3_BW		_MMIO(MCHBAR_MIRROR_BASE + 0x606)
-
-/* snb MCH registers for reading the DRAM channel configuration */
-#define MAD_DIMM_C0			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5004)
-#define MAD_DIMM_C1			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5008)
-#define MAD_DIMM_C2			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x500C)
-#define   MAD_DIMM_ECC_MASK		(0x3 << 24)
-#define   MAD_DIMM_ECC_OFF		(0x0 << 24)
-#define   MAD_DIMM_ECC_IO_ON_LOGIC_OFF	(0x1 << 24)
-#define   MAD_DIMM_ECC_IO_OFF_LOGIC_ON	(0x2 << 24)
-#define   MAD_DIMM_ECC_ON		(0x3 << 24)
-#define   MAD_DIMM_ENH_INTERLEAVE	(0x1 << 22)
-#define   MAD_DIMM_RANK_INTERLEAVE	(0x1 << 21)
-#define   MAD_DIMM_B_WIDTH_X16		(0x1 << 20) /* X8 chips if unset */
-#define   MAD_DIMM_A_WIDTH_X16		(0x1 << 19) /* X8 chips if unset */
-#define   MAD_DIMM_B_DUAL_RANK		(0x1 << 18)
-#define   MAD_DIMM_A_DUAL_RANK		(0x1 << 17)
-#define   MAD_DIMM_A_SELECT		(0x1 << 16)
-/* DIMM sizes are in multiples of 256mb. */
-#define   MAD_DIMM_B_SIZE_SHIFT		8
-#define   MAD_DIMM_B_SIZE_MASK		(0xff << MAD_DIMM_B_SIZE_SHIFT)
-#define   MAD_DIMM_A_SIZE_SHIFT		0
-#define   MAD_DIMM_A_SIZE_MASK		(0xff << MAD_DIMM_A_SIZE_SHIFT)
-
-/* snb MCH registers for priority tuning */
-#define MCH_SSKPD			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5d10)
-#define   MCH_SSKPD_WM0_MASK		0x3f
-#define   MCH_SSKPD_WM0_VAL		0xc
-
-/* Clocking configuration register */
-#define CLKCFG			_MMIO(MCHBAR_MIRROR_BASE + 0xc00)
-#define CLKCFG_FSB_400					(0 << 0)	/* hrawclk 100 */
-#define CLKCFG_FSB_400_ALT				(5 << 0)	/* hrawclk 100 */
-#define CLKCFG_FSB_533					(1 << 0)	/* hrawclk 133 */
-#define CLKCFG_FSB_667					(3 << 0)	/* hrawclk 166 */
-#define CLKCFG_FSB_800					(2 << 0)	/* hrawclk 200 */
-#define CLKCFG_FSB_1067					(6 << 0)	/* hrawclk 266 */
-#define CLKCFG_FSB_1067_ALT				(0 << 0)	/* hrawclk 266 */
-#define CLKCFG_FSB_1333					(7 << 0)	/* hrawclk 333 */
-#define CLKCFG_FSB_1333_ALT				(4 << 0)	/* hrawclk 333 */
-#define CLKCFG_FSB_1600_ALT				(6 << 0)	/* hrawclk 400 */
-#define CLKCFG_FSB_MASK					(7 << 0)
-#define CLKCFG_MEM_533					(1 << 4)
-#define CLKCFG_MEM_667					(2 << 4)
-#define CLKCFG_MEM_800					(3 << 4)
-#define CLKCFG_MEM_MASK					(7 << 4)
-
-#define HPLLVCO                 _MMIO(MCHBAR_MIRROR_BASE + 0xc38)
-#define HPLLVCO_MOBILE          _MMIO(MCHBAR_MIRROR_BASE + 0xc0f)
-
-#define TSC1			_MMIO(0x11001)
-#define   TSE			(1 << 0)
-#define TR1			_MMIO(0x11006)
-#define TSFS			_MMIO(0x11020)
-#define   TSFS_SLOPE_MASK	0x0000ff00
-#define   TSFS_SLOPE_SHIFT	8
-#define   TSFS_INTR_MASK	0x000000ff
-
-#define CSIPLL0			_MMIO(0x12c10)
-#define DDRMPLL1		_MMIO(0X12c20)
 #define PEG_BAND_GAP_DATA	_MMIO(0x14d68)
 
-#define GEN6_GT_PERF_STATUS	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5948)
-#define BXT_GT_PERF_STATUS      _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x7070)
-#define GEN6_RP_STATE_LIMITS	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5994)
-#define GEN6_RP_STATE_CAP	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5998)
-#define   RP0_CAP_MASK		REG_GENMASK(7, 0)
-#define   RP1_CAP_MASK		REG_GENMASK(15, 8)
-#define   RPN_CAP_MASK		REG_GENMASK(23, 16)
 #define BXT_RP_STATE_CAP        _MMIO(0x138170)
 #define GEN9_RP_STATE_LIMITS	_MMIO(0x138148)
 #define XEHPSDV_RP_STATE_CAP	_MMIO(0x250014)
@@ -4291,49 +4182,32 @@
 #define _WM0_PIPEC_IVB		0x45200
 #define WM0_PIPE_ILK(pipe)	_MMIO_PIPE3((pipe), _WM0_PIPEA_ILK, \
 					    _WM0_PIPEB_ILK, _WM0_PIPEC_IVB)
-#define  WM0_PIPE_PLANE_MASK	(0xffff << 16)
-#define  WM0_PIPE_PLANE_SHIFT	16
-#define  WM0_PIPE_SPRITE_MASK	(0xff << 8)
-#define  WM0_PIPE_SPRITE_SHIFT	8
-#define  WM0_PIPE_CURSOR_MASK	(0xff)
+#define  WM0_PIPE_PRIMARY_MASK	REG_GENMASK(31, 16)
+#define  WM0_PIPE_SPRITE_MASK	REG_GENMASK(15, 8)
+#define  WM0_PIPE_CURSOR_MASK	REG_GENMASK(7, 0)
+#define  WM0_PIPE_PRIMARY(x)	REG_FIELD_PREP(WM0_PIPE_PRIMARY_MASK, (x))
+#define  WM0_PIPE_SPRITE(x)	REG_FIELD_PREP(WM0_PIPE_SPRITE_MASK, (x))
+#define  WM0_PIPE_CURSOR(x)	REG_FIELD_PREP(WM0_PIPE_CURSOR_MASK, (x))
 #define WM1_LP_ILK		_MMIO(0x45108)
-#define  WM1_LP_SR_EN		(1 << 31)
-#define  WM1_LP_LATENCY_SHIFT	24
-#define  WM1_LP_LATENCY_MASK	(0x7f << 24)
-#define  WM1_LP_FBC_MASK	(0xf << 20)
-#define  WM1_LP_FBC_SHIFT	20
-#define  WM1_LP_FBC_SHIFT_BDW	19
-#define  WM1_LP_SR_MASK		(0x7ff << 8)
-#define  WM1_LP_SR_SHIFT	8
-#define  WM1_LP_CURSOR_MASK	(0xff)
 #define WM2_LP_ILK		_MMIO(0x4510c)
-#define  WM2_LP_EN		(1 << 31)
 #define WM3_LP_ILK		_MMIO(0x45110)
-#define  WM3_LP_EN		(1 << 31)
+#define  WM_LP_ENABLE		REG_BIT(31)
+#define  WM_LP_LATENCY_MASK	REG_GENMASK(30, 24)
+#define  WM_LP_FBC_MASK_BDW	REG_GENMASK(23, 19)
+#define  WM_LP_FBC_MASK_ILK	REG_GENMASK(23, 20)
+#define  WM_LP_PRIMARY_MASK	REG_GENMASK(18, 8)
+#define  WM_LP_CURSOR_MASK	REG_GENMASK(7, 0)
+#define  WM_LP_LATENCY(x)	REG_FIELD_PREP(WM_LP_LATENCY_MASK, (x))
+#define  WM_LP_FBC_BDW(x)	REG_FIELD_PREP(WM_LP_FBC_MASK_BDW, (x))
+#define  WM_LP_FBC_ILK(x)	REG_FIELD_PREP(WM_LP_FBC_MASK_ILK, (x))
+#define  WM_LP_PRIMARY(x)	REG_FIELD_PREP(WM_LP_PRIMARY_MASK, (x))
+#define  WM_LP_CURSOR(x)	REG_FIELD_PREP(WM_LP_CURSOR_MASK, (x))
 #define WM1S_LP_ILK		_MMIO(0x45120)
 #define WM2S_LP_IVB		_MMIO(0x45124)
 #define WM3S_LP_IVB		_MMIO(0x45128)
-#define  WM1S_LP_EN		(1 << 31)
-
-#define HSW_WM_LP_VAL(lat, fbc, pri, cur) \
-	(WM3_LP_EN | ((lat) << WM1_LP_LATENCY_SHIFT) | \
-	 ((fbc) << WM1_LP_FBC_SHIFT) | ((pri) << WM1_LP_SR_SHIFT) | (cur))
-
-/* Memory latency timer register */
-#define MLTR_ILK		_MMIO(0x11222)
-#define  MLTR_WM1_SHIFT		0
-#define  MLTR_WM2_SHIFT		8
-/* the unit of memory self-refresh latency time is 0.5us */
-#define  ILK_SRLT_MASK		0x3f
-
-
-/* the address where we get all kinds of latency value */
-#define SSKPD			_MMIO(0x5d10)
-#define SSKPD_WM_MASK		0x3f
-#define SSKPD_WM0_SHIFT		0
-#define SSKPD_WM1_SHIFT		8
-#define SSKPD_WM2_SHIFT		16
-#define SSKPD_WM3_SHIFT		24
+#define  WM_LP_SPRITE_ENABLE	REG_BIT(31) /* ilk/snb WM1S only */
+#define  WM_LP_SPRITE_MASK	REG_GENMASK(10, 0)
+#define  WM_LP_SPRITE(x)	REG_FIELD_PREP(WM_LP_SPRITE_MASK, (x))
 
 /*
  * The two pipe frame counter registers are not synchronized, so
@@ -5632,7 +5506,8 @@
 #define TGL_DMC_DEBUG_DC6_COUNT	_MMIO(0x101088)
 #define DG1_DMC_DEBUG_DC5_COUNT	_MMIO(0x134154)
 
-#define DMC_DEBUG3		_MMIO(0x101090)
+#define TGL_DMC_DEBUG3		_MMIO(0x101090)
+#define DG1_DMC_DEBUG3		_MMIO(0x13415c)
 
 /* Display Internal Timeout Register */
 #define RM_TIMEOUT		_MMIO(0x42060)
@@ -6040,11 +5915,14 @@
 #define HSW_NDE_RSTWRN_OPT	_MMIO(0x46408)
 #define  RESET_PCH_HANDSHAKE_ENABLE	(1 << 4)
 
-#define GEN8_CHICKEN_DCPR_1		_MMIO(0x46430)
-#define   SKL_SELECT_ALTERNATE_DC_EXIT	REG_BIT(30)
-#define   ICL_DELAY_PMRSP		REG_BIT(22)
-#define   DISABLE_FLR_SRC		REG_BIT(15)
-#define   MASK_WAKEMEM			REG_BIT(13)
+#define GEN8_CHICKEN_DCPR_1			_MMIO(0x46430)
+#define   SKL_SELECT_ALTERNATE_DC_EXIT		REG_BIT(30)
+#define   LATENCY_REPORTING_REMOVED_PIPE_C	REG_BIT(25)
+#define   LATENCY_REPORTING_REMOVED_PIPE_B	REG_BIT(24)
+#define   LATENCY_REPORTING_REMOVED_PIPE_A	REG_BIT(23)
+#define   ICL_DELAY_PMRSP			REG_BIT(22)
+#define   DISABLE_FLR_SRC			REG_BIT(15)
+#define   MASK_WAKEMEM				REG_BIT(13)
 
 #define GEN11_CHICKEN_DCPR_2			_MMIO(0x46434)
 #define   DCPR_MASK_MAXLATENCY_MEMUP_CLR	REG_BIT(27)
@@ -6181,6 +6059,7 @@
 /* south display engine interrupt: ICP/TGP */
 #define SDE_GMBUS_ICP			(1 << 23)
 #define SDE_TC_HOTPLUG_ICP(hpd_pin)	REG_BIT(24 + _HPD_PIN_TC(hpd_pin))
+#define SDE_TC_HOTPLUG_DG2(hpd_pin)	REG_BIT(25 + _HPD_PIN_TC(hpd_pin)) /* sigh */
 #define SDE_DDI_HOTPLUG_ICP(hpd_pin)	REG_BIT(16 + _HPD_PIN_DDI(hpd_pin))
 #define SDE_DDI_HOTPLUG_MASK_ICP	(SDE_DDI_HOTPLUG_ICP(HPD_PORT_D) | \
 					 SDE_DDI_HOTPLUG_ICP(HPD_PORT_C) | \
@@ -7986,6 +7865,12 @@ enum skl_power_gate {
 #define RKL_DPLL_CFGCR0(pll)		_MMIO_PLL(pll, _TGL_DPLL0_CFGCR0, \
 						  _TGL_DPLL1_CFGCR0)
 
+#define _TGL_DPLL0_DIV0					0x164B00
+#define _TGL_DPLL1_DIV0					0x164C00
+#define TGL_DPLL0_DIV0(pll)				_MMIO_PLL(pll, _TGL_DPLL0_DIV0, _TGL_DPLL1_DIV0)
+#define   TGL_DPLL0_DIV0_AFC_STARTUP_MASK		REG_GENMASK(27, 25)
+#define   TGL_DPLL0_DIV0_AFC_STARTUP(val)		REG_FIELD_PREP(TGL_DPLL0_DIV0_AFC_STARTUP_MASK, (val))
+
 #define _TGL_DPLL0_CFGCR1		0x164288
 #define _TGL_DPLL1_CFGCR1		0x164290
 #define _TGL_TBTPLL_CFGCR1		0x1642A0
@@ -8033,6 +7918,8 @@ enum skl_power_gate {
 
 /* DEKEL PHY MMIO Address = Phy base + (internal address & ~index_mask) */
 #define _DKL_PLL_DIV0			0x200
+#define   DKL_PLL_DIV0_AFC_STARTUP_MASK	REG_GENMASK(27, 25)
+#define   DKL_PLL_DIV0_AFC_STARTUP(val)	REG_FIELD_PREP(DKL_PLL_DIV0_AFC_STARTUP_MASK, (val))
 #define   DKL_PLL_DIV0_INTEG_COEFF(x)	((x) << 16)
 #define   DKL_PLL_DIV0_INTEG_COEFF_MASK	(0x1F << 16)
 #define   DKL_PLL_DIV0_PROP_COEFF(x)	((x) << 12)
@@ -8042,6 +7929,10 @@ enum skl_power_gate {
 #define   DKL_PLL_DIV0_FBPREDIV_MASK	(0xF << DKL_PLL_DIV0_FBPREDIV_SHIFT)
 #define   DKL_PLL_DIV0_FBDIV_INT(x)	((x) << 0)
 #define   DKL_PLL_DIV0_FBDIV_INT_MASK	(0xFF << 0)
+#define   DKL_PLL_DIV0_MASK		(DKL_PLL_DIV0_INTEG_COEFF_MASK | \
+					 DKL_PLL_DIV0_PROP_COEFF_MASK | \
+					 DKL_PLL_DIV0_FBPREDIV_MASK | \
+					 DKL_PLL_DIV0_FBDIV_INT_MASK)
 #define DKL_PLL_DIV0(tc_port)		_MMIO(_PORT(tc_port, _DKL_PHY1_BASE, \
 						    _DKL_PHY2_BASE) + \
 						    _DKL_PLL_DIV0)
@@ -8215,93 +8106,7 @@ enum skl_power_gate {
 #define  DC_STATE_DEBUG_MASK_CORES	(1 << 0)
 #define  DC_STATE_DEBUG_MASK_MEMORY_UP	(1 << 1)
 
-#define BXT_D_CR_DRP0_DUNIT8			0x1000
-#define BXT_D_CR_DRP0_DUNIT9			0x1200
-#define  BXT_D_CR_DRP0_DUNIT_START		8
-#define  BXT_D_CR_DRP0_DUNIT_END		11
-#define BXT_D_CR_DRP0_DUNIT(x)	_MMIO(MCHBAR_MIRROR_BASE_SNB + \
-				      _PICK_EVEN((x) - 8, BXT_D_CR_DRP0_DUNIT8,\
-						 BXT_D_CR_DRP0_DUNIT9))
-#define  BXT_DRAM_RANK_MASK			0x3
-#define  BXT_DRAM_RANK_SINGLE			0x1
-#define  BXT_DRAM_RANK_DUAL			0x3
-#define  BXT_DRAM_WIDTH_MASK			(0x3 << 4)
-#define  BXT_DRAM_WIDTH_SHIFT			4
-#define  BXT_DRAM_WIDTH_X8			(0x0 << 4)
-#define  BXT_DRAM_WIDTH_X16			(0x1 << 4)
-#define  BXT_DRAM_WIDTH_X32			(0x2 << 4)
-#define  BXT_DRAM_WIDTH_X64			(0x3 << 4)
-#define  BXT_DRAM_SIZE_MASK			(0x7 << 6)
-#define  BXT_DRAM_SIZE_SHIFT			6
-#define  BXT_DRAM_SIZE_4GBIT			(0x0 << 6)
-#define  BXT_DRAM_SIZE_6GBIT			(0x1 << 6)
-#define  BXT_DRAM_SIZE_8GBIT			(0x2 << 6)
-#define  BXT_DRAM_SIZE_12GBIT			(0x3 << 6)
-#define  BXT_DRAM_SIZE_16GBIT			(0x4 << 6)
-#define  BXT_DRAM_TYPE_MASK			(0x7 << 22)
-#define  BXT_DRAM_TYPE_SHIFT			22
-#define  BXT_DRAM_TYPE_DDR3			(0x0 << 22)
-#define  BXT_DRAM_TYPE_LPDDR3			(0x1 << 22)
-#define  BXT_DRAM_TYPE_LPDDR4			(0x2 << 22)
-#define  BXT_DRAM_TYPE_DDR4			(0x4 << 22)
-
-#define SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5E04)
-#define  DG1_GEAR_TYPE				REG_BIT(16)
-
-#define SKL_MAD_INTER_CHANNEL_0_0_0_MCHBAR_MCMAIN _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5000)
-#define  SKL_DRAM_DDR_TYPE_MASK			(0x3 << 0)
-#define  SKL_DRAM_DDR_TYPE_DDR4			(0 << 0)
-#define  SKL_DRAM_DDR_TYPE_DDR3			(1 << 0)
-#define  SKL_DRAM_DDR_TYPE_LPDDR3		(2 << 0)
-#define  SKL_DRAM_DDR_TYPE_LPDDR4		(3 << 0)
-
-#define SKL_MAD_DIMM_CH0_0_0_0_MCHBAR_MCMAIN	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x500C)
-#define SKL_MAD_DIMM_CH1_0_0_0_MCHBAR_MCMAIN	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5010)
-#define  SKL_DRAM_S_SHIFT			16
-#define  SKL_DRAM_SIZE_MASK			0x3F
-#define  SKL_DRAM_WIDTH_MASK			(0x3 << 8)
-#define  SKL_DRAM_WIDTH_SHIFT			8
-#define  SKL_DRAM_WIDTH_X8			(0x0 << 8)
-#define  SKL_DRAM_WIDTH_X16			(0x1 << 8)
-#define  SKL_DRAM_WIDTH_X32			(0x2 << 8)
-#define  SKL_DRAM_RANK_MASK			(0x1 << 10)
-#define  SKL_DRAM_RANK_SHIFT			10
-#define  SKL_DRAM_RANK_1			(0x0 << 10)
-#define  SKL_DRAM_RANK_2			(0x1 << 10)
-#define  SKL_DRAM_RANK_MASK			(0x1 << 10)
-#define  ICL_DRAM_SIZE_MASK			0x7F
-#define  ICL_DRAM_WIDTH_MASK			(0x3 << 7)
-#define  ICL_DRAM_WIDTH_SHIFT			7
-#define  ICL_DRAM_WIDTH_X8			(0x0 << 7)
-#define  ICL_DRAM_WIDTH_X16			(0x1 << 7)
-#define  ICL_DRAM_WIDTH_X32			(0x2 << 7)
-#define  ICL_DRAM_RANK_MASK			(0x3 << 9)
-#define  ICL_DRAM_RANK_SHIFT			9
-#define  ICL_DRAM_RANK_1			(0x0 << 9)
-#define  ICL_DRAM_RANK_2			(0x1 << 9)
-#define  ICL_DRAM_RANK_3			(0x2 << 9)
-#define  ICL_DRAM_RANK_4			(0x3 << 9)
-
-#define SA_PERF_STATUS_0_0_0_MCHBAR_PC		_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5918)
-#define  DG1_QCLK_RATIO_MASK			REG_GENMASK(9, 2)
-#define  DG1_QCLK_REFERENCE			REG_BIT(10)
-
-#define MCHBAR_CH0_CR_TC_PRE_0_0_0_MCHBAR	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x4000)
-#define   DG1_DRAM_T_RDPRE_MASK			REG_GENMASK(16, 11)
-#define   DG1_DRAM_T_RP_MASK			REG_GENMASK(6, 0)
-#define MCHBAR_CH0_CR_TC_PRE_0_0_0_MCHBAR_HIGH	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x4004)
-#define   DG1_DRAM_T_RCD_MASK			REG_GENMASK(15, 9)
-#define   DG1_DRAM_T_RAS_MASK			REG_GENMASK(8, 1)
-
-/*
- * Please see hsw_read_dcomp() and hsw_write_dcomp() before using this register,
- * since on HSW we can't write to it using intel_uncore_write.
- */
-#define D_COMP_HSW			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5F0C)
 #define D_COMP_BDW			_MMIO(0x138144)
-#define  D_COMP_RCOMP_IN_PROGRESS	(1 << 9)
-#define  D_COMP_COMP_FORCE		(1 << 8)
-#define  D_COMP_COMP_DISABLE		(1 << 0)
 
 /* Pipe WM_LINETIME - watermark line time */
 #define _WM_LINETIME_A		0x45270
@@ -9557,8 +9362,10 @@ enum skl_power_gate {
 
 #define _ICL_PHY_MISC_A		0x64C00
 #define _ICL_PHY_MISC_B		0x64C04
-#define ICL_PHY_MISC(port)	_MMIO_PORT(port, _ICL_PHY_MISC_A, \
-						 _ICL_PHY_MISC_B)
+#define _DG2_PHY_MISC_TC1	0x64C14 /* TC1="PHY E" but offset as if "PHY F" */
+#define ICL_PHY_MISC(port)	_MMIO_PORT(port, _ICL_PHY_MISC_A, _ICL_PHY_MISC_B)
+#define DG2_PHY_MISC(port)	((port) == PHY_E ? _MMIO(_DG2_PHY_MISC_TC1) : \
+				 ICL_PHY_MISC(port))
 #define  ICL_PHY_MISC_MUX_DDID			(1 << 28)
 #define  ICL_PHY_MISC_DE_IO_COMP_PWR_DOWN	(1 << 23)
 #define  DG2_PHY_DP_TX_ACK_MASK			REG_GENMASK(23, 20)
