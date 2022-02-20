@@ -840,6 +840,7 @@ static void pnv_php_init_irq(struct pnv_php_slot *php_slot, int irq)
 	struct pci_dev *pdev = php_slot->pdev;
 	u32 broken_pdc = 0;
 	u16 sts, ctrl;
+	u32 link_cap;
 	int ret;
 
 	/* Allocate workqueue */
@@ -873,17 +874,21 @@ static void pnv_php_init_irq(struct pnv_php_slot *php_slot, int irq)
 		return;
 	}
 
+	pcie_capability_read_dword(pdev, PCI_EXP_LNKCAP, &link_cap);
+
 	/* Enable the interrupts */
 	pcie_capability_read_word(pdev, PCI_EXP_SLTCTL, &ctrl);
 	if (php_slot->flags & PNV_PHP_FLAG_BROKEN_PDC) {
 		ctrl &= ~PCI_EXP_SLTCTL_PDCE;
-		ctrl |= (PCI_EXP_SLTCTL_HPIE |
-			 PCI_EXP_SLTCTL_DLLSCE);
+		ctrl |= PCI_EXP_SLTCTL_HPIE;
 	} else {
 		ctrl |= (PCI_EXP_SLTCTL_HPIE |
-			 PCI_EXP_SLTCTL_PDCE |
-			 PCI_EXP_SLTCTL_DLLSCE);
+			 PCI_EXP_SLTCTL_PDCE);
 	}
+	if (link_cap & PCI_EXP_LNKCAP_DLLLARC)
+		ctrl |= PCI_EXP_SLTCTL_DLLSCE;
+	else
+		ctrl &= ~PCI_EXP_SLTCTL_DLLSCE;
 	pcie_capability_write_word(pdev, PCI_EXP_SLTCTL, ctrl);
 
 	/* The interrupt is initialized successfully when @irq is valid */

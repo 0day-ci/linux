@@ -788,6 +788,7 @@ static int pciehp_poll(void *data)
 static void pcie_enable_notification(struct controller *ctrl)
 {
 	u16 cmd, mask;
+	u32 link_cap;
 
 	/*
 	 * TBD: Power fault detected software notification support.
@@ -800,12 +801,17 @@ static void pcie_enable_notification(struct controller *ctrl)
 	 * next power fault detected interrupt was notified again.
 	 */
 
+	pcie_capability_read_dword(ctrl_dev(ctrl), PCI_EXP_LNKCAP, &link_cap);
+
 	/*
-	 * Always enable link events: thus link-up and link-down shall
-	 * always be treated as hotplug and unplug respectively. Enable
-	 * presence detect only if Attention Button is not present.
+	 * Enable link events if their support is indicated in Link Capability
+	 * register: thus link-up and link-down shall always be treated as
+	 * hotplug and unplug respectively. Enable presence detect only if
+	 * Attention Button is not present.
 	 */
-	cmd = PCI_EXP_SLTCTL_DLLSCE;
+	cmd = 0;
+	if (link_cap & PCI_EXP_LNKCAP_DLLLARC)
+		cmd |= PCI_EXP_SLTCTL_DLLSCE;
 	if (ATTN_BUTTN(ctrl))
 		cmd |= PCI_EXP_SLTCTL_ABPE;
 	else
@@ -844,9 +850,14 @@ void pcie_clear_hotplug_events(struct controller *ctrl)
 
 void pcie_enable_interrupt(struct controller *ctrl)
 {
+	u32 link_cap;
 	u16 mask;
 
-	mask = PCI_EXP_SLTCTL_HPIE | PCI_EXP_SLTCTL_DLLSCE;
+	pcie_capability_read_dword(ctrl_dev(ctrl), PCI_EXP_LNKCAP, &link_cap);
+
+	mask = PCI_EXP_SLTCTL_HPIE;
+	if (link_cap & PCI_EXP_LNKCAP_DLLLARC)
+		mask |= PCI_EXP_SLTCTL_DLLSCE;
 	pcie_write_cmd(ctrl, mask, mask);
 }
 
@@ -904,10 +915,13 @@ int pciehp_reset_slot(struct hotplug_slot *hotplug_slot, bool probe)
 	struct controller *ctrl = to_ctrl(hotplug_slot);
 	struct pci_dev *pdev = ctrl_dev(ctrl);
 	u16 stat_mask = 0, ctrl_mask = 0;
+	u32 link_cap;
 	int rc;
 
 	if (probe)
 		return 0;
+
+	pcie_capability_read_dword(pdev, PCI_EXP_LNKCAP, &link_cap);
 
 	down_write_nested(&ctrl->reset_lock, ctrl->depth);
 
@@ -915,8 +929,10 @@ int pciehp_reset_slot(struct hotplug_slot *hotplug_slot, bool probe)
 		ctrl_mask |= PCI_EXP_SLTCTL_PDCE;
 		stat_mask |= PCI_EXP_SLTSTA_PDC;
 	}
-	ctrl_mask |= PCI_EXP_SLTCTL_DLLSCE;
-	stat_mask |= PCI_EXP_SLTSTA_DLLSC;
+	if (link_cap & PCI_EXP_LNKCAP_DLLLARC) {
+		ctrl_mask |= PCI_EXP_SLTCTL_DLLSCE;
+		stat_mask |= PCI_EXP_SLTSTA_DLLSC;
+	}
 
 	pcie_write_cmd(ctrl, 0, ctrl_mask);
 	ctrl_dbg(ctrl, "%s: SLOTCTRL %x write cmd %x\n", __func__,
