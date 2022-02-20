@@ -1621,11 +1621,28 @@ static void *intel_dgfx_alloc_opregion(struct drm_i915_private *i915)
 
 static void *intel_dgfx_alloc_rvda(struct drm_i915_private *i915)
 {
-	return ERR_PTR(-EOPNOTSUPP);
+	struct intel_opregion *opregion = &i915->opregion;
+	void *opreg_rvda;
+
+	if (!opregion->dgfx_oprom_opreg)
+		return ERR_PTR(-EINVAL);
+
+	opreg_rvda = kmemdup(opregion->dgfx_oprom_opreg + opregion->asle->rvda,
+			     opregion->asle->rvds, GFP_KERNEL);
+
+	/* We got RVDA, OPROM opregion + vbt image not nedded anymore */
+	kfree(opregion->dgfx_oprom_opreg);
+	opregion->dgfx_oprom_opreg = NULL;
+
+	return opreg_rvda ?: ERR_PTR(-ENOMEM);
 }
 
 static void intel_dgfx_free_rvda(struct drm_i915_private *i915)
 {
+	struct intel_opregion *opregion = &i915->opregion;
+
+	kfree(opregion->rvda);
+	opregion->rvda = NULL;
 }
 
 static void intel_dgfx_free_opregion(struct drm_i915_private *i915)
