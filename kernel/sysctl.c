@@ -2367,13 +2367,6 @@ static struct ctl_table vm_table[] = {
 		.proc_handler   = &hugetlb_mempolicy_sysctl_handler,
 	},
 #endif
-	 {
-		.procname	= "hugetlb_shm_group",
-		.data		= &sysctl_hugetlb_shm_group,
-		.maxlen		= sizeof(gid_t),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	 },
 	{
 		.procname	= "nr_overcommit_hugepages",
 		.data		= NULL,

@@ -62,7 +62,26 @@ struct hugetlbfs_fs_context {
 	umode_t			mode;
 };
 
-int sysctl_hugetlb_shm_group;
+static int sysctl_hugetlb_shm_group;
+#if defined(CONFIG_HUGETLB_PAGE) && defined(CONFIG_SYSCTL)
+static struct ctl_table vm_hugetlbfs_table[] = {
+	{
+		.procname       = "hugetlb_shm_group",
+		.data           = &sysctl_hugetlb_shm_group,
+		.maxlen         = sizeof(gid_t),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec,
+	},
+	{ }
+};
+
+static __init int vm_hugetlbfs_sysctls_init(void)
+{
+	register_sysctl_init("vm", vm_hugetlbfs_table);
+	return 0;
+}
+late_initcall(vm_hugetlbfs_sysctls_init);
+#endif
 
 enum hugetlb_param {
 	Opt_gid,
