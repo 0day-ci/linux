@@ -431,10 +431,17 @@ static void advk_pcie_issue_perst(struct advk_pcie *pcie)
 	if (!pcie->reset_gpio)
 		return;
 
-	/* 10ms delay is needed for some cards */
-	dev_info(&pcie->pdev->dev, "issuing PERST via reset GPIO for 10ms\n");
-	gpiod_set_value_cansleep(pcie->reset_gpio, 1);
-	usleep_range(10000, 11000);
+	/*
+	 * Assert PERST# for at least 10ms if it wasn't asserted yet (it could
+	 * have been asserted by bootloader or by GPIO driver, for example).
+	 */
+	if (!gpiod_get_value(pcie->reset_gpio)) {
+		dev_info(&pcie->pdev->dev, "issuing PERST via reset GPIO for 10ms\n");
+		gpiod_set_value_cansleep(pcie->reset_gpio, 1);
+		usleep_range(10000, 11000);
+	}
+
+	/* De-assert PERST# */
 	gpiod_set_value_cansleep(pcie->reset_gpio, 0);
 }
 
@@ -2049,7 +2056,7 @@ static int advk_pcie_probe(struct platform_device *pdev)
 
 	pcie->reset_gpio = devm_gpiod_get_from_of_node(dev, dev->of_node,
 						       "reset-gpios", 0,
-						       GPIOD_OUT_LOW,
+						       GPIOD_FLAGS_BIT_DIR_OUT,
 						       "pcie1-reset");
 	ret = PTR_ERR_OR_ZERO(pcie->reset_gpio);
 	if (ret) {
