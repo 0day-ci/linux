@@ -31,6 +31,7 @@
 #include <acpi/video.h>
 
 #include "i915_drv.h"
+#include "i915_reg.h"
 #include "intel_acpi.h"
 #include "intel_backlight.h"
 #include "intel_display_types.h"
@@ -144,6 +145,34 @@ struct i915_opregion_func {
 	void (*free_rvda)(struct drm_i915_private *i915);
 	void (*free_opregion)(struct drm_i915_private *i915);
 };
+
+/* Refer 8_PCI_Firmware_v3.2_01-26-2015_ts_clean_Firmware_Final Page 77 */
+struct expansion_rom_header {
+	u16 signature;		/* Offset[0x0]: Header 0x55 0xAA */
+	u8 resvd[0x16];
+	u16 pcistructoffset;	/* Offset[0x18]: Contains pointer PCI Data Structure */
+	u16 img_base;		/* Offset[0x1A]: Offset to Oprom Image Base start */
+} __packed;
+
+struct pci_data_structure {
+	u32 signature;
+	u8 resvd[12];
+	u16 img_len;
+	u8 resvd1[2];
+	u8 code_type;
+	u8 last_img;
+	u8 resvd2[6];
+} __packed;
+
+/* PCI Firmware Spec specific Macro */
+#define LAST_IMG_INDICATOR		0x80
+#define OPROM_IMAGE_MAGIC		0xAA55       /* Little Endian */
+#define OPROM_IMAGE_PCIR_MAGIC		0x52494350   /* "PCIR" */
+#define OPROM_BYTE_BOUNDARY		512          /* OPROM image sizes are in 512 byte */
+
+#define INTEL_CSS_SIGNATURE		"$CPD"	/* Code Signature System Signature */
+#define NUM_CSS_BYTES			4
+#define INTEL_OPROM_CSS_CODE_TYPE	0xF0
 
 /* Driver readiness indicator */
 #define ASLE_ARDY_READY		(1 << 0)
@@ -880,6 +909,196 @@ static int intel_load_vbt_firmware(struct drm_i915_private *dev_priv)
 	return ret;
 }
 
+/* Refer PCI Firmware Spec Chapter 5 */
+static int
+pci_exp_rom_check_signature(struct drm_i915_private *i915,
+			    struct expansion_rom_header *exprom_hdr,
+			    struct pci_data_structure *exprom_pci_data)
+{
+	if (exprom_hdr->signature != OPROM_IMAGE_MAGIC) {
+		drm_err(&i915->drm, "Invalid PCI ROM header signature.\n");
+		return -EINVAL;
+	}
+
+	if (exprom_pci_data->signature != OPROM_IMAGE_PCIR_MAGIC) {
+		drm_err(&i915->drm, "Invalid PCI ROM data signature.\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static u32 intel_spi_oprom_offset(struct drm_i915_private *i915)
+{
+	u32 static_region, offset;
+
+	/* initialize SPI to read the OPROM */
+	static_region = intel_uncore_read(&i915->uncore, SPI_STATIC_REGIONS);
+	static_region &= OPTIONROM_SPI_REGIONID_MASK;
+	intel_uncore_write(&i915->uncore, PRIMARY_SPI_REGIONID, static_region);
+
+	/* read OPROM offset in SPI flash */
+	offset = intel_uncore_read(&i915->uncore, OROM_OFFSET);
+
+	return offset;
+}
+
+static void intel_spi_read_oprom(struct drm_i915_private *i915,
+				 u32 offset, size_t len, void *buf)
+{
+	u32 count, data;
+	u32 *word = buf;
+
+	drm_WARN_ON(&i915->drm, !IS_ALIGNED(len, 4));
+
+	for (count = 0; count < len; count += 4) {
+		intel_uncore_write(&i915->uncore, PRIMARY_SPI_ADDRESS, offset + count);
+		data = intel_uncore_read(&i915->uncore, PRIMARY_SPI_TRIGGER);
+		word[count >> 2] = data;
+	}
+}
+
+static int intel_verify_css(struct drm_i915_private *i915,
+			    struct expansion_rom_header *exprom_hdr,
+			    struct pci_data_structure *exprom_pci_data)
+{
+	if (exprom_pci_data->code_type != INTEL_OPROM_CSS_CODE_TYPE) {
+		drm_dbg_kms(&i915->drm, "Invalid OPROM CSS Code\n");
+		return -EINVAL;
+	}
+	drm_dbg_kms(&i915->drm, "Found CSS image\n");
+	/*
+	 * TODO: Authticate OPROM RSA Signature if required in future
+	 * pubic key and signature are present in CSS image.
+	 */
+
+	return 0;
+}
+
+/**
+ * intel_spi_get_oprom_opreg() get OPROM OpRegion image.
+ * @i915: pointer to i915 device.
+ *
+ * This function parses the DGFX OPROM to retieve the opregion.
+ * OPROM has bundled multiple images but i915 only interested
+ * in CSS and opregion image.
+ *
+ *	+        DGFX OPROM IMAGE LAYOUT             +
+ *	+--------+-------+---------------------------+
+ *	| Offset | Value |   ROM Header Fields       +-----> Image1 (CSS)
+ *	+--------------------------------------------+
+ *	|    0h  |  55h  |   ROM Signature Byte1     |
+ *	|    1h  |  AAh  |   ROM Signature Byte2     |
+ *	|    2h  |  xx   |        Reserved           |
+ *	|  18+19h|  xx   |  Ptr to PCI DataStructure |
+ *	+----------------+---------------------------+
+ *	|           PCI Data Structure               |
+ *	+--------------------------------------------+
+ *	|    .       .             .                 |
+ *	|    .       .             .                 |
+ *	|    10  +  xx   +     Image Length          |
+ *	|    14  +  xx   +     Code Type             |
+ *	|    15  +  xx   +  Last Image Indicator     |
+ *	|    .       .             .                 |
+ *	+--------------------------------------------+
+ *	|         Signature and Public Key           |
+ *	+--------+-------+---------------------------+
+ *	|    .   |   .   |         .                 |
+ *	|    .   |   .   |         .                 |
+ *	+--------------------------------------------+
+ *	| Offset | Value |   ROM Header Fields       +-----> Image2 (opregion, vbt) (Offset: 0x800)
+ *	+--------------------------------------------+
+ *	|    0h  |  55h  |   ROM Signature Byte1     |
+ *	|    1h  |  AAh  |   ROM Signature Byte2     |
+ *	|    2h  |  xx   |        Reserved           |
+ *	|  18+19h|  xx   |  Ptr to PCI DataStructure |
+ *	+----------------+---------------------------+
+ *	|           PCI Data Structure               |
+ *	+--------------------------------------------+
+ *	|    .       .             .                 |
+ *	|    .       .             .                 |
+ *	|    10  +  xx   +     Image Length          |
+ *	|    14  +  xx   +      Code Type            |
+ *	|    15  +  xx   +   Last Image Indicator    |
+ *	|    .       .             .                 |
+ *	|    1A  +  3C   + Ptr to Opregion Signature |
+ *	|    .       .             .                 |
+ *	|    .       .             .                 |
+ *	|   83Ch + IntelGraphicsMem                  | <---+ Opregion Signature
+ *	+--------+-----------------------------------+
+ *
+ * Return : Returns the opregion image blob which starts from opregion
+ * signature "IntelGraphicsMem". Error value in case of error
+ */
+static void *
+intel_spi_get_oprom_opreg(struct drm_i915_private *i915)
+{
+	struct expansion_rom_header *exprom_hdr;
+	struct pci_data_structure *exprom_pci_data;
+	u8 img_sig[sizeof(OPREGION_SIGNATURE)];
+	u32 oprom_offset, offset;
+	size_t img_len, opreg_len;
+	void *opreg = ERR_PTR(-ENXIO);
+	int ret;
+
+	oprom_offset = intel_spi_oprom_offset(i915);
+
+	exprom_hdr = kzalloc(sizeof(struct expansion_rom_header), GFP_KERNEL);
+	exprom_pci_data = kzalloc(sizeof(struct pci_data_structure), GFP_KERNEL);
+	if (!exprom_hdr || !exprom_pci_data) {
+		opreg = ERR_PTR(-ENOMEM);
+		goto err_free_hdr;
+	}
+
+	for (offset = oprom_offset; exprom_pci_data->last_img != LAST_IMG_INDICATOR;
+	     offset = offset + img_len) {
+		intel_spi_read_oprom(i915, offset, sizeof(struct expansion_rom_header),
+				     exprom_hdr);
+		intel_spi_read_oprom(i915, offset + exprom_hdr->pcistructoffset,
+				     sizeof(struct pci_data_structure), exprom_pci_data);
+		ret = pci_exp_rom_check_signature(i915, exprom_hdr, exprom_pci_data);
+		if (ret) {
+			opreg = ERR_PTR(ret);
+			goto err_free_hdr;
+		}
+
+		img_len = exprom_pci_data->img_len * OPROM_BYTE_BOUNDARY;
+
+		/* CSS or OpReg signature is present at exprom_hdr->img_base offset */
+		intel_spi_read_oprom(i915, offset + exprom_hdr->img_base,
+				     sizeof(OPREGION_SIGNATURE) - 1, img_sig);
+
+		if (!memcmp(img_sig, INTEL_CSS_SIGNATURE, NUM_CSS_BYTES)) {
+			ret = intel_verify_css(i915, exprom_hdr, exprom_pci_data);
+			if (ret) {
+				opreg = ERR_PTR(ret);
+				goto err_free_hdr;
+			}
+		} else if (!memcmp(img_sig, OPREGION_SIGNATURE, sizeof(OPREGION_SIGNATURE) - 1)) {
+			opreg_len = img_len - exprom_hdr->img_base;
+			opreg_len = ALIGN(opreg_len, 4);
+			opreg = kzalloc(opreg_len, GFP_KERNEL);
+
+			if (!opreg) {
+				opreg = ERR_PTR(-ENOMEM);
+				goto err_free_hdr;
+			}
+
+			intel_spi_read_oprom(i915, offset + exprom_hdr->img_base,
+					     opreg_len, opreg);
+			drm_dbg_kms(&i915->drm, "Found opregion image of size %zu\n", opreg_len);
+			break;
+		}
+	}
+
+err_free_hdr:
+
+	kfree(exprom_pci_data);
+	kfree(exprom_hdr);
+
+	return opreg;
+}
+
 static int intel_opregion_setup(struct drm_i915_private *dev_priv)
 {
 	struct intel_opregion *opregion = &dev_priv->opregion;
@@ -1006,6 +1225,17 @@ mbox4_vbt:
 	}
 
 out:
+	/*
+	 * We might got VBT from OPROM OpRegion but we can't use OPROM OpRegion
+	 * to write ACPI OpRegion MBOX.
+	 */
+	if (!opregion->asls) {
+		drm_dbg(&dev_priv->drm, "ACPI OpRegion MBOX is not supported!\n");
+		opregion->acpi = NULL;
+		opregion->swsci = NULL;
+		opregion->asle = NULL;
+	}
+
 	return 0;
 
 }
@@ -1218,12 +1448,25 @@ intel_opregion_get_asls(struct drm_i915_private *i915)
 	pci_read_config_dword(pdev, ASLS, &asls);
 	drm_dbg(&i915->drm, "graphic opregion physical addr: 0x%x\n",
 		asls);
-	if (asls == 0) {
-		drm_dbg(&i915->drm, "ACPI OpRegion not supported!\n");
+	if (asls == 0)
 		return -EINVAL;
-	}
 
 	opregion->asls = asls;
+
+	return 0;
+}
+
+static int
+intel_opregion_verify_signature(struct drm_i915_private *i915, const void *base)
+{
+	char buf[sizeof(OPREGION_SIGNATURE)];
+
+	memcpy(buf, base, sizeof(buf));
+
+	if (memcmp(buf, OPREGION_SIGNATURE, 16)) {
+		drm_dbg(&i915->drm, "opregion signature mismatch\n");
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -1231,32 +1474,28 @@ intel_opregion_get_asls(struct drm_i915_private *i915)
 static void *intel_igfx_alloc_opregion(struct drm_i915_private *i915)
 {
 	struct intel_opregion *opregion = &i915->opregion;
-	char buf[sizeof(OPREGION_SIGNATURE)];
 	int err = 0;
 	void *base;
 
 	err = intel_opregion_get_asls(i915);
-	if (err)
+	if (err) {
+		if (!opregion->asls)
+			drm_dbg(&i915->drm, "ACPI OpRegion not supported!\n");
+
 		return ERR_PTR(err);
+	}
 
 	base = memremap(opregion->asls, OPREGION_SIZE, MEMREMAP_WB);
 	if (!base)
 		return ERR_PTR(-ENOMEM);
 
-	memcpy(buf, base, sizeof(buf));
-
-	if (memcmp(buf, OPREGION_SIGNATURE, 16)) {
-		drm_dbg(&i915->drm, "opregion signature mismatch\n");
-		err = -EINVAL;
-		goto err_out;
+	err = intel_opregion_verify_signature(i915, base);
+	if (err) {
+		memunmap(base);
+		return ERR_PTR(err);
 	}
 
 	return base;
-
-err_out:
-	memunmap(base);
-
-	return ERR_PTR(err);
 }
 
 static void *intel_igfx_alloc_rvda(struct drm_i915_private *i915)
@@ -1315,9 +1554,69 @@ static const struct i915_opregion_func igfx_opregion_func = {
 	.free_opregion = intel_igfx_free_opregion,
 };
 
+static void *intel_dgfx_setup_asls(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = &i915->opregion;
+	struct opregion_asle *asls_asle;
+	const struct opregion_asle *spi_asle;
+	void *base;
+	int ret;
+
+	if (!opregion->dgfx_oprom_opreg)
+		return ERR_PTR(-EINVAL);
+
+	spi_asle = opregion->dgfx_oprom_opreg + OPREGION_ASLE_OFFSET;
+
+	/*
+	 * DGFX MBD configs supports ASL storage.
+	 * Populate the RVDA and RVDS field from OPROM opregion.
+	 */
+	base = memremap(opregion->asls, OPREGION_SIZE, MEMREMAP_WB);
+	if (!base)
+		return ERR_PTR(-ENOMEM);
+
+	ret = intel_opregion_verify_signature(i915, base);
+	if (ret) {
+		memunmap(base);
+		return ERR_PTR(ret);
+	}
+
+	asls_asle = base + OPREGION_ASLE_OFFSET;
+	asls_asle->rvda = spi_asle->rvda;
+	asls_asle->rvds = spi_asle->rvds;
+
+	return base;
+}
+
 static void *intel_dgfx_alloc_opregion(struct drm_i915_private *i915)
 {
-	return ERR_PTR(-EOPNOTSUPP);
+	struct intel_opregion *opregion = &i915->opregion;
+	void *oprom_opreg;
+	void *asls_opreg;
+
+	BUILD_BUG_ON(sizeof(struct expansion_rom_header) != 28);
+	BUILD_BUG_ON(sizeof(struct pci_data_structure) != 28);
+
+	oprom_opreg = intel_spi_get_oprom_opreg(i915);
+
+	if (IS_ERR(oprom_opreg)) {
+		drm_err(&i915->drm, "Unable to get opregion image from dgfx oprom Err: %ld\n",
+			PTR_ERR(oprom_opreg));
+		return oprom_opreg;
+	}
+
+	/* Cache the OPROM opregion + vbt image to retrieve vbt later */
+	opregion->dgfx_oprom_opreg = oprom_opreg;
+
+	if (!intel_opregion_get_asls(i915)) {
+		asls_opreg = intel_dgfx_setup_asls(i915);
+		if (!IS_ERR(asls_opreg))
+			return asls_opreg;
+	}
+
+	oprom_opreg = kmemdup(opregion->dgfx_oprom_opreg, OPREGION_SIZE, GFP_KERNEL);
+
+	return oprom_opreg ?: ERR_PTR(-ENOMEM);
 }
 
 static void *intel_dgfx_alloc_rvda(struct drm_i915_private *i915)
@@ -1331,6 +1630,12 @@ static void intel_dgfx_free_rvda(struct drm_i915_private *i915)
 
 static void intel_dgfx_free_opregion(struct drm_i915_private *i915)
 {
+	struct intel_opregion *opregion = &i915->opregion;
+
+	if (opregion->asls)
+		memunmap(opregion->header);
+	else
+		kfree(opregion->header);
 }
 
 static const struct i915_opregion_func dgfx_opregion_func = {
