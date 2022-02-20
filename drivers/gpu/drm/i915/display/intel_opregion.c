@@ -1312,16 +1312,46 @@ static const struct i915_opregion_func igfx_opregion_func = {
 	.free_opregion = intel_igfx_free_opregion,
 };
 
+static void *intel_dgfx_alloc_opregion(struct drm_i915_private *i915)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static void *intel_dgfx_alloc_rvda(struct drm_i915_private *i915)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static void intel_dgfx_free_rvda(struct drm_i915_private *i915)
+{
+}
+
+static void intel_dgfx_free_opregion(struct drm_i915_private *i915)
+{
+}
+
+static const struct i915_opregion_func dgfx_opregion_func = {
+	.alloc_opregion = intel_dgfx_alloc_opregion,
+	.alloc_rvda = intel_dgfx_alloc_rvda,
+	.free_rvda = intel_dgfx_free_rvda,
+	.free_opregion = intel_dgfx_free_opregion,
+};
+
 /**
  * intel_opregion_init() - Init ACPI opregion.
  * @i915 i915 device priv data.
- * opregion init wrapper function, which encapsulate intel_opregion_setup.
+ * opregion init wrapper function.
+ * It initialize the dgfx/igfx opregion function pointers,
+ * and encapsulate intel_opregion_setup.
  */
 int intel_opregion_init(struct drm_i915_private *i915)
 {
 	struct intel_opregion *opregion = &i915->opregion;
 
-	opregion->opregion_func = &igfx_opregion_func;
+	if (IS_DGFX(i915))
+		opregion->opregion_func = &dgfx_opregion_func;
+	else
+		opregion->opregion_func = &igfx_opregion_func;
 
 	return intel_opregion_setup(i915);
 }
