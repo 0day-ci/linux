@@ -24,6 +24,7 @@
 #include <linux/of_address.h>
 #include <linux/of_gpio.h>
 #include <linux/of_pci.h>
+#include <linux/timer.h>
 
 #include "../pci.h"
 #include "../pci-bridge-emul.h"
@@ -99,6 +100,7 @@
 #define PCIE_MSG_PM_PME_MASK			BIT(7)
 #define PCIE_ISR0_MASK_REG			(CONTROL_BASE_ADDR + 0x44)
 #define     PCIE_ISR0_MSI_INT_PENDING		BIT(24)
+#define     PCIE_ISR0_LINK_DOWN			BIT(1)
 #define     PCIE_ISR0_CORR_ERR			BIT(11)
 #define     PCIE_ISR0_NFAT_ERR			BIT(12)
 #define     PCIE_ISR0_FAT_ERR			BIT(13)
@@ -284,6 +286,8 @@ struct advk_pcie {
 	DECLARE_BITMAP(msi_used, MSI_IRQ_NUM);
 	struct mutex msi_used_lock;
 	int link_gen;
+	bool link_was_up;
+	struct timer_list link_irq_timer;
 	struct pci_bridge_emul bridge;
 	struct gpio_desc *reset_gpio;
 	struct phy *phy;
@@ -313,7 +317,24 @@ static inline bool advk_pcie_link_up(struct advk_pcie *pcie)
 {
 	/* check if LTSSM is in normal operation - some L* state */
 	u8 ltssm_state = advk_pcie_ltssm_state(pcie);
-	return ltssm_state >= LTSSM_L0 && ltssm_state < LTSSM_DISABLED;
+	bool link_is_up;
+	u16 slotsta;
+
+	link_is_up = ltssm_state >= LTSSM_L0 && ltssm_state < LTSSM_DISABLED;
+
+	if (link_is_up && !pcie->link_was_up) {
+		dev_info(&pcie->pdev->dev, "link up\n");
+
+		pcie->link_was_up = true;
+
+		slotsta = le16_to_cpu(pcie->bridge.pcie_conf.slotsta);
+		slotsta |= PCI_EXP_SLTSTA_DLLSC;
+		pcie->bridge.pcie_conf.slotsta = cpu_to_le16(slotsta);
+
+		mod_timer(&pcie->link_irq_timer, jiffies + 1);
+	}
+
+	return link_is_up;
 }
 
 static inline bool advk_pcie_link_active(struct advk_pcie *pcie)
@@ -442,8 +463,6 @@ static void advk_pcie_train_link(struct advk_pcie *pcie)
 	ret = advk_pcie_wait_for_link(pcie);
 	if (ret < 0)
 		dev_err(dev, "link never came up\n");
-	else
-		dev_info(dev, "link up\n");
 }
 
 /*
@@ -590,6 +609,11 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 	/* Unmask summary MSI interrupt */
 	reg = advk_readl(pcie, PCIE_ISR0_MASK_REG);
 	reg &= ~PCIE_ISR0_MSI_INT_PENDING;
+	advk_writel(pcie, reg, PCIE_ISR0_MASK_REG);
+
+	/* Unmask Link Down interrupt */
+	reg = advk_readl(pcie, PCIE_ISR0_MASK_REG);
+	reg &= ~PCIE_ISR0_LINK_DOWN;
 	advk_writel(pcie, reg, PCIE_ISR0_MASK_REG);
 
 	/* Unmask PME interrupt for processing of PME requester */
@@ -918,6 +942,14 @@ advk_pci_bridge_emul_pcie_conf_write(struct pci_bridge_emul *bridge,
 			advk_pcie_wait_for_retrain(pcie);
 		break;
 
+	case PCI_EXP_SLTCTL: {
+		u16 slotctl = le16_to_cpu(bridge->pcie_conf.slotctl);
+		/* Only emulation of HPIE and DLLSCE bits is provided */
+		slotctl &= PCI_EXP_SLTCTL_HPIE | PCI_EXP_SLTCTL_DLLSCE;
+		bridge->pcie_conf.slotctl = cpu_to_le16(slotctl);
+		break;
+	}
+
 	case PCI_EXP_RTCTL: {
 		u16 rootctl = le16_to_cpu(bridge->pcie_conf.rootctl);
 		/* Only emulation of PMEIE and CRSSVE bits is provided */
@@ -1033,6 +1065,7 @@ static const struct pci_bridge_emul_ops advk_pci_bridge_emul_ops = {
 static int advk_sw_pci_bridge_init(struct advk_pcie *pcie)
 {
 	struct pci_bridge_emul *bridge = &pcie->bridge;
+	u32 slotcap;
 
 	bridge->conf.vendor =
 		cpu_to_le16(advk_readl(pcie, PCIE_CORE_DEV_ID_REG) & 0xffff);
@@ -1059,6 +1092,13 @@ static int advk_sw_pci_bridge_init(struct advk_pcie *pcie)
 	bridge->pcie_conf.cap = cpu_to_le16(2 | PCI_EXP_FLAGS_SLOT);
 
 	/*
+	 * Mark bridge as Hot Plug Capable since this is the way how to enable
+	 * delivering of Data Link Layer State Change interrupts.
+	 *
+	 * Set No Command Completed Support because bridge does not support
+	 * Command Completed Interrupt. Every command is executed immediately
+	 * without any delay.
+	 *
 	 * Set Presence Detect State bit permanently since there is no support
 	 * for unplugging the card nor detecting whether it is plugged. (If a
 	 * platform exists in the future that supports it, via a GPIO for
@@ -1068,7 +1108,9 @@ static int advk_sw_pci_bridge_init(struct advk_pcie *pcie)
 	 * value is reserved for ports within the same silicon as Root Port
 	 * which is not our case.
 	 */
-	bridge->pcie_conf.slotcap = cpu_to_le32(1 << PCI_EXP_SLTCAP_PSN_SHIFT);
+	slotcap = PCI_EXP_SLTCAP_NCCS | PCI_EXP_SLTCAP_HPC |
+		  (1 << PCI_EXP_SLTCAP_PSN_SHIFT);
+	bridge->pcie_conf.slotcap = cpu_to_le32(slotcap);
 	bridge->pcie_conf.slotsta = cpu_to_le16(PCI_EXP_SLTSTA_PDS);
 
 	/* Indicates supports for Completion Retry Status */
@@ -1565,6 +1607,24 @@ static void advk_pcie_remove_rp_irq_domain(struct advk_pcie *pcie)
 	irq_domain_remove(pcie->rp_irq_domain);
 }
 
+static void advk_pcie_link_irq_handler(struct timer_list *timer)
+{
+	struct advk_pcie *pcie = from_timer(pcie, timer, link_irq_timer);
+	u16 slotctl;
+
+	slotctl = le16_to_cpu(pcie->bridge.pcie_conf.slotctl);
+	if (!(slotctl & PCI_EXP_SLTCTL_DLLSCE) ||
+	    !(slotctl & PCI_EXP_SLTCTL_HPIE))
+		return;
+
+	/*
+	 * Aardvark HW returns zero for PCI_EXP_FLAGS_IRQ, so use PCIe
+	 * interrupt 0
+	 */
+	if (generic_handle_domain_irq(pcie->rp_irq_domain, 0) == -EINVAL)
+		dev_err_ratelimited(&pcie->pdev->dev, "unhandled HP IRQ\n");
+}
+
 static void advk_pcie_handle_pme(struct advk_pcie *pcie)
 {
 	u32 requester = advk_readl(pcie, PCIE_MSG_LOG_REG) >> 16;
@@ -1616,6 +1676,7 @@ static void advk_pcie_handle_int(struct advk_pcie *pcie)
 {
 	u32 isr0_val, isr0_mask, isr0_status;
 	u32 isr1_val, isr1_mask, isr1_status;
+	u16 slotsta;
 	int i;
 
 	isr0_val = advk_readl(pcie, PCIE_ISR0_REG);
@@ -1640,6 +1701,26 @@ static void advk_pcie_handle_int(struct advk_pcie *pcie)
 		 */
 		if (generic_handle_domain_irq(pcie->rp_irq_domain, 0) == -EINVAL)
 			dev_err_ratelimited(&pcie->pdev->dev, "unhandled ERR IRQ\n");
+	}
+
+	/* Process Link Down interrupt as HP IRQ */
+	if (isr0_status & PCIE_ISR0_LINK_DOWN) {
+		advk_writel(pcie, PCIE_ISR0_LINK_DOWN, PCIE_ISR0_REG);
+
+		dev_info(&pcie->pdev->dev, "link down\n");
+
+		pcie->link_was_up = false;
+
+		slotsta = le16_to_cpu(pcie->bridge.pcie_conf.slotsta);
+		slotsta |= PCI_EXP_SLTSTA_DLLSC;
+		pcie->bridge.pcie_conf.slotsta = cpu_to_le16(slotsta);
+
+		/*
+		 * Deactivate timer and call advk_pcie_link_irq_handler()
+		 * function directly as we are in the interrupt context.
+		 */
+		del_timer_sync(&pcie->link_irq_timer);
+		advk_pcie_link_irq_handler(&pcie->link_irq_timer);
 	}
 
 	/* Process MSI interrupts */
@@ -1877,6 +1958,14 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	/*
+	 * generic_handle_domain_irq() expects local IRQs to be disabled since
+	 * normally it is called from interrupt context, so use TIMER_IRQSAFE
+	 * flag for this link_irq_timer.
+	 */
+	timer_setup(&pcie->link_irq_timer, advk_pcie_link_irq_handler,
+		    TIMER_IRQSAFE);
+
 	advk_pcie_setup_hw(pcie);
 
 	ret = advk_sw_pci_bridge_init(pcie);
@@ -1970,6 +2059,9 @@ static int advk_pcie_remove(struct platform_device *pdev)
 	advk_pcie_remove_rp_irq_domain(pcie);
 	advk_pcie_remove_msi_irq_domain(pcie);
 	advk_pcie_remove_irq_domain(pcie);
+
+	/* Deactivate link event timer */
+	del_timer_sync(&pcie->link_irq_timer);
 
 	/* Free config space for emulated root bridge */
 	pci_bridge_emul_cleanup(&pcie->bridge);
