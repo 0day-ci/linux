@@ -30,7 +30,28 @@
 #include <linux/security.h>
 #include <linux/hugetlb.h>
 
-int sysctl_unprivileged_userfaultfd __read_mostly;
+static int sysctl_unprivileged_userfaultfd __read_mostly;
+#ifdef CONFIG_SYSCTL
+static struct ctl_table vm_userfaultfd_table[] = {
+	{
+		.procname       = "unprivileged_userfaultfd",
+		.data           = &sysctl_unprivileged_userfaultfd,
+		.maxlen         = sizeof(sysctl_unprivileged_userfaultfd),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = SYSCTL_ZERO,
+		.extra2         = SYSCTL_ONE,
+	},
+	{ }
+};
+
+static __init int vm_userfaultfd_sysctls_init(void)
+{
+	register_sysctl_init("vm", vm_userfaultfd_table);
+	return 0;
+}
+late_initcall(vm_userfaultfd_sysctls_init);
+#endif /* CONFIG_SYSCTL */
 
 static struct kmem_cache *userfaultfd_ctx_cachep __read_mostly;
 
