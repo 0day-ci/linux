@@ -106,6 +106,12 @@ csum_block_sub(__wsum csum, __wsum csum2, int offset)
 	return csum_block_add(csum, ~csum2, offset);
 }
 
+static inline __wsum
+csum_block_replace(__wsum csum, __wsum old, __wsum new, int offset)
+{
+	return csum_block_add(csum_block_sub(csum, old, offset), new, offset);
+}
+
 static inline __wsum csum_unfold(__sum16 n)
 {
 	return (__force __wsum)n;
@@ -184,4 +190,5 @@ static inline __wsum wsum_negate(__wsum val)
 {
 	return (__force __wsum)-((__force u32)val);
 }
+
 #endif
