@@ -55,10 +55,31 @@ static DECLARE_WAIT_QUEUE_HEAD(kmod_wq);
  */
 #define MAX_KMOD_ALL_BUSY_TIMEOUT 5
 
+#define KMOD_PATH_LEN 256
 /*
 	modprobe_path is set via /proc/sys.
 */
-char modprobe_path[KMOD_PATH_LEN] = CONFIG_MODPROBE_PATH;
+static char modprobe_path[KMOD_PATH_LEN] = CONFIG_MODPROBE_PATH;
+
+#ifdef CONFIG_SYSCTL
+static struct ctl_table kern_modprobe_table[] = {
+	{
+		.procname       = "modprobe",
+		.data           = &modprobe_path,
+		.maxlen         = KMOD_PATH_LEN,
+		.mode           = 0644,
+		.proc_handler   = proc_dostring,
+	},
+	{ }
+};
+
+static __init int kernel_modprobe_sysctls_init(void)
+{
+	register_sysctl_init("kernel", kern_modprobe_table);
+	return 0;
+}
+late_initcall(kernel_modprobe_sysctls_init);
+#endif /* CONFIG_SYSCTL */
 
 static void free_modprobe_argv(struct subprocess_info *info)
 {
