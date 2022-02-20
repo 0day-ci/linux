@@ -3144,7 +3144,8 @@ int unshare_files(void)
 	return 0;
 }
 
-int sysctl_max_threads(struct ctl_table *table, int write,
+#ifdef CONFIG_SYSCTL
+static int sysctl_max_threads(struct ctl_table *table, int write,
 		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct ctl_table t;
@@ -3166,3 +3167,22 @@ int sysctl_max_threads(struct ctl_table *table, int write,
 
 	return 0;
 }
+
+static struct ctl_table kern_fork_table[] = {
+	{
+		.procname       = "threads-max",
+		.data           = NULL,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = sysctl_max_threads,
+	},
+	{ }
+};
+
+static __init int kernel_fork_sysctls_init(void)
+{
+	register_sysctl_init("kernel", kern_fork_table);
+	return 0;
+}
+late_initcall(kernel_fork_sysctls_init);
+#endif /* CONFIG_SYSCTL */

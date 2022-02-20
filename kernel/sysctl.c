@@ -1986,13 +1986,6 @@ static struct ctl_table kern_table[] = {
 	},
 #endif
 	{
-		.procname	= "threads-max",
-		.data		= NULL,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= sysctl_max_threads,
-	},
-	{
 		.procname	= "usermodehelper",
 		.mode		= 0555,
 		.child		= usermodehelper_table,
