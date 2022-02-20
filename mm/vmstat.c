@@ -32,7 +32,7 @@
 #include "internal.h"
 
 #ifdef CONFIG_NUMA
-int sysctl_vm_numa_stat = ENABLE_NUMA_STAT;
+static int sysctl_vm_numa_stat = ENABLE_NUMA_STAT;
 
 /* zero numa counters within a zone */
 static void zero_zone_numa_counters(struct zone *zone)
@@ -74,7 +74,7 @@ static void invalid_numa_statistics(void)
 
 static DEFINE_MUTEX(vm_numa_stat_lock);
 
-int sysctl_vm_numa_stat_handler(struct ctl_table *table, int write,
+static int sysctl_vm_numa_stat_handler(struct ctl_table *table, int write,
 		void *buffer, size_t *length, loff_t *ppos)
 {
 	int ret, oldval;
@@ -1859,7 +1859,7 @@ static const struct seq_operations vmstat_op = {
 
 #ifdef CONFIG_SMP
 static DEFINE_PER_CPU(struct delayed_work, vmstat_work);
-int sysctl_stat_interval __read_mostly = HZ;
+static int sysctl_stat_interval __read_mostly = HZ;
 
 #ifdef CONFIG_PROC_FS
 static void refresh_vm_stats(struct work_struct *work)
@@ -1867,7 +1867,7 @@ static void refresh_vm_stats(struct work_struct *work)
 	refresh_cpu_vm_stats(true);
 }
 
-int vmstat_refresh(struct ctl_table *table, int write,
+static int vmstat_refresh(struct ctl_table *table, int write,
 		   void *buffer, size_t *lenp, loff_t *ppos)
 {
 	long val;
@@ -2244,3 +2244,45 @@ static int __init extfrag_debug_init(void)
 
 module_init(extfrag_debug_init);
 #endif
+
+#ifdef CONFIG_SYSCTL
+static struct ctl_table vm_stat_table[] = {
+#ifdef CONFIG_NUMA
+	{
+		.procname               = "numa_stat",
+		.data                   = &sysctl_vm_numa_stat,
+		.maxlen                 = sizeof(int),
+		.mode                   = 0644,
+		.proc_handler           = sysctl_vm_numa_stat_handler,
+		.extra1                 = SYSCTL_ZERO,
+		.extra2                 = SYSCTL_ONE,
+	},
+#endif /* CONFIG_NUMA */
+#ifdef CONFIG_SMP
+	{
+		.procname       = "stat_interval",
+		.data           = &sysctl_stat_interval,
+		.maxlen         = sizeof(sysctl_stat_interval),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_jiffies,
+	},
+#ifdef CONFIG_PROC_FS
+	{
+		.procname       = "stat_refresh",
+		.data           = NULL,
+		.maxlen         = 0,
+		.mode           = 0600,
+		.proc_handler   = vmstat_refresh,
+	},
+#endif /* CONFIG_PROC_FS */
+#endif /* CONFIG_SMP */
+	{ }
+};
+
+static __init int vm_stat_sysctls_init(void)
+{
+	register_sysctl_init("vm", vm_stat_table);
+	return 0;
+}
+late_initcall(vm_stat_sysctls_init);
+#endif /* CONFIG_SYSCTL */
