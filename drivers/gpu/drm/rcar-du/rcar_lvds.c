@@ -229,7 +229,7 @@ static void rcar_lvds_d3_e3_pll_calc(struct rcar_lvds *lvds, struct clk *clk,
 				 * the PLL, followed by a an optional fixed /7
 				 * divider.
 				 */
-				fout = fvco / (1 << e) / div7;
+				fout = (fvco >> e) / div7;
 				div = max(1UL, DIV_ROUND_CLOSEST(fout, target));
 				diff = abs(fout / div - target);
 
@@ -249,7 +249,7 @@ static void rcar_lvds_d3_e3_pll_calc(struct rcar_lvds *lvds, struct clk *clk,
 	}
 
 done:
-	output = fin * pll->pll_n / pll->pll_m / (1 << pll->pll_e)
+	output = (fin * pll->pll_n / pll->pll_m >> pll->pll_e)
 	       / div7 / pll->div;
 	error = (long)(output - target) * 10000 / (long)target;
 
