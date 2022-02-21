@@ -410,10 +410,11 @@ EXPORT_SYMBOL_GPL(fwnode_property_read_string);
  * fwnode_property_match_string - find a string in an array and return index
  * @fwnode: Firmware node to get the property of
  * @propname: Name of the property holding the array
- * @string: String to look for
+ * @cb: callback to execute on the string array
+ * @data: data to be passed to the callback
  *
- * Find a given string in a string array and if it is found return the
- * index back.
+ * Execute a given callback on a string array values and returns the callback
+ * return value.
  *
  * Return: %0 if the property was found (success),
  *	   %-EINVAL if given arguments are not valid,
@@ -421,8 +422,10 @@ EXPORT_SYMBOL_GPL(fwnode_property_read_string);
  *	   %-EPROTO if the property is not an array of strings,
  *	   %-ENXIO if no suitable firmware interface is present.
  */
-int fwnode_property_match_string(const struct fwnode_handle *fwnode,
-	const char *propname, const char *string)
+static int fwnode_property_string_match(const struct fwnode_handle *fwnode,
+					const char *propname,
+					int (*cb)(const char **, int, void *),
+					void *data)
 {
 	const char **values;
 	int nval, ret;
@@ -442,12 +445,45 @@ int fwnode_property_match_string(const struct fwnode_handle *fwnode,
 	if (ret < 0)
 		goto out;
 
-	ret = match_string(values, nval, string);
-	if (ret < 0)
-		ret = -ENODATA;
+	ret = cb(values, nval, data);
 out:
 	kfree(values);
 	return ret;
+}
+
+static int match_string_callback(const char **values, int nval, void *data)
+{
+	int ret;
+	const char *string = data;
+
+	ret = match_string(values, nval, string);
+	if (ret < 0)
+		ret = -ENODATA;
+
+	return ret;
+}
+
+/**
+ * fwnode_property_match_string - find a string in an array and return index
+ * @fwnode: Firmware node to get the property of
+ * @propname: Name of the property holding the array
+ * @string: String to look for
+ *
+ * Find a given string in a string array and if it is found return the
+ * index back.
+ *
+ * Return: %0 if the property was found (success),
+ *	   %-EINVAL if given arguments are not valid,
+ *	   %-ENODATA if the property does not have a value,
+ *	   %-EPROTO if the property is not an array of strings,
+ *	   %-ENXIO if no suitable firmware interface is present.
+ */
+int fwnode_property_match_string(const struct fwnode_handle *fwnode,
+				 const char *propname, const char *string)
+{
+	return fwnode_property_string_match(fwnode, propname,
+					    match_string_callback,
+					    (void *)string);
 }
 EXPORT_SYMBOL_GPL(fwnode_property_match_string);
 
