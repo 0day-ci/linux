@@ -1001,7 +1001,7 @@ void avic_vcpu_put(struct kvm_vcpu *vcpu)
 	WRITE_ONCE(*(svm->avic_physical_id_cache), entry);
 }
 
-void avic_vcpu_blocking(struct kvm_vcpu *vcpu)
+static void avic_vcpu_blocking(struct kvm_vcpu *vcpu)
 {
 	if (!kvm_vcpu_apicv_active(vcpu))
 		return;
@@ -1026,7 +1026,7 @@ void avic_vcpu_blocking(struct kvm_vcpu *vcpu)
 	preempt_enable();
 }
 
-void avic_vcpu_unblocking(struct kvm_vcpu *vcpu)
+static void avic_vcpu_unblocking(struct kvm_vcpu *vcpu)
 {
 	int cpu;
 
@@ -1060,6 +1060,14 @@ bool avic_hardware_setup(struct kvm_x86_ops *x86_ops)
 	if (boot_cpu_has(X86_FEATURE_X2AVIC)) {
 		avic_mode = AVIC_MODE_X2;
 		pr_info("x2AVIC enabled\n");
+	}
+
+	if (avic_mode) {
+		x86_ops->vcpu_blocking = avic_vcpu_blocking;
+		x86_ops->vcpu_unblocking = avic_vcpu_unblocking;
+	} else {
+		x86_ops->vcpu_blocking = NULL;
+		x86_ops->vcpu_unblocking = NULL;
 	}
 
 	amd_iommu_register_ga_log_notifier(&avic_ga_log_notifier);

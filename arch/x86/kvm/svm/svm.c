@@ -4531,8 +4531,6 @@ static struct kvm_x86_ops svm_x86_ops __initdata = {
 	.prepare_guest_switch = svm_prepare_guest_switch,
 	.vcpu_load = svm_vcpu_load,
 	.vcpu_put = svm_vcpu_put,
-	.vcpu_blocking = avic_vcpu_blocking,
-	.vcpu_unblocking = avic_vcpu_unblocking,
 
 	.update_exception_bitmap = svm_update_exception_bitmap,
 	.get_msr_feature = svm_get_msr_feature,
@@ -4818,11 +4816,6 @@ static __init int svm_hardware_setup(void)
 	}
 
 	enable_apicv = avic = avic && avic_hardware_setup(&svm_x86_ops);
-
-	if (!enable_apicv) {
-		svm_x86_ops.vcpu_blocking = NULL;
-		svm_x86_ops.vcpu_unblocking = NULL;
-	}
 
 	if (vls) {
 		if (!npt_enabled ||
