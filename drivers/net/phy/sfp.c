@@ -2499,43 +2499,25 @@ static int sfp_probe(struct platform_device *pdev)
 		return err;
 
 	sff = sfp->type = &sfp_data;
+	if (dev_fwnode(&pdev->dev)) {
+		struct fwnode_handle *fwnode = dev_fwnode(&pdev->dev);
+		struct fwnode_handle *np;
 
-	if (pdev->dev.of_node) {
-		struct device_node *node = pdev->dev.of_node;
-		const struct of_device_id *id;
-		struct device_node *np;
+		if (!is_acpi_device_node(fwnode)) {
+			sff = device_get_match_data(&pdev->dev);
+			if (WARN_ON(!sff))
+				return -EINVAL;
 
-		id = of_match_node(sfp_of_match, node);
-		if (WARN_ON(!id))
-			return -EINVAL;
+			sfp->type = sff;
+		}
 
-		sff = sfp->type = id->data;
-
-		np = of_parse_phandle(node, "i2c-bus", 0);
+		np = fwnode_find_reference(fwnode, "i2c-bus", 0);
 		if (!np) {
-			dev_err(sfp->dev, "missing 'i2c-bus' property\n");
+			dev_err(&pdev->dev, "Cannot parse i2c-bus\n");
 			return -ENODEV;
 		}
-
-		i2c = of_find_i2c_adapter_by_node(np);
-		of_node_put(np);
-	} else if (has_acpi_companion(&pdev->dev)) {
-		struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
-		struct fwnode_handle *fw = acpi_fwnode_handle(adev);
-		struct fwnode_reference_args args;
-		struct acpi_handle *acpi_handle;
-		int ret;
-
-		ret = acpi_node_get_property_reference(fw, "i2c-bus", 0, &args);
-		if (ret || !is_acpi_device_node(args.fwnode)) {
-			dev_err(&pdev->dev, "missing 'i2c-bus' property\n");
-			return -ENODEV;
-		}
-
-		acpi_handle = ACPI_HANDLE_FWNODE(args.fwnode);
-		i2c = i2c_acpi_find_adapter_by_handle(acpi_handle);
-	} else {
-		return -EINVAL;
+		i2c = fwnode_find_i2c_adapter_by_node(np);
+		fwnode_handle_put(np);
 	}
 
 	if (!i2c)
