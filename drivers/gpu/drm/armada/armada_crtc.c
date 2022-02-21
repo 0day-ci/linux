@@ -1026,12 +1026,7 @@ armada_lcd_bind(struct device *dev, struct device *master, void *data)
 
 		variant = (const struct armada_variant *)id->driver_data;
 	} else {
-		const struct of_device_id *match;
 		struct device_node *np, *parent = dev->of_node;
-
-		match = of_match_device(dev->driver->of_match_table, dev);
-		if (!match)
-			return -ENXIO;
 
 		np = of_get_child_by_name(parent, "ports");
 		if (np)
@@ -1043,7 +1038,7 @@ armada_lcd_bind(struct device *dev, struct device *master, void *data)
 			return -ENXIO;
 		}
 
-		variant = match->data;
+		variant = of_device_get_match_data(dev);
 	}
 
 	return armada_drm_crtc_create(drm, dev, res, irq, variant, port);
