@@ -74,3 +74,44 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	info.align_offset = pgoff << PAGE_SHIFT;
 	return vm_unmapped_area(&info);
 }
+
+pgprot_t vm_get_page_prot(unsigned long vm_flags)
+{
+	switch (vm_flags & (VM_READ | VM_WRITE | VM_EXEC | VM_SHARED)) {
+	case VM_NONE:
+		return PAGE_U_NONE;
+	case VM_READ:
+	/* Pvt-W => !W */
+	case VM_WRITE:
+	/* Pvt-W => !W */
+	case VM_WRITE | VM_READ:
+		return PAGE_U_R;
+	/* X => R */
+	case VM_EXEC:
+	case VM_EXEC | VM_READ:
+	 /* Pvt-W => !W and X => R */
+	case VM_EXEC | VM_WRITE:
+	 /* Pvt-W => !W */
+	case VM_EXEC | VM_WRITE | VM_READ:
+		return PAGE_U_X_R;
+	case VM_SHARED:
+		return PAGE_U_NONE;
+	case VM_SHARED | VM_READ:
+		return PAGE_U_R;
+	/* W => R */
+	case VM_SHARED | VM_WRITE:
+	case VM_SHARED | VM_WRITE | VM_READ:
+		return PAGE_U_W_R;
+	 /* X => R */
+	case VM_SHARED | VM_EXEC:
+	case VM_SHARED | VM_EXEC | VM_READ:
+		return PAGE_U_X_R;
+	/* X => R */
+	case VM_SHARED | VM_EXEC | VM_WRITE:
+	case VM_SHARED | VM_EXEC | VM_WRITE | VM_READ:
+		return PAGE_U_X_W_R;
+	default:
+		BUILD_BUG();
+	}
+}
+EXPORT_SYMBOL(vm_get_page_prot);
