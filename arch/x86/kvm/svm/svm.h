@@ -578,6 +578,7 @@ void avic_update_vapic_bar(struct vcpu_svm *svm, u64 data);
 void avic_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
 void avic_vcpu_put(struct kvm_vcpu *vcpu);
 void avic_post_state_restore(struct kvm_vcpu *vcpu);
+void avic_vcpu_after_set_cpuid(struct kvm_vcpu *vcpu, int nested);
 void svm_set_virtual_apic_mode(struct kvm_vcpu *vcpu);
 void svm_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu);
 bool svm_check_apicv_inhibit_reasons(ulong bit);
