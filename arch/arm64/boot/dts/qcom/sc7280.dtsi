@@ -2895,7 +2895,7 @@
 				assigned-clocks = <&dispcc DISP_CC_MDSS_MDP_CLK>,
 						<&dispcc DISP_CC_MDSS_VSYNC_CLK>,
 						<&dispcc DISP_CC_MDSS_AHB_CLK>;
-				assigned-clock-rates = <300000000>,
+				assigned-clock-rates = <506666667>,
 							<19200000>,
 							<19200000>;
 				operating-points-v2 = <&mdp_opp_table>;
