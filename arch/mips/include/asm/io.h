@@ -225,6 +225,17 @@ void iounmap(const volatile void __iomem *addr);
 #define war_io_reorder_wmb()		barrier()
 #endif
 
+#define __io_br()      mb()
+
+/* prevent prefetching of coherent DMA data ahead of a dma-complete */
+#define __io_ar(v)     rmb()
+
+/* flush writes to coherent DMA data before possibly triggering a DMA read */
+#define __io_bw()      wmb()
+
+/* serialize device access against a spin_unlock, usually handled there. */
+#define __io_aw()      do { } while (0)
+
 #define __BUILD_MEMORY_SINGLE(pfx, bwlq, type, barrier, relax, irq)	\
 									\
 static inline void pfx##write##bwlq(type val,				\
@@ -234,7 +245,7 @@ static inline void pfx##write##bwlq(type val,				\
 	type __val;							\
 									\
 	if (barrier)							\
-		iobarrier_rw();						\
+		__io_bw();						\
 	else								\
 		war_io_reorder_wmb();					\
 									\
@@ -265,6 +276,7 @@ static inline void pfx##write##bwlq(type val,				\
 			local_irq_restore(__flags);			\
 	} else								\
 		BUG();							\
+	__io_aw();							\
 }									\
 									\
 static inline type pfx##read##bwlq(const volatile void __iomem *mem)	\
@@ -275,7 +287,7 @@ static inline type pfx##read##bwlq(const volatile void __iomem *mem)	\
 	__mem = (void *)__swizzle_addr_##bwlq((unsigned long)(mem));	\
 									\
 	if (barrier)							\
-		iobarrier_rw();						\
+		__io_br();						\
 									\
 	if (sizeof(type) != sizeof(u64) || sizeof(u64) == sizeof(long)) \
 		__val = *__mem;						\
@@ -300,9 +312,8 @@ static inline type pfx##read##bwlq(const volatile void __iomem *mem)	\
 		BUG();							\
 	}								\
 									\
-	/* prevent prefetching of coherent DMA data prematurely */	\
 	if (!relax)							\
-		rmb();							\
+		io_ar(__val);						\
 	return pfx##ioswab##bwlq(__mem, __val);				\
 }
 
