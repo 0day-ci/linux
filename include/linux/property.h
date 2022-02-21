@@ -70,6 +70,9 @@ int fwnode_property_read_string_array(const struct fwnode_handle *fwnode,
 				      size_t nval);
 int fwnode_property_read_string(const struct fwnode_handle *fwnode,
 				const char *propname, const char **val);
+int fwnode_property_read_string_index(const struct fwnode_handle *fwnode,
+				      const char *propname, int index,
+				      const char **string);
 int fwnode_property_match_string(const struct fwnode_handle *fwnode,
 				 const char *propname, const char *string);
 int fwnode_property_get_reference_args(const struct fwnode_handle *fwnode,
