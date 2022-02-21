@@ -749,7 +749,7 @@ xfs_setattr_nonsize(
 		 * cleared upon successful return from chown()
 		 */
 		if ((inode->i_mode & (S_ISUID|S_ISGID)) &&
-		    !capable(CAP_FSETID))
+		    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
 			inode->i_mode &= ~(S_ISUID|S_ISGID);
 
 		/*
