@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/remoteproc/avm,wasp-rproc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: AVM WASP processor controller bindings
+
+maintainers:
+  - Daniel Kestrel <kestrelseventyfour@gmail.com>
+
+description: |
+  This document defines the bindings for the remoteproc component that loads and
+  boots firmwares on the AVM Wireless Assistent Support Processor (WASP) SoC
+  that is attached to some AVM Fritzbox devices (3390, 3490, 5490, 5491, 7490).
+
+properties:
+  compatible:
+    const: avm,wasp
+
+  ath9k-firmware:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: |
+      Should contain the name of the ath9k eeprom that is to be loaded from
+      the lantiq host flash. Wifi on the WASP SoC does not work without it.
+      The file should be located on the firmware search path.
+
+  ath10k-caldata:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: |
+      Should contain the name of the ath10k caldata that is to be loaded from
+      the lantiq host flash. Wifi on the WASP SoC does not work without it.
+      The file should be located on the firmware search path.
+
+  wasp-netboot-firmware:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: |
+      Should contain the name of the netboot firmware that is to be loaded
+      and started on the WASP SoC using mdio in order to be able to load
+      the initramfs image as a second stage.
+      The file should be located on the firmware search path.
+
+  wasp-netboot-mdio:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: Reference to the Lantiq GSWIP switch mdio.
+
+  wasp-initramfs-port:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: Reference to the network port, where the WASP SoC is connected to.
+
+  wasp-initramfs-image:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: |
+      Should contain the name of the initramfs linux image that is to be loaded
+      and started on the WASP SoC.
+      The file should be located on the firmware search path.
+
+  reset-gpio:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: Reference and parameters for the reset gpio of the WASP SoC.
+
+  startup-gpio:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: Reference and parameters for the power switch gpio of the WASP SoC.
+
+required:
+  - compatible
+  - ath9k-firmware
+  - ath10k-caldata
+  - wasp-netboot-firmware
+  - wasp-netboot-mdio
+  - wasp-initramfs-port
+  - wasp-initramfs-image
+  - reset-gpio
+  - startup-gpio
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    avm-wasp {
+        compatible = "avm,wasp";
+        ath9k-firmware = "ath9k-eeprom-ahb-18100000.wmac.bin";
+        ath10k-caldata = "ath10k/cal-pci-0000:00:00.0.bin";
+        wasp-netboot-firmware = "netboot.fw";
+        wasp-netboot-mdio = <&gswip_mdio>;
+        wasp-initramfs-port = <&port5>;
+        wasp-initramfs-image = "avm_fritzx490-wasp-initramfs-kernel.bin";
+        reset-gpio = <&gpio 34 GPIO_ACTIVE_HIGH>;
+        startup-gpio = <&gpio 5 GPIO_ACTIVE_HIGH>;
+    };
