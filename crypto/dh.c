@@ -104,7 +104,7 @@ err_clear_ctx:
 /*
  * SP800-56A public key verification:
  *
- * * If Q is provided as part of the domain paramenters, a full validation
+ * * If Q is provided as part of the domain parameters, a full validation
  *   according to SP800-56A section 5.6.2.3.1 is performed.
  *
  * * If Q is not provided, a partial validation according to SP800-56A section
