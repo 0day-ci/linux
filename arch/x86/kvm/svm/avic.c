@@ -447,8 +447,10 @@ static int avic_handle_apic_id_update(struct kvm_vcpu *vcpu)
 
 	old = avic_get_physical_id_entry(vcpu, vcpu->vcpu_id);
 	new = avic_get_physical_id_entry(vcpu, id);
-	if (!new || !old)
+	if (!new || !old) {
+		WARN_ON(1);
 		return 1;
+	}
 
 	/* We need to move physical_id_entry to new offset */
 	*new = *old;
