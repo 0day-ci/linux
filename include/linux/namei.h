@@ -77,6 +77,10 @@ extern int follow_up(struct path *);
 extern struct dentry *lock_rename(struct dentry *, struct dentry *);
 extern void unlock_rename(struct dentry *, struct dentry *);
 
+/* Special version of the above for stacking filesystems */
+extern struct dentry *lock_rename_stacked(struct dentry *, struct dentry *);
+extern void unlock_rename_stacked(struct dentry *, struct dentry *);
+
 extern int __must_check nd_jump_link(struct path *path);
 
 static inline void nd_terminate_link(void *name, size_t len, size_t maxlen)

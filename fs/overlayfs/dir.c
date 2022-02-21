@@ -416,7 +416,7 @@ static struct dentry *ovl_clear_empty(struct dentry *dentry,
 
 	ovl_cleanup_whiteouts(upper, list);
 	ovl_cleanup(wdir, upper);
-	unlock_rename(workdir, upperdir);
+	unlock_rename_stacked(workdir, upperdir);
 
 	/* dentry's upper doesn't match now, get rid of it */
 	d_drop(dentry);
@@ -427,7 +427,7 @@ out_cleanup:
 	ovl_cleanup(wdir, opaquedir);
 	dput(opaquedir);
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	unlock_rename_stacked(workdir, upperdir);
 out:
 	return ERR_PTR(err);
 }
@@ -551,7 +551,7 @@ static int ovl_create_over_whiteout(struct dentry *dentry, struct inode *inode,
 out_dput:
 	dput(upper);
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	unlock_rename_stacked(workdir, upperdir);
 out:
 	if (!hardlink) {
 		posix_acl_release(acl);
@@ -790,7 +790,7 @@ out_d_drop:
 out_dput_upper:
 	dput(upper);
 out_unlock:
-	unlock_rename(workdir, upperdir);
+	unlock_rename_stacked(workdir, upperdir);
 out_dput:
 	dput(opaquedir);
 out:
@@ -1187,7 +1187,7 @@ static int ovl_rename(struct user_namespace *mnt_userns, struct inode *olddir,
 		}
 	}
 
-	trap = lock_rename(new_upperdir, old_upperdir);
+	trap = lock_rename_stacked(new_upperdir, old_upperdir);
 
 	olddentry = lookup_one_len(old->d_name.name, old_upperdir,
 				   old->d_name.len);
@@ -1281,7 +1281,7 @@ out_dput:
 out_dput_old:
 	dput(olddentry);
 out_unlock:
-	unlock_rename(new_upperdir, old_upperdir);
+	unlock_rename_stacked(new_upperdir, old_upperdir);
 out_revert_creds:
 	revert_creds(old_cred);
 	if (update_nlink)

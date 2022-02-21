@@ -670,7 +670,7 @@ static int ovl_copy_up_workdir(struct ovl_copy_up_ctx *c)
 
 	/* workdir and destdir could be the same when copying up to indexdir */
 	err = -EIO;
-	if (lock_rename(c->workdir, c->destdir) != NULL)
+	if (lock_rename_stacked(c->workdir, c->destdir) != NULL)
 		goto unlock;
 
 	err = ovl_prep_cu_creds(c->dentry, &cc);
@@ -711,7 +711,7 @@ static int ovl_copy_up_workdir(struct ovl_copy_up_ctx *c)
 	if (S_ISDIR(inode->i_mode))
 		ovl_set_flag(OVL_WHITEOUTS, inode);
 unlock:
-	unlock_rename(c->workdir, c->destdir);
+	unlock_rename_stacked(c->workdir, c->destdir);
 
 	return err;
 

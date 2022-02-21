@@ -596,7 +596,7 @@ ecryptfs_rename(struct user_namespace *mnt_userns, struct inode *old_dir,
 
 	target_inode = d_inode(new_dentry);
 
-	trap = lock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
+	trap = lock_rename_stacked(lower_old_dir_dentry, lower_new_dir_dentry);
 	dget(lower_new_dentry);
 	rc = -EINVAL;
 	if (lower_old_dentry->d_parent != lower_old_dir_dentry)
@@ -631,7 +631,7 @@ ecryptfs_rename(struct user_namespace *mnt_userns, struct inode *old_dir,
 		fsstack_copy_attr_all(old_dir, d_inode(lower_old_dir_dentry));
 out_lock:
 	dput(lower_new_dentry);
-	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
+	unlock_rename_stacked(lower_old_dir_dentry, lower_new_dir_dentry);
 	return rc;
 }
 

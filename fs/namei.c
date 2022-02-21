@@ -122,6 +122,8 @@
  * PATH_MAX includes the nul terminator --RR.
  */
 
+static DECLARE_RWSEM(link_rwsem);
+
 #define EMBEDDED_NAME_MAX	(PATH_MAX - offsetof(struct filename, iname))
 
 struct filename *
@@ -2904,10 +2906,11 @@ static inline int may_create(struct user_namespace *mnt_userns,
 	return inode_permission(mnt_userns, dir, MAY_WRITE | MAY_EXEC);
 }
 
+
 /*
  * p1 and p2 should be directories on the same fs.
  */
-struct dentry *lock_rename(struct dentry *p1, struct dentry *p2)
+struct dentry *lock_rename_stacked(struct dentry *p1, struct dentry *p2)
 {
 	struct dentry *p;
 
@@ -2936,15 +2939,29 @@ struct dentry *lock_rename(struct dentry *p1, struct dentry *p2)
 	inode_lock_nested(p2->d_inode, I_MUTEX_PARENT2);
 	return NULL;
 }
+EXPORT_SYMBOL(lock_rename_stacked);
+
+struct dentry *lock_rename(struct dentry *p1, struct dentry *p2)
+{
+	down_read(&link_rwsem);
+	return lock_rename_stacked(p1, p2);
+}
 EXPORT_SYMBOL(lock_rename);
 
-void unlock_rename(struct dentry *p1, struct dentry *p2)
+void unlock_rename_stacked(struct dentry *p1, struct dentry *p2)
 {
 	inode_unlock(p1->d_inode);
 	if (p1 != p2) {
 		inode_unlock(p2->d_inode);
 		mutex_unlock(&p1->d_sb->s_vfs_rename_mutex);
 	}
+}
+EXPORT_SYMBOL(unlock_rename_stacked);
+
+void unlock_rename(struct dentry *p1, struct dentry *p2)
+{
+	unlock_rename_stacked(p1, p2);
+	up_read(&link_rwsem);
 }
 EXPORT_SYMBOL(unlock_rename);
 
@@ -4405,6 +4422,7 @@ int do_linkat(int olddfd, struct filename *old, int newdfd,
 	struct path old_path, new_path;
 	struct inode *delegated_inode = NULL;
 	int how = 0;
+	bool lock = false;
 	int error;
 
 	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0) {
@@ -4423,10 +4441,13 @@ int do_linkat(int olddfd, struct filename *old, int newdfd,
 
 	if (flags & AT_SYMLINK_FOLLOW)
 		how |= LOOKUP_FOLLOW;
+retry_lock:
+	if (lock)
+		down_write(&link_rwsem);
 retry:
 	error = filename_lookup(olddfd, old, how, &old_path, NULL);
 	if (error)
-		goto out_putnames;
+		goto out_unlock_link;
 
 	new_dentry = filename_create(newdfd, new, &new_path,
 					(how & LOOKUP_REVAL));
@@ -4460,8 +4481,16 @@ out_dput:
 		how |= LOOKUP_REVAL;
 		goto retry;
 	}
+	if (!lock && error == -ENOENT) {
+		path_put(&old_path);
+		lock = true;
+		goto retry_lock;
+	}
 out_putpath:
 	path_put(&old_path);
+out_unlock_link:
+	if (lock)
+		up_write(&link_rwsem);
 out_putnames:
 	putname(old);
 	putname(new);
