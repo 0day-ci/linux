@@ -89,7 +89,7 @@ static uint64_t osvw_len = 4, osvw_status;
 static DEFINE_PER_CPU(u64, current_tsc_ratio);
 #define TSC_RATIO_DEFAULT	0x0100000000ULL
 
-static const struct svm_direct_access_msrs {
+static struct svm_direct_access_msrs {
 	u32 index;   /* Index of the MSR */
 	bool always; /* True if intercept is initially cleared */
 } direct_access_msrs[MAX_DIRECT_ACCESS_MSRS] = {
@@ -116,6 +116,9 @@ static const struct svm_direct_access_msrs {
 	{ .index = MSR_AMD64_SEV_ES_GHCB,		.always = true  },
 	{ .index = MSR_INVALID,				.always = false },
 };
+
+static struct svm_direct_access_msrs
+direct_access_x2apic_msrs[NUM_DIRECT_ACCESS_X2APIC_MSRS + 1];
 
 /*
  * These 2 parameters are used to config the controls for Pause-Loop Exiting:
@@ -609,41 +612,42 @@ free_cpu_data:
 
 }
 
-static int direct_access_msr_slot(u32 msr)
+static int direct_access_msr_slot(u32 msr, struct svm_direct_access_msrs *msrs)
 {
 	u32 i;
 
-	for (i = 0; direct_access_msrs[i].index != MSR_INVALID; i++)
-		if (direct_access_msrs[i].index == msr)
+	for (i = 0; msrs[i].index != MSR_INVALID; i++)
+		if (msrs[i].index == msr)
 			return i;
 
 	return -ENOENT;
 }
 
-static void set_shadow_msr_intercept(struct kvm_vcpu *vcpu, u32 msr, int read,
-				     int write)
+static void set_shadow_msr_intercept(struct kvm_vcpu *vcpu,
+				     struct svm_direct_access_msrs *msrs, u32 msr,
+				     int read, void *read_bits,
+				     int write, void *write_bits)
 {
-	struct vcpu_svm *svm = to_svm(vcpu);
-	int slot = direct_access_msr_slot(msr);
+	int slot = direct_access_msr_slot(msr, msrs);
 
 	if (slot == -ENOENT)
 		return;
 
 	/* Set the shadow bitmaps to the desired intercept states */
 	if (read)
-		set_bit(slot, svm->shadow_msr_intercept.read);
+		set_bit(slot, read_bits);
 	else
-		clear_bit(slot, svm->shadow_msr_intercept.read);
+		clear_bit(slot, read_bits);
 
 	if (write)
-		set_bit(slot, svm->shadow_msr_intercept.write);
+		set_bit(slot, write_bits);
 	else
-		clear_bit(slot, svm->shadow_msr_intercept.write);
+		clear_bit(slot, write_bits);
 }
 
-static bool valid_msr_intercept(u32 index)
+static bool valid_msr_intercept(u32 index, struct svm_direct_access_msrs *msrs)
 {
-	return direct_access_msr_slot(index) != -ENOENT;
+	return direct_access_msr_slot(index, msrs) != -ENOENT;
 }
 
 static bool msr_write_intercepted(struct kvm_vcpu *vcpu, u32 msr)
@@ -674,9 +678,12 @@ static void set_msr_interception_bitmap(struct kvm_vcpu *vcpu, u32 *msrpm,
 
 	/*
 	 * If this warning triggers extend the direct_access_msrs list at the
-	 * beginning of the file
+	 * beginning of the file. The direct_access_x2apic_msrs is only for
+	 * x2apic MSRs.
 	 */
-	WARN_ON(!valid_msr_intercept(msr));
+	WARN_ON(!valid_msr_intercept(msr, direct_access_msrs) &&
+		(boot_cpu_has(X86_FEATURE_X2AVIC) &&
+		 !valid_msr_intercept(msr, direct_access_x2apic_msrs)));
 
 	/* Enforce non allowed MSRs to trap */
 	if (read && !kvm_msr_allowed(vcpu, msr, KVM_MSR_FILTER_READ))
@@ -704,7 +711,16 @@ static void set_msr_interception_bitmap(struct kvm_vcpu *vcpu, u32 *msrpm,
 void set_msr_interception(struct kvm_vcpu *vcpu, u32 *msrpm, u32 msr,
 			  int read, int write)
 {
-	set_shadow_msr_intercept(vcpu, msr, read, write);
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (msr < 0x800 || msr > 0x8ff)
+		set_shadow_msr_intercept(vcpu, direct_access_msrs, msr,
+					 read, svm->shadow_msr_intercept.read,
+					 write, svm->shadow_msr_intercept.write);
+	else
+		set_shadow_msr_intercept(vcpu, direct_access_x2apic_msrs, msr,
+					 read, svm->shadow_x2apic_msr_intercept.read,
+					 write, svm->shadow_x2apic_msr_intercept.write);
 	set_msr_interception_bitmap(vcpu, msrpm, msr, read, write);
 }
 
@@ -784,6 +800,22 @@ static void add_msr_offset(u32 offset)
 	 * increase MSRPM_OFFSETS in this case.
 	 */
 	BUG();
+}
+
+static void init_direct_access_x2apic_msrs(void)
+{
+	int i;
+
+	/* Initialize x2APIC direct_access_x2apic_msrs entries */
+	for (i = 0; i < NUM_DIRECT_ACCESS_X2APIC_MSRS; i++) {
+		direct_access_x2apic_msrs[i].index = boot_cpu_has(X86_FEATURE_X2AVIC) ?
+						  (0x800 + i) : MSR_INVALID;
+		direct_access_x2apic_msrs[i].always = false;
+	}
+
+	/* Initialize last entry */
+	direct_access_x2apic_msrs[i].index = MSR_INVALID;
+	direct_access_x2apic_msrs[i].always = false;
 }
 
 static void init_msrpm_offsets(void)
@@ -4752,6 +4784,7 @@ static __init int svm_hardware_setup(void)
 	memset(iopm_va, 0xff, PAGE_SIZE * (1 << order));
 	iopm_base = page_to_pfn(iopm_pages) << PAGE_SHIFT;
 
+	init_direct_access_x2apic_msrs();
 	init_msrpm_offsets();
 
 	supported_xcr0 &= ~(XFEATURE_MASK_BNDREGS | XFEATURE_MASK_BNDCSR);

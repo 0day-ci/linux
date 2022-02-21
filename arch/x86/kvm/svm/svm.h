@@ -29,6 +29,8 @@
 
 #define MAX_DIRECT_ACCESS_MSRS	20
 #define MSRPM_OFFSETS	16
+#define NUM_DIRECT_ACCESS_X2APIC_MSRS	0x100
+
 extern u32 msrpm_offsets[MSRPM_OFFSETS] __read_mostly;
 extern bool npt_enabled;
 extern bool intercept_smi;
@@ -241,6 +243,11 @@ struct vcpu_svm {
 		DECLARE_BITMAP(read, MAX_DIRECT_ACCESS_MSRS);
 		DECLARE_BITMAP(write, MAX_DIRECT_ACCESS_MSRS);
 	} shadow_msr_intercept;
+
+	struct {
+		DECLARE_BITMAP(read, NUM_DIRECT_ACCESS_X2APIC_MSRS);
+		DECLARE_BITMAP(write, NUM_DIRECT_ACCESS_X2APIC_MSRS);
+	} shadow_x2apic_msr_intercept;
 
 	struct vcpu_sev_es_state sev_es;
 
