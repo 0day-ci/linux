@@ -53,8 +53,10 @@ int vhost_iotlb_add_range_ctx(struct vhost_iotlb *iotlb,
 			      void *opaque)
 {
 	struct vhost_iotlb_map *map;
+	u64 size = last - start + 1;
 
-	if (last < start)
+	// size can overflow to 0 when start is 0 and last is (2^64 - 1).
+	if (last < start || size == 0)
 		return -EFAULT;
 
 	if (iotlb->limit &&
@@ -69,7 +71,7 @@ int vhost_iotlb_add_range_ctx(struct vhost_iotlb *iotlb,
 		return -ENOMEM;
 
 	map->start = start;
-	map->size = last - start + 1;
+	map->size = size;
 	map->last = last;
 	map->addr = addr;
 	map->perm = perm;
