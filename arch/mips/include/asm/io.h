@@ -225,7 +225,11 @@ void iounmap(const volatile void __iomem *addr);
 #define war_io_reorder_wmb()		barrier()
 #endif
 
+#if defined(CONFIG_CPU_HAS_WB)
 #define __io_br()      mb()
+#else
+#define __io_br()      barrier()
+#endif
 
 /* prevent prefetching of coherent DMA data ahead of a dma-complete */
 #define __io_ar(v)     rmb()
