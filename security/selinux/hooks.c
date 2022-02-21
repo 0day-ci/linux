@@ -3682,6 +3682,13 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 					    CAP_OPT_NONE, true);
 		break;
 
+	case FIOCLEX:
+	case FIONCLEX:
+		/* Must always succeed if polcap set, else default: */
+		if (selinux_policycap_ioctl_skip_cloexec())
+			break;
+		fallthrough;
+
 	/* default case assumes that the command will go
 	 * to the file's ioctl() function.
 	 */
