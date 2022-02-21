@@ -428,6 +428,8 @@ int avic_incomplete_ipi_interception(struct kvm_vcpu *vcpu)
 		kvm_lapic_reg_write(apic, APIC_ICR, icrl);
 		break;
 	case AVIC_IPI_FAILURE_TARGET_NOT_RUNNING:
+		handle_fastpath_set_x2apic_icr_irqoff(vcpu, svm->vmcb->control.exit_info_1);
+
 		/*
 		 * At this point, we expect that the AVIC HW has already
 		 * set the appropriate IRR bits on the valid target

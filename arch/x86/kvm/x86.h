@@ -286,6 +286,7 @@ int x86_decode_emulated_instruction(struct kvm_vcpu *vcpu, int emulation_type,
 int x86_emulate_instruction(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
 			    int emulation_type, void *insn, int insn_len);
 fastpath_t handle_fastpath_set_msr_irqoff(struct kvm_vcpu *vcpu);
+int handle_fastpath_set_x2apic_icr_irqoff(struct kvm_vcpu *vcpu, u64 data);
 
 extern u64 host_xcr0;
 extern u64 supported_xcr0;

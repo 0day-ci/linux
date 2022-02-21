@@ -2020,7 +2020,7 @@ static inline bool kvm_vcpu_exit_request(struct kvm_vcpu *vcpu)
  * from guest to host, e.g. reacquiring KVM's SRCU lock. In contrast to the
  * other cases which must be called after interrupts are enabled on the host.
  */
-static int handle_fastpath_set_x2apic_icr_irqoff(struct kvm_vcpu *vcpu, u64 data)
+int handle_fastpath_set_x2apic_icr_irqoff(struct kvm_vcpu *vcpu, u64 data)
 {
 	if (!lapic_in_kernel(vcpu) || !apic_x2apic_mode(vcpu->arch.apic))
 		return 1;
@@ -2040,6 +2040,7 @@ static int handle_fastpath_set_x2apic_icr_irqoff(struct kvm_vcpu *vcpu, u64 data
 
 	return 1;
 }
+EXPORT_SYMBOL_GPL(handle_fastpath_set_x2apic_icr_irqoff);
 
 static int handle_fastpath_set_tscdeadline(struct kvm_vcpu *vcpu, u64 data)
 {
