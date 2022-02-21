@@ -37,8 +37,7 @@ static void tegra_plane_reset(struct drm_plane *plane)
 
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (state) {
-		plane->state = &state->base;
-		plane->state->plane = plane;
+		__drm_atomic_helper_plane_reset(plane, &state->base);
 		plane->state->zpos = p->index;
 		plane->state->normalized_zpos = p->index;
 
