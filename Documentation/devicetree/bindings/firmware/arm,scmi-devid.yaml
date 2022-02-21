@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+# Copyright 2022 EPAM Systems.
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/firmware/arm,scmi-devid.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: System Control and Management Interface (SCMI) Device ID for permissions
+    handling
+
+maintainers:
+  - Oleksii Moisieiev <oleksii_moisieiev@epam.com>
+
+description: |
+  SCMI device id property is intended to set the device id, needed to manage
+  the device permissions via SCMI protocol in the firmware. The device Id
+  should match device ids, defined in the firmware so the device permissions
+  can be requested by sending BASE_SET_DEVICE_PERMISSIONS (see 4.2.2.10 of [0]).
+
+  This property is useful on the virtualized systems, when several agents are
+  running on the same time and permissions should be set for the devices,
+  related to different agents.
+
+  [0] https://developer.arm.com/documentation/den0056/latest
+
+properties:
+  scmi_devid:
+    description: Identifier of the device, matching device id, defined in
+      the firmware.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+additionalProperties: false
+
+examples:
+  - |
+    ohci1: usb@ee0a0000 {
+        /* ... */
+        reg = <0 0xee0a0000 0 0x100>;
+        scmi_devid = <11>;
+        clocks = <&scmi_clock 4>;
+    };
