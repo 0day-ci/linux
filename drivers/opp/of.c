@@ -1397,6 +1397,85 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_of_node);
 
 /*
  * Callback function provided to the Energy Model framework upon registration.
+ * It provides the power based on DT by @dev at @kHz if it is the frequency
+ * of an existing OPP, or at the frequency of the first OPP above @kHz otherwise
+ * (see dev_pm_opp_find_freq_ceil()). This function updates @kHz to the ceiled
+ * frequency and @mW to the associated power. The power is a value specified
+ * in DT for a given frequency. It's a total power (static + dynamic), so
+ * better reflects the real HW characteristics.
+ *
+ * Returns 0 on success or a proper -E* value in case of error.
+ */
+static int __maybe_unused
+_get_dt_power(unsigned long *mW, unsigned long *kHz, struct device *dev)
+{
+	struct device_node *np, *em_node;
+	const struct property *prop;
+	struct dev_pm_opp *opp;
+	unsigned long opp_freq;
+	const __be32 *val;
+	int nr;
+
+	np = of_node_get(dev->of_node);
+	if (!np)
+		return -EINVAL;
+
+	/* Find the right frequency and convert it to kHz */
+	opp_freq = *kHz * 1000;
+	opp = dev_pm_opp_find_freq_ceil(dev, &opp_freq);
+	if (IS_ERR(opp))
+		return -EINVAL;
+
+	opp_freq /= 1000;
+
+	em_node = of_parse_phandle(np, "energy-model", 0);
+	of_node_put(np);
+	if (!em_node) {
+		dev_warn(dev, "%s: No EM phandle found\n", __func__);
+		return -EINVAL;
+	}
+
+	prop = of_find_property(em_node, "energy-model-entries", NULL);
+	of_node_put(em_node);
+	if (!prop) {
+		dev_warn(dev, "%s: No EM entries found\n", __func__);
+		return -ENODEV;
+	}
+
+	if (!prop->value) {
+		dev_warn(dev, "%s: No EM entries value found\n", __func__);
+		return -ENODATA;
+	}
+
+	/*
+	 * Each EM entry is a set of tuples consisting of Frequency and
+	 * Power like <freq-kHz power-uW>.
+	 */
+	nr = prop->length / sizeof(u32);
+	if (nr % 2) {
+		dev_warn(dev, "%s: Invalid EM DT table\n", __func__);
+		return -EINVAL;
+	}
+
+	val = prop->value;
+	while (nr) {
+		unsigned long freq = be32_to_cpup(val++);
+		unsigned long power = be32_to_cpup(val++);
+
+		if (opp_freq == freq) {
+			*kHz = opp_freq;
+			*mW = power / 1000;
+			return 0;
+		}
+
+		nr -= 2;
+	}
+
+	return -EINVAL;
+}
+
+/*
+ * Callback function provided to the Energy Model framework upon registration.
  * This computes the power estimated by @dev at @kHz if it is the frequency
  * of an existing OPP, or at the frequency of the first OPP above @kHz otherwise
  * (see dev_pm_opp_find_freq_ceil()). This function updates @kHz to the ceiled
@@ -1459,7 +1538,7 @@ static int __maybe_unused _get_power(unsigned long *mW, unsigned long *kHz,
 int dev_pm_opp_of_register_em(struct device *dev, struct cpumask *cpus)
 {
 	struct em_data_callback em_cb = EM_DATA_CB(_get_power);
-	struct device_node *np;
+	struct device_node *np, *em_node;
 	int ret, nr_opp;
 	u32 cap;
 
@@ -1478,6 +1557,20 @@ int dev_pm_opp_of_register_em(struct device *dev, struct cpumask *cpus)
 	if (!np) {
 		ret = -EINVAL;
 		goto failed;
+	}
+
+	/* First, try to find more precised Energy Model array in DT */
+	em_node = of_parse_phandle(np, "energy-model", 0);
+	of_node_put(np);
+	if (em_node) {
+		struct em_data_callback em_dt_cb = EM_DATA_CB(_get_dt_power);
+
+		pr_info("EM: found energy-model phandle node\n");
+		of_node_put(em_node);
+		ret = em_dev_register_perf_domain(dev, nr_opp, &em_dt_cb, cpus, true);
+		if (ret)
+			goto failed;
+		return 0;
 	}
 
 	/*
