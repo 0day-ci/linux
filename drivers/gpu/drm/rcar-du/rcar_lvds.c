@@ -712,18 +712,12 @@ static int rcar_lvds_parse_dt(struct rcar_lvds *lvds)
 {
 	int ret;
 
-	ret = drm_of_find_panel_or_bridge(lvds->dev->of_node, 1, 0,
-					  &lvds->panel, &lvds->next_bridge);
-	if (ret)
+	lvds->next_bridge = devm_drm_of_get_bridge(lvds->dev,
+						   lvds->dev->of_node,
+						   1, 0);
+	if (IS_ERR(lvds->next_bridge)) {
+		ret = -EINVAL;
 		goto done;
-
-	if (lvds->panel) {
-		lvds->next_bridge = devm_drm_panel_bridge_add(lvds->dev,
-							      lvds->panel);
-		if (IS_ERR_OR_NULL(lvds->next_bridge)) {
-			ret = -EINVAL;
-			goto done;
-		}
 	}
 
 	if (lvds->info->quirks & RCAR_LVDS_QUIRK_DUAL_LINK)
