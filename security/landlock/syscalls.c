@@ -277,8 +277,9 @@ out_fdput:
  *
  * @ruleset_fd: File descriptor tied to the ruleset that should be extended
  *		with the new rule.
- * @rule_type: Identify the structure type pointed to by @rule_attr (only
- *             LANDLOCK_RULE_PATH_BENEATH for now).
+ * @rule_type: Identify the structure type pointed to by @rule_attr as defined
+ *             by enum landlock_rule_type (only LANDLOCK_RULE_PATH_BENEATH for
+ *             now).
  * @rule_attr: Pointer to a rule (only of type &struct
  *             landlock_path_beneath_attr for now).
  * @flags: Must be 0.
@@ -301,7 +302,7 @@ out_fdput:
  * - EFAULT: @rule_attr inconsistency.
  */
 SYSCALL_DEFINE4(landlock_add_rule,
-		const int, ruleset_fd, const enum landlock_rule_type, rule_type,
+		const int, ruleset_fd, const int, rule_type,
 		const void __user *const, rule_attr, const __u32, flags)
 {
 	struct landlock_path_beneath_attr path_beneath_attr;
