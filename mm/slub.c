@@ -2350,8 +2350,8 @@ static void deactivate_slab(struct kmem_cache *s, struct slab *slab,
 {
 	enum slab_modes { M_NONE, M_PARTIAL, M_FULL, M_FREE };
 	struct kmem_cache_node *n = get_node(s, slab_nid(slab));
-	int lock = 0, free_delta = 0;
-	enum slab_modes l = M_NONE, m = M_NONE;
+	int free_delta = 0;
+	enum slab_modes mode = M_NONE;
 	void *nextfree, *freelist_iter, *freelist_tail;
 	int tail = DEACTIVATE_TO_HEAD;
 	unsigned long flags = 0;
@@ -2420,57 +2420,49 @@ redo:
 	new.frozen = 0;
 
 	if (!new.inuse && n->nr_partial >= s->min_partial)
-		m = M_FREE;
+		mode = M_FREE;
 	else if (new.freelist) {
-		m = M_PARTIAL;
-		if (!lock) {
-			lock = 1;
-			/*
-			 * Taking the spinlock removes the possibility that
-			 * acquire_slab() will see a slab that is frozen
-			 */
-			spin_lock_irqsave(&n->list_lock, flags);
-		}
-	} else {
-		m = M_FULL;
-		if (kmem_cache_debug_flags(s, SLAB_STORE_USER) && !lock) {
-			lock = 1;
-			/*
-			 * This also ensures that the scanning of full
-			 * slabs from diagnostic functions will not see
-			 * any frozen slabs.
-			 */
-			spin_lock_irqsave(&n->list_lock, flags);
-		}
+		mode = M_PARTIAL;
+		/*
+		 * Taking the spinlock removes the possibility that
+		 * acquire_slab() will see a slab that is frozen
+		 */
+		spin_lock_irqsave(&n->list_lock, flags);
+		add_partial(n, slab, tail);
+	} else if (kmem_cache_debug_flags(s, SLAB_STORE_USER)) {
+		mode = M_FULL;
+		/*
+		 * This also ensures that the scanning of full
+		 * slabs from diagnostic functions will not see
+		 * any frozen slabs.
+		 */
+		spin_lock_irqsave(&n->list_lock, flags);
+		add_full(s, n, slab);
 	}
 
-	if (l != m) {
-		if (l == M_PARTIAL)
-			remove_partial(n, slab);
-		else if (l == M_FULL)
-			remove_full(s, n, slab);
 
-		if (m == M_PARTIAL)
-			add_partial(n, slab, tail);
-		else if (m == M_FULL)
-			add_full(s, n, slab);
-	}
-
-	l = m;
 	if (!cmpxchg_double_slab(s, slab,
 				old.freelist, old.counters,
 				new.freelist, new.counters,
-				"unfreezing slab"))
+				"unfreezing slab")) {
+		if (mode == M_PARTIAL) {
+			remove_partial(n, slab);
+			spin_unlock_irqrestore(&n->list_lock, flags);
+		} else if (mode == M_FULL) {
+			remove_full(s, n, slab);
+			spin_unlock_irqrestore(&n->list_lock, flags);
+		}
 		goto redo;
+	}
 
-	if (lock)
+
+	if (mode == M_PARTIAL) {
 		spin_unlock_irqrestore(&n->list_lock, flags);
-
-	if (m == M_PARTIAL)
 		stat(s, tail);
-	else if (m == M_FULL)
+	} else if (mode == M_FULL) {
+		spin_unlock_irqrestore(&n->list_lock, flags);
 		stat(s, DEACTIVATE_FULL);
-	else if (m == M_FREE) {
+	} else if (mode == M_FREE) {
 		stat(s, DEACTIVATE_EMPTY);
 		discard_slab(s, slab);
 		stat(s, FREE_SLAB);
