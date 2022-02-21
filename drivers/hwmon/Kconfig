@@ -265,6 +265,16 @@ config SENSORS_AQUACOMPUTER_D5NEXT
 	  This driver can also be built as a module. If so, the module
 	  will be called aquacomputer_d5next.
 
+config SENSORS_AQUACOMPUTER_FARBWERK360
+	tristate "Aquacomputer Farbwerk 360 RGB controller"
+	depends on USB_HID
+	help
+	  If you say yes here you get support for temperature sensors provided by
+	  the Aquacomputer Farbwerk 360 RGB controller.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called aquacomputer_farbwerk360.
+
 config SENSORS_AS370
 	tristate "Synaptics AS370 SoC hardware monitoring driver"
 	help

@@ -1386,6 +1386,13 @@ S:	Maintained
 F:	Documentation/hwmon/aquacomputer_d5next.rst
 F:	drivers/hwmon/aquacomputer_d5next.c
 
+AQUACOMPUTER FARBWERK 360 RGB CONTROLLER SENSOR DRIVER
+M:	Aleksa Savic <savicaleksa83@gmail.com>
+L:	linux-hwmon@vger.kernel.org
+S:	Maintained
+F:	Documentation/hwmon/aquacomputer_farbwerk360.rst
+F:	drivers/hwmon/aquacomputer_farbwerk360.c
+
 AQUANTIA ETHERNET DRIVER (atlantic)
 M:	Igor Russkikh <irusskikh@marvell.com>
 L:	netdev@vger.kernel.org
