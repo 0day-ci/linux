@@ -477,6 +477,7 @@ struct x86_pmu_lbr {
 };
 
 extern void perf_get_x86_pmu_capability(struct x86_pmu_capability *cap);
+extern u64 perf_get_hw_event_config(int hw_event);
 extern void perf_check_microcode(void);
 extern void perf_clear_dirty_counters(void);
 extern int x86_perf_rdpmc_index(struct perf_event *event);
@@ -484,6 +485,11 @@ extern int x86_perf_rdpmc_index(struct perf_event *event);
 static inline void perf_get_x86_pmu_capability(struct x86_pmu_capability *cap)
 {
 	memset(cap, 0, sizeof(*cap));
+}
+
+static inline u64 perf_get_hw_event_config(int hw_event)
+{
+	return 0;
 }
 
 static inline void perf_events_lapic_init(void)	{ }
