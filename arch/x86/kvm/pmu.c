@@ -34,7 +34,7 @@
  *   However AMD doesn't support fixed-counters;
  * - There are three types of index to access perf counters (PMC):
  *     1. MSR (named msr): For example Intel has MSR_IA32_PERFCTRn and AMD
- *        has MSR_K7_PERFCTRn.
+ *        has MSR_F15H_PERF_CTRn or MSR_K7_PERFCTRn.
  *     2. MSR Index (named idx): This normally is used by RDPMC instruction.
  *        For instance AMD RDPMC instruction uses 0000_0003h in ECX to access
  *        C001_0007h (MSR_K7_PERCTR3). Intel has a similar mechanism, except
@@ -46,7 +46,8 @@
  *        between pmc and perf counters is as the following:
  *        * Intel: [0 .. INTEL_PMC_MAX_GENERIC-1] <=> gp counters
  *                 [INTEL_PMC_IDX_FIXED .. INTEL_PMC_IDX_FIXED + 2] <=> fixed
- *        * AMD:   [0 .. AMD64_NUM_COUNTERS-1] <=> gp counters
+ *        * AMD:   [0 .. AMD64_NUM_COUNTERS-1] or
+ *                 [0 .. AMD64_NUM_COUNTERS_CORE-1] <=> gp counters
  */
 
 static void kvm_pmi_trigger_fn(struct irq_work *irq_work)
