@@ -450,6 +450,9 @@ static inline void *device_connection_find_match(struct device *dev,
 const struct of_device_id *fwnode_match_node(const struct fwnode_handle *fwnode,
 					     const struct of_device_id *matches);
 
+const void *fwnode_get_match_data(const struct fwnode_handle *fwnode,
+				  const struct device *dev);
+
 /* -------------------------------------------------------------------------- */
 /* Software fwnode support - when HW description is incomplete or missing */
 
