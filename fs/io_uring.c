@@ -3066,21 +3066,71 @@ static inline void io_rw_done(struct kiocb *kiocb, ssize_t ret)
 	}
 }
 
-static inline loff_t*
-io_kiocb_update_pos(struct io_kiocb *req, struct kiocb *kiocb)
+static inline bool
+io_kiocb_update_pos(struct io_kiocb *req, struct kiocb *kiocb,
+		loff_t **ppos, u64 expected, bool force_nonblock)
 {
 	bool is_stream = req->file->f_mode & FMODE_STREAM;
 	if (kiocb->ki_pos == -1) {
 		if (!is_stream) {
-			req->flags |= REQ_F_CUR_POS;
+			*ppos = &kiocb->ki_pos;
+			WARN_ON(req->flags & REQ_F_CUR_POS);
+			if (req->file->f_mode & FMODE_ATOMIC_POS) {
+				if (force_nonblock) {
+					if (!mutex_trylock(&req->file->f_pos_lock))
+						return true;
+				} else {
+					mutex_lock(&req->file->f_pos_lock);
+				}
+			}
 			kiocb->ki_pos = req->file->f_pos;
-			return &kiocb->ki_pos;
+			req->flags |= REQ_F_CUR_POS;
+			req->file->f_pos += expected;
+			if (req->file->f_mode & FMODE_ATOMIC_POS)
+				mutex_unlock(&req->file->f_pos_lock);
+			return false;
 		} else {
 			kiocb->ki_pos = 0;
-			return NULL;
+			*ppos = NULL;
+			return false;
 		}
 	}
-	return is_stream ? NULL : &kiocb->ki_pos;
+	*ppos = is_stream ? NULL : &kiocb->ki_pos;
+	return false;
+}
+
+static inline void
+io_kiocb_done_pos(struct io_kiocb *req, struct kiocb *kiocb, u64 actual)
+{
+	u64 expected;
+
+	if (likely(!(req->flags & REQ_F_CUR_POS)))
+		return;
+
+	expected = req->rw.len;
+	if (actual >= expected)
+		return;
+
+	/*
+	 * It's not definitely safe to lock here, and the assumption is,
+	 * that if we cannot lock the position that it will be changing,
+	 * and if it will be changing - then we can't update it anyway
+	 */
+	if (req->file->f_mode & FMODE_ATOMIC_POS
+		&& !mutex_trylock(&req->file->f_pos_lock))
+		return;
+
+	/*
+	 * now we want to move the pointer, but only if everything is consistent
+	 * with how we left it originally
+	 */
+	if (req->file->f_pos == kiocb->ki_pos + (expected - actual))
+		req->file->f_pos = kiocb->ki_pos;
+
+	/* else something else messed with f_pos and we can't do anything */
+
+	if (req->file->f_mode & FMODE_ATOMIC_POS)
+		mutex_unlock(&req->file->f_pos_lock);
 }
 
 static void kiocb_done(struct io_kiocb *req, ssize_t ret,
@@ -3096,8 +3146,7 @@ static void kiocb_done(struct io_kiocb *req, ssize_t ret,
 			ret += io->bytes_done;
 	}
 
-	if (req->flags & REQ_F_CUR_POS)
-		req->file->f_pos = req->rw.kiocb.ki_pos;
+	io_kiocb_done_pos(req, &req->rw.kiocb, ret >= 0 ? ret : 0);
 	if (ret >= 0 && (req->rw.kiocb.ki_complete == io_complete_rw))
 		__io_complete_rw(req, ret, issue_flags);
 	else
@@ -3662,21 +3711,23 @@ static int io_read(struct io_kiocb *req, unsigned int issue_flags)
 
 	if (force_nonblock) {
 		/* If the file doesn't support async, just async punt */
-		if (unlikely(!io_file_supports_nowait(req))) {
+		if (unlikely(!io_file_supports_nowait(req) ||
+				io_kiocb_update_pos(req, kiocb, &ppos,
+						req->rw.len, true))) {
 			ret = io_setup_async_rw(req, iovec, s, true);
 			return ret ?: -EAGAIN;
 		}
 		kiocb->ki_flags |= IOCB_NOWAIT;
 	} else {
+		io_kiocb_update_pos(req, kiocb, &ppos, req->rw.len, false);
 		/* Ensure we clear previously set non-block flag */
 		kiocb->ki_flags &= ~IOCB_NOWAIT;
 	}
 
-	ppos = io_kiocb_update_pos(req, kiocb);
-
 	ret = rw_verify_area(READ, req->file, ppos, req->result);
 	if (unlikely(ret)) {
 		kfree(iovec);
+		io_kiocb_done_pos(req, kiocb, 0);
 		return ret;
 	}
 
@@ -3798,13 +3849,16 @@ static int io_write(struct io_kiocb *req, unsigned int issue_flags)
 		    (req->flags & REQ_F_ISREG))
 			goto copy_iov;
 
+		/* if we cannot lock the file position then punt */
+		if (unlikely(io_kiocb_update_pos(req, kiocb, &ppos, req->rw.len, true)))
+			goto copy_iov;
+
 		kiocb->ki_flags |= IOCB_NOWAIT;
 	} else {
+		io_kiocb_update_pos(req, kiocb, &ppos, req->rw.len, false);
 		/* Ensure we clear previously set non-block flag */
 		kiocb->ki_flags &= ~IOCB_NOWAIT;
 	}
-
-	ppos = io_kiocb_update_pos(req, kiocb);
 
 	ret = rw_verify_area(WRITE, req->file, ppos, req->result);
 	if (unlikely(ret))
@@ -3858,6 +3912,7 @@ copy_iov:
 		return ret ?: -EAGAIN;
 	}
 out_free:
+	io_kiocb_done_pos(req, kiocb, 0);
 	/* it's reportedly faster than delegating the null check to kfree() */
 	if (iovec)
 		kfree(iovec);
