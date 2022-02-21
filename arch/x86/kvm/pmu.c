@@ -112,9 +112,6 @@ static void pmc_reprogram_counter(struct kvm_pmc *pmc, u32 type,
 		.config = config,
 	};
 
-	if (type == PERF_TYPE_HARDWARE && config >= PERF_COUNT_HW_MAX)
-		return;
-
 	attr.sample_period = get_sample_period(pmc, pmc->counter);
 
 	if (in_tx)
@@ -187,6 +184,9 @@ static bool check_pmu_event_filter(struct kvm_pmc *pmc)
 	bool allow_event = true;
 	__u64 key;
 	int idx;
+
+	if (kvm_x86_ops.pmu_ops->hw_event_is_unavail(pmc))
+		return false;
 
 	filter = srcu_dereference(kvm->arch.pmu_event_filter, &kvm->srcu);
 	if (!filter)
