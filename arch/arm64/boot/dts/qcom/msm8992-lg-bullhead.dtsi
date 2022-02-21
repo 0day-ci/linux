@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015, LGE Inc. All rights reserved.
  * Copyright (c) 2016, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021, Petr Vorel <petr.vorel@gmail.com>
+ * Copyright (c) 2021-2022, Petr Vorel <petr.vorel@gmail.com>
  */
 
 /dts-v1/;
@@ -299,4 +299,8 @@
 	status = "okay";
 
 	mmc-hs400-1_8v;
+
+	/* avoid overclocking warnings */
+	assigned-clocks = <&gcc GPLL4_EARLY>;
+	assigned-clock-rates = <384000000>;
 };
