@@ -2257,6 +2257,7 @@ static int wsa_swrm_clock(struct wsa_macro *wsa, bool enable)
 	struct regmap *regmap = wsa->regmap;
 
 	if (enable) {
+		clk_prepare_enable(wsa->clks[2].clk);
 		wsa_macro_mclk_enable(wsa, true);
 
 		/* reset swr ip */
@@ -2281,6 +2282,7 @@ static int wsa_swrm_clock(struct wsa_macro *wsa, bool enable)
 		regmap_update_bits(regmap, CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
 				   CDC_WSA_SWR_CLK_EN_MASK, 0);
 		wsa_macro_mclk_enable(wsa, false);
+		clk_disable_unprepare(wsa->clks[2].clk);
 	}
 
 	return 0;
@@ -2351,7 +2353,7 @@ static int wsa_macro_register_mclk_output(struct wsa_macro *wsa)
 	struct clk_init_data init;
 	int ret;
 
-	parent_clk_name = __clk_get_name(wsa->clks[2].clk);
+	parent_clk_name = __clk_get_name(wsa->clks[3].clk);
 
 	init.name = clk_name;
 	init.ops = &swclk_gate_ops;
