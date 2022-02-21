@@ -17,6 +17,7 @@ properties:
     enum:
       - qcom,ipq4019-mdio
       - qcom,ipq5018-mdio
+      - qcom,ipq6018-mdio
 
   "#address-cells":
     const: 1
