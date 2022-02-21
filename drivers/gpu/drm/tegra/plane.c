@@ -25,7 +25,6 @@ static void tegra_plane_destroy(struct drm_plane *plane)
 
 static void tegra_plane_reset(struct drm_plane *plane)
 {
-	struct tegra_plane *p = to_tegra_plane(plane);
 	struct tegra_plane_state *state;
 	unsigned int i;
 
@@ -38,8 +37,6 @@ static void tegra_plane_reset(struct drm_plane *plane)
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (state) {
 		__drm_atomic_helper_plane_reset(plane, &state->base);
-		plane->state->zpos = p->index;
-		plane->state->normalized_zpos = p->index;
 
 		for (i = 0; i < 3; i++)
 			state->iova[i] = DMA_MAPPING_ERROR;
