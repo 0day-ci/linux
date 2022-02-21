@@ -14,6 +14,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/slimbus.h>
 #include <linux/soundwire/sdw.h>
 #include <linux/soundwire/sdw_registers.h>
@@ -154,6 +155,7 @@ struct qcom_swrm_ctrl {
 	u8 rd_cmd_id;
 	int irq;
 	unsigned int version;
+	int wake_irq;
 	int num_din_ports;
 	int num_dout_ports;
 	int cols_index;
@@ -502,6 +504,46 @@ static int qcom_swrm_enumerate(struct sdw_bus *bus)
 	complete(&ctrl->enumeration);
 	return 0;
 }
+
+static irqreturn_t qcom_swrm_wake_irq_handler(int irq, void *dev_id)
+{
+	struct qcom_swrm_ctrl *swrm = dev_id;
+	int ret = IRQ_HANDLED;
+	struct sdw_slave *slave;
+
+	clk_prepare_enable(swrm->hclk);
+
+	if (swrm->wake_irq > 0) {
+		if (!irqd_irq_disabled(irq_get_irq_data(swrm->wake_irq)))
+			disable_irq_nosync(swrm->wake_irq);
+	}
+
+	/*
+	 * resume all the slaves which must have potentially generated this
+	 * interrupt, this should also wake the controller at the same time.
+	 * this is much safer than waking controller directly that will deadlock!
+	 */
+	list_for_each_entry(slave, &swrm->bus.slaves, node) {
+		ret = pm_runtime_get_sync(&slave->dev);
+		if (ret < 0 && ret != -EACCES) {
+			dev_err_ratelimited(swrm->dev,
+					    "pm_runtime_get_sync failed in %s, ret %d\n",
+					    __func__, ret);
+			pm_runtime_put_noidle(&slave->dev);
+			ret = IRQ_NONE;
+			goto err;
+		}
+	}
+
+	list_for_each_entry(slave, &swrm->bus.slaves, node) {
+		pm_runtime_mark_last_busy(&slave->dev);
+		pm_runtime_put_autosuspend(&slave->dev);
+	}
+err:
+	clk_disable_unprepare(swrm->hclk);
+	return IRQ_HANDLED;
+}
+
 
 static irqreturn_t qcom_swrm_irq_handler(int irq, void *dev_id)
 {
@@ -1340,6 +1382,19 @@ static int qcom_swrm_probe(struct platform_device *pdev)
 		goto err_clk;
 	}
 
+	ctrl->wake_irq = of_irq_get(dev->of_node, 1);
+	if (ctrl->wake_irq > 0) {
+		ret = devm_request_threaded_irq(dev, ctrl->wake_irq, NULL,
+						qcom_swrm_wake_irq_handler,
+						IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+						"swr_wake_irq", ctrl);
+		if (ret) {
+			dev_err(dev, "Failed to request soundwire wake irq\n");
+			goto err_init;
+		}
+	}
+
+
 	ret = sdw_bus_master_add(&ctrl->bus, dev, dev->fwnode);
 	if (ret) {
 		dev_err(dev, "Failed to register Soundwire controller (%d)\n",
@@ -1424,6 +1479,11 @@ static int swrm_runtime_resume(struct device *dev)
 	struct qcom_swrm_ctrl *ctrl = dev_get_drvdata(dev);
 	int ret;
 
+	if (ctrl->wake_irq > 0) {
+		if (!irqd_irq_disabled(irq_get_irq_data(ctrl->wake_irq)))
+			disable_irq_nosync(ctrl->wake_irq);
+	}
+
 	clk_prepare_enable(ctrl->hclk);
 
 	if (ctrl->clk_stop_bus_reset) {
@@ -1484,6 +1544,11 @@ static int __maybe_unused swrm_runtime_suspend(struct device *dev)
 	clk_disable_unprepare(ctrl->hclk);
 
 	usleep_range(300, 305);
+
+	if (ctrl->wake_irq > 0) {
+		if (irqd_irq_disabled(irq_get_irq_data(ctrl->wake_irq)))
+			enable_irq(ctrl->wake_irq);
+	}
 
 	return 0;
 }
