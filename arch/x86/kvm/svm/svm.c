@@ -911,11 +911,12 @@ static u64 svm_get_l2_tsc_offset(struct kvm_vcpu *vcpu)
 	return svm->nested.ctl.tsc_offset;
 }
 
-static u64 svm_get_l2_tsc_multiplier(struct kvm_vcpu *vcpu)
+u64 svm_get_l2_tsc_multiplier(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 
-	return svm->tsc_ratio_msr;
+	return svm->tsc_scaling_enabled ? svm->tsc_ratio_msr :
+	       kvm_default_tsc_scaling_ratio;
 }
 
 static void svm_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)

@@ -574,14 +574,12 @@ static void nested_vmcb02_prepare_control(struct vcpu_svm *svm)
 	vcpu->arch.tsc_offset = kvm_calc_nested_tsc_offset(
 			vcpu->arch.l1_tsc_offset,
 			svm->nested.ctl.tsc_offset,
-			svm->tsc_ratio_msr);
+			svm_get_l2_tsc_multiplier(vcpu));
 
 	svm->vmcb->control.tsc_offset = vcpu->arch.tsc_offset;
 
-	if (svm->tsc_ratio_msr != kvm_default_tsc_scaling_ratio) {
-		WARN_ON(!svm->tsc_scaling_enabled);
+	if (svm_get_l2_tsc_multiplier(vcpu) != kvm_default_tsc_scaling_ratio)
 		nested_svm_update_tsc_ratio_msr(vcpu);
-	}
 
 	svm->vmcb->control.int_ctl             =
 		(svm->nested.ctl.int_ctl & int_ctl_vmcb12_bits) |
@@ -867,8 +865,7 @@ int nested_svm_vmexit(struct vcpu_svm *svm)
 		vmcb_mark_dirty(svm->vmcb, VMCB_INTERCEPTS);
 	}
 
-	if (svm->tsc_ratio_msr != kvm_default_tsc_scaling_ratio) {
-		WARN_ON(!svm->tsc_scaling_enabled);
+	if (svm_get_l2_tsc_multiplier(vcpu) != kvm_default_tsc_scaling_ratio) {
 		vcpu->arch.tsc_scaling_ratio = vcpu->arch.l1_tsc_scaling_ratio;
 		svm_write_tsc_multiplier(vcpu, vcpu->arch.tsc_scaling_ratio);
 	}
@@ -1264,6 +1261,7 @@ void nested_svm_update_tsc_ratio_msr(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 
+	WARN_ON_ONCE(!svm->tsc_scaling_enabled);
 	vcpu->arch.tsc_scaling_ratio =
 		kvm_calc_nested_tsc_multiplier(vcpu->arch.l1_tsc_scaling_ratio,
 					       svm->tsc_ratio_msr);
