@@ -27,8 +27,27 @@ static int ref_tracker_cmp(void *priv, const struct list_head *a, const struct l
 	return ta->alloc_stack_handle - tb->alloc_stack_handle;
 }
 
-void __ref_tracker_dir_print(struct ref_tracker_dir *dir,
-			   unsigned int display_limit)
+struct ostream {
+	char *buf;
+	int size, used;
+};
+
+#define pr_ostream(stream, fmt, args...) \
+({ \
+	struct ostream *_s = (stream); \
+\
+	if (!_s->buf) { \
+		pr_err(fmt, ##args); \
+	} else { \
+		int ret, len = _s->size - _s->used; \
+		ret = snprintf(_s->buf + _s->used, len, pr_fmt(fmt), ##args); \
+		_s->used += min(ret, len); \
+	} \
+})
+
+static void
+__ref_tracker_dir_pr_ostream(struct ref_tracker_dir *dir,
+			     unsigned int display_limit, struct ostream *s)
 {
 	unsigned int i = 0, count = 0, total = 0;
 	struct ref_tracker *tracker;
@@ -58,15 +77,23 @@ void __ref_tracker_dir_print(struct ref_tracker_dir *dir,
 
 		if (sbuf && !stack_depot_snprint(stack, sbuf, STACK_BUF_SIZE, 4))
 			sbuf[0] = 0;
-		pr_err("%s@%pK has %d/%d users at\n%s\n",
-		       dir->name, dir, count, total, sbuf);
+		pr_ostream(s, "%s@%pK has %d/%d users at\n%s\n",
+			   dir->name, dir, count, total, sbuf);
 		count = 0;
 	}
 	if (i > display_limit)
-		pr_err("%s@%pK skipped %d/%d reports with %d unique stacks.\n",
-		       dir->name, dir, count, total, i - display_limit);
+		pr_ostream(s, "%s@%pK skipped %d/%d reports with %d unique stacks.\n",
+			   dir->name, dir, count, total, i - display_limit);
 
 	kfree(sbuf);
+}
+
+void __ref_tracker_dir_print(struct ref_tracker_dir *dir,
+			   unsigned int display_limit)
+{
+	struct ostream os = {};
+
+	__ref_tracker_dir_pr_ostream(dir, display_limit, &os);
 }
 EXPORT_SYMBOL(__ref_tracker_dir_print);
 
@@ -80,6 +107,19 @@ void ref_tracker_dir_print(struct ref_tracker_dir *dir,
 	spin_unlock_irqrestore(&dir->lock, flags);
 }
 EXPORT_SYMBOL(ref_tracker_dir_print);
+
+int ref_tracker_dir_snprint(struct ref_tracker_dir *dir, char *buf, size_t size)
+{
+	struct ostream os = { .buf = buf, .size = size };
+	unsigned long flags;
+
+	spin_lock_irqsave(&dir->lock, flags);
+	__ref_tracker_dir_pr_ostream(dir, 16, &os);
+	spin_unlock_irqrestore(&dir->lock, flags);
+
+	return os.used;
+}
+EXPORT_SYMBOL(ref_tracker_dir_snprint);
 
 void ref_tracker_dir_exit(struct ref_tracker_dir *dir)
 {
