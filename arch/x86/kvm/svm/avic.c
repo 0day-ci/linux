@@ -307,10 +307,16 @@ void avic_ring_doorbell(struct kvm_vcpu *vcpu)
 }
 
 static void avic_kick_target_vcpus(struct kvm *kvm, struct kvm_lapic *source,
-				   u32 icrl, u32 icrh)
+				   u32 icrl, u32 icrh, bool x2apic_enabled)
 {
 	struct kvm_vcpu *vcpu;
 	unsigned long i;
+	u32 dest;
+
+	if (x2apic_enabled)
+		dest = icrh;
+	else
+		dest = GET_APIC_DEST_FIELD(icrh);
 
 	/*
 	 * Wake any target vCPUs that are blocking, i.e. waiting for a wake
@@ -320,8 +326,7 @@ static void avic_kick_target_vcpus(struct kvm *kvm, struct kvm_lapic *source,
 	 */
 	kvm_for_each_vcpu(i, vcpu, kvm) {
 		if (kvm_apic_match_dest(vcpu, source, icrl & APIC_SHORT_MASK,
-					GET_APIC_DEST_FIELD(icrh),
-					icrl & APIC_DEST_MASK)) {
+					dest, icrl & APIC_DEST_MASK)) {
 			vcpu->arch.apic->irr_pending = true;
 			svm_complete_interrupt_delivery(vcpu,
 							icrl & APIC_MODE_MASK,
@@ -364,7 +369,7 @@ int avic_incomplete_ipi_interception(struct kvm_vcpu *vcpu)
 		 * set the appropriate IRR bits on the valid target
 		 * vcpus. So, we just need to kick the appropriate vcpu.
 		 */
-		avic_kick_target_vcpus(vcpu->kvm, apic, icrl, icrh);
+		avic_kick_target_vcpus(vcpu->kvm, apic, icrl, icrh, svm->x2apic_enabled);
 		break;
 	case AVIC_IPI_FAILURE_INVALID_TARGET:
 		break;
