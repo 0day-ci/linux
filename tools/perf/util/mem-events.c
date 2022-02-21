@@ -485,6 +485,7 @@ int c2c_decode_stats(struct c2c_stats *stats, struct mem_info *mi)
 	u64 daddr  = mi->daddr.addr;
 	u64 op     = data_src->mem_op;
 	u64 lvl    = data_src->mem_lvl;
+	u64 lnum   = data_src->mem_lvl_num;
 	u64 snoop  = data_src->mem_snoop;
 	u64 lock   = data_src->mem_lock;
 	u64 blk    = data_src->mem_blk;
@@ -527,16 +528,18 @@ do {				\
 			if (lvl & P(LVL, UNC)) stats->ld_uncache++;
 			if (lvl & P(LVL, IO))  stats->ld_io++;
 			if (lvl & P(LVL, LFB)) stats->ld_fbhit++;
-			if (lvl & P(LVL, L1 )) stats->ld_l1hit++;
-			if (lvl & P(LVL, L2 )) stats->ld_l2hit++;
-			if (lvl & P(LVL, L3 )) {
+			if (lvl & P(LVL, L1) || lnum == P(LVLNUM, L1))
+				stats->ld_l1hit++;
+			if (lvl & P(LVL, L2) || lnum == P(LVLNUM, L2))
+				stats->ld_l2hit++;
+			if (lvl & P(LVL, L3) || lnum == P(LVLNUM, L4)) {
 				if (snoop & P(SNOOP, HITM))
 					HITM_INC(lcl_hitm);
 				else
 					stats->ld_llchit++;
 			}
 
-			if (lvl & P(LVL, LOC_RAM)) {
+			if (lvl & P(LVL, LOC_RAM) || lnum == P(LVLNUM, RAM)) {
 				stats->lcl_dram++;
 				if (snoop & P(SNOOP, HIT))
 					stats->ld_shared++;
@@ -563,6 +566,9 @@ do {				\
 			else if (snoop & P(SNOOP, HITM))
 				HITM_INC(rmt_hitm);
 		}
+
+		if (lnum == P(LVLNUM, ANY_CACHE) && snoop & P(SNOOP, HITM))
+			HITM_INC(lcl_hitm);
 
 		if ((lvl & P(LVL, MISS)))
 			stats->ld_miss++;
