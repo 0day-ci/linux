@@ -4002,10 +4002,6 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 
 static void set_min_partial(struct kmem_cache *s, unsigned long min)
 {
-	if (min < MIN_PARTIAL)
-		min = MIN_PARTIAL;
-	else if (min > MAX_PARTIAL)
-		min = MAX_PARTIAL;
 	s->min_partial = min;
 }
 
@@ -4184,6 +4180,8 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 
 static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 {
+	int min_partial;
+
 	s->flags = kmem_cache_flags(s->size, flags, s->name);
 #ifdef CONFIG_SLAB_FREELIST_HARDENED
 	s->random = get_random_long();
@@ -4215,7 +4213,10 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 	 * The larger the object size is, the more slabs we want on the partial
 	 * list to avoid pounding the page allocator excessively.
 	 */
-	set_min_partial(s, ilog2(s->size) / 2);
+	min_partial = min(MAX_PARTIAL, ilog2(s->size) / 2);
+	min_partial = max(MIN_PARTIAL, min_partial);
+
+	set_min_partial(s, min_partial);
 
 	set_cpu_partial(s);
 
