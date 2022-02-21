@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/power/energy-model.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Energy Model Bindings
+
+maintainers:
+  - Lukasz Luba <lukasz.luba@arm.com>
+
+description: |+
+  Devices work at specific performance states (frequencies). The power which
+  is used at a given performance state is an important information. A framework
+  which maintains this information is Energy Model. This document defines
+  bindings for these Energy Model performance states applicable across wide
+  range of devices. For illustration purpose, this document uses GPU as a device.
+
+  This binding only supports frequency-power pairs.
+
+select: true
+
+properties:
+  operating-points:
+    $ref: /schemas/types.yaml#/definitions/uint32-matrix
+    items:
+      items:
+        - description: Frequency in kHz
+        - description: Power in uW
+
+
+additionalProperties: true
+examples:
+    {
+       gpu_energy_model: energy-model {
+               compatible = "energy-model";
+               energy-model-entries = <
+                               200000 300000
+                               297000 500000
+                               400000 800000
+                               500000 1400000
+                               600000 2000000
+                               800000 2800000
+                               >;
+       };
+    };
+
+    &gpu {
+       energy-model = <&gpu_energy_model>;
+    };
+...
