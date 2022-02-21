@@ -316,15 +316,9 @@ enum {
 	check_condition = 0x0800,	/* requesting sense after CHECK CONDITION */
 };
 
-struct aha152x_cmd_priv {
-	struct scsi_pointer scsi_pointer;
-};
-
 static struct scsi_pointer *aha152x_scsi_pointer(struct scsi_cmnd *cmd)
 {
-	struct aha152x_cmd_priv *acmd = scsi_cmd_priv(cmd);
-
-	return &acmd->scsi_pointer;
+	return scsi_cmd_priv(cmd);
 }
 
 MODULE_AUTHOR("Jürgen Fischer");
@@ -931,7 +925,6 @@ static int aha152x_internal_queue(struct scsi_cmnd *SCpnt,
 	scsi_pointer->phase	   = not_issued | phase;
 	scsi_pointer->Status	   = 0x1; /* Ilegal status by SCSI standard */
 	scsi_pointer->Message	   = 0;
-	scsi_pointer->have_data_in = 0;
 	scsi_pointer->sent_command = 0;
 
 	if (scsi_pointer->phase & (resetting | check_condition)) {
@@ -2971,7 +2964,7 @@ static struct scsi_host_template aha152x_driver_template = {
 	.sg_tablesize			= SG_ALL,
 	.dma_boundary			= PAGE_SIZE - 1,
 	.slave_alloc			= aha152x_adjust_queue,
-	.cmd_size			= sizeof(struct aha152x_cmd_priv),
+	.cmd_size			= sizeof(struct scsi_pointer),
 };
 
 #if !defined(AHA152X_PCMCIA)
