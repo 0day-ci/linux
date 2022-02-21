@@ -47,6 +47,9 @@
  */
 #define PIPE_MIN_DEF_BUFFERS 2
 
+/* SLAB cache for pipe inode */
+static struct kmem_cache *pipe_inode_cachep;
+
 /*
  * The max size that a non-root user is allowed to grow the pipe. Can
  * be set by root in /proc/sys/fs/pipe-max-size
@@ -786,7 +789,7 @@ struct pipe_inode_info *alloc_pipe_info(void)
 	unsigned long user_bufs;
 	unsigned int max_size = READ_ONCE(pipe_max_size);
 
-	pipe = kzalloc(sizeof(struct pipe_inode_info), GFP_KERNEL_ACCOUNT);
+	pipe = kmem_cache_zalloc(pipe_inode_cachep, GFP_KERNEL_ACCOUNT);
 	if (pipe == NULL)
 		goto out_free_uid;
 
@@ -820,7 +823,7 @@ struct pipe_inode_info *alloc_pipe_info(void)
 
 out_revert_acct:
 	(void) account_pipe_buffers(user, pipe_bufs, 0);
-	kfree(pipe);
+	kmem_cache_free(pipe_inode_cachep, pipe);
 out_free_uid:
 	free_uid(user);
 	return NULL;
@@ -847,7 +850,7 @@ void free_pipe_info(struct pipe_inode_info *pipe)
 	if (pipe->tmp_page)
 		__free_page(pipe->tmp_page);
 	kvfree(pipe->bufs);
-	kfree(pipe);
+	kmem_cache_free(pipe_inode_cachep, pipe);
 }
 
 static struct vfsmount *pipe_mnt __read_mostly;
@@ -1496,6 +1499,9 @@ static int __init init_pipe_fs(void)
 #ifdef CONFIG_SYSCTL
 	register_sysctl_init("fs", fs_pipe_sysctls);
 #endif
+	pipe_inode_cachep = kmem_cache_create("pipe_inode",
+					sizeof(struct pipe_inode_info),
+					0, SLAB_PANIC, NULL);
 	return err;
 }
 
