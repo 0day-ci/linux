@@ -53,19 +53,20 @@ static struct i2c_adapter *i2c_mux_pinctrl_root_adapter(
 
 static struct i2c_adapter *i2c_mux_pinctrl_parent_adapter(struct device *dev)
 {
-	struct device_node *np = dev->of_node;
-	struct device_node *parent_np;
+	struct fwnode_handle *fwnode = dev_fwnode(dev);
+	struct fwnode_handle *parent_np;
 	struct i2c_adapter *parent;
 
-	parent_np = of_parse_phandle(np, "i2c-parent", 0);
+	parent_np = fwnode_find_reference(fwnode, "i2c-parent", 0);
 	if (!parent_np) {
 		dev_err(dev, "Cannot parse i2c-parent\n");
 		return ERR_PTR(-ENODEV);
 	}
-	parent = of_find_i2c_adapter_by_node(parent_np);
-	of_node_put(parent_np);
-	if (!parent)
+	parent = fwnode_find_i2c_adapter_by_node(parent_np);
+	if (!parent) {
+		dev_err(dev, "Cannot find i2c-parent\n");
 		return ERR_PTR(-EPROBE_DEFER);
+	}
 
 	return parent;
 }
@@ -73,7 +74,7 @@ static struct i2c_adapter *i2c_mux_pinctrl_parent_adapter(struct device *dev)
 static int i2c_mux_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
+	struct fwnode_handle *np = dev_fwnode(dev);
 	struct i2c_mux_core *muxc;
 	struct i2c_mux_pinctrl *mux;
 	struct i2c_adapter *parent;
@@ -81,7 +82,7 @@ static int i2c_mux_pinctrl_probe(struct platform_device *pdev)
 	int num_names, i, ret;
 	const char *name;
 
-	num_names = of_property_count_strings(np, "pinctrl-names");
+	num_names = fwnode_property_string_array_count(np, "pinctrl-names");
 	if (num_names < 0) {
 		dev_err(dev, "Cannot parse pinctrl-names: %d\n",
 			num_names);
@@ -111,8 +112,8 @@ static int i2c_mux_pinctrl_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < num_names; i++) {
-		ret = of_property_read_string_index(np, "pinctrl-names", i,
-						    &name);
+		ret = fwnode_property_read_string_index(np, "pinctrl-names", i,
+							&name);
 		if (ret < 0) {
 			dev_err(dev, "Cannot parse pinctrl-names: %d\n", ret);
 			goto err_put_parent;
