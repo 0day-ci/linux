@@ -77,4 +77,7 @@ void drm_memcpy_init_early(void);
 void drm_memcpy_from_wc(struct iosys_map *dst,
 			const struct iosys_map *src,
 			unsigned long len);
+bool drm_memcpy_fastcopy_supported(void);
+void drm_memcpy_from_wc_vaddr(void *dst, const struct iosys_map *src,
+			      unsigned long len);
 #endif

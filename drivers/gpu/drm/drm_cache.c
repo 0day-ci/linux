@@ -358,6 +358,54 @@ void drm_memcpy_from_wc(struct iosys_map *dst,
 }
 EXPORT_SYMBOL(drm_memcpy_from_wc);
 
+/**
+ * drm_memcpy_from_wc_vaddr - Perform the fastest available memcpy from a source
+ * that may be WC.
+ * @dst: The destination pointer
+ * @src: The source pointer
+ * @len: The size of the area to transfer in bytes
+ *
+ * Same as drm_memcpy_from_wc except destination is accepted as system memory
+ * address. Useful in situations where passing destination address as iosys_map
+ * is simply an overhead and can be avoided.
+ */
+void drm_memcpy_from_wc_vaddr(void *dst, const struct iosys_map *src,
+			      unsigned long len)
+{
+	if (WARN_ON(in_interrupt())) {
+		iosys_map_memcpy_from(dst, src, 0, len);
+		return;
+	}
+
+	if (static_branch_likely(&has_movntdqa)) {
+		__drm_memcpy_from_wc(dst,
+				     src->is_iomem ?
+				     (void const __force *)src->vaddr_iomem :
+				     src->vaddr,
+				     len);
+		return;
+	}
+
+	iosys_map_memcpy_from(dst, src, 0, len);
+}
+EXPORT_SYMBOL(drm_memcpy_from_wc_vaddr);
+
+/*
+ * drm_memcpy_fastcopy_supported - Returns if fast copy using non-temporal
+ * instructions is supported
+ *
+ * Returns true if platform has support for fast copying from wc memory type
+ * using non-temporal instructions. Else false.
+ */
+bool drm_memcpy_fastcopy_supported(void)
+{
+	if (static_branch_likely(&has_movntdqa))
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL(drm_memcpy_fastcopy_supported);
+
 /*
  * drm_memcpy_init_early - One time initialization of the WC memcpy code
  */
@@ -381,6 +429,12 @@ void drm_memcpy_from_wc(struct iosys_map *dst,
 	memcpy_fallback(dst, src, len);
 }
 EXPORT_SYMBOL(drm_memcpy_from_wc);
+
+bool drm_memcpy_fastcopy_supported(void)
+{
+	return false;
+}
+EXPORT_SYMBOL(drm_memcpy_fastcopy_supported);
 
 void drm_memcpy_init_early(void)
 {
