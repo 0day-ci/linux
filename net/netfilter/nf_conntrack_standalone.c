@@ -621,6 +621,7 @@ enum nf_ct_sysctl_index {
 #if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
 	NF_SYSCTL_CT_COUNT_HW,
 	NF_SYSCTL_CT_MAX_HW,
+	NF_SYSCTL_CT_COUNT_WQ_ADD,
 #endif
 
 	__NF_SYSCTL_CT_LAST_SYSCTL,
@@ -991,6 +992,12 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
+	[NF_SYSCTL_CT_COUNT_WQ_ADD] = {
+		.procname	= "nf_flowtable_count_wq_add",
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= proc_dointvec,
+	},
 #endif
 	{}
 };
@@ -1131,6 +1138,7 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 	table[NF_SYSCTL_CT_PROTO_TIMEOUT_UDP_OFFLOAD].data = &un->offload_timeout;
 	table[NF_SYSCTL_CT_COUNT_HW].data = &net->nft.count_hw;
 	table[NF_SYSCTL_CT_MAX_HW].data = &net->nft.max_hw;
+	table[NF_SYSCTL_CT_COUNT_WQ_ADD].data = &net->nft.count_wq_add;
 #endif
 
 	nf_conntrack_standalone_init_tcp_sysctl(net, table);

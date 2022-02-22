@@ -953,11 +953,15 @@ static void flow_offload_work_stats(struct flow_offload_work *offload)
 static void flow_offload_work_handler(struct work_struct *work)
 {
 	struct flow_offload_work *offload;
+	struct net *net;
 
 	offload = container_of(work, struct flow_offload_work, work);
+	net = read_pnet(&offload->flowtable->net);
+
 	switch (offload->cmd) {
 		case FLOW_CLS_REPLACE:
 			flow_offload_work_add(offload);
+			atomic_dec(&net->nft.count_wq_add);
 			break;
 		case FLOW_CLS_DESTROY:
 			flow_offload_work_del(offload);
@@ -1011,11 +1015,15 @@ nf_flow_offload_work_alloc(struct nf_flowtable *flowtable,
 void nf_flow_offload_add(struct nf_flowtable *flowtable,
 			 struct flow_offload *flow)
 {
+	struct net *net = read_pnet(&flowtable->net);
 	struct flow_offload_work *offload;
 
+	atomic_inc(&net->nft.count_wq_add);
 	offload = nf_flow_offload_work_alloc(flowtable, flow, FLOW_CLS_REPLACE);
-	if (!offload)
+	if (!offload) {
+		atomic_dec(&net->nft.count_wq_add);
 		return;
+	}
 
 	flow_offload_queue_work(offload);
 }
