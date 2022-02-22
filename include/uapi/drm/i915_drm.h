@@ -3276,6 +3276,49 @@ struct drm_i915_gem_create_ext_protected_content {
 	__u32 flags;
 };
 
+/**
+ * DOC: GuC HWCONFIG blob uAPI
+ *
+ * The GuC produces a blob with information about the current device.
+ * i915 reads this blob from GuC and makes it available via this uAPI.
+ *
+ * The returned blob is a sequence of items of variable length
+ * described by struct drm_i915_query_hwconfig_blob_item.
+ *
+ * The overall blob returned by DRM_I915_QUERY_HWCONFIG_BLOB will end
+ * at the same location as the end of the final struct
+ * drm_i915_query_hwconfig_blob_item. In other words, walking through
+ * the individual items is guaranteed to eventually arrive at the
+ * exact end of the entire blob.
+ */
+
+/**
+ * struct drm_i915_query_hwconfig_blob_item - A single hwconfig item
+ * within the sequence of hwconfig items returned by
+ * DRM_I915_QUERY_HWCONFIG_BLOB.
+ *
+ * The length field gives the length of the data[] array. The length
+ * is the number of u32 items in the data[] array, and *not* the
+ * number of bytes.
+ *
+ * The key and length fields are required, so the minimum item size is
+ * 2 x u32, or 8 bytes, when the length field is 0. If the length
+ * field is 1, then the item's size is 12 bytes.
+ *
+ * The meaning of the key field and the data values are documented in
+ * the Programmer's Reference Manual.
+ */
+struct drm_i915_query_hwconfig_blob_item {
+	/** @key: Enum which defines how to interpret @data values. */
+	__u32 key;
+
+	/** @length: The number of u32 values in the @data array. */
+	__u32 length;
+
+	/** @data: Array of values with meaning defined by @key. */
+	__u32 data[];
+};
+
 /* ID of the protected content session managed by i915 when PXP is active */
 #define I915_PROTECTED_CONTENT_DEFAULT_SESSION 0xf
 
