@@ -2667,7 +2667,15 @@ enum nl80211_commands {
  *	%NL80211_IFTYPE_STA interface. This is used in
  *	%NL80211_CMD_GET/SET/NEW_INTERFACE response to indicate information of
  *	all the MLO links affiliated to %NL80211_IFTYPE_STATION interface.
+ *	This is also used with %NL80211_CMD_CONNECT and %NL80211_CMD_ROAM events
+ *	to indicate associated MLO links information for current connection.
  *	See &enum nl80211_mlo_link_info_attributes for details.
+ * @NL80211_ATTR_MLO_SUPPORT: Flag attribute to indicate that the user space
+ *	supports MLO connection. This is used with %NL80211_CMD_CONNECT or
+ *	%NL80211_CMD_ASSOCIATE. The driver shall use MLO link wdevs in
+ *	connection only when userpsace indicates support for MLO connection.
+ *	Using MLO links without userspace support may lead to disconnection
+ *	since RSN connection in MLO needs supplicant support.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -3182,6 +3190,7 @@ enum nl80211_attrs {
 	NL80211_ATTR_EHT_CAPABILITY,
 
 	NL80211_ATTR_MLO_LINK_INFO,
+	NL80211_ATTR_MLO_SUPPORT,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -7622,6 +7631,9 @@ enum nl80211_ap_settings_flags {
  *
  * @NL80211_MLO_LINK_INFO_ATTR_WDEV: wireless device identifier for MLO link
  *	(u64)
+ * @NL80211_MLO_LINK_INFO_ATTR_BSSID: BSSID associated with this MLO link
+ *	(6 octets).
+ * @NL80211_MLO_LINK_INFO_ATTR_LINK_ID: link id of associated BSSID (u8)
  *
  * @__NL80211_MLO_LINK_INFO_ATTR_LAST: Internal
  * @NL80211_MLO_LINK_INFO_ATTR_MAX: highest attribute
@@ -7630,6 +7642,8 @@ enum nl80211_mlo_link_info_attributes {
 	__NL80211_MLO_LINK_INFO_ATTR_INVALID,
 
 	NL80211_MLO_LINK_INFO_ATTR_WDEV,
+	NL80211_MLO_LINK_INFO_ATTR_BSSID,
+	NL80211_MLO_LINK_INFO_ATTR_LINK_ID,
 
 	/* keep last */
 	__NL80211_MLO_LINK_INFO_ATTR_LAST,

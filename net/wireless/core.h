@@ -579,5 +579,9 @@ void cfg80211_start_mlo_link(struct cfg80211_registered_device *rdev,
 			     struct wireless_dev *wdev);
 void cfg80211_stop_mlo_link(struct cfg80211_registered_device *rdev,
 			    struct wireless_dev *wdev);
+struct ieee80211_channel *
+cfg80211_get_colocated_ap_chan(struct cfg80211_registered_device *rdev,
+			       struct cfg80211_internal_bss *intbss,
+			       const u8 *colocated_bssid);
 
 #endif /* __NET_WIRELESS_CORE_H */

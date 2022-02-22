@@ -2706,6 +2706,31 @@ done:
 	spin_unlock_bh(&rdev->bss_lock);
 }
 
+struct ieee80211_channel *
+cfg80211_get_colocated_ap_chan(struct cfg80211_registered_device *rdev,
+			       struct cfg80211_internal_bss *intbss,
+			       const u8 *colocated_bssid)
+{
+	struct cfg80211_colocated_ap *ap;
+	LIST_HEAD(coloc_ap_list);
+	struct cfg80211_bss *res = &intbss->pub;
+	const struct cfg80211_bss_ies *ies = rcu_access_pointer(res->ies);
+	struct ieee80211_channel *chan = NULL;
+
+	cfg80211_parse_colocated_ap(ies, &coloc_ap_list);
+
+	list_for_each_entry(ap, &coloc_ap_list, list) {
+		if (memcmp(colocated_bssid, ap->bssid, ETH_ALEN))
+			continue;
+
+		chan = ieee80211_get_channel(&rdev->wiphy, ap->center_freq);
+		break;
+	}
+
+	cfg80211_free_coloc_ap_list(&coloc_ap_list);
+	return chan;
+}
+
 #ifdef CONFIG_CFG80211_WEXT
 static struct cfg80211_registered_device *
 cfg80211_get_dev_from_ifindex(struct net *net, int ifindex)

@@ -2735,6 +2735,9 @@ struct cfg80211_auth_request {
  *	userspace if this flag is set. Only applicable for cfg80211_connect()
  *	request (connect callback).
  * @ASSOC_REQ_DISABLE_HE:  Disable HE
+ * @ASSOC_MLO_SUPPORT: Userspace indicates support for handling MLO links.
+ *	Drivers shall disable MLO features for the current association if this
+ *	flag is not set.
  */
 enum cfg80211_assoc_req_flags {
 	ASSOC_REQ_DISABLE_HT			= BIT(0),
@@ -2742,6 +2745,7 @@ enum cfg80211_assoc_req_flags {
 	ASSOC_REQ_USE_RRM			= BIT(2),
 	CONNECT_REQ_EXTERNAL_AUTH_SUPPORT	= BIT(3),
 	ASSOC_REQ_DISABLE_HE			= BIT(4),
+	ASSOC_MLO_SUPPORT			= BIT(5),
 };
 
 /**
@@ -5564,6 +5568,12 @@ static inline void wiphy_unlock(struct wiphy *wiphy)
  * @mld_wdev: points to MLD wdev of type %NL80211_IFTYPE_STATION to which this
  *	MLO link wdev is affiliated to. Valid for iftype
  *	%NL80211_IFTYPE_MLO_LINK only.
+ * @link_bssid: BSSID of the AP associated with the MLO link wdev. Valid for
+ *	iftype %NL80211_IFTYPE_MLO_LINK. Scan result of the BSS associated with
+ *	the MLO link may not be available in rdev->bss_list so we can't use
+ *	@current_bss.
+ * @link_id: AP's MLO link ID to which this non-AP station's MLO link wdev is
+ *	associated. Valid only if iftype is %NL80211_IFTYPE_MLO_LINK.
  */
 struct wireless_dev {
 	struct wiphy *wiphy;
@@ -5644,6 +5654,8 @@ struct wireless_dev {
 	unsigned long unprot_beacon_reported;
 
 	struct wireless_dev *mld_wdev;
+	u8 link_bssid[ETH_ALEN];
+	u8 link_id;
 };
 
 static inline const u8 *wdev_address(struct wireless_dev *wdev)
@@ -7172,6 +7184,18 @@ struct cfg80211_fils_resp_params {
 };
 
 /**
+ * struct cfg80211_mlo_link_params - MLO link device params.
+ * @wdev: the wireless device associated with the MLO link device.
+ * @bssid: BSSID of the MLO link to which this MLO link is connected to.
+ * @link_id: Link ID of the AP's MLO link to which this @wdev is connected to.
+ */
+struct cfg80211_mlo_link_params {
+	struct wireless_dev *wdev;
+	u8 bssid[ETH_ALEN];
+	u8 link_id;
+};
+
+/**
  * struct cfg80211_connect_resp_params - Connection response params
  * @status: Status code, %WLAN_STATUS_SUCCESS for successful connection, use
  *	%WLAN_STATUS_UNSPECIFIED_FAILURE if your device cannot give you
@@ -7199,6 +7223,8 @@ struct cfg80211_fils_resp_params {
  *	not known. This value is used only if @status < 0 to indicate that the
  *	failure is due to a timeout and not due to explicit rejection by the AP.
  *	This value is ignored in other cases (@status >= 0).
+ * @mlo_links: Array of each MLO link's connection parameters.
+ * @n_mlo_links: Number of valid links that are indicated in @mlo_links.
  */
 struct cfg80211_connect_resp_params {
 	int status;
@@ -7210,6 +7236,8 @@ struct cfg80211_connect_resp_params {
 	size_t resp_ie_len;
 	struct cfg80211_fils_resp_params fils;
 	enum nl80211_timeout_reason timeout_reason;
+	const struct cfg80211_mlo_link_params *mlo_links;
+	int n_mlo_links;
 };
 
 /**
@@ -7359,6 +7387,8 @@ cfg80211_connect_timeout(struct net_device *dev, const u8 *bssid,
  * @resp_ie: association response IEs (may be %NULL)
  * @resp_ie_len: assoc response IEs length
  * @fils: FILS related roaming information.
+ * @mlo_links: Array of each MLO link's connection parameters.
+ * @n_mlo_links: Number of valid links that are indicated in @mlo_links.
  */
 struct cfg80211_roam_info {
 	struct ieee80211_channel *channel;
@@ -7369,6 +7399,8 @@ struct cfg80211_roam_info {
 	const u8 *resp_ie;
 	size_t resp_ie_len;
 	struct cfg80211_fils_resp_params fils;
+	const struct cfg80211_mlo_link_params *mlo_links;
+	int n_mlo_links;
 };
 
 /**

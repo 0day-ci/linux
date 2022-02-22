@@ -680,9 +680,12 @@ void __cfg80211_connect_result(struct net_device *dev,
 			       bool wextev)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct wireless_dev *link_wdev;
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
 	const struct element *country_elem;
 	const u8 *country_data;
 	u8 country_datalen;
+	int i;
 #ifdef CONFIG_CFG80211_WEXT
 	union iwreq_data wrqu;
 #endif
@@ -763,6 +766,25 @@ void __cfg80211_connect_result(struct net_device *dev,
 	if (!(wdev->wiphy->flags & WIPHY_FLAG_HAS_STATIC_WEP))
 		cfg80211_upload_connect_keys(wdev);
 
+	list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+		if (link_wdev->mld_wdev != wdev)
+			continue;
+
+		eth_zero_addr(link_wdev->link_bssid);
+	}
+
+	for (i = 0; i < cr->n_mlo_links; i++) {
+		list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+			if (link_wdev != cr->mlo_links[i].wdev)
+				continue;
+
+			link_wdev->link_id = cr->mlo_links[i].link_id;
+			memcpy(link_wdev->link_bssid, cr->mlo_links[i].bssid,
+			       ETH_ALEN);
+			break;
+		}
+	}
+
 	rcu_read_lock();
 	country_elem = ieee80211_bss_get_elem(cr->bss, WLAN_EID_COUNTRY);
 	if (!country_elem) {
@@ -792,6 +814,8 @@ void cfg80211_connect_done(struct net_device *dev,
 	struct cfg80211_event *ev;
 	unsigned long flags;
 	u8 *next;
+	int mlo_link_params_size =
+		params->n_mlo_links * sizeof(struct cfg80211_mlo_link_params);
 
 	if (params->bss) {
 		struct cfg80211_internal_bss *ibss = bss_from_pub(params->bss);
@@ -830,7 +854,8 @@ void cfg80211_connect_done(struct net_device *dev,
 	ev = kzalloc(sizeof(*ev) + (params->bssid ? ETH_ALEN : 0) +
 		     params->req_ie_len + params->resp_ie_len +
 		     params->fils.kek_len + params->fils.pmk_len +
-		     (params->fils.pmkid ? WLAN_PMKID_LEN : 0), gfp);
+		     (params->fils.pmkid ? WLAN_PMKID_LEN : 0) +
+		     mlo_link_params_size, gfp);
 	if (!ev) {
 		cfg80211_put_bss(wdev->wiphy, params->bss);
 		return;
@@ -877,6 +902,13 @@ void cfg80211_connect_done(struct net_device *dev,
 		       WLAN_PMKID_LEN);
 		next += WLAN_PMKID_LEN;
 	}
+	if (params->n_mlo_links) {
+		ev->cr.n_mlo_links = params->n_mlo_links;
+		ev->cr.mlo_links = (struct cfg80211_mlo_link_params *)next;
+		memcpy((void *)ev->cr.mlo_links, params->mlo_links,
+		       mlo_link_params_size);
+		next += mlo_link_params_size;
+	}
 	ev->cr.fils.update_erp_next_seq_num = params->fils.update_erp_next_seq_num;
 	if (params->fils.update_erp_next_seq_num)
 		ev->cr.fils.erp_next_seq_num = params->fils.erp_next_seq_num;
@@ -900,6 +932,10 @@ void __cfg80211_roamed(struct wireless_dev *wdev,
 #ifdef CONFIG_CFG80211_WEXT
 	union iwreq_data wrqu;
 #endif
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
+	struct wireless_dev *link_wdev;
+	int i;
+
 	ASSERT_WDEV_LOCK(wdev);
 
 	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_STATION &&
@@ -922,6 +958,26 @@ void __cfg80211_roamed(struct wireless_dev *wdev,
 	wdev->unprot_beacon_reported = 0;
 	nl80211_send_roamed(wiphy_to_rdev(wdev->wiphy),
 			    wdev->netdev, info, GFP_KERNEL);
+
+	list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+		if (link_wdev->mld_wdev != wdev)
+			continue;
+
+		eth_zero_addr(link_wdev->link_bssid);
+	}
+
+	for (i = 0; i < info->n_mlo_links; i++) {
+		list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+			if (link_wdev != info->mlo_links[i].wdev)
+				continue;
+
+			link_wdev->link_id = info->mlo_links[i].link_id;
+			memcpy((void *)link_wdev->link_bssid,
+			       info->mlo_links[i].bssid,
+			       ETH_ALEN);
+			break;
+		}
+	}
 
 #ifdef CONFIG_CFG80211_WEXT
 	if (info->req_ie) {
@@ -960,6 +1016,8 @@ void cfg80211_roamed(struct net_device *dev, struct cfg80211_roam_info *info,
 	struct cfg80211_event *ev;
 	unsigned long flags;
 	u8 *next;
+	int mlo_link_params_size =
+		info->n_mlo_links * sizeof(struct cfg80211_mlo_link_params);
 
 	if (!info->bss) {
 		info->bss = cfg80211_get_bss(wdev->wiphy, info->channel,
@@ -974,7 +1032,8 @@ void cfg80211_roamed(struct net_device *dev, struct cfg80211_roam_info *info,
 
 	ev = kzalloc(sizeof(*ev) + info->req_ie_len + info->resp_ie_len +
 		     info->fils.kek_len + info->fils.pmk_len +
-		     (info->fils.pmkid ? WLAN_PMKID_LEN : 0), gfp);
+		     (info->fils.pmkid ? WLAN_PMKID_LEN : 0) +
+		     mlo_link_params_size, gfp);
 	if (!ev) {
 		cfg80211_put_bss(wdev->wiphy, info->bss);
 		return;
@@ -1014,6 +1073,13 @@ void cfg80211_roamed(struct net_device *dev, struct cfg80211_roam_info *info,
 		memcpy((void *)ev->rm.fils.pmkid, info->fils.pmkid,
 		       WLAN_PMKID_LEN);
 		next += WLAN_PMKID_LEN;
+	}
+	if (info->n_mlo_links) {
+		ev->rm.n_mlo_links = info->n_mlo_links;
+		ev->rm.mlo_links = (struct cfg80211_mlo_link_params *)next;
+		memcpy((void *)ev->rm.mlo_links, info->mlo_links,
+		       mlo_link_params_size);
+		next += mlo_link_params_size;
 	}
 	ev->rm.fils.update_erp_next_seq_num = info->fils.update_erp_next_seq_num;
 	if (info->fils.update_erp_next_seq_num)
@@ -1074,7 +1140,7 @@ EXPORT_SYMBOL(cfg80211_port_authorized);
 void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
 			     size_t ie_len, u16 reason, bool from_ap)
 {
-	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct wireless_dev *wdev = dev->ieee80211_ptr, *link_wdev;
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
 	int i;
 #ifdef CONFIG_CFG80211_WEXT
@@ -1132,6 +1198,13 @@ void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
 	wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
 	wdev->wext.connect.ssid_len = 0;
 #endif
+
+	list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+		if (link_wdev->mld_wdev != wdev)
+			continue;
+
+		eth_zero_addr(wdev->link_bssid);
+	}
 
 	schedule_work(&cfg80211_disconnect_work);
 }
