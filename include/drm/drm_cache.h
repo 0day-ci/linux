@@ -34,6 +34,12 @@
 #define _DRM_CACHE_H_
 
 #include <linux/scatterlist.h>
+#include <asm/smp.h>
+
+#if !defined(CONFIG_x86)
+#define wbinvd_on_all_cpus() \
+	pr_warn("Missing cache flush in %s\n", __func__)
+#endif
 
 struct iosys_map;
 

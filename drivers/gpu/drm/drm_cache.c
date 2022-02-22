@@ -40,8 +40,6 @@
 #define MEMCPY_BOUNCE_SIZE 128
 
 #if defined(CONFIG_X86)
-#include <asm/smp.h>
-
 /*
  * clflushopt is an unordered instruction which needs fencing with mfence or
  * sfence to avoid ordering issues.  For drm_clflush_page this fencing happens
