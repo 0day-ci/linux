@@ -1397,6 +1397,40 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_of_node);
 
 /*
  * Callback function provided to the Energy Model framework upon registration.
+ * It provides the power based on DT by @dev at @kHz if it is the frequency
+ * of an existing OPP, or at the frequency of the first OPP above @kHz otherwise
+ * (see dev_pm_opp_find_freq_ceil()). This function updates @kHz to the ceiled
+ * frequency and @mW to the associated power.
+ *
+ * Returns 0 on success or a proper -EINVAL value in case of error.
+ */
+static int __maybe_unused
+_get_dt_power(unsigned long *mW, unsigned long *kHz, struct device *dev)
+{
+	struct dev_pm_opp *opp;
+	unsigned long opp_freq;
+	u32 opp_power;
+	int ret;
+
+	/* Find the right frequency and related OPP */
+	opp_freq = *kHz * 1000;
+	opp = dev_pm_opp_find_freq_ceil(dev, &opp_freq);
+	if (IS_ERR(opp))
+		return -EINVAL;
+
+	ret = of_property_read_u32(opp->np, "opp-microwatt", &opp_power);
+	dev_pm_opp_put(opp);
+	if (ret)
+		return -EINVAL;
+
+	*kHz = opp_freq / 1000;
+	*mW = opp_power / 1000;
+
+	return 0;
+}
+
+/*
+ * Callback function provided to the Energy Model framework upon registration.
  * This computes the power estimated by @dev at @kHz if it is the frequency
  * of an existing OPP, or at the frequency of the first OPP above @kHz otherwise
  * (see dev_pm_opp_find_freq_ceil()). This function updates @kHz to the ceiled
@@ -1445,6 +1479,33 @@ static int __maybe_unused _get_power(unsigned long *mW, unsigned long *kHz,
 	return 0;
 }
 
+static int _of_find_opp_microwatt_property(struct device *dev)
+{
+	unsigned long freq = 0;
+	struct dev_pm_opp *opp;
+	struct device_node *np;
+	struct property *prop;
+
+	/* We only support "operating-points-v2" */
+	np = dev_pm_opp_of_get_opp_desc_node(dev);
+	if (!np)
+		return -EINVAL;
+
+	of_node_put(np);
+
+	/* Check if an OPP has needed property */
+	opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+	if (IS_ERR(opp))
+		return -EINVAL;
+
+	prop = of_find_property(opp->np, "opp-microwatt", NULL);
+	dev_pm_opp_put(opp);
+	if (!prop)
+		return -EINVAL;
+
+	return 0;
+}
+
 /**
  * dev_pm_opp_of_register_em() - Attempt to register an Energy Model
  * @dev		: Device for which an Energy Model has to be registered
@@ -1472,6 +1533,15 @@ int dev_pm_opp_of_register_em(struct device *dev, struct cpumask *cpus)
 	if (nr_opp <= 0) {
 		ret = -EINVAL;
 		goto failed;
+	}
+
+	/* First, try to find more precised Energy Model in DT */
+	if (!_of_find_opp_microwatt_property(dev)) {
+		struct em_data_callback em_dt_cb = EM_DATA_CB(_get_dt_power);
+
+		ret = em_dev_register_perf_domain(dev, nr_opp, &em_dt_cb,
+						  cpus, true);
+		return ret;
 	}
 
 	np = of_node_get(dev->of_node);
