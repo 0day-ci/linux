@@ -883,11 +883,7 @@ static inline void blk_account_io_done(struct request *req, u64 now)
 
 static void __blk_account_io_start(struct request *rq)
 {
-	/* passthrough requests can hold bios that do not have ->bi_bdev set */
-	if (rq->bio && rq->bio->bi_bdev)
-		rq->part = rq->bio->bi_bdev;
-	else if (rq->q->disk)
-		rq->part = rq->q->disk->part0;
+	rq->part = rq->bio->bi_bdev;
 
 	part_stat_lock();
 	update_io_ticks(rq->part, jiffies, false);
