@@ -4568,6 +4568,8 @@ devlink_param_type_to_nla_type(enum devlink_param_type param_type)
 		return NLA_STRING;
 	case DEVLINK_PARAM_TYPE_BOOL:
 		return NLA_FLAG;
+	case DEVLINK_PARAM_TYPE_BITFIELD:
+		return NLA_BITFIELD;
 	default:
 		return -EINVAL;
 	}
@@ -4575,11 +4577,13 @@ devlink_param_type_to_nla_type(enum devlink_param_type param_type)
 
 static int
 devlink_nl_param_value_fill_one(struct sk_buff *msg,
-				enum devlink_param_type type,
+				const struct devlink_param *param,
 				enum devlink_param_cmode cmode,
 				union devlink_param_value val)
 {
 	struct nlattr *param_value_attr;
+	struct nla_bitfield *bitfield;
+	int err;
 
 	param_value_attr = nla_nest_start_noflag(msg,
 						 DEVLINK_ATTR_PARAM_VALUE);
@@ -4589,7 +4593,7 @@ devlink_nl_param_value_fill_one(struct sk_buff *msg,
 	if (nla_put_u8(msg, DEVLINK_ATTR_PARAM_VALUE_CMODE, cmode))
 		goto value_nest_cancel;
 
-	switch (type) {
+	switch (param->type) {
 	case DEVLINK_PARAM_TYPE_U8:
 		if (nla_put_u8(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val.vu8))
 			goto value_nest_cancel;
@@ -4612,6 +4616,17 @@ devlink_nl_param_value_fill_one(struct sk_buff *msg,
 		    nla_put_flag(msg, DEVLINK_ATTR_PARAM_VALUE_DATA))
 			goto value_nest_cancel;
 		break;
+	case DEVLINK_PARAM_TYPE_BITFIELD:
+		bitfield = nla_bitfield_alloc(param->nbits);
+		if (!bitfield)
+			return -ENOMEM;
+		nla_bitfield_from_bitmap(bitfield, val.vbitmap, param->nbits);
+		err = nla_put_bitfield(msg, DEVLINK_ATTR_PARAM_VALUE_DATA,
+				       bitfield);
+		nla_bitfield_free(bitfield);
+		if (err)
+			goto value_nest_cancel;
+		break;
 	}
 
 	nla_nest_end(msg, param_value_attr);
@@ -4621,6 +4636,24 @@ value_nest_cancel:
 	nla_nest_cancel(msg, param_value_attr);
 nla_put_failure:
 	return -EMSGSIZE;
+}
+
+static int devlink_param_value_get(const struct devlink_param *param,
+				   union devlink_param_value *value)
+{
+	if (param->type == DEVLINK_PARAM_TYPE_BITFIELD) {
+		value->vbitmap = bitmap_zalloc(param->nbits, GFP_KERNEL);
+		if (!value->vbitmap)
+			return -ENOMEM;
+	}
+	return 0;
+}
+
+static void devlink_param_value_put(const struct devlink_param *param,
+				    union devlink_param_value *value)
+{
+	if (param->type == DEVLINK_PARAM_TYPE_BITFIELD)
+		bitmap_free(value->vbitmap);
 }
 
 static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
@@ -4645,14 +4678,22 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 		if (!devlink_param_cmode_is_supported(param, i))
 			continue;
 		if (i == DEVLINK_PARAM_CMODE_DRIVERINIT) {
-			if (!param_item->driverinit_value_valid)
-				return -EOPNOTSUPP;
+			if (!param_item->driverinit_value_valid) {
+				err = -EOPNOTSUPP;
+				goto param_value_put;
+			}
 			param_value[i] = param_item->driverinit_value;
 		} else {
 			ctx.cmode = i;
-			err = devlink_param_get(devlink, param, &ctx);
+			err = devlink_param_value_get(param, &param_value[i]);
 			if (err)
-				return err;
+				goto param_value_put;
+			ctx.val = param_value[i];
+			err = devlink_param_get(devlink, param, &ctx);
+			if (err) {
+				devlink_param_value_put(param, &param_value[i]);
+				goto param_value_put;
+			}
 			param_value[i] = ctx.val;
 		}
 		param_value_set[i] = true;
@@ -4660,7 +4701,7 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 
 	hdr = genlmsg_put(msg, portid, seq, &devlink_nl_family, flags, cmd);
 	if (!hdr)
-		return -EMSGSIZE;
+		goto genlmsg_put_err;
 
 	if (devlink_nl_put_handle(msg, devlink))
 		goto genlmsg_cancel;
@@ -4693,10 +4734,13 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 	for (i = 0; i <= DEVLINK_PARAM_CMODE_MAX; i++) {
 		if (!param_value_set[i])
 			continue;
-		err = devlink_nl_param_value_fill_one(msg, param->type,
+		err = devlink_nl_param_value_fill_one(msg, param,
 						      i, param_value[i]);
 		if (err)
 			goto values_list_nest_cancel;
+		if (i != DEVLINK_PARAM_CMODE_DRIVERINIT)
+			devlink_param_value_put(param, &param_value[i]);
+		param_value_set[i] = false;
 	}
 
 	nla_nest_end(msg, param_values_list);
@@ -4710,7 +4754,13 @@ param_nest_cancel:
 	nla_nest_cancel(msg, param_attr);
 genlmsg_cancel:
 	genlmsg_cancel(msg, hdr);
-	return -EMSGSIZE;
+genlmsg_put_err:
+	err = -EMSGSIZE;
+param_value_put:
+	for (i = 0; i <= DEVLINK_PARAM_CMODE_MAX; i++)
+		if (i != DEVLINK_PARAM_CMODE_DRIVERINIT && param_value_set[i])
+			devlink_param_value_put(param, &param_value[i]);
+	return err;
 }
 
 static void devlink_param_notify(struct devlink *devlink,
@@ -4815,6 +4865,9 @@ devlink_param_type_get_from_info(struct genl_info *info,
 	case NLA_FLAG:
 		*param_type = DEVLINK_PARAM_TYPE_BOOL;
 		break;
+	case NLA_BITFIELD:
+		*param_type = DEVLINK_PARAM_TYPE_BITFIELD;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -4827,6 +4880,7 @@ devlink_param_value_get_from_info(const struct devlink_param *param,
 				  struct genl_info *info,
 				  union devlink_param_value *value)
 {
+	struct nla_bitfield *bitfield;
 	struct nlattr *param_data;
 	int len;
 
@@ -4862,6 +4916,18 @@ devlink_param_value_get_from_info(const struct devlink_param *param,
 		if (param_data && nla_len(param_data))
 			return -EINVAL;
 		value->vbool = nla_get_flag(param_data);
+		break;
+	case DEVLINK_PARAM_TYPE_BITFIELD:
+		bitfield = nla_data(param_data);
+
+		if (!nla_bitfield_len_is_valid(bitfield, nla_len(param_data)) ||
+		    !nla_bitfield_nbits_valid(bitfield, param->nbits))
+			return -EINVAL;
+		value->vbitmap = bitmap_zalloc(param->nbits, GFP_KERNEL);
+		if (!value->vbitmap)
+			return -ENOMEM;
+
+		nla_bitfield_to_bitmap(value->vbitmap, bitfield);
 		break;
 	}
 	return 0;
@@ -4936,33 +5002,48 @@ static int __devlink_nl_cmd_param_set_doit(struct devlink *devlink,
 	if (param->validate) {
 		err = param->validate(devlink, param->id, value, info->extack);
 		if (err)
-			return err;
+			goto out;
 	}
 
-	if (!info->attrs[DEVLINK_ATTR_PARAM_VALUE_CMODE])
-		return -EINVAL;
+	if (!info->attrs[DEVLINK_ATTR_PARAM_VALUE_CMODE]) {
+		err = -EINVAL;
+		goto out;
+	}
 	cmode = nla_get_u8(info->attrs[DEVLINK_ATTR_PARAM_VALUE_CMODE]);
-	if (!devlink_param_cmode_is_supported(param, cmode))
-		return -EOPNOTSUPP;
+	if (!devlink_param_cmode_is_supported(param, cmode)) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
 
 	if (cmode == DEVLINK_PARAM_CMODE_DRIVERINIT) {
 		if (param->type == DEVLINK_PARAM_TYPE_STRING)
 			strcpy(param_item->driverinit_value.vstr, value.vstr);
+		else if (param->type == DEVLINK_PARAM_TYPE_BITFIELD)
+			bitmap_copy(param_item->driverinit_value.vbitmap,
+				    value.vbitmap,
+				    param_item->param->nbits);
 		else
 			param_item->driverinit_value = value;
 		param_item->driverinit_value_valid = true;
 	} else {
-		if (!param->set)
-			return -EOPNOTSUPP;
+		if (!param->set) {
+			err = -EOPNOTSUPP;
+			goto out;
+		}
 		ctx.val = value;
 		ctx.cmode = cmode;
 		err = devlink_param_set(devlink, param, &ctx);
 		if (err)
-			return err;
+			goto out;
 	}
 
+	devlink_param_value_put(param, &value);
 	devlink_param_notify(devlink, port_index, param_item, cmd);
 	return 0;
+
+out:
+	devlink_param_value_put(param, &value);
+	return err;
 }
 
 static int devlink_nl_cmd_param_set_doit(struct sk_buff *skb,
@@ -10098,6 +10179,8 @@ static int devlink_param_verify(const struct devlink_param *param)
 {
 	if (!param || !param->name || !param->supported_cmodes)
 		return -EINVAL;
+	if (param->type == DEVLINK_PARAM_TYPE_BITFIELD && !param->nbits)
+		return -EINVAL;
 	if (param->generic)
 		return devlink_param_generic_verify(param);
 	else
@@ -10188,6 +10271,16 @@ int devlink_param_register(struct devlink *devlink,
 		return -ENOMEM;
 
 	param_item->param = param;
+	if (param_item->param->type == DEVLINK_PARAM_TYPE_BITFIELD &&
+	    devlink_param_cmode_is_supported(param_item->param,
+					     DEVLINK_PARAM_CMODE_DRIVERINIT)) {
+		param_item->driverinit_value.vbitmap =
+			bitmap_zalloc(param_item->param->nbits, GFP_KERNEL);
+		if (!param_item->driverinit_value.vbitmap) {
+			kfree(param_item);
+			return -ENOMEM;
+		}
+	}
 
 	list_add_tail(&param_item->list, &devlink->param_list);
 	return 0;
@@ -10210,6 +10303,10 @@ void devlink_param_unregister(struct devlink *devlink,
 		devlink_param_find_by_name(&devlink->param_list, param->name);
 	WARN_ON(!param_item);
 	list_del(&param_item->list);
+	if (param_item->param->type == DEVLINK_PARAM_TYPE_BITFIELD &&
+	    devlink_param_cmode_is_supported(param_item->param,
+					     DEVLINK_PARAM_CMODE_DRIVERINIT))
+		bitmap_free(param_item->driverinit_value.vbitmap);
 	kfree(param_item);
 }
 EXPORT_SYMBOL_GPL(devlink_param_unregister);
@@ -10244,6 +10341,10 @@ int devlink_param_driverinit_value_get(struct devlink *devlink, u32 param_id,
 
 	if (param_item->param->type == DEVLINK_PARAM_TYPE_STRING)
 		strcpy(init_val->vstr, param_item->driverinit_value.vstr);
+	else if (param_item->param->type == DEVLINK_PARAM_TYPE_BITFIELD)
+		bitmap_copy(init_val->vbitmap,
+			    param_item->driverinit_value.vbitmap,
+			    param_item->param->nbits);
 	else
 		*init_val = param_item->driverinit_value;
 
@@ -10280,6 +10381,9 @@ int devlink_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
 
 	if (param_item->param->type == DEVLINK_PARAM_TYPE_STRING)
 		strcpy(param_item->driverinit_value.vstr, init_val.vstr);
+	else if (param_item->param->type == DEVLINK_PARAM_TYPE_BITFIELD)
+		bitmap_copy(param_item->driverinit_value.vbitmap,
+			    init_val.vbitmap, param_item->param->nbits);
 	else
 		param_item->driverinit_value = init_val;
 	param_item->driverinit_value_valid = true;

@@ -372,6 +372,7 @@ enum devlink_param_type {
 	DEVLINK_PARAM_TYPE_U32,
 	DEVLINK_PARAM_TYPE_STRING,
 	DEVLINK_PARAM_TYPE_BOOL,
+	DEVLINK_PARAM_TYPE_BITFIELD,
 };
 
 union devlink_param_value {
@@ -380,6 +381,7 @@ union devlink_param_value {
 	u32 vu32;
 	char vstr[__DEVLINK_PARAM_MAX_STRING_VALUE];
 	bool vbool;
+	unsigned long *vbitmap;
 };
 
 struct devlink_param_gset_ctx {
@@ -412,6 +414,8 @@ struct devlink_flash_notify {
  * @generic: indicates if the parameter is generic or driver specific
  * @type: parameter type
  * @supported_cmodes: bitmap of supported configuration modes
+ * @nbits: number of bits this param need to use, if this param is
+ *         of dynamic len.
  * @get: get parameter value, used for runtime and permanent
  *       configuration modes
  * @set: set parameter value, used for runtime and permanent
@@ -427,6 +431,7 @@ struct devlink_param {
 	bool generic;
 	enum devlink_param_type type;
 	unsigned long supported_cmodes;
+	u64 nbits;
 	int (*get)(struct devlink *devlink, u32 id,
 		   struct devlink_param_gset_ctx *ctx);
 	int (*set)(struct devlink *devlink, u32 id,
@@ -537,6 +542,19 @@ enum devlink_param_generic_id {
 	.name = _name,							\
 	.type = _type,							\
 	.supported_cmodes = _cmodes,					\
+	.get = _get,							\
+	.set = _set,							\
+	.validate = _validate,						\
+}
+
+#define DEVLINK_PARAM_DYNAMIC_GENERIC(_id, _cmodes, _get, _set, _validate, _nbits)\
+{									\
+	.id = DEVLINK_PARAM_GENERIC_ID_##_id,				\
+	.name = DEVLINK_PARAM_GENERIC_##_id##_NAME,			\
+	.type = DEVLINK_PARAM_GENERIC_##_id##_TYPE,			\
+	.generic = true,						\
+	.supported_cmodes = _cmodes,					\
+	.nbits = _nbits,						\
 	.get = _get,							\
 	.set = _set,							\
 	.validate = _validate,						\
