@@ -293,6 +293,46 @@ static void nop_irq_handler(struct intel_engine_cs *engine, u16 iir)
 	GEM_DEBUG_WARN_ON(iir);
 }
 
+static u32 get_reset_domain(u8 ver, enum intel_engine_id id)
+{
+	u32 reset_domain;
+
+	if (ver >= 11) {
+		static const u32 engine_reset_domains[] = {
+			[RCS0]  = GEN11_GRDOM_RENDER,
+			[BCS0]  = GEN11_GRDOM_BLT,
+			[VCS0]  = GEN11_GRDOM_MEDIA,
+			[VCS1]  = GEN11_GRDOM_MEDIA2,
+			[VCS2]  = GEN11_GRDOM_MEDIA3,
+			[VCS3]  = GEN11_GRDOM_MEDIA4,
+			[VCS4]  = GEN11_GRDOM_MEDIA5,
+			[VCS5]  = GEN11_GRDOM_MEDIA6,
+			[VCS6]  = GEN11_GRDOM_MEDIA7,
+			[VCS7]  = GEN11_GRDOM_MEDIA8,
+			[VECS0] = GEN11_GRDOM_VECS,
+			[VECS1] = GEN11_GRDOM_VECS2,
+			[VECS2] = GEN11_GRDOM_VECS3,
+			[VECS3] = GEN11_GRDOM_VECS4,
+		};
+		GEM_BUG_ON(id >= ARRAY_SIZE(engine_reset_domains) ||
+			   !engine_reset_domains[id]);
+		reset_domain = engine_reset_domains[id];
+	} else {
+		static const u32 engine_reset_domains[] = {
+			[RCS0]  = GEN6_GRDOM_RENDER,
+			[BCS0]  = GEN6_GRDOM_BLT,
+			[VCS0]  = GEN6_GRDOM_MEDIA,
+			[VCS1]  = GEN8_GRDOM_MEDIA2,
+			[VECS0] = GEN6_GRDOM_VECS,
+		};
+		GEM_BUG_ON(id >= ARRAY_SIZE(engine_reset_domains) ||
+			   !engine_reset_domains[id]);
+		reset_domain = engine_reset_domains[id];
+	}
+
+	return reset_domain;
+}
+
 static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id,
 			      u8 logical_instance)
 {
@@ -328,38 +368,8 @@ static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id,
 	engine->id = id;
 	engine->legacy_idx = INVALID_ENGINE;
 	engine->mask = BIT(id);
-	if (GRAPHICS_VER(gt->i915) >= 11) {
-		static const u32 engine_reset_domains[] = {
-			[RCS0]  = GEN11_GRDOM_RENDER,
-			[BCS0]  = GEN11_GRDOM_BLT,
-			[VCS0]  = GEN11_GRDOM_MEDIA,
-			[VCS1]  = GEN11_GRDOM_MEDIA2,
-			[VCS2]  = GEN11_GRDOM_MEDIA3,
-			[VCS3]  = GEN11_GRDOM_MEDIA4,
-			[VCS4]  = GEN11_GRDOM_MEDIA5,
-			[VCS5]  = GEN11_GRDOM_MEDIA6,
-			[VCS6]  = GEN11_GRDOM_MEDIA7,
-			[VCS7]  = GEN11_GRDOM_MEDIA8,
-			[VECS0] = GEN11_GRDOM_VECS,
-			[VECS1] = GEN11_GRDOM_VECS2,
-			[VECS2] = GEN11_GRDOM_VECS3,
-			[VECS3] = GEN11_GRDOM_VECS4,
-		};
-		GEM_BUG_ON(id >= ARRAY_SIZE(engine_reset_domains) ||
-			   !engine_reset_domains[id]);
-		engine->reset_domain = engine_reset_domains[id];
-	} else {
-		static const u32 engine_reset_domains[] = {
-			[RCS0]  = GEN6_GRDOM_RENDER,
-			[BCS0]  = GEN6_GRDOM_BLT,
-			[VCS0]  = GEN6_GRDOM_MEDIA,
-			[VCS1]  = GEN8_GRDOM_MEDIA2,
-			[VECS0] = GEN6_GRDOM_VECS,
-		};
-		GEM_BUG_ON(id >= ARRAY_SIZE(engine_reset_domains) ||
-			   !engine_reset_domains[id]);
-		engine->reset_domain = engine_reset_domains[id];
-	}
+	engine->reset_domain = get_reset_domain(GRAPHICS_VER(gt->i915),
+						id);
 	engine->i915 = i915;
 	engine->gt = gt;
 	engine->uncore = gt->uncore;
@@ -1700,18 +1710,15 @@ static void intel_engine_print_registers(struct intel_engine_cs *engine,
 
 static void print_request_ring(struct drm_printer *m, struct i915_request *rq)
 {
-	struct i915_vma_snapshot *vsnap = &rq->batch_snapshot;
+	struct i915_vma_resource *vma_res = rq->batch_res;
 	void *ring;
 	int size;
-
-	if (!i915_vma_snapshot_present(vsnap))
-		vsnap = NULL;
 
 	drm_printf(m,
 		   "[head %04x, postfix %04x, tail %04x, batch 0x%08x_%08x]:\n",
 		   rq->head, rq->postfix, rq->tail,
-		   vsnap ? upper_32_bits(vsnap->gtt_offset) : ~0u,
-		   vsnap ? lower_32_bits(vsnap->gtt_offset) : ~0u);
+		   vma_res ? upper_32_bits(vma_res->start) : ~0u,
+		   vma_res ? lower_32_bits(vma_res->start) : ~0u);
 
 	size = rq->tail - rq->head;
 	if (rq->tail < rq->head)
