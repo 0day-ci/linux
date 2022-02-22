@@ -174,6 +174,15 @@ struct flow_offload {
 	struct rcu_head				rcu_head;
 };
 
+struct flow_offload_work {
+	struct list_head list;
+	enum flow_cls_command cmd;
+	int priority;
+	struct nf_flowtable *flowtable;
+	struct flow_offload *flow;
+	struct work_struct work;
+};
+
 #define NF_FLOW_TIMEOUT (30 * HZ)
 #define nf_flowtable_time_stamp	(u32)jiffies
 

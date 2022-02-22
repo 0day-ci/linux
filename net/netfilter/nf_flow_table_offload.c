@@ -12,19 +12,12 @@
 #include <net/netfilter/nf_conntrack_acct.h>
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
+#define CREATE_TRACE_POINTS
+#include "nf_flow_table_offload_trace.h"
 
 static struct workqueue_struct *nf_flow_offload_add_wq;
 static struct workqueue_struct *nf_flow_offload_del_wq;
 static struct workqueue_struct *nf_flow_offload_stats_wq;
-
-struct flow_offload_work {
-	struct list_head	list;
-	enum flow_cls_command	cmd;
-	int			priority;
-	struct nf_flowtable	*flowtable;
-	struct flow_offload	*flow;
-	struct work_struct	work;
-};
 
 #define NF_FLOW_DISSECTOR(__match, __type, __field)	\
 	(__match)->dissector.offset[__type] =		\
@@ -895,6 +888,8 @@ static void flow_offload_work_add(struct flow_offload_work *offload)
 	struct nf_flow_rule *flow_rule[FLOW_OFFLOAD_DIR_MAX];
 	int err;
 
+	trace_flow_offload_work_add(offload);
+
 	err = nf_flow_offload_alloc(offload, flow_rule);
 	if (err < 0)
 		return;
@@ -911,6 +906,8 @@ out:
 
 static void flow_offload_work_del(struct flow_offload_work *offload)
 {
+	trace_flow_offload_work_del(offload);
+
 	clear_bit(IPS_HW_OFFLOAD_BIT, &offload->flow->ct->status);
 	flow_offload_tuple_del(offload, FLOW_OFFLOAD_DIR_ORIGINAL);
 	flow_offload_tuple_del(offload, FLOW_OFFLOAD_DIR_REPLY);
@@ -930,6 +927,8 @@ static void flow_offload_work_stats(struct flow_offload_work *offload)
 {
 	struct flow_stats stats[FLOW_OFFLOAD_DIR_MAX] = {};
 	u64 lastused;
+
+	trace_flow_offload_work_stats(offload);
 
 	flow_offload_tuple_stats(offload, FLOW_OFFLOAD_DIR_ORIGINAL, &stats[0]);
 	flow_offload_tuple_stats(offload, FLOW_OFFLOAD_DIR_REPLY, &stats[1]);
@@ -1034,6 +1033,7 @@ void nf_flow_offload_add(struct nf_flowtable *flowtable,
 		return;
 	}
 
+	trace_flow_offload_add(offload);
 	flow_offload_queue_work(offload);
 }
 
@@ -1048,6 +1048,7 @@ void nf_flow_offload_del(struct nf_flowtable *flowtable,
 		return;
 
 	atomic_inc(&net->nft.count_wq_del);
+	trace_flow_offload_del(offload);
 	set_bit(NF_FLOW_HW_DYING, &flow->flags);
 	flow_offload_queue_work(offload);
 }
@@ -1068,6 +1069,7 @@ void nf_flow_offload_stats(struct nf_flowtable *flowtable,
 		return;
 
 	atomic_inc(&net->nft.count_wq_stats);
+	trace_flow_offload_stats(offload);
 	flow_offload_queue_work(offload);
 }
 
