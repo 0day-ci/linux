@@ -73,6 +73,48 @@ static DEFINE_PER_CPU(struct lru_pvecs, lru_pvecs) = {
 	.lock = INIT_LOCAL_LOCK(lock),
 };
 
+#ifdef CONFIG_PREEMPT_RT
+
+#define lru_local_lock(lock)		\
+	do {				\
+		rcu_read_lock();	\
+		local_lock(lock);	\
+	} while (0)
+
+#define lru_local_unlock(lock)		\
+	do {				\
+		local_unlock(lock);	\
+		rcu_read_unlock();	\
+	} while (0)
+
+#define lru_local_lock_irqsave(lock, flags)		\
+	do {						\
+		rcu_read_lock();			\
+		local_lock_irqsave(lock, flags);	\
+	} while (0)
+
+#define lru_local_unlock_irqrestore(lock, flags)		\
+	do {							\
+		local_unlock_irqrestore(lock, flags);		\
+		rcu_read_unlock();				\
+	} while (0)
+
+#else
+
+#define lru_local_lock(lock)		\
+	local_lock(lock)
+
+#define lru_local_unlock(lock)		\
+	local_unlock(lock)
+
+#define lru_local_lock_irqsave(lock, flag)		\
+	local_lock_irqsave(lock, flags)
+
+#define lru_local_unlock_irqrestore(lock, flags)	\
+	local_unlock_irqrestore(lock, flags)
+
+#endif
+
 /*
  * This path almost never happens for VM activity - pages are normally
  * freed via pagevecs.  But it gets used by networking.
@@ -255,11 +297,11 @@ void folio_rotate_reclaimable(struct folio *folio)
 		unsigned long flags;
 
 		folio_get(folio);
-		local_lock_irqsave(&lru_rotate.lock, flags);
+		lru_local_lock_irqsave(&lru_rotate.lock, flags);
 		pvec = this_cpu_ptr(&lru_rotate.pvec);
 		if (pagevec_add_and_need_flush(pvec, &folio->page))
 			pagevec_lru_move_fn(pvec, pagevec_move_tail_fn);
-		local_unlock_irqrestore(&lru_rotate.lock, flags);
+		lru_local_unlock_irqrestore(&lru_rotate.lock, flags);
 	}
 }
 
@@ -351,11 +393,11 @@ static void folio_activate(struct folio *folio)
 		struct pagevec *pvec;
 
 		folio_get(folio);
-		local_lock(&lru_pvecs.lock);
+		lru_local_lock(&lru_pvecs.lock);
 		pvec = this_cpu_ptr(&lru_pvecs.activate_page);
 		if (pagevec_add_and_need_flush(pvec, &folio->page))
 			pagevec_lru_move_fn(pvec, __activate_page);
-		local_unlock(&lru_pvecs.lock);
+		lru_local_unlock(&lru_pvecs.lock);
 	}
 }
 
@@ -382,7 +424,7 @@ static void __lru_cache_activate_folio(struct folio *folio)
 	struct pagevec *pvec;
 	int i;
 
-	local_lock(&lru_pvecs.lock);
+	lru_local_lock(&lru_pvecs.lock);
 	pvec = this_cpu_ptr(&lru_pvecs.lru_add);
 
 	/*
@@ -404,7 +446,7 @@ static void __lru_cache_activate_folio(struct folio *folio)
 		}
 	}
 
-	local_unlock(&lru_pvecs.lock);
+	lru_local_unlock(&lru_pvecs.lock);
 }
 
 /*
@@ -463,11 +505,11 @@ void folio_add_lru(struct folio *folio)
 	VM_BUG_ON_FOLIO(folio_test_lru(folio), folio);
 
 	folio_get(folio);
-	local_lock(&lru_pvecs.lock);
+	lru_local_lock(&lru_pvecs.lock);
 	pvec = this_cpu_ptr(&lru_pvecs.lru_add);
 	if (pagevec_add_and_need_flush(pvec, &folio->page))
 		__pagevec_lru_add(pvec);
-	local_unlock(&lru_pvecs.lock);
+	lru_local_unlock(&lru_pvecs.lock);
 }
 EXPORT_SYMBOL(folio_add_lru);
 
@@ -618,9 +660,9 @@ void lru_add_drain_cpu(int cpu)
 		unsigned long flags;
 
 		/* No harm done if a racing interrupt already did this */
-		local_lock_irqsave(&lru_rotate.lock, flags);
+		lru_local_lock_irqsave(&lru_rotate.lock, flags);
 		pagevec_lru_move_fn(pvec, pagevec_move_tail_fn);
-		local_unlock_irqrestore(&lru_rotate.lock, flags);
+		lru_local_unlock_irqrestore(&lru_rotate.lock, flags);
 	}
 
 	pvec = &per_cpu(lru_pvecs.lru_deactivate_file, cpu);
@@ -658,12 +700,12 @@ void deactivate_file_page(struct page *page)
 	if (likely(get_page_unless_zero(page))) {
 		struct pagevec *pvec;
 
-		local_lock(&lru_pvecs.lock);
+		lru_local_lock(&lru_pvecs.lock);
 		pvec = this_cpu_ptr(&lru_pvecs.lru_deactivate_file);
 
 		if (pagevec_add_and_need_flush(pvec, page))
 			pagevec_lru_move_fn(pvec, lru_deactivate_file_fn);
-		local_unlock(&lru_pvecs.lock);
+		lru_local_unlock(&lru_pvecs.lock);
 	}
 }
 
@@ -680,12 +722,12 @@ void deactivate_page(struct page *page)
 	if (PageLRU(page) && PageActive(page) && !PageUnevictable(page)) {
 		struct pagevec *pvec;
 
-		local_lock(&lru_pvecs.lock);
+		lru_local_lock(&lru_pvecs.lock);
 		pvec = this_cpu_ptr(&lru_pvecs.lru_deactivate);
 		get_page(page);
 		if (pagevec_add_and_need_flush(pvec, page))
 			pagevec_lru_move_fn(pvec, lru_deactivate_fn);
-		local_unlock(&lru_pvecs.lock);
+		lru_local_unlock(&lru_pvecs.lock);
 	}
 }
 
@@ -702,20 +744,20 @@ void mark_page_lazyfree(struct page *page)
 	    !PageSwapCache(page) && !PageUnevictable(page)) {
 		struct pagevec *pvec;
 
-		local_lock(&lru_pvecs.lock);
+		lru_local_lock(&lru_pvecs.lock);
 		pvec = this_cpu_ptr(&lru_pvecs.lru_lazyfree);
 		get_page(page);
 		if (pagevec_add_and_need_flush(pvec, page))
 			pagevec_lru_move_fn(pvec, lru_lazyfree_fn);
-		local_unlock(&lru_pvecs.lock);
+		lru_local_unlock(&lru_pvecs.lock);
 	}
 }
 
 void lru_add_drain(void)
 {
-	local_lock(&lru_pvecs.lock);
+	lru_local_lock(&lru_pvecs.lock);
 	lru_add_drain_cpu(smp_processor_id());
-	local_unlock(&lru_pvecs.lock);
+	lru_local_unlock(&lru_pvecs.lock);
 }
 
 /*
@@ -726,18 +768,18 @@ void lru_add_drain(void)
  */
 static void lru_add_and_bh_lrus_drain(void)
 {
-	local_lock(&lru_pvecs.lock);
+	lru_local_lock(&lru_pvecs.lock);
 	lru_add_drain_cpu(smp_processor_id());
-	local_unlock(&lru_pvecs.lock);
+	lru_local_unlock(&lru_pvecs.lock);
 	invalidate_bh_lrus_cpu();
 }
 
 void lru_add_drain_cpu_zone(struct zone *zone)
 {
-	local_lock(&lru_pvecs.lock);
+	lru_local_lock(&lru_pvecs.lock);
 	lru_add_drain_cpu(smp_processor_id());
 	drain_local_pages(zone);
-	local_unlock(&lru_pvecs.lock);
+	lru_local_unlock(&lru_pvecs.lock);
 }
 
 #ifdef CONFIG_SMP
