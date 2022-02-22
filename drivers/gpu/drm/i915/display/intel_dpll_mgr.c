@@ -2708,10 +2708,10 @@ static int icl_ddi_combo_pll_get_freq(struct drm_i915_private *i915,
 		break;
 	}
 
-	dco_freq = (pll_state->cfgcr0 & DPLL_CFGCR0_DCO_INTEGER_MASK) *
+	dco_freq = (pll_state->icl_cfgcr0 & DPLL_CFGCR0_DCO_INTEGER_MASK) *
 		   ref_clock;
 
-	dco_fraction = (pll_state->cfgcr0 & DPLL_CFGCR0_DCO_FRACTION_MASK) >>
+	dco_fraction = (pll_state->icl_cfgcr0 & DPLL_CFGCR0_DCO_FRACTION_MASK) >>
 		       DPLL_CFGCR0_DCO_FRACTION_SHIFT;
 
 	if (ehl_combo_pll_div_frac_wa_needed(i915))
@@ -2736,21 +2736,22 @@ static void icl_calc_dpll_state(struct drm_i915_private *i915,
 	if (ehl_combo_pll_div_frac_wa_needed(i915))
 		dco_fraction = DIV_ROUND_CLOSEST(dco_fraction, 2);
 
-	pll_state->cfgcr0 = DPLL_CFGCR0_DCO_FRACTION(dco_fraction) |
-			    pll_params->dco_integer;
+	pll_state->icl_cfgcr0 = DPLL_CFGCR0_DCO_FRACTION(dco_fraction) |
+				pll_params->dco_integer;
 
-	pll_state->cfgcr1 = DPLL_CFGCR1_QDIV_RATIO(pll_params->qdiv_ratio) |
-			    DPLL_CFGCR1_QDIV_MODE(pll_params->qdiv_mode) |
-			    DPLL_CFGCR1_KDIV(pll_params->kdiv) |
-			    DPLL_CFGCR1_PDIV(pll_params->pdiv);
+	pll_state->icl_cfgcr1 = DPLL_CFGCR1_QDIV_RATIO(pll_params->qdiv_ratio) |
+				DPLL_CFGCR1_QDIV_MODE(pll_params->qdiv_mode) |
+				DPLL_CFGCR1_KDIV(pll_params->kdiv) |
+				DPLL_CFGCR1_PDIV(pll_params->pdiv);
 
 	if (DISPLAY_VER(i915) >= 12)
-		pll_state->cfgcr1 |= TGL_DPLL_CFGCR1_CFSELOVRD_NORMAL_XTAL;
+		pll_state->icl_cfgcr1 |= TGL_DPLL_CFGCR1_CFSELOVRD_NORMAL_XTAL;
 	else
-		pll_state->cfgcr1 |= DPLL_CFGCR1_CENTRAL_FREQ_8400;
+		pll_state->icl_cfgcr1 |= DPLL_CFGCR1_CENTRAL_FREQ_8400;
 
 	if (i915->vbt.override_afc_startup)
-		pll_state->div0 = TGL_DPLL0_DIV0_AFC_STARTUP(i915->vbt.override_afc_startup_val);
+		pll_state->icl_div0 =
+			TGL_DPLL0_DIV0_AFC_STARTUP(i915->vbt.override_afc_startup_val);
 }
 
 static bool icl_mg_pll_find_divisors(int clock_khz, bool is_dp, bool use_ssc,
@@ -3506,36 +3507,36 @@ static bool icl_pll_get_hw_state(struct drm_i915_private *dev_priv,
 		goto out;
 
 	if (IS_ALDERLAKE_S(dev_priv)) {
-		hw_state->cfgcr0 = intel_de_read(dev_priv, ADLS_DPLL_CFGCR0(id));
-		hw_state->cfgcr1 = intel_de_read(dev_priv, ADLS_DPLL_CFGCR1(id));
+		hw_state->icl_cfgcr0 = intel_de_read(dev_priv, ADLS_DPLL_CFGCR0(id));
+		hw_state->icl_cfgcr1 = intel_de_read(dev_priv, ADLS_DPLL_CFGCR1(id));
 	} else if (IS_DG1(dev_priv)) {
-		hw_state->cfgcr0 = intel_de_read(dev_priv, DG1_DPLL_CFGCR0(id));
-		hw_state->cfgcr1 = intel_de_read(dev_priv, DG1_DPLL_CFGCR1(id));
+		hw_state->icl_cfgcr0 = intel_de_read(dev_priv, DG1_DPLL_CFGCR0(id));
+		hw_state->icl_cfgcr1 = intel_de_read(dev_priv, DG1_DPLL_CFGCR1(id));
 	} else if (IS_ROCKETLAKE(dev_priv)) {
-		hw_state->cfgcr0 = intel_de_read(dev_priv,
-						 RKL_DPLL_CFGCR0(id));
-		hw_state->cfgcr1 = intel_de_read(dev_priv,
-						 RKL_DPLL_CFGCR1(id));
+		hw_state->icl_cfgcr0 = intel_de_read(dev_priv,
+						     RKL_DPLL_CFGCR0(id));
+		hw_state->icl_cfgcr1 = intel_de_read(dev_priv,
+						     RKL_DPLL_CFGCR1(id));
 	} else if (DISPLAY_VER(dev_priv) >= 12) {
-		hw_state->cfgcr0 = intel_de_read(dev_priv,
-						 TGL_DPLL_CFGCR0(id));
-		hw_state->cfgcr1 = intel_de_read(dev_priv,
-						 TGL_DPLL_CFGCR1(id));
+		hw_state->icl_cfgcr0 = intel_de_read(dev_priv,
+						     TGL_DPLL_CFGCR0(id));
+		hw_state->icl_cfgcr1 = intel_de_read(dev_priv,
+						     TGL_DPLL_CFGCR1(id));
 		if (dev_priv->vbt.override_afc_startup) {
-			hw_state->div0 = intel_de_read(dev_priv, TGL_DPLL0_DIV0(id));
-			hw_state->div0 &= TGL_DPLL0_DIV0_AFC_STARTUP_MASK;
+			hw_state->icl_div0 = intel_de_read(dev_priv, TGL_DPLL0_DIV0(id));
+			hw_state->icl_div0 &= TGL_DPLL0_DIV0_AFC_STARTUP_MASK;
 		}
 	} else {
 		if (IS_JSL_EHL(dev_priv) && id == DPLL_ID_EHL_DPLL4) {
-			hw_state->cfgcr0 = intel_de_read(dev_priv,
-							 ICL_DPLL_CFGCR0(4));
-			hw_state->cfgcr1 = intel_de_read(dev_priv,
-							 ICL_DPLL_CFGCR1(4));
+			hw_state->icl_cfgcr0 = intel_de_read(dev_priv,
+							     ICL_DPLL_CFGCR0(4));
+			hw_state->icl_cfgcr1 = intel_de_read(dev_priv,
+							     ICL_DPLL_CFGCR1(4));
 		} else {
-			hw_state->cfgcr0 = intel_de_read(dev_priv,
-							 ICL_DPLL_CFGCR0(id));
-			hw_state->cfgcr1 = intel_de_read(dev_priv,
-							 ICL_DPLL_CFGCR1(id));
+			hw_state->icl_cfgcr0 = intel_de_read(dev_priv,
+							     ICL_DPLL_CFGCR0(id));
+			hw_state->icl_cfgcr1 = intel_de_read(dev_priv,
+							     ICL_DPLL_CFGCR1(id));
 		}
 	}
 
@@ -3591,14 +3592,14 @@ static void icl_dpll_write(struct drm_i915_private *dev_priv,
 		}
 	}
 
-	intel_de_write(dev_priv, cfgcr0_reg, hw_state->cfgcr0);
-	intel_de_write(dev_priv, cfgcr1_reg, hw_state->cfgcr1);
+	intel_de_write(dev_priv, cfgcr0_reg, hw_state->icl_cfgcr0);
+	intel_de_write(dev_priv, cfgcr1_reg, hw_state->icl_cfgcr1);
 	drm_WARN_ON_ONCE(&dev_priv->drm, dev_priv->vbt.override_afc_startup &&
 			 !i915_mmio_reg_valid(div0_reg));
 	if (dev_priv->vbt.override_afc_startup &&
 	    i915_mmio_reg_valid(div0_reg))
 		intel_de_rmw(dev_priv, div0_reg, TGL_DPLL0_DIV0_AFC_STARTUP_MASK,
-			     hw_state->div0);
+			     hw_state->icl_div0);
 	intel_de_posting_read(dev_priv, cfgcr1_reg);
 }
 
@@ -3935,8 +3936,8 @@ static void icl_dump_hw_state(struct drm_i915_private *dev_priv,
 		    "mg_pll_div2: 0x%x, mg_pll_lf: 0x%x, "
 		    "mg_pll_frac_lock: 0x%x, mg_pll_ssc: 0x%x, "
 		    "mg_pll_bias: 0x%x, mg_pll_tdc_coldst_bias: 0x%x\n",
-		    hw_state->cfgcr0, hw_state->cfgcr1,
-		    hw_state->div0,
+		    hw_state->icl_cfgcr0, hw_state->cfgcr1,
+		    hw_state->icl_div0,
 		    hw_state->mg_refclkin_ctl,
 		    hw_state->mg_clktop2_coreclkctl1,
 		    hw_state->mg_clktop2_hsclkctl,

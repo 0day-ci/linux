@@ -6303,38 +6303,45 @@ intel_pipe_config_compare(const struct intel_crtc_state *current_config,
 	if (dev_priv->dpll.mgr) {
 		PIPE_CONF_CHECK_P(shared_dpll);
 
-		PIPE_CONF_CHECK_X(dpll_hw_state.dpll);
-		PIPE_CONF_CHECK_X(dpll_hw_state.dpll_md);
-		PIPE_CONF_CHECK_X(dpll_hw_state.fp0);
-		PIPE_CONF_CHECK_X(dpll_hw_state.fp1);
-		PIPE_CONF_CHECK_X(dpll_hw_state.wrpll);
-		PIPE_CONF_CHECK_X(dpll_hw_state.spll);
-		PIPE_CONF_CHECK_X(dpll_hw_state.ctrl1);
-		PIPE_CONF_CHECK_X(dpll_hw_state.cfgcr1);
-		PIPE_CONF_CHECK_X(dpll_hw_state.cfgcr2);
-		PIPE_CONF_CHECK_X(dpll_hw_state.cfgcr0);
-		PIPE_CONF_CHECK_X(dpll_hw_state.div0);
-		PIPE_CONF_CHECK_X(dpll_hw_state.ebb0);
-		PIPE_CONF_CHECK_X(dpll_hw_state.ebb4);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll0);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll1);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll2);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll3);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll6);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll8);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll9);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pll10);
-		PIPE_CONF_CHECK_X(dpll_hw_state.pcsdw12);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_refclkin_ctl);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_clktop2_coreclkctl1);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_clktop2_hsclkctl);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_div0);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_div1);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_lf);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_frac_lock);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_ssc);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_bias);
-		PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_tdc_coldst_bias);
+		if (DISPLAY_VER(dev_priv) >= 11) {
+			PIPE_CONF_CHECK_X(dpll_hw_state.icl_cfgcr0);
+			PIPE_CONF_CHECK_X(dpll_hw_state.icl_cfgcr1);
+			PIPE_CONF_CHECK_X(dpll_hw_state.icl_div0);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_refclkin_ctl);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_clktop2_coreclkctl1);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_clktop2_hsclkctl);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_div0);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_div1);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_lf);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_frac_lock);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_ssc);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_bias);
+			PIPE_CONF_CHECK_X(dpll_hw_state.mg_pll_tdc_coldst_bias);
+		} else if (IS_GEMINILAKE(dev_priv) || IS_BROXTON(dev_priv)) {
+			PIPE_CONF_CHECK_X(dpll_hw_state.ebb0);
+			PIPE_CONF_CHECK_X(dpll_hw_state.ebb4);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll0);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll1);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll2);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll3);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll6);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll8);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll9);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pll10);
+			PIPE_CONF_CHECK_X(dpll_hw_state.pcsdw12);
+		} else if (DISPLAY_VER(dev_priv) == 9) {
+			PIPE_CONF_CHECK_X(dpll_hw_state.ctrl1);
+			PIPE_CONF_CHECK_X(dpll_hw_state.cfgcr1);
+			PIPE_CONF_CHECK_X(dpll_hw_state.cfgcr2);
+		} else if (HAS_DDI(dev_priv)) {
+			PIPE_CONF_CHECK_X(dpll_hw_state.wrpll);
+			PIPE_CONF_CHECK_X(dpll_hw_state.spll);
+		} else if (HAS_PCH_IBX(dev_priv) || HAS_PCH_CPT(dev_priv)) {
+			PIPE_CONF_CHECK_X(dpll_hw_state.dpll);
+			PIPE_CONF_CHECK_X(dpll_hw_state.dpll_md);
+			PIPE_CONF_CHECK_X(dpll_hw_state.fp0);
+			PIPE_CONF_CHECK_X(dpll_hw_state.fp1);
+		}
 	}
 
 	PIPE_CONF_CHECK_X(dsi_pll.ctrl);

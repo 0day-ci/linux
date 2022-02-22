@@ -1006,35 +1006,40 @@ static int i915_shared_dplls_info(struct seq_file *m, void *unused)
 		seq_printf(m, " pipe_mask: 0x%x, active: 0x%x, on: %s\n",
 			   pll->state.pipe_mask, pll->active_mask, yesno(pll->on));
 		seq_printf(m, " tracked hardware state:\n");
-		seq_printf(m, " dpll:    0x%08x\n", pll->state.hw_state.dpll);
-		seq_printf(m, " dpll_md: 0x%08x\n",
-			   pll->state.hw_state.dpll_md);
-		seq_printf(m, " fp0:     0x%08x\n", pll->state.hw_state.fp0);
-		seq_printf(m, " fp1:     0x%08x\n", pll->state.hw_state.fp1);
-		seq_printf(m, " wrpll:   0x%08x\n", pll->state.hw_state.wrpll);
-		seq_printf(m, " cfgcr0:  0x%08x\n", pll->state.hw_state.cfgcr0);
-		seq_printf(m, " cfgcr1:  0x%08x\n", pll->state.hw_state.cfgcr1);
-		seq_printf(m, " div0:    0x%08x\n", pll->state.hw_state.div0);
-		seq_printf(m, " mg_refclkin_ctl:        0x%08x\n",
-			   pll->state.hw_state.mg_refclkin_ctl);
-		seq_printf(m, " mg_clktop2_coreclkctl1: 0x%08x\n",
-			   pll->state.hw_state.mg_clktop2_coreclkctl1);
-		seq_printf(m, " mg_clktop2_hsclkctl:    0x%08x\n",
-			   pll->state.hw_state.mg_clktop2_hsclkctl);
-		seq_printf(m, " mg_pll_div0:  0x%08x\n",
-			   pll->state.hw_state.mg_pll_div0);
-		seq_printf(m, " mg_pll_div1:  0x%08x\n",
-			   pll->state.hw_state.mg_pll_div1);
-		seq_printf(m, " mg_pll_lf:    0x%08x\n",
-			   pll->state.hw_state.mg_pll_lf);
-		seq_printf(m, " mg_pll_frac_lock: 0x%08x\n",
-			   pll->state.hw_state.mg_pll_frac_lock);
-		seq_printf(m, " mg_pll_ssc:   0x%08x\n",
-			   pll->state.hw_state.mg_pll_ssc);
-		seq_printf(m, " mg_pll_bias:  0x%08x\n",
-			   pll->state.hw_state.mg_pll_bias);
-		seq_printf(m, " mg_pll_tdc_coldst_bias: 0x%08x\n",
-			   pll->state.hw_state.mg_pll_tdc_coldst_bias);
+
+		if (DISPLAY_VER(dev_priv) >= 11) {
+			seq_printf(m, " cfgcr0:  0x%08x\n", pll->state.hw_state.icl_cfgcr0);
+			seq_printf(m, " cfgcr1:  0x%08x\n", pll->state.hw_state.icl_cfgcr1);
+			seq_printf(m, " div0:    0x%08x\n", pll->state.hw_state.icl_div0);
+			seq_printf(m, " mg_refclkin_ctl:        0x%08x\n",
+				   pll->state.hw_state.mg_refclkin_ctl);
+			seq_printf(m, " mg_clktop2_coreclkctl1: 0x%08x\n",
+				   pll->state.hw_state.mg_clktop2_coreclkctl1);
+			seq_printf(m, " mg_clktop2_hsclkctl:    0x%08x\n",
+				   pll->state.hw_state.mg_clktop2_hsclkctl);
+			seq_printf(m, " mg_pll_div0:  0x%08x\n",
+				   pll->state.hw_state.mg_pll_div0);
+			seq_printf(m, " mg_pll_div1:  0x%08x\n",
+				   pll->state.hw_state.mg_pll_div1);
+			seq_printf(m, " mg_pll_lf:    0x%08x\n",
+				   pll->state.hw_state.mg_pll_lf);
+			seq_printf(m, " mg_pll_frac_lock: 0x%08x\n",
+				   pll->state.hw_state.mg_pll_frac_lock);
+			seq_printf(m, " mg_pll_ssc:   0x%08x\n",
+				   pll->state.hw_state.mg_pll_ssc);
+			seq_printf(m, " mg_pll_bias:  0x%08x\n",
+				   pll->state.hw_state.mg_pll_bias);
+			seq_printf(m, " mg_pll_tdc_coldst_bias: 0x%08x\n",
+				   pll->state.hw_state.mg_pll_tdc_coldst_bias);
+		} else if (HAS_DDI(dev_priv)) {
+			seq_printf(m, " wrpll:   0x%08x\n", pll->state.hw_state.wrpll);
+			seq_printf(m, " spll:   0x%08x\n", pll->state.hw_state.spll);
+		} else if (HAS_PCH_IBX(dev_priv) || HAS_PCH_CPT(dev_priv)) {
+			seq_printf(m, " dpll:    0x%08x\n", pll->state.hw_state.dpll);
+			seq_printf(m, " dpll_md: 0x%08x\n", pll->state.hw_state.dpll_md);
+			seq_printf(m, " fp0:     0x%08x\n", pll->state.hw_state.fp0);
+			seq_printf(m, " fp1:     0x%08x\n", pll->state.hw_state.fp1);
+		}
 	}
 	drm_modeset_unlock_all(dev);
 

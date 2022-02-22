@@ -184,52 +184,74 @@ enum icl_port_dpll_id {
 };
 
 struct intel_dpll_hw_state {
-	/* i9xx, pch plls */
-	u32 dpll;
-	u32 dpll_md;
-	u32 fp0;
-	u32 fp1;
+	union {
+		/* icl+ combo */
+		struct {
+			u32 icl_cfgcr0;
+			u32 icl_cfgcr1;
+			u32 icl_div0;
+		};
 
-	/* hsw, bdw */
-	u32 wrpll;
-	u32 spll;
+		/* icl+ TC */
+		struct {
+			u32 mg_refclkin_ctl;
+			u32 mg_clktop2_coreclkctl1;
+			u32 mg_clktop2_hsclkctl;
+			u32 mg_pll_div0;
+			u32 mg_pll_div1;
+			u32 mg_pll_lf;
+			u32 mg_pll_frac_lock;
+			u32 mg_pll_ssc;
+			u32 mg_pll_bias;
+			u32 mg_pll_tdc_coldst_bias;
+			u32 mg_pll_bias_mask;
+			u32 mg_pll_tdc_coldst_bias_mask;
+		};
 
-	/* skl */
-	/*
-	 * DPLL_CTRL1 has 6 bits for each each this DPLL. We store those in
-	 * lower part of ctrl1 and they get shifted into position when writing
-	 * the register.  This allows us to easily compare the state to share
-	 * the DPLL.
-	 */
-	u32 ctrl1;
-	/* HDMI only, 0 when used for DP */
-	u32 cfgcr1, cfgcr2;
+		/* bxt */
+		struct {
+			/* bxt */
+			u32 ebb0;
+			u32 ebb4;
+			u32 pll0;
+			u32 pll1;
+			u32 pll2;
+			u32 pll3;
+			u32 pll6;
+			u32 pll8;
+			u32 pll9;
+			u32 pll10;
+			u32 pcsdw12;
+		};
 
-	/* icl */
-	u32 cfgcr0;
+		/* skl */
+		struct {
+			/*
+			 * DPLL_CTRL1 has 6 bits for each this DPLL. We store those in
+			 * lower part of ctrl1 and they get shifted into position when writing
+			 * the register.  This allows us to easily compare the state to share
+			 * the DPLL.
+			 */
+			u32 ctrl1;
+			u32 cfgcr1;
+			/* HDMI only, 0 when used for DP */
+			u32 cfgcr2;
+		};
 
-	/* tgl */
-	u32 div0;
+		/* hsw, bdw */
+		struct {
+			u32 wrpll;
+			u32 spll;
+		};
 
-	/* bxt */
-	u32 ebb0, ebb4, pll0, pll1, pll2, pll3, pll6, pll8, pll9, pll10, pcsdw12;
-
-	/*
-	 * ICL uses the following, already defined:
-	 * u32 cfgcr0, cfgcr1;
-	 */
-	u32 mg_refclkin_ctl;
-	u32 mg_clktop2_coreclkctl1;
-	u32 mg_clktop2_hsclkctl;
-	u32 mg_pll_div0;
-	u32 mg_pll_div1;
-	u32 mg_pll_lf;
-	u32 mg_pll_frac_lock;
-	u32 mg_pll_ssc;
-	u32 mg_pll_bias;
-	u32 mg_pll_tdc_coldst_bias;
-	u32 mg_pll_bias_mask;
-	u32 mg_pll_tdc_coldst_bias_mask;
+		/* i9xx, pch plls */
+		struct {
+			u32 dpll;
+			u32 dpll_md;
+			u32 fp0;
+			u32 fp1;
+		};
+	};
 };
 
 /**
