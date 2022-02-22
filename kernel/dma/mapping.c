@@ -543,10 +543,11 @@ static struct page *__dma_alloc_pages(struct device *dev, size_t size,
 {
 	const struct dma_map_ops *ops = get_dma_ops(dev);
 
-	if (WARN_ON_ONCE(!dev->coherent_dma_mask))
-		return NULL;
-	if (WARN_ON_ONCE(gfp & (__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM)))
-		return NULL;
+	if (WARN_ON_ONCE(!dev->dma_mask))
+                return NULL;
+
+	/* let the implementation decide on the zone to allocate from: */
+        gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
 
 	size = PAGE_ALIGN(size);
 	if (dma_alloc_direct(dev, ops))
