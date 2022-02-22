@@ -453,6 +453,7 @@ static int panel_dpi_probe(struct device *dev,
 	struct panel_desc *desc;
 	unsigned int bus_flags;
 	struct videomode vm;
+	const char *format = "";
 	int ret;
 
 	np = dev->of_node;
@@ -476,6 +477,37 @@ static int panel_dpi_probe(struct device *dev,
 
 	of_property_read_u32(np, "width-mm", &desc->size.width);
 	of_property_read_u32(np, "height-mm", &desc->size.height);
+
+	of_property_read_string(np, "bus-format", &format);
+	if (!strcmp(format, "BGR888_1X24")) {
+		desc->bpc = 8;
+		desc->bus_format = MEDIA_BUS_FMT_BGR888_1X24;
+	} else if (!strcmp(format, "GBR888_1X24")) {
+		desc->bpc = 8;
+		desc->bus_format = MEDIA_BUS_FMT_GBR888_1X24;
+	} else if (!strcmp(format, "RBG888_1X24")) {
+		desc->bpc = 8;
+		desc->bus_format = MEDIA_BUS_FMT_RBG888_1X24;
+	} else if (!strcmp(format, "RGB444_1X12")) {
+		desc->bpc = 6;
+		desc->bus_format = MEDIA_BUS_FMT_RGB444_1X12;
+	} else if (!strcmp(format, "RGB565_1X16")) {
+		desc->bpc = 6;
+		desc->bus_format = MEDIA_BUS_FMT_RGB565_1X16;
+	} else if (!strcmp(format, "RGB666_1X18")) {
+		desc->bpc = 6;
+		desc->bus_format = MEDIA_BUS_FMT_RGB666_1X18;
+	} else if (!strcmp(format, "RGB666_1X24_CPADHI")) {
+		desc->bpc = 6;
+		desc->bus_format = MEDIA_BUS_FMT_RGB666_1X24_CPADHI;
+	} else if (!strcmp(format, "RGB888_1X24")) {
+		desc->bpc = 8;
+		desc->bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+	} else {
+		dev_err(dev, "%pOF: missing or unknown bus-format property\n",
+			np);
+		return -EINVAL;
+	}
 
 	/* Extract bus_flags from display_timing */
 	bus_flags = 0;
