@@ -2855,6 +2855,73 @@ TRACE_EVENT(ext4_fc_track_range,
 		      __entry->end)
 	);
 
+TRACE_EVENT(ext4_fc_track_template,
+	TP_PROTO(handle_t *handle, struct inode *inode,
+		 void *__fc_track_fn, int enqueue),
+
+	TP_ARGS(handle, inode, __fc_track_fn, enqueue),
+
+	TP_STRUCT__entry(
+		__field(dev_t, dev)
+		__field(tid_t, t_tid)
+		__field(ino_t, i_ino)
+		__field(tid_t, i_sync_tid)
+		__field(void *, __fc_track_fn)
+		__field(int, enqueue)
+		__field(bool, jbd2_ongoing)
+		__field(bool, fc_ongoing)
+	),
+
+	TP_fast_assign(
+		struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+		struct ext4_inode_info *ei = EXT4_I(inode);
+
+		__entry->dev = inode->i_sb->s_dev;
+		__entry->t_tid = handle->h_transaction->t_tid;
+		__entry->i_ino = inode->i_ino;
+		__entry->i_sync_tid = ei->i_sync_tid;
+		__entry->__fc_track_fn = __fc_track_fn;
+		__entry->enqueue = enqueue;
+		__entry->jbd2_ongoing =
+		    sbi->s_journal->j_flags & JBD2_FULL_COMMIT_ONGOING;
+		__entry->fc_ongoing =
+		    sbi->s_journal->j_flags & JBD2_FAST_COMMIT_ONGOING;
+	),
+
+	TP_printk("dev %d,%d, t_tid %u, ino %lu, i_sync_tid %u, "
+		  "track_fn %pS, enqueue %d, jbd2_ongoing %d, fc_ongoing %d",
+		  MAJOR(__entry->dev), MINOR(__entry->dev),
+		  __entry->t_tid, __entry->i_ino, __entry->i_sync_tid,
+		  (void *)__entry->__fc_track_fn, __entry->enqueue,
+		  __entry->jbd2_ongoing, __entry->fc_ongoing)
+	);
+
+TRACE_EVENT(ext4_fc_cleanup,
+	TP_PROTO(journal_t *journal, int full, tid_t tid),
+
+	TP_ARGS(journal, full, tid),
+
+	TP_STRUCT__entry(
+		__field(dev_t, dev)
+		__field(int, j_fc_off)
+		__field(int, full)
+		__field(tid_t, tid)
+	),
+
+	TP_fast_assign(
+		struct super_block *sb = journal->j_private;
+
+		__entry->dev = sb->s_dev;
+		__entry->j_fc_off = journal->j_fc_off;
+		__entry->full = full;
+		__entry->tid = tid;
+	),
+
+	TP_printk("dev %d,%d, j_fc_off %d, full %d, tid %u",
+		  MAJOR(__entry->dev), MINOR(__entry->dev),
+		  __entry->j_fc_off, __entry->full, __entry->tid)
+	);
+
 TRACE_EVENT(ext4_update_sb,
 	TP_PROTO(struct super_block *sb, ext4_fsblk_t fsblk,
 		 unsigned int flags),
