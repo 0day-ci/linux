@@ -95,8 +95,13 @@ void
 i915_gem_object_put_pages_phys(struct drm_i915_gem_object *obj,
 			       struct sg_table *pages)
 {
-	dma_addr_t dma = sg_dma_address(pages->sgl);
-	void *vaddr = sg_page(pages->sgl);
+	dma_addr_t dma;
+	void *vaddr;
+
+	if (!pages)
+		return;
+	dma = sg_dma_address(pages->sgl);
+	vaddr = sg_page(pages->sgl);
 
 	__i915_gem_object_release_shmem(obj, pages, false);
 
