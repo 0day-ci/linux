@@ -484,6 +484,8 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 
 		/* We can't support update_atime(), since the server will reset it */
 		inode->i_flags |= S_NOATIME|S_NOCMTIME;
+		/* Parallel updates to directories are trivial */
+		inode->i_flags |= S_PAR_UPDATE;
 		inode->i_mode = fattr->mode;
 		nfsi->cache_validity = 0;
 		if ((fattr->valid & NFS_ATTR_FATTR_MODE) == 0

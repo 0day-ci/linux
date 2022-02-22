@@ -1765,6 +1765,7 @@ static struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 	struct dentry *dentry;
 	char *dname;
 	int err;
+	static struct lock_class_key __key;
 
 	dentry = kmem_cache_alloc(dentry_cache, GFP_KERNEL);
 	if (!dentry)
@@ -1818,6 +1819,8 @@ static struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 	INIT_HLIST_NODE(&dentry->d_u.d_alias);
 	INIT_LIST_HEAD(&dentry->d_child);
 	d_set_d_op(dentry, dentry->d_sb->s_d_op);
+
+	lockdep_init_map(&dentry->d_update_map, "DENTRY_PAR_UPDATE", &__key, 0);
 
 	if (dentry->d_op && dentry->d_op->d_init) {
 		err = dentry->d_op->d_init(dentry);
@@ -2579,7 +2582,7 @@ static inline void end_dir_add(struct inode *dir, unsigned n)
 static void d_wait_lookup(struct dentry *dentry)
 {
 	if (d_in_lookup(dentry)) {
-		DECLARE_WAITQUEUE(wait, current);
+		DEFINE_WAIT(wait);
 		add_wait_queue(dentry->d_wait, &wait);
 		do {
 			set_current_state(TASK_UNINTERRUPTIBLE);
@@ -3207,6 +3210,60 @@ void d_tmpfile(struct dentry *dentry, struct inode *inode)
 	d_instantiate(dentry, inode);
 }
 EXPORT_SYMBOL(d_tmpfile);
+
+/**
+ * d_lock_update_nested - lock a dentry before updating
+ * @dentry: the dentry to be locked
+ * @base:   the parent, or %NULL
+ * @name:   the name in that parent, or %NULL
+ * @subclass: lockdep locking class.
+ *
+ * Lock a dentry in a directory on which a shared-lock is held, and
+ * on which parallel updates are permitted.
+ * If the base and name are given, then on success the dentry will still
+ * have that base and name - it will not have raced with rename.
+ * On success, a positive dentry will still be hashed, ensuring there
+ * was no race with unlink.
+ * If they are not given, then on success the dentry will be negative,
+ * which again ensures no race with rename, or unlink.
+ */
+bool d_lock_update_nested(struct dentry *dentry,
+			  struct dentry *base, const struct qstr *name,
+			  int subclass)
+{
+	bool ret = true;
+
+	lock_acquire_exclusive(&dentry->d_update_map, subclass,
+			       0, NULL, _THIS_IP_);
+	spin_lock(&dentry->d_lock);
+	if (dentry->d_flags & DCACHE_PAR_UPDATE)
+		___wait_var_event(&dentry->d_flags,
+				  !(dentry->d_flags & DCACHE_PAR_UPDATE),
+				  TASK_UNINTERRUPTIBLE, 0, 0,
+				  (spin_unlock(&dentry->d_lock),
+				   schedule(),
+				   spin_lock(&dentry->d_lock))
+			);
+	if (d_unhashed(dentry) && d_is_positive(dentry)) {
+		/* name was unlinked while we waited */
+		ret = false;
+	} else if (base &&
+		 (dentry->d_parent != base ||
+		  dentry->d_name.hash != name->hash ||
+		  !d_same_name(dentry, base, name))) {
+		/* dentry was renamed - possibly silly-rename */
+		ret = false;
+	} else if (!base && d_is_positive(dentry)) {
+		ret = false;
+	} else {
+		dentry->d_flags |= DCACHE_PAR_UPDATE;
+	}
+	spin_unlock(&dentry->d_lock);
+	if (!ret)
+		lock_map_release(&dentry->d_update_map);
+	return ret;
+}
+EXPORT_SYMBOL(d_lock_update_nested);
 
 static __initdata unsigned long dhash_entries;
 static int __init set_dhash_entries(char *str)

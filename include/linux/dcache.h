@@ -13,7 +13,9 @@
 #include <linux/rcupdate.h>
 #include <linux/lockref.h>
 #include <linux/stringhash.h>
+#include <linux/sched.h>
 #include <linux/wait.h>
+#include <linux/wait_bit.h>
 
 struct path;
 struct vfsmount;
@@ -96,6 +98,8 @@ struct dentry {
 	unsigned long d_time;		/* used by d_revalidate */
 	void *d_fsdata;			/* fs-specific data */
 
+	/* lockdep tracking of DCACHE_PAR_UPDATE locks */
+	struct lockdep_map		d_update_map;
 	union {
 		struct list_head d_lru;		/* LRU list */
 		wait_queue_head_t *d_wait;	/* in-lookup ones only */
@@ -211,6 +215,7 @@ struct dentry_operations {
 #define DCACHE_PAR_LOOKUP		0x10000000 /* being looked up (with parent locked shared) */
 #define DCACHE_DENTRY_CURSOR		0x20000000
 #define DCACHE_NORCU			0x40000000 /* No RCU delay for freeing */
+#define DCACHE_PAR_UPDATE		0x80000000 /* Being created or unlinked with shared lock */
 
 extern seqlock_t rename_lock;
 
@@ -598,5 +603,27 @@ struct name_snapshot {
 };
 void take_dentry_name_snapshot(struct name_snapshot *, struct dentry *);
 void release_dentry_name_snapshot(struct name_snapshot *);
+
+bool d_lock_update_nested(struct dentry *dentry,
+			  struct dentry *base, const struct qstr *name,
+			  int subclass);
+static inline bool d_lock_update(struct dentry *dentry,
+				 struct dentry *base, const struct qstr *name)
+{
+	return d_lock_update_nested(dentry, base, name, 0);
+}
+
+static inline void d_unlock_update(struct dentry *dentry)
+{
+	if (IS_ERR_OR_NULL(dentry))
+		return;
+	if (dentry->d_flags & DCACHE_PAR_UPDATE) {
+		lock_map_release(&dentry->d_update_map);
+		spin_lock(&dentry->d_lock);
+		dentry->d_flags &= ~DCACHE_PAR_UPDATE;
+		spin_unlock(&dentry->d_lock);
+		wake_up_var(&dentry->d_flags);
+	}
+}
 
 #endif	/* __LINUX_DCACHE_H */

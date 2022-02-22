@@ -453,6 +453,7 @@ nfs_sillyrename(struct inode *dir, struct dentry *dentry)
 	sdentry = NULL;
 	do {
 		int slen;
+		d_unlock_update(sdentry);
 		dput(sdentry);
 		sillycounter++;
 		slen = scnprintf(silly, sizeof(silly),
@@ -470,7 +471,8 @@ nfs_sillyrename(struct inode *dir, struct dentry *dentry)
 		 */
 		if (IS_ERR(sdentry))
 			goto out;
-	} while (d_inode(sdentry) != NULL); /* need negative lookup */
+	} while (!d_lock_update_nested(sdentry, NULL, NULL,
+				       SINGLE_DEPTH_NESTING));
 
 	ihold(inode);
 
@@ -515,6 +517,7 @@ nfs_sillyrename(struct inode *dir, struct dentry *dentry)
 	rpc_put_task(task);
 out_dput:
 	iput(inode);
+	d_unlock_update(sdentry);
 	dput(sdentry);
 out:
 	return error;

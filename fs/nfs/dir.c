@@ -1638,6 +1638,9 @@ __nfs_lookup_revalidate(struct dentry *dentry, unsigned int flags,
 	int ret;
 
 	if (flags & LOOKUP_RCU) {
+		if (dentry->d_flags & DCACHE_PAR_UPDATE)
+			/* Pending unlink */
+			return -ECHILD;
 		parent = READ_ONCE(dentry->d_parent);
 		dir = d_inode_rcu(parent);
 		if (!dir)
@@ -1646,6 +1649,9 @@ __nfs_lookup_revalidate(struct dentry *dentry, unsigned int flags,
 		if (parent != READ_ONCE(dentry->d_parent))
 			return -ECHILD;
 	} else {
+		/* Wait for unlink to complete */
+		wait_var_event(&dentry->d_flags,
+			       !(dentry->d_flags & DCACHE_PAR_UPDATE));
 		parent = dget_parent(dentry);
 		ret = reval(d_inode(parent), dentry, flags);
 		dput(parent);
@@ -2308,8 +2314,6 @@ static int nfs_safe_remove(struct dentry *dentry)
 			nfs_drop_nlink(inode);
 	} else
 		error = NFS_PROTO(dir)->remove(dir, dentry);
-	if (error == -ENOENT)
-		nfs_dentry_handle_enoent(dentry);
 	trace_nfs_remove_exit(dir, dentry, error);
 out:
 	return error;
@@ -2323,7 +2327,7 @@ out:
 int nfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int error;
-	int need_rehash = 0;
+	bool did_set_par_update = false;
 
 	dfprintk(VFS, "NFS: unlink(%s/%lu, %pd)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry);
@@ -2337,15 +2341,26 @@ int nfs_unlink(struct inode *dir, struct dentry *dentry)
 		error = nfs_sillyrename(dir, dentry);
 		goto out;
 	}
-	if (!d_unhashed(dentry)) {
-		__d_drop(dentry);
-		need_rehash = 1;
+	/* We must prevent any concurrent open until the unlink
+	 * completes.  ->d_revalidate will wait for DCACHE_PAR_UPDATE
+	 * to clear, but if this happens to a non-parallel update, we
+	 * still want to block opens.  So set DCACHE_PAR_UPDATE
+	 * temporarily.
+	 */
+	if (!(dentry->d_flags & DCACHE_PAR_UPDATE)) {
+		/* Must have exclusive lock on parent */
+		did_set_par_update = true;
+		dentry->d_flags |= DCACHE_PAR_UPDATE;
 	}
+
 	spin_unlock(&dentry->d_lock);
 	error = nfs_safe_remove(dentry);
 	nfs_dentry_remove_handle_error(dir, dentry, error);
-	if (need_rehash)
-		d_rehash(dentry);
+	if (did_set_par_update) {
+		spin_lock(&dentry->d_lock);
+		dentry->d_flags &= ~DCACHE_PAR_UPDATE;
+		spin_unlock(&dentry->d_lock);
+	}
 out:
 	trace_nfs_unlink_exit(dir, dentry, error);
 	return error;

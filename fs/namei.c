@@ -1613,6 +1613,94 @@ static struct dentry *__lookup_hash(const struct qstr *name,
 	return dentry;
 }
 
+/*
+ * Parent directory (base) is not locked.  We take either an exclusive
+ * or shared lock depending on the fs preference, then dor a lookup,
+ * and then set the DCACHE_PAR_UPDATE bit on the child if a shared lock
+ * was taken on the parent.
+ */
+static struct dentry *lookup_hash_update(const struct qstr *name,
+					 struct dentry *base, unsigned int flags,
+					 wait_queue_head_t *wq)
+{
+	struct dentry *dentry;
+	struct inode *dir = base->d_inode;
+	bool shared = (dir->i_flags & S_PAR_UPDATE) && wq;
+	int err;
+
+	if (shared)
+		inode_lock_shared_nested(dir, I_MUTEX_PARENT);
+	else
+		inode_lock_nested(dir, I_MUTEX_PARENT);
+
+retry:
+	dentry = lookup_dcache(name, base, flags);
+	if (!dentry) {
+		/* Don't create child dentry for a dead directory. */
+		err = -ENOENT;
+		if (unlikely(IS_DEADDIR(dir)))
+			goto out_err;
+
+		if (shared)
+			dentry = d_alloc_parallel(base, name, wq);
+		else
+			dentry = d_alloc(base, name);
+
+		if (!IS_ERR(dentry) &&
+		    (!shared || d_in_lookup(dentry))) {
+			struct dentry *old;
+
+			old = dir->i_op->lookup(dir, dentry, flags);
+			/*
+			 * Note: dentry might still be d_unhashed() and
+			 * d_in_lookup() if the fs will do the lookup
+			 * at 'create' time.
+			 */
+			if (unlikely(old)) {
+				d_lookup_done(dentry);
+				dput(dentry);
+				dentry = old;
+			}
+		}
+	}
+	if (IS_ERR(dentry)) {
+		err = PTR_ERR(dentry);
+		goto out_err;
+	}
+	if (shared && !d_lock_update(dentry, base, name)) {
+		/*
+		 * Failed to get lock due to race with unlink or rename
+		 * - try again
+		 */
+		d_lookup_done(dentry);
+		dput(dentry);
+		goto retry;
+	}
+	return dentry;
+
+out_err:
+	if (shared)
+		inode_unlock_shared(dir);
+	else
+		inode_unlock(dir);
+	return ERR_PTR(err);
+}
+
+static void lookup_done_update(struct path *path, struct dentry *dentry,
+			       wait_queue_head_t *wq)
+{
+	struct inode *dir = path->dentry->d_inode;
+	bool shared = (dir->i_flags & S_PAR_UPDATE) && wq;
+
+	if (shared) {
+		d_lookup_done(dentry);
+		d_unlock_update(dentry);
+		inode_unlock_shared(dir);
+	} else {
+		inode_unlock(dir);
+	}
+}
+
 static struct dentry *lookup_fast(struct nameidata *nd,
 				  struct inode **inode,
 			          unsigned *seqp)
@@ -3182,16 +3270,32 @@ static struct dentry *atomic_open(struct nameidata *nd, struct dentry *dentry,
 {
 	struct dentry *const DENTRY_NOT_SET = (void *) -1UL;
 	struct inode *dir =  nd->path.dentry->d_inode;
+	bool have_par_update = false;
 	int error;
 
 	if (nd->flags & LOOKUP_DIRECTORY)
 		open_flag |= O_DIRECTORY;
+
+	/*
+	 * dentry is negative or d_in_lookup().  If this is a
+	 * shared-lock create we need to set DCACHE_PAR_UPDATE to ensure
+	 * exclusion.
+	 */
+	if ((open_flag & O_CREAT) &&
+	    (dir->i_flags & S_PAR_UPDATE)) {
+		if (!d_lock_update(dentry, NULL, NULL))
+			/* already exists, non-atomic open */
+			return dentry;
+		have_par_update = true;
+	}
 
 	file->f_path.dentry = DENTRY_NOT_SET;
 	file->f_path.mnt = nd->path.mnt;
 	error = dir->i_op->atomic_open(dir, dentry, file,
 				       open_to_namei_flags(open_flag), mode);
 	d_lookup_done(dentry);
+	if (have_par_update)
+		d_unlock_update(dentry);
 	if (!error) {
 		if (file->f_mode & FMODE_OPENED) {
 			if (unlikely(dentry != file->f_path.dentry)) {
@@ -3243,6 +3347,7 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
 	int error, create_error = 0;
 	umode_t mode = op->mode;
 	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
+	bool have_par_update = false;
 
 	if (unlikely(IS_DEADDIR(dir_inode)))
 		return ERR_PTR(-ENOENT);
@@ -3317,6 +3422,14 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
 			dentry = res;
 		}
 	}
+	/*
+	 * If dentry is negative and this is a shared-lock
+	 * create we need to get DCACHE_PAR_UPDATE to ensure exclusion
+	 */
+	if ((open_flag & O_CREAT) &&
+	    !dentry->d_inode &&
+	    (dir_inode->i_flags & S_PAR_UPDATE))
+		have_par_update = d_lock_update(dentry, NULL, NULL);
 
 	/* Negative dentry, just create the file */
 	if (!dentry->d_inode && (open_flag & O_CREAT)) {
@@ -3336,9 +3449,13 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
 		error = create_error;
 		goto out_dput;
 	}
+	if (have_par_update)
+		d_unlock_update(dentry);
 	return dentry;
 
 out_dput:
+	if (have_par_update)
+		d_unlock_update(dentry);
 	dput(dentry);
 	return ERR_PTR(error);
 }
@@ -3353,6 +3470,7 @@ static const char *open_last_lookups(struct nameidata *nd,
 	struct inode *inode;
 	struct dentry *dentry;
 	const char *res;
+	bool shared;
 
 	nd->flags |= op->intent;
 
@@ -3393,14 +3511,15 @@ static const char *open_last_lookups(struct nameidata *nd,
 		 * dropping this one anyway.
 		 */
 	}
-	if (open_flag & O_CREAT)
+	shared = !!(dir->d_inode->i_flags & S_PAR_UPDATE);
+	if ((open_flag & O_CREAT) && !shared)
 		inode_lock(dir->d_inode);
 	else
 		inode_lock_shared(dir->d_inode);
 	dentry = lookup_open(nd, file, op, got_write);
 	if (!IS_ERR(dentry) && (file->f_mode & FMODE_CREATED))
 		fsnotify_create(dir->d_inode, dentry);
-	if (open_flag & O_CREAT)
+	if ((open_flag & O_CREAT) && !shared)
 		inode_unlock(dir->d_inode);
 	else
 		inode_unlock_shared(dir->d_inode);
@@ -3669,7 +3788,8 @@ struct file *do_file_open_root(const struct path *root,
 }
 
 static struct dentry *filename_create(int dfd, struct filename *name,
-				      struct path *path, unsigned int lookup_flags)
+				      struct path *path, unsigned int lookup_flags,
+				      wait_queue_head_t *wq)
 {
 	struct dentry *dentry = ERR_PTR(-EEXIST);
 	struct qstr last;
@@ -3701,10 +3821,9 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 	 * Do the final lookup.
 	 */
 	lookup_flags |= LOOKUP_CREATE | LOOKUP_EXCL;
-	inode_lock_nested(path->dentry->d_inode, I_MUTEX_PARENT);
-	dentry = __lookup_hash(&last, path->dentry, lookup_flags);
+	dentry = lookup_hash_update(&last, path->dentry, lookup_flags, wq);
 	if (IS_ERR(dentry))
-		goto unlock;
+		goto drop_write;
 
 	error = -EEXIST;
 	if (d_is_positive(dentry))
@@ -3726,10 +3845,10 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 	}
 	return dentry;
 fail:
+	lookup_done_update(path, dentry, wq);
 	dput(dentry);
 	dentry = ERR_PTR(error);
-unlock:
-	inode_unlock(path->dentry->d_inode);
+drop_write:
 	if (!err2)
 		mnt_drop_write(path->mnt);
 out:
@@ -3741,27 +3860,33 @@ struct dentry *kern_path_create(int dfd, const char *pathname,
 				struct path *path, unsigned int lookup_flags)
 {
 	struct filename *filename = getname_kernel(pathname);
-	struct dentry *res = filename_create(dfd, filename, path, lookup_flags);
+	struct dentry *res = filename_create(dfd, filename, path, lookup_flags,
+					     NULL);
 
 	putname(filename);
 	return res;
 }
 EXPORT_SYMBOL(kern_path_create);
 
-void done_path_create(struct path *path, struct dentry *dentry)
+static void __done_path_create(struct path *path, struct dentry *dentry,
+			       wait_queue_head_t *wq)
 {
+	lookup_done_update(path, dentry, wq);
 	dput(dentry);
-	inode_unlock(path->dentry->d_inode);
 	mnt_drop_write(path->mnt);
 	path_put(path);
+}
+void done_path_create(struct path *path, struct dentry *dentry)
+{
+	__done_path_create(path, dentry, NULL);
 }
 EXPORT_SYMBOL(done_path_create);
 
 inline struct dentry *user_path_create(int dfd, const char __user *pathname,
-				struct path *path, unsigned int lookup_flags)
+				       struct path *path, unsigned int lookup_flags)
 {
 	struct filename *filename = getname(pathname);
-	struct dentry *res = filename_create(dfd, filename, path, lookup_flags);
+	struct dentry *res = filename_create(dfd, filename, path, lookup_flags, NULL);
 
 	putname(filename);
 	return res;
@@ -3840,12 +3965,13 @@ static int do_mknodat(int dfd, struct filename *name, umode_t mode,
 	struct path path;
 	int error;
 	unsigned int lookup_flags = 0;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 
 	error = may_mknod(mode);
 	if (error)
 		goto out1;
 retry:
-	dentry = filename_create(dfd, name, &path, lookup_flags);
+	dentry = filename_create(dfd, name, &path, lookup_flags, &wq);
 	error = PTR_ERR(dentry);
 	if (IS_ERR(dentry))
 		goto out1;
@@ -3874,7 +4000,7 @@ retry:
 			break;
 	}
 out2:
-	done_path_create(&path, dentry);
+	__done_path_create(&path, dentry, &wq);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
 		goto retry;
@@ -3943,9 +4069,10 @@ int do_mkdirat(int dfd, struct filename *name, umode_t mode)
 	struct path path;
 	int error;
 	unsigned int lookup_flags = LOOKUP_DIRECTORY;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 
 retry:
-	dentry = filename_create(dfd, name, &path, lookup_flags);
+	dentry = filename_create(dfd, name, &path, lookup_flags, &wq);
 	error = PTR_ERR(dentry);
 	if (IS_ERR(dentry))
 		goto out_putname;
@@ -3959,7 +4086,7 @@ retry:
 		error = vfs_mkdir(mnt_userns, path.dentry->d_inode, dentry,
 				  mode);
 	}
-	done_path_create(&path, dentry);
+	__done_path_create(&path, dentry, &wq);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
 		goto retry;
@@ -4043,6 +4170,7 @@ int do_rmdir(int dfd, struct filename *name)
 	struct qstr last;
 	int type;
 	unsigned int lookup_flags = 0;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 retry:
 	error = filename_parentat(dfd, name, lookup_flags, &path, &last, &type);
 	if (error)
@@ -4064,8 +4192,7 @@ retry:
 	if (error)
 		goto exit2;
 
-	inode_lock_nested(path.dentry->d_inode, I_MUTEX_PARENT);
-	dentry = __lookup_hash(&last, path.dentry, lookup_flags);
+	dentry = lookup_hash_update(&last, path.dentry, lookup_flags, &wq);
 	error = PTR_ERR(dentry);
 	if (IS_ERR(dentry))
 		goto exit3;
@@ -4079,9 +4206,9 @@ retry:
 	mnt_userns = mnt_user_ns(path.mnt);
 	error = vfs_rmdir(mnt_userns, path.dentry->d_inode, dentry);
 exit4:
+	lookup_done_update(&path, dentry, &wq);
 	dput(dentry);
 exit3:
-	inode_unlock(path.dentry->d_inode);
 	mnt_drop_write(path.mnt);
 exit2:
 	path_put(&path);
@@ -4106,13 +4233,14 @@ SYSCALL_DEFINE1(rmdir, const char __user *, pathname)
  * @dentry:	victim
  * @delegated_inode: returns victim inode, if the inode is delegated.
  *
- * The caller must hold dir->i_mutex.
+ * The caller must either hold a write-lock on dir->i_rwsem, or
+ * a read-lock having atomically set DCACHE_PAR_UPDATE.
  *
  * If vfs_unlink discovers a delegation, it will return -EWOULDBLOCK and
  * return a reference to the inode in delegated_inode.  The caller
  * should then break the delegation on that inode and retry.  Because
  * breaking a delegation may take a long time, the caller should drop
- * dir->i_mutex before doing so.
+ * dir->i_rwsem before doing so.
  *
  * Alternatively, a caller may pass NULL for delegated_inode.  This may
  * be appropriate for callers that expect the underlying filesystem not
@@ -4171,9 +4299,11 @@ EXPORT_SYMBOL(vfs_unlink);
 
 /*
  * Make sure that the actual truncation of the file will occur outside its
- * directory's i_mutex.  Truncate can take a long time if there is a lot of
+ * directory's i_rwsem.  Truncate can take a long time if there is a lot of
  * writeout happening, and we don't want to prevent access to the directory
  * while waiting on the I/O.
+ * If the directory permits (S_PAR_UPDATE), we take a shared lock on the
+ * directory DCACHE_PAR_UPDATE to get exclusive access to the dentry.
  */
 int do_unlinkat(int dfd, struct filename *name)
 {
@@ -4185,6 +4315,7 @@ int do_unlinkat(int dfd, struct filename *name)
 	struct inode *inode = NULL;
 	struct inode *delegated_inode = NULL;
 	unsigned int lookup_flags = 0;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 retry:
 	error = filename_parentat(dfd, name, lookup_flags, &path, &last, &type);
 	if (error)
@@ -4197,9 +4328,9 @@ retry:
 	error = mnt_want_write(path.mnt);
 	if (error)
 		goto exit2;
+
 retry_deleg:
-	inode_lock_nested(path.dentry->d_inode, I_MUTEX_PARENT);
-	dentry = __lookup_hash(&last, path.dentry, lookup_flags);
+	dentry = lookup_hash_update(&last, path.dentry, lookup_flags, &wq);
 	error = PTR_ERR(dentry);
 	if (!IS_ERR(dentry)) {
 		struct user_namespace *mnt_userns;
@@ -4218,9 +4349,9 @@ retry_deleg:
 		error = vfs_unlink(mnt_userns, path.dentry->d_inode, dentry,
 				   &delegated_inode);
 exit3:
+		lookup_done_update(&path, dentry, &wq);
 		dput(dentry);
 	}
-	inode_unlock(path.dentry->d_inode);
 	if (inode)
 		iput(inode);	/* truncate the inode here */
 	inode = NULL;
@@ -4309,13 +4440,14 @@ int do_symlinkat(struct filename *from, int newdfd, struct filename *to)
 	struct dentry *dentry;
 	struct path path;
 	unsigned int lookup_flags = 0;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 
 	if (IS_ERR(from)) {
 		error = PTR_ERR(from);
 		goto out_putnames;
 	}
 retry:
-	dentry = filename_create(newdfd, to, &path, lookup_flags);
+	dentry = filename_create(newdfd, to, &path, lookup_flags, &wq);
 	error = PTR_ERR(dentry);
 	if (IS_ERR(dentry))
 		goto out_putnames;
@@ -4328,7 +4460,7 @@ retry:
 		error = vfs_symlink(mnt_userns, path.dentry->d_inode, dentry,
 				    from->name);
 	}
-	done_path_create(&path, dentry);
+	__done_path_create(&path, dentry, &wq);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
 		goto retry;
@@ -4457,6 +4589,7 @@ int do_linkat(int olddfd, struct filename *old, int newdfd,
 	struct inode *delegated_inode = NULL;
 	int how = 0;
 	int error;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 
 	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0) {
 		error = -EINVAL;
@@ -4480,7 +4613,7 @@ retry:
 		goto out_putnames;
 
 	new_dentry = filename_create(newdfd, new, &new_path,
-					(how & LOOKUP_REVAL));
+				     (how & LOOKUP_REVAL), &wq);
 	error = PTR_ERR(new_dentry);
 	if (IS_ERR(new_dentry))
 		goto out_putpath;
@@ -4498,7 +4631,7 @@ retry:
 	error = vfs_link(old_path.dentry, mnt_userns, new_path.dentry->d_inode,
 			 new_dentry, &delegated_inode);
 out_dput:
-	done_path_create(&new_path, new_dentry);
+	__done_path_create(&new_path, new_dentry, &wq);
 	if (delegated_inode) {
 		error = break_deleg_wait(&delegated_inode);
 		if (!error) {
