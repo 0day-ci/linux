@@ -521,7 +521,7 @@ struct sgmap64 {
 
 struct user_sgmap64 {
 	u32		count;
-	struct user_sgentry64 sg[1];
+	struct user_sgentry64 sg[];
 };
 
 struct sgmapraw {
