@@ -3364,23 +3364,23 @@ add_detailed_modes(struct drm_connector *connector, struct edid *edid,
  * Search EDID for CEA extension block.
  */
 const u8 *drm_find_edid_extension(const struct edid *edid,
-				  int ext_id, int *ext_index)
+				  int num_ext_blk, int ext_id, int *ext_index)
 {
 	const u8 *edid_ext = NULL;
 	int i;
 
 	/* No EDID or EDID extensions */
-	if (edid == NULL || edid->extensions == 0)
+	if (edid == NULL || edid->extensions == 0 || *ext_index >= num_ext_blk)
 		return NULL;
 
 	/* Find CEA extension */
-	for (i = *ext_index; i < edid->extensions; i++) {
+	for (i = *ext_index; i < num_ext_blk; i++) {
 		edid_ext = (const u8 *)edid + EDID_LENGTH * (i + 1);
 		if (edid_ext[0] == ext_id)
 			break;
 	}
 
-	if (i >= edid->extensions)
+	if (i >= num_ext_blk)
 		return NULL;
 
 	*ext_index = i + 1;
@@ -3397,7 +3397,7 @@ static const u8 *drm_find_cea_extension(const struct edid *edid)
 
 	/* Look for a top level CEA extension block */
 	/* FIXME: make callers iterate through multiple CEA ext blocks? */
-	cea = drm_find_edid_extension(edid, CEA_EXT, &ext_index);
+	cea = drm_find_edid_extension(edid, edid->extensions, CEA_EXT, &ext_index);
 	if (cea)
 		return cea;
 
@@ -4378,13 +4378,16 @@ add_cea_modes(struct drm_connector *connector, struct edid *edid)
 {
 	const u8 *cea = drm_find_cea_extension(edid);
 	const u8 *db, *hdmi = NULL, *video = NULL;
-	u8 dbl, hdmi_len, video_len = 0;
+	u8 dbl, hdmi_len, video_len = 0, num_ext_blk = edid->extensions;
 	int modes = 0, j;
 
 	if (!cea)
 		return 0;
 
-	for (j = (cea - (u8 *)edid) / EDID_LENGTH; j <= edid->extensions;) {
+	if (num_ext_blk && drm_edid_is_hf_eeodb_blk_available(edid))
+		num_ext_blk = drm_edid_read_hf_eeodb_blk_size(edid);
+
+	for (j = (cea - (u8 *)edid) / EDID_LENGTH; j <= num_ext_blk;) {
 		if (cea && cea_revision(cea) >= 3) {
 			int i, start, end;
 
@@ -4427,7 +4430,7 @@ add_cea_modes(struct drm_connector *connector, struct edid *edid)
 		}
 
 		/* move to next CEA extension block */
-		cea = drm_find_edid_extension(edid, CEA_EXT, &j);
+		cea = drm_find_edid_extension(edid, num_ext_blk, CEA_EXT, &j);
 		if (!cea)
 			break;
 	}

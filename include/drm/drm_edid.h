@@ -591,7 +591,7 @@ struct drm_display_mode *
 drm_display_mode_from_cea_vic(struct drm_device *dev,
 			      u8 video_code);
 const u8 *drm_find_edid_extension(const struct edid *edid,
-				  int ext_id, int *ext_index);
+				  int num_ext_blk, int ext_id, int *ext_index);
 
 bool drm_edid_is_hf_eeodb_blk_available(const struct edid *edid);
 u8 drm_edid_read_hf_eeodb_blk_size(const struct edid *edid);
