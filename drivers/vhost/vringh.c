@@ -1173,7 +1173,7 @@ static inline int getu16_iotlb(const struct vringh *vrh,
 			       u16 *val, const __virtio16 *p)
 {
 	struct bio_vec iov;
-	void *kaddr, *from;
+	void *kaddr;
 	int ret;
 
 	/* Atomic read is needed for getu16 */
@@ -1182,10 +1182,9 @@ static inline int getu16_iotlb(const struct vringh *vrh,
 	if (ret < 0)
 		return ret;
 
-	kaddr = kmap_atomic(iov.bv_page);
-	from = kaddr + iov.bv_offset;
-	*val = vringh16_to_cpu(vrh, READ_ONCE(*(__virtio16 *)from));
-	kunmap_atomic(kaddr);
+	kaddr = bvec_kmap_local(&iov);
+	*val = vringh16_to_cpu(vrh, READ_ONCE(*(__virtio16 *)kaddr));
+	kunmap_local(kaddr);
 
 	return 0;
 }
@@ -1194,7 +1193,7 @@ static inline int putu16_iotlb(const struct vringh *vrh,
 			       __virtio16 *p, u16 val)
 {
 	struct bio_vec iov;
-	void *kaddr, *to;
+	void *kaddr;
 	int ret;
 
 	/* Atomic write is needed for putu16 */
@@ -1203,10 +1202,9 @@ static inline int putu16_iotlb(const struct vringh *vrh,
 	if (ret < 0)
 		return ret;
 
-	kaddr = kmap_atomic(iov.bv_page);
-	to = kaddr + iov.bv_offset;
-	WRITE_ONCE(*(__virtio16 *)to, cpu_to_vringh16(vrh, val));
-	kunmap_atomic(kaddr);
+	kaddr = bvec_kmap_local(&iov);
+	WRITE_ONCE(*(__virtio16 *)kaddr, cpu_to_vringh16(vrh, val));
+	kunmap_local(kaddr);
 
 	return 0;
 }
