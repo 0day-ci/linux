@@ -278,18 +278,50 @@ static void __memcpy_ntdqa(void *dst, const void *src, unsigned long len)
 	kernel_fpu_end();
 }
 
+static void __memcpy_ntdqu(void *dst, const void *src, unsigned long len)
+{
+	kernel_fpu_begin();
+
+	while (len >= 4) {
+		asm("movntdqa   (%0), %%xmm0\n"
+		    "movntdqa 16(%0), %%xmm1\n"
+		    "movntdqa 32(%0), %%xmm2\n"
+		    "movntdqa 48(%0), %%xmm3\n"
+		    "movups %%xmm0,   (%1)\n"
+		    "movups %%xmm1, 16(%1)\n"
+		    "movups %%xmm2, 32(%1)\n"
+		    "movups %%xmm3, 48(%1)\n"
+		    :: "r" (src), "r" (dst) : "memory");
+		src += 64;
+		dst += 64;
+		len -= 4;
+	}
+	while (len--) {
+		asm("movntdqa (%0), %%xmm0\n"
+		    "movups %%xmm0, (%1)\n"
+		    :: "r" (src), "r" (dst) : "memory");
+		src += 16;
+		dst += 16;
+	}
+
+	kernel_fpu_end();
+}
+
 /*
  * __drm_memcpy_from_wc copies @len bytes from @src to @dst using
- * non-temporal instructions where available. Note that all arguments
- * (@src, @dst) must be aligned to 16 bytes and @len must be a multiple
- * of 16.
+ * non-temporal instructions where available. Note that @src must be aligned to
+ * 16 bytes and @len must be a multiple of 16.
  */
 static void __drm_memcpy_from_wc(void *dst, const void *src, unsigned long len)
 {
-	if (unlikely(((unsigned long)dst | (unsigned long)src | len) & 15))
+	if (unlikely(((unsigned long)src | len) & 15)) {
 		memcpy(dst, src, len);
-	else if (likely(len))
-		__memcpy_ntdqa(dst, src, len >> 4);
+	} else if (likely(len)) {
+		if (IS_ALIGNED((unsigned long)dst, 16))
+			__memcpy_ntdqa(dst, src, len >> 4);
+		else
+			__memcpy_ntdqu(dst, src, len >> 4);
+	}
 }
 
 /**
