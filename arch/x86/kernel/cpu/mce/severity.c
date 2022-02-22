@@ -423,8 +423,7 @@ static noinstr int mce_severity_intel(struct mce *m, struct pt_regs *regs,
 int noinstr mce_severity(struct mce *m, struct pt_regs *regs, int tolerant, char **msg,
 			 bool is_excp)
 {
-	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD ||
-	    boot_cpu_data.x86_vendor == X86_VENDOR_HYGON)
+	if (mce_flags.amd_compatible)
 		return mce_severity_amd(m, regs, tolerant, msg, is_excp);
 	else
 		return mce_severity_intel(m, regs, tolerant, msg, is_excp);

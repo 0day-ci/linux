@@ -170,7 +170,13 @@ struct mce_vendor_flags {
 	/* SandyBridge IFU quirk */
 	snb_ifu_quirk		: 1,
 
-	__reserved_0		: 57;
+	/* CPUs are from AMD or Hygon */
+	amd_compatible		: 1,
+
+	/* CPUs are from Intel or Zhaoxin */
+	intel_compatible	: 1,
+
+	__reserved_0		: 55;
 };
 
 extern struct mce_vendor_flags mce_flags;

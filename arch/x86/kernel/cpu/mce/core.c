@@ -241,7 +241,7 @@ static void print_mce(struct mce *m)
 {
 	__print_mce(m);
 
-	if (m->cpuvendor != X86_VENDOR_AMD && m->cpuvendor != X86_VENDOR_HYGON)
+	if (!mce_flags.amd_compatible)
 		pr_emerg_ratelimited(HW_ERR "Run the above through 'mcelog --ascii'\n");
 }
 
@@ -503,8 +503,7 @@ int mce_usable_address(struct mce *m)
 		return 0;
 
 	/* Checks after this one are Intel/Zhaoxin-specific: */
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL &&
-	    boot_cpu_data.x86_vendor != X86_VENDOR_ZHAOXIN)
+	if (!mce_flags.intel_compatible)
 		return 1;
 
 	if (!(m->status & MCI_STATUS_MISCV))
@@ -562,10 +561,7 @@ static bool whole_page(struct mce *m)
 
 bool mce_is_correctable(struct mce *m)
 {
-	if (m->cpuvendor == X86_VENDOR_AMD && m->status & MCI_STATUS_DEFERRED)
-		return false;
-
-	if (m->cpuvendor == X86_VENDOR_HYGON && m->status & MCI_STATUS_DEFERRED)
+	if (mce_flags.amd_compatible && m->status & MCI_STATUS_DEFERRED)
 		return false;
 
 	if (m->status & MCI_STATUS_UC)
@@ -1450,8 +1446,7 @@ noinstr void do_machine_check(struct pt_regs *regs)
 	 * Check if this MCE is signaled to only this logical processor,
 	 * on Intel, Zhaoxin only.
 	 */
-	if (m.cpuvendor == X86_VENDOR_INTEL ||
-	    m.cpuvendor == X86_VENDOR_ZHAOXIN)
+	if (mce_flags.intel_compatible)
 		lmce = m.mcgstatus & MCG_STATUS_LMCES;
 
 	/*
@@ -1910,7 +1905,9 @@ static void __mcheck_cpu_init_early(struct cpuinfo_x86 *c)
 		mce_flags.succor	 = !!cpu_has(c, X86_FEATURE_SUCCOR);
 		mce_flags.smca		 = !!cpu_has(c, X86_FEATURE_SMCA);
 		mce_flags.amd_threshold	 = 1;
-	}
+		mce_flags.amd_compatible = 1;
+	} else if (c->x86_vendor == X86_VENDOR_INTEL || c->x86_vendor == X86_VENDOR_ZHAOXIN)
+		mce_flags.intel_compatible = 1;
 }
 
 static void mce_centaur_feature_init(struct cpuinfo_x86 *c)
@@ -2277,10 +2274,7 @@ static void vendor_disable_error_reporting(void)
 	 * the socket like the last level cache (LLC), the integrated memory
 	 * controller (iMC), etc.
 	 */
-	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
-	    boot_cpu_data.x86_vendor == X86_VENDOR_HYGON ||
-	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD ||
-	    boot_cpu_data.x86_vendor == X86_VENDOR_ZHAOXIN)
+	if (mce_flags.intel_compatible || mce_flags.amd_compatible)
 		return;
 
 	mce_disable_error_reporting();
