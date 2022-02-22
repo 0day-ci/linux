@@ -527,6 +527,8 @@ static void a6xx_gmu_rpmh_init(struct a6xx_gmu *gmu)
 		pdc_in_aop = true;
 	else if (adreno_is_a618(adreno_gpu) || adreno_is_a640_family(adreno_gpu))
 		pdc_address_offset = 0x30090;
+	else if (adreno_is_a619(adreno_gpu))
+		pdc_address_offset = 0x300a0;
 	else
 		pdc_address_offset = 0x30080;
 
@@ -601,7 +603,8 @@ static void a6xx_gmu_rpmh_init(struct a6xx_gmu *gmu)
 
 	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID + 4, 0x10108);
 	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR + 4, 0x30000);
-	if (adreno_is_a618(adreno_gpu) || adreno_is_a650_family(adreno_gpu))
+	if (adreno_is_a618(adreno_gpu) || adreno_is_a619(adreno_gpu) ||
+			adreno_is_a650_family(adreno_gpu))
 		pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA + 4, 0x2);
 	else
 		pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA + 4, 0x3);
@@ -1537,7 +1540,7 @@ int a6xx_gmu_init(struct a6xx_gpu *a6xx_gpu, struct device_node *node)
 			SZ_16M - SZ_16K, 0x04000, "icache");
 		if (ret)
 			goto err_memory;
-	} else if (adreno_is_a640_family(adreno_gpu)) {
+	} else {
 		ret = a6xx_gmu_memory_alloc(gmu, &gmu->icache,
 			SZ_256K - SZ_16K, 0x04000, "icache");
 		if (ret)
@@ -1547,9 +1550,9 @@ int a6xx_gmu_init(struct a6xx_gpu *a6xx_gpu, struct device_node *node)
 			SZ_256K - SZ_16K, 0x44000, "dcache");
 		if (ret)
 			goto err_memory;
-	} else {
-		BUG_ON(adreno_is_a660_family(adreno_gpu));
+	}
 
+	if (adreno_is_a630(adreno_gpu) || adreno_is_a615_family(adreno_gpu)) {
 		/* HFI v1, has sptprac */
 		gmu->legacy = true;
 
