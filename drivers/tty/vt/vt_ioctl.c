@@ -898,10 +898,13 @@ int vt_ioctl(struct tty_struct *tty,
 		if (arg > MAX_NR_CONSOLES)
 			return -ENXIO;
 
-		if (arg == 0)
+		if (arg == 0) {
 			vt_disallocate_all();
-		else
-			return vt_disallocate(--arg);
+		} else {
+			--arg;
+			arg = array_index_nospec(arg, MAX_NR_CONSOLES);
+			return vt_disallocate(arg);
+		}
 		break;
 
 	case VT_RESIZE:
