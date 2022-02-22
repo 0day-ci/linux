@@ -969,6 +969,7 @@ static void flow_offload_work_handler(struct work_struct *work)
 			break;
 		case FLOW_CLS_STATS:
 			flow_offload_work_stats(offload);
+			atomic_dec(&net->nft.count_wq_stats);
 			break;
 		default:
 			WARN_ON_ONCE(1);
@@ -1054,6 +1055,7 @@ void nf_flow_offload_del(struct nf_flowtable *flowtable,
 void nf_flow_offload_stats(struct nf_flowtable *flowtable,
 			   struct flow_offload *flow)
 {
+	struct net *net = read_pnet(&flowtable->net);
 	struct flow_offload_work *offload;
 	__s32 delta;
 
@@ -1065,6 +1067,7 @@ void nf_flow_offload_stats(struct nf_flowtable *flowtable,
 	if (!offload)
 		return;
 
+	atomic_inc(&net->nft.count_wq_stats);
 	flow_offload_queue_work(offload);
 }
 

@@ -624,6 +624,7 @@ enum nf_ct_sysctl_index {
 	NF_SYSCTL_CT_COUNT_WQ_ADD,
 	NF_SYSCTL_CT_MAX_WQ_ADD,
 	NF_SYSCTL_CT_COUNT_WQ_DEL,
+	NF_SYSCTL_CT_COUNT_WQ_STATS,
 #endif
 
 	__NF_SYSCTL_CT_LAST_SYSCTL,
@@ -1012,6 +1013,12 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
 	},
+	[NF_SYSCTL_CT_COUNT_WQ_STATS] = {
+		.procname	= "nf_flowtable_count_wq_stats",
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= proc_dointvec,
+	},
 #endif
 	{}
 };
@@ -1155,6 +1162,7 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 	table[NF_SYSCTL_CT_COUNT_WQ_ADD].data = &net->nft.count_wq_add;
 	table[NF_SYSCTL_CT_MAX_WQ_ADD].data = &net->nft.max_wq_add;
 	table[NF_SYSCTL_CT_COUNT_WQ_DEL].data = &net->nft.count_wq_del;
+	table[NF_SYSCTL_CT_COUNT_WQ_STATS].data = &net->nft.count_wq_stats;
 #endif
 
 	nf_conntrack_standalone_init_tcp_sysctl(net, table);

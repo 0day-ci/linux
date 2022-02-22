@@ -11,6 +11,7 @@ struct netns_nftables {
 	atomic_t		count_wq_add;
 	int			max_wq_add;
 	atomic_t		count_wq_del;
+	atomic_t		count_wq_stats;
 };
 
 #endif
