@@ -9,7 +9,7 @@
 #include <linux/dma-resv.h>
 #include <linux/module.h>
 
-#include <asm/smp.h>
+#include <drm/drm_cache.h>
 
 #include "gem/i915_gem_dmabuf.h"
 #include "i915_drv.h"
