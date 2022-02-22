@@ -618,6 +618,9 @@ enum nf_ct_sysctl_index {
 #ifdef CONFIG_LWTUNNEL
 	NF_SYSCTL_CT_LWTUNNEL,
 #endif
+#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
+	NF_SYSCTL_CT_COUNT_HW,
+#endif
 
 	__NF_SYSCTL_CT_LAST_SYSCTL,
 };
@@ -974,6 +977,14 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.proc_handler	= nf_hooks_lwtunnel_sysctl_handler,
 	},
 #endif
+#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
+	[NF_SYSCTL_CT_COUNT_HW] = {
+		.procname	= "nf_flowtable_count_hw",
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
 	{}
 };
 
@@ -1111,6 +1122,7 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 	table[NF_SYSCTL_CT_PROTO_TIMEOUT_UDP_STREAM].data = &un->timeouts[UDP_CT_REPLIED];
 #if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
 	table[NF_SYSCTL_CT_PROTO_TIMEOUT_UDP_OFFLOAD].data = &un->offload_timeout;
+	table[NF_SYSCTL_CT_COUNT_HW].data = &net->nft.count_hw;
 #endif
 
 	nf_conntrack_standalone_init_tcp_sysctl(net, table);

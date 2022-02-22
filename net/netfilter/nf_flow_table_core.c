@@ -315,6 +315,9 @@ int flow_offload_add(struct nf_flowtable *flow_table, struct flow_offload *flow)
 	nf_ct_offload_timeout(flow->ct);
 
 	if (nf_flowtable_hw_offload(flow_table)) {
+		struct net *net = read_pnet(&flow_table->net);
+
+		atomic_inc(&net->nft.count_hw);
 		__set_bit(NF_FLOW_HW, &flow->flags);
 		nf_flow_offload_add(flow_table, flow);
 	}
@@ -462,10 +465,15 @@ static void nf_flow_offload_gc_step(struct flow_offload *flow, void *data)
 
 	if (test_bit(NF_FLOW_TEARDOWN, &flow->flags)) {
 		if (test_bit(NF_FLOW_HW, &flow->flags)) {
-			if (!test_bit(NF_FLOW_HW_DYING, &flow->flags))
+			if (!test_bit(NF_FLOW_HW_DYING, &flow->flags)) {
+				struct net *net = read_pnet(&flow_table->net);
+
 				nf_flow_offload_del(flow_table, flow);
-			else if (test_bit(NF_FLOW_HW_DEAD, &flow->flags))
+				if (test_bit(NF_FLOW_HW_DYING, &flow->flags))
+					atomic_dec(&net->nft.count_hw);
+			} else if (test_bit(NF_FLOW_HW_DEAD, &flow->flags)) {
 				flow_offload_del(flow_table, flow);
+			}
 		} else {
 			flow_offload_del(flow_table, flow);
 		}
