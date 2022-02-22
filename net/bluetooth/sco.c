@@ -879,15 +879,9 @@ static int sco_sock_setsockopt(struct socket *sock, int level, int optname,
 		}
 
 		sco_pi(sk)->setting = voice.setting;
-		hdev = hci_get_route(&sco_pi(sk)->dst, &sco_pi(sk)->src,
-				     BDADDR_BREDR);
-		if (!hdev) {
-			err = -EBADFD;
-			break;
-		}
-		if (enhanced_sco_capable(hdev) &&
-		    voice.setting == BT_VOICE_TRANSPARENT)
-			sco_pi(sk)->codec.id = BT_CODEC_TRANSPARENT;
+		if (voice.setting == BT_VOICE_TRANSPARENT)
+			sco_pi(sk)->codec.id = BT_CODEC_MSBC;
+
 		hci_dev_put(hdev);
 		break;
 
