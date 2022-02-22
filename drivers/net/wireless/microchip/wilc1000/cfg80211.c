@@ -539,7 +539,7 @@ static int wilc_wfi_cfg_copy_wpa_info(struct wilc_wfi_key *key_info,
 	return 0;
 }
 
-static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
+static int add_key(struct wiphy *wiphy, struct wireless_dev *wdev, u8 key_index,
 		   bool pairwise, const u8 *mac_addr, struct key_params *params)
 
 {
@@ -548,8 +548,15 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 	const u8 *tx_mic = NULL;
 	u8 mode = WILC_FW_SEC_NO;
 	u8 op_mode;
-	struct wilc_vif *vif = netdev_priv(netdev);
-	struct wilc_priv *priv = &vif->priv;
+	struct wilc_vif *vif;
+	struct wilc_priv *priv;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
+
+	vif = netdev_priv(netdev);
+	priv = &vif->priv;
 
 	switch (params->cipher) {
 	case WLAN_CIPHER_SUITE_WEP40:
@@ -649,13 +656,20 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 	return ret;
 }
 
-static int del_key(struct wiphy *wiphy, struct net_device *netdev,
+static int del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 		   u8 key_index,
 		   bool pairwise,
 		   const u8 *mac_addr)
 {
-	struct wilc_vif *vif = netdev_priv(netdev);
-	struct wilc_priv *priv = &vif->priv;
+	struct wilc_vif *vif;
+	struct wilc_priv *priv;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
+
+	vif = netdev_priv(netdev);
+	priv = &vif->priv;
 
 	if (priv->wilc_gtk[key_index]) {
 		kfree(priv->wilc_gtk[key_index]->key);
@@ -686,13 +700,20 @@ static int del_key(struct wiphy *wiphy, struct net_device *netdev,
 	return 0;
 }
 
-static int get_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
+static int get_key(struct wiphy *wiphy, struct wireless_dev *wdev, u8 key_index,
 		   bool pairwise, const u8 *mac_addr, void *cookie,
 		   void (*callback)(void *cookie, struct key_params *))
 {
-	struct wilc_vif *vif = netdev_priv(netdev);
-	struct wilc_priv *priv = &vif->priv;
+	struct wilc_vif *vif;
+	struct wilc_priv *priv;
 	struct  key_params key_params;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
+
+	vif = netdev_priv(netdev);
+	priv = &vif->priv;
 
 	if (!pairwise) {
 		key_params.key = priv->wilc_gtk[key_index]->key;
@@ -713,11 +734,16 @@ static int get_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 	return 0;
 }
 
-static int set_default_key(struct wiphy *wiphy, struct net_device *netdev,
+static int set_default_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			   u8 key_index, bool unicast, bool multicast)
 {
-	struct wilc_vif *vif = netdev_priv(netdev);
+	struct wilc_vif *vif;
+	struct net_device *netdev = wdev->netdev;
 
+	if (!netdev)
+		return -EOPNOTSUPP;
+
+	vif = netdev_priv(netdev);
 	wilc_set_wep_default_keyid(vif, key_index);
 
 	return 0;

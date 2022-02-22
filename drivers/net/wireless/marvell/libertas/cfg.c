@@ -1437,11 +1437,15 @@ static int lbs_cfg_disconnect(struct wiphy *wiphy, struct net_device *dev,
 }
 
 static int lbs_cfg_set_default_key(struct wiphy *wiphy,
-				   struct net_device *netdev,
+				   struct wireless_dev *wdev,
 				   u8 key_index, bool unicast,
 				   bool multicast)
 {
 	struct lbs_private *priv = wiphy_priv(wiphy);
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
 
 	if (netdev == priv->mesh_dev)
 		return -EOPNOTSUPP;
@@ -1456,7 +1460,7 @@ static int lbs_cfg_set_default_key(struct wiphy *wiphy,
 }
 
 
-static int lbs_cfg_add_key(struct wiphy *wiphy, struct net_device *netdev,
+static int lbs_cfg_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			   u8 idx, bool pairwise, const u8 *mac_addr,
 			   struct key_params *params)
 {
@@ -1464,6 +1468,10 @@ static int lbs_cfg_add_key(struct wiphy *wiphy, struct net_device *netdev,
 	u16 key_info;
 	u16 key_type;
 	int ret = 0;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
 
 	if (netdev == priv->mesh_dev)
 		return -EOPNOTSUPP;
@@ -1517,7 +1525,7 @@ static int lbs_cfg_add_key(struct wiphy *wiphy, struct net_device *netdev,
 }
 
 
-static int lbs_cfg_del_key(struct wiphy *wiphy, struct net_device *netdev,
+static int lbs_cfg_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			   u8 key_index, bool pairwise, const u8 *mac_addr)
 {
 

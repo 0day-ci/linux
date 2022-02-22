@@ -142,12 +142,18 @@ exit:
 	return err;
 }
 
-static int prism2_add_key(struct wiphy *wiphy, struct net_device *dev,
+static int prism2_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			  u8 key_index, bool pairwise, const u8 *mac_addr,
 			  struct key_params *params)
 {
-	struct wlandevice *wlandev = dev->ml_priv;
+	struct wlandevice *wlandev;
 	u32 did;
+	struct net_device *dev = wdev->netdev;
+
+	if (!dev)
+		return -EOPNOTSUPP;
+
+	wlandev = dev->ml_priv;
 
 	if (key_index >= NUM_WEPKEYS)
 		return -EINVAL;
@@ -171,14 +177,20 @@ static int prism2_add_key(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 
-static int prism2_get_key(struct wiphy *wiphy, struct net_device *dev,
+static int prism2_get_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			  u8 key_index, bool pairwise,
 			  const u8 *mac_addr, void *cookie,
 			  void (*callback)(void *cookie, struct key_params*))
 {
-	struct wlandevice *wlandev = dev->ml_priv;
+	struct wlandevice *wlandev;
 	struct key_params params;
 	int len;
+	struct net_device *dev = wdev->netdev;
+
+	if (!dev)
+		return -EOPNOTSUPP;
+
+	wlandev = dev->ml_priv;
 
 	if (key_index >= NUM_WEPKEYS)
 		return -EINVAL;
@@ -201,13 +213,19 @@ static int prism2_get_key(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 
-static int prism2_del_key(struct wiphy *wiphy, struct net_device *dev,
+static int prism2_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			  u8 key_index, bool pairwise, const u8 *mac_addr)
 {
-	struct wlandevice *wlandev = dev->ml_priv;
+	struct wlandevice *wlandev;
 	u32 did;
 	int err = 0;
 	int result = 0;
+	struct net_device *dev = wdev->netdev;
+
+	if (!dev)
+		return -EOPNOTSUPP;
+
+	wlandev = dev->ml_priv;
 
 	/* There is no direct way in the hardware (AFAIK) of removing
 	 * a key, so we will cheat by setting the key to a bogus value
@@ -226,10 +244,17 @@ static int prism2_del_key(struct wiphy *wiphy, struct net_device *dev,
 	return err;
 }
 
-static int prism2_set_default_key(struct wiphy *wiphy, struct net_device *dev,
+static int prism2_set_default_key(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
 				  u8 key_index, bool unicast, bool multicast)
 {
-	struct wlandevice *wlandev = dev->ml_priv;
+	struct wlandevice *wlandev;
+	struct net_device *dev = wdev->netdev;
+
+	if (!dev)
+		return -EOPNOTSUPP;
+
+	wlandev = dev->ml_priv;
 
 	return  prism2_domibset_uint32(wlandev,
 				       DIDMIB_DOT11SMT_PRIVACYTABLE_WEPDEFAULTKEYID,

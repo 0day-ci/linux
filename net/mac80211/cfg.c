@@ -431,16 +431,22 @@ static int ieee80211_set_tx(struct ieee80211_sub_if_data *sdata,
 	return ret;
 }
 
-static int ieee80211_add_key(struct wiphy *wiphy, struct net_device *dev,
+static int ieee80211_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			     u8 key_idx, bool pairwise, const u8 *mac_addr,
 			     struct key_params *params)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_sub_if_data *sdata;
+	struct ieee80211_local *local;
 	struct sta_info *sta = NULL;
 	const struct ieee80211_cipher_scheme *cs = NULL;
 	struct ieee80211_key *key;
 	int err;
+
+	if (!wdev->netdev)
+		return -EOPNOTSUPP;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(wdev->netdev);
+	local = sdata->local;
 
 	if (!ieee80211_sdata_running(sdata))
 		return -ENETDOWN;
@@ -549,14 +555,20 @@ static int ieee80211_add_key(struct wiphy *wiphy, struct net_device *dev,
 	return err;
 }
 
-static int ieee80211_del_key(struct wiphy *wiphy, struct net_device *dev,
+static int ieee80211_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			     u8 key_idx, bool pairwise, const u8 *mac_addr)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_sub_if_data *sdata;
+	struct ieee80211_local *local;
 	struct sta_info *sta;
 	struct ieee80211_key *key = NULL;
 	int ret;
+
+	if (!wdev->netdev)
+		return -EOPNOTSUPP;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(wdev->netdev);
+	local = sdata->local;
 
 	mutex_lock(&local->sta_mtx);
 	mutex_lock(&local->key_mtx);
@@ -590,7 +602,7 @@ static int ieee80211_del_key(struct wiphy *wiphy, struct net_device *dev,
 	return ret;
 }
 
-static int ieee80211_get_key(struct wiphy *wiphy, struct net_device *dev,
+static int ieee80211_get_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			     u8 key_idx, bool pairwise, const u8 *mac_addr,
 			     void *cookie,
 			     void (*callback)(void *cookie,
@@ -607,7 +619,10 @@ static int ieee80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 	int err = -ENOENT;
 	struct ieee80211_key_seq kseq = {};
 
-	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	if (!wdev->netdev)
+		return -EOPNOTSUPP;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(wdev->netdev);
 
 	rcu_read_lock();
 
@@ -710,11 +725,16 @@ static int ieee80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 }
 
 static int ieee80211_config_default_key(struct wiphy *wiphy,
-					struct net_device *dev,
+					struct wireless_dev *wdev,
 					u8 key_idx, bool uni,
 					bool multi)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_sub_if_data *sdata;
+
+	if (!wdev->netdev)
+		return -EOPNOTSUPP;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(wdev->netdev);
 
 	ieee80211_set_default_key(sdata, key_idx, uni, multi);
 
@@ -722,10 +742,15 @@ static int ieee80211_config_default_key(struct wiphy *wiphy,
 }
 
 static int ieee80211_config_default_mgmt_key(struct wiphy *wiphy,
-					     struct net_device *dev,
+					     struct wireless_dev *wdev,
 					     u8 key_idx)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_sub_if_data *sdata;
+
+	if (!wdev->netdev)
+		return -EOPNOTSUPP;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(wdev->netdev);
 
 	ieee80211_set_default_mgmt_key(sdata, key_idx);
 
@@ -733,10 +758,15 @@ static int ieee80211_config_default_mgmt_key(struct wiphy *wiphy,
 }
 
 static int ieee80211_config_default_beacon_key(struct wiphy *wiphy,
-					       struct net_device *dev,
+					       struct wireless_dev *wdev,
 					       u8 key_idx)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_sub_if_data *sdata;
+
+	if (!wdev->netdev)
+		return -EOPNOTSUPP;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(wdev->netdev);
 
 	ieee80211_set_default_beacon_key(sdata, key_idx);
 
