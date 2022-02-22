@@ -2643,6 +2643,88 @@ static bool dev_is_real_dma_subdevice(struct device *dev)
 	       pci_real_dma_dev(to_pci_dev(dev)) != to_pci_dev(dev);
 }
 
+static struct dmar_satc_unit *dmar_find_matched_satc_unit(struct pci_dev *dev)
+{
+	int i;
+	struct device *tmp;
+	struct dmar_satc_unit *satcu;
+	struct acpi_dmar_satc *satc;
+
+	dev = pci_physfn(dev);
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(satcu, &dmar_satc_units, list) {
+		satc = container_of(satcu->hdr, struct acpi_dmar_satc, header);
+		if (satc->segment != pci_domain_nr(dev->bus))
+			continue;
+		for_each_dev_scope(satcu->devices, satcu->devices_cnt, i, tmp)
+			if (to_pci_dev(tmp) == dev)
+				goto out;
+	}
+	satcu = NULL;
+out:
+	rcu_read_unlock();
+	return satcu;
+}
+
+static int dmar_ats_supported(struct pci_dev *dev, struct intel_iommu *iommu)
+{
+	int i, ret = 1;
+	struct pci_bus *bus;
+	struct pci_dev *bridge = NULL;
+	struct device *tmp;
+	struct acpi_dmar_atsr *atsr;
+	struct dmar_atsr_unit *atsru;
+	struct dmar_satc_unit *satcu;
+
+	dev = pci_physfn(dev);
+	satcu = dmar_find_matched_satc_unit(dev);
+	if (satcu) {
+		/* This dev supports ATS as it is in SATC table!
+		 * When IOMMU is in legacy mode, enabling ATS is done
+		 * automatically by HW for the device that requires
+		 * ATS, hence OS should not enable this device ATS
+		 * to avoid duplicated TLB invalidation
+		 */
+		if (satcu->atc_required && !sm_supported(iommu))
+			ret = 0;
+		return ret;
+	}
+
+	for (bus = dev->bus; bus; bus = bus->parent) {
+		bridge = bus->self;
+		/* If it's an integrated device, allow ATS */
+		if (!bridge)
+			return 1;
+		/* Connected via non-PCIe: no ATS */
+		if (!pci_is_pcie(bridge) ||
+		    pci_pcie_type(bridge) == PCI_EXP_TYPE_PCI_BRIDGE)
+			return 0;
+		/* If we found the root port, look it up in the ATSR */
+		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_ROOT_PORT)
+			break;
+	}
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(atsru, &dmar_atsr_units, list) {
+		atsr = container_of(atsru->hdr, struct acpi_dmar_atsr, header);
+		if (atsr->segment != pci_domain_nr(dev->bus))
+			continue;
+
+		for_each_dev_scope(atsru->devices, atsru->devices_cnt, i, tmp)
+			if (tmp == &bridge->dev)
+				goto out;
+
+		if (atsru->include_all)
+			goto out;
+	}
+	ret = 0;
+out:
+	rcu_read_unlock();
+
+	return ret;
+}
+
 static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 						    int bus, int devfn,
 						    struct device *dev,
@@ -4018,88 +4100,6 @@ static void intel_iommu_free_dmars(void)
 		dmar_free_dev_scope(&satcu->devices, &satcu->devices_cnt);
 		kfree(satcu);
 	}
-}
-
-static struct dmar_satc_unit *dmar_find_matched_satc_unit(struct pci_dev *dev)
-{
-	int i;
-	struct device *tmp;
-	struct dmar_satc_unit *satcu;
-	struct acpi_dmar_satc *satc;
-
-	dev = pci_physfn(dev);
-	rcu_read_lock();
-
-	list_for_each_entry_rcu(satcu, &dmar_satc_units, list) {
-		satc = container_of(satcu->hdr, struct acpi_dmar_satc, header);
-		if (satc->segment != pci_domain_nr(dev->bus))
-			continue;
-		for_each_dev_scope(satcu->devices, satcu->devices_cnt, i, tmp)
-			if (to_pci_dev(tmp) == dev)
-				goto out;
-	}
-	satcu = NULL;
-out:
-	rcu_read_unlock();
-	return satcu;
-}
-
-int dmar_ats_supported(struct pci_dev *dev, struct intel_iommu *iommu)
-{
-	int i, ret = 1;
-	struct pci_bus *bus;
-	struct pci_dev *bridge = NULL;
-	struct device *tmp;
-	struct acpi_dmar_atsr *atsr;
-	struct dmar_atsr_unit *atsru;
-	struct dmar_satc_unit *satcu;
-
-	dev = pci_physfn(dev);
-	satcu = dmar_find_matched_satc_unit(dev);
-	if (satcu) {
-		/* This dev supports ATS as it is in SATC table!
-		 * When IOMMU is in legacy mode, enabling ATS is done
-		 * automatically by HW for the device that requires
-		 * ATS, hence OS should not enable this device ATS
-		 * to avoid duplicated TLB invalidation
-		 */
-		if (satcu->atc_required && !sm_supported(iommu))
-			ret = 0;
-		return ret;
-	}
-
-	for (bus = dev->bus; bus; bus = bus->parent) {
-		bridge = bus->self;
-		/* If it's an integrated device, allow ATS */
-		if (!bridge)
-			return 1;
-		/* Connected via non-PCIe: no ATS */
-		if (!pci_is_pcie(bridge) ||
-		    pci_pcie_type(bridge) == PCI_EXP_TYPE_PCI_BRIDGE)
-			return 0;
-		/* If we found the root port, look it up in the ATSR */
-		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_ROOT_PORT)
-			break;
-	}
-
-	rcu_read_lock();
-	list_for_each_entry_rcu(atsru, &dmar_atsr_units, list) {
-		atsr = container_of(atsru->hdr, struct acpi_dmar_atsr, header);
-		if (atsr->segment != pci_domain_nr(dev->bus))
-			continue;
-
-		for_each_dev_scope(atsru->devices, atsru->devices_cnt, i, tmp)
-			if (tmp == &bridge->dev)
-				goto out;
-
-		if (atsru->include_all)
-			goto out;
-	}
-	ret = 0;
-out:
-	rcu_read_unlock();
-
-	return ret;
 }
 
 int dmar_iommu_notify_scope_dev(struct dmar_pci_notify_info *info)
