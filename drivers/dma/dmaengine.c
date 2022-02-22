@@ -360,7 +360,7 @@ static struct dma_chan *min_chan(enum dma_transaction_type cap, int cpu)
  */
 static void dma_channel_rebalance(void)
 {
-	struct dma_chan *chan;
+	struct dma_chan *chan, *n;
 	struct dma_device *device;
 	int cpu;
 	int cap;
@@ -373,7 +373,7 @@ static void dma_channel_rebalance(void)
 	list_for_each_entry(device, &dma_device_list, global_node) {
 		if (dma_has_cap(DMA_PRIVATE, device->cap_mask))
 			continue;
-		list_for_each_entry(chan, &device->channels, device_node)
+		list_for_each_entry_safe(chan, n, &device->channels, device_node)
 			chan->table_count = 0;
 	}
 
@@ -552,18 +552,18 @@ EXPORT_SYMBOL(dma_find_channel);
  */
 void dma_issue_pending_all(void)
 {
-	struct dma_device *device;
-	struct dma_chan *chan;
+	struct dma_device *device, *_d;
+	struct dma_chan *chan, *n;
 
-	rcu_read_lock();
-	list_for_each_entry_rcu(device, &dma_device_list, global_node) {
+	mutex_lock(&dma_list_mutex);
+	list_for_each_entry_safe(device, _d, &dma_device_list, global_node) {
 		if (dma_has_cap(DMA_PRIVATE, device->cap_mask))
 			continue;
-		list_for_each_entry(chan, &device->channels, device_node)
+		list_for_each_entry_safe(chan, n, &device->channels, device_node)
 			if (chan->client_count)
 				device->device_issue_pending(chan);
 	}
-	rcu_read_unlock();
+	mutex_unlock(&dma_list_mutex);
 }
 EXPORT_SYMBOL(dma_issue_pending_all);
 
