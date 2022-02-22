@@ -620,6 +620,7 @@ enum nf_ct_sysctl_index {
 #endif
 #if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
 	NF_SYSCTL_CT_COUNT_HW,
+	NF_SYSCTL_CT_MAX_HW,
 #endif
 
 	__NF_SYSCTL_CT_LAST_SYSCTL,
@@ -984,6 +985,12 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
 	},
+	[NF_SYSCTL_CT_MAX_HW] = {
+		.procname	= "nf_flowtable_max_hw",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
 #endif
 	{}
 };
@@ -1123,6 +1130,7 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 #if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
 	table[NF_SYSCTL_CT_PROTO_TIMEOUT_UDP_OFFLOAD].data = &un->offload_timeout;
 	table[NF_SYSCTL_CT_COUNT_HW].data = &net->nft.count_hw;
+	table[NF_SYSCTL_CT_MAX_HW].data = &net->nft.max_hw;
 #endif
 
 	nf_conntrack_standalone_init_tcp_sysctl(net, table);
@@ -1135,6 +1143,9 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 		table[NF_SYSCTL_CT_MAX].mode = 0444;
 		table[NF_SYSCTL_CT_EXPECT_MAX].mode = 0444;
 		table[NF_SYSCTL_CT_BUCKETS].mode = 0444;
+#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
+		table[NF_SYSCTL_CT_MAX_HW].mode = 0444;
+#endif
 	}
 
 	cnet->sysctl_header = register_net_sysctl(net, "net/netfilter", table);

@@ -290,6 +290,20 @@ unsigned long flow_offload_get_timeout(struct flow_offload *flow)
 	return timeout;
 }
 
+static bool flow_offload_inc_count_hw(struct nf_flowtable *flow_table)
+{
+	struct net *net = read_pnet(&flow_table->net);
+	int max_hw = net->nft.max_hw, count_hw;
+
+	count_hw = atomic_inc_return(&net->nft.count_hw);
+	if (max_hw && count_hw > max_hw) {
+		atomic_dec(&net->nft.count_hw);
+		return false;
+	}
+
+	return true;
+}
+
 int flow_offload_add(struct nf_flowtable *flow_table, struct flow_offload *flow)
 {
 	int err;
@@ -315,9 +329,9 @@ int flow_offload_add(struct nf_flowtable *flow_table, struct flow_offload *flow)
 	nf_ct_offload_timeout(flow->ct);
 
 	if (nf_flowtable_hw_offload(flow_table)) {
-		struct net *net = read_pnet(&flow_table->net);
+		if (!flow_offload_inc_count_hw(flow_table))
+			return 0;
 
-		atomic_inc(&net->nft.count_hw);
 		__set_bit(NF_FLOW_HW, &flow->flags);
 		nf_flow_offload_add(flow_table, flow);
 	}
@@ -329,6 +343,7 @@ EXPORT_SYMBOL_GPL(flow_offload_add);
 void flow_offload_refresh(struct nf_flowtable *flow_table,
 			  struct flow_offload *flow)
 {
+	struct net *net = read_pnet(&flow_table->net);
 	u32 timeout;
 
 	timeout = nf_flowtable_time_stamp + flow_offload_get_timeout(flow);
@@ -337,6 +352,12 @@ void flow_offload_refresh(struct nf_flowtable *flow_table,
 
 	if (likely(!nf_flowtable_hw_offload(flow_table)))
 		return;
+
+	if (!flow_offload_inc_count_hw(flow_table))
+		return;
+	/* only count each flow once when setting NF_FLOW_HW bit */
+	if (test_and_set_bit(NF_FLOW_HW, &flow->flags))
+		atomic_dec(&net->nft.count_hw);
 
 	nf_flow_offload_add(flow_table, flow);
 }

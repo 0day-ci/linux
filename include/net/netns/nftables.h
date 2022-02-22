@@ -7,6 +7,7 @@
 struct netns_nftables {
 	u8			gencursor;
 	atomic_t		count_hw;
+	int			max_hw;
 };
 
 #endif
