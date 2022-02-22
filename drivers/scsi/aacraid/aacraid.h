@@ -526,7 +526,7 @@ struct user_sgmap64 {
 
 struct sgmapraw {
 	__le32		  count;
-	struct sgentryraw sg[1];
+	struct sgentryraw sg[];
 };
 
 struct user_sgmapraw {
