@@ -58,11 +58,9 @@ static int __nla_validate_parse(const struct nlattr *head, int len, int maxtype,
 				struct netlink_ext_ack *extack,
 				struct nlattr **tb, unsigned int depth);
 
-static int validate_nla_bitfield32(const struct nlattr *nla,
-				   const u32 valid_flags_mask)
+static int validate_bitfield32(const struct nla_bitfield32 *bf,
+			       const u32 valid_flags_mask)
 {
-	const struct nla_bitfield32 *bf = nla_data(nla);
-
 	if (!valid_flags_mask)
 		return -EINVAL;
 
@@ -78,6 +76,33 @@ static int validate_nla_bitfield32(const struct nlattr *nla,
 	if (bf->value & ~bf->selector)
 		return -EINVAL;
 
+	return 0;
+}
+
+static int validate_nla_bitfield32(const struct nlattr *nla,
+				   const u32 valid_flags_mask)
+{
+	const struct nla_bitfield32 *bf = nla_data(nla);
+
+	return validate_bitfield32(bf, valid_flags_mask);
+}
+
+static int validate_nla_bitfield(const struct nlattr *nla,
+				 const u32 *valid_flags_masks,
+				 const u16 nbits)
+{
+	struct nla_bitfield *bf = nla_data(nla);
+	int err;
+	int i;
+
+	if (!nla_bitfield_len_is_valid(bf, nla_len(nla)) ||
+	    !nla_bitfield_nbits_valid(bf, nbits))
+		return -EINVAL;
+	for (i = 0; i < bf->size; i++) {
+		err = validate_bitfield32(&bf->data[i], valid_flags_masks[i]);
+		if (err)
+			return err;
+	}
 	return 0;
 }
 
@@ -418,6 +443,12 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 			goto out_err;
 
 		err = validate_nla_bitfield32(nla, pt->bitfield32_valid);
+		if (err)
+			goto out_err;
+		break;
+
+	case NLA_BITFIELD:
+		err = validate_nla_bitfield(nla, pt->arr_bitfield32_valid, pt->len);
 		if (err)
 			goto out_err;
 		break;
@@ -838,6 +869,112 @@ int nla_strcmp(const struct nlattr *nla, const char *str)
 	return d;
 }
 EXPORT_SYMBOL(nla_strcmp);
+
+/**
+ * nla_bitfield_alloc - Alloc struct nla_bitfield
+ * @nbits: number of bits to accommodate
+ */
+struct nla_bitfield *nla_bitfield_alloc(__u64 nbits)
+{
+	struct nla_bitfield *bitfield;
+	size_t bitfield_size;
+	size_t bitfield_len;
+
+	bitfield_len = DIV_ROUND_UP(nbits, BITS_PER_TYPE(u32));
+	bitfield_size = bitfield_len * sizeof(struct nla_bitfield32) +
+		sizeof(*bitfield);
+	bitfield = kzalloc(bitfield_size, GFP_KERNEL);
+	if (bitfield)
+		bitfield->size = bitfield_len;
+	return bitfield;
+}
+EXPORT_SYMBOL(nla_bitfield_alloc);
+
+/**
+ * nla_bitfield_free - Free struct nla_bitfield
+ * @bitfield: the bitfield to free
+ */
+void nla_bitfield_free(struct nla_bitfield *bitfield)
+{
+	kfree(bitfield);
+}
+EXPORT_SYMBOL(nla_bitfield_free);
+
+/**
+ * nla_bitfield_to_bitmap - Convert bitfield to bitmap
+ * @bitmap: bitmap to copy to (dst)
+ * @bitfield: bitfield to be copied (src)
+ */
+void nla_bitfield_to_bitmap(unsigned long *bitmap,
+			    struct nla_bitfield *bitfield)
+{
+	int i, j;
+	u32 tmp;
+
+	for (i = 0; i < bitfield->size; i++) {
+		tmp = bitfield->data[i].value & bitfield->data[i].selector;
+		for (j = 0; j < BITS_PER_TYPE(u32); j++)
+			if (tmp & (1 << j))
+				set_bit(j + i * BITS_PER_TYPE(u32), bitmap);
+	}
+}
+EXPORT_SYMBOL(nla_bitfield_to_bitmap);
+
+/**
+ * nla_bitfield_from_bitmap - Convert bitmap to bitfield
+ * @bitfield: bitfield to copy to (dst)
+ * @bitmap: bitmap to be copied (src)
+ * @bitmap_nbits: len of bitmap
+ */
+void nla_bitfield_from_bitmap(struct nla_bitfield *bitfield,
+			      unsigned long *bitmap, __u64 bitmap_nbits)
+{
+	long size;
+	int i, j;
+
+	size = DIV_ROUND_UP(bitmap_nbits, BITS_PER_TYPE(u32));
+	for (i = 0; i < size; i++) {
+		for (j = 0; j < min_t(__u64, bitmap_nbits, BITS_PER_TYPE(u32)); j++)
+			if (test_bit(j + i * BITS_PER_TYPE(u32), bitmap))
+				bitfield->data[i].value |= 1 << j;
+		bitfield->data[i].selector = bitmap_nbits >= BITS_PER_TYPE(u32) ?
+			UINT_MAX : (1 << bitmap_nbits) - 1;
+		bitmap_nbits -= BITS_PER_TYPE(u32);
+	}
+}
+EXPORT_SYMBOL(nla_bitfield_from_bitmap);
+
+/**
+ * nla_bitfield_len_is_valid - validate the len of the bitfield
+ * @bitfield: bitfield to validate
+ * @user_len: len of the nla.
+ */
+bool nla_bitfield_len_is_valid(struct nla_bitfield *bitfield, size_t user_len)
+{
+	return !(user_len % sizeof(bitfield->data[0]) ||
+		 sizeof(bitfield->data[0]) * bitfield->size +
+		 sizeof(*bitfield) != user_len);
+}
+EXPORT_SYMBOL(nla_bitfield_len_is_valid);
+
+/**
+ * nla_bitfield_nbits_valid - validate the len of the bitfield vs a given nbits
+ * @bitfield: bitfield to validate
+ * @nbits: number of bits the user wants to use.
+ */
+bool nla_bitfield_nbits_valid(struct nla_bitfield *bitfield, size_t nbits)
+{
+	u32 *last_value = &bitfield->data[bitfield->size - 1].value;
+	u32 last_bit;
+
+	if (BITS_PER_TYPE(u32) * (bitfield->size - 1) > nbits)
+		return false;
+
+	nbits -= BITS_PER_TYPE(u32) * (bitfield->size - 1);
+	last_bit = find_last_bit((unsigned long *)last_value, BITS_PER_TYPE(u32));
+	return last_bit == BITS_PER_TYPE(u32) ? true : last_bit <= nbits - 1;
+}
+EXPORT_SYMBOL(nla_bitfield_nbits_valid);
 
 #ifdef CONFIG_NET
 /**

@@ -252,6 +252,14 @@ struct nla_bitfield32 {
 	__u32 selector;
 };
 
+/* Generic bitmap attribute content sent to the kernel.
+ * The size is the number of elements in the array.
+ */
+struct nla_bitfield {
+	__u64 size;
+	struct nla_bitfield32 data[0];
+};
+
 /*
  * policy descriptions - it's specific to each family how this is used
  * Normally, it should be retrieved via a dump inside another attribute
@@ -283,6 +291,7 @@ struct nla_bitfield32 {
  *	entry has attributes again, the policy for those inner ones
  *	and the corresponding maxtype may be specified.
  * @NL_ATTR_TYPE_BITFIELD32: &struct nla_bitfield32 attribute
+ * @NL_ATTR_TYPE_BITFIELD: &struct nla_bitfield attribute
  */
 enum netlink_attribute_type {
 	NL_ATTR_TYPE_INVALID,
@@ -307,6 +316,7 @@ enum netlink_attribute_type {
 	NL_ATTR_TYPE_NESTED_ARRAY,
 
 	NL_ATTR_TYPE_BITFIELD32,
+	NL_ATTR_TYPE_BITFIELD,
 };
 
 /**

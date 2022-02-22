@@ -227,6 +227,7 @@ int netlink_policy_dump_attr_size_estimate(const struct nla_policy *pt)
 	case NLA_STRING:
 	case NLA_NUL_STRING:
 	case NLA_BINARY:
+	case NLA_BITFIELD:
 		/* maximum is common, u32 min-length/max-length */
 		return common + 2 * nla_attr_size(sizeof(u32));
 	case NLA_FLAG:
@@ -338,11 +339,14 @@ __netlink_policy_dump_write_attr(struct netlink_policy_dump_state *state,
 		break;
 	case NLA_STRING:
 	case NLA_NUL_STRING:
+	case NLA_BITFIELD:
 	case NLA_BINARY:
 		if (pt->type == NLA_STRING)
 			type = NL_ATTR_TYPE_STRING;
 		else if (pt->type == NLA_NUL_STRING)
 			type = NL_ATTR_TYPE_NUL_STRING;
+		else if (pt->type == NLA_BITFIELD)
+			type = NL_ATTR_TYPE_BITFIELD;
 		else
 			type = NL_ATTR_TYPE_BINARY;
 

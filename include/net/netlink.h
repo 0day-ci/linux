@@ -180,6 +180,7 @@ enum {
 	NLA_S32,
 	NLA_S64,
 	NLA_BITFIELD32,
+	NLA_BITFIELD,
 	NLA_REJECT,
 	__NLA_TYPE_MAX,
 };
@@ -235,12 +236,16 @@ enum nla_policy_validation {
  *                         given type fits, using it verifies minimum length
  *                         just like "All other"
  *    NLA_BITFIELD32       Unused
+ *    NLA_BITFIELD         Maximum length of attribute payload
  *    NLA_REJECT           Unused
  *    All other            Minimum length of attribute payload
  *
  * Meaning of validation union:
  *    NLA_BITFIELD32       This is a 32-bit bitmap/bitselector attribute and
  *                         `bitfield32_valid' is the u32 value of valid flags
+ *    NLA_BITFIELD         This is a dynamic array of 32-bit bitmap/bitselector
+ *                         attribute and `arr_bitfield32_valid' is the u32
+ *                         values array of valid flags.
  *    NLA_REJECT           This attribute is always rejected and `reject_message'
  *                         may point to a string to report as the error instead
  *                         of the generic one in extended ACK.
@@ -318,6 +323,7 @@ struct nla_policy {
 	u16		len;
 	union {
 		const u32 bitfield32_valid;
+		const u32 *arr_bitfield32_valid;
 		const u32 mask;
 		const char *reject_message;
 		const struct nla_policy *nested_policy;
@@ -363,6 +369,8 @@ struct nla_policy {
 	_NLA_POLICY_NESTED_ARRAY(ARRAY_SIZE(policy) - 1, policy)
 #define NLA_POLICY_BITFIELD32(valid) \
 	{ .type = NLA_BITFIELD32, .bitfield32_valid = valid }
+#define NLA_POLICY_BITFIELD(valid, size) \
+	{ .type = NLA_BITFIELD, .arr_bitfield32_valid = valid, .len = size }
 
 #define __NLA_IS_UINT_TYPE(tp)						\
 	(tp == NLA_U8 || tp == NLA_U16 || tp == NLA_U32 || tp == NLA_U64)
@@ -1546,6 +1554,19 @@ static inline int nla_put_bitfield32(struct sk_buff *skb, int attrtype,
 }
 
 /**
+ * nla_put_bitfield - Add a bitfield netlink attribute to a socket buffer
+ * @skb: socket buffer to add attribute to
+ * @attrtype: attribute type
+ * @bitfield: bitfield
+ */
+static inline int nla_put_bitfield(struct sk_buff *skb, int attrtype,
+				   const struct nla_bitfield *bitfield)
+{
+	return nla_put(skb, attrtype, bitfield->size * sizeof(struct nla_bitfield32)
+		       + sizeof(*bitfield), bitfield);
+}
+
+/**
  * nla_get_u32 - return payload of u32 attribute
  * @nla: u32 netlink attribute
  */
@@ -1737,6 +1758,15 @@ static inline struct nla_bitfield32 nla_get_bitfield32(const struct nlattr *nla)
 	nla_memcpy(&tmp, nla, sizeof(tmp));
 	return tmp;
 }
+
+struct nla_bitfield *nla_bitfield_alloc(__u64 nbits);
+void nla_bitfield_free(struct nla_bitfield *bitfield);
+void nla_bitfield_to_bitmap(unsigned long *bitmap,
+			    struct nla_bitfield *bitfield);
+void nla_bitfield_from_bitmap(struct nla_bitfield *bitfield,
+			      unsigned long *bitmap, __u64 bitmap_nbits);
+bool nla_bitfield_len_is_valid(struct nla_bitfield *bitfield, size_t user_len);
+bool nla_bitfield_nbits_valid(struct nla_bitfield *bitfield, size_t nbits);
 
 /**
  * nla_memdup - duplicate attribute memory (kmemdup)
