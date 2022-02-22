@@ -489,6 +489,11 @@ static int __uc_init_hw(struct intel_uc *uc)
 	if (ret)
 		goto err_log_capture;
 
+	ret = intel_guc_hwconfig_init(&guc->hwconfig);
+	if (ret)
+		drm_notice(&i915->drm, "Failed to retrieve hwconfig table: %pe\n",
+			   ERR_PTR(ret));
+
 	ret = guc_enable_communication(guc);
 	if (ret)
 		goto err_log_capture;
@@ -561,6 +566,8 @@ static void __uc_fini_hw(struct intel_uc *uc)
 
 	if (intel_uc_uses_guc_submission(uc))
 		intel_guc_submission_disable(guc);
+
+	intel_guc_hwconfig_fini(&guc->hwconfig);
 
 	__uc_sanitize(uc);
 }

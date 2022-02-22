@@ -990,6 +990,7 @@ static const struct intel_device_info adl_p_info = {
 		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0) | BIT(VCS2),
 	.ppgtt_size = 48,
 	.dma_mask_size = 39,
+	.has_guc_hwconfig = 1,
 };
 
 #undef GEN
