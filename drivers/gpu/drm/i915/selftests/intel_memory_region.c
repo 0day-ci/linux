@@ -7,6 +7,7 @@
 #include <linux/sort.h>
 
 #include <drm/drm_buddy.h>
+#include <drm/drm_cache.h>
 
 #include "../i915_selftest.h"
 
@@ -1033,7 +1034,10 @@ static inline void igt_memcpy(void *dst, const void *src, size_t size)
 
 static inline void igt_memcpy_from_wc(void *dst, const void *src, size_t size)
 {
-	i915_memcpy_from_wc(dst, src, size);
+	struct iosys_map src_map;
+
+	iosys_map_set_vaddr(&src_map, (void *)src);
+	drm_memcpy_from_wc_vaddr(dst, &src_map, size);
 }
 
 static int _perf_memcpy(struct intel_memory_region *src_mr,
@@ -1057,7 +1061,7 @@ static int _perf_memcpy(struct intel_memory_region *src_mr,
 		{
 			"memcpy_from_wc",
 			igt_memcpy_from_wc,
-			!i915_has_memcpy_from_wc(),
+			!drm_memcpy_fastcopy_supported(),
 		},
 	};
 	struct drm_i915_gem_object *src, *dst;
