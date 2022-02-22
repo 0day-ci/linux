@@ -3,6 +3,7 @@
  * Copyright © 2014-2019 Intel Corporation
  */
 
+#include <drm/drm_cache.h>
 #include <linux/debugfs.h>
 
 #include "gt/intel_gt.h"
@@ -205,6 +206,7 @@ static void guc_read_update_log_buffer(struct intel_guc_log *log)
 	enum guc_log_buffer_type type;
 	void *src_data, *dst_data;
 	bool new_overflow;
+	struct iosys_map src_map;
 
 	mutex_lock(&log->relay.lock);
 
@@ -281,14 +283,17 @@ static void guc_read_update_log_buffer(struct intel_guc_log *log)
 		}
 
 		/* Just copy the newly written data */
+		iosys_map_set_vaddr(&src_map, src_data);
 		if (read_offset > write_offset) {
-			i915_memcpy_from_wc(dst_data, src_data, write_offset);
+			drm_memcpy_from_wc_vaddr(dst_data, &src_map,
+						 write_offset);
 			bytes_to_copy = buffer_size - read_offset;
 		} else {
 			bytes_to_copy = write_offset - read_offset;
 		}
-		i915_memcpy_from_wc(dst_data + read_offset,
-				    src_data + read_offset, bytes_to_copy);
+		iosys_map_incr(&src_map, read_offset);
+		drm_memcpy_from_wc_vaddr(dst_data + read_offset, &src_map,
+					 bytes_to_copy);
 
 		src_data += buffer_size;
 		dst_data += buffer_size;
