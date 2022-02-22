@@ -705,6 +705,7 @@ struct iscsi_login {
 	u32 rsp_length;
 	u16 cid;
 	u16 tsih;
+	u8 negotiation_exchanges;
 	char req[ISCSI_HDR_LEN];
 	char rsp[ISCSI_HDR_LEN];
 	char *req_buf;
