@@ -73,9 +73,46 @@ static int guc_hwconfig_discover_size(struct intel_guc_hwconfig *hwconfig)
 	return 0;
 }
 
+static int verify_hwconfig_blob(struct intel_guc_hwconfig *hwconfig)
+{
+	struct intel_guc *guc = hwconfig_to_guc(hwconfig);
+	struct drm_device *drm = &guc_to_gt(guc)->i915->drm;
+	struct drm_i915_query_hwconfig_blob_item *item = hwconfig->ptr;
+	u64 offset = 0;
+	u64 remaining = hwconfig->size;
+	/* Everything before the data field is required */
+	u64 min_item_size = offsetof(struct drm_i915_query_hwconfig_blob_item, data);
+	u64 item_size;
+
+	if (!IS_ALIGNED(hwconfig->size, sizeof(u32))) {
+		drm_err(drm, "hwconfig blob size (%d) is not u32 aligned\n", hwconfig->size);
+		return -EINVAL;
+	}
+
+	while (offset < hwconfig->size) {
+		if (remaining < min_item_size) {
+			drm_err(drm, "hwconfig blob invalid (no room for item required fields at offset %lld)\n",
+				offset);
+			return -EINVAL;
+		}
+		item_size = min_item_size + sizeof(u32) * item->length;
+		if (item_size > remaining) {
+			drm_err(drm, "hwconfig blob invalid (no room for data array of item at offset %lld)\n",
+				offset);
+			return -EINVAL;
+		}
+		offset += item_size;
+		remaining -= item_size;
+		item = (void *)&item->data[item->length];
+	}
+
+	return 0;
+}
+
 static int guc_hwconfig_fill_buffer(struct intel_guc_hwconfig *hwconfig)
 {
 	struct intel_guc *guc = hwconfig_to_guc(hwconfig);
+	struct drm_device *drm = &guc_to_gt(guc)->i915->drm;
 	struct i915_vma *vma;
 	u32 ggtt_offset;
 	void *vaddr;
@@ -90,8 +127,13 @@ static int guc_hwconfig_fill_buffer(struct intel_guc_hwconfig *hwconfig)
 	ggtt_offset = intel_guc_ggtt_offset(guc, vma);
 
 	ret = __guc_action_get_hwconfig(guc, ggtt_offset, hwconfig->size);
-	if (ret >= 0)
+	if (ret >= 0) {
 		memcpy(hwconfig->ptr, vaddr, hwconfig->size);
+		if (verify_hwconfig_blob(hwconfig)) {
+			drm_err(drm, "Ignoring invalid hwconfig blob received from GuC!\n");
+			ret = -EINVAL;
+		}
+	}
 
 	i915_vma_unpin_and_release(&vma, I915_VMA_RELEASE_MAP);
 
