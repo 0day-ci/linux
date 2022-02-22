@@ -2594,9 +2594,8 @@ _base_check_pcie_native_sgl(struct MPT3SAS_ADAPTER *ioc,
 	/* Get the SG list pointer and info. */
 	sges_left = scsi_dma_map(scmd);
 	if (sges_left < 0) {
-		sdev_printk(KERN_ERR, scmd->device,
-			"scsi_dma_map failed: request for %d bytes!\n",
-			scsi_bufflen(scmd));
+		pr_err_ratelimited("sd %s: scsi_dma_map failed: request for %d bytes!\n",
+			dev_name(&scmd->device->sdev_gendev), scsi_bufflen(scmd));
 		return 1;
 	}
 
@@ -2706,9 +2705,8 @@ _base_build_sg_scmd(struct MPT3SAS_ADAPTER *ioc,
 	sg_scmd = scsi_sglist(scmd);
 	sges_left = scsi_dma_map(scmd);
 	if (sges_left < 0) {
-		sdev_printk(KERN_ERR, scmd->device,
-		 "scsi_dma_map failed: request for %d bytes!\n",
-		 scsi_bufflen(scmd));
+		pr_err_ratelimited("sd %s: scsi_dma_map failed: request for %d bytes!\n",
+			dev_name(&scmd->device->sdev_gendev), scsi_bufflen(scmd));
 		return -ENOMEM;
 	}
 
@@ -2854,9 +2852,8 @@ _base_build_sg_scmd_ieee(struct MPT3SAS_ADAPTER *ioc,
 	sg_scmd = scsi_sglist(scmd);
 	sges_left = scsi_dma_map(scmd);
 	if (sges_left < 0) {
-		sdev_printk(KERN_ERR, scmd->device,
-			"scsi_dma_map failed: request for %d bytes!\n",
-			scsi_bufflen(scmd));
+		pr_err_ratelimited("sd %s: scsi_dma_map failed: request for %d bytes!\n",
+			dev_name(&scmd->device->sdev_gendev), scsi_bufflen(scmd));
 		return -ENOMEM;
 	}
 
