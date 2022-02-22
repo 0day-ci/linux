@@ -561,8 +561,7 @@ static int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 		rcode = -EINVAL;
 		goto cleanup;
 	}
-	actual_fibsize = sizeof(struct aac_srb) - sizeof(struct sgentry) +
-		((user_srbcmd->sg.count & 0xff) * sizeof(struct sgentry));
+	actual_fibsize = struct_size(srbcmd, sg.sg, user_srbcmd->sg.count & 0xff);
 	actual_fibsize64 = actual_fibsize + (user_srbcmd->sg.count & 0xff) *
 	  (sizeof(struct sgentry64) - sizeof(struct sgentry));
 	/* User made a mistake - should not continue */
