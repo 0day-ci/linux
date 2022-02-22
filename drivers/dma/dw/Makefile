@@ -7,5 +7,7 @@ obj-$(CONFIG_DW_DMAC)		+= dw_dmac.o
 dw_dmac-y			:= platform.o
 dw_dmac-$(CONFIG_OF)		+= of.o
 
+obj-$(CONFIG_RZN1_DMAMUX)	+= dmamux.o
+
 obj-$(CONFIG_DW_DMAC_PCI)	+= dw_dmac_pci.o
 dw_dmac_pci-y			:= pci.o
