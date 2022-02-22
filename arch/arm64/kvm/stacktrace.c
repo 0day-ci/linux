@@ -261,7 +261,7 @@ static void hyp_dump_backtrace_entry(unsigned long hyp_pc, unsigned long hyp_off
 	hyp_pc &= va_mask;	/* Mask tags */
 	hyp_pc += hyp_offset;
 
-	kvm_err("[<%016lx>]\n", hyp_pc);
+	kvm_err("[<%016lx>] %pB\n", hyp_pc, (void *)hyp_pc);
 }
 
 void hyp_dump_backtrace(unsigned long hyp_offset)
