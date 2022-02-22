@@ -13,12 +13,7 @@
 #include "i915_driver.h"
 #include "i915_drv.h"
 
-#if defined(CONFIG_X86)
-#include <asm/smp.h>
-#else
-#define wbinvd_on_all_cpus() \
-	pr_warn(DRIVER_NAME ": Missing cache flush in %s\n", __func__)
-#endif
+#include <drm/drm_cache.h>
 
 void i915_gem_suspend(struct drm_i915_private *i915)
 {
