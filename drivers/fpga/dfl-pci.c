@@ -356,11 +356,12 @@ int cci_pci_probe(struct pci_dev *pcidev, const struct pci_device_id *pcidevid)
 	pci_set_master(pcidev);
 
 	ret = dma_set_mask_and_coherent(&pcidev->dev, DMA_BIT_MASK(64));
-	if (ret)
-		ret = dma_set_mask_and_coherent(&pcidev->dev, DMA_BIT_MASK(32));
 	if (ret) {
-		dev_err(&pcidev->dev, "No suitable DMA support available.\n");
-		goto disable_error_report_exit;
+		ret = dma_set_mask_and_coherent(&pcidev->dev, DMA_BIT_MASK(32));
+		if (ret) {
+			dev_err(&pcidev->dev, "No suitable DMA support available.\n");
+			goto disable_error_report_exit;
+		}
 	}
 
 	ret = cci_init_drvdata(pcidev);
