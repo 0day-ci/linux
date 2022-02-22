@@ -3,6 +3,7 @@
  * Copyright © 2018 Intel Corporation
  */
 
+#include <drm/drm_cache.h>
 #include <linux/crc32.h>
 
 #include "gem/i915_gem_stolen.h"
@@ -82,7 +83,7 @@ __igt_reset_stolen(struct intel_gt *gt,
 	for (page = 0; page < num_pages; page++) {
 		dma_addr_t dma = (dma_addr_t)dsm->start + (page << PAGE_SHIFT);
 		void __iomem *s;
-		void *in;
+		struct iosys_map src_map;
 
 		ggtt->vm.insert_page(&ggtt->vm, dma,
 				     ggtt->error_capture.start,
@@ -98,10 +99,9 @@ __igt_reset_stolen(struct intel_gt *gt,
 					     ((page + 1) << PAGE_SHIFT) - 1))
 			memset_io(s, STACK_MAGIC, PAGE_SIZE);
 
-		in = (void __force *)s;
-		if (i915_memcpy_from_wc(tmp, in, PAGE_SIZE))
-			in = tmp;
-		crc[page] = crc32_le(0, in, PAGE_SIZE);
+		iosys_map_set_vaddr_iomem(&src_map, s);
+		drm_memcpy_from_wc_vaddr(tmp, &src_map, PAGE_SIZE);
+		crc[page] = crc32_le(0, tmp, PAGE_SIZE);
 
 		io_mapping_unmap(s);
 	}
@@ -122,7 +122,7 @@ __igt_reset_stolen(struct intel_gt *gt,
 	for (page = 0; page < num_pages; page++) {
 		dma_addr_t dma = (dma_addr_t)dsm->start + (page << PAGE_SHIFT);
 		void __iomem *s;
-		void *in;
+		struct iosys_map src_map;
 		u32 x;
 
 		ggtt->vm.insert_page(&ggtt->vm, dma,
@@ -134,10 +134,9 @@ __igt_reset_stolen(struct intel_gt *gt,
 				      ggtt->error_capture.start,
 				      PAGE_SIZE);
 
-		in = (void __force *)s;
-		if (i915_memcpy_from_wc(tmp, in, PAGE_SIZE))
-			in = tmp;
-		x = crc32_le(0, in, PAGE_SIZE);
+		iosys_map_set_vaddr_iomem(&src_map, s);
+		drm_memcpy_from_wc_vaddr(tmp, &src_map, PAGE_SIZE);
+		x = crc32_le(0, tmp, PAGE_SIZE);
 
 		if (x != crc[page] &&
 		    !__drm_mm_interval_first(&gt->i915->mm.stolen,
@@ -146,7 +145,7 @@ __igt_reset_stolen(struct intel_gt *gt,
 			pr_debug("unused stolen page %pa modified by GPU reset\n",
 				 &page);
 			if (count++ == 0)
-				igt_hexdump(in, PAGE_SIZE);
+				igt_hexdump(tmp, PAGE_SIZE);
 			max = page;
 		}
 
