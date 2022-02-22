@@ -1281,7 +1281,7 @@ static int aac_read_raw_io(struct fib * fib, struct scsi_cmnd * cmd, u64 lba, u3
 
 static int aac_read_block64(struct fib * fib, struct scsi_cmnd * cmd, u64 lba, u32 count)
 {
-	u16 fibsize;
+	size_t fibsize;
 	struct aac_read64 *readcmd;
 	long ret;
 
@@ -1297,9 +1297,7 @@ static int aac_read_block64(struct fib * fib, struct scsi_cmnd * cmd, u64 lba, u
 	ret = aac_build_sg64(cmd, &readcmd->sg);
 	if (ret < 0)
 		return ret;
-	fibsize = sizeof(struct aac_read64) +
-		((le32_to_cpu(readcmd->sg.count) - 1) *
-		 sizeof (struct sgentry64));
+	fibsize = struct_size(readcmd, sg.sg, le32_to_cpu(readcmd->sg.count));
 	BUG_ON (fibsize > (fib->dev->max_fib_size -
 				sizeof(struct aac_fibhdr)));
 	/*
@@ -1413,7 +1411,7 @@ static int aac_write_raw_io(struct fib * fib, struct scsi_cmnd * cmd, u64 lba, u
 
 static int aac_write_block64(struct fib * fib, struct scsi_cmnd * cmd, u64 lba, u32 count, int fua)
 {
-	u16 fibsize;
+	size_t fibsize;
 	struct aac_write64 *writecmd;
 	long ret;
 
@@ -1429,9 +1427,7 @@ static int aac_write_block64(struct fib * fib, struct scsi_cmnd * cmd, u64 lba, 
 	ret = aac_build_sg64(cmd, &writecmd->sg);
 	if (ret < 0)
 		return ret;
-	fibsize = sizeof(struct aac_write64) +
-		((le32_to_cpu(writecmd->sg.count) - 1) *
-		 sizeof (struct sgentry64));
+	fibsize = struct_size(writecmd, sg.sg, le32_to_cpu(writecmd->sg.count));
 	BUG_ON (fibsize > (fib->dev->max_fib_size -
 				sizeof(struct aac_fibhdr)));
 	/*
@@ -2263,8 +2259,7 @@ int aac_get_adapter_info(struct aac_dev* dev)
 			dev->scsi_host_ptr->sg_tablesize =
 				(dev->max_fib_size -
 				sizeof(struct aac_fibhdr) -
-				sizeof(struct aac_write64) +
-				sizeof(struct sgentry64)) /
+				sizeof(struct aac_write64)) /
 					sizeof(struct sgentry64);
 		} else {
 			dev->a_ops.adapter_read = aac_read_block;

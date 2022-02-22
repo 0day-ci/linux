@@ -516,7 +516,7 @@ struct user_sgmap {
 
 struct sgmap64 {
 	__le32		count;
-	struct sgentry64 sg[1];
+	struct sgentry64 sg[];
 };
 
 struct user_sgmap64 {
