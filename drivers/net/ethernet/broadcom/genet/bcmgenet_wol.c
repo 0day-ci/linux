@@ -60,6 +60,10 @@ int bcmgenet_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	if (!device_can_wakeup(kdev))
 		return -ENOTSUPP;
 
+	/* We need a WoL IRQ to enable support, not all HW has one setup */
+	if (priv->wol_irq <= 0)
+		return -ENOTSUPP;
+
 	if (wol->wolopts & ~(WAKE_MAGIC | WAKE_MAGICSECURE | WAKE_FILTER))
 		return -EINVAL;
 
