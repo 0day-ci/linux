@@ -4757,7 +4757,7 @@ static bool map_is_reuse_compat(const struct bpf_map *map, int map_fd)
 	struct bpf_map_info map_info = {};
 	char msg[STRERR_BUFSIZE];
 	__u32 map_info_len;
-	int err;
+	int def_max_entries, err;
 
 	map_info_len = sizeof(map_info);
 
@@ -4770,10 +4770,15 @@ static bool map_is_reuse_compat(const struct bpf_map *map, int map_fd)
 		return false;
 	}
 
+	if (map->def.type == BPF_MAP_TYPE_PERF_EVENT_ARRAY && !map->def.max_entries)
+		def_max_entries = libbpf_num_possible_cpus();
+	else
+		def_max_entries = map->def.max_entries;
+
 	return (map_info.type == map->def.type &&
 		map_info.key_size == map->def.key_size &&
 		map_info.value_size == map->def.value_size &&
-		map_info.max_entries == map->def.max_entries &&
+		map_info.max_entries == def_max_entries &&
 		map_info.map_flags == map->def.map_flags &&
 		map_info.map_extra == map->map_extra);
 }
