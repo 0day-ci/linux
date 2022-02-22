@@ -2601,7 +2601,8 @@ static int get_tree_block_key(struct btrfs_fs_info *fs_info,
 			     block->key.offset, block->level, NULL);
 	if (IS_ERR(eb)) {
 		return PTR_ERR(eb);
-	} else if (!extent_buffer_uptodate(eb)) {
+	}
+	if (!extent_buffer_uptodate(eb)) {
 		free_extent_buffer(eb);
 		return -EIO;
 	}
