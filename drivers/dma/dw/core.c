@@ -705,6 +705,9 @@ slave_sg_todev_fill_desc:
 		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
 			DWC_CTLL_FC(DW_DMA_FC_D_P2M);
 
+		if (sconfig->dst_addr_width && sconfig->dst_addr_width < data_width)
+			data_width = sconfig->dst_addr_width;
+
 		for_each_sg(sgl, sg, sg_len, i) {
 			struct dw_desc	*desc;
 			u32		len, mem;
