@@ -322,7 +322,6 @@ static void dce_v8_0_hpd_fini(struct amdgpu_device *adev)
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
 	struct drm_connector_list_iter iter;
-	u32 tmp;
 
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
@@ -331,8 +330,7 @@ static void dce_v8_0_hpd_fini(struct amdgpu_device *adev)
 		if (amdgpu_connector->hpd.hpd >= adev->mode_info.num_hpd)
 			continue;
 
-		tmp = RREG32(mmDC_HPD1_CONTROL + hpd_offsets[amdgpu_connector->hpd.hpd]);
-		tmp &= ~DC_HPD1_CONTROL__DC_HPD1_EN_MASK;
+		RREG32(mmDC_HPD1_CONTROL + hpd_offsets[amdgpu_connector->hpd.hpd]);
 		WREG32(mmDC_HPD1_CONTROL + hpd_offsets[amdgpu_connector->hpd.hpd], 0);
 
 		amdgpu_irq_put(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
