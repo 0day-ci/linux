@@ -2137,8 +2137,11 @@ int drm_connector_update_edid_property(struct drm_connector *connector,
 	if (connector->override_edid)
 		return 0;
 
-	if (edid)
+	if (edid) {
 		size = EDID_LENGTH * (1 + edid->extensions);
+		if (drm_edid_is_hf_eeodb_blk_available(edid))
+			size = EDID_LENGTH * (1 + drm_edid_read_hf_eeodb_blk_size(edid));
+	}
 
 	/* Set the display info, using edid if available, otherwise
 	 * resetting the values to defaults. This duplicates the work

@@ -1991,7 +1991,7 @@ struct edid *drm_do_get_edid(struct drm_connector *connector,
 	void *data)
 {
 	int i, j = 0, valid_extensions = 0;
-	u8 *edid, *new;
+	u8 *edid, *new, ext_eeodb_blk_size;
 	struct edid *override;
 
 	override = drm_get_override_edid(connector);
@@ -2051,7 +2051,40 @@ struct edid *drm_do_get_edid(struct drm_connector *connector,
 		}
 
 		kfree(edid);
+		return (struct edid *)new;
+	}
+
+	if (drm_edid_is_hf_eeodb_blk_available((struct edid *)edid)) {
+		ext_eeodb_blk_size = drm_edid_read_hf_eeodb_blk_size((struct edid *)edid);
+
+		// no more ext blk wait for read
+		if (ext_eeodb_blk_size <= 1)
+			return (struct edid *)edid;
+
+		new = krealloc(edid, (ext_eeodb_blk_size + 1) * EDID_LENGTH, GFP_KERNEL);
+		if (!new)
+			goto out;
 		edid = new;
+
+		valid_extensions = ext_eeodb_blk_size - 1;
+		for (j = 2; j <= ext_eeodb_blk_size; j++) {
+			u8 *block = edid + j * EDID_LENGTH;
+
+			for (i = 0; i < 4; i++) {
+				if (get_edid_block(data, block, j, EDID_LENGTH))
+					goto out;
+				if (drm_edid_block_valid(block, j, false, NULL))
+					break;
+			}
+
+			if (i == 4)
+				valid_extensions--;
+		}
+
+		if (valid_extensions != ext_eeodb_blk_size - 1) {
+			DRM_ERROR("Not able to retrieve proper EDID contain HF-EEODB data.\n");
+			goto out;
+		}
 	}
 
 	return (struct edid *)edid;
@@ -3315,15 +3348,17 @@ add_detailed_modes(struct drm_connector *connector, struct edid *edid,
 #define VIDEO_BLOCK     0x02
 #define VENDOR_BLOCK    0x03
 #define SPEAKER_BLOCK	0x04
-#define HDR_STATIC_METADATA_BLOCK	0x6
-#define USE_EXTENDED_TAG 0x07
-#define EXT_VIDEO_CAPABILITY_BLOCK 0x00
+#define EXT_VIDEO_CAPABILITY_BLOCK	0x00
+#define HDR_STATIC_METADATA_BLOCK	0x06
+#define USE_EXTENDED_TAG		0x07
 #define EXT_VIDEO_DATA_BLOCK_420	0x0E
-#define EXT_VIDEO_CAP_BLOCK_Y420CMDB 0x0F
+#define EXT_VIDEO_CAP_BLOCK_Y420CMDB	0x0F
+#define EXT_VIDEO_HF_EEODB_DATA_BLOCK	0x78
 #define EDID_BASIC_AUDIO	(1 << 6)
 #define EDID_CEA_YCRCB444	(1 << 5)
 #define EDID_CEA_YCRCB422	(1 << 4)
 #define EDID_CEA_VCDB_QS	(1 << 6)
+#define HF_EEODB_LENGTH		2
 
 /*
  * Search EDID for CEA extension block.
@@ -4222,6 +4257,20 @@ static bool cea_db_is_hdmi_forum_vsdb(const u8 *db)
 	return oui(db[3], db[2], db[1]) == HDMI_FORUM_IEEE_OUI;
 }
 
+static bool cea_db_is_hdmi_forum_eeodb(const u8 *db)
+{
+	if (cea_db_tag(db) != USE_EXTENDED_TAG)
+		return false;
+
+	if (cea_db_payload_len(db) != HF_EEODB_LENGTH)
+		return false;
+
+	if (cea_db_extended_tag(db) != EXT_VIDEO_HF_EEODB_DATA_BLOCK)
+		return false;
+
+	return true;
+}
+
 static bool cea_db_is_vcdb(const u8 *db)
 {
 	if (cea_db_tag(db) != USE_EXTENDED_TAG)
@@ -4263,6 +4312,23 @@ static bool cea_db_is_y420vdb(const u8 *db)
 
 	return true;
 }
+
+bool drm_edid_is_hf_eeodb_blk_available(const struct edid *edid)
+{
+	const u8 *eeodb_header = (u8 *)edid + EDID_LENGTH + 4;
+
+	if (!edid->extensions)
+		return false;
+
+	return cea_db_is_hdmi_forum_eeodb(eeodb_header);
+}
+EXPORT_SYMBOL_GPL(drm_edid_is_hf_eeodb_blk_available);
+
+u8 drm_edid_read_hf_eeodb_blk_size(const struct edid *edid)
+{
+	return ((u8 *)edid)[EDID_LENGTH + 6];
+}
+EXPORT_SYMBOL_GPL(drm_edid_read_hf_eeodb_blk_size);
 
 #define for_each_cea_db(cea, i, start, end) \
 	for ((i) = (start); (i) < (end) && (i) + cea_db_payload_len(&(cea)[(i)]) < (end); (i) += cea_db_payload_len(&(cea)[(i)]) + 1)
