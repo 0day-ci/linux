@@ -1110,10 +1110,7 @@ static void blk_mq_release_queue(struct request_queue *q)
 	 * cgroup controller.
 	 */
 	if (q->elevator) {
-		ioc_clear_queue(q);
-
 		mutex_lock(&q->sysfs_lock);
-		blk_mq_sched_free_rqs(q);
 		elevator_exit(q);
 		mutex_unlock(&q->sysfs_lock);
 	}
