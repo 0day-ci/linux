@@ -300,7 +300,7 @@ int mlx5_irq_get_index(struct mlx5_irq *irq)
 /* requesting an irq from a given pool according to given index */
 static struct mlx5_irq *
 irq_pool_request_vector(struct mlx5_irq_pool *pool, int vecidx,
-			struct cpumask *affinity)
+			const struct cpumask *affinity)
 {
 	struct mlx5_irq *irq;
 
@@ -420,7 +420,7 @@ struct mlx5_irq *mlx5_ctrl_irq_request(struct mlx5_core_dev *dev)
  * This function returns a pointer to IRQ, or ERR_PTR in case of error.
  */
 struct mlx5_irq *mlx5_irq_request(struct mlx5_core_dev *dev, u16 vecidx,
-				  struct cpumask *affinity)
+				  const struct cpumask *affinity)
 {
 	struct mlx5_irq_table *irq_table = mlx5_irq_table_get(dev);
 	struct mlx5_irq_pool *pool;
@@ -479,6 +479,82 @@ int mlx5_irqs_request_vectors(struct mlx5_core_dev *dev, u16 *cpus, int nirqs,
 
 	free_cpumask_var(req_mask);
 	return i ? i : PTR_ERR(irq);
+}
+
+static int req_mask_local_spread(unsigned int i, int node,
+				 const struct cpumask *irqs_req_mask)
+{
+	int cpu;
+
+	if (node == NUMA_NO_NODE) {
+		for_each_cpu_and(cpu, cpu_online_mask, irqs_req_mask)
+			if (i-- == 0)
+				return cpu;
+	} else {
+		/* NUMA first. */
+		for_each_cpu_and(cpu, cpumask_of_node(node), irqs_req_mask)
+			if (cpu_online(cpu))
+				if (i-- == 0)
+					return cpu;
+
+		for_each_online_cpu(cpu) {
+			/* Skip NUMA nodes, done above. */
+			if (cpumask_test_cpu(cpu, cpumask_of_node(node)))
+				continue;
+
+			if (i-- == 0)
+				return cpu;
+		}
+	}
+	WARN_ON(true);
+	return cpumask_first(cpu_online_mask);
+}
+
+/**
+ * mlx5_irqs_request_mask - request one or more IRQs for mlx5 device.
+ * @dev: mlx5 device that is requesting the IRQs.
+ * @irqs: an output array of IRQs pointers.
+ * @irqs_req_mask: cpumask requested for these IRQs.
+ *
+ * Each IRQ is bounded to at most 1 CPU.
+ * This function returns the number of IRQs requested, (which might be smaller than
+ * cpumask_weight(@irqs_req_mask)), if successful, or a negative error code in
+ * case of an error.
+ */
+int mlx5_irqs_request_mask(struct mlx5_core_dev *dev, struct mlx5_irq **irqs,
+			   struct cpumask *irqs_req_mask)
+{
+	struct mlx5_irq_pool *pool = mlx5_irq_pool_get(dev);
+	struct mlx5_irq *irq;
+	int nirqs;
+	int cpu;
+	int i;
+
+	/* Request an IRQ for each online CPU in the given mask */
+	cpumask_and(irqs_req_mask, irqs_req_mask, cpu_online_mask);
+	nirqs = cpumask_weight(irqs_req_mask);
+	for (i = 0; i < nirqs; i++) {
+		/* Iterate over the mask the caller provided in numa aware fashion.
+		 * Local CPUs are requested first, followed by non-local ones.
+		 */
+		cpu = req_mask_local_spread(i, dev->priv.numa_node, irqs_req_mask);
+
+		if (mlx5_irq_pool_is_sf_pool(pool))
+			irq = mlx5_irq_affinity_request(pool, cpumask_of(cpu));
+		else
+			irq = mlx5_irq_request(dev, i, cpumask_of(cpu));
+		if (IS_ERR(irq)) {
+			if (!i)
+				return PTR_ERR(irq);
+			return i;
+		}
+		irqs[i] = irq;
+		mlx5_core_dbg(pool->dev, "IRQ %u mapped to cpu %*pbl, %u EQs on this irq\n",
+			      pci_irq_vector(dev->pdev, mlx5_irq_get_index(irq)),
+			      cpumask_pr_args(mlx5_irq_get_affinity_mask(irq)),
+			      mlx5_irq_read_locked(irq) / MLX5_EQ_REFS_PER_IRQ);
+	}
+	return i;
 }
 
 static struct mlx5_irq_pool *
@@ -668,6 +744,11 @@ void mlx5_irq_table_destroy(struct mlx5_core_dev *dev)
 	 */
 	irq_pools_destroy(table);
 	pci_free_irq_vectors(dev->pdev);
+}
+
+bool mlx5_irq_table_have_dedicated_sfs_irqs(struct mlx5_irq_table *table)
+{
+	return table->sf_comp_pool;
 }
 
 int mlx5_irq_table_get_sfs_vec(struct mlx5_irq_table *table)

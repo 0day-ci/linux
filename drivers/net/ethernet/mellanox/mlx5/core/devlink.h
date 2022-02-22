@@ -6,6 +6,8 @@
 
 #include <net/devlink.h>
 
+#define MLX5_CPU_AFFINITY_MAX_LEN (NR_CPUS)
+
 enum mlx5_devlink_param_id {
 	MLX5_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
 	MLX5_DEVLINK_PARAM_ID_FLOW_STEERING_MODE,

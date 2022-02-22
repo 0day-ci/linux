@@ -16,6 +16,7 @@ int mlx5_irq_table_create(struct mlx5_core_dev *dev);
 void mlx5_irq_table_destroy(struct mlx5_core_dev *dev);
 int mlx5_irq_table_get_num_comp(struct mlx5_irq_table *table);
 int mlx5_irq_table_get_sfs_vec(struct mlx5_irq_table *table);
+bool mlx5_irq_table_have_dedicated_sfs_irqs(struct mlx5_irq_table *table);
 struct mlx5_irq_table *mlx5_irq_table_get(struct mlx5_core_dev *dev);
 
 int mlx5_set_msix_vec_count(struct mlx5_core_dev *dev, int devfn,
@@ -25,10 +26,12 @@ int mlx5_get_default_msix_vec_count(struct mlx5_core_dev *dev, int num_vfs);
 struct mlx5_irq *mlx5_ctrl_irq_request(struct mlx5_core_dev *dev);
 void mlx5_ctrl_irq_release(struct mlx5_irq *ctrl_irq);
 struct mlx5_irq *mlx5_irq_request(struct mlx5_core_dev *dev, u16 vecidx,
-				  struct cpumask *affinity);
+				  const struct cpumask *affinity);
 int mlx5_irqs_request_vectors(struct mlx5_core_dev *dev, u16 *cpus, int nirqs,
 			      struct mlx5_irq **irqs);
 void mlx5_irqs_release_vectors(struct mlx5_irq **irqs, int nirqs);
+int mlx5_irqs_request_mask(struct mlx5_core_dev *dev, struct mlx5_irq **irqs,
+			   struct cpumask *irqs_req_mask);
 int mlx5_irq_attach_nb(struct mlx5_irq *irq, struct notifier_block *nb);
 int mlx5_irq_detach_nb(struct mlx5_irq *irq, struct notifier_block *nb);
 struct cpumask *mlx5_irq_get_affinity_mask(struct mlx5_irq *irq);

@@ -307,4 +307,6 @@ bool mlx5_rdma_supported(struct mlx5_core_dev *dev);
 bool mlx5_vnet_supported(struct mlx5_core_dev *dev);
 bool mlx5_same_hw_devs(struct mlx5_core_dev *dev, struct mlx5_core_dev *peer_dev);
 
+void mlx5_core_affinity_get(struct mlx5_core_dev *dev, struct cpumask *dev_mask);
+
 #endif /* __MLX5_CORE_H__ */

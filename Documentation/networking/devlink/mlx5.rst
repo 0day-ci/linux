@@ -27,6 +27,9 @@ Parameters
    * - ``max_macs``
      - driverinit
      - The range is between 1 and 2^31. Only power of 2 values are supported.
+   * - ``cpu_affinity``
+     - driverinit | runtime
+     - empty affinity (0) means kernel assign the affinity
 
 The ``mlx5`` driver also implements the following driver-specific
 parameters.

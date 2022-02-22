@@ -794,6 +794,30 @@ void mlx5_eq_update_ci(struct mlx5_eq *eq, u32 cc, bool arm)
 }
 EXPORT_SYMBOL(mlx5_eq_update_ci);
 
+static int comp_irqs_request_by_cpu_affinity(struct mlx5_core_dev *dev)
+{
+	struct mlx5_eq_table *table = dev->priv.eq_table;
+	struct devlink *devlink = priv_to_devlink(dev);
+	union devlink_param_value val;
+	cpumask_var_t user_mask;
+	int ret;
+
+	if (!zalloc_cpumask_var(&user_mask, GFP_KERNEL))
+		return -ENOMEM;
+
+	val.vbitmap = cpumask_bits(user_mask);
+	ret = devlink_param_driverinit_value_get(devlink,
+						 DEVLINK_PARAM_GENERIC_ID_CPU_AFFINITY,
+						 &val);
+	if (ret)
+		goto out;
+
+	ret = mlx5_irqs_request_mask(dev, table->comp_irqs, user_mask);
+out:
+	free_cpumask_var(user_mask);
+	return ret;
+}
+
 static void comp_irqs_release(struct mlx5_core_dev *dev)
 {
 	struct mlx5_eq_table *table = dev->priv.eq_table;
@@ -817,6 +841,11 @@ static int comp_irqs_request(struct mlx5_core_dev *dev)
 	table->comp_irqs = kcalloc(ncomp_eqs, sizeof(*table->comp_irqs), GFP_KERNEL);
 	if (!table->comp_irqs)
 		return -ENOMEM;
+
+	ret = comp_irqs_request_by_cpu_affinity(dev);
+	if (ret > 0)
+		return ret;
+	mlx5_core_dbg(dev, "failed to get param cpu_affinity. use default policy\n");
 	if (mlx5_core_is_sf(dev)) {
 		ret = mlx5_irq_affinity_irqs_request_auto(dev, ncomp_eqs, table->comp_irqs);
 		if (ret < 0)
@@ -986,6 +1015,16 @@ mlx5_comp_irq_get_affinity_mask(struct mlx5_core_dev *dev, int vector)
 	return mlx5_irq_get_affinity_mask(eq->core.irq);
 }
 EXPORT_SYMBOL(mlx5_comp_irq_get_affinity_mask);
+
+void mlx5_core_affinity_get(struct mlx5_core_dev *dev, struct cpumask *dev_mask)
+{
+	struct mlx5_eq_table *table = dev->priv.eq_table;
+	struct mlx5_eq_comp *eq, *n;
+
+	list_for_each_entry_safe(eq, n, &table->comp_eqs_list, list)
+		cpumask_or(dev_mask, dev_mask,
+			   mlx5_irq_get_affinity_mask(eq->core.irq));
+}
 
 #ifdef CONFIG_RFS_ACCEL
 struct cpu_rmap *mlx5_eq_table_get_rmap(struct mlx5_core_dev *dev)

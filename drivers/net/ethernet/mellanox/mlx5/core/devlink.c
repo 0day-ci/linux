@@ -10,6 +10,7 @@
 #include "esw/qos.h"
 #include "sf/dev/dev.h"
 #include "sf/sf.h"
+#include "mlx5_irq.h"
 
 static int mlx5_devlink_flash_update(struct devlink *devlink,
 				     struct devlink_flash_update_params *params,
@@ -833,6 +834,121 @@ mlx5_devlink_max_uc_list_param_unregister(struct devlink *devlink)
 	devlink_param_unregister(devlink, &max_uc_list_param);
 }
 
+static int mlx5_devlink_cpu_affinity_validate(struct devlink *devlink, u32 id,
+					      union devlink_param_value val,
+					      struct netlink_ext_ack *extack)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+	cpumask_var_t tmp;
+	int max_eqs;
+	int ret = 0;
+	int last;
+
+	/* Check whether the mask is valid cpu mask */
+	last = find_last_bit(val.vbitmap, MLX5_CPU_AFFINITY_MAX_LEN);
+	if (last == MLX5_CPU_AFFINITY_MAX_LEN)
+		/* Affinity is empty, will use default policy*/
+		return 0;
+	if (last >= num_present_cpus()) {
+		NL_SET_ERR_MSG_MOD(extack, "Some CPUs aren't present");
+		return -ERANGE;
+	}
+
+	if (!zalloc_cpumask_var(&tmp, GFP_KERNEL))
+		return -ENOMEM;
+
+	bitmap_copy(cpumask_bits(tmp), val.vbitmap, nr_cpu_ids);
+	if (!cpumask_subset(tmp, cpu_online_mask)) {
+		NL_SET_ERR_MSG_MOD(extack, "Some CPUs aren't online");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* Check whether the PF/VF/SFs have enough IRQs. SF will
+	 * perform IRQ->CPU check during load time.
+	 */
+	if (mlx5_core_is_sf(dev))
+		max_eqs = min_t(int, MLX5_COMP_EQS_PER_SF,
+				mlx5_irq_table_get_sfs_vec(mlx5_irq_table_get(dev)));
+	else
+		max_eqs = mlx5_irq_table_get_num_comp(mlx5_irq_table_get(dev));
+	if (cpumask_weight(tmp) > max_eqs) {
+		NL_SET_ERR_MSG_MOD(extack, "PCI Function doesn’t have enough IRQs");
+		ret = -EINVAL;
+	}
+
+out:
+	free_cpumask_var(tmp);
+	return ret;
+}
+
+static int mlx5_devlink_cpu_affinity_set(struct devlink *devlink, u32 id,
+					 struct devlink_param_gset_ctx *ctx)
+{
+	/* Runtime set of cpu_affinity is not supported */
+	return -EOPNOTSUPP;
+}
+
+static int mlx5_devlink_cpu_affinity_get(struct devlink *devlink, u32 id,
+					 struct devlink_param_gset_ctx *ctx)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+	cpumask_var_t dev_mask;
+
+	if (!zalloc_cpumask_var(&dev_mask, GFP_KERNEL))
+		return -ENOMEM;
+	mlx5_core_affinity_get(dev, dev_mask);
+	bitmap_copy(ctx->val.vbitmap, cpumask_bits(dev_mask), nr_cpu_ids);
+	free_cpumask_var(dev_mask);
+	return 0;
+}
+
+static const struct devlink_param cpu_affinity_param =
+	DEVLINK_PARAM_DYNAMIC_GENERIC(CPU_AFFINITY, BIT(DEVLINK_PARAM_CMODE_RUNTIME) |
+				      BIT(DEVLINK_PARAM_CMODE_DRIVERINIT),
+				      mlx5_devlink_cpu_affinity_get,
+				      mlx5_devlink_cpu_affinity_set,
+				      mlx5_devlink_cpu_affinity_validate,
+				      MLX5_CPU_AFFINITY_MAX_LEN);
+
+static int mlx5_devlink_cpu_affinity_param_register(struct devlink *devlink)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+	union devlink_param_value value;
+	cpumask_var_t dev_mask;
+	int ret = 0;
+
+	if (mlx5_core_is_sf(dev) &&
+	    !mlx5_irq_table_have_dedicated_sfs_irqs(mlx5_irq_table_get(dev)))
+		return 0;
+
+	if (!zalloc_cpumask_var(&dev_mask, GFP_KERNEL))
+		return -ENOMEM;
+
+	ret = devlink_param_register(devlink, &cpu_affinity_param);
+	if (ret)
+		goto out;
+
+	value.vbitmap = cpumask_bits(dev_mask);
+	devlink_param_driverinit_value_set(devlink,
+					   DEVLINK_PARAM_GENERIC_ID_CPU_AFFINITY,
+					   value);
+out:
+	free_cpumask_var(dev_mask);
+	return ret;
+}
+
+static void mlx5_devlink_cpu_affinity_param_unregister(struct devlink *devlink)
+{
+	struct mlx5_core_dev *dev = devlink_priv(devlink);
+
+	if (mlx5_core_is_sf(dev) &&
+	    !mlx5_irq_table_have_dedicated_sfs_irqs(mlx5_irq_table_get(dev)))
+		return;
+
+	devlink_param_unregister(devlink, &cpu_affinity_param);
+}
+
 #define MLX5_TRAP_DROP(_id, _group_id)					\
 	DEVLINK_TRAP_GENERIC(DROP, DROP, _id,				\
 			     DEVLINK_TRAP_GROUP_GENERIC_ID_##_group_id, \
@@ -896,6 +1012,10 @@ int mlx5_devlink_register(struct devlink *devlink)
 	if (err)
 		goto max_uc_list_err;
 
+	err = mlx5_devlink_cpu_affinity_param_register(devlink);
+	if (err)
+		goto cpu_affinity_err;
+
 	err = mlx5_devlink_traps_register(devlink);
 	if (err)
 		goto traps_reg_err;
@@ -906,6 +1026,8 @@ int mlx5_devlink_register(struct devlink *devlink)
 	return 0;
 
 traps_reg_err:
+	mlx5_devlink_cpu_affinity_param_unregister(devlink);
+cpu_affinity_err:
 	mlx5_devlink_max_uc_list_param_unregister(devlink);
 max_uc_list_err:
 	mlx5_devlink_auxdev_params_unregister(devlink);
@@ -918,6 +1040,7 @@ auxdev_reg_err:
 void mlx5_devlink_unregister(struct devlink *devlink)
 {
 	mlx5_devlink_traps_unregister(devlink);
+	mlx5_devlink_cpu_affinity_param_unregister(devlink);
 	mlx5_devlink_max_uc_list_param_unregister(devlink);
 	mlx5_devlink_auxdev_params_unregister(devlink);
 	devlink_params_unregister(devlink, mlx5_devlink_params,
