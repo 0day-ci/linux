@@ -40,6 +40,13 @@ struct at91_pm_data {
 	unsigned int pmc_mckr_offset;
 	unsigned int pmc_version;
 };
+
+#include <linux/parser.h>
+
+extern const match_table_t pm_modes;
+
+int at91_pm_common_modes_select(char *str, int *standby_mode, int *suspend_mode);
+
 #endif
 
 #endif

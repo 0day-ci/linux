@@ -99,15 +99,6 @@ static struct at91_soc_pm soc_pm = {
 	},
 };
 
-static const match_table_t pm_modes __initconst = {
-	{ AT91_PM_STANDBY,	"standby" },
-	{ AT91_PM_ULP0,		"ulp0" },
-	{ AT91_PM_ULP0_FAST,    "ulp0-fast" },
-	{ AT91_PM_ULP1,		"ulp1" },
-	{ AT91_PM_BACKUP,	"backup" },
-	{ -1, NULL },
-};
-
 #define at91_ramc_read(id, field) \
 	__raw_readl(soc_pm.data.ramc[id] + field)
 
@@ -1243,25 +1234,7 @@ void __init sama7_pm_init(void)
 
 static int __init at91_pm_modes_select(char *str)
 {
-	char *s;
-	substring_t args[MAX_OPT_ARGS];
-	int standby, suspend;
-
-	if (!str)
-		return 0;
-
-	s = strsep(&str, ",");
-	standby = match_token(s, pm_modes, args);
-	if (standby < 0)
-		return 0;
-
-	suspend = match_token(str, pm_modes, args);
-	if (suspend < 0)
-		return 0;
-
-	soc_pm.data.standby_mode = standby;
-	soc_pm.data.suspend_mode = suspend;
-
-	return 0;
+	return at91_pm_common_modes_select(str, &soc_pm.data.standby_mode,
+					   &soc_pm.data.suspend_mode);
 }
 early_param("atmel.pm_modes", at91_pm_modes_select);
