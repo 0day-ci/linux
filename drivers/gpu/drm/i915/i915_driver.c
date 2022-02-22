@@ -577,6 +577,10 @@ static int i915_driver_hw_probe(struct drm_i915_private *dev_priv)
 
 	i915_perf_init(dev_priv);
 
+	ret = intel_gt_assign_ggtt(to_gt(dev_priv));
+	if (ret)
+		goto err_perf;
+
 	ret = i915_ggtt_probe_hw(dev_priv);
 	if (ret)
 		goto err_perf;
@@ -592,8 +596,6 @@ static int i915_driver_hw_probe(struct drm_i915_private *dev_priv)
 	ret = intel_memory_regions_hw_probe(dev_priv);
 	if (ret)
 		goto err_ggtt;
-
-	intel_gt_init_hw_early(to_gt(dev_priv), &dev_priv->ggtt);
 
 	ret = intel_gt_probe_lmem(to_gt(dev_priv));
 	if (ret)
@@ -832,21 +834,6 @@ int i915_driver_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* Disable nuclear pageflip by default on pre-ILK */
 	if (!i915->params.nuclear_pageflip && match_info->graphics.ver < 5)
 		i915->drm.driver_features &= ~DRIVER_ATOMIC;
-
-	/*
-	 * Check if we support fake LMEM -- for now we only unleash this for
-	 * the live selftests(test-and-exit).
-	 */
-#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
-	if (IS_ENABLED(CONFIG_DRM_I915_UNSTABLE_FAKE_LMEM)) {
-		if (GRAPHICS_VER(i915) >= 9 && i915_selftest.live < 0 &&
-		    i915->params.fake_lmem_start) {
-			mkwrite_device_info(i915)->memory_regions =
-				REGION_SMEM | REGION_LMEM | REGION_STOLEN_SMEM;
-			GEM_BUG_ON(!HAS_LMEM(i915));
-		}
-	}
-#endif
 
 	ret = pci_enable_device(pdev);
 	if (ret)
@@ -1152,7 +1139,7 @@ static int i915_drm_suspend(struct drm_device *dev)
 
 	/* Must be called before GGTT is suspended. */
 	intel_dpt_suspend(dev_priv);
-	i915_ggtt_suspend(&dev_priv->ggtt);
+	i915_ggtt_suspend(to_gt(dev_priv)->ggtt);
 
 	i915_save_display(dev_priv);
 
@@ -1276,7 +1263,7 @@ static int i915_drm_resume(struct drm_device *dev)
 	if (ret)
 		drm_err(&dev_priv->drm, "failed to re-enable GGTT\n");
 
-	i915_ggtt_resume(&dev_priv->ggtt);
+	i915_ggtt_resume(to_gt(dev_priv)->ggtt);
 	/* Must be called after GGTT is resumed. */
 	intel_dpt_resume(dev_priv);
 
