@@ -8,9 +8,10 @@
 
 #include <linux/types.h>
 
+#include "intel_context.h"
+
 struct drm_i915_gem_object;
 struct i915_gem_ww_ctx;
-struct intel_context;
 struct intel_engine_cs;
 struct intel_ring;
 struct kref;
@@ -68,5 +69,29 @@ void lrc_check_regs(const struct intel_context *ce,
 		    const char *when);
 
 void lrc_update_runtime(struct intel_context *ce);
+
+static inline void lrc_runtime_start(struct intel_context *ce)
+{
+	struct intel_context_stats *stats = &ce->stats;
+
+	if (intel_context_is_barrier(ce))
+		return;
+
+	if (stats->active)
+		return;
+
+	WRITE_ONCE(stats->active, intel_context_clock());
+}
+
+static inline void lrc_runtime_stop(struct intel_context *ce)
+{
+	struct intel_context_stats *stats = &ce->stats;
+
+	if (!stats->active)
+		return;
+
+	lrc_update_runtime(ce);
+	WRITE_ONCE(stats->active, 0);
+}
 
 #endif /* __INTEL_LRC_H__ */
