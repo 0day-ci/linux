@@ -1016,9 +1016,16 @@ void nf_flow_offload_add(struct nf_flowtable *flowtable,
 			 struct flow_offload *flow)
 {
 	struct net *net = read_pnet(&flowtable->net);
+	int max_wq_add = net->nft.max_wq_add;
 	struct flow_offload_work *offload;
+	int count_wq_add;
 
-	atomic_inc(&net->nft.count_wq_add);
+	count_wq_add = atomic_inc_return(&net->nft.count_wq_add);
+	if (max_wq_add && count_wq_add > max_wq_add) {
+		atomic_dec(&net->nft.count_wq_add);
+		return;
+	}
+
 	offload = nf_flow_offload_work_alloc(flowtable, flow, FLOW_CLS_REPLACE);
 	if (!offload) {
 		atomic_dec(&net->nft.count_wq_add);

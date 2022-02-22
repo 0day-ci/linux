@@ -622,6 +622,7 @@ enum nf_ct_sysctl_index {
 	NF_SYSCTL_CT_COUNT_HW,
 	NF_SYSCTL_CT_MAX_HW,
 	NF_SYSCTL_CT_COUNT_WQ_ADD,
+	NF_SYSCTL_CT_MAX_WQ_ADD,
 #endif
 
 	__NF_SYSCTL_CT_LAST_SYSCTL,
@@ -998,6 +999,12 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
 	},
+	[NF_SYSCTL_CT_MAX_WQ_ADD] = {
+		.procname	= "nf_flowtable_max_wq_add",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
 #endif
 	{}
 };
@@ -1139,6 +1146,7 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 	table[NF_SYSCTL_CT_COUNT_HW].data = &net->nft.count_hw;
 	table[NF_SYSCTL_CT_MAX_HW].data = &net->nft.max_hw;
 	table[NF_SYSCTL_CT_COUNT_WQ_ADD].data = &net->nft.count_wq_add;
+	table[NF_SYSCTL_CT_MAX_WQ_ADD].data = &net->nft.max_wq_add;
 #endif
 
 	nf_conntrack_standalone_init_tcp_sysctl(net, table);
@@ -1153,6 +1161,7 @@ static int nf_conntrack_standalone_init_sysctl(struct net *net)
 		table[NF_SYSCTL_CT_BUCKETS].mode = 0444;
 #if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
 		table[NF_SYSCTL_CT_MAX_HW].mode = 0444;
+		table[NF_SYSCTL_CT_MAX_WQ_ADD].mode = 0444;
 #endif
 	}
 
