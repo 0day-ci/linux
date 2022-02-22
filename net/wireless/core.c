@@ -261,6 +261,36 @@ void cfg80211_stop_nan(struct cfg80211_registered_device *rdev,
 	rdev->opencount--;
 }
 
+void cfg80211_start_mlo_link(struct cfg80211_registered_device *rdev,
+			     struct wireless_dev *wdev)
+{
+	lockdep_assert_held(&rdev->wiphy.mtx);
+
+	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_MLO_LINK))
+		return;
+
+	if (wdev_running(wdev))
+		return;
+
+	wdev->is_running = true;
+	rdev->opencount++;
+}
+
+void cfg80211_stop_mlo_link(struct cfg80211_registered_device *rdev,
+			    struct wireless_dev *wdev)
+{
+	lockdep_assert_held(&rdev->wiphy.mtx);
+
+	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_MLO_LINK))
+		return;
+
+	if (!wdev_running(wdev))
+		return;
+
+	wdev->is_running = false;
+	rdev->opencount--;
+}
+
 void cfg80211_shutdown_all_interfaces(struct wiphy *wiphy)
 {
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
@@ -284,6 +314,9 @@ void cfg80211_shutdown_all_interfaces(struct wiphy *wiphy)
 			break;
 		case NL80211_IFTYPE_NAN:
 			cfg80211_stop_nan(rdev, wdev);
+			break;
+		case NL80211_IFTYPE_MLO_LINK:
+			/* dev_close() of MLD STA wdev calls MLO link stop */
 			break;
 		default:
 			break;
@@ -1156,6 +1189,9 @@ static void _cfg80211_unregister_wdev(struct wireless_dev *wdev,
 	case NL80211_IFTYPE_NAN:
 		cfg80211_stop_nan(rdev, wdev);
 		break;
+	case NL80211_IFTYPE_MLO_LINK:
+		cfg80211_stop_mlo_link(rdev, wdev);
+		break;
 	default:
 		break;
 	}
@@ -1257,6 +1293,7 @@ void __cfg80211_leave(struct cfg80211_registered_device *rdev,
 		break;
 	case NL80211_IFTYPE_UNSPECIFIED:
 	case NL80211_IFTYPE_WDS:
+	case NL80211_IFTYPE_MLO_LINK:
 	case NUM_NL80211_IFTYPES:
 		/* invalid */
 		break;
@@ -1322,6 +1359,7 @@ void cfg80211_init_wdev(struct wireless_dev *wdev)
 		wdev->netdev->priv_flags |= IFF_DONT_BRIDGE;
 
 	INIT_WORK(&wdev->disconnect_wk, cfg80211_autodisconnect_wk);
+	wdev->mld_wdev = NULL;
 }
 
 void cfg80211_register_wdev(struct cfg80211_registered_device *rdev,
@@ -1383,11 +1421,48 @@ out:
 }
 EXPORT_SYMBOL(cfg80211_register_netdevice);
 
+int cfg80211_register_sta_mlo_link(struct wireless_dev *sta_wdev,
+				   struct wireless_dev *link_wdev)
+{
+	struct cfg80211_registered_device *rdev;
+	struct wireless_dev *wdev;
+
+	ASSERT_RTNL();
+
+	if (WARN_ON(link_wdev->iftype != NL80211_IFTYPE_MLO_LINK ||
+		    sta_wdev->iftype != NL80211_IFTYPE_STATION ||
+		    sta_wdev->wiphy != link_wdev->wiphy))
+		return -EINVAL;
+
+	rdev = wiphy_to_rdev(sta_wdev->wiphy);
+
+	lockdep_assert_held(&rdev->wiphy.mtx);
+
+	list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
+		if (sta_wdev == wdev)
+			break;
+	}
+
+	if (wdev != sta_wdev)
+		return -ENODEV;
+
+	if (wdev_running(sta_wdev))
+		return -EBUSY;
+
+	cfg80211_init_wdev(link_wdev);
+	link_wdev->mld_wdev = sta_wdev;
+	cfg80211_register_wdev(rdev, link_wdev);
+	nl80211_notify_iface(rdev, sta_wdev, NL80211_CMD_SET_INTERFACE);
+
+	return 0;
+}
+EXPORT_SYMBOL(cfg80211_register_sta_mlo_link);
+
 static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 					 unsigned long state, void *ptr)
 {
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct wireless_dev *wdev = dev->ieee80211_ptr, *link_wdev, *tmp_wdev;
 	struct cfg80211_registered_device *rdev;
 	struct cfg80211_sched_scan_request *pos, *tmp;
 
@@ -1421,6 +1496,12 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		 */
 		if (wdev->registered && !wdev->registering) {
 			wiphy_lock(&rdev->wiphy);
+			list_for_each_entry_safe(link_wdev, tmp_wdev, &rdev->wiphy.wdev_list, list) {
+				if (link_wdev->mld_wdev != wdev)
+					continue;
+
+				rdev_del_virtual_intf(rdev, link_wdev);
+			}
 			_cfg80211_unregister_wdev(wdev, false);
 			wiphy_unlock(&rdev->wiphy);
 		}
@@ -1448,6 +1529,14 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 		}
 
 		rdev->opencount--;
+
+		list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+			if (link_wdev->mld_wdev != wdev)
+				continue;
+
+			cfg80211_stop_mlo_link(rdev, link_wdev);
+		}
+
 		wiphy_unlock(&rdev->wiphy);
 		wake_up(&rdev->dev_wait);
 		break;
@@ -1499,6 +1588,14 @@ static int cfg80211_netdev_notifier_call(struct notifier_block *nb,
 			/* assume this means it's off */
 			wdev->ps = false;
 		}
+
+		list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+			if (link_wdev->mld_wdev != wdev)
+				continue;
+
+			cfg80211_start_mlo_link(rdev, link_wdev);
+		}
+
 		wiphy_unlock(&rdev->wiphy);
 		break;
 	case NETDEV_PRE_UP:
