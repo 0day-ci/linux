@@ -37,26 +37,46 @@ static int __pkvm_create_mappings(unsigned long start, unsigned long size,
 	return err;
 }
 
+/*
+ * Allocates a private VA range above __io_map_base.
+ *
+ * @size:	The size of the VA range to reserve.
+ * @align:	The required alignment for the allocation.
+ */
+unsigned long pkvm_alloc_private_va_range(size_t size, size_t align)
+{
+	unsigned long base, addr;
+
+	hyp_spin_lock(&pkvm_pgd_lock);
+
+	addr = ALIGN(__io_map_base, align);
+
+	/* The allocated size is always a multiple of PAGE_SIZE */
+	base = addr + PAGE_ALIGN(size);
+
+	/* Are we overflowing on the vmemmap ? */
+	if (base > __hyp_vmemmap)
+		addr = (unsigned long)ERR_PTR(-ENOMEM);
+	else
+		__io_map_base = base;
+
+	hyp_spin_unlock(&pkvm_pgd_lock);
+
+	return addr;
+}
+
 unsigned long __pkvm_create_private_mapping(phys_addr_t phys, size_t size,
-					    enum kvm_pgtable_prot prot)
+					size_t align, enum kvm_pgtable_prot prot)
 {
 	unsigned long addr;
 	int err;
 
-	hyp_spin_lock(&pkvm_pgd_lock);
-
-	size = PAGE_ALIGN(size + offset_in_page(phys));
-	addr = __io_map_base;
-	__io_map_base += size;
-
-	/* Are we overflowing on the vmemmap ? */
-	if (__io_map_base > __hyp_vmemmap) {
-		__io_map_base -= size;
-		addr = (unsigned long)ERR_PTR(-ENOMEM);
+	size += offset_in_page(phys);
+	addr = pkvm_alloc_private_va_range(size, align);
+	if (IS_ERR((void *)addr))
 		goto out;
-	}
 
-	err = kvm_pgtable_hyp_map(&pkvm_pgtable, addr, size, phys, prot);
+	err = __pkvm_create_mappings(addr, size, phys, prot);
 	if (err) {
 		addr = (unsigned long)ERR_PTR(err);
 		goto out;
@@ -64,8 +84,6 @@ unsigned long __pkvm_create_private_mapping(phys_addr_t phys, size_t size,
 
 	addr = addr + offset_in_page(phys);
 out:
-	hyp_spin_unlock(&pkvm_pgd_lock);
-
 	return addr;
 }
 
@@ -152,9 +170,8 @@ int hyp_map_vectors(void)
 		return 0;
 
 	phys = __hyp_pa(__bp_harden_hyp_vecs);
-	bp_base = (void *)__pkvm_create_private_mapping(phys,
-							__BP_HARDEN_HYP_VECS_SZ,
-							PAGE_HYP_EXEC);
+	bp_base = (void *)__pkvm_create_private_mapping(phys, __BP_HARDEN_HYP_VECS_SZ,
+							PAGE_SIZE, PAGE_HYP_EXEC);
 	if (IS_ERR_OR_NULL(bp_base))
 		return PTR_ERR(bp_base);
 
