@@ -4477,6 +4477,11 @@ static const struct devlink_param devlink_param_generic[] = {
 		.name = DEVLINK_PARAM_GENERIC_EVENT_EQ_SIZE_NAME,
 		.type = DEVLINK_PARAM_GENERIC_EVENT_EQ_SIZE_TYPE,
 	},
+	{
+		.id = DEVLINK_PARAM_GENERIC_ID_CPU_AFFINITY,
+		.name = DEVLINK_PARAM_GENERIC_CPU_AFFINITY_NAME,
+		.type = DEVLINK_PARAM_GENERIC_CPU_AFFINITY_TYPE,
+	},
 };
 
 static int devlink_param_generic_verify(const struct devlink_param *param)

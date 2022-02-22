@@ -137,3 +137,8 @@ own name.
    * - ``event_eq_size``
      - u32
      - Control the size of asynchronous control events EQ.
+   * - ``cpu_affinity``
+     - Bitfield
+     - control the cpu affinity of the device. user is able to change cpu
+       affinity also via procfs interface (/proc/irq/\*/smp_affinity). This will
+       overwrite the devlink setting.
