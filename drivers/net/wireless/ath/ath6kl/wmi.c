@@ -857,7 +857,7 @@ static int ath6kl_wmi_connect_event_rx(struct wmi *wmi, u8 *datap, int len,
 	struct wmi_connect_event *ev;
 	u8 *pie, *peie;
 
-	if (len < sizeof(struct wmi_connect_event))
+	if (len <= sizeof(struct wmi_connect_event))
 		return -EINVAL;
 
 	ev = (struct wmi_connect_event *) datap;
