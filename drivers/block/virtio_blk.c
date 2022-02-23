@@ -72,6 +72,9 @@ struct virtio_blk {
 	/* What host tells us, plus 2 for header & tailer. */
 	unsigned int sg_elems;
 
+	/* The max discard segment. */
+	unsigned int discard_sg_elems;
+
 	/* Ida index - used to track minor number allocations. */
 	int index;
 
@@ -314,8 +317,10 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 	bool notify = false;
 	blk_status_t status;
 	int err;
+	u32 sg_elems = (req_op(req) == REQ_OP_DISCARD) ?
+				vblk->discard_sg_elems + 2 : vblk->sg_elems;
 
-	BUG_ON(req->nr_phys_segments + 2 > vblk->sg_elems);
+	BUG_ON(req->nr_phys_segments + 2 > sg_elems);
 
 	status = virtblk_setup_cmd(vblk->vdev, req, vbr);
 	if (unlikely(status))
@@ -887,9 +892,8 @@ static int virtblk_probe(struct virtio_device *vdev)
 
 		virtio_cread(vdev, struct virtio_blk_config, max_discard_seg,
 			     &v);
-		blk_queue_max_discard_segments(q,
-					       min_not_zero(v,
-							    MAX_DISCARD_SEGMENTS));
+		vblk->discard_sg_elems = min_not_zero(v, MAX_DISCARD_SEGMENTS);
+		blk_queue_max_discard_segments(q, vblk->discard_sg_elems);
 
 		blk_queue_flag_set(QUEUE_FLAG_DISCARD, q);
 	}
