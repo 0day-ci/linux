@@ -31,7 +31,11 @@
 #include <sound/info.h>
 #include <sound/compress_params.h>
 #include <sound/compress_offload.h>
-#include <sound/compress_driver.h>
+#include <sound/compress_driver.h>ASoC: compress: propagate the error code from the compress framework
+
+Propagate the error code from the compress framework for the timestamp
+query. This error code will be used by the client to handle the
+error case scenarios gracefully.
 
 /* struct snd_compr_codec_caps overflows the ioctl bit size for some
  * architectures, so we need to disable the relevant ioctls.
@@ -166,9 +170,12 @@ static int snd_compr_free(struct inode *inode, struct file *f)
 static int snd_compr_update_tstamp(struct snd_compr_stream *stream,
 		struct snd_compr_tstamp *tstamp)
 {
+	int ret = 0;
 	if (!stream->ops->pointer)
 		return -ENOTSUPP;
-	stream->ops->pointer(stream, tstamp);
+	ret = stream->ops->pointer(stream, tstamp);
+	if (ret)
+		return ret;
 	pr_debug("dsp consumed till %d total %d bytes\n",
 		tstamp->byte_offset, tstamp->copied_total);
 	if (stream->direction == SND_COMPRESS_PLAYBACK)
