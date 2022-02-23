@@ -26,6 +26,8 @@ static struct {
 	.lock  = __RAW_SPIN_LOCK_UNLOCKED(cpu_pm_notifier.lock),
 };
 
+static atomic_t cpus_in_pm;
+
 static int cpu_pm_notify(enum cpu_pm_event event)
 {
 	int ret;
@@ -116,7 +118,20 @@ EXPORT_SYMBOL_GPL(cpu_pm_unregister_notifier);
  */
 int cpu_pm_enter(void)
 {
-	return cpu_pm_notify_robust(CPU_PM_ENTER, CPU_PM_ENTER_FAILED);
+	int ret;
+
+	ret = cpu_pm_notify_robust(CPU_PM_ENTER, CPU_PM_ENTER_FAILED);
+	if (ret)
+		return ret;
+
+	if (atomic_inc_return(&cpus_in_pm) == num_online_cpus()) {
+		ret = cpu_pm_notify_robust(CPU_LAST_PM_ENTER,
+					   CPU_LAST_PM_ENTER_FAILED);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(cpu_pm_enter);
 
@@ -134,7 +149,21 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
  */
 int cpu_pm_exit(void)
 {
-	return cpu_pm_notify(CPU_PM_EXIT);
+	int ret;
+
+	ret = cpu_pm_notify(CPU_PM_EXIT);
+	if (ret)
+		return ret;
+
+	if (atomic_read(&cpus_in_pm) == num_online_cpus()) {
+		ret = cpu_pm_notify(CPU_FIRST_PM_EXIT);
+		if (ret)
+			return ret;
+	}
+
+	atomic_dec(&cpus_in_pm);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(cpu_pm_exit);
 

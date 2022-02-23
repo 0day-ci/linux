@@ -55,6 +55,21 @@ enum cpu_pm_event {
 
 	/* A cpu power domain is exiting a low power state */
 	CPU_CLUSTER_PM_EXIT,
+
+	/*
+	 * A cpu is entering a low power state after all other cpus
+	 * in the system have entered the lower power state.
+	 */
+	CPU_LAST_PM_ENTER,
+
+	/* The last cpu failed to enter a low power state */
+	CPU_LAST_PM_ENTER_FAILED,
+
+	/*
+	 * A cpu is exiting a low power state before any other cpus
+	 * in the system exits the low power state.
+	 */
+	CPU_FIRST_PM_EXIT,
 };
 
 #ifdef CONFIG_CPU_PM
