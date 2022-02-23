@@ -2186,15 +2186,15 @@ static int kvm_s390_cpus_from_pv(struct kvm *kvm, u16 *rcp, u16 *rrcp)
 	 * behind.
 	 * We want to return the first failure rc and rrc, though.
 	 */
+	kvm_s390_vcpu_block_all(kvm);
 	kvm_for_each_vcpu(i, vcpu, kvm) {
-		mutex_lock(&vcpu->mutex);
 		if (kvm_s390_pv_destroy_cpu(vcpu, &rc, &rrc) && !ret) {
 			*rcp = rc;
 			*rrcp = rrc;
 			ret = -EIO;
 		}
-		mutex_unlock(&vcpu->mutex);
 	}
+	kvm_s390_vcpu_unblock_all(kvm);
 	return ret;
 }
 
@@ -2206,13 +2206,13 @@ static int kvm_s390_cpus_to_pv(struct kvm *kvm, u16 *rc, u16 *rrc)
 
 	struct kvm_vcpu *vcpu;
 
+	kvm_s390_vcpu_block_all(kvm);
 	kvm_for_each_vcpu(i, vcpu, kvm) {
-		mutex_lock(&vcpu->mutex);
 		r = kvm_s390_pv_create_cpu(vcpu, rc, rrc);
-		mutex_unlock(&vcpu->mutex);
 		if (r)
 			break;
 	}
+	kvm_s390_vcpu_unblock_all(kvm);
 	if (r)
 		kvm_s390_cpus_from_pv(kvm, &dummy, &dummy);
 	return r;
