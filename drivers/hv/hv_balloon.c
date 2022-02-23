@@ -1730,9 +1730,19 @@ static int balloon_connect_vsp(struct hv_device *dev)
 	 * When hibernation (i.e. virtual ACPI S4 state) is enabled, the host
 	 * currently still requires the bits to be set, so we have to add code
 	 * to fail the host's hot-add and balloon up/down requests, if any.
+	 *
+	 * We disable balloon if the page size is larger than 4k, since
+	 * currently it's unclear to us whether an unballoon request can make
+	 * sure all page ranges are guest page size aligned.
+	 *
+	 * We also disable hot add on ARM64, because we currently rely on
+	 * memory_add_physaddr_to_nid() to get a node id of a hot add range,
+	 * however ARM64's memory_add_physaddr_to_nid() always return 0 and
+	 * DM_MEM_HOT_ADD_REQUEST doesn't have the NUMA node information for
+	 * add_memory().
 	 */
-	cap_msg.caps.cap_bits.balloon = 1;
-	cap_msg.caps.cap_bits.hot_add = 1;
+	cap_msg.caps.cap_bits.balloon = !(PAGE_SIZE > 4096UL);
+	cap_msg.caps.cap_bits.hot_add = !IS_ENABLED(CONFIG_ARM64);
 
 	/*
 	 * Specify our alignment requirements as it relates
