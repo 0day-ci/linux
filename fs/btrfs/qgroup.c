@@ -1219,8 +1219,8 @@ int btrfs_quota_disable(struct btrfs_fs_info *fs_info)
 	 * deadlock with transaction by the qgroup rescan worker.
 	 */
 	clear_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags);
-	btrfs_qgroup_wait_for_completion(fs_info, false);
 	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+	btrfs_qgroup_wait_for_completion(fs_info, false);
 
 	/*
 	 * 1 For the root item
