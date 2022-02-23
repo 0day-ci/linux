@@ -947,6 +947,12 @@ static int hsw_crtc_compute_clock(struct intel_crtc_state *crtc_state)
 	if (IS_DG2(dev_priv))
 		return intel_mpllb_calc_state(crtc_state, encoder);
 
+	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_WD)) {
+		pr_alert("%s: %d: output type: 0x%x",
+			__func__, __LINE__, crtc_state->output_types);
+		return 0;
+		}
+
 	if (DISPLAY_VER(dev_priv) < 11 &&
 	    intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DSI))
 		return 0;

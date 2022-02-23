@@ -43,6 +43,7 @@
 #include <drm/drm_vblank.h>
 #include <drm/drm_vblank_work.h>
 #include <drm/i915_mei_hdcp_interface.h>
+#include <drm/drm_writeback.h>
 #include <media/cec-notifier.h>
 
 #include "i915_vma.h"
@@ -539,6 +540,8 @@ struct intel_connector {
 	struct work_struct modeset_retry_work;
 
 	struct intel_hdcp hdcp;
+
+	struct drm_writeback_connector wb_conn;
 };
 
 struct intel_digital_connector_state {
@@ -1285,6 +1288,11 @@ struct intel_crtc {
 	bool cpu_fifo_underrun_disabled;
 	bool pch_fifo_underrun_disabled;
 
+	struct {
+		struct drm_pending_vblank_event *e;
+		atomic_t work_busy;
+		wait_queue_head_t wd_wait;
+	} wd;
 	/* per-pipe watermark state */
 	struct {
 		/* watermarks currently being used  */
@@ -1403,6 +1411,7 @@ struct cxsr_latency {
 #define to_intel_crtc(x) container_of(x, struct intel_crtc, base)
 #define to_intel_crtc_state(x) container_of(x, struct intel_crtc_state, uapi)
 #define to_intel_connector(x) container_of(x, struct intel_connector, base)
+#define to_intel_wb_connector(x) container_of(x, struct intel_wb_connector, base)
 #define to_intel_encoder(x) container_of(x, struct intel_encoder, base)
 #define to_intel_framebuffer(x) container_of(x, struct intel_framebuffer, base)
 #define to_intel_plane(x) container_of(x, struct intel_plane, base)
@@ -1832,6 +1841,13 @@ static inline bool intel_encoder_is_dp(struct intel_encoder *encoder)
 	default:
 		return false;
 	}
+}
+
+static inline bool intel_encoder_is_wd(struct intel_encoder *encoder)
+{
+	if (encoder->type == INTEL_OUTPUT_WD)
+		return true;
+	return false;
 }
 
 static inline struct intel_lspcon *

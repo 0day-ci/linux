@@ -110,6 +110,7 @@
 #include "intel_sprite.h"
 #include "intel_tc.h"
 #include "intel_vga.h"
+#include "intel_wd.h"
 #include "i9xx_plane.h"
 #include "skl_scaler.h"
 #include "skl_universal_plane.h"
@@ -1548,6 +1549,69 @@ static void intel_encoders_update_complete(struct intel_atomic_state *state)
 	}
 }
 
+static void intel_queue_writeback_job(struct intel_atomic_state *state,
+		struct intel_crtc *intel_crtc, struct intel_crtc_state *crtc_state)
+{
+	struct drm_connector_state *new_conn_state;
+	struct drm_connector *connector;
+	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
+	struct intel_wd *intel_wd;
+	struct intel_encoder *encoder;
+	int i;
+
+	for_each_intel_encoder_with_wd(&dev_priv->drm, encoder) {
+		intel_wd = enc_to_intel_wd(encoder);
+
+		if (intel_wd->wd_crtc != intel_crtc)
+			return;
+
+	}
+
+	for_each_new_connector_in_state(&state->base, connector, new_conn_state,
+					i) {
+		if (!new_conn_state->writeback_job)
+			continue;
+
+		drm_writeback_queue_job(connector->wb_connector, new_conn_state);
+		drm_dbg_kms(&dev_priv->drm, "queueing writeback job\n");
+	}
+}
+
+static void intel_find_writeback_connector(struct intel_atomic_state *state,
+		struct intel_crtc *intel_crtc, struct intel_crtc_state *crtc_state)
+{
+	struct drm_connector_state *new_conn_state;
+	struct drm_connector *connector;
+	struct drm_i915_private *dev_priv = to_i915(intel_crtc->base.dev);
+	struct intel_wd *intel_wd;
+	struct intel_encoder *encoder;
+	int i;
+
+	for_each_intel_encoder_with_wd(&dev_priv->drm, encoder) {
+		intel_wd = enc_to_intel_wd(encoder);
+
+		if (intel_wd->wd_crtc != intel_crtc)
+			return;
+
+	}
+
+	for_each_new_connector_in_state(&state->base, connector, new_conn_state,
+					i) {
+		struct intel_connector *intel_connector;
+
+		intel_connector = to_intel_connector(connector);
+		drm_dbg_kms(&dev_priv->drm, "[CONNECTOR:%d:%s]: status: %s\n",
+				connector->base.id, connector->name,
+				drm_get_connector_status_name(connector->status));
+		encoder = intel_connector_primary_encoder(intel_connector);
+		if (encoder->type == INTEL_OUTPUT_WD) {
+			drm_dbg_kms(&dev_priv->drm, "encoder intel_output_wd found\n");
+			intel_wd_enable_capture(encoder, crtc_state, new_conn_state);
+		}
+	}
+
+}
+
 static void intel_encoders_pre_pll_enable(struct intel_atomic_state *state,
 					  struct intel_crtc *crtc)
 {
@@ -1948,7 +2012,8 @@ static void hsw_crtc_enable(struct intel_atomic_state *state,
 		bdw_set_pipemisc(new_crtc_state);
 
 	if (!intel_crtc_is_bigjoiner_slave(new_crtc_state) &&
-	    !transcoder_is_dsi(cpu_transcoder))
+	    !transcoder_is_dsi(cpu_transcoder) &&
+	    !transcoder_is_wd(cpu_transcoder))
 		hsw_configure_cpu_transcoder(new_crtc_state);
 
 	crtc->active = true;
@@ -5169,6 +5234,7 @@ static const char * const output_type_str[] = {
 	OUTPUT_TYPE(DSI),
 	OUTPUT_TYPE(DDI),
 	OUTPUT_TYPE(DP_MST),
+	OUTPUT_TYPE(WD),
 };
 
 #undef OUTPUT_TYPE
@@ -8390,6 +8456,10 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 		}
 	}
 
+	for_each_new_intel_crtc_in_state(state, crtc, new_crtc_state, i) {
+		intel_wd_set_vblank_event(crtc, new_crtc_state);
+	}
+
 	intel_encoders_update_prepare(state);
 
 	intel_dbuf_pre_plane_update(state);
@@ -8474,6 +8544,11 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 		intel_verify_planes(state);
 
 	intel_sagv_post_plane_update(state);
+
+	for_each_new_intel_crtc_in_state(state, crtc, new_crtc_state, i) {
+		intel_queue_writeback_job(state, crtc, new_crtc_state);
+		intel_find_writeback_connector(state, crtc, new_crtc_state);
+	}
 
 	drm_atomic_helper_commit_hw_done(&state->base);
 
@@ -8779,6 +8854,7 @@ static void intel_setup_outputs(struct drm_i915_private *dev_priv)
 		intel_ddi_init(dev_priv, PORT_TC1);
 		intel_ddi_init(dev_priv, PORT_TC2);
 	} else if (DISPLAY_VER(dev_priv) >= 12) {
+		intel_wd_init(dev_priv, TRANSCODER_WD_0);
 		intel_ddi_init(dev_priv, PORT_A);
 		intel_ddi_init(dev_priv, PORT_B);
 		intel_ddi_init(dev_priv, PORT_TC1);
