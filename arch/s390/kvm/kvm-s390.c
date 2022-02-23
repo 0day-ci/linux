@@ -2218,6 +2218,34 @@ static int kvm_s390_cpus_to_pv(struct kvm *kvm, u16 *rc, u16 *rrc)
 	return r;
 }
 
+static int kvm_s390_handle_pv_info(struct kvm_s390_pv_info *info)
+{
+	u32 len;
+
+	switch (info->header.id) {
+	case KVM_PV_INFO_VM: {
+		len =  sizeof(info->header) + sizeof(info->vm);
+
+		if (info->header.len < len)
+			return -EINVAL;
+
+		memcpy(info->vm.inst_calls_list,
+		       uv_info.inst_calls_list,
+		       sizeof(uv_info.inst_calls_list));
+
+		/* It's max cpuidm not max cpus so it's off by one */
+		info->vm.max_cpus = uv_info.max_guest_cpu_id + 1;
+		info->vm.max_guests = uv_info.max_num_sec_conf;
+		info->vm.max_guest_addr = uv_info.max_sec_stor_addr;
+		info->vm.feature_indication = uv_info.uv_feature_indications;
+
+		return 0;
+	}
+	default:
+		return -EINVAL;
+	}
+}
+
 static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 {
 	int r = 0;
@@ -2353,6 +2381,25 @@ static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 		KVM_UV_EVENT(kvm, 3, "PROTVIRT UNSHARE: rc %x rrc %x",
 			     cmd->rc, cmd->rrc);
 		break;
+	}
+	case KVM_PV_INFO: {
+		struct kvm_s390_pv_info info = {};
+
+		if (copy_from_user(&info, argp, sizeof(info.header)))
+			return -EFAULT;
+
+		if (info.header.len < sizeof(info.header))
+			return -EINVAL;
+
+		r = kvm_s390_handle_pv_info(&info);
+		if (r)
+			return r;
+
+		r = copy_to_user(argp, &info, sizeof(info));
+
+		if (r)
+			return -EFAULT;
+		return 0;
 	}
 	default:
 		r = -ENOTTY;
