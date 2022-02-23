@@ -790,6 +790,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 		NLA_POLICY_RANGE(NLA_BINARY,
 				 NL80211_EHT_MIN_CAPABILITY_LEN,
 				 NL80211_EHT_MAX_CAPABILITY_LEN),
+	[NL80211_ATTR_MLO_SUPPORT] = { .type = NLA_FLAG },
 };
 
 /* policy for the key attributes */
@@ -1499,13 +1500,16 @@ static int nl80211_key_allowed(struct wireless_dev *wdev)
 		if (!wdev->current_bss)
 			return -ENOLINK;
 		break;
+	case NL80211_IFTYPE_MLO_LINK:
+		if (is_zero_ether_addr(wdev->link_bssid))
+			return -ENOLINK;
+		break;
 	case NL80211_IFTYPE_UNSPECIFIED:
 	case NL80211_IFTYPE_OCB:
 	case NL80211_IFTYPE_MONITOR:
 	case NL80211_IFTYPE_NAN:
 	case NL80211_IFTYPE_P2P_DEVICE:
 	case NL80211_IFTYPE_WDS:
-	case NL80211_IFTYPE_MLO_LINK:
 	case NUM_NL80211_IFTYPES:
 		return -EINVAL;
 	}
@@ -3755,6 +3759,13 @@ static int nl80211_send_iface(struct sk_buff *msg, u32 portid, u32 seq, int flag
 
 		if (nla_put_u64_64bit(msg, NL80211_MLO_LINK_INFO_ATTR_WDEV,
 				      wdev_id(link_wdev), NL80211_ATTR_PAD))
+			goto nla_put_failure_locked;
+
+		if (!is_zero_ether_addr(link_wdev->link_bssid) &&
+		    (nla_put(msg, NL80211_MLO_LINK_INFO_ATTR_BSSID, ETH_ALEN,
+			     link_wdev->link_bssid) ||
+		     nla_put_u8(msg, NL80211_MLO_LINK_INFO_ATTR_LINK_ID,
+				link_wdev->link_id)))
 			goto nla_put_failure_locked;
 
 		nla_nest_end(msg, nested_mlo_links);
@@ -10439,6 +10450,9 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 		req.flags |= ASSOC_REQ_USE_RRM;
 	}
 
+	if (nla_get_flag(info->attrs[NL80211_ATTR_MLO_SUPPORT]))
+		req.flags |= ASSOC_MLO_SUPPORT;
+
 	if (info->attrs[NL80211_ATTR_FILS_KEK]) {
 		req.fils_kek = nla_data(info->attrs[NL80211_ATTR_FILS_KEK]);
 		req.fils_kek_len = nla_len(info->attrs[NL80211_ATTR_FILS_KEK]);
@@ -11290,6 +11304,9 @@ static int nl80211_connect(struct sk_buff *skb, struct genl_info *info)
 		}
 		connect.flags |= CONNECT_REQ_EXTERNAL_AUTH_SUPPORT;
 	}
+
+	if (nla_get_flag(info->attrs[NL80211_ATTR_MLO_SUPPORT]))
+		connect.flags |= ASSOC_MLO_SUPPORT;
 
 	wdev_lock(dev->ieee80211_ptr);
 
@@ -16813,6 +16830,42 @@ void nl80211_send_assoc_timeout(struct cfg80211_registered_device *rdev,
 				  addr, gfp);
 }
 
+static int
+nl80211_put_mlo_link_params(struct sk_buff *msg,
+			    const struct cfg80211_mlo_link_params *mlo_links,
+			    int n_mlo_links)
+{
+	struct nlattr *nested, *nested_mlo_links;
+	int i;
+
+	if (n_mlo_links) {
+		nested = nla_nest_start(msg, NL80211_ATTR_MLO_LINK_INFO);
+		if (!nested)
+			return -ENOBUFS;
+
+		for (i = 0; i < n_mlo_links; i++) {
+			nested_mlo_links = nla_nest_start(msg, i + 1);
+			if (!nested_mlo_links)
+				return -ENOBUFS;
+
+			if (nla_put_u64_64bit(msg,
+					      NL80211_MLO_LINK_INFO_ATTR_WDEV,
+					      wdev_id(mlo_links[i].wdev),
+					      NL80211_ATTR_PAD) ||
+			    nla_put(msg, NL80211_MLO_LINK_INFO_ATTR_BSSID,
+				    ETH_ALEN, mlo_links[i].bssid) ||
+			    nla_put_u8(msg, NL80211_MLO_LINK_INFO_ATTR_LINK_ID,
+				       mlo_links[i].link_id))
+				return -ENOBUFS;
+
+			nla_nest_end(msg, nested_mlo_links);
+		}
+		nla_nest_end(msg, nested);
+	}
+
+	return 0;
+}
+
 void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
 				 struct net_device *netdev,
 				 struct cfg80211_connect_resp_params *cr,
@@ -16820,10 +16873,15 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
 {
 	struct sk_buff *msg;
 	void *hdr;
+	int mlo_link_info_size = cr->n_mlo_links *
+				 (nla_total_size_64bit(sizeof(u64)) +
+				  nla_total_size(ETH_ALEN) +
+				  nla_total_size(sizeof(u8)));
 
 	msg = nlmsg_new(100 + cr->req_ie_len + cr->resp_ie_len +
 			cr->fils.kek_len + cr->fils.pmk_len +
-			(cr->fils.pmkid ? WLAN_PMKID_LEN : 0), gfp);
+			(cr->fils.pmkid ? WLAN_PMKID_LEN : 0) +
+			mlo_link_info_size, gfp);
 	if (!msg)
 		return;
 
@@ -16862,6 +16920,9 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
 	       nla_put(msg, NL80211_ATTR_PMKID, WLAN_PMKID_LEN, cr->fils.pmkid)))))
 		goto nla_put_failure;
 
+	if (nl80211_put_mlo_link_params(msg, cr->mlo_links, cr->n_mlo_links))
+		goto nla_put_failure;
+
 	genlmsg_end(msg, hdr);
 
 	genlmsg_multicast_netns(&nl80211_fam, wiphy_net(&rdev->wiphy), msg, 0,
@@ -16879,10 +16940,16 @@ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
 	struct sk_buff *msg;
 	void *hdr;
 	const u8 *bssid = info->bss ? info->bss->bssid : info->bssid;
+	int mlo_link_info_size = info->n_mlo_links *
+				 (nla_total_size_64bit(sizeof(u64)) +
+				  nla_total_size(ETH_ALEN) +
+				  nla_total_size(sizeof(u8)));
 
-	msg = nlmsg_new(100 + info->req_ie_len + info->resp_ie_len +
-			info->fils.kek_len + info->fils.pmk_len +
-			(info->fils.pmkid ? WLAN_PMKID_LEN : 0), gfp);
+	msg = nlmsg_new(100 + info->req_ie_len +
+			info->resp_ie_len + info->fils.kek_len +
+			info->fils.pmk_len +
+			(info->fils.pmkid ? WLAN_PMKID_LEN : 0) +
+			mlo_link_info_size, gfp);
 	if (!msg)
 		return;
 
@@ -16911,6 +16978,10 @@ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
 	     nla_put(msg, NL80211_ATTR_PMK, info->fils.pmk_len, info->fils.pmk)) ||
 	    (info->fils.pmkid &&
 	     nla_put(msg, NL80211_ATTR_PMKID, WLAN_PMKID_LEN, info->fils.pmkid)))
+		goto nla_put_failure;
+
+	if (nl80211_put_mlo_link_params(msg, info->mlo_links,
+					info->n_mlo_links))
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);

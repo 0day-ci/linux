@@ -1386,6 +1386,25 @@ cfg80211_get_chan_state(struct wireless_dev *wdev,
 			return;
 		}
 		break;
+	case NL80211_IFTYPE_MLO_LINK:
+		if (!is_zero_ether_addr(wdev->link_bssid)) {
+			if (!memcmp(wdev->link_bssid,
+				    wdev->mld_wdev->current_bss->pub.bssid,
+				    ETH_ALEN))
+				*chan = wdev->current_bss->pub.channel;
+			else
+				*chan = cfg80211_get_colocated_ap_chan(
+						wiphy_to_rdev(wdev->wiphy),
+						wdev->mld_wdev->current_bss,
+						wdev->link_bssid);
+
+			if (WARN_ON(!*chan))
+				return;
+
+			*chanmode = CHAN_MODE_SHARED;
+			return;
+		}
+		break;
 	case NL80211_IFTYPE_AP:
 	case NL80211_IFTYPE_P2P_GO:
 		if (wdev->cac_started) {
@@ -1432,7 +1451,6 @@ cfg80211_get_chan_state(struct wireless_dev *wdev,
 		return;
 	case NL80211_IFTYPE_UNSPECIFIED:
 	case NL80211_IFTYPE_WDS:
-	case NL80211_IFTYPE_MLO_LINK:
 	case NUM_NL80211_IFTYPES:
 		WARN_ON(1);
 	}

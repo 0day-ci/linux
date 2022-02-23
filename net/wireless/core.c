@@ -1360,6 +1360,7 @@ void cfg80211_init_wdev(struct wireless_dev *wdev)
 
 	INIT_WORK(&wdev->disconnect_wk, cfg80211_autodisconnect_wk);
 	wdev->mld_wdev = NULL;
+	eth_zero_addr(wdev->link_bssid);
 }
 
 void cfg80211_register_wdev(struct cfg80211_registered_device *rdev,
