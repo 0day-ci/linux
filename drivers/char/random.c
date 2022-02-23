@@ -345,6 +345,46 @@ static void crng_reseed(void)
 }
 
 /*
+ * This mixes unique_vm_id directly into the base_crng key as soon as
+ * possible, similarly to crng_pre_init_inject(), even if the crng is
+ * already running, in order to immediately branch streams from prior
+ * VM instances.
+ */
+static void crng_vm_fork_inject(const void *unique_vm_id, size_t len)
+{
+	unsigned long flags, next_gen;
+	struct blake2s_state hash;
+
+	/*
+	 * Unlike crng_reseed(), we take the lock as early as possible,
+	 * since we don't want the RNG to be used until it's updated.
+	 */
+	spin_lock_irqsave(&base_crng.lock, flags);
+
+	/*
+	 * Also update the generation, while locked, as early as
+	 * possible. This will mean unlocked reads of the generation
+	 * will cause a reseeding of per-cpu crngs, and those will
+	 * spin on the base_crng lock waiting for the rest of this
+	 * operation to complete, which achieves the goal of blocking
+	 * the production of new output until this is done.
+	 */
+	next_gen = base_crng.generation + 1;
+	if (next_gen == ULONG_MAX)
+		++next_gen;
+	WRITE_ONCE(base_crng.generation, next_gen);
+	WRITE_ONCE(base_crng.birth, jiffies);
+
+	/* This is the same formulation used by crng_pre_init_inject(). */
+	blake2s_init(&hash, sizeof(base_crng.key));
+	blake2s_update(&hash, base_crng.key, sizeof(base_crng.key));
+	blake2s_update(&hash, unique_vm_id, len);
+	blake2s_final(&hash, base_crng.key);
+
+	spin_unlock_irqrestore(&base_crng.lock, flags);
+}
+
+/*
  * This generates a ChaCha block using the provided key, and then
  * immediately overwites that key with half the block. It returns
  * the resultant ChaCha state to the user, along with the second
@@ -935,6 +975,7 @@ static bool drain_entropy(void *buf, size_t nbytes)
  *	void add_hwgenerator_randomness(const void *buffer, size_t count,
  *					size_t entropy);
  *	void add_bootloader_randomness(const void *buf, size_t size);
+ *	void add_vmfork_randomness(const void *unique_vm_id, size_t size);
  *	void add_interrupt_randomness(int irq);
  *
  * add_device_randomness() adds data to the input pool that
@@ -965,6 +1006,11 @@ static bool drain_entropy(void *buf, size_t nbytes)
  * add_bootloader_randomness() is the same as add_hwgenerator_randomness() or
  * add_device_randomness(), depending on whether or not the configuration
  * option CONFIG_RANDOM_TRUST_BOOTLOADER is set.
+ *
+ * add_vmfork_randomness() adds a unique (but not neccessarily secret) ID
+ * representing the current instance of a VM to the pool, without crediting,
+ * and then immediately mixes that ID into the current base_crng key, so
+ * that it takes effect prior to a reseeding.
  *
  * add_interrupt_randomness() uses the interrupt timing as random
  * inputs to the entropy pool. Using the cycle counters and the irq source
@@ -1194,6 +1240,18 @@ void add_bootloader_randomness(const void *buf, size_t size)
 		add_device_randomness(buf, size);
 }
 EXPORT_SYMBOL_GPL(add_bootloader_randomness);
+
+/*
+ * Handle a new unique VM ID, which is unique, not secret, so we
+ * don't credit it, but we do mix it into the entropy pool and
+ * inject it into the crng.
+ */
+void add_vmfork_randomness(const void *unique_vm_id, size_t size)
+{
+	add_device_randomness(unique_vm_id, size);
+	crng_vm_fork_inject(unique_vm_id, size);
+}
+EXPORT_SYMBOL_GPL(add_vmfork_randomness);
 
 struct fast_pool {
 	union {
