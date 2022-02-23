@@ -61,6 +61,7 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_ioctl.h>
 #include <drm/gpu_scheduler.h>
+#include <drm/drm_suballoc.h>
 
 #include <kgd_kfd_interface.h>
 #include "dm_pp_interface.h"
@@ -417,29 +418,11 @@ struct amdgpu_clock {
  * alignment).
  */
 
-#define AMDGPU_SA_NUM_FENCE_LISTS	32
-
 struct amdgpu_sa_manager {
-	wait_queue_head_t	wq;
-	struct amdgpu_bo	*bo;
-	struct list_head	*hole;
-	struct list_head	flist[AMDGPU_SA_NUM_FENCE_LISTS];
-	struct list_head	olist;
-	unsigned		size;
-	uint64_t		gpu_addr;
-	void			*cpu_ptr;
-	uint32_t		domain;
-	uint32_t		align;
-};
-
-/* sub-allocation buffer */
-struct amdgpu_sa_bo {
-	struct list_head		olist;
-	struct list_head		flist;
-	struct amdgpu_sa_manager	*manager;
-	unsigned			soffset;
-	unsigned			eoffset;
-	struct dma_fence	        *fence;
+	struct drm_suballoc_manager	base;
+	struct amdgpu_bo		*bo;
+	uint64_t			gpu_addr;
+	void				*cpu_ptr;
 };
 
 int amdgpu_fence_slab_init(void);
@@ -470,7 +453,7 @@ struct amdgpu_flip_work {
  */
 
 struct amdgpu_ib {
-	struct amdgpu_sa_bo		*sa_bo;
+	struct drm_suballoc		*sa_bo;
 	uint32_t			length_dw;
 	uint64_t			gpu_addr;
 	uint32_t			*ptr;
