@@ -135,7 +135,25 @@ struct page_pool {
 	refcount_t user_cnt;
 
 	u64 destroy_cnt;
+#ifdef CONFIG_PAGE_POOL_STATS
+	struct page_pool_stats __percpu *stats ____cacheline_aligned_in_smp;
+#endif
 };
+
+#ifdef CONFIG_PAGE_POOL_STATS
+struct page_pool_stats {
+	struct {
+		u64 fast; /* fast path allocations */
+		u64 slow; /* slow-path order 0 allocations */
+		u64 slow_high_order; /* slow-path high order allocations */
+		u64 empty; /* failed refills due to empty ptr ring, forcing
+			    * slow path allocation
+			    */
+		u64 refill; /* allocations via successful refill */
+		u64 waive;  /* failed refills due to numa zone mismatch */
+	} alloc;
+};
+#endif
 
 struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp);
 
