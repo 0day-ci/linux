@@ -5561,6 +5561,9 @@ static inline void wiphy_unlock(struct wiphy *wiphy)
  * @pmsr_free_wk: (private) peer measurements cleanup work
  * @unprot_beacon_reported: (private) timestamp of last
  *	unprotected beacon report
+ * @mld_wdev: points to MLD wdev of type %NL80211_IFTYPE_STATION to which this
+ *	MLO link wdev is affiliated to. Valid for iftype
+ *	%NL80211_IFTYPE_MLO_LINK only.
  */
 struct wireless_dev {
 	struct wiphy *wiphy;
@@ -5639,6 +5642,8 @@ struct wireless_dev {
 	struct work_struct pmsr_free_wk;
 
 	unsigned long unprot_beacon_reported;
+
+	struct wireless_dev *mld_wdev;
 };
 
 static inline const u8 *wdev_address(struct wireless_dev *wdev)
@@ -8196,6 +8201,35 @@ int cfg80211_iter_combinations(struct wiphy *wiphy,
  */
 void cfg80211_stop_iface(struct wiphy *wiphy, struct wireless_dev *wdev,
 			 gfp_t gfp);
+
+/**
+ * cfg80211_register_sta_mlo_link - Register an MLO link wdev and affiliate
+ *	with STA wdev.
+ * @sta_wdev: wireless device of a non-AP Station interface
+ * @link_wdev: wireless device of an MLO link affiliated to the Station
+ *	Iface(@sta_wdev).
+ *
+ * Create a wdev interface for an MLO link and associate it with existing MLD
+ * STA wdev. Both MLD STA wdev and MLO link wdev must belong to same wiphy.
+ * Driver must register all the MLO link wdevs with MLD STA wdev before
+ * STA wdev interface is up. Callers must hold the RTNL and wiphy mutex lock.
+ *
+ * Return: A zero on success or a negative error code.
+ */
+int cfg80211_register_sta_mlo_link(struct wireless_dev *sta_wdev,
+				   struct wireless_dev *link_wdev);
+
+/**
+ * cfg80211_unregister_sta_mlo_link - remove the given MLO link wdev
+ * @wdev: struct wireless_dev of a MLO link to remove
+ *
+ * This function removes the MLO link device so it can no longer be used.
+ * Requires the RTNL and wiphy mutex to be held.
+ */
+static inline void cfg80211_unregister_sta_mlo_link(struct wireless_dev *wdev)
+{
+	cfg80211_unregister_wdev(wdev);
+}
 
 /**
  * cfg80211_shutdown_all_interfaces - shut down all interfaces for a wiphy

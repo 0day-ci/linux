@@ -2663,6 +2663,12 @@ enum nl80211_commands {
  *	association request when used with NL80211_CMD_NEW_STATION). Can be set
  *	only if %NL80211_STA_FLAG_WME is set.
  *
+ * @NL80211_ATTR_MLO_LINK_INFO: MLO links information associated with
+ *	%NL80211_IFTYPE_STA interface. This is used in
+ *	%NL80211_CMD_GET/SET/NEW_INTERFACE response to indicate information of
+ *	all the MLO links affiliated to %NL80211_IFTYPE_STATION interface.
+ *	See &enum nl80211_mlo_link_info_attributes for details.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -3175,6 +3181,8 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_EHT_CAPABILITY,
 
+	NL80211_ATTR_MLO_LINK_INFO,
+
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
@@ -3262,6 +3270,12 @@ enum nl80211_attrs {
  * @NL80211_IF_TYPE_OCB: Outside Context of a BSS
  *	This mode corresponds to the MIB variable dot11OCBActivated=true
  * @NL80211_IFTYPE_NAN: NAN device interface type (not a netdev)
+ * @NL80211_IFTYPE_MLO_LINK: MLO link device interface type, this is not a
+ *	netdev and can't be created in the normal ways. Drivers can
+ *	register and associate this interface with iftype
+ *	%NL80211_IFTYPE_STATION. Drivers shall indicate support for this
+ *	interface mode in %NL80211_ATTR_SUPPORTED_IFTYPES when MLO supported in
+ *	STA mode.
  * @NL80211_IFTYPE_MAX: highest interface type number currently defined
  * @NUM_NL80211_IFTYPES: number of defined interface types
  *
@@ -3283,6 +3297,7 @@ enum nl80211_iftype {
 	NL80211_IFTYPE_P2P_DEVICE,
 	NL80211_IFTYPE_OCB,
 	NL80211_IFTYPE_NAN,
+	NL80211_IFTYPE_MLO_LINK,
 
 	/* keep last */
 	NUM_NL80211_IFTYPES,
@@ -7598,6 +7613,27 @@ enum nl80211_mbssid_config_attributes {
 enum nl80211_ap_settings_flags {
 	NL80211_AP_SETTINGS_EXTERNAL_AUTH_SUPPORT	= 1 << 0,
 	NL80211_AP_SETTINGS_SA_QUERY_OFFLOAD_SUPPORT	= 1 << 1,
+};
+
+/**
+ * enum nl80211_mlo_link_info_attributes - MLO link's information.
+ *
+ * @__NL80211_MLO_LINK_INFO_ATTR_INVALID: Invalid
+ *
+ * @NL80211_MLO_LINK_INFO_ATTR_WDEV: wireless device identifier for MLO link
+ *	(u64)
+ *
+ * @__NL80211_MLO_LINK_INFO_ATTR_LAST: Internal
+ * @NL80211_MLO_LINK_INFO_ATTR_MAX: highest attribute
+ */
+enum nl80211_mlo_link_info_attributes {
+	__NL80211_MLO_LINK_INFO_ATTR_INVALID,
+
+	NL80211_MLO_LINK_INFO_ATTR_WDEV,
+
+	/* keep last */
+	__NL80211_MLO_LINK_INFO_ATTR_LAST,
+	NL80211_MLO_LINK_INFO_ATTR_MAX = __NL80211_MLO_LINK_INFO_ATTR_LAST - 1,
 };
 
 #endif /* __LINUX_NL80211_H */

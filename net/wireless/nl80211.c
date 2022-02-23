@@ -1505,6 +1505,7 @@ static int nl80211_key_allowed(struct wireless_dev *wdev)
 	case NL80211_IFTYPE_NAN:
 	case NL80211_IFTYPE_P2P_DEVICE:
 	case NL80211_IFTYPE_WDS:
+	case NL80211_IFTYPE_MLO_LINK:
 	case NUM_NL80211_IFTYPES:
 		return -EINVAL;
 	}
@@ -3660,6 +3661,10 @@ static int nl80211_send_iface(struct sk_buff *msg, u32 portid, u32 seq, int flag
 {
 	struct net_device *dev = wdev->netdev;
 	void *hdr;
+	struct wireless_dev *link_wdev;
+	struct nlattr *nested, *nested_mlo_links;
+	int i = 0;
+
 
 	WARN_ON(cmd != NL80211_CMD_NEW_INTERFACE &&
 		cmd != NL80211_CMD_DEL_INTERFACE &&
@@ -3734,6 +3739,30 @@ static int nl80211_send_iface(struct sk_buff *msg, u32 portid, u32 seq, int flag
 		/* nothing */
 		break;
 	}
+
+	nested = nla_nest_start(msg, NL80211_ATTR_MLO_LINK_INFO);
+	if (!nested)
+		goto nla_put_failure_locked;
+
+	list_for_each_entry(link_wdev, &rdev->wiphy.wdev_list, list) {
+		if (link_wdev->iftype != NL80211_IFTYPE_MLO_LINK ||
+		    link_wdev->mld_wdev != wdev)
+			continue;
+
+		nested_mlo_links = nla_nest_start(msg, i);
+		if (!nested_mlo_links)
+			goto nla_put_failure_locked;
+
+		if (nla_put_u64_64bit(msg, NL80211_MLO_LINK_INFO_ATTR_WDEV,
+				      wdev_id(link_wdev), NL80211_ATTR_PAD))
+			goto nla_put_failure_locked;
+
+		nla_nest_end(msg, nested_mlo_links);
+		i++;
+	}
+
+	nla_nest_end(msg, nested);
+
 	wdev_unlock(wdev);
 
 	if (rdev->ops->get_txq_stats) {
@@ -3991,6 +4020,10 @@ static int nl80211_set_interface(struct sk_buff *skb, struct genl_info *info)
 			change = true;
 	}
 
+	if (otype == NL80211_IFTYPE_MLO_LINK ||
+	    ntype == NL80211_IFTYPE_MLO_LINK)
+		return -EOPNOTSUPP;
+
 	if (info->attrs[NL80211_ATTR_MESH_ID]) {
 		struct wireless_dev *wdev = dev->ieee80211_ptr;
 
@@ -4060,6 +4093,9 @@ static int _nl80211_new_interface(struct sk_buff *skb, struct genl_info *info)
 		type = nla_get_u32(info->attrs[NL80211_ATTR_IFTYPE]);
 
 	if (!rdev->ops->add_virtual_intf)
+		return -EOPNOTSUPP;
+
+	if (type == NL80211_IFTYPE_MLO_LINK)
 		return -EOPNOTSUPP;
 
 	if ((type == NL80211_IFTYPE_P2P_DEVICE || type == NL80211_IFTYPE_NAN ||
@@ -4159,6 +4195,9 @@ static int nl80211_del_interface(struct sk_buff *skb, struct genl_info *info)
 	struct wireless_dev *wdev = info->user_ptr[1];
 
 	if (!rdev->ops->del_virtual_intf)
+		return -EOPNOTSUPP;
+
+	if (wdev->iftype == NL80211_IFTYPE_MLO_LINK)
 		return -EOPNOTSUPP;
 
 	/*
@@ -8566,7 +8605,8 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 
 	wiphy = &rdev->wiphy;
 
-	if (wdev->iftype == NL80211_IFTYPE_NAN)
+	if (wdev->iftype == NL80211_IFTYPE_NAN ||
+	    wdev->iftype == NL80211_IFTYPE_MLO_LINK)
 		return -EOPNOTSUPP;
 
 	if (!rdev->ops->scan)
@@ -11692,6 +11732,7 @@ static int nl80211_register_mgmt(struct sk_buff *skb, struct genl_info *info)
 	case NL80211_IFTYPE_P2P_GO:
 	case NL80211_IFTYPE_P2P_DEVICE:
 		break;
+	case NL80211_IFTYPE_MLO_LINK:
 	case NL80211_IFTYPE_NAN:
 	default:
 		return -EOPNOTSUPP;
@@ -11748,6 +11789,7 @@ static int nl80211_tx_mgmt(struct sk_buff *skb, struct genl_info *info)
 	case NL80211_IFTYPE_AP_VLAN:
 	case NL80211_IFTYPE_MESH_POINT:
 	case NL80211_IFTYPE_P2P_GO:
+	case NL80211_IFTYPE_MLO_LINK:
 		break;
 	case NL80211_IFTYPE_NAN:
 	default:
@@ -11872,6 +11914,7 @@ static int nl80211_tx_mgmt_cancel_wait(struct sk_buff *skb, struct genl_info *in
 	case NL80211_IFTYPE_AP_VLAN:
 	case NL80211_IFTYPE_P2P_GO:
 	case NL80211_IFTYPE_P2P_DEVICE:
+	case NL80211_IFTYPE_MLO_LINK:
 		break;
 	case NL80211_IFTYPE_NAN:
 	default:

@@ -2589,6 +2589,7 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 		case NL80211_IFTYPE_P2P_CLIENT:
 		case NL80211_IFTYPE_P2P_GO:
 		case NL80211_IFTYPE_WDS:
+		case NL80211_IFTYPE_MLO_LINK:
 			WARN_ON(1);
 			break;
 		}

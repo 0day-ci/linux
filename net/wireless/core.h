@@ -575,5 +575,9 @@ void cfg80211_cqm_config_free(struct wireless_dev *wdev);
 void cfg80211_release_pmsr(struct wireless_dev *wdev, u32 portid);
 void cfg80211_pmsr_wdev_down(struct wireless_dev *wdev);
 void cfg80211_pmsr_free_wk(struct work_struct *work);
+void cfg80211_start_mlo_link(struct cfg80211_registered_device *rdev,
+			     struct wireless_dev *wdev);
+void cfg80211_stop_mlo_link(struct cfg80211_registered_device *rdev,
+			    struct wireless_dev *wdev);
 
 #endif /* __NET_WIRELESS_CORE_H */
