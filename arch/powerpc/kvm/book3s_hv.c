@@ -3678,6 +3678,8 @@ static noinline void kvmppc_run_core(struct kvmppc_vcore *vc)
 		return;
 	}
 
+	guest_timing_enter_irqoff();
+
 	kvmppc_clear_host_core(pcpu);
 
 	/* Decide on micro-threading (split-core) mode */
@@ -3807,23 +3809,15 @@ static noinline void kvmppc_run_core(struct kvmppc_vcore *vc)
 	for (sub = 0; sub < core_info.n_subcores; ++sub)
 		spin_unlock(&core_info.vc[sub]->lock);
 
-	guest_enter_irqoff();
-
 	srcu_idx = srcu_read_lock(&vc->kvm->srcu);
 
+	guest_state_enter_irqoff();
 	this_cpu_disable_ftrace();
-
-	/*
-	 * Interrupts will be enabled once we get into the guest,
-	 * so tell lockdep that we're about to enable interrupts.
-	 */
-	trace_hardirqs_on();
 
 	trap = __kvmppc_vcore_entry();
 
-	trace_hardirqs_off();
-
 	this_cpu_enable_ftrace();
+	guest_state_exit_irqoff();
 
 	srcu_read_unlock(&vc->kvm->srcu, srcu_idx);
 
@@ -3858,11 +3852,10 @@ static noinline void kvmppc_run_core(struct kvmppc_vcore *vc)
 
 	kvmppc_set_host_core(pcpu);
 
-	context_tracking_guest_exit();
 	if (!vtime_accounting_enabled_this_cpu()) {
 		local_irq_enable();
 		/*
-		 * Service IRQs here before vtime_account_guest_exit() so any
+		 * Service IRQs here before guest_timing_exit_irqoff() so any
 		 * ticks that occurred while running the guest are accounted to
 		 * the guest. If vtime accounting is enabled, accounting uses
 		 * TB rather than ticks, so it can be done without enabling
@@ -3871,7 +3864,7 @@ static noinline void kvmppc_run_core(struct kvmppc_vcore *vc)
 		 */
 		local_irq_disable();
 	}
-	vtime_account_guest_exit();
+	guest_timing_exit_irqoff();
 
 	local_irq_enable();
 
@@ -4515,33 +4508,28 @@ int kvmhv_run_single_vcpu(struct kvm_vcpu *vcpu, u64 time_limit,
 
 	__kvmppc_create_dtl_entry(vcpu, pcpu, tb + vc->tb_offset, 0);
 
-	trace_kvm_guest_enter(vcpu);
-
-	guest_enter_irqoff();
-
 	srcu_idx = srcu_read_lock(&kvm->srcu);
 
+	trace_kvm_guest_enter(vcpu);
+	guest_timing_enter_irqoff();
+	guest_state_enter_irqoff();
 	this_cpu_disable_ftrace();
-
-	/* Tell lockdep that we're about to enable interrupts */
-	trace_hardirqs_on();
 
 	trap = kvmhv_p9_guest_entry(vcpu, time_limit, lpcr, &tb);
 	vcpu->arch.trap = trap;
 
-	trace_hardirqs_off();
-
 	this_cpu_enable_ftrace();
+	guest_state_exit_irqoff();
+	trace_kvm_guest_exit(vcpu);
 
 	srcu_read_unlock(&kvm->srcu, srcu_idx);
 
 	set_irq_happened(trap);
 
-	context_tracking_guest_exit();
 	if (!vtime_accounting_enabled_this_cpu()) {
 		local_irq_enable();
 		/*
-		 * Service IRQs here before vtime_account_guest_exit() so any
+		 * Service IRQs here before guest_timing_exit_irqoff() so any
 		 * ticks that occurred while running the guest are accounted to
 		 * the guest. If vtime accounting is enabled, accounting uses
 		 * TB rather than ticks, so it can be done without enabling
@@ -4550,7 +4538,7 @@ int kvmhv_run_single_vcpu(struct kvm_vcpu *vcpu, u64 time_limit,
 		 */
 		local_irq_disable();
 	}
-	vtime_account_guest_exit();
+	guest_timing_exit_irqoff();
 
 	vcpu->cpu = -1;
 	vcpu->arch.thread_cpu = -1;
@@ -4570,7 +4558,6 @@ int kvmhv_run_single_vcpu(struct kvm_vcpu *vcpu, u64 time_limit,
 			  kvmppc_get_gpr(vcpu, 3) == H_ENTER_NESTED)))
 		kvmppc_core_dequeue_dec(vcpu);
 
-	trace_kvm_guest_exit(vcpu);
 	r = RESUME_GUEST;
 	if (trap) {
 		if (!nested)
