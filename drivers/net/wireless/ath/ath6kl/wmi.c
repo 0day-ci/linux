@@ -1023,7 +1023,7 @@ static int ath6kl_wmi_disconnect_event_rx(struct wmi *wmi, u8 *datap, int len,
 	struct wmi_disconnect_event *ev;
 	wmi->traffic_class = 100;
 
-	if (len < sizeof(struct wmi_disconnect_event))
+	if (len <= sizeof(struct wmi_disconnect_event))
 		return -EINVAL;
 
 	ev = (struct wmi_disconnect_event *) datap;
