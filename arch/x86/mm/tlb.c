@@ -355,7 +355,7 @@ static void l1d_flush_evaluate(unsigned long prev_mm, unsigned long next_mm,
 	if (this_cpu_read(cpu_info.smt_active)) {
 		clear_ti_thread_flag(&next->thread_info, TIF_SPEC_L1D_FLUSH);
 		next->l1d_flush_kill.func = l1d_flush_force_sigbus;
-		task_work_add(next, &next->l1d_flush_kill, TWA_RESUME);
+		task_work_add(next, &next->l1d_flush_kill);
 	}
 }
 

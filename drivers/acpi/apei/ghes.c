@@ -988,8 +988,7 @@ static void ghes_proc_in_irq(struct irq_work *irq_work)
 		if (task_work_pending && current->mm != &init_mm) {
 			estatus_node->task_work.func = ghes_kick_task_work;
 			estatus_node->task_work_cpu = smp_processor_id();
-			ret = task_work_add(current, &estatus_node->task_work,
-					    TWA_RESUME);
+			ret = task_work_add(current, &estatus_node->task_work);
 			if (ret)
 				estatus_node->task_work.func = NULL;
 		}

@@ -13,14 +13,9 @@ init_task_work(struct callback_head *twork, task_work_func_t func)
 	twork->func = func;
 }
 
-enum task_work_notify_mode {
-	TWA_NONE,
-	TWA_RESUME,
-	TWA_SIGNAL,
-};
-
-int task_work_add(struct task_struct *task, struct callback_head *twork,
-			enum task_work_notify_mode mode);
+int task_work_add(struct task_struct *task, struct callback_head *twork);
+int task_work_add_nonotify(struct task_struct *task,
+		struct callback_head *twork);
 
 struct callback_head *task_work_cancel_match(struct task_struct *task,
 	bool (*match)(struct callback_head *, void *data), void *data);

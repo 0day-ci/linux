@@ -1693,7 +1693,7 @@ long keyctl_session_to_parent(void)
 
 	/* the replacement session keyring is applied just prior to userspace
 	 * restarting */
-	ret = task_work_add(parent, newwork, TWA_RESUME);
+	ret = task_work_add(parent, newwork);
 	if (!ret)
 		newwork = NULL;
 unlock:
