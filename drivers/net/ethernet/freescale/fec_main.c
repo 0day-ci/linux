@@ -4055,6 +4055,9 @@ static int __maybe_unused fec_suspend(struct device *dev)
 	struct net_device *ndev = dev_get_drvdata(dev);
 	struct fec_enet_private *fep = netdev_priv(ndev);
 
+	if (device_may_wakeup(&ndev->dev) && fep->wake_irq > 0)
+		enable_irq_wake(fep->wake_irq);
+
 	rtnl_lock();
 	if (netif_running(ndev)) {
 		if (fep->wol_flag & FEC_WOL_FLAG_ENABLE)
@@ -4136,6 +4139,9 @@ static int __maybe_unused fec_resume(struct device *dev)
 		phy_start(ndev->phydev);
 	}
 	rtnl_unlock();
+
+	if (device_may_wakeup(&ndev->dev) && fep->wake_irq > 0)
+		disable_irq_wake(fep->wake_irq);
 
 	return 0;
 
