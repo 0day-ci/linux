@@ -1,0 +1,149 @@
+QA output created by 543
+*** mkfs
+*** mount FS
+attr_set: Input/output error
+Could not set "attr_name" for SCRATCH_MNT/testdir/empty_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/empty_file1': Input/output error
+21d850f99c43cc13abbe34838a8a3c8a  -
+
+attr_remove: Input/output error
+Could not remove "attr_name" for SCRATCH_MNT/testdir/empty_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/empty_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name" for SCRATCH_MNT/testdir/empty_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name" for SCRATCH_MNT/testdir/empty_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/empty_file2': Input/output error
+2ff89c2935debc431745ec791be5421a  -
+
+attr_remove: Input/output error
+Could not remove "attr_name" for SCRATCH_MNT/testdir/empty_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/empty_file2': Input/output error
+attr_get: No data available
+Could not get "attr_name" for SCRATCH_MNT/testdir/empty_file2
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name" for SCRATCH_MNT/testdir/empty_file3
+touch: cannot touch 'SCRATCH_MNT/testdir/empty_file3': Input/output error
+5d24b314242c52176c98ac4bd685da8b  -
+
+attr_remove: Input/output error
+Could not remove "attr_name" for SCRATCH_MNT/testdir/empty_file3
+touch: cannot touch 'SCRATCH_MNT/testdir/empty_file3': Input/output error
+attr_get: No data available
+Could not get "attr_name" for SCRATCH_MNT/testdir/empty_file3
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/inline_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/inline_file1': Input/output error
+5a7b559a70d8e92b4f3c6f7158eead08  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/inline_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/inline_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/inline_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/inline_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/inline_file2': Input/output error
+5717d5e66c70be6bdb00ecbaca0b7749  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/inline_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/inline_file2': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/inline_file2
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/inline_file3
+touch: cannot touch 'SCRATCH_MNT/testdir/inline_file3': Input/output error
+5c929964efd1b243aa8cceb6524f4810  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/inline_file3
+touch: cannot touch 'SCRATCH_MNT/testdir/inline_file3': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/inline_file3
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/extent_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/extent_file1': Input/output error
+51ccb5cdfc9082060f0f94a8a108fea0  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/extent_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/extent_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/extent_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name4" for SCRATCH_MNT/testdir/extent_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/extent_file2': Input/output error
+8d530bbe852d8bca83b131d5b3e497f5  -
+
+attr_set: Input/output error
+Could not set "attr_name4" for SCRATCH_MNT/testdir/extent_file3
+touch: cannot touch 'SCRATCH_MNT/testdir/extent_file3': Input/output error
+5d77c4d3831a35bcbbd6e7677119ce9a  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/extent_file4
+touch: cannot touch 'SCRATCH_MNT/testdir/extent_file4': Input/output error
+6707ec2431e4dbea20e17da0816520bb  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/extent_file4
+touch: cannot touch 'SCRATCH_MNT/testdir/extent_file4': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/extent_file4
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/remote_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/remote_file1': Input/output error
+767ebca3e4a6d24170857364f2bf2a3c  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/remote_file1
+touch: cannot touch 'SCRATCH_MNT/testdir/remote_file1': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/remote_file1
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/remote_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/remote_file2': Input/output error
+fd84ddec89237e6d34a1703639efaebf  -
+
+attr_remove: Input/output error
+Could not remove "attr_name2" for SCRATCH_MNT/testdir/remote_file2
+touch: cannot touch 'SCRATCH_MNT/testdir/remote_file2': Input/output error
+attr_get: No data available
+Could not get "attr_name2" for SCRATCH_MNT/testdir/remote_file2
+d41d8cd98f00b204e9800998ecf8427e  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/sf_file
+touch: cannot touch 'SCRATCH_MNT/testdir/sf_file': Input/output error
+34aaa49662bafb46c76e377454685071  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/leaf_file
+touch: cannot touch 'SCRATCH_MNT/testdir/leaf_file': Input/output error
+664e95ec28830ffb367c0950026e0d21  -
+
+attr_set: Input/output error
+Could not set "attr_name2" for SCRATCH_MNT/testdir/node_file
+touch: cannot touch 'SCRATCH_MNT/testdir/node_file': Input/output error
+bb37a78ce26472eeb711e3559933db42  -
+
+*** done
