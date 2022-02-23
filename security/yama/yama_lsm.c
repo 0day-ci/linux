@@ -449,9 +449,9 @@ static int max_scope = YAMA_SCOPE_NO_ATTACH;
 
 static struct ctl_path yama_sysctl_path[] = {
 	{ .procname = "kernel", },
-	{ .procname = "yama", },
-	{ }
+	{ .procname = "yama", }
 };
+#define YAMA_SYSCTL_PATH_SIZE ARRAY_SIZE(yama_sysctl_path)
 
 static struct ctl_table yama_sysctl_table[] = {
 	{
@@ -467,7 +467,7 @@ static struct ctl_table yama_sysctl_table[] = {
 };
 static void __init yama_init_sysctl(void)
 {
-	if (!register_sysctl_paths(yama_sysctl_path, yama_sysctl_table))
+	if (!register_sysctl_paths(yama_sysctl_path, yama_sysctl_table, YAMA_SYSCTL_PATH_SIZE))
 		panic("Yama: sysctl registration failed.\n");
 }
 #else

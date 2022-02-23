@@ -560,17 +560,17 @@ static struct ctl_table nds32_sysctl_table[2] = {
 	{}
 };
 
-static struct ctl_path nds32_path[2] = {
-	{.procname = "nds32"},
-	{}
+static struct ctl_path nds32_path[1] = {
+	{.procname = "nds32"}
 };
+#define NDS32_PATH_SIZE ARRAY_SIZE(nds32_path)
 
 /*
  * Initialize nds32 alignment-correction interface
  */
 static int __init nds32_sysctl_init(void)
 {
-	register_sysctl_paths(nds32_path, nds32_sysctl_table);
+	register_sysctl_paths(nds32_path, nds32_sysctl_table, NDS32_PATH_SIZE);
 	return 0;
 }
 

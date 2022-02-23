@@ -1729,9 +1729,9 @@ static int apparmor_dointvec(struct ctl_table *table, int write,
 }
 
 static struct ctl_path apparmor_sysctl_path[] = {
-	{ .procname = "kernel", },
-	{ }
+	{ .procname = "kernel", }
 };
+#define APPARMOR_SYSCTL_PATH_SIZE ARRAY_SIZE(apparmor_sysctl_path)
 
 static struct ctl_table apparmor_sysctl_table[] = {
 	{
@@ -1747,7 +1747,8 @@ static struct ctl_table apparmor_sysctl_table[] = {
 static int __init apparmor_init_sysctl(void)
 {
 	return register_sysctl_paths(apparmor_sysctl_path,
-				     apparmor_sysctl_table) ? 0 : -ENOMEM;
+				     apparmor_sysctl_table,
+				     APPARMOR_SYSCTL_PATH_SIZE) ? 0 : -ENOMEM;
 }
 #else
 static inline int apparmor_init_sysctl(void)

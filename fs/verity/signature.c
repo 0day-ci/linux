@@ -92,9 +92,9 @@ static struct ctl_table_header *fsverity_sysctl_header;
 
 static const struct ctl_path fsverity_sysctl_path[] = {
 	{ .procname = "fs", },
-	{ .procname = "verity", },
-	{ }
+	{ .procname = "verity", }
 };
+#define FSVERITY_SYSCTL_PATH_SIZE ARRAY_SIZE(fsverity_sysctl_path)
 
 static struct ctl_table fsverity_sysctl_table[] = {
 	{
@@ -112,7 +112,8 @@ static struct ctl_table fsverity_sysctl_table[] = {
 static int __init fsverity_sysctl_init(void)
 {
 	fsverity_sysctl_header = register_sysctl_paths(fsverity_sysctl_path,
-						       fsverity_sysctl_table);
+						       fsverity_sysctl_table,
+						       FSVERITY_SYSCTL_PATH_SIZE);
 	if (!fsverity_sysctl_header) {
 		pr_err("sysctl registration failed!\n");
 		return -ENOMEM;

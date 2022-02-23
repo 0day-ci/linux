@@ -340,14 +340,14 @@ static struct ctl_table sysctl_table[2] = {
 	{}
 };
 
-static struct ctl_path sysctl_path[2] = {
-	{.procname = "csky"},
-	{}
+static struct ctl_path sysctl_path[1] = {
+	{.procname = "csky"}
 };
+#define SYSCTL_PATH_SIZE ARRAY_SIZE(sysctl_path)
 
 static int __init csky_alignment_init(void)
 {
-	register_sysctl_paths(sysctl_path, sysctl_table);
+	register_sysctl_paths(sysctl_path, sysctl_table, SYSCTL_PATH_SIZE);
 	return 0;
 }
 

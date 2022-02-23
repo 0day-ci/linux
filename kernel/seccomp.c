@@ -2333,9 +2333,9 @@ static int seccomp_actions_logged_handler(struct ctl_table *ro_table, int write,
 
 static struct ctl_path seccomp_sysctl_path[] = {
 	{ .procname = "kernel", },
-	{ .procname = "seccomp", },
-	{ }
+	{ .procname = "seccomp", }
 };
+#define SECCOMP_SYSCTL_PATH_SIZE ARRAY_SIZE(seccomp_sysctl_path)
 
 static struct ctl_table seccomp_sysctl_table[] = {
 	{
@@ -2357,7 +2357,8 @@ static int __init seccomp_sysctl_init(void)
 {
 	struct ctl_table_header *hdr;
 
-	hdr = register_sysctl_paths(seccomp_sysctl_path, seccomp_sysctl_table);
+	hdr = register_sysctl_paths(seccomp_sysctl_path, seccomp_sysctl_table,
+				    SECCOMP_SYSCTL_PATH_SIZE);
 	if (!hdr)
 		pr_warn("sysctl registration failed\n");
 	else

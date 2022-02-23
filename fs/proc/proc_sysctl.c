@@ -1552,20 +1552,21 @@ out:
  */
 struct ctl_table_header *__register_sysctl_paths(
 	struct ctl_table_set *set,
-	const struct ctl_path *path, struct ctl_table *table)
+	const struct ctl_path *path, struct ctl_table *table, int table_size)
 {
 	struct ctl_table *ctl_table_arg = table;
 	int nr_subheaders = count_subheaders(table);
 	struct ctl_table_header *header = NULL, **subheaders, **subheader;
 	const struct ctl_path *component;
 	char *new_path, *pos;
+	int i;
 
 	pos = new_path = kmalloc(PATH_MAX, GFP_KERNEL);
 	if (!new_path)
 		return NULL;
 
 	pos[0] = '\0';
-	for (component = path; component->procname; component++) {
+	for (component = path, i = 0; component->procname && i < table_size; component++, i++) {
 		pos = append_path(new_path, pos, component->procname);
 		if (!pos)
 			goto out;
@@ -1622,10 +1623,11 @@ err_register_leaves:
  * See __register_sysctl_paths for more details.
  */
 struct ctl_table_header *register_sysctl_paths(const struct ctl_path *path,
-						struct ctl_table *table)
+						struct ctl_table *table,
+						int table_size)
 {
 	return __register_sysctl_paths(&sysctl_table_root.default_set,
-					path, table);
+					path, table, table_size);
 }
 EXPORT_SYMBOL(register_sysctl_paths);
 
@@ -1642,7 +1644,7 @@ struct ctl_table_header *register_sysctl_table(struct ctl_table *table)
 {
 	static const struct ctl_path null_path[] = { {} };
 
-	return register_sysctl_paths(null_path, table);
+	return register_sysctl_paths(null_path, table, ARRAY_SIZE(null_path));
 }
 EXPORT_SYMBOL(register_sysctl_table);
 

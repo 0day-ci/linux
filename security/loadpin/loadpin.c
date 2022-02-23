@@ -48,9 +48,9 @@ static DEFINE_SPINLOCK(pinned_root_spinlock);
 
 static struct ctl_path loadpin_sysctl_path[] = {
 	{ .procname = "kernel", },
-	{ .procname = "loadpin", },
-	{ }
+	{ .procname = "loadpin", }
 };
+#define LOADPIN_SYSCTL_PATH_SIZE ARRAY_SIZE(loadpin_sysctl_path)
 
 static struct ctl_table loadpin_sysctl_table[] = {
 	{
@@ -91,7 +91,8 @@ static void check_pinning_enforcement(struct super_block *mnt_sb)
 
 	if (!ro) {
 		if (!register_sysctl_paths(loadpin_sysctl_path,
-					   loadpin_sysctl_table))
+					   loadpin_sysctl_table,
+					   LOADPIN_SYSCTL_PATH_SIZE))
 			pr_notice("sysctl registration failed!\n");
 		else
 			pr_info("enforcement can be disabled.\n");

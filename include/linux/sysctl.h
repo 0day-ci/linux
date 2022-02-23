@@ -220,11 +220,11 @@ struct ctl_table_header *__register_sysctl_table(
 	const char *path, struct ctl_table *table);
 struct ctl_table_header *__register_sysctl_paths(
 	struct ctl_table_set *set,
-	const struct ctl_path *path, struct ctl_table *table);
+	const struct ctl_path *path, struct ctl_table *table, int table_size);
 struct ctl_table_header *register_sysctl(const char *path, struct ctl_table *table);
 struct ctl_table_header *register_sysctl_table(struct ctl_table * table);
 struct ctl_table_header *register_sysctl_paths(const struct ctl_path *path,
-						struct ctl_table *table);
+						struct ctl_table *table, int table_size);
 
 void unregister_sysctl_table(struct ctl_table_header * table);
 
@@ -271,7 +271,7 @@ static inline struct ctl_table_header *register_sysctl_mount_point(const char *p
 }
 
 static inline struct ctl_table_header *register_sysctl_paths(
-			const struct ctl_path *path, struct ctl_table *table)
+			const struct ctl_path *path, struct ctl_table *table, int table_size)
 {
 	return NULL;
 }
