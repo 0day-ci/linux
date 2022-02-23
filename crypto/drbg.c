@@ -1851,7 +1851,7 @@ static int drbg_kcapi_sym_ctr(struct drbg_state *drbg,
 		/* Use scratchpad for in-place operation */
 		inlen = scratchpad_use;
 		memset(drbg->outscratchpad, 0, scratchpad_use);
-		sg_set_buf(sg_in, drbg->outscratchpad, scratchpad_use);
+		sg_in = sg_out;
 	}
 
 	while (outlen) {
