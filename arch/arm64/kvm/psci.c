@@ -376,7 +376,7 @@ static int kvm_psci_1_x_call(struct kvm_vcpu *vcpu, u32 minor)
 				ret = 0;
 			}
 			break;
-		};
+		}
 		fallthrough;
 	default:
 		return kvm_psci_0_2_call(vcpu);
