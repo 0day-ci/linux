@@ -176,7 +176,7 @@ struct lockdep_map {
 	u8				wait_type_outer; /* can be taken in this context */
 	u8				wait_type_inner; /* presents this context */
 	u8				lock_type;
-	/* u8				hole; */
+	u8				cache0_subclass; /* class_cache[0] subclass */
 #ifdef CONFIG_LOCK_STAT
 	int				cpu;
 	unsigned long			ip;

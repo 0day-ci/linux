@@ -880,6 +880,18 @@ look_up_lock_class(const struct lockdep_map *lock, unsigned int subclass)
 		return NULL;
 
 	/*
+	 * Use the class_cache[] to get the class information if available.
+	 */
+	if (unlikely(lock->cache0_subclass)) {
+		if (subclass == lock->cache0_subclass)
+			return lock->class_cache[0];
+	} else if (likely(subclass < NR_LOCKDEP_CACHING_CLASSES)) {
+		class = lock->class_cache[subclass];
+		if (class)
+			return class;
+	}
+
+	/*
 	 * NOTE: the class-key must be unique. For dynamic locks, a static
 	 * lock_class_key variable is passed in through the mutex_init()
 	 * (or spin_lock_init()) call - which acts as the key. For static
@@ -1337,10 +1349,12 @@ out_unlock_set:
 	graph_unlock();
 
 out_set_class_cache:
-	if (!subclass || force)
+	if (subclass && force) {
 		lock->class_cache[0] = class;
-	else if (subclass < NR_LOCKDEP_CACHING_CLASSES)
+		lock->cache0_subclass = subclass;
+	} else if (subclass < NR_LOCKDEP_CACHING_CLASSES) {
 		lock->class_cache[subclass] = class;
+	}
 
 	/*
 	 * Hash collision, did we smoke some? We found a class with a matching
@@ -4799,6 +4813,7 @@ void lockdep_init_map_type(struct lockdep_map *lock, const char *name,
 	lock->wait_type_outer = outer;
 	lock->wait_type_inner = inner;
 	lock->lock_type = lock_type;
+	lock->cache0_subclass = 0;
 
 	/*
 	 * No key, no joy, we need to hash something.
