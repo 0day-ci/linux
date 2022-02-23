@@ -556,7 +556,7 @@ static struct uart_amba_port *amba_ports[UART_NR];
 
 #ifdef CONFIG_SERIAL_AMBA_PL010_CONSOLE
 
-static void pl010_console_putchar(struct uart_port *port, int ch)
+static void pl010_console_putchar(struct uart_port *port, unsigned char ch)
 {
 	struct uart_amba_port *uap =
 		container_of(port, struct uart_amba_port, port);
