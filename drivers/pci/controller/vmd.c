@@ -17,6 +17,7 @@
 #include <linux/srcu.h>
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/irqdomain.h>
 

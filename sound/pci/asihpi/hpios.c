@@ -10,6 +10,7 @@ HPI Operating System function implementation for Linux
 (C) Copyright AudioScience Inc. 1997-2003
 ******************************************************************************/
 #define SOURCEFILE_NAME "hpios.c"
+#include <linux/dma-mapping.h>
 #include "hpi_internal.h"
 #include "hpidebug.h"
 #include <linux/delay.h>
