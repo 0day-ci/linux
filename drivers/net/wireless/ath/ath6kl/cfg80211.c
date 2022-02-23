@@ -1123,17 +1123,25 @@ void ath6kl_cfg80211_ch_switch_notify(struct ath6kl_vif *vif, int freq,
 	mutex_unlock(&vif->wdev.mtx);
 }
 
-static int ath6kl_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
+static int ath6kl_cfg80211_add_key(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
 				   u8 key_index, bool pairwise,
 				   const u8 *mac_addr,
 				   struct key_params *params)
 {
-	struct ath6kl *ar = ath6kl_priv(ndev);
-	struct ath6kl_vif *vif = netdev_priv(ndev);
+	struct ath6kl *ar;
+	struct ath6kl_vif *vif;
 	struct ath6kl_key *key = NULL;
 	int seq_len;
 	u8 key_usage;
 	u8 key_type;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ar = ath6kl_priv(ndev);
+	vif = netdev_priv(ndev);
 
 	if (!ath6kl_cfg80211_ready(vif))
 		return -EIO;
@@ -1248,12 +1256,20 @@ static int ath6kl_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
 				     (u8 *) mac_addr, SYNC_BOTH_WMIFLAG);
 }
 
-static int ath6kl_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
+static int ath6kl_cfg80211_del_key(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
 				   u8 key_index, bool pairwise,
 				   const u8 *mac_addr)
 {
-	struct ath6kl *ar = ath6kl_priv(ndev);
-	struct ath6kl_vif *vif = netdev_priv(ndev);
+	struct ath6kl *ar;
+	struct ath6kl_vif *vif;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ar = ath6kl_priv(ndev);
+	vif = netdev_priv(ndev);
 
 	ath6kl_dbg(ATH6KL_DBG_WLAN_CFG, "%s: index %d\n", __func__, key_index);
 
@@ -1278,15 +1294,22 @@ static int ath6kl_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
 	return ath6kl_wmi_deletekey_cmd(ar->wmi, vif->fw_vif_idx, key_index);
 }
 
-static int ath6kl_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
+static int ath6kl_cfg80211_get_key(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
 				   u8 key_index, bool pairwise,
 				   const u8 *mac_addr, void *cookie,
 				   void (*callback) (void *cookie,
 						     struct key_params *))
 {
-	struct ath6kl_vif *vif = netdev_priv(ndev);
+	struct ath6kl_vif *vif;
 	struct ath6kl_key *key = NULL;
 	struct key_params params;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	vif = netdev_priv(ndev);
 
 	ath6kl_dbg(ATH6KL_DBG_WLAN_CFG, "%s: index %d\n", __func__, key_index);
 
@@ -1314,15 +1337,22 @@ static int ath6kl_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 static int ath6kl_cfg80211_set_default_key(struct wiphy *wiphy,
-					   struct net_device *ndev,
+					   struct wireless_dev *wdev,
 					   u8 key_index, bool unicast,
 					   bool multicast)
 {
-	struct ath6kl *ar = ath6kl_priv(ndev);
-	struct ath6kl_vif *vif = netdev_priv(ndev);
+	struct ath6kl *ar;
+	struct ath6kl_vif *vif;
 	struct ath6kl_key *key = NULL;
 	u8 key_usage;
 	enum ath6kl_crypto_type key_type = NONE_CRYPT;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ar = ath6kl_priv(ndev);
+	vif = netdev_priv(ndev);
 
 	ath6kl_dbg(ATH6KL_DBG_WLAN_CFG, "%s: index %d\n", __func__, key_index);
 

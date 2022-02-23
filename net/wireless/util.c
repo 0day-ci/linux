@@ -926,7 +926,6 @@ EXPORT_SYMBOL(ieee80211_bss_get_elem);
 void cfg80211_upload_connect_keys(struct wireless_dev *wdev)
 {
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
-	struct net_device *dev = wdev->netdev;
 	int i;
 
 	if (!wdev->connect_keys)
@@ -935,14 +934,14 @@ void cfg80211_upload_connect_keys(struct wireless_dev *wdev)
 	for (i = 0; i < CFG80211_MAX_WEP_KEYS; i++) {
 		if (!wdev->connect_keys->params[i].cipher)
 			continue;
-		if (rdev_add_key(rdev, dev, i, false, NULL,
+		if (rdev_add_key(rdev, wdev, i, false, NULL,
 				 &wdev->connect_keys->params[i])) {
-			netdev_err(dev, "failed to set key %d\n", i);
+			wdev_err(wdev, "failed to set key %d\n", i);
 			continue;
 		}
 		if (wdev->connect_keys->def == i &&
-		    rdev_set_default_key(rdev, dev, i, true, true)) {
-			netdev_err(dev, "failed to set defkey %d\n", i);
+		    rdev_set_default_key(rdev, wdev, i, true, true)) {
+			wdev_err(wdev, "failed to set defkey %d\n", i);
 			continue;
 		}
 	}

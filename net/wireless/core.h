@@ -584,4 +584,12 @@ cfg80211_get_colocated_ap_chan(struct cfg80211_registered_device *rdev,
 			       struct cfg80211_internal_bss *intbss,
 			       const u8 *colocated_bssid);
 
+#define wdev_err(wdev, fmt, ...)					\
+	do {								\
+		if ((wdev)->netdev)					\
+			netdev_err((wdev)->netdev, fmt, ##__VA_ARGS__);	\
+		else							\
+			pr_err(fmt, ##__VA_ARGS__);			\
+	} while (0)
+
 #endif /* __NET_WIRELESS_CORE_H */

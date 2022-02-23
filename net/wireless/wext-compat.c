@@ -465,7 +465,7 @@ static int __cfg80211_set_encryption(struct cfg80211_registered_device *rdev,
 			    !(rdev->wiphy.flags & WIPHY_FLAG_IBSS_RSN))
 				err = -ENOENT;
 			else
-				err = rdev_del_key(rdev, dev, idx, pairwise,
+				err = rdev_del_key(rdev, wdev, idx, pairwise,
 						   addr);
 		}
 		wdev->wext.connect.privacy = false;
@@ -502,7 +502,7 @@ static int __cfg80211_set_encryption(struct cfg80211_registered_device *rdev,
 
 	err = 0;
 	if (wdev->current_bss)
-		err = rdev_add_key(rdev, dev, idx, pairwise, addr, params);
+		err = rdev_add_key(rdev, wdev, idx, pairwise, addr, params);
 	else if (params->cipher != WLAN_CIPHER_SUITE_WEP40 &&
 		 params->cipher != WLAN_CIPHER_SUITE_WEP104)
 		return -EINVAL;
@@ -537,7 +537,7 @@ static int __cfg80211_set_encryption(struct cfg80211_registered_device *rdev,
 				__cfg80211_leave_ibss(rdev, wdev->netdev, true);
 				rejoin = true;
 			}
-			err = rdev_set_default_key(rdev, dev, idx, true, true);
+			err = rdev_set_default_key(rdev, wdev, idx, true, true);
 		}
 		if (!err) {
 			wdev->wext.default_key = idx;
@@ -550,7 +550,7 @@ static int __cfg80211_set_encryption(struct cfg80211_registered_device *rdev,
 	if (params->cipher == WLAN_CIPHER_SUITE_AES_CMAC &&
 	    (tx_key || (!addr && wdev->wext.default_mgmt_key == -1))) {
 		if (wdev->current_bss)
-			err = rdev_set_default_mgmt_key(rdev, dev, idx);
+			err = rdev_set_default_mgmt_key(rdev, wdev, idx);
 		if (!err)
 			wdev->wext.default_mgmt_key = idx;
 		return err;
@@ -614,7 +614,7 @@ static int cfg80211_wext_siwencode(struct net_device *dev,
 		err = 0;
 		wdev_lock(wdev);
 		if (wdev->current_bss)
-			err = rdev_set_default_key(rdev, dev, idx, true,
+			err = rdev_set_default_key(rdev, wdev, idx, true,
 						   true);
 		if (!err)
 			wdev->wext.default_key = idx;

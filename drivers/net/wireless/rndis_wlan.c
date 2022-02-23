@@ -488,14 +488,14 @@ static int rndis_join_ibss(struct wiphy *wiphy, struct net_device *dev,
 
 static int rndis_leave_ibss(struct wiphy *wiphy, struct net_device *dev);
 
-static int rndis_add_key(struct wiphy *wiphy, struct net_device *netdev,
+static int rndis_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			 u8 key_index, bool pairwise, const u8 *mac_addr,
 			 struct key_params *params);
 
-static int rndis_del_key(struct wiphy *wiphy, struct net_device *netdev,
+static int rndis_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			 u8 key_index, bool pairwise, const u8 *mac_addr);
 
-static int rndis_set_default_key(struct wiphy *wiphy, struct net_device *netdev,
+static int rndis_set_default_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 				 u8 key_index, bool unicast, bool multicast);
 
 static int rndis_get_station(struct wiphy *wiphy, struct net_device *dev,
@@ -2376,13 +2376,17 @@ static int rndis_leave_ibss(struct wiphy *wiphy, struct net_device *dev)
 	return deauthenticate(usbdev);
 }
 
-static int rndis_add_key(struct wiphy *wiphy, struct net_device *netdev,
+static int rndis_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			 u8 key_index, bool pairwise, const u8 *mac_addr,
 			 struct key_params *params)
 {
 	struct rndis_wlan_private *priv = wiphy_priv(wiphy);
 	struct usbnet *usbdev = priv->usbdev;
 	__le32 flags;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
 
 	netdev_dbg(usbdev->net, "%s(%i, %pM, %08x)\n",
 		   __func__, key_index, mac_addr, params->cipher);
@@ -2412,23 +2416,31 @@ static int rndis_add_key(struct wiphy *wiphy, struct net_device *netdev,
 	}
 }
 
-static int rndis_del_key(struct wiphy *wiphy, struct net_device *netdev,
+static int rndis_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 			 u8 key_index, bool pairwise, const u8 *mac_addr)
 {
 	struct rndis_wlan_private *priv = wiphy_priv(wiphy);
 	struct usbnet *usbdev = priv->usbdev;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
 
 	netdev_dbg(usbdev->net, "%s(%i, %pM)\n", __func__, key_index, mac_addr);
 
 	return remove_key(usbdev, key_index, mac_addr);
 }
 
-static int rndis_set_default_key(struct wiphy *wiphy, struct net_device *netdev,
+static int rndis_set_default_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 				 u8 key_index, bool unicast, bool multicast)
 {
 	struct rndis_wlan_private *priv = wiphy_priv(wiphy);
 	struct usbnet *usbdev = priv->usbdev;
 	struct rndis_wlan_encr_key key;
+	struct net_device *netdev = wdev->netdev;
+
+	if (!netdev)
+		return -EOPNOTSUPP;
 
 	netdev_dbg(usbdev->net, "%s(%i)\n", __func__, key_index);
 

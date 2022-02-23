@@ -2360,14 +2360,22 @@ done:
 }
 
 static s32
-brcmf_cfg80211_config_default_key(struct wiphy *wiphy, struct net_device *ndev,
+brcmf_cfg80211_config_default_key(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
 				  u8 key_idx, bool unicast, bool multicast)
 {
-	struct brcmf_if *ifp = netdev_priv(ndev);
-	struct brcmf_pub *drvr = ifp->drvr;
+	struct brcmf_if *ifp;
+	struct brcmf_pub *drvr;
 	u32 index;
 	u32 wsec;
 	s32 err = 0;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ifp = netdev_priv(ndev);
+	drvr = ifp->drvr;
 
 	brcmf_dbg(TRACE, "Enter\n");
 	brcmf_dbg(CONN, "key index (%d)\n", key_idx);
@@ -2394,13 +2402,18 @@ done:
 }
 
 static s32
-brcmf_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
+brcmf_cfg80211_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 		       u8 key_idx, bool pairwise, const u8 *mac_addr)
 {
-	struct brcmf_if *ifp = netdev_priv(ndev);
+	struct brcmf_if *ifp;
 	struct brcmf_wsec_key *key;
 	s32 err;
+	struct net_device *ndev = wdev->netdev;
 
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ifp = netdev_priv(ndev);
 	brcmf_dbg(TRACE, "Enter\n");
 	brcmf_dbg(CONN, "key index (%d)\n", key_idx);
 
@@ -2431,12 +2444,12 @@ brcmf_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 static s32
-brcmf_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
+brcmf_cfg80211_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 		       u8 key_idx, bool pairwise, const u8 *mac_addr,
 		       struct key_params *params)
 {
 	struct brcmf_cfg80211_info *cfg = wiphy_to_cfg(wiphy);
-	struct brcmf_if *ifp = netdev_priv(ndev);
+	struct brcmf_if *ifp;
 	struct brcmf_pub *drvr = cfg->pub;
 	struct brcmf_wsec_key *key;
 	s32 val;
@@ -2444,7 +2457,12 @@ brcmf_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
 	s32 err;
 	u8 keybuf[8];
 	bool ext_key;
+	struct net_device *ndev = wdev->netdev;
 
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ifp = netdev_priv(ndev);
 	brcmf_dbg(TRACE, "Enter\n");
 	brcmf_dbg(CONN, "key index (%d)\n", key_idx);
 	if (!check_vif_up(ifp->vif))
@@ -2457,7 +2475,7 @@ brcmf_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
 	}
 
 	if (params->key_len == 0)
-		return brcmf_cfg80211_del_key(wiphy, ndev, key_idx, pairwise,
+		return brcmf_cfg80211_del_key(wiphy, wdev, key_idx, pairwise,
 					      mac_addr);
 
 	if (params->key_len > sizeof(key->data)) {
@@ -2553,20 +2571,27 @@ done:
 }
 
 static s32
-brcmf_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev, u8 key_idx,
-		       bool pairwise, const u8 *mac_addr, void *cookie,
+brcmf_cfg80211_get_key(struct wiphy *wiphy, struct wireless_dev *wdev,
+		       u8 key_idx, bool pairwise, const u8 *mac_addr,
+		       void *cookie,
 		       void (*callback)(void *cookie,
 					struct key_params *params))
 {
 	struct brcmf_cfg80211_info *cfg = wiphy_to_cfg(wiphy);
 	struct key_params params;
-	struct brcmf_if *ifp = netdev_priv(ndev);
-	struct brcmf_cfg80211_profile *profile = &ifp->vif->profile;
+	struct brcmf_if *ifp;
+	struct brcmf_cfg80211_profile *profile;
 	struct brcmf_pub *drvr = cfg->pub;
 	struct brcmf_cfg80211_security *sec;
 	s32 wsec;
 	s32 err = 0;
+	struct net_device *ndev = wdev->netdev;
 
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ifp = netdev_priv(ndev);
+	profile = &ifp->vif->profile;
 	brcmf_dbg(TRACE, "Enter\n");
 	brcmf_dbg(CONN, "key index (%d)\n", key_idx);
 	if (!check_vif_up(ifp->vif))
@@ -2610,10 +2635,15 @@ done:
 
 static s32
 brcmf_cfg80211_config_default_mgmt_key(struct wiphy *wiphy,
-				       struct net_device *ndev, u8 key_idx)
+				       struct wireless_dev *wdev, u8 key_idx)
 {
-	struct brcmf_if *ifp = netdev_priv(ndev);
+	struct brcmf_if *ifp;
+	struct net_device *ndev = wdev->netdev;
 
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	ifp = netdev_priv(ndev);
 	brcmf_dbg(TRACE, "Enter key_idx %d\n", key_idx);
 
 	if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFP))

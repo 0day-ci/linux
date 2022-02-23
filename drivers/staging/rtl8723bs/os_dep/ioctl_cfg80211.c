@@ -934,7 +934,7 @@ exit:
 	return ret;
 }
 
-static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev,
+static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 				u8 key_index, bool pairwise, const u8 *mac_addr,
 				struct key_params *params)
 {
@@ -942,9 +942,15 @@ static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev,
 	u32 param_len;
 	struct ieee_param *param = NULL;
 	int ret = 0;
-	struct adapter *padapter = rtw_netdev_priv(ndev);
-	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
+	struct adapter *padapter;
+	struct mlme_priv *pmlmepriv;
+	struct net_device *ndev = wdev->netdev;
 
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	padapter = rtw_netdev_priv(ndev);
+	pmlmepriv = &padapter->mlmepriv;
 	param_len = sizeof(struct ieee_param) + params->key_len;
 	param = rtw_malloc(param_len);
 	if (!param)
@@ -1026,7 +1032,7 @@ addkey_end:
 
 }
 
-static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev,
+static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 				u8 key_index, bool pairwise, const u8 *mac_addr,
 				void *cookie,
 				void (*callback)(void *cookie,
@@ -1035,11 +1041,18 @@ static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev,
 	return 0;
 }
 
-static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
+static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
 				u8 key_index, bool pairwise, const u8 *mac_addr)
 {
-	struct adapter *padapter = rtw_netdev_priv(ndev);
-	struct security_priv *psecuritypriv = &padapter->securitypriv;
+	struct adapter *padapter;
+	struct security_priv *psecuritypriv;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	padapter = rtw_netdev_priv(ndev);
+	psecuritypriv = &padapter->securitypriv;
 
 	if (key_index == psecuritypriv->dot11PrivacyKeyIndex)
 	{
@@ -1051,12 +1064,19 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy,
-	struct net_device *ndev, u8 key_index
+	struct wireless_dev *wdev, u8 key_index
 	, bool unicast, bool multicast
 	)
 {
-	struct adapter *padapter = rtw_netdev_priv(ndev);
-	struct security_priv *psecuritypriv = &padapter->securitypriv;
+	struct adapter *padapter;
+	struct security_priv *psecuritypriv;
+	struct net_device *ndev = wdev->netdev;
+
+	if (!ndev)
+		return -EOPNOTSUPP;
+
+	padapter = rtw_netdev_priv(ndev);
+	psecuritypriv = &padapter->securitypriv;
 
 	if ((key_index < WEP_KEYS) && ((psecuritypriv->dot11PrivacyAlgrthm == _WEP40_) || (psecuritypriv->dot11PrivacyAlgrthm == _WEP104_))) /* set wep default key */
 	{
