@@ -2177,6 +2177,9 @@ static void prepare_vmcs02_constant_state(struct vcpu_vmx *vmx)
 	if (cpu_has_vmx_encls_vmexit())
 		vmcs_write64(ENCLS_EXITING_BITMAP, INVALID_GPA);
 
+	if (notify_window >= 0)
+		vmcs_write32(NOTIFY_WINDOW, notify_window);
+
 	/*
 	 * Set the MSR load/store lists to match L0's settings.  Only the
 	 * addresses are constant (for vmcs02), the counts can change based
@@ -4213,8 +4216,16 @@ static void prepare_vmcs12(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 		/*
 		 * Transfer the event that L0 or L1 may wanted to inject into
 		 * L2 to IDT_VECTORING_INFO_FIELD.
+		 * L0 will synthensize a nested TRIPLE_FAULT to kill L2 when
+		 * notify VM exit occurred in L2 and NOTIFY_VM_CONTEXT_INVALID is
+		 * set in exit qualification. In this case, if notify VM exit
+		 * occurred incident to delivery of a vectored event, the IDT
+		 * vectoring info are recorded in VMCS. Drop the pending event
+		 * in vmcs12, otherwise L1 VMM will exit to userspace with
+		 * internal error due to delivery event.
 		 */
-		vmcs12_save_pending_event(vcpu, vmcs12);
+		if (to_vmx(vcpu)->exit_reason.basic != EXIT_REASON_NOTIFY)
+			vmcs12_save_pending_event(vcpu, vmcs12);
 
 		/*
 		 * According to spec, there's no need to store the guest's
@@ -6079,6 +6090,9 @@ static bool nested_vmx_l1_wants_exit(struct kvm_vcpu *vcpu,
 			SECONDARY_EXEC_ENABLE_USR_WAIT_PAUSE);
 	case EXIT_REASON_ENCLS:
 		return nested_vmx_exit_handled_encls(vcpu, vmcs12);
+	case EXIT_REASON_NOTIFY:
+		return nested_cpu_has2(vmcs12,
+			SECONDARY_EXEC_NOTIFY_VM_EXITING);
 	default:
 		return true;
 	}

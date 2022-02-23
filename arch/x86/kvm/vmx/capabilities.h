@@ -14,6 +14,7 @@ extern bool __read_mostly enable_unrestricted_guest;
 extern bool __read_mostly enable_ept_ad_bits;
 extern bool __read_mostly enable_pml;
 extern int __read_mostly pt_mode;
+extern int __read_mostly notify_window;
 
 #define PT_MODE_SYSTEM		0
 #define PT_MODE_HOST_GUEST	1
@@ -415,6 +416,12 @@ static inline u64 vmx_supported_debugctl(void)
 		debugctl |= DEBUGCTLMSR_LBR_MASK;
 
 	return debugctl;
+}
+
+static inline bool cpu_has_notify_vm_exiting(void)
+{
+	return vmcs_config.cpu_based_2nd_exec_ctrl &
+		SECONDARY_EXEC_NOTIFY_VM_EXITING;
 }
 
 #endif /* __KVM_X86_VMX_CAPS_H */
