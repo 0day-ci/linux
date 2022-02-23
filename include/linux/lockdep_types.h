@@ -118,10 +118,6 @@ struct lock_class {
 	unsigned long			usage_mask;
 	const struct lock_trace		*usage_traces[LOCK_TRACE_STATES];
 
-	/*
-	 * Generation counter, when doing certain classes of graph walking,
-	 * to ensure that we check one node only once:
-	 */
 	int				name_version;
 	const char			*name;
 
