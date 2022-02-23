@@ -3,6 +3,8 @@
  * Copyright 2017-2018 NXP.
  */
 
+#define pr_fmt(fmt) "pll14xx: " fmt
+
 #include <linux/bits.h>
 #include <linux/clk-provider.h>
 #include <linux/err.h>
@@ -176,7 +178,7 @@ static int clk_pll1416x_set_rate(struct clk_hw *hw, unsigned long drate,
 
 	rate = imx_get_pll_settings(pll, drate);
 	if (!rate) {
-		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
+		pr_err("Invalid rate %lu for pll clk %s\n", __func__,
 		       drate, clk_hw_get_name(hw));
 		return -EINVAL;
 	}
@@ -403,8 +405,7 @@ struct clk_hw *imx_dev_clk_hw_pll14xx(struct device *dev, const char *name,
 		init.ops = &clk_pll1443x_ops;
 		break;
 	default:
-		pr_err("%s: Unknown pll type for pll clk %s\n",
-		       __func__, name);
+		pr_err("Unknown pll type for pll clk %s\n", name);
 		kfree(pll);
 		return ERR_PTR(-EINVAL);
 	}
@@ -423,8 +424,7 @@ struct clk_hw *imx_dev_clk_hw_pll14xx(struct device *dev, const char *name,
 
 	ret = clk_hw_register(dev, hw);
 	if (ret) {
-		pr_err("%s: failed to register pll %s %d\n",
-			__func__, name, ret);
+		pr_err("failed to register pll %s %d\n", name, ret);
 		kfree(pll);
 		return ERR_PTR(ret);
 	}
