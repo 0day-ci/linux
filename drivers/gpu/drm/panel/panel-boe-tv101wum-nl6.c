@@ -1245,11 +1245,11 @@ static int boe_panel_prepare(struct drm_panel *panel)
 
 	ret = regulator_enable(boe->pp3300);
 	if (ret < 0)
-		return ret;
+		goto disablegpio;
 
 	ret = regulator_enable(boe->pp1800);
 	if (ret < 0)
-		return ret;
+		goto poweroff3v3;
 
 	usleep_range(3000, 5000);
 
@@ -1286,6 +1286,9 @@ poweroffavdd:
 poweroff1v8:
 	usleep_range(5000, 7000);
 	regulator_disable(boe->pp1800);
+poweroff3v3:
+	regulator_disable(boe->pp3300);
+disablegpio:
 	gpiod_set_value(boe->enable_gpio, 0);
 
 	return ret;
