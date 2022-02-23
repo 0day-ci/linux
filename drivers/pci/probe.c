@@ -1831,6 +1831,7 @@ int pci_setup_device(struct pci_dev *dev)
 	dev->hdr_type = hdr_type & 0x7f;
 	dev->multifunction = !!(hdr_type & 0x80);
 	dev->error_state = pci_channel_io_normal;
+	pci_find_all_capabilities(dev);
 	set_pcie_port_type(dev);
 
 	pci_set_of_node(dev);

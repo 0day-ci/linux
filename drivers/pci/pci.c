@@ -469,6 +469,40 @@ static u8 __pci_bus_find_cap_start(struct pci_bus *bus,
 }
 
 /**
+ * pci_find_all_capabilities - Read all capabilities
+ * @dev: the PCI device
+ *
+ * Read all capabilities and store offsets in cap_off
+ * array in pci_dev structure.
+ */
+void pci_find_all_capabilities(struct pci_dev *dev)
+{
+	int ttl = PCI_FIND_CAP_TTL;
+	u16 ent;
+	u8 pos;
+	u8 id;
+
+	pos = __pci_bus_find_cap_start(dev->bus, dev->devfn, dev->hdr_type);
+	if (!pos)
+		return;
+	pci_bus_read_config_byte(dev->bus, dev->devfn, pos, &pos);
+	while (ttl--) {
+		if (pos < 0x40)
+			break;
+		pos &= ~3;
+		pci_bus_read_config_word(dev->bus, dev->devfn, pos, &ent);
+		id = ent & 0xff;
+		if (id == 0xff)
+			break;
+
+		/* Read first instance of capability */
+		if (!(dev->cap_off[id]))
+			dev->cap_off[id] = pos;
+		pos = (ent >> 8);
+	}
+}
+
+/**
  * pci_find_capability - query for devices' capabilities
  * @dev: PCI device to query
  * @cap: capability code
@@ -489,13 +523,9 @@ static u8 __pci_bus_find_cap_start(struct pci_bus *bus,
  */
 u8 pci_find_capability(struct pci_dev *dev, int cap)
 {
-	u8 pos;
-
-	pos = __pci_bus_find_cap_start(dev->bus, dev->devfn, dev->hdr_type);
-	if (pos)
-		pos = __pci_find_next_cap(dev->bus, dev->devfn, pos, cap);
-
-	return pos;
+	if(cap >= PCI_CAP_ID_MAX)
+		return 0;
+	return dev->cap_off[cap];
 }
 EXPORT_SYMBOL(pci_find_capability);
 
