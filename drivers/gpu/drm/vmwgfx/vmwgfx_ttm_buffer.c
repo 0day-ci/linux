@@ -120,7 +120,7 @@ struct ttm_placement vmw_sys_placement = {
 	.busy_placement = &sys_placement_flags
 };
 
-struct ttm_placement vmw_pt_sys_placement = {
+static struct ttm_placement vmw_pt_sys_placement = {
 	.num_placement = 1,
 	.placement = &vmw_sys_placement_flags,
 	.num_busy_placement = 1,
