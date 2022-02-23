@@ -10,7 +10,6 @@ DSS Core
 Required properties:
 - compatible: "ti,dra7-dss"
 - reg: address and length of the register spaces for 'dss'
-- ti,hwmods: "dss_core"
 - clocks: handle to fclk
 - clock-names: "fck"
 - syscon: phandle to control module core syscon node
@@ -42,7 +41,6 @@ DISPC
 Required properties:
 - compatible: "ti,dra7-dispc"
 - reg: address and length of the register space
-- ti,hwmods: "dss_dispc"
 - interrupts: the DISPC interrupt
 - clocks: handle to fclk
 - clock-names: "fck"
