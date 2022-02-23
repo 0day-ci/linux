@@ -359,25 +359,37 @@ static inline void __raw_writeq_be(unsigned long v, volatile void __iomem *addr)
  */
 static inline void __raw_rm_writeb(u8 val, volatile void __iomem *paddr)
 {
-	__asm__ __volatile__("stbcix %0,0,%1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "stbcix %0,0,%1\n"
+			     ".machine \"pop\"\n"
 		: : "r" (val), "r" (paddr) : "memory");
 }
 
 static inline void __raw_rm_writew(u16 val, volatile void __iomem *paddr)
 {
-	__asm__ __volatile__("sthcix %0,0,%1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "sthcix %0,0,%1\n"
+			     ".machine \"pop\"\n"
 		: : "r" (val), "r" (paddr) : "memory");
 }
 
 static inline void __raw_rm_writel(u32 val, volatile void __iomem *paddr)
 {
-	__asm__ __volatile__("stwcix %0,0,%1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "stwcix %0,0,%1\n"
+			     ".machine \"pop\"\n"
 		: : "r" (val), "r" (paddr) : "memory");
 }
 
 static inline void __raw_rm_writeq(u64 val, volatile void __iomem *paddr)
 {
-	__asm__ __volatile__("stdcix %0,0,%1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "stdcix %0,0,%1\n"
+			     ".machine \"pop\"\n"
 		: : "r" (val), "r" (paddr) : "memory");
 }
 
@@ -389,7 +401,10 @@ static inline void __raw_rm_writeq_be(u64 val, volatile void __iomem *paddr)
 static inline u8 __raw_rm_readb(volatile void __iomem *paddr)
 {
 	u8 ret;
-	__asm__ __volatile__("lbzcix %0,0, %1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "lbzcix %0,0, %1\n"
+			     ".machine \"pop\"\n"
 			     : "=r" (ret) : "r" (paddr) : "memory");
 	return ret;
 }
@@ -397,7 +412,10 @@ static inline u8 __raw_rm_readb(volatile void __iomem *paddr)
 static inline u16 __raw_rm_readw(volatile void __iomem *paddr)
 {
 	u16 ret;
-	__asm__ __volatile__("lhzcix %0,0, %1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "lhzcix %0,0, %1\n"
+			     ".machine \"pop\"\n"
 			     : "=r" (ret) : "r" (paddr) : "memory");
 	return ret;
 }
@@ -405,7 +423,10 @@ static inline u16 __raw_rm_readw(volatile void __iomem *paddr)
 static inline u32 __raw_rm_readl(volatile void __iomem *paddr)
 {
 	u32 ret;
-	__asm__ __volatile__("lwzcix %0,0, %1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "lwzcix %0,0, %1\n"
+			     ".machine \"pop\"\n"
 			     : "=r" (ret) : "r" (paddr) : "memory");
 	return ret;
 }
@@ -413,7 +434,10 @@ static inline u32 __raw_rm_readl(volatile void __iomem *paddr)
 static inline u64 __raw_rm_readq(volatile void __iomem *paddr)
 {
 	u64 ret;
-	__asm__ __volatile__("ldcix %0,0, %1"
+	__asm__ __volatile__(".machine \"push\"\n"
+			     ".machine \"power6\"\n"
+			     "ldcix %0,0, %1\n"
+			     ".machine \"pop\"\n"
 			     : "=r" (ret) : "r" (paddr) : "memory");
 	return ret;
 }
@@ -441,7 +465,10 @@ static inline unsigned int name(unsigned int port)	\
 	unsigned int x;					\
 	__asm__ __volatile__(				\
 		"sync\n"				\
+		".machine \"push\"\n"			\
+		".machine \"power6\"\n"			\
 		"0:"	op "	%0,0,%1\n"		\
+		".machine \"pop\"\n"			\
 		"1:	twi	0,%0,0\n"		\
 		"2:	isync\n"			\
 		"3:	nop\n"				\
@@ -465,7 +492,10 @@ static inline void name(unsigned int val, unsigned int port) \
 {							\
 	__asm__ __volatile__(				\
 		"sync\n"				\
+		".machine \"push\"\n"			\
+		".machine \"power6\"\n"			\
 		"0:" op " %0,0,%1\n"			\
+		".machine \"pop\"\n"			\
 		"1:	sync\n"				\
 		"2:\n"					\
 		EX_TABLE(0b, 2b)			\
