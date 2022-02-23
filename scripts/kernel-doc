@@ -494,7 +494,11 @@ while ($ARGV[0] =~ m/^--?(.*)/) {
 	}
     } else {
 	# Unknown argument
-        usage();
+	usage();
+    }
+    if ($#ARGV < 0){
+	print "No FILE!\n";
+	usage();
     }
 }
 
