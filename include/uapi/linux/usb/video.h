@@ -21,6 +21,12 @@
  * UVC constants
  */
 
+/* UVC Protocol Version */
+#define UVC_VERSION_1_0					0x0100
+#define UVC_VERSION_1_1					0x0110
+#define UVC_VERSION_1_5					0x0150
+#define UVC_VERSION_DEFAULT				UVC_VERSION_1_1
+
 /* A.2. Video Interface Subclass Codes */
 #define UVC_SC_UNDEFINED				0x00
 #define UVC_SC_VIDEOCONTROL				0x01
@@ -104,6 +110,9 @@
 #define UVC_CT_ROLL_ABSOLUTE_CONTROL			0x0f
 #define UVC_CT_ROLL_RELATIVE_CONTROL			0x10
 #define UVC_CT_PRIVACY_CONTROL				0x11
+#define UVC_CT_FOCUS_SIMPLE_CONTROL			0x12
+#define UVC_CT_WINDOW_CONTROL				0x13
+#define UVC_CT_REGION_OF_INTEREST_CONTROL		0x14
 
 /* A.9.5. Processing Unit Control Selectors */
 #define UVC_PU_CONTROL_UNDEFINED			0x00
@@ -125,6 +134,7 @@
 #define UVC_PU_HUE_AUTO_CONTROL				0x10
 #define UVC_PU_ANALOG_VIDEO_STANDARD_CONTROL		0x11
 #define UVC_PU_ANALOG_LOCK_STATUS_CONTROL		0x12
+#define UVC_PU_CONTRAST_AUTO_CONTROL			0x13
 
 /* A.9.7. VideoStreaming Interface Control Selectors */
 #define UVC_VS_CONTROL_UNDEFINED			0x00
@@ -300,12 +310,14 @@ struct uvc_processing_unit_descriptor {
 	__u8   bSourceID;
 	__le16 wMaxMultiplier;
 	__u8   bControlSize;
-	__u8   bmControls[2];
+	__u8   bmControls[3];
 	__u8   iProcessing;
+	/* UVC 1.1 adds the following member */
 	__u8   bmVideoStandards;
 } __attribute__((__packed__));
 
-#define UVC_DT_PROCESSING_UNIT_SIZE(n)			(10+(n))
+#define UVC_DT_PROCESSING_UNIT_SIZE(v, n)		((__u8) \
+	(((v) == UVC_VERSION_1_0) ? (9+(n)) : ((10+(n)))))
 
 /* 3.7.2.6. Extension Unit Descriptor */
 struct uvc_extension_unit_descriptor {
@@ -447,12 +459,23 @@ struct uvc_streaming_control {
 	__u16 wDelay;
 	__u32 dwMaxVideoFrameSize;
 	__u32 dwMaxPayloadTransferSize;
+	/* UVC 1.1 adds the following members */
 	__u32 dwClockFrequency;
 	__u8  bmFramingInfo;
 	__u8  bPreferedVersion;
 	__u8  bMinVersion;
 	__u8  bMaxVersion;
+	/* UVC 1.5 adds the following members */
+	__u8  bUsage;
+	__u8  bBitDepthLuma;
+	__u8  bmSettings;
+	__u8  bMaxNumberOfRefFramesPlus1;
+	__u16 bmRateControlModes;
+	__u16 bmLayoutPerStream[4];
 } __attribute__((__packed__));
+
+#define UVC_STREAMING_CONTROL_SIZE(v)			\
+	(((v) == UVC_VERSION_1_0) ? 26 : (((v) == UVC_VERSION_1_1) ? 34 : 48))
 
 /* Uncompressed Payload - 3.1.1. Uncompressed Video Format Descriptor */
 struct uvc_format_uncompressed {

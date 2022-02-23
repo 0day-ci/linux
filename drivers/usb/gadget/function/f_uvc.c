@@ -589,6 +589,9 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 	struct usb_composite_dev *cdev = c->cdev;
 	struct uvc_device *uvc = to_uvc(f);
 	struct usb_string *us;
+	struct uvc_processing_unit_descriptor *pd;
+	struct uvc_descriptor_header **ctl_cls;
+	struct uvc_header_descriptor *desc;
 	unsigned int max_packet_mult;
 	unsigned int max_packet_size;
 	struct usb_ep *ep;
@@ -598,6 +601,15 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 	uvcg_info(f, "%s()\n", __func__);
 
 	opts = fi_to_f_uvc_opts(f->fi);
+
+	/* Handle the length of Processing Unit for different UVC versions */
+	ctl_cls = opts->uvc_ss_control_cls;
+	desc = (struct uvc_header_descriptor *)ctl_cls[0];
+	if (desc) {
+		pd = &opts->uvc_processing;
+		pd->bLength = UVC_DT_PROCESSING_UNIT_SIZE(desc->bcdUVC, 3);
+	}
+
 	/* Sanity check the streaming endpoint module parameters.
 	 */
 	opts->streaming_interval = clamp(opts->streaming_interval, 1U, 16U);
@@ -814,15 +826,16 @@ static struct usb_function_instance *uvc_alloc_inst(void)
 	cd->bmControls[2]		= 0;
 
 	pd = &opts->uvc_processing;
-	pd->bLength			= UVC_DT_PROCESSING_UNIT_SIZE(2);
+	pd->bLength			= UVC_DT_PROCESSING_UNIT_SIZE(UVC_VERSION_DEFAULT, 3);
 	pd->bDescriptorType		= USB_DT_CS_INTERFACE;
 	pd->bDescriptorSubType		= UVC_VC_PROCESSING_UNIT;
 	pd->bUnitID			= 2;
 	pd->bSourceID			= 1;
 	pd->wMaxMultiplier		= cpu_to_le16(16*1024);
-	pd->bControlSize		= 2;
+	pd->bControlSize		= 3;
 	pd->bmControls[0]		= 1;
 	pd->bmControls[1]		= 0;
+	pd->bmControls[2]		= 0;
 	pd->iProcessing			= 0;
 	pd->bmVideoStandards		= 0;
 

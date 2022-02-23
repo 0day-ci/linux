@@ -90,7 +90,7 @@ static const struct UVC_HEADER_DESCRIPTOR(1) uvc_control_header = {
 	.bLength		= UVC_DT_HEADER_SIZE(1),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VC_HEADER,
-	.bcdUVC			= cpu_to_le16(0x0110),
+	.bcdUVC			= cpu_to_le16(UVC_VERSION_DEFAULT),
 	.wTotalLength		= 0, /* dynamic */
 	.dwClockFrequency	= cpu_to_le32(48000000),
 	.bInCollection		= 0, /* dynamic */
@@ -115,15 +115,16 @@ static const struct uvc_camera_terminal_descriptor uvc_camera_terminal = {
 };
 
 static const struct uvc_processing_unit_descriptor uvc_processing = {
-	.bLength		= UVC_DT_PROCESSING_UNIT_SIZE(2),
+	.bLength		= UVC_DT_PROCESSING_UNIT_SIZE(UVC_VERSION_DEFAULT, 3),
 	.bDescriptorType	= USB_DT_CS_INTERFACE,
 	.bDescriptorSubType	= UVC_VC_PROCESSING_UNIT,
 	.bUnitID		= 2,
 	.bSourceID		= 1,
 	.wMaxMultiplier		= cpu_to_le16(16*1024),
-	.bControlSize		= 2,
+	.bControlSize		= 3,
 	.bmControls[0]		= 1,
 	.bmControls[1]		= 0,
+	.bmControls[2]		= 0,
 	.iProcessing		= 0,
 	.bmVideoStandards	= 0,
 };
