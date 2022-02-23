@@ -607,6 +607,26 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_S390_PROTECTED:
 		r = is_prot_virt_host();
 		break;
+	case KVM_CAP_S390_PROTECTED_DUMP: {
+		u64 pv_cmds_dump[] = {
+			BIT_UVC_CMD_DUMP_INIT,
+			BIT_UVC_CMD_DUMP_CONFIG_STOR_STATE,
+			BIT_UVC_CMD_DUMP_CONFIG_STOR_STATE,
+			BIT_UVC_CMD_DUMP_CPU,
+		};
+		int i;
+
+		if (!is_prot_virt_host())
+			return 0;
+
+		r = 1;
+		for (i = 0; i < ARRAY_SIZE(pv_cmds_dump); i++) {
+			if (!test_bit_inv(pv_cmds_dump[i],
+					  (unsigned long *)&uv_info.inst_calls_list))
+				return 0;
+		}
+		break;
+	}
 	default:
 		r = 0;
 	}
@@ -2257,6 +2277,92 @@ static int kvm_s390_handle_pv_info(struct kvm_s390_pv_info *info)
 	}
 }
 
+static int kvm_s390_pv_dmp(struct kvm *kvm, struct kvm_pv_cmd *cmd,
+			   struct kvm_s390_pv_dmp dmp)
+{
+	int r = -EINVAL;
+	void __user *result_buff = (void __user *)dmp.buff_addr;
+
+	switch (dmp.subcmd) {
+	case KVM_PV_DUMP_INIT: {
+		if (kvm->arch.pv.dumping)
+			break;
+
+		r = uv_cmd_nodata(kvm_s390_pv_get_handle(kvm),
+				  UVC_CMD_DUMP_INIT, &cmd->rc, &cmd->rrc);
+		KVM_UV_EVENT(kvm, 3, "PROTVIRT DUMP INIT: rc %x rrc %x",
+			     cmd->rc, cmd->rrc);
+		if (!r)
+			kvm->arch.pv.dumping = true;
+		else
+			r = -EINVAL;
+		break;
+	}
+	case KVM_PV_DUMP_CONFIG_STOR_STATE: {
+		if (!kvm->arch.pv.dumping)
+			break;
+
+		/*
+		 * GADDR is an output parameter since we might stop
+		 * early. As dmp will be copied back in our caller, we
+		 * don't need to do it ourselves.
+		 */
+		r = kvm_s390_pv_dump_stor_state(kvm, result_buff, &dmp.gaddr, dmp.buff_len,
+						&cmd->rc, &cmd->rrc);
+		break;
+	}
+	case KVM_PV_DUMP_COMPLETE: {
+		struct uv_cb_dump_complete complete = {
+			.header.len = sizeof(complete),
+			.header.cmd = UVC_CMD_DUMP_COMPLETE,
+			.config_handle = kvm_s390_pv_get_handle(kvm),
+		};
+		u64 *compl_data;
+
+		r = -EINVAL;
+		if (!kvm->arch.pv.dumping)
+			break;
+
+		if (dmp.buff_len < uv_info.conf_dump_finalize_len)
+			break;
+
+		/* Allocate dump area */
+		r = -ENOMEM;
+		compl_data = vzalloc(uv_info.conf_dump_finalize_len);
+		if (!compl_data)
+			break;
+		complete.dump_area_origin = (u64)compl_data;
+
+		r = uv_call(0, (u64)&complete);
+		cmd->rc = complete.header.rc;
+		cmd->rrc = complete.header.rrc;
+		KVM_UV_EVENT(kvm, 3, "PROTVIRT DUMP COMPLETE: rc %x rrc %x",
+			     complete.header.rc, complete.header.rrc);
+
+		if (!r) {
+			/*
+			 * kvm_s390_pv_dealloc_vm() will also (mem)set
+			 * this to false on a reboot or other destroy
+			 * operation for this vm.
+			 */
+			kvm->arch.pv.dumping = false;
+			r = copy_to_user(result_buff, compl_data, uv_info.conf_dump_finalize_len);
+			if (r)
+				r = -EFAULT;
+		}
+		vfree(compl_data);
+		if (r > 0)
+			r = -EINVAL;
+		break;
+	}
+	default:
+		r = -ENOTTY;
+		break;
+	}
+
+	return r;
+}
+
 static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 {
 	int r = 0;
@@ -2411,6 +2517,28 @@ static int kvm_s390_handle_pv(struct kvm *kvm, struct kvm_pv_cmd *cmd)
 		if (r)
 			return -EFAULT;
 		return 0;
+	}
+	case KVM_PV_DUMP: {
+		struct kvm_s390_pv_dmp dmp;
+
+		r = -EINVAL;
+		if (!kvm_s390_pv_is_protected(kvm))
+			break;
+
+		r = -EFAULT;
+		if (copy_from_user(&dmp, argp, sizeof(dmp)))
+			break;
+
+		r = kvm_s390_pv_dmp(kvm, cmd, dmp);
+		if (r)
+			break;
+
+		if (copy_to_user(argp, &dmp, sizeof(dmp))) {
+			r = -EFAULT;
+			break;
+		}
+
+		break;
 	}
 	default:
 		r = -ENOTTY;
@@ -4508,6 +4636,15 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 {
 	struct kvm_run *kvm_run = vcpu->run;
 	int rc;
+
+	/*
+	 * Running a VM while dumping always has the potential to
+	 * produce inconsistent dump data. But for PV vcpus a SIE
+	 * entry while dumping could also lead to a validity which we
+	 * absolutely want to avoid.
+	 */
+	if (vcpu->kvm->arch.pv.dumping)
+		return -EINVAL;
 
 	if (kvm_run->immediate_exit)
 		return -EINTR;
