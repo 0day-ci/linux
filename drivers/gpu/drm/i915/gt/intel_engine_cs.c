@@ -385,9 +385,25 @@ static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id,
 	engine->props.timeslice_duration_ms =
 		CONFIG_DRM_I915_TIMESLICE_DURATION;
 
-	/* Override to uninterruptible for OpenCL workloads. */
-	if (GRAPHICS_VER(i915) == 12 && engine->class == RENDER_CLASS)
-		engine->props.preempt_timeout_ms = 0;
+	/*
+	 * Mid-thread pre-emption is not available in Gen12. Unfortunately,
+	 * some OpenCL workloads run quite long threads. That means they get
+	 * reset due to not pre-empting in a timely manner. So, bump the
+	 * pre-emption timeout value to be much higher for compute engines.
+	 * Using three times the heartbeat period seems long enough for a
+	 * reasonable task to reach a pre-emption point but not so long as to
+	 * allow genuine hangs to go unresolved.
+	 */
+	if (GRAPHICS_VER(i915) == 12 && engine->class == RENDER_CLASS) {
+		unsigned long triple_beat = engine->props.heartbeat_interval_ms * 3;
+
+		if (triple_beat > engine->props.preempt_timeout_ms) {
+			drm_info(&gt->i915->drm, "Bumping pre-emption timeout from %ld to %ld on %s to allow slow compute pre-emption\n",
+				 engine->props.preempt_timeout_ms, triple_beat, engine->name);
+
+			engine->props.preempt_timeout_ms = triple_beat;
+		}
+	}
 
 	/* Cap properties according to any system limits */
 #define CLAMP_PROP(field) \
