@@ -182,8 +182,32 @@ int kmem_cache_shrink(struct kmem_cache *s);
 void * __must_check krealloc(const void *objp, size_t new_size, gfp_t flags) __alloc_size(2);
 void kfree(const void *objp);
 void kfree_sensitive(const void *objp);
+
+/**
+ * ksize - get the actual amount of memory allocated for a given object
+ * @objp: Pointer to the object
+ *
+ * kmalloc may internally round up allocations and return more memory
+ * than requested. ksize() can be used to determine the actual amount of
+ * memory allocated. The caller may use this additional memory, even though
+ * a smaller amount of memory was initially specified with the kmalloc call.
+ * The caller must guarantee that objp points to a valid object previously
+ * allocated with either kmalloc() or kmem_cache_alloc(). The object
+ * must not be freed during the duration of the call.
+ *
+ * Return: size of the actual memory used by @objp in bytes
+ */
+#define ksize(objp) ({							\
+	/*								\
+	 * Getting the actual allocation size means the __alloc_size	\
+	 * hints are no longer valid, and the compiler needs to		\
+	 * forget about them.						\
+	 */								\
+	OPTIMIZER_HIDE_VAR(objp);					\
+	_ksize(objp);							\
+})
 size_t __ksize(const void *objp);
-size_t ksize(const void *objp);
+size_t _ksize(const void *objp);
 #ifdef CONFIG_PRINTK
 bool kmem_valid_obj(void *object);
 void kmem_dump_obj(void *object);

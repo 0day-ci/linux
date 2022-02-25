@@ -855,6 +855,7 @@ void *devm_krealloc(struct device *dev, void *ptr, size_t new_size, gfp_t gfp)
 	size_t total_new_size, total_old_size;
 	struct devres *old_dr, *new_dr;
 	unsigned long flags;
+	void *allocation;
 
 	if (unlikely(!new_size)) {
 		devm_kfree(dev, ptr);
@@ -874,7 +875,8 @@ void *devm_krealloc(struct device *dev, void *ptr, size_t new_size, gfp_t gfp)
 	if (!check_dr_size(new_size, &total_new_size))
 		return NULL;
 
-	total_old_size = ksize(container_of(ptr, struct devres, data));
+	allocation = container_of(ptr, struct devres, data);
+	total_old_size = ksize(allocation);
 	if (total_old_size == 0) {
 		WARN(1, "Pointer doesn't point to dynamically allocated memory.");
 		return NULL;
