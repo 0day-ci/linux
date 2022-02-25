@@ -2433,6 +2433,7 @@ void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo,
 	if (last_rxstats->chains &&
 	    !(sinfo->filled & (BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL) |
 			       BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL_AVG)))) {
+		/* Neither chain signal nor chain signal avg is filled */
 		sinfo->filled |= BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL);
 		if (!sta->pcpu_rx_stats)
 			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL_AVG);
@@ -2444,6 +2445,21 @@ void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo,
 				last_rxstats->chain_signal_last[i];
 			sinfo->chain_signal_avg[i] =
 				-ewma_signal_read(&sta->rx_stats_avg.chain_signal[i]);
+		}
+	}
+
+	/* Check if chain signal is not filled, for cases avg was filled by
+	 * driver bug last chain signal was not.
+	 */
+	if (last_rxstats->chains &&
+		 !(sinfo->filled & (BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL)))) {
+		sinfo->filled |= BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL);
+
+		sinfo->chains = last_rxstats->chains;
+
+		for (i = 0; i < ARRAY_SIZE(sinfo->chain_signal); i++) {
+			sinfo->chain_signal[i] =
+				last_rxstats->chain_signal_last[i];
 		}
 	}
 
