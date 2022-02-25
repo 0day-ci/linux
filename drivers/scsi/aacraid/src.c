@@ -91,7 +91,9 @@ static irqreturn_t aac_src_intr_message(int irq, void *dev_id)
 					dev->sync_fib);
 			spin_lock_irqsave(&dev->sync_fib->event_lock, sflags);
 			if (dev->sync_fib->flags & FIB_CONTEXT_FLAG_WAIT) {
+				spin_lock(&dev->manage_lock);
 				dev->management_fib_count--;
+				spin_unlock(&dev->manage_lock);
 				complete(&dev->sync_fib->event_wait);
 			}
 			spin_unlock_irqrestore(&dev->sync_fib->event_lock,
