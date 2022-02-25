@@ -251,14 +251,26 @@ static void iwl_mvm_pass_packet_to_mac80211(struct iwl_mvm *mvm,
 static void iwl_mvm_get_signal_strength(struct iwl_mvm *mvm,
 					struct ieee80211_rx_status *rx_status,
 					u32 rate_n_flags, int energy_a,
-					int energy_b)
+					int energy_b, struct ieee80211_sta *sta,
+					bool is_beacon, bool my_beacon)
 {
 	int max_energy;
 	u32 rate_flags = rate_n_flags;
+	struct iwl_mvm_sta *mvmsta = NULL;
+
+	if (sta && !(is_beacon && !my_beacon)) {
+		mvmsta = iwl_mvm_sta_from_mac80211(sta);
+		if (energy_a)
+			ewma_signal_add(&mvmsta->rx_avg_chain_signal[0], energy_a);
+		if (energy_b)
+			ewma_signal_add(&mvmsta->rx_avg_chain_signal[1], energy_b);
+	}
 
 	energy_a = energy_a ? -energy_a : S8_MIN;
 	energy_b = energy_b ? -energy_b : S8_MIN;
-	max_energy = max(energy_a, energy_b);
+
+	/* use DB summing to get better RSSI reporting */
+	max_energy = iwl_mvm_sum_sigs_2(energy_a, energy_b);
 
 	IWL_DEBUG_STATS(mvm, "energy In A %d B %d, and max %d\n",
 			energy_a, energy_b, max_energy);
@@ -268,6 +280,15 @@ static void iwl_mvm_get_signal_strength(struct iwl_mvm *mvm,
 		(rate_flags & RATE_MCS_ANT_AB_MSK) >> RATE_MCS_ANT_POS;
 	rx_status->chain_signal[0] = energy_a;
 	rx_status->chain_signal[1] = energy_b;
+
+	if (mvmsta) {
+		if (is_beacon) {
+			if (my_beacon)
+				ewma_signal_add(&mvmsta->rx_avg_beacon_signal, -max_energy);
+		} else {
+			ewma_signal_add(&mvmsta->rx_avg_signal, -max_energy);
+		}
+	}
 }
 
 static int iwl_mvm_rx_mgmt_prot(struct ieee80211_sta *sta,
@@ -1654,6 +1675,8 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 	};
 	u32 format;
 	bool is_sgi;
+	bool is_beacon;
+	bool my_beacon = false;
 
 	if (unlikely(test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status)))
 		return;
@@ -1797,8 +1820,6 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 	}
 	rx_status->freq = ieee80211_channel_to_frequency(channel,
 							 rx_status->band);
-	iwl_mvm_get_signal_strength(mvm, rx_status, rate_n_flags, energy_a,
-				    energy_b);
 
 	/* update aggregation data for monitor sake on default queue */
 	if (!queue && (phy_info & IWL_RX_MPDU_PHY_AMPDU)) {
@@ -1846,6 +1867,16 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 		kfree_skb(skb);
 		goto out;
 	}
+
+	is_beacon = ieee80211_is_beacon(hdr->frame_control);
+	if (is_beacon && sta) {
+		/* see if it is beacon destined for us */
+		if (memcmp(sta->addr, hdr->addr2, ETH_ALEN) == 0)
+			my_beacon = true;
+	}
+
+	iwl_mvm_get_signal_strength(mvm, rx_status, rate_n_flags, energy_a,
+				    energy_b, sta, is_beacon, my_beacon);
 
 	if (sta) {
 		struct iwl_mvm_sta *mvmsta = iwl_mvm_sta_from_mac80211(sta);
@@ -2107,7 +2138,7 @@ void iwl_mvm_rx_monitor_no_data(struct iwl_mvm *mvm, struct napi_struct *napi,
 	rx_status->freq = ieee80211_channel_to_frequency(channel,
 							 rx_status->band);
 	iwl_mvm_get_signal_strength(mvm, rx_status, rate_n_flags, energy_a,
-				    energy_b);
+				    energy_b, sta, false, false);
 
 	rcu_read_lock();
 

@@ -114,7 +114,9 @@ static void iwl_mvm_get_signal_strength(struct iwl_mvm *mvm,
 	energy_b = (val & IWL_RX_INFO_ENERGY_ANT_B_MSK) >>
 						IWL_RX_INFO_ENERGY_ANT_B_POS;
 	energy_b = energy_b ? -energy_b : S8_MIN;
-	max_energy = max(energy_a, energy_b);
+
+	/* use DB summing to get better RSSI reporting */
+	max_energy = iwl_mvm_sum_sigs_2(energy_a, energy_b);
 
 	IWL_DEBUG_STATS(mvm, "energy In A %d B %d  , and max %d\n",
 			energy_a, energy_b, max_energy);

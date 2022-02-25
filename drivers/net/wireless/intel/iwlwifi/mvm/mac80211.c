@@ -5085,9 +5085,32 @@ static void iwl_mvm_mac_sta_statistics(struct ieee80211_hw *hw,
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	struct iwl_mvm_sta *mvmsta = iwl_mvm_sta_from_mac80211(sta);
 
-	if (mvmsta->avg_energy) {
-		sinfo->signal_avg = -(s8)mvmsta->avg_energy;
+	if (iwl_mvm_has_new_rx_api(mvm)) { /* rxmq logic */
+		/* Grab chain signal avg, mac80211 cannot do it because
+		 * this driver uses RSS.  Grab signal_avg here too because firmware
+		 * appears go not do DB summing and/or has other bugs. --Ben
+		 */
 		sinfo->filled |= BIT_ULL(NL80211_STA_INFO_SIGNAL_AVG);
+		sinfo->signal_avg = -ewma_signal_read(&mvmsta->rx_avg_signal);
+
+		if (!mvmvif->bf_data.bf_enabled) {
+			/* The firmware reliably reports different signal (2db weaker in my case)
+			 * than if I calculate it from the rx-status.  So, fill that here.
+			 * Beacons are only received if you turn off beacon filtering, however.
+			 */
+			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_BEACON_SIGNAL_AVG);
+			sinfo->rx_beacon_signal_avg = -ewma_signal_read(&mvmsta->rx_avg_beacon_signal);
+		}
+
+		sinfo->filled |= BIT_ULL(NL80211_STA_INFO_CHAIN_SIGNAL_AVG);
+		sinfo->chain_signal_avg[0] = -ewma_signal_read(&mvmsta->rx_avg_chain_signal[0]);
+		sinfo->chain_signal_avg[1] = -ewma_signal_read(&mvmsta->rx_avg_chain_signal[1]);
+	}
+	else {
+		if (mvmsta->avg_energy) {
+			sinfo->signal_avg = -(s8)mvmsta->avg_energy;
+			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_SIGNAL_AVG);
+		}
 	}
 
 	if (iwl_mvm_has_tlc_offload(mvm)) {
@@ -5115,10 +5138,13 @@ static void iwl_mvm_mac_sta_statistics(struct ieee80211_hw *hw,
 	sinfo->rx_beacon = mvmvif->beacon_stats.num_beacons +
 			   mvmvif->beacon_stats.accu_num_beacons;
 	sinfo->filled |= BIT_ULL(NL80211_STA_INFO_BEACON_RX);
-	if (mvmvif->beacon_stats.avg_signal) {
-		/* firmware only reports a value after RXing a few beacons */
-		sinfo->rx_beacon_signal_avg = mvmvif->beacon_stats.avg_signal;
-		sinfo->filled |= BIT_ULL(NL80211_STA_INFO_BEACON_SIGNAL_AVG);
+
+	if (!(sinfo->filled & BIT_ULL(NL80211_STA_INFO_BEACON_SIGNAL_AVG))) {
+		if (mvmvif->beacon_stats.avg_signal) {
+			/* firmware only reports a value after RXing a few beacons */
+			sinfo->rx_beacon_signal_avg = mvmvif->beacon_stats.avg_signal;
+			sinfo->filled |= BIT_ULL(NL80211_STA_INFO_BEACON_SIGNAL_AVG);
+		}
 	}
  unlock:
 	mutex_unlock(&mvm->mutex);

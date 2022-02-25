@@ -1577,6 +1577,11 @@ int iwl_mvm_add_sta(struct iwl_mvm *mvm,
 
 	spin_lock_init(&mvm_sta->lock);
 
+	ewma_signal_init(&mvm_sta->rx_avg_chain_signal[0]);
+	ewma_signal_init(&mvm_sta->rx_avg_chain_signal[1]);
+	ewma_signal_init(&mvm_sta->rx_avg_signal);
+	ewma_signal_init(&mvm_sta->rx_avg_beacon_signal);
+
 	/* if this is a HW restart re-alloc existing queues */
 	if (test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status)) {
 		struct iwl_mvm_int_sta tmp_sta = {

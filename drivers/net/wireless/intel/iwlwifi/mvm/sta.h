@@ -10,6 +10,7 @@
 #include <linux/spinlock.h>
 #include <net/mac80211.h>
 #include <linux/wait.h>
+#include <linux/average.h>
 
 #include "iwl-trans.h" /* for IWL_MAX_TID_COUNT */
 #include "fw-api.h" /* IWL_MVM_STATION_COUNT_MAX */
@@ -17,6 +18,9 @@
 
 struct iwl_mvm;
 struct iwl_mvm_vif;
+
+/* This makes us a 'struct ewma_signal {' object. */
+DECLARE_EWMA(signal, 10, 8);
 
 /**
  * DOC: DQA - Dynamic Queue Allocation -introduction
@@ -415,6 +419,9 @@ struct iwl_mvm_sta {
 	u8 sleep_tx_count;
 	u8 avg_energy;
 	u8 tx_ant;
+	struct ewma_signal rx_avg_chain_signal[2];
+	struct ewma_signal rx_avg_signal;
+	struct ewma_signal rx_avg_beacon_signal;
 };
 
 u16 iwl_mvm_tid_queued(struct iwl_mvm *mvm, struct iwl_mvm_tid_data *tid_data);
