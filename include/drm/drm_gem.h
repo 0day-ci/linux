@@ -327,7 +327,7 @@ struct drm_gem_object {
  * non-static version of this you're probably doing it wrong and will break the
  * THIS_MODULE reference by accident.
  */
-#define DEFINE_DRM_GEM_FOPS(name) \
+#define DEFINE_DRM_GEM_FOPS(name, ...) \
 	static const struct file_operations name = {\
 		.owner		= THIS_MODULE,\
 		.open		= drm_open,\
@@ -338,6 +338,7 @@ struct drm_gem_object {
 		.read		= drm_read,\
 		.llseek		= noop_llseek,\
 		.mmap		= drm_gem_mmap,\
+		##__VA_ARGS__\
 	}
 
 void drm_gem_object_release(struct drm_gem_object *obj);
