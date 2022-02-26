@@ -11,6 +11,7 @@
 #include "gt/intel_lrc.h"
 #include "gt/shmem_utils.h"
 #include "intel_guc_ads.h"
+#include "intel_guc_capture.h"
 #include "intel_guc_fwif.h"
 #include "intel_uc.h"
 #include "i915_drv.h"
@@ -86,8 +87,7 @@ static u32 guc_ads_golden_ctxt_size(struct intel_guc *guc)
 
 static u32 guc_ads_capture_size(struct intel_guc *guc)
 {
-	/* FIXME: Allocate a proper capture list */
-	return PAGE_ALIGN(PAGE_SIZE);
+	return PAGE_ALIGN(guc->ads_capture_size);
 }
 
 static u32 guc_ads_private_data_size(struct intel_guc *guc)
@@ -584,24 +584,124 @@ static void guc_init_golden_context(struct intel_guc *guc)
 	GEM_BUG_ON(guc->ads_golden_ctxt_size != total_size);
 }
 
-static void guc_capture_list_init(struct intel_guc *guc)
+static int
+guc_capture_prep_lists(struct intel_guc *guc)
 {
+	struct intel_gt *gt = guc_to_gt(guc);
+	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
+	u32 ggtt, capture_offset, null_ggtt, total_size = 0;
+	struct guc_gt_system_info local_info;
+	struct iosys_map info_map;
+	u32 null_header[2]={0};
+	struct file *file;
+	size_t size = 0;
 	int i, j;
-	u32 addr_ggtt, offset;
 
-	offset = guc_ads_capture_offset(guc);
-	addr_ggtt = intel_guc_ggtt_offset(guc, guc->ads_vma) + offset;
+	if (!iosys_map_is_null(&guc->ads_map)) {
+		capture_offset = guc_ads_capture_offset(guc);
+		ggtt = intel_guc_ggtt_offset(guc, guc->ads_vma) + capture_offset;
+		info_map = IOSYS_MAP_INIT_OFFSET(&guc->ads_map,
+						 offsetof(struct __guc_ads_blob, system_info));
+	} else {
+		memset(&local_info, 0, sizeof(local_info));
+		iosys_map_set_vaddr(&info_map, &local_info);
+		fill_engine_enable_masks(gt, &info_map);
+	}
 
-	/* FIXME: Populate a proper capture list */
+	/* first, set aside the first page for a capture_list with zero descriptors */
+	total_size = PAGE_SIZE;
+	if (!iosys_map_is_null(&guc->ads_map)) {
+		file = shmem_create_from_data("guc-err-cap", null_header, sizeof(null_header));
+		if (!IS_ERR(file)) {
+			shmem_read_to_iosys_map(file, 0, &guc->ads_map,
+						ggtt, sizeof(null_header));
+			fput(file);
+		} else {
+			drm_dbg(&i915->drm, "GuC-capture: failed shmem for nulllist = 0x%016lx",
+				PTR_ERR(file));
+		}
+		null_ggtt = ggtt;
+		ggtt += PAGE_SIZE;
+	}
 
 	for (i = 0; i < GUC_CAPTURE_LIST_INDEX_MAX; i++) {
 		for (j = 0; j < GUC_MAX_ENGINE_CLASSES; j++) {
-			ads_blob_write(guc, ads.capture_instance[i][j], addr_ggtt);
-			ads_blob_write(guc, ads.capture_class[i][j], addr_ggtt);
-		}
 
-		ads_blob_write(guc, ads.capture_global[i], addr_ggtt);
+			/* null list if we dont have said engine or list */
+			if (!info_map_read(&info_map, engine_enabled_masks[j])) {
+
+				if (!iosys_map_is_null(&guc->ads_map)) {
+					ads_blob_write(guc, ads.capture_class[i][j], null_ggtt);
+					ads_blob_write(guc, ads.capture_instance[i][j], null_ggtt);
+				}
+				continue;
+			}
+			if (intel_guc_capture_getlistsize(guc, i,
+							  GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS,
+							  j, &size)) {
+				if (!iosys_map_is_null(&guc->ads_map))
+					ads_blob_write(guc, ads.capture_class[i][j], null_ggtt);
+				goto engine_instance_list;
+			}
+			total_size += size;
+			if (!iosys_map_is_null(&guc->ads_map)) {
+				if (total_size > guc->ads_capture_size ||
+				    intel_guc_capture_getlist(guc, i,
+							      GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS,
+							      j, &file)) {
+					ads_blob_write(guc, ads.capture_class[i][j], null_ggtt);
+					continue;
+				}
+				ads_blob_write(guc, ads.capture_class[i][j], ggtt);
+				shmem_read_to_iosys_map(file, 0, &guc->ads_map, ggtt, size);
+				ggtt += size;
+			}
+engine_instance_list:
+			if (intel_guc_capture_getlistsize(guc, i,
+							  GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE,
+							  j, &size)) {
+				if (!iosys_map_is_null(&guc->ads_map))
+					ads_blob_write(guc, ads.capture_instance[i][j], null_ggtt);
+				continue;
+			}
+			total_size += size;
+			if (!iosys_map_is_null(&guc->ads_map)) {
+				if (total_size > guc->ads_capture_size ||
+				    intel_guc_capture_getlist(guc, i,
+							      GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE,
+							      j, &file)) {
+					ads_blob_write(guc, ads.capture_instance[i][j], null_ggtt);
+					continue;
+				}
+				ads_blob_write(guc, ads.capture_instance[i][j], ggtt);
+				shmem_read_to_iosys_map(file, 0, &guc->ads_map, ggtt, size);
+				ggtt += size;
+			}
+		}
+		if (intel_guc_capture_getlistsize(guc, i, GUC_CAPTURE_LIST_TYPE_GLOBAL, 0, &size)) {
+			if (!iosys_map_is_null(&guc->ads_map))
+				ads_blob_write(guc, ads.capture_global[i], null_ggtt);
+			continue;
+		}
+		total_size += size;
+		if (!iosys_map_is_null(&guc->ads_map)) {
+			if (total_size > guc->ads_capture_size ||
+			    intel_guc_capture_getlist(guc, i, GUC_CAPTURE_LIST_TYPE_GLOBAL, 0,
+						      &file)) {
+				ads_blob_write(guc, ads.capture_global[i], null_ggtt);
+				continue;
+			}
+			ads_blob_write(guc, ads.capture_global[i], ggtt);
+			shmem_read_to_iosys_map(file, 0, &guc->ads_map, ggtt, size);
+			ggtt += size;
+		}
 	}
+
+	if (guc->ads_capture_size && guc->ads_capture_size != PAGE_ALIGN(total_size))
+		drm_warn(&i915->drm, "GuC->ADS->Capture alloc size changed from %d to %d\n",
+			 guc->ads_capture_size, PAGE_ALIGN(total_size));
+
+	return PAGE_ALIGN(total_size);
 }
 
 static void __guc_ads_init(struct intel_guc *guc)
@@ -639,8 +739,8 @@ static void __guc_ads_init(struct intel_guc *guc)
 
 	base = intel_guc_ggtt_offset(guc, guc->ads_vma);
 
-	/* Capture list for hang debug */
-	guc_capture_list_init(guc);
+	/* Lists for error capture debug */
+	guc_capture_prep_lists(guc);
 
 	/* ADS */
 	ads_blob_write(guc, ads.scheduler_policies, base +
@@ -687,6 +787,12 @@ int intel_guc_ads_create(struct intel_guc *guc)
 	if (ret < 0)
 		return ret;
 	guc->ads_golden_ctxt_size = ret;
+
+	/* Likewise the capture lists: */
+	ret = guc_capture_prep_lists(guc);
+	if (ret < 0)
+		return ret;
+	guc->ads_capture_size = ret;
 
 	/* Now the total size can be determined: */
 	size = guc_ads_blob_size(guc);
