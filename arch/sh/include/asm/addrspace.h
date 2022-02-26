@@ -2,7 +2,7 @@
  *
  * Copyright (C) 1999 by Kaz Kojima
  *
- * Defitions for the address spaces of the SH CPUs.
+ * Definitions for the address spaces of the SH CPUs.
  */
 #ifndef __ASM_SH_ADDRSPACE_H
 #define __ASM_SH_ADDRSPACE_H

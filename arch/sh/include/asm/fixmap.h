@@ -26,7 +26,7 @@
  *
  * these 'compile-time allocated' memory buffers are
  * fixed-size 4k pages. (or larger if used with an increment
- * highger than 1) use fixmap_set(idx,phys) to associate
+ * higher than 1) use fixmap_set(idx,phys) to associate
  * physical memory with fixmap indices.
  *
  * TLB entries of such buffers will not be flushed across
@@ -34,7 +34,7 @@
  */
 
 /*
- * on UP currently we will have no trace of the fixmap mechanizm,
+ * on UP currently we will have no trace of the fixmap mechanism,
  * no page table allocations, etc. This might change in the
  * future, say framebuffers for the console driver(s) could be
  * fix-mapped?
@@ -53,7 +53,7 @@ enum fixed_addresses {
 #ifdef CONFIG_IOREMAP_FIXED
 	/*
 	 * FIX_IOREMAP entries are useful for mapping physical address
-	 * space before ioremap() is useable, e.g. really early in boot
+	 * space before ioremap() is usable, e.g. really early in boot
 	 * before kmalloc() is working.
 	 */
 #define FIX_N_IOREMAPS	32
