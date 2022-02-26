@@ -76,9 +76,11 @@ head-y := arch/loongarch/kernel/head.o
 
 libs-y += arch/loongarch/lib/
 
+ifeq ($(KBUILD_EXTMOD),)
 prepare: vdso_prepare
 vdso_prepare: prepare0
 	$(Q)$(MAKE) $(build)=arch/loongarch/vdso include/generated/vdso-offsets.h
+endif
 
 PHONY += vdso_install
 vdso_install:
