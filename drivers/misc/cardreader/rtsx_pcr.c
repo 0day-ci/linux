@@ -1054,6 +1054,7 @@ static int rtsx_pci_acquire_irq(struct rtsx_pcr *pcr)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 static void rtsx_enable_aspm(struct rtsx_pcr *pcr)
 {
 	if (pcr->ops->set_aspm)
@@ -1085,6 +1086,7 @@ static void rtsx_pm_power_saving(struct rtsx_pcr *pcr)
 {
 	rtsx_comm_pm_power_saving(pcr);
 }
+#endif
 
 static void rtsx_base_force_power_down(struct rtsx_pcr *pcr)
 {
