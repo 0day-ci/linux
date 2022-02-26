@@ -385,10 +385,20 @@ enum skb_drop_reason {
 					 * sk_buff
 					 */
 	SKB_DROP_REASON_SKB_GSO_SEG,	/* gso segmentation error */
+	SKB_DROP_REASON_SKB_PULL,	/* failed to pull sk_buff data */
+	SKB_DROP_REASON_SKB_TRIM,	/* failed to trim sk_buff data */
 	SKB_DROP_REASON_DEV_HDR,	/* there is something wrong with
 					 * device driver specific header
 					 */
+	SKB_DROP_REASON_DEV_READY,	/* device is not ready */
 	SKB_DROP_REASON_FULL_RING,	/* ring buffer is full */
+	SKB_DROP_REASON_TAP_FILTER,	/* dropped by (ebpf) filter directly
+					 * attached to tun/tap, e.g., via
+					 * TUNSETFILTEREBPF
+					 */
+	SKB_DROP_REASON_TAP_TXFILTER,	/* dropped by tx filter implemented
+					 * at tun/tap, e.g., check_filter()
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
