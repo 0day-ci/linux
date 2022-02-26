@@ -520,7 +520,7 @@ __kfifo_uint_must_check_helper( \
 ({ \
 	typeof((fifo) + 1) __tmp = (fifo); \
 	typeof(__tmp->ptr_const) __buf = (buf); \
-	unsigned long __n = (n); \
+	unsigned int __n = (n); \
 	const size_t __recsize = sizeof(*__tmp->rectype); \
 	struct __kfifo *__kfifo = &__tmp->kfifo; \
 	(__recsize) ?\
@@ -589,7 +589,7 @@ __kfifo_uint_must_check_helper( \
 ({ \
 	typeof((fifo) + 1) __tmp = (fifo); \
 	typeof(__tmp->ptr) __buf = (buf); \
-	unsigned long __n = (n); \
+	unsigned int __n = (n); \
 	const size_t __recsize = sizeof(*__tmp->rectype); \
 	struct __kfifo *__kfifo = &__tmp->kfifo; \
 	(__recsize) ?\
@@ -819,7 +819,7 @@ __kfifo_uint_must_check_helper( \
 ({ \
 	typeof((fifo) + 1) __tmp = (fifo); \
 	typeof(__tmp->ptr) __buf = (buf); \
-	unsigned long __n = (n); \
+	unsigned int __n = (n); \
 	const size_t __recsize = sizeof(*__tmp->rectype); \
 	struct __kfifo *__kfifo = &__tmp->kfifo; \
 	(__recsize) ? \
