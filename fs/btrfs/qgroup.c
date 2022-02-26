@@ -1214,13 +1214,18 @@ int btrfs_quota_disable(struct btrfs_fs_info *fs_info)
 		goto out;
 
 	/*
+	 * qgruop_ioctl_lock should be unlocked before waiting rescan completion
+	 * for avoiding deadlock with other qgroup command like remove_qgroup.
+	 */
+	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+
+	/*
 	 * Request qgroup rescan worker to complete and wait for it. This wait
 	 * must be done before transaction start for quota disable since it may
 	 * deadlock with transaction by the qgroup rescan worker.
 	 */
 	clear_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags);
 	btrfs_qgroup_wait_for_completion(fs_info, false);
-	mutex_unlock(&fs_info->qgroup_ioctl_lock);
 
 	/*
 	 * 1 For the root item
