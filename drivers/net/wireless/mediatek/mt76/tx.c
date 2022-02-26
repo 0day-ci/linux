@@ -62,13 +62,20 @@ mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
 		};
 		struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
 		struct mt76_wcid *wcid;
+		struct ieee80211_rate_status rate = {0};
 
 		wcid = rcu_dereference(dev->wcid[cb->wcid]);
 		if (wcid) {
 			status.sta = wcid_to_sta(wcid);
+			if (status.sta) {
+				rate.rate_idx = wcid->rate;
+				rate.retry_count = 1;
+				/* Default 0 for now, can be used by TPC algorithm */
+				rate.tx_power = 0;
 
-			if (status.sta)
-				status.rate = &wcid->rate;
+				status.rates = &rate;
+				status.n_rates = 1;
+			}
 		}
 
 		hw = mt76_tx_status_get_hw(dev, skb);
