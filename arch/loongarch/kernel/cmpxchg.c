@@ -92,7 +92,10 @@ unsigned long __cmpxchg_small(volatile void *ptr, unsigned long old,
 	"	or		%1, %1, %6	\n"
 	"	sc.w		%1, %2		\n"
 	"	beqz		%1, 1b		\n"
+	"	b		3f		\n"
 	"2:					\n"
+	__WEAK_LLSC_MB
+	"3:					\n"
 	: "=&r" (old32), "=&r" (temp), "=" GCC_OFF_SMALL_ASM() (*ptr32)
 	: GCC_OFF_SMALL_ASM() (*ptr32), "Jr" (~mask), "Jr" (old), "Jr" (new)
 	: "memory");

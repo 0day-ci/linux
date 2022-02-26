@@ -253,3 +253,11 @@ void output_signal_defines(void)
 	DEFINE(_SIGXFSZ, SIGXFSZ);
 	BLANK();
 }
+
+void output_smpboot_defines(void)
+{
+	COMMENT("Linux smp cpu boot offsets.");
+	OFFSET(CPU_BOOT_STACK, secondary_data, stack);
+	OFFSET(CPU_BOOT_TINFO, secondary_data, thread_info);
+	BLANK();
+}
