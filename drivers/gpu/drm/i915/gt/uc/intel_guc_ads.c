@@ -11,6 +11,7 @@
 #include "gt/intel_lrc.h"
 #include "gt/shmem_utils.h"
 #include "intel_guc_ads.h"
+#include "intel_guc_capture.h"
 #include "intel_guc_fwif.h"
 #include "intel_uc.h"
 #include "i915_drv.h"
@@ -73,8 +74,7 @@ static u32 guc_ads_golden_ctxt_size(struct intel_guc *guc)
 
 static u32 guc_ads_capture_size(struct intel_guc *guc)
 {
-	/* FIXME: Allocate a proper capture list */
-	return PAGE_ALIGN(PAGE_SIZE);
+	return PAGE_ALIGN(guc->ads_capture_size);
 }
 
 static u32 guc_ads_private_data_size(struct intel_guc *guc)
@@ -560,24 +560,120 @@ static void guc_init_golden_context(struct intel_guc *guc)
 	GEM_BUG_ON(guc->ads_golden_ctxt_size != total_size);
 }
 
-static void guc_capture_list_init(struct intel_guc *guc, struct __guc_ads_blob *blob)
+static int
+guc_capture_prep_lists(struct intel_guc *guc, struct __guc_ads_blob *blob, u32 blob_ggtt,
+		       struct guc_gt_system_info *sysinfo)
 {
+	struct intel_gt *gt = guc_to_gt(guc);
+	struct guc_gt_system_info *info, local_info;
+	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
+	u32 ggtt, capture_offset, null_ggtt, alloc_size = 0;
+	void *listptr = NULL;
+	size_t size = 0;
+	u8 *ptr = NULL;
 	int i, j;
-	u32 addr_ggtt, offset;
 
-	offset = guc_ads_capture_offset(guc);
-	addr_ggtt = intel_guc_ggtt_offset(guc, guc->ads_vma) + offset;
+	if (blob) {
+		capture_offset = guc_ads_capture_offset(guc);
+		ptr = ((u8 *)blob) + capture_offset;
+		ggtt = blob_ggtt + capture_offset;
+		GEM_BUG_ON(!sysinfo);
+		info = sysinfo;
+	} else {
+		memset(&local_info, 0, sizeof(local_info));
+		info = &local_info;
+		fill_engine_enable_masks(gt, info);
+	}
 
-	/* FIXME: Populate a proper capture list */
+	/* first, set aside the first page for a capture_list with zero descriptors */
+	alloc_size = PAGE_SIZE;
+	if (blob) {
+		memset(ptr, 0, PAGE_SIZE);
+		null_ggtt = ggtt;
+		ggtt += PAGE_SIZE;
+		ptr += PAGE_SIZE;
+	}
 
 	for (i = 0; i < GUC_CAPTURE_LIST_INDEX_MAX; i++) {
 		for (j = 0; j < GUC_MAX_ENGINE_CLASSES; j++) {
-			blob->ads.capture_instance[i][j] = addr_ggtt;
-			blob->ads.capture_class[i][j] = addr_ggtt;
-		}
 
-		blob->ads.capture_global[i] = addr_ggtt;
+			/* null list if we dont have said engine or list */
+			if (!info->engine_enabled_masks[j]) {
+				if (blob) {
+					blob->ads.capture_class[i][j] = null_ggtt;
+					blob->ads.capture_instance[i][j] = null_ggtt;
+				}
+				continue;
+			}
+			if (intel_guc_capture_getlistsize(guc, i,
+							  GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS,
+							  j, &size)) {
+				if (blob)
+					blob->ads.capture_class[i][j] = null_ggtt;
+				goto engine_instance_list;
+			}
+			alloc_size += size;
+			if (blob) {
+				if (alloc_size > guc->ads_capture_size ||
+				    intel_guc_capture_getlist(guc, i,
+							      GUC_CAPTURE_LIST_TYPE_ENGINE_CLASS,
+							      j, &listptr)) {
+					blob->ads.capture_class[i][j] = null_ggtt;
+					continue;
+				}
+				blob->ads.capture_class[i][j] = ggtt;
+				memcpy(ptr, listptr, size);
+				ptr += size;
+				ggtt += size;
+			}
+engine_instance_list:
+			if (intel_guc_capture_getlistsize(guc, i,
+							  GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE,
+							  j, &size)) {
+				if (blob)
+					blob->ads.capture_instance[i][j] = null_ggtt;
+				continue;
+			}
+			alloc_size += size;
+			if (blob) {
+				if (alloc_size > guc->ads_capture_size ||
+				    intel_guc_capture_getlist(guc, i,
+							      GUC_CAPTURE_LIST_TYPE_ENGINE_INSTANCE,
+							      j, &listptr)) {
+					blob->ads.capture_instance[i][j] = null_ggtt;
+					continue;
+				}
+				blob->ads.capture_instance[i][j] = ggtt;
+				memcpy(ptr, listptr, size);
+				ptr += size;
+				ggtt += size;
+			}
+		}
+		if (intel_guc_capture_getlistsize(guc, i, GUC_CAPTURE_LIST_TYPE_GLOBAL, 0, &size)) {
+			if (blob)
+				blob->ads.capture_global[i] = null_ggtt;
+			continue;
+		}
+		alloc_size += size;
+		if (blob) {
+			if (alloc_size > guc->ads_capture_size ||
+			    intel_guc_capture_getlist(guc, i, GUC_CAPTURE_LIST_TYPE_GLOBAL, 0,
+						      &listptr)) {
+				blob->ads.capture_global[i] = null_ggtt;
+				continue;
+			}
+			blob->ads.capture_global[i] = ggtt;
+			memcpy(ptr, listptr, size);
+			ptr += size;
+			ggtt += size;
+		}
 	}
+
+	if (guc->ads_capture_size && guc->ads_capture_size != PAGE_ALIGN(alloc_size))
+		drm_warn(&i915->drm, "GuC->ADS->Capture alloc size changed from %d to %d\n",
+			 guc->ads_capture_size, PAGE_ALIGN(alloc_size));
+
+	return PAGE_ALIGN(alloc_size);
 }
 
 static void __guc_ads_init(struct intel_guc *guc)
@@ -613,8 +709,8 @@ static void __guc_ads_init(struct intel_guc *guc)
 
 	base = intel_guc_ggtt_offset(guc, guc->ads_vma);
 
-	/* Capture list for hang debug */
-	guc_capture_list_init(guc, blob);
+	/* Lists for error capture debug */
+	guc_capture_prep_lists(guc, blob, base, &blob->system_info);
 
 	/* ADS */
 	blob->ads.scheduler_policies = base + ptr_offset(blob, policies);
@@ -657,6 +753,12 @@ int intel_guc_ads_create(struct intel_guc *guc)
 	if (ret < 0)
 		return ret;
 	guc->ads_golden_ctxt_size = ret;
+
+	/* Likewise the capture lists: */
+	ret = guc_capture_prep_lists(guc, NULL, 0, NULL);
+	if (ret < 0)
+		return ret;
+	guc->ads_capture_size = ret;
 
 	/* Now the total size can be determined: */
 	size = guc_ads_blob_size(guc);
