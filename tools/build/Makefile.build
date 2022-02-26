@@ -42,7 +42,6 @@ include $(build-dir)/Build.include
 # Init all relevant variables used in build files so
 # 1) they have correct type
 # 2) they do not inherit any value from the environment
-subdir-y     :=
 obj-y        :=
 subdir-y     :=
 subdir-obj-y :=
