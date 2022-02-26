@@ -29,6 +29,7 @@ Required properties:
                    "qcom,pm8150l",
                    "qcom,pm8226",
                    "qcom,pm8350c",
+                   "qcom,pm8450",
                    "qcom,pm8841",
                    "qcom,pm8901",
                    "qcom,pm8909",
