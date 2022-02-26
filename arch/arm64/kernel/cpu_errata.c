@@ -423,14 +423,6 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		ERRATA_MIDR_RANGE_LIST(erratum_845719_list),
 	},
 #endif
-#ifdef CONFIG_CAVIUM_ERRATUM_23154
-	{
-	/* Cavium ThunderX, pass 1.x */
-		.desc = "Cavium erratum 23154",
-		.capability = ARM64_WORKAROUND_CAVIUM_23154,
-		ERRATA_MIDR_REV_RANGE(MIDR_THUNDERX, 0, 0, 1),
-	},
-#endif
 #ifdef CONFIG_CAVIUM_ERRATUM_27456
 	{
 		.desc = "Cavium erratum 27456",

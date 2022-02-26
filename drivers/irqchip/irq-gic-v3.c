@@ -35,6 +35,8 @@
 
 #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
 #define FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539	(1ULL << 1)
+#define FLAGS_WORKAROUND_CAVIUM_ERRATUM_23154	(1ULL << 2)
+#define FLAGS_WORKAROUND_MARVELL_ERRATUM_38545	(1ULL << 3)
 
 #define GIC_IRQ_TYPE_PARTITION	(GIC_IRQ_TYPE_LPI + 1)
 
@@ -60,6 +62,7 @@ struct gic_chip_data {
 
 static struct gic_chip_data gic_data __read_mostly;
 static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
+static DEFINE_STATIC_KEY_FALSE(gic_iar_quirk);
 
 #define GIC_ID_NR	(1U << GICD_TYPER_ID_BITS(gic_data.rdists.gicd_typer))
 #define GIC_LINE_NR	min(GICD_TYPER_SPIS(gic_data.rdists.gicd_typer), 1020U)
@@ -235,10 +238,19 @@ static void gic_redist_wait_for_rwp(void)
 
 #ifdef CONFIG_ARM64
 
+static u64 __maybe_unused gic_read_iar_fixup(void)
+{
+	if (gic_data.flags & FLAGS_WORKAROUND_MARVELL_ERRATUM_38545 ||
+		gic_data.flags & FLAGS_WORKAROUND_CAVIUM_ERRATUM_23154)
+		return gic_read_iar_marvell_38545_23154();
+	else /* Not possible */
+		return ICC_IAR1_EL1_SPURIOUS;
+}
+
 static u64 __maybe_unused gic_read_iar(void)
 {
-	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_23154))
-		return gic_read_iar_cavium_thunderx();
+	if (static_branch_unlikely(&gic_iar_quirk))
+		return gic_read_iar_fixup();
 	else
 		return gic_read_iar_common();
 }
@@ -1614,11 +1626,31 @@ static bool gic_enable_quirk_msm8996(void *data)
 	return true;
 }
 
+static bool gic_enable_quirk_cavium_23154(void *data)
+{
+	struct gic_chip_data *d = data;
+
+	d->flags |= FLAGS_WORKAROUND_CAVIUM_ERRATUM_23154;
+	static_branch_enable(&gic_iar_quirk);
+
+	return true;
+}
+
 static bool gic_enable_quirk_cavium_38539(void *data)
 {
 	struct gic_chip_data *d = data;
 
 	d->flags |= FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539;
+
+	return true;
+}
+
+static bool gic_enable_quirk_marvell_38545(void *data)
+{
+	struct gic_chip_data *d = data;
+
+	d->flags |= FLAGS_WORKAROUND_MARVELL_ERRATUM_38545;
+	static_branch_enable(&gic_iar_quirk);
 
 	return true;
 }
@@ -1661,6 +1693,13 @@ static const struct gic_quirk gic_quirks[] = {
 		.mask	= 0xffffffff,
 		.init	= gic_enable_quirk_hip06_07,
 	},
+		/* ThunderX: CN88xx 1.x */
+	{
+		.desc	= "GICv3: Cavium erratum 23154",
+		.iidr	= 0xa101034c,
+		.mask	= 0xffff0fff,
+		.init	= gic_enable_quirk_cavium_23154,
+	},
 	{
 		/*
 		 * Reserved register accesses generate a Synchronous
@@ -1673,6 +1712,19 @@ static const struct gic_quirk gic_quirks[] = {
 		.iidr	= 0xa000034c,
 		.mask	= 0xe8f00fff,
 		.init	= gic_enable_quirk_cavium_38539,
+	},
+	{
+		/*
+		 * IAR register reads could be unreliable, under certain
+		 * race conditions. This erratum applies to:
+		 * - ThunderX: CN88xx
+		 * - OCTEON TX: CN83xx, CN81xx
+		 * - OCTEON TX2: CN93xx, CN96xx, CN98xx, CNF95xx*
+		 */
+		.desc	= "GICv3: Marvell erratum 38545",
+		.iidr	= 0xa000034c,
+		.mask	= 0xe0f00fff,
+		.init	= gic_enable_quirk_marvell_38545,
 	},
 	{
 	}

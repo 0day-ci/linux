@@ -47,21 +47,37 @@ static inline u64 gic_read_iar_common(void)
 	return irqstat;
 }
 
-/*
+/* Marvell Erratum 38545
+ *
+ * When a IAR register read races with a GIC interrupt RELEASE event,
+ * GIC-CPU interface could wrongly return a valid INTID to the CPU
+ * for an interrupt that is already released(non activated) instead of 0x3ff.
+ *
+ * To workaround this, return a valid interrupt ID only if there is a change
+ * in the active priority list after the IAR read.
+ *
  * Cavium ThunderX erratum 23154
  *
  * The gicv3 of ThunderX requires a modified version for reading the
  * IAR status to ensure data synchronization (access to icc_iar1_el1
  * is not sync'ed before and after).
+ *
+ * Have merged both the workarounds into a common function since,
+ * 1. On Thunderx 88xx 1.x both erratas are applicable.
+ * 2. Having extra nops doesn't add any side effects for Silicons where
+ *    erratum 23154 is not applicable.
  */
-static inline u64 gic_read_iar_cavium_thunderx(void)
+static inline u64 gic_read_iar_marvell_38545_23154(void)
 {
-	u64 irqstat;
+	u64 irqstat, apr;
 
+	apr = read_sysreg_s(SYS_ICC_AP1R0_EL1);
 	nops(8);
 	irqstat = read_sysreg_s(SYS_ICC_IAR1_EL1);
 	nops(4);
-	mb();
+	dsb(sy);
+	if (unlikely(apr == read_sysreg_s(SYS_ICC_AP1R0_EL1)))
+		return 0x3ff;
 
 	return irqstat;
 }
