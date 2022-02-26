@@ -51,6 +51,7 @@ struct __guc_mmio_reg_descr_group {
 	u32 owner; /* see enum guc_capture_owner */
 	u32 type; /* see enum guc_capture_type */
 	u32 engine; /* as per MAX_ENGINE_CLASS */
+	struct __guc_mmio_reg_descr *extlist; /* only used for steered registers */
 };
 
 /**
@@ -77,6 +78,14 @@ struct __guc_state_capture_priv {
 	 * @reglists: static table of register lists used for error-capture state.
 	 */
 	const struct __guc_mmio_reg_descr_group *reglists;
+
+	/**
+	 * @extlists: allocated table of steered register lists used for error-capture state.
+	 *
+	 * NOTE: steered registers have multiple instances depending on the HW configuration
+	 * (slices or dual-sub-slices) and thus depends on HW fuses discovered at startup
+	 */
+	struct __guc_mmio_reg_descr_group *extlists;
 
 	/**
 	 * @ads_cache: cached register lists that is ADS format ready
