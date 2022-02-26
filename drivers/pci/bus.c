@@ -194,6 +194,15 @@ static int pci_bus_alloc_from_region(struct pci_bus *bus, struct resource *res,
 		 */
 		if (avail.start)
 			min_used = avail.start;
+		/*
+		 * For non-bridge resources avoid assigning address 0 as
+		 * we assume that to mean no assignment in many places,
+		 * starting from `pci_iomap_range'.
+		 */
+		if (min_used == 0 && (res->flags & IORESOURCE_SIZEALIGN))
+			min_used = res->flags & IORESOURCE_IO ?
+				   ~PCI_BASE_ADDRESS_IO_MASK + 1 :
+				   ~PCI_BASE_ADDRESS_MEM_MASK + 1;
 
 		max = avail.end;
 
