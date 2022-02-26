@@ -545,19 +545,22 @@ static inline int dio_bio_reap(struct dio *dio, struct dio_submit *sdio)
 	int ret = 0;
 
 	if (sdio->reap_counter++ >= 64) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&dio->bio_lock, flags);
 		while (dio->bio_list) {
-			unsigned long flags;
 			struct bio *bio;
 			int ret2;
 
-			spin_lock_irqsave(&dio->bio_lock, flags);
 			bio = dio->bio_list;
 			dio->bio_list = bio->bi_private;
 			spin_unlock_irqrestore(&dio->bio_lock, flags);
 			ret2 = blk_status_to_errno(dio_bio_complete(dio, bio));
 			if (ret == 0)
 				ret = ret2;
+			spin_lock_irqsave(&dio->bio_lock, flags);
 		}
+		spin_unlock_irqrestore(&dio->bio_lock, flags);
 		sdio->reap_counter = 0;
 	}
 	return ret;
