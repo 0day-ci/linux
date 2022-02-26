@@ -380,6 +380,15 @@ enum skb_drop_reason {
 					 * the ofo queue, corresponding to
 					 * LINUX_MIB_TCPOFOMERGE
 					 */
+	SKB_DROP_REASON_SKB_CSUM,	/* sk_buff checksum error */
+	SKB_DROP_REASON_SKB_COPY_DATA,	/* failed to copy data from or to
+					 * sk_buff
+					 */
+	SKB_DROP_REASON_SKB_GSO_SEG,	/* gso segmentation error */
+	SKB_DROP_REASON_DEV_HDR,	/* there is something wrong with
+					 * device driver specific header
+					 */
+	SKB_DROP_REASON_FULL_RING,	/* ring buffer is full */
 	SKB_DROP_REASON_MAX,
 };
 
