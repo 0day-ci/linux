@@ -65,6 +65,7 @@ config IWLDVM
 config IWLMVM
 	tristate "Intel Wireless WiFi MVM Firmware support"
 	select WANT_DEV_COREDUMP
+	depends on RFKILL
 	depends on MAC80211
 	help
 	  This is the driver that supports the MVM firmware. The list
