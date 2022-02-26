@@ -3188,7 +3188,7 @@ again:
 	 * Flush the memory cgroup stats, so that we read accurate per-memcg
 	 * lruvec stats for heuristics.
 	 */
-	mem_cgroup_flush_stats();
+	mem_cgroup_flush_stats_async();
 
 	memset(&sc->nr, 0, sizeof(sc->nr));
 
