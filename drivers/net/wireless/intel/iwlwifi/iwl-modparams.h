@@ -62,6 +62,7 @@ enum iwl_uapsd_disable {
  * @disable_11ac: disable VHT capabilities, default = false.
  * @remove_when_gone: remove an inaccessible device from the PCIe bus.
  * @enable_ini: enable new FW debug infratructure (INI TLVs)
+ * @beacon_timeout: number of missed beacons before disconnect, default = 16
  */
 struct iwl_mod_params {
 	int swcrypto;
@@ -84,6 +85,7 @@ struct iwl_mod_params {
 	bool disable_11ax;
 	bool remove_when_gone;
 	bool enable_ini;
+	u32 beacon_timeout;
 };
 
 static inline bool iwl_enable_rx_ampdu(void)

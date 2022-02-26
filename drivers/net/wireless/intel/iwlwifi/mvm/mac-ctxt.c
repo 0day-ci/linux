@@ -8,6 +8,7 @@
 #include <linux/crc32.h>
 #include <net/mac80211.h>
 #include "iwl-io.h"
+#include "iwl-modparams.h"
 #include "iwl-prph.h"
 #include "fw-api.h"
 #include "mvm.h"
@@ -1416,7 +1417,7 @@ void iwl_mvm_rx_missed_beacons_notif(struct iwl_mvm *mvm,
 	 * TODO: the threshold should be adjusted based on latency conditions,
 	 * and/or in case of a CS flow on one of the other AP vifs.
 	 */
-	if (rx_missed_bcon > IWL_MVM_MISSED_BEACONS_THRESHOLD_LONG)
+	if (rx_missed_bcon > iwlwifi_mod_params.beacon_timeout)
 		iwl_mvm_connection_loss(mvm, vif, "missed beacons");
 	else if (rx_missed_bcon_since_rx > IWL_MVM_MISSED_BEACONS_THRESHOLD)
 		ieee80211_beacon_loss(vif);
