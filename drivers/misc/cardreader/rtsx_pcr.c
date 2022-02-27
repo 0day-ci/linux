@@ -1699,7 +1699,6 @@ out:
 	return ret;
 }
 
-#ifdef CONFIG_PM
 
 static void rtsx_pci_shutdown(struct pci_dev *pcidev)
 {
@@ -1784,17 +1783,10 @@ static int rtsx_pci_runtime_resume(struct device *device)
 	return 0;
 }
 
-#else /* CONFIG_PM */
-
-#define rtsx_pci_shutdown NULL
-#define rtsx_pci_runtime_suspend NULL
-#define rtsx_pic_runtime_resume NULL
-
-#endif /* CONFIG_PM */
-
 static const struct dev_pm_ops rtsx_pci_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(rtsx_pci_suspend, rtsx_pci_resume)
-	SET_RUNTIME_PM_OPS(rtsx_pci_runtime_suspend, rtsx_pci_runtime_resume, rtsx_pci_runtime_idle)
+	SYSTEM_SLEEP_PM_OPS(rtsx_pci_suspend, rtsx_pci_resume)
+	RUNTIME_PM_OPS(rtsx_pci_runtime_suspend, rtsx_pci_runtime_resume,
+		       rtsx_pci_runtime_idle)
 };
 
 static struct pci_driver rtsx_pci_driver = {
