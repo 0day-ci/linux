@@ -23,6 +23,16 @@ config REMOTEPROC_CDEV
 
 	  It's safe to say N if you don't want to use this interface.
 
+config AVM_WASP_REMOTEPROC
+	tristate "AVM WASP remoteproc support"
+	depends on NET_DSA_LANTIQ_GSWIP
+	help
+	  Say y here to support booting the secondary SoC ATH79 target
+	  called Wireless Assistant Support Processor (WASP) that some
+	  AVM Fritzbox devices (3390, 3490, 5490, 5491, 7490) have built in.
+
+	  It's safe to say N here.
+
 config IMX_REMOTEPROC
 	tristate "i.MX remoteproc support"
 	depends on ARCH_MXC
