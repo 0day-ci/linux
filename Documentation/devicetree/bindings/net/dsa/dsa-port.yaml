@@ -52,6 +52,8 @@ properties:
       - ocelot
       - ocelot-8021q
       - seville
+      - rtl8_4
+      - rtl8_4t
 
   phy-handle: true
 
