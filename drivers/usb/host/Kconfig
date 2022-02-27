@@ -340,6 +340,17 @@ config USB_OCTEON_EHCI
 	  USB 2.0 device support.  All CN6XXX based chips with USB are
 	  supported.
 
+config USB_EHCI_SUNPLUS
+	tristate "EHCI support for Sunplus USB controller"
+	depends on SOC_SP7021
+	select NVMEM_SUNPLUS_OCOTP
+	help
+	  Enables support for the on-chip EHCI controller in Sunplus
+	  SoCs. It supports 32-bit AHB/AXI config bus and 64-bit AXI
+	  data bus.
+	  This driver can also be built as a module. If so, the module
+	  will be called ehci-sunplus.
+
 endif # USB_EHCI_HCD
 
 config USB_OXU210HP_HCD
