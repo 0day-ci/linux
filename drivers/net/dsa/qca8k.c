@@ -1685,11 +1685,11 @@ qca8k_phylink_mac_select_pcs(struct dsa_switch *ds, int port,
 	case PHY_INTERFACE_MODE_1000BASEX:
 		switch (port) {
 		case 0:
-			pcs = &priv->pcs_port_0.pcs;
+			pcs = &priv->ports_config.qpcs[QCA8K_CPU_PORT0].pcs;
 			break;
 
 		case 6:
-			pcs = &priv->pcs_port_6.pcs;
+			pcs = &priv->ports_config.qpcs[QCA8K_CPU_PORT6].pcs;
 			break;
 		}
 		break;
@@ -2889,8 +2889,8 @@ qca8k_setup(struct dsa_switch *ds)
 	if (ret)
 		return ret;
 
-	qca8k_setup_pcs(priv, &priv->pcs_port_0, 0);
-	qca8k_setup_pcs(priv, &priv->pcs_port_6, 6);
+	qca8k_setup_pcs(priv, &priv->ports_config.qpcs[QCA8K_CPU_PORT0], 0);
+	qca8k_setup_pcs(priv, &priv->ports_config.qpcs[QCA8K_CPU_PORT0], 6);
 
 	/* Make sure MAC06 is disabled */
 	ret = regmap_clear_bits(priv->regmap, QCA8K_REG_PORT0_PAD_CTRL,
