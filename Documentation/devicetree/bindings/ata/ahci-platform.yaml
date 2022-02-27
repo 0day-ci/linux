@@ -67,6 +67,9 @@ properties:
       some embedded SoCs.
     minItems: 1
 
+  power-domains:
+    maxItems: 1
+
   resets:
     minItems: 1
 
