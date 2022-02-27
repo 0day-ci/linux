@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/leds.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -1037,6 +1038,8 @@ static __always_inline void nvme_pci_unmap_rq(struct request *req)
 			       rq_integrity_vec(req)->bv_len, rq_data_dir(req));
 	if (blk_rq_nr_phys_segments(req))
 		nvme_unmap_data(dev, req);
+
+	ledtrig_disk_activity(req_op(req) == REQ_OP_WRITE);
 }
 
 static void nvme_pci_complete_rq(struct request *req)
