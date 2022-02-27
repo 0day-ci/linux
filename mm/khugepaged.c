@@ -1824,7 +1824,8 @@ static void collapse_file(struct mm_struct *mm,
 		}
 
 		if (page_mapped(page))
-			try_to_unmap(folio, TTU_IGNORE_MLOCK | TTU_BATCH_FLUSH);
+			try_to_unmap(page_folio(page),
+				     TTU_IGNORE_MLOCK | TTU_BATCH_FLUSH);
 
 		xas_lock_irq(&xas);
 		xas_set(&xas, index);
