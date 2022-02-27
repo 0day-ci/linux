@@ -2109,6 +2109,8 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
 		spi->mode |= SPI_LSB_FIRST;
 	if (of_property_read_bool(nc, "spi-cs-high"))
 		spi->mode |= SPI_CS_HIGH;
+	if (of_property_read_bool(nc, "spi-trailing-clock"))
+		spi->mode |= SPI_TRAILING;
 
 	/* Device DUAL/QUAD mode */
 	if (!of_property_read_u32(nc, "spi-tx-bus-width", &value)) {
@@ -3538,12 +3540,13 @@ int spi_setup(struct spi_device *spi)
 
 	trace_spi_setup(spi, status);
 
-	dev_dbg(&spi->dev, "setup mode %lu, %s%s%s%s%u bits/w, %u Hz max --> %d\n",
+	dev_dbg(&spi->dev, "setup mode %lu, %s%s%s%s%s%u bits/w, %u Hz max --> %d\n",
 			spi->mode & SPI_MODE_X_MASK,
 			(spi->mode & SPI_CS_HIGH) ? "cs_high, " : "",
 			(spi->mode & SPI_LSB_FIRST) ? "lsb, " : "",
 			(spi->mode & SPI_3WIRE) ? "3wire, " : "",
 			(spi->mode & SPI_LOOP) ? "loopback, " : "",
+			(spi->mode & SPI_TRAILING) ? "trailing clock, " : "",
 			spi->bits_per_word, spi->max_speed_hz,
 			status);
 

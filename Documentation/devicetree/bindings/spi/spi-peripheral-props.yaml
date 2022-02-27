@@ -83,6 +83,10 @@ properties:
     description:
       Delay, in microseconds, after a write transfer.
 
+  spi-trailing-clock:
+    description:
+      Add a few clock cycles (minimum 2) with chipselect OFF after transfers.
+
 # The controller specific properties go here.
 allOf:
   - $ref: cdns,qspi-nor-peripheral-props.yaml#
