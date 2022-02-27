@@ -611,18 +611,6 @@ void fuse_read_args_fill(struct fuse_io_args *ia, struct file *file, loff_t pos,
 	args->out_args[0].size = count;
 }
 
-static void fuse_release_user_pages(struct fuse_args_pages *ap,
-				    bool should_dirty)
-{
-	unsigned int i;
-
-	for (i = 0; i < ap->num_pages; i++) {
-		if (should_dirty)
-			set_page_dirty_lock(ap->pages[i]);
-		put_page(ap->pages[i]);
-	}
-}
-
 static void fuse_io_release(struct kref *kref)
 {
 	kfree(container_of(kref, struct fuse_io_priv, refcnt));
@@ -720,7 +708,8 @@ static void fuse_aio_complete_req(struct fuse_mount *fm, struct fuse_args *args,
 	struct fuse_io_priv *io = ia->io;
 	ssize_t pos = -1;
 
-	fuse_release_user_pages(&ia->ap, io->should_dirty);
+	unpin_user_pages_dirty_lock(ia->ap.pages, ia->ap.num_pages,
+				    io->should_dirty);
 
 	if (err) {
 		/* Nothing */
@@ -1382,25 +1371,14 @@ static int fuse_get_user_pages(struct fuse_args_pages *ap, struct iov_iter *ii,
 	size_t nbytes = 0;  /* # bytes already packed in req */
 	ssize_t ret = 0;
 
-	/* Special case for kernel I/O: can copy directly into the buffer */
-	if (iov_iter_is_kvec(ii)) {
-		unsigned long user_addr = fuse_get_user_addr(ii);
-		size_t frag_size = fuse_get_frag_size(ii, *nbytesp);
-
-		if (write)
-			ap->args.in_args[1].value = (void *) user_addr;
-		else
-			ap->args.out_args[0].value = (void *) user_addr;
-
-		iov_iter_advance(ii, frag_size);
-		*nbytesp = frag_size;
-		return 0;
-	}
+	/* Only user space buffers are allowed with fuse Direct IO. */
+	if (WARN_ON_ONCE(!iter_is_iovec(ii)))
+		return -EOPNOTSUPP;
 
 	while (nbytes < *nbytesp && ap->num_pages < max_pages) {
 		unsigned npages;
 		size_t start;
-		ret = iov_iter_get_pages(ii, &ap->pages[ap->num_pages],
+		ret = iov_iter_pin_pages(ii, &ap->pages[ap->num_pages],
 					*nbytesp - nbytes,
 					max_pages - ap->num_pages,
 					&start);
@@ -1484,7 +1462,9 @@ ssize_t fuse_direct_io(struct fuse_io_priv *io, struct iov_iter *iter,
 		}
 
 		if (!io->async || nres < 0) {
-			fuse_release_user_pages(&ia->ap, io->should_dirty);
+			unpin_user_pages_dirty_lock(ia->ap.pages,
+						    ia->ap.num_pages,
+						    io->should_dirty);
 			fuse_io_free(ia);
 		}
 		ia = NULL;
