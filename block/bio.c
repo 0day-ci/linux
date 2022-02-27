@@ -1102,7 +1102,7 @@ void __bio_release_pages(struct bio *bio, bool mark_dirty)
 	bio_for_each_segment_all(bvec, bio, iter_all) {
 		if (mark_dirty && !PageCompound(bvec->bv_page))
 			set_page_dirty_lock(bvec->bv_page);
-		put_page(bvec->bv_page);
+		unpin_user_page(bvec->bv_page);
 	}
 }
 EXPORT_SYMBOL_GPL(__bio_release_pages);
@@ -1130,10 +1130,9 @@ void bio_iov_bvec_set(struct bio *bio, struct iov_iter *iter)
 
 static void bio_put_pages(struct page **pages, size_t size, size_t off)
 {
-	size_t i, nr = DIV_ROUND_UP(size + (off & ~PAGE_MASK), PAGE_SIZE);
+	size_t nr = DIV_ROUND_UP(size + (off & ~PAGE_MASK), PAGE_SIZE);
 
-	for (i = 0; i < nr; i++)
-		put_page(pages[i]);
+	unpin_user_pages(pages, nr);
 }
 
 #define PAGE_PTRS_PER_BVEC     (sizeof(struct bio_vec) / sizeof(struct page *))
@@ -1144,9 +1143,9 @@ static void bio_put_pages(struct page **pages, size_t size, size_t off)
  * @iter: iov iterator describing the region to be mapped
  *
  * Pins pages from *iter and appends them to @bio's bvec array. The
- * pages will have to be released using put_page() when done.
- * For multi-segment *iter, this function only adds pages from the
- * next non-empty segment of the iov iterator.
+ * pages will have to be released using unpin_user_page() when done. For
+ * multi-segment *iter, this function only adds pages from the next non-empty
+ * segment of the iov iterator.
  */
 static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 {
@@ -1169,7 +1168,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 
 	WARN_ON_ONCE(!iter_is_iovec(iter));
 
-	size = iov_iter_get_pages(iter, pages, LONG_MAX, nr_pages, &offset);
+	size = iov_iter_pin_pages(iter, pages, LONG_MAX, nr_pages, &offset);
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
@@ -1180,7 +1179,7 @@ static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 
 		if (__bio_try_merge_page(bio, page, len, offset, &same_page)) {
 			if (same_page)
-				put_page(page);
+				unpin_user_page(page);
 		} else {
 			if (WARN_ON_ONCE(bio_full(bio, len))) {
 				bio_put_pages(pages + i, left, offset);
@@ -1221,7 +1220,7 @@ static int __bio_iov_append_get_pages(struct bio *bio, struct iov_iter *iter)
 
 	WARN_ON_ONCE(!iter_is_iovec(iter));
 
-	size = iov_iter_get_pages(iter, pages, LONG_MAX, nr_pages, &offset);
+	size = iov_iter_pin_pages(iter, pages, LONG_MAX, nr_pages, &offset);
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
@@ -1237,7 +1236,7 @@ static int __bio_iov_append_get_pages(struct bio *bio, struct iov_iter *iter)
 			break;
 		}
 		if (same_page)
-			put_page(page);
+			unpin_user_page(page);
 		offset = 0;
 	}
 
@@ -1434,8 +1433,8 @@ void bio_set_pages_dirty(struct bio *bio)
  * the BIO and re-dirty the pages in process context.
  *
  * It is expected that bio_check_pages_dirty() will wholly own the BIO from
- * here on.  It will run one put_page() against each page and will run one
- * bio_put() against the BIO.
+ * here on.  It will run one unpin_user_page() against each page and will run
+ * one bio_put() against the BIO.
  */
 
 static void bio_dirty_fn(struct work_struct *work);
