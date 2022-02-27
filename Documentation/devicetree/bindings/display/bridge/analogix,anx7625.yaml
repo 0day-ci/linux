@@ -130,6 +130,7 @@ additionalProperties: false
 examples:
   - |
     #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/media/video-interfaces.h>
 
     i2c0 {
         #address-cells = <1>;
@@ -155,7 +156,7 @@ examples:
                     reg = <0>;
                     anx7625_in: endpoint {
                         remote-endpoint = <&mipi_dsi>;
-                        bus-type = <5>;
+                        bus-type = <MEDIA_BUS_TYPE_PARALLEL>;
                         data-lanes = <0 1 2 3>;
                     };
                 };
