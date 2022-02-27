@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/remoteproc/avm,wasp-rproc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: AVM WASP processor controller bindings
+
+maintainers:
+  - Daniel Kestrel <kestrelseventyfour@gmail.com>
+
+description: |
+  This document defines the bindings for the remoteproc component that loads and
+  boots firmwares on the AVM Wireless Assistent Support Processor (WASP) SoC
+  that is attached to some AVM Fritzbox devices (3390, 3490, 5490, 5491, 7490).
+
+properties:
+  compatible:
+    enum:
+      - avm,fritzbox3390-wasp
+      - avm,fritzboxx490-wasp
+
+  avm,wasp-mdio:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: Lantiq GSWIP switch mdio.
+
+  avm,wasp-port:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: Network port, where the WASP SoC is connected to.
+
+  avm,reset-gpios:
+    description: Reset gpio of the WASP SoC.
+
+  avm,startup-gpios:
+    description: Startup gpio of the WASP SoC.
+
+required:
+  - compatible
+  - avm,wasp-mdio
+  - avm,wasp-port
+  - avm,reset-gpios
+  - avm,startup-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    remoteproc {
+        compatible = "avm,fritzboxx490-wasp";
+        avm,wasp-mdio = <&gswip_mdio>;
+        avm,wasp-port = <&port5>;
+        avm,reset-gpios = <&gpio 34 GPIO_ACTIVE_HIGH>;
+        avm,startup-gpios = <&gpio 5 GPIO_ACTIVE_HIGH>;
+    };
