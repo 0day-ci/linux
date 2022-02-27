@@ -182,7 +182,8 @@ static bool remove_migration_pte(struct folio *folio,
 		struct page *new;
 		unsigned long idx = 0;
 
-		if (!folio_test_ksm(folio))
+		/* Skip call in common case, plus .pgoff is invalid for KSM */
+		if (pvmw.nr_pages != 1 && !folio_test_hugetlb(folio))
 			idx = linear_page_index(vma, pvmw.address) - pvmw.pgoff;
 		new = folio_page(folio, idx);
 
