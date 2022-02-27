@@ -50,7 +50,7 @@ static const struct hantro_fmt sunxi_vpu_dec_fmts[] = {
 
 static int sunxi_vpu_hw_init(struct hantro_dev *vpu)
 {
-	clk_set_rate(vpu->clocks[0].clk, 300000000);
+	clk_set_rate(vpu->clocks[0].clk, 576000000);
 
 	return 0;
 }
