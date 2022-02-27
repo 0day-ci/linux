@@ -192,17 +192,7 @@ static int __init early_hugetlb_free_vmemmap_param(char *buf)
 		return 0;
 	}
 
-	if (!buf)
-		return -EINVAL;
-
-	if (!strcmp(buf, "on"))
-		hugetlb_free_vmemmap_enabled = true;
-	else if (!strcmp(buf, "off"))
-		hugetlb_free_vmemmap_enabled = false;
-	else
-		return -EINVAL;
-
-	return 0;
+	return strtobool(buf, &hugetlb_free_vmemmap_enabled);
 }
 early_param("hugetlb_free_vmemmap", early_hugetlb_free_vmemmap_param);
 
