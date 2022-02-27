@@ -19,6 +19,7 @@
 #include "xfs_errortag.h"
 #include "xfs_error.h"
 #include "xfs_ag.h"
+#include "xfs_notify_failure.h"
 
 static struct kmem_cache *xfs_buf_cache;
 
@@ -1892,6 +1893,8 @@ xfs_free_buftarg(
 	list_lru_destroy(&btp->bt_lru);
 
 	blkdev_issue_flush(btp->bt_bdev);
+	if (btp->bt_daxdev)
+		dax_unregister_holder(btp->bt_daxdev, btp->bt_mount);
 	fs_put_dax(btp->bt_daxdev);
 
 	kmem_free(btp);
@@ -1939,6 +1942,7 @@ xfs_alloc_buftarg(
 	struct block_device	*bdev)
 {
 	xfs_buftarg_t		*btp;
+	int			error;
 
 	btp = kmem_zalloc(sizeof(*btp), KM_NOFS);
 
@@ -1946,6 +1950,14 @@ xfs_alloc_buftarg(
 	btp->bt_dev =  bdev->bd_dev;
 	btp->bt_bdev = bdev;
 	btp->bt_daxdev = fs_dax_get_by_bdev(bdev, &btp->bt_dax_part_off);
+	if (btp->bt_daxdev) {
+		error = dax_register_holder(btp->bt_daxdev, mp,
+				&xfs_dax_holder_operations);
+		if (error) {
+			xfs_err(mp, "DAX device already in use?!");
+			goto error_free;
+		}
+	}
 
 	/*
 	 * Buffer IO error rate limiting. Limit it to no more than 10 messages

@@ -353,6 +353,12 @@ xfs_setup_dax_always(
 		return -EINVAL;
 	}
 
+	if (xfs_has_reflink(mp) && !xfs_has_rmapbt(mp)) {
+		xfs_alert(mp,
+			"need rmapbt when both DAX and reflink enabled.");
+		return -EINVAL;
+	}
+
 	xfs_warn(mp, "DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
 	return 0;
 
