@@ -15,12 +15,23 @@ static const struct hantro_fmt sunxi_vpu_postproc_fmts[] = {
 		.codec_mode = HANTRO_MODE_NONE,
 		.postprocessed = true,
 	},
+	{
+		.fourcc = V4L2_PIX_FMT_P010,
+		.codec_mode = HANTRO_MODE_NONE,
+		.postprocessed = true,
+	},
 };
 
 static const struct hantro_fmt sunxi_vpu_dec_fmts[] = {
 	{
 		.fourcc = V4L2_PIX_FMT_NV12_4L4,
 		.codec_mode = HANTRO_MODE_NONE,
+		.match_depth = true,
+	},
+	{
+		.fourcc = V4L2_PIX_FMT_P010_4L4,
+		.codec_mode = HANTRO_MODE_NONE,
+		.match_depth = true,
 	},
 	{
 		.fourcc = V4L2_PIX_FMT_VP9_FRAME,
