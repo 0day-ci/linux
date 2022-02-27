@@ -49,6 +49,7 @@
 #include "gem/i915_gem_pm.h"
 #include "gem/i915_gem_region.h"
 #include "gem/i915_gem_userptr.h"
+#include "gem/i915_gem_tiling.h"
 #include "gt/intel_engine_user.h"
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
@@ -879,6 +880,96 @@ static void discard_ggtt_vma(struct i915_vma *vma)
 	spin_unlock(&obj->vma.lock);
 }
 
+static int
+i915_gem_object_fits_in_aperture(struct drm_i915_gem_object *obj,
+				 u64 alignment, u64 flags)
+{
+	struct drm_i915_private *i915 = to_i915(obj->base.dev);
+	struct i915_ggtt *ggtt = to_gt(i915)->ggtt;
+	struct drm_mm_node *hole;
+	u64 hole_start, hole_end, start, end;
+	u64 fence_size, fence_alignment;
+	unsigned int count = 0;
+	int err = 0;
+
+	/*
+	 * If the required space is larger than the available
+	 * aperture, we will not able to find a slot for the
+	 * object and unbinding the object now will be in
+	 * vain. Worse, doing so may cause us to ping-pong
+	 * the object in and out of the Global GTT and
+	 * waste a lot of cycles under the mutex.
+	 */
+	if (obj->base.size > ggtt->mappable_end)
+		return -E2BIG;
+
+	/*
+	 * If NONBLOCK is set the caller is optimistically
+	 * trying to cache the full object within the mappable
+	 * aperture, and *must* have a fallback in place for
+	 * situations where we cannot bind the object. We
+	 * can be a little more lax here and use the fallback
+	 * more often to avoid costly migrations of ourselves
+	 * and other objects within the aperture.
+	 */
+	if (!(flags & PIN_NONBLOCK))
+		return 0;
+
+	/*
+	 * Other objects such as batchbuffers are fairly small compared
+	 * to FBs and are unlikely to exahust the aperture space.
+	 * Therefore, return early if this obj is not an FB.
+	 */
+	if (!i915_gem_object_is_framebuffer(obj))
+		return 0;
+
+	fence_size = i915_gem_fence_size(i915, obj->base.size,
+					 i915_gem_object_get_tiling(obj),
+					 i915_gem_object_get_stride(obj));
+
+	if (i915_vm_has_cache_coloring(&ggtt->vm))
+		fence_size += 2 * I915_GTT_PAGE_SIZE;
+
+	fence_alignment = i915_gem_fence_alignment(i915, obj->base.size,
+						   i915_gem_object_get_tiling(obj),
+						   i915_gem_object_get_stride(obj));
+	alignment = max_t(u64, alignment, fence_alignment);
+
+	err = mutex_lock_interruptible_nested(&ggtt->vm.mutex, 0);
+	if (err)
+		return err;
+
+	/*
+	 * Assuming this object is a large scanout buffer, we try to find
+	 * out if there is room to map at-least two of them. There could
+	 * be space available to map one but to be consistent, we try to
+	 * avoid mapping/fencing any of them.
+	 */
+	drm_mm_for_each_suitable_hole(hole, &ggtt->vm.mm, 0, ggtt->mappable_end,
+				      fence_size, DRM_MM_INSERT_LOW) {
+		hole_start = drm_mm_hole_node_start(hole);
+		hole_end = hole_start + hole->hole_size;
+
+		do {
+			start = round_up(hole_start, alignment);
+			end = min_t(u64, hole_end, ggtt->mappable_end);
+
+			if (range_overflows(start, fence_size, end))
+				break;
+
+			if (++count >= 2) {
+				mutex_unlock(&ggtt->vm.mutex);
+				return 0;
+			}
+
+			hole_start = start + fence_size;
+		} while (1);
+	}
+
+	mutex_unlock(&ggtt->vm.mutex);
+	return -ENOSPC;
+}
+
 struct i915_vma *
 i915_gem_object_ggtt_pin_ww(struct drm_i915_gem_object *obj,
 			    struct i915_gem_ww_ctx *ww,
@@ -894,36 +985,9 @@ i915_gem_object_ggtt_pin_ww(struct drm_i915_gem_object *obj,
 
 	if (flags & PIN_MAPPABLE &&
 	    (!view || view->type == I915_GGTT_VIEW_NORMAL)) {
-		/*
-		 * If the required space is larger than the available
-		 * aperture, we will not able to find a slot for the
-		 * object and unbinding the object now will be in
-		 * vain. Worse, doing so may cause us to ping-pong
-		 * the object in and out of the Global GTT and
-		 * waste a lot of cycles under the mutex.
-		 */
-		if (obj->base.size > ggtt->mappable_end)
-			return ERR_PTR(-E2BIG);
-
-		/*
-		 * If NONBLOCK is set the caller is optimistically
-		 * trying to cache the full object within the mappable
-		 * aperture, and *must* have a fallback in place for
-		 * situations where we cannot bind the object. We
-		 * can be a little more lax here and use the fallback
-		 * more often to avoid costly migrations of ourselves
-		 * and other objects within the aperture.
-		 *
-		 * Half-the-aperture is used as a simple heuristic.
-		 * More interesting would to do search for a free
-		 * block prior to making the commitment to unbind.
-		 * That caters for the self-harm case, and with a
-		 * little more heuristics (e.g. NOFAULT, NOEVICT)
-		 * we could try to minimise harm to others.
-		 */
-		if (flags & PIN_NONBLOCK &&
-		    obj->base.size > ggtt->mappable_end / 2)
-			return ERR_PTR(-ENOSPC);
+		ret = i915_gem_object_fits_in_aperture(obj, alignment, flags);
+		if (ret)
+			return ERR_PTR(ret);
 	}
 
 new_vma:
@@ -934,10 +998,6 @@ new_vma:
 	if (i915_vma_misplaced(vma, size, alignment, flags)) {
 		if (flags & PIN_NONBLOCK) {
 			if (i915_vma_is_pinned(vma) || i915_vma_is_active(vma))
-				return ERR_PTR(-ENOSPC);
-
-			if (flags & PIN_MAPPABLE &&
-			    vma->fence_size > ggtt->mappable_end / 2)
 				return ERR_PTR(-ENOSPC);
 		}
 
