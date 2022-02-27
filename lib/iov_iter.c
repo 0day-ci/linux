@@ -1560,6 +1560,41 @@ ssize_t iov_iter_get_pages(struct iov_iter *i,
 }
 EXPORT_SYMBOL(iov_iter_get_pages);
 
+ssize_t iov_iter_pin_pages(struct iov_iter *i,
+		   struct page **pages, size_t maxsize, unsigned int maxpages,
+		   size_t *start)
+{
+	size_t len;
+	int n, res;
+
+	if (maxsize > i->count)
+		maxsize = i->count;
+	if (!maxsize)
+		return 0;
+
+	WARN_ON_ONCE(!iter_is_iovec(i));
+
+	if (likely(iter_is_iovec(i))) {
+		unsigned int gup_flags = 0;
+		unsigned long addr;
+
+		if (iov_iter_rw(i) != WRITE)
+			gup_flags |= FOLL_WRITE;
+		if (i->nofault)
+			gup_flags |= FOLL_NOFAULT;
+
+		addr = first_iovec_segment(i, &len, start, maxsize, maxpages);
+		n = DIV_ROUND_UP(len, PAGE_SIZE);
+		res = pin_user_pages_fast(addr, n, gup_flags, pages);
+		if (unlikely(res <= 0))
+			return res;
+		return (res == n ? len : res * PAGE_SIZE) - *start;
+	}
+
+	return -EFAULT;
+}
+EXPORT_SYMBOL(iov_iter_pin_pages);
+
 static struct page **get_pages_array(size_t n)
 {
 	return kvmalloc_array(n, sizeof(struct page *), GFP_KERNEL);
@@ -1695,6 +1730,49 @@ ssize_t iov_iter_get_pages_alloc(struct iov_iter *i,
 	return -EFAULT;
 }
 EXPORT_SYMBOL(iov_iter_get_pages_alloc);
+
+ssize_t iov_iter_pin_pages_alloc(struct iov_iter *i,
+		   struct page ***pages, size_t maxsize,
+		   size_t *start)
+{
+	struct page **p;
+	size_t len;
+	int n, res;
+
+	if (maxsize > i->count)
+		maxsize = i->count;
+	if (!maxsize)
+		return 0;
+
+	WARN_ON_ONCE(!iter_is_iovec(i));
+
+	if (likely(iter_is_iovec(i))) {
+		unsigned int gup_flags = 0;
+		unsigned long addr;
+
+		if (iov_iter_rw(i) != WRITE)
+			gup_flags |= FOLL_WRITE;
+		if (i->nofault)
+			gup_flags |= FOLL_NOFAULT;
+
+		addr = first_iovec_segment(i, &len, start, maxsize, ~0U);
+		n = DIV_ROUND_UP(len, PAGE_SIZE);
+		p = get_pages_array(n);
+		if (!p)
+			return -ENOMEM;
+		res = pin_user_pages_fast(addr, n, gup_flags, p);
+		if (unlikely(res <= 0)) {
+			kvfree(p);
+			*pages = NULL;
+			return res;
+		}
+		*pages = p;
+		return (res == n ? len : res * PAGE_SIZE) - *start;
+	}
+
+	return -EFAULT;
+}
+EXPORT_SYMBOL(iov_iter_pin_pages_alloc);
 
 size_t csum_and_copy_from_iter(void *addr, size_t bytes, __wsum *csum,
 			       struct iov_iter *i)
