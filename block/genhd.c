@@ -643,7 +643,6 @@ void del_gendisk(struct gendisk *disk)
 	blk_mq_freeze_queue_wait(q);
 
 	blk_throtl_cancel_bios(disk->queue);
-	rq_qos_exit(q);
 	blk_sync_queue(q);
 	blk_flush_integrity();
 	/*
@@ -1135,7 +1134,7 @@ static void disk_release_mq(struct request_queue *q)
 		elevator_exit(q);
 		mutex_unlock(&q->sysfs_lock);
 	}
-
+	rq_qos_exit(q);
 	__blk_mq_unfreeze_queue(q, true);
 }
 
