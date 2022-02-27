@@ -424,12 +424,23 @@ static int fsl_spi_do_one_msg(struct spi_master *master,
 		}
 	}
 
-	m->status = status;
-
 	if (status || !cs_change) {
 		ndelay(nsecs);
 		fsl_spi_chipselect(spi, BITBANG_CS_INACTIVE);
 	}
+
+	if (!status && spi->mode & SPI_TRAILING) {
+		struct spi_transfer t = {
+			.len = 1,
+			.tx_buf = "",
+			.bits_per_word = 4
+		};
+
+		status = fsl_spi_setup_transfer(spi, &t);
+		if (!status)
+			status = fsl_spi_bufs(spi, &t, 0);
+	}
+	m->status = status;
 
 	fsl_spi_setup_transfer(spi, NULL);
 	spi_finalize_current_message(master);
