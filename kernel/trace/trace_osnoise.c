@@ -21,7 +21,9 @@
 #include <linux/uaccess.h>
 #include <linux/cpumask.h>
 #include <linux/delay.h>
+#include <linux/tick.h>
 #include <linux/sched/clock.h>
+#include <linux/sched/isolation.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/sched.h>
 #include "trace.h"
@@ -1295,6 +1297,7 @@ static int run_osnoise(void)
 	struct osnoise_sample s;
 	unsigned int threshold;
 	u64 runtime, stop_in;
+	unsigned long flags;
 	u64 sum_noise = 0;
 	int hw_count = 0;
 	int ret = -1;
@@ -1384,6 +1387,22 @@ static int run_osnoise(void)
 			if (osnoise_data.stop_tracing)
 				if (noise > stop_in)
 					osnoise_stop_tracing();
+		}
+
+		/*
+		 * Check if we're the only ones running on this nohz_full CPU
+		 * and that we're on a PREEMPT_RCU setup. If so, let's fake a
+		 * QS since there is no way for RCU to know we're not making
+		 * use of it.
+		 *
+		 * Otherwise it'll be done through cond_resched().
+		 */
+		if (IS_ENABLED(CONFIG_PREEMPT_RCU) &&
+		    !housekeeping_cpu(raw_smp_processor_id(), HK_FLAG_MISC) &&
+		    tick_nohz_tick_stopped()) {
+			local_irq_save(flags);
+			rcu_momentary_dyntick_idle();
+			local_irq_restore(flags);
 		}
 
 		/*
