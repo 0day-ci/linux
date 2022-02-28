@@ -58,6 +58,22 @@ static dma_addr_t mxsfb_get_fb_paddr(struct drm_plane *plane)
 	return gem->paddr;
 }
 
+static void
+mxsfb_update_buffer(struct mxsfb_drm_private *mxsfb, struct drm_plane *plane,
+		    bool both)
+{
+	dma_addr_t paddr;
+
+	paddr = mxsfb_get_fb_paddr(plane);
+	if (!paddr)
+		return;
+
+	if (both)
+		writel(paddr, mxsfb->base + mxsfb->devdata->cur_buf);
+
+	writel(paddr, mxsfb->base + mxsfb->devdata->next_buf);
+}
+
 /*
  * Setup the MXSFB registers for decoding the pixels out of the framebuffer and
  * outputting them on the bus.
@@ -352,7 +368,6 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	struct drm_bridge_state *bridge_state;
 	struct drm_device *drm = mxsfb->drm;
 	u32 bus_format = 0;
-	dma_addr_t paddr;
 
 	/* If there is a bridge attached to the LCDIF, use its bus format */
 	if (mxsfb->bridge) {
@@ -383,11 +398,7 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	mxsfb_crtc_mode_set_nofb(mxsfb, bus_format);
 
 	/* Write cur_buf as well to avoid an initial corrupt frame */
-	paddr = mxsfb_get_fb_paddr(crtc->primary);
-	if (paddr) {
-		writel(paddr, mxsfb->base + mxsfb->devdata->cur_buf);
-		writel(paddr, mxsfb->base + mxsfb->devdata->next_buf);
-	}
+	mxsfb_update_buffer(mxsfb, crtc->primary, true);
 
 	mxsfb_enable_controller(mxsfb);
 
@@ -487,11 +498,8 @@ static void mxsfb_plane_primary_atomic_update(struct drm_plane *plane,
 					      struct drm_atomic_state *state)
 {
 	struct mxsfb_drm_private *mxsfb = to_mxsfb_drm_private(plane->dev);
-	dma_addr_t paddr;
 
-	paddr = mxsfb_get_fb_paddr(plane);
-	if (paddr)
-		writel(paddr, mxsfb->base + mxsfb->devdata->next_buf);
+	mxsfb_update_buffer(mxsfb, plane, false);
 }
 
 static void mxsfb_plane_overlay_atomic_update(struct drm_plane *plane,
