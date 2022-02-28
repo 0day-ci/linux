@@ -338,7 +338,6 @@ static void __init bootmem_init(void)
 
 #endif	/* CONFIG_SGI_IP27 */
 
-static int usermem __initdata;
 static phys_addr_t memory_limit;
 static phys_addr_t memory_base;
 
@@ -596,10 +595,6 @@ static void __init arch_mem_init(char **cmdline_p)
 	*cmdline_p = command_line;
 
 	parse_early_param();
-
-	if (usermem)
-		pr_info("User-defined physical RAM map overwrite\n");
-
 	check_kernel_sections_mem();
 
 	early_init_fdt_reserve_self();
