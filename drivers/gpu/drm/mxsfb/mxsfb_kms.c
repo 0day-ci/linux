@@ -43,6 +43,21 @@ static u32 set_hsync_pulse_width(struct mxsfb_drm_private *mxsfb, u32 val)
 		mxsfb->devdata->hs_wdth_shift;
 }
 
+static dma_addr_t mxsfb_get_fb_paddr(struct drm_plane *plane)
+{
+	struct drm_framebuffer *fb = plane->state->fb;
+	struct drm_gem_cma_object *gem;
+
+	if (!fb)
+		return 0;
+
+	gem = drm_fb_cma_get_gem_obj(fb, 0);
+	if (!gem)
+		return 0;
+
+	return gem->paddr;
+}
+
 /*
  * Setup the MXSFB registers for decoding the pixels out of the framebuffer and
  * outputting them on the bus.
@@ -213,21 +228,6 @@ static int mxsfb_reset_block(struct mxsfb_drm_private *mxsfb)
 		writel(0, mxsfb->base + LCDC_AS_CTRL);
 
 	return 0;
-}
-
-static dma_addr_t mxsfb_get_fb_paddr(struct drm_plane *plane)
-{
-	struct drm_framebuffer *fb = plane->state->fb;
-	struct drm_gem_cma_object *gem;
-
-	if (!fb)
-		return 0;
-
-	gem = drm_fb_cma_get_gem_obj(fb, 0);
-	if (!gem)
-		return 0;
-
-	return gem->paddr;
 }
 
 static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb,
