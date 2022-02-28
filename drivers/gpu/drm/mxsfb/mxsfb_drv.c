@@ -72,18 +72,6 @@ static const struct mxsfb_devdata mxsfb_devdata[] = {
 	},
 };
 
-void mxsfb_enable_axi_clk(struct mxsfb_drm_private *mxsfb)
-{
-	if (mxsfb->clk_axi)
-		clk_prepare_enable(mxsfb->clk_axi);
-}
-
-void mxsfb_disable_axi_clk(struct mxsfb_drm_private *mxsfb)
-{
-	if (mxsfb->clk_axi)
-		clk_disable_unprepare(mxsfb->clk_axi);
-}
-
 static struct drm_framebuffer *
 mxsfb_fb_create(struct drm_device *dev, struct drm_file *file_priv,
 		const struct drm_mode_fb_cmd2 *mode_cmd)
@@ -172,13 +160,9 @@ static void mxsfb_irq_disable(struct drm_device *drm)
 {
 	struct mxsfb_drm_private *mxsfb = drm->dev_private;
 
-	mxsfb_enable_axi_clk(mxsfb);
-
 	/* Disable and clear VBLANK IRQ */
 	writel(CTRL1_CUR_FRAME_DONE_IRQ_EN, mxsfb->base + LCDC_CTRL1 + REG_CLR);
 	writel(CTRL1_CUR_FRAME_DONE_IRQ, mxsfb->base + LCDC_CTRL1 + REG_CLR);
-
-	mxsfb_disable_axi_clk(mxsfb);
 }
 
 static int mxsfb_irq_install(struct drm_device *dev, int irq)
@@ -224,19 +208,19 @@ static int mxsfb_load(struct drm_device *drm,
 	if (IS_ERR(mxsfb->clk))
 		return PTR_ERR(mxsfb->clk);
 
-	mxsfb->clk_axi = devm_clk_get(drm->dev, "axi");
+	mxsfb->clk_axi = devm_clk_get_optional(drm->dev, "axi");
 	if (IS_ERR(mxsfb->clk_axi))
-		mxsfb->clk_axi = NULL;
+		return PTR_ERR(mxsfb->clk_axi);
 
-	mxsfb->clk_disp_axi = devm_clk_get(drm->dev, "disp_axi");
+	mxsfb->clk_disp_axi = devm_clk_get_optional(drm->dev, "disp_axi");
 	if (IS_ERR(mxsfb->clk_disp_axi))
-		mxsfb->clk_disp_axi = NULL;
+		return PTR_ERR(mxsfb->clk_disp_axi);
+
+	platform_set_drvdata(pdev, drm);
 
 	ret = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
 	if (ret)
 		return ret;
-
-	pm_runtime_enable(drm->dev);
 
 	/* Modeset init */
 	drm_mode_config_init(drm);
@@ -244,13 +228,13 @@ static int mxsfb_load(struct drm_device *drm,
 	ret = mxsfb_kms_init(mxsfb);
 	if (ret < 0) {
 		dev_err(drm->dev, "Failed to initialize KMS pipeline\n");
-		goto err_vblank;
+		return ret;
 	}
 
 	ret = drm_vblank_init(drm, drm->mode_config.num_crtc);
 	if (ret < 0) {
 		dev_err(drm->dev, "Failed to initialise vblank\n");
-		goto err_vblank;
+		return ret;
 	}
 
 	/* Start with vertical blanking interrupt reporting disabled. */
@@ -260,7 +244,7 @@ static int mxsfb_load(struct drm_device *drm,
 	if (ret) {
 		if (ret != -EPROBE_DEFER)
 			dev_err(drm->dev, "Cannot connect bridge: %d\n", ret);
-		goto err_vblank;
+		return ret;
 	}
 
 	drm->mode_config.min_width	= MXSFB_MIN_XRES;
@@ -274,44 +258,37 @@ static int mxsfb_load(struct drm_device *drm,
 
 	ret = platform_get_irq(pdev, 0);
 	if (ret < 0)
-		goto err_vblank;
+		return ret;
 	mxsfb->irq = ret;
 
-	pm_runtime_get_sync(drm->dev);
 	ret = mxsfb_irq_install(drm, mxsfb->irq);
-	pm_runtime_put_sync(drm->dev);
-
 	if (ret < 0) {
 		dev_err(drm->dev, "Failed to install IRQ handler\n");
-		goto err_vblank;
+		return ret;
 	}
 
 	drm_kms_helper_poll_init(drm);
 
-	platform_set_drvdata(pdev, drm);
-
 	drm_helper_hpd_irq_event(drm);
 
+	pm_runtime_enable(drm->dev);
+
 	return 0;
-
-err_vblank:
-	pm_runtime_disable(drm->dev);
-
-	return ret;
 }
 
 static void mxsfb_unload(struct drm_device *drm)
 {
+	pm_runtime_get_sync(drm->dev);
+
 	drm_kms_helper_poll_fini(drm);
 	drm_mode_config_cleanup(drm);
 
-	pm_runtime_get_sync(drm->dev);
 	mxsfb_irq_uninstall(drm);
+
 	pm_runtime_put_sync(drm->dev);
+	pm_runtime_disable(drm->dev);
 
 	drm->dev_private = NULL;
-
-	pm_runtime_disable(drm->dev);
 }
 
 DEFINE_DRM_GEM_CMA_FOPS(fops);
@@ -388,23 +365,60 @@ static void mxsfb_shutdown(struct platform_device *pdev)
 	drm_atomic_helper_shutdown(drm);
 }
 
-#ifdef CONFIG_PM_SLEEP
+static int mxsfb_rpm_suspend(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
+	/* These clock supply the DISPLAY CLOCK Domain */
+	clk_disable_unprepare(mxsfb->clk);
+	/* These clock supply the System Bus, AXI, Write Path, LFIFO */
+	clk_disable_unprepare(mxsfb->clk_disp_axi);
+	/* These clock supply the Control Bus, APB, APBH Ctrl Registers */
+	clk_disable_unprepare(mxsfb->clk_axi);
+
+	return 0;
+}
+
+static int mxsfb_rpm_resume(struct device *dev)
+{
+	struct drm_device *drm = dev_get_drvdata(dev);
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
+	/* These clock supply the Control Bus, APB, APBH Ctrl Registers */
+	clk_prepare_enable(mxsfb->clk_axi);
+	/* These clock supply the System Bus, AXI, Write Path, LFIFO */
+	clk_prepare_enable(mxsfb->clk_disp_axi);
+	/* These clock supply the DISPLAY CLOCK Domain */
+	clk_prepare_enable(mxsfb->clk);
+
+	return 0;
+}
+
 static int mxsfb_suspend(struct device *dev)
 {
 	struct drm_device *drm = dev_get_drvdata(dev);
+	int ret;
 
-	return drm_mode_config_helper_suspend(drm);
+	ret = drm_mode_config_helper_suspend(drm);
+	if (ret)
+		return ret;
+
+	return mxsfb_rpm_suspend(dev);
 }
 
 static int mxsfb_resume(struct device *dev)
 {
 	struct drm_device *drm = dev_get_drvdata(dev);
 
+	mxsfb_rpm_resume(dev);
+
 	return drm_mode_config_helper_resume(drm);
 }
-#endif
 
 static const struct dev_pm_ops mxsfb_pm_ops = {
+	.runtime_suspend = mxsfb_rpm_suspend,
+	.runtime_resume = mxsfb_rpm_resume,
 	SET_SYSTEM_SLEEP_PM_OPS(mxsfb_suspend, mxsfb_resume)
 };
 
