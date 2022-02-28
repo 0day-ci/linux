@@ -76,11 +76,18 @@ do { \
 	__rt_mutex_init(mutex, __func__, &__key); \
 } while (0)
 
+#ifdef CONFIG_DEPT
+#define DMAP_RT_MUTEX_INIT(mutexname)	.dmap = { .name = #mutexname, .skip_cnt = ATOMIC_INIT(0) },
+#else
+#define DMAP_RT_MUTEX_INIT(mutexname)
+#endif
+
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 #define __DEP_MAP_RT_MUTEX_INITIALIZER(mutexname)	\
 	.dep_map = {					\
 		.name = #mutexname,			\
 		.wait_type_inner = LD_WAIT_SLEEP,	\
+		DMAP_RT_MUTEX_INIT(mutexname)		\
 	}
 #else
 #define __DEP_MAP_RT_MUTEX_INITIALIZER(mutexname)
