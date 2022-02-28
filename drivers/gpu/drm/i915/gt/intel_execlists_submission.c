@@ -2914,6 +2914,19 @@ static int execlists_resume(struct intel_engine_cs *engine)
 	return 0;
 }
 
+static int gen12_rcs_resume(struct intel_engine_cs *engine)
+{
+	int ret;
+
+	ret = execlists_resume(engine);
+	if (ret)
+		return ret;
+
+	xehp_enable_ccs_engines(engine);
+
+	return 0;
+}
+
 static void execlists_reset_prepare(struct intel_engine_cs *engine)
 {
 	ENGINE_TRACE(engine, "depth<-%d\n",
@@ -3468,6 +3481,9 @@ static void rcs_submission_override(struct intel_engine_cs *engine)
 		engine->emit_fini_breadcrumb = gen8_emit_fini_breadcrumb_rcs;
 		break;
 	}
+
+	if (engine->class == RENDER_CLASS)
+		engine->resume = gen12_rcs_resume;
 }
 
 int intel_execlists_submission_setup(struct intel_engine_cs *engine)
