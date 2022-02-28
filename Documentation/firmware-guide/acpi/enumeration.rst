@@ -167,8 +167,7 @@ The table below shows an example of its usage::
         Name (_DSD, Package () {
             ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
             Package () {
-                Package () {"interrupt-names",
-                Package (2) {"default", "alert"}},
+                Package () { "interrupt-names", Package () { "default", "alert" } },
             }
         ...
         })
@@ -193,7 +192,7 @@ Here is what the ACPI namespace for a SPI slave might look like::
 	Device (EEP0)
 	{
 		Name (_ADR, 1)
-		Name (_CID, Package() {
+		Name (_CID, Package () {
 			"ATML0025",
 			"AT25",
 		})
@@ -365,8 +364,8 @@ For example::
 			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
 			Package ()
 			{
-				Package () {"power-gpios", Package() {^DEV, 0, 0, 0 }},
-				Package () {"irq-gpios", Package() {^DEV, 1, 0, 0 }},
+				Package () { "power-gpios", Package () { ^DEV, 0, 0, 0 } },
+				Package () { "irq-gpios", Package () { ^DEV, 1, 0, 0 } },
 			}
 		})
 		...
@@ -488,10 +487,10 @@ namespace link::
 	Device (TMP0)
 	{
 		Name (_HID, "PRP0001")
-		Name (_DSD, Package() {
+		Name (_DSD, Package () {
 			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
 			Package () {
-				Package (2) { "compatible", "ti,tmp75" },
+				Package () { "compatible", "ti,tmp75" },
 			}
 		})
 		Method (_CRS, 0, Serialized)
