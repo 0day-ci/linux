@@ -3527,8 +3527,9 @@ int __init list_bdev_fs_names(char *buf, size_t size);
 #define __FMODE_NONOTIFY	((__force int) FMODE_NONOTIFY)
 
 #define ACC_MODE(x) ("\004\002\006\006"[(x)&O_ACCMODE])
-#define OPEN_FMODE(flag) ((__force fmode_t)(((flag + 1) & O_ACCMODE) | \
-					    (flag & __FMODE_NONOTIFY)))
+#define OPEN_FMODE(flag) ((__force fmode_t)( \
+			(((flag + 1) & O_ACCMODE) ?: O_ACCMODE) | \
+			(flag & __FMODE_NONOTIFY)))
 
 static inline bool is_sxid(umode_t mode)
 {

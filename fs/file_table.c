@@ -135,6 +135,9 @@ static struct file *__alloc_file(int flags, const struct cred *cred)
 	struct file *f;
 	int error;
 
+	if ((flags & O_ACCMODE) == O_ACCMODE)
+		return ERR_PTR(-EINVAL);
+
 	f = kmem_cache_zalloc(filp_cachep, GFP_KERNEL);
 	if (unlikely(!f))
 		return ERR_PTR(-ENOMEM);
