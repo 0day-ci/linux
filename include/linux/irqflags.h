@@ -31,6 +31,22 @@
   static inline void lockdep_hardirqs_off(unsigned long ip) { }
 #endif
 
+#ifdef CONFIG_DEPT
+extern void dept_hardirq_enter(void);
+extern void dept_softirq_enter(void);
+extern void dept_enable_hardirq(unsigned long ip);
+extern void dept_enable_softirq(unsigned long ip);
+extern void dept_disable_hardirq(unsigned long ip);
+extern void dept_disable_softirq(unsigned long ip);
+#else
+static inline void dept_hardirq_enter(void) { }
+static inline void dept_softirq_enter(void) { }
+static inline void dept_enable_hardirq(unsigned long ip) { }
+static inline void dept_enable_softirq(unsigned long ip) { }
+static inline void dept_disable_hardirq(unsigned long ip) { }
+static inline void dept_disable_softirq(unsigned long ip) { }
+#endif
+
 #ifdef CONFIG_TRACE_IRQFLAGS
 
 /* Per-task IRQ trace events information. */
@@ -53,15 +69,19 @@ extern void trace_hardirqs_on_prepare(void);
 extern void trace_hardirqs_off_finish(void);
 extern void trace_hardirqs_on(void);
 extern void trace_hardirqs_off(void);
+extern void trace_softirqs_on_caller(unsigned long ip);
+extern void trace_softirqs_off_caller(unsigned long ip);
 
 # define lockdep_hardirq_context()	(raw_cpu_read(hardirq_context))
 # define lockdep_softirq_context(p)	((p)->softirq_context)
 # define lockdep_hardirqs_enabled()	(this_cpu_read(hardirqs_enabled))
 # define lockdep_softirqs_enabled(p)	((p)->softirqs_enabled)
-# define lockdep_hardirq_enter()			\
-do {							\
-	if (__this_cpu_inc_return(hardirq_context) == 1)\
-		current->hardirq_threaded = 0;		\
+# define lockdep_hardirq_enter()				\
+do {								\
+	if (__this_cpu_inc_return(hardirq_context) == 1) {	\
+		current->hardirq_threaded = 0;			\
+		dept_hardirq_enter();				\
+	}							\
 } while (0)
 # define lockdep_hardirq_threaded()		\
 do {						\
@@ -115,6 +135,8 @@ do {						\
 # define trace_hardirqs_off_finish()		do { } while (0)
 # define trace_hardirqs_on()			do { } while (0)
 # define trace_hardirqs_off()			do { } while (0)
+# define trace_softirqs_on_caller(ip)		do { } while (0)
+# define trace_softirqs_off_caller(ip)		do { } while (0)
 # define lockdep_hardirq_context()		0
 # define lockdep_softirq_context(p)		0
 # define lockdep_hardirqs_enabled()		0
@@ -135,7 +157,8 @@ do {						\
 #if defined(CONFIG_TRACE_IRQFLAGS) && !defined(CONFIG_PREEMPT_RT)
 # define lockdep_softirq_enter()		\
 do {						\
-	current->softirq_context++;		\
+	if (!current->softirq_context++)	\
+		dept_softirq_enter();		\
 } while (0)
 # define lockdep_softirq_exit()			\
 do {						\
