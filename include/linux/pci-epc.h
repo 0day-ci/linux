@@ -149,7 +149,7 @@ struct pci_epc {
 	/* mutex to protect against concurrent access of EP controller */
 	struct mutex			lock;
 	unsigned long			function_num_map;
-	struct atomic_notifier_head	notifier;
+	struct blocking_notifier_head	notifier;
 };
 
 /**
@@ -195,7 +195,7 @@ static inline void *epc_get_drvdata(struct pci_epc *epc)
 static inline int
 pci_epc_register_notifier(struct pci_epc *epc, struct notifier_block *nb)
 {
-	return atomic_notifier_chain_register(&epc->notifier, nb);
+	return blocking_notifier_chain_register(&epc->notifier, nb);
 }
 
 struct pci_epc *
