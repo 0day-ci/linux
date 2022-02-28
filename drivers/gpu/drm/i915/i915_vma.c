@@ -540,6 +540,9 @@ void __iomem *i915_vma_pin_iomap(struct i915_vma *vma)
 	void __iomem *ptr;
 	int err;
 
+	if (WARN_ON_ONCE(vma->obj->flags & I915_BO_ALLOC_GPU_ONLY))
+		return IO_ERR_PTR(-EINVAL);
+
 	if (!i915_gem_object_is_lmem(vma->obj)) {
 		if (GEM_WARN_ON(!i915_vma_is_map_and_fenceable(vma))) {
 			err = -ENODEV;
@@ -757,6 +760,14 @@ i915_vma_insert(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 		end = min_t(u64, end, (1ULL << 32) - I915_GTT_PAGE_SIZE);
 	GEM_BUG_ON(!IS_ALIGNED(end, I915_GTT_PAGE_SIZE));
 
+	alignment = max(alignment, i915_vm_obj_min_alignment(vma->vm, vma->obj));
+	/*
+	 * for compact-pt we round up the reservation to prevent
+	 * any smaller pages being used within the same PDE
+	 */
+	if (NEEDS_COMPACT_PT(vma->vm->i915))
+		size = round_up(size, alignment);
+
 	/* If binding the object/GGTT view requires more space than the entire
 	 * aperture has, reject it early before evicting everything in a vain
 	 * attempt to find space.
@@ -769,6 +780,7 @@ i915_vma_insert(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 	}
 
 	color = 0;
+
 	if (i915_vm_has_cache_coloring(vma->vm))
 		color = vma->obj->cache_level;
 
