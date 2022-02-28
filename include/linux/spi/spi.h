@@ -166,6 +166,7 @@ struct spi_device {
 	u32			max_speed_hz;
 	u8			chip_select;
 	u8			bits_per_word;
+	u8			trailing_bits;
 	bool			rt;
 #define SPI_NO_TX	BIT(31)		/* no transmit wire */
 #define SPI_NO_RX	BIT(30)		/* no receive wire */

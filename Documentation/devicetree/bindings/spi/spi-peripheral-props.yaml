@@ -83,6 +83,11 @@ properties:
     description:
       Delay, in microseconds, after a write transfer.
 
+  spi-trailing-bits:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Number of clock cycles with chipselect OFF after transfers.
+
 # The controller specific properties go here.
 allOf:
   - $ref: cdns,qspi-nor-peripheral-props.yaml#
