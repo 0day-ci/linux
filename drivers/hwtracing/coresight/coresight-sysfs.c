@@ -73,8 +73,10 @@ int coresight_add_sysfs_link(struct coresight_sysfs_link *info)
 	if (!info->orig || !info->target ||
 	    !info->orig_name || !info->target_name)
 		return -EINVAL;
-	if (!info->orig->has_conns_grp || !info->target->has_conns_grp)
+	if (!info->orig->has_conns_grp)
 		return -EINVAL;
+	if (!info->target->has_conns_grp)
+		return -EPROBE_DEFER;
 
 	/* first link orig->target */
 	ret = sysfs_add_link_to_group(&info->orig->dev.kobj,
