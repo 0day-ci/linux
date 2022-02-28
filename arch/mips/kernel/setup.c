@@ -340,6 +340,7 @@ static void __init bootmem_init(void)
 
 static int usermem __initdata;
 static phys_addr_t memory_limit;
+static phys_addr_t memory_base;
 
 static int __init early_parse_mem(char *p)
 {
@@ -355,42 +356,17 @@ early_param("mem", early_parse_mem);
 
 static int __init early_parse_memmap(char *p)
 {
-	char *oldp;
-	u64 start_at, mem_size;
-
 	if (!p)
-		return -EINVAL;
+		return 1;
 
-	if (!strncmp(p, "exactmap", 8)) {
-		pr_err("\"memmap=exactmap\" invalid on MIPS\n");
-		return 0;
-	}
+	memory_limit = memparse(p, &p) & PAGE_MASK;
+	if (*p == '@')
+		memory_base = memparse(p + 1, &p) & PAGE_MASK;
 
-	oldp = p;
-	mem_size = memparse(p, &p);
-	if (p == oldp)
-		return -EINVAL;
+	pr_notice("Memory limited to %lldMB-%lldMB\n",
+		  memory_base >> 20, (memory_base + memory_limit) >> 20);
 
-	if (*p == '@') {
-		start_at = memparse(p+1, &p);
-		memblock_add(start_at, mem_size);
-	} else if (*p == '#') {
-		pr_err("\"memmap=nn#ss\" (force ACPI data) invalid on MIPS\n");
-		return -EINVAL;
-	} else if (*p == '$') {
-		start_at = memparse(p+1, &p);
-		memblock_add(start_at, mem_size);
-		memblock_reserve(start_at, mem_size);
-	} else {
-		pr_err("\"memmap\" invalid format!\n");
-		return -EINVAL;
-	}
-
-	if (*p == '\0') {
-		usermem = 1;
-		return 0;
-	} else
-		return -EINVAL;
+	return 0;
 }
 early_param("memmap", early_parse_memmap);
 
@@ -667,7 +643,7 @@ static void __init arch_mem_init(char **cmdline_p)
 		__pa_symbol(&__nosave_end) - __pa_symbol(&__nosave_begin));
 
 	/* Limit the memory. */
-	memblock_enforce_memory_limit(memory_limit);
+	memblock_mem_range_remove_map(memory_base, memory_limit);
 	memblock_allow_resize();
 
 	early_memtest(PFN_PHYS(ARCH_PFN_OFFSET), PFN_PHYS(max_low_pfn));
