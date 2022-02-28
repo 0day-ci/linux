@@ -114,8 +114,6 @@ struct flow_offload_tuple {
 		__be16			dst_port;
 	};
 
-	int				iifidx;
-
 	u8				l3proto;
 	u8				l4proto;
 	struct {
@@ -126,6 +124,7 @@ struct flow_offload_tuple {
 	/* All members above are keys for lookups, see flow_offload_hash(). */
 	struct { }			__hash;
 
+	int				iifidx;
 	u8				dir:2,
 					xmit_type:2,
 					encap_num:2,
