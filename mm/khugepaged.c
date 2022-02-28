@@ -557,6 +557,26 @@ void __khugepaged_exit(struct mm_struct *mm)
 	}
 }
 
+void khugepaged_fork(struct mm_struct *mm, struct mm_struct *oldmm)
+{
+	if (test_bit(MMF_VM_HUGEPAGE, &oldmm->flags))
+		__khugepaged_enter(mm);
+}
+
+void khugepaged_exit(struct mm_struct *mm)
+{
+	if (test_bit(MMF_VM_HUGEPAGE, &mm->flags))
+		__khugepaged_exit(mm);
+}
+
+void khugepaged_enter(struct vm_area_struct *vma, unsigned long vm_flags)
+{
+	if (!test_bit(MMF_VM_HUGEPAGE, &vma->vm_mm->flags) &&
+	    khugepaged_enabled())
+		if (hugepage_vma_check(vma, vm_flags))
+			__khugepaged_enter(vma->vm_mm);
+}
+
 static void release_pte_page(struct page *page)
 {
 	mod_node_page_state(page_pgdat(page),
