@@ -20,9 +20,9 @@
 		timebase-frequency = <RTCCLK_FREQ>;
 	};
 
-	memory@80000000 {
-		device_type = "memory";
-		reg = <0x0 0x80000000 0x2 0x00000000>;
+	gpio-restart {
+		compatible = "gpio-restart";
+		gpios = <&gpio 10 GPIO_ACTIVE_LOW>;
 	};
 
 	hfclk: hfclk {
@@ -32,15 +32,16 @@
 		clock-output-names = "hfclk";
 	};
 
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x2 0x00000000>;
+	};
+
 	rtcclk: rtcclk {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
 		clock-frequency = <RTCCLK_FREQ>;
 		clock-output-names = "rtcclk";
-	};
-	gpio-restart {
-		compatible = "gpio-restart";
-		gpios = <&gpio 10 GPIO_ACTIVE_LOW>;
 	};
 };
 
