@@ -1112,6 +1112,9 @@ static void __dma_async_device_channel_unregister(struct dma_device *device,
 	mutex_lock(&dma_list_mutex);
 	device->chancnt--;
 	chan->dev->chan = NULL;
+	while (chan->client_count) {
+		dma_chan_put(chan);
+	}
 	mutex_unlock(&dma_list_mutex);
 	mutex_lock(&device->chan_mutex);
 	ida_free(&device->chan_ida, chan->chan_id);
