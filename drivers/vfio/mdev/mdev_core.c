@@ -337,16 +337,19 @@ out_put_device:
 
 int mdev_device_remove(struct mdev_device *mdev)
 {
-	struct mdev_device *tmp;
+	struct mdev_device *tmp = NULL;
+	struct mdev_device *iter;
 	struct mdev_parent *parent = mdev->type->parent;
 
 	mutex_lock(&mdev_list_lock);
-	list_for_each_entry(tmp, &mdev_list, next) {
-		if (tmp == mdev)
+	list_for_each_entry(iter, &mdev_list, next) {
+		if (iter == mdev) {
+			tmp = iter;
 			break;
+		}
 	}
 
-	if (tmp != mdev) {
+	if (!tmp) {
 		mutex_unlock(&mdev_list_lock);
 		return -ENODEV;
 	}

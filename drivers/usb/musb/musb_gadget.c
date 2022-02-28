@@ -1266,7 +1266,8 @@ static int musb_gadget_dequeue(struct usb_ep *ep, struct usb_request *request)
 {
 	struct musb_ep		*musb_ep = to_musb_ep(ep);
 	struct musb_request	*req = to_musb_request(request);
-	struct musb_request	*r;
+	struct musb_request	*r = NULL;
+	struct musb_request	*tmp;
 	unsigned long		flags;
 	int			status = 0;
 	struct musb		*musb = musb_ep->musb;
@@ -1278,11 +1279,13 @@ static int musb_gadget_dequeue(struct usb_ep *ep, struct usb_request *request)
 
 	spin_lock_irqsave(&musb->lock, flags);
 
-	list_for_each_entry(r, &musb_ep->req_list, list) {
-		if (r == req)
+	list_for_each_entry(tmp, &musb_ep->req_list, list) {
+		if (tmp == req) {
+			r = tmp;
 			break;
+		}
 	}
-	if (r != req) {
+	if (!r) {
 		dev_err(musb->controller, "request %p not queued to %s\n",
 				request, ep->name);
 		status = -EINVAL;

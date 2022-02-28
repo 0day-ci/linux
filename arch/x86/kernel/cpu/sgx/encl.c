@@ -450,7 +450,8 @@ static void sgx_mmu_notifier_release(struct mmu_notifier *mn,
 				     struct mm_struct *mm)
 {
 	struct sgx_encl_mm *encl_mm = container_of(mn, struct sgx_encl_mm, mmu_notifier);
-	struct sgx_encl_mm *tmp = NULL;
+	struct sgx_encl_mm *found_encl_mm = NULL;
+	struct sgx_encl_mm *tmp;
 
 	/*
 	 * The enclave itself can remove encl_mm.  Note, objects can't be moved
@@ -460,12 +461,13 @@ static void sgx_mmu_notifier_release(struct mmu_notifier *mn,
 	list_for_each_entry(tmp, &encl_mm->encl->mm_list, list) {
 		if (tmp == encl_mm) {
 			list_del_rcu(&encl_mm->list);
+			found_encl_mm = tmp;
 			break;
 		}
 	}
 	spin_unlock(&encl_mm->encl->mm_lock);
 
-	if (tmp == encl_mm) {
+	if (found_encl_mm) {
 		synchronize_srcu(&encl_mm->encl->srcu);
 		mmu_notifier_put(mn);
 	}

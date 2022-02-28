@@ -625,24 +625,30 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
 {
 	struct thermal_instance *dev;
 	struct thermal_instance *pos;
-	struct thermal_zone_device *pos1;
-	struct thermal_cooling_device *pos2;
+	struct thermal_zone_device *pos1 = NULL;
+	struct thermal_zone_device *tmp1;
+	struct thermal_cooling_device *pos2 = NULL;
+	struct thermal_cooling_device *tmp2;
 	unsigned long max_state;
 	int result, ret;
 
 	if (trip >= tz->trips || trip < 0)
 		return -EINVAL;
 
-	list_for_each_entry(pos1, &thermal_tz_list, node) {
-		if (pos1 == tz)
+	list_for_each_entry(tmp1, &thermal_tz_list, node) {
+		if (tmp1 == tz) {
+			pos1 = tmp1;
 			break;
+		}
 	}
-	list_for_each_entry(pos2, &thermal_cdev_list, node) {
-		if (pos2 == cdev)
+	list_for_each_entry(tmp2, &thermal_cdev_list, node) {
+		if (tmp2 == cdev) {
+			pos2 = tmp2;
 			break;
+		}
 	}
 
-	if (tz != pos1 || cdev != pos2)
+	if (!pos1 || !pos2)
 		return -EINVAL;
 
 	ret = cdev->ops->get_max_state(cdev, &max_state);
@@ -1074,15 +1080,18 @@ void thermal_cooling_device_unregister(struct thermal_cooling_device *cdev)
 	const struct thermal_zone_params *tzp;
 	struct thermal_zone_device *tz;
 	struct thermal_cooling_device *pos = NULL;
+	struct thermal_cooling_device *tmp;
 
 	if (!cdev)
 		return;
 
 	mutex_lock(&thermal_list_lock);
-	list_for_each_entry(pos, &thermal_cdev_list, node)
-		if (pos == cdev)
+	list_for_each_entry(tmp, &thermal_cdev_list, node)
+		if (tmp == cdev) {
+			pos = tmp;
 			break;
-	if (pos != cdev) {
+		}
+	if (!pos) {
 		/* thermal cooling device not found */
 		mutex_unlock(&thermal_list_lock);
 		return;
@@ -1335,6 +1344,7 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	const struct thermal_zone_params *tzp;
 	struct thermal_cooling_device *cdev;
 	struct thermal_zone_device *pos = NULL;
+	struct thermal_zone_device *tmp;
 
 	if (!tz)
 		return;
@@ -1343,10 +1353,12 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	tz_id = tz->id;
 
 	mutex_lock(&thermal_list_lock);
-	list_for_each_entry(pos, &thermal_tz_list, node)
-		if (pos == tz)
+	list_for_each_entry(tmp, &thermal_tz_list, node)
+		if (tmp == tz) {
+			pos = tmp;
 			break;
-	if (pos != tz) {
+		}
+	if (!pos) {
 		/* thermal zone device not found */
 		mutex_unlock(&thermal_list_lock);
 		return;

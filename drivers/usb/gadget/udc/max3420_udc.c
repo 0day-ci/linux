@@ -1044,22 +1044,25 @@ static int max3420_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
 
 static int max3420_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 {
-	struct max3420_req *t, *req = to_max3420_req(_req);
+	struct max3420_req *t = NULL;
+	struct max3420_req *req = to_max3420_req(_req);
+	struct max3420_req *tmp;
 	struct max3420_ep *ep = to_max3420_ep(_ep);
 	unsigned long flags;
 
 	spin_lock_irqsave(&ep->lock, flags);
 
 	/* Pluck the descriptor from queue */
-	list_for_each_entry(t, &ep->queue, queue)
-		if (t == req) {
+	list_for_each_entry(tmp, &ep->queue, queue)
+		if (tmp == req) {
 			list_del_init(&req->queue);
+			t = tmp;
 			break;
 		}
 
 	spin_unlock_irqrestore(&ep->lock, flags);
 
-	if (t == req)
+	if (t)
 		max3420_req_done(req, -ECONNRESET);
 
 	return 0;

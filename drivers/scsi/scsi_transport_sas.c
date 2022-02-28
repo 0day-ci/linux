@@ -1060,26 +1060,29 @@ EXPORT_SYMBOL(sas_port_get_phy);
  * connected to a remote device is a port, so ports must be formed on
  * all devices with phys if they're connected to anything.
  */
-void sas_port_add_phy(struct sas_port *port, struct sas_phy *phy)
+void sas_port_add_phy(struct sas_port *port, struct sas_phy *_phy)
 {
 	mutex_lock(&port->phy_list_mutex);
-	if (unlikely(!list_empty(&phy->port_siblings))) {
+	if (unlikely(!list_empty(&_phy->port_siblings))) {
 		/* make sure we're already on this port */
+		struct sas_phy *phy = NULL;
 		struct sas_phy *tmp;
 
 		list_for_each_entry(tmp, &port->phy_list, port_siblings)
-			if (tmp == phy)
+			if (tmp == _phy) {
+				phy = tmp;
 				break;
+			}
 		/* If this trips, you added a phy that was already
 		 * part of a different port */
-		if (unlikely(tmp != phy)) {
+		if (unlikely(!phy)) {
 			dev_printk(KERN_ERR, &port->dev, "trying to add phy %s fails: it's already part of another port\n",
-				   dev_name(&phy->dev));
+				   dev_name(&_phy->dev));
 			BUG();
 		}
 	} else {
-		sas_port_create_link(port, phy);
-		list_add_tail(&phy->port_siblings, &port->phy_list);
+		sas_port_create_link(port, _phy);
+		list_add_tail(&_phy->port_siblings, &port->phy_list);
 		port->num_phys++;
 	}
 	mutex_unlock(&port->phy_list_mutex);
