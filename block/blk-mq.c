@@ -3441,6 +3441,8 @@ static void blk_mq_exit_hctx(struct request_queue *q,
 
 	blk_mq_remove_cpuhp(hctx);
 
+	xa_erase(&q->hctx_table, hctx_idx);
+
 	spin_lock(&q->unused_hctx_lock);
 	list_add(&hctx->hctx_list, &q->unused_hctx_list);
 	spin_unlock(&q->unused_hctx_lock);
@@ -3480,8 +3482,15 @@ static int blk_mq_init_hctx(struct request_queue *q,
 	if (blk_mq_init_request(set, hctx->fq->flush_rq, hctx_idx,
 				hctx->numa_node))
 		goto exit_hctx;
+
+	if (xa_insert(&q->hctx_table, hctx_idx, hctx, GFP_KERNEL))
+		goto exit_flush_rq;
+
 	return 0;
 
+ exit_flush_rq:
+	if (set->ops->exit_request)
+		set->ops->exit_request(set, hctx->fq->flush_rq, hctx_idx);
  exit_hctx:
 	if (set->ops->exit_hctx)
 		set->ops->exit_hctx(hctx, hctx_idx);
@@ -3859,7 +3868,7 @@ void blk_mq_release(struct request_queue *q)
 		kobject_put(&hctx->kobj);
 	}
 
-	kfree(q->queue_hw_ctx);
+	xa_destroy(&q->hctx_table);
 
 	/*
 	 * release .mq_kobj and sw queue's kobject now because
@@ -3949,45 +3958,26 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 						struct request_queue *q)
 {
 	int i, j, end;
-	struct blk_mq_hw_ctx **hctxs = q->queue_hw_ctx;
-
-	if (q->nr_hw_queues < set->nr_hw_queues) {
-		struct blk_mq_hw_ctx **new_hctxs;
-
-		new_hctxs = kcalloc_node(set->nr_hw_queues,
-				       sizeof(*new_hctxs), GFP_KERNEL,
-				       set->numa_node);
-		if (!new_hctxs)
-			return;
-		if (hctxs)
-			memcpy(new_hctxs, hctxs, q->nr_hw_queues *
-			       sizeof(*hctxs));
-		q->queue_hw_ctx = new_hctxs;
-		kfree(hctxs);
-		hctxs = new_hctxs;
-	}
 
 	/* protect against switching io scheduler  */
 	mutex_lock(&q->sysfs_lock);
 	for (i = 0; i < set->nr_hw_queues; i++) {
 		int old_node;
 		int node = blk_mq_get_hctx_node(set, i);
-		struct blk_mq_hw_ctx *old_hctx = hctxs[i];
+		struct blk_mq_hw_ctx *old_hctx = blk_mq_get_hctx(q, i);
 
 		if (old_hctx) {
 			old_node = old_hctx->numa_node;
 			blk_mq_exit_hctx(q, set, old_hctx, i);
 		}
 
-		hctxs[i] = blk_mq_alloc_and_init_hctx(set, q, i, node);
-		if (!hctxs[i]) {
+		if (!blk_mq_alloc_and_init_hctx(set, q, i, node)) {
 			if (!old_hctx)
 				break;
 			pr_warn("Allocate new hctx on node %d fails, fallback to previous one on node %d\n",
 					node, old_node);
-			hctxs[i] = blk_mq_alloc_and_init_hctx(set, q, i,
-					old_node);
-			WARN_ON_ONCE(!hctxs[i]);
+			WARN_ON_ONCE(!blk_mq_alloc_and_init_hctx(set, q, i,
+						old_node));
 		}
 	}
 	/*
@@ -4004,12 +3994,10 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 	}
 
 	for (; j < end; j++) {
-		struct blk_mq_hw_ctx *hctx = hctxs[j];
+		struct blk_mq_hw_ctx *hctx = blk_mq_get_hctx(q, j);
 
-		if (hctx) {
+		if (hctx)
 			blk_mq_exit_hctx(q, set, hctx, j);
-			hctxs[j] = NULL;
-		}
 	}
 	mutex_unlock(&q->sysfs_lock);
 }
@@ -4049,6 +4037,8 @@ int blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 	INIT_LIST_HEAD(&q->unused_hctx_list);
 	spin_lock_init(&q->unused_hctx_lock);
 
+	xa_init(&q->hctx_table);
+
 	blk_mq_realloc_hw_ctxs(set, q);
 	if (!q->nr_hw_queues)
 		goto err_hctxs;
@@ -4078,7 +4068,7 @@ int blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 	return 0;
 
 err_hctxs:
-	kfree(q->queue_hw_ctx);
+	xa_destroy(&q->hctx_table);
 	q->nr_hw_queues = 0;
 	blk_mq_sysfs_deinit(q);
 err_poll:
