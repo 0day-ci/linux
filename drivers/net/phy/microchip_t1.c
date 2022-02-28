@@ -81,6 +81,9 @@
 #define T1_REG_BANK_SEL			8
 #define T1_REG_ADDR_MASK		0xFF
 
+#define T1_MODE_STAT_REG		0x11
+#define T1_LINK_UP_MSK			BIT(0)
+
 #define DRIVER_AUTHOR	"Nisar Sayed <nisar.sayed@microchip.com>"
 #define DRIVER_DESC	"Microchip LAN87XX/LAN937x T1 PHY driver"
 
@@ -435,6 +438,11 @@ static int lan_phy_config_init(struct phy_device *phydev)
 	if (rc < 0)
 		phydev_err(phydev, "failed to initialize phy\n");
 
+	phydev->duplex = DUPLEX_FULL;
+	phydev->speed = SPEED_100;
+	phydev->pause = 0;
+	phydev->asym_pause = 0;
+
 	return rc < 0 ? rc : 0;
 }
 
@@ -666,6 +674,69 @@ static int lan87xx_cable_test_get_status(struct phy_device *phydev,
 	return 0;
 }
 
+static int lan937x_read_status(struct phy_device *phydev)
+{
+	int rc;
+
+	rc = phy_read(phydev, T1_MODE_STAT_REG);
+	if (rc < 0)
+		return rc;
+
+	if (rc & T1_LINK_UP_MSK)
+		phydev->link = 1;
+	else
+		phydev->link = 0;
+
+	phydev->master_slave_get = MASTER_SLAVE_CFG_UNKNOWN;
+	phydev->master_slave_state = MASTER_SLAVE_STATE_UNKNOWN;
+
+	rc = phy_read(phydev, MII_CTRL1000);
+	if (rc < 0)
+		return rc;
+
+	if (rc & CTL1000_AS_MASTER)
+		phydev->master_slave_get = MASTER_SLAVE_CFG_MASTER_FORCE;
+	else
+		phydev->master_slave_get = MASTER_SLAVE_CFG_SLAVE_FORCE;
+
+	rc = phy_read(phydev, MII_STAT1000);
+	if (rc < 0)
+		return rc;
+
+	if (rc & LPA_1000MSRES)
+		phydev->master_slave_state = MASTER_SLAVE_STATE_MASTER;
+	else
+		phydev->master_slave_state = MASTER_SLAVE_STATE_SLAVE;
+
+	return 0;
+}
+
+static int lan937x_config_aneg(struct phy_device *phydev)
+{
+	int rc;
+	u16 ctl = 0;
+
+	switch (phydev->master_slave_set) {
+	case MASTER_SLAVE_CFG_MASTER_FORCE:
+		ctl |= CTL1000_AS_MASTER;
+		break;
+	case MASTER_SLAVE_CFG_SLAVE_FORCE:
+		break;
+	case MASTER_SLAVE_CFG_UNKNOWN:
+	case MASTER_SLAVE_CFG_UNSUPPORTED:
+		return 0;
+	default:
+		phydev_warn(phydev, "Unsupported Master/Slave mode\n");
+		return -EOPNOTSUPP;
+	}
+
+	rc = phy_modify_changed(phydev, MII_CTRL1000, CTL1000_AS_MASTER, ctl);
+	if (rc == 1)
+		rc = genphy_soft_reset(phydev);
+
+	return rc;
+}
+
 static struct phy_driver microchip_t1_phy_driver[] = {
 	{
 		.phy_id         = LAN87XX_PHY_ID,
@@ -689,6 +760,10 @@ static struct phy_driver microchip_t1_phy_driver[] = {
 		.config_init	= lan_phy_config_init,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
+		.config_aneg    = lan937x_config_aneg,
+		.read_status	= lan937x_read_status,
+		.cable_test_start = lan87xx_cable_test_start,
+		.cable_test_get_status = lan87xx_cable_test_get_status,
 	}
 };
 
