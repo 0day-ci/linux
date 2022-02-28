@@ -50,8 +50,13 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 		cclkin = ios->clock * RK3288_CLKGEN_DIV;
 
 	ret = clk_set_rate(host->ciu_clk, cclkin);
-	if (ret)
-		dev_warn(host->dev, "failed to set rate %uHz\n", ios->clock);
+	if (ret) {
+		/* this screams when card detection is broken */
+		if (host->slot->mmc->caps & MMC_CAP_NEEDS_POLL)
+			dev_dbg_ratelimited(host->dev, "failed to set rate %uHz\n", ios->clock);
+		else
+			dev_warn(host->dev, "failed to set rate %uHz\n", ios->clock);
+	}
 
 	bus_hz = clk_get_rate(host->ciu_clk) / RK3288_CLKGEN_DIV;
 	if (bus_hz != host->bus_hz) {
