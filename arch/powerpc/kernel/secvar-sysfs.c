@@ -30,12 +30,11 @@ static ssize_t format_show(struct kobject *kobj, struct kobj_attribute *attr,
 		return -ENODEV;
 
 	rc = of_property_read_string(node, "format", &format);
+	of_node_put(node);
 	if (rc)
 		return rc;
 
 	rc = sprintf(buf, "%s\n", format);
-
-	of_node_put(node);
 
 	return rc;
 }
