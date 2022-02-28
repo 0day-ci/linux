@@ -341,18 +341,24 @@ enum {
 
 struct qca8k_mgmt_eth_data {
 	struct completion rw_done;
-	struct mutex mutex; /* Enforce one mdio read/write at time */
+	u32 data[4];
 	bool ack;
 	u32 seq;
-	u32 data[4];
+	struct mutex mutex; /* Enforce one mdio read/write at time */
 };
 
 struct qca8k_mib_eth_data {
 	struct completion rw_done;
+	u64 *data; /* pointer to ethtool data */
+	u8 req_port;
 	struct mutex mutex; /* Process one command at time */
 	refcount_t port_parsed; /* Counter to track parsed port */
-	u8 req_port;
-	u64 *data; /* pointer to ethtool data */
+};
+
+struct qca8k_pcs {
+	struct phylink_pcs pcs;
+	struct qca8k_priv *priv;
+	int port;
 };
 
 struct qca8k_ports_config {
@@ -361,6 +367,7 @@ struct qca8k_ports_config {
 	bool sgmii_enable_pll;
 	u8 rgmii_rx_delay[QCA8K_NUM_CPU_PORTS]; /* 0: CPU port0, 1: CPU port6 */
 	u8 rgmii_tx_delay[QCA8K_NUM_CPU_PORTS]; /* 0: CPU port0, 1: CPU port6 */
+	struct qca8k_pcs qpcs[QCA8K_NUM_CPU_PORTS];
 };
 
 struct qca8k_mdio_cache {
@@ -376,13 +383,10 @@ struct qca8k_mdio_cache {
 	u16 hi;
 };
 
-struct qca8k_pcs {
-	struct phylink_pcs pcs;
-	struct qca8k_priv *priv;
-	int port;
-};
-
 struct qca8k_priv {
+	struct net_device *mgmt_master; /* Track if mdio/mib Ethernet is available */
+	struct qca8k_mgmt_eth_data mgmt_eth_data;
+	struct qca8k_mdio_cache mdio_cache;
 	u8 switch_id;
 	u8 switch_revision;
 	u8 mirror_rx;
@@ -396,15 +400,10 @@ struct qca8k_priv {
 	struct dsa_switch *ds;
 	struct mutex reg_mutex;
 	struct device *dev;
-	struct dsa_switch_ops ops;
 	struct gpio_desc *reset_gpio;
-	unsigned int port_mtu[QCA8K_NUM_PORTS];
-	struct net_device *mgmt_master; /* Track if mdio/mib Ethernet is available */
-	struct qca8k_mgmt_eth_data mgmt_eth_data;
+	struct dsa_switch_ops ops;
 	struct qca8k_mib_eth_data mib_eth_data;
-	struct qca8k_mdio_cache mdio_cache;
-	struct qca8k_pcs pcs_port_0;
-	struct qca8k_pcs pcs_port_6;
+	unsigned int port_mtu[QCA8K_NUM_PORTS];
 };
 
 struct qca8k_mib_desc {
