@@ -58,8 +58,7 @@ patternProperties:
           Contains the native Ready/Busy IDs.
 
       nand-ecc-engine:
-        allOf:
-          - $ref: /schemas/types.yaml#/definitions/phandle
+        $ref: /schemas/types.yaml#/definitions/phandle
         description: |
           A phandle on the hardware ECC engine if any. There are
           basically three possibilities:
@@ -79,9 +78,8 @@ patternProperties:
         description: Do not use any ECC correction.
 
       nand-ecc-placement:
-        allOf:
-          - $ref: /schemas/types.yaml#/definitions/string
-          - enum: [ oob, interleaved ]
+        $ref: /schemas/types.yaml#/definitions/string
+        enum: [ oob, interleaved ]
         description:
           Location of the ECC bytes. This location is unknown by default
           but can be explicitly set to "oob", if all ECC bytes are
