@@ -577,6 +577,17 @@ void khugepaged_enter(struct vm_area_struct *vma, unsigned long vm_flags)
 			__khugepaged_enter(vma->vm_mm);
 }
 
+void khugepaged_enter_file(struct vm_area_struct *vma, unsigned long vm_flags)
+{
+	if (!test_bit(MMF_VM_HUGEPAGE, &vma->vm_mm->flags) &&
+	    khugepaged_enabled() &&
+	    (((vma->vm_start + ~HPAGE_PMD_MASK) & HPAGE_PMD_MASK) <
+	     (vma->vm_end & HPAGE_PMD_MASK)))
+		if (hugepage_vma_check(vma, vm_flags))
+			__khugepaged_enter(vma->vm_mm);
+}
+EXPORT_SYMBOL_GPL(khugepaged_enter_file);
+
 static void release_pte_page(struct page *page)
 {
 	mod_node_page_state(page_pgdat(page),

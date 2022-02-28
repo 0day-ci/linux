@@ -21,6 +21,8 @@ extern void khugepaged_fork(struct mm_struct *mm,
 extern void khugepaged_exit(struct mm_struct *mm);
 extern void khugepaged_enter(struct vm_area_struct *vma,
 			     unsigned long vm_flags);
+extern void khugepaged_enter_file(struct vm_area_struct *vma,
+				  unsigned long vm_flags);
 
 extern void khugepaged_min_free_kbytes_update(void);
 #ifdef CONFIG_SHMEM
@@ -51,6 +53,10 @@ static inline void khugepaged_exit(struct mm_struct *mm)
 }
 static inline void khugepaged_enter(struct vm_area_struct *vma,
 				    unsigned long vm_flags)
+{
+}
+static inline void khugepaged_enter_file(struct vm_area_struct *vma,
+					 unsigned long vm_flags)
 {
 }
 static inline void khugepaged_enter_vma_merge(struct vm_area_struct *vma,
