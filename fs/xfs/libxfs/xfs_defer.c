@@ -510,9 +510,16 @@ xfs_defer_finish_noroll(
 		xfs_defer_create_intents(*tp);
 		list_splice_init(&(*tp)->t_dfops, &dop_pending);
 
-		error = xfs_defer_trans_roll(tp);
-		if (error)
-			goto out_shutdown;
+		/*
+		 * We must ensure the transaction is clean before we try to
+		 * finish the next deferred item by committing logged intent
+		 * items and anything else that dirtied the transaction.
+		 */
+		if ((*tp)->t_flags & XFS_TRANS_DIRTY) {
+			error = xfs_defer_trans_roll(tp);
+			if (error)
+				goto out_shutdown;
+		}
 
 		/* Possibly relog intent items to keep the log moving. */
 		error = xfs_defer_relog(tp, &dop_pending);
