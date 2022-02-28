@@ -167,7 +167,7 @@ int agp_create_segment(struct agp_client *client, struct agp_region *region)
 	struct agp_segment *user_seg;
 	size_t i;
 
-	seg = kzalloc((sizeof(struct agp_segment_priv) * region->seg_count), GFP_KERNEL);
+	seg = kcalloc(region->seg_count, sizeof(struct agp_segment_priv), GFP_KERNEL);
 	if (seg == NULL) {
 		kfree(region->seg_list);
 		region->seg_list = NULL;
