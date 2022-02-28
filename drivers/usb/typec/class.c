@@ -1579,8 +1579,40 @@ static const struct attribute_group typec_group = {
 	.attrs = typec_attrs,
 };
 
+#define DEV_ATTR_LOCATION_PROP(prop) \
+	static ssize_t prop##_show(struct device *dev, struct device_attribute *attr, \
+		char *buf) \
+	{ \
+		struct typec_port *port = to_typec_port(dev); \
+		if (port->pld) \
+			return sprintf(buf, "%u\n", port->pld->prop); \
+		return 0; \
+	}; \
+static DEVICE_ATTR_RO(prop)
+
+DEV_ATTR_LOCATION_PROP(panel);
+DEV_ATTR_LOCATION_PROP(vertical_position);
+DEV_ATTR_LOCATION_PROP(horizontal_position);
+DEV_ATTR_LOCATION_PROP(dock);
+DEV_ATTR_LOCATION_PROP(lid);
+
+static struct attribute *typec_location_attrs[] = {
+	&dev_attr_panel.attr,
+	&dev_attr_vertical_position.attr,
+	&dev_attr_horizontal_position.attr,
+	&dev_attr_dock.attr,
+	&dev_attr_lid.attr,
+	NULL,
+};
+
+static const struct attribute_group typec_location_group = {
+	.name = "location",
+	.attrs = typec_location_attrs,
+};
+
 static const struct attribute_group *typec_groups[] = {
 	&typec_group,
+	&typec_location_group,
 	NULL
 };
 
@@ -1613,6 +1645,24 @@ const struct device_type typec_port_dev_type = {
 	.uevent = typec_uevent,
 	.release = typec_release,
 };
+
+void *get_pld(struct device *dev)
+{
+#ifdef CONFIG_ACPI
+	struct acpi_pld_info *pld;
+	acpi_status status;
+
+	if (!has_acpi_companion(dev))
+		return NULL;
+
+	status = acpi_get_physical_device_location(ACPI_HANDLE(dev), &pld);
+	if (ACPI_FAILURE(status))
+		return NULL;
+	return pld;
+#else
+	return NULL;
+#endif
+}
 
 /* --------------------------------------- */
 /* Driver callbacks to report role updates */
@@ -2115,6 +2165,8 @@ struct typec_port *typec_register_port(struct device *parent,
 		put_device(&port->dev);
 		return ERR_PTR(ret);
 	}
+
+	port->pld = get_pld(&port->dev);
 
 	ret = device_add(&port->dev);
 	if (ret) {
