@@ -606,7 +606,19 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		iov_iter_revert(iter, iomi.pos - dio->i_size);
 
 	if (ret == -EFAULT && dio->size && (dio_flags & IOMAP_DIO_PARTIAL)) {
-		if (!(iocb->ki_flags & IOCB_NOWAIT))
+		/*
+		 * If we are a NOWAIT request we don't want to wait for the
+		 * completion of any previously submitted bios. However there
+		 * is one exception: if we are doing a read and we have not
+		 * submitted bios for everything we are supposed to read, then
+		 * we have to wait for completion - otherwise we may end up
+		 * returning -EIOCBQUEUED without having read everything we
+		 * can read, making our caller think we have reached EOF.
+		 */
+		if (!(iocb->ki_flags & IOCB_NOWAIT) ||
+		    (iov_iter_rw(iter) == READ &&
+		     iomi.len > 0 &&
+		     iomi.pos < dio->i_size))
 			wait_for_completion = true;
 		ret = 0;
 	}
