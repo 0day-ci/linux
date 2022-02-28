@@ -150,13 +150,14 @@ static void proc_ep_show(struct seq_file *s, struct at91_ep *ep)
 	if (list_empty (&ep->queue))
 		seq_printf(s, "\t(queue empty)\n");
 
-	else list_for_each_entry (req, &ep->queue, queue) {
-		unsigned	length = req->req.actual;
+	else
+		list_for_each_entry(req, &ep->queue, queue) {
+			unsigned int	length = req->req.actual;
 
-		seq_printf(s, "\treq %p len %d/%d buf %p\n",
-				&req->req, length,
-				req->req.length, req->req.buf);
-	}
+			seq_printf(s, "\treq %p len %d/%d buf %p\n",
+					&req->req, length,
+					req->req.length, req->req.buf);
+		}
 	spin_unlock_irqrestore(&udc->lock, flags);
 }
 
@@ -226,7 +227,7 @@ static int proc_udc_show(struct seq_file *s, void *unused)
 
 	if (udc->enabled && udc->vbus) {
 		proc_ep_show(s, &udc->ep[0]);
-		list_for_each_entry (ep, &udc->gadget.ep_list, ep.ep_list) {
+		list_for_each_entry(ep, &udc->gadget.ep_list, ep.ep_list) {
 			if (ep->ep.desc)
 				proc_ep_show(s, ep);
 		}
@@ -704,7 +705,8 @@ done:
 static int at91_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 {
 	struct at91_ep		*ep;
-	struct at91_request	*req;
+	struct at91_request	*req = NULL;
+	struct at91_request	*tmp;
 	unsigned long		flags;
 	struct at91_udc		*udc;
 
@@ -717,11 +719,13 @@ static int at91_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 	spin_lock_irqsave(&udc->lock, flags);
 
 	/* make sure it's actually queued on this endpoint */
-	list_for_each_entry (req, &ep->queue, queue) {
-		if (&req->req == _req)
+	list_for_each_entry(tmp, &ep->queue, queue) {
+		if (&tmp->req == _req) {
+			req = tmp;
 			break;
+		}
 	}
-	if (&req->req != _req) {
+	if (!req) {
 		spin_unlock_irqrestore(&udc->lock, flags);
 		return -EINVAL;
 	}
