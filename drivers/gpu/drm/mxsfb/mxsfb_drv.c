@@ -40,6 +40,8 @@ enum mxsfb_devtype {
 	 * i.MX family number as the version.
 	 */
 	MXSFB_V6,
+	/* Starting at i.MX8MP the register layout is scrambled. */
+	MXSFB_V8,
 };
 
 static const struct mxsfb_devdata mxsfb_devdata[] = {
@@ -51,6 +53,7 @@ static const struct mxsfb_devdata mxsfb_devdata[] = {
 		.hs_wdth_shift	= 24,
 		.has_overlay	= false,
 		.has_ctrl2	= false,
+		.has_regsv8	= false,
 	},
 	[MXSFB_V4] = {
 		.transfer_count	= LCDC_V4_TRANSFER_COUNT,
@@ -60,6 +63,7 @@ static const struct mxsfb_devdata mxsfb_devdata[] = {
 		.hs_wdth_shift	= 18,
 		.has_overlay	= false,
 		.has_ctrl2	= true,
+		.has_regsv8	= false,
 	},
 	[MXSFB_V6] = {
 		.transfer_count	= LCDC_V4_TRANSFER_COUNT,
@@ -69,6 +73,13 @@ static const struct mxsfb_devdata mxsfb_devdata[] = {
 		.hs_wdth_shift	= 18,
 		.has_overlay	= true,
 		.has_ctrl2	= true,
+		.has_regsv8	= false,
+	},
+	[MXSFB_V8] = {
+		/* Old register layout details do not apply here. */
+		.has_overlay	= false,
+		.has_ctrl2	= false,
+		.has_regsv8	= true,
 	},
 };
 
@@ -156,6 +167,22 @@ static irqreturn_t mxsfb_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t mxsfb_v8_irq_handler(int irq, void *data)
+{
+	struct drm_device *drm = data;
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+	u32 reg;
+
+	reg = readl(mxsfb->base + LCDC_V8_INT_STATUS_D0);
+
+	if (reg & INT_STATUS_D0_VS_BLANK)
+		drm_crtc_handle_vblank(&mxsfb->crtc);
+
+	writel(INT_STATUS_D0_VS_BLANK, mxsfb->base + LCDC_V8_INT_STATUS_D0);
+
+	return IRQ_HANDLED;
+}
+
 static int mxsfb_load(struct drm_device *drm,
 		      const struct mxsfb_devdata *devdata)
 {
@@ -191,7 +218,8 @@ static int mxsfb_load(struct drm_device *drm,
 
 	platform_set_drvdata(pdev, drm);
 
-	ret = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
+	ret = dma_set_mask_and_coherent(drm->dev,
+				DMA_BIT_MASK(devdata->has_regsv8 ? 36 : 32));
 	if (ret)
 		return ret;
 
@@ -234,7 +262,8 @@ static int mxsfb_load(struct drm_device *drm,
 		return ret;
 	mxsfb->irq = ret;
 
-	ret = request_irq(mxsfb->irq, mxsfb_irq_handler, 0,
+	ret = request_irq(mxsfb->irq, devdata->has_regsv8 ?
+			  mxsfb_v8_irq_handler : mxsfb_irq_handler, 0,
 			  drm->driver->name, drm);
 	if (ret < 0) {
 		dev_err(drm->dev, "Failed to install IRQ handler\n");
@@ -286,6 +315,7 @@ static const struct of_device_id mxsfb_dt_ids[] = {
 	{ .compatible = "fsl,imx23-lcdif", .data = &mxsfb_devdata[MXSFB_V3], },
 	{ .compatible = "fsl,imx28-lcdif", .data = &mxsfb_devdata[MXSFB_V4], },
 	{ .compatible = "fsl,imx6sx-lcdif", .data = &mxsfb_devdata[MXSFB_V6], },
+	{ .compatible = "fsl,imx8mp-lcdif", .data = &mxsfb_devdata[MXSFB_V8], },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, mxsfb_dt_ids);

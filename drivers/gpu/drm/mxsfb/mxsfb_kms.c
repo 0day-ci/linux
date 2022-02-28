@@ -74,6 +74,26 @@ mxsfb_update_buffer(struct mxsfb_drm_private *mxsfb, struct drm_plane *plane,
 	writel(paddr, mxsfb->base + mxsfb->devdata->next_buf);
 }
 
+static void
+mxsfb_v8_update_buffer(struct mxsfb_drm_private *mxsfb, struct drm_plane *plane)
+{
+	dma_addr_t paddr;
+	u32 reg;
+
+	paddr = mxsfb_get_fb_paddr(plane);
+	if (!paddr)
+		return;
+
+	writel(lower_32_bits(paddr),
+	       mxsfb->base + LCDC_V8_CTRLDESCL_LOW0_4);
+	writel(CTRLDESCL_HIGH0_4_ADDR_HIGH(upper_32_bits(paddr)),
+	       mxsfb->base + LCDC_V8_CTRLDESCL_HIGH0_4);
+
+	reg = readl(mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+	reg |= CTRLDESCL0_5_SHADOW_LOAD_EN;
+	writel(reg, mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+}
+
 /*
  * Setup the MXSFB registers for decoding the pixels out of the framebuffer and
  * outputting them on the bus.
@@ -127,6 +147,57 @@ static void mxsfb_set_formats(struct mxsfb_drm_private *mxsfb,
 	writel(ctrl, mxsfb->base + LCDC_CTRL);
 }
 
+static void mxsfb_v8_set_formats(struct mxsfb_drm_private *mxsfb,
+				 const u32 bus_format)
+{
+	struct drm_device *drm = mxsfb->drm;
+	const u32 format = mxsfb->crtc.primary->state->fb->format->format;
+
+	switch (bus_format) {
+	case MEDIA_BUS_FMT_RGB565_1X16:
+		writel(DISP_PARA_LINE_PATTERN_RGB565,
+		       mxsfb->base + LCDC_V8_DISP_PARA);
+		break;
+	case MEDIA_BUS_FMT_RGB888_1X24:
+		writel(DISP_PARA_LINE_PATTERN_RGB888,
+		       mxsfb->base + LCDC_V8_DISP_PARA);
+		break;
+	default:
+		dev_err(drm->dev, "Unknown media bus format 0x%x\n", bus_format);
+		break;
+	}
+
+	switch (format) {
+	case DRM_FORMAT_RGB565:
+		writel(CTRLDESCL0_5_BPP_16_RGB565,
+		       mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+		break;
+	case DRM_FORMAT_RGB888:
+		writel(CTRLDESCL0_5_BPP_24_RGB888,
+		       mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+		break;
+	case DRM_FORMAT_XRGB1555:
+		writel(CTRLDESCL0_5_BPP_16_ARGB1555,
+		       mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+		break;
+	case DRM_FORMAT_XRGB4444:
+		writel(CTRLDESCL0_5_BPP_16_ARGB4444,
+		       mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+		break;
+	case DRM_FORMAT_XBGR8888:
+		writel(CTRLDESCL0_5_BPP_32_ABGR8888,
+		       mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+		break;
+	case DRM_FORMAT_XRGB8888:
+		writel(CTRLDESCL0_5_BPP_32_ARGB8888,
+		       mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+		break;
+	default:
+		dev_err(drm->dev, "Unknown pixel format 0x%x\n", format);
+		break;
+	}
+}
+
 static void mxsfb_set_mode(struct mxsfb_drm_private *mxsfb, u32 bus_flags)
 {
 	struct drm_display_mode *m = &mxsfb->crtc.state->adjusted_mode;
@@ -176,6 +247,47 @@ static void mxsfb_set_mode(struct mxsfb_drm_private *mxsfb, u32 bus_flags)
 	writel(SET_DOTCLK_H_VALID_DATA_CNT(m->hdisplay),
 	       mxsfb->base + LCDC_VDCTRL4);
 
+}
+
+static void mxsfb_v8_set_mode(struct mxsfb_drm_private *mxsfb, u32 bus_flags)
+{
+	struct drm_display_mode *m = &mxsfb->crtc.state->adjusted_mode;
+	u32 ctrl;
+
+	if (m->flags & DRM_MODE_FLAG_PHSYNC)
+		ctrl |= CTRL_INV_HS;
+	if (m->flags & DRM_MODE_FLAG_PVSYNC)
+		ctrl |= CTRL_INV_VS;
+	/* Make sure Data Enable is high active by default */
+	if (!(bus_flags & DRM_BUS_FLAG_DE_LOW))
+		ctrl |= CTRL_INV_DE;
+	if (bus_flags & DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE)
+		ctrl |= CTRL_INV_PXCK;
+
+	writel(ctrl, mxsfb->base + LCDC_CTRL);
+
+	writel(DISP_SIZE_DELTA_Y(m->crtc_vdisplay) |
+	       DISP_SIZE_DELTA_X(m->crtc_hdisplay),
+	       mxsfb->base + LCDC_V8_DISP_SIZE);
+
+	writel(HSYN_PARA_BP_H(m->htotal - m->hsync_end) |
+	       HSYN_PARA_FP_H(m->hsync_start - m->hdisplay),
+	       mxsfb->base + LCDC_V8_HSYN_PARA);
+
+	writel(VSYN_PARA_BP_V(m->vtotal - m->vsync_end) |
+	       VSYN_PARA_FP_V(m->vsync_start - m->vdisplay),
+	       mxsfb->base + LCDC_V8_VSYN_PARA);
+
+	writel(VSYN_HSYN_WIDTH_PW_V(m->vsync_end - m->vsync_start) |
+	       VSYN_HSYN_WIDTH_PW_H(m->hsync_end - m->hsync_start),
+	       mxsfb->base + LCDC_V8_VSYN_HSYN_WIDTH);
+
+	writel(CTRLDESCL0_1_HEIGHT(m->crtc_vdisplay) |
+	       CTRLDESCL0_1_WIDTH(m->crtc_hdisplay),
+	       mxsfb->base + LCDC_V8_CTRLDESCL0_1);
+
+	writel(CTRLDESCL0_3_PITCH(mxsfb->crtc.primary->state->fb->pitches[0]),
+	       mxsfb->base + LCDC_V8_CTRLDESCL0_3);
 }
 
 static void mxsfb_enable_controller(struct mxsfb_drm_private *mxsfb)
@@ -230,6 +342,19 @@ static void mxsfb_enable_controller(struct mxsfb_drm_private *mxsfb)
 	writel(CTRL_RUN, mxsfb->base + LCDC_CTRL + REG_SET);
 }
 
+static void mxsfb_v8_enable_controller(struct mxsfb_drm_private *mxsfb)
+{
+	u32 reg;
+
+	reg = readl(mxsfb->base + LCDC_V8_DISP_PARA);
+	reg |= DISP_PARA_DISP_ON;
+	writel(reg, mxsfb->base + LCDC_V8_DISP_PARA);
+
+	reg = readl(mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+	reg |= CTRLDESCL0_5_EN;
+	writel(reg, mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+}
+
 static void mxsfb_disable_controller(struct mxsfb_drm_private *mxsfb)
 {
 	u32 reg;
@@ -246,6 +371,19 @@ static void mxsfb_disable_controller(struct mxsfb_drm_private *mxsfb)
 	reg = readl(mxsfb->base + LCDC_VDCTRL4);
 	reg &= ~VDCTRL4_SYNC_SIGNALS_ON;
 	writel(reg, mxsfb->base + LCDC_VDCTRL4);
+}
+
+static void mxsfb_v8_disable_controller(struct mxsfb_drm_private *mxsfb)
+{
+	u32 reg;
+
+	reg = readl(mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+	reg &= ~CTRLDESCL0_5_EN;
+	writel(reg, mxsfb->base + LCDC_V8_CTRLDESCL0_5);
+
+	reg = readl(mxsfb->base + LCDC_V8_DISP_PARA);
+	reg &= ~DISP_PARA_DISP_ON;
+	writel(reg, mxsfb->base + LCDC_V8_DISP_PARA);
 }
 
 /*
@@ -297,6 +435,26 @@ static int mxsfb_reset_block(struct mxsfb_drm_private *mxsfb)
 	return 0;
 }
 
+static int mxsfb_v8_reset_block(struct mxsfb_drm_private *mxsfb)
+{
+	u32 reg;
+	int ret;
+
+	writel(CTRL_SW_RESET, mxsfb->base + LCDC_CTRL + REG_SET);
+
+	ret = readl_poll_timeout(mxsfb->base + LCDC_CTRL, reg,
+				 (reg & CTRL_SW_RESET), 0,
+				 RESET_TIMEOUT);
+	if (ret)
+		return ret;
+
+	writel(CTRL_SW_RESET, mxsfb->base + LCDC_CTRL + REG_CLR);
+
+	return readl_poll_timeout(mxsfb->base + LCDC_CTRL, reg,
+				  !(reg & CTRL_SW_RESET), 0,
+				  RESET_TIMEOUT);
+}
+
 static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb,
 				     const u32 bus_format)
 {
@@ -315,14 +473,25 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb,
 			     bus_flags);
 	DRM_DEV_DEBUG_DRIVER(drm->dev, "Mode flags: 0x%08X\n", m->flags);
 
-	/* Mandatory eLCDIF reset as per the Reference Manual */
-	err = mxsfb_reset_block(mxsfb);
-	if (err)
-		return;
+	if (mxsfb->devdata->has_regsv8) {
+		/* Mandatory eLCDIF reset as per the Reference Manual */
+		err = mxsfb_v8_reset_block(mxsfb);
+		if (err)
+			return;
 
-	mxsfb_set_formats(mxsfb, bus_format);
+		mxsfb_v8_set_formats(mxsfb, bus_format);
 
-	mxsfb_set_mode(mxsfb, bus_flags);
+		mxsfb_v8_set_mode(mxsfb, bus_flags);
+	} else {
+		/* Mandatory eLCDIF reset as per the Reference Manual */
+		err = mxsfb_reset_block(mxsfb);
+		if (err)
+			return;
+
+		mxsfb_set_formats(mxsfb, bus_format);
+
+		mxsfb_set_mode(mxsfb, bus_flags);
+	}
 }
 
 static int mxsfb_crtc_atomic_check(struct drm_crtc *crtc,
@@ -398,9 +567,15 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	mxsfb_crtc_mode_set_nofb(mxsfb, bus_format);
 
 	/* Write cur_buf as well to avoid an initial corrupt frame */
-	mxsfb_update_buffer(mxsfb, crtc->primary, true);
+	if (mxsfb->devdata->has_regsv8) {
+		mxsfb_v8_update_buffer(mxsfb, crtc->primary);
 
-	mxsfb_enable_controller(mxsfb);
+		mxsfb_v8_enable_controller(mxsfb);
+	} else {
+		mxsfb_update_buffer(mxsfb, crtc->primary, true);
+
+		mxsfb_enable_controller(mxsfb);
+	}
 
 	drm_crtc_vblank_on(crtc);
 }
@@ -414,7 +589,10 @@ static void mxsfb_crtc_atomic_disable(struct drm_crtc *crtc,
 
 	drm_crtc_vblank_off(crtc);
 
-	mxsfb_disable_controller(mxsfb);
+	if (mxsfb->devdata->has_regsv8)
+		mxsfb_v8_disable_controller(mxsfb);
+	else
+		mxsfb_disable_controller(mxsfb);
 
 	spin_lock_irq(&drm->event_lock);
 	event = crtc->state->event;
@@ -432,8 +610,13 @@ static int mxsfb_crtc_enable_vblank(struct drm_crtc *crtc)
 	struct mxsfb_drm_private *mxsfb = to_mxsfb_drm_private(crtc->dev);
 
 	/* Clear and enable VBLANK IRQ */
-	writel(CTRL1_CUR_FRAME_DONE_IRQ, mxsfb->base + LCDC_CTRL1 + REG_CLR);
-	writel(CTRL1_CUR_FRAME_DONE_IRQ_EN, mxsfb->base + LCDC_CTRL1 + REG_SET);
+	if (mxsfb->devdata->has_regsv8) {
+		writel(INT_STATUS_D0_VS_BLANK, mxsfb->base + LCDC_V8_INT_STATUS_D0);
+		writel(INT_ENABLE_D0_VS_BLANK_EN, mxsfb->base + LCDC_V8_INT_ENABLE_D0);
+	} else {
+		writel(CTRL1_CUR_FRAME_DONE_IRQ, mxsfb->base + LCDC_CTRL1 + REG_CLR);
+		writel(CTRL1_CUR_FRAME_DONE_IRQ_EN, mxsfb->base + LCDC_CTRL1 + REG_SET);
+	}
 
 	return 0;
 }
@@ -443,8 +626,13 @@ static void mxsfb_crtc_disable_vblank(struct drm_crtc *crtc)
 	struct mxsfb_drm_private *mxsfb = to_mxsfb_drm_private(crtc->dev);
 
 	/* Disable and clear VBLANK IRQ */
-	writel(CTRL1_CUR_FRAME_DONE_IRQ_EN, mxsfb->base + LCDC_CTRL1 + REG_CLR);
-	writel(CTRL1_CUR_FRAME_DONE_IRQ, mxsfb->base + LCDC_CTRL1 + REG_CLR);
+	if (mxsfb->devdata->has_regsv8) {
+		writel(0, mxsfb->base + LCDC_V8_INT_ENABLE_D0);
+		writel(INT_STATUS_D0_VS_BLANK, mxsfb->base + LCDC_V8_INT_STATUS_D0);
+	} else {
+		writel(CTRL1_CUR_FRAME_DONE_IRQ_EN, mxsfb->base + LCDC_CTRL1 + REG_CLR);
+		writel(CTRL1_CUR_FRAME_DONE_IRQ, mxsfb->base + LCDC_CTRL1 + REG_CLR);
+	}
 }
 
 static const struct drm_crtc_helper_funcs mxsfb_crtc_helper_funcs = {
@@ -499,7 +687,10 @@ static void mxsfb_plane_primary_atomic_update(struct drm_plane *plane,
 {
 	struct mxsfb_drm_private *mxsfb = to_mxsfb_drm_private(plane->dev);
 
-	mxsfb_update_buffer(mxsfb, plane, false);
+	if (mxsfb->devdata->has_regsv8)
+		mxsfb_v8_update_buffer(mxsfb, plane);
+	else
+		mxsfb_update_buffer(mxsfb, plane, false);
 }
 
 static void mxsfb_plane_overlay_atomic_update(struct drm_plane *plane,
