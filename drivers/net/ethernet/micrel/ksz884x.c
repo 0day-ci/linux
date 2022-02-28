@@ -5225,7 +5225,6 @@ static irqreturn_t netdev_intr(int irq, void *dev_id)
  * Linux network device functions
  */
 
-static unsigned long next_jiffies;
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void netdev_netpoll(struct net_device *dev)
@@ -5361,7 +5360,7 @@ static int prepare_hardware(struct net_device *dev)
 	struct dev_info *hw_priv = priv->adapter;
 	struct ksz_hw *hw = &hw_priv->hw;
 	int rc = 0;
-
+	unsigned long next_jiffies = 0;
 	/* Remember the network device that requests interrupts. */
 	hw_priv->dev = dev;
 	rc = request_irq(dev->irq, netdev_intr, IRQF_SHARED, dev->name, dev);
@@ -5428,7 +5427,7 @@ static int netdev_open(struct net_device *dev)
 		if (rc)
 			return rc;
 		for (i = 0; i < hw->mib_port_cnt; i++) {
-			if (next_jiffies < jiffies)
+			if (time_before(next_jiffies, jiffies))
 				next_jiffies = jiffies + HZ * 2;
 			else
 				next_jiffies += HZ * 1;
@@ -6566,7 +6565,7 @@ static void mib_read_work(struct work_struct *work)
 	struct ksz_port_mib *mib;
 	int i;
 
-	next_jiffies = jiffies;
+	unsigned long next_jiffies = jiffies;
 	for (i = 0; i < hw->mib_port_cnt; i++) {
 		mib = &hw->port_mib[i];
 
