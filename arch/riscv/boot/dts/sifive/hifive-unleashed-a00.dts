@@ -3,6 +3,8 @@
 
 #include "fu540-c000.dtsi"
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
+#include <dt-bindings/pwm/pwm.h>
 
 /* Clock frequency (in Hz) of the PCB crystal for rtcclk */
 #define RTCCLK_FREQ		1000000
@@ -30,6 +32,46 @@
 		compatible = "fixed-clock";
 		clock-frequency = <33333333>;
 		clock-output-names = "hfclk";
+	};
+
+	led-controller {
+		compatible = "pwm-leds";
+
+		led-0 {
+			color = <LED_COLOR_ID_GREEN>;
+			pwms = <&pwm0 0 10000000 PWM_POLARITY_INVERTED>;
+			active-low;
+			max-brightness = <255>;
+			function = LED_FUNCTION_HEARTBEAT;
+			linux,default-trigger = "heartbeat";
+		};
+
+		led-1 {
+			color = <LED_COLOR_ID_GREEN>;
+			pwms = <&pwm0 1 10000000 PWM_POLARITY_INVERTED>;
+			active-low;
+			max-brightness = <255>;
+			function = LED_FUNCTION_MTD;
+			linux,default-trigger = "mtd";
+		};
+
+		led-2 {
+			color = <LED_COLOR_ID_GREEN>;
+			pwms = <&pwm0 2 10000000 PWM_POLARITY_INVERTED>;
+			active-low;
+			max-brightness = <255>;
+			function = LED_FUNCTION_LAN;
+			linux,default-trigger = "netdev";
+		};
+
+		led-3 {
+			color = <LED_COLOR_ID_GREEN>;
+			pwms = <&pwm0 3 10000000 PWM_POLARITY_INVERTED>;
+			active-low;
+			max-brightness = <255>;
+			function = LED_FUNCTION_PANIC;
+			linux,default-trigger = "panic";
+		};
 	};
 
 	memory@80000000 {
