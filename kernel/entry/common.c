@@ -7,6 +7,7 @@
 #include <linux/livepatch.h>
 #include <linux/audit.h>
 #include <linux/tick.h>
+#include <linux/dept.h>
 
 #include "common.h"
 
@@ -103,6 +104,7 @@ noinstr long syscall_enter_from_user_mode(struct pt_regs *regs, long syscall)
 	long ret;
 
 	__enter_from_user_mode(regs);
+	dept_kernel_enter();
 
 	instrumentation_begin();
 	local_irq_enable();
@@ -115,6 +117,7 @@ noinstr long syscall_enter_from_user_mode(struct pt_regs *regs, long syscall)
 noinstr void syscall_enter_from_user_mode_prepare(struct pt_regs *regs)
 {
 	__enter_from_user_mode(regs);
+	dept_kernel_enter();
 	instrumentation_begin();
 	local_irq_enable();
 	instrumentation_end();
