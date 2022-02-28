@@ -156,33 +156,6 @@ static irqreturn_t mxsfb_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void mxsfb_irq_disable(struct drm_device *drm)
-{
-	struct mxsfb_drm_private *mxsfb = drm->dev_private;
-
-	/* Disable and clear VBLANK IRQ */
-	writel(CTRL1_CUR_FRAME_DONE_IRQ_EN, mxsfb->base + LCDC_CTRL1 + REG_CLR);
-	writel(CTRL1_CUR_FRAME_DONE_IRQ, mxsfb->base + LCDC_CTRL1 + REG_CLR);
-}
-
-static int mxsfb_irq_install(struct drm_device *dev, int irq)
-{
-	if (irq == IRQ_NOTCONNECTED)
-		return -ENOTCONN;
-
-	mxsfb_irq_disable(dev);
-
-	return request_irq(irq, mxsfb_irq_handler, 0,  dev->driver->name, dev);
-}
-
-static void mxsfb_irq_uninstall(struct drm_device *dev)
-{
-	struct mxsfb_drm_private *mxsfb = dev->dev_private;
-
-	mxsfb_irq_disable(dev);
-	free_irq(mxsfb->irq, dev);
-}
-
 static int mxsfb_load(struct drm_device *drm,
 		      const struct mxsfb_devdata *devdata)
 {
@@ -261,7 +234,8 @@ static int mxsfb_load(struct drm_device *drm,
 		return ret;
 	mxsfb->irq = ret;
 
-	ret = mxsfb_irq_install(drm, mxsfb->irq);
+	ret = request_irq(mxsfb->irq, mxsfb_irq_handler, 0,
+			  drm->driver->name, drm);
 	if (ret < 0) {
 		dev_err(drm->dev, "Failed to install IRQ handler\n");
 		return ret;
@@ -278,15 +252,19 @@ static int mxsfb_load(struct drm_device *drm,
 
 static void mxsfb_unload(struct drm_device *drm)
 {
+	struct mxsfb_drm_private *mxsfb = drm->dev_private;
+
 	pm_runtime_get_sync(drm->dev);
+
+	drm_crtc_vblank_off(&mxsfb->crtc);
 
 	drm_kms_helper_poll_fini(drm);
 	drm_mode_config_cleanup(drm);
 
-	mxsfb_irq_uninstall(drm);
-
 	pm_runtime_put_sync(drm->dev);
 	pm_runtime_disable(drm->dev);
+
+	free_irq(mxsfb->irq, drm->dev);
 
 	drm->dev_private = NULL;
 }
