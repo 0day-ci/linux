@@ -1,0 +1,28 @@
+drm drm-fixes e7c470a4b543375d50d88a4c5abd4b9e0f5adcea
+	Merge tag 'exynos-drm-fixes-v5.17-rc6' of git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos into drm-fixes
+drm-misc drm-misc-fixes ecbd4912a693b862e25cba0a6990a8c95b00721e
+	drm/edid: Always set RGB444
+drm-intel drm-intel-fixes 7e57714cd0ad2d5bb90e50b5096a0e671dec1ef3
+	Linux 5.17-rc6
+drm drm-next 6c64ae228f0826859c56711ce133aff037d6205f
+	Backmerge tag 'v5.17-rc6' into drm-next
+drm-misc drm-misc-next-fixes 07f380da3ebd8d84fc866ccf83d93c667fcaaeaa
+	drm/panel: simple: Fix Innolux G070Y2-L01 BPP settings
+drm-intel drm-intel-next-fixes e26602be4869c74dd8a0f66f718b8a0ce120edb4
+	drm/i915/display/adlp: Implement new step in the TC voltage swing prog sequence
+drm-misc drm-misc-next f85b3f806e4d43a0e3e5c042f40b7fe5faf2f6cf
+	drm/panel: simple: Initialize bpc in RK101II01D-CT panel descriptor
+drm-intel drm-intel-next 2d0539575abb9dfda27eb7653bb442448fb8982a
+	drm/i915: Fix MSO vs. bigjoiner timings confusion
+drm-intel drm-intel-gt-next 2d45f66887055e169173345a7e6249ecf3ee7e21
+	drm/i915/selftests: mock test io_size
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI c8fa81010ba0974bd56cfa7696ec1595fd04898f
+	sound/hda/hdac_i915: reduce the timeout for component binding
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
