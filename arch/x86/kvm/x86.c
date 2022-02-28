@@ -12087,6 +12087,9 @@ static inline bool kvm_vcpu_has_events(struct kvm_vcpu *vcpu)
 	    kvm_x86_ops.nested_ops->hv_timer_pending(vcpu))
 		return true;
 
+	if (kvm_xen_has_pending_timer(vcpu))
+		return true;
+
 	return false;
 }
 
