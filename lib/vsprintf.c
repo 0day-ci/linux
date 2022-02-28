@@ -981,6 +981,80 @@ char *bdev_name(char *buf, char *end, struct block_device *bdev,
 }
 #endif
 
+#if !defined(CONFIG_KALLSYMS) && defined(CONFIG_MODULES)
+static int sprint_module_info(char *buf, char *end, unsigned long value,
+			     const char *fmt)
+{
+	struct module *mod;
+	unsigned long offset = 1;
+	unsigned long base;
+	int ret = 0;
+	const char *modname;
+	int modbuildid = 0;
+	int len;
+#if IS_ENABLED(CONFIG_STACKTRACE_BUILD_ID)
+	const unsigned char *buildid = NULL;
+#endif
+
+	if (is_ksym_addr(value))
+		return 0;
+
+	if (*fmt == 'B' && fmt[1] == 'b')
+		modbuildid = 1;
+	else if (*fmt == 'S' && (fmt[1] == 'b' || (fmt[1] == 'R' && fmt[2] == 'b')))
+		modbuildid = 1;
+	else if (*fmt != 's') {
+		/*
+		 * do nothing.
+		 */
+	} else
+		offset = 0;
+
+	preempt_disable();
+	mod = __module_address(value);
+	if (mod) {
+		ret = 1;
+		modname = mod->name;
+#if IS_ENABLED(CONFIG_STACKTRACE_BUILD_ID)
+		if (modbuildid)
+			buildid = mod->build_id;
+#endif
+		if (offset) {
+			base = (unsigned long)mod->core_layout.base;
+			offset = value - base;
+		}
+	}
+
+	preempt_enable();
+	if (!ret)
+		return 0;
+
+	/* address belongs to module */
+	if (offset)
+		len = sprintf(buf, "0x%lx+0x%lx", base, offset);
+	else
+		len = sprintf(buf, "0x%lx", value);
+
+	len += sprintf(buf + len, " [%s", modname);
+#if IS_ENABLED(CONFIG_STACKTRACE_BUILD_ID)
+	if (modbuildid && buildid) {
+		/* build ID should match length of sprintf */
+		static_assert(sizeof(typeof_member(struct module, build_id)) == 20);
+		len += sprintf(buf + len, " %20phN", buildid);
+	}
+#endif
+	len += sprintf(buf + len, "]");
+
+	return len;
+}
+#else
+static inline int sprint_module_info(char *buf, char *end, unsigned long value,
+			     const char *fmt)
+{
+	return 0;
+}
+#endif
+
 static noinline_for_stack
 char *symbol_string(char *buf, char *end, void *ptr,
 		    struct printf_spec spec, const char *fmt)
@@ -1006,7 +1080,7 @@ char *symbol_string(char *buf, char *end, void *ptr,
 
 	return string_nocheck(buf, end, sym, spec);
 #else
-	if (fill_minimal_module_info(sym, KSYM_SYMBOL_LEN, value))
+	if (sprint_module_info(sym, end, value, fmt))
 		return string_nocheck(buf, end, sym, spec);
 
 	return special_hex_number(buf, end, value, sizeof(void *));
