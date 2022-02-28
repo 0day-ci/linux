@@ -42,7 +42,7 @@ void gfn_to_pfn_cache_invalidate_start(struct kvm *kvm, unsigned long start,
 			 * If a guest vCPU could be using the physical address,
 			 * it needs to be woken.
 			 */
-			if (gpc->guest_uses_pa) {
+			if (gpc->usage & KVM_GUEST_USES_PFN) {
 				if (!wake_vcpus) {
 					wake_vcpus = true;
 					bitmap_zero(vcpu_bitmap, KVM_MAX_VCPUS);
@@ -219,7 +219,7 @@ int kvm_gfn_to_pfn_cache_refresh(struct kvm *kvm, struct gfn_to_pfn_cache *gpc,
 			goto map_done;
 		}
 
-		if (gpc->kernel_map) {
+		if (gpc->usage & KVM_HOST_USES_PFN) {
 			if (new_pfn == old_pfn) {
 				new_khva = old_khva;
 				old_pfn = KVM_PFN_ERR_FAULT;
@@ -299,10 +299,11 @@ EXPORT_SYMBOL_GPL(kvm_gfn_to_pfn_cache_unmap);
 
 
 int kvm_gfn_to_pfn_cache_init(struct kvm *kvm, struct gfn_to_pfn_cache *gpc,
-			      struct kvm_vcpu *vcpu, bool guest_uses_pa,
-			      bool kernel_map, gpa_t gpa, unsigned long len,
-			      bool dirty)
+			      struct kvm_vcpu *vcpu, enum pfn_cache_usage usage,
+			      gpa_t gpa, unsigned long len, bool dirty)
 {
+	WARN_ON_ONCE(!usage || (usage & KVM_GUEST_AND_HOST_USE_PFN) != usage);
+
 	if (!gpc->active) {
 		rwlock_init(&gpc->lock);
 
@@ -310,8 +311,7 @@ int kvm_gfn_to_pfn_cache_init(struct kvm *kvm, struct gfn_to_pfn_cache *gpc,
 		gpc->pfn = KVM_PFN_ERR_FAULT;
 		gpc->uhva = KVM_HVA_ERR_BAD;
 		gpc->vcpu = vcpu;
-		gpc->kernel_map = kernel_map;
-		gpc->guest_uses_pa = guest_uses_pa;
+		gpc->usage = usage;
 		gpc->valid = false;
 		gpc->active = true;
 

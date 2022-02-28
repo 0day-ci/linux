@@ -1222,9 +1222,9 @@ void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn);
  * @gpc:	   struct gfn_to_pfn_cache object.
  * @vcpu:	   vCPU to be used for marking pages dirty and to be woken on
  *		   invalidation.
- * @guest_uses_pa: indicates that the resulting host physical PFN is used while
- *		   @vcpu is IN_GUEST_MODE so invalidations should wake it.
- * @kernel_map:    requests a kernel virtual mapping (kmap / memremap).
+ * @usage:	   indicates if the resulting host physical PFN is used while
+ *		   the @vcpu is IN_GUEST_MODE and/or if the PFN used directly
+ *		   by KVM (and thus needs a kernel virtual mapping).
  * @gpa:	   guest physical address to map.
  * @len:	   sanity check; the range being access must fit a single page.
  * @dirty:         mark the cache dirty immediately.
@@ -1240,9 +1240,8 @@ void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn);
  * to ensure that the cache is valid before accessing the target page.
  */
 int kvm_gfn_to_pfn_cache_init(struct kvm *kvm, struct gfn_to_pfn_cache *gpc,
-			      struct kvm_vcpu *vcpu, bool guest_uses_pa,
-			      bool kernel_map, gpa_t gpa, unsigned long len,
-			      bool dirty);
+			      struct kvm_vcpu *vcpu, enum pfn_cache_usage usage,
+			      gpa_t gpa, unsigned long len, bool dirty);
 
 /**
  * kvm_gfn_to_pfn_cache_check - check validity of a gfn_to_pfn_cache.
