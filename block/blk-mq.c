@@ -71,7 +71,7 @@ static int blk_mq_poll_stats_bkt(const struct request *rq)
 static inline struct blk_mq_hw_ctx *blk_qc_to_hctx(struct request_queue *q,
 		blk_qc_t qc)
 {
-	return q->queue_hw_ctx[(qc & ~BLK_QC_T_INTERNAL) >> BLK_QC_T_SHIFT];
+	return blk_mq_get_hctx(q, (qc & ~BLK_QC_T_INTERNAL) >> BLK_QC_T_SHIFT);
 }
 
 static inline struct request *blk_qc_to_rq(struct blk_mq_hw_ctx *hctx,
@@ -573,7 +573,7 @@ struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
 	 * If not tell the caller that it should skip this queue.
 	 */
 	ret = -EXDEV;
-	data.hctx = q->queue_hw_ctx[hctx_idx];
+	data.hctx = blk_mq_get_hctx(q, hctx_idx);
 	if (!blk_mq_hw_queue_mapped(data.hctx))
 		goto out_queue_exit;
 	cpu = cpumask_first_and(data.hctx->cpumask, cpu_online_mask);
