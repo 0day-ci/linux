@@ -146,6 +146,15 @@ void imx_cscmr1_fixup(u32 *val)
 	return;
 }
 
+bool mcore_booted;
+
+static int __init setup_mcore_booted(char *booted)
+{
+	mcore_booted = true;
+	return 1;
+}
+__setup("mcore_booted", setup_mcore_booted);
+
 #ifndef MODULE
 
 static bool imx_keep_uart_clocks;
