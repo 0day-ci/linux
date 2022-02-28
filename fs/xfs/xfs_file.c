@@ -30,6 +30,7 @@
 #include <linux/mman.h>
 #include <linux/fadvise.h>
 #include <linux/mount.h>
+#include <linux/khugepaged.h>
 
 static const struct vm_operations_struct xfs_file_vm_ops;
 
@@ -1407,6 +1408,9 @@ xfs_file_mmap(
 	vma->vm_ops = &xfs_file_vm_ops;
 	if (IS_DAX(inode))
 		vma->vm_flags |= VM_HUGEPAGE;
+
+	khugepaged_enter_file(vma, vma->vm_flags);
+
 	return 0;
 }
 
