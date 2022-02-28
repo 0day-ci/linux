@@ -580,6 +580,13 @@ config SM_CAMCC_8250
 	  Support for the camera clock controller on SM8250 devices.
 	  Say Y if you want to support camera devices and camera functionality.
 
+config SM_CAMCC_8450
+	tristate "SM8450 Camera Clock Controller"
+	select SM_GCC_8450
+	help
+	  Support for the camera clock controller on SM8450 devices.
+	  Say Y if you want to support camera devices and camera functionality.
+
 config SM_DISPCC_8250
 	tristate "SM8150 and SM8250 Display Clock Controller"
 	depends on SM_GCC_8150 || SM_GCC_8250
