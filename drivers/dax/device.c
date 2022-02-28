@@ -474,6 +474,7 @@ int dev_dax_probe(struct dev_dax *dev_dax)
 }
 EXPORT_SYMBOL_GPL(dev_dax_probe);
 
+unsigned int match = 1;
 static struct dax_device_driver device_dax_driver = {
 	.probe = dev_dax_probe,
 	/* all probe actions are unwound by devm, so .remove isn't necessary */
@@ -482,6 +483,7 @@ static struct dax_device_driver device_dax_driver = {
 
 static int __init dax_init(void)
 {
+	device_dax_driver.match_always = match;
 	return dax_driver_register(&device_dax_driver);
 }
 
@@ -490,6 +492,7 @@ static void __exit dax_exit(void)
 	dax_driver_unregister(&device_dax_driver);
 }
 
+module_param(match, uint, 0644);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL v2");
 module_init(dax_init);

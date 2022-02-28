@@ -214,9 +214,11 @@ static void dev_dax_kmem_remove(struct dev_dax *dev_dax)
 }
 #endif /* CONFIG_MEMORY_HOTREMOVE */
 
+unsigned int match;
 static struct dax_device_driver device_dax_kmem_driver = {
 	.probe = dev_dax_kmem_probe,
 	.remove = dev_dax_kmem_remove,
+	.match_always = 0,
 };
 
 static int __init dax_kmem_init(void)
@@ -228,6 +230,7 @@ static int __init dax_kmem_init(void)
 	if (!kmem_name)
 		return -ENOMEM;
 
+	device_dax_kmem_driver.match_always = match;
 	rc = dax_driver_register(&device_dax_kmem_driver);
 	if (rc)
 		kfree_const(kmem_name);
@@ -241,6 +244,7 @@ static void __exit dax_kmem_exit(void)
 		kfree_const(kmem_name);
 }
 
+module_param(match, uint, 0644);
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL v2");
 module_init(dax_kmem_init);
