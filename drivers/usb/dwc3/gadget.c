@@ -1902,17 +1902,6 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 		return 0;
 
 	/*
-	 * Start the transfer only after the END_TRANSFER is completed
-	 * and endpoint STALL is cleared.
-	 */
-	if ((dep->flags & DWC3_EP_END_TRANSFER_PENDING) ||
-	    (dep->flags & DWC3_EP_WEDGE) ||
-	    (dep->flags & DWC3_EP_STALL)) {
-		dep->flags |= DWC3_EP_DELAY_START;
-		return 0;
-	}
-
-	/*
 	 * NOTICE: Isochronous endpoints should NEVER be prestarted. We must
 	 * wait for a XferNotReady event so we will know what's the current
 	 * (micro-)frame number.
@@ -1925,6 +1914,17 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 			if ((dep->flags & DWC3_EP_PENDING_REQUEST))
 				return __dwc3_gadget_start_isoc(dep);
 
+			return 0;
+		}
+	} else {
+		/*
+		 * Start the transfer only after the END_TRANSFER is completed
+		 * and endpoint STALL is cleared.
+		 */
+		if ((dep->flags & DWC3_EP_END_TRANSFER_PENDING) ||
+		    (dep->flags & DWC3_EP_WEDGE) ||
+		    (dep->flags & DWC3_EP_STALL)) {
+			dep->flags |= DWC3_EP_DELAY_START;
 			return 0;
 		}
 	}
