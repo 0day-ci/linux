@@ -9,6 +9,9 @@
 #include <linux/ethtool.h>
 #include <linux/ethtool_netlink.h>
 
+#define LAN87XX_PHY_ID			0x0007c150
+#define MICROCHIP_PHY_ID_MASK		0xfffffff0
+
 /* External Register Control Register */
 #define LAN87XX_EXT_REG_CTL                     (0x14)
 #define LAN87XX_EXT_REG_CTL_RD_CTL              (0x1000)
@@ -197,20 +200,10 @@ static int lan87xx_phy_init(struct phy_device *phydev)
 	if (rc < 0)
 		return rc;
 
-	/* Soft Reset the SMI block */
-	rc = access_ereg_modify_changed(phydev, PHYACC_ATTR_BANK_SMI,
-					0x00, 0x8000, 0x8000);
+	/* phy Soft reset */
+	rc = genphy_soft_reset(phydev);
 	if (rc < 0)
 		return rc;
-
-	/* Check to see if the self-clearing bit is cleared */
-	usleep_range(1000, 2000);
-	rc = access_ereg(phydev, PHYACC_ATTR_MODE_READ,
-			 PHYACC_ATTR_BANK_SMI, 0x00, 0);
-	if (rc < 0)
-		return rc;
-	if ((rc & 0x8000) != 0)
-		return -ETIMEDOUT;
 
 	/* PHY Initialization */
 	for (i = 0; i < ARRAY_SIZE(init); i++) {
@@ -272,6 +265,9 @@ static irqreturn_t lan87xx_handle_interrupt(struct phy_device *phydev)
 static int lan87xx_config_init(struct phy_device *phydev)
 {
 	int rc = lan87xx_phy_init(phydev);
+
+	if (rc < 0)
+		phydev_err(phydev, "failed to initialize phy\n");
 
 	return rc < 0 ? rc : 0;
 }
@@ -506,18 +502,14 @@ static int lan87xx_cable_test_get_status(struct phy_device *phydev,
 
 static struct phy_driver microchip_t1_phy_driver[] = {
 	{
-		.phy_id         = 0x0007c150,
-		.phy_id_mask    = 0xfffffff0,
-		.name           = "Microchip LAN87xx T1",
+		.phy_id         = LAN87XX_PHY_ID,
+		.phy_id_mask    = MICROCHIP_PHY_ID_MASK,
+		.name           = "LAN87xx T1",
 		.flags          = PHY_POLL_CABLE_TEST,
-
 		.features       = PHY_BASIC_T1_FEATURES,
-
 		.config_init	= lan87xx_config_init,
-
 		.config_intr    = lan87xx_phy_config_intr,
 		.handle_interrupt = lan87xx_handle_interrupt,
-
 		.suspend        = genphy_suspend,
 		.resume         = genphy_resume,
 		.cable_test_start = lan87xx_cable_test_start,
@@ -528,7 +520,7 @@ static struct phy_driver microchip_t1_phy_driver[] = {
 module_phy_driver(microchip_t1_phy_driver);
 
 static struct mdio_device_id __maybe_unused microchip_t1_tbl[] = {
-	{ 0x0007c150, 0xfffffff0 },
+	{ LAN87XX_PHY_ID, MICROCHIP_PHY_ID_MASK},
 	{ }
 };
 
