@@ -289,13 +289,6 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb,
 	u32 bus_flags = mxsfb->connector->display_info.bus_flags;
 	int err;
 
-	/* Mandatory eLCDIF reset as per the Reference Manual */
-	err = mxsfb_reset_block(mxsfb);
-	if (err)
-		return;
-
-	mxsfb_set_formats(mxsfb, bus_format);
-
 	if (mxsfb->bridge && mxsfb->bridge->timings)
 		bus_flags = mxsfb->bridge->timings->input_bus_flags;
 
@@ -305,6 +298,13 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb,
 	DRM_DEV_DEBUG_DRIVER(drm->dev, "Connector bus_flags: 0x%08X\n",
 			     bus_flags);
 	DRM_DEV_DEBUG_DRIVER(drm->dev, "Mode flags: 0x%08X\n", m->flags);
+
+	/* Mandatory eLCDIF reset as per the Reference Manual */
+	err = mxsfb_reset_block(mxsfb);
+	if (err)
+		return;
+
+	mxsfb_set_formats(mxsfb, bus_format);
 
 	mxsfb_set_mode(mxsfb, bus_flags);
 }
