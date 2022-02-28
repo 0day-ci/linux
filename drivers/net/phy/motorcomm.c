@@ -131,7 +131,7 @@ MODULE_LICENSE("GPL");
 
 static const struct mdio_device_id __maybe_unused motorcomm_tbl[] = {
 	{ PHY_ID_MATCH_EXACT(PHY_ID_YT8511) },
-	{ /* sentinal */ }
+	{}
 };
 
 MODULE_DEVICE_TABLE(mdio, motorcomm_tbl);
