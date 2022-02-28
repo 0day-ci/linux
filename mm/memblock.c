@@ -1728,7 +1728,7 @@ void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
 			base + size, PHYS_ADDR_MAX);
 }
 
-void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+void __init memblock_mem_range_remove_map(phys_addr_t base, phys_addr_t limit)
 {
 	phys_addr_t max_addr;
 
@@ -1741,7 +1741,12 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
 	if (max_addr == PHYS_ADDR_MAX)
 		return;
 
-	memblock_cap_memory_range(0, max_addr);
+	memblock_cap_memory_range(base, max_addr);
+}
+
+void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+{
+	memblock_mem_range_remove_map(0, limit);
 }
 
 static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
