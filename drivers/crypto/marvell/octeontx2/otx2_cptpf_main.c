@@ -144,7 +144,7 @@ static void cptpf_flr_wq_handler(struct work_struct *work)
 	req = otx2_mbox_alloc_msg_rsp(mbox, 0, sizeof(*req),
 				      sizeof(struct msg_rsp));
 	if (!req)
-		return;
+		goto out_unlock;
 
 	req->sig = OTX2_MBOX_REQ_SIG;
 	req->id = MBOX_MSG_VF_FLR;
@@ -164,6 +164,7 @@ static void cptpf_flr_wq_handler(struct work_struct *work)
 		otx2_cpt_write64(pf->reg_base, BLKADDR_RVUM, 0,
 				 RVU_PF_VFFLR_INT_ENA_W1SX(reg), BIT_ULL(vf));
 	}
+out_unlock:
 	mutex_unlock(&pf->lock);
 }
 
