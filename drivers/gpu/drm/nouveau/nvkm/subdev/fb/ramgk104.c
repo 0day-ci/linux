@@ -1155,17 +1155,20 @@ static void
 gk104_ram_prog_0(struct gk104_ram *ram, u32 freq)
 {
 	struct nvkm_device *device = ram->base.fb->subdev.device;
-	struct nvkm_ram_data *cfg;
+	struct nvkm_ram_data *cfg = NULL;
+	struct nvkm_ram_data *tmp;
 	u32 mhz = freq / 1000;
 	u32 mask, data;
 
-	list_for_each_entry(cfg, &ram->cfg, head) {
-		if (mhz >= cfg->bios.rammap_min &&
-		    mhz <= cfg->bios.rammap_max)
+	list_for_each_entry(tmp, &ram->cfg, head) {
+		if (mhz >= tmp->bios.rammap_min &&
+		    mhz <= tmp->bios.rammap_max) {
+			cfg = tmp;
 			break;
+		}
 	}
 
-	if (&cfg->head == &ram->cfg)
+	if (!cfg)
 		return;
 
 	if (mask = 0, data = 0, ram->diff.rammap_11_0a_03fe) {

@@ -330,7 +330,8 @@ static int catpt_dai_apply_usettings(struct snd_soc_dai *dai,
 				     struct catpt_stream_runtime *stream)
 {
 	struct snd_soc_component *component = dai->component;
-	struct snd_kcontrol *pos;
+	struct snd_kcontrol *pos = NULL;
+	struct snd_kcontrol *tmp;
 	struct catpt_dev *cdev = dev_get_drvdata(dai->dev);
 	const char *name;
 	int ret;
@@ -354,12 +355,14 @@ static int catpt_dai_apply_usettings(struct snd_soc_dai *dai,
 		return 0;
 	}
 
-	list_for_each_entry(pos, &component->card->snd_card->controls, list) {
-		if (pos->private_data == component &&
-		    !strncmp(name, pos->id.name, sizeof(pos->id.name)))
+	list_for_each_entry(tmp, &component->card->snd_card->controls, list) {
+		if (tmp->private_data == component &&
+		    !strncmp(name, tmp->id.name, sizeof(tmp->id.name))) {
+			pos = tmp;
 			break;
+		}
 	}
-	if (list_entry_is_head(pos, &component->card->snd_card->controls, list))
+	if (!pos)
 		return -ENOENT;
 
 	if (stream->template->type != CATPT_STRM_TYPE_LOOPBACK)

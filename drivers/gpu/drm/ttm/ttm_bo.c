@@ -672,37 +672,36 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 			struct ttm_operation_ctx *ctx,
 			struct ww_acquire_ctx *ticket)
 {
-	struct ttm_buffer_object *bo = NULL, *busy_bo = NULL;
+	struct ttm_buffer_object *bo = NULL, *tmp, *busy_bo = NULL;
 	bool locked = false;
 	unsigned i;
 	int ret;
 
 	spin_lock(&bdev->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
-		list_for_each_entry(bo, &man->lru[i], lru) {
+		list_for_each_entry(tmp, &man->lru[i], lru) {
 			bool busy;
 
-			if (!ttm_bo_evict_swapout_allowable(bo, ctx, place,
+			if (!ttm_bo_evict_swapout_allowable(tmp, ctx, place,
 							    &locked, &busy)) {
 				if (busy && !busy_bo && ticket !=
-				    dma_resv_locking_ctx(bo->base.resv))
-					busy_bo = bo;
+				    dma_resv_locking_ctx(tmp->base.resv))
+					busy_bo = tmp;
 				continue;
 			}
 
-			if (!ttm_bo_get_unless_zero(bo)) {
+			if (!ttm_bo_get_unless_zero(tmp)) {
 				if (locked)
-					dma_resv_unlock(bo->base.resv);
+					dma_resv_unlock(tmp->base.resv);
 				continue;
 			}
+			bo = tmp;
 			break;
 		}
 
 		/* If the inner loop terminated early, we have our candidate */
-		if (&bo->lru != &man->lru[i])
+		if (bo)
 			break;
-
-		bo = NULL;
 	}
 
 	if (!bo) {

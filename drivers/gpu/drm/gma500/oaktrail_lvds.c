@@ -87,6 +87,7 @@ static void oaktrail_lvds_mode_set(struct drm_encoder *encoder,
 	struct psb_intel_mode_device *mode_dev = &dev_priv->mode_dev;
 	struct drm_mode_config *mode_config = &dev->mode_config;
 	struct drm_connector *connector = NULL;
+	struct drm_connector *tmp;
 	struct drm_crtc *crtc = encoder->crtc;
 	u32 lvds_port;
 	uint64_t v = DRM_MODE_SCALE_FULLSCREEN;
@@ -112,12 +113,14 @@ static void oaktrail_lvds_mode_set(struct drm_encoder *encoder,
 	REG_WRITE(LVDS, lvds_port);
 
 	/* Find the connector we're trying to set up */
-	list_for_each_entry(connector, &mode_config->connector_list, head) {
-		if (connector->encoder && connector->encoder->crtc == crtc)
+	list_for_each_entry(tmp, &mode_config->connector_list, head) {
+		if (tmp->encoder && tmp->encoder->crtc == crtc) {
+			connector = tmp;
 			break;
+		}
 	}
 
-	if (list_entry_is_head(connector, &mode_config->connector_list, head)) {
+	if (!connector) {
 		DRM_ERROR("Couldn't find connector when setting mode");
 		gma_power_end(dev);
 		return;

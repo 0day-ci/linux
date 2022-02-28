@@ -781,18 +781,21 @@ fail_defcmd:
 static int kdb_exec_defcmd(int argc, const char **argv)
 {
 	int ret;
-	kdbtab_t *kp;
+	kdbtab_t *kp = NULL;
+	kdbtab_t *tmp;
 	struct kdb_macro *kmp;
 	struct kdb_macro_statement *kms;
 
 	if (argc != 0)
 		return KDB_ARGCOUNT;
 
-	list_for_each_entry(kp, &kdb_cmds_head, list_node) {
-		if (strcmp(kp->name, argv[0]) == 0)
+	list_for_each_entry(tmp, &kdb_cmds_head, list_node) {
+		if (strcmp(tmp->name, argv[0]) == 0) {
+			kp = tmp;
 			break;
+		}
 	}
-	if (list_entry_is_head(kp, &kdb_cmds_head, list_node)) {
+	if (!kp) {
 		kdb_printf("kdb_exec_defcmd: could not find commands for %s\n",
 			   argv[0]);
 		return KDB_NOTIMP;
@@ -919,7 +922,8 @@ int kdb_parse(const char *cmdstr)
 	static char cbuf[CMD_BUFLEN+2];
 	char *cp;
 	char *cpp, quoted;
-	kdbtab_t *tp;
+	kdbtab_t *tp = NULL;
+	kdbtab_t *tmp;
 	int escaped, ignore_errors = 0, check_grep = 0;
 
 	/*
@@ -1010,17 +1014,21 @@ int kdb_parse(const char *cmdstr)
 		++argv[0];
 	}
 
-	list_for_each_entry(tp, &kdb_cmds_head, list_node) {
+	list_for_each_entry(tmp, &kdb_cmds_head, list_node) {
 		/*
 		 * If this command is allowed to be abbreviated,
 		 * check to see if this is it.
 		 */
-		if (tp->minlen && (strlen(argv[0]) <= tp->minlen) &&
-		    (strncmp(argv[0], tp->name, tp->minlen) == 0))
+		if (tmp->minlen && (strlen(argv[0]) <= tmp->minlen) &&
+		    (strncmp(argv[0], tmp->name, tmp->minlen) == 0)) {
+			tp = tmp;
 			break;
+		}
 
-		if (strcmp(argv[0], tp->name) == 0)
+		if (strcmp(argv[0], tmp->name) == 0) {
+			tp = tmp;
 			break;
+		}
 	}
 
 	/*
@@ -1028,14 +1036,16 @@ int kdb_parse(const char *cmdstr)
 	 * few characters of this match any of the known commands.
 	 * e.g., md1c20 should match md.
 	 */
-	if (list_entry_is_head(tp, &kdb_cmds_head, list_node)) {
-		list_for_each_entry(tp, &kdb_cmds_head, list_node) {
-			if (strncmp(argv[0], tp->name, strlen(tp->name)) == 0)
+	if (!tp) {
+		list_for_each_entry(tmp, &kdb_cmds_head, list_node) {
+			if (strncmp(argv[0], tmp->name, strlen(tmp->name)) == 0) {
+				tp = tmp;
 				break;
+			}
 		}
 	}
 
-	if (!list_entry_is_head(tp, &kdb_cmds_head, list_node)) {
+	if (tp) {
 		int result;
 
 		if (!kdb_check_flags(tp->flags, kdb_cmd_enabled, argc <= 1))

@@ -191,24 +191,27 @@ wait_for_space(struct intel_ring *ring,
 	       struct intel_timeline *tl,
 	       unsigned int bytes)
 {
-	struct i915_request *target;
+	struct i915_request *target = NULL;
+	struct i915_request *tmp;
 	long timeout;
 
 	if (intel_ring_update_space(ring) >= bytes)
 		return 0;
 
 	GEM_BUG_ON(list_empty(&tl->requests));
-	list_for_each_entry(target, &tl->requests, link) {
-		if (target->ring != ring)
+	list_for_each_entry(tmp, &tl->requests, link) {
+		if (tmp->ring != ring)
 			continue;
 
 		/* Would completion of this request free enough space? */
-		if (bytes <= __intel_ring_space(target->postfix,
-						ring->emit, ring->size))
+		if (bytes <= __intel_ring_space(tmp->postfix,
+						ring->emit, ring->size)) {
+			target = tmp;
 			break;
+		}
 	}
 
-	if (GEM_WARN_ON(&target->link == &tl->requests))
+	if (GEM_WARN_ON(!target))
 		return -ENOSPC;
 
 	timeout = i915_request_wait(target,

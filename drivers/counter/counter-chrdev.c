@@ -131,18 +131,21 @@ static int counter_set_event_node(struct counter_device *const counter,
 				  struct counter_watch *const watch,
 				  const struct counter_comp_node *const cfg)
 {
-	struct counter_event_node *event_node;
+	struct counter_event_node *event_node = NULL;
+	struct counter_event_node *tmp;
 	int err = 0;
 	struct counter_comp_node *comp_node;
 
 	/* Search for event in the list */
-	list_for_each_entry(event_node, &counter->next_events_list, l)
-		if (event_node->event == watch->event &&
-		    event_node->channel == watch->channel)
+	list_for_each_entry(tmp, &counter->next_events_list, l)
+		if (tmp->event == watch->event &&
+		    tmp->channel == watch->channel) {
+			event_node = tmp;
 			break;
+		}
 
 	/* If event is not already in the list */
-	if (&event_node->l == &counter->next_events_list) {
+	if (!event_node) {
 		/* Allocate new event node */
 		event_node = kmalloc(sizeof(*event_node), GFP_KERNEL);
 		if (!event_node)
@@ -535,7 +538,8 @@ void counter_push_event(struct counter_device *const counter, const u8 event,
 	struct counter_event ev;
 	unsigned int copied = 0;
 	unsigned long flags;
-	struct counter_event_node *event_node;
+	struct counter_event_node *event_node = NULL;
+	struct counter_event_node *tmp;
 	struct counter_comp_node *comp_node;
 
 	ev.timestamp = ktime_get_ns();
@@ -546,13 +550,15 @@ void counter_push_event(struct counter_device *const counter, const u8 event,
 	spin_lock_irqsave(&counter->events_list_lock, flags);
 
 	/* Search for event in the list */
-	list_for_each_entry(event_node, &counter->events_list, l)
-		if (event_node->event == event &&
-		    event_node->channel == channel)
+	list_for_each_entry(tmp, &counter->events_list, l)
+		if (tmp->event == event &&
+		    tmp->channel == channel) {
+			event_node = tmp;
 			break;
+		}
 
 	/* If event is not in the list */
-	if (&event_node->l == &counter->events_list)
+	if (!event_node)
 		goto exit_early;
 
 	/* Read and queue relevant comp for userspace */

@@ -2444,7 +2444,8 @@ static struct i915_request *eb_throttle(struct i915_execbuffer *eb, struct intel
 {
 	struct intel_ring *ring = ce->ring;
 	struct intel_timeline *tl = ce->timeline;
-	struct i915_request *rq;
+	struct i915_request *rq = NULL;
+	struct i915_request *tmp;
 
 	/*
 	 * Completely unscientific finger-in-the-air estimates for suitable
@@ -2460,15 +2461,17 @@ static struct i915_request *eb_throttle(struct i915_execbuffer *eb, struct intel
 	 * claiming our resources, but not so long that the ring completely
 	 * drains before we can submit our next request.
 	 */
-	list_for_each_entry(rq, &tl->requests, link) {
-		if (rq->ring != ring)
+	list_for_each_entry(tmp, &tl->requests, link) {
+		if (tmp->ring != ring)
 			continue;
 
-		if (__intel_ring_space(rq->postfix,
-				       ring->emit, ring->size) > ring->size / 2)
+		if (__intel_ring_space(tmp->postfix,
+				       ring->emit, ring->size) > ring->size / 2) {
+			rq = tmp;
 			break;
+		}
 	}
-	if (&rq->link == &tl->requests)
+	if (!rq)
 		return NULL; /* weird, we will check again later for real */
 
 	return i915_request_get(rq);

@@ -316,6 +316,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	size_t page_offline_frozen = 1;
 	size_t phdrs_len, notes_len;
 	struct kcore_list *m;
+	struct kcore_list *tmp;
 	size_t tsz;
 	int nphdr;
 	unsigned long start;
@@ -479,10 +480,13 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 		 * the previous entry, search for a matching entry.
 		 */
 		if (!m || start < m->addr || start >= m->addr + m->size) {
-			list_for_each_entry(m, &kclist_head, list) {
-				if (start >= m->addr &&
-				    start < m->addr + m->size)
+			m = NULL;
+			list_for_each_entry(tmp, &kclist_head, list) {
+				if (start >= tmp->addr &&
+				    start < tmp->addr + tmp->size) {
+					m = tmp;
 					break;
+				}
 			}
 		}
 
@@ -492,12 +496,11 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 			page_offline_freeze();
 		}
 
-		if (&m->list == &kclist_head) {
+		if (!m) {
 			if (clear_user(buffer, tsz)) {
 				ret = -EFAULT;
 				goto out;
 			}
-			m = NULL;	/* skip the list anchor */
 			goto skip;
 		}
 

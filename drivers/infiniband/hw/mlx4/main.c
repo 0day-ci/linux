@@ -1920,17 +1920,19 @@ static int mlx4_ib_mcg_detach(struct ib_qp *ibqp, union ib_gid *gid, u16 lid)
 
 	if (mdev->dev->caps.steering_mode ==
 	    MLX4_STEERING_MODE_DEVICE_MANAGED) {
-		struct mlx4_ib_steering *ib_steering;
+		struct mlx4_ib_steering *ib_steering = NULL;
+		struct mlx4_ib_steering *tmp;
 
 		mutex_lock(&mqp->mutex);
-		list_for_each_entry(ib_steering, &mqp->steering_rules, list) {
-			if (!memcmp(ib_steering->gid.raw, gid->raw, 16)) {
-				list_del(&ib_steering->list);
+		list_for_each_entry(tmp, &mqp->steering_rules, list) {
+			if (!memcmp(tmp->gid.raw, gid->raw, 16)) {
+				list_del(&tmp->list);
+				ib_steering = tmp;
 				break;
 			}
 		}
 		mutex_unlock(&mqp->mutex);
-		if (&ib_steering->list == &mqp->steering_rules) {
+		if (!ib_steering) {
 			pr_err("Couldn't find reg_id for mgid. Steering rule is left attached\n");
 			return -EINVAL;
 		}

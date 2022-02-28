@@ -1239,7 +1239,7 @@ static int kern_alloc_tids(struct tid_rdma_flow *flow)
 	struct hfi1_ctxtdata *rcd = flow->req->rcd;
 	struct hfi1_devdata *dd = rcd->dd;
 	u32 ngroups, pageidx = 0;
-	struct tid_group *group = NULL, *used;
+	struct tid_group *group = NULL, *used, *tmp;
 	u8 use;
 
 	flow->tnode_cnt = 0;
@@ -1248,13 +1248,15 @@ static int kern_alloc_tids(struct tid_rdma_flow *flow)
 		goto used_list;
 
 	/* First look at complete groups */
-	list_for_each_entry(group,  &rcd->tid_group_list.list, list) {
-		kern_add_tid_node(flow, rcd, "complete groups", group,
-				  group->size);
+	list_for_each_entry(tmp,  &rcd->tid_group_list.list, list) {
+		kern_add_tid_node(flow, rcd, "complete groups", tmp,
+				  tmp->size);
 
-		pageidx += group->size;
-		if (!--ngroups)
+		pageidx += tmp->size;
+		if (!--ngroups) {
+			group = tmp;
 			break;
+		}
 	}
 
 	if (pageidx >= flow->npagesets)
@@ -1277,7 +1279,7 @@ used_list:
 	 * However, if we are at the head, we have reached the end of the
 	 * complete groups list from the first loop above
 	 */
-	if (group && &group->list == &rcd->tid_group_list.list)
+	if (!group)
 		goto bail_eagain;
 	group = list_prepare_entry(group, &rcd->tid_group_list.list,
 				   list);

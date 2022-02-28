@@ -492,17 +492,20 @@ static int enable_tuner(struct mxl *state, u32 tuner, u32 enable);
 static int sleep(struct dvb_frontend *fe)
 {
 	struct mxl *state = fe->demodulator_priv;
-	struct mxl *p;
+	struct mxl *p = NULL;
+	struct mxl *tmp;
 
 	cfg_demod_abort_tune(state);
 	if (state->tuner_in_use != 0xffffffff) {
 		mutex_lock(&state->base->tune_lock);
 		state->tuner_in_use = 0xffffffff;
-		list_for_each_entry(p, &state->base->mxls, mxl) {
-			if (p->tuner_in_use == state->tuner)
+		list_for_each_entry(tmp, &state->base->mxls, mxl) {
+			if (tmp->tuner_in_use == state->tuner) {
+				p = tmp;
 				break;
+			}
 		}
-		if (&p->mxl == &state->base->mxls)
+		if (!p)
 			enable_tuner(state, state->tuner, 0);
 		mutex_unlock(&state->base->tune_lock);
 	}

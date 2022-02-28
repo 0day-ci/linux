@@ -209,6 +209,7 @@ static struct ts_common_info *SearchAdmitTRStream(struct ieee80211_device *ieee,
 	bool				search_dir[4] = {0};
 	struct list_head		*psearch_list; //FIXME
 	struct ts_common_info	*pRet = NULL;
+	struct ts_common_info	*tmp;
 	if (ieee->iw_mode == IW_MODE_MASTER) { //ap mode
 		if (TxRxSelect == TX_DIR) {
 			search_dir[DIR_DOWN] = true;
@@ -243,23 +244,21 @@ static struct ts_common_info *SearchAdmitTRStream(struct ieee80211_device *ieee,
 	for (dir = 0; dir <= DIR_BI_DIR; dir++) {
 		if (!search_dir[dir])
 			continue;
-		list_for_each_entry(pRet, psearch_list, list) {
-	//		IEEE80211_DEBUG(IEEE80211_DL_TS, "ADD:%pM, TID:%d, dir:%d\n", pRet->Addr, pRet->TSpec.ts_info.ucTSID, pRet->TSpec.ts_info.ucDirection);
-			if (memcmp(pRet->addr, Addr, 6) == 0)
-				if (pRet->t_spec.ts_info.uc_tsid == TID)
-					if (pRet->t_spec.ts_info.uc_direction == dir) {
+		list_for_each_entry(tmp, psearch_list, list) {
+	//		IEEE80211_DEBUG(IEEE80211_DL_TS, "ADD:%pM, TID:%d, dir:%d\n", tmp->Addr, tmp->TSpec.ts_info.ucTSID, tmp->TSpec.ts_info.ucDirection);
+			if (memcmp(tmp->addr, Addr, 6) == 0)
+				if (tmp->t_spec.ts_info.uc_tsid == TID)
+					if (tmp->t_spec.ts_info.uc_direction == dir) {
 	//					printk("Bingo! got it\n");
+	//					pRet = tmp;
 						break;
 					}
 		}
-		if (&pRet->list  != psearch_list)
+		if (pRet)
 			break;
 	}
 
-	if (&pRet->list  != psearch_list)
-		return pRet;
-	else
-		return NULL;
+	return pRet;
 }
 
 static void MakeTSEntry(struct ts_common_info *pTsCommonInfo, u8 *Addr,

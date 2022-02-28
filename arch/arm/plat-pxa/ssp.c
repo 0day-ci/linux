@@ -38,22 +38,20 @@ static LIST_HEAD(ssp_list);
 struct ssp_device *pxa_ssp_request(int port, const char *label)
 {
 	struct ssp_device *ssp = NULL;
+	struct ssp_device *tmp;
 
 	mutex_lock(&ssp_lock);
 
-	list_for_each_entry(ssp, &ssp_list, node) {
-		if (ssp->port_id == port && ssp->use_count == 0) {
-			ssp->use_count++;
-			ssp->label = label;
+	list_for_each_entry(tmp, &ssp_list, node) {
+		if (tmp->port_id == port && tmp->use_count == 0) {
+			tmp->use_count++;
+			tmp->label = label;
+			ssp = tmp;
 			break;
 		}
 	}
 
 	mutex_unlock(&ssp_lock);
-
-	if (&ssp->node == &ssp_list)
-		return NULL;
-
 	return ssp;
 }
 EXPORT_SYMBOL(pxa_ssp_request);
@@ -62,22 +60,20 @@ struct ssp_device *pxa_ssp_request_of(const struct device_node *of_node,
 				      const char *label)
 {
 	struct ssp_device *ssp = NULL;
+	struct ssp_device *tmp;
 
 	mutex_lock(&ssp_lock);
 
-	list_for_each_entry(ssp, &ssp_list, node) {
-		if (ssp->of_node == of_node && ssp->use_count == 0) {
-			ssp->use_count++;
-			ssp->label = label;
+	list_for_each_entry(tmp, &ssp_list, node) {
+		if (tmp->of_node == of_node && tmp->use_count == 0) {
+			tmp->use_count++;
+			tmp->label = label;
+			ssp = tmp;
 			break;
 		}
 	}
 
 	mutex_unlock(&ssp_lock);
-
-	if (&ssp->node == &ssp_list)
-		return NULL;
-
 	return ssp;
 }
 EXPORT_SYMBOL(pxa_ssp_request_of);

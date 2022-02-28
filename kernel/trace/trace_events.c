@@ -2264,6 +2264,7 @@ event_subsystem_dir(struct trace_array *tr, const char *name,
 {
 	struct trace_subsystem_dir *dir;
 	struct event_subsystem *system;
+	struct event_subsystem *tmp;
 	struct dentry *entry;
 
 	/* First see if we did not already create this dir */
@@ -2277,13 +2278,13 @@ event_subsystem_dir(struct trace_array *tr, const char *name,
 	}
 
 	/* Now see if the system itself exists. */
-	list_for_each_entry(system, &event_subsystems, list) {
-		if (strcmp(system->name, name) == 0)
+	system = NULL;
+	list_for_each_entry(tmp, &event_subsystems, list) {
+		if (strcmp(tmp->name, name) == 0) {
+			system = tmp;
 			break;
+		}
 	}
-	/* Reset system variable when not found */
-	if (&system->list == &event_subsystems)
-		system = NULL;
 
 	dir = kmalloc(sizeof(*dir), GFP_KERNEL);
 	if (!dir)

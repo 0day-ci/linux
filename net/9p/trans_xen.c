@@ -115,7 +115,8 @@ static bool p9_xen_write_todo(struct xen_9pfs_dataring *ring, RING_IDX size)
 
 static int p9_xen_request(struct p9_client *client, struct p9_req_t *p9_req)
 {
-	struct xen_9pfs_front_priv *priv;
+	struct xen_9pfs_front_priv *priv = NULL;
+	struct xen_9pfs_front_priv *tmp;
 	RING_IDX cons, prod, masked_cons, masked_prod;
 	unsigned long flags;
 	u32 size = p9_req->tc.size;
@@ -123,12 +124,14 @@ static int p9_xen_request(struct p9_client *client, struct p9_req_t *p9_req)
 	int num;
 
 	read_lock(&xen_9pfs_lock);
-	list_for_each_entry(priv, &xen_9pfs_devs, list) {
-		if (priv->client == client)
+	list_for_each_entry(tmp, &xen_9pfs_devs, list) {
+		if (tmp->client == client) {
+			priv = tmp;
 			break;
+		}
 	}
 	read_unlock(&xen_9pfs_lock);
-	if (list_entry_is_head(priv, &xen_9pfs_devs, list))
+	if (!priv)
 		return -EINVAL;
 
 	num = p9_req->tc.tag % priv->num_rings;

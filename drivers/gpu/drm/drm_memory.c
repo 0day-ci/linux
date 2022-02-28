@@ -60,7 +60,8 @@ static void *agp_remap(unsigned long offset, unsigned long size,
 {
 	unsigned long i, num_pages =
 	    PAGE_ALIGN(size) / PAGE_SIZE;
-	struct drm_agp_mem *agpmem;
+	struct drm_agp_mem *agpmem = NULL;
+	struct drm_agp_mem *tmp;
 	struct page **page_map;
 	struct page **phys_page_map;
 	void *addr;
@@ -71,12 +72,14 @@ static void *agp_remap(unsigned long offset, unsigned long size,
 	offset -= dev->hose->mem_space->start;
 #endif
 
-	list_for_each_entry(agpmem, &dev->agp->memory, head)
-		if (agpmem->bound <= offset
-		    && (agpmem->bound + (agpmem->pages << PAGE_SHIFT)) >=
-		    (offset + size))
+	list_for_each_entry(tmp, &dev->agp->memory, head)
+		if (tmp->bound <= offset
+		    && (tmp->bound + (tmp->pages << PAGE_SHIFT)) >=
+		    (offset + size)) {
+			agpmem = tmp;
 			break;
-	if (&agpmem->head == &dev->agp->memory)
+		}
+	if (!agpmem)
 		return NULL;
 
 	/*

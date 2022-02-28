@@ -138,7 +138,8 @@ static vm_fault_t drm_vm_fault(struct vm_fault *vmf)
 		 */
 		resource_size_t offset = vmf->address - vma->vm_start;
 		resource_size_t baddr = map->offset + offset;
-		struct drm_agp_mem *agpmem;
+		struct drm_agp_mem *agpmem = NULL;
+		struct drm_agp_mem *tmp;
 		struct page *page;
 
 #ifdef __alpha__
@@ -151,13 +152,15 @@ static vm_fault_t drm_vm_fault(struct vm_fault *vmf)
 		/*
 		 * It's AGP memory - find the real physical page to map
 		 */
-		list_for_each_entry(agpmem, &dev->agp->memory, head) {
-			if (agpmem->bound <= baddr &&
-			    agpmem->bound + agpmem->pages * PAGE_SIZE > baddr)
+		list_for_each_entry(tmp, &dev->agp->memory, head) {
+			if (tmp->bound <= baddr &&
+			    tmp->bound + tmp->pages * PAGE_SIZE > baddr) {
+				agpmem = tmp;
 				break;
+			}
 		}
 
-		if (&agpmem->head == &dev->agp->memory)
+		if (!agpmem)
 			goto vm_fault_error;
 
 		/*

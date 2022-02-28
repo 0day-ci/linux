@@ -2582,22 +2582,26 @@ int vmw_kms_fbdev_init_data(struct vmw_private *dev_priv,
 			    struct drm_crtc **p_crtc,
 			    struct drm_display_mode **p_mode)
 {
-	struct drm_connector *con;
+	struct drm_connector *con = NULL;
+	struct drm_connector *tmp1;
 	struct vmw_display_unit *du;
-	struct drm_display_mode *mode;
+	struct drm_display_mode *mode = NULL;
+	struct drm_display_mode *tmp2;
 	int i = 0;
 	int ret = 0;
 
 	mutex_lock(&dev_priv->drm.mode_config.mutex);
-	list_for_each_entry(con, &dev_priv->drm.mode_config.connector_list,
+	list_for_each_entry(tmp1, &dev_priv->drm.mode_config.connector_list,
 			    head) {
-		if (i == unit)
+		if (i == unit) {
+			con = tmp1;
 			break;
+		}
 
 		++i;
 	}
 
-	if (&con->head == &dev_priv->drm.mode_config.connector_list) {
+	if (!con) {
 		DRM_ERROR("Could not find initial display unit.\n");
 		ret = -EINVAL;
 		goto out_unlock;
@@ -2616,12 +2620,14 @@ int vmw_kms_fbdev_init_data(struct vmw_private *dev_priv,
 	*p_con = con;
 	*p_crtc = &du->crtc;
 
-	list_for_each_entry(mode, &con->modes, head) {
-		if (mode->type & DRM_MODE_TYPE_PREFERRED)
+	list_for_each_entry(tmp2, &con->modes, head) {
+		if (tmp2->type & DRM_MODE_TYPE_PREFERRED) {
+			mode = tmp2;
 			break;
+		}
 	}
 
-	if (&mode->head == &con->modes) {
+	if (!mode) {
 		WARN_ONCE(true, "Could not find initial preferred mode.\n");
 		*p_mode = list_first_entry(&con->modes,
 					   struct drm_display_mode,

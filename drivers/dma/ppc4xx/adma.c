@@ -935,23 +935,26 @@ static void ppc440spe_adma_device_clear_eot_status(
 			if (rv & DMA_CDB_STATUS_MSK) {
 				/* ZeroSum check failed
 				 */
-				struct ppc440spe_adma_desc_slot *iter;
+				struct ppc440spe_adma_desc_slot *iter = NULL;
+				struct ppc440spe_adma_desc_slot *tmp;
 				dma_addr_t phys = rv & ~DMA_CDB_MSK;
 
 				/*
 				 * Update the status of corresponding
 				 * descriptor.
 				 */
-				list_for_each_entry(iter, &chan->chain,
+				list_for_each_entry(tmp, &chan->chain,
 				    chain_node) {
-					if (iter->phys == phys)
+					if (tmp->phys == phys) {
+						iter = tmp;
 						break;
+					}
 				}
 				/*
 				 * if cannot find the corresponding
 				 * slot it's a bug
 				 */
-				BUG_ON(&iter->chain_node == &chan->chain);
+				BUG_ON(!iter);
 
 				if (iter->xor_check_result) {
 					if (test_bit(PPC440SPE_DESC_PCHECK,

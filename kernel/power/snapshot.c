@@ -625,16 +625,18 @@ static int create_mem_extents(struct list_head *list, gfp_t gfp_mask)
 
 	for_each_populated_zone(zone) {
 		unsigned long zone_start, zone_end;
-		struct mem_extent *ext, *cur, *aux;
+		struct mem_extent *ext = NULL, *tmp, *cur, *aux;
 
 		zone_start = zone->zone_start_pfn;
 		zone_end = zone_end_pfn(zone);
 
-		list_for_each_entry(ext, list, hook)
-			if (zone_start <= ext->end)
+		list_for_each_entry(tmp, list, hook)
+			if (zone_start <= tmp->end) {
+				ext = tmp;
 				break;
+			}
 
-		if (&ext->hook == list || zone_end < ext->start) {
+		if (!ext || zone_end < ext->start) {
 			/* New extent is necessary */
 			struct mem_extent *new_ext;
 

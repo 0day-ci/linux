@@ -329,7 +329,8 @@ int mei_irq_read_handler(struct mei_device *dev,
 {
 	struct mei_msg_hdr *mei_hdr;
 	struct mei_ext_meta_hdr *meta_hdr = NULL;
-	struct mei_cl *cl;
+	struct mei_cl *cl = NULL;
+	struct mei_cl *tmp;
 	int ret;
 	u32 hdr_size_left;
 	u32 hdr_size_ext;
@@ -421,15 +422,16 @@ int mei_irq_read_handler(struct mei_device *dev,
 	}
 
 	/* find recipient cl */
-	list_for_each_entry(cl, &dev->file_list, link) {
-		if (mei_cl_hbm_equal(cl, mei_hdr)) {
-			cl_dbg(dev, cl, "got a message\n");
+	list_for_each_entry(tmp, &dev->file_list, link) {
+		if (mei_cl_hbm_equal(tmp, mei_hdr)) {
+			cl_dbg(dev, tmp, "got a message\n");
+			cl = tmp;
 			break;
 		}
 	}
 
 	/* if no recipient cl was found we assume corrupted header */
-	if (&cl->link == &dev->file_list) {
+	if (!cl) {
 		/* A message for not connected fixed address clients
 		 * should be silently discarded
 		 * On power down client may be force cleaned,

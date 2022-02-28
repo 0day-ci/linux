@@ -1081,7 +1081,8 @@ void drm_sched_increase_karma_ext(struct drm_sched_job *bad, int type)
 {
 	int i;
 	struct drm_sched_entity *tmp;
-	struct drm_sched_entity *entity;
+	struct drm_sched_entity *entity = NULL;
+	struct drm_sched_entity *iter;
 	struct drm_gpu_scheduler *sched = bad->sched;
 
 	/* don't change @bad's karma if it's from KERNEL RQ,
@@ -1099,16 +1100,17 @@ void drm_sched_increase_karma_ext(struct drm_sched_job *bad, int type)
 			struct drm_sched_rq *rq = &sched->sched_rq[i];
 
 			spin_lock(&rq->lock);
-			list_for_each_entry_safe(entity, tmp, &rq->entities, list) {
+			list_for_each_entry_safe(iter, tmp, &rq->entities, list) {
 				if (bad->s_fence->scheduled.context ==
-				    entity->fence_context) {
-					if (entity->guilty)
-						atomic_set(entity->guilty, type);
+				    iter->fence_context) {
+					if (iter->guilty)
+						atomic_set(iter->guilty, type);
+					entity = iter;
 					break;
 				}
 			}
 			spin_unlock(&rq->lock);
-			if (&entity->list != &rq->entities)
+			if (entity)
 				break;
 		}
 	}

@@ -942,6 +942,7 @@ int v4l2_query_ext_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_query_ext_ctr
 	const unsigned int next_flags = V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
 	u32 id = qc->id & V4L2_CTRL_ID_MASK;
 	struct v4l2_ctrl_ref *ref;
+	struct v4l2_ctrl_ref *tmp;
 	struct v4l2_ctrl *ctrl;
 
 	if (!hdl)
@@ -976,15 +977,17 @@ int v4l2_query_ext_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_query_ext_ctr
 			 * We found a control with the given ID, so just get
 			 * the next valid one in the list.
 			 */
-			list_for_each_entry_continue(ref, &hdl->ctrl_refs, node) {
-				is_compound = ref->ctrl->is_array ||
-					ref->ctrl->type >= V4L2_CTRL_COMPOUND_TYPES;
-				if (id < ref->ctrl->id &&
-				    (is_compound & mask) == match)
+			tmp = ref;
+			ref = NULL;
+			list_for_each_entry_continue(tmp, &hdl->ctrl_refs, node) {
+				is_compound = tmp->ctrl->is_array ||
+					tmp->ctrl->type >= V4L2_CTRL_COMPOUND_TYPES;
+				if (id < tmp->ctrl->id &&
+				    (is_compound & mask) == match) {
+					ref = tmp;
 					break;
+				}
 			}
-			if (&ref->node == &hdl->ctrl_refs)
-				ref = NULL;
 		} else {
 			/*
 			 * No control with the given ID exists, so start
@@ -992,15 +995,15 @@ int v4l2_query_ext_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_query_ext_ctr
 			 * is one, otherwise the first 'if' above would have
 			 * been true.
 			 */
-			list_for_each_entry(ref, &hdl->ctrl_refs, node) {
-				is_compound = ref->ctrl->is_array ||
-					ref->ctrl->type >= V4L2_CTRL_COMPOUND_TYPES;
-				if (id < ref->ctrl->id &&
-				    (is_compound & mask) == match)
+			list_for_each_entry(tmp, &hdl->ctrl_refs, node) {
+				is_compound = tmp->ctrl->is_array ||
+					tmp->ctrl->type >= V4L2_CTRL_COMPOUND_TYPES;
+				if (id < tmp->ctrl->id &&
+				    (is_compound & mask) == match) {
+					ref = tmp;
 					break;
+				}
 			}
-			if (&ref->node == &hdl->ctrl_refs)
-				ref = NULL;
 		}
 	}
 	mutex_unlock(hdl->lock);

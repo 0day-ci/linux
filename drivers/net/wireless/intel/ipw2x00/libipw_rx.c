@@ -1507,7 +1507,8 @@ static void libipw_process_probe_response(struct libipw_device
 {
 	struct net_device *dev = ieee->dev;
 	struct libipw_network network = { };
-	struct libipw_network *target;
+	struct libipw_network *target = NULL;
+	struct libipw_network *tmp;
 	struct libipw_network *oldest = NULL;
 #ifdef CONFIG_LIBIPW_DEBUG
 	struct libipw_info_element *info_element = beacon->info_element;
@@ -1555,18 +1556,20 @@ static void libipw_process_probe_response(struct libipw_device
 
 	spin_lock_irqsave(&ieee->lock, flags);
 
-	list_for_each_entry(target, &ieee->network_list, list) {
-		if (is_same_network(target, &network))
+	list_for_each_entry(tmp, &ieee->network_list, list) {
+		if (is_same_network(tmp, &network)) {
+			target = tmp;
 			break;
+		}
 
 		if ((oldest == NULL) ||
-		    time_before(target->last_scanned, oldest->last_scanned))
-			oldest = target;
+		    time_before(tmp->last_scanned, oldest->last_scanned))
+			oldest = tmp;
 	}
 
 	/* If we didn't find a match, then get a new network slot to initialize
 	 * with this beacon's information */
-	if (&target->list == &ieee->network_list) {
+	if (!target) {
 		if (list_empty(&ieee->network_free_list)) {
 			/* If there are no more slots, expire the oldest */
 			list_del(&oldest->list);

@@ -2444,26 +2444,31 @@ int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
 		       struct amdgpu_bo_va *bo_va,
 		       uint64_t saddr)
 {
-	struct amdgpu_bo_va_mapping *mapping;
+	struct amdgpu_bo_va_mapping *mapping = NULL;
+	struct amdgpu_bo_va_mapping *tmp;
 	struct amdgpu_vm *vm = bo_va->base.vm;
 	bool valid = true;
 
 	saddr /= AMDGPU_GPU_PAGE_SIZE;
 
-	list_for_each_entry(mapping, &bo_va->valids, list) {
-		if (mapping->start == saddr)
+	list_for_each_entry(tmp, &bo_va->valids, list) {
+		if (tmp->start == saddr) {
+			mapping = tmp;
 			break;
+		}
 	}
 
-	if (&mapping->list == &bo_va->valids) {
+	if (!mapping) {
 		valid = false;
 
-		list_for_each_entry(mapping, &bo_va->invalids, list) {
-			if (mapping->start == saddr)
+		list_for_each_entry(tmp, &bo_va->invalids, list) {
+			if (tmp->start == saddr) {
+				mapping = tmp;
 				break;
+			}
 		}
 
-		if (&mapping->list == &bo_va->invalids)
+		if (!mapping)
 			return -ENOENT;
 	}
 

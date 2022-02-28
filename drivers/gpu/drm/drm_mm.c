@@ -912,7 +912,8 @@ EXPORT_SYMBOL(drm_mm_scan_remove_block);
 struct drm_mm_node *drm_mm_scan_color_evict(struct drm_mm_scan *scan)
 {
 	struct drm_mm *mm = scan->mm;
-	struct drm_mm_node *hole;
+	struct drm_mm_node *hole = NULL;
+	struct drm_mm_node *tmp;
 	u64 hole_start, hole_end;
 
 	DRM_MM_BUG_ON(list_empty(&mm->hole_stack));
@@ -925,18 +926,20 @@ struct drm_mm_node *drm_mm_scan_color_evict(struct drm_mm_scan *scan)
 	 * in the hole_stack list, but due to side-effects in the driver it
 	 * may not be.
 	 */
-	list_for_each_entry(hole, &mm->hole_stack, hole_stack) {
-		hole_start = __drm_mm_hole_node_start(hole);
-		hole_end = hole_start + hole->hole_size;
+	list_for_each_entry(tmp, &mm->hole_stack, hole_stack) {
+		hole_start = __drm_mm_hole_node_start(tmp);
+		hole_end = hole_start + tmp->hole_size;
 
 		if (hole_start <= scan->hit_start &&
-		    hole_end >= scan->hit_end)
+		    hole_end >= scan->hit_end) {
+			hole = tmp;
 			break;
+		}
 	}
 
 	/* We should only be called after we found the hole previously */
-	DRM_MM_BUG_ON(&hole->hole_stack == &mm->hole_stack);
-	if (unlikely(&hole->hole_stack == &mm->hole_stack))
+	DRM_MM_BUG_ON(!hole);
+	if (unlikely(!hole))
 		return NULL;
 
 	DRM_MM_BUG_ON(hole_start > scan->hit_start);

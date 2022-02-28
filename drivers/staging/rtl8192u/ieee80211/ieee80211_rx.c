@@ -2239,7 +2239,8 @@ static inline void ieee80211_process_probe_response(
 	struct ieee80211_rx_stats *stats)
 {
 	struct ieee80211_network *network;
-	struct ieee80211_network *target;
+	struct ieee80211_network *target = NULL;
+	struct ieee80211_network *tmp;
 	struct ieee80211_network *oldest = NULL;
 #ifdef CONFIG_IEEE80211_DEBUG
 	struct ieee80211_info_element *info_element = &beacon->info_element[0];
@@ -2357,17 +2358,19 @@ static inline void ieee80211_process_probe_response(
 			network->flags = (~NETWORK_EMPTY_ESSID & network->flags) | (NETWORK_EMPTY_ESSID & ieee->current_network.flags);
 	}
 
-	list_for_each_entry(target, &ieee->network_list, list) {
-		if (is_same_network(target, network, ieee))
+	list_for_each_entry(tmp, &ieee->network_list, list) {
+		if (is_same_network(tmp, network, ieee)) {
+			target = tmp;
 			break;
+		}
 		if (!oldest ||
-		    (target->last_scanned < oldest->last_scanned))
-			oldest = target;
+		    (tmp->last_scanned < oldest->last_scanned))
+			oldest = tmp;
 	}
 
 	/* If we didn't find a match, then get a new network slot to initialize
 	 * with this beacon's information */
-	if (&target->list == &ieee->network_list) {
+	if (!target) {
 		if (list_empty(&ieee->network_free_list)) {
 			/* If there are no more slots, expire the oldest */
 			list_del(&oldest->list);

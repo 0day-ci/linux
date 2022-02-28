@@ -958,16 +958,19 @@ static int __tipc_nl_add_nametable_publ(struct tipc_nl_msg *msg,
 					struct service_range *sr,
 					u32 *last_key)
 {
-	struct publication *p;
+	struct publication *p = NULL;
+	struct publication *tmp;
 	struct nlattr *attrs;
 	struct nlattr *b;
 	void *hdr;
 
 	if (*last_key) {
-		list_for_each_entry(p, &sr->all_publ, all_publ)
-			if (p->key == *last_key)
+		list_for_each_entry(tmp, &sr->all_publ, all_publ)
+			if (tmp->key == *last_key) {
+				p = tmp;
 				break;
-		if (list_entry_is_head(p, &sr->all_publ, all_publ))
+			}
+		if (!p)
 			return -EPIPE;
 	} else {
 		p = list_first_entry(&sr->all_publ,

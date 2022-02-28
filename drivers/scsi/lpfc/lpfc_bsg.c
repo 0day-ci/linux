@@ -1185,7 +1185,8 @@ lpfc_bsg_hba_set_event(struct bsg_job *job)
 	struct lpfc_hba *phba = vport->phba;
 	struct fc_bsg_request *bsg_request = job->request;
 	struct set_ct_event *event_req;
-	struct lpfc_bsg_event *evt;
+	struct lpfc_bsg_event *evt = NULL;
+	struct lpfc_bsg_event *tmp;
 	int rc = 0;
 	struct bsg_job_data *dd_data = NULL;
 	uint32_t ev_mask;
@@ -1205,17 +1206,18 @@ lpfc_bsg_hba_set_event(struct bsg_job *job)
 	ev_mask = ((uint32_t)(unsigned long)event_req->type_mask &
 				FC_REG_EVENT_MASK);
 	spin_lock_irqsave(&phba->ct_ev_lock, flags);
-	list_for_each_entry(evt, &phba->ct_ev_waiters, node) {
-		if (evt->reg_id == event_req->ev_reg_id) {
-			lpfc_bsg_event_ref(evt);
-			evt->wait_time_stamp = jiffies;
-			dd_data = (struct bsg_job_data *)evt->dd_data;
+	list_for_each_entry(tmp, &phba->ct_ev_waiters, node) {
+		if (tmp->reg_id == event_req->ev_reg_id) {
+			lpfc_bsg_event_ref(tmp);
+			tmp->wait_time_stamp = jiffies;
+			dd_data = (struct bsg_job_data *)tmp->dd_data;
+			evt = tmp;
 			break;
 		}
 	}
 	spin_unlock_irqrestore(&phba->ct_ev_lock, flags);
 
-	if (&evt->node == &phba->ct_ev_waiters) {
+	if (!evt) {
 		/* no event waiting struct yet - first call */
 		dd_data = kmalloc(sizeof(struct bsg_job_data), GFP_KERNEL);
 		if (dd_data == NULL) {

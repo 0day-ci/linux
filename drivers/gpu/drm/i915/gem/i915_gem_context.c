@@ -107,25 +107,27 @@ static void lut_close(struct i915_gem_context *ctx)
 	radix_tree_for_each_slot(slot, &ctx->handles_vma, &iter, 0) {
 		struct i915_vma *vma = rcu_dereference_raw(*slot);
 		struct drm_i915_gem_object *obj = vma->obj;
-		struct i915_lut_handle *lut;
+		struct i915_lut_handle *lut = NULL;
+		struct i915_lut_handle *tmp;
 
 		if (!kref_get_unless_zero(&obj->base.refcount))
 			continue;
 
 		spin_lock(&obj->lut_lock);
-		list_for_each_entry(lut, &obj->lut_list, obj_link) {
-			if (lut->ctx != ctx)
+		list_for_each_entry(tmp, &obj->lut_list, obj_link) {
+			if (tmp->ctx != ctx)
 				continue;
 
-			if (lut->handle != iter.index)
+			if (tmp->handle != iter.index)
 				continue;
 
-			list_del(&lut->obj_link);
+			list_del(&tmp->obj_link);
+			lut = tmp;
 			break;
 		}
 		spin_unlock(&obj->lut_lock);
 
-		if (&lut->obj_link != &obj->lut_list) {
+		if (lut) {
 			i915_lut_handle_free(lut);
 			radix_tree_iter_delete(&ctx->handles_vma, &iter, slot);
 			i915_vma_close(vma);

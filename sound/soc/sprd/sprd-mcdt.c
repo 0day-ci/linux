@@ -866,19 +866,18 @@ EXPORT_SYMBOL_GPL(sprd_mcdt_chan_dma_disable);
 struct sprd_mcdt_chan *sprd_mcdt_request_chan(u8 channel,
 					      enum sprd_mcdt_channel_type type)
 {
-	struct sprd_mcdt_chan *temp;
+	struct sprd_mcdt_chan *temp = NULL;
+	struct sprd_mcdt_chan *tmp;
 
 	mutex_lock(&sprd_mcdt_list_mutex);
 
-	list_for_each_entry(temp, &sprd_mcdt_chan_list, list) {
-		if (temp->type == type && temp->id == channel) {
-			list_del_init(&temp->list);
+	list_for_each_entry(tmp, &sprd_mcdt_chan_list, list) {
+		if (tmp->type == type && tmp->id == channel) {
+			list_del_init(&tmp->list);
+			temp = tmp;
 			break;
 		}
 	}
-
-	if (list_entry_is_head(temp, &sprd_mcdt_chan_list, list))
-		temp = NULL;
 
 	mutex_unlock(&sprd_mcdt_list_mutex);
 
