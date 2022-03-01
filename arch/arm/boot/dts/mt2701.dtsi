@@ -222,7 +222,7 @@
 		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
 		clocks = <&infracfg CLK_INFRA_M4U>;
 		clock-names = "bclk";
-		mediatek,larbs = <&larb0 &larb1 &larb2>;
+		mediatek,larbs = <&larb0>, <&larb1>, <&larb2>;
 		#iommu-cells = <1>;
 	};
 
