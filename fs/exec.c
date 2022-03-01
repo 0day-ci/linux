@@ -2122,13 +2122,12 @@ static struct ctl_table fs_exec_sysctls[] = {
 		.proc_handler	= proc_dointvec_minmax_coredump,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_TWO,
-	},
-	{ }
+	}
 };
 
 static int __init init_fs_exec_sysctls(void)
 {
-	register_sysctl_init("fs", fs_exec_sysctls);
+	register_sysctl_single("fs", fs_exec_sysctls);
 	return 0;
 }
 

@@ -28,13 +28,12 @@ static struct ctl_table kern_do_mounts_initrd_table[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec,
-	},
-	{ }
+	}
 };
 
 static __init int kernel_do_mounts_initrd_sysctls_init(void)
 {
-	register_sysctl_init("kernel", kern_do_mounts_initrd_table);
+	register_sysctl_single("kernel", kern_do_mounts_initrd_table);
 	return 0;
 }
 late_initcall(kernel_do_mounts_initrd_sysctls_init);

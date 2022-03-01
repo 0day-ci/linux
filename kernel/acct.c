@@ -83,13 +83,12 @@ static struct ctl_table kern_acct_table[] = {
 		.maxlen         = 3*sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec,
-	},
-	{ }
+	}
 };
 
 static __init int kernel_acct_sysctls_init(void)
 {
-	register_sysctl_init("kernel", kern_acct_table);
+	register_sysctl_single("kernel", kern_acct_table);
 	return 0;
 }
 late_initcall(kernel_acct_sysctls_init);

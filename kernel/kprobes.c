@@ -970,13 +970,12 @@ static struct ctl_table kprobe_sysctls[] = {
 		.proc_handler	= proc_kprobes_optimization_handler,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_ONE,
-	},
-	{}
+	}
 };
 
 static void __init kprobe_sysctls_init(void)
 {
-	register_sysctl_init("debug", kprobe_sysctls);
+	register_sysctl_single("debug", kprobe_sysctls);
 }
 #endif /* CONFIG_SYSCTL */
 
