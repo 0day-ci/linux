@@ -159,7 +159,6 @@ static void __iop_adma_slot_cleanup(struct iop_adma_chan *iop_chan)
 
 		/* all the members of a group are complete */
 		if (slots_per_op != 0 && slot_cnt == 0) {
-			struct iop_adma_desc_slot *grp_iter, *_grp_iter;
 			int end_of_chain = 0;
 			pr_debug("\tgroup end\n");
 
@@ -167,9 +166,8 @@ static void __iop_adma_slot_cleanup(struct iop_adma_chan *iop_chan)
 			if (grp_start->xor_check_result) {
 				u32 zero_sum_result = 0;
 				slot_cnt = grp_start->slot_cnt;
-				grp_iter = grp_start;
 
-				list_for_each_entry_from(grp_iter,
+				list_for_each_entry_from_inside(grp_iter, grp_start,
 					&iop_chan->chain, chain_node) {
 					zero_sum_result |=
 					    iop_desc_get_zero_result(grp_iter);
@@ -186,9 +184,8 @@ static void __iop_adma_slot_cleanup(struct iop_adma_chan *iop_chan)
 
 			/* clean up the group */
 			slot_cnt = grp_start->slot_cnt;
-			grp_iter = grp_start;
-			list_for_each_entry_safe_from(grp_iter, _grp_iter,
-				&iop_chan->chain, chain_node) {
+			list_for_each_entry_safe_from_inside(grp_iter, _grp_iter,
+				grp_start, &iop_chan->chain, chain_node) {
 				cookie = iop_adma_run_tx_complete_actions(
 					grp_iter, iop_chan, cookie);
 
