@@ -433,6 +433,33 @@ static void __init hyp_mode_check(void)
 	}
 }
 
+static struct sched_domain_topology_level arm64_no_mc_topology[] = {
+#ifdef CONFIG_SCHED_SMT
+	{ cpu_smt_mask, cpu_smt_flags, SD_INIT_NAME(SMT) },
+#endif
+
+#ifdef CONFIG_SCHED_CLUSTER
+	{ cpu_clustergroup_mask, cpu_cluster_flags, SD_INIT_NAME(CLS) },
+#endif
+
+	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
+	{ NULL, },
+};
+
+static void __init update_sched_domain_topology(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		if (cpu_topology[cpu].llc_id != -1 &&
+		    cpumask_weight(&cpu_topology[cpu].llc_sibling) > 1)
+			return;
+	}
+
+	pr_info("No LLC siblings, using No MC sched domains topology\n");
+	set_sched_topology(arm64_no_mc_topology);
+}
+
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
@@ -440,6 +467,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	hyp_mode_check();
 	apply_alternatives_all();
 	mark_linear_text_alias_ro();
+	update_sched_domain_topology();
 }
 
 void __init smp_prepare_boot_cpu(void)
