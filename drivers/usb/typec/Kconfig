@@ -75,6 +75,18 @@ config TYPEC_HD3SS3220
 	  If you choose to build this driver as a dynamically linked module, the
 	  module will be called hd3ss3220.ko.
 
+config TYPEC_TUSB320XA
+	tristate "TI TUSB320xA Type-C DRP Port controller driver"
+	depends on USB_ROLE_SWITCH
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say Y or M here if your system has a TUSB320xA Type-C DRP port
+	  controller.
+
+	  If you choose to build this driver as a dynamically linked module, the
+	  module will be called tusb320xa.ko.
+
 config TYPEC_STUSB160X
 	tristate "STMicroelectronics STUSB160x Type-C controller driver"
 	depends on USB_ROLE_SWITCH || !USB_ROLE_SWITCH
