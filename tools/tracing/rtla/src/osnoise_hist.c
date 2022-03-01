@@ -773,7 +773,7 @@ int osnoise_hist_main(int argc, char *argv[])
 
 		if (!tracefs_trace_is_on(trace->inst))
 			break;
-	};
+	}
 
 	osnoise_read_trace_hist(tool);
 
