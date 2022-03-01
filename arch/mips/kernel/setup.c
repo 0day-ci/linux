@@ -339,27 +339,15 @@ static void __init bootmem_init(void)
 #endif	/* CONFIG_SGI_IP27 */
 
 static int usermem __initdata;
+static phys_addr_t memory_limit;
 
 static int __init early_parse_mem(char *p)
 {
-	phys_addr_t start, size;
+	if (!p)
+		return 1;
 
-	/*
-	 * If a user specifies memory size, we
-	 * blow away any automatically generated
-	 * size.
-	 */
-	if (usermem == 0) {
-		usermem = 1;
-		memblock_remove(memblock_start_of_DRAM(),
-			memblock_end_of_DRAM() - memblock_start_of_DRAM());
-	}
-	start = 0;
-	size = memparse(p, &p);
-	if (*p == '@')
-		start = memparse(p + 1, &p);
-
-	memblock_add(start, size);
+	memory_limit = memparse(p, &p) & PAGE_MASK;
+	pr_notice("Memory limited to %lluMB\n", (u64)memory_limit >> 20);
 
 	return 0;
 }
@@ -677,6 +665,10 @@ static void __init arch_mem_init(char **cmdline_p)
 	/* Reserve for hibernation. */
 	memblock_reserve(__pa_symbol(&__nosave_begin),
 		__pa_symbol(&__nosave_end) - __pa_symbol(&__nosave_begin));
+
+	/* Limit the memory. */
+	memblock_enforce_memory_limit(memory_limit);
+	memblock_allow_resize();
 
 	early_memtest(PFN_PHYS(ARCH_PFN_OFFSET), PFN_PHYS(max_low_pfn));
 }
