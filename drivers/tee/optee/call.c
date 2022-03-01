@@ -117,8 +117,8 @@ struct tee_shm *optee_get_msg_arg(struct tee_context *ctx, size_t num_params,
 	 * the RPC argument struct if a second MSG arg struct is expected.
 	 * The second arg struct will then be used for RPC.
 	 */
-	if (optee->rpc_arg_count)
-		sz += OPTEE_MSG_GET_ARG_SIZE(optee->rpc_arg_count);
+	if (optee->rpc_param_count)
+		sz += OPTEE_MSG_GET_ARG_SIZE(optee->rpc_param_count);
 
 	shm = tee_shm_alloc_priv_buf(ctx, sz);
 	if (IS_ERR(shm))
@@ -130,7 +130,7 @@ struct tee_shm *optee_get_msg_arg(struct tee_context *ctx, size_t num_params,
 		return (void *)ma;
 	}
 
-	memset(ma, 0, OPTEE_MSG_GET_ARG_SIZE(num_params));
+	memset(ma, 0, sz);
 	ma->num_params = num_params;
 	*msg_arg = ma;
 
