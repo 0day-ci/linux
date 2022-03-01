@@ -452,6 +452,7 @@ alloc_iova_fast(struct iova_domain *iovad, unsigned long size,
 retry:
 	new_iova = alloc_iova(iovad, size, limit_pfn, true);
 	if (!new_iova) {
+		unsigned long flags;
 		unsigned int cpu;
 
 		if (!flush_rcache)
@@ -462,6 +463,12 @@ retry:
 		for_each_online_cpu(cpu)
 			free_cpu_cached_iovas(cpu, iovad);
 		free_global_cached_iovas(iovad);
+
+		/* Reset max32_alloc_size after flushing rcache for retry */
+		spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
+		iovad->max32_alloc_size = iovad->dma_32bit_pfn;
+		spin_unlock_irqrestore(&iovad->iova_rbtree_lock, flags);
+
 		goto retry;
 	}
 
