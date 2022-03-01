@@ -15,6 +15,7 @@
  * If more options are added please update profile_names array in
  * platform_profile.c and sysfs-platform_profile documentation.
  */
+#define PLATFORM_PROFILE_UNCONFIGURED -1
 
 enum platform_profile_option {
 	PLATFORM_PROFILE_LOW_POWER,
