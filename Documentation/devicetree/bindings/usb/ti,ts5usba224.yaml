@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/ti,ts5usba224.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TS5USBA224 USB 2.0 High Speed and Audio mux DT bindings
+
+description:
+  The Texas Instruments TS5USBA224 is a double-pole, double throw
+  (DPDT) multiplexer that includes a low-distortion audio switch and a
+  USB 2.0 High Speed switch in the same package.
+
+maintainers:
+  - Alvin Šipraga <alsi@bang-olufsen.dk>
+
+properties:
+  compatible:
+    enum:
+      - ti,ts5usba224
+
+  asel-gpio:
+    description: Output GPIO for A_SEL signal
+    maxItems: 1
+
+  accessory:
+    type: boolean
+    description:
+      Indicates that this is an Accessory Mode mux.
+
+  port:
+    $ref: /schemas/graph.yaml#/properties/port
+    description:
+      OF graph bindings modelling a Type-C port controller.
+
+required:
+  - compatible
+  - asel-gpio
+  - accessory
+  - port
+
+additionalProperties: false
+
+examples:
+  - |
+    usbaudiomux@0 {
+      compatible = "ti,ts5usba224";
+      asel-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+      accessory;
+
+      port {
+        usb_audio_mux1: endpoint {
+          remote-endpoint = <&typec1_mux>;
+        };
+      };
+    };
