@@ -3,6 +3,7 @@
 #ifndef __USB_TYPEC_CLASS__
 #define __USB_TYPEC_CLASS__
 
+#include <linux/acpi.h>
 #include <linux/device.h>
 #include <linux/usb/typec.h>
 
@@ -54,6 +55,8 @@ struct typec_port {
 
 	const struct typec_capability	*cap;
 	const struct typec_operations   *ops;
+
+	struct acpi_pld_info		*pld;
 };
 
 #define to_typec_port(_dev_) container_of(_dev_, struct typec_port, dev)

@@ -141,6 +141,41 @@ Description:
 		- "reverse": CC2 orientation
 		- "unknown": Orientation cannot be determined.
 
+What:		/sys/class/typec/<port>/location/panel
+Date:		March 2022
+Contact:	Won Chung <wonchung@google.com>
+Description:
+		Describes which panel surface of the system’s housing the
+		port resides on.
+
+What:		/sys/class/typec/<port>/location/vertical_position
+Date:		March 2022
+Contact:	Won Chung <wonchung@google.com>
+Description:
+		Describes vertical position of the port on the panel surface.
+		Valid values: upper, center, lower
+
+What:		/sys/class/typec/<port>/location/horizontal_position
+Date:		March 2022
+Contact:	Won Chung <wonchung@google.com>
+Description:
+		Describes horizontal position of the port on the panel surface.
+		Valid values: left, center, right
+
+What:		/sys/class/typec/<port>/location/dock
+Date:		March 2022
+Contact:	Won Chung <wonchung@google.com>
+Description:
+		Set as "yes" if the port resides in a docking station or a port
+		replicator, otherwise set as "no".
+
+What:		/sys/class/typec/<port>/location/lid
+Date:		March 2022
+Contact:	Won Chung <wonchung@google.com>
+Description:
+		Set as "yes" if the port resides on the lid of laptop system,
+		otherwise set as "no".
+
 USB Type-C partner devices (eg. /sys/class/typec/port0-partner/)
 
 What:		/sys/class/typec/<port>-partner/accessory_mode

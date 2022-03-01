@@ -1579,8 +1579,101 @@ static const struct attribute_group typec_group = {
 	.attrs = typec_attrs,
 };
 
+static const char * const typec_location_panel[] = {
+	"top",
+	"bottom",
+	"left",
+	"right",
+	"front",
+	"back",
+	"unknown",
+};
+
+static const char * const typec_location_vertical_position[] = {
+	"upper", "center", "lower"
+};
+
+static const char * const typec_location_horizontal_position[] = {
+	"left", "center", "right"
+};
+
+static ssize_t panel_show(struct device *dev, struct device_attribute *attr,
+	char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	if (port->pld)
+		return sprintf(buf, "%s\n",
+			typec_location_panel[port->pld->panel]);
+	return 0;
+};
+static DEVICE_ATTR_RO(panel);
+
+static ssize_t vertical_position_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	if (port->pld)
+		return sprintf(buf, "%s\n",
+			typec_location_vertical_position[
+				port->pld->vertical_position]);
+	return 0;
+};
+static DEVICE_ATTR_RO(vertical_position);
+
+static ssize_t horizontal_position_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	if (port->pld)
+		return sprintf(buf, "%s\n",
+			typec_location_horizontal_position[
+				port->pld->horizontal_position]);
+	return 0;
+};
+static DEVICE_ATTR_RO(horizontal_position);
+
+static ssize_t dock_show(struct device *dev, struct device_attribute *attr,
+	char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	if (port->pld)
+		return sprintf(buf, "%s\n", port->pld->dock ? "yes" : "no");
+	return 0;
+};
+static DEVICE_ATTR_RO(dock);
+
+static ssize_t lid_show(struct device *dev, struct device_attribute *attr,
+	char *buf)
+{
+	struct typec_port *port = to_typec_port(dev);
+
+	if (port->pld)
+		return sprintf(buf, "%s\n", port->pld->lid ? "yes" : "no");
+	return 0;
+};
+static DEVICE_ATTR_RO(lid);
+
+static struct attribute *typec_location_attrs[] = {
+	&dev_attr_panel.attr,
+	&dev_attr_vertical_position.attr,
+	&dev_attr_horizontal_position.attr,
+	&dev_attr_dock.attr,
+	&dev_attr_lid.attr,
+	NULL,
+};
+
+static const struct attribute_group typec_location_group = {
+	.name = "location",
+	.attrs = typec_location_attrs,
+};
+
 static const struct attribute_group *typec_groups[] = {
 	&typec_group,
+	&typec_location_group,
 	NULL
 };
 
@@ -1613,6 +1706,24 @@ const struct device_type typec_port_dev_type = {
 	.uevent = typec_uevent,
 	.release = typec_release,
 };
+
+static struct acpi_pld_info *get_acpi_pld_info(struct device *dev)
+{
+#if defined(CONFIG_ACPI)
+	struct acpi_pld_info *pld;
+	acpi_status status;
+
+	if (!has_acpi_companion(dev))
+		return NULL;
+
+	status = acpi_get_physical_device_location(ACPI_HANDLE(dev), &pld);
+	if (ACPI_FAILURE(status))
+		return NULL;
+	return pld;
+#else
+	return NULL;
+#endif
+}
 
 /* --------------------------------------- */
 /* Driver callbacks to report role updates */
@@ -2115,6 +2226,8 @@ struct typec_port *typec_register_port(struct device *parent,
 		put_device(&port->dev);
 		return ERR_PTR(ret);
 	}
+
+	port->pld = get_acpi_pld_info(&port->dev);
 
 	ret = device_add(&port->dev);
 	if (ret) {
