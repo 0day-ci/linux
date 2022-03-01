@@ -32,7 +32,6 @@
 #define TMR_DISABLE	0x0
 #define TMR_ME		0x80000000
 #define TMR_ALPF	0x0c000000
-#define TMR_MSITE_ALL	GENMASK(15, 0)
 
 #define REGS_TMTMIR	0x008	/* Temperature measurement interval Register */
 #define TMTMIR_DEFAULT	0x0000000f
@@ -129,33 +128,51 @@ static const struct thermal_zone_of_device_ops tmu_tz_ops = {
 static int qoriq_tmu_register_tmu_zone(struct device *dev,
 				       struct qoriq_tmu_data *qdata)
 {
-	int id;
+	int ret = 0;
+	struct device_node *np, *child, *sensor_np;
 
-	if (qdata->ver == TMU_VER1) {
-		regmap_write(qdata->regmap, REGS_TMR,
-			     TMR_MSITE_ALL | TMR_ME | TMR_ALPF);
-	} else {
-		regmap_write(qdata->regmap, REGS_V2_TMSR, TMR_MSITE_ALL);
-		regmap_write(qdata->regmap, REGS_TMR, TMR_ME | TMR_ALPF_V2);
-	}
+	np = of_find_node_by_name(NULL, "thermal-zones");
+	if (!np)
+		return -ENODEV;
 
-	for (id = 0; id < SITES_MAX; id++) {
+	sensor_np = of_node_get(dev->of_node);
+
+	for_each_available_child_of_node(np, child) {
 		struct thermal_zone_device *tzd;
-		struct qoriq_sensor *sensor = &qdata->sensor[id];
-		int ret;
+		struct qoriq_sensor *sensor;
+		int id, site;
 
+		ret = thermal_zone_of_get_sensor_id(child, sensor_np, &id);
+
+		if (ret < 0) {
+			dev_err(dev, "failed to get valid sensor id: %d\n", ret);
+			of_node_put(child);
+			break;
+		}
+
+		sensor = &qdata->sensor[id];
 		sensor->id = id;
+
+		/* Enable monitoring */
+		if (qdata->ver == TMU_VER1) {
+			site = 0x1 << (15 - id);
+			regmap_update_bits(qdata->regmap, REGS_TMR,
+					   site | TMR_ME | TMR_ALPF,
+					   site | TMR_ME | TMR_ALPF);
+		} else {
+			site = 0x1 << id;
+			regmap_update_bits(qdata->regmap, REGS_V2_TMSR, site, site);
+			regmap_write(qdata->regmap, REGS_TMR, TMR_ME | TMR_ALPF_V2);
+		}
 
 		tzd = devm_thermal_zone_of_sensor_register(dev, id,
 							   sensor,
 							   &tmu_tz_ops);
-		ret = PTR_ERR_OR_ZERO(tzd);
-		if (ret) {
-			if (ret == -ENODEV)
-				continue;
-
-			regmap_write(qdata->regmap, REGS_TMR, TMR_DISABLE);
-			return ret;
+		if (IS_ERR(tzd)) {
+			ret = PTR_ERR(tzd);
+			dev_err(dev, "failed to register thermal zone: %d\n", ret);
+			of_node_put(child);
+			break;
 		}
 
 		if (devm_thermal_add_hwmon_sysfs(tzd))
@@ -164,7 +181,13 @@ static int qoriq_tmu_register_tmu_zone(struct device *dev,
 
 	}
 
-	return 0;
+	of_node_put(sensor_np);
+	of_node_put(np);
+
+	if (ret)
+		regmap_write(qdata->regmap, REGS_TMR, TMR_DISABLE);
+
+	return ret;
 }
 
 static int qoriq_tmu_calibration(struct device *dev,
