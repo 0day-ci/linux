@@ -646,6 +646,14 @@ static slab_flags_t slub_debug;
 
 static char *slub_debug_string;
 static int disable_higher_order_debug;
+static bool init_stack_depot;
+
+int slab_stack_depot_init(void)
+{
+	if (init_stack_depot)
+		stack_depot_init();
+	return 0;
+}
 
 /*
  * slub is about to manipulate internal object metadata.  This memory lies
@@ -1531,6 +1539,8 @@ static int __init setup_slub_debug(char *str)
 			global_slub_debug_changed = true;
 		} else {
 			slab_list_specified = true;
+			if (flags & SLAB_STORE_USER)
+				init_stack_depot = true;
 		}
 	}
 
@@ -1546,6 +1556,10 @@ static int __init setup_slub_debug(char *str)
 			global_flags = slub_debug;
 		slub_debug_string = saved_str;
 	}
+
+	if (global_flags & SLAB_STORE_USER)
+		init_stack_depot = true;
+
 out:
 	slub_debug = global_flags;
 	if (slub_debug != 0 || slub_debug_string)
@@ -1556,6 +1570,7 @@ out:
 	     static_branch_unlikely(&init_on_free)) &&
 	    (slub_debug & SLAB_POISON))
 		pr_info("mem auto-init: SLAB_POISON will take precedence over init_on_alloc/init_on_free\n");
+
 	return 1;
 }
 
@@ -4220,9 +4235,6 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 #ifdef CONFIG_NUMA
 	s->remote_node_defrag_ratio = 1000;
 #endif
-
-	if (s->flags & SLAB_STORE_USER && IS_ENABLED(CONFIG_STACKDEPOT))
-		stack_depot_init();
 
 	/* Initialize the pre-computed randomized freelist if slab is up */
 	if (slab_state >= UP) {

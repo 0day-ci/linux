@@ -763,6 +763,12 @@ extern void kvfree_sensitive(const void *addr, size_t len);
 unsigned int kmem_cache_size(struct kmem_cache *s);
 void __init kmem_cache_init_late(void);
 
+#if defined(CONFIG_SLUB_DEBUG) && defined(CONFIG_STACKDEPOT)
+int slab_stack_depot_init(void);
+#else
+int slab_stack_depot_init(void) { return 0; }
+#endif
+
 #if defined(CONFIG_SMP) && defined(CONFIG_SLAB)
 int slab_prepare_cpu(unsigned int cpu);
 int slab_dead_cpu(unsigned int cpu);

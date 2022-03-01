@@ -12,6 +12,7 @@
 #define _LINUX_STACKDEPOT_H
 
 #include <linux/gfp.h>
+#include <linux/slab.h>
 
 typedef u32 depot_stack_handle_t;
 
@@ -32,7 +33,7 @@ int stack_depot_init(void);
 #ifdef CONFIG_STACKDEPOT_ALWAYS_INIT
 static inline int stack_depot_early_init(void)	{ return stack_depot_init(); }
 #else
-static inline int stack_depot_early_init(void)	{ return 0; }
+static inline int stack_depot_early_init(void)	{ return slab_stack_depot_init(); }
 #endif
 
 depot_stack_handle_t stack_depot_save(unsigned long *entries,
