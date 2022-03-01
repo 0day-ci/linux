@@ -6886,6 +6886,11 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 		goto err_init_ctrlq;
 	}
 
+	/* Re-enable FW logging. Not fatal if this fails. */
+	err = ice_cfg_fw_log(hw, true);
+	if (err)
+		dev_dbg(dev, "Failed to re-enable FW logging\n");
+
 	/* if DDP was previously loaded successfully */
 	if (!ice_is_safe_mode(pf)) {
 		/* reload the SW DB of filter tables */

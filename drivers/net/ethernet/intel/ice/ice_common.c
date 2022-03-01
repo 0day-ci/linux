@@ -737,7 +737,7 @@ static int ice_get_fw_log_cfg(struct ice_hw *hw)
  * messages from FW to SW. Interrupts are typically disabled during the device's
  * initialization phase.
  */
-static int ice_cfg_fw_log(struct ice_hw *hw, bool enable)
+int ice_cfg_fw_log(struct ice_hw *hw, bool enable)
 {
 	struct ice_aqc_fw_logging *cmd;
 	u16 i, chgs = 0, len = 0;
