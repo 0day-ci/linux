@@ -9,7 +9,8 @@
 #define _XHCI_PLAT_H
 
 #include <linux/types.h>
-#include <linux/usb/hcd.h>
+
+struct usb_hcd;
 
 struct xhci_plat_priv {
 	const char *firmware_name;
