@@ -5753,6 +5753,9 @@ static int btf_check_func_arg_match(struct bpf_verifier_env *env,
 		return -EINVAL;
 	}
 
+	if (is_kfunc)
+		rel = btf_kfunc_id_set_contains(btf, resolve_prog_type(env->prog),
+						BTF_KFUNC_TYPE_RELEASE, func_id);
 	/* check that BTF function arguments match actual types that the
 	 * verifier sees.
 	 */
@@ -5815,6 +5818,16 @@ static int btf_check_func_arg_match(struct bpf_verifier_env *env,
 						bpf_log(log, "verifier internal error: more than one arg with ref_obj_id R%d %u %u\n",
 							regno, reg->ref_obj_id, ref_obj_id);
 						return -EFAULT;
+					}
+					/* Ensure that offset of referenced PTR_TO_BTF_ID is
+					 * always zero, when passed to release function.
+					 * var_off has already been checked to be 0 by
+					 * check_func_arg_reg_off.
+					 */
+					if (rel && reg->off) {
+						bpf_log(log, "R%d with ref_obj_id=%d must have zero offset when passed to release kfunc\n",
+							regno, reg->ref_obj_id);
+						return -EINVAL;
 					}
 					ref_regno = regno;
 					ref_obj_id = reg->ref_obj_id;
@@ -5892,8 +5905,6 @@ static int btf_check_func_arg_match(struct bpf_verifier_env *env,
 	/* Either both are set, or neither */
 	WARN_ON_ONCE((ref_obj_id && !ref_regno) || (!ref_obj_id && ref_regno));
 	if (is_kfunc) {
-		rel = btf_kfunc_id_set_contains(btf, resolve_prog_type(env->prog),
-						BTF_KFUNC_TYPE_RELEASE, func_id);
 		/* We already made sure ref_obj_id is set only for one argument */
 		if (rel && !ref_obj_id) {
 			bpf_log(log, "release kernel function %s expects refcounted PTR_TO_BTF_ID\n",
