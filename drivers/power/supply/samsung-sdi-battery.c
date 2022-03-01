@@ -10,7 +10,6 @@
  * the BTI resistance with a multimeter on the battery.
  */
 #include <linux/module.h>
-#include <linux/of.h>
 #include <linux/power_supply.h>
 #include "samsung-sdi-battery.h"
 
@@ -895,7 +894,7 @@ static struct samsung_sdi_battery samsung_sdi_batteries[] = {
 };
 
 int samsung_sdi_battery_get_info(struct device *dev,
-				 struct device_node *np,
+				 const char *compatible,
 				 struct power_supply_battery_info **info)
 {
 	struct samsung_sdi_battery *batt;
@@ -903,7 +902,7 @@ int samsung_sdi_battery_get_info(struct device *dev,
 
 	for (i = 0; i < ARRAY_SIZE(samsung_sdi_batteries); i++) {
 		batt = &samsung_sdi_batteries[i];
-		if (of_device_is_compatible(np, batt->compatible))
+		if (!strcmp(compatible, batt->compatible))
 			break;
 	}
 
