@@ -652,6 +652,7 @@ static bool sctp_auth_chunk_verify(struct net *net, struct sctp_chunk *chunk,
 		return false;
 
 	/* set-up our fake chunk so that we can process it */
+	memset(&auth, 0x0, sizeof(auth));
 	auth.skb = chunk->auth_chunk;
 	auth.asoc = chunk->asoc;
 	auth.sctp_hdr = chunk->sctp_hdr;
