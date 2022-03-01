@@ -37,6 +37,47 @@ properties:
     description:
       Shunt resistor value in micro-Ohm.
 
+  adi,volt-curr-sample-average:
+    description: |
+      Number of samples to be used to report voltage and current values.
+      If the configured value is not a power of 2, sample averaging number
+      will be configured with smaller and closest power of 2.
+
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [1, 2, 4, 8, 16, 32, 64, 128]
+    default: 1
+
+  adi,power-sample-average:
+    description: |
+      Number of samples to be used to report power values.
+      If the configured value is not a power of 2, sample averaging number
+      will be configured with smaller and closest power of 2.
+
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [1, 2, 4, 8, 16, 32, 64, 128]
+    default: 1
+
+  adi,power-sample-average-enable:
+    description: Enable sample averaging for power reading.
+    type: boolean
+
+dependencies:
+  adi,power-sample-average-enable: ['adi,power-sample-average']
+  adi,power-sample-average: ['adi,power-sample-average-enable']
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - adi,adm1075
+              - adi,adm1275
+              - adi,adm1276
+    then:
+      properties:
+        adi,power-sample-average-enable: false
+
 required:
   - compatible
   - reg
@@ -53,5 +94,8 @@ examples:
             compatible = "adi,adm1272";
             reg = <0x10>;
             shunt-resistor-micro-ohms = <500>;
+            adi,volt-curr-sample-average = <128>;
+            adi,power-sample-average = <128>;
+            adi,power-sample-average-enable;
         };
     };
