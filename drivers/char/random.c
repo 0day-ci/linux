@@ -1169,6 +1169,7 @@ void add_bootloader_randomness(const void *buf, size_t size)
 }
 EXPORT_SYMBOL_GPL(add_bootloader_randomness);
 
+#ifdef CONFIG_VMGENID
 /*
  * Handle a new unique VM ID, which is unique, not secret, so we
  * don't credit it, but we do immediately force a reseed after so
@@ -1183,6 +1184,7 @@ void add_vmfork_randomness(const void *unique_vm_id, size_t size)
 	}
 }
 EXPORT_SYMBOL_GPL(add_vmfork_randomness);
+#endif
 
 struct fast_pool {
 	union {
