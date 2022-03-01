@@ -641,6 +641,7 @@ int nci_set_config(struct nci_dev *ndev, __u8 id, size_t len, const __u8 *val)
 	if (!val || !len)
 		return 0;
 
+	memset(&param, 0x0, sizeof(param));
 	param.id = id;
 	param.len = len;
 	param.val = val;
