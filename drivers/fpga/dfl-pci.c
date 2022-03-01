@@ -275,7 +275,12 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 
 		dfl_fpga_enum_info_add_dfl(info, start, len);
 	} else {
-		ret = -ENODEV;
+		v = readq(base + DFH);
+		if (FIELD_GET(DFH_TYPE, v) != DFH_TYPE_AFU) {
+			dev_info(&pcidev->dev, "Unknown feature type 0x%llx id 0x%llx\n",
+				 FIELD_GET(DFH_TYPE, v), FIELD_GET(DFH_ID, v));
+			ret = -ENODEV;
+		}
 	}
 
 	/* release I/O mappings for next step enumeration */
