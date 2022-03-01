@@ -13,6 +13,12 @@
 #include <linux/platform_device.h>
 
 #include "core.h"
+#include <linux/usb/xhci-plat.h>
+#include <linux/usb/xhci-quirks.h>
+
+static const struct xhci_plat_priv xhci_plat_dwc3_xhci = {
+	.quirks = XHCI_SKIP_PHY_INIT,
+};
 
 static void dwc3_host_fill_xhci_irq_res(struct dwc3 *dwc,
 					int irq, char *name)
@@ -120,6 +126,13 @@ int dwc3_host_init(struct dwc3 *dwc)
 			dev_err(dwc->dev, "failed to add properties to xHCI\n");
 			goto err;
 		}
+	}
+
+	ret = platform_device_add_data(xhci, &xhci_plat_dwc3_xhci,
+			sizeof(xhci_plat_dwc3_xhci));
+	if (ret) {
+		dev_err(dwc->dev, "failed to add data to xHCI\n");
+		goto err;
 	}
 
 	ret = platform_device_add(xhci);
