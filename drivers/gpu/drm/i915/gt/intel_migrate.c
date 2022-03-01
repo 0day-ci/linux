@@ -341,12 +341,9 @@ static int emit_no_arbitration(struct i915_request *rq)
 	return 0;
 }
 
-static int emit_pte(struct i915_request *rq,
-		    struct sgt_dma *it,
+static int emit_pte(struct i915_request *rq, struct sgt_dma *it,
 		    enum i915_cache_level cache_level,
-		    bool is_lmem,
-		    u64 offset,
-		    int length)
+		    bool is_lmem, u64 offset, int length)
 {
 	bool has_64K_pages = HAS_64K_PAGES(rq->engine->i915);
 	const u64 encode = rq->context->vm->pte_encode(0, cache_level,
@@ -573,14 +570,54 @@ static u32 *_i915_ctrl_surf_copy_blt(u32 *cmd, u64 src_addr, u64 dst_addr,
 	return cmd;
 }
 
+static int emit_ccs_copy(struct i915_request *rq,
+			 bool dst_is_lmem, u32 dst_offset,
+			 bool src_is_lmem, u32 src_offset, int size)
+{
+	struct drm_i915_private *i915 = rq->engine->i915;
+	int mocs = rq->engine->gt->mocs.uc_index << 1;
+	u32 num_ccs_blks, ccs_ring_size;
+	u8 src_access, dst_access;
+	u32 *cs;
+
+	GEM_BUG_ON(!(src_is_lmem ^ dst_is_lmem) || !HAS_FLAT_CCS(i915));
+
+	ccs_ring_size = calc_ctrl_surf_instr_size(i915, size);
+	WARN_ON(!ccs_ring_size);
+
+	cs = intel_ring_begin(rq, round_up(ccs_ring_size, 2));
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	num_ccs_blks = DIV_ROUND_UP(GET_CCS_BYTES(i915, size),
+				    NUM_CCS_BYTES_PER_BLOCK);
+
+	src_access = !src_is_lmem && dst_is_lmem;
+	dst_access = !src_access;
+
+	cs = i915_flush_dw(cs, MI_FLUSH_LLC | MI_FLUSH_CCS);
+	cs = _i915_ctrl_surf_copy_blt(cs, src_offset, dst_offset,
+				      src_access, dst_access,
+				      mocs, mocs, num_ccs_blks);
+	cs = i915_flush_dw(cs, MI_FLUSH_LLC | MI_FLUSH_CCS);
+	if (ccs_ring_size & 1)
+		*cs++ = MI_NOOP;
+
+	intel_ring_advance(rq, cs);
+
+	return 0;
+}
+
 static int emit_copy(struct i915_request *rq,
-		     u32 dst_offset, u32 src_offset, int size)
+		     bool dst_is_lmem, u32 dst_offset,
+		     bool src_is_lmem, u32 src_offset, int size)
 {
 	const int ver = GRAPHICS_VER(rq->engine->i915);
 	u32 instance = rq->engine->instance;
 	u32 *cs;
 
 	cs = intel_ring_begin(rq, ver >= 8 ? 10 : 6);
+
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
@@ -620,6 +657,18 @@ static int emit_copy(struct i915_request *rq,
 	return 0;
 }
 
+static int scatter_list_length(struct scatterlist *sg)
+{
+	int len = 0;
+
+	while (sg) {
+		len += sg_dma_len(sg);
+		sg = sg_next(sg);
+	};
+
+	return len;
+}
+
 int
 intel_context_migrate_copy(struct intel_context *ce,
 			   const struct i915_deps *deps,
@@ -632,7 +681,10 @@ intel_context_migrate_copy(struct intel_context *ce,
 			   struct i915_request **out)
 {
 	struct sgt_dma it_src = sg_sgt(src), it_dst = sg_sgt(dst);
+	struct drm_i915_private *i915 = ce->engine->i915;
+	u32 src_sz, dst_sz, ccs_bytes = 0, bytes_to_cpy;
 	struct i915_request *rq;
+	bool ccs_copy = false;
 	int err;
 
 	GEM_BUG_ON(ce->vm != ce->engine->gt->migrate.context->vm);
@@ -640,9 +692,28 @@ intel_context_migrate_copy(struct intel_context *ce,
 
 	GEM_BUG_ON(ce->ring->size < SZ_64K);
 
+	if (HAS_FLAT_CCS(i915) && src_is_lmem ^ dst_is_lmem) {
+		src_sz = scatter_list_length(src);
+		dst_sz = scatter_list_length(dst);
+
+		if (src_is_lmem)
+			bytes_to_cpy = src_sz;
+		else if (dst_is_lmem)
+			bytes_to_cpy = dst_sz;
+
+		/*
+		 * When there is a eviction of ccs needed smem will have the
+		 * extra pages for the ccs data
+		 *
+		 * TO-DO: Want to move the size mismatch check to a WARN_ON,
+		 * but still we have some requests of smem->lmem with same size.
+		 * Need to fix it.
+		 */
+		ccs_bytes = src_sz != dst_sz ? GET_CCS_BYTES(i915, bytes_to_cpy) : 0;
+	}
+
 	do {
-		u32 src_offset, dst_offset;
-		int len;
+		u32 src_offset, dst_offset, copy_sz;
 
 		rq = i915_request_create(ce);
 		if (IS_ERR(rq)) {
@@ -682,27 +753,82 @@ intel_context_migrate_copy(struct intel_context *ce,
 				dst_offset = 2 * CHUNK_SZ;
 		}
 
-		len = emit_pte(rq, &it_src, src_cache_level, src_is_lmem,
-			       src_offset, CHUNK_SZ);
-		if (len <= 0) {
-			err = len;
+		if (ccs_copy) {
+			/* Flat-CCS: CCS data copy */
+			if (!src_is_lmem) { /* src is smem */
+				/*
+				 * We can only copy the ccs data corresponding to
+				 * the CHUNK_SZ of lmem which is
+				 * GET_CCS_BYTES(i915, CHUNK_SZ))
+				 */
+				src_sz = min_t(int, bytes_to_cpy,
+					       GET_CCS_BYTES(i915, CHUNK_SZ));
+				dst_sz = CHUNK_SZ;
+			} else {
+				src_sz = CHUNK_SZ;
+				dst_sz = min_t(int, bytes_to_cpy,
+					       GET_CCS_BYTES(i915, CHUNK_SZ));
+			}
+		} else if (!ccs_copy && ccs_bytes) {
+			/* Flat-CCS: Main memory copy */
+			if (!src_is_lmem) {
+				src_sz = min_t(int, bytes_to_cpy, CHUNK_SZ);
+				dst_sz = CHUNK_SZ;
+			} else {
+				dst_sz = min_t(int, bytes_to_cpy, CHUNK_SZ);
+				src_sz = CHUNK_SZ;
+			}
+		} else { /* ccs handling is not required */
+			src_sz = CHUNK_SZ;
+		}
+
+		src_sz = emit_pte(rq, &it_src, src_cache_level, src_is_lmem,
+				  src_offset, src_sz);
+		if (src_sz <= 0) {
+			err = src_sz;
 			goto out_rq;
 		}
 
+		if (!ccs_bytes)
+			dst_sz = src_sz;
+
 		err = emit_pte(rq, &it_dst, dst_cache_level, dst_is_lmem,
-			       dst_offset, len);
+			       dst_offset, dst_sz);
 		if (err < 0)
 			goto out_rq;
-		if (err < len) {
+		if (err < dst_sz && !ccs_bytes) {
 			err = -EINVAL;
 			goto out_rq;
 		}
+
+		dst_sz = err;
 
 		err = rq->engine->emit_flush(rq, EMIT_INVALIDATE);
 		if (err)
 			goto out_rq;
 
-		err = emit_copy(rq, dst_offset, src_offset, len);
+		if (ccs_copy) {
+			/*
+			 * Using max of src_sz and dst_sz, as we need to
+			 * pass the lmem size corresponding to the ccs
+			 * blocks we need to handle.
+			 */
+			copy_sz = max_t(int, src_sz, dst_sz);
+			err = emit_ccs_copy(rq, dst_is_lmem, dst_offset,
+					    src_is_lmem, src_offset,
+					    copy_sz);
+
+			/* Converting back to ccs bytes */
+			copy_sz = GET_CCS_BYTES(i915, copy_sz);
+		} else {
+			WARN(src_sz != dst_sz, "%d != %d", src_sz, dst_sz);
+			copy_sz = src_sz;
+			err = emit_copy(rq, dst_is_lmem, dst_offset,
+					src_is_lmem, src_offset, copy_sz);
+		}
+
+		if (!err && ccs_bytes)
+			bytes_to_cpy -= copy_sz;
 
 		/* Arbitration is re-enabled between requests. */
 out_rq:
@@ -710,9 +836,33 @@ out_rq:
 			i915_request_put(*out);
 		*out = i915_request_get(rq);
 		i915_request_add(rq);
-		if (err || !it_src.sg || !sg_dma_len(it_src.sg))
-			break;
 
+		if (err || !it_src.sg || !sg_dma_len(it_src.sg) ||
+		    !it_dst.sg || !sg_dma_len(it_src.sg)) {
+			if (err || !ccs_bytes)
+				break;
+
+			GEM_BUG_ON(bytes_to_cpy);
+			if (ccs_copy) {
+				break;
+			} else if (ccs_bytes) {
+				if (src_is_lmem) {
+					WARN_ON(it_src.sg && sg_dma_len(it_src.sg));
+					it_src = sg_sgt(src);
+				} else {
+					WARN_ON(it_dst.sg && sg_dma_len(it_dst.sg));
+					it_dst = sg_sgt(dst);
+				}
+				bytes_to_cpy = ccs_bytes;
+				ccs_copy = true;
+
+				continue;
+			} else {
+				DRM_ERROR("Invalid state\n");
+				err = -EINVAL;
+				break;
+			}
+		}
 		cond_resched();
 	} while (1);
 
