@@ -493,20 +493,22 @@ static void memcg_cancel_update_list_lru(struct list_lru *lru,
 int memcg_update_all_list_lrus(int new_size)
 {
 	int ret = 0;
-	struct list_lru *lru;
+	struct list_lru *ll = NULL;
 	int old_size = memcg_nr_cache_ids;
 
 	mutex_lock(&list_lrus_mutex);
-	list_for_each_entry(lru, &memcg_list_lrus, list) {
+	list_for_each_entry_inside(lru, struct list_lru, &memcg_list_lrus, list) {
 		ret = memcg_update_list_lru(lru, old_size, new_size);
-		if (ret)
+		if (ret) {
+			ll = lru;
 			goto fail;
+		}
 	}
 out:
 	mutex_unlock(&list_lrus_mutex);
 	return ret;
 fail:
-	list_for_each_entry_continue_reverse(lru, &memcg_list_lrus, list)
+	list_for_each_entry_continue_reverse_inside(lru, ll, &memcg_list_lrus, list)
 		memcg_cancel_update_list_lru(lru, old_size, new_size);
 	goto out;
 }

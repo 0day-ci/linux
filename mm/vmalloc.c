@@ -3417,14 +3417,14 @@ long vread(char *buf, char *addr, unsigned long count)
 	if ((unsigned long)addr + count <= va->va_start)
 		goto finished;
 
-	list_for_each_entry_from(va, &vmap_area_list, list) {
+	list_for_each_entry_from_inside(iter, va, &vmap_area_list, list) {
 		if (!count)
 			break;
 
-		if (!va->vm)
+		if (!iter->vm)
 			continue;
 
-		vm = va->vm;
+		vm = iter->vm;
 		vaddr = (char *) vm->addr;
 		if (addr >= vaddr + get_vm_area_size(vm))
 			continue;

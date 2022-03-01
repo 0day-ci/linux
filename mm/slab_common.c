@@ -186,8 +186,6 @@ int slab_unmergeable(struct kmem_cache *s)
 struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 		slab_flags_t flags, const char *name, void (*ctor)(void *))
 {
-	struct kmem_cache *s;
-
 	if (slab_nomerge)
 		return NULL;
 
@@ -202,7 +200,7 @@ struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 	if (flags & SLAB_NEVER_MERGE)
 		return NULL;
 
-	list_for_each_entry_reverse(s, &slab_caches, list) {
+	list_for_each_entry_reverse_inside(s, struct kmem_cache, &slab_caches, list) {
 		if (slab_unmergeable(s))
 			continue;
 
@@ -419,7 +417,6 @@ EXPORT_SYMBOL(kmem_cache_create);
 static void slab_caches_to_rcu_destroy_workfn(struct work_struct *work)
 {
 	LIST_HEAD(to_destroy);
-	struct kmem_cache *s, *s2;
 
 	/*
 	 * On destruction, SLAB_TYPESAFE_BY_RCU kmem_caches are put on the
@@ -439,7 +436,7 @@ static void slab_caches_to_rcu_destroy_workfn(struct work_struct *work)
 
 	rcu_barrier();
 
-	list_for_each_entry_safe(s, s2, &to_destroy, list) {
+	list_for_each_entry_safe_inside(s, s2, struct kmem_cache, &to_destroy, list) {
 		debugfs_slab_release(s);
 		kfence_shutdown_cache(s);
 #ifdef SLAB_SUPPORTS_SYSFS
