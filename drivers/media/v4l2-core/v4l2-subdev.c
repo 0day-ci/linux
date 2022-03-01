@@ -27,8 +27,9 @@
 static int subdev_fh_init(struct v4l2_subdev_fh *fh, struct v4l2_subdev *sd)
 {
 	struct v4l2_subdev_state *state;
+	static struct lock_class_key key;
 
-	state = __v4l2_subdev_state_alloc(sd);
+	state = __v4l2_subdev_state_alloc(sd, "fh->state->lock", &key);
 	if (IS_ERR(state))
 		return PTR_ERR(state);
 
@@ -383,17 +384,14 @@ subdev_ioctl_get_state(struct v4l2_subdev *sd, struct v4l2_subdev_fh *subdev_fh,
 			     v4l2_subdev_get_active_state(sd);
 }
 
-static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
+static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg,
+			    struct v4l2_subdev_state *state)
 {
 	struct video_device *vdev = video_devdata(file);
 	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
 	struct v4l2_fh *vfh = file->private_data;
-	struct v4l2_subdev_fh *subdev_fh = to_v4l2_subdev_fh(vfh);
 	bool ro_subdev = test_bit(V4L2_FL_SUBDEV_RO_DEVNODE, &vdev->flags);
-	struct v4l2_subdev_state *state;
 	int rval;
-
-	state = subdev_ioctl_get_state(sd, subdev_fh, cmd, arg);
 
 	switch (cmd) {
 	case VIDIOC_SUBDEV_QUERYCAP: {
@@ -707,8 +705,24 @@ static long subdev_do_ioctl_lock(struct file *file, unsigned int cmd, void *arg)
 
 	if (lock && mutex_lock_interruptible(lock))
 		return -ERESTARTSYS;
-	if (video_is_registered(vdev))
-		ret = subdev_do_ioctl(file, cmd, arg);
+
+	if (video_is_registered(vdev)) {
+		struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
+		struct v4l2_fh *vfh = file->private_data;
+		struct v4l2_subdev_fh *subdev_fh = to_v4l2_subdev_fh(vfh);
+		struct v4l2_subdev_state *state;
+
+		state = subdev_ioctl_get_state(sd, subdev_fh, cmd, arg);
+
+		if (state)
+			v4l2_subdev_lock_state(state);
+
+		ret = subdev_do_ioctl(file, cmd, arg, state);
+
+		if (state)
+			v4l2_subdev_unlock_state(state);
+	}
+
 	if (lock)
 		mutex_unlock(lock);
 	return ret;
@@ -864,7 +878,7 @@ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
 			media_entity_to_v4l2_subdev(pad->entity);
 		struct v4l2_subdev_state *state;
 
-		state = v4l2_subdev_get_active_state(sd);
+		state = v4l2_subdev_get_locked_active_state(sd);
 
 		fmt->which = V4L2_SUBDEV_FORMAT_ACTIVE;
 		fmt->pad = pad->index;
@@ -906,7 +920,9 @@ int v4l2_subdev_link_validate(struct media_link *link)
 }
 EXPORT_SYMBOL_GPL(v4l2_subdev_link_validate);
 
-struct v4l2_subdev_state *__v4l2_subdev_state_alloc(struct v4l2_subdev *sd)
+struct v4l2_subdev_state *
+__v4l2_subdev_state_alloc(struct v4l2_subdev *sd, const char *lock_name,
+			  struct lock_class_key *lock_key)
 {
 	struct v4l2_subdev_state *state;
 	int ret;
@@ -914,6 +930,12 @@ struct v4l2_subdev_state *__v4l2_subdev_state_alloc(struct v4l2_subdev *sd)
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (!state)
 		return ERR_PTR(-ENOMEM);
+
+	__mutex_init(&state->_lock, lock_name, lock_key);
+	if (sd->state_lock)
+		state->lock = sd->state_lock;
+	else
+		state->lock = &state->_lock;
 
 	if (sd->entity.num_pads) {
 		state->pads = kvmalloc_array(sd->entity.num_pads,
@@ -925,7 +947,14 @@ struct v4l2_subdev_state *__v4l2_subdev_state_alloc(struct v4l2_subdev *sd)
 		}
 	}
 
+	/*
+	 * There can be no race at this point, but we lock the state anyway to
+	 * satisfy lockdep checks.
+	 */
+	v4l2_subdev_lock_state(state);
 	ret = v4l2_subdev_call(sd, pad, init_cfg, state);
+	v4l2_subdev_unlock_state(state);
+
 	if (ret < 0 && ret != -ENOIOCTLCMD)
 		goto err;
 
@@ -946,16 +975,19 @@ void __v4l2_subdev_state_free(struct v4l2_subdev_state *state)
 	if (!state)
 		return;
 
+	mutex_destroy(&state->_lock);
+
 	kvfree(state->pads);
 	kfree(state);
 }
 EXPORT_SYMBOL_GPL(__v4l2_subdev_state_free);
 
-int v4l2_subdev_init_finalize(struct v4l2_subdev *sd)
+int __v4l2_subdev_init_finalize(struct v4l2_subdev *sd, const char *name,
+				struct lock_class_key *key)
 {
 	struct v4l2_subdev_state *state;
 
-	state = __v4l2_subdev_state_alloc(sd);
+	state = __v4l2_subdev_state_alloc(sd, name, key);
 	if (IS_ERR(state))
 		return PTR_ERR(state);
 
@@ -963,7 +995,7 @@ int v4l2_subdev_init_finalize(struct v4l2_subdev *sd)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(v4l2_subdev_init_finalize);
+EXPORT_SYMBOL_GPL(__v4l2_subdev_init_finalize);
 
 void v4l2_subdev_cleanup(struct v4l2_subdev *sd)
 {
