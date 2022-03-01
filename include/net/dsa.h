@@ -926,6 +926,12 @@ struct dsa_switch_ops {
 			    struct ethtool_regs *regs, void *p);
 
 	/*
+	 * Local receive
+	 */
+	int	(*set_local_receive)(struct dsa_switch *ds, int port,
+				     struct net_device *bridge, bool enable);
+
+	/*
 	 * Upper device tracking.
 	 */
 	int	(*port_prechangeupper)(struct dsa_switch *ds, int port,

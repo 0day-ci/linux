@@ -295,6 +295,12 @@ static int dsa_slave_port_attr_set(struct net_device *dev, const void *ctx,
 		ret = dsa_port_vlan_filtering(dp, attr->u.vlan_filtering,
 					      extack);
 		break;
+	case SWITCHDEV_ATTR_ID_BRIDGE_LOCAL_RECEIVE:
+		if (!dsa_port_offloads_bridge_dev(dp, attr->orig_dev))
+			return -EOPNOTSUPP;
+
+		ret = dsa_port_set_local_receive(dp, attr->orig_dev, attr->u.local_receive);
+		break;
 	case SWITCHDEV_ATTR_ID_BRIDGE_AGEING_TIME:
 		if (!dsa_port_offloads_bridge_dev(dp, attr->orig_dev))
 			return -EOPNOTSUPP;
@@ -669,6 +675,16 @@ dsa_slave_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *_p)
 
 	if (ds->ops->get_regs)
 		ds->ops->get_regs(ds, dp->index, regs, _p);
+}
+
+int dsa_port_set_local_receive(struct dsa_port *dp, struct net_device *br, bool enable)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (ds->ops->set_local_receive)
+		return ds->ops->set_local_receive(ds, dp->index, br, enable);
+
+	return 0;
 }
 
 static int dsa_slave_nway_reset(struct net_device *dev)
