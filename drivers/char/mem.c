@@ -642,6 +642,7 @@ static int open_port(struct inode *inode, struct file *filp)
 #define full_lseek      null_lseek
 #define write_zero	write_null
 #define write_iter_zero	write_iter_null
+#define splice_write_zero	splice_write_null
 #define open_mem	open_port
 
 static const struct file_operations __maybe_unused mem_fops = {
@@ -678,6 +679,8 @@ static const struct file_operations zero_fops = {
 	.read_iter	= read_iter_zero,
 	.read		= read_zero,
 	.write_iter	= write_iter_zero,
+	.splice_read	= generic_file_splice_read,
+	.splice_write	= splice_write_zero,
 	.mmap		= mmap_zero,
 	.get_unmapped_area = get_unmapped_area_zero,
 #ifndef CONFIG_MMU
@@ -689,6 +692,7 @@ static const struct file_operations full_fops = {
 	.llseek		= full_lseek,
 	.read_iter	= read_iter_zero,
 	.write		= write_full,
+	.splice_read	= generic_file_splice_read,
 };
 
 static const struct memdev {
