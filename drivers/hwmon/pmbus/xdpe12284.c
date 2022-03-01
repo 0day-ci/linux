@@ -110,7 +110,6 @@ static int xdpe122_identify(struct i2c_client *client,
 static struct pmbus_driver_info xdpe122_info = {
 	.pages = XDPE122_PAGE_NUM,
 	.format[PSC_VOLTAGE_IN] = linear,
-	.format[PSC_VOLTAGE_OUT] = vid,
 	.format[PSC_TEMPERATURE] = linear,
 	.format[PSC_CURRENT_IN] = linear,
 	.format[PSC_CURRENT_OUT] = linear,
@@ -123,23 +122,39 @@ static struct pmbus_driver_info xdpe122_info = {
 		PMBUS_HAVE_IIN | PMBUS_HAVE_IOUT | PMBUS_HAVE_STATUS_IOUT |
 		PMBUS_HAVE_TEMP | PMBUS_HAVE_STATUS_TEMP |
 		PMBUS_HAVE_POUT | PMBUS_HAVE_PIN | PMBUS_HAVE_STATUS_INPUT,
-	.identify = xdpe122_identify,
-	.read_word_data = xdpe122_read_word_data,
 };
 
 static int xdpe122_probe(struct i2c_client *client)
 {
 	struct pmbus_driver_info *info;
+	int vout_mode;
 
 	info = devm_kmemdup(&client->dev, &xdpe122_info, sizeof(*info),
 			    GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
+	vout_mode = pmbus_read_byte_data(client, 0, PMBUS_VOUT_MODE);
+	if (vout_mode >= 0 && vout_mode != 0xff) {
+		switch (vout_mode >> 5) {
+		case 0:
+			info->format[PSC_VOLTAGE_OUT] = linear;
+			break;
+		case 1:
+			info->format[PSC_VOLTAGE_OUT] = vid;
+			info->identify = xdpe122_identify;
+			info->read_word_data = xdpe122_read_word_data;
+			break;
+		default:
+			return -ENODEV;
+		}
+	}
+
 	return pmbus_do_probe(client, info);
 }
 
 static const struct i2c_device_id xdpe122_id[] = {
+	{"xdpe11280", 0},
 	{"xdpe12254", 0},
 	{"xdpe12284", 0},
 	{}
@@ -148,6 +163,7 @@ static const struct i2c_device_id xdpe122_id[] = {
 MODULE_DEVICE_TABLE(i2c, xdpe122_id);
 
 static const struct of_device_id __maybe_unused xdpe122_of_match[] = {
+	{.compatible = "infineon,xdpe11280"},
 	{.compatible = "infineon,xdpe12254"},
 	{.compatible = "infineon,xdpe12284"},
 	{}
