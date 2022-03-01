@@ -31,7 +31,7 @@ extern void __init housekeeping_init(void);
 
 static inline int housekeeping_any_cpu(enum hk_type type)
 {
-	return smp_processor_id();
+	return raw_smp_processor_id();
 }
 
 static inline const struct cpumask *housekeeping_cpumask(enum hk_type type)
