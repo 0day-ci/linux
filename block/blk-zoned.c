@@ -215,9 +215,8 @@ static int blkdev_zone_reset_all_emulated(struct block_device *bdev,
 			continue;
 		}
 
-		bio = blk_next_bio(bio, bdev, 0, REQ_OP_ZONE_RESET | REQ_SYNC,
-				   gfp_mask);
-		bio->bi_iter.bi_sector = sector;
+		bio = blk_next_bio(bio, bdev, sector, 0,
+				   REQ_OP_ZONE_RESET | REQ_SYNC, gfp_mask);
 		sector += zone_sectors;
 
 		/* This may take a while, so be nice to others */
@@ -302,8 +301,8 @@ int blkdev_zone_mgmt(struct block_device *bdev, enum req_opf op,
 	}
 
 	while (sector < end_sector) {
-		bio = blk_next_bio(bio, bdev, 0, op | REQ_SYNC, gfp_mask);
-		bio->bi_iter.bi_sector = sector;
+		bio = blk_next_bio(bio, bdev, sector, 0, op | REQ_SYNC,
+				   gfp_mask);
 		sector += zone_sectors;
 
 		/* This may take a while, so be nice to others */

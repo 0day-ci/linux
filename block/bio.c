@@ -353,7 +353,8 @@ void bio_chain(struct bio *bio, struct bio *parent)
 EXPORT_SYMBOL(bio_chain);
 
 struct bio *blk_next_bio(struct bio *bio, struct block_device *bdev,
-		unsigned int nr_pages, unsigned int opf, gfp_t gfp)
+			 sector_t sect, unsigned int nr_pages,
+			 unsigned int opf, gfp_t gfp)
 {
 	struct bio *new = bio_alloc(bdev, nr_pages, opf, gfp);
 
@@ -361,6 +362,8 @@ struct bio *blk_next_bio(struct bio *bio, struct block_device *bdev,
 		bio_chain(bio, new);
 		submit_bio(bio);
 	}
+
+	new->bi_iter.bi_sector = sect;
 
 	return new;
 }

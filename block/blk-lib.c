@@ -79,8 +79,7 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 
 		WARN_ON_ONCE((req_sects << 9) > UINT_MAX);
 
-		bio = blk_next_bio(bio, bdev, 0, op, gfp_mask);
-		bio->bi_iter.bi_sector = sector;
+		bio = blk_next_bio(bio, bdev, sector, 0, op, gfp_mask);
 		bio->bi_iter.bi_size = req_sects << 9;
 		sector += req_sects;
 		nr_sects -= req_sects;
@@ -167,8 +166,8 @@ static int __blkdev_issue_write_same(struct block_device *bdev, sector_t sector,
 	max_write_same_sectors = bio_allowed_max_sectors(q);
 
 	while (nr_sects) {
-		bio = blk_next_bio(bio, bdev, 1, REQ_OP_WRITE_SAME, gfp_mask);
-		bio->bi_iter.bi_sector = sector;
+		bio = blk_next_bio(bio, bdev, sector, 1, REQ_OP_WRITE_SAME,
+				   gfp_mask);
 		bio->bi_vcnt = 1;
 		bio->bi_io_vec->bv_page = page;
 		bio->bi_io_vec->bv_offset = 0;
@@ -224,6 +223,8 @@ static int __blkdev_issue_write_zeroes(struct block_device *bdev,
 		sector_t sector, sector_t nr_sects, gfp_t gfp_mask,
 		struct bio **biop, unsigned flags)
 {
+	unsigned int opf = flags & BLKDEV_ZERO_NOUNMAP ? REQ_NOUNMAP : 0;
+	unsigned int op = REQ_OP_WRITE_ZEROES;
 	struct bio *bio = *biop;
 	unsigned int max_write_zeroes_sectors;
 
@@ -237,10 +238,7 @@ static int __blkdev_issue_write_zeroes(struct block_device *bdev,
 		return -EOPNOTSUPP;
 
 	while (nr_sects) {
-		bio = blk_next_bio(bio, bdev, 0, REQ_OP_WRITE_ZEROES, gfp_mask);
-		bio->bi_iter.bi_sector = sector;
-		if (flags & BLKDEV_ZERO_NOUNMAP)
-			bio->bi_opf |= REQ_NOUNMAP;
+		bio = blk_next_bio(bio, bdev, sector, 0, op | opf, gfp_mask);
 
 		if (nr_sects > max_write_zeroes_sectors) {
 			bio->bi_iter.bi_size = max_write_zeroes_sectors << 9;
@@ -274,6 +272,7 @@ static int __blkdev_issue_zero_pages(struct block_device *bdev,
 		sector_t sector, sector_t nr_sects, gfp_t gfp_mask,
 		struct bio **biop)
 {
+	unsigned int nr_pages = __blkdev_sectors_to_bio_pages(nr_sects);
 	struct bio *bio = *biop;
 	int bi_size = 0;
 	unsigned int sz;
@@ -282,9 +281,8 @@ static int __blkdev_issue_zero_pages(struct block_device *bdev,
 		return -EPERM;
 
 	while (nr_sects != 0) {
-		bio = blk_next_bio(bio, bdev, __blkdev_sectors_to_bio_pages(nr_sects),
-				   REQ_OP_WRITE, gfp_mask);
-		bio->bi_iter.bi_sector = sector;
+		bio = blk_next_bio(bio, bdev, sector, nr_pages, REQ_OP_WRITE,
+				   gfp_mask);
 
 		while (nr_sects != 0) {
 			sz = min((sector_t) PAGE_SIZE, nr_sects << 9);
