@@ -84,6 +84,28 @@ static ssize_t forward_delay_store(struct device *d,
 }
 static DEVICE_ATTR_RW(forward_delay);
 
+static ssize_t local_receive_show(struct device *d,
+				  struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+
+	return sprintf(buf, "%u\n", br_opt_get(br, BROPT_LOCAL_RECEIVE));
+}
+
+static int set_local_receive(struct net_bridge *br, unsigned long val,
+			     struct netlink_ext_ack *extack)
+{
+	return br_local_receive_change(br, !!val);
+}
+
+static ssize_t local_receive_store(struct device *d,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
+{
+	return store_bridge_parm(d, buf, len, set_local_receive);
+}
+static DEVICE_ATTR_RW(local_receive);
+
 static ssize_t hello_time_show(struct device *d, struct device_attribute *attr,
 			       char *buf)
 {
@@ -950,6 +972,7 @@ static struct attribute *bridge_attrs[] = {
 	&dev_attr_group_addr.attr,
 	&dev_attr_flush.attr,
 	&dev_attr_no_linklocal_learn.attr,
+	&dev_attr_local_receive.attr,
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
 	&dev_attr_multicast_router.attr,
 	&dev_attr_multicast_snooping.attr,

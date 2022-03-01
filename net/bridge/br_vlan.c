@@ -905,6 +905,14 @@ bool br_vlan_enabled(const struct net_device *dev)
 }
 EXPORT_SYMBOL_GPL(br_vlan_enabled);
 
+bool br_local_receive_enabled(const struct net_device *dev)
+{
+	struct net_bridge *br = netdev_priv(dev);
+
+	return br_opt_get(br, BROPT_LOCAL_RECEIVE);
+}
+EXPORT_SYMBOL_GPL(br_local_receive_enabled);
+
 int br_vlan_get_proto(const struct net_device *dev, u16 *p_proto)
 {
 	struct net_bridge *br = netdev_priv(dev);

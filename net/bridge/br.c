@@ -325,6 +325,24 @@ void br_boolopt_multi_get(const struct net_bridge *br,
 	bm->optmask = GENMASK((BR_BOOLOPT_MAX - 1), 0);
 }
 
+int br_local_receive_change(struct net_bridge *p,
+			    bool local_receive)
+{
+	struct switchdev_attr attr = {
+		.orig_dev = p->dev,
+		.id = SWITCHDEV_ATTR_ID_BRIDGE_LOCAL_RECEIVE,
+		.flags = SWITCHDEV_F_DEFER,
+		.u.local_receive = local_receive,
+	};
+	int ret;
+
+	ret = switchdev_port_attr_set(p->dev, &attr, NULL);
+	if (!ret)
+		br_opt_toggle(p, BROPT_LOCAL_RECEIVE, local_receive);
+
+	return ret;
+}
+
 /* private bridge options, controlled by the kernel */
 void br_opt_toggle(struct net_bridge *br, enum net_bridge_opts opt, bool on)
 {

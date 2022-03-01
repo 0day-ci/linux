@@ -157,6 +157,7 @@ static inline int br_vlan_get_info_rcu(const struct net_device *dev, u16 vid,
 struct net_device *br_fdb_find_port(const struct net_device *br_dev,
 				    const unsigned char *addr,
 				    __u16 vid);
+bool br_local_receive_enabled(const struct net_device *dev);
 void br_fdb_clear_offload(const struct net_device *dev, u16 vid);
 bool br_port_flag_is_set(const struct net_device *dev, unsigned long flag);
 u8 br_port_get_stp_state(const struct net_device *dev);
@@ -168,6 +169,11 @@ br_fdb_find_port(const struct net_device *br_dev,
 		 __u16 vid)
 {
 	return NULL;
+}
+
+static inline bool br_local_receive_enabled(const struct net_device *dev)
+{
+	return true;
 }
 
 static inline void br_fdb_clear_offload(const struct net_device *dev, u16 vid)

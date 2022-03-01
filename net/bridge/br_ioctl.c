@@ -177,6 +177,7 @@ int br_dev_siocdevprivate(struct net_device *dev, struct ifreq *rq,
 		b.topology_change = br->topology_change;
 		b.topology_change_detected = br->topology_change_detected;
 		b.root_port = br->root_port;
+		b.local_receive = br_opt_get(br, BROPT_LOCAL_RECEIVE) ? 1 : 0;
 
 		b.stp_enabled = (br->stp_enabled != BR_NO_STP);
 		b.ageing_time = jiffies_to_clock_t(br->ageing_time);

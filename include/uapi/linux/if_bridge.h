@@ -72,6 +72,7 @@ struct __bridge_info {
 	__u32 tcn_timer_value;
 	__u32 topology_change_timer_value;
 	__u32 gc_timer_value;
+	__u8 local_receive;
 };
 
 struct __port_info {

@@ -445,6 +445,7 @@ enum net_bridge_opts {
 	BROPT_NO_LL_LEARN,
 	BROPT_VLAN_BRIDGE_BINDING,
 	BROPT_MCAST_VLAN_SNOOPING_ENABLED,
+	BROPT_LOCAL_RECEIVE,
 };
 
 struct net_bridge {
@@ -720,6 +721,7 @@ int br_boolopt_multi_toggle(struct net_bridge *br,
 void br_boolopt_multi_get(const struct net_bridge *br,
 			  struct br_boolopt_multi *bm);
 void br_opt_toggle(struct net_bridge *br, enum net_bridge_opts opt, bool on);
+int br_local_receive_change(struct net_bridge *p, bool local_receive);
 
 /* br_device.c */
 void br_dev_setup(struct net_device *dev);
