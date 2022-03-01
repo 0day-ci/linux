@@ -1454,6 +1454,8 @@ struct sb_writers {
 	struct percpu_rw_semaphore	rw_sem[SB_FREEZE_LEVELS];
 };
 
+struct sb_iostats;
+
 struct super_block {
 	struct list_head	s_list;		/* Keep this first */
 	dev_t			s_dev;		/* search index; _not_ kdev_t */
@@ -1508,8 +1510,12 @@ struct super_block {
 	/* Granularity of c/m/atime in ns (cannot be worse than a second) */
 	u32			s_time_gran;
 	/* Time limits for c/m/atime in seconds */
-	time64_t		   s_time_min;
-	time64_t		   s_time_max;
+	time64_t		s_time_min;
+	time64_t		s_time_max;
+#ifdef CONFIG_FS_IOSTATS
+	/* Optional per-sb I/O stats */
+	struct sb_iostats	*s_iostats;
+#endif
 #ifdef CONFIG_FSNOTIFY
 	__u32			s_fsnotify_mask;
 	struct fsnotify_mark_connector __rcu	*s_fsnotify_marks;
