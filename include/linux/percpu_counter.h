@@ -46,6 +46,10 @@ s64 __percpu_counter_sum(struct percpu_counter *fbc);
 int __percpu_counter_compare(struct percpu_counter *fbc, s64 rhs, s32 batch);
 void percpu_counter_sync(struct percpu_counter *fbc);
 
+int percpu_counters_init(struct percpu_counter counters[], int num, s64 amount,
+			 gfp_t gfp);
+void percpu_counters_destroy(struct percpu_counter counters[], int num);
+
 static inline int percpu_counter_compare(struct percpu_counter *fbc, s64 rhs)
 {
 	return __percpu_counter_compare(fbc, rhs, percpu_counter_batch);
@@ -105,7 +109,22 @@ static inline int percpu_counter_init(struct percpu_counter *fbc, s64 amount,
 	return 0;
 }
 
+static inline int percpu_counters_init(struct percpu_counter counters[],
+				       int num, s64 amount, gfp_t gfp)
+{
+	int i;
+
+	for (i = 0; i < num; i++)
+		percpu_counter_init(&counters[i], amount, gfp);
+	return 0;
+}
+
 static inline void percpu_counter_destroy(struct percpu_counter *fbc)
+{
+}
+
+static inline void percpu_counters_destroy(struct percpu_counter counters[],
+					   int num)
 {
 }
 
@@ -191,6 +210,15 @@ static inline void percpu_counter_dec(struct percpu_counter *fbc)
 static inline void percpu_counter_sub(struct percpu_counter *fbc, s64 amount)
 {
 	percpu_counter_add(fbc, -amount);
+}
+
+static inline void percpu_counters_set(struct percpu_counter counters[],
+				       int num, s64 amount)
+{
+	int i;
+
+	for (i = 0; i < num; i++)
+		percpu_counter_set(&counters[i], amount);
 }
 
 #endif /* _LINUX_PERCPU_COUNTER_H */
