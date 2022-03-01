@@ -31,6 +31,9 @@
 #define RT5682_CODEC_DAI	"rt5682-aif1"
 #define RT5682_DEV0_NAME	"rt5682.1-001a"
 
+#define RT5682S_CODEC_DAI	"rt5682s-aif1"
+#define RT5682S_DEV0_NAME	"rt5682s.1-001a"
+
 struct mt8192_mt6359_priv {
 	struct snd_soc_jack headset_jack;
 	struct snd_soc_jack hdmi_jack;
@@ -632,16 +635,28 @@ SND_SOC_DAILINK_DEFS(i2s7,
 		     DAILINK_COMP_ARRAY(COMP_DUMMY()),
 		     DAILINK_COMP_ARRAY(COMP_EMPTY()));
 
-SND_SOC_DAILINK_DEFS(i2s8,
+SND_SOC_DAILINK_DEFS(i2s8_rt5682,
 		     DAILINK_COMP_ARRAY(COMP_CPU("I2S8")),
 		     DAILINK_COMP_ARRAY(COMP_CODEC(RT5682_DEV0_NAME,
 						   RT5682_CODEC_DAI)),
 		     DAILINK_COMP_ARRAY(COMP_EMPTY()));
 
-SND_SOC_DAILINK_DEFS(i2s9,
+SND_SOC_DAILINK_DEFS(i2s8_rt5682s,
+		     DAILINK_COMP_ARRAY(COMP_CPU("I2S8")),
+		     DAILINK_COMP_ARRAY(COMP_CODEC(RT5682S_DEV0_NAME,
+						   RT5682S_CODEC_DAI)),
+		     DAILINK_COMP_ARRAY(COMP_EMPTY()));
+
+SND_SOC_DAILINK_DEFS(i2s9_rt5682,
 		     DAILINK_COMP_ARRAY(COMP_CPU("I2S9")),
 		     DAILINK_COMP_ARRAY(COMP_CODEC(RT5682_DEV0_NAME,
 						   RT5682_CODEC_DAI)),
+		     DAILINK_COMP_ARRAY(COMP_EMPTY()));
+
+SND_SOC_DAILINK_DEFS(i2s9_rt5682s,
+		     DAILINK_COMP_ARRAY(COMP_CPU("I2S9")),
+		     DAILINK_COMP_ARRAY(COMP_CODEC(RT5682S_DEV0_NAME,
+						   RT5682S_CODEC_DAI)),
 		     DAILINK_COMP_ARRAY(COMP_EMPTY()));
 
 SND_SOC_DAILINK_DEFS(connsys_i2s,
@@ -961,7 +976,6 @@ static struct snd_soc_dai_link mt8192_mt6359_dai_links[] = {
 		.ignore_suspend = 1,
 		.init = mt8192_rt5682_init,
 		.be_hw_params_fixup = mt8192_i2s_hw_params_fixup,
-		SND_SOC_DAILINK_REG(i2s8),
 		.ops = &mt8192_rt5682_i2s_ops,
 	},
 	{
@@ -970,7 +984,6 @@ static struct snd_soc_dai_link mt8192_mt6359_dai_links[] = {
 		.dpcm_playback = 1,
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt8192_i2s_hw_params_fixup,
-		SND_SOC_DAILINK_REG(i2s9),
 		.ops = &mt8192_rt5682_i2s_ops,
 	},
 	{
@@ -1100,6 +1113,19 @@ static struct snd_soc_card mt8192_mt6359_rt1015p_rt5682_card = {
 	.num_dapm_routes = ARRAY_SIZE(mt8192_mt6359_rt1015p_rt5682_routes),
 };
 
+static struct snd_soc_card mt8192_mt6359_rt1015p_rt5682s_card = {
+	.name = "mt8192_mt6359_rt1015p_rt5682s",
+	.owner = THIS_MODULE,
+	.dai_link = mt8192_mt6359_dai_links,
+	.num_links = ARRAY_SIZE(mt8192_mt6359_dai_links),
+	.controls = mt8192_mt6359_rt1015p_rt5682_controls,
+	.num_controls = ARRAY_SIZE(mt8192_mt6359_rt1015p_rt5682_controls),
+	.dapm_widgets = mt8192_mt6359_rt1015p_rt5682_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(mt8192_mt6359_rt1015p_rt5682_widgets),
+	.dapm_routes = mt8192_mt6359_rt1015p_rt5682_routes,
+	.num_dapm_routes = ARRAY_SIZE(mt8192_mt6359_rt1015p_rt5682_routes),
+};
+
 static int mt8192_mt6359_dev_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card;
@@ -1136,7 +1162,8 @@ static int mt8192_mt6359_dev_probe(struct platform_device *pdev)
 				dai_link->platforms = i2s3_rt1015_platforms;
 				dai_link->num_platforms =
 					ARRAY_SIZE(i2s3_rt1015_platforms);
-			} else if (card == &mt8192_mt6359_rt1015p_rt5682_card) {
+			} else if (card == &mt8192_mt6359_rt1015p_rt5682_card ||
+				   card == &mt8192_mt6359_rt1015p_rt5682s_card) {
 				dai_link->cpus = i2s3_rt1015p_cpus;
 				dai_link->num_cpus =
 					ARRAY_SIZE(i2s3_rt1015p_cpus);
@@ -1146,6 +1173,52 @@ static int mt8192_mt6359_dev_probe(struct platform_device *pdev)
 				dai_link->platforms = i2s3_rt1015p_platforms;
 				dai_link->num_platforms =
 					ARRAY_SIZE(i2s3_rt1015p_platforms);
+			}
+		} else if (strcmp(dai_link->name, "I2S8") == 0) {
+			if (card == &mt8192_mt6359_rt1015_rt5682_card ||
+			    card == &mt8192_mt6359_rt1015p_rt5682_card) {
+				dai_link->cpus = i2s8_rt5682_cpus;
+				dai_link->num_cpus =
+					ARRAY_SIZE(i2s8_rt5682_cpus);
+				dai_link->codecs = i2s8_rt5682_codecs;
+				dai_link->num_codecs =
+					ARRAY_SIZE(i2s8_rt5682_codecs);
+				dai_link->platforms = i2s8_rt5682_platforms;
+				dai_link->num_platforms =
+					ARRAY_SIZE(i2s8_rt5682_platforms);
+			} else if (card == &mt8192_mt6359_rt1015p_rt5682s_card) {
+				dai_link->cpus = i2s8_rt5682s_cpus;
+				dai_link->num_cpus =
+					ARRAY_SIZE(i2s8_rt5682s_cpus);
+				dai_link->codecs = i2s8_rt5682s_codecs;
+				dai_link->num_codecs =
+					ARRAY_SIZE(i2s8_rt5682s_codecs);
+				dai_link->platforms = i2s8_rt5682s_platforms;
+				dai_link->num_platforms =
+					ARRAY_SIZE(i2s8_rt5682s_platforms);
+			}
+		} else if (strcmp(dai_link->name, "I2S9") == 0) {
+			if (card == &mt8192_mt6359_rt1015_rt5682_card ||
+			    card == &mt8192_mt6359_rt1015p_rt5682_card) {
+				dai_link->cpus = i2s9_rt5682_cpus;
+				dai_link->num_cpus =
+					ARRAY_SIZE(i2s9_rt5682_cpus);
+				dai_link->codecs = i2s9_rt5682_codecs;
+				dai_link->num_codecs =
+					ARRAY_SIZE(i2s9_rt5682_codecs);
+				dai_link->platforms = i2s9_rt5682_platforms;
+				dai_link->num_platforms =
+					ARRAY_SIZE(i2s9_rt5682_platforms);
+			} else if (card == &mt8192_mt6359_rt1015p_rt5682s_card) {
+				dai_link->cpus = i2s9_rt5682s_cpus;
+				dai_link->num_cpus =
+					ARRAY_SIZE(i2s9_rt5682s_cpus);
+				dai_link->codecs = i2s9_rt5682s_codecs;
+				dai_link->num_codecs =
+					ARRAY_SIZE(i2s9_rt5682s_codecs);
+				dai_link->platforms = i2s9_rt5682s_platforms;
+				dai_link->num_platforms =
+					ARRAY_SIZE(i2s9_rt5682s_platforms);
 			}
 		}
 
@@ -1185,6 +1258,10 @@ static const struct of_device_id mt8192_mt6359_dt_match[] = {
 	{
 		.compatible = "mediatek,mt8192_mt6359_rt1015p_rt5682",
 		.data = &mt8192_mt6359_rt1015p_rt5682_card,
+	},
+	{
+		.compatible = "mediatek,mt8192_mt6359_rt1015p_rt5682s",
+		.data = &mt8192_mt6359_rt1015p_rt5682s_card,
 	},
 	{}
 };
