@@ -35,6 +35,7 @@ Dynamic debug has even more useful features:
    - line number (including ranges of line numbers)
    - module name
    - format string
+   - class number:0-15
 
  * Provides a debugfs control file: ``<debugfs>/dynamic_debug/control``
    which can be read to display the complete list of known debug
@@ -143,6 +144,7 @@ against.  Possible keywords are:::
 		 'module' string |
 		 'format' string |
 		 'line' line-range
+		 'class' integer:[0-15]
 
   line-range ::= lineno |
 		 '-'lineno |
@@ -216,6 +218,11 @@ line
 	line 1600-1605      // the six lines from line 1600 to line 1605
 	line -1605          // the 1605 lines from line 1 to line 1605
 	line 1600-          // all lines from line 1600 to the end of the file
+
+class
+    This expects a single integer in range: 0-15.
+    15 is used/reserved for existing/unclassed callsites,
+    and is defaulted in unless specified to >control
 
 The flags specification comprises a change operation followed
 by one or more flag characters.  The change operation is one
