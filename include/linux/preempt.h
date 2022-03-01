@@ -210,7 +210,11 @@ do { \
 	preempt_count_dec(); \
 } while (0)
 
-#define preempt_enable_no_resched() sched_preempt_enable_no_resched()
+#ifdef CONFIG_PREEMPT_RT
+# define preempt_enable_no_resched() preempt_enable()
+#else
+# define preempt_enable_no_resched() sched_preempt_enable_no_resched()
+#endif
 
 #define preemptible()	(preempt_count() == 0 && !irqs_disabled())
 
