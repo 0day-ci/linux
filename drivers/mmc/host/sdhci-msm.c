@@ -17,6 +17,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/interconnect.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/reset.h>
 
 #include "sdhci-pltfm.h"
 #include "cqhci.h"
@@ -284,6 +285,7 @@ struct sdhci_msm_host {
 	bool uses_tassadar_dll;
 	u32 dll_config;
 	u32 ddr_config;
+	struct reset_control *core_reset;
 	bool vqmmc_enabled;
 };
 
@@ -2482,6 +2484,45 @@ static inline void sdhci_msm_get_of_property(struct platform_device *pdev,
 	of_property_read_u32(node, "qcom,dll-config", &msm_host->dll_config);
 }
 
+static int sdhci_msm_gcc_reset(struct platform_device *pdev,
+	       struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+	int ret = 0;
+
+	msm_host->core_reset = devm_reset_control_get(&pdev->dev, "core_reset");
+	if (IS_ERR(msm_host->core_reset)) {
+		ret = PTR_ERR(msm_host->core_reset);
+		dev_err(&pdev->dev, "core_reset unavailable (%d)\n", ret);
+		msm_host->core_reset = NULL;
+	}
+	if (msm_host->core_reset) {
+		ret = reset_control_assert(msm_host->core_reset);
+		if (ret) {
+			dev_err(&pdev->dev, "core_reset assert failed (%d)\n",
+						ret);
+			goto out;
+		}
+		/*
+		 * The hardware requirement for delay between assert/deassert
+		 * is at least 3-4 sleep clock (32.7KHz) cycles, which comes to
+		 * ~125us (4/32768). To be on the safe side add 200us delay.
+		 */
+		usleep_range(200, 210);
+
+		ret = reset_control_deassert(msm_host->core_reset);
+		if (ret) {
+			dev_err(&pdev->dev, "core_reset deassert failed (%d)\n",
+						ret);
+			goto out;
+		}
+		usleep_range(200, 210);
+	}
+
+out:
+	return ret;
+}
 
 static int sdhci_msm_probe(struct platform_device *pdev)
 {
@@ -2528,6 +2569,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	sdhci_msm_get_of_property(pdev, host);
 
 	msm_host->saved_tuning_phase = INVALID_TUNING_PHASE;
+
+	ret = sdhci_msm_gcc_reset(pdev, host);
+	if (ret) {
+		dev_err(&pdev->dev, "core_reset assert/deassert failed (%d)\n",
+					ret);
+		goto pltfm_free;
+	}
 
 	/* Setup SDCC bus voter clock. */
 	msm_host->bus_clk = devm_clk_get(&pdev->dev, "bus");
