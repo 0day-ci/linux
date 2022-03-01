@@ -521,6 +521,7 @@ more:
 			      ceph_present_ino(inode->i_sb, le64_to_cpu(rde->inode.in->ino)),
 			      le32_to_cpu(rde->inode.in->mode) >> 12)) {
 			dout("filldir stopping us...\n");
+			ceph_mdsc_put_request(dfi->last_readdir);
 			return 0;
 		}
 		ctx->pos++;
