@@ -16,8 +16,8 @@ First you must mount binfmt_misc::
 	mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
 
 To actually register a new binary type, you have to set up a string looking like
-``:name:type:offset:magic:mask:interpreter:flags`` (where you can choose the
-``:`` upon your needs) and echo it to ``/proc/sys/fs/binfmt_misc/register``.
+``:name:type:offset:magic:mask:interpreter:flags:timeout`` (where you can choose
+the ``:`` upon your needs) and echo it to ``/proc/sys/fs/binfmt_misc/register``.
 
 Here is what the fields mean:
 
@@ -88,6 +88,14 @@ Here is what the fields mean:
 	    emulation is installed and uses the opened image to spawn the
 	    emulator, meaning it is always available once installed,
 	    regardless of how the environment changes.
+- ``timeout``
+  is an optional field; the newly added interpreter is automatically
+  disabled after the specified number of seconds. To cancel such
+  count down, cat or echo something to ``/proc/.../the_name``.  This
+  registration in two steps allows recovering a system left unusable
+  by some wrong configuration. A timeout of 0 seconds effectively adds
+  a disabled interpreter.  Values smaller than 0 or bigger than 120
+  are invalid.
 
 
 There are some restrictions:

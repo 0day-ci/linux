@@ -27,6 +27,8 @@
 #include <linux/syscalls.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
+#include <linux/spinlock.h>
+#include <linux/timer.h>
 
 #include "internal.h"
 
@@ -49,6 +51,8 @@ enum {Enabled, Magic};
 #define MISC_FMT_CREDENTIALS (1 << 29)
 #define MISC_FMT_OPEN_FILE (1 << 28)
 
+struct node_timer;
+
 typedef struct {
 	struct list_head list;
 	unsigned long flags;		/* type, status, etc. */
@@ -60,7 +64,14 @@ typedef struct {
 	char *name;
 	struct dentry *dentry;
 	struct file *interp_file;
+	struct node_timer *auto_disable;
+	spinlock_t auto_disable_lock;
 } Node;
+
+struct node_timer {
+	struct timer_list timer;
+	Node *node;
+};
 
 static DEFINE_RWLOCK(entries_lock);
 static struct file_system_type bm_fs_type;
@@ -69,18 +80,29 @@ static int entry_count;
 
 /*
  * Max length of the register string.  Determined by:
- *  - 7 delimiters
- *  - name:   ~50 bytes
- *  - type:   1 byte
- *  - offset: 3 bytes (has to be smaller than BINPRM_BUF_SIZE)
- *  - magic:  128 bytes (512 in escaped form)
- *  - mask:   128 bytes (512 in escaped form)
- *  - interp: ~50 bytes
- *  - flags:  5 bytes
+ *  - 8 delimiters
+ *  - name:    ~50 bytes
+ *  - type:    1 byte
+ *  - offset:  3 bytes (has to be smaller than BINPRM_BUF_SIZE)
+ *  - magic:   128 bytes (512 in escaped form)
+ *  - mask:    128 bytes (512 in escaped form)
+ *  - interp:  ~50 bytes
+ *  - flags:   5 bytes
+ *  - timeout: 3 bytes
  * Round that up a bit, and then back off to hold the internal data
  * (like struct Node).
  */
 #define MAX_REGISTER_LENGTH 1920
+
+#define MAX_AUTO_DISABLE_TIMEOUT 120
+
+static void auto_disable_timer_fn(struct timer_list *t)
+{
+	struct node_timer *timer = container_of(t, struct node_timer, timer);
+
+	clear_bit(Enabled, &timer->node->flags);
+	pr_info("%s: auto-disabled\n", timer->node->name);
+}
 
 /*
  * Check if we support the binfmt
@@ -266,6 +288,41 @@ static char *check_special_flags(char *sfs, Node *e)
 	return p;
 }
 
+static char *setup_auto_disable(char *p, char *endp, Node *e)
+{
+	unsigned int timeout;
+	char buf[4] = {0};
+
+	while (endp[-1] == '\n')
+		endp--;
+	if (p >= endp || *p != ':' || ++p == endp)
+		return p;
+
+	endp = min(endp, p + sizeof(buf) - 1);
+	memcpy(buf, p, (size_t) (endp - p));
+
+	if (kstrtouint(buf, 10, &timeout) || timeout > MAX_AUTO_DISABLE_TIMEOUT) {
+		pr_info("%s: invalid timeout: %s\n", e->name, buf);
+		return p;
+	}
+
+	if (timeout == 0) {
+		e->flags &= ~(1 << Enabled);
+		return endp;
+	}
+
+	e->auto_disable = kmalloc(sizeof(struct node_timer), GFP_KERNEL);
+	if (!e->auto_disable)
+		return ERR_PTR(-ENOMEM);
+
+	pr_info("%s: auto-disable in %u seconds\n", e->name, timeout);
+
+	timer_setup(&e->auto_disable->timer, auto_disable_timer_fn, 0);
+	e->auto_disable->timer.expires = jiffies + timeout * HZ;
+	e->auto_disable->node = e;
+	return endp;
+}
+
 /*
  * This registers a new binary format, it recognises the syntax
  * ':name:type:offset:magic:mask:interpreter:flags'
@@ -273,7 +330,7 @@ static char *check_special_flags(char *sfs, Node *e)
  */
 static Node *create_entry(const char __user *buffer, size_t count)
 {
-	Node *e;
+	Node *e = NULL;
 	int memsize, err;
 	char *buf, *p;
 	char del;
@@ -296,6 +353,8 @@ static Node *create_entry(const char __user *buffer, size_t count)
 	memset(e, 0, sizeof(Node));
 	if (copy_from_user(buf, buffer, count))
 		goto efault;
+
+	spin_lock_init(&e->auto_disable_lock);
 
 	del = *p++;	/* delimeter */
 
@@ -454,6 +513,14 @@ static Node *create_entry(const char __user *buffer, size_t count)
 
 	/* Parse the 'flags' field. */
 	p = check_special_flags(p, e);
+
+	/* Parse the 'timeout' field and init the auto-disable timer. */
+	p = setup_auto_disable(p, buf + count, e);
+	if (IS_ERR(p)) {
+		err = PTR_ERR(p);
+		goto out;
+	}
+
 	if (*p == '\n')
 		p++;
 	if (p != buf + count)
@@ -462,12 +529,15 @@ static Node *create_entry(const char __user *buffer, size_t count)
 	return e;
 
 out:
+	kfree(e);
 	return ERR_PTR(err);
 
 efault:
 	kfree(e);
 	return ERR_PTR(-EFAULT);
 einval:
+	if (e)
+		kfree(e->auto_disable);
 	kfree(e);
 	return ERR_PTR(-EINVAL);
 }
@@ -498,6 +568,21 @@ static int parse_command(const char __user *buffer, size_t count)
 }
 
 /* generic stuff */
+
+static void cancel_auto_disable(Node *e)
+{
+	struct node_timer *auto_disable = NULL;
+
+	spin_lock(&e->auto_disable_lock);
+	swap(e->auto_disable, auto_disable);
+	spin_unlock(&e->auto_disable_lock);
+
+	if (auto_disable) {
+		if (del_timer_sync(&auto_disable->timer))
+			pr_info("%s: cancelled auto-disable\n", e->name);
+		kfree(auto_disable);
+	}
+}
 
 static void entry_status(Node *e, char *page)
 {
@@ -559,6 +644,8 @@ static void bm_evict_inode(struct inode *inode)
 
 	if (e && e->flags & MISC_FMT_OPEN_FILE)
 		filp_close(e->interp_file, NULL);
+	if (e)
+		cancel_auto_disable(e);
 
 	clear_inode(inode);
 	kfree(e);
@@ -588,6 +675,8 @@ bm_entry_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 	ssize_t res;
 	char *page;
 
+	cancel_auto_disable(e);
+
 	page = (char *) __get_free_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
@@ -606,6 +695,8 @@ static ssize_t bm_entry_write(struct file *file, const char __user *buffer,
 	struct dentry *root;
 	Node *e = file_inode(file)->i_private;
 	int res = parse_command(buffer, count);
+
+	cancel_auto_disable(e);
 
 	switch (res) {
 	case 1:
@@ -698,6 +789,9 @@ static ssize_t bm_register_write(struct file *file, const char __user *buffer,
 	write_lock(&entries_lock);
 	list_add(&e->list, &entries);
 	write_unlock(&entries_lock);
+
+	if (e->auto_disable)
+		add_timer(&e->auto_disable->timer);
 
 	err = 0;
 out2:
