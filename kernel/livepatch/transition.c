@@ -641,6 +641,6 @@ void klp_force_transition(void)
 	for_each_possible_cpu(cpu)
 		klp_update_patch_state(idle_task(cpu));
 
-	klp_for_each_patch(patch)
-		patch->forced = true;
+	if (klp_target_state == KLP_UNPATCHED)
+		klp_transition_patch->forced = true;
 }
