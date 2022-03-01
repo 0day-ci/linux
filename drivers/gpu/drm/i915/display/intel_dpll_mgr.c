@@ -2085,8 +2085,7 @@ struct bxt_clk_div {
 	int clock;
 	u32 p1;
 	u32 p2;
-	u32 m2_int;
-	u32 m2_frac;
+	u32 m2;
 	u32 n;
 
 	int vco;
@@ -2094,13 +2093,20 @@ struct bxt_clk_div {
 
 /* pre-calculated values for DP linkrates */
 static const struct bxt_clk_div bxt_dp_clk_val[] = {
-	{ .clock = 162000, .p1 = 4, .p2 = 2, .m2_int = 32, .m2_frac = 1677722, .n = 1, },
-	{ .clock = 270000, .p1 = 4, .p2 = 1, .m2_int = 27, .m2_frac =       0, .n = 1, },
-	{ .clock = 540000, .p1 = 2, .p2 = 1, .m2_int = 27, .m2_frac =       0, .n = 1, },
-	{ .clock = 216000, .p1 = 3, .p2 = 2, .m2_int = 32, .m2_frac = 1677722, .n = 1, },
-	{ .clock = 243000, .p1 = 4, .p2 = 1, .m2_int = 24, .m2_frac = 1258291, .n = 1, },
-	{ .clock = 324000, .p1 = 4, .p2 = 1, .m2_int = 32, .m2_frac = 1677722, .n = 1, },
-	{ .clock = 432000, .p1 = 3, .p2 = 1, .m2_int = 32, .m2_frac = 1677722, .n = 1, },
+	{ .clock = 162000, .p1 = 4, .p2 = 2, .n = 1,
+	  .m2 = 0x819999a /* .m2_int = 32, m2_frac = 1677722 */ },
+	{ .clock = 270000, .p1 = 4, .p2 = 1, .n = 1,
+	  .m2 = 0x6c00000 /* .m2_int = 27, m2_frac =       0 */ },
+	{ .clock = 540000, .p1 = 2, .p2 = 1, .n = 1,
+	  .m2 = 0x6c00000 /* .m2_int = 27, m2_frac =       0 */ },
+	{ .clock = 216000, .p1 = 3, .p2 = 2, .n = 1,
+	  .m2 = 0x819999a /* .m2_int = 32, m2_frac = 1677722 */ },
+	{ .clock = 243000, .p1 = 4, .p2 = 1, .n = 1,
+	  .m2 = 0x6133333 /* .m2_int = 24, m2_frac = 1258291 */ },
+	{ .clock = 324000, .p1 = 4, .p2 = 1, .n = 1,
+	  .m2 = 0x819999a /* .m2_int = 32, m2_frac = 1677722 */ },
+	{ .clock = 432000, .p1 = 3, .p2 = 1, .n = 1,
+	  .m2 = 0x819999a /* .m2_int = 32, m2_frac = 1677722 */ },
 };
 
 static bool
@@ -2127,8 +2133,7 @@ bxt_ddi_hdmi_pll_dividers(struct intel_crtc_state *crtc_state,
 	clk_div->p2 = best_clock.p2;
 	drm_WARN_ON(&i915->drm, best_clock.m1 != 2);
 	clk_div->n = best_clock.n;
-	clk_div->m2_int = best_clock.m2 >> 22;
-	clk_div->m2_frac = best_clock.m2 & ((1 << 22) - 1);
+	clk_div->m2 = best_clock.m2;
 
 	clk_div->vco = best_clock.vco;
 
@@ -2197,11 +2202,11 @@ static bool bxt_ddi_set_dpll_hw_state(struct intel_crtc_state *crtc_state,
 		lanestagger = 0x02;
 
 	dpll_hw_state->ebb0 = PORT_PLL_P1(clk_div->p1) | PORT_PLL_P2(clk_div->p2);
-	dpll_hw_state->pll0 = clk_div->m2_int;
+	dpll_hw_state->pll0 = clk_div->m2 >> 22;
 	dpll_hw_state->pll1 = PORT_PLL_N(clk_div->n);
-	dpll_hw_state->pll2 = clk_div->m2_frac;
+	dpll_hw_state->pll2 = clk_div->m2 & 0x3fffff;
 
-	if (clk_div->m2_frac)
+	if (clk_div->m2 & 0x3fffff)
 		dpll_hw_state->pll3 = PORT_PLL_M2_FRAC_ENABLE;
 
 	dpll_hw_state->pll6 = prop_coef | PORT_PLL_INT_COEFF(int_coef);
