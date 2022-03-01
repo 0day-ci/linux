@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/ti,tusb320xa.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: TUSB320xA Type-C port controller DT bindings
+
+description:
+  The Texas Instruments TUSB320xA is a USB Type-C port controller which
+  supports role and plug orientation detection using the CC pins. It is
+  compatible with the USB Type-C Cable and Connector Specification v1.1.
+
+maintainers:
+  - Alvin Šipraga <alsi@bang-olufsen.dk>
+
+properties:
+  compatible:
+    enum:
+      - ti,tusb320la
+      - ti,tusb320ha
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  ports:
+    $ref: /schemas/graph.yaml#/properties/ports
+
+    patternProperties:
+      '^port@':
+        $ref: /schemas/graph.yaml#/properties/port
+        description:
+          OF graph bindings modelling any "usb-role-switch" or "accessory" mux.
+
+required:
+  - compatible
+  - reg
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      tcpc@47 {
+        compatible = "ti,tusb320la";
+        reg = <0x47>;
+        interrupt-parent = <&gpio5>;
+        interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+
+        ports {
+          #address-cells = <1>;
+          #size-cells = <0>;
+
+          port@0 {
+            reg = <0>;
+            typec1_mux: endpoint {
+              remote-endpoint = <&usb_audio_mux1>;
+            };
+          };
+
+          port@1 {
+            reg = <1>;
+            typec1_dr_sw: endpoint {
+              remote-endpoint = <&usbotg1_drd_sw>;
+            };
+          };
+        };
+      };
+    };
