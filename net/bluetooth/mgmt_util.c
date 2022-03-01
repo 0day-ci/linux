@@ -229,6 +229,22 @@ struct mgmt_pending_cmd *mgmt_pending_find(unsigned short channel, u16 opcode,
 	return NULL;
 }
 
+bool mgmt_pending_find_cmd(unsigned short channel,
+			   struct mgmt_pending_cmd *this_cmd,
+			   struct hci_dev *hdev)
+{
+	struct mgmt_pending_cmd *cmd;
+
+	list_for_each_entry(cmd, &hdev->mgmt_pending, list) {
+		if (hci_sock_get_channel(cmd->sk) != channel)
+			continue;
+		if (cmd == this_cmd)
+			return true;
+	}
+
+	return false;
+}
+
 struct mgmt_pending_cmd *mgmt_pending_find_data(unsigned short channel,
 						u16 opcode,
 						struct hci_dev *hdev,
