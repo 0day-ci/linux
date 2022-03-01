@@ -62,19 +62,19 @@ static bool objtool_create_backup(const char *_objname)
 	d = open(name, O_CREAT|O_WRONLY|O_TRUNC, 0644);
 	if (d < 0) {
 		perror("failed to create backup file");
-		return false;
+		goto free_name;
 	}
 
 	s = open(_objname, O_RDONLY);
 	if (s < 0) {
 		perror("failed to open orig file");
-		return false;
+		goto close_d;
 	}
 
 	buf = malloc(4096);
 	if (!buf) {
 		perror("failed backup data malloc");
-		return false;
+		goto close_s;
 	}
 
 	while ((l = read(s, buf, 4096)) > 0) {
@@ -83,7 +83,7 @@ static bool objtool_create_backup(const char *_objname)
 			t = write(d, base, l);
 			if (t < 0) {
 				perror("failed backup write");
-				return false;
+				goto free_buf;
 			}
 			base += t;
 			l -= t;
@@ -92,7 +92,7 @@ static bool objtool_create_backup(const char *_objname)
 
 	if (l < 0) {
 		perror("failed backup read");
-		return false;
+		goto free_buf;
 	}
 
 	free(name);
@@ -101,6 +101,17 @@ static bool objtool_create_backup(const char *_objname)
 	close(s);
 
 	return true;
+
+free_buf:
+	free(buf);
+close_s:
+	close(s);
+close_d:
+	close(d);
+free_name:
+	free(name);
+	return false;
+
 }
 
 struct objtool_file *objtool_open_read(const char *_objname)
