@@ -411,7 +411,7 @@ static int au1xpsc_ac97_drvprobe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = snd_soc_register_component(&pdev->dev, &au1xpsc_ac97_component,
+	ret = devm_snd_soc_register_component(&pdev->dev, &au1xpsc_ac97_component,
 					 &wd->dai_drv, 1);
 	if (ret)
 		return ret;

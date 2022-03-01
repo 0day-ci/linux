@@ -265,7 +265,7 @@ static int au1xi2s_drvprobe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
-	return snd_soc_register_component(&pdev->dev, &au1xi2s_component,
+	return devm_snd_soc_register_component(&pdev->dev, &au1xi2s_component,
 					  &au1xi2s_dai_driver, 1);
 }
 
