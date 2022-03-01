@@ -46,7 +46,7 @@
 
 #define MCHP_PIT64B_NAME		"pit64b"
 
-/**
+/*
  * struct mchp_pit64b_timer - PIT64B timer data structure
  * @base: base address of PIT64B hardware block
  * @pclk: PIT64B's peripheral clock
@@ -60,7 +60,7 @@ struct mchp_pit64b_timer {
 	u32		mode;
 };
 
-/**
+/*
  * mchp_pit64b_clkevt - PIT64B clockevent data structure
  * @timer: PIT64B timer
  * @clkevt: clockevent
@@ -74,7 +74,7 @@ struct mchp_pit64b_clkevt {
 	((struct mchp_pit64b_timer *)container_of(x,\
 		struct mchp_pit64b_clkevt, clkevt))
 
-/**
+/*
  * mchp_pit64b_clksrc - PIT64B clocksource data structure
  * @timer: PIT64B timer
  * @clksrc: clocksource
@@ -244,7 +244,7 @@ static void __init mchp_pit64b_pres_compute(u32 *pres, u32 clk_rate,
 		*pres = MCHP_PIT64B_PRES_MAX - 1;
 }
 
-/**
+/*
  * mchp_pit64b_init_mode - prepare PIT64B mode register value to be used at
  *			   runtime; this includes prescaler and SGCLK bit
  *
