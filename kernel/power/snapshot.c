@@ -625,16 +625,18 @@ static int create_mem_extents(struct list_head *list, gfp_t gfp_mask)
 
 	for_each_populated_zone(zone) {
 		unsigned long zone_start, zone_end;
-		struct mem_extent *ext, *cur, *aux;
+		struct mem_extent *me = NULL;
 
 		zone_start = zone->zone_start_pfn;
 		zone_end = zone_end_pfn(zone);
 
-		list_for_each_entry(ext, list, hook)
-			if (zone_start <= ext->end)
+		list_for_each_entry_inside(ext, struct mem_extent, list, hook)
+			if (zone_start <= ext->end) {
+				me = ext;
 				break;
+			}
 
-		if (&ext->hook == list || zone_end < ext->start) {
+		if (!me || zone_end < me->start) {
 			/* New extent is necessary */
 			struct mem_extent *new_ext;
 
@@ -645,23 +647,25 @@ static int create_mem_extents(struct list_head *list, gfp_t gfp_mask)
 			}
 			new_ext->start = zone_start;
 			new_ext->end = zone_end;
-			list_add_tail(&new_ext->hook, &ext->hook);
+			if (!me)
+				list_add_tail(&new_ext->hook, list);
+			else
+				list_add_tail(&new_ext->hook, &me->hook);
 			continue;
 		}
 
 		/* Merge this zone's range of PFNs with the existing one */
-		if (zone_start < ext->start)
-			ext->start = zone_start;
-		if (zone_end > ext->end)
-			ext->end = zone_end;
+		if (zone_start < me->start)
+			me->start = zone_start;
+		if (zone_end > me->end)
+			me->end = zone_end;
 
 		/* More merging may be possible */
-		cur = ext;
-		list_for_each_entry_safe_continue(cur, aux, list, hook) {
+		list_for_each_entry_safe_continue_inside(cur, aux, me, list, hook) {
 			if (zone_end < cur->start)
 				break;
 			if (zone_end < cur->end)
-				ext->end = cur->end;
+				me->end = cur->end;
 			list_del(&cur->hook);
 			kfree(cur);
 		}

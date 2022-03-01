@@ -711,7 +711,7 @@ static int dequeue_synchronous_signal(kernel_siginfo_t *info)
 {
 	struct task_struct *tsk = current;
 	struct sigpending *pending = &tsk->pending;
-	struct sigqueue *q, *sync = NULL;
+	struct sigqueue *sync = NULL;
 
 	/*
 	 * Might a synchronous signal be in the queue?
@@ -722,7 +722,7 @@ static int dequeue_synchronous_signal(kernel_siginfo_t *info)
 	/*
 	 * Return the first synchronous signal in the queue.
 	 */
-	list_for_each_entry(q, &pending->list, list) {
+	list_for_each_entry_inside(q, struct sigqueue, &pending->list, list) {
 		/* Synchronous signals have a positive si_code */
 		if ((q->info.si_code > SI_USER) &&
 		    (sigmask(q->info.si_signo) & SYNCHRONOUS_MASK)) {
@@ -735,7 +735,7 @@ next:
 	/*
 	 * Check if there is another siginfo for the same signal.
 	 */
-	list_for_each_entry_continue(q, &pending->list, list) {
+	list_for_each_entry_continue_inside(q, sync, &pending->list, list) {
 		if (q->info.si_signo == sync->info.si_signo)
 			goto still_pending;
 	}
