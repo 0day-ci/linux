@@ -253,12 +253,12 @@ static const struct intel_limit ilk_limits_dual_lvds_100m = {
 
 static const struct intel_limit intel_limits_vlv = {
 	 /*
-	  * These are the data rate limits (measured in fast clocks)
+	  * These are based on the data rate limits (measured in fast clocks)
 	  * since those are the strictest limits we have. The fast
 	  * clock and actual rate limits are more relaxed, so checking
 	  * them would make no difference.
 	  */
-	.dot = { .min = 25000 * 5, .max = 270000 * 5 },
+	.dot = { .min = 25000, .max = 270000 },
 	.vco = { .min = 4000000, .max = 6000000 },
 	.n = { .min = 1, .max = 7 },
 	.m1 = { .min = 2, .max = 3 },
@@ -269,12 +269,12 @@ static const struct intel_limit intel_limits_vlv = {
 
 static const struct intel_limit intel_limits_chv = {
 	/*
-	 * These are the data rate limits (measured in fast clocks)
+	 * These are based on the data rate limits (measured in fast clocks)
 	 * since those are the strictest limits we have.  The fast
 	 * clock and actual rate limits are more relaxed, so checking
 	 * them would make no difference.
 	 */
-	.dot = { .min = 25000 * 5, .max = 540000 * 5},
+	.dot = { .min = 25000, .max = 540000 },
 	.vco = { .min = 4800000, .max = 6480000 },
 	.n = { .min = 1, .max = 1 },
 	.m1 = { .min = 2, .max = 2 },
@@ -340,9 +340,9 @@ int vlv_calc_dpll_params(int refclk, struct dpll *clock)
 	if (WARN_ON(clock->n == 0 || clock->p == 0))
 		return 0;
 	clock->vco = DIV_ROUND_CLOSEST(refclk * clock->m, clock->n);
-	clock->dot = DIV_ROUND_CLOSEST(clock->vco, clock->p);
+	clock->dot = DIV_ROUND_CLOSEST(clock->vco, 5 * clock->p);
 
-	return clock->dot / 5;
+	return clock->dot;
 }
 
 int chv_calc_dpll_params(int refclk, struct dpll *clock)
@@ -353,9 +353,9 @@ int chv_calc_dpll_params(int refclk, struct dpll *clock)
 		return 0;
 	clock->vco = DIV_ROUND_CLOSEST_ULL(mul_u32_u32(refclk, clock->m),
 					   clock->n << 22);
-	clock->dot = DIV_ROUND_CLOSEST(clock->vco, clock->p);
+	clock->dot = DIV_ROUND_CLOSEST(clock->vco, 5 * clock->p);
 
-	return clock->dot / 5;
+	return clock->dot;
 }
 
 /*
@@ -658,8 +658,6 @@ vlv_find_best_dpll(const struct intel_limit *limit,
 	int max_n = min(limit->n.max, refclk / 19200);
 	bool found = false;
 
-	target *= 5; /* fast clock */
-
 	memset(best_clock, 0, sizeof(*best_clock));
 
 	/* based on hardware requirement, prefer smaller n to precision */
@@ -672,7 +670,7 @@ vlv_find_best_dpll(const struct intel_limit *limit,
 				for (clock.m1 = limit->m1.min; clock.m1 <= limit->m1.max; clock.m1++) {
 					unsigned int ppm;
 
-					clock.m2 = DIV_ROUND_CLOSEST(target * clock.p * clock.n,
+					clock.m2 = DIV_ROUND_CLOSEST(target * 5 * clock.p * clock.n,
 								     refclk * clock.m1);
 
 					vlv_calc_dpll_params(refclk, &clock);
@@ -728,7 +726,6 @@ chv_find_best_dpll(const struct intel_limit *limit,
 	 */
 	clock.n = 1;
 	clock.m1 = 2;
-	target *= 5;	/* fast clock */
 
 	for (clock.p1 = limit->p1.max; clock.p1 >= limit->p1.min; clock.p1--) {
 		for (clock.p2 = limit->p2.p2_fast;
@@ -738,7 +735,7 @@ chv_find_best_dpll(const struct intel_limit *limit,
 
 			clock.p = clock.p1 * clock.p2;
 
-			m2 = DIV_ROUND_CLOSEST_ULL(mul_u32_u32(target, clock.p * clock.n) << 22,
+			m2 = DIV_ROUND_CLOSEST_ULL(mul_u32_u32(target, 5 * clock.p * clock.n) << 22,
 						   refclk * clock.m1);
 
 			if (m2 > INT_MAX/clock.m1)
