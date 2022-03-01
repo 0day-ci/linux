@@ -12,6 +12,7 @@
  *  Copyright (C) 2004-2006 Ingo Molnar
  *  Copyright (C) 2004 Nadia Yvette Chambers
  */
+#include <linux/sched/isolation.h>
 #include <linux/ring_buffer.h>
 #include <generated/utsrelease.h>
 #include <linux/stacktrace.h>
@@ -1724,7 +1725,7 @@ void latency_fsnotify(struct trace_array *tr)
 	 * possible that we are called from __schedule() or do_idle(), which
 	 * could cause a deadlock.
 	 */
-	irq_work_queue(&tr->fsnotify_irqwork);
+	irq_work_queue_on(&tr->fsnotify_irqwork, housekeeping_any_cpu(HK_TYPE_MISC));
 }
 
 #elif defined(CONFIG_TRACER_MAX_TRACE) || defined(CONFIG_HWLAT_TRACER)	\
