@@ -290,7 +290,10 @@ static int intelfb_create(struct drm_fb_helper *helper,
 		goto out_unpin;
 	}
 	info->screen_base = vaddr;
-	info->screen_size = vma->node.size;
+	if (i915_gem_object_is_lmem(obj))
+		info->screen_size = vma->obj->base.size;
+	else
+		info->screen_size = vma->node.size;
 
 	drm_fb_helper_fill_info(info, &ifbdev->helper, sizes);
 
