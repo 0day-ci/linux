@@ -6,6 +6,7 @@
 
 #include <uapi/linux/magic.h>
 #include <linux/fs.h>
+#include <linux/fs_iostats.h>
 #include <linux/namei.h>
 #include <linux/xattr.h>
 #include <linux/mount.h>
@@ -1978,6 +1979,10 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 		goto out;
 
 	sb->s_d_op = &ovl_dentry_operations;
+
+	err = sb_iostats_init(sb);
+	if (err && err != -EOPNOTSUPP)
+		goto out;
 
 	err = -ENOMEM;
 	ofs = kzalloc(sizeof(struct ovl_fs), GFP_KERNEL);
