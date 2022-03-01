@@ -95,19 +95,23 @@ static int pcm030_fabric_probe(struct platform_device *op)
 	ret = platform_device_add(pdata->codec_device);
 	if (ret) {
 		dev_err(&op->dev, "platform_device_add() failed: %d\n", ret);
-		platform_device_put(pdata->codec_device);
+		goto err_add;
 	}
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		dev_err(&op->dev, "snd_soc_register_card() failed: %d\n", ret);
-		platform_device_del(pdata->codec_device);
-		platform_device_put(pdata->codec_device);
+		goto err_register;
 	}
 
 	platform_set_drvdata(op, pdata);
 	return ret;
 
+err_register:
+	platform_device_del(pdata->codec_device);
+err_add:
+	platform_device_put(pdata->codec_device);
+	return ret;
 }
 
 static int pcm030_fabric_remove(struct platform_device *op)
