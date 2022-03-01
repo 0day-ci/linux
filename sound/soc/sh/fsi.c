@@ -816,13 +816,25 @@ static int fsi_clk_enable(struct device *dev,
 			return ret;
 		}
 
-		clk_enable(clock->xck);
-		clk_enable(clock->ick);
-		clk_enable(clock->div);
+		ret = clk_enable(clock->xck);
+		if (ret)
+			goto err;
+		ret = clk_enable(clock->ick);
+		if (ret)
+			goto err;
+		ret = clk_enable(clock->div);
+		if (ret)
+			goto err;
 
 		clock->count++;
 	}
 
+	return ret;
+
+err:
+	clk_disable(clock->xck);
+	clk_disable(clock->ick);
+	clk_disable(clock->div);
 	return ret;
 }
 
