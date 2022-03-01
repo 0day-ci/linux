@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/fs_context.h>
+#include <linux/fs_iostats.h>
 #include <linux/fs_parser.h>
 #include <linux/statfs.h>
 #include <linux/random.h>
@@ -1515,6 +1516,10 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
 
 	err = -EINVAL;
 	if (sb->s_flags & SB_MANDLOCK)
+		goto err;
+
+	err = sb_iostats_init(sb);
+	if (err && err != -EOPNOTSUPP)
 		goto err;
 
 	rcu_assign_pointer(fc->curr_bucket, fuse_sync_bucket_alloc());
