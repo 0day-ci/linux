@@ -69,6 +69,10 @@ enum vmd_features {
 	VMD_FEAT_CAN_BYPASS_MSI_REMAP		= (1 << 4),
 };
 
+struct vmd_device_data {
+	enum vmd_features features;
+};
+
 static DEFINE_IDA(vmd_instance_ida);
 
 /*
@@ -710,11 +714,12 @@ static void vmd_copy_host_bridge_flags(struct pci_host_bridge *root_bridge,
 	vmd_bridge->native_dpc = root_bridge->native_dpc;
 }
 
-static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
+static int vmd_enable_domain(struct vmd_dev *vmd, struct vmd_device_data *info)
 {
 	struct pci_sysdata *sd = &vmd->sysdata;
 	struct resource *res;
 	u32 upper_bits;
+	unsigned long features = info->features;
 	unsigned long flags;
 	LIST_HEAD(resources);
 	resource_size_t offset[2] = {0};
@@ -881,7 +886,8 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 
 static int vmd_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	unsigned long features = (unsigned long) id->driver_data;
+	struct vmd_device_data *info = (struct vmd_device_data *)id->driver_data;
+	unsigned long features = info->features;
 	struct vmd_dev *vmd;
 	int err;
 
@@ -925,7 +931,7 @@ static int vmd_probe(struct pci_dev *dev, const struct pci_device_id *id)
 
 	spin_lock_init(&vmd->cfg_lock);
 	pci_set_drvdata(dev, vmd);
-	err = vmd_enable_domain(vmd, features);
+	err = vmd_enable_domain(vmd, info);
 	if (err)
 		goto out_release_instance;
 
@@ -994,29 +1000,47 @@ static int vmd_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(vmd_dev_pm_ops, vmd_suspend, vmd_resume);
 
 static const struct pci_device_id vmd_ids[] = {
-	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_VMD_201D),
-		.driver_data = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP,},
-	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_VMD_28C0),
-		.driver_data = VMD_FEAT_HAS_MEMBAR_SHADOW |
-				VMD_FEAT_HAS_BUS_RESTRICTIONS |
-				VMD_FEAT_CAN_BYPASS_MSI_REMAP,},
-	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x467f),
-		.driver_data = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
-				VMD_FEAT_HAS_BUS_RESTRICTIONS |
-				VMD_FEAT_OFFSET_FIRST_VECTOR,},
-	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x4c3d),
-		.driver_data = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
-				VMD_FEAT_HAS_BUS_RESTRICTIONS |
-				VMD_FEAT_OFFSET_FIRST_VECTOR,},
-	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0xa77f),
-		.driver_data = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
-				VMD_FEAT_HAS_BUS_RESTRICTIONS |
-				VMD_FEAT_OFFSET_FIRST_VECTOR,},
-	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_VMD_9A0B),
-		.driver_data = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
-				VMD_FEAT_HAS_BUS_RESTRICTIONS |
-				VMD_FEAT_OFFSET_FIRST_VECTOR,},
-	{0,}
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_VMD_201D),
+		(kernel_ulong_t)&(struct vmd_device_data) {
+			.features = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP,
+		},
+	},
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_VMD_28C0),
+		(kernel_ulong_t)&(struct vmd_device_data) {
+			.features = VMD_FEAT_HAS_MEMBAR_SHADOW |
+				    VMD_FEAT_HAS_BUS_RESTRICTIONS |
+				    VMD_FEAT_CAN_BYPASS_MSI_REMAP,
+		},
+	},
+	{ PCI_VDEVICE(INTEL, 0x467f),
+		(kernel_ulong_t)&(struct vmd_device_data) {
+			.features = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
+				    VMD_FEAT_HAS_BUS_RESTRICTIONS |
+				    VMD_FEAT_OFFSET_FIRST_VECTOR,
+		},
+	},
+	{ PCI_VDEVICE(INTEL, 0x4c3d),
+		(kernel_ulong_t)&(struct vmd_device_data) {
+			.features = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
+				    VMD_FEAT_HAS_BUS_RESTRICTIONS |
+				    VMD_FEAT_OFFSET_FIRST_VECTOR,
+		},
+	},
+	{ PCI_VDEVICE(INTEL, 0xa77f),
+		(kernel_ulong_t)&(struct vmd_device_data) {
+			.features = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
+				    VMD_FEAT_HAS_BUS_RESTRICTIONS |
+				    VMD_FEAT_OFFSET_FIRST_VECTOR,
+		},
+	},
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_VMD_9A0B),
+		(kernel_ulong_t)&(struct vmd_device_data) {
+			.features = VMD_FEAT_HAS_MEMBAR_SHADOW_VSCAP |
+				    VMD_FEAT_HAS_BUS_RESTRICTIONS |
+				    VMD_FEAT_OFFSET_FIRST_VECTOR,
+		},
+	},
+	{ }
 };
 MODULE_DEVICE_TABLE(pci, vmd_ids);
 
