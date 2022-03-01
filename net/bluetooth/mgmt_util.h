@@ -44,6 +44,8 @@ int mgmt_cmd_complete(struct sock *sk, u16 index, u16 cmd, u8 status,
 
 struct mgmt_pending_cmd *mgmt_pending_find(unsigned short channel, u16 opcode,
 					   struct hci_dev *hdev);
+bool mgmt_pending_find_cmd(unsigned short channel, struct mgmt_pending_cmd *cmd,
+					   struct hci_dev *hdev);
 struct mgmt_pending_cmd *mgmt_pending_find_data(unsigned short channel,
 						u16 opcode,
 						struct hci_dev *hdev,
