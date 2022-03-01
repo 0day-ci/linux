@@ -1384,6 +1384,7 @@ static u16 mv88e6xxx_port_vlan(struct mv88e6xxx_chip *chip, int dev, int port)
 	struct dsa_switch *ds = chip->ds;
 	struct dsa_switch_tree *dst = ds->dst;
 	struct dsa_port *dp, *other_dp;
+	int local_receive = 1;
 	bool found = false;
 	u16 pvlan;
 
@@ -1425,6 +1426,9 @@ static u16 mv88e6xxx_port_vlan(struct mv88e6xxx_chip *chip, int dev, int port)
 
 	pvlan = 0;
 
+	if (dp->bridge)
+		local_receive = br_local_receive_enabled(dp->bridge->dev);
+
 	/* Frames from standalone user ports can only egress on the
 	 * upstream port.
 	 */
@@ -1433,10 +1437,11 @@ static u16 mv88e6xxx_port_vlan(struct mv88e6xxx_chip *chip, int dev, int port)
 
 	/* Frames from bridged user ports can egress any local DSA
 	 * links and CPU ports, as well as any local member of their
-	 * bridge group.
+	 * as well as any local member of their bridge group. However, CPU ports
+	 * are omitted if local_receive is reset.
 	 */
 	dsa_switch_for_each_port(other_dp, ds)
-		if (other_dp->type == DSA_PORT_TYPE_CPU ||
+		if ((other_dp->type == DSA_PORT_TYPE_CPU && local_receive) ||
 		    other_dp->type == DSA_PORT_TYPE_DSA ||
 		    dsa_port_bridge_same(dp, other_dp))
 			pvlan |= BIT(other_dp->index);
@@ -2716,6 +2721,41 @@ static void mv88e6xxx_crosschip_bridge_leave(struct dsa_switch *ds,
 	    mv88e6xxx_map_virtual_bridge_to_pvt(ds, bridge.num))
 		dev_err(ds->dev, "failed to remap cross-chip Port VLAN\n");
 	mv88e6xxx_reg_unlock(chip);
+}
+
+static int mv88e6xxx_set_local_receive(struct dsa_switch *ds, int port, struct net_device *br,
+				       bool enable)
+{
+	struct mv88e6xxx_chip *chip = ds->priv;
+	struct dsa_bridge *bridge;
+	struct dsa_port *dp;
+	bool found = false;
+	int err;
+
+	if (!netif_is_bridge_master(br))
+		return 0;
+
+	list_for_each_entry(dp, &ds->dst->ports, list) {
+		if (dp->ds == ds && dp->index == port) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+		return 0;
+
+	bridge = dp->bridge;
+	if (!bridge)
+		return 0;
+
+	mv88e6xxx_reg_lock(chip);
+
+	err = mv88e6xxx_bridge_map(chip, *bridge);
+
+	mv88e6xxx_reg_unlock(chip);
+
+	return err;
 }
 
 static int mv88e6xxx_software_reset(struct mv88e6xxx_chip *chip)
@@ -6478,6 +6518,7 @@ static const struct dsa_switch_ops mv88e6xxx_switch_ops = {
 	.set_eeprom		= mv88e6xxx_set_eeprom,
 	.get_regs_len		= mv88e6xxx_get_regs_len,
 	.get_regs		= mv88e6xxx_get_regs,
+	.set_local_receive      = mv88e6xxx_set_local_receive,
 	.get_rxnfc		= mv88e6xxx_get_rxnfc,
 	.set_rxnfc		= mv88e6xxx_set_rxnfc,
 	.set_ageing_time	= mv88e6xxx_set_ageing_time,
