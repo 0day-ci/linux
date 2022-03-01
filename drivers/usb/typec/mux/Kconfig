@@ -19,4 +19,14 @@ config TYPEC_MUX_INTEL_PMC
 	  control the USB role switch and also the multiplexer/demultiplexer
 	  switches used with USB Type-C Alternate Modes.
 
+config TYPEC_MUX_TS5USBA224
+	tristate "TI TS5USBA224 USB High Speed/Audio switch mux driver"
+	select GPIOLIB
+	help
+	  Say Y or M if your system has a TI TS5USBA224 USB High Speed/Audio
+	  switch mux controller paired with a USB Type-C port controller.
+
+	  If you choose to build this driver as a dynamically linked module, the
+	  module will be called ts5usba224.ko.
+
 endmenu
