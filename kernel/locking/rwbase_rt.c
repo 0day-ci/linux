@@ -223,10 +223,10 @@ static inline bool __rwbase_write_trylock(struct rwbase_rt *rwb)
 	 */
 	if (!atomic_read_acquire(&rwb->readers)) {
 		atomic_set(&rwb->readers, WRITER_BIAS);
-		return 1;
+		return true;
 	}
 
-	return 0;
+	return false;
 }
 
 static int __sched rwbase_write_lock(struct rwbase_rt *rwb,
