@@ -647,6 +647,9 @@
 			mmc-hs400-1_8v;
 			mmc-hs400-enhanced-strobe;
 
+			/* Add dt entry for gcc hw reset */
+			resets = <&gcc GCC_SDCC1_BCR>;
+			reset-names = "core_reset";
 			sdhc1_opp_table: opp-table {
 				compatible = "operating-points-v2";
 
@@ -2447,6 +2450,9 @@
 
 			qcom,dll-config = <0x0007642c>;
 
+			/* Add dt entry for gcc hw reset */
+			resets = <&gcc GCC_SDCC2_BCR>;
+			reset-names = "core_reset";
 			sdhc2_opp_table: opp-table {
 				compatible = "operating-points-v2";
 
