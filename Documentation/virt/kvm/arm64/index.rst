@@ -1,13 +1,13 @@
 .. SPDX-License-Identifier: GPL-2.0
 
-===
-ARM
-===
+=====
+ARM64
+=====
 
 .. toctree::
    :maxdepth: 2
 
-   hyp-abi
+   el2-abi
    psci
    pvtime
    ptp_kvm

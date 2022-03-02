@@ -25,7 +25,7 @@ KVM
 
    review-checklist
 
-   arm/index
+   arm64/index
 
    devices/index
 

@@ -159,7 +159,7 @@ Returns:
 
 Specifies the base address of the stolen time structure for this VCPU. The
 base address must be 64 byte aligned and exist within a valid guest memory
-region. See Documentation/virt/kvm/arm/pvtime.rst for more information
+region. See Documentation/virt/kvm/arm64/pvtime.rst for more information
 including the layout of the stolen time structure.
 
 4. GROUP: KVM_VCPU_TSC_CTRL
