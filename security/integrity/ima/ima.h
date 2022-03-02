@@ -152,6 +152,7 @@ struct ima_namespace {
 	int valid_policy;
 
 	struct dentry *ima_policy;
+	bool ima_policy_removed;
 
 	struct notifier_block ima_lsm_policy_notifier;
 } __randomize_layout;
