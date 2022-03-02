@@ -283,33 +283,36 @@ static void hci_cmd_sync_work(struct work_struct *work)
 
 	bt_dev_dbg(hdev, "");
 
-	mutex_lock(&hdev->cmd_sync_work_lock);
-	entry = list_first_entry(&hdev->cmd_sync_work_list,
-				 struct hci_cmd_sync_work_entry, list);
-	if (entry) {
-		list_del(&entry->list);
+	/* Dequeue all entries and run them */
+	while (1) {
+		mutex_lock(&hdev->cmd_sync_work_lock);
+		entry = list_first_entry_or_null(&hdev->cmd_sync_work_list,
+						 struct hci_cmd_sync_work_entry,
+						 list);
+		if (entry)
+			list_del(&entry->list);
+		mutex_unlock(&hdev->cmd_sync_work_lock);
+
+		if (!entry)
+			break;
+
 		func = entry->func;
 		data = entry->data;
 		destroy = entry->destroy;
 		kfree(entry);
-	} else {
-		func = NULL;
-		data = NULL;
-		destroy = NULL;
-	}
-	mutex_unlock(&hdev->cmd_sync_work_lock);
 
-	if (func) {
-		int err;
+		if (func) {
+			int err;
 
-		hci_req_sync_lock(hdev);
+			hci_req_sync_lock(hdev);
 
-		err = func(hdev, data);
+			err = func(hdev, data);
 
-		if (destroy)
-			destroy(hdev, data, err);
+			if (destroy)
+				destroy(hdev, data, err);
 
-		hci_req_sync_unlock(hdev);
+			hci_req_sync_unlock(hdev);
+		}
 	}
 }
 
