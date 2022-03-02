@@ -139,11 +139,31 @@ static int tegra186_mc_probe_device(struct tegra_mc *mc, struct device *dev)
 	return 0;
 }
 
+static int tegra186_mc_map_regs(struct tegra_mc *mc,
+				struct platform_device *pdev)
+{
+	struct resource *res;
+	int i;
+
+	mc->mcb_regs = devm_platform_get_and_ioremap_resource(pdev, 1, &res);
+	if (IS_ERR(mc->mcb_regs))
+		return PTR_ERR(mc->mcb_regs);
+
+	for (i = 0; i < mc->soc->num_channels; i++) {
+		mc->mc_regs[i] = devm_platform_get_and_ioremap_resource(pdev, i + 2, &res);
+		if (IS_ERR(mc->mc_regs[i]))
+			return PTR_ERR(mc->mc_regs[i]);
+	}
+
+	return 0;
+}
+
 const struct tegra_mc_ops tegra186_mc_ops = {
 	.probe = tegra186_mc_probe,
 	.remove = tegra186_mc_remove,
 	.resume = tegra186_mc_resume,
 	.probe_device = tegra186_mc_probe_device,
+	.map_regs = tegra186_mc_map_regs,
 };
 
 #if defined(CONFIG_ARCH_TEGRA_186_SOC)
@@ -875,6 +895,7 @@ const struct tegra_mc_soc tegra186_mc_soc = {
 	.num_clients = ARRAY_SIZE(tegra186_mc_clients),
 	.clients = tegra186_mc_clients,
 	.num_address_bits = 40,
+	.num_channels = 4,
 	.ops = &tegra186_mc_ops,
 };
 #endif

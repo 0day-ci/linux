@@ -13,6 +13,9 @@
 #include <linux/irq.h>
 #include <linux/reset-controller.h>
 #include <linux/types.h>
+#include <linux/platform_device.h>
+
+#define MC_MAX_CHANNELS 16
 
 struct clk;
 struct device;
@@ -181,6 +184,7 @@ struct tegra_mc_ops {
 	int (*resume)(struct tegra_mc *mc);
 	irqreturn_t (*handle_irq)(int irq, void *data);
 	int (*probe_device)(struct tegra_mc *mc, struct device *dev);
+	int (*map_regs)(struct tegra_mc *mc, struct platform_device *pdev);
 };
 
 struct tegra_mc_soc {
@@ -194,6 +198,7 @@ struct tegra_mc_soc {
 	unsigned int atom_size;
 
 	u8 client_id_mask;
+	u8 num_channels;
 
 	const struct tegra_smmu_soc *smmu;
 
@@ -212,6 +217,8 @@ struct tegra_mc {
 	struct tegra_smmu *smmu;
 	struct gart_device *gart;
 	void __iomem *regs;
+	void __iomem *mcb_regs;
+	void __iomem *mc_regs[MC_MAX_CHANNELS];
 	struct clk *clk;
 	int irq;
 
