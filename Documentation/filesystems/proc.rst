@@ -340,10 +340,10 @@ It's slow but very precise.
   cmin_flt      number of minor faults with child's
   maj_flt       number of major faults
   cmaj_flt      number of major faults with child's
-  utime         user mode jiffies
-  stime         kernel mode jiffies
-  cutime        user mode jiffies with child's
-  cstime        kernel mode jiffies with child's
+  utime         user mode processor time (clock_t)
+  stime         kernel mode processor time (clock_t)
+  cutime        user mode processor time (clock_t) with child's
+  cstime        kernel mode processor time (clock_t) with child's
   priority      priority level
   nice          nice level
   num_threads   number of threads
@@ -370,8 +370,8 @@ It's slow but very precise.
   rt_priority   realtime priority
   policy        scheduling policy (man sched_setscheduler)
   blkio_ticks   time spent waiting for block IO
-  gtime         guest time of the task in jiffies
-  cgtime        guest time of the task children in jiffies
+  gtime         guest time of the task in processor time (clock_t)
+  cgtime        guest time of the task children in processor time (clock_t)
   start_data    address above which program data+bss is placed
   end_data      address below which program data+bss is placed
   start_brk     address above which program heap can be expanded with brk()
