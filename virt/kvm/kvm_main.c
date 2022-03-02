@@ -1137,6 +1137,9 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	preempt_notifier_inc();
 	kvm_init_pm_notifier(kvm);
 
+	/* This is safe, since we have a reference from open(). */
+	__module_get(THIS_MODULE);
+
 	return kvm;
 
 out_err:
@@ -1226,6 +1229,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	preempt_notifier_dec();
 	hardware_disable_all();
 	mmdrop(mm);
+	module_put(THIS_MODULE);
 }
 
 void kvm_get_kvm(struct kvm *kvm)
