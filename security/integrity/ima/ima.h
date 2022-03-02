@@ -106,7 +106,6 @@ struct ima_queue_entry {
 	struct list_head later;		/* place in ima_measurements list */
 	struct ima_template_entry *entry;
 };
-extern struct list_head ima_measurements;	/* list of all measurements */
 
 /* Some details preceding the binary serialized measurement list */
 struct ima_kexec_hdr {
@@ -136,6 +135,8 @@ struct ima_namespace {
 	struct ima_rule_entry *arch_policy_entry;
 
 	struct ima_h_table ima_htable;
+	struct list_head ima_measurements;	/* list of all measurements */
+	unsigned long binary_runtime_size;	/* used by init_ima_ns */
 } __randomize_layout;
 extern struct ima_namespace init_ima_ns;
 
@@ -186,7 +187,7 @@ int ima_restore_measurement_entry(struct ima_namespace *ns,
 int ima_restore_measurement_list(struct ima_namespace *ns,
 				 loff_t bufsize, void *buf);
 int ima_measurements_show(struct seq_file *m, void *v);
-unsigned long ima_get_binary_runtime_size(void);
+unsigned long ima_get_binary_runtime_size(struct ima_namespace *ns);
 int ima_init_template(void);
 void ima_init_template_list(void);
 int __init ima_init_digests(void);
