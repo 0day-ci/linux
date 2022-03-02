@@ -3,3 +3,4 @@
 source "drivers/media/platform/sunxi/sun4i-csi/Kconfig"
 source "drivers/media/platform/sunxi/sun6i-csi/Kconfig"
 source "drivers/media/platform/sunxi/sun6i-mipi-csi2/Kconfig"
+source "drivers/media/platform/sunxi/sun8i-a83t-mipi-csi2/Kconfig"
