@@ -2,6 +2,7 @@
 
 #include <linux/module.h>
 #include <linux/types.h>
+#include <drm/drm_drv.h>
 
 static bool drm_nomodeset;
 
