@@ -15,6 +15,12 @@
 
 #define GPU_PAS_ID 13
 
+bool a6xx_is_smmu_stalled(struct msm_gpu *gpu)
+{
+	return !!(gpu_read(gpu, REG_A6XX_RBBM_STATUS3) &
+			A6XX_RBBM_STATUS3_SMMU_STALLED_ON_FAULT);
+}
+
 static inline bool _a6xx_check_idle(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
@@ -1347,7 +1353,7 @@ static void a6xx_fault_detect_irq(struct msm_gpu *gpu)
 	 * to otherwise resume normally rather than killing the submit, so
 	 * just bail.
 	 */
-	if (gpu_read(gpu, REG_A6XX_RBBM_STATUS3) & A6XX_RBBM_STATUS3_SMMU_STALLED_ON_FAULT)
+	if (a6xx_is_smmu_stalled(gpu))
 		return;
 
 	/*
