@@ -894,10 +894,9 @@ static bool ceph_msg_data_pages_advance(struct ceph_msg_data_cursor *cursor,
 		return false;   /* no more data */
 
 	/* Move on to the next page; offset is already at 0 */
-
 	BUG_ON(cursor->page_index >= cursor->page_count);
 	cursor->page_index++;
-	cursor->last_piece = cursor->resid <= PAGE_SIZE;
+	cursor->last_piece = cursor->page_offset + cursor->resid <= PAGE_SIZE;
 
 	return true;
 }
