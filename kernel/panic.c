@@ -84,13 +84,12 @@ static struct ctl_table kern_panic_table[] = {
 		.proc_handler   = proc_dointvec_minmax,
 		.extra1         = SYSCTL_ZERO,
 		.extra2         = SYSCTL_ONE,
-	},
-	{ }
+	}
 };
 
 static __init int kernel_panic_sysctls_init(void)
 {
-	register_sysctl_init("kernel", kern_panic_table);
+	register_sysctl_single("kernel", kern_panic_table);
 	return 0;
 }
 late_initcall(kernel_panic_sysctls_init);

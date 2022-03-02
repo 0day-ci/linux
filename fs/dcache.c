@@ -190,13 +190,12 @@ static struct ctl_table fs_dcache_sysctls[] = {
 		.maxlen		= 6*sizeof(long),
 		.mode		= 0444,
 		.proc_handler	= proc_nr_dentry,
-	},
-	{ }
+	}
 };
 
 static int __init init_fs_dcache_sysctls(void)
 {
-	register_sysctl_init("fs", fs_dcache_sysctls);
+	register_sysctl_single("fs", fs_dcache_sysctls);
 	return 0;
 }
 fs_initcall(init_fs_dcache_sysctls);

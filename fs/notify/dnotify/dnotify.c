@@ -28,12 +28,11 @@ static struct ctl_table dnotify_sysctls[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
-	},
-	{}
+	}
 };
 static void __init dnotify_sysctl_init(void)
 {
-	register_sysctl_init("fs", dnotify_sysctls);
+	register_sysctl_single("fs", dnotify_sysctls);
 }
 #else
 #define dnotify_sysctl_init() do { } while (0)
