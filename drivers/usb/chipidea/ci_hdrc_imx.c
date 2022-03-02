@@ -344,6 +344,8 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 	if ((of_usb_get_phy_mode(dev->of_node) == USBPHY_INTERFACE_MODE_HSIC)
 		&& data->usbmisc_data) {
 		pdata.flags |= CI_HDRC_IMX_IS_HSIC;
+		/* Runtime suspend is not supported for HSIC interface */
+		pdata.flags &= ~CI_HDRC_SUPPORTS_RUNTIME_PM;
 		data->usbmisc_data->hsic = 1;
 		data->pinctrl = devm_pinctrl_get(dev);
 		if (PTR_ERR(data->pinctrl) == -ENODEV)
