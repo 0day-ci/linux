@@ -20,9 +20,6 @@ properties:
           - mediatek,mt2701-disp-pwm
           - mediatek,mt6595-disp-pwm
           - mediatek,mt8173-disp-pwm
-      - items:
-          - const: mediatek,mt8167-disp-pwm
-          - const: mediatek,mt8173-disp-pwm
 
   reg:
     maxItems: 1
