@@ -103,6 +103,23 @@ properties:
       register. Define this if your serial port does not use this pin.
     type: boolean
 
+  snps,rs485-interface-en:
+    description: Use true RS-485 DE and RE signals (in contrast to RS-485
+      emulation using RTS). Requires IP version 4 or above.
+    type: boolean
+
+  snps,de-active-high:
+    description: Defines the polarity of driver enable (DE_EN) signal.
+      Meaningful only with snps,rs485-interface-en. True indicates active
+      high.
+    type: boolean
+
+  snps,re-active-high:
+    description: Defines the polarity of receiver enable (RE_EN) signal.
+      Meaningful only with snps,rs485-interface-en. True indicates active
+      high.
+    type: boolean
+
 required:
   - compatible
   - reg
