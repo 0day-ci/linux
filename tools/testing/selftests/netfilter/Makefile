@@ -8,6 +8,7 @@ TEST_PROGS := nft_trans_stress.sh nft_fib.sh nft_nat.sh bridge_brouter.sh \
 	ipip-conntrack-mtu.sh conntrack_tcp_unreplied.sh \
 	conntrack_vrf.sh nft_synproxy.sh
 
+CFLAGS += -I/usr/include/libmnl
 LDLIBS = -lmnl
 TEST_GEN_FILES =  nf-queue
 
