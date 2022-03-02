@@ -35,7 +35,7 @@ properties:
 
   reg:
     minItems: 1
-    maxItems: 3
+    maxItems: 18
 
   interrupts:
     items:
