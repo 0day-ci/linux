@@ -20,6 +20,14 @@ struct intel_cdclk_config {
 	u8 voltage_level;
 };
 
+enum cdclk_actions {
+	CDCLK_MODESET = 0,
+	CDCLK_SQUASH,
+	CDCLK_CRAWL,
+	CDCLK_NOOP,
+	CDCLK_ACTIONS
+};
+
 struct intel_cdclk_state {
 	struct intel_global_state base;
 
@@ -49,6 +57,11 @@ struct intel_cdclk_state {
 
 	/* bitmask of active pipes */
 	u8 active_pipes;
+
+	struct cdclk_steps {
+		enum cdclk_actions action;
+		u32 cdclk;
+	} steps[CDCLK_ACTIONS];
 };
 
 int intel_crtc_compute_min_cdclk(const struct intel_crtc_state *crtc_state);
@@ -58,7 +71,8 @@ void intel_init_cdclk_hooks(struct drm_i915_private *dev_priv);
 void intel_update_max_cdclk(struct drm_i915_private *dev_priv);
 void intel_update_cdclk(struct drm_i915_private *dev_priv);
 u32 intel_read_rawclk(struct drm_i915_private *dev_priv);
-bool intel_cdclk_needs_modeset(const struct intel_cdclk_config *a,
+bool intel_cdclk_needs_modeset(struct drm_i915_private *i915,
+			       const struct intel_cdclk_config *a,
 			       const struct intel_cdclk_config *b);
 void intel_set_cdclk_pre_plane_update(struct intel_atomic_state *state);
 void intel_set_cdclk_post_plane_update(struct intel_atomic_state *state);
