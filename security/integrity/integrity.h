@@ -122,13 +122,39 @@ struct signature_v2_hdr {
 	uint8_t sig[];		/* signature payload */
 } __packed;
 
+/* integrity status of an inode in a namespace */
+struct ns_status {
+	struct list_head ns_next;
+	unsigned long flags;		/* flags split with iint */
+#ifdef CONFIG_IMA_NS
+	struct rb_node rb_node;
+	struct integrity_iint_cache *iint;
+	struct inode *inode;
+	struct ima_namespace *ns;
+	ino_t i_ino;
+	u32 i_generation;
+	struct llist_node gc_llist;	/* used while freeing */
+#endif
+};
+
+static inline void ns_status_reset(struct ns_status *ns_status)
+{
+	ns_status->flags = 0;
+}
+
+static inline void ns_status_init(struct ns_status *ns_status)
+{
+	INIT_LIST_HEAD(&ns_status->ns_next);
+	ns_status_reset(ns_status);
+}
+
 /* integrity data associated with an inode */
 struct integrity_iint_cache {
 	struct rb_node rb_node;	/* rooted in integrity_iint_tree */
 	struct mutex mutex;	/* protects: version, flags, digest */
 	struct inode *inode;	/* back pointer to inode in question */
 	u64 version;		/* track inode changes */
-	unsigned long flags;
+	unsigned long flags;	/* flags split with ns_status */
 	unsigned long measured_pcrs;
 	unsigned long atomic_flags;
 	enum integrity_status ima_file_status:4;
@@ -138,6 +164,13 @@ struct integrity_iint_cache {
 	enum integrity_status ima_creds_status:4;
 	enum integrity_status evm_status:4;
 	struct ima_digest_data *ima_hash;
+
+	/*
+	 * Lock and list of ns_status for files shared by different
+	 * namespaces
+	 */
+	rwlock_t ns_list_lock;
+	struct list_head ns_list;
 };
 
 /* rbtree tree calls to lookup, insert, delete
