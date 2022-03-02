@@ -1,7 +1,7 @@
 .. SPDX-License-Identifier: GPL-2.0
 
-PTP_KVM support for arm/arm64
-=============================
+PTP_KVM support for arm64
+=========================
 
 PTP_KVM is used for high precision time sync between host and guests.
 It relies on transferring the wall clock and counter value from the
