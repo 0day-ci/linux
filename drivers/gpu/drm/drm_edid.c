@@ -3350,6 +3350,7 @@ add_detailed_modes(struct drm_connector *connector, struct edid *edid,
 #define EXT_VIDEO_DATA_BLOCK_420	0x0E
 #define EXT_VIDEO_CAP_BLOCK_Y420CMDB	0x0F
 #define EXT_VIDEO_HF_EEODB_DATA_BLOCK	0x78
+#define EXT_VIDEO_HF_SCDB_DATA_BLOCK	0x79
 #define EDID_BASIC_AUDIO	(1 << 6)
 #define EDID_CEA_YCRCB444	(1 << 5)
 #define EDID_CEA_YCRCB422	(1 << 4)
@@ -4277,6 +4278,20 @@ static bool cea_db_is_vcdb(const u8 *db)
 	return true;
 }
 
+static bool cea_db_is_hf_scdb(const u8 *db)
+{
+	if (cea_db_tag(db) != USE_EXTENDED_TAG)
+		return false;
+
+	if (cea_db_payload_len(db) < 7)
+		return false;
+
+	if (cea_db_extended_tag(db) != EXT_VIDEO_HF_SCDB_DATA_BLOCK)
+		return false;
+
+	return true;
+}
+
 static bool cea_db_is_y420cmdb(const u8 *db)
 {
 	if (cea_db_tag(db) != USE_EXTENDED_TAG)
@@ -4987,6 +5002,25 @@ static void drm_parse_vcdb(struct drm_connector *connector, const u8 *db)
 		info->rgb_quant_range_selectable = true;
 }
 
+static void drm_parse_hf_scdb(struct drm_connector *connector, const u8 *db)
+{
+	struct drm_display_info *info = &connector->display_info;
+	u32 max_tmds_clock;
+
+	DRM_DEBUG_KMS("HF-SCDB version 0x%02x\n", db[4]);
+
+	max_tmds_clock = db[5] * 5000;
+	if (info->max_tmds_clock < max_tmds_clock) {
+		info->max_tmds_clock = max_tmds_clock;
+		DRM_DEBUG_KMS("HF-SCDB: max TMDS clock %d kHz\n",
+			      info->max_tmds_clock);
+	}
+
+	/*
+	 * ToDo: Parse the remaining SCDB data if needed
+	 */
+}
+
 static
 void drm_get_max_frl_rate(int max_frl_rate, u8 *max_lanes, u8 *max_rate_per_lane)
 {
@@ -5282,6 +5316,8 @@ static void drm_parse_cea_ext(struct drm_connector *connector,
 			drm_parse_y420cmdb_bitmap(connector, db);
 		if (cea_db_is_vcdb(db))
 			drm_parse_vcdb(connector, db);
+		if (cea_db_is_hf_scdb(db))
+			drm_parse_hf_scdb(connector, db);
 		if (cea_db_is_hdmi_hdr_metadata_block(db))
 			drm_parse_hdr_metadata_block(connector, db);
 	}
