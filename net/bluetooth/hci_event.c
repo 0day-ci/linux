@@ -6809,7 +6809,7 @@ static void hci_event_func(struct hci_dev *hdev, u8 event, struct sk_buff *skb,
 	const struct hci_ev *ev = &hci_ev_table[event];
 	void *data;
 
-	if (!ev->func)
+	if (!ev->func || event == HCI_EV_VENDOR)
 		return;
 
 	if (skb->len < ev->min_len) {
