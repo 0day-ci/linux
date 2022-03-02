@@ -110,9 +110,14 @@ static int dw8250_rs485_config(struct uart_port *p, struct serial_rs485 *rs485)
 
 	if (rs485->flags & SER_RS485_ENABLED) {
 		/* Clearing unsupported flags. */
-		rs485->flags &= SER_RS485_ENABLED;
+		rs485->flags &= SER_RS485_ENABLED | SER_RS485_RX_DURING_TX;
+		tcr |= DW_UART_TCR_RS485_EN;
 
-		tcr |= DW_UART_TCR_RS485_EN | DW_UART_TCR_XFER_MODE_DE_OR_RE;
+		if (rs485->flags & SER_RS485_RX_DURING_TX) {
+			tcr |= DW_UART_TCR_XFER_MODE_DE_DURING_RE;
+		} else {
+			tcr |= DW_UART_TCR_XFER_MODE_DE_OR_RE;
+		}
 		dw8250_writel_ext(p, DW_UART_DE_EN, 1);
 		dw8250_writel_ext(p, DW_UART_RE_EN, 1);
 	} else {
