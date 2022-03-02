@@ -10,6 +10,7 @@
 
 #define pr_fmt(fmt)	"HugeTLB: " fmt
 
+#include <linux/memory_hotplug.h>
 #include "hugetlb_vmemmap.h"
 
 /*
@@ -118,17 +119,14 @@ void __init hugetlb_vmemmap_init(struct hstate *h)
 	BUILD_BUG_ON(__NR_USED_SUBPAGE >=
 		     RESERVE_VMEMMAP_SIZE / sizeof(struct page));
 
-	if (!hugetlb_free_vmemmap_enabled())
-		return;
-
-	if (IS_ENABLED(CONFIG_HUGETLB_PAGE_FREE_VMEMMAP_DEFAULT_ON) &&
-	    !is_power_of_2(sizeof(struct page))) {
+	if (!is_power_of_2(sizeof(struct page))) {
 		/*
 		 * The hugetlb_free_vmemmap_enabled_key can be enabled when
 		 * CONFIG_HUGETLB_PAGE_FREE_VMEMMAP_DEFAULT_ON. It should
 		 * be disabled if "struct page" crosses page boundaries.
 		 */
-		static_branch_disable(&hugetlb_free_vmemmap_enabled_key);
+		if (IS_ENABLED(CONFIG_HUGETLB_PAGE_FREE_VMEMMAP_DEFAULT_ON))
+			static_branch_disable(&hugetlb_free_vmemmap_enabled_key);
 		return;
 	}
 
@@ -147,3 +145,35 @@ void __init hugetlb_vmemmap_init(struct hstate *h)
 	pr_info("can free %d vmemmap pages for %s\n", h->nr_free_vmemmap_pages,
 		h->name);
 }
+
+static struct ctl_table hugetlb_vmemmap_sysctls[] = {
+	{
+		.procname	= "hugetlb_free_vmemmap",
+		.data		= &hugetlb_free_vmemmap_enabled_key.key,
+		.mode		= 0644,
+		/* only handle a transition from default "0" to "1" */
+		.proc_handler	= proc_do_static_key,
+		.extra1		= SYSCTL_ONE,
+		.extra2		= SYSCTL_ONE,
+	},
+	{ }
+};
+
+static __init int hugetlb_vmemmap_sysctls_init(void)
+{
+	/*
+	 * The vmemmap pages cannot be optimized if
+	 * "memory_hotplug.memmap_on_memory" is enabled unless
+	 * "hugetlb_free_vmemmap" is enabled as well since
+	 * "hugetlb_free_vmemmap" takes precedence over
+	 * "memory_hotplug.memmap_on_memory".
+	 */
+	if (mhp_memmap_on_memory() && !hugetlb_free_vmemmap_enabled())
+		return 0;
+
+	if (is_power_of_2(sizeof(struct page)))
+		register_sysctl_init("vm", hugetlb_vmemmap_sysctls);
+
+	return 0;
+}
+late_initcall(hugetlb_vmemmap_sysctls_init);

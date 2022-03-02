@@ -50,6 +50,11 @@ static bool memmap_on_memory __ro_after_init;
 #ifdef CONFIG_MHP_MEMMAP_ON_MEMORY
 module_param(memmap_on_memory, bool, 0444);
 MODULE_PARM_DESC(memmap_on_memory, "Enable memmap on memory for memory hotplug");
+
+bool mhp_memmap_on_memory(void)
+{
+	return memmap_on_memory;
+}
 #endif
 
 enum {
