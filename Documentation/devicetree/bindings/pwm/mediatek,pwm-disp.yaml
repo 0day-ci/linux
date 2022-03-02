@@ -21,7 +21,9 @@ properties:
           - mediatek,mt6595-disp-pwm
           - mediatek,mt8173-disp-pwm
           - mediatek,mt8183-disp-pwm
-
+      - items:
+          - const: mediatek,mt8192-disp-pwm
+          - const: mediatek,mt8183-disp-pwm
   reg:
     maxItems: 1
 
