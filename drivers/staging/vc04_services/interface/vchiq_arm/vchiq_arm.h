@@ -122,6 +122,8 @@ vchiq_instance_get_trace(struct vchiq_instance *instance);
 extern void
 vchiq_instance_set_trace(struct vchiq_instance *instance, int trace);
 
+int vchiq_platform_init(struct platform_device *pdev, struct vchiq_state *state);
+
 #if IS_ENABLED(CONFIG_VCHIQ_CDEV)
 
 extern void
