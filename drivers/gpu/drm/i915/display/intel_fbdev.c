@@ -67,68 +67,15 @@ struct intel_fbdev {
 	struct mutex hpd_lock;
 };
 
-static struct intel_frontbuffer *to_frontbuffer(struct intel_fbdev *ifbdev)
-{
-	return ifbdev->fb->frontbuffer;
-}
-
-static void intel_fbdev_invalidate(struct intel_fbdev *ifbdev)
-{
-	intel_frontbuffer_invalidate(to_frontbuffer(ifbdev), ORIGIN_CPU);
-}
-
-static int intel_fbdev_set_par(struct fb_info *info)
-{
-	struct drm_fb_helper *fb_helper = info->par;
-	struct intel_fbdev *ifbdev =
-		container_of(fb_helper, struct intel_fbdev, helper);
-	int ret;
-
-	ret = drm_fb_helper_set_par(info);
-	if (ret == 0)
-		intel_fbdev_invalidate(ifbdev);
-
-	return ret;
-}
-
-static int intel_fbdev_blank(int blank, struct fb_info *info)
-{
-	struct drm_fb_helper *fb_helper = info->par;
-	struct intel_fbdev *ifbdev =
-		container_of(fb_helper, struct intel_fbdev, helper);
-	int ret;
-
-	ret = drm_fb_helper_blank(blank, info);
-	if (ret == 0)
-		intel_fbdev_invalidate(ifbdev);
-
-	return ret;
-}
-
-static int intel_fbdev_pan_display(struct fb_var_screeninfo *var,
-				   struct fb_info *info)
-{
-	struct drm_fb_helper *fb_helper = info->par;
-	struct intel_fbdev *ifbdev =
-		container_of(fb_helper, struct intel_fbdev, helper);
-	int ret;
-
-	ret = drm_fb_helper_pan_display(var, info);
-	if (ret == 0)
-		intel_fbdev_invalidate(ifbdev);
-
-	return ret;
-}
-
 static const struct fb_ops intelfb_ops = {
 	.owner = THIS_MODULE,
 	DRM_FB_HELPER_DEFAULT_OPS,
-	.fb_set_par = intel_fbdev_set_par,
+	.fb_set_par = drm_fb_helper_set_par,
 	.fb_fillrect = drm_fb_helper_cfb_fillrect,
 	.fb_copyarea = drm_fb_helper_cfb_copyarea,
 	.fb_imageblit = drm_fb_helper_cfb_imageblit,
-	.fb_pan_display = intel_fbdev_pan_display,
-	.fb_blank = intel_fbdev_blank,
+	.fb_pan_display = drm_fb_helper_pan_display,
+	.fb_blank = drm_fb_helper_blank,
 };
 
 static int intelfb_alloc(struct drm_fb_helper *helper,
@@ -694,8 +641,7 @@ void intel_fbdev_restore_mode(struct drm_device *dev)
 	if (!ifbdev->vma)
 		return;
 
-	if (drm_fb_helper_restore_fbdev_mode_unlocked(&ifbdev->helper) == 0)
-		intel_fbdev_invalidate(ifbdev);
+	drm_fb_helper_restore_fbdev_mode_unlocked(&ifbdev->helper);
 }
 
 struct intel_framebuffer *intel_fbdev_framebuffer(struct intel_fbdev *fbdev)
