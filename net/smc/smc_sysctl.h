@@ -20,12 +20,12 @@ void smc_sysctl_exit(void);
 
 #else
 
-int smc_sysctl_init(void)
+static inline int smc_sysctl_init(void)
 {
 	return 0;
 }
 
-void smc_sysctl_exit(void) { }
+static inline void smc_sysctl_exit(void) { }
 
 #endif /* CONFIG_SYSCTL */
 

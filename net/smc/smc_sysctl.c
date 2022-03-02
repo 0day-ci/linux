@@ -69,12 +69,12 @@ static struct pernet_operations smc_sysctl_ops __net_initdata = {
 	.exit = smc_sysctl_exit_net,
 };
 
-int __init smc_sysctl_init(void)
+int __net_init smc_sysctl_init(void)
 {
 	return register_pernet_subsys(&smc_sysctl_ops);
 }
 
-void smc_sysctl_exit(void)
+void __net_exit smc_sysctl_exit(void)
 {
 	unregister_pernet_subsys(&smc_sysctl_ops);
 }
