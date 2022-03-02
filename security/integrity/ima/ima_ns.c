@@ -26,22 +26,29 @@ struct ima_namespace *create_ima_ns(void)
 /* destroy_ima_ns() must only be called after ima_init_namespace() was called */
 static void destroy_ima_ns(struct ima_namespace *ns)
 {
+	set_bit(IMA_NS_ACTIVE, &ns->ima_ns_flags);
 	unregister_blocking_lsm_notifier(&ns->ima_lsm_policy_notifier);
 	kfree(ns->arch_policy_entry);
 	ima_free_policy_rules(ns);
 	ima_free_ns_status_tree(ns);
 }
 
-void free_ima_ns(struct user_namespace *user_ns)
+void ima_free_ima_ns(struct ima_namespace *ns)
 {
-	struct ima_namespace *ns = user_ns->ima_ns;
-
 	if (!ns || WARN_ON(ns == &init_ima_ns))
 		return;
 
-	destroy_ima_ns(ns);
+	if (ns_is_active(ns))
+		destroy_ima_ns(ns);
 
 	kmem_cache_free(imans_cachep, ns);
+}
+
+void free_ima_ns(struct user_namespace *user_ns)
+{
+	struct ima_namespace *ns = ima_ns_from_user_ns(user_ns);
+
+	ima_free_ima_ns(ns);
 
 	user_ns->ima_ns = NULL;
 }

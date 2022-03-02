@@ -46,6 +46,8 @@ int ima_init_namespace(struct ima_namespace *ns)
 			return ret;
 	}
 
+	set_bit(IMA_NS_ACTIVE, &ns->ima_ns_flags);
+
 	return 0;
 }
 

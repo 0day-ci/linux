@@ -30,8 +30,12 @@ void ima_post_key_create_or_update(struct key *keyring, struct key *key,
 				   const void *payload, size_t payload_len,
 				   unsigned long flags, bool create)
 {
-	struct ima_namespace *ns = &init_ima_ns;
+	struct ima_namespace *ns = get_current_ns();
 	bool queued = false;
+
+	/* only handle key if related to init_ima_ns */
+	if (ns != &init_ima_ns)
+		return;
 
 	/* Only asymmetric keys are handled by this hook. */
 	if (key->type != &key_type_asymmetric)

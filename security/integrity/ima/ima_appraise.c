@@ -74,6 +74,9 @@ int ima_must_appraise(struct ima_namespace *ns,
 {
 	u32 secid;
 
+	if (ns != &init_ima_ns)
+		return 0;
+
 	if (!ima_appraise)
 		return 0;
 
@@ -493,12 +496,17 @@ out:
 
 /*
  * ima_update_xattr - update 'security.ima' hash value
+ *
+ * Only a namespace with a hash policy would ever update the file.
  */
 void ima_update_xattr(struct ima_namespace *ns,
 		      struct integrity_iint_cache *iint, struct file *file)
 {
 	struct dentry *dentry = file_dentry(file);
 	int rc = 0;
+
+	if (!ns_is_active(ns) || !(ns->ima_policy_flag & IMA_HASH))
+		return;
 
 	/* do not collect and update hash for digital signatures */
 	if (test_bit(IMA_DIGSIG, &iint->atomic_flags))
