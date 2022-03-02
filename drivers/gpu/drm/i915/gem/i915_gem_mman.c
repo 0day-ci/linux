@@ -455,7 +455,9 @@ vm_access(struct vm_area_struct *area, unsigned long addr,
 		return -EACCES;
 
 	addr -= area->vm_start;
-	if (addr >= obj->base.size)
+	if (len < 1 || len > obj->base.size ||
+	    addr >= obj->base.size ||
+	    addr + len > obj->base.size)
 		return -EINVAL;
 
 	i915_gem_ww_ctx_init(&ww, true);
