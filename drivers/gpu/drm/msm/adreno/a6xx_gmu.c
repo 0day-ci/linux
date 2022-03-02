@@ -14,6 +14,37 @@
 #include "msm_gpu_trace.h"
 #include "msm_mmu.h"
 
+void a6xx_gmu_send_nmi(struct a6xx_gmu *gmu)
+{
+	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
+	struct msm_gpu *gpu = &adreno_gpu->base;
+	u32 val;
+
+	if (a6xx_gmu_gx_is_on(gmu) && a6xx_is_smmu_stalled(gpu)) {
+		DRM_DEV_ERROR(gmu->dev,
+				"Skipping GMU NMI since SMMU is stalled\n");
+	}
+
+	/* Don't retrigger NMI if gmu reset is already active */
+	val = gmu_read(gmu, REG_A6XX_GMU_CM3_FW_INIT_RESULT);
+	if (val & 0xE00)
+		return;
+
+	/* Mask all interrupts from GMU first */
+	gmu_write(gmu, REG_A6XX_GMU_GMU2HOST_INTR_MASK, 0xFFFFFFFF);
+
+	/* Trigger NMI to make gmu save it's internal state to ddr */
+	val = gmu_read(gmu, REG_A6XX_GMU_CM3_CFG);
+	gmu_write(gmu, REG_A6XX_GMU_CM3_CFG, val | BIT(9));
+
+	/* Barrier to ensure write is posted before we proceed */
+	wmb();
+
+	/* Small delay to ensure state copy is ddr is complete at GMU */
+	udelay(200);
+}
+
 static void a6xx_gmu_fault(struct a6xx_gmu *gmu)
 {
 	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
@@ -789,6 +820,12 @@ static int a6xx_gmu_fw_start(struct a6xx_gmu *gmu, unsigned int state)
 
 	gmu_write(gmu, REG_A6XX_GMU_CM3_FW_INIT_RESULT, 0);
 	gmu_write(gmu, REG_A6XX_GMU_CM3_BOOT_CONFIG, 0x02);
+
+	/*
+	 * Make sure that the NMI bit is cleared by configuring the reset value
+	 * here
+	 */
+	gmu_write(gmu, REG_A6XX_GMU_CM3_CFG, 0x4052);
 
 	/* Write the iova of the HFI table */
 	gmu_write(gmu, REG_A6XX_GMU_HFI_QTBL_ADDR, gmu->hfi.iova);
