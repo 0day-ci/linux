@@ -604,8 +604,16 @@ static const struct of_device_id dt_match[] = {
 static int adreno_resume(struct device *dev)
 {
 	struct msm_gpu *gpu = dev_to_gpu(dev);
+	int ret;
 
-	return gpu->funcs->pm_resume(gpu);
+	/* What hope do we have for the future if we can't turn ON gpu */
+	while (true) {
+		ret = gpu->funcs->pm_resume(gpu);
+		if (!ret)
+			break;
+	}
+
+	return 0;
 }
 
 static int active_submits(struct msm_gpu *gpu)
