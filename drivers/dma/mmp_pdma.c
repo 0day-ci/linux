@@ -1101,9 +1101,11 @@ static int mmp_pdma_probe(struct platform_device *op)
 	pdev->device.residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 
 	if (pdev->dev->coherent_dma_mask)
-		dma_set_mask(pdev->dev, pdev->dev->coherent_dma_mask);
+		ret = dma_set_mask(pdev->dev, pdev->dev->coherent_dma_mask);
 	else
-		dma_set_mask(pdev->dev, DMA_BIT_MASK(64));
+		ret = dma_set_mask(pdev->dev, DMA_BIT_MASK(64));
+	if (ret)
+		return ret;
 
 	ret = dma_async_device_register(&pdev->device);
 	if (ret) {
