@@ -1024,6 +1024,7 @@ out:
 	/* On failure, shut down the GMU to leave it in a good state */
 	if (ret) {
 		disable_irq(gmu->gmu_irq);
+		a6xx_gmu_inline_coredump(gmu);
 		a6xx_rpmh_stop(gmu);
 		pm_runtime_put(gmu->gxpd);
 		pm_runtime_put(gmu->dev);
@@ -1082,6 +1083,7 @@ static void a6xx_gmu_shutdown(struct a6xx_gmu *gmu)
 {
 	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
 	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
+	int ret = 0;
 	u32 val;
 
 	/*
@@ -1091,10 +1093,11 @@ static void a6xx_gmu_shutdown(struct a6xx_gmu *gmu)
 	val = gmu_read(gmu, REG_A6XX_GPU_GMU_CX_GMU_RPMH_POWER_STATE);
 
 	if (val != 0xf) {
-		int ret = a6xx_gmu_wait_for_idle(gmu);
+		ret = a6xx_gmu_wait_for_idle(gmu);
 
 		/* If the GMU isn't responding assume it is hung */
 		if (ret) {
+			a6xx_gmu_inline_coredump(gmu);
 			a6xx_gmu_force_off(gmu);
 			return;
 		}
@@ -1102,7 +1105,9 @@ static void a6xx_gmu_shutdown(struct a6xx_gmu *gmu)
 		a6xx_bus_clear_pending_transactions(adreno_gpu);
 
 		/* tell the GMU we want to slumber */
-		a6xx_gmu_notify_slumber(gmu);
+		ret = a6xx_gmu_notify_slumber(gmu);
+		if (ret)
+			goto out;
 
 		ret = gmu_poll_timeout(gmu,
 			REG_A6XX_GPU_GMU_AO_GPU_CX_BUSY_STATUS, val,
@@ -1122,6 +1127,10 @@ static void a6xx_gmu_shutdown(struct a6xx_gmu *gmu)
 				gmu_read(gmu,
 					REG_A6XX_GPU_GMU_AO_GPU_CX_BUSY_STATUS2));
 	}
+
+out:
+	if (ret)
+		a6xx_gmu_inline_coredump(gmu);
 
 	/* Turn off HFI */
 	a6xx_hfi_stop(gmu);
@@ -1146,9 +1155,10 @@ int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
 	 * Force the GMU off if we detected a hang, otherwise try to shut it
 	 * down gracefully
 	 */
-	if (gmu->hung)
+	if (gmu->hung) {
+		a6xx_gmu_inline_coredump(gmu);
 		a6xx_gmu_force_off(gmu);
-	else
+	} else
 		a6xx_gmu_shutdown(gmu);
 
 	/* Remove the bus vote */

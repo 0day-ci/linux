@@ -3,6 +3,7 @@
 
 #include <linux/ascii85.h>
 #include "msm_gem.h"
+#include "msm_gpu.h"
 #include "a6xx_gpu.h"
 #include "a6xx_gmu.h"
 #include "a6xx_gpu_state.h"
@@ -970,10 +971,19 @@ void a6xx_get_gmu_state(struct msm_gpu *gpu, struct a6xx_gpu_state *a6xx_state)
 	struct a6xx_gpu *a6xx_gpu = to_a6xx_gpu(adreno_gpu);
 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
 
-	if (gmu->hung)
+	if (gmu->hung) {
+		mutex_lock(&gmu->lock);
 		a6xx_gmu_send_nmi(gmu);
+		mutex_unlock(&gmu->lock);
+	}
 
 	a6xx_get_gmu_registers(gpu, a6xx_state);
+
+	a6xx_state->gmu_log = a6xx_snapshot_gmu_bo(a6xx_state, &a6xx_gpu->gmu.log);
+	a6xx_state->gmu_hfi = a6xx_snapshot_gmu_bo(a6xx_state, &a6xx_gpu->gmu.hfi);
+	a6xx_state->gmu_debug = a6xx_snapshot_gmu_bo(a6xx_state, &a6xx_gpu->gmu.debug);
+
+	a6xx_snapshot_gmu_hfi_history(gpu, a6xx_state);
 }
 
 struct msm_gpu_state *a6xx_gpu_state_get(struct msm_gpu *gpu)
@@ -993,12 +1003,6 @@ struct msm_gpu_state *a6xx_gpu_state_get(struct msm_gpu *gpu)
 	adreno_gpu_state_get(gpu, &a6xx_state->base);
 
 	a6xx_get_gmu_state(gpu, a6xx_state);
-
-	a6xx_state->gmu_log = a6xx_snapshot_gmu_bo(a6xx_state, &a6xx_gpu->gmu.log);
-	a6xx_state->gmu_hfi = a6xx_snapshot_gmu_bo(a6xx_state, &a6xx_gpu->gmu.hfi);
-	a6xx_state->gmu_debug = a6xx_snapshot_gmu_bo(a6xx_state, &a6xx_gpu->gmu.debug);
-
-	a6xx_snapshot_gmu_hfi_history(gpu, a6xx_state);
 
 	/* If GX isn't on the rest of the data isn't going to be accessible */
 	if (!a6xx_gmu_gx_is_on(&a6xx_gpu->gmu))
@@ -1342,4 +1346,46 @@ void a6xx_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 
 	drm_puts(p, "debugbus:\n");
 	a6xx_show_debugbus(a6xx_state, p);
+}
+
+void a6xx_gmu_inline_coredump(struct a6xx_gmu *gmu)
+{
+	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
+	struct msm_gpu *gpu = &adreno_gpu->base;
+	struct a6xx_gpu_state *a6xx_state;
+
+	WARN_ON(mutex_is_locked(&gmu->lock));
+
+	mutex_lock(&gpu->crashstate_lock);
+
+	if (gpu->crashstate) {
+		mutex_unlock(&gpu->crashstate_lock);
+		DRM_DEV_ERROR(gmu->dev, "Skipping GMU coredump\n");
+		return;
+	}
+
+	a6xx_state = kzalloc(sizeof(*a6xx_state), GFP_KERNEL);
+	if (!a6xx_state) {
+		mutex_unlock(&gpu->crashstate_lock);
+		DRM_DEV_ERROR(gmu->dev,
+				"Failed to allocate memory for GMU coredump\n");
+		return;
+	}
+
+	INIT_LIST_HEAD(&a6xx_state->objs);
+	adreno_gpu_state_init(&a6xx_state->base);
+
+	/*
+	 * Set hung=true here so that an NMI is sent to gmu while capturing
+	 * coredump
+	 */
+	gmu->hung = true;
+	a6xx_get_gmu_state(gpu, a6xx_state);
+
+	gpu->crashstate = &a6xx_state->base;
+
+	mutex_unlock(&gpu->crashstate_lock);
+
+	msm_gpu_create_devcoredump(gpu);
 }

@@ -499,6 +499,12 @@ bool adreno_idle(struct msm_gpu *gpu, struct msm_ringbuffer *ring)
 	return false;
 }
 
+void adreno_gpu_state_init(struct msm_gpu_state *state)
+{
+	kref_init(&state->ref);
+	ktime_get_real_ts64(&state->time);
+}
+
 int adreno_gpu_state_get(struct msm_gpu *gpu, struct msm_gpu_state *state)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
@@ -506,9 +512,7 @@ int adreno_gpu_state_get(struct msm_gpu *gpu, struct msm_gpu_state *state)
 
 	WARN_ON(!mutex_is_locked(&gpu->lock));
 
-	kref_init(&state->ref);
-
-	ktime_get_real_ts64(&state->time);
+	adreno_gpu_state_init(state);
 
 	for (i = 0; i < gpu->nr_rings; i++) {
 		int size = 0, j;

@@ -86,5 +86,6 @@ void a6xx_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 struct msm_gpu_state *a6xx_gpu_state_get(struct msm_gpu *gpu);
 int a6xx_gpu_state_put(struct msm_gpu_state *state);
 bool a6xx_is_smmu_stalled(struct msm_gpu *gpu);
+void a6xx_gmu_inline_coredump(struct a6xx_gmu *gmu);
 
 #endif /* __A6XX_GPU_H__ */

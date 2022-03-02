@@ -259,6 +259,12 @@ out:
 	state->nr_bos++;
 }
 
+void msm_gpu_create_devcoredump(struct msm_gpu *gpu)
+{
+	dev_coredumpm(gpu->dev->dev, THIS_MODULE, gpu, 0, GFP_KERNEL,
+		msm_gpu_devcoredump_read, msm_gpu_devcoredump_free);
+}
+
 static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 		struct msm_gem_submit *submit, char *comm, char *cmd)
 {
@@ -268,13 +274,19 @@ static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 	if (!gpu->funcs->gpu_state_get)
 		return;
 
+	mutex_lock(&gpu->crashstate_lock);
+
 	/* Only save one crash state at a time */
-	if (gpu->crashstate)
+	if (gpu->crashstate) {
+		mutex_unlock(&gpu->crashstate_lock);
 		return;
+	}
 
 	state = gpu->funcs->gpu_state_get(gpu);
-	if (IS_ERR_OR_NULL(state))
+	if (IS_ERR_OR_NULL(state)) {
+		mutex_unlock(&gpu->crashstate_lock);
 		return;
+	}
 
 	/* Fill in the additional crash state information */
 	state->comm = kstrdup(comm, GFP_KERNEL);
@@ -316,6 +328,8 @@ static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 	/* Set the active crash state to be dumped on failure */
 	gpu->crashstate = state;
 
+	mutex_unlock(&gpu->crashstate_lock);
+
 	/* FIXME: Release the crashstate if this errors out? */
 	dev_coredumpm(gpu->dev->dev, THIS_MODULE, gpu, 0, GFP_KERNEL,
 		msm_gpu_devcoredump_read, msm_gpu_devcoredump_free);
@@ -323,6 +337,10 @@ static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 #else
 static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 		struct msm_gem_submit *submit, char *comm, char *cmd)
+{
+}
+
+void msm_gpu_create_devcoredump(struct msm_gpu *gpu)
 {
 }
 #endif
@@ -850,6 +868,7 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 	INIT_LIST_HEAD(&gpu->active_list);
 	mutex_init(&gpu->active_lock);
 	mutex_init(&gpu->lock);
+	mutex_init(&gpu->crashstate_lock);
 	init_waitqueue_head(&gpu->retire_event);
 	kthread_init_work(&gpu->retire_work, retire_worker);
 	kthread_init_work(&gpu->recover_work, recover_worker);
