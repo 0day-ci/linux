@@ -518,6 +518,7 @@ struct mmc_host {
 	/* Host Software Queue support */
 	bool			hsq_enabled;
 	u32                     err_stats[MMC_ERR_MAX];
+	bool			err_state;
 
 	unsigned long		private[] ____cacheline_aligned;
 };
@@ -651,6 +652,11 @@ static inline bool mmc_doing_tune(struct mmc_host *host)
 static inline enum dma_data_direction mmc_get_dma_dir(struct mmc_data *data)
 {
 	return data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
+}
+
+static inline void mmc_debugfs_err_stats_enable(struct mmc_host *host)
+{
+	host->err_state = true;
 }
 
 static inline void mmc_debugfs_err_stats_inc(struct mmc_host *host,
