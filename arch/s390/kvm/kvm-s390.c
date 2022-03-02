@@ -32,6 +32,7 @@
 #include <linux/sched/signal.h>
 #include <linux/string.h>
 #include <linux/pgtable.h>
+#include <linux/mmu_notifier.h>
 
 #include <asm/asm-offsets.h>
 #include <asm/lowcore.h>
@@ -2833,8 +2834,10 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 	 * can mess with the pv state. To avoid lockdep_assert_held from
 	 * complaining we do not use kvm_s390_pv_is_protected.
 	 */
-	if (kvm_s390_pv_get_handle(kvm))
+	if (kvm_s390_pv_get_handle(kvm)) {
 		kvm_s390_pv_deinit_vm(kvm, &rc, &rrc);
+		mmu_notifier_unregister(&kvm->arch.pv.mmu_notifier, kvm->mm);
+	}
 	debug_unregister(kvm->arch.dbf);
 	free_page((unsigned long)kvm->arch.sie_page2);
 	if (!kvm_is_ucontrol(kvm))
