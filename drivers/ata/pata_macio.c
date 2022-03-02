@@ -1345,7 +1345,7 @@ static const struct of_device_id pata_macio_match[] =
 	{
 	.type		= "ata",
 	},
-	{},
+	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, pata_macio_match);
 

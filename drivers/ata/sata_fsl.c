@@ -1583,7 +1583,7 @@ static const struct of_device_id fsl_sata_match[] = {
 	{
 		.compatible = "fsl,pq-sata-v2",
 	},
-	{},
+	{ /* sentinel */ }
 };
 
 MODULE_DEVICE_TABLE(of, fsl_sata_match);
