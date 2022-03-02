@@ -280,7 +280,7 @@ out:
 
 unreg:
 	while (--i >= 0)
-		blk_mq_unregister_hctx(q->queue_hw_ctx[i]);
+		blk_mq_unregister_hctx(xa_load(&q->hctx_table, i));
 
 	kobject_uevent(q->mq_kobj, KOBJ_REMOVE);
 	kobject_del(q->mq_kobj);
