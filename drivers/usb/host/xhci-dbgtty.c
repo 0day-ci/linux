@@ -216,7 +216,7 @@ static int dbc_tty_write(struct tty_struct *tty,
 	unsigned long		flags;
 
 	spin_lock_irqsave(&port->port_lock, flags);
-	if (count)
+	if (count > 0)
 		count = kfifo_in(&port->write_fifo, buf, count);
 	dbc_start_tx(port);
 	spin_unlock_irqrestore(&port->port_lock, flags);
