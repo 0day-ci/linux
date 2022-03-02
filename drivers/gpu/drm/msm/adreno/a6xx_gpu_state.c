@@ -1054,6 +1054,9 @@ static void a6xx_gpu_state_destroy(struct kref *kref)
 	if (a6xx_state->gmu_hfi)
 		kvfree(a6xx_state->gmu_hfi->data);
 
+	if (a6xx_state->gmu_debug)
+		kvfree(a6xx_state->gmu_debug->data);
+
 	list_for_each_entry_safe(obj, tmp, &a6xx_state->objs, node)
 		kfree(obj);
 
