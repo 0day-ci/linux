@@ -722,7 +722,10 @@ static int mmp_tdma_probe(struct platform_device *pdev)
 	tdev->device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	tdev->device.descriptor_reuse = true;
 
-	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
+	ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
+	if (ret)
+		return ret;
+
 	platform_set_drvdata(pdev, tdev);
 
 	ret = dmaenginem_async_device_register(&tdev->device);
