@@ -273,43 +273,56 @@ int __hci_cmd_sync_status(struct hci_dev *hdev, u16 opcode, u32 plen,
 }
 EXPORT_SYMBOL(__hci_cmd_sync_status);
 
+
+static void hci_cmd_sync_work_entry_run(struct hci_dev *hdev,
+					struct hci_cmd_sync_work_entry *entry)
+{
+	hci_cmd_sync_work_func_t func;
+	hci_cmd_sync_work_destroy_t destroy;
+	void *data;
+	int err;
+
+	bt_dev_dbg(hdev, "entry %p", entry);
+
+	func = entry->func;
+	data = entry->data;
+	destroy = entry->destroy;
+	kfree(entry);
+
+	if (!func)
+		return;
+
+	hci_req_sync_lock(hdev);
+
+	err = func(hdev, data);
+
+	if (destroy)
+		destroy(hdev, data, err);
+
+	hci_req_sync_unlock(hdev);
+}
+
 static void hci_cmd_sync_work(struct work_struct *work)
 {
 	struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_sync_work);
 	struct hci_cmd_sync_work_entry *entry;
-	hci_cmd_sync_work_func_t func;
-	hci_cmd_sync_work_destroy_t destroy;
-	void *data;
 
 	bt_dev_dbg(hdev, "");
 
-	mutex_lock(&hdev->cmd_sync_work_lock);
-	entry = list_first_entry(&hdev->cmd_sync_work_list,
-				 struct hci_cmd_sync_work_entry, list);
-	if (entry) {
+	while (1) {
+		mutex_lock(&hdev->cmd_sync_work_lock);
+		entry = list_first_entry_or_null(&hdev->cmd_sync_work_list,
+						 struct hci_cmd_sync_work_entry,
+						 list);
+		if (!entry) {
+			mutex_unlock(&hdev->cmd_sync_work_lock);
+			break;
+		}
+
 		list_del(&entry->list);
-		func = entry->func;
-		data = entry->data;
-		destroy = entry->destroy;
-		kfree(entry);
-	} else {
-		func = NULL;
-		data = NULL;
-		destroy = NULL;
-	}
-	mutex_unlock(&hdev->cmd_sync_work_lock);
+		mutex_unlock(&hdev->cmd_sync_work_lock);
 
-	if (func) {
-		int err;
-
-		hci_req_sync_lock(hdev);
-
-		err = func(hdev, data);
-
-		if (destroy)
-			destroy(hdev, data, err);
-
-		hci_req_sync_unlock(hdev);
+		hci_cmd_sync_work_entry_run(hdev, entry);
 	}
 }
 
