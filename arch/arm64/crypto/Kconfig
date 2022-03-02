@@ -32,12 +32,14 @@ config CRYPTO_SHA2_ARM64_CE
 config CRYPTO_SHA512_ARM64_CE
 	tristate "SHA-384/SHA-512 digest algorithm (ARMv8 Crypto Extensions)"
 	depends on KERNEL_MODE_NEON
+	depends on !BROKEN_GAS_INST
 	select CRYPTO_HASH
 	select CRYPTO_SHA512_ARM64
 
 config CRYPTO_SHA3_ARM64
 	tristate "SHA3 digest algorithm (ARMv8.2 Crypto Extensions)"
 	depends on KERNEL_MODE_NEON
+	depends on !BROKEN_GAS_INST
 	select CRYPTO_HASH
 	select CRYPTO_SHA3
 
@@ -50,6 +52,7 @@ config CRYPTO_SM3_ARM64_CE
 config CRYPTO_SM4_ARM64_CE
 	tristate "SM4 symmetric cipher (ARMv8.2 Crypto Extensions)"
 	depends on KERNEL_MODE_NEON
+	depends on !BROKEN_GAS_INST
 	select CRYPTO_ALGAPI
 	select CRYPTO_LIB_SM4
 
