@@ -3,3 +3,16 @@
 config WIIU
 	bool "Nintendo Wii U"
 	depends on PPC_BOOK3S_32
+
+config LATTEIPC_UDBG
+	bool "Chipset IPC udbg console for the Nintendo Wii U"
+	depends on WIIU
+	help
+	  If you say yes to this option, support will be included for the
+	  Wii U's chipset IPC as a udbg console.
+	  These IPC messages can be received by a firmware running on the
+	  console's "Starbuck" security coprocessor.
+
+	  This driver bypasses the IPC layer completely.
+
+	  If in doubt, say N here.

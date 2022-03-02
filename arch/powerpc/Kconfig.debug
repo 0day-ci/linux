@@ -254,6 +254,15 @@ config PPC_EARLY_DEBUG_USBGECKO
 	  Select this to enable early debugging for Nintendo GameCube/Wii
 	  consoles via an external USB Gecko adapter.
 
+config PPC_EARLY_DEBUG_LATTEIPC
+	bool "Early debugging through Latte chipset IPC"
+	depends on WIIU
+	select LATTEIPC_UDBG
+	help
+	  Select this to enable early debugging for Nintendo Wii U consoles via
+	  chipset IPC to the security coprocessor. This assumes a firmware is
+	  running on the coprocessor to receive messages.
+
 config PPC_EARLY_DEBUG_PS3GELIC
 	bool "Early debugging through the PS3 Ethernet port"
 	depends on PPC_PS3
