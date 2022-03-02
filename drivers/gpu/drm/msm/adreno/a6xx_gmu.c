@@ -133,7 +133,7 @@ bool a6xx_gmu_gx_is_on(struct a6xx_gmu *gmu)
 		A6XX_GMU_SPTPRAC_PWR_CLK_STATUS_GX_HM_CLK_OFF));
 }
 
-void a6xx_gmu_set_freq(struct msm_gpu *gpu, struct dev_pm_opp *opp)
+int a6xx_gmu_set_freq(struct msm_gpu *gpu, struct dev_pm_opp *opp)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 	struct a6xx_gpu *a6xx_gpu = to_a6xx_gpu(adreno_gpu);
@@ -145,7 +145,7 @@ void a6xx_gmu_set_freq(struct msm_gpu *gpu, struct dev_pm_opp *opp)
 	gpu_freq = dev_pm_opp_get_freq(opp);
 
 	if (gpu_freq == gmu->freq)
-		return;
+		return 0;
 
 	for (perf_index = 0; perf_index < gmu->nr_gpu_freqs - 1; perf_index++)
 		if (gpu_freq == gmu->gpu_freqs[perf_index])
@@ -161,13 +161,13 @@ void a6xx_gmu_set_freq(struct msm_gpu *gpu, struct dev_pm_opp *opp)
 	 * bring up the power if it isn't already active
 	 */
 	if (pm_runtime_get_if_in_use(gmu->dev) == 0)
-		return;
+		return 0;
 
 	if (!gmu->legacy) {
-		a6xx_hfi_set_freq(gmu, perf_index);
+		ret = a6xx_hfi_set_freq(gmu, perf_index);
 		dev_pm_opp_set_opp(&gpu->pdev->dev, opp);
 		pm_runtime_put(gmu->dev);
-		return;
+		return ret;
 	}
 
 	gmu_write(gmu, REG_A6XX_GMU_DCVS_ACK_OPTION, 0);
@@ -182,15 +182,17 @@ void a6xx_gmu_set_freq(struct msm_gpu *gpu, struct dev_pm_opp *opp)
 	gmu_write(gmu, REG_A6XX_GMU_DCVS_BW_SETTING, 0xff);
 
 	/* Set and clear the OOB for DCVS to trigger the GMU */
-	a6xx_gmu_set_oob(gmu, GMU_OOB_DCVS_SET);
+	ret = a6xx_gmu_set_oob(gmu, GMU_OOB_DCVS_SET);
 	a6xx_gmu_clear_oob(gmu, GMU_OOB_DCVS_SET);
 
-	ret = gmu_read(gmu, REG_A6XX_GMU_DCVS_RETURN);
-	if (ret)
+	if (!ret && gmu_read(gmu, REG_A6XX_GMU_DCVS_RETURN)) {
 		dev_err(gmu->dev, "GMU set GPU frequency error: %d\n", ret);
+		ret = -EINVAL;
+	}
 
 	dev_pm_opp_set_opp(&gpu->pdev->dev, opp);
 	pm_runtime_put(gmu->dev);
+	return ret;
 }
 
 unsigned long a6xx_gmu_get_freq(struct msm_gpu *gpu)
@@ -353,11 +355,13 @@ int a6xx_gmu_set_oob(struct a6xx_gmu *gmu, enum a6xx_gmu_oob_state state)
 	ret = gmu_poll_timeout(gmu, REG_A6XX_GMU_GMU2HOST_INTR_INFO, val,
 		val & (1 << ack), 100, 10000);
 
-	if (ret)
+	if (ret) {
 		DRM_DEV_ERROR(gmu->dev,
 			"Timeout waiting for GMU OOB set %s: 0x%x\n",
 				a6xx_gmu_oob_bits[state].name,
 				gmu_read(gmu, REG_A6XX_GMU_GMU2HOST_INTR_INFO));
+		return -ETIMEDOUT;
+	}
 
 	/* Clear the acknowledge interrupt */
 	gmu_write(gmu, REG_A6XX_GMU_GMU2HOST_INTR_CLR, 1 << ack);
@@ -922,18 +926,21 @@ static void a6xx_gmu_force_off(struct a6xx_gmu *gmu)
 	a6xx_gmu_rpmh_off(gmu);
 }
 
-static void a6xx_gmu_set_initial_freq(struct msm_gpu *gpu, struct a6xx_gmu *gmu)
+static int a6xx_gmu_set_initial_freq(struct msm_gpu *gpu, struct a6xx_gmu *gmu)
 {
 	struct dev_pm_opp *gpu_opp;
 	unsigned long gpu_freq = gmu->gpu_freqs[gmu->current_perf_index];
+	int ret;
 
 	gpu_opp = dev_pm_opp_find_freq_exact(&gpu->pdev->dev, gpu_freq, true);
 	if (IS_ERR(gpu_opp))
-		return;
+		return PTR_ERR(gpu_opp);
 
 	gmu->freq = 0; /* so a6xx_gmu_set_freq() doesn't exit early */
-	a6xx_gmu_set_freq(gpu, gpu_opp);
+	ret = a6xx_gmu_set_freq(gpu, gpu_opp);
 	dev_pm_opp_put(gpu_opp);
+
+	return ret;
 }
 
 static void a6xx_gmu_set_initial_bw(struct msm_gpu *gpu, struct a6xx_gmu *gmu)
@@ -1018,7 +1025,7 @@ int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
 	enable_irq(gmu->hfi_irq);
 
 	/* Set the GPU to the current freq */
-	a6xx_gmu_set_initial_freq(gpu, gmu);
+	ret = a6xx_gmu_set_initial_freq(gpu, gmu);
 
 out:
 	/* On failure, shut down the GMU to leave it in a good state */
