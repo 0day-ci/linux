@@ -25,7 +25,7 @@ static LIST_HEAD(ssc_list);
 
 struct ssc_device *ssc_request(unsigned int ssc_num)
 {
-	int ssc_valid = 0;
+	int ssc_valid = 0, ret;
 	struct ssc_device *ssc;
 
 	mutex_lock(&user_lock);
@@ -57,7 +57,9 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
 	ssc->user++;
 	mutex_unlock(&user_lock);
 
-	clk_prepare(ssc->clk);
+	ret = clk_prepare(ssc->clk);
+	if (ret)
+		return ret;
 
 	return ssc;
 }
