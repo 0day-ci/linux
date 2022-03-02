@@ -1033,6 +1033,7 @@ out:
 		disable_irq(gmu->gmu_irq);
 		a6xx_gmu_inline_coredump(gmu);
 		a6xx_rpmh_stop(gmu);
+		clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
 		pm_runtime_put(gmu->gxpd);
 		pm_runtime_put(gmu->dev);
 	}
