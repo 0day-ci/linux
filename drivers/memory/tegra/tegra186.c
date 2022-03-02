@@ -16,6 +16,8 @@
 #include <dt-bindings/memory/tegra186-mc.h>
 #endif
 
+#include "mc.h"
+
 #define MC_SID_STREAMID_OVERRIDE_MASK GENMASK(7, 0)
 #define MC_SID_STREAMID_SECURITY_WRITE_ACCESS_DISABLED BIT(16)
 #define MC_SID_STREAMID_SECURITY_OVERRIDE BIT(8)
@@ -164,6 +166,7 @@ const struct tegra_mc_ops tegra186_mc_ops = {
 	.resume = tegra186_mc_resume,
 	.probe_device = tegra186_mc_probe_device,
 	.map_regs = tegra186_mc_map_regs,
+	.handle_irq = tegra30_mc_handle_irq,
 };
 
 #if defined(CONFIG_ARCH_TEGRA_186_SOC)
@@ -891,11 +894,53 @@ static const struct tegra_mc_client tegra186_mc_clients[] = {
 	},
 };
 
+static int tegra186_mc_get_channel(struct tegra_mc *mc, int *mc_channel)
+{
+	u32 g_intstatus;
+
+	g_intstatus = mc_ch_readl(mc, MC_BROADCAST_CHANNEL,
+				  MC_GLOBAL_INTSTATUS);
+
+	switch (g_intstatus & mc->soc->int_channel_mask) {
+	case BIT(0):
+		*mc_channel = 0;
+		break;
+
+	case BIT(1):
+		*mc_channel = 1;
+		break;
+
+	case BIT(2):
+		*mc_channel = 2;
+		break;
+
+	case BIT(3):
+		*mc_channel = 3;
+		break;
+
+	case BIT(24):
+		*mc_channel = MC_BROADCAST_CHANNEL;
+		break;
+
+	default:
+		pr_err("Unknown interrupt source\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 const struct tegra_mc_soc tegra186_mc_soc = {
 	.num_clients = ARRAY_SIZE(tegra186_mc_clients),
 	.clients = tegra186_mc_clients,
 	.num_address_bits = 40,
 	.num_channels = 4,
+	.client_id_mask = 0xff,
+	.intmask = MC_INT_DECERR_GENERALIZED_CARVEOUT | MC_INT_DECERR_MTS |
+		   MC_INT_SECERR_SEC | MC_INT_DECERR_VPR |
+		   MC_INT_SECURITY_VIOLATION | MC_INT_DECERR_EMEM,
 	.ops = &tegra186_mc_ops,
+	.int_channel_mask = 0x100000f,
+	.get_int_channel = tegra186_mc_get_channel,
 };
 #endif

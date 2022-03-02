@@ -203,6 +203,8 @@ struct tegra_mc_soc {
 	const struct tegra_smmu_soc *smmu;
 
 	u32 intmask;
+	u32 int_channel_mask;
+	bool has_addr_hi_reg;
 
 	const struct tegra_mc_reset_ops *reset_ops;
 	const struct tegra_mc_reset *resets;
@@ -210,6 +212,8 @@ struct tegra_mc_soc {
 
 	const struct tegra_mc_icc_ops *icc_ops;
 	const struct tegra_mc_ops *ops;
+
+	int (*get_int_channel)(struct tegra_mc *mc, int *mc_channel);
 };
 
 struct tegra_mc {
