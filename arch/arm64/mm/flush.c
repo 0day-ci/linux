@@ -75,6 +75,20 @@ EXPORT_SYMBOL_GPL(__sync_icache_dcache);
  */
 void flush_dcache_page(struct page *page)
 {
+#ifdef CONFIG_HUGETLB_PAGE_FREE_VMEMMAP
+	/*
+	 * Only the head page's flags of HugeTLB can be cleared since the tail
+	 * vmemmap pages associated with each HugeTLB page are mapped with
+	 * read-only when CONFIG_HUGETLB_PAGE_FREE_VMEMMAP is enabled (more
+	 * details can refer to vmemmap_remap_pte()).  Although
+	 * __sync_icache_dcache() only set PG_dcache_clean flag on the head
+	 * page struct, some tail page structs still can see the flag since
+	 * the head vmemmap page frame is reused (more details can refer to
+	 * the comments above page_fixed_fake_head()).
+	 */
+	if (PageHuge(page))
+		page = compound_head(page);
+#endif
 	if (test_bit(PG_dcache_clean, &page->flags))
 		clear_bit(PG_dcache_clean, &page->flags);
 }
