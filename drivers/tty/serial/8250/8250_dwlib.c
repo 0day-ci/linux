@@ -101,8 +101,26 @@ void dw8250_do_set_termios(struct uart_port *p, struct ktermios *termios, struct
 }
 EXPORT_SYMBOL_GPL(dw8250_do_set_termios);
 
+static void dw8250_rs485_start_tx(struct uart_8250_port *up)
+{
+	struct uart_port *p = &(up->port);
+
+	dw8250_writel_ext(p, DW_UART_RE_EN, 0);
+	dw8250_writel_ext(p, DW_UART_DE_EN, 1);
+}
+
+static void dw8250_rs485_stop_tx(struct uart_8250_port *up)
+{
+	struct uart_port *p = &(up->port);
+
+	dw8250_writel_ext(p, DW_UART_DE_EN, 0);
+	dw8250_writel_ext(p, DW_UART_RE_EN, 1);
+}
+
 static int dw8250_rs485_config(struct uart_port *p, struct serial_rs485 *rs485)
 {
+	struct uart_8250_port *up = up_to_u8250p(p);
+	u32 re_en, de_en;
 	u32 tcr;
 
 	tcr = dw8250_readl_ext(p, DW_UART_TCR);
@@ -110,16 +128,29 @@ static int dw8250_rs485_config(struct uart_port *p, struct serial_rs485 *rs485)
 
 	if (rs485->flags & SER_RS485_ENABLED) {
 		/* Clearing unsupported flags. */
-		rs485->flags &= SER_RS485_ENABLED | SER_RS485_RX_DURING_TX;
+		rs485->flags &= SER_RS485_ENABLED | SER_RS485_RX_DURING_TX | SER_RS485_SW_RX_OR_TX;
 		tcr |= DW_UART_TCR_RS485_EN;
 
 		if (rs485->flags & SER_RS485_RX_DURING_TX) {
 			tcr |= DW_UART_TCR_XFER_MODE_DE_DURING_RE;
+			re_en = 1;
+			de_en = 1;
+			rs485->flags &= ~SER_RS485_SW_RX_OR_TX;
+		} else if (rs485->flags & SER_RS485_SW_RX_OR_TX) {
+			tcr |= DW_UART_TCR_XFER_MODE_SW_DE_OR_RE;
+			re_en = 1;
+			de_en = 0;
+			if (up->em485 && !up->em485->tx_stopped) {
+				re_en = 0;
+				de_en = 1;
+			}
 		} else {
 			tcr |= DW_UART_TCR_XFER_MODE_DE_OR_RE;
+			re_en = 1;
+			de_en = 1;
 		}
-		dw8250_writel_ext(p, DW_UART_DE_EN, 1);
-		dw8250_writel_ext(p, DW_UART_RE_EN, 1);
+		dw8250_writel_ext(p, DW_UART_DE_EN, de_en);
+		dw8250_writel_ext(p, DW_UART_RE_EN, re_en);
 	} else {
 		rs485->flags = 0;
 
@@ -147,7 +178,16 @@ static int dw8250_rs485_config(struct uart_port *p, struct serial_rs485 *rs485)
 	rs485->delay_rts_before_send = 0;
 	rs485->delay_rts_after_send = 0;
 
-	p->rs485 = *rs485;
+	if (rs485->flags & SER_RS485_SW_RX_OR_TX) {
+		int ret;
+
+		ret = serial8250_em485_config(p, rs485);
+		if (ret)
+			return ret;
+	} else {
+		serial8250_em485_destroy(up_to_u8250p(p));
+		p->rs485 = *rs485;
+	}
 
 	return 0;
 }
@@ -159,8 +199,16 @@ void dw8250_setup_port(struct uart_port *p)
 	u32 reg;
 
 	d->hw_rs485_support = device_property_read_bool(p->dev, "snps,rs485-interface-en");
-	if (d->hw_rs485_support)
+	if (d->hw_rs485_support) {
 		p->rs485_config = dw8250_rs485_config;
+		up->rs485_start_tx = dw8250_rs485_start_tx;
+		up->rs485_stop_tx = dw8250_rs485_stop_tx;
+	} else {
+		p->rs485_config = serial8250_em485_config;
+		up->rs485_start_tx = serial8250_em485_start_tx;
+		up->rs485_stop_tx = serial8250_em485_stop_tx;
+	}
+	up->capabilities |= UART_CAP_NOTEMT;
 
 	/*
 	 * If the Component Version Register returns zero, we know that
@@ -192,7 +240,7 @@ void dw8250_setup_port(struct uart_port *p)
 		p->type = PORT_16550A;
 		p->flags |= UPF_FIXED_TYPE;
 		p->fifosize = DW_UART_CPR_FIFO_SIZE(reg);
-		up->capabilities = UART_CAP_FIFO;
+		up->capabilities = UART_CAP_FIFO | UART_CAP_NOTEMT;
 	}
 
 	if (reg & DW_UART_CPR_AFCE_MODE)
