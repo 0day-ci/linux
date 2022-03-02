@@ -6822,7 +6822,7 @@ static void hci_event_func(struct hci_dev *hdev, u8 event, struct sk_buff *skb,
 	 * possible to partially parse the event so leave to callback to
 	 * decide if that is acceptable.
 	 */
-	if (skb->len > ev->max_len)
+	if (skb->len > ev->max_len && event != HCI_EV_VENDOR)
 		bt_dev_warn(hdev, "unexpected event 0x%2.2x length: %u > %u",
 			    event, skb->len, ev->max_len);
 
