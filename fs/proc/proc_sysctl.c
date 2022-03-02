@@ -101,7 +101,9 @@ static void drop_sysctl_table(struct ctl_table_header *header);
 static int sysctl_follow_link(struct ctl_table_header **phead,
 	struct ctl_table **pentry);
 static int insert_links(struct ctl_table_header *head);
+static int insert_links_single(struct ctl_table_header *head);
 static void put_links(struct ctl_table_header *header);
+static void put_links_single(struct ctl_table_header *header);
 
 static void sysctl_print_dir(struct ctl_dir *dir)
 {
@@ -198,6 +200,25 @@ static void erase_entry(struct ctl_table_header *head, struct ctl_table *entry)
 	rb_erase(node, &head->parent->root);
 }
 
+static void init_header_single(struct ctl_table_header *head,
+	struct ctl_table_root *root, struct ctl_table_set *set,
+	struct ctl_node *node, struct ctl_table *table)
+{
+	head->ctl_table = table;
+	head->ctl_table_arg = table;
+	head->used = 0;
+	head->count = 1;
+	head->nreg = 1;
+	head->unregistering = NULL;
+	head->root = root;
+	head->set = set;
+	head->parent = NULL;
+	head->node = node;
+	INIT_HLIST_HEAD(&head->inodes);
+	if (node)
+		node->header = head;
+}
+
 static void init_header(struct ctl_table_header *head,
 	struct ctl_table_root *root, struct ctl_table_set *set,
 	struct ctl_node *node, struct ctl_table *table)
@@ -227,6 +248,42 @@ static void erase_header(struct ctl_table_header *head)
 		erase_entry(head, entry);
 }
 
+static int insert_header_single(struct ctl_dir *dir, struct ctl_table_header *header)
+{
+	int err;
+
+	/* Is this a permanently empty directory? */
+	if (is_empty_dir(&dir->header))
+		return -EROFS;
+
+	/* Am I creating a permanently empty directory? */
+	if (header->ctl_table == sysctl_mount_point) {
+		if (!RB_EMPTY_ROOT(&dir->root))
+			return -EINVAL;
+		set_empty_dir(dir);
+	}
+
+	dir->header.nreg++;
+	header->parent = dir;
+	err = insert_links_single(header);
+	if (err)
+		goto fail_links;
+
+	err = insert_entry(header, header->ctl_table);
+	if (err)
+		goto fail;
+
+	return 0;
+fail:
+	erase_entry(header, header->ctl_table);
+	put_links_single(header);
+fail_links:
+	if (header->ctl_table == sysctl_mount_point)
+		clear_empty_dir(dir);
+	header->parent = NULL;
+	drop_sysctl_table(&dir->header);
+	return err;
+}
 static int insert_header(struct ctl_dir *dir, struct ctl_table_header *header)
 {
 	struct ctl_table *entry;
@@ -1128,6 +1185,40 @@ static int sysctl_check_table_array(const char *path, struct ctl_table *table)
 	return err;
 }
 
+static int sysctl_check_table_single(const char *path, struct ctl_table *table)
+{
+	int err = 0;
+
+	if (table->child)
+		err |= sysctl_err(path, table, "Not a file");
+
+	if ((table->proc_handler == proc_dostring) ||
+	    (table->proc_handler == proc_dointvec) ||
+	    (table->proc_handler == proc_douintvec) ||
+	    (table->proc_handler == proc_douintvec_minmax) ||
+	    (table->proc_handler == proc_dointvec_minmax) ||
+	    (table->proc_handler == proc_dou8vec_minmax) ||
+	    (table->proc_handler == proc_dointvec_jiffies) ||
+	    (table->proc_handler == proc_dointvec_userhz_jiffies) ||
+	    (table->proc_handler == proc_dointvec_ms_jiffies) ||
+	    (table->proc_handler == proc_doulongvec_minmax) ||
+	    (table->proc_handler == proc_doulongvec_ms_jiffies_minmax)) {
+		if (!table->data)
+			err |= sysctl_err(path, table, "No data");
+		if (!table->maxlen)
+			err |= sysctl_err(path, table, "No maxlen");
+		else
+			err |= sysctl_check_table_array(path, table);
+	}
+	if (!table->proc_handler)
+		err |= sysctl_err(path, table, "No proc_handler");
+
+	if ((table->mode & (S_IRUGO|S_IWUGO)) != table->mode)
+		err |= sysctl_err(path, table, "bogus .mode 0%o",
+			table->mode);
+	return err;
+}
+
 static int sysctl_check_table(const char *path, struct ctl_table *table)
 {
 	int err = 0;
@@ -1163,6 +1254,41 @@ static int sysctl_check_table(const char *path, struct ctl_table *table)
 	return err;
 }
 
+static struct ctl_table_header *new_links_single(struct ctl_dir *dir, struct ctl_table *table,
+	struct ctl_table_root *link_root)
+{
+	struct ctl_table *link_table;
+	struct ctl_table_header *links;
+	struct ctl_node *node;
+	char *link_name;
+	int name_bytes = 0;
+
+	name_bytes += strlen(table->procname) + 1;
+
+	links = kzalloc(sizeof(struct ctl_table_header) +
+			sizeof(struct ctl_node) +
+			sizeof(struct ctl_table)*2 +
+			name_bytes,
+			GFP_KERNEL);
+
+	if (!links)
+		return NULL;
+
+	node = (struct ctl_node *)(links + 1);
+	link_table = (struct ctl_table *)(node + 1);
+	link_name = (char *)&link_table[2];
+
+	memcpy(link_name, table->procname, strlen(table->procname) + 1);
+	link_table->procname = link_name;
+	link_table->mode = S_IFLNK|S_IRWXUGO;
+	link_table->data = link_root;
+	link_name += strlen(table->procname) + 1;
+
+	init_header_single(links, dir->header.root, dir->header.set, node, link_table);
+	links->nreg = 1;
+
+	return links;
+}
 static struct ctl_table_header *new_links(struct ctl_dir *dir, struct ctl_table *table,
 	struct ctl_table_root *link_root)
 {
@@ -1206,6 +1332,27 @@ static struct ctl_table_header *new_links(struct ctl_dir *dir, struct ctl_table 
 	return links;
 }
 
+static bool get_links_single(struct ctl_dir *dir,
+	struct ctl_table *table, struct ctl_table_root *link_root)
+{
+	struct ctl_table_header *head;
+	struct ctl_table *link;
+
+	/* Is there link available for table? */
+	const char *procname = table->procname;
+
+	link = find_entry(&head, dir, procname, strlen(procname));
+	if (!link)
+		return false;
+	if ((S_ISDIR(link->mode) && S_ISDIR(table->mode)) ||
+	    (S_ISLNK(link->mode) && (link->data == link_root))) {
+		head->nreg++;
+		return true;
+	}
+
+	return false;
+}
+
 static bool get_links(struct ctl_dir *dir,
 	struct ctl_table *table, struct ctl_table_root *link_root)
 {
@@ -1232,6 +1379,47 @@ static bool get_links(struct ctl_dir *dir,
 		head->nreg++;
 	}
 	return true;
+}
+
+static int insert_links_single(struct ctl_table_header *head)
+{
+	struct ctl_table_set *root_set = &sysctl_table_root.default_set;
+	struct ctl_dir *core_parent = NULL;
+	struct ctl_table_header *links;
+	int err;
+
+	if (head->set == root_set)
+		return 0;
+
+	core_parent = xlate_dir(root_set, head->parent);
+	if (IS_ERR(core_parent))
+		return 0;
+
+	if (get_links_single(core_parent, head->ctl_table, head->root))
+		return 0;
+
+	core_parent->header.nreg++;
+	spin_unlock(&sysctl_lock);
+
+	links = new_links_single(core_parent, head->ctl_table, head->root);
+
+	spin_lock(&sysctl_lock);
+	err = -ENOMEM;
+	if (!links)
+		goto out;
+
+	err = 0;
+	if (get_links_single(core_parent, head->ctl_table, head->root)) {
+		kfree(links);
+		goto out;
+	}
+
+	err = insert_header_single(core_parent, links);
+	if (err)
+		kfree(links);
+out:
+	drop_sysctl_table(&core_parent->header);
+	return err;
 }
 
 static int insert_links(struct ctl_table_header *head)
@@ -1400,6 +1588,102 @@ struct ctl_table_header *register_sysctl(const char *path, struct ctl_table *tab
 					path, table);
 }
 EXPORT_SYMBOL(register_sysctl);
+
+/**
+ * __register_sysctl_table_single - register a leaf sysctl table
+ * @set: Sysctl tree to register on
+ * @path: The path to the directory the sysctl table is in.
+ * @table: the top-level table structure
+ *
+ * Register extraly one sysctl table. @table should be a filled in extraly one
+ * ctl_table. If ctl_table which need to register have child or is not single,
+ * we should use register_sysctl_init or register_sysctl instead of
+ * register_sysctl_single.
+ *
+ * The members of the &struct ctl_table structure are used refer to
+ * __register_sysctl_table.
+ */
+struct ctl_table_header *__register_sysctl_table_single(
+	struct ctl_table_set *set,
+	const char *path, struct ctl_table *table)
+{
+	struct ctl_table_root *root = set->dir.header.root;
+	struct ctl_table_header *header;
+	const char *name, *nextname;
+	struct ctl_dir *dir;
+	struct ctl_node *node;
+
+	header = kzalloc(sizeof(struct ctl_table_header) +
+			 sizeof(struct ctl_node), GFP_KERNEL);
+	if (!header)
+		return NULL;
+
+	node = (struct ctl_node *)(header + 1);
+	init_header_single(header, root, set, node, table);
+	if (sysctl_check_table_single(path, table))
+		goto fail;
+
+	spin_lock(&sysctl_lock);
+	dir = &set->dir;
+	/* Reference moved down the diretory tree get_subdir */
+	dir->header.nreg++;
+	spin_unlock(&sysctl_lock);
+
+	/* Find the directory for the ctl_table */
+	for (name = path; name; name = nextname) {
+		int namelen;
+
+		nextname = strchr(name, '/');
+		if (nextname) {
+			namelen = nextname - name;
+			nextname++;
+		} else {
+			namelen = strlen(name);
+		}
+		if (namelen == 0)
+			continue;
+
+		dir = get_subdir(dir, name, namelen);
+		if (IS_ERR(dir))
+			goto fail;
+	}
+
+	spin_lock(&sysctl_lock);
+	if (insert_header_single(dir, header))
+		goto fail_put_dir_locked;
+
+	drop_sysctl_table(&dir->header);
+	spin_unlock(&sysctl_lock);
+
+	return header;
+
+fail_put_dir_locked:
+	drop_sysctl_table(&dir->header);
+	spin_unlock(&sysctl_lock);
+fail:
+	kfree(header);
+	dump_stack();
+	return NULL;
+}
+
+/**
+ * __register_sysctl_single - register extraly one sysctl table
+ * @path: The path to the directory the sysctl table is in.
+ * @table: the table structure
+ *
+ * Register extraly one sysctl table. @table should be a filled in extraly one
+ * ctl_table. If ctl_table which need to register have child or is not single,
+ * we should use register_sysctl_init or register_sysctl instead of
+ * register_sysctl_single.
+ *
+ * See __register_sysctl_table_single for more details.
+ */
+struct ctl_table_header *__register_sysctl_single(const char *path, struct ctl_table *table)
+{
+	return __register_sysctl_table_single(&sysctl_table_root.default_set,
+					path, table);
+}
+EXPORT_SYMBOL(__register_sysctl_single);
 
 /**
  * __register_sysctl_init() - register sysctl table to path
@@ -1653,6 +1937,35 @@ int __register_sysctl_base(struct ctl_table *base_table)
 	hdr = register_sysctl_table(base_table);
 	kmemleak_not_leak(hdr);
 	return 0;
+}
+
+static void put_links_single(struct ctl_table_header *header)
+{
+	struct ctl_table_set *root_set = &sysctl_table_root.default_set;
+	struct ctl_table_root *root = header->root;
+	struct ctl_dir *parent = header->parent;
+	struct ctl_dir *core_parent;
+	struct ctl_table_header *link_head;
+	struct ctl_table *link;
+
+	if (header->set == root_set)
+		return;
+
+	core_parent = xlate_dir(root_set, parent);
+	if (IS_ERR(core_parent))
+		return;
+
+	link = find_entry(&link_head, core_parent, header->ctl_table->procname,
+			   strlen(header->ctl_table->procname));
+	if (link &&
+	    ((S_ISDIR(link->mode) && S_ISDIR(header->ctl_table->mode)) ||
+	     (S_ISLNK(link->mode) && (link->data == root)))) {
+		drop_sysctl_table(link_head);
+	} else {
+		pr_err("sysctl link missing during unregister: ");
+		sysctl_print_dir(parent);
+		pr_cont("%s\n", header->ctl_table->procname);
+	}
 }
 
 static void put_links(struct ctl_table_header *header)
