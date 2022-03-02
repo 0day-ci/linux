@@ -3,6 +3,7 @@
 config WIIU
 	bool "Nintendo Wii U"
 	depends on PPC_BOOK3S_32
+	select IRQ_DOMAIN_HIERARCHY
 
 config LATTEIPC_UDBG
 	bool "Chipset IPC udbg console for the Nintendo Wii U"
