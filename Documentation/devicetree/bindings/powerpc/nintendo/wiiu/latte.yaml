@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/powerpc/nintendo/wiiu/latte.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Latte system bus
+
+maintainers:
+  - Ash Logan <ash@heyquark.com>
+  - Emmanuel Gil Peyrot <linkmauve@linkmauve.fr>
+
+description: |
+  Latte multi-function SoC, containing many of the devices found on the Nintendo Wii U.
+
+properties:
+  compatible:
+    oneOf:
+      - description: Nintendo Wii U "Latte" SoC
+        items:
+          - const: nintendo,latte
+
+additionalProperties: true
+
+...

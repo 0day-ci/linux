@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/powerpc/nintendo/wiiu/espresso-pic.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Nintendo Wii U "Espresso" interrupt controller
+
+maintainers:
+  - Ash Logan <ash@heyquark.com>
+  - Emmanuel Gil Peyrot <linkmauve@linkmauve.fr>
+
+description: |
+  Interrupt controller found on the Nintendo Wii U for the "Espresso" processor.
+
+properties:
+  compatible:
+    oneOf:
+      - description: Nintendo Wii U "Espresso" interrupt controller
+        items:
+          - const: nintendo,espresso-pic
+  '#interrupt-cells':
+    # Interrupt numbers 0-32 in one cell
+    const: 1
+  interrupt-controller: true
+  reg:
+    items:
+      - description: Core registers
+
+additionalProperties: false
+
+examples:
+  - |
+    espresso_pic: pic@c000078 {
+            #interrupt-cells = <1>;
+            interrupt-controller;
+
+            compatible = "nintendo,espresso-pic";
+            reg = <0x0c000078 0x18>;
+    };
+
+...

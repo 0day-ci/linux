@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/powerpc/nintendo/wiiu/latte-dsp.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Nintendo Wii U Latte DSP
+
+maintainers:
+  - Ash Logan <ash@heyquark.com>
+  - Emmanuel Gil Peyrot <linkmauve@linkmauve.fr>
+
+description: |
+  Nintendo Wii U digital signal processor, as found in the Latte chip.
+
+properties:
+  compatible:
+    oneOf:
+      - description: Nintendo Wii U Latte DSP
+        items:
+          - const: nintendo,latte-dsp
+  reg:
+    items:
+      - description: DSP registers
+
+# Once more is known about this device more properties will likely be added
+additionalProperties: true
+
+examples:
+  - |
+    latte_dsp: dsp@c005000 {
+         compatible = "nintendo,latte-dsp";
+         reg = <0x0c005000 0x200>;
+    };
+...

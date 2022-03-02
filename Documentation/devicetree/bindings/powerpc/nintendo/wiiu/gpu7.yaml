@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/powerpc/nintendo/wiiu/gpu7.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Nintendo Wii U Latte "GPU7" graphics processor
+
+maintainers:
+  - Ash Logan <ash@heyquark.com>
+  - Emmanuel Gil Peyrot <linkmauve@linkmauve.fr>
+
+description: |
+  GPU7 graphics processor, also known as "GX2", found in the Latte multifunction chip of the
+  Nintendo Wii U.
+
+properties:
+  compatible:
+    oneOf:
+      - description: Nintendo Wii U Latte "GPU7" graphics processor
+        items:
+          - const: nintendo,latte-gpu7
+  reg:
+    items:
+      - description: GpuF0MMReg registers
+  interrupts:
+    items:
+      - description: Main interrupt, connected via Espresso PIC
+
+# This will likely get bound to the Radeon driver one day, which will neccesitate extra properties
+additionalProperties: true
+
+examples:
+  - |
+    gpu7@c200000 {
+            compatible = "nintendo,latte-gpu7";
+            reg = <0x0c200000 0x80000>;
+            interrupts = <2>;
+            interrupt-parent = <&espresso_pic>;
+    };
+...
