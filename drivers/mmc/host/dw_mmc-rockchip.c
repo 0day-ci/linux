@@ -15,7 +15,9 @@
 #include "dw_mmc.h"
 #include "dw_mmc-pltfm.h"
 
-#define RK3288_CLKGEN_DIV       2
+#define RK3288_CLKGEN_DIV	2
+#define RK3288_MIN_INIT_FREQ	375000
+#define MMC_MAX_INIT_FREQ	400000
 
 struct dw_mci_rockchip_priv_data {
 	struct clk		*drv_clk;
@@ -27,12 +29,17 @@ struct dw_mci_rockchip_priv_data {
 static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 {
 	struct dw_mci_rockchip_priv_data *priv = host->priv;
+	struct mmc_host *mmc = mmc_from_priv(host);
 	int ret;
 	unsigned int cclkin;
 	u32 bus_hz;
 
 	if (ios->clock == 0)
 		return;
+
+	/* the clock will fail if below the f_min rate */
+	if (ios->clock < mmc->f_min)
+		ios->clock = mmc->f_min;
 
 	/*
 	 * cclkin: source clock of mmc controller
@@ -51,7 +58,7 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 
 	ret = clk_set_rate(host->ciu_clk, cclkin);
 	if (ret)
-		dev_warn(host->dev, "failed to set rate %uHz\n", ios->clock);
+		dev_warn(host->dev, "failed to set rate %uHz err: %d\n", cclkin, ret);
 
 	bus_hz = clk_get_rate(host->ciu_clk) / RK3288_CLKGEN_DIV;
 	if (bus_hz != host->bus_hz) {
@@ -290,12 +297,28 @@ static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
 
 static int dw_mci_rockchip_init(struct dw_mci *host)
 {
+	struct mmc_host *mmc = mmc_from_priv(host);
+	int ret;
+
 	/* It is slot 8 on Rockchip SoCs */
 	host->sdio_id0 = 8;
 
-	if (of_device_is_compatible(host->dev->of_node,
-				    "rockchip,rk3288-dw-mshc"))
+	if (of_device_is_compatible(host->dev->of_node, "rockchip,rk3288-dw-mshc")) {
 		host->bus_hz /= RK3288_CLKGEN_DIV;
+
+		/* clock driver will fail if the clock is less than the lowest source clock
+		 * divided by the internal clock divider. Test for the lowest available
+		 * clock and set the f_min freq to clock / clock divider. If we fail, set
+		 * it to the downstream hardcoded value.
+		 */
+		ret = clk_round_rate(host->ciu_clk, MMC_MAX_INIT_FREQ * RK3288_CLKGEN_DIV);
+		if (ret < 0) {
+			dev_warn(host->dev, "mmc safe rate failed: %d\n", ret);
+			mmc->f_min = RK3288_MIN_INIT_FREQ;
+		} else {
+			mmc->f_min = ret / RK3288_CLKGEN_DIV;
+		}
+	}
 
 	return 0;
 }
