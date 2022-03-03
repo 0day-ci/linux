@@ -165,9 +165,10 @@ int arc_mdio_probe(struct arc_emac_priv *priv)
 
 	error = of_mdiobus_register(bus, priv->dev->of_node);
 	if (error) {
-		mdiobus_free(bus);
-		return dev_err_probe(priv->dev, error,
+		int dev_err = dev_err_probe(priv->dev, error,
 				     "cannot register MDIO bus %s\n", bus->name);
+		mdiobus_free(bus);
+		return dev_err;
 	}
 
 	return 0;
