@@ -502,6 +502,26 @@ Developer only needs to provide a sub feature driver with matched feature id.
 FME Partial Reconfiguration Sub Feature driver (see drivers/fpga/dfl-fme-pr.c)
 could be a reference.
 
+PCI Device Identification
+================================
+Since FPGA based PCI cards can be reconfigured to a perform a completely
+new function at runtime, properly identifying such cards and binding the
+correct driver can be challenging. In many use cases, deployed FPGA based
+PCI cards are essentially static and the PCI Product ID and Vendor ID pair
+is sufficient to identify the card.  The DFL framework helps with the
+dynamic case of deployed FPGA cards changing at run time by providing
+more detailed information about card discoverable at runtime.
+
+At one level, the DFL on a PCI card describes the function of the card.
+However, the same DFL could be instantiated on different physical cards.
+Conversely, different DFLs could be instantiated on the same physical card.
+Practical management of a cloud containing a heterogeneous set of such cards
+requires a PCI level of card identification. While the PCI Product ID and
+Vendor ID may be sufficient to bind the dfl-pci driver, it is expected
+that FPGA PCI cards would advertise suitable Subsystem ID and Subsystem
+Vendor ID values. PCI Vital Product Data (VPD) can also be used for
+more granular information about the board.
+
 Location of DFLs on a PCI Device
 ================================
 The original method for finding a DFL on a PCI device assumed the start of the
