@@ -1741,6 +1741,8 @@ enum netdev_ml_priv_type {
  *			do not use this in drivers
  *	@rx_nohandler:	nohandler dropped packets by core network on
  *			inactive devices, do not use this in drivers
+ *	@rx_otherhost_dropped:	Dropped packets due to mismatch in packet dest
+ *				MAC address
  *	@carrier_up_count:	Number of times the carrier has been up
  *	@carrier_down_count:	Number of times the carrier has been down
  *
@@ -2025,6 +2027,7 @@ struct net_device {
 	atomic_long_t		rx_dropped;
 	atomic_long_t		tx_dropped;
 	atomic_long_t		rx_nohandler;
+	atomic_long_t		rx_otherhost_dropped;
 
 	/* Stats to monitor link on/off, flapping */
 	atomic_t		carrier_up_count;

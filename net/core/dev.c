@@ -10037,6 +10037,8 @@ struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
 	storage->rx_dropped += (unsigned long)atomic_long_read(&dev->rx_dropped);
 	storage->tx_dropped += (unsigned long)atomic_long_read(&dev->tx_dropped);
 	storage->rx_nohandler += (unsigned long)atomic_long_read(&dev->rx_nohandler);
+	storage->rx_otherhost_dropped +=
+		(unsigned long)atomic_long_read(&dev->rx_otherhost_dropped);
 	return storage;
 }
 EXPORT_SYMBOL(dev_get_stats);
