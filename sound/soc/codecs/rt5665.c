@@ -1293,19 +1293,13 @@ static void rt5665_jack_detect_handler(struct work_struct *work)
 		container_of(work, struct rt5665_priv, jack_detect_work.work);
 	int val, btn_type;
 
-	while (!rt5665->component) {
-		pr_debug("%s codec = null\n", __func__);
-		usleep_range(10000, 15000);
-	}
-
-	while (!rt5665->component->card->instantiated) {
-		pr_debug("%s\n", __func__);
-		usleep_range(10000, 15000);
-	}
-
-	while (!rt5665->calibration_done) {
-		pr_debug("%s calibration not ready\n", __func__);
-		usleep_range(10000, 15000);
+	if (!rt5665->component || !rt5665->component->card->instantiated ||
+			!rt5665->calibration_done) {
+		pr_debug("%s card not yet ready\n", __func__);
+		/* try later */
+		mod_delayed_work(system_power_efficient_wq,
+				&rt5665->jack_detect_work, msecs_to_jiffies(15));
+		return;
 	}
 
 	mutex_lock(&rt5665->calibrate_mutex);
