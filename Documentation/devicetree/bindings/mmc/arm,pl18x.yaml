@@ -145,6 +145,11 @@ properties:
       driver to sample the receive data (for example with a voltage switch
       transceiver).
 
+  st,disable-dma-lli:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: ST Micro-specific property, disable DMA linked lists.
+      It is used for SDIO.
+
   st,cmd-gpios:
     maxItems: 1
     description:
