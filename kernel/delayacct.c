@@ -73,8 +73,7 @@ static struct ctl_table kern_delayacct_table[] = {
 		.proc_handler   = sysctl_delayacct,
 		.extra1         = SYSCTL_ZERO,
 		.extra2         = SYSCTL_ONE,
-	},
-	{ }
+	}
 };
 
 static __init int kernel_delayacct_sysctls_init(void)
