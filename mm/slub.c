@@ -1686,12 +1686,6 @@ static inline void *kmalloc_large_node_hook(void *ptr, size_t size, gfp_t flags)
 	return ptr;
 }
 
-static __always_inline void kfree_hook(void *x)
-{
-	kmemleak_free(x);
-	kasan_kfree_large(x);
-}
-
 static __always_inline bool slab_free_hook(struct kmem_cache *s,
 						void *x, bool init)
 {
@@ -3548,19 +3542,6 @@ struct detached_freelist {
 	int cnt;
 	struct kmem_cache *s;
 };
-
-static inline void free_large_kmalloc(struct folio *folio, void *object)
-{
-	unsigned int order = folio_order(folio);
-
-	if (WARN_ON_ONCE(order == 0))
-		pr_warn_once("object pointer: 0x%p\n", object);
-
-	kfree_hook(object);
-	mod_lruvec_page_state(folio_page(folio, 0), NR_SLAB_UNRECLAIMABLE_B,
-			      -(PAGE_SIZE << order));
-	__free_pages(folio_page(folio, 0), order);
-}
 
 /*
  * This function progressively scans the array with free objects (with

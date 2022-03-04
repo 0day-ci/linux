@@ -3639,7 +3639,8 @@ __do_kmalloc_node(size_t size, gfp_t flags, int node, unsigned long caller)
 	void *ret;
 
 	if (unlikely(size > KMALLOC_MAX_CACHE_SIZE))
-		return NULL;
+		return kmalloc_large(size, flags);
+
 	cachep = kmalloc_slab(size, flags);
 	if (unlikely(ZERO_OR_NULL_PTR(cachep)))
 		return cachep;
@@ -3700,7 +3701,8 @@ static __always_inline void *__do_kmalloc(size_t size, gfp_t flags,
 	void *ret;
 
 	if (unlikely(size > KMALLOC_MAX_CACHE_SIZE))
-		return NULL;
+		return kmalloc_large(size, flags);
+
 	cachep = kmalloc_slab(size, flags);
 	if (unlikely(ZERO_OR_NULL_PTR(cachep)))
 		return cachep;
@@ -3754,14 +3756,21 @@ void kmem_cache_free_bulk(struct kmem_cache *orig_s, size_t size, void **p)
 {
 	struct kmem_cache *s;
 	size_t i;
+	struct folio *folio;
 
 	local_irq_disable();
 	for (i = 0; i < size; i++) {
 		void *objp = p[i];
 
-		if (!orig_s) /* called via kfree_bulk */
+		if (!orig_s) {
+			/* called via kfree_bulk */
+			folio = virt_to_folio(objp);
+			if (unlikely(!folio_test_slab(folio))) {
+				free_large_kmalloc(folio, objp);
+				continue;
+			}
 			s = virt_to_cache(objp);
-		else
+		} else
 			s = cache_from_obj(orig_s, objp);
 		if (!s)
 			continue;
@@ -3791,11 +3800,20 @@ void kfree(const void *objp)
 {
 	struct kmem_cache *c;
 	unsigned long flags;
+	struct folio *folio;
+	void *object = (void *) objp;
 
 	trace_kfree(_RET_IP_, objp);
 
 	if (unlikely(ZERO_OR_NULL_PTR(objp)))
 		return;
+
+	folio = virt_to_folio(objp);
+	if (unlikely(!folio_test_slab(folio))) {
+		free_large_kmalloc(folio, object);
+		return;
+	}
+
 	local_irq_save(flags);
 	kfree_debugcheck(objp);
 	c = virt_to_cache(objp);
@@ -4226,11 +4244,16 @@ void __check_heap_object(const void *ptr, unsigned long n,
 size_t __ksize(const void *objp)
 {
 	struct kmem_cache *c;
+	struct folio *folio;
 	size_t size;
 
 	BUG_ON(!objp);
 	if (unlikely(objp == ZERO_SIZE_PTR))
 		return 0;
+
+	folio = virt_to_folio(objp);
+	if (!folio_test_slab(folio))
+		return folio_size(folio);
 
 	c = virt_to_cache(objp);
 	size = c ? c->object_size : 0;
