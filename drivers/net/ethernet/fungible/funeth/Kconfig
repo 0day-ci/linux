@@ -6,9 +6,10 @@
 config FUN_ETH
 	tristate "Fungible Ethernet device driver"
 	depends on PCI && PCI_MSI
-	depends on TLS && TLS_DEVICE || TLS_DEVICE=n
+	depends on TLS || TLS=n
 	select NET_DEVLINK
 	select FUN_CORE
+	select SBITMAP
 	help
 	  This driver supports the Ethernet functionality of Fungible adapters.
 	  It works with both physical and virtual functions.

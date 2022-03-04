@@ -234,7 +234,8 @@ static unsigned int write_pkt_desc(struct sk_buff *skb, struct funeth_txq *q,
 			fun_dataop_gl_init(gle, 0, 0, lens[i], addrs[i]);
 	}
 
-	if (IS_ENABLED(CONFIG_TLS_DEVICE) && unlikely(tls_len)) {
+#if IS_ENABLED(CONFIG_TLS_DEVICE)
+	if (unlikely(tls_len)) {
 		struct fun_eth_tls *tls = (struct fun_eth_tls *)gle;
 		struct fun_ktls_tx_ctx *tls_ctx;
 
@@ -250,6 +251,7 @@ static unsigned int write_pkt_desc(struct sk_buff *skb, struct funeth_txq *q,
 		q->stats.tx_tls_pkts += 1 + extra_pkts;
 		u64_stats_update_end(&q->syncp);
 	}
+#endif
 
 	u64_stats_update_begin(&q->syncp);
 	q->stats.tx_bytes += skb->len + extra_bytes;
@@ -306,12 +308,13 @@ netdev_tx_t fun_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	unsigned int tls_len = 0;
 	unsigned int ndesc;
 
-	if (IS_ENABLED(CONFIG_TLS_DEVICE) && skb->sk &&
-	    tls_is_sk_tx_device_offloaded(skb->sk)) {
+#if IS_ENABLED(CONFIG_TLS_DEVICE)
+	if (skb->sk && tls_is_sk_tx_device_offloaded(skb->sk)) {
 		skb = fun_tls_tx(skb, q, &tls_len);
 		if (unlikely(!skb))
 			goto dropped;
 	}
+#endif
 
 	ndesc = write_pkt_desc(skb, q, tls_len);
 	if (unlikely(!ndesc)) {
