@@ -9,6 +9,7 @@
 
 #include <linux/acpi.h>
 #include <linux/export.h>
+#include <linux/fwnode.h>
 #include <linux/kernel.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -45,14 +46,16 @@ EXPORT_SYMBOL_GPL(device_property_present);
 bool fwnode_property_present(const struct fwnode_handle *fwnode,
 			     const char *propname)
 {
-	bool ret;
+	if (IS_ERR_OR_NULL(fwnode))
+		return false;
 
-	ret = fwnode_call_bool_op(fwnode, property_present, propname);
-	if (ret == false && !IS_ERR_OR_NULL(fwnode) &&
-	    !IS_ERR_OR_NULL(fwnode->secondary))
-		ret = fwnode_call_bool_op(fwnode->secondary, property_present,
-					 propname);
-	return ret;
+	if (fwnode_call_bool_op(fwnode, property_present, propname))
+		return true;
+
+	if (IS_ERR_OR_NULL(fwnode->secondary))
+		return false;
+
+	return fwnode_call_bool_op(fwnode->secondary, property_present, propname);
 }
 EXPORT_SYMBOL_GPL(fwnode_property_present);
 
@@ -232,10 +235,12 @@ static int fwnode_property_read_int_array(const struct fwnode_handle *fwnode,
 {
 	int ret;
 
+	if (IS_ERR_OR_NULL(fwnode))
+		return -EINVAL;
+
 	ret = fwnode_call_int_op(fwnode, property_read_int_array, propname,
 				 elem_size, val, nval);
-	if (ret == -EINVAL && !IS_ERR_OR_NULL(fwnode) &&
-	    !IS_ERR_OR_NULL(fwnode->secondary))
+	if (ret == -EINVAL && !IS_ERR_OR_NULL(fwnode->secondary))
 		ret = fwnode_call_int_op(
 			fwnode->secondary, property_read_int_array, propname,
 			elem_size, val, nval);
@@ -371,10 +376,12 @@ int fwnode_property_read_string_array(const struct fwnode_handle *fwnode,
 {
 	int ret;
 
+	if (IS_ERR_OR_NULL(fwnode))
+		return -EINVAL;
+
 	ret = fwnode_call_int_op(fwnode, property_read_string_array, propname,
 				 val, nval);
-	if (ret == -EINVAL && !IS_ERR_OR_NULL(fwnode) &&
-	    !IS_ERR_OR_NULL(fwnode->secondary))
+	if (ret == -EINVAL && !IS_ERR_OR_NULL(fwnode->secondary))
 		ret = fwnode_call_int_op(fwnode->secondary,
 					 property_read_string_array, propname,
 					 val, nval);
@@ -480,11 +487,12 @@ int fwnode_property_get_reference_args(const struct fwnode_handle *fwnode,
 {
 	int ret;
 
+	if (IS_ERR_OR_NULL(fwnode))
+		return -ENOENT;
+
 	ret = fwnode_call_int_op(fwnode, get_reference_args, prop, nargs_prop,
 				 nargs, index, args);
-
-	if (ret < 0 && !IS_ERR_OR_NULL(fwnode) &&
-	    !IS_ERR_OR_NULL(fwnode->secondary))
+	if (ret < 0 && !IS_ERR_OR_NULL(fwnode->secondary))
 		ret = fwnode_call_int_op(fwnode->secondary, get_reference_args,
 					 prop, nargs_prop, nargs, index, args);
 
@@ -798,6 +806,9 @@ EXPORT_SYMBOL_GPL(fwnode_handle_put);
  */
 bool fwnode_device_is_available(const struct fwnode_handle *fwnode)
 {
+	if (IS_ERR_OR_NULL(fwnode))
+		return false;
+
 	if (!fwnode_has_op(fwnode, device_is_available))
 		return true;
 
@@ -959,11 +970,11 @@ fwnode_graph_get_next_endpoint(const struct fwnode_handle *fwnode,
 		parent = fwnode_graph_get_port_parent(prev);
 	else
 		parent = fwnode;
+	if (IS_ERR_OR_NULL(parent))
+		return NULL;
 
 	ep = fwnode_call_ptr_op(parent, graph_get_next_endpoint, prev);
-
-	if (IS_ERR_OR_NULL(ep) &&
-	    !IS_ERR_OR_NULL(parent) && !IS_ERR_OR_NULL(parent->secondary))
+	if (!ep && !IS_ERR_OR_NULL(parent->secondary))
 		ep = fwnode_graph_get_next_endpoint(parent->secondary, NULL);
 
 	return ep;
