@@ -25,11 +25,16 @@ struct task_struct;
 #define DEPT_MAX_SUBCLASSES_USR		(DEPT_MAX_SUBCLASSES / DEPT_MAX_SUBCLASSES_EVT)
 #define DEPT_MAX_SUBCLASSES_CACHE	2
 
-#define DEPT_SIRQ			0
-#define DEPT_HIRQ			1
-#define DEPT_IRQS_NR			2
-#define DEPT_SIRQF			(1UL << DEPT_SIRQ)
-#define DEPT_HIRQF			(1UL << DEPT_HIRQ)
+enum {
+	DEPT_CXT_SIRQ = 0,
+	DEPT_CXT_HIRQ,
+	DEPT_CXT_IRQS_NR,
+	DEPT_CXT_PROCESS = DEPT_CXT_IRQS_NR,
+	DEPT_CXTS_NR
+};
+
+#define DEPT_SIRQF			(1UL << DEPT_CXT_SIRQ)
+#define DEPT_HIRQF			(1UL << DEPT_CXT_HIRQ)
 
 struct dept_ecxt;
 struct dept_iecxt {
@@ -95,8 +100,8 @@ struct dept_class {
 	/*
 	 * for tracking IRQ dependencies
 	 */
-	struct dept_iecxt		iecxt[DEPT_IRQS_NR];
-	struct dept_iwait		iwait[DEPT_IRQS_NR];
+	struct dept_iecxt		iecxt[DEPT_CXT_IRQS_NR];
+	struct dept_iwait		iwait[DEPT_CXT_IRQS_NR];
 };
 
 struct dept_stack {
@@ -150,8 +155,8 @@ struct dept_ecxt {
 	/*
 	 * where the IRQ-enabled happened
 	 */
-	unsigned long			enirq_ip[DEPT_IRQS_NR];
-	struct dept_stack		*enirq_stack[DEPT_IRQS_NR];
+	unsigned long			enirq_ip[DEPT_CXT_IRQS_NR];
+	struct dept_stack		*enirq_stack[DEPT_CXT_IRQS_NR];
 
 	/*
 	 * where the event context started
@@ -194,8 +199,8 @@ struct dept_wait {
 	/*
 	 * where the IRQ wait happened
 	 */
-	unsigned long			irq_ip[DEPT_IRQS_NR];
-	struct dept_stack		*irq_stack[DEPT_IRQS_NR];
+	unsigned long			irq_ip[DEPT_CXT_IRQS_NR];
+	struct dept_stack		*irq_stack[DEPT_CXT_IRQS_NR];
 
 	/*
 	 * where the wait happened
@@ -400,19 +405,19 @@ struct dept_task {
 	int				wait_hist_pos;
 
 	/*
-	 * sequential id to identify each IRQ context
+	 * sequential id to identify each context
 	 */
-	unsigned int			irq_id[DEPT_IRQS_NR];
+	unsigned int			cxt_id[DEPT_CXTS_NR];
 
 	/*
 	 * for tracking IRQ-enabled points with cross-event
 	 */
-	unsigned int			wgen_enirq[DEPT_IRQS_NR];
+	unsigned int			wgen_enirq[DEPT_CXT_IRQS_NR];
 
 	/*
 	 * for keeping up-to-date IRQ-enabled points
 	 */
-	unsigned long			enirq_ip[DEPT_IRQS_NR];
+	unsigned long			enirq_ip[DEPT_CXT_IRQS_NR];
 
 	/*
 	 * current effective IRQ-enabled flag
@@ -448,7 +453,7 @@ struct dept_task {
 	.dept_task.wait_hist = { { .wait = NULL, } },			\
 	.dept_task.ecxt_held_pos = 0,					\
 	.dept_task.wait_hist_pos = 0,					\
-	.dept_task.irq_id = { 0 },					\
+	.dept_task.cxt_id = { 0 },					\
 	.dept_task.wgen_enirq = { 0 },					\
 	.dept_task.enirq_ip = { 0 },					\
 	.dept_task.recursive = 0,					\
@@ -480,6 +485,7 @@ extern void dept_split_map_common_init(struct dept_map_common *mc, struct dept_k
 extern void dept_wait_split_map(struct dept_map_each *me, struct dept_map_common *mc, unsigned long ip, const char *w_fn, int ne);
 extern void dept_event_split_map(struct dept_map_each *me, struct dept_map_common *mc, unsigned long ip, const char *e_fn);
 extern void dept_ask_event_split_map(struct dept_map_each *me, struct dept_map_common *mc);
+extern void dept_kernel_enter(void);
 
 /*
  * for users who want to manage external keys
@@ -520,6 +526,7 @@ struct dept_task { };
 #define dept_wait_split_map(me, mc, ip, w_fn, ne)	do { } while (0)
 #define dept_event_split_map(me, mc, ip, e_fn)		do { } while (0)
 #define dept_ask_event_split_map(me, mc)		do { } while (0)
+#define dept_kernel_enter()				do { } while (0)
 #define dept_key_init(k)				do { (void)(k); } while (0)
 #define dept_key_destroy(k)				do { (void)(k); } while (0)
 #endif
