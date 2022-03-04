@@ -43,6 +43,7 @@ struct sdmmc_lli_desc {
 struct sdmmc_idma {
 	dma_addr_t sg_dma;
 	void *sg_cpu;
+	u8 dma_lli:1;
 };
 
 struct sdmmc_dlyb {
@@ -118,6 +119,7 @@ static void sdmmc_idma_unprep_data(struct mmci_host *host,
 
 static int sdmmc_idma_setup(struct mmci_host *host)
 {
+	struct device_node *np = host->mmc->parent->of_node;
 	struct sdmmc_idma *idma;
 	struct device *dev = mmc_dev(host->mmc);
 
@@ -125,9 +127,13 @@ static int sdmmc_idma_setup(struct mmci_host *host)
 	if (!idma)
 		return -ENOMEM;
 
+	idma->dma_lli = host->variant->dma_lli;
+	if (of_get_property(np, "st,disable-dma-lli", NULL))
+		idma->dma_lli = 0;
+
 	host->dma_priv = idma;
 
-	if (host->variant->dma_lli) {
+	if (idma->dma_lli) {
 		idma->sg_cpu = dmam_alloc_coherent(dev, SDMMC_LLI_BUF_LEN,
 						   &idma->sg_dma, GFP_KERNEL);
 		if (!idma->sg_cpu) {
@@ -154,7 +160,7 @@ static int sdmmc_idma_start(struct mmci_host *host, unsigned int *datactrl)
 	struct scatterlist *sg;
 	int i;
 
-	if (!host->variant->dma_lli || data->sg_len == 1) {
+	if (!idma->dma_lli || data->sg_len == 1) {
 		writel_relaxed(sg_dma_address(data->sg),
 			       host->base + MMCI_STM32_IDMABASE0R);
 		writel_relaxed(MMCI_STM32_IDMAEN,
