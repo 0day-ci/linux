@@ -3075,6 +3075,15 @@ void xhci_update_erst_dequeue(struct xhci_hcd *xhci,
 }
 EXPORT_SYMBOL_GPL(xhci_update_erst_dequeue);
 
+static irqreturn_t xhci_vendor_queue_irq_work(struct xhci_hcd *xhci)
+{
+	struct xhci_vendor_ops *ops = xhci_vendor_get_ops(xhci);
+
+	if (ops && ops->queue_irq_work)
+		return ops->queue_irq_work(xhci);
+	return IRQ_NONE;
+}
+
 /*
  * xHCI spec says we can get an interrupt, and if the HC has an error condition,
  * we might get bad data out of the event ring.  Section 4.10.2.7 has a list of
@@ -3107,6 +3116,10 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 		ret = IRQ_HANDLED;
 		goto out;
 	}
+
+	ret = xhci_vendor_queue_irq_work(xhci);
+	if (ret == IRQ_HANDLED)
+		goto out;
 
 	/*
 	 * Clear the op reg interrupt status first,
