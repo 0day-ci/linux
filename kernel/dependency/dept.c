@@ -2325,6 +2325,12 @@ void dept_event(struct dept_map *m, unsigned long e_f, unsigned long ip,
 		do_event((void *)m, c, READ_ONCE(m->wgen), ip);
 		pop_ecxt((void *)m);
 	}
+
+	/*
+	 * Keep the map diabled until the next sleep.
+	 */
+	WRITE_ONCE(m->wgen, 0);
+
 	dept_exit(flags);
 }
 EXPORT_SYMBOL_GPL(dept_event);
@@ -2446,6 +2452,11 @@ void dept_event_split_map(struct dept_map_each *me,
 		do_event((void *)me, c, READ_ONCE(me->wgen), ip);
 		pop_ecxt((void *)me);
 	}
+
+	/*
+	 * Keep the map diabled until the next sleep.
+	 */
+	WRITE_ONCE(me->wgen, 0);
 
 	dept_exit(flags);
 }
