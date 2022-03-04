@@ -115,7 +115,12 @@ struct crypto_larval *crypto_larval_alloc(const char *name, u32 type, u32 mask)
 	larval->alg.cra_destroy = crypto_larval_destroy;
 
 	strlcpy(larval->alg.cra_name, name, CRYPTO_MAX_ALG_NAME);
-	init_completion(&larval->completion);
+	/*
+	 * TODO: Split ->completion according to what it's used for e.g.
+	 * ->test_completion, ->probe_completion and the like, so that
+	 *  Dept can track its dependency properly.
+	 */
+	init_completion_nocheck(&larval->completion);
 
 	return larval;
 }
