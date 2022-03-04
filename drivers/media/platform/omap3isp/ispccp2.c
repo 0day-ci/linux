@@ -675,8 +675,10 @@ static void ccp2_try_format(struct isp_ccp2_device *ccp2,
 		 */
 		format = __ccp2_get_format(ccp2, sd_state, CCP2_PAD_SINK,
 					   which);
-		memcpy(fmt, format, sizeof(*fmt));
-		fmt->code = MEDIA_BUS_FMT_SGRBG10_1X10;
+		if (format != NULL) {
+			memcpy(fmt, format, sizeof(*fmt));
+			fmt->code = MEDIA_BUS_FMT_SGRBG10_1X10;
+		}
 		break;
 	}
 
@@ -709,6 +711,9 @@ static int ccp2_enum_mbus_code(struct v4l2_subdev *sd,
 
 		format = __ccp2_get_format(ccp2, sd_state, CCP2_PAD_SINK,
 					   code->which);
+		if (format == NULL)
+			return -EINVAL;
+
 		code->code = format->code;
 	}
 
@@ -792,6 +797,9 @@ static int ccp2_set_format(struct v4l2_subdev *sd,
 	if (fmt->pad == CCP2_PAD_SINK) {
 		format = __ccp2_get_format(ccp2, sd_state, CCP2_PAD_SOURCE,
 					   fmt->which);
+		if (format == NULL)
+			return -EINVAL;
+
 		*format = fmt->format;
 		ccp2_try_format(ccp2, sd_state, CCP2_PAD_SOURCE, format,
 				fmt->which);
