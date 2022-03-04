@@ -1382,7 +1382,7 @@ static int coresight_fixup_device_conns(struct coresight_device *csdev)
 			continue;
 		conn->child_dev =
 			coresight_find_csdev_by_fwnode(conn->child_fwnode);
-		if (conn->child_dev) {
+		if (conn->child_dev && conn->child_dev->has_conns_grp) {
 			ret = coresight_make_links(csdev, conn,
 						   conn->child_dev);
 			if (ret)
@@ -1594,7 +1594,8 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
 	refcnts = kcalloc(nr_refcnts, sizeof(*refcnts), GFP_KERNEL);
 	if (!refcnts) {
 		ret = -ENOMEM;
-		goto err_free_csdev;
+		kfree(csdev);
+		goto err_out;
 	}
 
 	csdev->refcnt = refcnts;
@@ -1619,8 +1620,10 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
 	csdev->dev.fwnode = fwnode_handle_get(dev_fwnode(desc->dev));
 	dev_set_name(&csdev->dev, "%s", desc->name);
 
+	mutex_lock(&coresight_mutex);
 	ret = device_register(&csdev->dev);
 	if (ret) {
+		mutex_unlock(&coresight_mutex);
 		put_device(&csdev->dev);
 		/*
 		 * All resources are free'd explicitly via
@@ -1634,6 +1637,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
 		ret = etm_perf_add_symlink_sink(csdev);
 
 		if (ret) {
+			mutex_unlock(&coresight_mutex);
 			device_unregister(&csdev->dev);
 			/*
 			 * As with the above, all resources are free'd
@@ -1644,8 +1648,6 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
 			goto err_out;
 		}
 	}
-
-	mutex_lock(&coresight_mutex);
 
 	ret = coresight_create_conns_sysfs_group(csdev);
 	if (!ret)
@@ -1663,8 +1665,6 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
 
 	return csdev;
 
-err_free_csdev:
-	kfree(csdev);
 err_out:
 	/* Cleanup the connection information */
 	coresight_release_platform_data(NULL, desc->pdata);
