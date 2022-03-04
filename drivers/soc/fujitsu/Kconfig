@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+menu "fujitsu SoC drivers"
+
+config A64FX_DIAG
+	bool "A64FX diag driver"
+	depends on ARM64
+	help
+	  Say Y here if you want to enable diag interrupt on A64FX.
+	  This driver uses pseudo-NMI if available.
+
+	  If unsure, say N.
+
+endmenu
