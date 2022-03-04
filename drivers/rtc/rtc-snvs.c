@@ -269,8 +269,11 @@ static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
 	struct snvs_rtc_data *data = dev_get_drvdata(dev);
 	u32 lpsr;
 	u32 events = 0;
+	int ret;
 
-	clk_enable(data->clk);
+	ret = clk_enable(data->clk);
+	if (ret)
+		return IRQ_NONE;
 
 	regmap_read(data->regmap, data->offset + SNVS_LPSR, &lpsr);
 
