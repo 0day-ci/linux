@@ -6202,7 +6202,12 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 	local_irq_disable();
 	rcu_note_context_switch(!!sched_mode);
 
-	if (sched_mode == SM_NONE)
+	/*
+	 * Skip the commit if the current task does not actually go to
+	 * sleep.
+	 */
+	if (READ_ONCE(prev->__state) & TASK_NORMAL &&
+	    sched_mode == SM_NONE)
 		dept_ask_event_wait_commit(_RET_IP_);
 
 	/*
