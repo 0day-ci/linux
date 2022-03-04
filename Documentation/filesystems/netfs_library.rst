@@ -562,4 +562,4 @@ API Function Reference
 ======================
 
 .. kernel-doc:: include/linux/netfs.h
-.. kernel-doc:: fs/netfs/read_helper.c
+.. kernel-doc:: fs/netfs/io.c
