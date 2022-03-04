@@ -1458,14 +1458,7 @@ static void add_wait(struct dept_class *c, unsigned long ip,
 
 		eh = dt->ecxt_held + i;
 		if (eh->ecxt->class != c || eh->nest == ne)
-			break;
-	}
-
-	for (; i >= 0; i--) {
-		struct dept_ecxt_held *eh;
-
-		eh = dt->ecxt_held + i;
-		add_dep(eh->ecxt, w);
+			add_dep(eh->ecxt, w);
 	}
 
 	if (!wait_consumed(w) && !rich_stack) {
