@@ -312,6 +312,8 @@ struct i915_request {
 	struct i915_capture_list *capture_list;
 #endif
 
+	u32 *aux_inv_fixup; /* hsdes: 1809175790 */
+
 	/** Time at which this request was emitted, in jiffies. */
 	unsigned long emitted_jiffies;
 

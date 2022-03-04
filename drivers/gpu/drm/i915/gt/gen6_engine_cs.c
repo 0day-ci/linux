@@ -137,6 +137,9 @@ int gen6_emit_flush_rcs(struct i915_request *rq, u32 mode)
 	*cs++ = 0;
 	intel_ring_advance(rq, cs);
 
+	/* hsdes: 1809175790. No fixup needed for gen6 */
+	rq->aux_inv_fixup = NULL;
+
 	return 0;
 }
 
@@ -207,6 +210,9 @@ static int mi_flush_dw(struct i915_request *rq, u32 flags)
 	*cs++ = MI_NOOP;
 
 	intel_ring_advance(rq, cs);
+
+	/* hsdes: 1809175790. No fixup needed for gen6 */
+	rq->aux_inv_fixup = NULL;
 
 	return 0;
 }
@@ -346,6 +352,9 @@ int gen7_emit_flush_rcs(struct i915_request *rq, u32 mode)
 	*cs++ = scratch_addr;
 	*cs++ = 0;
 	intel_ring_advance(rq, cs);
+
+	/* hsdes: 1809175790. No fixup needed for gen7 rcs */
+	rq->aux_inv_fixup = NULL;
 
 	return 0;
 }

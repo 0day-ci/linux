@@ -73,6 +73,9 @@ int gen8_emit_flush_rcs(struct i915_request *rq, u32 mode)
 
 	intel_ring_advance(rq, cs);
 
+	/* hsdes: 1809175790. No fixup needed for gen8 rcs */
+	rq->aux_inv_fixup = NULL;
+
 	return 0;
 }
 
@@ -105,6 +108,9 @@ int gen8_emit_flush_xcs(struct i915_request *rq, u32 mode)
 	*cs++ = 0; /* upper addr */
 	*cs++ = 0; /* value */
 	intel_ring_advance(rq, cs);
+
+	/* hsdes: 1809175790. No fixup needed for gen8 xcs */
+	rq->aux_inv_fixup = NULL;
 
 	return 0;
 }
@@ -157,36 +163,15 @@ int gen11_emit_flush_rcs(struct i915_request *rq, u32 mode)
 		intel_ring_advance(rq, cs);
 	}
 
+	/* hsdes: 1809175790. No fixup needed for gen11 rcs */
+	rq->aux_inv_fixup = NULL;
+
 	return 0;
 }
 
 static u32 preparser_disable(bool state)
 {
 	return MI_ARB_CHECK | 1 << 8 | state;
-}
-
-static i915_reg_t aux_inv_reg(const struct intel_engine_cs *engine)
-{
-	static const i915_reg_t vd[] = {
-		GEN12_VD0_AUX_NV,
-		GEN12_VD1_AUX_NV,
-		GEN12_VD2_AUX_NV,
-		GEN12_VD3_AUX_NV,
-	};
-
-	static const i915_reg_t ve[] = {
-		GEN12_VE0_AUX_NV,
-		GEN12_VE1_AUX_NV,
-	};
-
-	if (engine->class == VIDEO_DECODE_CLASS)
-		return vd[engine->instance];
-
-	if (engine->class == VIDEO_ENHANCEMENT_CLASS)
-		return ve[engine->instance];
-
-	GEM_BUG_ON("unknown aux_inv reg\n");
-	return INVALID_MMIO_REG;
 }
 
 static u32 *gen12_emit_aux_table_inv(const i915_reg_t inv_reg, u32 *cs)
@@ -274,6 +259,9 @@ int gen12_emit_flush_rcs(struct i915_request *rq, u32 mode)
 		intel_ring_advance(rq, cs);
 	}
 
+	/* hsdes: 1809175790. aux_inv has been done above, no fixup needed */
+	rq->aux_inv_fixup = NULL;
+
 	return 0;
 }
 
@@ -288,7 +276,7 @@ int gen12_emit_flush_xcs(struct i915_request *rq, u32 mode)
 	if (mode & EMIT_INVALIDATE)
 		aux_inv = rq->engine->mask & ~BIT(BCS0);
 	if (aux_inv)
-		cmd += 2 * hweight32(aux_inv) + 2;
+		cmd += 4;
 
 	cs = intel_ring_begin(rq, cmd);
 	if (IS_ERR(cs))
@@ -319,16 +307,21 @@ int gen12_emit_flush_xcs(struct i915_request *rq, u32 mode)
 	*cs++ = 0; /* value */
 
 	if (aux_inv) { /* hsdes: 1809175790 */
-		struct intel_engine_cs *engine;
-		unsigned int tmp;
-
-		*cs++ = MI_LOAD_REGISTER_IMM(hweight32(aux_inv));
-		for_each_engine_masked(engine, rq->engine->gt, aux_inv, tmp) {
-			*cs++ = i915_mmio_reg_offset(aux_inv_reg(engine));
-			*cs++ = AUX_INV;
-		}
+		/*
+		 * We don't know which engine will eventually carry out
+		 * this request, so the mmio aux_inv register address is
+		 * unknown at this moment. We save the cs pointer supposed
+		 * to hold the aux_inv address in rq->aux_inv_fixup and set
+		 * it in execlists_dequeue() when the engine instance
+		 * carrying out this request becomes certain
+		 */
+		*cs++ = MI_LOAD_REGISTER_IMM(1);
+		rq->aux_inv_fixup = cs; /* save the pointer to aux_inv */
+		*cs++ = 0; /* mmio addr to be set at submission to HW */
+		*cs++ = AUX_INV;
 		*cs++ = MI_NOOP;
-	}
+	} else
+		rq->aux_inv_fixup = NULL;
 
 	if (mode & EMIT_INVALIDATE)
 		*cs++ = preparser_disable(false);
