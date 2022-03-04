@@ -549,6 +549,16 @@ static int spi_nor_parse_bfpt(struct spi_nor *nor,
 	map->uniform_erase_type = map->uniform_region.offset &
 				  SNOR_ERASE_TYPE_MASK;
 
+	/*
+	 * The first JESD216 revision doesn't specify a method to enable
+	 * quad mode. spi_nor_init_default_params() will set a legacy
+	 * default method to enable quad mode. We have to disable it
+	 * again.
+	 * Flashes with this JESD216 revision need to set the quad_enable
+	 * method in their post_bfpt() fixup if they want to use quad I/O.
+	 */
+	params->quad_enable = NULL;
+
 	/* Stop here if not JESD216 rev A or later. */
 	if (bfpt_header->length == BFPT_DWORD_MAX_JESD216)
 		return spi_nor_post_bfpt_fixups(nor, bfpt_header, &bfpt);
@@ -562,7 +572,6 @@ static int spi_nor_parse_bfpt(struct spi_nor *nor,
 	/* Quad Enable Requirements. */
 	switch (bfpt.dwords[BFPT_DWORD(15)] & BFPT_DWORD15_QER_MASK) {
 	case BFPT_DWORD15_QER_NONE:
-		params->quad_enable = NULL;
 		break;
 
 	case BFPT_DWORD15_QER_SR2_BIT1_BUGGY:
