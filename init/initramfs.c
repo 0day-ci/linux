@@ -139,8 +139,12 @@ static void __init dir_add(const char *name, time64_t mtime)
 	struct dir_entry *de = kmalloc(sizeof(struct dir_entry), GFP_KERNEL);
 	if (!de)
 		panic_show_mem("can't allocate dir_entry buffer");
-	INIT_LIST_HEAD(&de->list);
 	de->name = kstrdup(name, GFP_KERNEL);
+	if (!de->name) {
+		kfree(de);
+		panic_show_mem("can't duplicate dir name");
+	}
+	INIT_LIST_HEAD(&de->list);
 	de->mtime = mtime;
 	list_add(&de->list, &dir_list);
 }
