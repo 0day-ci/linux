@@ -215,13 +215,17 @@ extern void setup_sysctl_set(struct ctl_table_set *p,
 	int (*is_seen)(struct ctl_table_set *));
 extern void retire_sysctl_set(struct ctl_table_set *set);
 
-struct ctl_table_header *__register_sysctl_table(
+#define __register_sysctl_table(set, path, table) \
+	__register_sysctl_table_with_num(set, path, table, 0)
+struct ctl_table_header *__register_sysctl_table_with_num(
 	struct ctl_table_set *set,
-	const char *path, struct ctl_table *table);
+	const char *path, struct ctl_table *table, int register_by_num);
 struct ctl_table_header *__register_sysctl_paths(
 	struct ctl_table_set *set,
 	const struct ctl_path *path, struct ctl_table *table);
-struct ctl_table_header *register_sysctl(const char *path, struct ctl_table *table);
+#define register_sysctl(path, table) register_sysctl_with_num(path, table, ARRAY_SIZE(table))
+struct ctl_table_header *register_sysctl_with_num(const char *path,
+	struct ctl_table *table, int register_by_num);
 struct ctl_table_header *register_sysctl_table(struct ctl_table * table);
 struct ctl_table_header *register_sysctl_paths(const struct ctl_path *path,
 						struct ctl_table *table);
@@ -230,8 +234,9 @@ void unregister_sysctl_table(struct ctl_table_header * table);
 
 extern int sysctl_init_bases(void);
 extern void __register_sysctl_init(const char *path, struct ctl_table *table,
-				 const char *table_name);
-#define register_sysctl_init(path, table) __register_sysctl_init(path, table, #table)
+				 int register_by_num, const char *table_name);
+#define register_sysctl_init(path, table) \
+	__register_sysctl_init(path, table, ARRAY_SIZE(table), #table)
 extern struct ctl_table_header *register_sysctl_mount_point(const char *path);
 
 void do_sysctl_args(void);
