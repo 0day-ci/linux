@@ -20,8 +20,16 @@ struct percpu_rw_semaphore {
 #endif
 };
 
+#ifdef CONFIG_DEPT
+#define __PERCPU_RWSEM_DMAP_INIT(lockname) .dmap = { .name = #lockname, .skip_cnt = ATOMIC_INIT(0) }
+#else
+#define __PERCPU_RWSEM_DMAP_INIT(lockname)
+#endif
+
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
-#define __PERCPU_RWSEM_DEP_MAP_INIT(lockname)	.dep_map = { .name = #lockname },
+#define __PERCPU_RWSEM_DEP_MAP_INIT(lockname)	.dep_map = {	\
+	.name = #lockname,					\
+	__PERCPU_RWSEM_DMAP_INIT(lockname) },
 #else
 #define __PERCPU_RWSEM_DEP_MAP_INIT(lockname)
 #endif
