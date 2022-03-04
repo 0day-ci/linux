@@ -1668,7 +1668,7 @@ static int __synaptics_init(struct psmouse *psmouse, bool absolute_mode)
 
 	error = synaptics_query_hardware(psmouse, &info);
 	if (error) {
-		psmouse_err(psmouse, "Unable to query device: %d\n", error);
+		psmouse_warn(psmouse, "Unable to query device: %d\n", error);
 		return error;
 	}
 
@@ -1824,7 +1824,7 @@ int synaptics_init_smbus(struct psmouse *psmouse)
 
 	error = synaptics_query_hardware(psmouse, &info);
 	if (error) {
-		psmouse_err(psmouse, "Unable to query device: %d\n", error);
+		psmouse_warn(psmouse, "Unable to query device: %d\n", error);
 		return error;
 	}
 
@@ -1864,7 +1864,7 @@ int synaptics_init(struct psmouse *psmouse)
 
 	error = synaptics_query_hardware(psmouse, &info);
 	if (error) {
-		psmouse_err(psmouse, "Unable to query device: %d\n", error);
+		psmouse_warn(psmouse, "Unable to query device: %d\n", error);
 		return error;
 	}
 
