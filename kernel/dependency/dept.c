@@ -1943,6 +1943,7 @@ void dept_map_init(struct dept_map *m, struct dept_key *k, int sub,
 	m->name = n;
 	m->wgen = 0U;
 	m->nocheck = false;
+	atomic_set(&m->skip_cnt, 0);
 exit:
 	dept_exit(flags);
 }
@@ -1963,6 +1964,7 @@ void dept_map_reinit(struct dept_map *m)
 
 	clean_classes_cache(&m->keys_local);
 	m->wgen = 0U;
+	atomic_set(&m->skip_cnt, 0);
 
 	dept_exit(flags);
 }
@@ -2345,6 +2347,53 @@ void dept_ecxt_exit(struct dept_map *m, unsigned long ip)
 	dept_exit(flags);
 }
 EXPORT_SYMBOL_GPL(dept_ecxt_exit);
+
+void dept_skip(struct dept_map *m)
+{
+	struct dept_task *dt = dept_task();
+	unsigned long flags;
+
+	if (READ_ONCE(dept_stop) || dt->recursive)
+		return;
+
+	if (m->nocheck)
+		return;
+
+	flags = dept_enter();
+
+	atomic_inc(&m->skip_cnt);
+
+	dept_exit(flags);
+}
+EXPORT_SYMBOL_GPL(dept_skip);
+
+/*
+ * Return true if successfully unskip, otherwise false.
+ */
+bool dept_unskip_if_skipped(struct dept_map *m)
+{
+	struct dept_task *dt = dept_task();
+	unsigned long flags;
+	bool ret = false;
+
+	if (READ_ONCE(dept_stop) || dt->recursive)
+		return false;
+
+	if (m->nocheck)
+		return false;
+
+	flags = dept_enter();
+
+	if (!atomic_read(&m->skip_cnt))
+		goto exit;
+
+	atomic_dec(&m->skip_cnt);
+	ret = true;
+exit:
+	dept_exit(flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dept_unskip_if_skipped);
 
 void dept_task_exit(struct task_struct *t)
 {

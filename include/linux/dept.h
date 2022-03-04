@@ -352,6 +352,11 @@ struct dept_map {
 	unsigned int			wgen;
 
 	/*
+	 * for skipping dependency check temporarily
+	 */
+	atomic_t			skip_cnt;
+
+	/*
 	 * whether this map should be going to be checked or not
 	 */
 	bool				nocheck;
@@ -444,6 +449,8 @@ extern void dept_ecxt_enter(struct dept_map *m, unsigned long e_f, unsigned long
 extern void dept_ask_event(struct dept_map *m);
 extern void dept_event(struct dept_map *m, unsigned long e_f, unsigned long ip, const char *e_fn);
 extern void dept_ecxt_exit(struct dept_map *m, unsigned long ip);
+extern void dept_skip(struct dept_map *m);
+extern bool dept_unskip_if_skipped(struct dept_map *m);
 
 /*
  * for users who want to manage external keys
@@ -475,6 +482,8 @@ struct dept_task { };
 #define dept_ask_event(m)			do { } while (0)
 #define dept_event(m, e_f, ip, e_fn)		do { (void)(e_fn); } while (0)
 #define dept_ecxt_exit(m, ip)			do { } while (0)
+#define dept_skip(m)				do { } while (0)
+#define dept_unskip_if_skipped(m)		(false)
 #define dept_key_init(k)			do { (void)(k); } while (0)
 #define dept_key_destroy(k)			do { (void)(k); } while (0)
 #endif

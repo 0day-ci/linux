@@ -488,7 +488,9 @@ enum xhlock_context_t {
  */
 #define STATIC_DEPT_MAP_INIT(_name, _key) .dmap = {		\
 	.name = (_name),					\
-	.keys = NULL },
+	.keys = NULL,						\
+	.skip_cnt = ATOMIC_INIT(0),				\
+	},
 #else
 #define STATIC_DEPT_MAP_INIT(_name, _key)
 #endif
