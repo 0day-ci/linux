@@ -85,3 +85,15 @@ config PATA_PARPORT_FIT2
 	  you chose to build PATA_PARPORT support into your kernel, you may answer Y
 	  here to build in the protocol driver, otherwise you should answer M
 	  to build it as a loadable module. The module will be called ktti.
+
+config PATA_PARPORT_FIT3
+	tristate "FIT TD-3000 protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the TD-3000 parallel port IDE
+	  protocol from Fidelity International Technology. This protocol is
+	  used in newer models of their portable disk, CD-ROM and PD/CD
+	  devices. If you chose to build PATA_PARPORT support into your kernel, you
+	  may answer Y here to build in the protocol driver, otherwise you
+	  should answer M to build it as a loadable module. The module will be
+	  called fit3.
