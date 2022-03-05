@@ -142,3 +142,15 @@ config PATA_PARPORT_FRPW
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will be
 	  called frpw.
+
+config PATA_PARPORT_KBIC
+	tristate "KingByte KBIC-951A/971A protocols"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the KBIC-951A and KBIC-971A parallel
+	  port IDE protocols from KingByte Information Corp. KingByte's
+	  adapters appear in many no-name portable disk and CD-ROM products,
+	  especially in Europe. If you chose to build PATA_PARPORT support into your
+	  kernel, you may answer Y here to build in the protocol driver,
+	  otherwise you should answer M to build it as a loadable module. The
+	  module will be called kbic.
