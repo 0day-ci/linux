@@ -74,3 +74,14 @@ config PATA_PARPORT_DSTR
 	  into your kernel, you may answer Y here to build in the protocol
 	  driver, otherwise you should answer M to build it as a loadable
 	  module. The module will be called dstr.
+
+config PATA_PARPORT_FIT2
+	tristate "FIT TD-2000 protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the TD-2000 parallel port IDE
+	  protocol from Fidelity International Technology. This is a simple
+	  (low speed) adapter that is used in some portable hard drives. If
+	  you chose to build PATA_PARPORT support into your kernel, you may answer Y
+	  here to build in the protocol driver, otherwise you should answer M
+	  to build it as a loadable module. The module will be called ktti.
