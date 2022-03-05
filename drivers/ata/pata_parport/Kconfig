@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# PATA_PARPORT configuration
+#
+# PATA_PARPORT doesn't need PARPORT, but if PARPORT is configured as a module,
+# PATA_PARPORT must also be a module.
+# PATA_PARPORT only supports PC style parports. Tough for USB or other parports...
+
+comment "Parallel IDE protocol modules"
+	depends on PATA_PARPORT
