@@ -176,3 +176,14 @@ config PATA_PARPORT_ON20
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module.The module will
 	  be called on20.
+
+config PATA_PARPORT_ON26
+	tristate "OnSpec 90c26 protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the 90c26 parallel port IDE protocol
+	  from OnSpec Electronics (often marketed under the ValuStore brand
+	  name). If you chose to build PATA_PARPORT support into your kernel, you
+	  may answer Y here to build in the protocol driver, otherwise you
+	  should answer M to build it as a loadable module. The module will be
+	  called on26.

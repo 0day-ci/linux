@@ -21,3 +21,4 @@ obj-$(CONFIG_PATA_PARPORT_FRPW)		+= frpw.o
 obj-$(CONFIG_PATA_PARPORT_KBIC)		+= kbic.o
 obj-$(CONFIG_PATA_PARPORT_KTTI)		+= ktti.o
 obj-$(CONFIG_PATA_PARPORT_ON20)		+= on20.o
+obj-$(CONFIG_PATA_PARPORT_ON26)		+= on26.o
