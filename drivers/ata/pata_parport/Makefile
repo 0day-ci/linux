@@ -9,3 +9,4 @@
 obj-$(CONFIG_PATA_PARPORT)		+= pata_parport.o
 obj-$(CONFIG_PATA_PARPORT_ATEN)		+= aten.o
 obj-$(CONFIG_PATA_PARPORT_BPCK)		+= bpck.o
+obj-$(CONFIG_PATA_PARPORT_BPCK6)	+= bpck6.o

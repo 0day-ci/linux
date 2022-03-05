@@ -36,3 +36,21 @@ config PATA_PARPORT_BPCK
 	  answer Y here to build in the protocol driver, otherwise you should
 	  answer M to build it as a loadable module.  The module will be
 	  called bpck.
+
+config PATA_PARPORT_BPCK6
+	tristate "MicroSolutions backpack (Series 6) protocol"
+	depends on PATA_PARPORT && !64BIT
+	help
+	  This option enables support for the Micro Solutions BACKPACK
+	  parallel port Series 6 IDE protocol.  (Most BACKPACK drives made
+	  after 1999 were Series 6) Series 6 drives will have the Series noted
+	  on the bottom of the drive.  Series 5 drivers don't always have it
+	  noted.
+
+	  In other words, if your BACKPACK drive says "Series 6" on the
+	  bottom, enable this option.
+
+	  If you chose to build PATA_PARPORT support into your kernel, you may
+	  answer Y here to build in the protocol driver, otherwise you should
+	  answer M to build it as a loadable module.  The module will be
+	  called bpck6.
