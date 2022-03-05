@@ -8,3 +8,14 @@
 
 comment "Parallel IDE protocol modules"
 	depends on PATA_PARPORT
+
+config PATA_PARPORT_ATEN
+	tristate "ATEN EH-100 protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the ATEN EH-100 parallel port IDE
+	  protocol. This protocol is used in some inexpensive low performance
+	  parallel port kits made in Hong Kong. If you chose to build PATA_PARPORT
+	  support into your kernel, you may answer Y here to build in the
+	  protocol driver, otherwise you should answer M to build it as a
+	  loadable module. The module will be called aten.

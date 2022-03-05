@@ -7,3 +7,4 @@
 #
 
 obj-$(CONFIG_PATA_PARPORT)		+= pata_parport.o
+obj-$(CONFIG_PATA_PARPORT_ATEN)		+= aten.o
