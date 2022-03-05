@@ -16,3 +16,4 @@ obj-$(CONFIG_PATA_PARPORT_FIT2)		+= fit2.o
 obj-$(CONFIG_PATA_PARPORT_FIT3)		+= fit3.o
 obj-$(CONFIG_PATA_PARPORT_EPAT)		+= epat.o
 obj-$(CONFIG_PATA_PARPORT_EPIA)		+= epia.o
+obj-$(CONFIG_PATA_PARPORT_FRIQ)		+= friq.o

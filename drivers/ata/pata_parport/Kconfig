@@ -120,3 +120,15 @@ config PATA_PARPORT_EPIA
 	  into your kernel, you may answer Y here to build in the protocol
 	  driver, otherwise you should answer M to build it as a loadable
 	  module. The module will be called epia.
+
+config PATA_PARPORT_FRIQ
+	tristate "Freecom IQ ASIC-2 protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for version 2 of the Freecom IQ parallel
+	  port IDE adapter.  This adapter is used by the Maxell Superdisk
+	  drive.  If you chose to build PATA_PARPORT support into your kernel, you
+	  may answer Y here to build in the protocol driver, otherwise you
+	  should answer M to build it as a loadable module. The module will be
+	  called friq. You must also have a high-level driver for the type
+	  of device that you want to support.
