@@ -132,3 +132,13 @@ config PATA_PARPORT_FRIQ
 	  should answer M to build it as a loadable module. The module will be
 	  called friq. You must also have a high-level driver for the type
 	  of device that you want to support.
+
+config PATA_PARPORT_FRPW
+	tristate "FreeCom power protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the Freecom power parallel port IDE
+	  protocol. If you chose to build PATA_PARPORT support into your kernel, you
+	  may answer Y here to build in the protocol driver, otherwise you
+	  should answer M to build it as a loadable module. The module will be
+	  called frpw.
