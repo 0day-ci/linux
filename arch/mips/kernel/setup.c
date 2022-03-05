@@ -361,7 +361,6 @@ early_param("mem", early_parse_mem);
 static int __init early_parse_memmap(char *p)
 {
 	char *oldp;
-	u64 start_at, mem_size;
 
 	if (!p)
 		return -EINVAL;
@@ -372,30 +371,38 @@ static int __init early_parse_memmap(char *p)
 	}
 
 	oldp = p;
-	mem_size = memparse(p, &p);
+	memory_limit = memparse(p, &p) & PAGE_MASK;
 	if (p == oldp)
 		return -EINVAL;
 
 	if (*p == '@') {
-		start_at = memparse(p+1, &p);
-		memblock_add(start_at, mem_size);
-	} else if (*p == '#') {
-		pr_err("\"memmap=nn#ss\" (force ACPI data) invalid on MIPS\n");
-		return -EINVAL;
+		memory_base = memparse(p + 1, &p) & PAGE_MASK;
 	} else if (*p == '$') {
-		start_at = memparse(p+1, &p);
-		memblock_add(start_at, mem_size);
-		memblock_reserve(start_at, mem_size);
+		memory_base = memparse(p+1, &p) & PAGE_MASK;
+		memblock_reserve(memory_base, memory_limit);
+		pr_notice("Memory reserved to %lluMB-%lluMB\n",
+			  (u64)memory_base >> 20, (u64)(memory_base + memory_limit) >> 20);
+		memory_base = 0;
+		memory_limit = 0;
+		return 0;
+	} else if (*p == '#') {
+		pr_err("\"memmap=nn#ss\" invalid on MIPS\n");
+		memory_limit = 0;
+		return -EINVAL;
+	} else if (*p == '!') {
+		pr_err("\"memmap=nn!ss\" invalid on MIPS\n");
+		memory_limit = 0;
+		return -EINVAL;
 	} else {
-		pr_err("\"memmap\" invalid format!\n");
+		pr_err("Unrecognized memmap syntax: %s\n", p);
+		memory_limit = 0;
 		return -EINVAL;
 	}
 
-	if (*p == '\0') {
-		usermem = 1;
-		return 0;
-	} else
-		return -EINVAL;
+	pr_notice("Memory limited to %lluMB-%lluMB\n",
+		  (u64)memory_base >> 20, (u64)(memory_base + memory_limit) >> 20);
+
+	return *p == '\0' ? 0 : -EINVAL;
 }
 early_param("memmap", early_parse_memmap);
 
