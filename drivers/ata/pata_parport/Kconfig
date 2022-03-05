@@ -97,3 +97,15 @@ config PATA_PARPORT_FIT3
 	  may answer Y here to build in the protocol driver, otherwise you
 	  should answer M to build it as a loadable module. The module will be
 	  called fit3.
+
+config PATA_PARPORT_EPAT
+	tristate "Shuttle EPAT/EPEZ protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the EPAT parallel port IDE protocol.
+	  EPAT is a parallel port IDE adapter manufactured by Shuttle
+	  Technology and widely used in devices from major vendors such as
+	  Hewlett-Packard, SyQuest, Imation and Avatar. If you chose to build
+	  PATA_PARPORT support into your kernel, you may answer Y here to build in
+	  the protocol driver, otherwise you should answer M to build it as a
+	  loadable module. The module will be called epat.
