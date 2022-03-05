@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/bus/pci-ep-bus.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: PCIe Endpoint Bus binding
+
+description: |
+  PCIe device may use flattened device tree to describe apertures in its
+  PCIe BARs. The Bus PCIe endpoint node is created and attached under the
+  device tree root node for this kind of device. Then the flatten device
+  tree overlay for this device is attached under the endpoint node.
+
+  The aperture address which is under the endpoint node consists of BAR
+  index and offset. It uses the following encoding:
+
+    0xIooooooo 0xoooooooo
+
+  Where:
+
+    I = BAR index
+    oooooo oooooooo = BAR offset
+
+  The endpoint is compatible with 'simple-bus' and contains 'ranges'
+  property for translating aperture address to CPU address.
+
+allOf:
+  - $ref: /schemas/simple-bus.yaml#
+
+maintainers:
+  - Lizhi Hou <lizhi.hou@xilinx.com>
+
+properties:
+  compatible:
+    contains:
+      const: pci-ep-bus
+
+  "#address-cells":
+    const: 2
+
+  "#size-cells":
+    const: 2
+
+  ranges: true
+
+patternProperties:
+  "^.*@[0-9a-f]+$":
+    description: hardware apertures belong to this device.
+    type: object
+
+required:
+  - compatible
+  - "#address-cells"
+  - "#size-cells"
+  - ranges
+
+additionalProperties: false
+
+examples:
+  - |
+    bus {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        pci-ep-bus@e0000000 {
+            compatible = "pci-ep-bus", "simple-bus";
+            #address-cells = <2>;
+            #size-cells = <2>;
+            ranges = <0x0 0x0 0x0 0xe0000000 0x0 0x2000000
+                      0x20000000 0x0 0x0 0xe4200000 0x0 0x40000>;
+        };
+    };
