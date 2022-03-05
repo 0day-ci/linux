@@ -1,0 +1,24 @@
+
+# XRT Alveo FPGA device configuration
+#
+
+config FPGA_XRT
+	tristate "XRT Alveo Drivers"
+	depends on OF
+	select OF_EMPTY_ROOT
+	select OF_OVERLAY
+	help
+	  Select this option to enable Xilinx XRT Alveo drivers. Xilinx Alveo
+	  card is PCIe device and has two PCIe functions. The first function
+	  performs board manangement and XRT management driver will be attached
+	  to it. The second function performs data movement, compute unit
+	  scheduling etc. And an XRT user driver will be attached to it.
+
+config FPGA_XRT_XMGMT
+	tristate "Xilinx Alveo Management Driver"
+	depends on FPGA_XRT
+	help
+	  Select this option to enable XRT PCIe driver for Xilinx Alveo FPGA.
+	  This driver provides interfaces for userspace application to access
+	  Alveo FPGA device, such as: downloading FPGA bitstream, query card
+	  information, hot reset card etc.
