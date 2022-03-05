@@ -154,3 +154,14 @@ config PATA_PARPORT_KBIC
 	  kernel, you may answer Y here to build in the protocol driver,
 	  otherwise you should answer M to build it as a loadable module. The
 	  module will be called kbic.
+
+config PATA_PARPORT_KTTI
+	tristate "KT PHd protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the "PHd" parallel port IDE protocol
+	  from KT Technology. This is a simple (low speed) adapter that is
+	  used in some 2.5" portable hard drives. If you chose to build PATA_PARPORT
+	  support into your kernel, you may answer Y here to build in the
+	  protocol driver, otherwise you should answer M to build it as a
+	  loadable module. The module will be called ktti.
