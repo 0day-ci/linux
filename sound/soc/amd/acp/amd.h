@@ -96,7 +96,7 @@ struct acp_dev_data {
 	char *name;
 	struct device *dev;
 	void __iomem *acp_base;
-	unsigned int i2s_irq;
+	int i2s_irq;
 
 	/* SOC specific dais */
 	struct snd_soc_dai_driver *dai_driver;
