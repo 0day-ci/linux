@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+
+/ {
+	fragment@0 {
+		target-path="";
+		__overlay__ {
+			pr_isolate_ulp@0,41000 {
+				compatible = "xlnx,alveo-pr-isolation";
+				reg = <0x0 0x41000 0x0 0x1000>;
+			};
+		};
+	};
+};
+

@@ -9,4 +9,5 @@
 obj-$(CONFIG_FPGA_XRT_XMGMT) += xrt-mgmt.o
 
 xrt-mgmt-objs :=		\
+	dt-test.dtb.o		\
 	xmgmt-drv.o

@@ -14,7 +14,10 @@
 #include <linux/aer.h>
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
+#include <linux/of.h>
 #include <linux/of_pci.h>
+
+#include "dt-test.h"
 
 #define XMGMT_MODULE_NAME	"xrt-mgmt"
 
@@ -25,17 +28,53 @@ static const struct pci_device_id xmgmt_pci_ids[] = {
 	{ 0, }
 };
 
+struct xmgmt {
+	int ovcs_id;
+};
+
 static int xmgmt_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	devm_of_pci_create_bus_endpoint(pdev);
+	struct device_node *dn;
+	struct xmgmt *xm;
+	int ret;
+
+	xm = devm_kzalloc(&pdev->dev, sizeof(*xm), GFP_KERNEL);
+	if (!xm)
+		return -ENOMEM;
+	pci_set_drvdata(pdev, xm);
+
+	ret = devm_of_pci_create_bus_endpoint(pdev);
+	if (ret)
+		return ret;
+
+	dn = of_pci_find_bus_endpoint(pdev);
+	if (!dn) {
+		dev_err(&pdev->dev, "does not find bus endpoint");
+		return -EINVAL;
+	}
+
+	ret = of_overlay_fdt_apply(__dtb_dt_test_begin,
+				   (u32)(__dtb_dt_test_end - __dtb_dt_test_begin),
+				   &xm->ovcs_id, dn);
+	of_node_put(dn);
+	if (ret)
+		return ret;
 
 	return 0;
+}
+
+static void xmgmt_remove(struct pci_dev *pdev)
+{
+	struct xmgmt *xm = pci_get_drvdata(pdev);
+
+	of_overlay_remove(&xm->ovcs_id);
 }
 
 static struct pci_driver xmgmt_driver = {
 	.name = XMGMT_MODULE_NAME,
 	.id_table = xmgmt_pci_ids,
 	.probe = xmgmt_probe,
+	.remove = xmgmt_remove,
 };
 
 static int __init xmgmt_init(void)

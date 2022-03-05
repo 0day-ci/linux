@@ -60,7 +60,7 @@ static int __init rcar_du_of_apply_overlay(const struct rcar_du_of_overlay *dtbs
 
 	ovcs_id = 0;
 	return of_overlay_fdt_apply(dtb->begin, dtb->end - dtb->begin,
-				    &ovcs_id);
+				    &ovcs_id, NULL);
 }
 
 static int __init rcar_du_of_add_property(struct of_changeset *ocs,
