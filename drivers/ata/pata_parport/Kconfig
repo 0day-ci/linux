@@ -109,3 +109,14 @@ config PATA_PARPORT_EPAT
 	  PATA_PARPORT support into your kernel, you may answer Y here to build in
 	  the protocol driver, otherwise you should answer M to build it as a
 	  loadable module. The module will be called epat.
+
+config PATA_PARPORT_EPIA
+	tristate "Shuttle EPIA protocol"
+	depends on PATA_PARPORT
+	help
+	  This option enables support for the (obsolete) EPIA parallel port
+	  IDE protocol from Shuttle Technology. This adapter can still be
+	  found in some no-name kits. If you chose to build PATA_PARPORT support
+	  into your kernel, you may answer Y here to build in the protocol
+	  driver, otherwise you should answer M to build it as a loadable
+	  module. The module will be called epia.
