@@ -605,6 +605,186 @@ int devm_of_pci_bridge_init(struct device *dev, struct pci_host_bridge *bridge)
 	return pci_parse_request_of_pci_ranges(dev, bridge);
 }
 
+#if IS_ENABLED(CONFIG_OF_DYNAMIC)
+
+static void devm_of_pci_destroy_bus_endpoint(struct device *dev, void *res)
+{
+	struct device_node *node = res;
+
+	of_detach_node(node);
+}
+
+static int of_ep_add_property(struct device *dev, struct property **proplist, const char *name,
+			      const int length, void *value)
+{
+	struct property *new;
+
+	new = devm_kzalloc(dev, sizeof(*new), GFP_KERNEL);
+	if (!new)
+		return -ENOMEM;
+
+	new->name = devm_kstrdup(dev, name, GFP_KERNEL);
+	if (!new->name)
+		return -ENOMEM;
+
+	new->value = devm_kmalloc(dev, length, GFP_KERNEL);
+	if (!new->value)
+		return -ENOMEM;
+
+	memcpy(new->value, value, length);
+	new->length = length;
+	new->next = *proplist;
+	*proplist = new;
+
+	return 0;
+}
+
+static struct device_node *of_ep_alloc_node(struct pci_dev *pdev, const char *name)
+{
+	struct device_node *node;
+	char *full_name;
+
+	node = devres_alloc(devm_of_pci_destroy_bus_endpoint, sizeof(*node), GFP_KERNEL);
+	if (!node)
+		return NULL;
+
+	full_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "/%s@%llx", name,
+				   (u64)pci_resource_start(pdev, 0));
+	if (!full_name)
+		return NULL;
+
+	node->parent = of_root;
+	node->full_name = full_name;
+	of_node_set_flag(node, OF_DYNAMIC);
+	of_node_init(node);
+
+	return node;
+}
+
+/**
+ * devm_of_pci_create_bus_endpoint - Create a device node for the given pci device.
+ * @pdev: PCI device pointer.
+ *
+ * For PCI device which uses flattened device tree to describe apertures in its BARs,
+ * a device node for the given pci device is required. Then the flattened device tree
+ * overlay from the device can be applied to the base tree.
+ * The device node is under root node and act like bus node. It contains a "ranges"
+ * property which is used for address translation of its children. Each child node
+ * corresponds an aperture and use BAR index and offset as its address.
+
+ * Returns 0 on success or a negative error-code on failure.
+ */
+int devm_of_pci_create_bus_endpoint(struct pci_dev *pdev)
+{
+	struct property *proplist = NULL;
+	struct device *dev = &pdev->dev;
+	int range_ncells, addr_ncells;
+	struct device_node *node;
+	void *prop = NULL;
+	u32 *range_cell;
+	__be32 val;
+	int i, ret;
+
+	node = of_ep_alloc_node(pdev, "pci-ep-bus");
+	if (!node)
+		return -ENOMEM;
+
+	/* the endpoint node works as 'simple-bus' to translate aperture addresses. */
+	prop = "simple-bus";
+	ret = of_ep_add_property(dev, &proplist, "compatible", strlen(prop) + 1, prop);
+	if (ret)
+		goto cleanup;
+
+	/* The address and size cells of nodes underneath are 2 */
+	val = cpu_to_be32(2);
+	ret = of_ep_add_property(dev, &proplist, "#address-cells", sizeof(u32), &val);
+	if (ret)
+		goto cleanup;
+
+	ret = of_ep_add_property(dev, &proplist, "#size-cells", sizeof(u32), &val);
+	if (ret)
+		goto cleanup;
+
+	/* child address format: 0xIooooooo oooooooo, I = bar index, o = offset on bar */
+	addr_ncells = of_n_addr_cells(node);
+	if (addr_ncells > 2) {
+		/* does not support number of address cells greater than 2 */
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/* range cells include <node addr cells> <child addr cells> <child size cells> */
+	range_ncells = addr_ncells + 4;
+	prop = kzalloc(range_ncells * sizeof(u32) * PCI_STD_NUM_BARS, GFP_KERNEL);
+	if (!prop) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	range_cell = prop;
+	for (i = 0; i < PCI_STD_NUM_BARS; i++) {
+		if (!pci_resource_len(pdev, i))
+			continue;
+		/* highest 4 bits of address are bar index */
+		*(__be64 *)range_cell = cpu_to_be64((u64)i << 60);
+		range_cell += 2;
+		if (addr_ncells == 2)
+			*(__be64 *)range_cell = cpu_to_be64((u64)pci_resource_start(pdev, i));
+		else
+			*(__be32 *)range_cell = cpu_to_be32((u32)pci_resource_start(pdev, i));
+
+		range_cell += addr_ncells;
+		*(__be64 *)range_cell = cpu_to_be64((u64)pci_resource_len(pdev, i));
+		range_cell += 2;
+	}
+
+	/* error out if there is not PCI BAR been found */
+	if ((void *)range_cell == prop) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = of_ep_add_property(dev, &proplist, "ranges", (void *)range_cell - prop, prop);
+	kfree(prop);
+	if (ret)
+		goto cleanup;
+
+	node->properties = proplist;
+	ret = of_attach_node(node);
+	if (ret)
+		goto cleanup;
+
+	devres_add(dev, node);
+
+	return 0;
+
+cleanup:
+	kfree(prop);
+	if (node)
+		devres_free(node);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(devm_of_pci_create_bus_endpoint);
+
+struct device_node *of_pci_find_bus_endpoint(struct pci_dev *pdev)
+{
+	struct device_node *dn;
+	char *path;
+
+	path = kasprintf(GFP_KERNEL, "/pci-ep-bus@%llx",
+			 (u64)pci_resource_start(pdev, 0));
+	if (!path)
+		return NULL;
+
+	dn = of_find_node_by_path(path);
+	kfree(path);
+
+	return dn;
+}
+EXPORT_SYMBOL_GPL(of_pci_find_bus_endpoint);
+#endif /* CONFIG_OF_DYNAMIC */
+
 #endif /* CONFIG_PCI */
 
 /**
