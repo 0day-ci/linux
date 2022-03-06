@@ -472,9 +472,12 @@ static bool tsnep_tx_poll(struct tsnep_tx *tx, int napi_budget)
 			struct skb_shared_hwtstamps hwtstamps;
 			u64 timestamp =
 				__le64_to_cpu(entry->desc_wb->timestamp);
+			u64 counter =
+				__le64_to_cpu(entry->desc_wb->counter);
 
 			memset(&hwtstamps, 0, sizeof(hwtstamps));
 			hwtstamps.hwtstamp = ns_to_ktime(timestamp);
+			hwtstamps.hwfreeruntstamp = ns_to_ktime(counter);
 
 			skb_tstamp_tx(entry->skb, &hwtstamps);
 		}
@@ -706,9 +709,12 @@ static int tsnep_rx_poll(struct tsnep_rx *rx, struct napi_struct *napi,
 					(struct tsnep_rx_inline *)skb->data;
 				u64 timestamp =
 					__le64_to_cpu(rx_inline->timestamp);
+				u64 counter =
+					__le64_to_cpu(rx_inline->counter);
 
 				memset(hwtstamps, 0, sizeof(*hwtstamps));
 				hwtstamps->hwtstamp = ns_to_ktime(timestamp);
+				hwtstamps->hwfreeruntstamp = ns_to_ktime(counter);
 			}
 			skb_pull(skb, TSNEP_RX_INLINE_METADATA_SIZE);
 			skb->protocol = eth_type_trans(skb,
