@@ -68,12 +68,10 @@ static ssize_t file_name##_show						\
 }
 
 #define gov_attr_ro(_name)						\
-static struct governor_attr _name =					\
-__ATTR(_name, 0444, _name##_show, NULL)
+static struct governor_attr _name = __ATTR_RO(_name)
 
 #define gov_attr_rw(_name)						\
-static struct governor_attr _name =					\
-__ATTR(_name, 0644, _name##_show, _name##_store)
+static struct governor_attr _name = __ATTR_RW(_name)
 
 /* Common to all CPUs of a policy */
 struct policy_dbs_info {
