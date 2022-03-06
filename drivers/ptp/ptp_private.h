@@ -96,6 +96,15 @@ static inline bool ptp_vclock_in_use(struct ptp_clock *ptp)
 	return in_use;
 }
 
+/* Check if free run for virtual clock is required */
+static inline bool ptp_vclock_free_run(struct ptp_clock *ptp)
+{
+	if (ptp->info->getfreeruntimex64)
+		return false;
+	else
+		return ptp_vclock_in_use(ptp);
+}
+
 extern struct class *ptp_class;
 
 /*

@@ -230,11 +230,12 @@ static ssize_t n_vclocks_store(struct device *dev,
 		for (i = 1; i <= ptp->n_vclocks - num; i++)
 			*(ptp->vclock_index + ptp->n_vclocks - i) = -1;
 	}
-
-	if (num == 0)
-		dev_info(dev, "only physical clock in use now\n");
-	else
-		dev_info(dev, "guarantee physical clock free running\n");
+	if (!ptp->info->getfreeruntimex64) {
+		if (num == 0)
+			dev_info(dev, "only physical clock in use now\n");
+		else
+			dev_info(dev, "guarantee physical clock free running\n");
+	}
 
 	ptp->n_vclocks = num;
 	mutex_unlock(&ptp->n_vclocks_mux);
