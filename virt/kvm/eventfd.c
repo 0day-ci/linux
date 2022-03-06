@@ -195,6 +195,7 @@ irqfd_wakeup(wait_queue_entry_t *wait, unsigned int mode, int sync, void *key)
 
 	if (flags & EPOLLIN) {
 		u64 cnt;
+
 		eventfd_ctx_do_read(irqfd->eventfd, &cnt);
 
 		idx = srcu_read_lock(&kvm->irq_srcu);
