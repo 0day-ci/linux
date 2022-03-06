@@ -6127,6 +6127,23 @@ spec refer, https://github.com/riscv/riscv-sbi-doc.
 
 ::
 
+		/* KVM_EXIT_DIRTY_QUOTA_EXHAUSTED */
+		struct {
+			__u64 count;
+			__u64 quota;
+		} dirty_quota_exit;
+If exit reason is KVM_EXIT_DIRTY_QUOTA_EXHAUSTED, it indicates that the VCPU has
+exhausted its dirty quota. The 'dirty_quota_exit' member of kvm_run structure
+makes the following information available to the userspace:
+	'count' field: the current count of pages dirtied by the VCPU,
+	'quota' field: the observed dirty quota just before the exit to userspace.
+The userspace can design a strategy to allocate the overall scope of dirtying
+for the VM among the vcpus. Based on the strategy and the current state of dirty
+quota throttling, the userspace can make a decision to either update (increase)
+the quota or to put the VCPU to sleep for some time.
+
+::
+
 		/* Fix the size of the union. */
 		char padding[256];
 	};
@@ -6159,6 +6176,17 @@ values in kvm_run even if the corresponding bit in kvm_dirty_regs is not set.
 
 ::
 
+	/*
+	 * Number of pages the vCPU is allowed to have dirtied over its entire
+	 * lifetime.  KVM_RUN exits with KVM_EXIT_DIRTY_QUOTA_EXHAUSTED if the quota
+	 * is reached/exceeded.
+	 */
+	__u64 dirty_quota;
+Please note that this quota cannot be strictly enforced if PML is enabled, and
+the VCPU may end up dirtying pages more than its quota. The difference however
+is bounded by the PML buffer size.
+
+::
   };
 
 
