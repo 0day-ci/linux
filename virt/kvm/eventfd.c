@@ -32,7 +32,7 @@
 
 static struct workqueue_struct *irqfd_cleanup_wq;
 
-bool __attribute__((weak))
+bool __weak
 kvm_arch_irqfd_allowed(struct kvm *kvm, struct kvm_irqfd *args)
 {
 	return true;
@@ -169,7 +169,7 @@ irqfd_deactivate(struct kvm_kernel_irqfd *irqfd)
 	queue_work(irqfd_cleanup_wq, &irqfd->shutdown);
 }
 
-int __attribute__((weak)) kvm_arch_set_irq_inatomic(
+int __weak kvm_arch_set_irq_inatomic(
 				struct kvm_kernel_irq_routing_entry *irq,
 				struct kvm *kvm, int irq_source_id,
 				int level,
@@ -265,24 +265,24 @@ static void irqfd_update(struct kvm *kvm, struct kvm_kernel_irqfd *irqfd)
 }
 
 #ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
-void __attribute__((weak)) kvm_arch_irq_bypass_stop(
+void __weak kvm_arch_irq_bypass_stop(
 				struct irq_bypass_consumer *cons)
 {
 }
 
-void __attribute__((weak)) kvm_arch_irq_bypass_start(
+void __weak kvm_arch_irq_bypass_start(
 				struct irq_bypass_consumer *cons)
 {
 }
 
-int  __attribute__((weak)) kvm_arch_update_irqfd_routing(
+int  __weak kvm_arch_update_irqfd_routing(
 				struct kvm *kvm, unsigned int host_irq,
 				uint32_t guest_irq, bool set)
 {
 	return 0;
 }
 
-bool __attribute__((weak)) kvm_arch_irqfd_route_changed(
+bool __weak kvm_arch_irqfd_route_changed(
 				struct kvm_kernel_irq_routing_entry *old,
 				struct kvm_kernel_irq_routing_entry *new)
 {
