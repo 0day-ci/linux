@@ -1576,6 +1576,36 @@ static ssize_t btrfs_devinfo_error_stats_show(struct kobject *kobj,
 }
 BTRFS_ATTR(devid, error_stats, btrfs_devinfo_error_stats_show);
 
+
+struct allocation_hint_name_t {
+	const char *name;
+	const u64 value;
+} allocation_hint_name[] = {
+	{ "DATA_PREFERRED", BTRFS_DEV_ALLOCATION_HINT_DATA_PREFERRED },
+	{ "METADATA_PREFERRED", BTRFS_DEV_ALLOCATION_HINT_METADATA_PREFERRED },
+	{ "DATA_ONLY", BTRFS_DEV_ALLOCATION_HINT_DATA_ONLY },
+	{ "METADATA_ONLY", BTRFS_DEV_ALLOCATION_HINT_METADATA_ONLY },
+};
+
+static ssize_t btrfs_devinfo_allocation_hint_show(struct kobject *kobj,
+					struct kobj_attribute *a, char *buf)
+{
+	int i;
+	struct btrfs_device *device = container_of(kobj, struct btrfs_device,
+						   devid_kobj);
+
+	for (i = 0 ; i < ARRAY_SIZE(allocation_hint_name) ; i++) {
+		if ((device->type & BTRFS_DEV_ALLOCATION_HINT_MASK) !=
+		    allocation_hint_name[i].value)
+			continue;
+
+		return scnprintf(buf, PAGE_SIZE, "%s\n",
+			allocation_hint_name[i].name);
+	}
+	return scnprintf(buf, PAGE_SIZE, "<UNKNOWN>\n");
+}
+BTRFS_ATTR(devid, allocation_hint, btrfs_devinfo_allocation_hint_show);
+
 /*
  * Information about one device.
  *
@@ -1589,6 +1619,7 @@ static struct attribute *devid_attrs[] = {
 	BTRFS_ATTR_PTR(devid, replace_target),
 	BTRFS_ATTR_PTR(devid, scrub_speed_max),
 	BTRFS_ATTR_PTR(devid, writeable),
+	BTRFS_ATTR_PTR(devid, allocation_hint),
 	NULL
 };
 ATTRIBUTE_GROUPS(devid);
