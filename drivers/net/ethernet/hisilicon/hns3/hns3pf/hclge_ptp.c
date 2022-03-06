@@ -103,6 +103,7 @@ void hclge_ptp_clean_tx_hwts(struct hclge_dev *hdev)
 		hdev->ptp->tx_cleaned++;
 
 		ns += (((u64)hi) << 32 | lo) * NSEC_PER_SEC;
+		memset(&hwts, 0, sizeof(hwts));
 		hwts.hwtstamp = ns_to_ktime(ns);
 		skb_tstamp_tx(skb, &hwts);
 		dev_kfree_skb_any(skb);

@@ -445,6 +445,7 @@ static void mlxsw_sp1_packet_timestamp(struct mlxsw_sp *mlxsw_sp,
 	nsec = timecounter_cyc2time(&mlxsw_sp->clock->tc, timestamp);
 	spin_unlock_bh(&mlxsw_sp->clock->lock);
 
+	memset(&hwtstamps, 0, sizeof(hwtstamps));
 	hwtstamps.hwtstamp = ns_to_ktime(nsec);
 	mlxsw_sp1_ptp_packet_finish(mlxsw_sp, skb,
 				    key.local_port, key.ingress, &hwtstamps);

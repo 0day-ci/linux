@@ -109,6 +109,7 @@ void cxgb4_ptp_read_hwstamp(struct adapter *adapter, struct port_info *pi)
 	tx_ts |= (u64)t4_read_reg(adapter,
 				  T5_PORT_REG(pi->port_id,
 					      MAC_PORT_TX_TS_VAL_HI)) << 32;
+	memset(skb_ts, 0, sizeof(*skb_ts));
 	skb_ts->hwtstamp = ns_to_ktime(tx_ts);
 	skb_tstamp_tx(adapter->ptp_tx_skb, skb_ts);
 	dev_kfree_skb_any(adapter->ptp_tx_skb);

@@ -170,6 +170,7 @@ void efx_dequeue_buffer(struct efx_tx_queue *tx_queue,
 		     tx_queue->completed_timestamp_minor)) {
 			struct skb_shared_hwtstamps hwtstamp;
 
+			memset(&hwtstamp, 0, sizeof(hwtstamp));
 			hwtstamp.hwtstamp =
 				efx_ptp_nic_to_kernel_time(tx_queue);
 			skb_tstamp_tx(skb, &hwtstamp);

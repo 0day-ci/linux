@@ -659,6 +659,7 @@ static void ines_txtstamp_work(struct work_struct *work)
 		kfree_skb(skb);
 		return;
 	}
+	memset(&ssh, 0, sizeof(ssh));
 	ssh.hwtstamp = ns_to_ktime(ns);
 	skb_complete_tx_timestamp(skb, &ssh);
 }

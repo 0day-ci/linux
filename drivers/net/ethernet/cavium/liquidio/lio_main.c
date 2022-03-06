@@ -2212,6 +2212,7 @@ static void handle_timestamp(struct octeon_device *oct,
 		netif_info(lio, tx_done, lio->netdev,
 			   "Got resulting SKBTX_HW_TSTAMP skb=%p ns=%016llu\n",
 			   skb, (unsigned long long)ns);
+		memset(&ts, 0, sizeof(ts));
 		ts.hwtstamp = ns_to_ktime(ns + lio->ptp_adjust);
 		skb_tstamp_tx(skb, &ts);
 	}
