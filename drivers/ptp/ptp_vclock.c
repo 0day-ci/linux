@@ -68,7 +68,10 @@ static int ptp_vclock_gettimex(struct ptp_clock_info *ptp,
 	int err;
 	u64 ns;
 
-	err = pptp->info->gettimex64(pptp->info, &pts, sts);
+	if (pptp->info->getfreeruntimex64)
+		err = pptp->info->getfreeruntimex64(pptp->info, &pts, sts);
+	else
+		err = pptp->info->gettimex64(pptp->info, &pts, sts);
 	if (err)
 		return err;
 
@@ -104,7 +107,10 @@ static int ptp_vclock_getcrosststamp(struct ptp_clock_info *ptp,
 	int err;
 	u64 ns;
 
-	err = pptp->info->getcrosststamp(pptp->info, xtstamp);
+	if (pptp->info->getfreeruncrosststamp)
+		err = pptp->info->getfreeruncrosststamp(pptp->info, xtstamp);
+	else
+		err = pptp->info->getcrosststamp(pptp->info, xtstamp);
 	if (err)
 		return err;
 
@@ -143,7 +149,9 @@ static u64 ptp_vclock_read(const struct cyclecounter *cc)
 	struct ptp_clock *ptp = vclock->pclock;
 	struct timespec64 ts = {};
 
-	if (ptp->info->gettimex64)
+	if (ptp->info->getfreeruntimex64)
+		ptp->info->getfreeruntimex64(ptp->info, &ts, NULL);
+	else if (ptp->info->gettimex64)
 		ptp->info->gettimex64(ptp->info, &ts, NULL);
 	else
 		ptp->info->gettime64(ptp->info, &ts);
@@ -168,11 +176,13 @@ struct ptp_vclock *ptp_vclock_register(struct ptp_clock *pclock)
 
 	vclock->pclock = pclock;
 	vclock->info = ptp_vclock_info;
-	if (pclock->info->gettimex64)
+	if (pclock->info->getfreeruntimex64 || pclock->info->gettimex64)
 		vclock->info.gettimex64 = ptp_vclock_gettimex;
 	else
 		vclock->info.gettime64 = ptp_vclock_gettime;
-	if (pclock->info->getcrosststamp)
+	if ((pclock->info->getfreeruntimex64 &&
+	     pclock->info->getfreeruncrosststamp) ||
+	    pclock->info->getcrosststamp)
 		vclock->info.getcrosststamp = ptp_vclock_getcrosststamp;
 	vclock->cc = ptp_vclock_cc;
 

@@ -108,6 +108,28 @@ struct ptp_system_timestamp {
  * @settime64:  Set the current time on the hardware clock.
  *              parameter ts: Time value to set.
  *
+ * @getfreeruntimex64:  Reads the current free running time from the hardware
+ *                      clock and optionally also the system clock. This
+ *                      operation requires hardware support for an additional
+ *                      free running time including support for hardware time
+ *                      stamps based on that free running time.
+ *                      The free running time must be completely independet from
+ *                      the actual time of the PTP clock. It must be monotonic
+ *                      and its frequency must be constant.
+ *                      parameter ts: Holds the PHC free running timestamp.
+ *                      parameter sts: If not NULL, it holds a pair of
+ *                      timestamps from the system clock. The first reading is
+ *                      made right before reading the lowest bits of the PHC
+ *                      free running timestamp and the second reading
+ *                      immediately follows that.
+ *
+ * @getfreeruncrosststamp:  Reads the current time from the free running
+ *                          hardware clock and system clock simultaneously.
+ *                          parameter cts: Contains timestamp (device,system)
+ *                          pair, where device time is the free running time
+ *                          also used for @getfreeruntimex64 and system time is
+ *                          realtime and monotonic.
+ *
  * @enable:   Request driver to enable or disable an ancillary feature.
  *            parameter request: Desired resource to enable or disable.
  *            parameter on: Caller passes one to enable or zero to disable.
@@ -155,6 +177,11 @@ struct ptp_clock_info {
 	int (*getcrosststamp)(struct ptp_clock_info *ptp,
 			      struct system_device_crosststamp *cts);
 	int (*settime64)(struct ptp_clock_info *p, const struct timespec64 *ts);
+	int (*getfreeruntimex64)(struct ptp_clock_info *ptp,
+				 struct timespec64 *ts,
+				 struct ptp_system_timestamp *sts);
+	int (*getfreeruncrosststamp)(struct ptp_clock_info *ptp,
+				     struct system_device_crosststamp *cts);
 	int (*enable)(struct ptp_clock_info *ptp,
 		      struct ptp_clock_request *request, int on);
 	int (*verify)(struct ptp_clock_info *ptp, unsigned int pin,
