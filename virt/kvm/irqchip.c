@@ -120,8 +120,10 @@ static void free_irq_routing_table(struct kvm_irq_routing_table *rt)
 
 void kvm_free_irq_routing(struct kvm *kvm)
 {
-	/* Called only during vm destruction. Nobody can use the pointer
-	   at this stage */
+	/*
+	 * Called only during vm destruction. Nobody can use the pointer
+	 * at this stage
+	 */
 	struct kvm_irq_routing_table *rt = rcu_access_pointer(kvm->irq_routing);
 
 	free_irq_routing_table(rt);
