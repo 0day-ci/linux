@@ -22,28 +22,27 @@ static inline struct kvm_coalesced_mmio_dev *to_mmio(struct kvm_io_device *dev)
 	return container_of(dev, struct kvm_coalesced_mmio_dev, dev);
 }
 
-static int coalesced_mmio_in_range(struct kvm_coalesced_mmio_dev *dev,
-				   gpa_t addr, int len)
+static bool coalesced_mmio_in_range(struct kvm_coalesced_mmio_dev *dev,
+				    gpa_t addr, int len)
 {
 	/* is it in a batchable area ?
 	 * (addr,len) is fully included in
 	 * (zone->addr, zone->size)
 	 */
 	if (len < 0)
-		return 0;
+		return false;
 	if (addr + len < addr)
-		return 0;
+		return false;
 	if (addr < dev->zone.addr)
-		return 0;
+		return false;
 	if (addr + len > dev->zone.addr + dev->zone.size)
-		return 0;
-	return 1;
+		return false;
+	return true;
 }
 
-static int coalesced_mmio_has_room(struct kvm_coalesced_mmio_dev *dev, u32 last)
+static bool coalesced_mmio_has_room(struct kvm_coalesced_mmio_dev *dev, u32 last)
 {
 	struct kvm_coalesced_mmio_ring *ring;
-	unsigned int avail;
 
 	/* Are we able to batch it ? */
 
@@ -52,13 +51,7 @@ static int coalesced_mmio_has_room(struct kvm_coalesced_mmio_dev *dev, u32 last)
 	 * there is always one unused entry in the buffer
 	 */
 	ring = dev->kvm->coalesced_mmio_ring;
-	avail = (ring->first - last - 1) % KVM_COALESCED_MMIO_MAX;
-	if (avail == 0) {
-		/* full */
-		return 0;
-	}
-
-	return 1;
+	return (ring->first - last - 1) % KVM_COALESCED_MMIO_MAX != 0;
 }
 
 static int coalesced_mmio_write(struct kvm_vcpu *vcpu,
