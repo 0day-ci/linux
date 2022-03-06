@@ -1595,7 +1595,7 @@ static ssize_t btrfs_devinfo_allocation_hint_show(struct kobject *kobj,
 						   devid_kobj);
 
 	for (i = 0 ; i < ARRAY_SIZE(allocation_hint_name) ; i++) {
-		if ((device->type & BTRFS_DEV_ALLOCATION_HINT_MASK) !=
+		if ((device->flags & BTRFS_DEV_ALLOCATION_HINT_MASK) !=
 		    allocation_hint_name[i].value)
 			continue;
 
@@ -1615,7 +1615,7 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 	int ret;
 	struct btrfs_trans_handle *trans;
 	int i, l;
-	u64 type, prev_type;
+	u64 flags, prev_flags;
 
 	if (len < 1)
 		return -EINVAL;
@@ -1632,7 +1632,7 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 		if (strncasecmp(allocation_hint_name[i].name, buf, l))
 			continue;
 
-		type = allocation_hint_name[i].value;
+		flags = allocation_hint_name[i].value;
 		break;
 	}
 
@@ -1649,15 +1649,16 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 		return -EROFS;
 
 	/* check if a change is really needed */
-	if ((device->type & BTRFS_DEV_ALLOCATION_HINT_MASK) == type)
+	if ((device->flags & BTRFS_DEV_ALLOCATION_HINT_MASK) == flags)
 		return len;
 
 	trans = btrfs_start_transaction(root, 1);
 	if (IS_ERR(trans))
 		return PTR_ERR(trans);
 
-	prev_type = device->type;
-	device->type = (device->type & ~BTRFS_DEV_ALLOCATION_HINT_MASK) | type;
+	prev_flags = device->flags;
+	device->flags = (device->flags & ~BTRFS_DEV_ALLOCATION_HINT_MASK) |
+			flags;
 
 	ret = btrfs_update_device(trans, device);
 
@@ -1673,7 +1674,7 @@ static ssize_t btrfs_devinfo_allocation_hint_store(struct kobject *kobj,
 
 	return len;
 abort:
-	device->type = prev_type;
+	device->flags = prev_flags;
 	return  ret;
 }
 BTRFS_ATTR_RW(devid, allocation_hint, btrfs_devinfo_allocation_hint_show,
