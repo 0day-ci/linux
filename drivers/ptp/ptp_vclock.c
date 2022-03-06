@@ -268,7 +268,10 @@ ktime_t ptp_convert_timestamp(const struct skb_shared_hwtstamps *hwtstamps,
 
 	vclock = info_to_vclock(ptp->info);
 
-	ns = ktime_to_ns(hwtstamps->hwtstamp);
+	if (vclock->pclock->info->getfreeruntimex64)
+		ns = ktime_to_ns(hwtstamps->hwfreeruntstamp);
+	else
+		ns = ktime_to_ns(hwtstamps->hwtstamp);
 
 	spin_lock_irqsave(&vclock->lock, flags);
 	ns = timecounter_cyc2time(&vclock->tc, ns);
