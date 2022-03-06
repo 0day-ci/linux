@@ -237,7 +237,7 @@ int kvm_gfn_to_pfn_cache_refresh(struct kvm *kvm, struct gfn_to_pfn_cache *gpc,
 				ret = -EFAULT;
 		}
 
-	map_done:
+ map_done:
 		write_lock_irq(&gpc->lock);
 		if (ret) {
 			gpc->valid = false;
