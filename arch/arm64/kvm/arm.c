@@ -848,6 +848,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 	ret = 1;
 	run->exit_reason = KVM_EXIT_UNKNOWN;
 	while (ret > 0) {
+		ret = kvm_vcpu_check_dirty_quota(vcpu);
+		if (!ret)
+			break;
 		/*
 		 * Check conditions before entering the guest
 		 */

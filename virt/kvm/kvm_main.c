@@ -3163,7 +3163,12 @@ void mark_page_dirty_in_slot(struct kvm *kvm,
 		return;
 #endif
 
-	if (memslot && kvm_slot_dirty_track_enabled(memslot)) {
+	if (!memslot)
+		return;
+
+	vcpu->stat.generic.pages_dirtied++;
+
+	if (kvm_slot_dirty_track_enabled(memslot)) {
 		unsigned long rel_gfn = gfn - memslot->base_gfn;
 		u32 slot = (memslot->as_id << 16) | memslot->id;
 

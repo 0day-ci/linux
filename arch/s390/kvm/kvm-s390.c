@@ -3994,6 +3994,9 @@ static bool kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu)
 static int vcpu_pre_run(struct kvm_vcpu *vcpu)
 {
 	int rc, cpuflags;
+	rc = kvm_vcpu_check_dirty_quota(vcpu);
+	if (!rc)
+		return -EREMOTE;
 
 	/*
 	 * On s390 notifications for arriving pages will be delivered directly
