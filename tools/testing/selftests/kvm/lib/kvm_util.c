@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 
 #define KVM_UTIL_MIN_PFN	2
+#define PML_BUFFER_SIZE	512
 
 static int vcpu_mmap_sz(void);
 
@@ -2286,6 +2287,7 @@ static struct exit_reason {
 	{KVM_EXIT_X86_RDMSR, "RDMSR"},
 	{KVM_EXIT_X86_WRMSR, "WRMSR"},
 	{KVM_EXIT_XEN, "XEN"},
+	{KVM_EXIT_DIRTY_QUOTA_EXHAUSTED, "DIRTY_QUOTA_EXHAUSTED"},
 #ifdef KVM_EXIT_MEMORY_NOT_PRESENT
 	{KVM_EXIT_MEMORY_NOT_PRESENT, "MEMORY_NOT_PRESENT"},
 #endif
@@ -2516,4 +2518,38 @@ int vcpu_get_stats_fd(struct kvm_vm *vm, uint32_t vcpuid)
 	struct vcpu *vcpu = vcpu_find(vm, vcpuid);
 
 	return ioctl(vcpu->fd, KVM_GET_STATS_FD, NULL);
+}
+
+void vcpu_set_dirty_quota(struct kvm_run *run, uint64_t dirty_quota)
+{
+	run->dirty_quota = dirty_quota;
+
+	if (dirty_quota)
+		pr_info("Dirty quota throttling enabled with initial quota %"PRIu64"\n",
+			dirty_quota);
+	else
+		pr_info("Dirty quota throttling disabled\n");
+}
+
+void vcpu_handle_dirty_quota_exit(struct kvm_run *run,
+			uint64_t test_dirty_quota_increment)
+{
+	uint64_t quota = run->dirty_quota_exit.quota;
+	uint64_t count = run->dirty_quota_exit.count;
+
+	/*
+	 * Due to PML, number of pages dirtied by the vcpu can exceed its dirty
+	 * quota by PML buffer size.
+	 */
+	TEST_ASSERT(count <= quota + PML_BUFFER_SIZE, "Invalid number of pages
+		dirtied: count=%"PRIu64", quota=%"PRIu64"\n", count, quota);
+
+	TEST_ASSERT(count >= quota, "Dirty quota exit happened with quota yet to
+		be exhausted: count=%"PRIu64", quota=%"PRIu64"\n", count, quota);
+
+	if (count > quota)
+		pr_info("Dirty quota exit with unequal quota and count:
+			count=%"PRIu64", quota=%"PRIu64"\n", count, quota);
+
+	run->dirty_quota = count + test_dirty_quota_increment;
 }
