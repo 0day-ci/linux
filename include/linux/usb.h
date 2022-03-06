@@ -1969,8 +1969,7 @@ usb_pipe_endpoint(struct usb_device *dev, unsigned int pipe)
 	return eps[usb_pipeendpoint(pipe)];
 }
 
-static inline u16 usb_maxpacket(struct usb_device *dev, int pipe,
-				/* int is_out deprecated */ ...)
+static inline u16 usb_maxpacket(struct usb_device *dev, int pipe)
 {
 	return usb_endpoint_maxp(&usb_pipe_endpoint(dev, pipe)->desc);
 }
