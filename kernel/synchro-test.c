@@ -264,7 +264,7 @@ static int spinlocker(void *arg)
 
 	if (verbose >= 2)
 		printk("%s: done\n", current->comm);
-	complete_and_exit(&sp_comp[N], 0);
+	kthread_complete_and_exit(&sp_comp[N], 0);
 }
 
 static int mutexer(void *arg)
@@ -285,7 +285,7 @@ static int mutexer(void *arg)
 
 	if (verbose >= 2)
 		printk("%s: done\n", current->comm);
-	complete_and_exit(&mx_comp[N], 0);
+	kthread_complete_and_exit(&mx_comp[N], 0);
 }
 
 static int semaphorer(void *arg)
@@ -306,7 +306,7 @@ static int semaphorer(void *arg)
 
 	if (verbose >= 2)
 		printk("%s: done\n", current->comm);
-	complete_and_exit(&sm_comp[N], 0);
+	kthread_complete_and_exit(&sm_comp[N], 0);
 }
 
 static int reader(void *arg)
@@ -329,7 +329,7 @@ static int reader(void *arg)
 
 	if (verbose >= 2)
 		printk("%s: done\n", current->comm);
-	complete_and_exit(&rd_comp[N], 0);
+	kthread_complete_and_exit(&rd_comp[N], 0);
 }
 
 static int writer(void *arg)
@@ -352,7 +352,7 @@ static int writer(void *arg)
 
 	if (verbose >= 2)
 		printk("%s: done\n", current->comm);
-	complete_and_exit(&wr_comp[N], 0);
+	kthread_complete_and_exit(&wr_comp[N], 0);
 }
 
 static int downgrader(void *arg)
@@ -380,7 +380,7 @@ static int downgrader(void *arg)
 
 	if (verbose >= 2)
 		printk("%s: done\n", current->comm);
-	complete_and_exit(&dg_comp[N], 0);
+	kthread_complete_and_exit(&dg_comp[N], 0);
 }
 
 static void stop_test(struct timer_list *t)
