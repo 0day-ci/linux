@@ -26,12 +26,7 @@ ENDPROC(ftrace_stub)
 #define STACK_PTREGS_PSW	(STACK_PTREGS + __PT_PSW)
 #define STACK_PTREGS_ORIG_GPR2	(STACK_PTREGS + __PT_ORIG_GPR2)
 #define STACK_PTREGS_FLAGS	(STACK_PTREGS + __PT_FLAGS)
-<<<<<<< HEAD
-#ifdef __PACK_STACK
-/* allocate just enough for r14, r15 and backchain */
-=======
 /* packed stack: allocate just enough for r14, r15 and backchain */
->>>>>>> linux-next/akpm-base
 #define TRACED_FUNC_FRAME_SIZE	24
 
 	.macro	ftrace_regs_entry, allregs=0
@@ -63,10 +58,6 @@ ENDPROC(ftrace_stub)
 
 	.if \allregs == 1
 	stg	%r14,(STACK_PTREGS_PSW)(%r15)
-<<<<<<< HEAD
-	stosm	(STACK_PTREGS_PSW)(%r15),0
-=======
->>>>>>> linux-next/akpm-base
 #ifdef CONFIG_HAVE_MARCH_Z10_FEATURES
 	mvghi	STACK_PTREGS_FLAGS(%r15),_PIF_FTRACE_FULL_REGS
 #else

@@ -223,13 +223,8 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 	if (IS_ERR(trampoline))
 		return PTR_ERR(trampoline);
 	s390_kernel_write(&trampoline->interceptor, &addr, sizeof(addr));
-<<<<<<< HEAD
-	brcl_enable((void *)rec->ip);
-	return 0;
-=======
 	/* Expect brcl 0x0,... */
 	return ftrace_patch_branch_mask((void *)rec->ip, 0xc004, true);
->>>>>>> linux-next/akpm-base
 }
 
 int ftrace_update_ftrace_func(ftrace_func_t func)

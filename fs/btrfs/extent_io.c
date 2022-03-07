@@ -6888,11 +6888,7 @@ static void assert_eb_page_uptodate(const struct extent_buffer *eb,
 	 * would have !PageUptodate && !PageError, as we clear PageError before
 	 * reading.
 	 */
-<<<<<<< HEAD
-	if (fs_info->sectorsize < PAGE_SIZE) {
-=======
 	if (fs_info->nodesize < PAGE_SIZE) {
->>>>>>> linux-next/akpm-base
 		bool uptodate, error;
 
 		uptodate = btrfs_subpage_test_uptodate(fs_info, page,
