@@ -1405,7 +1405,7 @@ again:
 				continue;
 			rss[mm_counter(page)]--;
 			if (is_device_private_entry(entry))
-				page_remove_rmap(page, false);
+				page_remove_rmap(page, vma, false);
 			put_page(page);
 		} else if (!non_swap_entry(entry)) {
 			/* Genuine swap entry, hence a private anon page */

@@ -1575,7 +1575,7 @@ retry:
 		 */
 		mapping = page_mapping(page);
 		if (writeback && PageReclaim(page))
-			stat->nr_congested++;
+			stat->nr_congested += nr_pages;
 
 		/*
 		 * If a page at the tail of the LRU is under writeback, there
