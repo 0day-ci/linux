@@ -341,19 +341,14 @@ bool intel_dsc_source_support(const struct intel_crtc_state *crtc_state)
 	const struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
 	struct drm_i915_private *i915 = to_i915(crtc->base.dev);
 	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
-	enum pipe pipe = crtc->pipe;
 
 	if (!INTEL_INFO(i915)->display.has_dsc)
 		return false;
 
-	/* On TGL, DSC is supported on all Pipes */
 	if (DISPLAY_VER(i915) >= 12)
 		return true;
 
-	if (DISPLAY_VER(i915) >= 11 &&
-	    (pipe != PIPE_A || cpu_transcoder == TRANSCODER_EDP ||
-	     cpu_transcoder == TRANSCODER_DSI_0 ||
-	     cpu_transcoder == TRANSCODER_DSI_1))
+	if (DISPLAY_VER(i915) >= 11 && cpu_transcoder != TRANSCODER_A)
 		return true;
 
 	return false;
@@ -383,10 +378,18 @@ calculate_rc_params(struct rc_parameters *rc,
 {
 	int bpc = vdsc_cfg->bits_per_component;
 	int bpp = vdsc_cfg->bits_per_pixel >> 4;
-	int ofs_und6[] = { 0, -2, -2, -4, -6, -6, -8, -8, -8, -10, -10, -12, -12, -12, -12 };
-	int ofs_und8[] = { 2, 0, 0, -2, -4, -6, -8, -8, -8, -10, -10, -10, -12, -12, -12 };
-	int ofs_und12[] = { 2, 0, 0, -2, -4, -6, -8, -8, -8, -10, -10, -10, -12, -12, -12 };
-	int ofs_und15[] = { 10, 8, 6, 4, 2, 0, -2, -4, -6, -8, -10, -10, -12, -12, -12 };
+	static const s8 ofs_und6[] = {
+		0, -2, -2, -4, -6, -6, -8, -8, -8, -10, -10, -12, -12, -12, -12
+	};
+	static const s8 ofs_und8[] = {
+		2, 0, 0, -2, -4, -6, -8, -8, -8, -10, -10, -10, -12, -12, -12
+	};
+	static const s8 ofs_und12[] = {
+		2, 0, 0, -2, -4, -6, -8, -8, -8, -10, -10, -10, -12, -12, -12
+	};
+	static const s8 ofs_und15[] = {
+		10, 8, 6, 4, 2, 0, -2, -4, -6, -8, -10, -10, -12, -12, -12
+	};
 	int qp_bpc_modifier = (bpc - 8) * 2;
 	u32 res, buf_i, bpp_i;
 
@@ -1112,18 +1115,6 @@ static i915_reg_t dss_ctl2_reg(struct intel_crtc *crtc, enum transcoder cpu_tran
 		ICL_PIPE_DSS_CTL2(crtc->pipe) : DSS_CTL2;
 }
 
-struct intel_crtc *
-intel_dsc_get_bigjoiner_secondary(const struct intel_crtc *primary_crtc)
-{
-	return intel_crtc_for_pipe(to_i915(primary_crtc->base.dev), primary_crtc->pipe + 1);
-}
-
-static struct intel_crtc *
-intel_dsc_get_bigjoiner_primary(const struct intel_crtc *secondary_crtc)
-{
-	return intel_crtc_for_pipe(to_i915(secondary_crtc->base.dev), secondary_crtc->pipe - 1);
-}
-
 void intel_uncompressed_joiner_enable(const struct intel_crtc_state *crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
@@ -1131,7 +1122,7 @@ void intel_uncompressed_joiner_enable(const struct intel_crtc_state *crtc_state)
 	u32 dss_ctl1_val = 0;
 
 	if (crtc_state->bigjoiner && !crtc_state->dsc.compression_enable) {
-		if (crtc_state->bigjoiner_slave)
+		if (intel_crtc_is_bigjoiner_slave(crtc_state))
 			dss_ctl1_val |= UNCOMPRESSED_JOINER_SLAVE;
 		else
 			dss_ctl1_val |= UNCOMPRESSED_JOINER_MASTER;
@@ -1159,7 +1150,7 @@ void intel_dsc_enable(const struct intel_crtc_state *crtc_state)
 	}
 	if (crtc_state->bigjoiner) {
 		dss_ctl1_val |= BIG_JOINER_ENABLE;
-		if (!crtc_state->bigjoiner_slave)
+		if (!intel_crtc_is_bigjoiner_slave(crtc_state))
 			dss_ctl1_val |= MASTER_BIG_JOINER_ENABLE;
 	}
 	intel_de_write(dev_priv, dss_ctl1_reg(crtc, crtc_state->cpu_transcoder), dss_ctl1_val);
@@ -1176,25 +1167,6 @@ void intel_dsc_disable(const struct intel_crtc_state *old_crtc_state)
 	    old_crtc_state->bigjoiner) {
 		intel_de_write(dev_priv, dss_ctl1_reg(crtc, old_crtc_state->cpu_transcoder), 0);
 		intel_de_write(dev_priv, dss_ctl2_reg(crtc, old_crtc_state->cpu_transcoder), 0);
-	}
-}
-
-void intel_uncompressed_joiner_get_config(struct intel_crtc_state *crtc_state)
-{
-	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
-	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
-	u32 dss_ctl1;
-
-	dss_ctl1 = intel_de_read(dev_priv, dss_ctl1_reg(crtc, crtc_state->cpu_transcoder));
-	if (dss_ctl1 & UNCOMPRESSED_JOINER_MASTER) {
-		crtc_state->bigjoiner = true;
-		crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_secondary(crtc);
-		drm_WARN_ON(&dev_priv->drm, !crtc_state->bigjoiner_linked_crtc);
-	} else if (dss_ctl1 & UNCOMPRESSED_JOINER_SLAVE) {
-		crtc_state->bigjoiner = true;
-		crtc_state->bigjoiner_slave = true;
-		crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_primary(crtc);
-		drm_WARN_ON(&dev_priv->drm, !crtc_state->bigjoiner_linked_crtc);
 	}
 }
 
@@ -1227,18 +1199,6 @@ void intel_dsc_get_config(struct intel_crtc_state *crtc_state)
 
 	crtc_state->dsc.dsc_split = (dss_ctl2 & RIGHT_BRANCH_VDSC_ENABLE) &&
 		(dss_ctl1 & JOINER_ENABLE);
-
-	if (dss_ctl1 & BIG_JOINER_ENABLE) {
-		crtc_state->bigjoiner = true;
-
-		if (!(dss_ctl1 & MASTER_BIG_JOINER_ENABLE)) {
-			crtc_state->bigjoiner_slave = true;
-			crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_primary(crtc);
-		} else {
-			crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_secondary(crtc);
-		}
-		drm_WARN_ON(&dev_priv->drm, !crtc_state->bigjoiner_linked_crtc);
-	}
 
 	/* FIXME: add more state readout as needed */
 

@@ -3,9 +3,15 @@
  * Copyright © 2021 Intel Corporation
  */
 
+#include <drm/drm_cache.h>
+#include <linux/string_helpers.h>
+
 #include "i915_drv.h"
+#include "i915_reg.h"
 #include "intel_guc_slpc.h"
+#include "intel_mchbar_regs.h"
 #include "gt/intel_gt.h"
+#include "gt/intel_gt_regs.h"
 
 static inline struct intel_guc *slpc_to_guc(struct intel_guc_slpc *slpc)
 {
@@ -713,7 +719,7 @@ int intel_guc_slpc_print_info(struct intel_guc_slpc *slpc, struct drm_printer *p
 
 			drm_printf(p, "\tSLPC state: %s\n", slpc_get_state_string(slpc));
 			drm_printf(p, "\tGTPERF task active: %s\n",
-				   yesno(slpc_tasks->status & SLPC_GTPERF_TASK_ENABLED));
+				   str_yes_no(slpc_tasks->status & SLPC_GTPERF_TASK_ENABLED));
 			drm_printf(p, "\tMax freq: %u MHz\n",
 				   slpc_decode_max_freq(slpc));
 			drm_printf(p, "\tMin freq: %u MHz\n",

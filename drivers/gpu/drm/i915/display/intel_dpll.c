@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/string_helpers.h>
 
 #include "intel_crtc.h"
 #include "intel_de.h"
@@ -15,6 +16,10 @@
 #include "intel_pps.h"
 #include "intel_snps_phy.h"
 #include "vlv_sideband.h"
+
+struct intel_dpll_funcs {
+	int (*crtc_compute_clock)(struct intel_crtc_state *crtc_state);
+};
 
 struct intel_limit {
 	struct {
@@ -1400,6 +1405,14 @@ static const struct intel_dpll_funcs i8xx_dpll_funcs = {
 	.crtc_compute_clock = i8xx_crtc_compute_clock,
 };
 
+int intel_dpll_crtc_compute_clock(struct intel_crtc_state *crtc_state)
+{
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
+	struct drm_i915_private *i915 = to_i915(crtc->base.dev);
+
+	return i915->dpll_funcs->crtc_compute_clock(crtc_state);
+}
+
 void
 intel_dpll_init_clock_hook(struct drm_i915_private *dev_priv)
 {
@@ -1933,7 +1946,7 @@ static void assert_pll(struct drm_i915_private *dev_priv,
 	cur_state = intel_de_read(dev_priv, DPLL(pipe)) & DPLL_VCO_ENABLE;
 	I915_STATE_WARN(cur_state != state,
 			"PLL state assertion failure (expected %s, current %s)\n",
-			onoff(state), onoff(cur_state));
+			str_on_off(state), str_on_off(cur_state));
 }
 
 void assert_pll_enabled(struct drm_i915_private *i915, enum pipe pipe)

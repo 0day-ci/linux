@@ -173,6 +173,7 @@ properties:
       - nvidia,tegra194-carmel
       - qcom,krait
       - qcom,kryo
+      - qcom,kryo250
       - qcom,kryo260
       - qcom,kryo280
       - qcom,kryo385
@@ -243,6 +244,8 @@ properties:
 
   cpu-idle-states:
     $ref: '/schemas/types.yaml#/definitions/phandle-array'
+    items:
+      maxItems: 1
     description: |
       List of phandles to idle state nodes supported
       by this cpu (see ./idle-states.yaml).
