@@ -10329,7 +10329,7 @@ SYSCALL_DEFINE6(io_uring_enter, unsigned int, fd, u32, to_submit,
 		if (!tctx)
 			return -EINVAL;
 		if (fd != tctx->last_reg_fd) {
-			if (fd < 0 || fd >= IO_RINGFD_REG_MAX || !tctx)
+			if (fd >= IO_RINGFD_REG_MAX || !tctx)
 				return -EINVAL;
 			tctx->last_reg_fd = array_index_nospec(fd,
 							IO_RINGFD_REG_MAX);
