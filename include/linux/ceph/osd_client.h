@@ -29,6 +29,43 @@ typedef void (*ceph_osdc_callback_t)(struct ceph_osd_request *);
 
 #define CEPH_HOMELESS_OSD	-1
 
+enum ceph_sparse_read_state {
+	CEPH_SPARSE_READ_HDR	= 0,
+	CEPH_SPARSE_READ_EXTENTS,
+	CEPH_SPARSE_READ_DATA_LEN,
+	CEPH_SPARSE_READ_DATA,
+};
+
+/* A single extent in a SPARSE_READ reply */
+struct ceph_sparse_extent {
+	__le64	off;
+	__le64	len;
+} __attribute__((packed));
+
+/*
+ * A SPARSE_READ reply is a 32-bit count of extents, followed by an array of
+ * 64-bit offset/length pairs, and then all of the actual file data
+ * concatenated after it (sans holes).
+ *
+ * Unfortunately, we don't know how long the extent array is until we've
+ * started reading the data section of the reply, so for a real sparse read, we
+ * have to allocate the array after alloc_msg returns.
+ *
+ * For the common case of a single extent, we keep an embedded extent here so
+ * we can avoid the extra allocation.
+ */
+struct ceph_sparse_read {
+	enum ceph_sparse_read_state	sr_state;	/* state machine state */
+	u64				sr_req_off;	/* orig request offset */
+	u64				sr_req_len;	/* orig request length */
+	u64				sr_pos;		/* current pos in buffer */
+	int				sr_index;	/* current extent index */
+	__le32				sr_datalen;	/* length of actual data */
+	__le32				sr_count;	/* extent count */
+	struct ceph_sparse_extent	*sr_extent;	/* extent array */
+	struct ceph_sparse_extent	sr_emb_ext[1];	/* embedded extent */
+};
+
 /* a given osd we're communicating with */
 struct ceph_osd {
 	refcount_t o_ref;
@@ -46,6 +83,7 @@ struct ceph_osd {
 	unsigned long lru_ttl;
 	struct list_head o_keepalive_item;
 	struct mutex lock;
+	struct ceph_sparse_read	o_sparse_read;
 };
 
 #define CEPH_OSD_SLAB_OPS	2
