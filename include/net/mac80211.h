@@ -1144,6 +1144,12 @@ ieee80211_info_get_tx_time_est(struct ieee80211_tx_info *info)
 	return info->tx_time_est << 2;
 }
 
+struct ieee80211_rate_status {
+	struct rate_info rate_idx;
+	u8 retry_count;
+	s8 tx_power;
+};
+
 /**
  * struct ieee80211_tx_status - extended tx status info for rate control
  *
@@ -1157,7 +1163,9 @@ struct ieee80211_tx_status {
 	struct ieee80211_sta *sta;
 	struct ieee80211_tx_info *info;
 	struct sk_buff *skb;
-	struct rate_info *rate;
+	struct ieee80211_rate_status *rates;
+	u8 n_rates;
+
 	struct list_head *free_list;
 };
 
