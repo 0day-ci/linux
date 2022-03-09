@@ -71,6 +71,140 @@ bool netif_is_ice(struct net_device *dev)
 }
 
 /**
+ * ice_flush_vsi_fd_fltrs - flush VSI specific FD entries
+ * @vsi: ptr to VSI
+ *
+ * This function flushes all FD entries specific to VSI from
+ * HW FD table
+ */
+static void ice_flush_vsi_fd_fltrs(struct ice_vsi *vsi)
+{
+	struct device *dev = ice_pf_to_dev(vsi->back);
+	int status;
+
+	status = ice_clear_vsi_fd_table(&vsi->back->hw, vsi->vsi_num);
+	if (status)
+		dev_err(dev, "Failed to clear FD table for %s, vsi_num: %u, status: %d\n",
+			ice_vsi_type_str(vsi->type), vsi->vsi_num, status);
+}
+
+/**
+ * ice_chnl_handle_fd_transition - handle VSI specific FD transition
+ * @main_vsi: ptr to main VSI (ICE_VSI_PF)
+ * @ch: ptr to channel
+ * @hw_fd_cnt: HW FD count specific to VSI
+ * @fd_pkt_cnt: packets services through inline-FD filter
+ * @sw_fd_cnt: SW tracking of number of inline-FD filters programmed per VSI
+ *
+ * This function determines whether given VSI should continue to use inline-FD
+ * resources or not and sets the bit accordingly. It flushes the FD entries
+ * occupied per VSI if HW table full condition is detected for 'n' runs of
+ * service task and no more packets are serviced using inline-FD filter.
+ */
+static void
+ice_chnl_handle_fd_transition(struct ice_vsi *main_vsi, struct ice_channel *ch,
+			      u32 hw_fd_cnt, u64 fd_pkt_cnt, int sw_fd_cnt)
+{
+	struct ice_vsi *vsi = ch->ch_vsi;
+
+	/* check to see if given VSI reached max limit of FD entries */
+	if (ice_is_vsi_fd_table_full(vsi, hw_fd_cnt)) {
+		/* check to see if there are any hits using inline-FD filters,
+		 * if not start "table_full" counter
+		 */
+		if (!ch->fd_pkt_cnt && !fd_pkt_cnt &&
+		    ch->fd_pkt_cnt == fd_pkt_cnt) {
+			/* HW table is FULL. No more packets are being serviced
+			 * through inline-FD filters.
+			 */
+			vsi->cnt_tbl_full++;
+			main_vsi->cnt_tbl_full++;
+		} else {
+			vsi->cnt_tbl_full = 0;
+		}
+
+		/* detected that HW table remained full during last 'n' runs of
+		 * service task, now it is the time to purge HW table entries.
+		 */
+		if (vsi->cnt_tbl_full < ICE_TBL_FULL_TIMES)
+			return;
+
+		/* if we are here, then safe to flush HW inline-FD filters */
+		ice_flush_vsi_fd_fltrs(vsi);
+
+		/* reset VSI specific counters */
+		atomic_set(&vsi->inline_fd_active_cnt, 0);
+		vsi->cnt_tbl_full = 0;
+		/* clear the feature flag for inline-FD/RSS */
+		ch->switch_fd_to_rss = 0;
+	} else if ((u32)sw_fd_cnt > hw_fd_cnt) {
+		/* HW table (inline-FD filters) is not full and SW count is
+		 * higher than actual entries in HW table, time to sync SW
+		 * counter with HW counter (tracking inline-FD filter count)
+		 * and transition back to using inline-FD filters
+		 */
+		atomic_set(&vsi->inline_fd_active_cnt, hw_fd_cnt);
+		vsi->cnt_tbl_full = 0;
+
+		/* clear the feature flag for inline-FD/RSS */
+		ch->switch_fd_to_rss = 0;
+	}
+}
+
+/**
+ * ice_channel_sync_global_cntrs - sync SW and HW FD specific counters
+ * @pf: ptr to PF
+ *
+ * This function iterates thru' all channel VSIs and handles transition of
+ * FD (Flow-director) -> RSS and vice versa, if needed also flushes VSI
+ * specific FD entries from HW table
+ */
+static void ice_channel_sync_global_cntrs(struct ice_pf *pf)
+{
+	struct ice_vsi *main_vsi;
+	struct ice_channel *ch;
+
+	main_vsi = ice_get_main_vsi(pf);
+	if (!main_vsi)
+		return;
+
+	list_for_each_entry(ch, &main_vsi->ch_list, list) {
+		struct ice_vsi *ch_vsi;
+		u64 fd_pkt_cnt;
+		int sw_fd_cnt;
+		u32 hw_fd_cnt;
+
+		ch_vsi = ch->ch_vsi;
+		if (!ch_vsi)
+			continue;
+		if (!ch->fd_enabled || !ch->switch_fd_to_rss)
+			continue;
+
+		/* first counter index is always taken by sideband flow
+		 * director, hence channel specific counter index has
+		 * to be non-zero, otherwise skip...
+		 */
+		if (!ch->fd_cnt_index)
+			continue;
+
+		/* read SW count */
+		sw_fd_cnt = atomic_read(&ch_vsi->inline_fd_active_cnt);
+		/* Read HW count */
+		hw_fd_cnt = ice_get_current_fd_cnt(ch_vsi);
+		/* Read the HW counter which was associated with inline-FD */
+		fd_pkt_cnt = ice_fd_read_cntr(pf, ch->fd_cnt_index);
+
+		/* handle VSI specific transition: inline-FD/RSS
+		 * if needed flush FD entries specific to VSI
+		 */
+		ice_chnl_handle_fd_transition(main_vsi, ch, hw_fd_cnt,
+					      fd_pkt_cnt, sw_fd_cnt);
+		/* store the value of fd_pkt_cnt per channel */
+		ch->fd_pkt_cnt = fd_pkt_cnt;
+	}
+}
+
+/**
  * ice_get_tx_pending - returns number of Tx descriptors not processed
  * @ring: the ring of descriptors
  */
@@ -118,7 +252,7 @@ static void ice_check_for_hang_subtask(struct ice_pf *pf)
 
 		if (!tx_ring)
 			continue;
-		if (ice_ring_ch_enabled(tx_ring))
+		if (ice_txring_ch_enabled(tx_ring))
 			continue;
 
 		if (tx_ring->desc) {
@@ -2280,6 +2414,7 @@ static void ice_service_task(struct work_struct *work)
 		return;
 	}
 
+	ice_channel_sync_global_cntrs(pf);
 	ice_process_vflr_event(pf);
 	ice_clean_mailboxq_subtask(pf);
 	ice_clean_sbq_subtask(pf);
@@ -6353,6 +6488,10 @@ void ice_update_pf_stats(struct ice_pf *pf)
 			  GLSTAT_FD_CNT0L(ICE_FD_SB_STAT_IDX(fd_ctr_base)),
 			  pf->stat_prev_loaded, &prev_ps->fd_sb_match,
 			  &cur_ps->fd_sb_match);
+	ice_stat_update40(hw,
+			  GLSTAT_FD_CNT0L(ICE_FD_CH_STAT_IDX(fd_ctr_base)),
+			  pf->stat_prev_loaded, &prev_ps->ch_atr_match,
+			  &cur_ps->ch_atr_match);
 	ice_stat_update32(hw, GLPRT_LXONRXC(port), pf->stat_prev_loaded,
 			  &prev_ps->link_xon_rx, &cur_ps->link_xon_rx);
 
@@ -7738,8 +7877,10 @@ static int ice_add_vsi_to_fdir(struct ice_pf *pf, struct ice_vsi *vsi)
 			flow);
 	}
 
-	if (!added)
+	if (!added) {
 		dev_dbg(dev, "VSI idx %d not added to fdir groups\n", vsi->idx);
+		return -EFAULT;
+	}
 
 	return 0;
 }
@@ -7756,6 +7897,7 @@ static int ice_add_channel(struct ice_pf *pf, u16 sw_id, struct ice_channel *ch)
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_vsi *vsi;
+	int status;
 
 	if (ch->type != ICE_VSI_CHNL) {
 		dev_err(dev, "add new VSI failed, ch->type %d\n", ch->type);
@@ -7768,7 +7910,10 @@ static int ice_add_channel(struct ice_pf *pf, u16 sw_id, struct ice_channel *ch)
 		return -EINVAL;
 	}
 
-	ice_add_vsi_to_fdir(pf, vsi);
+	ch->fd_enabled = 0;
+	status = ice_add_vsi_to_fdir(pf, vsi);
+	if (!status)
+		ch->fd_enabled = 1;
 
 	ch->sw_id = sw_id;
 	ch->vsi_num = vsi->vsi_num;
@@ -7811,6 +7956,8 @@ static void ice_chnl_cfg_res(struct ice_vsi *vsi, struct ice_channel *ch)
 		tx_ring->ch = ch;
 		rx_ring->ch = ch;
 
+		tx_ring->ch_inline_fd_cnt_index = ch->fd_cnt_index;
+
 		/* following code block sets up vector specific attributes */
 		tx_q_vector = tx_ring->q_vector;
 		rx_q_vector = rx_ring->q_vector;
@@ -7852,7 +7999,20 @@ static void ice_chnl_cfg_res(struct ice_vsi *vsi, struct ice_channel *ch)
 static void
 ice_cfg_chnl_all_res(struct ice_vsi *vsi, struct ice_channel *ch)
 {
-	/* configure channel (aka ADQ) resources such as queues, vectors,
+	struct ice_pf *pf = vsi->back;
+
+	/* setup inline-FD counter index per channel, eventually
+	 * used separate counter index per channel, to offer
+	 * better granularity and QoS per channel for RSS and FD
+	 */
+	ch->fd_cnt_index = ICE_FD_CH_STAT_IDX(pf->hw.fd_ctr_base);
+	/* reset source for all counters is CORER, typically upon
+	 * driver load, those counters may have stale value, hence
+	 * initialize counter to zero, access type for counters is RWC
+	 */
+	ice_fd_clear_cntr(pf, ch->fd_cnt_index);
+
+	/* configure channel (i.e. ADQ) resources such as queues, vectors,
 	 * ITR settings for channel specific vectors and anything else
 	 */
 	ice_chnl_cfg_res(vsi, ch);
@@ -8460,6 +8620,11 @@ config_tcf:
 
 	if (vsi->ch_rss_size)
 		ice_vsi_cfg_rss_lut_key(vsi);
+
+	if (hw)
+		ret = ice_devlink_tc_params_register(vsi);
+	else
+		ice_devlink_tc_params_unregister(vsi);
 
 exit:
 	/* if error, reset the all_numtc and all_enatc */
