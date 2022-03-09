@@ -34,6 +34,7 @@ struct capture_priv {
 
 	struct imx_media_video_dev vdev;	/* Video device */
 	struct media_pad vdev_pad;		/* Video device pad */
+	enum imx_media_device_type type;	/* Type of hardware implementation */
 
 	struct v4l2_subdev *src_sd;		/* Source subdev */
 	int src_sd_pad;				/* Source subdev pad */
@@ -957,7 +958,8 @@ EXPORT_SYMBOL_GPL(imx_media_capture_device_unregister);
 
 struct imx_media_video_dev *
 imx_media_capture_device_init(struct device *dev, struct v4l2_subdev *src_sd,
-			      int pad, bool legacy_api)
+			      int pad, bool legacy_api,
+			      enum imx_media_device_type type)
 {
 	struct capture_priv *priv;
 	struct video_device *vfd;
@@ -972,6 +974,7 @@ imx_media_capture_device_init(struct device *dev, struct v4l2_subdev *src_sd,
 	priv->src_sd_pad = pad;
 	priv->dev = dev;
 	priv->legacy_api = legacy_api;
+	priv->type = type;
 
 	mutex_init(&priv->mutex);
 	INIT_LIST_HEAD(&priv->ready_q);
