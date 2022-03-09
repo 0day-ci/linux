@@ -225,6 +225,8 @@ static inline int __sched __down_common(struct semaphore *sem, long state,
 		raw_spin_lock_irq(&sem->lock);
 		if (waiter.up)
 			return 0;
+		if (timeout)
+			goto interrupted;
 	}
 
  timed_out:
