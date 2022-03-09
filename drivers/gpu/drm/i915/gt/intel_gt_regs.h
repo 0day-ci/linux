@@ -1502,5 +1502,6 @@
 #define GEN12_CCS2_CCS3_INTR_MASK		_MMIO(0x190104)
 
 #define GEN12_SFC_DONE(n)			_MMIO(0x1cc000 + (n) * 0x1000)
+#define GEN12_SFC_DONE_MAX			4
 
 #endif /* __INTEL_GT_REGS__ */
