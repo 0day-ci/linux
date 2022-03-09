@@ -125,12 +125,16 @@ static struct landlock_rule *create_rule(
 	return new_rule;
 }
 
-static void free_rule(struct landlock_rule *const rule)
+static void free_rule(struct landlock_rule *const rule, const u16 rule_type)
 {
 	might_sleep();
 	if (!rule)
 		return;
-	landlock_put_object(rule->object.ptr);
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		landlock_put_object(rule->object.ptr);
+		break;
+	}
 	kfree(rule);
 }
 
@@ -233,12 +237,12 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 		case LANDLOCK_RULE_PATH_BENEATH:
 			new_rule = create_rule(object_ptr, 0, &this->layers, this->num_layers,
 					       &(*layers)[0], rule_type);
+			if (IS_ERR(new_rule))
+				return PTR_ERR(new_rule);
+			rb_replace_node(&this->node, &new_rule->node, &ruleset->root_inode);
+			free_rule(this, rule_type);
 			break;
 		}
-		if (IS_ERR(new_rule))
-			return PTR_ERR(new_rule);
-		rb_replace_node(&this->node, &new_rule->node, &ruleset->root_inode);
-		free_rule(this);
 		return 0;
 	}
 
@@ -249,13 +253,13 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 	switch (rule_type) {
 	case LANDLOCK_RULE_PATH_BENEATH:
 		new_rule = create_rule(object_ptr, 0, layers, num_layers, NULL, rule_type);
+		if (IS_ERR(new_rule))
+			return PTR_ERR(new_rule);
+		rb_link_node(&new_rule->node, parent_node, walker_node);
+		rb_insert_color(&new_rule->node, &ruleset->root_inode);
+		ruleset->num_rules++;
 		break;
 	}
-	if (IS_ERR(new_rule))
-		return PTR_ERR(new_rule);
-	rb_link_node(&new_rule->node, parent_node, walker_node);
-	rb_insert_color(&new_rule->node, &ruleset->root_inode);
-	ruleset->num_rules++;
 	return 0;
 }
 
@@ -303,10 +307,53 @@ static void put_hierarchy(struct landlock_hierarchy *hierarchy)
 	}
 }
 
+static int tree_merge(struct landlock_ruleset *const src,
+		struct landlock_ruleset *const dst, u16 rule_type)
+{
+	struct landlock_rule *walker_rule, *next_rule;
+	struct rb_root *src_root;
+	int err = 0;
+
+	/* Choose rb_tree structure depending on a rule type */
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		src_root = &src->root_inode;
+		break;
+	default:
+		return -EINVAL;
+	}
+	/* Merges the @src tree. */
+	rbtree_postorder_for_each_entry_safe(walker_rule, next_rule,
+					     src_root, node) {
+		struct landlock_layer layers[] = {{
+			.level = dst->num_layers,
+		}};
+
+		if (WARN_ON_ONCE(walker_rule->num_layers != 1)) {
+			err = -EINVAL;
+			return err;
+		}
+		if (WARN_ON_ONCE(walker_rule->layers[0].level != 0)) {
+			err = -EINVAL;
+			return err;
+		}
+		layers[0].access = walker_rule->layers[0].access;
+
+		switch (rule_type) {
+		case LANDLOCK_RULE_PATH_BENEATH:
+			err = insert_rule(dst, walker_rule->object.ptr, 0, &layers,
+				ARRAY_SIZE(layers), rule_type);
+			break;
+		}
+		if (err)
+			return err;
+	}
+	return err;
+}
+
 static int merge_ruleset(struct landlock_ruleset *const dst,
 		struct landlock_ruleset *const src)
 {
-	struct landlock_rule *walker_rule, *next_rule;
 	int err = 0;
 
 	might_sleep();
@@ -328,27 +375,10 @@ static int merge_ruleset(struct landlock_ruleset *const dst,
 	}
 	dst->access_masks[dst->num_layers - 1] = src->access_masks[0];
 
-	/* Merges the @src tree. */
-	rbtree_postorder_for_each_entry_safe(walker_rule, next_rule,
-			&src->root_inode, node) {
-		struct landlock_layer layers[] = {{
-			.level = dst->num_layers,
-		}};
-
-		if (WARN_ON_ONCE(walker_rule->num_layers != 1)) {
-			err = -EINVAL;
-			goto out_unlock;
-		}
-		if (WARN_ON_ONCE(walker_rule->layers[0].level != 0)) {
-			err = -EINVAL;
-			goto out_unlock;
-		}
-		layers[0].access = walker_rule->layers[0].access;
-		err = insert_rule(dst, walker_rule->object.ptr, 0, &layers,
-				ARRAY_SIZE(layers), LANDLOCK_RULE_PATH_BENEATH);
-		if (err)
-			goto out_unlock;
-	}
+	/* Merges the @src inode tree. */
+	err = tree_merge(src, dst, LANDLOCK_RULE_PATH_BENEATH);
+	if (err)
+		goto out_unlock;
 
 out_unlock:
 	mutex_unlock(&src->lock);
@@ -356,12 +386,40 @@ out_unlock:
 	return err;
 }
 
+static int tree_copy(struct landlock_ruleset *const parent,
+		struct landlock_ruleset *const child, u16 rule_type)
+{
+	struct landlock_rule *walker_rule, *next_rule;
+	struct rb_root *parent_root;
+	int err = 0;
 
+	/* Choose rb_tree structure depending on a rule type */
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		parent_root = &parent->root_inode;
+		break;
+	default:
+		return -EINVAL;
+	}
+	/* Copies the @parent inode tree. */
+	rbtree_postorder_for_each_entry_safe(walker_rule, next_rule,
+					     parent_root, node) {
+		switch (rule_type) {
+		case LANDLOCK_RULE_PATH_BENEATH:
+			err = insert_rule(child, walker_rule->object.ptr, 0,
+				  &walker_rule->layers, walker_rule->num_layers,
+				  rule_type);
+			break;
+		}
+		if (err)
+			return err;
+	}
+	return err;
+}
 
 static int inherit_ruleset(struct landlock_ruleset *const parent,
 		struct landlock_ruleset *const child)
 {
-	struct landlock_rule *walker_rule, *next_rule;
 	int err = 0;
 
 	might_sleep();
@@ -372,15 +430,10 @@ static int inherit_ruleset(struct landlock_ruleset *const parent,
 	mutex_lock(&child->lock);
 	mutex_lock_nested(&parent->lock, SINGLE_DEPTH_NESTING);
 
-	/* Copies the @parent tree. */
-	rbtree_postorder_for_each_entry_safe(walker_rule, next_rule,
-			&parent->root_inode, node) {
-		err = insert_rule(child, walker_rule->object.ptr, 0,
-				&walker_rule->layers, walker_rule->num_layers,
-				LANDLOCK_RULE_PATH_BENEATH);
-		if (err)
-			goto out_unlock;
-	}
+	/* Copies the @parent inode tree. */
+	err = tree_copy(parent, child, LANDLOCK_RULE_PATH_BENEATH);
+	if (err)
+		goto out_unlock;
 
 	if (WARN_ON_ONCE(child->num_layers <= parent->num_layers)) {
 		err = -EINVAL;
@@ -410,7 +463,7 @@ static void free_ruleset(struct landlock_ruleset *const ruleset)
 	might_sleep();
 	rbtree_postorder_for_each_entry_safe(freeme, next, &ruleset->root_inode,
 			node)
-		free_rule(freeme);
+		free_rule(freeme, LANDLOCK_RULE_PATH_BENEATH);
 	put_hierarchy(ruleset->hierarchy);
 	kfree(ruleset);
 }
