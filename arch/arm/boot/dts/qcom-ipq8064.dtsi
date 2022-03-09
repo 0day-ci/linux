@@ -298,6 +298,12 @@
 	};
 
 	clocks {
+		qsb: qsb {
+			compatible = "fixed-clock";
+			clock-frequency = <384000000>;
+			#clock-cells = <0>;
+		};
+
 		cxo_board {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
@@ -504,11 +510,19 @@
 		acc0: clock-controller@2088000 {
 			compatible = "qcom,kpss-acc-v1";
 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
+			clock-output-names = "acpu0_aux";
+			clocks = <&gcc PLL8_VOTE>, <&pxo_board>;
+			clock-names = "pll8_vote", "pxo";
+			#clock-cells = <0>;
 		};
 
 		acc1: clock-controller@2098000 {
 			compatible = "qcom,kpss-acc-v1";
 			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
+			clock-output-names = "acpu1_aux";
+			clocks = <&gcc PLL8_VOTE>, <&pxo_board>;
+			clock-names = "pll8_vote", "pxo";
+			#clock-cells = <0>;
 		};
 
 		adm_dma: dma-controller@18300000 {
@@ -532,14 +546,20 @@
 		};
 
 		saw0: regulator@2089000 {
-			compatible = "qcom,saw2";
+			compatible = "qcom,saw2", "qcom,apq8064-saw2-v1.1-cpu", "syscon";
 			reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
 			regulator;
 		};
 
 		saw1: regulator@2099000 {
-			compatible = "qcom,saw2";
+			compatible = "qcom,saw2", "qcom,apq8064-saw2-v1.1-cpu", "syscon";
 			reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+			regulator;
+		};
+
+		saw_l2: regulator@02012000 {
+			compatible = "qcom,saw2", "syscon";
+			reg = <0x02012000 0x1000>;
 			regulator;
 		};
 
@@ -897,6 +917,16 @@
 			clocks = <&gcc PLL8_VOTE>, <&gcc PXO_SRC>;
 			clock-names = "pll8_vote", "pxo";
 			clock-output-names = "acpu_l2_aux";
+		};
+
+		kraitcc: clock-controller {
+			compatible = "qcom,krait-cc-v1";
+			clocks = <&gcc PLL9>, <&gcc PLL10>, <&gcc PLL12>,
+				 <&acc0>, <&acc1>, <&l2cc>, <&qsb>;
+			clock-names = "hfpll0", "hfpll1", "hfpll_l2",
+				      "acpu0_aux", "acpu1_aux", "acpu_l2_aux",
+				      "qsb";
+			#clock-cells = <1>;
 		};
 
 		lcc: clock-controller@28000000 {
