@@ -2411,7 +2411,7 @@ static void dsa_slave_switchdev_event_work(struct work_struct *work)
 		else
 			err = dsa_port_fdb_add(dp, switchdev_work->addr,
 					       switchdev_work->vid);
-		if (err) {
+		if (err && err != -EOPNOTSUPP) {
 			dev_err(ds->dev,
 				"port %d failed to add %pM vid %d to fdb: %d\n",
 				dp->index, switchdev_work->addr,
@@ -2428,7 +2428,7 @@ static void dsa_slave_switchdev_event_work(struct work_struct *work)
 		else
 			err = dsa_port_fdb_del(dp, switchdev_work->addr,
 					       switchdev_work->vid);
-		if (err) {
+		if (err && err != -EOPNOTSUPP) {
 			dev_err(ds->dev,
 				"port %d failed to delete %pM vid %d from fdb: %d\n",
 				dp->index, switchdev_work->addr,
