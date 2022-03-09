@@ -32,6 +32,7 @@
 #include <linux/dma-map-ops.h> /* for dma_default_coherent */
 
 #include "base.h"
+#include "physical_location.h"
 #include "power/power.h"
 
 #ifdef CONFIG_SYSFS_DEPRECATED
@@ -2649,8 +2650,17 @@ static int device_add_attrs(struct device *dev)
 			goto err_remove_dev_waiting_for_supplier;
 	}
 
+	if (dev_add_physical_location(dev)) {
+		error = device_add_group(dev,
+			&dev_attr_physical_location_group);
+		if (error)
+			goto err_remove_dev_physical_location;
+	}
+
 	return 0;
 
+ err_remove_dev_physical_location:
+	device_remove_group(dev, &dev_attr_physical_location_group);
  err_remove_dev_waiting_for_supplier:
 	device_remove_file(dev, &dev_attr_waiting_for_supplier);
  err_remove_dev_online:
