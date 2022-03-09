@@ -48,6 +48,11 @@ int folio_migrate_mapping(struct address_space *mapping,
 		struct folio *newfolio, struct folio *folio, int extra_count);
 
 extern bool numa_demotion_enabled;
+#ifdef CONFIG_HOTPLUG_CPU
+extern void set_migration_target_nodes(void);
+#else
+static inline void set_migration_target_nodes() {}
+#endif
 #else
 
 static inline void putback_movable_pages(struct list_head *l) {}
