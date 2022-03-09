@@ -341,10 +341,10 @@ SYSCALL_DEFINE4(landlock_add_rule,
 	}
 	/*
 	 * Checks that allowed_access matches the @ruleset constraints
-	 * (ruleset->fs_access_masks[0] is automatically upgraded to 64-bits).
+	 * (ruleset->access_masks[0] is automatically upgraded to 64-bits).
 	 */
-	if ((path_beneath_attr.allowed_access | ruleset->fs_access_masks[0]) !=
-			ruleset->fs_access_masks[0]) {
+	if ((path_beneath_attr.allowed_access | ruleset->access_masks[0]) !=
+			ruleset->access_masks[0]) {
 		err = -EINVAL;
 		goto out_put_ruleset;
 	}
