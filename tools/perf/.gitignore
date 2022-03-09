@@ -15,8 +15,9 @@ perf*.1
 perf*.xml
 perf*.html
 common-cmds.h
-perf.data
-perf.data.old
+perf*.data
+perf*.data.old
+stats-*.csv
 output.svg
 perf-archive
 perf-with-kcore
@@ -30,6 +31,7 @@ config.mak.autogen
 *-flex.*
 *.pyc
 *.pyo
+*.stdout
 .config-detected
 util/intel-pt-decoder/inat-tables.c
 arch/*/include/generated/
