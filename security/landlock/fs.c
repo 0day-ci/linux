@@ -178,51 +178,6 @@ int landlock_append_fs_rule(struct landlock_ruleset *const ruleset,
 	return err;
 }
 
-/* Access-control management */
-
-static inline u64 unmask_layers(
-		const struct landlock_ruleset *const domain,
-		const struct path *const path, const u32 access_request,
-		u64 layer_mask)
-{
-	const struct landlock_rule *rule;
-	const struct inode *inode;
-	size_t i;
-
-	if (d_is_negative(path->dentry))
-		/* Ignore nonexistent leafs. */
-		return layer_mask;
-	inode = d_backing_inode(path->dentry);
-	rcu_read_lock();
-	rule = landlock_find_rule(domain,
-			(uintptr_t)rcu_dereference(landlock_inode(inode)->object),
-			LANDLOCK_RULE_PATH_BENEATH);
-	rcu_read_unlock();
-	if (!rule)
-		return layer_mask;
-
-	/*
-	 * An access is granted if, for each policy layer, at least one rule
-	 * encountered on the pathwalk grants the requested accesses,
-	 * regardless of their position in the layer stack.  We must then check
-	 * the remaining layers for each inode, from the first added layer to
-	 * the last one.
-	 */
-	for (i = 0; i < rule->num_layers; i++) {
-		const struct landlock_layer *const layer = &rule->layers[i];
-		const u64 layer_level = BIT_ULL(layer->level - 1);
-
-		/* Checks that the layer grants access to the full request. */
-		if ((layer->access & access_request) == access_request) {
-			layer_mask &= ~layer_level;
-
-			if (layer_mask == 0)
-				return layer_mask;
-		}
-	}
-	return layer_mask;
-}
-
 static int check_access_path(const struct landlock_ruleset *const domain,
 		const struct path *const path, u32 access_request)
 {
@@ -268,15 +223,23 @@ static int check_access_path(const struct landlock_ruleset *const domain,
 	 */
 	while (true) {
 		struct dentry *parent_dentry;
+		const struct inode *inode;
+		struct landlock_object *object_ptr;
 
-		layer_mask = unmask_layers(domain, &walker_path,
-				access_request, layer_mask);
-		if (layer_mask == 0) {
-			/* Stops when a rule from each layer grants access. */
-			allowed = true;
-			break;
+		/* Ignore nonexistent leafs. */
+		if (!d_is_negative(walker_path.dentry)) {
+
+			inode = d_backing_inode(walker_path.dentry);
+			object_ptr = landlock_inode(inode)->object;
+			layer_mask = landlock_unmask_layers(domain, object_ptr,
+							access_request, layer_mask,
+							LANDLOCK_RULE_PATH_BENEATH);
+			if (layer_mask == 0) {
+				/* Stops when a rule from each layer grants access. */
+				allowed = true;
+				break;
+			}
 		}
-
 jump_up:
 		if (walker_path.dentry == walker_path.mnt->mnt_root) {
 			if (follow_up(&walker_path)) {

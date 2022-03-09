@@ -582,3 +582,47 @@ const struct landlock_rule *landlock_find_rule(
 	}
 	return NULL;
 }
+
+/* Access-control management */
+u64 landlock_unmask_layers(const struct landlock_ruleset *const domain,
+			   const struct landlock_object *object_ptr,
+			   const u32 access_request, u64 layer_mask,
+			   const u16 rule_type)
+{
+	const struct landlock_rule *rule;
+	size_t i;
+
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		rcu_read_lock();
+		rule = landlock_find_rule(domain,
+			(uintptr_t)rcu_dereference(object_ptr),
+			LANDLOCK_RULE_PATH_BENEATH);
+		rcu_read_unlock();
+		break;
+	}
+
+	if (!rule)
+		return layer_mask;
+
+	/*
+	 * An access is granted if, for each policy layer, at least one rule
+	 * encountered on the pathwalk grants the requested accesses,
+	 * regardless of their position in the layer stack.  We must then check
+	 * the remaining layers for each inode, from the first added layer to
+	 * the last one.
+	 */
+	for (i = 0; i < rule->num_layers; i++) {
+		const struct landlock_layer *const layer = &rule->layers[i];
+		const u64 layer_level = BIT_ULL(layer->level - 1);
+
+		/* Checks that the layer grants access to the full request. */
+		if ((layer->access & access_request) == access_request) {
+			layer_mask &= ~layer_level;
+
+			if (layer_mask == 0)
+				return layer_mask;
+		}
+	}
+	return layer_mask;
+}
