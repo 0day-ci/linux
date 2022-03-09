@@ -193,6 +193,18 @@ protocol. If not all packets are of equal size, the tagger can implement the
 default behavior by specifying the correct offset incurred by each individual
 RX packet. Tail taggers do not cause issues to the flow dissector.
 
+Tagging protocols might also break checksum offload. The offload hardware must
+either be able to parse the proprietary tag, usually when it matches the switch
+vendor, or, in the case of category 1 and 2, the driver and the hardware must
+be able to use the sum_start/csum_offset adjusted by the DSA framework. Drivers
+that enable the checksum offload based only on the network/transport headers
+might wrongly delegate the checksum to incompatible hardware, sending packets
+with an uncalculated checksum to the network. For category 3, when the offload
+hardware cannot parse the proprietary tag, the checksum must be calculated
+before any tag is inserted because both software and hardware checksums will
+include any trailing tag as part of the payload. When the switch strips the tag,
+the packet sent to the network will not match the checksum.
+
 Due to various reasons (most common being category 1 taggers being associated
 with DSA-unaware masters, mangling what the master perceives as MAC DA), the
 tagging protocol may require the DSA master to operate in promiscuous mode, to
