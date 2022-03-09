@@ -1564,9 +1564,13 @@ static bool vpu_malone_check_ready(struct vpu_shared_addr *shared, u32 instance)
 	u32 size = desc->end - desc->start;
 	u32 rptr = desc->rptr;
 	u32 wptr = desc->wptr;
-	u32 used = (wptr + size - rptr) % size;
+	u32 used;
 
-	if (!size || used < size / 2)
+	if (!size)
+		return true;
+
+	used = (wptr + size - rptr) % size;
+	if (used < size / 2)
 		return true;
 
 	return false;
