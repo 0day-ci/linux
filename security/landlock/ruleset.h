@@ -17,6 +17,16 @@
 #include "object.h"
 
 /**
+ * struct landlock_access_mask - A helper structure to handle different mask types
+ */
+struct landlock_access_mask {
+	/**
+	 * @fs: Filesystem access mask.
+	 */
+	u16 fs;
+};
+
+/**
  * struct landlock_layer - Access rights for a given layer
  */
 struct landlock_layer {
@@ -140,7 +150,8 @@ struct landlock_ruleset {
 	};
 };
 
-struct landlock_ruleset *landlock_create_ruleset(const u32 access_mask);
+struct landlock_ruleset *landlock_create_ruleset(const struct landlock_access_mask
+									*access_mask_set);
 
 void landlock_put_ruleset(struct landlock_ruleset *const ruleset);
 void landlock_put_ruleset_deferred(struct landlock_ruleset *const ruleset);
@@ -161,5 +172,11 @@ static inline void landlock_get_ruleset(struct landlock_ruleset *const ruleset)
 	if (ruleset)
 		refcount_inc(&ruleset->usage);
 }
+
+void landlock_set_fs_access_mask(struct landlock_ruleset *ruleset,
+				 const struct landlock_access_mask *access_mask_set,
+				 u16 mask_level);
+
+u32 landlock_get_fs_access_mask(const struct landlock_ruleset *ruleset, u16 mask_level);
 
 #endif /* _SECURITY_LANDLOCK_RULESET_H */

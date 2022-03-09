@@ -44,16 +44,30 @@ static struct landlock_ruleset *create_ruleset(const u32 num_layers)
 	return new_ruleset;
 }
 
-struct landlock_ruleset *landlock_create_ruleset(const u32 access_mask)
+/* A helper function to set a filesystem mask */
+void landlock_set_fs_access_mask(struct landlock_ruleset *ruleset,
+				 const struct landlock_access_mask *access_mask_set,
+				 u16 mask_level)
+{
+	ruleset->access_masks[mask_level] = access_mask_set->fs;
+}
+
+/* A helper function to get a filesystem mask */
+u32 landlock_get_fs_access_mask(const struct landlock_ruleset *ruleset, u16 mask_level)
+{
+	return ruleset->access_masks[mask_level];
+}
+
+struct landlock_ruleset *landlock_create_ruleset(const struct landlock_access_mask *access_mask_set)
 {
 	struct landlock_ruleset *new_ruleset;
 
 	/* Informs about useless ruleset. */
-	if (!access_mask)
+	if (!access_mask_set->fs)
 		return ERR_PTR(-ENOMSG);
 	new_ruleset = create_ruleset(1);
 	if (!IS_ERR(new_ruleset))
-		new_ruleset->access_masks[0] = access_mask;
+		landlock_set_fs_access_mask(new_ruleset, access_mask_set, 0);
 	return new_ruleset;
 }
 

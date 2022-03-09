@@ -159,6 +159,7 @@ SYSCALL_DEFINE3(landlock_create_ruleset,
 {
 	struct landlock_ruleset_attr ruleset_attr;
 	struct landlock_ruleset *ruleset;
+	struct landlock_access_mask access_mask_set = {.fs = 0};
 	int err, ruleset_fd;
 
 	/* Build-time checks. */
@@ -185,9 +186,10 @@ SYSCALL_DEFINE3(landlock_create_ruleset,
 	if ((ruleset_attr.handled_access_fs | LANDLOCK_MASK_ACCESS_FS) !=
 			LANDLOCK_MASK_ACCESS_FS)
 		return -EINVAL;
+	access_mask_set.fs = ruleset_attr.handled_access_fs;
 
 	/* Checks arguments and transforms to kernel struct. */
-	ruleset = landlock_create_ruleset(ruleset_attr.handled_access_fs);
+	ruleset = landlock_create_ruleset(&access_mask_set);
 	if (IS_ERR(ruleset))
 		return PTR_ERR(ruleset);
 
@@ -343,8 +345,9 @@ SYSCALL_DEFINE4(landlock_add_rule,
 	 * Checks that allowed_access matches the @ruleset constraints
 	 * (ruleset->access_masks[0] is automatically upgraded to 64-bits).
 	 */
-	if ((path_beneath_attr.allowed_access | ruleset->access_masks[0]) !=
-			ruleset->access_masks[0]) {
+
+	if ((path_beneath_attr.allowed_access | landlock_get_fs_access_mask(ruleset, 0)) !=
+						landlock_get_fs_access_mask(ruleset, 0)) {
 		err = -EINVAL;
 		goto out_put_ruleset;
 	}
