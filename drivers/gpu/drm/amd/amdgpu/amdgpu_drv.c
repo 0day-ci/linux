@@ -26,6 +26,7 @@
 #include <drm/drm_aperture.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_gem.h>
+#include <drm/drm_privacy_screen_consumer.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_managed.h>
 #include "amdgpu_drv.h"
@@ -1988,6 +1989,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 {
 	struct drm_device *ddev;
 	struct amdgpu_device *adev;
+	struct drm_privacy_screen *privacy_screen;
 	unsigned long flags = ent->driver_data;
 	int ret, retry = 0, i;
 	bool supports_atomic = false;
@@ -2062,6 +2064,13 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	base = pci_resource_start(pdev, 0);
 	size = pci_resource_len(pdev, 0);
 	is_fw_fb = amdgpu_is_fw_framebuffer(base, size);
+
+	/* If the LCD panel has a privacy screen, defer probe until its ready */
+	privacy_screen = drm_privacy_screen_get(&pdev->dev, NULL);
+	if (IS_ERR(privacy_screen) && PTR_ERR(privacy_screen) == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
+
+	drm_privacy_screen_put(privacy_screen);
 
 	/* Get rid of things like offb */
 	ret = drm_aperture_remove_conflicting_pci_framebuffers(pdev, &amdgpu_kms_driver);

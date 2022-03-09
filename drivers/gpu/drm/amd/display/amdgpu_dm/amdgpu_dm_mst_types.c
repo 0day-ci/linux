@@ -27,6 +27,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/dp/drm_dp_mst_helper.h>
 #include <drm/dp/drm_dp_helper.h>
+#include <drm/drm_privacy_screen_consumer.h>
 #include "dm_services.h"
 #include "amdgpu.h"
 #include "amdgpu_dm.h"
@@ -506,6 +507,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 				       struct amdgpu_dm_connector *aconnector,
 				       int link_index)
 {
+	struct drm_device *dev = dm->ddev;
 	struct dc_link_settings max_link_enc_cap = {0};
 
 	aconnector->dm_dp_aux.aux.name =
@@ -519,8 +521,20 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
 				      &aconnector->base);
 
-	if (aconnector->base.connector_type == DRM_MODE_CONNECTOR_eDP)
+	if (aconnector->base.connector_type == DRM_MODE_CONNECTOR_eDP) {
+		struct drm_privacy_screen *privacy_screen;
+
+		/* Reference given up in drm_connector_cleanup() */
+		privacy_screen = drm_privacy_screen_get(dev->dev, NULL);
+		if (!IS_ERR(privacy_screen)) {
+			drm_connector_attach_privacy_screen_provider(&aconnector->base,
+								     privacy_screen);
+		} else if (PTR_ERR(privacy_screen) != -ENODEV) {
+			drm_err(dev, "Error getting privacy screen, ret=%d\n",
+				PTR_ERR(privacy_screen));
+		}
 		return;
+	}
 
 	dc_link_dp_get_max_link_enc_cap(aconnector->dc_link, &max_link_enc_cap);
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
