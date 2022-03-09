@@ -363,6 +363,10 @@ static int mmc_update_ext_csd_runtime_params(struct mmc_card *card, u8 *ext_csd)
 {
 	int err = 0;
 
+	/* eMMC v4.41 or later */
+	if (card->ext_csd.rev >= 5)
+		card->ext_csd.rel_wr_set = ext_csd[EXT_CSD_WR_REL_SET];
+
 	/* eMMC v5 or later */
 	if (card->ext_csd.rev >= 7) {
 		card->ext_csd.pre_eol_info = ext_csd[EXT_CSD_PRE_EOL_INFO];
@@ -586,6 +590,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		}
 
 		card->ext_csd.rel_param = ext_csd[EXT_CSD_WR_REL_PARAM];
+		card->ext_csd.rel_wr_set = ext_csd[EXT_CSD_WR_REL_SET];
 		card->ext_csd.rst_n_function = ext_csd[EXT_CSD_RST_N_FUNCTION];
 
 		/*
@@ -819,6 +824,7 @@ MMC_DEV_ATTR(name, "%s\n", card->cid.prod_name);
 MMC_DEV_ATTR(oemid, "0x%04x\n", card->cid.oemid);
 MMC_DEV_ATTR(prv, "0x%x\n", card->cid.prv);
 MMC_DEV_ATTR(rev, "0x%x\n", card->ext_csd.rev);
+MMC_DEV_ATTR(rel_param, "0x%02x\n", card->ext_csd.rel_param);
 MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
 MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
@@ -885,6 +891,27 @@ static ssize_t pre_eol_info_show(struct device *dev,
 
 static DEVICE_ATTR_RO(pre_eol_info);
 
+static ssize_t rel_write_set_show(struct device *dev,
+				  struct device_attribute *attr,
+				  char *buf)
+{
+	int err = 0;
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	/* before eMMC v4.41 */
+	if (card->ext_csd.rev < 5)
+		return sprintf(buf, "%s\n", "-");
+
+	/* eMMC v4.41 or later */
+	err = mmc_update_csd(card);
+	if (err)
+		return (ssize_t)err;
+
+	return sprintf(buf, "0x%02x\n", card->ext_csd.rel_wr_set);
+}
+
+static DEVICE_ATTR_RO(rel_write_set);
+
 static ssize_t mmc_fwrev_show(struct device *dev,
 			      struct device_attribute *attr,
 			      char *buf)
@@ -931,6 +958,8 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_oemid.attr,
 	&dev_attr_prv.attr,
 	&dev_attr_rev.attr,
+	&dev_attr_rel_param.attr,
+	&dev_attr_rel_write_set.attr,
 	&dev_attr_pre_eol_info.attr,
 	&dev_attr_life_time.attr,
 	&dev_attr_serial.attr,

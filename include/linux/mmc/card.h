@@ -48,6 +48,7 @@ struct mmc_ext_csd {
 	u8			sec_feature_support;
 	u8			rel_sectors;
 	u8			rel_param;
+	u8			rel_wr_set;
 	bool			enhanced_rpmb_supported;
 	u8			part_config;
 	u8			cache_ctrl;
