@@ -29,6 +29,7 @@
 #include "cred.h"
 #include "fs.h"
 #include "limits.h"
+#include "net.h"
 #include "ruleset.h"
 #include "setup.h"
 
@@ -73,7 +74,8 @@ static void build_check_abi(void)
 {
 	struct landlock_ruleset_attr ruleset_attr;
 	struct landlock_path_beneath_attr path_beneath_attr;
-	size_t ruleset_size, path_beneath_size;
+	struct landlock_net_service_attr net_service_attr;
+	size_t ruleset_size, path_beneath_size, net_service_size;
 
 	/*
 	 * For each user space ABI structures, first checks that there is no
@@ -89,6 +91,11 @@ static void build_check_abi(void)
 	path_beneath_size += sizeof(path_beneath_attr.parent_fd);
 	BUILD_BUG_ON(sizeof(path_beneath_attr) != path_beneath_size);
 	BUILD_BUG_ON(sizeof(path_beneath_attr) != 12);
+
+	net_service_size = sizeof(net_service_attr.allowed_access);
+	net_service_size += sizeof(net_service_attr.port);
+	BUILD_BUG_ON(sizeof(net_service_attr) != net_service_size);
+	BUILD_BUG_ON(sizeof(net_service_attr) != 10);
 }
 
 /* Ruleset handling */
@@ -311,7 +318,6 @@ static int add_rule_path_beneath(const int ruleset_fd, const void *const rule_at
 	 * Checks that allowed_access matches the @ruleset constraints
 	 * (ruleset->access_masks[0] is automatically upgraded to 64-bits).
 	 */
-
 	if ((path_beneath_attr.allowed_access | landlock_get_fs_access_mask(ruleset, 0)) !=
 						landlock_get_fs_access_mask(ruleset, 0)) {
 		err = -EINVAL;
@@ -327,6 +333,50 @@ static int add_rule_path_beneath(const int ruleset_fd, const void *const rule_at
 	err = landlock_append_fs_rule(ruleset, &path,
 			path_beneath_attr.allowed_access);
 	path_put(&path);
+
+out_put_ruleset:
+	landlock_put_ruleset(ruleset);
+	return err;
+}
+
+static int add_rule_net_service(const int ruleset_fd, const void *const rule_attr)
+{
+	struct landlock_net_service_attr  net_service_attr;
+	struct landlock_ruleset *ruleset;
+	int res, err;
+
+	/* Copies raw user space buffer, only one type for now. */
+	res = copy_from_user(&net_service_attr, rule_attr,
+			sizeof(net_service_attr));
+	if (res)
+		return -EFAULT;
+
+	/* Gets and checks the ruleset. */
+	ruleset = get_ruleset_from_fd(ruleset_fd, FMODE_CAN_WRITE);
+	if (IS_ERR(ruleset))
+		return PTR_ERR(ruleset);
+
+	/*
+	 * Informs about useless rule: empty allowed_access (i.e. deny rules)
+	 * are ignored by network actions
+	 */
+	if (!net_service_attr.allowed_access) {
+		err = -ENOMSG;
+		goto out_put_ruleset;
+	}
+	/*
+	 * Checks that allowed_access matches the @ruleset constraints
+	 * (ruleset->access_masks[0] is automatically upgraded to 64-bits).
+	 */
+	if ((net_service_attr.allowed_access | landlock_get_net_access_mask(ruleset, 0)) !=
+					       landlock_get_net_access_mask(ruleset, 0)) {
+		err = -EINVAL;
+		goto out_put_ruleset;
+	}
+
+	/* Imports the new rule. */
+	err = landlock_append_net_rule(ruleset, net_service_attr.port,
+				       net_service_attr.allowed_access);
 
 out_put_ruleset:
 	landlock_put_ruleset(ruleset);
@@ -378,6 +428,13 @@ SYSCALL_DEFINE4(landlock_add_rule,
 	switch (rule_type) {
 	case LANDLOCK_RULE_PATH_BENEATH:
 		err = add_rule_path_beneath(ruleset_fd, rule_attr);
+		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+#if IS_ENABLED(CONFIG_INET)
+		err = add_rule_net_service(ruleset_fd, rule_attr);
+#else
+		err = -EOPNOTSUPP;
+#endif
 		break;
 	default:
 		err = -EINVAL;

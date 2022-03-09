@@ -193,6 +193,12 @@ void landlock_set_fs_access_mask(struct landlock_ruleset *ruleset,
 
 u32 landlock_get_fs_access_mask(const struct landlock_ruleset *ruleset, u16 mask_level);
 
+void landlock_set_net_access_mask(struct landlock_ruleset *ruleset,
+				  const struct landlock_access_mask *access_mask_set,
+				  u16 mask_level);
+
+u32 landlock_get_net_access_mask(const struct landlock_ruleset *ruleset, u16 mask_level);
+
 u64 landlock_unmask_layers(const struct landlock_ruleset *const domain,
 			   const struct landlock_object *object_ptr,
 			   const u16 port, const u32 access_request,

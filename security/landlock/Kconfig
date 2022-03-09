@@ -4,6 +4,7 @@ config SECURITY_LANDLOCK
 	bool "Landlock support"
 	depends on SECURITY && !ARCH_EPHEMERAL_INODES
 	select SECURITY_PATH
+	select SECURITY_NETWORK
 	help
 	  Landlock is a sandboxing mechanism that enables processes to restrict
 	  themselves (and their future children) by gradually enforcing
