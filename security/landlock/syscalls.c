@@ -160,7 +160,7 @@ SYSCALL_DEFINE3(landlock_create_ruleset,
 {
 	struct landlock_ruleset_attr ruleset_attr;
 	struct landlock_ruleset *ruleset;
-	struct landlock_access_mask access_mask_set = {.fs = 0};
+	struct landlock_access_mask access_mask_set = {.fs = 0, .net = 0};
 	int err, ruleset_fd;
 
 	/* Build-time checks. */
@@ -187,8 +187,14 @@ SYSCALL_DEFINE3(landlock_create_ruleset,
 	if ((ruleset_attr.handled_access_fs | LANDLOCK_MASK_ACCESS_FS) !=
 			 LANDLOCK_MASK_ACCESS_FS)
 		return -EINVAL;
-	access_mask_set.fs = ruleset_attr.handled_access_fs;
 
+	/* Checks network content (and 32-bits cast). */
+	if ((ruleset_attr.handled_access_net | LANDLOCK_MASK_ACCESS_NET) !=
+			LANDLOCK_MASK_ACCESS_NET)
+		return -EINVAL;
+
+	access_mask_set.fs = ruleset_attr.handled_access_fs;
+	access_mask_set.net = ruleset_attr.handled_access_net;
 	/* Checks arguments and transforms to kernel struct. */
 	ruleset = landlock_create_ruleset(&access_mask_set);
 	if (IS_ERR(ruleset))

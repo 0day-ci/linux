@@ -35,6 +35,7 @@ static struct landlock_ruleset *create_ruleset(const u32 num_layers)
 	refcount_set(&new_ruleset->usage, 1);
 	mutex_init(&new_ruleset->lock);
 	new_ruleset->root_inode = RB_ROOT;
+	new_ruleset->root_net_port = RB_ROOT;
 	new_ruleset->num_layers = num_layers;
 	/*
 	 * hierarchy = NULL
@@ -58,16 +59,32 @@ u32 landlock_get_fs_access_mask(const struct landlock_ruleset *ruleset, u16 mask
 	return ruleset->access_masks[mask_level];
 }
 
+/* A helper function to set a network mask */
+void landlock_set_net_access_mask(struct landlock_ruleset *ruleset,
+				  const struct landlock_access_mask *access_mask_set,
+				  u16 mask_level)
+{
+	ruleset->access_masks[mask_level] |= (access_mask_set->net << LANDLOCK_MASK_SHIFT_NET);
+}
+
+/* A helper function to get a network mask */
+u32 landlock_get_net_access_mask(const struct landlock_ruleset *ruleset, u16 mask_level)
+{
+	return (ruleset->access_masks[mask_level] >> LANDLOCK_MASK_SHIFT_NET);
+}
+
 struct landlock_ruleset *landlock_create_ruleset(const struct landlock_access_mask *access_mask_set)
 {
 	struct landlock_ruleset *new_ruleset;
 
 	/* Informs about useless ruleset. */
-	if (!access_mask_set->fs)
+	if (!access_mask_set->fs && !access_mask_set->net)
 		return ERR_PTR(-ENOMSG);
 	new_ruleset = create_ruleset(1);
-	if (!IS_ERR(new_ruleset))
+	if (!IS_ERR(new_ruleset) && access_mask_set->fs)
 		landlock_set_fs_access_mask(new_ruleset, access_mask_set, 0);
+	if (!IS_ERR(new_ruleset) && access_mask_set->net)
+		landlock_set_net_access_mask(new_ruleset, access_mask_set, 0);
 	return new_ruleset;
 }
 
@@ -111,6 +128,9 @@ static struct landlock_rule *create_rule(
 		landlock_get_object(object_ptr);
 		new_rule->object.ptr = object_ptr;
 		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		new_rule->object.data = object_data;
+		break;
 	default:
 		return ERR_PTR(-EINVAL);
 	}
@@ -145,10 +165,12 @@ static void build_check_ruleset(void)
 		.num_layers = ~0,
 	};
 	typeof(ruleset.access_masks[0]) fs_access_mask = ~0;
+	typeof(ruleset.access_masks[0]) net_access_mask = ~0;
 
 	BUILD_BUG_ON(ruleset.num_rules < LANDLOCK_MAX_NUM_RULES);
 	BUILD_BUG_ON(ruleset.num_layers < LANDLOCK_MAX_NUM_LAYERS);
 	BUILD_BUG_ON(fs_access_mask < LANDLOCK_MASK_ACCESS_FS);
+	BUILD_BUG_ON(net_access_mask < LANDLOCK_MASK_ACCESS_NET);
 }
 
 /**
@@ -190,6 +212,12 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 			return -ENOENT;
 		object = (uintptr_t)object_ptr;
 		root = &ruleset->root_inode;
+		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		if (WARN_ON_ONCE(!object_data || !layers))
+			return -ENOENT;
+		object = object_data;
+		root = &ruleset->root_net_port;
 		break;
 	default:
 		return -EINVAL;
@@ -242,6 +270,14 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 			rb_replace_node(&this->node, &new_rule->node, &ruleset->root_inode);
 			free_rule(this, rule_type);
 			break;
+		case LANDLOCK_RULE_NET_SERVICE:
+			new_rule = create_rule(NULL, object_data, &this->layers, this->num_layers,
+					       &(*layers)[0], rule_type);
+			if (IS_ERR(new_rule))
+				return PTR_ERR(new_rule);
+			rb_replace_node(&this->node, &new_rule->node, &ruleset->root_net_port);
+			free_rule(this, rule_type);
+			break;
 		}
 		return 0;
 	}
@@ -257,6 +293,14 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 			return PTR_ERR(new_rule);
 		rb_link_node(&new_rule->node, parent_node, walker_node);
 		rb_insert_color(&new_rule->node, &ruleset->root_inode);
+		ruleset->num_rules++;
+		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		new_rule = create_rule(NULL, object_data, layers, num_layers, NULL, rule_type);
+		if (IS_ERR(new_rule))
+			return PTR_ERR(new_rule);
+		rb_link_node(&new_rule->node, parent_node, walker_node);
+		rb_insert_color(&new_rule->node, &ruleset->root_net_port);
 		ruleset->num_rules++;
 		break;
 	}
@@ -319,6 +363,9 @@ static int tree_merge(struct landlock_ruleset *const src,
 	case LANDLOCK_RULE_PATH_BENEATH:
 		src_root = &src->root_inode;
 		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		src_root = &src->root_net_port;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -338,11 +385,14 @@ static int tree_merge(struct landlock_ruleset *const src,
 			return err;
 		}
 		layers[0].access = walker_rule->layers[0].access;
-
 		switch (rule_type) {
 		case LANDLOCK_RULE_PATH_BENEATH:
 			err = insert_rule(dst, walker_rule->object.ptr, 0, &layers,
-				ARRAY_SIZE(layers), rule_type);
+					ARRAY_SIZE(layers), rule_type);
+			break;
+		case LANDLOCK_RULE_NET_SERVICE:
+			err = insert_rule(dst, NULL, walker_rule->object.data, &layers,
+					ARRAY_SIZE(layers), rule_type);
 			break;
 		}
 		if (err)
@@ -379,6 +429,10 @@ static int merge_ruleset(struct landlock_ruleset *const dst,
 	err = tree_merge(src, dst, LANDLOCK_RULE_PATH_BENEATH);
 	if (err)
 		goto out_unlock;
+	/* Merges the @src network tree. */
+	err = tree_merge(src, dst, LANDLOCK_RULE_NET_SERVICE);
+	if (err)
+		goto out_unlock;
 
 out_unlock:
 	mutex_unlock(&src->lock);
@@ -398,6 +452,9 @@ static int tree_copy(struct landlock_ruleset *const parent,
 	case LANDLOCK_RULE_PATH_BENEATH:
 		parent_root = &parent->root_inode;
 		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		parent_root = &parent->root_net_port;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -407,6 +464,11 @@ static int tree_copy(struct landlock_ruleset *const parent,
 		switch (rule_type) {
 		case LANDLOCK_RULE_PATH_BENEATH:
 			err = insert_rule(child, walker_rule->object.ptr, 0,
+				  &walker_rule->layers, walker_rule->num_layers,
+				  rule_type);
+			break;
+		case LANDLOCK_RULE_NET_SERVICE:
+			err = insert_rule(child, NULL, walker_rule->object.data,
 				  &walker_rule->layers, walker_rule->num_layers,
 				  rule_type);
 			break;
@@ -432,6 +494,10 @@ static int inherit_ruleset(struct landlock_ruleset *const parent,
 
 	/* Copies the @parent inode tree. */
 	err = tree_copy(parent, child, LANDLOCK_RULE_PATH_BENEATH);
+	if (err)
+		goto out_unlock;
+	/* Copies the @parent inode tree. */
+	err = tree_copy(parent, child, LANDLOCK_RULE_NET_SERVICE);
 	if (err)
 		goto out_unlock;
 
@@ -464,6 +530,9 @@ static void free_ruleset(struct landlock_ruleset *const ruleset)
 	rbtree_postorder_for_each_entry_safe(freeme, next, &ruleset->root_inode,
 			node)
 		free_rule(freeme, LANDLOCK_RULE_PATH_BENEATH);
+	rbtree_postorder_for_each_entry_safe(freeme, next, &ruleset->root_net_port,
+			node)
+		free_rule(freeme, LANDLOCK_RULE_NET_SERVICE);
 	put_hierarchy(ruleset->hierarchy);
 	kfree(ruleset);
 }
@@ -565,6 +634,9 @@ const struct landlock_rule *landlock_find_rule(
 	case LANDLOCK_RULE_PATH_BENEATH:
 		node = ruleset->root_inode.rb_node;
 		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		node = ruleset->root_net_port.rb_node;
+		break;
 	default:
 		return ERR_PTR(-EINVAL);
 	}
@@ -586,8 +658,8 @@ const struct landlock_rule *landlock_find_rule(
 /* Access-control management */
 u64 landlock_unmask_layers(const struct landlock_ruleset *const domain,
 			   const struct landlock_object *object_ptr,
-			   const u32 access_request, u64 layer_mask,
-			   const u16 rule_type)
+			   const u16 port, const u32 access_request,
+			   u64 layer_mask, const u16 rule_type)
 {
 	const struct landlock_rule *rule;
 	size_t i;
@@ -599,6 +671,10 @@ u64 landlock_unmask_layers(const struct landlock_ruleset *const domain,
 			(uintptr_t)rcu_dereference(object_ptr),
 			LANDLOCK_RULE_PATH_BENEATH);
 		rcu_read_unlock();
+		break;
+	case LANDLOCK_RULE_NET_SERVICE:
+		rule = landlock_find_rule(domain, (uintptr_t)port,
+					LANDLOCK_RULE_NET_SERVICE);
 		break;
 	}
 

@@ -24,6 +24,10 @@ struct landlock_access_mask {
 	 * @fs: Filesystem access mask.
 	 */
 	u16 fs;
+	/**
+	 * @net: Network access mask.
+	 */
+	u16 net;
 };
 
 /**
@@ -98,6 +102,12 @@ struct landlock_ruleset {
 	 * tree is immutable until @usage reaches zero.
 	 */
 	struct rb_root root_inode;
+	/**
+	 * @root_net_port: Root of a red-black tree containing object nodes
+	 * for network port. Once a ruleset is tied to a process (i.e. as a domain),
+	 * this tree is immutable until @usage reaches zero.
+	 */
+	struct rb_root root_net_port;
 	/**
 	 * @hierarchy: Enables hierarchy identification even when a parent
 	 * domain vanishes.  This is needed for the ptrace protection.
@@ -185,7 +195,7 @@ u32 landlock_get_fs_access_mask(const struct landlock_ruleset *ruleset, u16 mask
 
 u64 landlock_unmask_layers(const struct landlock_ruleset *const domain,
 			   const struct landlock_object *object_ptr,
-			   const u32 access_request, u64 layer_mask,
-			   const u16 rule_type);
+			   const u16 port, const u32 access_request,
+			   u64 layer_mask, const u16 rule_type);
 
 #endif /* _SECURITY_LANDLOCK_RULESET_H */

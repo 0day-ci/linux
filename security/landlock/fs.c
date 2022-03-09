@@ -231,7 +231,7 @@ static int check_access_path(const struct landlock_ruleset *const domain,
 
 			inode = d_backing_inode(walker_path.dentry);
 			object_ptr = landlock_inode(inode)->object;
-			layer_mask = landlock_unmask_layers(domain, object_ptr,
+			layer_mask = landlock_unmask_layers(domain, object_ptr, 0,
 							access_request, layer_mask,
 							LANDLOCK_RULE_PATH_BENEATH);
 			if (layer_mask == 0) {
