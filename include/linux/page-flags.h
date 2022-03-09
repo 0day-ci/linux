@@ -107,7 +107,7 @@ enum pageflags {
 	PG_workingset,
 	PG_waiters,		/* Page has waiters, check its waitqueue. Must be bit #7 and in the same byte as "PG_locked" */
 	PG_error,
-	PG_slab,
+	PG_xyzzy,		/* Magic.  The other flags change meaning */
 	PG_owner_priv_1,	/* Owner use. If pagecache, fs may use*/
 	PG_arch_1,
 	PG_reserved,
@@ -139,6 +139,9 @@ enum pageflags {
 	PG_skip_kasan_poison,
 #endif
 	__NR_PAGEFLAGS,
+
+	/* xyzzy flags */
+	PG_slab = PG_owner_priv_1,
 
 	PG_readahead = PG_reclaim,
 
@@ -425,9 +428,53 @@ PAGEFLAG(Active, active, PF_HEAD) __CLEARPAGEFLAG(Active, active, PF_HEAD)
 	TESTCLEARFLAG(Active, active, PF_HEAD)
 PAGEFLAG(Workingset, workingset, PF_HEAD)
 	TESTCLEARFLAG(Workingset, workingset, PF_HEAD)
-__PAGEFLAG(Slab, slab, PF_NO_TAIL)
 __PAGEFLAG(SlobFree, slob_free, PF_NO_TAIL)
 PAGEFLAG(Checked, checked, PF_NO_COMPOUND)	   /* Used by some filesystems */
+
+#define XYZZY(name)		((1UL << PG_xyzzy) | (1UL << PG_##name))
+
+static __always_inline bool folio_test_slab(struct folio *folio)
+{
+	return (*folio_flags(folio, 0) & XYZZY(slab)) == XYZZY(slab);
+}
+
+static __always_inline bool PageSlab(struct page *page)
+{
+	return folio_test_slab(page_folio(page));
+}
+
+static __always_inline void folio_set_slab(struct folio *folio)
+{
+	unsigned long flags, *p = folio_flags(folio, 0);
+
+	do {
+		flags = READ_ONCE(*p);
+	} while (cmpxchg(p, flags, flags | XYZZY(slab)) != flags);
+}
+
+static __always_inline void folio_clear_slab(struct folio *folio)
+{
+	unsigned long flags, *p = folio_flags(folio, 0);
+
+	do {
+		flags = READ_ONCE(*p);
+	} while (cmpxchg(p, flags, flags & ~XYZZY(slab)) != flags);
+}
+
+static __always_inline void __folio_set_slab(struct folio *folio)
+{
+	*folio_flags(folio, 0) |= XYZZY(slab);
+}
+
+static __always_inline void __SetPageSlab(struct page *page)
+{
+	page->flags |= XYZZY(slab);
+}
+
+static __always_inline void __folio_clear_slab(struct folio *folio)
+{
+	*folio_flags(folio, 0) &= ~XYZZY(slab);
+}
 
 /* Xen */
 PAGEFLAG(Pinned, pinned, PF_NO_COMPOUND)
