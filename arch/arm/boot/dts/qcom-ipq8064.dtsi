@@ -981,6 +981,9 @@
 			tsens_calib_backup: calib_backup@410 {
 				reg = <0x410 0xb>;
 			};
+			speedbin_efuse: speedbin@0c0 {
+				reg = <0x0c0 0x4>;
+			};
 		};
 
 		gcc: clock-controller@900000 {
