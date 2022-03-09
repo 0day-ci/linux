@@ -274,53 +274,12 @@ out_fdput:
 	return err;
 }
 
-/**
- * sys_landlock_add_rule - Add a new rule to a ruleset
- *
- * @ruleset_fd: File descriptor tied to the ruleset that should be extended
- *		with the new rule.
- * @rule_type: Identify the structure type pointed to by @rule_attr (only
- *             LANDLOCK_RULE_PATH_BENEATH for now).
- * @rule_attr: Pointer to a rule (only of type &struct
- *             landlock_path_beneath_attr for now).
- * @flags: Must be 0.
- *
- * This system call enables to define a new rule and add it to an existing
- * ruleset.
- *
- * Possible returned errors are:
- *
- * - EOPNOTSUPP: Landlock is supported by the kernel but disabled at boot time;
- * - EINVAL: @flags is not 0, or inconsistent access in the rule (i.e.
- *   &landlock_path_beneath_attr.allowed_access is not a subset of the rule's
- *   accesses);
- * - ENOMSG: Empty accesses (e.g. &landlock_path_beneath_attr.allowed_access);
- * - EBADF: @ruleset_fd is not a file descriptor for the current thread, or a
- *   member of @rule_attr is not a file descriptor as expected;
- * - EBADFD: @ruleset_fd is not a ruleset file descriptor, or a member of
- *   @rule_attr is not the expected file descriptor type (e.g. file open
- *   without O_PATH);
- * - EPERM: @ruleset_fd has no write access to the underlying ruleset;
- * - EFAULT: @rule_attr inconsistency.
- */
-SYSCALL_DEFINE4(landlock_add_rule,
-		const int, ruleset_fd, const enum landlock_rule_type, rule_type,
-		const void __user *const, rule_attr, const __u32, flags)
+static int add_rule_path_beneath(const int ruleset_fd, const void *const rule_attr)
 {
 	struct landlock_path_beneath_attr path_beneath_attr;
 	struct path path;
 	struct landlock_ruleset *ruleset;
 	int res, err;
-
-	if (!landlock_initialized)
-		return -EOPNOTSUPP;
-
-	/* No flag for now. */
-	if (flags)
-		return -EINVAL;
-
-	if (rule_type != LANDLOCK_RULE_PATH_BENEATH)
-		return -EINVAL;
 
 	/* Copies raw user space buffer, only one type for now. */
 	res = copy_from_user(&path_beneath_attr, rule_attr,
@@ -364,6 +323,58 @@ SYSCALL_DEFINE4(landlock_add_rule,
 
 out_put_ruleset:
 	landlock_put_ruleset(ruleset);
+	return err;
+}
+
+/**
+ * sys_landlock_add_rule - Add a new rule to a ruleset
+ *
+ * @ruleset_fd: File descriptor tied to the ruleset that should be extended
+ *		with the new rule.
+ * @rule_type: Identify the structure type pointed to by @rule_attr (only
+ *             LANDLOCK_RULE_PATH_BENEATH for now).
+ * @rule_attr: Pointer to a rule (only of type &struct
+ *             landlock_path_beneath_attr for now).
+ * @flags: Must be 0.
+ *
+ * This system call enables to define a new rule and add it to an existing
+ * ruleset.
+ *
+ * Possible returned errors are:
+ *
+ * - EOPNOTSUPP: Landlock is supported by the kernel but disabled at boot time;
+ * - EINVAL: @flags is not 0, or inconsistent access in the rule (i.e.
+ *   &landlock_path_beneath_attr.allowed_access is not a subset of the rule's
+ *   accesses);
+ * - ENOMSG: Empty accesses (e.g. &landlock_path_beneath_attr.allowed_access);
+ * - EBADF: @ruleset_fd is not a file descriptor for the current thread, or a
+ *   member of @rule_attr is not a file descriptor as expected;
+ * - EBADFD: @ruleset_fd is not a ruleset file descriptor, or a member of
+ *   @rule_attr is not the expected file descriptor type (e.g. file open
+ *   without O_PATH);
+ * - EPERM: @ruleset_fd has no write access to the underlying ruleset;
+ * - EFAULT: @rule_attr inconsistency.
+ */
+SYSCALL_DEFINE4(landlock_add_rule,
+		const int, ruleset_fd, const enum landlock_rule_type, rule_type,
+		const void __user *const, rule_attr, const __u32, flags)
+{
+	int err;
+
+	if (!landlock_initialized)
+		return -EOPNOTSUPP;
+
+	/* No flag for now. */
+	if (flags)
+		return -EINVAL;
+
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		err = add_rule_path_beneath(ruleset_fd, rule_attr);
+		break;
+	default:
+		err = -EINVAL;
+	}
 	return err;
 }
 
