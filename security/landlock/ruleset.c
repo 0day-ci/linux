@@ -34,7 +34,7 @@ static struct landlock_ruleset *create_ruleset(const u32 num_layers)
 		return ERR_PTR(-ENOMEM);
 	refcount_set(&new_ruleset->usage, 1);
 	mutex_init(&new_ruleset->lock);
-	new_ruleset->root = RB_ROOT;
+	new_ruleset->root_inode = RB_ROOT;
 	new_ruleset->num_layers = num_layers;
 	/*
 	 * hierarchy = NULL
@@ -81,10 +81,12 @@ static void build_check_rule(void)
 }
 
 static struct landlock_rule *create_rule(
-		struct landlock_object *const object,
+		struct landlock_object *const object_ptr,
+		const uintptr_t object_data,
 		const struct landlock_layer (*const layers)[],
 		const u32 num_layers,
-		const struct landlock_layer *const new_layer)
+		const struct landlock_layer *const new_layer,
+		const u16 rule_type)
 {
 	struct landlock_rule *new_rule;
 	u32 new_num_layers;
@@ -103,8 +105,16 @@ static struct landlock_rule *create_rule(
 	if (!new_rule)
 		return ERR_PTR(-ENOMEM);
 	RB_CLEAR_NODE(&new_rule->node);
-	landlock_get_object(object);
-	new_rule->object = object;
+
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		landlock_get_object(object_ptr);
+		new_rule->object.ptr = object_ptr;
+		break;
+	default:
+		return ERR_PTR(-EINVAL);
+	}
+
 	new_rule->num_layers = new_num_layers;
 	/* Copies the original layer stack. */
 	memcpy(new_rule->layers, layers,
@@ -120,7 +130,7 @@ static void free_rule(struct landlock_rule *const rule)
 	might_sleep();
 	if (!rule)
 		return;
-	landlock_put_object(rule->object);
+	landlock_put_object(rule->object.ptr);
 	kfree(rule);
 }
 
@@ -156,26 +166,38 @@ static void build_check_ruleset(void)
  * access rights.
  */
 static int insert_rule(struct landlock_ruleset *const ruleset,
-		struct landlock_object *const object,
+		struct landlock_object *const object_ptr,
+		const uintptr_t object_data,
 		const struct landlock_layer (*const layers)[],
-		size_t num_layers)
+		size_t num_layers, u16 rule_type)
 {
 	struct rb_node **walker_node;
 	struct rb_node *parent_node = NULL;
 	struct landlock_rule *new_rule;
+	uintptr_t object;
+	struct rb_root *root;
 
 	might_sleep();
 	lockdep_assert_held(&ruleset->lock);
-	if (WARN_ON_ONCE(!object || !layers))
-		return -ENOENT;
-	walker_node = &(ruleset->root.rb_node);
+	/* Choose rb_tree structure depending on a rule type */
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		if (WARN_ON_ONCE(!object_ptr || !layers))
+			return -ENOENT;
+		object = (uintptr_t)object_ptr;
+		root = &ruleset->root_inode;
+		break;
+	default:
+		return -EINVAL;
+	}
+	walker_node = &root->rb_node;
 	while (*walker_node) {
 		struct landlock_rule *const this = rb_entry(*walker_node,
 				struct landlock_rule, node);
 
-		if (this->object != object) {
+		if (this->object.data != object) {
 			parent_node = *walker_node;
-			if (this->object < object)
+			if (this->object.data < object)
 				walker_node = &((*walker_node)->rb_right);
 			else
 				walker_node = &((*walker_node)->rb_left);
@@ -207,11 +229,15 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 		 * Intersects access rights when it is a merge between a
 		 * ruleset and a domain.
 		 */
-		new_rule = create_rule(object, &this->layers, this->num_layers,
-				&(*layers)[0]);
+		switch (rule_type) {
+		case LANDLOCK_RULE_PATH_BENEATH:
+			new_rule = create_rule(object_ptr, 0, &this->layers, this->num_layers,
+					       &(*layers)[0], rule_type);
+			break;
+		}
 		if (IS_ERR(new_rule))
 			return PTR_ERR(new_rule);
-		rb_replace_node(&this->node, &new_rule->node, &ruleset->root);
+		rb_replace_node(&this->node, &new_rule->node, &ruleset->root_inode);
 		free_rule(this);
 		return 0;
 	}
@@ -220,11 +246,15 @@ static int insert_rule(struct landlock_ruleset *const ruleset,
 	build_check_ruleset();
 	if (ruleset->num_rules >= LANDLOCK_MAX_NUM_RULES)
 		return -E2BIG;
-	new_rule = create_rule(object, layers, num_layers, NULL);
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		new_rule = create_rule(object_ptr, 0, layers, num_layers, NULL, rule_type);
+		break;
+	}
 	if (IS_ERR(new_rule))
 		return PTR_ERR(new_rule);
 	rb_link_node(&new_rule->node, parent_node, walker_node);
-	rb_insert_color(&new_rule->node, &ruleset->root);
+	rb_insert_color(&new_rule->node, &ruleset->root_inode);
 	ruleset->num_rules++;
 	return 0;
 }
@@ -242,7 +272,9 @@ static void build_check_layer(void)
 
 /* @ruleset must be locked by the caller. */
 int landlock_insert_rule(struct landlock_ruleset *const ruleset,
-		struct landlock_object *const object, const u32 access)
+		struct landlock_object *const object_ptr,
+		const uintptr_t object_data,
+		const u32 access, const u16 rule_type)
 {
 	struct landlock_layer layers[] = {{
 		.access = access,
@@ -251,7 +283,8 @@ int landlock_insert_rule(struct landlock_ruleset *const ruleset,
 	}};
 
 	build_check_layer();
-	return insert_rule(ruleset, object, &layers, ARRAY_SIZE(layers));
+	return insert_rule(ruleset, object_ptr, object_data, &layers,
+			   ARRAY_SIZE(layers), rule_type);
 }
 
 static inline void get_hierarchy(struct landlock_hierarchy *const hierarchy)
@@ -297,7 +330,7 @@ static int merge_ruleset(struct landlock_ruleset *const dst,
 
 	/* Merges the @src tree. */
 	rbtree_postorder_for_each_entry_safe(walker_rule, next_rule,
-			&src->root, node) {
+			&src->root_inode, node) {
 		struct landlock_layer layers[] = {{
 			.level = dst->num_layers,
 		}};
@@ -311,8 +344,8 @@ static int merge_ruleset(struct landlock_ruleset *const dst,
 			goto out_unlock;
 		}
 		layers[0].access = walker_rule->layers[0].access;
-		err = insert_rule(dst, walker_rule->object, &layers,
-				ARRAY_SIZE(layers));
+		err = insert_rule(dst, walker_rule->object.ptr, 0, &layers,
+				ARRAY_SIZE(layers), LANDLOCK_RULE_PATH_BENEATH);
 		if (err)
 			goto out_unlock;
 	}
@@ -322,6 +355,8 @@ out_unlock:
 	mutex_unlock(&dst->lock);
 	return err;
 }
+
+
 
 static int inherit_ruleset(struct landlock_ruleset *const parent,
 		struct landlock_ruleset *const child)
@@ -339,9 +374,10 @@ static int inherit_ruleset(struct landlock_ruleset *const parent,
 
 	/* Copies the @parent tree. */
 	rbtree_postorder_for_each_entry_safe(walker_rule, next_rule,
-			&parent->root, node) {
-		err = insert_rule(child, walker_rule->object,
-				&walker_rule->layers, walker_rule->num_layers);
+			&parent->root_inode, node) {
+		err = insert_rule(child, walker_rule->object.ptr, 0,
+				&walker_rule->layers, walker_rule->num_layers,
+				LANDLOCK_RULE_PATH_BENEATH);
 		if (err)
 			goto out_unlock;
 	}
@@ -372,7 +408,7 @@ static void free_ruleset(struct landlock_ruleset *const ruleset)
 	struct landlock_rule *freeme, *next;
 
 	might_sleep();
-	rbtree_postorder_for_each_entry_safe(freeme, next, &ruleset->root,
+	rbtree_postorder_for_each_entry_safe(freeme, next, &ruleset->root_inode,
 			node)
 		free_rule(freeme);
 	put_hierarchy(ruleset->hierarchy);
@@ -465,20 +501,28 @@ out_put_dom:
  */
 const struct landlock_rule *landlock_find_rule(
 		const struct landlock_ruleset *const ruleset,
-		const struct landlock_object *const object)
+		const uintptr_t object_data, const u16 rule_type)
 {
 	const struct rb_node *node;
 
-	if (!object)
+	if (!object_data)
 		return NULL;
-	node = ruleset->root.rb_node;
+
+	switch (rule_type) {
+	case LANDLOCK_RULE_PATH_BENEATH:
+		node = ruleset->root_inode.rb_node;
+		break;
+	default:
+		return ERR_PTR(-EINVAL);
+	}
+
 	while (node) {
 		struct landlock_rule *this = rb_entry(node,
 				struct landlock_rule, node);
 
-		if (this->object == object)
+		if (this->object.data == object_data)
 			return this;
-		if (this->object < object)
+		if (this->object.data < object_data)
 			node = node->rb_right;
 		else
 			node = node->rb_left;

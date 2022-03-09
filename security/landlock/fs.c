@@ -168,7 +168,7 @@ int landlock_append_fs_rule(struct landlock_ruleset *const ruleset,
 	if (IS_ERR(object))
 		return PTR_ERR(object);
 	mutex_lock(&ruleset->lock);
-	err = landlock_insert_rule(ruleset, object, access_rights);
+	err = landlock_insert_rule(ruleset, object, 0, access_rights, LANDLOCK_RULE_PATH_BENEATH);
 	mutex_unlock(&ruleset->lock);
 	/*
 	 * No need to check for an error because landlock_insert_rule()
@@ -195,7 +195,8 @@ static inline u64 unmask_layers(
 	inode = d_backing_inode(path->dentry);
 	rcu_read_lock();
 	rule = landlock_find_rule(domain,
-			rcu_dereference(landlock_inode(inode)->object));
+			(uintptr_t)rcu_dereference(landlock_inode(inode)->object),
+			LANDLOCK_RULE_PATH_BENEATH);
 	rcu_read_unlock();
 	if (!rule)
 		return layer_mask;

@@ -50,15 +50,17 @@ struct landlock_rule {
 	 */
 	struct rb_node node;
 	/**
-	 * @object: Pointer to identify a kernel object (e.g. an inode).  This
-	 * is used as a key for this ruleset element.  This pointer is set once
-	 * and never modified.  It always points to an allocated object because
-	 * each rule increments the refcount of its object.
+	 * @object: A union to identify either a kernel object (e.g. an inode) or
+	 * a socket port object. This is used as a key for this ruleset element.
+	 * This pointer is set once and never modified. It always points to an
+	 * allocated object because each rule increments the refcount of its
+	 * object (for inodes);
 	 */
-	struct landlock_object *object;
-	/**
-	 * @num_layers: Number of entries in @layers.
-	 */
+	 union {
+		struct landlock_object *ptr;
+		uintptr_t data;
+	 } object;
+
 	u32 num_layers;
 	/**
 	 * @layers: Stack of layers, from the latest to the newest, implemented
@@ -95,7 +97,7 @@ struct landlock_ruleset {
 	 * nodes.  Once a ruleset is tied to a process (i.e. as a domain), this
 	 * tree is immutable until @usage reaches zero.
 	 */
-	struct rb_root root;
+	struct rb_root root_inode;
 	/**
 	 * @hierarchy: Enables hierarchy identification even when a parent
 	 * domain vanishes.  This is needed for the ptrace protection.
@@ -157,7 +159,9 @@ void landlock_put_ruleset(struct landlock_ruleset *const ruleset);
 void landlock_put_ruleset_deferred(struct landlock_ruleset *const ruleset);
 
 int landlock_insert_rule(struct landlock_ruleset *const ruleset,
-		struct landlock_object *const object, const u32 access);
+			 struct landlock_object *const object_ptr,
+			 const uintptr_t object_data,
+			 const u32 access, const u16 rule_type);
 
 struct landlock_ruleset *landlock_merge_ruleset(
 		struct landlock_ruleset *const parent,
@@ -165,7 +169,7 @@ struct landlock_ruleset *landlock_merge_ruleset(
 
 const struct landlock_rule *landlock_find_rule(
 		const struct landlock_ruleset *const ruleset,
-		const struct landlock_object *const object);
+		const uintptr_t object_data, const u16 rule_type);
 
 static inline void landlock_get_ruleset(struct landlock_ruleset *const ruleset)
 {
