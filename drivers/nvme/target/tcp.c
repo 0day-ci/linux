@@ -1657,8 +1657,10 @@ static void nvmet_tcp_accept_work(struct work_struct *w)
 	struct nvmet_tcp_port *port =
 		container_of(w, struct nvmet_tcp_port, accept_work);
 	struct socket *newsock;
+	struct inet_connection_sock *icsk, *icsk_new;
 	int ret;
 
+	icsk = inet_csk(port->sock->sk);
 	while (true) {
 		ret = kernel_accept(port->sock, &newsock, O_NONBLOCK);
 		if (ret < 0) {
@@ -1666,6 +1668,16 @@ static void nvmet_tcp_accept_work(struct work_struct *w)
 				pr_warn("failed to accept err=%d\n", ret);
 			return;
 		}
+
+		if (port->nport->tcp_congestion) {
+			icsk_new = inet_csk(newsock->sk);
+			if (icsk_new->icsk_ca_ops != icsk->icsk_ca_ops) {
+				pr_warn("congestion abnormal: expected %s, actual %s.\n",
+					icsk->icsk_ca_ops->name,
+					icsk_new->icsk_ca_ops->name);
+			}
+		}
+
 		ret = nvmet_tcp_alloc_queue(port, newsock);
 		if (ret) {
 			pr_err("failed to allocate queue\n");
@@ -1693,6 +1705,8 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 {
 	struct nvmet_tcp_port *port;
 	__kernel_sa_family_t af;
+	char ca_name[TCP_CA_NAME_MAX];
+	sockptr_t optval;
 	int ret;
 
 	port = kzalloc(sizeof(*port), GFP_KERNEL);
@@ -1740,6 +1754,19 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	tcp_sock_set_nodelay(port->sock->sk);
 	if (so_priority > 0)
 		sock_set_priority(port->sock->sk, so_priority);
+
+	if (nport->tcp_congestion) {
+		strncpy(ca_name, nport->tcp_congestion, TCP_CA_NAME_MAX-1);
+		optval = KERNEL_SOCKPTR(ca_name);
+		ret = sock_common_setsockopt(port->sock, IPPROTO_TCP,
+					     TCP_CONGESTION, optval,
+					     strlen(ca_name));
+		if (ret) {
+			pr_err("failed to set port socket's congestion to %s: %d\n",
+			       ca_name, ret);
+			goto err_sock;
+		}
+	}
 
 	ret = kernel_bind(port->sock, (struct sockaddr *)&port->addr,
 			sizeof(port->addr));
