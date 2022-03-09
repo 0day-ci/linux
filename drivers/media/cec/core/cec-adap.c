@@ -1580,24 +1580,24 @@ void __cec_s_phys_addr(struct cec_adapter *adap, u16 phys_addr, bool block)
 		/* Disabling monitor all mode should always succeed */
 		if (adap->monitor_all_cnt)
 			WARN_ON(call_op(adap, adap_monitor_all_enable, false));
-		/* serialize adap_enable */
-		mutex_lock(&adap->devnode.lock);
-		if (adap->needs_hpd || list_empty(&adap->devnode.fhs)) {
+		if (adap->needs_hpd) {
+			/* serialize adap_enable */
+			mutex_lock(&adap->devnode.lock);
 			WARN_ON(adap->ops->adap_enable(adap, false));
 			adap->transmit_in_progress = false;
 			wake_up_interruptible(&adap->kthread_waitq);
+			mutex_unlock(&adap->devnode.lock);
 		}
-		mutex_unlock(&adap->devnode.lock);
 		if (phys_addr == CEC_PHYS_ADDR_INVALID)
 			return;
 	}
 
 	/* serialize adap_enable */
 	mutex_lock(&adap->devnode.lock);
-	adap->last_initiator = 0xff;
-	adap->transmit_in_progress = false;
 
-	if (adap->needs_hpd || list_empty(&adap->devnode.fhs)) {
+	if (adap->needs_hpd) {
+		adap->last_initiator = 0xff;
+		adap->transmit_in_progress = false;
 		if (adap->ops->adap_enable(adap, true)) {
 			mutex_unlock(&adap->devnode.lock);
 			return;
@@ -1606,8 +1606,10 @@ void __cec_s_phys_addr(struct cec_adapter *adap, u16 phys_addr, bool block)
 
 	if (adap->monitor_all_cnt &&
 	    call_op(adap, adap_monitor_all_enable, true)) {
-		if (adap->needs_hpd || list_empty(&adap->devnode.fhs))
+		if (adap->needs_hpd) {
 			WARN_ON(adap->ops->adap_enable(adap, false));
+			adap->transmit_in_progress = false;
+		}
 		mutex_unlock(&adap->devnode.lock);
 		return;
 	}
@@ -1683,6 +1685,13 @@ int __cec_s_log_addrs(struct cec_adapter *adap,
 		adap->log_addrs.osd_name[0] = '\0';
 		adap->log_addrs.vendor_id = CEC_VENDOR_ID_NONE;
 		adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
+		if (!adap->needs_hpd) {
+			/* serialize adap_enable */
+			mutex_lock(&adap->devnode.lock);
+			WARN_ON(adap->ops->adap_enable(adap, false));
+			adap->transmit_in_progress = false;
+			mutex_unlock(&adap->devnode.lock);
+		}
 		return 0;
 	}
 
@@ -1816,6 +1825,19 @@ int __cec_s_log_addrs(struct cec_adapter *adap,
 		       sizeof(log_addrs->features[i]));
 	}
 
+	if (!adap->needs_hpd) {
+		int ret;
+
+		/* serialize adap_enable */
+		mutex_lock(&adap->devnode.lock);
+		adap->last_initiator = 0xff;
+		adap->transmit_in_progress = false;
+		ret = adap->ops->adap_enable(adap, true);
+		mutex_unlock(&adap->devnode.lock);
+
+		if (ret)
+			return ret;
+	}
 	log_addrs->log_addr_mask = adap->log_addrs.log_addr_mask;
 	adap->log_addrs = *log_addrs;
 	if (adap->phys_addr != CEC_PHYS_ADDR_INVALID)
