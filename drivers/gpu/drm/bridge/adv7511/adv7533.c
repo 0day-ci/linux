@@ -108,7 +108,7 @@ void adv7533_mode_set(struct adv7511 *adv, const struct drm_display_mode *mode)
 	if (adv->num_dsi_lanes != 4)
 		return;
 
-	if (mode->clock > 80000)
+	if (!adv->override_lanes || mode->clock > 80000)
 		lanes = 4;
 	else
 		lanes = 3;
@@ -194,6 +194,9 @@ int adv7533_parse_dt(struct device_node *np, struct adv7511 *adv)
 
 	adv->use_timing_gen = !of_property_read_bool(np,
 						"adi,disable-timing-generator");
+
+	adv->override_lanes = !of_property_read_bool(np,
+						"adi,disable-lanes-override");
 
 	/* TODO: Check if these need to be parsed by DT or not */
 	adv->rgb = true;

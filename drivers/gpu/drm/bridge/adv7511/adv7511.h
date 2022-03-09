@@ -369,6 +369,7 @@ struct adv7511 {
 	struct mipi_dsi_device *dsi;
 	u8 num_dsi_lanes;
 	bool use_timing_gen;
+	bool override_lanes;
 
 	enum adv7511_type type;
 	struct platform_device *audio_pdev;
