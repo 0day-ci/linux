@@ -33,17 +33,15 @@ To make it clear from the start:
  - power = energy/time = [joule/second] = [watt]
 
 The goal of EAS is to minimize energy, while still getting the job done. That
-is, we want to maximize::
+is, we want to maximize:
 
-	performance [inst/s]
-	--------------------
-	    power [W]
+.. math::
+   \frac{\text{performance (inst/s)}}{\text{power (W)}}
 
-which is equivalent to minimizing::
+which is equivalent to minimizing:
 
-	energy [J]
-	-----------
-	instruction
+.. math::
+   \frac{\text{energy (J)}}{\text{instruction}}
 
 while still getting 'good' performance. It is essentially an alternative
 optimization objective to the current performance-only objective for the
@@ -152,8 +150,8 @@ Example 2.
     composed of two CPUs each. CPU0 and CPU1 are little CPUs; CPU2 and CPU3
     are big.
 
-    The scheduler must decide where to place a task P whose util_avg = 200
-    and prev_cpu = 0.
+    The scheduler must decide where to place a task :math:`P` whose
+    util_avg = 200 and prev_cpu = 0.
 
     The current utilization landscape of the CPUs is depicted on the graph
     below. CPUs 0-3 have a util_avg of 400, 100, 600 and 500 respectively
@@ -183,10 +181,10 @@ Example 2.
 
     find_energy_efficient_cpu() will first look for the CPUs with the
     maximum spare capacity in the two performance domains. In this example,
-    CPU1 and CPU3. Then it will estimate the energy of the system if P was
-    placed on either of them, and check if that would save some energy
-    compared to leaving P on CPU0. EAS assumes that OPPs follow utilization
-    (which is coherent with the behaviour of the schedutil CPUFreq
+    CPU1 and CPU3. Then it will estimate the energy of the system if :math:`P`
+    was placed on either of them, and check if that would save some energy
+    compared to leaving :math:`P` on CPU0. EAS assumes that OPPs follow
+    utilization (which is coherent with the behaviour of the schedutil CPUFreq
     governor, see Section 6. for more details on this topic).
 
     **Case 1. P is migrated to CPU1**::
@@ -364,10 +362,12 @@ too complex (too many CPUs, too many performance domains, too many performance
 states, ...), the cost of using it in the wake-up path can become prohibitive.
 The energy-aware wake-up algorithm has a complexity of:
 
-	C = Nd * (Nc + Ns)
+.. math::
+   C = N_d \cdot (N_c + N_s)
 
-with: Nd the number of performance domains; Nc the number of CPUs; and Ns the
-total number of OPPs (ex: for two perf. domains with 4 OPPs each, Ns = 8).
+with: :math:`N_d` the number of performance domains; :math:`N_c` the number of
+CPUs; and :math:`N_s` the total number of OPPs (ex: for two perf. domains with 4
+OPPs each, :math:`N_s` = 8).
 
 A complexity check is performed at the root domain level, when scheduling
 domains are built. EAS will not start on a root domain if its C happens to be

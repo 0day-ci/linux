@@ -29,35 +29,36 @@ increased interference against the other system users. All nicely bounded.
 
 Traditional (UP-EDF) bandwidth control is something like:
 
-  (U = \Sum u_i) <= 1
+.. math::
+  (U = \sum_{i} u_i) \leq 1
 
 This guaranteeds both that every deadline is met and that the system is
-stable. After all, if U were > 1, then for every second of walltime,
+stable. After all, if :math:`U > 1`, then for every second of walltime,
 we'd have to run more than a second of program time, and obviously miss
 our deadline, but the next deadline will be further out still, there is
 never time to catch up, unbounded fail.
 
 The burst feature observes that a workload doesn't always executes the full
-quota; this enables one to describe u_i as a statistical distribution.
+quota; this enables one to describe :math:`u_i` as a statistical distribution.
 
-For example, have u_i = {x,e}_i, where x is the p(95) and x+e p(100)
-(the traditional WCET). This effectively allows u to be smaller,
-increasing the efficiency (we can pack more tasks in the system), but at
-the cost of missing deadlines when all the odds line up. However, it
-does maintain stability, since every overrun must be paired with an
-underrun as long as our x is above the average.
+For example, have :math:`u_i = \{x,e\}_i`, where :math:`x` is the :math:`p(95)`
+and :math:`x+e` is :math:`p(100)` (the traditional WCET). This effectively
+allows :math:`u` to be smaller, increasing the efficiency (we can pack more
+tasks in the system), but at the cost of missing deadlines when all the odds
+line up. However, it does maintain stability, since every overrun must be paired
+with an underrun as long as our :math:`x` is above the average.
 
-That is, suppose we have 2 tasks, both specify a p(95) value, then we
-have a p(95)*p(95) = 90.25% chance both tasks are within their quota and
-everything is good. At the same time we have a p(5)p(5) = 0.25% chance
-both tasks will exceed their quota at the same time (guaranteed deadline
-fail). Somewhere in between there's a threshold where one exceeds and
-the other doesn't underrun enough to compensate; this depends on the
-specific CDFs.
+That is, suppose we have 2 tasks, both specify a :math:`p(95)` value, then we
+have a :math:`p(95) \times p(95) = 90.25\%` chance both tasks are within their
+quota and everything is good. At the same time we have a
+:math:`p(5) \times p(5) = 0.25\%` chance both tasks will exceed their quota at
+the same time (guaranteed deadline fail). Somewhere in between there's a
+threshold where one exceeds and the other doesn't underrun enough to compensate;
+this depends on the specific CDFs.
 
 At the same time, we can say that the worst case deadline miss, will be
-\Sum e_i; that is, there is a bounded tardiness (under the assumption
-that x+e is indeed WCET).
+:math:`\sum_{i} e_i`; that is, there is a bounded tardiness (under the
+assumption that :math:`x+e` is indeed WCET).
 
 The interferenece when using burst is valued by the possibilities for
 missing the deadline and the average WCET. Test results showed that when
@@ -141,13 +142,13 @@ This interface is read-only.
 Hierarchical considerations
 ---------------------------
 The interface enforces that an individual entity's bandwidth is always
-attainable, that is: max(c_i) <= C. However, over-subscription in the
-aggregate case is explicitly allowed to enable work-conserving semantics
-within a hierarchy:
+attainable, that is: :math:`max(c_i) \leq C`. However, over-subscription in the
+aggregate case is explicitly allowed to enable work-conserving semantics within
+a hierarchy:
 
-  e.g. \Sum (c_i) may exceed C
+  e.g. :math:`\sum_{i} c_i` may exceed :math:`C`
 
-[ Where C is the parent's bandwidth, and c_i its children ]
+[ Where :math:`C` is the parent's bandwidth, and :math:`c_i` its children ]
 
 
 There are two ways in which a group may become throttled:

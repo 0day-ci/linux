@@ -31,9 +31,10 @@ can.
 
 CPU performance is usually expressed in Millions of Instructions Per Second
 (MIPS), which can also be expressed as a given amount of instructions attainable
-per Hz, leading to::
+per Hz, leading to:
 
-  capacity(cpu) = work_per_hz(cpu) * max_freq(cpu)
+.. math::
+  \text{capacity(cpu)} = \text{work\_per\_hz(cpu)} \times \text{max\_freq(cpu)}
 
 1.2 Scheduler terms
 -------------------
@@ -57,14 +58,14 @@ brevity.
 
 Consider an hypothetical dual-core asymmetric CPU capacity system where
 
-- work_per_hz(CPU0) = W
-- work_per_hz(CPU1) = W/2
+- work_per_hz(CPU0) = :math:`W`
+- work_per_hz(CPU1) = :math:`\frac{W}{2}`
 - all CPUs are running at the same fixed frequency
 
 By the above definition of capacity:
 
-- capacity(CPU0) = C
-- capacity(CPU1) = C/2
+- capacity(CPU0) = :math:`C`
+- capacity(CPU1) = :math:`\frac{C}{2}`
 
 To draw the parallel with Arm big.LITTLE, CPU0 would be a big while CPU1 would
 be a LITTLE.
@@ -84,7 +85,7 @@ execution trace like so::
 
 CPU0 has the highest capacity in the system (C), and completes a fixed amount of
 work W in T units of time. On the other hand, CPU1 has half the capacity of
-CPU0, and thus only completes W/2 in T.
+CPU0, and thus only completes :math:`\frac{W}{2}` in :math:`T`.
 
 1.3.2 Different max OPPs
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,13 +93,13 @@ CPU0, and thus only completes W/2 in T.
 Usually, CPUs of different capacity values also have different maximum
 OPPs. Consider the same CPUs as above (i.e. same work_per_hz()) with:
 
-- max_freq(CPU0) = F
-- max_freq(CPU1) = 2/3 * F
+- max_freq(CPU0) = :math:`F`
+- max_freq(CPU1) = :math:`\frac{2}{3} \times F`
 
 This yields:
 
-- capacity(CPU0) = C
-- capacity(CPU1) = C/3
+- capacity(CPU0) = :math:`C`
+- capacity(CPU1) = :math:`\frac{C}{3}`
 
 Executing the same workload as described in 1.3.1, which each CPU running at its
 maximum frequency results in::
@@ -135,9 +136,10 @@ while task utilization is specific to CFS, it is convenient to describe it here
 in order to introduce more generic concepts.
 
 Task utilization is a percentage meant to represent the throughput requirements
-of a task. A simple approximation of it is the task's duty cycle, i.e.::
+of a task. A simple approximation of it is the task's duty cycle, i.e.:
 
-  task_util(p) = duty_cycle(p)
+.. math::
+  \text{task\_util(p)} = \text{duty\_cycle(p)}
 
 On an SMP system with fixed frequencies, 100% utilization suggests the task is a
 busy loop. Conversely, 10% utilization hints it is a small periodic task that
@@ -150,7 +152,7 @@ expand on these.
 
 One issue that needs to be taken into account is that a workload's duty cycle is
 directly impacted by the current OPP the CPU is running at. Consider running a
-periodic workload at a given frequency F::
+periodic workload at a given frequency :math:`F`::
 
   CPU work ^
            |     ____                ____                ____
@@ -159,7 +161,7 @@ periodic workload at a given frequency F::
 
 This yields duty_cycle(p) == 25%.
 
-Now, consider running the *same* workload at frequency F/2::
+Now, consider running the *same* workload at frequency :math:`\frac{F}{2}`::
 
   CPU work ^
            |     _________           _________           ____
@@ -170,9 +172,12 @@ This yields duty_cycle(p) == 50%, despite the task having the exact same
 behaviour (i.e. executing the same amount of work) in both executions.
 
 The task utilization signal can be made frequency invariant using the following
-formula::
+formula:
 
-  task_util_freq_inv(p) = duty_cycle(p) * (curr_frequency(cpu) / max_frequency(cpu))
+.. math::
+  \text{task\_util\_freq\_inv(p)} =
+  \text{duty\_cycle(p)} \times
+  \frac{\text{curr\_frequency(cpu)}}{\text{max\_frequency(cpu)}}
 
 Applying this formula to the two examples above yields a frequency invariant
 task utilization of 25%.
@@ -208,9 +213,12 @@ IOW,
 - duty_cycle(p) == 75% if p runs on CPU1 at its maximum frequency
 
 The task utilization signal can be made CPU invariant using the following
-formula::
+formula:
 
-  task_util_cpu_inv(p) = duty_cycle(p) * (capacity(cpu) / max_capacity)
+.. math::
+  \text{task\_util\_cpu\_inv(p)} =
+  \text{duty\_cycle(p)} \times
+  \frac{\text{capacity(cpu)}}{\text{max\_capacity}}
 
 with ``max_capacity`` being the highest CPU capacity value in the
 system. Applying this formula to the above example above yields a CPU
@@ -222,11 +230,13 @@ invariant task utilization of 25%.
 Both frequency and CPU invariance need to be applied to task utilization in
 order to obtain a truly invariant signal. The pseudo-formula for a task
 utilization that is both CPU and frequency invariant is thus, for a given
-task p::
+task p:
 
-                                     curr_frequency(cpu)   capacity(cpu)
-  task_util_inv(p) = duty_cycle(p) * ------------------- * -------------
-                                     max_frequency(cpu)    max_capacity
+.. math::
+  \text{task\_util\_inv(p)} =
+  \text{duty\_cycle(p)} \times
+  \frac{\text{curr\_frequency(cpu)}}{\text{max\_frequency(cpu)}} \times
+  \frac{\text{capacity(cpu)}}{\text{max\_capacity}}
 
 In other words, invariant task utilization describes the behaviour of a task as
 if it were running on the highest-capacity CPU in the system, running at its
@@ -336,9 +346,10 @@ asymmetric CPU capacities is to:
 5.1.1 Capacity fitness
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The main capacity scheduling criterion of CFS is::
+The main capacity scheduling criterion of CFS is:
 
-  task_util(p) < capacity(task_cpu(p))
+.. math::
+  \text{task\_util(p)} < \text{capacity(task\_cpu(p))}
 
 This is commonly called the capacity fitness criterion, i.e. CFS must ensure a
 task "fits" on its CPU. If it is violated, the task will need to achieve more
@@ -355,9 +366,11 @@ clamp task_util() in the previous criterion.
 CFS task wakeup CPU selection follows the capacity fitness criterion described
 above. On top of that, uclamp is used to clamp the task utilization values,
 which lets userspace have more leverage over the CPU selection of CFS
-tasks. IOW, CFS wakeup CPU selection searches for a CPU that satisfies::
+tasks. IOW, CFS wakeup CPU selection searches for a CPU that satisfies:
 
-  clamp(task_util(p), task_uclamp_min(p), task_uclamp_max(p)) < capacity(cpu)
+.. math::
+  \text{clamp(task\_util(p), task\_uclamp\_min(p), task\_uclamp\_max(p))} <
+  \text{capacity(cpu)}
 
 By using uclamp, userspace can e.g. allow a busy loop (100% utilization) to run
 on any CPU by giving it a low uclamp.max value. Conversely, it can force a small
@@ -401,7 +414,8 @@ This workload should run on CPU0, but if the task either:
 - was properly scheduled from the start, but suddenly needs more
   processing power
 
-then it might become CPU-bound, IOW ``task_util(p) > capacity(task_cpu(p))``;
+then it might become CPU-bound, IOW
+:math:`\text{task\_util(p)} > \text{capacity(task\_cpu(p))}`;
 the CPU capacity scheduling criterion is violated, and there may not be any more
 wakeup event to fix this up via wakeup CPU selection.
 
@@ -418,9 +432,10 @@ to a CPU with more capacity than its current one.
 5.2.1 Wakeup CPU selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-RT task wakeup CPU selection searches for a CPU that satisfies::
+RT task wakeup CPU selection searches for a CPU that satisfies:
 
-  task_uclamp_min(p) <= capacity(task_cpu(cpu))
+.. math::
+  \text{task\_uclamp\_min(p)} \leq \text{capacity(task\_cpu(cpu))}
 
 while still following the usual priority constraints. If none of the candidate
 CPUs can satisfy this capacity criterion, then strict priority based scheduling
@@ -432,9 +447,10 @@ is followed and CPU capacities are ignored.
 5.3.1 Wakeup CPU selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-DL task wakeup CPU selection searches for a CPU that satisfies::
+DL task wakeup CPU selection searches for a CPU that satisfies:
 
-  task_bandwidth(p) < capacity(task_cpu(p))
+.. math::
+  \text{task\_bandwidth(p)} < \text{capacity(task\_cpu(p))}
 
 while still respecting the usual bandwidth and deadline constraints. If
 none of the candidate CPUs can satisfy this capacity criterion, then the

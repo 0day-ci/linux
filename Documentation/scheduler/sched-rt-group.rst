@@ -60,14 +60,14 @@ SCHED_OTHER.
 Let's consider an example: a frame fixed realtime renderer must deliver 25
 frames a second, which yields a period of 0.04s per frame. Now say it will also
 have to play some music and respond to input, leaving it with around 80% CPU
-time dedicated for the graphics. We can then give this group a run time of 0.8
-* 0.04s = 0.032s.
+time dedicated for the graphics. We can then give this group a run time of
+:math:`0.8 \times 0.04s = 0.032s`.
 
 This way the graphics group will have a 0.04s period with a 0.032s run time
 limit. Now if the audio thread needs to refill the DMA buffer every 0.005s, but
-needs only about 3% CPU time to do so, it can do with a 0.03 * 0.005s =
-0.00015s. So this group can be scheduled with a period of 0.005s and a run time
-of 0.00015s.
+needs only about 3% CPU time to do so, it can do with a
+:math:`0.03 \times 0.005s = 0.00015s`. So this group can be scheduled with a
+period of 0.005s and a run time of 0.00015s.
 
 The remaining CPU time will be used for user input and other tasks. Because
 realtime tasks have explicitly allocated the CPU time they need to perform
@@ -138,12 +138,14 @@ Documentation/admin-guide/cgroup-v1/cgroups.rst as well.
 Group settings are checked against the following limits in order to keep the
 configuration schedulable:
 
-   \Sum_{i} runtime_{i} / global_period <= global_runtime / global_period
+.. math::
+  \frac{\sum_{i} \text{runtime$_{i}$}}{\text{global\_period}} \leq
+  \frac{\text{global\_runtime}}{\text{global\_period}}
 
 For now, this can be simplified to just the following (but see Future plans):
 
-   \Sum_{i} runtime_{i} <= global_runtime
-
+.. math::
+  \sum_{i} \text{runtime$_{i}$} \leq \text{global\_runtime}
 
 3. Future plans
 ===============

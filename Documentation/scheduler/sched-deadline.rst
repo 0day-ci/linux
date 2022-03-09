@@ -80,11 +80,12 @@ Deadline Task Scheduling
     a "remaining runtime". These two parameters are initially set to 0;
 
   - When a SCHED_DEADLINE task wakes up (becomes ready for execution),
-    the scheduler checks if::
+    the scheduler checks if:
 
-                 remaining runtime                  runtime
-        ----------------------------------    >    ---------
-        scheduling deadline - current time           period
+    .. math::
+      \frac{\text{remaining runtime}}
+           {\text{scheduleing deadline} - \text{current time}} >
+      \frac{\text{runtime}}{\text{period}}
 
     then, if the scheduling deadline is smaller than the current time, or
     this condition is verified, the scheduling deadline and the
@@ -168,11 +169,11 @@ Deadline Task Scheduling
       breaking the real-time guarantees.
 
       The 0-lag time for a task entering the ActiveNonContending state is
-      computed as::
+      computed as:
 
-                        (runtime * dl_period)
-             deadline - ---------------------
-                             dl_runtime
+      .. math::
+        \text{deadline} -
+        \frac{\text{runtime} \times \text{dl\_period}}{\text{dl\_runtime}}
 
       where runtime is the remaining runtime, while dl_runtime and dl_period
       are the reservation parameters.
@@ -208,21 +209,24 @@ Deadline Task Scheduling
  It does so by decrementing the runtime of the executing task Ti at a pace equal
  to
 
-           dq = -max{ Ui / Umax, (1 - Uinact - Uextra) } dt
+ .. math::
+   \Delta q =
+   -max(\frac{U_i}{U_{max}}, (1 - U_{inact} - U{extra})) \cdot
+   \Delta t
 
  where:
 
-  - Ui is the bandwidth of task Ti;
-  - Umax is the maximum reclaimable utilization (subjected to RT throttling
-    limits);
-  - Uinact is the (per runqueue) inactive utilization, computed as
+  - :math:`U_i` is the bandwidth of task :math:`T_i`;
+  - :math:`U_{max}` is the maximum reclaimable utilization (subjected to RT
+    throttling limits);
+  - :math:`U_{inact}` is the (per runqueue) inactive utilization, computed as
     (this_bq - running_bw);
-  - Uextra is the (per runqueue) extra reclaimable utilization
+  - :math:`U_{extra}` is the (per runqueue) extra reclaimable utilization
     (subjected to RT throttling limits).
 
 
- Let's now see a trivial example of two deadline tasks with runtime equal
- to 4 and period equal to 8 (i.e., bandwidth equal to 0.5)::
+  Let's now see a trivial example of two deadline tasks with runtime equal
+  to 4 and period equal to 8 (i.e., bandwidth equal to 0.5)::
 
          A            Task T1
          |
@@ -254,33 +258,35 @@ Deadline Task Scheduling
          0   1   2   3   4   5   6   7   8
 
 
-  - Time t = 0:
+  - Time :math:`t = 0`:
 
     Both tasks are ready for execution and therefore in ActiveContending state.
-    Suppose Task T1 is the first task to start execution.
-    Since there are no inactive tasks, its runtime is decreased as dq = -1 dt.
+    Suppose Task :math:`T_1` is the first task to start execution.
+    Since there are no inactive tasks, its runtime is decreased as
+    :math:`\Delta q = -1 \cdot \Delta t`.
 
-  - Time t = 2:
+  - Time :math:`t = 2`:
 
-    Suppose that task T1 blocks
-    Task T1 therefore enters the ActiveNonContending state. Since its remaining
-    runtime is equal to 2, its 0-lag time is equal to t = 4.
-    Task T2 start execution, with runtime still decreased as dq = -1 dt since
-    there are no inactive tasks.
+    Suppose that task :math:`T_1` blocks
+    Task :math:`T_1` therefore enters the ActiveNonContending state. Since its
+    remaining runtime is equal to 2, its 0-lag time is equal to :math:`t = 4`.
+    Task :math:`T_2` start execution, with runtime still decreased as
+    :math:`\Delta q = -1 \cdot \Delta t` since there are no inactive tasks.
 
-  - Time t = 4:
+  - Time :math:`t = 4`:
 
-    This is the 0-lag time for Task T1. Since it didn't woken up in the
+    This is the 0-lag time for Task :math:`T_1`. Since it didn't woken up in the
     meantime, it enters the Inactive state. Its bandwidth is removed from
     running_bw.
-    Task T2 continues its execution. However, its runtime is now decreased as
-    dq = - 0.5 dt because Uinact = 0.5.
-    Task T2 therefore reclaims the bandwidth unused by Task T1.
+    Task :math:`T_2` continues its execution. However, its runtime is now
+    decreased as :math:`\Delta q = -0.5 \cdot \Delta t` because
+    :math:`U_{inact} = 0.5`. Task :math:`T_2` therefore reclaims the bandwidth
+    unused by Task :math:`T_1`.
 
-  - Time t = 8:
+  - Time :math:`t = 8`:
 
-    Task T1 wakes up. It enters the ActiveContending state again, and the
-    running_bw is incremented.
+    Task :math:`T_1` wakes up. It enters the ActiveContending state again, and
+    the running_bw is incremented.
 
 
 2.3 Energy-aware scheduling
@@ -325,140 +331,157 @@ Deadline Task Scheduling
  A typical real-time task is composed of a repetition of computation phases
  (task instances, or jobs) which are activated on a periodic or sporadic
  fashion.
- Each job J_j (where J_j is the j^th job of the task) is characterized by an
- arrival time r_j (the time when the job starts), an amount of computation
- time c_j needed to finish the job, and a job absolute deadline d_j, which
- is the time within which the job should be finished. The maximum execution
- time max{c_j} is called "Worst Case Execution Time" (WCET) for the task.
- A real-time task can be periodic with period P if r_{j+1} = r_j + P, or
- sporadic with minimum inter-arrival time P is r_{j+1} >= r_j + P. Finally,
- d_j = r_j + D, where D is the task's relative deadline.
+ Each job :math:`J_j` (where :math:`J_j` is the :math:`j^{th}` job of the task)
+ is characterized by an arrival time :math:`r_j` (the time when the job starts),
+ an amount of computation time :math:`c_j` needed to finish the job, and a job
+ absolute deadline :math:`d_j`, which is the time within which the job should be
+ finished. The maximum execution time :math:`max(c_j)` is called "Worst Case
+ Execution Time" (WCET) for the task. A real-time task can be periodic with
+ period :math:`P` if :math:`r_{j+1} = r_j + P`, or sporadic with minimum
+ inter-arrival time :math:`P` is :math:`r_{j+1} \geq r_j + P`. Finally,
+ :math:`d_j = r_j + D`, where :math:`D` is the task's relative deadline.
  Summing up, a real-time task can be described as
 
-	Task = (WCET, D, P)
+ .. math::
+   \text{Task} = (\text{WCET}, D, P)
 
  The utilization of a real-time task is defined as the ratio between its
  WCET and its period (or minimum inter-arrival time), and represents
  the fraction of CPU time needed to execute the task.
 
- If the total utilization U=sum(WCET_i/P_i) is larger than M (with M equal
- to the number of CPUs), then the scheduler is unable to respect all the
- deadlines.
+ If the total utilization :math:`U = \sum_{i} (\text{WCET}_i / P_i)` is
+ larger than :math:`M` (with :math:`M` equal to the number of CPUs), then the
+ scheduler is unable to respect all the deadlines.
  Note that total utilization is defined as the sum of the utilizations
- WCET_i/P_i over all the real-time tasks in the system. When considering
- multiple real-time tasks, the parameters of the i-th task are indicated
- with the "_i" suffix.
- Moreover, if the total utilization is larger than M, then we risk starving
- non- real-time tasks by real-time tasks.
- If, instead, the total utilization is smaller than M, then non real-time
- tasks will not be starved and the system might be able to respect all the
- deadlines.
+ :math:`(\text{WCET}_i / P_i)` over all the real-time tasks in the system.
+ When considering multiple real-time tasks, the parameters of the :math:`i^{th}`
+ task are indicated with the :math:`i` suffix.
+ Moreover, if the total utilization is larger than :math:`M`, then we risk
+ starving non-real-time tasks by real-time tasks.
+ If, instead, the total utilization is smaller than :math:`M`, then non
+ real-time tasks will not be starved and the system might be able to respect
+ all the deadlines.
  As a matter of fact, in this case it is possible to provide an upper bound
  for tardiness (defined as the maximum between 0 and the difference
  between the finishing time of a job and its absolute deadline).
  More precisely, it can be proven that using a global EDF scheduler the
  maximum tardiness of each task is smaller or equal than
 
-	((M − 1) · WCET_max − WCET_min)/(M − (M − 2) · U_max) + WCET_max
+ .. math::
+   \frac{(M - 1) \cdot \text{WCET}_{max} - \text{WCET}_{min}}
+        {M - (M - 2) \cdot U_{max}} +
+   \text{WCET}_{max}
 
- where WCET_max = max{WCET_i} is the maximum WCET, WCET_min=min{WCET_i}
- is the minimum WCET, and U_max = max{WCET_i/P_i} is the maximum
+ where :math:`\text{WCET}_{max} = max(\text{WCET}_i)` is the maximum WCET,
+ :math:`\text{WCET}_{min} = min(\text{WCET}_i)` is the minimum WCET, and
+ :math:`U_{max} = max(\text{WCET}_i / P_i)` is the maximum
  utilization[12].
 
 3.2 Schedulability Analysis for Uniprocessor Systems
 ----------------------------------------------------
 
- If M=1 (uniprocessor system), or in case of partitioned scheduling (each
- real-time task is statically assigned to one and only one CPU), it is
- possible to formally check if all the deadlines are respected.
- If D_i = P_i for all tasks, then EDF is able to respect all the deadlines
+ If :math:`M = 1` (uniprocessor system), or in case of partitioned scheduling
+ (each real-time task is statically assigned to one and only one CPU), it is
+ possible to formally check if all the deadlines are respected. If
+ :math:`D_i = P_i` for all tasks, then EDF is able to respect all the deadlines
  of all the tasks executing on a CPU if and only if the total utilization
  of the tasks running on such a CPU is smaller or equal than 1.
- If D_i != P_i for some task, then it is possible to define the density of
- a task as WCET_i/min{D_i,P_i}, and EDF is able to respect all the deadlines
- of all the tasks running on a CPU if the sum of the densities of the tasks
- running on such a CPU is smaller or equal than 1:
+ If :math:`D_i \neq P_i` for some task, then it is possible to define the
+ density of a task as :math:`(\text{WCET}_i / min(D_i,P_i))`, and EDF is
+ able to respect all the deadlines of all the tasks running on a CPU if the sum
+ of the densities of the tasks running on such a CPU is smaller or equal than 1:
 
-	sum(WCET_i / min{D_i, P_i}) <= 1
+ .. math::
+   \sum_{i} \frac{\text{WCET}_i}{min(D_i, P_i)} \leq 1
 
  It is important to notice that this condition is only sufficient, and not
  necessary: there are task sets that are schedulable, but do not respect the
- condition. For example, consider the task set {Task_1,Task_2} composed by
- Task_1=(50ms,50ms,100ms) and Task_2=(10ms,100ms,100ms).
- EDF is clearly able to schedule the two tasks without missing any deadline
- (Task_1 is scheduled as soon as it is released, and finishes just in time
- to respect its deadline; Task_2 is scheduled immediately after Task_1, hence
- its response time cannot be larger than 50ms + 10ms = 60ms) even if
+ condition. For example, consider the task set
+ :math:`\{\text{Task}_1, \text{Task}_2\}` composed by
+ :math:`\text{Task}_1 = (50ms, 50ms, 100ms)` and
+ :math:`\text{Task}_2 = (10ms, 100ms, 100ms)`. EDF is clearly able to schedule
+ the two tasks without missing any deadline (:math:`\text{Task}_1` is scheduled
+ as soon as it is released, and finishes just in time to respect its deadline;
+ :math:`\text{Task}_2` is scheduled immediately after :math:`\text{Task}_1`,
+ hence its response time cannot be larger than :math:`50ms + 10ms = 60ms`) even
+ if
 
-	50 / min{50,100} + 10 / min{100, 100} = 50 / 50 + 10 / 100 = 1.1
+ .. math::
+   \frac{50}{min(50, 100)} + \frac{10}{min(100, 100)} =
+   \frac{50}{50} + \frac{10}{100} = 1.1
 
  Of course it is possible to test the exact schedulability of tasks with
- D_i != P_i (checking a condition that is both sufficient and necessary),
- but this cannot be done by comparing the total utilization or density with
- a constant. Instead, the so called "processor demand" approach can be used,
- computing the total amount of CPU time h(t) needed by all the tasks to
- respect all of their deadlines in a time interval of size t, and comparing
- such a time with the interval size t. If h(t) is smaller than t (that is,
- the amount of time needed by the tasks in a time interval of size t is
- smaller than the size of the interval) for all the possible values of t, then
- EDF is able to schedule the tasks respecting all of their deadlines. Since
- performing this check for all possible values of t is impossible, it has been
- proven[4,5,6] that it is sufficient to perform the test for values of t
- between 0 and a maximum value L. The cited papers contain all of the
- mathematical details and explain how to compute h(t) and L.
- In any case, this kind of analysis is too complex as well as too
- time-consuming to be performed on-line. Hence, as explained in Section
- 4 Linux uses an admission test based on the tasks' utilizations.
+ :math:`D_i \neq P_i` (checking a condition that is both sufficient and
+ necessary), but this cannot be done by comparing the total utilization or
+ density with a constant. Instead, the so called "processor demand" approach can
+ be used, computing the total amount of CPU time :math:`h(t)` needed by all the
+ tasks to respect all of their deadlines in a time interval of size :math:`t`,
+ and comparing such a time with the interval size :math:`t`. If :math:`h(t)` is
+ smaller than :math:`t` (that is, the amount of time needed by the tasks in a
+ time interval of size :math:`t` is smaller than the size of the interval) for
+ all the possible values of :math:`t`, then EDF is able to schedule the tasks
+ respecting all of their deadlines. Since performing this check for all possible
+ values of t is impossible, it has been proven[4,5,6] that it is sufficient to
+ perform the test for values of :math:`t` between 0 and a maximum value
+ :math:`L`. The cited papers contain all of the mathematical details and explain
+ how to compute :math:`h(t)` and :math:`L`. In any case, this kind of analysis
+ is too complex as well as too time-consuming to be performed on-line. Hence, as
+ explained in Section 4 Linux uses an admission test based on the tasks'
+ utilizations.
 
 3.3 Schedulability Analysis for Multiprocessor Systems
 ------------------------------------------------------
 
- On multiprocessor systems with global EDF scheduling (non partitioned
- systems), a sufficient test for schedulability can not be based on the
- utilizations or densities: it can be shown that even if D_i = P_i task
- sets with utilizations slightly larger than 1 can miss deadlines regardless
- of the number of CPUs.
+ On multiprocessor systems with global EDF scheduling (non partitioned systems),
+ a sufficient test for schedulability can not be based on the utilizations or
+ densities: it can be shown that even if :math:`D_i = P_i` task sets with
+ utilizations slightly larger than 1 can miss deadlines regardless of the number
+ of CPUs.
 
- Consider a set {Task_1,...Task_{M+1}} of M+1 tasks on a system with M
- CPUs, with the first task Task_1=(P,P,P) having period, relative deadline
- and WCET equal to P. The remaining M tasks Task_i=(e,P-1,P-1) have an
- arbitrarily small worst case execution time (indicated as "e" here) and a
- period smaller than the one of the first task. Hence, if all the tasks
- activate at the same time t, global EDF schedules these M tasks first
- (because their absolute deadlines are equal to t + P - 1, hence they are
- smaller than the absolute deadline of Task_1, which is t + P). As a
- result, Task_1 can be scheduled only at time t + e, and will finish at
- time t + e + P, after its absolute deadline. The total utilization of the
- task set is U = M · e / (P - 1) + P / P = M · e / (P - 1) + 1, and for small
- values of e this can become very close to 1. This is known as "Dhall's
- effect"[7]. Note: the example in the original paper by Dhall has been
+ Consider a set :math:`\{\text{Task}_1, ...\text{Task}_{M+1}\}` of :math:`M + 1`
+ tasks on a system with :math:`M` CPUs, with the first task
+ :math:`\text{Task}_1 = (P, P, P)` having period, relative deadline and
+ :math:`\text{WCET}` equal to :math:`P`. The remaining :math:`M` tasks
+ :math:`\text{Task}_i = (e, P - 1, P - 1)` have an arbitrarily small worst case
+ execution time (indicated as "e" here) and a period smaller than the one of the
+ first task. Hence, if all the tasks activate at the same time :math:`t`, global
+ EDF schedules these :math:`M` tasks first (because their absolute deadlines are
+ equal to :math:`t + P - 1`, hence they are smaller than the absolute deadline
+ of :math:`\text{Task}_1`, which is :math:`t + P`). As a result,
+ :math:`\text{Task}_1` can be scheduled only at time :math:`t + e`, and will
+ finish at time :math:`t + e + P`, after its absolute deadline. The total
+ utilization of the task set is
+ :math:`U = M \times \frac{e}{P - 1} + \frac{P}{P} = M \times \frac{e}{P - 1} + 1`,
+ and for small values of e this can become very close to 1. This is known as
+ "Dhall's effect"[7]. Note: the example in the original paper by Dhall has been
  slightly simplified here (for example, Dhall more correctly computed
- lim_{e->0}U).
+ :math:`\lim_{e\to0} U`).
 
  More complex schedulability tests for global EDF have been developed in
  real-time literature[8,9], but they are not based on a simple comparison
  between total utilization (or density) and a fixed constant. If all tasks
- have D_i = P_i, a sufficient schedulability condition can be expressed in
- a simple way:
+ have :math:`D_i = P_i`, a sufficient schedulability condition can be expressed
+ in a simple way:
 
-	sum(WCET_i / P_i) <= M - (M - 1) · U_max
+ .. math::
+	\sum_{i} \frac{\text{WCET}_i}{P_i} \leq M - (M - 1) \times U_{max}
 
- where U_max = max{WCET_i / P_i}[10]. Notice that for U_max = 1,
- M - (M - 1) · U_max becomes M - M + 1 = 1 and this schedulability condition
- just confirms the Dhall's effect. A more complete survey of the literature
- about schedulability tests for multi-processor real-time scheduling can be
- found in [11].
+ where :math:`U_{max} = max(\text{WCET}_i / P_i)`[10]. Notice that for
+ :math:`U_{max} = 1`, :math:`M - (M - 1) \times U_{max}` becomes
+ :math:`M - M + 1 = 1` and this schedulability condition just confirms the
+ Dhall's effect. A more complete survey of the literature about schedulability
+ tests for multi-processor real-time scheduling can be found in [11].
 
- As seen, enforcing that the total utilization is smaller than M does not
- guarantee that global EDF schedules the tasks without missing any deadline
+ As seen, enforcing that the total utilization is smaller than :math:`M` does
+ not guarantee that global EDF schedules the tasks without missing any deadline
  (in other words, global EDF is not an optimal scheduling algorithm). However,
- a total utilization smaller than M is enough to guarantee that non real-time
- tasks are not starved and that the tardiness of real-time tasks has an upper
- bound[12] (as previously noted). Different bounds on the maximum tardiness
- experienced by real-time tasks have been developed in various papers[13,14],
- but the theoretical result that is important for SCHED_DEADLINE is that if
- the total utilization is smaller or equal than M then the response times of
- the tasks are limited.
+ a total utilization smaller than :math:`M` is enough to guarantee that non
+ real-time tasks are not starved and that the tardiness of real-time tasks has
+ an upper bound[12] (as previously noted). Different bounds on the maximum
+ tardiness experienced by real-time tasks have been developed in various
+ papers[13,14], but the theoretical result that is important for SCHED_DEADLINE
+ is that if the total utilization is smaller or equal than :math:`M` then the
+ response times of the tasks are limited.
 
 3.4 Relationship with SCHED_DEADLINE Parameters
 -----------------------------------------------
@@ -467,24 +490,26 @@ Deadline Task Scheduling
  SCHED_DEADLINE scheduling parameters described in Section 2 (runtime,
  deadline and period) and the real-time task parameters (WCET, D, P)
  described in this section. Note that the tasks' temporal constraints are
- represented by its absolute deadlines d_j = r_j + D described above, while
- SCHED_DEADLINE schedules the tasks according to scheduling deadlines (see
+ represented by its absolute deadlines :math:`d_j = r_j + D` described above,
+ while SCHED_DEADLINE schedules the tasks according to scheduling deadlines (see
  Section 2).
  If an admission test is used to guarantee that the scheduling deadlines
  are respected, then SCHED_DEADLINE can be used to schedule real-time tasks
  guaranteeing that all the jobs' deadlines of a task are respected.
  In order to do this, a task must be scheduled by setting:
 
-  - runtime >= WCET
-  - deadline = D
-  - period <= P
+  - :math:`\text{runtime} \geq \text{WCET}`
+  - :math:`\text{deadline} = D`
+  - :math:`\text{period} \leq P`
 
- IOW, if runtime >= WCET and if period is <= P, then the scheduling deadlines
- and the absolute deadlines (d_j) coincide, so a proper admission control
- allows to respect the jobs' absolute deadlines for this task (this is what is
- called "hard schedulability property" and is an extension of Lemma 1 of [2]).
- Notice that if runtime > deadline the admission control will surely reject
- this task, as it is not possible to respect its temporal constraints.
+ IOW, if :math:`\text{runtime} \geq \text{WCET}` and if
+ :math:`\text{period} \leq P`, then the scheduling deadlines and the absolute
+ deadlines (:math:`d_j`) coincide, so a proper admission control allows to
+ respect the jobs' absolute deadlines for this task (this is what is called
+ "hard schedulability property" and is an extension of Lemma 1 of [2]).
+ Notice that if :math:`\text{runtime} > \text{deadline}` the admission control
+ will surely reject this task, as it is not possible to respect its temporal
+ constraints.
 
  References:
 
@@ -557,11 +582,11 @@ Deadline Task Scheduling
 
  As already stated in Section 3, a necessary condition to be respected to
  correctly schedule a set of real-time tasks is that the total utilization
- is smaller than M. When talking about -deadline tasks, this requires that
- the sum of the ratio between runtime and period for all tasks is smaller
- than M. Notice that the ratio runtime/period is equivalent to the utilization
- of a "traditional" real-time task, and is also often referred to as
- "bandwidth".
+ is smaller than :math:`M`. When talking about -deadline tasks, this requires
+ that the sum of the ratio between runtime and period for all tasks is smaller
+ than :math:`M`. Notice that the ratio runtime/period is equivalent to the
+ utilization of a "traditional" real-time task, and is also often referred to
+ as "bandwidth".
  The interface used to control the CPU bandwidth that can be allocated
  to -deadline tasks is similar to the one already used for -rt
  tasks with real-time group scheduling (a.k.a. RT-throttling - see
@@ -581,7 +606,7 @@ Deadline Task Scheduling
  parameters, so that CPU bandwidth is allocated to SCHED_DEADLINE tasks
  respecting their needs in terms of granularity. Therefore, using this simple
  interface we can put a cap on total utilization of -deadline tasks (i.e.,
- \Sum (runtime_i / period_i) < global_dl_utilization_cap).
+ :math:`\sum_{i} (\text{runtime}_i / \text{period}_i) < \text{global\_dl\_utilization\_cap}`).
 
 4.1 System wide settings
 ------------------------
@@ -595,10 +620,13 @@ Deadline Task Scheduling
  run -rt tasks from a -deadline server; in which case the -rt bandwidth is a
  direct subset of dl_bw.
 
- This means that, for a root_domain comprising M CPUs, -deadline tasks
+ This means that, for a root_domain comprising :math:`M` CPUs, -deadline tasks
  can be created while the sum of their bandwidths stays below:
 
-   M * (sched_rt_runtime_us / sched_rt_period_us)
+ .. math::
+   M \times
+   \frac{\text{sched\_rt\_runtime\_us}}
+        {\text{sched\_rt\_period\_us}}
 
  It is also possible to disable this bandwidth management logic, and
  be thus free of oversubscribing the system up to any arbitrary level.
