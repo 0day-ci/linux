@@ -33,6 +33,12 @@ enum dw_edma_map_format {
 	EDMA_MF_HDMA_COMPAT = 0x5
 };
 
+/* Probe EDMA engine locally and prevent generate MSI to host side*/
+#define DW_EDMA_CHIP_LOCAL	BIT(0)
+
+/* Only support 32bit DBI register access */
+#define DW_EDMA_CHIP_32BIT_DBI	BIT(1)
+
 /**
  * struct dw_edma_chip - representation of DesignWare eDMA controller hardware
  * @dev:		 struct device of the eDMA controller
@@ -40,6 +46,8 @@ enum dw_edma_map_format {
  * @nr_irqs:		 total dma irq number
  * @ops			 DMA channel to IRQ number mapping
  * @reg_base		 DMA register base address
+ * @flags		   - DW_EDMA_CHIP_LOCAL
+ *			   - DW_EDMA_CHIP_32BIT_DBI
  * @ll_wr_cnt		 DMA write link list number
  * @ll_rd_cnt		 DMA read link list number
  * @rg_region		 DMA register region
@@ -53,6 +61,7 @@ struct dw_edma_chip {
 	int			id;
 	int			nr_irqs;
 	const struct dw_edma_core_ops   *ops;
+	u32			flags;
 
 	void __iomem		*reg_base;
 
