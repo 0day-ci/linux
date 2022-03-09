@@ -296,9 +296,22 @@ static const char *shell_test__description(char *description, size_t size,
 
 #define for_each_shell_test(entlist, nr, base, ent)	                \
 	for (int __i = 0; __i < nr && (ent = entlist[__i]); __i++)	\
-		if (!is_directory(base, ent) && \
+		if (ent->d_name[0] != '.' && \
+			!is_directory(base, ent) && \
 			is_executable_file(base, ent) && \
-			ent->d_name[0] != '.')
+			is_shell_script(ent->d_name))
+
+static bool is_shell_script(const char *file)
+{
+	const char *ext;
+
+	ext = strrchr(file, '.');
+	if (!ext)
+		return false;
+	if (!strcmp(ext, ".sh"))
+		return true;
+	return false;
+}
 
 static const char *shell_tests__dir(char *path, size_t size)
 {
