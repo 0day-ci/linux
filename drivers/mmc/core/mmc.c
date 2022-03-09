@@ -357,6 +357,25 @@ static void mmc_manage_gp_partitions(struct mmc_card *card, u8 *ext_csd)
 #define MMC_MIN_PART_SWITCH_TIME	300
 
 /*
+ * Update extended CSD parameters changing during runtime.
+ */
+static int mmc_update_ext_csd_runtime_params(struct mmc_card *card, u8 *ext_csd)
+{
+	int err = 0;
+
+	/* eMMC v5 or later */
+	if (card->ext_csd.rev >= 7) {
+		card->ext_csd.pre_eol_info = ext_csd[EXT_CSD_PRE_EOL_INFO];
+		card->ext_csd.device_life_time_est_typ_a =
+			ext_csd[EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A];
+		card->ext_csd.device_life_time_est_typ_b =
+			ext_csd[EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B];
+	}
+
+	return err;
+}
+
+/*
  * Decode extended CSD.
  */
 static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
@@ -365,6 +384,16 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	u64 part_size;
 	struct device_node *np;
 	bool broken_hpi = false;
+
+	/*
+	 * After once having initialized the ext_csd structure, we want to
+	 * update only the changing parts. To check this the revistion is
+	 * taken.
+	 */
+	if (card->ext_csd.rev != 0) {
+		err = mmc_update_ext_csd_runtime_params(card, ext_csd);
+		goto out;
+	}
 
 	/* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
 	card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
@@ -790,10 +819,6 @@ MMC_DEV_ATTR(name, "%s\n", card->cid.prod_name);
 MMC_DEV_ATTR(oemid, "0x%04x\n", card->cid.oemid);
 MMC_DEV_ATTR(prv, "0x%x\n", card->cid.prv);
 MMC_DEV_ATTR(rev, "0x%x\n", card->ext_csd.rev);
-MMC_DEV_ATTR(pre_eol_info, "0x%02x\n", card->ext_csd.pre_eol_info);
-MMC_DEV_ATTR(life_time, "0x%02x 0x%02x\n",
-	card->ext_csd.device_life_time_est_typ_a,
-	card->ext_csd.device_life_time_est_typ_b);
 MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
 MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
@@ -805,6 +830,60 @@ MMC_DEV_ATTR(rel_sectors, "%#x\n", card->ext_csd.rel_sectors);
 MMC_DEV_ATTR(ocr, "0x%08x\n", card->ocr);
 MMC_DEV_ATTR(rca, "0x%04x\n", card->rca);
 MMC_DEV_ATTR(cmdq_en, "%d\n", card->ext_csd.cmdq_en);
+
+static int mmc_update_csd(struct mmc_card *card)
+{
+	int err = 0;
+
+	mmc_claim_host(card->host);
+	err = mmc_read_ext_csd(card);
+	mmc_release_host(card->host);
+	return err;
+}
+
+static ssize_t life_time_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	int err = 0;
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	/* before eMMC v5 */
+	if (card->ext_csd.rev < 7)
+		return sprintf(buf, "%s\n", "-");
+
+	/* eMMC v5 or later */
+	err = mmc_update_csd(card);
+	if (err)
+		return (ssize_t)err;
+
+	return sprintf(buf, "0x%02x 0x%02x\n",
+				card->ext_csd.device_life_time_est_typ_a,
+				card->ext_csd.device_life_time_est_typ_b);
+}
+
+static DEVICE_ATTR_RO(life_time);
+
+static ssize_t pre_eol_info_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	int err = 0;
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	/* before eMMC v5 */
+	if (card->ext_csd.rev < 7)
+		return sprintf(buf, "%s\n", "-");
+
+	/* eMMC v5 or later */
+	err = mmc_update_csd(card);
+	if (err)
+		return (ssize_t)err;
+
+	return sprintf(buf, "0x%02x\n", card->ext_csd.pre_eol_info);
+}
+
+static DEVICE_ATTR_RO(pre_eol_info);
 
 static ssize_t mmc_fwrev_show(struct device *dev,
 			      struct device_attribute *attr,
