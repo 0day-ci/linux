@@ -1175,8 +1175,6 @@
 			clocks = <&gcc USB30_0_UTMI_CLK>;
 			clock-names = "ref";
 			#phy-cells = <0>;
-
-			status = "disabled";
 		};
 
 		ss_phy_0: phy@100f8830 {
@@ -1185,8 +1183,6 @@
 			clocks = <&gcc USB30_0_MASTER_CLK>;
 			clock-names = "ref";
 			#phy-cells = <0>;
-
-			status = "disabled";
 		};
 
 		usb3_0: usb3@100f8800 {
