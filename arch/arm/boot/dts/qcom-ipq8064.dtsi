@@ -30,6 +30,16 @@
 			next-level-cache = <&L2>;
 			qcom,acc = <&acc0>;
 			qcom,saw = <&saw0>;
+			clocks = <&kraitcc 0>, <&kraitcc 4>;
+			clock-names = "cpu", "l2";
+			clock-latency = <100000>;
+			cpu-supply = <&smb208_s2a>;
+			operating-points-v2 = <&opp_table0>;
+			voltage-tolerance = <5>;
+			cooling-min-state = <0>;
+			cooling-max-state = <10>;
+			#cooling-cells = <2>;
+			cpu-idle-states = <&CPU_SPC>;
 		};
 
 		cpu1: cpu@1 {
@@ -40,11 +50,37 @@
 			next-level-cache = <&L2>;
 			qcom,acc = <&acc1>;
 			qcom,saw = <&saw1>;
+			clocks = <&kraitcc 1>, <&kraitcc 4>;
+			clock-names = "cpu", "l2";
+			clock-latency = <100000>;
+			cpu-supply = <&smb208_s2b>;
+			operating-points-v2 = <&opp_table0>;
+			voltage-tolerance = <5>;
+			cooling-min-state = <0>;
+			cooling-max-state = <10>;
+			#cooling-cells = <2>;
+			cpu-idle-states = <&CPU_SPC>;
+		};
+
+		idle-states {
+			CPU_SPC: spc {
+				compatible = "qcom,idle-state-spc";
+				status = "disabled";
+				entry-latency-us = <400>;
+				exit-latency-us = <900>;
+				min-residency-us = <3000>;
+			};
 		};
 
 		L2: l2-cache {
 			compatible = "cache";
 			cache-level = <2>;
+			qcom,saw = <&saw_l2>;
+
+			clocks = <&kraitcc 4>;
+			clock-names = "l2";
+			l2-supply = <&smb208_s1a>;
+			operating-points-v2 = <&opp_table_l2>;
 		};
 	};
 
