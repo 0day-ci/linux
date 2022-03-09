@@ -81,8 +81,9 @@ static void build_check_abi(void)
 	 * struct size.
 	 */
 	ruleset_size = sizeof(ruleset_attr.handled_access_fs);
+	ruleset_size += sizeof(ruleset_attr.handled_access_net);
 	BUILD_BUG_ON(sizeof(ruleset_attr) != ruleset_size);
-	BUILD_BUG_ON(sizeof(ruleset_attr) != 8);
+	BUILD_BUG_ON(sizeof(ruleset_attr) != 16);
 
 	path_beneath_size = sizeof(path_beneath_attr.allowed_access);
 	path_beneath_size += sizeof(path_beneath_attr.parent_fd);
@@ -184,7 +185,7 @@ SYSCALL_DEFINE3(landlock_create_ruleset,
 
 	/* Checks content (and 32-bits cast). */
 	if ((ruleset_attr.handled_access_fs | LANDLOCK_MASK_ACCESS_FS) !=
-			LANDLOCK_MASK_ACCESS_FS)
+			 LANDLOCK_MASK_ACCESS_FS)
 		return -EINVAL;
 	access_mask_set.fs = ruleset_attr.handled_access_fs;
 
