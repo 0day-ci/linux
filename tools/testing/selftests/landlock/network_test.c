@@ -457,4 +457,157 @@ TEST_F_FORK(socket, ruleset_overlap) {
 	ASSERT_EQ(0, close(sockfd));
 }
 
+TEST_F_FORK(socket, ruleset_expanding) {
+
+	int sockfd_1, sockfd_2;
+
+	struct landlock_ruleset_attr ruleset_attr_1 = {
+		.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP,
+	};
+	struct landlock_net_service_attr net_service_1 = {
+		.allowed_access = LANDLOCK_ACCESS_NET_BIND_TCP,
+
+		.port = port[0],
+	};
+
+	const int ruleset_fd_1 = landlock_create_ruleset(&ruleset_attr_1,
+					sizeof(ruleset_attr_1), 0);
+	ASSERT_LE(0, ruleset_fd_1);
+
+	/* Adds rule to port[0] socket */
+	ASSERT_EQ(0, landlock_add_rule(ruleset_fd_1, LANDLOCK_RULE_NET_SERVICE,
+				       &net_service_1, 0));
+
+	/* Enforces the ruleset. */
+	enforce_ruleset(_metadata, ruleset_fd_1);
+	ASSERT_EQ(0, close(ruleset_fd_1));
+
+	/* Creates a socket 1 */
+	sockfd_1 = create_socket(_metadata);
+	ASSERT_LE(0, sockfd_1);
+
+	/* Binds the socket 1 to address with port[0] */
+	ASSERT_EQ(0, bind(sockfd_1, (struct sockaddr *)&addr[0], sizeof(addr[0])));
+
+	/* Makes connection to socket 1 with port[0] */
+	ASSERT_EQ(0, connect(sockfd_1, (struct sockaddr *)&addr[0],
+						   sizeof(addr[0])));
+
+	/* Closes socket 1 */
+	ASSERT_EQ(0, close(sockfd_1));
+
+	/* Creates a socket 2 */
+	sockfd_2 = create_socket(_metadata);
+	ASSERT_LE(0, sockfd_2);
+
+	/*
+	 * Forbids to bind the socket 2 to address with port[1],
+	 * cause there is no rule with bind() access for port[1].
+	 */
+	ASSERT_EQ(-1, bind(sockfd_2, (struct sockaddr *)&addr[1], sizeof(addr[1])));
+	ASSERT_EQ(EACCES, errno);
+
+	/* Expands network mask */
+	struct landlock_ruleset_attr ruleset_attr_2 = {
+		.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP |
+				      LANDLOCK_ACCESS_NET_CONNECT_TCP,
+	};
+
+	/* Adds connect() access to port[0] */
+	struct landlock_net_service_attr net_service_2 = {
+		.allowed_access = LANDLOCK_ACCESS_NET_BIND_TCP |
+				  LANDLOCK_ACCESS_NET_CONNECT_TCP,
+
+		.port = port[0],
+	};
+	/* Adds bind() access to port[1] */
+	struct landlock_net_service_attr net_service_3 = {
+		.allowed_access = LANDLOCK_ACCESS_NET_BIND_TCP,
+
+		.port = port[1],
+	};
+
+	const int ruleset_fd_2 = landlock_create_ruleset(&ruleset_attr_2,
+					sizeof(ruleset_attr_2), 0);
+	ASSERT_LE(0, ruleset_fd_2);
+
+	/* Adds rule to port[0] socket */
+	ASSERT_EQ(0, landlock_add_rule(ruleset_fd_2, LANDLOCK_RULE_NET_SERVICE,
+				       &net_service_2, 0));
+	/* Adds rule to port[1] socket */
+	ASSERT_EQ(0, landlock_add_rule(ruleset_fd_2, LANDLOCK_RULE_NET_SERVICE,
+				       &net_service_3, 0));
+
+	/* Enforces the ruleset. */
+	enforce_ruleset(_metadata, ruleset_fd_2);
+	ASSERT_EQ(0, close(ruleset_fd_2));
+
+	/* Creates a socket 1 */
+	sockfd_1 = create_socket(_metadata);
+	ASSERT_LE(0, sockfd_1);
+
+	/* Binds the socket 1 to address with port[0] */
+	ASSERT_EQ(0, bind(sockfd_1, (struct sockaddr *)&addr[0], sizeof(addr[0])));
+
+	/* Makes connection to socket 1 with port[0] */
+	ASSERT_EQ(0, connect(sockfd_1, (struct sockaddr *)&addr[0],
+						   sizeof(addr[0])));
+	/* Closes socket 1 */
+	ASSERT_EQ(0, close(sockfd_1));
+
+	/* Creates a socket 2 */
+	sockfd_2 = create_socket(_metadata);
+	ASSERT_LE(0, sockfd_2);
+
+	/*
+	 * Forbids to bind the socket 2 to address with port[1],
+	 * cause just one layer has bind() access rule.
+	 */
+	ASSERT_EQ(-1, bind(sockfd_2, (struct sockaddr *)&addr[1], sizeof(addr[1])));
+	ASSERT_EQ(EACCES, errno);
+
+	/* Expands network mask */
+	struct landlock_ruleset_attr ruleset_attr_3 = {
+		.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP |
+				      LANDLOCK_ACCESS_NET_CONNECT_TCP,
+	};
+
+	/* Restricts connect() access to port[0] */
+	struct landlock_net_service_attr net_service_4 = {
+		.allowed_access = LANDLOCK_ACCESS_NET_BIND_TCP,
+
+		.port = port[0],
+	};
+
+	const int ruleset_fd_3 = landlock_create_ruleset(&ruleset_attr_3,
+					sizeof(ruleset_attr_3), 0);
+	ASSERT_LE(0, ruleset_fd_3);
+
+	/* Adds rule to port[0] socket */
+	ASSERT_EQ(0, landlock_add_rule(ruleset_fd_3, LANDLOCK_RULE_NET_SERVICE,
+				       &net_service_4, 0));
+
+	/* Enforces the ruleset. */
+	enforce_ruleset(_metadata, ruleset_fd_3);
+	ASSERT_EQ(0, close(ruleset_fd_3));
+
+	/* Creates a socket 1 */
+	sockfd_1 = create_socket(_metadata);
+	ASSERT_LE(0, sockfd_1);
+
+	/* Binds the socket 1 to address with port[0] */
+	ASSERT_EQ(0, bind(sockfd_1, (struct sockaddr *)&addr[0], sizeof(addr[0])));
+
+	/*
+	 * Forbids to bind the socket 1 to address with port[0],
+	 * cause just one layer has connect() access rule.
+	 */
+	ASSERT_EQ(-1, connect(sockfd_1, (struct sockaddr *)&addr[0],
+						   sizeof(addr[0])));
+	ASSERT_EQ(EACCES, errno);
+
+	/* Closes socket 1 */
+	ASSERT_EQ(0, close(sockfd_1));
+}
+
 TEST_HARNESS_MAIN
