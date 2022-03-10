@@ -31,6 +31,7 @@
 
 /* Values from the kernel */
 #define CHECK_DEFAULTS		"0"
+#define RUN_SINGLE		"1"
 #define RUN_CRASH_TEST		"9"
 
 time_t g_start_time;
@@ -53,6 +54,7 @@ static int do_simple_test(const char *debugfs_str);
  */
 enum {
 	TEST_DEFAULTS = 0,
+	TEST_SINGLE,
 	MAX_TESTS,
 } tests;
 
@@ -64,7 +66,8 @@ struct test_item {
 	const char *debugfs_str;
 	int (*test_fn)(const char *debugfs_str);
 } test_list[] = {
-	{ "check_defaults", CHECK_DEFAULTS, do_simple_test }
+	{ "check_defaults", CHECK_DEFAULTS, do_simple_test },
+	{ "single", RUN_SINGLE, do_simple_test }
 };
 
 static char *get_test_name(int test_num)
