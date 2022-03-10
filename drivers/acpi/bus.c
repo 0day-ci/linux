@@ -329,14 +329,29 @@ static void acpi_bus_osc_negotiate_platform_control(void)
 	if (ACPI_FAILURE(acpi_get_handle(NULL, "\\_SB", &handle)))
 		return;
 
-	if (ACPI_FAILURE(acpi_run_osc(handle, &context)))
-		return;
 
-	kfree(context.ret.pointer);
+	do {
+		if (ACPI_FAILURE(acpi_run_osc(handle, &context)))
+			return;
+		capbuf_ret = context.ret.pointer;
+		if (capbuf[OSC_SUPPORT_DWORD] == capbuf_ret[OSC_SUPPORT_DWORD])
+			capbuf[OSC_QUERY_DWORD] = 0;
+		capbuf[OSC_SUPPORT_DWORD] = capbuf_ret[OSC_SUPPORT_DWORD];
+		kfree(context.ret.pointer);
+	} while (capbuf[OSC_QUERY_DWORD] && capbuf[OSC_SUPPORT_DWORD]);
+
+	/*
+	 * Avoid problems with BIOS dynamically loading tables by indicating
+	 * support for CPPC even if it was masked.
+	 */
+#ifdef CONFIG_X86
+	if (boot_cpu_has(X86_FEATURE_HWP)) {
+		capbuf[OSC_SUPPORT_DWORD] |= OSC_SB_CPC_SUPPORT;
+		capbuf[OSC_SUPPORT_DWORD] |= OSC_SB_CPCV2_SUPPORT;
+	}
+#endif
 
 	/* Now run _OSC again with query flag clear */
-	capbuf[OSC_QUERY_DWORD] = 0;
-
 	if (ACPI_FAILURE(acpi_run_osc(handle, &context)))
 		return;
 
