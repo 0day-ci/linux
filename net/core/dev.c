@@ -10468,6 +10468,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	dev->gso_max_segs = GSO_MAX_SEGS;
 	dev->gro_max_size = GRO_MAX_SIZE;
 	dev->tso_ipv6_max_size = GSO_MAX_SIZE;
+	dev->gso_ipv6_max_size = GSO_MAX_SIZE;
 
 	dev->upper_level = 1;
 	dev->lower_level = 1;
