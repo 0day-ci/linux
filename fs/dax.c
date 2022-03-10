@@ -728,7 +728,9 @@ static int copy_cow_page_dax(struct vm_fault *vmf, const struct iomap_iter *iter
 		return rc;
 	}
 	vto = kmap_atomic(vmf->cow_page);
+	dax_set_readwrite(iter->iomap.dax_dev);
 	copy_user_page(vto, kaddr, vmf->address, vmf->cow_page);
+	dax_set_noaccess(iter->iomap.dax_dev);
 	kunmap_atomic(vto);
 	dax_read_unlock(id);
 	return 0;
@@ -937,8 +939,10 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
 	count = 1UL << dax_entry_order(entry);
 	index = xas->xa_index & ~(count - 1);
 
+	dax_set_readwrite(dax_dev);
 	dax_entry_mkclean(mapping, index, pfn);
 	dax_flush(dax_dev, page_address(pfn_to_page(pfn)), count * PAGE_SIZE);
+	dax_set_noaccess(dax_dev);
 	/*
 	 * After we have flushed the cache, we can clear the dirty tag. There
 	 * cannot be new dirty data in the pfn after the flush has completed as
@@ -1125,8 +1129,10 @@ static int dax_memzero(struct dax_device *dax_dev, pgoff_t pgoff,
 
 	ret = dax_direct_access(dax_dev, pgoff, 1, &kaddr, NULL);
 	if (ret > 0) {
+		dax_set_readwrite(dax_dev);
 		memset(kaddr + offset, 0, size);
 		dax_flush(dax_dev, kaddr + offset, size);
+		dax_set_noaccess(dax_dev);
 	}
 	return ret;
 }
@@ -1260,12 +1266,14 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 		if (map_len > end - pos)
 			map_len = end - pos;
 
+		dax_set_readwrite(dax_dev);
 		if (iov_iter_rw(iter) == WRITE)
 			xfer = dax_copy_from_iter(dax_dev, pgoff, kaddr,
 					map_len, iter);
 		else
 			xfer = dax_copy_to_iter(dax_dev, pgoff, kaddr,
 					map_len, iter);
+		dax_set_noaccess(dax_dev);
 
 		pos += xfer;
 		length -= xfer;

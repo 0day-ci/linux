@@ -297,7 +297,13 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 		r = -EOPNOTSUPP;
 		goto err2;
 	}
-	if (da != p) {
+
+	/*
+	 * Force the write cache to map the pages directly if the dax device
+	 * mapping is protected or if the number of pages returned was not what
+	 * was requested.
+	 */
+	if (dax_map_protected(wc->ssd_dev->dax_dev) || da != p) {
 		long i;
 		wc->memory_map = NULL;
 		pages = kvmalloc_array(p, sizeof(struct page *), GFP_KERNEL);

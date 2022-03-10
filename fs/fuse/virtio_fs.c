@@ -774,8 +774,10 @@ static int virtio_fs_zero_page_range(struct dax_device *dax_dev,
 	rc = dax_direct_access(dax_dev, pgoff, nr_pages, &kaddr, NULL);
 	if (rc < 0)
 		return rc;
+	dax_set_readwrite(dax_dev);
 	memset(kaddr, 0, nr_pages << PAGE_SHIFT);
 	dax_flush(dax_dev, kaddr, nr_pages << PAGE_SHIFT);
+	dax_set_noaccess(dax_dev);
 	return 0;
 }
 
