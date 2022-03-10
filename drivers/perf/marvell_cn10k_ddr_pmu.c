@@ -709,13 +709,11 @@ static int cn10k_ddr_perf_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_OF
 static const struct of_device_id cn10k_ddr_pmu_of_match[] = {
 	{ .compatible = "marvell,cn10k-ddr-pmu", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, cn10k_ddr_pmu_of_match);
-#endif
 
 static struct platform_driver cn10k_ddr_pmu_driver = {
 	.driver	= {
