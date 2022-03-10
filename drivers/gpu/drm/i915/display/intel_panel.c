@@ -49,14 +49,30 @@ const struct drm_display_mode *
 intel_panel_fixed_mode(struct intel_connector *connector,
 		       const struct drm_display_mode *mode)
 {
-	return connector->panel.fixed_mode;
+	const struct drm_display_mode *fixed_mode = connector->panel.fixed_mode;
+	const struct drm_display_mode *downclock_mode = connector->panel.downclock_mode;
+
+	/* pick the one that is closer in terms of vrefresh */
+	/* FIXME make this a a list of modes so we can have more than two */
+	if (fixed_mode && downclock_mode &&
+	    abs(drm_mode_vrefresh(downclock_mode) - drm_mode_vrefresh(mode)) <
+	    abs(drm_mode_vrefresh(fixed_mode) - drm_mode_vrefresh(mode)))
+		return downclock_mode;
+	else
+		return fixed_mode;
 }
 
 const struct drm_display_mode *
 intel_panel_downclock_mode(struct intel_connector *connector,
 			   const struct drm_display_mode *fixed_mode)
 {
-	return connector->panel.downclock_mode;
+	const struct drm_display_mode *downclock_mode = connector->panel.downclock_mode;
+
+	if (downclock_mode &&
+	    drm_mode_vrefresh(downclock_mode) < drm_mode_vrefresh(fixed_mode))
+		return downclock_mode;
+	else
+		return NULL;
 }
 
 int intel_panel_compute_config(struct intel_connector *connector,

@@ -4599,6 +4599,17 @@ static int intel_dp_get_modes(struct drm_connector *connector)
 			num_modes++;
 		}
 	}
+	if (intel_dp_is_edp(intel_attached_dp(intel_connector)) &&
+	    intel_connector->panel.downclock_mode) {
+		struct drm_display_mode *mode;
+
+		mode = drm_mode_duplicate(connector->dev,
+					  intel_connector->panel.downclock_mode);
+		if (mode) {
+			drm_mode_probed_add(connector, mode);
+			num_modes++;
+		}
+	}
 
 	if (num_modes)
 		return num_modes;
