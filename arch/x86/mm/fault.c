@@ -33,6 +33,7 @@
 #include <asm/kvm_para.h>		/* kvm_handle_async_pf		*/
 #include <asm/vdso.h>			/* fixup_vdso_exception()	*/
 #include <asm/irq_stack.h>
+#include <asm/pks.h>			/* pks_handle_key_fault() */
 
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
@@ -1147,12 +1148,16 @@ static void
 do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 		   unsigned long address)
 {
-	/*
-	 * PF_PF faults should only occur on kernel
-	 * addresses when supervisor pkeys are enabled.
-	 */
-	WARN_ON_ONCE(!cpu_feature_enabled(X86_FEATURE_PKS) &&
-		     (hw_error_code & X86_PF_PK));
+	if (hw_error_code & X86_PF_PK) {
+		/*
+		 * PF_PF faults should only occur on kernel
+		 * addresses when supervisor pkeys are enabled.
+		 */
+		WARN_ON_ONCE(!cpu_feature_enabled(X86_FEATURE_PKS));
+
+		if (pks_handle_key_fault(regs, hw_error_code, address))
+			return;
+	}
 
 #ifdef CONFIG_X86_32
 	/*

@@ -7,10 +7,20 @@
 void pks_setup(void);
 void x86_pkrs_load(struct thread_struct *thread);
 
+bool pks_handle_key_fault(struct pt_regs *regs, unsigned long hw_error_code,
+			  unsigned long address);
+
 #else /* !CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
 static inline void pks_setup(void) { }
 static inline void x86_pkrs_load(struct thread_struct *thread) { }
+
+static inline bool pks_handle_key_fault(struct pt_regs *regs,
+					unsigned long hw_error_code,
+					unsigned long address)
+{
+	return false;
+}
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 

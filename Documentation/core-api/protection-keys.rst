@@ -149,6 +149,12 @@ Changing permissions of individual keys
 .. kernel-doc:: include/linux/pks.h
         :identifiers: pks_set_readwrite pks_set_noaccess
 
+Overriding Default Fault Behavior
+---------------------------------
+
+.. kernel-doc:: arch/x86/mm/pkeys.c
+        :doc: DEFINE_PKS_FAULT_CALLBACK
+
 MSR details
 ~~~~~~~~~~~
 

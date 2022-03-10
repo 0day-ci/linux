@@ -12,6 +12,7 @@
 
 #include <asm/cpufeature.h>             /* boot_cpu_has, ...            */
 #include <asm/mmu_context.h>            /* vma_pkey()                   */
+#include <asm/trap_pf.h>		/* X86_PF_WRITE */
 
 int __execute_only_pkey(struct mm_struct *mm)
 {
@@ -215,6 +216,91 @@ u32 pkey_update_pkval(u32 pkval, u8 pkey, u32 accessbits)
 #ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
 
 static DEFINE_PER_CPU(u32, pkrs_cache);
+
+/**
+ * DOC: DEFINE_PKS_FAULT_CALLBACK
+ *
+ * Users may also provide a fault handler which can handle a fault differently
+ * than an oops.  For example if 'MY_FEATURE' wanted to define a handler they
+ * can do so by adding the coresponding entry to the pks_key_callbacks array.
+ *
+ * .. code-block:: c
+ *
+ *	#ifdef CONFIG_MY_FEATURE
+ *	bool my_feature_pks_fault_callback(struct pt_regs *regs,
+ *					   unsigned long address, bool write)
+ *	{
+ *		if (my_feature_fault_is_ok)
+ *			return true;
+ *		return false;
+ *	}
+ *	#endif
+ *
+ *	static const pks_key_callback pks_key_callbacks[PKS_KEY_MAX] = {
+ *		[PKS_KEY_DEFAULT]            = NULL,
+ *	#ifdef CONFIG_MY_FEATURE
+ *		[PKS_KEY_MY_FEATURE]         = my_feature_pks_fault_callback,
+ *	#endif
+ *	};
+ */
+static const pks_key_callback pks_key_callbacks[PKS_KEY_MAX] = { 0 };
+
+static bool pks_call_fault_callback(struct pt_regs *regs, unsigned long address,
+				    bool write, u16 key)
+{
+	if (key >= PKS_KEY_MAX)
+		return false;
+
+	if (pks_key_callbacks[key])
+		return pks_key_callbacks[key](regs, address, write);
+
+	return false;
+}
+
+bool pks_handle_key_fault(struct pt_regs *regs, unsigned long hw_error_code,
+			  unsigned long address)
+{
+	bool write;
+	pgd_t pgd;
+	p4d_t p4d;
+	pud_t pud;
+	pmd_t pmd;
+	pte_t pte;
+
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return false;
+
+	write = (hw_error_code & X86_PF_WRITE);
+
+	pgd = READ_ONCE(*(init_mm.pgd + pgd_index(address)));
+	if (!pgd_present(pgd))
+		return false;
+
+	p4d = READ_ONCE(*p4d_offset(&pgd, address));
+	if (p4d_large(p4d))
+		return pks_call_fault_callback(regs, address, write,
+					       pte_flags_pkey(p4d_val(p4d)));
+	if (!p4d_present(p4d))
+		return false;
+
+	pud = READ_ONCE(*pud_offset(&p4d, address));
+	if (pud_large(pud))
+		return pks_call_fault_callback(regs, address, write,
+					       pte_flags_pkey(pud_val(pud)));
+	if (!pud_present(pud))
+		return false;
+
+	pmd = READ_ONCE(*pmd_offset(&pud, address));
+	if (pmd_large(pmd))
+		return pks_call_fault_callback(regs, address, write,
+					       pte_flags_pkey(pmd_val(pmd)));
+	if (!pmd_present(pmd))
+		return false;
+
+	pte = READ_ONCE(*pte_offset_kernel(&pmd, address));
+	return pks_call_fault_callback(regs, address, write,
+				       pte_flags_pkey(pte_val(pte)));
+}
 
 /*
  * pks_write_pkrs() - Write the pkrs of the current CPU
