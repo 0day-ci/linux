@@ -806,6 +806,15 @@ config ARCH_HAS_PKEYS
 	bool
 config ARCH_HAS_SUPERVISOR_PKEYS
 	bool
+
+config ARCH_ENABLE_PKS_CONSUMER
+	select ARCH_ENABLE_SUPERVISOR_PKEYS
+	bool
+
+# WARNING Do not set ARCH_ENABLE_SUPERVISOR_PKEYS directly use
+# ARCH_ENABLE_PKS_CONSUMER instead.
+#
+# See the PKey (S)upervisor testing (PKS_TEST) config option for details.
 config ARCH_ENABLE_SUPERVISOR_PKEYS
 	bool
 

@@ -117,20 +117,20 @@ Kconfig
 -------
 
 Kernel users intending to use PKS support should depend on
-ARCH_HAS_SUPERVISOR_PKEYS, and select ARCH_ENABLE_SUPERVISOR_PKEYS to turn on
-this support within the core.  For example:
+ARCH_HAS_SUPERVISOR_PKEYS, and select ARCH_ENABLE_PKS_CONSUMER to turn on this
+support within the core.  For example:
 
 .. code-block:: c
 
         config MY_NEW_FEATURE
                 depends on ARCH_HAS_SUPERVISOR_PKEYS
-                select ARCH_ENABLE_SUPERVISOR_PKEYS
+                select ARCH_ENABLE_PKS_CONSUMER
 
 This will make "MY_NEW_FEATURE" unavailable unless the architecture sets
 ARCH_HAS_SUPERVISOR_PKEYS.  It also makes it possible for multiple independent
-features to "select ARCH_ENABLE_SUPERVISOR_PKEYS".  If no features enable PKS
-by selecting ARCH_ENABLE_SUPERVISOR_PKEYS, PKS support will not be compiled
-into the kernel.
+features to "select ARCH_ENABLE_PKS_CONSUMER".  If no features enable PKS by
+selecting ARCH_ENABLE_PKS_CONSUMER, PKS support will not be compiled into the
+kernel.
 
 PKS Key Allocation
 ------------------

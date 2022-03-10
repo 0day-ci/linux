@@ -2685,6 +2685,12 @@ config HYPERV_TESTING
 	help
 	  Select this option to enable Hyper-V vmbus testing.
 
+# PKS_TEST is a special PKS consumer and therefore sets
+# ARCH_ENABLE_SUPERVISOR_PKEYS directly rather than through
+# ARCH_ENABLE_PKS_CONSUMER
+#
+# This allows PKS_TEST_ALL_KEYS to remain mutially exclusive to any real PKS
+# consumer
 config PKS_TEST
 	bool "PKey (S)upervisor testing"
 	depends on ARCH_HAS_SUPERVISOR_PKEYS
@@ -2696,6 +2702,21 @@ config PKS_TEST
 	  Answer N if you don't know what supervisor keys are.
 
 	  If unsure, say N.
+
+config PKS_TEST_ALL_KEYS
+	bool "PKS test all keys"
+	depends on (PKS_TEST && !ARCH_ENABLE_PKS_CONSUMER)
+	help
+	  Select this option to enable testing of all the PKS keys available in
+	  the architecture.  This option is mutually exclusive with PKS
+	  consumers other than PKS_TEST.  This is because it will consume all
+	  PKS keys for testing purposes.
+
+	  Answer N if you don't know what supervisor keys are or want to have
+	  supervisor keys available for other consumers.
+
+	  If unsure, say N.
+
 
 endmenu # "Kernel Testing and Coverage"
 

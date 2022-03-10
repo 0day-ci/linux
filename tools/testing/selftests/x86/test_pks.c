@@ -37,6 +37,7 @@
 #define CHECK_CTX_SWITCH	"3"
 #define RUN_EXCEPTION		"4"
 #define RUN_EXCEPTION_UPDATE	"5"
+#define RUN_ALL_KEYS		"6"
 #define RUN_CRASH_TEST		"9"
 
 time_t g_start_time;
@@ -65,6 +66,7 @@ enum {
 	TEST_CTX_SWITCH,
 	TEST_EXCEPTION,
 	TEST_FAULT_CALLBACK,
+	TEST_ALL,
 	MAX_TESTS,
 } tests;
 
@@ -80,7 +82,8 @@ struct test_item {
 	{ "single", RUN_SINGLE, do_simple_test },
 	{ "context_switch", ARM_CTX_SWITCH, do_context_switch },
 	{ "exception", RUN_EXCEPTION, do_simple_test },
-	{ "exception_update", RUN_EXCEPTION_UPDATE, do_simple_test }
+	{ "exception_update", RUN_EXCEPTION_UPDATE, do_simple_test },
+	{ "run_all", RUN_ALL_KEYS, do_simple_test }
 };
 
 static char *get_test_name(int test_num)
