@@ -31,6 +31,7 @@
 #include <linux/sizes.h>
 #include <linux/sched.h>
 #include <linux/pgtable.h>
+#include <linux/pks.h>
 #include <linux/kasan.h>
 
 struct mempolicy;
@@ -1142,6 +1143,22 @@ static inline bool is_pci_p2pdma_page(const struct page *page)
 		is_zone_device_page(page) &&
 		page->pgmap->type == MEMORY_DEVICE_PCI_P2PDMA;
 }
+
+#ifdef CONFIG_DEVMAP_ACCESS_PROTECTION
+
+static inline bool pgmap_protection_available(void)
+{
+	return pks_available();
+}
+
+#else
+
+static inline bool pgmap_protection_available(void)
+{
+	return false;
+}
+
+#endif /* CONFIG_DEVMAP_ACCESS_PROTECTION */
 
 /* 127: arbitrary random number, small enough to assemble well */
 #define folio_ref_zero_or_close_to_overflow(folio) \
