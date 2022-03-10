@@ -8,6 +8,9 @@
 
 #include <uapi/asm-generic/mman-common.h>
 
+#include <asm/pks.h>
+
+bool pks_available(void);
 void pks_update_protection(u8 pkey, u8 protection);
 void pks_update_exception(struct pt_regs *regs, u8 pkey, u8 protection);
 
@@ -39,6 +42,11 @@ typedef bool (*pks_key_callback)(struct pt_regs *regs, unsigned long address,
 				 bool write);
 
 #else /* !CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
+
+static inline bool pks_available(void)
+{
+	return false;
+}
 
 static inline void pks_set_noaccess(u8 pkey) {}
 static inline void pks_set_readwrite(u8 pkey) {}
