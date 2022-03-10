@@ -85,6 +85,12 @@ static void debug_result(const char *label, int test_num,
 		     sd->last_test_pass ? "PASS" : "FAIL");
 }
 
+bool pks_test_fault_callback(struct pt_regs *regs, unsigned long address,
+			     bool write)
+{
+	return false;
+}
+
 static void *alloc_test_page(u8 pkey)
 {
 	return __vmalloc_node_range(PKS_TEST_MEM_SIZE, 1, VMALLOC_START,

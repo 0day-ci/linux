@@ -44,4 +44,11 @@ static inline void pks_set_readwrite(u8 pkey) {}
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 
+#ifdef CONFIG_PKS_TEST
+
+bool pks_test_fault_callback(struct pt_regs *regs, unsigned long address,
+			     bool write);
+
+#endif /* CONFIG_PKS_TEST */
+
 #endif /* _LINUX_PKS_H */
