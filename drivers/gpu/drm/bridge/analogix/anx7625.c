@@ -1583,6 +1583,7 @@ static int anx7625_get_swing_setting(struct device *dev,
 
 	if (of_get_property(dev->of_node,
 			    "analogix,lane0-swing", &num_regs)) {
+		num_regs /= sizeof(int);
 		if (num_regs > DP_TX_SWING_REG_CNT)
 			num_regs = DP_TX_SWING_REG_CNT;
 
@@ -1593,6 +1594,7 @@ static int anx7625_get_swing_setting(struct device *dev,
 
 	if (of_get_property(dev->of_node,
 			    "analogix,lane1-swing", &num_regs)) {
+		num_regs /= sizeof(int);
 		if (num_regs > DP_TX_SWING_REG_CNT)
 			num_regs = DP_TX_SWING_REG_CNT;
 
