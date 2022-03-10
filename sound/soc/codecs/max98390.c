@@ -1073,6 +1073,24 @@ static int max98390_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
+	max98390->reset_gpio = of_get_named_gpio(i2c->dev.of_node,
+						"maxim,reset-gpios", 0);
+
+	/* Power on device */
+	if (gpio_is_valid(max98390->reset_gpio)) {
+		ret = devm_gpio_request(&i2c->dev, max98390->reset_gpio,
+					"MAX98390_RESET");
+		if (ret) {
+			dev_err(&i2c->dev, "%s: Failed to request gpio %d\n",
+				__func__, max98390->reset_gpio);
+			return -EINVAL;
+		}
+		gpio_direction_output(max98390->reset_gpio, 0);
+		usleep_range(1000, 2000);
+		gpio_direction_output(max98390->reset_gpio, 1);
+		usleep_range(1000, 2000);
+	}
+
 	/* Check Revision ID */
 	ret = regmap_read(max98390->regmap,
 		MAX98390_R24FF_REV_ID, &reg);

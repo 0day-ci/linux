@@ -655,6 +655,7 @@
 
 struct max98390_priv {
 	struct regmap *regmap;
+	int reset_gpio;
 	unsigned int sysclk;
 	unsigned int master;
 	unsigned int tdm_mode;
