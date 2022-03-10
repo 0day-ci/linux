@@ -37,7 +37,6 @@ enum dw_edma_map_format {
  * struct dw_edma_chip - representation of DesignWare eDMA controller hardware
  * @dev:		 struct device of the eDMA controller
  * @id:			 instance ID
- * @irq:		 irq line
  * @nr_irqs:		 total dma irq number
  * @ops			 DMA channel to IRQ number mapping
  * @wr_ch_cnt		 DMA write channel number
@@ -51,7 +50,6 @@ enum dw_edma_map_format {
 struct dw_edma_chip {
 	struct device		*dev;
 	int			id;
-	int			irq;
 	int			nr_irqs;
 	const struct dw_edma_core_ops   *ops;
 
