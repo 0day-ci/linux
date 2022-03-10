@@ -1,0 +1,13 @@
+QA output created by 839
+Test 1 - qa_user
+777 -rwxrwxrwx TEST_DIR/839/a
+TEST_DIR/839/a cap_setgid,cap_setuid=ep
+777 -rwxrwxrwx TEST_DIR/839/a
+TEST_DIR/839/a
+
+Test 2 - root
+777 -rwxrwxrwx TEST_DIR/839/a
+TEST_DIR/839/a cap_setgid,cap_setuid=ep
+777 -rwxrwxrwx TEST_DIR/839/a
+TEST_DIR/839/a
+
