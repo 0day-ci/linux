@@ -58,6 +58,31 @@ initial_plane_vma(struct drm_i915_private *i915,
 
 	base = round_down(plane_config->base,
 			  I915_GTT_MIN_ALIGNMENT);
+	phys_base = base;
+	if (IS_DGFX(i915)) {
+		/*
+		 * On discrete, it looks like the GGTT base address should 1:1
+		 * map to somewhere in lmem. On DG1 for some reason this
+		 * intersects with the exact start of DSM(possibly due to small
+		 * lmem size), in which case we need to allocate it directly
+		 * from stolen, which means fudging the physical address to be
+		 * relative to the start of DSM.  In such cases we might also
+		 * need to choose between initial fb vs fbc, if space is
+		 * limited.
+		 *
+		 * On future discrete HW, like DG2, we should be able to just
+		 * allocate directly from lmem it seems.
+		 */
+		if (IS_DG1(i915)) {
+			if (WARN_ON(phys_base < i915->dsm.start))
+				return NULL;
+
+			phys_base -= i915->dsm.start;
+		} else {
+			mem = i915->mm.regions[INTEL_REGION_LMEM];
+		}
+	}
+
 	size = round_up(plane_config->base + plane_config->size,
 			mem->min_page_size);
 	size -= base;
@@ -68,28 +93,11 @@ initial_plane_vma(struct drm_i915_private *i915,
 	 * features.
 	 */
 	if (IS_ENABLED(CONFIG_FRAMEBUFFER_CONSOLE) &&
+	    mem == i915->mm.stolen_region &&
 	    size * 2 > i915->stolen_usable_size)
 		return NULL;
 
-	/*
-	 * On discrete, it looks like the GGTT base address should 1:1 map to
-	 * somewhere in lmem. On DG1 for some reason this intersects with the
-	 * exact start of DSM(possibly due to small lmem size), in which case we
-	 * need to allocate it directly from stolen, which means fudging the
-	 * physical address to be relative to the start of DSM.  In such cases
-	 * we might also need to choose between initial fb vs fbc, if space is
-	 * limited.
-	 */
-	phys_base = base;
-	if (IS_DG1(i915)) {
-		if (WARN_ON(phys_base < i915->dsm.start))
-			return NULL;
-
-		phys_base -= i915->dsm.start;
-	}
-
-	obj = i915_gem_object_create_region_at(i915->mm.stolen_region,
-					       phys_base, size, 0);
+	obj = i915_gem_object_create_region_at(mem, phys_base, size, 0);
 	if (IS_ERR(obj))
 		return NULL;
 
