@@ -1650,6 +1650,16 @@ alloc_new_skb:
 			skb->protocol = htons(ETH_P_IPV6);
 			skb->ip_summed = csummode;
 			skb->csum = 0;
+
+			/*
+			 *	Check if there is still room for payload
+			 */
+			if (fragheaderlen >= mtu) {
+				err = -EMSGSIZE;
+				kfree_skb(skb);
+				goto error;
+			}
+
 			/* reserve for fragmentation and ipsec header */
 			skb_reserve(skb, hh_len + sizeof(struct frag_hdr) +
 				    dst_exthdrlen);
