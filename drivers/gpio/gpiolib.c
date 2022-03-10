@@ -88,6 +88,7 @@ static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gc);
 static void gpiochip_irqchip_free_valid_mask(struct gpio_chip *gc);
 
 static bool gpiolib_initialized;
+bool gc_irq_initialized;
 
 static inline void desc_set_label(struct gpio_desc *d, const char *label)
 {
@@ -1532,6 +1533,8 @@ static int gpiochip_add_irqchip(struct gpio_chip *gc,
 	gpiochip_set_irq_hooks(gc);
 
 	acpi_gpiochip_request_interrupts(gc);
+
+	gc_irq_initialized = true;
 
 	return 0;
 }
@@ -3056,7 +3059,7 @@ int gpiod_to_irq(const struct gpio_desc *desc)
 
 	gc = desc->gdev->chip;
 	offset = gpio_chip_hwgpio(desc);
-	if (gc->to_irq) {
+	if (gc->to_irq && gc_irq_initialized) {
 		int retirq = gc->to_irq(gc, offset);
 
 		/* Zero means NO_IRQ */
