@@ -59,6 +59,7 @@
 /* Not included via unistd.h */
 #include <asm/unistd_32_ia32.h>
 #endif
+#include <asm/pks.h>
 
 #include "process.h"
 
@@ -612,6 +613,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	x86_fsgsbase_load(prev, next);
 
 	x86_pkru_load(prev, next);
+	x86_pkrs_load(next);
 
 	/*
 	 * Switch the PDA and FPU contexts.

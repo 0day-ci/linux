@@ -246,6 +246,15 @@ static inline void pks_write_pkrs(u32 new_pkrs)
 	}
 }
 
+/* x86_pkrs_load() - Update CPU with the incoming thread pkrs value */
+void x86_pkrs_load(struct thread_struct *thread)
+{
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	pks_write_pkrs(thread->pkrs);
+}
+
 /*
  * PKS is independent of PKU and either or both may be supported on a CPU.
  *
