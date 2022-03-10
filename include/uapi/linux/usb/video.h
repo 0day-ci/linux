@@ -435,6 +435,7 @@ struct uvc_color_matching_descriptor {
 #define UVC_DT_COLOR_MATCHING_SIZE			6
 
 /* 4.3.1.1. Video Probe and Commit Controls */
+#define UVC_NUM_SIMULCAST_STREAMS			4
 struct uvc_streaming_control {
 	__u16 bmHint;
 	__u8  bFormatIndex;
@@ -452,6 +453,12 @@ struct uvc_streaming_control {
 	__u8  bPreferedVersion;
 	__u8  bMinVersion;
 	__u8  bMaxVersion;
+	__u8  bUsage;
+	__u8  bBitDepthLuma;
+	__u8  bmSetting;
+	__u8  bMaxNumberOfRefFramesPlus1;
+	__u16 bmRateControlModes;
+	__u16 bmLayoutPerStream[UVC_NUM_SIMULCAST_STREAMS];
 } __attribute__((__packed__));
 
 /* Uncompressed Payload - 3.1.1. Uncompressed Video Format Descriptor */

@@ -253,6 +253,7 @@ static int uvc_get_video_ctrl(struct uvc_streaming *stream,
 	u16 size = uvc_video_ctrl_size(stream);
 	u8 *data;
 	int ret;
+	unsigned int i;
 
 	if ((stream->dev->quirks & UVC_QUIRK_PROBE_DEF) &&
 			query == UVC_GET_DEF)
@@ -322,6 +323,26 @@ static int uvc_get_video_ctrl(struct uvc_streaming *stream,
 		ctrl->bMaxVersion = 0;
 	}
 
+	if (size >= 48) {
+		ctrl->bUsage = data[34];
+		ctrl->bBitDepthLuma = data[35];
+		ctrl->bmSetting = data[36];
+		ctrl->bMaxNumberOfRefFramesPlus1 = data[37];
+		ctrl->bmRateControlModes = get_unaligned_le16(&data[38]);
+		for (i = 0; i < ARRAY_SIZE(ctrl->bmLayoutPerStream); ++i) {
+			ctrl->bmLayoutPerStream[i] =
+				get_unaligned_le16(&data[40 + i * 2]);
+		}
+	} else {
+		ctrl->bUsage = 0;
+		ctrl->bBitDepthLuma = 0;
+		ctrl->bmSetting = 0;
+		ctrl->bMaxNumberOfRefFramesPlus1 = 0;
+		ctrl->bmRateControlModes = 0;
+		for (i = 0; i < ARRAY_SIZE(ctrl->bmLayoutPerStream); ++i)
+			ctrl->bmLayoutPerStream[i] = 0;
+	}
+
 	/* Some broken devices return null or wrong dwMaxVideoFrameSize and
 	 * dwMaxPayloadTransferSize fields. Try to get the value from the
 	 * format and frame descriptors.
@@ -340,6 +361,7 @@ static int uvc_set_video_ctrl(struct uvc_streaming *stream,
 	u16 size = uvc_video_ctrl_size(stream);
 	u8 *data;
 	int ret;
+	unsigned int i;
 
 	data = kzalloc(size, GFP_KERNEL);
 	if (data == NULL)
@@ -363,6 +385,18 @@ static int uvc_set_video_ctrl(struct uvc_streaming *stream,
 		data[31] = ctrl->bPreferedVersion;
 		data[32] = ctrl->bMinVersion;
 		data[33] = ctrl->bMaxVersion;
+	}
+
+	if (size >= 48) {
+		data[34] = ctrl->bUsage;
+		data[35] = ctrl->bBitDepthLuma;
+		data[36] = ctrl->bmSetting;
+		data[37] = ctrl->bMaxNumberOfRefFramesPlus1;
+		*(__le16 *)&data[38] = cpu_to_le16(ctrl->bmRateControlModes);
+		for (i = 0; i < ARRAY_SIZE(ctrl->bmLayoutPerStream); ++i) {
+			*(__le16 *)&data[40 + i * 2] =
+				cpu_to_le16(ctrl->bmLayoutPerStream[i]);
+		}
 	}
 
 	ret = __uvc_query_ctrl(stream->dev, UVC_SET_CUR, 0, stream->intfnum,
