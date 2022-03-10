@@ -253,6 +253,7 @@ cifs_chan_update_iface(struct cifs_ses *ses, struct TCP_Server_Info *server)
 			continue;
 		}
 		kref_get(&iface->refcount);
+		break;
 	}
 
 	if (!iface) {
