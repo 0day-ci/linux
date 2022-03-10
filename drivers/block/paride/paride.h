@@ -1,3 +1,7 @@
+#if IS_ENABLED(CONFIG_PATA_PARPORT)
+#include "../../ata/parport/pata_parport.h"
+
+#else
 #ifndef __DRIVERS_PARIDE_H__
 #define __DRIVERS_PARIDE_H__
 
@@ -170,3 +174,4 @@ void pi_unregister_driver(void *);
 
 #endif /* __DRIVERS_PARIDE_H__ */
 /* end of paride.h */
+#endif /* IS_ENABLED(CONFIG_PATA_PARPORT) */

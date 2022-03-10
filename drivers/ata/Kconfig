@@ -1161,6 +1161,28 @@ config PATA_WINBOND_VLB
 	  Support for the Winbond W83759A controller on Vesa Local Bus
 	  systems.
 
+config PATA_PARPORT
+	tristate "Parallel port IDE device support"
+	depends on PARPORT_PC && PARIDE=n
+	help
+	  There are many external CD-ROM and disk devices that connect through
+	  your computer's parallel port. Most of them are actually IDE devices
+	  using a parallel port IDE adapter. This option enables the
+	  PATA_PARPORT subsystem which contains drivers for many of these
+	  external drives.
+	  Read <file:Documentation/admin-guide/blockdev/paride.rst> for more
+	  information.
+
+	  If your parallel port support is in a loadable module, you must build
+	  PATA_PARPORT as a module. If you built PATA_PARPORT support into your
+	  kernel, you may still build the individual protocol modules
+	  as loadable modules. Use the old PARIDE protocol modules.
+	  If you build this support as a module, it will be called pata_parport.
+
+	  Unlike the old PARIDE, there are no high-level drivers needed.
+	  The IDE devices behind parallel port adapters are handled by the
+	  ATA layer.
+
 comment "Generic fallback / legacy drivers"
 
 config PATA_ACPI
