@@ -141,6 +141,7 @@ static int ipvlan_init(struct net_device *dev)
 	dev->hw_enc_features |= dev->features;
 	netif_set_gso_max_size(dev, phy_dev->gso_max_size);
 	netif_set_gso_max_segs(dev, phy_dev->gso_max_segs);
+	netif_set_tso_ipv6_max_size(dev, phy_dev->tso_ipv6_max_size);
 	dev->hard_header_len = phy_dev->hard_header_len;
 
 	netdev_lockdep_set_classes(dev);
