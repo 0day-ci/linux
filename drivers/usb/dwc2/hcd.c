@@ -3672,7 +3672,7 @@ static int dwc2_hcd_hub_control(struct dwc2_hsotg *hsotg, u16 typereq,
 			hprt0 |= HPRT0_PWR;
 			dwc2_writel(hsotg, hprt0, HPRT0);
 			if (!pwr)
-				dwc2_vbus_supply_init(hsotg);
+				retval = dwc2_vbus_supply_init(hsotg);
 			break;
 
 		case USB_PORT_FEAT_RESET:
@@ -3722,7 +3722,7 @@ static int dwc2_hcd_hub_control(struct dwc2_hsotg *hsotg, u16 typereq,
 					"In host mode, hprt0=%08x\n", hprt0);
 				dwc2_writel(hsotg, hprt0, HPRT0);
 				if (!pwr)
-					dwc2_vbus_supply_init(hsotg);
+					retval = dwc2_vbus_supply_init(hsotg);
 			}
 
 			/* Clear reset bit in 10ms (FS/LS) or 50ms (HS) */
@@ -4523,7 +4523,9 @@ static int _dwc2_hcd_resume(struct usb_hcd *hcd)
 
 	/* Enable external vbus supply after resuming the port. */
 	spin_unlock_irqrestore(&hsotg->lock, flags);
-	dwc2_vbus_supply_init(hsotg);
+	ret = dwc2_vbus_supply_init(hsotg);
+	if (ret)
+		return ret;
 
 	/* Wait for controller to correctly update D+/D- level */
 	usleep_range(3000, 5000);
