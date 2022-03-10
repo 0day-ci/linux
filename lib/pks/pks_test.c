@@ -49,6 +49,7 @@
 #define ARM_CTX_SWITCH		2
 #define CHECK_CTX_SWITCH	3
 #define RUN_EXCEPTION		4
+#define RUN_EXCEPTION_UPDATE	5
 #define RUN_CRASH_TEST		9
 
 DECLARE_PER_CPU(u32, pkrs_cache);
@@ -64,6 +65,7 @@ struct pks_test_ctx {
 	void *test_page;
 	bool fault_seen;
 	bool validate_exp_handling;
+	bool validate_update_exp;
 };
 
 static bool check_pkey_val(u32 pk_reg, u8 pkey, u32 expected)
@@ -164,6 +166,16 @@ static void validate_exception(struct pks_test_ctx *ctx, u32 thread_pkrs)
 	}
 }
 
+static bool handle_update_exception(struct pt_regs *regs, struct pks_test_ctx *ctx)
+{
+	pr_debug("Updating pkey %d during exception\n", ctx->pkey);
+
+	ctx->fault_seen = true;
+	pks_update_exception(regs, ctx->pkey, 0);
+
+	return true;
+}
+
 /* Global data protected by test_run_lock */
 struct pks_test_ctx *g_ctx_under_test;
 
@@ -189,6 +201,9 @@ bool pks_test_fault_callback(struct pt_regs *regs, unsigned long address,
 
 	if (!g_ctx_under_test)
 		return false;
+
+	if (g_ctx_under_test->validate_update_exp)
+		return handle_update_exception(regs, g_ctx_under_test);
 
 	if (g_ctx_under_test->validate_exp_handling) {
 		validate_exception(g_ctx_under_test, pkrs);
@@ -518,6 +533,47 @@ static void check_ctx_switch(struct pks_session_data *sd)
 	}
 }
 
+static bool run_exception_update(struct pks_session_data *sd)
+{
+	struct pks_test_ctx *ctx;
+
+	ctx = alloc_ctx(PKS_KEY_TEST);
+	if (IS_ERR(ctx))
+		return false;
+
+	set_ctx_data(sd, ctx);
+
+	ctx->fault_seen = false;
+	ctx->validate_update_exp = true;
+	pks_set_noaccess(ctx->pkey);
+
+	set_context_for_fault(ctx);
+
+	/* fault */
+	memcpy(ctx->test_page, ctx->data, 8);
+
+	if (!ctx->fault_seen) {
+		pr_err("Failed to see the callback\n");
+		return false;
+	}
+
+	ctx->fault_seen = false;
+	ctx->validate_update_exp = false;
+
+	set_context_for_fault(ctx);
+
+	/* no fault */
+	memcpy(ctx->test_page, ctx->data, 8);
+
+	if (ctx->fault_seen) {
+		pr_err("Pkey %d failed to be set RD/WR in the callback\n",
+			ctx->pkey);
+		return false;
+	}
+
+	return true;
+}
+
 static ssize_t pks_read_file(struct file *file, char __user *user_buf,
 			     size_t count, loff_t *ppos)
 {
@@ -583,6 +639,10 @@ static ssize_t pks_write_file(struct file *file, const char __user *user_buf,
 	case RUN_EXCEPTION:
 		pr_debug("Exception checking\n");
 		sd->last_test_pass = run_exception_test(file->private_data);
+		break;
+	case RUN_EXCEPTION_UPDATE:
+		pr_debug("Fault clear test\n");
+		sd->last_test_pass = run_exception_update(file->private_data);
 		break;
 	default:
 		pr_debug("Unknown test\n");
