@@ -650,6 +650,36 @@ DEFINE_PER_CPU(struct sched_domain __rcu *, sd_asym_packing);
 DEFINE_PER_CPU(struct sched_domain __rcu *, sd_asym_cpucapacity);
 DEFINE_STATIC_KEY_FALSE(sched_asym_cpucapacity);
 
+static void set_sd_llc(int cpu, struct sched_domain *sd, int *first_cpu, int *cpu_num)
+{
+	int cache_level, cpu_id;
+	int first, last;
+	int id = cpumask_first(sched_domain_span(sd));
+	int size = cpumask_weight(sched_domain_span(sd));
+
+	*first_cpu = id;
+	*cpu_num = size;
+
+	for (cache_level = 0; cache_level < MAX_CPU_CACHE_LEVEL; cache_level++) {
+		if (!cache_topology[cpu][cache_level])
+			break;
+
+		first = -1;
+		last = id;
+		for (cpu_id = 0; cpu_id < NR_CPUS; cpu_id++) {
+			if (cache_topology[cpu][cache_level] == cache_topology[cpu_id][cache_level]) {
+				if (cpu_id >= id && cpu_id < id + size) {
+					first = (first == -1)?cpu_id:first;
+					last = cpu_id;
+				} else
+					return;
+			}
+		}
+		*first_cpu = first;
+		*cpu_num = last - first + 1;
+	}
+}
+
 static void update_top_cache_domain(int cpu)
 {
 	struct sched_domain_shared *sds = NULL;
@@ -659,8 +689,7 @@ static void update_top_cache_domain(int cpu)
 
 	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
 	if (sd) {
-		id = cpumask_first(sched_domain_span(sd));
-		size = cpumask_weight(sched_domain_span(sd));
+		set_sd_llc(cpu, sd, &id, &size);
 		sds = sd->shared;
 	}
 

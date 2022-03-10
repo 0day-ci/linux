@@ -723,6 +723,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	unsigned int this_cpu;
 
 	init_cpu_topology();
+	init_cpu_cache_topology();
 
 	this_cpu = smp_processor_id();
 	store_cpu_topology(this_cpu);

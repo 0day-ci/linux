@@ -72,6 +72,8 @@ struct cpu_topology {
 };
 
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
+#define MAX_CPU_CACHE_LEVEL 7
+extern struct device_node *cache_topology[NR_CPUS][MAX_CPU_CACHE_LEVEL];
 extern struct cpu_topology cpu_topology[NR_CPUS];
 
 #define topology_physical_package_id(cpu)	(cpu_topology[cpu].package_id)
@@ -82,6 +84,7 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
 #define topology_cluster_cpumask(cpu)	(&cpu_topology[cpu].cluster_sibling)
 #define topology_llc_cpumask(cpu)	(&cpu_topology[cpu].llc_sibling)
 void init_cpu_topology(void);
+void init_cpu_cache_topology(void);
 void store_cpu_topology(unsigned int cpuid);
 const struct cpumask *cpu_coregroup_mask(int cpu);
 const struct cpumask *cpu_clustergroup_mask(int cpu);
