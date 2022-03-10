@@ -215,7 +215,7 @@ u32 pkey_update_pkval(u32 pkval, u8 pkey, u32 accessbits)
 
 #ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
 
-static DEFINE_PER_CPU(u32, pkrs_cache);
+__static_or_pks_test DEFINE_PER_CPU(u32, pkrs_cache);
 
 /**
  * DOC: DEFINE_PKS_FAULT_CALLBACK
