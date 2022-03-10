@@ -1951,6 +1951,7 @@ enum netdev_ml_priv_type {
  *	@dev_registered_tracker:	tracker for reference held while
  *					registered
  *	@offload_xstats_l3:	L3 HW stats for this netdevice.
+ *	@tso_ipv6_max_size:	Maximum size of IPv6 TSO packets (driver/NIC limit)
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
@@ -2289,6 +2290,7 @@ struct net_device {
 	netdevice_tracker	watchdog_dev_tracker;
 	netdevice_tracker	dev_registered_tracker;
 	struct rtnl_hw_stats64	*offload_xstats_l3;
+	unsigned int		tso_ipv6_max_size;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
@@ -4887,6 +4889,14 @@ static inline void netif_set_gro_max_size(struct net_device *dev,
 	/* This pairs with the READ_ONCE() in skb_gro_receive() */
 	WRITE_ONCE(dev->gro_max_size, size);
 }
+
+/* Used by drivers to give their hardware/firmware limit for LSOv2 packets */
+static inline void netif_set_tso_ipv6_max_size(struct net_device *dev,
+					       unsigned int size)
+{
+	dev->tso_ipv6_max_size = size;
+}
+
 
 static inline void skb_gso_error_unwind(struct sk_buff *skb, __be16 protocol,
 					int pulled_hlen, u16 mac_offset,
