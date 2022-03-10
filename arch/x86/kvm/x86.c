@@ -163,6 +163,8 @@ u64 __read_mostly kvm_default_tsc_scaling_ratio;
 EXPORT_SYMBOL_GPL(kvm_default_tsc_scaling_ratio);
 bool __read_mostly kvm_has_bus_lock_exit;
 EXPORT_SYMBOL_GPL(kvm_has_bus_lock_exit);
+bool __read_mostly kvm_has_notify_vmexit;
+EXPORT_SYMBOL_GPL(kvm_has_notify_vmexit);
 
 /* tsc tolerance in parts per million - default to 1/2 of the NTP threshold */
 static u32 __read_mostly tsc_tolerance_ppm = 250;
@@ -291,7 +293,8 @@ const struct _kvm_stats_desc kvm_vcpu_stats_desc[] = {
 	STATS_DESC_COUNTER(VCPU, nested_run),
 	STATS_DESC_COUNTER(VCPU, directed_yield_attempted),
 	STATS_DESC_COUNTER(VCPU, directed_yield_successful),
-	STATS_DESC_ICOUNTER(VCPU, guest_mode)
+	STATS_DESC_ICOUNTER(VCPU, guest_mode),
+	STATS_DESC_COUNTER(VCPU, notify_window_exits),
 };
 
 const struct kvm_stats_header kvm_vcpu_stats_header = {
@@ -4359,10 +4362,13 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		if (r < sizeof(struct kvm_xsave))
 			r = sizeof(struct kvm_xsave);
 		break;
+	}
 	case KVM_CAP_PMU_CAPABILITY:
 		r = enable_pmu ? KVM_CAP_PMU_VALID_MASK : 0;
 		break;
-	}
+	case KVM_CAP_X86_NOTIFY_VMEXIT:
+		r = kvm_has_notify_vmexit;
+		break;
 	default:
 		break;
 	}
@@ -6051,6 +6057,13 @@ split_irqchip_unlock:
 			r = 0;
 		}
 		mutex_unlock(&kvm->lock);
+		break;
+	case KVM_CAP_X86_NOTIFY_VMEXIT:
+		r = -EINVAL;
+		if (!kvm_has_notify_vmexit)
+			break;
+		kvm->arch.notify_window = cap->args[0];
+		r = 0;
 		break;
 	default:
 		r = -EINVAL;
@@ -11645,6 +11658,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 
 	kvm->arch.guest_can_read_msr_platform_info = true;
 	kvm->arch.enable_pmu = enable_pmu;
+
+	kvm->arch.notify_window = -1;
 
 #if IS_ENABLED(CONFIG_HYPERV)
 	spin_lock_init(&kvm->arch.hv_root_tdp_lock);

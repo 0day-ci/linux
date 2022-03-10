@@ -344,6 +344,11 @@ static inline bool kvm_cstate_in_guest(struct kvm *kvm)
 	return kvm->arch.cstate_in_guest;
 }
 
+static inline bool kvm_notify_vmexit_enabled(struct kvm *kvm)
+{
+	return kvm->arch.notify_window >= 0;
+}
+
 enum kvm_intr_type {
 	/* Values are arbitrary, but must be non-zero. */
 	KVM_HANDLING_IRQ = 1,

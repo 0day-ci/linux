@@ -2134,6 +2134,8 @@ static u64 nested_vmx_calc_efer(struct vcpu_vmx *vmx, struct vmcs12 *vmcs12)
 
 static void prepare_vmcs02_constant_state(struct vcpu_vmx *vmx)
 {
+	struct kvm *kvm = vmx->vcpu.kvm;
+
 	/*
 	 * If vmcs02 hasn't been initialized, set the constant vmcs02 state
 	 * according to L0's settings (vmcs12 is irrelevant here).  Host
@@ -2175,6 +2177,9 @@ static void prepare_vmcs02_constant_state(struct vcpu_vmx *vmx)
 
 	if (cpu_has_vmx_encls_vmexit())
 		vmcs_write64(ENCLS_EXITING_BITMAP, INVALID_GPA);
+
+	if (kvm_notify_vmexit_enabled(kvm))
+		vmcs_write32(NOTIFY_WINDOW, kvm->arch.notify_window);
 
 	/*
 	 * Set the MSR load/store lists to match L0's settings.  Only the
@@ -4218,8 +4223,15 @@ static void prepare_vmcs12(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 		/*
 		 * Transfer the event that L0 or L1 may wanted to inject into
 		 * L2 to IDT_VECTORING_INFO_FIELD.
+		 *
+		 * Skip this if the exit is due to a NOTIFY_VM_CONTEXT_INVALID
+		 * exit; in that case, L0 will synthesize a nested TRIPLE_FAULT
+		 * vmexit to kill L2.  No IDT vectoring info is recorded for
+		 * triple faults, and __vmx_handle_exit does not expect it.
 		 */
-		vmcs12_save_pending_event(vcpu, vmcs12);
+		if (!(to_vmx(vcpu)->exit_reason.basic == EXIT_REASON_NOTIFY) &&
+		    kvm_test_request(KVM_REQ_TRIPLE_FAULT, vcpu))
+			vmcs12_save_pending_event(vcpu, vmcs12);
 
 		/*
 		 * According to spec, there's no need to store the guest's
@@ -6085,6 +6097,9 @@ static bool nested_vmx_l1_wants_exit(struct kvm_vcpu *vcpu,
 			SECONDARY_EXEC_ENABLE_USR_WAIT_PAUSE);
 	case EXIT_REASON_ENCLS:
 		return nested_vmx_exit_handled_encls(vcpu, vmcs12);
+	case EXIT_REASON_NOTIFY:
+		/* Notify VM exit is not exposed to L1 */
+		return false;
 	default:
 		return true;
 	}

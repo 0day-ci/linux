@@ -1150,6 +1150,8 @@ struct kvm_arch {
 
 	bool bus_lock_detection_enabled;
 	bool enable_pmu;
+
+	int notify_window;
 	/*
 	 * If exit_on_emulation_error is set, and the in-kernel instruction
 	 * emulator fails to emulate an instruction, allow userspace
@@ -1286,6 +1288,7 @@ struct kvm_vcpu_stat {
 	u64 directed_yield_attempted;
 	u64 directed_yield_successful;
 	u64 guest_mode;
+	u64 notify_window_exits;
 };
 
 struct x86_instruction_info;
@@ -1642,6 +1645,8 @@ extern u64  kvm_max_tsc_scaling_ratio;
 extern u64  kvm_default_tsc_scaling_ratio;
 /* bus lock detection supported? */
 extern bool kvm_has_bus_lock_exit;
+/* notify VM exit supported? */
+extern bool kvm_has_notify_vmexit;
 
 extern u64 kvm_mce_cap_supported;
 
