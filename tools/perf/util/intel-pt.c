@@ -5,6 +5,7 @@
  */
 
 #include <inttypes.h>
+#include <linux/perf_event.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -88,6 +89,10 @@ struct intel_pt {
 	bool sample_instructions;
 	u64 instructions_sample_type;
 	u64 instructions_id;
+
+	bool sample_cycles;
+	u64 cycles_sample_type;
+	u64 cycles_id;
 
 	bool sample_branches;
 	u32 branches_filter;
@@ -1217,7 +1222,7 @@ static struct intel_pt_queue *intel_pt_alloc_queue(struct intel_pt *pt,
 	if (pt->filts.cnt > 0)
 		params.pgd_ip = intel_pt_pgd_ip;
 
-	if (pt->synth_opts.instructions) {
+	if (pt->synth_opts.instructions || pt->synth_opts.cycles) {
 		if (pt->synth_opts.period) {
 			switch (pt->synth_opts.period_type) {
 			case PERF_ITRACE_PERIOD_INSTRUCTIONS:
@@ -1615,11 +1620,12 @@ static void intel_pt_prep_sample(struct intel_pt *pt,
 	}
 }
 
-static int intel_pt_synth_instruction_sample(struct intel_pt_queue *ptq)
+static int intel_pt_synth_instruction_or_cycle_sample(struct intel_pt_queue *ptq)
 {
 	struct intel_pt *pt = ptq->pt;
 	union perf_event *event = ptq->event_buf;
 	struct perf_sample sample = { .ip = 0, };
+	int err;
 
 	if (intel_pt_skip_event(pt))
 		return 0;
@@ -1633,7 +1639,7 @@ static int intel_pt_synth_instruction_sample(struct intel_pt_queue *ptq)
 	else
 		sample.period = ptq->state->tot_insn_cnt - ptq->last_insn_cnt;
 
-	if (ptq->sample_ipc)
+	if (ptq->sample_ipc || pt->sample_cycles)
 		sample.cyc_cnt = ptq->ipc_cyc_cnt - ptq->last_in_cyc_cnt;
 	if (sample.cyc_cnt) {
 		sample.insn_cnt = ptq->ipc_insn_cnt - ptq->last_in_insn_cnt;
@@ -1643,8 +1649,30 @@ static int intel_pt_synth_instruction_sample(struct intel_pt_queue *ptq)
 
 	ptq->last_insn_cnt = ptq->state->tot_insn_cnt;
 
-	return intel_pt_deliver_synth_event(pt, event, &sample,
-					    pt->instructions_sample_type);
+	if (pt->sample_instructions) {
+		err = intel_pt_deliver_synth_event(pt, event, &sample,
+						   pt->instructions_sample_type);
+		if (err)
+			return err;
+	}
+
+	/*
+	 * NOTE: If not doing sampling (e.g. itrace=y0us), we will in practice
+	 * only see cycles being attributed to branches, since CYC packets
+	 * only are emitted together with other packets are emitted.
+	 * We should perhaps consider spreading it out over everything since
+	 * the last CYC packet, ie., since last time sample.cyc_cnt was nonzero.
+	 */
+	if (pt->sample_cycles && sample.cyc_cnt) {
+		sample.id = ptq->pt->cycles_id;
+		sample.stream_id = ptq->pt->cycles_id;
+		err = intel_pt_deliver_synth_event(pt, event, &sample,
+						   pt->cycles_sample_type);
+		if (err)
+			return err;
+	}
+
+	return 0;
 }
 
 static int intel_pt_synth_transaction_sample(struct intel_pt_queue *ptq)
@@ -2301,8 +2329,9 @@ static int intel_pt_sample(struct intel_pt_queue *ptq)
 		}
 	}
 
-	if (pt->sample_instructions && (state->type & INTEL_PT_INSTRUCTION)) {
-		err = intel_pt_synth_instruction_sample(ptq);
+	if ((pt->sample_instructions || pt->sample_cycles) &&
+	    (state->type & INTEL_PT_INSTRUCTION)) {
+		err = intel_pt_synth_instruction_or_cycle_sample(ptq);
 		if (err)
 			return err;
 	}
@@ -3375,6 +3404,22 @@ static int intel_pt_synth_events(struct intel_pt *pt,
 		pt->sample_instructions = true;
 		pt->instructions_sample_type = attr.sample_type;
 		pt->instructions_id = id;
+		id += 1;
+	}
+
+	if (pt->synth_opts.cycles) {
+		attr.config = PERF_COUNT_HW_CPU_CYCLES;
+		if (pt->synth_opts.period_type == PERF_ITRACE_PERIOD_NANOSECS)
+			attr.sample_period =
+				intel_pt_ns_to_ticks(pt, pt->synth_opts.period);
+		else
+			attr.sample_period = pt->synth_opts.period;
+		err = intel_pt_synth_event(session, "cycles", &attr, id);
+		if (err)
+			return err;
+		pt->sample_cycles = true;
+		pt->cycles_sample_type = attr.sample_type;
+		pt->cycles_id = id;
 		id += 1;
 	}
 
