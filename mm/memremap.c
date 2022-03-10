@@ -82,6 +82,14 @@ static void devmap_protection_enable(void)
 	static_branch_inc(&dev_pgmap_protection_static_key);
 }
 
+static pgprot_t devmap_protection_adjust_pgprot(pgprot_t prot)
+{
+	pgprotval_t val;
+
+	val = pgprot_val(prot);
+	return __pgprot(val | _PAGE_PKEY(PKS_KEY_PGMAP_PROTECTION));
+}
+
 static void devmap_protection_disable(void)
 {
 	static_branch_dec(&dev_pgmap_protection_static_key);
@@ -92,6 +100,10 @@ static void devmap_protection_disable(void)
 static void devmap_protection_enable(void) { }
 static void devmap_protection_disable(void) { }
 
+static pgprot_t devmap_protection_adjust_pgprot(pgprot_t prot)
+{
+	return prot;
+}
 #endif /* CONFIG_DEVMAP_ACCESS_PROTECTION */
 
 static void pgmap_array_delete(struct range *range)
@@ -346,6 +358,7 @@ void *memremap_pages(struct dev_pagemap *pgmap, int nid)
 		if (!pgmap_protection_available())
 			return ERR_PTR(-EINVAL);
 		devmap_protection_enable();
+		params.pgprot = devmap_protection_adjust_pgprot(params.pgprot);
 	}
 
 	switch (pgmap->type) {
