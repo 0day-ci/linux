@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Suppport for CompuLab SBC-T3530 with CM-T3530
+ * Support for CompuLab SBC-T3530 with CM-T3530
  */
 
 #include "omap3-cm-t3530.dts"

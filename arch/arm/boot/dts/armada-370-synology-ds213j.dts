@@ -14,7 +14,7 @@
  * not be able to directly boot a kernel based on this Device Tree. In
  * that case, the preferred solution is to update your bootloader (e.g.
  * by upgrading to latest version of DSM, or building a new one and
- * installing it from u-boot prompt) or adjust the Devive Tree
+ * installing it from u-boot prompt) or adjust the Device Tree
  * (s/0xf1000000/0xd0000000/ in 'ranges' below).
  */
 

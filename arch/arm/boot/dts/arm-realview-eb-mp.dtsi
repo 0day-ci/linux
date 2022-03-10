@@ -72,7 +72,7 @@
 			 * Override default cache size, sets and
 			 * associativity as these may be erroneously set
 			 * up by boot loader(s), probably for safety
-			 * since th outer sync operation can cause the
+			 * since the outer sync operation can cause the
 			 * cache to hang unless disabled.
 			 */
 			cache-size = <1048576>; // 1MB
