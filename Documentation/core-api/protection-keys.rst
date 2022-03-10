@@ -131,3 +131,8 @@ ARCH_HAS_SUPERVISOR_PKEYS.  It also makes it possible for multiple independent
 features to "select ARCH_ENABLE_SUPERVISOR_PKEYS".  If no features enable PKS
 by selecting ARCH_ENABLE_SUPERVISOR_PKEYS, PKS support will not be compiled
 into the kernel.
+
+PKS Key Allocation
+------------------
+.. kernel-doc:: include/linux/pks-keys.h
+        :doc: PKS_KEY_ALLOCATION
