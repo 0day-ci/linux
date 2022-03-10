@@ -999,6 +999,9 @@ bool acpi_pci_bridge_d3(struct pci_dev *dev)
 	if (!adev)
 		return false;
 
+	if (!adev->wakeup.flags.valid)
+		return false;
+
 	if (acpi_dev_get_property(adev, "HotPlugSupportInD3",
 				   ACPI_TYPE_INTEGER, &obj) < 0)
 		return false;
