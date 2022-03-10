@@ -1198,6 +1198,9 @@ static inline void pgmap_set_noaccess(struct page *page)
 	__pgmap_set_noaccess(page->pgmap);
 }
 
+bool pgmap_pks_fault_callback(struct pt_regs *regs, unsigned long address,
+			      bool write);
+
 #else
 
 static inline void __pgmap_set_readwrite(struct dev_pagemap *pgmap) { }

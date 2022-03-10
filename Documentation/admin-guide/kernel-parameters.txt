@@ -4158,6 +4158,18 @@
 	pirq=		[SMP,APIC] Manual mp-table setup
 			See Documentation/x86/i386/IO-APIC.rst.
 
+	memremap.pks_fault_mode=	[X86] Control the behavior of page map
+			protection violations.
+			(depends on CONFIG_DEVMAP_ACCESS_PROTECTION)
+
+			Format: { relaxed | strict }
+
+			relaxed - Print a warning, disable the protection and
+				  continue execution.
+			strict - Stop kernel execution via fault
+
+			default: relaxed
+
 	plip=		[PPT,NET] Parallel port network link
 			Format: { parport<nr> | timid | 0 }
 			See also Documentation/admin-guide/parport.rst.
