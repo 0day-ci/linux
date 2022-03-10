@@ -2957,8 +2957,9 @@ out:
 	return ret;
 }
 
-static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
+static int btrfs_punch_hole(struct file *file, loff_t offset, loff_t len)
 {
+	struct inode *inode = file_inode(file);
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct extent_state *cached_state = NULL;
@@ -2989,6 +2990,10 @@ static int btrfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 		ret = 0;
 		goto out_only_mutex;
 	}
+
+	ret = file_modified(file);
+	if (ret)
+		goto out_only_mutex;
 
 	lockstart = round_up(offset, btrfs_inode_sectorsize(BTRFS_I(inode)));
 	lockend = round_down(offset + len,
@@ -3216,11 +3221,12 @@ static int btrfs_zero_range_check_range_boundary(struct btrfs_inode *inode,
 	return ret;
 }
 
-static int btrfs_zero_range(struct inode *inode,
+static int btrfs_zero_range(struct file *file,
 			    loff_t offset,
 			    loff_t len,
 			    const int mode)
 {
+	struct inode *inode = file_inode(file);
 	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
 	struct extent_map *em;
 	struct extent_changeset *data_reserved = NULL;
@@ -3238,6 +3244,12 @@ static int btrfs_zero_range(struct inode *inode,
 			      alloc_end - alloc_start);
 	if (IS_ERR(em)) {
 		ret = PTR_ERR(em);
+		goto out;
+	}
+
+	ret = file_modified(file);
+	if (ret) {
+		free_extent_map(em);
 		goto out;
 	}
 
@@ -3430,7 +3442,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 		return -EOPNOTSUPP;
 
 	if (mode & FALLOC_FL_PUNCH_HOLE)
-		return btrfs_punch_hole(inode, offset, len);
+		return btrfs_punch_hole(file, offset, len);
 
 	/*
 	 * Only trigger disk allocation, don't trigger qgroup reserve
@@ -3485,7 +3497,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 		goto out;
 
 	if (mode & FALLOC_FL_ZERO_RANGE) {
-		ret = btrfs_zero_range(inode, offset, len, mode);
+		ret = btrfs_zero_range(file, offset, len, mode);
 		btrfs_inode_unlock(inode, BTRFS_ILOCK_MMAP);
 		return ret;
 	}
@@ -3566,6 +3578,9 @@ static long btrfs_fallocate(struct file *file, int mode,
 		free_extent_map(em);
 		cur_offset = last_byte;
 	}
+
+	if (!ret)
+		ret = file_modified(file);
 
 	/*
 	 * If ret is still 0, means we're OK to fallocate.
