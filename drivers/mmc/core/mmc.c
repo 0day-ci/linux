@@ -1390,11 +1390,16 @@ static int mmc_select_hs400es(struct mmc_card *card)
 	}
 
 	mmc_set_timing(host, MMC_TIMING_MMC_HS);
+
+	/*
+	 * Bump to HS frequency. Some cards don't handle SEND_STATUS reliably
+	 * at the initial frequency.
+	 */
+	mmc_set_clock(host, card->ext_csd.hs_max_dtr);
+
 	err = mmc_switch_status(card, true);
 	if (err)
 		goto out_err;
-
-	mmc_set_clock(host, card->ext_csd.hs_max_dtr);
 
 	/* Switch card to DDR with strobe bit */
 	val = EXT_CSD_DDR_BUS_WIDTH_8 | EXT_CSD_BUS_WIDTH_STROBE;
@@ -1486,6 +1491,12 @@ static int mmc_select_hs200(struct mmc_card *card)
 			goto err;
 		old_timing = host->ios.timing;
 		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
+
+		/*
+		 * Bump to HS frequency. Some cards don't handle SEND_STATUS
+		 * reliably at the initial frequency.
+		 */
+		mmc_set_clock(host, card->ext_csd.hs_max_dtr);
 
 		/*
 		 * For HS200, CRC errors are not a reliable way to know the
