@@ -6,6 +6,7 @@
 #include <linux/debugfs.h>		/* debugfs_create_u32()		*/
 #include <linux/mm_types.h>             /* mm_struct, vma, etc...       */
 #include <linux/pkeys.h>                /* PKEY_*                       */
+#include <linux/pks-keys.h>
 #include <uapi/asm-generic/mman-common.h>
 
 #include <asm/cpufeature.h>             /* boot_cpu_has, ...            */
@@ -209,3 +210,19 @@ u32 pkey_update_pkval(u32 pkval, u8 pkey, u32 accessbits)
 	pkval &= ~(PKEY_ACCESS_MASK << shift);
 	return pkval | accessbits << shift;
 }
+
+#ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
+
+/*
+ * PKS is independent of PKU and either or both may be supported on a CPU.
+ */
+void pks_setup(void)
+{
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	wrmsrl(MSR_IA32_PKRS, PKS_INIT_VALUE);
+	cr4_set_bits(X86_CR4_PKS);
+}
+
+#endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
