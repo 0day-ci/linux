@@ -6292,43 +6292,14 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 {
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
 	int i, cpu, idle_cpu = -1, nr = INT_MAX;
-	struct rq *this_rq = this_rq();
-	int this = smp_processor_id();
-	struct sched_domain *this_sd;
-	u64 time = 0;
-
-	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
-	if (!this_sd)
-		return -1;
+	struct sched_domain_shared *sd_share;
 
 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
 
 	if (sched_feat(SIS_PROP) && !has_idle_core) {
-		u64 avg_cost, avg_idle, span_avg;
-		unsigned long now = jiffies;
-
-		/*
-		 * If we're busy, the assumption that the last idle period
-		 * predicts the future is flawed; age away the remaining
-		 * predicted idle time.
-		 */
-		if (unlikely(this_rq->wake_stamp < now)) {
-			while (this_rq->wake_stamp < now && this_rq->wake_avg_idle) {
-				this_rq->wake_stamp++;
-				this_rq->wake_avg_idle >>= 1;
-			}
-		}
-
-		avg_idle = this_rq->wake_avg_idle;
-		avg_cost = this_sd->avg_scan_cost + 1;
-
-		span_avg = sd->span_weight * avg_idle;
-		if (span_avg > 4*avg_cost)
-			nr = div_u64(span_avg, avg_cost);
-		else
-			nr = 4;
-
-		time = cpu_clock(this);
+		sd_share = rcu_dereference(per_cpu(sd_llc_shared, target));
+		if (sd_share)
+			nr = READ_ONCE(sd_share->nr_idle_scan);
 	}
 
 	for_each_cpu_wrap(cpu, cpus, target + 1) {
@@ -6348,18 +6319,6 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 
 	if (has_idle_core)
 		set_idle_cores(target, false);
-
-	if (sched_feat(SIS_PROP) && !has_idle_core) {
-		time = cpu_clock(this) - time;
-
-		/*
-		 * Account for the scan cost of wakeups against the average
-		 * idle time.
-		 */
-		this_rq->wake_avg_idle -= min(this_rq->wake_avg_idle, time);
-
-		update_avg(&this_sd->avg_scan_cost, time);
-	}
 
 	return idle_cpu;
 }
@@ -9221,6 +9180,60 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p, int this_cpu)
 	return idlest;
 }
 
+static inline void update_nr_idle_scan(struct lb_env *env, struct sd_lb_stats *sds,
+				       unsigned long sum_util)
+{
+	struct sched_domain_shared *sd_share;
+	int llc_size = per_cpu(sd_llc_size, env->dst_cpu);
+	int nr_scan;
+
+	/*
+	 * Update the number of CPUs to scan in LLC domain, which could
+	 * be used as a hint in select_idle_cpu(). The update of this hint
+	 * occurs during periodic load balancing, rather than frequent
+	 * newidle balance.
+	 */
+	if (env->idle == CPU_NEWLY_IDLE || env->sd->span_weight != llc_size)
+		return;
+
+	sd_share = rcu_dereference(per_cpu(sd_llc_shared, env->dst_cpu));
+	if (!sd_share)
+		return;
+
+	/*
+	 * In general, the number of cpus to be scanned should be
+	 * inversely proportional to the sum_util. That is, the lower
+	 * the sum_util is, the harder select_idle_cpu() should scan
+	 * for idle CPU, and vice versa. Let x be the sum_util ratio
+	 * [0-100] of the LLC domain, f(x) be the number of CPUs scanned:
+	 *
+	 * f(x) = a - bx                                              [1]
+	 *
+	 * Consider that f(x) = nr_llc when x = 0, and f(x) = 4 when
+	 * x >= threshold('h' below) then:
+	 *
+	 * a = llc_size;
+	 * b = (nr_llc - 4) / h                                       [2]
+	 *
+	 * then [2] becomes:
+	 *
+	 * f(x) = llc_size - (llc_size -4)x/h                         [3]
+	 *
+	 * Choose 50 (50%) for h as the threshold from experiment result.
+	 * And since x = 100 * sum_util / total_cap, [3] becomes:
+	 *
+	 * f(sum_util)
+	 *  = llc_size - (llc_size - 4) * 100 * sum_util / total_cap * 50
+	 *  = llc_size - (llc_size - 4) * 2 * sum_util / total_cap
+	 *
+	 */
+	nr_scan = llc_size - (llc_size - 4) * 2 * sum_util / sds->total_capacity;
+	if (nr_scan < 4)
+		nr_scan = 4;
+
+	WRITE_ONCE(sd_share->nr_idle_scan, nr_scan);
+}
+
 /**
  * update_sd_lb_stats - Update sched_domain's statistics for load balancing.
  * @env: The load balancing environment.
@@ -9234,6 +9247,7 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 	struct sg_lb_stats *local = &sds->local_stat;
 	struct sg_lb_stats tmp_sgs;
 	int sg_status = 0;
+	unsigned long sum_util = 0;
 
 	do {
 		struct sg_lb_stats *sgs = &tmp_sgs;
@@ -9264,6 +9278,7 @@ next_group:
 		/* Now, start updating sd_lb_stats */
 		sds->total_load += sgs->group_load;
 		sds->total_capacity += sgs->group_capacity;
+		sum_util += sgs->group_util;
 
 		sg = sg->next;
 	} while (sg != env->sd->groups);
@@ -9290,6 +9305,8 @@ next_group:
 		WRITE_ONCE(rd->overutilized, SG_OVERUTILIZED);
 		trace_sched_overutilized_tp(rd, SG_OVERUTILIZED);
 	}
+
+	update_nr_idle_scan(env, sds, sum_util);
 }
 
 #define NUMA_IMBALANCE_MIN 2
