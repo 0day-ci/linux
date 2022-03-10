@@ -17,6 +17,7 @@ properties:
     enum:
       - invensense,iam20680
       - invensense,icm20608
+      - invensense,icm20608d
       - invensense,icm20609
       - invensense,icm20689
       - invensense,icm20602
