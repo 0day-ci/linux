@@ -27,7 +27,35 @@ int panic_on_unrecovered_nmi;
 int panic_on_io_nmi;
 static int die_counter;
 
+#ifdef CONFIG_ARCH_HAS_PTREGS_AUXILIARY
+
+static struct pt_regs_extended exec_summary_regs;
+
+static void save_exec_summary(struct pt_regs *regs)
+{
+	exec_summary_regs = *(to_extended_pt_regs(regs));
+}
+
+static struct pt_regs *retrieve_exec_summary(void)
+{
+	return &exec_summary_regs.pt_regs;
+}
+
+#else /* !CONFIG_ARCH_HAS_PTREGS_AUXILIARY */
+
 static struct pt_regs exec_summary_regs;
+
+static void save_exec_summary(struct pt_regs *regs)
+{
+	exec_summary_regs = *regs;
+}
+
+static struct pt_regs *retrieve_exec_summary(void)
+{
+	return &exec_summary_regs;
+}
+
+#endif /* CONFIG_ARCH_HAS_PTREGS_AUXILIARY */
 
 bool noinstr in_task_stack(unsigned long *stack, struct task_struct *task,
 			   struct stack_info *info)
@@ -369,7 +397,7 @@ void oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 	oops_exit();
 
 	/* Executive summary in case the oops scrolled away */
-	__show_regs(&exec_summary_regs, SHOW_REGS_ALL, KERN_DEFAULT);
+	__show_regs(retrieve_exec_summary(), SHOW_REGS_ALL, KERN_DEFAULT);
 
 	if (!signr)
 		return;
@@ -396,7 +424,7 @@ static void __die_header(const char *str, struct pt_regs *regs, long err)
 
 	/* Save the regs of the first oops for the executive summary later. */
 	if (!die_counter)
-		exec_summary_regs = *regs;
+		save_exec_summary(regs);
 
 	if (IS_ENABLED(CONFIG_PREEMPTION))
 		pr = IS_ENABLED(CONFIG_PREEMPT_RT) ? " PREEMPT_RT" : " PREEMPT";
