@@ -601,7 +601,7 @@ static ssize_t lirc_read_mode2(struct file *file, char __user *buffer,
 {
 	struct lirc_fh *fh = file->private_data;
 	struct rc_dev *rcdev = fh->rc;
-	unsigned int copied;
+	unsigned int copied = 0;
 	int ret;
 
 	if (length < sizeof(unsigned int) || length % sizeof(unsigned int))
@@ -639,7 +639,7 @@ static ssize_t lirc_read_scancode(struct file *file, char __user *buffer,
 {
 	struct lirc_fh *fh = file->private_data;
 	struct rc_dev *rcdev = fh->rc;
-	unsigned int copied;
+	unsigned int copied = 0;
 	int ret;
 
 	if (length < sizeof(struct lirc_scancode) ||
