@@ -37,10 +37,14 @@
 #include <linux/pks.h>
 #include <linux/pks-keys.h>
 
+#include <uapi/asm-generic/mman-common.h>
+
 #define PKS_TEST_MEM_SIZE (PAGE_SIZE)
 
 #define CHECK_DEFAULTS		0
 #define RUN_SINGLE		1
+#define ARM_CTX_SWITCH		2
+#define CHECK_CTX_SWITCH	3
 #define RUN_CRASH_TEST		9
 
 static struct dentry *pks_test_dentry;
@@ -336,6 +340,48 @@ static void arm_or_run_crash_test(struct pks_session_data *sd)
 	crash_it(sd);
 }
 
+static void arm_ctx_switch(struct pks_session_data *sd)
+{
+	struct pks_test_ctx *ctx;
+
+	ctx = alloc_ctx(PKS_KEY_TEST);
+	if (IS_ERR(ctx)) {
+		pr_err("Failed to allocate a context\n");
+		sd->last_test_pass = false;
+		return;
+	}
+
+	set_ctx_data(sd, ctx);
+
+	/* Ensure a known state to test context switch */
+	pks_set_readwrite(ctx->pkey);
+}
+
+static void check_ctx_switch(struct pks_session_data *sd)
+{
+	struct pks_test_ctx *ctx = sd->ctx;
+	unsigned long reg_pkrs;
+	int access;
+
+	sd->last_test_pass = true;
+
+	if (!ctx) {
+		pr_err("No Context switch configured\n");
+		sd->last_test_pass = false;
+		return;
+	}
+
+	rdmsrl(MSR_IA32_PKRS, reg_pkrs);
+
+	access = (reg_pkrs >> PKR_PKEY_SHIFT(ctx->pkey)) &
+		  PKEY_ACCESS_MASK;
+	if (access != 0) {
+		pr_err("Context switch check failed: pkey %u: 0x%x reg: 0x%lx\n",
+			ctx->pkey, access, reg_pkrs);
+		sd->last_test_pass = false;
+	}
+}
+
 static ssize_t pks_read_file(struct file *file, char __user *user_buf,
 			     size_t count, loff_t *ppos)
 {
@@ -389,6 +435,14 @@ static ssize_t pks_write_file(struct file *file, const char __user *user_buf,
 	case RUN_SINGLE:
 		pr_debug("Single key\n");
 		sd->last_test_pass = run_single(file->private_data);
+		break;
+	case ARM_CTX_SWITCH:
+		pr_debug("Arming Context switch test\n");
+		arm_ctx_switch(file->private_data);
+		break;
+	case CHECK_CTX_SWITCH:
+		pr_debug("Checking Context switch test\n");
+		check_ctx_switch(file->private_data);
 		break;
 	default:
 		pr_debug("Unknown test\n");

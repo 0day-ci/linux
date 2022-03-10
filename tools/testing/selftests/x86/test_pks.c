@@ -17,6 +17,7 @@
  *	...
  */
 #define _GNU_SOURCE
+#include <sched.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -32,10 +33,13 @@
 /* Values from the kernel */
 #define CHECK_DEFAULTS		"0"
 #define RUN_SINGLE		"1"
+#define ARM_CTX_SWITCH		"2"
+#define CHECK_CTX_SWITCH	"3"
 #define RUN_CRASH_TEST		"9"
 
 time_t g_start_time;
 int g_debug;
+unsigned long g_cpu;
 
 #define PRINT_DEBUG(fmt, ...) \
 	do { \
@@ -47,6 +51,7 @@ int g_debug;
 	fprintf(stderr, "%s: " fmt, __func__, ##__VA_ARGS__)
 
 static int do_simple_test(const char *debugfs_str);
+static int do_context_switch(const char *debugfs_str);
 
 /*
  * The crash test is a special case which is not included in the run all
@@ -55,6 +60,7 @@ static int do_simple_test(const char *debugfs_str);
 enum {
 	TEST_DEFAULTS = 0,
 	TEST_SINGLE,
+	TEST_CTX_SWITCH,
 	MAX_TESTS,
 } tests;
 
@@ -67,7 +73,8 @@ struct test_item {
 	int (*test_fn)(const char *debugfs_str);
 } test_list[] = {
 	{ "check_defaults", CHECK_DEFAULTS, do_simple_test },
-	{ "single", RUN_SINGLE, do_simple_test }
+	{ "single", RUN_SINGLE, do_simple_test },
+	{ "context_switch", ARM_CTX_SWITCH, do_context_switch }
 };
 
 static char *get_test_name(int test_num)
@@ -101,6 +108,7 @@ static void print_help_and_exit(char *argv0)
 	printf("Usage: %s [-h,-d] [test]\n", argv0);
 	printf("	--help,-h   This help\n");
 	printf("	--debug,-d  Output kernel debug via dynamic debug if available\n");
+	printf("	--cpu,-c <cpu>  Use 'cpu' for context switch default 0\n");
 	printf("\n");
 	printf("        Run all PKS tests or the [test] specified.\n");
 	printf("\n");
@@ -114,6 +122,143 @@ static void print_help_and_exit(char *argv0)
 		CREATE_FAULT_TEST_NAME);
 
 	printf("\n");
+}
+
+/*
+ * debugfs_str is ignored for this test.
+ */
+static int do_context_switch(const char *debugfs_str)
+{
+	int switch_done[2];
+	int setup_done[2];
+	cpu_set_t cpuset;
+	char result[32];
+	char done = 'P';
+	int rc = 0;
+	pid_t pid;
+	int fd;
+
+	if (g_cpu >= sysconf(_SC_NPROCESSORS_ONLN)) {
+		PRINT_ERROR("CPU %lu is invalid\n", g_cpu);
+		g_cpu = sysconf(_SC_NPROCESSORS_ONLN) - 1;
+		PRINT_ERROR("   running on max CPU: %lu\n", g_cpu);
+	}
+
+	CPU_ZERO(&cpuset);
+	CPU_SET(g_cpu, &cpuset);
+	/*
+	 * Ensure the two processes run on the same CPU so that they go through
+	 * a context switch.
+	 */
+	sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
+
+	if (pipe(setup_done)) {
+		PRINT_ERROR("ERROR: Failed to create pipe\n");
+		return -EIO;
+	}
+	if (pipe(switch_done)) {
+		PRINT_ERROR("ERROR: Failed to create pipe\n");
+		return -EIO;
+	}
+
+	fd = open(PKS_TEST_FILE, O_RDWR);
+	if (fd < 0) {
+		PRINT_DEBUG("Failed to open test file : %s\n", PKS_TEST_FILE);
+		return -ENOENT;
+	}
+
+	/* Avoid duplicated output after fork */
+	fflush(stderr);
+	fflush(stdout);
+
+	pid = fork();
+	if (pid == 0) {
+		char done = 'P';
+
+		g_cpu = sched_getcpu();
+		PRINT_DEBUG("Child: running on cpu %lu...\n", g_cpu);
+
+		/* Allocate and run test. */
+		write(fd, RUN_SINGLE, 1);
+
+		/* Arm for context switch test */
+		write(fd, ARM_CTX_SWITCH, 1);
+
+		PRINT_DEBUG("Child: Tell parent to go\n");
+		write(setup_done[1], &done, sizeof(done));
+
+		/* Context switch out... */
+		PRINT_DEBUG("Child: Waiting for parent...\n");
+		read(switch_done[0], &done, sizeof(done));
+
+		/* Check msr restored */
+		PRINT_DEBUG("Child: Checking result\n");
+		rc = write(fd, CHECK_CTX_SWITCH, 1);
+		if (rc < 0) {
+			if (errno == ENOENT) {
+				sprintf(result, "SKIP");
+				done = 'S';
+			} else {
+				sprintf(result, "FAIL");
+				done = 'F';
+			}
+			goto child_exit;
+		}
+
+		read(fd, result, 10);
+		if (strncmp(result, "PASS", 4))
+			done = 'F';
+
+child_exit:
+		PRINT_DEBUG("Child: Result (%c) %s\n", done, result);
+
+		/* Signal result */
+		write(setup_done[1], &done, sizeof(done));
+		close(fd);
+
+		exit(0);
+	}
+
+	PRINT_DEBUG("Parent: Waiting for child\n");
+	read(setup_done[0], &done, sizeof(done));
+	g_cpu = sched_getcpu();
+	PRINT_DEBUG("Parent: running on cpu %lu\n", g_cpu);
+
+	/* The parent needs a unique file context within the kernel */
+	close(fd);
+	fd = open(PKS_TEST_FILE, O_RDWR);
+	if (fd < 0) {
+		PRINT_ERROR("FATAL ERROR: cannot open %s\n", PKS_TEST_FILE);
+		PRINT_DEBUG("Parent: Signaling child 'fail'\n");
+		done = 'F';
+		write(switch_done[1], &done, sizeof(done));
+		return -ENOENT;
+	}
+
+	/* run test with the same pkey */
+	rc = write(fd, RUN_SINGLE, 1);
+
+	PRINT_DEBUG("Parent: Signaling child\n");
+	write(switch_done[1], &done, sizeof(done));
+
+	if (rc < 0) {
+		rc = -errno;
+		goto close_file;
+	}
+	rc = 0;
+
+	/* Wait for result */
+	read(setup_done[0], &done, sizeof(done));
+	if (done == 'S')
+		rc = -ENOENT;
+	if (done == 'F')
+		rc = -EFAULT;
+
+	PRINT_DEBUG("Parent: exiting with rc (%c) %d\n", done, rc);
+
+close_file:
+	close(fd);
+	return rc;
 }
 
 /*
@@ -307,9 +452,10 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		static struct option long_options[] = {
-			{"help",	no_argument,	0,	'h' },
-			{"debug",	no_argument,	0,	'd' },
-			{0,		0,		0,	0 }
+			{"help",	no_argument,		0,	'h' },
+			{"debug",	no_argument,		0,	'd' },
+			{"cpu",		required_argument,	0,	'c' },
+			{0,		0,			0,	0 }
 		};
 		int option_index = 0;
 		int c;
@@ -324,6 +470,9 @@ int main(int argc, char *argv[])
 			return 0;
 		case 'd':
 			g_debug++;
+			break;
+		case 'c':
+			g_cpu = strtoul(optarg, NULL, 0);
 			break;
 		default:
 			print_help_and_exit(argv[0]);
