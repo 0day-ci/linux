@@ -65,7 +65,7 @@ static bool can_enable_drrs(struct intel_connector *connector,
 		return false;
 
 	return connector->panel.downclock_mode &&
-		i915->drrs.type == SEAMLESS_DRRS_SUPPORT;
+		i915->drrs.type == DRRS_TYPE_SEAMLESS;
 }
 
 void
@@ -82,6 +82,9 @@ intel_drrs_compute_config(struct intel_dp *intel_dp,
 			intel_zero_m_n(&pipe_config->dp_m2_n2);
 		return;
 	}
+
+	if (IS_IRONLAKE(i915) || IS_SANDYBRIDGE(i915) || IS_IVYBRIDGE(i915))
+		pipe_config->msa_timing_delay = i915->vbt.edp.drrs_msa_timing_delay;
 
 	pipe_config->has_drrs = true;
 
@@ -100,7 +103,7 @@ intel_drrs_compute_config(struct intel_dp *intel_dp,
 
 static void
 intel_drrs_set_refresh_rate_pipeconf(const struct intel_crtc_state *crtc_state,
-				     enum drrs_refresh_rate_type refresh_type)
+				     enum drrs_refresh_rate refresh_rate)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
@@ -108,13 +111,13 @@ intel_drrs_set_refresh_rate_pipeconf(const struct intel_crtc_state *crtc_state,
 	u32 val, bit;
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
-		bit = PIPECONF_EDP_RR_MODE_SWITCH_VLV;
+		bit = PIPECONF_REFRESH_RATE_ALT_VLV;
 	else
-		bit = PIPECONF_EDP_RR_MODE_SWITCH;
+		bit = PIPECONF_REFRESH_RATE_ALT_ILK;
 
 	val = intel_de_read(dev_priv, PIPECONF(cpu_transcoder));
 
-	if (refresh_type == DRRS_LOW_RR)
+	if (refresh_rate == DRRS_REFRESH_RATE_LOW)
 		val |= bit;
 	else
 		val &= ~bit;
@@ -124,22 +127,21 @@ intel_drrs_set_refresh_rate_pipeconf(const struct intel_crtc_state *crtc_state,
 
 static void
 intel_drrs_set_refresh_rate_m_n(const struct intel_crtc_state *crtc_state,
-				enum drrs_refresh_rate_type refresh_type)
+				enum drrs_refresh_rate refresh_rate)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
 
 	intel_cpu_transcoder_set_m1_n1(crtc, crtc_state->cpu_transcoder,
-				       refresh_type == DRRS_LOW_RR ?
+				       refresh_rate == DRRS_REFRESH_RATE_LOW ?
 				       &crtc_state->dp_m2_n2 : &crtc_state->dp_m_n);
 }
 
 static void intel_drrs_set_state(struct drm_i915_private *dev_priv,
 				 const struct intel_crtc_state *crtc_state,
-				 enum drrs_refresh_rate_type refresh_type)
+				 enum drrs_refresh_rate refresh_rate)
 {
 	struct intel_dp *intel_dp = dev_priv->drrs.dp;
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
-	struct drm_display_mode *mode;
 
 	if (!intel_dp) {
 		drm_dbg_kms(&dev_priv->drm, "DRRS not supported.\n");
@@ -152,12 +154,12 @@ static void intel_drrs_set_state(struct drm_i915_private *dev_priv,
 		return;
 	}
 
-	if (dev_priv->drrs.type < SEAMLESS_DRRS_SUPPORT) {
+	if (dev_priv->drrs.type != DRRS_TYPE_SEAMLESS) {
 		drm_dbg_kms(&dev_priv->drm, "Only Seamless DRRS supported.\n");
 		return;
 	}
 
-	if (refresh_type == dev_priv->drrs.refresh_rate_type)
+	if (refresh_rate == dev_priv->drrs.refresh_rate)
 		return;
 
 	if (!crtc_state->hw.active) {
@@ -167,18 +169,14 @@ static void intel_drrs_set_state(struct drm_i915_private *dev_priv,
 	}
 
 	if (DISPLAY_VER(dev_priv) >= 8 && !IS_CHERRYVIEW(dev_priv))
-		intel_drrs_set_refresh_rate_m_n(crtc_state, refresh_type);
+		intel_drrs_set_refresh_rate_m_n(crtc_state, refresh_rate);
 	else if (DISPLAY_VER(dev_priv) > 6)
-		intel_drrs_set_refresh_rate_pipeconf(crtc_state, refresh_type);
+		intel_drrs_set_refresh_rate_pipeconf(crtc_state, refresh_rate);
 
-	dev_priv->drrs.refresh_rate_type = refresh_type;
+	dev_priv->drrs.refresh_rate = refresh_rate;
 
-	if (refresh_type == DRRS_LOW_RR)
-		mode = intel_dp->attached_connector->panel.downclock_mode;
-	else
-		mode = intel_dp->attached_connector->panel.fixed_mode;
-	drm_dbg_kms(&dev_priv->drm, "eDP Refresh Rate set to : %dHz\n",
-		    drm_mode_vrefresh(mode));
+	drm_dbg_kms(&dev_priv->drm, "eDP Refresh Rate set to : %s\n",
+		    refresh_rate == DRRS_REFRESH_RATE_LOW ? "low" : "high");
 }
 
 static void
@@ -226,7 +224,7 @@ intel_drrs_disable_locked(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	intel_drrs_set_state(dev_priv, crtc_state, DRRS_HIGH_RR);
+	intel_drrs_set_state(dev_priv, crtc_state, DRRS_REFRESH_RATE_HIGH);
 	dev_priv->drrs.dp = NULL;
 }
 
@@ -271,7 +269,7 @@ intel_drrs_update(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	if (dev_priv->drrs.type != SEAMLESS_DRRS_SUPPORT)
+	if (dev_priv->drrs.type != DRRS_TYPE_SEAMLESS)
 		return;
 
 	mutex_lock(&dev_priv->drrs.mutex);
@@ -294,7 +292,6 @@ static void intel_drrs_downclock_work(struct work_struct *work)
 	struct drm_i915_private *dev_priv =
 		container_of(work, typeof(*dev_priv), drrs.work.work);
 	struct intel_dp *intel_dp;
-	struct drm_crtc *crtc;
 
 	mutex_lock(&dev_priv->drrs.mutex);
 
@@ -308,11 +305,13 @@ static void intel_drrs_downclock_work(struct work_struct *work)
 	 * recheck.
 	 */
 
-	if (dev_priv->drrs.busy_frontbuffer_bits)
-		goto unlock;
+	if (!dev_priv->drrs.busy_frontbuffer_bits) {
+		struct intel_crtc *crtc =
+			to_intel_crtc(dp_to_dig_port(intel_dp)->base.base.crtc);
 
-	crtc = dp_to_dig_port(intel_dp)->base.base.crtc;
-	intel_drrs_set_state(dev_priv, to_intel_crtc(crtc)->config, DRRS_LOW_RR);
+		intel_drrs_set_state(dev_priv, crtc->config,
+				     DRRS_REFRESH_RATE_LOW);
+	}
 
 unlock:
 	mutex_unlock(&dev_priv->drrs.mutex);
@@ -326,7 +325,7 @@ static void intel_drrs_frontbuffer_update(struct drm_i915_private *dev_priv,
 	struct drm_crtc *crtc;
 	enum pipe pipe;
 
-	if (dev_priv->drrs.type == DRRS_NOT_SUPPORTED)
+	if (dev_priv->drrs.type != DRRS_TYPE_SEAMLESS)
 		return;
 
 	cancel_delayed_work(&dev_priv->drrs.work);
@@ -351,7 +350,7 @@ static void intel_drrs_frontbuffer_update(struct drm_i915_private *dev_priv,
 	/* flush/invalidate means busy screen hence upclock */
 	if (frontbuffer_bits)
 		intel_drrs_set_state(dev_priv, to_intel_crtc(crtc)->config,
-				     DRRS_HIGH_RR);
+				     DRRS_REFRESH_RATE_HIGH);
 
 	/*
 	 * flush also means no more activity hence schedule downclock, if all
@@ -421,7 +420,7 @@ void intel_drrs_page_flip(struct intel_atomic_state *state,
  */
 struct drm_display_mode *
 intel_drrs_init(struct intel_connector *connector,
-		struct drm_display_mode *fixed_mode)
+		const struct drm_display_mode *fixed_mode)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_encoder *encoder = connector->encoder;
@@ -432,33 +431,41 @@ intel_drrs_init(struct intel_connector *connector,
 
 	if (DISPLAY_VER(dev_priv) <= 6) {
 		drm_dbg_kms(&dev_priv->drm,
-			    "DRRS supported for Gen7 and above\n");
+			    "[CONNECTOR:%d:%s] DRRS not supported on platform\n",
+			    connector->base.base.id, connector->base.name);
 		return NULL;
 	}
 
 	if ((DISPLAY_VER(dev_priv) < 8 && !HAS_GMCH(dev_priv)) &&
 	    encoder->port != PORT_A) {
 		drm_dbg_kms(&dev_priv->drm,
-			    "DRRS only supported on eDP port A\n");
+			    "[CONNECTOR:%d:%s] DRRS not supported on [ENCODER:%d:%s]\n",
+			    connector->base.base.id, connector->base.name,
+			    encoder->base.base.id, encoder->base.name);
 		return NULL;
 	}
 
-	if (dev_priv->vbt.drrs_type != SEAMLESS_DRRS_SUPPORT) {
-		drm_dbg_kms(&dev_priv->drm, "VBT doesn't support DRRS\n");
+	if (dev_priv->vbt.drrs_type != DRRS_TYPE_SEAMLESS) {
+		drm_dbg_kms(&dev_priv->drm,
+			    "[CONNECTOR:%d:%s] DRRS not supported according to VBT\n",
+			    connector->base.base.id, connector->base.name);
 		return NULL;
 	}
 
 	downclock_mode = intel_panel_edid_downclock_mode(connector, fixed_mode);
 	if (!downclock_mode) {
 		drm_dbg_kms(&dev_priv->drm,
-			    "Downclock mode is not found. DRRS not supported\n");
+			    "[CONNECTOR:%d:%s] DRRS not supported due to lack of downclock mode\n",
+			    connector->base.base.id, connector->base.name);
 		return NULL;
 	}
 
 	dev_priv->drrs.type = dev_priv->vbt.drrs_type;
 
-	dev_priv->drrs.refresh_rate_type = DRRS_HIGH_RR;
+	dev_priv->drrs.refresh_rate = DRRS_REFRESH_RATE_HIGH;
 	drm_dbg_kms(&dev_priv->drm,
-		    "seamless DRRS supported for eDP panel.\n");
+		    "[CONNECTOR:%d:%s] seamless DRRS supported\n",
+		    connector->base.base.id, connector->base.name);
+
 	return downclock_mode;
 }
