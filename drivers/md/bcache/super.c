@@ -14,6 +14,7 @@
 #include "request.h"
 #include "writeback.h"
 #include "features.h"
+#include "control.h"
 
 #include <linux/blkdev.h>
 #include <linux/pagemap.h>
@@ -1069,7 +1070,7 @@ int bch_cached_dev_run(struct cached_dev *dc)
 		goto out;
 	}
 
-	if (!d->c &&
+	if (!d->c && dc->sb_disk &&
 	    BDEV_STATE(&dc->sb) != BDEV_STATE_NONE) {
 		struct closure cl;
 
@@ -1259,9 +1260,6 @@ int bch_cached_dev_attach(struct cached_dev *dc, struct cache_set *c,
 	 */
 
 	if (bch_is_zero(u->uuid, 16)) {
-		struct closure cl;
-
-		closure_init_stack(&cl);
 
 		memcpy(u->uuid, dc->sb.uuid, 16);
 		memcpy(u->label, dc->sb.label, SB_LABEL_SIZE);
@@ -1271,8 +1269,14 @@ int bch_cached_dev_attach(struct cached_dev *dc, struct cache_set *c,
 		memcpy(dc->sb.set_uuid, c->set_uuid, 16);
 		SET_BDEV_STATE(&dc->sb, BDEV_STATE_CLEAN);
 
-		bch_write_bdev_super(dc, &cl);
-		closure_sync(&cl);
+		if (dc->sb_disk) {
+			struct closure cl;
+
+			closure_init_stack(&cl);
+			bch_write_bdev_super(dc, &cl);
+			closure_sync(&cl);
+		}
+
 	} else {
 		u->last_reg = rtime;
 		bch_uuid_write(c);
@@ -2403,14 +2407,14 @@ err:
 
 /* Global interfaces/init */
 
-static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
+static ssize_t register_bcache_sysfs(struct kobject *k, struct kobj_attribute *attr,
 			       const char *buffer, size_t size);
 static ssize_t bch_pending_bdevs_cleanup(struct kobject *k,
 					 struct kobj_attribute *attr,
 					 const char *buffer, size_t size);
 
-kobj_attribute_write(register,		register_bcache);
-kobj_attribute_write(register_quiet,	register_bcache);
+kobj_attribute_write(register,		register_bcache_sysfs);
+kobj_attribute_write(register_quiet,	register_bcache_sysfs);
 kobj_attribute_write(pendings_cleanup,	bch_pending_bdevs_cleanup);
 
 static bool bch_is_open_backing(dev_t dev)
@@ -2465,7 +2469,8 @@ static void register_bdev_worker(struct work_struct *work)
 	dc = kzalloc(sizeof(*dc), GFP_KERNEL);
 	if (!dc) {
 		fail = true;
-		put_page(virt_to_page(args->sb_disk));
+		if (args->sb_disk)
+			put_page(virt_to_page(args->sb_disk));
 		blkdev_put(args->bdev, FMODE_READ | FMODE_WRITE | FMODE_EXCL);
 		goto out;
 	}
@@ -2495,7 +2500,8 @@ static void register_cache_worker(struct work_struct *work)
 	ca = kzalloc(sizeof(*ca), GFP_KERNEL);
 	if (!ca) {
 		fail = true;
-		put_page(virt_to_page(args->sb_disk));
+		if (args->sb_disk)
+			put_page(virt_to_page(args->sb_disk));
 		blkdev_put(args->bdev, FMODE_READ | FMODE_WRITE | FMODE_EXCL);
 		goto out;
 	}
@@ -2525,7 +2531,7 @@ static void register_device_async(struct async_reg_args *args)
 	queue_delayed_work(system_wq, &args->reg_work, 10);
 }
 
-static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
+static ssize_t register_bcache_common(void *k, struct kobj_attribute *attr,
 			       const char *buffer, size_t size)
 {
 	const char *err;
@@ -2587,9 +2593,14 @@ static ssize_t register_bcache(struct kobject *k, struct kobj_attribute *attr,
 	if (set_blocksize(bdev, 4096))
 		goto out_blkdev_put;
 
-	err = read_super(sb, bdev, &sb_disk);
-	if (err)
-		goto out_blkdev_put;
+	if (!k) {
+		err = read_super(sb, bdev, &sb_disk);
+		if (err)
+			goto out_blkdev_put;
+	} else {
+		sb_disk =  NULL;
+		memcpy(sb, (struct cache_sb *)k, sizeof(struct cache_sb));
+	}
 
 	err = "failed to register device";
 
@@ -2651,7 +2662,8 @@ async_done:
 	return size;
 
 out_put_sb_page:
-	put_page(virt_to_page(sb_disk));
+	if (!k)
+		put_page(virt_to_page(sb_disk));
 out_blkdev_put:
 	blkdev_put(bdev, FMODE_READ | FMODE_WRITE | FMODE_EXCL);
 out_free_sb:
@@ -2665,6 +2677,18 @@ out:
 	pr_info("error %s: %s\n", path?path:"", err);
 	return ret;
 }
+
+static ssize_t register_bcache_sysfs(struct kobject *k, struct kobj_attribute *attr,
+			       const char *buffer, size_t size)
+{
+	return register_bcache_common(NULL, attr, buffer, size);
+}
+
+ssize_t register_bcache_ioctl(struct bch_register_device *brd)
+{
+	return register_bcache_common((void *)brd->sb, NULL, brd->dev_name, brd->size);
+}
+
 
 
 struct pdev {
@@ -2819,6 +2843,7 @@ static void bcache_exit(void)
 {
 	bch_debug_exit();
 	bch_request_exit();
+	bch_ctrl_device_deinit();
 	if (bcache_kobj)
 		kobject_put(bcache_kobj);
 	if (bcache_wq)
@@ -2917,6 +2942,11 @@ static int __init bcache_init(void)
 
 	bch_debug_init();
 	closure_debug_init();
+
+	if (bch_ctrl_device_init()) {
+		pr_err("Cannot initialize control device\n");
+		goto err;
+	}
 
 	bcache_is_reboot = false;
 

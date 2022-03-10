@@ -379,6 +379,10 @@ STORE(__cached_dev)
 		if (v < 0)
 			return v;
 
+		// XXX(atom): Devices created by IOCTL don't support changing cache mode
+		if (!dc->sb_disk)
+			return -EINVAL;
+
 		if ((unsigned int) v != BDEV_CACHE_MODE(&dc->sb)) {
 			SET_BDEV_CACHE_MODE(&dc->sb, v);
 			bch_write_bdev_super(dc, NULL);
