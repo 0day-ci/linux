@@ -347,6 +347,38 @@ void x86_pkrs_load(struct thread_struct *thread)
 }
 
 /*
+ * PKRS is a per-logical-processor MSR which overlays additional protection for
+ * pages which have been mapped with a protection key.
+ *
+ * To protect against exceptions having potentially privileged access to memory
+ * of an interrupted thread, save the current thread value and set the PKRS
+ * value to be used during the exception.
+ */
+void pks_save_pt_regs(struct pt_regs *regs)
+{
+	struct pt_regs_auxiliary *aux_pt_regs;
+
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	aux_pt_regs = &to_extended_pt_regs(regs)->aux;
+	aux_pt_regs->pkrs = current->thread.pkrs;
+	pks_write_pkrs(PKS_INIT_VALUE);
+}
+
+void pks_restore_pt_regs(struct pt_regs *regs)
+{
+	struct pt_regs_auxiliary *aux_pt_regs;
+
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	aux_pt_regs = &to_extended_pt_regs(regs)->aux;
+	current->thread.pkrs = aux_pt_regs->pkrs;
+	pks_write_pkrs(current->thread.pkrs);
+}
+
+/*
  * PKS is independent of PKU and either or both may be supported on a CPU.
  *
  * Context: must be called with preemption disabled

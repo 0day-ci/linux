@@ -34,10 +34,13 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/pgtable.h>
+#include <linux/pkeys.h>
 #include <linux/pks.h>
 #include <linux/pks-keys.h>
 
 #include <uapi/asm-generic/mman-common.h>
+
+#include <asm/ptrace.h>
 
 #define PKS_TEST_MEM_SIZE (PAGE_SIZE)
 
@@ -110,12 +113,16 @@ static void set_context_for_fault(struct pks_test_ctx *ctx)
 bool pks_test_fault_callback(struct pt_regs *regs, unsigned long address,
 			     bool write)
 {
+	struct pt_regs_extended *ept_regs = to_extended_pt_regs(regs);
+	struct pt_regs_auxiliary *aux_pt_regs = &ept_regs->aux;
+	u32 pkrs = aux_pt_regs->pkrs;
+
 	pr_debug("PKS Fault callback: ctx %p\n", g_ctx_under_test);
 
 	if (!g_ctx_under_test)
 		return false;
 
-	pks_set_readwrite(g_ctx_under_test->pkey);
+	aux_pt_regs->pkrs = pkey_update_pkval(pkrs, g_ctx_under_test->pkey, 0);
 	g_ctx_under_test->fault_seen = true;
 	return true;
 }
