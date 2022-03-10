@@ -136,3 +136,9 @@ PKS Key Allocation
 ------------------
 .. kernel-doc:: include/linux/pks-keys.h
         :doc: PKS_KEY_ALLOCATION
+
+Adding pages to a pkey protected domain
+---------------------------------------
+
+.. kernel-doc:: arch/x86/include/asm/pgtable_types.h
+        :doc: PKS_KEY_ASSIGNMENT
