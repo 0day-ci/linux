@@ -451,4 +451,13 @@ config RANDOM_TRUST_BOOTLOADER
 	pool. Otherwise, say N here so it will be regarded as device input that
 	only mixes the entropy pool.
 
+config DDCCI
+	tristate "DDCCI display protocol support"
+	help
+	  Display Data Channel Command Interface is a 
+	  interface that allows the kernel to "talk"
+	  to most displays made after 2005. Check your
+	  display's specification to see if it has
+	  support for this.
+
 endmenu
