@@ -131,4 +131,6 @@ static inline int vma_pkey(struct vm_area_struct *vma)
 	return (vma->vm_flags & vma_pkey_mask) >> VM_PKEY_SHIFT;
 }
 
+u32 pkey_update_pkval(u32 pkval, u8 pkey, u32 accessbits);
+
 #endif /*_ASM_X86_PKEYS_H */

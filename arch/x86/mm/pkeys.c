@@ -193,3 +193,19 @@ static __init int setup_init_pkru(char *opt)
 	return 1;
 }
 __setup("init_pkru=", setup_init_pkru);
+
+/*
+ * Kernel users use the same flags as user space:
+ *     PKEY_DISABLE_ACCESS
+ *     PKEY_DISABLE_WRITE
+ */
+u32 pkey_update_pkval(u32 pkval, u8 pkey, u32 accessbits)
+{
+	int shift = pkey * PKR_BITS_PER_PKEY;
+
+	if (WARN_ON_ONCE(accessbits & ~PKEY_ACCESS_MASK))
+		accessbits &= PKEY_ACCESS_MASK;
+
+	pkval &= ~(PKEY_ACCESS_MASK << shift);
+	return pkval | accessbits << shift;
+}
