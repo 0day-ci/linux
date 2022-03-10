@@ -142,3 +142,9 @@ Adding pages to a pkey protected domain
 
 .. kernel-doc:: arch/x86/include/asm/pgtable_types.h
         :doc: PKS_KEY_ASSIGNMENT
+
+Testing
+-------
+
+.. kernel-doc:: lib/pks/pks_test.c
+        :doc: PKS_TEST
