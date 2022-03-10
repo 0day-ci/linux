@@ -1016,6 +1016,7 @@ struct ice_hw_port_stats {
 	/* flow director stats */
 	u32 fd_sb_status;
 	u64 fd_sb_match;
+	u64 ch_atr_match;
 };
 
 enum ice_sw_fwd_act_type {

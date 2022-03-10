@@ -18,4 +18,6 @@ void ice_devlink_destroy_vf_port(struct ice_vf *vf);
 void ice_devlink_init_regions(struct ice_pf *pf);
 void ice_devlink_destroy_regions(struct ice_pf *pf);
 
+int ice_devlink_tc_params_register(struct ice_vsi *vsi);
+void ice_devlink_tc_params_unregister(struct ice_vsi *vsi);
 #endif /* _ICE_DEVLINK_H_ */

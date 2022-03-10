@@ -54,6 +54,7 @@ struct ice_fltr_desc {
 #define ICE_FXD_FLTR_QW0_COMP_REPORT_S	12
 #define ICE_FXD_FLTR_QW0_COMP_REPORT_M	\
 				(0x3ULL << ICE_FXD_FLTR_QW0_COMP_REPORT_S)
+#define ICE_FXD_FLTR_QW0_COMP_REPORT_NONE	0x0ULL
 #define ICE_FXD_FLTR_QW0_COMP_REPORT_SW_FAIL	0x1ULL
 #define ICE_FXD_FLTR_QW0_COMP_REPORT_SW		0x2ULL
 
@@ -396,6 +397,8 @@ enum ice_flg64_bits {
 
 /* for ice_32byte_rx_flex_desc.ptype_flexi_flags0 member */
 #define ICE_RX_FLEX_DESC_PTYPE_M	(0x3FF) /* 10-bits */
+
+#define ICE_RX_FLEX_DESC_FLEXI_FLAGS0_M		GENMASK(15, 10)
 
 /* for ice_32byte_rx_flex_desc.pkt_length member */
 #define ICE_RX_FLX_DESC_PKT_LEN_M	(0x3FFF) /* 14-bits */
