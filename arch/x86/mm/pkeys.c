@@ -409,6 +409,18 @@ void pks_setup(void)
 	cr4_set_bits(X86_CR4_PKS);
 }
 
+static void __pks_update_protection(u8 pkey, u8 protection)
+{
+	u32 pkrs;
+
+	pkrs = current->thread.pkrs;
+	current->thread.pkrs = pkey_update_pkval(pkrs, pkey, protection);
+
+	preempt_disable();
+	pks_write_pkrs(current->thread.pkrs);
+	preempt_enable();
+}
+
 /*
  * Do not call this directly, see pks_set*().
  *
@@ -422,7 +434,38 @@ void pks_setup(void)
  */
 void pks_update_protection(u8 pkey, u8 protection)
 {
-	u32 pkrs;
+	if (!cpu_feature_enabled(X86_FEATURE_PKS))
+		return;
+
+	if (WARN_ON_ONCE(pkey >= PKS_KEY_MAX))
+		return;
+
+	__pks_update_protection(pkey, protection);
+}
+EXPORT_SYMBOL_GPL(pks_update_protection);
+
+/**
+ * pks_update_exception() - Update the protections of a faulted thread
+ *
+ * @regs: Faulting thread registers
+ * @pkey: pkey to update
+ * @protection: protection bits to use.
+ *
+ * CONTEXT: Exception
+ *
+ * pks_update_exception() updates the faulted threads protections in addition
+ * to the protections within the exception.
+ *
+ * This is useful because the pks_set_*() functions will not work to change the
+ * protections of a thread which has been interrupted.  Only the current
+ * context is updated by those functions.  Therefore, if a PKS fault callback
+ * wants to update the faulted threads protections it must call
+ * pks_update_exception().
+ */
+void pks_update_exception(struct pt_regs *regs, u8 pkey, u8 protection)
+{
+	struct pt_regs_extended *ept_regs;
+	u32 old;
 
 	if (!cpu_feature_enabled(X86_FEATURE_PKS))
 		return;
@@ -430,13 +473,12 @@ void pks_update_protection(u8 pkey, u8 protection)
 	if (WARN_ON_ONCE(pkey >= PKS_KEY_MAX))
 		return;
 
-	pkrs = current->thread.pkrs;
-	current->thread.pkrs = pkey_update_pkval(pkrs, pkey,
-						 protection);
-	preempt_disable();
-	pks_write_pkrs(current->thread.pkrs);
-	preempt_enable();
+	__pks_update_protection(pkey, protection);
+
+	ept_regs = to_extended_pt_regs(regs);
+	old = ept_regs->aux.pkrs;
+	ept_regs->aux.pkrs = pkey_update_pkval(old, pkey, protection);
 }
-EXPORT_SYMBOL_GPL(pks_update_protection);
+EXPORT_SYMBOL_GPL(pks_update_exception);
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */

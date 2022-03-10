@@ -9,6 +9,7 @@
 #include <uapi/asm-generic/mman-common.h>
 
 void pks_update_protection(u8 pkey, u8 protection);
+void pks_update_exception(struct pt_regs *regs, u8 pkey, u8 protection);
 
 /**
  * pks_set_noaccess() - Disable all access to the domain
@@ -41,6 +42,10 @@ typedef bool (*pks_key_callback)(struct pt_regs *regs, unsigned long address,
 
 static inline void pks_set_noaccess(u8 pkey) {}
 static inline void pks_set_readwrite(u8 pkey) {}
+static inline void pks_update_exception(struct pt_regs *regs,
+					u8 pkey,
+					u8 protection)
+{ }
 
 #endif /* CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS */
 

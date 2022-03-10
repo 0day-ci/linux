@@ -149,6 +149,9 @@ Changing permissions of individual keys
 .. kernel-doc:: include/linux/pks.h
         :identifiers: pks_set_readwrite pks_set_noaccess
 
+.. kernel-doc:: arch/x86/mm/pkeys.c
+        :identifiers: pks_update_exception
+
 Overriding Default Fault Behavior
 ---------------------------------
 
