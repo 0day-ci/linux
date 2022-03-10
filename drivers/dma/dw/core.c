@@ -862,6 +862,10 @@ static int dwc_terminate_all(struct dma_chan *chan)
 
 	clear_bit(DW_DMA_IS_SOFT_LLP, &dwc->flags);
 
+	/* Ensure the last byte(s) are drained before disabling the channel */
+	if (test_bit(DW_DMA_IS_PAUSED, &dwc->flags))
+		dwc_chan_resume(dwc, true);
+
 	dwc_chan_pause(dwc, true);
 
 	dwc_chan_disable(dw, dwc);
