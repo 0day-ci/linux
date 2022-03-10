@@ -779,6 +779,7 @@ config ZONE_DEVICE
 config DEVMAP_ACCESS_PROTECTION
 	bool "Access protection for memremap_pages()"
 	depends on NVDIMM_PFN
+	depends on !HIGHMEM
 	depends on ARCH_HAS_SUPERVISOR_PKEYS
 	select ARCH_ENABLE_PKS_CONSUMER
 	default n
