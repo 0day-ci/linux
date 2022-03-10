@@ -6095,8 +6095,7 @@ static struct inode *btrfs_new_inode(struct btrfs_trans_handle *trans,
 				     struct user_namespace *mnt_userns,
 				     struct inode *dir,
 				     const char *name, int name_len,
-				     u64 ref_objectid, u64 objectid,
-				     umode_t mode, u64 *index)
+				     u64 objectid, umode_t mode, u64 *index)
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct inode *inode;
@@ -6182,7 +6181,10 @@ static struct inode *btrfs_new_inode(struct btrfs_trans_handle *trans,
 		 */
 		key[1].objectid = objectid;
 		key[1].type = BTRFS_INODE_REF_KEY;
-		key[1].offset = ref_objectid;
+		if (dir)
+			key[1].offset = btrfs_ino(BTRFS_I(dir));
+		else
+			key[1].offset = objectid;
 
 		sizes[1] = name_len + sizeof(*ref);
 	}
@@ -6380,7 +6382,7 @@ static int btrfs_mknod(struct user_namespace *mnt_userns, struct inode *dir,
 
 	inode = btrfs_new_inode(trans, root, mnt_userns, dir,
 			dentry->d_name.name, dentry->d_name.len,
-			btrfs_ino(BTRFS_I(dir)), objectid, mode, &index);
+			objectid, mode, &index);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		inode = NULL;
@@ -6444,7 +6446,7 @@ static int btrfs_create(struct user_namespace *mnt_userns, struct inode *dir,
 
 	inode = btrfs_new_inode(trans, root, mnt_userns, dir,
 			dentry->d_name.name, dentry->d_name.len,
-			btrfs_ino(BTRFS_I(dir)), objectid, mode, &index);
+			objectid, mode, &index);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		inode = NULL;
@@ -6589,7 +6591,7 @@ static int btrfs_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
 
 	inode = btrfs_new_inode(trans, root, mnt_userns, dir,
 			dentry->d_name.name, dentry->d_name.len,
-			btrfs_ino(BTRFS_I(dir)), objectid,
+			objectid,
 			S_IFDIR | mode, &index);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
@@ -8776,7 +8778,7 @@ int btrfs_create_subvol_root(struct btrfs_trans_handle *trans,
 		return err;
 
 	inode = btrfs_new_inode(trans, new_root, mnt_userns, NULL, "..", 2,
-				ino, ino,
+				ino,
 				S_IFDIR | (~current_umask() & S_IRWXUGO),
 				&index);
 	if (IS_ERR(inode))
@@ -9289,7 +9291,6 @@ static int btrfs_whiteout_for_rename(struct btrfs_trans_handle *trans,
 	inode = btrfs_new_inode(trans, root, mnt_userns, dir,
 				dentry->d_name.name,
 				dentry->d_name.len,
-				btrfs_ino(BTRFS_I(dir)),
 				objectid,
 				S_IFCHR | WHITEOUT_MODE,
 				&index);
@@ -9783,7 +9784,7 @@ static int btrfs_symlink(struct user_namespace *mnt_userns, struct inode *dir,
 
 	inode = btrfs_new_inode(trans, root, mnt_userns, dir,
 				dentry->d_name.name, dentry->d_name.len,
-				btrfs_ino(BTRFS_I(dir)), objectid,
+				objectid,
 				S_IFLNK | S_IRWXUGO, &index);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
@@ -10134,7 +10135,7 @@ static int btrfs_tmpfile(struct user_namespace *mnt_userns, struct inode *dir,
 		goto out;
 
 	inode = btrfs_new_inode(trans, root, mnt_userns, dir, NULL, 0,
-			btrfs_ino(BTRFS_I(dir)), objectid, mode, &index);
+			objectid, mode, &index);
 	if (IS_ERR(inode)) {
 		ret = PTR_ERR(inode);
 		inode = NULL;
