@@ -1,0 +1,20 @@
+menuconfig ARCH_HPE
+	bool "HPE SoC support"
+	help
+	  This enables support for HPE ARM based SoC chips
+if ARCH_HPE
+
+config ARCH_HPE_GXP
+	bool "HPE GXP SoC"
+	select ARM_VIC
+	select PINCTRL
+	select IRQ_DOMAIN
+	select GENERIC_IRQ_CHIP
+	select MULTI_IRQ_HANDLER
+	select SPARSE_IRQ
+	select CLKSRC_MMIO
+	depends on ARCH_MULTI_V7
+	help
+	  Support for GXP SoCs
+
+endif
