@@ -1168,7 +1168,42 @@ static inline bool devmap_protected(struct page *page)
 	return false;
 }
 
+void __pgmap_set_readwrite(struct dev_pagemap *pgmap);
+void __pgmap_set_noaccess(struct dev_pagemap *pgmap);
+
+static inline bool pgmap_check_pgmap_prot(struct page *page)
+{
+	if (!devmap_protected(page))
+		return false;
+
+	/*
+	 * There is no known use case to change permissions in an irq for pgmap
+	 * pages
+	 */
+	lockdep_assert_in_irq();
+	return true;
+}
+
+static inline void pgmap_set_readwrite(struct page *page)
+{
+	if (!pgmap_check_pgmap_prot(page))
+		return;
+	__pgmap_set_readwrite(page->pgmap);
+}
+
+static inline void pgmap_set_noaccess(struct page *page)
+{
+	if (!pgmap_check_pgmap_prot(page))
+		return;
+	__pgmap_set_noaccess(page->pgmap);
+}
+
 #else
+
+static inline void __pgmap_set_readwrite(struct dev_pagemap *pgmap) { }
+static inline void __pgmap_set_noaccess(struct dev_pagemap *pgmap) { }
+static inline void pgmap_set_readwrite(struct page *page) { }
+static inline void pgmap_set_noaccess(struct page *page) { }
 
 static inline bool pgmap_protection_available(void)
 {

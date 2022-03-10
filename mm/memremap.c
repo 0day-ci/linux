@@ -95,6 +95,20 @@ static void devmap_protection_disable(void)
 	static_branch_dec(&dev_pgmap_protection_static_key);
 }
 
+void __pgmap_set_readwrite(struct dev_pagemap *pgmap)
+{
+	if (!current->pgmap_prot_count++)
+		pks_set_readwrite(PKS_KEY_PGMAP_PROTECTION);
+}
+EXPORT_SYMBOL_GPL(__pgmap_set_readwrite);
+
+void __pgmap_set_noaccess(struct dev_pagemap *pgmap)
+{
+	if (!--current->pgmap_prot_count)
+		pks_set_noaccess(PKS_KEY_PGMAP_PROTECTION);
+}
+EXPORT_SYMBOL_GPL(__pgmap_set_noaccess);
+
 #else /* !CONFIG_DEVMAP_ACCESS_PROTECTION */
 
 static void devmap_protection_enable(void) { }
