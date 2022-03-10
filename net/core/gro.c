@@ -136,11 +136,27 @@ int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb)
 	unsigned int new_truesize;
 	struct sk_buff *lp;
 
+	if (unlikely(NAPI_GRO_CB(skb)->flush))
+		return -E2BIG;
+
 	/* pairs with WRITE_ONCE() in netif_set_gro_max_size() */
 	gro_max_size = READ_ONCE(p->dev->gro_max_size);
 
-	if (unlikely(p->len + len >= gro_max_size || NAPI_GRO_CB(skb)->flush))
-		return -E2BIG;
+	if (unlikely(p->len + len >= gro_max_size)) {
+		/* pairs with WRITE_ONCE() in netif_set_gro_ipv6_max_size() */
+		unsigned int gro6_max_size = READ_ONCE(p->dev->gro_ipv6_max_size);
+
+		if (gro6_max_size > gro_max_size &&
+		    p->protocol == htons(ETH_P_IPV6) &&
+		    skb_headroom(p) >= sizeof(struct hop_jumbo_hdr) &&
+		    ipv6_hdr(p)->nexthdr == IPPROTO_TCP &&
+		    !p->encapsulation)
+			gro_max_size = gro6_max_size;
+
+		if (p->len + len >= gro_max_size)
+			return -E2BIG;
+	}
+
 
 	lp = NAPI_GRO_CB(p)->last;
 	pinfo = skb_shinfo(lp);

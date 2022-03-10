@@ -1944,6 +1944,8 @@ enum netdev_ml_priv_type {
  *			keep a list of interfaces to be deleted.
  *	@gro_max_size:	Maximum size of aggregated packet in generic
  *			receive offload (GRO)
+ *	@gro_ipv6_max_size:	Maximum size of aggregated packet in generic
+ *				receive offload (GRO), for IPv6
  *
  *	@dev_addr_shadow:	Copy of @dev_addr to catch direct writes.
  *	@linkwatch_dev_tracker:	refcount tracker used by linkwatch.
@@ -2140,6 +2142,7 @@ struct net_device {
 	int			napi_defer_hard_irqs;
 #define GRO_MAX_SIZE		65536
 	unsigned int		gro_max_size;
+	unsigned int		gro_ipv6_max_size;
 	rx_handler_func_t __rcu	*rx_handler;
 	void __rcu		*rx_handler_data;
 
@@ -4908,6 +4911,13 @@ static inline void netif_set_gso_ipv6_max_size(struct net_device *dev,
 {
 	size = min(size, dev->tso_ipv6_max_size);
 	WRITE_ONCE(dev->gso_ipv6_max_size, size);
+}
+
+static inline void netif_set_gro_ipv6_max_size(struct net_device *dev,
+					       unsigned int size)
+{
+	/* This pairs with the READ_ONCE() in skb_gro_receive() */
+	WRITE_ONCE(dev->gro_ipv6_max_size, size);
 }
 
 static inline void skb_gso_error_unwind(struct sk_buff *skb, __be16 protocol,
