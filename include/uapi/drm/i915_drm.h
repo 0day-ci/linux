@@ -2687,10 +2687,11 @@ struct drm_i915_perf_oa_config {
 struct drm_i915_query_item {
 	/** @query_id: The id for this query */
 	__u64 query_id;
-#define DRM_I915_QUERY_TOPOLOGY_INFO    1
-#define DRM_I915_QUERY_ENGINE_INFO	2
-#define DRM_I915_QUERY_PERF_CONFIG      3
-#define DRM_I915_QUERY_MEMORY_REGIONS   4
+#define DRM_I915_QUERY_TOPOLOGY_INFO    	1
+#define DRM_I915_QUERY_ENGINE_INFO		2
+#define DRM_I915_QUERY_PERF_CONFIG      	3
+#define DRM_I915_QUERY_MEMORY_REGIONS   	4
+#define DRM_I915_QUERY_GEOMETRY_SUBSLICES	5
 /* Must be kept compact -- no holes and well documented */
 
 	/**
@@ -2714,6 +2715,9 @@ struct drm_i915_query_item {
 	 *	- DRM_I915_QUERY_PERF_CONFIG_LIST
 	 *      - DRM_I915_QUERY_PERF_CONFIG_DATA_FOR_UUID
 	 *      - DRM_I915_QUERY_PERF_CONFIG_FOR_UUID
+	 *
+	 * When query_id == DRM_I915_QUERY_GEOMETRY_SUBSLICES must have bits 0:7 set
+	 * as a valid engine class, and bits 8:15 must have a valid engine instance.
 	 */
 	__u32 flags;
 #define DRM_I915_QUERY_PERF_CONFIG_LIST          1
@@ -2772,15 +2776,19 @@ struct drm_i915_query {
 };
 
 /*
- * Data written by the kernel with query DRM_I915_QUERY_TOPOLOGY_INFO :
+ * Data written by the kernel with query DRM_I915_QUERY_TOPOLOGY_INFO,
+ * DRM_I915_QUERY_GEOMETRY_SUBSLICE:
  *
  * data: contains the 3 pieces of information :
  *
- * - the slice mask with one bit per slice telling whether a slice is
- *   available. The availability of slice X can be queried with the following
- *   formula :
+ * - For DRM_I915_QUERY_TOPOLOGY_INFO the slice mask with one bit per slice
+ *   telling whether a slice is available. The availability of slice X can be
+ *   queried with the following formula :
  *
  *           (data[X / 8] >> (X % 8)) & 1
+ *
+ * - For DRM_I915_QUERY_GEOMETRY_SUBSLICES Slices are equal to 1 and this field
+ *   is not used.
  *
  * - the subslice mask for each slice with one bit per subslice telling
  *   whether a subslice is available. Gen12 has dual-subslices, which are
