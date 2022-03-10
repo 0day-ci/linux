@@ -50,7 +50,7 @@ initial_plane_vma(struct drm_i915_private *i915,
 	struct intel_memory_region *mem = i915->mm.stolen_region;
 	struct drm_i915_gem_object *obj;
 	struct i915_vma *vma;
-	u32 base, size;
+	u32 base, phys_base, size;
 	u64 pinctl;
 
 	if (!mem || plane_config->size == 0)
@@ -71,8 +71,25 @@ initial_plane_vma(struct drm_i915_private *i915,
 	    size * 2 > i915->stolen_usable_size)
 		return NULL;
 
+	/*
+	 * On discrete, it looks like the GGTT base address should 1:1 map to
+	 * somewhere in lmem. On DG1 for some reason this intersects with the
+	 * exact start of DSM(possibly due to small lmem size), in which case we
+	 * need to allocate it directly from stolen, which means fudging the
+	 * physical address to be relative to the start of DSM.  In such cases
+	 * we might also need to choose between initial fb vs fbc, if space is
+	 * limited.
+	 */
+	phys_base = base;
+	if (IS_DG1(i915)) {
+		if (WARN_ON(phys_base < i915->dsm.start))
+			return NULL;
+
+		phys_base -= i915->dsm.start;
+	}
+
 	obj = i915_gem_object_create_region_at(i915->mm.stolen_region,
-					       base, size, 0);
+					       phys_base, size, 0);
 	if (IS_ERR(obj))
 		return NULL;
 
