@@ -1241,6 +1241,9 @@ can be set in the flags field to signal that the
 exception_has_payload, exception_payload, and exception.pending fields
 contain a valid state and shall be written into the VCPU.
 
+KVM_VCPUEVENT_SHUTDOWN can be set in flags field to synthesize a SHUTDOWN
+event for a vcpu from user space.
+
 ARM/ARM64:
 ^^^^^^^^^^
 

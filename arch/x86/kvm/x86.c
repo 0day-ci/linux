@@ -4903,7 +4903,8 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 			      | KVM_VCPUEVENT_VALID_SIPI_VECTOR
 			      | KVM_VCPUEVENT_VALID_SHADOW
 			      | KVM_VCPUEVENT_VALID_SMM
-			      | KVM_VCPUEVENT_VALID_PAYLOAD))
+			      | KVM_VCPUEVENT_VALID_PAYLOAD
+			      | KVM_VCPUEVENT_SHUTDOWN))
 		return -EINVAL;
 
 	if (events->flags & KVM_VCPUEVENT_VALID_PAYLOAD) {
@@ -4975,6 +4976,9 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 				clear_bit(KVM_APIC_INIT, &vcpu->arch.apic->pending_events);
 		}
 	}
+
+	if (events->flags & KVM_VCPUEVENT_SHUTDOWN)
+		kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
 
 	kvm_make_request(KVM_REQ_EVENT, vcpu);
 
