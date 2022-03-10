@@ -143,6 +143,21 @@ Adding pages to a pkey protected domain
 .. kernel-doc:: arch/x86/include/asm/pgtable_types.h
         :doc: PKS_KEY_ASSIGNMENT
 
+Changing permissions of individual keys
+---------------------------------------
+
+.. kernel-doc:: include/linux/pks.h
+        :identifiers: pks_set_readwrite
+
+MSR details
+~~~~~~~~~~~
+
+WRMSR is typically an architecturally serializing instruction.  However,
+WRMSR(MSR_IA32_PKRS) is an exception.  It is not a serializing instruction and
+instead maintains ordering properties similar to WRPKRU.  Thus it is safe to
+immediately use a mapping when the pks_set*() functions returns.  Check the
+latest SDM for details.
+
 Testing
 -------
 
