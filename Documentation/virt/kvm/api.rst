@@ -6203,6 +6203,26 @@ spec refer, https://github.com/riscv/riscv-sbi-doc.
 
 ::
 
+    /* KVM_EXIT_NOTIFY */
+    struct {
+  #define KVM_NOTIFY_CONTEXT_INVALID	(1 << 0)
+      __u32 data;
+    } notify;
+
+Used on x86 systems. When the VM capability KVM_CAP_X86_NOTIFY_VMEXIT is
+enabled and the parameter is non-negative, a VM exit generated if no event
+window occurs in VM non-root mode for a specified amount of time. In some
+special case, e.g. VM context invalid, it should exit to userspace with the
+exit reason KVM_EXIT_NOTIFY for further handling. The "data" field contains
+the more detailed info.
+
+Valid values for 'data' are:
+
+  - KVM_NOTIFY_CONTEXT_INVALID -- the VM context is corrupted and not valid
+    in VMCS. It would run into unknown result if resume the target VM.
+
+::
+
 		/* Fix the size of the union. */
 		char padding[256];
 	};
@@ -7086,6 +7106,25 @@ resource that is controlled with the H_SET_MODE hypercall.
 
 This capability allows a guest kernel to use a better-performance mode for
 handling interrupts and system calls.
+
+7.31 KVM_CAP_X86_NOTIFY_VMEXIT
+------------------------------
+
+:Architectures: x86
+:Target: VM
+:Parameters: args[0] is the value of notify window
+:Returns: 0 on success, -EINVAL if hardware doesn't support notify VM exit.
+
+This capability allows userspace to configure the notify VM exit on/off
+in per-VM scope during VM creation. Notify VM exit is disabled by default.
+When userspace provides a non-negative value in args[0], VMM would enable
+this feature to trigger VM exit if no event window occurs in VM non-root
+mode for a specified of time (notify window). The notify window is just
+determined by args[0].
+
+This capability is aimed to mitigate the threat that malicious VMs can
+cause CPU stuck (due to event windows don't open up) and make the CPU
+unavailable to host or other VMs.
 
 8. Other capabilities.
 ======================
