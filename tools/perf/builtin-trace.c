@@ -1487,10 +1487,12 @@ static size_t syscall_arg__scnprintf_augmented_string(struct syscall_arg *arg, c
 	 * So that the next arg with a payload can consume its augmented arg, i.e. for rename* syscalls
 	 * we would have two strings, each prefixed by its size.
 	 */
-	int consumed = sizeof(*augmented_arg) + augmented_arg->size;
+	int consumed = sizeof(*augmented_arg) + (unsigned int)augmented_arg->size;
 
-	arg->augmented.args = ((void *)arg->augmented.args) + consumed;
-	arg->augmented.size -= consumed;
+	if (consumed < arg->augmented.size) {
+		arg->augmented.args = ((void *)arg->augmented.args) + consumed;
+		arg->augmented.size -= consumed;
+	}
 
 	return printed;
 }
