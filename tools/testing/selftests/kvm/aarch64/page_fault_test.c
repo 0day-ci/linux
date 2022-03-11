@@ -45,6 +45,11 @@
 #define CMD_SKIP_TEST				(-1LL)
 #define CMD_HOLE_PT				(1ULL << 2)
 #define CMD_HOLE_TEST				(1ULL << 3)
+#define CMD_RECREATE_PT_MEMSLOT_WR		(1ULL << 4)
+#define CMD_CHECK_WRITE_IN_DIRTY_LOG		(1ULL << 5)
+#define CMD_CHECK_S1PTW_WR_IN_DIRTY_LOG		(1ULL << 6)
+#define CMD_CHECK_NO_WRITE_IN_DIRTY_LOG		(1ULL << 7)
+#define CMD_SET_PTE_AF				(1ULL << 8)
 
 #define PREPARE_FN_NR				10
 #define CHECK_FN_NR				10
@@ -251,6 +256,21 @@ static void guest_check_pte_af(void)
 	GUEST_ASSERT_EQ(*((uint64_t *)pte_gva) & PTE_AF, PTE_AF);
 }
 
+static void guest_check_write_in_dirty_log(void)
+{
+	GUEST_SYNC(CMD_CHECK_WRITE_IN_DIRTY_LOG);
+}
+
+static void guest_check_no_write_in_dirty_log(void)
+{
+	GUEST_SYNC(CMD_CHECK_NO_WRITE_IN_DIRTY_LOG);
+}
+
+static void guest_check_s1ptw_wr_in_dirty_log(void)
+{
+	GUEST_SYNC(CMD_CHECK_S1PTW_WR_IN_DIRTY_LOG);
+}
+
 static void guest_test_exec(void)
 {
 	int (*code)(void) = (int (*)(void))test_exec_gva;
@@ -380,12 +400,34 @@ static void punch_hole_in_memslot(struct kvm_vm *vm,
 	}
 }
 
+static bool check_write_in_dirty_log(struct kvm_vm *vm,
+		struct memslot_desc *ms, uint64_t host_pg_nr)
+{
+	unsigned long *bmap;
+	bool first_page_dirty;
+
+	bmap = bitmap_zalloc(ms->size / getpagesize());
+	kvm_vm_get_dirty_log(vm, ms->idx, bmap);
+	first_page_dirty = test_bit(host_pg_nr, bmap);
+	free(bmap);
+	return first_page_dirty;
+}
+
 static void handle_cmd(struct kvm_vm *vm, int cmd)
 {
 	if (cmd & CMD_HOLE_PT)
 		punch_hole_in_memslot(vm, &memslot[PT]);
 	if (cmd & CMD_HOLE_TEST)
 		punch_hole_in_memslot(vm, &memslot[TEST]);
+	if (cmd & CMD_CHECK_WRITE_IN_DIRTY_LOG)
+		TEST_ASSERT(check_write_in_dirty_log(vm, &memslot[TEST], 0),
+				"Missing write in dirty log");
+	if (cmd & CMD_CHECK_NO_WRITE_IN_DIRTY_LOG)
+		TEST_ASSERT(!check_write_in_dirty_log(vm, &memslot[TEST], 0),
+				"Unexpected s1ptw write in dirty log");
+	if (cmd & CMD_CHECK_S1PTW_WR_IN_DIRTY_LOG)
+		TEST_ASSERT(check_write_in_dirty_log(vm, &memslot[PT], 0),
+				"Missing s1ptw write in dirty log");
 }
 
 static void sync_stats_from_guest(struct kvm_vm *vm)
@@ -783,6 +825,56 @@ int main(int argc, char *argv[])
 #define TEST_ACCESS_AND_S1PTW_ON_HOLE_UFFD_AF(__a, __th, __ph)			\
 	TEST_ACCESS_AND_S1PTW_ON_HOLE_UFFD(__a, __th, __ph, __AF_TEST_ARGS)
 
+#define	__TEST_ACCESS_DIRTY_LOG(__a, ...)					\
+{										\
+	.name			= SNAME(TEST_ACCESS_DIRTY_LOG ## _ ## __a),	\
+	.test_memslot_flags	= KVM_MEM_LOG_DIRTY_PAGES,			\
+	.guest_test 		= __a,						\
+	.expected_events	= { 0 },					\
+	__VA_ARGS__								\
+}
+
+#define __CHECK_WRITE_IN_DIRTY_LOG						\
+	.guest_test_check	= { guest_check_write_in_dirty_log, },
+
+#define __CHECK_NO_WRITE_IN_DIRTY_LOG						\
+	.guest_test_check	= { guest_check_no_write_in_dirty_log, },
+
+#define	TEST_WRITE_DIRTY_LOG(__a, ...)						\
+	__TEST_ACCESS_DIRTY_LOG(__a, __CHECK_WRITE_IN_DIRTY_LOG __VA_ARGS__)
+
+#define	TEST_NO_WRITE_DIRTY_LOG(__a, ...)					\
+	__TEST_ACCESS_DIRTY_LOG(__a, __CHECK_NO_WRITE_IN_DIRTY_LOG __VA_ARGS__)
+
+#define	__TEST_S1PTW_DIRTY_LOG(__a, ...)					\
+{										\
+	.name			= SNAME(S1PTW_AF_DIRTY_LOG ## _ ## __a),	\
+	.pt_memslot_flags	= KVM_MEM_LOG_DIRTY_PAGES,			\
+	.guest_test 		= __a,						\
+	.expected_events	= { 0 },					\
+	__VA_ARGS__								\
+}
+
+#define __CHECK_S1PTW_WR_IN_DIRTY_LOG						\
+	.guest_test_check	= { guest_check_s1ptw_wr_in_dirty_log, },
+
+#define	TEST_S1PTW_DIRTY_LOG(__a, ...)						\
+	__TEST_S1PTW_DIRTY_LOG(__a, __CHECK_S1PTW_WR_IN_DIRTY_LOG __VA_ARGS__)
+
+#define __AF_TEST_ARGS_FOR_DIRTY_LOG						\
+	.guest_prepare		= { guest_set_ha, guest_clear_pte_af, },	\
+	.guest_test_check       = { guest_check_s1ptw_wr_in_dirty_log, 		\
+				    guest_check_pte_af, },
+
+#define __AF_AND_LSE_ARGS_FOR_DIRTY_LOG						\
+	.guest_prepare		= { guest_set_ha, guest_clear_pte_af,		\
+				    guest_check_lse, },				\
+	.guest_test_check       = { guest_check_s1ptw_wr_in_dirty_log, 		\
+				    guest_check_pte_af, },
+
+#define	TEST_S1PTW_AF_DIRTY_LOG(__a, ...)					\
+	TEST_S1PTW_DIRTY_LOG(__a, __AF_TEST_ARGS_FOR_DIRTY_LOG)
+
 static struct test_desc tests[] = {
 	/* Check that HW is setting the AF (sanity checks). */
 	TEST_HW_ACCESS_FLAG(guest_test_read64),
@@ -792,6 +884,37 @@ static struct test_desc tests[] = {
 	TEST_HW_ACCESS_FLAG(guest_test_st_preidx),
 	TEST_HW_ACCESS_FLAG(guest_test_dc_zva),
 	TEST_HW_ACCESS_FLAG(guest_test_exec),
+
+	/* Dirty log basic checks. */
+	TEST_WRITE_DIRTY_LOG(guest_test_write64),
+	TEST_WRITE_DIRTY_LOG(guest_test_cas, __PREPARE_LSE_TEST_ARGS),
+	TEST_WRITE_DIRTY_LOG(guest_test_dc_zva),
+	TEST_WRITE_DIRTY_LOG(guest_test_st_preidx),
+	TEST_NO_WRITE_DIRTY_LOG(guest_test_read64),
+	TEST_NO_WRITE_DIRTY_LOG(guest_test_ld_preidx),
+	TEST_NO_WRITE_DIRTY_LOG(guest_test_at),
+	TEST_NO_WRITE_DIRTY_LOG(guest_test_exec),
+
+	/*
+	 * S1PTW on a PT (no AF) which is marked for dirty logging. Note that
+	 * this still shows up in the dirty log as a write.
+	 */
+	TEST_S1PTW_DIRTY_LOG(guest_test_write64),
+	TEST_S1PTW_DIRTY_LOG(guest_test_st_preidx),
+	TEST_S1PTW_DIRTY_LOG(guest_test_read64),
+	TEST_S1PTW_DIRTY_LOG(guest_test_cas, __PREPARE_LSE_TEST_ARGS),
+	TEST_S1PTW_DIRTY_LOG(guest_test_ld_preidx),
+	TEST_S1PTW_DIRTY_LOG(guest_test_at),
+	TEST_S1PTW_DIRTY_LOG(guest_test_dc_zva),
+	TEST_S1PTW_DIRTY_LOG(guest_test_exec),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_write64),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_st_preidx),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_read64),
+	TEST_S1PTW_DIRTY_LOG(guest_test_cas, __AF_AND_LSE_ARGS_FOR_DIRTY_LOG),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_ld_preidx),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_at),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_dc_zva),
+	TEST_S1PTW_AF_DIRTY_LOG(guest_test_exec),
 
 	/* Accessing a hole shouldn't fault (more sanity checks). */
 	TEST_ACCESS_ON_HOLE_NO_FAULTS(guest_test_read64),
