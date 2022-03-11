@@ -765,7 +765,12 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 {
 	phys_addr_t addr;
 	int ret = 0;
-	struct kvm_mmu_memory_cache cache = { 0, __GFP_ZERO, NULL, };
+	DEFINE_KVM_MMU_MEMORY_CACHE(cache) page_cache = {
+		.cache = {
+			.gfp_zero = __GFP_ZERO,
+			.capacity = KVM_ARCH_NR_OBJS_PER_MEMORY_CACHE,
+		},
+	};
 	struct kvm_pgtable *pgt = kvm->arch.mmu.pgt;
 	enum kvm_pgtable_prot prot = KVM_PGTABLE_PROT_DEVICE |
 				     KVM_PGTABLE_PROT_R |
@@ -778,14 +783,14 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 	guest_ipa &= PAGE_MASK;
 
 	for (addr = guest_ipa; addr < guest_ipa + size; addr += PAGE_SIZE) {
-		ret = kvm_mmu_topup_memory_cache(&cache,
+		ret = kvm_mmu_topup_memory_cache(&page_cache.cache,
 						 kvm_mmu_cache_min_pages(kvm));
 		if (ret)
 			break;
 
 		spin_lock(&kvm->mmu_lock);
 		ret = kvm_pgtable_stage2_map(pgt, addr, PAGE_SIZE, pa, prot,
-					     &cache);
+					     &page_cache.cache);
 		spin_unlock(&kvm->mmu_lock);
 		if (ret)
 			break;
@@ -793,7 +798,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 		pa += PAGE_SIZE;
 	}
 
-	kvm_mmu_free_memory_cache(&cache);
+	kvm_mmu_free_memory_cache(&page_cache.cache);
 	return ret;
 }
 

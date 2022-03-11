@@ -186,7 +186,7 @@ struct kvm_vcpu_arch {
 	struct kvm_sbi_context sbi_context;
 
 	/* Cache pages needed to program page tables with spinlock held */
-	struct kvm_mmu_memory_cache mmu_page_cache;
+	DEFINE_KVM_MMU_MEMORY_CACHE(mmu_page_cache);
 
 	/* VCPU power-off state */
 	bool power_off;

@@ -692,10 +692,10 @@ struct kvm_vcpu_arch {
 	 */
 	struct kvm_mmu *walk_mmu;
 
-	struct kvm_mmu_memory_cache mmu_pte_list_desc_cache;
-	struct kvm_mmu_memory_cache mmu_shadow_page_cache;
-	struct kvm_mmu_memory_cache mmu_shadowed_translation_cache;
-	struct kvm_mmu_memory_cache mmu_page_header_cache;
+	DEFINE_KVM_MMU_MEMORY_CACHE(mmu_pte_list_desc_cache);
+	DEFINE_KVM_MMU_MEMORY_CACHE(mmu_shadow_page_cache);
+	DEFINE_KVM_MMU_MEMORY_CACHE(mmu_shadowed_translation_cache);
+	DEFINE_KVM_MMU_MEMORY_CACHE(mmu_page_header_cache);
 
 	/*
 	 * QEMU userspace and the guest each have their own FPU state.

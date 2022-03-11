@@ -371,9 +371,17 @@ int kvm_mmu_topup_memory_cache(struct kvm_mmu_memory_cache *mc, int min)
 {
 	void *obj;
 
+	/*
+	 * The capacity fieldmust be initialized since the storage for the
+	 * objects pointer array is laid out after the kvm_mmu_memory_cache
+	 * struct and not known at compile time.
+	 */
+	if (WARN_ON(mc->capacity == 0))
+		return -EINVAL;
+
 	if (mc->nobjs >= min)
 		return 0;
-	while (mc->nobjs < ARRAY_SIZE(mc->objects)) {
+	while (mc->nobjs < mc->capacity) {
 		obj = mmu_memory_cache_alloc_obj(mc, GFP_KERNEL_ACCOUNT);
 		if (!obj)
 			return mc->nobjs >= min ? 0 : -ENOMEM;

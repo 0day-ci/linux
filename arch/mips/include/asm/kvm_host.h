@@ -347,7 +347,7 @@ struct kvm_vcpu_arch {
 	unsigned long pending_exceptions_clr;
 
 	/* Cache some mmu pages needed inside spinlock regions */
-	struct kvm_mmu_memory_cache mmu_page_cache;
+	DEFINE_KVM_MMU_MEMORY_CACHE(mmu_page_cache);
 
 	/* vcpu's vzguestid is different on each host cpu in an smp system */
 	u32 vzguestid[NR_CPUS];
