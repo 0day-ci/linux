@@ -283,6 +283,12 @@ void nft_counter_init_seqcount(void)
 		seqcount_init(per_cpu_ptr(&nft_counter_seq, cpu));
 }
 
+static bool nft_counter_reduce(struct nft_regs_track *track,
+			       const struct nft_expr *expr)
+{
+	return false;
+}
+
 struct nft_expr_type nft_counter_type;
 static const struct nft_expr_ops nft_counter_ops = {
 	.type		= &nft_counter_type,
@@ -293,6 +299,7 @@ static const struct nft_expr_ops nft_counter_ops = {
 	.destroy_clone	= nft_counter_destroy,
 	.dump		= nft_counter_dump,
 	.clone		= nft_counter_clone,
+	.reduce		= nft_counter_reduce,
 	.offload	= nft_counter_offload,
 	.offload_stats	= nft_counter_offload_stats,
 };
