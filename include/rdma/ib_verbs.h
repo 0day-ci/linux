@@ -291,6 +291,8 @@ enum ib_device_cap_flags {
 	/* The device supports padding incoming writes to cacheline. */
 	IB_DEVICE_PCI_WRITE_END_PADDING		= (1ULL << 36),
 	IB_DEVICE_ALLOW_USER_UNREG		= (1ULL << 37),
+	/* Atomic write attributes */
+	IB_DEVICE_ATOMIC_WRITE			= (1ULL << 40),
 };
 
 enum ib_atomic_cap {
