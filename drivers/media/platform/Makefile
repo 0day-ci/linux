@@ -16,6 +16,7 @@ obj-y += exynos4-is/
 obj-y += exynos-gsc/
 obj-y += imx/
 obj-y += imx-jpeg/
+obj-y += intel/
 obj-y += marvell-ccic/
 obj-y += meson/ge2d/
 obj-y += mtk-jpeg/
@@ -48,7 +49,6 @@ obj-y += xilinx/
 # Please place here only ancillary drivers that aren't SoC-specific
 obj-$(CONFIG_VIDEO_MEM2MEM_DEINTERLACE)	+= m2m-deinterlace.o
 obj-$(CONFIG_VIDEO_MUX)			+= video-mux.o
-obj-$(CONFIG_VIDEO_PXA27x)		+= pxa_camera.o
 obj-$(CONFIG_VIDEO_RCAR_DRIF)		+= rcar_drif.o
 obj-$(CONFIG_VIDEO_RCAR_ISP)		+= rcar-isp.o
 obj-$(CONFIG_VIDEO_RENESAS_CEU)		+= renesas-ceu.o
