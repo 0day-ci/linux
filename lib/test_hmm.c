@@ -10,7 +10,6 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/rwsem.h>
@@ -25,18 +24,24 @@
 #include <linux/swapops.h>
 #include <linux/sched/mm.h>
 #include <linux/platform_device.h>
+#include <linux/miscdevice.h>
 #include <linux/rmap.h>
 
 #include "test_hmm_uapi.h"
 
-#define DMIRROR_NDEVICES		2
 #define DMIRROR_RANGE_FAULT_TIMEOUT	1000
 #define DEVMEM_CHUNK_SIZE		(256 * 1024 * 1024U)
 #define DEVMEM_CHUNKS_RESERVE		16
 
+static const char *dmirror_device_names[] = {
+	"hmm_dmirror0",
+	"hmm_dmirror1"
+};
+
+#define DMIRROR_NDEVICES ARRAY_SIZE(dmirror_device_names)
+
 static const struct dev_pagemap_ops dmirror_devmem_ops;
 static const struct mmu_interval_notifier_ops dmirror_min_ops;
-static dev_t dmirror_dev;
 
 struct dmirror_device;
 
@@ -82,7 +87,7 @@ struct dmirror_chunk {
  * Per device data.
  */
 struct dmirror_device {
-	struct cdev		cdevice;
+	struct miscdevice	miscdevice;
 	struct hmm_devmem	*devmem;
 
 	unsigned int		devmem_capacity;
@@ -118,7 +123,6 @@ static void dmirror_bounce_fini(struct dmirror_bounce *bounce)
 
 static int dmirror_fops_open(struct inode *inode, struct file *filp)
 {
-	struct cdev *cdev = inode->i_cdev;
 	struct dmirror *dmirror;
 	int ret;
 
@@ -127,12 +131,13 @@ static int dmirror_fops_open(struct inode *inode, struct file *filp)
 	if (dmirror == NULL)
 		return -ENOMEM;
 
-	dmirror->mdevice = container_of(cdev, struct dmirror_device, cdevice);
+	dmirror->mdevice = container_of(filp->private_data,
+					struct dmirror_device, miscdevice);
 	mutex_init(&dmirror->mutex);
 	xa_init(&dmirror->pt);
 
 	ret = mmu_interval_notifier_insert(&dmirror->notifier, current->mm,
-				0, ULONG_MAX & PAGE_MASK, &dmirror_min_ops);
+					0, ULONG_MAX & PAGE_MASK, &dmirror_min_ops);
 	if (ret) {
 		kfree(dmirror);
 		return ret;
@@ -1216,16 +1221,16 @@ static const struct dev_pagemap_ops dmirror_devmem_ops = {
 
 static int dmirror_device_init(struct dmirror_device *mdevice, int id)
 {
-	dev_t dev;
 	int ret;
 
-	dev = MKDEV(MAJOR(dmirror_dev), id);
 	mutex_init(&mdevice->devmem_lock);
 	spin_lock_init(&mdevice->lock);
 
-	cdev_init(&mdevice->cdevice, &dmirror_fops);
-	mdevice->cdevice.owner = THIS_MODULE;
-	ret = cdev_add(&mdevice->cdevice, dev, 1);
+	mdevice->miscdevice.minor = MISC_DYNAMIC_MINOR;
+	mdevice->miscdevice.name = dmirror_device_names[id];
+	mdevice->miscdevice.fops = &dmirror_fops;
+
+	ret = misc_register(&mdevice->miscdevice);
 	if (ret)
 		return ret;
 
@@ -1252,18 +1257,13 @@ static void dmirror_device_remove(struct dmirror_device *mdevice)
 		kfree(mdevice->devmem_chunks);
 	}
 
-	cdev_del(&mdevice->cdevice);
+	misc_deregister(&mdevice->miscdevice);
 }
 
 static int __init hmm_dmirror_init(void)
 {
 	int ret;
 	int id;
-
-	ret = alloc_chrdev_region(&dmirror_dev, 0, DMIRROR_NDEVICES,
-				  "HMM_DMIRROR");
-	if (ret)
-		goto err_unreg;
 
 	for (id = 0; id < DMIRROR_NDEVICES; id++) {
 		ret = dmirror_device_init(dmirror_devices + id, id);
@@ -1277,8 +1277,7 @@ static int __init hmm_dmirror_init(void)
 err_chrdev:
 	while (--id >= 0)
 		dmirror_device_remove(dmirror_devices + id);
-	unregister_chrdev_region(dmirror_dev, DMIRROR_NDEVICES);
-err_unreg:
+
 	return ret;
 }
 
@@ -1288,7 +1287,6 @@ static void __exit hmm_dmirror_exit(void)
 
 	for (id = 0; id < DMIRROR_NDEVICES; id++)
 		dmirror_device_remove(dmirror_devices + id);
-	unregister_chrdev_region(dmirror_dev, DMIRROR_NDEVICES);
 }
 
 module_init(hmm_dmirror_init);
