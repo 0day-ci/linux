@@ -1430,6 +1430,7 @@ static const u32 emulated_msrs_all[] = {
 
 	MSR_KVM_ASYNC_PF_EN, MSR_KVM_STEAL_TIME,
 	MSR_KVM_PV_EOI_EN, MSR_KVM_ASYNC_PF_INT, MSR_KVM_ASYNC_PF_ACK,
+	MSR_KVM_PREEMPT_COUNT,
 
 	MSR_IA32_TSC_ADJUST,
 	MSR_IA32_TSC_DEADLINE,
@@ -3424,6 +3425,25 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
 	mark_page_dirty_in_slot(vcpu->kvm, ghc->memslot, gpa_to_gfn(ghc->gpa));
 }
 
+static int kvm_pv_enable_preempt_count(struct kvm_vcpu *vcpu, u64 data)
+{
+	u64 addr = data & ~KVM_MSR_ENABLED;
+	struct gfn_to_hva_cache *ghc = &vcpu->arch.pv_pc.preempt_count_cache;
+
+	vcpu->arch.pv_pc.preempt_count_enabled = false;
+	vcpu->arch.pv_pc.msr_val = data;
+
+	if (!(data & KVM_MSR_ENABLED))
+		return 0;
+
+	if (kvm_gfn_to_hva_cache_init(vcpu->kvm, ghc, addr, sizeof(int)))
+		return 1;
+
+	vcpu->arch.pv_pc.preempt_count_enabled = true;
+
+	return 0;
+}
+
 int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 {
 	bool pr = false;
@@ -3641,6 +3661,14 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			return 1;
 
 		vcpu->arch.msr_kvm_poll_control = data;
+		break;
+
+	case MSR_KVM_PREEMPT_COUNT:
+		if (!guest_pv_has(vcpu, KVM_FEATURE_PREEMPT_COUNT))
+			return 1;
+
+		if (kvm_pv_enable_preempt_count(vcpu, data))
+			return 1;
 		break;
 
 	case MSR_IA32_MCG_CTL:
@@ -3982,6 +4010,12 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			return 1;
 
 		msr_info->data = vcpu->arch.msr_kvm_poll_control;
+		break;
+	case MSR_KVM_PREEMPT_COUNT:
+		if (!guest_pv_has(vcpu, KVM_FEATURE_PREEMPT_COUNT))
+			return 1;
+
+		msr_info->data = vcpu->arch.pv_pc.msr_val;
 		break;
 	case MSR_IA32_P5_MC_ADDR:
 	case MSR_IA32_P5_MC_TYPE:
@@ -11154,6 +11188,7 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.pending_external_vector = -1;
 	vcpu->arch.preempted_in_kernel = false;
+	vcpu->arch.pv_pc.preempt_count_enabled = false;
 
 #if IS_ENABLED(CONFIG_HYPERV)
 	vcpu->arch.hv_root_tdp = INVALID_PAGE;
