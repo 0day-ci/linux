@@ -513,6 +513,7 @@ int send_request_init(struct cc_drvdata *drvdata, struct cc_hw_desc *desc,
 
 	set_queue_last_ind(drvdata, &desc[(len - 1)]);
 
+	spin_lock_bh(&req_mgr_h->hw_lock);
 	/*
 	 * We are about to push command to the HW via the command registers
 	 * that may reference host memory. We need to issue a memory barrier
@@ -520,6 +521,7 @@ int send_request_init(struct cc_drvdata *drvdata, struct cc_hw_desc *desc,
 	 */
 	wmb();
 	enqueue_seq(drvdata, desc, len);
+	spin_unlock_bh(&req_mgr_h->hw_lock);
 
 	/* Update the free slots in HW queue */
 	req_mgr_h->q_free_slots =
