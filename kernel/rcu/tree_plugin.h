@@ -535,6 +535,8 @@ rcu_preempt_deferred_qs_irqrestore(struct task_struct *t, unsigned long flags)
 			drop_boost_mutex = rt_mutex_owner(&rnp->boost_mtx.rtmutex) == t;
 			if (&t->rcu_node_entry == rnp->boost_tasks)
 				WRITE_ONCE(rnp->boost_tasks, np);
+			if (&t->rcu_node_entry == rnp->boost_exp_tasks)
+				WRITE_ONCE(rnp->boost_exp_tasks, np);
 		}
 
 		/*
@@ -1022,7 +1024,7 @@ static int rcu_boost(struct rcu_node *rnp)
 	struct task_struct *t;
 	struct list_head *tb;
 
-	if (READ_ONCE(rnp->exp_tasks) == NULL &&
+	if (READ_ONCE(rnp->boost_exp_tasks) == NULL &&
 	    READ_ONCE(rnp->boost_tasks) == NULL)
 		return 0;  /* Nothing left to boost. */
 
@@ -1032,7 +1034,7 @@ static int rcu_boost(struct rcu_node *rnp)
 	 * Recheck under the lock: all tasks in need of boosting
 	 * might exit their RCU read-side critical sections on their own.
 	 */
-	if (rnp->exp_tasks == NULL && rnp->boost_tasks == NULL) {
+	if (rnp->boost_exp_tasks == NULL && rnp->boost_tasks == NULL) {
 		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 		return 0;
 	}
@@ -1043,8 +1045,8 @@ static int rcu_boost(struct rcu_node *rnp)
 	 * expedited grace period must boost all blocked tasks, including
 	 * those blocking the pre-existing normal grace period.
 	 */
-	if (rnp->exp_tasks != NULL)
-		tb = rnp->exp_tasks;
+	if (rnp->boost_exp_tasks != NULL)
+		tb = rnp->boost_exp_tasks;
 	else
 		tb = rnp->boost_tasks;
 
@@ -1065,14 +1067,24 @@ static int rcu_boost(struct rcu_node *rnp)
 	 * section.
 	 */
 	t = container_of(tb, struct task_struct, rcu_node_entry);
+	if (t->prio <= current->prio) {
+		tb = rcu_next_node_entry(t, rnp);
+		if (rnp->boost_exp_tasks)
+			WRITE_ONCE(rnp->boost_exp_tasks, tb);
+		else
+			WRITE_ONCE(rnp->boost_tasks, tb);
+		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
+		goto skip_boost;
+	}
+
 	rt_mutex_init_proxy_locked(&rnp->boost_mtx.rtmutex, t);
 	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 	/* Lock only for side effect: boosts task t's priority. */
 	rt_mutex_lock(&rnp->boost_mtx);
 	rt_mutex_unlock(&rnp->boost_mtx);  /* Then keep lockdep happy. */
 	rnp->n_boosts++;
-
-	return READ_ONCE(rnp->exp_tasks) != NULL ||
+skip_boost:
+	return READ_ONCE(rnp->boost_exp_tasks) != NULL ||
 	       READ_ONCE(rnp->boost_tasks) != NULL;
 }
 
@@ -1090,7 +1102,7 @@ static int rcu_boost_kthread(void *arg)
 		WRITE_ONCE(rnp->boost_kthread_status, RCU_KTHREAD_WAITING);
 		trace_rcu_utilization(TPS("End boost kthread@rcu_wait"));
 		rcu_wait(READ_ONCE(rnp->boost_tasks) ||
-			 READ_ONCE(rnp->exp_tasks));
+			 READ_ONCE(rnp->boost_exp_tasks));
 		trace_rcu_utilization(TPS("Start boost kthread@rcu_wait"));
 		WRITE_ONCE(rnp->boost_kthread_status, RCU_KTHREAD_RUNNING);
 		more2boost = rcu_boost(rnp);
@@ -1129,13 +1141,15 @@ static void rcu_initiate_boost(struct rcu_node *rnp, unsigned long flags)
 		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 		return;
 	}
-	if (rnp->exp_tasks != NULL ||
+	if ((rnp->exp_tasks != NULL && rnp->boost_exp_tasks == NULL) ||
 	    (rnp->gp_tasks != NULL &&
 	     rnp->boost_tasks == NULL &&
 	     rnp->qsmask == 0 &&
 	     (!time_after(rnp->boost_time, jiffies) || rcu_state.cbovld))) {
 		if (rnp->exp_tasks == NULL)
 			WRITE_ONCE(rnp->boost_tasks, rnp->gp_tasks);
+		else
+			WRITE_ONCE(rnp->boost_exp_tasks, rnp->exp_tasks);
 		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 		rcu_wake_cond(rnp->boost_kthread_task,
 			      READ_ONCE(rnp->boost_kthread_status));
