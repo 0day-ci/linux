@@ -21697,6 +21697,13 @@ L:	linux-mm@kvack.org
 S:	Maintained
 F:	mm/zbud.c
 
+ZTREE COMPRESSED PAGE ALLOCATOR
+M:	Ananda Badmaev <a.badmaev@clicknet.pro>
+M:	Vitaly Wool <vitaly.wool@konsulko.com>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	mm/ztree.c
+
 ZD1211RW WIRELESS DRIVER
 M:	Ulrich Kunitz <kune@deine-taler.de>
 L:	linux-wireless@vger.kernel.org
