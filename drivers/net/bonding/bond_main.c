@@ -1510,8 +1510,8 @@ static rx_handler_result_t bond_handle_frame(struct sk_buff **pskb)
 	struct sk_buff *skb = *pskb;
 	struct slave *slave;
 	struct bonding *bond;
-	int (*recv_probe)(const struct sk_buff *, struct bonding *,
-			  struct slave *);
+	int (*recv_probe)(struct sk_buff *skb, struct bonding *bond,
+			  struct slave *slave);
 	int ret = RX_HANDLER_ANOTHER;
 
 	skb = skb_share_check(skb, GFP_ATOMIC);
@@ -3228,7 +3228,7 @@ out:
 }
 #endif
 
-int bond_rcv_validate(const struct sk_buff *skb, struct bonding *bond,
+int bond_rcv_validate(struct sk_buff *skb, struct bonding *bond,
 		      struct slave *slave)
 {
 #if IS_ENABLED(CONFIG_IPV6)

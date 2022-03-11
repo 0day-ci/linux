@@ -220,8 +220,8 @@ struct bonding {
 	struct   bond_up_slave __rcu *all_slaves;
 	bool     force_primary;
 	s32      slave_cnt; /* never change this value outside the attach/detach wrappers */
-	int     (*recv_probe)(const struct sk_buff *, struct bonding *,
-			      struct slave *);
+	int     (*recv_probe)(struct sk_buff *skb, struct bonding *bond,
+			      struct slave *slave);
 	/* mode_lock is used for mode-specific locking needs, currently used by:
 	 * 3ad mode (4) - protect against running bond_3ad_unbind_slave() and
 	 *                bond_3ad_state_machine_handler() concurrently and also
@@ -639,7 +639,7 @@ struct bond_net {
 	struct class_attribute	class_attr_bonding_masters;
 };
 
-int bond_rcv_validate(const struct sk_buff *skb, struct bonding *bond, struct slave *slave);
+int bond_rcv_validate(struct sk_buff *skb, struct bonding *bond, struct slave *slave);
 netdev_tx_t bond_dev_queue_xmit(struct bonding *bond, struct sk_buff *skb, struct net_device *slave_dev);
 int bond_create(struct net *net, const char *name);
 int bond_create_sysfs(struct bond_net *net);
