@@ -150,7 +150,9 @@ struct fscache_cache *fscache_acquire_cache(const char *name)
 {
 	struct fscache_cache *cache;
 
-	ASSERT(name);
+	if (!name)
+		return ERR_PTR(-EINVAL);
+
 	cache = fscache_lookup_cache(name, true);
 	if (IS_ERR(cache))
 		return cache;
