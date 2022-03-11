@@ -2360,9 +2360,6 @@
 			the KVM_CLEAR_DIRTY ioctl, and only for the pages being
 			cleared.
 
-			Eager page splitting currently only supports splitting
-			huge pages mapped by the TDP MMU.
-
 			Default is Y (on).
 
 	kvm.enable_vmware_backdoor=[KVM] Support VMware backdoor PV interface.
