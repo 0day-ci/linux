@@ -4562,6 +4562,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	static_call(kvm_x86_vcpu_load)(vcpu, cpu);
 
+	vcpu->arch.irq_disabled = false;
 	/* Save host pkru register if supported */
 	vcpu->arch.host_pkru = read_pkru();
 
@@ -4654,6 +4655,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 
 	static_call(kvm_x86_vcpu_put)(vcpu);
 	vcpu->arch.last_host_tsc = rdtsc();
+	vcpu->arch.irq_disabled = !static_call(kvm_x86_get_if_flag)(vcpu);
 }
 
 static int kvm_vcpu_ioctl_get_lapic(struct kvm_vcpu *vcpu,
@@ -11189,6 +11191,7 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 	vcpu->arch.pending_external_vector = -1;
 	vcpu->arch.preempted_in_kernel = false;
 	vcpu->arch.pv_pc.preempt_count_enabled = false;
+	vcpu->arch.irq_disabled = false;
 
 #if IS_ENABLED(CONFIG_HYPERV)
 	vcpu->arch.hv_root_tdp = INVALID_PAGE;

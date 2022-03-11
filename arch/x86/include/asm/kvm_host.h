@@ -854,6 +854,7 @@ struct kvm_vcpu_arch {
 		bool preempt_count_enabled;
 		struct gfn_to_hva_cache preempt_count_cache;
 	} pv_pc;
+	bool irq_disabled;
 
 	/*
 	 * Indicates the guest is trying to write a gfn that contains one or
