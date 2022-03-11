@@ -566,6 +566,27 @@ struct uvc_urb {
 	struct work_struct work;
 };
 
+struct uvc_payload_header {
+	bool has_eof;
+
+	bool has_pts;
+	u32 pts;
+
+	bool has_scr;
+	u16 sof;
+	u32 stc;
+
+	bool has_sli;
+	u16 sli;
+
+	u8 fid;
+
+	bool has_err;
+
+	int length;
+	int payload_size;
+};
+
 struct uvc_streaming {
 	struct list_head list;
 	struct uvc_device *dev;
