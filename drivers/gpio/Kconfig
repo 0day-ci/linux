@@ -1575,6 +1575,18 @@ config GPIO_SODAVILLE
 
 endmenu
 
+config GPIO_NUVOTON_SGPIO
+	bool "Nuvoton SGPIO support"
+	depends on (ARCH_NPCM || COMPILE_TEST) && OF_GPIO
+	select GPIO_GENERIC
+	select GPIOLIB_IRQCHIP
+	help
+	  Say Y here to support Nuvoton NPCM7XX/NPCM8XX SGPIO functionality.
+	  If unsure, say N.
+	  NPCM7XX/NPCM8XX can use same serial GPIO driver.
+	  NPCM7XX/NPCM8XX includes two SGPIO modules, SIOX1 ans SIOX2 are
+	  under BMC control.
+
 menu "SPI GPIO expanders"
 	depends on SPI_MASTER
 
