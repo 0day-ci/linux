@@ -434,8 +434,6 @@ static void ps8640_post_disable(struct drm_bridge *bridge)
 {
 	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
 
-	ps_bridge->pre_enabled = false;
-
 	ps8640_bridge_vdo_control(ps_bridge, DISABLE);
 	pm_runtime_put_sync_suspend(&ps_bridge->page[PAGE0_DP_CNTL]->dev);
 }
@@ -487,6 +485,7 @@ static void ps8640_bridge_detach(struct drm_bridge *bridge)
 	drm_dp_aux_unregister(&ps_bridge->aux);
 	if (ps_bridge->link)
 		device_link_del(ps_bridge->link);
+	ps_bridge->pre_enabled = false;
 }
 
 static struct edid *ps8640_bridge_get_edid(struct drm_bridge *bridge,
@@ -508,7 +507,8 @@ static struct edid *ps8640_bridge_get_edid(struct drm_bridge *bridge,
 	 * EDID, for this chip, we need to do a full poweron, otherwise it will
 	 * fail.
 	 */
-	drm_bridge_chain_pre_enable(bridge);
+	if (poweroff)
+		drm_bridge_chain_pre_enable(bridge);
 
 	edid = drm_get_edid(connector,
 			    ps_bridge->page[PAGE0_DP_CNTL]->adapter);
