@@ -134,12 +134,19 @@ nla_put_failure:
 	return -1;
 }
 
+static bool nft_range_reduce(struct nft_regs_track *track,
+			     const struct nft_expr *expr)
+{
+	return false;
+}
+
 static const struct nft_expr_ops nft_range_ops = {
 	.type		= &nft_range_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_range_expr)),
 	.eval		= nft_range_eval,
 	.init		= nft_range_init,
 	.dump		= nft_range_dump,
+	.reduce		= nft_range_reduce,
 };
 
 struct nft_expr_type nft_range_type __read_mostly = {

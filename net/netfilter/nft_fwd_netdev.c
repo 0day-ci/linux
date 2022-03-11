@@ -209,6 +209,12 @@ static int nft_fwd_validate(const struct nft_ctx *ctx,
 						    (1 << NF_NETDEV_EGRESS));
 }
 
+static bool nft_fwd_reduce(struct nft_regs_track *track,
+                           const struct nft_expr *expr)
+{
+	return false;
+}
+
 static struct nft_expr_type nft_fwd_netdev_type;
 static const struct nft_expr_ops nft_fwd_neigh_netdev_ops = {
 	.type		= &nft_fwd_netdev_type,
@@ -217,6 +223,7 @@ static const struct nft_expr_ops nft_fwd_neigh_netdev_ops = {
 	.init		= nft_fwd_neigh_init,
 	.dump		= nft_fwd_neigh_dump,
 	.validate	= nft_fwd_validate,
+	.reduce		= nft_fwd_reduce,
 };
 
 static const struct nft_expr_ops nft_fwd_netdev_ops = {
@@ -228,6 +235,7 @@ static const struct nft_expr_ops nft_fwd_netdev_ops = {
 	.validate	= nft_fwd_validate,
 	.offload	= nft_fwd_netdev_offload,
 	.offload_action	= nft_fwd_netdev_offload_action,
+	.reduce		= nft_fwd_reduce,
 };
 
 static const struct nft_expr_ops *

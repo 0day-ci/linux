@@ -308,6 +308,12 @@ nft_nat_destroy(const struct nft_ctx *ctx, const struct nft_expr *expr)
 	nf_ct_netns_put(ctx->net, priv->family);
 }
 
+static bool nft_nat_reduce(struct nft_regs_track *track,
+			    const struct nft_expr *expr)
+{
+	return false;
+}
+
 static struct nft_expr_type nft_nat_type;
 static const struct nft_expr_ops nft_nat_ops = {
 	.type           = &nft_nat_type,
@@ -317,6 +323,7 @@ static const struct nft_expr_ops nft_nat_ops = {
 	.destroy        = nft_nat_destroy,
 	.dump           = nft_nat_dump,
 	.validate	= nft_nat_validate,
+	.reduce		= nft_nat_reduce,
 };
 
 static struct nft_expr_type nft_nat_type __read_mostly = {
@@ -346,6 +353,7 @@ static const struct nft_expr_ops nft_nat_inet_ops = {
 	.destroy        = nft_nat_destroy,
 	.dump           = nft_nat_dump,
 	.validate	= nft_nat_validate,
+	.reduce		= nft_nat_reduce,
 };
 
 static struct nft_expr_type nft_inet_nat_type __read_mostly = {

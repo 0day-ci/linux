@@ -221,6 +221,12 @@ nft_masq_inet_destroy(const struct nft_ctx *ctx, const struct nft_expr *expr)
 	nf_ct_netns_put(ctx->net, NFPROTO_INET);
 }
 
+static bool nft_masq_reduce(struct nft_regs_track *track,
+			    const struct nft_expr *expr)
+{
+	return false;
+}
+
 static struct nft_expr_type nft_masq_inet_type;
 static const struct nft_expr_ops nft_masq_inet_ops = {
 	.type		= &nft_masq_inet_type,
@@ -230,6 +236,7 @@ static const struct nft_expr_ops nft_masq_inet_ops = {
 	.destroy	= nft_masq_inet_destroy,
 	.dump		= nft_masq_dump,
 	.validate	= nft_masq_validate,
+	.reduce		= nft_masq_reduce,
 };
 
 static struct nft_expr_type nft_masq_inet_type __read_mostly = {

@@ -282,12 +282,19 @@ nla_put_failure:
 	return -1;
 }
 
+static bool nft_log_reduce(struct nft_regs_track *track,
+			   const struct nft_expr *expr)
+{
+	return false;
+}
+
 static struct nft_expr_type nft_log_type;
 static const struct nft_expr_ops nft_log_ops = {
 	.type		= &nft_log_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_log)),
 	.eval		= nft_log_eval,
 	.init		= nft_log_init,
+	.reduce		= nft_log_reduce,
 	.destroy	= nft_log_destroy,
 	.dump		= nft_log_dump,
 };

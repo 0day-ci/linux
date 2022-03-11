@@ -360,6 +360,7 @@ const struct nft_expr_ops nft_cmp16_fast_ops = {
 	.init		= nft_cmp16_fast_init,
 	.dump		= nft_cmp16_fast_dump,
 	.offload	= nft_cmp16_fast_offload,
+	.reduce		= nft_cmp_reduce,
 };
 
 static const struct nft_expr_ops *

@@ -72,6 +72,12 @@ static bool nft_dup_netdev_offload_action(const struct nft_expr *expr)
 	return true;
 }
 
+static bool nft_dup_reduce(struct nft_regs_track *track,
+                           const struct nft_expr *expr)
+{
+	return false;
+}
+
 static struct nft_expr_type nft_dup_netdev_type;
 static const struct nft_expr_ops nft_dup_netdev_ops = {
 	.type		= &nft_dup_netdev_type,
@@ -81,6 +87,7 @@ static const struct nft_expr_ops nft_dup_netdev_ops = {
 	.dump		= nft_dup_netdev_dump,
 	.offload	= nft_dup_netdev_offload,
 	.offload_action	= nft_dup_netdev_offload_action,
+	.reduce		= nft_dup_reduce,
 };
 
 static struct nft_expr_type nft_dup_netdev_type __read_mostly = {
