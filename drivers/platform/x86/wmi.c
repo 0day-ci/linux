@@ -22,7 +22,7 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/list.h>
+#include <linux/tlist.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -38,8 +38,6 @@
 MODULE_AUTHOR("Carlos Corbacho");
 MODULE_DESCRIPTION("ACPI-WMI Mapping Driver");
 MODULE_LICENSE("GPL");
-
-static LIST_HEAD(wmi_block_list);
 
 struct guid_block {
 	guid_t guid;
@@ -75,6 +73,7 @@ struct wmi_block {
 	unsigned long flags;
 };
 
+static TLIST_DEFINE(struct wmi_block, list, wmi_block_list);
 
 /*
  * If the GUID data block is marked as expensive, we must enable and
@@ -121,7 +120,6 @@ static struct platform_driver acpi_wmi_driver = {
 static acpi_status find_guid(const char *guid_string, struct wmi_block **out)
 {
 	guid_t guid_input;
-	struct wmi_block *wblock;
 
 	if (!guid_string)
 		return AE_BAD_PARAMETER;
@@ -129,7 +127,7 @@ static acpi_status find_guid(const char *guid_string, struct wmi_block **out)
 	if (guid_parse(guid_string, &guid_input))
 		return AE_BAD_PARAMETER;
 
-	list_for_each_entry(wblock, &wmi_block_list, list) {
+	tlist_for_each(&wmi_block_list, wblock) {
 		if (guid_equal(&wblock->gblock.guid, &guid_input)) {
 			if (out)
 				*out = wblock;
@@ -565,7 +563,6 @@ acpi_status wmi_install_notify_handler(const char *guid,
 				       wmi_notify_handler handler,
 				       void *data)
 {
-	struct wmi_block *block;
 	acpi_status status = AE_NOT_EXIST;
 	guid_t guid_input;
 
@@ -575,7 +572,7 @@ acpi_status wmi_install_notify_handler(const char *guid,
 	if (guid_parse(guid, &guid_input))
 		return AE_BAD_PARAMETER;
 
-	list_for_each_entry(block, &wmi_block_list, list) {
+	tlist_for_each(&wmi_block_list, block) {
 		acpi_status wmi_status;
 
 		if (guid_equal(&block->gblock.guid, &guid_input)) {
@@ -605,7 +602,6 @@ EXPORT_SYMBOL_GPL(wmi_install_notify_handler);
  */
 acpi_status wmi_remove_notify_handler(const char *guid)
 {
-	struct wmi_block *block;
 	acpi_status status = AE_NOT_EXIST;
 	guid_t guid_input;
 
@@ -615,7 +611,7 @@ acpi_status wmi_remove_notify_handler(const char *guid)
 	if (guid_parse(guid, &guid_input))
 		return AE_BAD_PARAMETER;
 
-	list_for_each_entry(block, &wmi_block_list, list) {
+	tlist_for_each(&wmi_block_list, block) {
 		acpi_status wmi_status;
 
 		if (guid_equal(&block->gblock.guid, &guid_input)) {
@@ -652,9 +648,7 @@ EXPORT_SYMBOL_GPL(wmi_remove_notify_handler);
  */
 acpi_status wmi_get_event_data(u32 event, struct acpi_buffer *out)
 {
-	struct wmi_block *wblock;
-
-	list_for_each_entry(wblock, &wmi_block_list, list) {
+	tlist_for_each(&wmi_block_list, wblock) {
 		struct guid_block *gblock = &wblock->gblock;
 
 		if ((gblock->flags & ACPI_WMI_EVENT) && gblock->notify_id == event)
@@ -854,10 +848,8 @@ static int wmi_dev_match(struct device *dev, struct device_driver *driver)
 static int wmi_char_open(struct inode *inode, struct file *filp)
 {
 	const char *driver_name = filp->f_path.dentry->d_iname;
-	struct wmi_block *wblock;
-	struct wmi_block *next;
 
-	list_for_each_entry_safe(wblock, next, &wmi_block_list, list) {
+	tlist_for_each(&wmi_block_list, wblock) {
 		if (!wblock->dev.dev.driver)
 			continue;
 		if (strcmp(driver_name, wblock->dev.dev.driver->name) == 0) {
@@ -1143,12 +1135,10 @@ static int wmi_create_device(struct device *wmi_bus_dev,
 
 static void wmi_free_devices(struct acpi_device *device)
 {
-	struct wmi_block *wblock, *next;
-
 	/* Delete devices for all the GUIDs */
-	list_for_each_entry_safe(wblock, next, &wmi_block_list, list) {
+	tlist_for_each_safe(&wmi_block_list, wblock) {
 		if (wblock->acpi_device == device) {
-			list_del(&wblock->list);
+			tlist_remove(&wmi_block_list, wblock);
 			device_unregister(&wblock->dev.dev);
 		}
 	}
@@ -1156,9 +1146,7 @@ static void wmi_free_devices(struct acpi_device *device)
 
 static bool guid_already_parsed(struct acpi_device *device, const guid_t *guid)
 {
-	struct wmi_block *wblock;
-
-	list_for_each_entry(wblock, &wmi_block_list, list) {
+	tlist_for_each(&wmi_block_list, wblock) {
 		if (guid_equal(&wblock->gblock.guid, guid)) {
 			/*
 			 * Because we historically didn't track the relationship
@@ -1182,7 +1170,7 @@ static int parse_wdg(struct device *wmi_bus_dev, struct acpi_device *device)
 {
 	struct acpi_buffer out = {ACPI_ALLOCATE_BUFFER, NULL};
 	const struct guid_block *gblock;
-	struct wmi_block *wblock, *next;
+	struct wmi_block *wblock;
 	union acpi_object *obj;
 	acpi_status status;
 	int retval = 0;
@@ -1232,7 +1220,7 @@ static int parse_wdg(struct device *wmi_bus_dev, struct acpi_device *device)
 			continue;
 		}
 
-		list_add_tail(&wblock->list, &wmi_block_list);
+		tlist_push_back(&wmi_block_list, wblock);
 
 		if (debug_event) {
 			wblock->handler = wmi_notify_debug;
@@ -1244,7 +1232,7 @@ static int parse_wdg(struct device *wmi_bus_dev, struct acpi_device *device)
 	 * Now that all of the devices are created, add them to the
 	 * device tree and probe subdrivers.
 	 */
-	list_for_each_entry_safe(wblock, next, &wmi_block_list, list) {
+	tlist_for_each_safe(&wmi_block_list, wblock) {
 		if (wblock->acpi_device != device)
 			continue;
 
@@ -1254,7 +1242,7 @@ static int parse_wdg(struct device *wmi_bus_dev, struct acpi_device *device)
 				&wblock->gblock.guid);
 			if (debug_event)
 				wmi_method_enable(wblock, false);
-			list_del(&wblock->list);
+			tlist_remove(&wmi_block_list, wblock);
 			put_device(&wblock->dev.dev);
 		}
 	}
@@ -1308,21 +1296,20 @@ acpi_wmi_ec_space_handler(u32 function, acpi_physical_address address,
 static void acpi_wmi_notify_handler(acpi_handle handle, u32 event,
 				    void *context)
 {
-	struct wmi_block *wblock;
-	bool found_it = false;
+	struct wmi_block *wblock = NULL;
 
-	list_for_each_entry(wblock, &wmi_block_list, list) {
-		struct guid_block *block = &wblock->gblock;
+	tlist_for_each(&wmi_block_list, b) {
+		struct guid_block *block = &b->gblock;
 
-		if (wblock->acpi_device->handle == handle &&
+		if (b->acpi_device->handle == handle &&
 		    (block->flags & ACPI_WMI_EVENT) &&
 		    (block->notify_id == event)) {
-			found_it = true;
+			wblock = b;
 			break;
 		}
 	}
 
-	if (!found_it)
+	if (!wblock)
 		return;
 
 	/* If a driver is bound, then notify the driver. */
