@@ -1,0 +1,37 @@
+What:		/sys/bus/ddcci/ddcci<I²C bus number>i<hex address>
+Date:		February 2022
+KernelVersion:	5.17
+Contact:	Christoph Grenz <webmaster@grenz-bonn.de>
+Description:	This file is a internal dependent device on the I2C bus,
+		it exports the same data that the main device exports.
+
+What:		/sys/bus/ddcci/ddcci<I²C bus number>e<hex address>
+Date:		February 2022
+KernelVersion:	5.17
+Contact:	Christoph Grenz <webmaster@grenz-bonn.de>
+Description:	This file is a external dependent device on the I2C bus,
+		it exports the same data that the main device exports.
+
+What:		/sys/bus/ddcci/ddcci<I²C bus number>
+Date:		February 2022
+KernelVersion:	5.17
+Contact:	Christoph Grenz <webmaster@grenz-bonn.de>
+Description:	This file is the main device on the I2C bus, it exports
+		the following peices of information about the device, capabilities
+		which is a full ACCESS.bus capabilities string(see the ACCESS.bus
+		specification for more info), idProt, which is a full ACCESS.bus
+		protocol supported by the device(Usually "monitor"), idType,
+		a ACCESS.buss device subtype(Usually "LCD" or "CRT"), idModel, a
+		ACCESS.bus device model identifier(Usually a shortened form of the
+		device model name), idVendor, a ACCESS.bus device vendor identifier
+		(Empty if the Identification command is not supported), idModule,
+		a ACCESS.bus device module identifier(Empty if the Identification
+		command is not supported), idSerial, a 32 bit device number
+		a fixed serial number if it's positive, a temporary serial number
+		if negative and zero if the Identification command is not supported,
+		and modalias, a combined identifier for driver selection,
+		it has the form ddcci:<idProt>-<idType>-<idModel>-<idVendor>-<idModule>,
+		All non-alphanumeric characters (including whitespace) in the model,
+		vendor or module parts are replaced by underscores to prevent issues
+		with software like systemd-udevd. See Documentation/misc-devices/ddcci.rst
+		for more information on DDC/CI.
