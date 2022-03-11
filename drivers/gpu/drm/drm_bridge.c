@@ -529,7 +529,7 @@ void drm_bridge_chain_post_disable(struct drm_bridge *bridge)
 {
 	struct drm_encoder *encoder;
 
-	if (!bridge)
+	if (!bridge || !bridge->dev)
 		return;
 
 	encoder = bridge->encoder;
@@ -585,7 +585,7 @@ void drm_bridge_chain_pre_enable(struct drm_bridge *bridge)
 	struct drm_encoder *encoder;
 	struct drm_bridge *iter;
 
-	if (!bridge)
+	if (!bridge || !bridge->dev)
 		return;
 
 	encoder = bridge->encoder;
