@@ -86,6 +86,7 @@ static void ax25_kill_by_device(struct net_device *dev)
 again:
 	ax25_for_each(s, &ax25_list) {
 		if (s->ax25_dev == ax25_dev) {
+			set_bit(AX25_DEV_KILL, &ax25_dev->flag);
 			sk = s->sk;
 			if (!sk) {
 				spin_unlock_bh(&ax25_list_lock);
@@ -115,6 +116,10 @@ again:
 		}
 	}
 	spin_unlock_bh(&ax25_list_lock);
+	if (!test_bit(AX25_DEV_KILL, &ax25_dev->flag) && test_bit(AX25_DEV_BIND, &ax25_dev->flag)) {
+		dev_put_track(ax25_dev->dev, &ax25_dev->dev_tracker);
+		ax25_dev_put(ax25_dev);
+	}
 }
 
 /*
@@ -1132,6 +1137,7 @@ static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 done:
 	ax25_cb_add(ax25);
 	sock_reset_flag(sk, SOCK_ZAPPED);
+	set_bit(AX25_DEV_BIND, &ax25_dev->flag);
 
 out:
 	release_sock(sk);

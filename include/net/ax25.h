@@ -158,6 +158,10 @@ enum {
 #define	AX25_DEF_PROTOCOL	AX25_PROTO_STD_SIMPLEX	/* Standard AX.25 */
 #define AX25_DEF_DS_TIMEOUT	180000			/* DAMA timeout 3 minutes */
 
+#define AX25_DEV_INIT    0
+#define AX25_DEV_KILL    0
+#define AX25_DEV_BIND    1
+
 typedef struct ax25_uid_assoc {
 	struct hlist_node	uid_node;
 	refcount_t		refcount;
@@ -240,6 +244,7 @@ typedef struct ax25_dev {
 	ax25_dama_info		dama;
 #endif
 	refcount_t		refcount;
+	unsigned long	flag;
 } ax25_dev;
 
 typedef struct ax25_cb {
