@@ -45,7 +45,7 @@ struct scrub_ctx;
  * operations. The first one configures an upper limit for the number
  * of (dynamically allocated) pages that are added to a bio.
  */
-#define SCRUB_PAGES_PER_BIO	32	/* 128KiB per bio for x86 */
+#define SCRUB_SECTORS_PER_BIO	32	/* 128KiB per bio for x86 */
 #define SCRUB_BIOS_PER_SCTX	64	/* 8MiB per device in flight for x86 */
 
 /*
@@ -87,8 +87,8 @@ struct scrub_bio {
 	blk_status_t		status;
 	u64			logical;
 	u64			physical;
-	struct scrub_sector	*pagev[SCRUB_PAGES_PER_BIO];
-	int			page_count;
+	struct scrub_sector	*sectorv[SCRUB_SECTORS_PER_BIO];
+	int			sector_count;
 	int			next_free;
 	struct btrfs_work	work;
 };
@@ -158,7 +158,7 @@ struct scrub_ctx {
 	struct list_head	csum_list;
 	atomic_t		cancel_req;
 	int			readonly;
-	int			pages_per_bio;
+	int			sectors_per_bio;
 
 	/* State of IO submission throttling affecting the associated device */
 	ktime_t			throttle_deadline;
@@ -535,9 +535,9 @@ static noinline_for_stack void scrub_free_ctx(struct scrub_ctx *sctx)
 	if (sctx->curr != -1) {
 		struct scrub_bio *sbio = sctx->bios[sctx->curr];
 
-		for (i = 0; i < sbio->page_count; i++) {
-			WARN_ON(!sbio->pagev[i]->page);
-			scrub_block_put(sbio->pagev[i]->sblock);
+		for (i = 0; i < sbio->sector_count; i++) {
+			WARN_ON(!sbio->sectorv[i]->page);
+			scrub_block_put(sbio->sectorv[i]->sblock);
 		}
 		bio_put(sbio->bio);
 	}
@@ -572,7 +572,7 @@ static noinline_for_stack struct scrub_ctx *scrub_setup_ctx(
 		goto nomem;
 	refcount_set(&sctx->refs, 1);
 	sctx->is_dev_replace = is_dev_replace;
-	sctx->pages_per_bio = SCRUB_PAGES_PER_BIO;
+	sctx->sectors_per_bio = SCRUB_SECTORS_PER_BIO;
 	sctx->curr = -1;
 	sctx->fs_info = fs_info;
 	INIT_LIST_HEAD(&sctx->csum_list);
@@ -586,7 +586,7 @@ static noinline_for_stack struct scrub_ctx *scrub_setup_ctx(
 
 		sbio->index = i;
 		sbio->sctx = sctx;
-		sbio->page_count = 0;
+		sbio->sector_count = 0;
 		btrfs_init_work(&sbio->work, scrub_bio_end_io_worker, NULL,
 				NULL);
 
@@ -1650,10 +1650,10 @@ again:
 			return -ENOMEM;
 		}
 		sctx->wr_curr_bio->sctx = sctx;
-		sctx->wr_curr_bio->page_count = 0;
+		sctx->wr_curr_bio->sector_count = 0;
 	}
 	sbio = sctx->wr_curr_bio;
-	if (sbio->page_count == 0) {
+	if (sbio->sector_count == 0) {
 		struct bio *bio;
 
 		ret = fill_writer_pointer_gap(sctx,
@@ -1668,7 +1668,7 @@ again:
 		sbio->dev = sctx->wr_tgtdev;
 		bio = sbio->bio;
 		if (!bio) {
-			bio = btrfs_bio_alloc(sctx->pages_per_bio);
+			bio = btrfs_bio_alloc(sctx->sectors_per_bio);
 			sbio->bio = bio;
 		}
 
@@ -1678,9 +1678,9 @@ again:
 		bio->bi_iter.bi_sector = sbio->physical >> 9;
 		bio->bi_opf = REQ_OP_WRITE;
 		sbio->status = 0;
-	} else if (sbio->physical + sbio->page_count * sectorsize !=
+	} else if (sbio->physical + sbio->sector_count * sectorsize !=
 		   ssector->physical_for_dev_replace ||
-		   sbio->logical + sbio->page_count * sectorsize !=
+		   sbio->logical + sbio->sector_count * sectorsize !=
 		   ssector->logical) {
 		scrub_wr_submit(sctx);
 		goto again;
@@ -1688,7 +1688,7 @@ again:
 
 	ret = bio_add_page(sbio->bio, ssector->page, sectorsize, 0);
 	if (ret != sectorsize) {
-		if (sbio->page_count < 1) {
+		if (sbio->sector_count < 1) {
 			bio_put(sbio->bio);
 			sbio->bio = NULL;
 			mutex_unlock(&sctx->wr_lock);
@@ -1698,10 +1698,10 @@ again:
 		goto again;
 	}
 
-	sbio->pagev[sbio->page_count] = ssector;
+	sbio->sectorv[sbio->sector_count] = ssector;
 	scrub_sector_get(ssector);
-	sbio->page_count++;
-	if (sbio->page_count == sctx->pages_per_bio)
+	sbio->sector_count++;
+	if (sbio->sector_count == sctx->sectors_per_bio)
 		scrub_wr_submit(sctx);
 	mutex_unlock(&sctx->wr_lock);
 
@@ -1726,7 +1726,7 @@ static void scrub_wr_submit(struct scrub_ctx *sctx)
 	btrfsic_submit_bio(sbio->bio);
 
 	if (btrfs_is_zoned(sctx->fs_info))
-		sctx->write_pointer = sbio->physical + sbio->page_count *
+		sctx->write_pointer = sbio->physical + sbio->sector_count *
 			sctx->fs_info->sectorsize;
 }
 
@@ -1748,21 +1748,21 @@ static void scrub_wr_bio_end_io_worker(struct btrfs_work *work)
 	struct scrub_ctx *sctx = sbio->sctx;
 	int i;
 
-	ASSERT(sbio->page_count <= SCRUB_PAGES_PER_BIO);
+	ASSERT(sbio->sector_count <= SCRUB_SECTORS_PER_BIO);
 	if (sbio->status) {
 		struct btrfs_dev_replace *dev_replace =
 			&sbio->sctx->fs_info->dev_replace;
 
-		for (i = 0; i < sbio->page_count; i++) {
-			struct scrub_sector *ssector = sbio->pagev[i];
+		for (i = 0; i < sbio->sector_count; i++) {
+			struct scrub_sector *ssector = sbio->sectorv[i];
 
 			ssector->io_error = 1;
 			atomic64_inc(&dev_replace->num_write_errors);
 		}
 	}
 
-	for (i = 0; i < sbio->page_count; i++)
-		scrub_sector_put(sbio->pagev[i]);
+	for (i = 0; i < sbio->sector_count; i++)
+		scrub_sector_put(sbio->sectorv[i]);
 
 	bio_put(sbio->bio);
 	kfree(sbio);
@@ -2078,7 +2078,7 @@ again:
 		if (sctx->curr != -1) {
 			sctx->first_free = sctx->bios[sctx->curr]->next_free;
 			sctx->bios[sctx->curr]->next_free = -1;
-			sctx->bios[sctx->curr]->page_count = 0;
+			sctx->bios[sctx->curr]->sector_count = 0;
 			spin_unlock(&sctx->list_lock);
 		} else {
 			spin_unlock(&sctx->list_lock);
@@ -2086,7 +2086,7 @@ again:
 		}
 	}
 	sbio = sctx->bios[sctx->curr];
-	if (sbio->page_count == 0) {
+	if (sbio->sector_count == 0) {
 		struct bio *bio;
 
 		sbio->physical = ssector->physical;
@@ -2094,7 +2094,7 @@ again:
 		sbio->dev = ssector->dev;
 		bio = sbio->bio;
 		if (!bio) {
-			bio = btrfs_bio_alloc(sctx->pages_per_bio);
+			bio = btrfs_bio_alloc(sctx->sectors_per_bio);
 			sbio->bio = bio;
 		}
 
@@ -2104,19 +2104,19 @@ again:
 		bio->bi_iter.bi_sector = sbio->physical >> 9;
 		bio->bi_opf = REQ_OP_READ;
 		sbio->status = 0;
-	} else if (sbio->physical + sbio->page_count * sectorsize !=
+	} else if (sbio->physical + sbio->sector_count * sectorsize !=
 		   ssector->physical ||
-		   sbio->logical + sbio->page_count * sectorsize !=
+		   sbio->logical + sbio->sector_count * sectorsize !=
 		   ssector->logical ||
 		   sbio->dev != ssector->dev) {
 		scrub_submit(sctx);
 		goto again;
 	}
 
-	sbio->pagev[sbio->page_count] = ssector;
+	sbio->sectorv[sbio->sector_count] = ssector;
 	ret = bio_add_page(sbio->bio, ssector->page, sectorsize, 0);
 	if (ret != sectorsize) {
-		if (sbio->page_count < 1) {
+		if (sbio->sector_count < 1) {
 			bio_put(sbio->bio);
 			sbio->bio = NULL;
 			return -EIO;
@@ -2127,8 +2127,8 @@ again:
 
 	scrub_block_get(sblock); /* one for the page added to the bio */
 	atomic_inc(&sblock->outstanding_sectors);
-	sbio->page_count++;
-	if (sbio->page_count == sctx->pages_per_bio)
+	sbio->sector_count++;
+	if (sbio->sector_count == sctx->sectors_per_bio)
 		scrub_submit(sctx);
 
 	return 0;
@@ -2362,10 +2362,10 @@ static void scrub_bio_end_io_worker(struct btrfs_work *work)
 	struct scrub_ctx *sctx = sbio->sctx;
 	int i;
 
-	ASSERT(sbio->page_count <= SCRUB_PAGES_PER_BIO);
+	ASSERT(sbio->sector_count <= SCRUB_SECTORS_PER_BIO);
 	if (sbio->status) {
-		for (i = 0; i < sbio->page_count; i++) {
-			struct scrub_sector *ssector = sbio->pagev[i];
+		for (i = 0; i < sbio->sector_count; i++) {
+			struct scrub_sector *ssector = sbio->sectorv[i];
 
 			ssector->io_error = 1;
 			ssector->sblock->no_io_error_seen = 0;
@@ -2373,8 +2373,8 @@ static void scrub_bio_end_io_worker(struct btrfs_work *work)
 	}
 
 	/* now complete the scrub_block items that have all pages completed */
-	for (i = 0; i < sbio->page_count; i++) {
-		struct scrub_sector *ssector = sbio->pagev[i];
+	for (i = 0; i < sbio->sector_count; i++) {
+		struct scrub_sector *ssector = sbio->sectorv[i];
 		struct scrub_block *sblock = ssector->sblock;
 
 		if (atomic_dec_and_test(&sblock->outstanding_sectors))
