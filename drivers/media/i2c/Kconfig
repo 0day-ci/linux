@@ -325,6 +325,16 @@ config VIDEO_BT866
 	  To compile this driver as a module, choose M here: the
 	  module will be called bt866.
 
+config VIDEO_ISL7998X
+	tristate "Intersil ISL7998x video decoder"
+	depends on VIDEO_V4L2 && I2C
+	depends on OF_GPIO
+	select MEDIA_CONTROLLER
+	select VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for Intersil ISL7998x analog to MIPI-CSI2 or
+	  BT.656 decoder.
+
 config VIDEO_KS0127
 	tristate "KS0127 video decoder"
 	depends on VIDEO_V4L2 && I2C
@@ -759,6 +769,19 @@ config VIDEO_HI846
 	  To compile this driver as a module, choose M here: the
 	  module will be called hi846.
 
+config VIDEO_HI847
+        tristate "Hynix Hi-847 sensor support"
+        depends on I2C && VIDEO_V4L2
+        select MEDIA_CONTROLLER
+        select VIDEO_V4L2_SUBDEV_API
+        select V4L2_FWNODE
+        help
+          This is a Video4Linux2 sensor driver for the Hynix
+          Hi-847 camera.
+
+          To compile this driver as a module, choose M here: the
+          module will be called hi847.
+
 config VIDEO_IMX208
 	tristate "Sony IMX208 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -899,6 +922,19 @@ config VIDEO_IMX412
 	  To compile this driver as a module, choose M here: the
 	  module will be called imx412.
 
+config VIDEO_OG01A1B
+	tristate "OmniVision OG01A1B sensor support"
+	depends on I2C && VIDEO_V4L2
+	select MEDIA_CONTROLLER
+	select VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OG01A1B camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called og01a1b.
+
 config VIDEO_OV02A10
 	tristate "OmniVision OV02A10 sensor support"
 	depends on VIDEO_V4L2 && I2C
@@ -911,6 +947,19 @@ config VIDEO_OV02A10
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov02a10.
+
+config VIDEO_OV08D10
+        tristate "OmniVision OV08D10 sensor support"
+        depends on I2C && VIDEO_V4L2
+        select MEDIA_CONTROLLER
+        select VIDEO_V4L2_SUBDEV_API
+        select V4L2_FWNODE
+        help
+          This is a Video4Linux2 sensor driver for the OmniVision
+          OV08D10 camera sensor.
+
+          To compile this driver as a module, choose M here: the
+          module will be called ov08d10.
 
 config VIDEO_OV2640
 	tristate "OmniVision OV2640 sensor support"

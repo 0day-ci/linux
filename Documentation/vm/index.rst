@@ -39,3 +39,4 @@ algorithms.  If you are looking for advice on simply allocating memory, see the
    vmalloced-kernel-stacks
    z3fold
    zsmalloc
+   memblock-sim

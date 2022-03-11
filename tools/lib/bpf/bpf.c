@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <linux/bpf.h>
 #include <linux/filter.h>
+#include <linux/kernel.h>
 #include <limits.h>
 #include <sys/resource.h>
 #include "bpf.h"
@@ -111,7 +112,7 @@ int probe_memcg_account(void)
 		BPF_EMIT_CALL(BPF_FUNC_ktime_get_coarse_ns),
 		BPF_EXIT_INSN(),
 	};
-	size_t insn_cnt = sizeof(insns) / sizeof(insns[0]);
+	size_t insn_cnt = ARRAY_SIZE(insns);
 	union bpf_attr attr;
 	int prog_fd;
 
@@ -754,10 +755,10 @@ int bpf_prog_attach(int prog_fd, int target_fd, enum bpf_attach_type type,
 		.flags = flags,
 	);
 
-	return bpf_prog_attach_xattr(prog_fd, target_fd, type, &opts);
+	return bpf_prog_attach_opts(prog_fd, target_fd, type, &opts);
 }
 
-int bpf_prog_attach_xattr(int prog_fd, int target_fd,
+int bpf_prog_attach_opts(int prog_fd, int target_fd,
 			  enum bpf_attach_type type,
 			  const struct bpf_prog_attach_opts *opts)
 {
@@ -777,6 +778,11 @@ int bpf_prog_attach_xattr(int prog_fd, int target_fd,
 	ret = sys_bpf(BPF_PROG_ATTACH, &attr, sizeof(attr));
 	return libbpf_err_errno(ret);
 }
+
+__attribute__((alias("bpf_prog_attach_opts")))
+int bpf_prog_attach_xattr(int prog_fd, int target_fd,
+			  enum bpf_attach_type type,
+			  const struct bpf_prog_attach_opts *opts);
 
 int bpf_prog_detach(int target_fd, enum bpf_attach_type type)
 {
@@ -989,6 +995,7 @@ int bpf_prog_test_run_opts(int prog_fd, struct bpf_test_run_opts *opts)
 
 	memset(&attr, 0, sizeof(attr));
 	attr.test.prog_fd = prog_fd;
+	attr.test.batch_size = OPTS_GET(opts, batch_size, 0);
 	attr.test.cpu = OPTS_GET(opts, cpu, 0);
 	attr.test.flags = OPTS_GET(opts, flags, 0);
 	attr.test.repeat = OPTS_GET(opts, repeat, 0);

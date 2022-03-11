@@ -34,12 +34,22 @@ struct lowcore {
 		__u32 ext_int_code_addr;
 	};
 	__u32	svc_int_code;			/* 0x0088 */
-	__u16	pgm_ilc;			/* 0x008c */
-	__u16	pgm_code;			/* 0x008e */
+	union {
+		struct {
+			__u16	pgm_ilc;	/* 0x008c */
+			__u16	pgm_code;	/* 0x008e */
+		};
+		__u32 pgm_int_code;
+	};
 	__u32	data_exc_code;			/* 0x0090 */
 	__u16	mon_class_num;			/* 0x0094 */
-	__u8	per_code;			/* 0x0096 */
-	__u8	per_atmid;			/* 0x0097 */
+	union {
+		struct {
+			__u8	per_code;	/* 0x0096 */
+			__u8	per_atmid;	/* 0x0097 */
+		};
+		__u16 per_code_combined;
+	};
 	__u64	per_address;			/* 0x0098 */
 	__u8	exc_access_id;			/* 0x00a0 */
 	__u8	per_access_id;			/* 0x00a1 */

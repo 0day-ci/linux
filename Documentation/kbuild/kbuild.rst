@@ -57,6 +57,10 @@ CFLAGS_MODULE
 -------------
 Additional module specific options to use for $(CC).
 
+KRUSTFLAGS
+----------
+Additional options to the Rust compiler (for built-in and modules).
+
 LDFLAGS_MODULE
 --------------
 Additional options used for $(LD) when linking modules.
@@ -76,6 +80,17 @@ Additional flags to be passed when linking host programs.
 HOSTLDLIBS
 ----------
 Additional libraries to link against when building host programs.
+
+.. _userkbuildflags:
+
+USERCFLAGS
+----------
+Additional options used for $(CC) when compiling userprogs.
+
+USERLDFLAGS
+-----------
+Additional options used for $(LD) when linking userprogs. userprogs are linked
+with CC, so $(USERLDFLAGS) should include "-Wl," prefix as applicable.
 
 KBUILD_KCONFIG
 --------------

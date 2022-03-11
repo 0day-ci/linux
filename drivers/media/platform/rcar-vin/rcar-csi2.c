@@ -17,6 +17,7 @@
 #include <linux/reset.h>
 #include <linux/sys_soc.h>
 
+#include <media/mipi-csi2.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-fwnode.h>
@@ -412,17 +413,51 @@ struct rcar_csi2_format {
 };
 
 static const struct rcar_csi2_format rcar_csi2_formats[] = {
-	{ .code = MEDIA_BUS_FMT_RGB888_1X24,	.datatype = 0x24, .bpp = 24 },
-	{ .code = MEDIA_BUS_FMT_UYVY8_1X16,	.datatype = 0x1e, .bpp = 16 },
-	{ .code = MEDIA_BUS_FMT_YUYV8_1X16,	.datatype = 0x1e, .bpp = 16 },
-	{ .code = MEDIA_BUS_FMT_UYVY8_2X8,	.datatype = 0x1e, .bpp = 16 },
-	{ .code = MEDIA_BUS_FMT_YUYV10_2X10,	.datatype = 0x1e, .bpp = 20 },
-	{ .code = MEDIA_BUS_FMT_Y10_1X10,	.datatype = 0x2b, .bpp = 10 },
-	{ .code = MEDIA_BUS_FMT_SBGGR8_1X8,     .datatype = 0x2a, .bpp = 8 },
-	{ .code = MEDIA_BUS_FMT_SGBRG8_1X8,     .datatype = 0x2a, .bpp = 8 },
-	{ .code = MEDIA_BUS_FMT_SGRBG8_1X8,     .datatype = 0x2a, .bpp = 8 },
-	{ .code = MEDIA_BUS_FMT_SRGGB8_1X8,     .datatype = 0x2a, .bpp = 8 },
-	{ .code = MEDIA_BUS_FMT_Y8_1X8,		.datatype = 0x2a, .bpp = 8 },
+	{
+		.code = MEDIA_BUS_FMT_RGB888_1X24,
+		.datatype = MIPI_CSI2_DT_RGB888,
+		.bpp = 24,
+	}, {
+		.code = MEDIA_BUS_FMT_UYVY8_1X16,
+		.datatype = MIPI_CSI2_DT_YUV422_8B,
+		.bpp = 16,
+	}, {
+		.code = MEDIA_BUS_FMT_YUYV8_1X16,
+		.datatype = MIPI_CSI2_DT_YUV422_8B,
+		.bpp = 16,
+	}, {
+		.code = MEDIA_BUS_FMT_UYVY8_2X8,
+		.datatype = MIPI_CSI2_DT_YUV422_8B,
+		.bpp = 16,
+	}, {
+		.code = MEDIA_BUS_FMT_YUYV10_2X10,
+		.datatype = MIPI_CSI2_DT_YUV422_8B,
+		.bpp = 20,
+	}, {
+		.code = MEDIA_BUS_FMT_Y10_1X10,
+		.datatype = MIPI_CSI2_DT_RAW10,
+		.bpp = 10,
+	}, {
+		.code = MEDIA_BUS_FMT_SBGGR8_1X8,
+		.datatype = MIPI_CSI2_DT_RAW8,
+		.bpp = 8,
+	}, {
+		.code = MEDIA_BUS_FMT_SGBRG8_1X8,
+		.datatype = MIPI_CSI2_DT_RAW8,
+		.bpp = 8,
+	}, {
+		.code = MEDIA_BUS_FMT_SGRBG8_1X8,
+		.datatype = MIPI_CSI2_DT_RAW8,
+		.bpp = 8,
+	}, {
+		.code = MEDIA_BUS_FMT_SRGGB8_1X8,
+		.datatype = MIPI_CSI2_DT_RAW8,
+		.bpp = 8,
+	}, {
+		.code = MEDIA_BUS_FMT_Y8_1X8,
+		.datatype = MIPI_CSI2_DT_RAW8,
+		.bpp = 8,
+	},
 };
 
 static const struct rcar_csi2_format *rcsi2_code_to_fmt(unsigned int code)
@@ -467,6 +502,8 @@ struct rcar_csi2 {
 	struct v4l2_async_notifier notifier;
 	struct v4l2_subdev *remote;
 	unsigned int remote_pad;
+
+	int channel_vc[4];
 
 	struct mutex lock; /* Protects mf and stream_count. */
 	struct v4l2_mbus_framefmt mf;
@@ -603,7 +640,6 @@ static int rcsi2_get_active_lanes(struct rcar_csi2 *priv,
 				  unsigned int *lanes)
 {
 	struct v4l2_mbus_config mbus_config = { 0 };
-	unsigned int num_lanes = UINT_MAX;
 	int ret;
 
 	*lanes = priv->lanes;
@@ -626,23 +662,14 @@ static int rcsi2_get_active_lanes(struct rcar_csi2 *priv,
 		return -EINVAL;
 	}
 
-	if (mbus_config.flags & V4L2_MBUS_CSI2_1_LANE)
-		num_lanes = 1;
-	else if (mbus_config.flags & V4L2_MBUS_CSI2_2_LANE)
-		num_lanes = 2;
-	else if (mbus_config.flags & V4L2_MBUS_CSI2_3_LANE)
-		num_lanes = 3;
-	else if (mbus_config.flags & V4L2_MBUS_CSI2_4_LANE)
-		num_lanes = 4;
-
-	if (num_lanes > priv->lanes) {
+	if (mbus_config.bus.mipi_csi2.num_data_lanes > priv->lanes) {
 		dev_err(priv->dev,
 			"Unsupported mbus config: too many data lanes %u\n",
-			num_lanes);
+			mbus_config.bus.mipi_csi2.num_data_lanes);
 		return -EINVAL;
 	}
 
-	*lanes = num_lanes;
+	*lanes = mbus_config.bus.mipi_csi2.num_data_lanes;
 
 	return 0;
 }
@@ -675,8 +702,11 @@ static int rcsi2_start_receiver(struct rcar_csi2 *priv)
 	for (i = 0; i < priv->info->num_channels; i++) {
 		u32 vcdt_part;
 
-		vcdt_part = VCDT_SEL_VC(i) | VCDT_VCDTN_EN | VCDT_SEL_DTN_ON |
-			VCDT_SEL_DT(format->datatype);
+		if (priv->channel_vc[i] < 0)
+			continue;
+
+		vcdt_part = VCDT_SEL_VC(priv->channel_vc[i]) | VCDT_VCDTN_EN |
+			VCDT_SEL_DTN_ON | VCDT_SEL_DT(format->datatype);
 
 		/* Store in correct reg and offset. */
 		if (i < 2)
@@ -1258,7 +1288,52 @@ static int rcsi2_init_phtw_v3u(struct rcar_csi2 *priv,
  * Platform Device Driver.
  */
 
+static int rcsi2_link_setup(struct media_entity *entity,
+			    const struct media_pad *local,
+			    const struct media_pad *remote, u32 flags)
+{
+	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
+	struct rcar_csi2 *priv = sd_to_csi2(sd);
+	struct video_device *vdev;
+	int channel, vc;
+	u32 id;
+
+	if (!is_media_entity_v4l2_video_device(remote->entity)) {
+		dev_err(priv->dev, "Remote is not a video device\n");
+		return -EINVAL;
+	}
+
+	vdev = media_entity_to_video_device(remote->entity);
+
+	if (of_property_read_u32(vdev->dev_parent->of_node, "renesas,id", &id)) {
+		dev_err(priv->dev, "No renesas,id, can't configure routing\n");
+		return -EINVAL;
+	}
+
+	channel = id % 4;
+
+	if (flags & MEDIA_LNK_FL_ENABLED) {
+		if (media_entity_remote_pad(local)) {
+			dev_dbg(priv->dev,
+				"Each VC can only be routed to one output channel\n");
+			return -EINVAL;
+		}
+
+		vc = local->index - 1;
+
+		dev_dbg(priv->dev, "Route VC%d to VIN%u on output channel %d\n",
+			vc, id, channel);
+	} else {
+		vc = -1;
+	}
+
+	priv->channel_vc[channel] = vc;
+
+	return 0;
+}
+
 static const struct media_entity_operations rcar_csi2_entity_ops = {
+	.link_setup = rcsi2_link_setup,
 	.link_validate = v4l2_subdev_link_validate,
 };
 
@@ -1414,7 +1489,7 @@ static const struct soc_device_attribute r8a7795[] = {
 		.soc_id = "r8a7795", .revision = "ES2.*",
 		.data = &rcar_csi2_info_r8a7795es2,
 	},
-	{ /* sentinel */ },
+	{ /* sentinel */ }
 };
 
 static int rcsi2_probe(struct platform_device *pdev)
@@ -1476,6 +1551,9 @@ static int rcsi2_probe(struct platform_device *pdev)
 				     priv->pads);
 	if (ret)
 		goto error_async;
+
+	for (i = 0; i < ARRAY_SIZE(priv->channel_vc); i++)
+		priv->channel_vc[i] = -1;
 
 	pm_runtime_enable(&pdev->dev);
 

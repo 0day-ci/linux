@@ -10,6 +10,8 @@
 #include "ice_eswitch.h"
 #include "ice_virtchnl_allowlist.h"
 #include "ice_flex_pipe.h"
+#include "ice_vf_vsi_vlan_ops.h"
+#include "ice_vlan.h"
 
 #define FIELD_SELECTOR(proto_hdr_field) \
 		BIT((proto_hdr_field) & PROTO_HDR_FIELD_MASK)
@@ -173,18 +175,107 @@ struct ice_vsi *ice_get_vf_vsi(struct ice_vf *vf)
 }
 
 /**
- * ice_validate_vf_id - helper to check if VF ID is valid
- * @pf: pointer to the PF structure
- * @vf_id: the ID of the VF to check
+ * ice_get_vf_by_id - Get pointer to VF by ID
+ * @pf: the PF private structure
+ * @vf_id: the VF ID to locate
+ *
+ * Locate and return a pointer to the VF structure associated with a given ID.
+ * Returns NULL if the ID does not have a valid VF structure associated with
+ * it.
+ *
+ * This function takes a reference to the VF, which must be released by
+ * calling ice_put_vf() once the caller is finished accessing the VF structure
+ * returned.
  */
-static int ice_validate_vf_id(struct ice_pf *pf, u16 vf_id)
+struct ice_vf *ice_get_vf_by_id(struct ice_pf *pf, u16 vf_id)
 {
-	/* vf_id range is only valid for 0-255, and should always be unsigned */
-	if (vf_id >= pf->num_alloc_vfs) {
-		dev_err(ice_pf_to_dev(pf), "Invalid VF ID: %u\n", vf_id);
-		return -EINVAL;
+	struct ice_vf *vf;
+
+	rcu_read_lock();
+	hash_for_each_possible_rcu(pf->vfs.table, vf, entry, vf_id) {
+		if (vf->vf_id == vf_id) {
+			struct ice_vf *found;
+
+			if (kref_get_unless_zero(&vf->refcnt))
+				found = vf;
+			else
+				found = NULL;
+
+			rcu_read_unlock();
+			return found;
+		}
 	}
-	return 0;
+	rcu_read_unlock();
+
+	return NULL;
+}
+
+/**
+ * ice_release_vf - Release VF associated with a refcount
+ * @ref: the kref decremented to zero
+ *
+ * Callback function for kref_put to release a VF once its reference count has
+ * hit zero.
+ */
+static void ice_release_vf(struct kref *ref)
+{
+	struct ice_vf *vf = container_of(ref, struct ice_vf, refcnt);
+
+	mutex_destroy(&vf->cfg_lock);
+
+	kfree_rcu(vf, rcu);
+}
+
+/**
+ * ice_put_vf - Release a reference to a VF
+ * @vf: the VF structure to decrease reference count on
+ *
+ * This must be called after ice_get_vf_by_id() once the reference to the VF
+ * structure is no longer used. Otherwise, the VF structure will never be
+ * freed.
+ */
+void ice_put_vf(struct ice_vf *vf)
+{
+	kref_put(&vf->refcnt, ice_release_vf);
+}
+
+/**
+ * ice_has_vfs - Return true if the PF has any associated VFs
+ * @pf: the PF private structure
+ *
+ * Return whether or not the PF has any allocated VFs.
+ *
+ * Note that this function only guarantees that there are no VFs at the point
+ * of calling it. It does not guarantee that no more VFs will be added.
+ */
+bool ice_has_vfs(struct ice_pf *pf)
+{
+	/* A simple check that the hash table is not empty does not require
+	 * the mutex or rcu_read_lock.
+	 */
+	return !hash_empty(pf->vfs.table);
+}
+
+/**
+ * ice_get_num_vfs - Get number of allocated VFs
+ * @pf: the PF private structure
+ *
+ * Return the total number of allocated VFs. NOTE: VF IDs are not guaranteed
+ * to be contiguous. Do not assume that a VF ID is guaranteed to be less than
+ * the output of this function.
+ */
+u16 ice_get_num_vfs(struct ice_pf *pf)
+{
+	struct ice_vf *vf;
+	unsigned int bkt;
+	u16 num_vfs = 0;
+
+	rcu_read_lock();
+	ice_for_each_vf_rcu(pf, bkt, vf)
+		num_vfs++;
+	rcu_read_unlock();
+
+	return num_vfs;
 }
 
 /**
@@ -203,6 +294,32 @@ static int ice_check_vf_init(struct ice_pf *pf, struct ice_vf *vf)
 }
 
 /**
+ * ice_free_vf_entries - Free all VF entries from the hash table
+ * @pf: pointer to the PF structure
+ *
+ * Iterate over the VF hash table, removing and releasing all VF entries.
+ * Called during VF teardown or as cleanup during failed VF initialization.
+ */
+static void ice_free_vf_entries(struct ice_pf *pf)
+{
+	struct ice_vfs *vfs = &pf->vfs;
+	struct hlist_node *tmp;
+	struct ice_vf *vf;
+	unsigned int bkt;
+
+	/* Remove all VFs from the hash table and release their main
+	 * reference. Once all references to the VF are dropped, ice_put_vf()
+	 * will call ice_release_vf which will remove the VF memory.
+	 */
+	lockdep_assert_held(&vfs->table_lock);
+
+	hash_for_each_safe(vfs->table, bkt, tmp, vf, entry) {
+		hash_del_rcu(&vf->entry);
+		ice_put_vf(vf);
+	}
+}
+
+/**
  * ice_vc_vf_broadcast - Broadcast a message to all VFs on PF
  * @pf: pointer to the PF structure
  * @v_opcode: operation code
@@ -215,11 +332,11 @@ ice_vc_vf_broadcast(struct ice_pf *pf, enum virtchnl_ops v_opcode,
 		    enum virtchnl_status_code v_retval, u8 *msg, u16 msglen)
 {
 	struct ice_hw *hw = &pf->hw;
-	unsigned int i;
+	struct ice_vf *vf;
+	unsigned int bkt;
 
-	ice_for_each_vf(pf, i) {
-		struct ice_vf *vf = &pf->vf[i];
-
+	mutex_lock(&pf->vfs.table_lock);
+	ice_for_each_vf(pf, bkt, vf) {
 		/* Not all vfs are enabled so skip the ones that are not */
 		if (!test_bit(ICE_VF_STATE_INIT, vf->vf_states) &&
 		    !test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states))
@@ -231,6 +348,7 @@ ice_vc_vf_broadcast(struct ice_pf *pf, enum virtchnl_ops v_opcode,
 		ice_aq_send_msg_to_vf(hw, vf->vf_id, v_opcode, v_retval, msg,
 				      msglen, NULL);
 	}
+	mutex_unlock(&pf->vfs.table_lock);
 }
 
 /**
@@ -379,7 +497,7 @@ static void ice_free_vf_res(struct ice_vf *vf)
 		vf->num_mac = 0;
 	}
 
-	last_vector_idx = vf->first_vector_idx + pf->num_msix_per_vf - 1;
+	last_vector_idx = vf->first_vector_idx + pf->vfs.num_msix_per - 1;
 
 	/* clear VF MDD event information */
 	memset(&vf->mdd_tx_events, 0, sizeof(vf->mdd_tx_events));
@@ -415,7 +533,7 @@ static void ice_dis_vf_mappings(struct ice_vf *vf)
 	wr32(hw, VPINT_ALLOC_PCI(vf->vf_id), 0);
 
 	first = vf->first_vector_idx;
-	last = first + pf->num_msix_per_vf - 1;
+	last = first + pf->vfs.num_msix_per - 1;
 	for (v = first; v <= last; v++) {
 		u32 reg;
 
@@ -497,13 +615,13 @@ static void ice_dis_vf_qs(struct ice_vf *vf)
 void ice_free_vfs(struct ice_pf *pf)
 {
 	struct device *dev = ice_pf_to_dev(pf);
+	struct ice_vfs *vfs = &pf->vfs;
 	struct ice_hw *hw = &pf->hw;
-	unsigned int tmp, i;
+	struct ice_vf *vf;
+	unsigned int bkt;
 
-	if (!pf->vf)
+	if (!ice_has_vfs(pf))
 		return;
-
-	ice_eswitch_release(pf);
 
 	while (test_and_set_bit(ICE_VF_DIS, pf->state))
 		usleep_range(1000, 2000);
@@ -517,12 +635,11 @@ void ice_free_vfs(struct ice_pf *pf)
 	else
 		dev_warn(dev, "VFs are assigned - not disabling SR-IOV\n");
 
-	tmp = pf->num_alloc_vfs;
-	pf->num_qps_per_vf = 0;
-	pf->num_alloc_vfs = 0;
-	for (i = 0; i < tmp; i++) {
-		struct ice_vf *vf = &pf->vf[i];
+	mutex_lock(&vfs->table_lock);
 
+	ice_eswitch_release(pf);
+
+	ice_for_each_vf(pf, bkt, vf) {
 		mutex_lock(&vf->cfg_lock);
 
 		ice_dis_vf_qs(vf);
@@ -534,42 +651,30 @@ void ice_free_vfs(struct ice_pf *pf)
 			ice_free_vf_res(vf);
 		}
 
-		mutex_unlock(&vf->cfg_lock);
+		if (!pci_vfs_assigned(pf->pdev)) {
+			u32 reg_idx, bit_idx;
 
-		mutex_destroy(&vf->cfg_lock);
+			reg_idx = (hw->func_caps.vf_base_id + vf->vf_id) / 32;
+			bit_idx = (hw->func_caps.vf_base_id + vf->vf_id) % 32;
+			wr32(hw, GLGEN_VFLRSTAT(reg_idx), BIT(bit_idx));
+		}
+
+		/* clear malicious info since the VF is getting released */
+		if (ice_mbx_clear_malvf(&hw->mbx_snapshot, pf->vfs.malvfs,
+					ICE_MAX_VF_COUNT, vf->vf_id))
+			dev_dbg(dev, "failed to clear malicious VF state for VF %u\n",
+				vf->vf_id);
+
+		mutex_unlock(&vf->cfg_lock);
 	}
 
 	if (ice_sriov_free_msix_res(pf))
 		dev_err(dev, "Failed to free MSIX resources used by SR-IOV\n");
 
-	devm_kfree(dev, pf->vf);
-	pf->vf = NULL;
+	vfs->num_qps_per = 0;
+	ice_free_vf_entries(pf);
 
-	/* This check is for when the driver is unloaded while VFs are
-	 * assigned. Setting the number of VFs to 0 through sysfs is caught
-	 * before this function ever gets called.
-	 */
-	if (!pci_vfs_assigned(pf->pdev)) {
-		unsigned int vf_id;
-
-		/* Acknowledge VFLR for all VFs. Without this, VFs will fail to
-		 * work correctly when SR-IOV gets re-enabled.
-		 */
-		for (vf_id = 0; vf_id < tmp; vf_id++) {
-			u32 reg_idx, bit_idx;
-
-			reg_idx = (hw->func_caps.vf_base_id + vf_id) / 32;
-			bit_idx = (hw->func_caps.vf_base_id + vf_id) % 32;
-			wr32(hw, GLGEN_VFLRSTAT(reg_idx), BIT(bit_idx));
-		}
-	}
-
-	/* clear malicious info if the VFs are getting released */
-	for (i = 0; i < tmp; i++)
-		if (ice_mbx_clear_malvf(&hw->mbx_snapshot, pf->malvfs,
-					ICE_MAX_VF_COUNT, i))
-			dev_dbg(dev, "failed to clear malicious VF state for VF %u\n",
-				i);
+	mutex_unlock(&vfs->table_lock);
 
 	clear_bit(ICE_VF_DIS, pf->state);
 	clear_bit(ICE_FLAG_SRIOV_ENA, pf->flags);
@@ -644,55 +749,6 @@ static void ice_trigger_vf_reset(struct ice_vf *vf, bool is_vflr, bool is_pfr)
 }
 
 /**
- * ice_vsi_manage_pvid - Enable or disable port VLAN for VSI
- * @vsi: the VSI to update
- * @pvid_info: VLAN ID and QoS used to set the PVID VSI context field
- * @enable: true for enable PVID false for disable
- */
-static int ice_vsi_manage_pvid(struct ice_vsi *vsi, u16 pvid_info, bool enable)
-{
-	struct ice_hw *hw = &vsi->back->hw;
-	struct ice_aqc_vsi_props *info;
-	struct ice_vsi_ctx *ctxt;
-	int ret;
-
-	ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
-	if (!ctxt)
-		return -ENOMEM;
-
-	ctxt->info = vsi->info;
-	info = &ctxt->info;
-	if (enable) {
-		info->vlan_flags = ICE_AQ_VSI_VLAN_MODE_UNTAGGED |
-			ICE_AQ_VSI_PVLAN_INSERT_PVID |
-			ICE_AQ_VSI_VLAN_EMOD_STR;
-		info->sw_flags2 |= ICE_AQ_VSI_SW_FLAG_RX_VLAN_PRUNE_ENA;
-	} else {
-		info->vlan_flags = ICE_AQ_VSI_VLAN_EMOD_NOTHING |
-			ICE_AQ_VSI_VLAN_MODE_ALL;
-		info->sw_flags2 &= ~ICE_AQ_VSI_SW_FLAG_RX_VLAN_PRUNE_ENA;
-	}
-
-	info->pvid = cpu_to_le16(pvid_info);
-	info->valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_VLAN_VALID |
-					   ICE_AQ_VSI_PROP_SW_VALID);
-
-	ret = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
-	if (ret) {
-		dev_info(ice_hw_to_dev(hw), "update VSI for port VLAN failed, err %d aq_err %s\n",
-			 ret, ice_aq_str(hw->adminq.sq_last_status));
-		goto out;
-	}
-
-	vsi->info.vlan_flags = info->vlan_flags;
-	vsi->info.sw_flags2 = info->sw_flags2;
-	vsi->info.pvid = info->pvid;
-out:
-	kfree(ctxt);
-	return ret;
-}
-
-/**
  * ice_vf_get_port_info - Get the VF's port info structure
  * @vf: VF used to get the port info structure for
  */
@@ -714,7 +770,7 @@ static struct ice_vsi *ice_vf_vsi_setup(struct ice_vf *vf)
 	struct ice_pf *pf = vf->pf;
 	struct ice_vsi *vsi;
 
-	vsi = ice_vsi_setup(pf, pi, ICE_VSI_VF, vf->vf_id, NULL);
+	vsi = ice_vsi_setup(pf, pi, ICE_VSI_VF, vf, NULL);
 
 	if (!vsi) {
 		dev_err(ice_pf_to_dev(pf), "Failed to create VF VSI\n");
@@ -741,7 +797,7 @@ struct ice_vsi *ice_vf_ctrl_vsi_setup(struct ice_vf *vf)
 	struct ice_pf *pf = vf->pf;
 	struct ice_vsi *vsi;
 
-	vsi = ice_vsi_setup(pf, pi, ICE_VSI_CTRL, vf->vf_id, NULL);
+	vsi = ice_vsi_setup(pf, pi, ICE_VSI_CTRL, vf, NULL);
 	if (!vsi) {
 		dev_err(ice_pf_to_dev(pf), "Failed to create VF control VSI\n");
 		ice_vf_ctrl_invalidate_vsi(vf);
@@ -764,7 +820,7 @@ struct ice_vsi *ice_vf_ctrl_vsi_setup(struct ice_vf *vf)
  */
 static int ice_calc_vf_first_vector_idx(struct ice_pf *pf, struct ice_vf *vf)
 {
-	return pf->sriov_base_vector + vf->vf_id * pf->num_msix_per_vf;
+	return pf->sriov_base_vector + vf->vf_id * pf->vfs.num_msix_per;
 }
 
 /**
@@ -801,41 +857,149 @@ static int ice_vf_rebuild_host_tx_rate_cfg(struct ice_vf *vf)
 	return 0;
 }
 
+static u16 ice_vf_get_port_vlan_id(struct ice_vf *vf)
+{
+	return vf->port_vlan_info.vid;
+}
+
+static u8 ice_vf_get_port_vlan_prio(struct ice_vf *vf)
+{
+	return vf->port_vlan_info.prio;
+}
+
+bool ice_vf_is_port_vlan_ena(struct ice_vf *vf)
+{
+	return (ice_vf_get_port_vlan_id(vf) || ice_vf_get_port_vlan_prio(vf));
+}
+
+static u16 ice_vf_get_port_vlan_tpid(struct ice_vf *vf)
+{
+	return vf->port_vlan_info.tpid;
+}
+
 /**
  * ice_vf_rebuild_host_vlan_cfg - add VLAN 0 filter or rebuild the Port VLAN
  * @vf: VF to add MAC filters for
+ * @vsi: Pointer to VSI
  *
  * Called after a VF VSI has been re-added/rebuilt during reset. The PF driver
  * always re-adds either a VLAN 0 or port VLAN based filter after reset.
  */
-static int ice_vf_rebuild_host_vlan_cfg(struct ice_vf *vf)
+static int ice_vf_rebuild_host_vlan_cfg(struct ice_vf *vf, struct ice_vsi *vsi)
 {
+	struct ice_vsi_vlan_ops *vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
 	struct device *dev = ice_pf_to_dev(vf->pf);
-	struct ice_vsi *vsi = ice_get_vf_vsi(vf);
-	u16 vlan_id = 0;
 	int err;
 
-	if (vf->port_vlan_info) {
-		err = ice_vsi_manage_pvid(vsi, vf->port_vlan_info, true);
+	if (ice_vf_is_port_vlan_ena(vf)) {
+		err = vlan_ops->set_port_vlan(vsi, &vf->port_vlan_info);
 		if (err) {
 			dev_err(dev, "failed to configure port VLAN via VSI parameters for VF %u, error %d\n",
 				vf->vf_id, err);
 			return err;
 		}
 
-		vlan_id = vf->port_vlan_info & VLAN_VID_MASK;
+		err = vlan_ops->add_vlan(vsi, &vf->port_vlan_info);
+	} else {
+		err = ice_vsi_add_vlan_zero(vsi);
 	}
 
-	/* vlan_id will either be 0 or the port VLAN number */
-	err = ice_vsi_add_vlan(vsi, vlan_id, ICE_FWD_TO_VSI);
 	if (err) {
-		dev_err(dev, "failed to add %s VLAN %u filter for VF %u, error %d\n",
-			vf->port_vlan_info ? "port" : "", vlan_id, vf->vf_id,
-			err);
+		dev_err(dev, "failed to add VLAN %u filter for VF %u during VF rebuild, error %d\n",
+			ice_vf_is_port_vlan_ena(vf) ?
+			ice_vf_get_port_vlan_id(vf) : 0, vf->vf_id, err);
 		return err;
 	}
 
+	err = vlan_ops->ena_rx_filtering(vsi);
+	if (err)
+		dev_warn(dev, "failed to enable Rx VLAN filtering for VF %d VSI %d during VF rebuild, error %d\n",
+			 vf->vf_id, vsi->idx, err);
+
 	return 0;
+}
+
+static int ice_cfg_mac_antispoof(struct ice_vsi *vsi, bool enable)
+{
+	struct ice_vsi_ctx *ctx;
+	int err;
+
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx)
+		return -ENOMEM;
+
+	ctx->info.sec_flags = vsi->info.sec_flags;
+	ctx->info.valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_SECURITY_VALID);
+
+	if (enable)
+		ctx->info.sec_flags |= ICE_AQ_VSI_SEC_FLAG_ENA_MAC_ANTI_SPOOF;
+	else
+		ctx->info.sec_flags &= ~ICE_AQ_VSI_SEC_FLAG_ENA_MAC_ANTI_SPOOF;
+
+	err = ice_update_vsi(&vsi->back->hw, vsi->idx, ctx, NULL);
+	if (err)
+		dev_err(ice_pf_to_dev(vsi->back), "Failed to configure Tx MAC anti-spoof %s for VSI %d, error %d\n",
+			enable ? "ON" : "OFF", vsi->vsi_num, err);
+	else
+		vsi->info.sec_flags = ctx->info.sec_flags;
+
+	kfree(ctx);
+
+	return err;
+}
+
+/**
+ * ice_vsi_ena_spoofchk - enable Tx spoof checking for this VSI
+ * @vsi: VSI to enable Tx spoof checking for
+ */
+static int ice_vsi_ena_spoofchk(struct ice_vsi *vsi)
+{
+	struct ice_vsi_vlan_ops *vlan_ops;
+	int err;
+
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+
+	err = vlan_ops->ena_tx_filtering(vsi);
+	if (err)
+		return err;
+
+	return ice_cfg_mac_antispoof(vsi, true);
+}
+
+/**
+ * ice_vsi_dis_spoofchk - disable Tx spoof checking for this VSI
+ * @vsi: VSI to disable Tx spoof checking for
+ */
+static int ice_vsi_dis_spoofchk(struct ice_vsi *vsi)
+{
+	struct ice_vsi_vlan_ops *vlan_ops;
+	int err;
+
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+
+	err = vlan_ops->dis_tx_filtering(vsi);
+	if (err)
+		return err;
+
+	return ice_cfg_mac_antispoof(vsi, false);
+}
+
+/**
+ * ice_vf_set_spoofchk_cfg - apply Tx spoof checking setting
+ * @vf: VF set spoofchk for
+ * @vsi: VSI associated to the VF
+ */
+static int
+ice_vf_set_spoofchk_cfg(struct ice_vf *vf, struct ice_vsi *vsi)
+{
+	int err;
+
+	if (vf->spoofchk)
+		err = ice_vsi_ena_spoofchk(vsi);
+	else
+		err = ice_vsi_dis_spoofchk(vsi);
+
+	return err;
 }
 
 /**
@@ -913,12 +1077,12 @@ static void ice_ena_vf_msix_mappings(struct ice_vf *vf)
 
 	hw = &pf->hw;
 	pf_based_first_msix = vf->first_vector_idx;
-	pf_based_last_msix = (pf_based_first_msix + pf->num_msix_per_vf) - 1;
+	pf_based_last_msix = (pf_based_first_msix + pf->vfs.num_msix_per) - 1;
 
 	device_based_first_msix = pf_based_first_msix +
 		pf->hw.func_caps.common_cap.msix_vector_first_id;
 	device_based_last_msix =
-		(device_based_first_msix + pf->num_msix_per_vf) - 1;
+		(device_based_first_msix + pf->vfs.num_msix_per) - 1;
 	device_based_vf_id = vf->vf_id + hw->func_caps.vf_base_id;
 
 	reg = (((device_based_first_msix << VPINT_ALLOC_FIRST_S) &
@@ -1009,45 +1173,6 @@ static void ice_ena_vf_mappings(struct ice_vf *vf)
 }
 
 /**
- * ice_determine_res
- * @pf: pointer to the PF structure
- * @avail_res: available resources in the PF structure
- * @max_res: maximum resources that can be given per VF
- * @min_res: minimum resources that can be given per VF
- *
- * Returns non-zero value if resources (queues/vectors) are available or
- * returns zero if PF cannot accommodate for all num_alloc_vfs.
- */
-static int
-ice_determine_res(struct ice_pf *pf, u16 avail_res, u16 max_res, u16 min_res)
-{
-	bool checked_min_res = false;
-	int res;
-
-	/* start by checking if PF can assign max number of resources for
-	 * all num_alloc_vfs.
-	 * if yes, return number per VF
-	 * If no, divide by 2 and roundup, check again
-	 * repeat the loop till we reach a point where even minimum resources
-	 * are not available, in that case return 0
-	 */
-	res = max_res;
-	while ((res >= min_res) && !checked_min_res) {
-		int num_all_res;
-
-		num_all_res = pf->num_alloc_vfs * res;
-		if (num_all_res <= avail_res)
-			return res;
-
-		if (res == min_res)
-			checked_min_res = true;
-
-		res = DIV_ROUND_UP(res, 2);
-	}
-	return 0;
-}
-
-/**
  * ice_calc_vf_reg_idx - Calculate the VF's register index in the PF space
  * @vf: VF to calculate the register index for
  * @q_vector: a q_vector associated to the VF
@@ -1062,7 +1187,7 @@ int ice_calc_vf_reg_idx(struct ice_vf *vf, struct ice_q_vector *q_vector)
 	pf = vf->pf;
 
 	/* always add one to account for the OICR being the first MSIX */
-	return pf->sriov_base_vector + pf->num_msix_per_vf * vf->vf_id +
+	return pf->sriov_base_vector + pf->vfs.num_msix_per * vf->vf_id +
 		q_vector->v_idx + 1;
 }
 
@@ -1126,6 +1251,7 @@ static int ice_sriov_set_msix_res(struct ice_pf *pf, u16 num_msix_needed)
 /**
  * ice_set_per_vf_res - check if vectors and queues are available
  * @pf: pointer to the PF structure
+ * @num_vfs: the number of SR-IOV VFs being configured
  *
  * First, determine HW interrupts from common pool. If we allocate fewer VFs, we
  * get more vectors and can enable more queues per VF. Note that this does not
@@ -1144,20 +1270,22 @@ static int ice_sriov_set_msix_res(struct ice_pf *pf, u16 num_msix_needed)
  * Lastly, set queue and MSI-X VF variables tracked by the PF so it can be used
  * by each VF during VF initialization and reset.
  */
-static int ice_set_per_vf_res(struct ice_pf *pf)
+static int ice_set_per_vf_res(struct ice_pf *pf, u16 num_vfs)
 {
 	int max_valid_res_idx = ice_get_max_valid_res_idx(pf->irq_tracker);
+	u16 num_msix_per_vf, num_txq, num_rxq, avail_qs;
 	int msix_avail_per_vf, msix_avail_for_sriov;
 	struct device *dev = ice_pf_to_dev(pf);
-	u16 num_msix_per_vf, num_txq, num_rxq;
 
-	if (!pf->num_alloc_vfs || max_valid_res_idx < 0)
+	lockdep_assert_held(&pf->vfs.table_lock);
+
+	if (!num_vfs || max_valid_res_idx < 0)
 		return -EINVAL;
 
 	/* determine MSI-X resources per VF */
 	msix_avail_for_sriov = pf->hw.func_caps.common_cap.num_msix_vectors -
 		pf->irq_tracker->num_entries;
-	msix_avail_per_vf = msix_avail_for_sriov / pf->num_alloc_vfs;
+	msix_avail_per_vf = msix_avail_for_sriov / num_vfs;
 	if (msix_avail_per_vf >= ICE_NUM_VF_MSIX_MED) {
 		num_msix_per_vf = ICE_NUM_VF_MSIX_MED;
 	} else if (msix_avail_per_vf >= ICE_NUM_VF_MSIX_SMALL) {
@@ -1169,40 +1297,43 @@ static int ice_set_per_vf_res(struct ice_pf *pf)
 	} else {
 		dev_err(dev, "Only %d MSI-X interrupts available for SR-IOV. Not enough to support minimum of %d MSI-X interrupts per VF for %d VFs\n",
 			msix_avail_for_sriov, ICE_MIN_INTR_PER_VF,
-			pf->num_alloc_vfs);
+			num_vfs);
 		return -EIO;
 	}
 
-	/* determine queue resources per VF */
-	num_txq = ice_determine_res(pf, ice_get_avail_txq_count(pf),
-				    min_t(u16,
-					  num_msix_per_vf - ICE_NONQ_VECS_VF,
-					  ICE_MAX_RSS_QS_PER_VF),
-				    ICE_MIN_QS_PER_VF);
+	num_txq = min_t(u16, num_msix_per_vf - ICE_NONQ_VECS_VF,
+			ICE_MAX_RSS_QS_PER_VF);
+	avail_qs = ice_get_avail_txq_count(pf) / num_vfs;
+	if (!avail_qs)
+		num_txq = 0;
+	else if (num_txq > avail_qs)
+		num_txq = rounddown_pow_of_two(avail_qs);
 
-	num_rxq = ice_determine_res(pf, ice_get_avail_rxq_count(pf),
-				    min_t(u16,
-					  num_msix_per_vf - ICE_NONQ_VECS_VF,
-					  ICE_MAX_RSS_QS_PER_VF),
-				    ICE_MIN_QS_PER_VF);
+	num_rxq = min_t(u16, num_msix_per_vf - ICE_NONQ_VECS_VF,
+			ICE_MAX_RSS_QS_PER_VF);
+	avail_qs = ice_get_avail_rxq_count(pf) / num_vfs;
+	if (!avail_qs)
+		num_rxq = 0;
+	else if (num_rxq > avail_qs)
+		num_rxq = rounddown_pow_of_two(avail_qs);
 
-	if (!num_txq || !num_rxq) {
+	if (num_txq < ICE_MIN_QS_PER_VF || num_rxq < ICE_MIN_QS_PER_VF) {
 		dev_err(dev, "Not enough queues to support minimum of %d queue pairs per VF for %d VFs\n",
-			ICE_MIN_QS_PER_VF, pf->num_alloc_vfs);
+			ICE_MIN_QS_PER_VF, num_vfs);
 		return -EIO;
 	}
 
-	if (ice_sriov_set_msix_res(pf, num_msix_per_vf * pf->num_alloc_vfs)) {
+	if (ice_sriov_set_msix_res(pf, num_msix_per_vf * num_vfs)) {
 		dev_err(dev, "Unable to set MSI-X resources for %d VFs\n",
-			pf->num_alloc_vfs);
+			num_vfs);
 		return -EINVAL;
 	}
 
 	/* only allow equal Tx/Rx queue count (i.e. queue pairs) */
-	pf->num_qps_per_vf = min_t(int, num_txq, num_rxq);
-	pf->num_msix_per_vf = num_msix_per_vf;
+	pf->vfs.num_qps_per = min_t(int, num_txq, num_rxq);
+	pf->vfs.num_msix_per = num_msix_per_vf;
 	dev_info(dev, "Enabling %d VFs with %d vectors and %d queues per VF\n",
-		 pf->num_alloc_vfs, pf->num_msix_per_vf, pf->num_qps_per_vf);
+		 num_vfs, pf->vfs.num_msix_per, pf->vfs.num_qps_per);
 
 	return 0;
 }
@@ -1228,10 +1359,10 @@ ice_vf_set_vsi_promisc(struct ice_vf *vf, struct ice_vsi *vsi, u8 promisc_m)
 	struct ice_hw *hw = &vsi->back->hw;
 	int status;
 
-	if (vf->port_vlan_info)
+	if (ice_vf_is_port_vlan_ena(vf))
 		status = ice_fltr_set_vsi_promisc(hw, vsi->idx, promisc_m,
-						  vf->port_vlan_info & VLAN_VID_MASK);
-	else if (vsi->num_vlan > 1)
+						  ice_vf_get_port_vlan_id(vf));
+	else if (ice_vsi_has_non_zero_vlans(vsi))
 		status = ice_fltr_set_vlan_vsi_promisc(hw, vsi, promisc_m);
 	else
 		status = ice_fltr_set_vsi_promisc(hw, vsi->idx, promisc_m, 0);
@@ -1251,10 +1382,10 @@ ice_vf_clear_vsi_promisc(struct ice_vf *vf, struct ice_vsi *vsi, u8 promisc_m)
 	struct ice_hw *hw = &vsi->back->hw;
 	int status;
 
-	if (vf->port_vlan_info)
+	if (ice_vf_is_port_vlan_ena(vf))
 		status = ice_fltr_clear_vsi_promisc(hw, vsi->idx, promisc_m,
-						    vf->port_vlan_info & VLAN_VID_MASK);
-	else if (vsi->num_vlan > 1)
+						    ice_vf_get_port_vlan_id(vf));
+	else if (ice_vsi_has_non_zero_vlans(vsi))
 		status = ice_fltr_clear_vlan_vsi_promisc(hw, vsi, promisc_m);
 	else
 		status = ice_fltr_clear_vsi_promisc(hw, vsi->idx, promisc_m, 0);
@@ -1339,12 +1470,16 @@ static void ice_vf_rebuild_host_cfg(struct ice_vf *vf)
 		dev_err(dev, "failed to rebuild default MAC configuration for VF %d\n",
 			vf->vf_id);
 
-	if (ice_vf_rebuild_host_vlan_cfg(vf))
+	if (ice_vf_rebuild_host_vlan_cfg(vf, vsi))
 		dev_err(dev, "failed to rebuild VLAN configuration for VF %u\n",
 			vf->vf_id);
 
 	if (ice_vf_rebuild_host_tx_rate_cfg(vf))
 		dev_err(dev, "failed to rebuild Tx rate limiting configuration for VF %u\n",
+			vf->vf_id);
+
+	if (ice_vf_set_spoofchk_cfg(vf, vsi))
+		dev_err(dev, "failed to rebuild spoofchk configuration for VF %d\n",
 			vf->vf_id);
 
 	/* rebuild aggregator node config for main VF VSI */
@@ -1407,6 +1542,7 @@ static void ice_vf_set_initialized(struct ice_vf *vf)
 	clear_bit(ICE_VF_STATE_UC_PROMISC, vf->vf_states);
 	clear_bit(ICE_VF_STATE_DIS, vf->vf_states);
 	set_bit(ICE_VF_STATE_INIT, vf->vf_states);
+	memset(&vf->vlan_v2_caps, 0, sizeof(vf->vlan_v2_caps));
 }
 
 /**
@@ -1444,24 +1580,30 @@ bool ice_reset_all_vfs(struct ice_pf *pf, bool is_vflr)
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
 	struct ice_vf *vf;
-	int v, i;
+	unsigned int bkt;
 
 	/* If we don't have any VFs, then there is nothing to reset */
-	if (!pf->num_alloc_vfs)
+	if (!ice_has_vfs(pf))
 		return false;
+
+	mutex_lock(&pf->vfs.table_lock);
 
 	/* clear all malicious info if the VFs are getting reset */
-	ice_for_each_vf(pf, i)
-		if (ice_mbx_clear_malvf(&hw->mbx_snapshot, pf->malvfs, ICE_MAX_VF_COUNT, i))
-			dev_dbg(dev, "failed to clear malicious VF state for VF %u\n", i);
+	ice_for_each_vf(pf, bkt, vf)
+		if (ice_mbx_clear_malvf(&hw->mbx_snapshot, pf->vfs.malvfs,
+					ICE_MAX_VF_COUNT, vf->vf_id))
+			dev_dbg(dev, "failed to clear malicious VF state for VF %u\n",
+				vf->vf_id);
 
 	/* If VFs have been disabled, there is no need to reset */
-	if (test_and_set_bit(ICE_VF_DIS, pf->state))
+	if (test_and_set_bit(ICE_VF_DIS, pf->state)) {
+		mutex_unlock(&pf->vfs.table_lock);
 		return false;
+	}
 
 	/* Begin reset on all VFs at once */
-	ice_for_each_vf(pf, v)
-		ice_trigger_vf_reset(&pf->vf[v], is_vflr, true);
+	ice_for_each_vf(pf, bkt, vf)
+		ice_trigger_vf_reset(vf, is_vflr, true);
 
 	/* HW requires some time to make sure it can flush the FIFO for a VF
 	 * when it resets it. Poll the VPGEN_VFRSTAT register for each VF in
@@ -1469,36 +1611,34 @@ bool ice_reset_all_vfs(struct ice_pf *pf, bool is_vflr)
 	 * the VFs using a simple iterator that increments once that VF has
 	 * finished resetting.
 	 */
-	for (i = 0, v = 0; i < 10 && v < pf->num_alloc_vfs; i++) {
-		/* Check each VF in sequence */
-		while (v < pf->num_alloc_vfs) {
-			u32 reg;
+	ice_for_each_vf(pf, bkt, vf) {
+		bool done = false;
+		unsigned int i;
+		u32 reg;
 
-			vf = &pf->vf[v];
-			reg = rd32(hw, VPGEN_VFRSTAT(vf->vf_id));
-			if (!(reg & VPGEN_VFRSTAT_VFRD_M)) {
-				/* only delay if the check failed */
-				usleep_range(10, 20);
+		for (i = 0; i < 10; i++) {
+			reg = rd32(&pf->hw, VPGEN_VFRSTAT(vf->vf_id));
+			if (reg & VPGEN_VFRSTAT_VFRD_M) {
+				done = true;
 				break;
 			}
 
-			/* If the current VF has finished resetting, move on
-			 * to the next VF in sequence.
+			/* only delay if check failed */
+			usleep_range(10, 20);
+		}
+
+		if (!done) {
+			/* Display a warning if at least one VF didn't manage
+			 * to reset in time, but continue on with the
+			 * operation.
 			 */
-			v++;
+			dev_warn(dev, "VF %u reset check timeout\n", vf->vf_id);
+			break;
 		}
 	}
 
-	/* Display a warning if at least one VF didn't manage to reset in
-	 * time, but continue on with the operation.
-	 */
-	if (v < pf->num_alloc_vfs)
-		dev_warn(dev, "VF reset check timeout\n");
-
 	/* free VF resources to begin resetting the VSI state */
-	ice_for_each_vf(pf, v) {
-		vf = &pf->vf[v];
-
+	ice_for_each_vf(pf, bkt, vf) {
 		mutex_lock(&vf->cfg_lock);
 
 		vf->driver_caps = 0;
@@ -1525,6 +1665,8 @@ bool ice_reset_all_vfs(struct ice_pf *pf, bool is_vflr)
 
 	ice_flush(hw);
 	clear_bit(ICE_VF_DIS, pf->state);
+
+	mutex_unlock(&pf->vfs.table_lock);
 
 	return true;
 }
@@ -1630,7 +1772,7 @@ bool ice_reset_vf(struct ice_vf *vf, bool is_vflr)
 	 */
 	if (test_bit(ICE_VF_STATE_UC_PROMISC, vf->vf_states) ||
 	    test_bit(ICE_VF_STATE_MC_PROMISC, vf->vf_states)) {
-		if (vf->port_vlan_info || vsi->num_vlan)
+		if (ice_vf_is_port_vlan_ena(vf) || vsi->num_vlan)
 			promisc_m = ICE_UCAST_VLAN_PROMISC_BITS;
 		else
 			promisc_m = ICE_UCAST_PROMISC_BITS;
@@ -1662,7 +1804,8 @@ bool ice_reset_vf(struct ice_vf *vf, bool is_vflr)
 	ice_eswitch_replay_vf_mac_rule(vf);
 
 	/* if the VF has been reset allow it to come up again */
-	if (ice_mbx_clear_malvf(&hw->mbx_snapshot, pf->malvfs, ICE_MAX_VF_COUNT, vf->vf_id))
+	if (ice_mbx_clear_malvf(&hw->mbx_snapshot, pf->vfs.malvfs,
+				ICE_MAX_VF_COUNT, vf->vf_id))
 		dev_dbg(dev, "failed to clear malicious VF state for VF %u\n", i);
 
 	return true;
@@ -1674,10 +1817,13 @@ bool ice_reset_vf(struct ice_vf *vf, bool is_vflr)
  */
 void ice_vc_notify_link_state(struct ice_pf *pf)
 {
-	int i;
+	struct ice_vf *vf;
+	unsigned int bkt;
 
-	ice_for_each_vf(pf, i)
-		ice_vc_notify_vf_link_state(&pf->vf[i]);
+	mutex_lock(&pf->vfs.table_lock);
+	ice_for_each_vf(pf, bkt, vf)
+		ice_vc_notify_vf_link_state(vf);
+	mutex_unlock(&pf->vfs.table_lock);
 }
 
 /**
@@ -1690,7 +1836,7 @@ void ice_vc_notify_reset(struct ice_pf *pf)
 {
 	struct virtchnl_pf_event pfe;
 
-	if (!pf->num_alloc_vfs)
+	if (!ice_has_vfs(pf))
 		return;
 
 	pfe.event = VIRTCHNL_EVENT_RESET_IMPENDING;
@@ -1706,14 +1852,7 @@ void ice_vc_notify_reset(struct ice_pf *pf)
 static void ice_vc_notify_vf_reset(struct ice_vf *vf)
 {
 	struct virtchnl_pf_event pfe;
-	struct ice_pf *pf;
-
-	if (!vf)
-		return;
-
-	pf = vf->pf;
-	if (ice_validate_vf_id(pf, vf->vf_id))
-		return;
+	struct ice_pf *pf = vf->pf;
 
 	/* Bail out if VF is in disabled state, neither initialized, nor active
 	 * state - otherwise proceed with notifications
@@ -1739,6 +1878,7 @@ static void ice_vc_notify_vf_reset(struct ice_vf *vf)
  */
 static int ice_init_vf_vsi_res(struct ice_vf *vf)
 {
+	struct ice_vsi_vlan_ops *vlan_ops;
 	struct ice_pf *pf = vf->pf;
 	u8 broadcast[ETH_ALEN];
 	struct ice_vsi *vsi;
@@ -1752,9 +1892,17 @@ static int ice_init_vf_vsi_res(struct ice_vf *vf)
 	if (!vsi)
 		return -ENOMEM;
 
-	err = ice_vsi_add_vlan(vsi, 0, ICE_FWD_TO_VSI);
+	err = ice_vsi_add_vlan_zero(vsi);
 	if (err) {
 		dev_warn(dev, "Failed to add VLAN 0 filter for VF %d\n",
+			 vf->vf_id);
+		goto release_vsi;
+	}
+
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+	err = vlan_ops->ena_rx_filtering(vsi);
+	if (err) {
+		dev_warn(dev, "Failed to enable Rx VLAN filtering for VF %d\n",
 			 vf->vf_id);
 		goto release_vsi;
 	}
@@ -1764,6 +1912,13 @@ static int ice_init_vf_vsi_res(struct ice_vf *vf)
 	if (err) {
 		dev_err(dev, "Failed to add broadcast MAC filter for VF %d, error %d\n",
 			vf->vf_id, err);
+		goto release_vsi;
+	}
+
+	err = ice_vf_set_spoofchk_cfg(vf, vsi);
+	if (err) {
+		dev_warn(dev, "Failed to initialize spoofchk setting for VF %d\n",
+			 vf->vf_id);
 		goto release_vsi;
 	}
 
@@ -1783,11 +1938,14 @@ release_vsi:
 static int ice_start_vfs(struct ice_pf *pf)
 {
 	struct ice_hw *hw = &pf->hw;
-	int retval, i;
+	unsigned int bkt, it_cnt;
+	struct ice_vf *vf;
+	int retval;
 
-	ice_for_each_vf(pf, i) {
-		struct ice_vf *vf = &pf->vf[i];
+	lockdep_assert_held(&pf->vfs.table_lock);
 
+	it_cnt = 0;
+	ice_for_each_vf(pf, bkt, vf) {
 		ice_clear_vf_reset_trigger(vf);
 
 		retval = ice_init_vf_vsi_res(vf);
@@ -1800,40 +1958,63 @@ static int ice_start_vfs(struct ice_pf *pf)
 		set_bit(ICE_VF_STATE_INIT, vf->vf_states);
 		ice_ena_vf_mappings(vf);
 		wr32(hw, VFGEN_RSTAT(vf->vf_id), VIRTCHNL_VFR_VFACTIVE);
+		it_cnt++;
 	}
 
 	ice_flush(hw);
 	return 0;
 
 teardown:
-	for (i = i - 1; i >= 0; i--) {
-		struct ice_vf *vf = &pf->vf[i];
+	ice_for_each_vf(pf, bkt, vf) {
+		if (it_cnt == 0)
+			break;
 
 		ice_dis_vf_mappings(vf);
 		ice_vf_vsi_release(vf);
+		it_cnt--;
 	}
 
 	return retval;
 }
 
 /**
- * ice_set_dflt_settings_vfs - set VF defaults during initialization/creation
- * @pf: PF holding reference to all VFs for default configuration
+ * ice_create_vf_entries - Allocate and insert VF entries
+ * @pf: pointer to the PF structure
+ * @num_vfs: the number of VFs to allocate
+ *
+ * Allocate new VF entries and insert them into the hash table. Set some
+ * basic default fields for initializing the new VFs.
+ *
+ * After this function exits, the hash table will have num_vfs entries
+ * inserted.
+ *
+ * Returns 0 on success or an integer error code on failure.
  */
-static void ice_set_dflt_settings_vfs(struct ice_pf *pf)
+static int ice_create_vf_entries(struct ice_pf *pf, u16 num_vfs)
 {
-	int i;
+	struct ice_vfs *vfs = &pf->vfs;
+	struct ice_vf *vf;
+	u16 vf_id;
+	int err;
 
-	ice_for_each_vf(pf, i) {
-		struct ice_vf *vf = &pf->vf[i];
+	lockdep_assert_held(&vfs->table_lock);
+
+	for (vf_id = 0; vf_id < num_vfs; vf_id++) {
+		vf = kzalloc(sizeof(*vf), GFP_KERNEL);
+		if (!vf) {
+			err = -ENOMEM;
+			goto err_free_entries;
+		}
+		kref_init(&vf->refcnt);
 
 		vf->pf = pf;
-		vf->vf_id = i;
+		vf->vf_id = vf_id;
+
 		vf->vf_sw_id = pf->first_sw;
 		/* assign default capabilities */
 		set_bit(ICE_VIRTCHNL_VF_CAP_L2, &vf->vf_caps);
 		vf->spoofchk = true;
-		vf->num_vf_qs = pf->num_qps_per_vf;
+		vf->num_vf_qs = pf->vfs.num_qps_per;
 		ice_vc_set_default_allowlist(vf);
 
 		/* ctrl_vsi_idx will be set to a valid value only when VF
@@ -1845,27 +2026,15 @@ static void ice_set_dflt_settings_vfs(struct ice_pf *pf)
 		ice_vc_set_dflt_vf_ops(&vf->vc_ops);
 
 		mutex_init(&vf->cfg_lock);
+
+		hash_add_rcu(vfs->table, &vf->entry, vf_id);
 	}
-}
-
-/**
- * ice_alloc_vfs - allocate num_vfs in the PF structure
- * @pf: PF to store the allocated VFs in
- * @num_vfs: number of VFs to allocate
- */
-static int ice_alloc_vfs(struct ice_pf *pf, int num_vfs)
-{
-	struct ice_vf *vfs;
-
-	vfs = devm_kcalloc(ice_pf_to_dev(pf), num_vfs, sizeof(*vfs),
-			   GFP_KERNEL);
-	if (!vfs)
-		return -ENOMEM;
-
-	pf->vf = vfs;
-	pf->num_alloc_vfs = num_vfs;
 
 	return 0;
+
+err_free_entries:
+	ice_free_vf_entries(pf);
+	return err;
 }
 
 /**
@@ -1886,28 +2055,29 @@ static int ice_ena_vfs(struct ice_pf *pf, u16 num_vfs)
 	ice_flush(hw);
 
 	ret = pci_enable_sriov(pf->pdev, num_vfs);
-	if (ret) {
-		pf->num_alloc_vfs = 0;
-		goto err_unroll_intr;
-	}
-
-	ret = ice_alloc_vfs(pf, num_vfs);
 	if (ret)
-		goto err_pci_disable_sriov;
+		goto err_unroll_intr;
 
-	if (ice_set_per_vf_res(pf)) {
+	mutex_lock(&pf->vfs.table_lock);
+
+	if (ice_set_per_vf_res(pf, num_vfs)) {
 		dev_err(dev, "Not enough resources for %d VFs, try with fewer number of VFs\n",
 			num_vfs);
 		ret = -ENOSPC;
 		goto err_unroll_sriov;
 	}
 
-	ice_set_dflt_settings_vfs(pf);
+	ret = ice_create_vf_entries(pf, num_vfs);
+	if (ret) {
+		dev_err(dev, "Failed to allocate VF entries for %d VFs\n",
+			num_vfs);
+		goto err_unroll_sriov;
+	}
 
 	if (ice_start_vfs(pf)) {
 		dev_err(dev, "Failed to start VF(s)\n");
 		ret = -EAGAIN;
-		goto err_unroll_sriov;
+		goto err_unroll_vf_entries;
 	}
 
 	clear_bit(ICE_VF_DIS, pf->state);
@@ -1920,13 +2090,14 @@ static int ice_ena_vfs(struct ice_pf *pf, u16 num_vfs)
 	if (test_and_clear_bit(ICE_OICR_INTR_DIS, pf->state))
 		ice_irq_dynamic_ena(hw, NULL, NULL);
 
+	mutex_unlock(&pf->vfs.table_lock);
+
 	return 0;
 
+err_unroll_vf_entries:
+	ice_free_vf_entries(pf);
 err_unroll_sriov:
-	devm_kfree(dev, pf->vf);
-	pf->vf = NULL;
-	pf->num_alloc_vfs = 0;
-err_pci_disable_sriov:
+	mutex_unlock(&pf->vfs.table_lock);
 	pci_disable_sriov(pf->pdev);
 err_unroll_intr:
 	/* rearm interrupts here */
@@ -1953,9 +2124,9 @@ static int ice_pci_sriov_ena(struct ice_pf *pf, int num_vfs)
 	else if (pre_existing_vfs && pre_existing_vfs == num_vfs)
 		return 0;
 
-	if (num_vfs > pf->num_vfs_supported) {
+	if (num_vfs > pf->vfs.num_supported) {
 		dev_err(dev, "Can't enable %d VFs, max VFs supported is %d\n",
-			num_vfs, pf->num_vfs_supported);
+			num_vfs, pf->vfs.num_supported);
 		return -EOPNOTSUPP;
 	}
 
@@ -2053,19 +2224,20 @@ int ice_sriov_configure(struct pci_dev *pdev, int num_vfs)
 void ice_process_vflr_event(struct ice_pf *pf)
 {
 	struct ice_hw *hw = &pf->hw;
-	unsigned int vf_id;
+	struct ice_vf *vf;
+	unsigned int bkt;
 	u32 reg;
 
 	if (!test_and_clear_bit(ICE_VFLR_EVENT_PENDING, pf->state) ||
-	    !pf->num_alloc_vfs)
+	    !ice_has_vfs(pf))
 		return;
 
-	ice_for_each_vf(pf, vf_id) {
-		struct ice_vf *vf = &pf->vf[vf_id];
+	mutex_lock(&pf->vfs.table_lock);
+	ice_for_each_vf(pf, bkt, vf) {
 		u32 reg_idx, bit_idx;
 
-		reg_idx = (hw->func_caps.vf_base_id + vf_id) / 32;
-		bit_idx = (hw->func_caps.vf_base_id + vf_id) % 32;
+		reg_idx = (hw->func_caps.vf_base_id + vf->vf_id) / 32;
+		bit_idx = (hw->func_caps.vf_base_id + vf->vf_id) % 32;
 		/* read GLGEN_VFLRSTAT register to find out the flr VFs */
 		reg = rd32(hw, GLGEN_VFLRSTAT(reg_idx));
 		if (reg & BIT(bit_idx)) {
@@ -2075,6 +2247,7 @@ void ice_process_vflr_event(struct ice_pf *pf)
 			mutex_unlock(&vf->cfg_lock);
 		}
 	}
+	mutex_unlock(&pf->vfs.table_lock);
 }
 
 /**
@@ -2094,22 +2267,36 @@ static void ice_vc_reset_vf(struct ice_vf *vf)
  *
  * If no VF is found who owns the pfq then return NULL, otherwise return a
  * pointer to the VF who owns the pfq
+ *
+ * If this function returns non-NULL, it acquires a reference count of the VF
+ * structure. The caller is responsible for calling ice_put_vf() to drop this
+ * reference.
  */
 static struct ice_vf *ice_get_vf_from_pfq(struct ice_pf *pf, u16 pfq)
 {
-	unsigned int vf_id;
+	struct ice_vf *vf;
+	unsigned int bkt;
 
-	ice_for_each_vf(pf, vf_id) {
-		struct ice_vf *vf = &pf->vf[vf_id];
+	rcu_read_lock();
+	ice_for_each_vf_rcu(pf, bkt, vf) {
 		struct ice_vsi *vsi;
 		u16 rxq_idx;
 
 		vsi = ice_get_vf_vsi(vf);
 
 		ice_for_each_rxq(vsi, rxq_idx)
-			if (vsi->rxq_map[rxq_idx] == pfq)
-				return vf;
+			if (vsi->rxq_map[rxq_idx] == pfq) {
+				struct ice_vf *found;
+
+				if (kref_get_unless_zero(&vf->refcnt))
+					found = vf;
+				else
+					found = NULL;
+				rcu_read_unlock();
+				return found;
+			}
 	}
+	rcu_read_unlock();
 
 	return NULL;
 }
@@ -2153,6 +2340,8 @@ ice_vf_lan_overflow_event(struct ice_pf *pf, struct ice_rq_event_info *event)
 	mutex_lock(&vf->cfg_lock);
 	ice_vc_reset_vf(vf);
 	mutex_unlock(&vf->cfg_lock);
+
+	ice_put_vf(vf);
 }
 
 /**
@@ -2173,13 +2362,7 @@ ice_vc_send_msg_to_vf(struct ice_vf *vf, u32 v_opcode,
 	struct ice_pf *pf;
 	int aq_ret;
 
-	if (!vf)
-		return -EINVAL;
-
 	pf = vf->pf;
-	if (ice_validate_vf_id(pf, vf->vf_id))
-		return -EINVAL;
-
 	dev = ice_pf_to_dev(pf);
 
 	aq_ret = ice_aq_send_msg_to_vf(&pf->hw, vf->vf_id, v_opcode, v_retval,
@@ -2233,7 +2416,7 @@ static u16 ice_vc_get_max_frame_size(struct ice_vf *vf)
 
 	max_frame_size = pi->phy.link_info.max_frame_size;
 
-	if (vf->port_vlan_info)
+	if (ice_vf_is_port_vlan_ena(vf))
 		max_frame_size -= VLAN_HLEN;
 
 	return max_frame_size;
@@ -2282,8 +2465,33 @@ static int ice_vc_get_vf_res_msg(struct ice_vf *vf, u8 *msg)
 		goto err;
 	}
 
-	if (!vsi->info.pvid)
-		vfres->vf_cap_flags |= VIRTCHNL_VF_OFFLOAD_VLAN;
+	if (vf->driver_caps & VIRTCHNL_VF_OFFLOAD_VLAN_V2) {
+		/* VLAN offloads based on current device configuration */
+		vfres->vf_cap_flags |= VIRTCHNL_VF_OFFLOAD_VLAN_V2;
+	} else if (vf->driver_caps & VIRTCHNL_VF_OFFLOAD_VLAN) {
+		/* allow VF to negotiate VIRTCHNL_VF_OFFLOAD explicitly for
+		 * these two conditions, which amounts to guest VLAN filtering
+		 * and offloads being based on the inner VLAN or the
+		 * inner/single VLAN respectively and don't allow VF to
+		 * negotiate VIRTCHNL_VF_OFFLOAD in any other cases
+		 */
+		if (ice_is_dvm_ena(&pf->hw) && ice_vf_is_port_vlan_ena(vf)) {
+			vfres->vf_cap_flags |= VIRTCHNL_VF_OFFLOAD_VLAN;
+		} else if (!ice_is_dvm_ena(&pf->hw) &&
+			   !ice_vf_is_port_vlan_ena(vf)) {
+			vfres->vf_cap_flags |= VIRTCHNL_VF_OFFLOAD_VLAN;
+			/* configure backward compatible support for VFs that
+			 * only support VIRTCHNL_VF_OFFLOAD_VLAN, the PF is
+			 * configured in SVM, and no port VLAN is configured
+			 */
+			ice_vf_vsi_cfg_svm_legacy_vlan_mode(vsi);
+		} else if (ice_is_dvm_ena(&pf->hw)) {
+			/* configure software offloaded VLAN support when DVM
+			 * is enabled, but no port VLAN is enabled
+			 */
+			ice_vf_vsi_cfg_dvm_legacy_vlan_mode(vsi);
+		}
+	}
 
 	if (vf->driver_caps & VIRTCHNL_VF_OFFLOAD_RSS_PF) {
 		vfres->vf_cap_flags |= VIRTCHNL_VF_OFFLOAD_RSS_PF;
@@ -2327,7 +2535,7 @@ static int ice_vc_get_vf_res_msg(struct ice_vf *vf, u8 *msg)
 	vfres->num_vsis = 1;
 	/* Tx and Rx queue are equal for VF */
 	vfres->num_queue_pairs = vsi->num_txq;
-	vfres->max_vectors = pf->num_msix_per_vf;
+	vfres->max_vectors = pf->vfs.num_msix_per;
 	vfres->rss_key_size = ICE_VSIQF_HKEY_ARRAY_SIZE;
 	vfres->rss_lut_size = ICE_VSIQF_HLUT_ARRAY_SIZE;
 	vfres->max_mtu = ice_vc_get_max_frame_size(vf);
@@ -2401,7 +2609,7 @@ bool ice_vc_isvalid_vsi_id(struct ice_vf *vf, u16 vsi_id)
 
 	vsi = ice_find_vsi_from_id(pf, vsi_id);
 
-	return (vsi && (vsi->vf_id == vf->vf_id));
+	return (vsi && (vsi->vf == vf));
 }
 
 /**
@@ -2886,70 +3094,54 @@ int ice_set_vf_spoofchk(struct net_device *netdev, int vf_id, bool ena)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
 	struct ice_pf *pf = np->vsi->back;
-	struct ice_vsi_ctx *ctx;
 	struct ice_vsi *vf_vsi;
 	struct device *dev;
 	struct ice_vf *vf;
 	int ret;
 
 	dev = ice_pf_to_dev(pf);
-	if (ice_validate_vf_id(pf, vf_id))
+
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return -EINVAL;
 
-	vf = &pf->vf[vf_id];
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
 	vf_vsi = ice_get_vf_vsi(vf);
 	if (!vf_vsi) {
 		netdev_err(netdev, "VSI %d for VF %d is null\n",
 			   vf->lan_vsi_idx, vf->vf_id);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_put_vf;
 	}
 
 	if (vf_vsi->type != ICE_VSI_VF) {
 		netdev_err(netdev, "Type %d of VSI %d for VF %d is no ICE_VSI_VF\n",
 			   vf_vsi->type, vf_vsi->vsi_num, vf->vf_id);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto out_put_vf;
 	}
 
 	if (ena == vf->spoofchk) {
 		dev_dbg(dev, "VF spoofchk already %s\n", ena ? "ON" : "OFF");
-		return 0;
+		ret = 0;
+		goto out_put_vf;
 	}
 
-	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-	if (!ctx)
-		return -ENOMEM;
+	if (ena)
+		ret = ice_vsi_ena_spoofchk(vf_vsi);
+	else
+		ret = ice_vsi_dis_spoofchk(vf_vsi);
+	if (ret)
+		dev_err(dev, "Failed to set spoofchk %s for VF %d VSI %d\n error %d\n",
+			ena ? "ON" : "OFF", vf->vf_id, vf_vsi->vsi_num, ret);
+	else
+		vf->spoofchk = ena;
 
-	ctx->info.sec_flags = vf_vsi->info.sec_flags;
-	ctx->info.valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_SECURITY_VALID);
-	if (ena) {
-		ctx->info.sec_flags |=
-			ICE_AQ_VSI_SEC_FLAG_ENA_MAC_ANTI_SPOOF |
-			(ICE_AQ_VSI_SEC_TX_VLAN_PRUNE_ENA <<
-			 ICE_AQ_VSI_SEC_TX_PRUNE_ENA_S);
-	} else {
-		ctx->info.sec_flags &=
-			~(ICE_AQ_VSI_SEC_FLAG_ENA_MAC_ANTI_SPOOF |
-			  (ICE_AQ_VSI_SEC_TX_VLAN_PRUNE_ENA <<
-			   ICE_AQ_VSI_SEC_TX_PRUNE_ENA_S));
-	}
-
-	ret = ice_update_vsi(&pf->hw, vf_vsi->idx, ctx, NULL);
-	if (ret) {
-		dev_err(dev, "Failed to %sable spoofchk on VF %d VSI %d\n error %d\n",
-			ena ? "en" : "dis", vf->vf_id, vf_vsi->vsi_num, ret);
-		goto out;
-	}
-
-	/* only update spoofchk state and VSI context on success */
-	vf_vsi->info.sec_flags = ctx->info.sec_flags;
-	vf->spoofchk = ena;
-
-out:
-	kfree(ctx);
+out_put_vf:
+	ice_put_vf(vf);
 	return ret;
 }
 
@@ -2962,18 +3154,22 @@ out:
  */
 bool ice_is_any_vf_in_promisc(struct ice_pf *pf)
 {
-	int vf_idx;
+	bool is_vf_promisc = false;
+	struct ice_vf *vf;
+	unsigned int bkt;
 
-	ice_for_each_vf(pf, vf_idx) {
-		struct ice_vf *vf = &pf->vf[vf_idx];
-
+	rcu_read_lock();
+	ice_for_each_vf_rcu(pf, bkt, vf) {
 		/* found a VF that has promiscuous mode configured */
 		if (test_bit(ICE_VF_STATE_UC_PROMISC, vf->vf_states) ||
-		    test_bit(ICE_VF_STATE_MC_PROMISC, vf->vf_states))
-			return true;
+		    test_bit(ICE_VF_STATE_MC_PROMISC, vf->vf_states)) {
+			is_vf_promisc = true;
+			break;
+		}
 	}
+	rcu_read_unlock();
 
-	return false;
+	return is_vf_promisc;
 }
 
 /**
@@ -2989,6 +3185,7 @@ static int ice_vc_cfg_promiscuous_mode_msg(struct ice_vf *vf, u8 *msg)
 	bool rm_promisc, alluni = false, allmulti = false;
 	struct virtchnl_promisc_info *info =
 	    (struct virtchnl_promisc_info *)msg;
+	struct ice_vsi_vlan_ops *vlan_ops;
 	int mcast_err = 0, ucast_err = 0;
 	struct ice_pf *pf = vf->pf;
 	struct ice_vsi *vsi;
@@ -3027,16 +3224,15 @@ static int ice_vc_cfg_promiscuous_mode_msg(struct ice_vf *vf, u8 *msg)
 
 	rm_promisc = !allmulti && !alluni;
 
-	if (vsi->num_vlan || vf->port_vlan_info) {
-		if (rm_promisc)
-			ret = ice_cfg_vlan_pruning(vsi, true);
-		else
-			ret = ice_cfg_vlan_pruning(vsi, false);
-		if (ret) {
-			dev_err(dev, "Failed to configure VLAN pruning in promiscuous mode\n");
-			v_ret = VIRTCHNL_STATUS_ERR_PARAM;
-			goto error_param;
-		}
+	vlan_ops = ice_get_compat_vsi_vlan_ops(vsi);
+	if (rm_promisc)
+		ret = vlan_ops->ena_rx_filtering(vsi);
+	else
+		ret = vlan_ops->dis_rx_filtering(vsi);
+	if (ret) {
+		dev_err(dev, "Failed to configure VLAN pruning in promiscuous mode\n");
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto error_param;
 	}
 
 	if (!test_bit(ICE_FLAG_VF_TRUE_PROMISC_ENA, pf->flags)) {
@@ -3063,7 +3259,8 @@ static int ice_vc_cfg_promiscuous_mode_msg(struct ice_vf *vf, u8 *msg)
 	} else {
 		u8 mcast_m, ucast_m;
 
-		if (vf->port_vlan_info || vsi->num_vlan > 1) {
+		if (ice_vf_is_port_vlan_ena(vf) ||
+		    ice_vsi_has_non_zero_vlans(vsi)) {
 			mcast_m = ICE_MCAST_VLAN_PROMISC_BITS;
 			ucast_m = ICE_UCAST_VLAN_PROMISC_BITS;
 		} else {
@@ -3492,7 +3689,7 @@ static int ice_vc_cfg_irq_map_msg(struct ice_vf *vf, u8 *msg)
 	 * there is actually at least a single VF queue vector mapped
 	 */
 	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states) ||
-	    pf->num_msix_per_vf < num_q_vectors_mapped ||
+	    pf->vfs.num_msix_per < num_q_vectors_mapped ||
 	    !num_q_vectors_mapped) {
 		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 		goto error_param;
@@ -3514,7 +3711,7 @@ static int ice_vc_cfg_irq_map_msg(struct ice_vf *vf, u8 *msg)
 		/* vector_id is always 0-based for each VF, and can never be
 		 * larger than or equal to the max allowed interrupts per VF
 		 */
-		if (!(vector_id < pf->num_msix_per_vf) ||
+		if (!(vector_id < pf->vfs.num_msix_per) ||
 		    !ice_vc_isvalid_vsi_id(vf, vsi_id) ||
 		    (!vector_id && (map->rxq_map || map->txq_map))) {
 			v_ret = VIRTCHNL_STATUS_ERR_PARAM;
@@ -3646,7 +3843,7 @@ static int ice_vc_cfg_qs_msg(struct ice_vf *vf, u8 *msg)
 			/* add space for the port VLAN since the VF driver is not
 			 * expected to account for it in the MTU calculation
 			 */
-			if (vf->port_vlan_info)
+			if (ice_vf_is_port_vlan_ena(vf))
 				vsi->max_frame += VLAN_HLEN;
 
 			if (ice_vsi_cfg_single_rxq(vsi, q_idx)) {
@@ -4058,6 +4255,33 @@ error_param:
 }
 
 /**
+ * ice_is_supported_port_vlan_proto - make sure the vlan_proto is supported
+ * @hw: hardware structure used to check the VLAN mode
+ * @vlan_proto: VLAN TPID being checked
+ *
+ * If the device is configured in Double VLAN Mode (DVM), then both ETH_P_8021Q
+ * and ETH_P_8021AD are supported. If the device is configured in Single VLAN
+ * Mode (SVM), then only ETH_P_8021Q is supported.
+ */
+static bool
+ice_is_supported_port_vlan_proto(struct ice_hw *hw, u16 vlan_proto)
+{
+	bool is_supported = false;
+
+	switch (vlan_proto) {
+	case ETH_P_8021Q:
+		is_supported = true;
+		break;
+	case ETH_P_8021AD:
+		if (ice_is_dvm_ena(hw))
+			is_supported = true;
+		break;
+	}
+
+	return is_supported;
+}
+
+/**
  * ice_set_vf_port_vlan
  * @netdev: network interface device structure
  * @vf_id: VF identifier
@@ -4072,14 +4296,12 @@ ice_set_vf_port_vlan(struct net_device *netdev, int vf_id, u16 vlan_id, u8 qos,
 		     __be16 vlan_proto)
 {
 	struct ice_pf *pf = ice_netdev_to_pf(netdev);
+	u16 local_vlan_proto = ntohs(vlan_proto);
 	struct device *dev;
 	struct ice_vf *vf;
-	u16 vlanprio;
 	int ret;
 
 	dev = ice_pf_to_dev(pf);
-	if (ice_validate_vf_id(pf, vf_id))
-		return -EINVAL;
 
 	if (vlan_id >= VLAN_N_VID || qos > 7) {
 		dev_err(dev, "Invalid Port VLAN parameters for VF %d, ID %d, QoS %d\n",
@@ -4087,38 +4309,45 @@ ice_set_vf_port_vlan(struct net_device *netdev, int vf_id, u16 vlan_id, u8 qos,
 		return -EINVAL;
 	}
 
-	if (vlan_proto != htons(ETH_P_8021Q)) {
-		dev_err(dev, "VF VLAN protocol is not supported\n");
+	if (!ice_is_supported_port_vlan_proto(&pf->hw, local_vlan_proto)) {
+		dev_err(dev, "VF VLAN protocol 0x%04x is not supported\n",
+			local_vlan_proto);
 		return -EPROTONOSUPPORT;
 	}
 
-	vf = &pf->vf[vf_id];
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
+		return -EINVAL;
+
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
-	vlanprio = vlan_id | (qos << VLAN_PRIO_SHIFT);
-
-	if (vf->port_vlan_info == vlanprio) {
+	if (ice_vf_get_port_vlan_prio(vf) == qos &&
+	    ice_vf_get_port_vlan_tpid(vf) == local_vlan_proto &&
+	    ice_vf_get_port_vlan_id(vf) == vlan_id) {
 		/* duplicate request, so just return success */
-		dev_dbg(dev, "Duplicate pvid %d request\n", vlanprio);
-		return 0;
+		dev_dbg(dev, "Duplicate port VLAN %u, QoS %u, TPID 0x%04x request\n",
+			vlan_id, qos, local_vlan_proto);
+		ret = 0;
+		goto out_put_vf;
 	}
 
 	mutex_lock(&vf->cfg_lock);
 
-	vf->port_vlan_info = vlanprio;
-
-	if (vf->port_vlan_info)
-		dev_info(dev, "Setting VLAN %d, QoS 0x%x on VF %d\n",
-			 vlan_id, qos, vf_id);
+	vf->port_vlan_info = ICE_VLAN(local_vlan_proto, vlan_id, qos);
+	if (ice_vf_is_port_vlan_ena(vf))
+		dev_info(dev, "Setting VLAN %u, QoS %u, TPID 0x%04x on VF %d\n",
+			 vlan_id, qos, local_vlan_proto, vf_id);
 	else
 		dev_info(dev, "Clearing port VLAN on VF %d\n", vf_id);
 
 	ice_vc_reset_vf(vf);
 	mutex_unlock(&vf->cfg_lock);
 
-	return 0;
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -4130,6 +4359,83 @@ ice_set_vf_port_vlan(struct net_device *netdev, int vf_id, u16 vlan_id, u8 qos,
 static bool ice_vf_vlan_offload_ena(u32 caps)
 {
 	return !!(caps & VIRTCHNL_VF_OFFLOAD_VLAN);
+}
+
+/**
+ * ice_is_vlan_promisc_allowed - check if VLAN promiscuous config is allowed
+ * @vf: VF used to determine if VLAN promiscuous config is allowed
+ */
+static bool ice_is_vlan_promisc_allowed(struct ice_vf *vf)
+{
+	if ((test_bit(ICE_VF_STATE_UC_PROMISC, vf->vf_states) ||
+	     test_bit(ICE_VF_STATE_MC_PROMISC, vf->vf_states)) &&
+	    test_bit(ICE_FLAG_VF_TRUE_PROMISC_ENA, vf->pf->flags))
+		return true;
+
+	return false;
+}
+
+/**
+ * ice_vf_ena_vlan_promisc - Enable Tx/Rx VLAN promiscuous for the VLAN
+ * @vsi: VF's VSI used to enable VLAN promiscuous mode
+ * @vlan: VLAN used to enable VLAN promiscuous
+ *
+ * This function should only be called if VLAN promiscuous mode is allowed,
+ * which can be determined via ice_is_vlan_promisc_allowed().
+ */
+static int ice_vf_ena_vlan_promisc(struct ice_vsi *vsi, struct ice_vlan *vlan)
+{
+	u8 promisc_m = ICE_PROMISC_VLAN_TX | ICE_PROMISC_VLAN_RX;
+	int status;
+
+	status = ice_fltr_set_vsi_promisc(&vsi->back->hw, vsi->idx, promisc_m,
+					  vlan->vid);
+	if (status && status != -EEXIST)
+		return status;
+
+	return 0;
+}
+
+/**
+ * ice_vf_dis_vlan_promisc - Disable Tx/Rx VLAN promiscuous for the VLAN
+ * @vsi: VF's VSI used to disable VLAN promiscuous mode for
+ * @vlan: VLAN used to disable VLAN promiscuous
+ *
+ * This function should only be called if VLAN promiscuous mode is allowed,
+ * which can be determined via ice_is_vlan_promisc_allowed().
+ */
+static int ice_vf_dis_vlan_promisc(struct ice_vsi *vsi, struct ice_vlan *vlan)
+{
+	u8 promisc_m = ICE_PROMISC_VLAN_TX | ICE_PROMISC_VLAN_RX;
+	int status;
+
+	status = ice_fltr_clear_vsi_promisc(&vsi->back->hw, vsi->idx, promisc_m,
+					    vlan->vid);
+	if (status && status != -ENOENT)
+		return status;
+
+	return 0;
+}
+
+/**
+ * ice_vf_has_max_vlans - check if VF already has the max allowed VLAN filters
+ * @vf: VF to check against
+ * @vsi: VF's VSI
+ *
+ * If the VF is trusted then the VF is allowed to add as many VLANs as it
+ * wants to, so return false.
+ *
+ * When the VF is untrusted compare the number of non-zero VLANs + 1 to the max
+ * allowed VLANs for an untrusted VF. Return the result of this comparison.
+ */
+static bool ice_vf_has_max_vlans(struct ice_vf *vf, struct ice_vsi *vsi)
+{
+	if (ice_is_vf_trusted(vf))
+		return false;
+
+#define ICE_VF_ADDED_VLAN_ZERO_FLTRS	1
+	return ((ice_vsi_num_non_zero_vlans(vsi) +
+		ICE_VF_ADDED_VLAN_ZERO_FLTRS) >= ICE_MAX_VLAN_PER_VF);
 }
 
 /**
@@ -4149,9 +4455,7 @@ static int ice_vc_process_vlan_msg(struct ice_vf *vf, u8 *msg, bool add_v)
 	bool vlan_promisc = false;
 	struct ice_vsi *vsi;
 	struct device *dev;
-	struct ice_hw *hw;
 	int status = 0;
-	u8 promisc_m;
 	int i;
 
 	dev = ice_pf_to_dev(pf);
@@ -4179,15 +4483,13 @@ static int ice_vc_process_vlan_msg(struct ice_vf *vf, u8 *msg, bool add_v)
 		}
 	}
 
-	hw = &pf->hw;
 	vsi = ice_get_vf_vsi(vf);
 	if (!vsi) {
 		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 		goto error_param;
 	}
 
-	if (add_v && !ice_is_vf_trusted(vf) &&
-	    vsi->num_vlan >= ICE_MAX_VLAN_PER_VF) {
+	if (add_v && ice_vf_has_max_vlans(vf, vsi)) {
 		dev_info(dev, "VF-%d is not trusted, switch the VF to trusted mode, in order to add more VLAN addresses\n",
 			 vf->vf_id);
 		/* There is no need to let VF know about being not trusted,
@@ -4196,22 +4498,28 @@ static int ice_vc_process_vlan_msg(struct ice_vf *vf, u8 *msg, bool add_v)
 		goto error_param;
 	}
 
-	if (vsi->info.pvid) {
+	/* in DVM a VF can add/delete inner VLAN filters when
+	 * VIRTCHNL_VF_OFFLOAD_VLAN is negotiated, so only reject in SVM
+	 */
+	if (ice_vf_is_port_vlan_ena(vf) && !ice_is_dvm_ena(&pf->hw)) {
 		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 		goto error_param;
 	}
 
-	if ((test_bit(ICE_VF_STATE_UC_PROMISC, vf->vf_states) ||
-	     test_bit(ICE_VF_STATE_MC_PROMISC, vf->vf_states)) &&
-	    test_bit(ICE_FLAG_VF_TRUE_PROMISC_ENA, pf->flags))
-		vlan_promisc = true;
+	/* in DVM VLAN promiscuous is based on the outer VLAN, which would be
+	 * the port VLAN if VIRTCHNL_VF_OFFLOAD_VLAN was negotiated, so only
+	 * allow vlan_promisc = true in SVM and if no port VLAN is configured
+	 */
+	vlan_promisc = ice_is_vlan_promisc_allowed(vf) &&
+		!ice_is_dvm_ena(&pf->hw) &&
+		!ice_vf_is_port_vlan_ena(vf);
 
 	if (add_v) {
 		for (i = 0; i < vfl->num_elements; i++) {
 			u16 vid = vfl->vlan_id[i];
+			struct ice_vlan vlan;
 
-			if (!ice_is_vf_trusted(vf) &&
-			    vsi->num_vlan >= ICE_MAX_VLAN_PER_VF) {
+			if (ice_vf_has_max_vlans(vf, vsi)) {
 				dev_info(dev, "VF-%d is not trusted, switch the VF to trusted mode, in order to add more VLAN addresses\n",
 					 vf->vf_id);
 				/* There is no need to let VF know about being
@@ -4228,29 +4536,23 @@ static int ice_vc_process_vlan_msg(struct ice_vf *vf, u8 *msg, bool add_v)
 			if (!vid)
 				continue;
 
-			status = ice_vsi_add_vlan(vsi, vid, ICE_FWD_TO_VSI);
+			vlan = ICE_VLAN(ETH_P_8021Q, vid, 0);
+			status = vsi->inner_vlan_ops.add_vlan(vsi, &vlan);
 			if (status) {
 				v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 				goto error_param;
 			}
 
-			/* Enable VLAN pruning when non-zero VLAN is added */
-			if (!vlan_promisc && vid &&
-			    !ice_vsi_is_vlan_pruning_ena(vsi)) {
-				status = ice_cfg_vlan_pruning(vsi, true);
-				if (status) {
+			/* Enable VLAN filtering on first non-zero VLAN */
+			if (!vlan_promisc && vid && !ice_is_dvm_ena(&pf->hw)) {
+				if (vsi->inner_vlan_ops.ena_rx_filtering(vsi)) {
 					v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 					dev_err(dev, "Enable VLAN pruning on VLAN ID: %d failed error-%d\n",
 						vid, status);
 					goto error_param;
 				}
 			} else if (vlan_promisc) {
-				/* Enable Ucast/Mcast VLAN promiscuous mode */
-				promisc_m = ICE_PROMISC_VLAN_TX |
-					    ICE_PROMISC_VLAN_RX;
-
-				status = ice_set_vsi_promisc(hw, vsi->idx,
-							     promisc_m, vid);
+				status = ice_vf_ena_vlan_promisc(vsi, &vlan);
 				if (status) {
 					v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 					dev_err(dev, "Enable Unicast/multicast promiscuous mode on VLAN ID:%d failed error-%d\n",
@@ -4271,6 +4573,7 @@ static int ice_vc_process_vlan_msg(struct ice_vf *vf, u8 *msg, bool add_v)
 		num_vf_vlan = vsi->num_vlan;
 		for (i = 0; i < vfl->num_elements && i < num_vf_vlan; i++) {
 			u16 vid = vfl->vlan_id[i];
+			struct ice_vlan vlan;
 
 			/* we add VLAN 0 by default for each VF so we can enable
 			 * Tx VLAN anti-spoof without triggering MDD events so
@@ -4279,28 +4582,19 @@ static int ice_vc_process_vlan_msg(struct ice_vf *vf, u8 *msg, bool add_v)
 			if (!vid)
 				continue;
 
-			/* Make sure ice_vsi_kill_vlan is successful before
-			 * updating VLAN information
-			 */
-			status = ice_vsi_kill_vlan(vsi, vid);
+			vlan = ICE_VLAN(ETH_P_8021Q, vid, 0);
+			status = vsi->inner_vlan_ops.del_vlan(vsi, &vlan);
 			if (status) {
 				v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 				goto error_param;
 			}
 
-			/* Disable VLAN pruning when only VLAN 0 is left */
-			if (vsi->num_vlan == 1 &&
-			    ice_vsi_is_vlan_pruning_ena(vsi))
-				ice_cfg_vlan_pruning(vsi, false);
+			/* Disable VLAN filtering when only VLAN 0 is left */
+			if (!ice_vsi_has_non_zero_vlans(vsi))
+				vsi->inner_vlan_ops.dis_rx_filtering(vsi);
 
-			/* Disable Unicast/Multicast VLAN promiscuous mode */
-			if (vlan_promisc) {
-				promisc_m = ICE_PROMISC_VLAN_TX |
-					    ICE_PROMISC_VLAN_RX;
-
-				ice_clear_vsi_promisc(hw, vsi->idx,
-						      promisc_m, vid);
-			}
+			if (vlan_promisc)
+				ice_vf_dis_vlan_promisc(vsi, &vlan);
 		}
 	}
 
@@ -4360,7 +4654,7 @@ static int ice_vc_ena_vlan_stripping(struct ice_vf *vf)
 	}
 
 	vsi = ice_get_vf_vsi(vf);
-	if (ice_vsi_manage_vlan_stripping(vsi, true))
+	if (vsi->inner_vlan_ops.ena_stripping(vsi, ETH_P_8021Q))
 		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 
 error_param:
@@ -4395,7 +4689,7 @@ static int ice_vc_dis_vlan_stripping(struct ice_vf *vf)
 		goto error_param;
 	}
 
-	if (ice_vsi_manage_vlan_stripping(vsi, false))
+	if (vsi->inner_vlan_ops.dis_stripping(vsi))
 		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
 
 error_param:
@@ -4407,11 +4701,8 @@ error_param:
  * ice_vf_init_vlan_stripping - enable/disable VLAN stripping on initialization
  * @vf: VF to enable/disable VLAN stripping for on initialization
  *
- * If the VIRTCHNL_VF_OFFLOAD_VLAN flag is set enable VLAN stripping, else if
- * the flag is cleared then we want to disable stripping. For example, the flag
- * will be cleared when port VLANs are configured by the administrator before
- * passing the VF to the guest or if the AVF driver doesn't support VLAN
- * offloads.
+ * Set the default for VLAN stripping based on whether a port VLAN is configured
+ * and the current VLAN mode of the device.
  */
 static int ice_vf_init_vlan_stripping(struct ice_vf *vf)
 {
@@ -4420,14 +4711,965 @@ static int ice_vf_init_vlan_stripping(struct ice_vf *vf)
 	if (!vsi)
 		return -EINVAL;
 
-	/* don't modify stripping if port VLAN is configured */
-	if (vsi->info.pvid)
+	/* don't modify stripping if port VLAN is configured in SVM since the
+	 * port VLAN is based on the inner/single VLAN in SVM
+	 */
+	if (ice_vf_is_port_vlan_ena(vf) && !ice_is_dvm_ena(&vsi->back->hw))
 		return 0;
 
 	if (ice_vf_vlan_offload_ena(vf->driver_caps))
-		return ice_vsi_manage_vlan_stripping(vsi, true);
+		return vsi->inner_vlan_ops.ena_stripping(vsi, ETH_P_8021Q);
 	else
-		return ice_vsi_manage_vlan_stripping(vsi, false);
+		return vsi->inner_vlan_ops.dis_stripping(vsi);
+}
+
+static u16 ice_vc_get_max_vlan_fltrs(struct ice_vf *vf)
+{
+	if (vf->trusted)
+		return VLAN_N_VID;
+	else
+		return ICE_MAX_VLAN_PER_VF;
+}
+
+/**
+ * ice_vf_outer_vlan_not_allowed - check outer VLAN can be used when the device is in DVM
+ * @vf: VF that being checked for
+ */
+static bool ice_vf_outer_vlan_not_allowed(struct ice_vf *vf)
+{
+	if (ice_vf_is_port_vlan_ena(vf))
+		return true;
+
+	return false;
+}
+
+/**
+ * ice_vc_set_dvm_caps - set VLAN capabilities when the device is in DVM
+ * @vf: VF that capabilities are being set for
+ * @caps: VLAN capabilities to populate
+ *
+ * Determine VLAN capabilities support based on whether a port VLAN is
+ * configured. If a port VLAN is configured then the VF should use the inner
+ * filtering/offload capabilities since the port VLAN is using the outer VLAN
+ * capabilies.
+ */
+static void
+ice_vc_set_dvm_caps(struct ice_vf *vf, struct virtchnl_vlan_caps *caps)
+{
+	struct virtchnl_vlan_supported_caps *supported_caps;
+
+	if (ice_vf_outer_vlan_not_allowed(vf)) {
+		/* until support for inner VLAN filtering is added when a port
+		 * VLAN is configured, only support software offloaded inner
+		 * VLANs when a port VLAN is confgured in DVM
+		 */
+		supported_caps = &caps->filtering.filtering_support;
+		supported_caps->inner = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		supported_caps = &caps->offloads.stripping_support;
+		supported_caps->inner = VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		supported_caps = &caps->offloads.insertion_support;
+		supported_caps->inner = VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		caps->offloads.ethertype_init = VIRTCHNL_VLAN_ETHERTYPE_8100;
+		caps->offloads.ethertype_match =
+			VIRTCHNL_ETHERTYPE_STRIPPING_MATCHES_INSERTION;
+	} else {
+		supported_caps = &caps->filtering.filtering_support;
+		supported_caps->inner = VIRTCHNL_VLAN_UNSUPPORTED;
+		supported_caps->outer = VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_ETHERTYPE_88A8 |
+					VIRTCHNL_VLAN_ETHERTYPE_9100 |
+					VIRTCHNL_VLAN_ETHERTYPE_AND;
+		caps->filtering.ethertype_init = VIRTCHNL_VLAN_ETHERTYPE_8100 |
+						 VIRTCHNL_VLAN_ETHERTYPE_88A8 |
+						 VIRTCHNL_VLAN_ETHERTYPE_9100;
+
+		supported_caps = &caps->offloads.stripping_support;
+		supported_caps->inner = VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1;
+		supported_caps->outer = VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_ETHERTYPE_88A8 |
+					VIRTCHNL_VLAN_ETHERTYPE_9100 |
+					VIRTCHNL_VLAN_ETHERTYPE_XOR |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG2_2;
+
+		supported_caps = &caps->offloads.insertion_support;
+		supported_caps->inner = VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1;
+		supported_caps->outer = VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_ETHERTYPE_88A8 |
+					VIRTCHNL_VLAN_ETHERTYPE_9100 |
+					VIRTCHNL_VLAN_ETHERTYPE_XOR |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG2;
+
+		caps->offloads.ethertype_init = VIRTCHNL_VLAN_ETHERTYPE_8100;
+
+		caps->offloads.ethertype_match =
+			VIRTCHNL_ETHERTYPE_STRIPPING_MATCHES_INSERTION;
+	}
+
+	caps->filtering.max_filters = ice_vc_get_max_vlan_fltrs(vf);
+}
+
+/**
+ * ice_vc_set_svm_caps - set VLAN capabilities when the device is in SVM
+ * @vf: VF that capabilities are being set for
+ * @caps: VLAN capabilities to populate
+ *
+ * Determine VLAN capabilities support based on whether a port VLAN is
+ * configured. If a port VLAN is configured then the VF does not have any VLAN
+ * filtering or offload capabilities since the port VLAN is using the inner VLAN
+ * capabilities in single VLAN mode (SVM). Otherwise allow the VF to use inner
+ * VLAN fitlering and offload capabilities.
+ */
+static void
+ice_vc_set_svm_caps(struct ice_vf *vf, struct virtchnl_vlan_caps *caps)
+{
+	struct virtchnl_vlan_supported_caps *supported_caps;
+
+	if (ice_vf_is_port_vlan_ena(vf)) {
+		supported_caps = &caps->filtering.filtering_support;
+		supported_caps->inner = VIRTCHNL_VLAN_UNSUPPORTED;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		supported_caps = &caps->offloads.stripping_support;
+		supported_caps->inner = VIRTCHNL_VLAN_UNSUPPORTED;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		supported_caps = &caps->offloads.insertion_support;
+		supported_caps->inner = VIRTCHNL_VLAN_UNSUPPORTED;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		caps->offloads.ethertype_init = VIRTCHNL_VLAN_UNSUPPORTED;
+		caps->offloads.ethertype_match = VIRTCHNL_VLAN_UNSUPPORTED;
+		caps->filtering.max_filters = 0;
+	} else {
+		supported_caps = &caps->filtering.filtering_support;
+		supported_caps->inner = VIRTCHNL_VLAN_ETHERTYPE_8100;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+		caps->filtering.ethertype_init = VIRTCHNL_VLAN_ETHERTYPE_8100;
+
+		supported_caps = &caps->offloads.stripping_support;
+		supported_caps->inner = VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		supported_caps = &caps->offloads.insertion_support;
+		supported_caps->inner = VIRTCHNL_VLAN_ETHERTYPE_8100 |
+					VIRTCHNL_VLAN_TOGGLE |
+					VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1;
+		supported_caps->outer = VIRTCHNL_VLAN_UNSUPPORTED;
+
+		caps->offloads.ethertype_init = VIRTCHNL_VLAN_ETHERTYPE_8100;
+		caps->offloads.ethertype_match =
+			VIRTCHNL_ETHERTYPE_STRIPPING_MATCHES_INSERTION;
+		caps->filtering.max_filters = ice_vc_get_max_vlan_fltrs(vf);
+	}
+}
+
+/**
+ * ice_vc_get_offload_vlan_v2_caps - determine VF's VLAN capabilities
+ * @vf: VF to determine VLAN capabilities for
+ *
+ * This will only be called if the VF and PF successfully negotiated
+ * VIRTCHNL_VF_OFFLOAD_VLAN_V2.
+ *
+ * Set VLAN capabilities based on the current VLAN mode and whether a port VLAN
+ * is configured or not.
+ */
+static int ice_vc_get_offload_vlan_v2_caps(struct ice_vf *vf)
+{
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct virtchnl_vlan_caps *caps = NULL;
+	int err, len = 0;
+
+	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	caps = kzalloc(sizeof(*caps), GFP_KERNEL);
+	if (!caps) {
+		v_ret = VIRTCHNL_STATUS_ERR_NO_MEMORY;
+		goto out;
+	}
+	len = sizeof(*caps);
+
+	if (ice_is_dvm_ena(&vf->pf->hw))
+		ice_vc_set_dvm_caps(vf, caps);
+	else
+		ice_vc_set_svm_caps(vf, caps);
+
+	/* store negotiated caps to prevent invalid VF messages */
+	memcpy(&vf->vlan_v2_caps, caps, sizeof(*caps));
+
+out:
+	err = ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_GET_OFFLOAD_VLAN_V2_CAPS,
+				    v_ret, (u8 *)caps, len);
+	kfree(caps);
+	return err;
+}
+
+/**
+ * ice_vc_validate_vlan_tpid - validate VLAN TPID
+ * @filtering_caps: negotiated/supported VLAN filtering capabilities
+ * @tpid: VLAN TPID used for validation
+ *
+ * Convert the VLAN TPID to a VIRTCHNL_VLAN_ETHERTYPE_* and then compare against
+ * the negotiated/supported filtering caps to see if the VLAN TPID is valid.
+ */
+static bool ice_vc_validate_vlan_tpid(u16 filtering_caps, u16 tpid)
+{
+	enum virtchnl_vlan_support vlan_ethertype = VIRTCHNL_VLAN_UNSUPPORTED;
+
+	switch (tpid) {
+	case ETH_P_8021Q:
+		vlan_ethertype = VIRTCHNL_VLAN_ETHERTYPE_8100;
+		break;
+	case ETH_P_8021AD:
+		vlan_ethertype = VIRTCHNL_VLAN_ETHERTYPE_88A8;
+		break;
+	case ETH_P_QINQ1:
+		vlan_ethertype = VIRTCHNL_VLAN_ETHERTYPE_9100;
+		break;
+	}
+
+	if (!(filtering_caps & vlan_ethertype))
+		return false;
+
+	return true;
+}
+
+/**
+ * ice_vc_is_valid_vlan - validate the virtchnl_vlan
+ * @vc_vlan: virtchnl_vlan to validate
+ *
+ * If the VLAN TCI and VLAN TPID are 0, then this filter is invalid, so return
+ * false. Otherwise return true.
+ */
+static bool ice_vc_is_valid_vlan(struct virtchnl_vlan *vc_vlan)
+{
+	if (!vc_vlan->tci || !vc_vlan->tpid)
+		return false;
+
+	return true;
+}
+
+/**
+ * ice_vc_validate_vlan_filter_list - validate the filter list from the VF
+ * @vfc: negotiated/supported VLAN filtering capabilities
+ * @vfl: VLAN filter list from VF to validate
+ *
+ * Validate all of the filters in the VLAN filter list from the VF. If any of
+ * the checks fail then return false. Otherwise return true.
+ */
+static bool
+ice_vc_validate_vlan_filter_list(struct virtchnl_vlan_filtering_caps *vfc,
+				 struct virtchnl_vlan_filter_list_v2 *vfl)
+{
+	u16 i;
+
+	if (!vfl->num_elements)
+		return false;
+
+	for (i = 0; i < vfl->num_elements; i++) {
+		struct virtchnl_vlan_supported_caps *filtering_support =
+			&vfc->filtering_support;
+		struct virtchnl_vlan_filter *vlan_fltr = &vfl->filters[i];
+		struct virtchnl_vlan *outer = &vlan_fltr->outer;
+		struct virtchnl_vlan *inner = &vlan_fltr->inner;
+
+		if ((ice_vc_is_valid_vlan(outer) &&
+		     filtering_support->outer == VIRTCHNL_VLAN_UNSUPPORTED) ||
+		    (ice_vc_is_valid_vlan(inner) &&
+		     filtering_support->inner == VIRTCHNL_VLAN_UNSUPPORTED))
+			return false;
+
+		if ((outer->tci_mask &&
+		     !(filtering_support->outer & VIRTCHNL_VLAN_FILTER_MASK)) ||
+		    (inner->tci_mask &&
+		     !(filtering_support->inner & VIRTCHNL_VLAN_FILTER_MASK)))
+			return false;
+
+		if (((outer->tci & VLAN_PRIO_MASK) &&
+		     !(filtering_support->outer & VIRTCHNL_VLAN_PRIO)) ||
+		    ((inner->tci & VLAN_PRIO_MASK) &&
+		     !(filtering_support->inner & VIRTCHNL_VLAN_PRIO)))
+			return false;
+
+		if ((ice_vc_is_valid_vlan(outer) &&
+		     !ice_vc_validate_vlan_tpid(filtering_support->outer, outer->tpid)) ||
+		    (ice_vc_is_valid_vlan(inner) &&
+		     !ice_vc_validate_vlan_tpid(filtering_support->inner, inner->tpid)))
+			return false;
+	}
+
+	return true;
+}
+
+/**
+ * ice_vc_to_vlan - transform from struct virtchnl_vlan to struct ice_vlan
+ * @vc_vlan: struct virtchnl_vlan to transform
+ */
+static struct ice_vlan ice_vc_to_vlan(struct virtchnl_vlan *vc_vlan)
+{
+	struct ice_vlan vlan = { 0 };
+
+	vlan.prio = (vc_vlan->tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+	vlan.vid = vc_vlan->tci & VLAN_VID_MASK;
+	vlan.tpid = vc_vlan->tpid;
+
+	return vlan;
+}
+
+/**
+ * ice_vc_vlan_action - action to perform on the virthcnl_vlan
+ * @vsi: VF's VSI used to perform the action
+ * @vlan_action: function to perform the action with (i.e. add/del)
+ * @vlan: VLAN filter to perform the action with
+ */
+static int
+ice_vc_vlan_action(struct ice_vsi *vsi,
+		   int (*vlan_action)(struct ice_vsi *, struct ice_vlan *),
+		   struct ice_vlan *vlan)
+{
+	int err;
+
+	err = vlan_action(vsi, vlan);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+/**
+ * ice_vc_del_vlans - delete VLAN(s) from the virtchnl filter list
+ * @vf: VF used to delete the VLAN(s)
+ * @vsi: VF's VSI used to delete the VLAN(s)
+ * @vfl: virthchnl filter list used to delete the filters
+ */
+static int
+ice_vc_del_vlans(struct ice_vf *vf, struct ice_vsi *vsi,
+		 struct virtchnl_vlan_filter_list_v2 *vfl)
+{
+	bool vlan_promisc = ice_is_vlan_promisc_allowed(vf);
+	int err;
+	u16 i;
+
+	for (i = 0; i < vfl->num_elements; i++) {
+		struct virtchnl_vlan_filter *vlan_fltr = &vfl->filters[i];
+		struct virtchnl_vlan *vc_vlan;
+
+		vc_vlan = &vlan_fltr->outer;
+		if (ice_vc_is_valid_vlan(vc_vlan)) {
+			struct ice_vlan vlan = ice_vc_to_vlan(vc_vlan);
+
+			err = ice_vc_vlan_action(vsi,
+						 vsi->outer_vlan_ops.del_vlan,
+						 &vlan);
+			if (err)
+				return err;
+
+			if (vlan_promisc)
+				ice_vf_dis_vlan_promisc(vsi, &vlan);
+		}
+
+		vc_vlan = &vlan_fltr->inner;
+		if (ice_vc_is_valid_vlan(vc_vlan)) {
+			struct ice_vlan vlan = ice_vc_to_vlan(vc_vlan);
+
+			err = ice_vc_vlan_action(vsi,
+						 vsi->inner_vlan_ops.del_vlan,
+						 &vlan);
+			if (err)
+				return err;
+
+			/* no support for VLAN promiscuous on inner VLAN unless
+			 * we are in Single VLAN Mode (SVM)
+			 */
+			if (!ice_is_dvm_ena(&vsi->back->hw) && vlan_promisc)
+				ice_vf_dis_vlan_promisc(vsi, &vlan);
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * ice_vc_remove_vlan_v2_msg - virtchnl handler for VIRTCHNL_OP_DEL_VLAN_V2
+ * @vf: VF the message was received from
+ * @msg: message received from the VF
+ */
+static int ice_vc_remove_vlan_v2_msg(struct ice_vf *vf, u8 *msg)
+{
+	struct virtchnl_vlan_filter_list_v2 *vfl =
+		(struct virtchnl_vlan_filter_list_v2 *)msg;
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct ice_vsi *vsi;
+
+	if (!ice_vc_validate_vlan_filter_list(&vf->vlan_v2_caps.filtering,
+					      vfl)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_isvalid_vsi_id(vf, vfl->vport_id)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	vsi = ice_get_vf_vsi(vf);
+	if (!vsi) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (ice_vc_del_vlans(vf, vsi, vfl))
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+
+out:
+	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_DEL_VLAN_V2, v_ret, NULL,
+				     0);
+}
+
+/**
+ * ice_vc_add_vlans - add VLAN(s) from the virtchnl filter list
+ * @vf: VF used to add the VLAN(s)
+ * @vsi: VF's VSI used to add the VLAN(s)
+ * @vfl: virthchnl filter list used to add the filters
+ */
+static int
+ice_vc_add_vlans(struct ice_vf *vf, struct ice_vsi *vsi,
+		 struct virtchnl_vlan_filter_list_v2 *vfl)
+{
+	bool vlan_promisc = ice_is_vlan_promisc_allowed(vf);
+	int err;
+	u16 i;
+
+	for (i = 0; i < vfl->num_elements; i++) {
+		struct virtchnl_vlan_filter *vlan_fltr = &vfl->filters[i];
+		struct virtchnl_vlan *vc_vlan;
+
+		vc_vlan = &vlan_fltr->outer;
+		if (ice_vc_is_valid_vlan(vc_vlan)) {
+			struct ice_vlan vlan = ice_vc_to_vlan(vc_vlan);
+
+			err = ice_vc_vlan_action(vsi,
+						 vsi->outer_vlan_ops.add_vlan,
+						 &vlan);
+			if (err)
+				return err;
+
+			if (vlan_promisc) {
+				err = ice_vf_ena_vlan_promisc(vsi, &vlan);
+				if (err)
+					return err;
+			}
+		}
+
+		vc_vlan = &vlan_fltr->inner;
+		if (ice_vc_is_valid_vlan(vc_vlan)) {
+			struct ice_vlan vlan = ice_vc_to_vlan(vc_vlan);
+
+			err = ice_vc_vlan_action(vsi,
+						 vsi->inner_vlan_ops.add_vlan,
+						 &vlan);
+			if (err)
+				return err;
+
+			/* no support for VLAN promiscuous on inner VLAN unless
+			 * we are in Single VLAN Mode (SVM)
+			 */
+			if (!ice_is_dvm_ena(&vsi->back->hw) && vlan_promisc) {
+				err = ice_vf_ena_vlan_promisc(vsi, &vlan);
+				if (err)
+					return err;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * ice_vc_validate_add_vlan_filter_list - validate add filter list from the VF
+ * @vsi: VF VSI used to get number of existing VLAN filters
+ * @vfc: negotiated/supported VLAN filtering capabilities
+ * @vfl: VLAN filter list from VF to validate
+ *
+ * Validate all of the filters in the VLAN filter list from the VF during the
+ * VIRTCHNL_OP_ADD_VLAN_V2 opcode. If any of the checks fail then return false.
+ * Otherwise return true.
+ */
+static bool
+ice_vc_validate_add_vlan_filter_list(struct ice_vsi *vsi,
+				     struct virtchnl_vlan_filtering_caps *vfc,
+				     struct virtchnl_vlan_filter_list_v2 *vfl)
+{
+	u16 num_requested_filters = vsi->num_vlan + vfl->num_elements;
+
+	if (num_requested_filters > vfc->max_filters)
+		return false;
+
+	return ice_vc_validate_vlan_filter_list(vfc, vfl);
+}
+
+/**
+ * ice_vc_add_vlan_v2_msg - virtchnl handler for VIRTCHNL_OP_ADD_VLAN_V2
+ * @vf: VF the message was received from
+ * @msg: message received from the VF
+ */
+static int ice_vc_add_vlan_v2_msg(struct ice_vf *vf, u8 *msg)
+{
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct virtchnl_vlan_filter_list_v2 *vfl =
+		(struct virtchnl_vlan_filter_list_v2 *)msg;
+	struct ice_vsi *vsi;
+
+	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_isvalid_vsi_id(vf, vfl->vport_id)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	vsi = ice_get_vf_vsi(vf);
+	if (!vsi) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_validate_add_vlan_filter_list(vsi,
+						  &vf->vlan_v2_caps.filtering,
+						  vfl)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (ice_vc_add_vlans(vf, vsi, vfl))
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+
+out:
+	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_ADD_VLAN_V2, v_ret, NULL,
+				     0);
+}
+
+/**
+ * ice_vc_valid_vlan_setting - validate VLAN setting
+ * @negotiated_settings: negotiated VLAN settings during VF init
+ * @ethertype_setting: ethertype(s) requested for the VLAN setting
+ */
+static bool
+ice_vc_valid_vlan_setting(u32 negotiated_settings, u32 ethertype_setting)
+{
+	if (ethertype_setting && !(negotiated_settings & ethertype_setting))
+		return false;
+
+	/* only allow a single VIRTCHNL_VLAN_ETHERTYPE if
+	 * VIRTHCNL_VLAN_ETHERTYPE_AND is not negotiated/supported
+	 */
+	if (!(negotiated_settings & VIRTCHNL_VLAN_ETHERTYPE_AND) &&
+	    hweight32(ethertype_setting) > 1)
+		return false;
+
+	/* ability to modify the VLAN setting was not negotiated */
+	if (!(negotiated_settings & VIRTCHNL_VLAN_TOGGLE))
+		return false;
+
+	return true;
+}
+
+/**
+ * ice_vc_valid_vlan_setting_msg - validate the VLAN setting message
+ * @caps: negotiated VLAN settings during VF init
+ * @msg: message to validate
+ *
+ * Used to validate any VLAN virtchnl message sent as a
+ * virtchnl_vlan_setting structure. Validates the message against the
+ * negotiated/supported caps during VF driver init.
+ */
+static bool
+ice_vc_valid_vlan_setting_msg(struct virtchnl_vlan_supported_caps *caps,
+			      struct virtchnl_vlan_setting *msg)
+{
+	if ((!msg->outer_ethertype_setting &&
+	     !msg->inner_ethertype_setting) ||
+	    (!caps->outer && !caps->inner))
+		return false;
+
+	if (msg->outer_ethertype_setting &&
+	    !ice_vc_valid_vlan_setting(caps->outer,
+				       msg->outer_ethertype_setting))
+		return false;
+
+	if (msg->inner_ethertype_setting &&
+	    !ice_vc_valid_vlan_setting(caps->inner,
+				       msg->inner_ethertype_setting))
+		return false;
+
+	return true;
+}
+
+/**
+ * ice_vc_get_tpid - transform from VIRTCHNL_VLAN_ETHERTYPE_* to VLAN TPID
+ * @ethertype_setting: VIRTCHNL_VLAN_ETHERTYPE_* used to get VLAN TPID
+ * @tpid: VLAN TPID to populate
+ */
+static int ice_vc_get_tpid(u32 ethertype_setting, u16 *tpid)
+{
+	switch (ethertype_setting) {
+	case VIRTCHNL_VLAN_ETHERTYPE_8100:
+		*tpid = ETH_P_8021Q;
+		break;
+	case VIRTCHNL_VLAN_ETHERTYPE_88A8:
+		*tpid = ETH_P_8021AD;
+		break;
+	case VIRTCHNL_VLAN_ETHERTYPE_9100:
+		*tpid = ETH_P_QINQ1;
+		break;
+	default:
+		*tpid = 0;
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_vc_ena_vlan_offload - enable VLAN offload based on the ethertype_setting
+ * @vsi: VF's VSI used to enable the VLAN offload
+ * @ena_offload: function used to enable the VLAN offload
+ * @ethertype_setting: VIRTCHNL_VLAN_ETHERTYPE_* to enable offloads for
+ */
+static int
+ice_vc_ena_vlan_offload(struct ice_vsi *vsi,
+			int (*ena_offload)(struct ice_vsi *vsi, u16 tpid),
+			u32 ethertype_setting)
+{
+	u16 tpid;
+	int err;
+
+	err = ice_vc_get_tpid(ethertype_setting, &tpid);
+	if (err)
+		return err;
+
+	err = ena_offload(vsi, tpid);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+#define ICE_L2TSEL_QRX_CONTEXT_REG_IDX	3
+#define ICE_L2TSEL_BIT_OFFSET		23
+enum ice_l2tsel {
+	ICE_L2TSEL_EXTRACT_FIRST_TAG_L2TAG2_2ND,
+	ICE_L2TSEL_EXTRACT_FIRST_TAG_L2TAG1,
+};
+
+/**
+ * ice_vsi_update_l2tsel - update l2tsel field for all Rx rings on this VSI
+ * @vsi: VSI used to update l2tsel on
+ * @l2tsel: l2tsel setting requested
+ *
+ * Use the l2tsel setting to update all of the Rx queue context bits for l2tsel.
+ * This will modify which descriptor field the first offloaded VLAN will be
+ * stripped into.
+ */
+static void ice_vsi_update_l2tsel(struct ice_vsi *vsi, enum ice_l2tsel l2tsel)
+{
+	struct ice_hw *hw = &vsi->back->hw;
+	u32 l2tsel_bit;
+	int i;
+
+	if (l2tsel == ICE_L2TSEL_EXTRACT_FIRST_TAG_L2TAG2_2ND)
+		l2tsel_bit = 0;
+	else
+		l2tsel_bit = BIT(ICE_L2TSEL_BIT_OFFSET);
+
+	for (i = 0; i < vsi->alloc_rxq; i++) {
+		u16 pfq = vsi->rxq_map[i];
+		u32 qrx_context_offset;
+		u32 regval;
+
+		qrx_context_offset =
+			QRX_CONTEXT(ICE_L2TSEL_QRX_CONTEXT_REG_IDX, pfq);
+
+		regval = rd32(hw, qrx_context_offset);
+		regval &= ~BIT(ICE_L2TSEL_BIT_OFFSET);
+		regval |= l2tsel_bit;
+		wr32(hw, qrx_context_offset, regval);
+	}
+}
+
+/**
+ * ice_vc_ena_vlan_stripping_v2_msg
+ * @vf: VF the message was received from
+ * @msg: message received from the VF
+ *
+ * virthcnl handler for VIRTCHNL_OP_ENABLE_VLAN_STRIPPING_V2
+ */
+static int ice_vc_ena_vlan_stripping_v2_msg(struct ice_vf *vf, u8 *msg)
+{
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct virtchnl_vlan_supported_caps *stripping_support;
+	struct virtchnl_vlan_setting *strip_msg =
+		(struct virtchnl_vlan_setting *)msg;
+	u32 ethertype_setting;
+	struct ice_vsi *vsi;
+
+	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_isvalid_vsi_id(vf, strip_msg->vport_id)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	vsi = ice_get_vf_vsi(vf);
+	if (!vsi) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	stripping_support = &vf->vlan_v2_caps.offloads.stripping_support;
+	if (!ice_vc_valid_vlan_setting_msg(stripping_support, strip_msg)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	ethertype_setting = strip_msg->outer_ethertype_setting;
+	if (ethertype_setting) {
+		if (ice_vc_ena_vlan_offload(vsi,
+					    vsi->outer_vlan_ops.ena_stripping,
+					    ethertype_setting)) {
+			v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+			goto out;
+		} else {
+			enum ice_l2tsel l2tsel =
+				ICE_L2TSEL_EXTRACT_FIRST_TAG_L2TAG2_2ND;
+
+			/* PF tells the VF that the outer VLAN tag is always
+			 * extracted to VIRTCHNL_VLAN_TAG_LOCATION_L2TAG2_2 and
+			 * inner is always extracted to
+			 * VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1. This is needed to
+			 * support outer stripping so the first tag always ends
+			 * up in L2TAG2_2ND and the second/inner tag, if
+			 * enabled, is extracted in L2TAG1.
+			 */
+			ice_vsi_update_l2tsel(vsi, l2tsel);
+		}
+	}
+
+	ethertype_setting = strip_msg->inner_ethertype_setting;
+	if (ethertype_setting &&
+	    ice_vc_ena_vlan_offload(vsi, vsi->inner_vlan_ops.ena_stripping,
+				    ethertype_setting)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+out:
+	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_ENABLE_VLAN_STRIPPING_V2, v_ret, NULL, 0);
+}
+
+/**
+ * ice_vc_dis_vlan_stripping_v2_msg
+ * @vf: VF the message was received from
+ * @msg: message received from the VF
+ *
+ * virthcnl handler for VIRTCHNL_OP_DISABLE_VLAN_STRIPPING_V2
+ */
+static int ice_vc_dis_vlan_stripping_v2_msg(struct ice_vf *vf, u8 *msg)
+{
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct virtchnl_vlan_supported_caps *stripping_support;
+	struct virtchnl_vlan_setting *strip_msg =
+		(struct virtchnl_vlan_setting *)msg;
+	u32 ethertype_setting;
+	struct ice_vsi *vsi;
+
+	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_isvalid_vsi_id(vf, strip_msg->vport_id)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	vsi = ice_get_vf_vsi(vf);
+	if (!vsi) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	stripping_support = &vf->vlan_v2_caps.offloads.stripping_support;
+	if (!ice_vc_valid_vlan_setting_msg(stripping_support, strip_msg)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	ethertype_setting = strip_msg->outer_ethertype_setting;
+	if (ethertype_setting) {
+		if (vsi->outer_vlan_ops.dis_stripping(vsi)) {
+			v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+			goto out;
+		} else {
+			enum ice_l2tsel l2tsel =
+				ICE_L2TSEL_EXTRACT_FIRST_TAG_L2TAG1;
+
+			/* PF tells the VF that the outer VLAN tag is always
+			 * extracted to VIRTCHNL_VLAN_TAG_LOCATION_L2TAG2_2 and
+			 * inner is always extracted to
+			 * VIRTCHNL_VLAN_TAG_LOCATION_L2TAG1. This is needed to
+			 * support inner stripping while outer stripping is
+			 * disabled so that the first and only tag is extracted
+			 * in L2TAG1.
+			 */
+			ice_vsi_update_l2tsel(vsi, l2tsel);
+		}
+	}
+
+	ethertype_setting = strip_msg->inner_ethertype_setting;
+	if (ethertype_setting && vsi->inner_vlan_ops.dis_stripping(vsi)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+out:
+	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_DISABLE_VLAN_STRIPPING_V2, v_ret, NULL, 0);
+}
+
+/**
+ * ice_vc_ena_vlan_insertion_v2_msg
+ * @vf: VF the message was received from
+ * @msg: message received from the VF
+ *
+ * virthcnl handler for VIRTCHNL_OP_ENABLE_VLAN_INSERTION_V2
+ */
+static int ice_vc_ena_vlan_insertion_v2_msg(struct ice_vf *vf, u8 *msg)
+{
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct virtchnl_vlan_supported_caps *insertion_support;
+	struct virtchnl_vlan_setting *insertion_msg =
+		(struct virtchnl_vlan_setting *)msg;
+	u32 ethertype_setting;
+	struct ice_vsi *vsi;
+
+	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_isvalid_vsi_id(vf, insertion_msg->vport_id)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	vsi = ice_get_vf_vsi(vf);
+	if (!vsi) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	insertion_support = &vf->vlan_v2_caps.offloads.insertion_support;
+	if (!ice_vc_valid_vlan_setting_msg(insertion_support, insertion_msg)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	ethertype_setting = insertion_msg->outer_ethertype_setting;
+	if (ethertype_setting &&
+	    ice_vc_ena_vlan_offload(vsi, vsi->outer_vlan_ops.ena_insertion,
+				    ethertype_setting)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	ethertype_setting = insertion_msg->inner_ethertype_setting;
+	if (ethertype_setting &&
+	    ice_vc_ena_vlan_offload(vsi, vsi->inner_vlan_ops.ena_insertion,
+				    ethertype_setting)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+out:
+	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_ENABLE_VLAN_INSERTION_V2, v_ret, NULL, 0);
+}
+
+/**
+ * ice_vc_dis_vlan_insertion_v2_msg
+ * @vf: VF the message was received from
+ * @msg: message received from the VF
+ *
+ * virthcnl handler for VIRTCHNL_OP_DISABLE_VLAN_INSERTION_V2
+ */
+static int ice_vc_dis_vlan_insertion_v2_msg(struct ice_vf *vf, u8 *msg)
+{
+	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
+	struct virtchnl_vlan_supported_caps *insertion_support;
+	struct virtchnl_vlan_setting *insertion_msg =
+		(struct virtchnl_vlan_setting *)msg;
+	u32 ethertype_setting;
+	struct ice_vsi *vsi;
+
+	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	if (!ice_vc_isvalid_vsi_id(vf, insertion_msg->vport_id)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	vsi = ice_get_vf_vsi(vf);
+	if (!vsi) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	insertion_support = &vf->vlan_v2_caps.offloads.insertion_support;
+	if (!ice_vc_valid_vlan_setting_msg(insertion_support, insertion_msg)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	ethertype_setting = insertion_msg->outer_ethertype_setting;
+	if (ethertype_setting && vsi->outer_vlan_ops.dis_insertion(vsi)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+	ethertype_setting = insertion_msg->inner_ethertype_setting;
+	if (ethertype_setting && vsi->inner_vlan_ops.dis_insertion(vsi)) {
+		v_ret = VIRTCHNL_STATUS_ERR_PARAM;
+		goto out;
+	}
+
+out:
+	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_DISABLE_VLAN_INSERTION_V2, v_ret, NULL, 0);
 }
 
 static struct ice_vc_vf_ops ice_vc_vf_dflt_ops = {
@@ -4452,6 +5694,13 @@ static struct ice_vc_vf_ops ice_vc_vf_dflt_ops = {
 	.handle_rss_cfg_msg = ice_vc_handle_rss_cfg,
 	.add_fdir_fltr_msg = ice_vc_add_fdir_fltr,
 	.del_fdir_fltr_msg = ice_vc_del_fdir_fltr,
+	.get_offload_vlan_v2_caps = ice_vc_get_offload_vlan_v2_caps,
+	.add_vlan_v2_msg = ice_vc_add_vlan_v2_msg,
+	.remove_vlan_v2_msg = ice_vc_remove_vlan_v2_msg,
+	.ena_vlan_stripping_v2_msg = ice_vc_ena_vlan_stripping_v2_msg,
+	.dis_vlan_stripping_v2_msg = ice_vc_dis_vlan_stripping_v2_msg,
+	.ena_vlan_insertion_v2_msg = ice_vc_ena_vlan_insertion_v2_msg,
+	.dis_vlan_insertion_v2_msg = ice_vc_dis_vlan_insertion_v2_msg,
 };
 
 void ice_vc_set_dflt_vf_ops(struct ice_vc_vf_ops *ops)
@@ -4620,12 +5869,13 @@ void ice_vc_process_vf_msg(struct ice_pf *pf, struct ice_rq_event_info *event)
 	int err = 0;
 
 	dev = ice_pf_to_dev(pf);
-	if (ice_validate_vf_id(pf, vf_id)) {
-		err = -EINVAL;
-		goto error_handler;
-	}
 
-	vf = &pf->vf[vf_id];
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf) {
+		dev_err(dev, "Unable to locate VF for message from VF ID %d, opcode %d, len %d\n",
+			vf_id, v_opcode, msglen);
+		return;
+	}
 
 	/* Check if VF is disabled. */
 	if (test_bit(ICE_VF_STATE_DIS, vf->vf_states)) {
@@ -4648,6 +5898,7 @@ void ice_vc_process_vf_msg(struct ice_pf *pf, struct ice_rq_event_info *event)
 		ice_vc_send_msg_to_vf(vf, v_opcode,
 				      VIRTCHNL_STATUS_ERR_NOT_SUPPORTED, NULL,
 				      0);
+		ice_put_vf(vf);
 		return;
 	}
 
@@ -4657,6 +5908,7 @@ error_handler:
 				      NULL, 0);
 		dev_err(dev, "Invalid message from VF %d, opcode %d, len %d, error %d\n",
 			vf_id, v_opcode, msglen, err);
+		ice_put_vf(vf);
 		return;
 	}
 
@@ -4666,6 +5918,7 @@ error_handler:
 	if (!mutex_trylock(&vf->cfg_lock)) {
 		dev_info(dev, "VF %u is being configured in another context that will trigger a VFR, so there is no need to handle this message\n",
 			 vf->vf_id);
+		ice_put_vf(vf);
 		return;
 	}
 
@@ -4676,7 +5929,7 @@ error_handler:
 	case VIRTCHNL_OP_GET_VF_RESOURCES:
 		err = ops->get_vf_res_msg(vf, msg);
 		if (ice_vf_init_vlan_stripping(vf))
-			dev_err(dev, "Failed to initialize VLAN stripping for VF %d\n",
+			dev_dbg(dev, "Failed to initialize VLAN stripping for VF %d\n",
 				vf->vf_id);
 		ice_vc_notify_vf_link_state(vf);
 		break;
@@ -4741,6 +5994,27 @@ error_handler:
 	case VIRTCHNL_OP_DEL_RSS_CFG:
 		err = ops->handle_rss_cfg_msg(vf, msg, false);
 		break;
+	case VIRTCHNL_OP_GET_OFFLOAD_VLAN_V2_CAPS:
+		err = ops->get_offload_vlan_v2_caps(vf);
+		break;
+	case VIRTCHNL_OP_ADD_VLAN_V2:
+		err = ops->add_vlan_v2_msg(vf, msg);
+		break;
+	case VIRTCHNL_OP_DEL_VLAN_V2:
+		err = ops->remove_vlan_v2_msg(vf, msg);
+		break;
+	case VIRTCHNL_OP_ENABLE_VLAN_STRIPPING_V2:
+		err = ops->ena_vlan_stripping_v2_msg(vf, msg);
+		break;
+	case VIRTCHNL_OP_DISABLE_VLAN_STRIPPING_V2:
+		err = ops->dis_vlan_stripping_v2_msg(vf, msg);
+		break;
+	case VIRTCHNL_OP_ENABLE_VLAN_INSERTION_V2:
+		err = ops->ena_vlan_insertion_v2_msg(vf, msg);
+		break;
+	case VIRTCHNL_OP_DISABLE_VLAN_INSERTION_V2:
+		err = ops->dis_vlan_insertion_v2_msg(vf, msg);
+		break;
 	case VIRTCHNL_OP_UNKNOWN:
 	default:
 		dev_err(dev, "Unsupported opcode %d from VF %d\n", v_opcode,
@@ -4759,6 +6033,7 @@ error_handler:
 	}
 
 	mutex_unlock(&vf->cfg_lock);
+	ice_put_vf(vf);
 }
 
 /**
@@ -4774,21 +6049,24 @@ ice_get_vf_cfg(struct net_device *netdev, int vf_id, struct ifla_vf_info *ivi)
 {
 	struct ice_pf *pf = ice_netdev_to_pf(netdev);
 	struct ice_vf *vf;
+	int ret;
 
-	if (ice_validate_vf_id(pf, vf_id))
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return -EINVAL;
 
-	vf = &pf->vf[vf_id];
-
-	if (ice_check_vf_init(pf, vf))
-		return -EBUSY;
+	ret = ice_check_vf_ready_for_cfg(vf);
+	if (ret)
+		goto out_put_vf;
 
 	ivi->vf = vf_id;
 	ether_addr_copy(ivi->mac, vf->hw_lan_addr.addr);
 
 	/* VF configuration for VLAN and applicable QoS */
-	ivi->vlan = vf->port_vlan_info & VLAN_VID_MASK;
-	ivi->qos = (vf->port_vlan_info & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+	ivi->vlan = ice_vf_get_port_vlan_id(vf);
+	ivi->qos = ice_vf_get_port_vlan_prio(vf);
+	if (ice_vf_is_port_vlan_ena(vf))
+		ivi->vlan_proto = cpu_to_be16(ice_vf_get_port_vlan_tpid(vf));
 
 	ivi->trusted = vf->trusted;
 	ivi->spoofchk = vf->spoofchk;
@@ -4800,7 +6078,10 @@ ice_get_vf_cfg(struct net_device *netdev, int vf_id, struct ifla_vf_info *ivi)
 		ivi->linkstate = IFLA_VF_LINK_STATE_DISABLE;
 	ivi->max_tx_rate = vf->max_tx_rate;
 	ivi->min_tx_rate = vf->min_tx_rate;
-	return 0;
+
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -4850,28 +6131,31 @@ int ice_set_vf_mac(struct net_device *netdev, int vf_id, u8 *mac)
 	struct ice_vf *vf;
 	int ret;
 
-	if (ice_validate_vf_id(pf, vf_id))
-		return -EINVAL;
-
 	if (is_multicast_ether_addr(mac)) {
 		netdev_err(netdev, "%pM not a valid unicast address\n", mac);
 		return -EINVAL;
 	}
 
-	vf = &pf->vf[vf_id];
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
+		return -EINVAL;
+
 	/* nothing left to do, unicast MAC already set */
 	if (ether_addr_equal(vf->dev_lan_addr.addr, mac) &&
-	    ether_addr_equal(vf->hw_lan_addr.addr, mac))
-		return 0;
+	    ether_addr_equal(vf->hw_lan_addr.addr, mac)) {
+		ret = 0;
+		goto out_put_vf;
+	}
 
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
 	if (ice_unicast_mac_exists(pf, mac)) {
 		netdev_err(netdev, "Unicast MAC %pM already exists on this PF. Preventing setting VF %u unicast MAC address to %pM\n",
 			   mac, vf_id, mac);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_put_vf;
 	}
 
 	mutex_lock(&vf->cfg_lock);
@@ -4895,7 +6179,10 @@ int ice_set_vf_mac(struct net_device *netdev, int vf_id, u8 *mac)
 
 	ice_vc_reset_vf(vf);
 	mutex_unlock(&vf->cfg_lock);
-	return 0;
+
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -4917,17 +6204,19 @@ int ice_set_vf_trust(struct net_device *netdev, int vf_id, bool trusted)
 		return -EOPNOTSUPP;
 	}
 
-	if (ice_validate_vf_id(pf, vf_id))
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return -EINVAL;
 
-	vf = &pf->vf[vf_id];
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
 	/* Check if already trusted */
-	if (trusted == vf->trusted)
-		return 0;
+	if (trusted == vf->trusted) {
+		ret = 0;
+		goto out_put_vf;
+	}
 
 	mutex_lock(&vf->cfg_lock);
 
@@ -4938,7 +6227,9 @@ int ice_set_vf_trust(struct net_device *netdev, int vf_id, bool trusted)
 
 	mutex_unlock(&vf->cfg_lock);
 
-	return 0;
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -4955,13 +6246,13 @@ int ice_set_vf_link_state(struct net_device *netdev, int vf_id, int link_state)
 	struct ice_vf *vf;
 	int ret;
 
-	if (ice_validate_vf_id(pf, vf_id))
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return -EINVAL;
 
-	vf = &pf->vf[vf_id];
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
 	switch (link_state) {
 	case IFLA_VF_LINK_STATE_AUTO:
@@ -4976,12 +6267,15 @@ int ice_set_vf_link_state(struct net_device *netdev, int vf_id, int link_state)
 		vf->link_up = false;
 		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_put_vf;
 	}
 
 	ice_vc_notify_vf_link_state(vf);
 
-	return 0;
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -4990,10 +6284,14 @@ int ice_set_vf_link_state(struct net_device *netdev, int vf_id, int link_state)
  */
 static int ice_calc_all_vfs_min_tx_rate(struct ice_pf *pf)
 {
-	int rate = 0, i;
+	struct ice_vf *vf;
+	unsigned int bkt;
+	int rate = 0;
 
-	ice_for_each_vf(pf, i)
-		rate += pf->vf[i].min_tx_rate;
+	rcu_read_lock();
+	ice_for_each_vf_rcu(pf, bkt, vf)
+		rate += vf->min_tx_rate;
+	rcu_read_unlock();
 
 	return rate;
 }
@@ -5048,13 +6346,14 @@ ice_set_vf_bw(struct net_device *netdev, int vf_id, int min_tx_rate,
 	int ret;
 
 	dev = ice_pf_to_dev(pf);
-	if (ice_validate_vf_id(pf, vf_id))
+
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return -EINVAL;
 
-	vf = &pf->vf[vf_id];
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
 	vsi = ice_get_vf_vsi(vf);
 
@@ -5064,23 +6363,27 @@ ice_set_vf_bw(struct net_device *netdev, int vf_id, int min_tx_rate,
 	if (max_tx_rate && min_tx_rate > max_tx_rate) {
 		dev_err(dev, "Cannot set min Tx rate %d Mbps greater than max Tx rate %d Mbps\n",
 			min_tx_rate, max_tx_rate);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_put_vf;
 	}
 
 	if (min_tx_rate && ice_is_dcb_active(pf)) {
 		dev_err(dev, "DCB on PF is currently enabled. VF min Tx rate limiting not allowed on this PF.\n");
-		return -EOPNOTSUPP;
+		ret = -EOPNOTSUPP;
+		goto out_put_vf;
 	}
 
-	if (ice_min_tx_rate_oversubscribed(vf, min_tx_rate))
-		return -EINVAL;
+	if (ice_min_tx_rate_oversubscribed(vf, min_tx_rate)) {
+		ret = -EINVAL;
+		goto out_put_vf;
+	}
 
 	if (vf->min_tx_rate != (unsigned int)min_tx_rate) {
 		ret = ice_set_min_bw_limit(vsi, (u64)min_tx_rate * 1000);
 		if (ret) {
 			dev_err(dev, "Unable to set min-tx-rate for VF %d\n",
 				vf->vf_id);
-			return ret;
+			goto out_put_vf;
 		}
 
 		vf->min_tx_rate = min_tx_rate;
@@ -5091,13 +6394,15 @@ ice_set_vf_bw(struct net_device *netdev, int vf_id, int min_tx_rate,
 		if (ret) {
 			dev_err(dev, "Unable to set max-tx-rate for VF %d\n",
 				vf->vf_id);
-			return ret;
+			goto out_put_vf;
 		}
 
 		vf->max_tx_rate = max_tx_rate;
 	}
 
-	return 0;
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -5115,17 +6420,19 @@ int ice_get_vf_stats(struct net_device *netdev, int vf_id,
 	struct ice_vf *vf;
 	int ret;
 
-	if (ice_validate_vf_id(pf, vf_id))
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return -EINVAL;
 
-	vf = &pf->vf[vf_id];
 	ret = ice_check_vf_ready_for_cfg(vf);
 	if (ret)
-		return ret;
+		goto out_put_vf;
 
 	vsi = ice_get_vf_vsi(vf);
-	if (!vsi)
-		return -EINVAL;
+	if (!vsi) {
+		ret = -EINVAL;
+		goto out_put_vf;
+	}
 
 	ice_update_eth_stats(vsi);
 	stats = &vsi->eth_stats;
@@ -5143,7 +6450,9 @@ int ice_get_vf_stats(struct net_device *netdev, int vf_id,
 	vf_stats->rx_dropped = stats->rx_discards;
 	vf_stats->tx_dropped = stats->tx_discards;
 
-	return 0;
+out_put_vf:
+	ice_put_vf(vf);
+	return ret;
 }
 
 /**
@@ -5174,21 +6483,21 @@ void ice_print_vfs_mdd_events(struct ice_pf *pf)
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	int i;
+	struct ice_vf *vf;
+	unsigned int bkt;
 
 	/* check that there are pending MDD events to print */
 	if (!test_and_clear_bit(ICE_MDD_VF_PRINT_PENDING, pf->state))
 		return;
 
 	/* VF MDD event logs are rate limited to one second intervals */
-	if (time_is_after_jiffies(pf->last_printed_mdd_jiffies + HZ * 1))
+	if (time_is_after_jiffies(pf->vfs.last_printed_mdd_jiffies + HZ * 1))
 		return;
 
-	pf->last_printed_mdd_jiffies = jiffies;
+	pf->vfs.last_printed_mdd_jiffies = jiffies;
 
-	ice_for_each_vf(pf, i) {
-		struct ice_vf *vf = &pf->vf[i];
-
+	mutex_lock(&pf->vfs.table_lock);
+	ice_for_each_vf(pf, bkt, vf) {
 		/* only print Rx MDD event message if there are new events */
 		if (vf->mdd_rx_events.count != vf->mdd_rx_events.last_printed) {
 			vf->mdd_rx_events.last_printed =
@@ -5202,10 +6511,11 @@ void ice_print_vfs_mdd_events(struct ice_pf *pf)
 							vf->mdd_tx_events.count;
 
 			dev_info(dev, "%d Tx Malicious Driver Detection events detected on PF %d VF %d MAC %pM.\n",
-				 vf->mdd_tx_events.count, hw->pf_id, i,
+				 vf->mdd_tx_events.count, hw->pf_id, vf->vf_id,
 				 vf->dev_lan_addr.addr);
 		}
 	}
+	mutex_unlock(&pf->vfs.table_lock);
 }
 
 /**
@@ -5257,13 +6567,12 @@ ice_is_malicious_vf(struct ice_pf *pf, struct ice_rq_event_info *event,
 	struct ice_vf *vf;
 	int status;
 
-	if (ice_validate_vf_id(pf, vf_id))
+	vf = ice_get_vf_by_id(pf, vf_id);
+	if (!vf)
 		return false;
 
-	vf = &pf->vf[vf_id];
-	/* Check if VF is disabled. */
 	if (test_bit(ICE_VF_STATE_DIS, vf->vf_states))
-		return false;
+		goto out_put_vf;
 
 	mbxdata.num_msg_proc = num_msg_proc;
 	mbxdata.num_pending_arq = num_msg_pending;
@@ -5274,7 +6583,7 @@ ice_is_malicious_vf(struct ice_pf *pf, struct ice_rq_event_info *event,
 	/* check to see if we have a malicious VF */
 	status = ice_mbx_vf_state_handler(&pf->hw, &mbxdata, vf_id, &malvf);
 	if (status)
-		return false;
+		goto out_put_vf;
 
 	if (malvf) {
 		bool report_vf = false;
@@ -5282,7 +6591,7 @@ ice_is_malicious_vf(struct ice_pf *pf, struct ice_rq_event_info *event,
 		/* if the VF is malicious and we haven't let the user
 		 * know about it, then let them know now
 		 */
-		status = ice_mbx_report_malvf(&pf->hw, pf->malvfs,
+		status = ice_mbx_report_malvf(&pf->hw, pf->vfs.malvfs,
 					      ICE_MAX_VF_COUNT, vf_id,
 					      &report_vf);
 		if (status)
@@ -5296,12 +6605,9 @@ ice_is_malicious_vf(struct ice_pf *pf, struct ice_rq_event_info *event,
 					 &vf->dev_lan_addr.addr[0],
 					 pf_vsi->netdev->dev_addr);
 		}
-
-		return true;
 	}
 
-	/* if there was an error in detection or the VF is not malicious then
-	 * return false
-	 */
-	return false;
+out_put_vf:
+	ice_put_vf(vf);
+	return malvf;
 }

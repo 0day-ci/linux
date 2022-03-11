@@ -206,13 +206,11 @@ static int arizona_spi_probe(struct spi_device *spi)
 	return arizona_dev_init(arizona);
 }
 
-static int arizona_spi_remove(struct spi_device *spi)
+static void arizona_spi_remove(struct spi_device *spi)
 {
 	struct arizona *arizona = spi_get_drvdata(spi);
 
 	arizona_dev_exit(arizona);
-
-	return 0;
 }
 
 static const struct spi_device_id arizona_spi_ids[] = {
@@ -226,7 +224,7 @@ static const struct spi_device_id arizona_spi_ids[] = {
 MODULE_DEVICE_TABLE(spi, arizona_spi_ids);
 
 #ifdef CONFIG_OF
-const struct of_device_id arizona_spi_of_match[] = {
+static const struct of_device_id arizona_spi_of_match[] = {
 	{ .compatible = "wlf,wm5102", .data = (void *)WM5102 },
 	{ .compatible = "wlf,wm5110", .data = (void *)WM5110 },
 	{ .compatible = "wlf,wm8280", .data = (void *)WM8280 },

@@ -1073,7 +1073,7 @@ static int fimc_lite_subdev_set_fmt(struct v4l2_subdev *sd,
 	mutex_lock(&fimc->lock);
 
 	if ((atomic_read(&fimc->out_path) == FIMC_IO_ISP &&
-	    sd->entity.stream_count > 0) ||
+	    media_entity_is_streaming(&sd->entity)) ||
 	    (atomic_read(&fimc->out_path) == FIMC_IO_DMA &&
 	    vb2_is_busy(&fimc->vb_queue))) {
 		mutex_unlock(&fimc->lock);
@@ -1197,8 +1197,8 @@ static int fimc_lite_subdev_s_stream(struct v4l2_subdev *sd, int on)
 	 * Find sensor subdev linked to FIMC-LITE directly or through
 	 * MIPI-CSIS. This is required for configuration where FIMC-LITE
 	 * is used as a subdev only and feeds data internally to FIMC-IS.
-	 * The pipeline links are protected through entity.stream_count
-	 * so there is no need to take the media graph mutex here.
+	 * The pipeline links are protected through entity.pipe so there is no
+	 * need to take the media graph mutex here.
 	 */
 	fimc->sensor = fimc_find_remote_sensor(&sd->entity);
 
@@ -1454,6 +1454,7 @@ static int fimc_lite_probe(struct platform_device *pdev)
 	struct fimc_lite *fimc;
 	struct resource *res;
 	int ret;
+	int irq;
 
 	if (!dev->of_node)
 		return -ENODEV;
@@ -1485,17 +1486,15 @@ static int fimc_lite_probe(struct platform_device *pdev)
 	if (IS_ERR(fimc->regs))
 		return PTR_ERR(fimc->regs);
 
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if (res == NULL) {
-		dev_err(dev, "Failed to get IRQ resource\n");
-		return -ENXIO;
-	}
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0)
+		return irq;
 
 	ret = fimc_lite_clk_get(fimc);
 	if (ret)
 		return ret;
 
-	ret = devm_request_irq(dev, res->start, flite_irq_handler,
+	ret = devm_request_irq(dev, irq, flite_irq_handler,
 			       0, dev_name(dev), fimc);
 	if (ret) {
 		dev_err(dev, "Failed to install irq (%d)\n", ret);

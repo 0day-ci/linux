@@ -20,6 +20,7 @@ obj-y	+= ti-vpe/
 obj-$(CONFIG_VIDEO_MX2_EMMAPRP)		+= mx2_emmaprp.o
 obj-$(CONFIG_VIDEO_CODA)		+= coda/
 
+obj-$(CONFIG_VIDEO_IMX)			+= imx/
 obj-$(CONFIG_VIDEO_IMX_PXP)		+= imx-pxp.o
 obj-$(CONFIG_VIDEO_IMX8_JPEG)		+= imx-jpeg/
 
@@ -69,6 +70,7 @@ obj-$(CONFIG_VIDEO_RCAR_VIN)		+= rcar-vin/
 obj-$(CONFIG_VIDEO_ATMEL_ISC)		+= atmel/
 obj-$(CONFIG_VIDEO_ATMEL_ISI)		+= atmel/
 obj-$(CONFIG_VIDEO_ATMEL_XISC)		+= atmel/
+obj-$(CONFIG_VIDEO_MICROCHIP_CSI2DC)	+= atmel/
 
 obj-$(CONFIG_VIDEO_STM32_DCMI)		+= stm32/
 obj-$(CONFIG_VIDEO_STM32_DMA2D)		+= stm32/
@@ -88,3 +90,7 @@ obj-$(CONFIG_VIDEO_QCOM_VENUS)		+= qcom/venus/
 obj-y					+= sunxi/
 
 obj-$(CONFIG_VIDEO_MESON_GE2D)		+= meson/ge2d/
+
+obj-$(CONFIG_VIDEO_TEGRA_VDE)		+= tegra/vde/
+
+obj-$(CONFIG_VIDEO_AMPHION_VPU)		+= amphion/

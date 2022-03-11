@@ -7,7 +7,6 @@
  *  - HAVE_MARCH_Z196_FEATURES: laal, laalg
  *  - HAVE_MARCH_Z10_FEATURES: msfi, cgrj, clgrj
  *  - HAVE_MARCH_Z9_109_FEATURES: alfi, llilf, clfi, oilf, nilf
- *  - PACK_STACK
  *  - 64BIT
  *
  * Copyright IBM Corp. 2012,2015
@@ -26,6 +25,7 @@
 #include <linux/mm.h>
 #include <linux/kernel.h>
 #include <asm/cacheflush.h>
+#include <asm/extable.h>
 #include <asm/dis.h>
 #include <asm/facility.h>
 #include <asm/nospec-branch.h>
@@ -622,19 +622,10 @@ static int get_probe_mem_regno(const u8 *insn)
 	return insn[1] >> 4;
 }
 
-static bool ex_handler_bpf(const struct exception_table_entry *x,
-			   struct pt_regs *regs)
+bool ex_handler_bpf(const struct exception_table_entry *x, struct pt_regs *regs)
 {
-	int regno;
-	u8 *insn;
-
 	regs->psw.addr = extable_fixup(x);
-	insn = (u8 *)__rewind_psw(regs->psw, regs->int_code >> 16);
-	regno = get_probe_mem_regno(insn);
-	if (WARN_ON_ONCE(regno < 0))
-		/* JIT bug - unexpected instruction. */
-		return false;
-	regs->gprs[regno] = 0;
+	regs->gprs[x->data] = 0;
 	return true;
 }
 
@@ -642,16 +633,17 @@ static int bpf_jit_probe_mem(struct bpf_jit *jit, struct bpf_prog *fp,
 			     int probe_prg, int nop_prg)
 {
 	struct exception_table_entry *ex;
+	int reg, prg;
 	s64 delta;
 	u8 *insn;
-	int prg;
 	int i;
 
 	if (!fp->aux->extable)
 		/* Do nothing during early JIT passes. */
 		return 0;
 	insn = jit->prg_buf + probe_prg;
-	if (WARN_ON_ONCE(get_probe_mem_regno(insn) < 0))
+	reg = get_probe_mem_regno(insn);
+	if (WARN_ON_ONCE(reg < 0))
 		/* JIT bug - unexpected probe instruction. */
 		return -1;
 	if (WARN_ON_ONCE(probe_prg + insn_length(*insn) != nop_prg))
@@ -678,7 +670,8 @@ static int bpf_jit_probe_mem(struct bpf_jit *jit, struct bpf_prog *fp,
 			/* JIT bug - landing pad and extable must be close. */
 			return -1;
 		ex->fixup = delta;
-		ex->handler = (u8 *)ex_handler_bpf - (u8 *)&ex->handler;
+		ex->type = EX_TYPE_BPF;
+		ex->data = reg;
 		jit->excnt++;
 	}
 	return 0;

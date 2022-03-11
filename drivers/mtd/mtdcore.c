@@ -358,6 +358,21 @@ static int mtd_partname_debug_show(struct seq_file *s, void *p)
 
 DEFINE_SHOW_ATTRIBUTE(mtd_partname_debug);
 
+static bool mtd_expert_analysis_mode;
+
+#ifdef CONFIG_DEBUG_FS
+bool mtd_check_expert_analysis_mode(void)
+{
+	const char *mtd_expert_analysis_warning =
+		"Bad block checks have been entirely disabled.\n"
+		"This is only reserved for post-mortem forensics and debug purposes.\n"
+		"Never enable this mode if you do not know what you are doing!\n";
+
+	return WARN_ONCE(mtd_expert_analysis_mode, mtd_expert_analysis_warning);
+}
+EXPORT_SYMBOL_GPL(mtd_check_expert_analysis_mode);
+#endif
+
 static struct dentry *dfs_dir_mtd;
 
 static void mtd_debugfs_populate(struct mtd_info *mtd)
@@ -743,8 +758,7 @@ int del_mtd_device(struct mtd_info *mtd)
 		debugfs_remove_recursive(mtd->dbg.dfs_dir);
 
 		/* Try to remove the NVMEM provider */
-		if (mtd->nvmem)
-			nvmem_unregister(mtd->nvmem);
+		nvmem_unregister(mtd->nvmem);
 
 		device_unregister(&mtd->dev);
 
@@ -923,8 +937,7 @@ static int mtd_otp_nvmem_add(struct mtd_info *mtd)
 	return 0;
 
 err:
-	if (mtd->otp_user_nvmem)
-		nvmem_unregister(mtd->otp_user_nvmem);
+	nvmem_unregister(mtd->otp_user_nvmem);
 	return err;
 }
 
@@ -1028,11 +1041,8 @@ int mtd_device_unregister(struct mtd_info *master)
 		memset(&master->reboot_notifier, 0, sizeof(master->reboot_notifier));
 	}
 
-	if (master->otp_user_nvmem)
-		nvmem_unregister(master->otp_user_nvmem);
-
-	if (master->otp_factory_nvmem)
-		nvmem_unregister(master->otp_factory_nvmem);
+	nvmem_unregister(master->otp_user_nvmem);
+	nvmem_unregister(master->otp_factory_nvmem);
 
 	err = del_mtd_partitions(master);
 	if (err)
@@ -2371,14 +2381,6 @@ static struct backing_dev_info * __init mtd_bdi_init(const char *name)
 
 	return ret ? ERR_PTR(ret) : bdi;
 }
-
-char *mtd_expert_analysis_warning =
-	"Bad block checks have been entirely disabled.\n"
-	"This is only reserved for post-mortem forensics and debug purposes.\n"
-	"Never enable this mode if you do not know what you are doing!\n";
-EXPORT_SYMBOL_GPL(mtd_expert_analysis_warning);
-bool mtd_expert_analysis_mode;
-EXPORT_SYMBOL_GPL(mtd_expert_analysis_mode);
 
 static struct proc_dir_entry *proc_mtd;
 
