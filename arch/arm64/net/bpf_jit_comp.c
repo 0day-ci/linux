@@ -971,20 +971,22 @@ emit_cond_jmp:
 	case BPF_LDX | BPF_PROBE_MEM | BPF_W:
 	case BPF_LDX | BPF_PROBE_MEM | BPF_H:
 	case BPF_LDX | BPF_PROBE_MEM | BPF_B:
-		emit_a64_mov_i(1, tmp, off, ctx);
+
+#define BUILD_LDX_INSN(a, b, c) \
+case BPF_##a: \
+	if ((off & ((1 << c) - 1)) == 0 && off >= 0 && off <= (0xFFF << c)) { \
+	      emit(A64_LDR##b##I(dst, src, off), ctx); \
+	} else { \
+	      emit_a64_mov_i(1, tmp, off, ctx); \
+	      emit(A64_LDR##b(dst, src, tmp), ctx); \
+	} \
+	break;
+
 		switch (BPF_SIZE(code)) {
-		case BPF_W:
-			emit(A64_LDR32(dst, src, tmp), ctx);
-			break;
-		case BPF_H:
-			emit(A64_LDRH(dst, src, tmp), ctx);
-			break;
-		case BPF_B:
-			emit(A64_LDRB(dst, src, tmp), ctx);
-			break;
-		case BPF_DW:
-			emit(A64_LDR64(dst, src, tmp), ctx);
-			break;
+		BUILD_LDX_INSN(W, 32, 2)
+		BUILD_LDX_INSN(H, H, 1)
+		BUILD_LDX_INSN(B, B, 0)
+		BUILD_LDX_INSN(DW, 64, 3)
 		}
 
 		ret = add_exception_handler(insn, ctx, dst);
@@ -1010,22 +1012,25 @@ emit_cond_jmp:
 	case BPF_ST | BPF_MEM | BPF_H:
 	case BPF_ST | BPF_MEM | BPF_B:
 	case BPF_ST | BPF_MEM | BPF_DW:
+
+#define __BUILD_STX_INSN(a, b, c, d, e) \
+	case BPF_##a: \
+		if ((off & ((1 << c) - 1)) == 0 && off >= 0 && off <= (0xFFF << c)) { \
+			emit(A64_STR##b##I(d, dst, off), ctx); \
+		} else { \
+			emit_a64_mov_i(1, e, off, ctx); \
+			emit(A64_STR##b(d, dst, e), ctx); \
+		} \
+		break;
+
+#define BUILD_ST_INSN(a, b, c) __BUILD_STX_INSN(a, b, c, tmp, tmp2)
 		/* Load imm to a register then store it */
-		emit_a64_mov_i(1, tmp2, off, ctx);
 		emit_a64_mov_i(1, tmp, imm, ctx);
 		switch (BPF_SIZE(code)) {
-		case BPF_W:
-			emit(A64_STR32(tmp, dst, tmp2), ctx);
-			break;
-		case BPF_H:
-			emit(A64_STRH(tmp, dst, tmp2), ctx);
-			break;
-		case BPF_B:
-			emit(A64_STRB(tmp, dst, tmp2), ctx);
-			break;
-		case BPF_DW:
-			emit(A64_STR64(tmp, dst, tmp2), ctx);
-			break;
+		BUILD_ST_INSN(W, 32, 2)
+		BUILD_ST_INSN(H, H, 1)
+		BUILD_ST_INSN(B, B, 0)
+		BUILD_ST_INSN(DW, 64, 3)
 		}
 		break;
 
@@ -1034,20 +1039,13 @@ emit_cond_jmp:
 	case BPF_STX | BPF_MEM | BPF_H:
 	case BPF_STX | BPF_MEM | BPF_B:
 	case BPF_STX | BPF_MEM | BPF_DW:
-		emit_a64_mov_i(1, tmp, off, ctx);
+
+#define BUILD_STX_INSN(a, b, c) __BUILD_STX_INSN(a, b, c, src, tmp)
 		switch (BPF_SIZE(code)) {
-		case BPF_W:
-			emit(A64_STR32(src, dst, tmp), ctx);
-			break;
-		case BPF_H:
-			emit(A64_STRH(src, dst, tmp), ctx);
-			break;
-		case BPF_B:
-			emit(A64_STRB(src, dst, tmp), ctx);
-			break;
-		case BPF_DW:
-			emit(A64_STR64(src, dst, tmp), ctx);
-			break;
+		BUILD_STX_INSN(W, 32, 2)
+		BUILD_STX_INSN(H, H, 1)
+		BUILD_STX_INSN(B, B, 0)
+		BUILD_STX_INSN(DW, 64, 3)
 		}
 		break;
 
