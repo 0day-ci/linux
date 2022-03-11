@@ -252,14 +252,6 @@ static int gb_bootrom_get_firmware(struct gb_operation *op)
 	/* Disable timeouts */
 	gb_bootrom_cancel_timeout(bootrom);
 
-	if (op->request->payload_size != sizeof(*firmware_request)) {
-		dev_err(dev, "%s: Illegal size of get firmware request (%zu %zu)\n",
-			__func__, op->request->payload_size,
-			sizeof(*firmware_request));
-		ret = -EINVAL;
-		goto queue_work;
-	}
-
 	mutex_lock(&bootrom->mutex);
 
 	fw = bootrom->fw;
@@ -267,6 +259,15 @@ static int gb_bootrom_get_firmware(struct gb_operation *op)
 		dev_err(dev, "%s: firmware not available\n", __func__);
 		ret = -EINVAL;
 		goto unlock;
+	}
+
+	if (op->request->payload_size != sizeof(*firmware_request)) {
+		dev_err(dev, "%s: Illegal size of get firmware request (%zu %zu)\n",
+			__func__, op->request->payload_size,
+			sizeof(*firmware_request));
+		ret = -EINVAL;
+		mutex_unlock(&bootrom->mutex);
+		goto queue_work;
 	}
 
 	firmware_request = op->request->payload;
