@@ -4455,6 +4455,26 @@ static ssize_t f2fs_buffered_write_iter(struct kiocb *iocb,
 	return ret;
 }
 
+
+static void f2fs_dio_submit_io(const struct iomap_iter *iter, struct bio *bio,
+							  loff_t file_offset)
+{
+	struct inode *inode = iter->inode;
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+
+	if (F2FS_OPTION(sbi).whint_mode == WHINT_MODE_FS) {
+		int seg_type = f2fs_rw_hint_to_seg_type(bio->bi_write_hint);
+		enum temp_type temp = f2fs_get_segment_temp(seg_type);
+
+		/*
+		 * in fs-based whint_mode, override bi_write_hint w/
+		 * the hint provided by filesystem.
+		 */
+		bio->bi_write_hint = f2fs_io_type_to_rw_hint(sbi, DATA, temp);
+	}
+	submit_bio(bio);
+}
+
 static int f2fs_dio_write_end_io(struct kiocb *iocb, ssize_t size, int error,
 				 unsigned int flags)
 {
@@ -4469,6 +4489,7 @@ static int f2fs_dio_write_end_io(struct kiocb *iocb, ssize_t size, int error,
 
 static const struct iomap_dio_ops f2fs_iomap_dio_write_ops = {
 	.end_io = f2fs_dio_write_end_io,
+	.submit_io = f2fs_dio_submit_io,
 };
 
 static ssize_t f2fs_dio_write_iter(struct kiocb *iocb, struct iov_iter *from,
