@@ -64,6 +64,7 @@ void kvm_mmu_uninit_tdp_mmu(struct kvm *kvm)
 
 static void tdp_mmu_free_sp(struct kvm_mmu_page *sp)
 {
+	dec_lruvec_page_state(virt_to_page(sp->spt), NR_PAGETABLE);
 	free_page((unsigned long)sp->spt);
 	kmem_cache_free(mmu_page_header_cache, sp);
 }
@@ -273,7 +274,9 @@ static struct kvm_mmu_page *tdp_mmu_alloc_sp(struct kvm_vcpu *vcpu)
 	struct kvm_mmu_page *sp;
 
 	sp = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_page_header_cache);
+
 	sp->spt = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_shadow_page_cache);
+	inc_lruvec_page_state(virt_to_page(sp->spt), NR_PAGETABLE);
 
 	return sp;
 }
@@ -1410,6 +1413,7 @@ static struct kvm_mmu_page *__tdp_mmu_alloc_sp_for_split(gfp_t gfp)
 		return NULL;
 	}
 
+	inc_lruvec_page_state(virt_to_page(sp->spt), NR_PAGETABLE);
 	return sp;
 }
 

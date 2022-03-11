@@ -396,6 +396,23 @@ void kvm_mmu_free_memory_cache(struct kvm_mmu_memory_cache *mc)
 	}
 }
 
+/*
+ * After this funciton is called to get a page from mmu_shadow_page_cache,
+ * increment per-memcg pagetable stats by calling:
+ * inc_lruvec_page_state(page, NR_PAGETABLE)
+ * Before the page is freed, decrement the stats by calling:
+ * dec_lruvec_page_state(page, NR_PAGETABLE).
+ *
+ * Note that for the sake per-memcg stats in memory.stat, the pages will be
+ * counted as pagetable pages only they are allocated from the cache. This means
+ * that pages sitting in the mmu_shadow_page_cache will not be counted as
+ * pagetable pages (but will still be counted as kernel memory).
+ *
+ * Counting pages in the cache can introduce unnecessary complexity as we will
+ * need to increment the stats in the cache layer when pages are allocated, and
+ * decrement the stats outside the cache layer when pages are freed. This can be
+ * confusing for new users of the cache.
+ */
 void *kvm_mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
 {
 	void *p;

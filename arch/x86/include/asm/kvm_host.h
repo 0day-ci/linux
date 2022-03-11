@@ -458,6 +458,13 @@ struct kvm_mmu {
 	*/
 	u32 pkru_mask;
 
+	/*
+	 * After a page is allocated for any of these roots,
+	 * increment per-memcg pagetable stats by calling:
+	 * inc_lruvec_page_state(page, NR_PAGETABLE)
+	 * Before the page is freed, decrement the stats by calling:
+	 * dec_lruvec_page_state(page, NR_PAGETABLE).
+	 */
 	u64 *pae_root;
 	u64 *pml4_root;
 	u64 *pml5_root;

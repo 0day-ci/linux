@@ -1673,7 +1673,10 @@ static void kvm_mmu_free_page(struct kvm_mmu_page *sp)
 	MMU_WARN_ON(!is_empty_shadow_page(sp->spt));
 	hlist_del(&sp->hash_link);
 	list_del(&sp->link);
+
+	dec_lruvec_page_state(virt_to_page(sp->spt), NR_PAGETABLE);
 	free_page((unsigned long)sp->spt);
+
 	if (!sp->role.direct)
 		free_page((unsigned long)sp->gfns);
 	kmem_cache_free(mmu_page_header_cache, sp);
@@ -1711,7 +1714,10 @@ static struct kvm_mmu_page *kvm_mmu_alloc_page(struct kvm_vcpu *vcpu, int direct
 	struct kvm_mmu_page *sp;
 
 	sp = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_page_header_cache);
+
 	sp->spt = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_shadow_page_cache);
+	inc_lruvec_page_state(virt_to_page(sp->spt), NR_PAGETABLE);
+
 	if (!direct)
 		sp->gfns = kvm_mmu_memory_cache_alloc(&vcpu->arch.mmu_gfn_array_cache);
 	set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
@@ -3602,6 +3608,10 @@ static int mmu_alloc_special_roots(struct kvm_vcpu *vcpu)
 	mmu->pml4_root = pml4_root;
 	mmu->pml5_root = pml5_root;
 
+	/* Update per-memcg pagetable stats */
+	inc_lruvec_page_state(virt_to_page(pae_root), NR_PAGETABLE);
+	inc_lruvec_page_state(virt_to_page(pml4_root), NR_PAGETABLE);
+	inc_lruvec_page_state(virt_to_page(pml5_root), NR_PAGETABLE);
 	return 0;
 
 #ifdef CONFIG_X86_64
@@ -5554,6 +5564,12 @@ static void free_mmu_pages(struct kvm_mmu *mmu)
 {
 	if (!tdp_enabled && mmu->pae_root)
 		set_memory_encrypted((unsigned long)mmu->pae_root, 1);
+
+	/* Update per-memcg pagetable stats */
+	dec_lruvec_page_state(virt_to_page(mmu->pae_root), NR_PAGETABLE);
+	dec_lruvec_page_state(virt_to_page(mmu->pml4_root), NR_PAGETABLE);
+	dec_lruvec_page_state(virt_to_page(mmu->pml5_root), NR_PAGETABLE);
+
 	free_page((unsigned long)mmu->pae_root);
 	free_page((unsigned long)mmu->pml4_root);
 	free_page((unsigned long)mmu->pml5_root);
@@ -5590,6 +5606,9 @@ static int __kvm_mmu_create(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu)
 	page = alloc_page(GFP_KERNEL_ACCOUNT | __GFP_DMA32);
 	if (!page)
 		return -ENOMEM;
+
+	/* Update per-memcg pagetable stats */
+	inc_lruvec_page_state(page, NR_PAGETABLE);
 
 	mmu->pae_root = page_address(page);
 
