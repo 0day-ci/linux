@@ -67,6 +67,7 @@ enum {
 	CFFPS_DEBUGFS_CCIN,
 	CFFPS_DEBUGFS_FW,
 	CFFPS_DEBUGFS_ON_OFF_CONFIG,
+	CFFPS_DEBUGFS_CLEAR_FAULTS,
 	CFFPS_DEBUGFS_NUM_ENTRIES
 };
 
@@ -272,6 +273,13 @@ static ssize_t ibm_cffps_debugfs_write(struct file *file,
 		rc = i2c_smbus_write_byte_data(psu->client,
 					       PMBUS_ON_OFF_CONFIG, data);
 		if (rc)
+			return rc;
+
+		rc = 1;
+		break;
+	case CFFPS_DEBUGFS_CLEAR_FAULTS:
+		rc = i2c_smbus_write_byte(psu->client, PMBUS_CLEAR_FAULTS);
+		if (rc < 0)
 			return rc;
 
 		rc = 1;
@@ -606,6 +614,9 @@ static int ibm_cffps_probe(struct i2c_client *client)
 			    &ibm_cffps_fops);
 	debugfs_create_file("on_off_config", 0644, ibm_cffps_dir,
 			    &psu->debugfs_entries[CFFPS_DEBUGFS_ON_OFF_CONFIG],
+			    &ibm_cffps_fops);
+	debugfs_create_file("clear_faults", 0200, ibm_cffps_dir,
+			    &psu->debugfs_entries[CFFPS_DEBUGFS_CLEAR_FAULTS],
 			    &ibm_cffps_fops);
 
 	return 0;
