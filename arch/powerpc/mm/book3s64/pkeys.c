@@ -333,7 +333,7 @@ static inline void init_iamr(u8 pkey, u8 init_bits)
  * Set the access rights in AMR IAMR and UAMOR registers for @pkey to that
  * specified in @init_val.
  */
-int __arch_set_user_pkey_access(struct task_struct *tsk, int pkey,
+int __arch_set_user_pkey_access(struct task_struct *tsk, u8 pkey,
 				unsigned long init_val)
 {
 	u64 new_amr_bits = 0x0ul;

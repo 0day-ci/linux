@@ -143,9 +143,9 @@ static inline int arch_override_mprotect_pkey(struct vm_area_struct *vma,
 	return __arch_override_mprotect_pkey(vma, prot, pkey);
 }
 
-extern int __arch_set_user_pkey_access(struct task_struct *tsk, int pkey,
+extern int __arch_set_user_pkey_access(struct task_struct *tsk, u8 pkey,
 				       unsigned long init_val);
-static inline int arch_set_user_pkey_access(struct task_struct *tsk, int pkey,
+static inline int arch_set_user_pkey_access(struct task_struct *tsk, u8 pkey,
 					    unsigned long init_val)
 {
 	if (!mmu_has_feature(MMU_FTR_PKEY))
