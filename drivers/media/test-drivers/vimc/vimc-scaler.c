@@ -93,15 +93,17 @@ static int vimc_sca_enum_mbus_code(struct v4l2_subdev *sd,
 				   struct v4l2_subdev_mbus_code_enum *code)
 {
 	u32 mbus_code = vimc_mbus_code_by_index(code->index);
-	const struct vimc_pix_map *vpix;
+	const struct v4l2_format_info *vinfo;
 
 	if (!mbus_code)
 		return -EINVAL;
 
-	vpix = vimc_pix_map_by_code(mbus_code);
+	vinfo = vimc_format_info_by_mbus_code(mbus_code);
+	if (!vinfo)
+		return -EINVAL;
 
 	/* We don't support bayer format */
-	if (!vpix || vpix->bayer)
+	if (v4l2_is_format_bayer(vinfo))
 		return -EINVAL;
 
 	code->code = mbus_code;
@@ -113,14 +115,18 @@ static int vimc_sca_enum_frame_size(struct v4l2_subdev *sd,
 				    struct v4l2_subdev_state *sd_state,
 				    struct v4l2_subdev_frame_size_enum *fse)
 {
-	const struct vimc_pix_map *vpix;
+	const struct v4l2_format_info *vinfo;
 
 	if (fse->index)
 		return -EINVAL;
 
 	/* Only accept code in the pix map table in non bayer format */
-	vpix = vimc_pix_map_by_code(fse->code);
-	if (!vpix || vpix->bayer)
+	vinfo = vimc_format_info_by_mbus_code(fse->code);
+
+	if (!vinfo)
+		return -EINVAL;
+
+	if (v4l2_is_format_bayer(vinfo))
 		return -EINVAL;
 
 	fse->min_width = VIMC_FRAME_MIN_WIDTH;
@@ -184,11 +190,11 @@ static int vimc_sca_set_fmt(struct v4l2_subdev *sd,
 	 * pad, the source pad only follows.
 	 */
 	if (format->pad == VIMC_SCA_SINK) {
-		const struct vimc_pix_map *vpix;
+		const struct v4l2_format_info *vinfo;
 
 		/* Only accept code in the pix map table in non bayer format. */
-		vpix = vimc_pix_map_by_code(format->format.code);
-		if (vpix && !vpix->bayer)
+		vinfo = vimc_format_info_by_mbus_code(format->format.code);
+		if (vinfo && !v4l2_is_format_bayer(vinfo))
 			fmt->code = format->format.code;
 		else
 			fmt->code = fmt_default.code;
@@ -307,15 +313,15 @@ static int vimc_sca_s_stream(struct v4l2_subdev *sd, int enable)
 	struct vimc_sca_device *vsca = v4l2_get_subdevdata(sd);
 
 	if (enable) {
-		const struct vimc_pix_map *vpix;
+		const struct v4l2_format_info *vinfo;
 		unsigned int frame_size;
 
 		if (vsca->src_frame)
 			return 0;
 
 		/* Save the bytes per pixel of the sink */
-		vpix = vimc_pix_map_by_code(vsca->fmt[VIMC_SCA_SINK].code);
-		vsca->bpp = vpix->bpp;
+		vinfo = vimc_format_info_by_mbus_code(vsca->fmt[VIMC_SCA_SINK].code);
+		vsca->bpp = vinfo->bpp[0];
 
 		/* Calculate the frame size of the source pad */
 		frame_size = vsca->fmt[VIMC_SCA_SRC].width

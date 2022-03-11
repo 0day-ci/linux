@@ -74,14 +74,14 @@ static int vimc_sen_enum_frame_size(struct v4l2_subdev *sd,
 				    struct v4l2_subdev_state *sd_state,
 				    struct v4l2_subdev_frame_size_enum *fse)
 {
-	const struct vimc_pix_map *vpix;
+	bool is_on_vmap_table;
 
 	if (fse->index)
 		return -EINVAL;
 
 	/* Only accept code in the pix map table */
-	vpix = vimc_pix_map_by_code(fse->code);
-	if (!vpix)
+	is_on_vmap_table = vimc_mbus_code_is_on_table(fse->code);
+	if (!is_on_vmap_table)
 		return -EINVAL;
 
 	fse->min_width = VIMC_FRAME_MIN_WIDTH;
@@ -108,14 +108,15 @@ static int vimc_sen_get_fmt(struct v4l2_subdev *sd,
 
 static void vimc_sen_tpg_s_format(struct vimc_sen_device *vsen)
 {
-	const struct vimc_pix_map *vpix =
-				vimc_pix_map_by_code(vsen->mbus_format.code);
+	const struct v4l2_format_info *vinfo =
+				vimc_format_info_by_mbus_code(vsen->mbus_format.code);
 
 	tpg_reset_source(&vsen->tpg, vsen->mbus_format.width,
 			 vsen->mbus_format.height, vsen->mbus_format.field);
-	tpg_s_bytesperline(&vsen->tpg, 0, vsen->mbus_format.width * vpix->bpp);
+	tpg_s_bytesperline(&vsen->tpg, 0, vsen->mbus_format.width *
+							vinfo->bpp[0]);
 	tpg_s_buf_height(&vsen->tpg, vsen->mbus_format.height);
-	tpg_s_fourcc(&vsen->tpg, vpix->pixelformat);
+	tpg_s_fourcc(&vsen->tpg, vinfo->format);
 	/* TODO: add support for V4L2_FIELD_ALTERNATE */
 	tpg_s_field(&vsen->tpg, vsen->mbus_format.field, false);
 	tpg_s_colorspace(&vsen->tpg, vsen->mbus_format.colorspace);
@@ -126,11 +127,11 @@ static void vimc_sen_tpg_s_format(struct vimc_sen_device *vsen)
 
 static void vimc_sen_adjust_fmt(struct v4l2_mbus_framefmt *fmt)
 {
-	const struct vimc_pix_map *vpix;
+	bool is_on_vmap_table;
 
 	/* Only accept code in the pix map table */
-	vpix = vimc_pix_map_by_code(fmt->code);
-	if (!vpix)
+	is_on_vmap_table = vimc_mbus_code_is_on_table(fmt->code);
+	if (!is_on_vmap_table)
 		fmt->code = fmt_default.code;
 
 	fmt->width = clamp_t(u32, fmt->width, VIMC_FRAME_MIN_WIDTH,
@@ -247,14 +248,14 @@ static int vimc_sen_s_stream(struct v4l2_subdev *sd, int enable)
 				container_of(sd, struct vimc_sen_device, sd);
 
 	if (enable) {
-		const struct vimc_pix_map *vpix;
+		const struct v4l2_format_info *vinfo;
 		unsigned int frame_size;
 
 		vsen->start_stream_ts = ktime_get_ns();
 
 		/* Calculate the frame size */
-		vpix = vimc_pix_map_by_code(vsen->mbus_format.code);
-		frame_size = vsen->mbus_format.width * vpix->bpp *
+		vinfo = vimc_format_info_by_mbus_code(vsen->mbus_format.code);
+		frame_size = vsen->mbus_format.width * vinfo->bpp[0] *
 			     vsen->mbus_format.height;
 
 		/*

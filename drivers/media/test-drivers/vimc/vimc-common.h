@@ -72,18 +72,14 @@ do {									\
  * struct vimc_pix_map - maps media bus code with v4l2 pixel format
  *
  * @code:		media bus format code defined by MEDIA_BUS_FMT_* macros
- * @bpp:		number of bytes each pixel occupies
  * @pixelformat:	pixel format defined by V4L2_PIX_FMT_* macros
- * @bayer:		true if this is a bayer format
  *
  * Struct which matches the MEDIA_BUS_FMT_* codes with the corresponding
  * V4L2_PIX_FMT_* fourcc pixelformat and its bytes per pixel (bpp)
  */
 struct vimc_pix_map {
 	unsigned int code[VIMC_PIX_FMT_MAX_CODES];
-	unsigned int bpp;
 	u32 pixelformat;
-	bool bayer;
 };
 
 /**
@@ -173,34 +169,49 @@ extern struct vimc_ent_type vimc_sca_type;
 extern struct vimc_ent_type vimc_cap_type;
 
 /**
- * vimc_pix_map_by_index - get vimc_pix_map struct by its index
+ * vimc_format_info_by_vmap_index - get v4l2_format_info struct by its vmap's index
  *
- * @i:			index of the vimc_pix_map struct in vimc_pix_map_list
+ * @i:			index of format containing struct in vimc_pix_map_list
  */
-const struct vimc_pix_map *vimc_pix_map_by_index(unsigned int i);
+const struct v4l2_format_info *vimc_format_info_by_vmap_index(unsigned int i);
 
 /**
  * vimc_mbus_code_by_index - get mbus code by its index
  *
- * @index:		index of the mbus code in vimc_pix_map_list
+ * @index:		index of mbus code containing struct in vimc_pix_map_list
  *
  * Returns 0 if no mbus code is found for the given index.
  */
 u32 vimc_mbus_code_by_index(unsigned int index);
 
 /**
- * vimc_pix_map_by_code - get vimc_pix_map struct by media bus code
+ * vimc_format_info_by_mbus_code - get v4l2_format_info struct by media bus code
  *
  * @code:		media bus format code defined by MEDIA_BUS_FMT_* macros
  */
-const struct vimc_pix_map *vimc_pix_map_by_code(u32 code);
+const struct v4l2_format_info *vimc_format_info_by_mbus_code(u32 code);
 
 /**
- * vimc_pix_map_by_pixelformat - get vimc_pix_map struct by v4l2 pixel format
+ * vimc_pixelformat_is_on_table - verify if pixel format is supported
+ * (i.e. contained in vimc pix map table)
  *
- * @pixelformat:	pixel format defined by V4L2_PIX_FMT_* macros
+ * @format:		V4l2 pixel format identifier defined by V4L2_PIX_FMT* macros
+ *
+ * Should only be used when no more info is required
  */
-const struct vimc_pix_map *vimc_pix_map_by_pixelformat(u32 pixelformat);
+
+bool vimc_pixelformat_is_on_table(u32 format);
+
+/**
+ * vimc_pixelformat_is_on_table - verify if pixel format is supported
+ * (i.e. contained in vimc pix map table)
+ *
+ * @code:		media bus format code defined by MEDIA_BUS_FMT_* macros
+ *
+ * Should only be used when no more info is required
+ */
+
+bool vimc_mbus_code_is_on_table(u32 code);
 
 /**
  * vimc_ent_sd_register - initialize and register a subdev node

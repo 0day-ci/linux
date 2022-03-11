@@ -318,13 +318,13 @@ static void vimc_deb_process_rgb_frame(struct vimc_deb_device *vdeb,
 				       unsigned int col,
 				       unsigned int rgb[3])
 {
-	const struct vimc_pix_map *vpix;
+	const struct v4l2_format_info *vinfo;
 	unsigned int i, index;
 
-	vpix = vimc_pix_map_by_code(vdeb->src_code);
+	vinfo = vimc_format_info_by_mbus_code(vdeb->src_code);
 	index = VIMC_FRAME_INDEX(lin, col, vdeb->sink_fmt.width, 3);
 	for (i = 0; i < 3; i++) {
-		switch (vpix->pixelformat) {
+		switch (vinfo->format) {
 		case V4L2_PIX_FMT_RGB24:
 			vdeb->src_frame[index + i] = rgb[i];
 			break;
@@ -340,20 +340,20 @@ static int vimc_deb_s_stream(struct v4l2_subdev *sd, int enable)
 	struct vimc_deb_device *vdeb = v4l2_get_subdevdata(sd);
 
 	if (enable) {
-		const struct vimc_pix_map *vpix;
+		const struct v4l2_format_info *vinfo;
 		unsigned int frame_size;
 
 		if (vdeb->src_frame)
 			return 0;
 
 		/* Calculate the frame size of the source pad */
-		vpix = vimc_pix_map_by_code(vdeb->src_code);
+		vinfo = vimc_format_info_by_mbus_code(vdeb->src_code);
 		frame_size = vdeb->sink_fmt.width * vdeb->sink_fmt.height *
-				vpix->bpp;
+				vinfo->bpp[0];
 
 		/* Save the bytes per pixel of the sink */
-		vpix = vimc_pix_map_by_code(vdeb->sink_fmt.code);
-		vdeb->sink_bpp = vpix->bpp;
+		vinfo = vimc_format_info_by_mbus_code(vdeb->sink_fmt.code);
+		vdeb->sink_bpp = vinfo->bpp[0];
 
 		/* Get the corresponding pixel map from the table */
 		vdeb->sink_pix_map =

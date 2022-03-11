@@ -85,8 +85,9 @@ static int vimc_cap_g_fmt_vid_cap(struct file *file, void *priv,
 static int vimc_cap_try_fmt_vid_cap(struct file *file, void *priv,
 				    struct v4l2_format *f)
 {
+	bool is_on_vmap_table;
 	struct v4l2_pix_format *format = &f->fmt.pix;
-	const struct vimc_pix_map *vpix;
+	const struct v4l2_format_info *vinfo;
 
 	format->width = clamp_t(u32, format->width, VIMC_FRAME_MIN_WIDTH,
 				VIMC_FRAME_MAX_WIDTH) & ~1;
@@ -94,13 +95,15 @@ static int vimc_cap_try_fmt_vid_cap(struct file *file, void *priv,
 				 VIMC_FRAME_MAX_HEIGHT) & ~1;
 
 	/* Don't accept a pixelformat that is not on the table */
-	vpix = vimc_pix_map_by_pixelformat(format->pixelformat);
-	if (!vpix) {
+	is_on_vmap_table = vimc_pixelformat_is_on_table(format->pixelformat);
+
+	if (!is_on_vmap_table)
 		format->pixelformat = fmt_default.pixelformat;
-		vpix = vimc_pix_map_by_pixelformat(format->pixelformat);
-	}
+
+	vinfo = v4l2_format_info(format->pixelformat);
+
 	/* TODO: Add support for custom bytesperline values */
-	format->bytesperline = format->width * vpix->bpp;
+	format->bytesperline = format->width * vinfo->bpp[0];
 	format->sizeimage = format->bytesperline * format->height;
 
 	if (format->field == V4L2_FIELD_ANY)
@@ -150,21 +153,21 @@ static int vimc_cap_s_fmt_vid_cap(struct file *file, void *priv,
 static int vimc_cap_enum_fmt_vid_cap(struct file *file, void *priv,
 				     struct v4l2_fmtdesc *f)
 {
-	const struct vimc_pix_map *vpix;
+	const struct v4l2_format_info *vinfo;
 
 	if (f->mbus_code) {
 		if (f->index > 0)
 			return -EINVAL;
 
-		vpix = vimc_pix_map_by_code(f->mbus_code);
+		vinfo = vimc_format_info_by_mbus_code(f->mbus_code);
 	} else {
-		vpix = vimc_pix_map_by_index(f->index);
+		vinfo = vimc_format_info_by_vmap_index(f->index);
 	}
 
-	if (!vpix)
+	if (!vinfo)
 		return -EINVAL;
 
-	f->pixelformat = vpix->pixelformat;
+	f->pixelformat = vinfo->format;
 
 	return 0;
 }
@@ -172,14 +175,14 @@ static int vimc_cap_enum_fmt_vid_cap(struct file *file, void *priv,
 static int vimc_cap_enum_framesizes(struct file *file, void *fh,
 				    struct v4l2_frmsizeenum *fsize)
 {
-	const struct vimc_pix_map *vpix;
+	bool is_on_vmap_table;
 
 	if (fsize->index)
 		return -EINVAL;
 
 	/* Only accept code in the pix map table */
-	vpix = vimc_pix_map_by_code(fsize->pixel_format);
-	if (!vpix)
+	is_on_vmap_table = vimc_pixelformat_is_on_table(fsize->pixel_format);
+	if (!is_on_vmap_table)
 		return -EINVAL;
 
 	fsize->type = V4L2_FRMSIZE_TYPE_CONTINUOUS;
@@ -398,7 +401,7 @@ static struct vimc_ent_device *vimc_cap_add(struct vimc_device *vimc,
 					    const char *vcfg_name)
 {
 	struct v4l2_device *v4l2_dev = &vimc->v4l2_dev;
-	const struct vimc_pix_map *vpix;
+	const struct v4l2_format_info *vinfo;
 	struct vimc_cap_device *vcap;
 	struct video_device *vdev;
 	struct vb2_queue *q;
@@ -450,8 +453,8 @@ static struct vimc_ent_device *vimc_cap_add(struct vimc_device *vimc,
 
 	/* Set default frame format */
 	vcap->format = fmt_default;
-	vpix = vimc_pix_map_by_pixelformat(vcap->format.pixelformat);
-	vcap->format.bytesperline = vcap->format.width * vpix->bpp;
+	vinfo = v4l2_format_info(vcap->format.pixelformat);
+	vcap->format.bytesperline = vcap->format.width * vinfo->bpp[0];
 	vcap->format.sizeimage = vcap->format.bytesperline *
 				 vcap->format.height;
 
