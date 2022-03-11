@@ -1317,8 +1317,7 @@ int __secure_computing(const struct seccomp_data *sd)
 	/* Surviving SECCOMP_RET_KILL_* must be proactively impossible. */
 	case SECCOMP_MODE_DEAD:
 		WARN_ON_ONCE(1);
-		do_exit(SIGKILL);
-		return -1;
+		do_exit(SIGKILL);	/* This is __noreturn */
 	default:
 		BUG();
 	}
