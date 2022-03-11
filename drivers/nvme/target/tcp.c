@@ -1741,6 +1741,17 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	if (so_priority > 0)
 		sock_set_priority(port->sock->sk, so_priority);
 
+	if (nport->tcp_congestion) {
+		ret = tcp_set_congestion_control(port->sock->sk,
+						 nport->tcp_congestion,
+						 true, true);
+		if (ret) {
+			pr_err("failed to set port socket's congestion to %s: %d\n",
+			       nport->tcp_congestion, ret);
+			goto err_sock;
+		}
+	}
+
 	ret = kernel_bind(port->sock, (struct sockaddr *)&port->addr,
 			sizeof(port->addr));
 	if (ret) {
