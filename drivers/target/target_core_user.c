@@ -1816,13 +1816,14 @@ static int tcmu_find_mem_index(struct vm_area_struct *vma)
 
 static struct page *tcmu_try_get_data_page(struct tcmu_dev *udev, uint32_t dpi)
 {
+	struct address_space *mapping = udev->inode->i_mapping;
 	struct page *page;
 
-	mutex_lock(&udev->cmdr_lock);
+	filemap_invalidate_lock_shared(mapping);
 	page = xa_load(&udev->data_pages, dpi);
 	if (likely(page)) {
 		get_page(page);
-		mutex_unlock(&udev->cmdr_lock);
+		filemap_invalidate_unlock_shared(mapping);
 		return page;
 	}
 
@@ -1832,7 +1833,7 @@ static struct page *tcmu_try_get_data_page(struct tcmu_dev *udev, uint32_t dpi)
 	 */
 	pr_err("Invalid addr to data page mapping (dpi %u) on device %s\n",
 	       dpi, udev->name);
-	mutex_unlock(&udev->cmdr_lock);
+	filemap_invalidate_unlock_shared(mapping);
 
 	return NULL;
 }
@@ -3164,6 +3165,7 @@ static void find_free_blocks(void)
 	loff_t off;
 	u32 pages_freed, total_pages_freed = 0;
 	u32 start, end, block, total_blocks_freed = 0;
+	struct address_space *mapping;
 
 	if (atomic_read(&global_page_count) <= tcmu_global_max_pages)
 		return;
@@ -3187,6 +3189,7 @@ static void find_free_blocks(void)
 			continue;
 		}
 
+		mapping = udev->inode->i_mapping;
 		end = udev->dbi_max + 1;
 		block = find_last_bit(udev->data_bitmap, end);
 		if (block == udev->dbi_max) {
@@ -3205,12 +3208,14 @@ static void find_free_blocks(void)
 			udev->dbi_max = block;
 		}
 
+		filemap_invalidate_lock(mapping);
 		/* Here will truncate the data area from off */
 		off = udev->data_off + (loff_t)start * udev->data_blk_size;
-		unmap_mapping_range(udev->inode->i_mapping, off, 0, 1);
+		unmap_mapping_range(mapping, off, 0, 1);
 
 		/* Release the block pages */
 		pages_freed = tcmu_blocks_release(udev, start, end - 1);
+		filemap_invalidate_unlock(mapping);
 		mutex_unlock(&udev->cmdr_lock);
 
 		total_pages_freed += pages_freed;
