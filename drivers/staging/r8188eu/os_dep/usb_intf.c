@@ -425,10 +425,8 @@ handle_dualmac:
 		rtw_handle_dualmac(padapter, 0);
 free_adapter:
 	if (status != _SUCCESS) {
-		if (pnetdev)
-			rtw_free_netdev(pnetdev);
-		else if (padapter)
-			vfree(padapter);
+		rtw_free_netdev(pnetdev);
+		vfree(padapter);
 		padapter = NULL;
 	}
 exit:
