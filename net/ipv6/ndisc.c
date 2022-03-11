@@ -572,6 +572,67 @@ void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
 	ndisc_send_skb(skb, daddr, src_addr);
 }
 
+void ndisc_bond_send_na(struct net_device *dev, const struct in6_addr *daddr,
+			const struct in6_addr *solicited_addr,
+			bool router, bool solicited, bool override,
+			bool inc_opt, unsigned short vlan_id,
+			const void *mac_dst, const void *mac_src)
+{
+	struct sk_buff *skb;
+	const struct in6_addr *src_addr;
+	struct nd_msg *msg;
+	struct net *net = dev_net(dev);
+	struct sock *sk = net->ipv6.ndisc_sk;
+	int optlen = 0;
+	int ret;
+
+	src_addr = solicited_addr;
+	if (!dev->addr_len)
+		inc_opt = false;
+	if (inc_opt)
+		optlen += ndisc_opt_addr_space(dev,
+					       NDISC_NEIGHBOUR_ADVERTISEMENT);
+
+	skb = ndisc_alloc_skb(dev, sizeof(*msg) + optlen);
+	if (!skb)
+		return;
+
+	msg = skb_put(skb, sizeof(*msg));
+	*msg = (struct nd_msg) {
+		.icmph = {
+			.icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT,
+			.icmp6_router = router,
+			.icmp6_solicited = solicited,
+			.icmp6_override = override,
+		},
+		.target = *solicited_addr,
+	};
+
+	if (inc_opt)
+		ndisc_fill_addr_option(skb, ND_OPT_TARGET_LL_ADDR,
+				       dev->dev_addr,
+				       NDISC_NEIGHBOUR_ADVERTISEMENT);
+
+	if (vlan_id)
+		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
+				       vlan_id);
+
+	msg->icmph.icmp6_cksum = csum_ipv6_magic(src_addr, daddr, skb->len,
+						 IPPROTO_ICMPV6,
+						 csum_partial(&msg->icmph,
+							      skb->len, 0));
+
+	ip6_nd_hdr(skb, src_addr, daddr, inet6_sk(sk)->hop_limit, skb->len);
+
+	skb->protocol = htons(ETH_P_IPV6);
+	skb->dev = dev;
+	if (dev_hard_header(skb, dev, ETH_P_IPV6, mac_dst, mac_src, skb->len) < 0)
+		return;
+
+	ret = dev_queue_xmit(skb);
+}
+EXPORT_SYMBOL(ndisc_bond_send_na);
+
 static void ndisc_send_unsol_na(struct net_device *dev)
 {
 	struct inet6_dev *idev;

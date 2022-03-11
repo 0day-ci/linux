@@ -471,6 +471,12 @@ void ndisc_update(const struct net_device *dev, struct neighbour *neigh,
 		  const u8 *lladdr, u8 new, u32 flags, u8 icmp6_type,
 		  struct ndisc_options *ndopts);
 
+void ndisc_bond_send_na(struct net_device *dev, const struct in6_addr *daddr,
+			const struct in6_addr *solicited_addr, bool router,
+			bool solicited, bool override, bool inc_opt,
+			unsigned short vlan_id, const void *mac_dst,
+			const void *mac_src);
+
 /*
  *	IGMP
  */
