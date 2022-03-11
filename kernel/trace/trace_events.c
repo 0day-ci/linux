@@ -3687,7 +3687,7 @@ static __init int event_trace_init_fields(void)
 	return 0;
 }
 
-__init int event_trace_init(void)
+int event_trace_init(void)
 {
 	struct trace_array *tr;
 	struct dentry *entry;

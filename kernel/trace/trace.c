@@ -9589,10 +9589,10 @@ int tracing_init_dentry(void)
 extern struct trace_eval_map *__start_ftrace_eval_maps[];
 extern struct trace_eval_map *__stop_ftrace_eval_maps[];
 
-static struct workqueue_struct *eval_map_wq __initdata;
-static struct work_struct eval_map_work __initdata;
+static struct workqueue_struct *eval_map_wq;
+static struct work_struct eval_map_work;
 
-static void __init eval_map_work_func(struct work_struct *work)
+static void eval_map_work_func(struct work_struct *work)
 {
 	int len;
 
@@ -9600,7 +9600,7 @@ static void __init eval_map_work_func(struct work_struct *work)
 	trace_insert_eval_map(NULL, __start_ftrace_eval_maps, len);
 }
 
-static int __init trace_eval_init(void)
+static int trace_eval_init(void)
 {
 	INIT_WORK(&eval_map_work, eval_map_work_func);
 
@@ -9698,7 +9698,7 @@ static struct notifier_block trace_module_nb = {
 };
 #endif /* CONFIG_MODULES */
 
-static __init int tracer_init_tracefs(void)
+static int tracefs_init(void *data)
 {
 	int ret;
 
@@ -9744,6 +9744,17 @@ static __init int tracer_init_tracefs(void)
 	create_trace_instances(NULL);
 
 	update_tracer_options(&global_trace);
+
+	return 0;
+}
+
+static __init int tracer_init_tracefs(void)
+{
+	struct task_struct *thread;
+
+	thread = kthread_run(tracefs_init, NULL, "tracefs_init");
+	if (IS_ERR(thread))
+		return PTR_ERR(thread);
 
 	return 0;
 }

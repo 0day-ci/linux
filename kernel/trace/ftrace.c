@@ -940,7 +940,7 @@ static const struct file_operations ftrace_profile_fops = {
 };
 
 /* used to initialize the real stat files */
-static struct tracer_stat function_stats __initdata = {
+static struct tracer_stat function_stats = {
 	.name		= "functions",
 	.stat_start	= function_stat_start,
 	.stat_next	= function_stat_next,
@@ -949,7 +949,7 @@ static struct tracer_stat function_stats __initdata = {
 	.stat_show	= function_stat_show
 };
 
-static __init void ftrace_profile_tracefs(struct dentry *d_tracer)
+static void ftrace_profile_tracefs(struct dentry *d_tracer)
 {
 	struct ftrace_profile_stat *stat;
 	struct dentry *entry;
@@ -991,7 +991,7 @@ static __init void ftrace_profile_tracefs(struct dentry *d_tracer)
 }
 
 #else /* CONFIG_FUNCTION_PROFILER */
-static __init void ftrace_profile_tracefs(struct dentry *d_tracer)
+static void ftrace_profile_tracefs(struct dentry *d_tracer)
 {
 }
 #endif /* CONFIG_FUNCTION_PROFILER */
@@ -6359,7 +6359,7 @@ void ftrace_destroy_filter_files(struct ftrace_ops *ops)
 	mutex_unlock(&ftrace_lock);
 }
 
-static __init int ftrace_init_dyn_tracefs(struct dentry *d_tracer)
+static int ftrace_init_dyn_tracefs(struct dentry *d_tracer)
 {
 
 	trace_create_file("available_filter_functions", TRACE_MODE_READ,
@@ -7755,8 +7755,8 @@ void ftrace_init_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 			  d_tracer, tr, &ftrace_no_pid_fops);
 }
 
-void __init ftrace_init_tracefs_toplevel(struct trace_array *tr,
-					 struct dentry *d_tracer)
+void ftrace_init_tracefs_toplevel(struct trace_array *tr,
+				  struct dentry *d_tracer)
 {
 	/* Only the top level directory has the dyn_tracefs and profile */
 	WARN_ON(!(tr->flags & TRACE_ARRAY_FL_GLOBAL));

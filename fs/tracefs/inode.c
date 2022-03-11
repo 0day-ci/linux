@@ -560,10 +560,10 @@ struct dentry *tracefs_create_dir(const char *name, struct dentry *parent)
  *
  * Returns the dentry of the instances directory.
  */
-__init struct dentry *tracefs_create_instance_dir(const char *name,
-					  struct dentry *parent,
-					  int (*mkdir)(const char *name),
-					  int (*rmdir)(const char *name))
+struct dentry *tracefs_create_instance_dir(const char *name,
+					   struct dentry *parent,
+					   int (*mkdir)(const char *name),
+					   int (*rmdir)(const char *name))
 {
 	struct dentry *dentry;
 
