@@ -609,6 +609,62 @@ out:
 #endif
 
 /*
+ * cpu cache topology table
+ */
+#define MAX_CACHE_LEVEL 7
+struct device_node *cache_topology[NR_CPUS][MAX_CACHE_LEVEL];
+
+void init_cpu_cache_topology(void)
+{
+	struct device_node *node_cpu, *node_cache;
+	int cpu, level;
+
+	for_each_possible_cpu(cpu) {
+		node_cpu = of_get_cpu_node(cpu, NULL);
+		if (!node_cpu)
+			continue;
+
+		level = 0;
+		node_cache = node_cpu;
+		while (level < MAX_CACHE_LEVEL) {
+			node_cache = of_parse_phandle(node_cache, "next-level-cache", 0);
+			if (!node_cache)
+				break;
+
+			cache_topology[cpu][level++] = node_cache;
+		}
+		of_node_put(node_cpu);
+	}
+}
+
+void fix_cpu_llc(int cpu, int *first_cpu, int *cpu_num)
+{
+	int cache_level, cpu_id;
+	int first, last;
+	int id = *first_cpu;
+	int size = *cpu_num;
+
+	for (cache_level = 0; cache_level < MAX_CACHE_LEVEL; cache_level++) {
+		if (!cache_topology[cpu][cache_level])
+			break;
+
+		first = -1;
+		last = id;
+		for (cpu_id = 0; cpu_id < NR_CPUS; cpu_id++) {
+			if (cache_topology[cpu][cache_level] == cache_topology[cpu_id][cache_level]) {
+				if (cpu_id < id || cpu_id >= id + size)
+					return;
+
+				first = (first == -1)?cpu_id:first;
+				last = cpu_id;
+			}
+		}
+		*first_cpu = first;
+		*cpu_num = last - first + 1;
+	}
+}
+
+/*
  * cpu topology table
  */
 struct cpu_topology cpu_topology[NR_CPUS];

@@ -661,6 +661,9 @@ static void update_top_cache_domain(int cpu)
 	if (sd) {
 		id = cpumask_first(sched_domain_span(sd));
 		size = cpumask_weight(sched_domain_span(sd));
+#ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
+		fix_cpu_llc(cpu, &id, &size);
+#endif
 		sds = sd->shared;
 	}
 
