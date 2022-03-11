@@ -290,17 +290,10 @@ static void hci_cmd_sync_work(struct work_struct *work)
 		if (entry)
 			list_del(&entry->list);
 		mutex_unlock(&hdev->cmd_sync_work_lock);
-<<<<<<< HEAD
 
 		if (!entry)
 			break;
 
-=======
-
-		if (!entry)
-			break;
-
->>>>>>> linux-next/akpm-base
 		bt_dev_dbg(hdev, "entry %p", entry);
 
 		if (entry->func) {

@@ -488,10 +488,7 @@ enum ice_pf_flags {
 	ICE_FLAG_LINK_LENIENT_MODE_ENA,
 	ICE_FLAG_PLUG_AUX_DEV,
 	ICE_FLAG_MTU_CHANGED,
-<<<<<<< HEAD
-=======
 	ICE_FLAG_GNSS,			/* GNSS successfully initialized */
->>>>>>> linux-next/akpm-base
 	ICE_PF_FLAGS_NBITS		/* must be last */
 };
 

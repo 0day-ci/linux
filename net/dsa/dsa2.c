@@ -1062,14 +1062,11 @@ static int dsa_tree_setup_master(struct dsa_switch_tree *dst)
 			err = dsa_master_setup(master, dp);
 			if (err)
 				break;
-<<<<<<< HEAD
-=======
 
 			/* Replay master state event */
 			dsa_tree_master_admin_state_change(dst, master, admin_up);
 			dsa_tree_master_oper_state_change(dst, master,
 							  netif_oper_up(master));
->>>>>>> linux-next/akpm-base
 		}
 	}
 
