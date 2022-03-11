@@ -442,6 +442,8 @@ LIBBPF_0.7.0 {
 
 LIBBPF_0.8.0 {
 	global:
+		bpf_object__open_subskeleton;
+		bpf_object__destroy_subskeleton;
 		libbpf_register_prog_handler;
 		libbpf_unregister_prog_handler;
 } LIBBPF_0.7.0;
