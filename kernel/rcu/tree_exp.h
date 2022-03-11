@@ -794,27 +794,7 @@ static int rcu_print_task_exp_stall(struct rcu_node *rnp)
 
 #endif /* #else #ifdef CONFIG_PREEMPT_RCU */
 
-/**
- * synchronize_rcu_expedited - Brute-force RCU grace period
- *
- * Wait for an RCU grace period, but expedite it.  The basic idea is to
- * IPI all non-idle non-nohz online CPUs.  The IPI handler checks whether
- * the CPU is in an RCU critical section, and if so, it sets a flag that
- * causes the outermost rcu_read_unlock() to report the quiescent state
- * for RCU-preempt or asks the scheduler for help for RCU-sched.  On the
- * other hand, if the CPU is not in an RCU read-side critical section,
- * the IPI handler reports the quiescent state immediately.
- *
- * Although this is a great improvement over previous expedited
- * implementations, it is still unfriendly to real-time workloads, so is
- * thus not recommended for any sort of common-case code.  In fact, if
- * you are using synchronize_rcu_expedited() in a loop, please restructure
- * your code to batch your updates, and then use a single synchronize_rcu()
- * instead.
- *
- * This has the same semantics as (but is more brutal than) synchronize_rcu().
- */
-void synchronize_rcu_expedited(void)
+static void __synchronize_rcu_expedited(bool polling)
 {
 	bool boottime = (rcu_scheduler_active == RCU_SCHEDULER_INIT);
 	struct rcu_exp_work rew;
@@ -827,7 +807,7 @@ void synchronize_rcu_expedited(void)
 			 "Illegal synchronize_rcu_expedited() in RCU read-side critical section");
 
 	/* Is the state is such that the call is a grace period? */
-	if (rcu_blocking_is_gp())
+	if (rcu_blocking_is_gp() && !polling)
 		return;
 
 	/* If expedited grace periods are prohibited, fall back to normal. */
@@ -863,6 +843,32 @@ void synchronize_rcu_expedited(void)
 
 	if (likely(!boottime))
 		destroy_work_on_stack(&rew.rew_work);
+
+}
+
+/**
+ * synchronize_rcu_expedited - Brute-force RCU grace period
+ *
+ * Wait for an RCU grace period, but expedite it.  The basic idea is to
+ * IPI all non-idle non-nohz online CPUs.  The IPI handler checks whether
+ * the CPU is in an RCU critical section, and if so, it sets a flag that
+ * causes the outermost rcu_read_unlock() to report the quiescent state
+ * for RCU-preempt or asks the scheduler for help for RCU-sched.  On the
+ * other hand, if the CPU is not in an RCU read-side critical section,
+ * the IPI handler reports the quiescent state immediately.
+ *
+ * Although this is a great improvement over previous expedited
+ * implementations, it is still unfriendly to real-time workloads, so is
+ * thus not recommended for any sort of common-case code.  In fact, if
+ * you are using synchronize_rcu_expedited() in a loop, please restructure
+ * your code to batch your updates, and then use a single synchronize_rcu()
+ * instead.
+ *
+ * This has the same semantics as (but is more brutal than) synchronize_rcu().
+ */
+void synchronize_rcu_expedited(void)
+{
+	__synchronize_rcu_expedited(false);
 }
 EXPORT_SYMBOL_GPL(synchronize_rcu_expedited);
 
@@ -903,7 +909,7 @@ static void sync_rcu_do_polled_gp(struct work_struct *wp)
 	if (s & 0x1)
 		return;
 	while (!sync_exp_work_done(s))
-		synchronize_rcu_expedited();
+		__synchronize_rcu_expedited(true);
 	raw_spin_lock_irqsave(&rnp->exp_poll_lock, flags);
 	s = rnp->exp_seq_poll_rq;
 	if (!(s & 0x1) && !sync_exp_work_done(s))
