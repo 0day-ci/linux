@@ -16,13 +16,13 @@ extern u32 init_pkru_value;
 #define pkru_get_init_value()	0
 #endif
 
-static inline bool __pkru_allows_read(u32 pkru, u16 pkey)
+static inline bool __pkru_allows_read(u32 pkru, u8 pkey)
 {
 	int pkru_pkey_bits = pkey * PKRU_BITS_PER_PKEY;
 	return !(pkru & (PKRU_AD_BIT << pkru_pkey_bits));
 }
 
-static inline bool __pkru_allows_write(u32 pkru, u16 pkey)
+static inline bool __pkru_allows_write(u32 pkru, u8 pkey)
 {
 	int pkru_pkey_bits = pkey * PKRU_BITS_PER_PKEY;
 	/*

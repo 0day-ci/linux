@@ -1357,7 +1357,7 @@ static inline pmd_t pmd_swp_clear_uffd_wp(pmd_t pmd)
 }
 #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_WP */
 
-static inline u16 pte_flags_pkey(unsigned long pte_flags)
+static inline u8 pte_flags_pkey(unsigned long pte_flags)
 {
 #ifdef CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS
 	/* ifdef to avoid doing 59-bit shift on 32-bit values */
@@ -1367,7 +1367,7 @@ static inline u16 pte_flags_pkey(unsigned long pte_flags)
 #endif
 }
 
-static inline bool __pkru_allows_pkey(u16 pkey, bool write)
+static inline bool __pkru_allows_pkey(u8 pkey, bool write)
 {
 	u32 pkru = read_pkru();
 
