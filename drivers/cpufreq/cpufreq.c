@@ -1806,10 +1806,14 @@ unsigned int cpufreq_get(unsigned int cpu)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
 	unsigned int ret_freq = 0;
+	unsigned int freq;
 
 	if (policy) {
 		down_read(&policy->rwsem);
-		if (cpufreq_driver->get)
+		freq = arch_freq_get_on_cpu(policy->cpu);
+		if (freq)
+			ret_freq = freq;
+		else if (cpufreq_driver->get)
 			ret_freq = __cpufreq_get(policy);
 		up_read(&policy->rwsem);
 
