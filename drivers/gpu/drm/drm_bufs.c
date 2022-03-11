@@ -734,7 +734,7 @@ int drm_legacy_addbufs_agp(struct drm_device *dev,
 	int i, valid;
 	struct drm_buf **temp_buflist;
 
-	if (!dma)
+	if (!dma || !dev->agp)
 		return -EINVAL;
 
 	count = request->count;
