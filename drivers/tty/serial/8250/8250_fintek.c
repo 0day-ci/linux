@@ -316,6 +316,7 @@ static void fintek_8250_set_termios(struct uart_port *port,
 		break;
 	case CHIP_ID_F81966:
 	case CHIP_ID_F81866:
+	case CHIP_ID_F81865:
 		reg = F81866_UART_CLK;
 		break;
 	default:
@@ -363,6 +364,7 @@ static void fintek_8250_set_termios_handler(struct uart_8250_port *uart)
 	case CHIP_ID_F81216H:
 	case CHIP_ID_F81966:
 	case CHIP_ID_F81866:
+	case CHIP_ID_F81865:
 		uart->port.set_termios = fintek_8250_set_termios;
 		break;
 
