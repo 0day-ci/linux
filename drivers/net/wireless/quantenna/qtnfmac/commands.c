@@ -1256,7 +1256,7 @@ qtnf_cmd_resp_proc_mac_info(struct qtnf_wmac *mac,
 				    sizeof(*mac->macinfo.if_comb),
 				    GFP_KERNEL);
 
-	if (!mac->macinfo.if_comb)
+	if (!mac_info->if_comb)
 		return -ENOMEM;
 
 	return 0;
