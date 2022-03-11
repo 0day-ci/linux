@@ -1765,6 +1765,16 @@ struct kvm_mmu_page *kvm_mmu_alloc_shadow_page(struct kvm_vcpu *vcpu, bool direc
 	return sp;
 }
 
+static inline gfp_t gfp_flags_for_split(bool locked)
+{
+	/*
+	 * If under the MMU lock, use GFP_NOWAIT to avoid direct reclaim (which
+	 * is slow) and to avoid making any filesystem callbacks (which can end
+	 * up invoking KVM MMU notifiers, resulting in a deadlock).
+	 */
+	return (locked ? GFP_NOWAIT : GFP_KERNEL) | __GFP_ACCOUNT;
+}
+
 /*
  * Allocate a new shadow page, potentially while holding the MMU lock.
  *
@@ -1772,17 +1782,11 @@ struct kvm_mmu_page *kvm_mmu_alloc_shadow_page(struct kvm_vcpu *vcpu, bool direc
  * being mapped directly with a lower level page table. Thus there's no need to
  * allocate the shadowed_translation array.
  */
-struct kvm_mmu_page *kvm_mmu_alloc_direct_sp_for_split(bool locked)
+static struct kvm_mmu_page *__kvm_mmu_alloc_direct_sp_for_split(gfp_t gfp)
 {
 	struct kvm_mmu_page *sp;
-	gfp_t gfp;
 
-	/*
-	 * If under the MMU lock, use GFP_NOWAIT to avoid direct reclaim (which
-	 * is slow) and to avoid making any filesystem callbacks (which can end
-	 * up invoking KVM MMU notifiers, resulting in a deadlock).
-	 */
-	gfp = (locked ? GFP_NOWAIT : GFP_KERNEL) | __GFP_ACCOUNT | __GFP_ZERO;
+	gfp |= __GFP_ZERO;
 
 	sp = kmem_cache_alloc(mmu_page_header_cache, gfp);
 	if (!sp)
@@ -1797,6 +1801,13 @@ struct kvm_mmu_page *kvm_mmu_alloc_direct_sp_for_split(bool locked)
 	set_page_private(virt_to_page(sp->spt), (unsigned long)sp);
 
 	return sp;
+}
+
+struct kvm_mmu_page *kvm_mmu_alloc_direct_sp_for_split(bool locked)
+{
+	gfp_t gfp = gfp_flags_for_split(locked);
+
+	return __kvm_mmu_alloc_direct_sp_for_split(gfp);
 }
 
 static void mark_unsync(u64 *spte);
@@ -5989,6 +6000,11 @@ void kvm_mmu_init_vm(struct kvm *kvm)
 	node->track_write = kvm_mmu_pte_write;
 	node->track_flush_slot = kvm_mmu_invalidate_zap_pages_in_memslot;
 	kvm_page_track_register_notifier(kvm, node);
+
+	kvm->arch.huge_page_split_desc_cache.capacity =
+		HUGE_PAGE_SPLIT_DESC_CACHE_CAPACITY;
+	kvm->arch.huge_page_split_desc_cache.kmem_cache = pte_list_desc_cache;
+	kvm->arch.huge_page_split_desc_cache.gfp_zero = __GFP_ZERO;
 }
 
 void kvm_mmu_uninit_vm(struct kvm *kvm)
@@ -6119,11 +6135,43 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 		kvm_arch_flush_remote_tlbs_memslot(kvm, memslot);
 }
 
+static int topup_huge_page_split_desc_cache(struct kvm *kvm, gfp_t gfp)
+{
+	/*
+	 * We may need up to HUGE_PAGE_SPLIT_DESC_CACHE_CAPACITY descriptors
+	 * to split any given huge page. We could more accurately calculate how
+	 * many we actually need by inspecting all the rmaps and check which
+	 * will need new descriptors, but that's not worth the extra cost or
+	 * code complexity.
+	 */
+	return __kvm_mmu_topup_memory_cache(
+			&kvm->arch.huge_page_split_desc_cache,
+			HUGE_PAGE_SPLIT_DESC_CACHE_CAPACITY,
+			gfp);
+}
+
+static int alloc_memory_for_split(struct kvm *kvm, struct kvm_mmu_page **spp,
+				  bool locked)
+{
+	gfp_t gfp = gfp_flags_for_split(locked);
+	int r;
+
+	r = topup_huge_page_split_desc_cache(kvm, gfp);
+	if (r)
+		return r;
+
+	if (!*spp) {
+		*spp = __kvm_mmu_alloc_direct_sp_for_split(gfp);
+		r = *spp ? 0 : -ENOMEM;
+	}
+
+	return r;
+}
+
 static int prepare_to_split_huge_page(struct kvm *kvm,
 				      const struct kvm_memory_slot *slot,
 				      u64 *huge_sptep,
 				      struct kvm_mmu_page **spp,
-				      bool *flush,
 				      bool *dropped_lock)
 {
 	int r = 0;
@@ -6136,24 +6184,18 @@ static int prepare_to_split_huge_page(struct kvm *kvm,
 	if (need_resched() || rwlock_needbreak(&kvm->mmu_lock))
 		goto drop_lock;
 
-	*spp = kvm_mmu_alloc_direct_sp_for_split(true);
+	r = alloc_memory_for_split(kvm, spp, true);
 	if (r)
 		goto drop_lock;
 
 	return 0;
 
 drop_lock:
-	if (*flush)
-		kvm_arch_flush_remote_tlbs_memslot(kvm, slot);
-
-	*flush = false;
 	*dropped_lock = true;
 
 	write_unlock(&kvm->mmu_lock);
 	cond_resched();
-	*spp = kvm_mmu_alloc_direct_sp_for_split(false);
-	if (!*spp)
-		r = -ENOMEM;
+	r = alloc_memory_for_split(kvm, spp, false);
 	write_lock(&kvm->mmu_lock);
 
 	return r;
@@ -6196,10 +6238,10 @@ static struct kvm_mmu_page *kvm_mmu_get_sp_for_split(struct kvm *kvm,
 
 static int kvm_mmu_split_huge_page(struct kvm *kvm,
 				   const struct kvm_memory_slot *slot,
-				   u64 *huge_sptep, struct kvm_mmu_page **spp,
-				   bool *flush)
+				   u64 *huge_sptep, struct kvm_mmu_page **spp)
 
 {
+	struct kvm_mmu_memory_cache *cache;
 	struct kvm_mmu_page *split_sp;
 	u64 huge_spte, split_spte;
 	int split_level, index;
@@ -6212,9 +6254,9 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 		return -EOPNOTSUPP;
 
 	/*
-	 * Since we did not allocate pte_list_desc_structs for the split, we
-	 * cannot add a new parent SPTE to parent_ptes. This should never happen
-	 * in practice though since this is a fresh SP.
+	 * We did not allocate an extra pte_list_desc struct to add huge_sptep
+	 * to split_sp->parent_ptes. An extra pte_list_desc struct should never
+	 * be necessary in practice though since split_sp is brand new.
 	 *
 	 * Note, this makes it safe to pass NULL to __link_shadow_page() below.
 	 */
@@ -6225,6 +6267,7 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 
 	split_level = split_sp->role.level;
 	access = split_sp->role.access;
+	cache = &kvm->arch.huge_page_split_desc_cache;
 
 	for (index = 0; index < PT64_ENT_PER_PAGE; index++) {
 		split_sptep = &split_sp->spt[index];
@@ -6232,25 +6275,11 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 
 		BUG_ON(is_shadow_present_pte(*split_sptep));
 
-		/*
-		 * Since we did not allocate pte_list_desc structs for the
-		 * split, we can't add a new SPTE that maps this GFN.
-		 * Skipping this SPTE means we're only partially mapping the
-		 * huge page, which means we'll need to flush TLBs before
-		 * dropping the MMU lock.
-		 *
-		 * Note, this make it safe to pass NULL to __rmap_add() below.
-		 */
-		if (gfn_to_rmap(split_gfn, split_level, slot)->val) {
-			*flush = true;
-			continue;
-		}
-
 		split_spte = make_huge_page_split_spte(
 				huge_spte, split_level + 1, index, access);
 
 		mmu_spte_set(split_sptep, split_spte);
-		__rmap_add(kvm, NULL, slot, split_sptep, split_gfn, access);
+		__rmap_add(kvm, cache, slot, split_sptep, split_gfn, access);
 	}
 
 	/*
@@ -6258,9 +6287,7 @@ static int kvm_mmu_split_huge_page(struct kvm *kvm,
 	 * page table. Since we are making this change without a TLB flush vCPUs
 	 * will see a mix of the split mappings and the original huge mapping,
 	 * depending on what's currently in their TLB. This is fine from a
-	 * correctness standpoint since the translation will either be identical
-	 * or non-present. To account for non-present mappings, the TLB will be
-	 * flushed prior to dropping the MMU lock.
+	 * correctness standpoint since the translation will be identical.
 	 */
 	__drop_large_spte(kvm, huge_sptep, false);
 	__link_shadow_page(NULL, huge_sptep, split_sp);
@@ -6297,7 +6324,6 @@ static bool rmap_try_split_huge_pages(struct kvm *kvm,
 	struct kvm_mmu_page *sp = NULL;
 	struct rmap_iterator iter;
 	u64 *huge_sptep, spte;
-	bool flush = false;
 	bool dropped_lock;
 	int level;
 	gfn_t gfn;
@@ -6312,7 +6338,7 @@ restart:
 		level = sptep_to_sp(huge_sptep)->role.level;
 		gfn = sptep_to_gfn(huge_sptep);
 
-		r = prepare_to_split_huge_page(kvm, slot, huge_sptep, &sp, &flush, &dropped_lock);
+		r = prepare_to_split_huge_page(kvm, slot, huge_sptep, &sp, &dropped_lock);
 		if (r) {
 			trace_kvm_mmu_split_huge_page(gfn, spte, level, r);
 			break;
@@ -6321,7 +6347,7 @@ restart:
 		if (dropped_lock)
 			goto restart;
 
-		r = kvm_mmu_split_huge_page(kvm, slot, huge_sptep, &sp, &flush);
+		r = kvm_mmu_split_huge_page(kvm, slot, huge_sptep, &sp);
 
 		trace_kvm_mmu_split_huge_page(gfn, spte, level, r);
 
@@ -6336,7 +6362,7 @@ restart:
 	if (sp)
 		kvm_mmu_free_shadow_page(sp);
 
-	return flush;
+	return false;
 }
 
 static void kvm_rmap_try_split_huge_pages(struct kvm *kvm,
@@ -6344,7 +6370,6 @@ static void kvm_rmap_try_split_huge_pages(struct kvm *kvm,
 					  gfn_t start, gfn_t end,
 					  int target_level)
 {
-	bool flush;
 	int level;
 
 	/*
@@ -6352,21 +6377,15 @@ static void kvm_rmap_try_split_huge_pages(struct kvm *kvm,
 	 * down to the target level. This ensures pages are recursively split
 	 * all the way to the target level. There's no need to split pages
 	 * already at the target level.
-	 *
-	 * Note that TLB flushes must be done before dropping the MMU lock since
-	 * rmap_try_split_huge_pages() may partially split any given huge page,
-	 * i.e. it may effectively unmap (make non-present) a portion of the
-	 * huge page.
 	 */
 	for (level = KVM_MAX_HUGEPAGE_LEVEL; level > target_level; level--) {
-		flush = slot_handle_level_range(kvm, slot,
-						rmap_try_split_huge_pages,
-						level, level, start, end - 1,
-						true, flush);
+		slot_handle_level_range(kvm, slot,
+					rmap_try_split_huge_pages,
+					level, level, start, end - 1,
+					true, false);
 	}
 
-	if (flush)
-		kvm_arch_flush_remote_tlbs_memslot(kvm, slot);
+	kvm_mmu_free_memory_cache(&kvm->arch.huge_page_split_desc_cache);
 }
 
 /* Must be called with the mmu_lock held in write-mode. */

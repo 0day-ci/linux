@@ -1240,6 +1240,16 @@ struct kvm_arch {
 	hpa_t	hv_root_tdp;
 	spinlock_t hv_root_tdp_lock;
 #endif
+
+	/*
+	 * Memory cache used to allocate pte_list_desc structs while splitting
+	 * huge pages. In the worst case, to split one huge page we need 512
+	 * pte_list_desc structs to add each new lower level leaf sptep to the
+	 * memslot rmap.
+	 */
+#define HUGE_PAGE_SPLIT_DESC_CACHE_CAPACITY 512
+	__DEFINE_KVM_MMU_MEMORY_CACHE(huge_page_split_desc_cache,
+				      HUGE_PAGE_SPLIT_DESC_CACHE_CAPACITY);
 };
 
 struct kvm_vm_stat {
