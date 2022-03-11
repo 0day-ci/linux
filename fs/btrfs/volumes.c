@@ -4443,6 +4443,7 @@ static int balance_kthread(void *data)
 	if (fs_info->balance_ctl)
 		ret = btrfs_balance(fs_info, fs_info->balance_ctl, NULL);
 	mutex_unlock(&fs_info->balance_mutex);
+	sb_end_write(fs_info->sb);
 
 	return ret;
 }
@@ -4463,6 +4464,7 @@ int btrfs_resume_balance_async(struct btrfs_fs_info *fs_info)
 		return 0;
 	}
 
+	sb_start_write(fs_info->sb);
 	spin_lock(&fs_info->super_lock);
 	ASSERT(fs_info->exclusive_operation == BTRFS_EXCLOP_BALANCE_PAUSED);
 	fs_info->exclusive_operation = BTRFS_EXCLOP_BALANCE;
