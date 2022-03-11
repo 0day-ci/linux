@@ -1518,6 +1518,9 @@ static char *internal_map_name(struct bpf_object *obj, const char *real_name)
 }
 
 static int
+bpf_map_find_btf_info(struct bpf_object *obj, struct bpf_map *map);
+
+static int
 bpf_object__init_internal_map(struct bpf_object *obj, enum libbpf_map_type type,
 			      const char *real_name, int sec_idx, void *data, size_t data_sz)
 {
@@ -1563,6 +1566,11 @@ bpf_object__init_internal_map(struct bpf_object *obj, enum libbpf_map_type type,
 		zfree(&map->name);
 		return err;
 	}
+
+	err = bpf_map_find_btf_info(obj, map);
+	/* intentionally ignoring err, failures are fine because of
+	 * maps like .rodata.str1.1
+	 */
 
 	if (data)
 		memcpy(map->mmaped, data, data_sz);
