@@ -78,6 +78,12 @@ enum libbpf_strict_mode {
 	 * in favor of BTF-defined map definitions in SEC(".maps").
 	 */
 	LIBBPF_STRICT_MAP_DEFINITIONS = 0x20,
+	/*
+	 * When enabled, always consider routines in the .text section to
+	 * be sub-programs. Previously, single routines in the .text section
+	 * would be considered a program on their own.
+	 */
+	LIBBPF_STRICT_TEXT_ONLY_SUBPROGRAMS = 0x40,
 
 	__LIBBPF_STRICT_LAST,
 };
