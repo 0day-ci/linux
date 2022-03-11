@@ -155,11 +155,22 @@ static int fintek_8250_check_id(struct fintek_8250 *pdata)
 
 	switch (chip) {
 	case CHIP_ID_F81865:
+		pr_info("Fintek F81865\n");
+		break;
 	case CHIP_ID_F81866:
+		pr_info("Fintek F81866\n");
+		break;
 	case CHIP_ID_F81966:
+		pr_info("Fintek F81966\n");
+		break;
 	case CHIP_ID_F81216AD:
+		pr_info("Fintek F81216AD\n");
+		break;
 	case CHIP_ID_F81216H:
+		pr_info("Fintek F81216H\n");
+		break;
 	case CHIP_ID_F81216:
+		pr_info("Fintek F81216\n");
 		break;
 	default:
 		return -ENODEV;
