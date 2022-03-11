@@ -10326,6 +10326,28 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 	return r;
 }
 
+static int kvm_vcpu_non_preemptable(struct kvm_vcpu *vcpu)
+{
+	int count;
+
+	if (!vcpu->arch.pv_pc.preempt_count_enabled)
+		return 0;
+
+	if (!kvm_read_guest_cached(vcpu->kvm, &vcpu->arch.pv_pc.preempt_count_cache,
+	    &count, sizeof(int)))
+		return (count & ~PREEMPT_NEED_RESCHED);
+
+	return 0;
+}
+
+bool kvm_arch_boost_candidate(struct kvm_vcpu *vcpu)
+{
+	if (vcpu->arch.irq_disabled || kvm_vcpu_non_preemptable(vcpu))
+		return true;
+
+	return false;
+}
+
 static inline int complete_emulated_io(struct kvm_vcpu *vcpu)
 {
 	int r;
