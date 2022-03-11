@@ -115,6 +115,7 @@ struct khugepaged_scan {
 	struct list_head mm_head;
 	struct mm_slot *mm_slot;
 	unsigned long address;
+	int node;
 };
 
 static struct khugepaged_scan khugepaged_scan = {
@@ -1055,6 +1056,7 @@ static void collapse_huge_page(struct mm_struct *mm,
 	struct vm_area_struct *vma;
 	struct mmu_notifier_range range;
 	gfp_t gfp;
+	const struct cpumask *cpumask;
 
 	VM_BUG_ON(address & ~HPAGE_PMD_MASK);
 
@@ -1068,6 +1070,13 @@ static void collapse_huge_page(struct mm_struct *mm,
 	 * that. We will recheck the vma after taking it again in write mode.
 	 */
 	mmap_read_unlock(mm);
+
+	/* sched to specified node before huage page memory copy */
+	cpumask = cpumask_of_node(node);
+	if ((khugepaged_scan.node != node) && !cpumask_empty(cpumask)) {
+		set_cpus_allowed_ptr(current, cpumask);
+		khugepaged_scan.node = node;
+	}
 	new_page = khugepaged_alloc_page(hpage, gfp, node);
 	if (!new_page) {
 		result = SCAN_ALLOC_HUGE_PAGE_FAIL;
@@ -2376,6 +2385,7 @@ int start_stop_khugepaged(void)
 		kthread_stop(khugepaged_thread);
 		khugepaged_thread = NULL;
 	}
+	khugepaged_scan.node = NUMA_NO_NODE;
 	set_recommended_min_free_kbytes();
 fail:
 	mutex_unlock(&khugepaged_mutex);
