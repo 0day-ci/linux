@@ -366,6 +366,14 @@ static void kvm_guest_cpu_init(void)
 
 	if (has_steal_clock)
 		kvm_register_steal_time();
+
+	if (kvm_para_has_feature(KVM_FEATURE_PREEMPT_COUNT)) {
+		u64 pa = slow_virt_to_phys(this_cpu_ptr(&__preempt_count))
+			| KVM_MSR_ENABLED;
+		wrmsrl(MSR_KVM_PREEMPT_COUNT, pa);
+
+		pr_debug("setup pv preempt_count: cpu %d\n", smp_processor_id());
+	}
 }
 
 static void kvm_pv_disable_apf(void)
@@ -442,6 +450,8 @@ static void kvm_guest_cpu_offline(bool shutdown)
 	if (!shutdown)
 		apf_task_wake_all();
 	kvmclock_disable();
+	if (kvm_para_has_feature(KVM_FEATURE_PREEMPT_COUNT))
+		wrmsrl(MSR_KVM_PREEMPT_COUNT, 0);
 }
 
 static int kvm_cpu_online(unsigned int cpu)
