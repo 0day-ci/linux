@@ -253,6 +253,26 @@ static int nft_lookup_validate(const struct nft_ctx *ctx,
 	return 0;
 }
 
+static bool nft_lookup_reduce(struct nft_regs_track *track,
+			      const struct nft_expr *expr)
+{
+	const struct nft_lookup *priv = nft_expr_priv(expr);
+
+	if (priv->set->flags & NFT_SET_MAP) {
+		unsigned int regcount, i, dreg = priv->dreg;
+
+		regcount = DIV_ROUND_UP(priv->set->dlen, NFT_REG32_SIZE);
+
+		/* reset registers that were clobbered */
+		for (i = 0; i < regcount; i++, dreg++) {
+			track->regs[dreg].selector = NULL;
+			track->regs[dreg].bitwise = NULL;
+		}
+	}
+
+	return false;
+}
+
 static const struct nft_expr_ops nft_lookup_ops = {
 	.type		= &nft_lookup_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_lookup)),
@@ -263,6 +283,7 @@ static const struct nft_expr_ops nft_lookup_ops = {
 	.destroy	= nft_lookup_destroy,
 	.dump		= nft_lookup_dump,
 	.validate	= nft_lookup_validate,
+	.reduce		= nft_lookup_reduce,
 };
 
 struct nft_expr_type nft_lookup_type __read_mostly = {
