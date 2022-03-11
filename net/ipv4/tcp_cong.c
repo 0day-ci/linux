@@ -344,10 +344,20 @@ out:
 	return ret;
 }
 
-/* Change congestion control for socket. If load is false, then it is the
- * responsibility of the caller to call tcp_init_congestion_control or
- * tcp_reinit_congestion_control (if the current congestion control was
- * already initialized.
+/**
+ * tcp_set_congestion_control - set a sock's congestion control
+ * @sk:            the sock.
+ * @name:          the desired congestion control.
+ * @load:          whether to load the required module in case not loaded.
+ * @cap_net_admin: indicating if the caller have the CAP_NET_ADMIN.
+ *
+ * Returns 0 or an error.
+ *
+ * Must be called on a locked sock.
+ *
+ * If load is false, then it is the responsibility of the caller to call
+ * tcp_init_congestion_control or tcp_reinit_congestion_control (if the
+ * current congestion control was already initialized).
  */
 int tcp_set_congestion_control(struct sock *sk, const char *name, bool load,
 			       bool cap_net_admin)
@@ -383,6 +393,7 @@ int tcp_set_congestion_control(struct sock *sk, const char *name, bool load,
 	rcu_read_unlock();
 	return err;
 }
+EXPORT_SYMBOL_GPL(tcp_set_congestion_control);
 
 /* Slow start is used when congestion window is no greater than the slow start
  * threshold. We base on RFC2581 and also handle stretch ACKs properly.
