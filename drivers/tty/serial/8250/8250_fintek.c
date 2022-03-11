@@ -333,7 +333,7 @@ static void fintek_8250_set_termios(struct uart_port *port,
 	default:
 		/* Don't change clocksource with unknown PID */
 		dev_warn(port->dev,
-			"%s: pid: %x Not support. use default set_termios.\n",
+			"%s: chipID: %x not supported; using default set_termios.\n",
 			__func__, pdata->pid);
 		goto exit;
 	}
