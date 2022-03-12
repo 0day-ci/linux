@@ -27,6 +27,7 @@
 #define MS_DUPLICATE_USAGES	BIT(5)
 #define MS_SURFACE_DIAL		BIT(6)
 #define MS_QUIRK_FF		BIT(7)
+#define MS_XBOX			BIT(8)
 
 struct ms_data {
 	unsigned long quirks;
@@ -275,6 +276,16 @@ static int ms_event(struct hid_device *hdev, struct hid_field *field,
 		return 1;
 	}
 
+	if (quirks & MS_XBOX) {
+		if (usage->hid == 0xc0223) {
+			input_report_key(input, BTN_MODE, value);
+			return 1;
+		} else if (usage->hid == 0xc0224) {
+			input_report_key(input, BTN_SELECT, value);
+			return 1;
+		}
+	}
+
 	return 0;
 }
 
@@ -447,7 +458,7 @@ static const struct hid_device_id ms_devices[] = {
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, 0x091B),
 		.driver_data = MS_SURFACE_DIAL },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_ONE_S_CONTROLLER),
-		.driver_data = MS_QUIRK_FF },
+		.driver_data = MS_QUIRK_FF | MS_XBOX },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_8BITDO_SN30_PRO_PLUS),
 		.driver_data = MS_QUIRK_FF },
 	{ }
