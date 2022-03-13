@@ -1497,13 +1497,19 @@ bool within_kprobe_blacklist(unsigned long addr)
 static kprobe_opcode_t *_kprobe_addr(kprobe_opcode_t *addr,
 			const char *symbol_name, unsigned int offset)
 {
-	if ((symbol_name && addr) || (!symbol_name && !addr))
+	kprobe_opcode_t *symbol_addr;
+
+	if (!symbol_name && !addr)
 		goto invalid;
 
 	if (symbol_name) {
-		addr = kprobe_lookup_name(symbol_name, offset);
-		if (!addr)
+		symbol_addr = kprobe_lookup_name(symbol_name, offset);
+		if (!symbol_addr)
 			return ERR_PTR(-ENOENT);
+
+		if (addr && symbol_addr != addr)
+			goto invalid;
+		addr = symbol_addr;
 	}
 
 	addr = (kprobe_opcode_t *)(((char *)addr) + offset);
@@ -2062,8 +2068,7 @@ bool __weak arch_kprobe_on_func_entry(unsigned long offset)
  * function entry address or not.
  * This returns 0 if it is the function entry, or -EINVAL if it is not.
  * And also it returns -ENOENT if it fails the symbol or address lookup.
- * Caller must pass @addr or @sym (either one must be NULL), or this
- * returns -EINVAL.
+ * Caller must pass @addr or @sym, or this returns -EINVAL.
  */
 int kprobe_on_func_entry(kprobe_opcode_t *addr, const char *sym, unsigned long offset)
 {
