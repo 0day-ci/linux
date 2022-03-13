@@ -1666,6 +1666,17 @@ static void config_port_access_mode(struct device *fme_dev, int port_id,
 #define config_port_vf_mode(dev, id) config_port_access_mode(dev, id, true)
 #define config_port_pf_mode(dev, id) config_port_access_mode(dev, id, false)
 
+static int dfl_check_port_connect_afu(struct device *dev, u64 flags)
+{
+	void __iomem *base;
+	int port;
+
+	base = dfl_get_feature_ioaddr_by_id(dev, PORT_FEATURE_ID_HEADER);
+	port = FIELD_GET(PORT_CAP_PORT_NUM, readq(base + PORT_HDR_CAP));
+
+	return flags & dfl_feat_port_connect_afu(port);
+}
+
 /**
  * dfl_fpga_cdev_config_ports_pf - configure ports to PF access mode
  *
@@ -1683,7 +1694,9 @@ void dfl_fpga_cdev_config_ports_pf(struct dfl_fpga_cdev *cdev)
 		if (device_is_registered(&pdata->dev->dev))
 			continue;
 
-		config_port_pf_mode(cdev->fme_dev, pdata->id);
+		/* configure port access mode for AFU connected to Port device */
+		if (dfl_check_port_connect_afu(&pdata->dev->dev, cdev->flags))
+			config_port_pf_mode(cdev->fme_dev, pdata->id);
 	}
 	mutex_unlock(&cdev->lock);
 }
@@ -1722,7 +1735,9 @@ int dfl_fpga_cdev_config_ports_vf(struct dfl_fpga_cdev *cdev, int num_vfs)
 		if (device_is_registered(&pdata->dev->dev))
 			continue;
 
-		config_port_vf_mode(cdev->fme_dev, pdata->id);
+		/* configure port access mode for AFU connected to Port device */
+		if (dfl_check_port_connect_afu(&pdata->dev->dev, cdev->flags))
+			config_port_vf_mode(cdev->fme_dev, pdata->id);
 	}
 done:
 	mutex_unlock(&cdev->lock);
