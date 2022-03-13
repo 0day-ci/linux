@@ -3024,7 +3024,9 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			unsigned long count, struct list_head *list,
 			int migratetype, unsigned int alloc_flags)
 {
+	struct page *page, *tmp;
 	int i, allocated = 0;
+	int free_cma_pages = 0;
 
 	/*
 	 * local_lock_irq held so equivalent to spin_lock_irqsave for
@@ -3032,13 +3034,9 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	 */
 	spin_lock(&zone->lock);
 	for (i = 0; i < count; ++i) {
-		struct page *page = __rmqueue(zone, order, migratetype,
-								alloc_flags);
+		page = __rmqueue(zone, order, migratetype, alloc_flags);
 		if (unlikely(page == NULL))
 			break;
-
-		if (unlikely(check_pcp_refill(page)))
-			continue;
 
 		/*
 		 * Split buddy pages returned by expand() are received here in
@@ -3052,9 +3050,6 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 		 */
 		list_add_tail(&page->lru, list);
 		allocated++;
-		if (is_migrate_cma(get_pcppage_migratetype(page)))
-			__mod_zone_page_state(zone, NR_FREE_CMA_PAGES,
-					      -(1 << order));
 	}
 
 	/*
@@ -3065,6 +3060,16 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	 */
 	__mod_zone_page_state(zone, NR_FREE_PAGES, -(i << order));
 	spin_unlock(&zone->lock);
+	list_for_each_entry_safe(page, tmp, list, lru) {
+		if (unlikely(check_pcp_refill(page))) {
+			list_del(&page->lru);
+			allocated--;
+		} else if (is_migrate_cma(get_pcppage_migratetype(page))) {
+			free_cma_pages++;
+		}
+	}
+	if (free_cma_pages)
+		__mod_zone_page_state(zone, NR_FREE_CMA_PAGES, -(free_cma_pages << order));
 	return allocated;
 }
 
