@@ -294,6 +294,7 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 	struct clk *cpu_clk;
 	int ret;
 	u32 cpu_capacity;
+	static bool cap_property_miss;
 
 	if (cap_parsing_failed)
 		return false;
@@ -301,6 +302,20 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 	ret = of_property_read_u32(cpu_node, "capacity-dmips-mhz",
 				   &cpu_capacity);
 	if (!ret) {
+		/*
+		 * A previous CPU node misses binding for CPU raw capacity and
+		 * current CPU node finds its property "capacity-dmips-mhz",
+		 * thus the DT binding for "capacity-dmips-mhz" is inconsistent
+		 * across all CPUs.  Set 'cap_parsing_failed' flag and drop the
+		 * CPU raw capacity values.
+		 */
+		if (cap_property_miss) {
+			pr_err("cpu_capacity: binding %pOF raw capacity\n",
+				cpu_node);
+			pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
+			goto parsing_failure;
+		}
+
 		if (!raw_capacity) {
 			raw_capacity = kcalloc(num_possible_cpus(),
 					       sizeof(*raw_capacity),
@@ -331,11 +346,17 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 			pr_err("cpu_capacity: missing %pOF raw capacity\n",
 				cpu_node);
 			pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
-			cap_parsing_failed = true;
-			free_raw_capacity();
+			goto parsing_failure;
+		} else {
+			cap_property_miss = true;
 		}
 	}
 
+	return !ret;
+
+parsing_failure:
+	cap_parsing_failed = true;
+	free_raw_capacity();
 	return !ret;
 }
 
