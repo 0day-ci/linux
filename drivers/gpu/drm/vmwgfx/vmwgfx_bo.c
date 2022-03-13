@@ -621,6 +621,8 @@ int vmw_user_bo_synccpu_ioctl(struct drm_device *dev, void *data,
 				  (unsigned int) arg->handle);
 			return ret;
 		}
+		if (unlikely(ret != 0))
+			return ret;
 		break;
 	case drm_vmw_synccpu_release:
 		ret = vmw_user_bo_synccpu_release(file_priv,
