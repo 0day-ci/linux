@@ -210,7 +210,7 @@ static void clk_sdmmc_mux_restore_context(struct clk_hw *hw)
 	unsigned long rate = clk_hw_get_rate(hw);
 	int parent_id;
 
-	parent_id = clk_hw_get_parent_index(hw);
+	parent_id = clk_hw_get_parent_index(hw, NULL);
 	if (WARN_ON(parent_id < 0))
 		return;
 

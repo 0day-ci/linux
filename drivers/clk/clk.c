@@ -1711,15 +1711,19 @@ static int clk_fetch_parent_index(struct clk_core *core,
 /**
  * clk_hw_get_parent_index - return the index of the parent clock
  * @hw: clk_hw associated with the clk being consumed
+ * @parent: optional clk_hw of the parent to be fetched
  *
- * Fetches and returns the index of parent clock. Returns -EINVAL if the given
- * clock does not have a current parent.
+ * Fetches and returns the index of parent clock. If parent is not
+ * provided the parent of hw is used.
+ * Returns -EINVAL if the given clock does not have a current parent.
  */
-int clk_hw_get_parent_index(struct clk_hw *hw)
+int clk_hw_get_parent_index(struct clk_hw *hw, struct clk_hw *parent)
 {
-	struct clk_hw *parent = clk_hw_get_parent(hw);
+	/* With parent NULL get the current parent of hw */
+	if (!parent)
+		parent = clk_hw_get_parent(hw);
 
-	if (WARN_ON(parent == NULL))
+	if (WARN_ON(!parent))
 		return -EINVAL;
 
 	return clk_fetch_parent_index(hw->core, parent->core);

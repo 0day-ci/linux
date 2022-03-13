@@ -116,7 +116,7 @@ static void clk_periph_restore_context(struct clk_hw *hw)
 	struct clk_hw *div_hw = &periph->divider.hw;
 	int parent_id;
 
-	parent_id = clk_hw_get_parent_index(hw);
+	parent_id = clk_hw_get_parent_index(hw, NULL);
 	if (WARN_ON(parent_id < 0))
 		return;
 
