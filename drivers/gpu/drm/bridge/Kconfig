@@ -171,6 +171,14 @@ config DRM_NWL_MIPI_DSI
 	  This enables the Northwest Logic MIPI DSI Host controller as
 	  for example found on NXP's i.MX8 Processors.
 
+config DRM_NXP_LDB
+	tristate "NXP i.MX8M LDB bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	select DRM_PANEL_BRIDGE
+	help
+	  Support for i.MX8M DPI-to-LVDS on-SoC encoder.
+
 config DRM_NXP_PTN3460
 	tristate "NXP PTN3460 DP/LVDS bridge"
 	depends on OF
