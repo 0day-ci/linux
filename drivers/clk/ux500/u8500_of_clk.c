@@ -18,6 +18,7 @@
 static struct clk *prcmu_clk[PRCMU_NUM_CLKS];
 static struct clk *prcc_pclk[(PRCC_NUM_PERIPH_CLUSTERS + 1) * PRCC_PERIPHS_PER_CLUSTER];
 static struct clk *prcc_kclk[(PRCC_NUM_PERIPH_CLUSTERS + 1) * PRCC_PERIPHS_PER_CLUSTER];
+static struct clk *clkout_clk[2];
 
 #define PRCC_SHOW(clk, base, bit) \
 	clk[(base * PRCC_PERIPHS_PER_CLUSTER) + bit]
@@ -44,6 +45,70 @@ static struct clk *ux500_twocell_get(struct of_phandle_args *clkspec,
 	}
 
 	return PRCC_SHOW(clk_data, base, bit);
+}
+
+/* Essentially names for the first PRCMU_CLKSRC_* defines */
+static const char *u8500_clkout_parents[] = {
+	"clk38m_to_clkgen",
+	"aclk",
+	"sysclk",
+	"lcdclk",
+	"sdmmcclk",
+	"tvclk",
+	"timclk",
+	/* CLK009 is not implemented, add it if you need it */
+	"clk009",
+};
+
+static struct clk *ux500_clkout_get(struct of_phandle_args *clkspec,
+				    void *data)
+{
+	int id, source, divider;
+	struct clk *clkout;
+
+	if (clkspec->args_count != 3)
+		return  ERR_PTR(-EINVAL);
+
+	id = clkspec->args[0];
+	source = clkspec->args[1];
+	divider = clkspec->args[2];
+
+	if (id < 0 || id > 1) {
+		pr_err("%s: invalid clkout ID %d\n", __func__, id);
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (clkout_clk[id]) {
+		pr_info("%s: clkout%d already registered, not reconfiguring\n",
+			__func__, id + 1);
+		return clkout_clk[id];
+	}
+
+	if (source > 7) {
+		pr_err("%s: invalid source ID %d\n", __func__, source);
+		return ERR_PTR(-EINVAL);
+	}
+
+	if ((divider == 0) || (divider > 63)) {
+		pr_err("%s: invalid divider %d\n", __func__, divider);
+		return ERR_PTR(-EINVAL);
+	}
+
+	pr_debug("registering clkout%d with source %d and divider %d\n",
+		 id + 1, source, divider);
+
+	clkout = clk_reg_prcmu_clkout(id ? "clkout2" : "clkout1",
+				      u8500_clkout_parents,
+				      ARRAY_SIZE(u8500_clkout_parents),
+				      source, divider);
+	if (IS_ERR(clkout)) {
+		pr_err("failed to register clkout%d\n",  id + 1);
+		return ERR_CAST(clkout);
+	}
+
+	clkout_clk[id] = clkout;
+
+	return clkout;
 }
 
 static void u8500_clk_init(struct device_node *np)
@@ -89,7 +154,19 @@ static void u8500_clk_init(struct device_node *np)
 				CLK_IGNORE_UNUSED);
 	prcmu_clk[PRCMU_PLLDDR] = clk;
 
-	/* FIXME: Add sys, ulp and int clocks here. */
+	/*
+	 * Read-only clocks that only return their current rate, only used
+	 * as parents to other clocks and not visible in the device tree.
+	 * clk38m_to_clkgen is the same as the SYSCLK, i.e. the root clock.
+	 */
+	clk = clk_reg_prcmu_rate("clk38m_to_clkgen", NULL, PRCMU_SYSCLK,
+				 CLK_IGNORE_UNUSED);
+	clk = clk_reg_prcmu_rate("aclk", NULL, PRCMU_ACLK,
+				 CLK_IGNORE_UNUSED);
+	clk = clk_reg_prcmu_rate("sysclk", NULL, PRCMU_SYSCLK,
+				 CLK_IGNORE_UNUSED);
+
+	/* TODO: add CLK009 if needed */
 
 	rtc_clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
 				CLK_IGNORE_UNUSED,
@@ -246,12 +323,6 @@ static void u8500_clk_init(struct device_node *np)
 
 	twd_clk = clk_register_fixed_factor(NULL, "smp_twd", "armss",
 				CLK_IGNORE_UNUSED, 1, 2);
-
-	/*
-	 * FIXME: Add special handled PRCMU clocks here:
-	 * 1. clkout0yuv, use PRCMU as parent + need regulator + pinctrl.
-	 * 2. ab9540_clkout1yuv, see clkout0yuv
-	 */
 
 	/* PRCC P-clocks */
 	clk = clk_reg_prcc_pclk("p1_pclk0", "per1clk", bases[CLKRST1_INDEX],
@@ -553,6 +624,10 @@ static void u8500_clk_init(struct device_node *np)
 			clk_data.clk_num = ARRAY_SIZE(prcmu_clk);
 			of_clk_add_provider(child, of_clk_src_onecell_get, &clk_data);
 		}
+
+		if (of_node_name_eq(child, "clkout-clock"))
+			of_clk_add_provider(child, ux500_clkout_get, NULL);
+
 		if (of_node_name_eq(child, "prcc-periph-clock"))
 			of_clk_add_provider(child, ux500_twocell_get, prcc_pclk);
 
