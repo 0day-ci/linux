@@ -234,6 +234,7 @@ static int register_cpu_capacity_sysctl(void)
 subsys_initcall(register_cpu_capacity_sysctl);
 
 static int update_topology;
+static bool cap_parsing_failed;
 
 int topology_update_cpu_topology(void)
 {
@@ -291,7 +292,6 @@ void topology_normalize_cpu_scale(void)
 bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 {
 	struct clk *cpu_clk;
-	static bool cap_parsing_failed;
 	int ret;
 	u32 cpu_capacity;
 
@@ -331,9 +331,9 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 			pr_err("cpu_capacity: missing %pOF raw capacity\n",
 				cpu_node);
 			pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
+			cap_parsing_failed = true;
+			free_raw_capacity();
 		}
-		cap_parsing_failed = true;
-		free_raw_capacity();
 	}
 
 	return !ret;
