@@ -109,6 +109,22 @@ properties:
 
     additionalProperties: false
 
+  clkout-clock:
+    description: A subnode with three clock cells for externally routed clocks,
+      output clocks. These are two PRCMU-internal clocks that can be divided and
+      muxed out on the pads of the DB8500 SoC. The first cell indicates which
+      output clock we are using, possible values are 0 (CLKOUT1) and 1 (CLKOUT2).
+      The second cell indicates which clock we want to use as source, possible
+      values are 0 thru 7, see the defines for the different source clocks.
+      The third cell is a divider, legal values are 1 thru 63.
+    type: object
+
+    properties:
+      '#clock-cells':
+        const: 3
+
+    additionalProperties: false
+
 required:
   - compatible
   - reg
