@@ -275,6 +275,8 @@ static int find_dfls_by_default(struct pci_dev *pcidev,
 		len = pci_resource_len(pcidev, 0);
 
 		dfl_fpga_enum_info_add_dfl(info, start, len);
+	} else if (dfl_feature_is_afu(base)) {
+		dev_info(&pcidev->dev, "find AFU\n");
 	} else {
 		ret = -ENODEV;
 	}

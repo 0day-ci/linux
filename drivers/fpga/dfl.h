@@ -421,6 +421,13 @@ static inline bool dfl_feature_is_port(void __iomem *base)
 		(FIELD_GET(DFH_ID, v) == DFH_ID_FIU_PORT);
 }
 
+static inline bool dfl_feature_is_afu(void __iomem *base)
+{
+	u64 v = readq(base + DFH);
+
+	return (FIELD_GET(DFH_TYPE, v) == DFH_TYPE_AFU);
+}
+
 static inline u8 dfl_feature_revision(void __iomem *base)
 {
 	return (u8)FIELD_GET(DFH_REVISION, readq(base + DFH));
