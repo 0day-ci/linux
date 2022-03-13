@@ -1124,8 +1124,10 @@ static void build_info_complete(struct build_feature_devs_info *binfo)
 static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 			     resource_size_t ofst)
 {
+	struct dfl_fpga_cdev *cdev = binfo->cdev;
 	int ret = 0;
 	u32 offset;
+	u32 port;
 	u16 id;
 	u64 v;
 
@@ -1160,8 +1162,15 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 	v = readq(binfo->ioaddr + NEXT_AFU);
 
 	offset = FIELD_GET(NEXT_AFU_NEXT_DFH_OFST, v);
-	if (offset)
+	if (offset) {
+		if (dfh_id_to_type(id) == PORT_ID) {
+			port = FIELD_GET(PORT_CAP_PORT_NUM,
+					 readq(binfo->ioaddr + PORT_HDR_CAP));
+			cdev->flags |= dfl_feat_port_connect_afu(port);
+		}
+
 		return parse_feature_afu(binfo, offset);
+	}
 
 	dev_dbg(binfo->dev, "No AFUs detected on FIU %d\n", id);
 

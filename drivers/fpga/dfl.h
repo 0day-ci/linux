@@ -461,6 +461,16 @@ int dfl_fpga_enum_info_add_irq(struct dfl_fpga_enum_info *info,
 			       unsigned int nr_irqs, int *irq_table);
 void dfl_fpga_enum_info_free(struct dfl_fpga_enum_info *info);
 
+/*
+ * Bitfields in flags of dfl_fpga_cdev.
+ *
+ * 0 - (DFL_PORT_CONNECT_BITS -1): AFU was connected with Port device.
+ * DFL_PORT_CONNECT_BITS - 63: reserved.
+ */
+#define dfl_feat_port_connect_afu(port) (BIT_ULL(port))
+#define DFL_PORT_CONNECT_BITS  MAX_DFL_FPGA_PORT_NUM
+#define DFL_FEAT_PORT_CONNECT_MASK ((1UL << (DFL_PORT_CONNECT_BITS)) - 1)
+
 /**
  * struct dfl_fpga_cdev - container device of DFL based FPGA
  *
@@ -470,6 +480,7 @@ void dfl_fpga_enum_info_free(struct dfl_fpga_enum_info *info);
  * @lock: mutex lock to protect the port device list.
  * @port_dev_list: list of all port feature devices under this container device.
  * @released_port_num: released port number under this container device.
+ * @flags: extensions discovered during DFL enumeration.
  */
 struct dfl_fpga_cdev {
 	struct device *parent;
@@ -478,6 +489,7 @@ struct dfl_fpga_cdev {
 	struct mutex lock;
 	struct list_head port_dev_list;
 	int released_port_num;
+	u64 flags;
 };
 
 struct dfl_fpga_cdev *
