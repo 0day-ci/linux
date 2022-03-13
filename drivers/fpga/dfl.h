@@ -471,6 +471,8 @@ void dfl_fpga_enum_info_free(struct dfl_fpga_enum_info *info);
 #define DFL_PORT_CONNECT_BITS  MAX_DFL_FPGA_PORT_NUM
 #define DFL_FEAT_PORT_CONNECT_MASK ((1UL << (DFL_PORT_CONNECT_BITS)) - 1)
 
+#define dfl_has_port_connected_afu(cdev) ((cdev)->flags & DFL_FEAT_PORT_CONNECT_MASK)
+
 /**
  * struct dfl_fpga_cdev - container device of DFL based FPGA
  *
