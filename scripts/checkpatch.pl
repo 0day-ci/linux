@@ -7062,6 +7062,12 @@ sub process {
 			     "$1 uses number as first arg, sizeof is generally wrong\n" . $herecurr);
 		}
 
+# check for small allocs
+		if ($line =~ /\b(?:kv|k|v)[zm]alloc\s*\(\s*(\d|sizeof\s*\([su](8|16|32)s*\))\s*,/) {
+			WARN("SMALL_ALLOC",
+			     "Small allocs should be combined\n" . $herecurr);
+		}
+
 # check for multiple semicolons
 		if ($line =~ /;\s*;\s*$/) {
 			if (WARN("ONE_SEMICOLON",
