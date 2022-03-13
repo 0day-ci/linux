@@ -379,7 +379,7 @@ static void __unregister_prot_hook(struct sock *sk, bool sync)
 
 	if (sync) {
 		spin_unlock(&po->bind_lock);
-		synchronize_net();
+		synchronize_net_expedited();
 		spin_lock(&po->bind_lock);
 	}
 }
@@ -1578,7 +1578,7 @@ static void __fanout_set_data_bpf(struct packet_fanout *f, struct bpf_prog *new)
 	spin_unlock(&f->lock);
 
 	if (old) {
-		synchronize_net();
+		synchronize_net_expedited();
 		bpf_prog_destroy(old);
 	}
 }
@@ -3137,7 +3137,7 @@ static int packet_release(struct socket *sock)
 
 	f = fanout_release(sk);
 
-	synchronize_net();
+	synchronize_net_expedited();
 
 	kfree(po->rollover);
 	if (f) {
@@ -4453,7 +4453,7 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 	}
 	spin_unlock(&po->bind_lock);
 
-	synchronize_net();
+	synchronize_net_expedited();
 
 	err = -EBUSY;
 	mutex_lock(&po->pg_vec_lock);
