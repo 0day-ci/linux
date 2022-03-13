@@ -59,11 +59,14 @@ static const u8 *drm_find_displayid_extension(const struct edid *edid,
 }
 
 void displayid_iter_edid_begin(const struct edid *edid,
-			       struct displayid_iter *iter)
+			       struct displayid_iter *iter, int *ext_index)
 {
 	memset(iter, 0, sizeof(*iter));
 
 	iter->edid = edid;
+
+	if (ext_index)
+		iter->ext_index = *ext_index;
 }
 
 static const struct displayid_block *
@@ -126,7 +129,10 @@ __displayid_iter_next(struct displayid_iter *iter)
 	}
 }
 
-void displayid_iter_end(struct displayid_iter *iter)
+void displayid_iter_end(struct displayid_iter *iter, int *ext_index)
 {
+	if (ext_index)
+		*ext_index = iter->ext_index;
+
 	memset(iter, 0, sizeof(*iter));
 }

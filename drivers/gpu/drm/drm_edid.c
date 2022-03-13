@@ -3353,28 +3353,27 @@ const u8 *drm_find_edid_extension(const struct edid *edid,
 	return edid_ext;
 }
 
-static const u8 *drm_find_cea_extension(const struct edid *edid)
+static const u8 *drm_find_cea_extension(const struct edid *edid,
+					int *cea_ext_index, int *displayid_ext_index)
 {
 	const struct displayid_block *block;
 	struct displayid_iter iter;
 	const u8 *cea;
-	int ext_index = 0;
 
-	/* Look for a top level CEA extension block */
-	/* FIXME: make callers iterate through multiple CEA ext blocks? */
-	cea = drm_find_edid_extension(edid, CEA_EXT, &ext_index);
+	/* Look for a CEA extension block from ext_index */
+	cea = drm_find_edid_extension(edid, CEA_EXT, cea_ext_index);
 	if (cea)
 		return cea;
 
 	/* CEA blocks can also be found embedded in a DisplayID block */
-	displayid_iter_edid_begin(edid, &iter);
+	displayid_iter_edid_begin(edid, &iter, displayid_ext_index);
 	displayid_iter_for_each(block, &iter) {
 		if (block->tag == DATA_BLOCK_CTA) {
 			cea = (const u8 *)block;
 			break;
 		}
 	}
-	displayid_iter_end(&iter);
+	displayid_iter_end(&iter, displayid_ext_index);
 
 	return cea;
 }
@@ -3643,10 +3642,10 @@ add_alternate_cea_modes(struct drm_connector *connector, struct edid *edid)
 	struct drm_device *dev = connector->dev;
 	struct drm_display_mode *mode, *tmp;
 	LIST_HEAD(list);
-	int modes = 0;
+	int modes = 0, cea_ext_index = 0, displayid_ext_index = 0;
 
 	/* Don't add CEA modes if the CEA extension block is missing */
-	if (!drm_find_cea_extension(edid))
+	if (!drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index))
 		return 0;
 
 	/*
@@ -4321,11 +4320,11 @@ static void drm_parse_y420cmdb_bitmap(struct drm_connector *connector,
 static int
 add_cea_modes(struct drm_connector *connector, struct edid *edid)
 {
-	const u8 *cea = drm_find_cea_extension(edid);
-	const u8 *db, *hdmi = NULL, *video = NULL;
+	const u8 *cea, *db, *hdmi = NULL, *video = NULL;
 	u8 dbl, hdmi_len, video_len = 0;
-	int modes = 0;
+	int modes = 0, cea_ext_index = 0, displayid_ext_index = 0;
 
+	cea = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (cea && cea_revision(cea) >= 3) {
 		int i, start, end;
 
@@ -4563,6 +4562,7 @@ static void drm_edid_to_eld(struct drm_connector *connector, struct edid *edid)
 	const u8 *cea;
 	const u8 *db;
 	int total_sad_count = 0;
+	int cea_ext_index = 0, displayid_ext_index = 0;
 	int mnl;
 	int dbl;
 
@@ -4571,7 +4571,7 @@ static void drm_edid_to_eld(struct drm_connector *connector, struct edid *edid)
 	if (!edid)
 		return;
 
-	cea = drm_find_cea_extension(edid);
+	cea = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (!cea) {
 		DRM_DEBUG_KMS("ELD: no CEA Extension found\n");
 		return;
@@ -4657,9 +4657,10 @@ int drm_edid_to_sad(struct edid *edid, struct cea_sad **sads)
 {
 	int count = 0;
 	int i, start, end, dbl;
+	int cea_ext_index = 0, displayid_ext_index = 0;
 	const u8 *cea;
 
-	cea = drm_find_cea_extension(edid);
+	cea = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (!cea) {
 		DRM_DEBUG_KMS("SAD: no CEA Extension found\n");
 		return 0;
@@ -4719,9 +4720,10 @@ int drm_edid_to_speaker_allocation(struct edid *edid, u8 **sadb)
 {
 	int count = 0;
 	int i, start, end, dbl;
+	int cea_ext_index = 0, displayid_ext_index = 0;
 	const u8 *cea;
 
-	cea = drm_find_cea_extension(edid);
+	cea = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (!cea) {
 		DRM_DEBUG_KMS("SAD: no CEA Extension found\n");
 		return 0;
@@ -4815,8 +4817,9 @@ bool drm_detect_hdmi_monitor(struct edid *edid)
 	const u8 *edid_ext;
 	int i;
 	int start_offset, end_offset;
+	int cea_ext_index = 0, displayid_ext_index = 0;
 
-	edid_ext = drm_find_cea_extension(edid);
+	edid_ext = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (!edid_ext)
 		return false;
 
@@ -4854,8 +4857,9 @@ bool drm_detect_monitor_audio(struct edid *edid)
 	int i, j;
 	bool has_audio = false;
 	int start_offset, end_offset;
+	int cea_ext_index = 0, displayid_ext_index = 0;
 
-	edid_ext = drm_find_cea_extension(edid);
+	edid_ext = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (!edid_ext)
 		goto end;
 
@@ -5178,8 +5182,9 @@ static void drm_parse_cea_ext(struct drm_connector *connector,
 	struct drm_display_info *info = &connector->display_info;
 	const u8 *edid_ext;
 	int i, start, end;
+	int cea_ext_index = 0, displayid_ext_index = 0;
 
-	edid_ext = drm_find_cea_extension(edid);
+	edid_ext = drm_find_cea_extension(edid, &cea_ext_index, &displayid_ext_index);
 	if (!edid_ext)
 		return;
 
@@ -5311,12 +5316,12 @@ static void drm_update_mso(struct drm_connector *connector, const struct edid *e
 	const struct displayid_block *block;
 	struct displayid_iter iter;
 
-	displayid_iter_edid_begin(edid, &iter);
+	displayid_iter_edid_begin(edid, &iter, NULL);
 	displayid_iter_for_each(block, &iter) {
 		if (block->tag == DATA_BLOCK_2_VENDOR_SPECIFIC)
 			drm_parse_vesa_mso_data(connector, block);
 	}
-	displayid_iter_end(&iter);
+	displayid_iter_end(&iter, NULL);
 }
 
 /* A connector has no EDID information, so we've got no EDID to compute quirks from. Reset
@@ -5516,13 +5521,13 @@ static int add_displayid_detailed_modes(struct drm_connector *connector,
 	struct displayid_iter iter;
 	int num_modes = 0;
 
-	displayid_iter_edid_begin(edid, &iter);
+	displayid_iter_edid_begin(edid, &iter, NULL);
 	displayid_iter_for_each(block, &iter) {
 		if (block->tag == DATA_BLOCK_TYPE_1_DETAILED_TIMING ||
 		    block->tag == DATA_BLOCK_2_TYPE_7_DETAILED_TIMING)
 			num_modes += add_displayid_detailed_1_modes(connector, block);
 	}
-	displayid_iter_end(&iter);
+	displayid_iter_end(&iter, NULL);
 
 	return num_modes;
 }
@@ -6164,12 +6169,12 @@ void drm_update_tile_info(struct drm_connector *connector,
 
 	connector->has_tile = false;
 
-	displayid_iter_edid_begin(edid, &iter);
+	displayid_iter_edid_begin(edid, &iter, NULL);
 	displayid_iter_for_each(block, &iter) {
 		if (block->tag == DATA_BLOCK_TILED_DISPLAY)
 			drm_parse_tiled_block(connector, block);
 	}
-	displayid_iter_end(&iter);
+	displayid_iter_end(&iter, NULL);
 
 	if (!connector->has_tile && connector->tile_group) {
 		drm_mode_put_tile_group(connector->dev, connector->tile_group);

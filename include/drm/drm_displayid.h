@@ -150,11 +150,11 @@ struct displayid_iter {
 };
 
 void displayid_iter_edid_begin(const struct edid *edid,
-			       struct displayid_iter *iter);
+			       struct displayid_iter *iter, int *ext_index);
 const struct displayid_block *
 __displayid_iter_next(struct displayid_iter *iter);
 #define displayid_iter_for_each(__block, __iter) \
 	while (((__block) = __displayid_iter_next(__iter)))
-void displayid_iter_end(struct displayid_iter *iter);
+void displayid_iter_end(struct displayid_iter *iter, int *ext_index);
 
 #endif
