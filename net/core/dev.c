@@ -10634,6 +10634,19 @@ void synchronize_net(void)
 EXPORT_SYMBOL(synchronize_net);
 
 /**
+ *	synchronize_net_expedited - synchronize_net, but always expedited
+ *
+ *	Some callers may have reasons other than "RTNL held" to want expedited
+ *	RCU sync.  A prominent example is if the RCU delay is user visible.
+ */
+void synchronize_net_expedited(void)
+{
+	might_sleep();
+	synchronize_rcu_expedited();
+}
+EXPORT_SYMBOL(synchronize_net_expedited);
+
+/**
  *	unregister_netdevice_queue - remove device from the kernel
  *	@dev: device
  *	@head: list

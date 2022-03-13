@@ -74,6 +74,8 @@ struct bpf_prog;
 struct xdp_buff;
 
 void synchronize_net(void);
+void synchronize_net_expedited(void);
+
 void netdev_set_default_ethtool_ops(struct net_device *dev,
 				    const struct ethtool_ops *ops);
 
