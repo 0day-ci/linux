@@ -100,50 +100,34 @@ static inline struct repaper_epd *drm_to_epd(struct drm_device *drm)
 static int repaper_spi_transfer(struct spi_device *spi, u8 header,
 				const void *tx, void *rx, size_t len)
 {
-	void *txbuf = NULL, *rxbuf = NULL;
 	struct spi_transfer tr[2] = {};
-	u8 *headerbuf;
+	u8 *buf;
 	int ret;
 
-	headerbuf = kmalloc(1, GFP_KERNEL);
-	if (!headerbuf)
+	buf = kmalloc(1 + len, GFP_KERNEL);
+	if (!buf)
 		return -ENOMEM;
 
-	headerbuf[0] = header;
-	tr[0].tx_buf = headerbuf;
+	buf[len] = header;
+	tr[0].tx_buf = &buf[len];
 	tr[0].len = 1;
 
-	/* Stack allocated tx? */
-	if (tx && len <= 32) {
-		txbuf = kmemdup(tx, len, GFP_KERNEL);
-		if (!txbuf) {
-			ret = -ENOMEM;
-			goto out_free;
-		}
+	if (tx) {
+		memcpy(buf, tx, len);
+		tr[1].tx_buf = buf;
 	}
 
-	if (rx) {
-		rxbuf = kmalloc(len, GFP_KERNEL);
-		if (!rxbuf) {
-			ret = -ENOMEM;
-			goto out_free;
-		}
-	}
+	if (rx)
+		tr[1].rx_buf = buf;
 
-	tr[1].tx_buf = txbuf ? txbuf : tx;
-	tr[1].rx_buf = rxbuf;
 	tr[1].len = len;
 
 	ndelay(80);
 	ret = spi_sync_transfer(spi, tr, 2);
 	if (rx && !ret)
-		memcpy(rx, rxbuf, len);
+		memcpy(rx, buf, len);
 
-out_free:
-	kfree(headerbuf);
-	kfree(txbuf);
-	kfree(rxbuf);
-
+	kfree(buf);
 	return ret;
 }
 
