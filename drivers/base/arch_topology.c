@@ -267,20 +267,25 @@ void topology_normalize_cpu_scale(void)
 {
 	u64 capacity;
 	u64 capacity_scale;
+	u32 raw_cpu_capacity;
 	int cpu;
 
-	if (!raw_capacity)
+	if (cap_parsing_failed)
 		return;
 
 	capacity_scale = 1;
 	for_each_possible_cpu(cpu) {
-		capacity = raw_capacity[cpu] * per_cpu(freq_factor, cpu);
+		raw_cpu_capacity =
+			raw_capacity ? raw_capacity[cpu] : SCHED_CAPACITY_SCALE;
+		capacity = raw_cpu_capacity * per_cpu(freq_factor, cpu);
 		capacity_scale = max(capacity, capacity_scale);
 	}
 
 	pr_debug("cpu_capacity: capacity_scale=%llu\n", capacity_scale);
 	for_each_possible_cpu(cpu) {
-		capacity = raw_capacity[cpu] * per_cpu(freq_factor, cpu);
+		raw_cpu_capacity =
+			raw_capacity ? raw_capacity[cpu] : SCHED_CAPACITY_SCALE;
+		capacity = raw_cpu_capacity * per_cpu(freq_factor, cpu);
 		capacity = div64_u64(capacity << SCHED_CAPACITY_SHIFT,
 			capacity_scale);
 		topology_set_cpu_scale(cpu, capacity);
@@ -373,7 +378,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 	int cpu;
 
-	if (!raw_capacity)
+	if (cap_parsing_failed)
 		return 0;
 
 	if (val != CPUFREQ_CREATE_POLICY)
@@ -412,7 +417,7 @@ static int __init register_cpufreq_notifier(void)
 	 * until we have the necessary code to parse the cpu capacity, so
 	 * skip registering cpufreq notifier.
 	 */
-	if (!acpi_disabled || !raw_capacity)
+	if (!acpi_disabled || cap_parsing_failed)
 		return -EINVAL;
 
 	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL))
