@@ -972,6 +972,29 @@ bool acpi_pci_power_manageable(struct pci_dev *dev)
 	return adev && acpi_device_power_manageable(adev);
 }
 
+/**
+ * acpi_pci_s0w_supports_d3 - Deterine if ACPI device supports D3.
+ * @adev: ACPI Device node.
+ *
+ * Validate that the GPE has been enabled for the ACPI device, and if it
+ * was then evaluate the _S0W method for the ACPI device.
+ *
+ * Returns true when GPE is enabled and _S0W can support D3hot or D3cold.
+ */
+static bool acpi_pci_s0w_supports_d3(struct acpi_device *adev)
+{
+	unsigned long long ret;
+	char *method = "_S0W";
+
+	if (!adev->wakeup.flags.valid)
+		return false;
+
+	if (ACPI_FAILURE(acpi_evaluate_integer(adev->handle, method, NULL, &ret)))
+		return false;
+
+	return ret >= ACPI_STATE_D3_HOT;
+}
+
 bool acpi_pci_bridge_d3(struct pci_dev *dev)
 {
 	const union acpi_object *obj;
@@ -1001,6 +1024,13 @@ bool acpi_pci_bridge_d3(struct pci_dev *dev)
 
 	if (acpi_dev_get_property(adev, "HotPlugSupportInD3",
 				   ACPI_TYPE_INTEGER, &obj) < 0)
+		return false;
+
+	/*
+	 * The ACPI firmware may have 'HotPlugSupportInD3' set on the device,
+	 * but _S0W may indicate that the device is not able to wake from D3.
+	 */
+	if (!acpi_pci_s0w_supports_d3(adev))
 		return false;
 
 	return obj->integer.value == 1;
