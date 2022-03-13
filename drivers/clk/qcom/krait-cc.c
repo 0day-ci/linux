@@ -34,9 +34,10 @@ static int krait_notifier_cb(struct notifier_block *nb,
 			     unsigned long event,
 			     void *data)
 {
-	int ret = 0;
 	struct krait_mux_clk *mux = container_of(nb, struct krait_mux_clk,
 						 clk_nb);
+	int ret = 0;
+
 	/* Switch to safe parent */
 	if (event == PRE_RATE_CHANGE) {
 		mux->old_index = krait_mux_clk_ops.get_parent(&mux->hw);
@@ -59,7 +60,7 @@ static int krait_notifier_cb(struct notifier_block *nb,
 static int krait_notifier_register(struct device *dev, struct clk *clk,
 				   struct krait_mux_clk *mux)
 {
-	int ret = 0;
+	int ret;
 
 	mux->clk_nb.notifier_call = krait_notifier_cb;
 	ret = clk_notifier_register(clk, &mux->clk_nb);
@@ -72,15 +73,15 @@ static int krait_notifier_register(struct device *dev, struct clk *clk,
 static struct clk *
 krait_add_div(struct device *dev, int id, const char *s, unsigned int offset)
 {
-	struct krait_div2_clk *div;
 	static struct clk_parent_data p_data[1];
 	struct clk_init_data init = {
 		.num_parents = ARRAY_SIZE(p_data),
 		.ops = &krait_div2_clk_ops,
 		.flags = CLK_SET_RATE_PARENT,
 	};
-	struct clk *clk;
+	struct krait_div2_clk *div;
 	char *parent_name;
+	struct clk *clk;
 
 	div = devm_kzalloc(dev, sizeof(*div), GFP_KERNEL);
 	if (!div)
@@ -119,8 +120,6 @@ static struct clk *
 krait_add_sec_mux(struct device *dev, int id, const char *s,
 		  unsigned int offset, bool unique_aux)
 {
-	int ret;
-	struct krait_mux_clk *mux;
 	static struct clk_parent_data sec_mux_list[2] = {
 		{ .name = "qsb", .fw_name = "qsb" },
 		{},
@@ -131,8 +130,10 @@ krait_add_sec_mux(struct device *dev, int id, const char *s,
 		.ops = &krait_mux_clk_ops,
 		.flags = CLK_SET_RATE_PARENT,
 	};
-	struct clk *clk;
+	struct krait_mux_clk *mux;
 	char *parent_name;
+	struct clk *clk;
+	int ret;
 
 	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
 	if (!mux)
@@ -182,8 +183,6 @@ static struct clk *
 krait_add_pri_mux(struct device *dev, struct clk *hfpll_div, struct clk *sec_mux,
 		  int id, const char *s, unsigned int offset)
 {
-	int ret;
-	struct krait_mux_clk *mux;
 	static struct clk_parent_data p_data[3];
 	struct clk_init_data init = {
 		.parent_data = p_data,
@@ -191,8 +190,10 @@ krait_add_pri_mux(struct device *dev, struct clk *hfpll_div, struct clk *sec_mux
 		.ops = &krait_mux_clk_ops,
 		.flags = CLK_SET_RATE_PARENT,
 	};
-	struct clk *clk;
+	struct krait_mux_clk *mux;
 	char *hfpll_name;
+	struct clk *clk;
+	int ret;
 
 	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
 	if (!mux)
@@ -240,10 +241,10 @@ err_hfpll:
 /* id < 0 for L2, otherwise id == physical CPU number */
 static struct clk *krait_add_clks(struct device *dev, int id, bool unique_aux)
 {
+	struct clk *hfpll_div, *sec_mux, *clk;
 	unsigned int offset;
 	void *p = NULL;
 	const char *s;
-	struct clk *hfpll_div, *sec_mux, *clk;
 
 	if (id >= 0) {
 		offset = 0x4501 + (0x1000 * id);
@@ -295,20 +296,21 @@ MODULE_DEVICE_TABLE(of, krait_cc_match_table);
 
 static int krait_cc_probe(struct platform_device *pdev)
 {
+	unsigned long cur_rate, aux_rate;
+	struct clk *l2_pri_mux_clk, *clk;
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *id;
-	unsigned long cur_rate, aux_rate;
-	int cpu;
-	struct clk *clk;
 	struct clk **clks;
-	struct clk *l2_pri_mux_clk;
+	int cpu;
 
 	id = of_match_device(krait_cc_match_table, dev);
 	if (!id)
 		return -ENODEV;
 
 	/* Rate is 1 because 0 causes problems for __clk_mux_determine_rate */
-	clk = clk_register_fixed_rate(dev, "qsb", NULL, 0, 1);
+	if (IS_ERR(clk_get(dev, "qsb")))
+		clk = clk_register_fixed_rate(dev, "qsb", NULL, 0, 1);
+
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
@@ -363,25 +365,25 @@ static int krait_cc_probe(struct platform_device *pdev)
 	cur_rate = clk_get_rate(l2_pri_mux_clk);
 	aux_rate = 384000000;
 	if (cur_rate == 1) {
-		pr_info("L2 @ QSB rate. Forcing new rate.\n");
+		dev_info(dev, "L2 @ QSB rate. Forcing new rate.\n");
 		cur_rate = aux_rate;
 	}
 	clk_set_rate(l2_pri_mux_clk, aux_rate);
 	clk_set_rate(l2_pri_mux_clk, 2);
 	clk_set_rate(l2_pri_mux_clk, cur_rate);
-	pr_info("L2 @ %lu KHz\n", clk_get_rate(l2_pri_mux_clk) / 1000);
+	dev_info(dev, "L2 @ %lu KHz\n", clk_get_rate(l2_pri_mux_clk) / 1000);
 	for_each_possible_cpu(cpu) {
 		clk = clks[cpu];
 		cur_rate = clk_get_rate(clk);
 		if (cur_rate == 1) {
-			pr_info("CPU%d @ QSB rate. Forcing new rate.\n", cpu);
+			dev_info(dev, "CPU%d @ QSB rate. Forcing new rate.\n", cpu);
 			cur_rate = aux_rate;
 		}
 
 		clk_set_rate(clk, aux_rate);
 		clk_set_rate(clk, 2);
 		clk_set_rate(clk, cur_rate);
-		pr_info("CPU%d @ %lu KHz\n", cpu, clk_get_rate(clk) / 1000);
+		dev_info(dev, "CPU%d @ %lu KHz\n", cpu, clk_get_rate(clk) / 1000);
 	}
 
 	of_clk_add_provider(dev->of_node, krait_of_get, clks);
