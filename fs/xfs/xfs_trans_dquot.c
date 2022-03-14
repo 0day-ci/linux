@@ -598,7 +598,8 @@ xfs_dqresv_check(
 		time64_t	now = ktime_get_real_seconds();
 
 		if ((res->timer != 0 && now > res->timer) ||
-		    (res->warnings != 0 && res->warnings >= qlim->warn)) {
+		    (res->warnings != 0 && qlim->warn != 0 &&
+		     res->warnings >= qlim->warn)) {
 			*fatal = true;
 			return QUOTA_NL_ISOFTLONGWARN;
 		}

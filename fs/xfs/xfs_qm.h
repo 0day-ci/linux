@@ -134,9 +134,14 @@ struct xfs_dquot_acct {
 #define XFS_QM_RTBTIMELIMIT	(7 * 24*60*60)          /* 1 week */
 #define XFS_QM_ITIMELIMIT	(7 * 24*60*60)          /* 1 week */
 
-#define XFS_QM_BWARNLIMIT	5
-#define XFS_QM_IWARNLIMIT	5
-#define XFS_QM_RTBWARNLIMIT	5
+/*
+ * Histerically, the quota warning counter never incremented and hence was
+ * never enforced.  Now that the counter works, we set a default warning limit
+ * of zero, which means there is no limit.
+ */
+#define XFS_QM_BWARNLIMIT	0
+#define XFS_QM_IWARNLIMIT	0
+#define XFS_QM_RTBWARNLIMIT	0
 
 extern void		xfs_qm_destroy_quotainfo(struct xfs_mount *);
 
