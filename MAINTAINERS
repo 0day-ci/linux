@@ -1056,7 +1056,7 @@ M:	Zhou Peng <eagle.zhou@nxp.com>
 L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/media/amphion,vpu.yaml
-F:	drivers/media/platform/amphion/
+F:	drivers/media/platform/nxp/amphion/
 
 AMS AS73211 DRIVER
 M:	Christian Eggers <ceggers@arri.de>
