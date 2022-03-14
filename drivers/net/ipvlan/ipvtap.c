@@ -83,7 +83,7 @@ static int ipvtap_newlink(struct net *src_net, struct net_device *dev,
 
 	INIT_LIST_HEAD(&vlantap->tap.queue_list);
 
-	/* Since macvlan supports all offloads by default, make
+	/* Since ipvlan supports all offloads by default, make
 	 * tap support all offloads also.
 	 */
 	vlantap->tap.tap_features = TUN_OFFLOADS;
@@ -95,7 +95,7 @@ static int ipvtap_newlink(struct net *src_net, struct net_device *dev,
 	if (err)
 		return err;
 
-	/* Don't put anything that may fail after macvlan_common_newlink
+	/* Don't put anything that may fail after ipvlan_link_new
 	 * because we can't undo what it does.
 	 */
 	err =  ipvlan_link_new(src_net, dev, tb, data, extack);
