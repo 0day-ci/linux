@@ -223,6 +223,81 @@ static int intel_compute_global_watermarks(struct intel_atomic_state *state)
 	return 0;
 }
 
+static void
+intel_connectors_wakeup_hpd_suppress(struct intel_atomic_state *state)
+{
+	struct drm_i915_private *i915 = to_i915(state->base.dev);
+	struct i915_hotplug *hpd = &i915->hotplug;
+	bool do_delay = false;
+	struct intel_connector *connector;
+	struct intel_digital_connector_state *conn_state;
+	int i;
+
+	if (!hpd->suppress_wakeup_hpd_enabled)
+		return;
+
+	for_each_new_intel_connector_in_state(state, connector,
+					      conn_state, i) {
+		struct intel_crtc *crtc = to_intel_crtc(conn_state->base.crtc);
+		struct intel_crtc_state *crtc_state;
+
+		if (!crtc || !intel_connector_needs_modeset(state,
+							    &connector->base))
+			continue;
+
+		crtc_state = intel_atomic_get_new_crtc_state(state, crtc);
+		if (!crtc_state->hw.active)
+			continue;
+
+		if (!intel_connector_need_suppress_wakeup_hpd(connector))
+			continue;
+
+		if (time_is_before_jiffies64(connector->disabled_time +
+					     msecs_to_jiffies(MSEC_PER_SEC * 10))) {
+			drm_dbg_kms(&i915->drm,
+				    "[CONNECTOR:%d:%s] Suppress wakeup HPD for 2 secs\n",
+				    connector->base.base.id, connector->base.name);
+			do_delay = true;
+		}
+	}
+
+	if (do_delay)
+		msleep(2 * MSEC_PER_SEC);
+}
+
+static void
+intel_connectors_wakeup_hpd_track_disabling(struct intel_atomic_state *state)
+{
+	struct drm_i915_private *i915 = to_i915(state->base.dev);
+	struct i915_hotplug *hpd = &i915->hotplug;
+	struct intel_connector *connector;
+	struct intel_digital_connector_state *conn_state;
+	int i;
+
+	if (!hpd->suppress_wakeup_hpd_enabled)
+		return;
+
+	for_each_old_intel_connector_in_state(state, connector,
+					      conn_state, i) {
+		struct intel_crtc *crtc = to_intel_crtc(conn_state->base.crtc);
+		struct intel_crtc_state *crtc_state;
+
+		if (!crtc || !intel_connector_needs_modeset(state,
+							    &connector->base))
+			continue;
+
+		crtc_state = intel_atomic_get_old_crtc_state(state, crtc);
+		if (!crtc_state->hw.active)
+			continue;
+
+		drm_dbg_kms(&i915->drm,
+			    "[CONNECTOR:%d:%s] Update disabled time for wakeup HPD handling\n",
+			    connector->base.base.id, connector->base.name);
+
+		connector->disabled_time = get_jiffies_64();
+	}
+}
+
 /* returns HPLL frequency in kHz */
 int vlv_get_hpll_vco(struct drm_i915_private *dev_priv)
 {
@@ -8433,6 +8508,8 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 		}
 	}
 
+	intel_connectors_wakeup_hpd_track_disabling(state);
+
 	intel_commit_modeset_disables(state);
 
 	/* FIXME: Eventually get rid of our crtc->config pointer */
@@ -8475,6 +8552,9 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 
 	/* Now enable the clocks, plane, pipe, and connectors that we set up. */
 	dev_priv->display->commit_modeset_enables(state);
+
+	/* sleep for 2sec for power state connector become available */
+	intel_connectors_wakeup_hpd_suppress(state);
 
 	intel_encoders_update_complete(state);
 

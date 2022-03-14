@@ -539,6 +539,14 @@ enum hpd_pin {
 			     ((connector) = to_intel_connector((__state)->base.connectors[__i].ptr), \
 			     (new_connector_state) = to_intel_digital_connector_state((__state)->base.connectors[__i].new_state), 1))
 
+#define for_each_old_intel_connector_in_state(__state, connector, old_connector_state, __i) \
+	for ((__i) = 0; \
+		(__i) < (__state)->base.num_connector; \
+		(__i)++) \
+		for_each_if((__state)->base.connectors[__i].ptr && \
+				((connector) = to_intel_connector((__state)->base.connectors[__i].ptr), \
+				(old_connector_state) = to_intel_digital_connector_state((__state)->base.connectors[__i].old_state), 1))
+
 int intel_atomic_add_affected_planes(struct intel_atomic_state *state,
 				     struct intel_crtc *crtc);
 u8 intel_calc_active_pipes(struct intel_atomic_state *state,
