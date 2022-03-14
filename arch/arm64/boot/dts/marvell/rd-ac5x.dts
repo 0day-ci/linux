@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device Tree For AC5X.
+ *
+ * Copyright (C) 2021 Marvell
+ *
+ */
+/*
+ * Device Tree file for Marvell Alleycat 5X development board
+ * This board file supports the B configuration of the board
+ */
+
+#include "armada-98dx2530.dtsi"
+
+&mdio {
+	phy0: ethernet-phy@0 {
+		reg = <0 0>;
+	};
+};
+
+&eth0 {
+	status = "okay";
+	phy = <&phy0>;
+};
+
+&spi0 {
+	status = "okay";
+
+	spiflash0: spi-flash@0 {
+		compatible = "spi-nor";
+		spi-max-frequency = <50000000>;
+		spi-tx-bus-width = <1>; /* 1-single, 2-dual, 4-quad */
+		spi-rx-bus-width = <1>; /* 1-single, 2-dual, 4-quad */
+		reg = <0>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		partition@0 {
+			label = "spi_flash_part0";
+			reg = <0x0 0x800000>;
+		};
+
+		parition@1 {
+			label = "spi_flash_part1";
+			reg = <0x800000 0x700000>;
+		};
+
+		parition@2 {
+			label = "spi_flash_part2";
+			reg = <0xF00000 0x100000>;
+		};
+	};
+};
+
+&usb1 {
+	compatible = "chipidea,usb2";
+	phys = <&usb1phy>;
+	phy-names = "usb-phy";
+	dr_mode = "peripheral";
+};
+
