@@ -33,16 +33,10 @@ static int meson_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 	return sizeof(u32);
 }
 
-static void meson_rng_clk_disable(void *data)
-{
-	clk_disable_unprepare(data);
-}
-
 static int meson_rng_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct meson_rng_data *data;
-	int ret;
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -54,20 +48,10 @@ static int meson_rng_probe(struct platform_device *pdev)
 	if (IS_ERR(data->base))
 		return PTR_ERR(data->base);
 
-	data->core_clk = devm_clk_get_optional(dev, "core");
+	data->core_clk = devm_clk_get_optional_enabled(dev, "core");
 	if (IS_ERR(data->core_clk))
 		return dev_err_probe(dev, PTR_ERR(data->core_clk),
-				     "Failed to get core clock\n");
-
-	if (data->core_clk) {
-		ret = clk_prepare_enable(data->core_clk);
-		if (ret)
-			return ret;
-		ret = devm_add_action_or_reset(dev, meson_rng_clk_disable,
-					       data->core_clk);
-		if (ret)
-			return ret;
-	}
+				     "Failed to get enabled core clock\n");
 
 	data->rng.name = pdev->name;
 	data->rng.read = meson_rng_read;
