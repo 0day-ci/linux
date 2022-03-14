@@ -53,7 +53,8 @@ const char *branch_type_name(int type)
 		"ERET",
 		"IRQ",
 		"SERROR",
-		"NO_TX"
+		"NO_TX",
+		"EXTEND_ABI"
 	};
 
 	if (type >= 0 && type < PERF_BR_MAX)
