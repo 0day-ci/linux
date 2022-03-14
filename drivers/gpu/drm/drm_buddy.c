@@ -685,7 +685,7 @@ int drm_buddy_alloc_blocks(struct drm_buddy *mm,
 			if (!IS_ERR(block))
 				break;
 
-			if (order-- == min_order) {
+			if (!order || order-- == min_order) {
 				err = -ENOSPC;
 				goto err_free;
 			}
