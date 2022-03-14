@@ -146,20 +146,26 @@ EXPORT_SYMBOL(gre_parse_header);
 static int gre_rcv(struct sk_buff *skb)
 {
 	const struct gre_protocol *proto;
+	enum skb_drop_reason reason;
 	u8 ver;
 	int ret;
 
+	reason = SKB_DROP_REASON_NOT_SPECIFIED;
 	if (!pskb_may_pull(skb, 12))
 		goto drop;
 
 	ver = skb->data[1]&0x7f;
-	if (ver >= GREPROTO_MAX)
+	if (ver >= GREPROTO_MAX) {
+		reason = SKB_DROP_REASON_GRE_VERSION;
 		goto drop;
+	}
 
 	rcu_read_lock();
 	proto = rcu_dereference(gre_proto[ver]);
-	if (!proto || !proto->handler)
+	if (!proto || !proto->handler) {
+		reason = SKB_DROP_REASON_GRE_NOHANDLER;
 		goto drop_unlock;
+	}
 	ret = proto->handler(skb);
 	rcu_read_unlock();
 	return ret;
@@ -167,7 +173,7 @@ static int gre_rcv(struct sk_buff *skb)
 drop_unlock:
 	rcu_read_unlock();
 drop:
-	kfree_skb(skb);
+	kfree_skb_reason(skb, reason);
 	return NET_RX_DROP;
 }
 

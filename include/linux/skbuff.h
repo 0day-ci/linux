@@ -444,6 +444,10 @@ enum skb_drop_reason {
 	SKB_DROP_REASON_TAP_TXFILTER,	/* dropped by tx filter implemented
 					 * at tun/tap, e.g., check_filter()
 					 */
+	SKB_DROP_REASON_GRE_VERSION,	/* GRE version not supported */
+	SKB_DROP_REASON_GRE_NOHANDLER,	/* no handler found (version not
+					 * supported?)
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
