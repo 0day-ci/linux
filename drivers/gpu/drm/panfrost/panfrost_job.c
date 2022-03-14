@@ -267,6 +267,22 @@ static void panfrost_attach_object_fences(struct drm_gem_object **bos,
 		dma_resv_add_excl_fence(bos[i]->resv, fence);
 }
 
+static bool panfrost_objects_alive(struct drm_gem_object **bos, int bo_count)
+{
+	struct panfrost_gem_object *bo;
+	bool alive = true;
+
+	while (alive && bo_count--) {
+		bo = to_panfrost_bo(bos[bo_count]);
+
+		mutex_lock(&bo->mappings.lock);
+		alive = !bo->base.madv;
+		mutex_unlock(&bo->mappings.lock);
+	}
+
+	return alive;
+}
+
 int panfrost_job_push(struct panfrost_job *job)
 {
 	struct panfrost_device *pfdev = job->pfdev;
@@ -277,6 +293,11 @@ int panfrost_job_push(struct panfrost_job *job)
 					    &acquire_ctx);
 	if (ret)
 		return ret;
+
+	if (!panfrost_objects_alive(job->bos, job->bo_count)) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
 
 	mutex_lock(&pfdev->sched_lock);
 	drm_sched_job_arm(&job->base);
@@ -319,7 +340,6 @@ static void panfrost_job_cleanup(struct kref *ref)
 			if (!job->mappings[i])
 				break;
 
-			atomic_dec(&job->mappings[i]->obj->gpu_usecount);
 			panfrost_gem_mapping_put(job->mappings[i]);
 		}
 		kvfree(job->mappings);

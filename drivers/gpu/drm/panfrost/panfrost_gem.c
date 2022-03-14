@@ -20,16 +20,6 @@ static void panfrost_gem_free_object(struct drm_gem_object *obj)
 	struct panfrost_device *pfdev = obj->dev->dev_private;
 
 	/*
-	 * Make sure the BO is no longer inserted in the shrinker list before
-	 * taking care of the destruction itself. If we don't do that we have a
-	 * race condition between this function and what's done in
-	 * panfrost_gem_shrinker_scan().
-	 */
-	mutex_lock(&pfdev->shrinker_lock);
-	list_del_init(&bo->base.madv_list);
-	mutex_unlock(&pfdev->shrinker_lock);
-
-	/*
 	 * If we still have mappings attached to the BO, there's a problem in
 	 * our refcounting.
 	 */
@@ -195,6 +185,22 @@ static int panfrost_gem_pin(struct drm_gem_object *obj)
 	return drm_gem_shmem_pin(&bo->base);
 }
 
+static unsigned long panfrost_gem_purge(struct drm_gem_object *obj)
+{
+	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
+	struct panfrost_gem_object *bo = to_panfrost_bo(obj);
+
+	if (!mutex_trylock(&bo->mappings.lock))
+		return 0;
+
+	panfrost_gem_teardown_mappings_locked(bo);
+	drm_gem_shmem_purge_locked(&bo->base);
+
+	mutex_unlock(&bo->mappings.lock);
+
+	return shmem->base.size >> PAGE_SHIFT;
+}
+
 static const struct drm_gem_object_funcs panfrost_gem_funcs = {
 	.free = panfrost_gem_free_object,
 	.open = panfrost_gem_open,
@@ -207,6 +213,7 @@ static const struct drm_gem_object_funcs panfrost_gem_funcs = {
 	.vunmap = drm_gem_shmem_object_vunmap,
 	.mmap = drm_gem_shmem_object_mmap,
 	.vm_ops = &drm_gem_shmem_vm_ops,
+	.purge = panfrost_gem_purge,
 };
 
 /**
