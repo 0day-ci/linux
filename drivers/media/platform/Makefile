@@ -12,7 +12,6 @@ obj-y += aspeed/
 obj-y += atmel/
 obj-y += cadence/
 obj-y += chips-media/
-obj-y += davinci/
 obj-y += intel/
 obj-y += marvell/
 obj-y += mediatek/mtk-jpeg/
@@ -42,6 +41,7 @@ obj-y += sti/hva/
 obj-y += sti/stm32/
 obj-y += ti-vpe/
 obj-y += ti/am437x/
+obj-y += ti/davinci/
 obj-y += via/
 obj-y += xilinx/
 
