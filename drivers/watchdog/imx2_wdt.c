@@ -248,11 +248,6 @@ static const struct regmap_config imx2_wdt_regmap_config = {
 	.max_register = 0x8,
 };
 
-static void imx2_wdt_action(void *data)
-{
-	clk_disable_unprepare(data);
-}
-
 static int __init imx2_wdt_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -277,7 +272,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
 		return PTR_ERR(wdev->regmap);
 	}
 
-	wdev->clk = devm_clk_get(dev, NULL);
+	wdev->clk = devm_clk_get_enabled(dev, NULL);
 	if (IS_ERR(wdev->clk)) {
 		dev_err(dev, "can't get Watchdog clock\n");
 		return PTR_ERR(wdev->clk);
@@ -296,14 +291,6 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
 		if (!devm_request_irq(dev, ret, imx2_wdt_isr, 0,
 				      dev_name(dev), wdog))
 			wdog->info = &imx2_wdt_pretimeout_info;
-
-	ret = clk_prepare_enable(wdev->clk);
-	if (ret)
-		return ret;
-
-	ret = devm_add_action_or_reset(dev, imx2_wdt_action, wdev->clk);
-	if (ret)
-		return ret;
 
 	wdev->clk_is_on = true;
 

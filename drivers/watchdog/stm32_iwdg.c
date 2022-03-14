@@ -150,49 +150,22 @@ static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
 	return 0;
 }
 
-static void stm32_clk_disable_unprepare(void *data)
-{
-	clk_disable_unprepare(data);
-}
-
 static int stm32_iwdg_clk_init(struct platform_device *pdev,
 			       struct stm32_iwdg *wdt)
 {
 	struct device *dev = &pdev->dev;
-	u32 ret;
 
-	wdt->clk_lsi = devm_clk_get(dev, "lsi");
+	wdt->clk_lsi = devm_clk_get_enabled(dev, "lsi");
 	if (IS_ERR(wdt->clk_lsi))
 		return dev_err_probe(dev, PTR_ERR(wdt->clk_lsi), "Unable to get lsi clock\n");
 
 	/* optional peripheral clock */
 	if (wdt->data->has_pclk) {
-		wdt->clk_pclk = devm_clk_get(dev, "pclk");
+		wdt->clk_pclk = devm_clk_get_enabled(dev, "pclk");
 		if (IS_ERR(wdt->clk_pclk))
 			return dev_err_probe(dev, PTR_ERR(wdt->clk_pclk),
 					     "Unable to get pclk clock\n");
-
-		ret = clk_prepare_enable(wdt->clk_pclk);
-		if (ret) {
-			dev_err(dev, "Unable to prepare pclk clock\n");
-			return ret;
-		}
-		ret = devm_add_action_or_reset(dev,
-					       stm32_clk_disable_unprepare,
-					       wdt->clk_pclk);
-		if (ret)
-			return ret;
 	}
-
-	ret = clk_prepare_enable(wdt->clk_lsi);
-	if (ret) {
-		dev_err(dev, "Unable to prepare lsi clock\n");
-		return ret;
-	}
-	ret = devm_add_action_or_reset(dev, stm32_clk_disable_unprepare,
-				       wdt->clk_lsi);
-	if (ret)
-		return ret;
 
 	wdt->rate = clk_get_rate(wdt->clk_lsi);
 
