@@ -1343,11 +1343,6 @@ static const struct of_device_id ams_of_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, ams_of_match_table);
 
-static void ams_clk_disable_unprepare(void *data)
-{
-	clk_disable_unprepare(data);
-}
-
 static void ams_cancel_delayed_work(void *data)
 {
 	cancel_delayed_work(data);
@@ -1377,17 +1372,9 @@ static int ams_probe(struct platform_device *pdev)
 	if (IS_ERR(ams->base))
 		return PTR_ERR(ams->base);
 
-	ams->clk = devm_clk_get(&pdev->dev, NULL);
+	ams->clk = devm_clk_get_enabled(&pdev->dev, NULL);
 	if (IS_ERR(ams->clk))
 		return PTR_ERR(ams->clk);
-
-	ret = clk_prepare_enable(ams->clk);
-	if (ret < 0)
-		return ret;
-
-	ret = devm_add_action_or_reset(&pdev->dev, ams_clk_disable_unprepare, ams->clk);
-	if (ret < 0)
-		return ret;
 
 	INIT_DELAYED_WORK(&ams->ams_unmask_work, ams_unmask_worker);
 	ret = devm_add_action_or_reset(&pdev->dev, ams_cancel_delayed_work,
