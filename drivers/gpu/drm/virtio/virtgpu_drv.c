@@ -46,9 +46,9 @@ static int virtio_gpu_modeset = -1;
 MODULE_PARM_DESC(modeset, "Disable/Enable modesetting");
 module_param_named(modeset, virtio_gpu_modeset, int, 0400);
 
-static int virtio_gpu_pci_quirk(struct drm_device *dev, struct virtio_device *vdev)
+static int virtio_gpu_pci_quirk(struct drm_device *dev)
 {
-	struct pci_dev *pdev = to_pci_dev(vdev->dev.parent);
+	struct pci_dev *pdev = to_pci_dev(dev->dev);
 	const char *pname = dev_name(&pdev->dev);
 	bool vga = (pdev->class >> 8) == PCI_CLASS_DISPLAY_VGA;
 	char unique[20];
@@ -101,6 +101,7 @@ static int virtio_gpu_pci_quirk(struct drm_device *dev, struct virtio_device *vd
 static int virtio_gpu_probe(struct virtio_device *vdev)
 {
 	struct drm_device *dev;
+	struct device *dma_dev;
 	int ret;
 
 	if (drm_firmware_drivers_only() && virtio_gpu_modeset == -1)
@@ -109,18 +110,29 @@ static int virtio_gpu_probe(struct virtio_device *vdev)
 	if (virtio_gpu_modeset == 0)
 		return -EINVAL;
 
-	dev = drm_dev_alloc(&driver, &vdev->dev);
+	/*
+	 * If GPU's parent is a PCI device, then we will use this PCI device
+	 * for the DRM's driver device because GPU won't have PCI's IOMMU DMA
+	 * ops in this case since GPU device is sitting on a separate (from PCI)
+	 * virtio-bus.
+	 */
+	if (!strcmp(vdev->dev.parent->bus->name, "pci"))
+		dma_dev = vdev->dev.parent;
+	else
+		dma_dev = &vdev->dev;
+
+	dev = drm_dev_alloc(&driver, dma_dev);
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 	vdev->priv = dev;
 
 	if (!strcmp(vdev->dev.parent->bus->name, "pci")) {
-		ret = virtio_gpu_pci_quirk(dev, vdev);
+		ret = virtio_gpu_pci_quirk(dev);
 		if (ret)
 			goto err_free;
 	}
 
-	ret = virtio_gpu_init(dev);
+	ret = virtio_gpu_init(vdev, dev);
 	if (ret)
 		goto err_free;
 
