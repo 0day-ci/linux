@@ -174,6 +174,11 @@ int __must_check submit_one_bio(struct bio *bio, int mirror_num,
 
 	/* Caller should ensure the bio has at least some range added */
 	ASSERT(bio->bi_iter.bi_size);
+	/*
+	 * This for later endio on errors, as later endio functions will rely
+	 * on btrfs_bio::iter.
+	 */
+	btrfs_bio_save_iter(btrfs_bio(bio));
 	if (is_data_inode(tree->private_data))
 		ret = btrfs_submit_data_bio(tree->private_data, bio, mirror_num,
 					    bio_flags);
@@ -191,6 +196,7 @@ static void end_write_bio(struct extent_page_data *epd, int ret)
 
 	if (bio) {
 		bio->bi_status = errno_to_blk_status(ret);
+		btrfs_bio_save_iter(btrfs_bio(bio));
 		bio_endio(bio);
 		epd->bio_ctrl.bio = NULL;
 	}
@@ -3357,6 +3363,7 @@ static int alloc_new_bio(struct btrfs_inode *inode,
 error:
 	bio_ctrl->bio = NULL;
 	bio->bi_status = errno_to_blk_status(ret);
+	btrfs_bio_save_iter(btrfs_bio(bio));
 	bio_endio(bio);
 	return ret;
 }

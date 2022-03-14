@@ -824,6 +824,7 @@ static void run_one_async_done(struct btrfs_work *work)
 	/* If an error occurred we just want to clean up the bio and move on */
 	if (async->status) {
 		async->bio->bi_status = async->status;
+		btrfs_bio_save_iter(btrfs_bio(async->bio));
 		bio_endio(async->bio);
 		return;
 	}
@@ -956,6 +957,7 @@ blk_status_t btrfs_submit_metadata_bio(struct inode *inode, struct bio *bio,
 
 out_w_error:
 	bio->bi_status = ret;
+	btrfs_bio_save_iter(btrfs_bio(bio));
 	bio_endio(bio);
 	return ret;
 }
