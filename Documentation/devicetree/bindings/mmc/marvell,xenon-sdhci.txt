@@ -14,6 +14,7 @@ Required Properties:
   - "marvell,armada-ap806-sdhci": For controllers on Armada AP806.
   - "marvell,armada-ap807-sdhci": For controllers on Armada AP807.
   - "marvell,armada-cp110-sdhci": For controllers on Armada CP110.
+  - "marvell,ac5-sdhci": For CnM on AC5, AC5X and derived.
 
 - clocks:
   Array of clocks required for SDHC.
@@ -32,6 +33,13 @@ Required Properties:
     Please follow the examples with compatible "marvell,armada-3700-sdhci"
     in below.
     Please also check property marvell,pad-type in below.
+
+  * For "marvell,ac5-sdhci", one or two register areas.
+    (reg-names "ctrl" & "decoder").
+    The first one is mandatory for the Xenon IP registers.
+    The second one is for systems where DMA mapping is required and is the
+    related address decoder register (the value to configure is derived from
+    the parent "dma-ranges").
 
   * For other compatible strings, one register area for Xenon IP.
 
@@ -170,4 +178,48 @@ Example:
 		bus-width = <4>;
 
 		marvell,pad-type = "sd";
+	};
+
+
+- For eMMC with compatible "marvell,ac5-sdhci" with one reg range (no dma):
+	sdhci0: sdhci@805c0000 {
+		compatible = "marvell,ac5-sdhci";
+		reg = <0x0 0x805c0000 0x0 0x300>;
+		reg-names = "ctrl", "decoder";
+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&core_clock>;
+		clock-names = "core";
+		status = "okay";
+		bus-width = <8>;
+		/*marvell,xenon-phy-slow-mode;*/
+		non-removable;
+		mmc-ddr-1_8v;
+		mmc-hs200-1_8v;
+		mmc-hs400-1_8v;
+	};
+
+- For eMMC with compatible "marvell,ac5-sdhci" with two reg ranges (with dma):
+	mmc_dma: mmc-dma-peripherals@80500000 {
+		compatible = "simple-bus";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+		dma-ranges = <0x2 0x0 0x2 0x80000000 0x1 0x0>;
+		dma-coherent;
+
+		sdhci0: sdhci@805c0000 {
+			compatible = "marvell,ac5-sdhci", "marvell,armada-ap806-sdhci";
+			reg = <0x0 0x805c0000 0x0 0x300>, <0x0 0x80440230 0x0 0x4>;
+			reg-names = "ctrl", "decoder";
+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&core_clock>;
+			clock-names = "core";
+			status = "okay";
+			bus-width = <8>;
+			/*marvell,xenon-phy-slow-mode;*/
+			non-removable;
+			mmc-ddr-1_8v;
+			mmc-hs200-1_8v;
+			mmc-hs400-1_8v;
+		};
 	};
