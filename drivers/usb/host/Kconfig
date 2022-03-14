@@ -501,6 +501,16 @@ config USB_OHCI_HCD_DAVINCI
 	  controller. This driver cannot currently be a loadable
 	  module because it lacks a proper PHY abstraction.
 
+config USB_OHCI_HCD_SUNPLUS
+	tristate "OHCI support for Sunplus SP7021"
+	depends on SOC_SP7021
+	help
+	  Enables support for the on-chip OHCI controller in Sunplus
+	  SoCs. It supports 32-bit AHB/AXI config bus and 64-bit AXI
+	  data bus.
+	  This driver can also be built as a module. If so, the module
+	  will be called ohci-sunplus.
+
 config USB_OHCI_HCD_PPC_OF_BE
 	bool "OHCI support for OF platform bus (big endian)"
 	depends on PPC
