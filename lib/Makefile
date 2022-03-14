@@ -279,6 +279,18 @@ $(foreach file, $(libfdt_files), \
 	$(eval CFLAGS_$(file) = -I $(srctree)/scripts/dtc/libfdt))
 lib-$(CONFIG_LIBFDT) += $(libfdt_files)
 
+ifeq ($(CONFIG_EMBED_BOOT_CONFIG),y)
+# Since the specified bootconfig file can be switched, we forcibly update the
+# default.bconf file always.
+$(obj)/default.bconf: FORCE
+	$(call cmd,defbconf)
+
+quiet_cmd_defbconf = GEN     $@
+      cmd_defbconf = cat < /dev/null $(CONFIG_EMBED_BOOT_CONFIG_FILE) > $@
+clean-files	+= default.bconf
+$(obj)/bootconfig.o: $(obj)/default.bconf
+endif
+
 lib-$(CONFIG_BOOT_CONFIG) += bootconfig.o
 
 obj-$(CONFIG_RBTREE_TEST) += rbtree_test.o

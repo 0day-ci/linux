@@ -6,3 +6,4 @@
 /oid_registry_data.c
 /test_fortify.log
 /test_fortify/*.log
+/default.bconf
