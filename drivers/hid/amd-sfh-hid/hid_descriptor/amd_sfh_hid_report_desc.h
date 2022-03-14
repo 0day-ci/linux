@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- * HID  descriptor stuructures
+ * HID  descriptor structures
  * Copyright 2020-2021 Advanced Micro Devices, Inc.
  * Authors: Nehal Bakulchandra Shah <Nehal-bakulchandra.shah@amd.com>
  *	    Sandeep Singh <Sandeep.singh@amd.com>
@@ -429,21 +429,21 @@ const u8 comp3_report_descriptor[] = {
 0x95, 1,		/* HID report count(1) */
 0x55, 0x0F,		/* HID unit exponent(0x0F) */
 0xB1, 0x02,		/* HID feature (Data_Arr_Abs) */
-0x0A, 0x84, 0x14,	/* Maganetic flux and change sensitivity ABS) */
+0x0A, 0x84, 0x14,	/* Magnetic flux and change sensitivity ABS) */
 0x15, 0,		/* HID logical Min_8(0) */
 0x26, 0xFF, 0xFF,	/* HID logical Max_16(0xFF,0xFF) */
 0x75, 16,		/* HID report size(16) */
 0x95, 1,		/* HID report count(1) */
 0x55, 0x0E,		/* HID unit exponent(0x0E) */
 0xB1, 0x02,		/* HID feature (Data_Arr_Abs) */
-0x0A, 0x84, 0x24,	/* Maganetic flux and mod change sensitivity Max) */
+0x0A, 0x84, 0x24,	/* Magnetic flux and mod change sensitivity Max) */
 0x16, 0x01, 0x80,	/* HID logical Min_16(0x01,0x80) */
 0x26, 0xFF, 0x7F,	/* HID logical Max_16(0xFF,0x7F) */
 0x75, 16,		/* HID report size(16) */
 0x95, 1,		/* HID report count(1) */
 0x55, 0x0F,		/* HID unit exponent(0x0F) */
 0xB1, 0x02,		/* HID feature (Data_Arr_Abs) */
-0x0A, 0x84, 0x34,	/* Maganetic flux and mod change sensitivity Min */
+0x0A, 0x84, 0x34,	/* Magnetic flux and mod change sensitivity Min */
 0x16, 0x01, 0x80,	/* HID logical Min_16(0x01,0x80) */
 0x26, 0xFF, 0x7F,	/* HID logical Max_16(0xFF,0x7F) */
 0x75, 16,		/* HID report size(16) */

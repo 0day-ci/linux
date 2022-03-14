@@ -869,7 +869,7 @@ static int magicmouse_probe(struct hid_device *hdev,
 	report->size = 6;
 
 	/*
-	 * Some devices repond with 'invalid report id' when feature
+	 * Some devices respond with 'invalid report id' when feature
 	 * report switching it into multitouch mode is sent to it.
 	 *
 	 * This results in -EIO from the _raw low-level transport callback,

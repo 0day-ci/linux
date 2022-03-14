@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *  HID driver for Redragon keyboards
  *
  *  Copyright (c) 2017 Robert Munteanu
- *  SPDX-License-Identifier: GPL-2.0+
  */
 
 /*

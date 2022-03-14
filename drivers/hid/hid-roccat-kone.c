@@ -688,7 +688,7 @@ static int kone_init_kone_device_struct(struct usb_device *usb_dev,
  * Since IGNORE_MOUSE quirk moved to hid-apple, there is no way to bind only to
  * mousepart if usb_hid is compiled into the kernel and kone is compiled as
  * module.
- * Secial behaviour is bound only to mousepart since only mouseevents contain
+ * Special behaviour is bound only to mousepart since only mouseevents contain
  * additional notifications.
  */
 static int kone_init_specials(struct hid_device *hdev)
@@ -835,7 +835,7 @@ static void kone_report_to_chrdev(struct kone_device const *kone,
 
 /*
  * Is called for keyboard- and mousepart.
- * Only mousepart gets informations about special events in its extended event
+ * Only mousepart gets information about special events in its extended event
  * structure.
  */
 static int kone_raw_event(struct hid_device *hdev, struct hid_report *report,

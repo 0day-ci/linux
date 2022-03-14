@@ -1071,7 +1071,7 @@ static void joycon_parse_imu_report(struct joycon_ctlr *ctlr,
 	 * samples, so the IMU sampling rate should be avg_time_delta/3. We can
 	 * also use this average to detect events where we have dropped a
 	 * packet. The userspace timestamp for the samples will be adjusted
-	 * accordingly to prevent unwanted behvaior.
+	 * accordingly to prevent unwanted behavior.
 	 */
 	if (!ctlr->imu_first_packet_received) {
 		ctlr->imu_timestamp_us = 0;
