@@ -63,4 +63,5 @@ config VIDEO_MX2_EMMAPRP
 	    memory to memory. Operations include resizing and format
 	    conversion.
 
+source "drivers/media/platform/nxp/amphion/Kconfig"
 source "drivers/media/platform/nxp/imx-jpeg/Kconfig"
