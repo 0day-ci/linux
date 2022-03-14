@@ -248,6 +248,7 @@ static void svc_thread_cmd_config_status(struct stratix10_svc_controller *ctrl,
 {
 	struct arm_smccc_res res;
 	int count_in_sec;
+	unsigned long a0, a1, a2;
 
 	cb_data->kaddr1 = NULL;
 	cb_data->kaddr2 = NULL;
@@ -256,24 +257,42 @@ static void svc_thread_cmd_config_status(struct stratix10_svc_controller *ctrl,
 
 	pr_debug("%s: polling config status\n", __func__);
 
+	a0 = INTEL_SIP_SMC_FPGA_CONFIG_ISDONE;
+	a1 = (unsigned long)p_data->paddr;
+	a2 = 0;
+
+	if (p_data->command == COMMAND_POLL_SERVICE_STATUS)
+		a0 = INTEL_SIP_SMC_SERVICE_COMPLETED;
+
 	count_in_sec = FPGA_CONFIG_STATUS_TIMEOUT_SEC;
 	while (count_in_sec) {
-		ctrl->invoke_fn(INTEL_SIP_SMC_FPGA_CONFIG_ISDONE,
-				0, 0, 0, 0, 0, 0, 0, &res);
+		ctrl->invoke_fn(a0, a1, a2, 0, 0, 0, 0, 0, &res);
 		if ((res.a0 == INTEL_SIP_SMC_STATUS_OK) ||
-		    (res.a0 == INTEL_SIP_SMC_STATUS_ERROR))
+		    (res.a0 == INTEL_SIP_SMC_STATUS_ERROR) ||
+		    (res.a0 == INTEL_SIP_SMC_STATUS_REJECTED))
 			break;
 
 		/*
-		 * configuration is still in progress, wait one second then
+		 * request is still in progress, wait one second then
 		 * poll again
 		 */
 		msleep(1000);
 		count_in_sec--;
 	}
 
-	if (res.a0 == INTEL_SIP_SMC_STATUS_OK && count_in_sec)
+	if (!count_in_sec) {
+		pr_err("%s: poll status timeout\n", __func__);
+		cb_data->status = BIT(SVC_STATUS_BUSY);
+	} else if (res.a0 == INTEL_SIP_SMC_STATUS_OK) {
 		cb_data->status = BIT(SVC_STATUS_COMPLETED);
+		cb_data->kaddr1 = (res.a1) ?
+				  svc_pa_to_va(res.a1) : NULL;
+		cb_data->kaddr2 = &res.a2;
+	} else {
+		pr_err("%s: poll status error\n", __func__);
+		cb_data->kaddr1 = &res.a1;
+		cb_data->status = BIT(SVC_STATUS_ERROR);
+	}
 
 	p_data->chan->scl->receive_cb(p_data->chan->scl, cb_data);
 }
@@ -298,6 +317,7 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 	case COMMAND_RECONFIG:
 	case COMMAND_RSU_UPDATE:
 	case COMMAND_RSU_NOTIFY:
+	case COMMAND_POLL_SERVICE_STATUS:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		break;
 	case COMMAND_RECONFIG_DATA_SUBMIT:
@@ -424,6 +444,13 @@ static int svc_normal_to_secure_thread(void *data)
 			a1 = 0;
 			a2 = 0;
 			break;
+		/* for polling */
+		case COMMAND_POLL_SERVICE_STATUS:
+			a0 = INTEL_SIP_SMC_SERVICE_COMPLETED;
+			a1 = (unsigned long)pdata->paddr;
+			a2 = 0;
+			break;
+
 		default:
 			pr_warn("it shouldn't happen\n");
 			break;
@@ -464,6 +491,7 @@ static int svc_normal_to_secure_thread(void *data)
 							  pdata, cbdata);
 				break;
 			case COMMAND_RECONFIG_STATUS:
+			case COMMAND_POLL_SERVICE_STATUS:
 				svc_thread_cmd_config_status(ctrl,
 							     pdata, cbdata);
 				break;
