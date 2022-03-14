@@ -972,10 +972,7 @@ static int rdp_offload_toggle(struct rcu_data *rdp,
 	}
 	raw_spin_unlock_irqrestore(&rdp_gp->nocb_gp_lock, flags);
 
-	if (wake_gp)
-		wake_up_process(rdp_gp->nocb_gp_kthread);
-
-	return 0;
+	return wake_gp;
 }
 
 static long rcu_nocb_rdp_deoffload(void *arg)
@@ -984,11 +981,18 @@ static long rcu_nocb_rdp_deoffload(void *arg)
 	struct rcu_segcblist *cblist = &rdp->cblist;
 	unsigned long flags;
 	int ret;
+	struct rcu_data *rdp_gp = rdp->nocb_gp_rdp;
 
+	/*
+	 *When rcuog or rcuop spawn fail, direct call rcu_nocb_rdp_deoffload().
+	 *due to the target CPU(rdp->cpu) is not online(cpu_online(rdp->cpu)
+	 *return false) yet. this warning will be triggered.
+	 */
 	WARN_ON_ONCE(rdp->cpu != raw_smp_processor_id());
 
 	pr_info("De-offloading %d\n", rdp->cpu);
 
+	mutex_lock(&rdp_gp->nocb_gp_kthread_mutex);
 	rcu_nocb_lock_irqsave(rdp, flags);
 	/*
 	 * Flush once and for all now. This suffices because we are
@@ -1010,9 +1014,19 @@ static long rcu_nocb_rdp_deoffload(void *arg)
 	rcu_segcblist_set_flags(cblist, SEGCBLIST_RCU_CORE);
 	invoke_rcu_core();
 	ret = rdp_offload_toggle(rdp, false, flags);
-	swait_event_exclusive(rdp->nocb_state_wq,
-			      !rcu_segcblist_test_flags(cblist, SEGCBLIST_KTHREAD_CB |
+
+	if (rdp_gp->nocb_gp_kthread) {
+		if (ret)
+			wake_up_process(rdp_gp->nocb_gp_kthread);
+		swait_event_exclusive(rdp->nocb_state_wq,
+				!rcu_segcblist_test_flags(cblist, SEGCBLIST_KTHREAD_CB |
 							SEGCBLIST_KTHREAD_GP));
+	} else {
+		rcu_nocb_lock_irqsave(rdp, flags);
+		rcu_segcblist_clear_flags(&rdp->cblist,
+				SEGCBLIST_KTHREAD_CB | SEGCBLIST_KTHREAD_GP);
+		rcu_nocb_unlock_irqrestore(rdp, flags);
+	}
 	/* Stop nocb_gp_wait() from iterating over this structure. */
 	list_del_rcu(&rdp->nocb_entry_rdp);
 	/*
@@ -1030,12 +1044,12 @@ static long rcu_nocb_rdp_deoffload(void *arg)
 	 * rcu_nocb_unlock_irqrestore() anymore.
 	 */
 	raw_spin_unlock_irqrestore(&rdp->nocb_lock, flags);
-
+	mutex_unlock(&rdp_gp->nocb_gp_kthread_mutex);
 	/* Sanity check */
 	WARN_ON_ONCE(rcu_cblist_n_cbs(&rdp->nocb_bypass));
 
 
-	return ret;
+	return 0;
 }
 
 int rcu_nocb_cpu_deoffload(int cpu)
@@ -1043,8 +1057,8 @@ int rcu_nocb_cpu_deoffload(int cpu)
 	struct rcu_data *rdp = per_cpu_ptr(&rcu_data, cpu);
 	int ret = 0;
 
-	mutex_lock(&rcu_state.barrier_mutex);
 	cpus_read_lock();
+	mutex_lock(&rcu_state.barrier_mutex);
 	if (rcu_rdp_is_offloaded(rdp)) {
 		if (cpu_online(cpu)) {
 			ret = work_on_cpu(cpu, rcu_nocb_rdp_deoffload, rdp);
@@ -1055,8 +1069,8 @@ int rcu_nocb_cpu_deoffload(int cpu)
 			ret = -EINVAL;
 		}
 	}
-	cpus_read_unlock();
 	mutex_unlock(&rcu_state.barrier_mutex);
+	cpus_read_unlock();
 
 	return ret;
 }
@@ -1068,6 +1082,7 @@ static long rcu_nocb_rdp_offload(void *arg)
 	struct rcu_segcblist *cblist = &rdp->cblist;
 	unsigned long flags;
 	int ret;
+	struct rcu_data *rdp_gp = rdp->nocb_gp_rdp;
 
 	WARN_ON_ONCE(rdp->cpu != raw_smp_processor_id());
 	/*
@@ -1076,6 +1091,12 @@ static long rcu_nocb_rdp_offload(void *arg)
 	 */
 	if (!rdp->nocb_gp_rdp)
 		return -EINVAL;
+
+	mutex_lock(&rdp_gp->nocb_gp_kthread_mutex);
+	if (!rdp_gp->nocb_gp_kthread) {
+		mutex_unlock(&rdp_gp->nocb_gp_kthread_mutex);
+		return -EINVAL;
+	}
 
 	pr_info("Offloading %d\n", rdp->cpu);
 
@@ -1112,6 +1133,8 @@ static long rcu_nocb_rdp_offload(void *arg)
 	 *      rcu_nocb_unlock()         rcu_nocb_unlock()
 	 */
 	ret = rdp_offload_toggle(rdp, true, flags);
+	if (ret)
+		wake_up_process(rdp_gp->nocb_gp_kthread);
 	swait_event_exclusive(rdp->nocb_state_wq,
 			      rcu_segcblist_test_flags(cblist, SEGCBLIST_KTHREAD_CB) &&
 			      rcu_segcblist_test_flags(cblist, SEGCBLIST_KTHREAD_GP));
@@ -1123,8 +1146,8 @@ static long rcu_nocb_rdp_offload(void *arg)
 	rcu_nocb_lock_irqsave(rdp, flags);
 	rcu_segcblist_clear_flags(cblist, SEGCBLIST_RCU_CORE);
 	rcu_nocb_unlock_irqrestore(rdp, flags);
-
-	return ret;
+	mutex_unlock(&rdp_gp->nocb_gp_kthread_mutex);
+	return 0;
 }
 
 int rcu_nocb_cpu_offload(int cpu)
@@ -1132,8 +1155,8 @@ int rcu_nocb_cpu_offload(int cpu)
 	struct rcu_data *rdp = per_cpu_ptr(&rcu_data, cpu);
 	int ret = 0;
 
-	mutex_lock(&rcu_state.barrier_mutex);
 	cpus_read_lock();
+	mutex_lock(&rcu_state.barrier_mutex);
 	if (!rcu_rdp_is_offloaded(rdp)) {
 		if (cpu_online(cpu)) {
 			ret = work_on_cpu(cpu, rcu_nocb_rdp_offload, rdp);
@@ -1144,8 +1167,8 @@ int rcu_nocb_cpu_offload(int cpu)
 			ret = -EINVAL;
 		}
 	}
-	cpus_read_unlock();
 	mutex_unlock(&rcu_state.barrier_mutex);
+	cpus_read_unlock();
 
 	return ret;
 }
@@ -1246,7 +1269,7 @@ static void rcu_spawn_cpu_nocb_kthread(int cpu)
 				"rcuog/%d", rdp_gp->cpu);
 		if (WARN_ONCE(IS_ERR(t), "%s: Could not start rcuo GP kthread, OOM is now expected behavior\n", __func__)) {
 			mutex_unlock(&rdp_gp->nocb_gp_kthread_mutex);
-			return;
+			goto end;
 		}
 		WRITE_ONCE(rdp_gp->nocb_gp_kthread, t);
 		if (kthread_prio)
@@ -1258,12 +1281,20 @@ static void rcu_spawn_cpu_nocb_kthread(int cpu)
 	t = kthread_run(rcu_nocb_cb_kthread, rdp,
 			"rcuo%c/%d", rcu_state.abbr, cpu);
 	if (WARN_ONCE(IS_ERR(t), "%s: Could not start rcuo CB kthread, OOM is now expected behavior\n", __func__))
-		return;
+		goto end;
 
 	if (kthread_prio)
 		sched_setscheduler_nocheck(t, SCHED_FIFO, &sp);
 	WRITE_ONCE(rdp->nocb_cb_kthread, t);
 	WRITE_ONCE(rdp->nocb_gp_kthread, rdp_gp->nocb_gp_kthread);
+	return;
+end:
+	mutex_lock(&rcu_state.barrier_mutex);
+	if (rcu_rdp_is_offloaded(rdp)) {
+		rcu_nocb_rdp_deoffload(rdp);
+		cpumask_clear_cpu(cpu, rcu_nocb_mask);
+	}
+	mutex_unlock(&rcu_state.barrier_mutex);
 }
 
 /* How many CB CPU IDs per GP kthread?  Default of -1 for sqrt(nr_cpu_ids). */
