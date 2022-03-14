@@ -785,6 +785,7 @@ err_out:
 			fwnode_remove_software_node(info->fwnode);
 	}
 	kfree(cros_laptop->i2c_peripherals);
+	cros_laptop->i2c_peripherals = NULL;
 	return error;
 }
 
