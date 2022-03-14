@@ -17,6 +17,7 @@
 struct userspace_data {
 	unsigned long user_frequency;
 	bool valid;
+	void *saved_data;
 };
 
 static int devfreq_userspace_func(struct devfreq *df, unsigned long *freq)
@@ -91,6 +92,7 @@ static int userspace_init(struct devfreq *devfreq)
 		goto out;
 	}
 	data->valid = false;
+	data->saved_data = devfreq->data;
 	devfreq->data = data;
 
 	err = sysfs_create_group(&devfreq->dev.kobj, &dev_attr_group);
@@ -100,6 +102,8 @@ out:
 
 static void userspace_exit(struct devfreq *devfreq)
 {
+	struct userspace_data *data = devfreq->data;
+	void *saved_data = data->saved_data;
 	/*
 	 * Remove the sysfs entry, unless this is being called after
 	 * device_del(), which should have done this already via kobject_del().
@@ -108,7 +112,7 @@ static void userspace_exit(struct devfreq *devfreq)
 		sysfs_remove_group(&devfreq->dev.kobj, &dev_attr_group);
 
 	kfree(devfreq->data);
-	devfreq->data = NULL;
+	devfreq->data = saved_data;
 }
 
 static int devfreq_userspace_handler(struct devfreq *devfreq,
