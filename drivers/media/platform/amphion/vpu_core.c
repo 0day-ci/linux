@@ -529,10 +529,12 @@ static int vpu_core_parse_dt(struct vpu_core *core, struct device_node *np)
 	}
 	if (of_address_to_resource(node, 0, &res)) {
 		dev_err(core->dev, "boot-region of_address_to_resource error\n");
+		of_node_put(node);
 		return -EINVAL;
 	}
 	core->fw.phys = res.start;
 	core->fw.length = resource_size(&res);
+	of_node_put(node);
 
 	node = of_parse_phandle(np, "memory-region", 1);
 	if (!node) {
@@ -541,10 +543,12 @@ static int vpu_core_parse_dt(struct vpu_core *core, struct device_node *np)
 	}
 	if (of_address_to_resource(node, 0, &res)) {
 		dev_err(core->dev, "rpc-region of_address_to_resource error\n");
+		of_node_put(node);
 		return -EINVAL;
 	}
 	core->rpc.phys = res.start;
 	core->rpc.length = resource_size(&res);
+	of_node_put(node);
 
 	if (core->rpc.length < core->res->rpc_size + core->res->fwlog_size) {
 		dev_err(core->dev, "the rpc-region <%pad, 0x%x> is not enough\n",
