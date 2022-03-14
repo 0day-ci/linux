@@ -453,8 +453,8 @@ static int apply_vma_lock_flags(unsigned long start, size_t len,
 		return -EINVAL;
 	if (end == start)
 		return 0;
-	vma = find_vma(current->mm, start);
-	if (!vma || vma->vm_start > start)
+	vma = vma_lookup(current->mm, start);
+	if (!vma)
 		return -ENOMEM;
 
 	prev = vma->vm_prev;
