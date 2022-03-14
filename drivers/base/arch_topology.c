@@ -614,7 +614,7 @@ out:
 struct cpu_topology cpu_topology[NR_CPUS];
 EXPORT_SYMBOL_GPL(cpu_topology);
 
-const struct cpumask *cpu_coregroup_mask(int cpu)
+const struct cpumask *_cpu_coregroup_mask(int cpu)
 {
 	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
 
@@ -631,9 +631,35 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
 	return core_mask;
 }
 
-const struct cpumask *cpu_clustergroup_mask(int cpu)
+const struct cpumask *_cpu_clustergroup_mask(int cpu)
 {
 	return &cpu_topology[cpu].cluster_sibling;
+}
+
+static int
+swap_masks(const cpumask_t *core_mask, const cpumask_t *cluster_mask)
+{
+	if (cpumask_weight(core_mask) == 1 &&
+	    cpumask_subset(core_mask, cluster_mask))
+		return 1;
+
+	return 0;
+}	
+
+const struct cpumask *cpu_coregroup_mask(int cpu)
+{
+	const cpumask_t *cluster_mask = _cpu_clustergroup_mask(cpu);
+	const cpumask_t *core_mask = _cpu_coregroup_mask(cpu);
+	
+	return swap_masks(core_mask, cluster_mask) ? cluster_mask : core_mask;
+}
+
+const struct cpumask *cpu_clustergroup_mask(int cpu)
+{
+	const cpumask_t *cluster_mask = _cpu_clustergroup_mask(cpu);
+	const cpumask_t *core_mask = _cpu_coregroup_mask(cpu);
+
+	return swap_masks(core_mask, cluster_mask) ? core_mask : cluster_mask;
 }
 
 void update_siblings_masks(unsigned int cpuid)
