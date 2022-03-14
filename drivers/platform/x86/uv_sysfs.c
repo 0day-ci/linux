@@ -555,7 +555,7 @@ static int init_pci_top_obj(struct uv_pci_top_obj *top_obj, char *line)
 	 */
 	line[6] = '_';
 
-	/* Null terminate after the concatencated name tokens
+	/* Null terminate after the concatenated name tokens
 	 * to produce kobj name string.
 	 */
 	line[14] = '\0';
