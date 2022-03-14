@@ -396,11 +396,11 @@ struct btrfs_dio_private {
 	/* Used for bio::bi_size */
 	u32 bytes;
 
-	/*
-	 * References to this structure. There is one reference per in-flight
-	 * bio plus one while we're still setting up.
-	 */
-	refcount_t refs;
+	/* Hit any error for the whole DIO bio */
+	bool errors;
+
+	/* How many bytes are still under IO or not submitted */
+	atomic_t pending_bytes;
 
 	/* dio_bio came from fs/direct-io.c */
 	struct bio *dio_bio;
