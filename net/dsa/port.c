@@ -747,7 +747,8 @@ int dsa_port_mst_enable(struct dsa_port *dp, bool on,
 	if (!on)
 		return 0;
 
-	if (!dsa_port_can_configure_learning(dp)) {
+	if (!(ds->ops->vlan_msti_set &&
+	      dsa_port_can_configure_learning(dp))) {
 		NL_SET_ERR_MSG_MOD(extack, "Hardware does not support MST");
 		return -EINVAL;
 	}
@@ -796,6 +797,17 @@ int dsa_port_bridge_flags(struct dsa_port *dp,
 	}
 
 	return 0;
+}
+
+int dsa_port_vlan_msti(struct dsa_port *dp,
+		       const struct switchdev_vlan_msti *msti)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->vlan_msti_set)
+		return -EOPNOTSUPP;
+
+	return ds->ops->vlan_msti_set(ds, *dp->bridge, msti);
 }
 
 int dsa_port_mtu_change(struct dsa_port *dp, int new_mtu,
