@@ -629,6 +629,9 @@ static inline void free_stable_node_chain(struct stable_node *chain,
 static void remove_node_from_stable_tree(struct stable_node *stable_node)
 {
 	struct rmap_item *rmap_item;
+#ifdef CONFIG_MEMCG
+	struct task_struct *owner;
+#endif
 
 	/* check it's not STABLE_NODE_CHAIN or negative */
 	BUG_ON(stable_node->rmap_hlist_len < 0);
@@ -638,6 +641,14 @@ static void remove_node_from_stable_tree(struct stable_node *stable_node)
 			ksm_pages_sharing--;
 		else
 			ksm_pages_shared--;
+
+#ifdef CONFIG_MEMCG /*Condition of mm_struct with owner*/
+		BUG_ON(rmap_item->mm == NULL);
+		owner = rmap_item->mm->owner;
+		/* In case that the process of mm may be killed or exit */
+		if (owner)
+			owner->ksm_merging_pages--;
+#endif
 		VM_BUG_ON(stable_node->rmap_hlist_len <= 0);
 		stable_node->rmap_hlist_len--;
 		put_anon_vma(rmap_item->anon_vma);
@@ -771,6 +782,9 @@ static void remove_rmap_item_from_tree(struct rmap_item *rmap_item)
 	if (rmap_item->address & STABLE_FLAG) {
 		struct stable_node *stable_node;
 		struct page *page;
+#ifdef CONFIG_MEMCG
+		struct task_struct *owner;
+#endif
 
 		stable_node = rmap_item->head;
 		page = get_ksm_page(stable_node, GET_KSM_PAGE_LOCK);
@@ -785,6 +799,14 @@ static void remove_rmap_item_from_tree(struct rmap_item *rmap_item)
 			ksm_pages_sharing--;
 		else
 			ksm_pages_shared--;
+
+#ifdef CONFIG_MEMCG /*Condition of mm_struct with owner*/
+		BUG_ON(rmap_item->mm == NULL);
+		owner = rmap_item->mm->owner;
+		/* In case that the process of mm may be killed or exit */
+		if (owner)
+			owner->ksm_merging_pages--;
+#endif
 		VM_BUG_ON(stable_node->rmap_hlist_len <= 0);
 		stable_node->rmap_hlist_len--;
 
@@ -1981,6 +2003,9 @@ static void stable_tree_append(struct rmap_item *rmap_item,
 			       struct stable_node *stable_node,
 			       bool max_page_sharing_bypass)
 {
+#ifdef CONFIG_MEMCG
+	struct task_struct *owner;
+#endif
 	/*
 	 * rmap won't find this mapping if we don't insert the
 	 * rmap_item in the right stable_node
@@ -2007,6 +2032,14 @@ static void stable_tree_append(struct rmap_item *rmap_item,
 		ksm_pages_sharing++;
 	else
 		ksm_pages_shared++;
+
+#ifdef CONFIG_MEMCG /*Condition of mm_struct with owner*/
+	BUG_ON(rmap_item->mm == NULL);
+	owner = rmap_item->mm->owner;
+	/* In case that the process of mm may be killed or exit */
+	if (owner)
+		owner->ksm_merging_pages++;
+#endif
 }
 
 /*

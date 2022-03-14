@@ -1346,6 +1346,11 @@ struct task_struct {
 	unsigned int			kasan_depth;
 #endif
 
+#if defined(CONFIG_KSM) && defined(CONFIG_MEMCG)
+	unsigned long ksm_merging_pages;
+#endif
+
+
 #ifdef CONFIG_KCSAN
 	struct kcsan_ctx		kcsan_ctx;
 #ifdef CONFIG_TRACE_IRQFLAGS
