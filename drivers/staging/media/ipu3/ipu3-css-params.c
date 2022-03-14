@@ -2593,6 +2593,10 @@ int imgu_css_cfg_acc(struct imgu_css *css, unsigned int pipe,
 					  acc->af.stripes[1].grid_cfg.width,
 					  b_w_log2);
 
+		if (acc->af.stripes[1].grid_cfg.x_end >= acc->stripe.bds_out_stripes[1].width)
+			acc->af.stripes[1].grid_cfg.x_end =
+				acc->stripe.bds_out_stripes[1].width - min_overlap;
+
 		/*
 		 * To reduce complexity of debubbling and loading statistics
 		 * fix grid_height_per_slice to 1 for both stripes
