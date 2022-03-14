@@ -448,6 +448,8 @@ enum skb_drop_reason {
 	SKB_DROP_REASON_GRE_NOHANDLER,	/* no handler found (version not
 					 * supported?)
 					 */
+	SKB_DROP_REASON_GRE_CSUM,	/* GRE csum error */
+	SKB_DROP_REASON_GRE_NOTUNNEL,	/* no tunnel device found */
 	SKB_DROP_REASON_MAX,
 };
 

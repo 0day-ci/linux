@@ -421,9 +421,10 @@ static int ipgre_rcv(struct sk_buff *skb, const struct tnl_ptk_info *tpi,
 
 static int gre_rcv(struct sk_buff *skb)
 {
+	enum skb_drop_reason reason = SKB_DROP_REASON_NOT_SPECIFIED;
 	struct tnl_ptk_info tpi;
 	bool csum_err = false;
-	int hdr_len;
+	int hdr_len, ret;
 
 #ifdef CONFIG_NET_IPGRE_BROADCAST
 	if (ipv4_is_multicast(ip_hdr(skb)->daddr)) {
@@ -438,19 +439,26 @@ static int gre_rcv(struct sk_buff *skb)
 		goto drop;
 
 	if (unlikely(tpi.proto == htons(ETH_P_ERSPAN) ||
-		     tpi.proto == htons(ETH_P_ERSPAN2))) {
-		if (erspan_rcv(skb, &tpi, hdr_len) == PACKET_RCVD)
-			return 0;
-		goto out;
-	}
+		     tpi.proto == htons(ETH_P_ERSPAN2)))
+		ret = erspan_rcv(skb, &tpi, hdr_len);
+	else
+		ret = ipgre_rcv(skb, &tpi, hdr_len);
 
-	if (ipgre_rcv(skb, &tpi, hdr_len) == PACKET_RCVD)
+	switch (ret) {
+	case PACKET_NEXT:
+		reason = SKB_DROP_REASON_GRE_NOTUNNEL;
+		break;
+	case PACKET_RCVD:
 		return 0;
-
-out:
+	case PACKET_REJECT:
+		reason = SKB_DROP_REASON_NOMEM;
+		break;
+	}
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
 drop:
-	kfree_skb(skb);
+	if (csum_err)
+		reason = SKB_DROP_REASON_GRE_CSUM;
+	kfree_skb_reason(skb, reason);
 	return 0;
 }
 
