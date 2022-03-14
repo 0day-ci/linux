@@ -139,6 +139,7 @@ struct nvme_dev {
 	struct nvme_ctrl ctrl;
 	u32 last_ps;
 	bool hmb;
+	bool restore_ltr;
 
 	mempool_t *iod_mempool;
 
@@ -3214,11 +3215,30 @@ static int nvme_set_power_state(struct nvme_ctrl *ctrl, u32 ps)
 	return nvme_set_features(ctrl, NVME_FEAT_POWER_MGMT, ps, NULL, 0, NULL);
 }
 
+static void nvme_suspend_ltr(struct device *dev, bool disable)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct nvme_dev *ndev = pci_get_drvdata(pdev);
+
+	if (disable) {
+		u16 word;
+
+		pcie_capability_read_word(pdev, PCI_EXP_DEVCTL2, &word);
+		ndev->restore_ltr = word & PCI_EXP_DEVCTL2_LTR_EN;
+		pcie_capability_clear_word(pdev, PCI_EXP_DEVCTL2,
+					   PCI_EXP_DEVCTL2_LTR_EN);
+	} else if (ndev->restore_ltr) {
+		pcie_capability_set_word(pdev, PCI_EXP_DEVCTL2,
+					 PCI_EXP_DEVCTL2_LTR_EN);
+	}
+}
+
 static int nvme_resume(struct device *dev)
 {
 	struct nvme_dev *ndev = pci_get_drvdata(to_pci_dev(dev));
 	struct nvme_ctrl *ctrl = &ndev->ctrl;
 
+	nvme_suspend_ltr(dev, false);
 	if (ndev->last_ps == U32_MAX ||
 	    nvme_set_power_state(ctrl, ndev->last_ps) != 0)
 		goto reset;
@@ -3238,6 +3258,11 @@ static int nvme_suspend(struct device *dev)
 	int ret = -EBUSY;
 
 	ndev->last_ps = U32_MAX;
+
+	/* If using s2idle with simple suspend, disable LTR to avoid problems. */
+	if (pm_suspend_target_state == PM_SUSPEND_TO_IDLE &&
+	    ndev->ctrl.quirks & NVME_QUIRK_SIMPLE_SUSPEND)
+		nvme_suspend_ltr(dev, true);
 
 	/*
 	 * The platform does not remove power for a kernel managed suspend so
