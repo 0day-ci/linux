@@ -447,6 +447,7 @@ struct btrfs_io_context {
 	struct bio *orig_bio;
 	void *private;
 	atomic_t error;
+	u32 stripe_len;
 	int max_errors;
 	int num_stripes;
 	int mirror_num;

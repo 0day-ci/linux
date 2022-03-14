@@ -969,6 +969,8 @@ static struct btrfs_raid_bio *alloc_rbio(struct btrfs_fs_info *fs_info,
 	int stripe_npages = DIV_ROUND_UP(stripe_len, PAGE_SIZE);
 	void *p;
 
+	ASSERT(stripe_len == BTRFS_STRIPE_LEN);
+
 	rbio = kzalloc(sizeof(*rbio) +
 		       sizeof(*rbio->stripe_pages) * num_pages +
 		       sizeof(*rbio->bio_pages) * num_pages +
@@ -1725,6 +1727,9 @@ int raid56_parity_write(struct bio *bio, struct btrfs_io_context *bioc,
 	struct blk_plug_cb *cb;
 	int ret;
 
+	/* Currently we only support fixed stripe len */
+	ASSERT(stripe_len == BTRFS_STRIPE_LEN);
+
 	rbio = alloc_rbio(fs_info, bioc, stripe_len);
 	if (IS_ERR(rbio)) {
 		btrfs_put_bioc(bioc);
@@ -2121,6 +2126,9 @@ int raid56_parity_recover(struct bio *bio, struct btrfs_io_context *bioc,
 	struct btrfs_fs_info *fs_info = bioc->fs_info;
 	struct btrfs_raid_bio *rbio;
 	int ret;
+
+	/* Currently we only support fixed stripe len */
+	ASSERT(stripe_len == BTRFS_STRIPE_LEN);
 
 	if (generic_io) {
 		ASSERT(bioc->mirror_num == mirror_num);
@@ -2671,12 +2679,12 @@ void raid56_parity_submit_scrub_rbio(struct btrfs_raid_bio *rbio)
 
 struct btrfs_raid_bio *
 raid56_alloc_missing_rbio(struct bio *bio, struct btrfs_io_context *bioc,
-			  u64 length)
+			  u64 stripe_len)
 {
 	struct btrfs_fs_info *fs_info = bioc->fs_info;
 	struct btrfs_raid_bio *rbio;
 
-	rbio = alloc_rbio(fs_info, bioc, length);
+	rbio = alloc_rbio(fs_info, bioc, stripe_len);
 	if (IS_ERR(rbio))
 		return NULL;
 

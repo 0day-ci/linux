@@ -1222,12 +1222,14 @@ static inline int scrub_nr_raid_mirrors(struct btrfs_io_context *bioc)
 
 static inline void scrub_stripe_index_and_offset(u64 logical, u64 map_type,
 						 u64 *raid_map,
-						 u64 mapped_length,
+						 u64 stripe_len,
 						 int nstripes, int mirror,
 						 int *stripe_index,
 						 u64 *stripe_offset)
 {
 	int i;
+
+	ASSERT(stripe_len == BTRFS_STRIPE_LEN);
 
 	if (map_type & BTRFS_BLOCK_GROUP_RAID56_MASK) {
 		/* RAID5/6 */
@@ -1237,7 +1239,7 @@ static inline void scrub_stripe_index_and_offset(u64 logical, u64 map_type,
 				continue;
 
 			if (logical >= raid_map[i] &&
-			    logical < raid_map[i] + mapped_length)
+			    logical < raid_map[i] + stripe_len)
 				break;
 		}
 
@@ -1342,7 +1344,7 @@ leave_nomem:
 			scrub_stripe_index_and_offset(logical,
 						      bioc->map_type,
 						      bioc->raid_map,
-						      mapped_length,
+						      bioc->stripe_len,
 						      bioc->num_stripes -
 						      bioc->num_tgtdevs,
 						      mirror_index,
@@ -1394,7 +1396,7 @@ static int scrub_submit_raid56_bio_wait(struct btrfs_fs_info *fs_info,
 
 	mirror_num = spage->sblock->pagev[0]->mirror_num;
 	ret = raid56_parity_recover(bio, spage->recover->bioc,
-				    spage->recover->map_length,
+				    spage->recover->bioc->stripe_len,
 				    mirror_num, 0);
 	if (ret)
 		return ret;
@@ -2223,7 +2225,7 @@ static void scrub_missing_raid56_pages(struct scrub_block *sblock)
 	bio->bi_private = sblock;
 	bio->bi_end_io = scrub_missing_raid56_end_io;
 
-	rbio = raid56_alloc_missing_rbio(bio, bioc, length);
+	rbio = raid56_alloc_missing_rbio(bio, bioc, bioc->stripe_len);
 	if (!rbio)
 		goto rbio_out;
 
@@ -2839,7 +2841,7 @@ static void scrub_parity_check_and_repair(struct scrub_parity *sparity)
 	bio->bi_private = sparity;
 	bio->bi_end_io = scrub_parity_bio_endio;
 
-	rbio = raid56_parity_alloc_scrub_rbio(bio, bioc, length,
+	rbio = raid56_parity_alloc_scrub_rbio(bio, bioc, bioc->stripe_len,
 					      sparity->scrub_dev,
 					      sparity->dbitmap,
 					      sparity->nsectors);

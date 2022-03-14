@@ -6043,6 +6043,7 @@ static int __btrfs_map_block_for_discard(struct btrfs_fs_info *fs_info,
 		ret = -ENOMEM;
 		goto out;
 	}
+	bioc->stripe_len = map->stripe_len;
 
 	for (i = 0; i < num_stripes; i++) {
 		bioc->stripes[i].physical =
@@ -6398,6 +6399,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 {
 	struct extent_map *em;
 	struct map_lookup *map;
+	const u64 orig_length = *length;
 	u64 stripe_offset;
 	u64 stripe_nr;
 	u64 stripe_len;
@@ -6419,6 +6421,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 
 	ASSERT(bioc_ret);
 	ASSERT(op != BTRFS_MAP_DISCARD);
+	ASSERT(orig_length);
 
 	em = btrfs_get_chunk_map(fs_info, logical, *length);
 	ASSERT(!IS_ERR(em));
@@ -6514,7 +6517,10 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 			num_stripes = map->num_stripes;
 			max_errors = nr_parity_stripes(map);
 
-			*length = map->stripe_len;
+			/* Return the length to the full stripe end */
+			*length = min(raid56_full_stripe_start + em->start +
+				      data_stripes * stripe_len,
+				      logical + orig_length) - logical;
 			stripe_index = 0;
 			stripe_offset = 0;
 		} else {
@@ -6566,6 +6572,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 		ret = -ENOMEM;
 		goto out;
 	}
+	bioc->stripe_len = map->stripe_len;
 
 	for (i = 0; i < num_stripes; i++) {
 		bioc->stripes[i].physical = map->stripes[stripe_index].physical +
@@ -6816,9 +6823,9 @@ static int submit_one_mapped_range(struct btrfs_fs_info *fs_info, struct bio *bi
 		/* In this case, map_length has been set to the length of
 		   a single stripe; not the whole write */
 		if (btrfs_op(bio) == BTRFS_MAP_WRITE) {
-			ret = raid56_parity_write(bio, bioc, map_length);
+			ret = raid56_parity_write(bio, bioc, bioc->stripe_len);
 		} else {
-			ret = raid56_parity_recover(bio, bioc, map_length,
+			ret = raid56_parity_recover(bio, bioc, bioc->stripe_len,
 						    mirror_num, 1);
 		}
 
