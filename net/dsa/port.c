@@ -240,6 +240,10 @@ static int dsa_port_switchdev_sync_attrs(struct dsa_port *dp,
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
+	err = dsa_port_mst_enable(dp, br_mst_enabled(br), extack);
+	if (err && err != -EOPNOTSUPP)
+		return err;
+
 	return 0;
 }
 
@@ -731,6 +735,22 @@ int dsa_port_ageing_time(struct dsa_port *dp, clock_t ageing_clock)
 		return err;
 
 	dp->ageing_time = ageing_time;
+
+	return 0;
+}
+
+int dsa_port_mst_enable(struct dsa_port *dp, bool on,
+			struct netlink_ext_ack *extack)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (!on)
+		return 0;
+
+	if (!dsa_port_can_configure_learning(dp)) {
+		NL_SET_ERR_MSG_MOD(extack, "Hardware does not support MST");
+		return -EINVAL;
+	}
 
 	return 0;
 }
