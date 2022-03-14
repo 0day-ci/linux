@@ -274,7 +274,9 @@ struct request_queue {
 	struct work_struct	timeout_work;
 
 	atomic_t		nr_active_requests_shared_tags;
-
+#ifdef CONFIG_BLK_CGROUP
+	atomic_t		cgroup_no_cross_merges;
+#endif
 	struct blk_mq_tags	*sched_shared_tags;
 
 	struct list_head	icq_list;

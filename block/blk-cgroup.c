@@ -1176,6 +1176,8 @@ int blkcg_init_queue(struct request_queue *q)
 	bool preloaded;
 	int ret;
 
+	atomic_set(&q->cgroup_no_cross_merges, 0);
+
 	new_blkg = blkg_alloc(&blkcg_root, q, GFP_KERNEL);
 	if (!new_blkg)
 		return -ENOMEM;

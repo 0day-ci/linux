@@ -2703,6 +2703,8 @@ static void ioc_rqos_merge(struct rq_qos *rqos, struct request *rq,
 	if (!ioc->enabled || !iocg || !iocg->level)
 		return;
 
+	WARN_ON_ONCE(rq->bio->bi_blkg != bio->bi_blkg);
+
 	abs_cost = calc_vtime_cost(bio, iocg, true);
 	if (!abs_cost)
 		return;
@@ -3253,13 +3255,17 @@ static ssize_t ioc_qos_write(struct kernfs_open_file *of, char *input,
 
 	spin_lock_irq(&ioc->lock);
 
-	if (enable) {
-		blk_stat_enable_accounting(ioc->rqos.q);
-		blk_queue_flag_set(QUEUE_FLAG_RQ_ALLOC_TIME, ioc->rqos.q);
-		ioc->enabled = true;
-	} else {
-		blk_queue_flag_clear(QUEUE_FLAG_RQ_ALLOC_TIME, ioc->rqos.q);
-		ioc->enabled = false;
+	if (enable != ioc->enabled) {
+		if (enable) {
+			blk_stat_enable_accounting(ioc->rqos.q);
+			blk_queue_flag_set(QUEUE_FLAG_RQ_ALLOC_TIME, ioc->rqos.q);
+			blk_cgroup_disable_cross_merges(ioc->rqos.q);
+			ioc->enabled = true;
+		} else {
+			blk_queue_flag_clear(QUEUE_FLAG_RQ_ALLOC_TIME, ioc->rqos.q);
+			blk_cgroup_enable_cross_merges(ioc->rqos.q);
+			ioc->enabled = false;
+		}
 	}
 
 	if (user) {

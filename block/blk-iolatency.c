@@ -855,12 +855,15 @@ out:
 
 		blk_mq_freeze_queue(blkg->q);
 
-		if (enable == 1)
+		if (enable == 1) {
 			atomic_inc(&blkiolat->enabled);
-		else if (enable == -1)
+			blk_cgroup_disable_cross_merges(blkg->q);
+		} else if (enable == -1) {
 			atomic_dec(&blkiolat->enabled);
-		else
+			blk_cgroup_enable_cross_merges(blkg->q);
+		} else {
 			WARN_ON_ONCE(1);
+		}
 
 		blk_mq_unfreeze_queue(blkg->q);
 
