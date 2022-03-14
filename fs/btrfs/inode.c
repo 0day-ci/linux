@@ -7866,12 +7866,19 @@ static void btrfs_end_dio_bio(struct bio *bio)
 	struct btrfs_dio_private *dip = bio->bi_private;
 	blk_status_t err = bio->bi_status;
 
-	if (err)
+	if (err) {
+		struct bvec_iter_all iter_all;
+		struct bio_vec *bvec;
+		u32 bi_size = 0;
+
+		bio_for_each_segment_all(bvec, bio, iter_all)
+			bi_size += bvec->bv_len;
+
 		btrfs_warn(BTRFS_I(dip->inode)->root->fs_info,
 			   "direct IO failed ino %llu rw %d,%u sector %#Lx len %u err no %d",
 			   btrfs_ino(BTRFS_I(dip->inode)), bio_op(bio),
-			   bio->bi_opf, bio->bi_iter.bi_sector,
-			   bio->bi_iter.bi_size, err);
+			   bio->bi_opf, bio->bi_iter.bi_sector, bi_size, err);
+	}
 
 	if (bio_op(bio) == REQ_OP_READ)
 		err = btrfs_check_read_dio_bio(dip, btrfs_bio(bio), !err);
