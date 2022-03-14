@@ -29,3 +29,4 @@ fit into other categories.
    spear-pcie-gadget
    uacce
    xilinx_sdfec
+   ch341

@@ -1,0 +1,114 @@
+.. SPDX-License-Identifier: GPL-2.0-or-later
+
+===========================================================
+WinChipHead (沁恒) CH341 linux driver for I2C and GPIO mode
+===========================================================
+
+The CH341 is declined in several flavors, and may support one or more
+of UART, SPI, I2C and GPIO, but not always simultaneously:
+
+  - CH341 A/B/F: UART, Printer, SPI, I2C and GPIO
+  - CH341 C/T: UART and I2C
+  - CH341 H: SPI
+
+They work in 3 different modes, with only one being presented
+depending on the USB PID:
+
+  - 0x5523: UART mode, covered by the USB `ch341` serial driver
+  - 0x5512: SPI/I2C/GPIO mode, covered by the MFD `ch341_buses` driver
+  - 0x5584: Parallel printer mode, covered by the USB `usblp` driver
+
+Mode selection is done at the hardware level by tying some
+pins. Breakout boards with one of the CH341 chip usually have one or
+more jumpers to select which mode they work on. At least one model
+(CJMCU-341) appears to need bridging some solder pads to select a
+different default. Breakout boards also don't usually offer an option
+to configure the chip into printer mode; for that case, connect the
+SCL and SDA lines directly together.
+
+The various CH341 appear to be indistinguishable from the
+software. For instance the ch341-buses driver will present a GPIO
+interface for the CH341T although physical pins are not present, and
+the device will accept GPIO commands.
+
+The ch341-buses driver has been tested with a CH341A, CH341B and
+CH341T.
+
+Some breakout boards work in 3.3V and 5V depending on some jumpers.
+
+The black chip programmer with a ZIF socket will power the CH341 at
+3.3V if a jumper is set, but will only output 5V to the chips to be
+programmed, which is not always desirable. A hardware hack to use 3.3V
+everywhere, involving some soldering, is available at
+https://eevblog.com/forum/repair/ch341a-serial-memory-programmer-power-supply-fix/
+
+Some sample code for the CH341 is available at the manufacturer
+website, at http://wch-ic.com/products/CH341.html
+
+The repository at https://github.com/boseji/CH341-Store contains a lot
+of information on these chips, including datasheets.
+
+This driver is based on the pre-existing work at
+https://github.com/gschorcht/i2c-ch341-usb
+
+
+I2C Caveats
+-----------
+
+The ch341 doesn't work with a Wii nunchuk, possibly because the
+pull-up value is too low (1500 ohms).
+
+i2c AT24 eeproms can be read but not programmed properly because the
+at24 linux driver tries to write a byte at a time, and doesn't wait at
+all (or enough) between writes. Data corruption on writes does occur.
+
+The driver doesn't support detection of I2C device present on the
+bus. Apparently when a device is not present at a given address, the
+CH341 will return an extra byte of data, but the driver doesn't
+support that. This may be addressed in the future.
+
+
+The GPIOs
+---------
+
+16 GPIOs are available on the CH341 A/B/F. The first 6 are input/output,
+and the last 10 are input only.
+
+Pinout and their names as they appear on some breakout boards::
+
+  CH341A/B/F     GPIO  Names                    Mode
+    pin          line
+
+   15             0     D0, CS0                  input/output
+   16             1     D1, CS1                  input/output
+   17             2     D2, CS2                  input/output
+   18             3     D3, SCK, DCK             input/output
+   19             4     D4, DOUT2, CS3           input/output
+   20             5     D5, MOSI, DOUT, SDO      input/output
+   21             6     D6, DIN2                 input
+   22             7     D7, MISO, DIN            input
+    5             8     ERR                      input
+    6             9     PEMP                     input
+    7            10     INT                      input
+    8            11     SLCT (SELECT)            input
+   26            12     RST# (?)                 input
+   27            13     WT (WAIT)                input
+    4            14     DS (Data Select?)        input
+    3            15     AS (Address Select?)     input
+
+
+GPIO interrupt
+~~~~~~~~~~~~~~
+
+The INT pin, corresponding to GPIO 10 is an input pin that can trigger
+an interrupt on a rising edge. Only that pin is able to generate an
+interrupt, and only on a rising edge. Trying to monitor events on
+another GPIO, or that GPIO on something other than a rising edge, will
+be rejected.
+
+
+SPI
+---
+
+This driver doesn't offer an SPI interface (yet) due to the
+impossibility of declaring an SPI device like I2C does.

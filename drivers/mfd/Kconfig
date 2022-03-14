@@ -1784,6 +1784,18 @@ config MFD_LOCHNAGAR
 	help
 	  Support for Cirrus Logic Lochnagar audio development board.
 
+config MFD_CH341
+	tristate "WinChipHead CH341 in I2C/SPI/GPIO mode"
+	depends on USB && GPIOLIB && I2C
+	help
+	  If you say yes to this option, support for the CH341 series
+	  of chips, running in I2C/SPI/GPIO mode will be included.
+
+	  The chip's SPI mode is not supported.
+
+	  This driver can also be built as a module.  If so, the
+	  module will be called ch341-buses.
+
 config MFD_ARIZONA
 	select REGMAP
 	select REGMAP_IRQ

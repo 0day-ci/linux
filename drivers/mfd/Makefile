@@ -75,6 +75,9 @@ wm8994-objs			:= wm8994-core.o wm8994-irq.o wm8994-regmap.o
 obj-$(CONFIG_MFD_WM8994)	+= wm8994.o
 obj-$(CONFIG_MFD_WM97xx)	+= wm97xx-core.o
 
+obj-$(CONFIG_MFD_CH341) := ch341-buses.o
+ch341-buses-objs := ch341-core.o ch341-i2c.o ch341-gpio.o
+
 madera-objs			:= madera-core.o
 ifeq ($(CONFIG_MFD_CS47L15),y)
 madera-objs			+= cs47l15-tables.o
