@@ -444,6 +444,11 @@ enum skb_drop_reason {
 	SKB_DROP_REASON_TAP_TXFILTER,	/* dropped by tx filter implemented
 					 * at tun/tap, e.g., check_filter()
 					 */
+	SKB_DROP_REASON_ICMP_CSUM,	/* ICMP checksum error */
+	SKB_DROP_REASON_ICMP_TYPE,	/* unknown ICMP type */
+	SKB_DROP_REASON_ICMP_BROADCAST,	/* unacceptable broadcast(multicast)
+					 * ICMP message
+					 */
 	SKB_DROP_REASON_MAX,
 };
 
