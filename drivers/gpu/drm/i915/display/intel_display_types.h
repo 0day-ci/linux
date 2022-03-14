@@ -280,8 +280,7 @@ struct intel_panel_bl_funcs {
 };
 
 struct intel_panel {
-	struct drm_display_mode *fixed_mode;
-	struct drm_display_mode *downclock_mode;
+	struct list_head fixed_modes;
 
 	/* backlight */
 	struct {
@@ -954,7 +953,7 @@ struct intel_crtc_state {
 	/* Pipe source size (ie. panel fitter input size)
 	 * All planes will be positioned inside this space,
 	 * and get clipped at the edges. */
-	int pipe_src_w, pipe_src_h;
+	struct drm_rect pipe_src;
 
 	/*
 	 * Pipe pixel rate, adjusted for
@@ -1154,6 +1153,9 @@ struct intel_crtc_state {
 	/* bitmask of planes that will be updated during the commit */
 	u8 update_planes;
 
+	u8 framestart_delay; /* 1-4 */
+	u8 msa_timing_delay; /* 0-3 */
+
 	struct {
 		u32 enable;
 		u32 gcp;
@@ -1178,9 +1180,6 @@ struct intel_crtc_state {
 
 	/* enable pipe csc? */
 	bool csc_enable;
-
-	/* enable pipe big joiner? */
-	bool bigjoiner;
 
 	/* big joiner pipe bitmask */
 	u8 bigjoiner_pipes;
@@ -1252,6 +1251,11 @@ enum intel_pipe_crc_source {
 	INTEL_PIPE_CRC_SOURCE_MAX,
 };
 
+enum drrs_refresh_rate {
+	DRRS_REFRESH_RATE_HIGH,
+	DRRS_REFRESH_RATE_LOW,
+};
+
 #define INTEL_PIPE_CRC_ENTRIES_NR	128
 struct intel_pipe_crc {
 	spinlock_t lock;
@@ -1293,6 +1297,15 @@ struct intel_crtc {
 			struct g4x_wm_state g4x;
 		} active;
 	} wm;
+
+	struct {
+		struct mutex mutex;
+		struct delayed_work work;
+		enum drrs_refresh_rate refresh_rate;
+		unsigned int busy_frontbuffer_bits;
+		enum transcoder cpu_transcoder;
+		struct intel_link_m_n m_n, m2_n2;
+	} drrs;
 
 	int scanline_offset;
 
