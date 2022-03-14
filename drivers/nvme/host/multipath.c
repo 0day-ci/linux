@@ -88,7 +88,7 @@ void nvme_mpath_start_freeze(struct nvme_subsystem *subsys)
  */
 bool nvme_mpath_set_disk_name(struct nvme_ns *ns, char *disk_name, int *flags)
 {
-	if (!multipath)
+	if (!multipath || !nvme_check_unique_nsid(ns->ctrl, ns->head))
 		return false;
 	if (!ns->head->disk) {
 		sprintf(disk_name, "nvme%dn%d", ns->ctrl->subsys->instance,
@@ -507,7 +507,8 @@ int nvme_mpath_alloc_disk(struct nvme_ctrl *ctrl, struct nvme_ns_head *head)
 	 * We also do this for private namespaces as the namespace sharing data could
 	 * change after a rescan.
 	 */
-	if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) || !multipath)
+	if (!(ctrl->subsys->cmic & NVME_CTRL_CMIC_MULTI_CTRL) || !multipath ||
+	    !nvme_check_unique_nsid(ctrl, head))
 		return 0;
 
 	head->disk = blk_alloc_disk(ctrl->numa_node);

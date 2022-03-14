@@ -3816,7 +3816,14 @@ static int nvme_init_ns_head(struct nvme_ns *ns, unsigned nsid,
 
 	mutex_lock(&ctrl->subsys->lock);
 	head = nvme_find_ns_head(ctrl->subsys, nsid);
-	if (!head) {
+	if (!head || !(nvme_check_unique_nsid(ctrl, head) || is_shared)) {
+		/*
+		 * If the found ns head is null or both of ns are not shared
+		 * without the unique namespace condition (this means both
+		 * namespace are private namespaces and those can share the
+		 * same nsid), allocate the new head. Private namespace can
+		 * reuse nsid with the others.
+		 */
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, ids);
 		if (ret) {
 			dev_err(ctrl->device,

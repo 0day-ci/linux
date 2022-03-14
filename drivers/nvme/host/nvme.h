@@ -719,6 +719,22 @@ static inline bool nvme_check_ready(struct nvme_ctrl *ctrl, struct request *rq,
 		return queue_live;
 	return __nvme_check_ready(ctrl, rq, queue_live);
 }
+static inline bool nvme_check_unique_nsid(struct nvme_ctrl *ctrl,
+		struct nvme_ns_head *head)
+{
+	/*
+	 * NSID should be unique on the following condition
+	 * 1. Namespace Management support; or
+	 * 2. ANA Reporing support; or
+	 * 3. NVM Set support; or
+	 * 4. Namespace is shared
+	 * Other case, private namespace are not required to be unique.
+	 */
+	return (ctrl->oacs & NVME_CTRL_OACS_NS_MNGT_SUPP) ||
+		(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA) ||
+		(ctrl->ctratt & NVME_CTRL_CTRATT_NVM_SETS) ||
+		(head->shared);
+}
 int nvme_submit_sync_cmd(struct request_queue *q, struct nvme_command *cmd,
 		void *buf, unsigned bufflen);
 int __nvme_submit_sync_cmd(struct request_queue *q, struct nvme_command *cmd,
