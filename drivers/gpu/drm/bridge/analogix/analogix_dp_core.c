@@ -567,7 +567,7 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
 	analogix_dp_get_adjust_training_lane(dp, adjust_request);
 
 	if (!analogix_dp_channel_eq_ok(link_status, link_align, lane_count)) {
-		/* traing pattern Set to Normal */
+		/* training pattern Set to Normal */
 		retval = analogix_dp_training_pattern_dis(dp);
 		if (retval < 0)
 			return retval;
@@ -1254,7 +1254,7 @@ static int analogix_dp_bridge_attach(struct drm_bridge *bridge,
 	/*
 	 * NOTE: the connector registration is implemented in analogix
 	 * platform driver, that to say connector would be exist after
-	 * plat_data->attch return, that's why we record the connector
+	 * plat_data->attach return, that's why we record the connector
 	 * point after plat attached.
 	 */
 	if (dp->plat_data->attach) {
