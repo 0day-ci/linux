@@ -509,8 +509,6 @@ static unsigned long count_mm_mlocked_page_nr(struct mm_struct *mm,
 		return 0;
 
 	for (; vma ; vma = vma->vm_next) {
-		if (start >= vma->vm_end)
-			continue;
 		if (start + len <=  vma->vm_start)
 			break;
 		if (vma->vm_flags & VM_LOCKED) {
