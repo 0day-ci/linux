@@ -7913,22 +7913,16 @@ static void btrfs_end_dio_bio(struct bio *bio)
 }
 
 static inline blk_status_t btrfs_submit_dio_bio(struct bio *bio,
-		struct inode *inode, u64 file_offset, int async_submit)
+		struct inode *inode, u64 file_offset)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_dio_private *dip = bio->bi_private;
 	bool write = btrfs_op(bio) == BTRFS_MAP_WRITE;
+	bool async_submit;
 	blk_status_t ret;
 
-	/*
-	 * Check btrfs_submit_data_bio() for rules about async submit.
-	 *
-	 * The only exception is for RAID56, when there are more than one bios
-	 * to submit, async submit seems to make it harder to collect csums
-	 * for the full stripe.
-	 */
-	if (async_submit)
-		async_submit = !atomic_read(&BTRFS_I(inode)->sync_writers);
+	/* Check btrfs_submit_data_bio() for rules about async submit. */
+	async_submit = !atomic_read(&BTRFS_I(inode)->sync_writers);
 
 	if (!write)
 		btrfs_bio(bio)->endio_type = BTRFS_WQ_ENDIO_DATA;
@@ -8002,25 +7996,12 @@ static void btrfs_submit_direct(const struct iomap_iter *iter,
 		struct bio *dio_bio, loff_t file_offset)
 {
 	struct inode *inode = iter->inode;
+	struct btrfs_dio_data *dio_data = iter->iomap.private;
 	const bool write = (btrfs_op(dio_bio) == BTRFS_MAP_WRITE);
-	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
-	const bool raid56 = (btrfs_data_alloc_profile(fs_info) &
-			     BTRFS_BLOCK_GROUP_RAID56_MASK);
 	struct btrfs_dio_private *dip;
 	struct bio *bio;
 	const u32 length = dio_bio->bi_iter.bi_size;
-	u32 submitted_bytes = 0;
-	u64 start_sector;
-	int async_submit = 0;
-	u64 submit_len;
-	u64 clone_offset = 0;
-	u64 clone_len;
-	u64 logical;
-	int ret;
 	blk_status_t status;
-	struct btrfs_io_geometry geom;
-	struct btrfs_dio_data *dio_data = iter->iomap.private;
-	struct extent_map *em = NULL;
 
 	dip = btrfs_create_dio_private(dio_bio, inode, file_offset, length);
 	if (!dip) {
@@ -8044,80 +8025,34 @@ static void btrfs_submit_direct(const struct iomap_iter *iter,
 			goto out_err;
 	}
 
-	start_sector = dio_bio->bi_iter.bi_sector;
-	submit_len = dio_bio->bi_iter.bi_size;
+	/*
+	 * This will never fail as it's passing GPF_NOFS and
+	 * the allocation is backed by btrfs_bioset.
+	 */
+	bio = btrfs_bio_clone(dio_bio);
+	bio->bi_private = dip;
+	bio->bi_end_io = btrfs_end_dio_bio;
 
-	do {
-		logical = start_sector << 9;
-		em = btrfs_get_chunk_map(fs_info, logical, submit_len);
-		if (IS_ERR(em)) {
-			status = errno_to_blk_status(PTR_ERR(em));
-			em = NULL;
-			goto out_err_em;
-		}
-		ret = btrfs_get_io_geometry(fs_info, em, btrfs_op(dio_bio),
-					    logical, &geom);
-		if (ret) {
-			status = errno_to_blk_status(ret);
-			goto out_err_em;
-		}
 
-		clone_len = min(submit_len, geom.len);
-		ASSERT(clone_len <= UINT_MAX);
-
-		/*
-		 * This will never fail as it's passing GPF_NOFS and
-		 * the allocation is backed by btrfs_bioset.
-		 */
-		bio = btrfs_bio_clone_partial(dio_bio, clone_offset, clone_len);
-		bio->bi_private = dip;
-		bio->bi_end_io = btrfs_end_dio_bio;
-
-		if (bio_op(bio) == REQ_OP_ZONE_APPEND) {
-			status = extract_ordered_extent(BTRFS_I(inode), bio,
-							file_offset);
-			if (status) {
-				bio_put(bio);
-				goto out_err;
-			}
-		}
-
-		ASSERT(submit_len >= clone_len);
-		submit_len -= clone_len;
-
-		if (submit_len > 0) {
-			/*
-			 * If we are submitting more than one bio, submit them
-			 * all asynchronously. The exception is RAID 5 or 6, as
-			 * asynchronous checksums make it difficult to collect
-			 * full stripe writes.
-			 */
-			if (!raid56)
-				async_submit = 1;
-		}
-
-		status = btrfs_submit_dio_bio(bio, inode, file_offset,
-						async_submit);
+	if (bio_op(bio) == REQ_OP_ZONE_APPEND) {
+		status = extract_ordered_extent(BTRFS_I(inode), bio,
+						file_offset);
 		if (status) {
 			bio_put(bio);
-			goto out_err_em;
+			goto out_err;
 		}
-
-		submitted_bytes += clone_len;
-		dio_data->submitted += clone_len;
-		clone_offset += clone_len;
-		start_sector += clone_len >> 9;
-		file_offset += clone_len;
-
-		free_extent_map(em);
-	} while (submit_len > 0);
+	}
+	status = btrfs_submit_dio_bio(bio, inode, file_offset);
+	if (status) {
+		bio_put(bio);
+		goto out_err;
+	}
+	dio_data->submitted += length;
 	return;
 
-out_err_em:
-	free_extent_map(em);
 out_err:
 	dip->dio_bio->bi_status = status;
-	dio_private_finish(dip, status, length - submitted_bytes);
+	dio_private_finish(dip, status, length);
 }
 
 const struct iomap_ops btrfs_dio_iomap_ops = {
