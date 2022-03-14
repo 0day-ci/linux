@@ -18220,6 +18220,7 @@ SUNPLUS USB OHCI DRIVER
 M:	Vincent Shih <vincent.sunplus@gmail.com>
 L:	linux-usb@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/usb/sunplus,sp7021-usb-ohci.yaml
 F:	drivers/usb/host/ohci-sunplus.c
 
 SUPERH

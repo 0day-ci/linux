@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/usb/sunplus,sp7021-usb-ohci.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Sunplus SP7021 OHCI Controller Device Tree Bindings
+
+allOf:
+  - $ref: usb-hcd.yaml#
+
+maintainers:
+  - Vincent Shih <vincent.sunplus@gmail.com>
+
+description:
+  Sunplus SP7021 USB HOST IP is a USB2.0 Host Controller. It supports both
+  Enhanced Host Controller Interface (EHCI) and Open Host Controller Interface
+  (OHCI).
+
+  It supports 32-bits address bus and 64bit data bus interface, compliant
+  to AMBA AXI interface for data transfer.
+
+  It supports 32-bits address and data bus interface, compliant to AMBA
+  AHB interface for register configurations.
+
+  It supports 32-bits address and data bus interface, compliant to AMBA
+  AXI interface for register alternative configurations.
+
+  The UTM Interface block generates PHY control signals, compliant to
+  USB2.0 Transceiver Macrocell Interface Specification Revision 1.0.
+
+properties:
+  compatible:
+    const: sunplus,sp7021-usb-ohci
+
+  reg:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+  resets:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - resets
+  - interrupts
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    sp_ohci0: usb@9c102080 {
+      compatible = "sunplus,sp7021-usb-ohci";
+      reg = <0x9c102080 0x68>;
+      clocks = <&clkc 0x3a>;
+      resets = <&rstc 0x2a>;
+      interrupt-parent = <&intc>;
+      interrupts = <15 IRQ_TYPE_LEVEL_HIGH>;
+    };
