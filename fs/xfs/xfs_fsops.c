@@ -379,6 +379,7 @@ xfs_reserve_blocks(
 	int64_t			fdblks_delta = 0;
 	uint64_t		request;
 	int64_t			free;
+	unsigned int		tries;
 	int			error = 0;
 
 	/* If inval is null, report current values and return */
@@ -432,9 +433,16 @@ xfs_reserve_blocks(
 	 * perform a partial reservation if the request exceeds free space.
 	 */
 	error = -ENOSPC;
-	do {
-		free = percpu_counter_sum(&mp->m_fdblocks) -
-						mp->m_alloc_set_aside;
+	for (tries = 0; tries < 30 && error == -ENOSPC; tries++) {
+		/*
+		 * The reservation pool cannot take space that xfs_mod_fdblocks
+		 * will not give us.  This includes the per-AG set-aside space
+		 * and free space btree blocks that are not available for
+		 * allocation due to per-AG metadata reservations.
+		 */
+		free = percpu_counter_sum(&mp->m_fdblocks);
+		free -= mp->m_alloc_set_aside;
+		free -= atomic64_read(&mp->m_allocbt_blks);
 		if (free <= 0)
 			break;
 
@@ -459,7 +467,7 @@ xfs_reserve_blocks(
 		spin_unlock(&mp->m_sb_lock);
 		error = xfs_mod_fdblocks(mp, -fdblks_delta, 0);
 		spin_lock(&mp->m_sb_lock);
-	} while (error == -ENOSPC);
+	}
 
 	/*
 	 * Update the reserve counters if blocks have been successfully
