@@ -51,8 +51,9 @@ config NVHE_EL2_DEBUG
 	depends on KVM
 	help
 	  Say Y here to enable the debug mode for the non-VHE KVM EL2 object.
-	  Failure reports will BUG() in the hypervisor. This is intended for
-	  local EL2 hypervisor development.
+	  Failure reports will BUG() in the hypervisor; and calls to hyp_panic()
+	  will result in printing the hypervisor call stack.
+	  This is intended for local EL2 hypervisor development.
 
 	  If unsure, say N.
 

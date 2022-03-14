@@ -15,6 +15,8 @@
 
 #include <asm/irq.h>
 #include <asm/pointer_auth.h>
+#include <asm/kvm_asm.h>
+#include <asm/kvm_hyp.h>
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
@@ -64,26 +66,15 @@ NOKPROBE_SYMBOL(start_backtrace);
  * records (e.g. a cycle), determined based on the location and fp value of A
  * and the location (but not the fp value) of B.
  */
-static int notrace unwind_frame(struct task_struct *tsk,
-				struct stackframe *frame)
+static int notrace __unwind_frame(struct stackframe *frame, struct stack_info *info,
+		unsigned long (*translate_fp)(unsigned long, enum stack_type))
 {
 	unsigned long fp = frame->fp;
-	struct stack_info info;
-
-	if (!tsk)
-		tsk = current;
-
-	/* Final frame; nothing to unwind */
-	if (fp == (unsigned long)task_pt_regs(tsk)->stackframe)
-		return -ENOENT;
 
 	if (fp & 0x7)
 		return -EINVAL;
 
-	if (!on_accessible_stack(tsk, fp, 16, &info))
-		return -EINVAL;
-
-	if (test_bit(info.type, frame->stacks_done))
+	if (test_bit(info->type, frame->stacks_done))
 		return -EINVAL;
 
 	/*
@@ -94,28 +85,62 @@ static int notrace unwind_frame(struct task_struct *tsk,
 	 *
 	 * TASK -> IRQ -> OVERFLOW -> SDEI_NORMAL
 	 * TASK -> SDEI_NORMAL -> SDEI_CRITICAL -> OVERFLOW
+	 * KVM_NVHE_HYP -> KVM_NVHE_OVERFLOW
 	 *
 	 * ... but the nesting itself is strict. Once we transition from one
 	 * stack to another, it's never valid to unwind back to that first
 	 * stack.
 	 */
-	if (info.type == frame->prev_type) {
+	if (info->type == frame->prev_type) {
 		if (fp <= frame->prev_fp)
 			return -EINVAL;
 	} else {
 		set_bit(frame->prev_type, frame->stacks_done);
 	}
 
+	/* Record fp as prev_fp before attempting to get the next fp */
+	frame->prev_fp = fp;
+
+	/*
+	 * If fp is not from the current address space perform the
+	 * necessary translation before dereferencing it to get next fp.
+	 */
+	if (translate_fp)
+		fp = translate_fp(fp, info->type);
+	if (!fp)
+		return -EINVAL;
+
 	/*
 	 * Record this frame record's values and location. The prev_fp and
-	 * prev_type are only meaningful to the next unwind_frame() invocation.
+	 * prev_type are only meaningful to the next __unwind_frame() invocation.
 	 */
 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
-	frame->prev_fp = fp;
-	frame->prev_type = info.type;
-
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
+	frame->prev_type = info->type;
+
+	return 0;
+}
+
+static int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+{
+	unsigned long fp = frame->fp;
+	struct stack_info info;
+	int err;
+
+	if (!tsk)
+		tsk = current;
+
+	/* Final frame; nothing to unwind */
+	if (fp == (unsigned long)task_pt_regs(tsk)->stackframe)
+		return -ENOENT;
+
+	if (!on_accessible_stack(tsk, fp, 16, &info))
+		return -EINVAL;
+
+	err = __unwind_frame(frame, &info, NULL);
+	if (err)
+		return err;
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	if (tsk->ret_stack &&
@@ -143,19 +168,26 @@ static int notrace unwind_frame(struct task_struct *tsk,
 }
 NOKPROBE_SYMBOL(unwind_frame);
 
-static void notrace walk_stackframe(struct task_struct *tsk,
-				    struct stackframe *frame,
-				    bool (*fn)(void *, unsigned long), void *data)
+static void notrace __walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
+		bool (*fn)(void *, unsigned long), void *data,
+		int (*unwind_frame_fn)(struct task_struct *tsk, struct stackframe *frame))
 {
 	while (1) {
 		int ret;
 
 		if (!fn(data, frame->pc))
 			break;
-		ret = unwind_frame(tsk, frame);
+		ret = unwind_frame_fn(tsk, frame);
 		if (ret < 0)
 			break;
 	}
+}
+
+static void notrace walk_stackframe(struct task_struct *tsk,
+				    struct stackframe *frame,
+				    bool (*fn)(void *, unsigned long), void *data)
+{
+	__walk_stackframe(tsk, frame, fn, data, unwind_frame);
 }
 NOKPROBE_SYMBOL(walk_stackframe);
 
@@ -210,3 +242,135 @@ noinline notrace void arch_stack_walk(stack_trace_consume_fn consume_entry,
 
 	walk_stackframe(task, &frame, consume_entry, cookie);
 }
+
+#ifdef CONFIG_NVHE_EL2_DEBUG
+DECLARE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+DECLARE_KVM_NVHE_PER_CPU(unsigned long [PAGE_SIZE/sizeof(long)], hyp_overflow_stack);
+DECLARE_KVM_NVHE_PER_CPU(struct kvm_nvhe_panic_info, kvm_panic_info);
+
+static inline bool kvm_nvhe_on_overflow_stack(unsigned long sp, unsigned long size,
+				 struct stack_info *info)
+{
+	struct kvm_nvhe_panic_info *panic_info = this_cpu_ptr_nvhe_sym(kvm_panic_info);
+	unsigned long low = (unsigned long)panic_info->hyp_overflow_stack_base;
+	unsigned long high = low + PAGE_SIZE;
+
+	return on_stack(sp, size, low, high, STACK_TYPE_KVM_NVHE_OVERFLOW, info);
+}
+
+static inline bool kvm_nvhe_on_hyp_stack(unsigned long sp, unsigned long size,
+				 struct stack_info *info)
+{
+	struct kvm_nvhe_panic_info *panic_info = this_cpu_ptr_nvhe_sym(kvm_panic_info);
+	unsigned long low = (unsigned long)panic_info->hyp_stack_base;
+	unsigned long high = low + PAGE_SIZE;
+
+	return on_stack(sp, size, low, high, STACK_TYPE_KVM_NVHE_HYP, info);
+}
+
+static inline bool kvm_nvhe_on_accessible_stack(unsigned long sp, unsigned long size,
+				       struct stack_info *info)
+{
+	if (info)
+		info->type = STACK_TYPE_UNKNOWN;
+
+	if (kvm_nvhe_on_hyp_stack(sp, size, info))
+		return true;
+	if (kvm_nvhe_on_overflow_stack(sp, size, info))
+		return true;
+
+	return false;
+}
+
+static unsigned long kvm_nvhe_hyp_stack_kern_va(unsigned long addr)
+{
+	struct kvm_nvhe_panic_info *panic_info = this_cpu_ptr_nvhe_sym(kvm_panic_info);
+	unsigned long hyp_base, kern_base, hyp_offset;
+
+	hyp_base = (unsigned long)panic_info->hyp_stack_base;
+	hyp_offset = addr - hyp_base;
+
+	kern_base = (unsigned long)*this_cpu_ptr(&kvm_arm_hyp_stack_page);
+
+	return kern_base + hyp_offset;
+}
+
+static unsigned long kvm_nvhe_overflow_stack_kern_va(unsigned long addr)
+{
+	struct kvm_nvhe_panic_info *panic_info = this_cpu_ptr_nvhe_sym(kvm_panic_info);
+	unsigned long hyp_base, kern_base, hyp_offset;
+
+	hyp_base = (unsigned long)panic_info->hyp_overflow_stack_base;
+	hyp_offset = addr - hyp_base;
+
+	kern_base = (unsigned long)this_cpu_ptr_nvhe_sym(hyp_overflow_stack);
+
+	return kern_base + hyp_offset;
+}
+
+/*
+ * Convert KVM nVHE hypervisor stack VA to a kernel VA.
+ *
+ * The nVHE hypervisor stack is mapped in the flexible 'private' VA range, to allow
+ * for guard pages below the stack. Consequently, the fixed offset address
+ * translation macros won't work here.
+ *
+ * The kernel VA is calculated as an offset from the kernel VA of the hypervisor
+ * stack base. See: kvm_nvhe_hyp_stack_kern_va(),  kvm_nvhe_overflow_stack_kern_va()
+ */
+static unsigned long kvm_nvhe_stack_kern_va(unsigned long addr,
+					enum stack_type type)
+{
+	switch (type) {
+	case STACK_TYPE_KVM_NVHE_HYP:
+		return kvm_nvhe_hyp_stack_kern_va(addr);
+	case STACK_TYPE_KVM_NVHE_OVERFLOW:
+		return kvm_nvhe_overflow_stack_kern_va(addr);
+	default:
+		return 0UL;
+	}
+}
+
+static int notrace kvm_nvhe_unwind_frame(struct task_struct *tsk,
+					struct stackframe *frame)
+{
+	struct stack_info info;
+
+	if (!kvm_nvhe_on_accessible_stack(frame->fp, 16, &info))
+		return -EINVAL;
+
+	return  __unwind_frame(frame, &info, kvm_nvhe_stack_kern_va);
+}
+
+static bool kvm_nvhe_dump_backtrace_entry(void *arg, unsigned long where)
+{
+	unsigned long va_mask = GENMASK_ULL(vabits_actual - 1, 0);
+	unsigned long hyp_offset = (unsigned long)arg;
+
+	where &= va_mask;	/* Mask tags */
+	where += hyp_offset;	/* Convert to kern addr */
+
+	kvm_err("[<%016lx>] %pB\n", where, (void *)where);
+
+	return true;
+}
+
+static void notrace kvm_nvhe_walk_stackframe(struct task_struct *tsk,
+				    struct stackframe *frame,
+				    bool (*fn)(void *, unsigned long), void *data)
+{
+	__walk_stackframe(tsk, frame, fn, data, kvm_nvhe_unwind_frame);
+}
+
+void kvm_nvhe_dump_backtrace(unsigned long hyp_offset)
+{
+	struct kvm_nvhe_panic_info *panic_info = this_cpu_ptr_nvhe_sym(kvm_panic_info);
+	struct stackframe frame;
+
+	start_backtrace(&frame, panic_info->fp, panic_info->pc);
+	pr_err("nVHE HYP call trace:\n");
+	kvm_nvhe_walk_stackframe(NULL, &frame, kvm_nvhe_dump_backtrace_entry,
+					(void *)hyp_offset);
+	pr_err("---- end of nVHE HYP call trace ----\n");
+}
+#endif /* CONFIG_NVHE_EL2_DEBUG */

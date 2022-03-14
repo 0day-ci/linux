@@ -22,6 +22,10 @@ enum stack_type {
 	STACK_TYPE_OVERFLOW,
 	STACK_TYPE_SDEI_NORMAL,
 	STACK_TYPE_SDEI_CRITICAL,
+#ifdef CONFIG_NVHE_EL2_DEBUG
+	STACK_TYPE_KVM_NVHE_HYP,
+	STACK_TYPE_KVM_NVHE_OVERFLOW,
+#endif /* CONFIG_NVHE_EL2_DEBUG */
 	__NR_STACK_TYPES
 };
 
@@ -146,5 +150,13 @@ static inline bool on_accessible_stack(const struct task_struct *tsk,
 
 	return false;
 }
+
+#ifdef CONFIG_NVHE_EL2_DEBUG
+void kvm_nvhe_dump_backtrace(unsigned long hyp_offset);
+#else
+static inline void kvm_nvhe_dump_backtrace(unsigned long hyp_offset)
+{
+}
+#endif /* CONFIG_NVHE_EL2_DEBUG */
 
 #endif	/* __ASM_STACKTRACE_H */
