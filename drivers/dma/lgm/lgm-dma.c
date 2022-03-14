@@ -1463,11 +1463,10 @@ static int ldma_init_v22(struct ldma_dev *d, struct platform_device *pdev)
 	return 0;
 }
 
-static void ldma_clk_disable(void *data)
+static void ldma_reset(void *data)
 {
 	struct ldma_dev *d = data;
 
-	clk_disable_unprepare(d->core_clk);
 	reset_control_assert(d->rst);
 }
 
@@ -1590,17 +1589,16 @@ static int intel_ldma_probe(struct platform_device *pdev)
 		return PTR_ERR(d->base);
 
 	/* Power up and reset the dma engine, some DMAs always on?? */
-	d->core_clk = devm_clk_get_optional(dev, NULL);
+	d->core_clk = devm_clk_get_optional_enabled(dev, NULL);
 	if (IS_ERR(d->core_clk))
 		return PTR_ERR(d->core_clk);
-	clk_prepare_enable(d->core_clk);
 
 	d->rst = devm_reset_control_get_optional(dev, NULL);
 	if (IS_ERR(d->rst))
 		return PTR_ERR(d->rst);
 	reset_control_deassert(d->rst);
 
-	ret = devm_add_action_or_reset(dev, ldma_clk_disable, d);
+	ret = devm_add_action_or_reset(dev, ldma_reset, d);
 	if (ret) {
 		dev_err(dev, "Failed to devm_add_action_or_reset, %d\n", ret);
 		return ret;
