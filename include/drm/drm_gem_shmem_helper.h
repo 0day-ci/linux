@@ -6,6 +6,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
+#include <linux/shrinker.h>
 
 #include <drm/drm_file.h>
 #include <drm/drm_gem.h>
@@ -15,6 +16,7 @@
 struct dma_buf_attachment;
 struct drm_mode_create_dumb;
 struct drm_printer;
+struct drm_device;
 struct sg_table;
 
 /**
@@ -271,6 +273,29 @@ static inline int drm_gem_shmem_object_mmap(struct drm_gem_object *obj, struct v
 
 	return drm_gem_shmem_mmap(shmem, vma);
 }
+
+/**
+ * struct drm_gem_shmem_shrinker - Generic memory shrinker for shmem GEMs
+ */
+struct drm_gem_shmem_shrinker {
+	/** @base: Shrinker for purging shmem GEM objects */
+	struct shrinker base;
+
+	/** @lock: Protects @lru */
+	struct mutex lock;
+
+	/** @lru: List of shmem GEM objects available for purging */
+	struct list_head lru;
+
+	/** @dev: DRM device that uses this shrinker */
+	struct drm_device *dev;
+
+	/** @shrinkable_count: Count of shmem GEM pages to be purged */
+	u64 shrinkable_count;
+};
+
+int drm_gem_shmem_shrinker_register(struct drm_device *dev);
+void drm_gem_shmem_shrinker_unregister(struct drm_device *dev);
 
 /*
  * Driver ops

@@ -172,6 +172,17 @@ struct drm_gem_object_funcs {
 	 * This is optional but necessary for mmap support.
 	 */
 	const struct vm_operations_struct *vm_ops;
+
+	/**
+	 * @purge:
+	 *
+	 * Releases the GEM object's allocated backing storage to the system.
+	 *
+	 * Returns the number of pages that have been freed by purging the GEM object.
+	 *
+	 * This callback is used by the GEM shrinker.
+	 */
+	unsigned long (*purge)(struct drm_gem_object *obj);
 };
 
 /**

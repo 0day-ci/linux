@@ -139,6 +139,9 @@ void drm_gem_shmem_free(struct drm_gem_shmem_object *shmem)
 {
 	struct drm_gem_object *obj = &shmem->base;
 
+	/* take out shmem GEM object from the memory shrinker */
+	drm_gem_shmem_madvise(shmem, 0);
+
 	WARN_ON(shmem->vmap_use_count);
 
 	if (obj->import_attach) {
@@ -162,6 +165,42 @@ void drm_gem_shmem_free(struct drm_gem_shmem_object *shmem)
 	kfree(shmem);
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_free);
+
+static void drm_gem_shmem_update_purgeable_status(struct drm_gem_shmem_object *shmem)
+{
+	struct drm_gem_object *obj = &shmem->base;
+	struct drm_gem_shmem_shrinker *gem_shrinker = obj->dev->shmem_shrinker;
+	size_t page_count = obj->size >> PAGE_SHIFT;
+
+	if (!gem_shrinker || obj->import_attach || !obj->funcs->purge)
+		return;
+
+	mutex_lock(&shmem->vmap_lock);
+	mutex_lock(&shmem->pages_lock);
+	mutex_lock(&gem_shrinker->lock);
+
+	if (shmem->madv < 0) {
+		list_del_init(&shmem->madv_list);
+		goto unlock;
+	} else if (shmem->madv > 0) {
+		if (!list_empty(&shmem->madv_list))
+			goto unlock;
+
+		WARN_ON(gem_shrinker->shrinkable_count + page_count < page_count);
+		gem_shrinker->shrinkable_count += page_count;
+
+		list_add_tail(&shmem->madv_list, &gem_shrinker->lru);
+	} else if (!list_empty(&shmem->madv_list)) {
+		list_del_init(&shmem->madv_list);
+
+		WARN_ON(gem_shrinker->shrinkable_count < page_count);
+		gem_shrinker->shrinkable_count -= page_count;
+	}
+unlock:
+	mutex_unlock(&gem_shrinker->lock);
+	mutex_unlock(&shmem->pages_lock);
+	mutex_unlock(&shmem->vmap_lock);
+}
 
 static int drm_gem_shmem_get_pages_locked(struct drm_gem_shmem_object *shmem)
 {
@@ -366,6 +405,8 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 	ret = drm_gem_shmem_vmap_locked(shmem, map);
 	mutex_unlock(&shmem->vmap_lock);
 
+	drm_gem_shmem_update_purgeable_status(shmem);
+
 	return ret;
 }
 EXPORT_SYMBOL(drm_gem_shmem_vmap);
@@ -409,6 +450,8 @@ void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 	mutex_lock(&shmem->vmap_lock);
 	drm_gem_shmem_vunmap_locked(shmem, map);
 	mutex_unlock(&shmem->vmap_lock);
+
+	drm_gem_shmem_update_purgeable_status(shmem);
 }
 EXPORT_SYMBOL(drm_gem_shmem_vunmap);
 
@@ -450,6 +493,8 @@ int drm_gem_shmem_madvise(struct drm_gem_shmem_object *shmem, int madv)
 	madv = shmem->madv;
 
 	mutex_unlock(&shmem->pages_lock);
+
+	drm_gem_shmem_update_purgeable_status(shmem);
 
 	return (madv >= 0);
 }
@@ -762,6 +807,155 @@ drm_gem_shmem_prime_import_sg_table(struct drm_device *dev,
 	return &shmem->base;
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_prime_import_sg_table);
+
+static struct drm_gem_shmem_shrinker *
+to_drm_shrinker(struct shrinker *shrinker)
+{
+	return container_of(shrinker, struct drm_gem_shmem_shrinker, base);
+}
+
+static unsigned long
+drm_gem_shmem_shrinker_count_objects(struct shrinker *shrinker,
+				     struct shrink_control *sc)
+{
+	struct drm_gem_shmem_shrinker *gem_shrinker = to_drm_shrinker(shrinker);
+	u64 count = gem_shrinker->shrinkable_count;
+
+	if (count >= SHRINK_EMPTY)
+		return SHRINK_EMPTY - 1;
+
+	return count ?: SHRINK_EMPTY;
+}
+
+static unsigned long
+drm_gem_shmem_shrinker_scan_objects(struct shrinker *shrinker,
+				    struct shrink_control *sc)
+{
+	struct drm_gem_shmem_shrinker *gem_shrinker = to_drm_shrinker(shrinker);
+	struct drm_gem_shmem_object *shmem;
+	struct list_head still_in_list;
+	bool lock_contention = true;
+	struct drm_gem_object *obj;
+	unsigned long freed = 0;
+
+	INIT_LIST_HEAD(&still_in_list);
+
+	mutex_lock(&gem_shrinker->lock);
+
+	while (freed < sc->nr_to_scan) {
+		shmem = list_first_entry_or_null(&gem_shrinker->lru,
+						 typeof(*shmem), madv_list);
+		if (!shmem)
+			break;
+
+		obj = &shmem->base;
+		list_move_tail(&shmem->madv_list, &still_in_list);
+
+		/*
+		 * If it's in the process of being freed, gem_object->free()
+		 * may be blocked on lock waiting to remove it.  So just
+		 * skip it.
+		 */
+		if (!kref_get_unless_zero(&obj->refcount))
+			continue;
+
+		mutex_unlock(&gem_shrinker->lock);
+
+		/* prevent racing with job submission code paths */
+		if (!dma_resv_trylock(obj->resv))
+			goto shrinker_lock;
+
+		/* prevent racing with the dma-buf exporting */
+		if (!mutex_trylock(&gem_shrinker->dev->object_name_lock))
+			goto resv_unlock;
+
+		if (!mutex_trylock(&shmem->vmap_lock))
+			goto object_name_unlock;
+
+		if (!mutex_trylock(&shmem->pages_lock))
+			goto vmap_unlock;
+
+		lock_contention = false;
+
+		/* check whether h/w uses this object */
+		if (!dma_resv_test_signaled(obj->resv, true))
+			goto pages_unlock;
+
+		/* GEM may've become unpurgeable while shrinker was unlocked */
+		if (!drm_gem_shmem_is_purgeable(shmem))
+			goto pages_unlock;
+
+		freed += obj->funcs->purge(obj);
+pages_unlock:
+		mutex_unlock(&shmem->pages_lock);
+vmap_unlock:
+		mutex_unlock(&shmem->vmap_lock);
+object_name_unlock:
+		mutex_unlock(&gem_shrinker->dev->object_name_lock);
+resv_unlock:
+		dma_resv_unlock(obj->resv);
+shrinker_lock:
+		drm_gem_object_put(&shmem->base);
+		mutex_lock(&gem_shrinker->lock);
+	}
+
+	list_splice_tail(&still_in_list, &gem_shrinker->lru);
+	WARN_ON(gem_shrinker->shrinkable_count < freed);
+	gem_shrinker->shrinkable_count -= freed;
+
+	mutex_unlock(&gem_shrinker->lock);
+
+	if (!freed && !lock_contention)
+		return SHRINK_STOP;
+
+	return freed;
+}
+
+int drm_gem_shmem_shrinker_register(struct drm_device *dev)
+{
+	struct drm_gem_shmem_shrinker *gem_shrinker;
+	int err;
+
+	if (WARN_ON(dev->shmem_shrinker))
+		return -EBUSY;
+
+	gem_shrinker = kzalloc(sizeof(*gem_shrinker), GFP_KERNEL);
+	if (!gem_shrinker)
+		return -ENOMEM;
+
+	gem_shrinker->base.count_objects = drm_gem_shmem_shrinker_count_objects;
+	gem_shrinker->base.scan_objects = drm_gem_shmem_shrinker_scan_objects;
+	gem_shrinker->base.seeks = DEFAULT_SEEKS;
+	gem_shrinker->dev = dev;
+
+	INIT_LIST_HEAD(&gem_shrinker->lru);
+	mutex_init(&gem_shrinker->lock);
+
+	dev->shmem_shrinker = gem_shrinker;
+
+	err = register_shrinker(&gem_shrinker->base);
+	if (err) {
+		dev->shmem_shrinker = NULL;
+		kfree(gem_shrinker);
+		return err;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(drm_gem_shmem_shrinker_register);
+
+void drm_gem_shmem_shrinker_unregister(struct drm_device *dev)
+{
+	struct drm_gem_shmem_shrinker *gem_shrinker = dev->shmem_shrinker;
+
+	if (gem_shrinker) {
+		unregister_shrinker(&gem_shrinker->base);
+		mutex_destroy(&gem_shrinker->lock);
+		dev->shmem_shrinker = NULL;
+		kfree(gem_shrinker);
+	}
+}
+EXPORT_SYMBOL_GPL(drm_gem_shmem_shrinker_unregister);
 
 MODULE_DESCRIPTION("DRM SHMEM memory-management helpers");
 MODULE_IMPORT_NS(DMA_BUF);
