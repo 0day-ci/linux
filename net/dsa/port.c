@@ -30,12 +30,11 @@ static int dsa_port_notify(const struct dsa_port *dp, unsigned long e, void *v)
 	return dsa_tree_notify(dp->ds->dst, e, v);
 }
 
-static void dsa_port_notify_bridge_fdb_flush(const struct dsa_port *dp)
+static void dsa_port_notify_bridge_fdb_flush(const struct dsa_port *dp, u16 vid)
 {
 	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
 	struct switchdev_notifier_fdb_info info = {
-		/* flush all VLANs */
-		.vid = 0,
+		.vid = vid,
 	};
 
 	/* When the port becomes standalone it has already left the bridge.
@@ -57,7 +56,39 @@ static void dsa_port_fast_age(const struct dsa_port *dp)
 
 	ds->ops->port_fast_age(ds, dp->index);
 
-	dsa_port_notify_bridge_fdb_flush(dp);
+	dsa_port_notify_bridge_fdb_flush(dp, 0);
+}
+
+static void dsa_port_vlan_fast_age(const struct dsa_port *dp, u16 vid)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->port_vlan_fast_age)
+		return;
+
+	ds->ops->port_vlan_fast_age(ds, dp->index, vid);
+
+	dsa_port_notify_bridge_fdb_flush(dp, vid);
+}
+
+static void dsa_port_msti_fast_age(const struct dsa_port *dp, u16 msti)
+{
+	unsigned long *vids;
+	int vid;
+
+	vids = bitmap_zalloc(VLAN_N_VID, 0);
+	if (!vids)
+		return;
+
+	if (br_mst_get_info(dsa_port_bridge_dev_get(dp), msti, vids))
+		goto out_free;
+
+	for_each_set_bit(vid, vids, VLAN_N_VID) {
+		dsa_port_vlan_fast_age(dp, vid);
+	}
+
+out_free:
+	kfree(vids);
 }
 
 static bool dsa_port_can_configure_learning(struct dsa_port *dp)
@@ -116,6 +147,32 @@ static void dsa_port_set_state_now(struct dsa_port *dp, u8 state,
 	err = dsa_port_set_state(dp, state, do_fast_age);
 	if (err)
 		pr_err("DSA: failed to set STP state %u (%d)\n", state, err);
+}
+
+int dsa_port_set_mst_state(struct dsa_port *dp,
+			   const struct switchdev_mst_state *state)
+{
+	struct dsa_switch *ds = dp->ds;
+	int err;
+
+	if (!ds->ops->port_mst_state_set)
+		return -EOPNOTSUPP;
+
+	err = ds->ops->port_mst_state_set(ds, dp->index, state);
+	if (err)
+		return err;
+
+	if (dp->learning) {
+		switch (state->state) {
+		case BR_STATE_DISABLED:
+		case BR_STATE_BLOCKING:
+		case BR_STATE_LISTENING:
+			dsa_port_msti_fast_age(dp, state->msti);
+			break;
+		}
+	}
+
+	return 0;
 }
 
 int dsa_port_enable_rt(struct dsa_port *dp, struct phy_device *phy)
@@ -748,6 +805,8 @@ int dsa_port_mst_enable(struct dsa_port *dp, bool on,
 		return 0;
 
 	if (!(ds->ops->vlan_msti_set &&
+	      ds->ops->port_mst_state_set &&
+	      ds->ops->port_vlan_fast_age &&
 	      dsa_port_can_configure_learning(dp))) {
 		NL_SET_ERR_MSG_MOD(extack, "Hardware does not support MST");
 		return -EINVAL;
