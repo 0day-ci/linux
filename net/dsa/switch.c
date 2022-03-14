@@ -123,54 +123,67 @@ static int dsa_switch_bridge_leave(struct dsa_switch *ds,
 	struct dsa_port *dp;
 	int err;
 
-	if (dst->index == info->tree_index && ds->index == info->sw_index &&
-	    ds->ops->port_bridge_leave)
-		ds->ops->port_bridge_leave(ds, info->port, info->bridge);
+	if (dst->index == info->tree_index && ds->index == info->sw_index) {
+		if (ds->ops->port_bridge_leave)
+			ds->ops->port_bridge_leave(ds, info->port,
+						   info->bridge);
+
+		/* This function is called by the notifier for every DSA switch
+		 * that has ports in the bridge we are leaving, but vlan
+		 * filtering on the port should be changed only once. Since the
+		 * code expects that ds is the switch containing the leaving
+		 * port, the following code must not be called in the crosschip
+		 * branch, only here.
+		 */
+
+		if (ds->needs_standalone_vlan_filtering &&
+		    !br_vlan_enabled(info->bridge.dev)) {
+			change_vlan_filtering = true;
+			vlan_filtering = true;
+		} else if (!ds->needs_standalone_vlan_filtering &&
+			   br_vlan_enabled(info->bridge.dev)) {
+			change_vlan_filtering = true;
+			vlan_filtering = false;
+		}
+
+		/* If the bridge was vlan_filtering, the bridge core doesn't
+		 * trigger an event for changing vlan_filtering setting upon
+		 * slave ports leaving it. That is a good thing, because that
+		 * lets us handle it and also handle the case where the switch's
+		 * vlan_filtering setting is global (not per port). When that
+		 * happens, the correct moment to trigger the vlan_filtering
+		 * callback is only when the last port leaves the last
+		 * VLAN-aware bridge.
+		 */
+		if (change_vlan_filtering && ds->vlan_filtering_is_global) {
+			dsa_switch_for_each_port(dp, ds) {
+				struct net_device *br =
+					dsa_port_bridge_dev_get(dp);
+
+				if (br && br_vlan_enabled(br)) {
+					change_vlan_filtering = false;
+					break;
+				}
+			}
+		}
+
+		if (change_vlan_filtering) {
+			err = dsa_port_vlan_filtering(dsa_to_port(ds,
+								  info->port),
+						      vlan_filtering, &extack);
+			if (extack._msg)
+				dev_err(ds->dev, "port %d: %s\n", info->port,
+					extack._msg);
+			if (err && err != -EOPNOTSUPP)
+				return err;
+		}
+	}
 
 	if ((dst->index != info->tree_index || ds->index != info->sw_index) &&
 	    ds->ops->crosschip_bridge_leave)
 		ds->ops->crosschip_bridge_leave(ds, info->tree_index,
 						info->sw_index, info->port,
 						info->bridge);
-
-	if (ds->needs_standalone_vlan_filtering &&
-	    !br_vlan_enabled(info->bridge.dev)) {
-		change_vlan_filtering = true;
-		vlan_filtering = true;
-	} else if (!ds->needs_standalone_vlan_filtering &&
-		   br_vlan_enabled(info->bridge.dev)) {
-		change_vlan_filtering = true;
-		vlan_filtering = false;
-	}
-
-	/* If the bridge was vlan_filtering, the bridge core doesn't trigger an
-	 * event for changing vlan_filtering setting upon slave ports leaving
-	 * it. That is a good thing, because that lets us handle it and also
-	 * handle the case where the switch's vlan_filtering setting is global
-	 * (not per port). When that happens, the correct moment to trigger the
-	 * vlan_filtering callback is only when the last port leaves the last
-	 * VLAN-aware bridge.
-	 */
-	if (change_vlan_filtering && ds->vlan_filtering_is_global) {
-		dsa_switch_for_each_port(dp, ds) {
-			struct net_device *br = dsa_port_bridge_dev_get(dp);
-
-			if (br && br_vlan_enabled(br)) {
-				change_vlan_filtering = false;
-				break;
-			}
-		}
-	}
-
-	if (change_vlan_filtering) {
-		err = dsa_port_vlan_filtering(dsa_to_port(ds, info->port),
-					      vlan_filtering, &extack);
-		if (extack._msg)
-			dev_err(ds->dev, "port %d: %s\n", info->port,
-				extack._msg);
-		if (err && err != -EOPNOTSUPP)
-			return err;
-	}
 
 	return dsa_tag_8021q_bridge_leave(ds, info);
 }
