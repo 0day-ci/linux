@@ -2943,6 +2943,18 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 			goto out_free;
 
 		/*
+		 * NSID should be unique on the following condition
+		 * 1. Namespace Management support; or
+		 * 2. ANA Reporting support; or
+		 * 3. NVM Set support; or
+		 * 4. Namespace is shared
+		 * Other case, private namespaces are not required to be unique.
+		 */
+		ctrl->unique_nsid = (ctrl->oacs & NVME_CTRL_OACS_NS_MNGT_SUPP) ||
+			(ctrl->subsys->cmic & NVME_CTRL_CMIC_ANA) ||
+			(ctrl->ctratt & NVME_CTRL_CTRATT_NVM_SETS);
+
+		/*
 		 * Check for quirks.  Quirk can depend on firmware version,
 		 * so, in principle, the set of quirks present can change
 		 * across a reset.  As a possible future enhancement, we
@@ -3816,7 +3828,13 @@ static int nvme_init_ns_head(struct nvme_ns *ns, unsigned nsid,
 
 	mutex_lock(&ctrl->subsys->lock);
 	head = nvme_find_ns_head(ctrl->subsys, nsid);
-	if (!head) {
+	if (!head || !(ctrl->unique_nsid || is_shared || head->shared)) {
+		/*
+		 * If the found ns head is null or both of ns are not shared without
+		 * the unique namespace condition (this means both namespace are
+		 * private namespaces and those can share the same nsid), allocate the
+		 * new head. Private namespace can reuse nsid with the others.
+		 */
 		ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, ids);
 		if (ret) {
 			dev_err(ctrl->device,
