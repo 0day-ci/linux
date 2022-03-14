@@ -134,6 +134,7 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 	dev->dev_private = vgdev;
 	vgdev->vdev = vdev;
 
+	mutex_init(&vgdev->mm_lock);
 	spin_lock_init(&vgdev->display_info_lock);
 	spin_lock_init(&vgdev->resource_export_lock);
 	spin_lock_init(&vgdev->host_visible_lock);
@@ -238,6 +239,12 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 		goto err_scanouts;
 	}
 
+	ret = drm_gem_shmem_shrinker_register(dev);
+	if (ret) {
+		DRM_ERROR("shrinker init failed\n");
+		goto err_modeset;
+	}
+
 	virtio_device_ready(vgdev->vdev);
 
 	if (num_capsets)
@@ -250,6 +257,8 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 			   5 * HZ);
 	return 0;
 
+err_modeset:
+	virtio_gpu_modeset_fini(vgdev);
 err_scanouts:
 	virtio_gpu_free_vbufs(vgdev);
 err_vbufs:
@@ -289,6 +298,7 @@ void virtio_gpu_release(struct drm_device *dev)
 	if (!vgdev)
 		return;
 
+	drm_gem_shmem_shrinker_unregister(dev);
 	virtio_gpu_modeset_fini(vgdev);
 	virtio_gpu_free_vbufs(vgdev);
 	virtio_gpu_cleanup_cap_cache(vgdev);

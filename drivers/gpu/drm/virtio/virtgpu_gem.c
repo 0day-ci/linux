@@ -282,3 +282,99 @@ void virtio_gpu_array_put_free_work(struct work_struct *work)
 	}
 	spin_unlock(&vgdev->obj_free_lock);
 }
+
+int virtio_gpu_array_validate(struct virtio_gpu_device *vgdev,
+			      struct virtio_gpu_object_array *objs)
+{
+	struct drm_gem_shmem_object *shmem;
+	int ret = 0;
+	u32 i;
+
+	mutex_lock(&vgdev->mm_lock);
+
+	for (i = 0; i < objs->nents; i++) {
+		shmem = to_drm_gem_shmem_obj(objs->objs[i]);
+		if (shmem->madv) {
+			ret = -ENOMEM;
+			break;
+		}
+	}
+
+	mutex_unlock(&vgdev->mm_lock);
+
+	return ret;
+}
+
+bool virtio_gpu_gem_madvise(struct virtio_gpu_object *bo, int madv)
+{
+	struct virtio_gpu_device *vgdev = bo->base.base.dev->dev_private;
+	bool retained;
+
+	/*
+	 * For now we support only purging BOs that are backed by guest's
+	 * memory.
+	 */
+	if (!virtio_gpu_is_shmem(bo))
+		return true;
+
+	mutex_lock(&vgdev->mm_lock);
+	retained = drm_gem_shmem_madvise(&bo->base, madv);
+	mutex_unlock(&vgdev->mm_lock);
+
+	return retained;
+}
+
+int virtio_gpu_gem_host_mem_release(struct virtio_gpu_object *bo)
+{
+	struct virtio_gpu_device *vgdev = bo->base.base.dev->dev_private;
+	int err;
+
+	if (bo->created) {
+		err = virtio_gpu_cmd_release_resource(vgdev, bo);
+		if (err)
+			return err;
+
+		virtio_gpu_notify(vgdev);
+		bo->created = false;
+	}
+
+	return 0;
+}
+
+int virtio_gpu_gem_pin(struct virtio_gpu_object *bo)
+{
+	struct virtio_gpu_device *vgdev = bo->base.base.dev->dev_private;
+	int ret = 0;
+
+	mutex_lock(&vgdev->mm_lock);
+
+	if (bo->base.madv == VIRTGPU_MADV_WILLNEED)
+		bo->mem_pin_count++;
+	else
+		ret = -ENOMEM;
+
+	mutex_unlock(&vgdev->mm_lock);
+
+	return ret;
+}
+
+void virtio_gpu_gem_unpin(struct virtio_gpu_object *bo)
+{
+	struct virtio_gpu_device *vgdev = bo->base.base.dev->dev_private;
+
+	mutex_lock(&vgdev->mm_lock);
+	WARN_ON(!bo->mem_pin_count--);
+	mutex_unlock(&vgdev->mm_lock);
+}
+
+bool virtio_gpu_gem_is_pinned(struct virtio_gpu_object *bo)
+{
+	struct virtio_gpu_device *vgdev = bo->base.base.dev->dev_private;
+	bool ret;
+
+	mutex_lock(&vgdev->mm_lock);
+	ret = bo->mem_pin_count > 0;
+	mutex_unlock(&vgdev->mm_lock);
+
+	return ret;
+}

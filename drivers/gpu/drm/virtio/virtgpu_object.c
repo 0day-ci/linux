@@ -97,6 +97,27 @@ static void virtio_gpu_free_object(struct drm_gem_object *obj)
 	virtio_gpu_cleanup_object(bo);
 }
 
+static unsigned long virtio_gpu_purge_object(struct drm_gem_object *obj)
+{
+	struct virtio_gpu_object *bo = gem_to_virtio_gpu_obj(obj);
+	int err;
+
+	if (virtio_gpu_gem_is_pinned(bo))
+		return 0;
+
+	/*
+	 * Release host's memory before guest's memory is gone to ensure that
+	 * host won't touch released memory of the guest.
+	 */
+	err = virtio_gpu_gem_host_mem_release(bo);
+	if (err)
+		return 0;
+
+	drm_gem_shmem_purge_locked(&bo->base);
+
+	return obj->size >> PAGE_SHIFT;
+}
+
 static const struct drm_gem_object_funcs virtio_gpu_shmem_funcs = {
 	.free = virtio_gpu_free_object,
 	.open = virtio_gpu_gem_object_open,
@@ -110,6 +131,7 @@ static const struct drm_gem_object_funcs virtio_gpu_shmem_funcs = {
 	.vunmap = drm_gem_shmem_object_vunmap,
 	.mmap = drm_gem_shmem_object_mmap,
 	.vm_ops = &drm_gem_shmem_vm_ops,
+	.purge = &virtio_gpu_purge_object,
 };
 
 bool virtio_gpu_is_shmem(struct virtio_gpu_object *bo)
