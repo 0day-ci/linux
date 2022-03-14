@@ -538,6 +538,8 @@ struct intel_connector {
 	struct work_struct modeset_retry_work;
 
 	struct intel_hdcp hdcp;
+	/* Timestamp when the connector got disabled */
+	u64 disabled_time;
 };
 
 struct intel_digital_connector_state {

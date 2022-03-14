@@ -126,6 +126,9 @@ int intel_connector_register(struct drm_connector *connector)
 
 	intel_connector_debugfs_add(intel_connector);
 
+	intel_connector->disabled_time =
+		get_jiffies_64() - msecs_to_jiffies(MSEC_PER_SEC * 10);
+
 	return 0;
 
 err_backlight:

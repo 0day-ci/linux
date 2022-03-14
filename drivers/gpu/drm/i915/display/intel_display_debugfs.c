@@ -23,6 +23,17 @@
 #include "intel_psr.h"
 #include "intel_sprite.h"
 
+struct {
+	/* manufacturer and product code of connector from edid data */
+	u8 edid_manuf_code[2];
+	u8 edid_prod_code[2];
+} wakeup_hpd_monitor_list[] = {
+	/* LG 27UL650-W, 27UK850 */
+	{{0x1e, 0x6d}, {0x06, 0x77}},
+	{{0x1e, 0x6d}, {0x07, 0x77}},
+	{{0x26, 0xcd}, {0x40, 0x66}},
+};
+
 static inline struct drm_i915_private *node_to_i915(struct drm_info_node *node)
 {
 	return to_i915(node->minor->dev);
@@ -2011,6 +2022,52 @@ static const struct file_operations i915_fifo_underrun_reset_ops = {
 	.llseek = default_llseek,
 };
 
+bool intel_connector_need_suppress_wakeup_hpd(struct intel_connector *connector)
+{
+	int i;
+	struct edid *edid = connector->detect_edid;
+
+	if (!edid)
+		return false;
+
+	for (i = 0; i < ARRAY_SIZE(wakeup_hpd_monitor_list); i++) {
+		if (*((u16 *)&wakeup_hpd_monitor_list[i].edid_manuf_code) !=
+		    *((u16 *)&edid->mfg_id))
+			continue;
+
+		if (*((u16 *)&wakeup_hpd_monitor_list[i].edid_prod_code) !=
+		    *((u16 *)&edid->prod_code))
+			continue;
+
+		return true;
+	}
+
+	return false;
+}
+
+static int i915_suppress_wakeup_hpd_set(void *data, u64 val)
+{
+	struct drm_i915_private *i915 = data;
+
+	drm_dbg(&i915->drm, "Suppress wakeup HPDs enabled: %s\n", yesno(val));
+
+	i915->hotplug.suppress_wakeup_hpd_enabled = val;
+
+	return 0;
+}
+
+static int i915_suppress_wakeup_hpd_get(void *data, u64 *val)
+{
+	struct drm_i915_private *i915 = data;
+
+	*val = i915->hotplug.suppress_wakeup_hpd_enabled;
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(i915_suppress_wakeup_hpd_fops, i915_suppress_wakeup_hpd_get,
+			i915_suppress_wakeup_hpd_set, "%llu\n");
+
 static const struct drm_info_list intel_display_debugfs_list[] = {
 	{"i915_frontbuffer_tracking", i915_frontbuffer_tracking, 0},
 	{"i915_ips_status", i915_ips_status, 0},
@@ -2045,6 +2102,7 @@ static const struct {
 	{"i915_ipc_status", &i915_ipc_status_fops},
 	{"i915_drrs_ctl", &i915_drrs_ctl_fops},
 	{"i915_edp_psr_debug", &i915_edp_psr_debug_fops},
+	{"i915_suppress_wakeup_hpd", &i915_suppress_wakeup_hpd_fops}
 };
 
 void intel_display_debugfs_register(struct drm_i915_private *i915)

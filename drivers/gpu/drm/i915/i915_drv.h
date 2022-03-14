@@ -146,6 +146,8 @@ struct i915_hotplug {
 	 * blocked behind the non-DP one.
 	 */
 	struct workqueue_struct *dp_wq;
+
+	bool suppress_wakeup_hpd_enabled;
 };
 
 #define I915_GEM_GPU_DOMAINS \
