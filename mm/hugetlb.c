@@ -6770,14 +6770,16 @@ unlock:
 
 int get_hwpoison_huge_page(struct page *page, bool *hugetlb)
 {
+	struct page *head;
 	int ret = 0;
 
 	*hugetlb = false;
 	spin_lock_irq(&hugetlb_lock);
-	if (PageHeadHuge(page)) {
+	head = compound_head(page);
+	if (PageHeadHuge(head)) {
 		*hugetlb = true;
-		if (HPageFreed(page) || HPageMigratable(page))
-			ret = get_page_unless_zero(page);
+		if (HPageFreed(head) || HPageMigratable(head))
+			ret = get_page_unless_zero(head);
 		else
 			ret = -EBUSY;
 	}
