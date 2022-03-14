@@ -525,6 +525,59 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
 			   pendbaser) != old_pendbaser);
 }
 
+static unsigned long vgic_mmio_read_sync(struct kvm_vcpu *vcpu,
+					 gpa_t addr, unsigned int len)
+{
+	return !!atomic_read(&vcpu->arch.vgic_cpu.syncr_busy);
+}
+
+static void vgic_make_rdist_busy(struct kvm_vcpu *vcpu, bool busy)
+{
+	if (busy) {
+		atomic_inc(&vcpu->arch.vgic_cpu.syncr_busy);
+		smp_mb__after_atomic();
+	} else {
+		smp_mb__before_atomic();
+		atomic_dec(&vcpu->arch.vgic_cpu.syncr_busy);
+	}
+}
+
+static void vgic_mmio_write_invlpi(struct kvm_vcpu *vcpu,
+				   gpa_t addr, unsigned int len,
+				   unsigned long val)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+	struct vgic_irq *irq;
+
+	if (!vgic_cpu->lpis_enabled)
+		return;
+
+	vgic_make_rdist_busy(vcpu, true);
+
+	irq = vgic_get_irq(vcpu->kvm, NULL, val);
+	if (!irq)
+		return;
+
+	vgic_its_inv_lpi(vcpu->kvm, irq);
+	vgic_put_irq(vcpu->kvm, irq);
+
+	vgic_make_rdist_busy(vcpu, false);
+}
+
+static void vgic_mmio_write_invall(struct kvm_vcpu *vcpu,
+				   gpa_t addr, unsigned int len,
+				   unsigned long val)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+
+	if (!vgic_cpu->lpis_enabled)
+		return;
+
+	vgic_make_rdist_busy(vcpu, true);
+	vgic_its_invall(vcpu);
+	vgic_make_rdist_busy(vcpu, false);
+}
+
 /*
  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
  * redistributors, while SPIs are covered by registers in the distributor
@@ -629,6 +682,15 @@ static const struct vgic_register_region vgic_v3_rd_registers[] = {
 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
 	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
 		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+	REGISTER_DESC_WITH_LENGTH(GICR_INVLPIR,
+		vgic_mmio_read_raz, vgic_mmio_write_invlpi, 8,
+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+	REGISTER_DESC_WITH_LENGTH(GICR_INVALLR,
+		vgic_mmio_read_raz, vgic_mmio_write_invall, 8,
+		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+	REGISTER_DESC_WITH_LENGTH(GICR_SYNCR,
+		vgic_mmio_read_sync, vgic_mmio_write_wi, 8,
 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
 	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
 		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
