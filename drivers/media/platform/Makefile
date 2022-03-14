@@ -37,11 +37,11 @@ obj-y += sti/c8sectpfe/
 obj-y += sti/delta/
 obj-y += sti/hva/
 obj-y += sti/stm32/
-obj-y += ti-vpe/
 obj-y += ti/am437x/
 obj-y += ti/davinci/
 obj-y += ti/omap/
 obj-y += ti/omap3isp/
+obj-y += ti/vpe/
 obj-y += via/
 obj-y += xilinx/
 
