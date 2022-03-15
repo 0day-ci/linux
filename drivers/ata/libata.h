@@ -44,7 +44,7 @@ static inline void ata_force_cbl(struct ata_port *ap) { }
 #endif
 extern u64 ata_tf_to_lba(const struct ata_taskfile *tf);
 extern u64 ata_tf_to_lba48(const struct ata_taskfile *tf);
-extern struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev, int tag);
+extern struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev, struct scsi_cmnd *scmd);
 extern int ata_build_rw_tf(struct ata_taskfile *tf, struct ata_device *dev,
 			   u64 block, u32 n_block, unsigned int tf_flags,
 			   unsigned int tag, int class);
@@ -93,7 +93,7 @@ extern unsigned int ata_read_log_page(struct ata_device *dev, u8 log,
 
 /* libata-sata.c */
 #ifdef CONFIG_SATA_HOST
-int ata_sas_allocate_tag(struct ata_port *ap);
+int ata_sas_allocate_tag(struct ata_port *ap, struct scsi_cmnd *scmd);
 void ata_sas_free_tag(unsigned int tag, struct ata_port *ap);
 #else
 static inline int ata_sas_allocate_tag(struct ata_port *ap)

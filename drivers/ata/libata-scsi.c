@@ -640,7 +640,7 @@ static struct ata_queued_cmd *ata_scsi_qc_new(struct ata_device *dev,
 {
 	struct ata_queued_cmd *qc;
 
-	qc = ata_qc_new_init(dev, scsi_cmd_to_rq(cmd)->tag);
+	qc = ata_qc_new_init(dev, cmd);
 	if (qc) {
 		qc->scsicmd = cmd;
 		qc->scsidone = scsi_done;

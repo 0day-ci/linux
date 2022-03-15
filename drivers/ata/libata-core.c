@@ -4563,8 +4563,9 @@ void swap_buf_le16(u16 *buf, unsigned int buf_words)
  *	None.
  */
 
-struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev, int tag)
+struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev, struct scsi_cmnd *scmd)
 {
+	int tag = scsi_cmd_to_rq(scmd)->tag;
 	struct ata_port *ap = dev->link->ap;
 	struct ata_queued_cmd *qc;
 
@@ -4574,7 +4575,7 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev, int tag)
 
 	/* libsas case */
 	if (ap->flags & ATA_FLAG_SAS_HOST) {
-		tag = ata_sas_allocate_tag(ap);
+		tag = ata_sas_allocate_tag(ap, scmd);
 		if (tag < 0)
 			return NULL;
 	}

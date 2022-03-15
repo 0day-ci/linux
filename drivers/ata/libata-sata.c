@@ -1268,29 +1268,16 @@ int ata_sas_queuecmd(struct scsi_cmnd *cmd, struct ata_port *ap)
 }
 EXPORT_SYMBOL_GPL(ata_sas_queuecmd);
 
-int ata_sas_allocate_tag(struct ata_port *ap)
+int ata_sas_allocate_tag(struct ata_port *ap, struct scsi_cmnd *scmd)
 {
-	unsigned int max_queue = ap->host->n_tags;
-	unsigned int i, tag;
+	if (scmd->budget_token >= ATA_MAX_QUEUE)
+		return -1;
 
-	for (i = 0, tag = ap->sas_last_tag + 1; i < max_queue; i++, tag++) {
-		tag = tag < max_queue ? tag : 0;
-
-		/* the last tag is reserved for internal command. */
-		if (ata_tag_internal(tag))
-			continue;
-
-		if (!test_and_set_bit(tag, &ap->sas_tag_allocated)) {
-			ap->sas_last_tag = tag;
-			return tag;
-		}
-	}
-	return -1;
+	return scmd->budget_token;
 }
 
 void ata_sas_free_tag(unsigned int tag, struct ata_port *ap)
 {
-	clear_bit(tag, &ap->sas_tag_allocated);
 }
 
 /**
