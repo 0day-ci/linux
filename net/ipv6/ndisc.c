@@ -518,29 +518,37 @@ EXPORT_SYMBOL(ndisc_send_skb);
 
 void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
 		   const struct in6_addr *solicited_addr,
-		   bool router, bool solicited, bool override, bool inc_opt)
+		   bool router, bool solicited, bool override, bool inc_opt,
+		   void *data)
 {
 	struct sk_buff *skb;
 	struct in6_addr tmpaddr;
 	struct inet6_ifaddr *ifp;
 	const struct in6_addr *src_addr;
 	struct nd_msg *msg;
+	struct nd_sendinfo *sendinfo = data;
+	struct net *net = dev_net(dev);
+	struct sock *sk = net->ipv6.ndisc_sk;
 	int optlen = 0;
 
-	/* for anycast or proxy, solicited_addr != src_addr */
-	ifp = ipv6_get_ifaddr(dev_net(dev), solicited_addr, dev, 1);
-	if (ifp) {
-		src_addr = solicited_addr;
-		if (ifp->flags & IFA_F_OPTIMISTIC)
-			override = false;
-		inc_opt |= ifp->idev->cnf.force_tllao;
-		in6_ifa_put(ifp);
+	if (!sendinfo) {
+		/* for anycast or proxy, solicited_addr != src_addr */
+		ifp = ipv6_get_ifaddr(dev_net(dev), solicited_addr, dev, 1);
+		if (ifp) {
+			src_addr = solicited_addr;
+			if (ifp->flags & IFA_F_OPTIMISTIC)
+				override = false;
+			inc_opt |= ifp->idev->cnf.force_tllao;
+			in6_ifa_put(ifp);
+		} else {
+			if (ipv6_dev_get_saddr(dev_net(dev), dev, daddr,
+					       inet6_sk(dev_net(dev)->ipv6.ndisc_sk)->srcprefs,
+					       &tmpaddr))
+				return;
+			src_addr = &tmpaddr;
+		}
 	} else {
-		if (ipv6_dev_get_saddr(dev_net(dev), dev, daddr,
-				       inet6_sk(dev_net(dev)->ipv6.ndisc_sk)->srcprefs,
-				       &tmpaddr))
-			return;
-		src_addr = &tmpaddr;
+		src_addr = solicited_addr;
 	}
 
 	if (!dev->addr_len)
@@ -568,9 +576,30 @@ void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
 		ndisc_fill_addr_option(skb, ND_OPT_TARGET_LL_ADDR,
 				       dev->dev_addr,
 				       NDISC_NEIGHBOUR_ADVERTISEMENT);
+	if (!sendinfo) {
+		ndisc_send_skb(skb, daddr, src_addr);
+	} else {
+		if (sendinfo->vlanid)
+			__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
+					       sendinfo->vlanid);
 
-	ndisc_send_skb(skb, daddr, src_addr);
+		msg->icmph.icmp6_cksum = csum_ipv6_magic(src_addr, daddr, skb->len,
+							 IPPROTO_ICMPV6,
+							 csum_partial(&msg->icmph,
+								      skb->len, 0));
+
+		ip6_nd_hdr(skb, src_addr, daddr, inet6_sk(sk)->hop_limit, skb->len);
+
+		skb->protocol = htons(ETH_P_IPV6);
+		skb->dev = dev;
+		if (dev_hard_header(skb, dev, ETH_P_IPV6, sendinfo->mac_dst,
+				    sendinfo->mac_src, skb->len) < 0)
+			return;
+
+		dev_queue_xmit(skb);
+	}
 }
+EXPORT_SYMBOL(ndisc_send_na);
 
 static void ndisc_send_unsol_na(struct net_device *dev)
 {
@@ -591,7 +620,7 @@ static void ndisc_send_unsol_na(struct net_device *dev)
 		ndisc_send_na(dev, &in6addr_linklocal_allnodes, &ifa->addr,
 			      /*router=*/ !!idev->cnf.forwarding,
 			      /*solicited=*/ false, /*override=*/ true,
-			      /*inc_opt=*/ true);
+			      /*inc_opt=*/ true, NULL);
 	}
 	read_unlock_bh(&idev->lock);
 
@@ -932,7 +961,7 @@ have_ifp:
 
 	if (dad) {
 		ndisc_send_na(dev, &in6addr_linklocal_allnodes, &msg->target,
-			      !!is_router, false, (ifp != NULL), true);
+			      !!is_router, false, ifp, true, NULL);
 		goto out;
 	}
 
@@ -954,7 +983,7 @@ have_ifp:
 			     NDISC_NEIGHBOUR_SOLICITATION, &ndopts);
 	if (neigh || !dev->header_ops) {
 		ndisc_send_na(dev, saddr, &msg->target, !!is_router,
-			      true, (ifp != NULL && inc), inc);
+			      true, (ifp && inc), inc, NULL);
 		if (neigh)
 			neigh_release(neigh);
 	}

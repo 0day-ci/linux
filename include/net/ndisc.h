@@ -107,6 +107,12 @@ struct nd_opt_hdr {
 	__u8		nd_opt_len;
 } __packed;
 
+struct nd_sendinfo {
+	__u16 vlanid;
+	void *mac_dst;
+	const void *mac_src;
+};
+
 /* ND options */
 struct ndisc_options {
 	struct nd_opt_hdr *nd_opt_array[__ND_OPT_ARRAY_MAX];
@@ -460,7 +466,8 @@ void ndisc_send_rs(struct net_device *dev,
 		   const struct in6_addr *saddr, const struct in6_addr *daddr);
 void ndisc_send_na(struct net_device *dev, const struct in6_addr *daddr,
 		   const struct in6_addr *solicited_addr,
-		   bool router, bool solicited, bool override, bool inc_opt);
+		   bool router, bool solicited, bool override, bool inc_opt,
+		   void *data);
 
 void ndisc_send_redirect(struct sk_buff *skb, const struct in6_addr *target);
 
