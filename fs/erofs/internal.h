@@ -144,6 +144,7 @@ struct erofs_sb_info {
 	u32 feature_incompat;
 
 	/* sysfs support */
+	bool s_sysfs_inited;
 	struct kobject s_kobj;		/* /sys/fs/erofs/<devname> */
 	struct completion s_kobj_unregister;
 };
