@@ -1234,7 +1234,13 @@ static ssize_t rfkill_fop_read(struct file *file, char __user *buf,
 	ev = list_first_entry(&data->events, struct rfkill_int_event,
 				list);
 
-	sz = min_t(unsigned long, sizeof(ev->ev), count);
+	BUILD_BUG_ON(sizeof(ev->ev) == RESERVED_RFKILL_EVENT_SIZE_1 ||
+		sizeof(ev->ev) == RESERVED_RFKILL_EVENT_SIZE_2);
+	if (count == RESERVED_RFKILL_EVENT_SIZE_1 ||
+		count == RESERVED_RFKILL_EVENT_SIZE_2)
+		sz = RFKILL_EVENT_SIZE_V1;
+	else
+		sz = min_t(unsigned long, sizeof(ev->ev), count);
 	ret = sz;
 	if (copy_to_user(buf, &ev->ev, sz))
 		ret = -EFAULT;
