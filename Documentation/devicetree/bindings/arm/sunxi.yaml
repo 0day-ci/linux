@@ -615,9 +615,19 @@ properties:
           - const: olimex,a20-olinuxino-lime2
           - const: allwinner,sun7i-a20
 
+      - description: Olimex A20-OlinuXino LIME2 Revisions G/G1/G2
+        items:
+          - const: olimex,a20-olinuxino-lime2-revG
+          - const: allwinner,sun7i-a20
+
       - description: Olimex A20-OlinuXino LIME2 (with eMMC)
         items:
           - const: olimex,a20-olinuxino-lime2-emmc
+          - const: allwinner,sun7i-a20
+
+      - description: Olimex A20-OlinuXino LIME2 Revisions G/G1/G2 (with eMMC)
+        items:
+          - const: olimex,a20-olinuxino-lime2-emmc-revG
           - const: allwinner,sun7i-a20
 
       - description: Olimex A20-OlinuXino Micro
