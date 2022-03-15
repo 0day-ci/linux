@@ -1677,20 +1677,48 @@ static void __iommu_flush_dev_iotlb(struct device_domain_info *info,
 			   qdep, addr, mask);
 }
 
+static void __iommu_flush_dev_piotlb(struct device_domain_info *info,
+					u64 address,
+				     ioasid_t pasid, unsigned int mask)
+{
+	u16 sid, qdep;
+
+	if (!info || !info->ats_enabled)
+		return;
+
+	sid = info->bus << 8 | info->devfn;
+	qdep = info->ats_qdep;
+	qi_flush_dev_iotlb_pasid(info->iommu, sid, info->pfsid,
+				 pasid, qdep, address, mask);
+}
+
 static void iommu_flush_dev_iotlb(struct dmar_domain *domain,
 				  u64 addr, unsigned mask)
 {
 	unsigned long flags;
 	struct device_domain_info *info;
 	struct subdev_domain_info *sinfo;
+	unsigned long pasid;
+	struct pasid_info *pinfo;
 
 	if (!domain->has_iotlb_device)
 		return;
 
 	spin_lock_irqsave(&device_domain_lock, flags);
-	list_for_each_entry(info, &domain->devices, link)
-		__iommu_flush_dev_iotlb(info, addr, mask);
-
+	list_for_each_entry(info, &domain->devices, link) {
+		/*
+		 * We cannot use PASID based devTLB invalidation on RID2PASID
+		 * Device does not understand RID2PASID/0. This is different
+		 * than IOTLB invalidation where RID2PASID is also used for
+		 * tagging.
+		 */
+		xa_for_each(&info->pasids, pasid, pinfo) {
+			if (!pasid)
+				__iommu_flush_dev_iotlb(info, addr, mask);
+			else
+				__iommu_flush_dev_piotlb(info, addr, pasid, mask);
+		}
+	}
 	list_for_each_entry(sinfo, &domain->subdevices, link_domain) {
 		info = get_domain_info(sinfo->pdev);
 		__iommu_flush_dev_iotlb(info, addr, mask);
@@ -1703,6 +1731,8 @@ static void domain_flush_piotlb(struct intel_iommu *iommu,
 				u64 addr, unsigned long npages, bool ih)
 {
 	u16 did = domain->iommu_did[iommu->seq_id];
+	struct pasid_info *pinfo;
+	unsigned long pasid;
 
 	if (domain->default_pasid)
 		qi_flush_piotlb(iommu, did, domain->default_pasid,
@@ -1710,6 +1740,21 @@ static void domain_flush_piotlb(struct intel_iommu *iommu,
 
 	if (!list_empty(&domain->devices))
 		qi_flush_piotlb(iommu, did, PASID_RID2PASID, addr, npages, ih);
+
+	if (list_empty(&domain->devices) || xa_empty(&domain->pasids))
+		return;
+
+	/*
+	 * Flush IOTLBs for all the PASIDs attached to this domain, RID2PASID
+	 * included.
+	 * TODO: If there are many PASIDs, we may resort to flush with
+	 * domain ID which may have performance benefits due to fewer
+	 * invalidation descriptors. VM exits may be reduced when running on
+	 * vIOMMU. The current use cases utilize no more than 2 PASIDs per
+	 * device, i.e. RID2PASID and a kernel DMA API PASID.
+	 */
+	xa_for_each(&domain->pasids, pasid, pinfo)
+		qi_flush_piotlb(iommu, did, pasid, addr, npages, ih);
 }
 
 static void iommu_flush_iotlb_psi(struct intel_iommu *iommu,
@@ -1984,6 +2029,7 @@ static struct dmar_domain *alloc_domain(unsigned int type)
 	domain->has_iotlb_device = false;
 	INIT_LIST_HEAD(&domain->devices);
 	INIT_LIST_HEAD(&domain->subdevices);
+	xa_init(&domain->pasids);
 
 	return domain;
 }
@@ -2643,6 +2689,144 @@ static bool dev_is_real_dma_subdevice(struct device *dev)
 	       pci_real_dma_dev(to_pci_dev(dev)) != to_pci_dev(dev);
 }
 
+
+static bool is_device_domain_attached(struct dmar_domain *dmar_domain,
+				      struct device *dev)
+{
+	struct device_domain_info *info;
+
+	list_for_each_entry(info, &dmar_domain->devices, link) {
+		if (info->dev == dev)
+			return true;
+	}
+
+	return false;
+}
+
+static int intel_iommu_attach_dev_pasid(struct iommu_domain *domain,
+					struct device *dev, ioasid_t pasid)
+{
+	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
+	struct device_domain_info *info = get_domain_info(dev);
+	struct intel_iommu *iommu = info->iommu;
+	struct pasid_info *pinfo;
+	unsigned long flags;
+	int ret = 0;
+	void *entry;
+
+	if (!info)
+		return -ENODEV;
+	/*
+	 * Allow attaching kernel PASIDs only after the device is already attached
+	 * with RID2PASID, which is used for legacy DMA.
+	 */
+	if (pasid != PASID_RID2PASID && !is_device_domain_attached(dmar_domain, dev)) {
+		dev_err(dev, "Device not attached, must attach device before PASID!\n");
+		return -ENODEV;
+	}
+
+	/*
+	 * The same PASID from the same device can only attach to this domain
+	 * once. PASID table is per device. NULL entry is not allowed in the
+	 * device-domain xarray.
+	 */
+	entry = xa_load(&info->pasids, pasid);
+	if (entry) {
+		dev_err(dev, "PASID %d already attached!\n", pasid);
+		return -EBUSY;
+	}
+
+	spin_lock_irqsave(&device_domain_lock, flags);
+	spin_lock(&iommu->lock);
+	if (hw_pass_through && domain_type_is_si(info->domain))
+		ret = intel_pasid_setup_pass_through(info->iommu, info->domain,
+						     dev, pasid);
+	else if (domain_use_first_level(dmar_domain))
+		ret = domain_setup_first_level(iommu, dmar_domain, dev, pasid);
+	else
+		ret = intel_pasid_setup_second_level(iommu, dmar_domain, dev, pasid);
+	spin_unlock(&iommu->lock);
+	spin_unlock_irqrestore(&device_domain_lock, flags);
+	if (ret)
+		return ret;
+
+	xa_lock(&dmar_domain->pasids);
+	/*
+	 * Each domain could have multiple devices attached with shared or per
+	 * device PASIDs. At the domain level, we keep track of unique PASIDs and
+	 * device user count.
+	 * E.g. If a domain has two devices attached, device A has PASID 0, 1;
+	 * device B has PASID 0, 2. Then the domain would have PASID 0, 1, 2.
+	 */
+	entry = xa_load(&dmar_domain->pasids, pasid);
+	if (entry) {
+		pinfo = entry;
+	} else {
+		pinfo = kzalloc(sizeof(*pinfo), GFP_ATOMIC);
+		if (!pinfo)
+			return -ENOMEM;
+		pinfo->pasid = pasid;
+		/* Store the new PASID info in the per domain array */
+		ret = xa_err(__xa_store(&dmar_domain->pasids, pasid, pinfo,
+			     GFP_ATOMIC));
+		if (ret)
+			goto xa_store_err;
+	}
+	/* Store PASID in per device-domain array, this is for tracking devTLB */
+	ret = xa_err(xa_store(&info->pasids, pasid, pinfo, GFP_ATOMIC));
+	if (ret)
+		goto xa_store_err;
+
+	atomic_inc(&pinfo->users);
+	xa_unlock(&dmar_domain->pasids);
+
+	return 0;
+
+xa_store_err:
+	xa_unlock(&dmar_domain->pasids);
+	spin_lock_irqsave(&iommu->lock, flags);
+	intel_pasid_tear_down_entry(iommu, dev, pasid, false);
+	spin_unlock_irqrestore(&iommu->lock, flags);
+
+	if (!atomic_read(&pinfo->users)) {
+		__xa_erase(&dmar_domain->pasids, pasid);
+		kfree(pinfo);
+	}
+	return ret;
+}
+
+static void intel_iommu_detach_dev_pasid(struct iommu_domain *domain,
+					 struct device *dev, ioasid_t pasid)
+{
+	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
+	struct device_domain_info *info = get_domain_info(dev);
+	struct intel_iommu *iommu = info->iommu;
+	unsigned long flags;
+	struct pasid_info *pinfo;
+
+	if (WARN_ON(!is_device_domain_attached(dmar_domain, dev)))
+		return;
+
+	spin_lock_irqsave(&iommu->lock, flags);
+	intel_pasid_tear_down_entry(iommu, dev, pasid, false);
+	spin_unlock_irqrestore(&iommu->lock, flags);
+
+	xa_lock(&dmar_domain->pasids);
+	pinfo = xa_load(&dmar_domain->pasids, pasid);
+	if (!pinfo) {
+		dev_err(dev, "PASID %d not attached!\n", pasid);
+		xa_unlock(&dmar_domain->pasids);
+		return;
+	}
+
+	xa_erase(&info->pasids, pasid);
+	if (atomic_dec_and_test(&pinfo->users)) {
+		__xa_erase(&dmar_domain->pasids, pasid);
+		kfree(pinfo);
+	}
+	xa_unlock(&dmar_domain->pasids);
+}
+
 static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 						    int bus, int devfn,
 						    struct device *dev,
@@ -2678,6 +2862,7 @@ static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 	info->pasid_table = NULL;
 	info->auxd_enabled = 0;
 	INIT_LIST_HEAD(&info->subdevices);
+	xa_init(&info->pasids);
 
 	if (dev && dev_is_pci(dev)) {
 		struct pci_dev *pdev = to_pci_dev(info->dev);
@@ -5278,6 +5463,7 @@ static void intel_iommu_probe_finalize(struct device *dev)
 	iommu_setup_dma_ops(dev, 0, U64_MAX);
 }
 
+
 static void intel_iommu_get_resv_regions(struct device *device,
 					 struct list_head *head)
 {
@@ -5604,6 +5790,8 @@ const struct iommu_ops intel_iommu_ops = {
 	.enable_nesting		= intel_iommu_enable_nesting,
 	.attach_dev		= intel_iommu_attach_device,
 	.detach_dev		= intel_iommu_detach_device,
+	.attach_dev_pasid       = intel_iommu_attach_dev_pasid,
+	.detach_dev_pasid       = intel_iommu_detach_dev_pasid,
 	.aux_attach_dev		= intel_iommu_aux_attach_device,
 	.aux_detach_dev		= intel_iommu_aux_detach_device,
 	.aux_get_pasid		= intel_iommu_aux_get_pasid,
