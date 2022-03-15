@@ -297,8 +297,8 @@ err1:
 	return err;
 }
 
-static void lookup_iova(struct rxe_mr *mr, u64 iova, int *m_out, int *n_out,
-			size_t *offset_out)
+void lookup_iova(struct rxe_mr *mr, u64 iova, int *m_out, int *n_out,
+		 size_t *offset_out)
 {
 	struct rxe_map_set *set = mr->cur_map_set;
 	size_t offset = iova - set->iova + set->offset;

@@ -626,6 +626,34 @@ static inline void feth_init(struct rxe_pkt_info *pkt, u8 type, u8 level)
 	*p = cpu_to_be32(feth);
 }
 
+static inline u32 __feth_plt(void *arg)
+{
+	__be32 *fethp = arg;
+	u32 feth = be32_to_cpu(*fethp);
+
+	return (feth & FETH_PLT_MASK) >> FETH_PLT_SHIFT;
+}
+
+static inline u32 __feth_sel(void *arg)
+{
+	__be32 *fethp = arg;
+	u32 feth = be32_to_cpu(*fethp);
+
+	return (feth & FETH_SEL_MASK) >> FETH_SEL_SHIFT;
+}
+
+static inline u32 feth_plt(struct rxe_pkt_info *pkt)
+{
+	return __feth_plt(pkt->hdr +
+		rxe_opcode[pkt->opcode].offset[RXE_FETH]);
+}
+
+static inline u32 feth_sel(struct rxe_pkt_info *pkt)
+{
+	return __feth_sel(pkt->hdr +
+		rxe_opcode[pkt->opcode].offset[RXE_FETH]);
+}
+
 /******************************************************************************
  * Atomic Extended Transport Header
  ******************************************************************************/

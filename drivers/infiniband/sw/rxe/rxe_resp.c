@@ -5,6 +5,7 @@
  */
 
 #include <linux/skbuff.h>
+#include <linux/libnvdimm.h>
 
 #include "rxe.h"
 #include "rxe_loc.h"
@@ -19,6 +20,7 @@ enum resp_states {
 	RESPST_CHK_RESOURCE,
 	RESPST_CHK_LENGTH,
 	RESPST_CHK_RKEY,
+	RESPST_CHK_PLT,
 	RESPST_EXECUTE,
 	RESPST_READ_REPLY,
 	RESPST_COMPLETE,
@@ -35,6 +37,7 @@ enum resp_states {
 	RESPST_ERR_TOO_MANY_RDMA_ATM_REQ,
 	RESPST_ERR_RNR,
 	RESPST_ERR_RKEY_VIOLATION,
+	RESPST_ERR_PLT_VIOLATION,
 	RESPST_ERR_INVALIDATE_RKEY,
 	RESPST_ERR_LENGTH,
 	RESPST_ERR_CQ_OVERFLOW,
@@ -53,6 +56,7 @@ static char *resp_state_name[] = {
 	[RESPST_CHK_RESOURCE]			= "CHK_RESOURCE",
 	[RESPST_CHK_LENGTH]			= "CHK_LENGTH",
 	[RESPST_CHK_RKEY]			= "CHK_RKEY",
+	[RESPST_CHK_PLT]			= "CHK_PLACEMENT_TYPE",
 	[RESPST_EXECUTE]			= "EXECUTE",
 	[RESPST_READ_REPLY]			= "READ_REPLY",
 	[RESPST_COMPLETE]			= "COMPLETE",
@@ -69,6 +73,7 @@ static char *resp_state_name[] = {
 	[RESPST_ERR_TOO_MANY_RDMA_ATM_REQ]	= "ERR_TOO_MANY_RDMA_ATM_REQ",
 	[RESPST_ERR_RNR]			= "ERR_RNR",
 	[RESPST_ERR_RKEY_VIOLATION]		= "ERR_RKEY_VIOLATION",
+	[RESPST_ERR_PLT_VIOLATION]		= "ERR_PLACEMENT_TYPE_VIOLATION",
 	[RESPST_ERR_INVALIDATE_RKEY]		= "ERR_INVALIDATE_RKEY_VIOLATION",
 	[RESPST_ERR_LENGTH]			= "ERR_LENGTH",
 	[RESPST_ERR_CQ_OVERFLOW]		= "ERR_CQ_OVERFLOW",
@@ -401,6 +406,24 @@ static enum resp_states check_length(struct rxe_qp *qp,
 	}
 }
 
+static enum resp_states check_placement_type(struct rxe_qp *qp,
+					     struct rxe_pkt_info *pkt)
+{
+	struct rxe_mr *mr = qp->resp.mr;
+	u32 plt = feth_plt(pkt);
+
+	if ((plt & IB_EXT_PLT_GLB_VIS &&
+	    !(mr->access & IB_ACCESS_FLUSH_GLOBAL_VISIBILITY)) ||
+	    (plt & IB_EXT_PLT_PERSIST &&
+	    !(mr->access & IB_ACCESS_FLUSH_PERSISTENT))) {
+		pr_info("Target MR didn't support this placement type, registered flag: %x, requested flag: %x\n",
+		        (mr->access & IB_ACCESS_FLUSHABLE) >> 8, plt);
+		return RESPST_ERR_PLT_VIOLATION;
+	}
+
+	return RESPST_EXECUTE;
+}
+
 static enum resp_states check_rkey(struct rxe_qp *qp,
 				   struct rxe_pkt_info *pkt)
 {
@@ -414,7 +437,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 	enum resp_states state;
 	int access;
 
-	if (pkt->mask & RXE_READ_OR_WRITE_MASK) {
+	if (pkt->mask & (RXE_READ_OR_WRITE_MASK | RXE_FLUSH_MASK)) {
 		if (pkt->mask & RXE_RETH_MASK) {
 			qp->resp.va = reth_va(pkt);
 			qp->resp.offset = 0;
@@ -422,8 +445,12 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 			qp->resp.resid = reth_len(pkt);
 			qp->resp.length = reth_len(pkt);
 		}
-		access = (pkt->mask & RXE_READ_MASK) ? IB_ACCESS_REMOTE_READ
-						     : IB_ACCESS_REMOTE_WRITE;
+		if (pkt->mask & RXE_FLUSH_MASK)
+			access = IB_ACCESS_FLUSHABLE;
+		else if (pkt->mask & RXE_READ_MASK)
+			access = IB_ACCESS_REMOTE_READ;
+		else
+			access = IB_ACCESS_REMOTE_WRITE;
 	} else if (pkt->mask & RXE_ATOMIC_MASK) {
 		qp->resp.va = atmeth_va(pkt);
 		qp->resp.offset = 0;
@@ -435,8 +462,10 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 	}
 
 	/* A zero-byte op is not required to set an addr or rkey. */
+	/* RXE_FETH_MASK carraies zero-byte playload */
 	if ((pkt->mask & RXE_READ_OR_WRITE_MASK) &&
 	    (pkt->mask & RXE_RETH_MASK) &&
+	    !(pkt->mask & RXE_FETH_MASK) &&
 	    reth_len(pkt) == 0) {
 		return RESPST_EXECUTE;
 	}
@@ -504,7 +533,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 	WARN_ON_ONCE(qp->resp.mr);
 
 	qp->resp.mr = mr;
-	return RESPST_EXECUTE;
+	return pkt->mask & RXE_FETH_MASK ? RESPST_CHK_PLT : RESPST_EXECUTE;
 
 err:
 	if (mr)
@@ -548,6 +577,93 @@ static enum resp_states write_data_in(struct rxe_qp *qp,
 
 out:
 	return rc;
+}
+
+static int nvdimm_flush_iova(struct rxe_mr *mr, u64 iova, int length)
+{
+	int err;
+	int bytes;
+	u8 *va;
+	struct rxe_map **map;
+	struct rxe_phys_buf *buf;
+	int m;
+	int i;
+	size_t offset;
+
+	if (length == 0)
+		return 0;
+
+	if (mr->type == IB_MR_TYPE_DMA) {
+		err = -EFAULT;
+		goto err1;
+	}
+
+	err = mr_check_range(mr, iova, length);
+	if (err) {
+		err = -EFAULT;
+		goto err1;
+	}
+
+	lookup_iova(mr, iova, &m, &i, &offset);
+
+	map = mr->cur_map_set->map + m;
+	buf = map[0]->buf + i;
+
+	while (length > 0) {
+		va = (u8 *)(uintptr_t)buf->addr + offset;
+		bytes = buf->size - offset;
+
+		if (bytes > length)
+			bytes = length;
+
+		arch_wb_cache_pmem(va, bytes);
+
+		length -= bytes;
+
+		offset = 0;
+		buf++;
+		i++;
+
+		if (i == RXE_BUF_PER_MAP) {
+			i = 0;
+			map++;
+			buf = map[0]->buf;
+		}
+	}
+
+	return 0;
+
+err1:
+	return err;
+}
+
+static enum resp_states process_flush(struct rxe_qp *qp,
+				       struct rxe_pkt_info *pkt)
+{
+	u64 length, start;
+	u32 sel = feth_sel(pkt);
+	u32 plt = feth_plt(pkt);
+	struct rxe_mr *mr = qp->resp.mr;
+
+	if (sel == IB_EXT_SEL_MR_RANGE) {
+		start = qp->resp.va;
+		length = qp->resp.length;
+	} else { /* sel == IB_EXT_SEL_MR_WHOLE */
+		start = mr->cur_map_set->iova;
+		length = mr->cur_map_set->length;
+	}
+
+	if (plt & IB_EXT_PLT_PERSIST) {
+		if (nvdimm_flush_iova(mr, start, length))
+			return RESPST_ERR_RKEY_VIOLATION;
+		wmb();
+	} else if (plt & IB_EXT_PLT_GLB_VIS)
+		wmb();
+
+	/* Prepare RDMA READ response of zero */
+	qp->resp.resid = 0;
+
+	return RESPST_READ_REPLY;
 }
 
 /* Guarantee atomicity of atomic operations at the machine level. */
@@ -802,6 +918,8 @@ static enum resp_states execute(struct rxe_qp *qp, struct rxe_pkt_info *pkt)
 		err = process_atomic(qp, pkt);
 		if (err)
 			return err;
+	} else if (pkt->mask & RXE_FLUSH_MASK) {
+		return process_flush(qp, pkt);
 	} else {
 		/* Unreachable */
 		WARN_ON_ONCE(1);
@@ -1062,7 +1180,7 @@ static enum resp_states duplicate_request(struct rxe_qp *qp,
 		/* SEND. Ack again and cleanup. C9-105. */
 		send_ack(qp, pkt, AETH_ACK_UNLIMITED, prev_psn);
 		return RESPST_CLEANUP;
-	} else if (pkt->mask & RXE_READ_MASK) {
+	} else if (pkt->mask & RXE_READ_MASK || pkt->mask & RXE_FLUSH_MASK) {
 		struct resp_res *res;
 
 		res = find_resource(qp, pkt->psn);
@@ -1101,7 +1219,7 @@ static enum resp_states duplicate_request(struct rxe_qp *qp,
 			/* Reset the resource, except length. */
 			res->read.va_org = iova;
 			res->read.va = iova;
-			res->read.resid = resid;
+			res->read.resid = pkt->mask & RXE_FLUSH_MASK ? 0 : resid;
 
 			/* Replay the RDMA read reply. */
 			qp->resp.res = res;
@@ -1247,6 +1365,9 @@ int rxe_responder(void *arg)
 		case RESPST_CHK_RKEY:
 			state = check_rkey(qp, pkt);
 			break;
+		case RESPST_CHK_PLT:
+			state = check_placement_type(qp, pkt);
+			break;
 		case RESPST_EXECUTE:
 			state = execute(qp, pkt);
 			break;
@@ -1301,6 +1422,8 @@ int rxe_responder(void *arg)
 			break;
 
 		case RESPST_ERR_RKEY_VIOLATION:
+		/* oA19-13 8 */
+		case RESPST_ERR_PLT_VIOLATION:
 			if (qp_type(qp) == IB_QPT_RC) {
 				/* Class C */
 				do_class_ac_error(qp, AETH_NAK_REM_ACC_ERR,
