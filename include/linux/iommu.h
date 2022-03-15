@@ -364,6 +364,7 @@ struct iommu_fault_param {
  * @fwspec:	 IOMMU fwspec data
  * @iommu_dev:	 IOMMU device this device is linked to
  * @priv:	 IOMMU Driver private data
+ * @pasid_max	 Max PASID value supported by this device
  *
  * TODO: migrate other per device data pointers under iommu_dev_data, e.g.
  *	struct iommu_group	*iommu_group;
@@ -375,7 +376,19 @@ struct dev_iommu {
 	struct iommu_fwspec		*fwspec;
 	struct iommu_device		*iommu_dev;
 	void				*priv;
+	unsigned int			pasid_max;
 };
+
+static inline void iommu_set_dev_pasid_max(struct device *dev,
+					    unsigned int max)
+{
+	struct dev_iommu *param = dev->iommu;
+
+	if (WARN_ON(!param))
+		return;
+
+	param->pasid_max = max;
+}
 
 int iommu_device_register(struct iommu_device *iommu,
 			  const struct iommu_ops *ops,

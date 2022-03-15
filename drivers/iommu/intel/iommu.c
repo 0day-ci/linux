@@ -2690,8 +2690,10 @@ static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 		if (sm_supported(iommu)) {
 			if (pasid_supported(iommu)) {
 				int features = pci_pasid_features(pdev);
-				if (features >= 0)
+				if (features >= 0) {
 					info->pasid_supported = features | 1;
+					iommu_set_dev_pasid_max(&pdev->dev, pci_max_pasids(pdev));
+				}
 			}
 
 			if (info->ats_supported && ecap_prs(iommu->ecap) &&
