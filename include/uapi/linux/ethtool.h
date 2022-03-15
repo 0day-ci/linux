@@ -1490,6 +1490,31 @@ enum ethtool_fec_config_bits {
 #define ETHTOOL_FEC_BASER		(1 << ETHTOOL_FEC_BASER_BIT)
 #define ETHTOOL_FEC_LLRS		(1 << ETHTOOL_FEC_LLRS_BIT)
 
+/**
+ * struct ethtool_dev_features - device feature configurations
+ * @cmd: Command number = %ETHTOOL_GDEVFEAT or %ETHTOOL_SDEVFEAT
+ * @type: feature configuration type.
+ * @data: feature configuration value.
+ */
+struct ethtool_dev_features {
+	__u32 cmd;
+	__u32 type;
+	__u32 data;
+};
+
+/**
+ * enum ethtool_dev_features_type - flags definition of ethtool_dev_features
+ * @ETHTOOL_DEV_TX_PUSH: nic tx push mode set bit.
+ */
+enum ethtool_dev_features_type {
+	ETHTOOL_DEV_TX_PUSH,
+	/*
+	 * Add your fresh feature type above and remember to update
+	 * feat_line[] in ethtool.c
+	 */
+	ETHTOOL_DEV_FEATURE_COUNT,
+};
+
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* DEPRECATED, Get settings.
 					    * Please use ETHTOOL_GLINKSETTINGS
@@ -1584,6 +1609,8 @@ enum ethtool_fec_config_bits {
 #define ETHTOOL_PHY_STUNABLE	0x0000004f /* Set PHY tunable configuration */
 #define ETHTOOL_GFECPARAM	0x00000050 /* Get FEC settings */
 #define ETHTOOL_SFECPARAM	0x00000051 /* Set FEC settings */
+#define ETHTOOL_GDEVFEAT	0x00000052 /* Get device features */
+#define ETHTOOL_SDEVFEAT	0x00000053 /* Set device features */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

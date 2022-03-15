@@ -2722,6 +2722,42 @@ static int ethtool_set_fecparam(struct net_device *dev, void __user *useraddr)
 	return dev->ethtool_ops->set_fecparam(dev, &fecparam);
 }
 
+static int ethtool_get_devfeatures(struct net_device *dev,
+				   void __user *useraddr)
+{
+	struct ethtool_dev_features dev_feat;
+	int ret;
+
+	if (!dev->ethtool_ops->get_devfeatures)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&dev_feat, useraddr, sizeof(dev_feat)))
+		return -EFAULT;
+
+	ret = dev->ethtool_ops->get_devfeatures(dev, &dev_feat);
+	if (ret)
+		return ret;
+
+	if (copy_to_user(useraddr, &dev_feat, sizeof(dev_feat)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int ethtool_set_devfeatures(struct net_device *dev,
+				   void __user *useraddr)
+{
+	struct ethtool_dev_features dev_feat;
+
+	if (!dev->ethtool_ops->set_devfeatures)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&dev_feat, useraddr, sizeof(dev_feat)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->set_devfeatures(dev, &dev_feat);
+}
+
 /* The main entry point in this file.  Called from net/core/dev_ioctl.c */
 
 static int
@@ -2781,6 +2817,7 @@ __dev_ethtool(struct net *net, struct ifreq *ifr, void __user *useraddr,
 	case ETHTOOL_PHY_GTUNABLE:
 	case ETHTOOL_GLINKSETTINGS:
 	case ETHTOOL_GFECPARAM:
+	case ETHTOOL_GDEVFEAT:
 		break;
 	default:
 		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
@@ -3007,6 +3044,12 @@ __dev_ethtool(struct net *net, struct ifreq *ifr, void __user *useraddr,
 		break;
 	case ETHTOOL_SFECPARAM:
 		rc = ethtool_set_fecparam(dev, useraddr);
+		break;
+	case ETHTOOL_GDEVFEAT:
+		rc = ethtool_get_devfeatures(dev, useraddr);
+		break;
+	case ETHTOOL_SDEVFEAT:
+		rc = ethtool_set_devfeatures(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;

@@ -756,6 +756,10 @@ struct ethtool_ops {
 	int	(*set_module_power_mode)(struct net_device *dev,
 					 const struct ethtool_module_power_mode_params *params,
 					 struct netlink_ext_ack *extack);
+	int	(*get_devfeatures)(struct net_device *dev,
+				   struct ethtool_dev_features *dev_feat);
+	int	(*set_devfeatures)(struct net_device *dev,
+				   struct ethtool_dev_features *dev_feat);
 };
 
 int ethtool_check_ops(const struct ethtool_ops *ops);
