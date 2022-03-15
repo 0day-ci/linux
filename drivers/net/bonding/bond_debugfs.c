@@ -41,6 +41,20 @@ static int bond_debug_rlb_hash_show(struct seq_file *m, void *v)
 			client_info->slave->dev->name);
 	}
 
+	seq_puts(m, "SourceIP                                 DestinationIP                           Destination MAC   Src MAC           DEV\n");
+
+	hash_index = bond_info->rx6_hashtbl_used_head;
+	for (; hash_index != RLB_NULL_INDEX;
+	     hash_index = client_info->used_next) {
+		client_info = &bond_info->rx6_hashtbl[hash_index];
+		seq_printf(m, "%-40pI6 %-40pI6 %-17pM %-17pM %s\n",
+			   &client_info->ip6_src,
+			   &client_info->ip6_dst,
+			   &client_info->mac_dst,
+			   &client_info->mac_src,
+			   client_info->slave->dev->name);
+	}
+
 	spin_unlock_bh(&bond->mode_lock);
 
 	return 0;

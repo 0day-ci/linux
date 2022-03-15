@@ -2682,7 +2682,7 @@ int bond_3ad_get_active_agg_info(struct bonding *bond, struct ad_info *ad_info)
 	return ret;
 }
 
-int bond_3ad_lacpdu_recv(const struct sk_buff *skb, struct bonding *bond,
+int bond_3ad_lacpdu_recv(struct sk_buff *skb, struct bonding *bond,
 			 struct slave *slave)
 {
 	struct lacpdu *lacpdu, _lacpdu;

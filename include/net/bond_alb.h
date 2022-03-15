@@ -94,6 +94,8 @@ struct tlb_client_info {
 struct rlb_client_info {
 	__be32 ip_src;		/* the server IP address */
 	__be32 ip_dst;		/* the client IP address */
+	struct in6_addr	ip6_src;
+	struct in6_addr	ip6_dst;
 	u8  mac_src[ETH_ALEN];	/* the server MAC address */
 	u8  mac_dst[ETH_ALEN];	/* the client MAC address */
 
@@ -131,10 +133,13 @@ struct alb_bond_info {
 	/* -------- rlb parameters -------- */
 	int rlb_enabled;
 	struct rlb_client_info	*rx_hashtbl;	/* Receive hash table */
+	struct rlb_client_info	*rx6_hashtbl;	/* Receive hash table */
 	u32			rx_hashtbl_used_head;
+	u32			rx6_hashtbl_used_head;
 	u8			rx_ntt;	/* flag - need to transmit
 					 * to all rx clients
 					 */
+	u8			rx6_ntt;
 	struct slave		*rx_slave;/* last slave to xmit from */
 	u8			primary_is_promisc;	   /* boolean */
 	u32			rlb_promisc_timeout_counter;/* counts primary
@@ -144,6 +149,8 @@ struct alb_bond_info {
 	u32			rlb_update_retry_counter;/* counter of retries
 							  * of client update
 							  */
+	u32			rlb6_update_delay_counter;
+	u32			rlb6_update_retry_counter;
 	u8			rlb_rebalance;	/* flag - indicates that the
 						 * rx traffic should be
 						 * rebalanced
