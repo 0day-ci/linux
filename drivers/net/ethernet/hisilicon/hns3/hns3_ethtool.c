@@ -1927,6 +1927,79 @@ static int hns3_get_link_ext_state(struct net_device *netdev,
 	return -ENODATA;
 }
 
+static int hns3_set_tx_push(struct net_device *netdev,
+			    struct ethtool_dev_features *dev_feat)
+{
+	struct hns3_nic_priv *priv = netdev_priv(netdev);
+	struct hnae3_handle *h = hns3_get_handle(netdev);
+	struct hnae3_ae_dev *ae_dev = pci_get_drvdata(h->pdev);
+
+	if (!test_bit(HNAE3_DEV_SUPPORT_TX_PUSH_B, ae_dev->caps))
+		return -EOPNOTSUPP;
+
+	if (dev_feat->data)
+		set_bit(HNAE3_PFLAG_PUSH_ENABLE, &priv->state);
+	else
+		clear_bit(HNAE3_PFLAG_PUSH_ENABLE, &priv->state);
+
+	return 0;
+}
+
+static int hns3_set_devfeatures(struct net_device *netdev,
+				struct ethtool_dev_features *dev_feat)
+{
+	struct set_proto {
+		u64 type;
+		int (*set_func)(struct net_device *dev,
+				struct ethtool_dev_features *feat);
+	} set_arr[] = {
+		{ ETHTOOL_DEV_TX_PUSH, hns3_set_tx_push },
+	};
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(set_arr); ++i) {
+		if (set_arr[i].type == dev_feat->type && set_arr[i].set_func)
+			return set_arr[i].set_func(netdev, dev_feat);
+	}
+
+	return -EINVAL;
+}
+
+static int hns3_get_tx_push(struct net_device *netdev,
+			    struct ethtool_dev_features *dev_feat)
+{
+	struct hns3_nic_priv *priv = netdev_priv(netdev);
+	struct hnae3_handle *h = hns3_get_handle(netdev);
+	struct hnae3_ae_dev *ae_dev = pci_get_drvdata(h->pdev);
+
+	if (!test_bit(HNAE3_DEV_SUPPORT_TX_PUSH_B, ae_dev->caps))
+		return -EOPNOTSUPP;
+
+	dev_feat->data = test_bit(HNAE3_PFLAG_PUSH_ENABLE, &priv->state);
+
+	return 0;
+}
+
+static int hns3_get_devfeatures(struct net_device *netdev,
+				struct ethtool_dev_features *dev_feat)
+{
+	struct get_proto {
+		u32 type;
+		int (*get_func)(struct net_device *netdev,
+				struct ethtool_dev_features *feat);
+	} get_arr[] = {
+		{ ETHTOOL_DEV_TX_PUSH, hns3_get_tx_push },
+	};
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(get_arr); ++i) {
+		if (get_arr[i].type == dev_feat->type && get_arr[i].get_func)
+			return get_arr[i].get_func(netdev, dev_feat);
+	}
+
+	return -EINVAL;
+}
+
 static const struct ethtool_ops hns3vf_ethtool_ops = {
 	.supported_coalesce_params = HNS3_ETHTOOL_COALESCE,
 	.supported_ring_params = HNS3_ETHTOOL_RING,
@@ -1957,6 +2030,8 @@ static const struct ethtool_ops hns3vf_ethtool_ops = {
 	.get_tunable = hns3_get_tunable,
 	.set_tunable = hns3_set_tunable,
 	.reset = hns3_set_reset,
+	.get_devfeatures = hns3_get_devfeatures,
+	.set_devfeatures = hns3_set_devfeatures,
 };
 
 static const struct ethtool_ops hns3_ethtool_ops = {
@@ -2001,6 +2076,8 @@ static const struct ethtool_ops hns3_ethtool_ops = {
 	.set_tunable = hns3_set_tunable,
 	.reset = hns3_set_reset,
 	.get_link_ext_state = hns3_get_link_ext_state,
+	.get_devfeatures = hns3_get_devfeatures,
+	.set_devfeatures = hns3_set_devfeatures,
 };
 
 void hns3_ethtool_set_ops(struct net_device *netdev)
