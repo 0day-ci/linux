@@ -39,6 +39,8 @@ enum iommu_dma_cookie_type {
 	IOMMU_DMA_MSI_COOKIE,
 };
 
+static DECLARE_IOASID_SET(iommu_dma_pasid);
+
 struct iommu_dma_cookie {
 	enum iommu_dma_cookie_type	type;
 	union {
@@ -369,6 +371,69 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
 	kfree(cookie);
 	domain->iova_cookie = NULL;
 }
+
+/**
+ * iommu_enable_pasid_dma --Enable in-kernel DMA request with PASID
+ * @dev:	Device to be enabled
+ *
+ * DMA request with PASID will be mapped the same way as the legacy DMA.
+ * If the device is in pass-through, PASID will also pass-through. If the
+ * device is in IOVA map, the supervisor PASID will point to the same IOVA
+ * page table.
+ *
+ * @return the kernel PASID to be used for DMA or INVALID_IOASID on failure
+ */
+int iommu_enable_pasid_dma(struct device *dev, ioasid_t *pasid)
+{
+	struct iommu_domain *dom;
+	ioasid_t id, max;
+	int ret;
+
+	dom = iommu_get_domain_for_dev(dev);
+	if (!dom || !dom->ops || !dom->ops->attach_dev_pasid)
+		return -ENODEV;
+	max = iommu_get_dev_pasid_max(dev);
+	if (!max)
+		return -EINVAL;
+
+	id = ioasid_alloc(&iommu_dma_pasid, 1, max, dev);
+	if (id == INVALID_IOASID)
+		return -ENOMEM;
+
+	ret = dom->ops->attach_dev_pasid(dom, dev, id);
+	if (ret) {
+		ioasid_put(id);
+		return ret;
+	}
+	*pasid = id;
+
+	return ret;
+}
+EXPORT_SYMBOL(iommu_enable_pasid_dma);
+
+/**
+ * iommu_disable_pasid_dma --Disable in-kernel DMA request with PASID
+ * @dev:	Device's PASID DMA to be disabled
+ *
+ * It is the device driver's responsibility to ensure no more incoming DMA
+ * requests with the kernel PASID before calling this function. IOMMU driver
+ * ensures PASID cache, IOTLBs related to the kernel PASID are cleared and
+ * drained.
+ *
+ * @return 0 on success or error code on failure
+ */
+void iommu_disable_pasid_dma(struct device *dev, ioasid_t pasid)
+{
+	struct iommu_domain *dom;
+
+	/* TODO: check the given PASID is within the ioasid_set */
+	dom = iommu_get_domain_for_dev(dev);
+	if (!dom->ops->detach_dev_pasid)
+		return;
+	dom->ops->detach_dev_pasid(dom, dev, pasid);
+	ioasid_put(pasid);
+}
+EXPORT_SYMBOL(iommu_disable_pasid_dma);
 
 /**
  * iommu_dma_get_resv_regions - Reserved region driver helper

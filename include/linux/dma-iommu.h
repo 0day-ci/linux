@@ -18,6 +18,13 @@ int iommu_get_dma_cookie(struct iommu_domain *domain);
 int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base);
 void iommu_put_dma_cookie(struct iommu_domain *domain);
 
+/*
+ * For devices that can do DMA request with PASID, setup a system PASID.
+ * Address modes (IOVA, PA) are selected by the platform code.
+ */
+int iommu_enable_pasid_dma(struct device *dev, ioasid_t *pasid);
+void iommu_disable_pasid_dma(struct device *dev, ioasid_t pasid);
+
 /* Setup call for arch DMA mapping code */
 void iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 dma_limit);
 int iommu_dma_init_fq(struct iommu_domain *domain);
