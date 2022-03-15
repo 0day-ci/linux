@@ -18465,13 +18465,6 @@ F:	include/linux/static_call*.h
 F:	kernel/jump_label.c
 F:	kernel/static_call.c
 
-STI AUDIO (ASoC) DRIVERS
-M:	Arnaud Pouliquen <arnaud.pouliquen@foss.st.com>
-L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-S:	Maintained
-F:	Documentation/devicetree/bindings/sound/st,sti-asoc-card.txt
-F:	sound/soc/sti/
-
 STI CEC DRIVER
 M:	Alain Volmat <alain.volmat@foss.st.com>
 S:	Maintained
