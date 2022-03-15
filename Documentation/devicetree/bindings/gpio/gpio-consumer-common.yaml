@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/gpio/gpio-consumer-common.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Common GPIO lines
+
+maintainers:
+  - Bartosz Golaszewski <brgl@bgdev.pl>
+  - Linus Walleij <linus.walleij@linaro.org>
+
+# do not select this schema for GPIO hogs
+select:
+  properties:
+    gpio-hog: false
+
+properties:
+  enable-gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+
+  reset-gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+
+  powerdown-gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+
+  pwdn-gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: Use powerdown-gpios
+    deprecated: true
+
+  wakeup-gpios:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+
+additionalProperties: true
