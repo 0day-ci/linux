@@ -256,7 +256,7 @@ static void twl_aen_queue_event(TW_Device_Extension *tw_dev, TW_Command_Apache_H
 	event->parameter_len = strlen(header->err_specific_desc);
 	memcpy(event->parameter_data, header->err_specific_desc, event->parameter_len + 1 + strlen(error_str));
 	if (event->severity != TW_AEN_SEVERITY_DEBUG)
-		printk(KERN_WARNING "3w-sas:%s AEN: %s (0x%02X:0x%04X): %s:%s.\n",
+		printk(KERN_INFO "3w-sas:%s AEN: %s (0x%02X:0x%04X): %s:%s.\n",
 		       host,
 		       twl_aen_severity_lookup(TW_SEV_OUT(header->status_block.severity__reserved)),
 		       TW_MESSAGE_SOURCE_CONTROLLER_EVENT, aen, error_str,
@@ -873,14 +873,14 @@ static int twl_fill_sense(TW_Device_Extension *tw_dev, int i, int request_id, in
 	error = le16_to_cpu(header->status_block.error);
 	if ((error != TW_ERROR_LOGICAL_UNIT_NOT_SUPPORTED) && (error != TW_ERROR_UNIT_OFFLINE) && (error != TW_ERROR_INVALID_FIELD_IN_CDB)) {
 		if (print_host)
-			printk(KERN_WARNING "3w-sas: scsi%d: ERROR: (0x%02X:0x%04X): %s:%s.\n",
+			printk(KERN_ERR "3w-sas: scsi%d: ERROR: (0x%02X:0x%04X): %s:%s.\n",
 			       tw_dev->host->host_no,
 			       TW_MESSAGE_SOURCE_CONTROLLER_ERROR,
 			       header->status_block.error,
 			       error_str,
 			       header->err_specific_desc);
 		else
-			printk(KERN_WARNING "3w-sas: ERROR: (0x%02X:0x%04X): %s:%s.\n",
+			printk(KERN_ERR "3w-sas: ERROR: (0x%02X:0x%04X): %s:%s.\n",
 			       TW_MESSAGE_SOURCE_CONTROLLER_ERROR,
 			       header->status_block.error,
 			       error_str,
@@ -1493,13 +1493,13 @@ static void __twl_shutdown(TW_Device_Extension *tw_dev)
 	/* Free up the IRQ */
 	free_irq(tw_dev->tw_pci_dev->irq, tw_dev);
 
-	printk(KERN_WARNING "3w-sas: Shutting down host %d.\n", tw_dev->host->host_no);
+	printk(KERN_INFO "3w-sas: Shutting down host %d.\n", tw_dev->host->host_no);
 
 	/* Tell the card we are shutting down */
 	if (twl_initconnection(tw_dev, 1, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL)) {
 		TW_PRINTK(tw_dev->host, TW_DRIVER, 0x16, "Connection shutdown failed");
 	} else {
-		printk(KERN_WARNING "3w-sas: Shutdown complete.\n");
+		printk(KERN_INFO "3w-sas: Shutdown complete.\n");
 	}
 
 	/* Clear doorbell interrupt just before exit */
@@ -1631,7 +1631,7 @@ static int twl_probe(struct pci_dev *pdev, const struct pci_device_id *dev_id)
 
 	pci_set_drvdata(pdev, host);
 
-	printk(KERN_WARNING "3w-sas: scsi%d: Found an LSI 3ware %s Controller at 0x%llx, IRQ: %d.\n",
+	printk(KERN_INFO "3w-sas: scsi%d: Found an LSI 3ware %s Controller at 0x%llx, IRQ: %d.\n",
 	       host->host_no,
 	       (char *)twl_get_param(tw_dev, 1, TW_VERSION_TABLE,
 				     TW_PARAM_MODEL, TW_PARAM_MODEL_LENGTH),
@@ -1642,7 +1642,7 @@ static int twl_probe(struct pci_dev *pdev, const struct pci_device_id *dev_id)
 	if (ptr_phycount)
 		phycount = le32_to_cpu(*(int *)ptr_phycount);
 
-	printk(KERN_WARNING "3w-sas: scsi%d: Firmware %s, BIOS %s, Phys: %d.\n",
+	printk(KERN_INFO "3w-sas: scsi%d: Firmware %s, BIOS %s, Phys: %d.\n",
 	       host->host_no,
 	       (char *)twl_get_param(tw_dev, 1, TW_VERSION_TABLE,
 				     TW_PARAM_FWVER, TW_PARAM_FWVER_LENGTH),
@@ -1753,7 +1753,7 @@ static int __maybe_unused twl_suspend(struct device *dev)
 	struct Scsi_Host *host = dev_get_drvdata(dev);
 	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
 
-	printk(KERN_WARNING "3w-sas: Suspending host %d.\n", tw_dev->host->host_no);
+	printk(KERN_INFO "3w-sas: Suspending host %d.\n", tw_dev->host->host_no);
 	/* Disable interrupts */
 	TWL_MASK_INTERRUPTS(tw_dev);
 
@@ -1763,7 +1763,7 @@ static int __maybe_unused twl_suspend(struct device *dev)
 	if (twl_initconnection(tw_dev, 1, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL)) {
 		TW_PRINTK(tw_dev->host, TW_DRIVER, 0x23, "Connection shutdown failed during suspend");
 	} else {
-		printk(KERN_WARNING "3w-sas: Suspend complete.\n");
+		printk(KERN_INFO "3w-sas: Suspend complete.\n");
 	}
 
 	/* Clear doorbell interrupt */
@@ -1780,7 +1780,7 @@ static int __maybe_unused twl_resume(struct device *dev)
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
 	TW_Device_Extension *tw_dev = (TW_Device_Extension *)host->hostdata;
 
-	printk(KERN_WARNING "3w-sas: Resuming host %d.\n", tw_dev->host->host_no);
+	printk(KERN_INFO "3w-sas: Resuming host %d.\n", tw_dev->host->host_no);
 	pci_try_set_mwi(pdev);
 
 	retval = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
@@ -1811,7 +1811,7 @@ static int __maybe_unused twl_resume(struct device *dev)
 	/* Re-enable interrupts on the card */
 	TWL_UNMASK_INTERRUPTS(tw_dev);
 
-	printk(KERN_WARNING "3w-sas: Resume complete.\n");
+	printk(KERN_INFO "3w-sas: Resume complete.\n");
 	return 0;
 
 out_disable_device:
