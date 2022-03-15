@@ -1075,11 +1075,12 @@ static int fotg210_udc_remove(struct platform_device *pdev)
 
 static int fotg210_udc_probe(struct platform_device *pdev)
 {
-	struct resource *res, *ires;
+	struct resource *res;
 	struct fotg210_udc *fotg210 = NULL;
 	struct fotg210_ep *_ep[FOTG210_MAX_NUM_EP];
 	int ret = 0;
 	int i;
+	int irq;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -1087,11 +1088,9 @@ static int fotg210_udc_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	ires = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if (!ires) {
-		pr_err("platform_get_resource IORESOURCE_IRQ error.\n");
-		return -ENODEV;
-	}
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0)
+		return irq;
 
 	ret = -ENOMEM;
 
@@ -1164,7 +1163,7 @@ static int fotg210_udc_probe(struct platform_device *pdev)
 
 	fotg210_disable_unplug(fotg210);
 
-	ret = request_irq(ires->start, fotg210_irq, IRQF_SHARED,
+	ret = request_irq(irq, fotg210_irq, IRQF_SHARED,
 			  udc_name, fotg210);
 	if (ret < 0) {
 		pr_err("request_irq error (%d)\n", ret);
@@ -1180,7 +1179,7 @@ static int fotg210_udc_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_udc:
-	free_irq(ires->start, fotg210);
+	free_irq(irq, fotg210);
 
 err_req:
 	fotg210_ep_free_request(&fotg210->ep[0]->ep, fotg210->ep0_req);
