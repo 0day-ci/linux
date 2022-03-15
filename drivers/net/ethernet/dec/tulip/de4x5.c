@@ -5208,9 +5208,7 @@ de4x5_parse_params(struct net_device *dev)
 		lp->params.autosense = TP_NW;
 	    } else if (strstr(p, "TP")) {
 		lp->params.autosense = TP;
-	    } else if (strstr(p, "BNC_AUI")) {
-		lp->params.autosense = BNC;
-	    } else if (strstr(p, "BNC")) {
+	    } else if (strstr(p, "BNC") || strstr(p, "BNC_AUI")) {
 		lp->params.autosense = BNC;
 	    } else if (strstr(p, "AUI")) {
 		lp->params.autosense = AUI;
