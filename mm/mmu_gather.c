@@ -8,6 +8,7 @@
 #include <linux/rcupdate.h>
 #include <linux/smp.h>
 #include <linux/swap.h>
+#include <linux/slab.h>
 
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
@@ -27,7 +28,7 @@ static bool tlb_next_batch(struct mmu_gather *tlb)
 	if (tlb->batch_count == MAX_GATHER_BATCH_COUNT)
 		return false;
 
-	batch = (void *)__get_free_pages(GFP_NOWAIT | __GFP_NOWARN, 0);
+	batch = kmalloc(MAX_GATHER_BATCH_SZ, GFP_NOWAIT | __GFP_NOWARN);
 	if (!batch)
 		return false;
 
@@ -49,6 +50,8 @@ static void tlb_batch_pages_flush(struct mmu_gather *tlb)
 	for (batch = &tlb->local; batch && batch->nr; batch = batch->next) {
 		free_pages_and_swap_cache(batch->pages, batch->nr);
 		batch->nr = 0;
+
+		cond_resched();
 	}
 	tlb->active = &tlb->local;
 }
@@ -59,7 +62,7 @@ static void tlb_batch_list_free(struct mmu_gather *tlb)
 
 	for (batch = tlb->local.next; batch; batch = next) {
 		next = batch->next;
-		free_pages((unsigned long)batch, 0);
+		kfree(batch);
 	}
 	tlb->local.next = NULL;
 }

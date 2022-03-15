@@ -230,8 +230,13 @@ struct mmu_gather_batch {
 	struct page		*pages[0];
 };
 
+#if PAGE_SIZE > 4096UL
+#define MAX_GATHER_BATCH_SZ	4096
+#else
+#define MAX_GATHER_BATCH_SZ	PAGE_SIZE
+#endif
 #define MAX_GATHER_BATCH	\
-	((PAGE_SIZE - sizeof(struct mmu_gather_batch)) / sizeof(void *))
+	((MAX_GATHER_BATCH_SZ - sizeof(struct mmu_gather_batch)) / sizeof(void *))
 
 /*
  * Limit the maximum number of mmu_gather batches to reduce a risk of soft
