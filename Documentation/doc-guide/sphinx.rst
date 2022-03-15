@@ -1,5 +1,9 @@
 .. _sphinxdoc:
 
+=============
+Sphinx Primer
+=============
+
 Introduction
 ============
 
