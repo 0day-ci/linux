@@ -1527,6 +1527,7 @@ sd_init(struct sched_domain_topology_level *tl,
 	struct sched_domain *sd = *per_cpu_ptr(sdd->sd, cpu);
 	int sd_id, sd_weight, sd_flags = 0;
 	struct cpumask *sd_span;
+	int ret;
 
 #ifdef CONFIG_NUMA
 	/*
@@ -1539,6 +1540,15 @@ sd_init(struct sched_domain_topology_level *tl,
 
 	if (tl->sd_flags)
 		sd_flags = (*tl->sd_flags)();
+
+#ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
+	ret = cpus_share_self_cache(cpu_map);
+	if (ret == 1)
+		sd_flags |= SD_SHARE_PKG_RESOURCES;
+	else if (ret == 0)
+		sd_flags &= ~SD_SHARE_PKG_RESOURCES;
+#endif
+
 	if (WARN_ONCE(sd_flags & ~TOPOLOGY_SD_FLAGS,
 			"wrong sd_flags in topology description\n"))
 		sd_flags &= TOPOLOGY_SD_FLAGS;
