@@ -197,6 +197,15 @@ struct gpio_irq_chip {
 	unsigned int *map;
 
 	/**
+	 * @gc_irq_initialized:
+	 *
+	 * Flag to track gc irq member's initialization.
+	 * This flag will make sure gc irq members are not used before
+	 * they are initialized.
+	 */
+	bool gc_irq_initialized;
+
+	/**
 	 * @threaded:
 	 *
 	 * True if set the interrupt handling uses nested threads.

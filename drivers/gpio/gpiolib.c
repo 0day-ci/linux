@@ -1533,6 +1533,15 @@ static int gpiochip_add_irqchip(struct gpio_chip *gc,
 
 	acpi_gpiochip_request_interrupts(gc);
 
+	/*
+	 * Using barrier() here to prevent compiler from reordering
+	 * gc->irq.gc_irq_initialized before initialization of above
+	 * gc irq members.
+	 */
+	barrier();
+
+	gc->irq.gc_irq_initialized = true;
+
 	return 0;
 }
 
@@ -3056,7 +3065,7 @@ int gpiod_to_irq(const struct gpio_desc *desc)
 
 	gc = desc->gdev->chip;
 	offset = gpio_chip_hwgpio(desc);
-	if (gc->to_irq) {
+	if (gc->to_irq && gc->irq.gc_irq_initialized) {
 		int retirq = gc->to_irq(gc, offset);
 
 		/* Zero means NO_IRQ */
