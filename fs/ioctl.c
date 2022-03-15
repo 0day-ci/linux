@@ -171,8 +171,6 @@ int fiemap_prep(struct inode *inode, struct fiemap_extent_info *fieinfo,
 	u32 incompat_flags;
 	int ret = 0;
 
-	if (*len == 0)
-		return -EINVAL;
 	if (start > maxbytes)
 		return -EFBIG;
 
@@ -181,6 +179,9 @@ int fiemap_prep(struct inode *inode, struct fiemap_extent_info *fieinfo,
 	 */
 	if (*len > maxbytes || (maxbytes - *len) < start)
 		*len = maxbytes - start;
+
+	if (*len == 0)
+		return -EINVAL;
 
 	supported_flags |= FIEMAP_FLAG_SYNC;
 	supported_flags &= FIEMAP_FLAGS_COMPAT;
