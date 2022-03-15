@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Uwb driver configuration
+#
+menuconfig UWB
+        bool "Ultra Wide Band(UWB) support"
+        help
+         Support for UWB Protocol driver.
+
+         This driver is designed to support UCI(UWB Command Interface)
+          as per FiRa Compliance.
+
+
+          If unsure, say no.
+if UWB
+config NXP_UWB
+        tristate "Nxp UCI(Uwb Command Interface) protocol driver support"
+	depends on SPI
+        help
+          This option enables the UWB driver for Nxp sr1xx
+          device. Such device supports UCI packet structure,
+          FiRa compliance.
+
+          Say Y here to compile support for sr1xx into the kernel or
+          say M  to compile it as a module. The module will be called
+          sr1xx.ko.
+endif

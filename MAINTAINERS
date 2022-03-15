@@ -21412,3 +21412,10 @@ Q:	http://patchwork.kernel.org/project/LKML/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 F:	*
 F:	*/
+
+UWB
+M:	Greg KH <gregkh@linuxfoundation.org>
+M:	manjunatha.venkatesh@nxp.com
+L:	rvmanjumce@gmail.com
+S:	Maintained
+F:	drivers/uwb/sr1xx.c
