@@ -161,6 +161,28 @@ void rxe_mr_init_dma(struct rxe_pd *pd, int access, struct rxe_mr *mr)
 	mr->type = IB_MR_TYPE_DMA;
 }
 
+static bool iova_in_pmem(struct rxe_mr *mr, u64 iova, int length)
+{
+	char *vaddr;
+	int is_pmem;
+
+	/* XXX: Shall me allow length == 0 */
+	if (length == 0) {
+		return false;
+	}
+	/* check the 1st byte only to avoid crossing page boundary */
+	vaddr = iova_to_vaddr(mr, iova, 1);
+	if (!vaddr) {
+		pr_warn("not a valid iova 0x%llx\n", iova);
+		return false;
+	}
+
+	is_pmem = region_intersects(virt_to_phys(vaddr), 1, IORESOURCE_MEM,
+				    IORES_DESC_PERSISTENT_MEMORY);
+
+	return is_pmem == REGION_INTERSECTS;
+}
+
 int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 		     int access, struct rxe_mr *mr)
 {
@@ -234,6 +256,16 @@ int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 	set->iova = iova;
 	set->va = start;
 	set->offset = ib_umem_offset(umem);
+
+	// iova_in_pmem() must be called after set is updated
+	if (!iova_in_pmem(mr, iova, length) &&
+	    access & IB_ACCESS_FLUSH_PERSISTENT) {
+		pr_warn("Cannot register IB_ACCESS_FLUSH_PERSISTENT for non-pmem memory\n");
+		mr->state = RXE_MR_STATE_INVALID;
+		mr->umem = NULL;
+		err = -EINVAL;
+		goto err_release_umem;
+	}
 
 	return 0;
 
