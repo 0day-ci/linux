@@ -1,0 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0+
+#include "sun7i-a20-olinuxino-lime2.dts"
+
+/ {
+	model = "Olimex A20-OLinuXino-LIME2 (Rev G/G1/G2)";
+	compatible = "olimex,a20-olinuxino-lime2-revG", "allwinner,sun7i-a20";
+};
+
+&gmac {
+	phy-mode = "rgmii-id";
+};
