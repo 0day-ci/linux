@@ -216,6 +216,9 @@ void __show_regs(struct pt_regs *regs)
 	show_regs_print_info(KERN_DEFAULT);
 	print_pstate(regs);
 
+	if (IS_ENABLED(CONFIG_SMP))
+		printk("tpidr : %016lx\n", this_cpu_ptr(NULL));
+
 	if (!user_mode(regs)) {
 		printk("pc : %pS\n", (void *)regs->pc);
 		printk("lr : %pS\n", (void *)ptrauth_strip_insn_pac(lr));
