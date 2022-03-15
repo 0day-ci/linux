@@ -1738,9 +1738,6 @@ static void domain_flush_piotlb(struct intel_iommu *iommu,
 		qi_flush_piotlb(iommu, did, domain->default_pasid,
 				addr, npages, ih);
 
-	if (!list_empty(&domain->devices))
-		qi_flush_piotlb(iommu, did, PASID_RID2PASID, addr, npages, ih);
-
 	if (list_empty(&domain->devices) || xa_empty(&domain->pasids))
 		return;
 
@@ -2934,17 +2931,7 @@ static struct dmar_domain *dmar_insert_one_dev_info(struct intel_iommu *iommu,
 		}
 
 		/* Setup the PASID entry for requests without PASID: */
-		spin_lock_irqsave(&iommu->lock, flags);
-		if (hw_pass_through && domain_type_is_si(domain))
-			ret = intel_pasid_setup_pass_through(iommu, domain,
-					dev, PASID_RID2PASID);
-		else if (domain_use_first_level(domain))
-			ret = domain_setup_first_level(iommu, domain, dev,
-					PASID_RID2PASID);
-		else
-			ret = intel_pasid_setup_second_level(iommu, domain,
-					dev, PASID_RID2PASID);
-		spin_unlock_irqrestore(&iommu->lock, flags);
+		ret = intel_iommu_attach_dev_pasid(&domain->domain, dev, PASID_RID2PASID);
 		if (ret) {
 			dev_err(dev, "Setup RID2PASID failed\n");
 			dmar_remove_one_dev_info(dev);
@@ -4731,8 +4718,7 @@ static void __dmar_remove_one_dev_info(struct device_domain_info *info)
 
 	if (info->dev && !dev_is_real_dma_subdevice(info->dev)) {
 		if (dev_is_pci(info->dev) && sm_supported(iommu))
-			intel_pasid_tear_down_entry(iommu, info->dev,
-					PASID_RID2PASID, false);
+			intel_iommu_detach_dev_pasid(&domain->domain, info->dev, PASID_RID2PASID);
 
 		iommu_disable_dev_iotlb(info);
 		domain_context_clear(info);
