@@ -1179,6 +1179,48 @@ static int m88e1510_config_init(struct phy_device *phydev)
 {
 	int err;
 
+	/* As per Marvell Release Notes - Alaska 88E1510/88E1518/88E1512/
+	 * 88E1514 Rev A0, Errata Section 5.1:
+	 * If EEE is intended to be used, the following register writes
+	 * must be done once after every hardware reset.
+	 */
+	err = marvell_set_page(phydev, 0x00FF);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 17, 0x214B);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 16, 0x2144);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 17, 0x0C28);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 16, 0x2146);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 17, 0xB233);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 16, 0x214D);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 17, 0xCC0C);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 16, 0x2159);
+	if (err < 0)
+		return err;
+	err = marvell_set_page(phydev, 0x00FB);
+	if (err < 0)
+		return err;
+	err = phy_write(phydev, 07, 0xC00D);
+	if (err < 0)
+		return err;
+	err = marvell_set_page(phydev, MII_MARVELL_COPPER_PAGE);
+	if (err < 0)
+		return err;
+
 	/* SGMII-to-Copper mode initialization */
 	if (phydev->interface == PHY_INTERFACE_MODE_SGMII) {
 		/* Select page 18 */
