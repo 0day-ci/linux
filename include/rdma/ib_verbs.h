@@ -965,6 +965,7 @@ const char *__attribute_const__ ib_wc_status_msg(enum ib_wc_status status);
 enum ib_wc_opcode {
 	IB_WC_SEND = IB_UVERBS_WC_SEND,
 	IB_WC_RDMA_WRITE = IB_UVERBS_WC_RDMA_WRITE,
+	IB_WC_RDMA_FLUSH = IB_UVERBS_WC_FLUSH,
 	IB_WC_RDMA_READ = IB_UVERBS_WC_RDMA_READ,
 	IB_WC_COMP_SWAP = IB_UVERBS_WC_COMP_SWAP,
 	IB_WC_FETCH_ADD = IB_UVERBS_WC_FETCH_ADD,
