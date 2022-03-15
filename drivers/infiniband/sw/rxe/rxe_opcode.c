@@ -922,6 +922,26 @@ struct rxe_opcode_info rxe_opcode[RXE_NUM_OPCODE] = {
 					  RXE_RDETH_BYTES,
 		}
 	},
+	[IB_OPCODE_RD_RDMA_FLUSH]			= {
+		.name	= "IB_OPCODE_RD_RDMA_FLUSH",
+		.mask	= RXE_RDETH_MASK | RXE_FETH_MASK | RXE_RETH_MASK |
+			  RXE_FLUSH_MASK | RXE_START_MASK |
+			  RXE_END_MASK | RXE_REQ_MASK,
+		.length = RXE_BTH_BYTES + RXE_FETH_BYTES + RXE_RETH_BYTES,
+		.offset = {
+			[RXE_BTH]	= 0,
+			[RXE_RDETH]	= RXE_BTH_BYTES,
+			[RXE_FETH]	= RXE_BTH_BYTES +
+					  RXE_RDETH_BYTES,
+			[RXE_RETH]	= RXE_BTH_BYTES +
+					  RXE_RDETH_BYTES +
+					  RXE_FETH_BYTES,
+			[RXE_PAYLOAD]	= RXE_BTH_BYTES +
+					  RXE_RDETH_BYTES +
+					  RXE_FETH_BYTES +
+					  RXE_RETH_BYTES,
+		}
+	},
 
 	/* UD */
 	[IB_OPCODE_UD_SEND_ONLY]			= {
