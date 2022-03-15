@@ -1570,8 +1570,8 @@ static void __update_and_free_page(struct hstate *h, struct page *page)
 
 /*
  * As update_and_free_page() can be called under any context, so we cannot
- * use GFP_KERNEL to allocate vmemmap pages. However, we can defer the
- * actual freeing in a workqueue to prevent from using GFP_ATOMIC to allocate
+ * use GFP_ATOMIC to allocate vmemmap pages. However, we can defer the
+ * actual freeing in a workqueue to prevent waits caused by allocating
  * the vmemmap pages.
  *
  * free_hpage_workfn() locklessly retrieves the linked list of pages to be
@@ -1617,16 +1617,14 @@ static inline void flush_free_hpage_work(struct hstate *h)
 }
 
 static void update_and_free_page(struct hstate *h, struct page *page,
-				 bool atomic)
+				 bool delay)
 {
-	if (!HPageVmemmapOptimized(page) || !atomic) {
+	if (!HPageVmemmapOptimized(page) || !delay) {
 		__update_and_free_page(h, page);
 		return;
 	}
 
 	/*
-	 * Defer freeing to avoid using GFP_ATOMIC to allocate vmemmap pages.
-	 *
 	 * Only call schedule_work() if hpage_freelist is previously
 	 * empty. Otherwise, schedule_work() had been called but the workfn
 	 * hasn't retrieved the list yet.
