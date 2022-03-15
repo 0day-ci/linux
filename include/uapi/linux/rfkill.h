@@ -168,8 +168,14 @@ struct rfkill_event_ext {
  *    older kernel;
  * 3. treat reads that are as long as requested as acceptable, not
  *    checking against RFKILL_EVENT_SIZE_V1 or such.
+ * 4. in order to avoid compatibilities issues with older application
+ *    versions specifying unusual event size requests, those unusual
+ *    request event sizes will be considered reserved. If requested size
+ *    is reserved, the event size will be RFKILL_EVENT_SIZE_V1.
  */
 #define RFKILL_EVENT_SIZE_V1	sizeof(struct rfkill_event)
+#define RESERVED_RFKILL_EVENT_SIZE_1	32
+#define RESERVED_RFKILL_EVENT_SIZE_2	1024
 
 /* ioctl for turning off rfkill-input (if present) */
 #define RFKILL_IOC_MAGIC	'R'
