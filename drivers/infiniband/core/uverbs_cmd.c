@@ -2079,6 +2079,23 @@ static int ib_uverbs_post_send(struct uverbs_attr_bundle *attrs)
 			rdma->rkey = user_wr->wr.rdma.rkey;
 
 			next = &rdma->wr;
+		} else if (user_wr->opcode == IB_WR_RDMA_FLUSH) {
+			struct ib_flush_wr *flush;
+
+			next_size = sizeof(*flush);
+			flush = alloc_wr(next_size, user_wr->num_sge);
+			if (!flush) {
+				ret = -ENOMEM;
+				goto out_put;
+			}
+
+			flush->remote_addr = user_wr->wr.flush.remote_addr;
+			flush->length = user_wr->wr.flush.length;
+			flush->rkey = user_wr->wr.flush.rkey;
+			flush->type = user_wr->wr.flush.type;
+			flush->level = user_wr->wr.flush.level;
+
+			next = &flush->wr;
 		} else if (user_wr->opcode == IB_WR_ATOMIC_CMP_AND_SWP ||
 			   user_wr->opcode == IB_WR_ATOMIC_FETCH_AND_ADD) {
 			struct ib_atomic_wr *atomic;

@@ -607,6 +607,25 @@ static inline void reth_set_len(struct rxe_pkt_info *pkt, u32 len)
 		rxe_opcode[pkt->opcode].offset[RXE_RETH], len);
 }
 
+/*
+ * FLUSH Extended Transport Header
+ */
+#define FETH_PLT_SHIFT 0UL
+#define FETH_SEL_SHIFT 4UL
+#define FETH_RESERVED_SHIFT 6UL
+#define FETH_PLT_MASK ((1UL << FETH_SEL_SHIFT) - 1UL)
+#define FETH_SEL_MASK (~FETH_PLT_MASK & ((1UL << FETH_RESERVED_SHIFT) - 1UL))
+
+static inline void feth_init(struct rxe_pkt_info *pkt, u8 type, u8 level)
+{
+	__be32 *p = (__be32 *)
+		    (pkt->hdr + rxe_opcode[pkt->opcode].offset[RXE_FETH]);
+	u32 feth = ((level << FETH_SEL_SHIFT) & FETH_SEL_MASK) |
+		   ((type << FETH_PLT_SHIFT) & FETH_PLT_MASK);
+
+	*p = cpu_to_be32(feth);
+}
+
 /******************************************************************************
  * Atomic Extended Transport Header
  ******************************************************************************/
@@ -910,6 +929,7 @@ enum rxe_hdr_length {
 	RXE_ATMETH_BYTES	= sizeof(struct rxe_atmeth),
 	RXE_IETH_BYTES		= sizeof(struct rxe_ieth),
 	RXE_RDETH_BYTES		= sizeof(struct rxe_rdeth),
+	RXE_FETH_BYTES		= sizeof(u32),
 };
 
 static inline size_t header_size(struct rxe_pkt_info *pkt)
