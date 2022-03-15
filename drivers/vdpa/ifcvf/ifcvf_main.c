@@ -46,7 +46,7 @@ static irqreturn_t ifcvf_vqs_reused_intr_handler(int irq, void *arg)
 	for (i = 0; i < vf->nr_vring; i++) {
 		vring = &vf->vring[i];
 		if (vring->cb.callback)
-			vf->vring->cb.callback(vring->cb.private);
+			vring->cb.callback(vring->cb.private);
 	}
 
 	return IRQ_HANDLED;
