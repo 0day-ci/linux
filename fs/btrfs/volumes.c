@@ -7090,6 +7090,7 @@ static int read_one_chunk(struct btrfs_key *key, struct extent_buffer *leaf,
 	u8 uuid[BTRFS_UUID_SIZE];
 	int num_stripes;
 	int ret;
+	int index;
 	int i;
 
 	logical = key->offset;
@@ -7113,6 +7114,7 @@ static int read_one_chunk(struct btrfs_key *key, struct extent_buffer *leaf,
 		if (ret)
 			return ret;
 	}
+	index = btrfs_bg_flags_to_raid_index(type);
 
 	read_lock(&map_tree->lock);
 	em = lookup_extent_mapping(map_tree, logical, 1);
@@ -7148,7 +7150,7 @@ static int read_one_chunk(struct btrfs_key *key, struct extent_buffer *leaf,
 	map->io_align = btrfs_chunk_io_align(leaf, chunk);
 	map->stripe_len = btrfs_chunk_stripe_len(leaf, chunk);
 	map->type = type;
-	map->sub_stripes = btrfs_chunk_sub_stripes(leaf, chunk);
+	map->sub_stripes = btrfs_raid_array[index].sub_stripes;
 	map->verified_stripes = 0;
 	em->orig_block_len = calc_stripe_length(type, em->len,
 						map->num_stripes);
