@@ -1,19 +1,20 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Driver for the High Speed UART DMA
  *
  * Copyright (C) 2015 Intel Corporation
  *
  * Partially based on the bits found in drivers/tty/serial/mfd.c.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #ifndef __DMA_HSU_H__
 #define __DMA_HSU_H__
 
-#include <linux/spinlock.h>
+#include <linux/bits.h>
+#include <linux/container_of.h>
+#include <linux/io.h>
+#include <linux/types.h>
+
 #include <linux/dma/hsu.h>
 
 #include "../virt-dma.h"
@@ -39,8 +40,11 @@
 
 /* Bits in HSU_CH_SR */
 #define HSU_CH_SR_DESCTO(x)	BIT(8 + (x))
-#define HSU_CH_SR_DESCTO_ANY	(BIT(11) | BIT(10) | BIT(9) | BIT(8))
+#define HSU_CH_SR_DESCTO_ANY	GENMASK(11, 8)
 #define HSU_CH_SR_CHE		BIT(15)
+#define HSU_CH_SR_DESCE(x)	BIT(16 + (x))
+#define HSU_CH_SR_DESCE_ANY	GENMASK(19, 16)
+#define HSU_CH_SR_CDESC_ANY	GENMASK(31, 30)
 
 /* Bits in HSU_CH_CR */
 #define HSU_CH_CR_CHA		BIT(0)
@@ -55,6 +59,10 @@
 #define HSU_CH_DCR_CHEI		BIT(23)
 #define HSU_CH_DCR_CHTOI(x)	BIT(24 + (x))
 
+/* Bits in HSU_CH_DxTSR */
+#define HSU_CH_DxTSR_MASK	GENMASK(15, 0)
+#define HSU_CH_DxTSR_TSR(x)	((x) & HSU_CH_DxTSR_MASK)
+
 struct hsu_dma_sg {
 	dma_addr_t addr;
 	unsigned int len;
@@ -65,6 +73,7 @@ struct hsu_dma_desc {
 	enum dma_transfer_direction direction;
 	struct hsu_dma_sg *sg;
 	unsigned int nents;
+	size_t length;
 	unsigned int active;
 	enum dma_status status;
 };
@@ -107,6 +116,7 @@ struct hsu_dma {
 
 	/* channels */
 	struct hsu_dma_chan		*chan;
+	unsigned short			nr_channels;
 };
 
 static inline struct hsu_dma *to_hsu_dma(struct dma_device *ddev)

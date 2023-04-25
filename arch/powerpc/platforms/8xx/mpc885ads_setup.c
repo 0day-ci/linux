@@ -42,6 +42,7 @@
 
 #include "mpc885ads.h"
 #include "mpc8xx.h"
+#include "pic.h"
 
 static u32 __iomem *bcsr, *bcsr5;
 
@@ -193,8 +194,7 @@ static void __init mpc885ads_setup_arch(void)
 
 static int __init mpc885ads_probe(void)
 {
-	unsigned long root = of_get_flat_dt_root();
-	return of_flat_dt_is_compatible(root, "fsl,mpc885ads");
+	return of_machine_is_compatible("fsl,mpc885ads");
 }
 
 static const struct of_device_id of_bus_ids[] __initconst = {
@@ -217,11 +217,9 @@ define_machine(mpc885_ads) {
 	.name			= "Freescale MPC885 ADS",
 	.probe			= mpc885ads_probe,
 	.setup_arch		= mpc885ads_setup_arch,
-	.init_IRQ		= mpc8xx_pics_init,
+	.init_IRQ		= mpc8xx_pic_init,
 	.get_irq		= mpc8xx_get_irq,
 	.restart		= mpc8xx_restart,
 	.calibrate_decr		= mpc8xx_calibrate_decr,
-	.set_rtc_time		= mpc8xx_set_rtc_time,
-	.get_rtc_time		= mpc8xx_get_rtc_time,
 	.progress		= udbg_progress,
 };

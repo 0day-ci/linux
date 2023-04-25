@@ -5,7 +5,7 @@ consisting of a compatible field, an address and possibly an interrupt
 line).
 
 Nonetheless, it also supports an option boolean property
-("isil,irq2-can-wakeup-machine") to handle the specific use-case found
+("wakeup-source") to handle the specific use-case found
 on at least three in-tree users of the chip (NETGEAR ReadyNAS 102, 104
 and 2120 ARM-based NAS); On those devices, the IRQ#2 pin of the chip
 (associated with the alarm supported by the driver) is not connected
@@ -22,12 +22,8 @@ Required properties supported by the device:
 
 Optional properties:
 
- - "isil,irq2-can-wakeup-machine": mark the chip as a wakeup source,
-   independently of the availability of an IRQ line connected to the
-   SoC.
-
- - "interrupt-parent", "interrupts": for passing the interrupt line
-   of the SoC connected to IRQ#2 of the RTC chip.
+ - "wakeup-source": mark the chip as a wakeup source, independently of
+    the availability of an IRQ line connected to the SoC.
 
 
 Example isl12057 node without IRQ#2 pin connected (no alarm support):
@@ -74,5 +70,5 @@ PMIC, allowing the device to be started based on configured alarm:
 	isl12057: isl12057@68 {
 		compatible = "isil,isl12057";
 		reg = <0x68>;
-		isil,irq2-can-wakeup-machine;
+		wakeup-source;
 	};

@@ -1,16 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * MAXIM MAX77693/MAX77843 Haptic device driver
  *
  * Copyright (C) 2014,2015 Samsung Electronics
  * Jaewon Kim <jaewon02.kim@samsung.com>
- * Krzysztof Kozlowski <k.kozlowski@samsung.com>
+ * Krzysztof Kozlowski <krzk@kernel.org>
  *
  * This program is not provided / owned by Maxim Integrated Products.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/err.h>
@@ -70,10 +66,13 @@ struct max77693_haptic {
 
 static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
 {
-	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
+	struct pwm_args pargs;
+	int delta;
 	int error;
 
-	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
+	pwm_get_args(haptic->pwm_dev, &pargs);
+	delta = (pargs.period + haptic->pwm_duty) / 2;
+	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
 	if (error) {
 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
 		return error;
@@ -234,6 +233,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
 				       struct ff_effect *effect)
 {
 	struct max77693_haptic *haptic = input_get_drvdata(dev);
+	struct pwm_args pargs;
 	u64 period_mag_multi;
 
 	haptic->magnitude = effect->u.rumble.strong_magnitude;
@@ -245,7 +245,8 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
 	 * The formula to convert magnitude to pwm_duty as follows:
 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
 	 */
-	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
+	pwm_get_args(haptic->pwm_dev, &pargs);
+	period_mag_multi = (u64)pargs.period * haptic->magnitude;
 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
 						MAX_MAGNITUDE_SHIFT);
 
@@ -329,6 +330,12 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 		return PTR_ERR(haptic->pwm_dev);
 	}
 
+	/*
+	 * FIXME: pwm_apply_args() should be removed when switching to the
+	 * atomic PWM API.
+	 */
+	pwm_apply_args(haptic->pwm_dev);
+
 	haptic->motor_reg = devm_regulator_get(&pdev->dev, "haptic");
 	if (IS_ERR(haptic->motor_reg)) {
 		dev_err(&pdev->dev, "failed to get regulator\n");
@@ -368,7 +375,7 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int __maybe_unused max77693_haptic_suspend(struct device *dev)
+static int max77693_haptic_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct max77693_haptic *haptic = platform_get_drvdata(pdev);
@@ -381,7 +388,7 @@ static int __maybe_unused max77693_haptic_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused max77693_haptic_resume(struct device *dev)
+static int max77693_haptic_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct max77693_haptic *haptic = platform_get_drvdata(pdev);
@@ -394,8 +401,9 @@ static int __maybe_unused max77693_haptic_resume(struct device *dev)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(max77693_haptic_pm_ops,
-			 max77693_haptic_suspend, max77693_haptic_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(max77693_haptic_pm_ops,
+				max77693_haptic_suspend,
+				max77693_haptic_resume);
 
 static const struct platform_device_id max77693_haptic_id[] = {
 	{ "max77693-haptic", TYPE_MAX77693 },
@@ -407,7 +415,7 @@ MODULE_DEVICE_TABLE(platform, max77693_haptic_id);
 static struct platform_driver max77693_haptic_driver = {
 	.driver		= {
 		.name	= "max77693-haptic",
-		.pm	= &max77693_haptic_pm_ops,
+		.pm	= pm_sleep_ptr(&max77693_haptic_pm_ops),
 	},
 	.probe		= max77693_haptic_probe,
 	.id_table	= max77693_haptic_id,
@@ -415,7 +423,6 @@ static struct platform_driver max77693_haptic_driver = {
 module_platform_driver(max77693_haptic_driver);
 
 MODULE_AUTHOR("Jaewon Kim <jaewon02.kim@samsung.com>");
-MODULE_AUTHOR("Krzysztof Kozlowski <k.kozlowski@samsung.com>");
+MODULE_AUTHOR("Krzysztof Kozlowski <krzk@kernel.org>");
 MODULE_DESCRIPTION("MAXIM 77693/77843 Haptic driver");
-MODULE_ALIAS("platform:max77693-haptic");
 MODULE_LICENSE("GPL");

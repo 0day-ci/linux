@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  *    HMC Drive CD/DVD Device
  *
@@ -89,7 +90,7 @@ static dev_t hmcdrv_dev_no; /* device number (major/minor) */
  *
  * Return: recommended device file name in /dev
  */
-static char *hmcdrv_dev_name(struct device *dev, umode_t *mode)
+static char *hmcdrv_dev_name(const struct device *dev, umode_t *mode)
 {
 	char *nodename = NULL;
 	const char *devname = dev_name(dev); /* kernel device name */

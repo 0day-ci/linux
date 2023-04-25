@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <linux/module.h>
 #include <linux/kthread.h>
 
@@ -18,8 +19,10 @@ static const char *random_strings[] = {
 	"One ring to rule them all"
 };
 
-static void simple_thread_func(int cnt)
+static void do_simple_thread_func(int cnt, const char *fmt, ...)
 {
+	unsigned long bitmask[1] = {0xdeadbeefUL};
+	va_list va;
 	int array[6];
 	int len = cnt % 5;
 	int i;
@@ -31,9 +34,13 @@ static void simple_thread_func(int cnt)
 		array[i] = i + 1;
 	array[i] = 0;
 
+	va_start(va, fmt);
+
 	/* Silly tracepoints */
 	trace_foo_bar("hello", cnt, array, random_strings[len],
-		      tsk_cpus_allowed(current));
+		      current->cpus_ptr, fmt, &va);
+
+	va_end(va);
 
 	trace_foo_with_template_simple("HELLO", cnt);
 
@@ -42,6 +49,13 @@ static void simple_thread_func(int cnt)
 	trace_foo_with_template_cond("prints other times", cnt);
 
 	trace_foo_with_template_print("I have to be different", cnt);
+
+	trace_foo_rel_loc("Hello __rel_loc", cnt, bitmask, current->cpus_ptr);
+}
+
+static void simple_thread_func(int cnt)
+{
+	do_simple_thread_func(cnt, "iter=%d", cnt);
 }
 
 static int simple_thread(void *arg)
@@ -78,28 +92,37 @@ static int simple_thread_fn(void *arg)
 }
 
 static DEFINE_MUTEX(thread_mutex);
+static int simple_thread_cnt;
 
-void foo_bar_reg(void)
+int foo_bar_reg(void)
 {
+	mutex_lock(&thread_mutex);
+	if (simple_thread_cnt++)
+		goto out;
+
 	pr_info("Starting thread for foo_bar_fn\n");
 	/*
 	 * We shouldn't be able to start a trace when the module is
 	 * unloading (there's other locks to prevent that). But
 	 * for consistency sake, we still take the thread_mutex.
 	 */
-	mutex_lock(&thread_mutex);
 	simple_tsk_fn = kthread_run(simple_thread_fn, NULL, "event-sample-fn");
+ out:
 	mutex_unlock(&thread_mutex);
+	return 0;
 }
 
 void foo_bar_unreg(void)
 {
-	pr_info("Killing thread for foo_bar_fn\n");
-	/* protect against module unloading */
 	mutex_lock(&thread_mutex);
+	if (--simple_thread_cnt)
+		goto out;
+
+	pr_info("Killing thread for foo_bar_fn\n");
 	if (simple_tsk_fn)
 		kthread_stop(simple_tsk_fn);
 	simple_tsk_fn = NULL;
+ out:
 	mutex_unlock(&thread_mutex);
 }
 

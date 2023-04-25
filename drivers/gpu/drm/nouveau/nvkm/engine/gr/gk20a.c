@@ -22,15 +22,10 @@
 #include "gf100.h"
 #include "ctxgf100.h"
 
+#include <core/firmware.h>
 #include <subdev/timer.h>
 
 #include <nvif/class.h>
-
-static void
-gk20a_gr_init_dtor(struct gf100_gr_pack *pack)
-{
-	vfree(pack);
-}
 
 struct gk20a_fw_av
 {
@@ -38,33 +33,40 @@ struct gk20a_fw_av
 	u32 data;
 };
 
-static struct gf100_gr_pack *
-gk20a_gr_av_to_init(struct gf100_gr_fuc *fuc)
+int
+gk20a_gr_av_to_init_(struct nvkm_blob *blob, u8 count, u32 pitch, struct gf100_gr_pack **ppack)
 {
 	struct gf100_gr_init *init;
 	struct gf100_gr_pack *pack;
-	const int nent = (fuc->size / sizeof(struct gk20a_fw_av));
+	int nent;
 	int i;
 
+	nent = (blob->size / sizeof(struct gk20a_fw_av));
 	pack = vzalloc((sizeof(*pack) * 2) + (sizeof(*init) * (nent + 1)));
 	if (!pack)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 	init = (void *)(pack + 2);
-
 	pack[0].init = init;
 
 	for (i = 0; i < nent; i++) {
 		struct gf100_gr_init *ent = &init[i];
-		struct gk20a_fw_av *av = &((struct gk20a_fw_av *)fuc->data)[i];
+		struct gk20a_fw_av *av = &((struct gk20a_fw_av *)blob->data)[i];
 
 		ent->addr = av->addr;
 		ent->data = av->data;
-		ent->count = 1;
-		ent->pitch = 1;
+		ent->count = ((ent->addr & 0xffff) != 0xe100) ? count : 1;
+		ent->pitch = pitch;
 	}
 
-	return pack;
+	*ppack = pack;
+	return 0;
+}
+
+int
+gk20a_gr_av_to_init(struct nvkm_blob *blob, struct gf100_gr_pack **ppack)
+{
+	return gk20a_gr_av_to_init_(blob, 1, 1, ppack);
 }
 
 struct gk20a_fw_aiv
@@ -74,25 +76,25 @@ struct gk20a_fw_aiv
 	u32 data;
 };
 
-static struct gf100_gr_pack *
-gk20a_gr_aiv_to_init(struct gf100_gr_fuc *fuc)
+int
+gk20a_gr_aiv_to_init(struct nvkm_blob *blob, struct gf100_gr_pack **ppack)
 {
 	struct gf100_gr_init *init;
 	struct gf100_gr_pack *pack;
-	const int nent = (fuc->size / sizeof(struct gk20a_fw_aiv));
+	int nent;
 	int i;
 
+	nent = (blob->size / sizeof(struct gk20a_fw_aiv));
 	pack = vzalloc((sizeof(*pack) * 2) + (sizeof(*init) * (nent + 1)));
 	if (!pack)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 	init = (void *)(pack + 2);
-
 	pack[0].init = init;
 
 	for (i = 0; i < nent; i++) {
 		struct gf100_gr_init *ent = &init[i];
-		struct gk20a_fw_aiv *av = &((struct gk20a_fw_aiv *)fuc->data)[i];
+		struct gk20a_fw_aiv *av = &((struct gk20a_fw_aiv *)blob->data)[i];
 
 		ent->addr = av->addr;
 		ent->data = av->data;
@@ -100,50 +102,54 @@ gk20a_gr_aiv_to_init(struct gf100_gr_fuc *fuc)
 		ent->pitch = 1;
 	}
 
-	return pack;
+	*ppack = pack;
+	return 0;
 }
 
-static struct gf100_gr_pack *
-gk20a_gr_av_to_method(struct gf100_gr_fuc *fuc)
+int
+gk20a_gr_av_to_method(struct nvkm_blob *blob, struct gf100_gr_pack **ppack)
 {
 	struct gf100_gr_init *init;
 	struct gf100_gr_pack *pack;
 	/* We don't suppose we will initialize more than 16 classes here... */
 	static const unsigned int max_classes = 16;
-	const int nent = (fuc->size / sizeof(struct gk20a_fw_av));
-	int i, classidx = 0;
-	u32 prevclass = 0;
+	u32 classidx = 0, prevclass = 0;
+	int nent;
+	int i;
 
-	pack = vzalloc((sizeof(*pack) * max_classes) +
-		       (sizeof(*init) * (nent + 1)));
+	nent = (blob->size / sizeof(struct gk20a_fw_av));
+	pack = vzalloc((sizeof(*pack) * (max_classes + 1)) +
+		       (sizeof(*init) * (nent + max_classes + 1)));
 	if (!pack)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
-	init = (void *)(pack + max_classes);
+	init = (void *)(pack + max_classes + 1);
 
-	for (i = 0; i < nent; i++) {
-		struct gf100_gr_init *ent = &init[i];
-		struct gk20a_fw_av *av = &((struct gk20a_fw_av *)fuc->data)[i];
+	for (i = 0; i < nent; i++, init++) {
+		struct gk20a_fw_av *av = &((struct gk20a_fw_av *)blob->data)[i];
 		u32 class = av->addr & 0xffff;
 		u32 addr = (av->addr & 0xffff0000) >> 14;
 
 		if (prevclass != class) {
-			pack[classidx].init = ent;
+			if (prevclass) /* Add terminator to the method list. */
+				init++;
+			pack[classidx].init = init;
 			pack[classidx].type = class;
 			prevclass = class;
 			if (++classidx >= max_classes) {
 				vfree(pack);
-				return ERR_PTR(-ENOSPC);
+				return -ENOSPC;
 			}
 		}
 
-		ent->addr = addr;
-		ent->data = av->data;
-		ent->count = 1;
-		ent->pitch = 1;
+		init->addr = addr;
+		init->data = av->data;
+		init->count = 1;
+		init->pitch = 1;
 	}
 
-	return pack;
+	*ppack = pack;
+	return 0;
 }
 
 static int
@@ -183,16 +189,12 @@ int
 gk20a_gr_init(struct gf100_gr *gr)
 {
 	struct nvkm_device *device = gr->base.engine.subdev.device;
-	const u32 magicgpc918 = DIV_ROUND_UP(0x00800000, gr->tpc_total);
-	u32 data[TPC_MAX / 8] = {};
-	u8  tpcnr[GPC_MAX];
-	int gpc, tpc;
-	int ret, i;
+	int ret;
 
 	/* Clear SCC RAM */
 	nvkm_wr32(device, 0x40802c, 0x1);
 
-	gf100_gr_mmio(gr, gr->fuc_sw_nonctx);
+	gf100_gr_mmio(gr, gr->sw_nonctx);
 
 	ret = gk20a_gr_wait_mem_scrubbing(gr);
 	if (ret)
@@ -203,9 +205,6 @@ gk20a_gr_init(struct gf100_gr *gr)
 		return ret;
 
 	/* MMU debug buffer */
-	nvkm_wr32(device, 0x100cc8, nvkm_memory_addr(gr->unk4188b4) >> 8);
-	nvkm_wr32(device, 0x100ccc, nvkm_memory_addr(gr->unk4188b8) >> 8);
-
 	if (gr->func->init_gpc_mmu)
 		gr->func->init_gpc_mmu(gr);
 
@@ -213,31 +212,9 @@ gk20a_gr_init(struct gf100_gr *gr)
 	nvkm_mask(device, 0x503018, 0x1, 0x1);
 
 	/* Zcull init */
-	memset(data, 0x00, sizeof(data));
-	memcpy(tpcnr, gr->tpc_nr, sizeof(gr->tpc_nr));
-	for (i = 0, gpc = -1; i < gr->tpc_total; i++) {
-		do {
-			gpc = (gpc + 1) % gr->gpc_nr;
-		} while (!tpcnr[gpc]);
-		tpc = gr->tpc_nr[gpc] - tpcnr[gpc]--;
+	gr->func->init_zcull(gr);
 
-		data[i / 8] |= tpc << ((i % 8) * 4);
-	}
-
-	nvkm_wr32(device, GPC_BCAST(0x0980), data[0]);
-	nvkm_wr32(device, GPC_BCAST(0x0984), data[1]);
-	nvkm_wr32(device, GPC_BCAST(0x0988), data[2]);
-	nvkm_wr32(device, GPC_BCAST(0x098c), data[3]);
-
-	for (gpc = 0; gpc < gr->gpc_nr; gpc++) {
-		nvkm_wr32(device, GPC_UNIT(gpc, 0x0914),
-			  gr->magic_not_rop_nr << 8 | gr->tpc_nr[gpc]);
-		nvkm_wr32(device, GPC_UNIT(gpc, 0x0910), 0x00040000 |
-			  gr->tpc_total);
-		nvkm_wr32(device, GPC_UNIT(gpc, 0x0918), magicgpc918);
-	}
-
-	nvkm_wr32(device, GPC_BCAST(0x3fd4), magicgpc918);
+	gr->func->init_rop_active_fbps(gr);
 
 	/* Enable FIFO access */
 	nvkm_wr32(device, 0x400500, 0x00010001);
@@ -273,73 +250,20 @@ gk20a_gr_init(struct gf100_gr *gr)
 	return gf100_gr_init_ctxctl(gr);
 }
 
-void
-gk20a_gr_dtor(struct gf100_gr *gr)
-{
-	gk20a_gr_init_dtor(gr->fuc_method);
-	gk20a_gr_init_dtor(gr->fuc_bundle);
-	gk20a_gr_init_dtor(gr->fuc_sw_ctx);
-	gk20a_gr_init_dtor(gr->fuc_sw_nonctx);
-}
-
-int
-gk20a_gr_new_(const struct gf100_gr_func *func, struct nvkm_device *device,
-	      int index, struct nvkm_gr **pgr)
-{
-	struct gf100_gr_fuc fuc;
-	struct gf100_gr *gr;
-	int ret;
-
-	if (!(gr = kzalloc(sizeof(*gr), GFP_KERNEL)))
-		return -ENOMEM;
-	*pgr = &gr->base;
-
-	ret = gf100_gr_ctor(func, device, index, gr);
-	if (ret)
-		return ret;
-
-	ret = gf100_gr_ctor_fw(gr, "sw_nonctx", &fuc);
-	if (ret)
-		return ret;
-	gr->fuc_sw_nonctx = gk20a_gr_av_to_init(&fuc);
-	gf100_gr_dtor_fw(&fuc);
-	if (IS_ERR(gr->fuc_sw_nonctx))
-		return PTR_ERR(gr->fuc_sw_nonctx);
-
-	ret = gf100_gr_ctor_fw(gr, "sw_ctx", &fuc);
-	if (ret)
-		return ret;
-	gr->fuc_sw_ctx = gk20a_gr_aiv_to_init(&fuc);
-	gf100_gr_dtor_fw(&fuc);
-	if (IS_ERR(gr->fuc_sw_ctx))
-		return PTR_ERR(gr->fuc_sw_ctx);
-
-	ret = gf100_gr_ctor_fw(gr, "sw_bundle_init", &fuc);
-	if (ret)
-		return ret;
-	gr->fuc_bundle = gk20a_gr_av_to_init(&fuc);
-	gf100_gr_dtor_fw(&fuc);
-	if (IS_ERR(gr->fuc_bundle))
-		return PTR_ERR(gr->fuc_bundle);
-
-	ret = gf100_gr_ctor_fw(gr, "sw_method_init", &fuc);
-	if (ret)
-		return ret;
-	gr->fuc_method = gk20a_gr_av_to_method(&fuc);
-	gf100_gr_dtor_fw(&fuc);
-	if (IS_ERR(gr->fuc_method))
-		return PTR_ERR(gr->fuc_method);
-
-	return 0;
-}
-
 static const struct gf100_gr_func
 gk20a_gr = {
-	.dtor = gk20a_gr_dtor,
+	.oneinit_tiles = gf100_gr_oneinit_tiles,
+	.oneinit_sm_id = gf100_gr_oneinit_sm_id,
 	.init = gk20a_gr_init,
+	.init_zcull = gf117_gr_init_zcull,
+	.init_rop_active_fbps = gk104_gr_init_rop_active_fbps,
+	.trap_mp = gf100_gr_trap_mp,
 	.set_hww_esr_report_mask = gk20a_gr_set_hww_esr_report_mask,
+	.fecs.reset = gf100_gr_fecs_reset,
+	.rops = gf100_gr_rops,
 	.ppc_nr = 1,
 	.grctx = &gk20a_grctx,
+	.zbc = &gf100_gr_zbc,
 	.sclass = {
 		{ -1, -1, FERMI_TWOD_A },
 		{ -1, -1, KEPLER_INLINE_TO_MEMORY_A },
@@ -350,7 +274,73 @@ gk20a_gr = {
 };
 
 int
-gk20a_gr_new(struct nvkm_device *device, int index, struct nvkm_gr **pgr)
+gk20a_gr_load_net(struct gf100_gr *gr, const char *path, const char *name, int ver,
+		  int (*load)(struct nvkm_blob *, struct gf100_gr_pack **),
+		  struct gf100_gr_pack **ppack)
 {
-	return gk20a_gr_new_(&gk20a_gr, device, index, pgr);
+	struct nvkm_blob blob;
+	int ret;
+
+	ret = nvkm_firmware_load_blob(&gr->base.engine.subdev, path, name, ver, &blob);
+	if (ret)
+		return ret;
+
+	ret = load(&blob, ppack);
+	nvkm_blob_dtor(&blob);
+	return 0;
+}
+
+int
+gk20a_gr_load_sw(struct gf100_gr *gr, const char *path, int ver)
+{
+	if (gk20a_gr_load_net(gr, path, "sw_nonctx", ver, gk20a_gr_av_to_init, &gr->sw_nonctx) ||
+	    gk20a_gr_load_net(gr, path, "sw_ctx", ver, gk20a_gr_aiv_to_init, &gr->sw_ctx) ||
+	    gk20a_gr_load_net(gr, path, "sw_bundle_init", ver, gk20a_gr_av_to_init, &gr->bundle) ||
+	    gk20a_gr_load_net(gr, path, "sw_method_init", ver, gk20a_gr_av_to_method, &gr->method))
+		return -ENOENT;
+
+	return 0;
+}
+
+#if IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC) || IS_ENABLED(CONFIG_ARCH_TEGRA_132_SOC)
+MODULE_FIRMWARE("nvidia/gk20a/fecs_data.bin");
+MODULE_FIRMWARE("nvidia/gk20a/fecs_inst.bin");
+MODULE_FIRMWARE("nvidia/gk20a/gpccs_data.bin");
+MODULE_FIRMWARE("nvidia/gk20a/gpccs_inst.bin");
+MODULE_FIRMWARE("nvidia/gk20a/sw_bundle_init.bin");
+MODULE_FIRMWARE("nvidia/gk20a/sw_ctx.bin");
+MODULE_FIRMWARE("nvidia/gk20a/sw_method_init.bin");
+MODULE_FIRMWARE("nvidia/gk20a/sw_nonctx.bin");
+#endif
+
+static int
+gk20a_gr_load(struct gf100_gr *gr, int ver, const struct gf100_gr_fwif *fwif)
+{
+	struct nvkm_subdev *subdev = &gr->base.engine.subdev;
+
+	if (nvkm_firmware_load_blob(subdev, "", "fecs_inst", ver,
+				    &gr->fecs.inst) ||
+	    nvkm_firmware_load_blob(subdev, "", "fecs_data", ver,
+				    &gr->fecs.data) ||
+	    nvkm_firmware_load_blob(subdev, "", "gpccs_inst", ver,
+				    &gr->gpccs.inst) ||
+	    nvkm_firmware_load_blob(subdev, "", "gpccs_data", ver,
+				    &gr->gpccs.data))
+		return -ENOENT;
+
+	gr->firmware = true;
+
+	return gk20a_gr_load_sw(gr, "", ver);
+}
+
+static const struct gf100_gr_fwif
+gk20a_gr_fwif[] = {
+	{ 0, gk20a_gr_load, &gk20a_gr },
+	{}
+};
+
+int
+gk20a_gr_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst, struct nvkm_gr **pgr)
+{
+	return gf100_gr_new_(gk20a_gr_fwif, device, type, inst, pgr);
 }

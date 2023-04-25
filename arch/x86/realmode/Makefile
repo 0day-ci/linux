@@ -6,7 +6,11 @@
 # for more details.
 #
 #
-KASAN_SANITIZE := n
+
+# Sanitizer runtimes are unavailable and cannot be linked here.
+KASAN_SANITIZE			:= n
+KCSAN_SANITIZE			:= n
+
 subdir- := rm
 
 obj-y += init.o

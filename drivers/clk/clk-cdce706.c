@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * TI CDCE706 programmable 3-PLL clock synthesizer driver
  *
  * Copyright (c) 2014 Cadence Design Systems Inc.
  *
- * Reference: http://www.ti.com/lit/ds/symlink/cdce706.pdf
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Reference: https://www.ti.com/lit/ds/symlink/cdce706.pdf
  */
 
 #include <linux/clk.h>
@@ -71,7 +68,6 @@ struct cdce706_hw_data {
 	struct cdce706_dev_data *dev_data;
 	unsigned idx;
 	unsigned parent;
-	struct clk *clk;
 	struct clk_hw hw;
 	unsigned div;
 	unsigned mul;
@@ -81,8 +77,6 @@ struct cdce706_hw_data {
 struct cdce706_dev_data {
 	struct i2c_client *client;
 	struct regmap *regmap;
-	struct clk_onecell_data onecell;
-	struct clk *clks[6];
 	struct clk *clkin_clk[2];
 	const char *clkin_name[2];
 	struct cdce706_hw_data clkin[1];
@@ -455,18 +449,19 @@ static int cdce706_register_hw(struct cdce706_dev_data *cdce,
 			       struct clk_init_data *init)
 {
 	unsigned i;
+	int ret;
 
 	for (i = 0; i < num_hw; ++i, ++hw) {
 		init->name = clk_names[i];
 		hw->dev_data = cdce;
 		hw->idx = i;
 		hw->hw.init = init;
-		hw->clk = devm_clk_register(&cdce->client->dev,
+		ret = devm_clk_hw_register(&cdce->client->dev,
 					    &hw->hw);
-		if (IS_ERR(hw->clk)) {
+		if (ret) {
 			dev_err(&cdce->client->dev, "Failed to register %s\n",
 				clk_names[i]);
-			return PTR_ERR(hw->clk);
+			return ret;
 		}
 	}
 	return 0;
@@ -613,19 +608,28 @@ static int cdce706_register_clkouts(struct cdce706_dev_data *cdce)
 			cdce->clkout[i].parent);
 	}
 
-	ret = cdce706_register_hw(cdce, cdce->clkout,
-				  ARRAY_SIZE(cdce->clkout),
-				  cdce706_clkout_name, &init);
-	for (i = 0; i < ARRAY_SIZE(cdce->clkout); ++i)
-		cdce->clks[i] = cdce->clkout[i].clk;
-
-	return ret;
+	return cdce706_register_hw(cdce, cdce->clkout,
+				   ARRAY_SIZE(cdce->clkout),
+				   cdce706_clkout_name, &init);
 }
 
-static int cdce706_probe(struct i2c_client *client,
-			 const struct i2c_device_id *id)
+static struct clk_hw *
+of_clk_cdce_get(struct of_phandle_args *clkspec, void *data)
 {
-	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
+	struct cdce706_dev_data *cdce = data;
+	unsigned int idx = clkspec->args[0];
+
+	if (idx >= ARRAY_SIZE(cdce->clkout)) {
+		pr_err("%s: invalid index %u\n", __func__, idx);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return &cdce->clkout[idx].hw;
+}
+
+static int cdce706_probe(struct i2c_client *client)
+{
+	struct i2c_adapter *adapter = client->adapter;
 	struct cdce706_dev_data *cdce;
 	int ret;
 
@@ -657,18 +661,13 @@ static int cdce706_probe(struct i2c_client *client,
 	ret = cdce706_register_clkouts(cdce);
 	if (ret < 0)
 		return ret;
-	cdce->onecell.clks = cdce->clks;
-	cdce->onecell.clk_num = ARRAY_SIZE(cdce->clks);
-	ret = of_clk_add_provider(client->dev.of_node, of_clk_src_onecell_get,
-				  &cdce->onecell);
-
-	return ret;
+	return of_clk_add_hw_provider(client->dev.of_node, of_clk_cdce_get,
+				      cdce);
 }
 
-static int cdce706_remove(struct i2c_client *client)
+static void cdce706_remove(struct i2c_client *client)
 {
 	of_clk_del_provider(client->dev.of_node);
-	return 0;
 }
 
 
@@ -691,7 +690,7 @@ static struct i2c_driver cdce706_i2c_driver = {
 		.name	= "cdce706",
 		.of_match_table = of_match_ptr(cdce706_dt_match),
 	},
-	.probe		= cdce706_probe,
+	.probe_new	= cdce706_probe,
 	.remove		= cdce706_remove,
 	.id_table	= cdce706_id,
 };

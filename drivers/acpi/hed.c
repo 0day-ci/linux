@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * ACPI Hardware Error Device (PNP0C33) Driver
  *
@@ -6,15 +7,6 @@
  *
  * ACPI Hardware Error Device is used to report some hardware errors
  * notified via SCI, mainly the corrected errors.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 2 as published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/kernel.h>
@@ -64,10 +56,9 @@ static int acpi_hed_add(struct acpi_device *device)
 	return 0;
 }
 
-static int acpi_hed_remove(struct acpi_device *device)
+static void acpi_hed_remove(struct acpi_device *device)
 {
 	hed_handle = NULL;
-	return 0;
 }
 
 static struct acpi_driver acpi_hed_driver = {
@@ -82,7 +73,6 @@ static struct acpi_driver acpi_hed_driver = {
 };
 module_acpi_driver(acpi_hed_driver);
 
-ACPI_MODULE_NAME("hed");
 MODULE_AUTHOR("Huang Ying");
 MODULE_DESCRIPTION("ACPI Hardware Error Device Driver");
 MODULE_LICENSE("GPL");

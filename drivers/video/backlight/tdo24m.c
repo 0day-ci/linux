@@ -1,12 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * tdo24m - SPI-based drivers for Toppoly TDO24M series LCD panels
  *
  * Copyright (C) 2008 Marvell International Ltd.
  *	Eric Miao <eric.miao@marvell.com>
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  publishhed by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -369,7 +366,7 @@ static int tdo24m_probe(struct spi_device *spi)
 
 	spi_message_init(m);
 
-	x->cs_change = 1;
+	x->cs_change = 0;
 	x->tx_buf = &lcd->buf[0];
 	spi_message_add_tail(x, m);
 
@@ -400,12 +397,11 @@ static int tdo24m_probe(struct spi_device *spi)
 	return 0;
 }
 
-static int tdo24m_remove(struct spi_device *spi)
+static void tdo24m_remove(struct spi_device *spi)
 {
 	struct tdo24m *lcd = spi_get_drvdata(spi);
 
 	tdo24m_power(lcd, FB_BLANK_POWERDOWN);
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -437,7 +433,6 @@ static void tdo24m_shutdown(struct spi_device *spi)
 static struct spi_driver tdo24m_driver = {
 	.driver = {
 		.name		= "tdo24m",
-		.owner		= THIS_MODULE,
 		.pm		= &tdo24m_pm_ops,
 	},
 	.probe		= tdo24m_probe,

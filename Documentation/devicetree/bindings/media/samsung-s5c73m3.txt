@@ -62,7 +62,7 @@ For more details see description of the SPI busses bindings
 
 Example:
 
-i2c@138A000000 {
+i2c@138a000000 {
 	...
 	s5c73m3@3c {
 		compatible = "samsung,s5c73m3";
@@ -76,7 +76,7 @@ i2c@138A000000 {
 		clock-frequency = <24000000>;
 		clocks = <&clk 0>;
 		clock-names = "cis_extclk";
-		reset-gpios = <&gpf1 3 1>;
+		xshutdown-gpios = <&gpf1 3 1>;
 		standby-gpios = <&gpm0 1 1>;
 		port {
 			s5c73m3_ep: endpoint {

@@ -1,22 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 1996, 2003 VIA Networking Technologies, Inc.
  * All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * File: device.h
  *
  * Purpose: MAC Data structure
  *
@@ -31,38 +16,12 @@
 
 #include <linux/module.h>
 #include <linux/types.h>
-#include <linux/mm.h>
-#include <linux/errno.h>
-#include <linux/ioport.h>
 #include <linux/pci.h>
-#include <linux/kernel.h>
-#include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-#include <linux/delay.h>
-#include <linux/timer.h>
-#include <linux/slab.h>
 #include <linux/interrupt.h>
-#include <linux/string.h>
-#include <linux/wait.h>
-#include <linux/if_arp.h>
-#include <linux/sched.h>
-#include <linux/io.h>
-#include <linux/if.h>
 #include <linux/crc32.h>
-#include <linux/uaccess.h>
-#include <linux/proc_fs.h>
-#include <linux/inetdevice.h>
-#include <linux/reboot.h>
-#include <linux/ethtool.h>
-/* Include Wireless Extension definition and check version - Jean II */
 #include <net/mac80211.h>
-#include <linux/wireless.h>
-#include <net/iw_handler.h>	/* New driver API */
-
-#ifndef WPA_SUPPLICANT_DRIVER_WEXT_SUPPORT
-#define WPA_SUPPLICANT_DRIVER_WEXT_SUPPORT
-#endif
 
 /* device specific */
 
@@ -87,29 +46,7 @@
 #define RATE_36M	9
 #define RATE_48M	10
 #define RATE_54M	11
-#define RATE_AUTO	12
 #define MAX_RATE	12
-
-#define MAC_MAX_CONTEXT_REG     (256+128)
-
-#define MAX_MULTICAST_ADDRESS_NUM       32
-#define MULTICAST_ADDRESS_LIST_SIZE     (MAX_MULTICAST_ADDRESS_NUM * ETH_ALEN)
-
-#define DUPLICATE_RX_CACHE_LENGTH       5
-
-#define NUM_KEY_ENTRY                   11
-
-#define TX_WEP_NONE                     0
-#define TX_WEP_OTF                      1
-#define TX_WEP_SW                       2
-#define TX_WEP_SWOTP                    3
-#define TX_WEP_OTPSW                    4
-#define TX_WEP_SW232                    5
-
-#define KEYSEL_WEP40                    0
-#define KEYSEL_WEP104                   1
-#define KEYSEL_TKIP                     2
-#define KEYSEL_CCMP                     3
 
 #define AUTO_FB_NONE            0
 #define AUTO_FB_0               1
@@ -126,25 +63,14 @@
 #define ANT_RXD_TXB             4
 #define ANT_UNKNOWN             0xFF
 
-#define MAXCHECKHANGCNT         4
-
 #define BB_VGA_LEVEL            4
 #define BB_VGA_CHANGE_THRESHOLD 16
 
-#ifndef RUN_AT
-#define RUN_AT(x)                       (jiffies+(x))
-#endif
-
 #define MAKE_BEACON_RESERVED	10  /* (us) */
-
-/* DMA related */
-#define RESERV_AC0DMA                   4
 
 /* BUILD OBJ mode */
 
-#define	AVAIL_TD(p, q)	((p)->sOpts.nTxDescs[(q)] - ((p)->iTDUsed[(q)]))
-
-#define	NUM				64
+#define	AVAIL_TD(p, q)	((p)->opts.tx_descs[(q)] - ((p)->iTDUsed[(q)]))
 
 /* 0:11A 1:11B 2:11G */
 #define BB_TYPE_11A    0
@@ -157,56 +83,19 @@
 #define PK_TYPE_11GB    2
 #define PK_TYPE_11GA    3
 
-typedef struct __chip_info_tbl {
-	CHIP_TYPE   chip_id;
-	char *name;
-	int         io_size;
-	int         nTxQueue;
-	u32         flags;
-} CHIP_INFO, *PCHIP_INFO;
+#define OWNED_BY_HOST	0
+#define	OWNED_BY_NIC	1
 
-typedef enum {
-	OWNED_BY_HOST = 0,
-	OWNED_BY_NIC = 1
-} DEVICE_OWNER_TYPE, *PDEVICE_OWNER_TYPE;
-
-/* flags for options */
-#define     DEVICE_FLAGS_IP_ALIGN        0x00000001UL
-#define     DEVICE_FLAGS_PREAMBLE_TYPE   0x00000002UL
-#define     DEVICE_FLAGS_OP_MODE         0x00000004UL
-#define     DEVICE_FLAGS_PS_MODE         0x00000008UL
-#define		DEVICE_FLAGS_80211h_MODE	 0x00000010UL
-#define		DEVICE_FLAGS_DiversityANT	 0x00000020UL
-
-/* flags for driver status */
-#define     DEVICE_FLAGS_OPENED          0x00010000UL
-#define     DEVICE_FLAGS_WOL_ENABLED     0x00080000UL
-/* flags for capabilities */
-#define     DEVICE_FLAGS_TX_ALIGN        0x01000000UL
-#define     DEVICE_FLAGS_HAVE_CAM        0x02000000UL
-#define     DEVICE_FLAGS_FLOW_CTRL       0x04000000UL
-
-/* flags for MII status */
-#define     DEVICE_LINK_FAIL             0x00000001UL
-#define     DEVICE_SPEED_10              0x00000002UL
-#define     DEVICE_SPEED_100             0x00000004UL
-#define     DEVICE_SPEED_1000            0x00000008UL
-#define     DEVICE_DUPLEX_FULL           0x00000010UL
-#define     DEVICE_AUTONEG_ENABLE        0x00000020UL
-#define     DEVICE_FORCED_BY_EEPROM      0x00000040UL
-/* for device_set_media_duplex */
-#define     DEVICE_LINK_CHANGE           0x00000001UL
-
-typedef struct __device_opt {
-	int         nRxDescs0;		/* Number of RX descriptors0 */
-	int         nRxDescs1;		/* Number of RX descriptors1 */
-	int         nTxDescs[2];	/* Number of TX descriptors 0, 1 */
-	int         int_works;		/* interrupt limits */
-	int         short_retry;
-	int         long_retry;
-	int         bbp_type;
-	u32         flags;
-} OPTIONS, *POPTIONS;
+struct vnt_options {
+	int rx_descs0;		/* Number of RX descriptors0 */
+	int rx_descs1;		/* Number of RX descriptors1 */
+	int tx_descs[2];	/* Number of TX descriptors 0, 1 */
+	int int_works;		/* interrupt limits */
+	int short_retry;
+	int long_retry;
+	int bbp_type;
+	u32 flags;
+};
 
 struct vnt_private {
 	struct pci_dev *pcid;
@@ -235,21 +124,12 @@ struct vnt_private {
 	unsigned char *tx1_bufs;
 	unsigned char *tx_beacon_bufs;
 
-	CHIP_TYPE                   chip_id;
-
-	void __iomem                *PortOffset;
+	void __iomem                *port_offset;
 	u32                         memaddr;
 	u32                         ioaddr;
-	u32                         io_size;
-
-	unsigned char byRevId;
-	unsigned char byRxMode;
-	unsigned short SubSystemID;
-	unsigned short SubVendorID;
 
 	spinlock_t                  lock;
 
-	int                         nTxQueues;
 	volatile int                iTDUsed[TYPE_MAXTD];
 
 	struct vnt_tx_desc *apCurrTD[TYPE_MAXTD];
@@ -258,25 +138,24 @@ struct vnt_private {
 	struct vnt_tx_desc *apTD0Rings;
 	struct vnt_tx_desc *apTD1Rings;
 
-	volatile PSRxDesc           aRD0Ring;
-	volatile PSRxDesc           aRD1Ring;
-	volatile PSRxDesc           pCurrRD[TYPE_MAXRD];
+	struct vnt_rx_desc *aRD0Ring;
+	struct vnt_rx_desc *aRD1Ring;
+	struct vnt_rx_desc *pCurrRD[TYPE_MAXRD];
 
-	OPTIONS                     sOpts;
+	struct vnt_options opts;
 
 	u32                         flags;
 
 	u32                         rx_buf_sz;
 	u8 rx_rate;
-	int                         multicast_limit;
 
 	u32                         rx_bytes;
 
 	/* Version control */
-	unsigned char byLocalID;
+	unsigned char local_id;
 	unsigned char byRFType;
 
-	unsigned char byMaxPwrLevel;
+	unsigned char max_pwr_level;
 	unsigned char byZoneType;
 	bool bZoneRegExist;
 	unsigned char byOriginalZonetype;
@@ -284,7 +163,7 @@ struct vnt_private {
 	unsigned char abyCurrentNetAddr[ETH_ALEN]; __aligned(2)
 	bool bLinkPass;          /* link status: OK or fail */
 
-	unsigned int	uCurrRSSI;
+	unsigned int current_rssi;
 	unsigned char byCurrSQ;
 
 	unsigned long dwTxAntennaSel;
@@ -322,7 +201,7 @@ struct vnt_private {
 	unsigned char byMinChannel;
 	unsigned char byMaxChannel;
 
-	unsigned char byPreambleType;
+	unsigned char preamble_type;
 	unsigned char byShortPreamble;
 
 	unsigned short wCurrentRate;
@@ -334,13 +213,13 @@ struct vnt_private {
 
 	bool bEncryptionEnable;
 	bool bLongHeader;
-	bool bShortSlotTime;
+	bool short_slot_time;
 	bool bProtectMode;
 	bool bNonERPPresent;
 	bool bBarkerPreambleMd;
 
 	bool bRadioControlOff;
-	bool bRadioOff;
+	bool radio_off;
 	bool bEnablePSMode;
 	unsigned short wListenInterval;
 	bool bPWBitOn;
@@ -348,7 +227,7 @@ struct vnt_private {
 	/* GPIO Radio Control */
 	unsigned char byRadioCtl;
 	unsigned char byGPIO;
-	bool bHWRadioOff;
+	bool hw_radio_off;
 	bool bPrvActive4RadioOFF;
 	bool bGPIOBlockRead;
 
@@ -372,7 +251,7 @@ struct vnt_private {
 	unsigned char byBBVGANew;
 	unsigned char byBBVGACurrent;
 	unsigned char abyBBVGA[BB_VGA_LEVEL];
-	long                    ldBmThreshold[BB_VGA_LEVEL];
+	long                    dbm_threshold[BB_VGA_LEVEL];
 
 	unsigned char byBBPreEDRSSI;
 	unsigned char byBBPreEDIndex;
@@ -387,12 +266,12 @@ struct vnt_private {
 	unsigned char byOFDMPwrG;
 	unsigned char byCurPwr;
 	char	 byCurPwrdBm;
-	unsigned char abyCCKPwrTbl[CB_MAX_CHANNEL_24G+1];
-	unsigned char abyOFDMPwrTbl[CB_MAX_CHANNEL+1];
-	char	abyCCKDefaultPwr[CB_MAX_CHANNEL_24G+1];
-	char	abyOFDMDefaultPwr[CB_MAX_CHANNEL+1];
-	char	abyRegPwr[CB_MAX_CHANNEL+1];
-	char	abyLocalPwr[CB_MAX_CHANNEL+1];
+	unsigned char abyCCKPwrTbl[CB_MAX_CHANNEL_24G + 1];
+	unsigned char abyOFDMPwrTbl[CB_MAX_CHANNEL + 1];
+	char	abyCCKDefaultPwr[CB_MAX_CHANNEL_24G + 1];
+	char	abyOFDMDefaultPwr[CB_MAX_CHANNEL + 1];
+	char	abyRegPwr[CB_MAX_CHANNEL + 1];
+	char	abyLocalPwr[CB_MAX_CHANNEL + 1];
 
 	/* BaseBand Loopback Use */
 	unsigned char byBBCR4d;
@@ -410,13 +289,4 @@ struct vnt_private {
 	struct ieee80211_low_level_stats low_stats;
 };
 
-static inline PDEVICE_RD_INFO alloc_rd_info(void)
-{
-	return kzalloc(sizeof(DEVICE_RD_INFO), GFP_ATOMIC);
-}
-
-static inline struct vnt_td_info *alloc_td_info(void)
-{
-	return kzalloc(sizeof(struct vnt_td_info), GFP_ATOMIC);
-}
 #endif

@@ -1,22 +1,5 @@
-/* Intel Ethernet Switch Host Interface Driver
- * Copyright(c) 2013 - 2015 Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * The full GNU General Public License is included in this distribution in
- * the file called "COPYING".
- *
- * Contact Information:
- * e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
- * Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
- */
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright(c) 2013 - 2019 Intel Corporation. */
 
 #include "fm10k_common.h"
 
@@ -57,7 +40,7 @@ static u16 fm10k_fifo_unused(struct fm10k_mbx_fifo *fifo)
 }
 
 /**
- *  fm10k_fifo_empty - Test to verify if fifo is empty
+ *  fm10k_fifo_empty - Test to verify if FIFO is empty
  *  @fifo: pointer to FIFO
  *
  *  This function returns true if the FIFO is empty, else false
@@ -72,7 +55,7 @@ static bool fm10k_fifo_empty(struct fm10k_mbx_fifo *fifo)
  *  @fifo: pointer to FIFO
  *  @offset: offset to add to head
  *
- *  This function returns the indices into the fifo based on head + offset
+ *  This function returns the indices into the FIFO based on head + offset
  **/
 static u16 fm10k_fifo_head_offset(struct fm10k_mbx_fifo *fifo, u16 offset)
 {
@@ -84,7 +67,7 @@ static u16 fm10k_fifo_head_offset(struct fm10k_mbx_fifo *fifo, u16 offset)
  *  @fifo: pointer to FIFO
  *  @offset: offset to add to tail
  *
- *  This function returns the indices into the fifo based on tail + offset
+ *  This function returns the indices into the FIFO based on tail + offset
  **/
 static u16 fm10k_fifo_tail_offset(struct fm10k_mbx_fifo *fifo, u16 offset)
 {
@@ -129,8 +112,8 @@ static u16 fm10k_fifo_head_drop(struct fm10k_mbx_fifo *fifo)
  *  fm10k_fifo_drop_all - Drop all messages in FIFO
  *  @fifo: pointer to FIFO
  *
- *  This function resets the head pointer to drop all messages in the FIFO,
- *  and ensure the FIFO is empty.
+ *  This function resets the head pointer to drop all messages in the FIFO and
+ *  ensure the FIFO is empty.
  **/
 static void fm10k_fifo_drop_all(struct fm10k_mbx_fifo *fifo)
 {
@@ -160,7 +143,7 @@ static u16 fm10k_mbx_index_len(struct fm10k_mbx_info *mbx, u16 head, u16 tail)
 /**
  *  fm10k_mbx_tail_add - Determine new tail value with added offset
  *  @mbx: pointer to mailbox
- *  @offset: length to add to head offset
+ *  @offset: length to add to tail offset
  *
  *  This function takes the local tail index and recomputes it for
  *  a given length added as an offset.
@@ -176,7 +159,7 @@ static u16 fm10k_mbx_tail_add(struct fm10k_mbx_info *mbx, u16 offset)
 /**
  *  fm10k_mbx_tail_sub - Determine new tail value with subtracted offset
  *  @mbx: pointer to mailbox
- *  @offset: length to add to head offset
+ *  @offset: length to add to tail offset
  *
  *  This function takes the local tail index and recomputes it for
  *  a given length added as an offset.
@@ -240,7 +223,7 @@ static u16 fm10k_mbx_pushed_tail_len(struct fm10k_mbx_info *mbx)
 }
 
 /**
- *  fm10k_fifo_write_copy - pulls data off of msg and places it in fifo
+ *  fm10k_fifo_write_copy - pulls data off of msg and places it in FIFO
  *  @fifo: pointer to FIFO
  *  @msg: message array to populate
  *  @tail_offset: additional offset to add to tail pointer
@@ -314,13 +297,14 @@ static u16 fm10k_mbx_validate_msg_size(struct fm10k_mbx_info *mbx, u16 len)
 {
 	struct fm10k_mbx_fifo *fifo = &mbx->rx;
 	u16 total_len = 0, msg_len;
-	u32 *msg;
 
 	/* length should include previous amounts pushed */
 	len += mbx->pushed;
 
 	/* offset in message is based off of current message size */
 	do {
+		u32 *msg;
+
 		msg = fifo->buffer + fm10k_fifo_tail_offset(fifo, total_len);
 		msg_len = FM10K_TLV_DWORD_LEN(*msg);
 		total_len += msg_len;
@@ -336,6 +320,7 @@ static u16 fm10k_mbx_validate_msg_size(struct fm10k_mbx_info *mbx, u16 len)
 
 /**
  *  fm10k_mbx_write_copy - pulls data off of Tx FIFO and places it in mbmem
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
  *  This function will take a section of the Tx FIFO and copy it into the
@@ -374,6 +359,8 @@ static void fm10k_mbx_write_copy(struct fm10k_hw *hw,
 			tail &= mask;
 			if (!tail)
 				tail++;
+
+			mbx->tx_mbmem_pulled++;
 
 			/* write message to hardware FIFO */
 			fm10k_write_reg(hw, mbmem + tail++, *(head++));
@@ -458,6 +445,8 @@ static void fm10k_mbx_read_copy(struct fm10k_hw *hw,
 			head &= mbx->mbmem_len - 1;
 			if (!head)
 				head++;
+
+			mbx->rx_mbmem_pushed++;
 
 			/* read message from hardware FIFO */
 			*(tail++) = fm10k_read_reg(hw, mbmem + head++);
@@ -703,11 +692,11 @@ static bool fm10k_mbx_tx_complete(struct fm10k_mbx_info *mbx)
 }
 
 /**
- *  fm10k_mbx_deqeueue_rx - Dequeues the message from the head in the Rx FIFO
+ *  fm10k_mbx_dequeue_rx - Dequeues the message from the head in the Rx FIFO
  *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
- *  This function dequeues messages and hands them off to the tlv parser.
+ *  This function dequeues messages and hands them off to the TLV parser.
  *  It will return the number of messages processed when called.
  **/
 static u16 fm10k_mbx_dequeue_rx(struct fm10k_hw *hw,
@@ -820,7 +809,7 @@ static s32 fm10k_mbx_read(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx)
  *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
- *  This function copies the message from the the message array to mbmem
+ *  This function copies the message from the message array to mbmem
  **/
 static void fm10k_mbx_write(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx)
 {
@@ -899,7 +888,28 @@ static void fm10k_mbx_create_disconnect_hdr(struct fm10k_mbx_info *mbx)
 }
 
 /**
- *  fm10k_mbx_create_error_msg - Generate a error message
+ *  fm10k_mbx_create_fake_disconnect_hdr - Generate a false disconnect mbox hdr
+ *  @mbx: pointer to mailbox
+ *
+ *  This function creates a fake disconnect header for loading into remote
+ *  mailbox header. The primary purpose is to prevent errors on immediate
+ *  start up after mbx->connect.
+ **/
+static void fm10k_mbx_create_fake_disconnect_hdr(struct fm10k_mbx_info *mbx)
+{
+	u32 hdr = FM10K_MSG_HDR_FIELD_SET(FM10K_MSG_DISCONNECT, TYPE) |
+		  FM10K_MSG_HDR_FIELD_SET(mbx->head, TAIL) |
+		  FM10K_MSG_HDR_FIELD_SET(mbx->tail, HEAD);
+	u16 crc = fm10k_crc_16b(&hdr, mbx->local, 1);
+
+	mbx->mbx_lock |= FM10K_MBX_ACK;
+
+	/* load header to memory to be written */
+	mbx->mbx_hdr = hdr | FM10K_MSG_HDR_FIELD_SET(crc, CRC);
+}
+
+/**
+ *  fm10k_mbx_create_error_msg - Generate an error message
  *  @mbx: pointer to mailbox
  *  @err: local error encountered
  *
@@ -932,7 +942,6 @@ static void fm10k_mbx_create_error_msg(struct fm10k_mbx_info *mbx, s32 err)
 /**
  *  fm10k_mbx_validate_msg_hdr - Validate common fields in the message header
  *  @mbx: pointer to mailbox
- *  @msg: message array to read
  *
  *  This function will parse up the fields in the mailbox header and return
  *  an error if the header contains any of a number of invalid configurations
@@ -958,7 +967,7 @@ static s32 fm10k_mbx_validate_msg_hdr(struct fm10k_mbx_info *mbx)
 		if (tail != mbx->head)
 			return FM10K_MBX_ERR_TAIL;
 
-		/* fall through */
+		fallthrough;
 	case FM10K_MSG_DATA:
 		/* validate that head is moving correctly */
 		if (!head || (head == FM10K_MSG_HDR_MASK(HEAD)))
@@ -978,7 +987,7 @@ static s32 fm10k_mbx_validate_msg_hdr(struct fm10k_mbx_info *mbx)
 		if ((size < FM10K_VFMBX_MSG_MTU) || (size & (size + 1)))
 			return FM10K_MBX_ERR_SIZE;
 
-		/* fall through */
+		fallthrough;
 	case FM10K_MSG_ERROR:
 		if (!head || (head == FM10K_MSG_HDR_MASK(HEAD)))
 			return FM10K_MBX_ERR_HEAD;
@@ -996,11 +1005,12 @@ static s32 fm10k_mbx_validate_msg_hdr(struct fm10k_mbx_info *mbx)
 
 /**
  *  fm10k_mbx_create_reply - Generate reply based on state and remote head
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *  @head: acknowledgement number
  *
  *  This function will generate an outgoing message based on the current
- *  mailbox state and the remote fifo head.  It will return the length
+ *  mailbox state and the remote FIFO head.  It will return the length
  *  of the outgoing message excluding header on success, and a negative value
  *  on error.
  **/
@@ -1029,6 +1039,7 @@ static s32 fm10k_mbx_create_reply(struct fm10k_hw *hw,
 	case FM10K_STATE_CLOSED:
 		/* generate new header based on data */
 		fm10k_mbx_create_disconnect_hdr(mbx);
+		break;
 	default:
 		break;
 	}
@@ -1046,8 +1057,25 @@ static s32 fm10k_mbx_create_reply(struct fm10k_hw *hw,
  **/
 static void fm10k_mbx_reset_work(struct fm10k_mbx_info *mbx)
 {
+	u16 len, head, ack;
+
 	/* reset our outgoing max size back to Rx limits */
 	mbx->max_size = mbx->rx.size - 1;
+
+	/* update mbx->pulled to account for tail_len and ack */
+	head = FM10K_MSG_HDR_FIELD_GET(mbx->mbx_hdr, HEAD);
+	ack = fm10k_mbx_index_len(mbx, head, mbx->tail);
+	mbx->pulled += mbx->tail_len - ack;
+
+	/* now drop any messages which have started or finished transmitting */
+	while (fm10k_fifo_head_len(&mbx->tx) && mbx->pulled) {
+		len = fm10k_fifo_head_drop(&mbx->tx);
+		mbx->tx_dropped++;
+		if (mbx->pulled >= len)
+			mbx->pulled -= len;
+		else
+			mbx->pulled = 0;
+	}
 
 	/* just do a quick resysnc to start of message */
 	mbx->pushed = 0;
@@ -1109,8 +1137,8 @@ static void fm10k_mbx_connect_reset(struct fm10k_mbx_info *mbx)
 
 /**
  *  fm10k_mbx_process_connect - Process connect header
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
- *  @msg: message array to process
  *
  *  This function will read an incoming connect header and reply with the
  *  appropriate message.  It will return a value indicating the number of
@@ -1156,6 +1184,7 @@ static s32 fm10k_mbx_process_connect(struct fm10k_hw *hw,
 
 /**
  *  fm10k_mbx_process_data - Process data header
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
  *  This function will read an incoming data header and reply with the
@@ -1197,6 +1226,7 @@ static s32 fm10k_mbx_process_data(struct fm10k_hw *hw,
 
 /**
  *  fm10k_mbx_process_disconnect - Process disconnect header
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
  *  This function will read an incoming disconnect header and reply with the
@@ -1249,6 +1279,7 @@ static s32 fm10k_mbx_process_disconnect(struct fm10k_hw *hw,
 
 /**
  *  fm10k_mbx_process_error - Process error header
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
  *  This function will read an incoming error header and reply with the
@@ -1418,8 +1449,10 @@ static s32 fm10k_mbx_connect(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx)
 	/* Place mbx in ready to connect state */
 	mbx->state = FM10K_STATE_CONNECT;
 
+	fm10k_mbx_reset_work(mbx);
+
 	/* initialize header of remote mailbox */
-	fm10k_mbx_create_disconnect_hdr(mbx);
+	fm10k_mbx_create_fake_disconnect_hdr(mbx);
 	fm10k_write_reg(hw, mbx->mbmem_reg ^ mbx->mbmem_len, mbx->mbx_hdr);
 
 	/* enable interrupt and notify other party of new message */
@@ -1516,7 +1549,7 @@ static s32 fm10k_mbx_register_handlers(struct fm10k_mbx_info *mbx,
  *  @id: ID reference for PF as it supports up to 64 PF/VF mailboxes
  *
  *  This function initializes the mailbox for use.  It will split the
- *  buffer provided an use that th populate both the Tx and Rx FIFO by
+ *  buffer provided and use that to populate both the Tx and Rx FIFO by
  *  evenly splitting it.  In order to allow for easy masking of head/tail
  *  the value reported in size must be a power of 2 and is reported in
  *  DWORDs, not bytes.  Any invalid values will cause the mailbox to return
@@ -1538,7 +1571,7 @@ s32 fm10k_pfvf_mbx_init(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx,
 			mbx->mbmem_reg = FM10K_MBMEM_VF(id, 0);
 			break;
 		}
-		/* fallthough */
+		fallthrough;
 	default:
 		return FM10K_MBX_ERR_NO_MBX;
 	}
@@ -1593,7 +1626,7 @@ s32 fm10k_pfvf_mbx_init(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx,
  *  fm10k_sm_mbx_create_data_hdr - Generate a mailbox header for local FIFO
  *  @mbx: pointer to mailbox
  *
- *  This function returns a connection mailbox header
+ *  This function returns a data mailbox header
  **/
 static void fm10k_sm_mbx_create_data_hdr(struct fm10k_mbx_info *mbx)
 {
@@ -1686,8 +1719,6 @@ static s32 fm10k_sm_mbx_connect(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx)
 	fm10k_sm_mbx_create_connect_hdr(mbx, 0);
 	fm10k_mbx_write(hw, mbx);
 
-	/* enable interrupt and notify other party of new message */
-
 	return 0;
 }
 
@@ -1725,13 +1756,13 @@ static void fm10k_sm_mbx_disconnect(struct fm10k_hw *hw,
 	mbx->state = FM10K_STATE_CLOSED;
 	mbx->remote = 0;
 	fm10k_mbx_reset_work(mbx);
-	fm10k_mbx_update_max_size(mbx, 0);
+	fm10k_fifo_drop_all(&mbx->tx);
 
 	fm10k_write_reg(hw, mbx->mbmem_reg, 0);
 }
 
 /**
- *  fm10k_mbx_validate_fifo_hdr - Validate fields in the remote FIFO header
+ *  fm10k_sm_mbx_validate_fifo_hdr - Validate fields in the remote FIFO header
  *  @mbx: pointer to mailbox
  *
  *  This function will parse up the fields in the mailbox header and return
@@ -1794,7 +1825,7 @@ static void fm10k_sm_mbx_process_error(struct fm10k_mbx_info *mbx)
 		fm10k_sm_mbx_connect_reset(mbx);
 		break;
 	case FM10K_STATE_CONNECT:
-		/* try connnecting at lower version */
+		/* try connecting at lower version */
 		if (mbx->remote) {
 			while (mbx->local > 1)
 				mbx->local--;
@@ -1809,7 +1840,7 @@ static void fm10k_sm_mbx_process_error(struct fm10k_mbx_info *mbx)
 }
 
 /**
- *  fm10k_sm_mbx_create_error_message - Process an error in FIFO hdr
+ *  fm10k_sm_mbx_create_error_msg - Process an error in FIFO header
  *  @mbx: pointer to mailbox
  *  @err: local error encountered
  *
@@ -1839,6 +1870,7 @@ static void fm10k_sm_mbx_create_error_msg(struct fm10k_mbx_info *mbx, s32 err)
  *  fm10k_sm_mbx_receive - Take message from Rx mailbox FIFO and put it in Rx
  *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
+ *  @tail: tail index of message
  *
  *  This function will dequeue one message from the Rx switch manager mailbox
  *  FIFO and place it in the Rx mailbox FIFO for processing by software.
@@ -1878,6 +1910,7 @@ static s32 fm10k_sm_mbx_receive(struct fm10k_hw *hw,
  *  fm10k_sm_mbx_transmit - Take message from Tx and put it in Tx mailbox FIFO
  *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
+ *  @head: head index of message
  *
  *  This function will dequeue one message from the Tx mailbox FIFO and place
  *  it in the Tx switch manager mailbox FIFO for processing by hardware.
@@ -1889,7 +1922,6 @@ static void fm10k_sm_mbx_transmit(struct fm10k_hw *hw,
 	/* reduce length by 1 to convert to a mask */
 	u16 mbmem_len = mbx->mbmem_len - 1;
 	u16 tail_len, len = 0;
-	u32 *msg;
 
 	/* push head behind tail */
 	if (mbx->tail < head)
@@ -1899,6 +1931,8 @@ static void fm10k_sm_mbx_transmit(struct fm10k_hw *hw,
 
 	/* determine msg aligned offset for end of buffer */
 	do {
+		u32 *msg;
+
 		msg = fifo->buffer + fm10k_fifo_head_offset(fifo, len);
 		tail_len = len;
 		len += FM10K_TLV_DWORD_LEN(*msg);
@@ -1917,11 +1951,12 @@ static void fm10k_sm_mbx_transmit(struct fm10k_hw *hw,
 
 /**
  *  fm10k_sm_mbx_create_reply - Generate reply based on state and remote head
+ *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *  @head: acknowledgement number
  *
  *  This function will generate an outgoing message based on the current
- *  mailbox state and the remote fifo head.  It will return the length
+ *  mailbox state and the remote FIFO head.  It will return the length
  *  of the outgoing message excluding header on success, and a negative value
  *  on error.
  **/
@@ -1962,9 +1997,10 @@ static void fm10k_sm_mbx_create_reply(struct fm10k_hw *hw,
  *  function can also be used to respond to an error as the connection
  *  resetting would also be a means of dealing with errors.
  **/
-static void fm10k_sm_mbx_process_reset(struct fm10k_hw *hw,
-				       struct fm10k_mbx_info *mbx)
+static s32 fm10k_sm_mbx_process_reset(struct fm10k_hw *hw,
+				      struct fm10k_mbx_info *mbx)
 {
+	s32 err = 0;
 	const enum fm10k_mbx_state state = mbx->state;
 
 	switch (state) {
@@ -1977,15 +2013,19 @@ static void fm10k_sm_mbx_process_reset(struct fm10k_hw *hw,
 	case FM10K_STATE_OPEN:
 		/* flush any incomplete work */
 		fm10k_sm_mbx_connect_reset(mbx);
+		err = FM10K_ERR_RESET_REQUESTED;
 		break;
 	case FM10K_STATE_CONNECT:
 		/* Update remote value to match local value */
 		mbx->remote = mbx->local;
+		break;
 	default:
 		break;
 	}
 
 	fm10k_sm_mbx_create_reply(hw, mbx, mbx->tail);
+
+	return err;
 }
 
 /**
@@ -2033,7 +2073,7 @@ send_reply:
 }
 
 /**
- *  fm10k_sm_mbx_process - Process mailbox switch mailbox interrupt
+ *  fm10k_sm_mbx_process - Process switch manager mailbox interrupt
  *  @hw: pointer to hardware structure
  *  @mbx: pointer to mailbox
  *
@@ -2066,7 +2106,7 @@ static s32 fm10k_sm_mbx_process(struct fm10k_hw *hw,
 
 	switch (FM10K_MSG_HDR_FIELD_GET(mbx->mbx_hdr, SM_VER)) {
 	case 0:
-		fm10k_sm_mbx_process_reset(hw, mbx);
+		err = fm10k_sm_mbx_process_reset(hw, mbx);
 		break;
 	case FM10K_SM_MBX_VERSION:
 		err = fm10k_sm_mbx_process_version_1(hw, mbx);
@@ -2089,13 +2129,20 @@ fifo_err:
  *  @mbx: pointer to mailbox
  *  @msg_data: handlers for mailbox events
  *
- *  This function for now is used to stub out the PF/SM mailbox
+ *  This function initializes the PF/SM mailbox for use.  It will split the
+ *  buffer provided and use that to populate both the Tx and Rx FIFO by
+ *  evenly splitting it.  In order to allow for easy masking of head/tail
+ *  the value reported in size must be a power of 2 and is reported in
+ *  DWORDs, not bytes.  Any invalid values will cause the mailbox to return
+ *  error.
  **/
-s32 fm10k_sm_mbx_init(struct fm10k_hw *hw, struct fm10k_mbx_info *mbx,
+s32 fm10k_sm_mbx_init(struct fm10k_hw __always_unused *hw,
+		      struct fm10k_mbx_info *mbx,
 		      const struct fm10k_msg_data *msg_data)
 {
 	mbx->mbx_reg = FM10K_GMBX;
 	mbx->mbmem_reg = FM10K_MBMEM_PF(0);
+
 	/* start out in closed state */
 	mbx->state = FM10K_STATE_CLOSED;
 

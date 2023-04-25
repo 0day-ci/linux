@@ -25,6 +25,42 @@
 
 #include <engine/fifo.h>
 
+u32
+nvkm_gr_ctxsw_inst(struct nvkm_device *device)
+{
+	struct nvkm_gr *gr = device->gr;
+	if (gr && gr->func->ctxsw.inst)
+		return gr->func->ctxsw.inst(gr);
+	return 0;
+}
+
+int
+nvkm_gr_ctxsw_resume(struct nvkm_device *device)
+{
+	struct nvkm_gr *gr = device->gr;
+	if (gr && gr->func->ctxsw.resume)
+		return gr->func->ctxsw.resume(gr);
+	return 0;
+}
+
+int
+nvkm_gr_ctxsw_pause(struct nvkm_device *device)
+{
+	struct nvkm_gr *gr = device->gr;
+	if (gr && gr->func->ctxsw.pause)
+		return gr->func->ctxsw.pause(gr);
+	return 0;
+}
+
+static bool
+nvkm_gr_chsw_load(struct nvkm_engine *engine)
+{
+	struct nvkm_gr *gr = nvkm_gr(engine);
+	if (gr->func->chsw_load)
+		return gr->func->chsw_load(gr);
+	return false;
+}
+
 static void
 nvkm_gr_tile(struct nvkm_engine *engine, int region, struct nvkm_fb_tile *tile)
 {
@@ -100,10 +136,30 @@ nvkm_gr_oneinit(struct nvkm_engine *engine)
 }
 
 static int
+nvkm_gr_reset(struct nvkm_engine *engine)
+{
+	struct nvkm_gr *gr = nvkm_gr(engine);
+
+	if (gr->func->reset)
+		return gr->func->reset(gr);
+
+	return -ENOSYS;
+}
+
+static int
 nvkm_gr_init(struct nvkm_engine *engine)
 {
 	struct nvkm_gr *gr = nvkm_gr(engine);
 	return gr->func->init(gr);
+}
+
+static int
+nvkm_gr_fini(struct nvkm_engine *engine, bool suspend)
+{
+	struct nvkm_gr *gr = nvkm_gr(engine);
+	if (gr->func->fini)
+		return gr->func->fini(gr, suspend);
+	return 0;
 }
 
 static void *
@@ -120,17 +176,19 @@ nvkm_gr = {
 	.dtor = nvkm_gr_dtor,
 	.oneinit = nvkm_gr_oneinit,
 	.init = nvkm_gr_init,
+	.fini = nvkm_gr_fini,
+	.reset = nvkm_gr_reset,
 	.intr = nvkm_gr_intr,
 	.tile = nvkm_gr_tile,
+	.chsw_load = nvkm_gr_chsw_load,
 	.fifo.cclass = nvkm_gr_cclass_new,
 	.fifo.sclass = nvkm_gr_oclass_get,
 };
 
 int
 nvkm_gr_ctor(const struct nvkm_gr_func *func, struct nvkm_device *device,
-	     int index, u32 pmc_enable, bool enable, struct nvkm_gr *gr)
+	     enum nvkm_subdev_type type, int inst, bool enable, struct nvkm_gr *gr)
 {
 	gr->func = func;
-	return nvkm_engine_ctor(&nvkm_gr, device, index, pmc_enable,
-				enable, &gr->engine);
+	return nvkm_engine_ctor(&nvkm_gr, device, type, inst, enable, &gr->engine);
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /* smp.c: Sparc SMP support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -28,8 +29,6 @@
 
 #include <asm/irq.h>
 #include <asm/page.h>
-#include <asm/pgalloc.h>
-#include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -173,11 +172,6 @@ void smp_call_function_interrupt(void)
 	generic_smp_call_function_interrupt();
 	local_cpu_data().irq_call_count++;
 	irq_exit();
-}
-
-int setup_profiling_timer(unsigned int multiplier)
-{
-	return -EINVAL;
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
@@ -349,12 +343,9 @@ static void sparc_start_secondary(void *arg)
 	 */
 	arch_cpu_pre_starting(arg);
 
-	preempt_disable();
 	cpu = smp_processor_id();
 
-	/* Invoke the CPU_STARTING notifier callbacks */
 	notify_cpu_starting(cpu);
-
 	arch_cpu_pre_online(arg);
 
 	/* Set the CPU in the cpu_online_mask */
@@ -364,7 +355,7 @@ static void sparc_start_secondary(void *arg)
 	local_irq_enable();
 
 	wmb();
-	cpu_startup_entry(CPUHP_ONLINE);
+	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);
 
 	/* We should never reach here! */
 	BUG();

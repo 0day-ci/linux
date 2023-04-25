@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * udelay() test kernel module
  *
@@ -7,15 +8,6 @@
  * Specifying usecs of 0 or negative values will run multiples tests.
  *
  * Copyright (C) 2014 Google, Inc.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/debugfs.h>
@@ -29,7 +21,6 @@
 #define DEBUGFS_FILENAME "udelay_test"
 
 static DEFINE_MUTEX(udelay_test_lock);
-static struct dentry *udelay_test_debugfs_file;
 static int udelay_test_usecs;
 static int udelay_test_iterations = DEFAULT_ITERATIONS;
 
@@ -43,13 +34,13 @@ static int udelay_test_single(struct seq_file *s, int usecs, uint32_t iters)
 	int allowed_error_ns = usecs * 5;
 
 	for (i = 0; i < iters; ++i) {
-		struct timespec ts1, ts2;
+		s64 kt1, kt2;
 		int time_passed;
 
-		ktime_get_ts(&ts1);
+		kt1 = ktime_get_ns();
 		udelay(usecs);
-		ktime_get_ts(&ts2);
-		time_passed = timespec_to_ns(&ts2) - timespec_to_ns(&ts1);
+		kt2 = ktime_get_ns();
+		time_passed = kt2 - kt1;
 
 		if (i == 0 || time_passed < min)
 			min = time_passed;
@@ -87,11 +78,11 @@ static int udelay_test_show(struct seq_file *s, void *v)
 	if (usecs > 0 && iters > 0) {
 		return udelay_test_single(s, usecs, iters);
 	} else if (usecs == 0) {
-		struct timespec ts;
+		struct timespec64 ts;
 
-		ktime_get_ts(&ts);
-		seq_printf(s, "udelay() test (lpj=%ld kt=%ld.%09ld)\n",
-				loops_per_jiffy, ts.tv_sec, ts.tv_nsec);
+		ktime_get_ts64(&ts);
+		seq_printf(s, "udelay() test (lpj=%ld kt=%lld.%09ld)\n",
+				loops_per_jiffy, (s64)ts.tv_sec, ts.tv_nsec);
 		seq_puts(s, "usage:\n");
 		seq_puts(s, "echo USECS [ITERS] > " DEBUGFS_FILENAME "\n");
 		seq_puts(s, "cat " DEBUGFS_FILENAME "\n");
@@ -146,8 +137,8 @@ static const struct file_operations udelay_test_debugfs_ops = {
 static int __init udelay_test_init(void)
 {
 	mutex_lock(&udelay_test_lock);
-	udelay_test_debugfs_file = debugfs_create_file(DEBUGFS_FILENAME,
-			S_IRUSR, NULL, NULL, &udelay_test_debugfs_ops);
+	debugfs_create_file(DEBUGFS_FILENAME, S_IRUSR, NULL, NULL,
+			    &udelay_test_debugfs_ops);
 	mutex_unlock(&udelay_test_lock);
 
 	return 0;
@@ -158,7 +149,7 @@ module_init(udelay_test_init);
 static void __exit udelay_test_exit(void)
 {
 	mutex_lock(&udelay_test_lock);
-	debugfs_remove(udelay_test_debugfs_file);
+	debugfs_lookup_and_remove(DEBUGFS_FILENAME, NULL);
 	mutex_unlock(&udelay_test_lock);
 }
 

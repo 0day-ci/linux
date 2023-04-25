@@ -1,12 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Marvell 88PM80x Interface
  *
  * Copyright (C) 2012 Marvell International Ltd.
  * Qiao Zhou <zhouqiao@marvell.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #ifndef __LINUX_MFD_88PM80X_H
@@ -21,6 +18,7 @@ enum {
 	CHIP_INVALID = 0,
 	CHIP_PM800,
 	CHIP_PM805,
+	CHIP_PM860,
 	CHIP_MAX,
 };
 
@@ -349,7 +347,7 @@ static inline int pm80x_dev_suspend(struct device *dev)
 	int irq = platform_get_irq(pdev, 0);
 
 	if (device_may_wakeup(dev))
-		set_bit((1 << irq), &chip->wu_flag);
+		set_bit(irq, &chip->wu_flag);
 
 	return 0;
 }
@@ -361,7 +359,7 @@ static inline int pm80x_dev_resume(struct device *dev)
 	int irq = platform_get_irq(pdev, 0);
 
 	if (device_may_wakeup(dev))
-		clear_bit((1 << irq), &chip->wu_flag);
+		clear_bit(irq, &chip->wu_flag);
 
 	return 0;
 }

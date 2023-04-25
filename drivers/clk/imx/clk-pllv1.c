@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+#include <linux/bits.h>
 #include <linux/clk-provider.h>
 #include <linux/io.h>
 #include <linux/slab.h>
@@ -6,20 +8,19 @@
 
 #include "clk.h"
 
-/**
- * pll v1
- *
- * @clk_hw	clock source
- * @parent	the parent clock name
- * @base	base address of pll registers
- *
- * PLL clock version 1, found on i.MX1/21/25/27/31/35
- */
-
 #define MFN_BITS	(10)
 #define MFN_SIGN	(BIT(MFN_BITS - 1))
 #define MFN_MASK	(MFN_SIGN - 1)
 
+/**
+ * struct clk_pllv1 - IMX PLLv1 clock descriptor
+ *
+ * @hw:		clock source
+ * @base:	base address of pll registers
+ * @type:	type of IMX_PLLV1
+ *
+ * PLL clock version 1, found on i.MX1/21/25/27/31/35
+ */
 struct clk_pllv1 {
 	struct clk_hw	hw;
 	void __iomem	*base;
@@ -52,7 +53,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
 	struct clk_pllv1 *pll = to_clk_pllv1(hw);
-	long long ll;
+	unsigned long long ull;
 	int mfn_abs;
 	unsigned int mfi, mfn, mfd, pd;
 	u32 reg;
@@ -94,28 +95,29 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
 	rate = parent_rate * 2;
 	rate /= pd + 1;
 
-	ll = (unsigned long long)rate * mfn_abs;
+	ull = (unsigned long long)rate * mfn_abs;
 
-	do_div(ll, mfd + 1);
+	do_div(ull, mfd + 1);
 
 	if (mfn_is_negative(pll, mfn))
-		ll = -ll;
+		ull = (rate * mfi) - ull;
+	else
+		ull = (rate * mfi) + ull;
 
-	ll = (rate * mfi) + ll;
-
-	return ll;
+	return ull;
 }
 
-static struct clk_ops clk_pllv1_ops = {
+static const struct clk_ops clk_pllv1_ops = {
 	.recalc_rate = clk_pllv1_recalc_rate,
 };
 
-struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
+struct clk_hw *imx_clk_hw_pllv1(enum imx_pllv1_type type, const char *name,
 		const char *parent, void __iomem *base)
 {
 	struct clk_pllv1 *pll;
-	struct clk *clk;
+	struct clk_hw *hw;
 	struct clk_init_data init;
+	int ret;
 
 	pll = kmalloc(sizeof(*pll), GFP_KERNEL);
 	if (!pll)
@@ -131,10 +133,13 @@ struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
 	init.num_parents = 1;
 
 	pll->hw.init = &init;
+	hw = &pll->hw;
 
-	clk = clk_register(NULL, &pll->hw);
-	if (IS_ERR(clk))
+	ret = clk_hw_register(NULL, hw);
+	if (ret) {
 		kfree(pll);
+		return ERR_PTR(ret);
+	}
 
-	return clk;
+	return hw;
 }

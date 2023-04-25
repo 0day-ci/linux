@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Symmetric Multi Processing (SMP) support for Marvell EBU Cortex-A9
  * based SOCs (Armada 375/38x).
@@ -6,10 +7,6 @@
  *
  * Gregory CLEMENT <gregory.clement@free-electrons.com>
  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 
 #include <linux/init.h>
@@ -93,11 +90,11 @@ static int armada_38x_cpu_kill(unsigned int cpu)
 }
 #endif
 
-static struct smp_operations mvebu_cortex_a9_smp_ops __initdata = {
+static const struct smp_operations mvebu_cortex_a9_smp_ops __initconst = {
 	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
 };
 
-static struct smp_operations armada_38x_smp_ops __initdata = {
+static const struct smp_operations armada_38x_smp_ops __initconst = {
 	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
 	.smp_secondary_init     = armada_38x_secondary_init,
 #ifdef CONFIG_HOTPLUG_CPU

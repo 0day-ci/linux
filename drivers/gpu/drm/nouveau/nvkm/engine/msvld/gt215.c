@@ -27,7 +27,6 @@
 
 static const struct nvkm_falcon_func
 gt215_msvld = {
-	.pmc_enable = 0x04008000,
 	.init = g98_msvld_init,
 	.sclass = {
 		{ -1, -1, GT212_MSVLD },
@@ -36,8 +35,8 @@ gt215_msvld = {
 };
 
 int
-gt215_msvld_new(struct nvkm_device *device, int index,
-	      struct nvkm_engine **pengine)
+gt215_msvld_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
+		struct nvkm_engine **pengine)
 {
-	return nvkm_msvld_new_(&gt215_msvld, device, index, pengine);
+	return nvkm_msvld_new_(&gt215_msvld, device, type, inst, pengine);
 }

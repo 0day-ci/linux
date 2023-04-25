@@ -1,9 +1,11 @@
-/* s3d.c: Sun 3DLABS XVR-2500 et al. driver for sparc64 systems
+/* sunxvr2500.c: Sun 3DLABS XVR-2500 et al. fb driver for sparc64 systems
+ *
+ * License: GPL
  *
  * Copyright (C) 2007 David S. Miller (davem@davemloft.net)
  */
 
-#include <linux/module.h>
+#include <linux/aperture.h>
 #include <linux/kernel.h>
 #include <linux/fb.h>
 #include <linux/pci.h>
@@ -62,7 +64,7 @@ static int s3d_setcolreg(unsigned regno,
 	return 0;
 }
 
-static struct fb_ops s3d_ops = {
+static const struct fb_ops s3d_ops = {
 	.owner			= THIS_MODULE,
 	.fb_setcolreg		= s3d_setcolreg,
 	.fb_fillrect		= cfb_fillrect,
@@ -83,7 +85,7 @@ static int s3d_set_fbinfo(struct s3d_info *sp)
 	info->pseudo_palette = sp->pseudo_palette;
 
 	/* Fill fix common fields */
-	strlcpy(info->fix.id, "s3d", sizeof(info->fix.id));
+	strscpy(info->fix.id, "s3d", sizeof(info->fix.id));
         info->fix.smem_start = sp->fb_base_phys;
         info->fix.smem_len = sp->fb_size;
         info->fix.type = FB_TYPE_PACKED_PIXELS;
@@ -122,6 +124,10 @@ static int s3d_pci_register(struct pci_dev *pdev,
 	struct s3d_info *sp;
 	int err;
 
+	err = aperture_remove_conflicting_pci_devices(pdev, "s3dfb");
+	if (err)
+		return err;
+
 	err = pci_enable_device(pdev);
 	if (err < 0) {
 		printk(KERN_ERR "s3d: Cannot enable PCI device %s\n",
@@ -131,7 +137,6 @@ static int s3d_pci_register(struct pci_dev *pdev,
 
 	info = framebuffer_alloc(sizeof(struct s3d_info), &pdev->dev);
 	if (!info) {
-		printk(KERN_ERR "s3d: Cannot allocate fb_info\n");
 		err = -ENOMEM;
 		goto err_disable;
 	}
@@ -219,23 +224,7 @@ err_out:
 	return err;
 }
 
-static void s3d_pci_unregister(struct pci_dev *pdev)
-{
-	struct fb_info *info = pci_get_drvdata(pdev);
-	struct s3d_info *sp = info->par;
-
-	unregister_framebuffer(info);
-
-	iounmap(sp->fb_base);
-
-	pci_release_region(pdev, 1);
-
-        framebuffer_release(info);
-
-	pci_disable_device(pdev);
-}
-
-static struct pci_device_id s3d_pci_table[] = {
+static const struct pci_device_id s3d_pci_table[] = {
 	{	PCI_DEVICE(PCI_VENDOR_ID_3DLABS, 0x002c),	},
 	{	PCI_DEVICE(PCI_VENDOR_ID_3DLABS, 0x002d),	},
 	{	PCI_DEVICE(PCI_VENDOR_ID_3DLABS, 0x002e),	},
@@ -248,29 +237,22 @@ static struct pci_device_id s3d_pci_table[] = {
 };
 
 static struct pci_driver s3d_driver = {
+	.driver = {
+		.suppress_bind_attrs = true,
+	},
 	.name		= "s3d",
 	.id_table	= s3d_pci_table,
 	.probe		= s3d_pci_register,
-	.remove		= s3d_pci_unregister,
 };
 
 static int __init s3d_init(void)
 {
+	if (fb_modesetting_disabled("s3d"))
+		return -ENODEV;
+
 	if (fb_get_options("s3d", NULL))
 		return -ENODEV;
 
 	return pci_register_driver(&s3d_driver);
 }
-
-static void __exit s3d_exit(void)
-{
-	pci_unregister_driver(&s3d_driver);
-}
-
-module_init(s3d_init);
-module_exit(s3d_exit);
-
-MODULE_DESCRIPTION("framebuffer driver for Sun XVR-2500 graphics");
-MODULE_AUTHOR("David S. Miller <davem@davemloft.net>");
-MODULE_VERSION("1.0");
-MODULE_LICENSE("GPL");
+device_initcall(s3d_init);

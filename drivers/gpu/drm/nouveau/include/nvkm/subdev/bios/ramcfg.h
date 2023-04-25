@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef __NVBIOS_RAMCFG_H__
 #define __NVBIOS_RAMCFG_H__
 struct nvbios_ramcfg {
@@ -39,6 +40,7 @@ struct nvbios_ramcfg {
 	unsigned ramcfg_timing;
 	unsigned ramcfg_DLLoff;
 	unsigned ramcfg_RON;
+	unsigned ramcfg_FBVDDQ;
 	union {
 		struct {
 			unsigned ramcfg_00_03_01:1;
@@ -78,7 +80,6 @@ struct nvbios_ramcfg {
 			unsigned ramcfg_11_01_04:1;
 			unsigned ramcfg_11_01_08:1;
 			unsigned ramcfg_11_01_10:1;
-			unsigned ramcfg_11_01_20:1;
 			unsigned ramcfg_11_01_40:1;
 			unsigned ramcfg_11_01_80:1;
 			unsigned ramcfg_11_02_03:2;

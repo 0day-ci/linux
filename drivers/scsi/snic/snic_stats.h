@@ -1,19 +1,5 @@
-/*
- * Copyright 2014 Cisco Systems, Inc.  All rights reserved.
- *
- * This program is free software; you may redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* Copyright 2014 Cisco Systems, Inc.  All rights reserved. */
 
 #ifndef __SNIC_STATS_H
 #define __SNIC_STATS_H
@@ -42,6 +28,7 @@ struct snic_abort_stats {
 	atomic64_t drv_tmo;	/* Abort Driver Timeouts */
 	atomic64_t fw_tmo;	/* Abort Firmware Timeouts */
 	atomic64_t io_not_found;/* Abort IO Not Found */
+	atomic64_t q_fail;	/* Abort Queuing Failed */
 };
 
 struct snic_reset_stats {
@@ -69,7 +56,9 @@ struct snic_fw_stats {
 struct snic_misc_stats {
 	u64	last_isr_time;
 	u64	last_ack_time;
-	atomic64_t isr_cnt;
+	atomic64_t ack_isr_cnt;
+	atomic64_t cmpl_isr_cnt;
+	atomic64_t errnotify_isr_cnt;
 	atomic64_t max_cq_ents;		/* Max CQ Entries */
 	atomic64_t data_cnt_mismat;	/* Data Count Mismatch */
 	atomic64_t io_tmo;
@@ -81,6 +70,9 @@ struct snic_misc_stats {
 	atomic64_t no_icmnd_itmf_cmpls;
 	atomic64_t io_under_run;
 	atomic64_t qfull;
+	atomic64_t qsz_rampup;
+	atomic64_t qsz_rampdown;
+	atomic64_t last_qsz;
 	atomic64_t tgt_not_rdy;
 };
 
@@ -93,7 +85,7 @@ struct snic_stats {
 	atomic64_t io_cmpl_skip;
 };
 
-int snic_stats_debugfs_init(struct snic *);
+void snic_stats_debugfs_init(struct snic *);
 void snic_stats_debugfs_remove(struct snic *);
 
 /* Auxillary function to update active IO counter */
@@ -101,9 +93,9 @@ static inline void
 snic_stats_update_active_ios(struct snic_stats *s_stats)
 {
 	struct snic_io_stats *io = &s_stats->io;
-	u32 nr_active_ios;
+	int nr_active_ios;
 
-	nr_active_ios = atomic64_inc_return(&io->active);
+	nr_active_ios = atomic64_read(&io->active);
 	if (atomic64_read(&io->max_active) < nr_active_ios)
 		atomic64_set(&io->max_active, nr_active_ios);
 

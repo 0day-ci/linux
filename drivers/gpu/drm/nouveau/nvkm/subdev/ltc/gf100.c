@@ -23,7 +23,7 @@
  */
 #include "priv.h"
 
-#include <core/enum.h>
+#include <core/memory.h>
 #include <subdev/fb.h>
 #include <subdev/timer.h>
 
@@ -71,7 +71,7 @@ gf100_ltc_zbc_clear_depth(struct nvkm_ltc *ltc, int i, const u32 depth)
 	nvkm_wr32(device, 0x17ea58, depth);
 }
 
-static const struct nvkm_bitfield
+const struct nvkm_bitfield
 gf100_ltc_lts_intr_name[] = {
 	{ 0x00000001, "IDLE_ERROR_IQ" },
 	{ 0x00000002, "IDLE_ERROR_CBC" },
@@ -122,12 +122,41 @@ gf100_ltc_intr(struct nvkm_ltc *ltc)
 	}
 }
 
+void
+gf100_ltc_invalidate(struct nvkm_ltc *ltc)
+{
+	struct nvkm_device *device = ltc->subdev.device;
+	s64 taken;
+
+	nvkm_wr32(device, 0x70004, 0x00000001);
+	taken = nvkm_wait_msec(device, 2000, 0x70004, 0x00000003, 0x00000000);
+
+	if (taken > 0)
+		nvkm_debug(&ltc->subdev, "LTC invalidate took %lld ns\n", taken);
+}
+
+void
+gf100_ltc_flush(struct nvkm_ltc *ltc)
+{
+	struct nvkm_device *device = ltc->subdev.device;
+	s64 taken;
+
+	nvkm_wr32(device, 0x70010, 0x00000001);
+	taken = nvkm_wait_msec(device, 2000, 0x70010, 0x00000003, 0x00000000);
+
+	if (taken > 0)
+		nvkm_debug(&ltc->subdev, "LTC flush took %lld ns\n", taken);
+}
+
 /* TODO: Figure out tag memory details and drop the over-cautious allocation.
  */
 int
 gf100_ltc_oneinit_tag_ram(struct nvkm_ltc *ltc)
 {
-	struct nvkm_ram *ram = ltc->subdev.device->fb->ram;
+	struct nvkm_device *device = ltc->subdev.device;
+	struct nvkm_fb *fb = device->fb;
+	struct nvkm_ram *ram = fb->ram;
+	u32 bits = (nvkm_rd32(device, 0x100c80) & 0x00001000) ? 16 : 17;
 	u32 tag_size, tag_margin, tag_align;
 	int ret;
 
@@ -139,8 +168,8 @@ gf100_ltc_oneinit_tag_ram(struct nvkm_ltc *ltc)
 
 	/* tags for 1/4 of VRAM should be enough (8192/4 per GiB of VRAM) */
 	ltc->num_tags = (ram->size >> 17) / 4;
-	if (ltc->num_tags > (1 << 17))
-		ltc->num_tags = 1 << 17; /* we have 17 bits in PTE */
+	if (ltc->num_tags > (1 << bits))
+		ltc->num_tags = 1 << bits; /* we have 16/17 bits in PTE */
 	ltc->num_tags = (ltc->num_tags + 63) & ~63; /* round up to 64 */
 
 	tag_align = ltc->ltc_nr * 0x800;
@@ -156,14 +185,13 @@ gf100_ltc_oneinit_tag_ram(struct nvkm_ltc *ltc)
 	 */
 	tag_size  = (ltc->num_tags / 64) * 0x6000 + tag_margin;
 	tag_size += tag_align;
-	tag_size  = (tag_size + 0xfff) >> 12; /* round up */
 
-	ret = nvkm_mm_tail(&ram->vram, 1, 1, tag_size, tag_size, 1,
-			   &ltc->tag_ram);
+	ret = nvkm_ram_get(device, NVKM_RAM_MM_NORMAL, 0x01, 12, tag_size,
+			   true, true, &ltc->tag_ram);
 	if (ret) {
 		ltc->num_tags = 0;
 	} else {
-		u64 tag_base = ((u64)ltc->tag_ram->offset << 12) + tag_margin;
+		u64 tag_base = nvkm_memory_addr(ltc->tag_ram) + tag_margin;
 
 		tag_base += tag_align - 1;
 		do_div(tag_base, tag_align);
@@ -172,7 +200,8 @@ gf100_ltc_oneinit_tag_ram(struct nvkm_ltc *ltc)
 	}
 
 mm_init:
-	return nvkm_mm_init(&ltc->tags, 0, ltc->num_tags, 1);
+	nvkm_mm_fini(&fb->tags.mm);
+	return nvkm_mm_init(&fb->tags.mm, 0, 0, ltc->num_tags, 1);
 }
 
 int
@@ -212,13 +241,17 @@ gf100_ltc = {
 	.intr = gf100_ltc_intr,
 	.cbc_clear = gf100_ltc_cbc_clear,
 	.cbc_wait = gf100_ltc_cbc_wait,
-	.zbc = 16,
+	.zbc_color = 16,
+	.zbc_depth = 16,
 	.zbc_clear_color = gf100_ltc_zbc_clear_color,
 	.zbc_clear_depth = gf100_ltc_zbc_clear_depth,
+	.invalidate = gf100_ltc_invalidate,
+	.flush = gf100_ltc_flush,
 };
 
 int
-gf100_ltc_new(struct nvkm_device *device, int index, struct nvkm_ltc **pltc)
+gf100_ltc_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
+	      struct nvkm_ltc **pltc)
 {
-	return nvkm_ltc_new_(&gf100_ltc, device, index, pltc);
+	return nvkm_ltc_new_(&gf100_ltc, device, type, inst, pltc);
 }

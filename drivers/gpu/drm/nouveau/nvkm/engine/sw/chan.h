@@ -1,8 +1,11 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef __NVKM_SW_CHAN_H__
 #define __NVKM_SW_CHAN_H__
 #define nvkm_sw_chan(p) container_of((p), struct nvkm_sw_chan, object)
-#include "priv.h"
+#include <core/object.h>
 #include <core/event.h>
+
+#include "priv.h"
 
 struct nvkm_sw_chan {
 	const struct nvkm_sw_chan_func *func;
@@ -11,6 +14,7 @@ struct nvkm_sw_chan {
 	struct nvkm_fifo_chan *fifo;
 	struct list_head head;
 
+#define NVKM_SW_CHAN_EVENT_PAGE_FLIP BIT(0)
 	struct nvkm_event event;
 };
 

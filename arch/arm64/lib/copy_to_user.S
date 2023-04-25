@@ -1,25 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2012 ARM Ltd.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/linkage.h>
 
-#include <asm/alternative.h>
+#include <asm/asm-uaccess.h>
 #include <asm/assembler.h>
-#include <asm/cpufeature.h>
-#include <asm/sysreg.h>
+#include <asm/cache.h>
 
 /*
  * Copy to user space from a kernel buffer (alignment handled by the hardware)
@@ -31,44 +19,55 @@
  * Returns:
  *	x0 - bytes not copied
  */
-ENTRY(__copy_to_user)
-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-	    CONFIG_ARM64_PAN)
-	add	x5, x0, x2			// upper user buffer boundary
-	subs	x2, x2, #16
-	b.mi	1f
-0:
-	ldp	x3, x4, [x1], #16
-	subs	x2, x2, #16
-USER(9f, stp	x3, x4, [x0], #16)
-	b.pl	0b
-1:	adds	x2, x2, #8
-	b.mi	2f
-	ldr	x3, [x1], #8
-	sub	x2, x2, #8
-USER(9f, str	x3, [x0], #8	)
-2:	adds	x2, x2, #4
-	b.mi	3f
-	ldr	w3, [x1], #4
-	sub	x2, x2, #4
-USER(9f, str	w3, [x0], #4	)
-3:	adds	x2, x2, #2
-	b.mi	4f
-	ldrh	w3, [x1], #2
-	sub	x2, x2, #2
-USER(9f, strh	w3, [x0], #2	)
-4:	adds	x2, x2, #1
-	b.mi	5f
-	ldrb	w3, [x1]
-USER(9f, strb	w3, [x0]	)
-5:	mov	x0, #0
-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-	    CONFIG_ARM64_PAN)
-	ret
-ENDPROC(__copy_to_user)
+	.macro ldrb1 reg, ptr, val
+	ldrb  \reg, [\ptr], \val
+	.endm
 
-	.section .fixup,"ax"
-	.align	2
-9:	sub	x0, x5, x0			// bytes not copied
+	.macro strb1 reg, ptr, val
+	user_ldst 9998f, sttrb, \reg, \ptr, \val
+	.endm
+
+	.macro ldrh1 reg, ptr, val
+	ldrh  \reg, [\ptr], \val
+	.endm
+
+	.macro strh1 reg, ptr, val
+	user_ldst 9997f, sttrh, \reg, \ptr, \val
+	.endm
+
+	.macro ldr1 reg, ptr, val
+	ldr \reg, [\ptr], \val
+	.endm
+
+	.macro str1 reg, ptr, val
+	user_ldst 9997f, sttr, \reg, \ptr, \val
+	.endm
+
+	.macro ldp1 reg1, reg2, ptr, val
+	ldp \reg1, \reg2, [\ptr], \val
+	.endm
+
+	.macro stp1 reg1, reg2, ptr, val
+	user_stp 9997f, \reg1, \reg2, \ptr, \val
+	.endm
+
+end	.req	x5
+srcin	.req	x15
+SYM_FUNC_START(__arch_copy_to_user)
+	add	end, x0, x2
+	mov	srcin, x1
+#include "copy_template.S"
+	mov	x0, #0
 	ret
-	.previous
+
+	// Exception fixups
+9997:	cmp	dst, dstin
+	b.ne	9998f
+	// Before being absolutely sure we couldn't copy anything, try harder
+	ldrb	tmp1w, [srcin]
+USER(9998f, sttrb tmp1w, [dst])
+	add	dst, dst, #1
+9998:	sub	x0, end, dst			// bytes not copied
+	ret
+SYM_FUNC_END(__arch_copy_to_user)
+EXPORT_SYMBOL(__arch_copy_to_user)

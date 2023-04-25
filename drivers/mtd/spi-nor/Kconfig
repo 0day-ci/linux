@@ -1,9 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
 menuconfig MTD_SPI_NOR
-	tristate "SPI-NOR device support"
+	tristate "SPI NOR device support"
 	depends on MTD
+	depends on MTD && SPI_MASTER
+	select SPI_MEM
 	help
 	  This is the framework for the SPI NOR which can be used by the SPI
-	  device drivers and the SPI-NOR device driver.
+	  device drivers and the SPI NOR device driver.
 
 if MTD_SPI_NOR
 
@@ -21,23 +24,50 @@ config MTD_SPI_NOR_USE_4K_SECTORS
 	  Please note that some tools/drivers/filesystems may not work with
 	  4096 B erase size (e.g. UBIFS requires 15 KiB as a minimum).
 
-config SPI_FSL_QUADSPI
-	tristate "Freescale Quad SPI controller"
-	depends on ARCH_MXC
-	help
-	  This enables support for the Quad SPI controller in master mode.
-	  This controller does not support generic SPI. It only supports
-	  SPI NOR.
+choice
+	prompt "Software write protection at boot"
+	default MTD_SPI_NOR_SWP_DISABLE_ON_VOLATILE
 
-config SPI_NXP_SPIFI
-	tristate "NXP SPI Flash Interface (SPIFI)"
-	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
-	depends on HAS_IOMEM
+config MTD_SPI_NOR_SWP_DISABLE
+	bool "Disable SWP on any flashes (legacy behavior)"
 	help
-	  Enable support for the NXP LPC SPI Flash Interface controller.
+	  This option disables the software write protection on any SPI
+	  flashes at boot-up.
 
-	  SPIFI is a specialized controller for connecting serial SPI
-	  Flash. Enable this option if you have a device with a SPIFI
-	  controller and want to access the Flash as a mtd device.
+	  Depending on the flash chip this either clears the block protection
+	  bits or does a "Global Unprotect" command.
+
+	  Don't use this if you intent to use the software write protection
+	  of your SPI flash. This is only to keep backwards compatibility.
+
+config MTD_SPI_NOR_SWP_DISABLE_ON_VOLATILE
+	bool "Disable SWP on flashes w/ volatile protection bits"
+	help
+	  Some SPI flashes have volatile block protection bits, ie. after a
+	  power-up or a reset the flash is software write protected by
+	  default.
+
+	  This option disables the software write protection for these kind
+	  of flashes while keeping it enabled for any other SPI flashes
+	  which have non-volatile write protection bits.
+
+	  If the software write protection will be disabled depending on
+	  the flash either the block protection bits are cleared or a
+	  "Global Unprotect" command is issued.
+
+	  If you are unsure, select this option.
+
+config MTD_SPI_NOR_SWP_KEEP
+	bool "Keep software write protection as is"
+	help
+	  If you select this option the software write protection of any
+	  SPI flashes will not be changed. If your flash is software write
+	  protected or will be automatically software write protected after
+	  power-up you have to manually unlock it before you are able to
+	  write to it.
+
+endchoice
+
+source "drivers/mtd/spi-nor/controllers/Kconfig"
 
 endif # MTD_SPI_NOR

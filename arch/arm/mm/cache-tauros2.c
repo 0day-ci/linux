@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * arch/arm/mm/cache-tauros2.c - Tauros2 L2 cache controller support
  *
  * Copyright (C) 2008 Marvell Semiconductor
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  *
  * References:
  * - PJ1 CPU Core Datasheet,
@@ -22,6 +19,11 @@
 #include <asm/cputype.h>
 #include <asm/hardware/cache-tauros2.h>
 
+/* CP15 PJ4 Control configuration register */
+#define CCR_L2C_PREFETCH_DISABLE	BIT(24)
+#define CCR_L2C_ECC_ENABLE		BIT(23)
+#define CCR_L2C_WAY7_4_DISABLE		BIT(21)
+#define CCR_L2C_BURST8_ENABLE		BIT(20)
 
 /*
  * When Tauros2 is used on a CPU that supports the v7 hierarchical
@@ -182,18 +184,18 @@ static void enable_extra_feature(unsigned int features)
 	u = read_extra_features();
 
 	if (features & CACHE_TAUROS2_PREFETCH_ON)
-		u &= ~0x01000000;
+		u &= ~CCR_L2C_PREFETCH_DISABLE;
 	else
-		u |= 0x01000000;
+		u |= CCR_L2C_PREFETCH_DISABLE;
 	pr_info("Tauros2: %s L2 prefetch.\n",
 			(features & CACHE_TAUROS2_PREFETCH_ON)
 			? "Enabling" : "Disabling");
 
 	if (features & CACHE_TAUROS2_LINEFILL_BURST8)
-		u |= 0x00100000;
+		u |= CCR_L2C_BURST8_ENABLE;
 	else
-		u &= ~0x00100000;
-	pr_info("Tauros2: %s line fill burt8.\n",
+		u &= ~CCR_L2C_BURST8_ENABLE;
+	pr_info("Tauros2: %s burst8 line fill.\n",
 			(features & CACHE_TAUROS2_LINEFILL_BURST8)
 			? "Enabling" : "Disabling");
 
@@ -287,16 +289,15 @@ void __init tauros2_init(unsigned int features)
 	node = of_find_matching_node(NULL, tauros2_ids);
 	if (!node) {
 		pr_info("Not found marvell,tauros2-cache, disable it\n");
-		return;
+	} else {
+		ret = of_property_read_u32(node, "marvell,tauros2-cache-features", &f);
+		if (ret) {
+			pr_info("Not found marvell,tauros-cache-features property, "
+				"disable extra features\n");
+			features = 0;
+		} else
+			features = f;
 	}
-
-	ret = of_property_read_u32(node, "marvell,tauros2-cache-features", &f);
-	if (ret) {
-		pr_info("Not found marvell,tauros-cache-features property, "
-			"disable extra features\n");
-		features = 0;
-	} else
-		features = f;
 #endif
 	tauros2_internal_init(features);
 }

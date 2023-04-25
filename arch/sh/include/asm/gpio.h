@@ -1,13 +1,10 @@
-/*
+/* SPDX-License-Identifier: GPL-2.0
+ *
  *  include/asm-sh/gpio.h
  *
  * Generic GPIO API and pinmux table support for SuperH.
  *
  * Copyright (c) 2008 Magnus Damm
- *
- * This file is subject to the terms and conditions of the GNU General Public
- * License.  See the file "COPYING" in the main directory of this archive
- * for more details.
  */
 #ifndef __ASM_SH_GPIO_H
 #define __ASM_SH_GPIO_H
@@ -19,7 +16,6 @@
 #include <cpu/gpio.h>
 #endif
 
-#define ARCH_NR_GPIOS 512
 #include <asm-generic/gpio.h>
 
 #ifdef CONFIG_GPIOLIB
@@ -42,11 +38,6 @@ static inline int gpio_cansleep(unsigned gpio)
 static inline int gpio_to_irq(unsigned gpio)
 {
 	return __gpio_to_irq(gpio);
-}
-
-static inline int irq_to_gpio(unsigned int irq)
-{
-	return -ENOSYS;
 }
 
 #endif /* CONFIG_GPIOLIB */

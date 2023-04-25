@@ -1,17 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Driver for the PCM512x CODECs
  *
- * Author:	Mark Brown <broonie@linaro.org>
+ * Author:	Mark Brown <broonie@kernel.org>
  *		Copyright 2014 Linaro Ltd
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
 
 #include <linux/init.h>
@@ -34,10 +26,9 @@ static int pcm512x_spi_probe(struct spi_device *spi)
 	return pcm512x_probe(&spi->dev, regmap);
 }
 
-static int pcm512x_spi_remove(struct spi_device *spi)
+static void pcm512x_spi_remove(struct spi_device *spi)
 {
 	pcm512x_remove(&spi->dev);
-	return 0;
 }
 
 static const struct spi_device_id pcm512x_spi_id[] = {
@@ -64,10 +55,13 @@ static struct spi_driver pcm512x_spi_driver = {
 	.id_table	= pcm512x_spi_id,
 	.driver = {
 		.name	= "pcm512x",
-		.owner	= THIS_MODULE,
 		.of_match_table = pcm512x_of_match,
 		.pm     = &pcm512x_pm_ops,
 	},
 };
 
 module_spi_driver(pcm512x_spi_driver);
+
+MODULE_DESCRIPTION("ASoC PCM512x codec driver - SPI");
+MODULE_AUTHOR("Mark Brown <broonie@kernel.org>");
+MODULE_LICENSE("GPL v2");

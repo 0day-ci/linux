@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /* USB OTG (On The Go) defines */
 /*
  *
@@ -118,5 +119,15 @@ enum usb_dr_mode {
 	USB_DR_MODE_PERIPHERAL,
 	USB_DR_MODE_OTG,
 };
+
+/**
+ * usb_get_dr_mode - Get dual role mode for given device
+ * @dev: Pointer to the given device
+ *
+ * The function gets phy interface string from property 'dr_mode',
+ * and returns the corresponding enum usb_dr_mode
+ */
+extern enum usb_dr_mode usb_get_dr_mode(struct device *dev);
+extern enum usb_dr_mode usb_get_role_switch_default_mode(struct device *dev);
 
 #endif /* __LINUX_USB_OTG_H */

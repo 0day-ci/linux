@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __LINUX_OMAP_DMA_H
 #define __LINUX_OMAP_DMA_H
-#include <linux/omap-dmaengine.h>
-
 /*
  *  Legacy OMAP DMA handling defines and functions
  *
@@ -17,7 +16,7 @@
 
 #include <linux/platform_device.h>
 
-#define INT_DMA_LCD			25
+#define INT_DMA_LCD			(NR_IRQS_LEGACY + 25)
 
 #define OMAP1_DMA_TOUT_IRQ		(1 << 0)
 #define OMAP_DMA_DROP_IRQ		(1 << 1)
@@ -130,7 +129,6 @@
 #define IS_WORD_16			BIT(0xd)
 #define ENABLE_16XX_MODE		BIT(0xe)
 #define HS_CHANNELS_RESERVED		BIT(0xf)
-#define DMA_ENGINE_HANDLE_IRQ		BIT(0x10)
 
 /* Defines for DMA Capabilities */
 #define DMA_HAS_TRANSPARENT_CAPS	(0x1 << 18)
@@ -240,9 +238,6 @@ struct omap_dma_lch {
 	void (*callback)(int lch, u16 ch_status, void *data);
 	void *data;
 	long flags;
-	/* required for Dynamic chaining */
-	int prev_linked_ch;
-	int next_linked_ch;
 	int state;
 	int chain_id;
 	int status;
@@ -267,6 +262,9 @@ struct omap_dma_reg {
 	u8	type;
 };
 
+#define SDMA_FILTER_PARAM(hw_req)	((int[]) { (hw_req) })
+struct dma_slave_map;
+
 /* System DMA platform data structure */
 struct omap_system_dma_plat_info {
 	const struct omap_dma_reg *reg_map;
@@ -278,6 +276,9 @@ struct omap_system_dma_plat_info {
 	void (*clear_dma)(int lch);
 	void (*dma_write)(u32 val, int reg, int lch);
 	u32 (*dma_read)(int reg, int lch);
+
+	const struct dma_slave_map *slave_map;
+	int slavecnt;
 };
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
@@ -293,20 +294,26 @@ struct omap_system_dma_plat_info {
 
 extern struct omap_system_dma_plat_info *omap_get_plat_info(void);
 
+#if defined(CONFIG_ARCH_OMAP1)
 extern void omap_set_dma_priority(int lch, int dst_port, int priority);
+#else
+static inline void omap_set_dma_priority(int lch, int dst_port, int priority)
+{
+}
+#endif
+
 extern int omap_request_dma(int dev_id, const char *dev_name,
 			void (*callback)(int lch, u16 ch_status, void *data),
 			void *data, int *dma_ch);
-extern void omap_enable_dma_irq(int ch, u16 irq_bits);
-extern void omap_disable_dma_irq(int ch, u16 irq_bits);
 extern void omap_free_dma(int ch);
+#if IS_ENABLED(CONFIG_USB_OMAP)
+extern void omap_disable_dma_irq(int ch, u16 irq_bits);
 extern void omap_start_dma(int lch);
 extern void omap_stop_dma(int lch);
 extern void omap_set_dma_transfer_params(int lch, int data_type,
 					 int elem_count, int frame_count,
 					 int sync_mode,
 					 int dma_trigger, int src_or_dst_synch);
-extern void omap_set_dma_write_mode(int lch, enum omap_dma_write_mode mode);
 extern void omap_set_dma_channel_mode(int lch, enum omap_dma_channel_mode mode);
 
 extern void omap_set_dma_src_params(int lch, int src_port, int src_amode,
@@ -323,25 +330,15 @@ extern void omap_set_dma_dest_data_pack(int lch, int enable);
 extern void omap_set_dma_dest_burst_mode(int lch,
 					 enum omap_dma_burst_mode burst_mode);
 
-extern void omap_set_dma_params(int lch,
-				struct omap_dma_channel_params *params);
-
-extern void omap_dma_link_lch(int lch_head, int lch_queue);
-
-extern int omap_set_dma_callback(int lch,
-			void (*callback)(int lch, u16 ch_status, void *data),
-			void *data);
 extern dma_addr_t omap_get_dma_src_pos(int lch);
 extern dma_addr_t omap_get_dma_dst_pos(int lch);
 extern int omap_get_dma_active_status(int lch);
-extern int omap_dma_running(void);
-extern void omap_dma_set_global_params(int arb_rate, int max_fifo_depth,
-				       int tparams);
-void omap_dma_global_context_save(void);
-void omap_dma_global_context_restore(void);
+#endif
 
-#if defined(CONFIG_ARCH_OMAP1) && IS_ENABLED(CONFIG_FB_OMAP)
-#include <mach/lcd_dma.h>
+extern int omap_dma_running(void);
+
+#if IS_ENABLED(CONFIG_FB_OMAP)
+extern int omap_lcd_dma_running(void);
 #else
 static inline int omap_lcd_dma_running(void)
 {

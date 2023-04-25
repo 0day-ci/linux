@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _LINUX_STOP_MACHINE
 #define _LINUX_STOP_MACHINE
 
@@ -23,16 +24,20 @@ typedef int (*cpu_stop_fn_t)(void *arg);
 struct cpu_stop_work {
 	struct list_head	list;		/* cpu_stopper->works */
 	cpu_stop_fn_t		fn;
+	unsigned long		caller;
 	void			*arg;
 	struct cpu_stop_done	*done;
 };
 
 int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg);
 int stop_two_cpus(unsigned int cpu1, unsigned int cpu2, cpu_stop_fn_t fn, void *arg);
-void stop_one_cpu_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
+bool stop_one_cpu_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
 			 struct cpu_stop_work *work_buf);
-int stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg);
-int try_stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg);
+void stop_machine_park(int cpu);
+void stop_machine_unpark(int cpu);
+void stop_machine_yield(const struct cpumask *cpumask);
+
+extern void print_stop_info(const char *log_lvl, struct task_struct *task);
 
 #else	/* CONFIG_SMP */
 
@@ -63,7 +68,7 @@ static void stop_one_cpu_nowait_workfn(struct work_struct *work)
 	preempt_enable();
 }
 
-static inline void stop_one_cpu_nowait(unsigned int cpu,
+static inline bool stop_one_cpu_nowait(unsigned int cpu,
 				       cpu_stop_fn_t fn, void *arg,
 				       struct cpu_stop_work *work_buf)
 {
@@ -72,22 +77,13 @@ static inline void stop_one_cpu_nowait(unsigned int cpu,
 		work_buf->fn = fn;
 		work_buf->arg = arg;
 		schedule_work(&work_buf->work);
+		return true;
 	}
+
+	return false;
 }
 
-static inline int stop_cpus(const struct cpumask *cpumask,
-			    cpu_stop_fn_t fn, void *arg)
-{
-	if (cpumask_test_cpu(raw_smp_processor_id(), cpumask))
-		return stop_one_cpu(raw_smp_processor_id(), fn, arg);
-	return -ENOENT;
-}
-
-static inline int try_stop_cpus(const struct cpumask *cpumask,
-				cpu_stop_fn_t fn, void *arg)
-{
-	return stop_cpus(cpumask, fn, arg);
-}
+static inline void print_stop_info(const char *log_lvl, struct task_struct *task) { }
 
 #endif	/* CONFIG_SMP */
 
@@ -97,7 +93,7 @@ static inline int try_stop_cpus(const struct cpumask *cpumask,
  * grabbing every spinlock (and more).  So the "read" side to such a
  * lock is anything which disables preemption.
  */
-#if defined(CONFIG_STOP_MACHINE) && defined(CONFIG_SMP)
+#if defined(CONFIG_SMP) || defined(CONFIG_HOTPLUG_CPU)
 
 /**
  * stop_machine: freeze the machine on all CPUs and run this function
@@ -111,15 +107,45 @@ static inline int try_stop_cpus(const struct cpumask *cpumask,
  * @fn() runs.
  *
  * This can be thought of as a very heavy write lock, equivalent to
- * grabbing every spinlock in the kernel. */
+ * grabbing every spinlock in the kernel.
+ *
+ * Protects against CPU hotplug.
+ */
 int stop_machine(cpu_stop_fn_t fn, void *data, const struct cpumask *cpus);
+
+/**
+ * stop_machine_cpuslocked: freeze the machine on all CPUs and run this function
+ * @fn: the function to run
+ * @data: the data ptr for the @fn()
+ * @cpus: the cpus to run the @fn() on (NULL = any online cpu)
+ *
+ * Same as above. Must be called from with in a cpus_read_lock() protected
+ * region. Avoids nested calls to cpus_read_lock().
+ */
+int stop_machine_cpuslocked(cpu_stop_fn_t fn, void *data, const struct cpumask *cpus);
+
+/**
+ * stop_core_cpuslocked: - stop all threads on just one core
+ * @cpu: any cpu in the targeted core
+ * @fn: the function to run
+ * @data: the data ptr for @fn()
+ *
+ * Same as above, but instead of every CPU, only the logical CPUs of a
+ * single core are affected.
+ *
+ * Context: Must be called from within a cpus_read_lock() protected region.
+ *
+ * Return: 0 if all executions of @fn returned 0, any non zero return
+ * value if any returned non zero.
+ */
+int stop_core_cpuslocked(unsigned int cpu, cpu_stop_fn_t fn, void *data);
 
 int stop_machine_from_inactive_cpu(cpu_stop_fn_t fn, void *data,
 				   const struct cpumask *cpus);
-#else	 /* CONFIG_STOP_MACHINE && CONFIG_SMP */
+#else	/* CONFIG_SMP || CONFIG_HOTPLUG_CPU */
 
-static inline int stop_machine(cpu_stop_fn_t fn, void *data,
-				 const struct cpumask *cpus)
+static __always_inline int stop_machine_cpuslocked(cpu_stop_fn_t fn, void *data,
+					  const struct cpumask *cpus)
 {
 	unsigned long flags;
 	int ret;
@@ -129,11 +155,18 @@ static inline int stop_machine(cpu_stop_fn_t fn, void *data,
 	return ret;
 }
 
-static inline int stop_machine_from_inactive_cpu(cpu_stop_fn_t fn, void *data,
-						 const struct cpumask *cpus)
+static __always_inline int
+stop_machine(cpu_stop_fn_t fn, void *data, const struct cpumask *cpus)
+{
+	return stop_machine_cpuslocked(fn, data, cpus);
+}
+
+static __always_inline int
+stop_machine_from_inactive_cpu(cpu_stop_fn_t fn, void *data,
+			       const struct cpumask *cpus)
 {
 	return stop_machine(fn, data, cpus);
 }
 
-#endif	/* CONFIG_STOP_MACHINE && CONFIG_SMP */
+#endif	/* CONFIG_SMP || CONFIG_HOTPLUG_CPU */
 #endif	/* _LINUX_STOP_MACHINE */

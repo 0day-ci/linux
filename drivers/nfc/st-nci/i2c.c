@@ -1,77 +1,58 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * I2C Link Layer for ST NCI NFC controller familly based Driver
  * Copyright (C) 2014-2015 STMicroelectronics SAS. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/module.h>
 #include <linux/i2c.h>
-#include <linux/gpio.h>
-#include <linux/of_irq.h>
-#include <linux/of_gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/acpi.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/nfc.h>
-#include <linux/platform_data/st-nci.h>
+#include <linux/of.h>
 
-#include "ndlc.h"
+#include "st-nci.h"
 
 #define DRIVER_DESC "NCI NFC driver for ST_NCI"
 
 /* ndlc header */
-#define ST_NCI_FRAME_HEADROOM	1
+#define ST_NCI_FRAME_HEADROOM 1
 #define ST_NCI_FRAME_TAILROOM 0
 
 #define ST_NCI_I2C_MIN_SIZE 4   /* PCB(1) + NCI Packet header(3) */
 #define ST_NCI_I2C_MAX_SIZE 250 /* req 4.2.1 */
 
+#define ST_NCI_DRIVER_NAME "st_nci"
 #define ST_NCI_I2C_DRIVER_NAME "st_nci_i2c"
-
-static struct i2c_device_id st_nci_i2c_id_table[] = {
-	{ST_NCI_DRIVER_NAME, 0},
-	{}
-};
-MODULE_DEVICE_TABLE(i2c, st_nci_i2c_id_table);
 
 struct st_nci_i2c_phy {
 	struct i2c_client *i2c_dev;
 	struct llt_ndlc *ndlc;
 
-	unsigned int gpio_reset;
-	unsigned int irq_polarity;
-};
+	bool irq_active;
 
-#define I2C_DUMP_SKB(info, skb)					\
-do {								\
-	pr_debug("%s:\n", info);				\
-	print_hex_dump(KERN_DEBUG, "i2c: ", DUMP_PREFIX_OFFSET,	\
-		       16, 1, (skb)->data, (skb)->len, 0);	\
-} while (0)
+	struct gpio_desc *gpiod_reset;
+
+	struct st_nci_se_status se_status;
+};
 
 static int st_nci_i2c_enable(void *phy_id)
 {
 	struct st_nci_i2c_phy *phy = phy_id;
 
-	gpio_set_value(phy->gpio_reset, 0);
+	gpiod_set_value(phy->gpiod_reset, 0);
 	usleep_range(10000, 15000);
-	gpio_set_value(phy->gpio_reset, 1);
+	gpiod_set_value(phy->gpiod_reset, 1);
 	usleep_range(80000, 85000);
 
-	if (phy->ndlc->powered == 0)
+	if (phy->ndlc->powered == 0 && phy->irq_active == 0) {
 		enable_irq(phy->i2c_dev->irq);
+		phy->irq_active = true;
+	}
 
 	return 0;
 }
@@ -81,6 +62,7 @@ static void st_nci_i2c_disable(void *phy_id)
 	struct st_nci_i2c_phy *phy = phy_id;
 
 	disable_irq_nosync(phy->i2c_dev->irq);
+	phy->irq_active = false;
 }
 
 /*
@@ -90,11 +72,9 @@ static void st_nci_i2c_disable(void *phy_id)
  */
 static int st_nci_i2c_write(void *phy_id, struct sk_buff *skb)
 {
-	int r = -1;
+	int r;
 	struct st_nci_i2c_phy *phy = phy_id;
 	struct i2c_client *client = phy->i2c_dev;
-
-	I2C_DUMP_SKB("st_nci_i2c_write", skb);
 
 	if (phy->ndlc->hard_fault != 0)
 		return phy->ndlc->hard_fault;
@@ -166,8 +146,6 @@ static int st_nci_i2c_read(struct st_nci_i2c_phy *phy,
 	skb_put(*skb, len);
 	memcpy((*skb)->data + ST_NCI_I2C_MIN_SIZE, buf, len);
 
-	I2C_DUMP_SKB("i2c frame read", *skb);
-
 	return 0;
 }
 
@@ -179,7 +157,6 @@ static int st_nci_i2c_read(struct st_nci_i2c_phy *phy,
 static irqreturn_t st_nci_irq_thread_fn(int irq, void *phy_id)
 {
 	struct st_nci_i2c_phy *phy = phy_id;
-	struct i2c_client *client;
 	struct sk_buff *skb = NULL;
 	int r;
 
@@ -187,9 +164,6 @@ static irqreturn_t st_nci_irq_thread_fn(int irq, void *phy_id)
 		WARN_ON_ONCE(1);
 		return IRQ_NONE;
 	}
-
-	client = phy->i2c_dev;
-	dev_dbg(&client->dev, "IRQ\n");
 
 	if (phy->ndlc->hard_fault)
 		return IRQ_HANDLED;
@@ -208,95 +182,31 @@ static irqreturn_t st_nci_irq_thread_fn(int irq, void *phy_id)
 	return IRQ_HANDLED;
 }
 
-static struct nfc_phy_ops i2c_phy_ops = {
+static const struct nfc_phy_ops i2c_phy_ops = {
 	.write = st_nci_i2c_write,
 	.enable = st_nci_i2c_enable,
 	.disable = st_nci_i2c_disable,
 };
 
-#ifdef CONFIG_OF
-static int st_nci_i2c_of_request_resources(struct i2c_client *client)
+static const struct acpi_gpio_params reset_gpios = { 1, 0, false };
+
+static const struct acpi_gpio_mapping acpi_st_nci_gpios[] = {
+	{ "reset-gpios", &reset_gpios, 1 },
+	{},
+};
+
+static int st_nci_i2c_probe(struct i2c_client *client)
 {
-	struct st_nci_i2c_phy *phy = i2c_get_clientdata(client);
-	struct device_node *pp;
-	int gpio;
-	int r;
-
-	pp = client->dev.of_node;
-	if (!pp)
-		return -ENODEV;
-
-	/* Get GPIO from device tree */
-	gpio = of_get_named_gpio(pp, "reset-gpios", 0);
-	if (gpio < 0) {
-		nfc_err(&client->dev,
-			"Failed to retrieve reset-gpios from device tree\n");
-		return gpio;
-	}
-
-	/* GPIO request and configuration */
-	r = devm_gpio_request_one(&client->dev, gpio,
-				GPIOF_OUT_INIT_HIGH, "clf_reset");
-	if (r) {
-		nfc_err(&client->dev, "Failed to request reset pin\n");
-		return r;
-	}
-	phy->gpio_reset = gpio;
-
-	phy->irq_polarity = irq_get_trigger_type(client->irq);
-
-	return 0;
-}
-#else
-static int st_nci_i2c_of_request_resources(struct i2c_client *client)
-{
-	return -ENODEV;
-}
-#endif
-
-static int st_nci_i2c_request_resources(struct i2c_client *client)
-{
-	struct st_nci_nfc_platform_data *pdata;
-	struct st_nci_i2c_phy *phy = i2c_get_clientdata(client);
-	int r;
-
-	pdata = client->dev.platform_data;
-	if (pdata == NULL) {
-		nfc_err(&client->dev, "No platform data\n");
-		return -EINVAL;
-	}
-
-	/* store for later use */
-	phy->gpio_reset = pdata->gpio_reset;
-	phy->irq_polarity = pdata->irq_polarity;
-
-	r = devm_gpio_request_one(&client->dev,
-			phy->gpio_reset, GPIOF_OUT_INIT_HIGH, "clf_reset");
-	if (r) {
-		pr_err("%s : reset gpio_request failed\n", __FILE__);
-		return r;
-	}
-
-	return 0;
-}
-
-static int st_nci_i2c_probe(struct i2c_client *client,
-				  const struct i2c_device_id *id)
-{
+	struct device *dev = &client->dev;
 	struct st_nci_i2c_phy *phy;
-	struct st_nci_nfc_platform_data *pdata;
 	int r;
-
-	dev_dbg(&client->dev, "%s\n", __func__);
-	dev_dbg(&client->dev, "IRQ: %d\n", client->irq);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		nfc_err(&client->dev, "Need I2C_FUNC_I2C\n");
 		return -ENODEV;
 	}
 
-	phy = devm_kzalloc(&client->dev, sizeof(struct st_nci_i2c_phy),
-			   GFP_KERNEL);
+	phy = devm_kzalloc(dev, sizeof(struct st_nci_i2c_phy), GFP_KERNEL);
 	if (!phy)
 		return -ENOMEM;
 
@@ -304,37 +214,34 @@ static int st_nci_i2c_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, phy);
 
-	pdata = client->dev.platform_data;
-	if (!pdata && client->dev.of_node) {
-		r = st_nci_i2c_of_request_resources(client);
-		if (r) {
-			nfc_err(&client->dev, "No platform data\n");
-			return r;
-		}
-	} else if (pdata) {
-		r = st_nci_i2c_request_resources(client);
-		if (r) {
-			nfc_err(&client->dev,
-				"Cannot get platform resources\n");
-			return r;
-		}
-	} else {
-		nfc_err(&client->dev,
-			"st_nci platform resources not available\n");
+	r = devm_acpi_dev_add_driver_gpios(dev, acpi_st_nci_gpios);
+	if (r)
+		dev_dbg(dev, "Unable to add GPIO mapping table\n");
+
+	/* Get RESET GPIO */
+	phy->gpiod_reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(phy->gpiod_reset)) {
+		nfc_err(dev, "Unable to get RESET GPIO\n");
 		return -ENODEV;
 	}
 
+	phy->se_status.is_ese_present =
+				device_property_read_bool(dev, "ese-present");
+	phy->se_status.is_uicc_present =
+				device_property_read_bool(dev, "uicc-present");
+
 	r = ndlc_probe(phy, &i2c_phy_ops, &client->dev,
 			ST_NCI_FRAME_HEADROOM, ST_NCI_FRAME_TAILROOM,
-			&phy->ndlc);
+			&phy->ndlc, &phy->se_status);
 	if (r < 0) {
 		nfc_err(&client->dev, "Unable to register ndlc layer\n");
 		return r;
 	}
 
+	phy->irq_active = true;
 	r = devm_request_threaded_irq(&client->dev, client->irq, NULL,
 				st_nci_irq_thread_fn,
-				phy->irq_polarity | IRQF_ONESHOT,
+				IRQF_ONESHOT,
 				ST_NCI_DRIVER_NAME, phy);
 	if (r < 0)
 		nfc_err(&client->dev, "Unable to register IRQ handler\n");
@@ -342,38 +249,44 @@ static int st_nci_i2c_probe(struct i2c_client *client,
 	return r;
 }
 
-static int st_nci_i2c_remove(struct i2c_client *client)
+static void st_nci_i2c_remove(struct i2c_client *client)
 {
 	struct st_nci_i2c_phy *phy = i2c_get_clientdata(client);
 
-	dev_dbg(&client->dev, "%s\n", __func__);
-
 	ndlc_remove(phy->ndlc);
-
-	return 0;
 }
 
-#ifdef CONFIG_OF
-static const struct of_device_id of_st_nci_i2c_match[] = {
+static const struct i2c_device_id st_nci_i2c_id_table[] = {
+	{ST_NCI_DRIVER_NAME, 0},
+	{}
+};
+MODULE_DEVICE_TABLE(i2c, st_nci_i2c_id_table);
+
+static const struct acpi_device_id st_nci_i2c_acpi_match[] __maybe_unused = {
+	{"SMO2101"},
+	{"SMO2102"},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, st_nci_i2c_acpi_match);
+
+static const struct of_device_id of_st_nci_i2c_match[] __maybe_unused = {
 	{ .compatible = "st,st21nfcb-i2c", },
 	{ .compatible = "st,st21nfcb_i2c", },
 	{ .compatible = "st,st21nfcc-i2c", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, of_st_nci_i2c_match);
-#endif
 
 static struct i2c_driver st_nci_i2c_driver = {
 	.driver = {
-		.owner = THIS_MODULE,
 		.name = ST_NCI_I2C_DRIVER_NAME,
 		.of_match_table = of_match_ptr(of_st_nci_i2c_match),
+		.acpi_match_table = ACPI_PTR(st_nci_i2c_acpi_match),
 	},
-	.probe = st_nci_i2c_probe,
+	.probe_new = st_nci_i2c_probe,
 	.id_table = st_nci_i2c_id_table,
 	.remove = st_nci_i2c_remove,
 };
-
 module_i2c_driver(st_nci_i2c_driver);
 
 MODULE_LICENSE("GPL");

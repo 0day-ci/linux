@@ -23,38 +23,45 @@
  */
 #include "priv.h"
 
-static const struct nvkm_mc_intr
-g98_mc_intr[] = {
-	{ 0x04000000, NVKM_ENGINE_DISP },  /* DISP first, so pageflip timestamps work */
-	{ 0x00000001, NVKM_ENGINE_MSPPP },
+static const struct nvkm_mc_map
+g98_mc_reset[] = {
+	{ 0x04008000, NVKM_ENGINE_MSVLD },
+	{ 0x02004000, NVKM_ENGINE_SEC },
+	{ 0x01020000, NVKM_ENGINE_MSPDEC },
+	{ 0x00400002, NVKM_ENGINE_MSPPP },
+	{ 0x00201000, NVKM_ENGINE_GR },
 	{ 0x00000100, NVKM_ENGINE_FIFO },
-	{ 0x00001000, NVKM_ENGINE_GR },
-	{ 0x00004000, NVKM_ENGINE_SEC },	/* NV84:NVA3 */
-	{ 0x00008000, NVKM_ENGINE_MSVLD },
-	{ 0x00020000, NVKM_ENGINE_MSPDEC },
-	{ 0x00040000, NVKM_SUBDEV_PMU },	/* NVA3:NVC0 */
-	{ 0x00080000, NVKM_SUBDEV_THERM },	/* NVA3:NVC0 */
-	{ 0x00100000, NVKM_SUBDEV_TIMER },
-	{ 0x00200000, NVKM_SUBDEV_GPIO },	/* PMGR->GPIO */
-	{ 0x00200000, NVKM_SUBDEV_I2C }, 	/* PMGR->I2C/AUX */
-	{ 0x00400000, NVKM_ENGINE_CE0 },	/* NVA3-     */
-	{ 0x10000000, NVKM_SUBDEV_BUS },
-	{ 0x80000000, NVKM_ENGINE_SW },
-	{ 0x0042d101, NVKM_SUBDEV_FB },
+	{}
+};
+
+static const struct nvkm_intr_data
+g98_mc_intrs[] = {
+	{ NVKM_ENGINE_DISP  , 0, 0, 0x04000000, true },
+	{ NVKM_ENGINE_MSPDEC, 0, 0, 0x00020000, true },
+	{ NVKM_ENGINE_MSVLD , 0, 0, 0x00008000, true },
+	{ NVKM_ENGINE_SEC   , 0, 0, 0x00004000, true },
+	{ NVKM_ENGINE_GR    , 0, 0, 0x00001000, true },
+	{ NVKM_ENGINE_FIFO  , 0, 0, 0x00000100 },
+	{ NVKM_ENGINE_MSPPP , 0, 0, 0x00000001, true },
+	{ NVKM_SUBDEV_FB    , 0, 0, 0x0002d101, true },
+	{ NVKM_SUBDEV_BUS   , 0, 0, 0x10000000, true },
+	{ NVKM_SUBDEV_GPIO  , 0, 0, 0x00200000, true },
+	{ NVKM_SUBDEV_I2C   , 0, 0, 0x00200000, true },
+	{ NVKM_SUBDEV_TIMER , 0, 0, 0x00100000, true },
 	{},
 };
 
 static const struct nvkm_mc_func
 g98_mc = {
 	.init = nv50_mc_init,
-	.intr = g98_mc_intr,
-	.intr_unarm = nv04_mc_intr_unarm,
-	.intr_rearm = nv04_mc_intr_rearm,
-	.intr_mask = nv04_mc_intr_mask,
+	.intr = &nv04_mc_intr,
+	.intrs = g98_mc_intrs,
+	.device = &nv04_mc_device,
+	.reset = g98_mc_reset,
 };
 
 int
-g98_mc_new(struct nvkm_device *device, int index, struct nvkm_mc **pmc)
+g98_mc_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst, struct nvkm_mc **pmc)
 {
-	return nvkm_mc_new_(&g98_mc, device, index, pmc);
+	return nvkm_mc_new_(&g98_mc, device, type, inst, pmc);
 }

@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * linux/arch/arm/mach-omap2/usb-tusb6010.c
  *
  * Copyright (C) 2006 Nokia Corporation
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/err.h>
@@ -21,8 +18,6 @@
 #include <linux/usb/musb.h>
 
 #include "gpmc.h"
-
-#include "mux.h"
 
 static u8		async_cs, sync_cs;
 static unsigned		refclk_psec;
@@ -102,7 +97,7 @@ static int tusb_set_sync_mode(unsigned sysclk_ps)
 }
 
 /* tusb driver calls this when it changes the chip's clocking */
-int tusb6010_platform_retime(unsigned is_refclk)
+static int tusb6010_platform_retime(unsigned is_refclk)
 {
 	static const char	error[] =
 		KERN_ERR "tusb6010 %s retime error %d\n";
@@ -126,7 +121,6 @@ int tusb6010_platform_retime(unsigned is_refclk)
 done:
 	return status;
 }
-EXPORT_SYMBOL_GPL(tusb6010_platform_retime);
 
 static struct resource tusb_resources[] = {
 	/* Order is significant!  The start/end fields
@@ -159,8 +153,7 @@ static struct platform_device tusb_device = {
 
 
 /* this may be called only from board-*.c setup code */
-int __init
-tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
+int __init tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
 		unsigned ps_refclk, unsigned waitpin,
 		unsigned async, unsigned sync,
 		unsigned irq, unsigned dmachan)
@@ -225,25 +218,6 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
 		return -ENODEV;
 	}
 	tusb_device.dev.platform_data = data;
-
-	/* REVISIT let the driver know what DMA channels work */
-	if (!dmachan)
-		tusb_device.dev.dma_mask = NULL;
-	else {
-		/* assume OMAP 2420 ES2.0 and later */
-		if (dmachan & (1 << 0))
-			omap_mux_init_signal("sys_ndmareq0", 0);
-		if (dmachan & (1 << 1))
-			omap_mux_init_signal("sys_ndmareq1", 0);
-		if (dmachan & (1 << 2))
-			omap_mux_init_signal("sys_ndmareq2", 0);
-		if (dmachan & (1 << 3))
-			omap_mux_init_signal("sys_ndmareq3", 0);
-		if (dmachan & (1 << 4))
-			omap_mux_init_signal("sys_ndmareq4", 0);
-		if (dmachan & (1 << 5))
-			omap_mux_init_signal("sys_ndmareq5", 0);
-	}
 
 	/* so far so good ... register the device */
 	status = platform_device_register(&tusb_device);

@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* X.509 certificate parser
  *
  * Copyright (C) 2012 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public Licence
- * as published by the Free Software Foundation; either version
- * 2 of the Licence, or (at your option) any later version.
  */
 
 #define pr_fmt(fmt) "X.509: "fmt
@@ -15,21 +11,21 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/oid_registry.h>
-#include "public_key.h"
+#include <crypto/public_key.h>
 #include "x509_parser.h"
-#include "x509-asn1.h"
-#include "x509_akid-asn1.h"
-#include "x509_rsakey-asn1.h"
+#include "x509.asn1.h"
+#include "x509_akid.asn1.h"
 
 struct x509_parse_context {
 	struct x509_certificate	*cert;		/* Certificate being constructed */
 	unsigned long	data;			/* Start of data */
-	const void	*cert_start;		/* Start of cert content */
 	const void	*key;			/* Key data */
 	size_t		key_size;		/* Size of key data */
+	const void	*params;		/* Key parameters */
+	size_t		params_size;		/* Size of key parameters */
+	enum OID	key_algo;		/* Algorithm used by the cert's key */
 	enum OID	last_oid;		/* Last OID encountered */
-	enum OID	algo_oid;		/* Algorithm OID */
-	unsigned char	nr_mpi;			/* Number of MPIs stored */
+	enum OID	sig_algo;		/* Algorithm used to sign the cert */
 	u8		o_size;			/* Size of organizationName (O) */
 	u8		cn_size;		/* Size of commonName (CN) */
 	u8		email_size;		/* Size of emailAddress */
@@ -48,15 +44,12 @@ struct x509_parse_context {
 void x509_free_certificate(struct x509_certificate *cert)
 {
 	if (cert) {
-		public_key_destroy(cert->pub);
+		public_key_free(cert->pub);
+		public_key_signature_free(cert->sig);
 		kfree(cert->issuer);
 		kfree(cert->subject);
 		kfree(cert->id);
 		kfree(cert->skid);
-		kfree(cert->akid_id);
-		kfree(cert->akid_skid);
-		kfree(cert->sig.digest);
-		mpi_free(cert->sig.rsa.s);
 		kfree(cert);
 	}
 }
@@ -78,6 +71,9 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 		goto error_no_cert;
 	cert->pub = kzalloc(sizeof(struct public_key), GFP_KERNEL);
 	if (!cert->pub)
+		goto error_no_ctx;
+	cert->sig = kzalloc(sizeof(struct public_key_signature), GFP_KERNEL);
+	if (!cert->sig)
 		goto error_no_ctx;
 	ctx = kzalloc(sizeof(struct x509_parse_context), GFP_KERNEL);
 	if (!ctx)
@@ -103,9 +99,22 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 		}
 	}
 
-	/* Decode the public key */
-	ret = asn1_ber_decoder(&x509_rsakey_decoder, ctx,
-			       ctx->key, ctx->key_size);
+	ret = -ENOMEM;
+	cert->pub->key = kmemdup(ctx->key, ctx->key_size, GFP_KERNEL);
+	if (!cert->pub->key)
+		goto error_decode;
+
+	cert->pub->keylen = ctx->key_size;
+
+	cert->pub->params = kmemdup(ctx->params, ctx->params_size, GFP_KERNEL);
+	if (!cert->pub->params)
+		goto error_decode;
+
+	cert->pub->paramlen = ctx->params_size;
+	cert->pub->algo = ctx->key_algo;
+
+	/* Grab the signature bits */
+	ret = x509_get_sig_params(cert);
 	if (ret < 0)
 		goto error_decode;
 
@@ -119,6 +128,11 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 		goto error_decode;
 	}
 	cert->id = kid;
+
+	/* Detect self-signed certificates */
+	ret = x509_check_for_self_signed(cert);
+	if (ret < 0)
+		goto error_decode;
 
 	kfree(ctx);
 	return cert;
@@ -171,11 +185,10 @@ int x509_note_tbs_certificate(void *context, size_t hdrlen,
 }
 
 /*
- * Record the public key algorithm
+ * Record the algorithm that was used to sign this certificate.
  */
-int x509_note_pkey_algo(void *context, size_t hdrlen,
-			unsigned char tag,
-			const void *value, size_t vlen)
+int x509_note_sig_algo(void *context, size_t hdrlen, unsigned char tag,
+		       const void *value, size_t vlen)
 {
 	struct x509_parse_context *ctx = context;
 
@@ -188,37 +201,81 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 		return -ENOPKG; /* Unsupported combination */
 
 	case OID_md4WithRSAEncryption:
-		ctx->cert->sig.pkey_hash_algo = HASH_ALGO_MD5;
-		ctx->cert->sig.pkey_algo = PKEY_ALGO_RSA;
-		break;
+		ctx->cert->sig->hash_algo = "md4";
+		goto rsa_pkcs1;
 
 	case OID_sha1WithRSAEncryption:
-		ctx->cert->sig.pkey_hash_algo = HASH_ALGO_SHA1;
-		ctx->cert->sig.pkey_algo = PKEY_ALGO_RSA;
-		break;
+		ctx->cert->sig->hash_algo = "sha1";
+		goto rsa_pkcs1;
 
 	case OID_sha256WithRSAEncryption:
-		ctx->cert->sig.pkey_hash_algo = HASH_ALGO_SHA256;
-		ctx->cert->sig.pkey_algo = PKEY_ALGO_RSA;
-		break;
+		ctx->cert->sig->hash_algo = "sha256";
+		goto rsa_pkcs1;
 
 	case OID_sha384WithRSAEncryption:
-		ctx->cert->sig.pkey_hash_algo = HASH_ALGO_SHA384;
-		ctx->cert->sig.pkey_algo = PKEY_ALGO_RSA;
-		break;
+		ctx->cert->sig->hash_algo = "sha384";
+		goto rsa_pkcs1;
 
 	case OID_sha512WithRSAEncryption:
-		ctx->cert->sig.pkey_hash_algo = HASH_ALGO_SHA512;
-		ctx->cert->sig.pkey_algo = PKEY_ALGO_RSA;
-		break;
+		ctx->cert->sig->hash_algo = "sha512";
+		goto rsa_pkcs1;
 
 	case OID_sha224WithRSAEncryption:
-		ctx->cert->sig.pkey_hash_algo = HASH_ALGO_SHA224;
-		ctx->cert->sig.pkey_algo = PKEY_ALGO_RSA;
-		break;
+		ctx->cert->sig->hash_algo = "sha224";
+		goto rsa_pkcs1;
+
+	case OID_id_ecdsa_with_sha1:
+		ctx->cert->sig->hash_algo = "sha1";
+		goto ecdsa;
+
+	case OID_id_ecdsa_with_sha224:
+		ctx->cert->sig->hash_algo = "sha224";
+		goto ecdsa;
+
+	case OID_id_ecdsa_with_sha256:
+		ctx->cert->sig->hash_algo = "sha256";
+		goto ecdsa;
+
+	case OID_id_ecdsa_with_sha384:
+		ctx->cert->sig->hash_algo = "sha384";
+		goto ecdsa;
+
+	case OID_id_ecdsa_with_sha512:
+		ctx->cert->sig->hash_algo = "sha512";
+		goto ecdsa;
+
+	case OID_gost2012Signature256:
+		ctx->cert->sig->hash_algo = "streebog256";
+		goto ecrdsa;
+
+	case OID_gost2012Signature512:
+		ctx->cert->sig->hash_algo = "streebog512";
+		goto ecrdsa;
+
+	case OID_SM2_with_SM3:
+		ctx->cert->sig->hash_algo = "sm3";
+		goto sm2;
 	}
 
-	ctx->algo_oid = ctx->last_oid;
+rsa_pkcs1:
+	ctx->cert->sig->pkey_algo = "rsa";
+	ctx->cert->sig->encoding = "pkcs1";
+	ctx->sig_algo = ctx->last_oid;
+	return 0;
+ecrdsa:
+	ctx->cert->sig->pkey_algo = "ecrdsa";
+	ctx->cert->sig->encoding = "raw";
+	ctx->sig_algo = ctx->last_oid;
+	return 0;
+sm2:
+	ctx->cert->sig->pkey_algo = "sm2";
+	ctx->cert->sig->encoding = "raw";
+	ctx->sig_algo = ctx->last_oid;
+	return 0;
+ecdsa:
+	ctx->cert->sig->pkey_algo = "ecdsa";
+	ctx->cert->sig->encoding = "x962";
+	ctx->sig_algo = ctx->last_oid;
 	return 0;
 }
 
@@ -231,12 +288,29 @@ int x509_note_signature(void *context, size_t hdrlen,
 {
 	struct x509_parse_context *ctx = context;
 
-	pr_debug("Signature type: %u size %zu\n", ctx->last_oid, vlen);
+	pr_debug("Signature: alg=%u, size=%zu\n", ctx->last_oid, vlen);
 
-	if (ctx->last_oid != ctx->algo_oid) {
-		pr_warn("Got cert with pkey (%u) and sig (%u) algorithm OIDs\n",
-			ctx->algo_oid, ctx->last_oid);
+	/*
+	 * In X.509 certificates, the signature's algorithm is stored in two
+	 * places: inside the TBSCertificate (the data that is signed), and
+	 * alongside the signature.  These *must* match.
+	 */
+	if (ctx->last_oid != ctx->sig_algo) {
+		pr_warn("signatureAlgorithm (%u) differs from tbsCertificate.signature (%u)\n",
+			ctx->last_oid, ctx->sig_algo);
 		return -EINVAL;
+	}
+
+	if (strcmp(ctx->cert->sig->pkey_algo, "rsa") == 0 ||
+	    strcmp(ctx->cert->sig->pkey_algo, "ecrdsa") == 0 ||
+	    strcmp(ctx->cert->sig->pkey_algo, "sm2") == 0 ||
+	    strcmp(ctx->cert->sig->pkey_algo, "ecdsa") == 0) {
+		/* Discard the BIT STRING metadata */
+		if (vlen < 1 || *(const u8 *)value != 0)
+			return -EBADMSG;
+
+		value++;
+		vlen--;
 	}
 
 	ctx->cert->raw_sig = value;
@@ -369,8 +443,18 @@ int x509_note_issuer(void *context, size_t hdrlen,
 		     const void *value, size_t vlen)
 {
 	struct x509_parse_context *ctx = context;
+	struct asymmetric_key_id *kid;
+
 	ctx->cert->raw_issuer = value;
 	ctx->cert->raw_issuer_size = vlen;
+
+	if (!ctx->cert->sig->auth_ids[2]) {
+		kid = asymmetric_key_generate_id(value, vlen, "", 0);
+		if (IS_ERR(kid))
+			return PTR_ERR(kid);
+		ctx->cert->sig->auth_ids[2] = kid;
+	}
+
 	return x509_fabricate_name(ctx, hdrlen, tag, &ctx->cert->issuer, vlen);
 }
 
@@ -385,6 +469,27 @@ int x509_note_subject(void *context, size_t hdrlen,
 }
 
 /*
+ * Extract the parameters for the public key
+ */
+int x509_note_params(void *context, size_t hdrlen,
+		     unsigned char tag,
+		     const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+
+	/*
+	 * AlgorithmIdentifier is used three times in the x509, we should skip
+	 * first and ignore third, using second one which is after subject and
+	 * before subjectPublicKey.
+	 */
+	if (!ctx->cert->raw_subject || ctx->key)
+		return 0;
+	ctx->params = value - hdrlen;
+	ctx->params_size = vlen + hdrlen;
+	return 0;
+}
+
+/*
  * Extract the data for the public key algorithm
  */
 int x509_extract_key_data(void *context, size_t hdrlen,
@@ -392,38 +497,50 @@ int x509_extract_key_data(void *context, size_t hdrlen,
 			  const void *value, size_t vlen)
 {
 	struct x509_parse_context *ctx = context;
+	enum OID oid;
 
-	if (ctx->last_oid != OID_rsaEncryption)
+	ctx->key_algo = ctx->last_oid;
+	switch (ctx->last_oid) {
+	case OID_rsaEncryption:
+		ctx->cert->pub->pkey_algo = "rsa";
+		break;
+	case OID_gost2012PKey256:
+	case OID_gost2012PKey512:
+		ctx->cert->pub->pkey_algo = "ecrdsa";
+		break;
+	case OID_sm2:
+		ctx->cert->pub->pkey_algo = "sm2";
+		break;
+	case OID_id_ecPublicKey:
+		if (parse_OID(ctx->params, ctx->params_size, &oid) != 0)
+			return -EBADMSG;
+
+		switch (oid) {
+		case OID_sm2:
+			ctx->cert->pub->pkey_algo = "sm2";
+			break;
+		case OID_id_prime192v1:
+			ctx->cert->pub->pkey_algo = "ecdsa-nist-p192";
+			break;
+		case OID_id_prime256v1:
+			ctx->cert->pub->pkey_algo = "ecdsa-nist-p256";
+			break;
+		case OID_id_ansip384r1:
+			ctx->cert->pub->pkey_algo = "ecdsa-nist-p384";
+			break;
+		default:
+			return -ENOPKG;
+		}
+		break;
+	default:
 		return -ENOPKG;
-
-	ctx->cert->pub->pkey_algo = PKEY_ALGO_RSA;
-
-	/* Discard the BIT STRING metadata */
-	ctx->key = value + 1;
-	ctx->key_size = vlen - 1;
-	return 0;
-}
-
-/*
- * Extract a RSA public key value
- */
-int rsa_extract_mpi(void *context, size_t hdrlen,
-		    unsigned char tag,
-		    const void *value, size_t vlen)
-{
-	struct x509_parse_context *ctx = context;
-	MPI mpi;
-
-	if (ctx->nr_mpi >= ARRAY_SIZE(ctx->cert->pub->mpi)) {
-		pr_err("Too many public key MPIs in certificate\n");
-		return -EBADMSG;
 	}
 
-	mpi = mpi_read_raw_data(value, vlen);
-	if (!mpi)
-		return -ENOMEM;
-
-	ctx->cert->pub->mpi[ctx->nr_mpi++] = mpi;
+	/* Discard the BIT STRING metadata */
+	if (vlen < 1 || *(const u8 *)value != 0)
+		return -EBADMSG;
+	ctx->key = value + 1;
+	ctx->key_size = vlen - 1;
 	return 0;
 }
 
@@ -462,10 +579,60 @@ int x509_process_extension(void *context, size_t hdrlen,
 		return 0;
 	}
 
+	if (ctx->last_oid == OID_keyUsage) {
+		/*
+		 * Get hold of the keyUsage bit string
+		 * v[1] is the encoding size
+		 *       (Expect either 0x02 or 0x03, making it 1 or 2 bytes)
+		 * v[2] is the number of unused bits in the bit string
+		 *       (If >= 3 keyCertSign is missing when v[1] = 0x02)
+		 * v[3] and possibly v[4] contain the bit string
+		 *
+		 * From RFC 5280 4.2.1.3:
+		 *   0x04 is where keyCertSign lands in this bit string
+		 *   0x80 is where digitalSignature lands in this bit string
+		 */
+		if (v[0] != ASN1_BTS)
+			return -EBADMSG;
+		if (vlen < 4)
+			return -EBADMSG;
+		if (v[2] >= 8)
+			return -EBADMSG;
+		if (v[3] & 0x80)
+			ctx->cert->pub->key_eflags |= 1 << KEY_EFLAG_DIGITALSIG;
+		if (v[1] == 0x02 && v[2] <= 2 && (v[3] & 0x04))
+			ctx->cert->pub->key_eflags |= 1 << KEY_EFLAG_KEYCERTSIGN;
+		else if (vlen > 4 && v[1] == 0x03 && (v[3] & 0x04))
+			ctx->cert->pub->key_eflags |= 1 << KEY_EFLAG_KEYCERTSIGN;
+		return 0;
+	}
+
 	if (ctx->last_oid == OID_authorityKeyIdentifier) {
 		/* Get hold of the CA key fingerprint */
 		ctx->raw_akid = v;
 		ctx->raw_akid_size = vlen;
+		return 0;
+	}
+
+	if (ctx->last_oid == OID_basicConstraints) {
+		/*
+		 * Get hold of the basicConstraints
+		 * v[1] is the encoding size
+		 *	(Expect 0x2 or greater, making it 1 or more bytes)
+		 * v[2] is the encoding type
+		 *	(Expect an ASN1_BOOL for the CA)
+		 * v[3] is the contents of the ASN1_BOOL
+		 *      (Expect 1 if the CA is TRUE)
+		 * vlen should match the entire extension size
+		 */
+		if (v[0] != (ASN1_CONS_BIT | ASN1_SEQ))
+			return -EBADMSG;
+		if (vlen < 2)
+			return -EBADMSG;
+		if (v[1] != vlen - 2)
+			return -EBADMSG;
+		if (vlen >= 4 && v[1] != 0 && v[2] == ASN1_BOOL && v[3] == 1)
+			ctx->cert->pub->key_eflags |= 1 << KEY_EFLAG_CA;
 		return 0;
 	}
 
@@ -494,7 +661,7 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
 		     unsigned char tag,
 		     const unsigned char *value, size_t vlen)
 {
-	static const unsigned char month_lengths[] = { 31, 29, 31, 30, 31, 30,
+	static const unsigned char month_lengths[] = { 31, 28, 31, 30, 31, 30,
 						       31, 31, 30, 31, 30, 31 };
 	const unsigned char *p = value;
 	unsigned year, mon, day, hour, min, sec, mon_len;
@@ -531,26 +698,28 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
 	if (*p != 'Z')
 		goto unsupported_time;
 
-	mon_len = month_lengths[mon];
+	if (year < 1970 ||
+	    mon < 1 || mon > 12)
+		goto invalid_time;
+
+	mon_len = month_lengths[mon - 1];
 	if (mon == 2) {
 		if (year % 4 == 0) {
 			mon_len = 29;
 			if (year % 100 == 0) {
-				year /= 100;
-				if (year % 4 != 0)
-					mon_len = 28;
+				mon_len = 28;
+				if (year % 400 == 0)
+					mon_len = 29;
 			}
 		}
 	}
 
-	if (year < 1970 ||
-	    mon < 1 || mon > 12 ||
-	    day < 1 || day > mon_len ||
-	    hour < 0 || hour > 23 ||
-	    min < 0 || min > 59 ||
-	    sec < 0 || sec > 59)
+	if (day < 1 || day > mon_len ||
+	    hour > 24 || /* ISO 8601 permits 24:00:00 as midnight tomorrow */
+	    min > 59 ||
+	    sec > 60) /* ISO 8601 permits leap seconds [X.680 46.3] */
 		goto invalid_time;
-	
+
 	*_t = mktime64(year, mon, day, hour, min, sec);
 	return 0;
 
@@ -593,14 +762,14 @@ int x509_akid_note_kid(void *context, size_t hdrlen,
 
 	pr_debug("AKID: keyid: %*phN\n", (int)vlen, value);
 
-	if (ctx->cert->akid_skid)
+	if (ctx->cert->sig->auth_ids[1])
 		return 0;
 
 	kid = asymmetric_key_generate_id(value, vlen, "", 0);
 	if (IS_ERR(kid))
 		return PTR_ERR(kid);
 	pr_debug("authkeyid %*phN\n", kid->len, kid->data);
-	ctx->cert->akid_skid = kid;
+	ctx->cert->sig->auth_ids[1] = kid;
 	return 0;
 }
 
@@ -632,7 +801,7 @@ int x509_akid_note_serial(void *context, size_t hdrlen,
 
 	pr_debug("AKID: serial: %*phN\n", (int)vlen, value);
 
-	if (!ctx->akid_raw_issuer || ctx->cert->akid_id)
+	if (!ctx->akid_raw_issuer || ctx->cert->sig->auth_ids[0])
 		return 0;
 
 	kid = asymmetric_key_generate_id(value,
@@ -643,6 +812,6 @@ int x509_akid_note_serial(void *context, size_t hdrlen,
 		return PTR_ERR(kid);
 
 	pr_debug("authkeyid %*phN\n", kid->len, kid->data);
-	ctx->cert->akid_id = kid;
+	ctx->cert->sig->auth_ids[0] = kid;
 	return 0;
 }

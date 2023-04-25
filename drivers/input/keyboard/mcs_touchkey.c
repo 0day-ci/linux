@@ -1,23 +1,19 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Touchkey driver for MELFAS MCS5000/5080 controller
  *
  * Copyright (C) 2010 Samsung Electronics Co.Ltd
  * Author: HeungJun Kim <riverful.kim@samsung.com>
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #include <linux/module.h>
 #include <linux/i2c.h>
-#include <linux/i2c/mcs.h>
 #include <linux/interrupt.h>
 #include <linux/input.h>
 #include <linux/irq.h>
 #include <linux/slab.h>
+#include <linux/platform_data/mcs.h>
 #include <linux/pm.h>
 
 /* MCS5000 Touchkey */
@@ -96,9 +92,9 @@ static irqreturn_t mcs_touchkey_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int mcs_touchkey_probe(struct i2c_client *client,
-		const struct i2c_device_id *id)
+static int mcs_touchkey_probe(struct i2c_client *client)
 {
+	const struct i2c_device_id *id = i2c_client_get_device_id(client);
 	const struct mcs_platform_data *pdata;
 	struct mcs_touchkey_data *data;
 	struct input_dev *input_dev;
@@ -113,9 +109,8 @@ static int mcs_touchkey_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	data = kzalloc(sizeof(struct mcs_touchkey_data) +
-			sizeof(data->keycodes[0]) * (pdata->key_maxval + 1),
-			GFP_KERNEL);
+	data = kzalloc(struct_size(data, keycodes, pdata->key_maxval + 1),
+		       GFP_KERNEL);
 	input_dev = input_allocate_device();
 	if (!data || !input_dev) {
 		dev_err(&client->dev, "Failed to allocate memory\n");
@@ -199,7 +194,7 @@ err_free_mem:
 	return error;
 }
 
-static int mcs_touchkey_remove(struct i2c_client *client)
+static void mcs_touchkey_remove(struct i2c_client *client)
 {
 	struct mcs_touchkey_data *data = i2c_get_clientdata(client);
 
@@ -208,8 +203,6 @@ static int mcs_touchkey_remove(struct i2c_client *client)
 		data->poweron(false);
 	input_unregister_device(data->input_dev);
 	kfree(data);
-
-	return 0;
 }
 
 static void mcs_touchkey_shutdown(struct i2c_client *client)
@@ -220,7 +213,6 @@ static void mcs_touchkey_shutdown(struct i2c_client *client)
 		data->poweron(false);
 }
 
-#ifdef CONFIG_PM_SLEEP
 static int mcs_touchkey_suspend(struct device *dev)
 {
 	struct mcs_touchkey_data *data = dev_get_drvdata(dev);
@@ -250,10 +242,9 @@ static int mcs_touchkey_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(mcs_touchkey_pm_ops,
-			 mcs_touchkey_suspend, mcs_touchkey_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(mcs_touchkey_pm_ops,
+				mcs_touchkey_suspend, mcs_touchkey_resume);
 
 static const struct i2c_device_id mcs_touchkey_id[] = {
 	{ "mcs5000_touchkey", MCS5000_TOUCHKEY },
@@ -265,9 +256,9 @@ MODULE_DEVICE_TABLE(i2c, mcs_touchkey_id);
 static struct i2c_driver mcs_touchkey_driver = {
 	.driver = {
 		.name	= "mcs_touchkey",
-		.pm	= &mcs_touchkey_pm_ops,
+		.pm	= pm_sleep_ptr(&mcs_touchkey_pm_ops),
 	},
-	.probe		= mcs_touchkey_probe,
+	.probe_new	= mcs_touchkey_probe,
 	.remove		= mcs_touchkey_remove,
 	.shutdown       = mcs_touchkey_shutdown,
 	.id_table	= mcs_touchkey_id,

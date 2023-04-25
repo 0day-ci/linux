@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Frame buffer driver for Trident TGUI, Blade and Image series
  *
@@ -15,6 +16,7 @@
  *	timing value tweaking so it looks good on every monitor in every mode
  */
 
+#include <linux/aperture.h>
 #include <linux/module.h>
 #include <linux/fb.h>
 #include <linux/init.h>
@@ -24,6 +26,9 @@
 #include <linux/delay.h>
 #include <video/vga.h>
 #include <video/trident.h>
+
+#include <linux/i2c.h>
+#include <linux/i2c-algo-bit.h>
 
 struct tridentfb_par {
 	void __iomem *io_virt;	/* iospace virtual memory address */
@@ -40,6 +45,9 @@ struct tridentfb_par {
 		(struct tridentfb_par *par, const char*,
 		 u32, u32, u32, u32, u32, u32);
 	unsigned char eng_oper;	/* engine operation... */
+	bool ddc_registered;
+	struct i2c_adapter ddc_adapter;
+	struct i2c_algo_bit_data ddc_algo;
 };
 
 static struct fb_fix_screeninfo tridentfb_fix = {
@@ -53,7 +61,7 @@ static struct fb_fix_screeninfo tridentfb_fix = {
 /* defaults which are normally overriden by user values */
 
 /* video mode */
-static char *mode_option = "640x480-8@60";
+static char *mode_option;
 static int bpp = 8;
 
 static int noaccel;
@@ -172,6 +180,121 @@ static inline void writemmr(struct tridentfb_par *par, u16 r, u32 v)
 static inline u32 readmmr(struct tridentfb_par *par, u16 r)
 {
 	return fb_readl(par->io_virt + r);
+}
+
+#define DDC_SDA_TGUI		BIT(0)
+#define DDC_SCL_TGUI		BIT(1)
+#define DDC_SCL_DRIVE_TGUI	BIT(2)
+#define DDC_SDA_DRIVE_TGUI	BIT(3)
+#define DDC_MASK_TGUI		(DDC_SCL_DRIVE_TGUI | DDC_SDA_DRIVE_TGUI)
+
+static void tridentfb_ddc_setscl_tgui(void *data, int val)
+{
+	struct tridentfb_par *par = data;
+	u8 reg = vga_mm_rcrt(par->io_virt, I2C) & DDC_MASK_TGUI;
+
+	if (val)
+		reg &= ~DDC_SCL_DRIVE_TGUI; /* disable drive - don't drive hi */
+	else
+		reg |= DDC_SCL_DRIVE_TGUI; /* drive low */
+
+	vga_mm_wcrt(par->io_virt, I2C, reg);
+}
+
+static void tridentfb_ddc_setsda_tgui(void *data, int val)
+{
+	struct tridentfb_par *par = data;
+	u8 reg = vga_mm_rcrt(par->io_virt, I2C) & DDC_MASK_TGUI;
+
+	if (val)
+		reg &= ~DDC_SDA_DRIVE_TGUI; /* disable drive - don't drive hi */
+	else
+		reg |= DDC_SDA_DRIVE_TGUI; /* drive low */
+
+	vga_mm_wcrt(par->io_virt, I2C, reg);
+}
+
+static int tridentfb_ddc_getsda_tgui(void *data)
+{
+	struct tridentfb_par *par = data;
+
+	return !!(vga_mm_rcrt(par->io_virt, I2C) & DDC_SDA_TGUI);
+}
+
+#define DDC_SDA_IN	BIT(0)
+#define DDC_SCL_OUT	BIT(1)
+#define DDC_SDA_OUT	BIT(3)
+#define DDC_SCL_IN	BIT(6)
+#define DDC_MASK	(DDC_SCL_OUT | DDC_SDA_OUT)
+
+static void tridentfb_ddc_setscl(void *data, int val)
+{
+	struct tridentfb_par *par = data;
+	unsigned char reg;
+
+	reg = vga_mm_rcrt(par->io_virt, I2C) & DDC_MASK;
+	if (val)
+		reg |= DDC_SCL_OUT;
+	else
+		reg &= ~DDC_SCL_OUT;
+	vga_mm_wcrt(par->io_virt, I2C, reg);
+}
+
+static void tridentfb_ddc_setsda(void *data, int val)
+{
+	struct tridentfb_par *par = data;
+	unsigned char reg;
+
+	reg = vga_mm_rcrt(par->io_virt, I2C) & DDC_MASK;
+	if (!val)
+		reg |= DDC_SDA_OUT;
+	else
+		reg &= ~DDC_SDA_OUT;
+	vga_mm_wcrt(par->io_virt, I2C, reg);
+}
+
+static int tridentfb_ddc_getscl(void *data)
+{
+	struct tridentfb_par *par = data;
+
+	return !!(vga_mm_rcrt(par->io_virt, I2C) & DDC_SCL_IN);
+}
+
+static int tridentfb_ddc_getsda(void *data)
+{
+	struct tridentfb_par *par = data;
+
+	return !!(vga_mm_rcrt(par->io_virt, I2C) & DDC_SDA_IN);
+}
+
+static int tridentfb_setup_ddc_bus(struct fb_info *info)
+{
+	struct tridentfb_par *par = info->par;
+
+	strscpy(par->ddc_adapter.name, info->fix.id,
+		sizeof(par->ddc_adapter.name));
+	par->ddc_adapter.owner		= THIS_MODULE;
+	par->ddc_adapter.class		= I2C_CLASS_DDC;
+	par->ddc_adapter.algo_data	= &par->ddc_algo;
+	par->ddc_adapter.dev.parent	= info->device;
+	if (is_oldclock(par->chip_id)) { /* not sure if this check is OK */
+		par->ddc_algo.setsda	= tridentfb_ddc_setsda_tgui;
+		par->ddc_algo.setscl	= tridentfb_ddc_setscl_tgui;
+		par->ddc_algo.getsda	= tridentfb_ddc_getsda_tgui;
+		/* no getscl */
+	} else {
+		par->ddc_algo.setsda	= tridentfb_ddc_setsda;
+		par->ddc_algo.setscl	= tridentfb_ddc_setscl;
+		par->ddc_algo.getsda	= tridentfb_ddc_getsda;
+		par->ddc_algo.getscl	= tridentfb_ddc_getscl;
+	}
+	par->ddc_algo.udelay		= 10;
+	par->ddc_algo.timeout		= 20;
+	par->ddc_algo.data		= par;
+
+	i2c_set_adapdata(&par->ddc_adapter, par);
+
+	return i2c_bit_add_bus(&par->ddc_adapter);
 }
 
 /*
@@ -656,9 +779,6 @@ static int get_nativex(struct tridentfb_par *par)
 	case 3:
 		x = 800; y = 600;
 		break;
-	case 4:
-		x = 1400; y = 1050;
-		break;
 	case 1:
 	default:
 		x = 640;  y = 480;
@@ -877,6 +997,9 @@ static int tridentfb_check_var(struct fb_var_screeninfo *var,
 	int ramdac = 230000; /* 230MHz for most 3D chips */
 	debug("enter\n");
 
+	if (!var->pixclock)
+		return -EINVAL;
+
 	/* check color depth */
 	if (bpp == 24)
 		bpp = var->bits_per_pixel = 32;
@@ -1003,11 +1126,6 @@ static int tridentfb_pan_display(struct fb_var_screeninfo *var,
 static inline void shadowmode_on(struct tridentfb_par *par)
 {
 	write3CE(par, CyberControl, read3CE(par, CyberControl) | 0x81);
-}
-
-static inline void shadowmode_off(struct tridentfb_par *par)
-{
-	write3CE(par, CyberControl, read3CE(par, CyberControl) & 0x7E);
 }
 
 /* Set the hardware to the requested video mode */
@@ -1324,7 +1442,7 @@ static int tridentfb_blank(int blank_mode, struct fb_info *info)
 	return (blank_mode == FB_BLANK_NORMAL) ? 1 : 0;
 }
 
-static struct fb_ops tridentfb_ops = {
+static const struct fb_ops tridentfb_ops = {
 	.owner = THIS_MODULE,
 	.fb_setcolreg = tridentfb_setcolreg,
 	.fb_pan_display = tridentfb_pan_display,
@@ -1346,8 +1464,13 @@ static int trident_pci_probe(struct pci_dev *dev,
 	struct tridentfb_par *default_par;
 	int chip3D;
 	int chip_id;
+	bool found = false;
 
-	err = pci_enable_device(dev);
+	err = aperture_remove_conflicting_pci_devices(dev, "tridentfb");
+	if (err)
+		return err;
+
+	err = pcim_enable_device(dev);
 	if (err)
 		return err;
 
@@ -1436,7 +1559,7 @@ static int trident_pci_probe(struct pci_dev *dev,
 		return -1;
 	}
 
-	default_par->io_virt = ioremap_nocache(tridentfb_fix.mmio_start,
+	default_par->io_virt = ioremap(tridentfb_fix.mmio_start,
 					       tridentfb_fix.mmio_len);
 
 	if (!default_par->io_virt) {
@@ -1459,7 +1582,7 @@ static int trident_pci_probe(struct pci_dev *dev,
 		goto out_unmap1;
 	}
 
-	info->screen_base = ioremap_nocache(tridentfb_fix.smem_start,
+	info->screen_base = ioremap(tridentfb_fix.smem_start,
 					    tridentfb_fix.smem_len);
 
 	if (!info->screen_base) {
@@ -1499,6 +1622,7 @@ static int trident_pci_probe(struct pci_dev *dev,
 	info->pixmap.scan_align = 1;
 	info->pixmap.access_align = 32;
 	info->pixmap.flags = FB_PIXMAP_SYSTEM;
+	info->var.bits_per_pixel = 8;
 
 	if (default_par->image_blit) {
 		info->flags |= FBINFO_HWACCEL_IMAGEBLIT;
@@ -1511,11 +1635,56 @@ static int trident_pci_probe(struct pci_dev *dev,
 		info->pixmap.scan_align = 1;
 	}
 
-	if (!fb_find_mode(&info->var, info,
-			  mode_option, NULL, 0, NULL, bpp)) {
-		err = -EINVAL;
-		goto out_unmap2;
+	if (tridentfb_setup_ddc_bus(info) == 0) {
+		u8 *edid = fb_ddc_read(&default_par->ddc_adapter);
+
+		default_par->ddc_registered = true;
+		if (edid) {
+			fb_edid_to_monspecs(edid, &info->monspecs);
+			kfree(edid);
+			if (!info->monspecs.modedb)
+				dev_err(info->device, "error getting mode database\n");
+			else {
+				const struct fb_videomode *m;
+
+				fb_videomode_to_modelist(info->monspecs.modedb,
+						 info->monspecs.modedb_len,
+						 &info->modelist);
+				m = fb_find_best_display(&info->monspecs,
+							 &info->modelist);
+				if (m) {
+					fb_videomode_to_var(&info->var, m);
+					/* fill all other info->var's fields */
+					if (tridentfb_check_var(&info->var,
+								info) == 0)
+						found = true;
+				}
+			}
+		}
 	}
+
+	if (!mode_option && !found)
+		mode_option = "640x480-8@60";
+
+	/* Prepare startup mode */
+	if (mode_option) {
+		err = fb_find_mode(&info->var, info, mode_option,
+				   info->monspecs.modedb,
+				   info->monspecs.modedb_len,
+				   NULL, info->var.bits_per_pixel);
+		if (!err || err == 4) {
+			err = -EINVAL;
+			dev_err(info->device, "mode %s not found\n",
+								mode_option);
+			fb_destroy_modedb(info->monspecs.modedb);
+			info->monspecs.modedb = NULL;
+			goto out_unmap2;
+		}
+	}
+
+	fb_destroy_modedb(info->monspecs.modedb);
+	info->monspecs.modedb = NULL;
+
 	err = fb_alloc_cmap(&info->cmap, 256, 0);
 	if (err < 0)
 		goto out_unmap2;
@@ -1536,15 +1705,15 @@ static int trident_pci_probe(struct pci_dev *dev,
 	return 0;
 
 out_unmap2:
+	if (default_par->ddc_registered)
+		i2c_del_adapter(&default_par->ddc_adapter);
 	kfree(info->pixmap.addr);
 	if (info->screen_base)
 		iounmap(info->screen_base);
-	release_mem_region(tridentfb_fix.smem_start, tridentfb_fix.smem_len);
 	disable_mmio(info->par);
 out_unmap1:
 	if (default_par->io_virt)
 		iounmap(default_par->io_virt);
-	release_mem_region(tridentfb_fix.mmio_start, tridentfb_fix.mmio_len);
 	framebuffer_release(info);
 	return err;
 }
@@ -1555,17 +1724,17 @@ static void trident_pci_remove(struct pci_dev *dev)
 	struct tridentfb_par *par = info->par;
 
 	unregister_framebuffer(info);
+	if (par->ddc_registered)
+		i2c_del_adapter(&par->ddc_adapter);
 	iounmap(par->io_virt);
 	iounmap(info->screen_base);
-	release_mem_region(tridentfb_fix.smem_start, tridentfb_fix.smem_len);
-	release_mem_region(tridentfb_fix.mmio_start, tridentfb_fix.mmio_len);
 	kfree(info->pixmap.addr);
 	fb_dealloc_cmap(&info->cmap);
 	framebuffer_release(info);
 }
 
 /* List of boards that we are trying to support */
-static struct pci_device_id trident_devices[] = {
+static const struct pci_device_id trident_devices[] = {
 	{PCI_VENDOR_ID_TRIDENT,	BLADE3D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_TRIDENT,	CYBERBLADEi7, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_TRIDENT,	CYBERBLADEi7D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
@@ -1642,7 +1811,12 @@ static int __init tridentfb_init(void)
 {
 #ifndef MODULE
 	char *option = NULL;
+#endif
 
+	if (fb_modesetting_disabled("tridentfb"))
+		return -ENODEV;
+
+#ifndef MODULE
 	if (fb_get_options("tridentfb", &option))
 		return -ENODEV;
 	tridentfb_setup(option);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  *  linux/fs/hpfs/inode.c
  *
@@ -77,6 +78,7 @@ void hpfs_read_inode(struct inode *i)
 			kfree(ea);
 			i->i_mode = S_IFLNK | 0777;
 			i->i_op = &page_symlink_inode_operations;
+			inode_nohighmem(i);
 			i->i_data.a_ops = &hpfs_symlink_aops;
 			set_nlink(i, 1);
 			i->i_size = ea_size;
@@ -255,7 +257,8 @@ void hpfs_write_inode_nolock(struct inode *i)
 	brelse(bh);
 }
 
-int hpfs_setattr(struct dentry *dentry, struct iattr *attr)
+int hpfs_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
+		 struct iattr *attr)
 {
 	struct inode *inode = d_inode(dentry);
 	int error = -EINVAL;
@@ -272,7 +275,7 @@ int hpfs_setattr(struct dentry *dentry, struct iattr *attr)
 	if ((attr->ia_valid & ATTR_SIZE) && attr->ia_size > inode->i_size)
 		goto out_unlock;
 
-	error = inode_change_ok(inode, attr);
+	error = setattr_prepare(&nop_mnt_idmap, dentry, attr);
 	if (error)
 		goto out_unlock;
 
@@ -286,7 +289,7 @@ int hpfs_setattr(struct dentry *dentry, struct iattr *attr)
 		hpfs_truncate(inode);
 	}
 
-	setattr_copy(inode, attr);
+	setattr_copy(&nop_mnt_idmap, inode, attr);
 
 	hpfs_write_inode(inode);
 

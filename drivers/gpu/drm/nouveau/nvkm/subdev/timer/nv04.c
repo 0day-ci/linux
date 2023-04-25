@@ -76,8 +76,8 @@ nv04_timer_intr(struct nvkm_timer *tmr)
 	u32 stat = nvkm_rd32(device, NV04_PTIMER_INTR_0);
 
 	if (stat & 0x00000001) {
-		nvkm_timer_alarm_trigger(tmr);
 		nvkm_wr32(device, NV04_PTIMER_INTR_0, 0x00000001);
+		nvkm_timer_alarm_trigger(tmr);
 		stat &= ~0x00000001;
 	}
 
@@ -145,7 +145,8 @@ nv04_timer = {
 };
 
 int
-nv04_timer_new(struct nvkm_device *device, int index, struct nvkm_timer **ptmr)
+nv04_timer_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
+	       struct nvkm_timer **ptmr)
 {
-	return nvkm_timer_new_(&nv04_timer, device, index, ptmr);
+	return nvkm_timer_new_(&nv04_timer, device, type, inst, ptmr);
 }

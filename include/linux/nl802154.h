@@ -1,21 +1,14 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * nl802154.h
  *
  * Copyright (C) 2007, 2008, 2009 Siemens AG
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #ifndef NL802154_H
 #define NL802154_H
+
+#include <net/netlink.h>
 
 #define IEEE802154_NL_NAME "802.15.4 MAC"
 #define IEEE802154_MCAST_COORD_NAME "coordinator"
@@ -91,6 +84,8 @@ enum {
 	IEEE802154_ATTR_LLSEC_SECLEVELS,
 	IEEE802154_ATTR_LLSEC_DEV_OVERRIDE,
 	IEEE802154_ATTR_LLSEC_DEV_KEY_MODE,
+
+	IEEE802154_ATTR_PAD,
 
 	__IEEE802154_ATTR_MAX,
 };

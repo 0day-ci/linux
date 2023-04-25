@@ -57,7 +57,7 @@ struct pip_app_resp_head {
 	 * The value of data_status can be the first byte of data or
 	 * the command status or the unsupported command code depending on the
 	 * requested command code.
-	*/
+	 */
 	u8 data_status;
 } __packed;
 
@@ -241,14 +241,10 @@ static int cyapa_gen6_read_sys_info(struct cyapa *cyapa)
 	memcpy(&cyapa->product_id[13], &resp_data[62], 2);
 	cyapa->product_id[15] = '\0';
 
+	/* Get the number of Rx electrodes. */
 	rotat_align = resp_data[68];
-	if (rotat_align) {
-		cyapa->electrodes_rx = cyapa->electrodes_y;
-		cyapa->electrodes_rx = cyapa->electrodes_y;
-	} else {
-		cyapa->electrodes_rx = cyapa->electrodes_x;
-		cyapa->electrodes_rx = cyapa->electrodes_y;
-	}
+	cyapa->electrodes_rx =
+		rotat_align ? cyapa->electrodes_y : cyapa->electrodes_x;
 	cyapa->aligned_electrodes_rx = (cyapa->electrodes_rx + 3) & ~3u;
 
 	if (!cyapa->electrodes_x || !cyapa->electrodes_y ||
@@ -429,7 +425,7 @@ static int cyapa_gen6_deep_sleep(struct cyapa *cyapa, u8 state)
 }
 
 static int cyapa_gen6_set_power_mode(struct cyapa *cyapa,
-		u8 power_mode, u16 sleep_time, bool is_suspend)
+		u8 power_mode, u16 sleep_time, enum cyapa_pm_stage pm_stage)
 {
 	struct device *dev = &cyapa->client->dev;
 	struct gen6_interval_setting *interval_setting =
@@ -577,7 +573,7 @@ static int cyapa_pip_retrieve_data_structure(struct cyapa *cyapa,
 
 	memset(&cmd, 0, sizeof(cmd));
 	put_unaligned_le16(PIP_OUTPUT_REPORT_ADDR, &cmd.head.addr);
-	put_unaligned_le16(sizeof(cmd), &cmd.head.length - 2);
+	put_unaligned_le16(sizeof(cmd) - 2, &cmd.head.length);
 	cmd.head.report_id = PIP_APP_CMD_REPORT_ID;
 	cmd.head.cmd_code = PIP_RETRIEVE_DATA_STRUCTURE;
 	put_unaligned_le16(read_offset, &cmd.read_offset);
@@ -684,6 +680,7 @@ static int cyapa_gen6_operational_check(struct cyapa *cyapa)
 		}
 
 		cyapa->state = CYAPA_STATE_GEN6_APP;
+		fallthrough;
 
 	case CYAPA_STATE_GEN6_APP:
 		/*
@@ -693,7 +690,7 @@ static int cyapa_gen6_operational_check(struct cyapa *cyapa)
 		 * the device state is required.
 		 */
 		error = cyapa_gen6_set_power_mode(cyapa,
-				PWR_MODE_FULL_ACTIVE, 0, false);
+				PWR_MODE_FULL_ACTIVE, 0, CYAPA_PM_ACTIVE);
 		if (error)
 			dev_warn(dev, "%s: failed to set power active mode.\n",
 				__func__);

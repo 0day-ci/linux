@@ -16,6 +16,9 @@ import gdb
 from linux import tasks, utils
 
 
+task_type = utils.CachedType("struct task_struct")
+
+
 MAX_CPUS = 4096
 
 
@@ -97,7 +100,46 @@ def cpu_list(mask_name):
         bits >>= 1
         bit += 1
 
+        yield int(cpu)
+
+
+def each_online_cpu():
+    for cpu in cpu_list("__cpu_online_mask"):
         yield cpu
+
+
+def each_present_cpu():
+    for cpu in cpu_list("__cpu_present_mask"):
+        yield cpu
+
+
+def each_possible_cpu():
+    for cpu in cpu_list("__cpu_possible_mask"):
+        yield cpu
+
+
+def each_active_cpu():
+    for cpu in cpu_list("__cpu_active_mask"):
+        yield cpu
+
+
+class LxCpus(gdb.Command):
+    """List CPU status arrays
+
+Displays the known state of each CPU based on the kernel masks
+and can help identify the state of hotplugged CPUs"""
+
+    def __init__(self):
+        super(LxCpus, self).__init__("lx-cpus", gdb.COMMAND_DATA)
+
+    def invoke(self, arg, from_tty):
+        gdb.write("Possible CPUs : {}\n".format(list(each_possible_cpu())))
+        gdb.write("Present CPUs  : {}\n".format(list(each_present_cpu())))
+        gdb.write("Online CPUs   : {}\n".format(list(each_online_cpu())))
+        gdb.write("Active CPUs   : {}\n".format(list(each_active_cpu())))
+
+
+LxCpus()
 
 
 class PerCpu(gdb.Function):
@@ -117,6 +159,23 @@ Note that VAR has to be quoted as string."""
 
 PerCpu()
 
+def get_current_task(cpu):
+    task_ptr_type = task_type.get_type().pointer()
+
+    if utils.is_target_arch("x86"):
+         var_ptr = gdb.parse_and_eval("&pcpu_hot.current_task")
+         return per_cpu(var_ptr, cpu).dereference()
+    elif utils.is_target_arch("aarch64"):
+         current_task_addr = gdb.parse_and_eval("$SP_EL0")
+         if((current_task_addr >> 63) != 0):
+             current_task = current_task_addr.cast(task_ptr_type)
+             return current_task.dereference()
+         else:
+             raise gdb.GdbError("Sorry, obtaining the current task is not allowed "
+                                "while running in userspace(EL0)")
+    else:
+        raise gdb.GdbError("Sorry, obtaining the current task is not yet "
+                           "supported with this arch")
 
 class LxCurrentFunc(gdb.Function):
     """Return current task.
@@ -128,8 +187,7 @@ number. If CPU is omitted, the CPU of the current context is used."""
         super(LxCurrentFunc, self).__init__("lx_current")
 
     def invoke(self, cpu=-1):
-        var_ptr = gdb.parse_and_eval("&current_task")
-        return per_cpu(var_ptr, cpu).dereference()
+        return get_current_task(cpu)
 
 
 LxCurrentFunc()

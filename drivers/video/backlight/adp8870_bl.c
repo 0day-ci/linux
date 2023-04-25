@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Backlight driver for Analog Devices ADP8870 Backlight Devices
  *
  * Copyright 2009-2011 Analog Devices Inc.
- *
- * Licensed under the GPL-2 or later.
  */
 
 #include <linux/module.h>
@@ -18,7 +17,7 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 
-#include <linux/i2c/adp8870.h>
+#include <linux/platform_data/adp8870.h>
 #define ADP8870_EXT_FEATURES
 #define ADP8870_USE_LEDS
 
@@ -246,7 +245,7 @@ static int adp8870_led_probe(struct i2c_client *client)
 	struct led_info *cur_led;
 	int ret, i;
 
-	led = devm_kzalloc(&client->dev, pdata->num_leds * sizeof(*led),
+	led = devm_kcalloc(&client->dev, pdata->num_leds, sizeof(*led),
 				GFP_KERNEL);
 	if (led == NULL)
 		return -ENOMEM;
@@ -400,15 +399,7 @@ static int adp8870_bl_set(struct backlight_device *bl, int brightness)
 
 static int adp8870_bl_update_status(struct backlight_device *bl)
 {
-	int brightness = bl->props.brightness;
-
-	if (bl->props.power != FB_BLANK_UNBLANK)
-		brightness = 0;
-
-	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
-		brightness = 0;
-
-	return adp8870_bl_set(bl, brightness);
+	return adp8870_bl_set(bl, backlight_get_brightness(bl));
 }
 
 static int adp8870_bl_get_brightness(struct backlight_device *bl)
@@ -807,10 +798,12 @@ static ssize_t adp8870_bl_ambient_light_zone_store(struct device *dev,
 
 		/* Set user supplied ambient light zone */
 		mutex_lock(&data->lock);
-		adp8870_read(data->client, ADP8870_CFGR, &reg_val);
-		reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
-		reg_val |= (val - 1) << CFGR_BLV_SHIFT;
-		adp8870_write(data->client, ADP8870_CFGR, reg_val);
+		ret = adp8870_read(data->client, ADP8870_CFGR, &reg_val);
+		if (!ret) {
+			reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
+			reg_val |= (val - 1) << CFGR_BLV_SHIFT;
+			adp8870_write(data->client, ADP8870_CFGR, reg_val);
+		}
 		mutex_unlock(&data->lock);
 	}
 
@@ -843,9 +836,9 @@ static const struct attribute_group adp8870_bl_attr_group = {
 	.attrs = adp8870_bl_attributes,
 };
 
-static int adp8870_probe(struct i2c_client *client,
-					const struct i2c_device_id *id)
+static int adp8870_probe(struct i2c_client *client)
 {
+	const struct i2c_device_id *id = i2c_client_get_device_id(client);
 	struct backlight_properties props;
 	struct backlight_device *bl;
 	struct adp8870_bl *data;
@@ -932,7 +925,7 @@ out:
 	return ret;
 }
 
-static int adp8870_remove(struct i2c_client *client)
+static void adp8870_remove(struct i2c_client *client)
 {
 	struct adp8870_bl *data = i2c_get_clientdata(client);
 
@@ -944,8 +937,6 @@ static int adp8870_remove(struct i2c_client *client)
 	if (data->pdata->en_ambl_sens)
 		sysfs_remove_group(&data->bl->dev.kobj,
 			&adp8870_bl_attr_group);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -982,7 +973,7 @@ static struct i2c_driver adp8870_driver = {
 		.name	= KBUILD_MODNAME,
 		.pm	= &adp8870_i2c_pm_ops,
 	},
-	.probe    = adp8870_probe,
+	.probe_new = adp8870_probe,
 	.remove   = adp8870_remove,
 	.id_table = adp8870_id,
 };
@@ -990,6 +981,5 @@ static struct i2c_driver adp8870_driver = {
 module_i2c_driver(adp8870_driver);
 
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Michael Hennerich <hennerich@blackfin.uclinux.org>");
+MODULE_AUTHOR("Michael Hennerich <michael.hennerich@analog.com>");
 MODULE_DESCRIPTION("ADP8870 Backlight driver");
-MODULE_ALIAS("i2c:adp8870-backlight");

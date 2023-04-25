@@ -75,50 +75,49 @@ static bool ar9003_hw_per_calibration(struct ath_hw *ah,
 				      struct ath9k_cal_list *currCal)
 {
 	struct ath9k_hw_cal_data *caldata = ah->caldata;
-	/* Cal is assumed not done until explicitly set below */
-	bool iscaldone = false;
+	const struct ath9k_percal_data *cur_caldata = currCal->calData;
 
 	/* Calibration in progress. */
 	if (currCal->calState == CAL_RUNNING) {
 		/* Check to see if it has finished. */
-		if (!(REG_READ(ah, AR_PHY_TIMING4) & AR_PHY_TIMING4_DO_CAL)) {
+		if (REG_READ(ah, AR_PHY_TIMING4) & AR_PHY_TIMING4_DO_CAL)
+			return false;
+
+		/*
+		* Accumulate cal measures for active chains
+		*/
+		cur_caldata->calCollect(ah);
+		ah->cal_samples++;
+
+		if (ah->cal_samples >= cur_caldata->calNumSamples) {
+			unsigned int i, numChains = 0;
+			for (i = 0; i < AR9300_MAX_CHAINS; i++) {
+				if (rxchainmask & (1 << i))
+					numChains++;
+			}
+
 			/*
-			* Accumulate cal measures for active chains
+			* Process accumulated data
 			*/
-			currCal->calData->calCollect(ah);
-			ah->cal_samples++;
+			cur_caldata->calPostProc(ah, numChains);
 
-			if (ah->cal_samples >=
-			    currCal->calData->calNumSamples) {
-				unsigned int i, numChains = 0;
-				for (i = 0; i < AR9300_MAX_CHAINS; i++) {
-					if (rxchainmask & (1 << i))
-						numChains++;
-				}
-
-				/*
-				* Process accumulated data
-				*/
-				currCal->calData->calPostProc(ah, numChains);
-
-				/* Calibration has finished. */
-				caldata->CalValid |= currCal->calData->calType;
-				currCal->calState = CAL_DONE;
-				iscaldone = true;
-			} else {
+			/* Calibration has finished. */
+			caldata->CalValid |= cur_caldata->calType;
+			currCal->calState = CAL_DONE;
+			return true;
+		} else {
 			/*
 			 * Set-up collection of another sub-sample until we
 			 * get desired number
 			 */
 			ar9003_hw_setup_calibration(ah, currCal);
-			}
 		}
-	} else if (!(caldata->CalValid & currCal->calData->calType)) {
+	} else if (!(caldata->CalValid & cur_caldata->calType)) {
 		/* If current cal is marked invalid in channel, kick it off */
 		ath9k_hw_reset_calibration(ah, currCal);
 	}
 
-	return iscaldone;
+	return false;
 }
 
 static int ar9003_hw_calibrate(struct ath_hw *ah, struct ath9k_channel *chan,
@@ -178,7 +177,7 @@ static void ar9003_hw_iqcal_collect(struct ath_hw *ah)
 	int i;
 
 	/* Accumulate IQ cal measures for active chains */
-	for (i = 0; i < AR5416_MAX_CHAINS; i++) {
+	for (i = 0; i < AR9300_MAX_CHAINS; i++) {
 		if (ah->txchainmask & BIT(i)) {
 			ah->totalPowerMeasI[i] +=
 				REG_READ(ah, AR_PHY_CAL_MEAS_0(i));
@@ -347,14 +346,14 @@ static bool ar9003_hw_dynamic_osdac_selection(struct ath_hw *ah,
 	/*
 	 * Clear offset and IQ calibration, run AGC cal.
 	 */
-	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL,
+	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL(ah),
 		    AR_PHY_AGC_CONTROL_OFFSET_CAL);
-	REG_CLR_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0,
+	REG_CLR_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0(ah),
 		    AR_PHY_TX_IQCAL_CONTROL_0_ENABLE_TXIQ_CAL);
-	REG_WRITE(ah, AR_PHY_AGC_CONTROL,
-		  REG_READ(ah, AR_PHY_AGC_CONTROL) | AR_PHY_AGC_CONTROL_CAL);
+	REG_WRITE(ah, AR_PHY_AGC_CONTROL(ah),
+		  REG_READ(ah, AR_PHY_AGC_CONTROL(ah)) | AR_PHY_AGC_CONTROL_CAL);
 
-	status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL,
+	status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL(ah),
 			       AR_PHY_AGC_CONTROL_CAL,
 			       0, AH_WAIT_TIMEOUT);
 	if (!status) {
@@ -368,13 +367,13 @@ static bool ar9003_hw_dynamic_osdac_selection(struct ath_hw *ah,
 	 * (Carrier Leak calibration, TX Filter calibration and
 	 *  Peak Detector offset calibration).
 	 */
-	REG_SET_BIT(ah, AR_PHY_AGC_CONTROL,
+	REG_SET_BIT(ah, AR_PHY_AGC_CONTROL(ah),
 		    AR_PHY_AGC_CONTROL_OFFSET_CAL);
 	REG_CLR_BIT(ah, AR_PHY_CL_CAL_CTL,
 		    AR_PHY_CL_CAL_ENABLE);
-	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL,
+	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL(ah),
 		    AR_PHY_AGC_CONTROL_FLTR_CAL);
-	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL,
+	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL(ah),
 		    AR_PHY_AGC_CONTROL_PKDET_CAL);
 
 	ch0_done = 0;
@@ -388,10 +387,10 @@ static bool ar9003_hw_dynamic_osdac_selection(struct ath_hw *ah,
 
 		REG_SET_BIT(ah, AR_PHY_ACTIVE, AR_PHY_ACTIVE_EN);
 
-		REG_WRITE(ah, AR_PHY_AGC_CONTROL,
-			  REG_READ(ah, AR_PHY_AGC_CONTROL) | AR_PHY_AGC_CONTROL_CAL);
+		REG_WRITE(ah, AR_PHY_AGC_CONTROL(ah),
+			  REG_READ(ah, AR_PHY_AGC_CONTROL(ah)) | AR_PHY_AGC_CONTROL_CAL);
 
-		status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL,
+		status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL(ah),
 				       AR_PHY_AGC_CONTROL_CAL,
 				       0, AH_WAIT_TIMEOUT);
 		if (!status) {
@@ -532,7 +531,7 @@ static bool ar9003_hw_dynamic_osdac_selection(struct ath_hw *ah,
 		}
 	}
 
-	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL,
+	REG_CLR_BIT(ah, AR_PHY_AGC_CONTROL(ah),
 		    AR_PHY_AGC_CONTROL_OFFSET_CAL);
 	REG_SET_BIT(ah, AR_PHY_ACTIVE, AR_PHY_ACTIVE_EN);
 
@@ -540,7 +539,7 @@ static bool ar9003_hw_dynamic_osdac_selection(struct ath_hw *ah,
 	 * We don't need to check txiqcal_done here since it is always
 	 * set for AR9550.
 	 */
-	REG_SET_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0,
+	REG_SET_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0(ah),
 		    AR_PHY_TX_IQCAL_CONTROL_0_ENABLE_TXIQ_CAL);
 
 	return true;
@@ -898,7 +897,7 @@ static void ar9003_hw_tx_iq_cal_outlier_detection(struct ath_hw *ah,
 	memset(tx_corr_coeff, 0, sizeof(tx_corr_coeff));
 	for (i = 0; i < MAX_MEASUREMENT / 2; i++) {
 		tx_corr_coeff[i * 2][0] = tx_corr_coeff[(i * 2) + 1][0] =
-					AR_PHY_TX_IQCAL_CORR_COEFF_B0(i);
+					AR_PHY_TX_IQCAL_CORR_COEFF_B0(ah, i);
 		if (!AR_SREV_9485(ah)) {
 			tx_corr_coeff[i * 2][1] =
 			tx_corr_coeff[(i * 2) + 1][1] =
@@ -915,7 +914,7 @@ static void ar9003_hw_tx_iq_cal_outlier_detection(struct ath_hw *ah,
 		if (!(ah->txchainmask & (1 << i)))
 			continue;
 		nmeasurement = REG_READ_FIELD(ah,
-				AR_PHY_TX_IQCAL_STATUS_B0,
+				AR_PHY_TX_IQCAL_STATUS_B0(ah),
 				AR_PHY_CALIBRATED_GAINS_0);
 
 		if (nmeasurement > MAX_MEASUREMENT)
@@ -989,10 +988,10 @@ static bool ar9003_hw_tx_iq_cal_run(struct ath_hw *ah)
 		REG_RMW_FIELD(ah, AR_PHY_TX_FORCED_GAIN,
 			      AR_PHY_TXGAIN_FORCE, 0);
 
-	REG_RMW_FIELD(ah, AR_PHY_TX_IQCAL_START,
+	REG_RMW_FIELD(ah, AR_PHY_TX_IQCAL_START(ah),
 		      AR_PHY_TX_IQCAL_START_DO_CAL, 1);
 
-	if (!ath9k_hw_wait(ah, AR_PHY_TX_IQCAL_START,
+	if (!ath9k_hw_wait(ah, AR_PHY_TX_IQCAL_START(ah),
 			AR_PHY_TX_IQCAL_START_DO_CAL, 0,
 			AH_WAIT_TIMEOUT)) {
 		ath_dbg(common, CALIBRATE, "Tx IQ Cal is not completed\n");
@@ -1006,24 +1005,20 @@ static void __ar955x_tx_iq_cal_sort(struct ath_hw *ah,
 				    int i, int nmeasurement)
 {
 	struct ath_common *common = ath9k_hw_common(ah);
-	int im, ix, iy, temp;
+	int im, ix, iy;
 
 	for (im = 0; im < nmeasurement; im++) {
 		for (ix = 0; ix < MAXIQCAL - 1; ix++) {
 			for (iy = ix + 1; iy <= MAXIQCAL - 1; iy++) {
 				if (coeff->mag_coeff[i][im][iy] <
 				    coeff->mag_coeff[i][im][ix]) {
-					temp = coeff->mag_coeff[i][im][ix];
-					coeff->mag_coeff[i][im][ix] =
-						coeff->mag_coeff[i][im][iy];
-					coeff->mag_coeff[i][im][iy] = temp;
+					swap(coeff->mag_coeff[i][im][ix],
+					     coeff->mag_coeff[i][im][iy]);
 				}
 				if (coeff->phs_coeff[i][im][iy] <
 				    coeff->phs_coeff[i][im][ix]) {
-					temp = coeff->phs_coeff[i][im][ix];
-					coeff->phs_coeff[i][im][ix] =
-						coeff->phs_coeff[i][im][iy];
-					coeff->phs_coeff[i][im][iy] = temp;
+					swap(coeff->phs_coeff[i][im][ix],
+					     coeff->phs_coeff[i][im][iy]);
 				}
 			}
 		}
@@ -1061,7 +1056,7 @@ static void ar9003_hw_tx_iq_cal_post_proc(struct ath_hw *ah,
 {
 	struct ath_common *common = ath9k_hw_common(ah);
 	const u32 txiqcal_status[AR9300_MAX_CHAINS] = {
-		AR_PHY_TX_IQCAL_STATUS_B0,
+		AR_PHY_TX_IQCAL_STATUS_B0(ah),
 		AR_PHY_TX_IQCAL_STATUS_B1,
 		AR_PHY_TX_IQCAL_STATUS_B2,
 	};
@@ -1081,7 +1076,7 @@ static void ar9003_hw_tx_iq_cal_post_proc(struct ath_hw *ah,
 			continue;
 
 		nmeasurement = REG_READ_FIELD(ah,
-				AR_PHY_TX_IQCAL_STATUS_B0,
+				AR_PHY_TX_IQCAL_STATUS_B0(ah),
 				AR_PHY_CALIBRATED_GAINS_0);
 		if (nmeasurement > MAX_MEASUREMENT)
 			nmeasurement = MAX_MEASUREMENT;
@@ -1101,7 +1096,7 @@ static void ar9003_hw_tx_iq_cal_post_proc(struct ath_hw *ah,
 				u32 idx = 2 * j, offset = 4 * (3 * im + j);
 
 				REG_RMW_FIELD(ah,
-						AR_PHY_CHAN_INFO_MEMORY,
+						AR_PHY_CHAN_INFO_MEMORY(ah),
 						AR_PHY_CHAN_INFO_TAB_S2_READ,
 						0);
 
@@ -1111,7 +1106,7 @@ static void ar9003_hw_tx_iq_cal_post_proc(struct ath_hw *ah,
 						offset);
 
 				REG_RMW_FIELD(ah,
-						AR_PHY_CHAN_INFO_MEMORY,
+						AR_PHY_CHAN_INFO_MEMORY(ah),
 						AR_PHY_CHAN_INFO_TAB_S2_READ,
 						1);
 
@@ -1166,7 +1161,7 @@ static void ar9003_hw_tx_iq_cal_reload(struct ath_hw *ah)
 	memset(tx_corr_coeff, 0, sizeof(tx_corr_coeff));
 	for (i = 0; i < MAX_MEASUREMENT / 2; i++) {
 		tx_corr_coeff[i * 2][0] = tx_corr_coeff[(i * 2) + 1][0] =
-					AR_PHY_TX_IQCAL_CORR_COEFF_B0(i);
+					AR_PHY_TX_IQCAL_CORR_COEFF_B0(ah, i);
 		if (!AR_SREV_9485(ah)) {
 			tx_corr_coeff[i * 2][1] =
 			tx_corr_coeff[(i * 2) + 1][1] =
@@ -1203,12 +1198,12 @@ static void ar9003_hw_tx_iq_cal_reload(struct ath_hw *ah)
 static void ar9003_hw_manual_peak_cal(struct ath_hw *ah, u8 chain, bool is_2g)
 {
 	int offset[8] = {0}, total = 0, test;
-	int agc_out, i, peak_detect_threshold;
+	int agc_out, i, peak_detect_threshold = 0;
 
 	if (AR_SREV_9550(ah) || AR_SREV_9531(ah))
 		peak_detect_threshold = 8;
-	else
-		peak_detect_threshold = 0;
+	else if (AR_SREV_9561(ah))
+		peak_detect_threshold = 11;
 
 	/*
 	 * Turn off LNA/SW.
@@ -1249,16 +1244,14 @@ static void ar9003_hw_manual_peak_cal(struct ath_hw *ah, u8 chain, bool is_2g)
 		REG_RMW_FIELD(ah, AR_PHY_65NM_RXRF_AGC(chain),
 			      AR_PHY_65NM_RXRF_AGC_AGC2G_CALDAC_OVR, 0x0);
 
-	if (AR_SREV_9003_PCOEM(ah) || AR_SREV_9550(ah) || AR_SREV_9531(ah)) {
-		if (is_2g)
-			REG_RMW_FIELD(ah, AR_PHY_65NM_RXRF_AGC(chain),
-				      AR_PHY_65NM_RXRF_AGC_AGC2G_DBDAC_OVR,
-				      peak_detect_threshold);
-		else
-			REG_RMW_FIELD(ah, AR_PHY_65NM_RXRF_AGC(chain),
-				      AR_PHY_65NM_RXRF_AGC_AGC5G_DBDAC_OVR,
-				      peak_detect_threshold);
-	}
+	if (is_2g)
+		REG_RMW_FIELD(ah, AR_PHY_65NM_RXRF_AGC(chain),
+			      AR_PHY_65NM_RXRF_AGC_AGC2G_DBDAC_OVR,
+			      peak_detect_threshold);
+	else
+		REG_RMW_FIELD(ah, AR_PHY_65NM_RXRF_AGC(chain),
+			      AR_PHY_65NM_RXRF_AGC_AGC5G_DBDAC_OVR,
+			      peak_detect_threshold);
 
 	for (i = 6; i > 0; i--) {
 		offset[i] = BIT(i - 1);
@@ -1310,9 +1303,6 @@ static void ar9003_hw_do_pcoem_manual_peak_cal(struct ath_hw *ah,
 	struct ath9k_hw_cal_data *caldata = ah->caldata;
 	int i;
 
-	if (!AR_SREV_9462(ah) && !AR_SREV_9565(ah) && !AR_SREV_9485(ah))
-		return;
-
 	if ((ah->caps.hw_caps & ATH9K_HW_CAP_RTT) && !run_rtt_cal)
 		return;
 
@@ -1356,7 +1346,7 @@ static void ar9003_hw_cl_cal_post_proc(struct ath_hw *ah, bool is_reusable)
 	if (!caldata || !(ah->enabled_cals & TX_CL_CAL))
 		return;
 
-	txclcal_done = !!(REG_READ(ah, AR_PHY_AGC_CONTROL) &
+	txclcal_done = !!(REG_READ(ah, AR_PHY_AGC_CONTROL(ah)) &
 			  AR_PHY_AGC_CONTROL_CLC_SUCCESS);
 
 	if (test_bit(TXCLCAL_DONE, &caldata->cal_flags)) {
@@ -1377,6 +1367,26 @@ static void ar9003_hw_cl_cal_post_proc(struct ath_hw *ah, bool is_reusable)
 		}
 		set_bit(TXCLCAL_DONE, &caldata->cal_flags);
 	}
+}
+
+static void ar9003_hw_init_cal_common(struct ath_hw *ah)
+{
+	struct ath9k_hw_cal_data *caldata = ah->caldata;
+
+	/* Initialize list pointers */
+	ah->cal_list = ah->cal_list_last = ah->cal_list_curr = NULL;
+
+	INIT_CAL(&ah->iq_caldata);
+	INSERT_CAL(ah, &ah->iq_caldata);
+
+	/* Initialize current pointer to first element in list */
+	ah->cal_list_curr = ah->cal_list;
+
+	if (ah->cal_list_curr)
+		ath9k_hw_reset_calibration(ah, ah->cal_list_curr);
+
+	if (caldata)
+		caldata->CalValid = 0;
 }
 
 static bool ar9003_hw_init_cal_pcoem(struct ath_hw *ah,
@@ -1414,12 +1424,12 @@ static bool ar9003_hw_init_cal_pcoem(struct ath_hw *ah,
 
 	if (rtt) {
 		if (!run_rtt_cal) {
-			agc_ctrl = REG_READ(ah, AR_PHY_AGC_CONTROL);
+			agc_ctrl = REG_READ(ah, AR_PHY_AGC_CONTROL(ah));
 			agc_supp_cals &= agc_ctrl;
 			agc_ctrl &= ~(AR_PHY_AGC_CONTROL_OFFSET_CAL |
 				      AR_PHY_AGC_CONTROL_FLTR_CAL |
 				      AR_PHY_AGC_CONTROL_PKDET_CAL);
-			REG_WRITE(ah, AR_PHY_AGC_CONTROL, agc_ctrl);
+			REG_WRITE(ah, AR_PHY_AGC_CONTROL(ah), agc_ctrl);
 		} else {
 			if (ah->ah_flags & AH_FASTCC)
 				run_agc_cal = true;
@@ -1442,7 +1452,7 @@ static bool ar9003_hw_init_cal_pcoem(struct ath_hw *ah,
 		goto skip_tx_iqcal;
 
 	/* Do Tx IQ Calibration */
-	REG_RMW_FIELD(ah, AR_PHY_TX_IQCAL_CONTROL_1,
+	REG_RMW_FIELD(ah, AR_PHY_TX_IQCAL_CONTROL_1(ah),
 		      AR_PHY_TX_IQCAL_CONTROL_1_IQCORR_I_Q_COFF_DELPT,
 		      DELPT);
 
@@ -1452,10 +1462,10 @@ static bool ar9003_hw_init_cal_pcoem(struct ath_hw *ah,
 	 */
 	if (ah->enabled_cals & TX_IQ_ON_AGC_CAL) {
 		if (caldata && !test_bit(TXIQCAL_DONE, &caldata->cal_flags))
-			REG_SET_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0,
+			REG_SET_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0(ah),
 				    AR_PHY_TX_IQCAL_CONTROL_0_ENABLE_TXIQ_CAL);
 		else
-			REG_CLR_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0,
+			REG_CLR_BIT(ah, AR_PHY_TX_IQCAL_CONTROL_0(ah),
 				    AR_PHY_TX_IQCAL_CONTROL_0_ENABLE_TXIQ_CAL);
 		txiqcal_done = run_agc_cal = true;
 	}
@@ -1475,12 +1485,12 @@ skip_tx_iqcal:
 
 	if (run_agc_cal || !(ah->ah_flags & AH_FASTCC)) {
 		/* Calibrate the AGC */
-		REG_WRITE(ah, AR_PHY_AGC_CONTROL,
-			  REG_READ(ah, AR_PHY_AGC_CONTROL) |
+		REG_WRITE(ah, AR_PHY_AGC_CONTROL(ah),
+			  REG_READ(ah, AR_PHY_AGC_CONTROL(ah)) |
 			  AR_PHY_AGC_CONTROL_CAL);
 
 		/* Poll for offset calibration complete */
-		status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL,
+		status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL(ah),
 				       AR_PHY_AGC_CONTROL_CAL,
 				       0, AH_WAIT_TIMEOUT);
 
@@ -1497,7 +1507,7 @@ skip_tx_iqcal:
 
 	if (rtt && !run_rtt_cal) {
 		agc_ctrl |= agc_supp_cals;
-		REG_WRITE(ah, AR_PHY_AGC_CONTROL, agc_ctrl);
+		REG_WRITE(ah, AR_PHY_AGC_CONTROL(ah), agc_ctrl);
 	}
 
 	if (!status) {
@@ -1538,21 +1548,7 @@ skip_tx_iqcal:
 	/* Revert chainmask to runtime parameters */
 	ar9003_hw_set_chain_masks(ah, ah->rxchainmask, ah->txchainmask);
 
-	/* Initialize list pointers */
-	ah->cal_list = ah->cal_list_last = ah->cal_list_curr = NULL;
-
-	INIT_CAL(&ah->iq_caldata);
-	INSERT_CAL(ah, &ah->iq_caldata);
-	ath_dbg(common, CALIBRATE, "enabling IQ Calibration\n");
-
-	/* Initialize current pointer to first element in list */
-	ah->cal_list_curr = ah->cal_list;
-
-	if (ah->cal_list_curr)
-		ath9k_hw_reset_calibration(ah, ah->cal_list_curr);
-
-	if (caldata)
-		caldata->CalValid = 0;
+	ar9003_hw_init_cal_common(ah);
 
 	return true;
 }
@@ -1562,11 +1558,11 @@ static bool do_ar9003_agc_cal(struct ath_hw *ah)
 	struct ath_common *common = ath9k_hw_common(ah);
 	bool status;
 
-	REG_WRITE(ah, AR_PHY_AGC_CONTROL,
-		  REG_READ(ah, AR_PHY_AGC_CONTROL) |
+	REG_WRITE(ah, AR_PHY_AGC_CONTROL(ah),
+		  REG_READ(ah, AR_PHY_AGC_CONTROL(ah)) |
 		  AR_PHY_AGC_CONTROL_CAL);
 
-	status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL,
+	status = ath9k_hw_wait(ah, AR_PHY_AGC_CONTROL(ah),
 			       AR_PHY_AGC_CONTROL_CAL,
 			       0, AH_WAIT_TIMEOUT);
 	if (!status) {
@@ -1583,8 +1579,6 @@ static bool do_ar9003_agc_cal(struct ath_hw *ah)
 static bool ar9003_hw_init_cal_soc(struct ath_hw *ah,
 				   struct ath9k_channel *chan)
 {
-	struct ath_common *common = ath9k_hw_common(ah);
-	struct ath9k_hw_cal_data *caldata = ah->caldata;
 	bool txiqcal_done = false;
 	bool status = true;
 	bool run_agc_cal = false, sep_iq_cal = false;
@@ -1602,7 +1596,7 @@ static bool ar9003_hw_init_cal_soc(struct ath_hw *ah,
 		goto skip_tx_iqcal;
 
 	/* Do Tx IQ Calibration */
-	REG_RMW_FIELD(ah, AR_PHY_TX_IQCAL_CONTROL_1,
+	REG_RMW_FIELD(ah, AR_PHY_TX_IQCAL_CONTROL_1(ah),
 		      AR_PHY_TX_IQCAL_CONTROL_1_IQCORR_I_Q_COFF_DELPT,
 		      DELPT);
 
@@ -1611,7 +1605,7 @@ static bool ar9003_hw_init_cal_soc(struct ath_hw *ah,
 	 * AGC calibration. Specifically, AR9550 in SoC chips.
 	 */
 	if (ah->enabled_cals & TX_IQ_ON_AGC_CAL) {
-		if (REG_READ_FIELD(ah, AR_PHY_TX_IQCAL_CONTROL_0,
+		if (REG_READ_FIELD(ah, AR_PHY_TX_IQCAL_CONTROL_0(ah),
 				   AR_PHY_TX_IQCAL_CONTROL_0_ENABLE_TXIQ_CAL)) {
 				txiqcal_done = true;
 		} else {
@@ -1640,13 +1634,12 @@ static bool ar9003_hw_init_cal_soc(struct ath_hw *ah,
 
 skip_tx_iqcal:
 	if (run_agc_cal || !(ah->ah_flags & AH_FASTCC)) {
-		if (AR_SREV_9330_11(ah) || AR_SREV_9531(ah) || AR_SREV_9550(ah)) {
-			for (i = 0; i < AR9300_MAX_CHAINS; i++) {
-				if (!(ah->rxchainmask & (1 << i)))
-					continue;
-				ar9003_hw_manual_peak_cal(ah, i,
-							  IS_CHAN_2GHZ(chan));
-			}
+		for (i = 0; i < AR9300_MAX_CHAINS; i++) {
+			if (!(ah->rxchainmask & (1 << i)))
+				continue;
+
+			ar9003_hw_manual_peak_cal(ah, i,
+						  IS_CHAN_2GHZ(chan));
 		}
 
 		/*
@@ -1683,21 +1676,7 @@ skip_tx_iqcal:
 	/* Revert chainmask to runtime parameters */
 	ar9003_hw_set_chain_masks(ah, ah->rxchainmask, ah->txchainmask);
 
-	/* Initialize list pointers */
-	ah->cal_list = ah->cal_list_last = ah->cal_list_curr = NULL;
-
-	INIT_CAL(&ah->iq_caldata);
-	INSERT_CAL(ah, &ah->iq_caldata);
-	ath_dbg(common, CALIBRATE, "enabling IQ Calibration\n");
-
-	/* Initialize current pointer to first element in list */
-	ah->cal_list_curr = ah->cal_list;
-
-	if (ah->cal_list_curr)
-		ath9k_hw_reset_calibration(ah, ah->cal_list_curr);
-
-	if (caldata)
-		caldata->CalValid = 0;
+	ar9003_hw_init_cal_common(ah);
 
 	return true;
 }
@@ -1707,7 +1686,7 @@ void ar9003_hw_attach_calib_ops(struct ath_hw *ah)
 	struct ath_hw_private_ops *priv_ops = ath9k_hw_private_ops(ah);
 	struct ath_hw_ops *ops = ath9k_hw_ops(ah);
 
-	if (AR_SREV_9485(ah) || AR_SREV_9462(ah) || AR_SREV_9565(ah))
+	if (AR_SREV_9003_PCOEM(ah))
 		priv_ops->init_cal = ar9003_hw_init_cal_pcoem;
 	else
 		priv_ops->init_cal = ar9003_hw_init_cal_soc;

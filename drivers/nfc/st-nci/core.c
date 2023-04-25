@@ -1,30 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * NCI based Driver for STMicroelectronics NFC Chip
  *
  * Copyright (C) 2014-2015  STMicroelectronics SAS. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/module.h>
 #include <linux/nfc.h>
 #include <net/nfc/nci.h>
 #include <net/nfc/nci_core.h>
-#include <linux/gpio.h>
-#include <linux/delay.h>
 
 #include "st-nci.h"
-#include "st-nci_se.h"
 
 #define DRIVER_DESC "NCI NFC driver for ST_NCI"
 
@@ -98,7 +84,7 @@ static int st_nci_prop_rsp_packet(struct nci_dev *ndev,
 	return 0;
 }
 
-static struct nci_prop_ops st_nci_prop_ops[] = {
+static const struct nci_driver_ops st_nci_prop_ops[] = {
 	{
 		.opcode = nci_opcode_pack(NCI_GID_PROPRIETARY,
 					  ST_NCI_CORE_PROP),
@@ -106,7 +92,7 @@ static struct nci_prop_ops st_nci_prop_ops[] = {
 	},
 };
 
-static struct nci_ops st_nci_ops = {
+static const struct nci_ops st_nci_ops = {
 	.init = st_nci_init,
 	.open = st_nci_open,
 	.close = st_nci_close,
@@ -124,7 +110,7 @@ static struct nci_ops st_nci_ops = {
 };
 
 int st_nci_probe(struct llt_ndlc *ndlc, int phy_headroom,
-		       int phy_tailroom)
+		 int phy_tailroom, struct st_nci_se_status *se_status)
 {
 	struct st_nci_info *info;
 	int r;
@@ -143,6 +129,7 @@ int st_nci_probe(struct llt_ndlc *ndlc, int phy_headroom,
 		| NFC_PROTO_ISO15693_MASK
 		| NFC_PROTO_NFC_DEP_MASK;
 
+	BUILD_BUG_ON(ARRAY_SIZE(st_nci_prop_ops) > NCI_MAX_PROPRIETARY_CMD);
 	ndlc->ndev = nci_allocate_device(&st_nci_ops, protocols,
 					phy_headroom, phy_tailroom);
 	if (!ndlc->ndev) {
@@ -153,14 +140,23 @@ int st_nci_probe(struct llt_ndlc *ndlc, int phy_headroom,
 
 	nci_set_drvdata(ndlc->ndev, info);
 
+	r = st_nci_vendor_cmds_init(ndlc->ndev);
+	if (r) {
+		pr_err("Cannot register proprietary vendor cmds\n");
+		goto err_reg_dev;
+	}
+
 	r = nci_register_device(ndlc->ndev);
 	if (r) {
 		pr_err("Cannot register nfc device to nci core\n");
-		nci_free_device(ndlc->ndev);
-		return r;
+		goto err_reg_dev;
 	}
 
-	return st_nci_se_init(ndlc->ndev);
+	return st_nci_se_init(ndlc->ndev, se_status);
+
+err_reg_dev:
+	nci_free_device(ndlc->ndev);
+	return r;
 }
 EXPORT_SYMBOL_GPL(st_nci_probe);
 

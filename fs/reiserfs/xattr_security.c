@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include "reiserfs.h"
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -9,45 +10,49 @@
 #include <linux/uaccess.h>
 
 static int
-security_get(struct dentry *dentry, const char *name, void *buffer, size_t size,
-		int handler_flags)
+security_get(const struct xattr_handler *handler, struct dentry *unused,
+	     struct inode *inode, const char *name, void *buffer, size_t size)
 {
-	if (strlen(name) < sizeof(XATTR_SECURITY_PREFIX))
-		return -EINVAL;
-
-	if (IS_PRIVATE(d_inode(dentry)))
+	if (IS_PRIVATE(inode))
 		return -EPERM;
 
-	return reiserfs_xattr_get(d_inode(dentry), name, buffer, size);
+	return reiserfs_xattr_get(inode, xattr_full_name(handler, name),
+				  buffer, size);
 }
 
 static int
-security_set(struct dentry *dentry, const char *name, const void *buffer,
-	     size_t size, int flags, int handler_flags)
+security_set(const struct xattr_handler *handler,
+	     struct mnt_idmap *idmap, struct dentry *unused,
+	     struct inode *inode, const char *name, const void *buffer,
+	     size_t size, int flags)
 {
-	if (strlen(name) < sizeof(XATTR_SECURITY_PREFIX))
-		return -EINVAL;
-
-	if (IS_PRIVATE(d_inode(dentry)))
+	if (IS_PRIVATE(inode))
 		return -EPERM;
 
-	return reiserfs_xattr_set(d_inode(dentry), name, buffer, size, flags);
+	return reiserfs_xattr_set(inode,
+				  xattr_full_name(handler, name),
+				  buffer, size, flags);
 }
 
-static size_t security_list(struct dentry *dentry, char *list, size_t list_len,
-			    const char *name, size_t namelen, int handler_flags)
+static bool security_list(struct dentry *dentry)
 {
-	const size_t len = namelen + 1;
+	return !IS_PRIVATE(d_inode(dentry));
+}
 
-	if (IS_PRIVATE(d_inode(dentry)))
-		return 0;
+static int
+reiserfs_initxattrs(struct inode *inode, const struct xattr *xattr_array,
+		    void *fs_info)
+{
+	struct reiserfs_security_handle *sec = fs_info;
 
-	if (list && len <= list_len) {
-		memcpy(list, name, namelen);
-		list[namelen] = '\0';
-	}
+	sec->value = kmemdup(xattr_array->value, xattr_array->value_len,
+			     GFP_KERNEL);
+	if (!sec->value)
+		return -ENOMEM;
 
-	return len;
+	sec->name = xattr_array->name;
+	sec->length = xattr_array->value_len;
+	return 0;
 }
 
 /* Initializes the security context for a new inode and returns the number
@@ -61,17 +66,15 @@ int reiserfs_security_init(struct inode *dir, struct inode *inode,
 	int error;
 
 	sec->name = NULL;
+	sec->value = NULL;
 
 	/* Don't add selinux attributes on xattrs - they'll never get used */
 	if (IS_PRIVATE(dir))
 		return 0;
 
-	error = security_old_inode_init_security(inode, dir, qstr, &sec->name,
-						 &sec->value, &sec->length);
+	error = security_inode_init_security(inode, dir, qstr,
+					     &reiserfs_initxattrs, sec);
 	if (error) {
-		if (error == -EOPNOTSUPP)
-			error = 0;
-
 		sec->name = NULL;
 		sec->value = NULL;
 		sec->length = 0;
@@ -92,11 +95,15 @@ int reiserfs_security_write(struct reiserfs_transaction_handle *th,
 			    struct inode *inode,
 			    struct reiserfs_security_handle *sec)
 {
+	char xattr_name[XATTR_NAME_MAX + 1] = XATTR_SECURITY_PREFIX;
 	int error;
-	if (strlen(sec->name) < sizeof(XATTR_SECURITY_PREFIX))
+
+	if (XATTR_SECURITY_PREFIX_LEN + strlen(sec->name) > XATTR_NAME_MAX)
 		return -EINVAL;
 
-	error = reiserfs_xattr_set_handle(th, inode, sec->name, sec->value,
+	strlcat(xattr_name, sec->name, sizeof(xattr_name));
+
+	error = reiserfs_xattr_set_handle(th, inode, xattr_name, sec->value,
 					  sec->length, XATTR_CREATE);
 	if (error == -ENODATA || error == -EOPNOTSUPP)
 		error = 0;
@@ -106,7 +113,6 @@ int reiserfs_security_write(struct reiserfs_transaction_handle *th,
 
 void reiserfs_security_free(struct reiserfs_security_handle *sec)
 {
-	kfree(sec->name);
 	kfree(sec->value);
 	sec->name = NULL;
 	sec->value = NULL;

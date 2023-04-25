@@ -1,23 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 1996, 2003 VIA Networking Technologies, Inc.
  * All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- *
- * File: mac.c
  *
  * Purpose:  MAC routines
  *
@@ -26,18 +10,16 @@
  * Date: May 21, 1996
  *
  * Functions:
- *      MACbIsRegBitsOn - Test if All test Bits On
- *      MACbIsRegBitsOff - Test if All test Bits Off
- *      MACbIsIntDisable - Test if MAC interrupt disable
- *      MACvSetShortRetryLimit - Set 802.11 Short Retry limit
+ *      vt6655_mac_is_reg_bits_off - Test if All test Bits Off
+ *      vt6655_mac_set_short_retry_limit - Set 802.11 Short Retry limit
  *      MACvSetLongRetryLimit - Set 802.11 Long Retry limit
- *      MACvSetLoopbackMode - Set MAC Loopback Mode
- *      MACvSaveContext - Save Context of MAC Registers
- *      MACvRestoreContext - Restore Context of MAC Registers
+ *      vt6655_mac_set_loopback_mode - Set MAC Loopback Mode
+ *      vt6655_mac_save_context - Save Context of MAC Registers
+ *      vt6655_mac_restore_context - Restore Context of MAC Registers
  *      MACbSoftwareReset - Software Reset MAC
- *      MACbSafeRxOff - Turn Off MAC Rx
- *      MACbSafeTxOff - Turn Off MAC Tx
- *      MACbSafeStop - Stop MAC function
+ *      vt6655_mac_safe_rx_off - Turn Off MAC Rx
+ *      vt6655_mac_safe_tx_off - Turn Off MAC Tx
+ *      vt6655_mac_safe_stop - Stop MAC function
  *      MACbShutdown - Shut down MAC
  *      MACvInitialize - Initialize MAC
  *      MACvSetCurrRxDescAddr - Set Rx Descriptors Address
@@ -47,36 +29,53 @@
  *
  * Revision History:
  *      08-22-2003 Kyle Hsu     :  Porting MAC functions from sim53
- *      09-03-2003 Bryan YC Fan :  Add MACvClearBusSusInd()& MACvEnableBusSusEn()
+ *      09-03-2003 Bryan YC Fan :  Add MACvClearBusSusInd()&
+ *				   MACvEnableBusSusEn()
  *      09-18-2003 Jerry Chen   :  Add MACvSetKeyEntry & MACvDisableKeyEntry
  *
  */
 
-#include "tmacro.h"
 #include "mac.h"
 
-/*
- * Description:
- *      Test if all test bits on
- *
- * Parameters:
- *  In:
- *      dwIoBase    - Base Address for MAC
- *      byRegOfs    - Offset of MAC Register
- *      byTestBits  - Test bits
- *  Out:
- *      none
- *
- * Return Value: true if all test bits On; otherwise false
- *
- */
-bool MACbIsRegBitsOn(void __iomem *dwIoBase, unsigned char byRegOfs,
-		     unsigned char byTestBits)
+void vt6655_mac_reg_bits_on(void __iomem *iobase, const u8 reg_offset, const u8 bit_mask)
 {
-	unsigned char byData;
+	unsigned char reg_value;
 
-	VNSvInPortB(dwIoBase + byRegOfs, &byData);
-	return (byData & byTestBits) == byTestBits;
+	reg_value = ioread8(iobase + reg_offset);
+	iowrite8(reg_value | bit_mask, iobase + reg_offset);
+}
+
+void vt6655_mac_word_reg_bits_on(void __iomem *iobase, const u8 reg_offset, const u16 bit_mask)
+{
+	unsigned short reg_value;
+
+	reg_value = ioread16(iobase + reg_offset);
+	iowrite16(reg_value | (bit_mask), iobase + reg_offset);
+}
+
+void vt6655_mac_reg_bits_off(void __iomem *iobase, const u8 reg_offset, const u8 bit_mask)
+{
+	unsigned char reg_value;
+
+	reg_value = ioread8(iobase + reg_offset);
+	iowrite8(reg_value & ~(bit_mask), iobase + reg_offset);
+}
+
+void vt6655_mac_word_reg_bits_off(void __iomem *iobase, const u8 reg_offset, const u16 bit_mask)
+{
+	unsigned short reg_value;
+
+	reg_value = ioread16(iobase + reg_offset);
+	iowrite16(reg_value & ~(bit_mask), iobase + reg_offset);
+}
+
+static void vt6655_mac_clear_stck_ds(void __iomem *iobase)
+{
+	u8 reg_value;
+
+	reg_value = ioread8(iobase + MAC_REG_STICKHW);
+	reg_value = reg_value & 0xFC;
+	iowrite8(reg_value, iobase + MAC_REG_STICKHW);
 }
 
 /*
@@ -85,46 +84,22 @@ bool MACbIsRegBitsOn(void __iomem *dwIoBase, unsigned char byRegOfs,
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
- *      byRegOfs    - Offset of MAC Register
- *      byTestBits  - Test bits
+ *      io_base    - Base Address for MAC
+ *      reg_offset - Offset of MAC Register
+ *      mask       - Test bits
  *  Out:
  *      none
  *
  * Return Value: true if all test bits Off; otherwise false
  *
  */
-bool MACbIsRegBitsOff(void __iomem *dwIoBase, unsigned char byRegOfs,
-		      unsigned char byTestBits)
+static bool vt6655_mac_is_reg_bits_off(struct vnt_private *priv,
+				       unsigned char reg_offset,
+				       unsigned char mask)
 {
-	unsigned char byData;
+	void __iomem *io_base = priv->port_offset;
 
-	VNSvInPortB(dwIoBase + byRegOfs, &byData);
-	return !(byData & byTestBits);
-}
-
-/*
- * Description:
- *      Test if MAC interrupt disable
- *
- * Parameters:
- *  In:
- *      dwIoBase    - Base Address for MAC
- *  Out:
- *      none
- *
- * Return Value: true if interrupt is disable; otherwise false
- *
- */
-bool MACbIsIntDisable(void __iomem *dwIoBase)
-{
-	unsigned long dwData;
-
-	VNSvInPortD(dwIoBase + MAC_REG_IMR, &dwData);
-	if (dwData != 0)
-		return false;
-
-	return true;
+	return !(ioread8(io_base + reg_offset) & mask);
 }
 
 /*
@@ -133,20 +108,20 @@ bool MACbIsIntDisable(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
- *      byRetryLimit- Retry Limit
+ *      io_base    - Base Address for MAC
+ *      retry_limit - Retry Limit
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvSetShortRetryLimit(void __iomem *dwIoBase, unsigned char byRetryLimit)
+void vt6655_mac_set_short_retry_limit(struct vnt_private *priv, unsigned char retry_limit)
 {
+	void __iomem *io_base = priv->port_offset;
 	/* set SRT */
-	VNSvOutPortB(dwIoBase + MAC_REG_SRT, byRetryLimit);
+	iowrite8(retry_limit, io_base + MAC_REG_SRT);
 }
-
 
 /*
  * Description:
@@ -154,7 +129,7 @@ void MACvSetShortRetryLimit(void __iomem *dwIoBase, unsigned char byRetryLimit)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *      byRetryLimit- Retry Limit
  *  Out:
  *      none
@@ -162,10 +137,12 @@ void MACvSetShortRetryLimit(void __iomem *dwIoBase, unsigned char byRetryLimit)
  * Return Value: none
  *
  */
-void MACvSetLongRetryLimit(void __iomem *dwIoBase, unsigned char byRetryLimit)
+void MACvSetLongRetryLimit(struct vnt_private *priv,
+			   unsigned char byRetryLimit)
 {
+	void __iomem *io_base = priv->port_offset;
 	/* set LRT */
-	VNSvOutPortB(dwIoBase + MAC_REG_LRT, byRetryLimit);
+	iowrite8(byRetryLimit, io_base + MAC_REG_LRT);
 }
 
 /*
@@ -174,24 +151,21 @@ void MACvSetLongRetryLimit(void __iomem *dwIoBase, unsigned char byRetryLimit)
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
- *      byLoopbackMode  - Loopback Mode
+ *      io_base        - Base Address for MAC
+ *      loopback_mode  - Loopback Mode
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvSetLoopbackMode(void __iomem *dwIoBase, unsigned char byLoopbackMode)
+static void vt6655_mac_set_loopback_mode(struct vnt_private *priv, u8 loopback_mode)
 {
-	unsigned char byOrgValue;
+	void __iomem *io_base = priv->port_offset;
 
-	byLoopbackMode <<= 6;
+	loopback_mode <<= 6;
 	/* set TCR */
-	VNSvInPortB(dwIoBase + MAC_REG_TEST, &byOrgValue);
-	byOrgValue = byOrgValue & 0x3F;
-	byOrgValue = byOrgValue | byLoopbackMode;
-	VNSvOutPortB(dwIoBase + MAC_REG_TEST, byOrgValue);
+	iowrite8((ioread8(io_base + MAC_REG_TEST) & 0x3f) | loopback_mode, io_base + MAC_REG_TEST);
 }
 
 /*
@@ -200,29 +174,27 @@ void MACvSetLoopbackMode(void __iomem *dwIoBase, unsigned char byLoopbackMode)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
- *      pbyCxtBuf   - Context buffer
+ *      cxt_buf   - Context buffer
  *
  * Return Value: none
  *
  */
-void MACvSaveContext(void __iomem *dwIoBase, unsigned char *pbyCxtBuf)
+static void vt6655_mac_save_context(struct vnt_private *priv, u8 *cxt_buf)
 {
-	int         ii;
+	void __iomem *io_base = priv->port_offset;
 
 	/* read page0 register */
-	for (ii = 0; ii < MAC_MAX_CONTEXT_SIZE_PAGE0; ii++)
-		VNSvInPortB((dwIoBase + ii), (pbyCxtBuf + ii));
+	memcpy_fromio(cxt_buf, io_base, MAC_MAX_CONTEXT_SIZE_PAGE0);
 
-	MACvSelectPage1(dwIoBase);
+	VT6655_MAC_SELECT_PAGE1(io_base);
 
 	/* read page1 register */
-	for (ii = 0; ii < MAC_MAX_CONTEXT_SIZE_PAGE1; ii++)
-		VNSvInPortB((dwIoBase + ii),
-			    (pbyCxtBuf + MAC_MAX_CONTEXT_SIZE_PAGE0 + ii));
+	memcpy_fromio(cxt_buf + MAC_MAX_CONTEXT_SIZE_PAGE0, io_base,
+		      MAC_MAX_CONTEXT_SIZE_PAGE1);
 
-	MACvSelectPage0(dwIoBase);
+	VT6655_MAC_SELECT_PAGE0(io_base);
 }
 
 /*
@@ -231,53 +203,50 @@ void MACvSaveContext(void __iomem *dwIoBase, unsigned char *pbyCxtBuf)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
- *      pbyCxtBuf   - Context buffer
+ *      io_base    - Base Address for MAC
+ *      cxt_buf   - Context buffer
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvRestoreContext(void __iomem *dwIoBase, unsigned char *pbyCxtBuf)
+static void vt6655_mac_restore_context(struct vnt_private *priv, u8 *cxt_buf)
 {
-	int         ii;
+	void __iomem *io_base = priv->port_offset;
 
-	MACvSelectPage1(dwIoBase);
+	VT6655_MAC_SELECT_PAGE1(io_base);
 	/* restore page1 */
-	for (ii = 0; ii < MAC_MAX_CONTEXT_SIZE_PAGE1; ii++)
-		VNSvOutPortB((dwIoBase + ii),
-			     *(pbyCxtBuf + MAC_MAX_CONTEXT_SIZE_PAGE0 + ii));
+	memcpy_toio(io_base, cxt_buf + MAC_MAX_CONTEXT_SIZE_PAGE0,
+		    MAC_MAX_CONTEXT_SIZE_PAGE1);
 
-	MACvSelectPage0(dwIoBase);
+	VT6655_MAC_SELECT_PAGE0(io_base);
 
 	/* restore RCR,TCR,IMR... */
-	for (ii = MAC_REG_RCR; ii < MAC_REG_ISR; ii++)
-		VNSvOutPortB(dwIoBase + ii, *(pbyCxtBuf + ii));
+	memcpy_toio(io_base + MAC_REG_RCR, cxt_buf + MAC_REG_RCR,
+		    MAC_REG_ISR - MAC_REG_RCR);
 
 	/* restore MAC Config. */
-	for (ii = MAC_REG_LRT; ii < MAC_REG_PAGE1SEL; ii++)
-		VNSvOutPortB(dwIoBase + ii, *(pbyCxtBuf + ii));
+	memcpy_toio(io_base + MAC_REG_LRT, cxt_buf + MAC_REG_LRT,
+		    MAC_REG_PAGE1SEL - MAC_REG_LRT);
 
-	VNSvOutPortB(dwIoBase + MAC_REG_CFG, *(pbyCxtBuf + MAC_REG_CFG));
+	iowrite8(*(cxt_buf + MAC_REG_CFG), io_base + MAC_REG_CFG);
 
 	/* restore PS Config. */
-	for (ii = MAC_REG_PSCFG; ii < MAC_REG_BBREGCTL; ii++)
-		VNSvOutPortB(dwIoBase + ii, *(pbyCxtBuf + ii));
+	memcpy_toio(io_base + MAC_REG_PSCFG, cxt_buf + MAC_REG_PSCFG,
+		    MAC_REG_BBREGCTL - MAC_REG_PSCFG);
 
 	/* restore CURR_RX_DESC_ADDR, CURR_TX_DESC_ADDR */
-	VNSvOutPortD(dwIoBase + MAC_REG_TXDMAPTR0,
-		     *(unsigned long *)(pbyCxtBuf + MAC_REG_TXDMAPTR0));
-	VNSvOutPortD(dwIoBase + MAC_REG_AC0DMAPTR,
-		     *(unsigned long *)(pbyCxtBuf + MAC_REG_AC0DMAPTR));
-	VNSvOutPortD(dwIoBase + MAC_REG_BCNDMAPTR,
-		     *(unsigned long *)(pbyCxtBuf + MAC_REG_BCNDMAPTR));
-
-	VNSvOutPortD(dwIoBase + MAC_REG_RXDMAPTR0,
-		     *(unsigned long *)(pbyCxtBuf + MAC_REG_RXDMAPTR0));
-
-	VNSvOutPortD(dwIoBase + MAC_REG_RXDMAPTR1,
-		     *(unsigned long *)(pbyCxtBuf + MAC_REG_RXDMAPTR1));
+	iowrite32(*(u32 *)(cxt_buf + MAC_REG_TXDMAPTR0),
+		  io_base + MAC_REG_TXDMAPTR0);
+	iowrite32(*(u32 *)(cxt_buf + MAC_REG_AC0DMAPTR),
+		  io_base + MAC_REG_AC0DMAPTR);
+	iowrite32(*(u32 *)(cxt_buf + MAC_REG_BCNDMAPTR),
+		  io_base + MAC_REG_BCNDMAPTR);
+	iowrite32(*(u32 *)(cxt_buf + MAC_REG_RXDMAPTR0),
+		  io_base + MAC_REG_RXDMAPTR0);
+	iowrite32(*(u32 *)(cxt_buf + MAC_REG_RXDMAPTR1),
+		  io_base + MAC_REG_RXDMAPTR1);
 }
 
 /*
@@ -286,24 +255,23 @@ void MACvRestoreContext(void __iomem *dwIoBase, unsigned char *pbyCxtBuf)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: true if Reset Success; otherwise false
  *
  */
-bool MACbSoftwareReset(void __iomem *dwIoBase)
+bool MACbSoftwareReset(struct vnt_private *priv)
 {
-	unsigned char byData;
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
 
 	/* turn on HOSTCR_SOFTRST, just write 0x01 to reset */
-	VNSvOutPortB(dwIoBase + MAC_REG_HOSTCR, 0x01);
+	iowrite8(0x01, io_base + MAC_REG_HOSTCR);
 
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_HOSTCR, &byData);
-		if (!(byData & HOSTCR_SOFTRST))
+		if (!(ioread8(io_base + MAC_REG_HOSTCR) & HOSTCR_SOFTRST))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT)
@@ -313,34 +281,32 @@ bool MACbSoftwareReset(void __iomem *dwIoBase)
 
 /*
  * Description:
- *      save some important register's value, then do reset, then restore register's value
+ *      save some important register's value, then do reset, then restore
+ *	register's value
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: true if success; otherwise false
  *
  */
-bool MACbSafeSoftwareReset(void __iomem *dwIoBase)
+static void vt6655_mac_save_soft_reset(struct vnt_private *priv)
 {
-	unsigned char abyTmpRegData[MAC_MAX_CONTEXT_SIZE_PAGE0+MAC_MAX_CONTEXT_SIZE_PAGE1];
-	bool bRetVal;
+	u8 tmp_reg_data[MAC_MAX_CONTEXT_SIZE_PAGE0 + MAC_MAX_CONTEXT_SIZE_PAGE1];
 
 	/* PATCH....
 	 * save some important register's value, then do
 	 * reset, then restore register's value
 	 */
 	/* save MAC context */
-	MACvSaveContext(dwIoBase, abyTmpRegData);
+	vt6655_mac_save_context(priv, tmp_reg_data);
 	/* do reset */
-	bRetVal = MACbSoftwareReset(dwIoBase);
+	MACbSoftwareReset(priv);
 	/* restore MAC context, except CR0 */
-	MACvRestoreContext(dwIoBase, abyTmpRegData);
-
-	return bRetVal;
+	vt6655_mac_restore_context(priv, tmp_reg_data);
 }
 
 /*
@@ -349,27 +315,25 @@ bool MACbSafeSoftwareReset(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: true if success; otherwise false
  *
  */
-bool MACbSafeRxOff(void __iomem *dwIoBase)
+static bool vt6655_mac_safe_rx_off(struct vnt_private *priv)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
-	unsigned long dwData;
-	unsigned char byData;
 
 	/* turn off wow temp for turn off Rx safely */
 
 	/* Clear RX DMA0,1 */
-	VNSvOutPortD(dwIoBase + MAC_REG_RXDMACTL0, DMACTL_CLRRUN);
-	VNSvOutPortD(dwIoBase + MAC_REG_RXDMACTL1, DMACTL_CLRRUN);
+	iowrite32(DMACTL_CLRRUN, io_base + MAC_REG_RXDMACTL0);
+	iowrite32(DMACTL_CLRRUN, io_base + MAC_REG_RXDMACTL1);
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortD(dwIoBase + MAC_REG_RXDMACTL0, &dwData);
-		if (!(dwData & DMACTL_RUN))
+		if (!(ioread32(io_base + MAC_REG_RXDMACTL0) & DMACTL_RUN))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -377,8 +341,7 @@ bool MACbSafeRxOff(void __iomem *dwIoBase)
 		return false;
 	}
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortD(dwIoBase + MAC_REG_RXDMACTL1, &dwData);
-		if (!(dwData & DMACTL_RUN))
+		if (!(ioread32(io_base + MAC_REG_RXDMACTL1) & DMACTL_RUN))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -387,11 +350,10 @@ bool MACbSafeRxOff(void __iomem *dwIoBase)
 	}
 
 	/* try to safe shutdown RX */
-	MACvRegBitsOff(dwIoBase, MAC_REG_HOSTCR, HOSTCR_RXON);
+	vt6655_mac_reg_bits_off(io_base, MAC_REG_HOSTCR, HOSTCR_RXON);
 	/* W_MAX_TIMEOUT is the timeout period */
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_HOSTCR, &byData);
-		if (!(byData & HOSTCR_RXONST))
+		if (!(ioread8(io_base + MAC_REG_HOSTCR) & HOSTCR_RXONST))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -407,28 +369,26 @@ bool MACbSafeRxOff(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: true if success; otherwise false
  *
  */
-bool MACbSafeTxOff(void __iomem *dwIoBase)
+static bool vt6655_mac_safe_tx_off(struct vnt_private *priv)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
-	unsigned long dwData;
-	unsigned char byData;
 
 	/* Clear TX DMA */
 	/* Tx0 */
-	VNSvOutPortD(dwIoBase + MAC_REG_TXDMACTL0, DMACTL_CLRRUN);
+	iowrite32(DMACTL_CLRRUN, io_base + MAC_REG_TXDMACTL0);
 	/* AC0 */
-	VNSvOutPortD(dwIoBase + MAC_REG_AC0DMACTL, DMACTL_CLRRUN);
+	iowrite32(DMACTL_CLRRUN, io_base + MAC_REG_AC0DMACTL);
 
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortD(dwIoBase + MAC_REG_TXDMACTL0, &dwData);
-		if (!(dwData & DMACTL_RUN))
+		if (!(ioread32(io_base + MAC_REG_TXDMACTL0) & DMACTL_RUN))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -436,8 +396,7 @@ bool MACbSafeTxOff(void __iomem *dwIoBase)
 		return false;
 	}
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortD(dwIoBase + MAC_REG_AC0DMACTL, &dwData);
-		if (!(dwData & DMACTL_RUN))
+		if (!(ioread32(io_base + MAC_REG_AC0DMACTL) & DMACTL_RUN))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -446,12 +405,11 @@ bool MACbSafeTxOff(void __iomem *dwIoBase)
 	}
 
 	/* try to safe shutdown TX */
-	MACvRegBitsOff(dwIoBase, MAC_REG_HOSTCR, HOSTCR_TXON);
+	vt6655_mac_reg_bits_off(io_base, MAC_REG_HOSTCR, HOSTCR_TXON);
 
 	/* W_MAX_TIMEOUT is the timeout period */
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_HOSTCR, &byData);
-		if (!(byData & HOSTCR_TXONST))
+		if (!(ioread8(io_base + MAC_REG_HOSTCR) & HOSTCR_TXONST))
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -467,29 +425,31 @@ bool MACbSafeTxOff(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: true if success; otherwise false
  *
  */
-bool MACbSafeStop(void __iomem *dwIoBase)
+static bool vt6655_mac_safe_stop(struct vnt_private *priv)
 {
-	MACvRegBitsOff(dwIoBase, MAC_REG_TCR, TCR_AUTOBCNTX);
+	void __iomem *io_base = priv->port_offset;
 
-	if (!MACbSafeRxOff(dwIoBase)) {
-		pr_debug(" MACbSafeRxOff == false)\n");
-		MACbSafeSoftwareReset(dwIoBase);
+	vt6655_mac_reg_bits_off(io_base, MAC_REG_TCR, TCR_AUTOBCNTX);
+
+	if (!vt6655_mac_safe_rx_off(priv)) {
+		pr_debug(" vt6655_mac_safe_rx_off == false)\n");
+		vt6655_mac_save_soft_reset(priv);
 		return false;
 	}
-	if (!MACbSafeTxOff(dwIoBase)) {
-		pr_debug(" MACbSafeTxOff == false)\n");
-		MACbSafeSoftwareReset(dwIoBase);
+	if (!vt6655_mac_safe_tx_off(priv)) {
+		pr_debug(" vt6655_mac_safe_tx_off == false)\n");
+		vt6655_mac_save_soft_reset(priv);
 		return false;
 	}
 
-	MACvRegBitsOff(dwIoBase, MAC_REG_HOSTCR, HOSTCR_MACEN);
+	vt6655_mac_reg_bits_off(io_base, MAC_REG_HOSTCR, HOSTCR_MACEN);
 
 	return true;
 }
@@ -500,24 +460,25 @@ bool MACbSafeStop(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: true if success; otherwise false
  *
  */
-bool MACbShutdown(void __iomem *dwIoBase)
+bool MACbShutdown(struct vnt_private *priv)
 {
+	void __iomem *io_base = priv->port_offset;
 	/* disable MAC IMR */
-	MACvIntDisable(dwIoBase);
-	MACvSetLoopbackMode(dwIoBase, MAC_LB_INTERNAL);
+	iowrite32(0, io_base + MAC_REG_IMR);
+	vt6655_mac_set_loopback_mode(priv, MAC_LB_INTERNAL);
 	/* stop the adapter */
-	if (!MACbSafeStop(dwIoBase)) {
-		MACvSetLoopbackMode(dwIoBase, MAC_LB_NONE);
+	if (!vt6655_mac_safe_stop(priv)) {
+		vt6655_mac_set_loopback_mode(priv, MAC_LB_NONE);
 		return false;
 	}
-	MACvSetLoopbackMode(dwIoBase, MAC_LB_NONE);
+	vt6655_mac_set_loopback_mode(priv, MAC_LB_NONE);
 	return true;
 }
 
@@ -527,28 +488,29 @@ bool MACbShutdown(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvInitialize(void __iomem *dwIoBase)
+void MACvInitialize(struct vnt_private *priv)
 {
+	void __iomem *io_base = priv->port_offset;
 	/* clear sticky bits */
-	MACvClearStckDS(dwIoBase);
+	vt6655_mac_clear_stck_ds(io_base);
 	/* disable force PME-enable */
-	VNSvOutPortB(dwIoBase + MAC_REG_PMC1, PME_OVR);
+	iowrite8(PME_OVR, io_base + MAC_REG_PMC1);
 	/* only 3253 A */
 
 	/* do reset */
-	MACbSoftwareReset(dwIoBase);
+	MACbSoftwareReset(priv);
 
 	/* reset TSF counter */
-	VNSvOutPortB(dwIoBase + MAC_REG_TFTCTL, TFTCTL_TSFCNTRST);
+	iowrite8(TFTCTL_TSFCNTRST, io_base + MAC_REG_TFTCTL);
 	/* enable TSF counter */
-	VNSvOutPortB(dwIoBase + MAC_REG_TFTCTL, TFTCTL_TSFCNTREN);
+	iowrite8(TFTCTL_TSFCNTREN, io_base + MAC_REG_TFTCTL);
 }
 
 /*
@@ -557,33 +519,32 @@ void MACvInitialize(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
- *      dwCurrDescAddr  - Descriptor Address
+ *      io_base        - Base Address for MAC
+ *      curr_desc_addr  - Descriptor Address
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvSetCurrRx0DescAddr(void __iomem *dwIoBase, unsigned long dwCurrDescAddr)
+void vt6655_mac_set_curr_rx_0_desc_addr(struct vnt_private *priv, u32 curr_desc_addr)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
-	unsigned char byData;
-	unsigned char byOrgDMACtl;
+	unsigned char org_dma_ctl;
 
-	VNSvInPortB(dwIoBase + MAC_REG_RXDMACTL0, &byOrgDMACtl);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_RXDMACTL0+2, DMACTL_RUN);
+	org_dma_ctl = ioread8(io_base + MAC_REG_RXDMACTL0);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_RXDMACTL0 + 2);
 
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_RXDMACTL0, &byData);
-		if (!(byData & DMACTL_RUN))
+		if (!(ioread8(io_base + MAC_REG_RXDMACTL0) & DMACTL_RUN))
 			break;
 	}
 
-	VNSvOutPortD(dwIoBase + MAC_REG_RXDMAPTR0, dwCurrDescAddr);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_RXDMACTL0, DMACTL_RUN);
+	iowrite32(curr_desc_addr, io_base + MAC_REG_RXDMAPTR0);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_RXDMACTL0);
 }
 
 /*
@@ -592,34 +553,32 @@ void MACvSetCurrRx0DescAddr(void __iomem *dwIoBase, unsigned long dwCurrDescAddr
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
- *      dwCurrDescAddr  - Descriptor Address
+ *      io_base        - Base Address for MAC
+ *      curr_desc_addr  - Descriptor Address
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvSetCurrRx1DescAddr(void __iomem *dwIoBase, unsigned long dwCurrDescAddr)
+void vt6655_mac_set_curr_rx_1_desc_addr(struct vnt_private *priv, u32 curr_desc_addr)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
-	unsigned char byData;
-	unsigned char byOrgDMACtl;
+	unsigned char org_dma_ctl;
 
-	VNSvInPortB(dwIoBase + MAC_REG_RXDMACTL1, &byOrgDMACtl);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_RXDMACTL1+2, DMACTL_RUN);
+	org_dma_ctl = ioread8(io_base + MAC_REG_RXDMACTL1);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_RXDMACTL1 + 2);
 
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_RXDMACTL1, &byData);
-		if (!(byData & DMACTL_RUN))
+		if (!(ioread8(io_base + MAC_REG_RXDMACTL1) & DMACTL_RUN))
 			break;
 	}
 
-	VNSvOutPortD(dwIoBase + MAC_REG_RXDMAPTR1, dwCurrDescAddr);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_RXDMACTL1, DMACTL_RUN);
-
+	iowrite32(curr_desc_addr, io_base + MAC_REG_RXDMAPTR1);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_RXDMACTL1);
 }
 
 /*
@@ -628,34 +587,32 @@ void MACvSetCurrRx1DescAddr(void __iomem *dwIoBase, unsigned long dwCurrDescAddr
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
- *      dwCurrDescAddr  - Descriptor Address
+ *      io_base        - Base Address for MAC
+ *      curr_desc_addr  - Descriptor Address
  *  Out:
  *      none
  *
  * Return Value: none
  *
  */
-void MACvSetCurrTx0DescAddrEx(void __iomem *dwIoBase,
-			      unsigned long dwCurrDescAddr)
+static void vt6655_mac_set_curr_tx_0_desc_addr_ex(struct vnt_private *priv, u32 curr_desc_addr)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
-	unsigned char byData;
-	unsigned char byOrgDMACtl;
+	unsigned char org_dma_ctl;
 
-	VNSvInPortB(dwIoBase + MAC_REG_TXDMACTL0, &byOrgDMACtl);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_TXDMACTL0+2, DMACTL_RUN);
+	org_dma_ctl = ioread8(io_base + MAC_REG_TXDMACTL0);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_TXDMACTL0 + 2);
 
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_TXDMACTL0, &byData);
-		if (!(byData & DMACTL_RUN))
+		if (!(ioread8(io_base + MAC_REG_TXDMACTL0) & DMACTL_RUN))
 			break;
 	}
 
-	VNSvOutPortD(dwIoBase + MAC_REG_TXDMAPTR0, dwCurrDescAddr);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_TXDMACTL0, DMACTL_RUN);
+	iowrite32(curr_desc_addr, io_base + MAC_REG_TXDMAPTR0);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_TXDMACTL0);
 }
 
 /*
@@ -664,8 +621,8 @@ void MACvSetCurrTx0DescAddrEx(void __iomem *dwIoBase,
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
- *      dwCurrDescAddr  - Descriptor Address
+ *      io_base        - Base Address for MAC
+ *      curr_desc_addr  - Descriptor Address
  *  Out:
  *      none
  *
@@ -673,37 +630,33 @@ void MACvSetCurrTx0DescAddrEx(void __iomem *dwIoBase,
  *
  */
 /* TxDMA1 = AC0DMA */
-void MACvSetCurrAC0DescAddrEx(void __iomem *dwIoBase,
-			      unsigned long dwCurrDescAddr)
+static void vt6655_mac_set_curr_ac_0_desc_addr_ex(struct vnt_private *priv, u32 curr_desc_addr)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned short ww;
-	unsigned char byData;
-	unsigned char byOrgDMACtl;
+	unsigned char org_dma_ctl;
 
-	VNSvInPortB(dwIoBase + MAC_REG_AC0DMACTL, &byOrgDMACtl);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_AC0DMACTL+2, DMACTL_RUN);
+	org_dma_ctl = ioread8(io_base + MAC_REG_AC0DMACTL);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_AC0DMACTL + 2);
 
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_AC0DMACTL, &byData);
-		if (!(byData & DMACTL_RUN))
+		if (!(ioread8(io_base + MAC_REG_AC0DMACTL) & DMACTL_RUN))
 			break;
 	}
-	if (ww == W_MAX_TIMEOUT) {
+	if (ww == W_MAX_TIMEOUT)
 		pr_debug(" DBG_PORT80(0x26)\n");
-	}
-	VNSvOutPortD(dwIoBase + MAC_REG_AC0DMAPTR, dwCurrDescAddr);
-	if (byOrgDMACtl & DMACTL_RUN)
-		VNSvOutPortB(dwIoBase + MAC_REG_AC0DMACTL, DMACTL_RUN);
+	iowrite32(curr_desc_addr, io_base + MAC_REG_AC0DMAPTR);
+	if (org_dma_ctl & DMACTL_RUN)
+		iowrite8(DMACTL_RUN, io_base + MAC_REG_AC0DMACTL);
 }
 
-void MACvSetCurrTXDescAddr(int iTxType, void __iomem *dwIoBase,
-			   unsigned long dwCurrDescAddr)
+void vt6655_mac_set_curr_tx_desc_addr(int tx_type, struct vnt_private *priv, u32 curr_desc_addr)
 {
-	if (iTxType == TYPE_AC0DMA)
-		MACvSetCurrAC0DescAddrEx(dwIoBase, dwCurrDescAddr);
-	else if (iTxType == TYPE_TXDMA0)
-		MACvSetCurrTx0DescAddrEx(dwIoBase, dwCurrDescAddr);
+	if (tx_type == TYPE_AC0DMA)
+		vt6655_mac_set_curr_ac_0_desc_addr_ex(priv, curr_desc_addr);
+	else if (tx_type == TYPE_TXDMA0)
+		vt6655_mac_set_curr_tx_0_desc_addr_ex(priv, curr_desc_addr);
 }
 
 /*
@@ -712,7 +665,7 @@ void MACvSetCurrTXDescAddr(int iTxType, void __iomem *dwIoBase,
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *      uDelay      - Delay time (timer resolution is 4 us)
  *  Out:
  *      none
@@ -720,25 +673,26 @@ void MACvSetCurrTXDescAddr(int iTxType, void __iomem *dwIoBase,
  * Return Value: none
  *
  */
-void MACvTimer0MicroSDelay(void __iomem *dwIoBase, unsigned int uDelay)
+void MACvTimer0MicroSDelay(struct vnt_private *priv, unsigned int uDelay)
 {
+	void __iomem *io_base = priv->port_offset;
 	unsigned char byValue;
 	unsigned int uu, ii;
 
-	VNSvOutPortB(dwIoBase + MAC_REG_TMCTL0, 0);
-	VNSvOutPortD(dwIoBase + MAC_REG_TMDATA0, uDelay);
-	VNSvOutPortB(dwIoBase + MAC_REG_TMCTL0, (TMCTL_TMD | TMCTL_TE));
+	iowrite8(0, io_base + MAC_REG_TMCTL0);
+	iowrite32(uDelay, io_base + MAC_REG_TMDATA0);
+	iowrite8((TMCTL_TMD | TMCTL_TE), io_base + MAC_REG_TMCTL0);
 	for (ii = 0; ii < 66; ii++) {  /* assume max PCI clock is 66Mhz */
 		for (uu = 0; uu < uDelay; uu++) {
-			VNSvInPortB(dwIoBase + MAC_REG_TMCTL0, &byValue);
+			byValue = ioread8(io_base + MAC_REG_TMCTL0);
 			if ((byValue == 0) ||
 			    (byValue & TMCTL_TSUSP)) {
-				VNSvOutPortB(dwIoBase + MAC_REG_TMCTL0, 0);
+				iowrite8(0, io_base + MAC_REG_TMCTL0);
 				return;
 			}
 		}
 	}
-	VNSvOutPortB(dwIoBase + MAC_REG_TMCTL0, 0);
+	iowrite8(0, io_base + MAC_REG_TMCTL0);
 }
 
 /*
@@ -747,7 +701,7 @@ void MACvTimer0MicroSDelay(void __iomem *dwIoBase, unsigned int uDelay)
  *
  * Parameters:
  *  In:
- *      dwIoBase    - Base Address for MAC
+ *      io_base    - Base Address for MAC
  *      uDelay      - Delay time
  *  Out:
  *      none
@@ -755,38 +709,42 @@ void MACvTimer0MicroSDelay(void __iomem *dwIoBase, unsigned int uDelay)
  * Return Value: none
  *
  */
-void MACvOneShotTimer1MicroSec(void __iomem *dwIoBase, unsigned int uDelayTime)
+void MACvOneShotTimer1MicroSec(struct vnt_private *priv,
+			       unsigned int uDelayTime)
 {
-	VNSvOutPortB(dwIoBase + MAC_REG_TMCTL1, 0);
-	VNSvOutPortD(dwIoBase + MAC_REG_TMDATA1, uDelayTime);
-	VNSvOutPortB(dwIoBase + MAC_REG_TMCTL1, (TMCTL_TMD | TMCTL_TE));
+	void __iomem *io_base = priv->port_offset;
+
+	iowrite8(0, io_base + MAC_REG_TMCTL1);
+	iowrite32(uDelayTime, io_base + MAC_REG_TMDATA1);
+	iowrite8((TMCTL_TMD | TMCTL_TE), io_base + MAC_REG_TMCTL1);
 }
 
-void MACvSetMISCFifo(void __iomem *dwIoBase, unsigned short wOffset,
-		     unsigned long dwData)
+void MACvSetMISCFifo(struct vnt_private *priv, unsigned short offset,
+		     u32 data)
 {
-	if (wOffset > 273)
+	void __iomem *io_base = priv->port_offset;
+
+	if (offset > 273)
 		return;
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFNDEX, wOffset);
-	VNSvOutPortD(dwIoBase + MAC_REG_MISCFFDATA, dwData);
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFCTL, MISCFFCTL_WRITE);
+	iowrite16(offset, io_base + MAC_REG_MISCFFNDEX);
+	iowrite32(data, io_base + MAC_REG_MISCFFDATA);
+	iowrite16(MISCFFCTL_WRITE, io_base + MAC_REG_MISCFFCTL);
 }
 
-bool MACbPSWakeup(void __iomem *dwIoBase)
+bool MACbPSWakeup(struct vnt_private *priv)
 {
-	unsigned char byOrgValue;
+	void __iomem *io_base = priv->port_offset;
 	unsigned int ww;
 	/* Read PSCTL */
-	if (MACbIsRegBitsOff(dwIoBase, MAC_REG_PSCTL, PSCTL_PS))
+	if (vt6655_mac_is_reg_bits_off(priv, MAC_REG_PSCTL, PSCTL_PS))
 		return true;
 
 	/* Disable PS */
-	MACvRegBitsOff(dwIoBase, MAC_REG_PSCTL, PSCTL_PSEN);
+	vt6655_mac_reg_bits_off(io_base, MAC_REG_PSCTL, PSCTL_PSEN);
 
 	/* Check if SyncFlushOK */
 	for (ww = 0; ww < W_MAX_TIMEOUT; ww++) {
-		VNSvInPortB(dwIoBase + MAC_REG_PSCTL, &byOrgValue);
-		if (byOrgValue & PSCTL_WAKEDONE)
+		if (ioread8(io_base + MAC_REG_PSCTL) & PSCTL_WAKEDONE)
 			break;
 	}
 	if (ww == W_MAX_TIMEOUT) {
@@ -802,7 +760,7 @@ bool MACbPSWakeup(void __iomem *dwIoBase)
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
+ *      io_base        - Base Address for MAC
  *
  *  Out:
  *      none
@@ -811,57 +769,57 @@ bool MACbPSWakeup(void __iomem *dwIoBase)
  *
  */
 
-void MACvSetKeyEntry(void __iomem *dwIoBase, unsigned short wKeyCtl,
+void MACvSetKeyEntry(struct vnt_private *priv, unsigned short wKeyCtl,
 		     unsigned int uEntryIdx, unsigned int uKeyIdx,
 		     unsigned char *pbyAddr, u32 *pdwKey,
-		     unsigned char byLocalID)
+		     unsigned char local_id)
 {
-	unsigned short wOffset;
-	u32 dwData;
+	void __iomem *io_base = priv->port_offset;
+	unsigned short offset;
+	u32 data;
 	int     ii;
 
-	if (byLocalID <= 1)
+	if (local_id <= 1)
 		return;
 
-	pr_debug("MACvSetKeyEntry\n");
-	wOffset = MISCFIFO_KEYETRY0;
-	wOffset += (uEntryIdx * MISCFIFO_KEYENTRYSIZE);
+	offset = MISCFIFO_KEYETRY0;
+	offset += (uEntryIdx * MISCFIFO_KEYENTRYSIZE);
 
-	dwData = 0;
-	dwData |= wKeyCtl;
-	dwData <<= 16;
-	dwData |= MAKEWORD(*(pbyAddr+4), *(pbyAddr+5));
-	pr_debug("1. wOffset: %d, Data: %X, KeyCtl:%X\n",
-		 wOffset, dwData, wKeyCtl);
+	data = 0;
+	data |= wKeyCtl;
+	data <<= 16;
+	data |= MAKEWORD(*(pbyAddr + 4), *(pbyAddr + 5));
+	pr_debug("1. offset: %d, Data: %X, KeyCtl:%X\n",
+		 offset, data, wKeyCtl);
 
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFNDEX, wOffset);
-	VNSvOutPortD(dwIoBase + MAC_REG_MISCFFDATA, dwData);
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFCTL, MISCFFCTL_WRITE);
-	wOffset++;
+	iowrite16(offset, io_base + MAC_REG_MISCFFNDEX);
+	iowrite32(data, io_base + MAC_REG_MISCFFDATA);
+	iowrite16(MISCFFCTL_WRITE, io_base + MAC_REG_MISCFFCTL);
+	offset++;
 
-	dwData = 0;
-	dwData |= *(pbyAddr+3);
-	dwData <<= 8;
-	dwData |= *(pbyAddr+2);
-	dwData <<= 8;
-	dwData |= *(pbyAddr+1);
-	dwData <<= 8;
-	dwData |= *(pbyAddr+0);
-	pr_debug("2. wOffset: %d, Data: %X\n", wOffset, dwData);
+	data = 0;
+	data |= *(pbyAddr + 3);
+	data <<= 8;
+	data |= *(pbyAddr + 2);
+	data <<= 8;
+	data |= *(pbyAddr + 1);
+	data <<= 8;
+	data |= *pbyAddr;
+	pr_debug("2. offset: %d, Data: %X\n", offset, data);
 
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFNDEX, wOffset);
-	VNSvOutPortD(dwIoBase + MAC_REG_MISCFFDATA, dwData);
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFCTL, MISCFFCTL_WRITE);
-	wOffset++;
+	iowrite16(offset, io_base + MAC_REG_MISCFFNDEX);
+	iowrite32(data, io_base + MAC_REG_MISCFFDATA);
+	iowrite16(MISCFFCTL_WRITE, io_base + MAC_REG_MISCFFCTL);
+	offset++;
 
-	wOffset += (uKeyIdx * 4);
+	offset += (uKeyIdx * 4);
 	for (ii = 0; ii < 4; ii++) {
 		/* always push 128 bits */
-		pr_debug("3.(%d) wOffset: %d, Data: %X\n",
-			 ii, wOffset+ii, *pdwKey);
-		VNSvOutPortW(dwIoBase + MAC_REG_MISCFFNDEX, wOffset+ii);
-		VNSvOutPortD(dwIoBase + MAC_REG_MISCFFDATA, *pdwKey++);
-		VNSvOutPortW(dwIoBase + MAC_REG_MISCFFCTL, MISCFFCTL_WRITE);
+		pr_debug("3.(%d) offset: %d, Data: %X\n",
+			 ii, offset + ii, *pdwKey);
+		iowrite16(offset + ii, io_base + MAC_REG_MISCFFNDEX);
+		iowrite32(*pdwKey++, io_base + MAC_REG_MISCFFDATA);
+		iowrite16(MISCFFCTL_WRITE, io_base + MAC_REG_MISCFFCTL);
 	}
 }
 
@@ -871,7 +829,7 @@ void MACvSetKeyEntry(void __iomem *dwIoBase, unsigned short wKeyCtl,
  *
  * Parameters:
  *  In:
- *      dwIoBase        - Base Address for MAC
+ *      io_base        - Base Address for MAC
  *
  *  Out:
  *      none
@@ -879,14 +837,15 @@ void MACvSetKeyEntry(void __iomem *dwIoBase, unsigned short wKeyCtl,
  * Return Value: none
  *
  */
-void MACvDisableKeyEntry(void __iomem *dwIoBase, unsigned int uEntryIdx)
+void MACvDisableKeyEntry(struct vnt_private *priv, unsigned int uEntryIdx)
 {
-	unsigned short wOffset;
+	void __iomem *io_base = priv->port_offset;
+	unsigned short offset;
 
-	wOffset = MISCFIFO_KEYETRY0;
-	wOffset += (uEntryIdx * MISCFIFO_KEYENTRYSIZE);
+	offset = MISCFIFO_KEYETRY0;
+	offset += (uEntryIdx * MISCFIFO_KEYENTRYSIZE);
 
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFNDEX, wOffset);
-	VNSvOutPortD(dwIoBase + MAC_REG_MISCFFDATA, 0);
-	VNSvOutPortW(dwIoBase + MAC_REG_MISCFFCTL, MISCFFCTL_WRITE);
+	iowrite16(offset, io_base + MAC_REG_MISCFFNDEX);
+	iowrite32(0, io_base + MAC_REG_MISCFFDATA);
+	iowrite16(MISCFFCTL_WRITE, io_base + MAC_REG_MISCFFCTL);
 }

@@ -1,45 +1,11 @@
+// SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0
 /******************************************************************************
  *
  * Module Name: nsprepkg - Validation of package objects for predefined names
  *
+ * Copyright (C) 2000 - 2022, Intel Corp.
+ *
  *****************************************************************************/
-
-/*
- * Copyright (C) 2000 - 2015, Intel Corp.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions, and the following disclaimer,
- *    without modification.
- * 2. Redistributions in binary form must reproduce at minimum a disclaimer
- *    substantially similar to the "NO WARRANTY" disclaimer below
- *    ("Disclaimer") and any redistribution must be conditioned upon
- *    including a substantially similar Disclaimer requirement for further
- *    binary redistribution.
- * 3. Neither the names of the above-listed copyright holders nor the names
- *    of any contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * Alternatively, this software may be distributed under the terms of the
- * GNU General Public License ("GPL") version 2 as published by the Free
- * Software Foundation.
- *
- * NO WARRANTY
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
- * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGES.
- */
 
 #include <acpi/acpi.h>
 #include "accommon.h"
@@ -61,6 +27,10 @@ acpi_ns_check_package_elements(struct acpi_evaluate_info *info,
 			       u8 type1,
 			       u32 count1,
 			       u8 type2, u32 count2, u32 start_index);
+
+static acpi_status
+acpi_ns_custom_package(struct acpi_evaluate_info *info,
+		       union acpi_operand_object **elements, u32 count);
 
 /*******************************************************************************
  *
@@ -89,7 +59,7 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 	u32 count;
 	u32 i;
 
-	ACPI_FUNCTION_NAME(ns_check_package);
+	ACPI_FUNCTION_TRACE(ns_check_package);
 
 	/* The package info for this name is in the next table entry */
 
@@ -118,14 +88,14 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 	 */
 	if (!count) {
 		if (package->ret_info.type == ACPI_PTYPE1_VAR) {
-			return (AE_OK);
+			return_ACPI_STATUS(AE_OK);
 		}
 
 		ACPI_WARN_PREDEFINED((AE_INFO, info->full_pathname,
 				      info->node_flags,
 				      "Return Package has no elements (empty)"));
 
-		return (AE_AML_OPERAND_VALUE);
+		return_ACPI_STATUS(AE_AML_OPERAND_VALUE);
 	}
 
 	/*
@@ -135,6 +105,11 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 	 * PTYPE2 packages contain subpackages
 	 */
 	switch (package->ret_info.type) {
+	case ACPI_PTYPE_CUSTOM:
+
+		status = acpi_ns_custom_package(info, elements, count);
+		break;
+
 	case ACPI_PTYPE1_FIXED:
 		/*
 		 * The package count is fixed and there are no subpackages
@@ -177,8 +152,9 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 							   package->ret_info.
 							   object_type1, i);
 			if (ACPI_FAILURE(status)) {
-				return (status);
+				return_ACPI_STATUS(status);
 			}
+
 			elements++;
 		}
 		break;
@@ -210,7 +186,7 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 							      object_type[i],
 							      i);
 				if (ACPI_FAILURE(status)) {
-					return (status);
+					return_ACPI_STATUS(status);
 				}
 			} else {
 				/* These are the optional package elements */
@@ -222,9 +198,10 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 							      tail_object_type,
 							      i);
 				if (ACPI_FAILURE(status)) {
-					return (status);
+					return_ACPI_STATUS(status);
 				}
 			}
+
 			elements++;
 		}
 		break;
@@ -233,10 +210,11 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 
 		/* First element is the (Integer) revision */
 
-		status = acpi_ns_check_object_type(info, elements,
-						   ACPI_RTYPE_INTEGER, 0);
+		status =
+		    acpi_ns_check_object_type(info, elements,
+					      ACPI_RTYPE_INTEGER, 0);
 		if (ACPI_FAILURE(status)) {
-			return (status);
+			return_ACPI_STATUS(status);
 		}
 
 		elements++;
@@ -252,10 +230,11 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 
 		/* First element is the (Integer) count of subpackages to follow */
 
-		status = acpi_ns_check_object_type(info, elements,
-						   ACPI_RTYPE_INTEGER, 0);
+		status =
+		    acpi_ns_check_object_type(info, elements,
+					      ACPI_RTYPE_INTEGER, 0);
 		if (ACPI_FAILURE(status)) {
-			return (status);
+			return_ACPI_STATUS(status);
 		}
 
 		/*
@@ -300,7 +279,7 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 			    acpi_ns_wrap_with_package(info, return_object,
 						      return_object_ptr);
 			if (ACPI_FAILURE(status)) {
-				return (status);
+				return_ACPI_STATUS(status);
 			}
 
 			/* Update locals to point to the new package (of 1 element) */
@@ -337,7 +316,7 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 							   package->ret_info.
 							   object_type1, 0);
 			if (ACPI_FAILURE(status)) {
-				return (status);
+				return_ACPI_STATUS(status);
 			}
 
 			/* Validate length of the UUID buffer */
@@ -347,14 +326,14 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 						      info->full_pathname,
 						      info->node_flags,
 						      "Invalid length for UUID Buffer"));
-				return (AE_AML_OPERAND_VALUE);
+				return_ACPI_STATUS(AE_AML_OPERAND_VALUE);
 			}
 
 			status = acpi_ns_check_object_type(info, elements + 1,
 							   package->ret_info.
 							   object_type2, 0);
 			if (ACPI_FAILURE(status)) {
-				return (status);
+				return_ACPI_STATUS(status);
 			}
 
 			elements += 2;
@@ -371,10 +350,10 @@ acpi_ns_check_package(struct acpi_evaluate_info *info,
 				      "Invalid internal return type in table entry: %X",
 				      package->ret_info.type));
 
-		return (AE_AML_INTERNAL);
+		return_ACPI_STATUS(AE_AML_INTERNAL);
 	}
 
-	return (status);
+	return_ACPI_STATUS(status);
 
 package_too_small:
 
@@ -384,7 +363,7 @@ package_too_small:
 			      "Return Package is too small - found %u elements, expected %u",
 			      count, expected_count));
 
-	return (AE_AML_OPERAND_VALUE);
+	return_ACPI_STATUS(AE_AML_OPERAND_VALUE);
 }
 
 /*******************************************************************************
@@ -567,11 +546,13 @@ acpi_ns_check_package_list(struct acpi_evaluate_info *info,
 			if (sub_package->package.count < expected_count) {
 				goto package_too_small;
 			}
+
 			if (sub_package->package.count <
 			    package->ret_info.count1) {
 				expected_count = package->ret_info.count1;
 				goto package_too_small;
 			}
+
 			if (expected_count == 0) {
 				/*
 				 * Either the num_entries element was originally zero or it was
@@ -599,6 +580,8 @@ acpi_ns_check_package_list(struct acpi_evaluate_info *info,
 
 		default:	/* Should not get here, type was validated by caller */
 
+			ACPI_ERROR((AE_INFO, "Invalid Package type: %X",
+				    package->ret_info.type));
 			return (AE_AML_INTERNAL);
 		}
 
@@ -616,6 +599,83 @@ package_too_small:
 			      i, sub_package->package.count, expected_count));
 
 	return (AE_AML_OPERAND_VALUE);
+}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ns_custom_package
+ *
+ * PARAMETERS:  info                - Method execution information block
+ *              elements            - Pointer to the package elements array
+ *              count               - Element count for the package
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Check a returned package object for the correct count and
+ *              correct type of all sub-objects.
+ *
+ * NOTE: Currently used for the _BIX method only. When needed for two or more
+ * methods, probably a detect/dispatch mechanism will be required.
+ *
+ ******************************************************************************/
+
+static acpi_status
+acpi_ns_custom_package(struct acpi_evaluate_info *info,
+		       union acpi_operand_object **elements, u32 count)
+{
+	u32 expected_count;
+	u32 version;
+	acpi_status status = AE_OK;
+
+	ACPI_FUNCTION_NAME(ns_custom_package);
+
+	/* Get version number, must be Integer */
+
+	if ((*elements)->common.type != ACPI_TYPE_INTEGER) {
+		ACPI_WARN_PREDEFINED((AE_INFO, info->full_pathname,
+				      info->node_flags,
+				      "Return Package has invalid object type for version number"));
+		return_ACPI_STATUS(AE_AML_OPERAND_TYPE);
+	}
+
+	version = (u32)(*elements)->integer.value;
+	expected_count = 21;	/* Version 1 */
+
+	if (version == 0) {
+		expected_count = 20;	/* Version 0 */
+	}
+
+	if (count < expected_count) {
+		ACPI_WARN_PREDEFINED((AE_INFO, info->full_pathname,
+				      info->node_flags,
+				      "Return Package is too small - found %u elements, expected %u",
+				      count, expected_count));
+		return_ACPI_STATUS(AE_AML_OPERAND_VALUE);
+	} else if (count > expected_count) {
+		ACPI_DEBUG_PRINT((ACPI_DB_REPAIR,
+				  "%s: Return Package is larger than needed - "
+				  "found %u, expected %u\n",
+				  info->full_pathname, count, expected_count));
+	}
+
+	/* Validate all elements of the returned package */
+
+	status = acpi_ns_check_package_elements(info, elements,
+						ACPI_RTYPE_INTEGER, 16,
+						ACPI_RTYPE_STRING, 4, 0);
+	if (ACPI_FAILURE(status)) {
+		return_ACPI_STATUS(status);
+	}
+
+	/* Version 1 has a single trailing integer */
+
+	if (version > 0) {
+		status = acpi_ns_check_package_elements(info, elements + 20,
+							ACPI_RTYPE_INTEGER, 1,
+							0, 0, 20);
+	}
+
+	return_ACPI_STATUS(status);
 }
 
 /*******************************************************************************
@@ -648,6 +708,8 @@ acpi_ns_check_package_elements(struct acpi_evaluate_info *info,
 	acpi_status status;
 	u32 i;
 
+	ACPI_FUNCTION_TRACE(ns_check_package_elements);
+
 	/*
 	 * Up to two groups of package elements are supported by the data
 	 * structure. All elements in each group must be of the same type.
@@ -657,8 +719,9 @@ acpi_ns_check_package_elements(struct acpi_evaluate_info *info,
 		status = acpi_ns_check_object_type(info, this_element,
 						   type1, i + start_index);
 		if (ACPI_FAILURE(status)) {
-			return (status);
+			return_ACPI_STATUS(status);
 		}
+
 		this_element++;
 	}
 
@@ -667,10 +730,11 @@ acpi_ns_check_package_elements(struct acpi_evaluate_info *info,
 						   type2,
 						   (i + count1 + start_index));
 		if (ACPI_FAILURE(status)) {
-			return (status);
+			return_ACPI_STATUS(status);
 		}
+
 		this_element++;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }

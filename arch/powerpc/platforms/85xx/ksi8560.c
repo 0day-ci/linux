@@ -26,7 +26,6 @@
 #include <asm/mpic.h>
 #include <mm/mmu_decl.h>
 #include <asm/udbg.h>
-#include <asm/prom.h>
 
 #include <sysdev/fsl_soc.h>
 #include <sysdev/fsl_pci.h>
@@ -44,7 +43,7 @@
 
 static void __iomem *cpld_base = NULL;
 
-static void machine_restart(char *cmd)
+static void __noreturn machine_restart(char *cmd)
 {
 	if (cpld_base)
 		out_8(cpld_base + KSI8560_CPLD_RCR1, KSI8560_CPLD_RCR1_CPUHR);
@@ -134,6 +133,8 @@ static void __init ksi8560_setup_arch(void)
 	else
 		printk(KERN_ERR "Can't find CPLD in device tree\n");
 
+	of_node_put(cpld);
+
 	if (ppc_md.progress)
 		ppc_md.progress("ksi8560_setup_arch()", 0);
 
@@ -176,9 +177,7 @@ machine_device_initcall(ksi8560, mpc85xx_common_publish_devices);
  */
 static int __init ksi8560_probe(void)
 {
-	unsigned long root = of_get_flat_dt_root();
-
-	return of_flat_dt_is_compatible(root, "emerson,KSI8560");
+	return of_machine_is_compatible("emerson,KSI8560");
 }
 
 define_machine(ksi8560) {

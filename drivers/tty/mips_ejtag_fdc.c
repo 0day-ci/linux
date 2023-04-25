@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * TTY driver for MIPS EJTAG Fast Debug Channels.
  *
  * Copyright (C) 2007-2015 Imagination Technologies Ltd
- *
- * This file is subject to the terms and conditions of the GNU General Public
- * License. See the file COPYING in the main directory of this archive for more
- * details.
  */
 
 #include <linux/atomic.h>
@@ -246,6 +243,7 @@ done:
 		/* Fall back to a 3 byte encoding */
 		word.bytes = 3;
 		word.word &= 0x00ffffff;
+		fallthrough;
 	case 3:
 		/* 3 byte encoding */
 		word.word |= 0x82000000;
@@ -683,13 +681,13 @@ static irqreturn_t mips_ejtag_fdc_isr(int irq, void *dev_id)
  * It simply triggers the common FDC handler code and arranges for further
  * polling.
  */
-static void mips_ejtag_fdc_tty_timer(unsigned long opaque)
+static void mips_ejtag_fdc_tty_timer(struct timer_list *t)
 {
-	struct mips_ejtag_fdc_tty *priv = (void *)opaque;
+	struct mips_ejtag_fdc_tty *priv = from_timer(priv, t, poll_timer);
 
 	mips_ejtag_fdc_handle(priv);
 	if (!priv->removing)
-		mod_timer_pinned(&priv->poll_timer, jiffies + FDC_TTY_POLL);
+		mod_timer(&priv->poll_timer, jiffies + FDC_TTY_POLL);
 }
 
 /* TTY Port operations */
@@ -842,11 +840,11 @@ static int mips_ejtag_fdc_tty_write(struct tty_struct *tty,
 	return total;
 }
 
-static int mips_ejtag_fdc_tty_write_room(struct tty_struct *tty)
+static unsigned int mips_ejtag_fdc_tty_write_room(struct tty_struct *tty)
 {
 	struct mips_ejtag_fdc_tty_port *dport = tty->driver_data;
 	struct mips_ejtag_fdc_tty *priv = dport->driver;
-	int room;
+	unsigned int room;
 
 	/* Report the space in the xmit buffer */
 	spin_lock(&dport->xmit_lock);
@@ -856,10 +854,10 @@ static int mips_ejtag_fdc_tty_write_room(struct tty_struct *tty)
 	return room;
 }
 
-static int mips_ejtag_fdc_tty_chars_in_buffer(struct tty_struct *tty)
+static unsigned int mips_ejtag_fdc_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	struct mips_ejtag_fdc_tty_port *dport = tty->driver_data;
-	int chars;
+	unsigned int chars;
 
 	/* Report the number of bytes in the xmit buffer */
 	spin_lock(&dport->xmit_lock);
@@ -901,7 +899,7 @@ static int mips_ejtag_fdc_tty_probe(struct mips_cdmm_device *dev)
 	atomic_set(&priv->xmit_total, 0);
 	raw_spin_lock_init(&priv->lock);
 
-	priv->reg = devm_ioremap_nocache(priv->dev, dev->res.start,
+	priv->reg = devm_ioremap(priv->dev, dev->res.start,
 					 resource_size(&dev->res));
 	if (!priv->reg) {
 		dev_err(priv->dev, "ioremap failed for resource %pR\n",
@@ -918,7 +916,7 @@ static int mips_ejtag_fdc_tty_probe(struct mips_cdmm_device *dev)
 	mips_ejtag_fdc_write(priv, REG_FDCFG, cfg);
 
 	/* Make each port's xmit FIFO big enough to fill FDC TX FIFO */
-	priv->xmit_size = min(tx_fifo * 4, (unsigned int)SERIAL_XMIT_SIZE);
+	priv->xmit_size = min(tx_fifo * 4, (unsigned int)UART_XMIT_SIZE);
 
 	driver = tty_alloc_driver(NUM_TTY_CHANNELS, TTY_DRIVER_REAL_RAW);
 	if (IS_ERR(driver))
@@ -957,19 +955,18 @@ static int mips_ejtag_fdc_tty_probe(struct mips_cdmm_device *dev)
 		mips_ejtag_fdc_con.tty_drv = driver;
 
 	init_waitqueue_head(&priv->waitqueue);
-	priv->thread = kthread_create(mips_ejtag_fdc_put, priv, priv->fdc_name);
-	if (IS_ERR(priv->thread)) {
-		ret = PTR_ERR(priv->thread);
-		dev_err(priv->dev, "Couldn't create kthread (%d)\n", ret);
-		goto err_destroy_ports;
-	}
 	/*
 	 * Bind the writer thread to the right CPU so it can't migrate.
 	 * The channels are per-CPU and we want all channel I/O to be on a
 	 * single predictable CPU.
 	 */
-	kthread_bind(priv->thread, dev->cpu);
-	wake_up_process(priv->thread);
+	priv->thread = kthread_run_on_cpu(mips_ejtag_fdc_put, priv,
+					  dev->cpu, "ttyFDC/%u");
+	if (IS_ERR(priv->thread)) {
+		ret = PTR_ERR(priv->thread);
+		dev_err(priv->dev, "Couldn't create kthread (%d)\n", ret);
+		goto err_destroy_ports;
+	}
 
 	/* Look for an FDC IRQ */
 	priv->irq = get_c0_fdc_int();
@@ -977,7 +974,7 @@ static int mips_ejtag_fdc_tty_probe(struct mips_cdmm_device *dev)
 	/* Try requesting the IRQ */
 	if (priv->irq >= 0) {
 		/*
-		 * IRQF_SHARED, IRQF_NO_SUSPEND: The FDC IRQ may be shared with
+		 * IRQF_SHARED, IRQF_COND_SUSPEND: The FDC IRQ may be shared with
 		 * other local interrupts such as the timer which sets
 		 * IRQF_TIMER (including IRQF_NO_SUSPEND).
 		 *
@@ -987,7 +984,7 @@ static int mips_ejtag_fdc_tty_probe(struct mips_cdmm_device *dev)
 		 */
 		ret = devm_request_irq(priv->dev, priv->irq, mips_ejtag_fdc_isr,
 				       IRQF_PERCPU | IRQF_SHARED |
-				       IRQF_NO_THREAD | IRQF_NO_SUSPEND,
+				       IRQF_NO_THREAD | IRQF_COND_SUSPEND,
 				       priv->fdc_name, priv);
 		if (ret)
 			priv->irq = -1;
@@ -1002,8 +999,8 @@ static int mips_ejtag_fdc_tty_probe(struct mips_cdmm_device *dev)
 		raw_spin_unlock_irq(&priv->lock);
 	} else {
 		/* If we didn't get an usable IRQ, poll instead */
-		setup_timer(&priv->poll_timer, mips_ejtag_fdc_tty_timer,
-			    (unsigned long)priv);
+		timer_setup(&priv->poll_timer, mips_ejtag_fdc_tty_timer,
+			    TIMER_PINNED);
 		priv->poll_timer.expires = jiffies + FDC_TTY_POLL;
 		/*
 		 * Always attach the timer to the right CPU. The channels are
@@ -1044,40 +1041,8 @@ err_destroy_ports:
 		dport = &priv->ports[nport];
 		tty_port_destroy(&dport->port);
 	}
-	put_tty_driver(priv->driver);
+	tty_driver_kref_put(priv->driver);
 	return ret;
-}
-
-static int mips_ejtag_fdc_tty_remove(struct mips_cdmm_device *dev)
-{
-	struct mips_ejtag_fdc_tty *priv = mips_cdmm_get_drvdata(dev);
-	struct mips_ejtag_fdc_tty_port *dport;
-	int nport;
-	unsigned int cfg;
-
-	if (priv->irq >= 0) {
-		raw_spin_lock_irq(&priv->lock);
-		cfg = mips_ejtag_fdc_read(priv, REG_FDCFG);
-		/* Disable interrupts */
-		cfg &= ~(REG_FDCFG_TXINTTHRES | REG_FDCFG_RXINTTHRES);
-		cfg |= REG_FDCFG_TXINTTHRES_DISABLED;
-		cfg |= REG_FDCFG_RXINTTHRES_DISABLED;
-		mips_ejtag_fdc_write(priv, REG_FDCFG, cfg);
-		raw_spin_unlock_irq(&priv->lock);
-	} else {
-		priv->removing = true;
-		del_timer_sync(&priv->poll_timer);
-	}
-	kthread_stop(priv->thread);
-	if (dev->cpu == 0)
-		mips_ejtag_fdc_con.tty_drv = NULL;
-	tty_unregister_driver(priv->driver);
-	for (nport = 0; nport < NUM_TTY_CHANNELS; nport++) {
-		dport = &priv->ports[nport];
-		tty_port_destroy(&dport->port);
-	}
-	put_tty_driver(priv->driver);
-	return 0;
 }
 
 static int mips_ejtag_fdc_tty_cpu_down(struct mips_cdmm_device *dev)
@@ -1129,20 +1094,19 @@ static int mips_ejtag_fdc_tty_cpu_up(struct mips_cdmm_device *dev)
 	}
 
 	/* Restart the kthread */
-	priv->thread = kthread_create(mips_ejtag_fdc_put, priv, priv->fdc_name);
+	/* Bind it back to the right CPU and set it off */
+	priv->thread = kthread_run_on_cpu(mips_ejtag_fdc_put, priv,
+					  dev->cpu, "ttyFDC/%u");
 	if (IS_ERR(priv->thread)) {
 		ret = PTR_ERR(priv->thread);
 		dev_err(priv->dev, "Couldn't re-create kthread (%d)\n", ret);
 		goto out;
 	}
-	/* Bind it back to the right CPU and set it off */
-	kthread_bind(priv->thread, dev->cpu);
-	wake_up_process(priv->thread);
 out:
 	return ret;
 }
 
-static struct mips_cdmm_device_id mips_ejtag_fdc_tty_ids[] = {
+static const struct mips_cdmm_device_id mips_ejtag_fdc_tty_ids[] = {
 	{ .type = 0xfd },
 	{ }
 };
@@ -1152,12 +1116,11 @@ static struct mips_cdmm_driver mips_ejtag_fdc_tty_driver = {
 		.name	= "mips_ejtag_fdc",
 	},
 	.probe		= mips_ejtag_fdc_tty_probe,
-	.remove		= mips_ejtag_fdc_tty_remove,
 	.cpu_down	= mips_ejtag_fdc_tty_cpu_down,
 	.cpu_up		= mips_ejtag_fdc_tty_cpu_up,
 	.id_table	= mips_ejtag_fdc_tty_ids,
 };
-module_mips_cdmm_driver(mips_ejtag_fdc_tty_driver);
+builtin_mips_cdmm_driver(mips_ejtag_fdc_tty_driver);
 
 static int __init mips_ejtag_fdc_init_console(void)
 {
@@ -1259,7 +1222,7 @@ static void kgdbfdc_push_one(void)
 
 	/* Construct a word from any data in buffer */
 	word = mips_ejtag_fdc_encode(bufs, &kgdbfdc_wbuflen, 1);
-	/* Relocate any remaining data to beginnning of buffer */
+	/* Relocate any remaining data to beginning of buffer */
 	kgdbfdc_wbuflen -= word.bytes;
 	for (i = 0; i < kgdbfdc_wbuflen; ++i)
 		kgdbfdc_wbuf[i] = kgdbfdc_wbuf[i + word.bytes];

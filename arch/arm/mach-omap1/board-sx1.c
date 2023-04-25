@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
 * linux/arch/arm/mach-omap1/board-sx1.c
 *
@@ -9,10 +10,6 @@
 *
 * Maintainters : Vladimir Ananiev (aka Vovan888), Sergge
 *		oslik.ru
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License version 2 as
-* published by the Free Software Foundation.
 */
 #include <linux/gpio.h>
 #include <linux/kernel.h>
@@ -29,20 +26,18 @@
 #include <linux/export.h>
 #include <linux/omapfb.h>
 #include <linux/platform_data/keypad-omap.h>
+#include <linux/omap-dma.h>
+#include "tc.h"
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
-#include <mach/flash.h>
-#include <mach/mux.h>
-#include <linux/omap-dma.h>
-#include <mach/tc.h>
-#include <mach/board-sx1.h>
-
-#include <mach/hardware.h>
-#include <mach/usb.h>
-
+#include "flash.h"
+#include "mux.h"
+#include "board-sx1.h"
+#include "hardware.h"
+#include "usb.h"
 #include "common.h"
 
 /* Write to I2C device */
@@ -297,7 +292,7 @@ static struct omap_usb_config sx1_usb_config __initdata = {
 
 /*----------- LCD -------------------------*/
 
-static struct omap_lcd_config sx1_lcd_config __initdata = {
+static const struct omap_lcd_config sx1_lcd_config __initconst = {
 	.ctrl_name	= "internal",
 };
 
@@ -340,7 +335,7 @@ static void __init omap_sx1_init(void)
 
 MACHINE_START(SX1, "OMAP310 based Siemens SX1")
 	.atag_offset	= 0x100,
-	.map_io		= omap15xx_map_io,
+	.map_io		= omap1_map_io,
 	.init_early     = omap1_init_early,
 	.init_irq	= omap1_init_irq,
 	.handle_irq	= omap1_handle_irq,

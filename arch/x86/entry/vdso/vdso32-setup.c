@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2002 Linus Torvalds
  * Portions based on the vdso-randomization code from exec-shield:
@@ -10,8 +11,8 @@
 #include <linux/smp.h>
 #include <linux/kernel.h>
 #include <linux/mm_types.h>
+#include <linux/elf.h>
 
-#include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/vdso.h>
 
@@ -31,8 +32,10 @@ static int __init vdso32_setup(char *s)
 {
 	vdso32_enabled = simple_strtoul(s, NULL, 0);
 
-	if (vdso32_enabled > 1)
+	if (vdso32_enabled > 1) {
 		pr_warn("vdso32 values other than 0 and 1 are no longer allowed; vdso disabled\n");
+		vdso32_enabled = 0;
+	}
 
 	return 1;
 }
@@ -50,41 +53,6 @@ __setup_param("vdso=", vdso_setup, vdso32_setup, 0);
 
 #ifdef CONFIG_X86_64
 
-#define	vdso32_sysenter()	(boot_cpu_has(X86_FEATURE_SYSENTER32))
-#define	vdso32_syscall()	(boot_cpu_has(X86_FEATURE_SYSCALL32))
-
-#else  /* CONFIG_X86_32 */
-
-#define vdso32_sysenter()	(boot_cpu_has(X86_FEATURE_SEP))
-#define vdso32_syscall()	(0)
-
-#endif	/* CONFIG_X86_64 */
-
-#if defined(CONFIG_X86_32) || defined(CONFIG_COMPAT)
-const struct vdso_image *selected_vdso32;
-#endif
-
-int __init sysenter_setup(void)
-{
-#ifdef CONFIG_COMPAT
-	if (vdso32_syscall())
-		selected_vdso32 = &vdso_image_32_syscall;
-	else
-#endif
-	if (vdso32_sysenter())
-		selected_vdso32 = &vdso_image_32_sysenter;
-	else
-		selected_vdso32 = &vdso_image_32_int80;
-
-	init_vdso_image(selected_vdso32);
-
-	return 0;
-}
-
-#ifdef CONFIG_X86_64
-
-subsys_initcall(sysenter_setup);
-
 #ifdef CONFIG_SYSCTL
 /* Register vsyscall32 into the ABI table */
 #include <linux/sysctl.h>
@@ -95,7 +63,9 @@ static struct ctl_table abi_table2[] = {
 		.data		= &vdso32_enabled,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
 	},
 	{}
 };

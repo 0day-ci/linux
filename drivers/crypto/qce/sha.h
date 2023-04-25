@@ -1,21 +1,14 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #ifndef _SHA_H_
 #define _SHA_H_
 
 #include <crypto/scatterwalk.h>
-#include <crypto/sha.h>
+#include <crypto/sha1.h>
+#include <crypto/sha2.h>
 
 #include "common.h"
 #include "core.h"
@@ -36,7 +29,6 @@ struct qce_sha_ctx {
  * @flags: operation flags
  * @src_orig: original request sg list
  * @nbytes_orig: original request number of bytes
- * @src_chained: is source scatterlist chained
  * @src_nents: source number of entries
  * @byte_count: byte count
  * @count: save count in states during update, import and export
@@ -55,7 +47,6 @@ struct qce_sha_reqctx {
 	unsigned long flags;
 	struct scatterlist *src_orig;
 	unsigned int nbytes_orig;
-	bool src_chained;
 	int src_nents;
 	__be32 byte_count[2];
 	u64 count;

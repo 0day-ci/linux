@@ -38,7 +38,7 @@
 
 /* mlx4_en_read_clock - read raw cycle counter (to be used by time counter)
  */
-static cycle_t mlx4_en_read_clock(const struct cyclecounter *tc)
+static u64 mlx4_en_read_clock(const struct cyclecounter *tc)
 {
 	struct mlx4_en_dev *mdev =
 		container_of(tc, struct mlx4_en_dev, cycles);
@@ -58,19 +58,25 @@ u64 mlx4_en_get_cqe_ts(struct mlx4_cqe *cqe)
 	return hi | lo;
 }
 
+u64 mlx4_en_get_hwtstamp(struct mlx4_en_dev *mdev, u64 timestamp)
+{
+	unsigned int seq;
+	u64 nsec;
+
+	do {
+		seq = read_seqbegin(&mdev->clock_lock);
+		nsec = timecounter_cyc2time(&mdev->clock, timestamp);
+	} while (read_seqretry(&mdev->clock_lock, seq));
+
+	return ns_to_ktime(nsec);
+}
+
 void mlx4_en_fill_hwtstamps(struct mlx4_en_dev *mdev,
 			    struct skb_shared_hwtstamps *hwts,
 			    u64 timestamp)
 {
-	unsigned long flags;
-	u64 nsec;
-
-	read_lock_irqsave(&mdev->clock_lock, flags);
-	nsec = timecounter_cyc2time(&mdev->clock, timestamp);
-	read_unlock_irqrestore(&mdev->clock_lock, flags);
-
 	memset(hwts, 0, sizeof(struct skb_shared_hwtstamps));
-	hwts->hwtstamp = ns_to_ktime(nsec);
+	hwts->hwtstamp = mlx4_en_get_hwtstamp(mdev, timestamp);
 }
 
 /**
@@ -88,50 +94,50 @@ void mlx4_en_remove_timestamp(struct mlx4_en_dev *mdev)
 	}
 }
 
+#define MLX4_EN_WRAP_AROUND_SEC	10UL
+/* By scheduling the overflow check every 5 seconds, we have a reasonably
+ * good chance we wont miss a wrap around.
+ * TOTO: Use a timer instead of a work queue to increase the guarantee.
+ */
+#define MLX4_EN_OVERFLOW_PERIOD (MLX4_EN_WRAP_AROUND_SEC * HZ / 2)
+
 void mlx4_en_ptp_overflow_check(struct mlx4_en_dev *mdev)
 {
 	bool timeout = time_is_before_jiffies(mdev->last_overflow_check +
-					      mdev->overflow_period);
+					      MLX4_EN_OVERFLOW_PERIOD);
 	unsigned long flags;
 
 	if (timeout) {
-		write_lock_irqsave(&mdev->clock_lock, flags);
+		write_seqlock_irqsave(&mdev->clock_lock, flags);
 		timecounter_read(&mdev->clock);
-		write_unlock_irqrestore(&mdev->clock_lock, flags);
+		write_sequnlock_irqrestore(&mdev->clock_lock, flags);
 		mdev->last_overflow_check = jiffies;
 	}
 }
 
 /**
- * mlx4_en_phc_adjfreq - adjust the frequency of the hardware clock
+ * mlx4_en_phc_adjfine - adjust the frequency of the hardware clock
  * @ptp: ptp clock structure
- * @delta: Desired frequency change in parts per billion
+ * @scaled_ppm: Desired frequency change in scaled parts per million
  *
- * Adjust the frequency of the PHC cycle counter by the indicated delta from
- * the base frequency.
+ * Adjust the frequency of the PHC cycle counter by the indicated scaled_ppm
+ * from the base frequency.
+ *
+ * Scaled parts per million is ppm with a 16-bit binary fractional field.
  **/
-static int mlx4_en_phc_adjfreq(struct ptp_clock_info *ptp, s32 delta)
+static int mlx4_en_phc_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 {
-	u64 adj;
-	u32 diff, mult;
-	int neg_adj = 0;
+	u32 mult;
 	unsigned long flags;
 	struct mlx4_en_dev *mdev = container_of(ptp, struct mlx4_en_dev,
 						ptp_clock_info);
 
-	if (delta < 0) {
-		neg_adj = 1;
-		delta = -delta;
-	}
-	mult = mdev->nominal_c_mult;
-	adj = mult;
-	adj *= delta;
-	diff = div_u64(adj, 1000000000ULL);
+	mult = (u32)adjust_by_scaled_ppm(mdev->nominal_c_mult, scaled_ppm);
 
-	write_lock_irqsave(&mdev->clock_lock, flags);
+	write_seqlock_irqsave(&mdev->clock_lock, flags);
 	timecounter_read(&mdev->clock);
-	mdev->cycles.mult = neg_adj ? mult - diff : mult + diff;
-	write_unlock_irqrestore(&mdev->clock_lock, flags);
+	mdev->cycles.mult = mult;
+	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
 
 	return 0;
 }
@@ -149,9 +155,9 @@ static int mlx4_en_phc_adjtime(struct ptp_clock_info *ptp, s64 delta)
 						ptp_clock_info);
 	unsigned long flags;
 
-	write_lock_irqsave(&mdev->clock_lock, flags);
+	write_seqlock_irqsave(&mdev->clock_lock, flags);
 	timecounter_adjtime(&mdev->clock, delta);
-	write_unlock_irqrestore(&mdev->clock_lock, flags);
+	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
 
 	return 0;
 }
@@ -172,9 +178,9 @@ static int mlx4_en_phc_gettime(struct ptp_clock_info *ptp,
 	unsigned long flags;
 	u64 ns;
 
-	write_lock_irqsave(&mdev->clock_lock, flags);
+	write_seqlock_irqsave(&mdev->clock_lock, flags);
 	ns = timecounter_read(&mdev->clock);
-	write_unlock_irqrestore(&mdev->clock_lock, flags);
+	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
 
 	*ts = ns_to_timespec64(ns);
 
@@ -198,9 +204,9 @@ static int mlx4_en_phc_settime(struct ptp_clock_info *ptp,
 	unsigned long flags;
 
 	/* reset the timecounter */
-	write_lock_irqsave(&mdev->clock_lock, flags);
+	write_seqlock_irqsave(&mdev->clock_lock, flags);
 	timecounter_init(&mdev->clock, &mdev->cycles, ns);
-	write_unlock_irqrestore(&mdev->clock_lock, flags);
+	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
 
 	return 0;
 }
@@ -229,45 +235,55 @@ static const struct ptp_clock_info mlx4_en_ptp_clock_info = {
 	.n_per_out	= 0,
 	.n_pins		= 0,
 	.pps		= 0,
-	.adjfreq	= mlx4_en_phc_adjfreq,
+	.adjfine	= mlx4_en_phc_adjfine,
 	.adjtime	= mlx4_en_phc_adjtime,
 	.gettime64	= mlx4_en_phc_gettime,
 	.settime64	= mlx4_en_phc_settime,
 	.enable		= mlx4_en_phc_enable,
 };
 
+
+/* This function calculates the max shift that enables the user range
+ * of MLX4_EN_WRAP_AROUND_SEC values in the cycles register.
+ */
+static u32 freq_to_shift(u16 freq)
+{
+	u32 freq_khz = freq * 1000;
+	u64 max_val_cycles = freq_khz * 1000 * MLX4_EN_WRAP_AROUND_SEC;
+	u64 max_val_cycles_rounded = 1ULL << fls64(max_val_cycles - 1);
+	/* calculate max possible multiplier in order to fit in 64bit */
+	u64 max_mul = div64_u64(ULLONG_MAX, max_val_cycles_rounded);
+
+	/* This comes from the reverse of clocksource_khz2mult */
+	return ilog2(div_u64(max_mul * freq_khz, 1000000));
+}
+
 void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
 {
 	struct mlx4_dev *dev = mdev->dev;
 	unsigned long flags;
-	u64 ns, zero = 0;
 
-	rwlock_init(&mdev->clock_lock);
+	/* mlx4_en_init_timestamp is called for each netdev.
+	 * mdev->ptp_clock is common for all ports, skip initialization if
+	 * was done for other port.
+	 */
+	if (mdev->ptp_clock)
+		return;
+
+	seqlock_init(&mdev->clock_lock);
 
 	memset(&mdev->cycles, 0, sizeof(mdev->cycles));
 	mdev->cycles.read = mlx4_en_read_clock;
 	mdev->cycles.mask = CLOCKSOURCE_MASK(48);
-	/* Using shift to make calculation more accurate. Since current HW
-	 * clock frequency is 427 MHz, and cycles are given using a 48 bits
-	 * register, the biggest shift when calculating using u64, is 14
-	 * (max_cycles * multiplier < 2^64)
-	 */
-	mdev->cycles.shift = 14;
+	mdev->cycles.shift = freq_to_shift(dev->caps.hca_core_clock);
 	mdev->cycles.mult =
 		clocksource_khz2mult(1000 * dev->caps.hca_core_clock, mdev->cycles.shift);
 	mdev->nominal_c_mult = mdev->cycles.mult;
 
-	write_lock_irqsave(&mdev->clock_lock, flags);
+	write_seqlock_irqsave(&mdev->clock_lock, flags);
 	timecounter_init(&mdev->clock, &mdev->cycles,
 			 ktime_to_ns(ktime_get_real()));
-	write_unlock_irqrestore(&mdev->clock_lock, flags);
-
-	/* Calculate period in seconds to call the overflow watchdog - to make
-	 * sure counter is checked at least once every wrap around.
-	 */
-	ns = cyclecounter_cyc2ns(&mdev->cycles, mdev->cycles.mask, zero, &zero);
-	do_div(ns, NSEC_PER_SEC / 2 / HZ);
-	mdev->overflow_period = ns;
+	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
 
 	/* Configure the PHC */
 	mdev->ptp_clock_info = mlx4_en_ptp_clock_info;
@@ -278,7 +294,7 @@ void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
 	if (IS_ERR(mdev->ptp_clock)) {
 		mdev->ptp_clock = NULL;
 		mlx4_err(mdev, "ptp_clock_register failed\n");
-	} else {
+	} else if (mdev->ptp_clock) {
 		mlx4_info(mdev, "registered PHC clock\n");
 	}
 

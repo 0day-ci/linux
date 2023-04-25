@@ -1,16 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * AT86RF230/RF231 driver
  *
  * Copyright (C) 2009-2012 Siemens AG
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  * Written by:
  * Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
@@ -216,5 +208,13 @@
 #define STATE_TRANSITION_IN_PROGRESS 0x1F
 
 #define TRX_STATE_MASK		(0x1F)
+#define TRAC_MASK(x)		((x & 0xe0) >> 5)
+
+#define TRAC_SUCCESS			0
+#define TRAC_SUCCESS_DATA_PENDING	1
+#define TRAC_SUCCESS_WAIT_FOR_ACK	2
+#define TRAC_CHANNEL_ACCESS_FAILURE	3
+#define TRAC_NO_ACK			5
+#define TRAC_INVALID			7
 
 #endif /* !_AT86RF230_H */

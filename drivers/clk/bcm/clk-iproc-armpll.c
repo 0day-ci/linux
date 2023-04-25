@@ -1,15 +1,5 @@
-/*
- * Copyright (C) 2014 Broadcom Corporation
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation version 2.
- *
- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
- * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
+// SPDX-License-Identifier: GPL-2.0-only
+// Copyright (C) 2014 Broadcom Corporation
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -19,6 +9,8 @@
 #include <linux/of.h>
 #include <linux/clkdev.h>
 #include <linux/of_address.h>
+
+#include "clk-iproc.h"
 
 #define IPROC_CLK_MAX_FREQ_POLICY                    0x3
 #define IPROC_CLK_POLICY_FREQ_OFFSET                 0x008
@@ -242,7 +234,6 @@ static const struct clk_ops iproc_arm_pll_ops = {
 void __init iproc_armpll_setup(struct device_node *node)
 {
 	int ret;
-	struct clk *clk;
 	struct iproc_arm_pll *pll;
 	struct clk_init_data init;
 	const char *parent_name;
@@ -263,18 +254,18 @@ void __init iproc_armpll_setup(struct device_node *node)
 	init.num_parents = (parent_name ? 1 : 0);
 	pll->hw.init = &init;
 
-	clk = clk_register(NULL, &pll->hw);
-	if (WARN_ON(IS_ERR(clk)))
+	ret = clk_hw_register(NULL, &pll->hw);
+	if (WARN_ON(ret))
 		goto err_iounmap;
 
-	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+	ret = of_clk_add_hw_provider(node, of_clk_hw_simple_get, &pll->hw);
 	if (WARN_ON(ret))
 		goto err_clk_unregister;
 
 	return;
 
 err_clk_unregister:
-	clk_unregister(clk);
+	clk_hw_unregister(&pll->hw);
 err_iounmap:
 	iounmap(pll->base);
 err_free_pll:

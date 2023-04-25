@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * drivers/i2c/chips/lm8323.c
  *
@@ -7,19 +8,6 @@
  *            Timo O. Karjalainen <timo.o.karjalainen@nokia.com>
  *
  * Updated by Felipe Balbi <felipe.balbi@nokia.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation (version 2 of the License only).
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
 #include <linux/module.h>
@@ -30,8 +18,8 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/leds.h>
+#include <linux/platform_data/lm8323.h>
 #include <linux/pm.h>
-#include <linux/i2c/lm8323.h>
 #include <linux/slab.h>
 
 /* Commands to send to the chip. */
@@ -627,8 +615,7 @@ static ssize_t lm8323_set_disable(struct device *dev,
 }
 static DEVICE_ATTR(disable_kp, 0644, lm8323_show_disable, lm8323_set_disable);
 
-static int lm8323_probe(struct i2c_client *client,
-				  const struct i2c_device_id *id)
+static int lm8323_probe(struct i2c_client *client)
 {
 	struct lm8323_platform_data *pdata = dev_get_platdata(&client->dev);
 	struct input_dev *idev;
@@ -764,7 +751,7 @@ fail1:
 	return err;
 }
 
-static int lm8323_remove(struct i2c_client *client)
+static void lm8323_remove(struct i2c_client *client)
 {
 	struct lm8323_chip *lm = i2c_get_clientdata(client);
 	int i;
@@ -781,11 +768,8 @@ static int lm8323_remove(struct i2c_client *client)
 			led_classdev_unregister(&lm->pwm[i].cdev);
 
 	kfree(lm);
-
-	return 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
 /*
  * We don't need to explicitly suspend the chip, as it already switches off
  * when there's no activity.
@@ -829,9 +813,8 @@ static int lm8323_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(lm8323_pm_ops, lm8323_suspend, lm8323_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(lm8323_pm_ops, lm8323_suspend, lm8323_resume);
 
 static const struct i2c_device_id lm8323_id[] = {
 	{ "lm8323", 0 },
@@ -841,9 +824,9 @@ static const struct i2c_device_id lm8323_id[] = {
 static struct i2c_driver lm8323_i2c_driver = {
 	.driver = {
 		.name	= "lm8323",
-		.pm	= &lm8323_pm_ops,
+		.pm	= pm_sleep_ptr(&lm8323_pm_ops),
 	},
-	.probe		= lm8323_probe,
+	.probe_new	= lm8323_probe,
 	.remove		= lm8323_remove,
 	.id_table	= lm8323_id,
 };

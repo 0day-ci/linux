@@ -1,15 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2006 Micron Technology Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #ifndef	_MTD_NAND_OMAP2_H
 #define	_MTD_NAND_OMAP2_H
 
 #include <linux/mtd/partitions.h>
+#include <linux/mod_devicetable.h>
 
 #define	GPMC_BCH_NUM_REMAINDER	8
 
@@ -45,7 +43,6 @@ enum omap_ecc {
 };
 
 struct gpmc_nand_regs {
-	void __iomem	*gpmc_status;
 	void __iomem	*gpmc_nand_command;
 	void __iomem	*gpmc_nand_address;
 	void __iomem	*gpmc_nand_data;
@@ -66,19 +63,10 @@ struct gpmc_nand_regs {
 	void __iomem	*gpmc_bch_result6[GPMC_BCH_NUM_REMAINDER];
 };
 
-struct omap_nand_platform_data {
-	int			cs;
-	struct mtd_partition	*parts;
-	int			nr_parts;
-	bool			dev_ready;
-	bool			flash_bbt;
-	enum nand_io		xfer_type;
-	int			devsize;
-	enum omap_ecc           ecc_opt;
-	struct gpmc_nand_regs	reg;
-
-	/* for passing the partitions */
-	struct device_node	*of_node;
-	struct device_node	*elm_of_node;
+static const struct of_device_id omap_nand_ids[] = {
+	{ .compatible = "ti,omap2-nand", },
+	{ .compatible = "ti,am64-nand", },
+	{},
 };
-#endif
+
+#endif /* _MTD_NAND_OMAP2_H */

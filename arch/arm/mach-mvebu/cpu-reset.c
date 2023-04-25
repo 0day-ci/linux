@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2014 Marvell
  *
  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 
 #define pr_fmt(fmt) "mvebu-cpureset: " fmt
@@ -15,6 +12,8 @@
 #include <linux/of_address.h>
 #include <linux/io.h>
 #include <linux/resource.h>
+
+#include "common.h"
 
 static void __iomem *cpu_reset_base;
 static size_t cpu_reset_size;

@@ -27,7 +27,6 @@
 
 static const struct nvkm_falcon_func
 gt215_mspdec = {
-	.pmc_enable = 0x01020000,
 	.init = g98_mspdec_init,
 	.sclass = {
 		{ -1, -1, GT212_MSPDEC },
@@ -36,8 +35,8 @@ gt215_mspdec = {
 };
 
 int
-gt215_mspdec_new(struct nvkm_device *device, int index,
-	     struct nvkm_engine **pengine)
+gt215_mspdec_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
+		 struct nvkm_engine **pengine)
 {
-	return nvkm_mspdec_new_(&gt215_mspdec, device, index, pengine);
+	return nvkm_mspdec_new_(&gt215_mspdec, device, type, inst, pengine);
 }

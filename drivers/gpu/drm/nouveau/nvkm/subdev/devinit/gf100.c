@@ -63,36 +63,47 @@ gf100_devinit_pll_set(struct nvkm_devinit *init, u32 type, u32 freq)
 	return ret;
 }
 
-static u64
+static void
 gf100_devinit_disable(struct nvkm_devinit *init)
 {
 	struct nvkm_device *device = init->subdev.device;
 	u32 r022500 = nvkm_rd32(device, 0x022500);
-	u64 disable = 0ULL;
 
 	if (r022500 & 0x00000001)
-		disable |= (1ULL << NVKM_ENGINE_DISP);
+		nvkm_subdev_disable(device, NVKM_ENGINE_DISP, 0);
 
 	if (r022500 & 0x00000002) {
-		disable |= (1ULL << NVKM_ENGINE_MSPDEC);
-		disable |= (1ULL << NVKM_ENGINE_MSPPP);
+		nvkm_subdev_disable(device, NVKM_ENGINE_MSPDEC, 0);
+		nvkm_subdev_disable(device, NVKM_ENGINE_MSPPP, 0);
 	}
 
 	if (r022500 & 0x00000004)
-		disable |= (1ULL << NVKM_ENGINE_MSVLD);
+		nvkm_subdev_disable(device, NVKM_ENGINE_MSVLD, 0);
 	if (r022500 & 0x00000008)
-		disable |= (1ULL << NVKM_ENGINE_MSENC);
+		nvkm_subdev_disable(device, NVKM_ENGINE_MSENC, 0);
 	if (r022500 & 0x00000100)
-		disable |= (1ULL << NVKM_ENGINE_CE0);
+		nvkm_subdev_disable(device, NVKM_ENGINE_CE, 0);
 	if (r022500 & 0x00000200)
-		disable |= (1ULL << NVKM_ENGINE_CE1);
+		nvkm_subdev_disable(device, NVKM_ENGINE_CE, 1);
+}
 
-	return disable;
+void
+gf100_devinit_preinit(struct nvkm_devinit *base)
+{
+	struct nv50_devinit *init = nv50_devinit(base);
+	struct nvkm_subdev *subdev = &init->base.subdev;
+	struct nvkm_device *device = subdev->device;
+
+	/*
+	 * This bit is set by devinit, and flips back to 0 on suspend. We
+	 * can use it as a reliable way to know whether we should run devinit.
+	 */
+	base->post = ((nvkm_rd32(device, 0x2240c) & BIT(1)) == 0);
 }
 
 static const struct nvkm_devinit_func
 gf100_devinit = {
-	.preinit = nv50_devinit_preinit,
+	.preinit = gf100_devinit_preinit,
 	.init = nv50_devinit_init,
 	.post = nv04_devinit_post,
 	.pll_set = gf100_devinit_pll_set,
@@ -100,8 +111,8 @@ gf100_devinit = {
 };
 
 int
-gf100_devinit_new(struct nvkm_device *device, int index,
-		struct nvkm_devinit **pinit)
+gf100_devinit_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
+		  struct nvkm_devinit **pinit)
 {
-	return nv50_devinit_new_(&gf100_devinit, device, index, pinit);
+	return nv50_devinit_new_(&gf100_devinit, device, type, inst, pinit);
 }

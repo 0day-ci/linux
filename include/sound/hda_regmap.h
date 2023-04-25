@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * HD-audio regmap helpers
  */
@@ -17,10 +18,15 @@ int snd_hdac_regmap_add_vendor_verb(struct hdac_device *codec,
 				    unsigned int verb);
 int snd_hdac_regmap_read_raw(struct hdac_device *codec, unsigned int reg,
 			     unsigned int *val);
+int snd_hdac_regmap_read_raw_uncached(struct hdac_device *codec,
+				      unsigned int reg, unsigned int *val);
 int snd_hdac_regmap_write_raw(struct hdac_device *codec, unsigned int reg,
 			      unsigned int val);
 int snd_hdac_regmap_update_raw(struct hdac_device *codec, unsigned int reg,
 			       unsigned int mask, unsigned int val);
+int snd_hdac_regmap_update_raw_once(struct hdac_device *codec, unsigned int reg,
+				    unsigned int mask, unsigned int val);
+void snd_hdac_regmap_sync(struct hdac_device *codec);
 
 /**
  * snd_hdac_regmap_encode_verb - encode the verb to a pseudo register
@@ -67,7 +73,7 @@ int snd_hdac_regmap_update_raw(struct hdac_device *codec, unsigned int reg,
  * @reg: verb to write
  * @val: value to write
  *
- * For writing an amp value, use snd_hda_regmap_amp_update().
+ * For writing an amp value, use snd_hdac_regmap_update_amp().
  */
 static inline int
 snd_hdac_regmap_write(struct hdac_device *codec, hda_nid_t nid,
@@ -85,7 +91,7 @@ snd_hdac_regmap_write(struct hdac_device *codec, hda_nid_t nid,
  * @mask: bit mask to update
  * @val: value to update
  *
- * For updating an amp value, use snd_hda_regmap_amp_update().
+ * For updating an amp value, use snd_hdac_regmap_update_amp().
  */
 static inline int
 snd_hdac_regmap_update(struct hdac_device *codec, hda_nid_t nid,

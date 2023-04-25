@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_X86_IA32_H
 #define _ASM_X86_IA32_H
 
@@ -10,7 +11,7 @@
  * 32 bit structures for IA32 support.
  */
 
-#include <asm/sigcontext32.h>
+#include <uapi/asm/sigcontext.h>
 
 /* signal.h */
 
@@ -18,7 +19,7 @@ struct ucontext_ia32 {
 	unsigned int	  uc_flags;
 	unsigned int 	  uc_link;
 	compat_stack_t	  uc_stack;
-	struct sigcontext_ia32 uc_mcontext;
+	struct sigcontext_32 uc_mcontext;
 	compat_sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
 
@@ -67,6 +68,6 @@ extern void ia32_pick_mmap_layout(struct mm_struct *mm);
 
 #endif
 
-#endif /* !CONFIG_IA32_SUPPORT */
+#endif /* CONFIG_IA32_EMULATION */
 
 #endif /* _ASM_X86_IA32_H */

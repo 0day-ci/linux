@@ -17,8 +17,10 @@
 
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
+#include <linux/sizes.h>
 #include <asm/boot.h>
 #include <asm/page.h>
+#include <asm/pgtable-prot.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -26,10 +28,9 @@
  * compile time, but to set the physical address only
  * in the boot process.
  *
- * These 'compile-time allocated' memory buffers are
- * page-sized. Use set_fixmap(idx,phys) to associate
- * physical memory with fixmap indices.
- *
+ * Each enum increment in these 'compile-time allocated'
+ * memory buffers is page-sized. Use set_fixmap(idx,phys)
+ * to associate physical memory with a fixmap index.
  */
 enum fixed_addresses {
 	FIX_HOLE,
@@ -49,22 +50,48 @@ enum fixed_addresses {
 
 	FIX_EARLYCON_MEM_BASE,
 	FIX_TEXT_POKE0,
+
+#ifdef CONFIG_ACPI_APEI_GHES
+	/* Used for GHES mapping from assorted contexts */
+	FIX_APEI_GHES_IRQ,
+	FIX_APEI_GHES_SEA,
+#ifdef CONFIG_ARM_SDE_INTERFACE
+	FIX_APEI_GHES_SDEI_NORMAL,
+	FIX_APEI_GHES_SDEI_CRITICAL,
+#endif
+#endif /* CONFIG_ACPI_APEI_GHES */
+
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+#ifdef CONFIG_RELOCATABLE
+	FIX_ENTRY_TRAMP_TEXT4,	/* one extra slot for the data page */
+#endif
+	FIX_ENTRY_TRAMP_TEXT3,
+	FIX_ENTRY_TRAMP_TEXT2,
+	FIX_ENTRY_TRAMP_TEXT1,
+#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT1))
+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
 	__end_of_permanent_fixed_addresses,
 
 	/*
 	 * Temporary boot-time mappings, used by early_ioremap(),
 	 * before ioremap() is functional.
 	 */
-#ifdef CONFIG_ARM64_64K_PAGES
-#define NR_FIX_BTMAPS		4
-#else
-#define NR_FIX_BTMAPS		64
-#endif
+#define NR_FIX_BTMAPS		(SZ_256K / PAGE_SIZE)
 #define FIX_BTMAPS_SLOTS	7
 #define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
 
 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
+
+	/*
+	 * Used for kernel page table creation, so unmapped memory may be used
+	 * for tables.
+	 */
+	FIX_PTE,
+	FIX_PMD,
+	FIX_PUD,
+	FIX_PGD,
+
 	__end_of_fixed_addresses
 };
 

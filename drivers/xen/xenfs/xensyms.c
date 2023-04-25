@@ -1,4 +1,4 @@
-#include <linux/module.h>
+// SPDX-License-Identifier: GPL-2.0
 #include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/fs.h>
@@ -31,7 +31,7 @@ static int xensyms_next_sym(struct xensyms *xs)
 
 	symnum = symdata->symnum;
 
-	ret = HYPERVISOR_dom0_op(&xs->op);
+	ret = HYPERVISOR_platform_op(&xs->op);
 	if (ret < 0)
 		return ret;
 
@@ -50,7 +50,7 @@ static int xensyms_next_sym(struct xensyms *xs)
 		set_xen_guest_handle(symdata->name, xs->name);
 		symdata->symnum--; /* Rewind */
 
-		ret = HYPERVISOR_dom0_op(&xs->op);
+		ret = HYPERVISOR_platform_op(&xs->op);
 		if (ret < 0)
 			return ret;
 	}
@@ -64,7 +64,7 @@ static int xensyms_next_sym(struct xensyms *xs)
 
 static void *xensyms_start(struct seq_file *m, loff_t *pos)
 {
-	struct xensyms *xs = (struct xensyms *)m->private;
+	struct xensyms *xs = m->private;
 
 	xs->op.u.symdata.symnum = *pos;
 
@@ -76,7 +76,7 @@ static void *xensyms_start(struct seq_file *m, loff_t *pos)
 
 static void *xensyms_next(struct seq_file *m, void *p, loff_t *pos)
 {
-	struct xensyms *xs = (struct xensyms *)m->private;
+	struct xensyms *xs = m->private;
 
 	xs->op.u.symdata.symnum = ++(*pos);
 
@@ -88,7 +88,7 @@ static void *xensyms_next(struct seq_file *m, void *p, loff_t *pos)
 
 static int xensyms_show(struct seq_file *m, void *p)
 {
-	struct xensyms *xs = (struct xensyms *)m->private;
+	struct xensyms *xs = m->private;
 	struct xenpf_symdata *symdata = &xs->op.u.symdata;
 
 	seq_printf(m, "%016llx %c %s\n", symdata->address,
@@ -120,7 +120,7 @@ static int xensyms_open(struct inode *inode, struct file *file)
 		return ret;
 
 	m = file->private_data;
-	xs = (struct xensyms *)m->private;
+	xs = m->private;
 
 	xs->namelen = XEN_KSYM_NAME_LEN + 1;
 	xs->name = kzalloc(xs->namelen, GFP_KERNEL);
@@ -138,7 +138,7 @@ static int xensyms_open(struct inode *inode, struct file *file)
 static int xensyms_release(struct inode *inode, struct file *file)
 {
 	struct seq_file *m = file->private_data;
-	struct xensyms *xs = (struct xensyms *)m->private;
+	struct xensyms *xs = m->private;
 
 	kfree(xs->name);
 	return seq_release_private(inode, file);

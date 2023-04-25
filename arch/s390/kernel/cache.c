@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Extract CPU cache information and expose them via sysfs.
  *
  *    Copyright IBM Corp. 2012
- *    Author(s): Heiko Carstens <heiko.carstens@de.ibm.com>
  */
 
 #include <linux/seq_file.h>
@@ -46,7 +46,7 @@ struct cache_info {
 #define CACHE_MAX_LEVEL 8
 union cache_topology {
 	struct cache_info ci[CACHE_MAX_LEVEL];
-	unsigned long long raw;
+	unsigned long raw;
 };
 
 static const char * const cache_type_string[] = {
@@ -70,9 +70,6 @@ void show_cacheinfo(struct seq_file *m)
 	struct cacheinfo *cache;
 	int idx;
 
-	if (!test_facility(34))
-		return;
-	get_online_cpus();
 	this_cpu_ci = get_cpu_cacheinfo(cpumask_any(cpu_online_mask));
 	for (idx = 0; idx < this_cpu_ci->num_leaves; idx++) {
 		cache = this_cpu_ci->info_list + idx;
@@ -86,7 +83,6 @@ void show_cacheinfo(struct seq_file *m)
 		seq_printf(m, "associativity=%d", cache->ways_of_associativity);
 		seq_puts(m, "\n");
 	}
-	put_online_cpus();
 }
 
 static inline enum cache_type get_cache_type(struct cache_info *ci, int level)
@@ -101,12 +97,7 @@ static inline enum cache_type get_cache_type(struct cache_info *ci, int level)
 
 static inline unsigned long ecag(int ai, int li, int ti)
 {
-	unsigned long cmd, val;
-
-	cmd = ai << 4 | li << 1 | ti;
-	asm volatile(".insn	rsy,0xeb000000004c,%0,0,0(%1)" /* ecag */
-		     : "=d" (val) : "a" (cmd));
-	return val;
+	return __ecag(ECAG_CACHE_ATTRIBUTE, ai << 4 | li << 1 | ti);
 }
 
 static void ci_leaf_init(struct cacheinfo *this_leaf, int private,
@@ -138,8 +129,6 @@ int init_cache_level(unsigned int cpu)
 	union cache_topology ct;
 	enum cache_type ctype;
 
-	if (!test_facility(34))
-		return -EOPNOTSUPP;
 	if (!this_cpu_ci)
 		return -EINVAL;
 	ct.raw = ecag(EXTRACT_TOPOLOGY, 0, 0);
@@ -163,8 +152,6 @@ int populate_cache_leaves(unsigned int cpu)
 	union cache_topology ct;
 	enum cache_type ctype;
 
-	if (!test_facility(34))
-		return -EOPNOTSUPP;
 	ct.raw = ecag(EXTRACT_TOPOLOGY, 0, 0);
 	for (idx = 0, level = 0; level < this_cpu_ci->num_levels &&
 	     idx < this_cpu_ci->num_leaves; idx++, level++) {

@@ -30,3 +30,10 @@ OPTIONS
 -v::
 --verbose::
 	Be more verbose.
+
+-F::
+--dont-fork::
+	Do not fork child for each test, run all tests within single process.
+
+--dso::
+	Specify a DSO for the "Symbols" test.

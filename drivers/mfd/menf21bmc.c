@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  MEN 14F021P00 Board Management Controller (BMC) MFD Core Driver.
  *
  *  Copyright (C) 2014 MEN Mikro Elektronik Nuernberg GmbH
- *
- *  This program is free software; you can redistribute  it and/or modify it
- *  under  the terms of  the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the  License, or (at your
- *  option) any later version.
  */
 
 #include <linux/kernel.h>
@@ -53,7 +49,7 @@ static int menf21bmc_wdt_exit_prod_mode(struct i2c_client *client)
 }
 
 static int
-menf21bmc_probe(struct i2c_client *client, const struct i2c_device_id *ids)
+menf21bmc_probe(struct i2c_client *client)
 {
 	int rev_major, rev_minor, rev_main;
 	int ret;
@@ -96,19 +92,13 @@ menf21bmc_probe(struct i2c_client *client, const struct i2c_device_id *ids)
 		return ret;
 	}
 
-	ret = mfd_add_devices(&client->dev, 0, menf21bmc_cell,
-			      ARRAY_SIZE(menf21bmc_cell), NULL, 0, NULL);
+	ret = devm_mfd_add_devices(&client->dev, 0, menf21bmc_cell,
+				   ARRAY_SIZE(menf21bmc_cell), NULL, 0, NULL);
 	if (ret < 0) {
 		dev_err(&client->dev, "failed to add BMC sub-devices\n");
 		return ret;
 	}
 
-	return 0;
-}
-
-static int menf21bmc_remove(struct i2c_client *client)
-{
-	mfd_remove_devices(&client->dev);
 	return 0;
 }
 
@@ -121,8 +111,7 @@ MODULE_DEVICE_TABLE(i2c, menf21bmc_id_table);
 static struct i2c_driver menf21bmc_driver = {
 	.driver.name	= "menf21bmc",
 	.id_table	= menf21bmc_id_table,
-	.probe		= menf21bmc_probe,
-	.remove		= menf21bmc_remove,
+	.probe_new	= menf21bmc_probe,
 };
 
 module_i2c_driver(menf21bmc_driver);

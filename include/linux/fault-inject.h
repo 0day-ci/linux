@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _LINUX_FAULT_INJECT_H
 #define _LINUX_FAULT_INJECT_H
 
@@ -10,7 +11,7 @@
 
 /*
  * For explanation of the elements of this struct, see
- * Documentation/fault-injection/fault-injection.txt
+ * Documentation/fault-injection/fault-injection.rst
  */
 struct fault_attr {
 	unsigned long probability;
@@ -18,7 +19,7 @@ struct fault_attr {
 	atomic_t times;
 	atomic_t space;
 	unsigned long verbose;
-	u32 task_filter;
+	bool task_filter;
 	unsigned long stacktrace_depth;
 	unsigned long require_start;
 	unsigned long require_end;
@@ -28,6 +29,10 @@ struct fault_attr {
 	unsigned long count;
 	struct ratelimit_state ratelimit_state;
 	struct dentry *dname;
+};
+
+enum fault_flags {
+	FAULT_NOWARN =	1 << 0,
 };
 
 #define FAULT_ATTR_INITIALIZER {					\
@@ -42,6 +47,7 @@ struct fault_attr {
 
 #define DECLARE_FAULT_ATTR(name) struct fault_attr name = FAULT_ATTR_INITIALIZER
 int setup_fault_attr(struct fault_attr *attr, char *str);
+bool should_fail_ex(struct fault_attr *attr, ssize_t size, int flags);
 bool should_fail(struct fault_attr *attr, ssize_t size);
 
 #ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
@@ -61,11 +67,15 @@ static inline struct dentry *fault_create_debugfs_attr(const char *name,
 
 #endif /* CONFIG_FAULT_INJECTION */
 
+struct kmem_cache;
+
+bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order);
+
+int should_failslab(struct kmem_cache *s, gfp_t gfpflags);
 #ifdef CONFIG_FAILSLAB
-extern bool should_failslab(size_t size, gfp_t gfpflags, unsigned long flags);
+extern bool __should_failslab(struct kmem_cache *s, gfp_t gfpflags);
 #else
-static inline bool should_failslab(size_t size, gfp_t gfpflags,
-				unsigned long flags)
+static inline bool __should_failslab(struct kmem_cache *s, gfp_t gfpflags)
 {
 	return false;
 }

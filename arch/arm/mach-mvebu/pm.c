@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Suspend/resume support. Currently supporting Armada XP only.
  *
  * Copyright (C) 2014 Marvell
  *
  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 
 #include <linux/cpu_pm.h>
@@ -23,6 +20,7 @@
 #include <asm/suspend.h>
 
 #include "coherency.h"
+#include "common.h"
 #include "pmsu.h"
 
 #define SDRAM_CONFIG_OFFS                  0x0
@@ -109,7 +107,7 @@ static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
 {
 	phys_addr_t resume_pc;
 
-	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
+	resume_pc = __pa_symbol(armada_370_xp_cpu_resume);
 
 	/*
 	 * The bootloader expects the first two words to be a magic

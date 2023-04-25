@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2002 Steve Schmidtke
- * Licensed under the GPL
  */
 
 #include <linux/fs.h>
@@ -9,7 +9,7 @@
 #include <linux/sound.h>
 #include <linux/soundcard.h>
 #include <linux/mutex.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <init.h>
 #include <os.h>
 
@@ -105,13 +105,9 @@ static ssize_t hostaudio_write(struct file *file, const char __user *buffer,
 	printk(KERN_DEBUG "hostaudio: write called, count = %d\n", count);
 #endif
 
-	kbuf = kmalloc(count, GFP_KERNEL);
-	if (kbuf == NULL)
-		return -ENOMEM;
-
-	err = -EFAULT;
-	if (copy_from_user(kbuf, buffer, count))
-		goto out;
+	kbuf = memdup_user(buffer, count);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
 
 	err = os_write_file(state->fd, kbuf, count);
 	if (err < 0)
@@ -123,16 +119,14 @@ static ssize_t hostaudio_write(struct file *file, const char __user *buffer,
 	return err;
 }
 
-static unsigned int hostaudio_poll(struct file *file,
-				   struct poll_table_struct *wait)
+static __poll_t hostaudio_poll(struct file *file,
+				struct poll_table_struct *wait)
 {
-	unsigned int mask = 0;
-
 #ifdef DEBUG
 	printk(KERN_DEBUG "hostaudio: poll called (unimplemented)\n");
 #endif
 
-	return mask;
+	return 0;
 }
 
 static long hostaudio_ioctl(struct file *file,
@@ -302,6 +296,7 @@ static const struct file_operations hostaudio_fops = {
 	.write          = hostaudio_write,
 	.poll           = hostaudio_poll,
 	.unlocked_ioctl	= hostaudio_ioctl,
+	.compat_ioctl	= compat_ptr_ioctl,
 	.mmap           = NULL,
 	.open           = hostaudio_open,
 	.release        = hostaudio_release,

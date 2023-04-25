@@ -1,21 +1,9 @@
-/******************************************************************************
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
  * Copyright(c) 2008 - 2010 Realtek Corporation. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- * The full GNU General Public License is included in this distribution in the
- * file called LICENSE.
- *
- * Contact Information:
- * wlanfae <wlanfae@realtek.com>
-******************************************************************************/
+ * Contact Information: wlanfae <wlanfae@realtek.com>
+ */
 #ifndef _R819XU_PHYREG_H
 #define _R819XU_PHYREG_H
 
@@ -54,8 +42,6 @@
 #define CCK_TXAGC		0x348
 
 /* Mac block on/off control register */
-#define MacBlkCtrl			0x403
-
 #define rFPGA0_RFMOD			0x800 /* RF mode & CCK TxSC */
 #define rFPGA0_TxInfo			0x804
 #define rFPGA0_PSDFunction		0x808
@@ -696,7 +682,7 @@
  * #define bRxPath4		0x08
  * #define bTxPath1		0x10
  * #define bTxPath2		0x20
-*/
+ */
 #define bHTDetect		0x100
 #define bCFOEn			0x10000
 #define bCFOValue		0xfff00000
