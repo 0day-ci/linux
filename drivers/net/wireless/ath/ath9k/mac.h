@@ -16,6 +16,7 @@
 
 #ifndef MAC_H
 #define MAC_H
+#include <net/cfg80211.h>
 
 #define set11nTries(_series, _index) \
 	(SM((_series)[_index].Tries, AR_XmitDataTries##_index))
@@ -34,8 +35,10 @@
 	 |((_series)[_index].RateFlags & ATH9K_RATESERIES_HALFGI ?	\
 	   AR_GI##_index : 0)						\
 	 |((_series)[_index].RateFlags & ATH9K_RATESERIES_STBC ?	\
-	   AR_STBC##_index : 0)						\
-	 |SM((_series)[_index].ChSel, AR_ChainSel##_index))
+	   AR_STBC##_index : 0))
+
+#define set11nChainSel(_series, _index)					\
+	(SM((_series)[_index].ChSel, AR_ChainSel##_index))
 
 #define CCK_SIFS_TIME        10
 #define CCK_PREAMBLE_BITS   144
@@ -64,10 +67,6 @@
 #define INIT_LG_RETRY   10
 #define INIT_SSH_RETRY  32
 #define INIT_SLG_RETRY  32
-
-#define ATH9K_SLOT_TIME_6 6
-#define ATH9K_SLOT_TIME_9 9
-#define ATH9K_SLOT_TIME_20 20
 
 #define ATH9K_TXERR_XRETRY         0x01
 #define ATH9K_TXERR_FILT           0x02
@@ -147,7 +146,8 @@ struct ath_rx_status {
 	u32 evm2;
 	u32 evm3;
 	u32 evm4;
-	u32 flag; /* see enum mac80211_rx_flags */
+	u16 enc_flags;
+	enum rate_info_bw bw;
 };
 
 struct ath_htc_rx_status {
@@ -209,21 +209,25 @@ enum ath9k_phyerr {
 	ATH9K_PHYERR_OFDM_POWER_DROP      = 21,
 	ATH9K_PHYERR_OFDM_SERVICE         = 22,
 	ATH9K_PHYERR_OFDM_RESTART         = 23,
-	ATH9K_PHYERR_FALSE_RADAR_EXT      = 24,
 
+	ATH9K_PHYERR_CCK_BLOCKER          = 24,
 	ATH9K_PHYERR_CCK_TIMING           = 25,
 	ATH9K_PHYERR_CCK_HEADER_CRC       = 26,
 	ATH9K_PHYERR_CCK_RATE_ILLEGAL     = 27,
+	ATH9K_PHYERR_CCK_LENGTH_ILLEGAL   = 28,
+	ATH9K_PHYERR_CCK_POWER_DROP       = 29,
 	ATH9K_PHYERR_CCK_SERVICE          = 30,
 	ATH9K_PHYERR_CCK_RESTART          = 31,
-	ATH9K_PHYERR_CCK_LENGTH_ILLEGAL   = 32,
-	ATH9K_PHYERR_CCK_POWER_DROP       = 33,
 
-	ATH9K_PHYERR_HT_CRC_ERROR         = 34,
-	ATH9K_PHYERR_HT_LENGTH_ILLEGAL    = 35,
-	ATH9K_PHYERR_HT_RATE_ILLEGAL      = 36,
+	ATH9K_PHYERR_HT_CRC_ERROR         = 32,
+	ATH9K_PHYERR_HT_LENGTH_ILLEGAL    = 33,
+	ATH9K_PHYERR_HT_RATE_ILLEGAL      = 34,
+	ATH9K_PHYERR_HT_ZLF               = 35,
 
-	ATH9K_PHYERR_SPECTRAL		  = 38,
+	ATH9K_PHYERR_FALSE_RADAR_EXT      = 36,
+	ATH9K_PHYERR_GREEN_FIELD          = 37,
+	ATH9K_PHYERR_SPECTRAL             = 38,
+
 	ATH9K_PHYERR_MAX                  = 39,
 };
 
@@ -744,6 +748,7 @@ void ath9k_hw_set_interrupts(struct ath_hw *ah);
 void ath9k_hw_enable_interrupts(struct ath_hw *ah);
 void ath9k_hw_disable_interrupts(struct ath_hw *ah);
 void ath9k_hw_kill_interrupts(struct ath_hw *ah);
+void ath9k_hw_resume_interrupts(struct ath_hw *ah);
 
 void ar9002_hw_attach_mac_ops(struct ath_hw *ah);
 

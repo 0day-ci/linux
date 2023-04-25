@@ -79,5 +79,18 @@ void radeon_audio_fini(struct radeon_device *rdev);
 void radeon_audio_mode_set(struct drm_encoder *encoder,
 	struct drm_display_mode *mode);
 void radeon_audio_dpms(struct drm_encoder *encoder, int mode);
+unsigned int radeon_audio_decode_dfs_div(unsigned int div);
 
+void dce3_2_afmt_write_sad_regs(struct drm_encoder *encoder,
+				struct cea_sad *sads, int sad_count);
+void dce3_2_afmt_hdmi_write_speaker_allocation(struct drm_encoder *encoder,
+					       u8 *sadb, int sad_count);
+void dce3_2_afmt_dp_write_speaker_allocation(struct drm_encoder *encoder,
+					     u8 *sadb, int sad_count);
+void dce3_2_audio_set_dto(struct radeon_device *rdev,
+			  struct radeon_crtc *crtc, unsigned int clock);
+void dce3_2_hdmi_update_acr(struct drm_encoder *encoder, long offset,
+			    const struct radeon_hdmi_acr *acr);
+void dce3_2_set_audio_packet(struct drm_encoder *encoder, u32 offset);
+void dce3_2_set_mute(struct drm_encoder *encoder, u32 offset, bool mute);
 #endif

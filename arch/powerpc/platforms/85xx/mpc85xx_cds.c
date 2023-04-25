@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * MPC85xx setup and early boot code plus other random bits.
  *
  * Maintained by Kumar Gala (see MAINTAINERS for contact information)
  *
  * Copyright 2005, 2011-2012 Freescale Semiconductor Inc.
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #include <linux/stddef.h>
@@ -25,9 +21,11 @@
 #include <linux/initrd.h>
 #include <linux/interrupt.h>
 #include <linux/fsl_devices.h>
+#include <linux/of_address.h>
+#include <linux/of_irq.h>
 #include <linux/of_platform.h>
+#include <linux/pgtable.h>
 
-#include <asm/pgtable.h>
 #include <asm/page.h>
 #include <linux/atomic.h>
 #include <asm/time.h>
@@ -37,7 +35,6 @@
 #include <asm/pci-bridge.h>
 #include <asm/irq.h>
 #include <mm/mmu_decl.h>
-#include <asm/prom.h>
 #include <asm/udbg.h>
 #include <asm/mpic.h>
 #include <asm/i8259.h>
@@ -83,7 +80,8 @@ static int mpc85xx_exclude_device(struct pci_controller *hose,
 		return PCIBIOS_SUCCESSFUL;
 }
 
-static void mpc85xx_cds_restart(char *cmd)
+static int mpc85xx_cds_restart(struct notifier_block *this,
+			       unsigned long mode, void *cmd)
 {
 	struct pci_dev *dev;
 	u_char tmp;
@@ -99,7 +97,7 @@ static void mpc85xx_cds_restart(char *cmd)
 		pci_read_config_byte(dev, 0x47, &tmp);
 
 		/*
-		 *  At this point, the harware reset should have triggered.
+		 *  At this point, the hardware reset should have triggered.
 		 *  However, if it doesn't work for some mysterious reason,
 		 *  just fall through to the default reset below.
 		 */
@@ -108,11 +106,24 @@ static void mpc85xx_cds_restart(char *cmd)
 	}
 
 	/*
-	 *  If we can't find the VIA chip (maybe the P2P bridge is disabled)
-	 *  or the VIA chip reset didn't work, just use the default reset.
+	 *  If we can't find the VIA chip (maybe the P2P bridge is
+	 *  disabled) or the VIA chip reset didn't work, just return
+	 *  and let default reset sequence happen.
 	 */
-	fsl_rstcr_restart(NULL);
+	return NOTIFY_DONE;
 }
+
+static int mpc85xx_cds_restart_register(void)
+{
+	static struct notifier_block restart_handler;
+
+	restart_handler.notifier_call = mpc85xx_cds_restart;
+	restart_handler.priority = 192;
+
+	return register_restart_handler(&restart_handler);
+}
+machine_arch_initcall(mpc85xx_cds, mpc85xx_cds_restart_register);
+
 
 static void __init mpc85xx_cds_pci_irq_fixup(struct pci_dev *dev)
 {
@@ -141,13 +152,14 @@ static void __init mpc85xx_cds_pci_irq_fixup(struct pci_dev *dev)
 		 */
 		case PCI_DEVICE_ID_VIA_82C586_2:
 		/* There are two USB controllers.
-		 * Identify them by functon number
+		 * Identify them by function number
 		 */
 			if (PCI_FUNC(dev->devfn) == 3)
 				dev->irq = 11;
 			else
 				dev->irq = 10;
 			pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+			break;
 		default:
 			break;
 		}
@@ -196,7 +208,7 @@ static void mpc85xx_8259_cascade_handler(struct irq_desc *desc)
 {
 	unsigned int cascade_irq = i8259_irq();
 
-	if (cascade_irq != NO_IRQ)
+	if (cascade_irq)
 		/* handle an interrupt from the 8259 */
 		generic_handle_irq(cascade_irq);
 
@@ -208,12 +220,6 @@ static irqreturn_t mpc85xx_8259_cascade_action(int irq, void *dev_id)
 {
 	return IRQ_HANDLED;
 }
-
-static struct irqaction mpc85xxcds_8259_irqaction = {
-	.handler = mpc85xx_8259_cascade_action,
-	.flags = IRQF_SHARED | IRQF_NO_THREAD,
-	.name = "8259 cascade",
-};
 #endif /* PPC_I8259 */
 #endif /* CONFIG_PCI */
 
@@ -247,7 +253,7 @@ static int mpc85xx_cds_8259_attach(void)
 	}
 
 	cascade_irq = irq_of_parse_and_map(cascade_node, 0);
-	if (cascade_irq == NO_IRQ) {
+	if (!cascade_irq) {
 		printk(KERN_ERR "Failed to map cascade interrupt\n");
 		return -ENXIO;
 	}
@@ -261,7 +267,10 @@ static int mpc85xx_cds_8259_attach(void)
 	 *  disabled when the last user of the shared IRQ line frees their
 	 *  interrupt.
 	 */
-	if ((ret = setup_irq(cascade_irq, &mpc85xxcds_8259_irqaction))) {
+	ret = request_irq(cascade_irq, mpc85xx_8259_cascade_action,
+			  IRQF_SHARED | IRQF_NO_THREAD, "8259 cascade",
+			  cascade_node);
+	if (ret) {
 		printk(KERN_ERR "Failed to setup cascade interrupt\n");
 		return ret;
 	}
@@ -275,7 +284,7 @@ machine_device_initcall(mpc85xx_cds, mpc85xx_cds_8259_attach);
 
 #endif /* CONFIG_PPC_I8259 */
 
-static void mpc85xx_cds_pci_assign_primary(void)
+static void __init mpc85xx_cds_pci_assign_primary(void)
 {
 #ifdef CONFIG_PCI
 	struct device_node *np;
@@ -367,9 +376,7 @@ static void mpc85xx_cds_show_cpuinfo(struct seq_file *m)
  */
 static int __init mpc85xx_cds_probe(void)
 {
-        unsigned long root = of_get_flat_dt_root();
-
-        return of_flat_dt_is_compatible(root, "MPC85xxCDS");
+	return of_machine_is_compatible("MPC85xxCDS");
 }
 
 machine_arch_initcall(mpc85xx_cds, mpc85xx_common_publish_devices);
@@ -382,11 +389,8 @@ define_machine(mpc85xx_cds) {
 	.show_cpuinfo	= mpc85xx_cds_show_cpuinfo,
 	.get_irq	= mpic_get_irq,
 #ifdef CONFIG_PCI
-	.restart	= mpc85xx_cds_restart,
 	.pcibios_fixup_bus	= mpc85xx_cds_fixup_bus,
 	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#else
-	.restart	= fsl_rstcr_restart,
 #endif
 	.calibrate_decr = generic_calibrate_decr,
 	.progress	= udbg_progress,

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * netup_unidvb.h
  *
@@ -6,16 +7,6 @@
  * Copyright (C) 2014 NetUP Inc.
  * Copyright (C) 2014 Sergey Kozlov <serjk@netup.ru>
  * Copyright (C) 2014 Abylay Ospan <aospan@netup.ru>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/pci.h>
@@ -24,7 +15,7 @@
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
 #include <media/videobuf2-dvb.h>
-#include <dvb_ca_en50221.h>
+#include <media/dvb_ca_en50221.h>
 
 #define NETUP_UNIDVB_NAME	"netup_unidvb"
 #define NETUP_UNIDVB_VERSION	"0.0.1"
@@ -50,11 +41,20 @@
 #define NETUP_UNIDVB_IRQ_CAM0	(1 << 11)
 #define NETUP_UNIDVB_IRQ_CAM1	(1 << 12)
 
+/* NetUP Universal DVB card hardware revisions and it's PCI device id's:
+ * 1.3 - CXD2841ER demod, ASCOT2E and HORUS3A tuners
+ * 1.4 - CXD2854ER demod, HELENE tuner
+*/
+enum netup_hw_rev {
+	NETUP_HW_REV_1_3 = 0x18F6,
+	NETUP_HW_REV_1_4 = 0x18F7
+};
+
 struct netup_dma {
 	u8			num;
 	spinlock_t		lock;
 	struct netup_unidvb_dev	*ndev;
-	struct netup_dma_regs	*regs;
+	struct netup_dma_regs __iomem *regs;
 	u32			ring_buffer_size;
 	u8			*addr_virt;
 	dma_addr_t		addr_phys;
@@ -82,7 +82,7 @@ struct netup_i2c {
 	wait_queue_head_t		wq;
 	struct i2c_adapter		adap;
 	struct netup_unidvb_dev		*dev;
-	struct netup_i2c_regs		*regs;
+	struct netup_i2c_regs __iomem	*regs;
 	struct i2c_msg			*msg;
 	enum netup_i2c_state		state;
 	u32				xmit_size;
@@ -119,6 +119,7 @@ struct netup_unidvb_dev {
 	struct netup_dma		dma[2];
 	struct netup_ci_state		ci[2];
 	struct netup_spi		*spi;
+	enum netup_hw_rev		rev;
 };
 
 int netup_i2c_register(struct netup_unidvb_dev *ndev);

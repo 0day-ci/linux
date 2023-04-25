@@ -1,29 +1,32 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef LINUX_VIRTIO_H
 #define LINUX_VIRTIO_H
 #include <linux/scatterlist.h>
 #include <linux/kernel.h>
+#include <linux/spinlock.h>
 
-/* TODO: empty stubs for now. Broken but enough for virtio_ring.c */
-#define list_add_tail(a, b) do {} while (0)
-#define list_del(a) do {} while (0)
-#define list_for_each_entry(a, b, c) while (0)
-/* end of stubs */
+struct device {
+	void *parent;
+};
 
 struct virtio_device {
-	void *dev;
+	struct device dev;
 	u64 features;
+	struct list_head vqs;
+	spinlock_t vqs_list_lock;
+	const struct virtio_config_ops *config;
 };
 
 struct virtqueue {
-	/* TODO: commented as list macros are empty stubs for now.
-	 * Broken but enough for virtio_ring.c
-	 * struct list_head list; */
+	struct list_head list;
 	void (*callback)(struct virtqueue *vq);
 	const char *name;
 	struct virtio_device *vdev;
         unsigned int index;
         unsigned int num_free;
+	unsigned int num_max;
 	void *priv;
+	bool reset;
 };
 
 /* Interfaces exported by virtio_ring. */
@@ -59,6 +62,7 @@ struct virtqueue *vring_new_virtqueue(unsigned int index,
 				      unsigned int vring_align,
 				      struct virtio_device *vdev,
 				      bool weak_barriers,
+				      bool ctx,
 				      void *pages,
 				      bool (*notify)(struct virtqueue *vq),
 				      void (*callback)(struct virtqueue *vq),

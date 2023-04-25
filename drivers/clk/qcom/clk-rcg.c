@@ -1,14 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013, The Linux Foundation. All rights reserved.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/kernel.h>
@@ -534,12 +526,221 @@ static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
 	return __clk_rcg_set_rate(rcg, f);
 }
 
+static int clk_rcg_set_floor_rate(struct clk_hw *hw, unsigned long rate,
+				  unsigned long parent_rate)
+{
+	struct clk_rcg *rcg = to_clk_rcg(hw);
+	const struct freq_tbl *f;
+
+	f = qcom_find_freq_floor(rcg->freq_tbl, rate);
+	if (!f)
+		return -EINVAL;
+
+	return __clk_rcg_set_rate(rcg, f);
+}
+
 static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
 	struct clk_rcg *rcg = to_clk_rcg(hw);
 
 	return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
+}
+
+static int clk_rcg_bypass2_determine_rate(struct clk_hw *hw,
+				struct clk_rate_request *req)
+{
+	struct clk_hw *p;
+
+	p = req->best_parent_hw;
+	req->best_parent_rate = clk_hw_round_rate(p, req->rate);
+	req->rate = req->best_parent_rate;
+
+	return 0;
+}
+
+static int clk_rcg_bypass2_set_rate(struct clk_hw *hw, unsigned long rate,
+				unsigned long parent_rate)
+{
+	struct clk_rcg *rcg = to_clk_rcg(hw);
+	struct freq_tbl f = { 0 };
+	u32 ns, src;
+	int i, ret, num_parents = clk_hw_get_num_parents(hw);
+
+	ret = regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
+	if (ret)
+		return ret;
+
+	src = ns_to_src(&rcg->s, ns);
+	f.pre_div = ns_to_pre_div(&rcg->p, ns) + 1;
+
+	for (i = 0; i < num_parents; i++) {
+		if (src == rcg->s.parent_map[i].cfg) {
+			f.src = rcg->s.parent_map[i].src;
+			return __clk_rcg_set_rate(rcg, &f);
+		}
+	}
+
+	return -EINVAL;
+}
+
+static int clk_rcg_bypass2_set_rate_and_parent(struct clk_hw *hw,
+		unsigned long rate, unsigned long parent_rate, u8 index)
+{
+	/* Read the hardware to determine parent during set_rate */
+	return clk_rcg_bypass2_set_rate(hw, rate, parent_rate);
+}
+
+struct frac_entry {
+	int num;
+	int den;
+};
+
+static const struct frac_entry pixel_table[] = {
+	{ 1, 2 },
+	{ 1, 3 },
+	{ 3, 16 },
+	{ }
+};
+
+static int clk_rcg_pixel_determine_rate(struct clk_hw *hw,
+		struct clk_rate_request *req)
+{
+	int delta = 100000;
+	const struct frac_entry *frac = pixel_table;
+	unsigned long request, src_rate;
+
+	for (; frac->num; frac++) {
+		request = (req->rate * frac->den) / frac->num;
+
+		src_rate = clk_hw_round_rate(req->best_parent_hw, request);
+
+		if ((src_rate < (request - delta)) ||
+			(src_rate > (request + delta)))
+			continue;
+
+		req->best_parent_rate = src_rate;
+		req->rate = (src_rate * frac->num) / frac->den;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int clk_rcg_pixel_set_rate(struct clk_hw *hw, unsigned long rate,
+				unsigned long parent_rate)
+{
+	struct clk_rcg *rcg = to_clk_rcg(hw);
+	int delta = 100000;
+	const struct frac_entry *frac = pixel_table;
+	unsigned long request;
+	struct freq_tbl f = { 0 };
+	u32 ns, src;
+	int i, ret, num_parents = clk_hw_get_num_parents(hw);
+
+	ret = regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
+	if (ret)
+		return ret;
+
+	src = ns_to_src(&rcg->s, ns);
+
+	for (i = 0; i < num_parents; i++) {
+		if (src == rcg->s.parent_map[i].cfg) {
+			f.src = rcg->s.parent_map[i].src;
+			break;
+		}
+	}
+
+	/* bypass the pre divider */
+	f.pre_div = 1;
+
+	/* let us find appropriate m/n values for this */
+	for (; frac->num; frac++) {
+		request = (rate * frac->den) / frac->num;
+
+		if ((parent_rate < (request - delta)) ||
+			(parent_rate > (request + delta)))
+			continue;
+
+		f.m = frac->num;
+		f.n = frac->den;
+
+		return __clk_rcg_set_rate(rcg, &f);
+	}
+
+	return -EINVAL;
+}
+
+static int clk_rcg_pixel_set_rate_and_parent(struct clk_hw *hw,
+		unsigned long rate, unsigned long parent_rate, u8 index)
+{
+	return clk_rcg_pixel_set_rate(hw, rate, parent_rate);
+}
+
+static int clk_rcg_esc_determine_rate(struct clk_hw *hw,
+		struct clk_rate_request *req)
+{
+	struct clk_rcg *rcg = to_clk_rcg(hw);
+	int pre_div_max = BIT(rcg->p.pre_div_width);
+	int div;
+	unsigned long src_rate;
+
+	if (req->rate == 0)
+		return -EINVAL;
+
+	src_rate = clk_hw_get_rate(req->best_parent_hw);
+
+	div = src_rate / req->rate;
+
+	if (div >= 1 && div <= pre_div_max) {
+		req->best_parent_rate = src_rate;
+		req->rate = src_rate / div;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int clk_rcg_esc_set_rate(struct clk_hw *hw, unsigned long rate,
+				unsigned long parent_rate)
+{
+	struct clk_rcg *rcg = to_clk_rcg(hw);
+	struct freq_tbl f = { 0 };
+	int pre_div_max = BIT(rcg->p.pre_div_width);
+	int div;
+	u32 ns;
+	int i, ret, num_parents = clk_hw_get_num_parents(hw);
+
+	if (rate == 0)
+		return -EINVAL;
+
+	ret = regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
+	if (ret)
+		return ret;
+
+	ns = ns_to_src(&rcg->s, ns);
+
+	for (i = 0; i < num_parents; i++) {
+		if (ns == rcg->s.parent_map[i].cfg) {
+			f.src = rcg->s.parent_map[i].src;
+			break;
+		}
+	}
+
+	div = parent_rate / rate;
+
+	if (div >= 1 && div <= pre_div_max) {
+		f.pre_div = div;
+		return __clk_rcg_set_rate(rcg, &f);
+	}
+
+	return -EINVAL;
+}
+
+static int clk_rcg_esc_set_rate_and_parent(struct clk_hw *hw,
+		unsigned long rate, unsigned long parent_rate, u8 index)
+{
+	return clk_rcg_esc_set_rate(hw, rate, parent_rate);
 }
 
 /*
@@ -628,6 +829,17 @@ const struct clk_ops clk_rcg_ops = {
 };
 EXPORT_SYMBOL_GPL(clk_rcg_ops);
 
+const struct clk_ops clk_rcg_floor_ops = {
+	.enable = clk_enable_regmap,
+	.disable = clk_disable_regmap,
+	.get_parent = clk_rcg_get_parent,
+	.set_parent = clk_rcg_set_parent,
+	.recalc_rate = clk_rcg_recalc_rate,
+	.determine_rate = clk_rcg_determine_rate,
+	.set_rate = clk_rcg_set_floor_rate,
+};
+EXPORT_SYMBOL_GPL(clk_rcg_floor_ops);
+
 const struct clk_ops clk_rcg_bypass_ops = {
 	.enable = clk_enable_regmap,
 	.disable = clk_disable_regmap,
@@ -638,6 +850,42 @@ const struct clk_ops clk_rcg_bypass_ops = {
 	.set_rate = clk_rcg_bypass_set_rate,
 };
 EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
+
+const struct clk_ops clk_rcg_bypass2_ops = {
+	.enable = clk_enable_regmap,
+	.disable = clk_disable_regmap,
+	.get_parent = clk_rcg_get_parent,
+	.set_parent = clk_rcg_set_parent,
+	.recalc_rate = clk_rcg_recalc_rate,
+	.determine_rate = clk_rcg_bypass2_determine_rate,
+	.set_rate = clk_rcg_bypass2_set_rate,
+	.set_rate_and_parent = clk_rcg_bypass2_set_rate_and_parent,
+};
+EXPORT_SYMBOL_GPL(clk_rcg_bypass2_ops);
+
+const struct clk_ops clk_rcg_pixel_ops = {
+	.enable = clk_enable_regmap,
+	.disable = clk_disable_regmap,
+	.get_parent = clk_rcg_get_parent,
+	.set_parent = clk_rcg_set_parent,
+	.recalc_rate = clk_rcg_recalc_rate,
+	.determine_rate = clk_rcg_pixel_determine_rate,
+	.set_rate = clk_rcg_pixel_set_rate,
+	.set_rate_and_parent = clk_rcg_pixel_set_rate_and_parent,
+};
+EXPORT_SYMBOL_GPL(clk_rcg_pixel_ops);
+
+const struct clk_ops clk_rcg_esc_ops = {
+	.enable = clk_enable_regmap,
+	.disable = clk_disable_regmap,
+	.get_parent = clk_rcg_get_parent,
+	.set_parent = clk_rcg_set_parent,
+	.recalc_rate = clk_rcg_recalc_rate,
+	.determine_rate = clk_rcg_esc_determine_rate,
+	.set_rate = clk_rcg_esc_set_rate,
+	.set_rate_and_parent = clk_rcg_esc_set_rate_and_parent,
+};
+EXPORT_SYMBOL_GPL(clk_rcg_esc_ops);
 
 const struct clk_ops clk_rcg_lcc_ops = {
 	.enable = clk_rcg_lcc_enable,

@@ -1,20 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2008-2010 Cisco Systems, Inc.  All rights reserved.
  * Copyright 2007 Nuova Systems, Inc.  All rights reserved.
- *
- * This program is free software; you may redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
  */
 
 #include <linux/kernel.h>
@@ -35,7 +22,7 @@ static int vnic_wq_alloc_bufs(struct vnic_wq *wq)
 	unsigned int blks = VNIC_WQ_BUF_BLKS_NEEDED(count);
 
 	for (i = 0; i < blks; i++) {
-		wq->bufs[i] = kzalloc(VNIC_WQ_BUF_BLK_SZ(count), GFP_ATOMIC);
+		wq->bufs[i] = kzalloc(VNIC_WQ_BUF_BLK_SZ(count), GFP_KERNEL);
 		if (!wq->bufs[i])
 			return -ENOMEM;
 	}
@@ -95,7 +82,7 @@ int vnic_wq_alloc(struct vnic_dev *vdev, struct vnic_wq *wq, unsigned int index,
 
 	wq->ctrl = vnic_dev_get_res(vdev, RES_TYPE_WQ, index);
 	if (!wq->ctrl) {
-		vdev_err("Failed to hook WQ[%d] resource\n", index);
+		vdev_err(vdev, "Failed to hook WQ[%d] resource\n", index);
 		return -EINVAL;
 	}
 
@@ -187,7 +174,7 @@ int vnic_wq_disable(struct vnic_wq *wq)
 		udelay(10);
 	}
 
-	vdev_neterr("Failed to disable WQ[%d]\n", wq->index);
+	vdev_neterr(vdev, "Failed to disable WQ[%d]\n", wq->index);
 
 	return -ETIMEDOUT;
 }

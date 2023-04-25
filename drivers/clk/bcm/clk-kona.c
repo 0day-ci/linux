@@ -1,22 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2013 Broadcom Corporation
  * Copyright 2013 Linaro Limited
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation version 2.
- *
- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
- * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include "clk-kona.h"
 
 #include <linux/delay.h>
+#include <linux/io.h>
 #include <linux/kernel.h>
-#include <linux/clk.h>
+#include <linux/clk-provider.h>
 
 /*
  * "Policies" affect the frequencies of bus clocks provided by a
@@ -1256,19 +1249,18 @@ bool __init kona_ccu_init(struct ccu_data *ccu)
 {
 	unsigned long flags;
 	unsigned int which;
-	struct clk **clks = ccu->clk_data.clks;
 	struct kona_clk *kona_clks = ccu->kona_clks;
 	bool success = true;
 
 	flags = ccu_lock(ccu);
 	__ccu_write_enable(ccu);
 
-	for (which = 0; which < ccu->clk_data.clk_num; which++) {
-		struct kona_clk *bcm_clk;
+	for (which = 0; which < ccu->clk_num; which++) {
+		struct kona_clk *bcm_clk = &kona_clks[which];
 
-		if (!clks[which])
+		if (!bcm_clk->ccu)
 			continue;
-		bcm_clk = &kona_clks[which];
+
 		success &= __kona_clk_init(bcm_clk);
 	}
 

@@ -35,7 +35,6 @@ g98_msppp_init(struct nvkm_falcon *msppp)
 
 static const struct nvkm_falcon_func
 g98_msppp = {
-	.pmc_enable = 0x00400002,
 	.init = g98_msppp_init,
 	.sclass = {
 		{ -1, -1, G98_MSPPP },
@@ -44,8 +43,8 @@ g98_msppp = {
 };
 
 int
-g98_msppp_new(struct nvkm_device *device, int index,
+g98_msppp_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
 	      struct nvkm_engine **pengine)
 {
-	return nvkm_msppp_new_(&g98_msppp, device, index, pengine);
+	return nvkm_msppp_new_(&g98_msppp, device, type, inst, pengine);
 }

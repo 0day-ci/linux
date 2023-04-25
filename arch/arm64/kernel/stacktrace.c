@@ -1,130 +1,232 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Stack tracing support
  *
  * Copyright (C) 2012 ARM Ltd.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <linux/kernel.h>
+#include <linux/efi.h>
 #include <linux/export.h>
+#include <linux/ftrace.h>
 #include <linux/sched.h>
+#include <linux/sched/debug.h>
+#include <linux/sched/task_stack.h>
 #include <linux/stacktrace.h>
 
+#include <asm/efi.h>
+#include <asm/irq.h>
+#include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
 /*
- * AArch64 PCS assigns the frame pointer to x29.
+ * Start an unwind from a pt_regs.
  *
- * A simple function prologue looks like this:
- * 	sub	sp, sp, #0x10
- *   	stp	x29, x30, [sp]
- *	mov	x29, sp
+ * The unwind will begin at the PC within the regs.
  *
- * A simple function epilogue looks like this:
- *	mov	sp, x29
- *	ldp	x29, x30, [sp]
- *	add	sp, sp, #0x10
+ * The regs must be on a stack currently owned by the calling task.
  */
-int notrace unwind_frame(struct stackframe *frame)
+static __always_inline void unwind_init_from_regs(struct unwind_state *state,
+						  struct pt_regs *regs)
 {
-	unsigned long high, low;
-	unsigned long fp = frame->fp;
+	unwind_init_common(state, current);
 
-	low  = frame->sp;
-	high = ALIGN(low, THREAD_SIZE);
+	state->fp = regs->regs[29];
+	state->pc = regs->pc;
+}
 
-	if (fp < low || fp > high - 0x18 || fp & 0xf)
-		return -EINVAL;
+/*
+ * Start an unwind from a caller.
+ *
+ * The unwind will begin at the caller of whichever function this is inlined
+ * into.
+ *
+ * The function which invokes this must be noinline.
+ */
+static __always_inline void unwind_init_from_caller(struct unwind_state *state)
+{
+	unwind_init_common(state, current);
 
-	frame->sp = fp + 0x10;
-	frame->fp = *(unsigned long *)(fp);
-	/*
-	 * -4 here because we care about the PC at time of bl,
-	 * not where the return will go.
-	 */
-	frame->pc = *(unsigned long *)(fp + 8) - 4;
+	state->fp = (unsigned long)__builtin_frame_address(1);
+	state->pc = (unsigned long)__builtin_return_address(0);
+}
+
+/*
+ * Start an unwind from a blocked task.
+ *
+ * The unwind will begin at the blocked tasks saved PC (i.e. the caller of
+ * cpu_switch_to()).
+ *
+ * The caller should ensure the task is blocked in cpu_switch_to() for the
+ * duration of the unwind, or the unwind will be bogus. It is never valid to
+ * call this for the current task.
+ */
+static __always_inline void unwind_init_from_task(struct unwind_state *state,
+						  struct task_struct *task)
+{
+	unwind_init_common(state, task);
+
+	state->fp = thread_saved_fp(task);
+	state->pc = thread_saved_pc(task);
+}
+
+/*
+ * Unwind from one frame record (A) to the next frame record (B).
+ *
+ * We terminate early if the location of B indicates a malformed chain of frame
+ * records (e.g. a cycle), determined based on the location and fp value of A
+ * and the location (but not the fp value) of B.
+ */
+static int notrace unwind_next(struct unwind_state *state)
+{
+	struct task_struct *tsk = state->task;
+	unsigned long fp = state->fp;
+	int err;
+
+	/* Final frame; nothing to unwind */
+	if (fp == (unsigned long)task_pt_regs(tsk)->stackframe)
+		return -ENOENT;
+
+	err = unwind_next_frame_record(state);
+	if (err)
+		return err;
+
+	state->pc = ptrauth_strip_insn_pac(state->pc);
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	if (tsk->ret_stack &&
+		(state->pc == (unsigned long)return_to_handler)) {
+		unsigned long orig_pc;
+		/*
+		 * This is a case where function graph tracer has
+		 * modified a return address (LR) in a stack frame
+		 * to hook a function return.
+		 * So replace it to an original value.
+		 */
+		orig_pc = ftrace_graph_ret_addr(tsk, NULL, state->pc,
+						(void *)state->fp);
+		if (WARN_ON_ONCE(state->pc == orig_pc))
+			return -EINVAL;
+		state->pc = orig_pc;
+	}
+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+#ifdef CONFIG_KRETPROBES
+	if (is_kretprobe_trampoline(state->pc))
+		state->pc = kretprobe_find_ret_addr(tsk, (void *)state->fp, &state->kr_cur);
+#endif
 
 	return 0;
 }
+NOKPROBE_SYMBOL(unwind_next);
 
-void notrace walk_stackframe(struct stackframe *frame,
-		     int (*fn)(struct stackframe *, void *), void *data)
+static void notrace unwind(struct unwind_state *state,
+			   stack_trace_consume_fn consume_entry, void *cookie)
 {
 	while (1) {
 		int ret;
 
-		if (fn(frame, data))
+		if (!consume_entry(cookie, state->pc))
 			break;
-		ret = unwind_frame(frame);
+		ret = unwind_next(state);
 		if (ret < 0)
 			break;
 	}
 }
-EXPORT_SYMBOL(walk_stackframe);
+NOKPROBE_SYMBOL(unwind);
 
-#ifdef CONFIG_STACKTRACE
-struct stack_trace_data {
-	struct stack_trace *trace;
-	unsigned int no_sched_functions;
-	unsigned int skip;
-};
-
-static int save_trace(struct stackframe *frame, void *d)
+static bool dump_backtrace_entry(void *arg, unsigned long where)
 {
-	struct stack_trace_data *data = d;
-	struct stack_trace *trace = data->trace;
-	unsigned long addr = frame->pc;
-
-	if (data->no_sched_functions && in_sched_functions(addr))
-		return 0;
-	if (data->skip) {
-		data->skip--;
-		return 0;
-	}
-
-	trace->entries[trace->nr_entries++] = addr;
-
-	return trace->nr_entries >= trace->max_entries;
+	char *loglvl = arg;
+	printk("%s %pSb\n", loglvl, (void *)where);
+	return true;
 }
 
-void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk,
+		    const char *loglvl)
 {
-	struct stack_trace_data data;
-	struct stackframe frame;
+	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
 
-	data.trace = trace;
-	data.skip = trace->skip;
+	if (regs && user_mode(regs))
+		return;
 
-	if (tsk != current) {
-		data.no_sched_functions = 1;
-		frame.fp = thread_saved_fp(tsk);
-		frame.sp = thread_saved_sp(tsk);
-		frame.pc = thread_saved_pc(tsk);
-	} else {
-		data.no_sched_functions = 0;
-		frame.fp = (unsigned long)__builtin_frame_address(0);
-		frame.sp = current_stack_pointer;
-		frame.pc = (unsigned long)save_stack_trace_tsk;
-	}
+	if (!tsk)
+		tsk = current;
 
-	walk_stackframe(&frame, save_trace, &data);
-	if (trace->nr_entries < trace->max_entries)
-		trace->entries[trace->nr_entries++] = ULONG_MAX;
+	if (!try_get_task_stack(tsk))
+		return;
+
+	printk("%sCall trace:\n", loglvl);
+	arch_stack_walk(dump_backtrace_entry, (void *)loglvl, tsk, regs);
+
+	put_task_stack(tsk);
 }
 
-void save_stack_trace(struct stack_trace *trace)
+void show_stack(struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 {
-	save_stack_trace_tsk(current, trace);
+	dump_backtrace(NULL, tsk, loglvl);
+	barrier();
 }
-EXPORT_SYMBOL_GPL(save_stack_trace);
+
+/*
+ * Per-cpu stacks are only accessible when unwinding the current task in a
+ * non-preemptible context.
+ */
+#define STACKINFO_CPU(name)					\
+	({							\
+		((task == current) && !preemptible())		\
+			? stackinfo_get_##name()		\
+			: stackinfo_get_unknown();		\
+	})
+
+/*
+ * SDEI stacks are only accessible when unwinding the current task in an NMI
+ * context.
+ */
+#define STACKINFO_SDEI(name)					\
+	({							\
+		((task == current) && in_nmi())			\
+			? stackinfo_get_sdei_##name()		\
+			: stackinfo_get_unknown();		\
+	})
+
+#define STACKINFO_EFI						\
+	({							\
+		((task == current) && current_in_efi())		\
+			? stackinfo_get_efi()			\
+			: stackinfo_get_unknown();		\
+	})
+
+noinline noinstr void arch_stack_walk(stack_trace_consume_fn consume_entry,
+			      void *cookie, struct task_struct *task,
+			      struct pt_regs *regs)
+{
+	struct stack_info stacks[] = {
+		stackinfo_get_task(task),
+		STACKINFO_CPU(irq),
+#if defined(CONFIG_VMAP_STACK)
+		STACKINFO_CPU(overflow),
 #endif
+#if defined(CONFIG_VMAP_STACK) && defined(CONFIG_ARM_SDE_INTERFACE)
+		STACKINFO_SDEI(normal),
+		STACKINFO_SDEI(critical),
+#endif
+#ifdef CONFIG_EFI
+		STACKINFO_EFI,
+#endif
+	};
+	struct unwind_state state = {
+		.stacks = stacks,
+		.nr_stacks = ARRAY_SIZE(stacks),
+	};
+
+	if (regs) {
+		if (task != current)
+			return;
+		unwind_init_from_regs(&state, regs);
+	} else if (task == current) {
+		unwind_init_from_caller(&state);
+	} else {
+		unwind_init_from_task(&state, task);
+	}
+
+	unwind(&state, consume_entry, cookie);
+}

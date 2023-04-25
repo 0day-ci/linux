@@ -38,6 +38,7 @@ struct llc_sock {
 	struct llc_addr	    laddr;		/* lsap/mac pair */
 	struct llc_addr	    daddr;		/* dsap/mac pair */
 	struct net_device   *dev;		/* device to send to remote */
+	netdevice_tracker   dev_tracker;
 	u32		    copied_seq;		/* head of yet unread data */
 	u8		    retry_count;	/* number of retries */
 	u8		    ack_must_be_send;
@@ -97,6 +98,7 @@ static __inline__ char llc_backlog_type(struct sk_buff *skb)
 
 struct sock *llc_sk_alloc(struct net *net, int family, gfp_t priority,
 			  struct proto *prot, int kern);
+void llc_sk_stop_all_timers(struct sock *sk, bool sync);
 void llc_sk_free(struct sock *sk);
 
 void llc_sk_reset(struct sock *sk);

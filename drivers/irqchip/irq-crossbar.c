@@ -1,13 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  drivers/irqchip/irq-crossbar.c
  *
  *  Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
  *  Author: Sricharan R <r.sricharan@ti.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
  */
 #include <linux/err.h>
 #include <linux/io.h>
@@ -78,9 +74,12 @@ static struct irq_chip crossbar_chip = {
 static int allocate_gic_irq(struct irq_domain *domain, unsigned virq,
 			    irq_hw_number_t hwirq)
 {
-	struct of_phandle_args args;
+	struct irq_fwspec fwspec;
 	int i;
 	int err;
+
+	if (!irq_domain_get_of_node(domain->parent))
+		return -EINVAL;
 
 	raw_spin_lock(&cb->lock);
 	for (i = cb->int_max - 1; i >= 0; i--) {
@@ -94,13 +93,13 @@ static int allocate_gic_irq(struct irq_domain *domain, unsigned virq,
 	if (i < 0)
 		return -ENODEV;
 
-	args.np = domain->parent->of_node;
-	args.args_count = 3;
-	args.args[0] = 0;	/* SPI */
-	args.args[1] = i;
-	args.args[2] = IRQ_TYPE_LEVEL_HIGH;
+	fwspec.fwnode = domain->parent->fwnode;
+	fwspec.param_count = 3;
+	fwspec.param[0] = 0;	/* SPI */
+	fwspec.param[1] = i;
+	fwspec.param[2] = IRQ_TYPE_LEVEL_HIGH;
 
-	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
+	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
 	if (err)
 		cb->irq_map[i] = IRQ_FREE;
 	else
@@ -112,16 +111,16 @@ static int allocate_gic_irq(struct irq_domain *domain, unsigned virq,
 static int crossbar_domain_alloc(struct irq_domain *d, unsigned int virq,
 				 unsigned int nr_irqs, void *data)
 {
-	struct of_phandle_args *args = data;
+	struct irq_fwspec *fwspec = data;
 	irq_hw_number_t hwirq;
 	int i;
 
-	if (args->args_count != 3)
+	if (fwspec->param_count != 3)
 		return -EINVAL;	/* Not GIC compliant */
-	if (args->args[0] != 0)
+	if (fwspec->param[0] != 0)
 		return -EINVAL;	/* No PPI should point to this domain */
 
-	hwirq = args->args[1];
+	hwirq = fwspec->param[1];
 	if ((hwirq + nr_irqs) > cb->max_crossbar_sources)
 		return -EINVAL;	/* Can't deal with this */
 
@@ -166,33 +165,37 @@ static void crossbar_domain_free(struct irq_domain *domain, unsigned int virq,
 	raw_spin_unlock(&cb->lock);
 }
 
-static int crossbar_domain_xlate(struct irq_domain *d,
-				 struct device_node *controller,
-				 const u32 *intspec, unsigned int intsize,
-				 unsigned long *out_hwirq,
-				 unsigned int *out_type)
+static int crossbar_domain_translate(struct irq_domain *d,
+				     struct irq_fwspec *fwspec,
+				     unsigned long *hwirq,
+				     unsigned int *type)
 {
-	if (d->of_node != controller)
-		return -EINVAL;	/* Shouldn't happen, really... */
-	if (intsize != 3)
-		return -EINVAL;	/* Not GIC compliant */
-	if (intspec[0] != 0)
-		return -EINVAL;	/* No PPI should point to this domain */
+	if (is_of_node(fwspec->fwnode)) {
+		if (fwspec->param_count != 3)
+			return -EINVAL;
 
-	*out_hwirq = intspec[1];
-	*out_type = intspec[2];
-	return 0;
+		/* No PPI should point to this domain */
+		if (fwspec->param[0] != 0)
+			return -EINVAL;
+
+		*hwirq = fwspec->param[1];
+		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 static const struct irq_domain_ops crossbar_domain_ops = {
-	.alloc	= crossbar_domain_alloc,
-	.free	= crossbar_domain_free,
-	.xlate	= crossbar_domain_xlate,
+	.alloc		= crossbar_domain_alloc,
+	.free		= crossbar_domain_free,
+	.translate	= crossbar_domain_translate,
 };
 
 static int __init crossbar_of_init(struct device_node *node)
 {
-	int i, size, max = 0, reserved = 0, entry;
+	u32 max = 0, entry, reg_size;
+	int i, size, reserved = 0;
 	const __be32 *irqsr;
 	int ret = -ENOMEM;
 
@@ -269,9 +272,9 @@ static int __init crossbar_of_init(struct device_node *node)
 	if (!cb->register_offsets)
 		goto err_irq_map;
 
-	of_property_read_u32(node, "ti,reg-size", &size);
+	of_property_read_u32(node, "ti,reg-size", &reg_size);
 
-	switch (size) {
+	switch (reg_size) {
 	case 1:
 		cb->write = crossbar_writeb;
 		break;
@@ -297,7 +300,7 @@ static int __init crossbar_of_init(struct device_node *node)
 			continue;
 
 		cb->register_offsets[i] = reserved;
-		reserved += size;
+		reserved += reg_size;
 	}
 
 	of_property_read_u32(node, "ti,irqs-safe-map", &cb->safe_map);
@@ -334,13 +337,13 @@ static int __init irqcrossbar_init(struct device_node *node,
 	int err;
 
 	if (!parent) {
-		pr_err("%s: no parent, giving up\n", node->full_name);
+		pr_err("%pOF: no parent, giving up\n", node);
 		return -ENODEV;
 	}
 
 	parent_domain = irq_find_host(parent);
 	if (!parent_domain) {
-		pr_err("%s: unable to obtain parent domain\n", node->full_name);
+		pr_err("%pOF: unable to obtain parent domain\n", node);
 		return -ENXIO;
 	}
 
@@ -353,7 +356,7 @@ static int __init irqcrossbar_init(struct device_node *node,
 					  node, &crossbar_domain_ops,
 					  NULL);
 	if (!domain) {
-		pr_err("%s: failed to allocated domain\n", node->full_name);
+		pr_err("%pOF: failed to allocated domain\n", node);
 		return -ENOMEM;
 	}
 

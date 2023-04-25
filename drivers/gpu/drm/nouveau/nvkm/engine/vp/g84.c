@@ -27,7 +27,6 @@
 
 static const struct nvkm_xtensa_func
 g84_vp = {
-	.pmc_enable = 0x01020000,
 	.fifo_val = 0x111,
 	.unkd28 = 0x9c544,
 	.sclass = {
@@ -37,8 +36,8 @@ g84_vp = {
 };
 
 int
-g84_vp_new(struct nvkm_device *device, int index, struct nvkm_engine **pengine)
+g84_vp_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
+	   struct nvkm_engine **pengine)
 {
-	return nvkm_xtensa_new_(&g84_vp, device, index,
-				true, 0x00f000, pengine);
+	return nvkm_xtensa_new_(&g84_vp, device, type, inst, true, 0x00f000, pengine);
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  *  linux/fs/affs/symlink.c
  *
@@ -10,17 +11,18 @@
 
 #include "affs.h"
 
-static int affs_symlink_readpage(struct file *file, struct page *page)
+static int affs_symlink_read_folio(struct file *file, struct folio *folio)
 {
+	struct page *page = &folio->page;
 	struct buffer_head *bh;
 	struct inode *inode = page->mapping->host;
-	char *link = kmap(page);
+	char *link = page_address(page);
 	struct slink_front *lf;
 	int			 i, j;
 	char			 c;
 	char			 lc;
 
-	pr_debug("follow_link(ino=%lu)\n", inode->i_ino);
+	pr_debug("get_link(ino=%lu)\n", inode->i_ino);
 
 	bh = affs_bread(inode->i_sb, inode->i_ino);
 	if (!bh)
@@ -57,23 +59,19 @@ static int affs_symlink_readpage(struct file *file, struct page *page)
 	link[i] = '\0';
 	affs_brelse(bh);
 	SetPageUptodate(page);
-	kunmap(page);
 	unlock_page(page);
 	return 0;
 fail:
 	SetPageError(page);
-	kunmap(page);
 	unlock_page(page);
 	return -EIO;
 }
 
 const struct address_space_operations affs_symlink_aops = {
-	.readpage	= affs_symlink_readpage,
+	.read_folio	= affs_symlink_read_folio,
 };
 
 const struct inode_operations affs_symlink_inode_operations = {
-	.readlink	= generic_readlink,
-	.follow_link	= page_follow_link_light,
-	.put_link	= page_put_link,
+	.get_link	= page_get_link,
 	.setattr	= affs_notify_change,
 };

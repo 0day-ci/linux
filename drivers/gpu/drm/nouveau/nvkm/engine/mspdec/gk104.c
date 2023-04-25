@@ -27,7 +27,6 @@
 
 static const struct nvkm_falcon_func
 gk104_mspdec = {
-	.pmc_enable = 0x00020000,
 	.init = gf100_mspdec_init,
 	.sclass = {
 		{ -1, -1, GK104_MSPDEC },
@@ -36,8 +35,8 @@ gk104_mspdec = {
 };
 
 int
-gk104_mspdec_new(struct nvkm_device *device, int index,
+gk104_mspdec_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst,
 		 struct nvkm_engine **pengine)
 {
-	return nvkm_mspdec_new_(&gk104_mspdec, device, index, pengine);
+	return nvkm_mspdec_new_(&gk104_mspdec, device, type, inst, pengine);
 }

@@ -1,4 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
+#include <dirent.h>
 #include <stdlib.h>
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -6,7 +9,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <api/fs/fs.h>
-#include "util.h"
+#include "dso.h"
 #include "machine.h"
 #include "symbol.h"
 #include "tests.h"
@@ -110,7 +113,7 @@ static int dso__data_fd(struct dso *dso, struct machine *machine)
 	return fd;
 }
 
-int test__dso_data(void)
+static int test__dso_data(struct test_suite *test __maybe_unused, int subtest __maybe_unused)
 {
 	struct machine machine;
 	struct dso *dso;
@@ -202,7 +205,7 @@ static int dsos__create(int cnt, int size)
 {
 	int i;
 
-	dsos = malloc(sizeof(dsos) * cnt);
+	dsos = malloc(sizeof(*dsos) * cnt);
 	TEST_ASSERT_VAL("failed to alloc dsos array", dsos);
 
 	for (i = 0; i < cnt; i++) {
@@ -245,11 +248,14 @@ static int set_fd_limit(int n)
 	return setrlimit(RLIMIT_NOFILE, &rlim);
 }
 
-int test__dso_data_cache(void)
+static int test__dso_data_cache(struct test_suite *test __maybe_unused, int subtest __maybe_unused)
 {
 	struct machine machine;
 	long nr_end, nr = open_files_cnt();
 	int dso_cnt, limit, i, fd;
+
+	/* Rest the internal dso open counter limit. */
+	reset_fd_limit();
 
 	memset(&machine, 0, sizeof(machine));
 
@@ -298,19 +304,32 @@ int test__dso_data_cache(void)
 	/* Make sure we did not leak any file descriptor. */
 	nr_end = open_files_cnt();
 	pr_debug("nr start %ld, nr stop %ld\n", nr, nr_end);
-	TEST_ASSERT_VAL("failed leadking files", nr == nr_end);
+	TEST_ASSERT_VAL("failed leaking files", nr == nr_end);
 	return 0;
 }
 
-int test__dso_data_reopen(void)
+static long new_limit(int count)
+{
+	int fd = open("/dev/null", O_RDONLY);
+	long ret = fd;
+	if (count > 0)
+		ret = new_limit(--count);
+	close(fd);
+	return ret;
+}
+
+static int test__dso_data_reopen(struct test_suite *test __maybe_unused, int subtest __maybe_unused)
 {
 	struct machine machine;
-	long nr_end, nr = open_files_cnt();
+	long nr_end, nr = open_files_cnt(), lim = new_limit(3);
 	int fd, fd_extra;
 
 #define dso_0 (dsos[0])
 #define dso_1 (dsos[1])
 #define dso_2 (dsos[2])
+
+	/* Rest the internal dso open counter limit. */
+	reset_fd_limit();
 
 	memset(&machine, 0, sizeof(machine));
 
@@ -325,7 +344,7 @@ int test__dso_data_reopen(void)
 
 	/* Make sure we are able to open 3 fds anyway */
 	TEST_ASSERT_VAL("failed to set file limit",
-			!set_fd_limit((nr + 3)));
+			!set_fd_limit((lim)));
 
 	TEST_ASSERT_VAL("failed to create dsos\n", !dsos__create(3, TEST_FILE_SIZE));
 
@@ -371,6 +390,10 @@ int test__dso_data_reopen(void)
 	/* Make sure we did not leak any file descriptor. */
 	nr_end = open_files_cnt();
 	pr_debug("nr start %ld, nr stop %ld\n", nr, nr_end);
-	TEST_ASSERT_VAL("failed leadking files", nr == nr_end);
+	TEST_ASSERT_VAL("failed leaking files", nr == nr_end);
 	return 0;
 }
+
+DEFINE_SUITE("DSO data read", dso_data);
+DEFINE_SUITE("DSO data cache", dso_data_cache);
+DEFINE_SUITE("DSO data reopen", dso_data_reopen);

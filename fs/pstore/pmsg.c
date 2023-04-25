@@ -1,64 +1,38 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2014  Google, Inc.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
-#include <linux/vmalloc.h>
+#include <linux/rtmutex.h>
 #include "internal.h"
 
-static DEFINE_MUTEX(pmsg_lock);
-#define PMSG_MAX_BOUNCE_BUFFER_SIZE (2*PAGE_SIZE)
+static DEFINE_RT_MUTEX(pmsg_lock);
 
 static ssize_t write_pmsg(struct file *file, const char __user *buf,
 			  size_t count, loff_t *ppos)
 {
-	size_t i, buffer_size;
-	char *buffer;
+	struct pstore_record record;
+	int ret;
 
 	if (!count)
 		return 0;
 
-	if (!access_ok(VERIFY_READ, buf, count))
+	pstore_record_init(&record, psinfo);
+	record.type = PSTORE_TYPE_PMSG;
+	record.size = count;
+
+	/* check outside lock, page in any data. write_user also checks */
+	if (!access_ok(buf, count))
 		return -EFAULT;
 
-	buffer_size = count;
-	if (buffer_size > PMSG_MAX_BOUNCE_BUFFER_SIZE)
-		buffer_size = PMSG_MAX_BOUNCE_BUFFER_SIZE;
-	buffer = vmalloc(buffer_size);
-
-	mutex_lock(&pmsg_lock);
-	for (i = 0; i < count; ) {
-		size_t c = min(count - i, buffer_size);
-		u64 id;
-		long ret;
-
-		ret = __copy_from_user(buffer, buf + i, c);
-		if (unlikely(ret != 0)) {
-			mutex_unlock(&pmsg_lock);
-			vfree(buffer);
-			return -EFAULT;
-		}
-		psinfo->write_buf(PSTORE_TYPE_PMSG, 0, &id, 0, buffer, 0, c,
-				  psinfo);
-
-		i += c;
-	}
-
-	mutex_unlock(&pmsg_lock);
-	vfree(buffer);
-	return count;
+	rt_mutex_lock(&pmsg_lock);
+	ret = psinfo->write_user(&record, buf);
+	rt_mutex_unlock(&pmsg_lock);
+	return ret ? ret : count;
 }
 
 static const struct file_operations pmsg_fops = {
@@ -73,7 +47,7 @@ static int pmsg_major;
 #undef pr_fmt
 #define pr_fmt(fmt) PMSG_NAME ": " fmt
 
-static char *pmsg_devnode(struct device *dev, umode_t *mode)
+static char *pmsg_devnode(const struct device *dev, umode_t *mode)
 {
 	if (mode)
 		*mode = 0220;
@@ -111,4 +85,11 @@ err_class:
 	unregister_chrdev(pmsg_major, PMSG_NAME);
 err:
 	return;
+}
+
+void pstore_unregister_pmsg(void)
+{
+	device_destroy(pmsg_class, MKDEV(pmsg_major, 0));
+	class_destroy(pmsg_class);
+	unregister_chrdev(pmsg_major, PMSG_NAME);
 }

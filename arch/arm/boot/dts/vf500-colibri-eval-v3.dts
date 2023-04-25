@@ -1,10 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
 /*
- * Copyright 2014 Toradex AG
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2014-2020 Toradex
  */
 
 /dts-v1/;
@@ -14,4 +10,9 @@
 / {
 	model = "Toradex Colibri VF50 on Colibri Evaluation Board";
 	compatible = "toradex,vf500-colibri_vf50-on-eval", "toradex,vf500-colibri_vf50", "fsl,vf500";
+};
+
+&touchscreen {
+	vf50-ts-min-pressure = <200>;
+	status = "okay";
 };

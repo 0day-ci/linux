@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * linux/percpu-defs.h - basic definitions for percpu areas
  *
@@ -50,7 +51,7 @@
 	PER_CPU_ATTRIBUTES
 
 #define __PCPU_DUMMY_ATTRS						\
-	__attribute__((section(".discard"), unused))
+	__section(".discard") __attribute__((unused))
 
 /*
  * s390 and alpha modules require percpu variables to be defined as
@@ -91,8 +92,7 @@
 	extern __PCPU_DUMMY_ATTRS char __pcpu_unique_##name;		\
 	__PCPU_DUMMY_ATTRS char __pcpu_unique_##name;			\
 	extern __PCPU_ATTRS(sec) __typeof__(type) name;			\
-	__PCPU_ATTRS(sec) PER_CPU_DEF_ATTRIBUTES __weak			\
-	__typeof__(type) name
+	__PCPU_ATTRS(sec) __weak __typeof__(type) name
 #else
 /*
  * Normal declaration and definition macros.
@@ -101,8 +101,7 @@
 	extern __PCPU_ATTRS(sec) __typeof__(type) name
 
 #define DEFINE_PER_CPU_SECTION(type, name, sec)				\
-	__PCPU_ATTRS(sec) PER_CPU_DEF_ATTRIBUTES			\
-	__typeof__(type) name
+	__PCPU_ATTRS(sec) __typeof__(type) name
 #endif
 
 /*
@@ -171,6 +170,20 @@
 
 #define DEFINE_PER_CPU_READ_MOSTLY(type, name)				\
 	DEFINE_PER_CPU_SECTION(type, name, "..read_mostly")
+
+/*
+ * Declaration/definition used for per-CPU variables that should be accessed
+ * as decrypted when memory encryption is enabled in the guest.
+ */
+#ifdef CONFIG_AMD_MEM_ENCRYPT
+#define DECLARE_PER_CPU_DECRYPTED(type, name)				\
+	DECLARE_PER_CPU_SECTION(type, name, "..decrypted")
+
+#define DEFINE_PER_CPU_DECRYPTED(type, name)				\
+	DEFINE_PER_CPU_SECTION(type, name, "..decrypted")
+#else
+#define DEFINE_PER_CPU_DECRYPTED(type, name)	DEFINE_PER_CPU(type, name)
+#endif
 
 /*
  * Intermodule exports for per-CPU variables.  sparse forgets about
@@ -297,7 +310,7 @@ extern void __bad_size_call_parameter(void);
 #ifdef CONFIG_DEBUG_PREEMPT
 extern void __this_cpu_preempt_check(const char *op);
 #else
-static inline void __this_cpu_preempt_check(const char *op) { }
+static __always_inline void __this_cpu_preempt_check(const char *op) { }
 #endif
 
 #define __pcpu_size_call_return(stem, variable)				\
@@ -399,7 +412,7 @@ do {									\
  * instead.
  *
  * If there is no other protection through preempt disable and/or disabling
- * interupts then one of these RMW operations can show unexpected behavior
+ * interrupts then one of these RMW operations can show unexpected behavior
  * because the execution thread was rescheduled on another processor or an
  * interrupt occurred and the same percpu variable was modified from the
  * interrupt context.

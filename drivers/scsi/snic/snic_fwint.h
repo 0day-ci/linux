@@ -1,19 +1,5 @@
-/*
- * Copyright 2014 Cisco Systems, Inc.  All rights reserved.
- *
- * This program is free software; you may redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* Copyright 2014 Cisco Systems, Inc.  All rights reserved. */
 
 #ifndef __SNIC_FWINT_H
 #define __SNIC_FWINT_H
@@ -92,7 +78,7 @@ enum snic_io_status {
 }; /* end of enum snic_io_status */
 
 /*
- * snic_io_hdr : host <--> firmare
+ * snic_io_hdr : host <--> firmware
  *
  * for any other message that will be queued to firmware should
  *  have the following request header
@@ -159,7 +145,7 @@ struct snic_exch_ver_req {
  * HBA Capabilities
  * Bit 1: Reserved.
  * Bit 2: Dynamic Discovery of LUNs.
- * Bit 3: Async event notifications on on tgt online/offline events.
+ * Bit 3: Async event notifications on tgt online/offline events.
  * Bit 4: IO timeout support in FW.
  * Bit 5-31: Reserved.
  */
@@ -414,7 +400,7 @@ enum snic_ev_type {
 /* Payload 88 bytes = 128 - 24 - 16 */
 #define SNIC_HOST_REQ_PAYLOAD	((int)(SNIC_HOST_REQ_LEN -		\
 					sizeof(struct snic_io_hdr) -	\
-					(2 * sizeof(u64))))
+					(2 * sizeof(u64)) - sizeof(ulong)))
 
 /*
  * snic_host_req: host -> firmware request
@@ -448,6 +434,8 @@ struct snic_host_req {
 		/* hba reset */
 		struct snic_hba_reset		reset;
 	} u;
+
+	ulong req_pa;
 }; /* end of snic_host_req structure */
 
 

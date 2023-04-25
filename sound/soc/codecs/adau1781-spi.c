@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Driver for ADAU1381/ADAU1781 CODEC
  *
  * Copyright 2014 Analog Devices Inc.
  *  Author: Lars-Peter Clausen <lars@metafoo.de>
- *
- * Licensed under the GPL-2.
  */
 
 #include <linux/mod_devicetable.h>
@@ -46,10 +45,9 @@ static int adau1781_spi_probe(struct spi_device *spi)
 		id->driver_data, adau1781_spi_switch_mode);
 }
 
-static int adau1781_spi_remove(struct spi_device *spi)
+static void adau1781_spi_remove(struct spi_device *spi)
 {
-	snd_soc_unregister_codec(&spi->dev);
-	return 0;
+	adau17x1_remove(&spi->dev);
 }
 
 static const struct spi_device_id adau1781_spi_id[] = {
@@ -59,10 +57,19 @@ static const struct spi_device_id adau1781_spi_id[] = {
 };
 MODULE_DEVICE_TABLE(spi, adau1781_spi_id);
 
+#if defined(CONFIG_OF)
+static const struct of_device_id adau1781_spi_dt_ids[] = {
+	{ .compatible = "adi,adau1381", },
+	{ .compatible = "adi,adau1781", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, adau1781_spi_dt_ids);
+#endif
+
 static struct spi_driver adau1781_spi_driver = {
 	.driver = {
 		.name = "adau1781",
-		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(adau1781_spi_dt_ids),
 	},
 	.probe = adau1781_spi_probe,
 	.remove = adau1781_spi_remove,

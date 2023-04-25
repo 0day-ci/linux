@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  Driver for PC-speaker like devices found on various Sparc systems.
  *
@@ -204,6 +205,7 @@ static int bbc_beep_probe(struct platform_device *op)
 
 	info = &state->u.bbc;
 	info->clock_freq = of_getintprop_default(dp, "clock-frequency", 0);
+	of_node_put(dp);
 	if (!info->clock_freq)
 		goto out_free;
 
@@ -345,23 +347,19 @@ static struct platform_driver grover_beep_driver = {
 	.shutdown	= sparcspkr_shutdown,
 };
 
+static struct platform_driver * const drivers[] = {
+	&bbc_beep_driver,
+	&grover_beep_driver,
+};
+
 static int __init sparcspkr_init(void)
 {
-	int err = platform_driver_register(&bbc_beep_driver);
-
-	if (!err) {
-		err = platform_driver_register(&grover_beep_driver);
-		if (err)
-			platform_driver_unregister(&bbc_beep_driver);
-	}
-
-	return err;
+	return platform_register_drivers(drivers, ARRAY_SIZE(drivers));
 }
 
 static void __exit sparcspkr_exit(void)
 {
-	platform_driver_unregister(&bbc_beep_driver);
-	platform_driver_unregister(&grover_beep_driver);
+	platform_unregister_drivers(drivers, ARRAY_SIZE(drivers));
 }
 
 module_init(sparcspkr_init);

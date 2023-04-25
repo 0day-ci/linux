@@ -170,7 +170,7 @@ static int bnx2x_send_msg2pf(struct bnx2x *bp, u8 *done, dma_addr_t msg_mapping)
 	wmb();
 
 	/* Trigger the PF FW */
-	writeb(1, &zone_data->trigger.vf_pf_channel.addr_valid);
+	writeb_relaxed(1, &zone_data->trigger.vf_pf_channel.addr_valid);
 
 	/* Wait for PF to complete */
 	while ((tout >= 0) && (!*done)) {
@@ -380,13 +380,12 @@ int bnx2x_vfpf_acquire(struct bnx2x *bp, u8 tx_count, u8 rx_count)
 	bp->igu_base_sb = bp->acquire_resp.resc.hw_sbs[0].hw_sb_id;
 	bp->vlan_credit = bp->acquire_resp.resc.num_vlan_filters;
 
-	strlcpy(bp->fw_ver, bp->acquire_resp.pfdev_info.fw_ver,
+	strscpy(bp->fw_ver, bp->acquire_resp.pfdev_info.fw_ver,
 		sizeof(bp->fw_ver));
 
 	if (is_valid_ether_addr(bp->acquire_resp.resc.current_mac_addr))
-		memcpy(bp->dev->dev_addr,
-		       bp->acquire_resp.resc.current_mac_addr,
-		       ETH_ALEN);
+		eth_hw_addr_set(bp->dev,
+				bp->acquire_resp.resc.current_mac_addr);
 
 out:
 	bnx2x_vfpf_finalize(bp, &req->first_tlv);
@@ -722,7 +721,7 @@ out:
 }
 
 /* request pf to add a mac for the vf */
-int bnx2x_vfpf_config_mac(struct bnx2x *bp, u8 *addr, u8 vf_qid, bool set)
+int bnx2x_vfpf_config_mac(struct bnx2x *bp, const u8 *addr, u8 vf_qid, bool set)
 {
 	struct vfpf_set_q_filters_tlv *req = &bp->vf2pf_mbox->req.set_q_filters;
 	struct pfvf_general_resp_tlv *resp = &bp->vf2pf_mbox->resp.general_resp;
@@ -767,7 +766,7 @@ int bnx2x_vfpf_config_mac(struct bnx2x *bp, u8 *addr, u8 vf_qid, bool set)
 		   "vfpf SET MAC failed. Check bulletin board for new posts\n");
 
 		/* copy mac from bulletin to device */
-		memcpy(bp->dev->dev_addr, bulletin.mac, ETH_ALEN);
+		eth_hw_addr_set(bp->dev, bulletin.mac);
 
 		/* check if bulletin board was updated */
 		if (bnx2x_sample_bulletin(bp) == PFVF_BULLETIN_UPDATED) {
@@ -868,7 +867,7 @@ int bnx2x_vfpf_set_mcast(struct net_device *dev)
 	struct bnx2x *bp = netdev_priv(dev);
 	struct vfpf_set_q_filters_tlv *req = &bp->vf2pf_mbox->req.set_q_filters;
 	struct pfvf_general_resp_tlv *resp = &bp->vf2pf_mbox->resp.general_resp;
-	int rc, i = 0;
+	int rc = 0, i = 0;
 	struct netdev_hw_addr *ha;
 
 	if (bp->state != BNX2X_STATE_OPEN) {
@@ -883,21 +882,20 @@ int bnx2x_vfpf_set_mcast(struct net_device *dev)
 	/* Get Rx mode requested */
 	DP(NETIF_MSG_IFUP, "dev->flags = %x\n", dev->flags);
 
+	/* We support PFVF_MAX_MULTICAST_PER_VF mcast addresses tops */
+	if (netdev_mc_count(dev) > PFVF_MAX_MULTICAST_PER_VF) {
+		DP(NETIF_MSG_IFUP,
+		   "VF supports not more than %d multicast MAC addresses\n",
+		   PFVF_MAX_MULTICAST_PER_VF);
+		rc = -EINVAL;
+		goto out;
+	}
+
 	netdev_for_each_mc_addr(ha, dev) {
 		DP(NETIF_MSG_IFUP, "Adding mcast MAC: %pM\n",
 		   bnx2x_mc_addr(ha));
 		memcpy(req->multicast[i], bnx2x_mc_addr(ha), ETH_ALEN);
 		i++;
-	}
-
-	/* We support four PFVF_MAX_MULTICAST_PER_VF mcast
-	  * addresses tops
-	  */
-	if (i >= PFVF_MAX_MULTICAST_PER_VF) {
-		DP(NETIF_MSG_IFUP,
-		   "VF supports not more than %d multicast MAC addresses\n",
-		   PFVF_MAX_MULTICAST_PER_VF);
-		return -EINVAL;
 	}
 
 	req->n_multicast = i;
@@ -924,7 +922,7 @@ int bnx2x_vfpf_set_mcast(struct net_device *dev)
 out:
 	bnx2x_vfpf_finalize(bp, &req->first_tlv);
 
-	return 0;
+	return rc;
 }
 
 /* request pf to add a vlan for the vf */
@@ -956,7 +954,7 @@ int bnx2x_vfpf_update_vlan(struct bnx2x *bp, u16 vid, u8 vf_qid, bool add)
 	bnx2x_sample_bulletin(bp);
 
 	if (bp->shadow_bulletin.content.valid_bitmap & 1 << VLAN_VALID) {
-		BNX2X_ERR("Hypervisor will dicline the request, avoiding\n");
+		BNX2X_ERR("Hypervisor will decline the request, avoiding\n");
 		rc = -EINVAL;
 		goto out;
 	}
@@ -1178,7 +1176,6 @@ static void bnx2x_vf_mbx_resp_send_msg(struct bnx2x *bp,
 
 	/* ack the FW */
 	storm_memset_vf_mbx_ack(bp, vf->abs_vfid);
-	mmiowb();
 
 	/* copy the response header including status-done field,
 	 * must be last dmae, must be after FW is acked
@@ -1653,13 +1650,9 @@ static int bnx2x_vf_mbx_macvlan_list(struct bnx2x *bp,
 {
 	int i, j;
 	struct bnx2x_vf_mac_vlan_filters *fl = NULL;
-	size_t fsz;
 
-	fsz = tlv->n_mac_vlan_filters *
-	      sizeof(struct bnx2x_vf_mac_vlan_filter) +
-	      sizeof(struct bnx2x_vf_mac_vlan_filters);
-
-	fl = kzalloc(fsz, GFP_KERNEL);
+	fl = kzalloc(struct_size(fl, filters, tlv->n_mac_vlan_filters),
+		     GFP_KERNEL);
 	if (!fl)
 		return -ENOMEM;
 
@@ -1771,6 +1764,23 @@ static int bnx2x_vf_mbx_qfilters(struct bnx2x *bp, struct bnx2x_virtf *vf)
 
 		if (fl) {
 			/* set mac list */
+			rc = bnx2x_vf_mac_vlan_config_list(bp, vf, fl,
+							   msg->vf_qid,
+							   false);
+			if (rc)
+				goto op_err;
+		}
+
+		/* build vlan list */
+		fl = NULL;
+
+		rc = bnx2x_vf_mbx_macvlan_list(bp, vf, msg, &fl,
+					       VFPF_VLAN_FILTER);
+		if (rc)
+			goto op_err;
+
+		if (fl) {
+			/* set vlan list */
 			rc = bnx2x_vf_mac_vlan_config_list(bp, vf, fl,
 							   msg->vf_qid,
 							   false);
@@ -2096,6 +2106,18 @@ static void bnx2x_vf_mbx_request(struct bnx2x *bp, struct bnx2x_virtf *vf,
 {
 	int i;
 
+	if (vf->state == VF_LOST) {
+		/* Just ack the FW and return if VFs are lost
+		 * in case of parity error. VFs are supposed to be timedout
+		 * on waiting for PF response.
+		 */
+		DP(BNX2X_MSG_IOV,
+		   "VF 0x%x lost, not handling the request\n", vf->abs_vfid);
+
+		storm_memset_vf_mbx_ack(bp, vf->abs_vfid);
+		return;
+	}
+
 	/* check if tlv type is known */
 	if (bnx2x_tlv_supported(mbx->first_tlv.tl.type)) {
 		/* Lock the per vf op mutex and note the locker's identity.
@@ -2160,7 +2182,6 @@ static void bnx2x_vf_mbx_request(struct bnx2x *bp, struct bnx2x_virtf *vf,
 		 */
 		storm_memset_vf_mbx_ack(bp, vf->abs_vfid);
 		/* Firmware ack should be written before unlocking channel */
-		mmiowb();
 		bnx2x_unlock_vf_pf_channel(bp, vf, mbx->first_tlv.tl.type);
 	}
 }
@@ -2187,8 +2208,10 @@ void bnx2x_vf_mbx_schedule(struct bnx2x *bp,
 
 	/* Update VFDB with current message and schedule its handling */
 	mutex_lock(&BP_VFDB(bp)->event_mutex);
-	BP_VF_MBX(bp, vf_idx)->vf_addr_hi = vfpf_event->msg_addr_hi;
-	BP_VF_MBX(bp, vf_idx)->vf_addr_lo = vfpf_event->msg_addr_lo;
+	BP_VF_MBX(bp, vf_idx)->vf_addr_hi =
+		le32_to_cpu(vfpf_event->msg_addr_hi);
+	BP_VF_MBX(bp, vf_idx)->vf_addr_lo =
+		le32_to_cpu(vfpf_event->msg_addr_lo);
 	BP_VFDB(bp)->event_occur |= (1ULL << vf_idx);
 	mutex_unlock(&BP_VFDB(bp)->event_mutex);
 

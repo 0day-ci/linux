@@ -23,21 +23,17 @@
  */
 #include "priv.h"
 
-const struct nvkm_mc_intr
-nv50_mc_intr[] = {
-	{ 0x04000000, NVKM_ENGINE_DISP },  /* DISP before FIFO, so pageflip-timestamping works! */
-	{ 0x00000001, NVKM_ENGINE_MPEG },
-	{ 0x00000100, NVKM_ENGINE_FIFO },
-	{ 0x00001000, NVKM_ENGINE_GR },
-	{ 0x00004000, NVKM_ENGINE_CIPHER },	/* NV84- */
-	{ 0x00008000, NVKM_ENGINE_BSP },	/* NV84- */
-	{ 0x00020000, NVKM_ENGINE_VP },	/* NV84- */
-	{ 0x00100000, NVKM_SUBDEV_TIMER },
-	{ 0x00200000, NVKM_SUBDEV_GPIO },	/* PMGR->GPIO */
-	{ 0x00200000, NVKM_SUBDEV_I2C }, 	/* PMGR->I2C/AUX */
-	{ 0x10000000, NVKM_SUBDEV_BUS },
-	{ 0x80000000, NVKM_ENGINE_SW },
-	{ 0x0002d101, NVKM_SUBDEV_FB },
+static const struct nvkm_intr_data
+nv50_mc_intrs[] = {
+	{ NVKM_ENGINE_DISP , 0, 0, 0x04000000, true },
+	{ NVKM_ENGINE_GR   , 0, 0, 0x00001000, true },
+	{ NVKM_ENGINE_FIFO , 0, 0, 0x00000100 },
+	{ NVKM_ENGINE_MPEG , 0, 0, 0x00000001, true },
+	{ NVKM_SUBDEV_FB   , 0, 0, 0x00001101, true },
+	{ NVKM_SUBDEV_BUS  , 0, 0, 0x10000000, true },
+	{ NVKM_SUBDEV_GPIO , 0, 0, 0x00200000, true },
+	{ NVKM_SUBDEV_I2C  , 0, 0, 0x00200000, true },
+	{ NVKM_SUBDEV_TIMER, 0, 0, 0x00100000, true },
 	{},
 };
 
@@ -51,14 +47,14 @@ nv50_mc_init(struct nvkm_mc *mc)
 static const struct nvkm_mc_func
 nv50_mc = {
 	.init = nv50_mc_init,
-	.intr = nv50_mc_intr,
-	.intr_unarm = nv04_mc_intr_unarm,
-	.intr_rearm = nv04_mc_intr_rearm,
-	.intr_mask = nv04_mc_intr_mask,
+	.intr = &nv04_mc_intr,
+	.intrs = nv50_mc_intrs,
+	.device = &nv04_mc_device,
+	.reset = nv17_mc_reset,
 };
 
 int
-nv50_mc_new(struct nvkm_device *device, int index, struct nvkm_mc **pmc)
+nv50_mc_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst, struct nvkm_mc **pmc)
 {
-	return nvkm_mc_new_(&nv50_mc, device, index, pmc);
+	return nvkm_mc_new_(&nv50_mc, device, type, inst, pmc);
 }

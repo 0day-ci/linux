@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _UFS_UFS_H
 #define _UFS_UFS_H 1
 
@@ -122,7 +123,8 @@ extern struct inode *ufs_iget(struct super_block *, unsigned long);
 extern int ufs_write_inode (struct inode *, struct writeback_control *);
 extern int ufs_sync_inode (struct inode *);
 extern void ufs_evict_inode (struct inode *);
-extern int ufs_setattr(struct dentry *dentry, struct iattr *attr);
+extern int ufs_setattr(struct mnt_idmap *idmap, struct dentry *dentry,
+		       struct iattr *attr);
 
 /* namei.c */
 extern const struct file_operations ufs_dir_operations;
@@ -135,10 +137,6 @@ void ufs_error(struct super_block *, const char *, const char *, ...);
 extern __printf(3, 4)
 void ufs_panic(struct super_block *, const char *, const char *, ...);
 void ufs_mark_sb_dirty(struct super_block *sb);
-
-/* symlink.c */
-extern const struct inode_operations ufs_fast_symlink_inode_operations;
-extern const struct inode_operations ufs_symlink_inode_operations;
 
 static inline struct ufs_sb_info *UFS_SB(struct super_block *sb)
 {

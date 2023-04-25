@@ -1,24 +1,21 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __ASM_IRQ_H
 #define __ASM_IRQ_H
 
-#include <linux/irqchip/arm-gic-acpi.h>
+#ifndef __ASSEMBLER__
 
 #include <asm-generic/irq.h>
 
 struct pt_regs;
 
-extern void migrate_irqs(void);
-extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+int set_handle_irq(void (*handle_irq)(struct pt_regs *));
+#define set_handle_irq	set_handle_irq
+int set_handle_fiq(void (*handle_fiq)(struct pt_regs *));
 
-static inline void acpi_irq_init(void)
+static inline int nr_legacy_irqs(void)
 {
-	/*
-	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
-	 * Proper irqchip infrastructure will be implemented along with
-	 * incoming  GICv2m|GICv3|ITS bits.
-	 */
-	acpi_gic_init();
+	return 0;
 }
-#define acpi_irq_init acpi_irq_init
 
+#endif /* !__ASSEMBLER__ */
 #endif

@@ -1,23 +1,9 @@
-/******************************************************************************
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
  * Copyright(c) 2008 - 2010 Realtek Corporation. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- * The full GNU General Public License is included in this distribution in the
- * file called LICENSE.
- *
- * Contact Information:
- * wlanfae <wlanfae@realtek.com>
-******************************************************************************/
-
-
+ * Contact Information: wlanfae <wlanfae@realtek.com>
+ */
 #ifndef R8190P_DEF_H
 #define R8190P_DEF_H
 
@@ -166,21 +152,6 @@ struct tx_fwinfo_8190pci {
 	u32			PacketID:13;
 
 
-};
-
-struct log_int_8190 {
-	u32	nIMR_COMDOK;
-	u32	nIMR_MGNTDOK;
-	u32	nIMR_HIGH;
-	u32	nIMR_VODOK;
-	u32	nIMR_VIDOK;
-	u32	nIMR_BEDOK;
-	u32	nIMR_BKDOK;
-	u32	nIMR_ROK;
-	u32	nIMR_RCOK;
-	u32	nIMR_TBDOK;
-	u32	nIMR_BDOK;
-	u32	nIMR_RXFOVW;
 };
 
 struct phy_ofdm_rx_status_rxsc_sgien_exintfflag {

@@ -1,16 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * An interface between IEEE802.15.4 device and rest of the kernel.
  *
  * Copyright (C) 2007-2012 Siemens AG
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  * Written by:
  * Pavel Smolenskiy <pavel.smolenskiy@gmail.com>
@@ -23,12 +15,64 @@
 #ifndef IEEE802154_NETDEVICE_H
 #define IEEE802154_NETDEVICE_H
 
+#define IEEE802154_REQUIRED_SIZE(struct_type, member) \
+	(offsetof(typeof(struct_type), member) + \
+	sizeof(((typeof(struct_type) *)(NULL))->member))
+
+#define IEEE802154_ADDR_OFFSET \
+	offsetof(typeof(struct sockaddr_ieee802154), addr)
+
+#define IEEE802154_MIN_NAMELEN (IEEE802154_ADDR_OFFSET + \
+	IEEE802154_REQUIRED_SIZE(struct ieee802154_addr_sa, addr_type))
+
+#define IEEE802154_NAMELEN_SHORT (IEEE802154_ADDR_OFFSET + \
+	IEEE802154_REQUIRED_SIZE(struct ieee802154_addr_sa, short_addr))
+
+#define IEEE802154_NAMELEN_LONG (IEEE802154_ADDR_OFFSET + \
+	IEEE802154_REQUIRED_SIZE(struct ieee802154_addr_sa, hwaddr))
+
 #include <net/af_ieee802154.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/ieee802154.h>
 
 #include <net/cfg802154.h>
+
+struct ieee802154_beacon_hdr {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+	u16 beacon_order:4,
+	    superframe_order:4,
+	    final_cap_slot:4,
+	    battery_life_ext:1,
+	    reserved0:1,
+	    pan_coordinator:1,
+	    assoc_permit:1;
+	u8  gts_count:3,
+	    gts_reserved:4,
+	    gts_permit:1;
+	u8  pend_short_addr_count:3,
+	    reserved1:1,
+	    pend_ext_addr_count:3,
+	    reserved2:1;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+	u16 assoc_permit:1,
+	    pan_coordinator:1,
+	    reserved0:1,
+	    battery_life_ext:1,
+	    final_cap_slot:4,
+	    superframe_order:4,
+	    beacon_order:4;
+	u8  gts_permit:1,
+	    gts_reserved:4,
+	    gts_count:3;
+	u8  reserved2:1,
+	    pend_ext_addr_count:3,
+	    reserved1:1,
+	    pend_short_addr_count:3;
+#else
+#error	"Please fix <asm/byteorder.h>"
+#endif
+} __packed;
 
 struct ieee802154_sechdr {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
@@ -47,15 +91,6 @@ struct ieee802154_sechdr {
 	union {
 		__le32 short_src;
 		__le64 extended_src;
-	};
-};
-
-struct ieee802154_addr {
-	u8 mode;
-	__le16 pan_id;
-	union {
-		__le16 short_addr;
-		__le64 extended_addr;
 	};
 };
 
@@ -86,6 +121,21 @@ struct ieee802154_hdr_fc {
 #endif
 };
 
+enum ieee802154_frame_version {
+	IEEE802154_2003_STD,
+	IEEE802154_2006_STD,
+	IEEE802154_STD,
+	IEEE802154_RESERVED_STD,
+	IEEE802154_MULTIPURPOSE_STD = IEEE802154_2003_STD,
+};
+
+enum ieee802154_addressing_mode {
+	IEEE802154_NO_ADDRESSING,
+	IEEE802154_RESERVED,
+	IEEE802154_SHORT_ADDRESSING,
+	IEEE802154_EXTENDED_ADDRESSING,
+};
+
 struct ieee802154_hdr {
 	struct ieee802154_hdr_fc fc;
 	u8 seq;
@@ -94,12 +144,17 @@ struct ieee802154_hdr {
 	struct ieee802154_sechdr sec;
 };
 
+struct ieee802154_beacon_frame {
+	struct ieee802154_hdr mhr;
+	struct ieee802154_beacon_hdr mac_pl;
+};
+
 /* pushes hdr onto the skb. fields of hdr->fc that can be calculated from
  * the contents of hdr will be, and the actual value of those bits in
  * hdr->fc will be ignored. this includes the INTRA_PAN bit and the frame
  * version, if SECEN is set.
  */
-int ieee802154_hdr_push(struct sk_buff *skb, const struct ieee802154_hdr *hdr);
+int ieee802154_hdr_push(struct sk_buff *skb, struct ieee802154_hdr *hdr);
 
 /* pulls the entire 802.15.4 header off of the skb, including the security
  * header, and performs pan id decompression
@@ -118,6 +173,10 @@ int ieee802154_hdr_peek_addrs(const struct sk_buff *skb,
  * header_ops.parse
  */
 int ieee802154_hdr_peek(const struct sk_buff *skb, struct ieee802154_hdr *hdr);
+
+/* pushes a beacon frame into an skb */
+int ieee802154_beacon_push(struct sk_buff *skb,
+			   struct ieee802154_beacon_frame *beacon);
 
 int ieee802154_max_payload(const struct ieee802154_hdr *hdr);
 
@@ -182,6 +241,33 @@ static inline void ieee802154_devaddr_to_raw(void *raw, __le64 addr)
 	memcpy(raw, &temp, IEEE802154_ADDR_LEN);
 }
 
+static inline int
+ieee802154_sockaddr_check_size(struct sockaddr_ieee802154 *daddr, int len)
+{
+	struct ieee802154_addr_sa *sa;
+	int ret = 0;
+
+	sa = &daddr->addr;
+	if (len < IEEE802154_MIN_NAMELEN)
+		return -EINVAL;
+	switch (sa->addr_type) {
+	case IEEE802154_ADDR_NONE:
+		break;
+	case IEEE802154_ADDR_SHORT:
+		if (len < IEEE802154_NAMELEN_SHORT)
+			ret = -EINVAL;
+		break;
+	case IEEE802154_ADDR_LONG:
+		if (len < IEEE802154_NAMELEN_LONG)
+			ret = -EINVAL;
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
 static inline void ieee802154_addr_from_sa(struct ieee802154_addr *a,
 					   const struct ieee802154_addr_sa *sa)
 {
@@ -243,87 +329,12 @@ static inline struct ieee802154_mac_cb *mac_cb_init(struct sk_buff *skb)
 	return mac_cb(skb);
 }
 
-#define IEEE802154_LLSEC_KEY_SIZE 16
-
-struct ieee802154_llsec_key_id {
-	u8 mode;
-	u8 id;
-	union {
-		struct ieee802154_addr device_addr;
-		__le32 short_source;
-		__le64 extended_source;
-	};
-};
-
-struct ieee802154_llsec_key {
-	u8 frame_types;
-	u32 cmd_frame_ids;
-	u8 key[IEEE802154_LLSEC_KEY_SIZE];
-};
-
-struct ieee802154_llsec_key_entry {
-	struct list_head list;
-
-	struct ieee802154_llsec_key_id id;
-	struct ieee802154_llsec_key *key;
-};
-
-struct ieee802154_llsec_device_key {
-	struct list_head list;
-
-	struct ieee802154_llsec_key_id key_id;
-	u32 frame_counter;
-};
-
 enum {
 	IEEE802154_LLSEC_DEVKEY_IGNORE,
 	IEEE802154_LLSEC_DEVKEY_RESTRICT,
 	IEEE802154_LLSEC_DEVKEY_RECORD,
 
 	__IEEE802154_LLSEC_DEVKEY_MAX,
-};
-
-struct ieee802154_llsec_device {
-	struct list_head list;
-
-	__le16 pan_id;
-	__le16 short_addr;
-	__le64 hwaddr;
-	u32 frame_counter;
-	bool seclevel_exempt;
-
-	u8 key_mode;
-	struct list_head keys;
-};
-
-struct ieee802154_llsec_seclevel {
-	struct list_head list;
-
-	u8 frame_type;
-	u8 cmd_frame_id;
-	bool device_override;
-	u32 sec_levels;
-};
-
-struct ieee802154_llsec_params {
-	bool enabled;
-
-	__be32 frame_counter;
-	u8 out_level;
-	struct ieee802154_llsec_key_id out_key;
-
-	__le64 default_key_source;
-
-	__le16 pan_id;
-	__le64 hwaddr;
-	__le64 coord_hwaddr;
-	__le16 coord_shortaddr;
-};
-
-struct ieee802154_llsec_table {
-	struct list_head keys;
-	struct list_head devices;
-	struct list_head security_levels;
 };
 
 #define IEEE802154_MAC_SCAN_ED		0
@@ -421,7 +432,7 @@ struct ieee802154_mlme_ops {
 	void (*get_mac_params)(struct net_device *dev,
 			       struct ieee802154_mac_params *params);
 
-	struct ieee802154_llsec_ops *llsec;
+	const struct ieee802154_llsec_ops *llsec;
 };
 
 static inline struct ieee802154_mlme_ops *

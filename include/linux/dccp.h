@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _LINUX_DCCP_H
 #define _LINUX_DCCP_H
 
@@ -163,6 +164,7 @@ struct dccp_request_sock {
 	__u64			 dreq_isr;
 	__u64			 dreq_gsr;
 	__be32			 dreq_service;
+	spinlock_t		 dreq_lock;
 	struct list_head	 dreq_featneg;
 	__u32			 dreq_timestamp_echo;
 	__u32			 dreq_timestamp_time;
@@ -196,22 +198,22 @@ enum dccp_role {
 
 struct dccp_service_list {
 	__u32	dccpsl_nr;
-	__be32	dccpsl_list[0];
+	__be32	dccpsl_list[];
 };
 
 #define DCCP_SERVICE_INVALID_VALUE htonl((__u32)-1)
 #define DCCP_SERVICE_CODE_IS_ABSENT		0
 
-static inline int dccp_list_has_service(const struct dccp_service_list *sl,
+static inline bool dccp_list_has_service(const struct dccp_service_list *sl,
 					const __be32 service)
 {
 	if (likely(sl != NULL)) {
 		u32 i = sl->dccpsl_nr;
 		while (i--)
 			if (sl->dccpsl_list[i] == service)
-				return 1;
+				return true;
 	}
-	return 0;
+	return false;
 }
 
 struct dccp_ackvec;

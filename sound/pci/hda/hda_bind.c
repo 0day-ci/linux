@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * HD-audio codec driver binding
  * Copyright (c) Takashi Iwai <tiwai@suse.de>
@@ -11,25 +12,27 @@
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
 #include <sound/core.h>
-#include "hda_codec.h"
+#include <sound/hda_codec.h>
 #include "hda_local.h"
+#include "hda_jack.h"
 
 /*
- * find a matching codec preset
+ * find a matching codec id
  */
 static int hda_codec_match(struct hdac_device *dev, struct hdac_driver *drv)
 {
 	struct hda_codec *codec = container_of(dev, struct hda_codec, core);
 	struct hda_codec_driver *driver =
 		container_of(drv, struct hda_codec_driver, core);
-	const struct hda_codec_preset *preset;
+	const struct hda_device_id *list;
 	/* check probe_id instead of vendor_id if set */
 	u32 id = codec->probe_id ? codec->probe_id : codec->core.vendor_id;
+	u32 rev_id = codec->core.revision_id;
 
-	for (preset = driver->preset; preset->id; preset++) {
-		if (preset->id == id &&
-		    (!preset->rev || preset->rev == codec->core.revision_id)) {
-			codec->preset = preset;
+	for (list = driver->id; list->vendor_id; list++) {
+		if (list->vendor_id == id &&
+		    (!list->rev_id || list->rev_id == rev_id)) {
+			codec->preset = list;
 			return 1;
 		}
 	}
@@ -41,30 +44,63 @@ static void hda_codec_unsol_event(struct hdac_device *dev, unsigned int ev)
 {
 	struct hda_codec *codec = container_of(dev, struct hda_codec, core);
 
+	/* ignore unsol events during shutdown */
+	if (codec->bus->shutdown)
+		return;
+
+	/* ignore unsol events during system suspend/resume */
+	if (codec->core.dev.power.power_state.event != PM_EVENT_ON)
+		return;
+
 	if (codec->patch_ops.unsol_event)
 		codec->patch_ops.unsol_event(codec, ev);
 }
 
-/* reset the codec name from the preset */
-static int codec_refresh_name(struct hda_codec *codec, const char *name)
+/**
+ * snd_hda_codec_set_name - set the codec name
+ * @codec: the HDA codec
+ * @name: name string to set
+ */
+int snd_hda_codec_set_name(struct hda_codec *codec, const char *name)
 {
-	if (name) {
-		kfree(codec->core.chip_name);
-		codec->core.chip_name = kstrdup(name, GFP_KERNEL);
+	int err;
+
+	if (!name)
+		return 0;
+	err = snd_hdac_device_set_chip_name(&codec->core, name);
+	if (err < 0)
+		return err;
+
+	/* update the mixer name */
+	if (!*codec->card->mixername ||
+	    codec->bus->mixer_assigned >= codec->core.addr) {
+		snprintf(codec->card->mixername,
+			 sizeof(codec->card->mixername), "%s %s",
+			 codec->core.vendor_name, codec->core.chip_name);
+		codec->bus->mixer_assigned = codec->core.addr;
 	}
-	return codec->core.chip_name ? 0 : -ENOMEM;
+
+	return 0;
 }
+EXPORT_SYMBOL_GPL(snd_hda_codec_set_name);
 
 static int hda_codec_driver_probe(struct device *dev)
 {
 	struct hda_codec *codec = dev_to_hda_codec(dev);
 	struct module *owner = dev->driver->owner;
+	hda_codec_patch_t patch;
 	int err;
+
+	if (codec->bus->core.ext_ops) {
+		if (WARN_ON(!codec->bus->core.ext_ops->hdev_attach))
+			return -EINVAL;
+		return codec->bus->core.ext_ops->hdev_attach(&codec->core);
+	}
 
 	if (WARN_ON(!codec->preset))
 		return -EINVAL;
 
-	err = codec_refresh_name(codec, codec->preset->name);
+	err = snd_hda_codec_set_name(codec, codec->preset->name);
 	if (err < 0)
 		goto error;
 	err = snd_hdac_regmap_init(&codec->core);
@@ -76,9 +112,12 @@ static int hda_codec_driver_probe(struct device *dev)
 		goto error;
 	}
 
-	err = codec->preset->patch(codec);
-	if (err < 0)
-		goto error_module;
+	patch = (hda_codec_patch_t)codec->preset->driver_data;
+	if (patch) {
+		err = patch(codec);
+		if (err < 0)
+			goto error_module_put;
+	}
 
 	err = snd_hda_codec_build_pcms(codec);
 	if (err < 0)
@@ -86,7 +125,8 @@ static int hda_codec_driver_probe(struct device *dev)
 	err = snd_hda_codec_build_controls(codec);
 	if (err < 0)
 		goto error_module;
-	if (codec->card->registered) {
+	/* only register after the bus probe finished; otherwise it's racy */
+	if (!codec->bus->bus_probing && codec->card->registered) {
 		err = snd_card_register(codec->card);
 		if (err < 0)
 			goto error_module;
@@ -97,10 +137,14 @@ static int hda_codec_driver_probe(struct device *dev)
 	return 0;
 
  error_module:
+	if (codec->patch_ops.free)
+		codec->patch_ops.free(codec);
+ error_module_put:
 	module_put(owner);
 
  error:
 	snd_hda_codec_cleanup_for_unbind(codec);
+	codec->preset = NULL;
 	return err;
 }
 
@@ -108,19 +152,29 @@ static int hda_codec_driver_remove(struct device *dev)
 {
 	struct hda_codec *codec = dev_to_hda_codec(dev);
 
+	if (codec->bus->core.ext_ops) {
+		if (WARN_ON(!codec->bus->core.ext_ops->hdev_detach))
+			return -EINVAL;
+		return codec->bus->core.ext_ops->hdev_detach(&codec->core);
+	}
+
+	snd_hda_codec_disconnect_pcms(codec);
+	snd_hda_jack_tbl_disconnect(codec);
+	if (!refcount_dec_and_test(&codec->pcm_ref))
+		wait_event(codec->remove_sleep, !refcount_read(&codec->pcm_ref));
+	snd_power_sync_ref(codec->bus->card);
+
 	if (codec->patch_ops.free)
 		codec->patch_ops.free(codec);
 	snd_hda_codec_cleanup_for_unbind(codec);
+	codec->preset = NULL;
 	module_put(dev->driver->owner);
 	return 0;
 }
 
 static void hda_codec_driver_shutdown(struct device *dev)
 {
-	struct hda_codec *codec = dev_to_hda_codec(dev);
-
-	if (!pm_runtime_suspended(dev) && codec->patch_ops.reboot_notify)
-		codec->patch_ops.reboot_notify(codec);
+	snd_hda_codec_shutdown(dev_to_hda_codec(dev));
 }
 
 int __hda_codec_driver_register(struct hda_codec_driver *drv, const char *name,
@@ -151,15 +205,40 @@ static inline bool codec_probed(struct hda_codec *codec)
 	return device_attach(hda_codec_dev(codec)) > 0 && codec->preset;
 }
 
+/* try to auto-load codec module */
+static void request_codec_module(struct hda_codec *codec)
+{
+#ifdef MODULE
+	char modalias[32];
+	const char *mod = NULL;
+
+	switch (codec->probe_id) {
+	case HDA_CODEC_ID_GENERIC_HDMI:
+#if IS_MODULE(CONFIG_SND_HDA_CODEC_HDMI)
+		mod = "snd-hda-codec-hdmi";
+#endif
+		break;
+	case HDA_CODEC_ID_GENERIC:
+#if IS_MODULE(CONFIG_SND_HDA_GENERIC)
+		mod = "snd-hda-codec-generic";
+#endif
+		break;
+	default:
+		snd_hdac_codec_modalias(&codec->core, modalias, sizeof(modalias));
+		mod = modalias;
+		break;
+	}
+
+	if (mod)
+		request_module(mod);
+#endif /* MODULE */
+}
+
 /* try to auto-load and bind the codec module */
 static void codec_bind_module(struct hda_codec *codec)
 {
 #ifdef MODULE
-	request_module("snd-hda-codec-id:%08x", codec->core.vendor_id);
-	if (codec_probed(codec))
-		return;
-	request_module("snd-hda-codec-id:%04x*",
-		       (codec->core.vendor_id >> 16) & 0xffff);
+	request_codec_module(codec);
 	if (codec_probed(codec))
 		return;
 #endif
@@ -170,6 +249,13 @@ static void codec_bind_module(struct hda_codec *codec)
 static bool is_likely_hdmi_codec(struct hda_codec *codec)
 {
 	hda_nid_t nid;
+
+	/*
+	 * For ASoC users, if snd_hda_hdmi_codec module is denylisted and any
+	 * event causes i915 enumeration to fail, ->wcaps remains uninitialized.
+	 */
+	if (!codec->wcaps)
+		return true;
 
 	for_each_hda_codec_node(nid, codec) {
 		unsigned int wcaps = get_wcaps(codec, nid);
@@ -196,17 +282,13 @@ static int codec_bind_generic(struct hda_codec *codec)
 
 	if (is_likely_hdmi_codec(codec)) {
 		codec->probe_id = HDA_CODEC_ID_GENERIC_HDMI;
-#if IS_MODULE(CONFIG_SND_HDA_CODEC_HDMI)
-		request_module("snd-hda-codec-hdmi");
-#endif
+		request_codec_module(codec);
 		if (codec_probed(codec))
 			return 0;
 	}
 
 	codec->probe_id = HDA_CODEC_ID_GENERIC;
-#if IS_MODULE(CONFIG_SND_HDA_GENERIC)
-	request_module("snd-hda-codec-generic");
-#endif
+	request_codec_module(codec);
 	if (codec_probed(codec))
 		return 0;
 	return -ENODEV;
@@ -232,34 +314,31 @@ int snd_hda_codec_configure(struct hda_codec *codec)
 {
 	int err;
 
+	if (codec->configured)
+		return 0;
+
 	if (is_generic_config(codec))
 		codec->probe_id = HDA_CODEC_ID_GENERIC;
 	else
 		codec->probe_id = 0;
 
-	err = snd_hdac_device_register(&codec->core);
-	if (err < 0)
-		return err;
+	if (!device_is_registered(&codec->core.dev)) {
+		err = snd_hdac_device_register(&codec->core);
+		if (err < 0)
+			return err;
+	}
 
 	if (!codec->preset)
 		codec_bind_module(codec);
 	if (!codec->preset) {
 		err = codec_bind_generic(codec);
 		if (err < 0) {
-			codec_err(codec, "Unable to bind the codec\n");
-			goto error;
+			codec_dbg(codec, "Unable to bind the codec\n");
+			return err;
 		}
 	}
 
-	/* audio codec should override the mixer name */
-	if (codec->core.afg || !*codec->card->mixername)
-		snprintf(codec->card->mixername,
-			 sizeof(codec->card->mixername), "%s %s",
-			 codec->core.vendor_name, codec->core.chip_name);
+	codec->configured = 1;
 	return 0;
-
- error:
-	snd_hdac_device_unregister(&codec->core);
-	return err;
 }
 EXPORT_SYMBOL_GPL(snd_hda_codec_configure);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * PowerPC 476FPE board specific routines
  *
@@ -14,26 +15,22 @@
  *    Rewritten and ported to the merged powerpc tree:
  *    Copyright 2007 David Gibson <dwg@au1.ibm.com>, IBM Corporation.
  *    Copyright © 2011 David Kliekamp IBM Corporation
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #include <linux/init.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/rtc.h>
 
 #include <asm/machdep.h>
-#include <asm/prom.h>
 #include <asm/udbg.h>
 #include <asm/time.h>
 #include <asm/uic.h>
 #include <asm/ppc4xx.h>
 #include <asm/mpic.h>
 #include <asm/mmu.h>
+#include <asm/swiotlb.h>
 
 #include <linux/pci.h>
 #include <linux/i2c.h>
@@ -68,7 +65,7 @@ DECLARE_PCI_FIXUP_HEADER(0x1033, 0x0035, quirk_ppc_currituck_usb_fixup);
 #define AVR_PWRCTL_RESET (0x02)
 
 static struct i2c_client *avr_i2c_client;
-static void avr_halt_system(int pwrctl_flags)
+static void __noreturn avr_halt_system(int pwrctl_flags)
 {
 	/* Request the AVR to reset the system */
 	i2c_smbus_write_byte_data(avr_i2c_client,
@@ -84,13 +81,12 @@ static void avr_power_off_system(void)
 	avr_halt_system(AVR_PWRCTL_PWROFF);
 }
 
-static void avr_reset_system(char *cmd)
+static void __noreturn avr_reset_system(char *cmd)
 {
 	avr_halt_system(AVR_PWRCTL_RESET);
 }
 
-static int avr_probe(struct i2c_client *client,
-			    const struct i2c_device_id *id)
+static int avr_probe(struct i2c_client *client)
 {
 	avr_i2c_client = client;
 	ppc_md.restart = avr_reset_system;
@@ -107,7 +103,7 @@ static struct i2c_driver avr_driver = {
 	.driver = {
 		.name = "akebono-avr",
 	},
-	.probe = avr_probe,
+	.probe_new = avr_probe,
 	.id_table = avr_id,
 };
 
@@ -144,6 +140,8 @@ static void __init ppc47x_init_irq(void)
 		ppc_md.get_irq = mpic_get_irq;
 	} else
 		panic("Unrecognized top level interrupt controller");
+
+	of_node_put(np);
 }
 
 #ifdef CONFIG_SMP
@@ -223,7 +221,7 @@ static int board_rev = -1;
 static int __init ppc47x_get_board_rev(void)
 {
 	int reg;
-	u8 *fpga;
+	u8 __iomem *fpga;
 	struct device_node *np = NULL;
 
 	if (of_machine_is_compatible("ibm,currituck")) {
@@ -237,7 +235,7 @@ static int __init ppc47x_get_board_rev(void)
 	if (!np)
 		goto fail;
 
-	fpga = (u8 *) of_iomap(np, 0);
+	fpga = of_iomap(np, 0);
 	of_node_put(np);
 	if (!fpga)
 		goto fail;
@@ -275,12 +273,10 @@ static void ppc47x_pci_irq_fixup(struct pci_dev *dev)
  */
 static int __init ppc47x_probe(void)
 {
-	unsigned long root = of_get_flat_dt_root();
-
-	if (of_flat_dt_is_compatible(root, "ibm,akebono"))
+	if (of_machine_is_compatible("ibm,akebono"))
 		return 1;
 
-	if (of_flat_dt_is_compatible(root, "ibm,currituck")) {
+	if (of_machine_is_compatible("ibm,currituck")) {
 		ppc_md.pci_irq_fixup = ppc47x_pci_irq_fixup;
 		return 1;
 	}

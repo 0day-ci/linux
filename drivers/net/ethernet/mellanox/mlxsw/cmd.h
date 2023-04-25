@@ -1,37 +1,5 @@
-/*
- * drivers/net/ethernet/mellanox/mlxsw/cmd.h
- * Copyright (c) 2015 Mellanox Technologies. All rights reserved.
- * Copyright (c) 2015 Jiri Pirko <jiri@mellanox.com>
- * Copyright (c) 2015 Ido Schimmel <idosch@mellanox.com>
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the names of the copyright holders nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * Alternatively, this software may be distributed under the terms of the
- * GNU General Public License ("GPL") version 2 as published by the Free
- * Software Foundation.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+/* SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0 */
+/* Copyright (c) 2015-2018 Mellanox Technologies. All rights reserved */
 
 #ifndef _MLXSW_CMD_H
 #define _MLXSW_CMD_H
@@ -58,7 +26,7 @@ static inline void mlxsw_cmd_mbox_zero(char *mbox)
 struct mlxsw_core;
 
 int mlxsw_cmd_exec(struct mlxsw_core *mlxsw_core, u16 opcode, u8 opcode_mod,
-		   u32 in_mod, bool out_mbox_direct,
+		   u32 in_mod, bool out_mbox_direct, bool reset_ok,
 		   char *in_mbox, size_t in_mbox_size,
 		   char *out_mbox, size_t out_mbox_size);
 
@@ -67,7 +35,7 @@ static inline int mlxsw_cmd_exec_in(struct mlxsw_core *mlxsw_core, u16 opcode,
 				    size_t in_mbox_size)
 {
 	return mlxsw_cmd_exec(mlxsw_core, opcode, opcode_mod, in_mod, false,
-			      in_mbox, in_mbox_size, NULL, 0);
+			      false, in_mbox, in_mbox_size, NULL, 0);
 }
 
 static inline int mlxsw_cmd_exec_out(struct mlxsw_core *mlxsw_core, u16 opcode,
@@ -76,7 +44,7 @@ static inline int mlxsw_cmd_exec_out(struct mlxsw_core *mlxsw_core, u16 opcode,
 				     char *out_mbox, size_t out_mbox_size)
 {
 	return mlxsw_cmd_exec(mlxsw_core, opcode, opcode_mod, in_mod,
-			      out_mbox_direct, NULL, 0,
+			      out_mbox_direct, false, NULL, 0,
 			      out_mbox, out_mbox_size);
 }
 
@@ -84,7 +52,7 @@ static inline int mlxsw_cmd_exec_none(struct mlxsw_core *mlxsw_core, u16 opcode,
 				      u8 opcode_mod, u32 in_mod)
 {
 	return mlxsw_cmd_exec(mlxsw_core, opcode, opcode_mod, in_mod, false,
-			      NULL, 0, NULL, 0);
+			      false, NULL, 0, NULL, 0);
 }
 
 enum mlxsw_cmd_opcode {
@@ -105,6 +73,7 @@ enum mlxsw_cmd_opcode {
 	MLXSW_CMD_OPCODE_SW2HW_EQ		= 0x013,
 	MLXSW_CMD_OPCODE_HW2SW_EQ		= 0x014,
 	MLXSW_CMD_OPCODE_QUERY_EQ		= 0x015,
+	MLXSW_CMD_OPCODE_QUERY_RESOURCES	= 0x101,
 };
 
 static inline const char *mlxsw_cmd_opcode_str(u16 opcode)
@@ -144,6 +113,8 @@ static inline const char *mlxsw_cmd_opcode_str(u16 opcode)
 		return "HW2SW_EQ";
 	case MLXSW_CMD_OPCODE_QUERY_EQ:
 		return "QUERY_EQ";
+	case MLXSW_CMD_OPCODE_QUERY_RESOURCES:
+		return "QUERY_RESOURCES";
 	default:
 		return "*UNKNOWN*";
 	}
@@ -176,6 +147,8 @@ enum mlxsw_cmd_status {
 	MLXSW_CMD_STATUS_BAD_INDEX	= 0x0A,
 	/* NVMEM checksum/CRC failed. */
 	MLXSW_CMD_STATUS_BAD_NVMEM	= 0x0B,
+	/* Device is currently running reset */
+	MLXSW_CMD_STATUS_RUNNING_RESET	= 0x26,
 	/* Bad management packet (silently discarded). */
 	MLXSW_CMD_STATUS_BAD_PKT	= 0x30,
 };
@@ -205,6 +178,8 @@ static inline const char *mlxsw_cmd_status_str(u8 status)
 		return "BAD_INDEX";
 	case MLXSW_CMD_STATUS_BAD_NVMEM:
 		return "BAD_NVMEM";
+	case MLXSW_CMD_STATUS_RUNNING_RESET:
+		return "RUNNING_RESET";
 	case MLXSW_CMD_STATUS_BAD_PKT:
 		return "BAD_PKT";
 	default:
@@ -342,6 +317,44 @@ MLXSW_ITEM64(cmd_mbox, query_fw, doorbell_page_offset, 0x40, 0, 64);
  */
 MLXSW_ITEM32(cmd_mbox, query_fw, doorbell_page_bar, 0x48, 30, 2);
 
+/* cmd_mbox_query_fw_free_running_clock_offset
+ * The offset of the free running clock page
+ */
+MLXSW_ITEM64(cmd_mbox, query_fw, free_running_clock_offset, 0x50, 0, 64);
+
+/* cmd_mbox_query_fw_fr_rn_clk_bar
+ * PCI base address register (BAR) of the free running clock page
+ * 0: BAR 0
+ * 1: 64 bit BAR
+ */
+MLXSW_ITEM32(cmd_mbox, query_fw, fr_rn_clk_bar, 0x58, 30, 2);
+
+/* cmd_mbox_query_fw_utc_sec_offset
+ * The offset of the UTC_Sec page
+ */
+MLXSW_ITEM64(cmd_mbox, query_fw, utc_sec_offset, 0x70, 0, 64);
+
+/* cmd_mbox_query_fw_utc_sec_bar
+ * PCI base address register (BAR) of the UTC_Sec page
+ * 0: BAR 0
+ * 1: 64 bit BAR
+ * Reserved on SwitchX/-2, Switch-IB/2, Spectrum-1
+ */
+MLXSW_ITEM32(cmd_mbox, query_fw, utc_sec_bar, 0x78, 30, 2);
+
+/* cmd_mbox_query_fw_utc_nsec_offset
+ * The offset of the UTC_nSec page
+ */
+MLXSW_ITEM64(cmd_mbox, query_fw, utc_nsec_offset, 0x80, 0, 64);
+
+/* cmd_mbox_query_fw_utc_nsec_bar
+ * PCI base address register (BAR) of the UTC_nSec page
+ * 0: BAR 0
+ * 1: 64 bit BAR
+ * Reserved on SwitchX/-2, Switch-IB/2, Spectrum-1
+ */
+MLXSW_ITEM32(cmd_mbox, query_fw, utc_nsec_bar, 0x88, 30, 2);
+
 /* QUERY_BOARDINFO - Query Board Information
  * -----------------------------------------
  * OpMod == 0 (N/A), INMmod == 0 (N/A)
@@ -421,9 +434,14 @@ MLXSW_ITEM32(cmd_mbox, query_aq_cap, log_max_rdq_sz, 0x04, 24, 8);
 MLXSW_ITEM32(cmd_mbox, query_aq_cap, max_num_rdqs, 0x04, 0, 8);
 
 /* cmd_mbox_query_aq_cap_log_max_cq_sz
- * Log (base 2) of max CQEs allowed on CQ.
+ * Log (base 2) of the Maximum CQEs allowed in a CQ for CQEv0 and CQEv1.
  */
 MLXSW_ITEM32(cmd_mbox, query_aq_cap, log_max_cq_sz, 0x08, 24, 8);
+
+/* cmd_mbox_query_aq_cap_log_max_cqv2_sz
+ * Log (base 2) of the Maximum CQEs allowed in a CQ for CQEv2.
+ */
+MLXSW_ITEM32(cmd_mbox, query_aq_cap, log_max_cqv2_sz, 0x08, 16, 8);
 
 /* cmd_mbox_query_aq_cap_max_num_cqs
  * Maximum number of CQs.
@@ -464,6 +482,8 @@ MLXSW_ITEM32(cmd_mbox, query_aq_cap, max_sg_rq, 0x10, 0, 8);
  * passed in this command must be pinned.
  */
 
+#define MLXSW_CMD_MAP_FA_VPM_ENTRIES_MAX 32
+
 static inline int mlxsw_cmd_map_fa(struct mlxsw_core *mlxsw_core,
 				   char *in_mbox, u32 vpm_entries_count)
 {
@@ -497,6 +517,40 @@ static inline int mlxsw_cmd_unmap_fa(struct mlxsw_core *mlxsw_core)
 {
 	return mlxsw_cmd_exec_none(mlxsw_core, MLXSW_CMD_OPCODE_UNMAP_FA, 0, 0);
 }
+
+/* QUERY_RESOURCES - Query chip resources
+ * --------------------------------------
+ * OpMod == 0 (N/A) , INMmod is index
+ * ----------------------------------
+ * The QUERY_RESOURCES command retrieves information related to chip resources
+ * by resource ID. Every command returns 32 entries. INmod is being use as base.
+ * for example, index 1 will return entries 32-63. When the tables end and there
+ * are no more sources in the table, will return resource id 0xFFF to indicate
+ * it.
+ */
+
+#define MLXSW_CMD_QUERY_RESOURCES_TABLE_END_ID 0xffff
+#define MLXSW_CMD_QUERY_RESOURCES_MAX_QUERIES 100
+#define MLXSW_CMD_QUERY_RESOURCES_PER_QUERY 32
+
+static inline int mlxsw_cmd_query_resources(struct mlxsw_core *mlxsw_core,
+					    char *out_mbox, int index)
+{
+	return mlxsw_cmd_exec_out(mlxsw_core, MLXSW_CMD_OPCODE_QUERY_RESOURCES,
+				  0, index, false, out_mbox,
+				  MLXSW_CMD_MBOX_SIZE);
+}
+
+/* cmd_mbox_query_resource_id
+ * The resource id. 0xFFFF indicates table's end.
+ */
+MLXSW_ITEM32_INDEXED(cmd_mbox, query_resource, id, 0x00, 16, 16, 0x8, 0, false);
+
+/* cmd_mbox_query_resource_data
+ * The resource
+ */
+MLXSW_ITEM64_INDEXED(cmd_mbox, query_resource, data,
+		     0x00, 0, 40, 0x8, 0, false);
 
 /* CONFIG_PROFILE (Set) - Configure Switch Profile
  * ------------------------------
@@ -568,7 +622,7 @@ MLXSW_ITEM32(cmd_mbox, config_profile, set_max_vlan_groups, 0x0C, 6, 1);
  */
 MLXSW_ITEM32(cmd_mbox, config_profile, set_max_regions, 0x0C, 7, 1);
 
-/* cmd_mbox_config_profile_set_fid_based
+/* cmd_mbox_config_profile_set_flood_mode
  * Capability bit. Setting a bit to 1 configures the profile
  * according to the mailbox contents.
  */
@@ -605,6 +659,42 @@ MLXSW_ITEM32(cmd_mbox, config_profile,
  */
 MLXSW_ITEM32(cmd_mbox, config_profile, set_ar_sec, 0x0C, 15, 1);
 
+/* cmd_mbox_config_set_ubridge
+ * Capability bit. Setting a bit to 1 configures the profile
+ * according to the mailbox contents.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, set_ubridge, 0x0C, 22, 1);
+
+/* cmd_mbox_config_set_kvd_linear_size
+ * Capability bit. Setting a bit to 1 configures the profile
+ * according to the mailbox contents.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, set_kvd_linear_size, 0x0C, 24, 1);
+
+/* cmd_mbox_config_set_kvd_hash_single_size
+ * Capability bit. Setting a bit to 1 configures the profile
+ * according to the mailbox contents.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, set_kvd_hash_single_size, 0x0C, 25, 1);
+
+/* cmd_mbox_config_set_kvd_hash_double_size
+ * Capability bit. Setting a bit to 1 configures the profile
+ * according to the mailbox contents.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, set_kvd_hash_double_size, 0x0C, 26, 1);
+
+/* cmd_mbox_config_set_cqe_version
+ * Capability bit. Setting a bit to 1 configures the profile
+ * according to the mailbox contents.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, set_cqe_version, 0x08, 0, 1);
+
+/* cmd_mbox_config_set_cqe_time_stamp_type
+ * Capability bit. Setting a bit to 1 configures the profile
+ * according to the mailbox contents.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, set_cqe_time_stamp_type, 0x08, 2, 1);
+
 /* cmd_mbox_config_profile_max_vepa_channels
  * Maximum number of VEPA channels per port (0 through 16)
  * 0 - multi-channel VEPA is disabled
@@ -613,6 +703,9 @@ MLXSW_ITEM32(cmd_mbox, config_profile, max_vepa_channels, 0x10, 0, 8);
 
 /* cmd_mbox_config_profile_max_lag
  * Maximum number of LAG IDs requested.
+ * Reserved when Spectrum-1/2/3, supported from Spectrum-4 and above.
+ * For Spectrum-4, firmware sets 128 for values between 1-128 and 256 for values
+ * between 129-256.
  */
 MLXSW_ITEM32(cmd_mbox, config_profile, max_lag, 0x14, 0, 16);
 
@@ -649,12 +742,8 @@ MLXSW_ITEM32(cmd_mbox, config_profile, max_vlan_groups, 0x28, 0, 12);
 MLXSW_ITEM32(cmd_mbox, config_profile, max_regions, 0x2C, 0, 16);
 
 /* cmd_mbox_config_profile_max_flood_tables
- * Maximum number of Flooding Tables. Flooding Tables are associated to
- * the different packet types for the different switch partitions.
- * Note that the table size depends on the fid_based mode.
- * In SwitchX silicon, tables are split equally between the switch
- * partitions. e.g. for 2 swids and 8 tables, the first 4 are associated
- * with swid-1 and the last 4 are associated with swid-2.
+ * Maximum number of single-entry flooding tables. Different flooding tables
+ * can be associated with different packet types.
  */
 MLXSW_ITEM32(cmd_mbox, config_profile, max_flood_tables, 0x30, 16, 4);
 
@@ -665,14 +754,50 @@ MLXSW_ITEM32(cmd_mbox, config_profile, max_flood_tables, 0x30, 16, 4);
  */
 MLXSW_ITEM32(cmd_mbox, config_profile, max_vid_flood_tables, 0x30, 8, 4);
 
-/* cmd_mbox_config_profile_fid_based
- * FID Based Flood Mode
- * 00 Do not use FID to offset the index into the Port Group Table/Multicast ID
- * 01 Use FID to offset the index to the Port Group Table (pgi)
- * 10 Use FID to offset the index to the Port Group Table (pgi) and
- * the Multicast ID
+enum mlxsw_cmd_mbox_config_profile_flood_mode {
+	/* Mixed mode, where:
+	 * max_flood_tables indicates the number of single-entry tables.
+	 * max_vid_flood_tables indicates the number of per-VID tables.
+	 * max_fid_offset_flood_tables indicates the number of FID-offset
+	 * tables. max_fid_flood_tables indicates the number of per-FID tables.
+	 * Reserved when unified bridge model is used.
+	 */
+	MLXSW_CMD_MBOX_CONFIG_PROFILE_FLOOD_MODE_MIXED = 3,
+	/* Controlled flood tables. Reserved when legacy bridge model is
+	 * used.
+	 */
+	MLXSW_CMD_MBOX_CONFIG_PROFILE_FLOOD_MODE_CONTROLLED = 4,
+};
+
+/* cmd_mbox_config_profile_flood_mode
+ * Flooding mode to use.
  */
-MLXSW_ITEM32(cmd_mbox, config_profile, flood_mode, 0x30, 0, 2);
+MLXSW_ITEM32(cmd_mbox, config_profile, flood_mode, 0x30, 0, 3);
+
+/* cmd_mbox_config_profile_max_fid_offset_flood_tables
+ * Maximum number of FID-offset flooding tables.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile,
+	     max_fid_offset_flood_tables, 0x34, 24, 4);
+
+/* cmd_mbox_config_profile_fid_offset_flood_table_size
+ * The size (number of entries) of each FID-offset flood table.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile,
+	     fid_offset_flood_table_size, 0x34, 0, 16);
+
+/* cmd_mbox_config_profile_max_fid_flood_tables
+ * Maximum number of per-FID flooding tables.
+ *
+ * Note: This flooding tables cover special FIDs only (vFIDs), starting at
+ * FID value 4K and higher.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, max_fid_flood_tables, 0x38, 24, 4);
+
+/* cmd_mbox_config_profile_fid_flood_table_size
+ * The size (number of entries) of each per-FID table.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, fid_flood_table_size, 0x38, 0, 16);
 
 /* cmd_mbox_config_profile_max_ib_mc
  * Maximum number of multicast FDB records for InfiniBand
@@ -708,6 +833,38 @@ MLXSW_ITEM32(cmd_mbox, config_profile, adaptive_routing_group_cap, 0x4C, 0, 16);
  */
 MLXSW_ITEM32(cmd_mbox, config_profile, arn, 0x50, 31, 1);
 
+/* cmd_mbox_config_profile_ubridge
+ * Unified Bridge
+ * 0 - non unified bridge
+ * 1 - unified bridge
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, ubridge, 0x50, 4, 1);
+
+/* cmd_mbox_config_kvd_linear_size
+ * KVD Linear Size
+ * Valid for Spectrum only
+ * Allowed values are 128*N where N=0 or higher
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, kvd_linear_size, 0x54, 0, 24);
+
+/* cmd_mbox_config_kvd_hash_single_size
+ * KVD Hash single-entries size
+ * Valid for Spectrum only
+ * Allowed values are 128*N where N=0 or higher
+ * Must be greater or equal to cap_min_kvd_hash_single_size
+ * Must be smaller or equal to cap_kvd_size - kvd_linear_size
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, kvd_hash_single_size, 0x58, 0, 24);
+
+/* cmd_mbox_config_kvd_hash_double_size
+ * KVD Hash double-entries size (units of single-size entries)
+ * Valid for Spectrum only
+ * Allowed values are 128*N where N=0 or higher
+ * Must be either 0 or greater or equal to cap_min_kvd_hash_double_size
+ * Must be smaller or equal to cap_kvd_size - kvd_linear_size
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, kvd_hash_double_size, 0x5C, 0, 24);
+
 /* cmd_mbox_config_profile_swid_config_mask
  * Modify Switch Partition Configuration mask. When set, the configu-
  * ration value for the Switch Partition are taken from the mailbox.
@@ -736,6 +893,34 @@ MLXSW_ITEM32_INDEXED(cmd_mbox, config_profile, swid_config_type,
 MLXSW_ITEM32_INDEXED(cmd_mbox, config_profile, swid_config_properties,
 		     0x60, 0, 8, 0x08, 0x00, false);
 
+enum mlxsw_cmd_mbox_config_profile_cqe_time_stamp_type {
+	/* uSec - 1.024uSec (default). Only bits 15:0 are valid. */
+	MLXSW_CMD_MBOX_CONFIG_PROFILE_CQE_TIME_STAMP_TYPE_USEC,
+	/* FRC - Free Running Clock, units of 1nSec.
+	 * Reserved when SwitchX/-2, Switch-IB/2 and Spectrum-1.
+	 */
+	MLXSW_CMD_MBOX_CONFIG_PROFILE_CQE_TIME_STAMP_TYPE_FRC,
+	/* UTC. time_stamp[37:30] = Sec, time_stamp[29:0] = nSec.
+	 * Reserved when SwitchX/2, Switch-IB/2 and Spectrum-1.
+	 */
+	MLXSW_CMD_MBOX_CONFIG_PROFILE_CQE_TIME_STAMP_TYPE_UTC,
+};
+
+/* cmd_mbox_config_profile_cqe_time_stamp_type
+ * CQE time_stamp_type for non-mirror-packets.
+ * Configured if set_cqe_time_stamp_type is set.
+ * Reserved when SwitchX/-2, Switch-IB/2 and Spectrum-1.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, cqe_time_stamp_type, 0xB0, 8, 2);
+
+/* cmd_mbox_config_profile_cqe_version
+ * CQE version:
+ * 0: CQE version is 0
+ * 1: CQE version is either 1 or 2
+ * CQE ver 1 or 2 is configured by Completion Queue Context field cqe_ver.
+ */
+MLXSW_ITEM32(cmd_mbox, config_profile, cqe_version, 0xB0, 0, 8);
+
 /* ACCESS_REG - Access EMAD Supported Register
  * ----------------------------------
  * OpMod == 0 (N/A), INMmod == 0 (N/A)
@@ -745,10 +930,12 @@ MLXSW_ITEM32_INDEXED(cmd_mbox, config_profile, swid_config_properties,
  */
 
 static inline int mlxsw_cmd_access_reg(struct mlxsw_core *mlxsw_core,
+				       bool reset_ok,
 				       char *in_mbox, char *out_mbox)
 {
 	return mlxsw_cmd_exec(mlxsw_core, MLXSW_CMD_OPCODE_ACCESS_REG,
-			      0, 0, false, in_mbox, MLXSW_CMD_MBOX_SIZE,
+			      0, 0, false, reset_ok,
+			      in_mbox, MLXSW_CMD_MBOX_SIZE,
 			      out_mbox, MLXSW_CMD_MBOX_SIZE);
 }
 
@@ -794,6 +981,18 @@ static inline int mlxsw_cmd_sw2hw_rdq(struct mlxsw_core *mlxsw_core,
  * Number of the CQ that this Descriptor Queue reports completions to.
  */
 MLXSW_ITEM32(cmd_mbox, sw2hw_dq, cq, 0x00, 24, 8);
+
+enum mlxsw_cmd_mbox_sw2hw_dq_sdq_lp {
+	MLXSW_CMD_MBOX_SW2HW_DQ_SDQ_LP_WQE,
+	MLXSW_CMD_MBOX_SW2HW_DQ_SDQ_LP_IGNORE_WQE,
+};
+
+/* cmd_mbox_sw2hw_dq_sdq_lp
+ * SDQ local Processing
+ * 0: local processing by wqe.lp
+ * 1: local processing (ignoring wqe.lp)
+ */
+MLXSW_ITEM32(cmd_mbox, sw2hw_dq, sdq_lp, 0x00, 23, 1);
 
 /* cmd_mbox_sw2hw_dq_sdq_tclass
  * SDQ: CPU Egress TClass
@@ -927,23 +1126,20 @@ static inline int mlxsw_cmd_sw2hw_cq(struct mlxsw_core *mlxsw_core,
 				 0, cq_number, in_mbox, MLXSW_CMD_MBOX_SIZE);
 }
 
-/* cmd_mbox_sw2hw_cq_cv
+enum mlxsw_cmd_mbox_sw2hw_cq_cqe_ver {
+	MLXSW_CMD_MBOX_SW2HW_CQ_CQE_VER_1,
+	MLXSW_CMD_MBOX_SW2HW_CQ_CQE_VER_2,
+};
+
+/* cmd_mbox_sw2hw_cq_cqe_ver
  * CQE Version.
- * 0 - CQE Version 0, 1 - CQE Version 1
  */
-MLXSW_ITEM32(cmd_mbox, sw2hw_cq, cv, 0x00, 28, 4);
+MLXSW_ITEM32(cmd_mbox, sw2hw_cq, cqe_ver, 0x00, 28, 4);
 
 /* cmd_mbox_sw2hw_cq_c_eqn
  * Event Queue this CQ reports completion events to.
  */
 MLXSW_ITEM32(cmd_mbox, sw2hw_cq, c_eqn, 0x00, 24, 1);
-
-/* cmd_mbox_sw2hw_cq_oi
- * When set, overrun ignore is enabled. When set, updates of
- * CQ consumer counter (poll for completion) or Request completion
- * notifications (Arm CQ) DoorBells should not be rung on that CQ.
- */
-MLXSW_ITEM32(cmd_mbox, sw2hw_cq, oi, 0x00, 12, 1);
 
 /* cmd_mbox_sw2hw_cq_st
  * Event delivery state machine
@@ -1027,12 +1223,7 @@ static inline int mlxsw_cmd_sw2hw_eq(struct mlxsw_core *mlxsw_core,
  */
 MLXSW_ITEM32(cmd_mbox, sw2hw_eq, int_msix, 0x00, 24, 1);
 
-/* cmd_mbox_sw2hw_eq_int_oi
- * When set, overrun ignore is enabled.
- */
-MLXSW_ITEM32(cmd_mbox, sw2hw_eq, oi, 0x00, 12, 1);
-
-/* cmd_mbox_sw2hw_eq_int_st
+/* cmd_mbox_sw2hw_eq_st
  * Event delivery state machine
  * 0x0 - FIRED
  * 0x1 - ARMED (Request for Notification)
@@ -1041,19 +1232,19 @@ MLXSW_ITEM32(cmd_mbox, sw2hw_eq, oi, 0x00, 12, 1);
  */
 MLXSW_ITEM32(cmd_mbox, sw2hw_eq, st, 0x00, 8, 2);
 
-/* cmd_mbox_sw2hw_eq_int_log_eq_size
+/* cmd_mbox_sw2hw_eq_log_eq_size
  * Log (base 2) of the EQ size (in entries).
  */
 MLXSW_ITEM32(cmd_mbox, sw2hw_eq, log_eq_size, 0x00, 0, 4);
 
-/* cmd_mbox_sw2hw_eq_int_producer_counter
+/* cmd_mbox_sw2hw_eq_producer_counter
  * Producer Counter. The counter is incremented for each EQE that is written
  * by the HW to the EQ.
  * Maintained by HW (valid for the QUERY_EQ command only)
  */
 MLXSW_ITEM32(cmd_mbox, sw2hw_eq, producer_counter, 0x04, 0, 16);
 
-/* cmd_mbox_sw2hw_eq_int_pa
+/* cmd_mbox_sw2hw_eq_pa
  * Physical Address.
  */
 MLXSW_ITEM64_INDEXED(cmd_mbox, sw2hw_eq, pa, 0x10, 11, 53, 0x08, 0x00, true);

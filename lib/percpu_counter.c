@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Fast batching percpu counters.
  */
 
 #include <linux/percpu_counter.h>
-#include <linux/notifier.h>
 #include <linux/mutex.h>
 #include <linux/init.h>
 #include <linux/cpu.h>
@@ -17,9 +17,9 @@ static DEFINE_SPINLOCK(percpu_counters_lock);
 
 #ifdef CONFIG_DEBUG_OBJECTS_PERCPU_COUNTER
 
-static struct debug_obj_descr percpu_counter_debug_descr;
+static const struct debug_obj_descr percpu_counter_debug_descr;
 
-static int percpu_counter_fixup_free(void *addr, enum debug_obj_state state)
+static bool percpu_counter_fixup_free(void *addr, enum debug_obj_state state)
 {
 	struct percpu_counter *fbc = addr;
 
@@ -27,13 +27,13 @@ static int percpu_counter_fixup_free(void *addr, enum debug_obj_state state)
 	case ODEBUG_STATE_ACTIVE:
 		percpu_counter_destroy(fbc);
 		debug_object_free(fbc, &percpu_counter_debug_descr);
-		return 1;
+		return true;
 	default:
-		return 0;
+		return false;
 	}
 }
 
-static struct debug_obj_descr percpu_counter_debug_descr = {
+static const struct debug_obj_descr percpu_counter_debug_descr = {
 	.name		= "percpu_counter",
 	.fixup_free	= percpu_counter_fixup_free,
 };
@@ -72,30 +72,58 @@ void percpu_counter_set(struct percpu_counter *fbc, s64 amount)
 }
 EXPORT_SYMBOL(percpu_counter_set);
 
-void __percpu_counter_add(struct percpu_counter *fbc, s64 amount, s32 batch)
+/*
+ * local_irq_save() is needed to make the function irq safe:
+ * - The slow path would be ok as protected by an irq-safe spinlock.
+ * - this_cpu_add would be ok as it is irq-safe by definition.
+ * But:
+ * The decision slow path/fast path and the actual update must be atomic, too.
+ * Otherwise a call in process context could check the current values and
+ * decide that the fast path can be used. If now an interrupt occurs before
+ * the this_cpu_add(), and the interrupt updates this_cpu(*fbc->counters),
+ * then the this_cpu_add() that is executed after the interrupt has completed
+ * can produce values larger than "batch" or even overflows.
+ */
+void percpu_counter_add_batch(struct percpu_counter *fbc, s64 amount, s32 batch)
 {
 	s64 count;
+	unsigned long flags;
 
-	preempt_disable();
+	local_irq_save(flags);
 	count = __this_cpu_read(*fbc->counters) + amount;
-	if (count >= batch || count <= -batch) {
-		unsigned long flags;
-		raw_spin_lock_irqsave(&fbc->lock, flags);
+	if (abs(count) >= batch) {
+		raw_spin_lock(&fbc->lock);
 		fbc->count += count;
 		__this_cpu_sub(*fbc->counters, count - amount);
-		raw_spin_unlock_irqrestore(&fbc->lock, flags);
+		raw_spin_unlock(&fbc->lock);
 	} else {
 		this_cpu_add(*fbc->counters, amount);
 	}
-	preempt_enable();
+	local_irq_restore(flags);
 }
-EXPORT_SYMBOL(__percpu_counter_add);
+EXPORT_SYMBOL(percpu_counter_add_batch);
 
 /*
- * Add up all the per-cpu counts, return the result.  This is a more accurate
- * but much slower version of percpu_counter_read_positive()
+ * For percpu_counter with a big batch, the devication of its count could
+ * be big, and there is requirement to reduce the deviation, like when the
+ * counter's batch could be runtime decreased to get a better accuracy,
+ * which can be achieved by running this sync function on each CPU.
  */
-s64 __percpu_counter_sum(struct percpu_counter *fbc)
+void percpu_counter_sync(struct percpu_counter *fbc)
+{
+	unsigned long flags;
+	s64 count;
+
+	raw_spin_lock_irqsave(&fbc->lock, flags);
+	count = __this_cpu_read(*fbc->counters);
+	fbc->count += count;
+	__this_cpu_sub(*fbc->counters, count);
+	raw_spin_unlock_irqrestore(&fbc->lock, flags);
+}
+EXPORT_SYMBOL(percpu_counter_sync);
+
+static s64 __percpu_counter_sum_mask(struct percpu_counter *fbc,
+			      const struct cpumask *cpu_mask)
 {
 	s64 ret;
 	int cpu;
@@ -103,14 +131,34 @@ s64 __percpu_counter_sum(struct percpu_counter *fbc)
 
 	raw_spin_lock_irqsave(&fbc->lock, flags);
 	ret = fbc->count;
-	for_each_online_cpu(cpu) {
+	for_each_cpu(cpu, cpu_mask) {
 		s32 *pcount = per_cpu_ptr(fbc->counters, cpu);
 		ret += *pcount;
 	}
 	raw_spin_unlock_irqrestore(&fbc->lock, flags);
 	return ret;
 }
+
+/*
+ * Add up all the per-cpu counts, return the result.  This is a more accurate
+ * but much slower version of percpu_counter_read_positive()
+ */
+s64 __percpu_counter_sum(struct percpu_counter *fbc)
+{
+	return __percpu_counter_sum_mask(fbc, cpu_online_mask);
+}
 EXPORT_SYMBOL(__percpu_counter_sum);
+
+/*
+ * This is slower version of percpu_counter_sum as it traverses all possible
+ * cpus. Use this only in the cases where accurate data is needed in the
+ * presense of CPUs getting offlined.
+ */
+s64 percpu_counter_sum_all(struct percpu_counter *fbc)
+{
+	return __percpu_counter_sum_mask(fbc, cpu_possible_mask);
+}
+EXPORT_SYMBOL(percpu_counter_sum_all);
 
 int __percpu_counter_init(struct percpu_counter *fbc, s64 amount, gfp_t gfp,
 			  struct lock_class_key *key)
@@ -158,39 +206,34 @@ EXPORT_SYMBOL(percpu_counter_destroy);
 int percpu_counter_batch __read_mostly = 32;
 EXPORT_SYMBOL(percpu_counter_batch);
 
-static void compute_batch_value(void)
+static int compute_batch_value(unsigned int cpu)
 {
 	int nr = num_online_cpus();
 
 	percpu_counter_batch = max(32, nr*2);
+	return 0;
 }
 
-static int percpu_counter_hotcpu_callback(struct notifier_block *nb,
-					unsigned long action, void *hcpu)
+static int percpu_counter_cpu_dead(unsigned int cpu)
 {
 #ifdef CONFIG_HOTPLUG_CPU
-	unsigned int cpu;
 	struct percpu_counter *fbc;
 
-	compute_batch_value();
-	if (action != CPU_DEAD && action != CPU_DEAD_FROZEN)
-		return NOTIFY_OK;
+	compute_batch_value(cpu);
 
-	cpu = (unsigned long)hcpu;
 	spin_lock_irq(&percpu_counters_lock);
 	list_for_each_entry(fbc, &percpu_counters, list) {
 		s32 *pcount;
-		unsigned long flags;
 
-		raw_spin_lock_irqsave(&fbc->lock, flags);
+		raw_spin_lock(&fbc->lock);
 		pcount = per_cpu_ptr(fbc->counters, cpu);
 		fbc->count += *pcount;
 		*pcount = 0;
-		raw_spin_unlock_irqrestore(&fbc->lock, flags);
+		raw_spin_unlock(&fbc->lock);
 	}
 	spin_unlock_irq(&percpu_counters_lock);
 #endif
-	return NOTIFY_OK;
+	return 0;
 }
 
 /*
@@ -222,8 +265,15 @@ EXPORT_SYMBOL(__percpu_counter_compare);
 
 static int __init percpu_counter_startup(void)
 {
-	compute_batch_value();
-	hotcpu_notifier(percpu_counter_hotcpu_callback, 0);
+	int ret;
+
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "lib/percpu_cnt:online",
+				compute_batch_value, NULL);
+	WARN_ON(ret < 0);
+	ret = cpuhp_setup_state_nocalls(CPUHP_PERCPU_CNT_DEAD,
+					"lib/percpu_cnt:dead", NULL,
+					percpu_counter_cpu_dead);
+	WARN_ON(ret < 0);
 	return 0;
 }
 module_init(percpu_counter_startup);

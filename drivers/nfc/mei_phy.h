@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __LOCAL_MEI_PHY_H_
 #define __LOCAL_MEI_PHY_H_
 
@@ -13,7 +14,7 @@
 /**
  * struct nfc_mei_phy
  *
- * @device: mei device
+ * @cldev: mei client device
  * @hdev:   nfc hci device
 
  * @send_wq: send completion wait queue
@@ -28,7 +29,7 @@
  *    and prevents normal operation.
  */
 struct nfc_mei_phy {
-	struct mei_cl_device *device;
+	struct mei_cl_device *cldev;
 	struct nfc_hci_dev *hdev;
 
 	wait_queue_head_t send_wq;
@@ -44,7 +45,7 @@ struct nfc_mei_phy {
 	int hard_fault;
 };
 
-extern struct nfc_phy_ops mei_phy_ops;
+extern const struct nfc_phy_ops mei_phy_ops;
 
 struct nfc_mei_phy *nfc_mei_phy_alloc(struct mei_cl_device *device);
 void nfc_mei_phy_free(struct nfc_mei_phy *phy);

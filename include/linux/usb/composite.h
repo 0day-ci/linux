@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * composite.h -- framework for usb gadgets which are composite devices
  *
  * Copyright (C) 2006-2008 David Brownell
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #ifndef	__LINUX_USB_COMPOSITE_H
@@ -38,6 +25,7 @@
 #include <linux/version.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/webusb.h>
 #include <linux/log2.h>
 #include <linux/configfs.h>
 
@@ -51,7 +39,10 @@
 #define USB_GADGET_DELAYED_STATUS       0x7fff	/* Impossibly large value */
 
 /* big enough to hold our biggest descriptor */
-#define USB_COMP_EP0_BUFSIZ	1024
+#define USB_COMP_EP0_BUFSIZ	4096
+
+/* OS feature descriptor length <= 4kB */
+#define USB_COMP_EP0_OS_DESC_BUFSIZ	4096
 
 #define USB_MS_TO_HS_INTERVAL(x)	(ilog2((x * 1000 / 125)) + 1)
 struct usb_configuration;
@@ -126,6 +117,10 @@ struct usb_os_desc_table {
  *	string identifiers assigned during @bind(). If this
  *	pointer is null after initiation, the function will not
  *	be available at super speed.
+ * @ssp_descriptors: Table of super speed plus descriptors, using
+ *	interface and string identifiers assigned during @bind(). If
+ *	this pointer is null after initiation, the function will not
+ *	be available at super speed plus.
  * @config: assigned when @usb_add_function() is called; this is the
  *	configuration with which this function is associated.
  * @os_desc_table: Table of (interface id, os descriptors) pairs. The function
@@ -186,6 +181,7 @@ struct usb_function {
 	struct usb_descriptor_header	**fs_descriptors;
 	struct usb_descriptor_header	**hs_descriptors;
 	struct usb_descriptor_header	**ss_descriptors;
+	struct usb_descriptor_header	**ssp_descriptors;
 
 	struct usb_configuration	*config;
 
@@ -215,7 +211,8 @@ struct usb_function {
 	int			(*setup)(struct usb_function *,
 					const struct usb_ctrlrequest *);
 	bool			(*req_match)(struct usb_function *,
-					const struct usb_ctrlrequest *);
+					const struct usb_ctrlrequest *,
+					bool config0);
 	void			(*suspend)(struct usb_function *);
 	void			(*resume)(struct usb_function *);
 
@@ -239,6 +236,9 @@ int usb_function_activate(struct usb_function *);
 
 int usb_interface_id(struct usb_configuration *, struct usb_function *);
 
+int config_ep_by_speed_and_alt(struct usb_gadget *g, struct usb_function *f,
+				struct usb_ep *_ep, u8 alt);
+
 int config_ep_by_speed(struct usb_gadget *g, struct usb_function *f,
 			struct usb_ep *_ep);
 
@@ -258,7 +258,7 @@ int config_ep_by_speed(struct usb_gadget *g, struct usb_function *f,
  * @bConfigurationValue: Copied into configuration descriptor.
  * @iConfiguration: Copied into configuration descriptor.
  * @bmAttributes: Copied into configuration descriptor.
- * @MaxPower: Power consumtion in mA. Used to compute bMaxPower in the
+ * @MaxPower: Power consumption in mA. Used to compute bMaxPower in the
  *	configuration descriptor after considering the bus speed.
  * @cdev: assigned by @usb_add_config() before calling @bind(); this is
  *	the device associated with this configuration.
@@ -317,6 +317,7 @@ struct usb_configuration {
 	unsigned		superspeed:1;
 	unsigned		highspeed:1;
 	unsigned		fullspeed:1;
+	unsigned		superspeed_plus:1;
 	struct usb_function	*interface[MAX_CONFIG_INTERFACES];
 };
 
@@ -423,7 +424,7 @@ static inline struct usb_composite_driver *to_cdriver(
 #define OS_STRING_IDX			0xEE
 
 /**
- * struct usb_composite_device - represents one composite usb gadget
+ * struct usb_composite_dev - represents one composite usb gadget
  * @gadget: read-only, abstracts the gadget's usb peripheral controller
  * @req: used for control responses; buffer is pre-allocated
  * @os_desc_req: used for OS descriptors responses; buffer is pre-allocated
@@ -431,6 +432,10 @@ static inline struct usb_composite_driver *to_cdriver(
  * @qw_sign: qwSignature part of the OS string
  * @b_vendor_code: bMS_VendorCode part of the OS string
  * @use_os_string: false by default, interested gadgets set it
+ * @bcd_webusb_version: 0x0100 by default, WebUSB specification version
+ * @b_webusb_vendor_code: 0x0 by default, vendor code for WebUSB
+ * @landing_page: empty by default, landing page to announce in WebUSB
+ * @use_webusb:: false by default, interested gadgets set it
  * @os_desc_config: the configuration to be used with OS descriptors
  * @setup_pending: true when setup request is queued but not completed
  * @os_desc_pending: true when os_desc request is queued but not completed
@@ -444,6 +449,7 @@ static inline struct usb_composite_driver *to_cdriver(
  * sure doing that won't hurt too much.
  *
  * One notion for how to handle Wireless USB devices involves:
+ *
  * (a) a second gadget here, discovery mechanism TBD, but likely
  *     needing separate "register/unregister WUSB gadget" calls;
  * (b) updates to usb_gadget to include flags "is it wireless",
@@ -473,6 +479,12 @@ struct usb_composite_dev {
 	struct usb_configuration	*os_desc_config;
 	unsigned int			use_os_string:1;
 
+	/* WebUSB */
+	u16				bcd_webusb_version;
+	u8				b_webusb_vendor_code;
+	char				landing_page[WEBUSB_URL_RAW_MAX_LENGTH];
+	unsigned int			use_webusb:1;
+
 	/* private: */
 	/* internals */
 	unsigned int			suspended:1;
@@ -482,6 +494,7 @@ struct usb_composite_dev {
 	struct usb_composite_driver	*driver;
 	u8				next_string_id;
 	char				*def_manufacturer;
+	struct usb_string		*usb_strings;
 
 	/* the gadget driver won't enable the data pullup
 	 * while the deactivation count is nonzero.
@@ -496,8 +509,9 @@ struct usb_composite_dev {
 	/* protects deactivations and delayed_status counts*/
 	spinlock_t			lock;
 
-	unsigned			setup_pending:1;
-	unsigned			os_desc_pending:1;
+	/* public: */
+	unsigned int			setup_pending:1;
+	unsigned int			os_desc_pending:1;
 };
 
 extern int usb_string_id(struct usb_composite_dev *c);
@@ -509,6 +523,8 @@ extern struct usb_string *usb_gstrings_attach(struct usb_composite_dev *cdev,
 extern int usb_string_ids_n(struct usb_composite_dev *c, unsigned n);
 
 extern void composite_disconnect(struct usb_gadget *gadget);
+extern void composite_reset(struct usb_gadget *gadget);
+
 extern int composite_setup(struct usb_gadget *gadget,
 		const struct usb_ctrlrequest *ctrl);
 extern void composite_suspend(struct usb_gadget *gadget);
@@ -557,8 +573,8 @@ static inline u16 get_default_bcdDevice(void)
 {
 	u16 bcdDevice;
 
-	bcdDevice = bin2bcd((LINUX_VERSION_CODE >> 16 & 0xff)) << 8;
-	bcdDevice |= bin2bcd((LINUX_VERSION_CODE >> 8 & 0xff));
+	bcdDevice = bin2bcd(LINUX_VERSION_MAJOR) << 8;
+	bcdDevice |= bin2bcd(LINUX_VERSION_PATCHLEVEL);
 	return bcdDevice;
 }
 

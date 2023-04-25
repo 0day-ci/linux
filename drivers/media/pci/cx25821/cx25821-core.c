@@ -1,24 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Driver for the Conexant CX25821 PCIe bridge
  *
  *  Copyright (C) 2009 Conexant Systems Inc.
  *  Authors  <shu.lin@conexant.com>, <hiep.huynh@conexant.com>
  *  Based on Steven Toth <stoth@linuxtv.org> cx23885 driver
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -351,13 +337,6 @@ static int cx25821_risc_decode(u32 risc)
 	return incr[risc >> 28] ? incr[risc >> 28] : 1;
 }
 
-static inline int i2c_slave_did_ack(struct i2c_adapter *i2c_adap)
-{
-	struct cx25821_i2c *bus = i2c_adap->algo_data;
-	struct cx25821_dev *dev = bus->dev;
-	return cx_read(bus->reg_stat) & 0x01;
-}
-
 static void cx25821_registers_init(struct cx25821_dev *dev)
 {
 	u32 tmp;
@@ -432,7 +411,7 @@ static void cx25821_registers_init(struct cx25821_dev *dev)
 	tmp |= FLD_USE_ALT_PLL_REF;
 	cx_write(CLK_RST, tmp & ~(FLD_VID_I_CLK_NOE | FLD_VID_J_CLK_NOE));
 
-	mdelay(100);
+	msleep(100);
 }
 
 int cx25821_sram_channel_setup(struct cx25821_dev *dev,
@@ -807,7 +786,7 @@ static void cx25821_initialize(struct cx25821_dev *dev)
 	cx_write(CLK_DELAY, cx_read(CLK_DELAY) & 0x80000000);
 	cx_write(PAD_CTRL, 0x12);	/* for I2C */
 	cx25821_registers_init(dev);	/* init Pecos registers */
-	mdelay(100);
+	msleep(100);
 
 	for (i = 0; i < VID_CHANNEL_NUM; i++) {
 		cx25821_set_vip_mode(dev, dev->channels[i].sram_channels);
@@ -871,6 +850,10 @@ static int cx25821_dev_setup(struct cx25821_dev *dev)
 	dev->nr = ++cx25821_devcount;
 	sprintf(dev->name, "cx25821[%d]", dev->nr);
 
+	if (dev->nr >= ARRAY_SIZE(card)) {
+		CX25821_INFO("dev->nr >= %zd", ARRAY_SIZE(card));
+		return -ENODEV;
+	}
 	if (dev->pci->device != 0x8210) {
 		pr_info("%s(): Exiting. Incorrect Hardware device = 0x%02x\n",
 			__func__, dev->pci->device);
@@ -885,9 +868,6 @@ static int cx25821_dev_setup(struct cx25821_dev *dev)
 		dev->channels[i].id = i;
 		dev->channels[i].sram_channels = &cx25821_sram_channels[i];
 	}
-
-	if (dev->nr > 1)
-		CX25821_INFO("dev->nr > 1!");
 
 	/* board config */
 	dev->board = 1;		/* card[dev->nr]; */
@@ -989,10 +969,12 @@ int cx25821_riscmem_alloc(struct pci_dev *pci,
 	__le32 *cpu;
 	dma_addr_t dma = 0;
 
-	if (NULL != risc->cpu && risc->size < size)
-		pci_free_consistent(pci, risc->size, risc->cpu, risc->dma);
+	if (risc->cpu && risc->size < size) {
+		dma_free_coherent(&pci->dev, risc->size, risc->cpu, risc->dma);
+		risc->cpu = NULL;
+	}
 	if (NULL == risc->cpu) {
-		cpu = pci_zalloc_consistent(pci, size, &dma);
+		cpu = dma_alloc_coherent(&pci->dev, size, &dma, GFP_KERNEL);
 		if (NULL == cpu)
 			return -ENOMEM;
 		risc->cpu  = cpu;
@@ -1211,11 +1193,10 @@ EXPORT_SYMBOL(cx25821_risc_databuffer_audio);
 
 void cx25821_free_buffer(struct cx25821_dev *dev, struct cx25821_buffer *buf)
 {
-	BUG_ON(in_interrupt());
 	if (WARN_ON(buf->risc.size == 0))
 		return;
-	pci_free_consistent(dev->pci,
-			buf->risc.size, buf->risc.cpu, buf->risc.dma);
+	dma_free_coherent(&dev->pci->dev, buf->risc.size, buf->risc.cpu,
+			  buf->risc.dma);
 	memset(&buf->risc, 0, sizeof(buf->risc));
 }
 
@@ -1301,15 +1282,10 @@ static int cx25821_initdev(struct pci_dev *pci_dev,
 
 		goto fail_unregister_device;
 	}
-	dev->alloc_ctx = vb2_dma_sg_init_ctx(&pci_dev->dev);
-	if (IS_ERR(dev->alloc_ctx)) {
-		err = PTR_ERR(dev->alloc_ctx);
-		goto fail_unregister_pci;
-	}
 
 	err = cx25821_dev_setup(dev);
 	if (err)
-		goto fail_free_ctx;
+		goto fail_unregister_pci;
 
 	/* print pci info */
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &dev->pci_rev);
@@ -1319,7 +1295,8 @@ static int cx25821_initdev(struct pci_dev *pci_dev,
 		dev->pci_lat, (unsigned long long)dev->base_io_addr);
 
 	pci_set_master(pci_dev);
-	if (!pci_dma_supported(pci_dev, 0xffffffff)) {
+	err = dma_set_mask(&pci_dev->dev, 0xffffffff);
+	if (err) {
 		pr_err("%s/0: Oops: no 32bit PCI DMA ???\n", dev->name);
 		err = -EIO;
 		goto fail_irq;
@@ -1339,8 +1316,6 @@ fail_irq:
 	pr_info("cx25821_initdev() can't get IRQ !\n");
 	cx25821_dev_unregister(dev);
 
-fail_free_ctx:
-	vb2_dma_sg_cleanup_ctx(dev->alloc_ctx);
 fail_unregister_pci:
 	pci_disable_device(pci_dev);
 fail_unregister_device:
@@ -1357,14 +1332,13 @@ static void cx25821_finidev(struct pci_dev *pci_dev)
 	struct cx25821_dev *dev = get_cx25821(v4l2_dev);
 
 	cx25821_shutdown(dev);
-	pci_disable_device(pci_dev);
 
 	/* unregister stuff */
 	if (pci_dev->irq)
 		free_irq(pci_dev->irq, dev);
+	pci_disable_device(pci_dev);
 
 	cx25821_dev_unregister(dev);
-	vb2_dma_sg_cleanup_ctx(dev->alloc_ctx);
 	v4l2_device_unregister(v4l2_dev);
 	kfree(dev);
 }
@@ -1394,17 +1368,11 @@ static struct pci_driver cx25821_pci_driver = {
 	.id_table = cx25821_pci_tbl,
 	.probe = cx25821_initdev,
 	.remove = cx25821_finidev,
-	/* TODO */
-	.suspend = NULL,
-	.resume = NULL,
 };
 
 static int __init cx25821_init(void)
 {
-	pr_info("driver version %d.%d.%d loaded\n",
-		(CX25821_VERSION_CODE >> 16) & 0xff,
-		(CX25821_VERSION_CODE >> 8) & 0xff,
-		CX25821_VERSION_CODE & 0xff);
+	pr_info("driver loaded\n");
 	return pci_register_driver(&cx25821_pci_driver);
 }
 

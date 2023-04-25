@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * MCS lock defines
  *
@@ -6,7 +7,7 @@
  * The MCS lock (proposed by Mellor-Crummey and Scott) is a simple spin-lock
  * with the desirable properties of being fair, and with each cpu trying
  * to acquire the lock spinning on a local variable.
- * It avoids expensive cache bouncings that common test-and-set spin-lock
+ * It avoids expensive cache bounces that common test-and-set spin-lock
  * implementations incur.
  */
 #ifndef __LINUX_MCS_SPINLOCK_H
@@ -22,13 +23,15 @@ struct mcs_spinlock {
 
 #ifndef arch_mcs_spin_lock_contended
 /*
- * Using smp_load_acquire() provides a memory barrier that ensures
- * subsequent operations happen after the lock is acquired.
+ * Using smp_cond_load_acquire() provides the acquire semantics
+ * required so that subsequent operations happen after the
+ * lock is acquired. Additionally, some architectures such as
+ * ARM64 would like to do spin-waiting instead of purely
+ * spinning, and smp_cond_load_acquire() provides that behavior.
  */
 #define arch_mcs_spin_lock_contended(l)					\
 do {									\
-	while (!(smp_load_acquire(l)))					\
-		cpu_relax_lowlatency();					\
+	smp_cond_load_acquire(l, VAL);					\
 } while (0)
 #endif
 
@@ -67,6 +70,12 @@ void mcs_spin_lock(struct mcs_spinlock **lock, struct mcs_spinlock *node)
 	node->locked = 0;
 	node->next   = NULL;
 
+	/*
+	 * We rely on the full barrier with global transitivity implied by the
+	 * below xchg() to order the initialization stores above against any
+	 * observation of @node. And to provide the ACQUIRE ordering associated
+	 * with a LOCK primitive.
+	 */
 	prev = xchg(lock, node);
 	if (likely(prev == NULL)) {
 		/*
@@ -98,11 +107,11 @@ void mcs_spin_unlock(struct mcs_spinlock **lock, struct mcs_spinlock *node)
 		/*
 		 * Release the lock by setting it to NULL
 		 */
-		if (likely(cmpxchg(lock, node, NULL) == node))
+		if (likely(cmpxchg_release(lock, node, NULL) == node))
 			return;
 		/* Wait until the next pointer is set */
 		while (!(next = READ_ONCE(node->next)))
-			cpu_relax_lowlatency();
+			cpu_relax();
 	}
 
 	/* Pass lock to next waiter. */

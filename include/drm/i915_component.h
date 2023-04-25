@@ -24,27 +24,32 @@
 #ifndef _I915_COMPONENT_H_
 #define _I915_COMPONENT_H_
 
+#include "drm_audio_component.h"
+
+enum i915_component_type {
+	I915_COMPONENT_AUDIO = 1,
+	I915_COMPONENT_HDCP,
+	I915_COMPONENT_PXP
+};
+
+/* MAX_PORT is the number of port
+ * It must be sync with I915_MAX_PORTS defined i915_drv.h
+ */
+#define MAX_PORTS 9
+
+/**
+ * struct i915_audio_component - Used for direct communication between i915 and hda drivers
+ */
 struct i915_audio_component {
-	struct device *dev;
+	/**
+	 * @base: the drm_audio_component base class
+	 */
+	struct drm_audio_component	base;
 
-	const struct i915_audio_component_ops {
-		struct module *owner;
-		void (*get_power)(struct device *);
-		void (*put_power)(struct device *);
-		void (*codec_wake_override)(struct device *, bool enable);
-		int (*get_cdclk_freq)(struct device *);
-	} *ops;
-
-	const struct i915_audio_component_audio_ops {
-		void *audio_ptr;
-		/**
-		 * Call from i915 driver, notifying the HDA driver that
-		 * pin sense and/or ELD information has changed.
-		 * @audio_ptr:		HDA driver object
-		 * @port:		Which port has changed (PORTA / PORTB / PORTC etc)
-		 */
-		void (*pin_eld_notify)(void *audio_ptr, int port);
-	} *audio_ops;
+	/**
+	 * @aud_sample_rate: the array of audio sample rate per port
+	 */
+	int aud_sample_rate[MAX_PORTS];
 };
 
 #endif /* _I915_COMPONENT_H_ */

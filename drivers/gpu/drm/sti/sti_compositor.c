@@ -1,17 +1,21 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) STMicroelectronics SA 2014
  * Authors: Benjamin Gaignard <benjamin.gaignard@st.com>
  *          Fabien Dessenne <fabien.dessenne@st.com>
  *          for STMicroelectronics.
- * License terms:  GNU General Public License (GPL), version 2
  */
 
 #include <linux/component.h>
+#include <linux/io.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 
-#include <drm/drmP.h>
+#include <drm/drm_device.h>
+#include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
 
 #include "sti_compositor.h"
 #include "sti_crtc.h"
@@ -25,7 +29,7 @@
 /*
  * stiH407 compositor properties
  */
-struct sti_compositor_data stih407_compositor_data = {
+static const struct sti_compositor_data stih407_compositor_data = {
 	.nb_subdev = 8,
 	.subdev_desc = {
 			{STI_CURSOR_SUBDEV, (int)STI_CURSOR, 0x000},
@@ -39,21 +43,19 @@ struct sti_compositor_data stih407_compositor_data = {
 	},
 };
 
-/*
- * stiH416 compositor properties
- * Note:
- * on stih416 MIXER_AUX has a different base address from MIXER_MAIN
- * Moreover, GDPx is different for Main and Aux Mixer. So this subdev map does
- * not fit for stiH416 if we want to enable the MIXER_AUX.
- */
-struct sti_compositor_data stih416_compositor_data = {
-	.nb_subdev = 3,
-	.subdev_desc = {
-			{STI_GPD_SUBDEV, (int)STI_GDP_0, 0x100},
-			{STI_GPD_SUBDEV, (int)STI_GDP_1, 0x200},
-			{STI_MIXER_MAIN_SUBDEV, STI_MIXER_MAIN, 0xC00}
-	},
-};
+void sti_compositor_debugfs_init(struct sti_compositor *compo,
+				 struct drm_minor *minor)
+{
+	unsigned int i;
+
+	for (i = 0; i < STI_MAX_VID; i++)
+		if (compo->vid[i])
+			vid_debugfs_init(compo->vid[i], minor);
+
+	for (i = 0; i < STI_MAX_MIXER; i++)
+		if (compo->mixer[i])
+			sti_mixer_debugfs_init(compo->mixer[i], minor);
+}
 
 static int sti_compositor_bind(struct device *dev,
 			       struct device *master,
@@ -75,13 +77,13 @@ static int sti_compositor_bind(struct device *dev,
 		switch (desc[i].type) {
 		case STI_VID_SUBDEV:
 			compo->vid[vid_id++] =
-			    sti_vid_create(compo->dev, desc[i].id,
+			    sti_vid_create(compo->dev, drm_dev, desc[i].id,
 					   compo->regs + desc[i].offset);
 			break;
 		case STI_MIXER_MAIN_SUBDEV:
 		case STI_MIXER_AUX_SUBDEV:
 			compo->mixer[mixer_id++] =
-			    sti_mixer_create(compo->dev, desc[i].id,
+			    sti_mixer_create(compo->dev, drm_dev, desc[i].id,
 					     compo->regs + desc[i].offset);
 			break;
 		case STI_GPD_SUBDEV:
@@ -89,7 +91,7 @@ static int sti_compositor_bind(struct device *dev,
 			/* Nothing to do, wait for the second round */
 			break;
 		default:
-			DRM_ERROR("Unknow subdev compoment type\n");
+			DRM_ERROR("Unknown subdev component type\n");
 			return 1;
 		}
 	}
@@ -129,7 +131,7 @@ static int sti_compositor_bind(struct device *dev,
 			}
 			break;
 		default:
-			DRM_ERROR("Unknown subdev compoment type\n");
+			DRM_ERROR("Unknown subdev component type\n");
 			return 1;
 		}
 
@@ -144,8 +146,6 @@ static int sti_compositor_bind(struct device *dev,
 	}
 
 	drm_vblank_init(drm_dev, crtc_id);
-	/* Allow usage of vblank without having to call drm_irq_install */
-	drm_dev->irq_enabled = 1;
 
 	return 0;
 }
@@ -163,9 +163,6 @@ static const struct component_ops sti_compositor_ops = {
 
 static const struct of_device_id compositor_of_match[] = {
 	{
-		.compatible = "st,stih416-compositor",
-		.data = &stih416_compositor_data,
-	}, {
 		.compatible = "st,stih407-compositor",
 		.data = &stih407_compositor_data,
 	}, {
@@ -181,6 +178,7 @@ static int sti_compositor_probe(struct platform_device *pdev)
 	struct device_node *vtg_np;
 	struct sti_compositor *compo;
 	struct resource *res;
+	unsigned int i;
 
 	compo = devm_kzalloc(dev, sizeof(*compo), GFP_KERNEL);
 	if (!compo) {
@@ -188,7 +186,8 @@ static int sti_compositor_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	compo->dev = dev;
-	compo->vtg_vblank_nb.notifier_call = sti_crtc_vblank_cb;
+	for (i = 0; i < STI_MAX_MIXER; i++)
+		compo->vtg_vblank_nb[i].notifier_call = sti_crtc_vblank_cb;
 
 	/* populate data structure depending on compatibility */
 	BUG_ON(!of_match_node(compositor_of_match, np)->data);
@@ -234,23 +233,25 @@ static int sti_compositor_probe(struct platform_device *pdev)
 	}
 
 	/* Get reset resources */
-	compo->rst_main = devm_reset_control_get(dev, "compo-main");
+	compo->rst_main = devm_reset_control_get_shared(dev, "compo-main");
 	/* Take compo main out of reset */
 	if (!IS_ERR(compo->rst_main))
 		reset_control_deassert(compo->rst_main);
 
-	compo->rst_aux = devm_reset_control_get(dev, "compo-aux");
+	compo->rst_aux = devm_reset_control_get_shared(dev, "compo-aux");
 	/* Take compo aux out of reset */
 	if (!IS_ERR(compo->rst_aux))
 		reset_control_deassert(compo->rst_aux);
 
 	vtg_np = of_parse_phandle(pdev->dev.of_node, "st,vtg", 0);
 	if (vtg_np)
-		compo->vtg_main = of_vtg_find(vtg_np);
+		compo->vtg[STI_MIXER_MAIN] = of_vtg_find(vtg_np);
+	of_node_put(vtg_np);
 
 	vtg_np = of_parse_phandle(pdev->dev.of_node, "st,vtg", 1);
 	if (vtg_np)
-		compo->vtg_aux = of_vtg_find(vtg_np);
+		compo->vtg[STI_MIXER_AUX] = of_vtg_find(vtg_np);
+	of_node_put(vtg_np);
 
 	platform_set_drvdata(pdev, compo);
 
@@ -263,7 +264,7 @@ static int sti_compositor_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_driver sti_compositor_driver = {
+struct platform_driver sti_compositor_driver = {
 	.driver = {
 		.name = "sti-compositor",
 		.of_match_table = compositor_of_match,
@@ -271,8 +272,6 @@ static struct platform_driver sti_compositor_driver = {
 	.probe = sti_compositor_probe,
 	.remove = sti_compositor_remove,
 };
-
-module_platform_driver(sti_compositor_driver);
 
 MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
 MODULE_DESCRIPTION("STMicroelectronics SoC DRM driver");

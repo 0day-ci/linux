@@ -1,35 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * rl6347a.c - RL6347A class device shared support
  *
  * Copyright 2015 Realtek Semiconductor Corp.
  *
  * Author: Oder Chiou <oder_chiou@realtek.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/init.h>
-#include <linux/delay.h>
-#include <linux/pm.h>
 #include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/spi/spi.h>
-#include <linux/dmi.h>
-#include <linux/acpi.h>
-#include <sound/core.h>
-#include <sound/pcm.h>
-#include <sound/pcm_params.h>
-#include <sound/soc.h>
-#include <sound/soc-dapm.h>
-#include <sound/initval.h>
-#include <sound/tlv.h>
-#include <sound/jack.h>
-#include <linux/workqueue.h>
-#include <sound/hda_verbs.h>
+#include <linux/regmap.h>
 
 #include "rl6347a.h"
 
@@ -68,7 +48,7 @@ int rl6347a_hw_write(void *context, unsigned int reg, unsigned int value)
 	if (ret == 4)
 		return 0;
 	else
-		pr_err("ret=%d\n", ret);
+		dev_err(&client->dev, "I2C error %d\n", ret);
 	if (ret < 0)
 		return ret;
 	else
@@ -81,8 +61,8 @@ int rl6347a_hw_read(void *context, unsigned int reg, unsigned int *value)
 	struct i2c_client *client = context;
 	struct i2c_msg xfer[2];
 	int ret;
-	__be32 be_reg;
-	unsigned int index, vid, buf = 0x0;
+	__be32 be_reg, buf = 0x0;
+	unsigned int index, vid;
 
 	/* handle index registers */
 	if (reg <= 0xff) {

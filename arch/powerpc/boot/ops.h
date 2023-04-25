@@ -1,12 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Global definition of all the bootwrapper operations.
  *
  * Author: Mark A. Greer <mgreer@mvista.com>
  *
- * 2006 (c) MontaVista Software, Inc.  This file is licensed under
- * the terms of the GNU General Public License version 2.  This program
- * is licensed "as is" without any warranty of any kind, whether express
- * or implied.
+ * 2006 (c) MontaVista Software, Inc.
  */
 #ifndef _PPC_BOOT_OPS_H_
 #define _PPC_BOOT_OPS_H_
@@ -30,6 +28,7 @@ struct platform_ops {
 	void *	(*realloc)(void *ptr, unsigned long size);
 	void	(*exit)(void);
 	void *	(*vmlinux_alloc)(unsigned long size);
+	void  	(*kentry)(unsigned long fdt_addr, void *vmlinux_addr);
 };
 extern struct platform_ops platform_ops;
 
@@ -85,10 +84,9 @@ void start(void);
 void fdt_init(void *blob);
 int serial_console_init(void);
 int ns16550_console_init(void *devp, struct serial_console_data *scdp);
-int mpsc_console_init(void *devp, struct serial_console_data *scdp);
 int cpm_console_init(void *devp, struct serial_console_data *scdp);
 int mpc5200_psc_console_init(void *devp, struct serial_console_data *scdp);
-int uartlite_console_init(void *devp, struct serial_console_data *scdp);
+int opal_console_init(void *devp, struct serial_console_data *scdp);
 void *simple_alloc_init(char *base, unsigned long heap_size,
 			unsigned long granularity, unsigned long max_allocs);
 extern void flush_cache(void *, unsigned long);
@@ -200,12 +198,6 @@ void __dt_fixup_mac_addresses(u32 startindex, ...);
 	__dt_fixup_mac_addresses(0, __VA_ARGS__, NULL)
 
 
-static inline void *find_node_by_linuxphandle(const u32 linuxphandle)
-{
-	return find_node_by_prop_value(NULL, "linux,phandle",
-			(char *)&linuxphandle, sizeof(u32));
-}
-
 static inline char *get_path(const void *phandle, char *buf, int len)
 {
 	if (dt_ops.get_path)
@@ -250,6 +242,8 @@ extern char _initrd_start[];
 extern char _initrd_end[];
 extern char _dtb_start[];
 extern char _dtb_end[];
+extern char _esm_blob_start[];
+extern char _esm_blob_end[];
 
 static inline __attribute__((const))
 int __ilog2_u32(u32 n)
@@ -258,5 +252,8 @@ int __ilog2_u32(u32 n)
 	asm ("cntlzw %0,%1" : "=r" (bit) : "r" (n));
 	return 31 - bit;
 }
+
+long partial_decompress(void *inbuf, unsigned long input_size, void *outbuf,
+	unsigned long output_size, unsigned long skip);
 
 #endif /* _PPC_BOOT_OPS_H_ */

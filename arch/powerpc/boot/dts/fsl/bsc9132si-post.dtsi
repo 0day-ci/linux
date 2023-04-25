@@ -40,6 +40,34 @@
 	interrupts = <16 2 0 0 20 2 0 0>;
 };
 
+/* controller at 0xa000 */
+&pci0 {
+	compatible = "fsl,bsc9132-pcie", "fsl,qoriq-pcie-v2.2";
+	device_type = "pci";
+	#size-cells = <2>;
+	#address-cells = <3>;
+	bus-range = <0 255>;
+	interrupts = <16 2 0 0>;
+
+	pcie@0 {
+		reg = <0 0 0 0 0>;
+		#interrupt-cells = <1>;
+		#size-cells = <2>;
+		#address-cells = <3>;
+		device_type = "pci";
+		interrupts = <16 2 0 0>;
+		interrupt-map-mask = <0xf800 0 0 7>;
+
+		interrupt-map = <
+			/* IDSEL 0x0 */
+			0000 0x0 0x0 0x1 &mpic 0x0 0x2 0x0 0x0
+			0000 0x0 0x0 0x2 &mpic 0x1 0x2 0x0 0x0
+			0000 0x0 0x0 0x3 &mpic 0x2 0x2 0x0 0x0
+			0000 0x0 0x0 0x4 &mpic 0x3 0x2 0x0 0x0
+			>;
+	};
+};
+
 &soc {
 	#address-cells = <1>;
 	#size-cells = <1>;
@@ -162,8 +190,6 @@ crypto@30000 {
 /include/ "pq3-etsec2-0.dtsi"
 enet0: ethernet@b0000 {
 	queue-group@b0000 {
-		fsl,rx-bit-map = <0xff>;
-		fsl,tx-bit-map = <0xff>;
 		interrupts = <26 2 0 0 27 2 0 0 28 2 0 0>;
 	};
 };
@@ -171,8 +197,6 @@ enet0: ethernet@b0000 {
 /include/ "pq3-etsec2-1.dtsi"
 enet1: ethernet@b1000 {
 	queue-group@b1000 {
-		fsl,rx-bit-map = <0xff>;
-		fsl,tx-bit-map = <0xff>;
 		interrupts = <33 2 0 0 34 2 0 0 35 2 0 0>;
 	};
 };

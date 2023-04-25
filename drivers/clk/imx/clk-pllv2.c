@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 #include <linux/kernel.h>
 #include <linux/clk.h>
 #include <linux/io.h>
@@ -77,9 +78,9 @@ struct clk_pllv2 {
 static unsigned long __clk_pllv2_recalc_rate(unsigned long parent_rate,
 		u32 dp_ctl, u32 dp_op, u32 dp_mfd, u32 dp_mfn)
 {
-	long mfi, mfn, mfd, pdf, ref_clk, mfn_abs;
+	long mfi, mfn, mfd, pdf, ref_clk;
 	unsigned long dbl;
-	s64 temp;
+	u64 temp;
 
 	dbl = dp_ctl & MXC_PLL_DP_CTL_DPDCK0_2_EN;
 
@@ -87,23 +88,20 @@ static unsigned long __clk_pllv2_recalc_rate(unsigned long parent_rate,
 	mfi = (dp_op & MXC_PLL_DP_OP_MFI_MASK) >> MXC_PLL_DP_OP_MFI_OFFSET;
 	mfi = (mfi <= 5) ? 5 : mfi;
 	mfd = dp_mfd & MXC_PLL_DP_MFD_MASK;
-	mfn = mfn_abs = dp_mfn & MXC_PLL_DP_MFN_MASK;
-	/* Sign extend to 32-bits */
-	if (mfn >= 0x04000000) {
-		mfn |= 0xFC000000;
-		mfn_abs = -mfn;
-	}
+	mfn = dp_mfn & MXC_PLL_DP_MFN_MASK;
+	mfn = sign_extend32(mfn, 26);
 
 	ref_clk = 2 * parent_rate;
 	if (dbl != 0)
 		ref_clk *= 2;
 
 	ref_clk /= (pdf + 1);
-	temp = (u64) ref_clk * mfn_abs;
+	temp = (u64) ref_clk * abs(mfn);
 	do_div(temp, mfd + 1);
 	if (mfn < 0)
-		temp = -temp;
-	temp = (ref_clk * mfi) + temp;
+		temp = (ref_clk * mfi) - temp;
+	else
+		temp = (ref_clk * mfi) + temp;
 
 	return temp;
 }
@@ -130,7 +128,7 @@ static int __clk_pllv2_set_rate(unsigned long rate, unsigned long parent_rate,
 {
 	u32 reg;
 	long mfi, pdf, mfn, mfd = 999999;
-	s64 temp64;
+	u64 temp64;
 	unsigned long quad_parent_rate;
 
 	quad_parent_rate = 4 * parent_rate;
@@ -184,8 +182,12 @@ static long clk_pllv2_round_rate(struct clk_hw *hw, unsigned long rate,
 		unsigned long *prate)
 {
 	u32 dp_op, dp_mfd, dp_mfn;
+	int ret;
 
-	__clk_pllv2_set_rate(rate, *prate, &dp_op, &dp_mfd, &dp_mfn);
+	ret = __clk_pllv2_set_rate(rate, *prate, &dp_op, &dp_mfd, &dp_mfn);
+	if (ret)
+		return ret;
+
 	return __clk_pllv2_recalc_rate(*prate, MXC_PLL_DP_CTL_DPDCK0_2_EN,
 			dp_op, dp_mfd, dp_mfn);
 }
@@ -229,7 +231,7 @@ static void clk_pllv2_unprepare(struct clk_hw *hw)
 	__raw_writel(reg, pllbase + MXC_PLL_DP_CTL);
 }
 
-static struct clk_ops clk_pllv2_ops = {
+static const struct clk_ops clk_pllv2_ops = {
 	.prepare = clk_pllv2_prepare,
 	.unprepare = clk_pllv2_unprepare,
 	.recalc_rate = clk_pllv2_recalc_rate,
@@ -237,12 +239,13 @@ static struct clk_ops clk_pllv2_ops = {
 	.set_rate = clk_pllv2_set_rate,
 };
 
-struct clk *imx_clk_pllv2(const char *name, const char *parent,
+struct clk_hw *imx_clk_hw_pllv2(const char *name, const char *parent,
 		void __iomem *base)
 {
 	struct clk_pllv2 *pll;
-	struct clk *clk;
+	struct clk_hw *hw;
 	struct clk_init_data init;
+	int ret;
 
 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
 	if (!pll)
@@ -257,10 +260,13 @@ struct clk *imx_clk_pllv2(const char *name, const char *parent,
 	init.num_parents = 1;
 
 	pll->hw.init = &init;
+	hw = &pll->hw;
 
-	clk = clk_register(NULL, &pll->hw);
-	if (IS_ERR(clk))
+	ret = clk_hw_register(NULL, hw);
+	if (ret) {
 		kfree(pll);
+		return ERR_PTR(ret);
+	}
 
-	return clk;
+	return hw;
 }

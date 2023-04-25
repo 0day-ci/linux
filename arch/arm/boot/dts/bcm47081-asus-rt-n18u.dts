@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 /*
  * Broadcom BCM470X / BCM5301X ARM platform code.
  * DTS for Asus RT-N18U
  *
  * Copyright (C) 2014 Rafał Miłecki <zajec5@gmail.com>
- *
- * Licensed under the GNU/GPL. See COPYING for details.
  */
 
 /dts-v1/;
@@ -20,59 +19,61 @@
 		bootargs = "console=ttyS0,115200";
 	};
 
-	memory {
-		reg = <0x00000000 0x08000000>;
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x08000000>,
+		      <0x88000000 0x08000000>;
 	};
 
 	leds {
 		compatible = "gpio-leds";
 
-		power {
+		led-power {
 			label = "bcm53xx:blue:power";
 			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
 			linux,default-trigger = "default-on";
 		};
 
-		usb2 {
+		led-usb2 {
 			label = "bcm53xx:blue:usb2";
 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-off";
 		};
 
-		wan {
+		led-wan {
 			label = "bcm53xx:blue:wan";
 			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
 			linux,default-trigger = "default-on";
 		};
 
-		lan {
+		led-lan {
 			label = "bcm53xx:blue:lan";
 			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
 			linux,default-trigger = "default-on";
 		};
 
-		usb3 {
+		led-usb3 {
 			label = "bcm53xx:blue:usb3";
 			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-off";
 		};
 	};
 
 	gpio-keys {
 		compatible = "gpio-keys";
-		#address-cells = <1>;
-		#size-cells = <0>;
 
-		restart {
+		button-restart {
 			label = "Reset";
 			linux,code = <KEY_RESTART>;
 			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
 		};
 
-		wps {
+		button-wps {
 			label = "WPS";
 			linux,code = <KEY_WPS_BUTTON>;
 			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
 		};
 	};
+};
+
+&usb3_phy {
+	status = "okay";
 };

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Cryptographic API.
  *
@@ -11,76 +12,70 @@
  * Copyright (c) Jean-Francois Dive <jef@linuxbe.org>
  * Copyright (c) Mathias Krause <minipli@googlemail.com>
  * Copyright (c) Chandramouli Narayanan <mouli@linux.intel.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
- *
  */
 
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
 #include <crypto/internal/hash.h>
+#include <crypto/internal/simd.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/mm.h>
-#include <linux/cryptohash.h>
 #include <linux/types.h>
-#include <crypto/sha.h>
+#include <crypto/sha1.h>
 #include <crypto/sha1_base.h>
-#include <asm/fpu/api.h>
+#include <asm/simd.h>
 
-
-asmlinkage void sha1_transform_ssse3(u32 *digest, const char *data,
-				     unsigned int rounds);
-#ifdef CONFIG_AS_AVX
-asmlinkage void sha1_transform_avx(u32 *digest, const char *data,
-				   unsigned int rounds);
-#endif
-#ifdef CONFIG_AS_AVX2
-#define SHA1_AVX2_BLOCK_OPTSIZE	4	/* optimal 4*64 bytes of SHA1 blocks */
-
-asmlinkage void sha1_transform_avx2(u32 *digest, const char *data,
-				    unsigned int rounds);
-#endif
-
-static void (*sha1_transform_asm)(u32 *, const char *, unsigned int);
-
-static int sha1_ssse3_update(struct shash_desc *desc, const u8 *data,
-			     unsigned int len)
+static int sha1_update(struct shash_desc *desc, const u8 *data,
+			     unsigned int len, sha1_block_fn *sha1_xform)
 {
 	struct sha1_state *sctx = shash_desc_ctx(desc);
 
-	if (!irq_fpu_usable() ||
+	if (!crypto_simd_usable() ||
 	    (sctx->count % SHA1_BLOCK_SIZE) + len < SHA1_BLOCK_SIZE)
 		return crypto_sha1_update(desc, data, len);
 
-	/* make sure casting to sha1_block_fn() is safe */
+	/*
+	 * Make sure struct sha1_state begins directly with the SHA1
+	 * 160-bit internal state, as this is what the asm functions expect.
+	 */
 	BUILD_BUG_ON(offsetof(struct sha1_state, state) != 0);
 
 	kernel_fpu_begin();
-	sha1_base_do_update(desc, data, len,
-			    (sha1_block_fn *)sha1_transform_asm);
+	sha1_base_do_update(desc, data, len, sha1_xform);
 	kernel_fpu_end();
 
 	return 0;
 }
 
-static int sha1_ssse3_finup(struct shash_desc *desc, const u8 *data,
-			      unsigned int len, u8 *out)
+static int sha1_finup(struct shash_desc *desc, const u8 *data,
+		      unsigned int len, u8 *out, sha1_block_fn *sha1_xform)
 {
-	if (!irq_fpu_usable())
+	if (!crypto_simd_usable())
 		return crypto_sha1_finup(desc, data, len, out);
 
 	kernel_fpu_begin();
 	if (len)
-		sha1_base_do_update(desc, data, len,
-				    (sha1_block_fn *)sha1_transform_asm);
-	sha1_base_do_finalize(desc, (sha1_block_fn *)sha1_transform_asm);
+		sha1_base_do_update(desc, data, len, sha1_xform);
+	sha1_base_do_finalize(desc, sha1_xform);
 	kernel_fpu_end();
 
 	return sha1_base_finish(desc, out);
+}
+
+asmlinkage void sha1_transform_ssse3(struct sha1_state *state,
+				     const u8 *data, int blocks);
+
+static int sha1_ssse3_update(struct shash_desc *desc, const u8 *data,
+			     unsigned int len)
+{
+	return sha1_update(desc, data, len, sha1_transform_ssse3);
+}
+
+static int sha1_ssse3_finup(struct shash_desc *desc, const u8 *data,
+			      unsigned int len, u8 *out)
+{
+	return sha1_finup(desc, data, len, out, sha1_transform_ssse3);
 }
 
 /* Add padding and return the message digest. */
@@ -89,19 +84,7 @@ static int sha1_ssse3_final(struct shash_desc *desc, u8 *out)
 	return sha1_ssse3_finup(desc, NULL, 0, out);
 }
 
-#ifdef CONFIG_AS_AVX2
-static void sha1_apply_transform_avx2(u32 *digest, const char *data,
-				unsigned int rounds)
-{
-	/* Select the optimal transform based on data block size */
-	if (rounds >= SHA1_AVX2_BLOCK_OPTSIZE)
-		sha1_transform_avx2(digest, data, rounds);
-	else
-		sha1_transform_avx(digest, data, rounds);
-}
-#endif
-
-static struct shash_alg alg = {
+static struct shash_alg sha1_ssse3_alg = {
 	.digestsize	=	SHA1_DIGEST_SIZE,
 	.init		=	sha1_base_init,
 	.update		=	sha1_ssse3_update,
@@ -110,19 +93,66 @@ static struct shash_alg alg = {
 	.descsize	=	sizeof(struct sha1_state),
 	.base		=	{
 		.cra_name	=	"sha1",
-		.cra_driver_name=	"sha1-ssse3",
+		.cra_driver_name =	"sha1-ssse3",
 		.cra_priority	=	150,
-		.cra_flags	=	CRYPTO_ALG_TYPE_SHASH,
 		.cra_blocksize	=	SHA1_BLOCK_SIZE,
 		.cra_module	=	THIS_MODULE,
 	}
 };
 
-#ifdef CONFIG_AS_AVX
-static bool __init avx_usable(void)
+static int register_sha1_ssse3(void)
 {
-	if (!cpu_has_xfeatures(XSTATE_SSE | XSTATE_YMM, NULL)) {
-		if (cpu_has_avx)
+	if (boot_cpu_has(X86_FEATURE_SSSE3))
+		return crypto_register_shash(&sha1_ssse3_alg);
+	return 0;
+}
+
+static void unregister_sha1_ssse3(void)
+{
+	if (boot_cpu_has(X86_FEATURE_SSSE3))
+		crypto_unregister_shash(&sha1_ssse3_alg);
+}
+
+asmlinkage void sha1_transform_avx(struct sha1_state *state,
+				   const u8 *data, int blocks);
+
+static int sha1_avx_update(struct shash_desc *desc, const u8 *data,
+			     unsigned int len)
+{
+	return sha1_update(desc, data, len, sha1_transform_avx);
+}
+
+static int sha1_avx_finup(struct shash_desc *desc, const u8 *data,
+			      unsigned int len, u8 *out)
+{
+	return sha1_finup(desc, data, len, out, sha1_transform_avx);
+}
+
+static int sha1_avx_final(struct shash_desc *desc, u8 *out)
+{
+	return sha1_avx_finup(desc, NULL, 0, out);
+}
+
+static struct shash_alg sha1_avx_alg = {
+	.digestsize	=	SHA1_DIGEST_SIZE,
+	.init		=	sha1_base_init,
+	.update		=	sha1_avx_update,
+	.final		=	sha1_avx_final,
+	.finup		=	sha1_avx_finup,
+	.descsize	=	sizeof(struct sha1_state),
+	.base		=	{
+		.cra_name	=	"sha1",
+		.cra_driver_name =	"sha1-avx",
+		.cra_priority	=	160,
+		.cra_blocksize	=	SHA1_BLOCK_SIZE,
+		.cra_module	=	THIS_MODULE,
+	}
+};
+
+static bool avx_usable(void)
+{
+	if (!cpu_has_xfeatures(XFEATURE_MASK_SSE | XFEATURE_MASK_YMM, NULL)) {
+		if (boot_cpu_has(X86_FEATURE_AVX))
 			pr_info("AVX detected but unusable.\n");
 		return false;
 	}
@@ -130,55 +160,179 @@ static bool __init avx_usable(void)
 	return true;
 }
 
-#ifdef CONFIG_AS_AVX2
-static bool __init avx2_usable(void)
+static int register_sha1_avx(void)
 {
-	if (avx_usable() && cpu_has_avx2 && boot_cpu_has(X86_FEATURE_BMI1) &&
-	    boot_cpu_has(X86_FEATURE_BMI2))
+	if (avx_usable())
+		return crypto_register_shash(&sha1_avx_alg);
+	return 0;
+}
+
+static void unregister_sha1_avx(void)
+{
+	if (avx_usable())
+		crypto_unregister_shash(&sha1_avx_alg);
+}
+
+#define SHA1_AVX2_BLOCK_OPTSIZE	4	/* optimal 4*64 bytes of SHA1 blocks */
+
+asmlinkage void sha1_transform_avx2(struct sha1_state *state,
+				    const u8 *data, int blocks);
+
+static bool avx2_usable(void)
+{
+	if (avx_usable() && boot_cpu_has(X86_FEATURE_AVX2)
+		&& boot_cpu_has(X86_FEATURE_BMI1)
+		&& boot_cpu_has(X86_FEATURE_BMI2))
 		return true;
 
 	return false;
 }
-#endif
+
+static void sha1_apply_transform_avx2(struct sha1_state *state,
+				      const u8 *data, int blocks)
+{
+	/* Select the optimal transform based on data block size */
+	if (blocks >= SHA1_AVX2_BLOCK_OPTSIZE)
+		sha1_transform_avx2(state, data, blocks);
+	else
+		sha1_transform_avx(state, data, blocks);
+}
+
+static int sha1_avx2_update(struct shash_desc *desc, const u8 *data,
+			     unsigned int len)
+{
+	return sha1_update(desc, data, len, sha1_apply_transform_avx2);
+}
+
+static int sha1_avx2_finup(struct shash_desc *desc, const u8 *data,
+			      unsigned int len, u8 *out)
+{
+	return sha1_finup(desc, data, len, out, sha1_apply_transform_avx2);
+}
+
+static int sha1_avx2_final(struct shash_desc *desc, u8 *out)
+{
+	return sha1_avx2_finup(desc, NULL, 0, out);
+}
+
+static struct shash_alg sha1_avx2_alg = {
+	.digestsize	=	SHA1_DIGEST_SIZE,
+	.init		=	sha1_base_init,
+	.update		=	sha1_avx2_update,
+	.final		=	sha1_avx2_final,
+	.finup		=	sha1_avx2_finup,
+	.descsize	=	sizeof(struct sha1_state),
+	.base		=	{
+		.cra_name	=	"sha1",
+		.cra_driver_name =	"sha1-avx2",
+		.cra_priority	=	170,
+		.cra_blocksize	=	SHA1_BLOCK_SIZE,
+		.cra_module	=	THIS_MODULE,
+	}
+};
+
+static int register_sha1_avx2(void)
+{
+	if (avx2_usable())
+		return crypto_register_shash(&sha1_avx2_alg);
+	return 0;
+}
+
+static void unregister_sha1_avx2(void)
+{
+	if (avx2_usable())
+		crypto_unregister_shash(&sha1_avx2_alg);
+}
+
+#ifdef CONFIG_AS_SHA1_NI
+asmlinkage void sha1_ni_transform(struct sha1_state *digest, const u8 *data,
+				  int rounds);
+
+static int sha1_ni_update(struct shash_desc *desc, const u8 *data,
+			     unsigned int len)
+{
+	return sha1_update(desc, data, len, sha1_ni_transform);
+}
+
+static int sha1_ni_finup(struct shash_desc *desc, const u8 *data,
+			      unsigned int len, u8 *out)
+{
+	return sha1_finup(desc, data, len, out, sha1_ni_transform);
+}
+
+static int sha1_ni_final(struct shash_desc *desc, u8 *out)
+{
+	return sha1_ni_finup(desc, NULL, 0, out);
+}
+
+static struct shash_alg sha1_ni_alg = {
+	.digestsize	=	SHA1_DIGEST_SIZE,
+	.init		=	sha1_base_init,
+	.update		=	sha1_ni_update,
+	.final		=	sha1_ni_final,
+	.finup		=	sha1_ni_finup,
+	.descsize	=	sizeof(struct sha1_state),
+	.base		=	{
+		.cra_name	=	"sha1",
+		.cra_driver_name =	"sha1-ni",
+		.cra_priority	=	250,
+		.cra_blocksize	=	SHA1_BLOCK_SIZE,
+		.cra_module	=	THIS_MODULE,
+	}
+};
+
+static int register_sha1_ni(void)
+{
+	if (boot_cpu_has(X86_FEATURE_SHA_NI))
+		return crypto_register_shash(&sha1_ni_alg);
+	return 0;
+}
+
+static void unregister_sha1_ni(void)
+{
+	if (boot_cpu_has(X86_FEATURE_SHA_NI))
+		crypto_unregister_shash(&sha1_ni_alg);
+}
+
+#else
+static inline int register_sha1_ni(void) { return 0; }
+static inline void unregister_sha1_ni(void) { }
 #endif
 
 static int __init sha1_ssse3_mod_init(void)
 {
-	char *algo_name;
+	if (register_sha1_ssse3())
+		goto fail;
 
-	/* test for SSSE3 first */
-	if (cpu_has_ssse3) {
-		sha1_transform_asm = sha1_transform_ssse3;
-		algo_name = "SSSE3";
+	if (register_sha1_avx()) {
+		unregister_sha1_ssse3();
+		goto fail;
 	}
 
-#ifdef CONFIG_AS_AVX
-	/* allow AVX to override SSSE3, it's a little faster */
-	if (avx_usable()) {
-		sha1_transform_asm = sha1_transform_avx;
-		algo_name = "AVX";
-#ifdef CONFIG_AS_AVX2
-		/* allow AVX2 to override AVX, it's a little faster */
-		if (avx2_usable()) {
-			sha1_transform_asm = sha1_apply_transform_avx2;
-			algo_name = "AVX2";
-		}
-#endif
+	if (register_sha1_avx2()) {
+		unregister_sha1_avx();
+		unregister_sha1_ssse3();
+		goto fail;
 	}
-#endif
 
-	if (sha1_transform_asm) {
-		pr_info("Using %s optimized SHA-1 implementation\n", algo_name);
-		return crypto_register_shash(&alg);
+	if (register_sha1_ni()) {
+		unregister_sha1_avx2();
+		unregister_sha1_avx();
+		unregister_sha1_ssse3();
+		goto fail;
 	}
-	pr_info("Neither AVX nor AVX2 nor SSSE3 is available/usable.\n");
 
+	return 0;
+fail:
 	return -ENODEV;
 }
 
 static void __exit sha1_ssse3_mod_fini(void)
 {
-	crypto_unregister_shash(&alg);
+	unregister_sha1_ni();
+	unregister_sha1_avx2();
+	unregister_sha1_avx();
+	unregister_sha1_ssse3();
 }
 
 module_init(sha1_ssse3_mod_init);
@@ -188,3 +342,9 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SHA1 Secure Hash Algorithm, Supplemental SSE3 accelerated");
 
 MODULE_ALIAS_CRYPTO("sha1");
+MODULE_ALIAS_CRYPTO("sha1-ssse3");
+MODULE_ALIAS_CRYPTO("sha1-avx");
+MODULE_ALIAS_CRYPTO("sha1-avx2");
+#ifdef CONFIG_AS_SHA1_NI
+MODULE_ALIAS_CRYPTO("sha1-ni");
+#endif

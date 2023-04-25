@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) 2012 Red Hat, Inc.
  *
@@ -45,18 +46,22 @@
  * As these various flags are defined they should be added to the
  * following masks.
  */
+
 #define DM_CACHE_FEATURE_COMPAT_SUPP	  0UL
 #define DM_CACHE_FEATURE_COMPAT_RO_SUPP	  0UL
 #define DM_CACHE_FEATURE_INCOMPAT_SUPP	  0UL
 
+struct dm_cache_metadata;
+
 /*
- * Reopens or creates a new, empty metadata volume.
- * Returns an ERR_PTR on failure.
+ * Reopens or creates a new, empty metadata volume.  Returns an ERR_PTR on
+ * failure.  If reopening then features must match.
  */
 struct dm_cache_metadata *dm_cache_metadata_open(struct block_device *bdev,
 						 sector_t data_block_size,
 						 bool may_format_device,
-						 size_t policy_hint_size);
+						 size_t policy_hint_size,
+						 unsigned int metadata_version);
 
 void dm_cache_metadata_close(struct dm_cache_metadata *cmd);
 
@@ -66,7 +71,7 @@ void dm_cache_metadata_close(struct dm_cache_metadata *cmd);
  * origin blocks to map to.
  */
 int dm_cache_resize(struct dm_cache_metadata *cmd, dm_cblock_t new_cache_size);
-dm_cblock_t dm_cache_size(struct dm_cache_metadata *cmd);
+int dm_cache_size(struct dm_cache_metadata *cmd, dm_cblock_t *result);
 
 int dm_cache_discard_bitset_resize(struct dm_cache_metadata *cmd,
 				   sector_t discard_block_size,
@@ -91,7 +96,8 @@ int dm_cache_load_mappings(struct dm_cache_metadata *cmd,
 			   load_mapping_fn fn,
 			   void *context);
 
-int dm_cache_set_dirty(struct dm_cache_metadata *cmd, dm_cblock_t cblock, bool dirty);
+int dm_cache_set_dirty_bits(struct dm_cache_metadata *cmd,
+			    unsigned int nr_bits, unsigned long *bits);
 
 struct dm_cache_statistics {
 	uint32_t read_hits;
@@ -126,7 +132,7 @@ void dm_cache_dump(struct dm_cache_metadata *cmd);
  * hints will be lost.
  *
  * The hints are indexed by the cblock, but many policies will not
- * neccessarily have a fast way of accessing efficiently via cblock.  So
+ * necessarily have a fast way of accessing efficiently via cblock.  So
  * rather than querying the policy for each cblock, we let it walk its data
  * structures and fill in the hints in whatever order it wishes.
  */
@@ -137,7 +143,7 @@ int dm_cache_write_hints(struct dm_cache_metadata *cmd, struct dm_cache_policy *
  */
 int dm_cache_metadata_all_clean(struct dm_cache_metadata *cmd, bool *result);
 
-bool dm_cache_metadata_needs_check(struct dm_cache_metadata *cmd);
+int dm_cache_metadata_needs_check(struct dm_cache_metadata *cmd, bool *result);
 int dm_cache_metadata_set_needs_check(struct dm_cache_metadata *cmd);
 void dm_cache_metadata_set_read_only(struct dm_cache_metadata *cmd);
 void dm_cache_metadata_set_read_write(struct dm_cache_metadata *cmd);

@@ -11,11 +11,38 @@
 
 #include <linux/linkage.h>
 #include <linux/smp.h>
-#include <linux/irqdomain.h>
 
 #include <asm/mipsmtregs.h>
 
 #include <irq.h>
+
+#define IRQ_STACK_SIZE			THREAD_SIZE
+#define IRQ_STACK_START			(IRQ_STACK_SIZE - 16)
+
+extern void __init init_IRQ(void);
+extern void *irq_stack[NR_CPUS];
+
+/*
+ * The highest address on the IRQ stack contains a dummy frame put down in
+ * genex.S (handle_int & except_vec_vi_handler) which is structured as follows:
+ *
+ *   top ------------
+ *       | task sp  | <- irq_stack[cpu] + IRQ_STACK_START
+ *       ------------
+ *       |          | <- First frame of IRQ context
+ *       ------------
+ *
+ * task sp holds a copy of the task stack pointer where the struct pt_regs
+ * from exception entry can be found.
+ */
+
+static inline bool on_irq_stack(int cpu, unsigned long sp)
+{
+	unsigned long low = (unsigned long)irq_stack[cpu];
+	unsigned long high = low + IRQ_STACK_SIZE;
+
+	return (low <= sp && sp <= high);
+}
 
 #ifdef CONFIG_I8259
 static inline int irq_canonicalize(int irq)
@@ -30,12 +57,11 @@ asmlinkage void plat_irq_dispatch(void);
 
 extern void do_IRQ(unsigned int irq);
 
+struct irq_domain;
+extern void do_domain_IRQ(struct irq_domain *domain, unsigned int irq);
+
 extern void arch_init_irq(void);
 extern void spurious_interrupt(void);
-
-extern int allocate_irqno(void);
-extern void alloc_legacy_irqno(void);
-extern void free_irqno(unsigned int irq);
 
 /*
  * Before R2 the timer and performance counter interrupts were both fixed to
@@ -51,7 +77,8 @@ extern int cp0_fdc_irq;
 
 extern int get_c0_fdc_int(void);
 
-void arch_trigger_all_cpu_backtrace(bool);
-#define arch_trigger_all_cpu_backtrace arch_trigger_all_cpu_backtrace
+void arch_trigger_cpumask_backtrace(const struct cpumask *mask,
+				    bool exclude_self);
+#define arch_trigger_cpumask_backtrace arch_trigger_cpumask_backtrace
 
 #endif /* _ASM_IRQ_H */

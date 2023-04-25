@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * SMP support for Allwinner SoCs
  *
@@ -8,9 +9,6 @@
  * Based on code
  *  Copyright (C) 2012-2013 Allwinner Ltd.
  *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 
 #include <linux/delay.h>
@@ -50,6 +48,7 @@ static void __init sun6i_smp_prepare_cpus(unsigned int max_cpus)
 	}
 
 	prcm_membase = of_iomap(node, 0);
+	of_node_put(node);
 	if (!prcm_membase) {
 		pr_err("Couldn't map A31 PRCM registers\n");
 		return;
@@ -63,6 +62,7 @@ static void __init sun6i_smp_prepare_cpus(unsigned int max_cpus)
 	}
 
 	cpucfg_membase = of_iomap(node, 0);
+	of_node_put(node);
 	if (!cpucfg_membase)
 		pr_err("Couldn't map A31 CPU config registers\n");
 
@@ -80,7 +80,7 @@ static int sun6i_smp_boot_secondary(unsigned int cpu,
 	spin_lock(&cpu_lock);
 
 	/* Set CPU boot address */
-	writel(virt_to_phys(secondary_startup),
+	writel(__pa_symbol(secondary_startup),
 	       cpucfg_membase + CPUCFG_PRIVATE0_REG);
 
 	/* Assert the CPU core in reset */
@@ -116,7 +116,7 @@ static int sun6i_smp_boot_secondary(unsigned int cpu,
 	return 0;
 }
 
-static struct smp_operations sun6i_smp_ops __initdata = {
+static const struct smp_operations sun6i_smp_ops __initconst = {
 	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
 	.smp_boot_secondary	= sun6i_smp_boot_secondary,
 };
@@ -133,6 +133,7 @@ static void __init sun8i_smp_prepare_cpus(unsigned int max_cpus)
 	}
 
 	prcm_membase = of_iomap(node, 0);
+	of_node_put(node);
 	if (!prcm_membase) {
 		pr_err("Couldn't map A23 PRCM registers\n");
 		return;
@@ -146,6 +147,7 @@ static void __init sun8i_smp_prepare_cpus(unsigned int max_cpus)
 	}
 
 	cpucfg_membase = of_iomap(node, 0);
+	of_node_put(node);
 	if (!cpucfg_membase)
 		pr_err("Couldn't map A23 CPU config registers\n");
 
@@ -162,7 +164,7 @@ static int sun8i_smp_boot_secondary(unsigned int cpu,
 	spin_lock(&cpu_lock);
 
 	/* Set CPU boot address */
-	writel(virt_to_phys(secondary_startup),
+	writel(__pa_symbol(secondary_startup),
 	       cpucfg_membase + CPUCFG_PRIVATE0_REG);
 
 	/* Assert the CPU core in reset */
@@ -185,7 +187,7 @@ static int sun8i_smp_boot_secondary(unsigned int cpu,
 	return 0;
 }
 
-struct smp_operations sun8i_smp_ops __initdata = {
+static const struct smp_operations sun8i_smp_ops __initconst = {
 	.smp_prepare_cpus	= sun8i_smp_prepare_cpus,
 	.smp_boot_secondary	= sun8i_smp_boot_secondary,
 };

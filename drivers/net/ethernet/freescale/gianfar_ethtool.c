@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  drivers/net/ethernet/freescale/gianfar_ethtool.c
  *
@@ -10,10 +11,6 @@
  *  Modifier: Sandeep Gopalpet <sandeep.kumar@freescale.com>
  *
  *  Copyright 2003-2006, 2008-2009, 2011 Freescale Semiconductor, Inc.
- *
- *  This software may be used and distributed according to
- *  the terms of the GNU Public License, Version 2, incorporated herein
- *  by reference.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -32,7 +29,7 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/crc32.h>
 #include <asm/types.h>
@@ -41,24 +38,13 @@
 #include <linux/phy.h>
 #include <linux/sort.h>
 #include <linux/if_vlan.h>
+#include <linux/of_platform.h>
+#include <linux/fsl/ptp_qoriq.h>
 
 #include "gianfar.h"
 
 #define GFAR_MAX_COAL_USECS 0xffff
 #define GFAR_MAX_COAL_FRAMES 0xff
-static void gfar_fill_stats(struct net_device *dev, struct ethtool_stats *dummy,
-			    u64 *buf);
-static void gfar_gstrings(struct net_device *dev, u32 stringset, u8 * buf);
-static int gfar_gcoalesce(struct net_device *dev,
-			  struct ethtool_coalesce *cvals);
-static int gfar_scoalesce(struct net_device *dev,
-			  struct ethtool_coalesce *cvals);
-static void gfar_gringparam(struct net_device *dev,
-			    struct ethtool_ringparam *rvals);
-static int gfar_sringparam(struct net_device *dev,
-			   struct ethtool_ringparam *rvals);
-static void gfar_gdrvinfo(struct net_device *dev,
-			  struct ethtool_drvinfo *drvinfo);
 
 static const char stat_gstrings[][ETH_GSTRING_LEN] = {
 	/* extra stats */
@@ -177,47 +163,7 @@ static int gfar_sset_count(struct net_device *dev, int sset)
 static void gfar_gdrvinfo(struct net_device *dev,
 			  struct ethtool_drvinfo *drvinfo)
 {
-	strlcpy(drvinfo->driver, DRV_NAME, sizeof(drvinfo->driver));
-	strlcpy(drvinfo->version, gfar_driver_version,
-		sizeof(drvinfo->version));
-	strlcpy(drvinfo->fw_version, "N/A", sizeof(drvinfo->fw_version));
-	strlcpy(drvinfo->bus_info, "N/A", sizeof(drvinfo->bus_info));
-	drvinfo->regdump_len = 0;
-	drvinfo->eedump_len = 0;
-}
-
-
-static int gfar_ssettings(struct net_device *dev, struct ethtool_cmd *cmd)
-{
-	struct gfar_private *priv = netdev_priv(dev);
-	struct phy_device *phydev = priv->phydev;
-
-	if (NULL == phydev)
-		return -ENODEV;
-
-	return phy_ethtool_sset(phydev, cmd);
-}
-
-
-/* Return the current settings in the ethtool_cmd structure */
-static int gfar_gsettings(struct net_device *dev, struct ethtool_cmd *cmd)
-{
-	struct gfar_private *priv = netdev_priv(dev);
-	struct phy_device *phydev = priv->phydev;
-	struct gfar_priv_rx_q *rx_queue = NULL;
-	struct gfar_priv_tx_q *tx_queue = NULL;
-
-	if (NULL == phydev)
-		return -ENODEV;
-	tx_queue = priv->tx_queue[0];
-	rx_queue = priv->rx_queue[0];
-
-	/* etsec-1.7 and older versions have only one txic
-	 * and rxic regs although they support multiple queues */
-	cmd->maxtxpkt = get_icft_value(tx_queue->txic);
-	cmd->maxrxpkt = get_icft_value(rx_queue->rxic);
-
-	return phy_ethtool_gset(phydev, cmd);
+	strscpy(drvinfo->driver, DRV_NAME, sizeof(drvinfo->driver));
 }
 
 /* Return the length of the register structure */
@@ -244,10 +190,12 @@ static void gfar_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 static unsigned int gfar_usecs2ticks(struct gfar_private *priv,
 				     unsigned int usecs)
 {
+	struct net_device *ndev = priv->ndev;
+	struct phy_device *phydev = ndev->phydev;
 	unsigned int count;
 
 	/* The timer is different, depending on the interface speed */
-	switch (priv->phydev->speed) {
+	switch (phydev->speed) {
 	case SPEED_1000:
 		count = GFAR_GBIT_TIME;
 		break;
@@ -262,17 +210,19 @@ static unsigned int gfar_usecs2ticks(struct gfar_private *priv,
 
 	/* Make sure we return a number greater than 0
 	 * if usecs > 0 */
-	return (usecs * 1000 + count - 1) / count;
+	return DIV_ROUND_UP(usecs * 1000, count);
 }
 
 /* Convert ethernet clock ticks to microseconds */
 static unsigned int gfar_ticks2usecs(struct gfar_private *priv,
 				     unsigned int ticks)
 {
+	struct net_device *ndev = priv->ndev;
+	struct phy_device *phydev = ndev->phydev;
 	unsigned int count;
 
 	/* The timer is different, depending on the interface speed */
-	switch (priv->phydev->speed) {
+	switch (phydev->speed) {
 	case SPEED_1000:
 		count = GFAR_GBIT_TIME;
 		break;
@@ -293,7 +243,9 @@ static unsigned int gfar_ticks2usecs(struct gfar_private *priv,
 /* Get the coalescing parameters, and put them in the cvals
  * structure.  */
 static int gfar_gcoalesce(struct net_device *dev,
-			  struct ethtool_coalesce *cvals)
+			  struct ethtool_coalesce *cvals,
+			  struct kernel_ethtool_coalesce *kernel_coal,
+			  struct netlink_ext_ack *extack)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 	struct gfar_priv_rx_q *rx_queue = NULL;
@@ -306,7 +258,7 @@ static int gfar_gcoalesce(struct net_device *dev,
 	if (!(priv->device_flags & FSL_GIANFAR_DEV_HAS_COALESCE))
 		return -EOPNOTSUPP;
 
-	if (NULL == priv->phydev)
+	if (!dev->phydev)
 		return -ENODEV;
 
 	rx_queue = priv->rx_queue[0];
@@ -322,35 +274,6 @@ static int gfar_gcoalesce(struct net_device *dev,
 	cvals->tx_coalesce_usecs = gfar_ticks2usecs(priv, txtime);
 	cvals->tx_max_coalesced_frames = txcount;
 
-	cvals->use_adaptive_rx_coalesce = 0;
-	cvals->use_adaptive_tx_coalesce = 0;
-
-	cvals->pkt_rate_low = 0;
-	cvals->rx_coalesce_usecs_low = 0;
-	cvals->rx_max_coalesced_frames_low = 0;
-	cvals->tx_coalesce_usecs_low = 0;
-	cvals->tx_max_coalesced_frames_low = 0;
-
-	/* When the packet rate is below pkt_rate_high but above
-	 * pkt_rate_low (both measured in packets per second) the
-	 * normal {rx,tx}_* coalescing parameters are used.
-	 */
-
-	/* When the packet rate is (measured in packets per second)
-	 * is above pkt_rate_high, the {rx,tx}_*_high parameters are
-	 * used.
-	 */
-	cvals->pkt_rate_high = 0;
-	cvals->rx_coalesce_usecs_high = 0;
-	cvals->rx_max_coalesced_frames_high = 0;
-	cvals->tx_coalesce_usecs_high = 0;
-	cvals->tx_max_coalesced_frames_high = 0;
-
-	/* How often to do adaptive coalescing packet rate sampling,
-	 * measured in seconds.  Must not be zero.
-	 */
-	cvals->rate_sample_interval = 0;
-
 	return 0;
 }
 
@@ -359,7 +282,9 @@ static int gfar_gcoalesce(struct net_device *dev,
  * in order for coalescing to be active
  */
 static int gfar_scoalesce(struct net_device *dev,
-			  struct ethtool_coalesce *cvals)
+			  struct ethtool_coalesce *cvals,
+			  struct kernel_ethtool_coalesce *kernel_coal,
+			  struct netlink_ext_ack *extack)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 	int i, err = 0;
@@ -367,7 +292,7 @@ static int gfar_scoalesce(struct net_device *dev,
 	if (!(priv->device_flags & FSL_GIANFAR_DEV_HAS_COALESCE))
 		return -EOPNOTSUPP;
 
-	if (NULL == priv->phydev)
+	if (!dev->phydev)
 		return -ENODEV;
 
 	/* Check the bounds of the values */
@@ -447,7 +372,9 @@ static int gfar_scoalesce(struct net_device *dev,
  * rx, rx_mini, and rx_jumbo rings are the same size, as mini and
  * jumbo are ignored by the driver */
 static void gfar_gringparam(struct net_device *dev,
-			    struct ethtool_ringparam *rvals)
+			    struct ethtool_ringparam *rvals,
+			    struct kernel_ethtool_ringparam *kernel_rvals,
+			    struct netlink_ext_ack *extack)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 	struct gfar_priv_tx_q *tx_queue = NULL;
@@ -474,7 +401,9 @@ static void gfar_gringparam(struct net_device *dev,
  * necessary so that we don't mess things up while we're in motion.
  */
 static int gfar_sringparam(struct net_device *dev,
-			   struct ethtool_ringparam *rvals)
+			   struct ethtool_ringparam *rvals,
+			   struct kernel_ethtool_ringparam *kernel_rvals,
+			   struct netlink_ext_ack *extack)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 	int err = 0, i;
@@ -531,67 +460,46 @@ static int gfar_spauseparam(struct net_device *dev,
 			    struct ethtool_pauseparam *epause)
 {
 	struct gfar_private *priv = netdev_priv(dev);
-	struct phy_device *phydev = priv->phydev;
+	struct phy_device *phydev = dev->phydev;
 	struct gfar __iomem *regs = priv->gfargrp[0].regs;
-	u32 oldadv, newadv;
 
 	if (!phydev)
 		return -ENODEV;
 
-	if (!(phydev->supported & SUPPORTED_Pause) ||
-	    (!(phydev->supported & SUPPORTED_Asym_Pause) &&
-	     (epause->rx_pause != epause->tx_pause)))
+	if (!phy_validate_pause(phydev, epause))
 		return -EINVAL;
 
 	priv->rx_pause_en = priv->tx_pause_en = 0;
+	phy_set_asym_pause(phydev, epause->rx_pause, epause->tx_pause);
 	if (epause->rx_pause) {
 		priv->rx_pause_en = 1;
 
 		if (epause->tx_pause) {
 			priv->tx_pause_en = 1;
-			/* FLOW_CTRL_RX & TX */
-			newadv = ADVERTISED_Pause;
-		} else  /* FLOW_CTLR_RX */
-			newadv = ADVERTISED_Pause | ADVERTISED_Asym_Pause;
+		}
 	} else if (epause->tx_pause) {
 		priv->tx_pause_en = 1;
-		/* FLOW_CTLR_TX */
-		newadv = ADVERTISED_Asym_Pause;
-	} else
-		newadv = 0;
+	}
 
 	if (epause->autoneg)
 		priv->pause_aneg_en = 1;
 	else
 		priv->pause_aneg_en = 0;
 
-	oldadv = phydev->advertising &
-		(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
-	if (oldadv != newadv) {
-		phydev->advertising &=
-			~(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
-		phydev->advertising |= newadv;
-		if (phydev->autoneg)
-			/* inform link partner of our
-			 * new flow ctrl settings
-			 */
-			return phy_start_aneg(phydev);
+	if (!epause->autoneg) {
+		u32 tempval = gfar_read(&regs->maccfg1);
 
-		if (!epause->autoneg) {
-			u32 tempval;
-			tempval = gfar_read(&regs->maccfg1);
-			tempval &= ~(MACCFG1_TX_FLOW | MACCFG1_RX_FLOW);
+		tempval &= ~(MACCFG1_TX_FLOW | MACCFG1_RX_FLOW);
 
-			priv->tx_actual_en = 0;
-			if (priv->tx_pause_en) {
-				priv->tx_actual_en = 1;
-				tempval |= MACCFG1_TX_FLOW;
-			}
-
-			if (priv->rx_pause_en)
-				tempval |= MACCFG1_RX_FLOW;
-			gfar_write(&regs->maccfg1, tempval);
+		priv->tx_actual_en = 0;
+		if (priv->tx_pause_en) {
+			priv->tx_actual_en = 1;
+			tempval |= MACCFG1_TX_FLOW;
 		}
+
+		if (priv->rx_pause_en)
+			tempval |= MACCFG1_RX_FLOW;
+		gfar_write(&regs->maccfg1, tempval);
 	}
 
 	return 0;
@@ -644,28 +552,49 @@ static void gfar_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 
-	if (priv->device_flags & FSL_GIANFAR_DEV_HAS_MAGIC_PACKET) {
-		wol->supported = WAKE_MAGIC;
-		wol->wolopts = priv->wol_en ? WAKE_MAGIC : 0;
-	} else {
-		wol->supported = wol->wolopts = 0;
-	}
+	wol->supported = 0;
+	wol->wolopts = 0;
+
+	if (priv->wol_supported & GFAR_WOL_MAGIC)
+		wol->supported |= WAKE_MAGIC;
+
+	if (priv->wol_supported & GFAR_WOL_FILER_UCAST)
+		wol->supported |= WAKE_UCAST;
+
+	if (priv->wol_opts & GFAR_WOL_MAGIC)
+		wol->wolopts |= WAKE_MAGIC;
+
+	if (priv->wol_opts & GFAR_WOL_FILER_UCAST)
+		wol->wolopts |= WAKE_UCAST;
 }
 
 static int gfar_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct gfar_private *priv = netdev_priv(dev);
+	u16 wol_opts = 0;
+	int err;
 
-	if (!(priv->device_flags & FSL_GIANFAR_DEV_HAS_MAGIC_PACKET) &&
-	    wol->wolopts != 0)
+	if (!priv->wol_supported && wol->wolopts)
 		return -EINVAL;
 
-	if (wol->wolopts & ~WAKE_MAGIC)
+	if (wol->wolopts & ~(WAKE_MAGIC | WAKE_UCAST))
 		return -EINVAL;
 
-	device_set_wakeup_enable(&dev->dev, wol->wolopts & WAKE_MAGIC);
+	if (wol->wolopts & WAKE_MAGIC) {
+		wol_opts |= GFAR_WOL_MAGIC;
+	} else {
+		if (wol->wolopts & WAKE_UCAST)
+			wol_opts |= GFAR_WOL_FILER_UCAST;
+	}
 
-	priv->wol_en = !!device_may_wakeup(&dev->dev);
+	wol_opts &= priv->wol_supported;
+	priv->wol_opts = 0;
+
+	err = device_set_wakeup_enable(priv->dev, wol_opts);
+	if (err)
+		return err;
+
+	priv->wol_opts = wol_opts;
 
 	return 0;
 }
@@ -676,14 +605,14 @@ static void ethflow_to_filer_rules (struct gfar_private *priv, u64 ethflow)
 	u32 fcr = 0x0, fpr = FPR_FILER_MASK;
 
 	if (ethflow & RXH_L2DA) {
-		fcr = RQFCR_PID_DAH |RQFCR_CMP_NOMATCH |
+		fcr = RQFCR_PID_DAH | RQFCR_CMP_NOMATCH |
 		      RQFCR_HASH | RQFCR_AND | RQFCR_HASHTBL_0;
 		priv->ftp_rqfpr[priv->cur_filer_idx] = fpr;
 		priv->ftp_rqfcr[priv->cur_filer_idx] = fcr;
 		gfar_write_filer(priv, priv->cur_filer_idx, fcr, fpr);
 		priv->cur_filer_idx = priv->cur_filer_idx - 1;
 
-		fcr = RQFCR_PID_DAL | RQFCR_AND | RQFCR_CMP_NOMATCH |
+		fcr = RQFCR_PID_DAL | RQFCR_CMP_NOMATCH |
 		      RQFCR_HASH | RQFCR_AND | RQFCR_HASHTBL_0;
 		priv->ftp_rqfpr[priv->cur_filer_idx] = fpr;
 		priv->ftp_rqfcr[priv->cur_filer_idx] = fcr;
@@ -749,7 +678,6 @@ static void ethflow_to_filer_rules (struct gfar_private *priv, u64 ethflow)
 static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 				       u64 class)
 {
-	unsigned int last_rule_idx = priv->cur_filer_idx;
 	unsigned int cmp_rqfpr;
 	unsigned int *local_rqfpr;
 	unsigned int *local_rqfcr;
@@ -828,7 +756,6 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 	}
 
 	priv->cur_filer_idx = l - 1;
-	last_rule_idx = l;
 
 	/* hash rules */
 	ethflow_to_filer_rules(priv, ethflow);
@@ -1166,11 +1093,9 @@ static int gfar_convert_to_filer(struct ethtool_rx_flow_spec *rule,
 		prio = vlan_tci_prio(rule);
 		prio_mask = vlan_tci_priom(rule);
 
-		if (cfi == VLAN_TAG_PRESENT && cfi_mask == VLAN_TAG_PRESENT) {
-			vlan |= RQFPR_CFI;
-			vlan_mask |= RQFPR_CFI;
-		} else if (cfi != VLAN_TAG_PRESENT &&
-			   cfi_mask == VLAN_TAG_PRESENT) {
+		if (cfi_mask) {
+			if (cfi)
+				vlan |= RQFPR_CFI;
 			vlan_mask |= RQFPR_CFI;
 		}
 	}
@@ -1520,24 +1445,40 @@ static int gfar_get_nfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
 	return ret;
 }
 
-int gfar_phc_index = -1;
-EXPORT_SYMBOL(gfar_phc_index);
-
 static int gfar_get_ts_info(struct net_device *dev,
 			    struct ethtool_ts_info *info)
 {
 	struct gfar_private *priv = netdev_priv(dev);
+	struct platform_device *ptp_dev;
+	struct device_node *ptp_node;
+	struct ptp_qoriq *ptp = NULL;
+
+	info->phc_index = -1;
 
 	if (!(priv->device_flags & FSL_GIANFAR_DEV_HAS_TIMER)) {
 		info->so_timestamping = SOF_TIMESTAMPING_RX_SOFTWARE |
+					SOF_TIMESTAMPING_TX_SOFTWARE |
 					SOF_TIMESTAMPING_SOFTWARE;
-		info->phc_index = -1;
 		return 0;
 	}
+
+	ptp_node = of_find_compatible_node(NULL, NULL, "fsl,etsec-ptp");
+	if (ptp_node) {
+		ptp_dev = of_find_device_by_node(ptp_node);
+		of_node_put(ptp_node);
+		if (ptp_dev)
+			ptp = platform_get_drvdata(ptp_dev);
+	}
+
+	if (ptp)
+		info->phc_index = ptp->phc_index;
+
 	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
 				SOF_TIMESTAMPING_RX_HARDWARE |
-				SOF_TIMESTAMPING_RAW_HARDWARE;
-	info->phc_index = gfar_phc_index;
+				SOF_TIMESTAMPING_RAW_HARDWARE |
+				SOF_TIMESTAMPING_RX_SOFTWARE |
+				SOF_TIMESTAMPING_TX_SOFTWARE |
+				SOF_TIMESTAMPING_SOFTWARE;
 	info->tx_types = (1 << HWTSTAMP_TX_OFF) |
 			 (1 << HWTSTAMP_TX_ON);
 	info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
@@ -1546,8 +1487,8 @@ static int gfar_get_ts_info(struct net_device *dev,
 }
 
 const struct ethtool_ops gfar_ethtool_ops = {
-	.get_settings = gfar_gsettings,
-	.set_settings = gfar_ssettings,
+	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
+				     ETHTOOL_COALESCE_MAX_FRAMES,
 	.get_drvinfo = gfar_gdrvinfo,
 	.get_regs_len = gfar_reglen,
 	.get_regs = gfar_get_regs,
@@ -1570,4 +1511,6 @@ const struct ethtool_ops gfar_ethtool_ops = {
 	.set_rxnfc = gfar_set_nfc,
 	.get_rxnfc = gfar_get_nfc,
 	.get_ts_info = gfar_get_ts_info,
+	.get_link_ksettings = phy_ethtool_get_link_ksettings,
+	.set_link_ksettings = phy_ethtool_set_link_ksettings,
 };

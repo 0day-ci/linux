@@ -23,22 +23,17 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <linux/export.h>
 
-#include <drm/drmP.h>
+#include <linux/export.h>
+#include <linux/pci.h>
+
+#include <drm/drm_device.h>
 #include <drm/drm_edid.h>
 #include <drm/radeon_drm.h>
+
 #include "radeon.h"
 #include "atom.h"
 
-extern int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
-				   struct i2c_msg *msgs, int num);
-extern u32 radeon_atom_hw_i2c_func(struct i2c_adapter *adap);
-
-/**
- * radeon_ddc_probe
- *
- */
 bool radeon_ddc_probe(struct radeon_connector *radeon_connector, bool use_aux)
 {
 	u8 out = 0x0;
@@ -924,7 +919,7 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 	i2c->rec = *rec;
 	i2c->adapter.owner = THIS_MODULE;
 	i2c->adapter.class = I2C_CLASS_DDC;
-	i2c->adapter.dev.parent = &dev->pdev->dev;
+	i2c->adapter.dev.parent = dev->dev;
 	i2c->dev = dev;
 	i2c_set_adapdata(&i2c->adapter, i2c);
 	mutex_init(&i2c->mutex);
@@ -938,10 +933,8 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			 "Radeon i2c hw bus %s", name);
 		i2c->adapter.algo = &radeon_i2c_algo;
 		ret = i2c_add_adapter(&i2c->adapter);
-		if (ret) {
-			DRM_ERROR("Failed to register hw i2c %s\n", name);
+		if (ret)
 			goto out_free;
-		}
 	} else if (rec->hw_capable &&
 		   radeon_hw_i2c &&
 		   ASIC_IS_DCE3(rdev)) {
@@ -950,10 +943,8 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			 "Radeon i2c hw bus %s", name);
 		i2c->adapter.algo = &radeon_atom_i2c_algo;
 		ret = i2c_add_adapter(&i2c->adapter);
-		if (ret) {
-			DRM_ERROR("Failed to register hw i2c %s\n", name);
+		if (ret)
 			goto out_free;
-		}
 	} else {
 		/* set the radeon bit adapter */
 		snprintf(i2c->adapter.name, sizeof(i2c->adapter.name),
@@ -986,9 +977,8 @@ void radeon_i2c_destroy(struct radeon_i2c_chan *i2c)
 {
 	if (!i2c)
 		return;
+	WARN_ON(i2c->has_aux);
 	i2c_del_adapter(&i2c->adapter);
-	if (i2c->has_aux)
-		drm_dp_aux_unregister(&i2c->aux);
 	kfree(i2c);
 }
 

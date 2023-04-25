@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * platform.h
  *
  * Hardware platform operations. Intended for use by domain-0 kernel.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2002-2006, K Fraser
  */
@@ -35,14 +18,23 @@
  * Set clock such that it would read <secs,nsecs> after 00:00:00 UTC,
  * 1 January, 1970 if the current system time was <system_time>.
  */
-#define XENPF_settime             17
-struct xenpf_settime {
+#define XENPF_settime32             17
+struct xenpf_settime32 {
 	/* IN variables. */
 	uint32_t secs;
 	uint32_t nsecs;
 	uint64_t system_time;
 };
-DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime_t);
+DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime32_t);
+#define XENPF_settime64           62
+struct xenpf_settime64 {
+    /* IN variables. */
+    uint64_t secs;
+    uint32_t nsecs;
+    uint32_t mbz;
+    uint64_t system_time;
+};
+DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime64_t);
 
 /*
  * Request memory range (@mfn, @mfn+@nr_mfns-1) to have type @type.
@@ -495,7 +487,8 @@ struct xen_platform_op {
 	uint32_t cmd;
 	uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
 	union {
-		struct xenpf_settime           settime;
+		struct xenpf_settime32         settime32;
+		struct xenpf_settime64         settime64;
 		struct xenpf_add_memtype       add_memtype;
 		struct xenpf_del_memtype       del_memtype;
 		struct xenpf_read_memtype      read_memtype;

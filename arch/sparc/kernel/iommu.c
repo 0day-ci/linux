@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /* iommu.c: Generic sparc64 IOMMU support.
  *
  * Copyright (C) 1999, 2007, 2008 David S. Miller (davem@davemloft.net)
@@ -9,11 +10,11 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/device.h>
-#include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 #include <linux/errno.h>
 #include <linux/iommu-helper.h>
 #include <linux/bitmap.h>
-#include <linux/iommu-common.h>
+#include <asm/iommu-common.h>
 
 #ifdef CONFIG_PCI
 #include <linux/pci.h>
@@ -107,10 +108,9 @@ int iommu_table_init(struct iommu *iommu, int tsbsize,
 	/* Allocate and initialize the free area map.  */
 	sz = num_tsb_entries / 8;
 	sz = (sz + 7UL) & ~7UL;
-	iommu->tbl.map = kmalloc_node(sz, GFP_KERNEL, numa_node);
+	iommu->tbl.map = kzalloc_node(sz, GFP_KERNEL, numa_node);
 	if (!iommu->tbl.map)
 		return -ENOMEM;
-	memset(iommu->tbl.map, 0, sz);
 
 	iommu_tbl_pool_init(&iommu->tbl, num_tsb_entries, IO_PAGE_SHIFT,
 			    (tlb_type != hypervisor ? iommu_flushall : NULL),
@@ -161,7 +161,7 @@ static inline iopte_t *alloc_npages(struct device *dev,
 
 	entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages, NULL,
 				      (unsigned long)(-1), 0);
-	if (unlikely(entry == DMA_ERROR_CODE))
+	if (unlikely(entry == IOMMU_ERROR_CODE))
 		return NULL;
 
 	return iommu->page_table + entry;
@@ -196,7 +196,7 @@ static inline void iommu_free_ctx(struct iommu *iommu, int ctx)
 
 static void *dma_4u_alloc_coherent(struct device *dev, size_t size,
 				   dma_addr_t *dma_addrp, gfp_t gfp,
-				   struct dma_attrs *attrs)
+				   unsigned long attrs)
 {
 	unsigned long order, first_page;
 	struct iommu *iommu;
@@ -245,7 +245,7 @@ static void *dma_4u_alloc_coherent(struct device *dev, size_t size,
 
 static void dma_4u_free_coherent(struct device *dev, size_t size,
 				 void *cpu, dma_addr_t dvma,
-				 struct dma_attrs *attrs)
+				 unsigned long attrs)
 {
 	struct iommu *iommu;
 	unsigned long order, npages;
@@ -253,7 +253,7 @@ static void dma_4u_free_coherent(struct device *dev, size_t size,
 	npages = IO_PAGE_ALIGN(size) >> IO_PAGE_SHIFT;
 	iommu = dev->archdata.iommu;
 
-	iommu_tbl_range_free(&iommu->tbl, dvma, npages, DMA_ERROR_CODE);
+	iommu_tbl_range_free(&iommu->tbl, dvma, npages, IOMMU_ERROR_CODE);
 
 	order = get_order(size);
 	if (order < 10)
@@ -263,7 +263,7 @@ static void dma_4u_free_coherent(struct device *dev, size_t size,
 static dma_addr_t dma_4u_map_page(struct device *dev, struct page *page,
 				  unsigned long offset, size_t sz,
 				  enum dma_data_direction direction,
-				  struct dma_attrs *attrs)
+				  unsigned long attrs)
 {
 	struct iommu *iommu;
 	struct strbuf *strbuf;
@@ -314,7 +314,7 @@ bad:
 bad_no_ctx:
 	if (printk_ratelimit())
 		WARN_ON(1);
-	return DMA_ERROR_CODE;
+	return DMA_MAPPING_ERROR;
 }
 
 static void strbuf_flush(struct strbuf *strbuf, struct iommu *iommu,
@@ -385,7 +385,7 @@ do_flush_sync:
 
 static void dma_4u_unmap_page(struct device *dev, dma_addr_t bus_addr,
 			      size_t sz, enum dma_data_direction direction,
-			      struct dma_attrs *attrs)
+			      unsigned long attrs)
 {
 	struct iommu *iommu;
 	struct strbuf *strbuf;
@@ -415,7 +415,7 @@ static void dma_4u_unmap_page(struct device *dev, dma_addr_t bus_addr,
 		ctx = (iopte_val(*base) & IOPTE_CONTEXT) >> 47UL;
 
 	/* Step 1: Kick data out of streaming buffers if necessary. */
-	if (strbuf->strbuf_enabled)
+	if (strbuf->strbuf_enabled && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 		strbuf_flush(strbuf, iommu, bus_addr, ctx,
 			     npages, direction);
 
@@ -426,12 +426,12 @@ static void dma_4u_unmap_page(struct device *dev, dma_addr_t bus_addr,
 	iommu_free_ctx(iommu, ctx);
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
-	iommu_tbl_range_free(&iommu->tbl, bus_addr, npages, DMA_ERROR_CODE);
+	iommu_tbl_range_free(&iommu->tbl, bus_addr, npages, IOMMU_ERROR_CODE);
 }
 
 static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
 			 int nelems, enum dma_data_direction direction,
-			 struct dma_attrs *attrs)
+			 unsigned long attrs)
 {
 	struct scatterlist *s, *outs, *segstart;
 	unsigned long flags, handle, prot, ctx;
@@ -448,7 +448,7 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
 	iommu = dev->archdata.iommu;
 	strbuf = dev->archdata.stc;
 	if (nelems == 0 || !iommu)
-		return 0;
+		return -EINVAL;
 
 	spin_lock_irqsave(&iommu->lock, flags);
 
@@ -472,8 +472,7 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
 	outs->dma_length = 0;
 
 	max_seg_size = dma_get_max_seg_size(dev);
-	seg_boundary_size = ALIGN(dma_get_seg_boundary(dev) + 1,
-				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
+	seg_boundary_size = dma_get_seg_boundary_nr_pages(dev, IO_PAGE_SHIFT);
 	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
 	for_each_sg(sglist, s, nelems, i) {
 		unsigned long paddr, npages, entry, out_entry = 0, slen;
@@ -492,7 +491,7 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
 					      &handle, (unsigned long)(-1), 0);
 
 		/* Handle failure */
-		if (unlikely(entry == DMA_ERROR_CODE)) {
+		if (unlikely(entry == IOMMU_ERROR_CODE)) {
 			if (printk_ratelimit())
 				printk(KERN_INFO "iommu_alloc failed, iommu %p paddr %lx"
 				       " npages %lx\n", iommu, paddr, npages);
@@ -547,7 +546,6 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
 
 	if (outcount < incount) {
 		outs = sg_next(outs);
-		outs->dma_address = DMA_ERROR_CODE;
 		outs->dma_length = 0;
 	}
 
@@ -571,9 +569,8 @@ iommu_map_failed:
 				iopte_make_dummy(iommu, base + j);
 
 			iommu_tbl_range_free(&iommu->tbl, vaddr, npages,
-					     DMA_ERROR_CODE);
+					     IOMMU_ERROR_CODE);
 
-			s->dma_address = DMA_ERROR_CODE;
 			s->dma_length = 0;
 		}
 		if (s == outs)
@@ -581,7 +578,7 @@ iommu_map_failed:
 	}
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
-	return 0;
+	return -EINVAL;
 }
 
 /* If contexts are being used, they are the same in all of the mappings
@@ -607,7 +604,7 @@ static unsigned long fetch_sg_ctx(struct iommu *iommu, struct scatterlist *sg)
 
 static void dma_4u_unmap_sg(struct device *dev, struct scatterlist *sglist,
 			    int nelems, enum dma_data_direction direction,
-			    struct dma_attrs *attrs)
+			    unsigned long attrs)
 {
 	unsigned long flags, ctx;
 	struct scatterlist *sg;
@@ -640,7 +637,7 @@ static void dma_4u_unmap_sg(struct device *dev, struct scatterlist *sglist,
 		base = iommu->page_table + entry;
 
 		dma_handle &= IO_PAGE_MASK;
-		if (strbuf->strbuf_enabled)
+		if (strbuf->strbuf_enabled && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 			strbuf_flush(strbuf, iommu, dma_handle, ctx,
 				     npages, direction);
 
@@ -648,7 +645,7 @@ static void dma_4u_unmap_sg(struct device *dev, struct scatterlist *sglist,
 			iopte_make_dummy(iommu, base + i);
 
 		iommu_tbl_range_free(&iommu->tbl, dma_handle, npages,
-				     DMA_ERROR_CODE);
+				     IOMMU_ERROR_CODE);
 		sg = sg_next(sg);
 	}
 
@@ -741,7 +738,19 @@ static void dma_4u_sync_sg_for_cpu(struct device *dev,
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static struct dma_map_ops sun4u_dma_ops = {
+static int dma_4u_supported(struct device *dev, u64 device_mask)
+{
+	struct iommu *iommu = dev->archdata.iommu;
+
+	if (ali_sound_dma_hack(dev, device_mask))
+		return 1;
+
+	if (device_mask < iommu->dma_addr_mask)
+		return 0;
+	return 1;
+}
+
+static const struct dma_map_ops sun4u_dma_ops = {
 	.alloc			= dma_4u_alloc_coherent,
 	.free			= dma_4u_free_coherent,
 	.map_page		= dma_4u_map_page,
@@ -750,27 +759,8 @@ static struct dma_map_ops sun4u_dma_ops = {
 	.unmap_sg		= dma_4u_unmap_sg,
 	.sync_single_for_cpu	= dma_4u_sync_single_for_cpu,
 	.sync_sg_for_cpu	= dma_4u_sync_sg_for_cpu,
+	.dma_supported		= dma_4u_supported,
 };
 
-struct dma_map_ops *dma_ops = &sun4u_dma_ops;
+const struct dma_map_ops *dma_ops = &sun4u_dma_ops;
 EXPORT_SYMBOL(dma_ops);
-
-int dma_supported(struct device *dev, u64 device_mask)
-{
-	struct iommu *iommu = dev->archdata.iommu;
-	u64 dma_addr_mask = iommu->dma_addr_mask;
-
-	if (device_mask >= (1UL << 32UL))
-		return 0;
-
-	if ((device_mask & dma_addr_mask) == dma_addr_mask)
-		return 1;
-
-#ifdef CONFIG_PCI
-	if (dev_is_pci(dev))
-		return pci64_dma_supported(to_pci_dev(dev), device_mask);
-#endif
-
-	return 0;
-}
-EXPORT_SYMBOL(dma_supported);

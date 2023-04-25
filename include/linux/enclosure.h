@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Enclosure Services
  *
@@ -5,18 +6,6 @@
  *
 **-----------------------------------------------------------------------------
 **
-**  This program is free software; you can redistribute it and/or
-**  modify it under the terms of the GNU General Public License
-**  version 2 as published by the Free Software Foundation.
-**
-**  This program is distributed in the hope that it will be useful,
-**  but WITHOUT ANY WARRANTY; without even the implied warranty of
-**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-**  GNU General Public License for more details.
-**
-**  You should have received a copy of the GNU General Public License
-**  along with this program; if not, write to the Free Software
-**  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 **
 **-----------------------------------------------------------------------------
 */
@@ -29,7 +18,11 @@
 /* A few generic types ... taken from ses-2 */
 enum enclosure_component_type {
 	ENCLOSURE_COMPONENT_DEVICE = 0x01,
+	ENCLOSURE_COMPONENT_CONTROLLER_ELECTRONICS = 0x07,
+	ENCLOSURE_COMPONENT_SCSI_TARGET_PORT = 0x14,
+	ENCLOSURE_COMPONENT_SCSI_INITIATOR_PORT = 0x15,
 	ENCLOSURE_COMPONENT_ARRAY_DEVICE = 0x17,
+	ENCLOSURE_COMPONENT_SAS_EXPANDER = 0x18,
 };
 
 /* ses-2 common element status */
@@ -108,7 +101,7 @@ struct enclosure_device {
 	struct device edev;
 	struct enclosure_component_callbacks *cb;
 	int components;
-	struct enclosure_component component[0];
+	struct enclosure_component component[];
 };
 
 static inline struct enclosure_device *

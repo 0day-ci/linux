@@ -156,6 +156,7 @@ nv40_gr_chan_new(struct nvkm_gr *base, struct nvkm_fifo_chan *fifoch,
 		return -ENOMEM;
 	nvkm_object_ctor(&nv40_gr_chan, oclass, &chan->object);
 	chan->gr = gr;
+	chan->fifo = fifoch;
 	*pobject = &chan->object;
 
 	spin_lock_irqsave(&chan->gr->base.engine.lock, flags);
@@ -274,8 +275,8 @@ nv40_gr_intr(struct nvkm_gr *base)
 				   "nstatus %08x [%s] ch %d [%08x %s] subc %d "
 				   "class %04x mthd %04x data %08x\n",
 			   show, msg, nsource, src, nstatus, sta,
-			   chan ? chan->fifo->chid : -1, inst << 4,
-			   chan ? chan->fifo->object.client->name : "unknown",
+			   chan ? chan->fifo->id : -1, inst << 4,
+			   chan ? chan->fifo->name : "unknown",
 			   subc, class, mthd, data);
 	}
 
@@ -428,7 +429,7 @@ nv40_gr_init(struct nvkm_gr *base)
 
 int
 nv40_gr_new_(const struct nvkm_gr_func *func, struct nvkm_device *device,
-	     int index, struct nvkm_gr **pgr)
+	     enum nvkm_subdev_type type, int inst, struct nvkm_gr **pgr)
 {
 	struct nv40_gr *gr;
 
@@ -437,7 +438,7 @@ nv40_gr_new_(const struct nvkm_gr_func *func, struct nvkm_device *device,
 	*pgr = &gr->base;
 	INIT_LIST_HEAD(&gr->chan);
 
-	return nvkm_gr_ctor(func, device, index, 0x00001000, true, &gr->base);
+	return nvkm_gr_ctor(func, device, type, inst, true, &gr->base);
 }
 
 static const struct nvkm_gr_func
@@ -469,7 +470,7 @@ nv40_gr = {
 };
 
 int
-nv40_gr_new(struct nvkm_device *device, int index, struct nvkm_gr **pgr)
+nv40_gr_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst, struct nvkm_gr **pgr)
 {
-	return nv40_gr_new_(&nv40_gr, device, index, pgr);
+	return nv40_gr_new_(&nv40_gr, device, type, inst, pgr);
 }

@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
  *
  * arch/arm/mach-mvebu/kirkwood.c
  *
  * Flattened Device Tree board initialization
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 
 #include <linux/clk.h>
@@ -25,7 +22,6 @@
 #include "kirkwood.h"
 #include "kirkwood-pm.h"
 #include "common.h"
-#include "board.h"
 
 static struct resource kirkwood_cpufreq_resources[] = {
 	[0] = {
@@ -85,6 +81,7 @@ static void __init kirkwood_dt_eth_fixup(void)
 		struct device_node *pnp = of_get_parent(np);
 		struct clk *clk;
 		struct property *pmac;
+		u8 tmpmac[ETH_ALEN];
 		void __iomem *io;
 		u8 *macaddr;
 		u32 reg;
@@ -93,7 +90,8 @@ static void __init kirkwood_dt_eth_fixup(void)
 			continue;
 
 		/* skip disabled nodes or nodes with valid MAC address*/
-		if (!of_device_is_available(pnp) || of_get_mac_address(np))
+		if (!of_device_is_available(pnp) ||
+		    !of_get_mac_address(np, tmpmac))
 			goto eth_fixup_skip;
 
 		clk = of_clk_get(pnp, 0);
@@ -108,9 +106,6 @@ static void __init kirkwood_dt_eth_fixup(void)
 		clk_prepare_enable(clk);
 
 		/* store MAC address register contents in local-mac-address */
-		pr_err(FW_INFO "%s: local-mac-address is not set\n",
-		       np->full_name);
-
 		pmac = kzalloc(sizeof(*pmac) + 6, GFP_KERNEL);
 		if (!pmac)
 			goto eth_fixup_no_mem;
@@ -151,7 +146,7 @@ eth_fixup_skip:
  * causes mbus errors (which can occur for example for PCI aborts) to
  * throw CPU aborts, which we're not set up to deal with.
  */
-void kirkwood_disable_mbus_error_propagation(void)
+static void kirkwood_disable_mbus_error_propagation(void)
 {
 	void __iomem *cpu_config;
 
@@ -180,10 +175,7 @@ static void __init kirkwood_dt_init(void)
 	kirkwood_pm_init();
 	kirkwood_dt_eth_fixup();
 
-	if (of_machine_is_compatible("lacie,netxbig"))
-		netxbig_init();
-
-	of_platform_populate(NULL, of_default_bus_match_table, auxdata, NULL);
+	of_platform_default_populate(NULL, auxdata, NULL);
 }
 
 static const char * const kirkwood_dt_board_compat[] __initconst = {

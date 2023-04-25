@@ -1,19 +1,5 @@
-/*
- * Copyright 2014 Cisco Systems, Inc.  All rights reserved.
- *
- * This program is free software; you may redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+// SPDX-License-Identifier: GPL-2.0-only
+// Copyright 2014 Cisco Systems, Inc.  All rights reserved.
 
 #include <linux/errno.h>
 #include <linux/pci.h>
@@ -39,17 +25,15 @@ snic_handle_link(struct work_struct *work)
 {
 	struct snic *snic = container_of(work, struct snic, link_work);
 
-	if (snic->config.xpt_type != SNIC_DAS) {
-		SNIC_HOST_INFO(snic->shost, "Link Event Received.\n");
-		SNIC_ASSERT_NOT_IMPL(1);
-
+	if (snic->config.xpt_type == SNIC_DAS)
 		return;
-	}
 
 	snic->link_status = svnic_dev_link_status(snic->vdev);
 	snic->link_down_cnt = svnic_dev_link_down_cnt(snic->vdev);
 	SNIC_HOST_INFO(snic->shost, "Link Event: Link %s.\n",
 		       ((snic->link_status) ? "Up" : "Down"));
+
+	SNIC_ASSERT_NOT_IMPL(1);
 }
 
 
@@ -75,7 +59,7 @@ snic_ver_enc(const char *s)
 			continue;
 		}
 
-		if (i > 4 || !isdigit(c))
+		if (i > 3 || !isdigit(c))
 			goto end;
 
 		v[i] = v[i] * 10 + (c - '0');
@@ -116,10 +100,7 @@ snic_queue_exch_ver_req(struct snic *snic)
 
 	rqi = snic_req_init(snic, 0);
 	if (!rqi) {
-		SNIC_HOST_ERR(snic->shost,
-			      "Queuing Exch Ver Req failed, err = %d\n",
-			      ret);
-
+		SNIC_HOST_ERR(snic->shost, "Init Exch Ver Req failed\n");
 		ret = -ENOMEM;
 		goto error;
 	}
@@ -153,7 +134,7 @@ error:
 /*
  * snic_io_exch_ver_cmpl_handler
  */
-int
+void
 snic_io_exch_ver_cmpl_handler(struct snic *snic, struct snic_fw_req *fwreq)
 {
 	struct snic_req_info *rqi = NULL;
@@ -162,7 +143,6 @@ snic_io_exch_ver_cmpl_handler(struct snic *snic, struct snic_fw_req *fwreq)
 	u32 cmnd_id, hid, max_sgs;
 	ulong ctx = 0;
 	unsigned long flags;
-	int ret = 0;
 
 	SNIC_HOST_INFO(snic->shost, "Exch Ver Compl Received.\n");
 	snic_io_hdr_dec(&fwreq->hdr, &typ, &hdr_stat, &cmnd_id, &hid, &ctx);
@@ -226,8 +206,6 @@ exch_cmpl_end:
 	snic_release_untagged_req(snic, rqi);
 
 	SNIC_HOST_INFO(snic->shost, "Exch_cmpl Done, hdr_stat %d.\n", hdr_stat);
-
-	return ret;
 } /* end of snic_io_exch_ver_cmpl_handler */
 
 /*

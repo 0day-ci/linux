@@ -44,9 +44,9 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "skeleton.dtsi"
-
 / {
+	#address-cells = <1>;
+	#size-cells = <1>;
 	compatible = "cnxt,cx92755";
 
 	interrupt-parent = <&intc>;
@@ -95,12 +95,19 @@
 		timeout-sec = <15>;
 	};
 
+	pinctrl: pinctrl@f0000e20 {
+		compatible = "cnxt,cx92755-pinctrl";
+		reg = <0xf0000e20 0x100>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
 	uc_regs: syscon@f00003a0 {
 		compatible = "cnxt,cx92755-uc", "syscon";
 		reg = <0xf00003a0 0x10>;
 	};
 
-	uart0: uart@f0000740 {
+	uart0: serial@f0000740 {
 		compatible = "cnxt,cx92755-usart";
 		reg = <0xf0000740 0x20>;
 		clocks = <&main_clk>;
@@ -108,7 +115,7 @@
 		status = "disabled";
 	};
 
-	uart1: uart@f0000760 {
+	uart1: serial@f0000760 {
 		compatible = "cnxt,cx92755-usart";
 		reg = <0xf0000760 0x20>;
 		clocks = <&main_clk>;
@@ -116,7 +123,7 @@
 		status = "disabled";
 	};
 
-	uart2: uart@f0000780 {
+	uart2: serial@f0000780 {
 		compatible = "cnxt,cx92755-usart";
 		reg = <0xf0000780 0x20>;
 		clocks = <&main_clk>;

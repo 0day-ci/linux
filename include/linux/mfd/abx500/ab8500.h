@@ -1,7 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (C) ST-Ericsson SA 2010
  *
- * License Terms: GNU General Public License v2
  * Author: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
  */
 #ifndef MFD_AB8500_H
@@ -62,6 +62,8 @@ enum ab8500_version {
 #define AB8500_PROD_TEST	0x13
 #define AB8500_STE_TEST		0x14
 #define AB8500_OTP_EMUL		0x15
+
+#define AB8500_DEBUG_FIELD_LAST	0x16
 
 /*
  * Interrupts
@@ -366,7 +368,6 @@ struct ab8500 {
 	int it_latchhier_num;
 };
 
-struct ab8500_regulator_platform_data;
 struct ab8500_codec_platform_data;
 struct ab8500_sysctrl_platform_data;
 
@@ -374,11 +375,9 @@ struct ab8500_sysctrl_platform_data;
  * struct ab8500_platform_data - AB8500 platform data
  * @irq_base: start of AB8500 IRQs, AB8500_NR_IRQS will be used
  * @init: board-specific initialization after detection of ab8500
- * @regulator: machine-specific constraints for regulators
  */
 struct ab8500_platform_data {
 	void (*init) (struct ab8500 *);
-	struct ab8500_regulator_platform_data *regulator;
 	struct ab8500_codec_platform_data *codec;
 	struct ab8500_sysctrl_platform_data *sysctrl;
 };

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Device Tree support for Armada 370 and XP platforms.
  *
@@ -6,23 +7,17 @@
  * Lior Amsalem <alior@marvell.com>
  * Gregory CLEMENT <gregory.clement@free-electrons.com>
  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/of_address.h>
 #include <linux/of_fdt.h>
-#include <linux/of_platform.h>
 #include <linux/io.h>
 #include <linux/clocksource.h>
 #include <linux/dma-mapping.h>
 #include <linux/memblock.h>
 #include <linux/mbus.h>
-#include <linux/signal.h>
 #include <linux/slab.h>
 #include <linux/irqchip.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -105,44 +100,12 @@ static void __init mvebu_memblock_reserve(void)
 static void __init mvebu_memblock_reserve(void) {}
 #endif
 
-/*
- * Early versions of Armada 375 SoC have a bug where the BootROM
- * leaves an external data abort pending. The kernel is hit by this
- * data abort as soon as it enters userspace, because it unmasks the
- * data aborts at this moment. We register a custom abort handler
- * below to ignore the first data abort to work around this
- * problem.
- */
-static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
-					struct pt_regs *regs)
-{
-	static int ignore_first;
-
-	if (!ignore_first && fsr == 0x1406) {
-		ignore_first = 1;
-		return 0;
-	}
-
-	return 1;
-}
-
 static void __init mvebu_init_irq(void)
 {
 	irqchip_init();
 	mvebu_scu_enable();
 	coherency_init();
 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
-}
-
-static void __init external_abort_quirk(void)
-{
-	u32 dev, rev;
-
-	if (mvebu_get_soc_id(&dev, &rev) == 0 && rev > ARMADA_375_Z1_REV)
-		return;
-
-	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
-			"imprecise external abort");
 }
 
 static void __init i2c_quirk(void)
@@ -170,17 +133,19 @@ static void __init i2c_quirk(void)
 
 		of_update_property(np, new_compat);
 	}
-	return;
 }
 
 static void __init mvebu_dt_init(void)
 {
 	if (of_machine_is_compatible("marvell,armadaxp"))
 		i2c_quirk();
-	if (of_machine_is_compatible("marvell,a375-db"))
-		external_abort_quirk();
+}
 
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+static void __init armada_370_xp_dt_fixup(void)
+{
+#ifdef CONFIG_SMP
+	smp_set_ops(smp_ops(armada_xp_smp_ops));
+#endif
 }
 
 static const char * const armada_370_xp_dt_compat[] __initconst = {
@@ -191,17 +156,12 @@ static const char * const armada_370_xp_dt_compat[] __initconst = {
 DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
 	.l2c_aux_val	= 0,
 	.l2c_aux_mask	= ~0,
-/*
- * The following field (.smp) is still needed to ensure backward
- * compatibility with old Device Trees that were not specifying the
- * cpus enable-method property.
- */
-	.smp		= smp_ops(armada_xp_smp_ops),
 	.init_machine	= mvebu_dt_init,
 	.init_irq       = mvebu_init_irq,
 	.restart	= mvebu_restart,
 	.reserve        = mvebu_memblock_reserve,
 	.dt_compat	= armada_370_xp_dt_compat,
+	.dt_fixup	= armada_370_xp_dt_fixup,
 MACHINE_END
 
 static const char * const armada_375_dt_compat[] __initconst = {

@@ -1,18 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * rt5645.h  --  RT5645 ALSA SoC audio driver
  *
  * Copyright 2013 Realtek Microelectronics
  * Author: Bard Liao <bardliao@realtek.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #ifndef __RT5645_H__
 #define __RT5645_H__
-
-#include <sound/rt5645.h>
 
 /* Info */
 #define RT5645_RESET				0x00
@@ -621,14 +616,14 @@
 #define RT5645_G_OM_L_SM_L_SFT			6
 #define RT5645_M_BST1_L_SM_L			(0x1 << 5)
 #define RT5645_M_BST1_L_SM_L_SFT		5
-#define RT5645_M_IN_L_SM_L			(0x1 << 3)
-#define RT5645_M_IN_L_SM_L_SFT			3
-#define RT5645_M_DAC_L1_SM_L			(0x1 << 1)
-#define RT5645_M_DAC_L1_SM_L_SFT		1
-#define RT5645_M_DAC_L2_SM_L			(0x1 << 2)
-#define RT5645_M_DAC_L2_SM_L_SFT		2
 #define RT5645_M_BST3_L_SM_L			(0x1 << 4)
 #define RT5645_M_BST3_L_SM_L_SFT		4
+#define RT5645_M_IN_L_SM_L			(0x1 << 3)
+#define RT5645_M_IN_L_SM_L_SFT			3
+#define RT5645_M_DAC_L2_SM_L			(0x1 << 2)
+#define RT5645_M_DAC_L2_SM_L_SFT		2
+#define RT5645_M_DAC_L1_SM_L			(0x1 << 1)
+#define RT5645_M_DAC_L1_SM_L_SFT		1
 
 /* SPK Right Mixer Control (0x47) */
 #define RT5645_G_RM_R_SM_R_MASK			(0x3 << 14)
@@ -643,14 +638,14 @@
 #define RT5645_G_OM_R_SM_R_SFT			6
 #define RT5645_M_BST2_R_SM_R			(0x1 << 5)
 #define RT5645_M_BST2_R_SM_R_SFT		5
-#define RT5645_M_IN_R_SM_R			(0x1 << 3)
-#define RT5645_M_IN_R_SM_R_SFT			3
-#define RT5645_M_DAC_R1_SM_R			(0x1 << 1)
-#define RT5645_M_DAC_R1_SM_R_SFT		1
-#define RT5645_M_DAC_R2_SM_R			(0x1 << 2)
-#define RT5645_M_DAC_R2_SM_R_SFT		2
 #define RT5645_M_BST3_R_SM_R			(0x1 << 4)
 #define RT5645_M_BST3_R_SM_R_SFT		4
+#define RT5645_M_IN_R_SM_R			(0x1 << 3)
+#define RT5645_M_IN_R_SM_R_SFT			3
+#define RT5645_M_DAC_R2_SM_R			(0x1 << 2)
+#define RT5645_M_DAC_R2_SM_R_SFT		2
+#define RT5645_M_DAC_R1_SM_R			(0x1 << 1)
+#define RT5645_M_DAC_R1_SM_R_SFT		1
 
 /* SPOLMIX Control (0x48) */
 #define RT5645_M_DAC_L1_SPM_L			(0x1 << 15)
@@ -670,13 +665,17 @@
 #define RT5645_M_SV_R_SPM_R			(0x1 << 0)
 #define RT5645_M_SV_R_SPM_R_SFT			0
 
+/* SPOMIX Ratio Control (0x4a) */
+#define RT5645_SPK_G_CLSD_MASK			(0x7 << 0)
+#define RT5645_SPK_G_CLSD_SFT			0
+
 /* Mono Output Mixer Control (0x4c) */
+#define RT5645_G_MONOMIX_MASK			(0x1 << 10)
+#define RT5645_G_MONOMIX_SFT			10
 #define RT5645_M_OV_L_MM			(0x1 << 9)
 #define RT5645_M_OV_L_MM_SFT			9
 #define RT5645_M_DAC_L2_MA			(0x1 << 8)
 #define RT5645_M_DAC_L2_MA_SFT			8
-#define RT5645_G_MONOMIX_MASK			(0x1 << 10)
-#define RT5645_G_MONOMIX_SFT			10
 #define RT5645_M_BST2_MM			(0x1 << 4)
 #define RT5645_M_BST2_MM_SFT			4
 #define RT5645_M_DAC_R1_MM			(0x1 << 3)
@@ -779,8 +778,6 @@
 #define RT5645_PWR_CLS_D_R_BIT			9
 #define RT5645_PWR_CLS_D_L			(0x1 << 8)
 #define RT5645_PWR_CLS_D_L_BIT			8
-#define RT5645_PWR_ADC_R			(0x1 << 1)
-#define RT5645_PWR_ADC_R_BIT			1
 #define RT5645_PWR_DAC_L2			(0x1 << 7)
 #define RT5645_PWR_DAC_L2_BIT			7
 #define RT5645_PWR_DAC_R2			(0x1 << 6)
@@ -1628,6 +1625,10 @@
 #define RT5645_OT_P_NOR				(0x0 << 10)
 #define RT5645_OT_P_INV				(0x1 << 10)
 #define RT5645_IRQ_JD_1_1_EN			(0x1 << 9)
+#define RT5645_JD_1_1_MASK			(0x1 << 7)
+#define RT5645_JD_1_1_SFT			7
+#define RT5645_JD_1_1_NOR			(0x0 << 7)
+#define RT5645_JD_1_1_INV			(0x1 << 7)
 
 /* IRQ Control 2 (0xbe) */
 #define RT5645_IRQ_MB1_OC_MASK			(0x1 << 15)
@@ -2012,6 +2013,9 @@
 
 
 /* Codec Private Register definition */
+/* DAC ADC Digital Volume (0x00) */
+#define RT5645_DA1_ZDET_SFT			6
+
 /* 3D Speaker Control (0x63) */
 #define RT5645_3D_SPK_MASK			(0x1 << 15)
 #define RT5645_3D_SPK_SFT			15
@@ -2108,6 +2112,12 @@ enum {
 #define RT5645_RXDC_SRC_STO			(0x0 << 7)
 #define RT5645_RXDC_SRC_MONO			(0x1 << 7)
 #define RT5645_RXDC_SRC_SFT			(7)
+#define RT5645_MICBIAS1_POW_CTRL_SEL_MASK	(0x1 << 5)
+#define RT5645_MICBIAS1_POW_CTRL_SEL_A		(0x0 << 5)
+#define RT5645_MICBIAS1_POW_CTRL_SEL_M		(0x1 << 5)
+#define RT5645_MICBIAS2_POW_CTRL_SEL_MASK	(0x1 << 4)
+#define RT5645_MICBIAS2_POW_CTRL_SEL_A		(0x0 << 4)
+#define RT5645_MICBIAS2_POW_CTRL_SEL_M		(0x1 << 4)
 #define RT5645_RXDP2_SEL_MASK			(0x1 << 3)
 #define RT5645_RXDP2_SEL_IF2			(0x0 << 3)
 #define RT5645_RXDP2_SEL_ADC			(0x1 << 3)
@@ -2116,6 +2126,10 @@ enum {
 /* General Control3 (0xfc) */
 #define RT5645_JD_PSV_MODE			(0x1 << 12)
 #define RT5645_IRQ_CLK_GATE_CTRL		(0x1 << 11)
+#define RT5645_DET_CLK_MASK			(0x3 << 9)
+#define RT5645_DET_CLK_DIS			(0x0 << 9)
+#define RT5645_DET_CLK_MODE1			(0x1 << 9)
+#define RT5645_DET_CLK_MODE2			(0x2 << 9)
 #define RT5645_MICINDET_MANU			(0x1 << 7)
 #define RT5645_RING2_SLEEVE_GND			(0x1 << 5)
 
@@ -2181,10 +2195,10 @@ enum {
 	RT5645_AD_MONO_R_FILTER = (0x1 << 5),
 };
 
-int rt5645_sel_asrc_clk_src(struct snd_soc_codec *codec,
+int rt5645_sel_asrc_clk_src(struct snd_soc_component *component,
 		unsigned int filter_mask, unsigned int clk_src);
 
-int rt5645_set_jack_detect(struct snd_soc_codec *codec,
+int rt5645_set_jack_detect(struct snd_soc_component *component,
 	struct snd_soc_jack *hp_jack, struct snd_soc_jack *mic_jack,
 	struct snd_soc_jack *btn_jack);
 #endif /* __RT5645_H__ */

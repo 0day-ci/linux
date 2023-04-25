@@ -1,33 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0
 /* System call table for i386. */
 
 #include <linux/linkage.h>
 #include <linux/sys.h>
 #include <linux/cache.h>
-#include <asm/asm-offsets.h>
+#include <linux/syscalls.h>
+#include <asm/syscall.h>
 
 #ifdef CONFIG_IA32_EMULATION
-#define SYM(sym, compat) compat
+#define __SYSCALL_WITH_COMPAT(nr, native, compat)	__SYSCALL(nr, compat)
 #else
-#define SYM(sym, compat) sym
-#define ia32_sys_call_table sys_call_table
-#define __NR_syscall_compat_max __NR_syscall_max
+#define __SYSCALL_WITH_COMPAT(nr, native, compat)	__SYSCALL(nr, native)
 #endif
 
-#define __SYSCALL_I386(nr, sym, compat) extern asmlinkage void SYM(sym, compat)(void) ;
+#define __SYSCALL(nr, sym) extern long __ia32_##sym(const struct pt_regs *);
+
 #include <asm/syscalls_32.h>
-#undef __SYSCALL_I386
+#undef __SYSCALL
 
-#define __SYSCALL_I386(nr, sym, compat) [nr] = SYM(sym, compat),
+#define __SYSCALL(nr, sym) __ia32_##sym,
 
-typedef asmlinkage void (*sys_call_ptr_t)(void);
-
-extern asmlinkage void sys_ni_syscall(void);
-
-__visible const sys_call_ptr_t ia32_sys_call_table[__NR_syscall_compat_max+1] = {
-	/*
-	 * Smells like a compiler bug -- it doesn't work
-	 * when the & below is removed.
-	 */
-	[0 ... __NR_syscall_compat_max] = &sys_ni_syscall,
+__visible const sys_call_ptr_t ia32_sys_call_table[] = {
 #include <asm/syscalls_32.h>
 };

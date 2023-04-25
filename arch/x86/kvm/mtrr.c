@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * vMTRR implementation
  *
@@ -11,10 +12,8 @@
  *   Marcelo Tosatti <mtosatti@redhat.com>
  *   Paolo Bonzini <pbonzini@redhat.com>
  *   Xiao Guangrong <guangrong.xiao@linux.intel.com>
- *
- * This work is licensed under the terms of the GNU GPL, version 2.  See
- * the COPYING file in the top-level directory.
  */
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kvm_host.h>
 #include <asm/mtrr.h>
@@ -44,15 +43,8 @@ static bool msr_mtrr_valid(unsigned msr)
 	case MSR_MTRRdefType:
 	case MSR_IA32_CR_PAT:
 		return true;
-	case 0x2f8:
-		return true;
 	}
 	return false;
-}
-
-static bool valid_pat_type(unsigned t)
-{
-	return t < 8 && (1 << t) & 0xf3; /* 0, 1, 4, 5, 6, 7 */
 }
 
 static bool valid_mtrr_type(unsigned t)
@@ -69,10 +61,7 @@ bool kvm_mtrr_valid(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 		return false;
 
 	if (msr == MSR_IA32_CR_PAT) {
-		for (i = 0; i < 8; i++)
-			if (!valid_pat_type((data >> (i * 8)) & 0xff))
-				return false;
-		return true;
+		return kvm_pat_valid(data);
 	} else if (msr == MSR_MTRRdefType) {
 		if (data & ~0xcff)
 			return false;
@@ -87,7 +76,7 @@ bool kvm_mtrr_valid(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 	/* variable MTRRs */
 	WARN_ON(!(msr >= 0x200 && msr < 0x200 + 2 * KVM_NR_VAR_MTRR));
 
-	mask = (~0ULL) << cpuid_maxphyaddr(vcpu);
+	mask = kvm_vcpu_reserved_gpa_bits_raw(vcpu);
 	if ((msr & 1) == 0) {
 		/* MTRR base */
 		if (!valid_mtrr_type(data & 0xff))
@@ -96,12 +85,8 @@ bool kvm_mtrr_valid(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 	} else
 		/* MTRR mask */
 		mask |= 0x7ff;
-	if (data & mask) {
-		kvm_inject_gp(vcpu, 0);
-		return false;
-	}
 
-	return true;
+	return (data & mask) == 0;
 }
 EXPORT_SYMBOL_GPL(kvm_mtrr_valid);
 
@@ -120,14 +105,22 @@ static u8 mtrr_default_type(struct kvm_mtrr *mtrr_state)
 	return mtrr_state->deftype & IA32_MTRR_DEF_TYPE_TYPE_MASK;
 }
 
-static u8 mtrr_disabled_type(void)
+static u8 mtrr_disabled_type(struct kvm_vcpu *vcpu)
 {
 	/*
 	 * Intel SDM 11.11.2.2: all MTRRs are disabled when
 	 * IA32_MTRR_DEF_TYPE.E bit is cleared, and the UC
 	 * memory type is applied to all of physical memory.
+	 *
+	 * However, virtual machines can be run with CPUID such that
+	 * there are no MTRRs.  In that case, the firmware will never
+	 * enable MTRRs and it is obviously undesirable to run the
+	 * guest entirely with UC memory and we use WB.
 	 */
-	return MTRR_TYPE_UNCACHABLE;
+	if (guest_cpuid_has(vcpu, X86_FEATURE_MTRR))
+		return MTRR_TYPE_UNCACHABLE;
+	else
+		return MTRR_TYPE_WRBACK;
 }
 
 /*
@@ -196,11 +189,15 @@ static bool fixed_msr_to_seg_unit(u32 msr, int *seg, int *unit)
 		break;
 	case MSR_MTRRfix16K_80000 ... MSR_MTRRfix16K_A0000:
 		*seg = 1;
-		*unit = msr - MSR_MTRRfix16K_80000;
+		*unit = array_index_nospec(
+			msr - MSR_MTRRfix16K_80000,
+			MSR_MTRRfix16K_A0000 - MSR_MTRRfix16K_80000 + 1);
 		break;
 	case MSR_MTRRfix4K_C0000 ... MSR_MTRRfix4K_F8000:
 		*seg = 2;
-		*unit = msr - MSR_MTRRfix4K_C0000;
+		*unit = array_index_nospec(
+			msr - MSR_MTRRfix4K_C0000,
+			MSR_MTRRfix4K_F8000 - MSR_MTRRfix4K_C0000 + 1);
 		break;
 	default:
 		return false;
@@ -267,7 +264,7 @@ static int fixed_mtrr_addr_to_seg(u64 addr)
 
 	for (seg = 0; seg < seg_num; seg++) {
 		mtrr_seg = &fixed_seg_table[seg];
-		if (mtrr_seg->start >= addr && addr < mtrr_seg->end)
+		if (mtrr_seg->start <= addr && addr < mtrr_seg->end)
 			return seg;
 	}
 
@@ -300,7 +297,6 @@ static void var_mtrr_range(struct kvm_mtrr_range *range, u64 *start, u64 *end)
 	*start = range->base & PAGE_MASK;
 
 	mask = range->mask & PAGE_MASK;
-	mask |= ~0ULL << boot_cpu_data.x86_phys_bits;
 
 	/* This cannot overflow because writing to the reserved bits of
 	 * variable MTRRs causes a #GP.
@@ -356,10 +352,14 @@ static void set_var_mtrr_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 	if (var_mtrr_range_is_valid(cur))
 		list_del(&mtrr_state->var_ranges[index].node);
 
+	/*
+	 * Set all illegal GPA bits in the mask, since those bits must
+	 * implicitly be 0.  The bits are then cleared when reading them.
+	 */
 	if (!is_mtrr_mask)
 		cur->base = data;
 	else
-		cur->mask = data;
+		cur->mask = data | kvm_vcpu_reserved_gpa_bits_raw(vcpu);
 
 	/* add it to the list if it's enabled. */
 	if (var_mtrr_range_is_valid(cur)) {
@@ -426,6 +426,8 @@ int kvm_mtrr_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 			*pdata = vcpu->arch.mtrr_state.var_ranges[index].base;
 		else
 			*pdata = vcpu->arch.mtrr_state.var_ranges[index].mask;
+
+		*pdata &= ~kvm_vcpu_reserved_gpa_bits_raw(vcpu);
 	}
 
 	return 0;
@@ -528,6 +530,7 @@ static void mtrr_lookup_var_start(struct mtrr_iter *iter)
 
 	iter->fixed = false;
 	iter->start_max = iter->start;
+	iter->range = NULL;
 	iter->range = list_prepare_entry(iter->range, &mtrr_state->head, node);
 
 	__mtrr_lookup_var_next(iter);
@@ -670,7 +673,7 @@ u8 kvm_mtrr_get_guest_memory_type(struct kvm_vcpu *vcpu, gfn_t gfn)
 	}
 
 	if (iter.mtrr_disabled)
-		return mtrr_disabled_type();
+		return mtrr_disabled_type(vcpu);
 
 	/* not contained in any MTRRs. */
 	if (type == -1)

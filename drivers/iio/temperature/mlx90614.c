@@ -1,12 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * mlx90614.c - Support for Melexis MLX90614 contactless IR temperature sensor
  *
  * Copyright (c) 2014 Peter Meerwald <pmeerw@pmeerw.net>
  * Copyright (c) 2015 Essensium NV
- *
- * This file is subject to the terms and conditions of version 2 of
- * the GNU General Public License.  See the file COPYING in the main
- * directory of this archive for more details.
+ * Copyright (c) 2015 Melexis
  *
  * Driver for the Melexis MLX90614 I2C 16-bit IR thermopile sensor
  *
@@ -19,8 +17,6 @@
  * i2c adapter is locked since it cannot be used by other clients.  The SCL line
  * always has a pull-up so we do not need an extra GPIO to drive it high.  If
  * the "wakeup" GPIO is not given, power management will be disabled.
- *
- * TODO: filter configuration
  */
 
 #include <linux/err.h>
@@ -32,6 +28,7 @@
 #include <linux/pm_runtime.h>
 
 #include <linux/iio/iio.h>
+#include <linux/iio/sysfs.h>
 
 #define MLX90614_OP_RAM		0x00
 #define MLX90614_OP_EEPROM	0x20
@@ -71,12 +68,26 @@
 #define MLX90614_CONST_SCALE 20 /* Scale in milliKelvin (0.02 * 1000) */
 #define MLX90614_CONST_RAW_EMISSIVITY_MAX 65535 /* max value for emissivity */
 #define MLX90614_CONST_EMISSIVITY_RESOLUTION 15259 /* 1/65535 ~ 0.000015259 */
+#define MLX90614_CONST_FIR 0x7 /* Fixed value for FIR part of low pass filter */
 
 struct mlx90614_data {
 	struct i2c_client *client;
 	struct mutex lock; /* for EEPROM access only */
 	struct gpio_desc *wakeup_gpio; /* NULL to disable sleep/wake-up */
 	unsigned long ready_timestamp; /* in jiffies */
+};
+
+/* Bandwidth values for IIR filtering */
+static const int mlx90614_iir_values[] = {77, 31, 20, 15, 723, 153, 110, 86};
+static const int mlx90614_freqs[][2] = {
+	{0, 150000},
+	{0, 200000},
+	{0, 310000},
+	{0, 770000},
+	{0, 860000},
+	{1, 100000},
+	{1, 530000},
+	{7, 230000}
 };
 
 /*
@@ -117,6 +128,43 @@ static s32 mlx90614_write_word(const struct i2c_client *client, u8 command,
 	return ret;
 }
 
+/*
+ * Find the IIR value inside mlx90614_iir_values array and return its position
+ * which is equivalent to the bit value in sensor register
+ */
+static inline s32 mlx90614_iir_search(const struct i2c_client *client,
+				      int value)
+{
+	int i;
+	s32 ret;
+
+	for (i = 0; i < ARRAY_SIZE(mlx90614_iir_values); ++i) {
+		if (value == mlx90614_iir_values[i])
+			break;
+	}
+
+	if (i == ARRAY_SIZE(mlx90614_iir_values))
+		return -EINVAL;
+
+	/*
+	 * CONFIG register values must not be changed so
+	 * we must read them before we actually write
+	 * changes
+	 */
+	ret = i2c_smbus_read_word_data(client, MLX90614_CONFIG);
+	if (ret < 0)
+		return ret;
+
+	ret &= ~MLX90614_CONFIG_FIR_MASK;
+	ret |= MLX90614_CONST_FIR << MLX90614_CONFIG_FIR_SHIFT;
+	ret &= ~MLX90614_CONFIG_IIR_MASK;
+	ret |= i << MLX90614_CONFIG_IIR_SHIFT;
+
+	/* Write changed values */
+	ret = mlx90614_write_word(client, MLX90614_CONFIG, ret);
+	return ret;
+}
+
 #ifdef CONFIG_PM
 /*
  * If @startup is true, make sure MLX90614_TIMING_STARTUP ms have elapsed since
@@ -127,11 +175,14 @@ static s32 mlx90614_write_word(const struct i2c_client *client, u8 command,
 static int mlx90614_power_get(struct mlx90614_data *data, bool startup)
 {
 	unsigned long now;
+	int ret;
 
 	if (!data->wakeup_gpio)
 		return 0;
 
-	pm_runtime_get_sync(&data->client->dev);
+	ret = pm_runtime_resume_and_get(&data->client->dev);
+	if (ret < 0)
+		return ret;
 
 	if (startup) {
 		now = jiffies;
@@ -218,7 +269,10 @@ static int mlx90614_read_raw(struct iio_dev *indio_dev,
 		*val = MLX90614_CONST_SCALE;
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_CALIBEMISSIVITY: /* 1/65535 / LSB */
-		mlx90614_power_get(data, false);
+		ret = mlx90614_power_get(data, false);
+		if (ret < 0)
+			return ret;
+
 		mutex_lock(&data->lock);
 		ret = i2c_smbus_read_word_data(data->client,
 					       MLX90614_EMISSIVITY);
@@ -236,6 +290,24 @@ static int mlx90614_read_raw(struct iio_dev *indio_dev,
 			*val2 = ret * MLX90614_CONST_EMISSIVITY_RESOLUTION;
 		}
 		return IIO_VAL_INT_PLUS_NANO;
+	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY: /* IIR setting with
+							     FIR = 1024 */
+		ret = mlx90614_power_get(data, false);
+		if (ret < 0)
+			return ret;
+
+		mutex_lock(&data->lock);
+		ret = i2c_smbus_read_word_data(data->client, MLX90614_CONFIG);
+		mutex_unlock(&data->lock);
+		mlx90614_power_put(data);
+
+		if (ret < 0)
+			return ret;
+
+		*val = mlx90614_iir_values[ret & MLX90614_CONFIG_IIR_MASK] / 100;
+		*val2 = (mlx90614_iir_values[ret & MLX90614_CONFIG_IIR_MASK] % 100) *
+			10000;
+		return IIO_VAL_INT_PLUS_MICRO;
 	default:
 		return -EINVAL;
 	}
@@ -255,10 +327,28 @@ static int mlx90614_write_raw(struct iio_dev *indio_dev,
 		val = val * MLX90614_CONST_RAW_EMISSIVITY_MAX +
 			val2 / MLX90614_CONST_EMISSIVITY_RESOLUTION;
 
-		mlx90614_power_get(data, false);
+		ret = mlx90614_power_get(data, false);
+		if (ret < 0)
+			return ret;
+
 		mutex_lock(&data->lock);
 		ret = mlx90614_write_word(data->client, MLX90614_EMISSIVITY,
 					  val);
+		mutex_unlock(&data->lock);
+		mlx90614_power_put(data);
+
+		return ret;
+	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY: /* IIR Filter setting */
+		if (val < 0 || val2 < 0)
+			return -EINVAL;
+
+		ret = mlx90614_power_get(data, false);
+		if (ret < 0)
+			return ret;
+
+		mutex_lock(&data->lock);
+		ret = mlx90614_iir_search(data->client,
+					  val * 100 + val2 / 10000);
 		mutex_unlock(&data->lock);
 		mlx90614_power_put(data);
 
@@ -275,6 +365,24 @@ static int mlx90614_write_raw_get_fmt(struct iio_dev *indio_dev,
 	switch (mask) {
 	case IIO_CHAN_INFO_CALIBEMISSIVITY:
 		return IIO_VAL_INT_PLUS_NANO;
+	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
+		return IIO_VAL_INT_PLUS_MICRO;
+	default:
+		return -EINVAL;
+	}
+}
+
+static int mlx90614_read_avail(struct iio_dev *indio_dev,
+			       struct iio_chan_spec const *chan,
+			       const int **vals, int *type, int *length,
+			       long mask)
+{
+	switch (mask) {
+	case IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY:
+		*vals = (int *)mlx90614_freqs;
+		*type = IIO_VAL_INT_PLUS_MICRO;
+		*length = 2 * ARRAY_SIZE(mlx90614_freqs);
+		return IIO_AVAIL_LIST;
 	default:
 		return -EINVAL;
 	}
@@ -294,7 +402,10 @@ static const struct iio_chan_spec mlx90614_channels[] = {
 		.modified = 1,
 		.channel2 = IIO_MOD_TEMP_OBJECT,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-		    BIT(IIO_CHAN_INFO_CALIBEMISSIVITY),
+		    BIT(IIO_CHAN_INFO_CALIBEMISSIVITY) |
+			BIT(IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY),
+		.info_mask_separate_available =
+			BIT(IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY),
 		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_OFFSET) |
 		    BIT(IIO_CHAN_INFO_SCALE),
 	},
@@ -305,7 +416,10 @@ static const struct iio_chan_spec mlx90614_channels[] = {
 		.channel = 1,
 		.channel2 = IIO_MOD_TEMP_OBJECT,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-		    BIT(IIO_CHAN_INFO_CALIBEMISSIVITY),
+		    BIT(IIO_CHAN_INFO_CALIBEMISSIVITY) |
+			BIT(IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY),
+		.info_mask_separate_available =
+			BIT(IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY),
 		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_OFFSET) |
 		    BIT(IIO_CHAN_INFO_SCALE),
 	},
@@ -315,7 +429,7 @@ static const struct iio_info mlx90614_info = {
 	.read_raw = mlx90614_read_raw,
 	.write_raw = mlx90614_write_raw,
 	.write_raw_get_fmt = mlx90614_write_raw_get_fmt,
-	.driver_module = THIS_MODULE,
+	.read_avail = mlx90614_read_avail,
 };
 
 #ifdef CONFIG_PM
@@ -349,11 +463,11 @@ static int mlx90614_wakeup(struct mlx90614_data *data)
 
 	dev_dbg(&data->client->dev, "Requesting wake-up");
 
-	i2c_lock_adapter(data->client->adapter);
+	i2c_lock_bus(data->client->adapter, I2C_LOCK_ROOT_ADAPTER);
 	gpiod_direction_output(data->wakeup_gpio, 0);
 	msleep(MLX90614_TIMING_WAKEUP);
 	gpiod_direction_input(data->wakeup_gpio);
-	i2c_unlock_adapter(data->client->adapter);
+	i2c_unlock_bus(data->client->adapter, I2C_LOCK_ROOT_ADAPTER);
 
 	data->ready_timestamp = jiffies +
 			msecs_to_jiffies(MLX90614_TIMING_STARTUP);
@@ -423,15 +537,15 @@ static int mlx90614_probe_num_ir_sensors(struct i2c_client *client)
 	return (ret & MLX90614_CONFIG_DUAL_MASK) ? 1 : 0;
 }
 
-static int mlx90614_probe(struct i2c_client *client,
-			 const struct i2c_device_id *id)
+static int mlx90614_probe(struct i2c_client *client)
 {
+	const struct i2c_device_id *id = i2c_client_get_device_id(client);
 	struct iio_dev *indio_dev;
 	struct mlx90614_data *data;
 	int ret;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_WORD_DATA))
-		return -ENODEV;
+		return -EOPNOTSUPP;
 
 	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
 	if (!indio_dev)
@@ -445,7 +559,6 @@ static int mlx90614_probe(struct i2c_client *client,
 
 	mlx90614_wakeup(data);
 
-	indio_dev->dev.parent = &client->dev;
 	indio_dev->name = id->name;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->info = &mlx90614_info;
@@ -477,7 +590,7 @@ static int mlx90614_probe(struct i2c_client *client,
 	return iio_device_register(indio_dev);
 }
 
-static int mlx90614_remove(struct i2c_client *client)
+static void mlx90614_remove(struct i2c_client *client)
 {
 	struct iio_dev *indio_dev = i2c_get_clientdata(client);
 	struct mlx90614_data *data = iio_priv(indio_dev);
@@ -490,8 +603,6 @@ static int mlx90614_remove(struct i2c_client *client)
 			mlx90614_sleep(data);
 		pm_runtime_set_suspended(&client->dev);
 	}
-
-	return 0;
 }
 
 static const struct i2c_device_id mlx90614_id[] = {
@@ -500,7 +611,12 @@ static const struct i2c_device_id mlx90614_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, mlx90614_id);
 
-#ifdef CONFIG_PM_SLEEP
+static const struct of_device_id mlx90614_of_match[] = {
+	{ .compatible = "melexis,mlx90614" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, mlx90614_of_match);
+
 static int mlx90614_pm_suspend(struct device *dev)
 {
 	struct iio_dev *indio_dev = i2c_get_clientdata(to_i2c_client(dev));
@@ -530,9 +646,7 @@ static int mlx90614_pm_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 
-#ifdef CONFIG_PM
 static int mlx90614_pm_runtime_suspend(struct device *dev)
 {
 	struct iio_dev *indio_dev = i2c_get_clientdata(to_i2c_client(dev));
@@ -548,20 +662,20 @@ static int mlx90614_pm_runtime_resume(struct device *dev)
 
 	return mlx90614_wakeup(data);
 }
-#endif
 
 static const struct dev_pm_ops mlx90614_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(mlx90614_pm_suspend, mlx90614_pm_resume)
-	SET_RUNTIME_PM_OPS(mlx90614_pm_runtime_suspend,
-			   mlx90614_pm_runtime_resume, NULL)
+	SYSTEM_SLEEP_PM_OPS(mlx90614_pm_suspend, mlx90614_pm_resume)
+	RUNTIME_PM_OPS(mlx90614_pm_runtime_suspend,
+		       mlx90614_pm_runtime_resume, NULL)
 };
 
 static struct i2c_driver mlx90614_driver = {
 	.driver = {
 		.name	= "mlx90614",
-		.pm	= &mlx90614_pm_ops,
+		.of_match_table = mlx90614_of_match,
+		.pm	= pm_ptr(&mlx90614_pm_ops),
 	},
-	.probe = mlx90614_probe,
+	.probe_new = mlx90614_probe,
 	.remove = mlx90614_remove,
 	.id_table = mlx90614_id,
 };
@@ -569,5 +683,6 @@ module_i2c_driver(mlx90614_driver);
 
 MODULE_AUTHOR("Peter Meerwald <pmeerw@pmeerw.net>");
 MODULE_AUTHOR("Vianney le Clément de Saint-Marcq <vianney.leclement@essensium.com>");
+MODULE_AUTHOR("Crt Mori <cmo@melexis.com>");
 MODULE_DESCRIPTION("Melexis MLX90614 contactless IR temperature sensor driver");
 MODULE_LICENSE("GPL");

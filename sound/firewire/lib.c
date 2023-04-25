@@ -1,14 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * miscellaneous helper functions
  *
  * Copyright (c) Clemens Ladisch <clemens@ladisch.de>
- * Licensed under the terms of the GNU General Public License, version 2.
  */
 
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/firewire.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 #include "lib.h"
 
 #define ERROR_RETRY_DELAY_MS	20

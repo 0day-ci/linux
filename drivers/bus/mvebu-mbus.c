@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Address map functions for Marvell EBU SoCs (Kirkwood, Armada
  * 370/XP, Dove, Orion5x and MV78xx0)
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  *
  * The Marvell EBU SoCs have a configurable physical address space:
  * the physical address at which certain devices (PCIe, NOR, NAND,
@@ -25,8 +22,8 @@
  *
  * - Reads out the SDRAM address decoding windows at initialization
  *   time, and fills the mvebu_mbus_dram_info structure with these
- *   informations. The exported function mv_mbus_dram_info() allow
- *   device drivers to get those informations related to the SDRAM
+ *   information. The exported function mv_mbus_dram_info() allow
+ *   device drivers to get those information related to the SDRAM
  *   address decoding windows. This is because devices also have their
  *   own windows (configured through registers that are part of each
  *   device register space), and therefore the drivers for Marvell
@@ -117,13 +114,13 @@ struct mvebu_mbus_soc_data {
 	unsigned int (*win_remap_offset)(const int win);
 	void (*setup_cpu_target)(struct mvebu_mbus_state *s);
 	int (*save_cpu_target)(struct mvebu_mbus_state *s,
-			       u32 *store_addr);
+			       u32 __iomem *store_addr);
 	int (*show_cpu_target)(struct mvebu_mbus_state *s,
 			       struct seq_file *seq, void *v);
 };
 
 /*
- * Used to store the state of one MBus window accross suspend/resume.
+ * Used to store the state of one MBus window across suspend/resume.
  */
 struct mvebu_mbus_win_data {
 	u32 ctrl;
@@ -469,18 +466,7 @@ static int mvebu_sdram_debug_show(struct seq_file *seq, void *v)
 	struct mvebu_mbus_state *mbus = &mbus_state;
 	return mbus->soc->show_cpu_target(mbus, seq, v);
 }
-
-static int mvebu_sdram_debug_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, mvebu_sdram_debug_show, inode->i_private);
-}
-
-static const struct file_operations mvebu_sdram_debug_fops = {
-	.open = mvebu_sdram_debug_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(mvebu_sdram_debug);
 
 static int mvebu_devs_debug_show(struct seq_file *seq, void *v)
 {
@@ -519,18 +505,7 @@ static int mvebu_devs_debug_show(struct seq_file *seq, void *v)
 
 	return 0;
 }
-
-static int mvebu_devs_debug_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, mvebu_devs_debug_show, inode->i_private);
-}
-
-static const struct file_operations mvebu_devs_debug_fops = {
-	.open = mvebu_devs_debug_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(mvebu_devs_debug);
 
 /*
  * SoC-specific functions and definitions
@@ -610,23 +585,23 @@ static unsigned int armada_xp_mbus_win_remap_offset(int win)
 static void __init
 mvebu_mbus_find_bridge_hole(uint64_t *start, uint64_t *end)
 {
-	struct memblock_region *r;
-	uint64_t s = 0;
+	phys_addr_t reg_start, reg_end;
+	uint64_t i, s = 0;
 
-	for_each_memblock(memory, r) {
+	for_each_mem_range(i, &reg_start, &reg_end) {
 		/*
 		 * This part of the memory is above 4 GB, so we don't
 		 * care for the MBus bridge hole.
 		 */
-		if (r->base >= 0x100000000ULL)
+		if ((u64)reg_start >= 0x100000000ULL)
 			continue;
 
 		/*
 		 * The MBus bridge hole is at the end of the RAM under
 		 * the 4 GB limit.
 		 */
-		if (r->base + r->size > s)
-			s = r->base + r->size;
+		if (reg_end > s)
+			s = reg_end;
 	}
 
 	*start = s;
@@ -720,7 +695,7 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
 			if (mbus->hw_io_coherency)
 				w->mbus_attr |= ATTR_HW_COHERENCY;
 			w->base = base & DDR_BASE_CS_LOW_MASK;
-			w->size = (size | ~DDR_SIZE_MASK) + 1;
+			w->size = (u64)(size | ~DDR_SIZE_MASK) + 1;
 		}
 	}
 	mvebu_mbus_dram_info.num_cs = cs;
@@ -728,7 +703,7 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
 
 static int
 mvebu_mbus_default_save_cpu_target(struct mvebu_mbus_state *mbus,
-				   u32 *store_addr)
+				   u32 __iomem *store_addr)
 {
 	int i;
 
@@ -780,7 +755,7 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
 
 static int
 mvebu_mbus_dove_save_cpu_target(struct mvebu_mbus_state *mbus,
-				u32 *store_addr)
+				u32 __iomem *store_addr)
 {
 	int i;
 
@@ -796,7 +771,7 @@ mvebu_mbus_dove_save_cpu_target(struct mvebu_mbus_state *mbus,
 	return 4;
 }
 
-int mvebu_mbus_save_cpu_target(u32 *store_addr)
+int mvebu_mbus_save_cpu_target(u32 __iomem *store_addr)
 {
 	return mbus_state.soc->save_cpu_target(&mbus_state, store_addr);
 }
@@ -914,6 +889,7 @@ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
 
 	return mvebu_mbus_alloc_window(s, base, size, remap, target, attribute);
 }
+EXPORT_SYMBOL_GPL(mvebu_mbus_add_window_remap_by_id);
 
 int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
 				phys_addr_t base, size_t size)
@@ -921,6 +897,7 @@ int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
 	return mvebu_mbus_add_window_remap_by_id(target, attribute, base,
 						 size, MVEBU_MBUS_NO_REMAP);
 }
+EXPORT_SYMBOL_GPL(mvebu_mbus_add_window_by_id);
 
 int mvebu_mbus_del_window(phys_addr_t base, size_t size)
 {
@@ -933,6 +910,7 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size)
 	mvebu_mbus_disable_window(&mbus_state, win);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(mvebu_mbus_del_window);
 
 void mvebu_mbus_get_pcie_mem_aperture(struct resource *res)
 {
@@ -940,6 +918,7 @@ void mvebu_mbus_get_pcie_mem_aperture(struct resource *res)
 		return;
 	*res = mbus_state.pcie_mem_aperture;
 }
+EXPORT_SYMBOL_GPL(mvebu_mbus_get_pcie_mem_aperture);
 
 void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
 {
@@ -947,6 +926,59 @@ void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
 		return;
 	*res = mbus_state.pcie_io_aperture;
 }
+EXPORT_SYMBOL_GPL(mvebu_mbus_get_pcie_io_aperture);
+
+int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
+{
+	const struct mbus_dram_target_info *dram;
+	int i;
+
+	/* Get dram info */
+	dram = mv_mbus_dram_info();
+	if (!dram) {
+		pr_err("missing DRAM information\n");
+		return -ENODEV;
+	}
+
+	/* Try to find matching DRAM window for phyaddr */
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+
+		if (cs->base <= phyaddr &&
+			phyaddr <= (cs->base + cs->size - 1)) {
+			*target = dram->mbus_dram_target_id;
+			*attr = cs->mbus_attr;
+			return 0;
+		}
+	}
+
+	pr_err("invalid dram address %pa\n", &phyaddr);
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(mvebu_mbus_get_dram_win_info);
+
+int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
+			       u8 *attr)
+{
+	int win;
+
+	for (win = 0; win < mbus_state.soc->num_wins; win++) {
+		u64 wbase;
+		int enabled;
+
+		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
+				       size, target, attr, NULL);
+
+		if (!enabled)
+			continue;
+
+		if (wbase <= phyaddr && phyaddr <= wbase + *size)
+			return win;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(mvebu_mbus_get_io_win_info);
 
 static __init int mvebu_mbus_debugfs_init(void)
 {
@@ -1037,7 +1069,7 @@ static void mvebu_mbus_resume(void)
 	}
 }
 
-struct syscore_ops mvebu_mbus_syscore_ops = {
+static struct syscore_ops mvebu_mbus_syscore_ops = {
 	.suspend	= mvebu_mbus_suspend,
 	.resume		= mvebu_mbus_resume,
 };
@@ -1059,7 +1091,7 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
 
 	mbus->sdramwins_base = ioremap(sdramwins_phys_base, sdramwins_size);
 	if (!mbus->sdramwins_base) {
-		iounmap(mbus_state.mbuswins_base);
+		iounmap(mbus->mbuswins_base);
 		return -ENOMEM;
 	}
 
@@ -1177,7 +1209,7 @@ mbus_parse_ranges(struct device_node *node,
 	tuple_len = (*cell_count) * sizeof(__be32);
 
 	if (ranges_len % tuple_len) {
-		pr_warn("malformed ranges entry '%s'\n", node->name);
+		pr_warn("malformed ranges entry '%pOFn'\n", node);
 		return -EINVAL;
 	}
 	return 0;

@@ -1,20 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright 2008-2010 Cisco Systems, Inc.  All rights reserved.
  * Copyright 2007 Nuova Systems, Inc.  All rights reserved.
- *
- * This program is free software; you may redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
  */
 
 #ifndef _VNIC_DEV_H_
@@ -155,7 +142,9 @@ int vnic_dev_deinit(struct vnic_dev *vdev);
 void vnic_dev_intr_coal_timer_info_default(struct vnic_dev *vdev);
 int vnic_dev_intr_coal_timer_info(struct vnic_dev *vdev);
 int vnic_dev_hang_reset(struct vnic_dev *vdev, int arg);
+int vnic_dev_soft_reset(struct vnic_dev *vdev, int arg);
 int vnic_dev_hang_reset_done(struct vnic_dev *vdev, int *done);
+int vnic_dev_soft_reset_done(struct vnic_dev *vdev, int *done);
 void vnic_dev_set_intr_mode(struct vnic_dev *vdev,
 	enum vnic_dev_intr_mode intr_mode);
 enum vnic_dev_intr_mode vnic_dev_get_intr_mode(struct vnic_dev *vdev);
@@ -177,5 +166,11 @@ int vnic_dev_set_mac_addr(struct vnic_dev *vdev, u8 *mac_addr);
 int vnic_dev_classifier(struct vnic_dev *vdev, u8 cmd, u16 *entry,
 			struct filter *data);
 int vnic_devcmd_init(struct vnic_dev *vdev);
+int vnic_dev_overlay_offload_ctrl(struct vnic_dev *vdev, u8 overlay, u8 config);
+int vnic_dev_overlay_offload_cfg(struct vnic_dev *vdev, u8 overlay,
+				 u16 vxlan_udp_port_number);
+int vnic_dev_get_supported_feature_ver(struct vnic_dev *vdev, u8 feature,
+				       u64 *supported_versions, u64 *a1);
+int vnic_dev_capable_rss_hash_type(struct vnic_dev *vdev, u8 *rss_hash_type);
 
 #endif /* _VNIC_DEV_H_ */

@@ -1,20 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * arch/arm/boot/dts/axm55xx.dtsi
  *
  * Copyright (C) 2013 LSI
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/lsi,axm5516-clks.h>
 
-#include "skeleton64.dtsi"
-
 / {
+	#address-cells = <2>;
+	#size-cells = <2>;
 	interrupt-parent = <&gic>;
 
 	aliases {
@@ -62,7 +58,7 @@
 		#address-cells = <0>;
 		interrupt-controller;
 		reg = <0x20 0x01001000 0 0x1000>,
-		      <0x20 0x01002000 0 0x1000>,
+		      <0x20 0x01002000 0 0x2000>,
 		      <0x20 0x01004000 0 0x2000>,
 		      <0x20 0x01006000 0 0x2000>;
 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
@@ -107,12 +103,12 @@
 		};
 
 		amba {
-			compatible = "arm,amba-bus";
+			compatible = "simple-bus";
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
 
-			serial0: uart@2010080000 {
+			serial0: serial@2010080000 {
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x20 0x10080000 0 0x1000>;
 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
@@ -121,7 +117,7 @@
 				status = "disabled";
 			};
 
-			serial1: uart@2010081000 {
+			serial1: serial@2010081000 {
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x20 0x10081000 0 0x1000>;
 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
@@ -130,7 +126,7 @@
 				status = "disabled";
 			};
 
-			serial2: uart@2010082000 {
+			serial2: serial@2010082000 {
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x20 0x10082000 0 0x1000>;
 				interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
@@ -139,7 +135,7 @@
 				status = "disabled";
 			};
 
-			serial3: uart@2010083000 {
+			serial3: serial@2010083000 {
 				compatible = "arm,pl011", "arm,primecell";
 				reg = <0x20 0x10083000 0 0x1000>;
 				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;

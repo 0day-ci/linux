@@ -1,16 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * ARC simulation Platform support code
  *
  * Copyright (C) 2012 Synopsys, Inc. (www.synopsys.com)
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/init.h>
 #include <asm/mach_desc.h>
-#include <asm/mcip.h>
 
 /*----------------------- Machine Descriptions ------------------------------
  *
@@ -21,17 +17,16 @@
  */
 
 static const char *simulation_compat[] __initconst = {
+#ifdef CONFIG_ISA_ARCOMPACT
 	"snps,nsim",
-	"snps,nsim_hs",
 	"snps,nsimosci",
+#else
 	"snps,nsimosci_hs",
+	"snps,zebu_hs",
+#endif
 	NULL,
 };
 
 MACHINE_START(SIMULATION, "simulation")
 	.dt_compat	= simulation_compat,
-#ifdef CONFIG_ARC_MCIP
-	.init_early	= mcip_init_early_smp,
-	.init_smp	= mcip_init_smp,
-#endif
 MACHINE_END

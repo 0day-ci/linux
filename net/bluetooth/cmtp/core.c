@@ -122,7 +122,7 @@ static inline void cmtp_add_msgpart(struct cmtp_session *session, int id, const 
 	if (skb && (skb->len > 0))
 		skb_copy_from_linear_data(skb, skb_put(nskb, skb->len), skb->len);
 
-	memcpy(skb_put(nskb, count), buf, count);
+	skb_put_data(nskb, buf, count);
 
 	session->reassembly[id] = nskb;
 
@@ -178,8 +178,7 @@ static inline int cmtp_recv_frame(struct cmtp_session *session, struct sk_buff *
 			cmtp_add_msgpart(session, id, skb->data + hdrlen, len);
 			break;
 		default:
-			if (session->reassembly[id] != NULL)
-				kfree_skb(session->reassembly[id]);
+			kfree_skb(session->reassembly[id]);
 			session->reassembly[id] = NULL;
 			break;
 		}
@@ -281,17 +280,14 @@ static int cmtp_session(void *arg)
 	struct cmtp_session *session = arg;
 	struct sock *sk = session->sock->sk;
 	struct sk_buff *skb;
-	wait_queue_t wait;
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 
 	BT_DBG("session %p", session);
 
 	set_user_nice(current, -15);
 
-	init_waitqueue_entry(&wait, current);
 	add_wait_queue(sk_sleep(sk), &wait);
 	while (1) {
-		set_current_state(TASK_INTERRUPTIBLE);
-
 		if (atomic_read(&session->terminate))
 			break;
 		if (sk->sk_state != BT_CONNECTED)
@@ -307,9 +303,12 @@ static int cmtp_session(void *arg)
 
 		cmtp_process_transmit(session);
 
-		schedule();
+		/*
+		 * wait_woken() performs the necessary memory barriers
+		 * for us; see the header comment for this primitive.
+		 */
+		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 	}
-	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(sk_sleep(sk), &wait);
 
 	down_write(&cmtp_session_sem);
@@ -324,7 +323,7 @@ static int cmtp_session(void *arg)
 	up_write(&cmtp_session_sem);
 
 	kfree(session);
-	module_put_and_exit(0);
+	module_put_and_kthread_exit(0);
 	return 0;
 }
 
@@ -393,8 +392,13 @@ int cmtp_add_connection(struct cmtp_connadd_req *req, struct socket *sock)
 	if (!(session->flags & BIT(CMTP_LOOPBACK))) {
 		err = cmtp_attach_device(session);
 		if (err < 0) {
+			/* Caller will call fput in case of failure, and so
+			 * will cmtp_session kthread.
+			 */
+			get_file(session->sock->file);
+
 			atomic_inc(&session->terminate);
-			wake_up_process(session->task);
+			wake_up_interruptible(sk_sleep(session->sock->sk));
 			up_write(&cmtp_session_sem);
 			return err;
 		}
@@ -432,7 +436,12 @@ int cmtp_del_connection(struct cmtp_conndel_req *req)
 
 		/* Stop session thread */
 		atomic_inc(&session->terminate);
-		wake_up_process(session->task);
+
+		/*
+		 * See the comment preceding the call to wait_woken()
+		 * in cmtp_session().
+		 */
+		wake_up_interruptible(sk_sleep(session->sock->sk));
 	} else
 		err = -ENOENT;
 
@@ -492,9 +501,7 @@ static int __init cmtp_init(void)
 {
 	BT_INFO("CMTP (CAPI Emulation) ver %s", VERSION);
 
-	cmtp_init_sockets();
-
-	return 0;
+	return cmtp_init_sockets();
 }
 
 static void __exit cmtp_exit(void)

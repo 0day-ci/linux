@@ -1,23 +1,37 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *	6LoWPAN IPv6 UDP compression according to RFC6282
- *
  *
  *	Authors:
  *	Alexander Aring	<aar@pengutronix.de>
  *
- *	Orignal written by:
+ *	Original written by:
  *	Alexander Smirnov <alex.bluesman.smirnov@gmail.com>
  *	Jon Smirl <jonsmirl@gmail.com>
- *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
  */
 
 #include "nhc.h"
 
-#define LOWPAN_NHC_UDP_IDLEN	1
+#define LOWPAN_NHC_UDP_MASK		0xF8
+#define LOWPAN_NHC_UDP_ID		0xF0
+
+#define LOWPAN_NHC_UDP_4BIT_PORT	0xF0B0
+#define LOWPAN_NHC_UDP_4BIT_MASK	0xFFF0
+#define LOWPAN_NHC_UDP_8BIT_PORT	0xF000
+#define LOWPAN_NHC_UDP_8BIT_MASK	0xFF00
+
+/* values for port compression, _with checksum_ ie bit 5 set to 0 */
+
+/* all inline */
+#define LOWPAN_NHC_UDP_CS_P_00	0xF0
+/* source 16bit inline, dest = 0xF0 + 8 bit inline */
+#define LOWPAN_NHC_UDP_CS_P_01	0xF1
+/* source = 0xF0 + 8bit inline, dest = 16 bit inline */
+#define LOWPAN_NHC_UDP_CS_P_10	0xF2
+/* source & dest = 0xF0B + 4bit inline */
+#define LOWPAN_NHC_UDP_CS_P_11	0xF3
+/* checksum elided */
+#define LOWPAN_NHC_UDP_CS_C	0x04
 
 static int udp_uncompress(struct sk_buff *skb, size_t needed)
 {
@@ -67,11 +81,22 @@ static int udp_uncompress(struct sk_buff *skb, size_t needed)
 	if (fail)
 		return -EINVAL;
 
-	/* UDP length needs to be infered from the lower layers
+	/* UDP length needs to be inferred from the lower layers
 	 * here, we obtain the hint from the remaining size of the
 	 * frame
 	 */
-	uh.len = htons(skb->len + sizeof(struct udphdr));
+	switch (lowpan_dev(skb->dev)->lltype) {
+	case LOWPAN_LLTYPE_IEEE802154:
+		if (lowpan_802154_cb(skb)->d_size)
+			uh.len = htons(lowpan_802154_cb(skb)->d_size -
+				       sizeof(struct ipv6hdr));
+		else
+			uh.len = htons(skb->len + sizeof(struct udphdr));
+		break;
+	default:
+		uh.len = htons(skb->len + sizeof(struct udphdr));
+		break;
+	}
 	pr_debug("uncompressed UDP length: src = %d", ntohs(uh.len));
 
 	/* replace the compressed UDP head by the uncompressed UDP
@@ -143,14 +168,8 @@ static int udp_compress(struct sk_buff *skb, u8 **hc_ptr)
 	return 0;
 }
 
-static void udp_nhid_setup(struct lowpan_nhc *nhc)
-{
-	nhc->id[0] = LOWPAN_NHC_UDP_ID;
-	nhc->idmask[0] = LOWPAN_NHC_UDP_MASK;
-}
-
 LOWPAN_NHC(nhc_udp, "RFC6282 UDP", NEXTHDR_UDP, sizeof(struct udphdr),
-	   udp_nhid_setup, LOWPAN_NHC_UDP_IDLEN, udp_uncompress, udp_compress);
+	   LOWPAN_NHC_UDP_ID, LOWPAN_NHC_UDP_MASK, udp_uncompress, udp_compress);
 
 module_lowpan_nhc(nhc_udp);
 MODULE_DESCRIPTION("6LoWPAN next header RFC6282 UDP compression");

@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * arch/arm/mach-orion5x/rd88f5182-setup.c
  *
  * Marvell Orion-NAS Reference Design Setup
  *
  * Maintainer: Ronen Shitrit <rshitrit@marvell.com>
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
  */
 #include <linux/gpio.h>
 #include <linux/kernel.h>
@@ -18,8 +15,8 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/pci.h>
-#include <mach/orion5x.h>
 #include "common.h"
+#include "orion5x.h"
 
 /*****************************************************************************
  * RD-88F5182 Info

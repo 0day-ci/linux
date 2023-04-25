@@ -1,15 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * TI Palmas MFD Driver
  *
  * Copyright 2011-2012 Texas Instruments Inc.
  *
  * Author: Graeme Gregory <gg@slimlogic.co.uk>
- *
- *  This program is free software; you can redistribute it and/or modify it
- *  under  the terms of the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the License, or (at your
- *  option) any later version.
- *
  */
 
 #include <linux/module.h>
@@ -430,9 +425,28 @@ static void palmas_power_off(void)
 {
 	unsigned int addr;
 	int ret, slave;
+	u8 powerhold_mask;
+	struct device_node *np = palmas_dev->dev->of_node;
 
-	if (!palmas_dev)
-		return;
+	if (of_property_read_bool(np, "ti,palmas-override-powerhold")) {
+		addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
+					  PALMAS_PRIMARY_SECONDARY_PAD2);
+		slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
+
+		if (of_device_is_compatible(np, "ti,tps65917"))
+			powerhold_mask =
+				TPS65917_PRIMARY_SECONDARY_PAD2_GPIO_5_MASK;
+		else
+			powerhold_mask =
+				PALMAS_PRIMARY_SECONDARY_PAD2_GPIO_7_MASK;
+
+		ret = regmap_update_bits(palmas_dev->regmap[slave], addr,
+					 powerhold_mask, 0);
+		if (ret)
+			dev_err(palmas_dev->dev,
+				"Unable to write PRIMARY_SECONDARY_PAD2 %d\n",
+				ret);
+	}
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PMU_CONTROL_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_PMU_CONTROL_BASE, PALMAS_DEV_CTRL);
@@ -488,8 +502,7 @@ static const struct of_device_id of_palmas_match_tbl[] = {
 };
 MODULE_DEVICE_TABLE(of, of_palmas_match_tbl);
 
-static int palmas_i2c_probe(struct i2c_client *i2c,
-			    const struct i2c_device_id *id)
+static int palmas_i2c_probe(struct i2c_client *i2c)
 {
 	struct palmas *palmas;
 	struct palmas_platform_data *pdata;
@@ -498,7 +511,6 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	int ret = 0, i;
 	unsigned int reg, addr;
 	int slave;
-	const struct of_device_id *match;
 
 	pdata = dev_get_platdata(&i2c->dev);
 
@@ -522,12 +534,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	palmas->dev = &i2c->dev;
 	palmas->irq = i2c->irq;
 
-	match = of_match_device(of_palmas_match_tbl, &i2c->dev);
-
-	if (!match)
-		return -ENODATA;
-
-	driver_data = (struct palmas_driver_data *)match->data;
+	driver_data = (struct palmas_driver_data *) device_get_match_data(&i2c->dev);
 	palmas->features = *driver_data->features;
 
 	for (i = 0; i < PALMAS_NUM_CLIENTS; i++) {
@@ -535,12 +542,12 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			palmas->i2c_clients[i] = i2c;
 		else {
 			palmas->i2c_clients[i] =
-					i2c_new_dummy(i2c->adapter,
+					i2c_new_dummy_device(i2c->adapter,
 							i2c->addr + i);
-			if (!palmas->i2c_clients[i]) {
+			if (IS_ERR(palmas->i2c_clients[i])) {
 				dev_err(palmas->dev,
 					"can't attach client %d\n", i);
-				ret = -ENOMEM;
+				ret = PTR_ERR(palmas->i2c_clients[i]);
 				goto err_i2c;
 			}
 			palmas->i2c_clients[i]->dev.of_node = of_node_get(node);
@@ -570,7 +577,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			PALMAS_POLARITY_CTRL, PALMAS_POLARITY_CTRL_INT_POLARITY,
 			reg);
 	if (ret < 0) {
-		dev_err(palmas->dev, "POLARITY_CTRL updat failed: %d\n", ret);
+		dev_err(palmas->dev, "POLARITY_CTRL update failed: %d\n", ret);
 		goto err_i2c;
 	}
 
@@ -665,7 +672,7 @@ no_irq:
 	 * otherwise continue and add devices using mfd helpers.
 	 */
 	if (node) {
-		ret = of_platform_populate(node, NULL, NULL, &i2c->dev);
+		ret = devm_of_platform_populate(&i2c->dev);
 		if (ret < 0) {
 			goto err_irq;
 		} else if (pdata->pm_off && !pm_power_off) {
@@ -686,7 +693,7 @@ err_i2c:
 	return ret;
 }
 
-static int palmas_i2c_remove(struct i2c_client *i2c)
+static void palmas_i2c_remove(struct i2c_client *i2c)
 {
 	struct palmas *palmas = i2c_get_clientdata(i2c);
 	int i;
@@ -702,8 +709,6 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
 		pm_power_off = NULL;
 		palmas_dev = NULL;
 	}
-
-	return 0;
 }
 
 static const struct i2c_device_id palmas_i2c_id[] = {
@@ -720,7 +725,7 @@ static struct i2c_driver palmas_i2c_driver = {
 		   .name = "palmas",
 		   .of_match_table = of_palmas_match_tbl,
 	},
-	.probe = palmas_i2c_probe,
+	.probe_new = palmas_i2c_probe,
 	.remove = palmas_i2c_remove,
 	.id_table = palmas_i2c_id,
 };

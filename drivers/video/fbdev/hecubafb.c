@@ -47,7 +47,7 @@
 #define DPY_W 600
 #define DPY_H 800
 
-static struct fb_fix_screeninfo hecubafb_fix = {
+static const struct fb_fix_screeninfo hecubafb_fix = {
 	.id =		"hecubafb",
 	.type =		FB_TYPE_PACKED_PIXELS,
 	.visual =	FB_VISUAL_MONO01,
@@ -58,7 +58,7 @@ static struct fb_fix_screeninfo hecubafb_fix = {
 	.accel =	FB_ACCEL_NONE,
 };
 
-static struct fb_var_screeninfo hecubafb_var = {
+static const struct fb_var_screeninfo hecubafb_var = {
 	.xres		= DPY_W,
 	.yres		= DPY_H,
 	.xres_virtual	= DPY_W,
@@ -115,8 +115,7 @@ static void hecubafb_dpy_update(struct hecubafb_par *par)
 }
 
 /* this is called back from the deferred io workqueue */
-static void hecubafb_dpy_deferred_io(struct fb_info *info,
-				struct list_head *pagelist)
+static void hecubafb_dpy_deferred_io(struct fb_info *info, struct list_head *pagereflist)
 {
 	hecubafb_dpy_update(info->par);
 }
@@ -197,13 +196,14 @@ static ssize_t hecubafb_write(struct fb_info *info, const char __user *buf,
 	return (err) ? err : count;
 }
 
-static struct fb_ops hecubafb_ops = {
+static const struct fb_ops hecubafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_read        = fb_sys_read,
 	.fb_write	= hecubafb_write,
 	.fb_fillrect	= hecubafb_fillrect,
 	.fb_copyarea	= hecubafb_copyarea,
 	.fb_imageblit	= hecubafb_imageblit,
+	.fb_mmap	= fb_deferred_io_mmap,
 };
 
 static struct fb_deferred_io hecubafb_defio = {

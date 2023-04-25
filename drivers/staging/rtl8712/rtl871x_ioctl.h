@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __IOCTL_H
 #define __IOCTL_H
 
@@ -11,7 +12,6 @@
 #ifndef OID_802_11_PMKID
 	#define OID_802_11_PMKID                        0x0d010123
 #endif
-
 
 /* For DDK-defined OIDs*/
 #define OID_NDIS_SEG1	0x00010100
@@ -68,7 +68,8 @@ struct oid_par_priv {
 
 struct oid_obj_priv {
 	unsigned char	dbg; /* 0: without OID debug message
-			      * 1: with OID debug message */
+			      * 1: with OID debug message
+			      */
 	uint (*oidfuns)(struct oid_par_priv *poid_par_priv);
 };
 

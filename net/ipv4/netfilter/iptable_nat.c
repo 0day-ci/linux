@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2006 Netfilter Core Team <coreteam@netfilter.org>
  * (C) 2011 Patrick McHardy <kaber@trash.net>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -15,8 +12,12 @@
 #include <net/ip.h>
 
 #include <net/netfilter/nf_nat.h>
-#include <net/netfilter/nf_nat_core.h>
-#include <net/netfilter/nf_nat_l3proto.h>
+
+struct iptable_nat_pernet {
+	struct nf_hook_ops *nf_nat_ops;
+};
+
+static unsigned int iptable_nat_net_id __read_mostly;
 
 static const struct xt_table nf_nat_ipv4_table = {
 	.name		= "nat",
@@ -28,124 +29,141 @@ static const struct xt_table nf_nat_ipv4_table = {
 	.af		= NFPROTO_IPV4,
 };
 
-static unsigned int iptable_nat_do_chain(const struct nf_hook_ops *ops,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state,
-					 struct nf_conn *ct)
-{
-	struct net *net = nf_ct_net(ct);
-
-	return ipt_do_table(skb, ops->hooknum, state, net->ipv4.nat_table);
-}
-
-static unsigned int iptable_nat_ipv4_fn(const struct nf_hook_ops *ops,
-					struct sk_buff *skb,
-					const struct nf_hook_state *state)
-{
-	return nf_nat_ipv4_fn(ops, skb, state, iptable_nat_do_chain);
-}
-
-static unsigned int iptable_nat_ipv4_in(const struct nf_hook_ops *ops,
-					struct sk_buff *skb,
-					const struct nf_hook_state *state)
-{
-	return nf_nat_ipv4_in(ops, skb, state, iptable_nat_do_chain);
-}
-
-static unsigned int iptable_nat_ipv4_out(const struct nf_hook_ops *ops,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state)
-{
-	return nf_nat_ipv4_out(ops, skb, state, iptable_nat_do_chain);
-}
-
-static unsigned int iptable_nat_ipv4_local_fn(const struct nf_hook_ops *ops,
-					      struct sk_buff *skb,
-					      const struct nf_hook_state *state)
-{
-	return nf_nat_ipv4_local_fn(ops, skb, state, iptable_nat_do_chain);
-}
-
-static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
-	/* Before packet filtering, change destination */
+static const struct nf_hook_ops nf_nat_ipv4_ops[] = {
 	{
-		.hook		= iptable_nat_ipv4_in,
-		.owner		= THIS_MODULE,
+		.hook		= ipt_do_table,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_PRE_ROUTING,
 		.priority	= NF_IP_PRI_NAT_DST,
 	},
-	/* After packet filtering, change source */
 	{
-		.hook		= iptable_nat_ipv4_out,
-		.owner		= THIS_MODULE,
+		.hook		= ipt_do_table,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP_PRI_NAT_SRC,
 	},
-	/* Before packet filtering, change destination */
 	{
-		.hook		= iptable_nat_ipv4_local_fn,
-		.owner		= THIS_MODULE,
+		.hook		= ipt_do_table,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_LOCAL_OUT,
 		.priority	= NF_IP_PRI_NAT_DST,
 	},
-	/* After packet filtering, change source */
 	{
-		.hook		= iptable_nat_ipv4_fn,
-		.owner		= THIS_MODULE,
+		.hook		= ipt_do_table,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP_PRI_NAT_SRC,
 	},
 };
 
-static int __net_init iptable_nat_net_init(struct net *net)
+static int ipt_nat_register_lookups(struct net *net)
+{
+	struct iptable_nat_pernet *xt_nat_net;
+	struct nf_hook_ops *ops;
+	struct xt_table *table;
+	int i, ret;
+
+	xt_nat_net = net_generic(net, iptable_nat_net_id);
+	table = xt_find_table(net, NFPROTO_IPV4, "nat");
+	if (WARN_ON_ONCE(!table))
+		return -ENOENT;
+
+	ops = kmemdup(nf_nat_ipv4_ops, sizeof(nf_nat_ipv4_ops), GFP_KERNEL);
+	if (!ops)
+		return -ENOMEM;
+
+	for (i = 0; i < ARRAY_SIZE(nf_nat_ipv4_ops); i++) {
+		ops[i].priv = table;
+		ret = nf_nat_ipv4_register_fn(net, &ops[i]);
+		if (ret) {
+			while (i)
+				nf_nat_ipv4_unregister_fn(net, &ops[--i]);
+
+			kfree(ops);
+			return ret;
+		}
+	}
+
+	xt_nat_net->nf_nat_ops = ops;
+	return 0;
+}
+
+static void ipt_nat_unregister_lookups(struct net *net)
+{
+	struct iptable_nat_pernet *xt_nat_net = net_generic(net, iptable_nat_net_id);
+	struct nf_hook_ops *ops = xt_nat_net->nf_nat_ops;
+	int i;
+
+	if (!ops)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(nf_nat_ipv4_ops); i++)
+		nf_nat_ipv4_unregister_fn(net, &ops[i]);
+
+	kfree(ops);
+}
+
+static int iptable_nat_table_init(struct net *net)
 {
 	struct ipt_replace *repl;
+	int ret;
 
 	repl = ipt_alloc_initial_table(&nf_nat_ipv4_table);
 	if (repl == NULL)
 		return -ENOMEM;
-	net->ipv4.nat_table = ipt_register_table(net, &nf_nat_ipv4_table, repl);
+
+	ret = ipt_register_table(net, &nf_nat_ipv4_table, repl, NULL);
+	if (ret < 0) {
+		kfree(repl);
+		return ret;
+	}
+
+	ret = ipt_nat_register_lookups(net);
+	if (ret < 0)
+		ipt_unregister_table_exit(net, "nat");
+
 	kfree(repl);
-	return PTR_ERR_OR_ZERO(net->ipv4.nat_table);
+	return ret;
+}
+
+static void __net_exit iptable_nat_net_pre_exit(struct net *net)
+{
+	ipt_nat_unregister_lookups(net);
 }
 
 static void __net_exit iptable_nat_net_exit(struct net *net)
 {
-	ipt_unregister_table(net, net->ipv4.nat_table);
+	ipt_unregister_table_exit(net, "nat");
 }
 
 static struct pernet_operations iptable_nat_net_ops = {
-	.init	= iptable_nat_net_init,
+	.pre_exit = iptable_nat_net_pre_exit,
 	.exit	= iptable_nat_net_exit,
+	.id	= &iptable_nat_net_id,
+	.size	= sizeof(struct iptable_nat_pernet),
 };
 
 static int __init iptable_nat_init(void)
 {
-	int err;
+	int ret = xt_register_template(&nf_nat_ipv4_table,
+				       iptable_nat_table_init);
 
-	err = register_pernet_subsys(&iptable_nat_net_ops);
-	if (err < 0)
-		goto err1;
+	if (ret < 0)
+		return ret;
 
-	err = nf_register_hooks(nf_nat_ipv4_ops, ARRAY_SIZE(nf_nat_ipv4_ops));
-	if (err < 0)
-		goto err2;
-	return 0;
+	ret = register_pernet_subsys(&iptable_nat_net_ops);
+	if (ret < 0) {
+		xt_unregister_template(&nf_nat_ipv4_table);
+		return ret;
+	}
 
-err2:
-	unregister_pernet_subsys(&iptable_nat_net_ops);
-err1:
-	return err;
+	return ret;
 }
 
 static void __exit iptable_nat_exit(void)
 {
-	nf_unregister_hooks(nf_nat_ipv4_ops, ARRAY_SIZE(nf_nat_ipv4_ops));
 	unregister_pernet_subsys(&iptable_nat_net_ops);
+	xt_unregister_template(&nf_nat_ipv4_table);
 }
 
 module_init(iptable_nat_init);

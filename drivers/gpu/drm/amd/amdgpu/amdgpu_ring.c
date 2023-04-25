@@ -28,7 +28,9 @@
  */
 #include <linux/seq_file.h>
 #include <linux/slab.h>
-#include <drm/drmP.h>
+#include <linux/uaccess.h>
+#include <linux/debugfs.h>
+
 #include <drm/amdgpu_drm.h>
 #include "amdgpu.h"
 #include "atom.h"
@@ -46,36 +48,10 @@
  * wptr.  The GPU then starts fetching commands and executes
  * them until the pointers are equal again.
  */
-static int amdgpu_debugfs_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring);
-
-/**
- * amdgpu_ring_free_size - update the free size
- *
- * @adev: amdgpu_device pointer
- * @ring: amdgpu_ring structure holding ring information
- *
- * Update the free dw slots in the ring buffer (all asics).
- */
-void amdgpu_ring_free_size(struct amdgpu_ring *ring)
-{
-	uint32_t rptr = amdgpu_ring_get_rptr(ring);
-
-	/* This works because ring_size is a power of 2 */
-	ring->ring_free_dw = rptr + (ring->ring_size / 4);
-	ring->ring_free_dw -= ring->wptr;
-	ring->ring_free_dw &= ring->ptr_mask;
-	if (!ring->ring_free_dw) {
-		/* this is an empty ring */
-		ring->ring_free_dw = ring->ring_size / 4;
-		/*  update lockup info to avoid false positive */
-		amdgpu_ring_lockup_update(ring);
-	}
-}
 
 /**
  * amdgpu_ring_alloc - allocate space on the ring buffer
  *
- * @adev: amdgpu_device pointer
  * @ring: amdgpu_ring structure holding ring information
  * @ndw: number of dwords to allocate in the ring buffer
  *
@@ -84,50 +60,22 @@ void amdgpu_ring_free_size(struct amdgpu_ring *ring)
  */
 int amdgpu_ring_alloc(struct amdgpu_ring *ring, unsigned ndw)
 {
-	int r;
-
-	/* make sure we aren't trying to allocate more space than there is on the ring */
-	if (ndw > (ring->ring_size / 4))
-		return -ENOMEM;
 	/* Align requested size with padding so unlock_commit can
 	 * pad safely */
-	amdgpu_ring_free_size(ring);
-	ndw = (ndw + ring->align_mask) & ~ring->align_mask;
-	while (ndw > (ring->ring_free_dw - 1)) {
-		amdgpu_ring_free_size(ring);
-		if (ndw < ring->ring_free_dw) {
-			break;
-		}
-		r = amdgpu_fence_wait_next(ring);
-		if (r)
-			return r;
-	}
+	ndw = (ndw + ring->funcs->align_mask) & ~ring->funcs->align_mask;
+
+	/* Make sure we aren't trying to allocate more space
+	 * than the maximum for one submission
+	 */
+	if (WARN_ON_ONCE(ndw > ring->max_dw))
+		return -ENOMEM;
+
 	ring->count_dw = ndw;
 	ring->wptr_old = ring->wptr;
-	return 0;
-}
 
-/**
- * amdgpu_ring_lock - lock the ring and allocate space on it
- *
- * @adev: amdgpu_device pointer
- * @ring: amdgpu_ring structure holding ring information
- * @ndw: number of dwords to allocate in the ring buffer
- *
- * Lock the ring and allocate @ndw dwords in the ring buffer
- * (all asics).
- * Returns 0 on success, error on failure.
- */
-int amdgpu_ring_lock(struct amdgpu_ring *ring, unsigned ndw)
-{
-	int r;
+	if (ring->funcs->begin_use)
+		ring->funcs->begin_use(ring);
 
-	mutex_lock(ring->ring_lock);
-	r = amdgpu_ring_alloc(ring, ndw);
-	if (r) {
-		mutex_unlock(ring->ring_lock);
-		return r;
-	}
 	return 0;
 }
 
@@ -143,14 +91,27 @@ void amdgpu_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
 	int i;
 
 	for (i = 0; i < count; i++)
-		amdgpu_ring_write(ring, ring->nop);
+		amdgpu_ring_write(ring, ring->funcs->nop);
+}
+
+/**
+ * amdgpu_ring_generic_pad_ib - pad IB with NOP packets
+ *
+ * @ring: amdgpu_ring structure holding ring information
+ * @ib: IB to add NOP packets to
+ *
+ * This is the generic pad_ib function for rings except SDMA
+ */
+void amdgpu_ring_generic_pad_ib(struct amdgpu_ring *ring, struct amdgpu_ib *ib)
+{
+	while (ib->length_dw & ring->funcs->align_mask)
+		ib->ptr[ib->length_dw++] = ring->funcs->nop;
 }
 
 /**
  * amdgpu_ring_commit - tell the GPU to execute the new
  * commands on the ring buffer
  *
- * @adev: amdgpu_device pointer
  * @ring: amdgpu_ring structure holding ring information
  *
  * Update the wptr (write pointer) to tell the GPU to
@@ -161,26 +122,16 @@ void amdgpu_ring_commit(struct amdgpu_ring *ring)
 	uint32_t count;
 
 	/* We pad to match fetch size */
-	count = ring->align_mask + 1 - (ring->wptr & ring->align_mask);
-	count %= ring->align_mask + 1;
+	count = ring->funcs->align_mask + 1 -
+		(ring->wptr & ring->funcs->align_mask);
+	count %= ring->funcs->align_mask + 1;
 	ring->funcs->insert_nop(ring, count);
 
 	mb();
 	amdgpu_ring_set_wptr(ring);
-}
 
-/**
- * amdgpu_ring_unlock_commit - tell the GPU to execute the new
- * commands on the ring buffer and unlock it
- *
- * @ring: amdgpu_ring structure holding ring information
- *
- * Call amdgpu_ring_commit() then unlock the ring (all asics).
- */
-void amdgpu_ring_unlock_commit(struct amdgpu_ring *ring)
-{
-	amdgpu_ring_commit(ring);
-	mutex_unlock(ring->ring_lock);
+	if (ring->funcs->end_use)
+		ring->funcs->end_use(ring);
 }
 
 /**
@@ -193,290 +144,276 @@ void amdgpu_ring_unlock_commit(struct amdgpu_ring *ring)
 void amdgpu_ring_undo(struct amdgpu_ring *ring)
 {
 	ring->wptr = ring->wptr_old;
+
+	if (ring->funcs->end_use)
+		ring->funcs->end_use(ring);
 }
 
-/**
- * amdgpu_ring_unlock_undo - reset the wptr and unlock the ring
- *
- * @ring: amdgpu_ring structure holding ring information
- *
- * Call amdgpu_ring_undo() then unlock the ring (all asics).
- */
-void amdgpu_ring_unlock_undo(struct amdgpu_ring *ring)
-{
-	amdgpu_ring_undo(ring);
-	mutex_unlock(ring->ring_lock);
-}
+#define amdgpu_ring_get_gpu_addr(ring, offset)				\
+	(ring->is_mes_queue ?						\
+	 (ring->mes_ctx->meta_data_gpu_addr + offset) :			\
+	 (ring->adev->wb.gpu_addr + offset * 4))
 
-/**
- * amdgpu_ring_lockup_update - update lockup variables
- *
- * @ring: amdgpu_ring structure holding ring information
- *
- * Update the last rptr value and timestamp (all asics).
- */
-void amdgpu_ring_lockup_update(struct amdgpu_ring *ring)
-{
-	atomic_set(&ring->last_rptr, amdgpu_ring_get_rptr(ring));
-	atomic64_set(&ring->last_activity, jiffies_64);
-}
-
-/**
- * amdgpu_ring_test_lockup() - check if ring is lockedup by recording information
- * @ring:       amdgpu_ring structure holding ring information
- *
- */
-bool amdgpu_ring_test_lockup(struct amdgpu_ring *ring)
-{
-	uint32_t rptr = amdgpu_ring_get_rptr(ring);
-	uint64_t last = atomic64_read(&ring->last_activity);
-	uint64_t elapsed;
-
-	if (rptr != atomic_read(&ring->last_rptr)) {
-		/* ring is still working, no lockup */
-		amdgpu_ring_lockup_update(ring);
-		return false;
-	}
-
-	elapsed = jiffies_to_msecs(jiffies_64 - last);
-	if (amdgpu_lockup_timeout && elapsed >= amdgpu_lockup_timeout) {
-		dev_err(ring->adev->dev, "ring %d stalled for more than %llumsec\n",
-			ring->idx, elapsed);
-		return true;
-	}
-	/* give a chance to the GPU ... */
-	return false;
-}
-
-/**
- * amdgpu_ring_backup - Back up the content of a ring
- *
- * @ring: the ring we want to back up
- *
- * Saves all unprocessed commits from a ring, returns the number of dwords saved.
- */
-unsigned amdgpu_ring_backup(struct amdgpu_ring *ring,
-			    uint32_t **data)
-{
-	unsigned size, ptr, i;
-
-	/* just in case lock the ring */
-	mutex_lock(ring->ring_lock);
-	*data = NULL;
-
-	if (ring->ring_obj == NULL) {
-		mutex_unlock(ring->ring_lock);
-		return 0;
-	}
-
-	/* it doesn't make sense to save anything if all fences are signaled */
-	if (!amdgpu_fence_count_emitted(ring)) {
-		mutex_unlock(ring->ring_lock);
-		return 0;
-	}
-
-	ptr = le32_to_cpu(*ring->next_rptr_cpu_addr);
-
-	size = ring->wptr + (ring->ring_size / 4);
-	size -= ptr;
-	size &= ring->ptr_mask;
-	if (size == 0) {
-		mutex_unlock(ring->ring_lock);
-		return 0;
-	}
-
-	/* and then save the content of the ring */
-	*data = kmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
-	if (!*data) {
-		mutex_unlock(ring->ring_lock);
-		return 0;
-	}
-	for (i = 0; i < size; ++i) {
-		(*data)[i] = ring->ring[ptr++];
-		ptr &= ring->ptr_mask;
-	}
-
-	mutex_unlock(ring->ring_lock);
-	return size;
-}
-
-/**
- * amdgpu_ring_restore - append saved commands to the ring again
- *
- * @ring: ring to append commands to
- * @size: number of dwords we want to write
- * @data: saved commands
- *
- * Allocates space on the ring and restore the previously saved commands.
- */
-int amdgpu_ring_restore(struct amdgpu_ring *ring,
-			unsigned size, uint32_t *data)
-{
-	int i, r;
-
-	if (!size || !data)
-		return 0;
-
-	/* restore the saved ring content */
-	r = amdgpu_ring_lock(ring, size);
-	if (r)
-		return r;
-
-	for (i = 0; i < size; ++i) {
-		amdgpu_ring_write(ring, data[i]);
-	}
-
-	amdgpu_ring_unlock_commit(ring);
-	kfree(data);
-	return 0;
-}
+#define amdgpu_ring_get_cpu_addr(ring, offset)				\
+	(ring->is_mes_queue ?						\
+	 (void *)((uint8_t *)(ring->mes_ctx->meta_data_ptr) + offset) : \
+	 (&ring->adev->wb.wb[offset]))
 
 /**
  * amdgpu_ring_init - init driver ring struct.
  *
  * @adev: amdgpu_device pointer
  * @ring: amdgpu_ring structure holding ring information
- * @ring_size: size of the ring
- * @nop: nop packet for this ring
+ * @max_dw: maximum number of dw for ring alloc
+ * @irq_src: interrupt source to use for this ring
+ * @irq_type: interrupt type to use for this ring
+ * @hw_prio: ring priority (NORMAL/HIGH)
+ * @sched_score: optional score atomic shared with other schedulers
  *
  * Initialize the driver information for the selected ring (all asics).
  * Returns 0 on success, error on failure.
  */
 int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
-		     unsigned ring_size, u32 nop, u32 align_mask,
-		     struct amdgpu_irq_src *irq_src, unsigned irq_type,
-		     enum amdgpu_ring_type ring_type)
+		     unsigned int max_dw, struct amdgpu_irq_src *irq_src,
+		     unsigned int irq_type, unsigned int hw_prio,
+		     atomic_t *sched_score)
 {
-	u32 rb_bufsz;
 	int r;
+	int sched_hw_submission = amdgpu_sched_hw_submission;
+	u32 *num_sched;
+	u32 hw_ip;
+
+	/* Set the hw submission limit higher for KIQ because
+	 * it's used for a number of gfx/compute tasks by both
+	 * KFD and KGD which may have outstanding fences and
+	 * it doesn't really use the gpu scheduler anyway;
+	 * KIQ tasks get submitted directly to the ring.
+	 */
+	if (ring->funcs->type == AMDGPU_RING_TYPE_KIQ)
+		sched_hw_submission = max(sched_hw_submission, 256);
+	else if (ring == &adev->sdma.instance[0].page)
+		sched_hw_submission = 256;
 
 	if (ring->adev == NULL) {
 		if (adev->num_rings >= AMDGPU_MAX_RINGS)
 			return -EINVAL;
 
 		ring->adev = adev;
-		ring->idx = adev->num_rings++;
-		adev->rings[ring->idx] = ring;
+		ring->num_hw_submission = sched_hw_submission;
+		ring->sched_score = sched_score;
+		ring->vmid_wait = dma_fence_get_stub();
+
+		if (!ring->is_mes_queue) {
+			ring->idx = adev->num_rings++;
+			adev->rings[ring->idx] = ring;
+		}
+
 		r = amdgpu_fence_driver_init_ring(ring);
 		if (r)
 			return r;
 	}
 
-	r = amdgpu_wb_get(adev, &ring->rptr_offs);
-	if (r) {
-		dev_err(adev->dev, "(%d) ring rptr_offs wb alloc failed\n", r);
-		return r;
+	if (ring->is_mes_queue) {
+		ring->rptr_offs = amdgpu_mes_ctx_get_offs(ring,
+				AMDGPU_MES_CTX_RPTR_OFFS);
+		ring->wptr_offs = amdgpu_mes_ctx_get_offs(ring,
+				AMDGPU_MES_CTX_WPTR_OFFS);
+		ring->fence_offs = amdgpu_mes_ctx_get_offs(ring,
+				AMDGPU_MES_CTX_FENCE_OFFS);
+		ring->trail_fence_offs = amdgpu_mes_ctx_get_offs(ring,
+				AMDGPU_MES_CTX_TRAIL_FENCE_OFFS);
+		ring->cond_exe_offs = amdgpu_mes_ctx_get_offs(ring,
+				AMDGPU_MES_CTX_COND_EXE_OFFS);
+	} else {
+		r = amdgpu_device_wb_get(adev, &ring->rptr_offs);
+		if (r) {
+			dev_err(adev->dev, "(%d) ring rptr_offs wb alloc failed\n", r);
+			return r;
+		}
+
+		r = amdgpu_device_wb_get(adev, &ring->wptr_offs);
+		if (r) {
+			dev_err(adev->dev, "(%d) ring wptr_offs wb alloc failed\n", r);
+			return r;
+		}
+
+		r = amdgpu_device_wb_get(adev, &ring->fence_offs);
+		if (r) {
+			dev_err(adev->dev, "(%d) ring fence_offs wb alloc failed\n", r);
+			return r;
+		}
+
+		r = amdgpu_device_wb_get(adev, &ring->trail_fence_offs);
+		if (r) {
+			dev_err(adev->dev, "(%d) ring trail_fence_offs wb alloc failed\n", r);
+			return r;
+		}
+
+		r = amdgpu_device_wb_get(adev, &ring->cond_exe_offs);
+		if (r) {
+			dev_err(adev->dev, "(%d) ring cond_exec_polling wb alloc failed\n", r);
+			return r;
+		}
 	}
 
-	r = amdgpu_wb_get(adev, &ring->wptr_offs);
-	if (r) {
-		dev_err(adev->dev, "(%d) ring wptr_offs wb alloc failed\n", r);
-		return r;
-	}
+	ring->fence_gpu_addr =
+		amdgpu_ring_get_gpu_addr(ring, ring->fence_offs);
+	ring->fence_cpu_addr =
+		amdgpu_ring_get_cpu_addr(ring, ring->fence_offs);
 
-	r = amdgpu_wb_get(adev, &ring->fence_offs);
-	if (r) {
-		dev_err(adev->dev, "(%d) ring fence_offs wb alloc failed\n", r);
-		return r;
-	}
+	ring->rptr_gpu_addr =
+		amdgpu_ring_get_gpu_addr(ring, ring->rptr_offs);
+	ring->rptr_cpu_addr =
+		amdgpu_ring_get_cpu_addr(ring, ring->rptr_offs);
 
-	r = amdgpu_wb_get(adev, &ring->next_rptr_offs);
-	if (r) {
-		dev_err(adev->dev, "(%d) ring next_rptr wb alloc failed\n", r);
-		return r;
-	}
-	ring->next_rptr_gpu_addr = adev->wb.gpu_addr + (ring->next_rptr_offs * 4);
-	ring->next_rptr_cpu_addr = &adev->wb.wb[ring->next_rptr_offs];
-	spin_lock_init(&ring->fence_lock);
+	ring->wptr_gpu_addr =
+		amdgpu_ring_get_gpu_addr(ring, ring->wptr_offs);
+	ring->wptr_cpu_addr =
+		amdgpu_ring_get_cpu_addr(ring, ring->wptr_offs);
+
+	ring->trail_fence_gpu_addr =
+		amdgpu_ring_get_gpu_addr(ring, ring->trail_fence_offs);
+	ring->trail_fence_cpu_addr =
+		amdgpu_ring_get_cpu_addr(ring, ring->trail_fence_offs);
+
+	ring->cond_exe_gpu_addr =
+		amdgpu_ring_get_gpu_addr(ring, ring->cond_exe_offs);
+	ring->cond_exe_cpu_addr =
+		amdgpu_ring_get_cpu_addr(ring, ring->cond_exe_offs);
+
+	/* always set cond_exec_polling to CONTINUE */
+	*ring->cond_exe_cpu_addr = 1;
+
 	r = amdgpu_fence_driver_start_ring(ring, irq_src, irq_type);
 	if (r) {
 		dev_err(adev->dev, "failed initializing fences (%d).\n", r);
 		return r;
 	}
 
-	ring->ring_lock = &adev->ring_lock;
-	/* Align ring size */
-	rb_bufsz = order_base_2(ring_size / 8);
-	ring_size = (1 << (rb_bufsz + 1)) * 4;
-	ring->ring_size = ring_size;
-	ring->align_mask = align_mask;
-	ring->nop = nop;
-	ring->type = ring_type;
+	ring->ring_size = roundup_pow_of_two(max_dw * 4 * sched_hw_submission);
+
+	ring->buf_mask = (ring->ring_size / 4) - 1;
+	ring->ptr_mask = ring->funcs->support_64bit_ptrs ?
+		0xffffffffffffffff : ring->buf_mask;
 
 	/* Allocate ring buffer */
-	if (ring->ring_obj == NULL) {
-		r = amdgpu_bo_create(adev, ring->ring_size, PAGE_SIZE, true,
-				     AMDGPU_GEM_DOMAIN_GTT, 0,
-				     NULL, NULL, &ring->ring_obj);
+	if (ring->is_mes_queue) {
+		int offset = 0;
+
+		BUG_ON(ring->ring_size > PAGE_SIZE*4);
+
+		offset = amdgpu_mes_ctx_get_offs(ring,
+					 AMDGPU_MES_CTX_RING_OFFS);
+		ring->gpu_addr = amdgpu_mes_ctx_get_offs_gpu_addr(ring, offset);
+		ring->ring = amdgpu_mes_ctx_get_offs_cpu_addr(ring, offset);
+		amdgpu_ring_clear_ring(ring);
+
+	} else if (ring->ring_obj == NULL) {
+		r = amdgpu_bo_create_kernel(adev, ring->ring_size + ring->funcs->extra_dw, PAGE_SIZE,
+					    AMDGPU_GEM_DOMAIN_GTT,
+					    &ring->ring_obj,
+					    &ring->gpu_addr,
+					    (void **)&ring->ring);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring create failed\n", r);
 			return r;
 		}
-		r = amdgpu_bo_reserve(ring->ring_obj, false);
-		if (unlikely(r != 0))
-			return r;
-		r = amdgpu_bo_pin(ring->ring_obj, AMDGPU_GEM_DOMAIN_GTT,
-					&ring->gpu_addr);
-		if (r) {
-			amdgpu_bo_unreserve(ring->ring_obj);
-			dev_err(adev->dev, "(%d) ring pin failed\n", r);
-			return r;
-		}
-		r = amdgpu_bo_kmap(ring->ring_obj,
-				       (void **)&ring->ring);
-		amdgpu_bo_unreserve(ring->ring_obj);
-		if (r) {
-			dev_err(adev->dev, "(%d) ring map failed\n", r);
-			return r;
-		}
+		amdgpu_ring_clear_ring(ring);
 	}
-	ring->ptr_mask = (ring->ring_size / 4) - 1;
-	ring->ring_free_dw = ring->ring_size / 4;
 
-	if (amdgpu_debugfs_ring_init(adev, ring)) {
-		DRM_ERROR("Failed to register debugfs file for rings !\n");
+	ring->max_dw = max_dw;
+	ring->hw_prio = hw_prio;
+
+	if (!ring->no_scheduler) {
+		hw_ip = ring->funcs->type;
+		num_sched = &adev->gpu_sched[hw_ip][hw_prio].num_scheds;
+		adev->gpu_sched[hw_ip][hw_prio].sched[(*num_sched)++] =
+			&ring->sched;
 	}
-	amdgpu_ring_lockup_update(ring);
+
 	return 0;
 }
 
 /**
  * amdgpu_ring_fini - tear down the driver ring struct.
  *
- * @adev: amdgpu_device pointer
  * @ring: amdgpu_ring structure holding ring information
  *
  * Tear down the driver information for the selected ring (all asics).
  */
 void amdgpu_ring_fini(struct amdgpu_ring *ring)
 {
-	int r;
-	struct amdgpu_bo *ring_obj;
 
-	if (ring->ring_lock == NULL)
+	/* Not to finish a ring which is not initialized */
+	if (!(ring->adev) ||
+	    (!ring->is_mes_queue && !(ring->adev->rings[ring->idx])))
 		return;
 
-	mutex_lock(ring->ring_lock);
-	ring_obj = ring->ring_obj;
-	ring->ready = false;
-	ring->ring = NULL;
-	ring->ring_obj = NULL;
-	mutex_unlock(ring->ring_lock);
+	ring->sched.ready = false;
 
-	amdgpu_wb_free(ring->adev, ring->fence_offs);
-	amdgpu_wb_free(ring->adev, ring->rptr_offs);
-	amdgpu_wb_free(ring->adev, ring->wptr_offs);
-	amdgpu_wb_free(ring->adev, ring->next_rptr_offs);
+	if (!ring->is_mes_queue) {
+		amdgpu_device_wb_free(ring->adev, ring->rptr_offs);
+		amdgpu_device_wb_free(ring->adev, ring->wptr_offs);
 
-	if (ring_obj) {
-		r = amdgpu_bo_reserve(ring_obj, false);
-		if (likely(r == 0)) {
-			amdgpu_bo_kunmap(ring_obj);
-			amdgpu_bo_unpin(ring_obj);
-			amdgpu_bo_unreserve(ring_obj);
-		}
-		amdgpu_bo_unref(&ring_obj);
+		amdgpu_device_wb_free(ring->adev, ring->cond_exe_offs);
+		amdgpu_device_wb_free(ring->adev, ring->fence_offs);
+
+		amdgpu_bo_free_kernel(&ring->ring_obj,
+				      &ring->gpu_addr,
+				      (void **)&ring->ring);
 	}
+
+	dma_fence_put(ring->vmid_wait);
+	ring->vmid_wait = NULL;
+	ring->me = 0;
+
+	if (!ring->is_mes_queue)
+		ring->adev->rings[ring->idx] = NULL;
+}
+
+/**
+ * amdgpu_ring_emit_reg_write_reg_wait_helper - ring helper
+ *
+ * @ring: ring to write to
+ * @reg0: register to write
+ * @reg1: register to wait on
+ * @ref: reference value to write/wait on
+ * @mask: mask to wait on
+ *
+ * Helper for rings that don't support write and wait in a
+ * single oneshot packet.
+ */
+void amdgpu_ring_emit_reg_write_reg_wait_helper(struct amdgpu_ring *ring,
+						uint32_t reg0, uint32_t reg1,
+						uint32_t ref, uint32_t mask)
+{
+	amdgpu_ring_emit_wreg(ring, reg0, ref);
+	amdgpu_ring_emit_reg_wait(ring, reg1, mask, mask);
+}
+
+/**
+ * amdgpu_ring_soft_recovery - try to soft recover a ring lockup
+ *
+ * @ring: ring to try the recovery on
+ * @vmid: VMID we try to get going again
+ * @fence: timedout fence
+ *
+ * Tries to get a ring proceeding again when it is stuck.
+ */
+bool amdgpu_ring_soft_recovery(struct amdgpu_ring *ring, unsigned int vmid,
+			       struct dma_fence *fence)
+{
+	ktime_t deadline = ktime_add_us(ktime_get(), 10000);
+
+	if (amdgpu_sriov_vf(ring->adev) || !ring->funcs->soft_recovery || !fence)
+		return false;
+
+	atomic_inc(&ring->adev->gpu_reset_counter);
+	while (!dma_fence_is_signaled(fence) &&
+	       ktime_to_ns(ktime_sub(deadline, ktime_get())) > 0)
+		ring->funcs->soft_recovery(ring, vmid);
+
+	return dma_fence_is_signaled(fence);
 }
 
 /*
@@ -484,98 +421,163 @@ void amdgpu_ring_fini(struct amdgpu_ring *ring)
  */
 #if defined(CONFIG_DEBUG_FS)
 
-static int amdgpu_debugfs_ring_info(struct seq_file *m, void *data)
+/* Layout of file is 12 bytes consisting of
+ * - rptr
+ * - wptr
+ * - driver's copy of wptr
+ *
+ * followed by n-words of ring data
+ */
+static ssize_t amdgpu_debugfs_ring_read(struct file *f, char __user *buf,
+					size_t size, loff_t *pos)
 {
-	struct drm_info_node *node = (struct drm_info_node *) m->private;
-	struct drm_device *dev = node->minor->dev;
-	struct amdgpu_device *adev = dev->dev_private;
-	int roffset = *(int*)node->info_ent->data;
-	struct amdgpu_ring *ring = (void *)(((uint8_t*)adev) + roffset);
+	struct amdgpu_ring *ring = file_inode(f)->i_private;
+	int r, i;
+	uint32_t value, result, early[3];
 
-	uint32_t rptr, wptr, rptr_next;
-	unsigned count, i, j;
+	if (*pos & 3 || size & 3)
+		return -EINVAL;
 
-	amdgpu_ring_free_size(ring);
-	count = (ring->ring_size / 4) - ring->ring_free_dw;
+	result = 0;
 
-	wptr = amdgpu_ring_get_wptr(ring);
-	seq_printf(m, "wptr: 0x%08x [%5d]\n",
-		   wptr, wptr);
-
-	rptr = amdgpu_ring_get_rptr(ring);
-	seq_printf(m, "rptr: 0x%08x [%5d]\n",
-		   rptr, rptr);
-
-	rptr_next = ~0;
-
-	seq_printf(m, "driver's copy of the wptr: 0x%08x [%5d]\n",
-		   ring->wptr, ring->wptr);
-	seq_printf(m, "last semaphore signal addr : 0x%016llx\n",
-		   ring->last_semaphore_signal_addr);
-	seq_printf(m, "last semaphore wait addr   : 0x%016llx\n",
-		   ring->last_semaphore_wait_addr);
-	seq_printf(m, "%u free dwords in ring\n", ring->ring_free_dw);
-	seq_printf(m, "%u dwords in ring\n", count);
-
-	if (!ring->ready)
-		return 0;
-
-	/* print 8 dw before current rptr as often it's the last executed
-	 * packet that is the root issue
-	 */
-	i = (rptr + ring->ptr_mask + 1 - 32) & ring->ptr_mask;
-	for (j = 0; j <= (count + 32); j++) {
-		seq_printf(m, "r[%5d]=0x%08x", i, ring->ring[i]);
-		if (rptr == i)
-			seq_puts(m, " *");
-		if (rptr_next == i)
-			seq_puts(m, " #");
-		seq_puts(m, "\n");
-		i = (i + 1) & ring->ptr_mask;
+	if (*pos < 12) {
+		early[0] = amdgpu_ring_get_rptr(ring) & ring->buf_mask;
+		early[1] = amdgpu_ring_get_wptr(ring) & ring->buf_mask;
+		early[2] = ring->wptr & ring->buf_mask;
+		for (i = *pos / 4; i < 3 && size; i++) {
+			r = put_user(early[i], (uint32_t *)buf);
+			if (r)
+				return r;
+			buf += 4;
+			result += 4;
+			size -= 4;
+			*pos += 4;
+		}
 	}
-	return 0;
+
+	while (size) {
+		if (*pos >= (ring->ring_size + 12))
+			return result;
+
+		value = ring->ring[(*pos - 12)/4];
+		r = put_user(value, (uint32_t *)buf);
+		if (r)
+			return r;
+		buf += 4;
+		result += 4;
+		size -= 4;
+		*pos += 4;
+	}
+
+	return result;
 }
 
-/* TODO: clean this up !*/
-static int amdgpu_gfx_index = offsetof(struct amdgpu_device, gfx.gfx_ring[0]);
-static int cayman_cp1_index = offsetof(struct amdgpu_device, gfx.compute_ring[0]);
-static int cayman_cp2_index = offsetof(struct amdgpu_device, gfx.compute_ring[1]);
-static int amdgpu_dma1_index = offsetof(struct amdgpu_device, sdma[0].ring);
-static int amdgpu_dma2_index = offsetof(struct amdgpu_device, sdma[1].ring);
-static int r600_uvd_index = offsetof(struct amdgpu_device, uvd.ring);
-static int si_vce1_index = offsetof(struct amdgpu_device, vce.ring[0]);
-static int si_vce2_index = offsetof(struct amdgpu_device, vce.ring[1]);
-
-static struct drm_info_list amdgpu_debugfs_ring_info_list[] = {
-	{"amdgpu_ring_gfx", amdgpu_debugfs_ring_info, 0, &amdgpu_gfx_index},
-	{"amdgpu_ring_cp1", amdgpu_debugfs_ring_info, 0, &cayman_cp1_index},
-	{"amdgpu_ring_cp2", amdgpu_debugfs_ring_info, 0, &cayman_cp2_index},
-	{"amdgpu_ring_dma1", amdgpu_debugfs_ring_info, 0, &amdgpu_dma1_index},
-	{"amdgpu_ring_dma2", amdgpu_debugfs_ring_info, 0, &amdgpu_dma2_index},
-	{"amdgpu_ring_uvd", amdgpu_debugfs_ring_info, 0, &r600_uvd_index},
-	{"amdgpu_ring_vce1", amdgpu_debugfs_ring_info, 0, &si_vce1_index},
-	{"amdgpu_ring_vce2", amdgpu_debugfs_ring_info, 0, &si_vce2_index},
+static const struct file_operations amdgpu_debugfs_ring_fops = {
+	.owner = THIS_MODULE,
+	.read = amdgpu_debugfs_ring_read,
+	.llseek = default_llseek
 };
 
 #endif
 
-static int amdgpu_debugfs_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring)
+void amdgpu_debugfs_ring_init(struct amdgpu_device *adev,
+			      struct amdgpu_ring *ring)
 {
 #if defined(CONFIG_DEBUG_FS)
-	unsigned i;
-	for (i = 0; i < ARRAY_SIZE(amdgpu_debugfs_ring_info_list); ++i) {
-		struct drm_info_list *info = &amdgpu_debugfs_ring_info_list[i];
-		int roffset = *(int*)amdgpu_debugfs_ring_info_list[i].data;
-		struct amdgpu_ring *other = (void *)(((uint8_t*)adev) + roffset);
-		unsigned r;
+	struct drm_minor *minor = adev_to_drm(adev)->primary;
+	struct dentry *root = minor->debugfs_root;
+	char name[32];
 
-		if (other != ring)
-			continue;
+	sprintf(name, "amdgpu_ring_%s", ring->name);
+	debugfs_create_file_size(name, S_IFREG | S_IRUGO, root, ring,
+				 &amdgpu_debugfs_ring_fops,
+				 ring->ring_size + 12);
 
-		r = amdgpu_debugfs_add_files(adev, info, 1);
-		if (r)
-			return r;
-	}
 #endif
-	return 0;
+}
+
+/**
+ * amdgpu_ring_test_helper - tests ring and set sched readiness status
+ *
+ * @ring: ring to try the recovery on
+ *
+ * Tests ring and set sched readiness status
+ *
+ * Returns 0 on success, error on failure.
+ */
+int amdgpu_ring_test_helper(struct amdgpu_ring *ring)
+{
+	struct amdgpu_device *adev = ring->adev;
+	int r;
+
+	r = amdgpu_ring_test_ring(ring);
+	if (r)
+		DRM_DEV_ERROR(adev->dev, "ring %s test failed (%d)\n",
+			      ring->name, r);
+	else
+		DRM_DEV_DEBUG(adev->dev, "ring test on %s succeeded\n",
+			      ring->name);
+
+	ring->sched.ready = !r;
+	return r;
+}
+
+static void amdgpu_ring_to_mqd_prop(struct amdgpu_ring *ring,
+				    struct amdgpu_mqd_prop *prop)
+{
+	struct amdgpu_device *adev = ring->adev;
+
+	memset(prop, 0, sizeof(*prop));
+
+	prop->mqd_gpu_addr = ring->mqd_gpu_addr;
+	prop->hqd_base_gpu_addr = ring->gpu_addr;
+	prop->rptr_gpu_addr = ring->rptr_gpu_addr;
+	prop->wptr_gpu_addr = ring->wptr_gpu_addr;
+	prop->queue_size = ring->ring_size;
+	prop->eop_gpu_addr = ring->eop_gpu_addr;
+	prop->use_doorbell = ring->use_doorbell;
+	prop->doorbell_index = ring->doorbell_index;
+
+	/* map_queues packet doesn't need activate the queue,
+	 * so only kiq need set this field.
+	 */
+	prop->hqd_active = ring->funcs->type == AMDGPU_RING_TYPE_KIQ;
+
+	if ((ring->funcs->type == AMDGPU_RING_TYPE_COMPUTE &&
+	     amdgpu_gfx_is_high_priority_compute_queue(adev, ring)) ||
+	    (ring->funcs->type == AMDGPU_RING_TYPE_GFX &&
+	     amdgpu_gfx_is_high_priority_graphics_queue(adev, ring))) {
+		prop->hqd_pipe_priority = AMDGPU_GFX_PIPE_PRIO_HIGH;
+		prop->hqd_queue_priority = AMDGPU_GFX_QUEUE_PRIORITY_MAXIMUM;
+	}
+}
+
+int amdgpu_ring_init_mqd(struct amdgpu_ring *ring)
+{
+	struct amdgpu_device *adev = ring->adev;
+	struct amdgpu_mqd *mqd_mgr;
+	struct amdgpu_mqd_prop prop;
+
+	amdgpu_ring_to_mqd_prop(ring, &prop);
+
+	ring->wptr = 0;
+
+	if (ring->funcs->type == AMDGPU_RING_TYPE_KIQ)
+		mqd_mgr = &adev->mqds[AMDGPU_HW_IP_COMPUTE];
+	else
+		mqd_mgr = &adev->mqds[ring->funcs->type];
+
+	return mqd_mgr->init_mqd(adev, ring->mqd_ptr, &prop);
+}
+
+void amdgpu_ring_ib_begin(struct amdgpu_ring *ring)
+{
+	if (ring->is_sw_ring)
+		amdgpu_sw_ring_ib_begin(ring);
+}
+
+void amdgpu_ring_ib_end(struct amdgpu_ring *ring)
+{
+	if (ring->is_sw_ring)
+		amdgpu_sw_ring_ib_end(ring);
 }

@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * 842 Software Compression
  *
  * Copyright (C) 2015 Dan Streetman, IBM Corp
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  * See 842.h for details of the 842 compressed format.
  */
@@ -490,6 +481,7 @@ int sw842_compress(const u8 *in, unsigned int ilen,
 	int ret;
 	u64 last, next, pad, total;
 	u8 repeat_count = 0;
+	u32 crc;
 
 	BUILD_BUG_ON(sizeof(*p) > SW842_MEM_COMPRESS);
 
@@ -577,6 +569,18 @@ skip_comp:
 	}
 
 	ret = add_end_template(p);
+	if (ret)
+		return ret;
+
+	/*
+	 * crc(0:31) is appended to target data starting with the next
+	 * bit after End of stream template.
+	 * nx842 calculates CRC for data in big-endian format. So doing
+	 * same here so that sw842 decompression can be used for both
+	 * compressed data.
+	 */
+	crc = crc32_be(0, in, ilen);
+	ret = add_bits(p, crc, CRC_BITS);
 	if (ret)
 		return ret;
 

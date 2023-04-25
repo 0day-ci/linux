@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/arch/arm/mm/context.c
  *
@@ -5,10 +6,6 @@
  *  Copyright (C) 2012 ARM Limited
  *
  *  Author: Will Deacon <will.deacon@arm.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -112,7 +109,7 @@ static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
 	if (cmd != THREAD_NOTIFY_SWITCH)
 		return NOTIFY_DONE;
 
-	pid = task_pid_nr(thread->task) << ASID_BITS;
+	pid = task_pid_nr(thread_task(thread)) << ASID_BITS;
 	asm volatile(
 	"	mrc	p15, 0, %0, c13, c0, 1\n"
 	"	and	%0, %0, %2\n"
@@ -165,13 +162,28 @@ static void flush_context(unsigned int cpu)
 		__flush_icache_all();
 }
 
-static int is_reserved_asid(u64 asid)
+static bool check_update_reserved_asid(u64 asid, u64 newasid)
 {
 	int cpu;
-	for_each_possible_cpu(cpu)
-		if (per_cpu(reserved_asids, cpu) == asid)
-			return 1;
-	return 0;
+	bool hit = false;
+
+	/*
+	 * Iterate over the set of reserved ASIDs looking for a match.
+	 * If we find one, then we can update our mm to use newasid
+	 * (i.e. the same ASID in the current generation) but we can't
+	 * exit the loop early, since we need to ensure that all copies
+	 * of the old ASID are updated to reflect the mm. Failure to do
+	 * so could result in us missing the reserved ASID in a future
+	 * generation.
+	 */
+	for_each_possible_cpu(cpu) {
+		if (per_cpu(reserved_asids, cpu) == asid) {
+			hit = true;
+			per_cpu(reserved_asids, cpu) = newasid;
+		}
+	}
+
+	return hit;
 }
 
 static u64 new_context(struct mm_struct *mm, unsigned int cpu)
@@ -181,12 +193,14 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 	u64 generation = atomic64_read(&asid_generation);
 
 	if (asid != 0) {
+		u64 newasid = generation | (asid & ~ASID_MASK);
+
 		/*
 		 * If our current ASID was active during a rollover, we
 		 * can continue to use it and this was just a false alarm.
 		 */
-		if (is_reserved_asid(asid))
-			return generation | (asid & ~ASID_MASK);
+		if (check_update_reserved_asid(asid, newasid))
+			return newasid;
 
 		/*
 		 * We had a valid ASID in a previous life, so try to re-use
@@ -194,7 +208,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 		 */
 		asid &= ~ASID_MASK;
 		if (!__test_and_set_bit(asid, asid_map))
-			goto bump_gen;
+			return newasid;
 	}
 
 	/*
@@ -216,11 +230,8 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 
 	__set_bit(asid, asid_map);
 	cur_idx = asid;
-
-bump_gen:
-	asid |= generation;
 	cpumask_clear(mm_cpumask(mm));
-	return asid;
+	return asid | generation;
 }
 
 void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
@@ -229,8 +240,7 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
 	unsigned int cpu = smp_processor_id();
 	u64 asid;
 
-	if (unlikely(mm->context.vmalloc_seq != init_mm.context.vmalloc_seq))
-		__check_vmalloc_seq(mm);
+	check_vmalloc_seq(mm);
 
 	/*
 	 * We cannot update the pgd and the ASID atomicly with classic

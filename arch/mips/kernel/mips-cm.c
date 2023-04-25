@@ -1,19 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (C) 2013 Imagination Technologies
- * Author: Paul Burton <paul.burton@imgtec.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
+ * Author: Paul Burton <paul.burton@mips.com>
  */
 
 #include <linux/errno.h>
+#include <linux/percpu.h>
+#include <linux/spinlock.h>
 
-#include <asm/mips-cm.h>
+#include <asm/mips-cps.h>
 #include <asm/mipsregs.h>
 
-void __iomem *mips_cm_base;
+void __iomem *mips_gcr_base;
 void __iomem *mips_cm_l2sync_base;
 int mips_cm_is64;
 
@@ -22,7 +20,7 @@ static char *cm2_tr[8] = {
 	"0x04", "cpc", "0x06", "0x07"
 };
 
-/* CM3 Tag ECC transation type */
+/* CM3 Tag ECC transaction type */
 static char *cm3_tr[16] = {
 	[0x0] = "ReqNoData",
 	[0x1] = "0x1",
@@ -116,14 +114,56 @@ static char *cm2_core[8] = {
 	"Exclusive/OK", "Exclusive/Data"
 };
 
+static char *cm2_l2_type[4] = {
+	[0x0] = "None",
+	[0x1] = "Tag RAM single/double ECC error",
+	[0x2] = "Data RAM single/double ECC error",
+	[0x3] = "WS RAM uncorrectable dirty parity"
+};
+
+static char *cm2_l2_instr[32] = {
+	[0x00] = "L2_NOP",
+	[0x01] = "L2_ERR_CORR",
+	[0x02] = "L2_TAG_INV",
+	[0x03] = "L2_WS_CLEAN",
+	[0x04] = "L2_RD_MDYFY_WR",
+	[0x05] = "L2_WS_MRU",
+	[0x06] = "L2_EVICT_LN2",
+	[0x07] = "0x07",
+	[0x08] = "L2_EVICT",
+	[0x09] = "L2_REFL",
+	[0x0a] = "L2_RD",
+	[0x0b] = "L2_WR",
+	[0x0c] = "L2_EVICT_MRU",
+	[0x0d] = "L2_SYNC",
+	[0x0e] = "L2_REFL_ERR",
+	[0x0f] = "0x0f",
+	[0x10] = "L2_INDX_WB_INV",
+	[0x11] = "L2_INDX_LD_TAG",
+	[0x12] = "L2_INDX_ST_TAG",
+	[0x13] = "L2_INDX_ST_DATA",
+	[0x14] = "L2_INDX_ST_ECC",
+	[0x15] = "0x15",
+	[0x16] = "0x16",
+	[0x17] = "0x17",
+	[0x18] = "L2_FTCH_AND_LCK",
+	[0x19] = "L2_HIT_INV",
+	[0x1a] = "L2_HIT_WB_INV",
+	[0x1b] = "L2_HIT_WB",
+	[0x1c] = "0x1c",
+	[0x1d] = "0x1d",
+	[0x1e] = "0x1e",
+	[0x1f] = "0x1f"
+};
+
 static char *cm2_causes[32] = {
 	"None", "GC_WR_ERR", "GC_RD_ERR", "COH_WR_ERR",
 	"COH_RD_ERR", "MMIO_WR_ERR", "MMIO_RD_ERR", "0x07",
 	"0x08", "0x09", "0x0a", "0x0b",
 	"0x0c", "0x0d", "0x0e", "0x0f",
-	"0x10", "0x11", "0x12", "0x13",
-	"0x14", "0x15", "0x16", "INTVN_WR_ERR",
-	"INTVN_RD_ERR", "0x19", "0x1a", "0x1b",
+	"0x10", "INTVN_WR_ERR", "INTVN_RD_ERR", "0x13",
+	"0x14", "0x15", "0x16", "0x17",
+	"L2_RD_UNCORR", "L2_WR_UNCORR", "L2_CORR", "0x1b",
 	"0x1c", "0x1d", "0x1e", "0x1f"
 };
 
@@ -135,6 +175,9 @@ static char *cm3_causes[32] = {
 	"0x11", "0x12", "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
 	"0x19", "0x1a", "0x1b", "0x1c", "0x1d", "0x1e", "0x1f"
 };
+
+static DEFINE_PER_CPU_ALIGNED(spinlock_t, cm_core_lock);
+static DEFINE_PER_CPU_ALIGNED(unsigned long, cm_core_lock_flags);
 
 phys_addr_t __mips_cm_phys_base(void)
 {
@@ -162,8 +205,8 @@ phys_addr_t __mips_cm_l2sync_phys_base(void)
 	 * current location.
 	 */
 	base_reg = read_gcr_l2_only_sync_base();
-	if (base_reg & CM_GCR_L2_ONLY_SYNC_BASE_SYNCEN_MSK)
-		return base_reg & CM_GCR_L2_ONLY_SYNC_BASE_SYNCBASE_MSK;
+	if (base_reg & CM_GCR_L2_ONLY_SYNC_BASE_SYNCEN)
+		return base_reg & CM_GCR_L2_ONLY_SYNC_BASE_SYNCBASE;
 
 	/* Default to following the CM */
 	return mips_cm_phys_base() + MIPS_CM_GCR_SIZE;
@@ -178,107 +221,176 @@ static void mips_cm_probe_l2sync(void)
 	phys_addr_t addr;
 
 	/* L2-only sync was introduced with CM major revision 6 */
-	major_rev = (read_gcr_rev() & CM_GCR_REV_MAJOR_MSK) >>
-		CM_GCR_REV_MAJOR_SHF;
+	major_rev = FIELD_GET(CM_GCR_REV_MAJOR, read_gcr_rev());
 	if (major_rev < 6)
 		return;
 
 	/* Find a location for the L2 sync region */
 	addr = mips_cm_l2sync_phys_base();
-	BUG_ON((addr & CM_GCR_L2_ONLY_SYNC_BASE_SYNCBASE_MSK) != addr);
+	BUG_ON((addr & CM_GCR_L2_ONLY_SYNC_BASE_SYNCBASE) != addr);
 	if (!addr)
 		return;
 
 	/* Set the region base address & enable it */
-	write_gcr_l2_only_sync_base(addr | CM_GCR_L2_ONLY_SYNC_BASE_SYNCEN_MSK);
+	write_gcr_l2_only_sync_base(addr | CM_GCR_L2_ONLY_SYNC_BASE_SYNCEN);
 
 	/* Map the region */
-	mips_cm_l2sync_base = ioremap_nocache(addr, MIPS_CM_L2SYNC_SIZE);
+	mips_cm_l2sync_base = ioremap(addr, MIPS_CM_L2SYNC_SIZE);
 }
 
 int mips_cm_probe(void)
 {
 	phys_addr_t addr;
 	u32 base_reg;
+	unsigned cpu;
 
 	/*
 	 * No need to probe again if we have already been
 	 * here before.
 	 */
-	if (mips_cm_base)
+	if (mips_gcr_base)
 		return 0;
 
 	addr = mips_cm_phys_base();
-	BUG_ON((addr & CM_GCR_BASE_GCRBASE_MSK) != addr);
+	BUG_ON((addr & CM_GCR_BASE_GCRBASE) != addr);
 	if (!addr)
 		return -ENODEV;
 
-	mips_cm_base = ioremap_nocache(addr, MIPS_CM_GCR_SIZE);
-	if (!mips_cm_base)
+	mips_gcr_base = ioremap(addr, MIPS_CM_GCR_SIZE);
+	if (!mips_gcr_base)
 		return -ENXIO;
 
 	/* sanity check that we're looking at a CM */
 	base_reg = read_gcr_base();
-	if ((base_reg & CM_GCR_BASE_GCRBASE_MSK) != addr) {
+	if ((base_reg & CM_GCR_BASE_GCRBASE) != addr) {
 		pr_err("GCRs appear to have been moved (expected them at 0x%08lx)!\n",
 		       (unsigned long)addr);
-		mips_cm_base = NULL;
+		iounmap(mips_gcr_base);
+		mips_gcr_base = NULL;
 		return -ENODEV;
 	}
 
 	/* set default target to memory */
-	base_reg &= ~CM_GCR_BASE_CMDEFTGT_MSK;
-	base_reg |= CM_GCR_BASE_CMDEFTGT_MEM;
-	write_gcr_base(base_reg);
+	change_gcr_base(CM_GCR_BASE_CMDEFTGT, CM_GCR_BASE_CMDEFTGT_MEM);
 
 	/* disable CM regions */
-	write_gcr_reg0_base(CM_GCR_REGn_BASE_BASEADDR_MSK);
-	write_gcr_reg0_mask(CM_GCR_REGn_MASK_ADDRMASK_MSK);
-	write_gcr_reg1_base(CM_GCR_REGn_BASE_BASEADDR_MSK);
-	write_gcr_reg1_mask(CM_GCR_REGn_MASK_ADDRMASK_MSK);
-	write_gcr_reg2_base(CM_GCR_REGn_BASE_BASEADDR_MSK);
-	write_gcr_reg2_mask(CM_GCR_REGn_MASK_ADDRMASK_MSK);
-	write_gcr_reg3_base(CM_GCR_REGn_BASE_BASEADDR_MSK);
-	write_gcr_reg3_mask(CM_GCR_REGn_MASK_ADDRMASK_MSK);
+	write_gcr_reg0_base(CM_GCR_REGn_BASE_BASEADDR);
+	write_gcr_reg0_mask(CM_GCR_REGn_MASK_ADDRMASK);
+	write_gcr_reg1_base(CM_GCR_REGn_BASE_BASEADDR);
+	write_gcr_reg1_mask(CM_GCR_REGn_MASK_ADDRMASK);
+	write_gcr_reg2_base(CM_GCR_REGn_BASE_BASEADDR);
+	write_gcr_reg2_mask(CM_GCR_REGn_MASK_ADDRMASK);
+	write_gcr_reg3_base(CM_GCR_REGn_BASE_BASEADDR);
+	write_gcr_reg3_mask(CM_GCR_REGn_MASK_ADDRMASK);
 
 	/* probe for an L2-only sync region */
 	mips_cm_probe_l2sync();
 
 	/* determine register width for this CM */
-	mips_cm_is64 = config_enabled(CONFIG_64BIT) && (mips_cm_revision() >= CM_REV_CM3);
+	mips_cm_is64 = IS_ENABLED(CONFIG_64BIT) && (mips_cm_revision() >= CM_REV_CM3);
+
+	for_each_possible_cpu(cpu)
+		spin_lock_init(&per_cpu(cm_core_lock, cpu));
 
 	return 0;
 }
 
+void mips_cm_lock_other(unsigned int cluster, unsigned int core,
+			unsigned int vp, unsigned int block)
+{
+	unsigned int curr_core, cm_rev;
+	u32 val;
+
+	cm_rev = mips_cm_revision();
+	preempt_disable();
+
+	if (cm_rev >= CM_REV_CM3) {
+		val = FIELD_PREP(CM3_GCR_Cx_OTHER_CORE, core) |
+		      FIELD_PREP(CM3_GCR_Cx_OTHER_VP, vp);
+
+		if (cm_rev >= CM_REV_CM3_5) {
+			val |= CM_GCR_Cx_OTHER_CLUSTER_EN;
+			val |= FIELD_PREP(CM_GCR_Cx_OTHER_CLUSTER, cluster);
+			val |= FIELD_PREP(CM_GCR_Cx_OTHER_BLOCK, block);
+		} else {
+			WARN_ON(cluster != 0);
+			WARN_ON(block != CM_GCR_Cx_OTHER_BLOCK_LOCAL);
+		}
+
+		/*
+		 * We need to disable interrupts in SMP systems in order to
+		 * ensure that we don't interrupt the caller with code which
+		 * may modify the redirect register. We do so here in a
+		 * slightly obscure way by using a spin lock, since this has
+		 * the neat property of also catching any nested uses of
+		 * mips_cm_lock_other() leading to a deadlock or a nice warning
+		 * with lockdep enabled.
+		 */
+		spin_lock_irqsave(this_cpu_ptr(&cm_core_lock),
+				  *this_cpu_ptr(&cm_core_lock_flags));
+	} else {
+		WARN_ON(cluster != 0);
+		WARN_ON(block != CM_GCR_Cx_OTHER_BLOCK_LOCAL);
+
+		/*
+		 * We only have a GCR_CL_OTHER per core in systems with
+		 * CM 2.5 & older, so have to ensure other VP(E)s don't
+		 * race with us.
+		 */
+		curr_core = cpu_core(&current_cpu_data);
+		spin_lock_irqsave(&per_cpu(cm_core_lock, curr_core),
+				  per_cpu(cm_core_lock_flags, curr_core));
+
+		val = FIELD_PREP(CM_GCR_Cx_OTHER_CORENUM, core);
+	}
+
+	write_gcr_cl_other(val);
+
+	/*
+	 * Ensure the core-other region reflects the appropriate core &
+	 * VP before any accesses to it occur.
+	 */
+	mb();
+}
+
+void mips_cm_unlock_other(void)
+{
+	unsigned int curr_core;
+
+	if (mips_cm_revision() < CM_REV_CM3) {
+		curr_core = cpu_core(&current_cpu_data);
+		spin_unlock_irqrestore(&per_cpu(cm_core_lock, curr_core),
+				       per_cpu(cm_core_lock_flags, curr_core));
+	} else {
+		spin_unlock_irqrestore(this_cpu_ptr(&cm_core_lock),
+				       *this_cpu_ptr(&cm_core_lock_flags));
+	}
+
+	preempt_enable();
+}
+
 void mips_cm_error_report(void)
 {
-	unsigned long revision = mips_cm_revision();
-	/*
-	 * CM3 has a 64-bit Error cause register with 0:57 containing the error
-	 * info and 63:58 the error type. For old CMs, everything is contained
-	 * in a single 32-bit register (0:26 and 31:27 respectively). Even
-	 * though the cm_error is u64, we will simply ignore the upper word
-	 * for CM2.
-	 */
-	u64 cm_error = read_gcr_error_cause();
-	int cm_error_cause_sft = CM_GCR_ERROR_CAUSE_ERRTYPE_SHF +
-				 ((revision >= CM_REV_CM3) ? 31 : 0);
-	unsigned long cm_addr = read_gcr_error_addr();
-	unsigned long cm_other = read_gcr_error_mult();
+	u64 cm_error, cm_addr, cm_other;
+	unsigned long revision;
 	int ocause, cause;
 	char buf[256];
 
 	if (!mips_cm_present())
 		return;
 
-	cause = cm_error >> cm_error_cause_sft;
+	revision = mips_cm_revision();
+	cm_error = read_gcr_error_cause();
+	cm_addr = read_gcr_error_addr();
+	cm_other = read_gcr_error_mult();
 
-	if (!cause)
-		/* All good */
-		return;
-
-	ocause = cm_other >> CM_GCR_ERROR_MULT_ERR2ND_SHF;
 	if (revision < CM_REV_CM3) { /* CM2 */
+		cause = FIELD_GET(CM_GCR_ERROR_CAUSE_ERRTYPE, cm_error);
+		ocause = FIELD_GET(CM_GCR_ERROR_MULT_ERR2ND, cm_other);
+
+		if (!cause)
+			return;
+
 		if (cause < 16) {
 			unsigned long cca_bits = (cm_error >> 15) & 7;
 			unsigned long tr_bits = (cm_error >> 12) & 7;
@@ -290,7 +402,7 @@ void mips_cm_error_report(void)
 				 "CCA=%lu TR=%s MCmd=%s STag=%lu "
 				 "SPort=%lu\n", cca_bits, cm2_tr[tr_bits],
 				 cm2_cmd[cmd_bits], stag_bits, sport_bits);
-		} else {
+		} else if (cause < 24) {
 			/* glob state & sresp together */
 			unsigned long c3_bits = (cm_error >> 18) & 7;
 			unsigned long c2_bits = (cm_error >> 15) & 7;
@@ -307,21 +419,46 @@ void mips_cm_error_report(void)
 				 cm2_core[c1_bits], cm2_core[c0_bits],
 				 sc_bit ? "True" : "False",
 				 cm2_cmd[cmd_bits], sport_bits);
+		} else {
+			unsigned long muc_bit = (cm_error >> 23) & 1;
+			unsigned long ins_bits = (cm_error >> 18) & 0x1f;
+			unsigned long arr_bits = (cm_error >> 16) & 3;
+			unsigned long dw_bits = (cm_error >> 12) & 15;
+			unsigned long way_bits = (cm_error >> 9) & 7;
+			unsigned long mway_bit = (cm_error >> 8) & 1;
+			unsigned long syn_bits = (cm_error >> 0) & 0xFF;
+
+			snprintf(buf, sizeof(buf),
+				 "Type=%s%s Instr=%s DW=%lu Way=%lu "
+				 "MWay=%s Syndrome=0x%02lx",
+				 muc_bit ? "Multi-UC " : "",
+				 cm2_l2_type[arr_bits],
+				 cm2_l2_instr[ins_bits], dw_bits, way_bits,
+				 mway_bit ? "True" : "False", syn_bits);
 		}
-			pr_err("CM_ERROR=%08llx %s <%s>\n", cm_error,
-			       cm2_causes[cause], buf);
-		pr_err("CM_ADDR =%08lx\n", cm_addr);
-		pr_err("CM_OTHER=%08lx %s\n", cm_other, cm2_causes[ocause]);
+		pr_err("CM_ERROR=%08llx %s <%s>\n", cm_error,
+		       cm2_causes[cause], buf);
+		pr_err("CM_ADDR =%08llx\n", cm_addr);
+		pr_err("CM_OTHER=%08llx %s\n", cm_other, cm2_causes[ocause]);
 	} else { /* CM3 */
-	/* Used by cause == {1,2,3} */
-		unsigned long core_id_bits = (cm_error >> 22) & 0xf;
-		unsigned long vp_id_bits = (cm_error >> 18) & 0xf;
-		unsigned long cmd_bits = (cm_error >> 14) & 0xf;
-		unsigned long cmd_group_bits = (cm_error >> 11) & 0xf;
-		unsigned long cm3_cca_bits = (cm_error >> 8) & 7;
-		unsigned long mcp_bits = (cm_error >> 5) & 0xf;
-		unsigned long cm3_tr_bits = (cm_error >> 1) & 0xf;
-		unsigned long sched_bit = cm_error & 0x1;
+		ulong core_id_bits, vp_id_bits, cmd_bits, cmd_group_bits;
+		ulong cm3_cca_bits, mcp_bits, cm3_tr_bits, sched_bit;
+
+		cause = FIELD_GET(CM3_GCR_ERROR_CAUSE_ERRTYPE, cm_error);
+		ocause = FIELD_GET(CM_GCR_ERROR_MULT_ERR2ND, cm_other);
+
+		if (!cause)
+			return;
+
+		/* Used by cause == {1,2,3} */
+		core_id_bits = (cm_error >> 22) & 0xf;
+		vp_id_bits = (cm_error >> 18) & 0xf;
+		cmd_bits = (cm_error >> 14) & 0xf;
+		cmd_group_bits = (cm_error >> 11) & 0xf;
+		cm3_cca_bits = (cm_error >> 8) & 7;
+		mcp_bits = (cm_error >> 5) & 0xf;
+		cm3_tr_bits = (cm_error >> 1) & 0xf;
+		sched_bit = cm_error & 0x1;
 
 		if (cause == 1 || cause == 3) { /* Tag ECC */
 			unsigned long tag_ecc = (cm_error >> 57) & 0x1;
@@ -363,14 +500,16 @@ void mips_cm_error_report(void)
 				 cm3_cmd_group[cmd_group_bits],
 				 cm3_cca_bits, 1 << mcp_bits,
 				 cm3_tr[cm3_tr_bits], sched_bit);
+		} else {
+			buf[0] = 0;
 		}
 
 		pr_err("CM_ERROR=%llx %s <%s>\n", cm_error,
 		       cm3_causes[cause], buf);
-		pr_err("CM_ADDR =%lx\n", cm_addr);
-		pr_err("CM_OTHER=%lx %s\n", cm_other, cm3_causes[ocause]);
+		pr_err("CM_ADDR =%llx\n", cm_addr);
+		pr_err("CM_OTHER=%llx %s\n", cm_other, cm3_causes[ocause]);
 	}
 
 	/* reprime cause register */
-	write_gcr_error_cause(0);
+	write_gcr_error_cause(cm_error);
 }

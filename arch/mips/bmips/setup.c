@@ -9,14 +9,15 @@
 
 #include <linux/init.h>
 #include <linux/bitops.h>
-#include <linux/bootmem.h>
-#include <linux/clk-provider.h>
+#include <linux/memblock.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/of_clk.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#include <linux/libfdt.h>
 #include <linux/smp.h>
 #include <asm/addrspace.h>
 #include <asm/bmips.h>
@@ -27,6 +28,7 @@
 #include <asm/smp-ops.h>
 #include <asm/time.h>
 #include <asm/traps.h>
+#include <asm/fw/cfe/cfe_api.h>
 
 #define RELO_NORMAL_VEC		BIT(18)
 
@@ -95,26 +97,48 @@ static void bcm6328_quirks(void)
 		bcm63xx_fixup_cpu1();
 }
 
+static void bcm6358_quirks(void)
+{
+	/*
+	 * BCM3368/BCM6358 need special handling for their shared TLB, so
+	 * disable SMP for now
+	 */
+	bmips_smp_enabled = 0;
+}
+
 static void bcm6368_quirks(void)
 {
 	bcm63xx_fixup_cpu1();
 }
 
 static const struct bmips_quirk bmips_quirk_list[] = {
+	{ "brcm,bcm3368",		&bcm6358_quirks			},
 	{ "brcm,bcm3384-viper",		&bcm3384_viper_quirks		},
 	{ "brcm,bcm33843-viper",	&bcm3384_viper_quirks		},
 	{ "brcm,bcm6328",		&bcm6328_quirks			},
+	{ "brcm,bcm6358",		&bcm6358_quirks			},
+	{ "brcm,bcm6362",		&bcm6368_quirks			},
 	{ "brcm,bcm6368",		&bcm6368_quirks			},
+	{ "brcm,bcm63168",		&bcm6368_quirks			},
+	{ "brcm,bcm63268",		&bcm6368_quirks			},
 	{ },
 };
 
-void __init prom_init(void)
+static void __init bmips_init_cfe(void)
 {
-	register_bmips_smp_ops();
+	cfe_seal = fw_arg3;
+
+	if (cfe_seal != CFE_EPTSEAL)
+		return;
+
+	cfe_init(fw_arg0, fw_arg2);
 }
 
-void __init prom_free_prom_memory(void)
+void __init prom_init(void)
 {
+	bmips_init_cfe();
+	bmips_cpu_setup();
+	register_bmips_smp_ops();
 }
 
 const char *get_system_type(void)
@@ -146,18 +170,16 @@ void __init plat_mem_setup(void)
 	ioport_resource.start = 0;
 	ioport_resource.end = ~0;
 
-	/* intended to somewhat resemble ARM; see Documentation/arm/Booting */
+	/* intended to somewhat resemble ARM; see Documentation/arm/booting.rst */
 	if (fw_arg0 == 0 && fw_arg1 == 0xffffffff)
 		dtb = phys_to_virt(fw_arg2);
-	else if (fw_arg0 == -2) /* UHI interface */
-		dtb = (void *)fw_arg1;
-	else if (__dtb_start != __dtb_end)
-		dtb = (void *)__dtb_start;
 	else
-		panic("no dtb found");
+		dtb = get_fdt();
+
+	if (!dtb)
+		cfe_die("no dtb found");
 
 	__dt_setup_arch(dtb);
-	strlcpy(arcs_cmdline, boot_command_line, COMMAND_LINE_SIZE);
 
 	for (q = bmips_quirk_list; q->quirk_fn; q++) {
 		if (of_flat_dt_is_compatible(of_get_flat_dt_root(),
@@ -180,17 +202,10 @@ void __init device_tree_init(void)
 	of_node_put(np);
 }
 
-int __init plat_of_setup(void)
-{
-	return __dt_register_buses("simple-bus", NULL);
-}
-
-arch_initcall(plat_of_setup);
-
 static int __init plat_dev_init(void)
 {
 	of_clk_init(NULL);
 	return 0;
 }
 
-device_initcall(plat_dev_init);
+arch_initcall(plat_dev_init);

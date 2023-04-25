@@ -107,6 +107,7 @@
  *              Add support for 945GME. (Phil Endecott <spam_from_intelfb@chezphil.org>)
  */
 
+#include <linux/aperture.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -173,7 +174,7 @@ static int intelfb_set_fbinfo(struct intelfb_info *dinfo);
 #define INTELFB_CLASS_MASK 0
 #endif
 
-static struct pci_device_id intelfb_pci_table[] = {
+static const struct pci_device_id intelfb_pci_table[] = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_830M, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_830M },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_845G, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_845G },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_85XGM, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_85XGM },
@@ -193,7 +194,7 @@ static struct pci_device_id intelfb_pci_table[] = {
 static int num_registered = 0;
 
 /* fb ops */
-static struct fb_ops intel_fb_ops = {
+static const struct fb_ops intel_fb_ops = {
 	.owner =		THIS_MODULE,
 	.fb_open =              intelfb_open,
 	.fb_release =           intelfb_release,
@@ -302,7 +303,7 @@ static __inline__ int get_opt_int(const char *this_opt, const char *name,
 }
 
 static __inline__ int get_opt_bool(const char *this_opt, const char *name,
-				   int *ret)
+				   bool *ret)
 {
 	if (!ret)
 		return 0;
@@ -386,6 +387,9 @@ static int __init intelfb_init(void)
 	INF_MSG("Version " INTELFB_VERSION "\n");
 
 	if (idonly)
+		return -ENODEV;
+
+	if (fb_modesetting_disabled("intelfb"))
 		return -ENODEV;
 
 #ifndef MODULE
@@ -472,7 +476,7 @@ static int intelfb_pci_register(struct pci_dev *pdev,
 	struct fb_info *info;
 	struct intelfb_info *dinfo;
 	int i, err, dvo;
-	int aperture_size, stolen_size;
+	int aperture_size, stolen_size = 0;
 	struct agp_kern_info gtt_info;
 	int agp_memtype;
 	const char *s;
@@ -483,6 +487,10 @@ static int intelfb_pci_register(struct pci_dev *pdev,
 
 	DBG_MSG("intelfb_pci_register\n");
 
+	err = aperture_remove_conflicting_pci_devices(pdev, "intelfb");
+	if (err)
+		return err;
+
 	num_registered++;
 	if (num_registered != 1) {
 		ERR_MSG("Attempted to register %d devices "
@@ -491,10 +499,9 @@ static int intelfb_pci_register(struct pci_dev *pdev,
 	}
 
 	info = framebuffer_alloc(sizeof(struct intelfb_info), &pdev->dev);
-	if (!info) {
-		ERR_MSG("Could not allocate memory for intelfb_info.\n");
-		return -ENODEV;
-	}
+	if (!info)
+		return -ENOMEM;
+
 	if (fb_alloc_cmap(&info->cmap, 256, 1) < 0) {
 		ERR_MSG("Could not allocate cmap for intelfb_info.\n");
 		goto err_out_cmap;
@@ -572,7 +579,7 @@ static int intelfb_pci_register(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	if (intelfbhw_get_memory(pdev, &aperture_size,&stolen_size)) {
+	if (intelfbhw_get_memory(pdev, &aperture_size, &stolen_size)) {
 		cleanup(dinfo);
 		return -ENODEV;
 	}
@@ -655,7 +662,7 @@ static int intelfb_pci_register(struct pci_dev *pdev,
 	}
 
 	dinfo->mmio_base =
-		(u8 __iomem *)ioremap_nocache(dinfo->mmio_base_phys,
+		(u8 __iomem *)ioremap(dinfo->mmio_base_phys,
 					      INTEL_REG_SIZE);
 	if (!dinfo->mmio_base) {
 		ERR_MSG("Cannot remap MMIO region.\n");
@@ -907,7 +914,7 @@ static void intelfb_pci_unregister(struct pci_dev *pdev)
  *                       helper functions                      *
  ***************************************************************/
 
-int __inline__ intelfb_var_to_depth(const struct fb_var_screeninfo *var)
+__inline__ int intelfb_var_to_depth(const struct fb_var_screeninfo *var)
 {
 	DBG_MSG("intelfb_var_to_depth: bpp: %d, green.length is %d\n",
 		var->bits_per_pixel, var->green.length);
@@ -934,7 +941,7 @@ static __inline__ int var_to_refresh(const struct fb_var_screeninfo *var)
 }
 
 /***************************************************************
- *                Various intialisation functions              *
+ *                Various initialisation functions             *
  ***************************************************************/
 
 static void get_initial_mode(struct intelfb_info *dinfo)
@@ -1300,11 +1307,6 @@ static int intelfb_check_var(struct fb_var_screeninfo *var,
 		v.transp.length = 8;
 		break;
 	}
-
-	if (v.xoffset < 0)
-		v.xoffset = 0;
-	if (v.yoffset < 0)
-		v.yoffset = 0;
 
 	if (v.xoffset > v.xres_virtual - v.xres)
 		v.xoffset = v.xres_virtual - v.xres;

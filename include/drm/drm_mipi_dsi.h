@@ -1,12 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * MIPI DSI Bus
  *
  * Copyright (C) 2012-2013, Samsung Electronics, Co., Ltd.
  * Andrzej Hajda <a.hajda@samsung.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #ifndef __DRM_MIPI_DSI_H__
@@ -16,6 +13,7 @@
 
 struct mipi_dsi_host;
 struct mipi_dsi_device;
+struct drm_dsc_picture_parameter_set;
 
 /* request ACK from peripheral */
 #define MIPI_DSI_MSG_REQ_ACK	BIT(0)
@@ -82,6 +80,11 @@ int mipi_dsi_create_packet(struct mipi_dsi_packet *packet,
  * Note that typically DSI packet transmission is atomic, so the .transfer()
  * function will seldomly return anything other than the number of bytes
  * contained in the transmit buffer on success.
+ *
+ * Also note that those callbacks can be called no matter the state the
+ * host is in. Drivers that need the underlying device to be powered to
+ * perform these operations will first need to make sure it's been
+ * properly enabled.
  */
 struct mipi_dsi_host_ops {
 	int (*attach)(struct mipi_dsi_host *host,
@@ -96,14 +99,17 @@ struct mipi_dsi_host_ops {
  * struct mipi_dsi_host - DSI host device
  * @dev: driver model device node for this DSI host
  * @ops: DSI host operations
+ * @list: list management
  */
 struct mipi_dsi_host {
 	struct device *dev;
 	const struct mipi_dsi_host_ops *ops;
+	struct list_head list;
 };
 
 int mipi_dsi_host_register(struct mipi_dsi_host *host);
 void mipi_dsi_host_unregister(struct mipi_dsi_host *host);
+struct mipi_dsi_host *of_find_mipi_dsi_host_by_node(struct device_node *node);
 
 /* DSI mode flags */
 
@@ -118,19 +124,21 @@ void mipi_dsi_host_unregister(struct mipi_dsi_host *host);
 /* enable hsync-end packets in vsync-pulse and v-porch area */
 #define MIPI_DSI_MODE_VIDEO_HSE		BIT(4)
 /* disable hfront-porch area */
-#define MIPI_DSI_MODE_VIDEO_HFP		BIT(5)
+#define MIPI_DSI_MODE_VIDEO_NO_HFP	BIT(5)
 /* disable hback-porch area */
-#define MIPI_DSI_MODE_VIDEO_HBP		BIT(6)
+#define MIPI_DSI_MODE_VIDEO_NO_HBP	BIT(6)
 /* disable hsync-active area */
-#define MIPI_DSI_MODE_VIDEO_HSA		BIT(7)
+#define MIPI_DSI_MODE_VIDEO_NO_HSA	BIT(7)
 /* flush display FIFO on vsync pulse */
 #define MIPI_DSI_MODE_VSYNC_FLUSH	BIT(8)
 /* disable EoT packets in HS mode */
-#define MIPI_DSI_MODE_EOT_PACKET	BIT(9)
+#define MIPI_DSI_MODE_NO_EOT_PACKET	BIT(9)
 /* device supports non-continuous clock behavior (DSI spec 5.6.1) */
 #define MIPI_DSI_CLOCK_NON_CONTINUOUS	BIT(10)
 /* transmit data in low power */
 #define MIPI_DSI_MODE_LPM		BIT(11)
+/* transmit data ending at the same time for all lanes within one hsync */
+#define MIPI_DSI_HS_PKT_END_ALIGNED	BIT(12)
 
 enum mipi_dsi_pixel_format {
 	MIPI_DSI_FMT_RGB888,
@@ -139,35 +147,101 @@ enum mipi_dsi_pixel_format {
 	MIPI_DSI_FMT_RGB565,
 };
 
+#define DSI_DEV_NAME_SIZE		20
+
+/**
+ * struct mipi_dsi_device_info - template for creating a mipi_dsi_device
+ * @type: DSI peripheral chip type
+ * @channel: DSI virtual channel assigned to peripheral
+ * @node: pointer to OF device node or NULL
+ *
+ * This is populated and passed to mipi_dsi_device_new to create a new
+ * DSI device
+ */
+struct mipi_dsi_device_info {
+	char type[DSI_DEV_NAME_SIZE];
+	u32 channel;
+	struct device_node *node;
+};
+
 /**
  * struct mipi_dsi_device - DSI peripheral device
  * @host: DSI host for this peripheral
  * @dev: driver model device node for this peripheral
+ * @name: DSI peripheral chip type
  * @channel: virtual channel assigned to the peripheral
  * @format: pixel format for video mode
  * @lanes: number of active data lanes
  * @mode_flags: DSI operation mode related flags
+ * @hs_rate: maximum lane frequency for high speed mode in hertz, this should
+ * be set to the real limits of the hardware, zero is only accepted for
+ * legacy drivers
+ * @lp_rate: maximum lane frequency for low power mode in hertz, this should
+ * be set to the real limits of the hardware, zero is only accepted for
+ * legacy drivers
+ * @dsc: panel/bridge DSC pps payload to be sent
  */
 struct mipi_dsi_device {
 	struct mipi_dsi_host *host;
 	struct device dev;
 
+	char name[DSI_DEV_NAME_SIZE];
 	unsigned int channel;
 	unsigned int lanes;
 	enum mipi_dsi_pixel_format format;
 	unsigned long mode_flags;
+	unsigned long hs_rate;
+	unsigned long lp_rate;
+	struct drm_dsc_config *dsc;
 };
 
-static inline struct mipi_dsi_device *to_mipi_dsi_device(struct device *dev)
+#define MIPI_DSI_MODULE_PREFIX "mipi-dsi:"
+
+#define to_mipi_dsi_device(__dev)	container_of_const(__dev, struct mipi_dsi_device, dev)
+
+/**
+ * mipi_dsi_pixel_format_to_bpp - obtain the number of bits per pixel for any
+ *                                given pixel format defined by the MIPI DSI
+ *                                specification
+ * @fmt: MIPI DSI pixel format
+ *
+ * Returns: The number of bits per pixel of the given pixel format.
+ */
+static inline int mipi_dsi_pixel_format_to_bpp(enum mipi_dsi_pixel_format fmt)
 {
-	return container_of(dev, struct mipi_dsi_device, dev);
+	switch (fmt) {
+	case MIPI_DSI_FMT_RGB888:
+	case MIPI_DSI_FMT_RGB666:
+		return 24;
+
+	case MIPI_DSI_FMT_RGB666_PACKED:
+		return 18;
+
+	case MIPI_DSI_FMT_RGB565:
+		return 16;
+	}
+
+	return -EINVAL;
 }
 
+struct mipi_dsi_device *
+mipi_dsi_device_register_full(struct mipi_dsi_host *host,
+			      const struct mipi_dsi_device_info *info);
+void mipi_dsi_device_unregister(struct mipi_dsi_device *dsi);
+struct mipi_dsi_device *
+devm_mipi_dsi_device_register_full(struct device *dev, struct mipi_dsi_host *host,
+				   const struct mipi_dsi_device_info *info);
 struct mipi_dsi_device *of_find_mipi_dsi_device_by_node(struct device_node *np);
 int mipi_dsi_attach(struct mipi_dsi_device *dsi);
 int mipi_dsi_detach(struct mipi_dsi_device *dsi);
+int devm_mipi_dsi_attach(struct device *dev, struct mipi_dsi_device *dsi);
+int mipi_dsi_shutdown_peripheral(struct mipi_dsi_device *dsi);
+int mipi_dsi_turn_on_peripheral(struct mipi_dsi_device *dsi);
 int mipi_dsi_set_maximum_return_packet_size(struct mipi_dsi_device *dsi,
 					    u16 value);
+ssize_t mipi_dsi_compression_mode(struct mipi_dsi_device *dsi, bool enable);
+ssize_t mipi_dsi_picture_parameter_set(struct mipi_dsi_device *dsi,
+				       const struct drm_dsc_picture_parameter_set *pps);
 
 ssize_t mipi_dsi_generic_write(struct mipi_dsi_device *dsi, const void *payload,
 			       size_t size);
@@ -214,6 +288,53 @@ int mipi_dsi_dcs_set_tear_off(struct mipi_dsi_device *dsi);
 int mipi_dsi_dcs_set_tear_on(struct mipi_dsi_device *dsi,
 			     enum mipi_dsi_dcs_tear_mode mode);
 int mipi_dsi_dcs_set_pixel_format(struct mipi_dsi_device *dsi, u8 format);
+int mipi_dsi_dcs_set_tear_scanline(struct mipi_dsi_device *dsi, u16 scanline);
+int mipi_dsi_dcs_set_display_brightness(struct mipi_dsi_device *dsi,
+					u16 brightness);
+int mipi_dsi_dcs_get_display_brightness(struct mipi_dsi_device *dsi,
+					u16 *brightness);
+int mipi_dsi_dcs_set_display_brightness_large(struct mipi_dsi_device *dsi,
+					     u16 brightness);
+int mipi_dsi_dcs_get_display_brightness_large(struct mipi_dsi_device *dsi,
+					     u16 *brightness);
+
+/**
+ * mipi_dsi_generic_write_seq - transmit data using a generic write packet
+ * @dsi: DSI peripheral device
+ * @seq: buffer containing the payload
+ */
+#define mipi_dsi_generic_write_seq(dsi, seq...)                                \
+	do {                                                                   \
+		static const u8 d[] = { seq };                                 \
+		struct device *dev = &dsi->dev;                                \
+		int ret;                                                       \
+		ret = mipi_dsi_generic_write(dsi, d, ARRAY_SIZE(d));           \
+		if (ret < 0) {                                                 \
+			dev_err_ratelimited(dev, "transmit data failed: %d\n", \
+					    ret);                              \
+			return ret;                                            \
+		}                                                              \
+	} while (0)
+
+/**
+ * mipi_dsi_dcs_write_seq - transmit a DCS command with payload
+ * @dsi: DSI peripheral device
+ * @cmd: Command
+ * @seq: buffer containing data to be transmitted
+ */
+#define mipi_dsi_dcs_write_seq(dsi, cmd, seq...)                           \
+	do {                                                               \
+		static const u8 d[] = { cmd, seq };                        \
+		struct device *dev = &dsi->dev;                            \
+		int ret;                                                   \
+		ret = mipi_dsi_dcs_write_buffer(dsi, d, ARRAY_SIZE(d));    \
+		if (ret < 0) {                                             \
+			dev_err_ratelimited(                               \
+				dev, "sending command %#02x failed: %d\n", \
+				cmd, ret);                                 \
+			return ret;                                        \
+		}                                                          \
+	} while (0)
 
 /**
  * struct mipi_dsi_driver - DSI driver
@@ -225,7 +346,7 @@ int mipi_dsi_dcs_set_pixel_format(struct mipi_dsi_device *dsi, u8 format);
 struct mipi_dsi_driver {
 	struct device_driver driver;
 	int(*probe)(struct mipi_dsi_device *dsi);
-	int(*remove)(struct mipi_dsi_device *dsi);
+	void (*remove)(struct mipi_dsi_device *dsi);
 	void (*shutdown)(struct mipi_dsi_device *dsi);
 };
 

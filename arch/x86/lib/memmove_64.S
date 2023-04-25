@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Normally compiler builtins are used, but sometimes the compiler calls out
  * of line code. Based on asm-i386/string.h.
@@ -6,10 +7,13 @@
  *	- Copyright 2011 Fenghua Yu <fenghua.yu@intel.com>
  */
 #include <linux/linkage.h>
-#include <asm/cpufeature.h>
-#include <asm/alternative-asm.h>
+#include <asm/cpufeatures.h>
+#include <asm/alternative.h>
+#include <asm/export.h>
 
 #undef memmove
+
+.section .noinstr.text, "ax"
 
 /*
  * Implement memmove(). This can handle overlap between src and dst.
@@ -22,15 +26,9 @@
  * Output:
  * rax: dest
  */
-.weak memmove
+SYM_FUNC_START(__memmove)
 
-ENTRY(memmove)
-ENTRY(__memmove)
-
-	/* Handle more 32 bytes in loop */
 	mov %rdi, %rax
-	cmp $0x20, %rdx
-	jb	1f
 
 	/* Decide forward/backward copy mode */
 	cmp %rdi, %rsi
@@ -40,8 +38,10 @@ ENTRY(__memmove)
 	cmp %rdi, %r8
 	jg 2f
 
+	/* FSRM implies ERMS => no length checks, do the copy directly */
 .Lmemmove_begin_forward:
-	ALTERNATIVE "", "movq %rdx, %rcx; rep movsb; retq", X86_FEATURE_ERMS
+	ALTERNATIVE "cmp $0x20, %rdx; jb 1f", "", X86_FEATURE_FSRM
+	ALTERNATIVE "", "jmp .Lmemmove_erms", X86_FEATURE_ERMS
 
 	/*
 	 * movsq instruction have many startup latency
@@ -112,6 +112,8 @@ ENTRY(__memmove)
 	 */
 	.p2align 4
 2:
+	cmp $0x20, %rdx
+	jb 1f
 	cmp $680, %rdx
 	jb 6f
 	cmp %dil, %sil
@@ -204,6 +206,14 @@ ENTRY(__memmove)
 	movb (%rsi), %r11b
 	movb %r11b, (%rdi)
 13:
-	retq
-ENDPROC(__memmove)
-ENDPROC(memmove)
+	RET
+
+.Lmemmove_erms:
+	movq %rdx, %rcx
+	rep movsb
+	RET
+SYM_FUNC_END(__memmove)
+EXPORT_SYMBOL(__memmove)
+
+SYM_FUNC_ALIAS(memmove, __memmove)
+EXPORT_SYMBOL(memmove)

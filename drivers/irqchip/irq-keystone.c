@@ -1,27 +1,19 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Texas Instruments Keystone IRQ controller IP driver
  *
  * Copyright (C) 2014 Texas Instruments, Inc.
  * Author: Sajesh Kumar Saran <sajesh@ti.com>
  *	   Grygorii Strashko <grygorii.strashko@ti.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation version 2.
- *
- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
- * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/irq.h>
 #include <linux/bitops.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
+#include <linux/interrupt.h>
 #include <linux/irqdomain.h>
 #include <linux/irqchip.h>
-#include <linux/irqchip/chained_irq.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/mfd/syscon.h>
@@ -39,6 +31,7 @@ struct keystone_irq_device {
 	struct irq_domain	*irqd;
 	struct regmap		*devctrl_regs;
 	u32			devctrl_offset;
+	raw_spinlock_t		wa_lock;
 };
 
 static inline u32 keystone_irq_readl(struct keystone_irq_device *kirq)
@@ -83,16 +76,14 @@ static void keystone_irq_ack(struct irq_data *d)
 	/* nothing to do here */
 }
 
-static void keystone_irq_handler(struct irq_desc *desc)
+static irqreturn_t keystone_irq_handler(int irq, void *keystone_irq)
 {
-	unsigned int irq = irq_desc_get_irq(desc);
-	struct keystone_irq_device *kirq = irq_desc_get_handler_data(desc);
+	struct keystone_irq_device *kirq = keystone_irq;
+	unsigned long wa_lock_flags;
 	unsigned long pending;
-	int src, virq;
+	int src, err;
 
 	dev_dbg(kirq->dev, "start irq %d\n", irq);
-
-	chained_irq_enter(irq_desc_get_chip(desc), desc);
 
 	pending = keystone_irq_readl(kirq);
 	keystone_irq_writel(kirq, pending);
@@ -105,19 +96,19 @@ static void keystone_irq_handler(struct irq_desc *desc)
 
 	for (src = 0; src < KEYSTONE_N_IRQ; src++) {
 		if (BIT(src) & pending) {
-			virq = irq_find_mapping(kirq->irqd, src);
-			dev_dbg(kirq->dev, "dispatch bit %d, virq %d\n",
-				src, virq);
-			if (!virq)
-				dev_warn(kirq->dev, "sporious irq detected hwirq %d, virq %d\n",
-					 src, virq);
-			generic_handle_irq(virq);
+			raw_spin_lock_irqsave(&kirq->wa_lock, wa_lock_flags);
+			err = generic_handle_domain_irq(kirq->irqd, src);
+			raw_spin_unlock_irqrestore(&kirq->wa_lock,
+						   wa_lock_flags);
+
+			if (err)
+				dev_warn_ratelimited(kirq->dev, "spurious irq detected hwirq %d\n",
+						     src);
 		}
 	}
 
-	chained_irq_exit(irq_desc_get_chip(desc), desc);
-
 	dev_dbg(kirq->dev, "end irq %d\n", irq);
+	return IRQ_HANDLED;
 }
 
 static int keystone_irq_map(struct irq_domain *h, unsigned int virq,
@@ -163,10 +154,8 @@ static int keystone_irq_probe(struct platform_device *pdev)
 	}
 
 	kirq->irq = platform_get_irq(pdev, 0);
-	if (kirq->irq < 0) {
-		dev_err(dev, "no irq resource %d\n", kirq->irq);
+	if (kirq->irq < 0)
 		return kirq->irq;
-	}
 
 	kirq->dev = dev;
 	kirq->mask = ~0x0;
@@ -182,9 +171,16 @@ static int keystone_irq_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	raw_spin_lock_init(&kirq->wa_lock);
+
 	platform_set_drvdata(pdev, kirq);
 
-	irq_set_chained_handler_and_data(kirq->irq, keystone_irq_handler, kirq);
+	ret = request_irq(kirq->irq, keystone_irq_handler,
+			  0, dev_name(dev), kirq);
+	if (ret) {
+		irq_domain_remove(kirq->irqd);
+		return ret;
+	}
 
 	/* clear all source bits */
 	keystone_irq_writel(kirq, ~0x0);
@@ -198,6 +194,8 @@ static int keystone_irq_remove(struct platform_device *pdev)
 {
 	struct keystone_irq_device *kirq = platform_get_drvdata(pdev);
 	int hwirq;
+
+	free_irq(kirq->irq, kirq);
 
 	for (hwirq = 0; hwirq < KEYSTONE_N_IRQ; hwirq++)
 		irq_dispose_mapping(irq_find_mapping(kirq->irqd, hwirq));

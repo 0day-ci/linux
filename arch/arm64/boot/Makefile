@@ -14,7 +14,9 @@
 # Based on the ia64 boot/Makefile.
 #
 
-targets := Image Image.gz
+OBJCOPYFLAGS_Image :=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+
+targets := Image Image.bz2 Image.gz Image.lz4 Image.lzma Image.lzo Image.zst
 
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
@@ -34,10 +36,11 @@ $(obj)/Image.lzma: $(obj)/Image FORCE
 $(obj)/Image.lzo: $(obj)/Image FORCE
 	$(call if_changed,lzo)
 
-install: $(obj)/Image
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
-	$(obj)/Image System.map "$(INSTALL_PATH)"
+$(obj)/Image.zst: $(obj)/Image FORCE
+	$(call if_changed,zstd)
 
-zinstall: $(obj)/Image.gz
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
-	$(obj)/Image.gz System.map "$(INSTALL_PATH)"
+EFI_ZBOOT_PAYLOAD	:= Image
+EFI_ZBOOT_BFD_TARGET	:= elf64-littleaarch64
+EFI_ZBOOT_MACH_TYPE	:= ARM64
+
+include $(srctree)/drivers/firmware/efi/libstub/Makefile.zboot

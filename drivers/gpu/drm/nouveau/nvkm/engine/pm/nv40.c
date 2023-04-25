@@ -59,9 +59,11 @@ static void
 nv40_perfctr_next(struct nvkm_pm *pm, struct nvkm_perfdom *dom)
 {
 	struct nvkm_device *device = pm->engine.subdev.device;
-	if (pm->sequence != pm->sequence) {
+	struct nv40_pm *nv40pm = container_of(pm, struct nv40_pm, base);
+
+	if (nv40pm->sequence != pm->sequence) {
 		nvkm_wr32(device, 0x400084, 0x00000020);
-		pm->sequence = pm->sequence;
+		nv40pm->sequence = pm->sequence;
 	}
 }
 
@@ -78,7 +80,7 @@ nv40_pm_ = {
 
 int
 nv40_pm_new_(const struct nvkm_specdom *doms, struct nvkm_device *device,
-	     int index, struct nvkm_pm **ppm)
+	     enum nvkm_subdev_type type, int inst, struct nvkm_pm **ppm)
 {
 	struct nv40_pm *pm;
 	int ret;
@@ -87,7 +89,7 @@ nv40_pm_new_(const struct nvkm_specdom *doms, struct nvkm_device *device,
 		return -ENOMEM;
 	*ppm = &pm->base;
 
-	ret = nvkm_pm_ctor(&nv40_pm_, device, index, &pm->base);
+	ret = nvkm_pm_ctor(&nv40_pm_, device, type, inst, &pm->base);
 	if (ret)
 		return ret;
 
@@ -115,7 +117,7 @@ nv40_pm[] = {
 };
 
 int
-nv40_pm_new(struct nvkm_device *device, int index, struct nvkm_pm **ppm)
+nv40_pm_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst, struct nvkm_pm **ppm)
 {
-	return nv40_pm_new_(nv40_pm, device, index, ppm);
+	return nv40_pm_new_(nv40_pm, device, type, inst, ppm);
 }

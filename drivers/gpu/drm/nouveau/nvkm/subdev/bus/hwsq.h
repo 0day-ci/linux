@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef __NVKM_BUS_HWSQ_H__
 #define __NVKM_BUS_HWSQ_H__
 #include <subdev/bus.h>
@@ -131,6 +132,12 @@ static inline void
 hwsq_wait(struct hwsq *ram, u8 flag, u8 data)
 {
 	nvkm_hwsq_wait(ram->hwsq, flag, data);
+}
+
+static inline void
+hwsq_wait_vblank(struct hwsq *ram)
+{
+	nvkm_hwsq_wait_vblank(ram->hwsq);
 }
 
 static inline void

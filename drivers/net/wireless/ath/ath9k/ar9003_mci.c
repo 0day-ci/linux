@@ -427,25 +427,38 @@ static void ar9003_mci_observation_set_up(struct ath_hw *ah)
 	struct ath9k_hw_mci *mci = &ah->btcoex_hw.mci;
 
 	if (mci->config & ATH_MCI_CONFIG_MCI_OBS_MCI) {
-		ath9k_hw_cfg_output(ah, 3, AR_GPIO_OUTPUT_MUX_AS_MCI_WLAN_DATA);
-		ath9k_hw_cfg_output(ah, 2, AR_GPIO_OUTPUT_MUX_AS_MCI_WLAN_CLK);
-		ath9k_hw_cfg_output(ah, 1, AR_GPIO_OUTPUT_MUX_AS_MCI_BT_DATA);
-		ath9k_hw_cfg_output(ah, 0, AR_GPIO_OUTPUT_MUX_AS_MCI_BT_CLK);
+		ath9k_hw_gpio_request_out(ah, 3, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_MCI_WLAN_DATA);
+		ath9k_hw_gpio_request_out(ah, 2, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_MCI_WLAN_CLK);
+		ath9k_hw_gpio_request_out(ah, 1, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_MCI_BT_DATA);
+		ath9k_hw_gpio_request_out(ah, 0, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_MCI_BT_CLK);
 	} else if (mci->config & ATH_MCI_CONFIG_MCI_OBS_TXRX) {
-		ath9k_hw_cfg_output(ah, 3, AR_GPIO_OUTPUT_MUX_AS_WL_IN_TX);
-		ath9k_hw_cfg_output(ah, 2, AR_GPIO_OUTPUT_MUX_AS_WL_IN_RX);
-		ath9k_hw_cfg_output(ah, 1, AR_GPIO_OUTPUT_MUX_AS_BT_IN_TX);
-		ath9k_hw_cfg_output(ah, 0, AR_GPIO_OUTPUT_MUX_AS_BT_IN_RX);
-		ath9k_hw_cfg_output(ah, 5, AR_GPIO_OUTPUT_MUX_AS_OUTPUT);
+		ath9k_hw_gpio_request_out(ah, 3, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_WL_IN_TX);
+		ath9k_hw_gpio_request_out(ah, 2, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_WL_IN_RX);
+		ath9k_hw_gpio_request_out(ah, 1, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_BT_IN_TX);
+		ath9k_hw_gpio_request_out(ah, 0, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_BT_IN_RX);
+		ath9k_hw_gpio_request_out(ah, 5, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_OUTPUT);
 	} else if (mci->config & ATH_MCI_CONFIG_MCI_OBS_BT) {
-		ath9k_hw_cfg_output(ah, 3, AR_GPIO_OUTPUT_MUX_AS_BT_IN_TX);
-		ath9k_hw_cfg_output(ah, 2, AR_GPIO_OUTPUT_MUX_AS_BT_IN_RX);
-		ath9k_hw_cfg_output(ah, 1, AR_GPIO_OUTPUT_MUX_AS_MCI_BT_DATA);
-		ath9k_hw_cfg_output(ah, 0, AR_GPIO_OUTPUT_MUX_AS_MCI_BT_CLK);
+		ath9k_hw_gpio_request_out(ah, 3, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_BT_IN_TX);
+		ath9k_hw_gpio_request_out(ah, 2, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_BT_IN_RX);
+		ath9k_hw_gpio_request_out(ah, 1, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_MCI_BT_DATA);
+		ath9k_hw_gpio_request_out(ah, 0, NULL,
+					  AR_GPIO_OUTPUT_MUX_AS_MCI_BT_CLK);
 	} else
 		return;
 
-	REG_SET_BIT(ah, AR_GPIO_INPUT_EN_VAL, AR_GPIO_JTAG_DISABLE);
+	REG_SET_BIT(ah, AR_GPIO_INPUT_EN_VAL(ah), AR_GPIO_JTAG_DISABLE);
 
 	REG_RMW_FIELD(ah, AR_PHY_GLB_CONTROL, AR_GLB_DS_JTAG_DISABLE, 1);
 	REG_RMW_FIELD(ah, AR_PHY_GLB_CONTROL, AR_GLB_WLAN_UART_INTF_EN, 0);
@@ -453,12 +466,12 @@ static void ar9003_mci_observation_set_up(struct ath_hw *ah)
 
 	REG_RMW_FIELD(ah, AR_BTCOEX_CTRL2, AR_BTCOEX_CTRL2_GPIO_OBS_SEL, 0);
 	REG_RMW_FIELD(ah, AR_BTCOEX_CTRL2, AR_BTCOEX_CTRL2_MAC_BB_OBS_SEL, 1);
-	REG_WRITE(ah, AR_OBS, 0x4b);
+	REG_WRITE(ah, AR_OBS(ah), 0x4b);
 	REG_RMW_FIELD(ah, AR_DIAG_SW, AR_DIAG_OBS_PT_SEL1, 0x03);
 	REG_RMW_FIELD(ah, AR_DIAG_SW, AR_DIAG_OBS_PT_SEL2, 0x01);
 	REG_RMW_FIELD(ah, AR_MACMISC, AR_MACMISC_MISC_OBS_BUS_LSB, 0x02);
 	REG_RMW_FIELD(ah, AR_MACMISC, AR_MACMISC_MISC_OBS_BUS_MSB, 0x03);
-	REG_RMW_FIELD(ah, AR_PHY_TEST_CTL_STATUS,
+	REG_RMW_FIELD(ah, AR_PHY_TEST_CTL_STATUS(ah),
 		      AR_PHY_TEST_CTL_DEBUGPORT_SEL, 0x07);
 }
 
@@ -572,7 +585,7 @@ static u32 ar9003_mci_wait_for_gpm(struct ath_hw *ah, u8 gpm_type,
 {
 	struct ath_common *common = ath9k_hw_common(ah);
 	struct ath9k_hw_mci *mci = &ah->btcoex_hw.mci;
-	u32 *p_gpm = NULL, mismatch = 0, more_data;
+	u32 *p_gpm = NULL, more_data;
 	u32 offset;
 	u8 recv_type = 0, recv_opcode = 0;
 	bool b_is_bt_cal_done = (gpm_type == MCI_GPM_BT_CAL_DONE);
@@ -643,7 +656,6 @@ static u32 ar9003_mci_wait_for_gpm(struct ath_hw *ah, u8 gpm_type,
 		} else {
 			ath_dbg(common, MCI, "MCI GPM subtype not match 0x%x\n",
 				*(p_gpm + 1));
-			mismatch++;
 			ar9003_mci_process_gpm_extra(ah, recv_type,
 						     recv_opcode, p_gpm);
 		}
@@ -1042,17 +1054,15 @@ void ar9003_mci_stop_bt(struct ath_hw *ah, bool save_fullsleep)
 static void ar9003_mci_send_2g5g_status(struct ath_hw *ah, bool wait_done)
 {
 	struct ath9k_hw_mci *mci = &ah->btcoex_hw.mci;
-	u32 new_flags, to_set, to_clear;
+	u32 to_set, to_clear;
 
 	if (!mci->update_2g5g || (mci->bt_state == MCI_BT_SLEEP))
 		return;
 
 	if (mci->is_2g) {
-		new_flags = MCI_2G_FLAGS;
 		to_clear = MCI_2G_FLAGS_CLEAR_MASK;
 		to_set = MCI_2G_FLAGS_SET_MASK;
 	} else {
-		new_flags = MCI_5G_FLAGS;
 		to_clear = MCI_5G_FLAGS_CLEAR_MASK;
 		to_set = MCI_5G_FLAGS_SET_MASK;
 	}

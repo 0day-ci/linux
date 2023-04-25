@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * DA9150 Core MFD Driver
  *
  * Copyright (c) 2014 Dialog Semiconductor
  *
  * Author: Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #include <linux/kernel.h>
@@ -22,6 +18,77 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/da9150/core.h>
 #include <linux/mfd/da9150/registers.h>
+
+/* Raw device access, used for QIF */
+static int da9150_i2c_read_device(struct i2c_client *client, u8 addr, int count,
+				  u8 *buf)
+{
+	struct i2c_msg xfer;
+	int ret;
+
+	/*
+	 * Read is split into two transfers as device expects STOP/START rather
+	 * than repeated start to carry out this kind of access.
+	 */
+
+	/* Write address */
+	xfer.addr = client->addr;
+	xfer.flags = 0;
+	xfer.len = 1;
+	xfer.buf = &addr;
+
+	ret = i2c_transfer(client->adapter, &xfer, 1);
+	if (ret != 1) {
+		if (ret < 0)
+			return ret;
+		else
+			return -EIO;
+	}
+
+	/* Read data */
+	xfer.addr = client->addr;
+	xfer.flags = I2C_M_RD;
+	xfer.len = count;
+	xfer.buf = buf;
+
+	ret = i2c_transfer(client->adapter, &xfer, 1);
+	if (ret == 1)
+		return 0;
+	else if (ret < 0)
+		return ret;
+	else
+		return -EIO;
+}
+
+static int da9150_i2c_write_device(struct i2c_client *client, u8 addr,
+				   int count, const u8 *buf)
+{
+	struct i2c_msg xfer;
+	u8 *reg_data;
+	int ret;
+
+	reg_data = kzalloc(1 + count, GFP_KERNEL);
+	if (!reg_data)
+		return -ENOMEM;
+
+	reg_data[0] = addr;
+	memcpy(&reg_data[1], buf, count);
+
+	/* Write address & data */
+	xfer.addr = client->addr;
+	xfer.flags = 0;
+	xfer.len = 1 + count;
+	xfer.buf = reg_data;
+
+	ret = i2c_transfer(client->adapter, &xfer, 1);
+	kfree(reg_data);
+	if (ret == 1)
+		return 0;
+	else if (ret < 0)
+		return ret;
+	else
+		return -EIO;
+}
 
 static bool da9150_volatile_reg(struct device *dev, unsigned int reg)
 {
@@ -106,6 +173,28 @@ static const struct regmap_config da9150_regmap_config = {
 
 	.volatile_reg = da9150_volatile_reg,
 };
+
+void da9150_read_qif(struct da9150 *da9150, u8 addr, int count, u8 *buf)
+{
+	int ret;
+
+	ret = da9150_i2c_read_device(da9150->core_qif, addr, count, buf);
+	if (ret < 0)
+		dev_err(da9150->dev, "Failed to read from QIF 0x%x: %d\n",
+			addr, ret);
+}
+EXPORT_SYMBOL_GPL(da9150_read_qif);
+
+void da9150_write_qif(struct da9150 *da9150, u8 addr, int count, const u8 *buf)
+{
+	int ret;
+
+	ret = da9150_i2c_write_device(da9150->core_qif, addr, count, buf);
+	if (ret < 0)
+		dev_err(da9150->dev, "Failed to write to QIF 0x%x: %d\n",
+			addr, ret);
+}
+EXPORT_SYMBOL_GPL(da9150_write_qif);
 
 u8 da9150_reg_read(struct da9150 *da9150, u16 reg)
 {
@@ -261,62 +350,53 @@ static const struct regmap_irq_chip da9150_regmap_irq_chip = {
 	.num_irqs = ARRAY_SIZE(da9150_irqs),
 };
 
-static struct resource da9150_gpadc_resources[] = {
-	{
-		.name = "GPADC",
-		.start = DA9150_IRQ_GPADC,
-		.end = DA9150_IRQ_GPADC,
-		.flags = IORESOURCE_IRQ,
-	},
+static const struct resource da9150_gpadc_resources[] = {
+	DEFINE_RES_IRQ_NAMED(DA9150_IRQ_GPADC, "GPADC"),
 };
 
-static struct resource da9150_charger_resources[] = {
-	{
-		.name = "CHG_STATUS",
-		.start = DA9150_IRQ_CHG,
-		.end = DA9150_IRQ_CHG,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "CHG_TJUNC",
-		.start = DA9150_IRQ_TJUNC,
-		.end = DA9150_IRQ_TJUNC,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "CHG_VFAULT",
-		.start = DA9150_IRQ_VFAULT,
-		.end = DA9150_IRQ_VFAULT,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "CHG_VBUS",
-		.start = DA9150_IRQ_VBUS,
-		.end = DA9150_IRQ_VBUS,
-		.flags = IORESOURCE_IRQ,
-	},
+static const struct resource da9150_charger_resources[] = {
+	DEFINE_RES_IRQ_NAMED(DA9150_IRQ_CHG, "CHG_STATUS"),
+	DEFINE_RES_IRQ_NAMED(DA9150_IRQ_TJUNC, "CHG_TJUNC"),
+	DEFINE_RES_IRQ_NAMED(DA9150_IRQ_VFAULT, "CHG_VFAULT"),
+	DEFINE_RES_IRQ_NAMED(DA9150_IRQ_VBUS, "CHG_VBUS"),
+};
+
+static const struct resource da9150_fg_resources[] = {
+	DEFINE_RES_IRQ_NAMED(DA9150_IRQ_FG, "FG"),
+};
+
+enum da9150_dev_idx {
+	DA9150_GPADC_IDX = 0,
+	DA9150_CHARGER_IDX,
+	DA9150_FG_IDX,
 };
 
 static struct mfd_cell da9150_devs[] = {
-	{
+	[DA9150_GPADC_IDX] = {
 		.name = "da9150-gpadc",
 		.of_compatible = "dlg,da9150-gpadc",
 		.resources = da9150_gpadc_resources,
 		.num_resources = ARRAY_SIZE(da9150_gpadc_resources),
 	},
-	{
+	[DA9150_CHARGER_IDX] = {
 		.name = "da9150-charger",
 		.of_compatible = "dlg,da9150-charger",
 		.resources = da9150_charger_resources,
 		.num_resources = ARRAY_SIZE(da9150_charger_resources),
 	},
+	[DA9150_FG_IDX] = {
+		.name = "da9150-fuel-gauge",
+		.of_compatible = "dlg,da9150-fuel-gauge",
+		.resources = da9150_fg_resources,
+		.num_resources = ARRAY_SIZE(da9150_fg_resources),
+	},
 };
 
-static int da9150_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int da9150_probe(struct i2c_client *client)
 {
 	struct da9150 *da9150;
 	struct da9150_pdata *pdata = dev_get_platdata(&client->dev);
+	int qif_addr;
 	int ret;
 
 	da9150 = devm_kzalloc(&client->dev, sizeof(*da9150), GFP_KERNEL);
@@ -335,16 +415,41 @@ static int da9150_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	da9150->irq_base = pdata ? pdata->irq_base : -1;
+	/* Setup secondary I2C interface for QIF access */
+	qif_addr = da9150_reg_read(da9150, DA9150_CORE2WIRE_CTRL_A);
+	qif_addr = (qif_addr & DA9150_CORE_BASE_ADDR_MASK) >> 1;
+	qif_addr |= DA9150_QIF_I2C_ADDR_LSB;
+	da9150->core_qif = i2c_new_dummy_device(client->adapter, qif_addr);
+	if (IS_ERR(da9150->core_qif)) {
+		dev_err(da9150->dev, "Failed to attach QIF client\n");
+		return PTR_ERR(da9150->core_qif);
+	}
+
+	i2c_set_clientdata(da9150->core_qif, da9150);
+
+	if (pdata) {
+		da9150->irq_base = pdata->irq_base;
+
+		da9150_devs[DA9150_FG_IDX].platform_data = pdata->fg_pdata;
+		da9150_devs[DA9150_FG_IDX].pdata_size =
+			sizeof(struct da9150_fg_pdata);
+	} else {
+		da9150->irq_base = -1;
+	}
 
 	ret = regmap_add_irq_chip(da9150->regmap, da9150->irq,
 				  IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 				  da9150->irq_base, &da9150_regmap_irq_chip,
 				  &da9150->regmap_irq_data);
-	if (ret)
-		return ret;
+	if (ret) {
+		dev_err(da9150->dev, "Failed to add regmap irq chip: %d\n",
+			ret);
+		goto regmap_irq_fail;
+	}
+
 
 	da9150->irq_base = regmap_irq_chip_get_base(da9150->regmap_irq_data);
+
 	enable_irq_wake(da9150->irq);
 
 	ret = mfd_add_devices(da9150->dev, -1, da9150_devs,
@@ -352,21 +457,26 @@ static int da9150_probe(struct i2c_client *client,
 			      da9150->irq_base, NULL);
 	if (ret) {
 		dev_err(da9150->dev, "Failed to add child devices: %d\n", ret);
-		regmap_del_irq_chip(da9150->irq, da9150->regmap_irq_data);
-		return ret;
+		goto mfd_fail;
 	}
 
 	return 0;
+
+mfd_fail:
+	regmap_del_irq_chip(da9150->irq, da9150->regmap_irq_data);
+regmap_irq_fail:
+	i2c_unregister_device(da9150->core_qif);
+
+	return ret;
 }
 
-static int da9150_remove(struct i2c_client *client)
+static void da9150_remove(struct i2c_client *client)
 {
 	struct da9150 *da9150 = i2c_get_clientdata(client);
 
 	regmap_del_irq_chip(da9150->irq, da9150->regmap_irq_data);
 	mfd_remove_devices(da9150->dev);
-
-	return 0;
+	i2c_unregister_device(da9150->core_qif);
 }
 
 static void da9150_shutdown(struct i2c_client *client)
@@ -398,9 +508,9 @@ MODULE_DEVICE_TABLE(of, da9150_of_match);
 static struct i2c_driver da9150_driver = {
 	.driver	= {
 		.name	= "da9150",
-		.of_match_table = of_match_ptr(da9150_of_match),
+		.of_match_table = da9150_of_match,
 	},
-	.probe		= da9150_probe,
+	.probe_new	= da9150_probe,
 	.remove		= da9150_remove,
 	.shutdown	= da9150_shutdown,
 	.id_table	= da9150_i2c_id,

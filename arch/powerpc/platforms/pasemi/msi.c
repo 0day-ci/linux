@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2007, Olof Johansson, PA Semi
  *
@@ -5,18 +6,12 @@
  *
  * Copyright 2006, Segher Boessenkool, IBM Corporation.
  * Copyright 2006-2007, Michael Ellerman, IBM Corporation.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; version 2 of the
- * License.
- *
  */
 
 #include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/msi.h>
 #include <asm/mpic.h>
-#include <asm/prom.h>
 #include <asm/hw_irq.h>
 #include <asm/ppc-pci.h>
 #include <asm/msi_bitmap.h>
@@ -67,17 +62,13 @@ static void pasemi_msi_teardown_msi_irqs(struct pci_dev *pdev)
 
 	pr_debug("pasemi_msi_teardown_msi_irqs, pdev %p\n", pdev);
 
-	for_each_pci_msi_entry(entry, pdev) {
-		if (entry->irq == NO_IRQ)
-			continue;
-
+	msi_for_each_desc(entry, &pdev->dev, MSI_DESC_ASSOCIATED) {
 		hwirq = virq_to_hw(entry->irq);
 		irq_set_msi_desc(entry->irq, NULL);
 		irq_dispose_mapping(entry->irq);
+		entry->irq = 0;
 		msi_bitmap_free_hwirqs(&msi_mpic->msi_bitmap, hwirq, ALLOC_CHUNK);
 	}
-
-	return;
 }
 
 static int pasemi_msi_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
@@ -95,7 +86,7 @@ static int pasemi_msi_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
 	msg.address_hi = 0;
 	msg.address_lo = PASEMI_MSI_ADDR;
 
-	for_each_pci_msi_entry(entry, pdev) {
+	msi_for_each_desc(entry, &pdev->dev, MSI_DESC_NOTASSOCIATED) {
 		/* Allocate 16 interrupts for now, since that's the grouping for
 		 * affinity. This can be changed later if it turns out 32 is too
 		 * few MSIs for someone, but restrictions will apply to how the
@@ -109,7 +100,7 @@ static int pasemi_msi_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
 		}
 
 		virq = irq_create_mapping(msi_mpic->irqhost, hwirq);
-		if (virq == NO_IRQ) {
+		if (!virq) {
 			pr_debug("pasemi_msi: failed mapping hwirq 0x%x\n",
 				  hwirq);
 			msi_bitmap_free_hwirqs(&msi_mpic->msi_bitmap, hwirq,
@@ -140,13 +131,15 @@ static int pasemi_msi_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
 	return 0;
 }
 
-int mpic_pasemi_msi_init(struct mpic *mpic)
+int __init mpic_pasemi_msi_init(struct mpic *mpic)
 {
 	int rc;
 	struct pci_controller *phb;
+	struct device_node *of_node;
 
-	if (!mpic->irqhost->of_node ||
-	    !of_device_is_compatible(mpic->irqhost->of_node,
+	of_node = irq_domain_get_of_node(mpic->irqhost);
+	if (!of_node ||
+	    !of_device_is_compatible(of_node,
 				     "pasemi,pwrficient-openpic"))
 		return -ENODEV;
 
